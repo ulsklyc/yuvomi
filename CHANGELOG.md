@@ -743,6 +743,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   makes a series private means its past entries too. Existing series are carried over on update
   without changing any entry.
 
+- **"Change all future occurrences" no longer ends a recurring payment** (#1546). Editing a later
+  month of a series and choosing "Change all future occurrences" sent the recurrence settings of
+  that single month along, and a generated month carries none: the series was switched off, every
+  occurrence from today on was deleted, and a weekly, yearly or virtual series was reset to monthly,
+  while the message said the change was saved. The dialog now sends only what you changed, and the
+  recurrence of a series is edited on its first entry; a generated month no longer shows the
+  "Recurring" switch. Changing the amount of a virtual series from one of its months now counts as
+  that month's share. **Series ended this way do not come back by themselves:** open the first entry
+  of the series (the search finds it by its title), switch "Recurring" on again and choose its
+  rhythm again. The missing months reappear when you open them; receipts and one-off changes that
+  were attached to the deleted months are gone. For API users: `PUT /api/v1/budget/:id/series` now
+  answers `is_recurring: false` with 400 instead of ending the series; end a series with
+  `PUT /api/v1/budget/:id` and `is_recurring: false` on its first entry, or delete it with
+  `DELETE /api/v1/budget/:id/series`.
+
+- **The API documentation page answers "restore in progress" during a restore** (#1531). Outside
+  production, `/docs` checks the API token or session, and while a restore had the database closed
+  a request with a token ended in an internal error instead of the "restore in progress" answer
+  every other page that needs the database gives. The same happened to `/openapi.json/` with a
+  trailing slash, which reaches the same route. A new test now reads every top-level route from
+  the running app and fails when one is neither covered by the restore gate nor listed with a reason.
+
 - **The family card no longer misses an evening appointment on a busy day** (#1449). The card took
   its appointments from the calendar tile, which stops at five coming ones and follows its "Only
   mine" option: a child's evening appointment could be cut off, and with "Only mine" every other
@@ -762,6 +784,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in Berlin a visit on the 1st at 00:30 counted in the previous month, west of UTC a visit on the
   evening of the last day in the next one. The overview now uses the same month boundaries as the
   Housekeeping module, so both show the same number.
+
+- **Editing a housekeeping visit keeps its day** (#1540). The edit dialog showed the UTC day of
+  the visit: in Berlin a visit on the 1st at 00:30 appeared on the day before, and saving it, even
+  just to correct the amount, moved its calendar entry and payment task there. Correcting the date
+  moved the visit itself a day later. The dialog now shows the household's day, and a new day
+  keeps the visit's time on the household's clock.
 
 - **The wall display stays dark after a reload at night** (#1453). Reloading the wall between 22:00
   and 06:00 with the theme set to Automatic or Light left the dimmed night surface in the light
@@ -784,6 +812,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   zone, a reminder "1 hour before" was saved hours off, and opening it again showed a different
   lead or "after the start". Both dialogs now read the time in the household zone, including on
   the days the clocks change, the same way the server does.
+
+- **"Due today until" shows the time you entered on a device in another time zone** (#1534).
+  The today sheet on the overview read a task's due time in the zone of the device and then
+  converted it into the household's, so with a household time zone set and a device elsewhere a
+  task due at 18:00 could read "until 00:00". It now shows the due time as entered, like the task
+  list does.
+
+- **Medication reminders come at the household's time** (#1539). The scheduler read the day and
+  the time on the server's clock. With a household time zone set and the server running in
+  another zone, such as UTC in a container, a dose planned for 08:00 in Berlin was due at 10:00,
+  and near midnight a dose could land on the wrong day. Doses are now due on the household's day
+  and clock, also on the days the clocks change. The intake log in Health also shows the times
+  as recorded on a device in another time zone.
 
 - **The note category hints no longer suggest that notes are private** (#1514). A personal
   category is only visible to you, but a note filed under it is still visible to every household
@@ -810,6 +851,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the new one from the guide or from Settings, Administration, Backup and restore. A restore on
   Node running natively on Windows no longer stops with `EPERM` while writing the restored copy to
   disk; Docker installs were not affected. (#1441)
+
+- **A restore waits for work that continues after an answer.** A few actions keep working after
+  they have answered: the push to someone mentioned in a task comment, the password reset mail,
+  and the immediate push of a changed or deleted appointment to Google, CalDAV or iCloud. A restore
+  did not see this work, so a mention push or a second reset request could write into the restored
+  database afterwards. The restore now waits for it, and while a restore runs this work does not
+  start. The automatic calendar sync no longer stops the server when its timer fires in the moment
+  a restore has the database closed. (#1532)
 - **Confirming a long list of moved events no longer holds up the server** (#1440). When an admin
   confirmed a page of moved events under Settings > Sync, every picked entry was checked with a
   query prepared anew for it, and a full page of up to 5,000 ran without a pause, so other requests

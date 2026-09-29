@@ -347,3 +347,60 @@ test('openVisitFromDeepLink: can_edit=false oeffnet den Berichtsmodal statt eine
   assert.equal(openModalCalls[0][0].title, 'housekeeping.visitReportDetails');
   assert.equal(toastCalls.length, 0);
 });
+
+// Der Tag im Bearbeiten-Formular ist der des Haushalts (#1540): `check_in` ist
+// ein UTC-Instant, und `check_in.slice(0, 10)` war der UTC-Tag. Ein Besuch am
+// 1. Oktober um 00:30 in Berlin stand im Formular am 30. September.
+const tzModule = await import('/utils/timezone.js');
+
+async function editFormDay(checkIn, zone) {
+  openModalCalls.length = 0;
+  hk.state().workers = [{ id: 7, display_name: 'Maria' }];
+  globalThis.__apiStub = {
+    get: async () => ({ data: { id: 23, worker_id: 7, can_edit: true, rate_type: 'daily', check_in: checkIn, daily_rate: 40, extras: 0 } }),
+  };
+  tzModule.setDisplayTimeZone(zone);
+  try {
+    await openVisitFromDeepLink('23', { querySelector: () => null });
+  } finally {
+    tzModule.setDisplayTimeZone(null);
+  }
+  const content = openModalCalls[0]?.[0]?.content ?? '';
+  return (/<yuvomi-datepicker name="date"[^>]*value="([^"]*)"/.exec(content) || [])[1];
+}
+
+test('#1540 Bearbeiten-Formular: der Besuchstag ist der Tag des Haushalts, nicht der UTC-Tag', async () => {
+  assert.equal(await editFormDay('2026-09-30T22:30:00.000Z', 'Europe/Berlin'), '2026-10-01');
+  assert.equal(await editFormDay('2026-10-01T02:00:00.000Z', 'America/Los_Angeles'), '2026-09-30');
+  // Gegenfall: Haushalt in UTC - der Tag bleibt, was er war.
+  assert.equal(await editFormDay('2026-09-30T22:30:00.000Z', 'UTC'), '2026-09-30');
+});
+
+// Und das Speichern schickt den vorbelegten Tag als `original_date` mit: ohne
+// eingestellte Haushaltszone liest der Server eine andere Uhr als der Browser
+// und verschiebt den Besuch um den Abstand zu DIESEM Tag (#1540, Review).
+test('#1540 Bearbeiten-Formular: Speichern schickt den vorbelegten Tag als original_date', async () => {
+  const puts = [];
+  openModalCalls.length = 0;
+  hk.state().workers = [{ id: 7, display_name: 'Maria' }];
+  globalThis.__apiStub = {
+    get: async () => ({ data: { id: 24, worker_id: 7, can_edit: true, rate_type: 'daily', check_in: '2026-09-30T22:30:00.000Z', daily_rate: 40, extras: 0 } }),
+    put: async (path, body) => { puts.push({ path, body }); return { data: {} }; },
+  };
+  tzModule.setDisplayTimeZone('Europe/Berlin');
+  try {
+    await openVisitFromDeepLink('24', { querySelector: () => null });
+    let submit = null;
+    const form = { addEventListener: (type, fn) => { if (type === 'submit') submit = fn; } };
+    openModalCalls[0][0].onSave({ querySelector: (sel) => (sel === '#housekeeping-visit-form' ? form : null) });
+    assert.equal(typeof submit, 'function', 'das Formular muss seinen Submit-Handler anhaengen');
+    const elements = { date: { value: '2026-10-05' }, daily_rate: { value: '40' }, extras: { value: '0' } };
+    await submit({ preventDefault() {}, currentTarget: { elements, querySelector: () => null } });
+  } finally {
+    tzModule.setDisplayTimeZone(null);
+    delete globalThis.__apiStub;
+  }
+  assert.equal(puts.length, 1, 'genau ein PUT');
+  assert.equal(puts[0].body.date, '2026-10-05');
+  assert.equal(puts[0].body.original_date, '2026-10-01', 'der Tag, den das Formular gezeigt hat');
+});

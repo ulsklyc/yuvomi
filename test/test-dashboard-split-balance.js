@@ -444,3 +444,76 @@ test('Kachel: Wert und Position kommen aus der Waehrung, in der wirklich etwas o
   assert.match(tile.note, /Cleo/, 'die genannte Position gehoert zur Waehrung des Werts');
   assert.equal(tile.route, '/budget?tab=split-expenses&group=9');
 });
+
+// --------------------------------------------------------------------------
+// Aequivalenz: Kachel-Netto == Kennzahlband des Moduls (GET /split-expenses/dashboard)
+// --------------------------------------------------------------------------
+//
+// Das Kennzahlband des Moduls ("Du bekommst" / "Du schuldest") summiert in
+// einer eigenen Abfrage ueber alle aktiven Gruppen des Betrachters, die Kachel
+// geht ueber `openBalancesForUser()` -> `groupBalanceRows()` je Gruppe. Beide
+// sind dieselbe Summe (je Waehrung die Ledger-Zeilen des Betrachters in seinen
+// aktiven Gruppen); der Test haelt fest, dass das auch auf einem Datensatz mit
+// allen bekannten Sonderfaellen gilt, damit eine Aenderung an EINER der beiden
+// Stellen hier rot wird statt still eine zweite Zahl zu zeigen.
+
+async function moduleNetOf(userId) {
+  return as(userId, async () => {
+    const { data } = await getJson('/split-expenses/dashboard');
+    const out = new Map();
+    for (const row of data.total_owed) out.set(row.currency, (out.get(row.currency) ?? 0) + row.amount_minor);
+    for (const row of data.total_owing) out.set(row.currency, (out.get(row.currency) ?? 0) - row.amount_minor);
+    return [...out.entries()].filter(([, minor]) => minor !== 0).sort(([a], [b]) => a.localeCompare(b));
+  });
+}
+
+async function tileNetOf(userId) {
+  return (await splitBalanceOf(userId)).net
+    .map(({ currency, netMinor }) => [currency, netMinor])
+    .sort(([a], [b]) => a.localeCompare(b));
+}
+
+async function deleteJson(path) {
+  const response = await fetch(`${base}${path}`, { method: 'DELETE' });
+  assert.equal(response.status, 200, `DELETE ${path}`);
+}
+
+test('Aequivalenz: Kachel-Netto und Kennzahlband des Moduls sind dieselbe Summe, fuer jeden Betrachter', async () => {
+  const CLEO = seedUser('Cleo');
+  const SWAP = seedGroup('Ausgleich ueber Gruppen', [ME, ALEX, CLEO]);
+  const USD = seedGroup('USA', [ME, BEA, CLEO], { currency: 'USD' });
+  const KWD = seedGroup('Kuwait', [ALEX, ME], { currency: 'KWD' });
+  const LEFT = seedGroup('Ausgetreten', [ALEX, CLEO]);
+
+  // Geloeschte Ausgabe: ihre Ledger-Zeilen fallen mit ihr.
+  const gone = await as(ME, () => addExpense(SWAP, ME, '90.00', [ME, ALEX, CLEO]));
+  await as(ME, () => deleteJson(`/split-expenses/expenses/${gone.data.id}`));
+  // Offene Ausgabe mit Rest-Cent (Aufteilung 100,00 / 3).
+  await as(ALEX, () => addExpense(SWAP, ALEX, '100.00', [ME, ALEX, CLEO]));
+  // Zahlung und ihr Storno (Gegenbuchung) - danach wieder offen.
+  const paid = await as(ME, () => settle(SWAP, ME, ALEX, '20.00'));
+  await as(ME, async () => {
+    const response = await fetch(`${base}/split-expenses/groups/${SWAP}/settlements/${paid.data.id}/reverse`, { method: 'POST' });
+    assert.equal(response.status, 200, 'Storno');
+  });
+  // Eine Zahlung, die stehen bleibt.
+  await as(CLEO, () => settle(SWAP, CLEO, ALEX, '10.00'));
+  // Fremdwaehrungen mit 2 und 3 Nachkommastellen.
+  await as(BEA, () => addExpense(USD, BEA, '75.50', [ME, BEA, CLEO], { currency: 'USD' }));
+  await as(ALEX, () => addExpense(KWD, ALEX, '12.345', [ME, ALEX], { currency: 'KWD' }));
+  // Ein Mitglied, das mit offenem Saldo aus der Gruppe entfernt wurde: seine
+  // Zeilen bleiben im Ledger, zaehlen fuer ihn aber an keiner der beiden Stellen.
+  await as(CLEO, () => addExpense(LEFT, CLEO, '40.00', [ALEX, CLEO]));
+  await as(ALEX, () => deleteJson(`/split-expenses/groups/${LEFT}/members/${CLEO}`));
+  // Archivierte Gruppe mit offenem Saldo (ARCHIVED aus dem Test oben) bleibt aussen vor.
+
+  for (const [name, uid] of [['Linda', ME], ['Alex', ALEX], ['Bea', BEA], ['Cleo', CLEO]]) {
+    const tile = await tileNetOf(uid);
+    const module = await moduleNetOf(uid);
+    assert.deepEqual(tile, module, `${name}: Kachel ${JSON.stringify(tile)} vs Modul ${JSON.stringify(module)}`);
+  }
+  // Der Datensatz darf nicht trivial ausgeglichen sein - sonst misst die
+  // Gleichheit nur zwei leere Listen.
+  assert.ok((await tileNetOf(ME)).length >= 2, 'Linda hat in mehreren Waehrungen etwas offen');
+  assert.ok((await tileNetOf(CLEO)).length >= 1, 'Cleo hat etwas offen');
+});

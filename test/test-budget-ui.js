@@ -1795,7 +1795,9 @@ test('Serien-Speichern reicht ein leeres Konto einer kontolosen Instanz nicht we
     'ein leeres Feld zählt nur als "Konto entfernen", wenn die Instanz vorher eines trug');
   assert.match(zweig, /delete seriesBody\.account_id/,
     'sonst muss das Feld ungesendet bleiben - weglassen heißt serverseitig "unverändert"');
-  assert.match(zweig, /api\.put\(`\/budget\/\$\{entry\.id\}\/series`, seriesBody\)/,
+  // Seit #1546 geht der bereinigte Body noch durch occurrenceSeriesBody(),
+  // das den Rhythmus und Unveraendertes herausnimmt (Test darunter).
+  assert.match(zweig, /api\.put\(`\/budget\/\$\{entry\.id\}\/series`, occurrenceSeriesBody\(seriesBody, entry\)\)/,
     'gesendet wird der bereinigte Body, nicht der ursprüngliche');
 });
 
@@ -1815,6 +1817,43 @@ test('Bearbeiten der ersten Buchung einer Serie fragt nach dem Umfang (#1035)', 
   const bedingung = davor.slice(davor.lastIndexOf('} else if ('));
   assert.match(bedingung, /entry\.recurrence_parent_id \|\| entry\.is_recurring/,
     'der Dialog muss fuer Instanzen UND fuer den Anker (is_recurring) kommen');
+});
+
+/**
+ * "Alle zukuenftigen" aus einem Vorkommen schickt keinen Rhythmus (#1546).
+ *
+ * Das Formular eines Vorkommens ist mit dessen Zeile vorbelegt: is_recurring 0,
+ * monatlich, alle 1, nicht virtuell. Genau dieser Body beendete die Serie
+ * (gemessen im Browser, test:budget-series-edit-browser). Hier als Programm:
+ * occurrenceSeriesBody() bekommt den Body, den der Dialog baut.
+ */
+test('occurrenceSeriesBody: kein Rhythmus, kein Datum, nur Geaendertes (#1546)', () => {
+  const entry = {
+    id: 4, recurrence_parent_id: 1, is_recurring: 0, title: 'Miete', amount: -900,
+    category: 'housing', subcategory: 'rent_mortgage', account_id: 7, visibility: 'shared',
+    responsible_users: [{ id: 2 }, { id: 3 }],
+  };
+  const dialogBody = {
+    title: 'Miete neu', amount: -900, category: 'housing', subcategory: 'rent_mortgage', date: '2026-09-05',
+    is_recurring: 0, recurrence_interval: 'monthly', recurrence_interval_count: 1,
+    recurrence_virtual: 0, recurrence_confirm: 0, account_id: 7, responsible_user_ids: [3, 2],
+  };
+  assert.deepEqual(budgetUi.occurrenceSeriesBody(dialogBody, entry), { title: 'Miete neu' });
+
+  const changed = budgetUi.occurrenceSeriesBody({ ...dialogBody, amount: -950, account_id: null, responsible_user_ids: [2] }, entry);
+  assert.deepEqual(changed, { title: 'Miete neu', amount: -950, account_id: null, responsible_user_ids: [2] });
+  for (const key of ['is_recurring', 'recurrence_interval', 'recurrence_interval_count', 'recurrence_virtual', 'recurrence_confirm', 'date']) {
+    assert.ok(!(key in changed), `${key} darf nie mit`);
+  }
+});
+
+test('Bearbeiten eines Vorkommens zeigt den Wiederholungs-Schalter nicht (#1546)', () => {
+  // Das Vorkommen traegt den Rhythmus seiner Serie nicht - ein Schalter "nicht
+  // wiederkehrend" waere dort eine falsche Aussage, und nichts, was er sendet,
+  // erreicht die Serie noch.
+  const idx = budget.indexOf('id="bm-recurring"');
+  const wrap = budget.slice(budget.lastIndexOf('<div class="form-group"', idx), idx);
+  assert.match(wrap, /entry\.recurrence_parent_id \? 'hidden' : ''/);
 });
 
 // --------------------------------------------------------
