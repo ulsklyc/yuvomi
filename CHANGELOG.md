@@ -773,6 +773,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lead or "after the start". Both dialogs now read the time in the household zone, including on
   the days the clocks change, the same way the server does.
 
+- **"Due today until" shows the time you entered on a device in another time zone** (#1534).
+  The today sheet on the overview read a task's due time in the zone of the device and then
+  converted it into the household's, so with a household time zone set and a device elsewhere a
+  task due at 18:00 could read "until 00:00". It now shows the due time as entered, like the task
+  list does.
+
 - **The note category hints no longer suggest that notes are private** (#1514). A personal
   category is only visible to you, but a note filed under it is still visible to every household
   member, just without that category. The hint next to the category type and the hint in the
