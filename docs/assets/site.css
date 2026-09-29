@@ -227,6 +227,11 @@
   /* The top bar's height, one value for all five pages: the legal pages pad
      their column by it, index and install their heroes. */
   --bar-h: 62px;
+  /* ...and its row's column: the landing page's (index.html --maxw, 24px
+     gutter), so the logo does not jump between pages. The legal pages keep
+     their 820px text column and install.html its 1160px one below the bar;
+     only the row lines up. test:docs-landing holds the two values equal. */
+  --bar-maxw: 1200px;
 
   /* One curve, one name. Exponential ease-out: nothing here is a glass
      element, and overshoot on a hover reads as wobble. */
@@ -375,8 +380,8 @@
    fixed, with differently sized controls - so a visitor crossing from the
    install guide to the privacy notice changed websites for one click.
    Markup: <header class="site-bar"> (the banner landmark, unstyled) holds
-   .topbar (this rule), inside it .bar-row on the page's own column (.wrap,
-   .container-wide); the controls on its right are .nav-btn capsules in a
+   .topbar (this rule), inside it .bar-row on the landing page's column
+   (--bar-maxw, whatever column class it carries); the controls on its right are .nav-btn capsules in a
    .nav-controls group (index.html groups its larger set as .nav-right).
    The glass sits on .topbar, NOT on the header: backdrop-filter makes an
    element the containing block of its fixed descendants, and index.html's
@@ -389,6 +394,13 @@
   border-bottom: 1px solid var(--border);
 }
 .bar-row { display: flex; align-items: center; justify-content: space-between; height: 100%; }
+/* The row sits on --bar-maxw on every page, whatever column class it
+   borrows (.wrap, .container-wide). 48px is the landing page's two gutters;
+   a page with a narrower gutter (install.html: 22px) sets --bar-pad, and the
+   column widens by the difference, so the logo lands on the same x on a wide
+   screen and on the page's own gutter on a narrow one. Two classes, so it
+   wins over the single-class column rules in legal.css and the inline styles. */
+.topbar .bar-row { max-width: calc(var(--bar-maxw) - 48px + 2 * var(--bar-pad, 24px)); margin-inline: auto; padding-inline: var(--bar-pad, 24px); }
 .nav-logo { display: flex; align-items: center; gap: 11px; flex-shrink: 0; min-height: 44px; margin-right: 12px;
   font-weight: 700; font-size: 1.2rem; letter-spacing: -0.02em; color: var(--text-1); text-decoration: none; }
 .nav-logo:hover { color: var(--text-1); text-decoration: none; }

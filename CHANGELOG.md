@@ -815,7 +815,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   appears twice any more, the dot in "Why one app" travels along the arrow instead of across the
   first label, the expanded Household group has no gap between its entries, and at 320px the header
   fits the screen. The privacy notice, Datenschutz and Impressum use the same glass header as the
-  other pages, and with "reduce transparency" or "increase contrast" switched on in the system the
+  other pages, with the logo in the same place on all five, and with "reduce transparency" or "increase contrast" switched on in the system the
   header turns solid, as in the app.
 
 - **The website is easier to use on a phone and with a keyboard.** The Install button at the

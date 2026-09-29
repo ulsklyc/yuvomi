@@ -3093,6 +3093,20 @@ function sharedBarFindings(pages, siteCss, legalCss) {
       if (!re.test(bar.body)) found.push(`site.css: .topbar nicht ${what}`);
     }
   }
+  // Die Zeile steht auf jeder Seite auf der Spalte der Startseite (Logo-x
+  // gleich), nicht auf der Textspalte der Seite: bis Runde 2 sass das Logo der
+  // Rechtsseiten am Desktop bei 334px statt 144px. --bar-maxw ist die zweite
+  // Quelle fuer die 1200px von index.html - deshalb muessen beide gleich sein.
+  const row = rules.find((r) => r.selector === '.topbar .bar-row' && !r.at.length);
+  if (!row) found.push('site.css: .topbar .bar-row fehlt - die Zeile erbt die Spalte der Seite');
+  else {
+    if (!/max-width:\s*calc\(var\(--bar-maxw\)/.test(row.body)) found.push('site.css: .topbar .bar-row liest --bar-maxw nicht');
+    if (!/padding-inline:\s*var\(--bar-pad/.test(row.body)) found.push('site.css: .topbar .bar-row liest --bar-pad nicht');
+  }
+  const barMax = (siteCss.match(/--bar-maxw:\s*([^;]+);/) || [])[1];
+  const index = pages.find(([p]) => p === 'index.html');
+  const indexMax = index && (inlineStyles(index[1]).join('\n').match(/--maxw:\s*([^;]+);/) || [])[1];
+  if (index && barMax !== indexMax) found.push(`site.css: --bar-maxw (${barMax}) != index.html --maxw (${indexMax})`);
   const sheets = [['site.css', siteCss], ['legal.css', legalCss], ...pages.flatMap(([p, h]) => inlineStyles(h).map((css) => [p, css]))];
   for (const [where, css] of sheets) {
     for (const r of eachRule(css)) {
@@ -3243,6 +3257,14 @@ test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () =
   assert.ok(hit(sharedBarFindings(pages, onHeader, read('assets/legal.css')), /Bezugsrahmen der fixierten Install-Pille/));
   const noTop = pages.map(([p, h]) => [p, p === 'impressum.html' ? h.replace('<div class="topbar">', '<div>') : h]);
   assert.ok(hit(sharedBarFindings(noTop, read('assets/site.css'), read('assets/legal.css')), /impressum\.html: Leiste ohne \.topbar/));
+  // Zeilenkante: die Regel fehlt (Rechtsseiten zurueck auf 820px), oder die
+  // Startseite wird breiter und --bar-maxw bleibt stehen.
+  const noRow = read('assets/site.css').replace(/\n\.topbar \.bar-row \{[^}]*\}/, '');
+  assert.notEqual(noRow, read('assets/site.css'));
+  assert.ok(hit(sharedBarFindings(pages, noRow, read('assets/legal.css')), /\.topbar \.bar-row fehlt/));
+  const wider = pages.map(([p, h]) => [p, p === 'index.html' ? h.replace(':root { --maxw: 1200px; }', ':root { --maxw: 1280px; }') : h]);
+  assert.notDeepEqual(wider, pages);
+  assert.ok(hit(sharedBarFindings(wider, read('assets/site.css'), read('assets/legal.css')), /--bar-maxw \(1200px\) != index\.html --maxw \(1280px\)/));
   // Glas: ein Fallback fehlt, einer schlaegt den Media-Zwilling nicht, und ein Blur als Literal.
   const site = read('assets/site.css');
   const noRt = site.replace('@media (prefers-reduced-transparency: reduce)', '@media (prefers-reduced-motion: reduce)');

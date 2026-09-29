@@ -38,8 +38,9 @@ body {
    back ("Overview"/"Übersicht"), the language switch (privacy/datenschutz
    only, a link to the other document), the theme toggle. Until round 2 these
    pages drew a header of their own: opaque, 81px, not fixed, 14px controls,
-   under a comment that already called it "one header". Only the column width
-   stays the page's own - the bar's row sits on the 820px text column.
+   under a comment that already called it "one header". The text column
+   stays the page's own 820px; the bar's row sits on the landing page's
+   column (--bar-maxw in site.css), so the logo keeps its place between pages.
 
    On a phone the row did not fit: the wordmark yields to the icon (as on the
    other pages), and below 400px the way back keeps its chevron and drops its
