@@ -111,6 +111,11 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     [hidden] { display: none !important; }
+    /* Die Fussleiste schwebt ueber dem Inhalt (sticky, 73px). Ohne diesen Rand
+       hielt der Browser ein Feld fuer "sichtbar", das unter ihr lag - Fokus per
+       Tab, reveal() nach einem Fehler und aufgeklappte Akkordeons endeten
+       dahinter. scroll-padding verschiebt den Fangbereich um ihre Hoehe. */
+    html { scroll-padding-block: 16px 96px; }
     body {
       font-family: var(--font-sans); color: var(--color-text-primary);
       min-height: 100dvh; padding: 48px 16px 80px;
@@ -406,6 +411,49 @@
     }
     .field label:has(input[type=checkbox]) {
       display: flex; align-items: center; gap: 10px; margin-bottom: 0; cursor: pointer;
+    }
+    /* Die ganze Zeile ist das Ziel, nicht nur Kaestchen und Text: das Label
+       war 24px hoch und endete am letzten Buchstaben, der Rest der 48px-Zeile
+       war tote Flaeche - auf dem Handy traf der Daumen daneben, und der Schalter
+       blieb stumm. Das Zeilenpolster wandert deshalb vom Feld ins Label, die
+       Zeile sieht gleich aus und nimmt den Tipp jetzt ueberall an, wie eine
+       Schalterzeile in den Einstellungen der App. */
+    .inset-group .field:has(> label > input[type=checkbox]) { padding: 0; }
+    .inset-group .field > label:has(> input[type=checkbox]) { min-height: 48px; padding: 12px 16px; }
+    /* Das Polster sitzt jetzt IM Hinweis; das Lesemass waechst um genau das,
+       sonst braeche er frueher um als die Hinweise der Textfelder. */
+    .inset-group .field > label:has(> input[type=checkbox]) ~ .hint {
+      margin-top: -6px; padding: 0 16px 12px; max-width: calc(70ch + 32px);
+    }
+    /* "Mehr erfahren": Hintergrund zu einer Frage, der beim Ausfuellen nicht
+       gebraucht wird (was eine Abschaltung spaeter bewirkt, wie sich Werte
+       ueberlagern). Auf dem Handy stand er als Absatz von bis zu sechs Zeilen
+       zwischen den Feldern; jetzt zeigt ihn ein Tipp. Ab 641px ist Platz, dort
+       oeffnet syncHintMore() ihn und die Zeile "Mehr erfahren" entfaellt. */
+    .hint-more > summary {
+      display: flex; align-items: center; gap: 4px; min-height: 44px; width: fit-content;
+      font-size: var(--type-caption); font-weight: 600; color: var(--color-accent);
+      cursor: pointer; list-style: none;
+    }
+    .hint-more > summary::-webkit-details-marker { display: none; }
+    .hint-more > summary::after {
+      content: ''; width: 12px; height: 12px; flex-shrink: 0; background: currentColor;
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+      transition: transform var(--duration-sm, 150ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    }
+    .hint-more[open] > summary::after { transform: rotate(180deg); }
+    .hint-more > summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: var(--radius-xs); }
+    .hint-more > .hint { margin-top: 0; }
+    /* Unter einer Schalterzeile: der Knopf ueberlappt deren unteres Polster,
+       damit er 44px Ziel hat, ohne 44px Hoehe dazuzulegen. */
+    .inset-group .field > label:has(> input[type=checkbox]) ~ .hint-more { margin-top: -12px; padding: 0 16px 4px; }
+    .inset-group .field > label:has(> input[type=checkbox]) ~ .hint-more > .hint { padding-bottom: 8px; }
+    .toggle-body > .hint-more { padding: 2px 16px 0; }
+    @media (min-width: 641px) {
+      .hint-more > summary { display: none; }
+      .toggle-body > .hint-more { padding-top: 12px; }
+      .inset-group .field > label:has(> input[type=checkbox]) ~ .hint-more { margin-top: -6px; }
     }
     .opt { font-weight: 400; color: var(--color-text-tertiary); font-size: var(--text-xs); }
     /* Der Platzhalter war NIRGENDS gesetzt und fiel damit auf Chromes UA-Default
@@ -795,10 +843,51 @@
     /* Touch-Ziele ≥44px auf Mobilgeräten. Die Fussleiste ist in jeder Breite
        sticky (siehe .card-foot) und steht deshalb nicht mehr hier. */
     @media (max-width: 640px) {
-      /* Der Sprachumschalter sitzt absolut oben rechts und ist auf 44px
-         Zielgroesse gewachsen: er reichte damit bis 56px herunter, waehrend der
-         Inhalt bei 48px begann und das Markenzeichen anschnitt. */
-      body { padding-top: 68px; }
+      /* ── Kompakte Kopfzeile ab Schritt 1 ──────────────────────────────────
+         Bis hierher stand ueber jedem Schritt die Einstiegsmarke: 68px Rand
+         fuer den Sprachumschalter, 64px-Tile, Wortmarke darunter - der Inhalt
+         begann bei 191px (Critique 2026-09-29), fast ein Viertel des
+         Bildschirms war Absender. Jetzt teilen sich Tile (40px, wie die
+         Schrittliste auf dem Desktop), Wortmarke und Sprachumschalter EINE
+         Zeile, der Schritt beginnt bei 72px.
+
+         Die Zeile scrollt mit, statt zu kleben: unten schwebt schon die
+         Fussleiste, eine zweite Leiste oben haette jedem Bildschirm weitere
+         56px genommen. Die Orientierung haelt der fixe Fortschrittsbalken am
+         oberen Rand, und der Schrittzaehler steht ueber jeder H2.
+
+         Einstieg und Abschluss (.shell--solo) behalten das grosse Tile: dort
+         ist die Marke die Aussage, und darunter liegt keine Formularstrecke. */
+      body { padding-top: 12px; padding-bottom: 0; }
+      .lang-switch { top: 12px; inset-inline-end: 16px; }
+      .shell--solo { padding-bottom: 32px; }
+      .shell--solo .brand { padding-top: 56px; }
+      .shell:not(.shell--solo) .brand {
+        display: flex; align-items: center; gap: 10px;
+        min-height: 44px; margin-bottom: 16px; text-align: start;
+      }
+      .shell:not(.shell--solo) .brand__mark { width: 40px; height: 40px; margin-bottom: 0; border-radius: var(--radius-md); }
+
+      /* ── Fussleiste: Zurueck als Symbol, Primaeraktion fuellt die Zeile ──
+         Bei 360px blieben neben "Zurueck" 209px fuer die Primaeraktion, und
+         die laengsten Beschriftungen brauchen mehr ("Нажмите ещё раз..."
+         270px, Griechisch "Speichern & Docker starten" 229px) - sie brachen
+         um. Der Pfeil nach links ist auf dem Handy das Zurueck der Plattform;
+         der Text bleibt als zugaenglicher Name im Knopf (font-size: 0 blendet
+         ihn nur aus), die Primaeraktion bekommt die ganze restliche Breite und
+         liegt damit dort, wo der Daumen ohnehin ist. */
+      .card-foot { gap: 8px; }
+      .card-foot .btn-primary { flex: 1 1 auto; padding-inline: 12px; }
+      .card-foot .btn-ghost[data-back] {
+        flex: none; width: 48px; padding: 0; font-size: 0;
+      }
+      .card-foot .btn-ghost[data-back]::before {
+        content: ''; width: 20px; height: 20px; background: currentColor;
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15 18-6-6 6-6'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15 18-6-6 6-6'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+      }
+      html[dir="rtl"] .card-foot .btn-ghost[data-back]::before { transform: scaleX(-1); }
+
       .btn-sm { min-height: 44px; min-width: 44px; padding: 8px 12px; }
       .secret-row .btn-sm { flex: 0 0 auto; }
       /* Der Select war das letzte Bedienelement unter der Grenze (Primärbutton
@@ -1466,7 +1555,7 @@
             <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="document-webdav-body">
-            <p class="hint" data-i18n="advanced.documentWebdavHint">Non-empty environment values override the corresponding settings stored in the database.</p>
+            <details class="hint-more"><summary data-i18n="common.learnMore">Learn more</summary><p class="hint" data-i18n="advanced.documentWebdavHint">Non-empty environment values override the corresponding settings stored in the database.</p></details>
             <div class="field">
               <label><input type="checkbox" id="adv-document-webdav-enable"> <span data-i18n="advanced.documentWebdavEnable">Store new documents on WebDAV</span></label>
             </div>
@@ -1501,7 +1590,7 @@
             <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="document-google-drive-body">
-            <p class="hint" data-i18n="advanced.documentGoogleDriveHint">Configure OAuth credentials here, then connect and explicitly select Google Drive in Document settings after installation.</p>
+            <details class="hint-more"><summary data-i18n="common.learnMore">Learn more</summary><p class="hint" data-i18n="advanced.documentGoogleDriveHint">Configure OAuth credentials here, then connect and explicitly select Google Drive in Document settings after installation.</p></details>
             <div class="field">
               <label><input type="checkbox" id="adv-document-google-drive-enable"> <span data-i18n="advanced.documentGoogleDriveEnable">Configure Google Drive for Documents</span></label>
             </div>
@@ -1578,11 +1667,11 @@
             </div>
             <div class="field">
               <label><input type="checkbox" id="adv-oidc-allow-signup" checked> <span data-i18n="advanced.oidcAllowSignup">Let SSO sign-ins create new accounts</span></label>
-              <div class="hint" data-i18n="advanced.oidcAllowSignupHint">Turn this off when your provider serves more people than this household. Existing accounts still sign in and still get linked.</div>
+              <details class="hint-more"><summary data-i18n="common.learnMore">Learn more</summary><div class="hint" data-i18n="advanced.oidcAllowSignupHint">Turn this off when your provider serves more people than this household. Existing accounts still sign in and still get linked.</div></details>
             </div>
             <div class="field">
               <label><input type="checkbox" id="adv-auth-password-login" checked> <span data-i18n="advanced.authPasswordLogin">Keep the username and password login</span></label>
-              <div class="hint" data-i18n="advanced.authPasswordLoginHint">Turning this off makes SSO the only way in: the login form and password reset disappear. It takes effect once at least one account is linked to your provider, so a fresh install can still create its first admin. If your provider becomes unreachable, the way back is editing the .env file and restarting.</div>
+              <details class="hint-more"><summary data-i18n="common.learnMore">Learn more</summary><div class="hint" data-i18n="advanced.authPasswordLoginHint">Turning this off makes SSO the only way in: the login form and password reset disappear. It takes effect once at least one account is linked to your provider, so a fresh install can still create its first admin. If your provider becomes unreachable, the way back is editing the .env file and restarting.</div></details>
             </div>
           </div>
         </div>
@@ -2107,6 +2196,17 @@ $('lang-switch').addEventListener('change', async e => {
   // Dynamisch gefüllte Texte des aktuellen Schritts (z. B. Simple-Zugriffszeile) auffrischen.
   onEnterStep(flow[currentStep]);
 });
+
+// "Mehr erfahren" klappt nur auf dem Handy zu. Ab 641px ist Platz fuer den
+// Absatz, dort blendet das CSS den Knopf aus - und ein zugeklappter <details>
+// ohne sichtbaren Knopf waere Text, an den niemand mehr herankommt. Deshalb
+// folgt `open` der Breite, auch beim Drehen des Geraets.
+const hintMoreMq = matchMedia('(max-width: 640px)');
+function syncHintMore() {
+  document.querySelectorAll('details.hint-more').forEach(d => { d.open = !hintMoreMq.matches; });
+}
+hintMoreMq.addEventListener('change', syncHintMore);
+syncHintMore();
 
 localize();
 
@@ -2665,8 +2765,8 @@ $('done-link').addEventListener('click', e => {
     e.preventDefault();
     openWarned = true;
     const dl = $('done-download');
-    dl.focus();
-    dl.scrollIntoView({ block: 'center' });
+    dl.focus({ preventScroll: true });
+    reveal(dl);
   }
 });
 
@@ -2776,8 +2876,25 @@ function fail(bannerId, msg, inputId) {
     // zurueckkehrt, hoert den Grund, nicht nur "ungueltig" (WCAG 3.3.1/1.3.1).
     el.setAttribute('aria-describedby', bannerId);
     el.focus({ preventScroll: true });
-    el.scrollIntoView({ block: 'center' });
+    // Liegt das Feld ueber dem Bildschirm, fuehrt es (das Banner folgt
+    // darunter); sonst das Banner, damit Feld UND Grund zu sehen sind.
+    const wrap = el.closest('.field') || el;
+    reveal(banner && wrap.getBoundingClientRect().top >= 0 ? banner : wrap);
   }
+}
+
+/**
+ * Sanft und nur so weit wie noetig in Sicht holen. `block: 'center'` riss die
+ * Seite bei jedem Fehler um einen halben Bildschirm herum, auch wenn das Feld
+ * schon zu sehen war - auf dem Handy verlor man dabei den Ort, an dem man
+ * gerade getippt hatte. `nearest` bewegt nur, was fehlt; den Rand der
+ * schwebenden Fussleiste traegt scroll-padding am <html>. Unter
+ * reduced-motion springt die Seite, statt zu gleiten.
+ */
+function reveal(el) {
+  if (!el) return;
+  const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  el.scrollIntoView({ block: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
 }
 
 document.addEventListener('click', async e => {
@@ -2855,9 +2972,10 @@ document.addEventListener('click', async e => {
   if (toggleBtn) {
     const open = $(toggleBtn.dataset.toggle).classList.toggle('open');
     toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    // Beim Öffnen die Sektion in Sicht holen, damit die neu erschienenen Felder
-    // nicht unter der Sticky-Fußzeile verschwinden (v. a. mobil).
-    if (open) toggleBtn.scrollIntoView({ block: 'nearest' });
+    // Beim Öffnen die ganze Sektion in Sicht holen, nicht nur ihren Kopf: die
+    // neu erschienenen Felder lagen sonst unter der Sticky-Fußzeile (v. a.
+    // mobil). Ist sie höher als der Bildschirm, bleibt der Kopf oben stehen.
+    if (open) reveal(toggleBtn.closest('.toggle-card') || toggleBtn);
     return;
   }
 

@@ -1238,3 +1238,156 @@ test('jedes Feld und jedes Akkordeon steht in einer Inset-Gruppe', () => {
   assert.equal(declared(g, 'border-radius', base), 'var(--radius-lg)');
   assert.equal(declared(g, 'box-shadow', base), 'var(--shadow-sm)');
 });
+
+// ── Mobil (Critique 2026-09-29, adapt) ────────────────────────────────────────
+
+/**
+ * Laengsseite einer Box aus der Kaskade: Longhand (`padding-top`) und
+ * Shorthand (`padding: 48px 16px 80px`) in Deklarationsreihenfolge, wie der
+ * Browser sie bei gleicher Spezifitaet verrechnet. `side` = top|right|bottom|left.
+ */
+function boxSide(selectorMatches, prop, side, mediaMatches) {
+  const index = { top: 0, right: 1, bottom: 2, left: 3 }[side];
+  let value = null;
+  for (const rule of RULES) {
+    if (!mediaMatches(rule.media) || !selectorMatches(rule.selector)) continue;
+    for (const [, name, raw] of rule.body.matchAll(/(?:^|;)\s*([\w-]+)\s*:\s*([^;]+)/g)) {
+      if (name === `${prop}-${side}`) value = toPx(raw.trim());
+      else if (name === prop) {
+        const parts = raw.trim().split(/\s+/);
+        const pick = [parts[0], parts[1] ?? parts[0], parts[2] ?? parts[0], parts[3] ?? parts[1] ?? parts[0]][index];
+        value = toPx(pick);
+      } else if (name === `${prop}-block` && (side === 'top' || side === 'bottom')) {
+        const parts = raw.trim().split(/\s+/);
+        value = toPx(side === 'top' ? parts[0] : (parts[1] ?? parts[0]));
+      } else if (name === `${prop}-inline` && (side === 'left' || side === 'right')) {
+        const parts = raw.trim().split(/\s+/);
+        value = toPx(side === 'left' ? parts[0] : (parts[1] ?? parts[0]));
+      }
+    }
+  }
+  return value;
+}
+
+const PHONE = 360;   // die schmalste Breite, die der Installer zusagt
+
+/* Schalterzeilen: das Label war 24px hoch und endete am letzten Buchstaben,
+ * die restliche Zeile nahm keinen Tipp an. Geprueft wird die WIRKUNG: jedes
+ * Kaestchen sitzt direkt in einem Label direkt in einem .field (sonst greift die
+ * Regel nicht), das Feld gibt sein Polster ab (sonst endet das Label vor der
+ * Zeilenkante), und das Label ist mit Polster und Kaestchen mindestens 44px
+ * hoch. Ein neuer Schalter ohne diese Form faellt ueber die Markup-Pruefung auf. */
+test('jede Schalterzeile ist als ganze Zeile tippbar, mindestens 44px hoch', () => {
+  const boxes = [...html.matchAll(/<input type="checkbox"[^>]*>/g)];
+  assert.ok(boxes.length >= 10, `erwartet mindestens zehn Schalter, gefunden ${boxes.length}`);
+  const wrapped = [...html.matchAll(/<div class="field">\s*<label><input type="checkbox"[^>]*>/g)];
+  assert.equal(wrapped.length, boxes.length,
+    'ein Schalter sitzt nicht direkt in <div class="field"><label> - die Zeilenregel greift fuer ihn nicht');
+
+  const phone = appliesAt(PHONE);
+  const fieldSel = sel => /\.field:has\(\s*>\s*label\s*>\s*input\[type=checkbox\]\s*\)$/.test(sel);
+  const labelSel = sel => /\.field\s*>\s*label:has\(\s*>\s*input\[type=checkbox\]\s*\)$/.test(sel);
+  // Ohne eigene Regel gilt fuer das Feld das Zeilenpolster aller Felder.
+  const rowField = sel => sel === '.inset-group .field' || fieldSel(sel);
+  for (const side of ['top', 'right', 'bottom', 'left']) {
+    const pad = boxSide(rowField, 'padding', side, phone) ?? 0;
+    assert.equal(pad, 0, `die Schalterzeile behaelt ${pad}px Polster ${side} - dort nimmt sie keinen Tipp an`);
+  }
+  const box = toPx(declared(sel => sel === 'input[type=checkbox]', 'block-size')) ?? 0;
+  const padY = (boxSide(labelSel, 'padding', 'top', phone) ?? 0) + (boxSide(labelSel, 'padding', 'bottom', phone) ?? 0);
+  const minH = toPx(declared(labelSel, 'min-height', phone)) ?? 0;
+  const tap = Math.max(minH, box + padY);
+  assert.ok(tap >= 44, `eine Schalterzeile ist nur ${tap}px hoch tippbar, 44px sind das Minimum`);
+  // Die Zeile sieht aus wie vorher: das Label traegt das Zeilenpolster der Felder.
+  const rowPad = boxSide(sel => sel === '.inset-group .field', 'padding', 'left', phone);
+  assert.equal(boxSide(labelSel, 'padding', 'left', phone), rowPad,
+    'das Schalter-Label fluchtet nicht mit den Feldern der Gruppe');
+});
+
+/* Kompakte Kopfzeile: bis zum ersten Schritt-Inhalt vergingen auf dem Handy
+ * 191px (Critique 2026-09-29) - Rand fuer den Sprachumschalter, 64px-Tile,
+ * Wortmarke darunter. Gerechnet wird der Inhaltsbeginn aus der Kaskade bei
+ * 360px: Seitenrand oben + eine Zeile (Tile ODER Mindesthoehe) + Abstand. Der
+ * Sprachumschalter muss in DIESER Zeile enden, sonst ragt er in den Inhalt;
+ * Einstieg und Abschluss behalten das grosse Tile UNTER dem Umschalter. */
+test('ab Schritt 1 steht auf dem Handy eine einzeilige Kopfzeile, der Inhalt beginnt vor 90px', () => {
+  const phone = appliesAt(PHONE);
+  const compact = sel => sel === '.brand' || sel === '.shell:not(.shell--solo) .brand';
+  const mark = sel => sel === '.brand__mark' || sel === '.shell:not(.shell--solo) .brand__mark';
+
+  assert.equal(declared(compact, 'display', phone), 'flex', 'Tile und Wortmarke stehen nicht in einer Zeile');
+  const tile = toPx(declared(mark, 'height', phone));
+  assert.ok(tile <= 40, `das Tile der Kopfzeile ist ${tile}px hoch, 40px sind das Mass der App-Zeile`);
+
+  const top = boxSide(sel => sel === 'body', 'padding', 'top', phone);
+  const rowH = Math.max(tile, toPx(declared(compact, 'min-height', phone)) ?? 0);
+  const gap = boxSide(compact, 'margin', 'bottom', phone) ?? 0;
+  const start = top + rowH + gap;
+  assert.ok(start <= 90, `der Schritt beginnt auf dem Handy erst bei ${start}px (Ziel <= 90px)`);
+
+  const lang = sel => sel === '.lang-switch';
+  const langTop = toPx(declared(lang, 'top', phone));
+  const langH = toPx(declared(sel => sel === '.lang-switch select', 'min-height', phone));
+  assert.ok(langTop + langH <= top + rowH,
+    `der Sprachumschalter endet bei ${langTop + langH}px, die Kopfzeile bei ${top + rowH}px - er ragt in den Inhalt`);
+
+  // Einstieg/Abschluss: das grosse Tile beginnt unter dem Umschalter.
+  const soloTop = top + (boxSide(sel => sel === '.shell--solo .brand', 'padding', 'top', phone) ?? 0);
+  assert.ok(soloTop >= langTop + langH,
+    `das Tile des Einstiegs beginnt bei ${soloTop}px, unter dem Umschalter (${langTop + langH}px) waere noetig`);
+
+  // Fortschritt bleibt: Balken sichtbar, Zaehler nicht versteckt.
+  assert.notEqual(declared(sel => sel === '.progress-track', 'display', phone), 'none', 'der Fortschrittsbalken fehlt mobil');
+  assert.notEqual(declared(sel => sel === '.step-tag', 'display', phone), 'none', 'der Schrittzaehler fehlt mobil');
+});
+
+/* Fussleiste bei 360px: Zurueck und Primaeraktion nebeneinander, ohne Umbruch.
+ * Gemessen im Browser (14px/600, Systemschrift): die laengsten Beschriftungen
+ * sind el review.save 229px und fr review.confirm 228px; ru/uk review.confirm
+ * und uk simple.start sind dafuer gekuerzt worden. Die Rechnung hier haelt das
+ * Budget, das die Leiste der Primaeraktion laesst: Zeile minus Zurueck minus
+ * Abstand minus Polster. Ein Zurueck mit Textbreite (auto) ist nicht rechenbar
+ * und zaehlt als Verstoss - genau so lief es vorher auf 209px zusammen. */
+test('die Primaeraktion hat bei 360px Platz fuer die laengste Beschriftung', () => {
+  const phone = appliesAt(PHONE);
+  const LONGEST_LABEL = 229;
+  const row = PHONE - (boxSide(sel => sel === 'body', 'padding', 'left', phone) ?? 0)
+    - (boxSide(sel => sel === 'body', 'padding', 'right', phone) ?? 0);
+  const back = sel => sel === '.card-foot .btn-ghost[data-back]';
+  const backW = toPx(declared(back, 'width', phone));
+  assert.ok(backW !== null, 'Zurueck hat in der Fussleiste keine feste Breite - die Primaeraktion bekommt den Rest, der uebrig bleibt');
+  assert.ok(backW >= 44, `Zurueck ist nur ${backW}px breit, 44px sind das Minimum`);
+  const gap = toPx(declared(sel => sel === '.card-foot', 'gap', phone)) ?? 0;
+  const primary = sel => sel === '.btn' || sel === '.card-foot .btn-primary';
+  const padL = boxSide(primary, 'padding', 'left', phone) ?? 0;
+  const padR = boxSide(primary, 'padding', 'right', phone) ?? 0;
+  const budget = row - backW - gap - padL - padR;
+  assert.ok(budget >= LONGEST_LABEL + 8,
+    `der Primaeraktion bleiben ${budget}px fuer ihre Beschriftung, die laengste braucht ${LONGEST_LABEL}px (plus Reserve)`);
+  const grow = flexParts(declared(sel => sel === '.card-foot .btn-primary', 'flex', phone) || '0 1 auto').grow;
+  assert.ok(grow >= 1, 'die Primaeraktion waechst nicht in die freie Breite der Leiste');
+});
+
+/* Sanft und nur so weit wie noetig: `block: 'center'` riss die Seite bei jedem
+ * Fehler um einen halben Bildschirm. reveal() wird AUSGEFUEHRT, mit und ohne
+ * reduced-motion; alle Aufrufer gehen ueber reveal(). */
+test('Fehler und Akkordeons scrollen nur so weit wie noetig, unter reduced-motion ohne Gleiten', () => {
+  const src = fnSource('reveal');
+  const calls = [];
+  for (const reduce of [false, true]) {
+    const reveal = new Function('matchMedia', `${src}; return reveal;`)(q => ({ matches: reduce && /reduce/.test(q) }));
+    reveal({ scrollIntoView: opts => calls.push(opts) });
+    reveal(null);   // ohne Ziel kein Wurf
+  }
+  assert.deepEqual(calls, [
+    { block: 'nearest', behavior: 'smooth' },
+    { block: 'nearest', behavior: 'auto' },
+  ]);
+  const script = html.slice(html.indexOf('<script type="module">'));
+  const direct = [...script.matchAll(/\.scrollIntoView\(/g)].length;
+  assert.equal(direct, 1, `scrollIntoView steht ${direct}x im Skript - nur reveal() darf es rufen`);
+  assert.match(fnSource('fail'), /reveal\(/, 'fail() holt Feld und Grund nicht per reveal() in Sicht');
+  // Die schwebende Fussleiste verdeckt sonst, was nearest fuer sichtbar haelt.
+  const pad = boxSide(sel => sel === 'html', 'scroll-padding', 'bottom', m => m === null);
+  assert.ok(pad >= 73, `scroll-padding unten ist ${pad}px, die Fussleiste ist 73px hoch`);
+});
