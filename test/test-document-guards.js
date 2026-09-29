@@ -3535,12 +3535,14 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
   test('desktop 1280x900', async () => {
     const page = await openPage(harness, { device: 'desktop', theme: 'light', locale: 'de' });
     const offenders = [];
-    let seen = 0;
+    // Zustaende, in denen die Vorbedingung fehlte - JE ZUSTAND, nicht als Summe.
+    const unmeasured = [];
 
     for (const name of sweep('Sonde 16')) {
       await gotoRoute(page, ALL_ROUTES[name]);
       const found = await page.evaluate(() => {
-        const out = { animated: 0, offenders: [] };
+        const out = { animated: 0, blobs: 0, blobsRunning: 0, offenders: [] };
+        out.blobs = document.querySelectorAll('.lg-blob').length;
         for (const el of document.querySelectorAll('*')) {
           const cs = getComputedStyle(el);
           // `infinite` liest sich berechnet als 'infinite'; mehrere Animationen
@@ -3553,6 +3555,7 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
             && cs.animationDuration.split(',').some((v) => parseFloat(v) > 0);
           if (!endless || !running) continue;
           out.animated += 1;
+          if (el.classList.contains('lg-blob')) out.blobsRunning += 1;
           const filter = cs.filter;
           if (filter && filter !== 'none') {
             out.offenders.push(`${el.tagName.toLowerCase()}.${el.className || '(ohne Klasse)'} -> ${filter}`);
@@ -3560,7 +3563,10 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
         }
         return out;
       });
-      seen += found.animated;
+      if (found.blobs === 0 || found.blobsRunning < found.blobs) {
+        unmeasured.push(`${name}: ${found.blobs} .lg-blob, davon ${found.blobsRunning} endlos animiert `
+          + `(${found.animated} dauerlaufende Animationen insgesamt)`);
+      }
       for (const o of found.offenders) offenders.push(`${name}: ${o}`);
     }
     await page.close();
@@ -3568,12 +3574,19 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
     // Dieselbe Zusicherung wie bei den Sonden 3, 4 und 15, und hier ist sie
     // besonders leicht zu verlieren: waeren die Blobs eines Tages nicht mehr
     // animiert, faende die Sonde nichts mehr zu pruefen und bliebe still gruen.
-    // Der lebende Backdrop laeuft auf JEDER Route, also sind vier Blobs mal der
-    // Zahl der abgefahrenen Zustaende die Untergrenze.
-    assert.ok(seen >= 4 * sweep('Sonde 16').length,
-      `Nur ${seen} dauerlaufende Animationen ueber ${sweep('Sonde 16').length} Zustaende `
-      + '- die Sonde hat nichts gemessen, statt nichts zu finden. Laeuft der lebende '
-      + 'Backdrop (.lg-blob) noch?');
+    //
+    // JE ZUSTAND, NICHT ALS SUMME (#1456). Die erste Fassung verlangte vier
+    // Animationen mal die Zahl der Zustaende. Ein Volllauf sah 125 von 192 und
+    // konnte nicht sagen, welche Zustaende zu kurz kamen; und ein Lauf, in dem
+    // einigen die Shell fehlte, waehrend andere Spinner oder Skelette trugen,
+    // blieb gruen, obwohl jene Zustaende nie geprueft waren. Die Vorbedingung
+    // ist der lebende Backdrop, und der steht in JEDEM Zustand: mindestens ein
+    // `.lg-blob`, und jeder davon laeuft endlos. Fehlt er, nennt die Meldung
+    // den Zustand - die Zahl der Blobs kommt aus dem Dokument, nicht von hier.
+    assert.deepEqual(unmeasured, [],
+      'Zustaende ohne laufenden Backdrop - dort hat die Sonde nichts gemessen, statt nichts '
+      + 'zu finden. Fehlt die Shell (Route nicht aufgebaut, auf /login gelandet), oder laufen '
+      + `die .lg-blob nicht mehr?\n  ${unmeasured.join('\n  ')}`);
 
     assert.deepEqual(offenders.sort(), [],
       'Ein endlos animiertes Element traegt einen `filter` und rastert ihn damit pro '
