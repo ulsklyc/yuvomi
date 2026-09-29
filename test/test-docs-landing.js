@@ -19,8 +19,12 @@
  *            übernommen. Nichts hielt sie zusammen.
  *
  *        (3) Die Modulzahl der Proof-Leiste ist die Summe dessen, was die Seite
- *            zeigt. "Die übrigen dreizehn" stand über vierzehn Karten, weil das
- *            achtzehnte Modul dazukam und die Zahl im Absatz darüber nicht.
+ *            zeigt, und die Zeilenzahl der README-Modultabelle. "Die übrigen
+ *            dreizehn" stand über vierzehn Karten, weil das achtzehnte Modul
+ *            dazukam und die Zahl im Absatz darüber nicht. Seit 2026-09-29
+ *            steht ein ausgeschriebenes Zahlwort nur noch dort, wo die Suite es
+ *            nachzählt; dazu OpenAPI-Version gegen `server/openapi.js` und die
+ *            Outbound-Liste gegen die README.
  *
  *        (4) Jede referenzierte Aufnahme hat ihre zwei WebP-Ableitungen, in
  *            BEIDEN Sprachordnern. `onerror` greift nur bei FEHLENDEN Dateien,
@@ -210,21 +214,212 @@ test('die Modulzahl der Proof-Leiste ist die Summe aus Feature-Zeilen und Modulk
     `plus ${modCards} Modulkarten = ${featureRows + modCards}.`);
 });
 
-test('der Absatz ueber dem Modulraster nennt die Zahl der Karten, nicht irgendeine', () => {
-  const html = read('index.html');
-  const modCards = (html.match(/class="mod-card/g) || []).length;
-  const WORDS = {
-    ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
-    zehn: 10, elf: 11, zwoelf: 12, zwölf: 12, dreizehn: 13, vierzehn: 14, fuenfzehn: 15, fünfzehn: 15, sechzehn: 16,
-  };
-  for (const lang of ['en', 'de']) {
-    const desc = dictBlock(html, lang).match(/\bmore_desc:'((?:[^'\\]|\\.)*)'/)?.[1];
-    assert.ok(desc, `more_desc fehlt im ${lang}-Woerterbuch`);
-    const hit = Object.entries(WORDS).find(([w]) => new RegExp(`\\b${w}\\b`, 'i').test(desc));
-    assert.ok(hit, `more_desc (${lang}) nennt keine Zahl: "${desc}"`);
-    assert.equal(hit[1], modCards,
-      `more_desc (${lang}) sagt "${hit[0]}" (${hit[1]}), es sind aber ${modCards} Modulkarten.`);
+/**
+ * Die Modultabelle der README: `| **Name** | Ein Satz. |` unter einer
+ * `## `-Ueberschrift, die von Modulen spricht, bis zur naechsten.
+ *
+ * Die README-Tabelle ist die kanonische Modulliste, und `test-readme-
+ * consistency.js` haelt dort Ueberschrift, Kennzahl und Zeilen zusammen. Was
+ * fehlte, war die Bruecke zur Homepage: beide Flaechen zaehlten fuer sich
+ * richtig und haetten trotzdem verschiedene Zahlen nennen koennen.
+ */
+function readmeModuleCount() {
+  // Abschnitt fuer Abschnitt zaehlen und den mit den meisten Zeilen nehmen:
+  // "## The modules talk to each other" steht VOR der Tabelle und traegt das
+  // Wort ebenfalls - die erste Fassung griff genau dort ins Leere.
+  const sections = readFileSync(resolve(ROOT, 'README.md'), 'utf8').split(/^## /m).slice(1);
+  const counts = sections
+    .filter((sec) => /\bmodules\b/i.test(sec.split('\n')[0]))
+    .map((sec) => sec.split('\n').filter((l) => /^\| \*\*(.+?)\*\* \| (.+?) \|$/.test(l)).length);
+  assert.ok(counts.length > 0, 'README: keine Modul-Ueberschrift gefunden - Muster veraltet?');
+  return Math.max(...counts);
+}
+
+test('die Modulzahl der Proof-Leiste ist die Zeilenzahl der README-Modultabelle', () => {
+  const claimed = Number(read('index.html').match(/<b>(\d+)<\/b>\s*<span data-t="proof_modules"/)?.[1]);
+  const rows = readmeModuleCount();
+  assert.ok(rows >= 10, `README-Modultabelle nicht gefunden oder zu kurz (${rows} Zeilen)`);
+  assert.equal(claimed, rows,
+    `Die Proof-Leiste sagt ${claimed} Module, die README-Modultabelle hat ${rows} Zeilen.`);
+});
+
+/**
+ * Ausgeschriebene Zahlwoerter stehen nur dort, wo sie gezaehlt werden.
+ *
+ * Frueher hielt dieser Guard EIN Zahlwort fest: "the other sixteen" ueber den
+ * Modulkarten, gegen die Kartenzahl. Gehalten hat er den Absatz, aber nicht die
+ * Nachbarn - "twenty separate apps" und "twenty separate tabs" standen daneben
+ * ungeprueft, und "turn on what fits" galt fuer vier der sechzehn Karten gar
+ * nicht (Familie, Erinnerungen, API, Backup sind nicht abschaltbar). Seit der
+ * Critique vom 2026-09-29 nennt der Absatz keine Zahl mehr; die eine Modulzahl
+ * steht in der Proof-Leiste und ist oben gegen Seite UND README gehalten.
+ *
+ * Die Regel ist deshalb jetzt allgemein: ein Zahlwort in einem Woerterbuchwert
+ * ist nur erlaubt, wo diese Suite die Zahl nachzaehlt. Das sind die zehn
+ * Zeilen der Substitutionstabelle ("Ten apps, one place."). Jede andere
+ * Fundstelle ist eine Zahl, die niemand haelt, und faellt hier auf. Der
+ * Markup-Fallback braucht keine eigene Pruefung: er ist ueber Kopplung (6)
+ * an T.en gebunden.
+ */
+const NUMBER_WORDS = {
+  ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
+  seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
+  zehn: 10, zehnmal: 10, elf: 11, zwoelf: 12, zwölf: 12, dreizehn: 13, vierzehn: 14, fuenfzehn: 15,
+  fünfzehn: 15, sechzehn: 16, siebzehn: 17, achtzehn: 18, neunzehn: 19, zwanzig: 20,
+};
+
+/** Alle Woerterbuchwerte eines Blocks als [Schluessel, Text], beide Quotierungen. */
+function dictEntries(block) {
+  return [...block.matchAll(/(?:^|[{,]\s*)\s*([a-z][a-z0-9_]*)\s*:\s*(['"])((?:(?!\2)[^\\]|\\.)*)\2/gm)]
+    .map((m) => [m[1], stripTags(unescapeJs(m[3]))]);
+}
+
+/** Jede Zahlwort-Fundstelle eines Blocks, als { key, word, value }. */
+function numberWordClaims(block) {
+  const claims = [];
+  for (const [key, text] of dictEntries(block)) {
+    for (const [word, value] of Object.entries(NUMBER_WORDS)) {
+      // \b kennt kein ü/ö: die Grenze deshalb ueber Unicode-Buchstaben selbst.
+      if (new RegExp(`(?<!\\p{L})${word}(?!\\p{L})`, 'iu').test(text)) claims.push({ key, word, value });
+    }
   }
+  return claims;
+}
+
+/** Schluessel, deren Zahlwort gezaehlt wird, und die Zahl, die sie nennen muessen. */
+function countedKeys(html) {
+  const swapRows = pageSwapRows(html).length;
+  return { swap_title: swapRows, swap_desc: swapRows };
+}
+
+function unheldNumbers(html, block) {
+  const counted = countedKeys(html);
+  return numberWordClaims(block)
+    .filter(({ key, value }) => counted[key] !== value)
+    .map(({ key, word }) => `${key}: "${word}"` + (key in counted ? ` (gezaehlt: ${counted[key]})` : ' (von nichts gehalten)'));
+}
+
+test('ein Zahlwort steht nur dort, wo die Suite es nachzaehlt', () => {
+  const html = read('index.html');
+  assert.equal(pageSwapRows(html).length, 10, 'Vorbedingung: die Substitutionstabelle hat zehn Zeilen');
+  for (const lang of ['en', 'de']) {
+    const block = dictBlock(html, lang);
+    assert.ok(block, `${lang}-Woerterbuch nicht gefunden`);
+    assert.ok(numberWordClaims(block).some((c) => c.key === 'swap_title'),
+      `swap_title (${lang}) nennt kein Zahlwort mehr - Extraktor gebrochen oder Titel umgebaut?`);
+    assert.deepEqual(unheldNumbers(html, block), [],
+      `Zahlwoerter im ${lang}-Woerterbuch, die keiner Zaehlung entsprechen.`);
+  }
+});
+
+test('der Zahlwort-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  // Der Anlassfall ("dreizehn" ueber vierzehn Karten) und der Stand vor der
+  // Critique vom 2026-09-29 - beide muessen anschlagen.
+  const damaged = [
+    "more_desc:'The other thirteen, each one independent.',",
+    "ho_desc:'This is the part twenty separate apps cannot do.',",
+    "swap_title:'Nine apps, <em>one place.</em>',",
+  ].join('\n');
+  assert.deepEqual(unheldNumbers(html, damaged).sort(), [
+    'ho_desc: "twenty" (von nichts gehalten)',
+    'more_desc: "thirteen" (von nichts gehalten)',
+  ], 'freie Zahlwoerter muessen gemeldet werden');
+  // Ein Zahlwort ausserhalb der Liste ("Nine") ist fuer den Guard unsichtbar -
+  // das ist die Grenze: er haelt die Zahlen, die Modul- und App-Mengen nennen.
+  assert.equal(numberWordClaims(damaged).filter((c) => c.key === 'swap_title').length, 0);
+  // Der gezaehlte Schluessel mit falscher Zahl schlaegt an, mit richtiger nicht.
+  assert.deepEqual(unheldNumbers(html, "swap_title:'Twelve apps, <em>one place.</em>',"),
+    ['swap_title: "twelve" (gezaehlt: 10)']);
+  assert.deepEqual(unheldNumbers(html, "swap_desc:'Zehn Apps, zehn Konten, zehnmal eure Daten.',"), []);
+  // Umlaut-Grenze: "zwölf" und "fünfzehn" werden gefunden, "Elfenbein" nicht.
+  assert.deepEqual(numberWordClaims("a:'zwölf Tabs', b:'Elfenbein', c:'fünfzehn'").map((c) => c.key).sort(), ['a', 'c']);
+});
+
+// ── (3c) OpenAPI-Version == was der Server ausliefert ────────────────────────
+
+/**
+ * "OpenAPI 3.0" stand auf der Homepage, in beiden READMEs und in SPEC.md, waehrend
+ * `server/openapi.js` seit langem `openapi: '3.1.0'` ausliefert. Eine
+ * Versionsnummer in einem Werbetext veraltet still - sie gehoert an den Code.
+ */
+function servedOpenApiVersion() {
+  const src = readFileSync(resolve(ROOT, 'server/openapi.js'), 'utf8');
+  const m = src.match(/\bopenapi:\s*'(\d+)\.(\d+)\.\d+'/);
+  assert.ok(m, 'server/openapi.js: openapi-Version nicht gefunden - Muster veraltet?');
+  return `${m[1]}.${m[2]}`;
+}
+
+function claimedOpenApiVersions(text) {
+  return [...text.matchAll(/OpenAPI[\s-](\d+\.\d+)/g)].map((m) => m[1]);
+}
+
+test('jede genannte OpenAPI-Version ist die, die der Server ausliefert', () => {
+  const served = servedOpenApiVersion();
+  const sources = {
+    'docs/index.html': read('index.html'),
+    'README.md': readFileSync(resolve(ROOT, 'README.md'), 'utf8'),
+    'README.de.md': readFileSync(resolve(ROOT, 'README.de.md'), 'utf8'),
+    'docs/SPEC.md': read('SPEC.md'),
+  };
+  const claims = claimedOpenApiVersions(sources['docs/index.html']);
+  assert.ok(claims.length >= 3, `nur ${claims.length} OpenAPI-Angaben in index.html - Muster veraltet?`);
+  const wrong = Object.entries(sources).flatMap(([file, text]) =>
+    claimedOpenApiVersions(text).filter((v) => v !== served).map((v) => `${file}: OpenAPI ${v}`));
+  assert.deepEqual(wrong, [], `server/openapi.js liefert OpenAPI ${served}.`);
+  // Gegenprobe: beide Schreibweisen des Altstands werden erkannt.
+  assert.deepEqual(claimedOpenApiVersions('an OpenAPI 3.0 spec, eine OpenAPI-3.0-Spezifikation'), ['3.0', '3.0']);
+});
+
+// ── (3d) Die Outbound-Liste der Seite nennt, was die README nennt ─────────────
+
+/**
+ * Die README fuehrte die Dienste, die sich erst nach dem Einschalten verbinden,
+ * vollstaendig; die Homepage nannte fuenf davon (Wetter, Feiertage, Kalender-
+ * Sync, Push, Cloud-Backup) und liess Wechselkurse, Kontakte-Sync, Rezept-
+ * Spiegel, Immich, Paperless/Papra und die Benachrichtigungskanaele weg - auf
+ * der Seite, deren staerkstes Argument ist, dass nichts ungefragt nach aussen
+ * geht. Die README ist hier die Quelle; die Seite muss jeden Eintrag nennen.
+ */
+const OUTBOUND = {
+  en: { readme: 'README.md', bullet: /^- \*\*Outbound\*\* - (.+)$/m, list: /, and ((?:(?!, and ).)+?) connect once you switch them on/, base: 'one update check against the GitHub releases API' },
+  de: { readme: 'README.de.md', bullet: /^- \*\*Nach außen\*\* - (.+)$/m, list: /, und ((?:(?!, und ).)+?) verbinden sich erst/, base: 'eine Update-Abfrage an die GitHub-Releases-API' },
+};
+
+function outboundItems(lang, md) {
+  const spec = OUTBOUND[lang];
+  const bullet = md.match(spec.bullet)?.[1];
+  assert.ok(bullet, `${spec.readme}: Outbound-Zeile nicht gefunden - Muster veraltet?`);
+  const list = bullet.match(spec.list)?.[1];
+  assert.ok(list, `${spec.readme}: Liste der zuschaltbaren Verbindungen nicht gefunden`);
+  return list.split(', ').map((s) => s.trim()).filter(Boolean);
+}
+
+function missingOutbound(items, siteText) {
+  const norm = (s) => s.replace(/[’‘]/g, "'").toLowerCase();
+  return items.filter((item) => !norm(siteText).includes(norm(item)));
+}
+
+for (const lang of ['en', 'de']) {
+  test(`index.html (${lang}): die Outbound-Angabe nennt jede Verbindung der README`, () => {
+    const items = outboundItems(lang, readFileSync(resolve(ROOT, OUTBOUND[lang].readme), 'utf8'));
+    assert.ok(items.length >= 8, `nur ${items.length} Eintraege in der README-Liste - Muster veraltet?`);
+    const raw = dictValue(dictBlock(read('index.html'), lang), 'tb_out_v');
+    assert.ok(raw, `tb_out_v fehlt im ${lang}-Woerterbuch`);
+    const site = stripTags(unescapeJs(raw));
+    assert.ok(site.includes(OUTBOUND[lang].base), `tb_out_v (${lang}) nennt die Versionspruefung nicht mehr`);
+    assert.deepEqual(missingOutbound(items, site), [],
+      `tb_out_v (${lang}) verschweigt Verbindungen, die ${OUTBOUND[lang].readme} nennt.`);
+  });
+}
+
+test('der Outbound-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  // Der Stand vor der Critique vom 2026-09-29, woertlich.
+  const old = 'and weather, holidays, calendar sync, push and cloud backup connect once you switch them on.';
+  const items = outboundItems('en', readFileSync(resolve(ROOT, 'README.md'), 'utf8'));
+  const missing = missingOutbound(items, old);
+  assert.ok(missing.includes('exchange rates') && missing.includes('Immich'),
+    `der Altstand muss als unvollstaendig auffallen, gemeldet: ${missing.join(', ')}`);
 });
 
 // ── (4) WebP-Ableitungen je referenzierter Aufnahme ──────────────────────────

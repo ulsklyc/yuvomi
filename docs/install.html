@@ -526,7 +526,7 @@
     <div class="container">
       <p class="eyebrow reveal" style="justify-content:center"><span data-t="hero_eyebrow">Installation</span></p>
       <h1 class="reveal"><span data-t="hero_title_pre">Install Yuvomi</span> <em data-t="hero_title_em">your way.</em></h1>
-      <p class="hero-desc reveal" data-t="hero_desc">Get your self-hosted family planner running in a few minutes. Pick a one-click app-store install, a two-command Docker setup, or the guided web installer.</p>
+      <p class="hero-desc reveal" data-t="hero_desc">Get your self-hosted family planner running in a few minutes. Pick a one-click app-store install, a Docker setup with a handful of commands, or the guided web installer.</p>
       <div class="reveal">
         <span class="time-badge">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -614,7 +614,7 @@
         <h3 class="panel-head" style="--pc:#2496ED" data-t="tab_docker">Docker / Podman</h3>
         <div class="callout callout-info">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span data-t="opt_docker_info">No Git, no build step - just two files and a single command. Requires only Docker or Podman (Podman: use podman-compose.yml).</span>
+          <span data-t="opt_docker_info">No Git, no build step - two files, a handful of commands and one edit in <code>.env</code>. Requires only Docker or Podman (Podman: use podman-compose.yml).</span>
         </div>
         <div class="step">
           <div class="step-num">1</div>
@@ -968,7 +968,7 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
     var i18n = {
       en: {
         hero_eyebrow:'Installation', hero_title_pre:'Install Yuvomi', hero_title_em:'your way.',
-        hero_desc:'Get your self-hosted family planner running in a few minutes. Pick a one-click app-store install, a two-command Docker setup, or the guided web installer.',
+        hero_desc:'Get your self-hosted family planner running in a few minutes. Pick a one-click app-store install, a Docker setup with a handful of commands, or the guided web installer.',
         hero_time:'~10 minutes',
         nav_main:'Main', nav_home:'Yuvomi home', foot_nav:'Footer', tablist_label:'Installation options', code_label:'Command block',
         prereq_title:'What you need',
@@ -992,7 +992,7 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         step_px1_alt:'Prefer a full VM? That works too and needs no nesting flag: install Debian as usual and continue from step 2.',
         step_px2_title:'Install Docker inside the container', step_px2_desc:"From Debian's own repositories, so there is no install script piped into a shell.",
         step_px3_title:'Follow the Docker steps', step_px3_desc:'From here nothing is Proxmox-specific: the <a href="#tab-docker">Docker image</a> path applies unchanged. Afterwards Yuvomi answers on the container\'s IP at port 3000 - <code>pct exec 110 -- hostname -I</code> on the host prints it.',
-        opt_docker_info:'No Git, no build step - just two files and a single command. Requires only Docker or Podman (Podman: use podman-compose.yml).',
+        opt_docker_info:'No Git, no build step - two files, a handful of commands and one edit in <code>.env</code>. Requires only Docker or Podman (Podman: use podman-compose.yml).',
         step_a1_title:'Download the configuration files', step_a1_desc:'Run these two commands. They download the Docker configuration and the template for your settings.',
         step_a2_title:'Create your configuration', step_a2_desc:'Copy the template, then open <code>.env</code> in a text editor. <code>SESSION_SECRET</code> is required; <code>DB_ENCRYPTION_KEY</code> is optional but permanent.',
         step_a2_gen:'This prints two secure values - paste one as <code>SESSION_SECRET</code> and the other as <code>DB_ENCRYPTION_KEY</code>:', px_gen_c:'# two values: one for SESSION_SECRET, one for DB_ENCRYPTION_KEY',
@@ -1054,7 +1054,7 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
       },
       de: {
         hero_eyebrow:'Installation', hero_title_pre:'Yuvomi installieren', hero_title_em:'- euer Weg.',
-        hero_desc:'Euren selbstgehosteten Familienplaner in wenigen Minuten zum Laufen bringen. Wählt eine App-Store-Installation mit einem Klick, ein Docker-Setup mit zwei Befehlen oder den geführten Web-Installer.',
+        hero_desc:'Euren selbstgehosteten Familienplaner in wenigen Minuten zum Laufen bringen. Wählt eine App-Store-Installation mit einem Klick, ein Docker-Setup mit einer Handvoll Befehle oder den geführten Web-Installer.',
         hero_time:'~10 Minuten',
         nav_main:'Hauptnavigation', nav_home:'Yuvomi Startseite', foot_nav:'Fußzeile', tablist_label:'Installationswege', code_label:'Befehlsblock',
         prereq_title:'Was ihr braucht',
@@ -1078,7 +1078,7 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         step_px1_alt:'Lieber eine ganze VM? Geht auch und braucht kein Nesting-Flag: Debian wie gewohnt installieren und ab Schritt 2 weitermachen.',
         step_px2_title:'Docker im Container installieren', step_px2_desc:'Aus Debians eigenen Paketquellen, damit kein Installationsskript in eine Shell gepipet wird.',
         step_px3_title:'Den Docker-Schritten folgen', step_px3_desc:'Ab hier ist nichts mehr Proxmox-spezifisch: Der Weg über das <a href="#tab-docker">Docker-Image</a> gilt unverändert. Danach antwortet Yuvomi auf der IP des Containers an Port 3000 - <code>pct exec 110 -- hostname -I</code> auf dem Host gibt sie aus.',
-        opt_docker_info:'Kein Git, kein Build-Schritt - nur zwei Dateien und ein einziger Befehl. Nur Docker oder Podman erforderlich (Podman: podman-compose.yml verwenden).',
+        opt_docker_info:'Kein Git, kein Build-Schritt - zwei Dateien, eine Handvoll Befehle und eine Änderung in der <code>.env</code>. Nur Docker oder Podman erforderlich (Podman: podman-compose.yml verwenden).',
         step_a1_title:'Konfigurationsdateien herunterladen', step_a1_desc:'Führt diese zwei Befehle aus. Sie laden die Docker-Konfiguration und die Vorlage für eure Einstellungen herunter.',
         step_a2_title:'Konfiguration erstellen', step_a2_desc:'Kopiert die Vorlage, öffnet dann <code>.env</code> in einem Texteditor. <code>SESSION_SECRET</code> ist Pflicht; <code>DB_ENCRYPTION_KEY</code> ist optional, aber endgültig.',
         step_a2_gen:'Das gibt zwei sichere Werte aus - einen als <code>SESSION_SECRET</code>, den anderen als <code>DB_ENCRYPTION_KEY</code> einsetzen:', px_gen_c:'# zwei Werte: einer für SESSION_SECRET, einer für DB_ENCRYPTION_KEY',

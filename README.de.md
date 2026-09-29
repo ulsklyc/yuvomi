@@ -55,7 +55,7 @@ eigenständig - nutze, was passt, und schalte ab, was nicht passt.
 | einer Essensplaner- &amp; Rezept-App | **Mahlzeiten &amp; Rezepte** - Wochenplaner mit Einkaufsexport |
 | einer Einkaufslisten-App | **Einkauf** - geteilte, nach Gang sortierte Listen |
 | einem Vorrats- und Ablauf-Tracker | **Vorrat** - Bestand, Lagerort, Mindesthaltbarkeit |
-| einem Dokumentenmanager | **Dokumente** - getaggte, durchsuchbare Familiendateien |
+| einem Dokumentenmanager | **Dokumente** - durchsuchbare Familiendateien in Ordnern |
 | einer Hausinventar-App | **Inventar** - Besitz, Kaufpreis, Garantie, verknüpfte Belege |
 | einer Notiz-App &amp; Kontakte-Sync | **Notizen &amp; Kontakte** - Markdown-Notizen, CardDAV-Sync |
 
@@ -80,7 +80,7 @@ Schalte an, was dein Haushalt braucht; der Rest bleibt aus dem Weg.
 | **Rezepte** | Rezepte anlegen und skalieren, Mahlzeiten vorbelegen oder eine Mealie- oder Tandoor-Instanz lesend spiegeln. |
 | **Vorrat** | Menge, Lagerort und Mindesthaltbarkeit, mit einer Erinnerung, bevor etwas abläuft. |
 | **Kalender** | Zwei-Wege-Sync mit Google und CalDAV, Outlook-Push, Kalender-Abos, Feiertage und Sichtbarkeit je Termin. |
-| **Dokumente** | Getaggte, durchsuchbare Familiendateien in Ordnern, lokal, auf WebDAV oder in Google Drive. |
+| **Dokumente** | Durchsuchbare Familiendateien in Ordnern, lokal, auf WebDAV oder in Google Drive. |
 | **Inventar** | Was dir gehört, mit Kaufpreis, Garantie, verknüpften Belegen, einem Wartungsprotokoll und wiederkehrenden Erinnerungen vor Fristablauf. Standardmäßig aus. |
 | **Budget** | Einnahmen, Ausgaben, Konten, Darlehen, Abos und gemeinsame Ausgaben mit Schuldenvereinfachung. |
 | **Hauswirtschaft** | Haushaltshilfen: Dienstpläne, Ein- und Ausstempeln, Abrechnung, Aufgaben und Materialwünsche. |
@@ -92,7 +92,7 @@ Schalte an, was dein Haushalt braucht; der Rest bleibt aus dem Weg.
 | **Geburtstage** | Geburtstage und optionale Namenstage, mit Kalendereinträgen, Alter und Erinnerungen. |
 | **Familie** | Mitgliedsprofile mit Rollen und Einladungslinks, über die neue Mitglieder ihr Passwort selbst wählen. |
 | **Erinnerungen** | An Aufgaben, Termine, Garantien, Mindesthaltbarkeit und Abfuhr - in der App, per Push, Gotify, ntfy, Webhook oder E-Mail. |
-| **API-Token** | Bearer-Token mit OpenAPI-3.0-Spezifikation und eingebautem MCP-Endpunkt für KI-Agenten. |
+| **API-Token** | Bearer-Token mit OpenAPI-3.1-Spezifikation und eingebautem MCP-Endpunkt für KI-Agenten. |
 | **Backup** | Manuelle und geplante Sicherungen mit Rollback vor dem Wiederherstellen und optionalem Cloud-Upload. |
 
 Zwei Dinge gibt es nur auf dem eigenen Server: der **Wandmodus** macht aus dem Küchen-Tablet eine

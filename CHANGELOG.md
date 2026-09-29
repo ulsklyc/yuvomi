@@ -731,6 +731,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The website no longer states things the app does not do.** The quick start said a database
+  left on the placeholder key gets encrypted with a public value; Yuvomi does not start on the
+  placeholders at all, and the note now says so. The install page promised a two-command Docker
+  setup where the steps are a handful of commands plus one edit in `.env`. The site and both
+  READMEs named OpenAPI 3.0 while the server delivers 3.1 and called documents "tagged", and "turn
+  on what fits" stood over four modules that cannot be switched off. The outbound note now lists
+  every service that connects once you switch it on, as the README does.
+
 - **Wall mode can be left on a phone** (#1559). "Leave wall mode" was below the bottom edge on
   phones and showed only a grey icon until the screen was touched, and the back button closed the
   app instead of leaving wall mode, which was still on at the next start. The exit now stays at the
