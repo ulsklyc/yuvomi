@@ -27,6 +27,7 @@
     "hostHint": "Alamat yang Anda gunakan untuk membuka Yuvomi di browser.",
     "portLabel": "Port",
     "tzLabel": "Zona waktu",
+    "tzHint": "Dipakai sebagai bawaan rumah tangga. Anda bisa mengubahnya nanti di aplikasi, di Pengaturan → Tampilan.",
     "errHost": "Nama host tidak valid. Gunakan hanya huruf, angka, tanda hubung, dan titik.",
     "errPort": "Port tidak valid. Harus berupa angka antara 1 dan 65535.",
     "prereqMissing": "Prasyarat yang kurang: {{list}}. {{link}} menunjukkan cara memasangnya.",
@@ -52,6 +53,7 @@
     "title": "Widget cuaca",
     "subtitle": "Cuaca langsung di dasbor — gratis, tanpa akun, tanpa kunci API.",
     "enable": "Aktifkan widget cuaca",
+    "appHint": "Nilai ini berlaku sampai lokasi rumah tangga disimpan di aplikasi, di Pengaturan → Integrasi.",
     "latLabel": "Lintang",
     "lonLabel": "Bujur",
     "coordHint": "Cari koordinat di openstreetmap.org atau Google Maps.",
@@ -65,7 +67,7 @@
   },
   "calendar": {
     "title": "Sinkronisasi kalender",
-    "subtitle": "Sambungkan Yuvomi dengan Google Calendar, Apple iCloud, atau Outlook. Semuanya opsional - bentangkan untuk mengonfigurasi.",
+    "subtitle": "Sambungkan Yuvomi dengan Google Calendar, Outlook, atau Apple iCloud. Semuanya opsional - bentangkan untuk mengonfigurasi.",
     "google": "Google Calendar",
     "googleHint": "Buat kredensial OAuth di {{link}}. Redirect URI: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -73,6 +75,8 @@
     "googleSecretLabel": "Client Secret",
     "googleSelectNote": "Setelah tersambung, Anda dapat memilih kalender mana yang disinkronkan di pengaturan aplikasi (default: kalender utama).",
     "apple": "Apple iCloud CalDAV",
+    "legacy": "Lama",
+    "moreInApp": "Tambahkan akun CalDAV lain, misalnya Nextcloud atau akun iCloud kedua, di aplikasi pada Pengaturan → Kalender.",
     "appleHint": "Buat kata sandi khusus aplikasi di {{link}}.",
     "appleLink": "appleid.apple.com",
     "appleUserLabel": "Apple ID (email)",
@@ -267,6 +271,8 @@
     "nextInviteDesc": "Buat tautan undangan agar setiap orang memilih kata sandinya sendiri.",
     "nextModules": "Pilih modulmu",
     "nextModulesDesc": "Aktifkan yang benar-benar dipakai rumah tanggamu dan sembunyikan sisanya.",
+    "nextRegion": "Wilayah & bahasa",
+    "nextRegionDesc": "Atur mata uang, format tanggal, dan hari libur sesuai tempat tinggalmu.",
     "nextInstall": "Pasang di ponsel",
     "nextInstallDesc": "Buka Yuvomi di ponsel dan tambahkan ke layar utama - bisa dipakai offline.",
     "subtitleExisting": "Yuvomi sedang berjalan. Instalasi ini sudah punya akun administrator - masuk dengan kredensialmu yang ada."
@@ -303,6 +309,7 @@
     "subtitle": "Izinkan anggota keluarga mengatur ulang kata sandi yang terlupa melalui email. Opsional — lewati jika tidak perlu.",
     "enable": "Aktifkan pengiriman email",
     "hint": "Menggunakan server SMTP Anda sendiri (penyedia email, self-hosted, atau layanan transaksional).",
+    "appHint": "Apa yang Anda isi di sini menjadi hanya-baca di aplikasi. Jika lebih suka mengelola dan menguji SMTP di aplikasi, di Pengaturan → Email (SMTP), lewati langkah ini.",
     "hostLabel": "Server SMTP",
     "portLabel": "Porta",
     "secureLabel": "Enkripsi",
@@ -320,6 +327,9 @@
     "title": "Penyimpanan & cadangan",
     "subtitle": "Di mana datamu tersimpan di server, dan ke mana salinannya pergi. Semua opsional - nilai bawaan sudah berfungsi.",
     "sectionBackups": "Cadangan",
-    "sectionDocuments": "Penyimpanan dokumen"
+    "sectionDocuments": "Penyimpanan dokumen",
+    "maxUploadLabel": "Batas unggahan (MB)",
+    "maxUploadHint": "Berkas terbesar yang bisa diunggah, 1-100 MB. Biarkan kosong untuk 5 MB - nilai lebih tinggi butuh lebih banyak memori.",
+    "errMaxUpload": "Batas unggahan tidak valid. Harus bilangan bulat antara 1 dan 100."
   }
 }

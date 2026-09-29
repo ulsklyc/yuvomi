@@ -1161,9 +1161,10 @@ test('die Pruefseite hat Gruppen mit Aendern-Link und keine Strich-Zeile', () =>
   check('leer');
   const unset = cells.get('rv-integrations-unset');
   assert.equal(unset.parentElement.hidden, false, 'nichts eingerichtet, aber keine Zeile "Nicht eingerichtet"');
-  assert.equal(unset.textContent, 'review.weather, review.google, review.apple, review.outlook, review.email',
+  // Reihenfolge wie im Kalenderschritt: Apple (Legacy) steht nach Outlook.
+  assert.equal(unset.textContent, 'review.weather, review.google, review.outlook, review.apple, review.email',
     'die Zeile "Nicht eingerichtet" nennt nicht alles, was fehlt');
-  for (const id of ['rv-weather', 'rv-google', 'rv-apple', 'rv-outlook', 'rv-email']) {
+  for (const id of ['rv-weather', 'rv-google', 'rv-outlook', 'rv-apple', 'rv-email']) {
     assert.equal(cells.get(id).parentElement.hidden, true, `${id} steht leer als eigene Zeile`);
   }
 

@@ -27,6 +27,7 @@
     "hostHint": "Het adres waarmee je Yuvomi in de browser opent.",
     "portLabel": "Poort",
     "tzLabel": "Tijdzone",
+    "tzHint": "Geldt als standaard voor het huishouden. Je kunt dit later in de app wijzigen onder Instellingen → Weergave.",
     "errHost": "Ongeldige hostnaam. Gebruik alleen letters, cijfers, koppeltekens en punten.",
     "errPort": "Ongeldige poort. Moet een getal tussen 1 en 65535 zijn.",
     "prereqMissing": "Ontbrekende vereisten: {{list}}. {{link}} laat zien hoe je ze installeert.",
@@ -52,6 +53,7 @@
     "title": "Weer-widget",
     "subtitle": "Live weer op het dashboard — gratis, geen account, geen API-sleutel.",
     "enable": "Weer-widget inschakelen",
+    "appHint": "Deze waarden gelden totdat in de app onder Instellingen → Integraties een locatie voor het huishouden is opgeslagen.",
     "latLabel": "Breedtegraad",
     "lonLabel": "Lengtegraad",
     "coordHint": "Vind coördinaten op openstreetmap.org of Google Maps.",
@@ -65,7 +67,7 @@
   },
   "calendar": {
     "title": "Kalendersynchronisatie",
-    "subtitle": "Verbind Yuvomi met Google Agenda, Apple iCloud of Outlook. Alles optioneel - uitklappen om te configureren.",
+    "subtitle": "Verbind Yuvomi met Google Agenda, Outlook of Apple iCloud. Alles optioneel - uitklappen om te configureren.",
     "google": "Google Agenda",
     "googleHint": "Maak OAuth-inloggegevens aan op {{link}}. Redirect-URI: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -73,6 +75,8 @@
     "googleSecretLabel": "Client-secret",
     "googleSelectNote": "Na het verbinden kun je in de app-instellingen kiezen welke kalender gesynchroniseerd wordt (standaard: primaire kalender).",
     "apple": "Apple iCloud CalDAV",
+    "legacy": "Verouderd",
+    "moreInApp": "Meer CalDAV-accounts, zoals Nextcloud of een tweede iCloud-account, voeg je in de app toe onder Instellingen → Agenda.",
     "appleHint": "Maak een app-specifiek wachtwoord aan op {{link}}.",
     "appleLink": "appleid.apple.com",
     "appleUserLabel": "Apple ID (e-mail)",
@@ -267,6 +271,8 @@
     "nextInviteDesc": "Maak uitnodigingslinks zodat iedereen een eigen wachtwoord kiest.",
     "nextModules": "Kies je modules",
     "nextModulesDesc": "Zet aan wat je huishouden echt gebruikt en verberg de rest.",
+    "nextRegion": "Regio en taal",
+    "nextRegionDesc": "Stel valuta, datumnotatie en feestdagen in op waar je woont.",
     "nextInstall": "Installeer het op de telefoons",
     "nextInstallDesc": "Open Yuvomi op een telefoon en zet het op het startscherm - het werkt offline.",
     "subtitleExisting": "Yuvomi draait. Deze installatie heeft al een beheerdersaccount - log in met je bestaande gegevens."
@@ -303,6 +309,7 @@
     "subtitle": "Laat gezinsleden een vergeten wachtwoord per e-mail herstellen. Optioneel — sla over als je het niet nodig hebt.",
     "enable": "E-mailverzending inschakelen",
     "hint": "Gebruikt je eigen SMTP-server (mailprovider, zelf gehost of een transactionele dienst).",
+    "appHint": "Wat je hier invult, is in de app alleen-lezen. Wil je SMTP liever in de app beheren en testen onder Instellingen → E-mail (SMTP), sla deze stap dan over.",
     "hostLabel": "SMTP-server",
     "portLabel": "Poort",
     "secureLabel": "Versleuteling",
@@ -320,6 +327,9 @@
     "title": "Opslag en back-ups",
     "subtitle": "Waar je gegevens op de server staan en waar kopieën ervan heen gaan. Alles optioneel - de standaarden werken.",
     "sectionBackups": "Back-ups",
-    "sectionDocuments": "Documentopslag"
+    "sectionDocuments": "Documentopslag",
+    "maxUploadLabel": "Uploadlimiet (MB)",
+    "maxUploadHint": "Grootste bestand dat je kunt uploaden, 1-100 MB. Laat leeg voor 5 MB - hogere waarden vragen meer geheugen.",
+    "errMaxUpload": "Ongeldige uploadlimiet. Moet een geheel getal tussen 1 en 100 zijn."
   }
 }

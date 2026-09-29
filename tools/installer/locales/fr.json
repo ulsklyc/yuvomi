@@ -27,6 +27,7 @@
     "hostHint": "L'adresse que vous utiliserez pour ouvrir Yuvomi dans votre navigateur.",
     "portLabel": "Port",
     "tzLabel": "Fuseau horaire",
+    "tzHint": "Sert de valeur par défaut pour le foyer. Vous pourrez la modifier plus tard dans l’app, sous Paramètres → Apparence.",
     "errHost": "Nom d'hôte non valide. Utilisez uniquement des lettres, des chiffres, des tirets et des points.",
     "errPort": "Port non valide. Doit être un nombre compris entre 1 et 65535.",
     "prereqMissing": "Prérequis manquants : {{list}}. {{link}} explique comment les installer.",
@@ -52,6 +53,7 @@
     "title": "Widget Météo",
     "subtitle": "Météo en direct sur le tableau de bord — gratuit, sans compte, sans clé API.",
     "enable": "Activer le widget météo",
+    "appHint": "Ces valeurs s’appliquent jusqu’à ce qu’un emplacement du foyer soit enregistré dans l’app, sous Paramètres → Intégrations.",
     "latLabel": "Latitude",
     "lonLabel": "Longitude",
     "coordHint": "Trouvez vos coordonnées sur openstreetmap.org ou Google Maps.",
@@ -65,7 +67,7 @@
   },
   "calendar": {
     "title": "Synchronisation du calendrier",
-    "subtitle": "Connectez Yuvomi à Google Agenda, Apple iCloud ou Outlook. Tous facultatifs - dépliez pour configurer.",
+    "subtitle": "Connectez Yuvomi à Google Agenda, Outlook ou Apple iCloud. Tous facultatifs - dépliez pour configurer.",
     "google": "Google Agenda",
     "googleHint": "Créez des identifiants OAuth sur {{link}}. URI de redirection : {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -73,6 +75,8 @@
     "googleSecretLabel": "Secret client",
     "googleSelectNote": "Une fois connecté, vous pouvez choisir l'agenda à synchroniser dans les paramètres de l'application (par défaut : agenda principal).",
     "apple": "Apple iCloud CalDAV",
+    "legacy": "Ancien",
+    "moreInApp": "Ajoutez d’autres comptes CalDAV, par exemple Nextcloud ou un second compte iCloud, dans l’app, sous Paramètres → Calendrier.",
     "appleHint": "Créez un mot de passe spécifique à l'application sur {{link}}.",
     "appleLink": "appleid.apple.com",
     "appleUserLabel": "Identifiant Apple (e-mail)",
@@ -186,6 +190,8 @@
     "nextInviteDesc": "Crée des liens d'invitation pour que chacun choisisse son mot de passe.",
     "nextModules": "Choisis tes modules",
     "nextModulesDesc": "Active ce que ton foyer utilise vraiment et masque le reste.",
+    "nextRegion": "Région et langue",
+    "nextRegionDesc": "Règle la devise, le format de date et les jours fériés selon ton pays.",
     "nextInstall": "Installe-le sur les téléphones",
     "nextInstallDesc": "Ouvre Yuvomi sur un téléphone et ajoute-le à l'écran d'accueil : il fonctionne hors ligne.",
     "subtitleExisting": "Yuvomi fonctionne. Cette installation possède déjà un compte administrateur : connecte-toi avec tes identifiants existants."
@@ -303,6 +309,7 @@
     "subtitle": "Permettez aux membres de la famille de réinitialiser un mot de passe oublié par e-mail. Facultatif — ignorez si inutile.",
     "enable": "Activer l’envoi d’e-mails",
     "hint": "Utilise votre propre serveur SMTP (fournisseur de messagerie, auto-hébergé ou service transactionnel).",
+    "appHint": "Ce que vous saisissez ici sera en lecture seule dans l’app. Pour gérer et tester le SMTP dans l’app, sous Paramètres → E-mail (SMTP), passez cette étape.",
     "hostLabel": "Serveur SMTP",
     "portLabel": "Port",
     "secureLabel": "Chiffrement",
@@ -320,6 +327,9 @@
     "title": "Stockage et sauvegardes",
     "subtitle": "Où vivent tes données sur le serveur et où vont leurs copies. Tout est facultatif : les valeurs par défaut fonctionnent.",
     "sectionBackups": "Sauvegardes",
-    "sectionDocuments": "Stockage de documents"
+    "sectionDocuments": "Stockage de documents",
+    "maxUploadLabel": "Limite d’envoi (Mo)",
+    "maxUploadHint": "Taille maximale d’un fichier envoyé, 1-100 Mo. Laissez vide pour 5 Mo - des valeurs plus élevées demandent plus de mémoire.",
+    "errMaxUpload": "Limite d’envoi non valide. Doit être un nombre entier compris entre 1 et 100."
   }
 }

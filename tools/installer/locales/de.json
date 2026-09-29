@@ -27,6 +27,7 @@
     "hostHint": "Die Adresse, über die du Yuvomi im Browser öffnest.",
     "portLabel": "Port",
     "tzLabel": "Zeitzone",
+    "tzHint": "Vorgabe für den Haushalt. Lässt sich später in der App unter Einstellungen → Darstellung ändern.",
     "errHost": "Ungültiger Hostname. Verwende nur Buchstaben, Ziffern, Bindestriche und Punkte.",
     "errPort": "Ungültiger Port. Muss eine Zahl zwischen 1 und 65535 sein.",
     "prereqMissing": "Fehlende Voraussetzungen: {{list}}. {{link}} zeigt, wie du sie installierst.",
@@ -52,6 +53,7 @@
     "title": "Wetter-Widget",
     "subtitle": "Live-Wetter auf dem Dashboard - kostenlos, kein Account, kein API-Schlüssel.",
     "enable": "Wetter-Widget aktivieren",
+    "appHint": "Diese Werte gelten, bis in der App unter Einstellungen → Integrationen ein eigener Haushalts-Standort gespeichert wird.",
     "latLabel": "Breitengrad",
     "lonLabel": "Längengrad",
     "coordHint": "Koordinaten auf openstreetmap.org oder Google Maps suchen.",
@@ -65,7 +67,7 @@
   },
   "calendar": {
     "title": "Kalender-Synchronisation",
-    "subtitle": "Verbinde Yuvomi mit Google Kalender, Apple iCloud oder Outlook. Alles optional - zum Konfigurieren ausklappen.",
+    "subtitle": "Verbinde Yuvomi mit Google Kalender, Outlook oder Apple iCloud. Alles optional - zum Konfigurieren ausklappen.",
     "google": "Google Kalender",
     "googleHint": "Erstelle OAuth-Anmeldedaten unter {{link}}. Redirect-URI: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -73,6 +75,8 @@
     "googleSecretLabel": "Client-Secret",
     "googleSelectNote": "Nach der Verbindung kannst du in den App-Einstellungen wählen, welcher Kalender synchronisiert wird (Standard: primärer Kalender).",
     "apple": "Apple iCloud CalDAV",
+    "legacy": "Legacy",
+    "moreInApp": "Weitere CalDAV-Konten, etwa Nextcloud oder ein zweites iCloud-Konto, richtest du in der App unter Einstellungen → Kalender ein.",
     "appleHint": "Erstelle ein app-spezifisches Passwort unter {{link}}.",
     "appleLink": "appleid.apple.com",
     "appleUserLabel": "Apple-ID (E-Mail)",
@@ -267,6 +271,8 @@
     "nextInviteDesc": "Erzeuge Einladungslinks, damit sich jede und jeder ein eigenes Passwort setzt.",
     "nextModules": "Module wählen",
     "nextModulesDesc": "Schalte frei, was ihr wirklich nutzt, und blende den Rest aus.",
+    "nextRegion": "Region & Sprache",
+    "nextRegionDesc": "Währung, Datumsformat und Feiertage passend einstellen.",
     "nextInstall": "Auf den Handys installieren",
     "nextInstallDesc": "Öffne Yuvomi auf dem Handy und lege es auf den Startbildschirm - es läuft auch offline.",
     "subtitleExisting": "Yuvomi läuft. Diese Installation hat bereits ein Administratorkonto - melde dich mit deinen bestehenden Zugangsdaten an."
@@ -303,6 +309,7 @@
     "subtitle": "Ermögliche Familienmitgliedern, ein vergessenes Passwort per E-Mail zurückzusetzen. Optional - überspringen, falls nicht benötigt.",
     "enable": "E-Mail-Versand aktivieren",
     "hint": "Nutzt deinen eigenen SMTP-Server (Mailanbieter, selbst gehostet oder ein Transaktions-Dienst).",
+    "appHint": "Was du hier einträgst, ist in der App schreibgeschützt. Wer SMTP lieber in der App unter Einstellungen → E-Mail (SMTP) pflegt und testet, lässt diesen Schritt aus.",
     "hostLabel": "SMTP-Server",
     "portLabel": "Port",
     "secureLabel": "Verschlüsselung",
@@ -320,6 +327,9 @@
     "title": "Speicher & Backups",
     "subtitle": "Wo deine Daten auf dem Server liegen und wohin ihre Kopien gehen. Alles optional - die Voreinstellungen funktionieren.",
     "sectionBackups": "Backups",
-    "sectionDocuments": "Dokumentspeicher"
+    "sectionDocuments": "Dokumentspeicher",
+    "maxUploadLabel": "Upload-Limit (MB)",
+    "maxUploadHint": "Größte Datei, die sich hochladen lässt, 1-100 MB. Leer lassen für 5 MB - höhere Werte brauchen mehr Arbeitsspeicher.",
+    "errMaxUpload": "Ungültiges Upload-Limit. Muss eine ganze Zahl zwischen 1 und 100 sein."
   }
 }

@@ -443,6 +443,9 @@
       font-size: var(--type-caption); line-height: 1.38; color: var(--color-text-secondary);
       padding-inline: 16px; margin: -2px 0 10px; max-width: 70ch;
     }
+    /* Nach einer Gruppe: ein Ausweg zu ihr (Kalender -> weitere Konten in der
+       App). Abstand wie unter einem Label, nur in die andere Richtung. */
+    .inset-group + .group-note { margin: 10px 0 0; }
     /* Kopf einer Pruefseiten-Gruppe: Label links, "Aendern" rechts. */
     /* Mittig ausgerichtet, damit "Aendern" auf der Zeile des Labels steht; der
        negative Abstand unten gleicht die 44px-Zielhoehe des Knopfs aus, sonst
@@ -694,6 +697,15 @@
       font-size: var(--type-caption); font-weight: 500; color: var(--color-text-secondary);
     }
     .toggle-badge[data-state="set"] { color: var(--color-text-primary); }
+    /* Einordnung einer Zeile, kein Zustand: "Legacy" an der Apple-Zeile. Leise
+       wie ein Etikett in der App - Kante statt Flaeche, keine Akzentfarbe, die
+       gehoert der einen Primaeraktion. */
+    .toggle-tag {
+      font-size: var(--type-caption); font-weight: 600; line-height: 1.38;
+      color: var(--color-text-secondary);
+      padding: 0 8px; border-radius: var(--radius-full); white-space: nowrap; flex-shrink: 0;
+      box-shadow: inset 0 0 0 1px var(--color-border);
+    }
     .toggle-badge[data-state="set"]::before {
       content: ''; width: 14px; height: 14px; flex-shrink: 0;
       background: var(--color-success);
@@ -1307,6 +1319,10 @@
         <div class="field">
           <label for="cfg-tz" data-i18n="config.tzLabel">Timezone</label>
           <input type="text" id="cfg-tz" placeholder="Europe/Berlin">
+          <!-- TZ ist nur die Vorbelegung der Haushaltszone (#829); die App fuehrt
+               sie als eigene Einstellung. Wer das nicht weiss, haelt das Feld fuer
+               endgueltig und sucht spaeter in der .env statt in der App. -->
+          <div class="hint" data-i18n="config.tzHint">Used as the household default. You can change it later in the app under Settings → Appearance.</div>
         </div>
         </div>
 
@@ -1427,6 +1443,11 @@
         <div class="inset-group">
         <div class="field">
           <label><input type="checkbox" id="wea-enable"> <span data-i18n="weather.enable">Enable weather widget</span></label>
+          <!-- Zwei Quellen fuer denselben Standort: WEATHER_* aus der .env und der
+               Haushalts-Standort der App. Der gespeicherte Standort gewinnt
+               (#1568) - ohne diesen Satz wirkt eine spaetere Aenderung hier wie
+               ein Fehler, weil die App weiter ihren eigenen Wert zeigt. -->
+          <div class="hint" data-i18n="weather.appHint">These values apply until a household location is saved in the app under Settings → Integrations.</div>
         </div>
         <div class="inset-sub" id="wea-fields" style="display:none">
           <div class="field">
@@ -1464,7 +1485,7 @@
       <div class="card-head">
         <div class="step-tag"></div>
         <h2 tabindex="-1" data-i18n="calendar.title">Calendar Sync</h2>
-        <p data-i18n="calendar.subtitle">Connect Yuvomi to Google Calendar, Apple iCloud or Outlook. All optional - expand to configure.</p>
+        <p data-i18n="calendar.subtitle">Connect Yuvomi to Google Calendar, Outlook or Apple iCloud. All optional - expand to configure.</p>
       </div>
       <div class="card-body">
         <!-- Drei Anbieter, EINE Gruppe: jede Zeile klappt in sich selbst auf. -->
@@ -1505,30 +1526,6 @@
             <p class="hint" data-i18n="calendar.googleSelectNote">After connecting, you can choose which calendar to sync in the app settings (default: primary calendar).</p>
           </div>
         </div>
-        <div class="toggle-card" data-setup="apple-user apple-pass">
-          <button type="button" class="toggle-head" data-toggle="apple-body" aria-expanded="false" aria-controls="apple-body">
-            <span data-i18n="calendar.apple">Apple iCloud CalDAV</span>
-            <span class="toggle-badge" id="apple-badge" data-state="optional">Optional</span>
-          </button>
-          <div class="toggle-body" id="apple-body">
-            <p class="hint" id="apple-hint">
-              Create an app-specific password at <a href="https://appleid.apple.com" target="_blank" rel="noopener">appleid.apple.com</a>.
-            </p>
-            <div class="field">
-              <label for="apple-user" data-i18n="calendar.appleUserLabel">Apple ID (email)</label>
-              <input type="email" id="apple-user">
-            </div>
-            <div class="field">
-              <label for="apple-pass" data-i18n="calendar.applePassLabel">App-Specific Password</label>
-              <input type="password" id="apple-pass">
-            </div>
-            <div class="field">
-              <label for="apple-url"><span data-i18n="calendar.appleUrlLabel">CalDAV URL</span> <span class="opt" data-i18n="common.opt">(optional)</span></label>
-              <input type="text" id="apple-url" placeholder="https://caldav.icloud.com">
-              <div class="hint" data-i18n="calendar.appleUrlHint">Leave empty unless your provider uses a different CalDAV endpoint.</div>
-            </div>
-          </div>
-        </div>
         <div class="toggle-card" data-setup="outlook-id outlook-secret">
           <button type="button" class="toggle-head" data-toggle="outlook-body" aria-expanded="false" aria-controls="outlook-body">
             <span data-i18n="calendar.outlook">Outlook Calendar (Microsoft Graph)</span>
@@ -1557,7 +1554,38 @@
             <p class="hint" data-i18n="calendar.outlookNote">One-way push: Yuvomi stays the source of truth and overwrites changes made in Outlook. Family accounts are connected later in the app under Settings.</p>
           </div>
         </div>
+        <!-- Apple zuletzt und als "Legacy": die .env traegt genau EIN iCloud-Konto,
+             die App verwaltet beliebig viele CalDAV-Konten (auch Nextcloud) und
+             kann sie pruefen. Die Zeile bleibt, weil bestehende Installationen sie
+             nutzen - sie ist nur nicht mehr der Weg, den der Wizard nahelegt. -->
+        <div class="toggle-card" data-setup="apple-user apple-pass">
+          <button type="button" class="toggle-head" data-toggle="apple-body" aria-expanded="false" aria-controls="apple-body">
+            <span data-i18n="calendar.apple">Apple iCloud CalDAV</span>
+            <span class="toggle-tag" data-i18n="calendar.legacy">Legacy</span>
+            <span class="toggle-badge" id="apple-badge" data-state="optional">Optional</span>
+          </button>
+          <div class="toggle-body" id="apple-body">
+            <p class="hint" id="apple-hint">
+              Create an app-specific password at <a href="https://appleid.apple.com" target="_blank" rel="noopener">appleid.apple.com</a>.
+            </p>
+            <div class="field">
+              <label for="apple-user" data-i18n="calendar.appleUserLabel">Apple ID (email)</label>
+              <input type="email" id="apple-user">
+            </div>
+            <div class="field">
+              <label for="apple-pass" data-i18n="calendar.applePassLabel">App-Specific Password</label>
+              <input type="password" id="apple-pass">
+            </div>
+            <div class="field">
+              <label for="apple-url"><span data-i18n="calendar.appleUrlLabel">CalDAV URL</span> <span class="opt" data-i18n="common.opt">(optional)</span></label>
+              <input type="text" id="apple-url" placeholder="https://caldav.icloud.com">
+              <div class="hint" data-i18n="calendar.appleUrlHint">Leave empty unless your provider uses a different CalDAV endpoint.</div>
+            </div>
+          </div>
         </div>
+        </div>
+        <!-- Der Ausweg zur Legacy-Zeile, sichtbar ohne Aufklappen. -->
+        <p class="group-note" data-i18n="calendar.moreInApp">Add more CalDAV accounts, such as Nextcloud or a second iCloud account, in the app under Settings → Calendar.</p>
       </div>
       <div class="card-foot">
         <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
@@ -1577,6 +1605,10 @@
         <div class="field">
           <label><input type="checkbox" id="email-enable"> <span data-i18n="email.enable">Enable email sending</span></label>
           <div class="hint" data-i18n="email.hint">Uses your own SMTP server (mailbox provider, self-hosted, or a transactional service).</div>
+          <!-- Die .env gewinnt ueber die Datenbank, und die App sperrt jedes Feld,
+               das die Umgebung setzt (admin-email.js). Wer SMTP in der App testen
+               und nachstellen will, muss das VOR dieser Entscheidung wissen. -->
+          <div class="hint" data-i18n="email.appHint">Whatever you enter here is read-only in the app. If you'd rather manage and test SMTP in the app under Settings → Email (SMTP), skip this step.</div>
         </div>
         </div>
         <!-- Eingeschaltet folgen zwei Gruppen entlang der Frage, die sie
@@ -1661,6 +1693,16 @@
           <label for="adv-data-dir" data-i18n="advanced.dataDirLabel">Host data folder</label>
           <input type="text" id="adv-data-dir" placeholder="./data">
           <div class="hint" data-i18n="advanced.dataDirHint">Where the database and app data live on the server. Leave empty to use ./data next to the compose file.</div>
+        </div>
+        <!-- MAX_UPLOAD_MB stand im Schema und in buildEnv, aber in keinem Feld:
+             S.MAX_UPLOAD_MB blieb immer leer, der Wert liess sich nur von Hand in
+             die .env schreiben. Er gilt fuer JEDEN Upload (Dokumente, Anhaenge,
+             Importe), deshalb hier neben dem Datenordner und nicht in der
+             Dokumentgruppe. Grenzen wie server/utils/upload-limit.js. -->
+        <div class="field">
+          <label for="adv-max-upload" data-i18n="storage.maxUploadLabel">Upload limit (MB)</label>
+          <input type="text" id="adv-max-upload" inputmode="numeric" placeholder="5">
+          <div class="hint" data-i18n="storage.maxUploadHint">Largest file anyone can upload, 1-100 MB. Leave empty for 5 MB - higher values need more memory.</div>
         </div>
         </div>
 
@@ -1995,8 +2037,8 @@
           <dl class="inset-group">
             <div class="rv-row"><dt data-i18n="review.weather">Weather</dt><dd id="rv-weather"></dd></div>
             <div class="rv-row"><dt data-i18n="review.google">Google Calendar</dt><dd id="rv-google"></dd></div>
-            <div class="rv-row"><dt data-i18n="review.apple">Apple CalDAV</dt><dd id="rv-apple"></dd></div>
             <div class="rv-row"><dt data-i18n="review.outlook">Outlook Calendar</dt><dd id="rv-outlook"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.apple">Apple CalDAV</dt><dd id="rv-apple"></dd></div>
             <div class="rv-row"><dt data-i18n="review.email">Email</dt><dd id="rv-email"></dd></div>
             <div class="rv-row rv-row--unset"><dt data-i18n="review.notSetUp">Not set up</dt><dd id="rv-integrations-unset"></dd></div>
           </dl>
@@ -2221,6 +2263,10 @@
             <a class="next-step" id="next-modules" href="#" target="_blank" rel="noopener">
               <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
               <span><b data-i18n="done.nextModules">Choose your modules</b><br><span data-i18n="done.nextModulesDesc">Turn on what your household actually uses and hide the rest.</span></span>
+            </a>
+            <a class="next-step" id="next-region" href="#" target="_blank" rel="noopener">
+              <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+              <span><b data-i18n="done.nextRegion">Region &amp; language</b><br><span data-i18n="done.nextRegionDesc">Set currency, date format and holidays to match where you live.</span></span>
             </a>
             <div class="next-step next-step--static">
               <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
@@ -3006,6 +3052,10 @@ function onEnterStep(name) {
     // test-installer-static.js prueft jedes Ziel gegen die Registry.
     $('next-invite').href = `${appUrl}/settings/admin/family`;
     $('next-modules').href = `${appUrl}/settings/modules/active`;
+    // Region, Waehrung, Datumsformat und Datensprache stehen im Blatt
+    // "Darstellung". Die Sprache hat der Installer schon uebergeben, die Region
+    // kann er nicht ableiten (`de` ist DE, AT oder CH) - also der Weg dorthin.
+    $('next-region').href = `${appUrl}/settings/personal/appearance`;
     if (savedEnvPath) {
       const p = $('done-path');
       p.textContent = t('done.savedTo', { path: savedEnvPath });
@@ -3579,6 +3629,15 @@ $('storage-next').addEventListener('click', () => {
   // unveraendert, nur der Fehler-Container heisst hier storage-err.
   const origin = S.BASE_URL;
 
+  // Zuerst, weil es das oberste Feld des Schritts ist. Streng wie der Port:
+  // der Server rundet ab und klemmt still auf 1-100, "7.5" oder "500" landeten
+  // sonst als etwas anderes in der App, als hier stand. Leer = Server-Default.
+  const maxUpload = $('adv-max-upload').value.trim();
+  if (maxUpload && !(/^[1-9]\d*$/.test(maxUpload) && Number(maxUpload) <= 100)) {
+    fail('storage-err', t('storage.errMaxUpload'), 'adv-max-upload');
+    return;
+  }
+
   const driveEnabled = $('adv-document-google-drive-enable').checked;
   const driveClientId = $('adv-document-google-drive-client-id').value.trim();
   const driveClientSecret = $('adv-document-google-drive-client-secret').value;
@@ -3641,6 +3700,7 @@ $('storage-next').addEventListener('click', () => {
   S.WEBDAV_BACKUP_KEEP = webdavKeep;
 
   S.DATA_DIR = $('adv-data-dir').value.trim();
+  S.MAX_UPLOAD_MB = maxUpload;
 
   next();
 });
@@ -3745,8 +3805,8 @@ function renderReview() {
   fillReviewGroup('rv-integrations-unset', [
     ['rv-weather', S.WEATHER_LAT ? (S.WEATHER_CITY || `${S.WEATHER_LAT}, ${S.WEATHER_LON}`) : ''],
     ['rv-google', S.GOOGLE_CLIENT_ID ? setUp : ''],
-    ['rv-apple', S.APPLE_USERNAME],
     ['rv-outlook', S.MS_CLIENT_ID ? setUp : ''],
+    ['rv-apple', S.APPLE_USERNAME],
     ['rv-email', S.EMAIL_SMTP_HOST ? (S.EMAIL_FROM_ADDRESS || setUp) : ''],
   ]);
   fillReviewGroup('rv-storage-unset', [
@@ -4159,7 +4219,11 @@ async function createAdmin() {
     const r = await fetch('/api/create-admin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: u, display_name: dn, password: p, port: parseInt(S.port, 10) }),
+      // Die Sprache, in der der Wizard gerade steht, wird die Datensprache des
+      // Haushalts (Geburtstagstitel, Kalender-Export). Der Proxy reicht nur
+      // Codes weiter, die die App kennt, und wiederholt ohne, falls ein Image
+      // sie ablehnt - die Kontoanlage haengt nie an der Sprache.
+      body: JSON.stringify({ username: u, display_name: dn, password: p, port: parseInt(S.port, 10), language: getLocale() }),
     });
     const d = await r.json();
     // 201 = angelegt. 403/404 = es gibt schon eins, und das ist beim Rerun der

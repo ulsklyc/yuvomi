@@ -27,6 +27,7 @@
     "hostHint": "Adresa, na které otevřeš Yuvomi v prohlížeči.",
     "portLabel": "Port",
     "tzLabel": "Časové pásmo",
+    "tzHint": "Slouží jako výchozí hodnota domácnosti. Později ji změníš v aplikaci v Nastavení → Vzhled.",
     "errHost": "Neplatný název hostitele. Používej jen písmena, číslice, pomlčky a tečky.",
     "errPort": "Neplatný port. Musí být číslo mezi 1 a 65535.",
     "prereqMissing": "Chybějící požadavky: {{list}}. {{link}} ukazuje, jak je nainstalovat.",
@@ -52,6 +53,7 @@
     "title": "Widget počasí",
     "subtitle": "Živé počasí na nástěnce — zdarma, bez účtu, bez API klíče.",
     "enable": "Povolit widget počasí",
+    "appHint": "Tyto hodnoty platí, dokud se v aplikaci v Nastavení → Integrace neuloží poloha domácnosti.",
     "latLabel": "Zeměpisná šířka",
     "lonLabel": "Zeměpisná délka",
     "coordHint": "Souřadnice najdete na openstreetmap.org nebo Google Maps.",
@@ -65,7 +67,7 @@
   },
   "calendar": {
     "title": "Synchronizace kalendáře",
-    "subtitle": "Propoj Yuvomi s Kalendářem Google, Apple iCloud nebo Outlookem. Vše volitelné - rozbal pro konfiguraci.",
+    "subtitle": "Propoj Yuvomi s Kalendářem Google, Outlookem nebo Apple iCloud. Vše volitelné - rozbal pro konfiguraci.",
     "google": "Kalendář Google",
     "googleHint": "Vytvoř OAuth přihlašovací údaje na {{link}}. Přesměrovací URI: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -73,6 +75,8 @@
     "googleSecretLabel": "Tajný klíč klienta",
     "googleSelectNote": "Po připojení si v nastavení aplikace zvol, který kalendář se synchronizuje (výchozí: primární kalendář).",
     "apple": "Apple iCloud CalDAV",
+    "legacy": "Starší",
+    "moreInApp": "Další účty CalDAV, třeba Nextcloud nebo druhý účet iCloud, přidáš v aplikaci v Nastavení → Kalendář.",
     "appleHint": "Vytvoř heslo pro aplikaci na {{link}}.",
     "appleLink": "appleid.apple.com",
     "appleUserLabel": "Apple ID (e-mail)",
@@ -267,6 +271,8 @@
     "nextInviteDesc": "Vytvoř pozvánkové odkazy, ať si každý zvolí vlastní heslo.",
     "nextModules": "Vyber moduly",
     "nextModulesDesc": "Zapni to, co vaše domácnost opravdu používá, zbytek skryj.",
+    "nextRegion": "Region a jazyk",
+    "nextRegionDesc": "Nastav měnu, formát data a svátky podle místa, kde žiješ.",
     "nextInstall": "Nainstaluj do telefonů",
     "nextInstallDesc": "Otevři Yuvomi v telefonu a přidej ho na plochu - funguje i offline.",
     "subtitleExisting": "Yuvomi běží. Tato instalace už má účet správce - přihlas se svými stávajícími údaji."
@@ -303,6 +309,7 @@
     "subtitle": "Umožněte členům rodiny obnovit zapomenuté heslo e-mailem. Volitelné — přeskočte, pokud to nepotřebujete.",
     "enable": "Povolit odesílání e-mailů",
     "hint": "Používá váš vlastní SMTP server (poskytovatel pošty, self-hosted nebo transakční služba).",
+    "appHint": "Co tu zadáš, bude v aplikaci jen pro čtení. Pokud chceš SMTP spravovat a testovat v aplikaci v Nastavení → E-mail (SMTP), tento krok přeskoč.",
     "hostLabel": "SMTP server",
     "portLabel": "Port",
     "secureLabel": "Šifrování",
@@ -320,6 +327,9 @@
     "title": "Úložiště a zálohy",
     "subtitle": "Kde na serveru leží tvá data a kam se ukládají jejich kopie. Vše je volitelné - výchozí nastavení funguje.",
     "sectionBackups": "Zálohy",
-    "sectionDocuments": "Úložiště dokumentů"
+    "sectionDocuments": "Úložiště dokumentů",
+    "maxUploadLabel": "Limit nahrávání (MB)",
+    "maxUploadHint": "Největší soubor, který jde nahrát, 1-100 MB. Nech prázdné pro 5 MB - vyšší hodnoty potřebují víc paměti.",
+    "errMaxUpload": "Neplatný limit nahrávání. Musí být celé číslo mezi 1 a 100."
   }
 }

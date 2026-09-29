@@ -27,6 +27,7 @@
     "hostHint": "Địa chỉ bạn sẽ dùng để mở Yuvomi trong trình duyệt.",
     "portLabel": "Cổng",
     "tzLabel": "Múi giờ",
+    "tzHint": "Dùng làm mặc định cho gia đình. Bạn có thể đổi sau trong ứng dụng, tại Cài đặt → Giao diện.",
     "errHost": "Tên máy chủ không hợp lệ. Chỉ dùng chữ cái, số, dấu gạch ngang và dấu chấm.",
     "errPort": "Cổng không hợp lệ. Phải là số từ 1 đến 65535.",
     "prereqMissing": "Thiếu thành phần bắt buộc: {{list}}. {{link}} hướng dẫn cách cài đặt.",
@@ -52,6 +53,7 @@
     "title": "Widget thời tiết",
     "subtitle": "Thời tiết trực tiếp trên bảng điều khiển — miễn phí, không cần tài khoản, không cần API key.",
     "enable": "Bật widget thời tiết",
+    "appHint": "Các giá trị này có hiệu lực cho đến khi vị trí của gia đình được lưu trong ứng dụng, tại Cài đặt → Tích hợp.",
     "latLabel": "Vĩ độ",
     "lonLabel": "Kinh độ",
     "coordHint": "Tìm tọa độ trên openstreetmap.org hoặc Google Maps.",
@@ -65,7 +67,7 @@
   },
   "calendar": {
     "title": "Đồng bộ lịch",
-    "subtitle": "Kết nối Yuvomi với Google Calendar, Apple iCloud hoặc Outlook. Tất cả đều tùy chọn - mở rộng để cấu hình.",
+    "subtitle": "Kết nối Yuvomi với Google Calendar, Outlook hoặc Apple iCloud. Tất cả đều tùy chọn - mở rộng để cấu hình.",
     "google": "Google Calendar",
     "googleHint": "Tạo thông tin xác thực OAuth tại {{link}}. URI chuyển hướng: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -73,6 +75,8 @@
     "googleSecretLabel": "Client Secret",
     "googleSelectNote": "Sau khi kết nối, bạn có thể chọn lịch cần đồng bộ trong cài đặt ứng dụng (mặc định: lịch chính).",
     "apple": "Apple iCloud CalDAV",
+    "legacy": "Cũ",
+    "moreInApp": "Thêm tài khoản CalDAV khác, như Nextcloud hoặc tài khoản iCloud thứ hai, trong ứng dụng tại Cài đặt → Lịch.",
     "appleHint": "Tạo mật khẩu dành riêng cho ứng dụng tại {{link}}.",
     "appleLink": "appleid.apple.com",
     "appleUserLabel": "Apple ID (email)",
@@ -186,6 +190,8 @@
     "nextInviteDesc": "Tạo liên kết mời để mỗi người tự chọn mật khẩu riêng.",
     "nextModules": "Chọn mô-đun",
     "nextModulesDesc": "Bật những gì gia đình bạn thực sự dùng và ẩn phần còn lại.",
+    "nextRegion": "Khu vực và ngôn ngữ",
+    "nextRegionDesc": "Đặt tiền tệ, định dạng ngày và ngày lễ theo nơi bạn sống.",
     "nextInstall": "Cài lên điện thoại",
     "nextInstallDesc": "Mở Yuvomi trên điện thoại và thêm vào màn hình chính - vẫn dùng được khi ngoại tuyến.",
     "subtitleExisting": "Yuvomi đang chạy. Bản cài đặt này đã có tài khoản quản trị - hãy đăng nhập bằng thông tin hiện có của bạn."
@@ -303,6 +309,7 @@
     "subtitle": "Cho phép các thành viên gia đình đặt lại mật khẩu đã quên qua email. Tùy chọn — bỏ qua nếu không cần.",
     "enable": "Bật gửi email",
     "hint": "Dùng máy chủ SMTP của riêng bạn (nhà cung cấp email, tự lưu trữ hoặc dịch vụ giao dịch).",
+    "appHint": "Những gì bạn nhập ở đây sẽ chỉ đọc trong ứng dụng. Nếu muốn quản lý và kiểm tra SMTP trong ứng dụng, tại Cài đặt → Email (SMTP), hãy bỏ qua bước này.",
     "hostLabel": "Máy chủ SMTP",
     "portLabel": "Cổng",
     "secureLabel": "Mã hóa",
@@ -320,6 +327,9 @@
     "title": "Lưu trữ và sao lưu",
     "subtitle": "Dữ liệu của bạn nằm ở đâu trên máy chủ, và bản sao của nó đi về đâu. Tất cả đều tùy chọn - giá trị mặc định vẫn chạy tốt.",
     "sectionBackups": "Sao lưu",
-    "sectionDocuments": "Lưu trữ tài liệu"
+    "sectionDocuments": "Lưu trữ tài liệu",
+    "maxUploadLabel": "Giới hạn tải lên (MB)",
+    "maxUploadHint": "Tệp lớn nhất có thể tải lên, 1-100 MB. Để trống để dùng 5 MB - giá trị cao hơn cần nhiều bộ nhớ hơn.",
+    "errMaxUpload": "Giới hạn tải lên không hợp lệ. Phải là số nguyên từ 1 đến 100."
   }
 }

@@ -27,6 +27,7 @@
     "hostHint": "Adressen du använder för att öppna Yuvomi i webbläsaren.",
     "portLabel": "Port",
     "tzLabel": "Tidszon",
+    "tzHint": "Används som standard för hushållet. Du kan ändra den senare i appen under Inställningar → Utseende.",
     "errHost": "Ogiltigt värdnamn. Använd endast bokstäver, siffror, bindestreck och punkter.",
     "errPort": "Ogiltig port. Måste vara ett tal mellan 1 och 65535.",
     "prereqMissing": "Saknade förutsättningar: {{list}}. {{link}} visar hur du installerar dem.",
@@ -52,6 +53,7 @@
     "title": "Väder-widget",
     "subtitle": "Liveväder på instrumentpanelen — gratis, inget konto, ingen API-nyckel.",
     "enable": "Aktivera väder-widget",
+    "appHint": "De här värdena gäller tills en plats för hushållet sparas i appen under Inställningar → Integrationer.",
     "latLabel": "Latitud",
     "lonLabel": "Longitud",
     "coordHint": "Hitta koordinater på openstreetmap.org eller Google Maps.",
@@ -65,7 +67,7 @@
   },
   "calendar": {
     "title": "Kalendersynkronisering",
-    "subtitle": "Anslut Yuvomi till Google Kalender, Apple iCloud eller Outlook. Alla valfria - expandera för att konfigurera.",
+    "subtitle": "Anslut Yuvomi till Google Kalender, Outlook eller Apple iCloud. Alla valfria - expandera för att konfigurera.",
     "google": "Google Kalender",
     "googleHint": "Skapa OAuth-uppgifter på {{link}}. Omdirigerings-URI: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -73,6 +75,8 @@
     "googleSecretLabel": "Klienthemlighet",
     "googleSelectNote": "Efter anslutning kan du välja vilken kalender som ska synkroniseras i appens inställningar (standard: primär kalender).",
     "apple": "Apple iCloud CalDAV",
+    "legacy": "Äldre",
+    "moreInApp": "Lägg till fler CalDAV-konton, till exempel Nextcloud eller ett andra iCloud-konto, i appen under Inställningar → Kalender.",
     "appleHint": "Skapa ett appspecifikt lösenord på {{link}}.",
     "appleLink": "appleid.apple.com",
     "appleUserLabel": "Apple-ID (e-post)",
@@ -186,6 +190,8 @@
     "nextInviteDesc": "Skapa inbjudningslänkar så att alla väljer sitt eget lösenord.",
     "nextModules": "Välj dina moduler",
     "nextModulesDesc": "Slå på det hushållet faktiskt använder och göm resten.",
+    "nextRegion": "Region och språk",
+    "nextRegionDesc": "Ställ in valuta, datumformat och helgdagar efter där du bor.",
     "nextInstall": "Installera på telefonerna",
     "nextInstallDesc": "Öppna Yuvomi i telefonen och lägg till den på hemskärmen - den fungerar offline.",
     "subtitleExisting": "Yuvomi körs. Den här installationen har redan ett administratörskonto - logga in med dina befintliga uppgifter."
@@ -303,6 +309,7 @@
     "subtitle": "Låt familjemedlemmar återställa ett glömt lösenord via e-post. Valfritt — hoppa över om du inte behöver det.",
     "enable": "Aktivera e-postutskick",
     "hint": "Använder din egen SMTP-server (e-postleverantör, självhostad eller en transaktionstjänst).",
+    "appHint": "Det du anger här är skrivskyddat i appen. Vill du hellre sköta och testa SMTP i appen under Inställningar → E-post (SMTP), hoppa över det här steget.",
     "hostLabel": "SMTP-server",
     "portLabel": "Port",
     "secureLabel": "Kryptering",
@@ -320,6 +327,9 @@
     "title": "Lagring och säkerhetskopior",
     "subtitle": "Var dina data ligger på servern och vart kopiorna tar vägen. Allt är valfritt - standardvärdena fungerar.",
     "sectionBackups": "Säkerhetskopior",
-    "sectionDocuments": "Dokumentlagring"
+    "sectionDocuments": "Dokumentlagring",
+    "maxUploadLabel": "Uppladdningsgräns (MB)",
+    "maxUploadHint": "Största fil som går att ladda upp, 1-100 MB. Lämna tomt för 5 MB - högre värden kräver mer minne.",
+    "errMaxUpload": "Ogiltig uppladdningsgräns. Måste vara ett heltal mellan 1 och 100."
   }
 }

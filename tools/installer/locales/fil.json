@@ -27,6 +27,7 @@
     "hostHint": "Ang address na gagamitin mo para buksan ang Yuvomi sa iyong browser.",
     "portLabel": "Port",
     "tzLabel": "Time zone",
+    "tzHint": "Ginagamit bilang default ng sambahayan. Mapapalitan mo ito mamaya sa app sa Mga Setting → Hitsura.",
     "errHost": "Hindi wastong hostname. Gumamit lamang ng mga titik, numero, gitling at tuldok.",
     "errPort": "Hindi wastong port. Dapat numero sa pagitan ng 1 at 65535.",
     "prereqMissing": "Kulang na kinakailangan: {{list}}. Ipinapakita ng {{link}} kung paano ito i-install.",
@@ -52,6 +53,7 @@
     "title": "Widget ng Panahon",
     "subtitle": "Live na panahon sa dashboard - libre, walang account, walang API key.",
     "enable": "I-enable ang widget ng panahon",
+    "appHint": "Ang mga value na ito ang gagamitin hangga't walang naka-save na lokasyon ng sambahayan sa app sa Mga Setting → Mga integrasyon.",
     "latLabel": "Latitud",
     "lonLabel": "Longhitud",
     "coordHint": "Hanapin ang mga coordinate sa openstreetmap.org o Google Maps.",
@@ -65,7 +67,7 @@
   },
   "calendar": {
     "title": "Pag-sync ng Kalendaryo",
-    "subtitle": "Ikonekta ang Yuvomi sa Google Calendar, Apple iCloud o Outlook. Lahat opsyonal - palawakin para i-configure.",
+    "subtitle": "Ikonekta ang Yuvomi sa Google Calendar, Outlook o Apple iCloud. Lahat opsyonal - palawakin para i-configure.",
     "google": "Google Calendar",
     "googleHint": "Gumawa ng mga kredensyal na OAuth sa {{link}}. Redirect URI: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -73,6 +75,8 @@
     "googleSecretLabel": "Client Secret",
     "googleSelectNote": "Pagkatapos kumonekta, mapipili mo kung aling kalendaryo ang isi-sync sa mga setting ng app (default: pangunahing kalendaryo).",
     "apple": "Apple iCloud CalDAV",
+    "legacy": "Luma",
+    "moreInApp": "Magdagdag ng iba pang CalDAV account, gaya ng Nextcloud o pangalawang iCloud account, sa app sa Mga Setting → Kalendaryo.",
     "appleHint": "Gumawa ng password na tanging sa app sa {{link}}.",
     "appleLink": "appleid.apple.com",
     "appleUserLabel": "Apple ID (email)",
@@ -267,6 +271,8 @@
     "nextInviteDesc": "Gumawa ng mga invitation link para pumili ang bawat isa ng sariling password.",
     "nextModules": "Piliin ang mga module",
     "nextModulesDesc": "I-on ang talagang ginagamit ng sambahayan mo at itago ang iba.",
+    "nextRegion": "Rehiyon at wika",
+    "nextRegionDesc": "Itakda ang pera, format ng petsa at mga holiday ayon sa lugar mo.",
     "nextInstall": "I-install sa mga telepono",
     "nextInstallDesc": "Buksan ang Yuvomi sa telepono at idagdag sa home screen - gumagana kahit offline.",
     "subtitleExisting": "Tumatakbo ang Yuvomi. May administrator account na ang installation na ito - mag-sign in gamit ang kasalukuyan mong mga kredensyal."
@@ -303,6 +309,7 @@
     "subtitle": "Hayaang i-reset ng mga miyembro ng pamilya ang nakalimutang password sa email. Opsyonal - laktawan kung hindi kailangan.",
     "enable": "I-enable ang pagpapadala ng email",
     "hint": "Gumagamit ng sarili mong SMTP server (provider ng mailbox, sariling host, o serbisyong transaksyonal).",
+    "appHint": "Ang ilalagay mo rito ay read-only sa app. Kung mas gusto mong pamahalaan at subukan ang SMTP sa app sa Mga Setting → Email (SMTP), laktawan ang hakbang na ito.",
     "hostLabel": "SMTP server",
     "portLabel": "Port",
     "secureLabel": "Pag-encrypt",
@@ -320,6 +327,9 @@
     "title": "Storage at backup",
     "subtitle": "Kung saan nakatira ang data mo sa server, at saan napupunta ang mga kopya nito. Opsyonal lahat - gumagana ang mga default.",
     "sectionBackups": "Mga backup",
-    "sectionDocuments": "Storage ng dokumento"
+    "sectionDocuments": "Storage ng dokumento",
+    "maxUploadLabel": "Limitasyon sa pag-upload (MB)",
+    "maxUploadHint": "Pinakamalaking file na maaaring i-upload, 1-100 MB. Iwanang blangko para sa 5 MB - mas maraming memory ang kailangan ng mas mataas na value.",
+    "errMaxUpload": "Hindi wastong limitasyon sa pag-upload. Dapat buong numero sa pagitan ng 1 at 100."
   }
 }

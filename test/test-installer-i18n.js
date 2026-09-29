@@ -265,3 +265,34 @@ test('der Sprachumschalter bietet genau die unterstuetzten Sprachen an', () => {
     `Optionsliste weicht von SUPPORTED_LOCALES ab. Nur im Select: ${offered.filter(l => !supported.includes(l))}; `
     + `nur in SUPPORTED_LOCALES: ${supported.filter(l => !offered.includes(l))}`);
 });
+
+/* Die Sprache, die der Installer als `language` an /api/v1/auth/setup reicht,
+ * muss die App kennen - in BEIDE Richtungen gemessen.
+ *
+ * Die App nimmt nur Codes aus getSupportedLocales() an (server/utils/i18n.js),
+ * und die kommen aus den Dateinamen in public/locales/ - Kurzcodes wie `de`,
+ * `pt`, `fil`. Hiesse eine Installer-Locale einmal `pt-BR` oder `zh-Hans`,
+ * waehrend die App `pt`/`zh` fuehrt, bekaeme genau dieser Haushalt still eine
+ * englische Datensprache (der Proxy wiederholt nach einem 400 ohne Sprache).
+ * Gelesen wird die echte Funktion, nicht eine abgeschriebene Liste: kommt in
+ * der App eine Sprache dazu, faellt die Rueckrichtung hier auf. */
+test('jede Installer-Sprache ist eine App-Sprache, und umgekehrt', async () => {
+  const { getSupportedLocales } = await import('../server/utils/i18n.js');
+  const { SETUP_LANGUAGES, setupLanguage } = await import('../tools/installer/install-server.js');
+  const app = getSupportedLocales();
+  assert.ok(app.length >= 2, `getSupportedLocales() lieferte nur ${app} - der Leser greift nicht`);
+
+  const installer = [...SETUP_LANGUAGES].sort();
+  assert.deepEqual(installer, [...SUPPORTED_LOCALES].sort(),
+    'die Allowlist des Proxys muss aus den Installer-Locales kommen');
+
+  const unknownToApp = installer.filter(l => !app.includes(l));
+  assert.deepEqual(unknownToApp, [],
+    `Installer-Sprachen, die /auth/setup mit 400 ablehnen wuerde: ${unknownToApp}. `
+    + 'Code auf den App-Code abbilden (setupLanguage) statt ihn roh weiterzureichen.');
+  const missingInInstaller = app.filter(l => !installer.includes(l));
+  assert.deepEqual(missingInInstaller, [],
+    `App-Sprachen ohne Installer-Locale: ${missingInInstaller} - wer sie spricht, kann sie im Wizard nicht waehlen.`);
+
+  for (const l of installer) assert.equal(setupLanguage(l), l, `${l} muss unveraendert durchgehen`);
+});

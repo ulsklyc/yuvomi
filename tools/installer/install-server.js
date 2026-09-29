@@ -13,6 +13,7 @@ import { randomBytes } from 'node:crypto';
 import { resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENV_SCHEMA } from './env-schema.js';
+import { SUPPORTED_LOCALES as INSTALLER_LOCALES } from './i18n-mini.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = resolve(__dirname, '..', '..');
@@ -27,6 +28,25 @@ function projectRoot() {
 }
 
 const WRITABLE_KEYS = new Set(ENV_SCHEMA.filter(e => e.writeToEnv).map(e => e.key));
+
+/**
+ * Sprachen, die der Proxy als `language` an /api/v1/auth/setup weiterreicht.
+ *
+ * Die App setzt damit die Datensprache des Haushalts (Geburtstagstitel, ICS,
+ * Suche) - ohne sie fiel die beim ersten Konto still auf Englisch, obwohl der
+ * Nutzer den ganzen Wizard z.B. auf Franzoesisch durchlaufen hatte. Die Liste
+ * kommt aus den Installer-Locales, denn nur die kann der Browser schicken; der
+ * Server nimmt ausschliesslich Kurzcodes aus getSupportedLocales() an
+ * (server/utils/i18n.js), `de-DE` oder `DE` waeren ein 400. Heute sind beide
+ * Listen gleich, test-installer-i18n.js haelt sie gleich. Alles andere faellt
+ * hier weg, statt die Kontoanlage an einem Sprachcode scheitern zu lassen.
+ */
+export const SETUP_LANGUAGES = new Set(INSTALLER_LOCALES);
+
+/** Der weiterzureichende Sprachcode, oder null. */
+export function setupLanguage(value) {
+  return typeof value === 'string' && SETUP_LANGUAGES.has(value) ? value : null;
+}
 
 let idleTimer = null;
 
@@ -770,30 +790,25 @@ async function route(req, res, server) {
       // Pin the proxy target to a valid port; ignore anything else the client sends.
       const oikosPort = Number.isInteger(body.port) && body.port > 0 && body.port < 65536
         ? body.port : 3000;
-      const payload = JSON.stringify({
+      const account = {
         username: body.username,
         display_name: body.display_name,
         password: body.password,
-      });
-
-      const result = await new Promise((resolve, reject) => {
-        const opts = {
-          hostname: 'localhost', port: oikosPort,
-          path: '/api/v1/auth/setup', method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
-        };
-        const proxyReq = http.request(opts, proxyRes => {
-          let data = '';
-          proxyRes.on('data', d => { data += d; });
-          proxyRes.on('end', () => {
-            try { resolve({ status: proxyRes.statusCode, body: JSON.parse(data) }); }
-            catch { resolve({ status: proxyRes.statusCode, body: { error: 'Invalid response from Yuvomi' } }); }
-          });
-        });
-        proxyReq.on('error', reject);
-        proxyReq.write(payload);
-        proxyReq.end();
-      });
+      };
+      const language = setupLanguage(body.language);
+      let result = await postSetup(oikosPort, language ? { ...account, language } : account);
+      // Ein Image, das `language` noch gar nicht kennt, ignoriert das Feld (die
+      // Route verwirft unbekannte Felder). Ein 400 mit Sprache heisst also: das
+      // Image kennt das Feld, aber nicht DIESEN Code. Das darf die Kontoanlage
+      // nicht kosten - einmal ohne Sprache wiederholen, sie ist in der App
+      // nachtraeglich einstellbar. Absichtlich an jedem 400 und nicht am Text
+      // der Meldung: aendert sich deren Wortlaut, bliebe der Nutzer sonst ohne
+      // Admin-Konto stehen. Ein 400 aus anderem Grund (Name, Passwort) kommt
+      // beim zweiten Versuch unveraendert zurueck, und der ist dann die Antwort.
+      if (result.status === 400 && language) {
+        console.log(`Setup did not accept language "${language}" - retrying without it.`);
+        result = await postSetup(oikosPort, account);
+      }
 
       json(res, result.status, result.body);
 
@@ -817,6 +832,32 @@ async function route(req, res, server) {
   }
 
   json(res, 404, { error: 'Not found' });
+}
+
+/**
+ * Ein POST an /api/v1/auth/setup der frisch gestarteten App. Loggt nichts vom
+ * Body: darin stehen Benutzername und Passwort des ersten Admins.
+ */
+function postSetup(port, account) {
+  const payload = JSON.stringify(account);
+  return new Promise((resolvePromise, reject) => {
+    const opts = {
+      hostname: 'localhost', port,
+      path: '/api/v1/auth/setup', method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+    };
+    const proxyReq = http.request(opts, proxyRes => {
+      let data = '';
+      proxyRes.on('data', d => { data += d; });
+      proxyRes.on('end', () => {
+        try { resolvePromise({ status: proxyRes.statusCode, body: JSON.parse(data) }); }
+        catch { resolvePromise({ status: proxyRes.statusCode, body: { error: 'Invalid response from Yuvomi' } }); }
+      });
+    });
+    proxyReq.on('error', reject);
+    proxyReq.write(payload);
+    proxyReq.end();
+  });
 }
 
 export function createInstallerServer() {
