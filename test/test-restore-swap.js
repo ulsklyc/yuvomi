@@ -1159,7 +1159,7 @@ test('#1431 restoreWriteGate haengt vor Body-Parsern, Sessions und Routern', () 
   const source = readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
   const gate = source.indexOf('app.use(createRestoreWriteGate(db.isRestoreRunning, db.isDatabaseOpen));');
   assert.ok(gate > 0, 'server/index.js muss den Riegel mit db.isRestoreRunning und db.isDatabaseOpen einhaengen');
-  for (const later of ['app.use(express.json(', 'app.use(express.urlencoded(', 'app.use(sessionMiddleware);', "app.use('/api/v1/auth', authRouter);", "app.use('/mcp'", "app.use('/api/v1/tasks', tasksRouter);"]) {
+  for (const later of ['app.use(express.json(', 'app.use(express.urlencoded(', 'app.use(sessionMiddleware);', "app.use('/api/v1/auth', trackAdmittedWrite, authRouter);", "app.use('/mcp'", "app.use('/api/v1/tasks', tasksRouter);"]) {
     assert.ok(source.indexOf(later) > gate, `${later} kommt nach dem Riegel`);
   }
 });
@@ -1680,4 +1680,210 @@ test('#1431 trackAdmittedWrite weist eine Anfrage ab, die erst nach Restore-Begi
   assert.equal(passed, false);
   assert.equal(res.statusCode, 503);
   assert.equal(res.body.reason, 'restore_in_progress');
+});
+
+// ---------------------------------------------------------------------------
+// Restarbeit #1441
+// ---------------------------------------------------------------------------
+
+/** Minimale Antwort fuer die Middleware-Proben: haelt Status, Koerper und Ereignisse. */
+function probeResponse() {
+  const { EventEmitter } = globalThis.__restoreProbeEvents;
+  const res = new EventEmitter();
+  Object.assign(res, {
+    statusCode: 200, body: null, headers: {}, writableEnded: false,
+    setHeader(k, v) { this.headers[k] = v; },
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; this.end(); return this; },
+    end() { this.writableEnded = true; this.emit('finish'); return this; },
+  });
+  return res;
+}
+globalThis.__restoreProbeEvents = await import('node:events');
+
+test('#1441 bei geschlossener Verbindung bekommt jede Schreibweise des Pfads 503, die Express annimmt', async () => {
+  const { createRestoreWriteGate } = await import('../server/middleware/restore-gate.js');
+  const gate = createRestoreWriteGate(() => true, () => false);
+  // Express vergleicht Pfade ohne Beachtung der Gross- und Kleinschreibung:
+  // /API/v1/... erreicht dieselben Router wie /api/v1/... - und scheiterte
+  // dort an der fehlenden Verbindung mit 500 statt 503.
+  for (const url of ['/API/v1/auth/me', '/Api/V1/tasks', '/MCP', '/Mcp/x', '/Feed/calendar/abc.ics', '/OpenAPI.json']) {
+    const res = probeResponse();
+    let passed = false;
+    gate({ method: 'GET', originalUrl: url, url }, res, () => { passed = true; });
+    assert.equal(passed, false, `${url} darf bei geschlossener Verbindung nicht durchgehen`);
+    assert.equal(res.statusCode, 503, url);
+    assert.equal(res.body.reason, 'restore_in_progress', url);
+  }
+  const asset = probeResponse();
+  let passed = false;
+  gate({ method: 'GET', originalUrl: '/Manifest.json', url: '/Manifest.json' }, asset, () => { passed = true; });
+  assert.equal(passed, true, 'statische Dateien gehen weiter durch');
+});
+
+test('#1441 ein OAuth- oder OIDC-Callback, der vor dem Restore begann, wird bis zu seinem Ende abgewartet', async () => {
+  const state = await import('../server/utils/restore-state.js');
+  const { refuseWhileRestoring } = await import('../server/middleware/restore-gate.js');
+  // Die Callbacks (Google Calendar, Outlook, Google Drive, /oidc/callback)
+  // sind GET-Anfragen: die Schreibsperre fasst sie nicht an. Sie warten auf
+  // den Anbieter und schreiben danach Tokens oder einen Nutzer - lief ein
+  // Restore dazwischen durch, landete das in der eingespielten Datenbank.
+  assert.equal(state.hasActiveWriteRequests(), false, 'Vorbedingung: nichts festgehalten');
+  const res = probeResponse();
+  let passed = false;
+  refuseWhileRestoring({ method: 'GET' }, res, () => { passed = true; });
+  assert.equal(passed, true, 'ohne Restore geht der Callback durch');
+  assert.equal(state.hasActiveWriteRequests(), true, 'der Callback wird festgehalten, bis er endet');
+  res.end();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(state.hasActiveWriteRequests(), false, 'nach dem Ende gibt er den Restore frei');
+});
+
+test('#1441 bricht der Client ab, bleibt eine zugelassene Anfrage festgehalten, bis ihr Handler endet', async () => {
+  const state = await import('../server/utils/restore-state.js');
+  assert.equal(state.hasActiveWriteRequests(), false, 'Vorbedingung: nichts festgehalten');
+  const res = probeResponse();
+  state.trackWriteRequest(res);
+  // Der Client legt auf (etwa mitten in einem langsamen Upload): 'close' ohne
+  // Ende der Antwort. Der Handler laeuft weiter und schreibt spaeter.
+  res.emit('close');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(state.hasActiveWriteRequests(), true, 'nach dem Abbruch schreibt der Handler noch - festhalten');
+  res.end();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(state.hasActiveWriteRequests(), false, 'erst sein Ende gibt den Restore frei');
+});
+
+test('#1441 ein Handler, der nach dem Abbruch des Clients nie endet, haelt den Restore nicht dauerhaft auf', async () => {
+  const state = await import('../server/utils/restore-state.js');
+  state.setAbandonedWriteGraceForTests(50);
+  try {
+    const res = probeResponse();
+    state.trackWriteRequest(res);
+    res.emit('close');
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    assert.equal(state.hasActiveWriteRequests(), false, 'nach der Frist ist er freigegeben');
+  } finally {
+    state.setAbandonedWriteGraceForTests();
+  }
+});
+
+test('#1441 alle vier Anbieter-Callbacks laufen durch refuseWhileRestoring und werden damit abgewartet', () => {
+  const callbacks = [
+    ['../server/auth.js', "router.get('/oidc/callback', refuseWhileRestoring,"],
+    ['../server/routes/calendar/google.js', "router.get('/google/callback', refuseWhileRestoring,"],
+    ['../server/routes/calendar/outlook.js', "router.get('/outlook/callback', refuseWhileRestoring,"],
+    ['../server/routes/document-storage-google-drive.js', "router.get('/callback', requireAdmin, refuseWhileRestoring,"],
+  ];
+  for (const [file, line] of callbacks) {
+    const source = readFileSync(new URL(file, import.meta.url), 'utf8');
+    assert.ok(source.includes(line), `${file}: ${line}`);
+  }
+});
+
+test('#1441 der dokumentierte Compose-Restore bringt das Beiseitelegen von -wal und -shm auf die Platte, bevor er die Datenbank ersetzt', async () => {
+  // Ein Stromausfall direkt nach dem letzten `mv` darf den Tausch nicht
+  // behalten und das Wegraeumen des alten Journals verlieren: SQLite wendete
+  // das -wal der alten Datenbank sonst auf die eingespielte an (#1267).
+  const laufend = join(tempDir('yuvomi-test-swap-'), 'laufend.db');
+  const mod = await bootDb(laufend, null);
+  mod.get().exec('CREATE TABLE restore_probe (note TEXT)');
+  mod.get().pragma('wal_autocheckpoint = 0');
+  mod.get().prepare('INSERT INTO restore_probe (note) VALUES (?)').run('nur im -wal');
+  const dir = tempDir('yuvomi-test-swap-');
+  const dbPath = join(dir, 'yuvomi.db');
+  for (const suffix of ['', '-wal', '-shm']) copyFileSync(`${laufend}${suffix}`, `${dbPath}${suffix}`);
+  mod.get().close();
+  const backupPath = await bigBackup(null, 'aus dem Backup');
+
+  // mv, rm und sync protokollieren und dann das echte Programm ausfuehren.
+  const shimDir = tempDir('yuvomi-test-swap-order-');
+  const logPath = join(shimDir, 'calls.log');
+  for (const cmd of ['mv', 'rm', 'sync']) {
+    writeFileSync(join(shimDir, cmd), [
+      '#!/bin/sh',
+      `printf '%s\\n' "${cmd} $*" >> "$SWAP_CALL_LOG"`,
+      `PATH="$SWAP_ORIG_PATH" exec ${cmd} "$@"`,
+      '',
+    ].join('\n'));
+    chmodSync(join(shimDir, cmd), 0o755);
+  }
+  const script = documentedComposeRestore().replaceAll('/tmp/yuvomi-restore.db', backupPath);
+  const run = spawnSync('/bin/sh', ['-c', script], {
+    env: {
+      ...process.env, DB_PATH: dbPath, LOG_LEVEL: 'error',
+      PATH: `${shimDir}:${process.env.PATH}`, SWAP_ORIG_PATH: process.env.PATH, SWAP_CALL_LOG: logPath,
+    },
+    encoding: 'utf8',
+    cwd: fileURLToPath(new URL('..', import.meta.url)),
+  });
+  assert.equal(run.status, 0, `der Befehl muss gelingen: ${run.stderr}`);
+  const calls = readFileSync(logPath, 'utf8').trim().split('\n');
+  const swap = calls.findIndex((call) => call.startsWith('mv ') && call.includes('.restore-tmp-') && call.endsWith(` ${dbPath}`));
+  assert.ok(swap > 0, `der Tausch per mv: ${calls.join(' | ')}`);
+  const journal = calls.findIndex((call) => call.startsWith(`mv ${dbPath}-wal ${dbPath}.pre-restore-`));
+  assert.ok(journal >= 0 && journal < swap, `Vorbedingung: das -wal wird vor dem Tausch beiseitegelegt: ${calls.join(' | ')}`);
+  const shm = calls.findIndex((call) => call.startsWith('rm ') && call.endsWith(`${dbPath}-shm`));
+  assert.ok(shm >= 0 && shm < swap, `Vorbedingung: das -shm wird vor dem Tausch entfernt: ${calls.join(' | ')}`);
+  const lastJournalStep = Math.max(journal, shm);
+  assert.ok(
+    calls.slice(lastJournalStep + 1, swap).includes('sync '),
+    `zwischen dem Wegraeumen des Journals und dem Tausch muss ein sync stehen: ${calls.join(' | ')}`
+  );
+  assert.equal(sha256(dbPath), sha256(backupPath), 'DB_PATH ist das Backup');
+});
+
+test('#1441 wie unter Windows: fsync auf einem nur lesend geoeffneten Handle scheitert mit EPERM - der Restore laeuft trotzdem', async () => {
+  // Windows (FlushFileBuffers) verlangt einen Handle mit Schreibrecht. Node
+  // nativ unter Windows blieb deshalb beim Anlegen der Arbeitsdatei stehen.
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const realOpen = fsp.open;
+  const readOnlySyncs = [];
+  fsp.open = async (filePath, flags = 'r', mode) => {
+    const handle = await realOpen(filePath, flags, mode);
+    if (flags === 'r') {
+      handle.sync = async () => {
+        readOnlySyncs.push(String(filePath));
+        throw Object.assign(new Error(`EPERM: operation not permitted, fsync '${filePath}'`), { code: 'EPERM', syscall: 'fsync' });
+      };
+    }
+    return handle;
+  };
+  try {
+    await target.mod.restoreFromFile(backupPath);
+  } finally {
+    fsp.open = realOpen;
+  }
+  assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe').get()?.note, 'aus dem Backup');
+  assert.deepEqual(
+    readOnlySyncs.filter((p) => !statSync(p, { throwIfNoEntry: false })?.isDirectory() && p !== target.dir),
+    [],
+    'keine Datei wird ueber einen nur lesenden Handle auf die Platte gebracht'
+  );
+  target.mod.get().close();
+});
+
+test('#1441 ist die Arbeitsdatei schreibgeschuetzt, wird sie lesend geoeffnet und trotzdem auf die Platte gebracht', async () => {
+  // Kein Schreibrecht auf die Datei (etwa eine Datenbank mit 0444): dann
+  // bleibt es beim lesenden Handle, wie bisher - er genuegt ausserhalb von Windows.
+  const backupPath = await bigBackup(null, 'aus dem Backup');
+  const target = await frozenTarget(null, 'vor dem Restore');
+  const realOpen = fsp.open;
+  const opened = [];
+  fsp.open = async (filePath, flags = 'r', mode) => {
+    if (String(filePath).includes('.restore-tmp-') && flags !== 'r') {
+      opened.push(flags);
+      throw Object.assign(new Error(`EACCES: permission denied, open '${filePath}'`), { code: 'EACCES' });
+    }
+    return realOpen(filePath, flags, mode);
+  };
+  try {
+    await target.mod.restoreFromFile(backupPath);
+  } finally {
+    fsp.open = realOpen;
+  }
+  assert.ok(opened.length > 0, 'Vorbedingung: erst wurde schreibend geoeffnet');
+  assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe').get()?.note, 'aus dem Backup');
+  target.mod.get().close();
 });

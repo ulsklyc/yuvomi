@@ -290,7 +290,12 @@ app.use('/api/', apiLimiter);
 // --------------------------------------------------------
 // API-Routen
 // --------------------------------------------------------
-app.use('/api/v1/auth', authRouter);
+// Anmeldung, Passwort-Reset und Einladungen schreiben ebenfalls - /auth/login
+// liest den Nutzer, wartet auf bcrypt und schreibt dann die Sitzung. Ein
+// Restore in dieser Luecke wartet sie ab, statt dass die Sitzung nach dem Tausch
+// in der eingespielten Datenbank landet (#1441). Der Koerper ist hier schon
+// gelesen (express.json oben), eine langsame Anfrage haelt also nichts auf.
+app.use('/api/v1/auth', trackAdmittedWrite, authRouter);
 
 function buildVersionPayload(includeVersion = false) {
   let appName = DEFAULT_APP_NAME;
