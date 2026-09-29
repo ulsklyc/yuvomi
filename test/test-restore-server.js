@@ -24,7 +24,8 @@ import { tempDir } from './tmp-dir.js';
 
 const { baseUrl: BASE, server } = await startTestServer({
   name: 'restore-server',
-  env: { SESSION_SECRET: 'test-restore-server-secret-min-32-chars' },
+  // BASE_URL: ohne ihn verschickt /forgot-password keinen Link (#1532).
+  env: { SESSION_SECRET: 'test-restore-server-secret-min-32-chars', BASE_URL: 'http://127.0.0.1' },
 });
 const dbmod = await import('../server/db.js');
 
@@ -434,4 +435,150 @@ test('#1441 legt der Client waehrend der Anmeldung auf, wird ihr Handler trotzde
   const { restoreOutcome, sessionsInBackup, sessionsAfter } = await restoreDuringHeldLogin({ abortClient: true });
   assert.equal(sessionsAfter, sessionsInBackup, 'die eingespielte Datenbank traegt genau die Sitzungen des Backups');
   assert.equal(restoreOutcome, 'wartet auf die Anmeldung', 'der Restore wartet den noch laufenden Handler ab');
+});
+
+// ---------------------------------------------------------------------------
+// #1532: Arbeit, die nach der Antwort weiterlaeuft
+// ---------------------------------------------------------------------------
+
+/**
+ * Einen Restore neben einer haengenden Arbeit laufen lassen und die Arbeit erst
+ * freigeben, wenn der Restore fertig ist - hoechstens nach `holdMs`. Wartet der
+ * Restore auf sie, laeuft die Frist ab; tut er es nicht, ist er vorher fertig.
+ */
+async function restoreBesideHeldWork(backupPath, release, { holdMs = 3000 } = {}) {
+  const restore = dbmod.restoreFromFile(backupPath).then(() => 'eingespielt', (err) => err.reason ?? err.message);
+  let timer;
+  const outcome = await Promise.race([
+    restore.then((result) => `vor der Arbeit ${result}`),
+    new Promise((resolve) => { timer = setTimeout(() => resolve('wartet auf die Arbeit'), holdMs); }),
+  ]);
+  clearTimeout(timer);
+  release();
+  await restore;
+  return outcome;
+}
+
+function heldGate() {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  let reached;
+  const atGate = new Promise((resolve) => { reached = resolve; });
+  return { gate, atGate, reached, release };
+}
+
+async function csrfToken() {
+  const res = await fetch(`${BASE}/api/v1/notes`, { headers: { Cookie: COOKIE } });
+  const token = res.headers.get('x-csrf-token');
+  assert.ok(token, 'Vorbedingung: ein CSRF-Token');
+  return token;
+}
+
+test('#1532 die Reset-Mail nach der Antwort wird abgewartet und schreibt kein Token in die eingespielte Datenbank', async () => {
+  const database = dbmod.get();
+  const admin = database.prepare("SELECT id FROM users WHERE username = 'admin'").get();
+  const contact = database.prepare('SELECT id FROM contacts WHERE family_user_id = ?').get(admin.id);
+  if (contact) database.prepare("UPDATE contacts SET email = 'admin@example.org' WHERE id = ?").run(contact.id);
+  else database.prepare("INSERT INTO contacts (name, email, family_user_id) VALUES ('Admin', 'admin@example.org', ?)").run(admin.id);
+  database.prepare('DELETE FROM password_resets').run();
+
+  const { emailService } = await import('../server/services/email.js');
+  const real = { isConfigured: emailService.isConfigured, sendMail: emailService.sendMail };
+  const held = heldGate();
+  let mails = 0;
+  emailService.isConfigured = () => true;
+  emailService.sendMail = async () => {
+    mails += 1;
+    held.reached();
+    await held.gate;
+    return {};
+  };
+  const backupPath = join(tempDir('yuvomi-test-restore-server-'), 'backup.db');
+  let outcome;
+  try {
+    await dbmod.backupToFile(backupPath);
+    const ask = () => fetch(`${BASE}/api/v1/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: 'admin' }),
+    });
+    // Der erste Antrag legt sein Token an und haengt im Versand; der zweite
+    // wartet in der Kette auf ihn und legt sein Token erst danach an.
+    assert.equal((await ask()).status, 200, 'Vorbedingung: erster Antrag');
+    await held.atGate;
+    assert.equal((await ask()).status, 200, 'Vorbedingung: zweiter Antrag');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    outcome = await restoreBesideHeldWork(backupPath, held.release);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  } finally {
+    held.release();
+    emailService.isConfigured = real.isConfigured;
+    emailService.sendMail = real.sendMail;
+  }
+  assert.equal(mails >= 1, true, 'Vorbedingung: der Versand wurde erreicht');
+  const tokens = dbmod.get().prepare('SELECT COUNT(*) AS n FROM password_resets').get().n;
+  assert.equal(tokens, 0, 'die eingespielte Datenbank traegt nur die Tokens des Backups (keine)');
+  assert.equal(outcome, 'wartet auf die Arbeit', 'der Restore wartet den Versand nach der Antwort ab');
+});
+
+test('#1532 der Erwaehnungs-Push nach der Antwort wird abgewartet und schreibt nicht in die eingespielte Datenbank', async () => {
+  const csrf = await csrfToken();
+  const headers = { Cookie: COOKIE, 'X-CSRF-Token': csrf, 'Content-Type': 'application/json' };
+  const created = await fetch(`${BASE}/api/v1/auth/users`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ username: 'bea1532', display_name: 'Bea', password: 'beapass1234' }),
+  });
+  assert.ok([200, 201].includes(created.status), `Vorbedingung: zweites Mitglied (${created.status} ${await created.text()})`);
+  const bea = dbmod.get().prepare("SELECT id FROM users WHERE username = 'bea1532'").get();
+  const task = await fetch(`${BASE}/api/v1/tasks`, { method: 'POST', headers, body: JSON.stringify({ title: 'Erwaehnung #1532' }) });
+  assert.equal(task.status, 201, 'Vorbedingung: eine Aufgabe');
+  const taskId = (await task.json()).data.id;
+  const endpoint = 'https://push.example.org/1532';
+  dbmod.get().prepare('INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)')
+    .run(bea.id, endpoint, 'p256dh-1532', 'auth-1532');
+
+  const webpush = (await import('web-push')).default;
+  const realSend = webpush.sendNotification;
+  const held = heldGate();
+  let pushes = 0;
+  webpush.sendNotification = async () => {
+    pushes += 1;
+    held.reached();
+    await held.gate;
+    return { statusCode: 201 };
+  };
+  const backupPath = join(tempDir('yuvomi-test-restore-server-'), 'backup.db');
+  let outcome;
+  try {
+    await dbmod.backupToFile(backupPath);
+    const comment = await fetch(`${BASE}/api/v1/tasks/${taskId}/comments`, {
+      method: 'POST', headers, body: JSON.stringify({ comment: '@Bea schau mal' }),
+    });
+    assert.equal(comment.status, 201, 'Vorbedingung: der Kommentar');
+    await held.atGate;
+    outcome = await restoreBesideHeldWork(backupPath, held.release);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  } finally {
+    held.release();
+    webpush.sendNotification = realSend;
+  }
+  assert.equal(pushes, 1, 'Vorbedingung: der Push wurde erreicht');
+  const row = dbmod.get().prepare('SELECT last_used_at FROM push_subscriptions WHERE endpoint = ?').get(endpoint);
+  assert.equal(row?.last_used_at ?? null, null, 'die eingespielte Datenbank traegt den Stand des Backups (nie benutzt)');
+  assert.equal(outcome, 'wartet auf die Arbeit', 'der Restore wartet den Push nach der Antwort ab');
+});
+
+test('#1532 der Kalender-Sofortversuch beginnt waehrend eines Restores nicht, auch bei geschlossener Verbindung', async () => {
+  const outbound = await import('../server/services/calendar-outbound.js');
+  const restore = await restoreHeldWhileCopying({ phase: 'closed' });
+  let result;
+  try {
+    assert.equal(dbmod.isDatabaseOpen(), false, 'Vorbedingung: die Verbindung ist zu');
+    result = await outbound.flushOutbound().then((value) => value, (err) => ({ geworfen: err.message }));
+  } finally {
+    restore.release();
+    await restore.done;
+  }
+  assert.deepEqual(result, { success: false, skipped: 'restore_in_progress' });
 });
