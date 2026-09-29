@@ -17,7 +17,7 @@ import {
   budgetFilter, budgetCategoryExpr, maskEntries, getBudgetMode, mayEdit, bookedOnly,
   DATE_RE, thisMonthLocalKey, cents,
   generateRecurringInstances, RECURRENCE_INTERVAL_KEYS, MAX_INTERVAL_COUNT,
-  normalizeIntervalCount, effectiveMonthly,
+  normalizeIntervalCount, effectiveMonthly, occurrencesPerYear,
   validCategoryKeys, defaultCategory, validateSubcategory, validateAccountRef,
   entryWithLoanMeta, refreshLoanStatus, fromBudgetAmount, bookingFor,
   RESPONSIBLE_USERS_SQL, replaceResponsibles, withResponsibles, responsibleNonMembers,
@@ -443,6 +443,28 @@ router.put('/:id/series', (req, res) => {
     if (req.body.recurrence_interval_count !== undefined) checks.push(intervalCountCheck(req.body.recurrence_interval_count));
     const errors = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    // EINE SERIEN-AENDERUNG BEENDET DIE SERIE NICHT (#1546).
+    //
+    // `is_recurring: false` hiess hier "Serie beenden, jedes Vorkommen ab heute
+    // loeschen" - und kam fast nie gewollt: der Bearbeiten-Dialog eines
+    // Vorkommens belegte sein Formular mit dem Vorkommen vor, und ein
+    // Vorkommen traegt is_recurring = 0. "Alle kuenftigen aendern" beendete so
+    // still die ganze Serie, mit Erfolgs-Toast. Der Dialog schickt den Rhythmus
+    // jetzt gar nicht mehr mit; diese Grenze ist die zweite Sicherung, und sie
+    // faengt genau den Body, den ein noch zwischengespeicherter alter Client
+    // schickt: der wird laut abgewiesen, statt still Vorkommen zu loeschen.
+    //
+    // Abweisen statt ignorieren: ein Aufrufer, der die Serie wirklich beenden
+    // will, bekaeme sonst 200 und eine Serie, die weiterlaeuft - dieselbe
+    // stille Luege in die andere Richtung. Beenden hat zwei eigene Wege:
+    // PUT /budget/:id mit is_recurring: false an der ersten Buchung (so beendet
+    // der Dialog eine Serie) oder DELETE /budget/:id/series.
+    if (req.body.is_recurring !== undefined && !req.body.is_recurring) {
+      return res.status(400).json({
+        error: 'A series edit cannot end the series. To end it, set is_recurring to false on its first entry (PUT /budget/:id) or delete it (DELETE /budget/:id/series).',
+        code: 400,
+      });
+    }
     // Neu nur Haushaltsmitglieder (#1207), gegen den Stand der Serie.
     const strangers = responsibleNonMembers(parentId, req.body.responsible_user_ids);
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
@@ -467,10 +489,25 @@ router.put('/:id/series', (req, res) => {
     const finalConfirm   = req.body.recurrence_confirm !== undefined
       ? (req.body.recurrence_confirm ? 1 : 0)
       : parent.recurrence_confirm;
+    // DER BETRAG EINES VORKOMMENS IST SEIN BETRAG (#1546). Bei einer virtuellen
+    // Serie zeigt ein Vorkommen den Monatsanteil, die erste Buchung dagegen den
+    // Periodenbetrag. Kommt die Aenderung ueber ein Vorkommen, ist der Betrag
+    // also ein Monatsanteil - als Periodenbetrag gelesen, wuerde er ein zweites
+    // Mal geglaettet (aus 100 im Monat wurden 8,33). Der Periodenbetrag wird
+    // deshalb aus ihm zurueckgerechnet, und die Vorkommen tragen genau den
+    // eingegebenen Anteil.
+    const shareFromOccurrence = amount !== undefined && entry.id !== parentId
+      && finalVirtual && parent.recurrence_virtual;
     const finalFull      = finalVirtual
-      ? (amount !== undefined ? cents(finalAmount) : (parent.recurrence_full_amount ?? parent.amount))
+      ? (amount !== undefined
+        ? cents(shareFromOccurrence
+          ? finalAmount * 12 / occurrencesPerYear(finalInterval, finalCount)
+          : finalAmount)
+        : (parent.recurrence_full_amount ?? parent.amount))
       : null;
-    const storeAmount    = finalVirtual ? effectiveMonthly(finalFull, finalInterval, finalCount) : finalAmount;
+    const storeAmount    = shareFromOccurrence
+      ? cents(finalAmount)
+      : (finalVirtual ? effectiveMonthly(finalFull, finalInterval, finalCount) : finalAmount);
     const finalRrule     = recurrence_rule !== undefined ? (recurrence_rule || null) : parent.recurrence_rule;
 
     // Sichtbarkeit ist eine Serien-Eigenschaft (#476/#505): eine Änderung wirkt auf

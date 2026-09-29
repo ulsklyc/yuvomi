@@ -2094,6 +2094,7 @@
         "backupWebdavTriggeredToast": "Back-up succesvol naar WebDAV geüpload.",
         "backupWebdavTestSuccess": "Verbinding geslaagd - {{files}} back-up(s) gevonden.",
         "backupWebdavTestFailed": "Verbinding mislukt: {{error}}",
+        "backupWebdavPasswordRequired": "Voor een andere server of gebruikersnaam moet je het wachtwoord opnieuw invoeren.",
         "backupWebdavLastUpload": "Laatste upload",
         "backupWebdavLastError": "Laatste fout",
         "backupWebdavNeverUploaded": "Nog geen upload",

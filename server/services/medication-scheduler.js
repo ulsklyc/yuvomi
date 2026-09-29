@@ -6,7 +6,8 @@
  *        notifications.js, ohne Delivery-Logik zu duplizieren.
  *        Empfänger sind die betroffene Person UND jede Person, die ein Admin
  *        als Betreuer eingetragen hat (health_care_grants, #584, D#1041).
- * Abhängigkeiten: server/db.js, push.js, notification-channels.js, notifications.js.
+ * Abhängigkeiten: server/db.js, push.js, notification-channels.js, notifications.js,
+ *                 utils/timezone.js.
  */
 import { runExternalJob } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
@@ -15,6 +16,7 @@ import { pushService as defaultPushService } from './push.js';
 import { createNotificationChannelStore } from './notification-channels.js';
 import { defaultProviders } from './notifications.js';
 import { resolveHouseholdLocale, translate } from '../utils/i18n.js';
+import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 
 const log = createLogger('MedicationScheduler');
 const APP_NAME = 'Yuvomi';
@@ -22,23 +24,24 @@ const APP_NAME = 'Yuvomi';
 const FALLBACK_BODY = 'Medication reminder';
 const PROVIDER_TIMEOUT_MS = 8_000;
 
-/** Lokaler Datums-Key (YYYY-MM-DD) ohne UTC-Shift. */
-function localDateKey(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+/**
+ * Tag (YYYY-MM-DD) und Uhrzeit ('HH:MM') von `now` auf der Uhr des HAUSHALTS.
+ * `time_of_day` und `scheduled_at` sind Wanduhrzeit des Haushalts; hier standen
+ * getDate()/getHours(), also die Zone des Server-Prozesses - mit `TZ=UTC` im
+ * Container kam die Erinnerung fuer 08:00 in Berlin um 10:00 (#1539).
+ */
+function householdWallClock(database, now) {
+  const iso = now.toISOString();
+  const wall = utcToWall(iso, householdTimeZone(database));
+  return wall
+    ? { dateKey: wall.date, time: wall.time.slice(0, 5) }
+    : { dateKey: iso.slice(0, 10), time: iso.slice(11, 16) };
 }
 
-/** Lokale Uhrzeit 'HH:MM'. */
-function localTime(d) {
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-/** Wochentag-Index (Mo=0…So=6) eines Datums-Keys. */
+/** Wochentag-Index (Mo=0…So=6) eines Datums-Keys - zonenfrei ueber Date.UTC. */
 function weekdayIndex(dateKey) {
   const [y, m, d] = dateKey.split('-').map(Number);
-  return (new Date(y, m - 1, d).getDay() + 6) % 7;
+  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
 }
 
 /** Ist der Plan am gegebenen Datum fällig (Aktivität, Grenzen, Wochentags-Maske)? */
@@ -93,8 +96,7 @@ async function processDueMedicationsUntracked({
 } = {}) {
   const activeDb = database || dbModule.get();
   const store = channelStore || createNotificationChannelStore({ db: activeDb });
-  const dateKey = localDateKey(now);
-  const nowTime = localTime(now);
+  const { dateKey, time: nowTime } = householdWallClock(activeDb, now);
 
   const schedules = activeDb.prepare(`
     SELECT s.*, m.user_id AS owner_id, m.name AS med_name, u.display_name AS owner_name

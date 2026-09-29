@@ -1368,6 +1368,107 @@ test('ein umgefaerbter gespiegelter Besuch faellt aus dem Schnappschuss der Farb
   }
 });
 
+// --------------------------------------------------------------------------
+// Besuch bearbeiten: der Tag ist der des HAUSHALTS (#1540)
+// --------------------------------------------------------------------------
+// `check_in` ist ein UTC-Instant. Das Formular zeigte `check_in.slice(0, 10)`,
+// den UTC-Tag, und `updateVisitLinks` legte Termin und Zahlungsaufgabe auf
+// denselben. Ein Besuch am 1. Oktober um 00:30 in Berlin (30.09. 22:30Z) sprang
+// beim Bearbeiten - auch wenn nur der Betrag geaendert wurde - auf den
+// 30. September; wer den Tag im Formular auf den 1. „korrigierte", schob den
+// Besuch selbst auf den 2. um 00:30. Der Tag im Formular ist jetzt der des
+// Haushalts, die Uhrzeit des Besuchs bleibt die des Haushalts.
+
+function seedLinkedVisit(workerId, checkIn, day) {
+  const eventId = db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, all_day, created_by, external_source)
+    VALUES ('Besuch', ?, 1, ?, 'local')
+  `).run(day, ADMIN).lastInsertRowid;
+  const taskId = db.prepare(`
+    INSERT INTO tasks (title, due_date, priority, category, status, created_by)
+    VALUES ('Zahlung', ?, 'medium', 'household', 'open', ?)
+  `).run(day, ADMIN).lastInsertRowid;
+  return db.prepare(`
+    INSERT INTO housekeeping_work_sessions (worker_id, check_in, check_out, daily_rate, extras, calendar_event_id, payment_task_id, created_by)
+    VALUES (?, ?, ?, 40, 0, ?, ?, ?)
+  `).run(workerId, checkIn, checkIn, eventId, taskId, ADMIN).lastInsertRowid;
+}
+
+function visitState(id) {
+  return db.prepare(`
+    SELECT hws.check_in, e.start_datetime AS event_day, t.due_date AS task_day
+    FROM housekeeping_work_sessions hws
+    JOIN calendar_events e ON e.id = hws.calendar_event_id
+    JOIN tasks t ON t.id = hws.payment_task_id
+    WHERE hws.id = ?
+  `).get(id);
+}
+
+async function inHouseholdZone(zone, fn) {
+  const prevTz = process.env.TZ;
+  process.env.TZ = 'America/New_York'; // Server-Prozess bewusst in einer dritten Zone
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('household_timezone', ?)").run(zone);
+  try {
+    await fn();
+  } finally {
+    db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run();
+    if (prevTz === undefined) delete process.env.TZ;
+    else process.env.TZ = prevTz;
+  }
+}
+
+test('#1540 Besuch bearbeiten: nur den Betrag aendern laesst Tag und Uhrzeit des Haushalts stehen', () => inHouseholdZone('Europe/Berlin', async () => {
+  const workerId = await freshWorker('Nachtbesuch');
+  const id = seedLinkedVisit(workerId, '2026-09-30T22:30:00.000Z', '2026-10-01');
+  const r = await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-10-01', daily_rate: 40, extras: 5 } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(visitState(id), { check_in: '2026-09-30T22:30:00.000Z', event_day: '2026-10-01', task_day: '2026-10-01' });
+}));
+
+test('#1540 Besuch bearbeiten: ein neuer Tag behaelt die Uhrzeit des Haushalts, auch ueber die Zeitumstellung', () => inHouseholdZone('Europe/Berlin', async () => {
+  const workerId = await freshWorker('Umzug');
+  const id = seedLinkedVisit(workerId, '2026-09-30T22:30:00.000Z', '2026-10-01');
+  await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-10-05', daily_rate: 40 } });
+  assert.deepEqual(visitState(id), { check_in: '2026-10-04T22:30:00.000Z', event_day: '2026-10-05', task_day: '2026-10-05' });
+  // 26.10. ist nach der Umstellung: 00:30 MEZ ist 23:30Z am Vortag.
+  await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-10-26', daily_rate: 40 } });
+  assert.deepEqual(visitState(id), { check_in: '2026-10-25T23:30:00.000Z', event_day: '2026-10-26', task_day: '2026-10-26' });
+}));
+
+test('#1540 Besuch bearbeiten: Haushalt in UTC - unveraendert', () => inHouseholdZone('UTC', async () => {
+  const workerId = await freshWorker('Nullzone');
+  const id = seedLinkedVisit(workerId, '2026-09-30T22:30:00.000Z', '2026-09-30');
+  await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-09-30', daily_rate: 40, extras: 5 } });
+  assert.deepEqual(visitState(id), { check_in: '2026-09-30T22:30:00.000Z', event_day: '2026-09-30', task_day: '2026-09-30' });
+  await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-10-02', daily_rate: 40 } });
+  assert.deepEqual(visitState(id), { check_in: '2026-10-02T22:30:00.000Z', event_day: '2026-10-02', task_day: '2026-10-02' });
+}));
+
+test('#1540 ohne eingestellte Haushaltszone: der Tag, den das Formular zeigte, entscheidet (Review)', async () => {
+  // Ohne `household_timezone` liest die Oberflaeche die Zone des BROWSERS, der
+  // Server `TZ` bzw. die Systemzone - im Container meist UTC. Ein Besuch um
+  // 00:30 in Berlin steht im Formular am 1., auf der Server-Uhr am 30.09.
+  // Verglich der Server den eingereichten Tag mit SEINEM, hielt er ein reines
+  // Betragsupdate fuer einen neuen Tag und schob den Besuch um 24 Stunden.
+  // Das Formular schickt deshalb den Tag mit, den es vorbelegt hat.
+  const prevTz = process.env.TZ;
+  process.env.TZ = 'UTC';
+  db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run();
+  try {
+    const workerId = await freshWorker('Ohnezone');
+    const id = seedLinkedVisit(workerId, '2026-09-30T22:30:00.000Z', '2026-10-01');
+    await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-10-01', original_date: '2026-10-01', daily_rate: 40, extras: 5 } });
+    assert.deepEqual(visitState(id), { check_in: '2026-09-30T22:30:00.000Z', event_day: '2026-10-01', task_day: '2026-10-01' },
+      'nur der Betrag geaendert: der Besuch bleibt, wo er war');
+    await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-10-05', original_date: '2026-10-01', daily_rate: 40 } });
+    assert.deepEqual(visitState(id), { check_in: '2026-10-04T22:30:00.000Z', event_day: '2026-10-05', task_day: '2026-10-05' },
+      'vier Tage spaeter, dieselbe Uhrzeit');
+  } finally {
+    if (prevTz === undefined) delete process.env.TZ;
+    else process.env.TZ = prevTz;
+  }
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

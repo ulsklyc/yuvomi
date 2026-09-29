@@ -11,6 +11,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
+import { sameCredentialOrigin } from '../utils/credential-origin.js';
 
 const log = createLogger('BackupWebDAV');
 
@@ -101,6 +102,14 @@ function envValue(raw) {
   return raw !== undefined && String(raw).trim() !== '' ? String(raw) : undefined;
 }
 
+/**
+ * Die Maske, mit der `getStatus()` ein gespeichertes Passwort ausliefert. Sie
+ * ist nie ein Passwort: ein Client, der das Formular unveraendert zurueckschickt,
+ * sendet genau diesen Wert, und er darf das gespeicherte weder ueberschreiben
+ * noch als neues Passwort fuer einen neuen Server gelten (`passwordRequired`).
+ */
+export const PASSWORD_MASK = '****';
+
 export function getConfig() {
   const envEnabled = envValue(ENV_ENABLED);
   const enabled = envEnabled !== undefined
@@ -118,6 +127,30 @@ export function getConfig() {
   const keep     = Math.max(1, parseInt(keepRaw, 10) || 7);
 
   return { enabled, url, username, password, remotePath, keep };
+}
+
+/**
+ * Ob eine Anfrage fuer Verbindungstest oder Speichern das Passwort neu braucht.
+ *
+ * DAS GESPEICHERTE PASSWORT GEHOERT ZU EINEM SERVER UND EINEM BENUTZER, wie bei
+ * CalDAV und CardDAV (server/utils/credential-origin.js). Eine neue Adresse mit
+ * anderem Schema, Host oder Port, oder ein anderer Benutzername, ohne neues
+ * Passwort: sonst schickte der Verbindungstest das gespeicherte Passwort per
+ * Basic Auth an die neue Adresse, und ein gespeicherter Wechsel taete es beim
+ * naechsten Backup. Ein anderer Pfad auf demselben Server braucht nichts.
+ * Die Maske aus `getStatus()` (`PASSWORD_MASK`) zaehlt nicht als Passwort.
+ *
+ * @param {{ url?: string|null, username?: string|null, password?: string|null }} next
+ * @returns {boolean}
+ */
+export function passwordRequired({ url, username, password } = {}) {
+  if (typeof password === 'string' && password !== '' && password !== PASSWORD_MASK) return false;
+  const cfg = getConfig();
+  if (!cfg.password) return false;
+  const nextUrl = typeof url === 'string' ? url.trim() : '';
+  const nextUser = typeof username === 'string' ? username.trim() : '';
+  return Boolean((nextUrl && !sameCredentialOrigin(nextUrl, cfg.url ?? ''))
+    || (nextUser && nextUser !== cfg.username));
 }
 
 /**
@@ -142,8 +175,9 @@ export function saveConfig(data) {
     if (data.username) cfgSet('webdav_backup_username', data.username.trim());
     else cfgDelete('webdav_backup_username');
   }
-  // Only overwrite password when a non-empty value is sent
-  if (data.password !== undefined && data.password !== '') {
+  // Nur ein echtes neues Passwort ueberschreibt: leer oder die Maske aus
+  // getStatus() heisst "unveraendert" (bis dahin wurde die Maske gespeichert).
+  if (data.password !== undefined && data.password !== '' && data.password !== PASSWORD_MASK) {
     cfgSet('webdav_backup_password', data.password);
   }
   if (data.remotePath !== undefined) {
@@ -466,7 +500,7 @@ export function getStatus() {
     configured:    Boolean(cfg.url && cfg.username && cfg.password),
     url:           cfg.url,
     username:      cfg.username,
-    password:      cfg.password ? '****' : null,
+    password:      cfg.password ? PASSWORD_MASK : null,
     remotePath:    cfg.remotePath,
     keep:          cfg.keep,
     lastUpload:    cfgGet('webdav_backup_last_upload') ?? null,

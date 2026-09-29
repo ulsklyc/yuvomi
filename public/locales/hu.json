@@ -2167,6 +2167,7 @@
         "backupWebdavTriggeredToast": "Biztonsági mentés sikeresen feltöltve WebDAV-ra.",
         "backupWebdavTestSuccess": "Kapcsolat sikeres - {{files}} biztonsági mentés található.",
         "backupWebdavTestFailed": "Kapcsolat sikertelen: {{error}}",
+        "backupWebdavPasswordRequired": "Másik szerverhez vagy felhasználónévhez add meg újra a jelszót.",
         "backupWebdavLastUpload": "Utolsó feltöltés",
         "backupWebdavLastError": "Utolsó hiba",
         "backupWebdavNeverUploaded": "Még nem történt feltöltés",

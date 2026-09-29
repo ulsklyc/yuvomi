@@ -2122,6 +2122,7 @@
         "backupWebdavTriggeredToast": "Copia de seguridad subida a WebDAV correctamente.",
         "backupWebdavTestSuccess": "Conexión exitosa - {{files}} copia(s) encontrada(s).",
         "backupWebdavTestFailed": "Error de conexión: {{error}}",
+        "backupWebdavPasswordRequired": "Para otro servidor u otro nombre de usuario, vuelve a introducir la contraseña.",
         "backupWebdavLastUpload": "Última subida",
         "backupWebdavLastError": "Último error",
         "backupWebdavNeverUploaded": "Sin subidas aún",

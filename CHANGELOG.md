@@ -745,6 +745,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   like "every month" instead of the number, so a day with 21 events read "1 событие" in Russian and
   a day with 5 events read "1 kaganapan" in Filipino. They now show the actual number; a fixed
   wording stays only where the screen can never show another number, and a test checks that.
+- **"Change all future occurrences" no longer ends a recurring payment** (#1546). Editing a later
+  month of a series and choosing "Change all future occurrences" sent the recurrence settings of
+  that single month along, and a generated month carries none: the series was switched off, every
+  occurrence from today on was deleted, and a weekly, yearly or virtual series was reset to monthly,
+  while the message said the change was saved. The dialog now sends only what you changed, and the
+  recurrence of a series is edited on its first entry; a generated month no longer shows the
+  "Recurring" switch. Changing the amount of a virtual series from one of its months now counts as
+  that month's share. **Series ended this way do not come back by themselves:** open the first entry
+  of the series (the search finds it by its title), switch "Recurring" on again and choose its
+  rhythm again. The missing months reappear when you open them; receipts and one-off changes that
+  were attached to the deleted months are gone. For API users: `PUT /api/v1/budget/:id/series` now
+  answers `is_recurring: false` with 400 instead of ending the series; end a series with
+  `PUT /api/v1/budget/:id` and `is_recurring: false` on its first entry, or delete it with
+  `DELETE /api/v1/budget/:id/series`.
 
 - **The API documentation page answers "restore in progress" during a restore** (#1531). Outside
   production, `/docs` checks the API token or session, and while a restore had the database closed
@@ -773,6 +787,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evening of the last day in the next one. The overview now uses the same month boundaries as the
   Housekeeping module, so both show the same number.
 
+- **Editing a housekeeping visit keeps its day** (#1540). The edit dialog showed the UTC day of
+  the visit: in Berlin a visit on the 1st at 00:30 appeared on the day before, and saving it, even
+  just to correct the amount, moved its calendar entry and payment task there. Correcting the date
+  moved the visit itself a day later. The dialog now shows the household's day, and a new day
+  keeps the visit's time on the household's clock.
+
 - **The wall display stays dark after a reload at night** (#1453). Reloading the wall between 22:00
   and 06:00 with the theme set to Automatic or Light left the dimmed night surface in the light
   theme until the morning. The wall now forces the dark theme on every check during the night and
@@ -800,6 +820,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   converted it into the household's, so with a household time zone set and a device elsewhere a
   task due at 18:00 could read "until 00:00". It now shows the due time as entered, like the task
   list does.
+
+- **Medication reminders come at the household's time** (#1539). The scheduler read the day and
+  the time on the server's clock. With a household time zone set and the server running in
+  another zone, such as UTC in a container, a dose planned for 08:00 in Berlin was due at 10:00,
+  and near midnight a dose could land on the wrong day. Doses are now due on the household's day
+  and clock, also on the days the clocks change. The intake log in Health also shows the times
+  as recorded on a device in another time zone.
 
 - **The note category hints no longer suggest that notes are private** (#1514). A personal
   category is only visible to you, but a note filed under it is still visible to every household
@@ -1173,6 +1200,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   against the edge of their tinted panel.
 
 ### Security
+
+- **The WebDAV backup target moved to another server or username needs its password again.**
+  The connection test in Settings -> Household -> Backup and restore, and the API behind it, took
+  a new server address with the password field left as it was and tested it with the stored
+  password, so the password went to that server; saving the change kept the stored password for
+  the next backup. Both are admin-only. They now follow the rule of CalDAV and CardDAV accounts:
+  the stored password is kept only while the server (scheme, host and port) and the username stay
+  the same. Otherwise the test and the save are refused with `400` and the error code
+  `password_required`, no connection is made and nothing is saved, and the form asks for the
+  password again. A different path on the same server keeps working without it. The mask `****`
+  the API shows in place of the password now counts as "unchanged" when it is sent back; until
+  then saving it through the API replaced the stored password with the mask itself.
 
 - **A CalDAV account moved to another server or username needs its password again.** Editing an
   account through the API with a new server address but without a password tested the connection

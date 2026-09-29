@@ -2202,6 +2202,7 @@
         "backupWebdavTriggeredToast": "Záloha úspěšně nahrána na WebDAV.",
         "backupWebdavTestSuccess": "Připojení úspěšné - nalezeno {{files}} záloha(zálohy).",
         "backupWebdavTestFailed": "Připojení selhalo: {{error}}",
+        "backupWebdavPasswordRequired": "Pro jiný server nebo uživatelské jméno zadej heslo znovu.",
         "backupWebdavLastUpload": "Poslední nahrání",
         "backupWebdavLastError": "Poslední chyba",
         "backupWebdavNeverUploaded": "Zatím žádné nahrání",

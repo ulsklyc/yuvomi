@@ -2122,6 +2122,7 @@
         "backupWebdavTriggeredToast": "बैकअप WebDAV पर सफलतापूर्वक अपलोड हुआ।",
         "backupWebdavTestSuccess": "कनेक्शन सफल - {{files}} बैकअप मिले।",
         "backupWebdavTestFailed": "कनेक्शन विफल: {{error}}",
+        "backupWebdavPasswordRequired": "किसी दूसरे सर्वर या उपयोगकर्ता नाम के लिए पासवर्ड फिर से दर्ज करें।",
         "backupWebdavLastUpload": "अंतिम अपलोड",
         "backupWebdavLastError": "अंतिम त्रुटि",
         "backupWebdavNeverUploaded": "अभी तक कोई अपलोड नहीं",

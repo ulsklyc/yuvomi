@@ -2134,6 +2134,7 @@
         "backupWebdavTriggeredToast": "백업이 WebDAV에 성공적으로 업로드되었습니다.",
         "backupWebdavTestSuccess": "연결 성공 - 백업 {{files}}개 발견.",
         "backupWebdavTestFailed": "연결 실패: {{error}}",
+        "backupWebdavPasswordRequired": "다른 서버나 사용자 이름에는 비밀번호를 다시 입력해야 합니다.",
         "backupWebdavLastUpload": "마지막 업로드",
         "backupWebdavLastError": "마지막 오류",
         "backupWebdavNeverUploaded": "아직 업로드 안 됨",
