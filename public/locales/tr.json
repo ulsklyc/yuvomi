@@ -3876,7 +3876,8 @@
             "recurring_resumed": "Tekrarlanan gider sürdürüldü",
             "recurring_generated": "Tekrarlanan gider üretildi",
             "payment_reversed": "Ödeme iptal edildi",
-            "ledger_restored": "Kayıt geri yüklendi"
+            "ledger_restored": "Kayıt geri yüklendi",
+            "ledger_removed": "Kayıt kaldırıldı"
         },
         "splitPercentage": "Yüzde",
         "splitExact": "Kesin tutar",

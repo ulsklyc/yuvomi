@@ -360,6 +360,39 @@ test('Buchung wiederhergestellt: nennt Titel und Betrag, maskiert', () => {
   }
 });
 
+// Migration v227 (#1445) entfernt die Zeilen einer Ausgabe, die es nicht mehr
+// gibt, und schreibt dafuer 'ledger_removed' - dieselbe Form wie
+// 'ledger_restored': eigener Typtext in jeder Sprache, "System", Titel und
+// Betrag, maskiert. Eine Ausgabenliste kennt die Ausgabe nicht mehr; was der
+// Eintrag nennt, steht allein in seinen Metadaten.
+test('Buchung entfernt: eigener Typtext, "System", Titel und Betrag maskiert, in jeder Sprache uebersetzt', async () => {
+  const vorher = { ...split.state };
+  try {
+    Object.assign(split.state, {
+      expenses: [],
+      activity: [eintrag(1, { type: 'ledger_removed', actor_id: null, actor_name: null, metadata: { title: 'Urlaub <i>', amount_minor: 1850, amount: '18.50', currency: 'EUR' } })],
+      activityCursor: null, groupStatus: 'active',
+    });
+    const html = withAccess({ budget: 'write' }, () => split.renderActivity());
+    assert.match(html, /<strong>splitExpenses\.activityType\.ledger_removed<\/strong>/);
+    assert.match(html, /splitExpenses\.system · /, 'ohne Akteur steht "System"');
+    const details = [...html.matchAll(/<span class="split-activity-payment">([^<]*)<\/span>/g)].map((m) => m[1]);
+    assert.equal(details.length, 1, 'eine Zeile mit Titel und Betrag');
+    assert.match(details[0], /^Urlaub &lt;i&gt; · .*18,50/);
+    assert.doesNotMatch(html, /data-reverse-settlement/, 'keine Handlung am Eintrag');
+  } finally {
+    Object.assign(split.state, vorher);
+  }
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const dir = new URL('../public/locales/', import.meta.url);
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const types = JSON.parse(readFileSync(new URL(file, dir), 'utf8')).splitExpenses?.activityType;
+    const text = types?.ledger_removed;
+    assert.ok(typeof text === 'string' && text.trim() && !text.includes('activityType'), `${file}: ledger_removed fehlt`);
+    assert.notEqual(text, types.ledger_restored, `${file}: entfernt und wiederhergestellt lesen sich gleich`);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // R10 L11 (Re-Critique 2026-09-27, A5 P2-8 und distill): der Verlauf nennt
 // Objekt und Betrag, und die Gruppenzahl belegt mobil keine volle Zeile.

@@ -3876,7 +3876,8 @@
             "recurring_resumed": "Terugkerende uitgave hervat",
             "recurring_generated": "Terugkerende uitgave gegenereerd",
             "payment_reversed": "Betaling tegengeboekt",
-            "ledger_restored": "Boeking hersteld"
+            "ledger_restored": "Boeking hersteld",
+            "ledger_removed": "Boeking verwijderd"
         },
         "splitPercentage": "Percentage",
         "splitExact": "Exact bedrag",

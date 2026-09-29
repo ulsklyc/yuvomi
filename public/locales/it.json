@@ -3876,7 +3876,8 @@
             "recurring_resumed": "Spesa ricorrente ripresa",
             "recurring_generated": "Spesa ricorrente generata",
             "payment_reversed": "Pagamento stornato",
-            "ledger_restored": "Registrazione ripristinata"
+            "ledger_restored": "Registrazione ripristinata",
+            "ledger_removed": "Registrazione rimossa"
         },
         "splitPercentage": "Percentuale",
         "splitExact": "Importo esatto",

@@ -17,7 +17,7 @@ import { completionFeed, seriesHistory, syncTaskCompletion } from '../services/t
 import { normalizeCategoryFilter, taskCategoryWhere, taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
 import { normalizeVisibility, visibilityWhere } from '../services/visibility.js';
 import {
-  flushOutbound, markTodoOutbound, queueTodoDeletion,
+  flushOutbound, markTodoOutbound, queueTodoDeletion, recurrenceFollowupTarget,
 } from '../services/caldav-todo-outbound.js';
 import { uniqueKey } from '../utils/category-slug.js';
 import { toLocalDateKey } from '../../public/utils/date.js';
@@ -1124,7 +1124,8 @@ router.post('/', (req, res) => {
         syncTaskCompletion(db.get(), newId, 'open', status, actingUserId);
         // Erledigt angelegte Serie: die naechste Instanz gehoert dazu, genau wie
         // beim Abhaken. Ohne sie endete eine Serie in dem Moment, in dem sie
-        // entsteht.
+        // entsteht. Erbt sie ein Ziel (#1515), dann dasselbe, das `syncTarget`
+        // unten ohnehin zum Sofortversuch macht.
         if (status === 'done') {
           spawnRecurrenceFollowup(db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(newId));
         }
@@ -1283,6 +1284,7 @@ router.put('/:id', (req, res) => {
     // derselbe stille Serienabbruch, den dieser Weg gerade erst verloren hat.
     let pending = false;
     let undone  = 0;
+    let spawned = false;
     let updated;
     db.get().transaction(() => {
       db.get().prepare(`
@@ -1344,7 +1346,7 @@ router.put('/:id', (req, res) => {
       // Das Status-Dropdown im Bearbeiten-Formular hakt genauso ab wie die Checkbox -
       // also muss es die Serie genauso weiterschreiben. Grundlage ist die frisch
       // gelesene Zeile, damit im selben Zug geänderte Regel/Fälligkeit schon zählen.
-      if (status === 'done' && task.status !== 'done') spawnRecurrenceFollowup(updated);
+      if (status === 'done' && task.status !== 'done') spawned = spawnRecurrenceFollowup(updated);
     })();
 
     addAssignedUsers(updated);
@@ -1352,7 +1354,7 @@ router.put('/:id', (req, res) => {
 
     res.json({ data: updated });
 
-    if (pending || undone || syncTarget) pushToCalDAV('Änderung');
+    if (pending || undone || syncTarget || spawned) pushToCalDAV('Änderung');
   } catch (err) {
     log.error('PUT /:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1446,7 +1448,9 @@ function discardRecurrenceFollowup(taskId) {
   if (isFollowupSubtasksTouched(followup) || recurrenceFollowupOf(followup.id)) return 0;
 
   // Vor dem DELETE vormerken, wie in DELETE /:id: danach sind UID und Objekt-URL
-  // weg. Lokal erzeugte Folgeinstanzen sind nicht gespiegelt, dann ist das ein No-op.
+  // weg. Eine noch nicht hochgeladene Folgeinstanz ist kein Spiegel - auch nicht
+  // mit geerbtem Ziel (#1515), das verschwindet mit der Zeile -, dann ist das ein
+  // No-op. Ist sie schon oben, geht die Löschung wie jede andere hinaus.
   const queued = queueTodoDeletion('tasks', followup) ? 1 : 0;
   db.get().prepare('DELETE FROM tasks WHERE id = ?').run(followup.id);
   return queued;
@@ -1476,18 +1480,21 @@ function shiftedStartDate(startDate, dueDate, nextDue) {
  * das Status-Dropdown im Bearbeiten-Dialog (PUT /:id). Lag der Spawn nur im
  * einen, beendete der andere die Serie lautlos.
  *
- * Ohne Rückgabewert, anders als discardRecurrenceFollowup: die Folgeinstanz
- * entsteht ohne external_uid/external_source, markTodoOutbound lässt sie
- * deshalb liegen. Es gibt nichts zu pushen.
+ * Die Folgeinstanz entsteht ohne external_uid/external_source: sie ist auf dem
+ * Server ein neuer Eintrag, keine Kopie der Vorgängerin - mit deren UID
+ * überschriebe der Upload das eben erledigte Vorkommen. Das Sync-Ziel dagegen
+ * erbt sie (#1515): eine in eine Erinnerungsliste geschickte Serie blieb sonst
+ * ab dem zweiten Vorkommen lokal. Rückgabe: true, wenn die Folgeinstanz damit
+ * auf ihren Upload wartet und der Aufrufer den Sofortversuch anstoßen soll.
  *
  * Beide Aufrufer halten bereits eine Transaktion, die eigene läuft darin als
  * Savepoint. Sie bleibt trotzdem stehen: sie hält Aufgabe, Zuweisungen und Tags
  * auch dann zusammen, wenn später jemand von außerhalb einer Transaktion ruft.
  */
 function spawnRecurrenceFollowup(task) {
-  if (!task?.is_recurring || !task.recurrence_rule || task.parent_task_id) return;
+  if (!task?.is_recurring || !task.recurrence_rule || task.parent_task_id) return false;
   // Höchstens eine Folgeinstanz je Erledigung - sonst legt doppeltes Abhaken nach.
-  if (recurrenceFollowupOf(task.id)) return;
+  if (recurrenceFollowupOf(task.id)) return false;
 
   // Zwei Verankerungen, die Aufgabe entscheidet (#658): ab Fälligkeit
   // (Vorgabe, holt übersprungene Vorkommen auf, damit die nächste Instanz
@@ -1499,7 +1506,7 @@ function spawnRecurrenceFollowup(task) {
     completedOn,
     fromCompletion: !!task.recurrence_from_completion,
   });
-  if (!nextDate) return;
+  if (!nextDate) return false;
 
   const existingAssignments = db.get()
     .prepare('SELECT user_id FROM task_assignments WHERE task_id = ?')
@@ -1514,13 +1521,17 @@ function spawnRecurrenceFollowup(task) {
   const existingSubtasks = db.get()
     .prepare('SELECT * FROM tasks WHERE parent_task_id = ? ORDER BY id ASC')
     .all(task.id);
+  // Das Ziel erbt nur die Aufgabe selbst. Unteraufgaben gehen nie als eigenes
+  // VTODO hinaus (pendingCreations), ihre Kopien unten nehmen keines mit.
+  const syncTarget = recurrenceFollowupTarget(task);
 
   db.get().transaction(() => {
     const newTask = db.get().prepare(`
       INSERT INTO tasks (title, description, category, priority, status,
         start_date, due_date, due_time, assigned_to, created_by, is_recurring, recurrence_rule,
-        points, visibility, recurrence_from_completion, countdown, recurrence_origin_id)
-      VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+        points, visibility, recurrence_from_completion, countdown, locked, recurrence_origin_id,
+        target_caldav_account_id, target_caldav_list_url)
+      VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       task.title, task.description, task.category, task.priority,
       shiftedStartDate(task.start_date, task.due_date, nextDate),
@@ -1536,7 +1547,15 @@ function spawnRecurrenceFollowup(task) {
       // Erledigung rechnet - der Countdown, der genau davon lebt, dürfte beim
       // ersten Zurücksetzen nicht verschwinden.
       task.countdown ? 1 : 0,
-      task.id
+      // Und die Sperre (#1488). Sie ist an einer Serie gerade der Zweck: das
+      // Kind hakt das erste Vorkommen ab, und genau dieses Abhaken legt das
+      // zweite an. Fiel sie hier weg, war die Serie ab dem zweiten Vorkommen
+      // wieder frei umschreib- und loeschbar - von der Person, fuer die sie
+      // gesperrt wurde. created_by wandert oben mit, also bleiben Ersteller:in
+      // und Admins auch an der Folgeinstanz berechtigt.
+      task.locked ? 1 : 0,
+      task.id,
+      syncTarget?.accountId ?? null, syncTarget?.listUrl ?? null
     );
     setAssignments(db.get(), newTask.lastInsertRowid, existingAssignments);
     setTags(db.get(), newTask.lastInsertRowid, existingTags);
@@ -1552,19 +1571,23 @@ function spawnRecurrenceFollowup(task) {
       const newSub = db.get().prepare(`
         INSERT INTO tasks (title, description, category, priority, status,
           start_date, due_date, due_time, assigned_to, created_by, parent_task_id,
-          is_recurring, recurrence_rule, points, visibility, recurrence_origin_id)
-        VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)
+          is_recurring, recurrence_rule, points, visibility, locked, recurrence_origin_id)
+        VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?)
       `).run(
         sub.title, sub.description, sub.category, sub.priority,
         shiftedStartDate(sub.start_date, subAnchorDate, nextDate) ?? sub.start_date,
         sub.due_date ? (shiftedStartDate(sub.due_date, subAnchorDate, nextDate) ?? nextDate) : null,
         sub.due_time, sub.assigned_to, sub.created_by, newTask.lastInsertRowid,
-        sub.points, sub.visibility, sub.id
+        // Eine Unteraufgabe kann eine eigene Sperre tragen (POST nimmt `locked`
+        // auch dort an) - die geerbte der Elternaufgabe kommt ueber
+        // lockingTask(), die eigene muss mitkopiert werden (#1488).
+        sub.points, sub.visibility, sub.locked ? 1 : 0, sub.id
       );
       setAssignments(db.get(), newSub.lastInsertRowid, subAssignments);
       setTags(db.get(), newSub.lastInsertRowid, subTags);
     }
   })();
+  return !!syncTarget;
 }
 
 // --------------------------------------------------------
@@ -1709,6 +1732,7 @@ router.patch('/:id/status', (req, res) => {
     // ohne Statuswechsel gibt es auch nichts zu pushen.
     let pending = false;
     let undone  = 0;
+    let spawned = false;
     db.get().transaction(() => {
       db.get().prepare('UPDATE tasks SET status = ? WHERE id = ?').run(status, req.params.id);
       pending = markTodoOutbound('tasks', prev, { ...prev, status });
@@ -1729,13 +1753,13 @@ router.patch('/:id/status', (req, res) => {
 
       // Wiederkehrende Aufgabe: nächste Instanz erstellen wenn erledigt
       if (status === 'done' && prev.status !== 'done') {
-        spawnRecurrenceFollowup(db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id));
+        spawned = spawnRecurrenceFollowup(db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id));
       }
     })();
 
     res.json({ data: { id: Number(req.params.id), status, archived_at: prev.archived_at } });
 
-    if (pending || undone) pushToCalDAV('Statuswechsel');
+    if (pending || undone || spawned) pushToCalDAV('Statuswechsel');
   } catch (err) {
     log.error('PATCH /:id/status error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

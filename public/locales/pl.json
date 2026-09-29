@@ -3876,7 +3876,8 @@
             "recurring_resumed": "Cykliczny wydatek wznowiony",
             "recurring_generated": "Cykliczny wydatek wygenerowany",
             "payment_reversed": "Płatność stornowana",
-            "ledger_restored": "Księgowanie przywrócone"
+            "ledger_restored": "Księgowanie przywrócone",
+            "ledger_removed": "Księgowanie usunięte"
         },
         "splitPercentage": "Procent",
         "splitExact": "Dokładna kwota",

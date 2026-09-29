@@ -3876,7 +3876,8 @@
             "recurring_resumed": "Gasto recurrente reanudado",
             "recurring_generated": "Gasto recurrente generado",
             "payment_reversed": "Pago anulado",
-            "ledger_restored": "Asiento restaurado"
+            "ledger_restored": "Asiento restaurado",
+            "ledger_removed": "Asiento eliminado"
         },
         "splitPercentage": "Porcentaje",
         "splitExact": "Importe exacto",
