@@ -736,6 +736,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that an admin enables it, and admins get a link to Reminder sync. If the lists cannot be loaded,
   the section shows an error with "Try again" instead of claiming that no list is enabled. The
   section is now called "Reminder list for new tasks" (#1516).
+- **A locked recurring task stays locked after it is checked off** (#1488). Checking off one
+  occurrence created the next one without the lock, so from the second occurrence on a child could
+  edit or delete a series a parent had locked. The next occurrence now keeps the lock, and so does a
+  subtask that was locked on its own.
+
+- **Bookings of a shared expense that no longer exists stop counting in balances.** Before 2.69.0,
+  editing a shared expense stamped its bookings with the person who edited it. If the account of
+  the person who created the expense was deleted afterwards, the expense and its shares went with
+  it, but its bookings stayed and kept moving the group's balances, while no list showed an expense
+  that explained them. They also kept the members they named from being deleted. The update
+  removes these bookings once; expenses that still exist, including deleted ones, and payments stay
+  as they are. The group's activity shows "Booking removed" once for each such expense, with its
+  title and amount, so the changed balance has a visible reason. (#1445)
+- **A recurring task sent to a reminder list keeps going there** (#1515). A recurring task created
+  here with a CalDAV reminder list as its destination was uploaded for its first occurrence only;
+  every later occurrence stayed in Yuvomi. Each new occurrence now goes to the same list as a new
+  reminder, as long as the list is still enabled for tasks. Recurring tasks that came from the
+  server are unchanged.
 
 - **The glass tab bar blurs again.** Text scrolling under the tab bar on a phone and under the
   sidebar indicator was readable through the glass because the page transition cut the glass off

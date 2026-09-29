@@ -3878,7 +3878,8 @@
             "recurring_resumed": "Recurring expense resumed",
             "recurring_generated": "Recurring expense generated",
             "payment_reversed": "Payment reversed",
-            "ledger_restored": "Booking restored"
+            "ledger_restored": "Booking restored",
+            "ledger_removed": "Booking removed"
         },
         "splitPercentage": "Percentage",
         "splitExact": "Exact amount",

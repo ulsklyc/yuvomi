@@ -186,10 +186,10 @@ function simplifyDebts(balanceRows) {
  * (`openBalancesForUser()` unten) - beide lesen sie hier, damit sie nie
  * auseinanderlaufen.
  *
- * #1445 (offen): gezaehlt wird das Ledger ohne Blick auf `expenses`. Zeilen
- * einer Ausgabe, die es nicht mehr gibt, verschieben den Saldo deshalb mit.
- * Das Modul und die Kachel zeigen diesen Fehler bis zum Fix GEMEINSAM - wer
- * ihn hier behebt, heilt beide.
+ * Gezaehlt wird NUR das Ledger, ohne Blick auf `expenses`: der Saldo hat
+ * keine zweite Quelle. Zeilen einer Ausgabe, die es nicht mehr gibt (#1445),
+ * hat Migration v227 einmal entfernt; neue entstehen seit v225 nicht mehr,
+ * weil jede Zeile `expenses.created_by` traegt und mit ihrer Ausgabe faellt.
  */
 function groupBalanceRows(database, groupId) {
   return database.prepare(`

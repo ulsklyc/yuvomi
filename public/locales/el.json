@@ -3878,7 +3878,8 @@
             "recurring_resumed": "Το επαναλαμβανόμενο έξοδο συνεχίστηκε",
             "recurring_generated": "Δημιουργήθηκε επαναλαμβανόμενο έξοδο",
             "payment_reversed": "Η πληρωμή ακυρώθηκε",
-            "ledger_restored": "Η εγγραφή αποκαταστάθηκε"
+            "ledger_restored": "Η εγγραφή αποκαταστάθηκε",
+            "ledger_removed": "Η εγγραφή αφαιρέθηκε"
         },
         "splitPercentage": "Ποσοστό",
         "splitExact": "Ακριβές ποσό",

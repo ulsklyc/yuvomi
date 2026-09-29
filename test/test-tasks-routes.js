@@ -22,6 +22,8 @@ process.env.SESSION_SECRET = 'tasks-routes-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { pendingCreations, processPendingCreations, todoUidFor } =
+  await import('../server/services/caldav-todo-outbound.js');
 
 const moduleDatabase = get();
 const db = buildMigratedDatabase(MIGRATIONS);
@@ -592,6 +594,121 @@ test('Eine bereits hochgeladene Aufgabe wechselt ihre Liste nicht', async () => 
   const r = await call('PUT', `/${id}`, { as: admin, body: { title: 'Laengst oben', sync_target: `caldav:${accountId}|${url}` } });
   assert.equal(r.status, 200);
   assert.equal(db.prepare('SELECT target_caldav_list_url AS u FROM tasks WHERE id = ?').get(id).u, null);
+});
+
+// --------------------------------------------------------
+// Sync-Ziel der Folgeinstanz einer Serie (#1515)
+// --------------------------------------------------------
+//
+// Das Ziel lebt an zwei Stellen, je nachdem wie weit die Vorgaengerin ist:
+// solange sie auf ihren Upload wartet, in den Zielspalten; danach ist sie ein
+// Spiegel, und processPendingCreations hat die Zielspalten abgeraeumt. Der
+// zweite Fall ist der gewoehnliche - der Sofortversuch laeuft direkt nach dem
+// Anlegen -, also muessen beide die Folgeinstanz auf dieselbe Liste bringen.
+
+/** Attrappe des tsdav-Clients: haelt nur fest, was hochgeladen wurde. */
+function uploadRecorder() {
+  const uploads = [];
+  return { uploads, client: { createCalendarObject: async (args) => { uploads.push(args); } } };
+}
+
+async function createPushedSeries(title, url, accountId) {
+  const r = await call('POST', '/', {
+    as: { id: ALICE, role: 'admin' },
+    body: {
+      title, is_recurring: true, recurrence_rule: 'FREQ=WEEKLY', due_date: '2031-03-03',
+      sync_target: `caldav:${accountId}|${url}`,
+    },
+  });
+  assert.equal(r.status, 201);
+  return r.body.data.id;
+}
+
+const followupOf = (id) => db.prepare(
+  'SELECT * FROM tasks WHERE recurrence_origin_id = ? AND parent_task_id IS NULL'
+).get(id);
+
+test('Die Folgeinstanz einer wartenden Serie behaelt deren Ziel (#1515)', async () => {
+  const { accountId, url } = seedReminderList({ url: 'https://dav.example/dav/u/serie-wartend/' });
+  const id = await createPushedSeries('Muell rausbringen', url, accountId);
+
+  await call('PATCH', `/${id}/status`, { as: { id: ALICE, role: 'admin' }, body: { status: 'done' } });
+
+  const next = followupOf(id);
+  assert.ok(next, 'Abhaken muss eine Folgeinstanz anlegen');
+  assert.equal(next.target_caldav_account_id, accountId);
+  assert.equal(next.target_caldav_list_url, url);
+  assert.equal(next.external_source, 'local', 'erst der Upload macht sie zum Spiegel');
+  assert.ok(pendingCreations(accountId).some((row) => row.id === next.id),
+    'der Outbound-Push muss die Folgeinstanz als Upload-Kandidaten sehen');
+});
+
+test('Die Folgeinstanz einer hochgeladenen Serie geht als neues VTODO in dieselbe Liste (#1515)', async () => {
+  const admin = { id: ALICE, role: 'admin' };
+  const { accountId, url } = seedReminderList({ url: 'https://dav.example/dav/u/serie-oben/' });
+  const lists = new Map([[url, { url }]]);
+  const id = await createPushedSeries('Pflanzen giessen', url, accountId);
+
+  // Erstes Vorkommen hochladen - danach ist es ein Spiegel ohne Zielspalten.
+  const { uploads, client } = uploadRecorder();
+  assert.equal(await processPendingCreations(client, accountId, 'tasks', lists), 1);
+  const first = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  assert.equal(first.external_uid, todoUidFor('tasks', id));
+  assert.equal(first.target_caldav_list_url, null);
+
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done' } });
+
+  const next = followupOf(id);
+  assert.ok(next, 'Abhaken muss eine Folgeinstanz anlegen');
+  assert.equal(next.target_caldav_account_id, accountId);
+  assert.equal(next.target_caldav_list_url, url);
+  // Eine neue Aufgabe auf dem Server, keine Kopie der Kennung der Vorgaengerin:
+  // mit deren UID ueberschriebe der Upload das erledigte Vorkommen.
+  assert.equal(next.external_source, 'local');
+  assert.equal(next.external_uid, null);
+  assert.equal(next.external_object_url, null);
+
+  assert.equal(await processPendingCreations(client, accountId, 'tasks', lists), 1);
+  assert.equal(uploads.length, 2);
+  assert.equal(uploads[1].filename, `${todoUidFor('tasks', next.id)}.ics`);
+  assert.equal(uploads[1].calendar.url, url);
+  assert.notEqual(uploads[1].filename, uploads[0].filename);
+
+  // Und auch die dritte bleibt dabei: die hochgeladene Folgeinstanz ist
+  // ihrerseits ein hier geborener Spiegel.
+  await call('PATCH', `/${next.id}/status`, { as: admin, body: { status: 'done' } });
+  assert.equal(followupOf(next.id)?.target_caldav_list_url, url);
+});
+
+test('Eine importierte Serie bleibt, wie sie war: die Folgeinstanz bekommt kein Ziel (#1515)', async () => {
+  const { accountId, url } = seedReminderList({ url: 'https://dav.example/dav/u/importiert/' });
+  const id = db.prepare(`
+    INSERT INTO tasks (title, category, priority, status, due_date, created_by, is_recurring, recurrence_rule,
+                       external_source, external_uid, external_account_id, external_object_url)
+    VALUES ('Vom iPhone', ?, 'none', 'open', '2031-03-03', ?, 1, 'FREQ=WEEKLY', 'caldav', 'apple-1@icloud.com', ?, ?)
+  `).run(CATEGORY, ALICE, accountId, `${url}apple-1.ics`).lastInsertRowid;
+
+  await call('PATCH', `/${id}/status`, { as: { id: ALICE, role: 'admin' }, body: { status: 'done' } });
+
+  const next = followupOf(id);
+  assert.ok(next);
+  assert.equal(next.target_caldav_account_id, null);
+  assert.equal(next.target_caldav_list_url, null);
+  assert.ok(!pendingCreations(accountId).some((row) => row.id === next.id));
+});
+
+test('Ist die Liste inzwischen abgewaehlt, bleibt die Folgeinstanz lokal (#1515)', async () => {
+  const { accountId, url } = seedReminderList({ url: 'https://dav.example/dav/u/abgewaehlt-spaeter/' });
+  const id = await createPushedSeries('Filter wechseln', url, accountId);
+  const { client } = uploadRecorder();
+  await processPendingCreations(client, accountId, 'tasks', new Map([[url, { url }]]));
+  db.prepare('UPDATE caldav_reminder_selection SET enabled = 0 WHERE account_id = ?').run(accountId);
+
+  await call('PATCH', `/${id}/status`, { as: { id: ALICE, role: 'admin' }, body: { status: 'done' } });
+
+  const next = followupOf(id);
+  assert.ok(next);
+  assert.equal(next.target_caldav_list_url, null);
 });
 
 test('eine private Unteraufgabe bleibt in der Liste fremd und unantastbar (#748-Review)', async () => {

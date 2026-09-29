@@ -6,8 +6,8 @@
  *        den Knopf ausblendet. Geprüft werden PUT (Vollupdate wie aus dem
  *        Dialog), PATCH /:id/status, PATCH /:id/archive, DELETE, die
  *        Dokument-Verknüpfung, die drei Tag-Sammelwege, die Sammel-Ablage
- *        POST /archive (#1250) und die Vererbung auf
- *        Unteraufgaben. Berechtigt sind Ersteller:in und Admins - bewusst nicht
+ *        POST /archive (#1250), die Vererbung auf
+ *        Unteraufgaben und die Folgeinstanz einer Serie (#1488). Berechtigt sind Ersteller:in und Admins - bewusst nicht
  *        `family_role`.
  * Ausführen: npm run test:task-lock
  */
@@ -312,6 +312,93 @@ test('Unteraufgaben: die Sperre der Elternaufgabe gilt eine Ebene tiefer', async
 
   const tick = await call('PATCH', `/${sub.body.data.id}/status`, { as: asChild, body: { status: 'done' } });
   assert.equal(tick.status, 200, 'abhaken bleibt auch eine Ebene tiefer offen');
+});
+
+// --------------------------------------------------------
+// Serien: die Folgeinstanz traegt die Sperre weiter (#1488)
+//
+// Das Kind hakt das erste Vorkommen ab - und genau damit entstand die naechste
+// Instanz ohne Sperre: `spawnRecurrenceFollowup()` kopierte die Definition,
+// liess `locked` aber aus. Ab dem zweiten Vorkommen konnte das Kind die Serie
+// umschreiben oder loeschen. Alle drei Wege zum Haken laufen durch dieselbe
+// Funktion; geprueft werden die beiden, die ein Kind an einer gesperrten
+// Aufgabe gehen kann (PATCH /:id/status und das Vollupdate aus dem Dialog).
+// --------------------------------------------------------
+
+/** Die Folgeinstanz, die das Abhaken von `taskId` angelegt hat. */
+function followupOf(taskId) {
+  return db.prepare('SELECT * FROM tasks WHERE recurrence_origin_id = ? AND parent_task_id IS NULL')
+    .get(taskId);
+}
+
+async function lockedSeries(title) {
+  return lockedTask(title, {
+    is_recurring: true,
+    recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,FR',
+    due_date: '2026-09-28',
+  });
+}
+
+async function assertFollowupStaysLocked(origin) {
+  const next = followupOf(origin.id);
+  assert.ok(next, 'das Abhaken legt die naechste Instanz an');
+  assert.equal(next.locked, 1, 'die Folgeinstanz traegt die Sperre der Serie weiter');
+  assert.equal(next.created_by, PARENT);
+
+  const detail = await call('GET', `/${next.id}`, { as: asChild });
+  const rename = await call('PUT', `/${next.id}`, {
+    as: asChild, body: fullUpdate(detail.body.data, { title: `${origin.title} (egal)` }),
+  });
+  assert.equal(rename.status, 403, 'das Kind schreibt das zweite Vorkommen nicht um');
+  assert.equal((await call('DELETE', `/${next.id}`, { as: asChild })).status, 403,
+    'das Kind loescht das zweite Vorkommen nicht');
+
+  const tick = await call('PATCH', `/${next.id}/status`, { as: asChild, body: { status: 'done' } });
+  assert.equal(tick.status, 200, 'abhaken bleibt auch am zweiten Vorkommen offen');
+  assert.equal(followupOf(next.id)?.locked, 1, 'und das dritte Vorkommen ist wieder gesperrt');
+}
+
+test('Serie: das Kind hakt per PATCH /:id/status ab - die Folgeinstanz bleibt gesperrt (#1488)', async () => {
+  const origin = await lockedSeries('Zimmer aufraeumen');
+  const tick = await call('PATCH', `/${origin.id}/status`, { as: asChild, body: { status: 'done' } });
+  assert.equal(tick.status, 200);
+  await assertFollowupStaysLocked(origin);
+});
+
+test('Serie: das Kind hakt im Dialog per PUT ab - die Folgeinstanz bleibt gesperrt (#1488)', async () => {
+  const origin = await lockedSeries('Muell rausbringen');
+  const done = await call('PUT', `/${origin.id}`, {
+    as: asChild, body: fullUpdate(origin, { status: 'done' }),
+  });
+  assert.equal(done.status, 200);
+  await assertFollowupStaysLocked(origin);
+});
+
+test('Serie: eine selbst gesperrte Unteraufgabe bleibt in der Folgeinstanz gesperrt (#1488)', async () => {
+  const origin = await call('POST', '/', {
+    as: asParent,
+    body: {
+      title: 'Wochenputz', visibility: 'all',
+      is_recurring: true, recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,FR', due_date: '2026-09-28',
+    },
+  });
+  assert.equal(origin.status, 201);
+  const sub = await call('POST', '/', {
+    as: asParent,
+    body: { title: 'Bad putzen', parent_task_id: origin.body.data.id, visibility: 'all', locked: true },
+  });
+  assert.equal(sub.status, 201);
+  assert.equal(sub.body.data.locked, 1);
+
+  const tick = await call('PATCH', `/${origin.body.data.id}/status`, { as: asChild, body: { status: 'done' } });
+  assert.equal(tick.status, 200);
+  const next = followupOf(origin.body.data.id);
+  assert.ok(next);
+  assert.equal(next.locked, 0, 'die ungesperrte Serie bleibt ungesperrt');
+  const nextSub = db.prepare('SELECT * FROM tasks WHERE parent_task_id = ?').get(next.id);
+  assert.ok(nextSub, 'die Unteraufgabe wandert mit');
+  assert.equal(nextSub.locked, 1, 'ihre eigene Sperre wandert mit');
+  assert.equal((await call('DELETE', `/${nextSub.id}`, { as: asChild })).status, 403);
 });
 
 test('POST: einen Punkt an eine gesperrte Checkliste hängen ist zu', async () => {

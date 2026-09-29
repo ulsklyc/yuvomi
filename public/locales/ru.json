@@ -3878,7 +3878,8 @@
             "recurring_resumed": "Повторяющийся расход возобновлен",
             "recurring_generated": "Повторяющийся расход создан автоматически",
             "payment_reversed": "Платеж сторнирован",
-            "ledger_restored": "Проводка восстановлена"
+            "ledger_restored": "Проводка восстановлена",
+            "ledger_removed": "Проводка удалена"
         },
         "splitPercentage": "Процент",
         "splitExact": "Точная сумма",
