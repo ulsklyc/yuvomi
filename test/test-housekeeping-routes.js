@@ -1444,6 +1444,31 @@ test('#1540 Besuch bearbeiten: Haushalt in UTC - unveraendert', () => inHousehol
   assert.deepEqual(visitState(id), { check_in: '2026-10-02T22:30:00.000Z', event_day: '2026-10-02', task_day: '2026-10-02' });
 }));
 
+test('#1540 ohne eingestellte Haushaltszone: der Tag, den das Formular zeigte, entscheidet (Review)', async () => {
+  // Ohne `household_timezone` liest die Oberflaeche die Zone des BROWSERS, der
+  // Server `TZ` bzw. die Systemzone - im Container meist UTC. Ein Besuch um
+  // 00:30 in Berlin steht im Formular am 1., auf der Server-Uhr am 30.09.
+  // Verglich der Server den eingereichten Tag mit SEINEM, hielt er ein reines
+  // Betragsupdate fuer einen neuen Tag und schob den Besuch um 24 Stunden.
+  // Das Formular schickt deshalb den Tag mit, den es vorbelegt hat.
+  const prevTz = process.env.TZ;
+  process.env.TZ = 'UTC';
+  db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run();
+  try {
+    const workerId = await freshWorker('Ohnezone');
+    const id = seedLinkedVisit(workerId, '2026-09-30T22:30:00.000Z', '2026-10-01');
+    await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-10-01', original_date: '2026-10-01', daily_rate: 40, extras: 5 } });
+    assert.deepEqual(visitState(id), { check_in: '2026-09-30T22:30:00.000Z', event_day: '2026-10-01', task_day: '2026-10-01' },
+      'nur der Betrag geaendert: der Besuch bleibt, wo er war');
+    await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-10-05', original_date: '2026-10-01', daily_rate: 40 } });
+    assert.deepEqual(visitState(id), { check_in: '2026-10-04T22:30:00.000Z', event_day: '2026-10-05', task_day: '2026-10-05' },
+      'vier Tage spaeter, dieselbe Uhrzeit');
+  } finally {
+    if (prevTz === undefined) delete process.env.TZ;
+    else process.env.TZ = prevTz;
+  }
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

@@ -375,3 +375,32 @@ test('#1540 Bearbeiten-Formular: der Besuchstag ist der Tag des Haushalts, nicht
   // Gegenfall: Haushalt in UTC - der Tag bleibt, was er war.
   assert.equal(await editFormDay('2026-09-30T22:30:00.000Z', 'UTC'), '2026-09-30');
 });
+
+// Und das Speichern schickt den vorbelegten Tag als `original_date` mit: ohne
+// eingestellte Haushaltszone liest der Server eine andere Uhr als der Browser
+// und verschiebt den Besuch um den Abstand zu DIESEM Tag (#1540, Review).
+test('#1540 Bearbeiten-Formular: Speichern schickt den vorbelegten Tag als original_date', async () => {
+  const puts = [];
+  openModalCalls.length = 0;
+  hk.state().workers = [{ id: 7, display_name: 'Maria' }];
+  globalThis.__apiStub = {
+    get: async () => ({ data: { id: 24, worker_id: 7, can_edit: true, rate_type: 'daily', check_in: '2026-09-30T22:30:00.000Z', daily_rate: 40, extras: 0 } }),
+    put: async (path, body) => { puts.push({ path, body }); return { data: {} }; },
+  };
+  tzModule.setDisplayTimeZone('Europe/Berlin');
+  try {
+    await openVisitFromDeepLink('24', { querySelector: () => null });
+    let submit = null;
+    const form = { addEventListener: (type, fn) => { if (type === 'submit') submit = fn; } };
+    openModalCalls[0][0].onSave({ querySelector: (sel) => (sel === '#housekeeping-visit-form' ? form : null) });
+    assert.equal(typeof submit, 'function', 'das Formular muss seinen Submit-Handler anhaengen');
+    const elements = { date: { value: '2026-10-05' }, daily_rate: { value: '40' }, extras: { value: '0' } };
+    await submit({ preventDefault() {}, currentTarget: { elements, querySelector: () => null } });
+  } finally {
+    tzModule.setDisplayTimeZone(null);
+    delete globalThis.__apiStub;
+  }
+  assert.equal(puts.length, 1, 'genau ein PUT');
+  assert.equal(puts[0].body.date, '2026-10-05');
+  assert.equal(puts[0].body.original_date, '2026-10-01', 'der Tag, den das Formular gezeigt hat');
+});

@@ -35,6 +35,7 @@ import { documentVisibleSql } from '../services/document-access.js';
 import { tokenAllows } from '../scopes.js';
 import {
   householdTimeZone,
+  daysBetweenDateKeys,
   localToUTCPrecise,
   shiftDateKey,
   storedToInstantMs,
@@ -387,8 +388,10 @@ function householdWallOf(checkIn, tz) {
   return ms === null ? null : utcToWall(new Date(ms).toISOString(), tz);
 }
 
-function updateVisitLinks(database, session, worker, checkIn, dailyRate, extras, eventTitle = null, paymentTitle = null, paymentDescription = null) {
-  const visitDate = householdWallOf(checkIn, householdTimeZone(database))?.date ?? checkIn.slice(0, 10);
+// `visitDate` ist der Tag, den die Person im Formular gewaehlt hat - derselbe,
+// auf den der Check-in Termin und Zahlungsaufgabe gelegt hat (`local_date`).
+// Hier stand `checkIn.slice(0, 10)`, der UTC-Tag des Besuchs (#1540).
+function updateVisitLinks(database, session, worker, visitDate, dailyRate, extras, eventTitle = null, paymentTitle = null, paymentDescription = null) {
   if (session.calendar_event_id) {
     // Datum, Titel und Farbe des Termins stehen in MIRRORED_FIELDS. Ein Besuch,
     // den der Apple-Sync bereits hochgeladen hat, trägt external_source='apple'
@@ -1071,6 +1074,8 @@ router.put('/visits/:id', (req, res) => {
     if (!assertMayTouchSettled(existing, req, res)) return;
 
     const vDate = date(req.body.date, 'date', true);
+    // Der Tag, den das Formular vorbelegt hat - siehe unten bei `baseDay`.
+    const vOriginalDate = date(req.body.original_date, 'original_date', false);
     const isHourly = existing.rate_type === 'hourly';
     const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: !isHourly });
     const vExtras = num(req.body.extras, 'extras');
@@ -1084,7 +1089,7 @@ router.put('/visits/:id', (req, res) => {
       ? num(req.body.minutes_worked, 'minutes_worked')
       : { value: null, error: null };
     if (vMinutesWorked.error) return res.status(400).json({ error: vMinutesWorked.error, code: 400 });
-    const errors = collectErrors([vDate, vDailyRate, vExtras, vEventTitle, vPaymentTitle, vPaymentDescription, vReceiptId]);
+    const errors = collectErrors([vDate, vOriginalDate, vDailyRate, vExtras, vEventTitle, vPaymentTitle, vPaymentDescription, vReceiptId]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     // Der Beleg folgt Regel 2 aus services/document-links.js: entfernen oder
     // ersetzen kann man nur, was man sieht (#1358). Wer den GESPEICHERTEN Beleg
@@ -1126,16 +1131,28 @@ router.put('/visits/:id', (req, res) => {
       effectiveDailyRate = computeHourlyAmount(vMinutesWorked.value, existing.hourly_rate || 0);
     }
 
-    // Der Tag im Formular ist der des Haushalts, die Uhrzeit bleibt die des
-    // Besuchs auf derselben Uhr (#1540). Hier stand der UTC-Tag mit der
-    // UTC-Uhrzeit: wer einen Besuch um 00:30 in Berlin auf seinen eigenen Tag
-    // „korrigierte", schob ihn um einen Tag. Unveraenderter Tag = unveraenderter
-    // Zeitpunkt, damit ein reines Betragsupdate den Besuch nicht bewegt.
+    // Ein neuer Tag verschiebt den Besuch um die Tage zwischen altem und neuem
+    // Tag, zur selben Uhrzeit des Haushalts (#1540). Hier stand der gewaehlte
+    // Tag mit der UTC-Uhrzeit: wer einen Besuch um 00:30 in Berlin auf seinen
+    // eigenen Tag „korrigierte", schob ihn um einen Tag. Unveraenderter Tag =
+    // unveraenderter Zeitpunkt, damit ein reines Betragsupdate nichts bewegt.
+    //
+    // „Der alte Tag" ist der, den das FORMULAR gezeigt hat (`original_date`),
+    // nicht der auf der Uhr des Servers: ohne eingestellte Haushaltszone liest
+    // die Oberflaeche die Zone des Browsers und der Server `TZ` - im Container
+    // meist UTC -, und ein Vergleich mit dem Server-Tag hielt ein reines
+    // Betragsupdate fuer einen neuen Tag. Ohne das Feld (API) gilt der Server-Tag.
     const tz = householdTimeZone(db.get());
     const originalWall = householdWallOf(existing.check_in, tz);
-    const checkIn = originalWall?.date === vDate.value
-      ? existing.check_in
-      : new Date(localToUTCPrecise(`${vDate.value}T${originalWall?.time ?? '09:00:00'}`, tz)).toISOString();
+    const baseDay = vOriginalDate.value ?? originalWall?.date ?? null;
+    const dayShift = baseDay ? daysBetweenDateKeys(baseDay, vDate.value) : null;
+    let checkIn;
+    if (dayShift === 0) checkIn = existing.check_in;
+    else if (originalWall && dayShift !== null) {
+      checkIn = new Date(localToUTCPrecise(`${shiftDateKey(originalWall.date, dayShift)}T${originalWall.time}`, tz)).toISOString();
+    } else {
+      checkIn = new Date(localToUTCPrecise(`${vDate.value}T09:00:00`, tz)).toISOString();
+    }
     const worker = existing.worker_id ? loadWorkerById(existing.worker_id) : null;
     db.get().transaction(() => {
       db.get().prepare(`
@@ -1155,7 +1172,7 @@ router.put('/visits/:id', (req, res) => {
         db.get(),
         existing,
         worker,
-        checkIn,
+        vDate.value,
         effectiveDailyRate,
         vExtras.value ?? 0,
         vEventTitle.value,
