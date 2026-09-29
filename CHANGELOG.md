@@ -738,6 +738,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lead or "after the start". Both dialogs now read the time in the household zone, including on
   the days the clocks change, the same way the server does.
 
+- **The note category hints no longer suggest that notes are private** (#1514). A personal
+  category is only visible to you, but a note filed under it is still visible to every household
+  member, just without that category. The hint next to the category type and the hint in the
+  category manager now say so.
+- **The reminder list for new tasks says why it is empty.** Without a CalDAV reminder list enabled
+  for tasks, the section under Settings → Modules → Tasks now explains what a reminder list is and
+  that an admin enables it, and admins get a link to Reminder sync. If the lists cannot be loaded,
+  the section shows an error with "Try again" instead of claiming that no list is enabled. The
+  section is now called "Reminder list for new tasks" (#1516).
 - **Saving an event no longer removes the shares on its attachment.** Every save of an event with
   an attachment, even one that only changed the title or the time, removed the shares the owner
   had added in Documents for people who are not on the event. A member who may not manage the

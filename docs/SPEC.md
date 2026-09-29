@@ -917,7 +917,7 @@ All three are configured in Settings → Modules → Calendar → Event defaults
 ### Task defaults for new tasks (per-user)
 - **`tasks_default_target`** (#695) — the CalDAV reminder list a new task starts out pointing at, in the same identifier format as `calendar_default_target` (`''` or `caldav:<accountId>|<listUrl>`; a `google:` value is rejected, because the VTODO sync runs over CalDAV only). The server validates the shape here and the *eligibility* in `POST/PUT /api/v1/tasks` — a list that was deselected in the meantime must not make the setting unsavable, but it must not silently park a task in a queue that will never drain either.
 
-Configured in Settings → **Modules → Tasks** → Task defaults ("For me"), deliberately not in the same section as the reminder lists (Settings → Modules → Tasks, "For the household"): which lists the household syncs at all is an admin decision, which of them *my* new tasks go to is mine, and the value is written per user. The field is replaced by a hint while no list is enabled for tasks.
+Configured in Settings → **Modules → Tasks** → Reminder list for new tasks ("For me"), deliberately not in the same section as the reminder lists (Settings → Modules → Tasks → Reminder sync, "For the household"): which lists the household syncs at all is an admin decision, which of them *my* new tasks go to is mine, and the value is written per user. While no list is enabled for tasks, the field gives way to an explanation (a reminder list is a CalDAV task list, an admin enables it), and admins get a link to Reminder sync; a failed `GET /tasks/sync-targets` shows an error with a retry instead of that empty state (#1516). The section stays visible either way: settings visibility is role-based and synchronous (`public/settings/registry.js`), and for members it is the only section of the Tasks sheet.
 
 ### External Calendars
 Display metadata (name, color) for synced Google/CalDAV calendars. Populated automatically during sync.
@@ -1373,7 +1373,10 @@ hand.
 #### Note Categories (migration v176)
 
 The catalog starts empty. A personal category belongs to one user and is visible only to that
-user; a household category is visible to everyone. Every member may manage their own personal
+user; a household category is visible to everyone. Only the category is private: a note filed
+under a personal category stays visible to every member, just without that category, and the
+category hints (`noteCategories.scopeHelp`, `noteCategories.personalManagementHint`) say so
+(#1514). Every member may manage their own personal
 catalog. Managing the household catalog requires admin access or the
 `notes_manage_household_categories` capability. Category responses use `id` as their identifier
 and `scope` (`personal` or `household`) as the single catalog discriminator.
