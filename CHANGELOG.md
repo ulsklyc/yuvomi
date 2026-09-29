@@ -731,6 +731,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The API documentation page answers "restore in progress" during a restore** (#1531). Outside
+  production, `/docs` checks the API token or session, and while a restore had the database closed
+  a request with a token ended in an internal error instead of the "restore in progress" answer
+  every other page that needs the database gives. A new test now reads every top-level route from
+  the running app and fails when one is neither covered by the restore gate nor listed with a reason.
+
 - **The family card no longer misses an evening appointment on a busy day** (#1449). The card took
   its appointments from the calendar tile, which stops at five coming ones and follows its "Only
   mine" option: a child's evening appointment could be cut off, and with "Only mine" every other
