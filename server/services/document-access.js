@@ -74,7 +74,7 @@ export function canManageDocument(document, { userId, isAdmin }) {
  * Die Sichtbarkeit eines Dokuments aus der eines Datensatzes nachziehen, an dem
  * es als Anhang haengt (Kalender: Termin-Sichtbarkeit und Zugewiesene).
  *
- * NUR VERENGEN, WENN DER AUFRUFER NICHT DARF (#1358). Bis dahin kopierte jedes
+ * NUR, WER DAS DOKUMENT VERWALTEN DARF (#1358, #1443). Bis #1358 kopierte jedes
  * Speichern eines Termins dessen Sichtbarkeit auf das Dokument - auch wenn die
  * Bearbeiterin das Dokument gar nicht sah oder kein Dokumentenrecht hatte. Ein
  * privates Dokument einer anderen Person wurde so mit einem normalen Speichern
@@ -87,16 +87,25 @@ export function canManageDocument(document, { userId, isAdmin }) {
  *     an einem Termin fuer Zugewiesene ein schon eingeschraenktes Dokument
  *     die Zugewiesenen als Freigabe dazubekommt. Nichts wird `family`, ein
  *     privates Dokument bleibt zu, keine Freigabe faellt weg;
- *   - sonst wird nur enger: `family` -> `restricted`/`private`, `restricted`
- *     verliert Personen, die nicht mehr drankommen, `private` bleibt `private`.
- *     Niemand bekommt Zugriff, den er vorher nicht hatte.
+ *   - `mayNarrow` (ein Anhang, der in DIESEM Schreiben neu entstanden ist und
+ *     der Terminerstellerin gehoert, siehe `ATTACHMENT_NARROW_ONLY`): nur enger,
+ *     `family` -> `restricted`/`private`, `restricted` verliert Personen, die
+ *     nicht mehr drankommen, `private` bleibt `private`. Niemand bekommt Zugriff,
+ *     den er vorher nicht hatte;
+ *   - sonst bleibt das Dokument UNANGETASTET (#1443). Auch das Verengen war ein
+ *     Eingriff in ein fremdes Dokument: jedes Speichern, auch nur des Titels,
+ *     loeschte die Freigaben, die die Besitzerin im Dokumente-Modul gesetzt
+ *     hatte, und ein privater Termin machte ihr Dokument privat. Wer ein
+ *     Dokument nicht verwalten darf, aendert seine Rechte nicht - wie im
+ *     Dokumente-Modul (`canManageDocument`). Wer den Anhang am Termin sieht,
+ *     entscheidet ohnehin das Dokument selbst (#1432).
  *
  * @param {import('better-sqlite3-multiple-ciphers').Database} database
  * @param {number} documentId
- * @param {{ visibility: 'private'|'restricted'|'family', userIds: number[], mayWiden: boolean }} target
+ * @param {{ visibility: 'private'|'restricted'|'family', userIds: number[], mayWiden: boolean, mayNarrow: boolean }} target
  */
 export function applyDocumentAccess(database, documentId, {
-  visibility, userIds = [], mayWiden = false, grantAssignees = false,
+  visibility, userIds = [], mayWiden = false, mayNarrow = false, grantAssignees = false,
 }) {
   if (!documentId) return;
   const current = database.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(documentId);
@@ -119,6 +128,9 @@ export function applyDocumentAccess(database, documentId, {
     return;
   }
 
+  // Weder verwalten noch gerade selbst angelegt: die Rechte der Besitzerin bleiben (#1443).
+  if (!mayWiden && !mayNarrow) return;
+
   if (mayWiden || visibility === 'private' || current.visibility === 'family') {
     // Voller Abgleich: erlaubt, oder das Ziel ist ohnehin enger als/gleich `family`.
     if (!mayWiden && visibility === 'family') return;
@@ -136,6 +148,53 @@ export function applyDocumentAccess(database, documentId, {
     .all(documentId).map((row) => row.user_id);
   const drop = database.prepare('DELETE FROM family_document_access WHERE document_id = ? AND user_id = ?');
   for (const userId of existing) if (!keep.has(userId)) drop.run(documentId, userId);
+}
+
+/**
+ * Hat sich in diesem Speichern geaendert, wer einen Termin sieht (#1443)? Nur
+ * dann gleicht der Kalender das Anhang-Dokument ab - auch fuer die Besitzerin.
+ * Bis dahin lief jedes Speichern (auch nur des Titels oder der Zeit) ueber das
+ * Dokument und loeschte die Freigaben, die die Besitzerin im Dokumente-Modul an
+ * Personen ausserhalb des Termins vergeben hatte.
+ *
+ * Verglichen wird das Publikum, auf das das Dokument abgeglichen wuerde: die
+ * Sichtbarkeit, und die Zugewiesenen nur an einem Termin fuer Zugewiesene - an
+ * einem Termin fuer alle oder einem privaten bestimmen sie nichts.
+ * `before === null` heisst: es gab keinen Vorzustand (neuer Termin), also
+ * abgleichen.
+ * @param {{ visibility: string, userIds: number[] } | null} before
+ * @param {{ visibility: string, userIds: number[] }} after
+ * @returns {boolean}
+ */
+export function eventAudienceChanged(before, after) {
+  if (!before) return true;
+  const visibility = before.visibility ?? 'all';
+  if (visibility !== (after.visibility ?? 'all')) return true;
+  if (visibility !== 'assignees') return false;
+  const ids = (list) => new Set((list || []).map(Number).filter((id) => Number.isInteger(id) && id > 0));
+  const was = ids(before.userIds);
+  const is = ids(after.userIds);
+  return was.size !== is.size || [...was].some((id) => !is.has(id));
+}
+
+/**
+ * Das Urteil eines `mayWiden`-Praedikats fuer einen Anhang, den der Aufrufer in
+ * diesem Schreiben selbst hochgeladen hat, ohne ihn zu verwalten (#1443): ein
+ * neues Anhang-Dokument entsteht als `family` und gehoert der Terminerstellerin;
+ * seine Rechte bekommt es erst aus dem Termin. Dieses Nachziehen darf es nur
+ * enger machen - ein Praedikat, das eine ID irrtuemlich fuer neu haelt, oeffnet
+ * damit nichts.
+ */
+export const ATTACHMENT_NARROW_ONLY = 'narrow-only';
+
+/**
+ * Uebersetzt das Urteil eines `mayWiden`-Praedikats in die Schalter von
+ * `applyDocumentAccess()`: `true` gleicht voll ab, `ATTACHMENT_NARROW_ONLY`
+ * verengt nur, alles andere laesst das Dokument unangetastet.
+ * @returns {{ mayWiden: boolean, mayNarrow: boolean }}
+ */
+export function attachmentAccessMode(verdict) {
+  return { mayWiden: verdict === true, mayNarrow: verdict === ATTACHMENT_NARROW_ONLY };
 }
 
 /**

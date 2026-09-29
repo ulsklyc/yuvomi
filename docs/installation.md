@@ -1537,22 +1537,23 @@ the container log, such as SQLite messages, are worth checking separately.
 <details>
 <summary>CalDAV tasks are not syncing</summary>
 
-Adding a CalDAV account only sets up **calendars**. Task lists live on their own page under
-**Settings → Synchronization → Reminder sync**, and each list has to be switched on there and
-mapped to Tasks or Shopping before anything is mirrored. That step is deliberate: enabling every
-list by default would pull a server's existing reminders into your task board unannounced.
+Adding a CalDAV account only sets up **calendars**. Task lists live in their own section under
+**Settings → Modules → Tasks → Reminder sync** ("For the household"), and each list has to be
+switched on there and mapped to Tasks or Shopping before anything is mirrored. That step is
+deliberate: enabling every list by default would pull a server's existing reminders into your task
+board unannounced.
 
 After switching a list on, either press "Sync reminders" or wait for the next scheduled run
 (`SYNC_INTERVAL_MINUTES`).
 
 Once a list is enabled for **Tasks**, it also becomes a destination: the task dialog gains a "sync
 target" field, and a task created in Yuvomi with a target set is uploaded on the next run (or right
-away, on save). Each member sets their own default under **Settings → Personal → Task defaults** -
-which lists the household mirrors is an admin decision, which of them your new tasks go to is
-yours. A task without a target stays local, as every task did before. Lists mapped to **Shopping**
-are not offered as task destinations: a task sent there would come back as a shopping item.
-Subtasks are never uploaded on their own, and a task that has already been uploaded cannot be moved
-to a different list.
+away, on save). Each member sets their own default under **Settings → Modules → Tasks → Reminder
+list for new tasks** ("For me") - which lists the household mirrors is an admin decision, which of
+them your new tasks go to is yours. A task without a target stays local, as every task did before.
+Lists mapped to **Shopping** are not offered as task destinations: a task sent there would come back
+as a shopping item. Subtasks are never uploaded on their own, and a task that has already been
+uploaded cannot be moved to a different list.
 
 One boundary worth knowing if you use both mirroring and the task lock: a **locked** task is closed
 to everyone but its creator and admins inside Yuvomi, but an **inbound sync still rewrites its
