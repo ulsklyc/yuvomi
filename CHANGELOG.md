@@ -736,6 +736,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that an admin enables it, and admins get a link to Reminder sync. If the lists cannot be loaded,
   the section shows an error with "Try again" instead of claiming that no list is enabled. The
   section is now called "Reminder list for new tasks" (#1516).
+- **Saving an event no longer removes the shares on its attachment.** Every save of an event with
+  an attachment, even one that only changed the title or the time, removed the shares the owner
+  had added in Documents for people who are not on the event. A member who may not manage the
+  document - no access to documents, no sight of it, or neither its owner nor an admin - also
+  made it private by making the event private. The attachment now follows the event only when
+  the save changes who sees the event (its visibility, or the people on an event for its
+  assignees), and only for its owner or an admin; for everyone else the document stays as the
+  owner set it. A new attachment uploaded to someone else's event is still limited to the event's
+  people. (#1443)
+
 - **A locked recurring task stays locked after it is checked off** (#1488). Checking off one
   occurrence created the next one without the lock, so from the second occurrence on a child could
   edit or delete a series a parent had locked. The next occurrence now keeps the lock, and so does a
