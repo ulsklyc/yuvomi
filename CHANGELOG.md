@@ -738,6 +738,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wall mode (also right after a restart in wall mode), and turning it on says in one line what it is
   and how to leave it.
 
+- **A restore waits for pages that save something after asking another service** (#1551). Some
+  pages that only show data still save something once an answer comes back: a renewed Google token
+  when the calendar list, the sync targets of the event dialog or a Google Drive document are
+  loaded, the calendar list of an Outlook or CalDAV account when it is refreshed or loaded for the
+  first time, and the exchange rates on the subscriptions page. A restore did not wait for them, so
+  this could land in the restored database or fail on the closed one. A restore now waits for them,
+  and while it runs these pages answer "try again" instead of starting. A new page that waits for
+  another service now fails a test until it is covered or marked as only reading.
 - **Deleting the first entry of a recurring budget payment says that it ends the series** (#1544).
   The series hangs on its first entry, so "Only this occurrence" there also ends the whole series:
   the entries already created stay as single entries and no new ones follow. The dialog now says so

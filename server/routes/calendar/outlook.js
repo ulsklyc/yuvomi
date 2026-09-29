@@ -127,9 +127,10 @@ router.delete('/outlook/accounts/:id', requireAdmin, (req, res) => {
 /**
  * GET /api/v1/calendar/outlook/accounts/:id/calendars
  * Admin only. Kalenderliste eines Kontos (aus der DB; ?refresh=true lädt neu
- * von Graph).
+ * von Graph). Mit `?refresh=true` schreibt sie Token und Auswahl nach dem Warten
+ * auf Microsoft - deshalb `refuseWhileRestoring` (#1551).
  */
-router.get('/outlook/accounts/:id/calendars', requireAdmin, async (req, res) => {
+router.get('/outlook/accounts/:id/calendars', requireAdmin, refuseWhileRestoring, async (req, res) => {
   try {
     outlookCalendar.assertConfigured();
     const accountId = parseInt(req.params.id, 10);
