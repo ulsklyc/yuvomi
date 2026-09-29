@@ -681,7 +681,7 @@ function dictKeys(block) {
  * Galerie bis Fusszeile - ungeprueft gelassen, und die Suite blieb dabei gruen.
  */
 function usedKeys(html) {
-  const body = html.replace(/<script\b[^>]*>[\s\S]*?<\/script\b[^>]*>/gi, '');
+  const body = html.replace(/<script\b[^>]*>[\s\S]*?<\/script\b[^>]*>/gi, ' ');
   const keys = new Set();
   for (const attr of ['data-t', 'data-alt-t', 'data-t-aria']) {
     for (const m of body.matchAll(new RegExp(`${attr}="([^"]+)"`, 'g'))) keys.add(m[1]);
@@ -782,7 +782,7 @@ test('der Zwillings-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
  * Woerterbuch bleibt als zweite Stufe fuer Vorlagen ohne <script>.
  */
 function fallbackNodes(html) {
-  const body = html.replace(/<script\b[^>]*>[\s\S]*?<\/script\b[^>]*>/gi, '')
+  const body = html.replace(/<script\b[^>]*>[\s\S]*?<\/script\b[^>]*>/gi, ' ')
     .split(/\n\s*(?:var |const )?(?:DICT|T)\s*=/)[0];
   return [...body.matchAll(/<(\w+)[^>]*\sdata-t="([\w-]+)"[^>]*>([\s\S]*?)<\/\1>/g)]
     .map((m) => [m[2], stripTags(m[3])]);
@@ -1486,7 +1486,7 @@ test('docs: jede heruntergeladene Datei und jede Compose-Datei existiert im Repo
  * Gedankenstrich hinterlaesst deshalb ZWEI Bindestriche (`option-g--portainer`).
  */
 function githubSlug(heading) {
-  return heading.replace(/<[^>]+>/g, '').replace(/`/g, '').trim().toLowerCase()
+  return heading.split(/<[^>]+>/).join('').replace(/`/g, '').trim().toLowerCase()
     .replace(/[^\p{L}\p{N} _-]/gu, '').replace(/ /g, '-');
 }
 
@@ -2264,7 +2264,7 @@ test('index.html: das LCP-Bild hat Vorrang und reservierten Platz in beiden Form
 test('der LCP-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const html = read('index.html');
   assert.deepEqual(heroFindings(html.replace(' fetchpriority="high"', '')), ['heroShot ohne fetchpriority="high"']);
-  assert.deepEqual(heroFindings(html.replace('id="heroShot">', 'id="heroShot">'.replace('>', '>')).replace('width="1400" height="1050" loading="eager"', 'width="1050" height="1400" loading="eager"')),
+  assert.deepEqual(heroFindings(html.replace('width="1400" height="1050" loading="eager"', 'width="1050" height="1400" loading="eager"')),
     ['heroShot 1050x1400 passt nicht zur Desktopaufnahme 2752x2064']);
   const noPhone = html.replace('.hero-frame img { aspect-ratio: var(--ar-phone);', '.hero-frame img {');
   assert.notEqual(noPhone, html);
@@ -2286,7 +2286,7 @@ test('der LCP-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
 function earlyLangFindings(html) {
   const found = [];
   const head = html.split('</head>')[0];
-  const headScripts = (head.match(/<script>[\s\S]*?<\/script>/g) || []).join('\n');
+  const headScripts = (head.match(/<script>[\s\S]*?<\/script>/gi) || []).join('\n');
   if (!/classList\.add\('i18n-wait'\)/.test(headScripts)) found.push('Kopfskript setzt i18n-wait nicht');
   if (!/classList\.add\('js'\)/.test(headScripts)) found.push('Kopfskript setzt js nicht');
   const dict = html.search(/\n\s*var T = \{\n/);
@@ -2975,7 +2975,7 @@ function pngSrcFindings(page, html) {
     const light = (m[0].match(/\bdata-light="([^"]+)"/) || [])[1];
     // Die Kopie folgt direkt (beim Hero hinter seinem Inline-Skript, das die
     // Maske zu Leerzeichen gemacht hat).
-    const after = html.slice(m.index + m[0].length).replace(/^\s*<script>[\s\S]*?<\/script>/, '');
+    const after = html.slice(m.index + m[0].length).replace(/^\s*<script>[\s\S]*?<\/script>/i, '');
     const copy = (after.match(/^\s*<noscript><img\b[^>]*\bsrc="([^"]+)"[^>]*><\/noscript>/) || [])[1];
     if (!copy) found.push(`${page}: ${light || 'Aufnahme'} ohne src und ohne <noscript>-Kopie dahinter`);
     else if (copy !== light) found.push(`${page}: <noscript>-Kopie zeigt ${copy}, das Bild ${light}`);
