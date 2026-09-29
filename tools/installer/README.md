@@ -191,8 +191,9 @@ An inline fallback token block (with a dark-mode variant) precedes the
 `tokens.css` link, so the wizard stays legible even if that stylesheet cannot be
 served; its values mirror the current tokens, because a fallback that shows the
 previous release sends the diagnosis in the wrong direction. The layout follows the app's settings screens: options sit in grouped inset
-lists, wide screens show a step list beside the content (finished steps can be
-revisited), the action bar stays in reach at every width, and the review page
+lists with the app's switches for on/off settings, wide screens show a step list
+beside the content (finished steps can be revisited, and the Docker start has its
+own entry), the action bar stays in reach at every width, and the review page
 is grouped by topic with an edit link per group. The wizard meets WCAG 2.1 AA
 (keyboard-operable accordions, ARIA live regions for Docker status, focus
 management, labelled controls, a `<main>` landmark, and field-level error

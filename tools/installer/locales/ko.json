@@ -214,6 +214,7 @@
   },
   "docker": {
     "title": "Yuvomi 시작 중",
+    "navLabel": "Yuvomi 시작",
     "subtitle": "이미지를 불러오고 Docker 컨테이너를 시작합니다.",
     "elapsed": "{{n}}초 경과",
     "running": "컨테이너가 정상이며 실행 중입니다",

@@ -214,6 +214,7 @@
   },
   "docker": {
     "title": "Yuvomi wird gestartet",
+    "navLabel": "Yuvomi starten",
     "subtitle": "Das Image wird geladen und der Docker-Container gestartet.",
     "elapsed": "{{n}} s vergangen",
     "running": "Container ist gesund und läuft",

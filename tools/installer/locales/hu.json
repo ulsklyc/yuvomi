@@ -134,6 +134,7 @@
   },
   "docker": {
     "title": "Yuvomi indítása",
+    "navLabel": "Yuvomi indítása",
     "subtitle": "A kép letöltése és a Docker konténer indítása.",
     "elapsed": "{{n}}s eltelt",
     "running": "A konténer egészséges és fut",

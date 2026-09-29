@@ -214,6 +214,7 @@
   },
   "docker": {
     "title": "Sinisimulan ang Yuvomi",
+    "navLabel": "Simulan ang Yuvomi",
     "subtitle": "Kinukuha ang image at sinisimulan ang Docker container.",
     "elapsed": "{{n}}s ang lumipas",
     "running": "Malusog at tumatakbo ang container",

@@ -134,6 +134,7 @@
   },
   "docker": {
     "title": "Yuvomi başlatılıyor",
+    "navLabel": "Yuvomi'yi başlat",
     "subtitle": "İmaj indiriliyor ve Docker kapsayıcısı başlatılıyor.",
     "elapsed": "{{n}} sn geçti",
     "running": "Kapsayıcı sağlıklı ve çalışıyor",

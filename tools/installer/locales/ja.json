@@ -134,6 +134,7 @@
   },
   "docker": {
     "title": "Yuvomi を起動しています",
+    "navLabel": "Yuvomi の起動",
     "subtitle": "イメージを取得し、Docker コンテナを起動しています。",
     "elapsed": "{{n}} 秒経過",
     "running": "コンテナは正常に稼働しています",

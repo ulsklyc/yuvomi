@@ -32,6 +32,8 @@
          WCAG 1.4.11 verlangt fuer die Kante eines Bedienelements 3:1. */
       --neutral-500: #8C8880;
       --color-border-control: var(--neutral-500);
+      /* Bahn eines ausgeschalteten Schalters (.toggle__track), wie in der App. */
+      --neutral-300: #CFC9BC;
       --color-text-primary: #1D1B17;
       --color-text-secondary: #63615B;
       --color-text-tertiary: #6B675F;
@@ -93,6 +95,11 @@
       --duration-2xl: 400ms;
       --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
       --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
+      /* Die Feder des Schalterknopfs beim Einschalten (tokens.css, Glass-
+         Uebergaenge) und sein Glanz - der Glanz haengt dort an
+         --glass-inset-strength, das in beiden Themes 1 ist. */
+      --ease-glass: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --glass-inset-thumb: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(0, 0, 0, 0.08);
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -106,7 +113,7 @@
         --color-text-placeholder: #A9A39A; --color-text-tertiary: #A9A39A;
         --color-border-subtle: #3E3933;
         --color-accent: #A78BFA; --color-accent-hover: #BCA6FC; --color-ink-on-vivid: #0A0A0C;
-        --neutral-950: #FBFAF7; --neutral-500: #948E85;
+        --neutral-950: #FBFAF7; --neutral-500: #948E85; --neutral-300: #514B45;
         --color-success: #30D158; --color-warning: #FF9F0A; --color-danger: #FF6961;
         /* Inkl. des 1px-Kantenrings aus tokens.css (Dark-Kur 2026-08-17): ein
            reiner Schwarz-Wurf ist auf der Kohle-Buehne unsichtbar, die Karte
@@ -469,27 +476,73 @@
 
     .field { margin-bottom: 18px; }
     .field label { display: block; font-size: var(--text-sm); font-weight: 600; margin-bottom: 6px; }
-    /* Die Kästchen waren 13x13 neben einem 16px hohen Label und verfehlten damit
-       jede Zielgrösse (WCAG 2.2 SC 2.5.8 verlangt 24x24 CSS-Pixel). Das gilt in
-       jeder Breite, nicht nur mobil - deshalb keine Media-Query. */
-    input[type=checkbox] {
-      inline-size: 24px; block-size: 24px; flex-shrink: 0;
-      margin: 0; accent-color: var(--color-accent); cursor: pointer;
+    /* ── Schalter: die Boolean-Einstellung der App ───────────────────────────
+       Komponenten-Kanon (DESIGN.md, "Boolean in den Einstellungen"): ein
+       Schalter wie in Apples Einstellungen, Label links, Zustand rechts. Die
+       native Checkbox steht dort unter "Nicht mehr" - der Installer war die
+       erste Begegnung mit Yuvomi und sprach als einzige Stelle noch den alten
+       Dialekt (Critique 2026-09-29, 2. Runde, P1). Nachgebaut nach
+       toggleRowHtml({ control: 'switch' }) (settings/components.js) und der
+       .toggle-Bahn (layout.css, glass.css), nicht importiert: der Installer ist
+       eine Einzeldatei. Der Knoten bleibt eine input[type=checkbox] mit
+       role="switch" - .checked und change lesen sich wie vorher, ein
+       Screenreader sagt "Schalter, an" statt "Kontrollkaestchen, aktiviert".
+       Den Modifikator toggle-row--switch der App braucht es hier nicht: eine
+       Haken-Zeile gibt es im Installer nicht mehr.
+
+       Die ganze Zeile ist das Label und damit die Trefferflaeche. Das Polster
+       sitzt deshalb im Label, nicht im Feld: sonst endete das Ziel am letzten
+       Buchstaben, und der Daumen traf daneben. `label.` hebt die Regel ueber
+       `.field label` (Block, Abstand darunter). */
+    .inset-group .field:has(> .toggle-row) { padding: 0; }
+    label.toggle-row {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 0; cursor: pointer;
+      min-height: 48px; padding: 12px 16px;
     }
-    .field label:has(input[type=checkbox]) {
-      display: flex; align-items: center; gap: 10px; margin-bottom: 0; cursor: pointer;
+    .toggle-row__label { flex: 1; min-width: 0; }
+    .toggle { position: relative; display: inline-flex; flex-shrink: 0; margin-inline-start: auto; }
+    /* Visuell versteckt, aber im Fokus-Weg: Space schaltet, der Ring steht an
+       der Zeile. position: relative oben haelt das Kaestchen in der Zeile - die
+       App fand ohne das einen Scroll-Sprung ins falsche Element (#483). */
+    .toggle input {
+      position: absolute; width: 1px; height: 1px; margin: 0;
+      overflow: hidden; clip: rect(0, 0, 0, 0);
     }
-    /* Die ganze Zeile ist das Ziel, nicht nur Kaestchen und Text: das Label
-       war 24px hoch und endete am letzten Buchstaben, der Rest der 48px-Zeile
-       war tote Flaeche - auf dem Handy traf der Daumen daneben, und der Schalter
-       blieb stumm. Das Zeilenpolster wandert deshalb vom Feld ins Label, die
-       Zeile sieht gleich aus und nimmt den Tipp jetzt ueberall an, wie eine
-       Schalterzeile in den Einstellungen der App. */
-    .inset-group .field:has(> label > input[type=checkbox]) { padding: 0; }
-    .inset-group .field > label:has(> input[type=checkbox]) { min-height: 48px; padding: 12px 16px; }
-    /* Das Polster sitzt jetzt IM Hinweis; das Lesemass waechst um genau das,
-       sonst braeche er frueher um als die Hinweise der Textfelder. */
-    .inset-group .field > label:has(> input[type=checkbox]) ~ .hint {
+    .toggle__track {
+      position: relative; width: 44px; height: 26px; flex-shrink: 0;
+      border-radius: var(--radius-full);
+      background-color: var(--neutral-300);
+      transition: background-color var(--duration-sm) var(--ease-out);
+    }
+    /* Der Knopf traegt den Glanz der App (Specular oben, Schattenkante unten). */
+    .toggle__track::after {
+      content: ''; position: absolute; top: 3px; inset-inline-start: 3px;
+      width: 20px; height: 20px; border-radius: var(--radius-full);
+      background: var(--color-surface);
+      box-shadow: var(--shadow-sm), var(--glass-inset-thumb);
+      transition: transform var(--duration-sm) var(--ease-out);
+    }
+    .toggle input:checked + .toggle__track { background-color: var(--color-accent); }
+    /* Einschalten federt (--ease-glass wie in der App), Ausschalten gleitet
+       ruhig zurueck - dieselbe Asymmetrie wie layout.css. */
+    .toggle input:checked + .toggle__track::after {
+      transform: translateX(18px);
+      transition: transform var(--duration-xl) var(--ease-glass);
+    }
+    /* In RTL steht "an" links, wie bei Apple: die Zeile spiegelt sich per
+       Flex, der Knopf per inset-inline-start - nur sein Weg braucht das
+       Vorzeichen. */
+    html[dir="rtl"] .toggle input:checked + .toggle__track::after { transform: translateX(-18px); }
+    .toggle input:disabled + .toggle__track { opacity: 0.4; }
+    label.toggle-row:has(input:disabled) { cursor: not-allowed; }
+    /* Der Ring steht an der Zeile und nur bei Tastaturfokus (wie
+       .toggle-row--switch der App). Nach innen gezogen wie an .toggle-head: die
+       Gruppe clippt ihre Kanten, ein aeusserer Ring fehlte links und rechts. */
+    label.toggle-row:has(input:focus-visible) { box-shadow: inset 0 0 0 2px var(--color-accent); }
+    /* Hinweis unter einer Schalterzeile: das Polster sitzt IM Hinweis, das
+       Lesemass waechst um genau das, sonst braeche er frueher um als die
+       Hinweise der Textfelder. */
+    .inset-group .field > .toggle-row ~ .hint {
       margin-top: -6px; padding: 0 16px 12px; max-width: calc(70ch + 32px);
     }
     /* "Mehr erfahren": Hintergrund zu einer Frage, der beim Ausfuellen nicht
@@ -531,13 +584,13 @@
     .hint-more > .hint { margin-top: 0; }
     /* Unter einer Schalterzeile: der Knopf ueberlappt deren unteres Polster,
        damit er 44px Ziel hat, ohne 44px Hoehe dazuzulegen. */
-    .inset-group .field > label:has(> input[type=checkbox]) ~ .hint-more { margin-top: -12px; padding: 0 16px 4px; }
-    .inset-group .field > label:has(> input[type=checkbox]) ~ .hint-more > .hint { padding-bottom: 8px; }
+    .inset-group .field > .toggle-row ~ .hint-more { margin-top: -12px; padding: 0 16px 4px; }
+    .inset-group .field > .toggle-row ~ .hint-more > .hint { padding-bottom: 8px; }
     .toggle-body > .hint-more { padding: 2px 16px 0; }
     @media (min-width: 641px) {
       .hint-more > summary { display: none; }
       .toggle-body > .hint-more { padding-top: 12px; }
-      .inset-group .field > label:has(> input[type=checkbox]) ~ .hint-more { margin-top: -6px; }
+      .inset-group .field > .toggle-row ~ .hint-more { margin-top: -6px; }
     }
     .opt { font-weight: 400; color: var(--color-text-tertiary); font-size: var(--text-xs); }
     /* Der Platzhalter war NIRGENDS gesetzt und fiel damit auf Chromes UA-Default
@@ -1005,7 +1058,7 @@
         background-color var(--duration-md) var(--ease-out),
         color var(--duration-md) var(--ease-out);
     }
-    .steps-nav__link:hover:not(:disabled) { background: color-mix(in srgb, var(--color-text-primary) 6%, transparent); }
+    button.steps-nav__link:hover:not(:disabled) { background: color-mix(in srgb, var(--color-text-primary) 6%, transparent); }
     .steps-nav__link:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
     /* Kommende Schritte: gedaempft, aber lesbar (Sekundaertext haelt AA) und
        ohne Hand-Cursor - sie sind die Vorschau, nicht das Ziel. */
@@ -1018,9 +1071,14 @@
     }
     /* "erledigt" nur fuer den Screenreader und nur am erledigten Eintrag: der
        Haken sagt es dem Auge, aria-current nennt nur den aktuellen Schritt. */
-    .steps-nav__item:not([data-state="done"]) .steps-nav__done { display: none; }
+    .steps-nav__item:not([data-state="done"]):not([data-run="ok"]) .steps-nav__done { display: none; }
+    .steps-nav__item:not([data-run="failed"]) .steps-nav__failed { display: none; }
+    /* Der Docker-Eintrag ist kein Knopf: kein Hand-Cursor, und kommend
+       gedaempft wie die gesperrten Knoepfe daneben. */
+    span.steps-nav__link { cursor: default; }
+    .steps-nav__item[data-state="upcoming"] span.steps-nav__link { color: var(--color-text-secondary); }
     .steps-nav__mark {
-      display: inline-grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0;
+      position: relative; display: inline-grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0;
       border-radius: var(--radius-full);
       box-shadow: inset 0 0 0 1.5px var(--color-border-control);
       font-size: var(--text-xs); font-weight: 600; font-variant-numeric: tabular-nums;
@@ -1036,7 +1094,8 @@
     }
     /* Erledigt: der Haken in Erfolgsgruen, wie auf der Bereitschaftsliste und
        dem Abschluss - die Ziffer weicht ihm. */
-    .steps-nav__item[data-state="done"] .steps-nav__mark {
+    .steps-nav__item[data-state="done"] .steps-nav__mark,
+    .steps-nav__item[data-run="ok"] .steps-nav__mark {
       box-shadow: none; font-size: 0;
       background: color-mix(in srgb, var(--color-success) 14%, transparent);
     }
@@ -1044,11 +1103,32 @@
        Sprung wie auf dem Docker-Schirm. Ein Pseudo-Element entsteht erst mit
        dem Zustand, also Animation statt Transition. */
     @keyframes check-in { from { opacity: 0; transform: scale(0.6); } }
-    .steps-nav__item[data-state="done"] .steps-nav__mark::before {
+    .steps-nav__item[data-state="done"] .steps-nav__mark::before,
+    .steps-nav__item[data-run="ok"] .steps-nav__mark::before {
       animation: check-in var(--duration-md) var(--ease-out);
       content: ''; width: 14px; height: 14px; background: var(--color-success);
       -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5L20 7'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
       mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5L20 7'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+    }
+    /* Der laufende Start: leerer Ring mit dem drehenden Bogen der Docker-
+       Checkliste (.phase__mark) statt der gefuellten Ziffer - die Liste zeigt
+       dasselbe Zeichen wie der Schirm daneben, nur kleiner und leiser. */
+    .steps-nav__item[data-run="running"] .steps-nav__mark {
+      background: none; box-shadow: inset 0 0 0 2px var(--color-border);
+    }
+    .steps-nav__item[data-run="running"] .steps-nav__mark::after {
+      content: ''; position: absolute; inset: 0; border-radius: inherit;
+      border: 2px solid transparent; border-top-color: var(--color-accent);
+      animation: phase-spin calc(var(--duration-2xl) * 2) linear infinite;
+    }
+    /* Gescheitert: das Kreuz der Checkliste auf Danger-Toenung. */
+    .steps-nav__item[data-run="failed"] .steps-nav__mark {
+      box-shadow: none; background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+    }
+    .steps-nav__item[data-run="failed"] .steps-nav__mark::before {
+      content: ''; width: 12px; height: 12px; background: var(--color-danger);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
     }
 
     /* Touch-Ziele ≥44px auf Mobilgeräten. Die Fussleiste ist in jeder Breite
@@ -1135,6 +1215,10 @@
       .toggle-card, .toggle-body { transition: none; }
       .hint-more::details-content { transition: none; }
       .toggle-head::after, .hint-more > summary::after { transition: none; }
+      /* Der Schalter springt in seine Lage, wie in der App. */
+      .toggle__track,
+      .toggle__track::after,
+      .toggle input:checked + .toggle__track::after { transition: none; }
       /* Der stehende Spinner wirkte wie ein haengender Schirm. Statt zu drehen
          atmet der Bogen: ein langsamer Deckkraft-Puls, keine Bewegung. */
       .phase[data-state="active"] .phase__mark::after {
@@ -1142,8 +1226,12 @@
       }
       /* Haken und Kreuz blenden nur ein, ohne Sprung. */
       .phase__mark::before { transform: none; transition: opacity var(--duration-md) var(--ease-out); }
-      .steps-nav__item[data-state="done"] .steps-nav__mark::before {
+      .steps-nav__item[data-state="done"] .steps-nav__mark::before,
+      .steps-nav__item[data-run="ok"] .steps-nav__mark::before {
         animation: step-fade var(--duration-md) var(--ease-out);
+      }
+      .steps-nav__item[data-run="running"] .steps-nav__mark::after {
+        animation: phase-pulse calc(var(--duration-2xl) * 2) var(--ease-in-out) infinite alternate;
       }
     }
   </style>
@@ -1198,6 +1286,13 @@
       <li class="steps-nav__item" data-nav-step="storage" hidden><button type="button" class="steps-nav__link" data-goto="storage" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="storage.title">Storage &amp; backups</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
       <li class="steps-nav__item" data-nav-step="advanced" hidden><button type="button" class="steps-nav__link" data-goto="advanced" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="advanced.title">Advanced Settings</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
       <li class="steps-nav__item" data-nav-step="review" hidden><button type="button" class="steps-nav__link" data-goto="review" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="review.title">Review</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <!-- Der Containerstart hat keine Nummer (er fragt nichts), aber einen
+           Platz in der Liste: ohne ihn stand die Liste waehrend des laengsten
+           Wartens ohne aktuellen Eintrag da, und niemand wusste, wo er ist.
+           Kein Knopf: zurueck auf einen laufenden oder fertigen Start fuehrt
+           nichts. renderStepNav() setzt data-run (running/ok/failed), solange
+           sein Schirm steht; "(fehlgeschlagen)" sagt nur der Screenreader. -->
+      <li class="steps-nav__item" data-nav-step="docker" hidden><span class="steps-nav__link"><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="docker.navLabel">Start Yuvomi</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span><span class="vh steps-nav__failed" data-i18n="docker.stepFailed">(failed)</span></span></li>
       <li class="steps-nav__item" data-nav-step="admin" hidden><button type="button" class="steps-nav__link" data-goto="admin" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="admin.title">Create Admin Account</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
     </ol>
   </nav>
@@ -1474,7 +1569,7 @@
              der Zeile, die sie einschaltet (wie ein Schalter in den Einstellungen). -->
         <div class="inset-group">
         <div class="field">
-          <label><input type="checkbox" id="wea-enable"> <span data-i18n="weather.enable">Enable weather widget</span></label>
+          <label class="toggle-row"><span class="toggle-row__label" data-i18n="weather.enable">Enable weather widget</span><span class="toggle"><input type="checkbox" role="switch" id="wea-enable"><span class="toggle__track" aria-hidden="true"></span></span></label>
           <!-- Zwei Quellen fuer denselben Standort: WEATHER_* aus der .env und der
                Haushalts-Standort der App. Der gespeicherte Standort gewinnt
                (#1568) - ohne diesen Satz wirkt eine spaetere Aenderung hier wie
@@ -1635,7 +1730,7 @@
       <div class="card-body">
         <div class="inset-group">
         <div class="field">
-          <label><input type="checkbox" id="email-enable"> <span data-i18n="email.enable">Enable email sending</span></label>
+          <label class="toggle-row"><span class="toggle-row__label" data-i18n="email.enable">Enable email sending</span><span class="toggle"><input type="checkbox" role="switch" id="email-enable"><span class="toggle__track" aria-hidden="true"></span></span></label>
           <div class="hint" data-i18n="email.hint">Uses your own SMTP server (mailbox provider, self-hosted, or a transactional service).</div>
           <!-- Die .env gewinnt ueber die Datenbank, und die App sperrt jedes Feld,
                das die Umgebung setzt (admin-email.js). Wer SMTP in der App testen
@@ -1747,7 +1842,7 @@
           </button>
           <div class="toggle-body" id="backup-body">
             <div class="field">
-              <label><input type="checkbox" id="adv-backup-enable" checked> <span data-i18n="advanced.backupEnable">Enable automatic backups</span></label>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.backupEnable">Enable automatic backups</span><span class="toggle"><input type="checkbox" role="switch" id="adv-backup-enable" checked><span class="toggle__track" aria-hidden="true"></span></span></label>
             </div>
             <div class="field">
               <label for="adv-backup-schedule" data-i18n="advanced.backupScheduleLabel">Schedule (cron)</label>
@@ -1768,7 +1863,7 @@
           <div class="toggle-body" id="webdav-backup-body">
             <p class="hint" data-i18n="advanced.webdavBackupHint">Copy each backup to a WebDAV server (e.g. Nextcloud) so it survives a disk failure.</p>
             <div class="field">
-              <label><input type="checkbox" id="adv-webdav-backup-enable"> <span data-i18n="advanced.webdavBackupEnable">Also send backups to WebDAV</span></label>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.webdavBackupEnable">Also send backups to WebDAV</span><span class="toggle"><input type="checkbox" role="switch" id="adv-webdav-backup-enable"><span class="toggle__track" aria-hidden="true"></span></span></label>
             </div>
             <div class="field">
               <label for="adv-webdav-backup-url" data-i18n="advanced.webdavBackupUrlLabel">WebDAV URL</label>
@@ -1809,7 +1904,7 @@
           </button>
           <div class="toggle-body" id="document-local-body">
             <div class="field">
-              <label><input type="checkbox" id="adv-document-local-enable"> <span data-i18n="advanced.documentLocalEnable">Store new documents in a local folder</span></label>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.documentLocalEnable">Store new documents in a local folder</span><span class="toggle"><input type="checkbox" role="switch" id="adv-document-local-enable"><span class="toggle__track" aria-hidden="true"></span></span></label>
             </div>
             <div class="field">
               <label for="adv-document-local-dir" data-i18n="advanced.documentLocalDirLabel">Host folder</label>
@@ -1831,7 +1926,7 @@
           <div class="toggle-body" id="document-webdav-body">
             <details class="hint-more"><summary data-i18n="common.learnMore">Learn more</summary><p class="hint" data-i18n="advanced.documentWebdavHint">Non-empty environment values override the corresponding settings stored in the database.</p></details>
             <div class="field">
-              <label><input type="checkbox" id="adv-document-webdav-enable"> <span data-i18n="advanced.documentWebdavEnable">Store new documents on WebDAV</span></label>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.documentWebdavEnable">Store new documents on WebDAV</span><span class="toggle"><input type="checkbox" role="switch" id="adv-document-webdav-enable"><span class="toggle__track" aria-hidden="true"></span></span></label>
             </div>
             <div class="field">
               <label for="adv-document-webdav-url" data-i18n="advanced.documentWebdavUrlLabel">WebDAV URL</label>
@@ -1866,7 +1961,7 @@
           <div class="toggle-body" id="document-google-drive-body">
             <details class="hint-more"><summary data-i18n="common.learnMore">Learn more</summary><p class="hint" data-i18n="advanced.documentGoogleDriveHint">Configure OAuth credentials here, then connect and explicitly select Google Drive in Document settings after installation.</p></details>
             <div class="field">
-              <label><input type="checkbox" id="adv-document-google-drive-enable"> <span data-i18n="advanced.documentGoogleDriveEnable">Configure Google Drive for Documents</span></label>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.documentGoogleDriveEnable">Configure Google Drive for Documents</span><span class="toggle"><input type="checkbox" role="switch" id="adv-document-google-drive-enable"><span class="toggle__track" aria-hidden="true"></span></span></label>
             </div>
             <div class="field">
               <label for="adv-document-google-drive-client-id" data-i18n="advanced.documentGoogleDriveClientIdLabel">Own client ID (optional)</label>
@@ -1936,15 +2031,15 @@
               <input type="text" id="oidc-redirect">
             </div>
             <div class="field">
-              <label><input type="checkbox" id="adv-oidc-trust-email"> <span data-i18n="advanced.oidcTrustEmail">Trust email without a verified claim</span></label>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.oidcTrustEmail">Trust email without a verified claim</span><span class="toggle"><input type="checkbox" role="switch" id="adv-oidc-trust-email"><span class="toggle__track" aria-hidden="true"></span></span></label>
               <div class="hint" data-i18n="advanced.oidcTrustEmailHint">Only enable this if your provider does not send email_verified and you trust it.</div>
             </div>
             <div class="field">
-              <label><input type="checkbox" id="adv-oidc-allow-signup" checked> <span data-i18n="advanced.oidcAllowSignup">Let SSO sign-ins create new accounts</span></label>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.oidcAllowSignup">Let SSO sign-ins create new accounts</span><span class="toggle"><input type="checkbox" role="switch" id="adv-oidc-allow-signup" checked><span class="toggle__track" aria-hidden="true"></span></span></label>
               <details class="hint-more"><summary data-i18n="common.learnMore">Learn more</summary><div class="hint" data-i18n="advanced.oidcAllowSignupHint">Turn this off when your provider serves more people than this household. Existing accounts still sign in and still get linked.</div></details>
             </div>
             <div class="field">
-              <label><input type="checkbox" id="adv-auth-password-login" checked> <span data-i18n="advanced.authPasswordLogin">Keep the username and password login</span></label>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.authPasswordLogin">Keep the username and password login</span><span class="toggle"><input type="checkbox" role="switch" id="adv-auth-password-login" checked><span class="toggle__track" aria-hidden="true"></span></span></label>
               <details class="hint-more"><summary data-i18n="common.learnMore">Learn more</summary><div class="hint" data-i18n="advanced.authPasswordLoginHint">Turning this off makes SSO the only way in: the login form and password reset disappear. It takes effect once at least one account is linked to your provider, so a fresh install can still create its first admin. If your provider becomes unreachable, the way back is editing the .env file and restarting.</div></details>
             </div>
           </div>
@@ -1965,19 +2060,19 @@
              ob ihn die Freigabe betrifft. -->
         <div class="inset-group">
         <div class="field">
-          <label><input type="checkbox" id="adv-ics-private"> <span data-i18n="advanced.icsPrivateNetwork">Allow calendar subscriptions from your home network</span></label>
+          <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.icsPrivateNetwork">Allow calendar subscriptions from your home network</span><span class="toggle"><input type="checkbox" role="switch" id="adv-ics-private"><span class="toggle__track" aria-hidden="true"></span></span></label>
           <div class="hint" data-i18n="advanced.icsPrivateNetworkHint">Needed for ICS feeds from devices on your own network. Lifts the SSRF protection for calendar subscriptions.</div>
         </div>
         <div class="field">
-          <label><input type="checkbox" id="adv-recipe-provider-private"> <span data-i18n="advanced.recipeProviderPrivateNetwork">Allow recipe provider mirrors on your home network</span></label>
+          <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.recipeProviderPrivateNetwork">Allow recipe provider mirrors on your home network</span><span class="toggle"><input type="checkbox" role="switch" id="adv-recipe-provider-private"><span class="toggle__track" aria-hidden="true"></span></span></label>
           <div class="hint" data-i18n="advanced.recipeProviderPrivateNetworkHint">Needed for a Mealie or Tandoor instance on your own network. Lifts the SSRF protection for recipe provider mirrors.</div>
         </div>
         <div class="field">
-          <label><input type="checkbox" id="adv-waste-source-private"> <span data-i18n="advanced.wasteSourcePrivateNetwork">Allow waste collection feeds on your home network</span></label>
+          <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.wasteSourcePrivateNetwork">Allow waste collection feeds on your home network</span><span class="toggle"><input type="checkbox" role="switch" id="adv-waste-source-private"><span class="toggle__track" aria-hidden="true"></span></span></label>
           <div class="hint" data-i18n="advanced.wasteSourcePrivateNetworkHint">Needed for a municipal waste calendar mirrored on your own network. Lifts the SSRF protection for waste collection URL sources.</div>
         </div>
         <div class="field">
-          <label><input type="checkbox" id="adv-document-webdav-private"> <span data-i18n="advanced.documentWebdavPrivateNetwork">Allow a WebDAV target on your home network</span></label>
+          <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.documentWebdavPrivateNetwork">Allow a WebDAV target on your home network</span><span class="toggle"><input type="checkbox" role="switch" id="adv-document-webdav-private"><span class="toggle__track" aria-hidden="true"></span></span></label>
           <div class="hint" data-i18n="advanced.documentWebdavPrivateNetworkHint">Needed for a Nextcloud on your own network. Lifts the SSRF protection for this target.</div>
         </div>
         </div>
@@ -2519,12 +2614,32 @@ function localize() {
   applyStepCounters();
 }
 
+/**
+ * Wo ein Schritt auf dem Weg steht, in der Zaehlung von "Schritt n von m".
+ * EINE Rechnung fuer Zaehler UND Balken: vorher teilte der Balken durch alle
+ * Schirme (Einstieg, Docker, Abschluss mitgezaehlt), der Zaehler durch die
+ * nummerierten - "Schritt 1 von 9" stand bei 9 %, "2 von 2" bei 75 %.
+ * Unnummerierte Schirme liegen zwischen ihren Nachbarn: der Einstieg bei 0,
+ * der Abschluss bei m, der Docker-Schirm auf halbem Weg zwischen dem Schritt
+ * davor und dem danach. Er fragt nichts und traegt deshalb keine Nummer, aber
+ * er ist ein Stueck des Weges - der Balken rueckt waehrend des Wartens vor,
+ * statt auf dem Stand der Pruefseite stehen zu bleiben.
+ */
+function stepPosition(name) {
+  const nums = flow.filter(s => !UNNUMBERED.has(s));
+  const total = nums.length;
+  if (!UNNUMBERED.has(name)) return { n: nums.indexOf(name) + 1, total };
+  const idx = flow.indexOf(name);
+  const before = flow.slice(0, idx).filter(s => !UNNUMBERED.has(s)).length;
+  const edge = idx === 0 || idx === flow.length - 1;
+  return { n: edge ? before : before + 0.5, total };
+}
+
 /** „Schritt N von M" für die nummerierten Schritte des aktiven Flows setzen. */
 function applyStepCounters() {
-  const nums = flow.filter(s => !UNNUMBERED.has(s));
-  nums.forEach((name, i) => {
+  flow.filter(s => !UNNUMBERED.has(s)).forEach(name => {
     const tag = document.querySelector(`#step-${name} .step-tag`);
-    if (tag) tag.textContent = t('common.stepCounter', { n: i + 1, total: nums.length });
+    if (tag) tag.textContent = t('common.stepCounter', stepPosition(name));
   });
 }
 
@@ -2854,9 +2969,10 @@ async function checkPrereqs() {
 checkPrereqs();
 $('prereq-recheck').addEventListener('click', checkPrereqs);
 
+/** Der Balken (nur unter 1024px sichtbar) aus derselben Rechnung wie der Zaehler. */
 function setProgress(n) {
-  const ratio = flow.length > 1 ? n / (flow.length - 1) : 0;
-  $('prog').style.transform = `scaleX(${ratio})`;
+  const { n: at, total } = stepPosition(flow[n]);
+  $('prog').style.transform = `scaleX(${total ? at / total : 0})`;
 }
 
 /** Zaehlt die Schrittwechsel; nur der juengste darf noch zeichnen. */
@@ -3021,15 +3137,22 @@ function renderStepNav() {
   const canReturn = docker === -1 || currentStep < docker;
   document.querySelectorAll('[data-nav-step]').forEach(item => {
     const name = item.dataset.navStep;
-    const pos = nums.indexOf(name);
-    item.hidden = pos === -1;
-    if (pos === -1) return;
     const idx = flow.indexOf(name);
+    item.hidden = idx === -1;
+    if (idx === -1) return;
     const state = idx === currentStep ? 'current' : idx < currentStep ? 'done' : 'upcoming';
     item.dataset.state = state;
-    item.querySelector('.steps-nav__mark').textContent = String(pos + 1);
-    const link = item.querySelector('button');
-    link.disabled = !(state === 'done' && canReturn);
+    // Der Docker-Eintrag traegt keine Ziffer: sein Ring bleibt leer, solange
+    // er kommt, und zeigt waehrend seines Schirms den Ausgang des Starts.
+    const pos = nums.indexOf(name);
+    item.querySelector('.steps-nav__mark').textContent = pos === -1 ? '' : String(pos + 1);
+    if (name === 'docker' && state === 'current') {
+      item.dataset.run = dockerOutcome === 'running' ? 'ok' : dockerOutcome === 'failed' ? 'failed' : 'running';
+    } else {
+      delete item.dataset.run;
+    }
+    const link = item.querySelector('.steps-nav__link');
+    if (link.tagName === 'BUTTON') link.disabled = !(state === 'done' && canReturn);
     if (state === 'current') link.setAttribute('aria-current', 'step');
     else link.removeAttribute('aria-current');
   });
@@ -4095,6 +4218,9 @@ function renderPhases() {
     const note = row.querySelector('.phase__state');
     if (note) note.textContent = state === 'done' ? t('common.stepDone') : state === 'failed' ? t('docker.stepFailed') : '';
   });
+  // Die Schrittliste zeigt denselben Ausgang (laeuft, fertig, gescheitert) -
+  // jeder Wechsel des Docker-Zustands laeuft hier durch.
+  renderStepNav();
 }
 
 /**

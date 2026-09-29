@@ -134,6 +134,7 @@
   },
   "docker": {
     "title": "Запуск Yuvomi",
+    "navLabel": "Запуск Yuvomi",
     "subtitle": "Загрузка образа и запуск контейнера Docker.",
     "elapsed": "прошло {{n}} с",
     "running": "Контейнер исправен и работает",

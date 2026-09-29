@@ -134,6 +134,7 @@
   },
   "docker": {
     "title": "Đang khởi động Yuvomi",
+    "navLabel": "Khởi động Yuvomi",
     "subtitle": "Đang tải image và khởi động container Docker.",
     "elapsed": "Đã qua {{n}}s",
     "running": "Container hoạt động bình thường",

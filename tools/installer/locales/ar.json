@@ -134,6 +134,7 @@
   },
   "docker": {
     "title": "جارٍ بدء Yuvomi",
+    "navLabel": "تشغيل Yuvomi",
     "subtitle": "جارٍ سحب الصورة وبدء حاوية Docker.",
     "elapsed": "مرّت {{n}} ثانية",
     "running": "الحاوية سليمة وقيد التشغيل",

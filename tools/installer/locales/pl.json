@@ -134,6 +134,7 @@
   },
   "docker": {
     "title": "Uruchamianie Yuvomi",
+    "navLabel": "Uruchomienie Yuvomi",
     "subtitle": "Pobieranie obrazu i uruchamianie kontenera Docker.",
     "elapsed": "upłynęło {{n}} s",
     "running": "Kontener jest sprawny i działa",

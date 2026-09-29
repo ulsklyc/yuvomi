@@ -134,6 +134,7 @@
   },
   "docker": {
     "title": "Startar Yuvomi",
+    "navLabel": "Starta Yuvomi",
     "subtitle": "Hämtar avbildningen och startar Docker-containern.",
     "elapsed": "{{n}} s förflutna",
     "running": "Containern är frisk och körs",

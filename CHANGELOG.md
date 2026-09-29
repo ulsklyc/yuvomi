@@ -114,8 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **The web installer looks and works like the app.** A step list on the desktop jumps back to
-  finished steps, a phone shows more of each step, and the review groups your answers with a
-  "Change" link each. The language you set up in carries over to the app, the upload limit can be
+  finished steps and stays with you while Yuvomi starts, on/off options are switches as in the app,
+  a phone shows more of each step, and the review groups your answers with a "Change" link each. The language you set up in carries over to the app, the upload limit can be
   set, and the "Active modules" link on the last page no longer opens the budget.
 
 - **New events in the calendar's week and day come from a double-click or a long press, not a

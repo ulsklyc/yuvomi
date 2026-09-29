@@ -417,7 +417,7 @@ test('Textfelder stehen auf mindestens 16px (sonst zoomt iOS Safari bei jedem Fo
   assert.ok(size >= 16, `Textfelder stehen auf ${size}px, iOS zoomt unter 16px`);
 });
 
-test('Bedienelemente erfüllen die Zielgrössen (44px Höhe, 24px Kästchen)', () => {
+test('Bedienelemente erfüllen die Zielgrössen (44px Höhe, 24px Schalterbahn)', () => {
   const media = appliesAt(MOBILE_VIEWPORT);
   const buttonHeight = toPx(declared(sel => sel === '.btn', 'min-height', media));
   assert.ok(buttonHeight >= 44, `.btn ist ${buttonHeight}px hoch, 44px sind das Touch-Minimum`);
@@ -426,10 +426,12 @@ test('Bedienelemente erfüllen die Zielgrössen (44px Höhe, 24px Kästchen)', (
   assert.ok(selectHeight >= 44, `select ist ${selectHeight}px hoch, 44px sind das Touch-Minimum`);
 
   // WCAG 2.2 SC 2.5.8 verlangt 24x24 CSS-Pixel, in jeder Breite. Die Kästchen
-  // waren 13x13 neben einem 16px hohen Label.
-  for (const prop of ['inline-size', 'block-size']) {
-    const size = toPx(declared(sel => sel === 'input[type=checkbox]', prop));
-    assert.ok(size >= 24, `Checkbox-${prop} ist ${size}px, WCAG 2.2 verlangt 24px`);
+  // waren 13x13 neben einem 16px hohen Label. Seit den Schaltern der App ist
+  // das sichtbare Ziel die Bahn (die ganze Zeile nimmt den Tipp ohnehin an,
+  // siehe "Schalterzeile" unten).
+  for (const prop of ['width', 'height']) {
+    const size = toPx(declared(sel => sel === '.toggle__track', prop));
+    assert.ok(size >= 24, `Schalterbahn-${prop} ist ${size}px, WCAG 2.2 verlangt 24px`);
   }
 });
 
@@ -978,6 +980,21 @@ test('Layout: oben verankert, ab 1024px Schrittliste links und Inhaltsspalte rec
     'display:none nimmt dem aria-describedby der H2 seinen Text');
 });
 
+/** Nachbau der Listeneintraege fuer renderStepNav: der Docker-Eintrag ist ein <span>. */
+function navFakes(names) {
+  return names.map(name => {
+    const button = {
+      tagName: name === 'docker' ? 'SPAN' : 'BUTTON', disabled: true, attrs: {},
+      setAttribute(k, v) { this.attrs[k] = v; }, removeAttribute(k) { delete this.attrs[k]; },
+    };
+    const mark = { textContent: '?' };
+    return {
+      name, button, mark, hidden: true, dataset: { navStep: name },
+      querySelector: sel => (sel === '.steps-nav__link' ? button : mark),
+    };
+  });
+}
+
 /* Die Schrittliste zeigt genau die nummerierten Schritte beider Wege. Die
  * Funktion wird AUSGEFUEHRT: erledigt heisst anklickbar, aktuell heisst
  * aria-current="step", kommend heisst gesperrt, und ab dem Container-Start ist
@@ -987,8 +1004,9 @@ test('die Schrittliste folgt dem Weg: erledigt anklickbar, aktuell markiert, kom
   const UNNUMBERED = literal('UNNUMBERED');
   const numbered = new Set([...FLOWS.simple, ...FLOWS.advanced].filter(s => !UNNUMBERED.has(s)));
   const navItems = [...html.matchAll(/<li class="steps-nav__item" data-nav-step="([a-z]+)"[^>]*>(.*?)<\/li>/g)];
-  assert.deepEqual(new Set(navItems.map(m => m[1])), numbered, 'die Liste fuehrt andere Schritte als die Wege');
-  for (const m of navItems) {
+  // Dazu der Containerstart: ohne Nummer, aber mit Platz (eigener Test unten).
+  assert.deepEqual(new Set(navItems.map(m => m[1])), new Set([...numbered, 'docker']), 'die Liste fuehrt andere Schritte als die Wege');
+  for (const m of navItems.filter(i => numbered.has(i[1]))) {
     assert.match(m[2], new RegExp(`<button type="button" class="steps-nav__link" data-goto="${m[1]}"`),
       `Eintrag ${m[1]} ist kein Knopf mit data-goto`);
   }
@@ -998,22 +1016,11 @@ test('die Schrittliste folgt dem Weg: erledigt anklickbar, aktuell markiert, kom
   assert.match(fnSource('showStep'), /renderStep\(\)/, 'showStep zeichnet den Schritt nicht');
   assert.match(fnSource('renderStep'), /renderStepNav\(\)/, 'renderStep aktualisiert die Liste nicht');
 
-  const make = () => [...numbered].map(name => {
-    const button = {
-      disabled: true, attrs: {},
-      setAttribute(k, v) { this.attrs[k] = v; }, removeAttribute(k) { delete this.attrs[k]; },
-    };
-    const mark = { textContent: '' };
-    return {
-      name, button, mark, hidden: true, dataset: { navStep: name },
-      querySelector: sel => (sel === 'button' ? button : mark),
-    };
-  });
-  const run = (flow, currentStep) => {
-    const items = make();
+  const run = (flow, currentStep, dockerOutcome = null) => {
+    const items = navFakes([...numbered, 'docker']);
     const document = { querySelectorAll: () => items };
-    new Function('flow', 'currentStep', 'UNNUMBERED', 'document', `${fnSource('renderStepNav')}; renderStepNav();`)(
-      flow, currentStep, UNNUMBERED, document);
+    new Function('flow', 'currentStep', 'UNNUMBERED', 'dockerOutcome', 'document', `${fnSource('renderStepNav')}; renderStepNav();`)(
+      flow, currentStep, UNNUMBERED, dockerOutcome, document);
     return Object.fromEntries(items.map(i => [i.name, i]));
   };
 
@@ -1290,28 +1297,30 @@ function boxSide(selectorMatches, prop, side, mediaMatches) {
 const PHONE = 360;   // die schmalste Breite, die der Installer zusagt
 
 /* Schalterzeilen: das Label war 24px hoch und endete am letzten Buchstaben,
- * die restliche Zeile nahm keinen Tipp an. Geprueft wird die WIRKUNG: jedes
- * Kaestchen sitzt direkt in einem Label direkt in einem .field (sonst greift die
- * Regel nicht), das Feld gibt sein Polster ab (sonst endet das Label vor der
- * Zeilenkante), und das Label ist mit Polster und Kaestchen mindestens 44px
- * hoch. Ein neuer Schalter ohne diese Form faellt ueber die Markup-Pruefung auf. */
+ * die restliche Zeile nahm keinen Tipp an. Geprueft wird die WIRKUNG: jeder
+ * Schalter sitzt in einem label.toggle-row direkt in einem .field (sonst greift
+ * die Regel nicht), das Feld gibt sein Polster ab (sonst endet das Label vor der
+ * Zeilenkante), und das Label ist mit Polster und Bahn mindestens 44px hoch.
+ * Ein neuer Schalter ohne diese Form faellt ueber die Markup-Pruefung auf.
+ * (Seit den Schaltern der App ist das Kaestchen eine 26px hohe Bahn in
+ * .toggle; die Regel ist dieselbe.) */
 test('jede Schalterzeile ist als ganze Zeile tippbar, mindestens 44px hoch', () => {
   const boxes = [...html.matchAll(/<input type="checkbox"[^>]*>/g)];
   assert.ok(boxes.length >= 10, `erwartet mindestens zehn Schalter, gefunden ${boxes.length}`);
-  const wrapped = [...html.matchAll(/<div class="field">\s*<label><input type="checkbox"[^>]*>/g)];
+  const wrapped = [...html.matchAll(/<div class="field">\s*<label class="toggle-row">(?:(?!<\/label>)[\s\S])*?<input type="checkbox"[^>]*>/g)];
   assert.equal(wrapped.length, boxes.length,
-    'ein Schalter sitzt nicht direkt in <div class="field"><label> - die Zeilenregel greift fuer ihn nicht');
+    'ein Schalter sitzt nicht in <div class="field"><label class="toggle-row"> - die Zeilenregel greift fuer ihn nicht');
 
   const phone = appliesAt(PHONE);
-  const fieldSel = sel => /\.field:has\(\s*>\s*label\s*>\s*input\[type=checkbox\]\s*\)$/.test(sel);
-  const labelSel = sel => /\.field\s*>\s*label:has\(\s*>\s*input\[type=checkbox\]\s*\)$/.test(sel);
+  const fieldSel = sel => /\.field:has\(\s*>\s*\.toggle-row\s*\)$/.test(sel);
+  const labelSel = sel => sel === 'label.toggle-row';
   // Ohne eigene Regel gilt fuer das Feld das Zeilenpolster aller Felder.
   const rowField = sel => sel === '.inset-group .field' || fieldSel(sel);
   for (const side of ['top', 'right', 'bottom', 'left']) {
     const pad = boxSide(rowField, 'padding', side, phone) ?? 0;
     assert.equal(pad, 0, `die Schalterzeile behaelt ${pad}px Polster ${side} - dort nimmt sie keinen Tipp an`);
   }
-  const box = toPx(declared(sel => sel === 'input[type=checkbox]', 'block-size')) ?? 0;
+  const box = toPx(declared(sel => sel === '.toggle__track', 'height')) ?? 0;
   const padY = (boxSide(labelSel, 'padding', 'top', phone) ?? 0) + (boxSide(labelSel, 'padding', 'bottom', phone) ?? 0);
   const minH = toPx(declared(labelSel, 'min-height', phone)) ?? 0;
   const tap = Math.max(minH, box + padY);
@@ -1787,6 +1796,7 @@ test('Docker-Schirm: Phasen-Checkliste, Erfolg mit neuem Titel und Fokus, Fehler
       let dockerDone = false, pollInterval = null, dockerStart = Date.now() - 34_000;
       let flow = ['review', 'docker'], currentStep = 1;
       const clearInterval = () => {}, setDockerPrimary = () => {}, next = () => {}, restartDocker = () => {};
+      const renderStepNav = () => {};   // eigener Test: "Docker in der Schrittliste"
       ${fnSource('setDockerText')}
       ${fnSource('reachPhase')}
       ${fnSource('setPhase')}
@@ -2007,4 +2017,182 @@ test('der erste Frame steht schon im Layout des Einstiegs (keine Verschiebung be
   const first = literal('FLOWS').advanced[0];
   assert.ok([...solo].includes(first), `SOLO_STEPS ohne ${first} - Regel pruefen`);
   assert.match(shell[1], /\bshell--solo\b/, 'das Markup beginnt im Zwei-Spalten-Raster, renderStep() springt dann auf solo');
+});
+
+// ── Runde 2 (Critique 2026-09-29 17:21, zwei P1) ────────────────────────────
+
+/* Echte Zustimmungs-Haken ("Ich habe die .env gesichert") sind keine
+ * Einstellung und blieben eine Checkbox. Der Installer hat heute keinen - die
+ * Karte ist leer und steht hier, damit ein kuenftiger Haken seinen Grund
+ * nennen muss, statt still als nackte Checkbox durchzurutschen. id -> Grund. */
+const CONSENT_CHECKBOXES = new Map();
+
+/* Komponenten-Kanon (DESIGN.md, "Boolean in den Einstellungen"): Schalter mit
+ * .toggle-Bahn und role="switch", Label links, Zustand rechts - die native
+ * Checkbox steht dort unter "Nicht mehr". Geprueft wird die Grammatik von
+ * toggleRowHtml({ control: 'switch' }) im Markup (auch Skript-Vorlagen stehen
+ * in derselben Datei) und die Masse, Farben und Bewegung der App-Bahn. */
+test('jede Boolean-Einstellung ist ein Schalter der App, keine nackte Checkbox', () => {
+  const boxes = [...html.matchAll(/<input\b[^>]*\btype="checkbox"[^>]*>/g)].map(m => m[0]);
+  assert.ok(boxes.length >= 14, `erwartet mindestens 14 Schalter, gefunden ${boxes.length} - der Scanner greift nicht`);
+  assert.doesNotMatch(html, /\.type\s*=\s*['"]checkbox['"]|setAttribute\(\s*['"]type['"]\s*,\s*['"]checkbox['"]/,
+    'das Skript baut eine Checkbox am Markup vorbei');
+  const naked = boxes.filter(tag => !/\brole="switch"/.test(tag) && !CONSENT_CHECKBOXES.has(tag.match(/\bid="([^"]+)"/)?.[1]));
+  assert.deepEqual(naked, [], 'Boolean-Einstellung als nackte Checkbox (role="switch" fehlt, keine begruendete Zustimmung)');
+
+  // Label links, Bahn rechts, Bahn nur Grafik - in jeder Zeile gleich.
+  const ROW = /^<span class="toggle-row__label" data-i18n="[\w.]+">[^<]+<\/span><span class="toggle"><input type="checkbox" role="switch" id="[\w-]+"(?: checked)?><span class="toggle__track" aria-hidden="true"><\/span><\/span>$/;
+  const rows = [...html.matchAll(/<label class="toggle-row">([\s\S]*?)<\/label>/g)].map(m => m[1]);
+  assert.equal(rows.length, boxes.length - CONSENT_CHECKBOXES.size, 'ein Schalter steht nicht in einer label.toggle-row');
+  for (const row of rows) assert.match(row, ROW, `Schalterzeile weicht von der Grammatik der App ab: ${row}`);
+
+  // Kein Rest der Kaestchen-Optik.
+  const legacy = RULES.filter(r => /input\[type=checkbox\]/.test(r.selector)).map(r => r.selector);
+  assert.deepEqual(legacy, [], 'eine Regel stylt noch die native Checkbox');
+
+  const base = m => m === null;
+  const val = (sel, prop) => declared(s => s === sel, prop, base);
+  // Das Kaestchen ist versteckt, aber fokussierbar (Space schaltet).
+  assert.equal(val('.toggle input', 'position'), 'absolute');
+  assert.equal(toPx(val('.toggle input', 'width')), 1);
+  assert.equal(val('.toggle input', 'display'), null, 'display am Kaestchen nimmt es aus dem Fokus-Weg');
+  assert.equal(val('.toggle input', 'visibility'), null);
+  // Rechts, in RTL gespiegelt: logische Eigenschaft, kein margin-left.
+  assert.equal(val('.toggle', 'margin-inline-start'), 'auto', 'der Schalter steht nicht am Zeilenende');
+  assert.equal(val('.toggle-row__label', 'flex'), '1');
+  // Masse der App (layout.css .toggle__track): 44x26, Knopf 20px, Weg 18px.
+  assert.equal(toPx(val('.toggle__track', 'width')), 44);
+  assert.equal(toPx(val('.toggle__track', 'height')), 26);
+  assert.equal(val('.toggle__track', 'border-radius'), 'var(--radius-full)');
+  assert.equal(toPx(val('.toggle__track::after', 'width')), 20);
+  assert.equal(val('.toggle__track::after', 'inset-inline-start'), '3px', 'der Knopf spiegelt sich in RTL nicht mit');
+  assert.equal(val('.toggle input:checked + .toggle__track::after', 'transform'), 'translateX(18px)');
+  assert.equal(val('html[dir="rtl"] .toggle input:checked + .toggle__track::after', 'transform'), 'translateX(-18px)',
+    'in RTL laeuft der Knopf aus der Bahn');
+  // Farben aus Tokens: aus = --neutral-300, an = Akzent, Knopf = Flaeche.
+  assert.equal(val('.toggle__track', 'background-color'), 'var(--neutral-300)');
+  assert.equal(val('.toggle input:checked + .toggle__track', 'background-color'), 'var(--color-accent)');
+  assert.equal(val('.toggle__track::after', 'background'), 'var(--color-surface)');
+  // Bewegung wie die App: aus ruhig, an federnd.
+  assert.equal(val('.toggle__track::after', 'transition'), 'transform var(--duration-sm) var(--ease-out)');
+  assert.equal(val('.toggle input:checked + .toggle__track::after', 'transition'), 'transform var(--duration-xl) var(--ease-glass)');
+  // Fokusring an der Zeile, nur bei Tastaturfokus; gesperrt gedaempft.
+  assert.match(val('label.toggle-row:has(input:focus-visible)', 'box-shadow') ?? '', /var\(--color-accent\)/,
+    'der Schalter zeigt keinen Tastaturfokus');
+  assert.ok(Number(val('.toggle input:disabled + .toggle__track', 'opacity')) < 1, 'ein gesperrter Schalter sieht aus wie ein freier');
+  // Jedes neue Token steht im Fallback, --neutral-300 in beiden Themes.
+  for (const name of ['--neutral-300', '--ease-glass', '--glass-inset-thumb']) {
+    assert.ok(ROOT_VARS.has(name), `${name} fehlt im Inline-Fallback`);
+  }
+  const dark = html.slice(html.indexOf('@media (prefers-color-scheme: dark)'), html.indexOf('</style>'));
+  assert.match(dark, /--neutral-300:\s*#/, '--neutral-300 fehlt im Dunkel-Fallback');
+});
+
+/* Der Docker-Schritt hatte in der Liste keinen Eintrag: waehrend des laengsten
+ * Wartens stand sie ohne aktuellen Schritt und ohne aria-current da. Jetzt ein
+ * unnummerierter Eintrag zwischen Pruefung/Einfach-Start und Admin, kein Knopf,
+ * mit dem Ausgang des Starts. renderStepNav wird AUSGEFUEHRT. */
+test('Docker in der Schrittliste: eigener Eintrag ohne Nummer, genau ein aria-current, Ausgang sichtbar', () => {
+  const FLOWS = literal('FLOWS');
+  const UNNUMBERED = literal('UNNUMBERED');
+  assert.ok(UNNUMBERED.has('docker'), 'der Docker-Schritt traegt eine Nummer - Regel pruefen');
+
+  const li = html.match(/<li class="steps-nav__item" data-nav-step="docker"[^>]*>(.*?)<\/li>/);
+  assert.ok(li, 'kein Listeneintrag fuer den Docker-Schritt');
+  assert.doesNotMatch(li[1], /<button|data-goto/, 'zurueck auf den Docker-Schirm fuehrt nichts - kein Knopf');
+  assert.match(li[1], /data-i18n="docker\.navLabel"/);
+  assert.match(li[1], /class="vh steps-nav__failed" data-i18n="docker\.stepFailed"/, 'der Fehler hat keinen Text fuer Screenreader');
+  const at = name => html.indexOf(`data-nav-step="${name}"`);
+  assert.ok(at('simple') < at('docker') && at('review') < at('docker') && at('docker') < at('admin'),
+    'der Eintrag steht nicht zwischen Pruefung/Einfach-Start und Admin');
+  for (const locale of SUPPORTED_LOCALES) {
+    assert.ok(loadLocale(locale).docker?.navLabel, `${locale}: docker.navLabel fehlt`);
+  }
+
+  const names = ['simple', 'config', 'secrets', 'weather', 'calendar', 'email', 'storage', 'advanced', 'review', 'docker', 'admin'];
+  const run = (flow, currentStep, dockerOutcome) => {
+    const items = navFakes(names);
+    new Function('flow', 'currentStep', 'UNNUMBERED', 'dockerOutcome', 'document', `${fnSource('renderStepNav')}; renderStepNav();`)(
+      flow, currentStep, UNNUMBERED, dockerOutcome, { querySelectorAll: () => items });
+    return Object.fromEntries(items.map(i => [i.name, i]));
+  };
+  const currentOf = r => Object.values(r).filter(i => !i.hidden && i.button.attrs['aria-current'] === 'step').map(i => i.name);
+
+  for (const flow of [FLOWS.simple, FLOWS.advanced]) {
+    const d = flow.indexOf('docker');
+    let r = run(flow, d - 1, null);
+    assert.equal(r.docker.hidden, false, 'der Docker-Eintrag fehlt im Weg');
+    assert.equal(r.docker.dataset.state, 'upcoming');
+    assert.equal(r.docker.dataset.run, undefined);
+    assert.equal(r.docker.mark.textContent, '', 'der Docker-Eintrag traegt eine Ziffer');
+    for (const [outcome, shown] of [[null, 'running'], ['running', 'ok'], ['failed', 'failed']]) {
+      r = run(flow, d, outcome);
+      assert.deepEqual(currentOf(r), ['docker'], `waehrend Docker (${shown}) traegt nicht genau der Docker-Eintrag aria-current`);
+      assert.equal(r.docker.dataset.state, 'current');
+      assert.equal(r.docker.dataset.run, shown, `der Ausgang ${shown} erscheint nicht in der Liste`);
+      assert.equal(r.docker.button.disabled, true, 'der Docker-Eintrag wurde anklickbar');
+    }
+    r = run(flow, d + 1, 'running');
+    assert.equal(r.docker.dataset.state, 'done');
+    assert.equal(r.docker.dataset.run, undefined, 'der Laufzustand bleibt nach dem Docker-Schirm stehen');
+    assert.deepEqual(currentOf(r), ['admin']);
+    // Die Nummern bleiben die des Zaehlers: Admin ist der letzte nummerierte.
+    assert.equal(r.admin.mark.textContent, String(flow.filter(s => !UNNUMBERED.has(s)).length));
+  }
+
+  // Jeder Wechsel des Docker-Zustands zieht die Liste nach.
+  assert.match(fnSource('renderPhases'), /renderStepNav\(\)/, 'Erfolg/Fehler erreichen die Schrittliste nicht');
+  // Zeichen wie die Checkliste daneben: Bogen (reduced-motion: Puls), Haken, Kreuz.
+  const sel = s => r => r === s;
+  assert.match(declared(sel('.steps-nav__item[data-run="running"] .steps-nav__mark::after'), 'animation') ?? '', /^phase-spin /);
+  assert.match(declared(sel('.steps-nav__item[data-run="running"] .steps-nav__mark::after'), 'animation',
+    m => m !== null && /prefers-reduced-motion/.test(m)) ?? '', /^phase-pulse /);
+  assert.equal(declared(sel('.steps-nav__item[data-run="failed"] .steps-nav__mark::before'), 'background'), 'var(--color-danger)');
+  assert.ok(RULES.some(r => r.selector === '.steps-nav__item[data-run="ok"] .steps-nav__mark::before'), 'Erfolg zeigt keinen Haken');
+  assert.equal(declared(sel('.steps-nav__item:not([data-run="failed"]) .steps-nav__failed'), 'display'), 'none',
+    '"fehlgeschlagen" steht auch ohne Fehler im Namen');
+});
+
+/* Balken und Zaehler rechneten mit verschiedenen Nennern: der Balken durch alle
+ * Schirme, der Zaehler durch die nummerierten - "Schritt 1 von 9" bei 9 %,
+ * "2 von 2" bei 75 %. Jetzt EINE Funktion (stepPosition) fuer beide; der
+ * Docker-Schirm liegt zwischen seinen Nachbarn. Beide Wege werden AUSGEFUEHRT. */
+test('Balken und Zaehler folgen derselben Rechnung, der Docker-Schirm liegt zwischen seinen Nachbarn', () => {
+  const FLOWS = literal('FLOWS');
+  const UNNUMBERED = literal('UNNUMBERED');
+  assert.match(fnSource('setProgress'), /stepPosition\(/, 'der Balken rechnet an stepPosition vorbei');
+  assert.match(fnSource('applyStepCounters'), /stepPosition\(/, 'der Zaehler rechnet an stepPosition vorbei');
+  assert.match(fnSource('showStep'), /setProgress\(n\)/);
+
+  for (const flow of [FLOWS.simple, FLOWS.advanced]) {
+    const tags = {};
+    const prog = { style: {} };
+    const h = new Function('flow', 'UNNUMBERED', 'document', '$', 't', `
+      ${fnSource('stepPosition')}
+      ${fnSource('applyStepCounters')}
+      ${fnSource('setProgress')}
+      return { applyStepCounters, setProgress };
+    `)(flow, UNNUMBERED,
+      { querySelector: q => (tags[q.match(/#step-(\w+)/)[1]] ??= { textContent: '' }) },
+      () => prog, (k, p) => `${p.n}/${p.total}`);
+    h.applyStepCounters();
+    const bar = flow.map((_, i) => { h.setProgress(i); return Number(prog.style.transform.match(/^scaleX\(([\d.]+)\)$/)[1]); });
+    const numbered = flow.filter(s => !UNNUMBERED.has(s));
+
+    flow.forEach((name, i) => {
+      if (UNNUMBERED.has(name)) {
+        assert.equal(tags[name], undefined, `${name} bekommt einen Zaehler`);
+        return;
+      }
+      const [n, total] = tags[name].textContent.split('/').map(Number);
+      assert.equal(total, numbered.length);
+      assert.ok(Math.abs(bar[i] - n / total) < 1e-9, `${name}: Zaehler ${n}/${total}, Balken ${bar[i]} - verschiedene Rechnung`);
+    });
+    assert.equal(bar[0], 0, 'der Einstieg zeigt schon Fortschritt');
+    assert.equal(bar[flow.length - 1], 1, 'der Abschluss fuellt den Balken nicht');
+    const d = flow.indexOf('docker');
+    assert.ok(bar[d - 1] < bar[d] && bar[d] < bar[d + 1],
+      `der Balken steht waehrend Docker nicht zwischen den Nachbarn (${bar[d - 1]} / ${bar[d]} / ${bar[d + 1]})`);
+    for (let i = 1; i < flow.length; i++) assert.ok(bar[i] >= bar[i - 1], `der Balken laeuft bei ${flow[i]} zurueck`);
+  }
 });

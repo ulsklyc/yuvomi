@@ -134,6 +134,7 @@
   },
   "docker": {
     "title": "正在启动 Yuvomi",
+    "navLabel": "启动 Yuvomi",
     "subtitle": "正在拉取镜像并启动 Docker 容器。",
     "elapsed": "已用时 {{n}} 秒",
     "running": "容器运行正常",

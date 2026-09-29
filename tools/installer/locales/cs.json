@@ -214,6 +214,7 @@
   },
   "docker": {
     "title": "Spouštění Yuvomi",
+    "navLabel": "Spuštění Yuvomi",
     "subtitle": "Obraz se načítá a kontejner Docker se spouští.",
     "elapsed": "{{n}} s uplynulo",
     "running": "Kontejner je v pořádku a spuštěn",

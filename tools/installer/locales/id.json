@@ -214,6 +214,7 @@
   },
   "docker": {
     "title": "Yuvomi sedang dimulai",
+    "navLabel": "Mulai Yuvomi",
     "subtitle": "Image dimuat dan kontainer Docker dimulai.",
     "elapsed": "{{n}} d berlalu",
     "running": "Kontainer sehat dan berjalan",
