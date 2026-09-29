@@ -731,6 +731,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The weather settings show weather configured by the server.** A location set during
+  installation (`WEATHER_*`, or the legacy `OPENWEATHER_*`) showed weather on the overview while
+  the admin weather page said "Not configured". The page now names that source, shows its location
+  and units read-only, and says that a location saved here takes precedence and how to turn the
+  server setting off. Removing a saved location now also removes its coordinates, so the server
+  setting applies again, and the page says so. `GET /api/v1/preferences` reports the source as
+  `weather_source`, without any API key.
+
 - **Wall mode can be left on a phone** (#1559). "Leave wall mode" was below the bottom edge on
   phones and showed only a grey icon until the screen was touched, and the back button closed the
   app instead of leaving wall mode, which was still on at the next start. The exit now stays at the
