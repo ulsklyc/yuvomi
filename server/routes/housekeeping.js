@@ -34,12 +34,15 @@ import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../per
 import { documentVisibleSql } from '../services/document-access.js';
 import { tokenAllows } from '../scopes.js';
 import {
+  configuredHouseholdTimeZone,
   householdTimeZone,
   daysBetweenDateKeys,
+  isValidTimeZone,
   localToUTCPrecise,
   shiftDateKey,
   storedToInstantMs,
   todayKey,
+  utcDateKey,
   utcToWall,
 } from '../utils/timezone.js';
 import { addMonthsClamped } from '../utils/interval-date.js';
@@ -104,35 +107,69 @@ function householdMonthRange(monthValue, tz = householdTimeZone(db.get())) {
   return householdMonthRangeIn(monthValue, tz);
 }
 
-function localDateString(dateValue = new Date()) {
-  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
-}
-
-function localDayContext(source = {}) {
-  const dateValue = typeof source.local_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(source.local_date)
+/**
+ * Der heutige Tag der Haushaltshilfe und seine Grenzen (#1556).
+ *
+ * Welche Uhr gilt, der Reihe nach:
+ *   1. die eingestellte Haushaltszone. Dann zaehlt nichts, was der Client
+ *      schickt: eine Oberflaeche aus dem Cache des Service Workers schickt noch
+ *      Tag und Offset ihres GERAETS, und ein Geraet auf Reisen legte den
+ *      Check-in um 00:30 im Haushalt auf den Vortag.
+ *   2. ohne Einstellung die Zone, in der die Oberflaeche anzeigt (`timezone`) -
+ *      dann die des Browsers, wie ueberall in der Anzeige
+ *      (public/utils/timezone.js). `TZ` des Servers sagt nichts darueber, wo der
+ *      Haushalt lebt, im Container ist es meist UTC.
+ *   3. eine aeltere Oberflaeche ohne `timezone`: ihr `local_date` mit ihrem
+ *      `timezone_offset_minutes`, wie bisher. Der Offset ist der von JETZT und
+ *      verschiebt an Umstelltagen eine Grenze um eine Stunde - das endet mit
+ *      dem naechsten Laden der Seite.
+ *   4. sonst die Uhr des Servers (`householdTimeZone`); ein `local_date` eines
+ *      API-Aufrufs bleibt dann der Tag.
+ *
+ * @param {object} [source]  req.query bzw. req.body
+ * @param {Date} [now]
+ * @returns {{localDate: string, timeZone?: string, timezoneOffsetMinutes?: number}}
+ */
+function localDayContext(source = {}, now = new Date()) {
+  const database = db.get();
+  const configured = configuredHouseholdTimeZone(database);
+  const clientZone = isValidTimeZone(source.timezone) ? source.timezone : null;
+  const clientDate = typeof source.local_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(source.local_date)
     ? source.local_date
-    : localDateString();
-  const offset = Number(source.timezone_offset_minutes);
-  return {
-    localDate: dateValue,
-    timezoneOffsetMinutes: Number.isFinite(offset) ? offset : new Date().getTimezoneOffset(),
-  };
+    : null;
+  const rawOffset = source.timezone_offset_minutes;
+  const offset = rawOffset === undefined || rawOffset === null || rawOffset === '' ? NaN : Number(rawOffset);
+  if (!configured && !clientZone && clientDate && Number.isFinite(offset)) {
+    return { localDate: clientDate, timezoneOffsetMinutes: offset };
+  }
+  const timeZone = configured ?? clientZone ?? householdTimeZone(database);
+  const today = utcToWall(now.toISOString(), timeZone)?.date ?? utcDateKey(now);
+  return { localDate: configured || clientZone ? today : (clientDate ?? today), timeZone };
 }
 
+/**
+ * Mitternacht eines Tages in einer Zone als Zeitpunkt, in der Form von
+ * `check_in` (`toISOString()`) - verglichen wird als Text.
+ */
+function dayStartIso(dateKey, timeZone) {
+  return new Date(localToUTCPrecise(`${dateKey}T00:00:00`, timeZone)).toISOString();
+}
+
+// Beide Grenzen sind je fuer sich umgerechnete Mitternaechte: ein Offset fuer
+// den ganzen Tag hat an den Umstelltagen 23 bzw. 25 Stunden nicht.
 function localDayRange(context = localDayContext()) {
   const normalized = context && typeof context === 'object' && typeof context.localDate === 'string'
     ? context
     : localDayContext();
+  if (normalized.timeZone) {
+    return {
+      start: dayStartIso(normalized.localDate, normalized.timeZone),
+      end: dayStartIso(shiftDateKey(normalized.localDate, 1), normalized.timeZone),
+    };
+  }
   const [year, monthValue, day] = normalized.localDate.split('-').map(Number);
   const startMs = Date.UTC(year, monthValue - 1, day) + (normalized.timezoneOffsetMinutes * 60_000);
-  const start = new Date(startMs);
-  const end = new Date(startMs + 86_400_000);
-  return { start: start.toISOString(), end: end.toISOString() };
+  return { start: new Date(startMs).toISOString(), end: new Date(startMs + 86_400_000).toISOString() };
 }
 
 // `receipts` ist das Urteil aus `receiptAccess(req)`; ohne es bleibt der Beleg
@@ -987,7 +1024,6 @@ router.post('/work-sessions/check-in', (req, res) => {
     if (!worker) return res.status(404).json({ error: 'Housekeeper not found.', code: 404 });
     const workerRateType = worker.rate_type || 'daily';
     const workerHourlyRate = worker.hourly_rate ?? 0;
-    const context = localDayContext(req.body);
     // Nur eine OFFENE Sitzung sperrt. Vorher sperrte jede Sitzung des Tages,
     // auch eine laengst abgeschlossene - geteilte Schichten, eine Pause mit
     // Wiederaufnahme und zwei getrennte Besuche am selben Tag waren damit
@@ -1007,6 +1043,9 @@ router.post('/work-sessions/check-in', (req, res) => {
 
     const actorId = userId(req);
     const checkIn = nowIso();
+    // Termin und Zahlungsaufgabe liegen am Tag des Check-ins - gelesen an
+    // derselben Uhr wie "heute" auf der Seite (#1556).
+    const context = localDayContext(req.body, new Date(checkIn));
     const result = db.get().transaction(() => {
       const eventId = createVisitCalendarEvent(db.get(), worker, checkIn, actorId, vEventTitle.value, context.localDate);
       const totalAmount = Number(vDailyRate.value || 0) + Number(vExtras.value || 0);
