@@ -156,6 +156,56 @@ function eventHasEnded(event, nowStamp) {
   return endStamp !== '' && endStamp <= nowStamp;
 }
 
+/**
+ * Wo die Uebersicht einen Termin HEUTE fuehrt (#1457).
+ *
+ * `upcomingEvents` bringt seit #1457 auch, was vor heute begann und heute
+ * noch laeuft - die Reise von gestern 18:00 bis morgen 12:00. Nach ihrem
+ * Beginn stuende sie auf gestern und fiele aus Kachel, Heute-Blatt, Wand und
+ * Familienkarte; mit ihrer Startzeit neben den heutigen Eintraegen log sie.
+ * Hier bekommt sie deshalb den Tag heute und die Form, die der Kalender fuer
+ * denselben Tag waehlt (agendaSegmentKind): endet sie heute, heisst es
+ * „bis 12:00" (`until`), laeuft sie weiter, steht sie wie ganztaegig da.
+ *
+ * `day`     der Tag der Zeile (Haushaltszone)
+ * `carried` begann vor heute und reicht in heute
+ * `allDay`  ganztaegig oder ueber heute hinweg
+ * `until`   das Ende, wenn ein mitgetragener Termin heute endet, sonst null
+ */
+function overviewEventSpan(event, todayKey) {
+  const raw = String(event?.start_datetime || '');
+  const allDay = Boolean(event?.all_day) || raw.length <= 10;
+  const day = eventOccurrenceDateKey(event);
+  if (!day || !todayKey || day >= todayKey || !eventReachesInto(event, todayKey, allDay)) {
+    return { day, carried: false, allDay, until: null };
+  }
+  const end = String(event?.end_datetime || '');
+  // Ein Ende um genau 00:00 schliesst den Tag davor (#804): bis Mitternacht
+  // heisst „bis heute 24:00", nicht „laeuft morgen weiter".
+  const endsToday = !allDay && end.length > 10 && (zonedDateKey(end) === todayKey
+    || householdStamp(end) === `${addLocalDays(todayKey, 1)}T00:00`);
+  return { day: todayKey, carried: true, allDay: allDay || !endsToday, until: endsToday ? end : null };
+}
+
+/** Reicht der Termin ueber die Mitternacht vor `dayKey` hinaus? Ganztaegig inklusiv, wie im Kalender. */
+function eventReachesInto(event, dayKey, allDay) {
+  const raw = String(event?.start_datetime || '');
+  if (allDay) {
+    const startKey = raw.slice(0, 10);
+    const endKey = event?.end_datetime ? String(event.end_datetime).slice(0, 10) : startKey;
+    return (endKey > startKey ? endKey : startKey) >= dayKey;
+  }
+  const endStamp = householdStamp(String(event?.end_datetime || raw));
+  return endStamp !== '' && endStamp > `${dayKey}T00:00`;
+}
+
+/** Die Zeitangabe eines Termins auf der Uebersicht: „bis 12:00", „Ganztaegig" oder der Beginn. */
+function overviewEventTime(event, span) {
+  if (span.until) return t('dashboard.todayUntil', { time: formatTime(span.until) });
+  if (span.allDay) return t('dashboard.allDay');
+  return formatTime(event.start_datetime);
+}
+
 function getAppName() {
   return localStorage.getItem(APP_NAME_STORAGE_KEY) || 'Yuvomi';
 }
@@ -854,7 +904,7 @@ function buildTodayHighlights(data) {
   const today = householdToday();
   const todayEvents = events.filter((e) => {
     if (!e.start_datetime) return true;
-    const dayKey = eventOccurrenceDateKey(e);
+    const dayKey = overviewEventSpan(e, today).day;
     return dayKey ? dayKey === today : true;
   });
   const nextEvent = todayEvents[0] ?? null;
@@ -923,17 +973,20 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
 
   if (includeCalendar) {
     for (const event of events) {
-      if (eventOccurrenceDateKey(event) !== todayKey) continue;
+      const span = overviewEventSpan(event, todayKey);
+      if (span.day !== todayKey) continue;
       // Das Blatt verspricht, was heute NOCH ansteht (#1449): ein beendeter
       // Termin verlaesst es. Die Termin-Kachel behaelt ihn zurueckgetreten.
       if (eventHasEnded(event, nowStamp)) continue;
-      const start = eventStartDate(event);
-      const timed = !event.all_day && start && String(event.start_datetime).length > 10;
+      // Der Platz im Tag nach der Wanduhr des HAUSHALTS: hier stand
+      // `getHours()` eines Date, also die Zone des Geraets (#1457). Was schon
+      // vor heute begann, steht oben bei den ganztaegigen.
+      const time = !span.allDay && !span.carried ? zonedTimeKey(event.start_datetime) : '';
       rows.push({
         kind: 'event',
         objectId: event.id,
-        sortKey: timed ? `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}` : '00:01',
-        timeLabel: timed ? formatTime(start) : t('dashboard.allDay'),
+        sortKey: time || '00:01',
+        timeLabel: overviewEventTime(event, span),
         title: event.title,
         sub: t('dashboard.todayEvent'),
         icon: 'calendar',
@@ -1103,7 +1156,7 @@ const UPCOMING_EVENTS_SHOWN = 5;
 function renderUpcomingEvents(allEvents, { now = new Date() } = {}) {
   const todayKey = zonedDateKey(now);
   const nowStamp = householdNowStamp(now);
-  const endedToday = allEvents.filter((e) => eventOccurrenceDateKey(e) === todayKey && eventHasEnded(e, nowStamp));
+  const endedToday = allEvents.filter((e) => overviewEventSpan(e, todayKey).day === todayKey && eventHasEnded(e, nowStamp));
   const ended = endedToday.slice(-ENDED_EVENTS_SHOWN);
   const folded = endedToday.length - ended.length;
   const ahead = allEvents.filter((e) => !endedToday.includes(e)).slice(0, UPCOMING_EVENTS_SHOWN);
@@ -1122,12 +1175,15 @@ function renderUpcomingEvents(allEvents, { now = new Date() } = {}) {
   // Browser-Zone und machte „heute" zu einer Frage an das Geraet (#851).
   const today = todayKey;
   const items = events.map((e) => {
-    const d = eventStartDate(e) ?? new Date(e.start_datetime);
-    const dayKey = eventOccurrenceDateKey(e);
+    const span = overviewEventSpan(e, today);
+    const dayKey = span.day;
     const isToday = dayKey === today;
     const isEnded = ended.includes(e);
     const _suffix = timeSuffix();
-    const timeStr = e.all_day ? t('dashboard.allDay') : `${formatTime(d)}${_suffix ? ' ' + _suffix : ''}`.trim();
+    // Was gestern begann, nennt nicht seine Startzeit von gestern (#1457).
+    const timeStr = span.until || span.allDay
+      ? overviewEventTime(e, span)
+      : `${formatTime(e.start_datetime)}${_suffix ? ' ' + _suffix : ''}`.trim();
     const badge = isEnded
       ? `<span class="event-time-badge">${esc(t('dashboard.eventEnded'))}</span>`
       : `<span class="event-time-badge ${isToday ? 'event-time-badge--today' : ''}">${isToday ? t('common.today') : relativeDateLabel(dayKey)}</span>`;
@@ -1691,14 +1747,16 @@ function familyAgenda(events, shownIds, todayKey, now = new Date()) {
   const nowStamp = householdNowStamp(now);
   const items = events.map((event) => {
     const raw = String(event?.start_datetime || '');
-    const allDay = Boolean(event?.all_day) || raw.length <= 10;
-    const day = allDay ? raw.slice(0, 10) : eventOccurrenceDateKey(event);
-    const start = allDay ? '' : householdStamp(raw);
+    // Was vor heute begann und heute noch laeuft, ist ein Termin von HEUTE
+    // (#1457) - ganztaegig, wenn es ueber heute hinausgeht, sonst „bis".
+    const span = overviewEventSpan(event, todayKey);
+    const { day, allDay, until } = span;
+    const start = allDay ? '' : span.carried ? `${todayKey}T00:00` : householdStamp(raw);
     const people = new Set((Array.isArray(event?.assigned_users) ? event.assigned_users : [])
       .map((a) => Number(a.id))
       .filter((id) => shownIds.has(id)));
     const ended = !allDay && eventHasEnded(event, nowStamp);
-    return { event, day, allDay, start, ended, people, shared: people.size >= 2 };
+    return { event, day, allDay, until, start, ended, people, shared: people.size >= 2 };
   }).filter((item) => item.day && item.day >= todayKey && item.people.size > 0);
 
   const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -1721,7 +1779,10 @@ function familyAgenda(events, shownIds, todayKey, now = new Date()) {
 /** „10:00 Zahnarzt" heute, „Sa. · Zahnarzt" an einem spaeteren Tag (escaped). */
 function familyEventLabel(item, todayKey) {
   const title = esc(item.event.title);
-  if (item.day === todayKey) return item.allDay ? title : `${esc(formatTime(item.event.start_datetime))} ${title}`;
+  if (item.day === todayKey) {
+    if (item.until) return `${esc(t('dashboard.todayUntil', { time: formatTime(item.until) }))} ${title}`;
+    return item.allDay ? title : `${esc(formatTime(item.event.start_datetime))} ${title}`;
+  }
   return `${esc(relativeDateLabel(item.day))} · ${title}`;
 }
 

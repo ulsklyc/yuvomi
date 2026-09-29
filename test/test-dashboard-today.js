@@ -8,6 +8,9 @@
  *
  *        1. Haushaltshilfe (#1451): Besuche und offener Betrag des Monats
  *           zaehlten den UTC-Monat von `check_in` (`substr(check_in, 1, 7)`).
+ *        2. Mehrtaegige Termine (#1457): `upcomingEvents` waehlte nach dem
+ *           BEGINN, und was gestern begann und heute noch laeuft, fehlte in
+ *           Liste, Heute-Blatt, Wand und Familienkarte.
  *
  * Ausfuehren: npm run test:dashboard-today
  */
@@ -160,4 +163,179 @@ test('#1451: Uebersicht und Modul zaehlen dieselben abgeschlossenen Besuche', wi
   const module = (await getJson('/housekeeping/dashboard')).data;
   assert.equal(module.visits_this_month, 2, 'Vorbedingung: das Modul zaehlt zwei Oktober-Besuche');
   assert.equal(housekeeping.visitsThisMonth, module.visits_this_month, 'Uebersicht und Modul sagen dieselbe Zahl');
+}));
+
+// --------------------------------------------------------------------------
+// 2. Was gestern begann und heute laeuft (#1457)
+// --------------------------------------------------------------------------
+
+const { getUpcomingEvents } = await import('../server/services/calendar-event-reader.js');
+
+const insertEvent = db.prepare(`
+  INSERT INTO calendar_events (title, start_datetime, end_datetime, all_day, visibility, created_by, recurrence_rule)
+  VALUES (?, ?, ?, ?, 'all', ?, ?)
+`);
+function addEvent(title, start, end = null, { allDay = 0, rrule = null } = {}) {
+  return Number(insertEvent.run(title, start, end, allDay, ADMIN, rrule).lastInsertRowid);
+}
+const clearEvents = () => db.prepare('DELETE FROM calendar_events').run();
+const titles = (events) => events.map((e) => e.title);
+
+// Donnerstag, 24.09.2026, 10:00 in Berlin.
+const THU_10_BERLIN = '2026-09-24T08:00:00Z';
+
+test('#1457: laufende mehrtaegige Termine stehen heute in upcomingEvents', withClock(THU_10_BERLIN, 'Europe/Berlin', async () => {
+  clearEvents();
+  addEvent('Reise', '2026-09-23T18:00', '2026-09-25T12:00');
+  addEvent('Klassenfahrt', '2026-09-23', '2026-09-25', { allDay: 1 });
+  addEvent('Synchronisiert', '2026-09-23T16:00:00.000Z', '2026-09-25T10:00:00.000Z');
+  addEvent('Nachtschicht', '2026-09-23T18:00', '2026-09-24T08:00');
+  addEvent('Gestern vorbei', '2026-09-23T10:00', '2026-09-23T12:00');
+  addEvent('Ganztag gestern', '2026-09-23', '2026-09-23', { allDay: 1 });
+  addEvent('Heute abend', '2026-09-24T19:00', '2026-09-24T20:00');
+  const { upcomingEvents } = await getJson('/');
+  const got = titles(upcomingEvents);
+  for (const title of ['Reise', 'Klassenfahrt', 'Synchronisiert', 'Nachtschicht', 'Heute abend']) {
+    assert.ok(got.includes(title), `${title} fehlt in upcomingEvents: ${got.join(', ')}`);
+  }
+  for (const title of ['Gestern vorbei', 'Ganztag gestern']) {
+    assert.ok(!got.includes(title), `${title} ist gestern zu Ende und gehoert nicht in heute: ${got.join(', ')}`);
+  }
+}));
+
+test('#1457: der Deckel von fuenf zaehlt den laufenden Termin, nicht den heute beendeten', withClock(THU_10_BERLIN, 'Europe/Berlin', async () => {
+  clearEvents();
+  addEvent('Nachtschicht', '2026-09-23T18:00', '2026-09-24T08:00');
+  for (let i = 1; i <= 5; i += 1) addEvent(`Kommt ${i}`, `2026-09-24T1${i}:00`, `2026-09-24T1${i}:30`);
+  const { upcomingEvents } = await getJson('/');
+  const got = titles(upcomingEvents);
+  assert.deepEqual(got, ['Nachtschicht', 'Kommt 1', 'Kommt 2', 'Kommt 3', 'Kommt 4', 'Kommt 5'],
+    'die heute beendete Nachtschicht steht ausserhalb des Deckels, alle fuenf kommenden bleiben');
+}));
+
+test('#1457: auch das Vorkommen einer Serie, das gestern begann, laeuft heute', withClock(THU_10_BERLIN, 'Europe/Berlin', async () => {
+  clearEvents();
+  // Taeglich 23:00 bis 11:00 am Folgetag: das Vorkommen von gestern laeuft um 10:00 noch.
+  addEvent('Bereitschaft', '2026-09-20T23:00', '2026-09-21T11:00', { rrule: 'FREQ=DAILY' });
+  const { upcomingEvents } = await getJson('/');
+  const starts = upcomingEvents.filter((e) => e.title === 'Bereitschaft').map((e) => String(e.start_datetime).slice(0, 16));
+  assert.ok(starts.includes('2026-09-23T23:00'), `das laufende Vorkommen von gestern fehlt: ${starts.join(', ')}`);
+  assert.ok(starts.includes('2026-09-24T23:00'), 'und das von heute Abend steht weiter da');
+}));
+
+test('#1457: ob ein Termin in heute reicht, entscheidet die Haushaltszone', async () => {
+  // Endet um 01:00Z: in Berlin nach Mitternacht (03:00) - heute beendet; in
+  // Los Angeles am Vortag um 18:00, also gestern vorbei.
+  const setup = () => {
+    clearEvents();
+    addEvent('Ueber Mitternacht', '2026-09-23T16:00:00.000Z', '2026-09-24T01:00:00.000Z');
+  };
+  await withClock('2026-09-24T15:00:00Z', 'Europe/Berlin', async () => {
+    setup();
+    assert.ok(titles((await getJson('/')).upcomingEvents).includes('Ueber Mitternacht'), 'Berlin: heute beendet, steht da');
+  })();
+  await withClock('2026-09-24T15:00:00Z', 'America/Los_Angeles', async () => {
+    setup();
+    assert.ok(!titles((await getJson('/')).upcomingEvents).includes('Ueber Mitternacht'), 'Los Angeles: gestern vorbei');
+  })();
+});
+
+test('#1457: /calendar/upcoming und MCP (ohne fromToday) bleiben „ab jetzt"', withClock(THU_10_BERLIN, 'Europe/Berlin', async () => {
+  clearEvents();
+  addEvent('Reise', '2026-09-23T18:00', '2026-09-25T12:00');
+  addEvent('Heute abend', '2026-09-24T19:00', '2026-09-24T20:00');
+  assert.deepEqual(titles(getUpcomingEvents(db, { userId: ADMIN, limit: 5 })), ['Heute abend']);
+}));
+
+// --- dieselben Termine im Browser: Kachel, Tagesprogramm, Familienkarte ---
+
+const tz = await import('/utils/timezone.js');
+const { __test: dash } = await import('../public/pages/dashboard.js');
+const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+
+function inBrowser(iso, zone, fn) {
+  return async () => {
+    mock.timers.enable({ apis: ['Date'], now: new Date(iso) });
+    tz.setDisplayTimeZone(zone);
+    const prevWindow = global.window;
+    global.window = { yuvomi: { isModuleDisabled: () => false } };
+    setPermissions({ admin: true, modules: {}, widgets: {}, capabilities: {} });
+    try {
+      await fn();
+    } finally {
+      clearPermissions();
+      global.window = prevWindow;
+      tz.setDisplayTimeZone(null);
+      mock.timers.reset();
+    }
+  };
+}
+
+const KID = { id: 91, display_name: 'Leo', avatar_color: '#FF9500' };
+const ev = (id, title, start, end, extra = {}) => ({
+  id, title, start_datetime: start, end_datetime: end, all_day: 0, assigned_users: [], ...extra,
+});
+// Wie die Antwort sie liefert: sortiert nach Beginn.
+const BERLIN_DAY = [
+  ev(1, 'Reise', '2026-09-23T18:00', '2026-09-25T12:00'),
+  ev(2, 'Nachtschicht', '2026-09-23T18:00', '2026-09-24T08:00'),
+  ev(3, 'Heimweg', '2026-09-23T20:00', '2026-09-24T12:00'),
+  ev(4, 'Klassenfahrt', '2026-09-23', '2026-09-25', { all_day: 1 }),
+  ev(5, 'Heute abend', '2026-09-24T19:00', '2026-09-24T20:00'),
+];
+
+function tileRows(html) {
+  return [...html.matchAll(/<div class="event-item([^"]*)"[\s\S]*?event-item__title">([^<]*)<\/div>[\s\S]*?event-item__time">([\s\S]*?)<\/div>/g)]
+    .map(([, cls, title, time]) => ({
+      title,
+      ended: cls.includes('event-item--ended'),
+      badge: (/event-time-badge[^>]*>([^<]*)</.exec(time) || [])[1],
+      time: time.replace(/<span[^>]*>[^<]*<\/span>/g, '').replace(/\s+/g, ' ').trim(),
+    }));
+}
+
+test('#1457 Kachel: ein Termin von gestern steht heute, mit „ganztaegig" oder „bis"', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const rows = tileRows(dash.renderUpcomingEvents(BERLIN_DAY, { now: new Date() }));
+  const by = Object.fromEntries(rows.map((row) => [row.title, row]));
+  assert.deepEqual(by.Reise, { title: 'Reise', ended: false, badge: 'common.today', time: 'dashboard.allDay' },
+    'laeuft ueber heute hinaus: heute, ohne die Startzeit von gestern');
+  assert.deepEqual(by.Klassenfahrt, { title: 'Klassenfahrt', ended: false, badge: 'common.today', time: 'dashboard.allDay' });
+  assert.deepEqual(by.Heimweg, { title: 'Heimweg', ended: false, badge: 'common.today', time: 'dashboard.todayUntil{"time":"2026-09-24T12:00"}' },
+    'endet heute: „bis 12:00"');
+  assert.equal(by.Nachtschicht?.ended, true, 'heute um 08:00 zu Ende: tritt zurueck wie jeder heute beendete Termin');
+
+  // Ein Ende um genau 00:00 schliesst den Tag davor (#804): die Reise bis
+  // heute Mitternacht endet heute, sie laeuft morgen nicht weiter.
+  const [midnight] = tileRows(dash.renderUpcomingEvents([ev(9, 'Bis Mitternacht', '2026-09-23T18:00', '2026-09-25T00:00')], { now: new Date() }));
+  assert.equal(midnight.time, 'dashboard.todayUntil{"time":"2026-09-25T00:00"}');
+}));
+
+test('#1457 Heute-Blatt: der laufende Termin steht oben, der beendete nicht', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const program = dash.buildTodayProgram({ upcomingEvents: BERLIN_DAY }, { includeTasks: false, includeMeals: false, now: new Date() });
+  const rows = program.rows.map((row) => [row.title, row.sortKey, row.timeLabel]);
+  assert.deepEqual(rows, [
+    ['Reise', '00:01', 'dashboard.allDay'],
+    ['Heimweg', '00:01', 'dashboard.todayUntil{"time":"2026-09-24T12:00"}'],
+    ['Klassenfahrt', '00:01', 'dashboard.allDay'],
+    ['Heute abend', '19:00', '2026-09-24T19:00'],
+  ]);
+  assert.equal(dash.buildTodayHighlights({ upcomingEvents: BERLIN_DAY }).eventCount, 5, '„Heute auf einen Blick" zaehlt alle fuenf von heute');
+}));
+
+test('#1457 Familienkarte: wer auf Reise ist, ist nicht „heute frei"', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const events = [ev(1, 'Reise', '2026-09-23T18:00', '2026-09-25T12:00', { assigned_users: [{ id: KID.id }] })];
+  const html = dash.renderFamilyWidget([KID], { upcomingEvents: events, familyEvents: events });
+  const status = (/family-member__status[^"]*">([^<]*)</.exec(html) || [])[1];
+  assert.equal(status, 'Reise', `die laufende Reise ist der Termin von heute, bekam ${status}`);
+}));
+
+test('#1457: im Browser entscheidet die Haushaltszone, nicht die Geraetezone', inBrowser('2026-09-24T20:00:00Z', 'Pacific/Honolulu', () => {
+  // 10:00 in Honolulu. Beide als Instant, wie synchronisiert.
+  const events = [
+    ev(1, 'Reise', '2026-09-24T04:00:00.000Z', '2026-09-25T22:00:00.000Z'), // 23.09. 18:00 bis 25.09. 12:00
+    ev(2, 'Abend', '2026-09-25T05:00:00.000Z', '2026-09-25T06:00:00.000Z'), // 24.09. 19:00
+  ];
+  const program = dash.buildTodayProgram({ upcomingEvents: events }, { includeTasks: false, includeMeals: false, now: new Date() });
+  assert.deepEqual(program.rows.map((row) => [row.title, row.sortKey]), [['Reise', '00:01'], ['Abend', '19:00']],
+    'Platz im Tag nach der Wanduhr des Haushalts');
 }));

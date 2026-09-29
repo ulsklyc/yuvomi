@@ -731,6 +731,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A trip that began yesterday shows on today's overview** (#1457). Appointments were picked by
+  their start, so a trip, a hospital stay or a school camp that started yesterday and runs until
+  tomorrow was missing from the calendar tile, the today sheet, the wall display and the family
+  card, although the week strip showed it. They now appear as today's, marked all-day while they
+  continue and "until 12:00" on the day they end, never with yesterday's start time. The time of an
+  appointment in the today sheet also follows the household's clock instead of the device's.
+
 - **The overview counts housekeeping visits in the household's month** (#1451). Visits and the
   unpaid amount in the metric tile and the Housekeeping widget went by the UTC month of the check-in:
   in Berlin a visit on the 1st at 00:30 counted in the previous month, west of UTC a visit on the
