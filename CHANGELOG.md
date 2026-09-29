@@ -739,7 +739,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   definition: the change applies to the series and to every entry from today on, while entries
   already booked, the first one included, keep their values. Correcting only the first entry no
   longer changes every future month either, and editing it now asks "only this or all future", like
-  every other entry of the series. Visibility still applies to the whole series on purpose: whoever
+  every other entry of the series; switching "Recurring" off there still ends the series without
+  that question. Visibility still applies to the whole series on purpose: whoever
   makes a series private means its past entries too. Existing series are carried over on update
   without changing any entry.
 

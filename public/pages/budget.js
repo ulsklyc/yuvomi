@@ -3558,13 +3558,20 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
             closeModal({ force: true });
             renderBody();
             window.yuvomi?.showToast(t('budget.addedToast'), 'success');
-          } else if (entry.recurrence_parent_id || entry.is_recurring) {
+          } else if (entry.recurrence_parent_id || (entry.is_recurring && recurring)) {
             // Buchung einer Serie - eine Instanz ODER die erste Buchung selbst:
             // Nutzer fragen, ob nur diese oder alle zukünftigen. Seit #1035 ist
             // die erste Buchung eine gewöhnliche Buchung neben einer eigenen
             // Serien-Definition; ohne die Frage wäre ihre Korrektur nur noch
             // eine Einzeländerung, und die Serie ließe sich von hier aus nicht
             // mehr ändern.
+            //
+            // AUSNAHME: "wiederkehrend" an der ersten Buchung abgewählt. Das ist
+            // kein Umfang, sondern das Ende der Serie, und das Ende hat seinen
+            // eigenen Weg - PUT /budget/:id mit is_recurring 0 (unten im
+            // else-Zweig). Der Serien-PUT weist es seit #1546 mit 400 ab, und
+            // durch occurrenceSeriesBody() geschickt fiele der Schalter weg: die
+            // Serie liefe mit Erfolgs-Toast still weiter.
             saveBtn.disabled = false;
             saveBtn.textContent = t('common.save');
             closeModal({ force: true });
@@ -3592,7 +3599,13 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
               if (seriesBody.account_id === null && entry.account_id == null) {
                 delete seriesBody.account_id;
               }
-              await api.put(`/budget/${entry.id}/series`, occurrenceSeriesBody(seriesBody, entry));
+              // Nur ein VORKOMMEN geht durch occurrenceSeriesBody() (#1546): sein
+              // Formular ist mit Spalten-Defaults statt dem Rhythmus der Serie
+              // vorbelegt. Die erste Buchung trägt den Rhythmus wirklich - von
+              // hier aus wird er geändert, und er muss mit.
+              await api.put(`/budget/${entry.id}/series`, entry.recurrence_parent_id
+                ? occurrenceSeriesBody(seriesBody, entry)
+                : seriesBody);
               window.yuvomi?.showToast(t('budget.recurringSeriesSaved'), 'success');
             } else {
               const res = await api.put(`/budget/${entry.id}`, await withReceipts());

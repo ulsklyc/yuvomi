@@ -970,7 +970,12 @@ test('#1546: ein ueber ein Vorkommen geaenderter Betrag einer virtuellen Serie i
   assert.equal(r.status, 200);
   const later = occurrences1546(anchor).filter((row) => row.date >= todayKeyOf1546());
   assert.ok(later.length && later.every((row) => row.amount === -110), 'kuenftige Vorkommen tragen 110 im Monat');
-  assert.equal(entryRow1546(anchor).recurrence_full_amount, -1320, 'Periodenbetrag 12 x 110');
+  // Der Periodenbetrag gehoert der Definition (#1035); die erste Buchung liegt
+  // drei Monate zurueck, ist gebucht und behaelt ihren.
+  const def = db.prepare('SELECT * FROM budget_series WHERE anchor_id = ?').get(anchor);
+  assert.equal(def.full_amount, -1320, 'Periodenbetrag 12 x 110');
+  assert.equal(def.amount, -110, 'Vorlage fuer kuenftige Monate: der Anteil');
+  assert.equal(entryRow1546(anchor).recurrence_full_amount, -1200, 'die gebuchte erste Buchung bleibt');
   assert.equal(entryRow1546(anchor).recurrence_virtual, 1);
 });
 

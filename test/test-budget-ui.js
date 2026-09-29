@@ -1795,9 +1795,10 @@ test('Serien-Speichern reicht ein leeres Konto einer kontolosen Instanz nicht we
     'ein leeres Feld zählt nur als "Konto entfernen", wenn die Instanz vorher eines trug');
   assert.match(zweig, /delete seriesBody\.account_id/,
     'sonst muss das Feld ungesendet bleiben - weglassen heißt serverseitig "unverändert"');
-  // Seit #1546 geht der bereinigte Body noch durch occurrenceSeriesBody(),
-  // das den Rhythmus und Unveraendertes herausnimmt (Test darunter).
-  assert.match(zweig, /api\.put\(`\/budget\/\$\{entry\.id\}\/series`, occurrenceSeriesBody\(seriesBody, entry\)\)/,
+  // Seit #1546 geht der bereinigte Body eines VORKOMMENS noch durch
+  // occurrenceSeriesBody(), das den Rhythmus und Unveraendertes herausnimmt
+  // (Test darunter); die erste Buchung schickt ihn so, wie er ist (#1035).
+  assert.match(zweig, /api\.put\(`\/budget\/\$\{entry\.id\}\/series`, entry\.recurrence_parent_id\s*\?\s*occurrenceSeriesBody\(seriesBody, entry\)\s*:\s*seriesBody\)/,
     'gesendet wird der bereinigte Body, nicht der ursprüngliche');
 });
 
@@ -1815,8 +1816,12 @@ test('Bearbeiten der ersten Buchung einer Serie fragt nach dem Umfang (#1035)', 
   assert.ok(start >= 0, 'der Umfang-Dialog beim Bearbeiten muss auffindbar sein');
   const davor = budget.slice(Math.max(0, start - 1500), start);
   const bedingung = davor.slice(davor.lastIndexOf('} else if ('));
-  assert.match(bedingung, /entry\.recurrence_parent_id \|\| entry\.is_recurring/,
-    'der Dialog muss fuer Instanzen UND fuer den Anker (is_recurring) kommen');
+  // Am Anker nur, solange "wiederkehrend" angehakt bleibt: abgewaehlt ist es
+  // das Ende der Serie und geht ohne Frage ueber PUT /:id - der Serien-PUT
+  // weist is_recurring false seit #1546 ab. Den Klick misst
+  // test:budget-series-edit-browser.
+  assert.match(bedingung, /entry\.recurrence_parent_id \|\| \(entry\.is_recurring && recurring\)/,
+    'der Dialog muss fuer Instanzen UND fuer den Anker (is_recurring) kommen, am Anker nicht beim Beenden');
 });
 
 /**
