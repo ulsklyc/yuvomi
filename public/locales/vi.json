@@ -207,6 +207,7 @@
         "wallTimerStarted": "Hẹn giờ nhà bếp đang chạy: {{duration}}",
         "wallTimerCancelled": "Đã hủy hẹn giờ nhà bếp",
         "wallExited": "Đã tắt chế độ treo tường. Quay lại bằng “{{action}}” ở đầu trang.",
+        "wallEntered": "Chế độ treo tường: trang tổng quan thành màn hình tĩnh để treo tường. Thoát bằng “{{action}}” ở dưới hoặc nút Quay lại.",
         "wallOffline": "Không có kết nối",
         "wallOfflineHint": "Màn hình vẫn đang thử lại.",
         "familyDayCalm": "Hôm nay không có việc nào được giao",

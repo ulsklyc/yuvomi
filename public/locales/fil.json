@@ -221,6 +221,7 @@
         "wallTimerStarted": "Tumatakbo ang kitchen timer: {{duration}}",
         "wallTimerCancelled": "Kinansela ang kitchen timer",
         "wallExited": "Naka-off ang wall mode. Bumalik sa pamamagitan ng “{{action}}” sa header ng pahina.",
+        "wallEntered": "Wall mode: ang overview bilang tahimik na display para sa dingding. Lumabas gamit ang “{{action}}” sa ibaba o ang Back.",
         "wallOffline": "Walang koneksyon",
         "wallOfflineHint": "Patuloy na sumusubok ang screen.",
         "familyDayCalm": "Walang gawaing nakatalaga ngayon",

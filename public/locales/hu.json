@@ -207,6 +207,7 @@
         "wallTimerStarted": "A konyhai időzítő fut: {{duration}}",
         "wallTimerCancelled": "Konyhai időzítő megszakítva",
         "wallExited": "Fali mód kikapcsolva. A fejlécben lévő „{{action}}” gombbal térhet vissza.",
+        "wallEntered": "Fali mód: az áttekintés nyugodt fali kijelzőként. Kilépés a lenti „{{action}}” gombbal vagy a Vissza gombbal.",
         "wallOffline": "Nincs kapcsolat",
         "wallOfflineHint": "A képernyő tovább próbálkozik.",
         "familyDayCalm": "Mára nincs feladat kiosztva",

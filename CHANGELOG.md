@@ -731,6 +731,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Wall mode can be left on a phone** (#1559). "Leave wall mode" was below the bottom edge on
+  phones and showed only a grey icon until the screen was touched, and the back button closed the
+  app instead of leaving wall mode, which was still on at the next start. The exit now stays at the
+  bottom of the screen at every size and always shows its label, the back button or gesture leaves
+  wall mode (also right after a restart in wall mode), and turning it on says in one line what it is
+  and how to leave it.
+
 - **Counts read correctly in Czech, Polish, Russian, Ukrainian and Arabic** (#1473). These
   languages need more than a singular and a plural: Czech, Polish, Russian and Ukrainian have their
   own form for 2 to 4 (and 22 to 24), Arabic has a dual for 2 and a separate form from 11 to 99.

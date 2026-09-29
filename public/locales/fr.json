@@ -207,6 +207,7 @@
         "wallTimerStarted": "Minuteur de cuisine lancé : {{duration}}",
         "wallTimerCancelled": "Minuteur de cuisine annulé",
         "wallExited": "Mode mural désactivé. Revenez via « {{action}} » dans l’en-tête.",
+        "wallEntered": "Mode mural : la vue d’ensemble en affichage calme pour le mur. Quittez via « {{action}} » en bas ou avec Retour.",
         "wallOffline": "Pas de connexion",
         "wallOfflineHint": "L'écran continue d'essayer.",
         "familyDayCalm": "Aucune tâche attribuée aujourd'hui",

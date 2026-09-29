@@ -207,6 +207,7 @@
         "wallTimerStarted": "Köksklockan går: {{duration}}",
         "wallTimerCancelled": "Köksklockan avbröts",
         "wallExited": "Väggläget avstängt. Gå tillbaka via ”{{action}}” i sidhuvudet.",
+        "wallEntered": "Väggläge: översikten som en lugn skärm för väggen. Lämna via ”{{action}}” längst ned eller med Tillbaka.",
         "wallOffline": "Ingen anslutning",
         "wallOfflineHint": "Skärmen fortsätter försöka.",
         "familyDayCalm": "Inga uppgifter fördelade i dag",

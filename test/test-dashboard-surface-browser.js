@@ -360,6 +360,138 @@ test('Wand-Modus 1280x800: Abschnittstitel aus zwei Metern lesbar, ein ruhiger T
   }
 });
 
+/* DER AUSSTIEG LIEGT IN JEDER GROESSE IM BILD (#1559). Die Sonde darueber mass
+ * nur 1280x800, wo der Fuss passt. Auf 390x844 lag `#wall-exit` bei y=832-880,
+ * auf 375x667 ganz unter der Kante - erreichbar nur per Scrollen, und im
+ * Ruhezustand ein graues Zeichen ohne Wort. Gemessen wird die RUHENDE Wand
+ * (kein Zeiger hat sie geweckt), am Anfang des Scrollwegs, also genau das Bild,
+ * das jemand nach dem Einschalten sieht. Keine Regel nach Geraeteklasse
+ * (d697fa1e4): dieselbe Erwartung fuer Telefon und Wand. */
+const WALL_VIEWPORTS = [
+  { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
+  { width: 375, height: 667, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
+  { width: 1280, height: 800, deviceScaleFactor: 1, isMobile: false, hasTouch: false },
+];
+
+for (const viewport of WALL_VIEWPORTS) {
+  test(`Wand-Modus ${viewport.width}x${viewport.height}: der Ausstieg liegt ganz im Bild und traegt sein Wort (#1559)`, async () => {
+    const page = await openPage(harness, { device: viewport.isMobile ? 'mobile' : 'desktop' });
+    await page.setViewport(viewport);
+    await page.evaluate(() => localStorage.setItem('yuvomi-wall-mode', '1'));
+    await gotoRoute(page, '/');
+    await page.waitForSelector('.wall-program__list .wall-row', { timeout: 10000 }).catch(() => {});
+    await freeze(page);
+    const m = await page.evaluate(() => {
+      const btn = document.getElementById('wall-exit');
+      if (!btn) return null;
+      const r = btn.getBoundingClientRect();
+      const label = btn.querySelector('.wall__foot-btn-label');
+      const lr = label?.getBoundingClientRect();
+      const lcs = label ? getComputedStyle(label) : null;
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return {
+        awake: document.querySelector('.wall')?.hasAttribute('data-wall-awake'),
+        rect: { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left), right: Math.round(r.right) },
+        width: r.width,
+        height: r.height,
+        vw: document.documentElement.clientWidth,
+        vh: innerHeight,
+        labelText: label?.textContent.trim() ?? '',
+        labelShown: !!lr && lr.width > 1 && lr.height > 1 && lcs.display !== 'none' && lcs.visibility !== 'hidden'
+          && parseFloat(lcs.opacity) > 0.5,
+        onTop: !!hit && btn.contains(hit),
+      };
+    });
+    await page.evaluate(() => localStorage.removeItem('yuvomi-wall-mode'));
+    await page.close();
+    assert.ok(m, 'Reichweite: kein #wall-exit auf der Wand');
+    assert.ok(!m.awake, 'Reichweite: die Wand ist geweckt, gemessen werden soll der Ruhezustand');
+    const r = m.rect;
+    assert.ok(r.top >= 0 && r.left >= 0 && r.bottom <= m.vh && r.right <= m.vw,
+      `Der Ausstieg liegt nicht ganz im Bild: ${r.left}-${r.right} x ${r.top}-${r.bottom} bei ${m.vw}x${m.vh}`);
+    assert.ok(m.onTop, 'Der Ausstieg ist verdeckt - ein Tipp auf seine Mitte trifft etwas anderes');
+    assert.ok(m.width >= 44 && m.height >= 44, `Treffflaeche ${Math.round(m.width)}x${Math.round(m.height)}px`);
+    assert.ok(m.labelShown && m.labelText.length > 0,
+      `Der ruhende Ausstieg zeigt kein Wort (Beschriftung "${m.labelText}", sichtbar: ${m.labelShown})`);
+  });
+}
+
+/* ZURUECK BEENDET DIE WAND (#1559). Es gab weder einen History-Eintrag noch
+ * einen `popstate`-Handler: in der installierten App schloss Zurueck die App,
+ * und beim naechsten Start stand die Wand wieder da. Gemessen wird, dass die
+ * Geste im SELBEN Dokument bleibt (kein Ladevorgang), auf der Uebersicht
+ * landet und den gemerkten Modus loescht. */
+async function markDocument(page) {
+  await page.evaluate(() => { window.__wallProbeDoc = true; });
+}
+
+async function afterBack(page) {
+  // Verlaesst die Geste das Dokument, reisst sie den Ausfuehrungskontext mit -
+  // das ist der gemessene Fehler, kein Messfehler: dann fehlt die Marke.
+  await page.evaluate(() => history.back()).catch(() => {});
+  await wait(900);
+  await page.waitForFunction(() => document.getElementById('main-content')?.children.length > 0, { timeout: 10000 })
+    .catch(() => {});
+  return page.evaluate(() => ({
+    sameDoc: window.__wallProbeDoc === true,
+    path: location.pathname,
+    wallAttr: document.documentElement.hasAttribute('data-wall-mode'),
+    // Auf `about:blank` (die App ist „geschlossen") ist der Speicher gesperrt.
+    stored: (() => { try { return localStorage.getItem('yuvomi-wall-mode'); } catch { return 'unlesbar'; } })(),
+    wallSurface: !!document.querySelector('.dashboard--wall'),
+    overview: !!document.querySelector('.dashboard-overview'),
+  }));
+}
+
+test('Wand-Modus: Einschalten sagt, was das ist und wie man herauskommt; Zurueck beendet ihn (#1559)', async () => {
+  const page = await openPage(harness, { device: 'mobile' });
+  await page.setViewport(WALL_VIEWPORTS[0]);
+  await page.evaluate(() => localStorage.removeItem('yuvomi-wall-mode'));
+  await gotoRoute(page, '/');
+  await markDocument(page);
+  const depthBefore = await page.evaluate(() => history.length);
+  await page.click('#dashboard-wall-enter');
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-wall-mode'), { timeout: 5000 });
+  await wait(300);
+  const hint = await page.evaluate(async () => {
+    const { t } = await import('/i18n.js');
+    const toasts = [...document.querySelectorAll('.toast')].map((el) => el.textContent.trim());
+    return { toasts, exitWord: t('dashboard.wallExit') };
+  });
+  const depthIn = await page.evaluate(() => history.length);
+  const out = await afterBack(page);
+  await page.evaluate(() => localStorage.removeItem('yuvomi-wall-mode')).catch(() => {});
+  await page.close();
+
+  assert.ok(hint.toasts.some((text) => text.includes(hint.exitWord)),
+    `Kein Hinweis beim Einschalten, der den Ausstieg nennt ("${hint.exitWord}"): ${JSON.stringify(hint.toasts)}`);
+  assert.equal(depthIn, depthBefore + 1, 'Die Wand legt genau EINEN History-Eintrag an');
+  assert.ok(out.sameDoc, 'Zurueck hat das Dokument verlassen statt die Wand zu beenden');
+  assert.equal(out.path, '/');
+  assert.ok(!out.wallAttr && !out.wallSurface, 'Nach Zurueck steht noch die Wand');
+  assert.equal(out.stored, null, 'Nach Zurueck ist der Modus noch gemerkt - beim naechsten Start stuende die Wand wieder da');
+  assert.ok(out.overview, 'Nach Zurueck steht nicht die Uebersicht');
+});
+
+test('Wand-Modus nach einem Neustart: Zurueck beendet ihn, statt die App zu verlassen (#1559)', async () => {
+  const page = await openPage(harness, { device: 'mobile' });
+  await page.setViewport(WALL_VIEWPORTS[1]);
+  // Der Neustart: der Modus ist gemerkt, die Seite laedt hart auf `/`.
+  await page.evaluate(() => localStorage.setItem('yuvomi-wall-mode', '1'));
+  await gotoRoute(page, '/');
+  await markDocument(page);
+  const before = await page.evaluate(() => document.documentElement.hasAttribute('data-wall-mode'));
+  const out = await afterBack(page);
+  await page.evaluate(() => localStorage.removeItem('yuvomi-wall-mode')).catch(() => {});
+  await page.close();
+
+  assert.ok(before, 'Reichweite: nach dem Neustart steht keine Wand');
+  assert.ok(out.sameDoc, 'Zurueck hat das Dokument verlassen statt die Wand zu beenden');
+  assert.equal(out.path, '/');
+  assert.ok(!out.wallAttr && !out.wallSurface, 'Nach Zurueck steht noch die Wand');
+  assert.equal(out.stored, null, 'Nach Zurueck ist der Modus noch gemerkt');
+});
+
 /* ────────────────────────────────────────────────────────────────────────────
  * 3. Das Raster packt dicht, auch mit eigener Reihenfolge
  * ──────────────────────────────────────────────────────────────────────────── */

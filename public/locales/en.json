@@ -207,6 +207,7 @@
         "wallTimerStarted": "Kitchen timer running: {{duration}}",
         "wallTimerCancelled": "Kitchen timer cancelled",
         "wallExited": "Wall mode off. Use “{{action}}” in the page header to go back.",
+        "wallEntered": "Wall mode: the overview as a calm display for the wall. Leave with “{{action}}” at the bottom or with Back.",
         "wallOffline": "No connection",
         "wallOfflineHint": "The screen keeps trying.",
         "familyDayCalm": "No tasks assigned for today",
