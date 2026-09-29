@@ -773,8 +773,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removes the data folder, which `docker compose down -v` never touched. Step 2 names the
   `REPLACE_WITH_…` placeholders and how to edit `.env`, a new first fix covers a container that
   keeps restarting on them, and the Docker path switches its commands to Podman. Portainer and
-  Windows get a note each, the Proxmox link opens the Docker steps again, and the last step shows
-  the right address for Proxmox and the web installer.
+  Windows get a note each, and the last step shows the right address for Proxmox and the web
+  installer.
+
+- **Every install path on the website runs to the end.** The Proxmox steps installed a Debian
+  package that does not exist in Debian 13 and created the container from a template that was
+  never downloaded; they now fetch the current template with `pveam` and install `docker-compose`,
+  and the Docker steps sit in the Proxmox tab itself, so the page ends on the container's address
+  instead of `localhost`. The web installer names the SSH tunnel for opening it from another
+  device and points servers without a browser to `bash install.sh`. After choosing Podman,
+  troubleshooting, restarts and updates show Podman commands too. Umbrel no longer reads as if it
+  had asked for the keys it generates itself, TrueNAS calls the database key optional like its
+  own form, and the encryption decision comes before the first start. On a phone the download
+  commands wrap, so the file name is visible.
 
 - **The website is easier to use on a phone and with a keyboard.** The Install button at the
   bottom of the phone screen stays while you read and only steps aside over the command blocks and

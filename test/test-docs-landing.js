@@ -98,6 +98,16 @@
  *            englische Zusammenfassung im Impressum auf die englische
  *            Datenschutzerklaerung (2026-09-29).
  *
+ *       (15) Die Installationsseite haelt jeden Weg bis zum Ende: Proxmox holt
+ *            seine Vorlage per pveam, installiert ein Paket, das es in Debian 13
+ *            gibt, und fuehrt die Docker-Schritte im eigenen Panel (der Link in
+ *            den Docker-Tab warf den Leser aus dem Proxmox-Scope); der Web-
+ *            Installer nennt den SSH-Tunnel, solange er nur auf 127.0.0.1
+ *            lauscht; Fehlerbehebung, "Go further" und Updates tragen jeden
+ *            Compose-Befehl als Docker/Podman-Paar; Umbrel hat einen eigenen
+ *            Scope, TrueNAS sagt "optional" wie sein Formular; die
+ *            Schluesselentscheidung steht vor dem Start (2026-09-29, Runde 2).
+ *
  * Ausführen: node --test test/test-docs-landing.js   (bzw. npm run test:docs-landing)
  */
 
@@ -1346,7 +1356,12 @@ test('install.html: jeder seiteninterne Link trifft einen Tab oder eine Sektion'
   const html = read(INSTALL);
   assert.deepEqual(brokenHashLinks(html), [],
     'Link auf einen Tab-KNOPF statt auf den Tab-Slug: der Browser springt, der Tab wechselt nicht');
-  assert.ok(html.includes('href="#docker"') && html.includes('href="#installer"'), 'Tab-Links nicht gefunden - Muster veraltet?');
+  // Beide Sorten Ziel muessen vorkommen, sonst prueft der Guard ins Leere: ein
+  // Tab-Slug (#installer, aus dem Windows-Hinweis) und eine Sektion (#open, aus
+  // Proxmox Schritt 5). Bis 2026-09-29 stand hier `#docker` - den Link gibt es
+  // nicht mehr, weil er den Proxmox-Leser aus seinem Scope warf; dass er nicht
+  // zurueckkommt, haelt (15).
+  assert.ok(html.includes('href="#installer"') && html.includes('href="#open"'), 'Tab- oder Sektions-Links nicht gefunden - Muster veraltet?');
 });
 
 test('die Installationsseiten-Guards erkennen den Schaden, gegen den sie gebaut sind', () => {
@@ -2395,4 +2410,239 @@ test('die Such-, Symbol- und Beleg-Guards erkennen den Schaden, gegen den sie ge
   const oldImp = imp.replace(/(<p lang="en" class="en-summary">[\s\S]*?)href="privacy\.html"/, '$1href="datenschutz.html"');
   assert.notEqual(oldImp, imp);
   assert.ok(enSummaryLinks(oldImp).includes('datenschutz.html') && !enSummaryLinks(oldImp).includes('privacy.html'));
+});
+
+// ── (15) Die Installationsseite haelt jeden Weg bis zum Ende ─────────────────
+
+/**
+ * Re-Critique vom 2026-09-29 (abends). Fuenf Stellen, an denen ein Weg vor dem
+ * Ziel abriss oder etwas behauptete, das die Quelle nicht sagt:
+ *   - Proxmox installierte `docker-compose-v2` - das Paket gibt es in Debian
+ *     trixie nicht (packages.debian.org: "No such package"; `docker-compose`
+ *     2.26 liefert /usr/libexec/docker/cli-plugins/docker-compose). `pct create`
+ *     griff auf eine Vorlage `debian-13-standard_13.0-1`, die weder
+ *     heruntergeladen wurde noch heute noch auf dem Spiegel liegt (13.1-2, 13.6-1).
+ *   - Proxmox Schritt 3 verlinkte den Docker-Tab. Der Klick schaltete den Scope
+ *     auf Docker, und die Erfolgsbox nannte localhost:3000 statt der
+ *     Container-IP.
+ *   - Der Web-Installer lauscht nur auf 127.0.0.1 (install-server.js); "oeffnet
+ *     http://localhost:8090" scheiterte fuer jeden, der vor einem anderen Geraet
+ *     sitzt als dem Server.
+ *   - Wer Podman waehlte, bekam ab der Fehlerbehebung wieder nur
+ *     `docker compose`.
+ *   - Umbrel stand unter "euer App-Store hat beide abgefragt", fragt aber
+ *     nichts: es setzt beide Schluessel aus APP_SEED. TrueNAS hiess den
+ *     Schluessel "empfohlen", sein eigenes Formular "(Optional)".
+ * Dazu die Schluesselentscheidung, die erst NACH dem Start erklaert wurde.
+ * ------------------------------------------------------------------------- */
+
+const PODMAN_COMPOSE = 'podman compose -f podman-compose.yml';
+
+/** Der Markup-Teil vor dem Woerterbuch, ohne Kommentare. */
+const pageBody = (html) => stripComments(html.split('<script>\n  (function(){')[0]);
+
+/** Das Panel eines Tabs bis zum naechsten Panel oder Sektionsende. */
+function panelOf(html, slug) {
+  const body = pageBody(html);
+  const start = body.indexOf(`id="panel-${slug}"`);
+  if (start < 0) return '';
+  const rest = body.slice(start);
+  const end = rest.search(/<div class="tab-panel\b|<\/section>/);
+  return end < 0 ? rest : rest.slice(0, end);
+}
+
+/** Der Inhalt einer Sektion. */
+function sectionOf(html, id) {
+  return pageBody(html).match(new RegExp(`<section[^>]*\\sid="${id}"[^>]*>([\\s\\S]*?)</section>`))?.[1] || '';
+}
+
+/**
+ * Codeplatten als Text, Zeile fuer Zeile (stripTags faltet Umbrueche zu
+ * Leerzeichen, deshalb vorher trennen); `.ln`-Zeilen der Download-Platten
+ * werden wieder Zeilen.
+ */
+function plateTexts(fragment) {
+  return [...fragment.matchAll(/<div class="code-block[^"]*">([\s\S]*?)<\/div>/g)]
+    .map((m) => m[1].replace(/<span class="ln">/g, '\n').split('\n')
+      .map((l) => decode(stripTags(l)).replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n'));
+}
+
+/** Ein Fragment ohne seine Podman-Varianten (mit und ohne Kopierknopf). */
+const withoutPodman = (frag) => frag.replace(/<div class="eng-podman">[\s\S]*?(?:<\/button><\/div><\/div>|<\/div><\/div><\/div>)/g, '');
+
+function proxmoxFindings(html) {
+  const found = [];
+  const px = panelOf(html, 'proxmox');
+  if (!px) return ['Proxmox-Panel nicht gefunden'];
+  const plates = plateTexts(px);
+  const all = plates.join('\n');
+  if (!/^pveam update$/m.test(all)) found.push('kein `pveam update` - die Vorlagenliste ist auf einem frischen Host leer');
+  if (!/^pveam download local /m.test(all)) found.push('kein `pveam download` - pct create greift auf eine Vorlage, die lokal nicht liegt');
+  if (/debian-\d+-standard_\d/.test(all)) found.push('Vorlage mit fester Versionsnummer - veraltet mit dem naechsten Debian-Punkt-Release');
+  if (/docker-compose-v2/.test(stripComments(html))) found.push('`docker-compose-v2` gibt es in Debian trixie nicht (das Paket heisst docker-compose)');
+  if (!/apt install[^\n]*\sdocker-compose(?:\s|$)/m.test(all)) found.push('apt installiert kein Compose');
+  if (/href=\\?"#(?:docker|podman)\\?"/.test(px)) found.push('Link in den Docker-Tab: er schaltet den Scope um, die Erfolgsbox nennt dann localhost');
+  for (const plate of plateTexts(withoutPodman(panelOf(html, 'docker')))) {
+    if (!plates.some((p) => p.includes(plate))) found.push(`Docker-Schritt fehlt im Proxmox-Panel: ${plate.split('\n')[0]}`);
+  }
+  return found;
+}
+
+function enginePairFindings(html) {
+  const found = [];
+  const blocks = { en: dictBlock(html, 'en'), de: dictBlock(html, 'de') };
+  for (const id of ['troubleshooting', 'optional', 'open']) {
+    const sec = sectionOf(html, id);
+    if (!sec) { found.push(`#${id} nicht gefunden`); continue; }
+    const pairs = [...sec.matchAll(/<div class="eng-docker">([\s\S]*?)<div class="eng-podman">([\s\S]*?(?:<\/button><\/div><\/div>|<\/div><\/div><\/div>))/g)];
+    const dockerPlates = plateTexts(sec).filter((p) => /\bdocker compose\b/.test(p));
+    if (dockerPlates.length !== pairs.length) {
+      found.push(`#${id}: ${dockerPlates.length} Platten mit docker compose, aber ${pairs.length} Docker/Podman-Paare`);
+    }
+    for (const [, d, p] of pairs) {
+      const norm = (t) => t.split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).join('\n');
+      const want = norm(plateTexts(d).join('\n'));
+      const got = norm(plateTexts(p).join('\n').split(PODMAN_COMPOSE).join('docker compose'));
+      if (!plateTexts(p).join('\n').includes(PODMAN_COMPOSE)) found.push(`#${id}: Podman-Platte ohne ${PODMAN_COMPOSE}: ${plateTexts(p)[0]}`);
+      else if (want !== got) found.push(`#${id}: Podman-Platte sagt etwas anderes als die Docker-Platte:\n    ${want}\n    ${got}`);
+    }
+    // Die Prosa bleibt engine-neutral: ein `docker compose` im Satz steht auch
+    // dann da, wenn oben Podman gewaehlt ist.
+    for (const key of new Set([...sec.matchAll(/data-t="([\w-]+)"/g)].map((m) => m[1]))) {
+      for (const lang of ['en', 'de']) {
+        const raw = dictValue(blocks[lang], key);
+        if (raw !== null && /docker compose/.test(stripTags(unescapeJs(raw)))) found.push(`#${id}: ${key} (${lang}) nennt docker compose im Fliesstext`);
+      }
+    }
+  }
+  return found;
+}
+
+function scopeFindings(html) {
+  const found = [];
+  const map = html.match(/var SCOPE_OF = (\{[^}]*\})/)?.[1];
+  if (!map) return ['SCOPE_OF nicht gefunden - Muster veraltet?'];
+  const scopeOf = Object.fromEntries([...map.matchAll(/(\w+):\s*'(\w+)'/g)].map((m) => [m[1], m[2]]));
+  const body = pageBody(html);
+  const served = new Set([...body.matchAll(/data-scope="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/)));
+  const known = new Set([...Object.values(scopeOf), 'terminal']);
+  for (const s of served) if (!known.has(s)) found.push(`data-scope "${s}" gehoert zu keinem Tab`);
+  for (const s of known) if (!served.has(s)) found.push(`Scope "${s}" hat keinen einzigen Knoten - der Weg endet ohne Text`);
+  const umbrel = repo('deploy/umbrel/docker-compose.yml');
+  if (/SESSION_SECRET=\$\{APP_SEED\}/.test(umbrel) && /DB_ENCRYPTION_KEY=\$\{APP_SEED\}/.test(umbrel)) {
+    if (scopeOf.umbrel === scopeOf.truenas || scopeOf.umbrel === scopeOf.unraid) {
+      found.push('Umbrel teilt den Scope mit TrueNAS/Unraid, fragt aber nichts ab: es setzt beide Schluessel aus APP_SEED');
+    }
+    const storeNode = body.match(/data-scope="([^"]+)"[^>]*data-t="env_where_store"/)?.[1] || '';
+    if (storeNode.split(/\s+/).includes(scopeOf.umbrel)) found.push('env_where_store ("im Installationsformular") erreicht auch Umbrel');
+    if (!new RegExp(`data-scope="(?:[^"]*\\s)?${scopeOf.umbrel}(?:\\s[^"]*)?"[^>]*data-t="env_where_umbrel"`).test(body)) found.push('kein eigener .env-Satz fuer Umbrel');
+  } else {
+    found.push('deploy/umbrel/docker-compose.yml setzt die Schluessel nicht mehr aus APP_SEED - Umbrel-Texte neu pruefen');
+  }
+  const q = repo('deploy/truenas/questions.yaml');
+  if (!/label: Database Encryption Key \(Optional\)/.test(q)) found.push('questions.yaml: Label des Schluessels geaendert - Wortlaut neu pruefen');
+  for (const [lang, text] of bothLangs(html, 'step_tn2_desc')) {
+    if (/recommended|empfohlen/i.test(text) || !/optional/i.test(text)) found.push(`step_tn2_desc (${lang}): das Formular sagt "(Optional)", die Seite nicht`);
+  }
+  return found;
+}
+
+function installerFindings(html) {
+  const found = [];
+  const src = repo('tools/installer/install-server.js');
+  const port = src.match(/const PORT = (\d+);/)?.[1];
+  const host = src.match(/\.listen\(PORT, '([^']+)'/)?.[1];
+  if (!port || !host) return ['install-server.js: PORT oder listen-Host nicht gefunden - Muster veraltet?'];
+  if (/^(?:127\.0\.0\.1|localhost|::1)$/.test(host)) {
+    for (const [lang, text] of bothLangs(html, 'step_inst3_remote')) {
+      if (!text.includes(`ssh -L ${port}:localhost:${port}`)) found.push(`step_inst3_remote (${lang}) nennt keinen Tunnel auf ${port}`);
+    }
+    if (!panelOf(html, 'installer').includes('data-t="step_inst3_remote"')) found.push('der Tunnel-Hinweis steht nicht im Web-Installer-Panel');
+  }
+  if (!existsSync(resolve(ROOT, 'install.sh'))) found.push('install.sh gibt es nicht mehr');
+  for (const [lang, text] of bothLangs(html, 'step_inst2_cli')) {
+    if (!text.includes('bash install.sh')) found.push(`step_inst2_cli (${lang}) nennt install.sh nicht`);
+  }
+  return found;
+}
+
+function decisionFindings(html) {
+  const found = [];
+  for (const [slug, start] of [['docker', 'step_a3_title'], ['proxmox', 'step_a3_title'], ['source', 'step_b3_title']]) {
+    const panel = panelOf(html, slug);
+    const w = panel.indexOf('data-t="step_a2_warning"');
+    const s = panel.indexOf(`data-t="${start}"`);
+    if (s < 0) found.push(`${slug}: Startschritt nicht gefunden - Muster veraltet?`);
+    else if (w < 0) found.push(`${slug}: keine Schluesselentscheidung vor dem Start`);
+    else if (w > s) found.push(`${slug}: die Schluesselentscheidung steht erst nach dem Start`);
+  }
+  for (const [lang, text] of bothLangs(html, 'step_a2_warning')) {
+    if (!text.includes('DB_ENCRYPTION_KEY')) found.push(`step_a2_warning (${lang}) nennt den Schluessel nicht`);
+  }
+  return found;
+}
+
+/** Karten, die keine Bedienelemente sind, heben sich nicht unter dem Zeiger. */
+function cardLiftFindings(html) {
+  return inlineStyles(html).flatMap((css) => [...eachRule(css)])
+    .filter((r) => /\.opt-card:hover/.test(r.selector) && /transform\s*:\s*translate/.test(r.body))
+    .map((r) => `${r.selector} hebt die ganze Karte an, klickbar ist nur der Link`);
+}
+
+test('install.html: Proxmox laedt seine Vorlage, installiert ein Debian-13-Paket und fuehrt die Docker-Schritte selbst', () => {
+  assert.deepEqual(proxmoxFindings(read(INSTALL)), []);
+});
+
+test('install.html: jeder Compose-Befehl nach den Schritten ist ein Docker/Podman-Paar', () => {
+  assert.deepEqual(enginePairFindings(read(INSTALL)), []);
+});
+
+test('install.html: Umbrel hat einen eigenen Scope, TrueNAS spricht wie sein Formular', () => {
+  assert.deepEqual(scopeFindings(read(INSTALL)), []);
+});
+
+test('install.html: der Web-Installer nennt den Tunnel, solange er nur lokal lauscht', () => {
+  assert.deepEqual(installerFindings(read(INSTALL)), []);
+});
+
+test('install.html: die Schluesselentscheidung steht vor dem Start, die Optionskarten heben sich nicht', () => {
+  const html = read(INSTALL);
+  assert.deepEqual(decisionFindings(html), []);
+  assert.deepEqual(cardLiftFindings(html), []);
+});
+
+test('die Guards aus (15) erkennen den Schaden, gegen den sie gebaut sind', () => {
+  const html = read(INSTALL);
+  const hit = (list, re) => list.some((f) => re.test(f));
+  // Proxmox: der Stand vor dem Fix - v2-Paket, feste Vorlage ohne Download, Link in den Docker-Tab.
+  const pxOld = html
+    .replace('pveam update&#10;', '').replace('pveam update\n', '')
+    .replace(/docker-compose curl openssl/g, 'docker-compose-v2 curl openssl')
+    .replace('"local:vztmpl/$TEMPLATE"', 'local:vztmpl/debian-13-standard_13.0-1_amd64.tar.zst')
+    .replace('<a href="#open">', '<a href="#docker">');
+  const px = proxmoxFindings(pxOld);
+  for (const re of [/pveam update/, /docker-compose-v2/, /feste[rn]? Versionsnummer/, /Docker-Tab/]) assert.ok(hit(px, re), `Proxmox-Guard blind fuer ${re}: ${px.join(' | ')}`);
+  // Ein Docker-Schritt, der im Proxmox-Panel fehlt, faellt auf.
+  const pxShort = html.replace(/(id="panel-proxmox"[\s\S]*?)docker compose logs -f/, '$1docker compose logs');
+  assert.ok(hit(proxmoxFindings(pxShort), /Docker-Schritt fehlt/), 'Kopplung Docker- zu Proxmox-Panel blind');
+  // Podman: eine Platte ohne Paar und ein Satz mit docker compose.
+  const engOld = html
+    .replace(/(<section[^>]*id="troubleshooting"[\s\S]*?)<div class="eng-podman">[\s\S]*?<\/div><\/div><\/div>/, '$1')
+    .replace("then start it again:',", "then run <code>docker compose up -d</code> again.',");
+  const eng = enginePairFindings(engOld);
+  assert.ok(hit(eng, /Docker\/Podman-Paare/) && hit(eng, /nennt docker compose im Fliesstext/), `Paar-Guard blind: ${eng.join(' | ')}`);
+  const engWrong = html.replace(`${PODMAN_COMPOSE} ps`, `${PODMAN_COMPOSE} top`);
+  assert.ok(hit(enginePairFindings(engWrong), /sagt etwas anderes/), 'Paar-Guard vergleicht die Befehle nicht');
+  // Scope: Umbrel zurueck unter "store", TrueNAS wieder "recommended".
+  const scOld = html.replace("umbrel: 'umbrel'", "umbrel: 'store'")
+    .replaceAll('Database Encryption Key (optional, but irreversible once set - back it up)', 'Database Encryption Key (recommended - back it up, it cannot be recovered)');
+  const sc = scopeFindings(scOld);
+  for (const re of [/APP_SEED/, /keinen einzigen Knoten|gehoert zu keinem Tab/, /step_tn2_desc \(en\)/]) assert.ok(hit(sc, re), `Scope-Guard blind fuer ${re}: ${sc.join(' | ')}`);
+  // Installer ohne Tunnel.
+  assert.ok(hit(installerFindings(html.replace(/ssh -L 8090:localhost:8090/g, 'ssh user@server')), /Tunnel/), 'Tunnel-Guard blind');
+  // Entscheidung erst nach dem Start (im Proxmox-Panel), und die Kartenhebung.
+  const decOld = html.replace(/(id="panel-proxmox"[\s\S]*?)data-t="step_a2_warning"/, '$1data-t="step_a2_note"');
+  assert.ok(hit(decisionFindings(decOld), /proxmox: keine Schluesselentscheidung/), 'Entscheidungs-Guard blind');
+  const liftOld = html.replace('</style>', '.opt-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }\n</style>');
+  assert.equal(cardLiftFindings(liftOld).length, 1, 'Kartenhebungs-Guard blind');
 });
