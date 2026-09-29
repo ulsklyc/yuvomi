@@ -25,12 +25,12 @@
  * Lauf: npm run test:restore-rekey
  */
 
-import { test, after } from 'node:test';
+import { test, after, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, writeFileSync, chmodSync } from 'node:fs';
+import fsp from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3-multiple-ciphers';
@@ -317,21 +317,45 @@ test('ein Backup DIESER Installation mit mitgeschicktem Schluessel laeuft den no
 });
 
 test('nach jedem Restore mit Backup-Schluessel bleibt kein Arbeitsverzeichnis im Temp liegen', async () => {
-  const prod = () => new Set(readdirSync(tmpdir()).filter((name) => name.startsWith('yuvomi-rekey-')));
-  const vorher = prod();
+  // GEZAEHLT WIRD NUR, WAS DIESER PROZESS ANLEGT (#1446). `yuvomi-rekey-` ist
+  // das Praefix JEDES Restores mit Backup-Schluessel - auch eines, der zur
+  // selben Zeit in einem anderen Prozess laeuft (zweiter Testlauf in einem
+  // anderen Worktree, lokale Instanz). Ein Vorher/Nachher ueber den geteilten
+  // Temp-Ordner zaehlte dessen Arbeitsverzeichnis als Rest dieses Tests. Die
+  // Restores laufen deshalb unter einem eigenen TMPDIR (`os.tmpdir()` liest ihn
+  // bei jedem Aufruf). Das zweite Verzeichnis steht fuer den anderen Prozess:
+  // es liegt waehrend der Restores mit demselben Praefix im geteilten Ordner
+  // und darf das Urteil nicht beruehren.
+  const eigenes = tmpDir();
+  tempDir('yuvomi-rekey-');
+  const vorherTmp = process.env.TMPDIR;
+  // Reichweite: ohne diesen Nachweis waere ein leeres `eigenes` auch dann
+  // gruen, wenn db.js seinen Ordner woanders anlegte.
+  const angelegt = mock.method(fsp, 'mkdtemp');
+  try {
+    process.env.TMPDIR = eigenes;
+    const gut = await backupWithMarker(KEY_ALT, 'gut');
+    const { mod } = await targetWithMarker(KEY_NEU, 'x');
+    await mod.restoreFromFile(gut, { backupKey: KEY_ALT });
+    await assert.rejects(() => mod.restoreFromFile(gut, { backupKey: 'falsch-0123456789' }));
+    const kaputt = join(tmpDir(), 'kaputt.db');
+    const buf = Buffer.from(readFileSync(await bigBackup(KEY_ALT)));
+    buf[4 * PAGE + 100] ^= 0xff;
+    writeFileSync(kaputt, buf);
+    await assert.rejects(() => mod.restoreFromFile(kaputt, { backupKey: KEY_ALT }));
+    mod.get().close();
+  } finally {
+    if (vorherTmp === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = vorherTmp;
+    angelegt.mock.restore();
+  }
 
-  const gut = await backupWithMarker(KEY_ALT, 'gut');
-  const { mod } = await targetWithMarker(KEY_NEU, 'x');
-  await mod.restoreFromFile(gut, { backupKey: KEY_ALT });
-  await assert.rejects(() => mod.restoreFromFile(gut, { backupKey: 'falsch-0123456789' }));
-  const kaputt = join(tmpDir(), 'kaputt.db');
-  const buf = Buffer.from(readFileSync(await bigBackup(KEY_ALT)));
-  buf[4 * PAGE + 100] ^= 0xff;
-  writeFileSync(kaputt, buf);
-  await assert.rejects(() => mod.restoreFromFile(kaputt, { backupKey: KEY_ALT }));
-  mod.get().close();
-
-  const uebrig = [...prod()].filter((name) => !vorher.has(name));
+  const rekeyDirs = angelegt.mock.calls.map((call) => String(call.arguments[0]))
+    .filter((prefix) => prefix.endsWith('yuvomi-rekey-'));
+  assert.ok(rekeyDirs.length > 0, 'die Restores haben ein Arbeitsverzeichnis angelegt');
+  assert.deepEqual(rekeyDirs.filter((prefix) => !prefix.startsWith(eigenes)), [],
+    'jedes Arbeitsverzeichnis liegt im eigenen Temp-Ordner dieses Tests');
+  const uebrig = readdirSync(eigenes).filter((name) => name.startsWith('yuvomi-rekey-'));
   assert.deepEqual(uebrig, [], 'Erfolg, falscher Schluessel und beschaedigte Datei raeumen ihr Arbeitsverzeichnis weg');
 });
 

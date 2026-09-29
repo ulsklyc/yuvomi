@@ -30,11 +30,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startHarness } from './document-guards-harness.js';
+import { tempDir } from './tmp-dir.js';
 
 if (process.env.HARNESS_PROBE === '1') {
   // Der Kindprozess: einmal starten, das Ergebnis melden, sonst nichts. Kein
@@ -49,45 +49,41 @@ if (process.env.HARNESS_PROBE === '1') {
 } else {
   test('ein Browser, der nicht startet, laesst weder Server noch Temp-Verzeichnis zurueck', async () => {
     // Eigener Temp-Ordner: gezaehlt wird nur, was DIESER Lauf anlegt.
-    const tmp = mkdtempSync(join(tmpdir(), 'yuvomi-harness-probe-'));
-    try {
-      const child = spawn(process.execPath, [fileURLToPath(import.meta.url)], {
-        env: {
-          ...process.env,
-          HARNESS_PROBE: '1',
-          PUPPETEER_EXECUTABLE_PATH: join(tmp, 'kein-chrome'),
-          TMPDIR: tmp,
-          DOCUMENT_GUARDS_BASE_URL: '',
-        },
-        // Eigene Prozessgruppe: haengt der Kindprozess, geht der Server, den er
-        // gestartet hat, mit ihm - auch dann, wenn genau das der Befund ist.
-        detached: true,
-        stdio: ['ignore', 'pipe', 'inherit'],
-      });
-      let out = '';
-      child.stdout.on('data', (chunk) => { out += chunk; });
+    const tmp = tempDir('yuvomi-harness-probe-');
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url)], {
+      env: {
+        ...process.env,
+        HARNESS_PROBE: '1',
+        PUPPETEER_EXECUTABLE_PATH: join(tmp, 'kein-chrome'),
+        TMPDIR: tmp,
+        DOCUMENT_GUARDS_BASE_URL: '',
+      },
+      // Eigene Prozessgruppe: haengt der Kindprozess, geht der Server, den er
+      // gestartet hat, mit ihm - auch dann, wenn genau das der Befund ist.
+      detached: true,
+      stdio: ['ignore', 'pipe', 'inherit'],
+    });
+    let out = '';
+    child.stdout.on('data', (chunk) => { out += chunk; });
 
-      // Migration, Seed und zwei Serverstarts brauchen wenige Sekunden; wer
-      // nach einer Minute noch laeuft, haengt.
-      const LIMIT_MS = 60_000;
-      let timer;
-      const ended = await Promise.race([
-        new Promise((resolve) => child.once('exit', () => resolve(true))),
-        new Promise((resolve) => { timer = setTimeout(() => resolve(false), LIMIT_MS); }),
-      ]);
-      clearTimeout(timer);
-      if (!ended) {
-        try { process.kill(-child.pid, 'SIGKILL'); } catch { /* schon weg */ }
-      }
-
-      assert.match(out, /HARNESS_REJECTED/, `startHarness() lehnt ab - Ausgabe des Kindprozesses: ${out}`);
-      assert.ok(ended,
-        `Der Kindprozess lief ${LIMIT_MS / 1000} s nach der Ablehnung weiter: ein Serverprozess `
-        + 'haengt an ihm, den startHarness() nach dem Fehlschlag nicht gestoppt hat (#1446).');
-      assert.deepEqual(readdirSync(tmp).filter((name) => name.startsWith('yuvomi-document-guards-')), [],
-        'das Temp-Verzeichnis des Harness ist nach dem Fehlschlag weggeraeumt');
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
+    // Migration, Seed und zwei Serverstarts brauchen wenige Sekunden; wer
+    // nach einer Minute noch laeuft, haengt.
+    const LIMIT_MS = 60_000;
+    let timer;
+    const ended = await Promise.race([
+      new Promise((resolve) => child.once('exit', () => resolve(true))),
+      new Promise((resolve) => { timer = setTimeout(() => resolve(false), LIMIT_MS); }),
+    ]);
+    clearTimeout(timer);
+    if (!ended) {
+      try { process.kill(-child.pid, 'SIGKILL'); } catch { /* schon weg */ }
     }
+
+    assert.match(out, /HARNESS_REJECTED/, `startHarness() lehnt ab - Ausgabe des Kindprozesses: ${out}`);
+    assert.ok(ended,
+      `Der Kindprozess lief ${LIMIT_MS / 1000} s nach der Ablehnung weiter: ein Serverprozess `
+      + 'haengt an ihm, den startHarness() nach dem Fehlschlag nicht gestoppt hat (#1446).');
+    assert.deepEqual(readdirSync(tmp).filter((name) => name.startsWith('yuvomi-document-guards-')), [],
+      'das Temp-Verzeichnis des Harness ist nach dem Fehlschlag weggeraeumt');
   });
 }
