@@ -756,6 +756,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **"Due today" stays readable on the selected task.** On a wide screen the task open on the
+  right is highlighted in the list, and on that highlight "Due today" and "Overdue" fell below
+  the 4.5:1 contrast the rest of the app keeps. Both now use the darker text shade there.
+
 - **The website no longer states things the app does not do.** The quick start said a database
   left on the placeholder key gets encrypted with a public value; Yuvomi does not start on the
   placeholders at all, and the note now says so. The install page promised a two-command Docker
