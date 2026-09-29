@@ -1347,6 +1347,7 @@
         "recurringEditSeries": "Change all future occurrences",
         "recurringSeriesDeleted": "Series deleted",
         "recurringSeriesSaved": "Series saved",
+        "recurringDeleteFirstHint": "This is the first entry of the series. Here “Only this occurrence” also ends the series: no new entries are added, and those already created stay as single entries.",
         "deleteLabel": "Delete entry “{{title}}”",
         "deleteConfirm": "Really delete this entry?",
         "deletePersonConfirm": "Really delete \"{{title}}\"?",

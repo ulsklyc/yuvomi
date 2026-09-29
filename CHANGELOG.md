@@ -739,6 +739,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this could land in the restored database or fail on the closed one. A restore now waits for them,
   and while it runs these pages answer "try again" instead of starting. A new page that waits for
   another service now fails a test until it is covered or marked as only reading.
+- **Deleting the first entry of a recurring budget payment says that it ends the series** (#1544).
+  The series hangs on its first entry, so "Only this occurrence" there also ends the whole series:
+  the entries already created stay as single entries and no new ones follow. The dialog now says so
+  before you choose; deleting a later entry works as before.
 
 - **Counts read correctly in Czech, Polish, Russian, Ukrainian and Arabic** (#1473). These
   languages need more than a singular and a plural: Czech, Polish, Russian and Ukrainian have their

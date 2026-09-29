@@ -1508,6 +1508,7 @@
         "recurringEditSeries": "Zmień wszystkie przyszłe płatności",
         "recurringSeriesDeleted": "Seria usunięta",
         "recurringSeriesSaved": "Seria zapisana",
+        "recurringDeleteFirstHint": "To pierwszy wpis serii. Tutaj „Tylko ta płatność” kończy także całą serię: nie pojawią się nowe wpisy, a już utworzone pozostaną jako pojedyncze wpisy.",
         "deleteLabel": "Usuń wpis „{{title}}”",
         "deleteConfirm": "Naprawdę usunąć wpis?",
         "deletePersonConfirm": "Naprawdę usunąć \"{{title}}\"?",

@@ -1362,6 +1362,7 @@
         "recurringEditSeries": "Baguhin ang lahat ng susunod na pagkakataon",
         "recurringSeriesDeleted": "Natanggal ang serye",
         "recurringSeriesSaved": "Na-save ang serye",
+        "recurringDeleteFirstHint": "Ito ang unang entry ng serye. Dito, tinatapos din ng “Ang pagkakataong ito lamang” ang serye: walang bagong entry na idaragdag, at mananatiling hiwalay na entry ang mga nagawa na.",
         "deleteLabel": "Tanggalin ang entry na “{{title}}”",
         "deleteConfirm": "Talagang tanggalin ang entry na ito?",
         "deletePersonConfirm": "Talagang tanggalin ang \"{{title}}\"?",

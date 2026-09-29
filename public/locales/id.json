@@ -1362,6 +1362,7 @@
         "recurringEditSeries": "Ubah semua entri mendatang",
         "recurringSeriesDeleted": "Seri dihapus",
         "recurringSeriesSaved": "Seri disimpan",
+        "recurringDeleteFirstHint": "Ini entri pertama dalam seri. Di sini, “Hanya entri ini” juga mengakhiri seri: tidak ada entri baru yang ditambahkan, dan entri yang sudah dibuat tetap sebagai entri tunggal.",
         "deleteLabel": "Hapus entri “{{title}}”",
         "deleteConfirm": "Benar-benar hapus entri?",
         "deletePersonConfirm": "Benar-benar hapus \"{{title}}\"?",

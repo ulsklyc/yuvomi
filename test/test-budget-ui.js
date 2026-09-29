@@ -2807,6 +2807,55 @@ test('Serie loeschen im Konto-Drilldown rechnet die Bilanz nicht aus der gefilte
   }
 });
 
+// #1544: die Serie haengt an ihrer ersten Buchung. "Nur dieser Eintrag" an
+// genau dieser Buchung beendet deshalb die ganze Serie - die angelegten
+// Vorkommen bleiben als Einzelbuchungen, kuenftige Monate bleiben leer. Das
+// Verhalten bleibt; der Dialog sagt es, bevor die Wahl faellt. Gefahren wird
+// das echte deleteEntry() bis zum Dialog und dort abgebrochen.
+test('Loeschen der ersten Serienbuchung sagt, dass "nur dieser" die Serie beendet (#1544)', async () => {
+  const s = budgetUi.state;
+  const zuvor = { entries: s.entries, ledgerResults: s.ledgerResults };
+  const vorherModal = globalThis.__openModal;
+  const erste = { id: 10, title: 'Miete', amount: -800, date: '2026-07-05', is_recurring: 1, recurrence_parent_id: null };
+  const vorkommen = { id: 11, title: 'Miete', amount: -800, date: '2026-08-05', is_recurring: 0, recurrence_parent_id: 10 };
+  const beendet = { id: 12, title: 'Alt', amount: -5, date: '2026-06-01', is_recurring: 0, recurrence_parent_id: null };
+  const dialoge = [];
+  const dialogFuer = async (id) => {
+    dialoge.length = 0;
+    await budgetUi.deleteEntry(id);
+    return dialoge[0];
+  };
+  globalThis.__openModal = (o) => {
+    dialoge.push(o);
+    o.onClose(); // abbrechen: nichts wird geloescht
+  };
+  try {
+    Object.assign(s, { entries: [erste, vorkommen, beendet], ledgerResults: null });
+
+    const amAnfang = await dialogFuer(10);
+    assert.ok(amAnfang, 'die erste Buchung einer laufenden Serie fragt nach dem Umfang');
+    assert.match(amAnfang.content, /budget\.recurringDeleteFirstHint/, 'der Hinweis fehlt an der ersten Buchung');
+    assert.ok(
+      amAnfang.content.indexOf('budget.recurringDeleteFirstHint') < amAnfang.content.indexOf('id="rcs-this"'),
+      'der Hinweis steht vor den Knoepfen',
+    );
+
+    const mittendrin = await dialogFuer(11);
+    assert.ok(mittendrin, 'ein Vorkommen fragt nach dem Umfang');
+    assert.doesNotMatch(mittendrin.content, /recurringDeleteFirstHint/, 'ein Vorkommen beendet die Serie nicht - kein Hinweis');
+
+    assert.deepEqual(s.entries.map((e) => e.id), [10, 11, 12], 'abgebrochen bleibt jede Buchung');
+
+    // Eine Buchung ohne laufende Serie geht ohne Frage ins Undo-Fenster.
+    globalThis.__undoStub = () => {};
+    assert.equal(await dialogFuer(12), undefined, 'eine Buchung ohne laufende Serie fragt gar nicht');
+  } finally {
+    delete globalThis.__undoStub;
+    if (vorherModal === undefined) delete globalThis.__openModal; else globalThis.__openModal = vorherModal;
+    Object.assign(s, zuvor);
+  }
+});
+
 // --------------------------------------------------------
 // Rot ist Warnung, nicht Grundton (Re-Critique 2026-09-27, C1)
 // --------------------------------------------------------

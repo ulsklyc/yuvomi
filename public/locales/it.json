@@ -1347,6 +1347,7 @@
         "recurringEditSeries": "Modifica tutte le occorrenze future",
         "recurringSeriesDeleted": "Serie eliminata",
         "recurringSeriesSaved": "Serie salvata",
+        "recurringDeleteFirstHint": "Questa è la prima registrazione della serie. Qui «Solo questa occorrenza» chiude anche la serie: non vengono aggiunte nuove registrazioni e quelle già create restano come registrazioni singole.",
         "deleteLabel": "Elimina la voce «{{title}}»",
         "deleteConfirm": "Eliminare davvero questa voce?",
         "deletePersonConfirm": "Eliminare davvero \"{{title}}\"?",

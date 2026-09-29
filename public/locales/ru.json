@@ -1493,6 +1493,7 @@
         "recurringEditSeries": "Изменить все будущие записи",
         "recurringSeriesDeleted": "Серия удалена",
         "recurringSeriesSaved": "Серия сохранена",
+        "recurringDeleteFirstHint": "Это первая запись серии. Здесь «Только эта запись» завершает и всю серию: новые записи больше не появятся, а уже созданные останутся отдельными записями.",
         "deleteLabel": "Удалить запись «{{title}}»",
         "deleteConfirm": "Удалить эту запись?",
         "deletePersonConfirm": "Удалить «{{title}}»?",
