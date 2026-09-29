@@ -108,6 +108,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The demo data shows an ordinary family day on any date.** Three tasks for Linda, Alex and Leo
+  are due today, today brings an all-day sports day and an evening movie night, and the weekly
+  classes start in the first week of the month, so the overview no longer says "Nothing else today"
+  beside "No tasks assigned for today" and the month view is filled from the 1st. Today's plan
+  holds dinner, which the overview shows at any hour, and this week's Friday pizza exists before
+  the meal plan is opened. Height and head circumference have a value, so no vitals card reads
+  "No value yet". Only a database filled by `scripts/seed-demo.js` is affected.
+
 - **The website speaks to the whole family, and its module list follows the app's menu.** A new
   section shows three moments from the family's side - the tablet on the kitchen wall, the app on
   every phone and an invite with the right access for each role - drawn with the three circles of
