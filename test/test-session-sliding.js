@@ -48,9 +48,15 @@ const DAY = 24 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
 const NINETY_DAYS = 90 * DAY;
 
-const { baseUrl: BASE } = await startTestServer({
+const { baseUrl: BASE, server } = await startTestServer({
   name: 'session-sliding',
-  env: { SESSION_SECRET: 'test-session-sliding-secret-min32chars' },
+  env: {
+    SESSION_SECRET: 'test-session-sliding-secret-min32chars',
+    // Die Suite stellt die gemockte Uhr, auf der auch der Login-Limiter sein
+    // Fenster misst - und sie misst die Sitzung, nicht den Limiter. Warum fuenf
+    // Versuche hier nicht reichen, steht beim Limiter-Test unten (#1446).
+    RATE_LIMIT_MAX_ATTEMPTS: '1000',
+  },
 });
 const db = (await import('../server/db.js')).get();
 
@@ -262,6 +268,32 @@ test('eine faellige Auffrischung holt eine widerrufene Sitzung nicht zurueck', a
   } finally {
     stack.splice(stack.indexOf(hold), 1);
     release();
+  }
+});
+
+test('der Login-Limiter zaehlt keine Anmeldung, nach der die Uhr springt', async () => {
+  // DER FLAKE AUS DEM VOLLLAUF VOM 2026-09-23 (#1446): die sechste Anmeldung
+  // dieser Datei bekam 429. Der Login-Limiter zaehlt jede Anmeldung und nimmt
+  // eine erfolgreiche erst beim `finish` der Antwort wieder zurueck - aber nur,
+  // solange `Date.now()` vor dem Ende seines Fensters liegt
+  // (express-rate-limit, `decrementKey`). Diese Suite stellt die gemockte Uhr
+  // gleich nach jeder Anmeldung Stunden bis Tage vor. Kommt der Test dem
+  // `finish` zuvor - unter Last ist das die Regel -, bleibt der Versuch
+  // gezaehlt; und weil jede Anmeldung die Uhr auf T0 zurueckstellt, laeuft das
+  // Fenster nie ab. Nach fuenf solchen Resten ist die sechste gesperrt.
+  //
+  // Hier wird das Rennen nicht abgewartet, sondern erzwungen: die Uhr springt
+  // IM `finish` der Anmeldung, also garantiert vor dem Zuruecknehmen. Die
+  // Suite prueft die Sitzung, nicht den Limiter - deshalb setzt sie ihn per
+  // `RATE_LIMIT_MAX_ATTEMPTS` aus dem Weg, wie der Browser-Harness.
+  const jump = (req, res) => {
+    if (req.url === '/api/v1/auth/login') res.once('finish', () => clockAt(13 * HOUR));
+  };
+  server.on('request', jump);
+  try {
+    for (let i = 0; i < 6; i += 1) await login(0);
+  } finally {
+    server.off('request', jump);
   }
 });
 
