@@ -108,6 +108,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The website speaks to the whole family, and its module list follows the app's menu.** A new
+  section shows three moments from the family's side - the tablet on the kitchen wall, the app on
+  every phone and an invite with the right access for each role - drawn with the three circles of
+  the logo instead of a mock screenshot. The module section is grouped like the app's navigation
+  (Plan, Household, People, Finance, plus what lives in Settings) instead of one long row of cards,
+  and the handoffs show the item travelling from one module to the next once as they scroll in.
+  The hero no longer tilts, the grain overlay is gone, the first gallery screen is the meal week
+  instead of a repeat of the hero, and the page ends on the family call to action rather than on
+  the key warning, which stays in full on the install page.
+
 - **New events in the calendar's week and day come from a double-click or a long press, not a
   click.** A single click or tap on empty time now only closes what is open, such as an event's
   popover, so clicking beside an event to put it away no longer opens "New event". With a mouse,

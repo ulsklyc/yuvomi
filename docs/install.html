@@ -80,10 +80,6 @@
       line-height: 1.65; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
       overflow-x: hidden;
     }
-    body::after {
-      content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none; opacity: var(--grain);
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
     img { max-width: 100%; height: auto; display: block; }
@@ -523,7 +519,6 @@
     @media print {
       html { scroll-behavior: auto; }
       body { background: #fff; color: #000; }
-      body::after { content: none; }
       .hero::before { display: none; }
       .skip-link, .site-bar, .copy-btn, .tab-bar, .to-top, .path-now, .engine-row { display: none !important; }
       /* Every variant on paper, each labelled: a printout has no tab or engine

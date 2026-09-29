@@ -68,6 +68,16 @@
  *            auf den Tab-Knopf. Anlass: `down -v` bei Host-Ordnern,
  *            `3000:3000` statt OIKOS_HTTP_PORT, `#tab-docker` (2026-09-29).
  *
+ *        (9) Die Modulsektion ist gegliedert wie das Menue der App: Gruppen,
+ *            Zuordnung und Reihenfolge aus `public/router.js`, Gruppennamen aus
+ *            `public/locales/{en,de}.json` (2026-09-29).
+ *
+ *       (10) Jede Zusage der Familien-Sektion haengt an einer Stelle im Code
+ *            (Display-Schreibrecht, Offline-Cache, Zugriffsstufen, Kinderrolle,
+ *            HTTPS-Bedingung fuer Push).
+ *
+ *       (11) Jedes Ziel des Sprungmenues ist eine Sektion der Seite.
+ *
  * Ausführen: node --test test/test-docs-landing.js   (bzw. npm run test:docs-landing)
  */
 
@@ -408,16 +418,28 @@ function missingOutbound(items, siteText) {
   return items.filter((item) => !norm(siteText).includes(norm(item)));
 }
 
+/**
+ * Seit 2026-09-29 steht die Angabe in ZWEI Werten: `tb_out_v` ist der immer
+ * sichtbare Satz (ab Werk nur die Versionspruefung), `tb_out_list` die
+ * vollstaendige Liste hinter einem <details> - der dichteste Absatz vor dem
+ * Seitenende war sonst die letzte Emotion vor dem Schluss-CTA. Geprueft wird
+ * deshalb die Liste gegen die README UND, schaerfer als vorher, dass die
+ * Versionspruefung im SICHTBAREN Teil steht: die Grundaussage darf nicht mit
+ * hinter die Klappe rutschen.
+ */
 for (const lang of ['en', 'de']) {
   test(`index.html (${lang}): die Outbound-Angabe nennt jede Verbindung der README`, () => {
     const items = outboundItems(lang, readFileSync(resolve(ROOT, OUTBOUND[lang].readme), 'utf8'));
     assert.ok(items.length >= 8, `nur ${items.length} Eintraege in der README-Liste - Muster veraltet?`);
-    const raw = dictValue(dictBlock(read('index.html'), lang), 'tb_out_v');
-    assert.ok(raw, `tb_out_v fehlt im ${lang}-Woerterbuch`);
-    const site = stripTags(unescapeJs(raw));
-    assert.ok(site.includes(OUTBOUND[lang].base), `tb_out_v (${lang}) nennt die Versionspruefung nicht mehr`);
-    assert.deepEqual(missingOutbound(items, site), [],
-      `tb_out_v (${lang}) verschweigt Verbindungen, die ${OUTBOUND[lang].readme} nennt.`);
+    const block = dictBlock(read('index.html'), lang);
+    const lead = dictValue(block, 'tb_out_v');
+    const list = dictValue(block, 'tb_out_list');
+    assert.ok(lead, `tb_out_v fehlt im ${lang}-Woerterbuch`);
+    assert.ok(list, `tb_out_list fehlt im ${lang}-Woerterbuch`);
+    assert.ok(stripTags(unescapeJs(lead)).includes(OUTBOUND[lang].base),
+      `tb_out_v (${lang}) nennt die Versionspruefung nicht mehr im sichtbaren Satz`);
+    assert.deepEqual(missingOutbound(items, stripTags(unescapeJs(list))), [],
+      `tb_out_list (${lang}) verschweigt Verbindungen, die ${OUTBOUND[lang].readme} nennt.`);
   });
 }
 
@@ -977,12 +999,19 @@ test('der Kapitelmarken-Guard erkennt den Schaden, gegen den er gebaut ist', () 
   assert.equal(sectionHeads(alleLead).filter((h) => h.lead).length, 6, 'Vorbedingung: sechs Kapitelmarken');
   assert.ok(6 * 2 > sectionCount(alleLead), 'der Guard muss hier anschlagen');
 
-  // Der echte Stand ist still - und zwar KNAPP: vier von acht ist der Hoechststand,
-  // den der Kommentar erlaubt. Eine fuenfte Kapitelmarke laesst diesen Test fallen,
-  // und das ist die Absicht.
+  // Der echte Stand ist still - und zwar KNAPP: eine fuenfte Kapitelmarke laesst
+  // die Regel fallen, und das ist die Absicht. Bis 2026-09-29 stand hier "vier
+  // von acht, exakt auf der Grenze"; mit .family kam eine neunte Sektion dazu,
+  // die bewusst KEINE Kapitelmarke ist. Die Zusicherung bleibt dieselbe - kein
+  // Spielraum fuer eine weitere Marke -, nur ueber eine ungerade Grundmenge
+  // formuliert: mit einer Marke mehr kippte die Haelfte.
   const html = read('index.html');
   const lead = sectionHeads(html).filter((h) => h.lead).length;
-  assert.equal(lead * 2, sectionCount(html), 'der Stand liegt exakt auf der erlaubten Grenze');
+  const sections = sectionCount(html);
+  assert.ok(lead * 2 <= sections, 'Vorbedingung: der echte Stand haelt die Regel');
+  assert.ok((lead + 1) * 2 > sections,
+    `${lead} Kapitelmarken bei ${sections} Sektionen: eine weitere passte noch hinein - `
+    + 'der Stand liegt nicht mehr an der Grenze, die dieser Test festhaelt');
 });
 
 // ── (7) Ein Telefonrahmen hat die Proportion eines Telefons ──────────────────
@@ -1303,4 +1332,281 @@ test('die Installationsseiten-Guards erkennen den Schaden, gegen den sie gebaut 
   const anchors = markdownAnchors('### Option G \u2014 Portainer (Stack or Git/GitOps)\n## Backup & Restore\n');
   assert.ok(anchors.has('option-g--portainer-stack-or-gitgitops') && anchors.has('backup--restore'));
   assert.deepEqual(brokenGuideAnchors('installation.md#option-g-portainer', anchors), ['option-g-portainer']);
+});
+
+// ── (9) Die Modulsektion ist gegliedert wie das Menue der App ────────────────
+
+/**
+ * Seit der Critique vom 2026-09-29 folgt `#modules` den Gruppen der App-
+ * Navigation (Planen, Haushalt, Menschen, Finanzen) plus einer Gruppe fuer das,
+ * was nicht im Menue, sondern in den Einstellungen wohnt. Das ist eine Zusage
+ * ueber die App, und die App kann sie still brechen: ein Modul wandert in
+ * `public/router.js` in eine andere `NAV_SECTION`, oder die Gruppe heisst in
+ * den Locales anders. Die Quelle ist deshalb der Router, nicht diese Datei.
+ *
+ * Die Zuordnung Seitenschluessel -> Modul-ID ist die einzige Handpflege hier.
+ * Ein neuer Eintrag auf der Seite ohne Zuordnung faellt auf ("ohne Zuordnung"),
+ * statt ungeprueft durchzurutschen. `null` heisst: steht nicht im Menue.
+ */
+const PAGE_MODULE = {
+  f_tasks: 'tasks', m_cal: 'calendar', m_sched: 'schedule', m_notes: 'notes',
+  f_meals: 'meals', m_recipes: 'recipes', m_shop: 'shopping', m_pantry: 'pantry',
+  m_house: 'housekeeping', m_waste: 'waste', m_docs: 'documents', m_inv: 'inventory', m_rewards: 'rewards',
+  f_health: 'health', m_bday: 'birthdays', f_budget: 'budget',
+  m_family: null, m_rem: null, m_api: null, m_backup: null,
+};
+/**
+ * Notizen & Kontakte ist EINE Karte, wie in der README-Modultabelle (deren
+ * Zeilenzahl die Proof-Leiste haelt). Im Menue stehen die beiden in
+ * verschiedenen Gruppen; die Karte steht bei den Notizen, und Kontakte reist
+ * mit. Das ist die eine erlaubte Abweichung, und sie steht hier ausdruecklich.
+ */
+const RIDES_ALONG = { contacts: 'notes' };
+const NOT_A_MODULE = new Set(['dashboard', 'settings']);
+
+/** Die Menue-Eintraege des Routers in Reihenfolge: [{ module, section }]. */
+function routerNav(src) {
+  return [...src.matchAll(/\{ path: '[^']*',[^\n]*?module: '(\w+)',\s*section: NAV_SECTION\.(\w+)/g)]
+    .map((m) => ({ module: m[1], section: m[2] }))
+    .filter((e) => !NOT_A_MODULE.has(e.module));
+}
+
+/** Die Gruppen der Seite: [{ group, keys: ['f_tasks', 'm_cal', …] }]. */
+function pageGroups(html) {
+  const body = stripComments(html);
+  const from = body.indexOf('id="modGrid"');
+  const to = body.indexOf('id="modToggle"', from);
+  assert.ok(from > 0 && to > from, 'Modulraster (#modGrid bis #modToggle) nicht gefunden - Markup umgebaut?');
+  return body.slice(from, to).split('class="mod-group-head" data-t="grp_').slice(1).map((chunk) => ({
+    group: chunk.match(/^(\w+)"/)[1],
+    keys: [...chunk.matchAll(/data-t="((?:f|m)_[a-z]+)_t"/g)].map((m) => m[1]),
+  }));
+}
+
+/** Alle Abweichungen zwischen Seite und Router, als lesbare Zeilen. */
+function navGroupProblems(html, routerSrc) {
+  const nav = routerNav(routerSrc);
+  const problems = [];
+  const where = new Map(); // Modul -> Gruppe auf der Seite
+  const order = new Map(); // Gruppe -> kompakte Eintraege in Seitenreihenfolge
+  for (const { group, keys } of pageGroups(html)) {
+    order.set(group, []);
+    // Das ausfuehrliche Modul (f_) fuehrt seine Gruppe an - gewollt, nicht
+    // Menue-Reihenfolge. Es steht deshalb VORN oder gar nicht; die Reihenfolge
+    // gegen den Router gilt fuer die kompakten Eintraege dahinter.
+    const feats = keys.filter((k) => k.startsWith('f_'));
+    if (feats.length > 1 || (feats.length === 1 && keys[0] !== feats[0])) {
+      problems.push(`${group}: das ausfuehrliche Modul steht nicht vorn (${keys.join(', ')})`);
+    }
+    for (const key of keys) {
+      if (!(key in PAGE_MODULE)) { problems.push(`${key}: ohne Zuordnung in PAGE_MODULE`); continue; }
+      const mod = PAGE_MODULE[key];
+      if (mod === null) {
+        if (group !== 'settings') problems.push(`${key}: steht nicht im Menue, aber in der Gruppe ${group}`);
+        continue;
+      }
+      where.set(mod, group);
+      if (!key.startsWith('f_')) order.get(group).push(mod);
+    }
+  }
+  for (const { module, section } of nav) {
+    const host = RIDES_ALONG[module];
+    const expected = host ? where.get(host) : section;
+    const actual = host ? where.get(host) : where.get(module);
+    if (actual === undefined) problems.push(`${module}: steht im Menue (${section}), fehlt auf der Seite`);
+    else if (!host && actual !== expected) problems.push(`${module}: Menue-Gruppe ${section}, auf der Seite ${actual}`);
+  }
+  for (const [group, mods] of order) {
+    const want = nav.filter((e) => e.section === group && !RIDES_ALONG[e.module]).map((e) => e.module)
+      .filter((m) => mods.includes(m));
+    if (JSON.stringify(mods) !== JSON.stringify(want)) {
+      problems.push(`${group}: Reihenfolge ${mods.join(', ')} statt wie im Menue ${want.join(', ')}`);
+    }
+  }
+  return problems;
+}
+
+const ROUTER = () => readFileSync(resolve(ROOT, 'public/router.js'), 'utf8');
+
+test('index.html: die Modulgruppen sind die Menuegruppen des Routers, in seiner Reihenfolge', () => {
+  const nav = routerNav(ROUTER());
+  assert.ok(nav.length >= 15, `nur ${nav.length} Menue-Eintraege im Router gefunden - Muster veraltet?`);
+  const groups = pageGroups(read('index.html')).map((g) => g.group);
+  assert.deepEqual(groups, ['plan', 'household', 'people', 'finance', 'settings'],
+    'Gruppen der Modulsektion nicht in der Reihenfolge des Menues (plus Einstellungen am Ende)');
+  assert.deepEqual(navGroupProblems(read('index.html'), ROUTER()), []);
+});
+
+test('index.html: die Gruppenkoepfe heissen wie im Menue der App', () => {
+  const html = read('index.html');
+  const LOCALE_KEY = { plan: 'sectionPlan', household: 'sectionHousehold', people: 'sectionPeople',
+    finance: 'sectionFinance', settings: 'settings' };
+  for (const lang of ['en', 'de']) {
+    const nav = JSON.parse(readFileSync(resolve(ROOT, `public/locales/${lang}.json`), 'utf8')).nav;
+    const block = dictBlock(html, lang);
+    for (const [group, key] of Object.entries(LOCALE_KEY)) {
+      assert.equal(dictValue(block, `grp_${group}`), nav[key],
+        `grp_${group} (${lang}) weicht von nav.${key} in public/locales/${lang}.json ab`);
+    }
+  }
+});
+
+test('der Menuegruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const card = (key) => `<h4 data-t="${key}_t">x</h4>`;
+  const page = (groups) => '<div id="modGrid">'
+    + groups.map(([g, keys]) => `<h3 class="mod-group-head" data-t="grp_${g}">${g}</h3>` + keys.map(card).join('')).join('')
+    + '</div><button id="modToggle">';
+  const healthy = page([
+    ['plan', ['f_tasks', 'm_cal', 'm_sched', 'm_notes']],
+    ['household', ['f_meals', 'm_recipes', 'm_shop', 'm_pantry', 'm_house', 'm_waste', 'm_docs', 'm_inv', 'm_rewards']],
+    ['people', ['f_health', 'm_bday']],
+    ['finance', ['f_budget']],
+    ['settings', ['m_family', 'm_rem', 'm_api', 'm_backup']],
+  ]);
+  assert.deepEqual(navGroupProblems(healthy, ROUTER()), [], 'Vorbedingung: die Router-Reihenfolge ist still');
+  // Vorrat im falschen Kapitel, eine Einstellung im Menue, ein unbekannter Eintrag.
+  const moved = healthy.replace("'m_pantry'", '')
+    .replace('<h4 data-t="m_pantry_t">x</h4>', '')
+    .replace('<h4 data-t="m_cal_t">x</h4>', '<h4 data-t="m_cal_t">x</h4><h4 data-t="m_pantry_t">x</h4>')
+    .replace('<h4 data-t="m_bday_t">x</h4>', '<h4 data-t="m_bday_t">x</h4><h4 data-t="m_backup_t">x</h4><h4 data-t="m_new_t">x</h4>');
+  const found = navGroupProblems(moved, ROUTER()).join('\n');
+  assert.match(found, /pantry: Menue-Gruppe household, auf der Seite plan/);
+  assert.match(found, /m_backup: steht nicht im Menue, aber in der Gruppe people/);
+  assert.match(found, /m_new: ohne Zuordnung/);
+  // Vertauschte Reihenfolge innerhalb einer Gruppe.
+  const swapped = healthy.replace('<h4 data-t="m_cal_t">x</h4><h4 data-t="m_sched_t">x</h4>',
+    '<h4 data-t="m_sched_t">x</h4><h4 data-t="m_cal_t">x</h4>');
+  assert.match(navGroupProblems(swapped, ROUTER()).join('\n'), /plan: Reihenfolge schedule, calendar/);
+  // Das ausfuehrliche Modul rutscht aus der Spitze seiner Gruppe.
+  const featLate = healthy.replace('<h4 data-t="f_tasks_t">x</h4><h4 data-t="m_cal_t">x</h4>',
+    '<h4 data-t="m_cal_t">x</h4><h4 data-t="f_tasks_t">x</h4>');
+  assert.match(navGroupProblems(featLate, ROUTER()).join('\n'), /plan: das ausfuehrliche Modul steht nicht vorn/);
+  // Und ein Modul, das der Router kennt, das auf der Seite aber fehlt.
+  assert.match(navGroupProblems(healthy.replace('<h4 data-t="m_waste_t">x</h4>', ''), ROUTER()).join('\n'),
+    /waste: steht im Menue \(household\), fehlt auf der Seite/);
+  assert.ok(html.includes('id="modGrid"'));
+});
+
+// ── (10) Die Familien-Sektion verspricht nur, was der Code haelt ─────────────
+
+/**
+ * `#family` spricht aus Sicht der Familie und macht dabei fuenf Zusagen, die an
+ * je einer Stelle im Code haengen. Jede Zeile hier: WAS die Seite sagt (in
+ * beiden Sprachen) und WORAN es haengt. Faellt die Stelle im Code weg, wird die
+ * Zusage falsch, ohne dass sich an der Seite etwas aendert - genau die Drift,
+ * die Schritt 1 dieser Critique an sechs Stellen aufgeraeumt hat.
+ */
+const FAMILY_CLAIMS = [
+  {
+    key: 'fam_1_d', what: 'das Tablet hakt fuer eine gewaehlte Person ab',
+    says: { en: /pick who did it/, de: /wer sie erledigt hat/ },
+    holds: (s) => s.display.includes("method: 'PATCH', pattern: /^\\/tasks\\/\\d+\\/status$/"),
+    where: 'server/display-scopes.js DISPLAY_WRITE_ROUTES (PATCH /tasks/:id/status)',
+  },
+  {
+    key: 'fam_1_d', what: 'Fotos aus Immich als Bildschirmschoner',
+    says: { en: /Immich/, de: /Immich/ },
+    holds: (s) => s.screensaver,
+    where: 'public/components/photo-screensaver.js',
+  },
+  {
+    key: 'fam_2_d', what: 'die Einkaufsliste bleibt offline lesbar',
+    says: { en: /shopping list .* without signal/, de: /Einkaufsliste bleibt lesbar/ },
+    holds: (s) => /API_CACHE_WHITELIST = \[[^\]]*'\/shopping'/.test(s.sw),
+    where: "public/sw.js API_CACHE_WHITELIST ('/shopping')",
+  },
+  {
+    key: 'fam_2_d', what: 'Push nennt seine Bedingung (HTTPS)',
+    says: { en: /notifications/, de: /Mitteilung/ },
+    holds: (s, text) => /HTTPS/.test(text) && /\*\*Requires HTTPS\*\*/.test(s.spec),
+    where: 'docs/SPEC.md "Web Push (PWA) ... Requires HTTPS" - und die Seite sagt es dazu',
+  },
+  {
+    key: 'fam_3_d', what: 'drei Zugriffsstufen je Modul',
+    says: { en: /full, read only or not at all/, de: /voll, nur lesen oder gar nicht/ },
+    holds: (s) => /MODULE_ACCESS_LEVELS = Object\.freeze\(\['none', 'read', 'write'\]\)/.test(s.permissions),
+    where: 'server/permissions.js MODULE_ACCESS_LEVELS',
+  },
+  {
+    key: 'fam_3_d', what: 'ein Kind als Familienrolle',
+    says: { en: /child/, de: /Kind/ },
+    holds: (s) => /FAMILY_ROLES = Object\.freeze\(\[[^\]]*'child'/.test(s.permissions),
+    where: "server/permissions.js FAMILY_ROLES ('child')",
+  },
+];
+
+function familySources() {
+  const src = (p) => readFileSync(resolve(ROOT, p), 'utf8');
+  return {
+    display: src('server/display-scopes.js'),
+    sw: src('public/sw.js'),
+    permissions: src('server/permissions.js'),
+    spec: read('SPEC.md'),
+    screensaver: existsSync(resolve(ROOT, 'public/components/photo-screensaver.js')),
+  };
+}
+
+/** Zusagen, die die Seite macht und der Code nicht (mehr) haelt. */
+function brokenFamilyClaims(html, sources) {
+  const broken = [];
+  for (const lang of ['en', 'de']) {
+    const block = dictBlock(html, lang);
+    for (const c of FAMILY_CLAIMS) {
+      const raw = dictValue(block, c.key);
+      const text = raw === null ? '' : stripTags(unescapeJs(raw));
+      if (!c.says[lang].test(text)) continue;
+      if (!c.holds(sources, text)) broken.push(`${c.key} (${lang}): ${c.what} - haengt an ${c.where}`);
+    }
+  }
+  return broken;
+}
+
+test('index.html: jede Zusage der Familien-Sektion haengt am Code', () => {
+  const html = read('index.html');
+  // Vorbedingung: die Tabelle ist nicht veraltet - jede Zusage steht noch auf
+  // der Seite. Sonst pruefte der Guard still nichts mehr.
+  for (const lang of ['en', 'de']) {
+    const block = dictBlock(html, lang);
+    for (const c of FAMILY_CLAIMS) {
+      const text = stripTags(unescapeJs(dictValue(block, c.key) || ''));
+      assert.match(text, c.says[lang], `${c.key} (${lang}) sagt "${c.what}" nicht mehr - FAMILY_CLAIMS nachziehen`);
+    }
+  }
+  assert.deepEqual(brokenFamilyClaims(html, familySources()), []);
+});
+
+test('der Familien-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const real = familySources();
+  // Der Code verliert eine Faehigkeit, die Seite bleibt stehen.
+  const noShopping = { ...real, sw: real.sw.replace(/'\/shopping', /, '') };
+  assert.match(brokenFamilyClaims(html, noShopping).join('\n'), /fam_2_d \(en\): die Einkaufsliste/);
+  const readOnlyTablet = { ...real, display: real.display.replace(/method: 'PATCH'/, "method: 'GET'") };
+  assert.match(brokenFamilyClaims(html, readOnlyTablet).join('\n'), /fam_1_d \(de\): das Tablet hakt/);
+  // Die Seite verschweigt die Bedingung: Push ohne HTTPS-Hinweis.
+  const quiet = html.replace(/ \(your server needs HTTPS for that\)/g, '').replace(/ \(dafür braucht euer Server HTTPS\)/g, '');
+  assert.notEqual(quiet, html, 'Vorbedingung: der HTTPS-Hinweis steht in beiden Sprachen woertlich so');
+  const found = brokenFamilyClaims(quiet, real).join('\n');
+  assert.match(found, /fam_2_d \(en\): Push nennt seine Bedingung/);
+  assert.match(found, /fam_2_d \(de\): Push nennt seine Bedingung/);
+});
+
+// ── (11) Das Sprungmenue trifft seine Sektionen ─────────────────────────────
+
+/** Ziele des Sprungmenues, die keine ID auf der Seite treffen. */
+function deadJumpTargets(html) {
+  const body = stripComments(html);
+  const menu = body.match(/<details class="nav-jump"[\s\S]*?<\/details>/)?.[0] || '';
+  const ids = new Set([...body.matchAll(/\sid="([\w-]+)"/g)].map((m) => m[1]));
+  return [...menu.matchAll(/href="#([\w-]+)"/g)].map((m) => m[1]).filter((h) => !ids.has(h));
+}
+
+test('index.html: jedes Ziel des Sprungmenues ist eine Sektion, und die Familie steht darin', () => {
+  const html = read('index.html');
+  assert.deepEqual(deadJumpTargets(html), [], 'Sprungmenue-Eintrag ohne Ziel: der Scroll-Spy markiert ihn nie');
+  assert.match(html.match(/<details class="nav-jump"[\s\S]*?<\/details>/)[0], /href="#family"/,
+    'die Familien-Sektion fehlt im Sprungmenue');
+  // Gegenprobe: ein Ziel ohne ID faellt auf.
+  assert.deepEqual(deadJumpTargets(html.replace('id="family"', 'id="familie"')), ['family']);
 });

@@ -79,12 +79,9 @@
       -moz-osx-font-smoothing: grayscale;
       overflow-x: hidden;
     }
-    /* Subtle film grain for texture (no flat sterility) */
-    body::after {
-      content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
-      opacity: var(--grain);
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    }
+    /* Kein Kornfilter mehr (Critique 2026-09-29): eine fixierte Vollflaechen-
+       Ebene mit SVG-Rauschen ueber jedem Pixel, bei 2,5 % Deckkraft - Kosten
+       bei jedem Scrollbild, sichtbar nur als leichte Truebung. */
     a { color: var(--accent); text-decoration: none; }
     img { max-width: 100%; height: auto; display: block; }
     ::selection { background: var(--accent-soft); color: var(--accent-deep); }
@@ -235,9 +232,10 @@
        Eleven headlines at one size is a list, not a hierarchy - and picking one
        to enlarge just moved the question to which one deserved it.
 
-       Es waren drei, bis .swap dazukam. Vier von acht Sektionen sind damit
-       Kapitelmarken, und weiter darf das nicht wachsen: ab der Haelfte ist die
-       Unterscheidung wieder eine Liste. */
+       Es waren drei, bis .swap dazukam. Vier von neun Sektionen sind damit
+       Kapitelmarken (seit .family dazukam, die bewusst KEINE ist), und weiter
+       darf das nicht wachsen: ab der Haelfte ist die Unterscheidung wieder eine
+       Liste. */
     .sec-head.lead { max-width: var(--m-read); }
     .sec-head.lead .sec-title { font-size: clamp(2.3rem, 5.2vw, 3.9rem); }
 
@@ -274,15 +272,14 @@
       background: var(--surface); color: var(--text-2); border: 1px solid var(--border);
     }
 
-    /* Hero visual */
-    .hero-visual { position: relative; perspective: 1600px; }
+    /* Hero visual. Flach: die 3D-Kippung (rotateY/rotateX, beim Hover
+       geradegezogen) verzerrte ausgerechnet den Beleg, den das Bild liefern
+       soll, und bewegte sich unter dem Mauszeiger ohne Anlass. */
+    .hero-visual { position: relative; }
     .hero-frame {
       border-radius: var(--r-xl); overflow: hidden; border: 1px solid var(--border);
       box-shadow: var(--shadow-hero);
-      transform: rotateY(-6deg) rotateX(3deg) translateZ(0); transform-origin: center;
-      transition: transform .6s var(--ease-out);
     }
-    .hero-frame:hover { transform: rotateY(0) rotateX(0); }
     .hero-frame img { width: 100%; display: block; }
     .hero-float {
       position: absolute; bottom: -28px; right: -22px; width: 150px;
@@ -360,9 +357,14 @@
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
       overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
     .swap-to b { color: var(--text-1); font-weight: 700; }
-    .swap-close { text-align: center; margin-top: 44px; font-size: clamp(1.3rem, 3vw, 1.7rem); font-weight: 600;
-      letter-spacing: -0.02em; font-style: italic; color: var(--text-1); }
-    .swap-close span { color: var(--accent); }
+    /* Schlusszeile, keine dritte Ueberschrift. Sie stand kursiv, bis 27px gross
+       und halb violett - also im Muster der Sektionstitel ("schwarz + kursiv-
+       violett"), das die Seite schon sechsmal traegt, und direkt unter dem Titel
+       ihrer eigenen Sektion. Jetzt spricht sie in Fliesstextgroesse, aufrecht,
+       und die zweite Haelfte hebt sich nur durch die dunklere Tinte ab. */
+    .swap-close { text-align: center; margin-top: 36px; font-size: 1.1rem; font-weight: 600;
+      letter-spacing: -0.01em; color: var(--text-2); }
+    .swap-close span { color: var(--text-1); }
     /* Same break as .ho-flow, and deliberately the same one: both are an "A leads
        to B" row, so they must not fold differently. Three columns at 390px would
        leave 110px for the left label.
@@ -400,6 +402,33 @@
     .ho-arrow { color: var(--text-3, var(--text-2)); flex-shrink: 0; opacity: 0.55; }
     .ho-arrow svg { width: 26px; height: 26px; display: block; }
     .ho-note { margin-top: 14px; margin-left: 54px; font-size: 0.97rem; color: var(--text-2); line-height: 1.6; max-width: 62ch; }
+    /* Die eine erzaehlende Bewegung der Seite (Critique 2026-09-29): wird eine
+       Zeile zum ersten Mal sichtbar, wandert ein Punkt in der Farbe des
+       liefernden Moduls vom ersten zum zweiten Symbol, und das empfangende
+       Symbol nimmt ihn kurz auf - genau die Aussage der Zeile, als Weg statt als
+       Pfeil. Einmal je Zeile (ihr Observer gibt sie danach frei), nur
+       transform und opacity. Die Strecke misst das Skript beim Ausloesen
+       (--ho-dx/--ho-dy): sie haengt an der Labellaenge und laeuft mobil
+       senkrecht. Ohne JS, im Druck und bei reduzierter Bewegung gibt es den
+       Punkt nicht; die Zeile sagt dasselbe dann statisch. */
+    .ho-ico { position: relative; }
+    .ho-token { display: none; }
+    html.js .ho-token { display: block; position: absolute; left: 50%; top: 50%; z-index: 2;
+      width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; pointer-events: none;
+      background: var(--m); box-shadow: 0 0 0 3px color-mix(in srgb, var(--m) 24%, transparent); opacity: 0; }
+    .ho-row.go .ho-token { animation: ho-travel 1s cubic-bezier(0.65, 0, 0.35, 1) calc(.25s + var(--ho-delay, 0s)) both; }
+    .ho-row.go .ho-step--to .ho-ico { animation: ho-receive .5s var(--ease-out) calc(1.1s + var(--ho-delay, 0s)) both; }
+    @keyframes ho-travel {
+      0%   { opacity: 0; transform: translate(0, 0) scale(.5); }
+      16%  { opacity: 1; transform: translate(calc(var(--ho-dx, 0px) * .06), calc(var(--ho-dy, 0px) * .06)) scale(1); }
+      84%  { opacity: 1; transform: translate(calc(var(--ho-dx, 0px) * .95), calc(var(--ho-dy, 0px) * .95)) scale(1); }
+      100% { opacity: 0; transform: translate(var(--ho-dx, 0px), var(--ho-dy, 0px)) scale(.4); }
+    }
+    @keyframes ho-receive {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.14); }
+      100% { transform: scale(1); }
+    }
     @media (max-width: 700px) {
       .ho-flow { flex-direction: column; align-items: flex-start; gap: 10px; }
       .ho-arrow { transform: rotate(90deg); margin-left: 8px; }
@@ -407,19 +436,77 @@
       .ho-note { margin-left: 0; }
     }
 
+    /* ===== Fuer die Familie =====
+       Die Seite spricht hier einmal nicht zum Admin. Eigener Rhythmus statt
+       eines weiteren Kopfs ueber einer Liste: Bild und Text stehen nebeneinander,
+       der Kopf linksbuendig in der Textspalte, ohne Eyebrow (keine Kapitelmarke)
+       und ohne das kursiv-violette Titelmuster, das die Kapitel tragen. */
+    .family { padding: 80px 0; }
+    /* Breit: Bild und Kopf teilen sich die erste Reihe, die drei Momente
+       stehen darunter nebeneinander - drei gleichrangige Szenen, keine Liste,
+       und gemessen rund 130px kuerzer als Bild links neben allem. */
+    .fam-grid { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+      grid-template-areas: "art head" "list list"; gap: 40px 64px; align-items: center; }
+    .fam-body { display: contents; }
+    .fam-art { grid-area: art; max-width: 300px; width: 100%; justify-self: center; }
+    .fam-art svg { display: block; width: 100%; height: auto; overflow: visible; }
+    /* Drei gleich starke Flaechen: wo zwei sich decken, verdoppelt sich die
+       Deckkraft von selbst - dieselben "helleren Linsen" wie im Logo, nur als
+       Tinte auf Papier statt als Licht auf Violett. */
+    .fam-circles circle { fill: var(--accent); fill-opacity: 0.13; stroke: var(--accent); stroke-opacity: 0.45; stroke-width: 0.6; }
+    .fam-glyphs { stroke: var(--accent-deep); }
+    .fam-head { grid-area: head; max-width: none; }
+    .fam-head .sec-title { margin-top: 0; }
+    .fam-list { grid-area: list; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px;
+      padding-top: 36px; border-top: 1px solid var(--border); }
+    .fam-item { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; align-items: start; }
+    .fam-ico { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+      color: var(--accent-on-soft); background: var(--accent-soft); }
+    .fam-ico svg { width: 21px; height: 21px; }
+    .fam-text h3 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; margin: 9px 0 6px; text-wrap: balance; }
+    .fam-text p { font-size: 0.96rem; color: var(--text-2); line-height: 1.6; max-width: var(--m-prose); }
+    @media (max-width: 1024px) {
+      .fam-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "art" "head" "list"; gap: 22px; }
+      .fam-art { max-width: 176px; justify-self: start; }
+      .fam-list { grid-template-columns: minmax(0, 1fr); gap: 26px; padding-top: 8px; border-top: 0; }
+    }
+    @media (max-width: 600px) {
+      .family { padding: 64px 0; }
+      .fam-art { max-width: 128px; }
+      .fam-item { grid-template-columns: 38px minmax(0, 1fr); gap: 13px; }
+      .fam-ico { width: 38px; height: 38px; }
+      .fam-ico svg { width: 19px; height: 19px; }
+      .fam-text h3 { margin-top: 6px; font-size: 1.04rem; }
+      .fam-text p { font-size: 0.95rem; }
+    }
+
     /* Eine Sektion fuer beide Stufen. Der `--bg-alt`-Streifen sass frueher an
        der zweiten Sektion und trennte die vier ausfuehrlichen Module von den
        uebrigen Karten, obwohl beide dasselbe sagen. */
-    .showcase { padding: 96px 0; background: var(--bg-alt); border-block: 1px solid var(--border); }
-    /* 2x2 statt vier Zeilen ueber die volle Breite. Die Zeilen waren je 405px
-       hoch, weil ein Hochkant-Handy die Hoehe trieb; im Raster teilen sich zwei
-       Karten eine Reihe und die Hoehe faellt auf das Mass des Textes daneben.
-       Gemessen 1.908px -> rund 640px. */
-    .feat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 48px; }
+    .showcase { padding: 80px 0; background: var(--bg-alt); border-block: 1px solid var(--border); }
+    /* Gegliedert wie das Menue der App (Critique 2026-09-29): vorher standen
+       vier ausfuehrliche Karten im 2x2 und darunter alle uebrigen als gleich
+       grosse Karten ohne jede Ordnung, 3.693px am Schirm. Jetzt fuenf Gruppen mit
+       kleinem Kopf; jede beginnt mit ihrem ausfuehrlichen Modul (die vier
+       Feature-Karten fallen zufaellig genau auf die vier Menuegruppen), der
+       Rest steht als Eintrag ohne Kartenrahmen daneben - zwei Stufen, die man
+       auch sieht. Grosse Gruppen: drei Spalten, die Feature-Karte belegt zwei
+       davon und so viele Reihen, wie --rows sagt; die Eintraege fuellen die
+       dritte Spalte und laufen darunter weiter. Menschen und Finanzen haben je
+       nur ein oder kein weiteres Modul und teilen sich deshalb eine Reihe. */
+    .mod-groups { display: grid; gap: 44px; margin-top: 40px; }
+    .mod-group-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px;
+      font-size: 0.95rem; font-weight: 700; letter-spacing: -0.005em; color: var(--text-1); }
+    .mod-group-head::after { content: ''; flex: 1; height: 1px; background: var(--border-strong); }
+    .mod-group-body { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 32px; align-items: start; }
+    .mod-group-body > .feat-row { grid-column: span 2; grid-row: span var(--rows, 1); margin-bottom: 8px; }
+    .mod-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 52px 32px; align-items: start; }
+    .mod-pair .mod-group-body { grid-template-columns: minmax(0, 1fr); }
+    .mod-pair .mod-group-body > .feat-row { grid-column: auto; grid-row: auto; }
+    .mod-group--flat .mod-group-body { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
     .feat-row { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 24px; align-items: center;
       padding: 26px; border-radius: var(--r-lg); background: var(--surface);
       border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
-    .feat-row:last-child { margin-bottom: 0; }
     /* The kicker keeps its module accent - that is the one place on this page
        where the app's colour vocabulary is semantically correct. But at 12.5px
        bold the raw tokens missed AA on the lightest two (--m-shopping 4.40:1,
@@ -430,7 +517,7 @@
     .feat-kicker .k-ico { width: 26px; height: 26px; border-radius: var(--r-sm); display: grid; place-items: center;
       color: var(--m); background: color-mix(in srgb, var(--m) 13%, transparent); }
     .feat-kicker .k-ico svg { width: 15px; height: 15px; }
-    .feat-info h3 { font-size: clamp(1.15rem, 1.7vw, 1.4rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.12; margin-bottom: 14px; text-wrap: balance; }
+    .feat-info h4 { font-size: clamp(1.15rem, 1.7vw, 1.4rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.12; margin-bottom: 14px; text-wrap: balance; }
     .feat-info p { color: var(--text-2); font-size: 0.95rem; line-height: 1.6; }
     .feat-list { list-style: none; margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
     .feat-list li { display: flex; align-items: flex-start; gap: 9px; font-size: 0.88rem; color: var(--text-2); }
@@ -466,70 +553,51 @@
       border-radius: var(--r-phone) !important; border: 4px solid var(--surface);
       box-shadow: var(--shadow-lg); position: relative; z-index: 2; }
 
-    /* ===== Feature grid ===== */
-    /* Handyaufnahmen der Module, die sonst nur Prosa waeren. Feste Breite statt
-       fr-Spalten: die Reihe soll umbrechen statt die Bilder zu stauchen, und ein
-       Telefon unter ~150px zeigt nichts mehr. */
-    .mod-shots { display: flex; flex-wrap: wrap; justify-content: center; gap: 26px 22px; margin-top: 52px; }
-    .mod-shot { width: 176px; }
-    .mod-shot img { width: 100%; aspect-ratio: var(--ar-phone); object-fit: cover; object-position: top center;
-      border-radius: var(--r-phone);
-      border: 4px solid var(--surface); box-shadow: var(--shadow-lg); display: block; }
-    .mod-shot figcaption { margin-top: 12px; text-align: center; font-size: 0.82rem; font-weight: 600; color: var(--text-3); }
-    /* 176px breite Telefone brechen bei 390px auf fuenf Reihen um und kosten dort
-       2.129px - weit mehr als das Karussell, das diese Reihe ersetzt hat. Bei
-       104px passen drei nebeneinander, es bleiben zwei Reihen und 527px. Auf
-       Daumennagelgroesse ist das der Beleg, dass es das Modul gibt, und mehr soll
-       es hier nicht sein. (Gemessen nach der Ratio-Korrektur: mit dem alten
-       1320/1900-Zuschnitt sah dieselbe Rechnung um ein Drittel guenstiger aus,
-       weil jedes Telefon 129px seiner eigenen Hoehe verschwieg.)
-       Steht bewusst HINTER der Basisregel: gleiche Spezifitaet, es entscheidet
-       die Quellreihenfolge. */
-    @media (max-width: 700px) {
-      .mod-shots { gap: 20px 14px; margin-top: 40px; }
-      .mod-shot { width: 104px; }
-      .mod-shot figcaption { margin-top: 8px; font-size: 0.74rem; }
-    }
-    .mod-lead { max-width: 62ch; margin: 72px auto 0; text-align: center; font-size: 1.02rem;
-      line-height: 1.65; color: var(--text-2); }
-    .mod-scope { max-width: var(--m-prose); margin: 44px auto 0; padding-top: 30px; border-top: 1px solid var(--border);
-      font-size: 0.98rem; line-height: 1.7; color: var(--text-2); text-align: center; }
-    /* Vierzehn Karten gehen in keiner brauchbaren Spaltenzahl auf (14 teilt sich
-       nur durch 1, 2, 7 und 14), die letzte Reihe bleibt also angebrochen: 5+5+4
-       bei 1440px, 4+4+4+2 bei 1152px. Das per `grid-column: span` zu fuellen
-       haengt an einer Spaltenzahl, die `auto-fill` je nach Breite anders waehlt -
-       es braeche bei drei Spalten. Eine angebrochene Schlusszeile in einem
-       Kartenraster ist gewoehnlich; die fragile Regel dagegen nicht. */
-    .mod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 16px; margin-top: 26px; }
-    .mod-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 26px; box-shadow: var(--shadow-sm);
-      transition: transform .25s var(--ease-out), box-shadow .25s, border-color .25s; position: relative; overflow: hidden; }
-    .mod-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--m); opacity: 0; transition: opacity .25s; }
-    .mod-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: color-mix(in srgb, var(--m) 30%, var(--border)); }
-    .mod-card:hover::before { opacity: 1; }
-    .mod-ico { width: 46px; height: 46px; border-radius: var(--r-md); display: grid; place-items: center; margin-bottom: 16px;
+    /* ===== Kompakte Modul-Eintraege =====
+       Ohne Kartenrahmen, Schatten und Hover-Hub: die Eintraege sind keine
+       Links, und eine Karte, die sich unter dem Zeiger hebt, verspricht eine
+       Handlung, die es nicht gibt. Symbol und Name stehen in einer Zeile, die
+       Beschreibung darunter ueber die volle Breite des Eintrags.
+       Die Reihe mit 104px-Telefonen unter dem Raster ist entfallen: auf
+       Daumennagelgroesse belegte sie nichts, was der Name nicht auch sagt, und
+       kostete mobil 527px. Lesbare Aufnahmen tragen die Galerie und die vier
+       Feature-Karten. */
+    .mod-card { display: grid; grid-template-columns: 32px minmax(0, 1fr); column-gap: 12px; align-items: center;
+      padding: 16px 0 20px; border-top: 1px solid var(--border); }
+    .mod-ico { width: 32px; height: 32px; border-radius: var(--r-sm); display: grid; place-items: center;
       color: var(--m); background: color-mix(in srgb, var(--m) 13%, transparent); }
-    .mod-ico svg { width: 23px; height: 23px; }
-    .mod-card h3 { font-size: 1.02rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 7px; }
-    .mod-card p { font-size: 0.875rem; color: var(--text-2); line-height: 1.6; }
-    /* Mobile Progressive Disclosure fuer die Modulkarten: einspaltig liefen sie
-       ~7.300px, also 8,7 Bildschirme Inventar ZWISCHEN den Handoffs und dem
-       Vertrauens-Peak (Longevity). Desktop hat zwei Stufen (vier ausfuehrlich,
-       Rest als Karte), mobil zahlte man den vollen Preis linear. Sechs Karten
-       bleiben stehen, der Rest kommt per Knopf - und ohne JS steht wie beim
+    .mod-ico svg { width: 17px; height: 17px; }
+    .mod-card h4 { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; }
+    .mod-card p { grid-column: 1 / -1; margin-top: 9px; font-size: 0.875rem; color: var(--text-2); line-height: 1.6; }
+    .mod-scope { max-width: var(--m-prose); margin: 52px auto 0; padding-top: 30px; border-top: 1px solid var(--border);
+      font-size: 0.98rem; line-height: 1.7; color: var(--text-2); text-align: center; }
+    @media (max-width: 860px) {
+      .mod-group-body, .mod-pair { grid-template-columns: minmax(0, 1fr); }
+      .mod-group-body > .feat-row { grid-column: auto; grid-row: auto; }
+    }
+    /* Mobile Progressive Disclosure. Frueher: sechs Karten stehen, der Rest
+       kommt per Knopf - also verschwanden zehn Module ganz, und welche, hing an
+       ihrer Position im Raster. Jetzt bleibt jedes Modul mit Symbol und Namen
+       in seiner Gruppe stehen (zweispaltig, wie eine Inhaltsangabe), und der
+       Knopf blendet nur die Beschreibungen ein. Ohne JS steht wie beim
        .reveal-Fallback alles da, weil dieses Publikum JS gern abschaltet. */
     .mod-toggle { display: none; }
     @media (max-width: 700px) {
-      html.js .mod-grid:not(.expanded) .mod-card:nth-child(n+7) { display: none; }
+      .mod-groups { gap: 40px; margin-top: 40px; }
+      .mod-pair { gap: 40px; }
+      html.js .mod-groups:not(.expanded) .mod-group-body { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
+      html.js .mod-groups:not(.expanded) .mod-group-body > .feat-row { grid-column: 1 / -1; }
+      html.js .mod-groups:not(.expanded) .mod-card { padding: 12px 0; }
+      html.js .mod-groups:not(.expanded) .mod-card p { display: none; }
       /* display: flex (nicht inline-flex): nur ein Block-Level-Element laesst
          sich mit margin: auto auf der Zeile zentrieren. */
       html.js .mod-toggle { display: flex; align-items: center; justify-content: center; gap: 8px;
-        margin: 18px auto 0; min-height: 44px; padding: 0 22px; width: max-content;
+        margin: 24px auto 0; min-height: 44px; padding: 0 22px; width: max-content;
         background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
         border-radius: var(--r-full); box-shadow: var(--shadow-sm);
         font-family: var(--ff); font-size: 0.9rem; font-weight: 600; cursor: pointer; }
       html.js .mod-toggle svg { width: 16px; height: 16px; color: var(--accent); transition: transform .2s var(--ease-out); }
-      /* Der Knopf bleibt nach dem Aufklappen stehen und klappt wieder zu: vorher
-         verschwand er, und die Karten liessen sich mobil nie mehr einklappen. */
+      /* Der Knopf bleibt nach dem Aufklappen stehen und klappt wieder zu. */
       html.js .mod-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
     }
 
@@ -657,24 +725,42 @@
     .tb-proof { color: var(--accent-deep); font-weight: 600; text-decoration: underline;
       text-underline-offset: 2px; text-decoration-thickness: 1px; }
     .tb-proof:hover { text-decoration-thickness: 2px; }
-    /* The one irreversible thing on this page. The block above generates two
-       secrets and starts the container; nothing on this page used to say that
-       one of the two can never be regenerated, while install.html says it twice. */
-    .quick-warn { display: flex; gap: 11px; margin-top: 14px; padding: 13px 16px; border-radius: var(--r-md);
+    /* Die Outbound-Zeile war mit ueber achtzig Woertern der dichteste Absatz vor
+       dem Schluss der Seite. Sichtbar bleibt die Aussage, auf die es ankommt
+       (ab Werk nur die Versionspruefung, alles andere erst nach dem
+       Einschalten); die vollstaendige Liste steht einen Klick tiefer, ohne JS
+       genauso, und test:docs-landing prueft sie weiter gegen die README. */
+    .tb-more summary { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; cursor: pointer; list-style: none;
+      color: var(--accent-deep); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+    .tb-more summary::-webkit-details-marker { display: none; }
+    .tb-more summary:hover { text-decoration-thickness: 2px; }
+    .tb-more summary svg { width: 14px; height: 14px; transition: transform .2s var(--ease-out); }
+    .tb-more[open] summary svg { transform: rotate(180deg); }
+    .tb-more > span { display: block; margin: 2px 0 8px; }
+    /* Flex-Kind mit Block darin: ohne min-width 0 setzte das <details> die
+       Mindestbreite, und der Belegs-Link lief mobil 7px ueber den Rand. */
+    .trust-bar li > span { min-width: 0; }
+    /* Der Handgriff zwischen den beiden Befehlsbloecken: .env bearbeiten. Bis
+       2026-09-29 eine Warnbox in Bernstein mit dem Satz, dass ohne Schluessel
+       niemand die Datenbank wieder oeffnet - und damit die letzte Emotion vor
+       dem Schluss-CTA. Die Unumkehrbarkeit steht ausfuehrlich in install.html
+       und auf dieser Seite als dritte Frage unter "Bevor ihr euch festlegt";
+       hier bleibt der Handgriff, neutral gesetzt, mit einem ruhigen Satz zum
+       Aufbewahren des Schluessels. */
+    .quick-step { display: flex; gap: 11px; margin-top: 14px; padding: 13px 16px; border-radius: var(--r-md);
       /* Die Box traegt Icon, Abstand, Polster und Kante NEBEN dem Text - die
          gehen auf --m-prose obendrauf, sonst landet die Textspalte bei 62px
          weniger als die Regel sagt. */
       max-width: calc(var(--m-prose) + 62px);
-      background: color-mix(in srgb, var(--warn-ink) 10%, transparent);
-      border: 1px solid color-mix(in srgb, var(--warn-ink) 32%, transparent);
+      background: var(--surface); border: 1px solid var(--border);
       font-size: 0.88rem; line-height: 1.55; color: var(--text-1); }
-    .quick-warn svg { width: 17px; height: 17px; flex-shrink: 0; margin-top: 2px; color: var(--warn-ink); }
-    .quick-warn b { font-weight: 700; }
-    .quick-warn code { font-family: var(--ff-mono); font-size: 0.92em; overflow-wrap: anywhere; }
-    /* The start command lives in its own block BELOW the warning, so the .env edit
-       cannot be skipped by pasting one long chain. Same gap the warning takes from
+    .quick-step svg { width: 17px; height: 17px; flex-shrink: 0; margin-top: 2px; color: var(--accent); }
+    .quick-step b { font-weight: 700; }
+    .quick-step code { font-family: var(--ff-mono); font-size: 0.92em; overflow-wrap: anywhere; }
+    /* The start command lives in its own block BELOW the edit step, so the .env edit
+       cannot be skipped by pasting one long chain. Same gap the step takes from
        the block above it, so the three parts read as one sequence. */
-    .quick-warn + .code-wrap { margin-top: 14px; }
+    .quick-step + .code-wrap { margin-top: 14px; }
     /* Fielen beim Entfernen der Setup-Sektion mit weg, das <p> blieb stehen: der
        Satz rutschte damit auf 16px/--text-1 ohne Abstand und las sich als
        Fortsetzung der Codeplatte, waehrend die <code>-Chips daneben ihre
@@ -785,13 +871,11 @@
       .hero-sub { max-width: 46ch; margin-left: auto; margin-right: auto; }
       .hero-actions, .hero-tags { justify-content: center; }
       .hero-visual { max-width: 560px; margin: 0 auto; width: 100%; }
-      .hero-frame { transform: none; }
       /* c2 was hidden here but c1 kept its -30px outset. Once .hero-visual stops
          being narrower than the column it hangs past the gutter and the hero's
          own overflow:hidden shaves it - 6px off at 375px. It tucks in instead. */
     }
     @media (max-width: 860px) {
-      .feat-grid { grid-template-columns: 1fr; gap: 18px; }
       /* Unter 860px hat die Karte rund 310px Inhaltsbreite. Neben einem Telefon
          blieben dem Text 162px, also zwei Woerter pro Zeile - unlesbar. Das
          Telefon faellt hier weg statt zu schrumpfen: die Galerie schaltet ab
@@ -873,8 +957,11 @@
         scroll-behavior: auto !important;
       }
       .reveal { opacity: 1; transform: none; }
-      .hero-frame { transition: none; }
       .plat-card:hover { transform: none; }
+      /* Die Handoff-Bewegung ist Ortswechsel, also genau das, was hier
+         wegfaellt: kein Wandern, kein Ankommen. Die Zeilen stehen statisch. */
+      .ho-token { display: none !important; }
+      .ho-row.go .ho-step--to .ho-ico { animation: none !important; }
     }
 
     /* Print. Without this the page printed the reveal state it happened to be
@@ -883,17 +970,18 @@
     @media print {
       html { scroll-behavior: auto; }
       body { background: #fff; color: #000; padding-bottom: 0; }
-      body::after { content: none; }
-      .skip-link, .site-bar, .copy-btn, .hero-glow, .to-top { display: none !important; }
+      .skip-link, .site-bar, .copy-btn, .hero-glow, .to-top, .ho-token, .mod-toggle { display: none !important; }
+      /* Papier hat keinen Aufklapp-Knopf: jede Modulbeschreibung steht da. */
+      .mod-card p { display: block !important; }
       /* The CTA stays on paper: it used to be hidden entirely, so a printed copy
          ended on the footer with no closing line and no GitHub address - and the
          external-href rule below is what puts that address on the sheet. */
       .cta-box { box-shadow: none; padding: 28px 24px; }
       .reveal { opacity: 1 !important; transform: none !important; }
-      .hero-frame { transform: none !important; box-shadow: none !important; }
+      .hero-frame { box-shadow: none !important; }
       .hero, section { padding: 20px 0 !important; }
-      .feat-row { margin-bottom: 32px; }
-      .gal-item, .feat-row, .mod-card, .swap-row, .plat-card, .ho-row { break-inside: avoid; }
+      .gal-item, .feat-row, .mod-card, .swap-row, .plat-card, .ho-row, .fam-item { break-inside: avoid; }
+      .mod-group-head, .fam-art { break-after: avoid; }
       /* Paper has no hover and no href, so external targets go inline. Internal
          anchors stay bare - "(#screens)" tells a reader nothing. */
       a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; word-break: break-all; }
@@ -926,6 +1014,7 @@
         <li><a href="#screens" data-t="jump_screens">See it first</a></li>
         <li><a href="#swap" data-t="jump_swap">What it replaces</a></li>
         <li><a href="#handoff" data-t="jump_handoff">Why one app</a></li>
+        <li><a href="#family" data-t="jump_family">For the family</a></li>
         <li><a href="#modules" data-t="jump_modules">Everything your household needs</a></li>
         <li><a href="#longevity" data-t="jump_longevity">Before you commit</a></li>
         <li><a href="#install" data-t="jump_install">Install it</a></li>
@@ -1026,8 +1115,9 @@
 <!-- GALLERY - show before telling. This sits at position 2 because the first
      section that shows the product instead of describing it used to start at 71%
      scroll depth, and the hero's own second button existed to skip past the
-     argument to reach it. Two screens at full content width - Dashboard and
-     Kalender, die beiden Flaechen der taeglichen Schleife. Der Kommentar sagte
+     argument to reach it. Two screens at full content width - Essenswoche und
+     Kalender (seit 2026-09-29; vorher Dashboard und Kalender, und das Dashboard
+     stand schon im Hero). Der Kommentar sagte
      bis zum 2026-08-20 "four screens": die Zahl blieb stehen, als zwei Bilder
      gingen, und beschrieb danach eine Sektion, die es nicht mehr gab. Wer hier
      etwas hinzufuegt oder wegnimmt, zieht diesen Satz mit.
@@ -1037,17 +1127,22 @@
   <div class="wrap">
     <div class="sec-head lead reveal">
       <span class="eyebrow" data-t="gal_eyebrow">See it first</span>
-      <h2 class="sec-title" data-t="gal_title">This is the whole thing, <em>on one screen.</em></h2>
+      <h2 class="sec-title" data-t="gal_title">Your family’s plans, <em>at a glance.</em></h2>
       <p class="sec-desc" data-t="gal_desc">No demo account, no sales call. The screens your family opens every day, at the size you will actually use them. The rest are further down.</p>
     </div>
     <div class="gal-list">
-      <figure class="gal-item reveal" style="--m: var(--accent)">
+      <!-- Bild 1 war bis 2026-09-29 dieselbe Uebersicht wie im Hero, 1.500px
+           darueber - der erste "Beleg" wiederholte also nur das Titelbild. Die
+           Essenswoche zeigt eine Flaeche, die der Hero nicht hat, und traegt
+           links die Seitenleiste mit den Gruppen, nach denen die Modulsektion
+           weiter unten gegliedert ist. -->
+      <figure class="gal-item reveal" style="--m: var(--m-meals)">
         <figcaption class="gal-cap">
-          <span class="gal-kicker" data-t="gal_dash_k">Overview</span>
-          <p data-t="gal_dash_c"><b>Everything due today, in one place.</b> Tasks, the calendar, tonight’s dinner and the shopping list, without opening a single other app.</p>
+          <span class="gal-kicker" data-t="gal_meals_k">Meals</span>
+          <p data-t="gal_meals_c"><b>The whole week of meals, on one board.</b> Breakfast to snacks for every day, dragged into place and there for everyone in the house.</p>
         </figcaption>
         <div class="gal-frame">
-          <img class="sc" data-shot-profile="lead" data-light="screenshots/dashboard-light-web.png" data-light-m="screenshots/dashboard-light-mobile.png" data-dark-m="screenshots/dashboard-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/dashboard-dark-web.png" src="screenshots/dashboard-light-web.png" alt="Yuvomi dashboard showing today's tasks, calendar, meals and shopping at a glance" data-alt-t="alt_hero" loading="lazy" decoding="async" width="900" height="675">
+          <img class="sc" data-light="screenshots/meals-light-web.png" data-light-m="screenshots/meals-light-mobile.png" data-dark-m="screenshots/meals-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/meals-dark-web.png" src="screenshots/meals-light-web.png" alt="Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks" data-alt-t="alt_gal_meals" loading="lazy" decoding="async" width="900" height="675">
         </div>
       </figure>
       <figure class="gal-item reveal" style="--m: var(--m-calendar)">
@@ -1114,11 +1209,11 @@
       <li class="ho-row reveal">
         <div class="ho-flow">
           <span class="ho-step" style="--m: var(--m-meals)">
-            <span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2V2"/><line x1="5.5" y1="11" x2="5.5" y2="22"/><path d="M17 2a4 4 0 0 0-3 3.9V13h3v9"/></svg></span>
+            <span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2V2"/><line x1="5.5" y1="11" x2="5.5" y2="22"/><path d="M17 2a4 4 0 0 0-3 3.9V13h3v9"/></svg></span>
             <span class="ho-label" data-t="ho_1_a">Meal plan for the week</span>
           </span>
           <span class="ho-arrow" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="19" y2="12"/><polyline points="14 7 19 12 14 17"/></svg></span>
-          <span class="ho-step" style="--m: var(--m-shopping)">
+          <span class="ho-step ho-step--to" style="--m: var(--m-shopping)">
             <span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
             <span class="ho-label" data-t="ho_1_b">Ingredients on the shopping list</span>
           </span>
@@ -1128,11 +1223,11 @@
       <li class="ho-row reveal">
         <div class="ho-flow">
           <span class="ho-step" style="--m: var(--m-tasks)">
-            <span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+            <span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
             <span class="ho-label" data-t="ho_2_a">A chore gets ticked off</span>
           </span>
           <span class="ho-arrow" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="19" y2="12"/><polyline points="14 7 19 12 14 17"/></svg></span>
-          <span class="ho-step" style="--m: var(--m-rewards)">
+          <span class="ho-step ho-step--to" style="--m: var(--m-rewards)">
             <span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg></span>
             <span class="ho-label" data-t="ho_2_b">Points land on your kid's balance</span>
           </span>
@@ -1142,11 +1237,11 @@
       <li class="ho-row reveal">
         <div class="ho-flow">
           <span class="ho-step" style="--m: var(--m-documents)">
-            <span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span>
+            <span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span>
             <span class="ho-label" data-t="ho_3_a">A receipt gets filed</span>
           </span>
           <span class="ho-arrow" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="19" y2="12"/><polyline points="14 7 19 12 14 17"/></svg></span>
-          <span class="ho-step" style="--m: var(--m-budget)">
+          <span class="ho-step ho-step--to" style="--m: var(--m-budget)">
             <span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></span>
             <span class="ho-label" data-t="ho_3_b">It hangs on the transaction</span>
           </span>
@@ -1160,11 +1255,11 @@
       <li class="ho-row reveal">
         <div class="ho-flow">
           <span class="ho-step" style="--m: var(--m-pantry)">
-            <span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3"/><path d="M4 8h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><line x1="10" y1="13" x2="14" y2="13"/></svg></span>
+            <span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3"/><path d="M4 8h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><line x1="10" y1="13" x2="14" y2="13"/></svg></span>
             <span class="ho-label" data-t="ho_4_a">The last jar goes out of the pantry</span>
           </span>
           <span class="ho-arrow" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="19" y2="12"/><polyline points="14 7 19 12 14 17"/></svg></span>
-          <span class="ho-step" style="--m: var(--m-shopping)">
+          <span class="ho-step ho-step--to" style="--m: var(--m-shopping)">
             <span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
             <span class="ho-label" data-t="ho_4_b">It is already on the shopping list</span>
           </span>
@@ -1175,209 +1270,266 @@
   </div>
 </section>
 
+<!-- FUER DIE FAMILIE (Critique 2026-09-29). Bis hierher sprach die Seite zu
+     dem, der den Server betreibt; wer mit ihm am Kuechentisch sitzt, kam nicht
+     vor, und der Wandmodus stand nur als Nebensatz in .mod-scope. Drei Momente
+     aus Sicht der Familie, jeder am Code belegt:
+       - Wandmodus, Display-Konto, Abhaken fuer wen, Kuechentimer, Immich:
+         SPEC "Wall mode" und "Display Accounts", CHANGELOG 2.60.0 und 2.68.0
+       - App aufs Handy, Push (nur mit HTTPS), zuletzt Gesehenes offline lesbar:
+         SPEC "PWA offline and update contract", "Read-only offline data",
+         "Web Push"; public/sw.js
+       - Einladungslink mit eigenem Passwort, Rechte je Familienrolle und
+         Modul, Kinderkonto ohne Link: SPEC "Invites" und "Roles and
+         permissions", CHANGELOG 1.75.0 und 2.62.0, server/permissions.js
+     Keine Kapitelmarke: die Sektion gehoert zum Kapitel "Warum eine App"
+     darueber (die Module reden miteinander - und die Menschen damit), und eine
+     fuenfte Marke kippte die Regel an .sec-head.lead. Das Bild ist das
+     Markenmotiv, kein Bildschirmfoto: ein Wandmodus-Screenshot kommt erst mit
+     der naechsten Aufnahme-Pipeline, und ein leerer Bildplatz waere schlechter
+     als keiner. -->
+<section class="family" id="family">
+  <div class="wrap">
+    <div class="fam-grid">
+      <!-- Die drei Kreise aus logo.svg, in denselben Koordinaten, als Licht statt
+           als Plakette: jeder Kreis traegt das Zeichen eines der drei Momente,
+           die Ueberschneidungen werden von selbst dunkler. Farbe aus --accent,
+           folgt also beiden Themes. Rein dekorativ - die Liste daneben sagt
+           alles, was das Bild zeigt. -->
+      <div class="fam-art reveal" aria-hidden="true">
+        <svg viewBox="33 41 96 93" fill="none" focusable="false">
+          <g class="fam-circles">
+            <circle cx="64" cy="72" r="27"/>
+            <circle cx="100" cy="78" r="25"/>
+            <circle cx="80" cy="106" r="24"/>
+          </g>
+          <g class="fam-glyphs" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <g transform="translate(47.5 55) scale(0.6)"><rect width="20" height="15" x="2" y="4.5" rx="2"/><line x1="18" x2="18.01" y1="12" y2="12"/></g>
+            <g transform="translate(103 61) scale(0.6)"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></g>
+            <g transform="translate(72.8 106) scale(0.6)"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></g>
+          </g>
+        </svg>
+      </div>
+      <div class="fam-body">
+        <div class="sec-head fam-head reveal">
+          <h2 class="sec-title" data-t="fam_title">On the kitchen wall, in every pocket, for every age.</h2>
+          <p class="sec-desc" data-t="fam_desc">Everyone in the house gets their own login from a link, the app sits on their phone’s home screen, and the calendar, the shopping list and the chores are shared by all of you. A terminal, if any, is only for whoever sets it up.</p>
+        </div>
+        <ul class="fam-list">
+          <li class="fam-item reveal">
+            <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="4.5" rx="2"/><line x1="18" x2="18.01" y1="12" y2="12"/></svg></span>
+            <div class="fam-text">
+              <h3 data-t="fam_1_t">The tablet on the kitchen wall</h3>
+              <p data-t="fam_1_d">Wall mode shows the time, today’s plan and who is up, readable from across the room. The tablet has an account of its own, no family password on the wall: tap a task, pick who did it, and the points go to the right person. Plus a kitchen timer, and photos from your own Immich after a few idle minutes.</p>
+            </div>
+          </li>
+          <li class="fam-item reveal d1">
+            <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></svg></span>
+            <div class="fam-text">
+              <h3 data-t="fam_2_t">The app on every phone</h3>
+              <p data-t="fam_2_d">It goes on the home screen straight from the browser, no app store involved. Reminders arrive as notifications even while it is closed (your server needs HTTPS for that), and the shopping list you opened last stays readable in a shop without signal.</p>
+            </div>
+          </li>
+          <li class="fam-item reveal d2">
+            <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg></span>
+            <div class="fam-text">
+              <h3 data-t="fam_3_t">An invite, and just the right access</h3>
+              <p data-t="fam_3_d">An admin sends a link, and the new member picks their own password. Per family role, each module is set to full, read only or not at all, so a child gets their chores and points without the budget. A child with no phone of their own gets an account created directly.</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- FEATURE SHOWCASE -->
 <section class="showcase" id="modules">
   <div class="wrap">
     <div class="sec-head center reveal">
       <h2 class="sec-title" data-t="feat_title">Everything your household needs</h2>
-      <p class="sec-desc" data-t="feat_desc">A complete set of tools for your household, designed to work together, not scattered across separate apps and tabs.</p>
+      <p class="sec-desc" data-t="feat_desc">Grouped the way the app itself groups them. Anything your household does not need, an admin switches off for everyone, and it disappears from the menu.</p>
     </div>
 
-    <div class="feat-grid">
-    <div class="feat-row reveal" style="--m: var(--m-tasks)">
-      <div class="feat-info">
-        <span class="feat-kicker"><span class="k-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span data-t="f_tasks_k">Tasks</span></span>
-        <h3 data-t="f_tasks_t">Everyone knows what needs doing.</h3>
-        <p data-t="f_tasks_d">Shared tasks with deadlines, priorities, subtasks, tags and recurring schedules, assignable to several family members at once.</p>
-        <ul class="feat-list">
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l1">Kanban board with one-tap status changes</span></li>
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l2">Multi-member assignment with stacked avatars</span></li>
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l3">Optional two-way sync with CalDAV reminder lists</span></li>
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l4">Lock a task so only its creator and admins can change it</span></li>
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l5">A history of what was completed, by day and by member</span></li>
-        </ul>
+    <!-- Gegliedert wie das Menue der App (public/router.js, NAV_SECTION:
+         Planen, Haushalt, Menschen, Finanzen), in derselben Reihenfolge der
+         Eintraege; was nicht im Menue steht, sondern in den Einstellungen
+         (Familie, Erinnerungen, API-Tokens, Backup), steht unter deren Namen.
+         Notizen & Kontakte bleibt EINE Karte wie in der README-Modultabelle
+         und steht bei den Notizen (Planen). Jede Gruppe beginnt mit ihrem
+         ausfuehrlichen Modul, falls sie eines hat. Die Klassen feat-row und
+         mod-card zaehlt test:docs-landing gegen die Proof-Leiste. -->
+    <div class="mod-groups" id="modGrid">
+      <div class="mod-group reveal">
+        <h3 class="mod-group-head" data-t="grp_plan">Plan</h3>
+        <div class="mod-group-body" style="--rows: 3">
+        <div class="feat-row" style="--m: var(--m-tasks)">
+          <div class="feat-info">
+            <span class="feat-kicker"><span class="k-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span data-t="f_tasks_k">Tasks</span></span>
+            <h4 data-t="f_tasks_t">Everyone knows what needs doing.</h4>
+            <p data-t="f_tasks_d">Shared tasks with deadlines, priorities, subtasks, tags and recurring schedules, assignable to several family members at once.</p>
+            <ul class="feat-list">
+              <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l1">Kanban board with one-tap status changes</span></li>
+              <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l2">Multi-member assignment with stacked avatars</span></li>
+              <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l3">Optional two-way sync with CalDAV reminder lists</span></li>
+              <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l4">Lock a task so only its creator and admins can change it</span></li>
+              <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l5">A history of what was completed, by day and by member</span></li>
+            </ul>
+          </div>
+          <div class="feat-visual">
+            <img class="sc feat-phone" data-light="screenshots/tasks-light-mobile.png" data-dark="screenshots/tasks-dark-mobile.png" src="screenshots/tasks-light-mobile.png" alt="Tasks on mobile" data-alt-t="alt_f_tasks_m" loading="lazy" width="440" height="956">
+          </div>
+        </div>
+          <div class="mod-card" style="--m: var(--m-calendar)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+            <h4 data-t="m_cal_t">Calendar</h4><p data-t="m_cal_d">Two-way sync with Google and CalDAV, one-way push to Outlook.com via Microsoft Graph, public ICS subscriptions, recurring events, holiday overlays and per-event visibility.</p>
+          </div>
+          <div class="mod-card" style="--m: var(--m-schedule)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><circle cx="17.5" cy="17.5" r="4.5"/><path d="M17.5 15.5v2l1.5 1"/></svg></div>
+            <h4 data-t="m_sched_t">Schedule</h4><p data-t="m_sched_d">Rotating shifts and fixed weekly timetables, with changes for single days and an explicit day off. The calendar shows them as a layer of their own, so changing a pattern never leaves old appointments behind. Off by default; households turn it on.</p>
+          </div>
+          <div class="mod-card" style="--m: var(--m-notes)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg></div>
+            <h4 data-t="m_notes_t">Notes &amp; Contacts</h4><p data-t="m_notes_d">Colored Markdown sticky notes for recipes, memos and quick reminders, sorted into personal or household categories, with checklists you tick off by tapping them. Plus a shared contact directory with CardDAV sync and vCard import/export.</p>
+          </div>
+        </div>
       </div>
-      <div class="feat-visual">
-        <img class="sc feat-phone" data-light="screenshots/tasks-light-mobile.png" data-dark="screenshots/tasks-dark-mobile.png" src="screenshots/tasks-light-mobile.png" alt="Tasks on mobile" data-alt-t="alt_f_tasks_m" loading="lazy" width="440" height="956">
+      <div class="mod-group reveal">
+        <h3 class="mod-group-head" data-t="grp_household">Household</h3>
+        <div class="mod-group-body" style="--rows: 2">
+        <div class="feat-row" style="--m: var(--m-meals)">
+          <div class="feat-info">
+            <span class="feat-kicker"><span class="k-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2"/><path d="M5 2v20"/><path d="M19 2v20"/><path d="M19 2a4 4 0 0 0-4 4v6h4"/></svg></span><span data-t="f_meals_k">Meals</span></span>
+            <h4 data-t="f_meals_t">Dinner sorted before anyone asks.</h4>
+            <p data-t="f_meals_d">A weekly drag-and-drop planner with repeating meals and ingredient lists that export straight to the shopping list in one click.</p>
+            <ul class="feat-list">
+              <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_meals_l1">Drag-and-drop weekly planner with repeats</span></li>
+              <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_meals_l2">Reusable recipes you can scale &amp; duplicate</span></li>
+              <!-- Shopping used to be a row of its own, but its own screenshot showed
+                   the Kitchen module with Shopping as one tab beside Meals, Recipes
+                   and Pantry. It belongs here, as the thing the plan produces. -->
+              <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_meals_l3">A shared shopping list, sorted by aisle and updating live</span></li>
+            </ul>
+          </div>
+          <div class="feat-visual">
+            <img class="sc feat-phone" data-light="screenshots/meals-light-mobile.png" data-dark="screenshots/meals-dark-mobile.png" src="screenshots/meals-light-mobile.png" alt="Meals on mobile" data-alt-t="alt_f_meals_m" loading="lazy" width="440" height="956">
+          </div>
+        </div>
+          <div class="mod-card" style="--m: var(--m-recipes)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-7 7c0 2.4 1.2 4.5 3 5.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3c1.8-1.2 3-3.3 3-5.7a7 7 0 0 0-7-7z"/><line x1="9" y1="22" x2="15" y2="22"/></svg></div>
+            <h4 data-t="m_recipes_t">Recipes</h4><p data-t="m_recipes_d">Create, duplicate and scale reusable recipes, then pre-fill meal slots or send the ingredients to a shopping list. A self-hosted Mealie or Tandoor instance can be mirrored read-only.</p>
+          </div>
+          <div class="mod-card" style="--m: var(--m-shopping)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>
+            <h4 data-t="m_shop_t">Shopping</h4><p data-t="m_shop_d">Collaborative lists grouped by aisle and ordered to match your shop, with swipe gestures and one-tap import from the meal plan.</p>
+          </div>
+          <div class="mod-card" style="--m: var(--m-pantry)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14a1 1 0 0 1 1 1v3H4V4a1 1 0 0 1 1-1z"/><path d="M4 7h16v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><line x1="10" y1="12" x2="14" y2="12"/></svg></div>
+            <h4 data-t="m_pantry_t">Pantry</h4><p data-t="m_pantry_d">What is actually in the house: amount, storage location and best-before date, with expiry and low-stock filters, and a two-way handover with the shopping list.</p>
+          </div>
+          <div class="mod-card" style="--m: var(--m-housekeeping)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2a2 2 0 0 0 2.8 0z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4z"/></svg></div>
+            <h4 data-t="m_house_t">Housekeeping</h4><p data-t="m_house_d">Manage household staff: schedules, check-in/out, daily or hourly billing, chores and supplies.</p>
+          </div>
+          <div class="mod-card" style="--m: var(--m-waste)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
+            <h4 data-t="m_waste_t">Waste collection</h4><p data-t="m_waste_d">Weekly, monthly or nth-weekday pickup rhythms, or a municipal ICS calendar imported once or subscribed by URL, with per-occurrence moves and skips, personal reminders, a Dashboard widget and a switchable Calendar layer. Off by default; households turn it on.</p>
+          </div>
+          <div class="mod-card" style="--m: var(--m-documents)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+            <h4 data-t="m_docs_t">Documents</h4><p data-t="m_docs_d">Family files with previews, folders, visibility controls and bulk actions. Storage on a local folder, WebDAV or Google Drive; Paperless-ngx and Papra optional.</p>
+          </div>
+          <div class="mod-card" style="--m: var(--m-inventory)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/></svg></div>
+            <h4 data-t="m_inv_t">Inventory</h4><p data-t="m_inv_d">What you own: brand, model, serial number, storage location, purchase price, warranty and condition, with linked receipts and bookings. Off by default; households turn it on.</p>
+          </div>
+          <div class="mod-card" style="--m: var(--m-rewards)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg></div>
+            <h4 data-t="m_rewards_t">Rewards</h4><p data-t="m_rewards_d">Points on tasks credit the assigned member, with a configurable default for new tasks, a parent-approved catalog and an auditable ledger.</p>
+          </div>
+        </div>
+      </div>
+      <div class="mod-pair">
+        <div class="mod-group reveal">
+          <h3 class="mod-group-head" data-t="grp_people">People</h3>
+          <div class="mod-group-body">
+          <div class="feat-row" style="--m: var(--m-health)">
+            <div class="feat-info">
+              <span class="feat-kicker"><span class="k-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.7-1.5L12.5 16l2-8 1.5 4h4.8"/></svg></span><span data-t="f_health_k">Health</span></span>
+              <h4 data-t="f_health_t">Health that stays in the family.</h4>
+              <p data-t="f_health_d">Vitals, medications, preventive care, lab results, activity, cycles, fasting and nutrition, tracked per member, private by default, and never leaving your server.</p>
+              <ul class="feat-list">
+                <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_health_l1">Cycle ring with period &amp; fertile-window predictions</span></li>
+                <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_health_l2">Medication reminders with refill alerts</span></li>
+                <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_health_l3">Per-entry visibility: private or shared</span></li>
+                <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_health_l4">Parents can record a child’s fever and medication</span></li>
+              </ul>
+            </div>
+            <div class="feat-visual">
+              <img class="sc feat-phone" data-light="screenshots/health-vitals-light-mobile.png" data-dark="screenshots/health-vitals-dark-mobile.png" src="screenshots/health-vitals-light-mobile.png" alt="Health vitals on mobile" data-alt-t="alt_f_health_m" loading="lazy" style="left:-20px;right:auto" width="440" height="956">
+            </div>
+          </div>
+            <div class="mod-card" style="--m: var(--m-birthdays)">
+              <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v3M12 8v3M17 8v3M7 4h.01M12 3h.01M17 4h.01"/></svg></div>
+              <h4 data-t="m_bday_t">Birthdays</h4><p data-t="m_bday_d">Birthday tracker with optional name days, automatic annual calendar events, age display and custom reminders.</p>
+            </div>
+          </div>
+        </div>
+        <div class="mod-group reveal">
+          <h3 class="mod-group-head" data-t="grp_finance">Finance</h3>
+          <div class="mod-group-body">
+          <div class="feat-row" style="--m: var(--m-budget)">
+            <div class="feat-info">
+              <span class="feat-kicker"><span class="k-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span data-t="f_budget_k">Budget</span></span>
+              <h4 data-t="f_budget_t">No surprise at the end of the month.</h4>
+              <p data-t="f_budget_d">Track who spent what, split shared costs automatically, and see exactly where the money goes.</p>
+              <ul class="feat-list">
+                <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_budget_l1">57 currencies, recurring entries, weekly/monthly/yearly statistics, monthly budgets &amp; savings goals</span></li>
+                <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_budget_l3">Subscription tracker with renewals, budgets &amp; alerts</span></li>
+                <!-- Split expenses is a sub-area of Budget with an inherited accent,
+                     not a module of its own. It had its own row directly under this
+                     one, selling the same money story twice. -->
+                <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_budget_l4">Shared costs for household, trips and events, with automatic debt simplification</span></li>
+                <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_budget_l5">Share an entry's amount while its title and category stay private</span></li>
+              </ul>
+            </div>
+            <div class="feat-visual">
+              <img class="sc feat-phone" data-light="screenshots/budget-light-mobile.png" data-dark="screenshots/budget-dark-mobile.png" src="screenshots/budget-light-mobile.png" alt="Budget on mobile" data-alt-t="alt_f_budget_m" loading="lazy" style="left:-20px;right:auto" width="440" height="956">
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+      <div class="mod-group reveal mod-group--flat">
+        <h3 class="mod-group-head" data-t="grp_settings">Settings</h3>
+        <div class="mod-group-body">
+          <div class="mod-card" style="--m: var(--m-contacts)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <h4 data-t="m_family_t">Family</h4><p data-t="m_family_d">Member profiles with roles, photos and contact details, kept in sync with Contacts and Birthdays.</p>
+          </div>
+          <div class="mod-card" style="--m: var(--m-calendar)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+            <h4 data-t="m_rem_t">Reminders</h4><p data-t="m_rem_d">Reminders on tasks, events, shifts, subscription renewals, warranties, best-before dates and waste pickups, with an in-app badge, opt-in push notifications and household Gotify, ntfy, webhook or email channels.</p>
+          </div>
+          <div class="mod-card" style="--m: var(--m-infra)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+            <h4 data-t="m_api_t">API tokens</h4><p data-t="m_api_d">Bearer and X-API-Key tokens against a documented OpenAPI 3.1 spec, plus an MCP endpoint at <code>/mcp</code> that lets a client like Claude Desktop drive the API in plain language.</p>
+          </div>
+          <div class="mod-card" style="--m: var(--m-infra)">
+            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
+            <h4 data-t="m_backup_t">Backup</h4><p data-t="m_backup_d">Scheduled backups with optional WebDAV upload (Nextcloud, ownCloud, Hetzner, etc.). Every restore saves the current state first, and a backup from another installation restores in the browser, no shell needed.</p>
+          </div>
+        </div>
       </div>
     </div>
-
-    <!-- Health sits at position 2, not 6. "Never leaves your server" is the
-         strongest privacy claim on the page and the one category no cloud
-         planner can honestly offer. -->
-    <div class="feat-row reveal" style="--m: var(--m-health)">
-      <div class="feat-info">
-        <span class="feat-kicker"><span class="k-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.7-1.5L12.5 16l2-8 1.5 4h4.8"/></svg></span><span data-t="f_health_k">Health</span></span>
-        <h3 data-t="f_health_t">Health that stays in the family.</h3>
-        <p data-t="f_health_d">Vitals, medications, preventive care, lab results, activity, cycles, fasting and nutrition, tracked per member, private by default, and never leaving your server.</p>
-        <ul class="feat-list">
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_health_l1">Cycle ring with period &amp; fertile-window predictions</span></li>
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_health_l2">Medication reminders with refill alerts</span></li>
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_health_l3">Per-entry visibility: private or shared</span></li>
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_health_l4">Parents can record a child’s fever and medication</span></li>
-        </ul>
-      </div>
-      <div class="feat-visual">
-        <img class="sc feat-phone" data-light="screenshots/health-vitals-light-mobile.png" data-dark="screenshots/health-vitals-dark-mobile.png" src="screenshots/health-vitals-light-mobile.png" alt="Health vitals on mobile" data-alt-t="alt_f_health_m" loading="lazy" style="left:-20px;right:auto" width="440" height="956">
-      </div>
-    </div>
-
-    <div class="feat-row reveal" style="--m: var(--m-meals)">
-      <div class="feat-info">
-        <span class="feat-kicker"><span class="k-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2"/><path d="M5 2v20"/><path d="M19 2v20"/><path d="M19 2a4 4 0 0 0-4 4v6h4"/></svg></span><span data-t="f_meals_k">Meals</span></span>
-        <h3 data-t="f_meals_t">Dinner sorted before anyone asks.</h3>
-        <p data-t="f_meals_d">A weekly drag-and-drop planner with repeating meals and ingredient lists that export straight to the shopping list in one click.</p>
-        <ul class="feat-list">
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_meals_l1">Drag-and-drop weekly planner with repeats</span></li>
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_meals_l2">Reusable recipes you can scale &amp; duplicate</span></li>
-          <!-- Shopping used to be a row of its own, but its own screenshot showed
-               the Kitchen module with Shopping as one tab beside Meals, Recipes
-               and Pantry. It belongs here, as the thing the plan produces. -->
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_meals_l3">A shared shopping list, sorted by aisle and updating live</span></li>
-        </ul>
-      </div>
-      <div class="feat-visual">
-        <img class="sc feat-phone" data-light="screenshots/meals-light-mobile.png" data-dark="screenshots/meals-dark-mobile.png" src="screenshots/meals-light-mobile.png" alt="Meals on mobile" data-alt-t="alt_f_meals_m" loading="lazy" width="440" height="956">
-      </div>
-    </div>
-
-    <div class="feat-row reveal" style="--m: var(--m-budget)">
-      <div class="feat-info">
-        <span class="feat-kicker"><span class="k-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span data-t="f_budget_k">Budget</span></span>
-        <h3 data-t="f_budget_t">No surprise at the end of the month.</h3>
-        <p data-t="f_budget_d">Track who spent what, split shared costs automatically, and see exactly where the money goes.</p>
-        <ul class="feat-list">
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_budget_l1">57 currencies, recurring entries, weekly/monthly/yearly statistics, monthly budgets &amp; savings goals</span></li>
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_budget_l3">Subscription tracker with renewals, budgets &amp; alerts</span></li>
-          <!-- Split expenses is a sub-area of Budget with an inherited accent,
-               not a module of its own. It had its own row directly under this
-               one, selling the same money story twice. -->
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_budget_l4">Shared costs for household, trips and events, with automatic debt simplification</span></li>
-          <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_budget_l5">Share an entry's amount while its title and category stay private</span></li>
-        </ul>
-      </div>
-      <div class="feat-visual">
-        <img class="sc feat-phone" data-light="screenshots/budget-light-mobile.png" data-dark="screenshots/budget-dark-mobile.png" src="screenshots/budget-light-mobile.png" alt="Budget on mobile" data-alt-t="alt_f_budget_m" loading="lazy" style="left:-20px;right:auto" width="440" height="956">
-      </div>
-    </div>
-    </div>
-
-    <!-- Die uebrigen standen bis zur Re-Kritik in einer EIGENEN Sektion
-         mit eigenem Kopf. Zwei Sektionen mit zwei Ueberschriften fuer eine
-         Aussage - hier ist die Modulliste - kosteten zusammen 4.419px, ein
-         Drittel der Seite, und waren der Grund, warum der Umbau von elf auf acht
-         Sektionen unterm Strich nur rund 300px gespart hat. Jetzt eine Sektion,
-         ein Kopf, zwei Stufen: vier ausfuehrlich, der Rest als Karte. Die Zahl steht
-         bewusst nicht mehr hier - sie driftet, und der Guard misst sie ohnehin. -->
-    <p class="mod-lead reveal" data-t="more_desc">The rest, each one independent. Anything your household does not need, an admin switches off for everyone, and it disappears from the menu.</p>
-    <div class="mod-grid" id="modGrid">
-      <div class="mod-card reveal" style="--m: var(--m-calendar)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
-        <h3 data-t="m_cal_t">Calendar</h3><p data-t="m_cal_d">Two-way sync with Google and CalDAV, one-way push to Outlook.com via Microsoft Graph, public ICS subscriptions, recurring events, holiday overlays and per-event visibility.</p>
-      </div>
-      <div class="mod-card reveal d1" style="--m: var(--m-shopping)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>
-        <h3 data-t="m_shop_t">Shopping</h3><p data-t="m_shop_d">Collaborative lists grouped by aisle and ordered to match your shop, with swipe gestures and one-tap import from the meal plan.</p>
-      </div>
-      <div class="mod-card reveal d2" style="--m: var(--m-recipes)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-7 7c0 2.4 1.2 4.5 3 5.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3c1.8-1.2 3-3.3 3-5.7a7 7 0 0 0-7-7z"/><line x1="9" y1="22" x2="15" y2="22"/></svg></div>
-        <h3 data-t="m_recipes_t">Recipes</h3><p data-t="m_recipes_d">Create, duplicate and scale reusable recipes, then pre-fill meal slots or send the ingredients to a shopping list. A self-hosted Mealie or Tandoor instance can be mirrored read-only.</p>
-      </div>
-      <div class="mod-card reveal" style="--m: var(--m-pantry)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14a1 1 0 0 1 1 1v3H4V4a1 1 0 0 1 1-1z"/><path d="M4 7h16v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><line x1="10" y1="12" x2="14" y2="12"/></svg></div>
-        <h3 data-t="m_pantry_t">Pantry</h3><p data-t="m_pantry_d">What is actually in the house: amount, storage location and best-before date, with expiry and low-stock filters, and a two-way handover with the shopping list.</p>
-      </div>
-      <div class="mod-card reveal d1" style="--m: var(--m-documents)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
-        <h3 data-t="m_docs_t">Documents</h3><p data-t="m_docs_d">Family files with previews, folders, visibility controls and bulk actions. Storage on a local folder, WebDAV or Google Drive; Paperless-ngx and Papra optional.</p>
-      </div>
-      <div class="mod-card reveal d2" style="--m: var(--m-rewards)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg></div>
-        <h3 data-t="m_rewards_t">Rewards</h3><p data-t="m_rewards_d">Points on tasks credit the assigned member, with a configurable default for new tasks, a parent-approved catalog and an auditable ledger.</p>
-      </div>
-      <div class="mod-card reveal" style="--m: var(--m-notes)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg></div>
-        <h3 data-t="m_notes_t">Notes &amp; Contacts</h3><p data-t="m_notes_d">Colored Markdown sticky notes for recipes, memos and quick reminders, sorted into personal or household categories, with checklists you tick off by tapping them. Plus a shared contact directory with CardDAV sync and vCard import/export.</p>
-      </div>
-      <div class="mod-card reveal d1" style="--m: var(--m-birthdays)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v3M12 8v3M17 8v3M7 4h.01M12 3h.01M17 4h.01"/></svg></div>
-        <h3 data-t="m_bday_t">Birthdays</h3><p data-t="m_bday_d">Birthday tracker with optional name days, automatic annual calendar events, age display and custom reminders.</p>
-      </div>
-      <div class="mod-card reveal d2" style="--m: var(--m-contacts)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-        <h3 data-t="m_family_t">Family</h3><p data-t="m_family_d">Member profiles with roles, photos and contact details, kept in sync with Contacts and Birthdays.</p>
-      </div>
-      <div class="mod-card reveal" style="--m: var(--m-calendar)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
-        <h3 data-t="m_rem_t">Reminders</h3><p data-t="m_rem_d">Reminders on tasks, events, shifts, subscription renewals, warranties, best-before dates and waste pickups, with an in-app badge, opt-in push notifications and household Gotify, ntfy, webhook or email channels.</p>
-      </div>
-      <div class="mod-card reveal d1" style="--m: var(--m-infra)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
-        <h3 data-t="m_api_t">API tokens</h3><p data-t="m_api_d">Bearer and X-API-Key tokens against a documented OpenAPI 3.1 spec, plus an MCP endpoint at <code>/mcp</code> that lets a client like Claude Desktop drive the API in plain language.</p>
-      </div>
-      <div class="mod-card reveal d2" style="--m: var(--m-infra)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
-        <h3 data-t="m_backup_t">Backup</h3><p data-t="m_backup_d">Scheduled backups with optional WebDAV upload (Nextcloud, ownCloud, Hetzner, etc.). Every restore saves the current state first, and a backup from another installation restores in the browser, no shell needed.</p>
-      </div>
-      <div class="mod-card reveal" style="--m: var(--m-housekeeping)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2a2 2 0 0 0 2.8 0z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4z"/></svg></div>
-        <h3 data-t="m_house_t">Housekeeping</h3><p data-t="m_house_d">Manage household staff: schedules, check-in/out, daily or hourly billing, chores and supplies.</p>
-      </div>
-      <div class="mod-card reveal d1" style="--m: var(--m-inventory)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/></svg></div>
-        <h3 data-t="m_inv_t">Inventory</h3><p data-t="m_inv_d">What you own: brand, model, serial number, storage location, purchase price, warranty and condition, with linked receipts and bookings. Off by default; households turn it on.</p>
-      </div>
-      <div class="mod-card reveal d2" style="--m: var(--m-schedule)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><circle cx="17.5" cy="17.5" r="4.5"/><path d="M17.5 15.5v2l1.5 1"/></svg></div>
-        <h3 data-t="m_sched_t">Schedule</h3><p data-t="m_sched_d">Rotating shifts and fixed weekly timetables, with changes for single days and an explicit day off. The calendar shows them as a layer of their own, so changing a pattern never leaves old appointments behind. Off by default; households turn it on.</p>
-      </div>
-      <div class="mod-card reveal" style="--m: var(--m-waste)">
-        <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
-        <h3 data-t="m_waste_t">Waste collection</h3><p data-t="m_waste_d">Weekly, monthly or nth-weekday pickup rhythms, or a municipal ICS calendar imported once or subscribed by URL, with per-occurrence moves and skips, personal reminders, a Dashboard widget and a switchable Calendar layer. Off by default; households turn it on.</p>
-      </div>
-    </div>
-    <!-- Nur auf dem Telefon sichtbar (CSS oben): klappt die Karten ab der
-         siebten auf und wieder zu. Ohne Zahl im Label - die Kartenzahl steht im
-         Vorspann (more_desc, von test:docs-landing gehalten), eine zweite Zahl
-         driftet doppelt. -->
+    <!-- Nur auf dem Telefon sichtbar (CSS oben): blendet die Beschreibungen
+         der kompakten Eintraege ein und wieder aus. Die Namen aller Module
+         stehen auch zugeklappt da - ausgeblendet wird Text, kein Modul. -->
     <button class="mod-toggle" type="button" id="modToggle" aria-expanded="false" aria-controls="modGrid">
-      <span data-t="mods_more">Show all modules</span>
+      <span data-t="mods_more">Show descriptions</span>
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
     </button>
-    <!-- Anyone already running a home server asks the same two questions before
-         they ask anything else: what does this not do, and will it fight what I
-         already have. A wall of module cards answers neither.
-         The </div> above closes .mod-grid, which was missing: this paragraph was
-         the grid's fourteenth child, so it rendered 276px wide in the middle
-         column with `margin: 0 auto` inert and `max-width: 68ch` never binding -
-         63 words of centred text at 22 characters a line, wearing a border-top
-         that read as a card divider.
-
-         Nachtrag (Critique 2026-08-20): diese Reparatur schloss das FALSCHE
-         Element. Das ergaenzte Tag stand am Ende der .feat-grid-Kette und
-         schloss dort .wrap statt .feat-grid, also fiel alles ab hier - Raster,
-         Vorspann, Telefonreihe, Abgrenzungsabsatz - aus dem 1152px-Container:
-         .mod-grid mass left:0 width:1440 padding:0, mobil klebten die Karten
-         bei left:0/right:390 an beiden Bildschirmraendern. Kein Test hat es
-         gesehen, weil alle nach UEBERLAUF fragten und volle Viewport-Breite
-         nicht ueberlaeuft. Jetzt prueft test-docs-landing.js die div-Bilanz
-         JE SEKTION - das ist die Frage, die hier gefehlt hat. -->
-    <!-- Fuenf Module, die sonst NUR als Prosakarte vorkaemen. Ersetzt das
-         geloeschte Karussell und macht das Gegenteil von dem, was das tat:
-         das zeigte unter der Ueberschrift "die ihr noch nicht gesehen habt"
-         drei Unteransichten des Budget-Moduls, das oben schon eine eigene
-         Zeile hatte. Kein Drag, kein Autoplay, kein JS - eine Reihe, die
-         umbricht. Beschriftung und alt sagen bewusst VERSCHIEDENES: sie teilten
-         sich den Modulnamen-Key, und ein Screenreader las den Namen damit
-         zweimal hintereinander. -->
-    <div class="mod-shots">
-      <figure class="mod-shot reveal"><img class="sc" data-light="screenshots/inventory-light-mobile.png" data-dark="screenshots/inventory-dark-mobile.png" src="screenshots/inventory-light-mobile.png" alt="The inventory module on a phone" data-alt-t="alt_m_inventory" loading="lazy" decoding="async" width="440" height="956"><figcaption data-t="m_inv_t">Inventory</figcaption></figure>
-      <figure class="mod-shot reveal"><img class="sc" data-light="screenshots/shopping-light-mobile.png" data-dark="screenshots/shopping-dark-mobile.png" src="screenshots/shopping-light-mobile.png" alt="A shared shopping list on a phone" data-alt-t="alt_m_shopping" loading="lazy" decoding="async" width="440" height="956"><figcaption data-t="m_shop_t">Shopping</figcaption></figure>
-      <figure class="mod-shot reveal"><img class="sc" data-light="screenshots/rewards-light-mobile.png" data-dark="screenshots/rewards-dark-mobile.png" src="screenshots/rewards-light-mobile.png" alt="The rewards ledger on a phone" data-alt-t="alt_m_rewards" loading="lazy" decoding="async" width="440" height="956"><figcaption data-t="m_rewards_t">Rewards</figcaption></figure>
-      <figure class="mod-shot reveal"><img class="sc" data-light="screenshots/documents-light-mobile.png" data-dark="screenshots/documents-dark-mobile.png" src="screenshots/documents-light-mobile.png" alt="Family documents on a phone" data-alt-t="alt_m_documents" loading="lazy" decoding="async" width="440" height="956"><figcaption data-t="m_docs_t">Documents</figcaption></figure>
-      <figure class="mod-shot reveal"><img class="sc" data-light="screenshots/recipes-light-mobile.png" data-dark="screenshots/recipes-dark-mobile.png" src="screenshots/recipes-light-mobile.png" alt="The recipe list on a phone" data-alt-t="alt_m_recipes" loading="lazy" decoding="async" width="440" height="956"><figcaption data-t="m_recipes_t">Recipes</figcaption></figure>
-    </div>
-    <p class="mod-scope reveal" data-t="more_scope">Not a photo library, a password manager or a media server: Yuvomi replaces the apps a household runs on, not your whole server. What you already run can stay. Calendars and contacts sync both ways over CalDAV and CardDAV, documents can live on WebDAV or Google Drive, an idle kitchen tablet can show photos from your own Immich, and API tokens plus the MCP endpoint let the rest of your setup talk to it.</p>
+    <p class="mod-scope reveal" data-t="more_scope">Not a photo library, a password manager or a media server: Yuvomi replaces the apps a household runs on, not your whole server. What you already run can stay. Calendars and contacts sync both ways over CalDAV and CardDAV, documents can live on WebDAV or Google Drive, and API tokens plus the MCP endpoint let the rest of your setup talk to it.</p>
   </div>
 </section>
 
@@ -1476,7 +1628,7 @@
         <li><b data-t="tb_needs_k">Needs</b> <span data-t="tb_needs_v">256 MB RAM and one port, 3000 by default.</span></li>
         <li><b data-t="tb_writes_k">Writes</b> <span data-t="tb_writes_v">Four volumes you own: data, backups, modules, documents.</span></li>
         <li class="tb-wide"><b data-t="tb_data_k">Your data</b> <span><span data-t="tb_data_v">One SQLite file at</span> <code>/data/yuvomi.db</code>. <span data-t="tb_data_v2">Copying it is the whole export, unless documents live outside the database.</span></span></li>
-        <li class="tb-wide"><b data-t="tb_out_k">Outbound</b> <span><span data-t="tb_out_v">Out of the box, one update check against the GitHub releases API. Everything else reaches out only when you use or switch on a feature that needs it: opening the calendar settings loads the list of holiday countries from openholidaysapi.org, finding a logo for a subscription looks up the service’s website, and weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.</span> <a class="tb-proof" href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html" data-t="tb_out_proof">What the site itself stores</a><span class="tb-sep" aria-hidden="true"> · </span><a class="tb-proof" href="https://github.com/ulsklyc/yuvomi/blob/main/server/routes/changelog.js" data-t="tb_out_code">Read the server source</a></span></li>
+        <li class="tb-wide"><b data-t="tb_out_k">Outbound</b> <span><span data-t="tb_out_v">Out of the box, one update check against the GitHub releases API. Everything else reaches out only when you use or switch on a feature that needs it.</span> <details class="tb-more"><summary><span data-t="tb_out_more">Which features</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><span data-t="tb_out_list">Opening the calendar settings loads the list of holiday countries from openholidaysapi.org, finding a logo for a subscription looks up the service’s website, and weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.</span></details></span> <a class="tb-proof" href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html" data-t="tb_out_proof">What the site itself stores</a><span class="tb-sep" aria-hidden="true"> · </span><a class="tb-proof" href="https://github.com/ulsklyc/yuvomi/blob/main/server/routes/changelog.js" data-t="tb_out_code">Read the server source</a></span></li>
       </ul>
       <div class="code-wrap"><div class="code-block"><span class="c" data-t="qs_c1"># Pre-built image - Docker</span>
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
@@ -1491,9 +1643,9 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
            REPLACE_WITH_ placeholders from .env.example - on which the app refuses to
            start (server/auth.js, server/db.js). A human step cannot be
            a footnote to a copyable chain that has already run past it. -->
-      <p class="quick-warn">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <span data-t="quick_warn"><b>Now open <code>.env</code> and replace both <code>REPLACE_WITH_…</code> placeholders</b> with the two values you just generated. Yuvomi does not start while a placeholder is still in there. Keep a copy of the key: without it, nobody can open the database again. To run without encryption, clear the <code>DB_ENCRYPTION_KEY</code> line instead.</span>
+      <p class="quick-step">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        <span data-t="quick_env"><b>Now open <code>.env</code> and replace both <code>REPLACE_WITH_…</code> placeholders</b> with the two values you just generated. Yuvomi does not start while a placeholder is still in there. Keep a copy of the key with your other passwords. To run without encryption, clear the <code>DB_ENCRYPTION_KEY</code> line instead.</span>
       </p>
       <div class="code-wrap code-wrap--single"><div class="code-block"><span class="h">docker compose up -d</span></div><button class="copy-btn" type="button" data-copy="docker compose up -d"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
       <p class="quick-note" data-t="quick_note">Then open <code>http://localhost:3000</code>. The first visit walks you through creating your admin account. Prefer a guided setup? The <a href="install.html#installer">step-by-step installer</a> handles HTTPS, SSO and backups for you.</p>
@@ -1507,10 +1659,14 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
   <div class="wrap">
     <div class="cta-box reveal">
       <h2 data-t="cta_title">Set it up once. <em>Then the whole family plans with it.</em></h2>
-      <p data-t="cta_desc">After that it is yours. No account with us, no subscription, and nothing of ours between your household and its data.</p>
+      <p data-t="cta_desc">After that it belongs to the household: on every phone and on the kitchen wall, with no account with us, no subscription and nothing of ours in between.</p>
       <div class="cta-actions">
         <a href="install.html" class="btn btn-primary"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span data-t="cta_install">Install Yuvomi</span></a>
-        <a href="https://github.com/ulsklyc/yuvomi" class="btn btn-secondary" target="_blank" rel="noopener"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg><span data-t="cta_gh">View on GitHub</span></a>
+        <!-- Zweiter Knopf fuer die Person, die NICHT installiert: GitHub steht
+             schon in der Leiste und im Fuss, und wer bis hier gelesen hat und
+             jemandem zu Hause zeigen will, was er davon hat, braucht die
+             Familien-Sektion, nicht das Repository. -->
+        <a href="#family" class="btn btn-secondary"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span data-t="cta_family">What the family gets</span></a>
       </div>
     </div>
   </div>
@@ -1581,14 +1737,17 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       long_q3:'What if I lose the encryption key?', long_a3:'<b>Then the database is gone, and we cannot help you.</b> That is the honest answer: SQLCipher has no recovery path and no back door, which is the entire point of it. Store the key the way you store the ones that matter. Encryption is optional; if you would rather not carry that risk, leave it off and the file stays readable.',
       long_title:'The three questions worth asking first',
       alt_c_cal:'Yuvomi calendar showing appointments, tasks and birthdays for the whole household',
-      alt_m_inventory:'The inventory module on a phone',
-      alt_m_shopping:'A shared shopping list on a phone',
-      alt_m_rewards:'The rewards ledger on a phone',
-      alt_m_documents:'Family documents on a phone',
-      alt_m_recipes:'The recipe list on a phone',
       jump_label:'Jump to', jump_aria:'Jump to a section',
-      jump_screens:'See it first', jump_swap:'What it replaces', jump_handoff:'Why one app',
+      jump_screens:'See it first', jump_swap:'What it replaces', jump_handoff:'Why one app', jump_family:'For the family',
       jump_modules:'Everything your household needs', jump_longevity:'Before you commit', jump_install:'Install it',
+      fam_title:'On the kitchen wall, in every pocket, for every age.',
+      fam_desc:'Everyone in the house gets their own login from a link, the app sits on their phone’s home screen, and the calendar, the shopping list and the chores are shared by all of you. A terminal, if any, is only for whoever sets it up.',
+      fam_1_t:'The tablet on the kitchen wall',
+      fam_1_d:'Wall mode shows the time, today’s plan and who is up, readable from across the room. The tablet has an account of its own, no family password on the wall: tap a task, pick who did it, and the points go to the right person. Plus a kitchen timer, and photos from your own Immich after a few idle minutes.',
+      fam_2_t:'The app on every phone',
+      fam_2_d:'It goes on the home screen straight from the browser, no app store involved. Reminders arrive as notifications even while it is closed (your server needs HTTPS for that), and the shopping list you opened last stays readable in a shop without signal.',
+      fam_3_t:'An invite, and just the right access',
+      fam_3_d:'An admin sends a link, and the new member picks their own password. Per family role, each module is set to full, read only or not at all, so a child gets their chores and points without the budget. A child with no phone of their own gets an account created directly.',
       swap_rel:'is replaced by',
       swap_eyebrow:'What it replaces', swap_title:'Ten apps, <em>one place.</em>',
       swap_desc:'Ten apps, ten accounts, ten copies of your data on someone else’s server - or one place on yours. Nothing here is a plan or a roadmap: every line is built and shipping today.',
@@ -1604,7 +1763,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       swap_10_a:'a notes app & contacts sync',  swap_10_b:'<b>Notes & Contacts</b> - Markdown notes, CardDAV sync',
       swap_close:'There\'s a calmer way. <span>Self-hosted, and yours.</span>',
       skip_link:'Skip to content',
-      more_scope:'Not a photo library, a password manager or a media server: Yuvomi replaces the apps a household runs on, not your whole server. What you already run can stay. Calendars and contacts sync both ways over CalDAV and CardDAV, documents can live on WebDAV or Google Drive, an idle kitchen tablet can show photos from your own Immich, and API tokens plus the MCP endpoint let the rest of your setup talk to it.',
+      more_scope:'Not a photo library, a password manager or a media server: Yuvomi replaces the apps a household runs on, not your whole server. What you already run can stay. Calendars and contacts sync both ways over CalDAV and CardDAV, documents can live on WebDAV or Google Drive, and API tokens plus the MCP endpoint let the rest of your setup talk to it.',
       m_pantry_t:'Pantry', m_pantry_d:'What is actually in the house: amount, storage location and best-before date, with expiry and low-stock filters, and a two-way handover with the shopping list.',
       m_family_t:'Family', m_family_d:'Member profiles with roles, photos and contact details, kept in sync with Contacts and Birthdays.',
       m_api_t:'API tokens', m_api_d:'Bearer and X-API-Key tokens against a documented OpenAPI 3.1 spec, plus an MCP endpoint at <code>/mcp</code> that lets a client like Claude Desktop drive the API in plain language.',
@@ -1633,18 +1792,20 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       long_eyebrow:'Before you commit', tb_image_k:'Image', tb_image_v:'about 500 MB',
       tb_needs_k:'Needs', tb_needs_v:'256 MB RAM and one port, 3000 by default.',
       tb_writes_k:'Writes', tb_writes_v:'Four volumes you own: data, backups, modules, documents.',
-      tb_out_k:'Outbound', tb_out_v:'Out of the box, one update check against the GitHub releases API. Everything else reaches out only when you use or switch on a feature that needs it: opening the calendar settings loads the list of holiday countries from openholidaysapi.org, finding a logo for a subscription looks up the service’s website, and weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.',
+      tb_out_k:'Outbound', tb_out_v:'Out of the box, one update check against the GitHub releases API. Everything else reaches out only when you use or switch on a feature that needs it.',
+      tb_out_more:'Which features', tb_out_list:'Opening the calendar settings loads the list of holiday countries from openholidaysapi.org, finding a logo for a subscription looks up the service’s website, and weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.',
       tb_data_k:'Your data', tb_data_v:'One SQLite file at', tb_data_v2:'Copying it is the whole export, unless documents live outside the database.',
       hero_install:'Install Yuvomi', hero_demo:'See it in action', tag_nocloud:'No cloud required',
-      gal_eyebrow:'See it first', gal_title:'This is the whole thing, <em>on one screen.</em>',
+      gal_eyebrow:'See it first', gal_title:'Your family’s plans, <em>at a glance.</em>',
       gal_desc:'No demo account, no sales call. The screens your family opens every day, at the size you will actually use them. The rest are further down.',
-      gal_dash_k:'Overview', gal_dash_c:'<b>Everything due today, in one place.</b> Tasks, the calendar, tonight’s dinner and the shopping list, without opening a single other app.',
+      gal_meals_k:'Meals', gal_meals_c:'<b>The whole week of meals, on one board.</b> Breakfast to snacks for every day, dragged into place and there for everyone in the house.',
+      alt_gal_meals:'Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks',
       gal_cal_k:'Calendar', gal_cal_c:'<b>Google, iCloud and Nextcloud, finally in one calendar.</b> Two-way sync, so an appointment added here lands on every phone in the house.',
       proof_modules:'modules', proof_langs:'languages', proof_telemetry:'trackers', proof_mit:'MIT licensed', feat_title:'Everything your household needs',
       /* "for families" war die eine Stelle, die die Solo-Zusage des Heros
          zurücknahm (Persona-Befund in zwei Läufen); "household" ist die
          Positionierung aus PRODUCT.md und deckt beide Zielgruppen. */
-      feat_desc:'A complete set of tools for your household, designed to work together, not scattered across separate apps and tabs.',
+      feat_desc:'Grouped the way the app itself groups them. Anything your household does not need, an admin switches off for everyone, and it disappears from the menu.',
       f_tasks_k:'Tasks', f_tasks_t:'Everyone knows what needs doing.', f_tasks_d:'Shared tasks with deadlines, priorities, subtasks, tags and recurring schedules, assignable to several family members at once.',
       f_tasks_l1:'Kanban board with one-tap status changes', f_tasks_l2:'Multi-member assignment with stacked avatars', f_tasks_l3:'Optional two-way sync with CalDAV reminder lists', f_tasks_l4:'Lock a task so only its creator and admins can change it', f_tasks_l5:'A history of what was completed, by day and by member',
       f_meals_k:'Meals', f_meals_t:'Dinner sorted before anyone asks.', f_meals_d:'A weekly drag-and-drop planner with repeating meals and ingredient lists that export straight to the shopping list in one click.',
@@ -1655,8 +1816,8 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       f_health_l1:'Cycle ring with period & fertile-window predictions', f_health_l2:'Medication reminders with refill alerts', f_health_l3:'Per-entry visibility: private or shared', f_health_l4:'Parents can record a child\u2019s fever and medication',
       m_sched_t:'Schedule', m_sched_d:'Rotating shifts and fixed weekly timetables, with changes for single days and an explicit day off. The calendar shows them as a layer of their own, so changing a pattern never leaves old appointments behind. Off by default; households turn it on.',
       m_waste_t:'Waste collection', m_waste_d:'Weekly, monthly or nth-weekday pickup rhythms, or a municipal ICS calendar imported once or subscribed by URL, with per-occurrence moves and skips, personal reminders, a Dashboard widget and a switchable Calendar layer. Off by default; households turn it on.',
-      more_desc:'The rest, each one independent. Anything your household does not need, an admin switches off for everyone, and it disappears from the menu.',
-      mods_more:'Show all modules', mods_less:'Show fewer modules',
+      grp_plan:'Plan', grp_household:'Household', grp_people:'People', grp_finance:'Finance', grp_settings:'Settings',
+      mods_more:'Show descriptions', mods_less:'Hide descriptions',
       m_docs_t:'Documents', m_docs_d:'Family files with previews, folders, visibility controls and bulk actions. Storage on a local folder, WebDAV or Google Drive; Paperless-ngx and Papra optional.',
       m_notes_t:'Notes & Contacts', m_notes_d:'Colored Markdown sticky notes for recipes, memos and quick reminders, sorted into personal or household categories, with checklists you tick off by tapping them. Plus a shared contact directory with CardDAV sync and vCard import/export.',
       m_cal_t:'Calendar', m_cal_d:'Two-way sync with Google and CalDAV, one-way push to Outlook.com via Microsoft Graph, public ICS subscriptions, recurring events, holiday overlays and per-event visibility.',
@@ -1677,12 +1838,12 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       plat_umbrel:'Available in the Umbrel App Store; everything stays on your Umbrel.',
       plat_unraid:'A Community Apps template: add it straight from the Unraid Apps tab.',
       plat_oneclick:'1-click', plat_start:'Start here', plat_guide:'Guide', to_top:'Back to top',
-      quick_warn:'<b>Now open <code>.env</code> and replace both <code>REPLACE_WITH_…</code> placeholders</b> with the two values you just generated. Yuvomi does not start while a placeholder is still in there. Keep a copy of the key: without it, nobody can open the database again. To run without encryption, clear the <code>DB_ENCRYPTION_KEY</code> line instead.',
-      quick_note:'Then open <code>http://localhost:3000</code>. The first visit walks you through creating your admin account. Prefer a guided setup? The <a href="install.html#installer">step-by-step installer</a> handles HTTPS, SSO and backups for you.', cta_title:'Set it up once. <em>Then the whole family plans with it.</em>', cta_desc:'After that it is yours. No account with us, no subscription, and nothing of ours between your household and its data.',
+      quick_env:'<b>Now open <code>.env</code> and replace both <code>REPLACE_WITH_…</code> placeholders</b> with the two values you just generated. Yuvomi does not start while a placeholder is still in there. Keep a copy of the key with your other passwords. To run without encryption, clear the <code>DB_ENCRYPTION_KEY</code> line instead.',
+      quick_note:'Then open <code>http://localhost:3000</code>. The first visit walks you through creating your admin account. Prefer a guided setup? The <a href="install.html#installer">step-by-step installer</a> handles HTTPS, SSO and backups for you.', cta_title:'Set it up once. <em>Then the whole family plans with it.</em>', cta_desc:'After that it belongs to the household: on every phone and on the kitchen wall, with no account with us, no subscription and nothing of ours in between.',
       /* "Get started" brach als einziger CTA die Installieren-Verbfamilie
          (nav, hero, Sprungmenue sagen alle "Install") - gleiches Ziel, gleiches
          Icon, also auch dasselbe Verb. */
-      cta_install:'Install Yuvomi', cta_gh:'View on GitHub',
+      cta_install:'Install Yuvomi', cta_family:'What the family gets',
       footer_heart:'Built with care for households who value privacy and simplicity.',
       foot_product:'Product', foot_screens:'Screenshots', foot_install:'Install', foot_docs:'Docs & spec',
       foot_guide:'User guide (community)',
@@ -1698,14 +1859,17 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       long_q3:'Was, wenn ich den Verschlüsselungsschlüssel verliere?', long_a3:'<b>Dann ist die Datenbank weg, und wir können euch nicht helfen.</b> Das ist die ehrliche Antwort: SQLCipher hat keinen Wiederherstellungsweg und keine Hintertür, und genau das ist der Sinn der Sache. Verwahrt den Schlüssel wie die, auf die es ankommt. Die Verschlüsselung ist optional; wer dieses Risiko nicht tragen will, lässt sie aus, dann bleibt die Datei lesbar.',
       long_title:'Die drei Fragen, die man vorher stellen sollte',
       alt_c_cal:'Yuvomi-Kalender mit Terminen, Aufgaben und Geburtstagen des ganzen Haushalts',
-      alt_m_inventory:'Das Inventar-Modul auf dem Handy',
-      alt_m_shopping:'Eine geteilte Einkaufsliste auf dem Handy',
-      alt_m_rewards:'Das Belohnungs-Konto auf dem Handy',
-      alt_m_documents:'Familiendokumente auf dem Handy',
-      alt_m_recipes:'Die Rezeptliste auf dem Handy',
       jump_label:'Springen zu', jump_aria:'Springen zu einem Abschnitt',
-      jump_screens:'Erst sehen', jump_swap:'Was es ersetzt', jump_handoff:'Warum eine App',
+      jump_screens:'Erst sehen', jump_swap:'Was es ersetzt', jump_handoff:'Warum eine App', jump_family:'Für die Familie',
       jump_modules:'Alles, was euer Haushalt braucht', jump_longevity:'Bevor ihr euch festlegt', jump_install:'Installieren',
+      fam_title:'An der Küchenwand, in jeder Hosentasche, für jedes Alter.',
+      fam_desc:'Alle im Haus bekommen per Link ein eigenes Konto, die App liegt auf dem Startbildschirm ihres Handys, und Kalender, Einkaufsliste und Aufgaben teilt ihr euch. Ein Terminal braucht, wenn überhaupt, nur wer es einrichtet.',
+      fam_1_t:'Das Tablet an der Küchenwand',
+      fam_1_d:'Der Wandmodus zeigt Uhrzeit, Tagesplan und wer heute dran ist, lesbar quer durch den Raum. Das Tablet hat ein eigenes Konto, kein Familienpasswort an der Wand: Aufgabe antippen, auswählen, wer sie erledigt hat, und die Punkte landen bei der richtigen Person. Dazu ein Küchentimer und nach ein paar ruhigen Minuten Fotos aus eurem eigenen Immich.',
+      fam_2_t:'Die App auf jedem Handy',
+      fam_2_d:'Sie kommt direkt aus dem Browser auf den Startbildschirm, ganz ohne App Store. Erinnerungen kommen als Mitteilung, auch wenn die App geschlossen ist (dafür braucht euer Server HTTPS), und die zuletzt geöffnete Einkaufsliste bleibt lesbar, wenn im Laden kein Netz ist.',
+      fam_3_t:'Eine Einladung und genau die richtigen Rechte',
+      fam_3_d:'Ein Admin schickt einen Link, und das neue Mitglied wählt sein Passwort selbst. Je Familienrolle stellt ihr jedes Modul auf voll, nur lesen oder gar nicht - so hat ein Kind seine Aufgaben und Punkte, aber nicht das Budget. Ein Kind ohne eigenes Handy bekommt sein Konto direkt angelegt.',
       swap_rel:'wird ersetzt durch',
       swap_eyebrow:'Was es ersetzt', swap_title:'Zehn Apps, <em>ein Ort.</em>',
       swap_desc:'Zehn Apps, zehn Konten, zehnmal eure Daten bei jemand anderem - oder ein Ort auf eurem Server. Nichts davon ist angekündigt oder geplant: jede Zeile ist gebaut und ausgeliefert.',
@@ -1721,7 +1885,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       swap_10_a:'eine Notiz-App plus Kontakte-Sync',swap_10_b:'<b>Notizen & Kontakte</b> - Markdown-Notizen, CardDAV-Sync',
       swap_close:'Es geht auch ruhiger. <span>Selbstgehostet, und es gehört euch.</span>',
       skip_link:'Zum Inhalt springen',
-      more_scope:'Keine Fotobibliothek, kein Passwort-Manager, kein Media-Server: Yuvomi ersetzt die Apps, mit denen ein Haushalt läuft, nicht euren ganzen Server. Was ihr schon betreibt, darf bleiben. Kalender und Kontakte synchronisieren in beide Richtungen über CalDAV und CardDAV, Dokumente können auf WebDAV oder Google Drive liegen, ein ruhendes Küchentablett zeigt Fotos aus eurem eigenen Immich, und über API-Tokens samt MCP-Endpunkt spricht der Rest eurer Einrichtung mit Yuvomi.',
+      more_scope:'Keine Fotobibliothek, kein Passwort-Manager, kein Media-Server: Yuvomi ersetzt die Apps, mit denen ein Haushalt läuft, nicht euren ganzen Server. Was ihr schon betreibt, darf bleiben. Kalender und Kontakte synchronisieren in beide Richtungen über CalDAV und CardDAV, Dokumente können auf WebDAV oder Google Drive liegen, und über API-Tokens samt MCP-Endpunkt spricht der Rest eurer Einrichtung mit Yuvomi.',
       m_pantry_t:'Vorrat', m_pantry_d:'Was tatsächlich im Haus ist: Menge, Lagerort und Mindesthaltbarkeit, mit Filtern für Ablauf und knappe Bestände, und einer Übergabe in beide Richtungen mit der Einkaufsliste.',
       m_family_t:'Familie', m_family_d:'Mitgliederprofile mit Rollen, Fotos und Kontaktdaten, synchron mit Kontakten und Geburtstagen.',
       m_api_t:'API-Tokens', m_api_d:'Bearer- und X-API-Key-Tokens gegen eine dokumentierte OpenAPI-3.1-Spezifikation, dazu ein MCP-Endpunkt unter <code>/mcp</code>, über den ein Client wie Claude Desktop die API in natürlicher Sprache bedient.',
@@ -1750,15 +1914,17 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       long_eyebrow:'Bevor ihr euch festlegt', tb_image_k:'Image', tb_image_v:'rund 500 MB',
       tb_needs_k:'Braucht', tb_needs_v:'256 MB RAM und einen Port, standardmäßig 3000.',
       tb_writes_k:'Legt an', tb_writes_v:'Vier Volumes, die euch gehören: Daten, Backups, Module, Dokumente.',
-      tb_out_k:'Nach außen', tb_out_v:'Ab Werk eine Update-Abfrage an die GitHub-Releases-API. Alles andere geht erst nach außen, wenn ihr eine Funktion nutzt oder einschaltet, die es braucht: das Öffnen der Kalender-Einstellungen lädt die Liste der Feiertagsländer von openholidaysapi.org, die Logo-Suche für ein Abo ruft die Website des Dienstes auf, und Wetter, Feiertage, Wechselkurse, Kalender- und Kontakte-Sync, Rezept-Spiegel, Immich, Paperless oder Papra, Push- und Benachrichtigungskanäle, Cloud-Speicher und Backup verbinden sich erst, wenn ihr sie einschaltet.',
+      tb_out_k:'Nach außen', tb_out_v:'Ab Werk eine Update-Abfrage an die GitHub-Releases-API. Alles andere geht erst nach außen, wenn ihr eine Funktion nutzt oder einschaltet, die es braucht.',
+      tb_out_more:'Welche Funktionen', tb_out_list:'Das Öffnen der Kalender-Einstellungen lädt die Liste der Feiertagsländer von openholidaysapi.org, die Logo-Suche für ein Abo ruft die Website des Dienstes auf, und Wetter, Feiertage, Wechselkurse, Kalender- und Kontakte-Sync, Rezept-Spiegel, Immich, Paperless oder Papra, Push- und Benachrichtigungskanäle, Cloud-Speicher und Backup verbinden sich erst, wenn ihr sie einschaltet.',
       tb_data_k:'Eure Daten', tb_data_v:'Eine einzige SQLite-Datei unter', tb_data_v2:'Kopieren ist der ganze Export, solange die Dokumente in der Datenbank liegen.',
       hero_install:'Yuvomi installieren', hero_demo:'App ansehen', tag_nocloud:'Keine Cloud nötig',
-      gal_eyebrow:'Erst sehen', gal_title:'Das ist alles, <em>auf einem Bildschirm.</em>',
+      gal_eyebrow:'Erst sehen', gal_title:'Die Pläne der Familie, <em>auf einen Blick.</em>',
       gal_desc:'Kein Demo-Konto, kein Verkaufsgespräch. Die Bildschirme, die eure Familie täglich öffnet, in der Größe, in der ihr sie wirklich nutzt. Der Rest kommt weiter unten.',
-      gal_dash_k:'Übersicht', gal_dash_c:'<b>Alles, was heute ansteht, an einem Ort.</b> Aufgaben, der Kalender, das Abendessen und die Einkaufsliste, ohne eine einzige weitere App zu öffnen.',
+      gal_meals_k:'Mahlzeiten', gal_meals_c:'<b>Die ganze Essenswoche auf einer Tafel.</b> Vom Frühstück bis zum Snack für jeden Tag, per Ziehen verteilt und für alle im Haus da.',
+      alt_gal_meals:'Yuvomi-Essensplaner mit einer Woche Frühstück, Mittag- und Abendessen und Snacks',
       gal_cal_k:'Kalender', gal_cal_c:'<b>Google, iCloud und Nextcloud, endlich in einem Kalender.</b> Sync in beide Richtungen, damit ein hier eingetragener Termin auf jedem Handy im Haus landet.',
       proof_modules:'Module', proof_langs:'Sprachen', proof_telemetry:'Tracker', proof_mit:'MIT-lizenziert', feat_title:'Alles, was euer Haushalt braucht',
-      feat_desc:'Ein vollständiges Werkzeugset für euren Haushalt, aufeinander abgestimmt statt verstreut über getrennte Apps und Tabs.',
+      feat_desc:'Gegliedert wie in der App selbst. Was euer Haushalt nicht braucht, schaltet ein Admin für alle ab, und es verschwindet aus dem Menü.',
       f_tasks_k:'Aufgaben', f_tasks_t:'Alle wissen, was zu tun ist.', f_tasks_d:'Gemeinsame Aufgaben mit Fristen, Prioritäten, Unteraufgaben, Tags und Wiederholungen, mehreren Mitgliedern gleichzeitig zuweisbar.',
       f_tasks_l1:'Kanban-Board mit Ein-Tipp-Status', f_tasks_l2:'Mehrfachzuweisung mit gestapelten Avataren', f_tasks_l3:'Optionaler Zwei-Wege-Sync mit CalDAV-Erinnerungslisten', f_tasks_l4:'Aufgabe sperren, damit nur Ersteller:in und Admins sie \u00e4ndern', f_tasks_l5:'Ein Verlauf, was erledigt wurde - nach Tag und nach Mitglied',
       f_meals_k:'Mahlzeiten', f_meals_t:'Das Abendessen steht, bevor jemand fragt.', f_meals_d:'Ein wöchentlicher Drag-and-Drop-Planer mit wiederkehrenden Mahlzeiten und Zutatenlisten, die per Klick direkt auf die Einkaufsliste wandern.',
@@ -1769,8 +1935,8 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       f_health_l1:'Zyklus-Ring mit Perioden- & fruchtbare-Tage-Prognose', f_health_l2:'Medikamenten-Erinnerungen mit Nachfüll-Warnung', f_health_l3:'Sichtbarkeit pro Eintrag: privat oder geteilt', f_health_l4:'Eltern tragen Fieber und Medikamente ihres Kindes ein',
       m_sched_t:'Schichtplan', m_sched_d:'Wechselschichten und feste Wochenpläne, mit Änderungen für einzelne Tage und einem ausdrücklichen freien Tag. Der Kalender zeigt sie als eigene Ebene, eine Musteränderung lässt also keine alten Termine zurück. Standardmäßig aus; Haushalte schalten es ein.',
       m_waste_t:'Entsorgung', m_waste_d:'Wöchentliche, monatliche oder Wochentag-Abholrhythmen oder ein kommunaler ICS-Kalender, einmal importiert oder per URL abonniert, mit Verschieben/Ausfallenlassen je Termin, persönlichen Erinnerungen, einem Dashboard-Widget und einer schaltbaren Kalender-Ebene. Standardmäßig aus; Haushalte schalten es ein.',
-      more_desc:'Der Rest, jedes Modul für sich. Was euer Haushalt nicht braucht, schaltet ein Admin für alle ab, und es verschwindet aus dem Menü.',
-      mods_more:'Alle Module zeigen', mods_less:'Weniger Module zeigen',
+      grp_plan:'Planen', grp_household:'Haushalt', grp_people:'Menschen', grp_finance:'Finanzen', grp_settings:'Einstellungen',
+      mods_more:'Beschreibungen zeigen', mods_less:'Beschreibungen ausblenden',
       m_docs_t:'Dokumente', m_docs_d:'Familiendateien mit Vorschau, Ordnern, Sichtbarkeitsregeln und Stapelaktionen. Ablage lokal, per WebDAV oder Google Drive; Paperless-ngx und Papra optional.',
       m_notes_t:'Notizen & Kontakte', m_notes_d:'Farbige Markdown-Haftnotizen für Rezepte, Memos und schnelle Erinnerungen, in persönlichen oder Haushalts-Kategorien, mit Checklisten, die man antippt statt zu bearbeiten. Dazu ein geteiltes Kontaktverzeichnis mit CardDAV-Sync und vCard-Import/-Export.',
       m_cal_t:'Kalender', m_cal_d:'Sync in beide Richtungen mit Google und CalDAV, einseitiger Push nach Outlook.com via Microsoft Graph, öffentliche ICS-Abos, wiederkehrende Termine, Feiertags-Overlays und Sichtbarkeit pro Termin.',
@@ -1791,9 +1957,9 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       plat_umbrel:'Im Umbrel App Store verfügbar; alles bleibt auf eurem Umbrel.',
       plat_unraid:'Ein Community-Apps-Template: direkt über den Unraid-Apps-Tab hinzufügen.',
       plat_oneclick:'1 Klick', plat_start:'Fangt hier an', plat_guide:'Anleitung', to_top:'Nach oben',
-      quick_warn:'<b>Öffnet jetzt <code>.env</code> und ersetzt beide <code>REPLACE_WITH_…</code>-Platzhalter</b> durch die zwei eben erzeugten Werte. Solange noch ein Platzhalter drinsteht, startet Yuvomi nicht. Hebt den Schlüssel gut auf: ohne ihn öffnet niemand die Datenbank wieder. Wer ohne Verschlüsselung fahren will, leert stattdessen die Zeile <code>DB_ENCRYPTION_KEY</code>.',
-      quick_note:'Dann <code>http://localhost:3000</code> öffnen. Beim ersten Aufruf legt ihr euer Admin-Konto an. Lieber geführt? Der <a href="install.html#installer">schrittweise Installer</a> kümmert sich um HTTPS, SSO und Backups.', cta_title:'Einmal einrichten. <em>Dann plant die ganze Familie mit.</em>', cta_desc:'Danach gehört es euch. Kein Konto bei uns, kein Abo, und nichts von uns zwischen eurem Haushalt und seinen Daten.',
-      cta_install:'Yuvomi installieren', cta_gh:'Auf GitHub ansehen',
+      quick_env:'<b>Öffnet jetzt <code>.env</code> und ersetzt beide <code>REPLACE_WITH_…</code>-Platzhalter</b> durch die zwei eben erzeugten Werte. Solange noch ein Platzhalter drinsteht, startet Yuvomi nicht. Legt eine Kopie des Schlüssels zu euren anderen Passwörtern. Wer ohne Verschlüsselung fahren will, leert stattdessen die Zeile <code>DB_ENCRYPTION_KEY</code>.',
+      quick_note:'Dann <code>http://localhost:3000</code> öffnen. Beim ersten Aufruf legt ihr euer Admin-Konto an. Lieber geführt? Der <a href="install.html#installer">schrittweise Installer</a> kümmert sich um HTTPS, SSO und Backups.', cta_title:'Einmal einrichten. <em>Dann plant die ganze Familie mit.</em>', cta_desc:'Danach gehört es dem Haushalt: auf jedem Handy und an der Küchenwand, ohne Konto bei uns, ohne Abo und ohne etwas von uns dazwischen.',
+      cta_install:'Yuvomi installieren', cta_family:'Was die Familie davon hat',
       footer_heart:'Mit Sorgfalt gebaut für Haushalte, die Privatsphäre und Einfachheit schätzen.',
       foot_product:'Produkt', foot_screens:'Screenshots', foot_install:'Installieren', foot_docs:'Doku & Spec',
       foot_guide:'Nutzerhandbuch (Community)',
@@ -1977,9 +2143,27 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
   document.getElementById('langBtn').onclick = function(){ lang = lang === 'en' ? 'de' : 'en'; lsSet('lang', lang); applyLang(); };
   matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function(){ if (!theme) applyTheme(); });
   document.documentElement.classList.add('js');
+  /* Strecke fuer die Handoff-Bewegung: von der Mitte des liefernden Symbols zur
+     Mitte des empfangenden. Gemessen im Moment des Reveals, weil sie an der
+     Labellaenge (also an der Sprache) und am Umbruch haengt. Die Reveal-
+     Verschiebung trifft beide Symbole gleich und faellt aus der Differenz. */
+  function measureHandoff(row){
+    var icos = row.querySelectorAll('.ho-flow .ho-ico');
+    if (icos.length < 2) return;
+    var a = icos[0].getBoundingClientRect(), b = icos[1].getBoundingClientRect();
+    row.style.setProperty('--ho-dx', Math.round((b.left + b.width / 2) - (a.left + a.width / 2)) + 'px');
+    row.style.setProperty('--ho-dy', Math.round((b.top + b.height / 2) - (a.top + a.height / 2)) + 'px');
+  }
   if ('IntersectionObserver' in window) {
     var obs = new IntersectionObserver(function(entries){ entries.forEach(function(e){ if (e.isIntersecting){ e.target.classList.add('vis'); obs.unobserve(e.target); } }); }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
     document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });
+    /* Eigener, spaeterer Ausloeser: der Reveal feuert, sobald 8 % der Zeile im
+       Bild sind - die Bewegung liefe dann am unteren Rand ab, wo noch niemand
+       hinsieht. Sie startet erst, wenn die Zeile zu drei Fuenfteln steht. */
+    /* Stehen mehrere Zeilen zugleich im Bild (Desktop: alle vier), laufen sie
+       nacheinander statt im Gleichschritt - eine Erzaehlung, kein Blinken. */
+    var hoObs = new IntersectionObserver(function(entries){ var k = 0; entries.forEach(function(e){ if (e.intersectionRatio >= 0.6){ measureHandoff(e.target); e.target.style.setProperty('--ho-delay', (k++ * 0.45) + 's'); e.target.classList.add('go'); hoObs.unobserve(e.target); } }); }, { threshold: [0.6] });
+    document.querySelectorAll('.ho-row').forEach(function(el){ hoObs.observe(el); });
   } else { document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('vis'); }); }
   /* Sticky mobile Install pill: reveal only after the hero scrolls out of view,
      so it doesn't duplicate the in-hero Install button on first paint. */
@@ -2066,6 +2250,8 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
     document.addEventListener('click', function(e){ if (!d.contains(e.target)) d.removeAttribute('open'); });
   })();
   addEventListener('resize', syncCodeScroll);
+  /* Papier klappt nichts auf: die Outbound-Liste gehoert auf den Ausdruck. */
+  addEventListener('beforeprint', function(){ document.querySelectorAll('details.tb-more').forEach(function(d){ d.open = true; }); });
   (function(){
     var b = document.getElementById('toTop');
     // Richtung, nicht Position: die beiden fixierten Pillen weichen beim
@@ -2082,12 +2268,14 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
     }
     addEventListener('scroll', sync, { passive: true }); sync();
   })();
-  /* Mobile Modulliste auf- und wieder zuklappen. Beim Aufklappen wandert der
-     Fokus auf die erste neu sichtbare Karte, damit ein Tastatur-Nutzer nicht
-     im Nichts steht. Beim Zuklappen rueckt der Knopf um die verborgenen
-     Karten nach oben und laege sonst ausserhalb des Blicks - scrollIntoView
-     holt ihn zurueck. Das Label wechselt ueber data-t, damit ein spaeterer
-     Sprachwechsel die passende Fassung setzt. */
+  /* Mobile Modulbeschreibungen ein- und wieder ausblenden. Die neuen Zeilen
+     erscheinen UEBER dem Knopf, in allen fuenf Gruppen. Beim Aufklappen geht
+     es deshalb an den Anfang der Liste, und der Fokus sitzt auf dem ersten
+     Gruppenkopf - wer mit der Tastatur kommt, liest von dort weiter, statt
+     unter dem letzten Eintrag zu stehen. Beim Zuklappen schrumpft alles
+     darueber, und der Knopf laege ohne scrollIntoView ausserhalb des Blicks.
+     Das Label wechselt ueber data-t, damit ein spaeterer Sprachwechsel die
+     passende Fassung setzt. */
   (function(){
     var btn = document.getElementById('modToggle'); if (!btn) return;
     var grid = document.getElementById('modGrid'); if (!grid) return;
@@ -2100,8 +2288,12 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       label.setAttribute('data-t', key);
       setRich(label, T[lang][key]);
       if (open) {
-        var first = grid.querySelector('.mod-card:nth-child(7)');
-        if (first) { first.setAttribute('tabindex', '-1'); first.focus({ preventScroll: false }); }
+        var head = grid.querySelector('.mod-group-head');
+        if (head) {
+          head.setAttribute('tabindex', '-1');
+          head.scrollIntoView({ block: 'start' });
+          head.focus({ preventScroll: true });
+        }
       } else {
         btn.scrollIntoView({ block: 'nearest' });
       }

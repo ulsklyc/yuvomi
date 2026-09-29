@@ -185,8 +185,6 @@
 
   --success-ink: #186A2C;   /* --color-success-ink */
   --warn-ink: #8F4F00;      /* --color-warning-ink */
-
-  --grain: 0.025;
 }
 
 /* The explicit choice from the theme toggle. */
