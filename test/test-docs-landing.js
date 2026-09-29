@@ -115,6 +115,16 @@
  *            das kurze Band gegen beide READMEs, unter (3) die Modulzahl ueber
  *            Namen statt Klassen, unter (9) die Kontakte in ihrer Menuegruppe.
  *
+ *       (17) Handwerk aus Runde 2 (2026-09-29, R3): keine Aufnahme traegt ein
+ *            PNG-src im Markup (der Lazy-Loader holte am Schirm eine 414-KB-PNG
+ *            vor dem Theme-/Sprachtausch), jede hat ihre <noscript>-Kopie; kein
+ *            Motiv steht zweimal auf der Landing; der Handoff-Punkt faehrt vom
+ *            Pfeil los, nicht ueber das Label; die ueberspannte Modulkarte gibt
+ *            ihren Ueberschuss an EINE 1fr-Reihe; alle fuenf Seiten tragen die
+ *            eine Leiste aus site.css; das Glas hat die Fallbacks der App fuer
+ *            reduzierte Transparenz und mehr Kontrast; die Plattformkarte hebt
+ *            sich hoechstens 1px wie die Karten der App.
+ *
  * Ausführen: node --test test/test-docs-landing.js   (bzw. npm run test:docs-landing)
  */
 
@@ -1961,7 +1971,9 @@ test('der Farb-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
 });
 
 /** Selektoren, die eine Seite in ihrem eigenen Style-Block neu anlegt, obwohl ein geteiltes Blatt sie fuehrt. */
-const SHARED_SELECTORS = ['.btn', '.btn-primary', '.btn-secondary', '.nav-btn', '.code-block', '.copy-btn', '.reveal', '.reveal.vis', ':focus-visible', '.skip-link'];
+const SHARED_SELECTORS = ['.btn', '.btn-primary', '.btn-secondary', '.nav-btn', '.code-block', '.copy-btn', '.reveal', '.reveal.vis', ':focus-visible', '.skip-link',
+  // Seit Runde 2 (R3): die eine Leiste aller fuenf Seiten.
+  '.topbar', '.bar-row', '.nav-logo', '.nav-logo svg', '.nav-controls'];
 
 function inlineStyles(html) {
   const body = stripComments(html.split(/<\/head>/)[0]);
@@ -2235,7 +2247,10 @@ function heroFindings(html) {
   // dann weichen, und die noscript-Kopie muss es geben.
   if (!/\bsrc=/.test(img)) {
     const hide = inlineStyles(html).flatMap((css) => [...eachRule(css)])
-      .find((r) => r.at.length === 0 && r.selector.split(',').map((x) => x.trim()).includes('html:not(.js) #heroShot'));
+      // Seit Runde 2 (R3) deckt eine allgemeine Regel jede Aufnahme ohne src;
+      // heroShot traegt .sc, faellt also auch darunter.
+      .find((r) => r.at.length === 0 && r.selector.split(',').map((x) => x.trim())
+        .some((x) => x === 'html:not(.js) #heroShot' || (x === 'html:not(.js) img.sc:not([src])' && /\bclass="sc\b/.test(img))));
     if (!hide || !/display:\s*none/.test(hide.body)) found.push('heroShot ohne src steht ohne JS als leerer Kasten (html:not(.js) #heroShot { display: none } fehlt)');
     if (!/id="heroShot">\s*<script>[\s\S]*?<\/script>\s*<noscript><img\b[^>]*\bsrc="/.test(html)) found.push('heroShot ohne <noscript>-Kopie mit src');
   }
@@ -2254,7 +2269,7 @@ test('der LCP-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const noPhone = html.replace('.hero-frame img { aspect-ratio: var(--ar-phone);', '.hero-frame img {');
   assert.notEqual(noPhone, html);
   assert.deepEqual(heroFindings(noPhone), ['kein .hero-frame img { aspect-ratio: var(--ar-phone) } unter max-width:860px']);
-  const noJsBox = html.replace('html:not(.js) #heroShot { display: none; }', '');
+  const noJsBox = html.replace('html:not(.js) #heroShot, html:not(.js) img.sc:not([src]) { display: none; }', '');
   assert.notEqual(noJsBox, html);
   assert.deepEqual(heroFindings(noJsBox), ['heroShot ohne src steht ohne JS als leerer Kasten (html:not(.js) #heroShot { display: none } fehlt)']);
 });
@@ -2931,4 +2946,317 @@ test('der Guard aus (16) erkennt den Schaden, gegen den er gebaut ist', () => {
   assert.ok(hit(r2Findings(html, no2fa), /long_a4 \(en\): haengt an haushaltsweite Pflicht/), '2FA-Guard blind');
   // Die Frage verschwindet aus dem Markup.
   assert.ok(hit(r2Findings(html.replace('<dt data-t="long_q4">', '<dt>'), real), /long_q4\/long_a4 fehlen im Markup/));
+});
+
+
+// ── (17) Handwerk aus Runde 2 (R3) ──────────────────────────────────────────
+
+/**
+ * Keine Aufnahme mit PNG-src im Markup. Anlass: `.hero-float img` trug
+ * `src="screenshots/tasks-light-mobile.png"` mit loading=lazy. Das
+ * Woerterbuch-Skript mitten im Body loest ein erstes Layout aus, bevor
+ * applyShots() am Dateiende Theme und Sprache waehlt - der Lazy-Loader sah das
+ * Bild im ersten Bildschirm und holte die englische helle PNG (414 KB), auch im
+ * Dark und auf Deutsch, in fuenf von acht Desktop-Laeufen (ein Wettlauf, also
+ * nicht jedes Mal). Jede umschaltbare Aufnahme (`img.sc`) steht deshalb ohne
+ * src da, ihre PNG lebt nur in der <noscript>-Kopie direkt dahinter, und eine
+ * Regel blendet die src-lose Fassung ohne JS aus.
+ */
+function pngSrcFindings(page, html) {
+  const found = [];
+  const masked = maskNonMarkup(html).replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, (m) => m.replace(/[^\n]/g, ' '));
+  for (const m of masked.matchAll(/<img\b[^>]*>/g)) {
+    const src = (m[0].match(/\bsrc="([^"]+)"/) || [])[1];
+    if (src && /\.png$/i.test(src)) found.push(`${page}: <img src="${src}"> ausserhalb von <noscript>`);
+  }
+  const plain = maskNonMarkup(html);
+  for (const m of plain.matchAll(/<img\b[^>]*\bclass="sc\b[^"]*"[^>]*>/g)) {
+    if (/\bsrc=/.test(m[0])) continue;
+    const light = (m[0].match(/\bdata-light="([^"]+)"/) || [])[1];
+    // Die Kopie folgt direkt (beim Hero hinter seinem Inline-Skript, das die
+    // Maske zu Leerzeichen gemacht hat).
+    const after = html.slice(m.index + m[0].length).replace(/^\s*<script>[\s\S]*?<\/script>/, '');
+    const copy = (after.match(/^\s*<noscript><img\b[^>]*\bsrc="([^"]+)"[^>]*><\/noscript>/) || [])[1];
+    if (!copy) found.push(`${page}: ${light || 'Aufnahme'} ohne src und ohne <noscript>-Kopie dahinter`);
+    else if (copy !== light) found.push(`${page}: <noscript>-Kopie zeigt ${copy}, das Bild ${light}`);
+  }
+  if (/<img\b[^>]*\bclass="sc\b[^"]*"(?![^>]*\bsrc=)[^>]*>/.test(plain)) {
+    const hide = inlineStyles(html).flatMap((css) => [...eachRule(css)])
+      .find((r) => !r.at.length && r.selector.split(',').map((x) => x.trim()).includes('html:not(.js) img.sc:not([src])'));
+    if (!hide || !/display:\s*none/.test(hide.body)) found.push(`${page}: src-lose Aufnahmen stehen ohne JS als leere Kaesten (html:not(.js) img.sc:not([src]) fehlt)`);
+  }
+  return found;
+}
+
+/**
+ * Jedes Motiv einmal. Die Aufgaben-Ansicht stand im Hero-Float UND in der
+ * Planen-Karte, die Essenswoche in der Galerie UND in der Haushalt-Karte - der
+ * zweite "Beleg" wiederholte den ersten. Gezaehlt wird das Modul der Aufnahme
+ * (`meals-light-web` und `meals-light-mobile` sind dasselbe Motiv).
+ */
+function motifFindings(html) {
+  const seen = new Map();
+  const found = [];
+  for (const m of maskNonMarkup(html).matchAll(/<img\b[^>]*\bdata-light="screenshots\/([a-z0-9-]+?)-light-(?:web|mobile)\.png"[^>]*>/g)) {
+    const alt = (m[0].match(/\bdata-alt-t="([^"]+)"/) || [])[1] || '?';
+    if (seen.has(m[1])) found.push(`Motiv ${m[1]} steht zweimal (${seen.get(m[1])}, ${alt})`);
+    else seen.set(m[1], alt);
+  }
+  if (seen.size < 5) found.push(`nur ${seen.size} Motive gefunden - Muster veraltet?`);
+  return found;
+}
+
+/**
+ * Der Handoff-Punkt faehrt ueber den Pfeil, nicht ueber das Label. Bis Runde 2
+ * mass measureHandoff() von Symbol-Mitte zu Symbol-Mitte, der Punkt lief also
+ * quer durch den Text des ersten Schritts. Geometrisch belegt ist das nur im
+ * Browser (Handoff-Probe in r3/); hier haelt die Suite die Bauweise, die es
+ * moeglich macht: Start und Strecke kommen vom Pfeil, der Bezugsrahmen ist
+ * .ho-flow, der Punkt steht an --ho-x/--ho-y.
+ */
+function handoffPathFindings(html) {
+  const found = [];
+  const fn = (html.match(/function measureHandoff\(row\)\{[\s\S]*?\n  \}/) || [])[0];
+  if (!fn) return ['measureHandoff() nicht gefunden'];
+  if (!/querySelector\('\.ho-flow > \.ho-arrow'\)/.test(fn)) found.push('measureHandoff() misst nicht vom Pfeil');
+  if (/querySelectorAll\('\.ho-flow \.ho-ico'\)/.test(fn)) found.push('measureHandoff() misst wieder von Symbol zu Symbol (ueber das Label)');
+  for (const v of ['--ho-x', '--ho-y', '--ho-dx', '--ho-dy']) if (!fn.includes(`'${v}'`)) found.push(`measureHandoff() setzt ${v} nicht`);
+  const rules = inlineStyles(html).flatMap((css) => [...eachRule(css)]).filter((r) => !r.at.length);
+  const flow = rules.find((r) => r.selector === '.ho-flow' && /position:\s*relative/.test(r.body));
+  if (!flow) found.push('.ho-flow ist nicht der Bezugsrahmen des Punkts (position: relative fehlt)');
+  const token = rules.find((r) => r.selector === 'html.js .ho-token');
+  if (!token || !/left:\s*var\(--ho-x/.test(token.body) || !/top:\s*var\(--ho-y/.test(token.body)) found.push('der Punkt steht nicht an --ho-x/--ho-y');
+  if (rules.some((r) => r.selector === '.ho-ico' && /position:\s*relative/.test(r.body))) found.push('.ho-ico ist wieder Bezugsrahmen - der Punkt startet dann im Symbol');
+  return found;
+}
+
+/**
+ * Die Modulkarte ueberspannt --rows Reihen; die letzte davon ist 1fr und nimmt
+ * den Ueberschuss. Mit lauter auto-Reihen verteilte das Raster ihn gleich, und
+ * aufgeklappt stand ein 92px-Loch zwischen Rezepte und Einkauf. repeat() nimmt
+ * keine Rechnung aus einer Variable, deshalb stehen Zahl und Spurenliste
+ * nebeneinander am Element - und muessen dasselbe sagen.
+ */
+function rowTrackFindings(html) {
+  const found = [];
+  const groups = [...maskNonMarkup(html).matchAll(/class="mod-group-body" style="([^"]*)"/g)];
+  if (!groups.length) return ['keine .mod-group-body mit --rows gefunden - Muster veraltet?'];
+  for (const [, style] of groups) {
+    const rows = Number((style.match(/--rows:\s*(\d+)/) || [])[1]);
+    const tracks = (style.match(/--row-tracks:\s*([^;]+)/) || [])[1];
+    if (!rows) { found.push(`${style}: ohne --rows`); continue; }
+    if (rows < 2) continue;
+    if (!tracks) { found.push(`--rows: ${rows} ohne --row-tracks - der Ueberschuss verteilt sich wieder auf alle Reihen`); continue; }
+    const list = tracks.trim().split(/\s+/);
+    if (list.length !== rows) found.push(`--rows: ${rows}, aber --row-tracks nennt ${list.length} Spuren (${tracks.trim()})`);
+    if (list[list.length - 1] !== '1fr' || list.slice(0, -1).some((t) => t !== 'auto')) found.push(`--row-tracks "${tracks.trim()}": erwartet auto ... auto 1fr`);
+  }
+  const rule = inlineStyles(html).flatMap((css) => [...eachRule(css)]).find((r) => !r.at.length && r.selector === '.mod-group-body' && /grid-template-rows:\s*var\(--row-tracks/.test(r.body));
+  if (!rule) found.push('.mod-group-body liest --row-tracks nicht');
+  return found;
+}
+
+/**
+ * Eine Leiste fuer alle fuenf Seiten. Die Rechtsseiten zeichneten ihre eigene
+ * (deckend, 81px, nicht fixiert, 14px-Knoepfe) unter einem Kommentar, der
+ * schon "one header" versprach. Jetzt: <header class="site-bar"> mit .topbar,
+ * .bar-row und .nav-logo auf jeder Seite, jede Bedienung darin ist eine
+ * .nav-btn-Kapsel, und die Leiste selbst (.topbar) steht nur in site.css (Hoehe
+ * --bar-h, Glas). Das Glas darf NICHT am <header> sitzen: backdrop-filter (wie
+ * transform und filter) macht ein Element zum Bezugsrahmen seiner fixierten
+ * Kinder, und die Install-Pille der Startseite steht fixiert IM Header - im
+ * ersten Entwurf dieser Runde sprang sie so an den oberen Bildschirmrand.
+ */
+function sharedBarFindings(pages, siteCss, legalCss) {
+  const found = [];
+  for (const [page, html] of pages) {
+    const heads = [...maskNonMarkup(html).matchAll(/<header class="([^"]*)"[\s\S]*?<\/header>/g)];
+    const bar = heads.filter((h) => h[1] === 'site-bar');
+    if (bar.length !== 1) { found.push(`${page}: ${bar.length}x <header class="site-bar"> statt einmal`); continue; }
+    const block = bar[0][0];
+    if (!/class="[^"]*\btopbar\b/.test(block)) found.push(`${page}: Leiste ohne .topbar`);
+    if (!/class="[^"]*\bbar-row\b/.test(block)) found.push(`${page}: Leiste ohne .bar-row`);
+    if (!/<a\b[^>]*class="nav-logo"/.test(block)) found.push(`${page}: Leiste ohne .nav-logo`);
+    for (const c of block.matchAll(/<(a|button)\b([^>]*)>/g)) {
+      const cls = (c[2].match(/class="([^"]*)"/) || [])[1] || '';
+      // Die Install-Pille (.mobile-cta) steht mit im Banner-Landmark, schwebt
+      // aber am Daumen und gehoert nicht zur Leiste.
+      if (/\bnav-logo\b|\bmobile-cta\b/.test(cls)) continue;
+      if (!/\bnav-btn\b/.test(cls) && !/href="#/.test(c[2])) found.push(`${page}: <${c[1]} class="${cls}"> in der Leiste ist keine .nav-btn`);
+    }
+  }
+  const rules = [...eachRule(siteCss)];
+  const bar = rules.find((r) => r.selector === '.topbar' && !r.at.length);
+  if (!bar) found.push('site.css: .topbar fehlt');
+  else {
+    for (const [re, what] of [[/position:\s*fixed/, 'fest'], [/height:\s*var\(--bar-h\)/, 'Hoehe --bar-h'], [/background:\s*var\(--glass-bg\)/, 'Glasflaeche'], [/(?:^|[;\s])backdrop-filter:\s*var\(--glass-blur\)/, 'Glas-Blur']]) {
+      if (!re.test(bar.body)) found.push(`site.css: .topbar nicht ${what}`);
+    }
+  }
+  const sheets = [['site.css', siteCss], ['legal.css', legalCss], ...pages.flatMap(([p, h]) => inlineStyles(h).map((css) => [p, css]))];
+  for (const [where, css] of sheets) {
+    for (const r of eachRule(css)) {
+      if (!r.selector.split(',').some((x) => x.trim() === '.site-bar')) continue;
+      for (const [n, v] of declarations(r.body)) {
+        if (/^(?:-webkit-)?backdrop-filter$|^transform$|^filter$|^contain$|^will-change$/.test(n) && v !== 'none') found.push(`${where}: .site-bar { ${n}: ${v} } - der Header wird Bezugsrahmen der fixierten Install-Pille`);
+      }
+    }
+  }
+  for (const r of eachRule(legalCss)) {
+    if (/header\.top|\.back-link|\.lang-link|\.theme-btn|\.top-actions/.test(r.selector)) found.push(`legal.css: eigene Kopfleiste zurueck (${r.selector})`);
+    for (const sel of r.selector.split(',').map((x) => x.trim())) {
+      if (!r.at.length && SHARED_SELECTORS.includes(sel)) found.push(`legal.css: ${sel} steht schon in site.css`);
+    }
+  }
+  return found;
+}
+
+/**
+ * Glas nur, wo es darf. Die App schaltet unter prefers-reduced-transparency und
+ * prefers-contrast: more alle Glasflaechen deckend und ohne Blur (tokens.css,
+ * Abschnitt "Accessibility"); die Website hatte keinen der beiden Faelle. Die
+ * Fallbacks muessen auch den Media-Zwilling der Dark-Liste schlagen (dessen
+ * Selektor ist spezifischer als :root), und jeder backdrop-filter der Site muss
+ * --glass-blur lesen, sonst erreicht ihn der Schalter nicht.
+ */
+function glassFallbackFindings(siteCss, sheets) {
+  const found = [];
+  const rules = [...eachRule(siteCss)];
+  for (const q of ['prefers-reduced-transparency:\\s*reduce', 'prefers-contrast:\\s*more']) {
+    const r = rules.find((x) => x.at.some((a) => new RegExp(q).test(a)) && /--glass-bg/.test(x.body));
+    if (!r) { found.push(`site.css: kein Glas-Fallback unter (${q.replace('\\s*', ' ')})`); continue; }
+    const sels = r.selector.split(',').map((x) => x.trim());
+    if (!sels.includes(':root') || !sels.includes(':root:not([data-theme="light"])')) found.push(`site.css: Fallback (${q.replace('\\s*', ' ')}) schlaegt nicht beide Dark-Listen (Selektoren: ${r.selector})`);
+    const d = Object.fromEntries(declarations(r.body));
+    if (d['--glass-bg'] !== 'var(--surface)') found.push(`site.css: Fallback (${q.replace('\\s*', ' ')}) laesst --glass-bg durchscheinend (${d['--glass-bg']})`);
+    if (d['--glass-blur'] !== 'none') found.push(`site.css: Fallback (${q.replace('\\s*', ' ')}) laesst den Blur an (${d['--glass-blur']})`);
+  }
+  for (const { where, css } of sheets) {
+    for (const r of eachRule(css)) {
+      for (const [n, v] of declarations(r.body)) {
+        if (/^(?:-webkit-)?backdrop-filter$/.test(n) && v !== 'var(--glass-blur)' && v !== 'none') found.push(`${where}: ${r.selector} { ${n}: ${v} } liest --glass-blur nicht`);
+      }
+    }
+  }
+  return found;
+}
+
+/** Die Plattformkarte hebt sich hoechstens 1px (App: translateY(-1px)), nicht 4px. */
+function platLiftFindings(html) {
+  const found = [];
+  for (const r of inlineStyles(html).flatMap((css) => [...eachRule(css)])) {
+    if (!/\.plat-card:hover$/.test(r.selector.trim())) continue;
+    const m = r.body.match(/translateY\(\s*-?(\d+(?:\.\d+)?)px\s*\)/);
+    if (m && Number(m[1]) > 1) found.push(`${r.selector} hebt die Karte ${m[1]}px an`);
+  }
+  return found;
+}
+
+/** Der GitHub-Knopf verliert unter 600px seine Beschriftung nur sichtbar - mit display:none hiess er "★ 1.6k". */
+function ghNameFindings(html) {
+  return inlineStyles(html).flatMap((css) => [...eachRule(css)])
+    .filter((r) => /\.nav-gh span|#gh-stars-nav/.test(r.selector) && /display:\s*none/.test(r.body))
+    .map((r) => `${r.selector} nimmt dem GitHub-Link den Namen (display: none)`);
+}
+
+function siteSheets() {
+  const sheets = [{ where: 'assets/site.css', css: read('assets/site.css') }, { where: 'assets/legal.css', css: read('assets/legal.css') }];
+  for (const p of PAGES) for (const css of inlineStyles(read(p))) sheets.push({ where: p, css });
+  return sheets;
+}
+
+test('docs: keine Aufnahme laedt ihre PNG ausserhalb von <noscript>', () => {
+  assert.deepEqual(PAGES.flatMap((p) => pngSrcFindings(p, read(p))), []);
+});
+
+test('index.html: jedes Motiv steht einmal auf der Seite', () => {
+  assert.deepEqual(motifFindings(read('index.html')), []);
+});
+
+test('index.html: der Handoff-Punkt faehrt vom Pfeil, und die Modulkarte laesst kein Loch', () => {
+  const html = read('index.html');
+  assert.deepEqual([...handoffPathFindings(html), ...rowTrackFindings(html)], []);
+});
+
+test('docs: alle fuenf Seiten tragen die eine Leiste aus site.css', () => {
+  assert.deepEqual(sharedBarFindings(PAGES.map((p) => [p, read(p)]), read('assets/site.css'), read('assets/legal.css')), []);
+});
+
+test('site.css: das Glas hat die Fallbacks der App, und jeder Blur haengt am Schalter', () => {
+  assert.deepEqual(glassFallbackFindings(read('assets/site.css'), siteSheets()), []);
+});
+
+test('index.html: die Plattformkarte hebt sich wie die App, der GitHub-Knopf behaelt seinen Namen', () => {
+  const html = read('index.html');
+  assert.deepEqual([...platLiftFindings(html), ...ghNameFindings(html)], []);
+});
+
+test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () => {
+  const html = read('index.html');
+  const hit = (list, re) => list.some((l) => re.test(l));
+  // Bildlast: das alte PNG-src am Hero-Float, und eine Kopie, die fehlt oder abweicht.
+  const floatPng = html.replace('<img class="sc" data-light="screenshots/shopping-light-mobile.png"', '<img class="sc" src="screenshots/shopping-light-mobile.png" data-light="screenshots/shopping-light-mobile.png"');
+  assert.notEqual(floatPng, html, 'Vorbedingung: Hero-Float mit data-light shopping');
+  assert.ok(hit(pngSrcFindings('index.html', floatPng), /src="screenshots\/shopping-light-mobile\.png"> ausserhalb/));
+  const noCopy = html.replace(/(data-alt-t="alt_f_tasks_m"[^>]*>)\s*<noscript>[\s\S]*?<\/noscript>/, '$1');
+  assert.notEqual(noCopy, html);
+  assert.ok(hit(pngSrcFindings('index.html', noCopy), /tasks-light-mobile\.png ohne src und ohne <noscript>-Kopie/));
+  const wrongCopy = html.replace('<noscript><img class="sc feat-phone" src="screenshots/recipes-light-mobile.png"', '<noscript><img class="sc feat-phone" src="screenshots/meals-light-mobile.png"');
+  assert.notEqual(wrongCopy, html);
+  assert.ok(hit(pngSrcFindings('index.html', wrongCopy), /Kopie zeigt screenshots\/meals-light-mobile\.png/));
+  const noHide = html.replace('html:not(.js) #heroShot, html:not(.js) img.sc:not([src]) { display: none; }', 'html:not(.js) #heroShot { display: none; }');
+  assert.notEqual(noHide, html);
+  assert.ok(hit(pngSrcFindings('index.html', noHide), /leere Kaesten/));
+  // Motive: das Aufgaben-Telefon zurueck in den Hero, die Essenswoche zurueck in die Haushalt-Karte.
+  const dupTasks = html.replace('data-light="screenshots/shopping-light-mobile.png" data-dark="screenshots/shopping-dark-mobile.png" alt="Yuvomi shopping list on mobile" data-alt-t="alt_hero_m"', 'data-light="screenshots/tasks-light-mobile.png" data-dark="screenshots/tasks-dark-mobile.png" alt="Yuvomi tasks on mobile" data-alt-t="alt_hero_m"');
+  assert.notEqual(dupTasks, html);
+  assert.ok(hit(motifFindings(dupTasks), /Motiv tasks steht zweimal/));
+  const dupMeals = html.replace('data-light="screenshots/recipes-light-mobile.png" data-dark="screenshots/recipes-dark-mobile.png"', 'data-light="screenshots/meals-light-mobile.png" data-dark="screenshots/meals-dark-mobile.png"');
+  assert.notEqual(dupMeals, html);
+  assert.ok(hit(motifFindings(dupMeals), /Motiv meals steht zweimal/));
+  // Handoff: die alte Messung von Symbol zu Symbol, und der Punkt wieder im Symbol verankert.
+  const oldPath = html.replace("row.querySelector('.ho-flow > .ho-arrow')", "row.querySelectorAll('.ho-flow .ho-ico')[0]").replace('    .ho-flow { position: relative; }\n', '    .ho-ico { position: relative; }\n');
+  assert.notEqual(oldPath, html);
+  const hp = handoffPathFindings(oldPath);
+  assert.ok(hit(hp, /misst nicht vom Pfeil/) && hit(hp, /Bezugsrahmen/) && hit(hp, /startet dann im Symbol/), hp.join(' | '));
+  // Raster: ohne Spurenliste, und mit einer, die nicht zur Zahl passt.
+  const noTracks = html.replace('style="--rows: 2; --row-tracks: auto 1fr"', 'style="--rows: 2"');
+  assert.notEqual(noTracks, html);
+  assert.ok(hit(rowTrackFindings(noTracks), /--rows: 2 ohne --row-tracks/));
+  const badTracks = html.replace('style="--rows: 3; --row-tracks: auto auto 1fr"', 'style="--rows: 3; --row-tracks: auto 1fr"');
+  assert.notEqual(badTracks, html);
+  assert.ok(hit(rowTrackFindings(badTracks), /nennt 2 Spuren/));
+  // Leiste: die alte Kopfzeile der Rechtsseiten und ihre Regeln in legal.css.
+  const pages = PAGES.map((p) => [p, read(p)]);
+  const oldHead = pages.map(([p, h]) => [p, p === 'privacy.html' ? h.replace('<header class="site-bar">', '<header class="top">').replace('class="nav-btn nav-back"', 'class="back-link"') : h]);
+  assert.ok(hit(sharedBarFindings(oldHead, read('assets/site.css'), read('assets/legal.css')), /privacy\.html: 0x <header class="site-bar">/));
+  const oldBtn = pages.map(([p, h]) => [p, p === 'datenschutz.html' ? h.replace('class="nav-btn" hreflang="en"', 'class="lang-link" hreflang="en"') : h]);
+  assert.ok(hit(sharedBarFindings(oldBtn, read('assets/site.css'), read('assets/legal.css')), /datenschutz\.html: <a class="lang-link"> in der Leiste ist keine \.nav-btn/));
+  const legalOld = read('assets/legal.css') + '\nheader.top { background: var(--surface); padding: 18px 0; }\n.nav-logo { font-size: 18px; }\n';
+  const lf = sharedBarFindings(pages, read('assets/site.css'), legalOld);
+  assert.ok(hit(lf, /eigene Kopfleiste zurueck/) && hit(lf, /legal\.css: \.nav-logo steht schon/), lf.join(' | '));
+  const opaque = read('assets/site.css').replace('  background: var(--glass-bg);\n  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);\n  border-bottom', '  background: var(--surface);\n  border-bottom');
+  assert.notEqual(opaque, read('assets/site.css'));
+  assert.ok(hit(sharedBarFindings(pages, opaque, read('assets/legal.css')), /nicht Glasflaeche/));
+  // Der erste Entwurf dieser Runde: das Glas am <header> - die Pille sprang nach oben.
+  const onHeader = read('assets/site.css') + '\n.site-bar { -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }\n';
+  assert.ok(hit(sharedBarFindings(pages, onHeader, read('assets/legal.css')), /Bezugsrahmen der fixierten Install-Pille/));
+  const noTop = pages.map(([p, h]) => [p, p === 'impressum.html' ? h.replace('<div class="topbar">', '<div>') : h]);
+  assert.ok(hit(sharedBarFindings(noTop, read('assets/site.css'), read('assets/legal.css')), /impressum\.html: Leiste ohne \.topbar/));
+  // Glas: ein Fallback fehlt, einer schlaegt den Media-Zwilling nicht, und ein Blur als Literal.
+  const site = read('assets/site.css');
+  const noRt = site.replace('@media (prefers-reduced-transparency: reduce)', '@media (prefers-reduced-motion: reduce)');
+  assert.notEqual(noRt, site);
+  assert.ok(hit(glassFallbackFindings(noRt, []), /kein Glas-Fallback unter \(prefers-reduced-transparency/));
+  const weak = site.replace('@media (prefers-contrast: more) {\n  :root, :root:not([data-theme="light"]) {', '@media (prefers-contrast: more) {\n  :root {');
+  assert.notEqual(weak, site);
+  assert.ok(hit(glassFallbackFindings(weak, []), /schlaegt nicht beide Dark-Listen/));
+  assert.ok(hit(glassFallbackFindings(site, [{ where: 'x', css: '.time-badge { backdrop-filter: blur(18px); }' }]), /liest --glass-blur nicht/));
+  // Karte und GitHub-Name: der alte 4px-Hub und das alte display:none.
+  const lift = html.replace('.plat-card:hover { transform: translateY(-1px);', '.plat-card:hover { transform: translateY(-4px);');
+  assert.notEqual(lift, html);
+  assert.ok(hit(platLiftFindings(lift), /hebt die Karte 4px/));
+  const nameless = html.replace('.nav-gh span:not(#gh-stars-nav) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }', '.nav-gh span:not(#gh-stars-nav) { display: none; }');
+  assert.notEqual(nameless, html);
+  assert.ok(hit(ghNameFindings(nameless), /nimmt dem GitHub-Link den Namen/));
 });

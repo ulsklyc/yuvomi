@@ -142,7 +142,7 @@
        Textlink musste sich den Strich selbst holen - zwei taten es nicht. */
     a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
     a:hover { text-decoration-thickness: 2px; }
-    .nav-logo, .mobile-cta, .plat-card, .to-top, .foot-col a { text-decoration: none; }
+    .mobile-cta, .plat-card, .to-top, .foot-col a { text-decoration: none; }
     /* Trefferflaeche der Textlinks: die Zeile gibt ihnen 17px, SC 2.5.8 will
        24. Senkrechtes Polster an einem Inline-Element vergroessert die Flaeche,
        die den Klick annimmt, ohne die Zeilenhoehe anzufassen - der Absatz
@@ -156,19 +156,10 @@
     .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
 
     /* ===== NAV =====
-       Class-scoped, not `nav {}`: the footer link block is a <nav> too now, and
-       a bare element selector would have pinned it to the top of the viewport. */
-    .topbar {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      background: var(--glass-bg);
-      -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
-      border-bottom: 1px solid var(--border);
-      height: 62px;
-    }
-    .topbar .wrap { display: flex; align-items: center; justify-content: space-between; height: 100%; }
-    .nav-logo { display: flex; align-items: center; gap: 11px; font-weight: 700; font-size: 1.2rem; letter-spacing: -0.02em; color: var(--text-1);
-      flex-shrink: 0; min-height: 44px; margin-right: 12px; }
-    .nav-logo svg { width: 34px; height: 34px; filter: drop-shadow(0 3px 8px var(--accent-glow)); }
+       Die Leiste selbst (.topbar: fest, --bar-h, Glas), ihre Zeile (.bar-row),
+       das Logo und die Kapselknoepfe stehen in assets/site.css - dieselbe
+       Leiste auf allen fuenf Seiten. Hier nur, was die Startseite mehr hat:
+       Fortschrittslinie, Sprungmenue, GitHub und Installieren. */
     /* Fortschrittslinie unter der Topbar: der billigste ehrliche Weg, "wo bin
        ich" auf einer Seite von 15 Bildschirmen zu beantworten. Sie sitzt IN der
        Leiste, verbraucht also keine eigene Hoehe. */
@@ -235,9 +226,16 @@
     /* The star count made the GitHub pill wrap to two lines and it then set the
        height of the whole bar; below 400px the wordmark yields to the icon so the
        logo stops touching the language button. */
-    .nav-gh { white-space: nowrap; }
+    .nav-gh { white-space: nowrap; position: relative; }
     @media (max-width: 400px) {
       .topbar .nav-logo { font-size: 0; gap: 0; margin-right: 8px; min-width: 44px; }
+    }
+    /* Bei 320px endete die Leiste bei 351px, der GitHub-Knopf ragte 31px aus
+       dem Bild (Runde 2). Darunter bleibt er ein Symbolknopf; die Sternzahl
+       geht nur sichtbar weg und bleibt Teil des Namens. */
+    @media (max-width: 360px) {
+      .nav-gh { padding: 0; }
+      #gh-stars-nav { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     }
     /* .nav-btn steht in site.css. Der Installieren-Knopf der Leiste ist ein
        Primaerknopf in Leistengroesse: dieselbe flache Akzentflaeche, kein Glow. */
@@ -255,7 +253,10 @@
     /* Das Hero-Bild hat absichtlich kein src (siehe Kommentar am Bild); ohne
        JS bekommt es auch keins und stand als leerer Kasten mit Alt-Text ueber
        der <noscript>-Aufnahme. Ohne JS zeigt nur die noscript-Kopie. */
-    html:not(.js) #heroShot { display: none; }
+    /* Seit Runde 2 gilt das fuer JEDE umschaltbare Aufnahme: keine traegt ein
+       PNG-src im Markup (sonst laedt der Lazy-Loader es, bevor applyShots()
+       Theme und Sprache waehlt), jede hat ihre <noscript>-Kopie. */
+    html:not(.js) #heroShot, html:not(.js) img.sc:not([src]) { display: none; }
     /* Deutsche Sitzung, solange das Woerterbuch hinter der Proof-Leiste noch
        nicht geparst ist: der erste Bildschirm bleibt unsichtbar, statt
        englisch zu erscheinen und beim Tausch zu springen. Auf schneller
@@ -490,17 +491,21 @@
        liefernden Moduls vom ersten zum zweiten Symbol, und das empfangende
        Symbol nimmt ihn kurz auf - genau die Aussage der Zeile, als Weg statt als
        Pfeil. Einmal je Zeile (ihr Observer gibt sie danach frei), nur
-       transform und opacity. Die Strecke misst das Skript beim Ausloesen
-       (--ho-dx/--ho-dy): sie haengt an der Labellaenge und laeuft mobil
-       senkrecht. Ohne JS, im Druck und bei reduzierter Bewegung gibt es den
-       Punkt nicht; die Zeile sagt dasselbe dann statisch. */
-    .ho-ico { position: relative; }
+       transform und opacity. Ohne JS, im Druck und bei reduzierter Bewegung
+       gibt es den Punkt nicht; die Zeile sagt dasselbe dann statisch.
+       Die Bahn liegt seit Runde 2 nur ueber dem Pfeil: vom Pfeilanfang bis
+       zur Mitte des empfangenden Symbols (steht das Ziel nach einem Umbruch
+       nicht auf der Pfeilachse, bis zur Pfeilspitze). Vorher lief der Punkt
+       von Symbol zu Symbol und damit quer ueber den ersten Labeltext. Start
+       (--ho-x/--ho-y, relativ zu .ho-flow) und Strecke (--ho-dx/--ho-dy)
+       misst das Skript beim Ausloesen; mobil laeuft sie senkrecht. */
+    .ho-flow { position: relative; }
     .ho-token { display: none; }
-    html.js .ho-token { display: block; position: absolute; left: 50%; top: 50%; z-index: 2;
+    html.js .ho-token { display: block; position: absolute; left: var(--ho-x, 0px); top: var(--ho-y, 0px); z-index: 2;
       width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; pointer-events: none;
       background: var(--m); box-shadow: 0 0 0 3px color-mix(in srgb, var(--m) 24%, transparent); opacity: 0; }
-    .ho-row.go .ho-token { animation: ho-travel 1s cubic-bezier(0.65, 0, 0.35, 1) calc(.25s + var(--ho-delay, 0s)) both; }
-    .ho-row.go .ho-step--to .ho-ico { animation: ho-receive .5s var(--ease-out) calc(1.1s + var(--ho-delay, 0s)) both; }
+    .ho-row.go .ho-token { animation: ho-travel .7s cubic-bezier(0.65, 0, 0.35, 1) calc(.25s + var(--ho-delay, 0s)) both; }
+    .ho-row.go .ho-step--to .ho-ico { animation: ho-receive .5s var(--ease-out) calc(.85s + var(--ho-delay, 0s)) both; }
     @keyframes ho-travel {
       0%   { opacity: 0; transform: translate(0, 0) scale(.5); }
       16%  { opacity: 1; transform: translate(calc(var(--ho-dx, 0px) * .06), calc(var(--ho-dy, 0px) * .06)) scale(1); }
@@ -575,6 +580,15 @@
     .mod-group-head::after { content: ''; flex: 1; height: 1px; background: var(--border-strong); }
     .mod-group-body { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 32px; align-items: start; }
     .mod-group-body > .feat-row { grid-column: span 2; grid-row: span var(--rows, 1); margin-bottom: 8px; }
+    /* Die Karte ist hoeher als die Eintraege neben ihr. Mit lauter auto-Reihen
+       verteilt das Raster den Ueberschuss gleichmaessig auf alle Reihen, die sie
+       ueberspannt - aufgeklappt stand so ein 92px-Loch zwischen Rezepte und
+       Einkauf (Runde 2). Ist die letzte ueberspannte Reihe 1fr, nimmt sie den
+       Ueberschuss allein, und die Eintraege stehen dicht untereinander. Die
+       Spurenliste steht am Element neben --rows (repeat() nimmt keine
+       Rechnung aus einer Variable); test:docs-landing prueft, dass beide
+       dieselbe Zahl sagen. */
+    .mod-group-body { grid-template-rows: var(--row-tracks, none); }
     .mod-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 52px 32px; align-items: start; }
     .mod-pair .mod-group-body { grid-template-columns: minmax(0, 1fr); }
     .mod-pair .mod-group-body > .feat-row { grid-column: auto; grid-row: auto; }
@@ -649,6 +663,7 @@
       font-size: 0.98rem; line-height: 1.7; color: var(--text-2); text-align: center; text-wrap: pretty; }
     @media (max-width: 860px) {
       .mod-group-body, .mod-pair { grid-template-columns: minmax(0, 1fr); }
+      .mod-group-body { grid-template-rows: none; }
       .mod-group-body > .feat-row { grid-column: auto; grid-row: auto; }
     }
     /* Progressive Disclosure, seit Runde 2 (2026-09-29) auf jeder Breite.
@@ -662,6 +677,7 @@
        beim .reveal-Fallback alles da, weil dieses Publikum JS gern abschaltet. */
     .mod-list { display: contents; }
     .mod-toggle { display: none; }
+    html.js .mod-groups:not(.expanded) .mod-group-body { grid-template-rows: none; }
     html.js .mod-groups:not(.expanded) .mod-group-body > .feat-row { grid-row: auto; }
     html.js .mod-groups:not(.expanded) .mod-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
       column-gap: 20px; align-self: start; }
@@ -686,6 +702,14 @@
       html.js .mod-groups:not(.expanded) .mod-group--flat .mod-list { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
       html.js .mod-toggle { margin-top: 24px; }
     }
+    /* Unter 380px bleiben der Namensspalte neben dem Symbol 84-104px, und
+       "Haushaltshilfe" oder "Housekeeping" liefen 2-26px darueber hinaus - bei
+       320px schob das die ganze Seite 2px breit (gemessen in Runde 2, R3).
+       Die Namen trennen dort nach Silben; anywhere ist nur das Netz, falls
+       der Browser kein Woerterbuch fuer die Sprache hat. */
+    @media (max-width: 380px) {
+      html.js .mod-groups:not(.expanded) .mod-card h4 { hyphens: auto; -webkit-hyphens: auto; overflow-wrap: anywhere; }
+    }
 
 
     /* ===== Platform / Install anywhere ===== */
@@ -703,7 +727,10 @@
       background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 24px;
       box-shadow: var(--shadow-sm); transition: transform .25s var(--ease-out), box-shadow .25s, border-color .25s; color: inherit;
     }
-    .plat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--border-strong); }
+    /* Die ganze Karte ist der Link, ein Hover-Zeichen darf sie also tragen -
+       aber das der App: 1px Hub und die naechste Schattenstufe (wie deren
+       klickbare Karten), nicht 4px Sprung unter einem lg-Schatten. */
+    .plat-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
     .plat-logo { width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--r-md);
       background: color-mix(in srgb, var(--pc, var(--accent)) 12%, transparent); color: var(--pc, var(--accent)); }
     .plat-logo svg { width: 26px; height: 26px; fill: currentColor; }
@@ -968,14 +995,16 @@
     @media (max-width: 600px) {
       .hero { padding: 120px 0 56px; }
       /* Das Handy-Float verdeckte bei 390px rund 40% der Dashboard-Aufnahme -
-         ausgerechnet deren rechte Spalte - und zeigte dieselbe Aufgaben-Ansicht,
-         die 2.000px tiefer die erste Feature-Karte traegt. Auf dem Telefon ist
-         der eine Beweis mehr wert als die Collage. */
+         ausgerechnet deren rechte Spalte. Auf dem Telefon ist der eine Beweis
+         mehr wert als die Collage. (Es zeigt seit Runde 2 die Einkaufsliste;
+         die Aufgaben-Ansicht traegt allein die Planen-Karte.) */
       .hero-float { display: none; }
       .gallery { padding: 64px 0 16px; }
       .gal-cap p { font-size: 0.95rem; }
       .cta-box { padding: 52px 24px; }
-      .nav-gh span:not(#gh-stars-nav) { display: none; }
+      /* Nur sichtbar weg, nicht aus dem Namen: mit display:none hiess der Link
+         fuer Screenreader nur noch "★ 1.6k". */
+      .nav-gh span:not(#gh-stars-nav) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
       /* Zwei Knoepfe, zwei Breiten, je nach Sprache in anderer Reihenfolge
          umgebrochen (DE 224/180px, EN 186/192px). Gestapelt und gleich breit
          stehen sie ruhig - in beiden Sprachen an derselben Stelle, und kein
@@ -1082,7 +1111,7 @@
 <header class="site-bar">
 <nav class="topbar" data-t-aria="nav_main" aria-label="Main">
   <div class="nav-progress" aria-hidden="true"><span id="navBar"></span></div>
-  <div class="wrap">
+  <div class="wrap bar-row">
     <a href="#top" class="nav-logo" aria-label="Yuvomi">
       <svg viewBox="0 0 160 160" fill="none" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#6c3aed"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#g)"/><g fill="white" fill-opacity="0.82"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg>
       Yuvomi
@@ -1171,8 +1200,15 @@
         <script>document.getElementById('heroShot')&&(function(i){try{var t=localStorage.getItem('yuvomi-theme')||localStorage.getItem('oikos-theme'),d=t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches),l=localStorage.getItem('yuvomi-lang')||localStorage.getItem('oikos-lang')||((navigator.language||'en').toLowerCase().indexOf('de')===0?'de':'en'),m=matchMedia('(max-width:860px)').matches,k=d?'dark':'light',b=i.dataset[m&&i.dataset[k+'M']?k+'M':k],p=l!=='en'?b.replace('screenshots/','screenshots/'+l+'/'):b;i.onerror=function(){i.onerror=null;i.srcset='';i.src=b;};i.srcset=p.replace(/\.png$/,'@1x.webp')+' 1x, '+p.replace(/\.png$/,'.webp')+' 2x';i.src=p.replace(/\.png$/,'.webp');}catch(e){i.src=i.dataset.light;}})(document.getElementById('heroShot'));</script>
         <noscript><img class="sc" src="screenshots/dashboard-light-web.png" alt="Yuvomi dashboard showing today's tasks, calendar, meals and shopping at a glance" width="1400" height="1050"></noscript>
       </div>
+      <!-- Einkaufsliste statt Aufgaben: dieselbe Aufgaben-Aufnahme traegt die
+           Planen-Karte weiter unten, dort in lesbarer Groesse (Critique Runde 2).
+           Kein src im Markup, wie bei jeder umschaltbaren Aufnahme dieser Seite:
+           mit src holte der Lazy-Loader am Schirm die englische helle PNG
+           (414 KB), sobald das Woerterbuch-Skript das erste Layout ausloeste -
+           vor applyShots(), und in jedem Theme und jeder Sprache. -->
       <div class="hero-float">
-        <img class="sc" data-light="screenshots/tasks-light-mobile.png" data-dark="screenshots/tasks-dark-mobile.png" src="screenshots/tasks-light-mobile.png" alt="Yuvomi tasks on mobile" data-alt-t="alt_hero_m" loading="lazy" width="440" height="956">
+        <img class="sc" data-light="screenshots/shopping-light-mobile.png" data-dark="screenshots/shopping-dark-mobile.png" alt="Yuvomi shopping list on mobile" data-alt-t="alt_hero_m" loading="lazy" width="440" height="956">
+        <noscript><img class="sc" src="screenshots/shopping-light-mobile.png" alt="Yuvomi shopping list on mobile" loading="lazy" width="440" height="956"></noscript>
       </div>
     </div>
   </div>
@@ -1258,10 +1294,10 @@
       ho_3_a:'A receipt gets filed', ho_3_b:'It’s attached to the expense',
       ho_3_d:'Attach it to the budget entry from the documents you already keep, or upload it on the spot. Filed once, findable from both sides.',
       alt_hero:"Yuvomi dashboard showing today's tasks, calendar, meals and shopping at a glance",
-      alt_hero_m:"Yuvomi tasks on mobile",
+      alt_hero_m:"Yuvomi shopping list on mobile",
       alt_f_health_m:"Health vitals on mobile",
       alt_f_tasks_m:"Tasks on mobile",
-      alt_f_meals_m:"Meals on mobile",
+      alt_f_recipes_m:"Recipes on mobile",
       alt_f_budget_m:"Budget on mobile",
       qs_c1:'# Pre-built image - Docker', qs_c2:'# two values: one for SESSION_SECRET, one for DB_ENCRYPTION_KEY',
       nav_main:'Main', foot_nav:'Footer', code_label:'Command block',
@@ -1380,10 +1416,10 @@
       ho_3_a:'Ein Beleg wird abgelegt', ho_3_b:'Er hängt an der Buchung',
       ho_3_d:'Hängt ihn aus euren vorhandenen Dokumenten an den Budget-Eintrag oder ladet ihn direkt hoch. Einmal ablegen, von beiden Seiten auffindbar.',
       alt_hero:"Yuvomi-Übersicht: Aufgaben, Kalender, Mahlzeiten und Einkauf des Tages auf einen Blick",
-      alt_hero_m:"Yuvomi-Aufgaben auf dem Handy",
+      alt_hero_m:"Yuvomi-Einkaufsliste auf dem Handy",
       alt_f_health_m:"Gesundheitswerte auf dem Handy",
       alt_f_tasks_m:"Aufgaben auf dem Handy",
-      alt_f_meals_m:"Mahlzeiten auf dem Handy",
+      alt_f_recipes_m:"Rezepte auf dem Handy",
       alt_f_budget_m:"Budget auf dem Handy",
       qs_c1:'# Fertiges Image - Docker', qs_c2:'# zwei Werte: einer für SESSION_SECRET, einer für DB_ENCRYPTION_KEY',
       nav_main:'Hauptnavigation', foot_nav:'Fußzeile', code_label:'Befehlsblock',
@@ -1588,7 +1624,8 @@
           <p data-t="gal_meals_c"><b>Every meal of the week, planned in one place.</b> Breakfast to snacks, dragged into place and there for everyone in the house.</p>
         </figcaption>
         <div class="gal-frame">
-          <img class="sc" data-light="screenshots/meals-light-web.png" data-light-m="screenshots/meals-light-mobile.png" data-dark-m="screenshots/meals-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/meals-dark-web.png" src="screenshots/meals-light-web.png" alt="Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks" data-alt-t="alt_gal_meals" loading="lazy" decoding="async" width="900" height="675">
+          <img class="sc" data-light="screenshots/meals-light-web.png" data-light-m="screenshots/meals-light-mobile.png" data-dark-m="screenshots/meals-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/meals-dark-web.png" alt="Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks" data-alt-t="alt_gal_meals" loading="lazy" decoding="async" width="900" height="675">
+          <noscript><img class="sc" src="screenshots/meals-light-web.png" alt="Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks" loading="lazy" width="900" height="675"></noscript>
         </div>
       </figure>
       <figure class="gal-item reveal" style="--m: var(--m-calendar)">
@@ -1597,7 +1634,8 @@
           <p data-t="gal_cal_c"><b>Google, iCloud and Nextcloud, finally in one calendar.</b> Two-way sync, so an appointment added here lands on every phone in the house.</p>
         </figcaption>
         <div class="gal-frame">
-          <img class="sc" data-light="screenshots/calendar-light-web.png" data-light-m="screenshots/calendar-light-mobile.png" data-dark-m="screenshots/calendar-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/calendar-dark-web.png" src="screenshots/calendar-light-web.png" alt="Yuvomi calendar showing appointments, tasks and birthdays for the whole household" data-alt-t="alt_c_cal" loading="lazy" decoding="async" width="900" height="675">
+          <img class="sc" data-light="screenshots/calendar-light-web.png" data-light-m="screenshots/calendar-light-mobile.png" data-dark-m="screenshots/calendar-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/calendar-dark-web.png" alt="Yuvomi calendar showing appointments, tasks and birthdays for the whole household" data-alt-t="alt_c_cal" loading="lazy" decoding="async" width="900" height="675">
+          <noscript><img class="sc" src="screenshots/calendar-light-web.png" alt="Yuvomi calendar showing appointments, tasks and birthdays for the whole household" loading="lazy" width="900" height="675"></noscript>
         </div>
       </figure>
       <!-- Tasks and Budget used to sit here too, with the same two images the
@@ -1808,7 +1846,7 @@
     <div class="mod-groups" id="modGrid">
       <div class="mod-group reveal">
         <h3 class="mod-group-head" data-t="grp_plan">Plan</h3>
-        <div class="mod-group-body" style="--rows: 3">
+        <div class="mod-group-body" style="--rows: 3; --row-tracks: auto auto 1fr">
         <div class="feat-row" style="--m: var(--m-tasks)">
           <div class="feat-info">
             <span class="feat-kicker"><span class="k-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span data-t="f_tasks_k">Tasks</span></span>
@@ -1823,7 +1861,8 @@
             </ul>
           </div>
           <div class="feat-visual">
-            <img class="sc feat-phone" data-light="screenshots/tasks-light-mobile.png" data-dark="screenshots/tasks-dark-mobile.png" src="screenshots/tasks-light-mobile.png" alt="Tasks on mobile" data-alt-t="alt_f_tasks_m" loading="lazy" width="440" height="956">
+            <img class="sc feat-phone" data-light="screenshots/tasks-light-mobile.png" data-dark="screenshots/tasks-dark-mobile.png" alt="Tasks on mobile" data-alt-t="alt_f_tasks_m" loading="lazy" width="440" height="956">
+            <noscript><img class="sc feat-phone" src="screenshots/tasks-light-mobile.png" alt="Tasks on mobile" loading="lazy" width="440" height="956"></noscript>
           </div>
         </div>
           <div class="mod-list">
@@ -1844,7 +1883,7 @@
       </div>
       <div class="mod-group reveal">
         <h3 class="mod-group-head" data-t="grp_household">Household</h3>
-        <div class="mod-group-body" style="--rows: 2">
+        <div class="mod-group-body" style="--rows: 2; --row-tracks: auto 1fr">
         <div class="feat-row" style="--m: var(--m-meals)">
           <div class="feat-info">
             <span class="feat-kicker"><span class="k-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2"/><path d="M5 2v20"/><path d="M19 2v20"/><path d="M19 2a4 4 0 0 0-4 4v6h4"/></svg></span><span data-t="f_meals_k">Meals</span></span>
@@ -1860,7 +1899,8 @@
             </ul>
           </div>
           <div class="feat-visual">
-            <img class="sc feat-phone" data-light="screenshots/meals-light-mobile.png" data-dark="screenshots/meals-dark-mobile.png" src="screenshots/meals-light-mobile.png" alt="Meals on mobile" data-alt-t="alt_f_meals_m" loading="lazy" width="440" height="956">
+            <img class="sc feat-phone" data-light="screenshots/recipes-light-mobile.png" data-dark="screenshots/recipes-dark-mobile.png" alt="Recipes on mobile" data-alt-t="alt_f_recipes_m" loading="lazy" width="440" height="956">
+            <noscript><img class="sc feat-phone" src="screenshots/recipes-light-mobile.png" alt="Recipes on mobile" loading="lazy" width="440" height="956"></noscript>
           </div>
         </div>
           <div class="mod-list">
@@ -1916,7 +1956,8 @@
               </ul>
             </div>
             <div class="feat-visual">
-              <img class="sc feat-phone" data-light="screenshots/health-vitals-light-mobile.png" data-dark="screenshots/health-vitals-dark-mobile.png" src="screenshots/health-vitals-light-mobile.png" alt="Health vitals on mobile" data-alt-t="alt_f_health_m" loading="lazy" style="left:-20px;right:auto" width="440" height="956">
+              <img class="sc feat-phone" data-light="screenshots/health-vitals-light-mobile.png" data-dark="screenshots/health-vitals-dark-mobile.png" alt="Health vitals on mobile" data-alt-t="alt_f_health_m" loading="lazy" style="left:-20px;right:auto" width="440" height="956">
+              <noscript><img class="sc feat-phone" src="screenshots/health-vitals-light-mobile.png" alt="Health vitals on mobile" style="left:-20px;right:auto" loading="lazy" width="440" height="956"></noscript>
             </div>
           </div>
             <div class="mod-list">
@@ -1950,7 +1991,8 @@
               </ul>
             </div>
             <div class="feat-visual">
-              <img class="sc feat-phone" data-light="screenshots/budget-light-mobile.png" data-dark="screenshots/budget-dark-mobile.png" src="screenshots/budget-light-mobile.png" alt="Budget on mobile" data-alt-t="alt_f_budget_m" loading="lazy" style="left:-20px;right:auto" width="440" height="956">
+              <img class="sc feat-phone" data-light="screenshots/budget-light-mobile.png" data-dark="screenshots/budget-dark-mobile.png" alt="Budget on mobile" data-alt-t="alt_f_budget_m" loading="lazy" style="left:-20px;right:auto" width="440" height="956">
+              <noscript><img class="sc feat-phone" src="screenshots/budget-light-mobile.png" alt="Budget on mobile" style="left:-20px;right:auto" loading="lazy" width="440" height="956"></noscript>
             </div>
           </div>
           </div>
@@ -2311,16 +2353,26 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
   document.getElementById('langBtn').onclick = function(){ lang = lang === 'en' ? 'de' : 'en'; lsSet('lang', lang); applyLang(); };
   matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function(){ if (!theme) applyTheme(); });
   /* Die Klasse `js` setzt das Kopfskript, vor dem ersten Bild. */
-  /* Strecke fuer die Handoff-Bewegung: von der Mitte des liefernden Symbols zur
-     Mitte des empfangenden. Gemessen im Moment des Reveals, weil sie an der
-     Labellaenge (also an der Sprache) und am Umbruch haengt. Die Reveal-
-     Verschiebung trifft beide Symbole gleich und faellt aus der Differenz. */
+  /* Bahn fuer die Handoff-Bewegung: vom Anfang des Pfeils zur Mitte des
+     empfangenden Symbols - nie ueber einen Labeltext (Runde 2: von Symbol zu
+     Symbol fuhr der Punkt quer durch das erste Label). Steht das Ziel nach
+     einem Umbruch nicht auf der Pfeilachse, endet die Bahn an der
+     Pfeilspitze. Gemessen im Moment des Reveals, weil die Lage an der
+     Sprache und am Umbruch haengt; die Reveal-Verschiebung trifft alle drei
+     Rechtecke gleich und faellt aus den Differenzen. */
   function measureHandoff(row){
-    var icos = row.querySelectorAll('.ho-flow .ho-ico');
-    if (icos.length < 2) return;
-    var a = icos[0].getBoundingClientRect(), b = icos[1].getBoundingClientRect();
-    row.style.setProperty('--ho-dx', Math.round((b.left + b.width / 2) - (a.left + a.width / 2)) + 'px');
-    row.style.setProperty('--ho-dy', Math.round((b.top + b.height / 2) - (a.top + a.height / 2)) + 'px');
+    var flow = row.querySelector('.ho-flow'), arrow = row.querySelector('.ho-flow > .ho-arrow'), to = row.querySelector('.ho-step--to .ho-ico');
+    if (!flow || !arrow || !to) return;
+    var f = flow.getBoundingClientRect(), a = arrow.getBoundingClientRect(), b = to.getBoundingClientRect();
+    var down = getComputedStyle(flow).flexDirection === 'column';
+    var x0 = down ? a.left + a.width / 2 : a.left, y0 = down ? a.top : a.top + a.height / 2;
+    var bx = b.left + b.width / 2, by = b.top + b.height / 2;
+    var onAxis = down ? Math.abs(bx - x0) < 4 : Math.abs(by - y0) < 4;
+    var x1 = onAxis ? bx : (down ? x0 : a.right), y1 = onAxis ? by : (down ? a.bottom : y0);
+    row.style.setProperty('--ho-x', Math.round(x0 - f.left) + 'px');
+    row.style.setProperty('--ho-y', Math.round(y0 - f.top) + 'px');
+    row.style.setProperty('--ho-dx', Math.round(x1 - x0) + 'px');
+    row.style.setProperty('--ho-dy', Math.round(y1 - y0) + 'px');
   }
   if ('IntersectionObserver' in window) {
     var obs = new IntersectionObserver(function(entries){ entries.forEach(function(e){ if (e.isIntersecting){ e.target.classList.add('vis'); obs.unobserve(e.target); } }); }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });

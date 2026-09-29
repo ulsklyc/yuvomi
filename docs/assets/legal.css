@@ -32,82 +32,29 @@ body {
 
 .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; width: 100%; }
 
-/* Header: logo, then the way back ("Overview"/"Übersicht"), the language
-   switch (privacy/datenschutz only) and the theme toggle - the order, labels
-   and 34px logo of install.html's bar, so the site has one header, not two.
-   Every control is a capsule, as in the app - a square icon button is a
-   circle. */
-header.top {
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  padding: 18px 0;
-}
-header.top .wrap {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.nav-logo {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  gap: 10px;
-  font-weight: 700;
-  font-size: 18px;
-  color: var(--text-1);
-  text-decoration: none;
-}
-.nav-logo svg { width: 34px; height: 34px; }
-.top-actions { display: flex; align-items: center; gap: 14px; }
-/* Bis zur Re-Kritik hatten die Rechtsseiten als einzige keinen
-   Theme-Umschalter. Sie uebernahmen zwar die Wahl von den Hauptseiten, aber
-   wer aus einer Suche direkt hier landet, hatte keine - und die
-   Datenschutzseite ist der einzige Beleg fuer die "0 Tracker" der Startseite. */
-.theme-btn {
-  display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0;
-  border-radius: var(--r-full); border: 1px solid var(--border); background: var(--bg);
-  color: var(--text-2); cursor: pointer; transition: border-color .15s, color .15s;
-}
-.theme-btn:hover { border-color: var(--border-strong); color: var(--text-1); }
-.theme-btn svg { width: 17px; height: 17px; }
-/* Sprachwechsel zwischen den beiden Fassungen der Datenschutzerklaerung. */
-.lang-link { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 14px;
-  border-radius: var(--r-full); border: 1px solid var(--border); background: var(--bg);
-  color: var(--text-2); font-size: 14px; font-weight: 600; text-decoration: none;
-  transition: border-color .15s, color .15s; }
-.lang-link:hover { color: var(--accent-on-soft); border-color: var(--accent); background: var(--accent-soft); }
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  color: var(--text-2);
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 500;
-  padding: 8px 16px;
-  border-radius: var(--r-full);
-  border: 1px solid var(--border);
-  transition: color .15s, border-color .15s, background-color .15s;
-}
-.back-link svg { width: 16px; height: 16px; margin-right: 6px; flex-shrink: 0; }
-/* Auf der Akzenttoenung --accent-on-soft, nicht --accent: das stand im Dark
-   bei 4.38:1 (Critique 2026-09-29), bei beiden Kapseln. */
-.back-link:hover {
-  color: var(--accent-on-soft);
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-/* On a phone the four controls did not fit one row: "Deutsch" and "Back to
-   start" broke onto two lines and the wordmark split as "Yuvo / mi" (390px,
-   measured). The wordmark yields to the icon, as on index.html below 400px,
-   and the labels stay on one line. */
-@media (max-width: 480px) {
-  header.top .nav-logo { font-size: 0; gap: 0; min-width: 44px; }
-  .top-actions { gap: 8px; }
-  .lang-link, .back-link { white-space: nowrap; padding: 8px 12px; }
-}
+/* Header: the site's one bar (.topbar, .bar-row, .nav-logo, .nav-controls,
+   .nav-btn from site.css) - fixed, glass, --bar-h high, the same capsules as
+   index.html and install.html. The order follows install.html: logo, the way
+   back ("Overview"/"Übersicht"), the language switch (privacy/datenschutz
+   only, a link to the other document), the theme toggle. Until round 2 these
+   pages drew a header of their own: opaque, 81px, not fixed, 14px controls,
+   under a comment that already called it "one header". Only the column width
+   stays the page's own - the bar's row sits on the 820px text column.
 
-main { flex: 1; padding: 48px 0 64px; }
+   On a phone the row did not fit: the wordmark yields to the icon (as on the
+   other pages), and below 400px the way back keeps its chevron and drops its
+   label from view - the logo beside it leads to the same page, and the label
+   stays in the link's name. */
+@media (max-width: 480px) {
+  .topbar .nav-logo { font-size: 0; gap: 0; margin-right: 8px; min-width: 44px; }
+}
+@media (max-width: 400px) {
+  .nav-back { padding: 0; }
+  .nav-back-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+.nav-back { position: relative; }
+
+main { flex: 1; padding: calc(var(--bar-h) + 48px) 0 64px; }
 
 h1 {
   font-size: clamp(28px, 4vw, 40px);
@@ -132,8 +79,8 @@ h2 {
 }
 h2:first-of-type { margin-top: 0; }
 /* Every section carries an id, so a single section can be linked to
-   directly; the jump lands a little below the top edge. */
-main h2 { scroll-margin-top: 24px; }
+   directly; the jump lands a little below the fixed bar. */
+main h2 { scroll-margin-top: calc(var(--bar-h) + 24px); }
 h3 {
   font-size: 16px;
   font-weight: 700;
@@ -267,8 +214,9 @@ footer.bot nav a { padding: 6px 2px; min-height: 44px; display: inline-flex; ali
 @media print {
   html { scroll-behavior: auto; }
   body { background: #fff; color: #000; }
-  .to-top, .back-link { display: none !important; }
-  header.top, .info-block, .toc { background: transparent; }
+  .to-top { display: none !important; }
+  main { padding-top: 24px; }
+  .info-block, .toc { background: transparent; }
   .info-block, .toc, table, tr { break-inside: avoid; }
   h2 { break-after: avoid; }
   a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; word-break: break-all; }

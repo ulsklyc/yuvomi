@@ -38,7 +38,7 @@
   <link rel="stylesheet" href="assets/site.css">
   <link rel="stylesheet" href="assets/legal.css">
   <script>
-    /* Honor the theme the visitor picked on the main pages (no toggle here). */
+    /* Honor the theme picked on any page before the first paint; the bar's toggle writes the same key. */
     (function(){
       try {
         var t = localStorage.getItem('yuvomi-theme') || localStorage.getItem('oikos-theme');
@@ -50,8 +50,9 @@
 <body>
 <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
 
-<header class="top">
-  <div class="wrap">
+<header class="site-bar">
+ <div class="topbar">
+  <div class="wrap bar-row">
     <a href="index.html" class="nav-logo">
       <svg viewBox="0 0 160 160" fill="none" aria-hidden="true">
         <defs>
@@ -66,15 +67,16 @@
       </svg>
       Yuvomi
     </a>
-    <div class="top-actions">
-      <a href="index.html" class="back-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>Übersicht</a>
-      <a href="privacy.html" class="lang-link" hreflang="en" lang="en">English</a>
-      <button class="theme-btn" id="themeBtn" type="button" aria-pressed="false" aria-label="Design umschalten">
+    <div class="nav-controls">
+      <a href="index.html" class="nav-btn nav-back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg><span class="nav-back-label">Übersicht</span></a>
+      <a href="privacy.html" class="nav-btn" hreflang="en" lang="en"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/></svg>English</a>
+      <button class="nav-btn" id="themeBtn" type="button" aria-pressed="false" aria-label="Design umschalten">
         <svg aria-hidden="true" id="sunIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         <svg aria-hidden="true" id="moonIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
     </div>
   </div>
+ </div>
 </header>
 
 <main id="main-content" tabindex="-1">

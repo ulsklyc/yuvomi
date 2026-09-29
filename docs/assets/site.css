@@ -12,17 +12,20 @@
       not load the app's public/styles/tokens.css: a static site should not
       depend on the application's stylesheet, and the app's ladder carries far
       more rungs than a landing page needs.
-   2. The few components every page draws the same way - focus ring, skip
-      link, buttons, the code plate, the reveal-on-scroll fade. index.html and
-      install.html each carried their own copy of these and had drifted apart
-      (different button padding, code-plate corners, reveal distance, and a
-      copy chip that turned green-on-white in one page's dark mode only).
+   2. The few components every page draws the same way - the top bar with
+      its logo and capsule controls, focus ring, skip link, buttons, the code
+      plate, the reveal-on-scroll fade. index.html and install.html each
+      carried their own copy of these and had drifted apart (different button
+      padding, code-plate corners, reveal distance, and a copy chip that
+      turned green-on-white in one page's dark mode only); the legal pages
+      drew a second, opaque 81px header of their own until round 2.
 
    WHERE THE VALUES COME FROM. Most colours, shadows and radii are app tokens,
    and the comment beside each one names its source in tokens.css. Not all of
    them are: the type scale, --r-sm/--r-2xl, the device-frame radii, the hero
-   shadow and the code plate are the page's own and say so. The nine module
-   family tones (--f-*) are checked against tokens.css by test:docs-landing.
+   shadow and the code plate are the page's own and say so. The module
+   family tones are checked against tokens.css by test:docs-landing: eight
+   --f-* here, and the app's ninth family (overview) is --accent itself.
 
    Why they follow the app at all: the page is largely made OF the app. Its
    screenshots show the shipped interface; a landing page may be louder than
@@ -117,8 +120,8 @@
   --info: #0663C7;           /* --color-info */
   --info-soft: #E0EFFF;      /* --color-info-light */
 
-  /* Module accents: the app's nine family tones (tokens.css section 4,
-     --_family-*). The app gave up one tone per module for one tone per area
+  /* Module accents: the app's family tones (tokens.css section 4,
+     --_family-*) - eight written down here, the ninth is --accent (below). The app gave up one tone per module for one tone per area
      of life - modules of the same area share it and are told apart by their
      icon. This page still carried six single-module tones from before that
      (recipes teal, shopping pink, notes amber, contacts blue, housekeeping and
@@ -162,9 +165,10 @@
   --m-settings: var(--f-neutral);
 
   /* The code plate keeps ONE palette in both themes - it is a terminal, and a
-     terminal does not turn white. It borrows the app's dark neutrals so it
-     reads as the same material as a dark-mode card, but deliberately NOT the
-     dark surface #2B2825: --code-comment would fall to 4.51:1 there.
+     terminal does not turn white. --code-bg #262422 is the app's FORMER dark
+     card surface (replaced by #2B2825 in its dark-mode pass of 2026-08-17),
+     kept here on purpose for the code palette: on the current #2B2825
+     --code-comment would fall to 4.51:1. It no longer names a live app token.
      --code-accent doubles as the focus ring on the plate.
 
      Ratios against --code-bg - all four pass AA:
@@ -213,10 +217,16 @@
   --shadow-hero: 0 32px 80px rgba(0,0,0,0.20), 0 10px 30px rgba(0,0,0,0.08);
 
   /* Glass for the top bar and the two floating badges: --color-surface-glass
-     and --glass-border. The blur is the page's own. */
+     and --glass-border. The blur is the page's own. Both turn opaque under
+     prefers-reduced-transparency and prefers-contrast (end of the token
+     section). */
   --glass-bg: rgba(250,250,252,0.62);
   --glass-border: rgba(255,255,255,0.65);
   --glass-blur: blur(18px) saturate(180%);
+
+  /* The top bar's height, one value for all five pages: the legal pages pad
+     their column by it, index and install their heroes. */
+  --bar-h: 62px;
 
   /* One curve, one name. Exponential ease-out: nothing here is a glass
      element, and overshoot on a hover reads as wobble. */
@@ -335,7 +345,60 @@
   }
 }
 
+/* Glass off, as in the app (tokens.css "Accessibility: prefers-reduced-
+   transparency" / "prefers-contrast: more"): the top bar becomes the opaque
+   card surface without blur; under more contrast its edge takes the text
+   colour. The selectors repeat those of the lists above - :root and the
+   media twin :root:not([data-theme="light"]), whose higher specificity would
+   otherwise keep the dark glass - so the fallback wins in every theme. Every
+   backdrop-filter on the site reads --glass-blur (test:docs-landing), so
+   this one switch reaches all of them. */
+@media (prefers-reduced-transparency: reduce) {
+  :root, :root:not([data-theme="light"]) {
+    --glass-bg: var(--surface);
+    --glass-blur: none;
+    --glass-border: var(--border);
+  }
+}
+@media (prefers-contrast: more) {
+  :root, :root:not([data-theme="light"]) {
+    --glass-bg: var(--surface);
+    --glass-blur: none;
+    --glass-border: var(--text-1);
+  }
+}
+
 /* ===== Shared components ================================================== */
+
+/* The top bar. ONE bar for all five pages: fixed, --bar-h high, glass over
+   the page. The legal pages used to draw their own - opaque, 81px, not
+   fixed, with differently sized controls - so a visitor crossing from the
+   install guide to the privacy notice changed websites for one click.
+   Markup: <header class="site-bar"> (the banner landmark, unstyled) holds
+   .topbar (this rule), inside it .bar-row on the page's own column (.wrap,
+   .container-wide); the controls on its right are .nav-btn capsules in a
+   .nav-controls group (index.html groups its larger set as .nav-right).
+   The glass sits on .topbar, NOT on the header: backdrop-filter makes an
+   element the containing block of its fixed descendants, and index.html's
+   install pill is fixed to the thumb zone from inside that header - on the
+   header it jumped to the top of the screen. */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: var(--bar-h);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--border);
+}
+.bar-row { display: flex; align-items: center; justify-content: space-between; height: 100%; }
+.nav-logo { display: flex; align-items: center; gap: 11px; flex-shrink: 0; min-height: 44px; margin-right: 12px;
+  font-weight: 700; font-size: 1.2rem; letter-spacing: -0.02em; color: var(--text-1); text-decoration: none; }
+.nav-logo:hover { color: var(--text-1); text-decoration: none; }
+.nav-logo svg { width: 34px; height: 34px; filter: drop-shadow(0 3px 8px var(--accent-glow)); }
+.nav-controls { display: flex; align-items: center; gap: 8px; }
+/* More contrast: the bar's lower edge in the text colour, as the app does
+   with its glass edge. After the base rule, which sets the whole border. */
+@media (prefers-contrast: more) {
+  .topbar { border-bottom-color: var(--text-1); }
+}
 
 /* Focus ring, as in the app: 2px in the voice, 2px away. Every page used to
    write this rule itself, the legal pages with raw literals. */
@@ -370,13 +433,13 @@
 .btn-secondary { background: transparent; color: var(--accent); border-color: var(--border); }
 .btn-secondary:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: var(--accent); color: var(--accent); }
 
-/* The header controls of index.html and install.html (language, theme,
+/* The header controls of every page (back to the overview, language, theme,
    GitHub): small capsules with a hairline edge. */
 .nav-btn {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 44px; min-width: 44px; /* WCAG touch target (both axes) */
   padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--r-full);
-  background: none; color: var(--text-2); cursor: pointer; text-decoration: none;
+  background: none; color: var(--text-2); cursor: pointer; text-decoration: none; white-space: nowrap;
   font-family: var(--ff); font-size: 0.82rem; font-weight: 600;
   transition: background-color .15s, color .15s, border-color .15s, transform .15s;
 }
@@ -423,5 +486,9 @@ html:not(.js) .reveal { opacity: 1; transform: none; }
 }
 @media print {
   .skip-link, .copy-btn { display: none !important; }
+  /* Fixed elements repeat on every printed page. index and install drop the
+     bar on paper; the legal pages keep their logo in the flow. */
+  .topbar { position: static; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .topbar .nav-btn { display: none; }
   .reveal { opacity: 1 !important; transform: none !important; }
 }
