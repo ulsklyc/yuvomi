@@ -1799,6 +1799,24 @@ test('Serien-Speichern reicht ein leeres Konto einer kontolosen Instanz nicht we
     'gesendet wird der bereinigte Body, nicht der ursprüngliche');
 });
 
+/**
+ * Auch die ERSTE Buchung einer Serie fragt "nur diese oder alle künftigen" (#1035).
+ *
+ * Seit die Serie eine eigene Definition hat, ist eine Änderung am Anker ohne
+ * Rückfrage nur noch eine Einzeländerung - die Serie liesse sich von ihrer
+ * ersten Buchung aus nicht mehr ändern, und wer im ersten Monat den Titel
+ * korrigiert, fände ihn im zweiten wieder alt. Dieselbe Grenze wie oben: ohne
+ * `__test`-Naht misst das die Bedingung im Quelltext, nicht den Klick.
+ */
+test('Bearbeiten der ersten Buchung einer Serie fragt nach dem Umfang (#1035)', () => {
+  const start = budget.indexOf("t('budget.recurringEditSeries')");
+  assert.ok(start >= 0, 'der Umfang-Dialog beim Bearbeiten muss auffindbar sein');
+  const davor = budget.slice(Math.max(0, start - 1500), start);
+  const bedingung = davor.slice(davor.lastIndexOf('} else if ('));
+  assert.match(bedingung, /entry\.recurrence_parent_id \|\| entry\.is_recurring/,
+    'der Dialog muss fuer Instanzen UND fuer den Anker (is_recurring) kommen');
+});
+
 // --------------------------------------------------------
 // Split-Ausgaben: EINE Neu-Aktion, und sie wohnt im Budget-Kopf
 // --------------------------------------------------------

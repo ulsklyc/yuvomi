@@ -1628,13 +1628,30 @@ Index: CREATE INDEX idx_carddav_addressbook_account ON carddav_addressbook_selec
 | recurrence_confirm | INTEGER | NOT NULL DEFAULT 0 (migration v129, #637) — 1 = generated instances wait for confirmation before they count |
 | is_pending | INTEGER | NOT NULL DEFAULT 0 (migration v129, #637) — 1 = expected, not yet booked; visible but excluded from every total |
 | recurrence_full_amount | REAL | For virtual series: the entered period amount (`amount` then holds the monthly share) |
-| recurrence_parent_id | INTEGER | FK → Budget Entries (generated instance points to original) |
+| recurrence_parent_id | INTEGER | FK → Budget Entries (generated instance points to the anchor of its series). `NULL` means only "entered by hand, not generated" - whether the row anchors a series is answered by `budget_series` (migration v228, #1035) |
 | account_id | INTEGER | FK → Budget Accounts, nullable (ON DELETE SET NULL); NULL = not assigned to an account |
 | created_by | INTEGER | FK → Users, NOT NULL |
 | owner_id | INTEGER | FK → Users, nullable (ON DELETE SET NULL) — the entry's owner, fixed to the creator on insert (migration v88) |
 | visibility | TEXT | NOT NULL DEFAULT `shared` — `private` \| `shared` (migration v88) \| `shared_amount` (migration v156, #659) |
 
-Recurring entries are materialised on demand for the month being viewed. **Non-virtual** series post the full amount on each due date, which `occurrenceDatesInMonth()` derives from the series' start date, unit and count; a weekly series therefore posts several times in one month, a monthly one at most once, and a day-of-month past the end of a short month is clamped to its last day. **Virtual** series store the smoothed monthly share on the original and post it once every month regardless of the rhythm, so a 1,200/year bill shows as 100/month in the summary, balance and CSV export; smoothing goes through `occurrencesPerYear(unit, count)`, which counts a year at 52 weeks. A generated instance inherits its owner and visibility from the series original.
+Recurring entries are materialised on demand for the month being viewed. **Non-virtual** series post the full amount on each due date, which `occurrenceDatesInMonth()` derives from the series' start date, unit and count; a weekly series therefore posts several times in one month, a monthly one at most once, and a day-of-month past the end of a short month is clamped to its last day. **Virtual** series store the smoothed monthly share in their definition and post it once every month regardless of the rhythm, so a 1,200/year bill shows as 100/month in the summary, balance and CSV export; smoothing goes through `occurrencesPerYear(unit, count)`, which counts a year at 52 weeks. A generated instance takes its values, account, visibility and responsible members from the series definition and its owner from the anchor.
+
+**A series has its own definition; its first entry is an ordinary booking (migration v228, #1035).** Until v227 the first row of a series was two things at once: the template every future occurrence was built from, and the first hand-entered booking. "Change all future occurrences" therefore rewrote the title, amount, category, subcategory, account and responsible members of a booking that could lie years back (moving a rent series to a new account moved the January 2020 rent with it), and correcting only that first booking changed every future month. The template now lives in its own table:
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| anchor_id | INTEGER | PRIMARY KEY, FK → Budget Entries (ON DELETE CASCADE) - the id of the series' first entry, which is also what `recurrence_parent_id`, `budget_recurrence_skipped.parent_id` and `/api/v1/budget/:id/series` use |
+| title | TEXT | NOT NULL |
+| amount | REAL | NOT NULL - for virtual series the smoothed monthly share |
+| full_amount | REAL | virtual series: the entered period amount, otherwise NULL |
+| category | TEXT | NOT NULL |
+| subcategory | TEXT | NOT NULL DEFAULT '' |
+| account_id | INTEGER | FK → Budget Accounts (ON DELETE SET NULL); virtual series still pass no account to their instances |
+| visibility | TEXT | `private` \| `shared` \| `shared_amount` |
+
+`budget_series_responsibles` (`anchor_id` → `budget_series`, `user_id` → Users, both ON DELETE CASCADE) holds the responsible members of the series; those on the anchor describe the first booking only. The rhythm (`recurrence_interval`, `_interval_count`, `_virtual`, `_confirm`, `recurrence_rule`), the start day (`date`), `is_recurring` and the owner stay on the anchor, because they have only one meaning. A definition exists exactly while its anchor is a running series: triggers create it from the entry's values when an entry becomes recurring (on insert or when `is_recurring` turns 1, whoever writes the row) and remove it when the series ends; deleting the anchor removes it by cascade, as before. The migration fills it from every running series without changing any entry.
+
+A series edit ("all future", `PUT /api/v1/budget/:id/series`) writes the definition and every entry of the series dated **today or later** (household time zone, `todayKey()`); entries before that are booked and keep their values, the first entry included - unless it lies in the future itself. **Visibility is the deliberate exception**: whoever makes a series private means its past entries too, so it applies to the definition, the anchor and every instance without a date cut. Editing the first entry offers the same "only this / all future" choice as every other entry of the series; "only this" changes that booking and not the template.
 
 **Unit plus count (migration v128, #636).** Until then the interval was a list of three fixed rhythms, so "every two weeks" or "every three months" could not be expressed at all. It is now a unit (`weekly`/`monthly`/`yearly`) with a count of 1 to 99. `half_year` is gone as a key and lives on as `monthly` + 6; the migration converts existing rows, because two spellings for one rhythm would have to be understood by every evaluation forever. The weekday, or the day of the month, is carried by the entry's own `date` - a series starting on the 15th returns on the 15th - so there is deliberately no separate field for it, which would be a second truth beside `date`.
 
@@ -1685,9 +1702,10 @@ feature. Responsibility is a second axis.
 people stays in Split Expenses. A handover button under the picker opens a new split expense
 pre-filled from the entry, but the claim only comes into existence once that dialog is confirmed.
 
-On a recurring series the label belongs to the series: newly materialised instances inherit it, and
-editing the series moves it on every instance from today onwards while already-booked months keep
-whoever was responsible then. Unlike the account, a **virtual** series inherits it too - the label
+On a recurring series the label belongs to the series (`budget_series_responsibles`, migration v228,
+#1035): newly materialised instances inherit it, and editing the series moves it on every entry from
+today onwards while already-booked months, the first entry included, keep whoever was responsible
+then. Unlike the account, a **virtual** series inherits it too - the label
 cannot distort a balance. In a one-person household the picker does not appear.
 
 ### Budget Accounts

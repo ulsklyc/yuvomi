@@ -3551,8 +3551,13 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
             closeModal({ force: true });
             renderBody();
             window.yuvomi?.showToast(t('budget.addedToast'), 'success');
-          } else if (entry.recurrence_parent_id) {
-            // Kind-Instanz: Nutzer fragen, ob nur dieser oder alle zukünftigen
+          } else if (entry.recurrence_parent_id || entry.is_recurring) {
+            // Buchung einer Serie - eine Instanz ODER die erste Buchung selbst:
+            // Nutzer fragen, ob nur diese oder alle zukünftigen. Seit #1035 ist
+            // die erste Buchung eine gewöhnliche Buchung neben einer eigenen
+            // Serien-Definition; ohne die Frage wäre ihre Korrektur nur noch
+            // eine Einzeländerung, und die Serie ließe sich von hier aus nicht
+            // mehr ändern.
             saveBtn.disabled = false;
             saveBtn.textContent = t('common.save');
             closeModal({ force: true });
@@ -3560,12 +3565,9 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
               title: t('budget.recurringSeriesScope'),
               thisLabel: t('budget.recurringThisOnly'),
               seriesLabel: t('budget.recurringEditSeries'),
-              // #1035: das Original der Serie ist Vorlage UND erste Buchung, und
-              // `PUT /budget/:id/series` schreibt Titel, Betrag, Kategorie und
-              // Konto auf genau diese Zeile - ohne Datumsschnitt
-              // (`WHERE id = ?`, routes/budget/entries.js). Bis die beiden
-              // Bedeutungen getrennt sind, sagt es wenigstens der Dialog, an
-              // dem die Wahl faellt.
+              // Was "alle zukünftigen" heisst, sagt der Dialog, an dem die Wahl
+              // fällt: ab heute, gebuchte Einträge bleiben, die Sichtbarkeit
+              // gilt für die ganze Serie (PUT /budget/:id/series).
               note: t('budget.recurringEditSeriesHint'),
             });
             if (scope === null) { openBudgetModal({ mode: 'edit', entry }); return; }
