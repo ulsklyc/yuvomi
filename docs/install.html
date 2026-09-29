@@ -31,6 +31,15 @@
 
   <!-- Geteiltes Token-System der vier Seiten. Frueher stand es hier viermal. -->
   <link rel="stylesheet" href="assets/site.css">
+  <!-- Set before first paint. The `js` class used to be added at the end of the
+       body script, so every tab panel, scope and no-JS label rendered for a
+       moment and then collapsed. `data-engine` follows the landing page's
+       Podman card (#podman) for the same reason: no Docker command flashing
+       up first. -->
+  <script>
+    document.documentElement.classList.add('js');
+    if (/^#podman$/i.test(location.hash)) document.documentElement.setAttribute('data-engine', 'podman');
+  </script>
   <style>
     /* Seiteneigen: die Semantikfarben des Installationsleitfadens. Nur diese
        Seite kennt Erfolg, Warnung, Gefahr und Hinweis - die drei anderen nicht,
@@ -247,6 +256,29 @@
        .env-desc and .details-body already read this way - these two were the
        outliers, not the pattern. */
     .step-desc code { font-size: 0.84em; background: var(--bg-alt); color: var(--text-1); padding: 1px 6px; border-radius: var(--r-xs); border: 1px solid var(--border); }
+    /* Platform asides inside a step (Windows): quieter than the step text, and
+       after the command, so the reader who needs none of it reaches the
+       command first. */
+    .step-note { font-size: 0.86rem; color: var(--text-2); line-height: 1.6; margin: 4px 0 12px; }
+    .step-note code { font-size: 0.84em; background: var(--bg-alt); color: var(--text-1); padding: 1px 6px; border-radius: var(--r-xs); border: 1px solid var(--border); }
+    .step-note b { color: var(--text-1); }
+
+    /* Docker and Podman are one path: only the compose file and the command
+       prefix differ. The panel said "Podman: use podman-compose.yml" and left
+       the reader to rewrite four commands by hand, so the commands switch
+       instead of the panel. Without JS both variants stand, each labelled. */
+    .engine-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 22px; }
+    .engine-label { font-size: 0.85rem; font-weight: 600; color: var(--text-2); }
+    .engine { display: inline-flex; gap: 4px; padding: 3px; border-radius: var(--r-full); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+    .engine-btn { min-height: 44px; padding: 0 18px; border: 0; border-radius: var(--r-full); background: transparent; color: var(--text-2);
+      font-family: var(--ff); font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: background .18s, color .18s; }
+    .engine-btn:hover { color: var(--text-1); }
+    .engine-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-on-soft); }
+    html.js:not([data-engine="podman"]) .eng-podman,
+    html.js[data-engine="podman"] .eng-docker { display: none; }
+    .eng-head, .scope-head { display: none; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-3); margin: 0 0 6px; }
+    html:not(.js) .engine-row { display: none; }
+    html:not(.js) .eng-head, html:not(.js) .scope-head { display: block; }
 
     /* Code */
     .code-wrap { position: relative; margin-bottom: 14px; }
@@ -318,6 +350,16 @@
     .success-url .copy-btn { position: static; min-height: 44px; background: var(--surface); border-color: var(--border); color: var(--text-2); }
     .success-url .copy-btn:hover { background: var(--bg); color: var(--text-1); }
     .success-links { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    /* The box is the last step now, not a trailer after it: it used to say
+       "You're all set - open localhost:3000" one step AFTER "create your admin
+       account", which needs that address open. Each path gets its own ending,
+       so the command-line alternative and the Proxmox IP lookup live here. */
+    .success-box .success-note { font-size: 0.88rem; max-width: 52ch; margin: -6px auto 14px; }
+    .success-box .success-note code { font-size: 0.86em; background: var(--bg-alt); color: var(--text-1); padding: 1px 5px; border-radius: var(--r-xs); border: 1px solid var(--border); }
+    .success-box .code-wrap { text-align: left; max-width: 560px; margin: 0 auto 22px; }
+    .success-url var { font-style: italic; color: var(--text-2); }
+    .success-box .scope + .scope { margin-top: 0; }
+    html:not(.js) .success-box .scope + .scope { margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--border); }
 
     /* Env */
     .env-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 36px; }
@@ -424,8 +466,24 @@
     html:not(.js) .reveal { opacity: 1; transform: none; }
 
     @media (max-width: 760px) {
-      .prereq-grid { grid-template-columns: 1fr; }
+      /* On a phone the first command sat at 2798px, three screens down, behind
+         a 150px hero pad and three full-size prerequisite cards (1405px) that
+         the app-store reader does not need at all. Same content, row layout:
+         icon beside the text instead of above it, tighter section rhythm. */
+      section { padding: 56px 0; }
+      .hero { padding: 104px 0 36px; }
+      .hero h1 { margin-bottom: 14px; }
+      .hero-desc { font-size: 1.04rem; margin-bottom: 20px; }
+      .prereq-grid { grid-template-columns: 1fr; gap: 10px; margin-top: 24px; }
+      .prereq-card { display: grid; grid-template-columns: 38px minmax(0, 1fr); column-gap: 14px; padding: 16px 18px; }
+      .prereq-card > * { grid-column: 2; }
+      .prereq-ico { grid-column: 1; grid-row: 1 / span 4; width: 38px; height: 38px; margin: 0; }
+      .prereq-ico svg { width: 20px; height: 20px; }
+      .prereq-card h3 { margin-bottom: 4px; padding-top: 7px; }
+      .prereq-links { margin-top: 10px; }
+      .prereq-card .prereq-hint { margin-top: 8px; }
       .env-grid { grid-template-columns: 1fr; }
+      .tab-bar { margin: 26px 0 22px; }
       .tab-btn { flex: 1 1 auto; justify-content: center; }
     }
     @media (max-width: 480px) {
@@ -467,9 +525,11 @@
       body { background: #fff; color: #000; }
       body::after { content: none; }
       .hero::before { display: none; }
-      .skip-link, .site-bar, .copy-btn, .tab-bar, .to-top, .path-now { display: none !important; }
-      /* Both variants on paper: a printout has no tab state to follow. */
-      .scope { display: block !important; }
+      .skip-link, .site-bar, .copy-btn, .tab-bar, .to-top, .path-now, .engine-row { display: none !important; }
+      /* Every variant on paper, each labelled: a printout has no tab or engine
+         state to follow. */
+      .scope, .eng-docker, .eng-podman { display: block !important; }
+      .eng-head, .scope-head { display: block !important; }
       .reveal { opacity: 1 !important; transform: none !important; }
       .hero, section { padding: 20px 0 !important; }
       .tab-panel { display: block !important; }
@@ -540,7 +600,7 @@
   <section id="prerequisites">
     <div class="container">
       <h2 class="section-title reveal" data-t="prereq_title">What you need</h2>
-      <p class="section-desc reveal" data-t="prereq_desc">Yuvomi runs as a Docker or Podman container, so you don't need to install Node.js or any other runtime. Just a container engine, and you're good to go. (App-store installs handle even this for you; the guided web installer is the one path that also needs Git and Node.js.)</p>
+      <p class="section-desc reveal" data-t="prereq_desc">Yuvomi runs as a Docker or Podman container, so there is no Node.js or other runtime to install. App-store installs bring even the container engine along; only the guided web installer also needs Git and Node.js.</p>
       <div class="prereq-grid">
         <div class="prereq-card reveal">
           <div class="prereq-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
@@ -614,26 +674,45 @@
         <h3 class="panel-head" style="--pc:#2496ED" data-t="tab_docker">Docker / Podman</h3>
         <div class="callout callout-info">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span data-t="opt_docker_info">No Git, no build step - two files, a handful of commands and one edit in <code>.env</code>. Requires only Docker or Podman (Podman: use podman-compose.yml).</span>
+          <span data-t="opt_docker_info">No Git, no build step - two files, a handful of commands and one edit in <code>.env</code>. On Portainer, see the note at the end of this path.</span>
+        </div>
+        <div class="engine-row">
+          <span class="engine-label" id="engine-label" data-t="engine_label">Commands for</span>
+          <div class="engine" role="group" aria-labelledby="engine-label">
+            <button class="engine-btn" type="button" data-engine="docker" aria-pressed="true">Docker</button>
+            <button class="engine-btn" type="button" data-engine="podman" aria-pressed="false">Podman</button>
+          </div>
         </div>
         <div class="step">
           <div class="step-num">1</div>
           <div class="step-content">
             <h3 class="step-title" data-t="step_a1_title">Download the configuration files</h3>
-            <p class="step-desc" data-t="step_a1_desc">Run these two commands. They download the Docker configuration and the template for your settings.</p>
-            <div class="code-wrap"><div class="code-block">curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example</div><button class="copy-btn" data-copy="curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml&#10;curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
+            <p class="step-desc" data-t="step_a1_desc">Run these two commands. They download the compose file and the template for your settings.</p>
+            <div class="eng-docker"><p class="eng-head">Docker</p><div class="code-wrap"><div class="code-block">curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example</div><button class="copy-btn" data-copy="curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml&#10;curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div></div>
+            <div class="eng-podman"><p class="eng-head">Podman (RHEL, Fedora, CentOS Stream)</p><div class="code-wrap"><div class="code-block">curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/podman-compose.yml
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example</div><button class="copy-btn" data-copy="curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/podman-compose.yml&#10;curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div></div>
+            <!-- Windows PowerShell maps `curl` to Invoke-WebRequest, which rejects
+                 `-O`, and ships no openssl - the two commands this path is built
+                 on. Named here rather than as its own tab: the path is the same,
+                 two words differ. -->
+            <p class="step-note" data-t="win_note"><b>On Windows:</b> in PowerShell, type <code>curl.exe</code> instead of <code>curl</code> - Windows PowerShell answers <code>curl</code> with a different command. PowerShell has no <code>openssl</code> for step 2: run these steps in WSL, or let the <a href="#installer">web installer</a> generate both values. <code>notepad .env</code> opens the file for editing.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num">2</div>
           <div class="step-content">
             <h3 class="step-title" data-t="step_a2_title">Create your configuration</h3>
-            <p class="step-desc" data-t="step_a2_desc">Copy the template, then open <code>.env</code> in a text editor. <code>SESSION_SECRET</code> is required; <code>DB_ENCRYPTION_KEY</code> is optional but permanent.</p>
-            <div class="code-wrap"><div class="code-block">cp .env.example .env</div><button class="copy-btn" data-copy="cp .env.example .env" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
-            <p class="step-desc" data-t="step_a2_gen">This prints two secure values - paste one as <code>SESSION_SECRET</code> and the other as <code>DB_ENCRYPTION_KEY</code>:</p>
-            <div class="code-wrap"><div class="code-block">openssl rand -hex 32
-openssl rand -hex 32</div><button class="copy-btn" data-copy="openssl rand -hex 32&#10;openssl rand -hex 32" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
+            <p class="step-desc" data-t="step_a2_desc">Copy the template, then print two random values:</p>
+            <div class="code-wrap"><div class="code-block">cp .env.example .env
+<span class="comment" data-t="px_gen_c"># two values: one for SESSION_SECRET, one for DB_ENCRYPTION_KEY</span>
+openssl rand -hex 32
+openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .env&#10;openssl rand -hex 32&#10;openssl rand -hex 32" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
+            <!-- The edit is the one step no copy button can do, and the one the
+                 app refuses to start without (server/auth.js, server/db.js). It
+                 said "open .env in a text editor" without naming the editor or
+                 the placeholder text the reader has to find in it. -->
+            <p class="step-desc" data-t="step_a2_edit">Now open <code>.env</code>, for example with <code>nano .env</code> (Ctrl+O and Enter save, Ctrl+X quits), and replace both <code>REPLACE_WITH_…</code> placeholders: the first value goes to <code>SESSION_SECRET</code>, the second to <code>DB_ENCRYPTION_KEY</code>. Yuvomi does not start while a placeholder is still in there. To run without encryption, clear the <code>DB_ENCRYPTION_KEY</code> line instead.</p>
             <div class="callout callout-warning">
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
               <span data-t="step_a2_warning">Keep a backup of your <code>.env</code> file somewhere safe. If you lose the <code>DB_ENCRYPTION_KEY</code>, your data cannot be recovered.</span>
@@ -644,21 +723,29 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="openssl rand -hex 
           <div class="step-num">3</div>
           <div class="step-content">
             <h3 class="step-title" data-t="step_a3_title">Start the container</h3>
-            <p class="step-desc" data-t="step_a3_desc">Docker downloads the Yuvomi image and starts it in the background. The first download takes a minute.</p>
-            <div class="code-wrap"><div class="code-block"><span class="cmd">docker compose up -d</span></div><button class="copy-btn" data-copy="docker compose up -d" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
+            <p class="step-desc" data-t="step_a3_desc">The first line downloads the Yuvomi image and starts it in the background - the first download takes a minute. The second follows its log.</p>
+            <div class="eng-docker"><p class="eng-head">Docker</p><div class="code-wrap"><div class="code-block"><span class="cmd">docker compose up -d</span>
+docker compose logs -f</div><button class="copy-btn" data-copy="docker compose up -d&#10;docker compose logs -f" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div></div>
+            <div class="eng-podman"><p class="eng-head">Podman (RHEL, Fedora, CentOS Stream)</p><div class="code-wrap"><div class="code-block"><span class="cmd">podman compose -f podman-compose.yml up -d</span>
+podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-copy="podman compose -f podman-compose.yml up -d&#10;podman compose -f podman-compose.yml logs -f" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div></div>
             <div class="callout callout-success">
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              <span data-t="step_a3_success">Check the logs with <code>docker compose logs -f</code>. You should see <code>Server running on port 3000</code>. The container keeps running in the background.</span>
+              <span data-t="step_a3_success">You should see <code>Server running on port 3000</code>. Ctrl+C stops following the log; the container keeps running in the background. Restarting over and over instead? See <a href="#troubleshooting">troubleshooting</a>.</span>
             </div>
           </div>
         </div>
-        <div class="step">
-          <div class="step-num">4</div>
-          <div class="step-content">
-            <h3 class="step-title" data-t="step_setup_title">Create your admin account</h3>
-            <p class="step-desc" data-t="step_setup_desc">On the first visit, Yuvomi walks you through creating your admin account right in the browser. Prefer the command line? Run the setup wizard instead:</p>
-            <div class="code-wrap"><div class="code-block"><span class="cmd">docker compose exec yuvomi node setup.js</span></div><button class="copy-btn" data-copy="docker compose exec yuvomi node setup.js" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
-          </div>
+        <!-- Portainer is a documented path (installation.md, Option G) with its
+             own compose file, and it was nowhere on this page. Not an eighth tab:
+             the bar is full, and the steps are this path's steps minus the .env. -->
+        <div class="callout callout-info">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>
+            <span data-t="portainer_info"><b>Using Portainer?</b> Deploy <code>docs/docker-compose.portainer.yml</code> as a stack instead of these steps. Portainer puts no <code>.env</code> next to a stack, so that file lists every variable itself, and <code>SESSION_SECRET</code> and <code>DB_ENCRYPTION_KEY</code> go under the stack's environment variables - both are required there.</span>
+            <span class="callout-links">
+              <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/docker-compose.portainer.yml" target="_blank" rel="noopener" class="prereq-link" data-t="portainer_file">Compose file for Portainer</a>
+              <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#option-g--portainer-stack-or-gitgitops" target="_blank" rel="noopener" class="prereq-link" data-t="portainer_guide">Portainer guide</a>
+            </span>
+          </span>
         </div>
       </div>
 
@@ -697,7 +784,7 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="openssl rand -hex 
           <div class="step-num">3</div>
           <div class="step-content">
             <h3 class="step-title" data-t="step_px3_title">Follow the Docker steps</h3>
-            <p class="step-desc" data-t="step_px3_desc">From here nothing is Proxmox-specific: the <a href="#tab-docker">Docker image</a> path applies unchanged. Afterwards Yuvomi answers on the container's IP at port 3000 - <code>pct exec 110 -- hostname -I</code> on the host prints it.</p>
+            <p class="step-desc" data-t="step_px3_desc">From here nothing is Proxmox-specific: the <a href="#docker">Docker image</a> path applies unchanged. Afterwards Yuvomi answers on the container's IP at port 3000 - <code>pct exec 110 -- hostname -I</code> on the host prints it.</p>
           </div>
         </div>
       </div>
@@ -739,6 +826,7 @@ cd yuvomi</div><button class="copy-btn" data-copy="git clone https://github.com/
             <h3 class="step-title" data-t="step_inst2_title">Start the installer</h3>
             <p class="step-desc" data-t="step_inst2_desc">Run this command from the repository root. The installer server starts on port 8090.</p>
             <div class="code-wrap"><div class="code-block"><span class="cmd">node tools/installer/install-server.js</span></div><button class="copy-btn" data-copy="node tools/installer/install-server.js" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
+            <p class="step-note" data-t="step_inst2_cli">Linux or macOS, and rather stay in the terminal? <code>bash install.sh</code> in the same folder sets Yuvomi up as a dialog there instead: it generates the keys, starts the container and creates your admin account.</p>
           </div>
         </div>
         <div class="step">
@@ -774,11 +862,12 @@ cd yuvomi</div><button class="copy-btn" data-copy="git clone https://github.com/
           <div class="step-num">2</div>
           <div class="step-content">
             <h3 class="step-title" data-t="step_a2_title">Create your configuration</h3>
-            <p class="step-desc" data-t="step_a2_desc">Copy the template, then open <code>.env</code> in a text editor. <code>SESSION_SECRET</code> is required; <code>DB_ENCRYPTION_KEY</code> is optional but permanent.</p>
+            <p class="step-desc" data-t="step_a2_desc">Copy the template, then print two random values:</p>
             <div class="code-wrap"><div class="code-block">cp .env.example .env
 <span class="comment" data-t="px_gen_c"># two values: one for SESSION_SECRET, one for DB_ENCRYPTION_KEY</span>
 openssl rand -hex 32
 openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .env&#10;openssl rand -hex 32&#10;openssl rand -hex 32" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
+            <p class="step-desc" data-t="step_a2_edit">Now open <code>.env</code>, for example with <code>nano .env</code> (Ctrl+O and Enter save, Ctrl+X quits), and replace both <code>REPLACE_WITH_…</code> placeholders: the first value goes to <code>SESSION_SECRET</code>, the second to <code>DB_ENCRYPTION_KEY</code>. Yuvomi does not start while a placeholder is still in there. To run without encryption, clear the <code>DB_ENCRYPTION_KEY</code> line instead.</p>
           </div>
         </div>
         <div class="step">
@@ -787,14 +876,6 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
             <h3 class="step-title" data-t="step_b3_title">Build and start</h3>
             <p class="step-desc" data-t="step_b3_desc">The <code>--build</code> flag compiles the Docker image locally. This takes a few minutes the first time.</p>
             <div class="code-wrap"><div class="code-block"><span class="cmd">docker compose up -d --build</span></div><button class="copy-btn" data-copy="docker compose up -d --build" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num">4</div>
-          <div class="step-content">
-            <h3 class="step-title" data-t="step_setup_title">Create your admin account</h3>
-            <p class="step-desc" data-t="step_setup_desc">On the first visit, Yuvomi walks you through creating your admin account right in the browser. Prefer the command line? Run the setup wizard instead:</p>
-            <div class="code-wrap"><div class="code-block"><span class="cmd">docker compose exec yuvomi node setup.js</span></div><button class="copy-btn" data-copy="docker compose exec yuvomi node setup.js" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
           </div>
         </div>
       </div>
@@ -840,39 +921,14 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
     </div>
   </section>
 
-  <!-- Success -->
-  <section id="open">
-    <div class="container">
-      <div class="success-box reveal">
-        <div class="success-emoji" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg></div>
-        <p class="path-now"><span data-t="path_now">You are installing on</span> <b id="pathName">Docker / Podman</b> <a href="#install" data-t="path_change">Change</a></p>
-        <h2 data-t="success_title">You're all set</h2>
-        <div class="scope" data-scope="terminal">
-          <p data-t="success_desc">Open your browser and navigate to:</p>
-          <div class="success-url"><span>http://localhost:3000</span><button class="copy-btn" type="button" data-copy="http://localhost:3000"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
-        </div>
-        <div class="scope" data-scope="store">
-          <p data-t="success_desc_store">Open Yuvomi the way your app store offers it: the WebUI button on TrueNAS and Unraid, the Yuvomi tile on your Umbrel home screen. The address is your server's, not this machine's - <code>localhost</code> only works if you are sitting at the box itself.</p>
-        </div>
-        <p style="font-size:0.88rem" data-t="success_hint">Log in with the admin credentials you just created. From the Settings page you can invite more family members by link, so they choose their own password.</p>
-        <div class="success-links">
-          <a href="https://github.com/ulsklyc/yuvomi" target="_blank" rel="noopener" class="btn btn-primary">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>GitHub
-          </a>
-          <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md" target="_blank" rel="noopener" class="btn btn-secondary" data-t="success_full_guide">Full technical guide</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- Env vars -->
-  <section class="alt" id="env">
+  <section id="env">
     <div class="container">
       <h2 class="section-title reveal" data-t="env_title">Two settings decide your security</h2>
       <p class="section-desc reveal" data-t="env_desc">One is mandatory, one is optional but permanent. Everything below this section can be changed later; the second of these two cannot.</p>
       <!-- No .reveal on scoped nodes: a display:none element never intersects,
            so the observer would leave it at opacity 0 when it is shown later. -->
-      <p class="section-desc scope" data-scope="terminal" data-t="env_where">Both live in the <code>.env</code> file you created next to your compose file.</p>
+      <p class="section-desc scope" data-scope="terminal installer proxmox" data-t="env_where">Both live in the <code>.env</code> file you created next to your compose file.</p>
       <p class="section-desc scope" data-scope="store" data-t="env_where_store">Your app store asked for both in its install form, so there is no <code>.env</code> file to edit. Change them in the app's configuration screen and restart it.</p>
       <div class="env-grid">
         <div class="env-card reveal">
@@ -889,12 +945,109 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
     </div>
   </section>
 
+  <!-- Success. Sits after the two settings, not before them: "You're all set"
+       used to come first and the explanation of the key it depends on second. -->
+  <section class="alt" id="open">
+    <div class="container">
+      <div class="success-box reveal">
+        <div class="success-emoji" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg></div>
+        <p class="path-now"><span data-t="path_now">You are installing on</span> <b id="pathName">Docker / Podman</b> <a href="#install" data-t="path_change">Change</a></p>
+        <h2 data-t="success_title">Open Yuvomi</h2>
+        <div class="scope" data-scope="terminal">
+          <p class="scope-head" data-t="scope_terminal">Docker, Podman or from source</p>
+          <p data-t="success_desc">Open this address in your browser. The first visit walks you through creating your admin account.</p>
+          <div class="success-url"><span>http://localhost:3000</span><button class="copy-btn" type="button" data-copy="http://localhost:3000"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
+          <p class="success-note" data-t="success_remote">From another device, use the server's IP address or host name instead of <code>localhost</code>, and your own port if you changed <code>OIKOS_HTTP_PORT</code>.</p>
+          <p class="success-note" data-t="success_cli">Prefer the command line? This creates the admin account instead:</p>
+          <div class="eng-docker"><p class="eng-head">Docker</p><div class="code-wrap"><div class="code-block"><span class="cmd">docker compose exec yuvomi node setup.js</span></div><button class="copy-btn" data-copy="docker compose exec yuvomi node setup.js" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div></div>
+          <div class="eng-podman"><p class="eng-head">Podman</p><div class="code-wrap"><div class="code-block"><span class="cmd">podman compose -f podman-compose.yml exec yuvomi node setup.js</span></div><button class="copy-btn" data-copy="podman compose -f podman-compose.yml exec yuvomi node setup.js" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div></div>
+        </div>
+        <div class="scope" data-scope="installer">
+          <p class="scope-head" data-t="tab_installer">Web Installer</p>
+          <p data-t="success_desc_installer">The wizard already created your admin account: sign in with it here. This is the address unless you gave the wizard another host or port:</p>
+          <div class="success-url"><span>http://localhost:3000</span><button class="copy-btn" type="button" data-copy="http://localhost:3000"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
+        </div>
+        <!-- Proxmox had no ending of its own: it fell into the terminal branch and
+             was told to open localhost:3000, which is the LXC, not the machine
+             the reader sits at. -->
+        <div class="scope" data-scope="proxmox">
+          <p class="scope-head" data-t="tab_proxmox">Proxmox</p>
+          <p data-t="success_desc_proxmox">Open the container's address in your browser. The first visit walks you through creating your admin account.</p>
+          <div class="success-url"><span>http://<var data-t="px_ip_ph">container-IP</var>:3000</span></div>
+          <p class="success-note" data-t="success_px_ip">On the Proxmox host, this prints the IP of container 110 from step 1:</p>
+          <div class="code-wrap"><div class="code-block"><span class="cmd">pct exec 110 -- hostname -I</span></div><button class="copy-btn" data-copy="pct exec 110 -- hostname -I" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
+        </div>
+        <div class="scope" data-scope="store">
+          <p class="scope-head">TrueNAS, Umbrel, Unraid</p>
+          <p data-t="success_desc_store">Open Yuvomi the way your app store offers it: the WebUI button on TrueNAS and Unraid, the Yuvomi tile on your Umbrel home screen. The address is your server's, not this machine's - <code>localhost</code> only works if you are sitting at the box itself. The first visit walks you through creating your admin account.</p>
+        </div>
+        <p style="font-size:0.88rem" data-t="success_hint">Once you are in, invite the rest of the family by link from the Settings page, so everyone chooses their own password.</p>
+        <!-- No primary button: the accent went to "GitHub", which is not the next
+             step for anyone who just installed. The address above is. -->
+        <div class="success-links">
+          <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md" target="_blank" rel="noopener" class="btn btn-secondary" data-t="success_full_guide">Full technical guide</a>
+          <a href="https://github.com/ulsklyc/yuvomi" target="_blank" rel="noopener" class="btn btn-secondary">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>GitHub
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Troubleshooting. Moved up, ahead of the optional extras: nine extra
+       cards ran 3,300px on a phone and put the fixes for a failed first start
+       at the very end of the page, after everything a working install needs. -->
+  <section id="troubleshooting">
+    <div class="container">
+      <h2 class="section-title reveal" data-t="trouble_title">Something not working?</h2>
+      <p class="section-desc reveal" data-t="trouble_desc">Most issues have a simple fix. If you're still stuck, open an issue on GitHub.</p>
+      <div class="trouble-list reveal">
+        <!-- First, because it is the failure this page's own steps can cause: a
+             .env left on the REPLACE_WITH_ placeholders stops the app at start
+             (server/auth.js, server/db.js) and restart: unless-stopped turns
+             that into a loop that looks like a broken image. -->
+        <details>
+          <summary data-t="trouble_restart_title">The container keeps restarting</summary>
+          <div class="details-body"><p data-t="trouble_restart_desc">Almost always a placeholder: Yuvomi refuses to start while <code>SESSION_SECRET</code> still reads <code>REPLACE_WITH_…</code> from <code>.env.example</code>, and on a new install the same goes for <code>DB_ENCRYPTION_KEY</code>. The log says which one:</p><div class="code-wrap"><div class="code-block">docker compose logs yuvomi   <span class="comment"># look for "still the placeholder"</span></div></div><p data-t="trouble_restart_fix">Put a value from <code>openssl rand -hex 32</code> in its place, or clear the <code>DB_ENCRYPTION_KEY</code> line to run without encryption, then run <code>docker compose up -d</code> again. On Podman the log is <code>podman compose -f podman-compose.yml logs yuvomi</code>.</p></div>
+        </details>
+        <details>
+          <summary data-t="trouble_port_title">Port 3000 is already in use</summary>
+          <div class="details-body"><p data-t="trouble_port_desc">Another application is using port 3000. This shows which one:</p><div class="code-wrap"><div class="code-block">lsof -i :3000</div></div><p data-t="trouble_port_change">Either stop it, or give Yuvomi another host port in <code>.env</code>, for example <code>OIKOS_HTTP_PORT=8080</code>, and run <code>docker compose up -d</code> again. Yuvomi then answers on <code>http://localhost:8080</code>; inside the container it stays on 3000.</p></div>
+        </details>
+        <details>
+          <summary data-t="trouble_perm_title">Docker: Permission denied</summary>
+          <div class="details-body"><p data-t="trouble_perm_desc">Add your user to the Docker group, then log out and back in:</p><div class="code-wrap"><div class="code-block">sudo usermod -aG docker $USER</div></div></div>
+        </details>
+        <details>
+          <summary data-t="trouble_reach_title">Container starts but the page is not reachable</summary>
+          <div class="details-body"><p data-t="trouble_reach_desc">Check the container status and logs:</p><div class="code-wrap"><div class="code-block">docker compose ps        <span class="comment"># should show "Up" and "healthy"</span>
+docker compose logs      <span class="comment"># look for error messages</span></div></div><p data-t="trouble_reach_firewall">Accessing from another device? Check your firewall rules.</p></div>
+        </details>
+        <!-- The reset used to be `docker compose down -v`. The compose file mounts
+             host folders, not named volumes, so -v removed nothing and the
+             encrypted database survived to fail the next start the same way
+             (docs/installation.md, "Database encryption error"). -->
+        <details>
+          <summary data-t="trouble_db_title">Database encryption error</summary>
+          <div class="details-body"><p data-t="trouble_db_desc">The <code>DB_ENCRYPTION_KEY</code> in your <code>.env</code> is missing or doesn't match the key used when the database was created. On a fresh install with no data yet, delete the database folder and start again:</p><div class="code-wrap"><div class="code-block">docker compose down
+rm -rf ./data   <span class="comment"># or your DATA_DIR, if you changed it</span>
+<span class="cmd">docker compose up -d</span></div></div><div class="callout callout-warning" style="margin-top:10px"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span data-t="trouble_db_warning"><code>rm -rf ./data</code> deletes the database for good - only on a fresh install. With existing data you need the original key; nothing else opens it. <code>docker compose down -v</code> is no shortcut: the data sits in a host folder, not in a Docker volume, so it survives that command.</span></div></div>
+        </details>
+        <details>
+          <summary data-t="trouble_nginx_title">Nginx shows 502 Bad Gateway</summary>
+          <div class="details-body"><p data-t="trouble_nginx_desc">Nginx can't reach the container. Check it's running and the port matches:</p><div class="code-wrap"><div class="code-block">docker compose ps
+docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_port">Ensure the <code>proxy_pass</code> port in your Nginx config matches <code>OIKOS_HTTP_PORT</code> in your <code>.env</code> (default: 3000).</p></div>
+        </details>
+      </div>
+    </div>
+  </section>
+
   <!-- Optional -->
-  <section id="optional">
+  <section class="alt" id="optional">
     <div class="container">
       <h2 class="section-title reveal" data-t="optional_title">Go further</h2>
       <p class="section-desc reveal" data-t="optional_desc">Once Yuvomi is running, you can set up these extras. All of them are environment variables.</p>
-      <p class="section-desc scope" data-scope="terminal" data-t="optional_where">You set them in the same <code>.env</code> file, then restart with <code>docker compose up -d</code>.</p>
+      <p class="section-desc scope" data-scope="terminal installer proxmox" data-t="optional_where">You set them in the same <code>.env</code> file, then restart with <code>docker compose up -d</code>.</p>
       <p class="section-desc scope" data-scope="store" data-t="optional_where_store">On TrueNAS and Unraid you add them in the app's configuration screen and restart it. On Umbrel they need an override in the app's compose file.</p>
       <div class="opt-grid">
         <div class="opt-card reveal"><h3 data-t="opt_https_title">HTTPS &amp; network access</h3><p data-t="opt_https_desc">Reach Yuvomi from other devices or the internet: set up Nginx as a reverse proxy with a free Let's Encrypt certificate.</p><a class="opt-guide" href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#https--reverse-proxy-nginx" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></div>
@@ -907,39 +1060,6 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
         <div class="opt-card reveal"><h3 data-t="opt_fixer_title">Live currency conversion</h3><p data-t="opt_fixer_desc">Budget → Subscriptions works fully without external services. Set <code>FIXER_API_KEY</code> to convert subscriptions billed in foreign currencies into your household base currency, with a 12-hour rate cache.</p><a class="opt-guide" href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#subscription-currency-conversion-optional" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></div>
         <div class="opt-card reveal"><h3 data-t="opt_immich_title">Immich photo screensaver</h3><p data-t="opt_immich_desc">Let an idle wall tablet show photos from your own Immich library instead of a fixed dashboard, which burns into the panel over time. Set it up under Settings → Administration → Immich, or preconfigure <code>IMMICH_URL</code> and <code>IMMICH_API_KEY</code>; the key never leaves the server.</p><a class="opt-guide" href="https://github.com/ulsklyc/yuvomi/blob/main/docs/immich-screensaver.md" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></div>
         <div class="opt-card reveal"><h3 data-t="opt_update_title">Updates</h3><p data-t="opt_update_desc">Pull the latest image and restart: <code>docker compose pull &amp;&amp; docker compose up -d</code>. Your data persists across updates.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Troubleshooting -->
-  <section class="alt" id="troubleshooting">
-    <div class="container">
-      <h2 class="section-title reveal" data-t="trouble_title">Something not working?</h2>
-      <p class="section-desc reveal" data-t="trouble_desc">Most issues have a simple fix. If you're still stuck, open an issue on GitHub.</p>
-      <div class="trouble-list reveal">
-        <details>
-          <summary data-t="trouble_port_title">Port 3000 is already in use</summary>
-          <div class="details-body"><p data-t="trouble_port_desc">Another application is using port 3000. Either stop it, or change the port in <code>docker-compose.yml</code>:</p><div class="code-wrap"><div class="code-block">lsof -i :3000   <span class="comment"># find what's using the port</span></div></div><p data-t="trouble_port_change">Or edit <code>docker-compose.yml</code> and change <code>3000:3000</code> to e.g. <code>8080:3000</code>.</p></div>
-        </details>
-        <details>
-          <summary data-t="trouble_perm_title">Docker: Permission denied</summary>
-          <div class="details-body"><p data-t="trouble_perm_desc">Add your user to the Docker group, then log out and back in:</p><div class="code-wrap"><div class="code-block">sudo usermod -aG docker $USER</div></div></div>
-        </details>
-        <details>
-          <summary data-t="trouble_reach_title">Container starts but the page is not reachable</summary>
-          <div class="details-body"><p data-t="trouble_reach_desc">Check the container status and logs:</p><div class="code-wrap"><div class="code-block">docker compose ps        <span class="comment"># should show "Up" and "healthy"</span>
-docker compose logs      <span class="comment"># look for error messages</span></div></div><p data-t="trouble_reach_firewall">Accessing from another device? Check your firewall rules.</p></div>
-        </details>
-        <details>
-          <summary data-t="trouble_db_title">Database encryption error</summary>
-          <div class="details-body"><p data-t="trouble_db_desc">The <code>DB_ENCRYPTION_KEY</code> in your <code>.env</code> is missing or doesn't match the key used when the database was created. On a fresh install you can reset:</p><div class="code-wrap"><div class="code-block">docker compose down -v
-<span class="cmd">docker compose up -d</span></div></div><div class="callout callout-warning" style="margin-top:10px"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span data-t="trouble_db_warning"><code>docker compose down -v</code> deletes all data. Only use this on a fresh install with no data.</span></div></div>
-        </details>
-        <details>
-          <summary data-t="trouble_nginx_title">Nginx shows 502 Bad Gateway</summary>
-          <div class="details-body"><p data-t="trouble_nginx_desc">Nginx can't reach the container. Check it's running and the port matches:</p><div class="code-wrap"><div class="code-block">docker compose ps
-docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_port">Ensure the <code>proxy_pass</code> port in your Nginx config matches the host port in <code>docker-compose.yml</code> (default: 3000).</p></div>
-        </details>
       </div>
     </div>
   </section>
@@ -972,7 +1092,7 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         hero_time:'~10 minutes',
         nav_main:'Main', nav_home:'Yuvomi home', foot_nav:'Footer', tablist_label:'Installation options', code_label:'Command block',
         prereq_title:'What you need',
-        prereq_desc:"Yuvomi runs as a Docker or Podman container, so you don't need to install Node.js or any other runtime. Just a container engine, and you're good to go. (App-store installs handle even this for you; the guided web installer is the one path that also needs Git and Node.js.)",
+        prereq_desc:'Yuvomi runs as a Docker or Podman container, so there is no Node.js or other runtime to install. App-store installs bring even the container engine along; only the guided web installer also needs Git and Node.js.',
         prereq_docker_title:'Docker or Podman', prereq_docker_desc:"Packages the app so you don't need to install anything else. Free for personal use. Podman (RHEL/Fedora/CentOS Stream) works too - rootless and SELinux-ready.",
         prereq_terminal_title:'Terminal', prereq_terminal_desc:'A command-line interface to type a few commands. Built into every OS - no extra install needed.',
         prereq_terminal_hint:'macOS: Terminal · Windows: PowerShell · Linux: bash',
@@ -987,19 +1107,24 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         step_inst2_title:'Start the installer', step_inst2_desc:'Run this command from the repository root. The installer server starts on port 8090.',
         step_inst3_title:'Open the wizard in your browser', step_inst3_desc:'Navigate to the following address. The wizard guides you through configuration, container startup, and admin account creation.',
         step_inst3_info:'The installer shuts down automatically after setup completes. Your Yuvomi instance keeps running via Docker or Podman.',
+        step_inst2_cli:'Linux or macOS, and rather stay in the terminal? <code>bash install.sh</code> in the same folder sets Yuvomi up as a dialog there instead: it generates the keys, starts the container and creates your admin account.',
         opt_proxmox_info:'There is no Yuvomi entry in a Proxmox catalog. What works is a small Debian LXC that runs the same Docker setup as everywhere else. These three steps only cover the container around it.',
         step_px1_title:'Create an unprivileged LXC', step_px1_desc:'Run this on the Proxmox host shell. <code>nesting=1</code> is what lets Docker run inside an unprivileged container; without it the daemon will not start. Adjust the ID, storage and bridge to match your setup.',
         step_px1_alt:'Prefer a full VM? That works too and needs no nesting flag: install Debian as usual and continue from step 2.',
         step_px2_title:'Install Docker inside the container', step_px2_desc:"From Debian's own repositories, so there is no install script piped into a shell.",
-        step_px3_title:'Follow the Docker steps', step_px3_desc:'From here nothing is Proxmox-specific: the <a href="#tab-docker">Docker image</a> path applies unchanged. Afterwards Yuvomi answers on the container\'s IP at port 3000 - <code>pct exec 110 -- hostname -I</code> on the host prints it.',
-        opt_docker_info:'No Git, no build step - two files, a handful of commands and one edit in <code>.env</code>. Requires only Docker or Podman (Podman: use podman-compose.yml).',
-        step_a1_title:'Download the configuration files', step_a1_desc:'Run these two commands. They download the Docker configuration and the template for your settings.',
-        step_a2_title:'Create your configuration', step_a2_desc:'Copy the template, then open <code>.env</code> in a text editor. <code>SESSION_SECRET</code> is required; <code>DB_ENCRYPTION_KEY</code> is optional but permanent.',
-        step_a2_gen:'This prints two secure values - paste one as <code>SESSION_SECRET</code> and the other as <code>DB_ENCRYPTION_KEY</code>:', px_gen_c:'# two values: one for SESSION_SECRET, one for DB_ENCRYPTION_KEY',
+        step_px3_title:'Follow the Docker steps', step_px3_desc:'From here nothing is Proxmox-specific: the <a href="#docker">Docker image</a> path applies unchanged. Afterwards Yuvomi answers on the container\'s IP at port 3000 - <code>pct exec 110 -- hostname -I</code> on the host prints it.',
+        opt_docker_info:'No Git, no build step - two files, a handful of commands and one edit in <code>.env</code>. On Portainer, see the note at the end of this path.',
+        engine_label:'Commands for',
+        win_note:'<b>On Windows:</b> in PowerShell, type <code>curl.exe</code> instead of <code>curl</code> - Windows PowerShell answers <code>curl</code> with a different command. PowerShell has no <code>openssl</code> for step 2: run these steps in WSL, or let the <a href="#installer">web installer</a> generate both values. <code>notepad .env</code> opens the file for editing.',
+        portainer_info:'<b>Using Portainer?</b> Deploy <code>docs/docker-compose.portainer.yml</code> as a stack instead of these steps. Portainer puts no <code>.env</code> next to a stack, so that file lists every variable itself, and <code>SESSION_SECRET</code> and <code>DB_ENCRYPTION_KEY</code> go under the stack\'s environment variables - both are required there.',
+        portainer_file:'Compose file for Portainer',
+        portainer_guide:'Portainer guide',
+        step_a1_title:'Download the configuration files', step_a1_desc:'Run these two commands. They download the compose file and the template for your settings.',
+        step_a2_title:'Create your configuration', step_a2_desc:'Copy the template, then print two random values:', px_gen_c:'# two values: one for SESSION_SECRET, one for DB_ENCRYPTION_KEY',
         step_a2_warning:'Keep a backup of your <code>.env</code> file somewhere safe. If you lose the <code>DB_ENCRYPTION_KEY</code>, your data cannot be recovered.',
-        step_a3_title:'Start the container', step_a3_desc:'Docker downloads the Yuvomi image and starts it in the background. The first download takes a minute.',
-        step_a3_success:'Check the logs with <code>docker compose logs -f</code>. You should see <code>Server running on port 3000</code>. The container keeps running in the background.',
-        step_setup_title:'Create your admin account', step_setup_desc:'On the first visit, Yuvomi walks you through creating your admin account right in the browser. Prefer the command line? Run the setup wizard instead:',
+        step_a2_edit:'Now open <code>.env</code>, for example with <code>nano .env</code> (Ctrl+O and Enter save, Ctrl+X quits), and replace both <code>REPLACE_WITH_…</code> placeholders: the first value goes to <code>SESSION_SECRET</code>, the second to <code>DB_ENCRYPTION_KEY</code>. Yuvomi does not start while a placeholder is still in there. To run without encryption, clear the <code>DB_ENCRYPTION_KEY</code> line instead.',
+        step_a3_title:'Start the container', step_a3_desc:'The first line downloads the Yuvomi image and starts it in the background - the first download takes a minute. The second follows its log.',
+        step_a3_success:'You should see <code>Server running on port 3000</code>. Ctrl+C stops following the log; the container keeps running in the background. Restarting over and over instead? See <a href="#troubleshooting">troubleshooting</a>.',
         opt_source_info:'For contributors or anyone who wants to run a custom version. Requires Git. The first build takes a few minutes.',
         step_b1_title:'Clone the repository', step_b3_title:'Build and start', step_b3_desc:'The <code>--build</code> flag compiles the Docker image locally. This takes a few minutes the first time.',
         opt_truenas_info:'No terminal required. Yuvomi is in the TrueNAS SCALE Community Apps Catalog - install it directly from the TrueNAS web UI in a few clicks.',
@@ -1015,9 +1140,16 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         step_ur2_title:'Configure the template', step_ur2_desc:'Click Install. Set SESSION_SECRET (required) and DB_ENCRYPTION_KEY (optional, but irreversible once set - back it up). Adjust the WebUI port and the appdata path if needed.',
         step_ur3_title:'Apply and open', step_ur3_desc:'Click Apply. Once the container is running, click the Yuvomi icon → WebUI. The first visit walks you through creating your admin account.',
         path_now:'You are installing on', path_change:'Change',
-        success_title:"You're all set", success_desc:'Open your browser and navigate to:',
-        success_desc_store:"Open Yuvomi the way your app store offers it: the WebUI button on TrueNAS and Unraid, the Yuvomi tile on your Umbrel home screen. The address is your server's, not this machine's - <code>localhost</code> only works if you are sitting at the box itself.",
-        success_hint:'Log in with the admin credentials you just created. From the Settings page you can invite more family members by link, so they choose their own password.',
+        success_title:'Open Yuvomi', success_desc:'Open this address in your browser. The first visit walks you through creating your admin account.',
+        scope_terminal:'Docker, Podman or from source',
+        success_remote:'From another device, use the server\'s IP address or host name instead of <code>localhost</code>, and your own port if you changed <code>OIKOS_HTTP_PORT</code>.',
+        success_cli:'Prefer the command line? This creates the admin account instead:',
+        success_desc_installer:'The wizard already created your admin account: sign in with it here. This is the address unless you gave the wizard another host or port:',
+        success_desc_proxmox:'Open the container\'s address in your browser. The first visit walks you through creating your admin account.',
+        px_ip_ph:'container-IP',
+        success_px_ip:'On the Proxmox host, this prints the IP of container 110 from step 1:',
+        success_desc_store:'Open Yuvomi the way your app store offers it: the WebUI button on TrueNAS and Unraid, the Yuvomi tile on your Umbrel home screen. The address is your server\'s, not this machine\'s - <code>localhost</code> only works if you are sitting at the box itself. The first visit walks you through creating your admin account.',
+        success_hint:'Once you are in, invite the rest of the family by link from the Settings page, so everyone chooses their own password.',
         success_full_guide:'Full technical guide',
         env_where:'Both live in the <code>.env</code> file you created next to your compose file.',
         env_where_store:"Your app store asked for both in its install form, so there is no <code>.env</code> file to edit. Change them in the app's configuration screen and restart it.",
@@ -1040,14 +1172,17 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         opt_immich_title:'Immich photo screensaver', opt_immich_desc:'Let an idle wall tablet show photos from your own Immich library instead of a fixed dashboard, which burns into the panel over time. Set it up under Settings → Administration → Immich, or preconfigure <code>IMMICH_URL</code> and <code>IMMICH_API_KEY</code>; the key never leaves the server.',
         opt_update_title:'Updates', opt_update_desc:'Pull the latest image and restart: <code>docker compose pull && docker compose up -d</code>. Your data persists across updates.',
         trouble_title:'Something not working?', trouble_desc:"Most issues have a simple fix. If you're still stuck, open an issue on GitHub.",
-        trouble_port_title:'Port 3000 is already in use', trouble_port_desc:'Another application is using port 3000. Either stop it, or change the port in <code>docker-compose.yml</code>:',
-        trouble_port_change:'Or edit <code>docker-compose.yml</code> and change <code>3000:3000</code> to e.g. <code>8080:3000</code>.',
+        trouble_restart_title:'The container keeps restarting',
+        trouble_restart_desc:'Almost always a placeholder: Yuvomi refuses to start while <code>SESSION_SECRET</code> still reads <code>REPLACE_WITH_…</code> from <code>.env.example</code>, and on a new install the same goes for <code>DB_ENCRYPTION_KEY</code>. The log says which one:',
+        trouble_restart_fix:'Put a value from <code>openssl rand -hex 32</code> in its place, or clear the <code>DB_ENCRYPTION_KEY</code> line to run without encryption, then run <code>docker compose up -d</code> again. On Podman the log is <code>podman compose -f podman-compose.yml logs yuvomi</code>.',
+        trouble_port_title:'Port 3000 is already in use', trouble_port_desc:'Another application is using port 3000. This shows which one:',
+        trouble_port_change:'Either stop it, or give Yuvomi another host port in <code>.env</code>, for example <code>OIKOS_HTTP_PORT=8080</code>, and run <code>docker compose up -d</code> again. Yuvomi then answers on <code>http://localhost:8080</code>; inside the container it stays on 3000.',
         trouble_perm_title:'Docker: Permission denied', trouble_perm_desc:'Add your user to the Docker group, then log out and back in:',
         trouble_reach_title:'Container starts but the page is not reachable', trouble_reach_desc:'Check the container status and logs:', trouble_reach_firewall:'Accessing from another device? Check your firewall rules.',
-        trouble_db_title:'Database encryption error', trouble_db_desc:"The <code>DB_ENCRYPTION_KEY</code> in your <code>.env</code> is missing or doesn't match the key used when the database was created. On a fresh install you can reset:",
-        trouble_db_warning:'<code>docker compose down -v</code> deletes all data. Only use this on a fresh install with no data.',
+        trouble_db_title:'Database encryption error', trouble_db_desc:'The <code>DB_ENCRYPTION_KEY</code> in your <code>.env</code> is missing or doesn\'t match the key used when the database was created. On a fresh install with no data yet, delete the database folder and start again:',
+        trouble_db_warning:'<code>rm -rf ./data</code> deletes the database for good - only on a fresh install. With existing data you need the original key; nothing else opens it. <code>docker compose down -v</code> is no shortcut: the data sits in a host folder, not in a Docker volume, so it survives that command.',
         trouble_nginx_title:'Nginx shows 502 Bad Gateway', trouble_nginx_desc:"Nginx can't reach the container. Check it's running and the port matches:",
-        trouble_nginx_port:'Ensure the <code>proxy_pass</code> port in your Nginx config matches the host port in <code>docker-compose.yml</code> (default: 3000).',
+        trouble_nginx_port:'Ensure the <code>proxy_pass</code> port in your Nginx config matches <code>OIKOS_HTTP_PORT</code> in your <code>.env</code> (default: 3000).',
         footer_home:'Home', footer_heart:'Built with care for families who value privacy and simplicity.', footer_contrib:'Contributing', footer_impressum:'Imprint (DE)', footer_privacy:'Privacy',
         to_top:'Back to top',
         skip_link:'Skip to content', backLabel:'Overview', copy:'Copy', copied:'Copied!', copyfail:'Copy failed'
@@ -1058,7 +1193,7 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         hero_time:'~10 Minuten',
         nav_main:'Hauptnavigation', nav_home:'Yuvomi Startseite', foot_nav:'Fußzeile', tablist_label:'Installationswege', code_label:'Befehlsblock',
         prereq_title:'Was ihr braucht',
-        prereq_desc:'Yuvomi läuft als Docker- oder Podman-Container. Node.js oder andere Laufzeiten müsst ihr nicht installieren. Nur eine Container-Engine, und ihr seid startklar. (App-Store-Installationen übernehmen sogar das für euch; einzige Ausnahme ist der geführte Web-Installer, der zusätzlich Git und Node.js braucht.)',
+        prereq_desc:'Yuvomi läuft als Docker- oder Podman-Container, Node.js oder eine andere Laufzeit müsst ihr also nicht installieren. App-Store-Installationen bringen sogar die Container-Engine mit; nur der geführte Web-Installer braucht zusätzlich Git und Node.js.',
         prereq_docker_title:'Docker oder Podman', prereq_docker_desc:'Verpackt die App, sodass ihr nichts weiter installieren müsst. Für den privaten Gebrauch kostenlos. Podman (RHEL/Fedora/CentOS Stream) funktioniert ebenfalls - rootless und SELinux-fähig.',
         prereq_terminal_title:'Terminal', prereq_terminal_desc:'Eine Befehlszeile, um ein paar Befehle einzugeben. In jedem Betriebssystem eingebaut - kein Extra-Install nötig.',
         prereq_terminal_hint:'macOS: Terminal · Windows: PowerShell · Linux: bash',
@@ -1073,19 +1208,24 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         step_inst2_title:'Installer starten', step_inst2_desc:'Führt diesen Befehl vom Projektordner aus. Der Installer-Server startet auf Port 8090.',
         step_inst3_title:'Assistenten im Browser öffnen', step_inst3_desc:'Navigiert zur folgenden Adresse. Der Assistent führt euch durch Konfiguration, Container-Start und Admin-Konto-Erstellung.',
         step_inst3_info:'Der Installer beendet sich automatisch nach Abschluss der Einrichtung. Eure Yuvomi-Instanz läuft weiter über Docker oder Podman.',
+        step_inst2_cli:'Linux oder macOS, und lieber im Terminal bleiben? <code>bash install.sh</code> im selben Ordner richtet Yuvomi stattdessen als Dialog im Terminal ein: Es erzeugt die Schlüssel, startet den Container und legt euer Admin-Konto an.',
         opt_proxmox_info:'Es gibt keinen Yuvomi-Eintrag in einem Proxmox-Katalog. Was funktioniert, ist ein kleiner Debian-LXC, in dem dasselbe Docker-Setup läuft wie überall sonst. Diese drei Schritte decken nur den Container drumherum ab.',
         step_px1_title:'Unprivilegierten LXC anlegen', step_px1_desc:'Das läuft auf der Proxmox-Host-Shell. <code>nesting=1</code> ist das, was Docker in einem unprivilegierten Container überhaupt starten lässt; ohne das Flag kommt der Daemon nicht hoch. ID, Storage und Bridge an euer Setup anpassen.',
         step_px1_alt:'Lieber eine ganze VM? Geht auch und braucht kein Nesting-Flag: Debian wie gewohnt installieren und ab Schritt 2 weitermachen.',
         step_px2_title:'Docker im Container installieren', step_px2_desc:'Aus Debians eigenen Paketquellen, damit kein Installationsskript in eine Shell gepipet wird.',
-        step_px3_title:'Den Docker-Schritten folgen', step_px3_desc:'Ab hier ist nichts mehr Proxmox-spezifisch: Der Weg über das <a href="#tab-docker">Docker-Image</a> gilt unverändert. Danach antwortet Yuvomi auf der IP des Containers an Port 3000 - <code>pct exec 110 -- hostname -I</code> auf dem Host gibt sie aus.',
-        opt_docker_info:'Kein Git, kein Build-Schritt - zwei Dateien, eine Handvoll Befehle und eine Änderung in der <code>.env</code>. Nur Docker oder Podman erforderlich (Podman: podman-compose.yml verwenden).',
-        step_a1_title:'Konfigurationsdateien herunterladen', step_a1_desc:'Führt diese zwei Befehle aus. Sie laden die Docker-Konfiguration und die Vorlage für eure Einstellungen herunter.',
-        step_a2_title:'Konfiguration erstellen', step_a2_desc:'Kopiert die Vorlage, öffnet dann <code>.env</code> in einem Texteditor. <code>SESSION_SECRET</code> ist Pflicht; <code>DB_ENCRYPTION_KEY</code> ist optional, aber endgültig.',
-        step_a2_gen:'Das gibt zwei sichere Werte aus - einen als <code>SESSION_SECRET</code>, den anderen als <code>DB_ENCRYPTION_KEY</code> einsetzen:', px_gen_c:'# zwei Werte: einer für SESSION_SECRET, einer für DB_ENCRYPTION_KEY',
+        step_px3_title:'Den Docker-Schritten folgen', step_px3_desc:'Ab hier ist nichts mehr Proxmox-spezifisch: Der Weg über das <a href="#docker">Docker-Image</a> gilt unverändert. Danach antwortet Yuvomi auf der IP des Containers an Port 3000 - <code>pct exec 110 -- hostname -I</code> auf dem Host gibt sie aus.',
+        opt_docker_info:'Kein Git, kein Build-Schritt - zwei Dateien, eine Handvoll Befehle und eine Änderung in der <code>.env</code>. Für Portainer steht ein Hinweis am Ende dieses Wegs.',
+        engine_label:'Befehle für',
+        win_note:'<b>Unter Windows:</b> in PowerShell <code>curl.exe</code> statt <code>curl</code> tippen - Windows PowerShell beantwortet <code>curl</code> mit einem anderen Befehl. <code>openssl</code> für Schritt 2 fehlt in PowerShell: führt diese Schritte in WSL aus, oder lasst den <a href="#installer">Web-Installer</a> beide Werte erzeugen. <code>notepad .env</code> öffnet die Datei zum Bearbeiten.',
+        portainer_info:'<b>Mit Portainer?</b> Dann statt dieser Schritte <code>docs/docker-compose.portainer.yml</code> als Stack anlegen. Portainer legt keine <code>.env</code> neben einen Stack, deshalb führt diese Datei jede Variable selbst auf, und <code>SESSION_SECRET</code> und <code>DB_ENCRYPTION_KEY</code> kommen in die Umgebungsvariablen des Stacks - dort sind beide Pflicht.',
+        portainer_file:'Compose-Datei für Portainer',
+        portainer_guide:'Portainer-Anleitung',
+        step_a1_title:'Konfigurationsdateien herunterladen', step_a1_desc:'Führt diese zwei Befehle aus. Sie laden die Compose-Datei und die Vorlage für eure Einstellungen herunter.',
+        step_a2_title:'Konfiguration erstellen', step_a2_desc:'Kopiert die Vorlage und erzeugt dann zwei Zufallswerte:', px_gen_c:'# zwei Werte: einer für SESSION_SECRET, einer für DB_ENCRYPTION_KEY',
         step_a2_warning:'Behaltet eine Sicherungskopie eurer <code>.env</code>-Datei an einem sicheren Ort. Wenn ihr den <code>DB_ENCRYPTION_KEY</code> verliert, können eure Daten nicht wiederhergestellt werden.',
-        step_a3_title:'Container starten', step_a3_desc:'Docker lädt das Yuvomi-Image herunter und startet es im Hintergrund. Der erste Download dauert eine Minute.',
-        step_a3_success:'Prüft die Logs mit <code>docker compose logs -f</code>. Ihr solltet sehen: <code>Server running on port 3000</code>. Der Container läuft im Hintergrund weiter.',
-        step_setup_title:'Admin-Konto erstellen', step_setup_desc:'Beim ersten Aufruf führt euch Yuvomi direkt im Browser durch die Erstellung eures Admin-Kontos. Lieber per Kommandozeile? Führt stattdessen den Einrichtungsassistenten aus:',
+        step_a2_edit:'Öffnet jetzt die <code>.env</code>, zum Beispiel mit <code>nano .env</code> (Strg+O und Enter speichern, Strg+X beendet), und ersetzt beide <code>REPLACE_WITH_…</code>-Platzhalter: Der erste Wert kommt zu <code>SESSION_SECRET</code>, der zweite zu <code>DB_ENCRYPTION_KEY</code>. Solange ein Platzhalter drinsteht, startet Yuvomi nicht. Ohne Verschlüsselung leert ihr stattdessen die <code>DB_ENCRYPTION_KEY</code>-Zeile.',
+        step_a3_title:'Container starten', step_a3_desc:'Die erste Zeile lädt das Yuvomi-Image herunter und startet es im Hintergrund - der erste Download dauert eine Minute. Die zweite verfolgt sein Log.',
+        step_a3_success:'Ihr solltet <code>Server running on port 3000</code> sehen. Strg+C beendet das Mitlesen; der Container läuft im Hintergrund weiter. Startet er stattdessen immer wieder neu? Siehe <a href="#troubleshooting">Fehlerbehebung</a>.',
         opt_source_info:'Für Mitwirkende oder wer eine eigene Version ausführen möchte. Erfordert Git. Der erste Build dauert einige Minuten.',
         step_b1_title:'Repository klonen', step_b3_title:'Bauen und starten', step_b3_desc:'Das Flag <code>--build</code> kompiliert das Docker-Image lokal. Das dauert beim ersten Mal einige Minuten.',
         opt_truenas_info:'Kein Terminal erforderlich. Yuvomi ist im TrueNAS SCALE Community Apps Catalog - direkt über das TrueNAS-Web-UI in wenigen Klicks installierbar.',
@@ -1101,9 +1241,16 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         step_ur2_title:'Template konfigurieren', step_ur2_desc:'Auf Installieren klicken. SESSION_SECRET (erforderlich) und DB_ENCRYPTION_KEY (optional, aber einmal gesetzt unwiderruflich - sichern) setzen. WebUI-Port und appdata-Pfad bei Bedarf anpassen.',
         step_ur3_title:'Anwenden und öffnen', step_ur3_desc:'Auf Anwenden klicken. Sobald der Container läuft, auf das Yuvomi-Icon → WebUI klicken. Beim ersten Aufruf führt Yuvomi durch die Erstellung des Admin-Kontos.',
         path_now:'Ihr installiert auf', path_change:'Ändern',
-        success_title:'Alles bereit', success_desc:'Öffnet euren Browser und geht zu:',
-        success_desc_store:'Öffnet Yuvomi so, wie euer App-Store es anbietet: über den WebUI-Button bei TrueNAS und Unraid, über die Yuvomi-Kachel auf dem Umbrel-Startbildschirm. Die Adresse ist die eures Servers, nicht die dieses Rechners - <code>localhost</code> funktioniert nur, wenn ihr direkt an der Kiste sitzt.',
-        success_hint:'Meldet euch mit den Admin-Zugangsdaten an, die ihr gerade erstellt habt. Weitere Familienmitglieder ladet ihr auf der Einstellungsseite per Link ein, ihr Passwort legen sie selbst fest.',
+        success_title:'Yuvomi öffnen', success_desc:'Öffnet diese Adresse im Browser. Beim ersten Aufruf legt ihr dort euer Admin-Konto an.',
+        scope_terminal:'Docker, Podman oder aus Quellcode',
+        success_remote:'Von einem anderen Gerät aus nehmt ihr statt <code>localhost</code> die IP-Adresse oder den Hostnamen des Servers, und euren eigenen Port, falls ihr <code>OIKOS_HTTP_PORT</code> geändert habt.',
+        success_cli:'Lieber per Kommandozeile? Das legt das Admin-Konto stattdessen an:',
+        success_desc_installer:'Euer Admin-Konto hat der Assistent schon angelegt: Meldet euch hier damit an. Das ist die Adresse, sofern ihr im Assistenten keinen anderen Host oder Port angegeben habt:',
+        success_desc_proxmox:'Öffnet die Adresse des Containers im Browser. Beim ersten Aufruf legt ihr dort euer Admin-Konto an.',
+        px_ip_ph:'Container-IP',
+        success_px_ip:'Auf dem Proxmox-Host gibt das die IP von Container 110 aus Schritt 1 aus:',
+        success_desc_store:'Öffnet Yuvomi so, wie euer App-Store es anbietet: über den WebUI-Button bei TrueNAS und Unraid, über die Yuvomi-Kachel auf dem Umbrel-Startbildschirm. Die Adresse ist die eures Servers, nicht die dieses Rechners - <code>localhost</code> funktioniert nur, wenn ihr direkt an der Kiste sitzt. Beim ersten Aufruf legt ihr dort euer Admin-Konto an.',
+        success_hint:'Seid ihr drin, ladet den Rest der Familie auf der Einstellungsseite per Link ein; ihr Passwort legen alle selbst fest.',
         success_full_guide:'Vollständige technische Anleitung',
         env_where:'Beide stehen in der <code>.env</code>-Datei, die ihr neben eurer Compose-Datei angelegt habt.',
         env_where_store:'Euer App-Store hat beide in seinem Installationsformular abgefragt, es gibt also keine <code>.env</code>-Datei zu bearbeiten. Ändern könnt ihr sie im Konfigurationsbildschirm der App, danach neu starten.',
@@ -1126,14 +1273,17 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         opt_immich_title:'Immich-Foto-Bildschirmschoner', opt_immich_desc:'Ein unt\xe4tiges Wandtablet zeigt Fotos aus eurer eigenen Immich-Bibliothek statt eines festen Dashboards, das sich mit der Zeit ins Panel einbrennt. Einzurichten unter Einstellungen → Verwaltung → Immich, oder vorab \xfcber <code>IMMICH_URL</code> und <code>IMMICH_API_KEY</code>; der Schl\xfcssel verl\xe4sst den Server nie.',
         opt_update_title:'Updates', opt_update_desc:'Neuestes Image holen und neu starten: <code>docker compose pull && docker compose up -d</code>. Eure Daten bleiben bei Updates erhalten.',
         trouble_title:'Etwas funktioniert nicht?', trouble_desc:'Die meisten Probleme haben eine einfache Lösung. Wenn ihr weiterhin Schwierigkeiten habt, öffnet ein Issue auf GitHub.',
-        trouble_port_title:'Port 3000 ist bereits belegt', trouble_port_desc:'Eine andere Anwendung nutzt Port 3000. Entweder stoppen oder den Port in <code>docker-compose.yml</code> ändern:',
-        trouble_port_change:'Oder <code>docker-compose.yml</code> bearbeiten und <code>3000:3000</code> zu z. B. <code>8080:3000</code> ändern.',
+        trouble_restart_title:'Der Container startet immer wieder neu',
+        trouble_restart_desc:'Fast immer ein Platzhalter: Yuvomi startet nicht, solange <code>SESSION_SECRET</code> noch <code>REPLACE_WITH_…</code> aus der <code>.env.example</code> enthält, und bei einer Neuinstallation gilt dasselbe für <code>DB_ENCRYPTION_KEY</code>. Das Log sagt, welcher es ist:',
+        trouble_restart_fix:'Setzt einen Wert aus <code>openssl rand -hex 32</code> an seine Stelle, oder leert die <code>DB_ENCRYPTION_KEY</code>-Zeile, um ohne Verschlüsselung zu laufen, und führt dann <code>docker compose up -d</code> erneut aus. Unter Podman zeigt <code>podman compose -f podman-compose.yml logs yuvomi</code> das Log.',
+        trouble_port_title:'Port 3000 ist bereits belegt', trouble_port_desc:'Eine andere Anwendung nutzt Port 3000. Das zeigt, welche:',
+        trouble_port_change:'Stoppt sie, oder gebt Yuvomi in der <code>.env</code> einen anderen Host-Port, zum Beispiel <code>OIKOS_HTTP_PORT=8080</code>, und führt <code>docker compose up -d</code> erneut aus. Yuvomi antwortet dann unter <code>http://localhost:8080</code>; im Container bleibt es bei 3000.',
         trouble_perm_title:'Docker: Permission denied', trouble_perm_desc:'Euren Benutzer zur Docker-Gruppe hinzufügen, dann ab- und wieder anmelden:',
         trouble_reach_title:'Container startet, aber die Seite ist nicht erreichbar', trouble_reach_desc:'Container-Status und Logs prüfen:', trouble_reach_firewall:'Zugriff von einem anderen Gerät? Firewall-Regeln prüfen.',
-        trouble_db_title:'Datenbank-Verschlüsselungsfehler', trouble_db_desc:'Der <code>DB_ENCRYPTION_KEY</code> in eurer <code>.env</code> fehlt oder stimmt nicht mit dem Schlüssel überein, der beim Erstellen der Datenbank verwendet wurde. Bei einer Neuinstallation könnt ihr zurücksetzen:',
-        trouble_db_warning:'<code>docker compose down -v</code> löscht alle Daten. Nur bei einer Neuinstallation ohne Daten verwenden.',
+        trouble_db_title:'Datenbank-Verschlüsselungsfehler', trouble_db_desc:'Der <code>DB_ENCRYPTION_KEY</code> in eurer <code>.env</code> fehlt oder stimmt nicht mit dem Schlüssel überein, mit dem die Datenbank angelegt wurde. Bei einer Neuinstallation ohne Daten löscht ihr den Datenbankordner und fangt neu an:',
+        trouble_db_warning:'<code>rm -rf ./data</code> löscht die Datenbank endgültig - nur bei einer Neuinstallation. Mit vorhandenen Daten braucht ihr den ursprünglichen Schlüssel; nichts anderes öffnet sie. <code>docker compose down -v</code> ist keine Abkürzung: Die Daten liegen in einem Host-Ordner, nicht in einem Docker-Volume, und überstehen den Befehl.',
         trouble_nginx_title:'Nginx zeigt 502 Bad Gateway', trouble_nginx_desc:'Nginx kann den Container nicht erreichen. Prüfen, ob er läuft und der Port stimmt:',
-        trouble_nginx_port:'Sicherstellen, dass der <code>proxy_pass</code>-Port in der Nginx-Konfiguration mit dem Host-Port in <code>docker-compose.yml</code> übereinstimmt (Standard: 3000).',
+        trouble_nginx_port:'Sicherstellen, dass der <code>proxy_pass</code>-Port in der Nginx-Konfiguration mit <code>OIKOS_HTTP_PORT</code> in eurer <code>.env</code> übereinstimmt (Standard: 3000).',
         footer_home:'Startseite', footer_heart:'Mit Sorgfalt gebaut für Familien, die Privatsphäre und Einfachheit schätzen.', footer_contrib:'Mitmachen', footer_impressum:'Impressum', footer_privacy:'Datenschutz',
         to_top:'Nach oben',
         skip_link:'Zum Inhalt springen', backLabel:'Übersicht', copy:'Kopieren', copied:'Kopiert!', copyfail:'Nicht kopiert'
@@ -1270,6 +1420,25 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
     document.getElementById('langToggle').addEventListener('click', function(){ lang = lang === 'en' ? 'de' : 'en'; lsSet('lang', lang); applyLang(); });
     matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function(){ if (!theme) applyTheme(); });
 
+    /* Engine switch (Docker / Podman) inside the Docker panel. State lives on
+       <html data-engine>, where the head script already put it for #podman, so
+       CSS alone shows one variant of each command pair; aria-pressed mirrors
+       it for assistive tech. Without JS both variants stay, labelled. */
+    var writeTabHash = function(){};
+    function getEngine(){ return document.documentElement.getAttribute('data-engine') === 'podman' ? 'podman' : 'docker'; }
+    function setEngine(e){
+      if (e === 'podman') document.documentElement.setAttribute('data-engine', 'podman');
+      else document.documentElement.removeAttribute('data-engine');
+      document.querySelectorAll('.engine-btn').forEach(function(b){
+        b.setAttribute('aria-pressed', b.getAttribute('data-engine') === getEngine() ? 'true' : 'false');
+      });
+      syncCodeScroll();
+    }
+    document.querySelectorAll('.engine-btn').forEach(function(b){
+      b.addEventListener('click', function(){ setEngine(b.getAttribute('data-engine')); writeTabHash('docker'); });
+    });
+    setEngine(getEngine());
+
     /* Tabs - ARIA tabs pattern: roving tabindex + Arrow/Home/End keys with
        automatic activation. Only the selected tab stays in the tab order.
        The active tab is mirrored into the URL hash (#docker, #truenas, ...) so
@@ -1281,14 +1450,20 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
       function tabSlug(btn){ return btn.id.replace(/^tab-/, ''); }
       /* The three app-store paths never see a shell, a .env file or localhost.
          Everything below #install now follows the tab instead of assuming the
-         Docker path, and says out loud which one it is following. */
-      var STORE_PATHS = { truenas: 1, umbrel: 1, unraid: 1 };
+         Docker path, and says out loud which one it is following.
+         Proxmox and the web installer end differently from plain Docker - the
+         address is the LXC's, or the wizard already made the admin - so they
+         are scopes of their own. A node lists every scope it serves
+         (data-scope="terminal installer proxmox"), which keeps the shared
+         .env paragraphs single. */
+      var SCOPE_OF = { truenas: 'store', umbrel: 'store', unraid: 'store', proxmox: 'proxmox', installer: 'installer' };
       var currentSlug = 'docker';
       function applyPathScope(slug){
         currentSlug = slug;
-        var want = STORE_PATHS[slug] ? 'store' : 'terminal';
+        var want = SCOPE_OF[slug] || 'terminal';
         document.querySelectorAll('.scope').forEach(function(el){
-          el.classList.toggle('on', el.getAttribute('data-scope') === want);
+          var serves = (el.getAttribute('data-scope') || '').split(/\s+/);
+          el.classList.toggle('on', serves.indexOf(want) !== -1);
         });
         var out = document.getElementById('pathName');
         var src = document.getElementById('tab-' + slug);
@@ -1309,16 +1484,27 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         var panel = document.getElementById(btn.getAttribute('aria-controls'));
         if (panel) panel.classList.add('active');
         applyPathScope(tabSlug(btn));
+        /* A panel that was display:none measured 0 wide when syncCodeScroll()
+           last ran, so its overflowing command plates never got their
+           tabindex and stayed unreachable from the keyboard. Measure again
+           now that it is visible. */
+        syncCodeScroll();
         if (setFocus) btn.focus();
-        if (writeHash && history.replaceState) {
-          try { history.replaceState(null, '', '#' + tabSlug(btn)); } catch (e) {}
-        }
+        if (writeHash) writeTabHash(tabSlug(btn));
       }
       /* The landing page has its own Podman card, and sending it to #docker made
          its "Guide" open a panel with someone else's name on it. There is no
          separate Podman path - the compose file is the difference - so the tab
          is named for both and answers to both anchors. */
       var TAB_ALIAS = { podman: 'docker' };
+      /* The Docker tab carries the engine in its hash, so a Podman choice
+         survives a reload or a shared link and the landing page's Podman card
+         (#podman) opens the Podman commands. */
+      writeTabHash = function(slug){
+        if (!history.replaceState) return;
+        if (slug === 'docker' && getEngine() === 'podman') slug = 'podman';
+        try { history.replaceState(null, '', '#' + slug); } catch (e) {}
+      };
       function tabForHash(){
         var slug = (location.hash || '').replace(/^#/, '').toLowerCase();
         if (!slug) return null;
@@ -1331,6 +1517,8 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         if (sec) sec.scrollIntoView({ block: 'start', behavior: instant ? 'auto' : 'smooth' });
       }
       function applyHash(scroll, instant){
+        var raw = (location.hash || '').replace(/^#/, '').toLowerCase();
+        if (raw === 'podman' || raw === 'docker') setEngine(raw);
         var btn = tabForHash();
         if (!btn) return false;
         activate(btn, false, false);
@@ -1416,8 +1604,7 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
       });
     });
 
-    /* Reveal */
-    document.documentElement.classList.add('js');
+    /* Reveal. The `js` class is set in <head> now, before first paint. */
     if ('IntersectionObserver' in window) {
       var obs = new IntersectionObserver(function(entries){ entries.forEach(function(e){ if (e.isIntersecting){ e.target.classList.add('visible'); obs.unobserve(e.target); } }); }, { threshold: 0.1, rootMargin: '0px 0px -30px 0px' });
       document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });

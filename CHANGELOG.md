@@ -739,6 +739,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on what fits" stood over four modules that cannot be switched off. The outbound note now lists
   every service that connects once you switch it on, as the README does.
 
+- **The install page's steps and fixes match the files they describe.** A busy port is now moved
+  with `OIKOS_HTTP_PORT` in `.env` instead of by editing the compose file, and the database reset
+  removes the data folder, which `docker compose down -v` never touched. Step 2 names the
+  `REPLACE_WITH_…` placeholders and how to edit `.env`, a new first fix covers a container that
+  keeps restarting on them, and the Docker path switches its commands to Podman. Portainer and
+  Windows get a note each, the Proxmox link opens the Docker steps again, and the last step shows
+  the right address for Proxmox and the web installer.
+
 - **Wall mode can be left on a phone** (#1559). "Leave wall mode" was below the bottom edge on
   phones and showed only a grey icon until the screen was touched, and the back button closed the
   app instead of leaving wall mode, which was still on at the next start. The exit now stays at the

@@ -60,6 +60,14 @@
  *            Verhaeltnisses (ein Name, `--ar-phone`) und danach, ob dieser Name
  *            noch das misst, was die Aufnahmen wirklich sind.
  *
+ *        (8) Die Installationsseite sagt, was die Dateien tun, die sie
+ *            beschreibt. Port-Variable und Datenordner aus docker-compose.yml,
+ *            der Platzhalter aus server/auth.js und .env.example, jede
+ *            heruntergeladene Datei im Repository, jeder Anker in die
+ *            installation.md, jeder seiteninterne Link auf einen Tab-Slug statt
+ *            auf den Tab-Knopf. Anlass: `down -v` bei Host-Ordnern,
+ *            `3000:3000` statt OIKOS_HTTP_PORT, `#tab-docker` (2026-09-29).
+ *
  * Ausführen: node --test test/test-docs-landing.js   (bzw. npm run test:docs-landing)
  */
 
@@ -1124,4 +1132,175 @@ test('der Ratio-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
     portraitRatioLiterals([{ where: 'test', css: '.gal-frame img { aspect-ratio: 4 / 3; }' }]), [],
     '4/3 ist die Desktopaufnahme und darf als Literal stehen'
   );
+});
+
+// ── (8) Die Installationsseite: Befehle und Verweise gegen ihre Quelle ───────
+
+/* ---------------------------------------------------------------------------
+ * Die Critique vom 2026-09-29 fand auf `install.html` fuenf Anweisungen, die
+ * gegen die Dateien verstiessen, die sie beschreiben, und keine davon haette
+ * eine Suite gesehen:
+ *   - "Port belegt": `3000:3000` in docker-compose.yml aendern - die Datei
+ *     liest den Host-Port laengst aus `.env` (OIKOS_HTTP_PORT).
+ *   - "Verschluesselungsfehler": `docker compose down -v` - die Compose-Datei
+ *     bindet Host-Ordner ein, `-v` loescht dort nichts, der Fehler bleibt.
+ *   - Schritt 2 nannte die `REPLACE_WITH_`-Platzhalter nicht, an denen der
+ *     Server den Start verweigert.
+ *   - Der Proxmox-Link zeigte auf `#tab-docker`. Das ist eine ID (der Knopf),
+ *     also sprang der Browser brav hin - nur die Tab-Logik kennt `#docker`.
+ *   - Portainer stand nirgends, obwohl installation.md einen Abschnitt hat.
+ * Jede Zusage wird deshalb an der Stelle festgemacht, die sie wahr macht.
+ * ------------------------------------------------------------------------- */
+
+const INSTALL = 'install.html';
+const repo = (p) => readFileSync(resolve(ROOT, p), 'utf8');
+
+/** Beide Woerterbuchwerte eines Schluessels als reiner Text. */
+function bothLangs(html, key) {
+  return ['en', 'de'].map((lang) => {
+    const raw = dictValue(dictBlock(html, lang), key);
+    assert.ok(raw !== null, `${key} fehlt im ${lang}-Woerterbuch (oder steht in doppelten Anfuehrungszeichen)`);
+    return [lang, stripTags(unescapeJs(raw))];
+  });
+}
+
+/** Host-Port-Variable und Datenordner-Default, wie docker-compose.yml sie mappt. */
+function composeFacts() {
+  const yml = repo('docker-compose.yml');
+  const port = yml.match(/"[^"]*\$\{(\w+):-3000\}:3000"/)?.[1];
+  const data = yml.match(/\$\{DATA_DIR:-([^}]+)\}:\/data/)?.[1];
+  assert.ok(port && data, 'docker-compose.yml: Port- oder Daten-Mapping nicht gefunden - Muster veraltet?');
+  return { port, data, namedVolumes: /^volumes:/m.test(yml) };
+}
+
+/** Alle Befehlstexte der Seite: Codeplatten und Copy-Payloads. */
+function commandTexts(html) {
+  const body = stripComments(html.split('<script>\n  (function(){')[0]);
+  const plates = [...body.matchAll(/<div class="code-block">([\s\S]*?)<\/div>/g)].map((m) => stripTags(m[1]));
+  const copies = [...body.matchAll(/data-copy="([^"]*)"/g)].map((m) => decode(m[1].replace(/&#10;/g, '\n')));
+  return [...plates, ...copies];
+}
+
+test('install.html: der Port-Weg nennt die Variable, die docker-compose.yml liest', () => {
+  const html = read(INSTALL);
+  const { port } = composeFacts();
+  for (const key of ['trouble_port_change', 'trouble_nginx_port', 'success_remote']) {
+    for (const [lang, text] of bothLangs(html, key)) {
+      assert.ok(text.includes(port), `${key} (${lang}) nennt ${port} nicht: ${text}`);
+    }
+  }
+  // Keine Anleitung, die Portzuordnung in der Compose-Datei von Hand zu aendern.
+  assert.deepEqual(html.match(/\b\d{2,5}:3000\b/g) || [], [],
+    `install.html schickt Leser in die Compose-Datei, obwohl sie ${port} aus .env liest`);
+});
+
+test('install.html: der Datenbank-Reset loescht den Ordner, den die Compose-Datei einbindet', () => {
+  const html = read(INSTALL);
+  const { data, namedVolumes } = composeFacts();
+  assert.equal(namedVolumes, false,
+    'docker-compose.yml hat jetzt benannte Volumes - dann waere `down -v` wieder ein Weg, Anleitung neu pruefen');
+  const cmds = commandTexts(html);
+  assert.ok(cmds.length > 15, `nur ${cmds.length} Befehle gefunden - Muster veraltet?`);
+  assert.deepEqual(cmds.filter((c) => /down\s+-v\b/.test(c)), [],
+    '`down -v` als Befehl: bei Host-Ordnern loescht es nichts, der Schluesselfehler bleibt');
+  assert.ok(cmds.some((c) => c.includes(`rm -rf ${data}`)), `kein Reset-Befehl fuer ${data} gefunden`);
+});
+
+test('install.html: Schritt 2 und die Neustart-Hilfe nennen den Platzhalter, an dem der Server stoppt', () => {
+  const html = read(INSTALL);
+  const prefix = repo('server/auth.js').match(/SESSION_SECRET\.startsWith\('([A-Z_]+)'\)/)?.[1];
+  assert.ok(prefix, 'server/auth.js: Platzhalter-Pruefung nicht gefunden - Muster veraltet?');
+  assert.ok(repo('server/db.js').includes(`DB_KEY.startsWith('${prefix}')`), 'server/db.js prueft einen anderen Praefix');
+  const example = repo('.env.example');
+  for (const v of ['SESSION_SECRET', 'DB_ENCRYPTION_KEY']) {
+    assert.ok(new RegExp(`^${v}=${prefix}`, 'm').test(example), `.env.example liefert ${v} nicht mehr als ${prefix}...`);
+  }
+  for (const key of ['step_a2_edit', 'trouble_restart_desc']) {
+    for (const [lang, text] of bothLangs(html, key)) {
+      assert.ok(text.includes(prefix), `${key} (${lang}) nennt ${prefix} nicht`);
+    }
+  }
+});
+
+test('docs: jede heruntergeladene Datei und jede Compose-Datei existiert im Repository', () => {
+  for (const page of ['index.html', INSTALL]) {
+    const html = read(page);
+    const fetched = [...html.matchAll(/raw\.githubusercontent\.com\/ulsklyc\/yuvomi\/main\/([\w./-]+)/g)].map((m) => m[1]);
+    const composed = [...html.matchAll(/compose -f ([\w./-]+\.ya?ml)/g)].map((m) => m[1]);
+    assert.ok(fetched.length >= 2, `${page}: keine Download-URL gefunden - Muster veraltet?`);
+    const missing = [...new Set([...fetched, ...composed])].filter((f) => !existsSync(resolve(ROOT, f)));
+    assert.deepEqual(missing, [], `${page} verweist auf Dateien, die es im Repository nicht gibt`);
+  }
+  // Der Podman-Start ist woertlich der aus installation.md, nicht eine Nachdichtung.
+  const up = 'podman compose -f podman-compose.yml up -d';
+  assert.ok(read(INSTALL).includes(up) && read('installation.md').includes(up), `"${up}" fehlt auf der Seite oder in installation.md`);
+});
+
+/**
+ * GitHubs Anker fuer eine Markdown-Ueberschrift: klein, alles ausser Buchstaben,
+ * Ziffern, Leerzeichen, `-` und `_` faellt weg, Leerzeichen werden `-`. Ein
+ * Gedankenstrich hinterlaesst deshalb ZWEI Bindestriche (`option-g--portainer`).
+ */
+function githubSlug(heading) {
+  return heading.replace(/<[^>]+>/g, '').replace(/`/g, '').trim().toLowerCase()
+    .replace(/[^\p{L}\p{N} _-]/gu, '').replace(/ /g, '-');
+}
+
+function markdownAnchors(md) {
+  const seen = new Map();
+  const out = new Set();
+  const body = md.replace(/^```[\s\S]*?^```/gm, '');
+  for (const m of body.matchAll(/^#{1,6}\s+(.+?)\s*$/gm)) {
+    const base = githubSlug(m[1]);
+    const n = seen.get(base) || 0;
+    seen.set(base, n + 1);
+    out.add(n ? `${base}-${n}` : base);
+  }
+  for (const m of body.matchAll(/<a name="([^"]+)"/g)) out.add(m[1]);
+  return out;
+}
+
+function brokenGuideAnchors(html, anchors) {
+  return [...html.matchAll(/installation\.md#([^"'\s)]+)/g)].map((m) => m[1]).filter((a) => !anchors.has(a));
+}
+
+test('docs: jeder Anker in die installation.md trifft eine Ueberschrift', () => {
+  const anchors = markdownAnchors(read('installation.md'));
+  for (const page of ['index.html', INSTALL]) {
+    assert.deepEqual(brokenGuideAnchors(read(page), anchors), [], `${page}: Anker ohne Ziel in docs/installation.md`);
+  }
+  assert.ok(read(INSTALL).includes('installation.md#option-g--portainer'), 'install.html verweist nicht mehr auf den Portainer-Abschnitt');
+});
+
+/** Seiteninterne Sprungziele: ein Tab-Slug (samt Alias) oder eine ID, die kein Tab-Knopf ist. */
+function brokenHashLinks(html) {
+  const body = stripComments(html);
+  const tabIds = [...body.matchAll(/class="tab-btn[^"]*"[^>]*\sid="([\w-]+)"/g)].map((m) => m[1]);
+  const slugs = new Set(tabIds.map((id) => id.replace(/^tab-/, '')));
+  for (const m of body.matchAll(/TAB_ALIAS = \{([^}]*)\}/g)) for (const a of m[1].matchAll(/(\w+):/g)) slugs.add(a[1]);
+  const ids = new Set([...body.matchAll(/\sid="([\w-]+)"/g)].map((m) => m[1]));
+  return [...body.matchAll(/href=\\?"#([\w-]+)\\?"/g)].map((m) => m[1])
+    .filter((h) => !slugs.has(h) && (!ids.has(h) || tabIds.includes(h)));
+}
+
+test('install.html: jeder seiteninterne Link trifft einen Tab oder eine Sektion', () => {
+  const html = read(INSTALL);
+  assert.deepEqual(brokenHashLinks(html), [],
+    'Link auf einen Tab-KNOPF statt auf den Tab-Slug: der Browser springt, der Tab wechselt nicht');
+  assert.ok(html.includes('href="#docker"') && html.includes('href="#installer"'), 'Tab-Links nicht gefunden - Muster veraltet?');
+});
+
+test('die Installationsseiten-Guards erkennen den Schaden, gegen den sie gebaut sind', () => {
+  // Der Stand vor dem Fix, woertlich.
+  const alt = '<button class="tab-btn" role="tab" id="tab-docker" type="button"></button>'
+    + '<p>the <a href="#tab-docker">Docker image</a> path</p>'
+    + '<div class="code-block">docker compose down -v\n<span class="cmd">docker compose up -d</span></div>'
+    + '<p>change <code>3000:3000</code> to e.g. <code>8080:3000</code>.</p>';
+  assert.deepEqual(brokenHashLinks(alt), ['tab-docker']);
+  assert.ok(commandTexts(alt).some((c) => /down\s+-v\b/.test(c)), 'der Reset-Guard sieht `down -v` nicht');
+  assert.equal((alt.match(/\b\d{2,5}:3000\b/g) || []).length, 2, 'der Port-Guard sieht die Compose-Anleitung nicht');
+  // Anker: der Gedankenstrich wird zu zwei Bindestrichen, ein falscher Slug faellt auf.
+  const anchors = markdownAnchors('### Option G \u2014 Portainer (Stack or Git/GitOps)\n## Backup & Restore\n');
+  assert.ok(anchors.has('option-g--portainer-stack-or-gitgitops') && anchors.has('backup--restore'));
+  assert.deepEqual(brokenGuideAnchors('installation.md#option-g-portainer', anchors), ['option-g-portainer']);
 });
