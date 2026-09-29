@@ -4197,7 +4197,7 @@ test('Baender in RTL: offene Kante, Chevron und Nachbarmonat-Toenung kippen mit 
   // Jede Regel, deren Selektorliste die Klasse traegt - auch in @media und
   // spaeter im File -, damit eine Ueberschreibung nicht durchrutscht.
   const withClass = (cls) => {
-    const re = new RegExp(`${cls.replace(/[.]/g, '\\.')}(?![\\w-])`);
+    const re = new RegExp(`${cls.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`);
     return all.filter((r) => r.selector.split(',').some((s) => re.test(s)));
   };
   const physical = /(?:^|[;\s])(?:margin|padding|border)-(?:left|right)\b|border-(?:top|bottom)-(?:left|right)-radius|(?:^|[;\s])(?:left|right)\s*:|translateX/;
