@@ -741,6 +741,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the section shows an error with "Try again" instead of claiming that no list is enabled. The
   section is now called "Reminder list for new tasks" (#1516).
 
+- **Confirming a long list of moved events no longer holds up the server** (#1440). When an admin
+  confirmed a page of moved events under Settings > Sync, every picked entry was checked with a
+  query prepared anew for it, and a full page of up to 5,000 ran without a pause, so other requests
+  waited meanwhile. The check now prepares its query once and lets other requests through after
+  every 50 entries. An entry that no longer matches still stops the whole confirmation with nothing
+  written.
+
 - **Recolouring a CalDAV event no longer grows a list that is never emptied** (#1442). Every
   colour chosen in Yuvomi for an event from a CalDAV calendar was noted so the one-time colour
   repair from 2.69.0 would leave it alone, and that list only grew; each recolour read and rewrote

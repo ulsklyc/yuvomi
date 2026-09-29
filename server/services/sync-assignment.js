@@ -234,7 +234,13 @@ function moveDefaultAssignment(d, eventId, toUserId, nowKey) {
   `).run(eventId, toUserId, nowKey);
 }
 
-const BACKFILL_BATCH_SIZE = 50;
+/**
+ * Happengroesse des Nachtragens: so viele Termine schreibt ein Happen, und so
+ * viele abgehakte Umzuege prueft die Bestaetigung am Stueck (#1440). Ein Objekt
+ * statt einer Konstante, damit ein Test sie fuer DENSELBEN Aufrufpfad kleiner
+ * stellen kann, ohne Hunderte Termine anzulegen.
+ */
+export const backfillBatch = { size: 50 };
 
 /**
  * Die Kandidaten des Nachtragens, wie sie JETZT sind: Termin ohne Zuweisung und
@@ -352,22 +358,39 @@ export function listMovedCandidates(d, { viewerId, limit, after = null }) {
 }
 
 /**
- * EIN umgezogener Termin, wie er JETZT ist - die Punktabfrage, mit der die
- * Bestaetigung jeden abgehakten Eintrag prueft, statt die ganze Liste zu laden.
- * Dieselbe Regel und dieselbe Sichtbarkeit wie die Vorschau.
+ * Stehen die abgehakten Umzuege noch genau so in der Vorschau? Die Pruefung der
+ * Bestaetigung: jeder Eintrag per Punktabfrage gegen dieselbe Regel und
+ * dieselbe Sichtbarkeit wie die Vorschau, statt die ganze Liste zu laden. Ein
+ * Eintrag, der nicht mehr passt, beendet die Pruefung mit `false`.
+ *
+ * IN HAPPEN, MIT EINER VORBEREITETEN ABFRAGE (#1440). Eine volle Seite sind bis
+ * zu 5000 Eintraege; je Eintrag eine frisch vorbereitete Abfrage, alle ohne
+ * Pause, hielt jede andere Anfrage so lange auf. Die Abfrage wird einmal
+ * vorbereitet, und nach jedem Happen von `backfillBatch.size` Eintraegen kommen
+ * andere Anfragen dran - wie beim Schreiben in applyDefaultAssigneesToExisting().
+ * Was sich waehrend der Pruefung aendert, faengt dort die Neupruefung jeder
+ * Zeile ab.
  *
  * @param {object} d better-sqlite3 Datenbank-Handle
- * @param {number} eventId
- * @param {{ viewerId: number }} options
- * @returns {{ eventId: number, userId: number, fromUserId: number } | undefined}
+ * @param {{ eventId: number, userId: number, fromUserId: number }[]} moves
+ * @param {{ viewerId: number, batchSize?: number }} options
+ * @returns {Promise<boolean>}
  */
-export function getMovedCandidate(d, eventId, { viewerId }) {
-  return d.prepare(`
-    SELECT e.id AS eventId, ec.default_assignee_user_id AS userId, cur.user_id AS fromUserId
+export async function movesStillOffered(d, moves, { viewerId, batchSize = backfillBatch.size }) {
+  const current = d.prepare(`
+    SELECT ec.default_assignee_user_id AS userId, cur.user_id AS fromUserId
     ${MOVED_DEFAULT_EVENTS}
       AND e.id = @eventId
       AND ${MOVED_VISIBLE_TO_VIEWER}
-  `).get({ eventId, viewerId });
+  `);
+  for (let start = 0; start < moves.length; start += batchSize) {
+    if (start > 0) await new Promise((resolve) => setImmediate(resolve));
+    for (const { eventId, userId, fromUserId } of moves.slice(start, start + batchSize)) {
+      const row = current.get({ eventId, viewerId });
+      if (!row || row.fromUserId !== fromUserId || row.userId !== userId) return false;
+    }
+  }
+  return true;
 }
 
 /**
@@ -433,7 +456,7 @@ export function backfillCandidatesToken(candidates) {
 export async function applyDefaultAssigneesToExisting(
   d,
   candidates = listBackfillCandidates(d),
-  { batchSize = BACKFILL_BATCH_SIZE, now = new Date(), viewerId = null } = {},
+  { batchSize = backfillBatch.size, now = new Date(), viewerId = null } = {},
 ) {
   // Derselbe Vergleich wie beim Zustellen (#1364): `remind_at` als Zeitpunkt.
   const nowKey = remindAtCompareKey(now);

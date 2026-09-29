@@ -17,7 +17,7 @@ import {
   listBackfillCandidates,
   listMovedCandidates,
   countMovedCandidates,
-  getMovedCandidate,
+  movesStillOffered,
   movedCandidatesLimit,
   movedCursorOf,
   parseMovedCursor,
@@ -352,9 +352,10 @@ router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, 
  * Jeder abgehakte Umzug nennt Termin, bisherige und neue Person - genau die
  * Zeile, die die Vorschau gezeigt hat. Geprueft wird jeder EINZELN per
  * Punktabfrage gegen dieselbe Regel und dieselbe Sichtbarkeit wie die Vorschau
- * (getMovedCandidate) - die ganze Liste wird dafuer nicht geladen, und eine
- * Seite braucht die Bestaetigung nicht. Passt einer nicht mehr (inzwischen
- * bearbeitet, Standard-Person umgestellt, nie angeboten, nicht sichtbar), ist die
+ * (movesStillOffered, in Happen mit Pause dazwischen, #1440) - die ganze Liste
+ * wird dafuer nicht geladen, und eine Seite braucht die Bestaetigung nicht.
+ * Passt einer nicht mehr (inzwischen bearbeitet, Standard-Person umgestellt,
+ * nie angeboten, nicht sichtbar), ist die
  * Auswahl veraltet: 409 mit der ersten Seite der Vorschau, und nichts wird
  * geschrieben.
  * Ohne `moves` wird kein Termin umgestellt.
@@ -377,18 +378,16 @@ router.post('/external-calendars/default-assignee-backfill', requireAdmin, async
     if (!Array.isArray(moves)) {
       return res.status(400).json({ error: moves.error, code: 400 });
     }
-    // Gezählt und festgehalten im selben synchronen Schritt: genau diese Liste
-    // ist bestätigt, und nur sie wird abgearbeitet - auch wenn zwischen den
-    // Happen neue Kandidaten dazukommen.
     const d = db.get();
+    const viewerId = getUserId(req);
+    // Die Umzuege zuerst, in Happen (#1440): dazwischen kommen andere Anfragen dran.
+    const movesOffered = await movesStillOffered(d, moves, { viewerId });
+    // Gezählt und festgehalten im selben synchronen Schritt wie der erste Happen
+    // des Schreibens: genau diese Liste ist bestätigt, und nur sie wird
+    // abgearbeitet - auch wenn zwischen den Happen neue Kandidaten dazukommen.
     const candidates = listBackfillCandidates(d);
     const token = backfillCandidatesToken(candidates);
-    const viewerId = getUserId(req);
-    const movesStillOffered = moves.every((m) => {
-      const current = getMovedCandidate(d, m.eventId, { viewerId });
-      return current && current.fromUserId === m.fromUserId && current.userId === m.userId;
-    });
-    if (candidates.length !== expected || (expectedToken && expectedToken !== token) || !movesStillOffered) {
+    if (candidates.length !== expected || (expectedToken && expectedToken !== token) || !movesOffered) {
       return res.status(409).json({
         error: 'Die Termine haben sich seit der Zählung geändert.',
         code: 409,
