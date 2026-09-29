@@ -23,6 +23,7 @@ import os from 'node:os';
 import fs from 'node:fs/promises';
 import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync, readdirSync, constants as fsConstants } from 'node:fs';
 import { createLogger } from './logger.js';
+import { acquireInstanceLock } from './utils/instance-lock.js';
 import { RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON } from './utils/restore-messages.js';
 import { setRestoreRunning, activeWriters, restoreWaitTimeoutMs, waitUntilIdle } from './utils/restore-state.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
@@ -386,6 +387,14 @@ const EMPTY_DATABASE_FILE = 'YUVOMI_EMPTY_DATABASE_FILE';
 const RESTORE_TARGET_HANDSHAKE = Symbol.for('yuvomi.db.restoreTarget');
 
 /**
+ * Handschlag fuer die Instanzsperre (#1530), gesetzt VOR dem Import dieser
+ * Datei: `'wait'` vom Server (server/utils/claim-instance-lock.js), `'refuse'`
+ * vom CLI-Restore. Wie beim Restore-Handschlag ein Symbol und keine
+ * Env-Variable - ein Kindprozess soll ihn nicht erben.
+ */
+const INSTANCE_LOCK_HANDSHAKE = Symbol.for('yuvomi.db.instanceLock');
+
+/**
  * Bricht den Start ab, wenn die Datei, die gleich geöffnet wird, existiert und
  * leer ist. Läuft VOR allem, was die Datei anfasst - auch vor
  * `migrateLegacyDbFile()`, die eine leere `oikos.db` samt Journal sonst schon
@@ -417,6 +426,18 @@ function init({ plaintextBackup = true } = {}) {
       `"${path.resolve(DB_PATH)}", which is NOT the mounted volume. ` +
       `Data will be lost on container restart. Use an absolute path, e.g. DB_PATH=/data/yuvomi.db`
     );
+  }
+  // Instanzsperre (#1530) als ERSTES, vor allem, was neben DB_PATH etwas
+  // anfasst: ein Server, der waehrend eines CLI-Restores startet, wartet hier,
+  // statt Reste wegzuraeumen oder die Datei mitten im Tausch zu oeffnen. Nur
+  // Server und Restore-CLI setzen den Handschlag; andere Importeure (das
+  // Backup per `node -e` aus docs/installation.md, Skripte) bleiben frei.
+  // Der Restore aus der Einstellungsseite laeuft erneut hier durch und haelt
+  // die Sperre schon.
+  const instanceLockMode = globalThis[INSTANCE_LOCK_HANDSHAKE];
+  if ((instanceLockMode === 'wait' || instanceLockMode === 'refuse') && DB_PATH !== ':memory:') {
+    mkdirSync(path.dirname(DB_PATH), { recursive: true });
+    acquireInstanceLock(DB_PATH, { onBusy: instanceLockMode, log });
   }
   // Reste eines abgebrochenen Restores zuerst: auch vor der Leer-Pruefung,
   // denn ein CLI-Restore auf eine leere Datei (#1282), der mittendrin stirbt,

@@ -738,6 +738,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Only mine", and switches to the next appointment or to "Done for today" when one ends, without a
   reload.
 
+- **A command-line restore refuses to run while Yuvomi is running** (#1530). `scripts/restore-backup.js`
+  replaced the database without knowing whether a server was working on it: the file changed under
+  the server's open connection, and the server kept writing to the old one. Yuvomi and the restore
+  now both hold a lock on `yuvomi.db.lock` next to the database. The restore stops with "Restore
+  refused" while a server holds it, and a server that starts during a command-line restore waits
+  until it has finished, with a log line every 30 seconds. A second server on the same database
+  waits the same way. The operating system drops the lock when the process ends, also after a
+  crash, so nothing is left to clean up. Do not delete `yuvomi.db.lock` while Yuvomi runs. If the
+  file cannot be created or locked, Yuvomi logs a warning and works as before; the lock does not
+  reach across machines (NFS with `nolock`) or from a Docker Desktop host into its containers.
+
 - **A trip that began yesterday shows on today's overview** (#1457). Appointments were picked by
   their start, so a trip, a hospital stay or a school camp that started yesterday and runs until
   tomorrow was missing from the calendar tile, the today sheet, the wall display and the family
