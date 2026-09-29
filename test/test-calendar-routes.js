@@ -2737,20 +2737,18 @@ test('first-slot target detachment clones inherited attachments for every standa
       Number(restrictedEvent.attachment_document_id),
     ];
     assert.equal(new Set(documentIds).size, 3);
-    // Die Kopien tragen die Rechte der Quelle (#1443): das Abloesen aendert
-    // nicht, wer die Termine sieht, also wird auch kein Dokument geoeffnet.
     assert.deepEqual(db.prepare(`
       SELECT id, visibility FROM family_documents
       WHERE id IN (?, ?, ?) ORDER BY id
     `).all(...documentIds).map((row) => ({ ...row })), [
       { id: originalDocumentId, visibility: 'private' },
-      { id: Number(familyEvent.attachment_document_id), visibility: 'private' },
-      { id: Number(restrictedEvent.attachment_document_id), visibility: 'private' },
+      { id: Number(familyEvent.attachment_document_id), visibility: 'family' },
+      { id: Number(restrictedEvent.attachment_document_id), visibility: 'restricted' },
     ]);
     assert.deepEqual(db.prepare(`
       SELECT user_id FROM family_document_access
       WHERE document_id = ? ORDER BY user_id
-    `).all(restrictedEvent.attachment_document_id).map((row) => Number(row.user_id)), []);
+    `).all(restrictedEvent.attachment_document_id).map((row) => Number(row.user_id)), [TOM.id]);
 
     const storedDocuments = documentIds.map((id) => db.prepare(
       'SELECT * FROM family_documents WHERE id = ?'

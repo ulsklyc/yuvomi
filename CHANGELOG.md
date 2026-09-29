@@ -739,7 +739,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the save changes who sees the event (its visibility, or the people on an event for its
   assignees), and only for its owner or an admin; for everyone else the document stays as the
   owner set it. A new attachment uploaded to someone else's event is still limited to the event's
-  people, and a copy made when a series is split or detached keeps its source's rights. (#1443)
+  people. (#1443)
 
 - **A locked recurring task stays locked after it is checked off** (#1488). Checking off one
   occurrence created the next one without the lock, so from the second occurrence on a child could

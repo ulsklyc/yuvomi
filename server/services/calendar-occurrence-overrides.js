@@ -1817,8 +1817,12 @@ export function splitSeries(database, {
       successorAssignments,
       mayWidenAttachment,
       {
-        // Vorher sah den Termin, wer den geteilten Serientermin sah.
-        before: { visibility: selectedResolved.visibility, userIds: selectedAssignments },
+        // Verglichen wird mit dem Publikum, dem das Dokument bisher folgte: dem
+        // des Serientermins, wenn er den Anhang selbst trug, sonst dem des
+        // Serienkopfs - eine geerbte Kopie folgt einem engeren Termin (Review #1443).
+        before: selectedFields.includes('attachment')
+          ? { visibility: selectedResolved.visibility, userIds: selectedAssignments }
+          : { visibility: master.visibility, userIds: canonicalIds(assignmentIds(database, master.id)) },
         attachmentSet: createdAttachment !== undefined,
       },
     );
@@ -1955,9 +1959,8 @@ function materializeDetachedChild(database, child, master, {
 } = {}) {
   const fields = parseOverrideFields(child.overridden_fields);
   const resolved = resolveOccurrence(database, child, master);
-  const assignmentsBefore = canonicalIds(assignmentIds(database, child.id));
   const effectiveAssignments = fields.includes('assignments')
-    ? assignmentsBefore
+    ? canonicalIds(assignmentIds(database, child.id))
     : canonicalIds(assignmentIds(database, master.id));
   if (!fields.includes('assignments')) {
     replaceAssignments(database, child.id, effectiveAssignments);
@@ -2016,9 +2019,10 @@ function materializeDetachedChild(database, child, master, {
       resolved.visibility,
       effectiveAssignments,
       mayWidenAttachment,
-      // Die Kopie traegt die Rechte der Quelle; abgeglichen wird nur, wenn der
-      // abgeloeste Termin ein anderes Publikum hat als der Serientermin davor.
-      { before: { visibility: resolved.visibility, userIds: assignmentsBefore } },
+      // Die Kopie traegt die Rechte der Quelle, und die folgte dem Serienkopf:
+      // abgeglichen wird, wenn der abgeloeste Termin ein anderes Publikum hat
+      // als der Serienkopf (Review #1443).
+      { before: { visibility: master.visibility, userIds: canonicalIds(assignmentIds(database, master.id)) } },
     );
   }
 }

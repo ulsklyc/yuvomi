@@ -2745,19 +2745,19 @@ test('confirmed split gives every inherited orphan an independent attachment ACL
     childOwnedDocumentId,
   ]).size, 5);
 
-  // The copies keep their source's rights (#1443): detaching does not change who
-  // sees the orphans, so no copy is opened wider than the private source.
+  // Each copy now belongs to an event whose audience differs from the master's,
+  // whose audience the source followed - so the owner's copy follows its event (#1443).
   assert.deepEqual(database.prepare(`
     SELECT id, visibility FROM family_documents
     WHERE id IN (?, ?, ?) ORDER BY id
   `).all(sourceDocumentId, familyDocumentId, restrictedDocumentId).map((row) => ({ ...row })), [
     { id: sourceDocumentId, visibility: 'private' },
-    { id: familyDocumentId, visibility: 'private' },
-    { id: restrictedDocumentId, visibility: 'private' },
+    { id: familyDocumentId, visibility: 'family' },
+    { id: restrictedDocumentId, visibility: 'restricted' },
   ]);
   assert.deepEqual(database.prepare(`
     SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id
-  `).all(restrictedDocumentId).map((row) => Number(row.user_id)), []);
+  `).all(restrictedDocumentId).map((row) => Number(row.user_id)), [3]);
 
   database.prepare('DELETE FROM family_documents WHERE id = ?').run(familyDocumentId);
   assert.equal(database.prepare('SELECT id FROM family_documents WHERE id = ?')
@@ -2770,6 +2770,64 @@ test('confirmed split gives every inherited orphan an independent attachment ACL
   ]) {
     assert.equal(attachmentIdFor(eventId), expectedDocumentId);
   }
+});
+
+test('split copies of an inherited attachment follow a narrower occurrence, not the master (#1443, review)', () => {
+  // Die Quelle folgt dem Publikum des Serienkopfs (fuer alle, also family). Ein
+  // privater Serientermin, der den Anhang nur erbt, bekommt beim Teilen oder
+  // Abloesen eine Kopie - die muss seinem Publikum folgen, sonst entstuende aus
+  // einem privaten Termin ein neues Familien-Dokument.
+  const database = createDatabase();
+  const insertDocument = (name, visibility) => Number(database.prepare(`
+    INSERT INTO family_documents
+      (name, visibility, original_name, mime_type, file_size, content_data, created_by)
+    VALUES (?, ?, ?, 'text/plain', 4, 'body', 1)
+  `).run(name, visibility, `${name}.txt`).lastInsertRowid);
+  const sourceDocumentId = insertDocument('family source', 'family');
+  const seriesId = Number(insertSeries(database, {
+    title: 'Family series',
+    start_datetime: '2026-10-01T09:00:00',
+    recurrence_rule: 'FREQ=DAILY',
+    assigned_to: 1,
+    visibility: 'all',
+  }));
+  database.prepare(`
+    UPDATE calendar_events
+    SET attachment_name = 'source.txt', attachment_mime = 'text/plain',
+        attachment_size = 4, attachment_document_id = ?
+    WHERE id = ?
+  `).run(sourceDocumentId, seriesId);
+  database.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, 1)').run(seriesId);
+  for (const recurrenceId of ['2026-10-02', '2026-10-04']) {
+    upsertOccurrenceOverride(database, {
+      seriesId, recurrenceId, actorId: 1, changes: { title: `Private ${recurrenceId}`, visibility: 'private' },
+    });
+  }
+  const clones = new Map();
+  const clone = (owner, sourceId) => {
+    const source = database.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(sourceId);
+    const documentId = insertDocument(`${owner} clone`, source.visibility);
+    clones.set(owner, documentId);
+    return {
+      attachment_name: 'source.txt', attachment_mime: 'text/plain', attachment_size: 4,
+      attachment_data: null, attachment_document_id: documentId,
+    };
+  };
+  splitSeries(database, {
+    seriesId,
+    recurrenceId: '2026-10-02',
+    actorId: 1,
+    changes: { recurrence_rule: 'FREQ=WEEKLY;BYDAY=FR' },
+    confirmedOrphanCount: 1,
+    cloneAttachment: (sourceId) => clone('successor', sourceId),
+    cloneDetachedAttachment: (childId, sourceId) => clone('detached', sourceId),
+    mayWidenAttachment: () => true,
+  });
+  const visibility = (id) => database.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(id).visibility;
+  assert.equal(clones.size, 2, 'successor and detached orphan each got a copy');
+  assert.equal(visibility(sourceDocumentId), 'family', 'the source stays as it was');
+  assert.equal(visibility(clones.get('successor')), 'private', 'the successor copy follows the private occurrence');
+  assert.equal(visibility(clones.get('detached')), 'private', 'the detached copy follows the private occurrence');
 });
 
 test('confirmed following detachment rolls back orphan materialization and EXDATE cleanup atomically', () => {
