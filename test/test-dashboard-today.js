@@ -14,6 +14,9 @@
  *        3. Familienkarte (#1449): sie lieh sich die Liste der Termin-Kachel
  *           - fuenf Kommende und deren „nur meine" - und verlor damit den
  *           Abendtermin eines Mitglieds an einem vollen Tag.
+ *        4. „Heute bis HH:MM" (#1534): die Faelligkeit einer Aufgabe wurde
+ *           in der Zone des Geraets gelesen und dann in die des Haushalts
+ *           umgerechnet - hier mit Prozesszone != Haushaltszone.
  *
  * Ausfuehren: npm run test:dashboard-today
  */
@@ -407,3 +410,58 @@ test('#1449 Browser: endet ein Termin der Familienkarte, baut der Minutentakt ne
   const after = dash.todayFingerprint(data, [], new Date('2026-09-24T20:01:00Z'));
   assert.notEqual(before, after, 'um 22:00 wechselt Leo auf „fuer heute durch" - ohne Neuladen');
 }));
+
+// --------------------------------------------------------------------------
+// 4. „Heute bis HH:MM" ist die Uhrzeit des Haushalts (#1534)
+// --------------------------------------------------------------------------
+// Die Faelligkeit einer Aufgabe ist zonenlose Wanduhrzeit. Das Heute-Blatt
+// baute daraus `new Date(`${due_date}T${due_time}`)` - einen Zeitpunkt der
+// GERAETE-Zone - und reichte ihn an `formatTime`, das jeden Zeitpunkt in die
+// Haushaltszone umrechnet. Liegt das Geraet woanders als der Haushalt, stand an
+// einer Aufgabe fuer 18:00 eine andere Uhrzeit. Der Prozess laeuft deshalb in
+// einer ANDEREN Zone als der Haushalt; der Stub von `formatTime` gibt sein
+// Argument als Text zurueck, und gelesen wird es hier ueber `zonedTimeKey` -
+// dieselbe Umrechnung (`zonedFields`), mit der das echte `formatTime` rechnet.
+
+function inProcessZone(processZone, fn) {
+  return async () => {
+    const prevTz = process.env.TZ;
+    process.env.TZ = processZone;
+    try {
+      await fn();
+    } finally {
+      if (prevTz === undefined) delete process.env.TZ;
+      else process.env.TZ = prevTz;
+    }
+  };
+}
+
+const dueToday = (id, title, dueTime) => ({ id, title, due_date: '2026-09-24', due_time: dueTime, status: 'open', assigned_users: [] });
+function todayUntil(row) {
+  const m = /^dashboard\.todayUntil(\{.*\})$/.exec(row?.timeLabel ?? '');
+  assert.ok(m, `Zeile ohne „heute bis": ${row?.timeLabel}`);
+  return JSON.parse(m[1]).time;
+}
+function taskRows(now) {
+  return dash.buildTodayProgram(
+    { urgentTasks: [dueToday(1, 'Muell', '18:00'), dueToday(2, 'Spaet', '23:30:00'), dueToday(3, 'Frueh', '06:15')] },
+    { includeCalendar: false, includeMeals: false, now },
+  ).rows.filter((row) => row.kind === 'task');
+}
+
+test('#1534: „heute bis" nennt die Uhrzeit des Haushalts, nicht die des Geraets',
+  inProcessZone('America/New_York', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+    assert.equal(new Date('2026-09-24T12:00').getTimezoneOffset(), 240, 'Prozess muss in New York laufen');
+    const rows = taskRows(new Date());
+    assert.deepEqual(rows.map((row) => [row.title, tz.zonedTimeKey(todayUntil(row))]),
+      [['Frueh', '06:15'], ['Muell', '18:00'], ['Spaet', '23:30']],
+      'die eingetragene Wanduhrzeit, in Berlin wie eingetippt');
+    assert.deepEqual(rows.map((row) => row.sortKey), ['06:15', '18:00', '23:30'], 'Platz im Tag nach derselben Uhr');
+  })));
+
+test('#1534: Geraet und Haushalt in derselben Zone - unveraendert',
+  inProcessZone('Europe/Berlin', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+    const rows = taskRows(new Date());
+    assert.deepEqual(rows.map((row) => [row.title, tz.zonedTimeKey(todayUntil(row)), row.sortKey]),
+      [['Frueh', '06:15', '06:15'], ['Muell', '18:00', '18:00'], ['Spaet', '23:30', '23:30']]);
+  })));
