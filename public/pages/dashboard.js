@@ -1356,6 +1356,17 @@ function listMoreLine(key, rest) {
   return rest > 0 ? `<p class="widget-list-more">${esc(t(key, { count: rest }))}</p>` : '';
 }
 
+/* DATUM UND ABSTAND IN EINER ZEILE (#1454). Das Datum folgt der Stufung der
+ * Uebersicht (`relativeDateLabel`: Wochentag bis sechs Tage voraus, dann Tag
+ * und Monat, das Jahr nur, wenn es ein anderes ist) - hier stand `formatDate`
+ * mit Jahr, drei Tage voraus („26.09.2026 · 3 Tage"), neben einem Termin, der
+ * „Sa." sagte. Heute und morgen sagen beide Haelften dasselbe Wort; dann steht
+ * es einmal da. */
+function dateAndCount(dateLabel, countLabel) {
+  if (!dateLabel || dateLabel === countLabel) return countLabel;
+  return `${esc(dateLabel)} · ${countLabel}`;
+}
+
 export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
   // Der Vorrat kommt fuer die groesste Fassung vom Server (routes/dashboard.js);
   // was davon erscheint, entscheidet die Kachel. Die Badge zaehlte hier die
@@ -1399,7 +1410,7 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
         </div>
         <div class="birthday-widget-item__body">
           <div class="birthday-widget-item__name">${esc(b.name)}</div>
-          <div class="birthday-widget-item__meta">${formatDate(b.next_date ?? b.next_birthday)} · ${daysLabel}</div>
+          <div class="birthday-widget-item__meta">${dateAndCount(relativeDateLabel(b.next_date ?? b.next_birthday), daysLabel)}</div>
         </div>
         ${occasionLabel ? `<div class="birthday-widget-item__age">${esc(occasionLabel)}</div>` : ''}
       </div>
@@ -1439,6 +1450,10 @@ function renderCountdowns(allItems, size, total = null) {
   const rows = items.map((c) => {
     const phrase = countdownPhrase(c.days_until);
     const label = phrase.count === undefined ? t(phrase.key) : t(phrase.key, { count: phrase.count });
+    // Sagt der Zaehler rechts schon „Heute"/„Morgen", traegt die Zeile kein
+    // zweites (#1454).
+    const when = relativeDateLabel(c.date);
+    const meta = when && when !== label ? `<div class="countdown-item__meta">${esc(when)}</div>` : '';
     // Die Farbe des Termins trägt die Zeile als schmale Marke - dieselbe
     // Zuordnung, die er im Kalender hat. Eine Aufgabe hat keine, sie bekommt
     // den Modulton.
@@ -1468,7 +1483,7 @@ function renderCountdowns(allItems, size, total = null) {
         </span>
         <div class="countdown-item__body">
           <div class="countdown-item__title">${esc(c.title)}</div>
-          <div class="countdown-item__meta">${formatDate(c.date)}</div>
+          ${meta}
         </div>
         <div class="countdown-item__days countdown-item__days--${countdownRank(c.days_until)}">${esc(label)}</div>
       </div>
@@ -2263,7 +2278,7 @@ function metricTileFor(id, data, currency, sheetSpeaks = new Set()) {
           : hk.unpaidAmount > 0
             ? t('dashboard.housekeepingUnpaid', { amount: formatCurrency(hk.unpaidAmount, currency) })
             : hk.lastVisit
-              ? t('dashboard.housekeepingLastVisit', { date: formatDate(hk.lastVisit) })
+              ? t('dashboard.housekeepingLastVisit', { date: earnedWhenLabel(hk.lastVisit) })
               : t('dashboard.housekeepingNoVisits'),
       };
     }
@@ -2715,6 +2730,12 @@ function renderCycleWidget(cycle) {
   const phaseLabel = t(CYCLE_WIDGET_PHASE_KEYS[prediction.phase] || CYCLE_WIDGET_PHASE_KEYS[PHASE.FOLLICULAR]);
   const dayText = t('health.cycle.ring.cycleDay', { day: prediction.cycleDay });
   const countdown = cycleWidgetCountdown(prediction);
+  // Dieselbe Stufung wie jedes kommende Datum der Uebersicht (#1454); sagt der
+  // Zaehler schon „heute", steht das Wort nicht zweimal da.
+  const nextLabel = relativeDateLabel(prediction.nextStart);
+  const cycleDate = nextLabel && nextLabel.toLowerCase() !== countdown.toLowerCase()
+    ? `<span class="cycle-widget__date">${esc(nextLabel)}</span>`
+    : '';
   const phaseColor = CYCLE_WIDGET_PHASE_COLOR[prediction.phase] || 'var(--module-health)';
 
   // Mini-Fortschrittsring: Zyklustag / Ø-Zyklus als einzelner Bogen in Phasenfarbe.
@@ -2743,7 +2764,7 @@ function renderCycleWidget(cycle) {
             <span class="cycle-widget__next-label">${esc(t('health.cycle.status.nextPeriod'))}</span>
             <span class="cycle-widget__countdown">${esc(countdown)}</span>
           </span>
-          <span class="cycle-widget__date">${esc(formatDate(prediction.nextStart))}</span>
+          ${cycleDate}
         </div>
       </div>
     </div>
@@ -3189,7 +3210,7 @@ function renderHousekeepingWidget(hk, currency) {
     : `<div class="housekeeping-widget__status">
         <span class="housekeeping-widget__dot housekeeping-widget__dot--idle" aria-hidden="true"></span>
         <div class="housekeeping-widget__lines">
-          <div class="housekeeping-widget__state">${hk.lastVisit ? t('dashboard.housekeepingLastVisit', { date: formatDate(hk.lastVisit) }) : t('dashboard.housekeepingNoVisits')}</div>
+          <div class="housekeeping-widget__state">${hk.lastVisit ? t('dashboard.housekeepingLastVisit', { date: earnedWhenLabel(hk.lastVisit) }) : t('dashboard.housekeepingNoVisits')}</div>
           <div class="housekeeping-widget__sub">${t('dashboard.housekeepingVisitsMonth', { count: visits })}</div>
         </div>
       </div>`;
@@ -7014,3 +7035,4 @@ Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderDashboa
 
 // Test-Tor fuer die Uebersichts-Bugs vom 2026-09-29 (#1449, #1451-#1457).
 Object.assign(__test, { renderBudgetWidget });
+Object.assign(__test, { renderCountdowns, renderHousekeepingWidget, renderCycleWidget });

@@ -520,3 +520,93 @@ test('#1455: leerer Mahlzeiten-Slot und Sparquote ohne Einnahmen zeigen "-"', ()
   assert.doesNotMatch(budget, TYPO_DASH, 'die Budget-Kachel traegt keinen Halbgeviert');
   assert.match(budget, /<strong>-<\/strong>/, 'die Sparquote ohne Einnahmen ist ein einfacher Bindestrich');
 });
+
+// --------------------------------------------------------
+// Geburtstage, Countdowns, letzter Besuch und Zyklus (#1454)
+// --------------------------------------------------------
+// Die Geburtstagszeile schrieb `formatDate` - immer mit Jahr, auch drei Tage
+// voraus („26.09.2026 · 3 Tage") -, waehrend der Termin daneben „Sa." sagte.
+// Dieselbe Stufung wie `relativeDateLabel` gilt jetzt fuer alles Kommende der
+// Uebersicht; der letzte Besuch liest rueckwaerts (`earnedWhenLabel`). Nennt
+// die Zeile daneben schon „Heute"/„Morgen", steht das Wort einmal da.
+const metaOf = (html, cls) => [...html.matchAll(new RegExp(`class="${cls}">([^<]*)<`, 'g'))].map((m) => m[1]);
+
+test('#1454: die Geburtstagszeile sagt Wochentag, Tag+Monat oder Datum mit Jahr', () => {
+  at(CRITIQUE_NOW, 'Europe/Berlin', () => {
+    globalThis.__locale = 'de';
+    const html = renderUpcomingBirthdays([
+      { name: 'Heute', days_until: 0, next_date: '2026-09-23', kind: 'birthday' },
+      { name: 'Samstag', days_until: 3, next_date: '2026-09-26', kind: 'birthday' },
+      { name: 'Oktober', days_until: 22, next_date: '2026-10-15', kind: 'birthday' },
+      { name: 'Januar', days_until: 104, next_date: '2027-01-05', kind: 'birthday' },
+    ], '1x2', 4);
+    assert.deepEqual(metaOf(html, 'birthday-widget-item__meta'), [
+      'common.today',
+      `${wd('2026-09-26')} · dashboard.daysLeft{"count":3}`,
+      'DM:2026-10-15 · dashboard.daysLeft{"count":22}',
+      '2027-01-05 · dashboard.daysLeft{"count":104}',
+    ]);
+  });
+});
+
+test('#1454: ueber den Tag der Geburtstagszeile entscheidet die Haushaltszone', () => {
+  const row = [{ name: 'Mi', days_until: 6, next_date: '2026-09-30', kind: 'birthday' }];
+  // Derselbe Zeitpunkt: in Berlin noch der 23. (sieben Tage bis zum 30.), auf
+  // Kiritimati schon der 24. (sechs Tage - der Wochentag).
+  at(CRITIQUE_NOW, 'Europe/Berlin', () => {
+    assert.match(metaOf(renderUpcomingBirthdays(row, '1x1', 1), 'birthday-widget-item__meta')[0], /^DM:2026-09-30 · /);
+  });
+  at(CRITIQUE_NOW, 'Pacific/Kiritimati', () => {
+    globalThis.__locale = 'de';
+    assert.equal(metaOf(renderUpcomingBirthdays(row, '1x1', 1), 'birthday-widget-item__meta')[0].split(' · ')[0], wd('2026-09-30'));
+  });
+});
+
+test('#1454: Countdown-Zeilen folgen derselben Stufung und sagen „Heute" nicht zweimal', () => {
+  const prevWindow = global.window;
+  global.window = { yuvomi: { isModuleDisabled: () => false } };
+  try { at(CRITIQUE_NOW, 'Europe/Berlin', () => {
+    globalThis.__locale = 'de';
+    const html = __test.renderCountdowns([
+      { id: 1, source: 'task', title: 'Heute', date: '2026-09-23', days_until: 0 },
+      { id: 2, source: 'event', title: 'Samstag', date: '2026-09-26', days_until: 3 },
+      { id: 3, source: 'event', title: 'Oktober', date: '2026-10-15', days_until: 22 },
+    ], '1x2', 3);
+    assert.deepEqual(metaOf(html, 'countdown-item__meta'), [wd('2026-09-26'), 'DM:2026-10-15'],
+      'der Countdown von heute traegt keine zweite „Heute"-Zeile neben dem Zaehler');
+  }); } finally {
+    global.window = prevWindow;
+  }
+});
+
+test('#1454: der letzte Besuch liest rueckwaerts, ohne Jahr', () => {
+  const prevWindow = global.window;
+  global.window = { yuvomi: { isModuleDisabled: () => false } };
+  try {
+    at(CRITIQUE_NOW, 'Europe/Berlin', () => {
+      const hk = (lastVisit) => ({ configured: true, present: false, unpaidAmount: 0, visitsThisMonth: 3, lastVisit });
+      // Zwei Kacheln, sonst ist es keine Reihe (selectMetricTiles).
+      const health = { hasMeds: true, dosesTotal: 1, dosesTaken: 0, dosesSkipped: 0, lowStockCount: 0, nextDose: { time: '22:00', name: 'X' } };
+      const note = (lastVisit) => __test.selectMetricTiles({ health, housekeeping: hk(lastVisit) }, 'EUR')
+        .find((tile) => tile.id === 'housekeeping').note;
+      assert.equal(note('2026-09-22T07:00:00.000Z'), 'dashboard.housekeepingLastVisit{"date":"common.yesterday"}');
+      assert.equal(note('2026-09-10T07:00:00.000Z'), 'dashboard.housekeepingLastVisit{"date":"DM:2026-09-10T07:00:00.000Z"}');
+      const widget = __test.renderHousekeepingWidget(hk('2026-09-22T07:00:00.000Z'), 'EUR');
+      assert.match(widget, /dashboard\.housekeepingLastVisit\{"date":"common\.yesterday"\}/,
+        'Kachel und Widget sagen dasselbe');
+    });
+  } finally {
+    global.window = prevWindow;
+  }
+});
+
+test('#1454: der naechste Zyklusbeginn sagt den Wochentag', () => {
+  at(CRITIQUE_NOW, 'Europe/Berlin', () => {
+    globalThis.__locale = 'de';
+    // Letzter Beginn 29.08., 28 Tage Zyklus: naechster am 26.09., in drei Tagen.
+    const html = __test.renderCycleWidget({ periods: [{ start_date: '2026-08-29', end_date: '2026-09-02' }], settings: {} });
+    const date = metaOf(html, 'cycle-widget__date')[0];
+    assert.ok(date, 'Reichweite: das Datum steht in der Kachel');
+    assert.equal(date, wd('2026-09-26'), `Wochentag statt Datum mit Jahr, bekam ${date}`);
+  });
+});

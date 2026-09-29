@@ -731,6 +731,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Birthdays, countdowns and the next cycle start on the overview drop the year** (#1454). They
+  read like the other dates there: the weekday up to six days ahead, then day and month, the year
+  only when it is a different one. When the row already says "Today" or "Tomorrow", the word
+  appears once. The last visit of the household help reads backwards ("Yesterday", "10.09.").
+
 - **The reminder list for new tasks says why it is empty.** Without a CalDAV reminder list enabled
   for tasks, the section under Settings → Modules → Tasks now explains what a reminder list is and
   that an admin enables it, and admins get a link to Reminder sync. If the lists cannot be loaded,
