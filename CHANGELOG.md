@@ -744,6 +744,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removes these bookings once; expenses that still exist, including deleted ones, and payments stay
   as they are. The group's activity shows "Booking removed" once for each such expense, with its
   title and amount, so the changed balance has a visible reason. (#1445)
+- **A recurring task sent to a reminder list keeps going there** (#1515). A recurring task created
+  here with a CalDAV reminder list as its destination was uploaded for its first occurrence only;
+  every later occurrence stayed in Yuvomi. Each new occurrence now goes to the same list as a new
+  reminder, as long as the list is still enabled for tasks. Recurring tasks that came from the
+  server are unchanged.
 
 - **The glass tab bar blurs again.** Text scrolling under the tab bar on a phone and under the
   sidebar indicator was readable through the glass because the page transition cut the glass off
