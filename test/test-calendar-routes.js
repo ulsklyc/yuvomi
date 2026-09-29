@@ -4171,8 +4171,9 @@ test('Anhang: auch an einem Serientermin loest ihn nur, wer ihn sieht (#1358)', 
 
 // ── Das Speichern eines Termins oeffnet kein fremdes Dokument (#1358) ─────────
 // Der Anhang folgt Sichtbarkeit und Zuweisung des Termins. Weiter oeffnen darf
-// das nur, wer Dokumente schreiben darf UND das Dokument sieht; sonst wird nur
-// verengt. Und ein Split oder Abloesen kopiert den Anhang nur fuer so jemanden.
+// das nur, wer Dokumente schreiben darf UND das Dokument sieht; sonst bleibt es
+// unangetastet (#1443). Und ein Split oder Abloesen kopiert den Anhang nur fuer
+// so jemanden.
 test('Anhang: Bearbeiten durch eine Nicht-Sehende oeffnet das Dokument nicht wieder - Einzeltermin und Serie (#1358)', async () => {
   const dataUrl = `data:text/plain;base64,${Buffer.from('privat').toString('base64')}`;
   const docRow = (id) => ({ ...db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(id) });
@@ -4204,16 +4205,196 @@ test('Anhang: Bearbeiten durch eine Nicht-Sehende oeffnet das Dokument nicht wie
     assert.equal(widen.status, 200);
     assert.deepEqual({ ...docRow(docId), access: access(docId) }, { visibility: 'restricted', access: [TOM.id] },
       `${label}: Maria bekommt keinen Zugriff`);
-    // Verengen bleibt: wer herausfaellt, verliert den Zugriff.
+    // Auch verengen darf sie nicht: Toms Freigabe hat die Besitzerin gesetzt (#1443).
     const narrow = await call('PUT', `/${eventId}`, { actor: MARIA, body: { visibility: 'assignees', assigned_to: [MARIA.id] } });
     assert.equal(narrow.status, 200);
-    assert.deepEqual(access(docId), [], `${label}: TOM faellt heraus, niemand kommt dazu`);
+    assert.deepEqual(access(docId), [TOM.id], `${label}: TOM behaelt die Freigabe, niemand kommt dazu`);
 
     // Wer das Dokument sieht und schreiben darf, oeffnet es wie bisher.
     const owner = await call('PUT', `/${eventId}`, { actor: ADMIN, body: { visibility: 'all' } });
     assert.equal(owner.status, 200);
     assert.deepEqual(docRow(docId), { visibility: 'family' }, `${label}: die Erstellerin darf es oeffnen`);
   }
+});
+
+// ── Ein fremdes Speichern nimmt der Besitzerin keine Freigabe weg (#1443) ─────
+// #1358/#1432 liessen Nicht-Verwaltende das Anhang-Dokument nur noch verengen.
+// Auch das aenderte aber, wer ein fremdes Dokument sieht: jedes Speichern (auch
+// nur des Titels) loeschte die Freigaben, die die Besitzerin im Dokumente-Modul
+// gesetzt hatte, und ein privater Termin machte das Dokument privat. Wer das
+// Dokument nicht verwalten darf, laesst seine Rechte jetzt ganz stehen.
+test('Anhang: ein Speichern ohne Verwaltungsrecht laesst Sichtbarkeit und Freigaben des Dokuments stehen (#1443)', async () => {
+  const dataUrl = `data:text/plain;base64,${Buffer.from('freigabe').toString('base64')}`;
+  const state = (id) => ({
+    visibility: db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(id).visibility,
+    access: db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+      .all(id).map((r) => r.user_id),
+  });
+  const actors = [
+    ['ohne Dokumentenrecht', { ...MARIA, moduleAccess: { documents: 'none' } }],
+    ['Token nur calendar:write', { ...MARIA, authScopes: ['calendar:write'] }],
+    ['sieht das Dokument, verwaltet es nicht', MARIA],
+  ];
+  for (const recurrence_rule of [null, 'FREQ=DAILY;COUNT=3']) {
+    for (const [who, actor] of actors) {
+      const label = `${recurrence_rule ? 'Serie' : 'Einzeltermin'}, ${who}`;
+      const created = await call('POST', '/', { actor: ADMIN, body: {
+        title: 'Freigabe-Probe', start_datetime: '2044-01-01T09:00', recurrence_rule,
+        visibility: 'assignees', assigned_to: [MARIA.id],
+        attachment_data: dataUrl, attachment_name: 'f.txt',
+      } });
+      assert.equal(created.status, 201, `${label}: ${JSON.stringify(created.body)}`);
+      const eventId = created.body.data.id;
+      const docId = created.body.data.attachment_document_id;
+      assert.deepEqual(state(docId), { visibility: 'restricted', access: [MARIA.id] });
+      // Die Besitzerin gibt das Dokument im Dokumente-Modul zusaetzlich Tom frei,
+      // der nicht am Termin steht.
+      db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(docId, TOM.id);
+      const owned = { visibility: 'restricted', access: [MARIA.id, TOM.id] };
+
+      const title = await call('PUT', `/${eventId}`, { actor, body: { title: 'Nur der Titel' } });
+      assert.equal(title.status, 200, `${label}: Titel speichern`);
+      assert.deepEqual(state(docId), owned, `${label}: ein Titel-Speichern nimmt Tom die Freigabe nicht`);
+
+      const assignees = await call('PUT', `/${eventId}`, { actor, body: { visibility: 'assignees', assigned_to: [MARIA.id] } });
+      assert.equal(assignees.status, 200, `${label}: Zugewiesene speichern`);
+      assert.deepEqual(state(docId), owned, `${label}: Zugewiesene speichern nimmt Tom die Freigabe nicht`);
+
+      const hidden = await call('PUT', `/${eventId}`, { actor, body: { visibility: 'private' } });
+      assert.equal(hidden.status, 200, `${label}: privat stellen`);
+      assert.deepEqual(state(docId), owned, `${label}: ein privater Termin macht das fremde Dokument nicht privat`);
+
+      // Ein Familien-Dokument an einem Termin fuer Zugewiesene bleibt family.
+      db.prepare("UPDATE calendar_events SET visibility = 'all' WHERE id = ?").run(eventId);
+      db.prepare("UPDATE family_documents SET visibility = 'family' WHERE id = ?").run(docId);
+      db.prepare('DELETE FROM family_document_access WHERE document_id = ?').run(docId);
+      const narrow = await call('PUT', `/${eventId}`, { actor, body: { visibility: 'assignees', assigned_to: [MARIA.id] } });
+      assert.equal(narrow.status, 200, `${label}: auf Zugewiesene stellen`);
+      assert.deepEqual(state(docId), { visibility: 'family', access: [] },
+        `${label}: das Familien-Dokument bleibt, wie die Besitzerin es gesetzt hat`);
+
+      // Die Besitzerin selbst gleicht ab, sobald sich die Zugewiesenen aendern.
+      const owner = await call('PUT', `/${eventId}`, { actor: ADMIN, body: { assigned_to: [MARIA.id, TOM.id] } });
+      assert.equal(owner.status, 200);
+      assert.deepEqual(state(docId), { visibility: 'restricted', access: [MARIA.id, TOM.id] },
+        `${label}: die Besitzerin verengt ihr eigenes Dokument auf die Zugewiesenen`);
+    }
+  }
+});
+
+test('Anhang: die Besitzerin gleicht nur ab, wenn sich Sichtbarkeit oder Zugewiesene aendern (#1443)', async () => {
+  // Auch ein Speichern der Besitzerin lief bisher jedes Mal ueber das Dokument:
+  // ein reines Titel- oder Zeit-Speichern loeschte die Freigaben, die sie im
+  // Dokumente-Modul an Personen ausserhalb des Termins vergeben hatte.
+  const dataUrl = `data:text/plain;base64,${Buffer.from('besitz').toString('base64')}`;
+  const state = (id) => ({
+    visibility: db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(id).visibility,
+    access: db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+      .all(id).map((r) => r.user_id),
+  });
+  const shareWithTom = (id) => db.prepare('INSERT OR IGNORE INTO family_document_access (document_id, user_id) VALUES (?, ?)')
+    .run(id, TOM.id);
+  for (const recurrence_rule of [null, 'FREQ=DAILY;COUNT=3']) {
+    const label = recurrence_rule ? 'Serie' : 'Einzeltermin';
+    const created = await call('POST', '/', { actor: ADMIN, body: {
+      title: 'Besitz-Probe', start_datetime: '2046-01-01T09:00', recurrence_rule,
+      visibility: 'assignees', assigned_to: [MARIA.id],
+      attachment_data: dataUrl, attachment_name: 'b.txt',
+    } });
+    assert.equal(created.status, 201);
+    const eventId = created.body.data.id;
+    const docId = created.body.data.attachment_document_id;
+    shareWithTom(docId);
+    const owned = { visibility: 'restricted', access: [MARIA.id, TOM.id] };
+
+    for (const body of [
+      { title: 'Nur der Titel' },
+      { start_datetime: '2046-01-01T10:00' },
+      { title: 'Alles gleich', visibility: 'assignees', assigned_to: [MARIA.id] },
+    ]) {
+      const save = await call('PUT', `/${eventId}`, { actor: ADMIN, body });
+      assert.equal(save.status, 200, `${label} ${JSON.stringify(body)}: ${JSON.stringify(save.body)}`);
+      assert.deepEqual(state(docId), owned, `${label} ${JSON.stringify(body)}: Toms Freigabe bleibt`);
+    }
+
+    // Aendert sich, wer den Termin sieht, gleicht sie weiter ab.
+    const assignees = await call('PUT', `/${eventId}`, { actor: ADMIN, body: { assigned_to: [MARIA.id, ADMIN.id] } });
+    assert.equal(assignees.status, 200);
+    assert.deepEqual(state(docId), { visibility: 'restricted', access: [ADMIN.id, MARIA.id] },
+      `${label}: neue Zugewiesene - das Dokument folgt dem Termin`);
+    const all = await call('PUT', `/${eventId}`, { actor: ADMIN, body: { visibility: 'all' } });
+    assert.equal(all.status, 200);
+    assert.deepEqual(state(docId), { visibility: 'family', access: [] }, `${label}: fuer alle - das Dokument auch`);
+    const hidden = await call('PUT', `/${eventId}`, { actor: ADMIN, body: { visibility: 'private' } });
+    assert.equal(hidden.status, 200);
+    assert.deepEqual(state(docId), { visibility: 'private', access: [] }, `${label}: privat - das Dokument auch`);
+  }
+
+  // Dieselbe Regel an einer Einzelausnahme mit eigenem Anhang.
+  const series = await call('POST', '/', { actor: ADMIN, body: {
+    title: 'Besitz-Ausnahme', start_datetime: '2046-02-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=3',
+    visibility: 'assignees', assigned_to: [MARIA.id],
+  } });
+  assert.equal(series.status, 201);
+  const route = `/${series.body.data.id}/occurrences/2046-02-02`;
+  const upload = await call('PUT', route, { actor: ADMIN, body: { attachment_data: dataUrl, attachment_name: 'a.txt' } });
+  assert.equal(upload.status, 200, JSON.stringify(upload.body));
+  const childId = upload.body.data.id;
+  const docId = db.prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?').get(childId).attachment_document_id;
+  assert.deepEqual(state(docId), { visibility: 'restricted', access: [MARIA.id] }, 'Einzelausnahme: der neue Anhang folgt ihr');
+  shareWithTom(docId);
+  const title = await call('PUT', route, { actor: ADMIN, body: { title: 'Nur der Titel' } });
+  assert.equal(title.status, 200, JSON.stringify(title.body));
+  assert.deepEqual(state(docId), { visibility: 'restricted', access: [MARIA.id, TOM.id] },
+    'Einzelausnahme: ein Titel-Speichern laesst Toms Freigabe stehen');
+  const hidden = await call('PUT', route, { actor: ADMIN, body: { visibility: 'private' } });
+  assert.equal(hidden.status, 200, JSON.stringify(hidden.body));
+  assert.deepEqual(state(docId), { visibility: 'private', access: [] }, 'Einzelausnahme: privat - das Dokument auch');
+});
+
+test('Anhang: ein neu hochgeladener Anhang folgt dem Termin, auch wenn er der Terminerstellerin gehoert (#1443)', async () => {
+  // Ein neues Anhang-Dokument entsteht als `family` und bekommt die Rechte des
+  // Termins erst beim Abgleich. Laedt eine Zugewiesene es an einen fremden
+  // Termin, gehoert es der Terminerstellerin - der Abgleich muss trotzdem greifen,
+  // sonst saehe die ganze Familie einen Anhang eines Termins fuer Zugewiesene.
+  const created = await call('POST', '/', { actor: ADMIN, body: {
+    title: 'Upload-Probe', start_datetime: '2045-01-01T09:00',
+    visibility: 'assignees', assigned_to: [MARIA.id],
+  } });
+  assert.equal(created.status, 201);
+  const upload = await call('PUT', `/${created.body.data.id}`, { actor: MARIA, body: {
+    attachment_data: `data:text/plain;base64,${Buffer.from('neu').toString('base64')}`, attachment_name: 'neu.txt',
+  } });
+  assert.equal(upload.status, 200, JSON.stringify(upload.body));
+  const docId = db.prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?')
+    .get(created.body.data.id).attachment_document_id;
+  assert.ok(docId, 'der Anhang ist gespeichert');
+  assert.equal(db.prepare('SELECT created_by FROM family_documents WHERE id = ?').get(docId).created_by, ADMIN.id,
+    'er gehoert der Terminerstellerin');
+  assert.deepEqual({
+    visibility: db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(docId).visibility,
+    access: db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+      .all(docId).map((r) => r.user_id),
+  }, { visibility: 'restricted', access: [MARIA.id] }, 'und ist nur fuer die Zugewiesenen sichtbar');
+
+  // Derselbe Weg ueber eine Einzelausnahme einer fremden Serie.
+  const series = await call('POST', '/', { actor: ADMIN, body: {
+    title: 'Upload-Serie', start_datetime: '2045-02-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=3',
+    visibility: 'assignees', assigned_to: [MARIA.id],
+  } });
+  assert.equal(series.status, 201);
+  const occurrence = await call('PUT', `/${series.body.data.id}/occurrences/2045-02-02`, { actor: MARIA, body: {
+    attachment_data: `data:text/plain;base64,${Buffer.from('neu').toString('base64')}`, attachment_name: 'neu.txt',
+  } });
+  assert.equal(occurrence.status, 200, JSON.stringify(occurrence.body));
+  const occurrenceDoc = db.prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?')
+    .get(occurrence.body.data.id).attachment_document_id;
+  assert.ok(occurrenceDoc && occurrenceDoc !== docId, 'die Ausnahme hat ihren eigenen Anhang');
+  assert.deepEqual({
+    visibility: db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(occurrenceDoc).visibility,
+    access: db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+      .all(occurrenceDoc).map((r) => r.user_id),
+  }, { visibility: 'restricted', access: [MARIA.id] }, 'Einzelausnahme: nur fuer die Zugewiesenen sichtbar');
 });
 
 test('Anhang: Split und Abloesen kopieren kein Dokument ohne Sicht oder Schreibrecht (#1358)', async () => {
@@ -4302,6 +4483,9 @@ test('Anhang: weiter oeffnen darf nur, wer das Dokument verwalten darf - Sehen r
   assert.equal(widen.status, 200);
   assert.equal(visibility(), 'restricted', 'Maria macht das Dokument nicht family');
 
+  // Abgeglichen wird nur, wenn das Speichern die Sichtbarkeit aendert (#1443):
+  // der Termin steht nach Marias Speichern schon auf `all`.
+  db.prepare("UPDATE calendar_events SET visibility = 'assignees' WHERE id = ?").run(eventId);
   const owner = await call('PUT', `/${eventId}`, { actor: ADMIN, body: { visibility: 'all' } });
   assert.equal(owner.status, 200);
   assert.equal(visibility(), 'family', 'die Erstellerin darf es');
@@ -4358,8 +4542,8 @@ test('Anhang: die Kopie gehoert der Besitzerin des Quelldokuments, nicht der Ter
 });
 
 test('Anhang: teilt eine Nicht-Besitzerin die Serie und weist neu zu, meldet der Nachfolger den Anhang als gesperrt (#1358)', async () => {
-  // Folge von "Nicht-Besitzer verengen nur": die Kopie gehoert der Besitzerin
-  // der Quelle, ihre Freigaben werden auf die neuen Zugewiesenen verengt. Wer
+  // Die Kopie gehoert der Besitzerin der Quelle und traegt deren Freigaben;
+  // eine Nicht-Besitzerin gleicht sie nicht auf die neuen Zugewiesenen ab (#1443). Wer
   // Dokumente lesen darf, bekommt `attachment_locked` - der Dialog zeigt dann
   // "Anhang vorhanden (privat)"; freigeben kann die Besitzerin oder ein Admin.
   const created = await call('POST', '/', { actor: ADMIN, body: {
