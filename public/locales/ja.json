@@ -1348,6 +1348,7 @@
         "recurringEditSeries": "以降のすべての項目を変更",
         "recurringSeriesDeleted": "シリーズを削除しました",
         "recurringSeriesSaved": "シリーズを保存しました",
+        "recurringDeleteFirstHint": "これはシリーズの最初の項目です。ここで「この項目のみ」を選ぶとシリーズも終了します。新しい項目は追加されず、作成済みの項目は個別の項目として残ります。",
         "deleteLabel": "項目「{{title}}」を削除",
         "deleteConfirm": "項目を削除しますか？",
         "deletePersonConfirm": "「{{title}}」を削除しますか？",

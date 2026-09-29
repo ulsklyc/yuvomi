@@ -1348,6 +1348,7 @@
         "recurringEditSeries": "Cambiar todas las ocurrencias futuras",
         "recurringSeriesDeleted": "Serie eliminada",
         "recurringSeriesSaved": "Serie guardada",
+        "recurringDeleteFirstHint": "Este es el primer apunte de la serie. Aquí «Solo esta ocurrencia» también termina la serie: no se añaden apuntes nuevos y los ya creados quedan como apuntes sueltos.",
         "deleteLabel": "Eliminar la entrada «{{title}}»",
         "deleteConfirm": "¿Eliminar entrada?",
         "deletePersonConfirm": "¿Eliminar «{{title}}»?",

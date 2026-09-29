@@ -1363,6 +1363,7 @@
         "recurringEditSeries": "이후의 모든 항목 변경",
         "recurringSeriesDeleted": "시리즈가 삭제되었습니다",
         "recurringSeriesSaved": "시리즈가 저장되었습니다",
+        "recurringDeleteFirstHint": "시리즈의 첫 항목입니다. 여기서 “이 항목만”을 선택하면 시리즈도 끝납니다. 새 항목은 추가되지 않으며, 이미 만들어진 항목은 개별 항목으로 남습니다.",
         "deleteLabel": "항목 “{{title}}” 삭제",
         "deleteConfirm": "항목을 정말 삭제할까요?",
         "deletePersonConfirm": "\"{{title}}\"을(를) 정말 삭제할까요?",

@@ -1363,6 +1363,7 @@
         "recurringEditSeries": "Alle zukünftigen Einträge ändern",
         "recurringSeriesDeleted": "Serie gelöscht",
         "recurringSeriesSaved": "Serie gespeichert",
+        "recurringDeleteFirstHint": "Das ist die erste Buchung der Serie. Hier beendet auch „Nur dieser Eintrag“ die Serie: Es kommen keine neuen Einträge hinzu, die bereits angelegten bleiben als einzelne Buchungen.",
         "deleteLabel": "Eintrag „{{title}}“ löschen",
         "deleteConfirm": "Eintrag wirklich löschen?",
         "deletePersonConfirm": "\"{{title}}\" wirklich löschen?",

@@ -1348,6 +1348,7 @@
         "recurringEditSeries": "Alle toekomstige betalingen wijzigen",
         "recurringSeriesDeleted": "Reeks verwijderd",
         "recurringSeriesSaved": "Reeks opgeslagen",
+        "recurringDeleteFirstHint": "Dit is de eerste boeking van de reeks. Hier beëindigt “Alleen deze betaling” ook de reeks: er komen geen nieuwe boekingen bij, en de al aangemaakte blijven als losse boekingen staan.",
         "deleteLabel": "Boeking „{{title}}” verwijderen",
         "deleteConfirm": "Deze boeking echt verwijderen?",
         "deletePersonConfirm": "\"{{title}}\" echt verwijderen?",

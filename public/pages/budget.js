@@ -4402,11 +4402,18 @@ async function deleteEntry(id) {
   const inMonth = state.entries.some((e) => e.id === id);
 
   if (entry && (entry.is_recurring || entry.recurrence_parent_id)) {
+    // #1544: die Serie haengt an ihrer ersten Buchung (ohne recurrence_parent_id,
+    // seit #1035 per `budget_series.anchor_id` mit ON DELETE CASCADE). Loescht
+    // "Nur dieser Eintrag" genau diese Buchung, endet die ganze Serie: die
+    // angelegten Vorkommen bleiben als Einzelbuchungen (ON DELETE SET NULL),
+    // kuenftige Monate bleiben leer. Das Verhalten bleibt, der Dialog sagt es.
+    const isSeriesStart = Boolean(entry.is_recurring) && !entry.recurrence_parent_id;
     const scope = await recurringChoiceModal({
       title: t('budget.recurringSeriesScope'),
       thisLabel: t('budget.recurringThisOnly'),
       seriesLabel: t('budget.recurringEntireSeries'),
       seriesDanger: true,
+      note: isSeriesStart ? t('budget.recurringDeleteFirstHint') : '',
     });
     if (scope === null) return;
     if (scope === 'series') { await deleteEntrySeries(id); return; }
@@ -4511,8 +4518,9 @@ function occurrenceSeriesBody(body, entry) {
  *
  * `note` steht ÜBER den Knöpfen, nicht darunter: der Hinweis soll gelesen
  * werden, bevor die Wahl fällt, und die gestapelten Knöpfe sind das Ende des
- * Dialogs. Optional, weil ihn nur das Bearbeiten braucht - beim Löschen sagt
- * „Gesamte Serie löschen" schon alles.
+ * Dialogs. Optional: das Bearbeiten nennt ihn immer, das Löschen nur an der
+ * ersten Buchung einer Serie (#1544) - dort beendet auch „Nur dieser Eintrag"
+ * die Serie, an einem Vorkommen sagen die Knöpfe schon alles.
  */
 function recurringChoiceModal({ title, thisLabel, seriesLabel, seriesDanger = false, note = '' }) {
   return new Promise((resolve) => {
@@ -4605,6 +4613,8 @@ export const __test = {
   tabSearch,
   writeTabToUrl,
   summaryWith,
+  // #1544: der Loeschdialog einer Serienbuchung, als Programm gefahren.
+  deleteEntry,
   deleteEntrySeries,
   subcategoryChoice,
   currentMonth,

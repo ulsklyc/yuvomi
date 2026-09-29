@@ -1348,6 +1348,7 @@
         "recurringEditSeries": "更改所有未来条目",
         "recurringSeriesDeleted": "系列已删除",
         "recurringSeriesSaved": "系列已保存",
+        "recurringDeleteFirstHint": "这是系列的第一条条目。在这里选择“仅此条目”也会结束整个系列：不会再添加新条目，已创建的条目将保留为单独条目。",
         "deleteLabel": "删除条目“{{title}}”",
         "deleteConfirm": "确定删除条目？",
         "deletePersonConfirm": "确定删除 \"{{title}}\"？",

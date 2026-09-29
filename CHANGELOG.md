@@ -738,6 +738,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wall mode (also right after a restart in wall mode), and turning it on says in one line what it is
   and how to leave it.
 
+- **Deleting the first entry of a recurring budget payment says that it ends the series** (#1544).
+  The series hangs on its first entry, so "Only this occurrence" there also ends the whole series:
+  the entries already created stay as single entries and no new ones follow. The dialog now says so
+  before you choose; deleting a later entry works as before.
+
 - **Counts read correctly in Czech, Polish, Russian, Ukrainian and Arabic** (#1473). These
   languages need more than a singular and a plural: Czech, Polish, Russian and Ukrainian have their
   own form for 2 to 4 (and 22 to 24), Arabic has a dual for 2 and a separate form from 11 to 99.

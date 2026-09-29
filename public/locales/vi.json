@@ -1348,6 +1348,7 @@
         "recurringEntireSeries": "Xóa toàn bộ chuỗi",
         "recurringSeriesDeleted": "Đã xóa chuỗi",
         "recurringSeriesSaved": "Đã lưu chuỗi",
+        "recurringDeleteFirstHint": "Đây là mục đầu tiên của chuỗi. Tại đây, “Chỉ mục này” cũng kết thúc chuỗi: không có mục mới nào được thêm, và các mục đã tạo vẫn được giữ lại dưới dạng mục riêng lẻ.",
         "deleteLabel": "Xóa mục nhập “{{title}}”",
         "deleteConfirm": "Thực sự xóa mục nhập này?",
         "deletePersonConfirm": "Thực sự xóa \"{{title}}\"?",
