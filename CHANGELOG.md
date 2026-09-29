@@ -731,6 +731,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Counts read correctly in Czech, Polish, Russian, Ukrainian and Arabic** (#1473). These
+  languages need more than a singular and a plural: Czech, Polish, Russian and Ukrainian have their
+  own form for 2 to 4 (and 22 to 24), Arabic has a dual for 2 and a separate form from 11 to 99.
+  For about 110 counters across the overview, tasks, settings, documents and other modules only the
+  singular and the form for 5 and more existed, so "za 2 dní" appeared instead of "za 2 dny" and
+  "خلال 2 أيام" instead of "خلال يومين". Every counter now carries every form its language uses, only
+  in that language, and a test fails for any new counter that misses one.
 - **"Change all future occurrences" no longer ends a recurring payment** (#1546). Editing a later
   month of a series and choosing "Change all future occurrences" sent the recurrence settings of
   that single month along, and a generated month carries none: the series was switched off, every
@@ -1195,6 +1202,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   against the edge of their tinted panel.
 
 ### Security
+
+- **The WebDAV backup target moved to another server or username needs its password again.**
+  The connection test in Settings -> Household -> Backup and restore, and the API behind it, took
+  a new server address with the password field left as it was and tested it with the stored
+  password, so the password went to that server; saving the change kept the stored password for
+  the next backup. Both are admin-only. They now follow the rule of CalDAV and CardDAV accounts:
+  the stored password is kept only while the server (scheme, host and port) and the username stay
+  the same. Otherwise the test and the save are refused with `400` and the error code
+  `password_required`, no connection is made and nothing is saved, and the form asks for the
+  password again. A different path on the same server keeps working without it. The mask `****`
+  the API shows in place of the password now counts as "unchanged" when it is sent back; until
+  then saving it through the API replaced the stored password with the mask itself.
 
 - **A CalDAV account moved to another server or username needs its password again.** Editing an
   account through the API with a new server address but without a password tested the connection
