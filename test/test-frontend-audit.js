@@ -12174,6 +12174,13 @@ test('row lists sit in exactly one carrier', () => {
   // Werte werden ausgelesen und geprueft, nicht per Lookahead ausgeschlossen:
   // `border-radius:\s*(?!0)` ist wahr, sobald `\s*` leer matchen darf - der
   // Lookahead sieht dann das Leerzeichen statt der Null.
+  //
+  // UEBER `eachRule()`, NICHT UEBER DEN ROHEN TEXT (#1456). Die erste Fassung
+  // las die Stylesheets mit eigenen Regexen, und `(?:^|;)\s*border-radius:`
+  // beginnt nie hinter einem Kommentar: in `.countdown-item` steht einer
+  // zwischen dem vorigen `;` und dem Radius, und der Guard sah ihn nicht. Das
+  // Urteil ueber die Zeile fiel damit am Kommentar, nicht an der Regel.
+  // `eachRule()` streift Kommentare vorher ab.
   const declared = (body, prop) => {
     const hits = [...body.matchAll(new RegExp(`(?:^|;)\\s*${prop}:([^;]*)`, 'g'))];
     return hits.map((m) => m[1].trim());
@@ -12185,33 +12192,62 @@ test('row lists sit in exactly one carrier', () => {
     { prop: 'background-color', isCard: (v) => /^var\(--color-surface(-work|-raised|-elevated)?\)$/.test(v) },
   ];
 
+  // BENANNTE AUSNAHMEN, und jede muss noch gesehen werden: ein Eintrag, den
+  // der Guard nicht mehr trifft, ist eine Ausnahme ohne Gegenstand und faellt
+  // unten als veraltet auf. Der Schluessel traegt den WERT - ein anderer
+  // Radius an derselben Zeile ist wieder ein Befund.
+  const EXEMPT = new Map([
+    ['dashboard.css .countdown-item border-radius: var(--radius-sm)',
+      'Radius fuer Fokusring und Hover-Flaeche, keine Flaeche und kein Schatten im Ruhezustand '
+      + '(Begruendung am Selektor). Ob ein solcher Radius an einer flachen Zeile als Kartenmerkmal '
+      + 'zaehlt, ist offen (#1456) - `.list-row` traegt keinen.'],
+  ]);
+  const exemptSeen = new Set();
+  let rowCount = 0;
+
   const offenders = [];
   for (const name of files) {
-    const css = read(`../public/styles/${name}`);
-    // `X + X { … border-top … }` — derselbe Selektor auf beiden Seiten ist die
+    const rules = [...eachRule(read(`../public/styles/${name}`))];
+    const parts = (rule) => rule.selector.split(',').map((part) => part.trim());
+    // `X + X { … border-top … }` - derselbe Selektor auf beiden Seiten ist die
     // Signatur der Haarlinien-Trennung (im Unterschied zu `.a + .b`, das ein
     // Geschwister-Abstand sein kann).
-    const seen = new Set();
-    for (const m of css.matchAll(/(?:^|[},])\s*(\.[\w-]+)\s*\+\s*\1\s*\{([^}]*)\}/g)) {
-      const [, selector, body] = m;
-      if (!/border-top:/.test(body)) continue;
-      if (seen.has(selector)) continue;
-      seen.add(selector);
+    const rows = new Set();
+    for (const rule of rules) {
+      if (!/(?:^|;)\s*border-top:/.test(rule.body)) continue;
+      for (const part of parts(rule)) {
+        const pair = part.match(/^(\.[\w-]+)\s*\+\s*\1$/);
+        if (pair) rows.add(pair[1]);
+      }
+    }
 
-      // Basisregel des Selektors: exakt `X {`, nicht `.foo X {` und nicht
-      // `X--modifier {` (cssRuleBody matcht ungebunden, siehe Handoff-Falle).
-      const base = css.match(new RegExp(`(?:^|[},])\\s*\\${selector}\\s*\\{([^}]*)\\}`, 'm'));
-      if (!base) continue;
-      for (const marker of CARD_MARKERS) {
-        for (const value of declared(base[1], marker.prop)) {
-          if (marker.isCard(value)) {
-            offenders.push(`${name} ${selector} traegt ${marker.prop}: ${value} — eine Zeile in einer Liste ist keine Karte`);
+    rowCount += rows.size;
+
+    // Basisregel des Selektors: exakt `X`, nicht `.foo X` und nicht
+    // `X--modifier` - in jeder Regel, die ihn fuehrt, auch in einem At-Block.
+    for (const selector of rows) {
+      for (const rule of rules) {
+        if (!parts(rule).includes(selector)) continue;
+        for (const marker of CARD_MARKERS) {
+          for (const value of declared(rule.body, marker.prop)) {
+            if (!marker.isCard(value)) continue;
+            const id = `${name} ${selector} ${marker.prop}: ${value}`;
+            if (EXEMPT.has(id)) {
+              exemptSeen.add(id);
+              continue;
+            }
+            offenders.push(`${name} ${selector} traegt ${marker.prop}: ${value} - eine Zeile in einer Liste ist keine Karte`);
           }
         }
       }
     }
   }
+
+  // Ein Guard, der keine Zeilenliste gefunden hat, darf nicht urteilen.
+  assert.ok(rowCount > 0, 'Keine `X + X { border-top }`-Zeile gefunden - der Guard hat nichts gemessen.');
   assert.deepEqual(offenders, []);
+  assert.deepEqual([...EXEMPT.keys()].filter((id) => !exemptSeen.has(id)), [],
+    'Ausnahmen, die der Guard nicht mehr trifft - Eintrag streichen');
 });
 
 // --------------------------------------------------------------------------
