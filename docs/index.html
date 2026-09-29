@@ -252,6 +252,10 @@
        Sprache bleibt die englische Dokumentfassung. Gleiches Muster wie der
        .reveal-No-JS-Fallback. */
     html:not(.js) #langBtn, html:not(.js) #themeBtn { display: none; }
+    /* Das Hero-Bild hat absichtlich kein src (siehe Kommentar am Bild); ohne
+       JS bekommt es auch keins und stand als leerer Kasten mit Alt-Text ueber
+       der <noscript>-Aufnahme. Ohne JS zeigt nur die noscript-Kopie. */
+    html:not(.js) #heroShot { display: none; }
     /* Deutsche Sitzung, solange das Woerterbuch hinter der Proof-Leiste noch
        nicht geparst ist: der erste Bildschirm bleibt unsichtbar, statt
        englisch zu erscheinen und beim Tausch zu springen. Auf schneller

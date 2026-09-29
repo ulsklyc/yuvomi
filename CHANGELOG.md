@@ -778,7 +778,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   off the left edge on a phone, fits its longest entry on one line and closes with Escape or when
   focus moves on. Links inside sentences are underlined and easier to tap, long captions and legal
   text wrap at a readable width, and the German page no longer shows English first and then jumps
-  on a slow connection. The legal pages share the install page's header and footer links.
+  on a slow connection. The legal pages share the install page's header and footer links. With
+  JavaScript off, the home page no longer shows an empty box above the dashboard picture.
 
 - **The website's evidence links show what they claim.** "0 trackers" now opens the README's
   full list of outbound connections instead of the website's own privacy policy, and the source

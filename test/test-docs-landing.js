@@ -2052,6 +2052,15 @@ function heroFindings(html) {
   const rule = inlineStyles(html).flatMap((css) => [...eachRule(css)])
     .find((r) => r.selector === '.hero-frame img' && r.at.some((a) => a.replace(/\s+/g, '') === `@media(max-width:${bp}px)`));
   if (!rule || !/aspect-ratio:\s*var\(--ar-phone\)/.test(rule.body)) found.push(`kein .hero-frame img { aspect-ratio: var(--ar-phone) } unter max-width:${bp}px`);
+  // Ohne src und ohne JS bleibt das Bild ein leerer Kasten mit Alt-Text ueber
+  // der <noscript>-Kopie (gemessen 2026-09-29: 519x389px bei 1440). Es muss
+  // dann weichen, und die noscript-Kopie muss es geben.
+  if (!/\bsrc=/.test(img)) {
+    const hide = inlineStyles(html).flatMap((css) => [...eachRule(css)])
+      .find((r) => r.at.length === 0 && r.selector.split(',').map((x) => x.trim()).includes('html:not(.js) #heroShot'));
+    if (!hide || !/display:\s*none/.test(hide.body)) found.push('heroShot ohne src steht ohne JS als leerer Kasten (html:not(.js) #heroShot { display: none } fehlt)');
+    if (!/id="heroShot">\s*<script>[\s\S]*?<\/script>\s*<noscript><img\b[^>]*\bsrc="/.test(html)) found.push('heroShot ohne <noscript>-Kopie mit src');
+  }
   return found;
 }
 
@@ -2067,6 +2076,9 @@ test('der LCP-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const noPhone = html.replace('.hero-frame img { aspect-ratio: var(--ar-phone);', '.hero-frame img {');
   assert.notEqual(noPhone, html);
   assert.deepEqual(heroFindings(noPhone), ['kein .hero-frame img { aspect-ratio: var(--ar-phone) } unter max-width:860px']);
+  const noJsBox = html.replace('html:not(.js) #heroShot { display: none; }', '');
+  assert.notEqual(noJsBox, html);
+  assert.deepEqual(heroFindings(noJsBox), ['heroShot ohne src steht ohne JS als leerer Kasten (html:not(.js) #heroShot { display: none } fehlt)']);
 });
 
 /**
