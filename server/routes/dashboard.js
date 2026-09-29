@@ -64,7 +64,7 @@ const log = createLogger('Dashboard');
 const DENIED_PAYLOAD = Object.freeze({
   // Geburtstage gehören zum Kalender-Modul, nicht zu einem eigenen — dieselbe
   // Zuordnung wie in PERMISSION_MODULES (navIds) und im Client (NAV_TO_MODULE).
-  calendar: () => ({ upcomingEvents: [], weekEvents: [], birthdays: [], birthdayCount: 0, birthdayTotal: 0, birthdaySoonCount: 0 }),
+  calendar: () => ({ upcomingEvents: [], familyEvents: [], weekEvents: [], birthdays: [], birthdayCount: 0, birthdayTotal: 0, birthdaySoonCount: 0 }),
   tasks: () => ({
     urgentTasks: [], openTaskCount: 0, overdueTaskCount: 0,
     memberTodayTasks: [], tasksDoneToday: 0,
@@ -104,6 +104,11 @@ const DENIED_PAYLOAD = Object.freeze({
 
 /** Wie viele beendete Termine von heute ausserhalb des Deckels mitkommen (#1449). */
 const ENDED_TODAY_POOL = 20;
+
+/** Wie viele noch kommende Termine die Familienkarte je Mitglied bekommt (#1449):
+ * der naechste eigene heute, einer danach fuer „als Naechstes", und Raum fuer
+ * gemeinsame, die die Karte in einer eigenen Zeile zeigt. */
+const FAMILY_AHEAD_PER_MEMBER = 6;
 
 function emptyFastingWidget() {
   return {
@@ -194,6 +199,7 @@ const router = express.Router();
  *
  * Response: {
  *   upcomingEvents: CalendarEvent[],   // Nächste 5 Termine
+ *   familyEvents:   CalendarEvent[],   // Termine je Mitglied fuer die Familienkarte (#1449)
  *   weekEvents:     WeekEvent[],       // Termine, die die Woche ab heute berühren (schlank)
  *   urgentTasks:    Task[],            // High/Urgent mit Fälligkeit ≤ 48h
  *   todayMeals:     Meal[],            // Mahlzeiten für heute
@@ -562,6 +568,38 @@ router.get('/', (req, res) => {
     ).all();
   } catch (err) {
     result.users = [];
+  }
+
+  /* DIE FAMILIENKARTE HAT EIGENE TERMINE (#1449). Sie lieh sich die Liste der
+   * Termin-Kachel: fuenf Kommende fuer den ganzen Haushalt und deren „nur
+   * meine". An einem vollen Tag fiel so der Abendtermin eines Kindes heraus,
+   * und mit „nur meine" standen alle anderen als „heute frei" da. Hier fragt
+   * deshalb jedes Mitglied fuer sich: was heute war (die beendeten, damit
+   * „fuer heute durch" von „frei" zu unterscheiden ist) und die naechsten
+   * kommenden.
+   *
+   * „NUR MEINE" GILT HIER NICHT - die Karte zeigt jedes Mitglied, das ist ihr
+   * Zweck (Empfehlung in #1449). Sichtbarkeit und abgewaehlte Geburtstage
+   * gelten wie ueberall: der Betrachter sieht nur, was er sehen darf. */
+  if (allows('calendar')) try {
+    const seen = new Set();
+    const merged = [];
+    for (const member of result.users) {
+      for (const event of getUpcomingEvents(d, {
+        userId, limit: FAMILY_AHEAD_PER_MEMBER, fromToday: true, assignedTo: member.id, includeBirthdays,
+        keepEndedToday: ENDED_TODAY_POOL,
+      })) {
+        const key = `${event.id}@${event.start_datetime}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        merged.push(event);
+      }
+    }
+    merged.sort((a, b) => String(a.start_datetime).localeCompare(String(b.start_datetime)));
+    result.familyEvents = serializeEvents(merged, { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminUser(req) });
+  } catch (err) {
+    log.error('familyEvents error:', err.message);
+    result.familyEvents = [];
   }
 
   if (allows('calendar')) try {

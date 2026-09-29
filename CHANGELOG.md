@@ -731,6 +731,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The family card no longer misses an evening appointment on a busy day** (#1449). The card took
+  its appointments from the calendar tile, which stops at five coming ones and follows its "Only
+  mine" option: a child's evening appointment could be cut off, and with "Only mine" every other
+  member read as free. The card now loads each member's appointments of the day on its own, ignores
+  "Only mine", and switches to the next appointment or to "Done for today" when one ends, without a
+  reload.
+
 - **A trip that began yesterday shows on today's overview** (#1457). Appointments were picked by
   their start, so a trip, a hospital stay or a school camp that started yesterday and runs until
   tomorrow was missing from the calendar tile, the today sheet, the wall display and the family

@@ -11,6 +11,9 @@
  *        2. Mehrtaegige Termine (#1457): `upcomingEvents` waehlte nach dem
  *           BEGINN, und was gestern begann und heute noch laeuft, fehlte in
  *           Liste, Heute-Blatt, Wand und Familienkarte.
+ *        3. Familienkarte (#1449): sie lieh sich die Liste der Termin-Kachel
+ *           - fuenf Kommende und deren „nur meine" - und verlor damit den
+ *           Abendtermin eines Mitglieds an einem vollen Tag.
  *
  * Ausfuehren: npm run test:dashboard-today
  */
@@ -338,4 +341,69 @@ test('#1457: im Browser entscheidet die Haushaltszone, nicht die Geraetezone', i
   const program = dash.buildTodayProgram({ upcomingEvents: events }, { includeTasks: false, includeMeals: false, now: new Date() });
   assert.deepEqual(program.rows.map((row) => [row.title, row.sortKey]), [['Reise', '00:01'], ['Abend', '19:00']],
     'Platz im Tag nach der Wanduhr des Haushalts');
+}));
+
+// --------------------------------------------------------------------------
+// 3. Die Familienkarte hat eigene Termine je Mitglied (#1449)
+// --------------------------------------------------------------------------
+
+const LEO = db.prepare(`
+  INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
+  VALUES (?, 'Leo', 'hash', '#FF9500', 'member', 'child')
+`).run(`today-leo-${randomUUID()}`).lastInsertRowid;
+const assign = db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)');
+function addAssigned(title, start, end, userIds) {
+  const id = addEvent(title, start, end);
+  for (const uid of userIds) assign.run(id, uid);
+  return id;
+}
+// 14:00 in Berlin. Leo hatte fuenf Termine am Morgen und hat einen am Abend;
+// Anna hat fuenf am Nachmittag - genug, um den Deckel der Kachel zu fuellen.
+const THU_14_BERLIN = '2026-09-24T12:00:00Z';
+function seedBusyDay() {
+  clearEvents();
+  for (const h of ['06', '07', '08', '09', '10']) addAssigned(`Leo ${h}`, `2026-09-24T${h}:00`, `2026-09-24T${h}:30`, [LEO]);
+  addAssigned('Leo Abend', '2026-09-24T21:00', '2026-09-24T22:00', [LEO]);
+  for (const h of ['15', '16', '17', '18', '19']) addAssigned(`Anna ${h}`, `2026-09-24T${h}:00`, `2026-09-24T${h}:30`, [ADMIN]);
+}
+
+test('#1449: familyEvents traegt den Abendtermin, den der Deckel der Kachel abschneidet', withClock(THU_14_BERLIN, 'Europe/Berlin', async () => {
+  seedBusyDay();
+  const body = await getJson('/');
+  assert.ok(!titles(body.upcomingEvents).includes('Leo Abend'), 'Vorbedingung: die Kachel zeigt fuenf Kommende, Leos Abend ist der sechste');
+  const family = titles(body.familyEvents ?? []);
+  assert.ok(family.includes('Leo Abend'), `familyEvents fehlt Leos Abendtermin: ${family.join(', ')}`);
+  assert.ok(family.includes('Leo 10'), 'die heute beendeten kommen mit - sonst hiesse es „frei" statt „fuer heute durch"');
+}));
+
+test('#1449: „nur meine" der Kachel gilt nicht fuer die Familienkarte', withClock(THU_14_BERLIN, 'Europe/Berlin', async () => {
+  seedBusyDay();
+  const body = await getJson('/?events_scope=mine');
+  assert.deepEqual([...new Set(titles(body.upcomingEvents).map((t) => t.split(' ')[0]))], ['Anna'], 'Vorbedingung: die Kachel zeigt nur Annas');
+  assert.ok(titles(body.familyEvents ?? []).includes('Leo Abend'), 'die Karte zeigt jedes Mitglied - Leo ist nicht „frei"');
+}));
+
+test('#1449 Browser: die Karte liest familyEvents, nicht die Liste der Kachel', inBrowser(THU_14_BERLIN, 'Europe/Berlin', () => {
+  const leo = { id: 7, display_name: 'Leo', avatar_color: '#FF9500' };
+  const anna = { id: 8, display_name: 'Anna', avatar_color: '#7C3AED' };
+  const mk = (id, title, start, end, who) => ev(id, title, start, end, { assigned_users: [{ id: who.id }] });
+  const morning = ['06', '07', '08', '09', '10'].map((h, i) => mk(10 + i, `Leo ${h}`, `2026-09-24T${h}:00`, `2026-09-24T${h}:30`, leo));
+  const afternoon = ['15', '16', '17', '18', '19'].map((h, i) => mk(20 + i, `Anna ${h}`, `2026-09-24T${h}:00`, `2026-09-24T${h}:30`, anna));
+  const evening = mk(30, 'Leo Abend', '2026-09-24T21:00', '2026-09-24T22:00', leo);
+  // Die Liste der Kachel: zwei beendete aus dem Pool, fuenf Kommende - ohne Leos Abend.
+  const tile = [...morning, ...afternoon];
+  const html = dash.renderFamilyWidget([anna, leo], {
+    upcomingEvents: tile,
+    familyEvents: [...morning, ...afternoon, evening],
+  });
+  const statusOf = (name) => (new RegExp(`family-member__name">${name}</span>\\s*<span class="family-member__status[^"]*">([^<]*)<`).exec(html) || [])[1];
+  assert.equal(statusOf('Leo'), '2026-09-24T21:00 Leo Abend', `Leo hat heute noch den Abend, bekam ${statusOf('Leo')}`);
+}));
+
+test('#1449 Browser: endet ein Termin der Familienkarte, baut der Minutentakt neu', inBrowser(THU_14_BERLIN, 'Europe/Berlin', () => {
+  // Nur in familyEvents - die Kachel zeigt ihn nicht (Deckel oder „nur meine").
+  const data = { upcomingEvents: [], familyEvents: [ev(30, 'Leo Abend', '2026-09-24T21:00', '2026-09-24T22:00', { assigned_users: [{ id: 7 }] })] };
+  const before = dash.todayFingerprint(data, [], new Date('2026-09-24T19:59:00Z'));
+  const after = dash.todayFingerprint(data, [], new Date('2026-09-24T20:01:00Z'));
+  assert.notEqual(before, after, 'um 22:00 wechselt Leo auf „fuer heute durch" - ohne Neuladen');
 }));

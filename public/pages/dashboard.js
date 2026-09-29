@@ -137,6 +137,14 @@ function householdNowStamp(now = new Date()) {
   return householdStamp(now);
 }
 
+/** Geburtstags-Termine tragen serverseitig einen sprachneutralen Titel (#524) -
+ * in beiden Terminlisten der Antwort, der der Kachel und der der Familienkarte. */
+function localizeEventLists(payload) {
+  for (const key of ['upcomingEvents', 'familyEvents']) {
+    if (Array.isArray(payload?.[key])) payload[key] = payload[key].map(localizeBirthdayEvent);
+  }
+}
+
 /**
  * Ist dieser Termin vorbei (#1449)? „Vorbei" heisst: sein ENDE liegt hinter
  * uns, gelesen in der Wanduhr des Haushalts - dieselbe Regel wie serverseitig
@@ -1740,8 +1748,9 @@ function renderQuickLinks(items) {
  * (`householdStamp`) - das Geraet hat keine Stimme. Unter den heutigen geht
  * ein Termin mit Uhrzeit dem ganztaegigen vor.
  *
- * Noch offen aus #1449 und bewusst nicht hier: die Karte leiht sich weiter die
- * Liste der Kalenderkachel (fuenf Eintraege, ihr „nur meine"-Filter).
+ * Die Termine kommen seit #1449 aus `familyEvents`, eigens je Mitglied
+ * geladen - nicht mehr aus der Liste der Kalenderkachel (fuenf Eintraege, ihr
+ * „nur meine"-Filter).
  */
 function familyAgenda(events, shownIds, todayKey, now = new Date()) {
   const nowStamp = householdNowStamp(now);
@@ -1824,7 +1833,12 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
     (Array.isArray(data?.memberTodayTasks) ? data.memberTodayTasks : [])
       .map((r) => [r.user_id, Number(r.open_count) || 0])
   );
-  const events = Array.isArray(data?.upcomingEvents) ? data.upcomingEvents : [];
+  // Eigene Termine je Mitglied (#1449): die Liste der Kachel ist bei fuenf
+  // Kommenden gedeckelt und traegt deren „nur meine". Ein aelterer Server ohne
+  // `familyEvents` faellt auf sie zurueck.
+  const events = Array.isArray(data?.familyEvents)
+    ? data.familyEvents
+    : Array.isArray(data?.upcomingEvents) ? data.upcomingEvents : [];
   const todayKey = householdToday();
   // S-18 (UX-Audit): dieselbe Schichtplan-Kachel, direkt daneben, widersprach
   // dieser Zeile - eine Person mit einer echten Schicht heute stand hier
@@ -5957,9 +5971,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Geburtstags-Termine tragen serverseitig einen sprachneutralen Titel
     // („Birthday: <Name>"); anhand von birthday_name in die aktive Sprache
     // übersetzen (Issue #524).
-    if (Array.isArray(data?.upcomingEvents)) {
-      data.upcomingEvents = data.upcomingEvents.map(localizeBirthdayEvent);
-    }
+    localizeEventLists(data);
     setCountdownAvailability(data?.countdowns);
     weather      = weatherRes.data ?? null;
     weatherAutoLocate = Boolean(prefsRes.data?.weather_user?.auto_locate ?? prefsRes.data?.weather_auto_locate);
@@ -5980,9 +5992,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       try {
         const filtered = await api.get(dashboardQuery(widgetConfig));
         if (signal.aborted) return;
-        if (Array.isArray(filtered?.upcomingEvents)) {
-          filtered.upcomingEvents = filtered.upcomingEvents.map(localizeBirthdayEvent);
-        }
+        localizeEventLists(filtered);
         data = filtered;
         setCountdownAvailability(data?.countdowns);
       } catch { /* die ungefilterte Antwort steht bereits - lieber mehr als nichts */ }
@@ -6090,9 +6100,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     if (dashboardQuery(widgetConfig) === previousQuery) return;
     try {
       const fresh = await api.get(dashboardQuery(widgetConfig));
-      if (Array.isArray(fresh?.upcomingEvents)) {
-        fresh.upcomingEvents = fresh.upcomingEvents.map(localizeBirthdayEvent);
-      }
+      localizeEventLists(fresh);
       fresh.cycle = data.cycle;
       fresh.schedule = data.schedule;
       fresh.waste = data.waste;
@@ -6778,9 +6786,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     try {
       const fresh = await api.get(dashboardQuery(widgetConfig));
       if (signal.aborted) return;
-      if (Array.isArray(fresh?.upcomingEvents)) {
-        fresh.upcomingEvents = fresh.upcomingEvents.map(localizeBirthdayEvent);
-      }
+      localizeEventLists(fresh);
       // Der owner-only Zyklus-Slice reist unveraendert mit: /dashboard
       // liefert ihn nie, ein Refresh darf ihn nicht auf „nie geladen"
       // zurückwerfen.
@@ -6911,7 +6917,10 @@ function todayFingerprint(data, cfg, now = new Date()) {
   if (!data) return '';
   const model = buildTodayCockpitModel(data, cfg, { now });
   const nowStamp = householdNowStamp(now);
-  const ended = (Array.isArray(data.upcomingEvents) ? data.upcomingEvents : [])
+  // Beide Terminlisten: auch die Familienkarte wechselt am Ende eines Termins
+  // auf den naechsten oder auf „fuer heute durch" (#1449).
+  const ended = ['upcomingEvents', 'familyEvents']
+    .flatMap((key) => (Array.isArray(data[key]) ? data[key] : []))
     .filter((event) => eventHasEnded(event, nowStamp))
     .map((event) => `${event.id}@${event.start_datetime}`);
   return JSON.stringify([
@@ -7028,4 +7037,4 @@ Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderDashboa
 
 // Test-Tor fuer die Uebersichts-Bugs vom 2026-09-29 (#1449, #1451-#1457).
 Object.assign(__test, { renderBudgetWidget });
-Object.assign(__test, { renderCountdowns, renderHousekeepingWidget, renderCycleWidget });
+Object.assign(__test, { renderCountdowns, renderHousekeepingWidget, renderCycleWidget, todayFingerprint });
