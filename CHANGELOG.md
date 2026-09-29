@@ -738,6 +738,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   singular and the form for 5 and more existed, so "za 2 dní" appeared instead of "za 2 dny" and
   "خلال 2 أيام" instead of "خلال يومين". Every counter now carries every form its language uses, only
   in that language, and a test fails for any new counter that misses one.
+- **"Change all future occurrences" no longer ends a recurring payment** (#1546). Editing a later
+  month of a series and choosing "Change all future occurrences" sent the recurrence settings of
+  that single month along, and a generated month carries none: the series was switched off, every
+  occurrence from today on was deleted, and a weekly, yearly or virtual series was reset to monthly,
+  while the message said the change was saved. The dialog now sends only what you changed, and the
+  recurrence of a series is edited on its first entry; a generated month no longer shows the
+  "Recurring" switch. Changing the amount of a virtual series from one of its months now counts as
+  that month's share. **Series ended this way do not come back by themselves:** open the first entry
+  of the series (the search finds it by its title), switch "Recurring" on again and choose its
+  rhythm again. The missing months reappear when you open them; receipts and one-off changes that
+  were attached to the deleted months are gone. For API users: `PUT /api/v1/budget/:id/series` now
+  answers `is_recurring: false` with 400 instead of ending the series; end a series with
+  `PUT /api/v1/budget/:id` and `is_recurring: false` on its first entry, or delete it with
+  `DELETE /api/v1/budget/:id/series`.
 
 - **The API documentation page answers "restore in progress" during a restore** (#1531). Outside
   production, `/docs` checks the API token or session, and while a restore had the database closed
@@ -766,6 +780,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evening of the last day in the next one. The overview now uses the same month boundaries as the
   Housekeeping module, so both show the same number.
 
+- **Editing a housekeeping visit keeps its day** (#1540). The edit dialog showed the UTC day of
+  the visit: in Berlin a visit on the 1st at 00:30 appeared on the day before, and saving it, even
+  just to correct the amount, moved its calendar entry and payment task there. Correcting the date
+  moved the visit itself a day later. The dialog now shows the household's day, and a new day
+  keeps the visit's time on the household's clock.
+
 - **The wall display stays dark after a reload at night** (#1453). Reloading the wall between 22:00
   and 06:00 with the theme set to Automatic or Light left the dimmed night surface in the light
   theme until the morning. The wall now forces the dark theme on every check during the night and
@@ -793,6 +813,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   converted it into the household's, so with a household time zone set and a device elsewhere a
   task due at 18:00 could read "until 00:00". It now shows the due time as entered, like the task
   list does.
+
+- **Medication reminders come at the household's time** (#1539). The scheduler read the day and
+  the time on the server's clock. With a household time zone set and the server running in
+  another zone, such as UTC in a container, a dose planned for 08:00 in Berlin was due at 10:00,
+  and near midnight a dose could land on the wrong day. Doses are now due on the household's day
+  and clock, also on the days the clocks change. The intake log in Health also shows the times
+  as recorded on a device in another time zone.
 
 - **The note category hints no longer suggest that notes are private** (#1514). A personal
   category is only visible to you, but a note filed under it is still visible to every household

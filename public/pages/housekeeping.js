@@ -1727,6 +1727,11 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
     return;
   }
   const worker = state.workers.find((item) => String(item.id) === String(visit.worker_id)) || null;
+  // Der Tag des Besuchs auf der Uhr des Haushalts, nicht `check_in.slice(0, 10)`
+  // (der UTC-Tag, #1540). Er geht beim Speichern als `original_date` mit: der
+  // Server verschiebt den Besuch um den Abstand zu DIESEM Tag, weil seine Uhr
+  // ohne eingestellte Haushaltszone eine andere sein kann als die des Browsers.
+  const visitDay = zonedDateKey(visit.check_in);
   openModal({
     title: t('housekeeping.editVisit'),
     size: 'md',
@@ -1734,7 +1739,7 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
       <form id="housekeeping-visit-form" class="housekeeping-worker-form">
         <label class="housekeeping-field">
           <span>${esc(t('housekeeping.visitDate'))}</span>
-          <yuvomi-datepicker name="date" type="date" value="${esc(visit.check_in.slice(0, 10))}"></yuvomi-datepicker>
+          <yuvomi-datepicker name="date" type="date" value="${esc(visitDay)}"></yuvomi-datepicker>
         </label>
         <div class="housekeeping-form-grid">
           ${visit.rate_type === 'hourly' ? `
@@ -1831,6 +1836,7 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
           }
           await api.put(`/housekeeping/visits/${visit.id}`, {
             date: dateValue,
+            original_date: visitDay,
             ...(visit.rate_type === 'hourly'
               ? { minutes_worked: minutesWorked }
               : { daily_rate: dailyRate }),
