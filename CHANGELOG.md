@@ -822,6 +822,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the new one from the guide or from Settings, Administration, Backup and restore. A restore on
   Node running natively on Windows no longer stops with `EPERM` while writing the restored copy to
   disk; Docker installs were not affected. (#1441)
+
+- **A restore waits for work that continues after an answer.** A few actions keep working after
+  they have answered: the push to someone mentioned in a task comment, the password reset mail,
+  and the immediate push of a changed or deleted appointment to Google, CalDAV or iCloud. A restore
+  did not see this work, so a mention push or a second reset request could write into the restored
+  database afterwards. The restore now waits for it, and while a restore runs this work does not
+  start. The automatic calendar sync no longer stops the server when its timer fires in the moment
+  a restore has the database closed. (#1532)
 - **Confirming a long list of moved events no longer holds up the server** (#1440). When an admin
   confirmed a page of moved events under Settings > Sync, every picked entry was checked with a
   query prepared anew for it, and a full page of up to 5,000 ran without a pause, so other requests
