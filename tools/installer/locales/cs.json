@@ -2,6 +2,10 @@
   "title": "Nastavení Yuvomi",
   "common": {
     "continue": "Pokračovat",
+    "setUp": "Nastaveno",
+    "stepsNav": "Kroky nastavení",
+    "stepDone": "(hotovo)",
+    "groupServer": "Server",
     "back": "Zpět",
     "generate": "Generovat",
     "generating": "Generuji…",
@@ -113,7 +117,6 @@
     "documentLocalEnable": "Ukládat nové dokumenty do místní složky",
     "documentLocalPathLabel": "Cesta ke složce",
     "documentLocalPathHint": "Cesta uvnitř kontejneru. Ponechte prázdné pro /documents.",
-    "sectionIntegrations": "Jednotné přihlášení",
     "errSchedule": "Neplatný cron plán (očekává se pět polí oddělených mezerami, např. 0 2 * * *).",
     "errKeep": "Počet zachovaných záloh musí být kladné číslo.",
     "webdavBackup": "Externí zálohy (WebDAV)",
@@ -165,6 +168,9 @@
   },
   "review": {
     "title": "Přehled",
+    "edit": "Změnit",
+    "notSetUp": "Nenastaveno",
+    "groupIntegrations": "Integrace",
     "subtitle": "Zkontroluj nastavení před zápisem .env a spuštěním kontejneru.",
     "host": "Hostitel",
     "port": "Port",
@@ -177,8 +183,6 @@
     "save": "Uložit a spustit Docker",
     "saving": "Ukládá se …",
     "errSave": "Uložení .env se nezdařilo.",
-    "weatherEnabled": "povoleno ({{city}})",
-    "configured": "nakonfigurováno",
     "finalNote": "Tímto se zapíše soubor .env (stávající se zálohuje) a spustí se kontejner.",
     "confirm": "Potvrďte dalším kliknutím",
     "access": "Přístup",
@@ -188,8 +192,8 @@
     "oidc": "Jednotné přihlášení",
     "backups": "Zálohy",
     "webdavBackup": "Externí zálohy",
-    "on": "zapnuto",
-    "off": "vypnuto",
+    "on": "Zapnuto",
+    "off": "Vypnuto",
     "documentGoogleDrive": "Dokumenty Google Drive",
     "sessionSecret": "Klíč relace",
     "dbKey": "Klíč databáze",
@@ -202,8 +206,7 @@
     "privateNetworkWaste": "Svoz odpadu",
     "privateNetworkWebdav": "Dokumenty WebDAV",
     "baseUrl": "Veřejná adresa",
-    "outlook": "Kalendář Outlook",
-    "notEnabled": "nepovoleno"
+    "outlook": "Kalendář Outlook"
   },
   "docker": {
     "title": "Spouštění Yuvomi",
@@ -260,8 +263,8 @@
     "subtitleExisting": "Yuvomi běží. Tato instalace už má účet správce - přihlas se svými stávajícími údaji."
   },
   "welcome": {
-    "title": "Vítejte v Yuvomi",
-    "subtitle": "Pojďme spustit váš soukromý rodinný plánovač. Vyberte, jak jej chcete nastavit.",
+    "title": "Jak chcete Yuvomi nastavit?",
+    "subtitle": "Poté poběží váš soukromý rodinný plánovač na vašem vlastním serveru.",
     "simpleTitle": "Jednoduché nastavení",
     "simpleBadge": "Doporučeno",
     "simpleDesc": "Technické detaily vyřešíme za vás. Ideální pro provoz Yuvomi doma.",
@@ -287,6 +290,7 @@
   },
   "email": {
     "title": "E-mail a obnovení hesla",
+    "groupSender": "Odesílatel",
     "subtitle": "Umožněte členům rodiny obnovit zapomenuté heslo e-mailem. Volitelné — přeskočte, pokud to nepotřebujete.",
     "enable": "Povolit odesílání e-mailů",
     "hint": "Používá váš vlastní SMTP server (poskytovatel pošty, self-hosted nebo transakční služba).",

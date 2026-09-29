@@ -2,6 +2,10 @@
   "title": "Cài đặt Yuvomi",
   "common": {
     "continue": "Tiếp tục",
+    "setUp": "Đã thiết lập",
+    "stepsNav": "Các bước thiết lập",
+    "stepDone": "(đã xong)",
+    "groupServer": "Máy chủ",
     "back": "Quay lại",
     "generate": "Tạo",
     "generating": "Đang tạo…",
@@ -83,6 +87,9 @@
   },
   "review": {
     "title": "Xem lại",
+    "edit": "Thay đổi",
+    "notSetUp": "Chưa thiết lập",
+    "groupIntegrations": "Tích hợp",
     "subtitle": "Kiểm tra cài đặt của bạn trước khi ghi .env và khởi động container.",
     "host": "Máy chủ",
     "port": "Cổng",
@@ -95,8 +102,6 @@
     "save": "Lưu & Khởi động Docker",
     "saving": "Đang lưu …",
     "errSave": "Không thể lưu .env.",
-    "weatherEnabled": "đã bật ({{city}})",
-    "configured": "đã cấu hình",
     "finalNote": "Thao tác này ghi tệp .env của bạn (tệp hiện có được sao lưu) và khởi động container.",
     "confirm": "Nhấp lại để xác nhận",
     "access": "Truy cập",
@@ -106,8 +111,8 @@
     "oidc": "Đăng nhập một lần",
     "backups": "Sao lưu",
     "webdavBackup": "Sao lưu bên ngoài",
-    "on": "bật",
-    "off": "tắt",
+    "on": "Bật",
+    "off": "Tắt",
     "documentGoogleDrive": "Tài liệu Google Drive",
     "sessionSecret": "Khóa phiên",
     "dbKey": "Khóa cơ sở dữ liệu",
@@ -120,8 +125,7 @@
     "privateNetworkWaste": "Thu gom rác",
     "privateNetworkWebdav": "Tài liệu WebDAV",
     "baseUrl": "Địa chỉ công khai",
-    "outlook": "Lịch Outlook",
-    "notEnabled": "chưa bật"
+    "outlook": "Lịch Outlook"
   },
   "docker": {
     "title": "Đang khởi động Yuvomi",
@@ -209,7 +213,6 @@
     "documentLocalEnable": "Lưu tài liệu mới vào thư mục cục bộ",
     "documentLocalPathLabel": "Đường dẫn thư mục",
     "documentLocalPathHint": "Đường dẫn trong container. Để trống để dùng /documents.",
-    "sectionIntegrations": "Đăng nhập một lần",
     "errSchedule": "Lịch cron không hợp lệ (cần năm trường phân tách bằng dấu cách, ví dụ 0 2 * * *).",
     "errKeep": "Số bản sao lưu cần giữ phải là một số dương.",
     "webdavBackup": "Sao lưu bên ngoài (WebDAV)",
@@ -260,8 +263,8 @@
     "authPasswordLoginHint": "Tắt tùy chọn này khiến SSO là lối vào duy nhất: biểu mẫu đăng nhập và đặt lại mật khẩu sẽ biến mất. Nếu nhà cung cấp không truy cập được, đường quay lại là sửa tệp .env và khởi động lại."
   },
   "welcome": {
-    "title": "Chào mừng đến với Yuvomi",
-    "subtitle": "Hãy khởi chạy trình lập kế hoạch gia đình riêng tư của bạn. Chọn cách thiết lập.",
+    "title": "Bạn muốn thiết lập Yuvomi như thế nào?",
+    "subtitle": "Sau đó, trình lập kế hoạch gia đình riêng tư của bạn chạy trên máy chủ của chính bạn.",
     "simpleTitle": "Thiết lập đơn giản",
     "simpleBadge": "Khuyến nghị",
     "simpleDesc": "Chúng tôi lo các chi tiết kỹ thuật cho bạn. Lý tưởng để chạy Yuvomi tại nhà.",
@@ -287,6 +290,7 @@
   },
   "email": {
     "title": "Email & đặt lại mật khẩu",
+    "groupSender": "Người gửi",
     "subtitle": "Cho phép các thành viên gia đình đặt lại mật khẩu đã quên qua email. Tùy chọn — bỏ qua nếu không cần.",
     "enable": "Bật gửi email",
     "hint": "Dùng máy chủ SMTP của riêng bạn (nhà cung cấp email, tự lưu trữ hoặc dịch vụ giao dịch).",

@@ -2,6 +2,10 @@
   "title": "Yuvomi 설정",
   "common": {
     "continue": "계속",
+    "setUp": "설정됨",
+    "stepsNav": "설정 단계",
+    "stepDone": "(완료)",
+    "groupServer": "서버",
     "back": "뒤로",
     "generate": "생성",
     "generating": "생성 중…",
@@ -113,7 +117,6 @@
     "documentLocalEnable": "새 문서를 로컬 폴더에 저장",
     "documentLocalPathLabel": "폴더 경로",
     "documentLocalPathHint": "컨테이너 내부 경로. 비워 두면 /documents를 사용합니다.",
-    "sectionIntegrations": "통합 인증",
     "errSchedule": "잘못된 cron 일정입니다(공백으로 구분된 다섯 개 필드 필요, 예: 0 2 * * *).",
     "errKeep": "보관할 백업 수는 양수여야 합니다.",
     "webdavBackup": "외부 백업(WebDAV)",
@@ -165,6 +168,9 @@
   },
   "review": {
     "title": "검토",
+    "edit": "변경",
+    "notSetUp": "설정 안 됨",
+    "groupIntegrations": "연동",
     "subtitle": ".env를 작성하고 컨테이너를 시작하기 전에 설정을 확인하세요.",
     "host": "호스트",
     "port": "포트",
@@ -177,8 +183,6 @@
     "save": "저장 & Docker 시작",
     "saving": "저장하는 중 …",
     "errSave": ".env 저장에 실패했습니다.",
-    "weatherEnabled": "활성화됨 ({{city}})",
-    "configured": "구성됨",
     "finalNote": "이 작업은 .env를 작성하고(기존 파일은 백업됨) 컨테이너를 시작합니다.",
     "confirm": "확인하려면 다시 클릭",
     "access": "접근",
@@ -202,8 +206,7 @@
     "privateNetworkWaste": "폐기물 수거",
     "privateNetworkWebdav": "WebDAV 문서",
     "baseUrl": "공개 주소",
-    "outlook": "Outlook 캘린더",
-    "notEnabled": "허용 안 함"
+    "outlook": "Outlook 캘린더"
   },
   "docker": {
     "title": "Yuvomi 시작 중",
@@ -260,8 +263,8 @@
     "subtitleExisting": "Yuvomi가 실행 중입니다. 이 설치에는 이미 관리자 계정이 있습니다. 기존 자격 증명으로 로그인하세요."
   },
   "welcome": {
-    "title": "Yuvomi에 오신 것을 환영합니다",
-    "subtitle": "개인 가족 플래너를 실행해 봅시다. 설정 방법을 선택하세요.",
+    "title": "Yuvomi를 어떻게 설정하시겠어요?",
+    "subtitle": "설정이 끝나면 개인 가족 플래너가 직접 운영하는 서버에서 실행됩니다.",
     "simpleTitle": "간편 설정",
     "simpleBadge": "권장",
     "simpleDesc": "기술적인 세부 사항은 저희가 처리합니다. 집에서 Yuvomi를 운영하기에 적합합니다.",
@@ -287,6 +290,7 @@
   },
   "email": {
     "title": "이메일 및 비밀번호 재설정",
+    "groupSender": "보낸 사람",
     "subtitle": "가족 구성원이 잊어버린 비밀번호를 이메일로 재설정할 수 있게 합니다. 선택 사항 — 필요 없으면 건너뛰세요.",
     "enable": "이메일 전송 활성화",
     "hint": "자체 SMTP 서버를 사용합니다(메일 제공업체, 자체 호스팅 또는 트랜잭션 서비스).",

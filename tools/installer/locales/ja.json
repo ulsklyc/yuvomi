@@ -2,6 +2,10 @@
   "title": "Yuvomi セットアップ",
   "common": {
     "continue": "続ける",
+    "setUp": "設定済み",
+    "stepsNav": "セットアップの手順",
+    "stepDone": "（完了）",
+    "groupServer": "サーバー",
     "back": "戻る",
     "generate": "生成",
     "generating": "生成中…",
@@ -83,6 +87,9 @@
   },
   "review": {
     "title": "確認",
+    "edit": "変更",
+    "notSetUp": "未設定",
+    "groupIntegrations": "連携",
     "subtitle": ".env を書き込んでコンテナを起動する前に、設定を確認してください。",
     "host": "ホスト",
     "port": "ポート",
@@ -95,8 +102,6 @@
     "save": "保存して Docker を起動",
     "saving": "保存中 …",
     "errSave": ".env の保存に失敗しました。",
-    "weatherEnabled": "有効（{{city}}）",
-    "configured": "設定済み",
     "finalNote": "これにより .env が書き込まれ（既存のものはバックアップされます）、コンテナが起動します。",
     "confirm": "確認するにはもう一度クリック",
     "access": "アクセス",
@@ -106,8 +111,8 @@
     "oidc": "シングルサインオン",
     "backups": "バックアップ",
     "webdavBackup": "外部バックアップ",
-    "on": "有効",
-    "off": "無効",
+    "on": "オン",
+    "off": "オフ",
     "documentGoogleDrive": "Google Drive 文書",
     "sessionSecret": "セッションキー",
     "dbKey": "データベースキー",
@@ -120,8 +125,7 @@
     "privateNetworkWaste": "ごみ収集",
     "privateNetworkWebdav": "WebDAV ドキュメント",
     "baseUrl": "公開アドレス",
-    "outlook": "Outlook カレンダー",
-    "notEnabled": "未許可"
+    "outlook": "Outlook カレンダー"
   },
   "docker": {
     "title": "Yuvomi を起動しています",
@@ -209,7 +213,6 @@
     "documentLocalEnable": "新しいドキュメントをローカルフォルダーに保存する",
     "documentLocalPathLabel": "フォルダーのパス",
     "documentLocalPathHint": "コンテナ内のパス。空欄の場合は /documents を使用します。",
-    "sectionIntegrations": "シングルサインオン",
     "errSchedule": "無効な cron スケジュールです（スペース区切りの5フィールドが必要、例：0 2 * * *）。",
     "errKeep": "保持するバックアップ数は正の数である必要があります。",
     "webdavBackup": "外部バックアップ（WebDAV）",
@@ -260,8 +263,8 @@
     "authPasswordLoginHint": "オフにすると SSO が唯一の入口になります。ログインフォームとパスワードの再設定は表示されなくなります。プロバイダーに接続できなくなった場合の戻り道は、.env ファイルの編集と再起動です。"
   },
   "welcome": {
-    "title": "Yuvomi へようこそ",
-    "subtitle": "プライベートな家族プランナーを立ち上げましょう。セットアップ方法を選んでください。",
+    "title": "Yuvomi をどのようにセットアップしますか？",
+    "subtitle": "セットアップ後、プライベートな家族プランナーがご自身のサーバーで動作します。",
     "simpleTitle": "簡単セットアップ",
     "simpleBadge": "おすすめ",
     "simpleDesc": "技術的な詳細はこちらで対応します。自宅で Yuvomi を使うのに最適です。",
@@ -287,6 +290,7 @@
   },
   "email": {
     "title": "メールとパスワードリセット",
+    "groupSender": "差出人",
     "subtitle": "家族が忘れたパスワードをメールでリセットできるようにします。任意です — 不要ならスキップしてください。",
     "enable": "メール送信を有効にする",
     "hint": "ご自身の SMTP サーバーを使用します（メールプロバイダー、セルフホスト、またはトランザクションサービス）。",

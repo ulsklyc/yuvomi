@@ -2,6 +2,10 @@
   "title": "Konfiguracja Yuvomi",
   "common": {
     "continue": "Dalej",
+    "setUp": "Skonfigurowano",
+    "stepsNav": "Kroki konfiguracji",
+    "stepDone": "(ukończono)",
+    "groupServer": "Serwer",
     "back": "Wstecz",
     "generate": "Generuj",
     "generating": "Generowanie…",
@@ -83,6 +87,9 @@
   },
   "review": {
     "title": "Przegląd",
+    "edit": "Zmień",
+    "notSetUp": "Nie skonfigurowano",
+    "groupIntegrations": "Integracje",
     "subtitle": "Sprawdź ustawienia przed zapisaniem pliku .env i uruchomieniem kontenera.",
     "host": "Host",
     "port": "Port",
@@ -95,8 +102,6 @@
     "save": "Zapisz i uruchom Docker",
     "saving": "Zapisywanie …",
     "errSave": "Nie udało się zapisać pliku .env.",
-    "weatherEnabled": "włączone ({{city}})",
-    "configured": "skonfigurowano",
     "finalNote": "Spowoduje to zapis pliku .env (istniejący zostanie skopiowany) i uruchomienie kontenera.",
     "confirm": "Kliknij ponownie, aby potwierdzić",
     "access": "Dostęp",
@@ -106,8 +111,8 @@
     "oidc": "Logowanie jednokrotne",
     "backups": "Kopie zapasowe",
     "webdavBackup": "Kopie zewnętrzne",
-    "on": "włączone",
-    "off": "wyłączone",
+    "on": "Włączone",
+    "off": "Wyłączone",
     "documentGoogleDrive": "Dokumenty Google Drive",
     "sessionSecret": "Klucz sesji",
     "dbKey": "Klucz bazy danych",
@@ -120,8 +125,7 @@
     "privateNetworkWaste": "Odbiór odpadów",
     "privateNetworkWebdav": "Dokumenty WebDAV",
     "baseUrl": "Adres publiczny",
-    "outlook": "Kalendarz Outlook",
-    "notEnabled": "nie włączono"
+    "outlook": "Kalendarz Outlook"
   },
   "docker": {
     "title": "Uruchamianie Yuvomi",
@@ -209,7 +213,6 @@
     "documentLocalEnable": "Zapisuj nowe dokumenty w folderze lokalnym",
     "documentLocalPathLabel": "Ścieżka folderu",
     "documentLocalPathHint": "Ścieżka w kontenerze. Pozostaw puste, aby użyć /documents.",
-    "sectionIntegrations": "Logowanie jednokrotne",
     "errSchedule": "Nieprawidłowy harmonogram cron (oczekiwano pięciu pól oddzielonych spacjami, np. 0 2 * * *).",
     "errKeep": "Liczba kopii do zachowania musi być liczbą dodatnią.",
     "webdavBackup": "Kopie zewnętrzne (WebDAV)",
@@ -260,8 +263,8 @@
     "authPasswordLoginHint": "Wyłączenie sprawia, że SSO jest jedyną drogą do środka: formularz logowania i resetowanie hasła znikają. Jeśli dostawca stanie się nieosiągalny, droga powrotna prowadzi przez plik .env i ponowne uruchomienie."
   },
   "welcome": {
-    "title": "Witamy w Yuvomi",
-    "subtitle": "Uruchommy Twój prywatny planer rodzinny. Wybierz sposób konfiguracji.",
+    "title": "Jak chcesz skonfigurować Yuvomi?",
+    "subtitle": "Potem Twój prywatny planer rodzinny działa na Twoim własnym serwerze.",
     "simpleTitle": "Prosta konfiguracja",
     "simpleBadge": "Zalecane",
     "simpleDesc": "Zajmiemy się szczegółami technicznymi za Ciebie. Idealne do korzystania z Yuvomi w domu.",
@@ -287,6 +290,7 @@
   },
   "email": {
     "title": "E-mail i resetowanie hasła",
+    "groupSender": "Nadawca",
     "subtitle": "Pozwól członkom rodziny zresetować zapomniane hasło przez e-mail. Opcjonalne — pomiń, jeśli niepotrzebne.",
     "enable": "Włącz wysyłanie e-maili",
     "hint": "Używa Twojego serwera SMTP (dostawca poczty, self-hosted lub usługa transakcyjna).",

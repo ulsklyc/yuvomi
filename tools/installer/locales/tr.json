@@ -2,6 +2,10 @@
   "title": "Yuvomi Kurulumu",
   "common": {
     "continue": "Devam",
+    "setUp": "Kuruldu",
+    "stepsNav": "Kurulum adımları",
+    "stepDone": "(tamamlandı)",
+    "groupServer": "Sunucu",
     "back": "Geri",
     "generate": "Oluştur",
     "generating": "Oluşturuluyor…",
@@ -83,6 +87,9 @@
   },
   "review": {
     "title": "İnceleme",
+    "edit": "Değiştir",
+    "notSetUp": "Kurulmadı",
+    "groupIntegrations": "Entegrasyonlar",
     "subtitle": ".env yazılmadan ve kapsayıcı başlatılmadan önce ayarlarınızı kontrol edin.",
     "host": "Ana bilgisayar",
     "port": "Bağlantı noktası",
@@ -95,8 +102,6 @@
     "save": "Kaydet ve Docker'ı başlat",
     "saving": "Kaydediliyor …",
     "errSave": ".env kaydedilemedi.",
-    "weatherEnabled": "etkin ({{city}})",
-    "configured": "yapılandırıldı",
     "finalNote": "Bu, .env dosyanızı yazar (mevcut olan yedeklenir) ve konteyneri başlatır.",
     "confirm": "Onaylamak için tekrar tıklayın",
     "access": "Erişim",
@@ -106,8 +111,8 @@
     "oidc": "Tek oturum açma",
     "backups": "Yedeklemeler",
     "webdavBackup": "Harici yedeklemeler",
-    "on": "etkin",
-    "off": "devre dışı",
+    "on": "Açık",
+    "off": "Kapalı",
     "documentGoogleDrive": "Google Drive belgeleri",
     "sessionSecret": "Oturum anahtarı",
     "dbKey": "Veritabanı anahtarı",
@@ -120,8 +125,7 @@
     "privateNetworkWaste": "Atık toplama",
     "privateNetworkWebdav": "WebDAV belgeleri",
     "baseUrl": "Herkese açık adres",
-    "outlook": "Outlook Takvimi",
-    "notEnabled": "etkin değil"
+    "outlook": "Outlook Takvimi"
   },
   "docker": {
     "title": "Yuvomi başlatılıyor",
@@ -209,7 +213,6 @@
     "documentLocalEnable": "Yeni belgeleri yerel bir klasörde sakla",
     "documentLocalPathLabel": "Klasör yolu",
     "documentLocalPathHint": "Konteyner içindeki yol. /documents için boş bırakın.",
-    "sectionIntegrations": "Çoklu oturum açma",
     "errSchedule": "Geçersiz cron zamanlaması (boşlukla ayrılmış beş alan beklenir, örn. 0 2 * * *).",
     "errKeep": "Saklanacak yedek sayısı pozitif bir sayı olmalıdır.",
     "webdavBackup": "Harici yedeklemeler (WebDAV)",
@@ -260,8 +263,8 @@
     "authPasswordLoginHint": "Kapatmak SSO'yu tek giriş yolu yapar: giriş formu ve şifre sıfırlama kaybolur. Sağlayıcıya erişilemez hale gelirse dönüş yolu .env dosyasını düzenlemek ve yeniden başlatmaktır."
   },
   "welcome": {
-    "title": "Yuvomi’ye hoş geldiniz",
-    "subtitle": "Özel aile planlayıcınızı çalıştıralım. Nasıl kuracağınızı seçin.",
+    "title": "Yuvomi'yi nasıl kurmak istersiniz?",
+    "subtitle": "Ardından özel aile planlayıcınız kendi sunucunuzda çalışır.",
     "simpleTitle": "Basit kurulum",
     "simpleBadge": "Önerilen",
     "simpleDesc": "Teknik ayrıntıları sizin için biz hallederiz. Yuvomi’yi evde çalıştırmak için idealdir.",
@@ -287,6 +290,7 @@
   },
   "email": {
     "title": "E-posta ve parola sıfırlama",
+    "groupSender": "Gönderen",
     "subtitle": "Aile üyelerinin unuttukları parolayı e-postayla sıfırlamasına izin verin. İsteğe bağlı — gerekmiyorsa atlayın.",
     "enable": "E-posta göndermeyi etkinleştir",
     "hint": "Kendi SMTP sunucunuzu kullanır (e-posta sağlayıcısı, self-hosted veya bir işlemsel hizmet).",

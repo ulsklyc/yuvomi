@@ -2,6 +2,10 @@
   "title": "Pag-set up ng Yuvomi",
   "common": {
     "continue": "Magpatuloy",
+    "setUp": "Naka-set up",
+    "stepsNav": "Mga hakbang sa setup",
+    "stepDone": "(tapos na)",
+    "groupServer": "Server",
     "back": "Bumalik",
     "generate": "Gumawa",
     "generating": "Ginagawa…",
@@ -113,7 +117,6 @@
     "documentLocalEnable": "Iimbak sa lokal na folder ang mga bagong dokumento",
     "documentLocalPathLabel": "Path ng folder",
     "documentLocalPathHint": "Path sa loob ng container. Iwanang blangko para gamitin ang /documents.",
-    "sectionIntegrations": "Single sign-on",
     "errSchedule": "Hindi wastong iskedyul ng cron (inaasahan ang limang field na pinaghihiwalay ng espasyo, hal. 0 2 * * *).",
     "errKeep": "Dapat positibong numero ang mga backup na itatago.",
     "webdavBackup": "Mga Backup sa Labas (WebDAV)",
@@ -165,6 +168,9 @@
   },
   "review": {
     "title": "Suriin",
+    "edit": "Baguhin",
+    "notSetUp": "Hindi naka-set up",
+    "groupIntegrations": "Mga integration",
     "subtitle": "Suriin ang iyong mga setting bago isulat ang .env at simulan ang container.",
     "host": "Host",
     "port": "Port",
@@ -177,8 +183,6 @@
     "save": "I-save at Simulan ang Docker",
     "saving": "Sine-save …",
     "errSave": "Nabigo ang pag-save ng .env.",
-    "weatherEnabled": "naka-enable ({{city}})",
-    "configured": "naka-configure",
     "finalNote": "Isinusulat nito ang iyong .env (binibinbinan ang umiiral na) at sinisimulan ang container.",
     "confirm": "Mag-click ulit para kumpirmahin",
     "access": "Pag-abot",
@@ -188,8 +192,8 @@
     "oidc": "Single sign-on",
     "backups": "Mga Backup",
     "webdavBackup": "Mga backup sa labas",
-    "on": "naka-enable",
-    "off": "naka-disable",
+    "on": "Naka-on",
+    "off": "Naka-off",
     "documentGoogleDrive": "Mga dokumento sa Google Drive",
     "sessionSecret": "Session key",
     "dbKey": "Database key",
@@ -202,8 +206,7 @@
     "privateNetworkWaste": "Koleksyon ng basura",
     "privateNetworkWebdav": "Mga dokumento sa WebDAV",
     "baseUrl": "Pampublikong address",
-    "outlook": "Outlook Calendar",
-    "notEnabled": "hindi pinagana"
+    "outlook": "Outlook Calendar"
   },
   "docker": {
     "title": "Sinisimulan ang Yuvomi",
@@ -260,8 +263,8 @@
     "subtitleExisting": "Tumatakbo ang Yuvomi. May administrator account na ang installation na ito - mag-sign in gamit ang kasalukuyan mong mga kredensyal."
   },
   "welcome": {
-    "title": "Maligayang pagdating sa Yuvomi",
-    "subtitle": "Patakbuhin natin ang iyong pribadong family planner. Piliin kung paano mo ito gustong i-set up.",
+    "title": "Paano mo gustong i-set up ang Yuvomi?",
+    "subtitle": "Pagkatapos, tatakbo ang iyong pribadong family planner sa sarili mong server.",
     "simpleTitle": "Simpleng setup",
     "simpleBadge": "Inirerekomenda",
     "simpleDesc": "Kami ang bahala sa mga teknikal na detalye. Angkop na angkop para patakbuhin ang Yuvomi sa bahay.",
@@ -287,6 +290,7 @@
   },
   "email": {
     "title": "Email at Pag-reset ng Password",
+    "groupSender": "Nagpadala",
     "subtitle": "Hayaang i-reset ng mga miyembro ng pamilya ang nakalimutang password sa email. Opsyonal - laktawan kung hindi kailangan.",
     "enable": "I-enable ang pagpapadala ng email",
     "hint": "Gumagamit ng sarili mong SMTP server (provider ng mailbox, sariling host, o serbisyong transaksyonal).",

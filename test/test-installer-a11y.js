@@ -269,6 +269,16 @@ function cardContentWidth(viewport) {
   return cardWidth - cardBody.left - cardBody.right;
 }
 
+/**
+ * Innenbreite einer Zeile in einer Inset-Gruppe. Seit die Felder in Gruppen
+ * stehen (Critique 2026-09-29), liegt zwischen Kartenkante und Feld noch das
+ * Zeilenpolster - ohne es rechnete das Modell mit 32px zu viel Platz.
+ */
+function rowContentWidth(viewport, rowSelector) {
+  const pad = paddingX(declared(sel => sel === rowSelector, 'padding', appliesAt(viewport)) || '0');
+  return cardContentWidth(viewport) - pad.left - pad.right;
+}
+
 /** flex-Shorthand in { grow, shrink, basis } zerlegen. */
 function flexParts(shorthand) {
   const parts = shorthand.trim().split(/\s+/);
@@ -288,7 +298,7 @@ function flexParts(shorthand) {
  */
 function secretFieldWidth(viewport) {
   const media = appliesAt(viewport);
-  const available = cardContentWidth(viewport);
+  const available = rowContentWidth(viewport, '.inset-group .field');
   const gap = toPx(declared(sel => sel === '.secret-row', 'gap', media)) ?? 0;
   const wraps = (declared(sel => sel === '.secret-row', 'flex-wrap', media) || 'nowrap') === 'wrap';
 
@@ -311,28 +321,33 @@ function secretFieldWidth(viewport) {
 
 test('das Secret-Feld bekommt auf dem Handy die volle Zeile, nicht den Rest', () => {
   const breite = secretFieldWidth(MOBILE_VIEWPORT);
-  const voll = cardContentWidth(MOBILE_VIEWPORT);
+  const voll = rowContentWidth(MOBILE_VIEWPORT, '.inset-group .field');
   assert.ok(breite >= voll * 0.95,
     `#sec-db misst bei ${MOBILE_VIEWPORT}px nur ${breite.toFixed(0)}px von ${voll.toFixed(0)}px verfügbarer Breite. `
     + 'Ein 64-Zeichen-Schlüssel gehört auf eine eigene Zeile, die Buttons darunter.');
 });
 
 /* Die Pruefseite traegt unzerbrechliche Maschinenwerte (BASE_URL mit DDNS-Host,
- * Nextcloud-WebDAV-URL) in einem Grid mit fester Schluesselspalte. Gemessen
+ * Nextcloud-WebDAV-URL) in Zeilen mit fester Schluesselspalte. Gemessen
  * 2026-08-31: 534px body-scrollWidth bei 375px Viewport - die GANZE Seite
  * scrollte seitlich, inklusive Sticky-Footer (WCAG 1.4.10), ausgerechnet auf
  * dem Kontrollschirm vor dem irreversiblen Klick. Die damalige Suite mass nur
  * die .secret-row; dieselbe Luecke gab es hier ohne Guard.
  *
+ * Seit 2026-09-29 ist die Pruefseite nach Schritten gruppiert, und jede Zeile
+ * (.rv-row) ist ihr eigenes Zwei-Spalten-Raster statt eines Rasters ueber die
+ * ganze Seite. Die Regel ist dieselbe geblieben, deshalb misst der Guard sie
+ * jetzt dort: in der Zeile, abzueglich ihres Polsters.
+ *
  * Modelliert wird die WIRKUNG, nicht die Regel: wie breit wird die Seite mit
  * einem 500px-Wert in der Wertspalte? `overflow-wrap: anywhere` senkt dessen
  * min-content auf ~0 (anders als break-word, das die Messung nicht aendert),
  * minmax(0, ...) erlaubt der Spur, unter min-content zu schrumpfen. */
-function reviewGridNeed(viewport, unbreakable) {
+function reviewRowNeed(viewport, unbreakable) {
   const media = appliesAt(viewport);
-  const columns = declared(sel => sel === '.review-grid', 'grid-template-columns', media) || '160px 1fr';
+  const columns = declared(sel => sel === '.rv-row', 'grid-template-columns', media) || '160px 1fr';
   const tracks = columns.match(/minmax\([^)]*\)|\S+/g) || [];
-  const gapParts = (declared(sel => sel === '.review-grid', 'gap', media) || '0').trim().split(/\s+/);
+  const gapParts = (declared(sel => sel === '.rv-row', 'gap', media) || '0').trim().split(/\s+/);
   const gapX = toPx(gapParts[1] ?? gapParts[0]) ?? 0;
 
   const trackMin = track => {
@@ -343,7 +358,7 @@ function reviewGridNeed(viewport, unbreakable) {
   };
   const keyMin = trackMin(tracks[0] ?? '160px') ?? 0;
 
-  const wrap = (declared(sel => sel === '.review-grid > :not(.review-key)', 'overflow-wrap', media) || 'normal').trim();
+  const wrap = (declared(sel => sel === '.rv-row dd', 'overflow-wrap', media) || 'normal').trim();
   // Nur `anywhere` geht in die min-content-Rechnung ein (CSS Text 3, §5.2).
   const valueContentMin = wrap === 'anywhere' ? 0 : unbreakable;
   const valueTrackMin = trackMin(tracks[1] ?? '1fr');
@@ -353,12 +368,13 @@ function reviewGridNeed(viewport, unbreakable) {
 }
 
 test('ein unzerbrechlicher Wert verbreitert die Pruefseite nicht (WCAG 1.4.10)', () => {
-  const need = reviewGridNeed(MOBILE_VIEWPORT, 500);
-  const available = cardContentWidth(MOBILE_VIEWPORT);
+  assert.ok(html.includes('class="rv-row"'), 'keine .rv-row im Markup - der Guard misst ins Leere');
+  const need = reviewRowNeed(MOBILE_VIEWPORT, 500);
+  const available = rowContentWidth(MOBILE_VIEWPORT, '.rv-row');
   assert.ok(need <= available,
-    `Das Review-Grid braucht mit einem 500px-Wert ${need.toFixed(0)}px von ${available.toFixed(0)}px `
+    `Eine Pruefzeile braucht mit einem 500px-Wert ${need.toFixed(0)}px von ${available.toFixed(0)}px `
     + 'verfuegbarer Breite. Wertspalte minmax(0, ...) plus overflow-wrap: anywhere '
-    + 'auf den Wertzellen halten lange URLs in der Karte.');
+    + 'auf den Wertzellen halten lange URLs in der Gruppe.');
 });
 
 test('Redirect-URIs in Hints brechen um, statt an der Kartenkante zu clippen', () => {
@@ -845,4 +861,380 @@ test('die Feldmarkierung faellt, sobald der Nutzer das Feld korrigiert', () => {
   const clean = fakeField({ 'aria-describedby': 'own-hint' });
   clearFieldInvalid({ target: clean });
   assert.equal(clean.getAttribute('aria-describedby'), 'own-hint', 'ein unmarkiertes Feld verliert seine Beschreibung');
+});
+
+// ── Typo, Layout, Gruppen und Pruefseite (Critique 2026-09-29) ─────────────────
+
+/** Quelltext einer Funktion aus dem Modul-Script (bis zur schliessenden Klammer in Spalte 0). */
+function fnSource(name) {
+  const m = html.match(new RegExp(`function ${name}\\([^)]*\\) \\{[\\s\\S]*?\\n\\}`));
+  assert.ok(m, `function ${name} nicht gefunden`);
+  return m[0];
+}
+
+/** Ein Objekt-/Array-Literal aus dem Modul-Script auswerten (`const NAME = ...;`). */
+function literal(name) {
+  const m = html.match(new RegExp(`const ${name} = ([\\s\\S]*?);\\n`));
+  assert.ok(m, `const ${name} nicht gefunden`);
+  return new Function(`return (${m[1]});`)();
+}
+
+/** Abschnitt eines Elements per div-/section-/dl-Klammerzaehlung ab `from`. */
+function elementRange(source, from) {
+  const tag = source.slice(from + 1).match(/^[a-z0-9]+/)[0];
+  let depth = 0;
+  const open = new RegExp(`<${tag}[\\s>]`, 'y');
+  const close = `</${tag}>`;
+  for (let k = from; k < source.length; k++) {
+    open.lastIndex = k;
+    if (open.test(source)) depth++;
+    else if (source.startsWith(close, k)) {
+      depth--;
+      if (depth === 0) return [from, k + close.length];
+    }
+  }
+  return [from, source.length];
+}
+
+/** Markup eines Schritts. */
+function stepSource(name) {
+  const from = html.indexOf(`<div class="step" id="step-${name}">`);
+  assert.ok(from !== -1, `step-${name} nicht gefunden`);
+  const [a, b] = elementRange(html, from);
+  return html.slice(a, b);
+}
+
+const resolveVar = (value) => {
+  const v = (value ?? '').trim().match(/^var\(\s*(--[\w-]+)/);
+  return v ? (ROOT_VARS.get(v[1]) ?? value).trim() : (value ?? '').trim();
+};
+
+/* Die Schritt-H2 stand auf 20px/700 - auf derselben Stufe wie die Wortmarke
+ * darueber, zwei gleich laute Titel und keiner fuehrte. Jetzt Title 1 der App
+ * (28px, bold, -0.015em, 1.21), die Wortmarke eine klare Stufe darunter, und
+ * Untertitel/Hinweise auf Subheadline/Footnote. Geprueft wird die Wirkung in px
+ * ueber den Fallback, nicht der Tokenname - ein var(), das auf die falsche
+ * Stufe zeigt, faellt so mit auf. */
+test('Typo-Hierarchie: die Schritt-H2 ist Title 1, die Wortmarke eine Stufe darunter', () => {
+  const base = m => m === null;
+  const h2 = sel => sel === '.card-head h2';
+  assert.equal(toPx(declared(h2, 'font-size', base)), 28, '.card-head h2 ist nicht Title 1 (28px)');
+  assert.equal(declared(h2, 'font-weight', base), '700');
+  assert.equal(resolveVar(declared(h2, 'letter-spacing', base)), '-0.015em');
+  assert.equal(resolveVar(declared(h2, 'line-height', base)), '1.21');
+
+  const word = sel => sel === '.brand__word';
+  const wordPx = toPx(declared(word, 'font-size', base));
+  assert.ok(wordPx <= 17, `die Wortmarke steht auf ${wordPx}px und konkurriert mit der H2`);
+  assert.ok(Number(declared(word, 'font-weight', base)) <= 600, 'die Wortmarke ist fetter als 600');
+
+  assert.equal(toPx(declared(sel => sel === '.card-head p', 'font-size', base)), 15, 'Untertitel ist nicht Subheadline (15px)');
+  assert.equal(toPx(declared(sel => sel === '.hint', 'font-size', base)), 13, 'Hinweis ist nicht Footnote (13px)');
+
+  // Das Gruppen-Label ist das Versal-Mikro-Label der App.
+  const label = sel => sel === '.group-label';
+  assert.equal(declared(label, 'text-transform', base), 'uppercase');
+  assert.equal(resolveVar(declared(label, 'letter-spacing', base)), '0.05em');
+  assert.equal(toPx(declared(label, 'font-size', base)), 12);
+});
+
+/* Desktop ab 1024px: zweispaltig, Inhalt oben verankert. `safe center` liess die
+ * Ueberschrift bei jedem Schrittwechsel springen (77px gemessen), und die
+ * 560px-Karte stand auf 1440px allein in der Mitte. */
+test('Layout: oben verankert, ab 1024px Schrittliste links und Inhaltsspalte rechts', () => {
+  const base = m => m === null;
+  const desktop = m => m !== null && /min-width:\s*1024px/.test(m);
+  assert.doesNotMatch(declared(sel => sel === 'body', 'justify-content', base) ?? '', /center/,
+    'body zentriert den Schritt vertikal - die Ueberschrift springt zwischen den Schritten');
+  assert.doesNotMatch(stylesheet(html), /safe\s+center/, 'safe center steht wieder im Stylesheet');
+
+  const shell = sel => sel === '.shell:not(.shell--solo)';
+  assert.equal(declared(shell, 'display', desktop), 'grid', 'ab 1024px ist die Buehne nicht zweispaltig');
+  const tracks = (declared(shell, 'grid-template-columns', desktop) || '').match(/minmax\([^)]*\)|\S+/g) || [];
+  assert.equal(tracks.length, 2, `erwartet zwei Spalten, gefunden: ${tracks.join(' ')}`);
+  const content = toPx((tracks[1].match(/,\s*([^)]+)\)/) || [])[1] ?? tracks[1]);
+  assert.ok(content >= 640 && content <= 680, `Inhaltsspalte ${content}px statt 640-680px`);
+  assert.equal(declared(sel => sel === '.shell:not(.shell--solo) .rail', 'position', desktop), 'sticky',
+    'die Schrittliste scrollt mit dem Inhalt weg');
+  assert.equal(declared(sel => sel === '.shell:not(.shell--solo) .steps-nav', 'display', desktop), 'block');
+  assert.equal(declared(sel => sel === '.steps-nav', 'display', base), 'none', 'die Liste steht auch unter 1024px');
+  // Der Zaehler bleibt als aria-describedby im Dokument, sichtbar traegt die Liste.
+  assert.equal(declared(sel => sel === '.shell:not(.shell--solo) .step-tag', 'position', desktop), 'absolute');
+  assert.notEqual(declared(sel => sel === '.shell:not(.shell--solo) .step-tag', 'display', desktop), 'none',
+    'display:none nimmt dem aria-describedby der H2 seinen Text');
+});
+
+/* Die Schrittliste zeigt genau die nummerierten Schritte beider Wege. Die
+ * Funktion wird AUSGEFUEHRT: erledigt heisst anklickbar, aktuell heisst
+ * aria-current="step", kommend heisst gesperrt, und ab dem Container-Start ist
+ * kein Weg zurueck mehr offen (die .env steht dann schon). */
+test('die Schrittliste folgt dem Weg: erledigt anklickbar, aktuell markiert, kommend gesperrt', () => {
+  const FLOWS = literal('FLOWS');
+  const UNNUMBERED = literal('UNNUMBERED');
+  const numbered = new Set([...FLOWS.simple, ...FLOWS.advanced].filter(s => !UNNUMBERED.has(s)));
+  const navItems = [...html.matchAll(/<li class="steps-nav__item" data-nav-step="([a-z]+)"[^>]*>(.*?)<\/li>/g)];
+  assert.deepEqual(new Set(navItems.map(m => m[1])), numbered, 'die Liste fuehrt andere Schritte als die Wege');
+  for (const m of navItems) {
+    assert.match(m[2], new RegExp(`<button type="button" class="steps-nav__link" data-goto="${m[1]}"`),
+      `Eintrag ${m[1]} ist kein Knopf mit data-goto`);
+  }
+  assert.match(html, /<nav class="steps-nav"[^>]*aria-label=[^>]*>\s*<ol/, 'die Liste ist kein <nav> mit <ol>');
+  assert.match(fnSource('showStep'), /renderStepNav\(\)/, 'showStep aktualisiert die Liste nicht');
+
+  const make = () => [...numbered].map(name => {
+    const button = {
+      disabled: true, attrs: {},
+      setAttribute(k, v) { this.attrs[k] = v; }, removeAttribute(k) { delete this.attrs[k]; },
+    };
+    const mark = { textContent: '' };
+    return {
+      name, button, mark, hidden: true, dataset: { navStep: name },
+      querySelector: sel => (sel === 'button' ? button : mark),
+    };
+  });
+  const run = (flow, currentStep) => {
+    const items = make();
+    const document = { querySelectorAll: () => items };
+    new Function('flow', 'currentStep', 'UNNUMBERED', 'document', `${fnSource('renderStepNav')}; renderStepNav();`)(
+      flow, currentStep, UNNUMBERED, document);
+    return Object.fromEntries(items.map(i => [i.name, i]));
+  };
+
+  const adv = FLOWS.advanced;
+  let r = run(adv, adv.indexOf('calendar'));
+  assert.equal(r.simple.hidden, true, 'der Einfach-Schritt steht in der Liste des erweiterten Wegs');
+  assert.equal(r.config.mark.textContent, '1');
+  assert.equal(r.admin.mark.textContent, String(adv.filter(s => !UNNUMBERED.has(s)).length));
+  for (const done of ['config', 'secrets', 'weather']) {
+    assert.equal(r[done].dataset.state, 'done');
+    assert.equal(r[done].button.disabled, false, `${done} ist erledigt und trotzdem nicht anklickbar`);
+  }
+  assert.equal(r.calendar.dataset.state, 'current');
+  assert.equal(r.calendar.button.attrs['aria-current'], 'step');
+  for (const next of ['email', 'storage', 'advanced', 'review', 'admin']) {
+    assert.equal(r[next].button.disabled, true, `${next} kommt erst noch und ist trotzdem anklickbar`);
+    assert.equal(r[next].button.attrs['aria-current'], undefined);
+  }
+
+  r = run(adv, adv.indexOf('docker'));
+  assert.equal(r.review.dataset.state, 'done');
+  assert.equal(r.review.button.disabled, true, 'nach dem Container-Start fuehrt die Liste noch zurueck vor die .env');
+
+  r = run(FLOWS.simple, FLOWS.simple.indexOf('simple'));
+  assert.equal(r.simple.dataset.state, 'current');
+  assert.equal(r.config.hidden, true, 'der erweiterte Weg steht in der Liste des Einfach-Wegs');
+  assert.equal(r.admin.hidden, false);
+});
+
+/* "Aendern" auf der Pruefseite fuehrt zum Schritt, "Weiter" von dort zurueck -
+ * OHNE dass ein Schritt dazwischen seine Pruefung verliert. Die Schritte haengen
+ * aneinander (Host -> Redirect-URIs in adv-next, Google-Zugang -> Drive-Pruefung
+ * in storage-next); ein direkter Sprung liesse diese Werte veraltet stehen.
+ * next() drueckt deshalb das "Weiter" jedes Schritts dazwischen. Ausgefuehrt
+ * gegen einen Nachbau von showStep und den Primaerknoepfen. */
+test('der Rueckweg zur Pruefseite prueft jeden Schritt dazwischen erneut', () => {
+  const FLOWS = literal('FLOWS');
+  const harness = new Function('flow', 'failAt', `
+    let currentStep = flow.indexOf('review');
+    let reviewReturn = null;
+    const entered = [];
+    const validated = [];
+    function showStep(n) {
+      currentStep = n;
+      entered.push(flow[n]);
+      if (flow[n] === 'review') reviewReturn = null;   // wie onEnterStep('review')
+    }
+    const $ = (id) => ({
+      querySelector: () => ({ click: () => {
+        const name = id.replace('step-', '');
+        validated.push(name);
+        if (name !== failAt) next();
+      } }),
+    });
+    ${fnSource('next')}
+    ${fnSource('jumpBack')}
+    return {
+      next, jumpBack,
+      get step() { return flow[currentStep]; },
+      get reviewReturn() { return reviewReturn; },
+      entered, validated,
+      setFail(v) { failAt = v; },
+    };
+  `);
+
+  const flow = FLOWS.advanced;
+  let h = harness(flow, null);
+  h.jumpBack('weather', 'email');
+  assert.equal(h.step, 'weather', 'Aendern landet nicht im ersten Schritt der Gruppe');
+  h.next();
+  assert.equal(h.step, 'calendar', 'innerhalb der Gruppe fuehrt Weiter zum naechsten Schritt der Gruppe');
+  h.next();
+  assert.equal(h.step, 'email');
+  h.next();
+  assert.equal(h.step, 'review', 'nach dem letzten Schritt der Gruppe fuehrt Weiter nicht zur Pruefseite');
+  assert.deepEqual(h.validated, ['storage', 'advanced'], 'die Schritte zwischen Gruppe und Pruefseite wurden nicht erneut geprueft');
+  assert.equal(h.reviewReturn, null);
+
+  // Scheitert eine Pruefung unterwegs, bleibt der Nutzer genau dort stehen.
+  h = harness(flow, 'storage');
+  h.jumpBack('config');
+  h.next();
+  assert.equal(h.step, 'storage', 'eine gescheiterte Pruefung wurde uebersprungen');
+  h.setFail(null);
+  h.next();
+  assert.equal(h.step, 'review', 'nach der Korrektur fuehrt Weiter nicht weiter zur Pruefseite');
+
+  // Vorwaerts springt niemand, und ausserhalb der Pruefseite gibt es keinen Rueckweg.
+  h = harness(flow, null);
+  h.jumpBack('admin');
+  assert.equal(h.step, 'review', 'jumpBack springt vorwaerts');
+  h.jumpBack('config');
+  h.next();
+  assert.equal(h.step, 'review', 'Aendern ueber die Liste fuehrt nach dem Schritt nicht zurueck');
+
+  // Die Verdrahtung: Liste und Aendern-Knoepfe laufen ueber jumpBack.
+  assert.match(html, /closest\('\[data-goto\]'\)[\s\S]{0,120}jumpBack\(goto\.dataset\.goto\)/);
+  assert.match(html, /closest\('\[data-edit\]'\)[\s\S]{0,120}jumpBack\(edit\.dataset\.edit, edit\.dataset\.editUntil/);
+});
+
+/* Die Pruefseite: nach Schritten gruppiert, jede Gruppe mit "Aendern", und KEINE
+ * nackte "-"-Zeile mehr. Vorher 20 ungegliederte Zeilen, 11 davon mit Strich
+ * (Critique 2026-09-29). renderReview wird mit leerem und mit vollem Zustand
+ * AUSGEFUEHRT: jede sichtbare Zeile traegt einen Wert, was fehlt, steht je
+ * Gruppe in EINER Zeile "Nicht eingerichtet". */
+test('die Pruefseite hat Gruppen mit Aendern-Link und keine Strich-Zeile', () => {
+  const FLOWS = literal('FLOWS');
+  const review = stepSource('review');
+  const reviewAt = FLOWS.advanced.indexOf('review');
+
+  const groups = [...review.matchAll(/<section class="rv-group"/g)];
+  assert.ok(groups.length >= 5, `nur ${groups.length} Gruppen auf der Pruefseite`);
+  for (const g of groups) {
+    const [a, b] = elementRange(review, g.index);
+    const section = review.slice(a, b);
+    const edit = section.match(/<button[^>]*class="group-edit"[^>]*>/);
+    assert.ok(edit, `Gruppe ohne Aendern-Knopf: ${section.slice(0, 80)}`);
+    const target = edit[0].match(/data-edit="([a-z]+)"/)?.[1];
+    const until = edit[0].match(/data-edit-until="([a-z]+)"/)?.[1] ?? target;
+    const ti = FLOWS.advanced.indexOf(target);
+    const ui = FLOWS.advanced.indexOf(until);
+    assert.ok(ti > 0 && ti < reviewAt, `Aendern zielt auf ${target}, keinen Schritt vor der Pruefseite`);
+    assert.ok(ui >= ti && ui < reviewAt, `data-edit-until=${until} liegt nicht zwischen Ziel und Pruefseite`);
+    assert.match(edit[0], /aria-labelledby="[^"]+ [^"]+"/, 'Aendern ist ohne Gruppennamen nicht unterscheidbar');
+    assert.match(section, /<dl class="inset-group">/, 'Gruppe ohne Inset-Traeger');
+  }
+
+  // Zellen aus dem Markup: id -> Beschriftung.
+  const cells = new Map();
+  for (const m of review.matchAll(/<dt data-i18n="([^"]+)">[^<]*<\/dt><dd id="([^"]+)"><\/dd>/g)) {
+    cells.set(m[2], { key: m[1], textContent: 'VORHER', parentElement: { hidden: false }, previousElementSibling: { textContent: m[1] } });
+  }
+  assert.ok(cells.size >= 20, `nur ${cells.size} Zellen gefunden - der Scanner greift nicht`);
+
+  const run = (overrides) => {
+    for (const c of cells.values()) { c.textContent = 'VORHER'; c.parentElement.hidden = false; }
+    const S = { ...literal('S'), ...overrides };
+    new Function('S', '$', 't', 'preservedKeys', 'deriveBaseUrl',
+      `${fnSource('fillReviewGroup')}; ${fnSource('renderReview')}; renderReview();`)(
+      S, id => cells.get(id), key => `T:${key}`, new Set(), () => 'http://localhost:3000');
+    return cells;
+  };
+
+  const check = (label) => {
+    for (const [id, c] of cells) {
+      if (c.parentElement.hidden) continue;
+      assert.ok(c.textContent.trim() !== '', `${label}: sichtbare Zeile ${id} ohne Wert`);
+      assert.doesNotMatch(c.textContent, /^\s*[-\u2013\u2014]\s*$/, `${label}: ${id} zeigt einen nackten Strich`);
+    }
+  };
+
+  // Frischer Zustand: nichts eingerichtet.
+  run({ host: 'localhost', port: '3000', tz: 'Europe/Berlin' });
+  check('leer');
+  const unset = cells.get('rv-integrations-unset');
+  assert.equal(unset.parentElement.hidden, false, 'nichts eingerichtet, aber keine Zeile "Nicht eingerichtet"');
+  assert.equal(unset.textContent, 'review.weather, review.google, review.apple, review.outlook, review.email',
+    'die Zeile "Nicht eingerichtet" nennt nicht alles, was fehlt');
+  for (const id of ['rv-weather', 'rv-google', 'rv-apple', 'rv-outlook', 'rv-email']) {
+    assert.equal(cells.get(id).parentElement.hidden, true, `${id} steht leer als eigene Zeile`);
+  }
+
+  // Voller Zustand: alles eingerichtet, keine "Nicht eingerichtet"-Zeile.
+  run({
+    host: 'nas.local', port: '3000', tz: 'Europe/Berlin', BASE_URL: 'https://yuvomi.example.com',
+    WEATHER_LAT: '52.5', WEATHER_LON: '13.4', GOOGLE_CLIENT_ID: 'id', APPLE_USERNAME: 'a@b.c',
+    MS_CLIENT_ID: 'ms', EMAIL_SMTP_HOST: 'smtp', EMAIL_FROM_ADDRESS: 'x@y.z',
+    WEBDAV_BACKUP_ENABLED: 'true', DOCUMENT_STORAGE_LOCAL_ENABLED: 'true',
+    DOCUMENT_STORAGE_WEBDAV_ENABLED: 'true', GOOGLE_DRIVE_REDIRECT_URI: 'https://x/cb', OIDC_ISSUER: 'https://idp',
+  });
+  check('voll');
+  for (const id of ['rv-integrations-unset', 'rv-storage-unset', 'rv-advanced-unset']) {
+    assert.equal(cells.get(id).parentElement.hidden, true, `${id} steht, obwohl alles eingerichtet ist`);
+  }
+});
+
+/* Die Akkordeon-Abzeichen standen fuer immer auf "Optional" - gcal-badge und
+ * Geschwister wurden nie beschrieben. Jetzt setzt EINE Funktion sie aus der
+ * data-setup-Regel ihrer Karte. Ausgefuehrt, nicht gesucht. */
+test('die Akkordeon-Abzeichen zeigen "Eingerichtet", sobald ihre Felder stehen', () => {
+  const cards = [...html.matchAll(/<div class="toggle-card"([^>]*)>/g)];
+  assert.ok(cards.length >= 9, `nur ${cards.length} Akkordeon-Karten`);
+  for (const c of cards) {
+    const setup = c[1].match(/data-setup="([^"]+)"/)?.[1];
+    assert.ok(setup, `Akkordeon ohne data-setup: ${c[0]}`);
+    for (const id of setup.split(/\s+/)) assert.match(html, new RegExp(`id="${id}"`), `data-setup nennt unbekanntes Feld ${id}`);
+  }
+  // Ein data-i18n am Abzeichen setzte es bei jedem Sprachwechsel auf "Optional" zurueck.
+  assert.doesNotMatch(html, /class="toggle-badge"[^>]*data-i18n=/, 'ein Abzeichen traegt data-i18n und verliert beim Sprachwechsel seinen Zustand');
+  assert.match(html, /document\.addEventListener\('input', refreshBadges\)/);
+  assert.match(html, /document\.addEventListener\('change', refreshBadges\)/);
+  assert.match(fnSource('localize'), /refreshBadges\(\)/, 'localize() uebersetzt die Abzeichen nicht');
+
+  const fields = {
+    'gcal-id': { type: 'text', value: '' }, 'gcal-secret': { type: 'password', value: '' },
+    'adv-backup-enable': { type: 'checkbox', checked: false },
+  };
+  const badge = () => ({ textContent: 'Optional', dataset: {} });
+  const mk = (setup) => { const b = badge(); return { b, card: { dataset: { setup }, querySelector: () => b } }; };
+  const gcal = mk('gcal-id gcal-secret');
+  const backup = mk('adv-backup-enable');
+  const refresh = new Function('document', '$', 't', `${fnSource('refreshBadges')}; return refreshBadges;`)(
+    { querySelectorAll: () => [gcal.card, backup.card] }, id => fields[id], key => key);
+
+  refresh();
+  assert.equal(gcal.b.textContent, 'common.optional');
+  assert.equal(backup.b.textContent, 'common.optional');
+  fields['gcal-id'].value = 'abc';
+  refresh();
+  assert.equal(gcal.b.textContent, 'common.optional', 'halb ausgefuellt ist noch nicht eingerichtet');
+  fields['gcal-secret'].value = 'geheim';
+  fields['adv-backup-enable'].checked = true;
+  refresh();
+  assert.equal(gcal.b.textContent, 'common.setUp');
+  assert.equal(gcal.b.dataset.state, 'set');
+  assert.equal(backup.b.textContent, 'common.setUp', 'ein angehakter Schalter richtet seine Karte nicht ein');
+});
+
+/* Einstellungen als Inset-Gruppen wie in der App: kein Feld und kein Akkordeon
+ * steht mehr lose auf der Buehne. Bracket-gezaehlt, nicht per Regex - ein
+ * vergessener Wrapper faellt so auch in der Mitte eines Schritts auf. */
+test('jedes Feld und jedes Akkordeon steht in einer Inset-Gruppe', () => {
+  const loose = [];
+  for (const name of ['config', 'secrets', 'weather', 'calendar', 'email', 'storage', 'advanced', 'admin']) {
+    const seg = stepSource(name);
+    const groups = [...seg.matchAll(/<(?:div|dl) class="inset-group">/g)].map(m => elementRange(seg, m.index));
+    assert.ok(groups.length > 0, `step-${name} hat keine Inset-Gruppe`);
+    const inside = i => groups.some(([a, b]) => i > a && i < b);
+    for (const m of seg.matchAll(/<div class="(field|toggle-card)"/g)) {
+      if (!inside(m.index)) loose.push(`step-${name}: ${m[1]} bei Offset ${m.index}`);
+    }
+  }
+  assert.deepEqual(loose, [], `lose auf der Buehne statt in einer Gruppe: ${loose.join(', ')}`);
+
+  // Die Gruppe selbst ist der weisse Traeger der App: Surface, 16px, Schatten.
+  const base = m => m === null;
+  const g = sel => sel === '.inset-group';
+  assert.equal(declared(g, 'background', base), 'var(--color-surface)');
+  assert.equal(declared(g, 'border-radius', base), 'var(--radius-lg)');
+  assert.equal(declared(g, 'box-shadow', base), 'var(--shadow-sm)');
 });

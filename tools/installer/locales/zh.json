@@ -2,6 +2,10 @@
   "title": "Yuvomi 设置",
   "common": {
     "continue": "继续",
+    "setUp": "已设置",
+    "stepsNav": "设置步骤",
+    "stepDone": "（已完成）",
+    "groupServer": "服务器",
     "back": "返回",
     "generate": "生成",
     "generating": "生成中…",
@@ -83,6 +87,9 @@
   },
   "review": {
     "title": "检查",
+    "edit": "更改",
+    "notSetUp": "未设置",
+    "groupIntegrations": "集成",
     "subtitle": "在写入 .env 并启动容器之前检查您的设置。",
     "host": "主机",
     "port": "端口",
@@ -95,8 +102,6 @@
     "save": "保存并启动 Docker",
     "saving": "正在保存 …",
     "errSave": "无法保存 .env。",
-    "weatherEnabled": "已启用（{{city}}）",
-    "configured": "已配置",
     "finalNote": "这会写入你的 .env（已有文件会被备份）并启动容器。",
     "confirm": "再次点击以确认",
     "access": "访问",
@@ -106,8 +111,8 @@
     "oidc": "单点登录",
     "backups": "备份",
     "webdavBackup": "异地备份",
-    "on": "已启用",
-    "off": "已禁用",
+    "on": "开启",
+    "off": "关闭",
     "documentGoogleDrive": "Google Drive 文档",
     "sessionSecret": "会话密钥",
     "dbKey": "数据库密钥",
@@ -120,8 +125,7 @@
     "privateNetworkWaste": "垃圾收集",
     "privateNetworkWebdav": "WebDAV 文档",
     "baseUrl": "公开地址",
-    "outlook": "Outlook 日历",
-    "notEnabled": "未启用"
+    "outlook": "Outlook 日历"
   },
   "docker": {
     "title": "正在启动 Yuvomi",
@@ -209,7 +213,6 @@
     "documentLocalEnable": "将新文档存储到本地文件夹",
     "documentLocalPathLabel": "文件夹路径",
     "documentLocalPathHint": "容器内的路径。留空则使用 /documents。",
-    "sectionIntegrations": "单点登录",
     "errSchedule": "cron 计划无效（需要五个以空格分隔的字段，例如 0 2 * * *）。",
     "errKeep": "要保留的备份数量必须为正数。",
     "webdavBackup": "异地备份（WebDAV）",
@@ -260,8 +263,8 @@
     "authPasswordLoginHint": "关闭后 SSO 将成为唯一的入口：登录表单和密码重置都会消失。若提供方无法访问，返回的办法是修改 .env 文件并重启。"
   },
   "welcome": {
-    "title": "欢迎使用 Yuvomi",
-    "subtitle": "让我们启动你的私人家庭计划工具。选择你想要的设置方式。",
+    "title": "你想如何设置 Yuvomi？",
+    "subtitle": "完成后，你的私人家庭计划工具将在你自己的服务器上运行。",
     "simpleTitle": "简易设置",
     "simpleBadge": "推荐",
     "simpleDesc": "技术细节由我们为你处理。非常适合在家中运行 Yuvomi。",
@@ -287,6 +290,7 @@
   },
   "email": {
     "title": "电子邮件与密码重置",
+    "groupSender": "发件人",
     "subtitle": "让家庭成员通过电子邮件重置忘记的密码。可选——如无需要可跳过。",
     "enable": "启用邮件发送",
     "hint": "使用你自己的 SMTP 服务器（邮箱提供商、自托管或事务性服务）。",

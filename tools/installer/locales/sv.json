@@ -2,6 +2,10 @@
   "title": "Yuvomi-installation",
   "common": {
     "continue": "Fortsätt",
+    "setUp": "Konfigurerat",
+    "stepsNav": "Installationssteg",
+    "stepDone": "(klart)",
+    "groupServer": "Server",
     "back": "Tillbaka",
     "generate": "Generera",
     "generating": "Genererar…",
@@ -83,6 +87,9 @@
   },
   "review": {
     "title": "Granskning",
+    "edit": "Ändra",
+    "notSetUp": "Inte konfigurerat",
+    "groupIntegrations": "Integrationer",
     "subtitle": "Kontrollera dina inställningar innan .env skrivs och containern startas.",
     "host": "Värd",
     "port": "Port",
@@ -95,8 +102,6 @@
     "save": "Spara och starta Docker",
     "saving": "Sparar …",
     "errSave": "Det gick inte att spara .env.",
-    "weatherEnabled": "aktiverat ({{city}})",
-    "configured": "konfigurerat",
     "finalNote": "Detta skriver din .env (en befintlig säkerhetskopieras) och startar containern.",
     "confirm": "Klicka igen för att bekräfta",
     "access": "Åtkomst",
@@ -106,8 +111,8 @@
     "oidc": "Enkel inloggning",
     "backups": "Säkerhetskopior",
     "webdavBackup": "Externa säkerhetskopior",
-    "on": "aktiverad",
-    "off": "inaktiverad",
+    "on": "På",
+    "off": "Av",
     "documentGoogleDrive": "Google Drive-dokument",
     "sessionSecret": "Sessionsnyckel",
     "dbKey": "Databasnyckel",
@@ -120,8 +125,7 @@
     "privateNetworkWaste": "Avfallshämtning",
     "privateNetworkWebdav": "WebDAV-dokument",
     "baseUrl": "Publik adress",
-    "outlook": "Outlook-kalender",
-    "notEnabled": "inte aktiverat"
+    "outlook": "Outlook-kalender"
   },
   "docker": {
     "title": "Startar Yuvomi",
@@ -209,7 +213,6 @@
     "documentLocalEnable": "Spara nya dokument i en lokal mapp",
     "documentLocalPathLabel": "Mappsökväg",
     "documentLocalPathHint": "Sökväg i containern. Lämna tomt för /documents.",
-    "sectionIntegrations": "Enkel inloggning",
     "errSchedule": "Ogiltigt cron-schema (fem mellanslagsseparerade fält förväntas, t.ex. 0 2 * * *).",
     "errKeep": "Antal säkerhetskopior att behålla måste vara ett positivt tal.",
     "webdavBackup": "Externa säkerhetskopior (WebDAV)",
@@ -260,8 +263,8 @@
     "authPasswordLoginHint": "Om du stänger av detta blir SSO enda vägen in: inloggningsformuläret och lösenordsåterställningen försvinner. Om leverantören blir onåbar går vägen tillbaka via .env-filen och en omstart."
   },
   "welcome": {
-    "title": "Välkommen till Yuvomi",
-    "subtitle": "Nu sätter vi igång din privata familjeplanerare. Välj hur du vill konfigurera den.",
+    "title": "Hur vill du konfigurera Yuvomi?",
+    "subtitle": "Sedan körs din privata familjeplanerare på din egen server.",
     "simpleTitle": "Enkel installation",
     "simpleBadge": "Rekommenderas",
     "simpleDesc": "Vi sköter de tekniska detaljerna åt dig. Perfekt för att köra Yuvomi hemma.",
@@ -287,6 +290,7 @@
   },
   "email": {
     "title": "E-post & lösenordsåterställning",
+    "groupSender": "Avsändare",
     "subtitle": "Låt familjemedlemmar återställa ett glömt lösenord via e-post. Valfritt — hoppa över om du inte behöver det.",
     "enable": "Aktivera e-postutskick",
     "hint": "Använder din egen SMTP-server (e-postleverantör, självhostad eller en transaktionstjänst).",

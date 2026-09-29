@@ -2,6 +2,10 @@
   "title": "Siapkan Yuvomi",
   "common": {
     "continue": "Lanjut",
+    "setUp": "Sudah disiapkan",
+    "stepsNav": "Langkah penyiapan",
+    "stepDone": "(selesai)",
+    "groupServer": "Server",
     "back": "Kembali",
     "generate": "Buat",
     "generating": "Membuat…",
@@ -113,7 +117,6 @@
     "documentLocalEnable": "Simpan dokumen baru di folder lokal",
     "documentLocalPathLabel": "Jalur folder",
     "documentLocalPathHint": "Jalur di dalam kontainer. Biarkan kosong untuk /documents.",
-    "sectionIntegrations": "Single sign-on",
     "errSchedule": "Jadwal cron tidak valid (diharapkan lima bidang dipisah spasi, mis. 0 2 * * *).",
     "errKeep": "Jumlah cadangan yang disimpan harus berupa angka positif.",
     "webdavBackup": "Cadangan eksternal (WebDAV)",
@@ -165,6 +168,9 @@
   },
   "review": {
     "title": "Tinjauan",
+    "edit": "Ubah",
+    "notSetUp": "Belum disiapkan",
+    "groupIntegrations": "Integrasi",
     "subtitle": "Periksa pengaturan Anda sebelum .env ditulis dan kontainer dimulai.",
     "host": "Host",
     "port": "Port",
@@ -177,8 +183,6 @@
     "save": "Simpan & mulai Docker",
     "saving": "Menyimpan …",
     "errSave": "Gagal menyimpan .env.",
-    "weatherEnabled": "diaktifkan ({{city}})",
-    "configured": "dikonfigurasi",
     "finalNote": "Ini menulis .env Anda (yang sudah ada dicadangkan) dan menjalankan kontainer.",
     "confirm": "Klik lagi untuk mengonfirmasi",
     "access": "Akses",
@@ -188,8 +192,8 @@
     "oidc": "Single sign-on",
     "backups": "Pencadangan",
     "webdavBackup": "Cadangan eksternal",
-    "on": "aktif",
-    "off": "nonaktif",
+    "on": "Aktif",
+    "off": "Nonaktif",
     "documentGoogleDrive": "Dokumen Google Drive",
     "sessionSecret": "Kunci sesi",
     "dbKey": "Kunci basis data",
@@ -202,8 +206,7 @@
     "privateNetworkWaste": "Pengumpulan sampah",
     "privateNetworkWebdav": "Dokumen WebDAV",
     "baseUrl": "Alamat publik",
-    "outlook": "Kalender Outlook",
-    "notEnabled": "tidak diaktifkan"
+    "outlook": "Kalender Outlook"
   },
   "docker": {
     "title": "Yuvomi sedang dimulai",
@@ -260,8 +263,8 @@
     "subtitleExisting": "Yuvomi sedang berjalan. Instalasi ini sudah punya akun administrator - masuk dengan kredensialmu yang ada."
   },
   "welcome": {
-    "title": "Selamat datang di Yuvomi",
-    "subtitle": "Mari jalankan perencana keluarga pribadi Anda. Pilih cara menyiapkannya.",
+    "title": "Bagaimana Anda ingin menyiapkan Yuvomi?",
+    "subtitle": "Setelah itu, perencana keluarga pribadi Anda berjalan di server Anda sendiri.",
     "simpleTitle": "Penyiapan sederhana",
     "simpleBadge": "Disarankan",
     "simpleDesc": "Kami mengurus detail teknis untuk Anda. Ideal untuk menjalankan Yuvomi di rumah.",
@@ -287,6 +290,7 @@
   },
   "email": {
     "title": "Email & atur ulang kata sandi",
+    "groupSender": "Pengirim",
     "subtitle": "Izinkan anggota keluarga mengatur ulang kata sandi yang terlupa melalui email. Opsional — lewati jika tidak perlu.",
     "enable": "Aktifkan pengiriman email",
     "hint": "Menggunakan server SMTP Anda sendiri (penyedia email, self-hosted, atau layanan transaksional).",

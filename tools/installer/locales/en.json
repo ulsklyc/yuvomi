@@ -2,6 +2,10 @@
   "title": "Yuvomi Setup",
   "common": {
     "continue": "Continue",
+    "setUp": "Set up",
+    "stepsNav": "Setup steps",
+    "stepDone": "(done)",
+    "groupServer": "Server",
     "back": "Back",
     "generate": "Generate",
     "generating": "Generating…",
@@ -83,6 +87,9 @@
   },
   "review": {
     "title": "Review",
+    "edit": "Change",
+    "notSetUp": "Not set up",
+    "groupIntegrations": "Integrations",
     "subtitle": "Check your settings before writing .env and starting the container.",
     "host": "Host",
     "port": "Port",
@@ -95,8 +102,6 @@
     "save": "Save & Start Docker",
     "saving": "Saving …",
     "errSave": "Failed to save .env.",
-    "weatherEnabled": "enabled ({{city}})",
-    "configured": "configured",
     "finalNote": "This writes your .env (an existing one is backed up) and starts the container.",
     "confirm": "Click again to confirm",
     "access": "Access",
@@ -106,8 +111,8 @@
     "oidc": "Single sign-on",
     "backups": "Backups",
     "webdavBackup": "Off-site backups",
-    "on": "enabled",
-    "off": "disabled",
+    "on": "On",
+    "off": "Off",
     "documentGoogleDrive": "Google Drive documents",
     "sessionSecret": "Session Secret",
     "dbKey": "Database Encryption Key",
@@ -120,8 +125,7 @@
     "privateNetworkWaste": "Waste collection",
     "privateNetworkWebdav": "WebDAV documents",
     "baseUrl": "Public address",
-    "outlook": "Outlook Calendar",
-    "notEnabled": "not enabled"
+    "outlook": "Outlook Calendar"
   },
   "docker": {
     "title": "Starting Yuvomi",
@@ -209,7 +213,6 @@
     "documentLocalEnable": "Store new documents in a local folder",
     "documentLocalPathLabel": "Folder path",
     "documentLocalPathHint": "Path inside the container. Leave empty to use /documents.",
-    "sectionIntegrations": "Single sign-on",
     "errSchedule": "Invalid cron schedule (expected five space-separated fields, e.g. 0 2 * * *).",
     "errKeep": "Backups to keep must be a positive number.",
     "webdavBackup": "Off-site Backups (WebDAV)",
@@ -260,8 +263,8 @@
     "authPasswordLoginHint": "Turning this off makes SSO the only way in: the login form and password reset disappear. It takes effect once at least one account is linked to your provider, so a fresh install can still create its first admin. If your provider becomes unreachable, the way back is editing the .env file and restarting."
   },
   "welcome": {
-    "title": "Welcome to Yuvomi",
-    "subtitle": "Let's get your private family planner running. Choose how you'd like to set it up.",
+    "title": "How would you like to set up Yuvomi?",
+    "subtitle": "Afterwards, your private family planner runs on your own server.",
     "simpleTitle": "Simple setup",
     "simpleBadge": "Recommended",
     "simpleDesc": "We handle the technical details for you. Perfect for running Yuvomi at home.",
@@ -287,6 +290,7 @@
   },
   "email": {
     "title": "Email & Password Reset",
+    "groupSender": "Sender",
     "subtitle": "Let family members reset a forgotten password by email. Optional - skip if you don't need it.",
     "enable": "Enable email sending",
     "hint": "Uses your own SMTP server (mailbox provider, self-hosted, or a transactional service).",

@@ -2,6 +2,10 @@
   "title": "Yuvomi einrichten",
   "common": {
     "continue": "Weiter",
+    "setUp": "Eingerichtet",
+    "stepsNav": "Einrichtungsschritte",
+    "stepDone": "(erledigt)",
+    "groupServer": "Server",
     "back": "Zurück",
     "generate": "Generieren",
     "generating": "Wird generiert…",
@@ -113,7 +117,6 @@
     "documentLocalEnable": "Neue Dokumente in einem lokalen Ordner speichern",
     "documentLocalPathLabel": "Ordnerpfad",
     "documentLocalPathHint": "Pfad im Container. Leer lassen für /documents.",
-    "sectionIntegrations": "Single Sign-On",
     "errSchedule": "Ungültiger Cron-Zeitplan (fünf durch Leerzeichen getrennte Felder erwartet, z. B. 0 2 * * *).",
     "errKeep": "Aufzubewahrende Backups muss eine positive Zahl sein.",
     "webdavBackup": "Externe Backups (WebDAV)",
@@ -165,6 +168,9 @@
   },
   "review": {
     "title": "Überprüfung",
+    "edit": "Ändern",
+    "notSetUp": "Nicht eingerichtet",
+    "groupIntegrations": "Integrationen",
     "subtitle": "Prüfe deine Einstellungen, bevor .env geschrieben und der Container gestartet wird.",
     "host": "Host",
     "port": "Port",
@@ -177,8 +183,6 @@
     "save": "Speichern & Docker starten",
     "saving": "Wird gespeichert …",
     "errSave": "Speichern der .env fehlgeschlagen.",
-    "weatherEnabled": "aktiviert ({{city}})",
-    "configured": "konfiguriert",
     "finalNote": "Dies schreibt deine .env (eine bestehende wird gesichert) und startet den Container.",
     "confirm": "Zum Bestätigen erneut klicken",
     "access": "Zugriff",
@@ -188,8 +192,8 @@
     "oidc": "Single Sign-On",
     "backups": "Backups",
     "webdavBackup": "Externe Backups",
-    "on": "aktiviert",
-    "off": "deaktiviert",
+    "on": "An",
+    "off": "Aus",
     "documentGoogleDrive": "Google-Drive-Dokumente",
     "sessionSecret": "Session-Secret",
     "dbKey": "Datenbank-Verschlüsselungsschlüssel",
@@ -202,8 +206,7 @@
     "privateNetworkWaste": "Entsorgung",
     "privateNetworkWebdav": "WebDAV-Ziel",
     "baseUrl": "Öffentliche Adresse",
-    "outlook": "Outlook-Kalender",
-    "notEnabled": "nicht freigegeben"
+    "outlook": "Outlook-Kalender"
   },
   "docker": {
     "title": "Yuvomi wird gestartet",
@@ -260,8 +263,8 @@
     "subtitleExisting": "Yuvomi läuft. Diese Installation hat bereits ein Administratorkonto - melde dich mit deinen bestehenden Zugangsdaten an."
   },
   "welcome": {
-    "title": "Willkommen bei Yuvomi",
-    "subtitle": "Bring deinen privaten Familienplaner zum Laufen. Wähle, wie du ihn einrichten möchtest.",
+    "title": "Wie möchtest du Yuvomi einrichten?",
+    "subtitle": "Danach läuft dein privater Familienplaner auf deinem eigenen Server.",
     "simpleTitle": "Einfache Einrichtung",
     "simpleBadge": "Empfohlen",
     "simpleDesc": "Wir übernehmen die technischen Details für dich. Ideal, um Yuvomi zu Hause zu betreiben.",
@@ -287,6 +290,7 @@
   },
   "email": {
     "title": "E-Mail & Passwort-Reset",
+    "groupSender": "Absender",
     "subtitle": "Ermögliche Familienmitgliedern, ein vergessenes Passwort per E-Mail zurückzusetzen. Optional - überspringen, falls nicht benötigt.",
     "enable": "E-Mail-Versand aktivieren",
     "hint": "Nutzt deinen eigenen SMTP-Server (Mailanbieter, selbst gehostet oder ein Transaktions-Dienst).",

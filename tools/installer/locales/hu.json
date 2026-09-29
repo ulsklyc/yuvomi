@@ -2,6 +2,10 @@
   "title": "Yuvomi Beállítási varázsló",
   "common": {
     "continue": "Folytatás",
+    "setUp": "Beállítva",
+    "stepsNav": "Beállítási lépések",
+    "stepDone": "(kész)",
+    "groupServer": "Szerver",
     "back": "Vissza",
     "generate": "Generálás",
     "generating": "Generálás…",
@@ -83,6 +87,9 @@
   },
   "review": {
     "title": "Áttekintés",
+    "edit": "Módosítás",
+    "notSetUp": "Nincs beállítva",
+    "groupIntegrations": "Integrációk",
     "subtitle": "Ellenőrizze a beállításokat a .env fájl írása és a konténer indítása előtt.",
     "host": "Host",
     "port": "Port",
@@ -95,8 +102,6 @@
     "save": "Mentés és Docker indítása",
     "saving": "Mentés …",
     "errSave": "Nem sikerült menteni a .env fájlt.",
-    "weatherEnabled": "engedélyezve ({{city}})",
-    "configured": "beállítva",
     "finalNote": "Ez kiírja a .env fájlt (a meglévőről biztonsági másolat készül), és elindítja a konténert.",
     "confirm": "Kattints újra a megerősítéshez",
     "access": "Hozzáférés",
@@ -106,8 +111,8 @@
     "oidc": "Egyszeri bejelentkezés",
     "backups": "Biztonsági mentések",
     "webdavBackup": "Külső mentések",
-    "on": "bekapcsolva",
-    "off": "kikapcsolva",
+    "on": "Be",
+    "off": "Ki",
     "documentGoogleDrive": "Google Drive-dokumentumok",
     "sessionSecret": "Munkamenetkulcs",
     "dbKey": "Adatbáziskulcs",
@@ -120,8 +125,7 @@
     "privateNetworkWaste": "Hulladékgyűjtés",
     "privateNetworkWebdav": "WebDAV-dokumentumok",
     "baseUrl": "Nyilvános cím",
-    "outlook": "Outlook naptár",
-    "notEnabled": "nincs engedélyezve"
+    "outlook": "Outlook naptár"
   },
   "docker": {
     "title": "Yuvomi indítása",
@@ -209,7 +213,6 @@
     "documentLocalEnable": "Új dokumentumok mentése helyi mappába",
     "documentLocalPathLabel": "Mappa elérési útja",
     "documentLocalPathHint": "Elérési út a konténerben. Hagyja üresen a /documents használatához.",
-    "sectionIntegrations": "Egyszeri bejelentkezés",
     "errSchedule": "Érvénytelen cron-ütemezés (öt, szóközzel elválasztott mező szükséges, pl. 0 2 * * *).",
     "errKeep": "A megőrzendő mentések számának pozitív számnak kell lennie.",
     "webdavBackup": "Külső biztonsági mentések (WebDAV)",
@@ -260,8 +263,8 @@
     "authPasswordLoginHint": "Kikapcsolásával az SSO lesz az egyetlen út befelé: a bejelentkezési űrlap és a jelszó-visszaállítás eltűnik. Ha a szolgáltató elérhetetlenné válik, a visszaút a .env fájl szerkesztése és egy újraindítás."
   },
   "welcome": {
-    "title": "Üdvözöl a Yuvomi",
-    "subtitle": "Indítsuk el a privát családi tervezőt. Válaszd ki, hogyan szeretnéd beállítani.",
+    "title": "Hogyan szeretnéd beállítani a Yuvomi-t?",
+    "subtitle": "Ezután a privát családi tervező a saját szervereden fut.",
     "simpleTitle": "Egyszerű telepítés",
     "simpleBadge": "Ajánlott",
     "simpleDesc": "A technikai részleteket elintézzük helyetted. Ideális a Yuvomi otthoni használatához.",
@@ -287,6 +290,7 @@
   },
   "email": {
     "title": "E-mail és jelszó-visszaállítás",
+    "groupSender": "Feladó",
     "subtitle": "Tedd lehetővé, hogy a családtagok e-mailben állítsák vissza elfelejtett jelszavukat. Nem kötelező — hagyd ki, ha nincs rá szükség.",
     "enable": "E-mail-küldés bekapcsolása",
     "hint": "A saját SMTP-kiszolgálódat használja (levelezőszolgáltató, önállóan üzemeltetett vagy tranzakciós szolgáltatás).",

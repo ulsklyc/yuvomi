@@ -33,6 +33,10 @@
       --color-border-control: var(--neutral-500);
       --color-text-primary: #1D1B17;
       --color-text-secondary: #63615B;
+      --color-text-tertiary: #6B675F;
+      /* Haarlinie zwischen den Zeilen einer Inset-Gruppe (Kasten-in-Kasten-
+         Regel der App): leiser als --color-border, das Karten abgrenzt. */
+      --color-border-subtle: #EDEAE3;
       /* tokens.css leitet dieses Token aus --color-text-tertiary ab; hier steht
          dessen Wert direkt, weil der Fallback keine zweite Ebene braucht. */
       --color-text-placeholder: #6B675F;
@@ -66,6 +70,14 @@
       --text-lg:   1.125rem;
       --text-xl:   1.25rem;
       --text-2xl:  1.375rem;
+      --text-3xl:  1.75rem;
+      /* Rollen der Apple-Skala, die der Installer seit dem Anschluss an die
+         App fuehrt: Subheadline fuer Untertitel, Footnote fuer Hinweise. */
+      --type-secondary: 0.9375rem;
+      --type-caption:   0.8125rem;
+      --line-height-tight: 1.21;
+      --tracking-tight: -0.015em;
+      --tracking-label: 0.05em;
       --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.04);
       --shadow-md: 0 2px 10px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
       --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
@@ -79,7 +91,8 @@
            Neutralen-Rampe, tokens.css setzt es im Dark-Mode eigens. */
         --color-bg: #191816; --color-surface: #2B2825; --color-surface-2: #0F0E0D;
         --color-border: #47423B; --color-text-primary: #F5F3ED; --color-text-secondary: #B4AEA5;
-        --color-text-placeholder: #A9A39A;
+        --color-text-placeholder: #A9A39A; --color-text-tertiary: #A9A39A;
+        --color-border-subtle: #3E3933;
         --color-accent: #A78BFA; --color-accent-hover: #BCA6FC; --color-ink-on-vivid: #0A0A0C;
         --neutral-950: #FBFAF7; --neutral-500: #948E85;
         --color-success: #30D158; --color-warning: #FF9F0A; --color-danger: #FF6961;
@@ -100,8 +113,7 @@
     [hidden] { display: none !important; }
     body {
       font-family: var(--font-sans); color: var(--color-text-primary);
-      min-height: 100dvh; display: flex; flex-direction: column;
-      align-items: center; padding: 48px 16px 80px;
+      min-height: 100dvh; padding: 48px 16px 80px;
       /* HIER STAND EIN AKZENT-HAUCH am oberen Rand - ein radialer Verlauf, der
          bis v2.0.0 wortgleich auf der Login-Seite der App stand. Dort ist er mit
          dem HIG-Redesign gefallen, und der Grund gilt hier genauso: die Marke
@@ -113,13 +125,21 @@
          als „kahl" wieder gefüllt wird: sie ist absichtlich der Seitengrund. */
       background: var(--color-bg);
       position: relative;   /* Bezug fuer .lang-switch */
-      /* Die Karte hing oben und liess rund 40 % der Höhe leer. `safe` verhindert
-         den klassischen Zentrier-Bug: ohne das Schlüsselwort schneidet ein
-         überhoher Schritt (Advanced sind 4 Bildschirme) oben unscrollbar ab.
-         Browser ohne `safe`-Unterstützung verwerfen die Zeile und bleiben beim
-         bisherigen Verhalten. */
-      justify-content: safe center;
+      /* Kein vertikales Zentrieren mehr. `justify-content: safe center` stellte
+         jeden Schritt in die Mitte seiner eigenen Hoehe, und damit sprang die
+         Ueberschrift bei jedem Wechsel an eine andere Stelle (gemessen 77px
+         zwischen zwei Schritten). Oben verankert steht sie immer am selben Ort -
+         wie der Kopf jeder Seite der App. */
     }
+
+    /* Die Buehne: Marke plus Schrittliste links, Inhalt rechts ab 1024px (siehe
+       Desktop-Block unten); darunter eine Spalte. Die Inhaltsspalte ist 680px
+       breit, das Lesemass der App fuer Formulare und Listen. */
+    .shell { max-width: 680px; margin-inline: auto; }
+    .rail { min-width: 0; }
+    /* Die Schrittliste traegt den Fortschritt erst ab 1024px. Darunter reichen
+       Zaehler und Balken, eine zweite Liste stuende vor dem Inhalt. */
+    .steps-nav { display: none; }
 
     /* Marken-Anker über der Karte: Zeichen plus Wortmarke, dasselbe Motiv wie
        .login-hero__mark in der App. Der Wizard trug bisher kein Yuvomi-Zeichen. */
@@ -135,14 +155,17 @@
       box-shadow: var(--shadow-md), inset 0 1px 0 color-mix(in srgb, var(--color-ink-on-vivid) 22%, transparent);
     }
     .brand__mark svg { width: 55%; height: 55%; }
+    /* Absender, nicht Ueberschrift: die Wortmarke stand mit 20px/700 gleich laut
+       wie die Schritt-H2 darunter, und das Auge hatte zwei Titel zur Wahl. Jetzt
+       spricht sie in Headline-Staerke, der Titel des Schritts fuehrt. */
     .brand__word {
-      font-size: var(--text-xl); font-weight: 700;
+      font-size: var(--text-base); font-weight: 600;
       /* Label-Farbe, nicht Akzent. auth.css:77-81 haelt fest, dass DESIGN.md
          einen Titel in Akzentfarbe ausdruecklich verbietet, und hat die
          Anmeldeseite genau deshalb zurueckgesetzt. Der Installer ist die ERSTE
          Begegnung mit dem Produkt und trug als einziges Yuvomi-Artefakt noch
          die abgeloeste Fassung. Die Marke traegt das Tile darueber. */
-      letter-spacing: -.02em; color: var(--color-text-primary);
+      letter-spacing: -.01em; color: var(--color-text-primary);
     }
     .progress-track { position: fixed; top: 0; left: 0; right: 0; height: 3px; background: var(--color-border); z-index: 100; }
     /* scaleX statt width: kein Layout-Reflow, flüssiger Fortschrittsbalken. */
@@ -226,8 +249,8 @@
     .mode-card:disabled .mode-card__meta svg { stroke: var(--color-text-secondary); }
 
     /* Simple-Bereitschaftsliste: „alles erledigt"-Zusammenfassung. */
-    .ready-list { display: flex; flex-direction: column; gap: 12px; margin: 4px 0 20px; }
-    .ready-item { display: flex; align-items: flex-start; gap: 11px; font-size: var(--text-sm); line-height: 1.45; }
+    .ready-list { margin: 0 0 20px; }
+    .ready-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; font-size: var(--text-sm); line-height: 1.45; }
     .ready-item svg { width: 20px; height: 20px; flex-shrink: 0; stroke: var(--color-success); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; margin-top: 1px; }
     .ready-item b { font-weight: 600; }
     .ready-item span { color: var(--color-text-secondary); }
@@ -236,21 +259,29 @@
       font-size: var(--text-sm); font-weight: 600; color: var(--color-accent); cursor: pointer; text-decoration: underline;
     }
     .link-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: var(--radius-xs); }
-    .card {
-      /* Kein 1px-Rahmen PLUS 28px-Schatten: die Karte der App traegt --shadow-sm
-         und keine Kante (layout.css:3260). Die Kombination aus feiner Linie und
-         weitem Schatten ist genau das Muster, das der Detektor als
-         gpt-thin-border-wide-shadow meldet - hier zu Recht. */
-      background: var(--color-surface);
-      border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
-      width: 100%; max-width: 560px;
-    }
+    /* Die Karte ist keine Flaeche mehr, sondern die Inhaltsspalte. Solange sie
+       weiss war, haetten die Inset-Gruppen der App (weisse Traeger auf dem
+       Grouped-Grund) als Kasten im Kasten gestanden - genau das, was die
+       Kasten-in-Kasten-Regel in DESIGN.md verbietet. Titel und Untertitel stehen
+       jetzt auf der Buehne, die Fragen in weissen Gruppen darunter, wie auf
+       jedem Einstellungsblatt der App. */
+    .card { width: 100%; max-width: 680px; }
     .step { display: none; animation: up .25s ease; }
     .step.active { display: block; }
     @keyframes up { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
-    .card-head { padding: 28px 32px 22px; border-bottom: 1px solid var(--color-border); }
-    .step-tag { font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--color-accent); margin-bottom: 8px; }
-    .card-head h2 { font-size: var(--text-xl); font-weight: 700; letter-spacing: -.02em; }
+    .card-head { padding: 0 0 24px; }
+    /* Der Zaehler ist echte Information (Schritt 3 von 9), keine Zierzeile: er
+       bleibt, verliert aber den Akzent. Violett ist die EINE Stimme der
+       Primaeraktion - eine versale Akzentzeile ueber jedem Titel war eine zweite. */
+    .step-tag { font-size: var(--type-caption); font-weight: 600; color: var(--color-text-secondary); margin-bottom: 6px; }
+    /* Title 1 der App-Skala (28/34, bold, -0.015em). Die H2 stand auf 20px und
+       damit auf der Stufe der Wortmarke - zwei gleich laute Titel uebereinander,
+       und keiner fuehrte (Critique 2026-09-29, "Typo flach"). */
+    .card-head h2 {
+      font-size: var(--text-3xl); font-weight: 700;
+      letter-spacing: var(--tracking-tight); line-height: var(--line-height-tight);
+      text-wrap: balance;
+    }
     /* showStep() fokussiert die Überschrift programmatisch, damit Tastatur- und
        Screenreader-Nutzer der Navigation folgen (WCAG 2.4.3). Der blaue
        UA-Default-Ring liess sie dabei bei jedem Schrittwechsel wie ein
@@ -261,27 +292,35 @@
     }
     /* Visuell versteckt, für Screenreader vorhanden (persistenter Seiten-H1). */
     .vh { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-    .card-head p  { font-size: var(--text-sm); color: var(--color-text-secondary); margin-top: 7px; line-height: 1.55; }
-    .card-body { padding: 24px 32px; }
+    /* Subheadline der App-Skala. 62ch halten das Lesemass, auch wenn die Spalte
+       auf dem Desktop 680px breit ist. */
+    .card-head p  {
+      font-size: var(--type-secondary); color: var(--color-text-secondary);
+      margin-top: 8px; line-height: 1.4; max-width: 62ch;
+    }
+    .card-body { padding: 0; }
     /* Sticky in JEDER Breite, nicht nur mobil: bei 1440x900 lag die Fussleiste
        von Schritt 1 bei y=901, also einen Pixel unter dem Falz - die
        Primaeraktion war auf dem Desktop erst nach dem Scrollen zu sehen. Die
        Leiste schwebt wie das Chrome der App: opak als Grundfall, Glas nur mit
-       backdrop-filter (gleiche @supports-Weiche wie glass.css). Die unteren
-       Ecken folgen der Karte, damit die ruhende Leiste die Rundung nicht kappt. */
+       backdrop-filter (gleiche @supports-Weiche wie glass.css). Seit die Karte
+       keine Flaeche mehr ist, liegt die Leiste auf der Buehne und nimmt deren
+       Farbe - eine weisse Leiste unter weissen Gruppen hiesse eine weitere
+       Karte am Seitenende. */
     .card-foot {
-      padding: 16px 32px; border-top: 1px solid var(--color-border);
+      margin-top: 24px; padding: 12px 0;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      border-top: 1px solid var(--color-border);
       display: flex; justify-content: flex-end; gap: 10px;
       position: sticky; bottom: 0; z-index: 10;
-      background: var(--color-surface);
-      border-radius: 0 0 var(--radius-md) var(--radius-md);
+      background: var(--color-bg);
     }
     @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
       .card-foot {
         /* 82 % Deckung: der Inhalt darunter ist als Bewegung zu ahnen, aber
            nicht lesbar - Text hinter Text waere Rauschen neben der Primaeraktion.
            Die Blur-Tokens kommen aus tokens.css; der Fallback steht im var(). */
-        background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+        background: color-mix(in srgb, var(--color-bg) 82%, transparent);
         backdrop-filter: var(--blur-md, blur(20px)) saturate(var(--lg-glass-saturate, 200%));
         -webkit-backdrop-filter: var(--blur-md, blur(20px)) saturate(var(--lg-glass-saturate, 200%));
       }
@@ -289,8 +328,73 @@
     /* Ohne Unschaerfe (tokens.css setzt --blur-* hier auf 0) waere die
        Teiltransparenz nur noch durchscheinender Text - dann lieber opak. */
     @media (prefers-reduced-transparency: reduce) {
-      .card-foot { background: var(--color-surface); }
+      .card-foot { background: var(--color-bg); }
     }
+
+    /* ── Inset-Gruppen: die Formensprache der Einstellungen ───────────────────
+       Zusammengehoerige Fragen stehen in EINEM weissen Traeger auf dem
+       Grouped-Grund, Zeilen durch Haarlinien getrennt - dieselbe Grammatik wie
+       .row-carrier in der App (list-row.css): 16px Radius fuer den
+       Zeilentraeger, --shadow-sm statt Kante, die Trennung leistet die
+       --color-border-subtle-Linie.
+
+       Die Haarlinie haengt an JEDER Zeile oben, und die Zeile rueckt 1px nach
+       oben: die Linie der ersten sichtbaren Zeile liegt damit ausserhalb des
+       Traegers und wird von overflow:hidden gekappt. Das `* + *` der App reicht
+       hier nicht, weil Zeilen per `hidden` wegfallen (Pruefseite) - die erste
+       SICHTBARE Zeile truege dann eine Linie ueber sich. Fehlerbanner, die
+       fail() unter ein Feld zieht, sind keine Zeile und bleiben aussen vor. */
+    .inset-group {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .inset-group + .inset-group { margin-top: 24px; }
+    .inset-group > :not(.error-banner),
+    .inset-sub > :not(.error-banner) {
+      border-top: 1px solid var(--color-border-subtle); margin-top: -1px;
+    }
+    .inset-group .field { padding: 12px 16px; margin: 0; }
+    .inset-group .error-banner { margin: 0 16px 12px; }
+    /* Gruppen-Label im Stil des Versal-Mikro-Labels der App (typography.css):
+       der Sektionskopf einer Grouped-Liste, 12px semibold, 0.05em, um die
+       16px der Zeilen eingerueckt, damit er mit deren Text fluchtet. Die
+       Haarlinie darunter ist gegangen - die Gruppe grenzt sich selbst ab. */
+    .group-label {
+      font-size: var(--text-xs); font-weight: 600; line-height: var(--line-height-tight);
+      letter-spacing: var(--tracking-label); text-transform: uppercase;
+      color: var(--color-text-secondary);
+      margin: 28px 0 8px; padding-inline: 16px;
+    }
+    /* Das erste Label eines Schritts rueckt an den Kopf heran; erst zwischen
+       zwei Gruppen braucht es den vollen Abstand. */
+    .card-body > .group-label:not(.inset-group ~ .group-label) { margin-top: 0; }
+    /* Erklaerung zu einer ganzen Gruppe: steht zwischen Label und Traeger, weil
+       sie VOR der Entscheidung gelesen werden muss (Heimnetz-Freigaben). */
+    .group-note {
+      font-size: var(--type-caption); line-height: 1.38; color: var(--color-text-secondary);
+      padding-inline: 16px; margin: -2px 0 10px; max-width: 70ch;
+    }
+    /* Kopf einer Pruefseiten-Gruppe: Label links, "Aendern" rechts. */
+    /* Mittig ausgerichtet, damit "Aendern" auf der Zeile des Labels steht; der
+       negative Abstand unten gleicht die 44px-Zielhoehe des Knopfs aus, sonst
+       stuende die Gruppe weiter vom Label ab als ueberall sonst. */
+    .group-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin: 20px 0 -6px;
+    }
+    .group-head .group-label { margin: 0; }
+    .group-head + .inset-group { margin-top: 0; }
+    .rv-group:first-of-type > .group-head { margin-top: 0; }
+    .group-edit {
+      background: none; border: none; cursor: pointer;
+      font-family: var(--font-sans); font-size: var(--type-secondary); font-weight: 600;
+      color: var(--color-accent);
+      min-height: 44px; padding: 0 16px; border-radius: var(--radius-full);
+    }
+    .group-edit:hover { background: color-mix(in srgb, var(--color-accent) var(--tint-state, 12%), transparent); }
+    .group-edit:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
     .field { margin-bottom: 18px; }
     .field label { display: block; font-size: var(--text-sm); font-weight: 600; margin-bottom: 6px; }
     /* Die Kästchen waren 13x13 neben einem 16px hohen Label und verfehlten damit
@@ -303,7 +407,7 @@
     .field label:has(input[type=checkbox]) {
       display: flex; align-items: center; gap: 10px; margin-bottom: 0; cursor: pointer;
     }
-    .opt { font-weight: 400; color: var(--color-text-secondary); font-size: var(--text-xs); }
+    .opt { font-weight: 400; color: var(--color-text-tertiary); font-size: var(--text-xs); }
     /* Der Platzhalter war NIRGENDS gesetzt und fiel damit auf Chromes UA-Default
        #757575 zurück, der im Dark Mode nicht mitkippt: gemessen 3.36:1 auf dem
        dunklen Feldgrund, über alle 25 Felder mit placeholder-Attribut. Dieselbe
@@ -351,9 +455,11 @@
        in die zweite. min-width: 0 verhindert, dass der Feldinhalt die Zeile
        aufspannt und den Umbruch aushebelt. */
     .secret-row input { flex: 1 1 100%; min-width: 0; font-family: var(--font-mono); font-size: var(--text-sm); }
-    /* 14px wie die Hinweise der App (auth.css:115). Auf 12px war ausgerechnet
-       die erklaerende Prosa fuer Laien kleiner als in der fertigen App. */
-    .hint { font-size: var(--text-sm); color: var(--color-text-secondary); margin-top: 5px; line-height: 1.4; }
+    /* Footnote der App-Skala (13/18), in Sekundaertext statt Tertiaer: das ist
+       erklaerende Prosa fuer Laien, keine Metazeile, und sie braucht den
+       Kontrast. Auf 12px war sie einmal kleiner als in der fertigen App; die
+       Footnote ist die Stufe, auf der Apple Feld- und Gruppenfussnoten setzt. */
+    .hint { font-size: var(--type-caption); color: var(--color-text-secondary); margin-top: 6px; line-height: 1.38; max-width: 70ch; }
     .hint a { color: var(--color-accent); }
     /* Redirect-URIs sind unzerbrechliche Maschinenwerte in fester Kartenbreite:
        ohne Umbruch clippte overflow:hidden der Toggle-Card sie mobil kommentarlos
@@ -416,26 +522,64 @@
       border: 1.5px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
       color: var(--color-text-primary); font-size: var(--text-sm); line-height: 1.45;
     }
-    .toggle-card { border: 1.5px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 14px; }
+    /* Ein Akkordeon ist eine ZEILE seiner Gruppe, keine eigene Karte: vorher
+       trug jedes seine 1,5px-Kante und stand als Kasten auf der weissen Karte,
+       bis zu fuenf davon untereinander. Jetzt ist der Kopf eine Zeile wie jede
+       andere, der aufgeklappte Inhalt setzt die Zeilen unter einer Haarlinie
+       fort - dieselbe Flaeche, kein zweiter Grund. */
+    .toggle-card { margin: 0; }
     .toggle-head {
-      display: flex; align-items: center; justify-content: space-between;
-      width: 100%; padding: 13px 16px; cursor: pointer; user-select: none;
-      font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; text-align: start;
-      background: var(--color-surface); color: var(--color-text-primary); border: none;
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; padding: 12px 16px; cursor: pointer; user-select: none;
+      font-family: var(--font-sans); font-size: var(--text-base); font-weight: 600; text-align: start;
+      background: transparent; color: var(--color-text-primary); border: none;
       /* Aus 13 + 17 + 13 wurden gemessene 43px. Der Knopf trägt keine .btn-Klasse
          und fiel damit durch beide Netze: weder `.btn { min-height: 44px }` noch
          die mobile `.btn-sm`-Regel erfassen ihn. Sieben dieser Köpfe stehen im
-         Erweitert-Schritt untereinander. */
-      min-height: 44px;
+         Erweitert-Schritt untereinander. 48px wie jede Zeile der App. */
+      min-height: 48px;
     }
-    .toggle-head:hover { background: var(--color-surface-2); }
+    /* Neutral statt --color-surface-2: das liegt im Dark Mode TIEFER als die
+       Gruppe (#0F0E0D auf #2B2825), die Zeile fiel beim Hover in ein Loch. */
+    .toggle-head:hover { background: color-mix(in srgb, var(--color-text-primary) 5%, var(--color-surface)); }
     .toggle-head:focus-visible {
       outline: none; box-shadow: inset 0 0 0 2px var(--color-accent);
     }
-    .toggle-badge { font-size: var(--text-xs); font-weight: 500; color: var(--color-text-secondary); }
-    .toggle-body { display: none; padding: 16px; border-top: 1.5px solid var(--color-border); background: var(--color-surface-2); }
+    /* Der Winkel sagt, dass die Zeile aufklappt - vorher verriet das nur der
+       Cursor. Maske statt Bild, damit er dem Theme folgt (wie .lang-switch). */
+    .toggle-head::after {
+      content: ''; width: 16px; height: 16px; flex-shrink: 0;
+      background: var(--color-text-secondary);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
+      transition: transform var(--duration-sm, 150ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    }
+    .toggle-head[aria-expanded="true"]::after { transform: rotate(180deg); }
+    /* Zustand statt Dauerbeschriftung: refreshBadges() schreibt "Eingerichtet",
+       sobald die Zeile ausgefuellt oder eingeschaltet ist. Vorher stand an allen
+       zehn Koepfen fuer immer "Optional", auch an einem fertig eingerichteten
+       Google-Kalender. */
+    .toggle-badge {
+      margin-inline-start: auto;
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: var(--type-caption); font-weight: 500; color: var(--color-text-secondary);
+    }
+    .toggle-badge[data-state="set"] { color: var(--color-text-primary); }
+    .toggle-badge[data-state="set"]::before {
+      content: ''; width: 14px; height: 14px; flex-shrink: 0;
+      background: var(--color-success);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5L20 7'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5L20 7'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+    }
+    .toggle-body { display: none; padding: 0 0 4px; border-top: 1px solid var(--color-border-subtle); }
     .toggle-body.open { display: block; }
-    .status-box { background: var(--color-surface-2); border: 1.5px solid var(--color-border); border-radius: var(--radius-sm); padding: 16px; }
+    .toggle-body > .hint { padding: 12px 16px 0; margin: 0; }
+    .toggle-body > .field ~ .field { border-top: 1px solid var(--color-border-subtle); }
+    /* Der Docker-Schirm ist eine Gruppe wie jede andere. */
+    .status-box {
+      background: var(--color-surface); border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm); padding: 16px;
+    }
     .status-row { display: flex; align-items: center; gap: 10px; font-size: var(--text-sm); }
     .spinner { width: 18px; height: 18px; border: 2px solid var(--color-border); border-top-color: var(--color-accent); border-radius: 50%; animation: spin .65s linear infinite; flex-shrink: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -457,9 +601,18 @@
        Pruefseite die GANZE Seite seitlich (gemessen 534px body-scrollWidth bei
        375px Viewport, WCAG 1.4.10) - ausgerechnet der Kontrollschirm vor dem
        irreversiblen Klick. Die Schluesselspalte gibt auf schmalen Viewports mit. */
-    .review-grid { display: grid; grid-template-columns: minmax(110px, 160px) minmax(0, 1fr); gap: 8px 12px; font-size: var(--text-sm); }
-    .review-grid > :not(.review-key) { overflow-wrap: anywhere; }
-    .review-key  { color: var(--color-text-secondary); }
+    /* Seit der Gruppierung eine Zeile je Wert in einer Inset-Gruppe; die
+       Spaltenregel gilt je Zeile, die Lehre von oben bleibt dieselbe. */
+    .rv-row {
+      display: grid; grid-template-columns: minmax(96px, 38%) minmax(0, 1fr); gap: 2px 16px;
+      padding: 12px 16px; font-size: var(--type-secondary); line-height: 1.35;
+    }
+    .rv-row dt { color: var(--color-text-secondary); }
+    .rv-row dd { overflow-wrap: anywhere; }
+    /* Die EINE Zeile fuer alles, was nicht eingerichtet ist - statt fuenf
+       Zeilen mit einem Strich. Leiser als die Werte darueber: sie meldet eine
+       Abwesenheit, keine Entscheidung. */
+    .rv-row--unset dd { color: var(--color-text-secondary); }
     .masked      { font-family: var(--font-mono); letter-spacing: 3px; color: var(--color-text-secondary); }
     .done-wrap   { text-align: center; padding: 20px 0 8px; }
     /* Der Abschluss trug ein 🎉-Systemsemoji: der einzige Bildinhalt der ganzen
@@ -473,7 +626,12 @@
       box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-success) 34%, transparent);
     }
     .done-mark svg { width: 40px; height: 40px; }
-    .done-wrap h2 { font-size: var(--text-2xl); font-weight: 700; letter-spacing: -.02em; }
+    /* Dieselbe Title-1-Rolle wie jede Schritt-H2: der Abschluss ist kein
+       leiserer Schritt als die davor. */
+    .done-wrap h2 {
+      font-size: var(--text-3xl); font-weight: 700;
+      letter-spacing: var(--tracking-tight); line-height: var(--line-height-tight); text-wrap: balance;
+    }
     .done-wrap p  { color: var(--color-text-secondary); margin: 8px 0 28px; font-size: var(--text-base); }
     /* Geometrie und Schrift wie .btn: setDoneEmphasis() tauscht den Download
        zwischen .open-link und .btn-ghost, und mit 700/16px gegen 600/14px
@@ -497,15 +655,14 @@
     .done-actions .open-link, .done-actions .btn { width: 100%; max-width: 300px; }
     .done-check { color: var(--color-success); }
 
-    /* „Als Naechstes" auf dem Abschluss. Zeilen in EINEM Traeger, getrennt durch
-       Haarlinien ueber den +-Kombinator - dieselbe Grammatik wie .ready-list im
-       Einfach-Pfad, damit der Abschluss nicht eine dritte Listenform erfindet. */
+    /* „Als Naechstes" auf dem Abschluss. Zeilen in EINER Inset-Gruppe - dieselbe
+       Grammatik wie .ready-list im Einfach-Pfad und wie jede Gruppe davor,
+       damit der Abschluss nicht eine dritte Listenform erfindet. */
     .next-steps { margin-top: 28px; text-align: start; }
     .next-step {
-      display: flex; align-items: flex-start; gap: 12px; padding: 14px 0;
+      display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px;
       color: inherit; text-decoration: none; font-size: var(--text-sm); line-height: 1.5;
     }
-    .next-step + .next-step { border-top: 1px solid var(--color-border); }
     /* fill/stroke-Angaben ausgeschrieben: die gemeinsame .icon-svg-Regel gilt nur
        für `.btn .icon-svg, .open-link .icon-svg`. Ohne sie rendert Lucide als
        gefüllte schwarze Fläche statt als Strichzeichnung - im ersten Screenshot
@@ -517,8 +674,8 @@
     }
     .next-step b { font-weight: 600; }
     .next-step span span { color: var(--color-text-secondary); }
-    a.next-step:hover { background: var(--color-surface-2); }
-    a.next-step:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: var(--radius-xs); }
+    a.next-step:hover { background: color-mix(in srgb, var(--color-text-primary) 5%, var(--color-surface)); }
+    a.next-step:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--color-accent); }
 
     /* Hochkonsequente Warnung (Schlüsselverlust, Backup-Erinnerung) - stärker als .info-banner. */
     .danger-banner {
@@ -547,23 +704,10 @@
        dekorative Icons nicht gilt. */
     .warn-banner .warn-icon { color: var(--color-warning); font-size: var(--text-base); line-height: 1.4; flex-shrink: 0; }
 
-    /* Sektionsüberschrift im Advanced-Schritt - Haarlinie statt zweitem Eyebrow,
-       damit sie sich klar vom akzentfarbenen .step-tag unterscheidet. */
-    .group-label {
-      font-size: var(--text-xs); font-weight: 700; letter-spacing: .01em;
-      color: var(--color-text-secondary); margin: 22px 0 10px;
-      padding-bottom: 6px; border-bottom: 1px solid var(--color-border);
-    }
-    .group-label:first-child { margin-top: 4px; }
-    .group-label + .field, .group-label + .toggle-card { margin-top: 0; }
-
-    /* Der Proxy-Select ist sicherheitsrelevant - visuell hervorheben. */
-    .field-emphasis {
-      padding: 14px; border-radius: var(--radius-sm);
-      background: color-mix(in srgb, var(--color-accent) 5%, transparent);
-      border: 1.5px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
-    }
-    .field-emphasis label { color: var(--color-accent); }
+    /* .field-emphasis ist gegangen: eine violett getoente Box mit violettem Label
+       in einer weissen Gruppe waere Kasten-in-Kasten UND eine zweite violette
+       Stimme gewesen. Die Proxy-Frage steht jetzt als erste Zeile ihrer eigenen
+       Gruppe "Zugriff" - die Stellung hebt sie hervor, nicht die Farbe. */
 
     /* Eye-/Copy-Icons: Lucide-SVG statt Emoji, konsistent zum App-Icon-Set. */
     .btn .icon-svg, .open-link .icon-svg { width: 16px; height: 16px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -572,6 +716,81 @@
     [data-eye][aria-pressed="true"] .icon-on  { display: none; }
     [data-eye][aria-pressed="true"] .icon-off { display: inline; }
     .copied-note { font-size: var(--text-xs); color: var(--color-success); }
+
+    /* ── Desktop ab 1024px: Schrittliste links, Inhalt rechts ─────────────────
+       Die 560px-Karte stand auf 1440px allein in der Mitte, und der Fortschritt
+       war ein 3px-Strich am oberen Rand. Jetzt traegt eine feste Liste die
+       Orientierung (wo bin ich, was kommt, wohin zurueck), die Inhaltsspalte
+       bleibt beim Lesemass von 680px. Einstieg und Abschluss bleiben einspaltig
+       (.shell--solo): vor der Wahl des Weges gibt es keine Schritte, die eine
+       Liste zeigen koennte, und nach dem letzten ist sie nur noch Rueckschau. */
+    @media (min-width: 1024px) {
+      body { padding: 56px 32px 96px; }
+      .progress-track { display: none; }
+      .shell:not(.shell--solo) {
+        display: grid; grid-template-columns: 240px minmax(0, 680px);
+        column-gap: 48px; justify-content: center; align-items: start;
+        max-width: none;
+      }
+      .shell:not(.shell--solo) .rail { position: sticky; top: 56px; }
+      .shell:not(.shell--solo) .brand {
+        display: flex; align-items: center; gap: 10px;
+        text-align: start; margin-bottom: 28px;
+      }
+      .shell:not(.shell--solo) .brand__mark { width: 40px; height: 40px; margin-bottom: 0; border-radius: var(--radius-md); }
+      .shell:not(.shell--solo) .steps-nav { display: block; }
+      /* Der Zaehler bleibt fuer den Screenreader (aria-describedby der H2), die
+         Liste zeigt dasselbe sichtbar. */
+      .shell:not(.shell--solo) .step-tag {
+        position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden;
+        clip: rect(0 0 0 0); white-space: nowrap;
+      }
+      .shell--solo { max-width: 560px; }
+    }
+    .steps-nav__list { list-style: none; display: grid; gap: 2px; }
+    .steps-nav__link {
+      display: flex; align-items: center; gap: 12px; width: 100%;
+      min-height: 44px; padding: 8px 12px; border: none; border-radius: var(--radius-md);
+      background: transparent; color: var(--color-text-primary); text-align: start;
+      font-family: var(--font-sans); font-size: var(--type-secondary); font-weight: 500; line-height: 1.25;
+      cursor: pointer;
+    }
+    .steps-nav__link:hover:not(:disabled) { background: color-mix(in srgb, var(--color-text-primary) 6%, transparent); }
+    .steps-nav__link:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+    /* Kommende Schritte: gedaempft, aber lesbar (Sekundaertext haelt AA) und
+       ohne Hand-Cursor - sie sind die Vorschau, nicht das Ziel. */
+    .steps-nav__link:disabled { cursor: default; color: var(--color-text-secondary); }
+    /* Der aktuelle Schritt traegt die Toenung der Sidebar-Pille der App - und als
+       einziger in der Liste das Violett, die eine Stimme. */
+    .steps-nav__item[data-state="current"] .steps-nav__link {
+      background: color-mix(in srgb, var(--color-accent) var(--tint-state, 12%), transparent);
+      color: var(--color-text-primary); font-weight: 600;
+    }
+    /* "erledigt" nur fuer den Screenreader und nur am erledigten Eintrag: der
+       Haken sagt es dem Auge, aria-current nennt nur den aktuellen Schritt. */
+    .steps-nav__item:not([data-state="done"]) .steps-nav__done { display: none; }
+    .steps-nav__mark {
+      display: inline-grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0;
+      border-radius: var(--radius-full);
+      box-shadow: inset 0 0 0 1.5px var(--color-border-control);
+      font-size: var(--text-xs); font-weight: 600; font-variant-numeric: tabular-nums;
+      color: var(--color-text-secondary);
+    }
+    .steps-nav__item[data-state="current"] .steps-nav__mark {
+      background: color-mix(in srgb, var(--color-accent) 88%, var(--neutral-950));
+      box-shadow: none; color: var(--color-ink-on-vivid);
+    }
+    /* Erledigt: der Haken in Erfolgsgruen, wie auf der Bereitschaftsliste und
+       dem Abschluss - die Ziffer weicht ihm. */
+    .steps-nav__item[data-state="done"] .steps-nav__mark {
+      box-shadow: none; font-size: 0;
+      background: color-mix(in srgb, var(--color-success) 14%, transparent);
+    }
+    .steps-nav__item[data-state="done"] .steps-nav__mark::before {
+      content: ''; width: 14px; height: 14px; background: var(--color-success);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5L20 7'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5L20 7'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+    }
 
     /* Touch-Ziele ≥44px auf Mobilgeräten. Die Fussleiste ist in jeder Breite
        sticky (siehe .card-foot) und steht deshalb nicht mehr hier. */
@@ -611,6 +830,12 @@
 
   <!-- Sprachumschaltung: überschreibt die Browser-Erkennung, Wahl wird gemerkt. -->
 
+  <!-- Marke und Schrittliste teilen sich ab 1024px die linke, feste Spalte.
+       Die Liste steht im DOM VOR dem Inhalt, weil sie dort auch sichtbar steht
+       (WCAG 1.3.2); showStep() setzt den Fokus trotzdem auf die H2 des Schritts,
+       die Liste ist per Shift+Tab von dort aus der naechste Halt. -->
+  <div class="shell" id="shell">
+  <div class="rail">
   <!-- Absender der Reise. Die Wortmarke ist ein Eigenname und bleibt in jeder
        Sprache gleich, braucht also keinen Locale-Key. -->
   <div class="brand">
@@ -626,14 +851,39 @@
     <div class="brand__word">Yuvomi</div>
   </div>
 
+  <!-- Die Schrittliste. Statisches Markup fuer JEDEN nummerierten Schritt beider
+       Wege; renderStepNav() blendet aus, was nicht zum gewaehlten Weg gehoert,
+       setzt die Nummern und den Zustand. Die Beschriftungen sind die Titel der
+       Schritte selbst: wer einen Eintrag waehlt, landet unter derselben
+       Ueberschrift. Erledigte Eintraege sind Knoepfe zurueck, kommende sind
+       gesperrt - vorwaerts fuehrt nur "Weiter", damit keine Pruefung entfaellt. -->
+  <nav class="steps-nav" aria-label="Setup steps" data-i18n-aria="common.stepsNav">
+    <ol class="steps-nav__list">
+      <li class="steps-nav__item" data-nav-step="simple" hidden><button type="button" class="steps-nav__link" data-goto="simple" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="simple.title">Ready to go</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="config" hidden><button type="button" class="steps-nav__link" data-goto="config" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="config.title">Basic Configuration</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="secrets" hidden><button type="button" class="steps-nav__link" data-goto="secrets" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="secrets.title">Security Keys</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="weather" hidden><button type="button" class="steps-nav__link" data-goto="weather" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="weather.title">Weather Widget</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="calendar" hidden><button type="button" class="steps-nav__link" data-goto="calendar" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="calendar.title">Calendar Sync</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="email" hidden><button type="button" class="steps-nav__link" data-goto="email" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="email.title">Email &amp; Password Reset</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="storage" hidden><button type="button" class="steps-nav__link" data-goto="storage" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="storage.title">Storage &amp; backups</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="advanced" hidden><button type="button" class="steps-nav__link" data-goto="advanced" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="advanced.title">Advanced Settings</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="review" hidden><button type="button" class="steps-nav__link" data-goto="review" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="review.title">Review</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="admin" hidden><button type="button" class="steps-nav__link" data-goto="admin" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="admin.title">Create Admin Account</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+    </ol>
+  </nav>
+  </div>
+
   <main class="card">
     <h1 class="vh" data-i18n="title">Yuvomi Setup</h1>
 
     <!-- Step: Welcome / mode selection -->
     <div class="step" id="step-welcome">
       <div class="card-head">
-        <h2 tabindex="-1" data-i18n="welcome.title">Welcome to Yuvomi</h2>
-        <p data-i18n="welcome.subtitle">Let's get your private family planner running. Choose how you'd like to set it up.</p>
+        <!-- Die Aufgabe, nicht der Absender: "Willkommen bei Yuvomi" stand direkt
+             unter der Wortmarke "Yuvomi" - zweimal derselbe Absender, und keine
+             Zeile sagte, was hier zu tun ist. -->
+        <h2 tabindex="-1" data-i18n="welcome.title">How would you like to set up Yuvomi?</h2>
+        <p data-i18n="welcome.subtitle">Afterwards, your private family planner runs on your own server.</p>
       </div>
       <div class="card-body">
         <!-- Kein data-i18n: der Text wird zur Laufzeit mit {{list}} und einem
@@ -704,7 +954,7 @@
         <p data-i18n="simple.subtitle">We've prepared everything with safe defaults. Just create your account next.</p>
       </div>
       <div class="card-body">
-        <div class="ready-list">
+        <div class="ready-list inset-group">
           <div class="ready-item">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>
             <div><b data-i18n="simple.itemKeysTitle">Security keys generated</b><br><span data-i18n="simple.itemKeysDesc">Your session and database are encrypted automatically.</span></div>
@@ -754,6 +1004,8 @@
         </div>
         <!-- Wie #welcome-prereq: Text zur Laufzeit, kein data-i18n. -->
         <div class="error-banner" id="cfg-prereq" role="alert"></div>
+        <div class="group-label" data-i18n="common.groupServer">Server</div>
+        <div class="inset-group">
         <div class="field">
           <label for="cfg-host" data-i18n="config.hostLabel">Domain or IP address</label>
           <input type="text" id="cfg-host" value="localhost" placeholder="localhost or 192.168.1.x">
@@ -767,6 +1019,7 @@
           <label for="cfg-tz" data-i18n="config.tzLabel">Timezone</label>
           <input type="text" id="cfg-tz" placeholder="Europe/Berlin">
         </div>
+        </div>
 
         <!-- Proxy-Wahl und oeffentliche Adresse standen bis 2026-08-15 im
              Erweitert-Schritt, unter der Ueberschrift "Alles optional,
@@ -778,7 +1031,9 @@
              Yuvomi zu?"). Nebenwirkung: plannedOrigin() kennt die endgueltige
              Adresse jetzt schon im Kalenderschritt, der frueher davor lag.
              Die Locale-Schluessel behalten ihr advanced.*-Praefix. -->
-        <div class="field field-emphasis">
+        <div class="group-label" data-i18n="review.access">Access</div>
+        <div class="inset-group">
+        <div class="field">
           <label for="adv-proxy" data-i18n="advanced.proxyLabel">How is Yuvomi exposed?</label>
           <select id="adv-proxy">
             <option value="proxy" data-i18n="advanced.proxyBehindHttps">Behind a reverse proxy with HTTPS (Caddy, nginx, Traefik)</option>
@@ -799,6 +1054,7 @@
           <label for="adv-base-url" data-i18n="advanced.baseUrlLabel">Public address</label>
           <input type="text" id="adv-base-url" placeholder="https://yuvomi.example.com">
           <div class="hint" data-i18n="advanced.baseUrlHint">The address your family opens Yuvomi at - not the container's host and port. Used for password reset and invitation links.</div>
+        </div>
         </div>
 
         <div class="error-banner" id="cfg-err" role="alert"></div>
@@ -824,6 +1080,10 @@
         <div class="info-banner" id="sec-preserved" style="display:none" role="note" data-i18n="secrets.preserved">
           Your existing keys are kept, so this setup will not lock you out of the current database. Leave a field empty to keep its key; entering a new value replaces it.
         </div>
+        <!-- Eine Gruppe ohne Label: der Schritt heisst schon "Sicherheitsschluessel",
+             ein gleichlautendes Label darueber waere die Titelwiederholung, die
+             DESIGN.md verbietet. -->
+        <div class="inset-group">
         <div class="field">
           <label for="sec-session" data-i18n="secrets.sessionLabel">Session Secret</label>
           <div class="secret-row">
@@ -856,6 +1116,7 @@
           <span class="copied-note" id="sec-db-copied" role="status" aria-live="polite"></span>
           <div class="hint" data-i18n="secrets.dbHint">Encrypts the SQLite database at rest.</div>
         </div>
+        </div>
         <div class="error-banner" id="sec-err" role="alert"></div>
       </div>
       <div class="card-foot">
@@ -872,10 +1133,13 @@
         <p data-i18n="weather.subtitle">Show live weather on your dashboard. No account or API key needed.</p>
       </div>
       <div class="card-body">
+        <!-- Schalter und Felder in EINER Gruppe: die Felder sind die Fortsetzung
+             der Zeile, die sie einschaltet (wie ein Schalter in den Einstellungen). -->
+        <div class="inset-group">
         <div class="field">
           <label><input type="checkbox" id="wea-enable"> <span data-i18n="weather.enable">Enable weather widget</span></label>
         </div>
-        <div id="wea-fields" style="display:none">
+        <div class="inset-sub" id="wea-fields" style="display:none">
           <div class="field">
             <label for="wea-lat" data-i18n="weather.latLabel">Latitude</label>
             <input type="number" id="wea-lat" step="any" min="-90" max="90" placeholder="52.52">
@@ -897,6 +1161,7 @@
             </select>
           </div>
         </div>
+        </div>
         <div class="error-banner" id="wea-err" role="alert"></div>
       </div>
       <div class="card-foot">
@@ -913,13 +1178,15 @@
         <p data-i18n="calendar.subtitle">Connect Yuvomi to Google Calendar, Apple iCloud or Outlook. All optional - expand to configure.</p>
       </div>
       <div class="card-body">
-        <div class="toggle-card">
+        <!-- Drei Anbieter, EINE Gruppe: jede Zeile klappt in sich selbst auf. -->
+        <div class="inset-group">
+        <div class="toggle-card" data-setup="gcal-id gcal-secret">
           <button type="button" class="toggle-head" data-toggle="gcal-body" aria-expanded="false" aria-controls="gcal-body">
             <span data-i18n="calendar.google">Google Calendar</span>
-            <span class="toggle-badge" id="gcal-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" id="gcal-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="gcal-body">
-            <p class="hint" id="gcal-hint" style="margin-bottom:12px">
+            <p class="hint" id="gcal-hint">
               Create OAuth credentials at <a href="https://console.cloud.google.com" target="_blank" rel="noopener">console.cloud.google.com</a>.
               Redirect URI: <code id="gcal-redirect-hint"></code>
             </p>
@@ -927,7 +1194,7 @@
                  baut dessen Inhalt per applyRich mit replaceChildren neu auf, und
                  ein Kind wäre beim ersten Sprachdurchlauf spurlos verschwunden.
                  Genau das ist beim ersten Anlauf passiert. -->
-            <p class="hint" style="margin-bottom:12px">
+            <p class="hint">
               <!-- Sichtbare Beschriftung statt nur aria-label: fünf gleich
                    aussehende Icon-Knöpfe waren in der Elementliste eines
                    Screenreaders nicht unterscheidbar, und ein Erstinstallierer
@@ -949,13 +1216,13 @@
             <p class="hint" data-i18n="calendar.googleSelectNote">After connecting, you can choose which calendar to sync in the app settings (default: primary calendar).</p>
           </div>
         </div>
-        <div class="toggle-card">
+        <div class="toggle-card" data-setup="apple-user apple-pass">
           <button type="button" class="toggle-head" data-toggle="apple-body" aria-expanded="false" aria-controls="apple-body">
             <span data-i18n="calendar.apple">Apple iCloud CalDAV</span>
-            <span class="toggle-badge" id="apple-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" id="apple-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="apple-body">
-            <p class="hint" id="apple-hint" style="margin-bottom:12px">
+            <p class="hint" id="apple-hint">
               Create an app-specific password at <a href="https://appleid.apple.com" target="_blank" rel="noopener">appleid.apple.com</a>.
             </p>
             <div class="field">
@@ -973,17 +1240,17 @@
             </div>
           </div>
         </div>
-        <div class="toggle-card">
+        <div class="toggle-card" data-setup="outlook-id outlook-secret">
           <button type="button" class="toggle-head" data-toggle="outlook-body" aria-expanded="false" aria-controls="outlook-body">
             <span data-i18n="calendar.outlook">Outlook Calendar (Microsoft Graph)</span>
-            <span class="toggle-badge" id="outlook-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" id="outlook-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="outlook-body">
-            <p class="hint" id="outlook-hint" style="margin-bottom:12px">
+            <p class="hint" id="outlook-hint">
               Create a free Entra ID app registration ("Personal Microsoft accounts only") at <a href="https://entra.microsoft.com" target="_blank" rel="noopener">entra.microsoft.com</a> - see the installation guide.
               Redirect URI: <code id="outlook-redirect-hint"></code>
             </p>
-            <p class="hint" style="margin-bottom:12px">
+            <p class="hint">
               <button type="button" class="btn btn-ghost btn-sm" data-copy="outlook-redirect-hint">
                 <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 <span data-i18n="common.copyRedirect">Copy redirect URI</span>
@@ -1001,6 +1268,7 @@
             <p class="hint" data-i18n="calendar.outlookNote">One-way push: Yuvomi stays the source of truth and overwrites changes made in Outlook. Family accounts are connected later in the app under Settings.</p>
           </div>
         </div>
+        </div>
       </div>
       <div class="card-foot">
         <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
@@ -1016,11 +1284,17 @@
         <p data-i18n="email.subtitle">Let family members reset a forgotten password by email. Optional - skip if you don't need it.</p>
       </div>
       <div class="card-body">
+        <div class="inset-group">
         <div class="field">
           <label><input type="checkbox" id="email-enable"> <span data-i18n="email.enable">Enable email sending</span></label>
           <div class="hint" data-i18n="email.hint">Uses your own SMTP server (mailbox provider, self-hosted, or a transactional service).</div>
         </div>
+        </div>
+        <!-- Eingeschaltet folgen zwei Gruppen entlang der Frage, die sie
+             beantworten: wie Yuvomi den Server erreicht, und als wer es schreibt. -->
         <div id="email-fields" style="display:none">
+          <div class="group-label" data-i18n="common.groupServer">Server</div>
+          <div class="inset-group">
           <div class="field">
             <label for="email-host" data-i18n="email.hostLabel">SMTP server</label>
             <input type="text" id="email-host" placeholder="smtp.example.com">
@@ -1051,6 +1325,9 @@
               </button>
             </div>
           </div>
+          </div>
+          <div class="group-label" data-i18n="email.groupSender">Sender</div>
+          <div class="inset-group">
           <div class="field">
             <label for="email-from" data-i18n="email.fromLabel">Sender address</label>
             <input type="email" id="email-from" placeholder="yuvomi@example.com">
@@ -1059,6 +1336,7 @@
           <div class="field">
             <label for="email-from-name"><span data-i18n="email.fromNameLabel">Sender name</span> <span class="opt" data-i18n="common.opt">(optional)</span></label>
             <input type="text" id="email-from-name" placeholder="Yuvomi">
+          </div>
           </div>
         </div>
         <div class="error-banner" id="email-err" role="alert"></div>
@@ -1089,17 +1367,20 @@
         <p data-i18n="storage.subtitle">Where your data lives on the server, and where copies of it go. All optional - the defaults work.</p>
       </div>
       <div class="card-body">
+        <div class="inset-group">
         <div class="field">
           <label for="adv-data-dir" data-i18n="advanced.dataDirLabel">Host data folder</label>
           <input type="text" id="adv-data-dir" placeholder="./data">
           <div class="hint" data-i18n="advanced.dataDirHint">Where the database and app data live on the server. Leave empty to use ./data next to the compose file.</div>
         </div>
+        </div>
 
         <div class="group-label" data-i18n="storage.sectionBackups">Backups</div>
-        <div class="toggle-card">
+        <div class="inset-group">
+        <div class="toggle-card" data-setup="adv-backup-enable">
           <button type="button" class="toggle-head" data-toggle="backup-body" aria-expanded="false" aria-controls="backup-body">
             <span data-i18n="advanced.backup">Automatic Backups</span>
-            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="backup-body">
             <div class="field">
@@ -1116,13 +1397,13 @@
             </div>
           </div>
         </div>
-        <div class="toggle-card">
+        <div class="toggle-card" data-setup="adv-webdav-backup-enable">
           <button type="button" class="toggle-head" data-toggle="webdav-backup-body" aria-expanded="false" aria-controls="webdav-backup-body">
             <span data-i18n="advanced.webdavBackup">Off-site Backups (WebDAV)</span>
-            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="webdav-backup-body">
-            <p class="hint" style="margin-bottom:12px" data-i18n="advanced.webdavBackupHint">Copy each backup to a WebDAV server (e.g. Nextcloud) so it survives a disk failure.</p>
+            <p class="hint" data-i18n="advanced.webdavBackupHint">Copy each backup to a WebDAV server (e.g. Nextcloud) so it survives a disk failure.</p>
             <div class="field">
               <label><input type="checkbox" id="adv-webdav-backup-enable"> <span data-i18n="advanced.webdavBackupEnable">Also send backups to WebDAV</span></label>
             </div>
@@ -1154,12 +1435,14 @@
             </div>
           </div>
         </div>
+        </div>
 
         <div class="group-label" data-i18n="storage.sectionDocuments">Document storage</div>
-        <div class="toggle-card">
+        <div class="inset-group">
+        <div class="toggle-card" data-setup="adv-document-local-enable">
           <button type="button" class="toggle-head" data-toggle="document-local-body" aria-expanded="false" aria-controls="document-local-body">
             <span data-i18n="advanced.documentLocal">Local Document Storage</span>
-            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="document-local-body">
             <div class="field">
@@ -1177,13 +1460,13 @@
             </div>
           </div>
         </div>
-        <div class="toggle-card">
+        <div class="toggle-card" data-setup="adv-document-webdav-enable">
           <button type="button" class="toggle-head" data-toggle="document-webdav-body" aria-expanded="false" aria-controls="document-webdav-body">
             <span data-i18n="advanced.documentWebdav">WebDAV Document Storage</span>
-            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="document-webdav-body">
-            <p class="hint" style="margin-bottom:12px" data-i18n="advanced.documentWebdavHint">Non-empty environment values override the corresponding settings stored in the database.</p>
+            <p class="hint" data-i18n="advanced.documentWebdavHint">Non-empty environment values override the corresponding settings stored in the database.</p>
             <div class="field">
               <label><input type="checkbox" id="adv-document-webdav-enable"> <span data-i18n="advanced.documentWebdavEnable">Store new documents on WebDAV</span></label>
             </div>
@@ -1212,13 +1495,13 @@
             </div>
                       </div>
         </div>
-        <div class="toggle-card">
+        <div class="toggle-card" data-setup="adv-document-google-drive-enable">
           <button type="button" class="toggle-head" data-toggle="document-google-drive-body" aria-expanded="false" aria-controls="document-google-drive-body">
             <span data-i18n="advanced.documentGoogleDrive">Google Drive Document Storage</span>
-            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="document-google-drive-body">
-            <p class="hint" style="margin-bottom:12px" data-i18n="advanced.documentGoogleDriveHint">Configure OAuth credentials here, then connect and explicitly select Google Drive in Document settings after installation.</p>
+            <p class="hint" data-i18n="advanced.documentGoogleDriveHint">Configure OAuth credentials here, then connect and explicitly select Google Drive in Document settings after installation.</p>
             <div class="field">
               <label><input type="checkbox" id="adv-document-google-drive-enable"> <span data-i18n="advanced.documentGoogleDriveEnable">Configure Google Drive for Documents</span></label>
             </div>
@@ -1246,6 +1529,7 @@
             </div>
           </div>
         </div>
+        </div>
 
         <div class="error-banner" id="storage-err" role="alert"></div>
       </div>
@@ -1262,14 +1546,16 @@
         <p data-i18n="advanced.subtitle">Single sign-on, access to your home network, and a few fine adjustments. All optional.</p>
       </div>
       <div class="card-body">
-        <div class="group-label" data-i18n="advanced.sectionIntegrations">Single sign-on</div>
-        <div class="toggle-card">
+        <!-- Ohne Label: ueber einer einzigen Zeile "Single Sign-On (OIDC)" stand
+             das Label "Single Sign-On" - derselbe Name zweimal untereinander. -->
+        <div class="inset-group">
+        <div class="toggle-card" data-setup="oidc-issuer oidc-client-id oidc-client-secret">
           <button type="button" class="toggle-head" data-toggle="oidc-body" aria-expanded="false" aria-controls="oidc-body">
             <span data-i18n="advanced.oidc">Single Sign-On (OIDC)</span>
-            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="oidc-body">
-            <p class="hint" style="margin-bottom:12px" data-i18n="advanced.oidcHint">Fill in all four fields to enable SSO, or leave them empty.</p>
+            <p class="hint" data-i18n="advanced.oidcHint">Fill in all four fields to enable SSO, or leave them empty.</p>
             <div class="field">
               <label for="oidc-issuer" data-i18n="advanced.oidcIssuerLabel">Issuer URL</label>
               <input type="text" id="oidc-issuer" placeholder="https://auth.example.com/application/o/oikos/">
@@ -1300,11 +1586,7 @@
             </div>
           </div>
         </div>
-
-
-
-
-
+        </div>
 
         <!-- Die drei Freigaben stehen zusammen, weil sie DIESELBE Frage beantworten:
              darf Yuvomi Ziele im eigenen Netz erreichen? Sie hingen vorher an drei
@@ -1313,11 +1595,12 @@
              sie laengst zu einer Zeile zusammen und begruendet das dort auch; was sie
              als eine Auskunft zeigt, wird hier als eine Frage gestellt. -->
         <div class="group-label" data-i18n="advanced.sectionPrivateNetwork">Access to your home network</div>
-        <p class="hint" style="margin-bottom:12px" data-i18n="advanced.privateNetworkHint">Yuvomi refuses connections to addresses on your own network by default, which protects against a server being tricked into reaching internal services. Enable what you actually run at home.</p>
+        <p class="group-note" data-i18n="advanced.privateNetworkHint">Yuvomi refuses connections to addresses on your own network by default, which protects against a server being tricked into reaching internal services. Enable what you actually run at home.</p>
         <!-- Die drei Einzel-Hints lagen fertig uebersetzt in allen 24 Locales,
              wurden aber nie gerendert - dabei tragen genau sie die Anker
              (Mealie, Tandoor, Nextcloud), an denen ein Erstinstallierer erkennt,
              ob ihn die Freigabe betrifft. -->
+        <div class="inset-group">
         <div class="field">
           <label><input type="checkbox" id="adv-ics-private"> <span data-i18n="advanced.icsPrivateNetwork">Allow calendar subscriptions from your home network</span></label>
           <div class="hint" data-i18n="advanced.icsPrivateNetworkHint">Needed for ICS feeds from devices on your own network. Lifts the SSRF protection for calendar subscriptions.</div>
@@ -1334,11 +1617,13 @@
           <label><input type="checkbox" id="adv-document-webdav-private"> <span data-i18n="advanced.documentWebdavPrivateNetwork">Allow a WebDAV target on your home network</span></label>
           <div class="hint" data-i18n="advanced.documentWebdavPrivateNetworkHint">Needed for a Nextcloud on your own network. Lifts the SSRF protection for this target.</div>
         </div>
+        </div>
 
         <div class="group-label" data-i18n="advanced.sectionMore">More options</div>
         <!-- Stand hart auf 15 im Code und wurde bei jedem weiteren Lauf wieder
              auf 15 zurückgeschrieben - wer wegen iCloud-Ratenbegrenzung auf 60
              gestellt hatte, verlor die Einstellung stillschweigend. -->
+        <div class="inset-group">
         <div class="field">
           <label for="adv-sync-interval" data-i18n="advanced.syncIntervalLabel">Calendar sync interval (minutes)</label>
           <input type="number" id="adv-sync-interval" min="5" max="1440" step="5" placeholder="15">
@@ -1353,6 +1638,7 @@
           <label for="adv-push-subject" data-i18n="advanced.pushSubjectLabel">Push contact address</label>
           <input type="text" id="adv-push-subject" placeholder="mailto:admin@example.com">
           <div class="hint" data-i18n="advanced.pushSubjectHint">Sent to push services as a contact for your server. Leave empty to use the default.</div>
+        </div>
         </div>
 
         <div class="error-banner" id="adv-err" role="alert"></div>
@@ -1372,45 +1658,90 @@
       </div>
       <div class="card-body">
         <div class="info-banner" data-i18n="review.finalNote">This writes your .env (an existing one is backed up) and starts the container.</div>
-        <div class="review-grid">
-          <div class="review-key" data-i18n="review.host">Host</div>           <div id="rv-host"></div>
-          <div class="review-key" data-i18n="review.port">Port</div>           <div id="rv-port"></div>
-          <div class="review-key" data-i18n="review.tz">Timezone</div>       <div id="rv-tz"></div>
-          <div class="review-key" data-i18n="review.access">Access</div>       <div id="rv-access"></div>
-          <!-- Der einzige Wert, dessen Fehler AUSSCHLIESSLICH still auftritt:
-               falsch gesetzt zeigen Reset- und Einladungslinks ins Leere, und
-               das faellt erst Wochen spaeter auf. Er wurde auf Schritt 1
-               erfragt und danach nirgends mehr gezeigt - waehrend die Seite
-               drei SSRF-Schalter listet, die sofort sichtbar scheitern. -->
-          <div class="review-key" data-i18n="review.baseUrl">Public address</div><div id="rv-base-url"></div>
-          <!-- Hier standen acht Punkte hinter „SESSION_SECRET" und
-               „DB_ENCRYPT_KEY". Beides war unbrauchbar: die Maskierung verbarg
-               genau den Wert, den eine Prüfseite prüfbar machen soll, und
-               DB_ENCRYPT_KEY war nicht einmal der echte Variablenname (er heißt
-               DB_ENCRYPTION_KEY) - wer danach in seiner .env suchte, fand nichts.
-               Die nützliche Auskunft ist nicht der Wert, sondern was mit ihm
-               geschieht: neu erzeugt oder aus der bestehenden .env übernommen. -->
-          <div class="review-key" data-i18n="review.sessionSecret">Session key</div> <div id="rv-session-secret"></div>
-          <div class="review-key" data-i18n="review.dbKey">Database key</div>        <div id="rv-db-key"></div>
-          <div class="review-key" data-i18n="review.weather">Weather</div>        <div id="rv-weather"></div>
-          <div class="review-key" data-i18n="review.google">Google Calendar</div><div id="rv-google"></div>
-          <div class="review-key" data-i18n="review.apple">Apple CalDAV</div>   <div id="rv-apple"></div>
-          <div class="review-key" data-i18n="review.outlook">Outlook Calendar</div><div id="rv-outlook"></div>
-          <div class="review-key" data-i18n="review.email">Email</div>          <div id="rv-email"></div>
-          <div class="review-key" data-i18n="review.oidc">Single Sign-On</div>  <div id="rv-oidc"></div>
-          <div class="review-key" data-i18n="review.backups">Backups</div>       <div id="rv-backups"></div>
-          <div class="review-key" data-i18n="review.webdavBackup">Off-site backups</div><div id="rv-webdav-backup"></div>
-          <div class="review-key" data-i18n="review.documentLocal">Local documents</div><div id="rv-document-local"></div>
-          <div class="review-key" data-i18n="review.documentWebdav">WebDAV documents</div><div id="rv-document-webdav"></div>
-          <div class="review-key" data-i18n="review.documentGoogleDrive">Google Drive documents</div><div id="rv-document-google-drive"></div>
-          <!-- Der Host-Ordner ist ein Mount, kein Detail: liegt er falsch, sind
-               die Daten beim nächsten `pull && up -d` weg. -->
-          <div class="review-key" data-i18n="review.dataDir">Data folder</div><div id="rv-data-dir"></div>
-          <!-- Und die beiden SSRF-Aufhebungen: der Wizard fragt sie ab, die
-               Prüfseite zeigte sie nicht. Eine Prüfseite, die ausgerechnet die
-               sicherheitsrelevanten Schalter auslässt, prüft das Falsche. -->
-          <div class="review-key" data-i18n="review.privateNetwork">Private-network access</div><div id="rv-private-network"></div>
-        </div>
+        <!-- Gruppiert nach den Schritten, aus denen die Werte kommen - jede Gruppe
+             mit einem Weg zurueck. Vorher standen 20 Zeilen ungegliedert
+             untereinander, 11 davon mit einem Strich (Critique 2026-09-29).
+             Was nicht eingerichtet ist, steht je Gruppe in EINER Zeile.
+             "Aendern" fuehrt zum ersten Schritt der Gruppe; "Weiter" fuehrt nach
+             ihrem letzten zurueck hierher, die Schritte dazwischen pruefen sich
+             dabei erneut (siehe next()). Die Werte setzt renderReview(). -->
+        <section class="rv-group" aria-labelledby="rvg-config">
+          <div class="group-head">
+            <h3 class="group-label" id="rvg-config" data-i18n="config.title">Basic Configuration</h3>
+            <!-- aria-labelledby: fuenf Knoepfe "Aendern" waren in der Elementliste
+                 eines Screenreaders nicht unterscheidbar. -->
+            <button type="button" class="group-edit" id="rve-config" data-edit="config" aria-labelledby="rve-config rvg-config" data-i18n="review.edit">Change</button>
+          </div>
+          <dl class="inset-group">
+            <div class="rv-row"><dt data-i18n="review.host">Host</dt><dd id="rv-host"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.port">Port</dt><dd id="rv-port"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.tz">Timezone</dt><dd id="rv-tz"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.access">Access</dt><dd id="rv-access"></dd></div>
+            <!-- Der einzige Wert, dessen Fehler AUSSCHLIESSLICH still auftritt:
+                 falsch gesetzt zeigen Reset- und Einladungslinks ins Leere, und
+                 das faellt erst Wochen spaeter auf. -->
+            <div class="rv-row"><dt data-i18n="review.baseUrl">Public address</dt><dd id="rv-base-url"></dd></div>
+          </dl>
+        </section>
+        <section class="rv-group" aria-labelledby="rvg-secrets">
+          <div class="group-head">
+            <h3 class="group-label" id="rvg-secrets" data-i18n="secrets.title">Security Keys</h3>
+            <button type="button" class="group-edit" id="rve-secrets" data-edit="secrets" aria-labelledby="rve-secrets rvg-secrets" data-i18n="review.edit">Change</button>
+          </div>
+          <!-- Nicht der Wert, sondern was mit ihm geschieht: neu erzeugt oder aus
+               der bestehenden .env uebernommen. Die Schluessel selbst erscheinen
+               hier nie. -->
+          <dl class="inset-group">
+            <div class="rv-row"><dt data-i18n="review.sessionSecret">Session key</dt><dd id="rv-session-secret"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.dbKey">Database key</dt><dd id="rv-db-key"></dd></div>
+          </dl>
+        </section>
+        <section class="rv-group" aria-labelledby="rvg-integrations">
+          <div class="group-head">
+            <h3 class="group-label" id="rvg-integrations" data-i18n="review.groupIntegrations">Integrations</h3>
+            <!-- Die Gruppe umfasst drei Schritte: data-edit-until sagt, nach
+                 welchem es zurueck zur Pruefung geht. -->
+            <button type="button" class="group-edit" id="rve-integrations" data-edit="weather" data-edit-until="email" aria-labelledby="rve-integrations rvg-integrations" data-i18n="review.edit">Change</button>
+          </div>
+          <dl class="inset-group">
+            <div class="rv-row"><dt data-i18n="review.weather">Weather</dt><dd id="rv-weather"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.google">Google Calendar</dt><dd id="rv-google"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.apple">Apple CalDAV</dt><dd id="rv-apple"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.outlook">Outlook Calendar</dt><dd id="rv-outlook"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.email">Email</dt><dd id="rv-email"></dd></div>
+            <div class="rv-row rv-row--unset"><dt data-i18n="review.notSetUp">Not set up</dt><dd id="rv-integrations-unset"></dd></div>
+          </dl>
+        </section>
+        <section class="rv-group" aria-labelledby="rvg-storage">
+          <div class="group-head">
+            <h3 class="group-label" id="rvg-storage" data-i18n="storage.title">Storage &amp; backups</h3>
+            <button type="button" class="group-edit" id="rve-storage" data-edit="storage" aria-labelledby="rve-storage rvg-storage" data-i18n="review.edit">Change</button>
+          </div>
+          <dl class="inset-group">
+            <!-- Der Host-Ordner ist ein Mount, kein Detail: liegt er falsch, sind
+                 die Daten beim nächsten `pull && up -d` weg. -->
+            <div class="rv-row"><dt data-i18n="review.dataDir">Data folder</dt><dd id="rv-data-dir"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.backups">Backups</dt><dd id="rv-backups"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.webdavBackup">Off-site backups</dt><dd id="rv-webdav-backup"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.documentLocal">Local documents</dt><dd id="rv-document-local"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.documentWebdav">WebDAV documents</dt><dd id="rv-document-webdav"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.documentGoogleDrive">Google Drive documents</dt><dd id="rv-document-google-drive"></dd></div>
+            <div class="rv-row rv-row--unset"><dt data-i18n="review.notSetUp">Not set up</dt><dd id="rv-storage-unset"></dd></div>
+          </dl>
+        </section>
+        <section class="rv-group" aria-labelledby="rvg-advanced">
+          <div class="group-head">
+            <h3 class="group-label" id="rvg-advanced" data-i18n="advanced.title">Advanced Settings</h3>
+            <button type="button" class="group-edit" id="rve-advanced" data-edit="advanced" aria-labelledby="rve-advanced rvg-advanced" data-i18n="review.edit">Change</button>
+          </div>
+          <dl class="inset-group">
+            <div class="rv-row"><dt data-i18n="review.oidc">Single Sign-On</dt><dd id="rv-oidc"></dd></div>
+            <!-- Die SSRF-Aufhebungen: eine Pruefseite, die ausgerechnet die
+                 sicherheitsrelevanten Schalter auslaesst, prueft das Falsche. -->
+            <div class="rv-row"><dt data-i18n="review.privateNetwork">Private-network access</dt><dd id="rv-private-network"></dd></div>
+            <div class="rv-row rv-row--unset"><dt data-i18n="review.notSetUp">Not set up</dt><dd id="rv-advanced-unset"></dd></div>
+          </dl>
+        </section>
         <div class="error-banner" id="rev-err" role="alert"></div>
       </div>
       <div class="card-foot">
@@ -1480,6 +1811,7 @@
         <p data-i18n="admin.subtitle">Set up your first login. This account has full access to Yuvomi.</p>
       </div>
       <div class="card-body">
+        <div class="inset-group">
         <div class="field">
           <label for="adm-user" data-i18n="admin.userLabel">Username</label>
           <!-- required: die Wizard-Konvention ist "alles optional" - gerade darum
@@ -1505,6 +1837,7 @@
         <div class="field">
           <label for="adm-conf" data-i18n="admin.confLabel">Confirm Password</label>
           <input type="password" id="adm-conf" autocomplete="new-password" required aria-required="true">
+        </div>
         </div>
         <div class="error-banner" id="adm-err" role="alert"></div>
       </div>
@@ -1568,6 +1901,7 @@
                Instanz-Adresse gehängt (siehe fillNextSteps). -->
           <div class="next-steps">
             <div class="group-label" data-i18n="done.nextTitle">Next up</div>
+            <div class="inset-group">
             <a class="next-step" id="next-invite" href="#" target="_blank" rel="noopener">
               <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
               <span><b data-i18n="done.nextInvite">Invite your family</b><br><span data-i18n="done.nextInviteDesc">Create invitation links so everyone picks their own password.</span></span>
@@ -1580,12 +1914,14 @@
               <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
               <span><b data-i18n="done.nextInstall">Install it on your phones</b><br><span data-i18n="done.nextInstallDesc">Open Yuvomi on a phone and add it to the home screen - it works offline.</span></span>
             </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
   </main>
+  </div>
 
   <!-- Der Sprachumschalter steht am ENDE des Dokuments, nicht davor.
        showStep() setzt den Fokus bei jedem Schrittwechsel auf die Ueberschrift
@@ -1654,6 +1990,12 @@ const UNNUMBERED = new Set(['welcome', 'docker', 'done']);
 let flow = FLOWS.advanced;
 let mode = 'advanced';
 let currentStep = 0;
+// Einstieg und Abschluss stehen einspaltig: vor der Wahl des Weges gibt es
+// keine Schritte, die die Liste zeigen koennte, danach ist sie nur Rueckschau.
+const SOLO_STEPS = new Set(['welcome', 'done']);
+// Rueckweg zur Pruefseite: Index des Schritts, nach dem "Weiter" wieder auf
+// der Pruefseite landet. null = der normale Weg vorwaerts. Siehe next().
+let reviewReturn = null;
 
 // Persistenter Knoten für die Google-Redirect-URI: applyRich baut die Hint-Kinder
 // bei jedem Sprachwechsel neu, dieser <code>-Knoten behält seinen Text.
@@ -1741,6 +2083,8 @@ function localize() {
   // die Werte ("Neu erzeugt", "Direkt / HTTP") kommen aus renderReview - ohne
   // diesen Aufruf blieb der Kontrollschirm nach einem Sprachwechsel zweisprachig.
   if (wizardReady) renderReview();
+  // Die Badges tragen kein data-i18n (sie haengen am Zustand), also hier.
+  refreshBadges();
   applyStepCounters();
 }
 
@@ -2082,6 +2426,8 @@ function showStep(n) {
     if (el) el.classList.toggle('active', name === active);
   });
   setProgress(n);
+  $('shell').classList.toggle('shell--solo', SOLO_STEPS.has(active));
+  renderStepNav();
   window.scrollTo(0, 0);
   // Fokus auf die Überschrift des neuen Schritts, damit Tastatur-/Screenreader-
   // Nutzer der Navigation folgen (WCAG 2.4.3). preventScroll verhindert Sprünge.
@@ -2102,7 +2448,89 @@ function showStep(n) {
   onEnterStep(active);
 }
 
-function next() { showStep(currentStep + 1); }
+/**
+ * Einen Schritt vorwaerts - oder, nach einem "Aendern" von der Pruefseite aus,
+ * zurueck dorthin.
+ *
+ * Der Rueckweg springt NICHT direkt auf die Pruefseite. Die Schritte haengen
+ * aneinander: der Host aus Schritt 1 steckt in drei Redirect-URIs, die erst
+ * adv-next endgueltig setzt, und die Drive-Pruefung in storage-next liest die
+ * Google-Zugangsdaten aus dem Kalenderschritt. Ein Sprung haette diese Werte
+ * auf dem alten Stand gelassen - die Pruefseite zeigte dann etwas anderes als
+ * das, was in die .env geht. Stattdessen druecken wir fuer jeden Schritt
+ * dazwischen dessen eigenes "Weiter": dieselbe Pruefung wie beim ersten Mal,
+ * und scheitert sie, bleibt der Nutzer genau dort stehen, mit Fehler und
+ * markiertem Feld.
+ */
+function next() {
+  const target = currentStep + 1;
+  showStep(target);
+  // onEnterStep('review') hat reviewReturn beim Ankommen schon geloescht.
+  if (reviewReturn !== null && target > reviewReturn) {
+    $(`step-${flow[target]}`)?.querySelector('.card-foot .btn-primary')?.click();
+  }
+}
+
+/**
+ * Zu einem frueheren Schritt zurueck (Schrittliste, "Aendern" der Pruefseite).
+ * Nur rueckwaerts: vorwaerts fuehrt allein "Weiter", damit kein Schritt seine
+ * Pruefung verliert. Kommt der Sprung von der Pruefseite, fuehrt "Weiter" nach
+ * `until` wieder dorthin zurueck.
+ */
+function jumpBack(name, until = name) {
+  const idx = flow.indexOf(name);
+  if (idx < 0 || idx >= currentStep) return;
+  if (flow[currentStep] === 'review') reviewReturn = Math.max(idx, flow.indexOf(until));
+  showStep(idx);
+}
+
+/**
+ * Die Schrittliste auf den Stand des Weges bringen. Zeigt nur die nummerierten
+ * Schritte des gewaehlten Weges, in derselben Zaehlung wie "Schritt n von m".
+ * Zurueck geht es nur, solange noch nichts geschrieben ist: ab dem Start des
+ * Containers steht die .env, und ein Schritt davor aenderte nichts mehr.
+ */
+function renderStepNav() {
+  const nums = flow.filter(s => !UNNUMBERED.has(s));
+  const docker = flow.indexOf('docker');
+  const canReturn = docker === -1 || currentStep < docker;
+  document.querySelectorAll('[data-nav-step]').forEach(item => {
+    const name = item.dataset.navStep;
+    const pos = nums.indexOf(name);
+    item.hidden = pos === -1;
+    if (pos === -1) return;
+    const idx = flow.indexOf(name);
+    const state = idx === currentStep ? 'current' : idx < currentStep ? 'done' : 'upcoming';
+    item.dataset.state = state;
+    item.querySelector('.steps-nav__mark').textContent = String(pos + 1);
+    const link = item.querySelector('button');
+    link.disabled = !(state === 'done' && canReturn);
+    if (state === 'current') link.setAttribute('aria-current', 'step');
+    else link.removeAttribute('aria-current');
+  });
+}
+
+/**
+ * Die Akkordeon-Abzeichen aus dem Zustand ihrer Felder setzen: "Eingerichtet",
+ * sobald alle in data-setup genannten Felder gefuellt bzw. angehakt sind, sonst
+ * "Optional". EINE Funktion fuer alle Karten - die Regel steht im Markup der
+ * Karte, nicht in neun Kopien hier.
+ */
+function refreshBadges() {
+  document.querySelectorAll('.toggle-card[data-setup]').forEach(card => {
+    const ready = card.dataset.setup.split(/\s+/).every(id => {
+      const el = $(id);
+      if (!el) return false;
+      return el.type === 'checkbox' ? el.checked : el.value.trim() !== '';
+    });
+    const badge = card.querySelector('.toggle-badge');
+    if (!badge) return;
+    badge.dataset.state = ready ? 'set' : 'optional';
+    badge.textContent = t(ready ? 'common.setUp' : 'common.optional');
+  });
+}
+document.addEventListener('input', refreshBadges);
+document.addEventListener('change', refreshBadges);
 
 /** Schritt-Eintritts-Hooks: was beim Anzeigen eines Schritts vorbereitet wird. */
 function onEnterStep(name) {
@@ -2117,6 +2545,8 @@ function onEnterStep(name) {
     $('simple-next').classList.remove('is-armed');
     $('simple-armed-note').textContent = '';
   } else if (name === 'review') {
+    // Angekommen: der Rueckweg ist gegangen, "Weiter" heisst wieder vorwaerts.
+    reviewReturn = null;
     renderReview();
     // Bestätigungszustand zurücksetzen, falls der Nutzer erneut hierher
     // navigiert - dieselbe Entwaffnung wie beim Einfach-Pfad oben.
@@ -2291,6 +2721,7 @@ async function startFlow(m) {
   }
   mode = m;
   flow = FLOWS[m];
+  reviewReturn = null;
   applyStepCounters();
   if (m === 'simple') applySimpleDefaults();
   showStep(1);
@@ -2427,6 +2858,18 @@ document.addEventListener('click', async e => {
     // Beim Öffnen die Sektion in Sicht holen, damit die neu erschienenen Felder
     // nicht unter der Sticky-Fußzeile verschwinden (v. a. mobil).
     if (open) toggleBtn.scrollIntoView({ block: 'nearest' });
+    return;
+  }
+
+  const goto = e.target.closest('[data-goto]');
+  if (goto) {
+    if (!goto.disabled) jumpBack(goto.dataset.goto);
+    return;
+  }
+
+  const edit = e.target.closest('[data-edit]');
+  if (edit) {
+    jumpBack(edit.dataset.edit, edit.dataset.editUntil || edit.dataset.edit);
     return;
   }
 
@@ -2821,52 +3264,73 @@ $('adv-next').addEventListener('click', () => {
  * onEnterStep('review') und localize() dieselbe Funktion.
  */
 function renderReview() {
-  $('rv-host').textContent    = S.host;
-  $('rv-port').textContent    = S.port;
-  $('rv-tz').textContent      = S.tz;
-  $('rv-access').textContent  = S.SESSION_SECURE === 'true' ? t('review.accessProxy') : t('review.accessDirect');
-  $('rv-weather').textContent = S.WEATHER_LAT
-    ? t('review.weatherEnabled', { city: S.WEATHER_CITY || `${S.WEATHER_LAT}, ${S.WEATHER_LON}` })
-    : '-';
-  $('rv-google').textContent  = S.GOOGLE_CLIENT_ID ? t('review.configured') : '-';
-  $('rv-apple').textContent   = S.APPLE_USERNAME || '-';
-  $('rv-outlook').textContent = S.MS_CLIENT_ID ? t('review.configured') : '-';
-  $('rv-email').textContent   = S.EMAIL_SMTP_HOST ? (S.EMAIL_FROM_ADDRESS || t('review.configured')) : '-';
-  $('rv-oidc').textContent    = S.OIDC_ISSUER ? t('review.configured') : '-';
-  $('rv-backups').textContent = S.BACKUP_ENABLED === 'false' ? t('review.off') : t('review.on');
-  $('rv-webdav-backup').textContent = S.WEBDAV_BACKUP_ENABLED === 'true'
-    ? (S.WEBDAV_BACKUP_URL || t('review.configured'))
-    : '-';
-  // Beide Enden des Mounts zeigen: der Host-Ordner ist die Hälfte, die
-  // bisher fehlte und ohne die Uploads beim nächsten Update verschwanden.
-  $('rv-document-local').textContent = S.DOCUMENT_STORAGE_LOCAL_ENABLED === 'true'
-    ? `${S.DOCUMENT_STORAGE_LOCAL_DIR || './documents'} → ${S.DOCUMENT_STORAGE_LOCAL_PATH || '/documents'}`
-    : '-';
-  $('rv-document-webdav').textContent = S.DOCUMENT_STORAGE_WEBDAV_ENABLED === 'true'
-    ? (S.DOCUMENT_STORAGE_WEBDAV_URL || t('review.configured'))
-    : '-';
-  $('rv-document-google-drive').textContent = S.GOOGLE_DRIVE_REDIRECT_URI
-    ? t('review.configured')
-    : '-';
+  const setUp = t('common.setUp');
+  // Kein Wert zeigt je "-": was nicht eingerichtet ist, verschwindet aus seiner
+  // Zeile und steht stattdessen in der EINEN Zeile "Nicht eingerichtet" seiner
+  // Gruppe. Wo ein leerer Wert einen Default bedeutet, steht der Default.
+  fillReviewGroup(null, [
+    ['rv-host', S.host],
+    ['rv-port', S.port],
+    ['rv-tz', S.tz],
+    ['rv-access', S.SESSION_SECURE === 'true' ? t('review.accessProxy') : t('review.accessDirect')],
+    ['rv-base-url', S.BASE_URL || deriveBaseUrl()],
+  ]);
   // Was mit den Schlüsseln geschieht, nicht wie sie aussehen. preservedKeys
   // kennt die Antwort schon, seit der Preflight sie meldet.
-  for (const [id, key] of [['rv-session-secret', 'SESSION_SECRET'], ['rv-db-key', 'DB_ENCRYPTION_KEY']]) {
-    $(id).textContent = preservedKeys.has(key) ? t('review.keyPreserved') : t('review.keyGenerated');
-  }
-  $('rv-base-url').textContent = S.BASE_URL || '-';
-  $('rv-data-dir').textContent = S.DATA_DIR || './data';
-  // Die drei Schalter zusammen in einer Zeile: sie beantworten dieselbe Frage
-  // („darf Yuvomi Ziele im eigenen Netz erreichen?") und stehen im Wizard nur
-  // deshalb getrennt, weil sie an verschiedenen Feldern hängen.
+  fillReviewGroup(null, [['rv-session-secret', 'SESSION_SECRET'], ['rv-db-key', 'DB_ENCRYPTION_KEY']]
+    .map(([id, key]) => [id, t(preservedKeys.has(key) ? 'review.keyPreserved' : 'review.keyGenerated')]));
+  fillReviewGroup('rv-integrations-unset', [
+    ['rv-weather', S.WEATHER_LAT ? (S.WEATHER_CITY || `${S.WEATHER_LAT}, ${S.WEATHER_LON}`) : ''],
+    ['rv-google', S.GOOGLE_CLIENT_ID ? setUp : ''],
+    ['rv-apple', S.APPLE_USERNAME],
+    ['rv-outlook', S.MS_CLIENT_ID ? setUp : ''],
+    ['rv-email', S.EMAIL_SMTP_HOST ? (S.EMAIL_FROM_ADDRESS || setUp) : ''],
+  ]);
+  fillReviewGroup('rv-storage-unset', [
+    ['rv-data-dir', S.DATA_DIR || './data'],
+    ['rv-backups', S.BACKUP_ENABLED === 'false' ? t('review.off') : t('review.on')],
+    ['rv-webdav-backup', S.WEBDAV_BACKUP_ENABLED === 'true' ? (S.WEBDAV_BACKUP_URL || setUp) : ''],
+    // Beide Enden des Mounts zeigen: der Host-Ordner ist die Hälfte, die
+    // bisher fehlte und ohne die Uploads beim nächsten Update verschwanden.
+    ['rv-document-local', S.DOCUMENT_STORAGE_LOCAL_ENABLED === 'true'
+      ? `${S.DOCUMENT_STORAGE_LOCAL_DIR || './documents'} → ${S.DOCUMENT_STORAGE_LOCAL_PATH || '/documents'}`
+      : ''],
+    ['rv-document-webdav', S.DOCUMENT_STORAGE_WEBDAV_ENABLED === 'true' ? (S.DOCUMENT_STORAGE_WEBDAV_URL || setUp) : ''],
+    ['rv-document-google-drive', S.GOOGLE_DRIVE_REDIRECT_URI ? setUp : ''],
+  ]);
+  // Die vier Heimnetz-Schalter zusammen in einer Zeile: sie beantworten dieselbe
+  // Frage („darf Yuvomi Ziele im eigenen Netz erreichen?"). Ein Schalter ist
+  // nie "nicht eingerichtet", also steht die Zeile immer da - im Grundzustand
+  // mit "Aus".
   const privateNet = [
     S.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK === 'true' && t('review.privateNetworkIcs'),
     S.RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK === 'true' && t('review.privateNetworkRecipes'),
     S.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK === 'true' && t('review.privateNetworkWaste'),
     S.DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK === 'true' && t('review.privateNetworkWebdav'),
   ].filter(Boolean);
-  // "nicht freigegeben" statt "deaktiviert": der unberuehrte Default ist keine
-  // getroffene Entscheidung und soll auch nicht wie eine klingen.
-  $('rv-private-network').textContent = privateNet.length ? privateNet.join(', ') : t('review.notEnabled');
+  fillReviewGroup('rv-advanced-unset', [
+    ['rv-oidc', S.OIDC_ISSUER ? setUp : ''],
+    ['rv-private-network', privateNet.length ? privateNet.join(', ') : t('review.off')],
+  ]);
+}
+
+/**
+ * Eine Gruppe der Pruefseite fuellen. Leere Werte blenden ihre Zeile aus und
+ * sammeln deren Beschriftung (das schon uebersetzte <dt>) in der Zeile
+ * `unsetId`; die verschwindet, wenn alles eingerichtet ist.
+ */
+function fillReviewGroup(unsetId, rows) {
+  const unset = [];
+  for (const [id, value] of rows) {
+    const cell = $(id);
+    cell.textContent = value || '';
+    cell.parentElement.hidden = !value;
+    if (!value) unset.push(cell.previousElementSibling.textContent.trim());
+  }
+  if (!unsetId) return;
+  const cell = $(unsetId);
+  cell.textContent = unset.join(', ');
+  cell.parentElement.hidden = unset.length === 0;
 }
 
 $('rev-next').addEventListener('click', async () => {

@@ -2,6 +2,10 @@
   "title": "Yuvomi instellen",
   "common": {
     "continue": "Doorgaan",
+    "setUp": "Ingesteld",
+    "stepsNav": "Installatiestappen",
+    "stepDone": "(klaar)",
+    "groupServer": "Server",
     "back": "Terug",
     "generate": "Genereren",
     "generating": "Bezig met genereren…",
@@ -113,7 +117,6 @@
     "documentLocalEnable": "Nieuwe documenten in een lokale map opslaan",
     "documentLocalPathLabel": "Mappad",
     "documentLocalPathHint": "Pad in de container. Laat leeg voor /documents.",
-    "sectionIntegrations": "Eenmalige aanmelding",
     "errSchedule": "Ongeldige cron-planning (vijf door spaties gescheiden velden verwacht, bijv. 0 2 * * *).",
     "errKeep": "Te bewaren back-ups moet een positief getal zijn.",
     "webdavBackup": "Externe back-ups (WebDAV)",
@@ -165,6 +168,9 @@
   },
   "review": {
     "title": "Controleren",
+    "edit": "Wijzigen",
+    "notSetUp": "Niet ingesteld",
+    "groupIntegrations": "Integraties",
     "subtitle": "Controleer je instellingen voordat .env wordt geschreven en de container wordt gestart.",
     "host": "Host",
     "port": "Poort",
@@ -177,8 +183,6 @@
     "save": "Opslaan & Docker starten",
     "saving": "Wordt opgeslagen …",
     "errSave": "Opslaan van .env mislukt.",
-    "weatherEnabled": "ingeschakeld ({{city}})",
-    "configured": "geconfigureerd",
     "finalNote": "Dit schrijft je .env (een bestaande wordt geback-upt) en start de container.",
     "confirm": "Klik nogmaals om te bevestigen",
     "access": "Toegang",
@@ -188,8 +192,8 @@
     "oidc": "Single sign-on",
     "backups": "Back-ups",
     "webdavBackup": "Externe back-ups",
-    "on": "ingeschakeld",
-    "off": "uitgeschakeld",
+    "on": "Aan",
+    "off": "Uit",
     "documentGoogleDrive": "Google Drive-documenten",
     "sessionSecret": "Sessiesleutel",
     "dbKey": "Databasesleutel",
@@ -202,8 +206,7 @@
     "privateNetworkWaste": "Afvalophaal",
     "privateNetworkWebdav": "WebDAV-documenten",
     "baseUrl": "Openbaar adres",
-    "outlook": "Outlook-agenda",
-    "notEnabled": "niet vrijgegeven"
+    "outlook": "Outlook-agenda"
   },
   "docker": {
     "title": "Yuvomi wordt gestart",
@@ -260,8 +263,8 @@
     "subtitleExisting": "Yuvomi draait. Deze installatie heeft al een beheerdersaccount - log in met je bestaande gegevens."
   },
   "welcome": {
-    "title": "Welkom bij Yuvomi",
-    "subtitle": "Laten we je privé-gezinsplanner starten. Kies hoe je hem wilt instellen.",
+    "title": "Hoe wil je Yuvomi instellen?",
+    "subtitle": "Daarna draait je privé-gezinsplanner op je eigen server.",
     "simpleTitle": "Eenvoudige installatie",
     "simpleBadge": "Aanbevolen",
     "simpleDesc": "Wij regelen de technische details voor je. Ideaal om Yuvomi thuis te draaien.",
@@ -287,6 +290,7 @@
   },
   "email": {
     "title": "E-mail & wachtwoordherstel",
+    "groupSender": "Afzender",
     "subtitle": "Laat gezinsleden een vergeten wachtwoord per e-mail herstellen. Optioneel — sla over als je het niet nodig hebt.",
     "enable": "E-mailverzending inschakelen",
     "hint": "Gebruikt je eigen SMTP-server (mailprovider, zelf gehost of een transactionele dienst).",
