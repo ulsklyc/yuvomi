@@ -49,23 +49,19 @@ independent, so you use what fits and switch off what doesn't.
 | Instead of juggling… | Yuvomi gives you |
 |---|---|
 | a to-do &amp; task app | **Tasks** - Kanban, deadlines, recurring, multi-assignment |
-| a shared calendar subscription | **Calendar** - sync, subscriptions, per-event visibility |
-| a cost-splitting app | **Shared expenses** - shared costs with debt simplification |
-| a budgeting app | **Budget** - income, expenses, accounts, savings goals |
+| a family calendar app | **Calendar** - sync, subscriptions, per-event visibility |
 | a meal planner &amp; recipe app | **Meals &amp; Recipes** - weekly planner with shopping export |
 | a grocery-list app | **Shopping** - shared, aisle-organized lists |
-| a pantry &amp; expiry tracker | **Pantry** - stock, storage location, best-before dates |
+| a budgeting &amp; cost-splitting app | **Budget** - income, expenses, accounts, savings goals, shared costs with debt simplification |
 | a document manager | **Documents** - searchable family files in folders |
-| a home-inventory app | **Inventory** - owned belongings, purchase price, warranty, linked receipts |
-| a notes app &amp; contacts sync | **Notes &amp; Contacts** - Markdown notes, CardDAV sync |
 
 ## The modules talk to each other
 
 This is the part a folder full of separate apps cannot do:
 
 - **The week's meal plan writes the shopping list.** Plan Thursday, and the ingredients are on the list before anyone walks to the shop.
-- **The last jar out of the pantry is already on the list.** Tick items off after a shop and they book back into the pantry with their quantity.
-- **A ticked-off chore pays out.** Points on a task land on the assigned member's account, and the reward catalog spends them.
+- **The last jar out of the pantry goes on the list with one tap.** Tick items off after a shop and they book back into the pantry with their quantity.
+- **A ticked-off chore pays out.** Points on a task go to whoever did it - the assignee, or the person picked when it is ticked off - and the reward catalog spends them.
 - **A filed receipt hangs on the booking.** Upload it once and it belongs to the transaction, the shared expense and the inventory item at the same time.
 
 ## The twenty modules

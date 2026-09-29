@@ -49,23 +49,19 @@ eigenständig - nutze, was passt, und schalte ab, was nicht passt.
 | Statt zu jonglieren mit… | gibt dir Yuvomi |
 |---|---|
 | einer To-do- &amp; Aufgaben-App | **Aufgaben** - Kanban, Fristen, Wiederholungen, Mehrfachzuweisung |
-| einem Abo für den geteilten Kalender | **Kalender** - Sync, Abos, Sichtbarkeit je Termin |
-| einer App fürs Kostenteilen | **Gemeinsame Ausgaben** - geteilte Kosten mit Schuldenvereinfachung |
-| einer Budget-App | **Budget** - Einnahmen, Ausgaben, Konten, Sparziele |
+| einer Familienkalender-App | **Kalender** - Sync, Abos, Sichtbarkeit je Termin |
 | einer Essensplaner- &amp; Rezept-App | **Mahlzeiten &amp; Rezepte** - Wochenplaner mit Einkaufsexport |
 | einer Einkaufslisten-App | **Einkauf** - geteilte, nach Gang sortierte Listen |
-| einem Vorrats- und Ablauf-Tracker | **Vorrat** - Bestand, Lagerort, Mindesthaltbarkeit |
+| einer App für Budget und Kostenteilen | **Budget** - Einnahmen, Ausgaben, Konten, Sparziele, geteilte Kosten mit Schuldenvereinfachung |
 | einem Dokumentenmanager | **Dokumente** - durchsuchbare Familiendateien in Ordnern |
-| einer Hausinventar-App | **Inventar** - Besitz, Kaufpreis, Garantie, verknüpfte Belege |
-| einer Notiz-App &amp; Kontakte-Sync | **Notizen &amp; Kontakte** - Markdown-Notizen, CardDAV-Sync |
 
 ## Die Module reden miteinander
 
 Das ist der Teil, den ein Ordner voller Einzel-Apps nicht kann:
 
 - **Der Wochenplan schreibt die Einkaufsliste.** Donnerstag geplant, und die Zutaten stehen auf der Liste, bevor jemand losgeht.
-- **Das letzte Glas aus dem Vorrat steht schon auf der Liste.** Was nach dem Einkauf abgehakt ist, bucht sich mit Menge und Einheit zurück in den Vorrat.
-- **Eine erledigte Aufgabe zahlt aus.** Punkte auf einer Aufgabe landen auf dem Konto der zugewiesenen Person, und der Belohnungskatalog gibt sie aus.
+- **Das letzte Glas aus dem Vorrat kommt mit einem Tipp auf die Liste.** Was nach dem Einkauf abgehakt ist, bucht sich mit Menge und Einheit zurück in den Vorrat.
+- **Eine erledigte Aufgabe zahlt aus.** Punkte auf einer Aufgabe bekommt, wer sie erledigt hat - die zugewiesene Person oder die beim Abhaken ausgewählte -, und der Belohnungskatalog gibt sie aus.
 - **Ein abgelegter Beleg hängt an der Buchung.** Einmal hochgeladen, gehört er gleichzeitig zur Buchung, zur geteilten Ausgabe und zum Inventargegenstand.
 
 ## Die zwanzig Module

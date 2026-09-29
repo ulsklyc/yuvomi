@@ -133,6 +133,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   page no longer shows white text on bright green in dark mode, and the legal pages keep their
   header on one line on a phone.
 
+- **The website says less and promises only what the app does.** "What it replaces" is a short
+  band of six pairs instead of a ten-row table, the module catalog shows names first and puts the
+  descriptions behind "Show descriptions" on every screen size, and contacts sit under People as in
+  the app's menu. The pantry handoff no longer claims the last jar is "already" on the list (one
+  tap puts it there, and reminders are about best-before dates only), points are described as going
+  to whoever did the task, and a fourth question before you commit answers how safe access from
+  outside is: two-factor sign-in that an admin can require, invite links, SSO-only login and
+  signing out other devices. The same two sentences are corrected in the README. The page is about
+  1,350px shorter on a desktop and 800px shorter on a phone.
+
 - **New events in the calendar's week and day come from a double-click or a long press, not a
   click.** A single click or tap on empty time now only closes what is open, such as an event's
   popover, so clicking beside an event to put it away no longer opens "New event". With a mouse,

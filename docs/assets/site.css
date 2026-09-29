@@ -153,6 +153,7 @@
   --m-shopping: var(--f-kitchen);
   --m-pantry: var(--f-kitchen);
   --m-budget: var(--f-money);
+  --m-contacts: var(--f-people);
   --m-birthdays: var(--f-people);
   --m-health: var(--f-health);
   --m-documents: var(--f-records);

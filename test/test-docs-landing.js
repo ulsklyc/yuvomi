@@ -108,6 +108,13 @@
  *            Scope, TrueNAS sagt "optional" wie sein Formular; die
  *            Schluesselentscheidung steht vor dem Start (2026-09-29, Runde 2).
  *
+ *       (16) Die Zusagen der Landing-Page aus Runde 2 (2026-09-29): der Vorrat
+ *            setzt per Tipp auf die Liste und erinnert nur an Ablaufdaten, die
+ *            Punkte gehen an die erledigende Person, und jede Aussage der
+ *            Sicherheitsfrage haengt an ihrer Stelle im Server. Dazu unter (2)
+ *            das kurze Band gegen beide READMEs, unter (3) die Modulzahl ueber
+ *            Namen statt Klassen, unter (9) die Kontakte in ihrer Menuegruppe.
+ *
  * Ausführen: node --test test/test-docs-landing.js   (bzw. npm run test:docs-landing)
  */
 
@@ -211,55 +218,155 @@ test('der Kommentar-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
 
 // ── (2) Substitutionstabelle == README ───────────────────────────────────────
 
-/** Die zehn Zeilen aus der README-Tabelle "Instead of juggling… | Yuvomi gives you". */
-function readmeSwapRows() {
-  const readme = readFileSync(resolve(ROOT, 'README.md'), 'utf8');
+/**
+ * Seit Runde 2 der Critique (2026-09-29) ist `#swap` ein kurzes Band: je Zeile
+ * nur noch "statt X" und der Modulname, ohne die Beschreibung, die in der
+ * README-Tabelle rechts steht (auf der Seite steht sie im Modulkatalog weiter
+ * unten). Gekoppelt bleibt, was beide Flaechen gemeinsam zeigen: dieselben
+ * Paare, woertlich, in derselben Reihenfolge und Zahl - englisch gegen
+ * README.md, und die deutschen Modulnamen gegen README.de.md (die linke
+ * Spalte steht dort im Dativ, "mit einer ...", und ist deshalb nicht woertlich
+ * vergleichbar). Die README wurde dafuer auf dieselben sechs Paare gekuerzt;
+ * dass die Beschreibung rechts DORT bleibt, ist gewollt.
+ */
+function readmeSwapRows(file = 'README.md') {
+  const readme = readFileSync(resolve(ROOT, file), 'utf8');
   return readme.split('\n')
     .map((l) => l.match(/^\| (.+?) \| \*\*(.+?)\*\* - (.+?) \|$/))
     .filter(Boolean)
-    .map((m) => [decode(m[1]).trim(), decode(m[2]).trim(), decode(m[3]).trim()]);
+    .map((m) => [decode(m[1]).trim(), decode(m[2]).trim()]);
 }
 
-/** Dieselben Zeilen aus dem englischen Wörterbuch von index.html. */
-function pageSwapRows(html) {
-  const en = dictBlock(html, 'en');
+/** Dieselben Paare aus einem Woerterbuch von index.html: [von, Modulname]. */
+function pageSwapRows(html, lang = 'en') {
+  const block = dictBlock(html, lang);
   const rows = [];
   for (let i = 1; ; i++) {
-    const a = en.match(new RegExp(`\\bswap_${i}_a:'((?:[^'\\\\]|\\\\.)*)'`));
-    const b = en.match(new RegExp(`\\bswap_${i}_b:'<b>(.*?)</b> - ((?:[^'\\\\]|\\\\.)*)'`));
+    const a = block.match(new RegExp(`\\bswap_${i}_a:'((?:[^'\\\\]|\\\\.)*)'`));
+    const b = block.match(new RegExp(`\\bswap_${i}_b:'<b>(.*?)</b>((?:[^'\\\\]|\\\\.)*)'`));
     if (!a || !b) break;
-    rows.push([decode(a[1]).trim(), decode(b[1]).trim(), decode(b[2]).trim()]);
+    rows.push([decode(a[1]).trim(), decode(b[1]).trim(), b[2]]);
   }
   return rows;
 }
 
-test('die Substitutionszeilen stimmen woertlich mit der README-Tabelle ueberein', () => {
+/** Abweichungen zwischen Band und README-Tabellen, als lesbare Zeilen. */
+function swapFindings(html, readmeEn = readmeSwapRows('README.md'), readmeDe = readmeSwapRows('README.de.md')) {
+  const found = [];
+  const en = pageSwapRows(html, 'en');
+  const de = pageSwapRows(html, 'de');
+  if (en.length !== readmeEn.length) found.push(`Seite ${en.length} Paare, README.md ${readmeEn.length} Zeilen`);
+  if (de.length !== en.length) found.push(`T.de ${de.length} Paare, T.en ${en.length}`);
+  en.forEach((row, i) => {
+    if (row[2]) found.push(`swap_${i + 1}_b (en) traegt wieder eine Beschreibung: "${row[2]}"`);
+    const r = readmeEn[i];
+    if (!r || row[0] !== r[0] || row[1] !== r[1]) found.push(`Zeile ${i + 1} (en): Seite ${JSON.stringify(row.slice(0, 2))}, README ${JSON.stringify(r)}`);
+  });
+  de.forEach((row, i) => {
+    if (row[2]) found.push(`swap_${i + 1}_b (de) traegt wieder eine Beschreibung: "${row[2]}"`);
+    const r = readmeDe[i];
+    if (!r || row[1] !== r[1]) found.push(`Zeile ${i + 1} (de): Modul "${row[1]}", README.de.md "${r?.[1]}"`);
+  });
+  return found;
+}
+
+test('die Substitutionspaare stimmen woertlich mit den README-Tabellen ueberein', () => {
   const readme = readmeSwapRows();
-  const page = pageSwapRows(read('index.html'));
-
   assert.ok(readme.length >= 5, `README-Tabelle nicht gefunden oder zu kurz (${readme.length} Zeilen)`);
-  assert.equal(page.length, readme.length,
-    `Die Seite zeigt ${page.length} Zeilen, die README hat ${readme.length}. ` +
-    'Beide sind handgepflegt - wer eine aendert, aendert die andere mit.');
+  assert.deepEqual(swapFindings(read('index.html')), [],
+    'Band und README sind handgepflegt - wer eine Seite aendert, aendert die andere mit.');
+});
 
-  for (let i = 0; i < readme.length; i++) {
-    assert.deepEqual(page[i], readme[i],
-      `Zeile ${i + 1} weicht ab.\n  README: ${JSON.stringify(readme[i])}\n  Seite : ${JSON.stringify(page[i])}`);
-  }
+test('der Substitutions-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  // Die alte Zehnzeilen-README gegen das neue Band: Zahl und Paare weichen ab.
+  const longReadme = [...readmeSwapRows(), ['a pantry & expiry tracker', 'Pantry']];
+  assert.match(swapFindings(html, longReadme).join('\n'), /Seite \d+ Paare, README\.md \d+ Zeilen/);
+  // Ein Paar driftet nur auf der Seite.
+  const drift = html.replace("swap_2_a:'a family calendar app'", "swap_2_a:'a shared calendar subscription'");
+  assert.notEqual(drift, html, 'Vorbedingung: swap_2_a steht so im Woerterbuch');
+  assert.match(swapFindings(drift).join('\n'), /Zeile 2 \(en\)/);
+  // Die Beschreibung kehrt zurueck, oder ein deutscher Modulname weicht ab.
+  const desc = html.replace("swap_1_b:'<b>Tasks</b>'", "swap_1_b:'<b>Tasks</b> - Kanban, deadlines'");
+  assert.match(swapFindings(desc).join('\n'), /swap_1_b \(en\) traegt wieder eine Beschreibung/);
+  const deName = html.replace("swap_4_b:'<b>Einkauf</b>'", "swap_4_b:'<b>Einkaufen</b>'");
+  assert.notEqual(deName, html, 'Vorbedingung: swap_4_b (de) steht so im Woerterbuch');
+  assert.match(swapFindings(deName).join('\n'), /Zeile 4 \(de\)/);
 });
 
 // ── (3) Modulzahl == was die Seite zeigt ─────────────────────────────────────
 
-test('die Modulzahl der Proof-Leiste ist die Summe aus Feature-Zeilen und Modulkarten', () => {
+/**
+ * Was die Seite als Modul zeigt: die Feature-Karten (Name im Kicker `f_*_k`)
+ * und die kompakten Eintraege (`m_*_t`), jeweils mit dem englischen Namen.
+ *
+ * Bis Runde 2 zaehlte der Guard nur Klassen (feat-row + mod-card == Proof).
+ * Seit Notizen und Kontakte in ihren Menuegruppen stehen (Planen, Menschen),
+ * zeigt die Seite 21 Eintraege fuer 20 README-Zeilen: "Notes & Contacts" ist
+ * dort EINE Zeile. Der Guard vergleicht deshalb Namen statt Klassen - jede
+ * README-Zeile muss auf der Seite stehen, und eine Zeile "A & B" darf als
+ * zwei Eintraege A und B erscheinen, aber nur als beide zusammen.
+ */
+function pageModuleNames(html) {
+  const body = stripComments(html);
+  const from = body.indexOf('id="modGrid"');
+  const to = body.indexOf('id="modToggle"', from);
+  const en = dictBlock(html, 'en');
+  const grid = body.slice(from, to);
+  const keys = [
+    ...[...grid.matchAll(/class="feat-row[\s\S]*?data-t="(f_[a-z]+_k)"/g)].map((m) => m[1]),
+    ...[...grid.matchAll(/class="mod-card[\s\S]*?data-t="(m_[a-z]+_t)"/g)].map((m) => m[1]),
+  ];
+  return keys.map((k) => stripTags(unescapeJs(dictValue(en, k) || k)));
+}
+
+/** Die Modulnamen der README-Tabelle (`| **Name** | ... |`), aus dem Modulabschnitt. */
+function readmeModuleNames(file = 'README.md') {
+  const sections = readFileSync(resolve(ROOT, file), 'utf8').split(/^## /m).slice(1);
+  const rows = sections
+    .map((sec) => sec.split('\n').map((l) => l.match(/^\| \*\*(.+?)\*\* \| (.+?) \|$/)).filter(Boolean).map((m) => decode(m[1]).trim()))
+    .sort((a, b) => b.length - a.length)[0] || [];
+  return rows;
+}
+
+/** README-Zeilen, die die Seite nicht zeigt, und Seiteneintraege ohne README-Zeile. */
+function moduleCoverage(pageNames, readmeNames) {
+  const page = new Set(pageNames.map((n) => n.toLowerCase()));
+  const used = new Set();
+  const missing = [];
+  for (const name of readmeNames) {
+    const low = name.toLowerCase();
+    if (page.has(low)) { used.add(low); continue; }
+    const parts = low.split(' & ');
+    if (parts.length === 2 && parts.every((p) => page.has(p))) { parts.forEach((p) => used.add(p)); continue; }
+    missing.push(name);
+  }
+  const extra = [...page].filter((n) => !used.has(n));
+  return { missing, extra, shown: readmeNames.length - missing.length };
+}
+
+test('die Modulzahl der Proof-Leiste ist die Zahl der README-Module, die die Seite zeigt', () => {
   const html = read('index.html');
   const claimed = Number(html.match(/<b>(\d+)<\/b>\s*<span data-t="proof_modules"/)?.[1]);
-  const featureRows = (html.match(/class="feat-row/g) || []).length;
-  const modCards = (html.match(/class="mod-card/g) || []).length;
-
   assert.ok(Number.isInteger(claimed), 'Modulzahl in der Proof-Leiste nicht gefunden');
-  assert.equal(featureRows + modCards, claimed,
-    `Die Proof-Leiste behauptet ${claimed} Module, die Seite zeigt ${featureRows} Feature-Zeilen ` +
-    `plus ${modCards} Modulkarten = ${featureRows + modCards}.`);
+  const names = pageModuleNames(html);
+  assert.ok(names.length >= 15, `nur ${names.length} Moduleintraege gefunden - Extraktor gebrochen?`);
+  const { missing, extra, shown } = moduleCoverage(names, readmeModuleNames());
+  assert.deepEqual({ missing, extra }, { missing: [], extra: [] },
+    'Seite und README-Modultabelle zeigen verschiedene Module (eine Zeile "A & B" darf als A und B erscheinen).');
+  assert.equal(shown, claimed, `Die Proof-Leiste behauptet ${claimed} Module, die Seite zeigt ${shown} README-Module.`);
+});
+
+test('der Modulzahl-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const readme = readmeModuleNames();
+  assert.ok(readme.includes('Notes & Contacts'), 'Vorbedingung: die README fuehrt Notizen und Kontakte als eine Zeile');
+  const page = pageModuleNames(read('index.html'));
+  // Nur eine Haelfte der geteilten Zeile: die Kontakte fehlen.
+  const half = moduleCoverage(page.filter((n) => n !== 'Contacts'), readme);
+  assert.deepEqual([half.missing, half.extra], [['Notes & Contacts'], ['notes']]);
+  // Ein Eintrag ohne README-Zeile, und eine README-Zeile ohne Eintrag.
+  const odd = moduleCoverage([...page.filter((n) => n !== 'Backup'), 'Photos'], readme);
+  assert.deepEqual([odd.missing, odd.extra], [['Backup'], ['photos']]);
 });
 
 /**
@@ -303,17 +410,30 @@ test('die Modulzahl der Proof-Leiste ist die Zeilenzahl der README-Modultabelle'
  * steht in der Proof-Leiste und ist oben gegen Seite UND README gehalten.
  *
  * Die Regel ist deshalb jetzt allgemein: ein Zahlwort in einem Woerterbuchwert
- * ist nur erlaubt, wo diese Suite die Zahl nachzaehlt. Das sind die zehn
- * Zeilen der Substitutionstabelle ("Ten apps, one place."). Jede andere
- * Fundstelle ist eine Zahl, die niemand haelt, und faellt hier auf. Der
- * Markup-Fallback braucht keine eigene Pruefung: er ist ueber Kopplung (6)
- * an T.en gebunden.
+ * ist nur erlaubt, wo diese Suite die Zahl nachzaehlt. Jede andere Fundstelle
+ * ist eine Zahl, die niemand haelt, und faellt hier auf. Der Markup-Fallback
+ * braucht keine eigene Pruefung: er ist ueber Kopplung (6) an T.en gebunden.
+ *
+ * Seit Runde 2 (2026-09-29) nennt KEIN Titel mehr eine Zahl: "Ten apps, one
+ * place." wurde mit dem Band "Many apps", und "The three questions" stand
+ * noch da, als die vierte Frage kam - genau die Drift, gegen die dieser Guard
+ * steht, nur mit einem Zahlwort unterhalb seiner Liste. Die gezaehlten
+ * Schluessel pruefen deshalb zusaetzlich die kleinen Zahlwoerter (zwei bis
+ * neun): nennen swap_* oder long_title wieder eine Zahl, muss es die gezaehlte
+ * sein. Fuer alle anderen Werte bleiben die kleinen frei ("two values",
+ * "Two-way sync" zaehlen nichts).
  */
 const NUMBER_WORDS = {
   ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
   seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
   zehn: 10, zehnmal: 10, elf: 11, zwoelf: 12, zwölf: 12, dreizehn: 13, vierzehn: 14, fuenfzehn: 15,
   fünfzehn: 15, sechzehn: 16, siebzehn: 17, achtzehn: 18, neunzehn: 19, zwanzig: 20,
+};
+
+/** Kleine Zahlwoerter - nur an gezaehlten Schluesseln geprueft (siehe oben). */
+const SMALL_NUMBER_WORDS = {
+  two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+  zwei: 2, drei: 3, vier: 4, fünf: 5, fuenf: 5, sechs: 6, sieben: 7, acht: 8, neun: 9,
 };
 
 /** Alle Woerterbuchwerte eines Blocks als [Schluessel, Text], beide Quotierungen. */
@@ -323,10 +443,11 @@ function dictEntries(block) {
 }
 
 /** Jede Zahlwort-Fundstelle eines Blocks, als { key, word, value }. */
-function numberWordClaims(block) {
+function numberWordClaims(block, counted = {}) {
   const claims = [];
   for (const [key, text] of dictEntries(block)) {
-    for (const [word, value] of Object.entries(NUMBER_WORDS)) {
+    const words = key in counted ? { ...NUMBER_WORDS, ...SMALL_NUMBER_WORDS } : NUMBER_WORDS;
+    for (const [word, value] of Object.entries(words)) {
       // \b kennt kein ü/ö: die Grenze deshalb ueber Unicode-Buchstaben selbst.
       if (new RegExp(`(?<!\\p{L})${word}(?!\\p{L})`, 'iu').test(text)) claims.push({ key, word, value });
     }
@@ -337,24 +458,30 @@ function numberWordClaims(block) {
 /** Schluessel, deren Zahlwort gezaehlt wird, und die Zahl, die sie nennen muessen. */
 function countedKeys(html) {
   const swapRows = pageSwapRows(html).length;
-  return { swap_title: swapRows, swap_desc: swapRows };
+  const questions = (stripComments(html).match(/<dt data-t="long_q\d+"/g) || []).length;
+  return { swap_title: swapRows, swap_desc: swapRows, long_title: questions };
 }
 
 function unheldNumbers(html, block) {
   const counted = countedKeys(html);
-  return numberWordClaims(block)
+  return numberWordClaims(block, counted)
     .filter(({ key, value }) => counted[key] !== value)
     .map(({ key, word }) => `${key}: "${word}"` + (key in counted ? ` (gezaehlt: ${counted[key]})` : ' (von nichts gehalten)'));
 }
 
 test('ein Zahlwort steht nur dort, wo die Suite es nachzaehlt', () => {
   const html = read('index.html');
-  assert.equal(pageSwapRows(html).length, 10, 'Vorbedingung: die Substitutionstabelle hat zehn Zeilen');
+  const counted = countedKeys(html);
+  assert.equal(counted.swap_title, 6, 'Vorbedingung: das Band hat sechs Paare');
+  assert.equal(counted.long_title, 4, 'Vorbedingung: die Longevity-Sektion stellt vier Fragen');
   for (const lang of ['en', 'de']) {
     const block = dictBlock(html, lang);
     assert.ok(block, `${lang}-Woerterbuch nicht gefunden`);
-    assert.ok(numberWordClaims(block).some((c) => c.key === 'swap_title'),
-      `swap_title (${lang}) nennt kein Zahlwort mehr - Extraktor gebrochen oder Titel umgebaut?`);
+    // Der Extraktor muss das ganze Woerterbuch sehen, samt der gezaehlten
+    // Schluessel - sonst prueft der Guard still einen Ausschnitt.
+    const keys = dictEntries(block).map(([k]) => k);
+    assert.ok(keys.length >= 200, `nur ${keys.length} Woerterbuchwerte (${lang}) gelesen - Extraktor gebrochen?`);
+    for (const k of Object.keys(counted)) assert.ok(keys.includes(k), `${k} (${lang}) fehlt im Woerterbuch`);
     assert.deepEqual(unheldNumbers(html, block), [],
       `Zahlwoerter im ${lang}-Woerterbuch, die keiner Zaehlung entsprechen.`);
   }
@@ -362,24 +489,29 @@ test('ein Zahlwort steht nur dort, wo die Suite es nachzaehlt', () => {
 
 test('der Zahlwort-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const html = read('index.html');
+  const { swap_title: pairs, long_title: questions } = countedKeys(html);
   // Der Anlassfall ("dreizehn" ueber vierzehn Karten) und der Stand vor der
   // Critique vom 2026-09-29 - beide muessen anschlagen.
   const damaged = [
     "more_desc:'The other thirteen, each one independent.',",
     "ho_desc:'This is the part twenty separate apps cannot do.',",
-    "swap_title:'Nine apps, <em>one place.</em>',",
   ].join('\n');
   assert.deepEqual(unheldNumbers(html, damaged).sort(), [
     'ho_desc: "twenty" (von nichts gehalten)',
     'more_desc: "thirteen" (von nichts gehalten)',
   ], 'freie Zahlwoerter muessen gemeldet werden');
-  // Ein Zahlwort ausserhalb der Liste ("Nine") ist fuer den Guard unsichtbar -
-  // das ist die Grenze: er haelt die Zahlen, die Modul- und App-Mengen nennen.
-  assert.equal(numberWordClaims(damaged).filter((c) => c.key === 'swap_title').length, 0);
-  // Der gezaehlte Schluessel mit falscher Zahl schlaegt an, mit richtiger nicht.
-  assert.deepEqual(unheldNumbers(html, "swap_title:'Twelve apps, <em>one place.</em>',"),
-    ['swap_title: "twelve" (gezaehlt: 10)']);
-  assert.deepEqual(unheldNumbers(html, "swap_desc:'Zehn Apps, zehn Konten, zehnmal eure Daten.',"), []);
+  // Der Stand vor Runde 2 gegen die heutige Seite: zehn Zeilen im Titel, drei Fragen.
+  assert.deepEqual(unheldNumbers(html, "swap_title:'Ten apps, <em>one place.</em>',"),
+    [`swap_title: "ten" (gezaehlt: ${pairs})`]);
+  assert.deepEqual(unheldNumbers(html, "long_title:'The three questions worth asking first',"),
+    [`long_title: "three" (gezaehlt: ${questions})`]);
+  assert.deepEqual(unheldNumbers(html, "long_title:'Die drei Fragen, die man vorher stellen sollte',"),
+    [`long_title: "drei" (gezaehlt: ${questions})`]);
+  // Die richtige Zahl ist erlaubt, und ausserhalb der gezaehlten Schluessel
+  // bleiben kleine Zahlwoerter frei.
+  assert.deepEqual(unheldNumbers(html, "long_title:'The four questions worth asking first',"), []);
+  assert.deepEqual(unheldNumbers(html, "swap_desc:'Six apps, six accounts.',"), []);
+  assert.deepEqual(unheldNumbers(html, "qs_c2:'# two values: one for each secret',"), []);
   // Umlaut-Grenze: "zwölf" und "fünfzehn" werden gefunden, "Elfenbein" nicht.
   assert.deepEqual(numberWordClaims("a:'zwölf Tabs', b:'Elfenbein', c:'fünfzehn'").map((c) => c.key).sort(), ['a', 'c']);
 });
@@ -628,9 +760,20 @@ test('der Zwillings-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
  * setzen als der Woerterbuchwert. Was er nicht darf, ist etwas anderes behaupten.
  * ------------------------------------------------------------------------- */
 
-/** Alle `<tag data-t="key">…</tag>`-Paare einer Seite, als [key, Innentext]. */
+/**
+ * Alle `<tag data-t="key">…</tag>`-Paare einer Seite, als [key, Innentext].
+ *
+ * Skripte werden herausgeschnitten, wie in `usedKeys`. Bis Runde 2 (2026-09-29)
+ * galt hier "alles vor `var T =`" als Markup - und seit das Woerterbuch in
+ * index.html hinter der Proof-Leiste steht (Schritt 5), verglich dieser Guard
+ * nur noch Hero und Proof-Leiste: 23 Knoten von 220, Galerie bis Fusszeile
+ * ungeprueft, und die Mindestzahl (> 20) hielt ihn gruen. Sie steht deshalb
+ * jetzt je Seite (FALLBACK_FLOOR). Der Schnitt am
+ * Woerterbuch bleibt als zweite Stufe fuer Vorlagen ohne <script>.
+ */
 function fallbackNodes(html) {
-  const body = html.split(/\n\s*(?:var |const )?(?:DICT|T)\s*=/)[0];
+  const body = html.replace(/<script\b[^>]*>[\s\S]*?<\/script\b[^>]*>/gi, '')
+    .split(/\n\s*(?:var |const )?(?:DICT|T)\s*=/)[0];
   return [...body.matchAll(/<(\w+)[^>]*\sdata-t="([\w-]+)"[^>]*>([\s\S]*?)<\/\1>/g)]
     .map((m) => [m[2], stripTags(m[3])]);
 }
@@ -641,6 +784,9 @@ function englishText(block, key) {
   return raw === null ? null : stripTags(unescapeJs(raw));
 }
 
+/** Mindestzahl gepruefter Knoten je Seite - gemessen 212 (index) und 230 (install), 2026-09-29. */
+const FALLBACK_FLOOR = { 'index.html': 150, 'install.html': 160 };
+
 for (const page of ['index.html', 'install.html']) {
   test(`${page}: der Markup-Fallback sagt dasselbe wie das englische Woerterbuch`, () => {
     const html = read(page);
@@ -648,7 +794,8 @@ for (const page of ['index.html', 'install.html']) {
     assert.ok(en, 'en-Woerterbuch nicht gefunden');
 
     const nodes = fallbackNodes(html);
-    assert.ok(nodes.length > 20, `nur ${nodes.length} data-t-Knoten gefunden - Regex veraltet?`);
+    assert.ok(nodes.length >= FALLBACK_FLOOR[page],
+      `nur ${nodes.length} data-t-Knoten gefunden (Boden ${FALLBACK_FLOOR[page]}) - Regex veraltet oder Seite abgeschnitten?`);
 
     const drift = [];
     for (const [key, markup] of nodes) {
@@ -683,6 +830,24 @@ test('der Fallback-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   assert.equal(key, 'tb_out_v');
   assert.notEqual(markup, englishText(en, key),
     'der Guard sieht den Drift nicht, gegen den er geschrieben wurde');
+});
+
+test('der Fallback-Guard sieht auch Markup HINTER einem fruehen Woerterbuch', () => {
+  // Der Stand seit Schritt 5: das Woerterbuch steht als Skript mitten im Body.
+  // Der Knoten dahinter muss geprueft werden - der alte Schnitt sah ihn nie.
+  const html = [
+    '<p data-t="hero_sub">Early.</p>',
+    '<script>',
+    '  var T = {',
+    "    en: { hero_sub:'Early.', gal_title:'Your plans' },",
+    "    de: { hero_sub:'Frueh.', gal_title:'Eure Plaene' }",
+    '  };',
+    '</script>',
+    '<h2 data-t="gal_title">Something else entirely</h2>',
+  ].join('\n');
+  assert.deepEqual(fallbackNodes(html).map(([k]) => k), ['hero_sub', 'gal_title']);
+  const oldCut = html.split(/\n\s*(?:var |const )?(?:DICT|T)\s*=/)[0];
+  assert.equal([...oldCut.matchAll(/data-t="/g)].length, 1, 'Vorbedingung: der alte Schnitt endet vor gal_title');
 });
 
 test('der Fallback-Guard vergleicht Text, nicht Markup', () => {
@@ -1394,19 +1559,22 @@ test('die Installationsseiten-Guards erkennen den Schaden, gegen den sie gebaut 
  * statt ungeprueft durchzurutschen. `null` heisst: steht nicht im Menue.
  */
 const PAGE_MODULE = {
-  f_tasks: 'tasks', m_cal: 'calendar', m_sched: 'schedule', m_notes: 'notes',
+  f_tasks: 'tasks', m_cal: 'calendar', m_sched: 'schedule', m_notes: 'notes', m_contacts: 'contacts',
   f_meals: 'meals', m_recipes: 'recipes', m_shop: 'shopping', m_pantry: 'pantry',
   m_house: 'housekeeping', m_waste: 'waste', m_docs: 'documents', m_inv: 'inventory', m_rewards: 'rewards',
   f_health: 'health', m_bday: 'birthdays', f_budget: 'budget',
   m_family: null, m_rem: null, m_api: null, m_backup: null,
 };
 /**
- * Notizen & Kontakte ist EINE Karte, wie in der README-Modultabelle (deren
- * Zeilenzahl die Proof-Leiste haelt). Im Menue stehen die beiden in
- * verschiedenen Gruppen; die Karte steht bei den Notizen, und Kontakte reist
- * mit. Das ist die eine erlaubte Abweichung, und sie steht hier ausdruecklich.
+ * Bis Runde 2 (2026-09-29) stand hier eine Ausnahme: `RIDES_ALONG = { contacts:
+ * 'notes' }`. Notizen & Kontakte war EINE Karte (wie die README-Zeile) und
+ * stand bei den Notizen; die Kontakte "reisten mit" und wurden gegen ihre
+ * Menuegruppe gar nicht geprueft. Deshalb fing der Guard nie, dass die Seite
+ * "gegliedert wie die App" sagte und die Kontakte unter Planen zeigte, waehrend
+ * die App sie unter Menschen fuehrt - die Ausnahme WAR der blinde Fleck. Jetzt
+ * stehen beide als eigene Eintraege in ihrer Gruppe und werden wie jedes Modul
+ * geprueft; die README-Zeile halten die Modulzahl-Guards unter (3).
  */
-const RIDES_ALONG = { contacts: 'notes' };
 const NOT_A_MODULE = new Set(['dashboard', 'settings']);
 
 /** Die Menue-Eintraege des Routers in Reihenfolge: [{ module, section }]. */
@@ -1455,14 +1623,12 @@ function navGroupProblems(html, routerSrc) {
     }
   }
   for (const { module, section } of nav) {
-    const host = RIDES_ALONG[module];
-    const expected = host ? where.get(host) : section;
-    const actual = host ? where.get(host) : where.get(module);
+    const actual = where.get(module);
     if (actual === undefined) problems.push(`${module}: steht im Menue (${section}), fehlt auf der Seite`);
-    else if (!host && actual !== expected) problems.push(`${module}: Menue-Gruppe ${section}, auf der Seite ${actual}`);
+    else if (actual !== section) problems.push(`${module}: Menue-Gruppe ${section}, auf der Seite ${actual}`);
   }
   for (const [group, mods] of order) {
-    const want = nav.filter((e) => e.section === group && !RIDES_ALONG[e.module]).map((e) => e.module)
+    const want = nav.filter((e) => e.section === group).map((e) => e.module)
       .filter((m) => mods.includes(m));
     if (JSON.stringify(mods) !== JSON.stringify(want)) {
       problems.push(`${group}: Reihenfolge ${mods.join(', ')} statt wie im Menue ${want.join(', ')}`);
@@ -1505,7 +1671,7 @@ test('der Menuegruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () =
   const healthy = page([
     ['plan', ['f_tasks', 'm_cal', 'm_sched', 'm_notes']],
     ['household', ['f_meals', 'm_recipes', 'm_shop', 'm_pantry', 'm_house', 'm_waste', 'm_docs', 'm_inv', 'm_rewards']],
-    ['people', ['f_health', 'm_bday']],
+    ['people', ['f_health', 'm_contacts', 'm_bday']],
     ['finance', ['f_budget']],
     ['settings', ['m_family', 'm_rem', 'm_api', 'm_backup']],
   ]);
@@ -1527,6 +1693,10 @@ test('der Menuegruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () =
   const featLate = healthy.replace('<h4 data-t="f_tasks_t">x</h4><h4 data-t="m_cal_t">x</h4>',
     '<h4 data-t="m_cal_t">x</h4><h4 data-t="f_tasks_t">x</h4>');
   assert.match(navGroupProblems(featLate, ROUTER()).join('\n'), /plan: das ausfuehrliche Modul steht nicht vorn/);
+  // Der Anlass von Runde 2: die Kontakte wieder bei den Notizen (Planen).
+  const contactsInPlan = healthy.replace('<h4 data-t="m_contacts_t">x</h4>', '')
+    .replace('<h4 data-t="m_notes_t">x</h4>', '<h4 data-t="m_notes_t">x</h4><h4 data-t="m_contacts_t">x</h4>');
+  assert.match(navGroupProblems(contactsInPlan, ROUTER()).join('\n'), /contacts: Menue-Gruppe people, auf der Seite plan/);
   // Und ein Modul, das der Router kennt, das auf der Seite aber fehlt.
   assert.match(navGroupProblems(healthy.replace('<h4 data-t="m_waste_t">x</h4>', ''), ROUTER()).join('\n'),
     /waste: steht im Menue \(household\), fehlt auf der Seite/);
@@ -1536,7 +1706,7 @@ test('der Menuegruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () =
 // ── (10) Die Familien-Sektion verspricht nur, was der Code haelt ─────────────
 
 /**
- * `#family` spricht aus Sicht der Familie und macht dabei fuenf Zusagen, die an
+ * `#family` spricht aus Sicht der Familie und macht dabei Zusagen, die an
  * je einer Stelle im Code haengen. Jede Zeile hier: WAS die Seite sagt (in
  * beiden Sprachen) und WORAN es haengt. Faellt die Stelle im Code weg, wird die
  * Zusage falsch, ohne dass sich an der Seite etwas aendert - genau die Drift,
@@ -1548,12 +1718,6 @@ const FAMILY_CLAIMS = [
     says: { en: /pick who did it/, de: /wer sie erledigt hat/ },
     holds: (s) => s.display.includes("method: 'PATCH', pattern: /^\\/tasks\\/\\d+\\/status$/"),
     where: 'server/display-scopes.js DISPLAY_WRITE_ROUTES (PATCH /tasks/:id/status)',
-  },
-  {
-    key: 'fam_1_d', what: 'Fotos aus Immich als Bildschirmschoner',
-    says: { en: /Immich/, de: /Immich/ },
-    holds: (s) => s.screensaver,
-    where: 'public/components/photo-screensaver.js',
   },
   {
     key: 'fam_2_d', what: 'die Einkaufsliste bleibt offline lesbar',
@@ -1588,7 +1752,6 @@ function familySources() {
     sw: src('public/sw.js'),
     permissions: src('server/permissions.js'),
     spec: read('SPEC.md'),
-    screensaver: existsSync(resolve(ROOT, 'public/components/photo-screensaver.js')),
   };
 }
 
@@ -2645,4 +2808,127 @@ test('die Guards aus (15) erkennen den Schaden, gegen den sie gebaut sind', () =
   assert.ok(hit(decisionFindings(decOld), /proxmox: keine Schluesselentscheidung/), 'Entscheidungs-Guard blind');
   const liftOld = html.replace('</style>', '.opt-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }\n</style>');
   assert.equal(cardLiftFindings(liftOld).length, 1, 'Kartenhebungs-Guard blind');
+});
+
+// ── (16) Die Zusagen der Landing-Page aus Runde 2 ────────────────────────────
+
+/**
+ * Runde 2 der Critique (2026-09-29) fand drei Saetze, die mehr versprachen als
+ * der Code: "It is already on the shopping list" (der Vorrat setzt nichts von
+ * selbst auf die Liste - es ist ein Tipp auf den Warenkorb der Zeile), "speaks
+ * up before one of them is reached" (erinnert wird nur an Ablaufdaten, nie an
+ * einen Mindestbestand), und "credits whoever it was assigned to" (seit 2.68.0
+ * bekommt eine benannte erledigende Person die Punkte, nicht die Zuweisung).
+ * Die README trug zwei davon woertlich mit. Dazu kam eine neue Zusage, die
+ * Sicherheitsfrage der Longevity-Sektion.
+ *
+ * Jede Zeile hier: was die Seite (oder README) sagt, und woran es haengt. Ein
+ * `never` ist ein Satz, der nicht zurueckkommen darf.
+ */
+const R2_CLAIMS = [
+  // Vorrat
+  { where: 'ho_4_b', says: { en: /^One tap puts it on the shopping list$/, de: /^Ein Tipp setzt es auf die Einkaufsliste$/ },
+    holds: (s) => /dataset\.action = 'to-shopping'/.test(s.pantryPage) && /\/import-pantry/.test(s.pantryPage),
+    what: 'Warenkorb-Knopf der Vorratszeile (public/pages/pantry.js, to-shopping -> import-pantry)' },
+  { where: 'ho_4_d', says: { en: /reminds you before something expires/, de: /erinnert euch, bevor etwas abläuft/ },
+    holds: (s) => /expires_on/.test(s.pantryReminders) && !/min_quantity/.test(s.pantryReminders),
+    what: 'Erinnerungen nur an Ablaufdaten (server/services/pantry-reminders.js liest expires_on, nie min_quantity)' },
+  // Punkte
+  { where: 'ho_2_d', says: { en: /go to whoever did it/, de: /Die bekommt, wer sie erledigt hat/ },
+    holds: (s) => /if \(doneByUserId\) return enrolled\.has\(doneByUserId\)/.test(s.rewards),
+    what: 'die benannte Person schlaegt die Zuweisung (server/services/rewards.js rewardTargets)' },
+  { where: 'm_rewards_d', says: { en: /go to whoever did it/, de: /bekommt, wer sie erledigt hat/ },
+    holds: (s) => /if \(doneByUserId\) return enrolled\.has\(doneByUserId\)/.test(s.rewards),
+    what: 'die benannte Person schlaegt die Zuweisung (server/services/rewards.js rewardTargets)' },
+  // Sicherheit (long_a4)
+  { where: 'long_a4', says: { en: /an admin can require it for the whole household/, de: /ein Admin kann ihn für den ganzen Haushalt verlangen/ },
+    holds: (s) => /export function setRequiredForHousehold/.test(s.twoFactor) && /export function isRequiredForHousehold/.test(s.twoFactor),
+    what: 'haushaltsweite Pflicht (server/services/two-factor.js set/isRequiredForHousehold)' },
+  { where: 'long_a4', says: { en: /\(TOTP\), with recovery codes/, de: /\(TOTP\), mit Wiederherstellungscodes/ },
+    holds: (s) => s.totp && /user_recovery_codes/.test(s.twoFactor),
+    what: 'TOTP und Wiederherstellungscodes (server/utils/totp.js, user_recovery_codes)' },
+  { where: 'long_a4', says: { en: /invite link and pick their own password/, de: /Einladungslink und wählen ihr Passwort selbst/ },
+    holds: (s) => /\.post\('\/invites\/accept'/.test(s.auth),
+    what: 'Einladung annehmen mit eigenem Passwort (server/auth.js POST /invites/accept)' },
+  { where: 'long_a4', says: { en: /password login can be switched off for the household/, de: /Passwort-Anmeldung für den Haushalt abschalten/ },
+    holds: (s) => /export function isPasswordLoginEnabled/.test(s.auth) && /AUTH_ALLOW_PASSWORD_LOGIN=false/.test(s.envExample),
+    what: 'SSO als einziger Weg (server/auth.js isPasswordLoginEnabled, .env.example AUTH_ALLOW_PASSWORD_LOGIN)' },
+  { where: 'long_a4', says: { en: /signed out from any of your other devices/, de: /von jedem eurer anderen Geräte aus ab/ },
+    holds: (s) => /router\.post\('\/logout-others'/.test(s.auth),
+    what: 'andere Sitzungen beenden (server/auth.js POST /logout-others)' },
+];
+
+/** Saetze, die nicht zurueckkommen duerfen - auf der Seite (beide Sprachen) und in den READMEs. */
+const R2_NEVER = [
+  /already on the (shopping )?list/i, /steht schon auf der (Einkaufs)?[Ll]iste/,
+  /speaks up before one of them/i, /bevor eines davon erreicht ist/,
+  /credits? (whoever it was assigned to|the assigned member)/i, /assigned member's account/i,
+  /dem zuständigen Mitglied gutgeschrieben/, /landen auf dem Konto der zugewiesenen Person/,
+];
+
+function r2Sources() {
+  const src = (p) => readFileSync(resolve(ROOT, p), 'utf8');
+  return {
+    pantryPage: src('public/pages/pantry.js'),
+    pantryReminders: src('server/services/pantry-reminders.js'),
+    rewards: src('server/services/rewards.js'),
+    twoFactor: src('server/services/two-factor.js'),
+    totp: existsSync(resolve(ROOT, 'server/utils/totp.js')),
+    auth: src('server/auth.js'),
+    envExample: src('.env.example'),
+    readmes: { 'README.md': src('README.md'), 'README.de.md': src('README.de.md') },
+  };
+}
+
+/** Alles, was an (16) nicht stimmt, als lesbare Zeilen. */
+function r2Findings(html, sources) {
+  const found = [];
+  for (const lang of ['en', 'de']) {
+    const block = dictBlock(html, lang);
+    for (const c of R2_CLAIMS) {
+      const raw = dictValue(block, c.where);
+      const text = raw === null ? '' : stripTags(unescapeJs(raw));
+      if (!c.says[lang].test(text)) found.push(`${c.where} (${lang}) sagt nicht mehr ${c.says[lang]} - R2_CLAIMS nachziehen`);
+      else if (!c.holds(sources)) found.push(`${c.where} (${lang}): haengt an ${c.what}, und das haelt nicht mehr`);
+    }
+    for (const [key, text] of dictEntries(block)) {
+      for (const re of R2_NEVER) if (re.test(text)) found.push(`${key} (${lang}) sagt wieder ${re}`);
+    }
+  }
+  for (const [file, md] of Object.entries(sources.readmes)) {
+    for (const re of R2_NEVER) if (re.test(md)) found.push(`${file} sagt wieder ${re}`);
+  }
+  // Die Sicherheitsfrage steht auch im Markup (ohne JS), nicht nur im Woerterbuch.
+  if (!/<dt data-t="long_q4">/.test(html) || !/<dd data-t="long_a4">/.test(html)) found.push('long_q4/long_a4 fehlen im Markup');
+  return found;
+}
+
+test('index.html + READMEs: Vorrat, Punkte und Sicherheit sagen nur, was der Code haelt', () => {
+  assert.deepEqual(r2Findings(read('index.html'), r2Sources()), []);
+});
+
+test('der Guard aus (16) erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const real = r2Sources();
+  const hit = (list, re) => list.some((l) => re.test(l));
+  // Die alten Saetze, auf der Seite und in der README.
+  const oldPage = html.replace("ho_4_b:'One tap puts it on the shopping list'", "ho_4_b:'It is already on the shopping list'")
+    .replace("m_rewards_d:'Points on tasks go to whoever did it,", "m_rewards_d:'Points on tasks credit the assigned member,");
+  assert.notEqual(oldPage, html, 'Vorbedingung: ho_4_b und m_rewards_d stehen so im Woerterbuch');
+  const f1 = r2Findings(oldPage, real);
+  assert.ok(hit(f1, /ho_4_b \(en\) sagt nicht mehr/) && hit(f1, /ho_4_b \(en\) sagt wieder/), f1.join(' | '));
+  assert.ok(hit(f1, /m_rewards_d \(en\) sagt wieder/), f1.join(' | '));
+  const oldReadme = { ...real, readmes: { ...real.readmes, 'README.md': real.readmes['README.md'].replace('goes on the list with one tap', 'is already on the list') } };
+  assert.ok(hit(r2Findings(html, oldReadme), /README\.md sagt wieder/), 'README-Satz faellt nicht auf');
+  // Der Code verliert, woran die Zusage haengt.
+  const lowStock = { ...real, pantryReminders: real.pantryReminders + '\nconst low = item.min_quantity;' };
+  assert.ok(hit(r2Findings(html, lowStock), /ho_4_d \(de\): haengt an Erinnerungen nur an Ablaufdaten/), 'Vorrats-Erinnerung blind');
+  const assignee = { ...real, rewards: real.rewards.replace('if (doneByUserId) return enrolled.has(doneByUserId)', 'if (false) return null') };
+  assert.ok(hit(r2Findings(html, assignee), /ho_2_d \(en\): haengt an/), 'Punkte-Guard blind');
+  const noLogout = { ...real, auth: real.auth.replace("router.post('/logout-others'", "router.post('/logout-all'") };
+  assert.ok(hit(r2Findings(html, noLogout), /long_a4 \(de\): haengt an andere Sitzungen beenden/), 'Abmelde-Guard blind');
+  const no2fa = { ...real, twoFactor: real.twoFactor.replace('export function setRequiredForHousehold', 'function setRequiredForHousehold') };
+  assert.ok(hit(r2Findings(html, no2fa), /long_a4 \(en\): haengt an haushaltsweite Pflicht/), '2FA-Guard blind');
+  // Die Frage verschwindet aus dem Markup.
+  assert.ok(hit(r2Findings(html.replace('<dt data-t="long_q4">', '<dt>'), real), /long_q4\/long_a4 fehlen im Markup/));
 });

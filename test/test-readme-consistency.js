@@ -222,7 +222,18 @@ test('jeder Modulname der Homepage steht in der README-Modultabelle', () => {
   // unterscheiden duerfen ("API tokens" vs. "API Tokens") - der NAME ist die
   // Zusage, nicht seine Typografie.
   const inReadme = new Set(moduleRows(readme('en')).map((r) => r.name.toLowerCase()));
-  const missing = cardNames.filter((n) => !inReadme.has(n.toLowerCase())).sort();
+  // Eine README-Zeile "A & B" darf auf der Homepage als zwei Eintraege A und B
+  // stehen - aber nur beide zusammen. Seit 2026-09-29 (Critique, Runde 2)
+  // stehen Notizen und Kontakte dort getrennt in ihren Menuegruppen der App
+  // (Planen, Menschen), waehrend die README sie als EINE Zeile fuehrt.
+  // test-docs-landing.js (3) haelt die Gegenrichtung (jede README-Zeile steht
+  // auf der Seite) und die Modulzahl.
+  const onPage = new Set(cardNames.map((n) => n.toLowerCase()));
+  const halves = new Set([...inReadme]
+    .map((n) => n.split(' & '))
+    .filter((parts) => parts.length === 2 && parts.every((part) => onPage.has(part)))
+    .flat());
+  const missing = cardNames.filter((n) => !inReadme.has(n.toLowerCase()) && !halves.has(n.toLowerCase())).sort();
 
   assert.deepEqual(missing, [],
     'Die Homepage zeigt Module, die die README-Tabelle nicht kennt: ' + missing.join(', ')
