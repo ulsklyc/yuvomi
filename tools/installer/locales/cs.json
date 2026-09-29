@@ -91,7 +91,6 @@
     "outlookNote": "Jednosměrný push: Yuvomi zůstává zdrojem pravdy - změny v Outlooku se přepíší. Rodinné účty se připojí později v nastavení aplikace."
   },
   "advanced": {
-    "tag": "Pokročilé · volitelné",
     "title": "Pokročilá nastavení",
     "subtitle": "Jednotné přihlášení, přístup do domácí sítě a pár jemných nastavení. Vše volitelné.",
     "proxyLabel": "Jak je Yuvomi zpřístupněn?",
@@ -247,7 +246,8 @@
     "userHint": "3-64 znaků: písmena, číslice, . - _",
     "nameLabel": "Zobrazované jméno",
     "passLabel": "Heslo",
-    "passPlaceholder": "Minimálně 8 znaků",
+    "passHint": "Minimálně 8 znaků",
+    "passOk": "Délka stačí",
     "confLabel": "Potvrdit heslo",
     "creating": "Vytváří se …",
     "create": "Vytvořit účet",
@@ -269,7 +269,7 @@
     "nextTitle": "Další kroky",
     "nextInvite": "Pozvi rodinu",
     "nextInviteDesc": "Vytvoř pozvánkové odkazy, ať si každý zvolí vlastní heslo.",
-    "nextModules": "Vyber moduly",
+    "nextModules": "Aktivní moduly",
     "nextModulesDesc": "Zapni to, co vaše domácnost opravdu používá, zbytek skryj.",
     "nextRegion": "Region a jazyk",
     "nextRegionDesc": "Nastav měnu, formát data a svátky podle místa, kde žiješ.",

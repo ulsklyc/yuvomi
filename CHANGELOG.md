@@ -113,6 +113,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The web installer looks and works like the app.** A step list on the desktop jumps back to
+  finished steps, a phone shows more of each step, and the review groups your answers with a
+  "Change" link each. The language you set up in carries over to the app, the upload limit can be
+  set, and the "Active modules" link on the last page no longer opens the budget.
+
 - **New events in the calendar's week and day come from a double-click or a long press, not a
   click.** A single click or tap on empty time now only closes what is open, such as an event's
   popover, so clicking beside an event to put it away no longer opens "New event". With a mouse,

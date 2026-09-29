@@ -136,13 +136,22 @@ test('common.stepCounter existiert in jeder Locale mit {{n}}/{{total}}', () => {
   }
 });
 
-test('die nummerierten *.tag-Schlüssel sind entfernt, advanced.tag bleibt', () => {
+/* advanced.tag ("Erweitert · optional") durfte einmal bleiben, als der
+ * Erweitert-Schritt keine Nummer trug. Seit er nummeriert ist, schrieb
+ * applyStepCounters() den Zaehler darueber - der Text stand tot im Markup und
+ * in 24 Locales. Regel jetzt: keine Schrittmarke traegt einen eigenen Text,
+ * den der Zaehler ueberschreibt, und kein Schritt fuehrt einen *.tag-Schluessel. */
+test('keine Schrittmarke traegt einen Text, den der Zaehler ueberschreibt', () => {
   for (const locale of SUPPORTED_LOCALES) {
     const data = loadLocale(locale);
-    for (const step of ['config', 'secrets', 'weather', 'calendar', 'review', 'docker', 'admin']) {
-      assert.equal(data[step]?.tag, undefined, `${locale}: ${step}.tag sollte entfernt sein`);
-    }
-    assert.ok(data.advanced?.tag, `${locale}: advanced.tag muss erhalten bleiben`);
+    const tagged = Object.keys(data).filter(section => typeof data[section]?.tag === 'string');
+    assert.deepEqual(tagged, [], `${locale}: tote *.tag-Schluessel ${tagged}`);
+  }
+  const steps = [...html.matchAll(/<div class="step-tag"([^>]*)>([^<]*)<\/div>/g)];
+  assert.ok(steps.length >= 9, `nur ${steps.length} Schrittmarken gefunden - der Leser greift nicht`);
+  for (const [tag, attrs, text] of steps) {
+    assert.doesNotMatch(attrs, /data-i18n/, `Schrittmarke mit data-i18n: ${tag}`);
+    assert.equal(text.trim(), '', `Schrittmarke mit totem Text: ${tag}`);
   }
 });
 
@@ -1840,4 +1849,162 @@ test('Docker-Schirm: Phasen-Checkliste, Erfolg mit neuem Titel und Fokus, Fehler
   const localize = fnSource('localize');
   assert.match(localize, /renderPhases\(\)/, 'ein Sprachwechsel laesst die Zustandstexte der Liste in der alten Sprache');
   assert.match(localize, /docker\.doneIn/, 'ein Sprachwechsel verliert "fertig in N s"');
+});
+
+// ── Polish (Critique 2026-09-29, Restliste) ─────────────────────────────────
+
+/** Markup eines Schritts (vom Oeffnen bis zum naechsten Schritt-Kommentar). */
+function stepMarkup(name) {
+  const start = html.indexOf(`<div class="step" id="step-${name}">`);
+  assert.ok(start >= 0, `Schritt ${name} nicht gefunden`);
+  const end = html.indexOf('<!-- Step', start + 1);
+  return html.slice(start, end > start ? end : undefined);
+}
+
+/* Passwortzeilen: ein Auge neben einem gewoehnlichen Passwort. Mit der Basis
+ * 100 % der Schluesselzeile rutschte es auch auf dem Desktop allein unter das
+ * Feld. Gemessen wird die Flex-Rechnung bei 1440px, nicht die Klasse: passt
+ * die Basis des Feldes plus Knopf in die Zeile, oder bricht sie um? */
+test('das Auge einer Passwortzeile bleibt neben dem Feld, auch auf dem Desktop', () => {
+  const rows = [...html.matchAll(/<div class="secret-row([^"]*)">([\s\S]*?)<\/div>/g)];
+  const pwRows = rows.filter(([, , body]) => /data-eye=/.test(body) && !/data-(copy|gen)/.test(body));
+  assert.ok(pwRows.length >= 6, `nur ${pwRows.length} Passwortzeilen gefunden`);
+  for (const [, cls, body] of pwRows) {
+    const id = body.match(/id="([^"]+)"/)[1];
+    assert.match(cls, /\bpw-row\b/, `${id}: Passwortzeile ohne .pw-row - das Auge rutscht unter das Feld`);
+  }
+  for (const width of [1440, MOBILE_VIEWPORT]) {
+    const media = appliesAt(width);
+    const wrap = (declared(s => s === '.pw-row' || s === '.secret-row', 'flex-wrap', media) || 'nowrap');
+    const flex = flexParts(declared(s => s === '.pw-row input' || s === '.secret-row input', 'flex', media) || '0 1 auto');
+    const basisIsFullLine = /^100%$/.test(flex.basis);
+    assert.ok(wrap === 'nowrap' || !basisIsFullLine,
+      `bei ${width}px bricht die Passwortzeile um (flex-wrap ${wrap}, Basis ${flex.basis})`);
+  }
+  // Die 64-Zeichen-Schluessel behalten ihre eigene Zeile (Guard oben).
+  const fontSize = toPx(declared(s => s === '.pw-row input' || s === '.secret-row input', 'font-size'));
+  assert.ok(fontSize >= 16, `Passwortfelder stehen auf ${fontSize}px - iOS zoomt beim Fokus`);
+  assert.match(stepMarkup('admin'), /data-eye="adm-conf"/, '"Passwort bestaetigen" hat kein Auge');
+});
+
+/* Mindestlaenge: ein Hinweis unter dem Feld statt eines Platzhalters, der beim
+ * ersten Zeichen verschwand; beim Tippen schaltet er leise um. Ausgefuehrt:
+ * renderPassHint und passLongEnough (NFC wie der Server), die Bindung per
+ * aria-describedby, und dass ein Fehler die eigene Beschreibung nicht wegraeumt. */
+test('Admin-Passwort: Mindestlaenge als Hinweis, beim Tippen umgeschaltet, per describedby gebunden', () => {
+  const admin = stepMarkup('admin');
+  const input = admin.match(/<input[^>]*id="adm-pass"[^>]*>/)[0];
+  assert.doesNotMatch(input, /placeholder=/, 'die Mindestlaenge steht wieder als Platzhalter im Feld');
+  assert.match(input, /aria-describedby="adm-pass-hint"/, 'der Hinweis ist nicht ans Feld gebunden');
+  assert.match(input, /data-describedby="adm-pass-hint"/, 'die eigene Beschreibung ist nicht gemerkt');
+  const hint = admin.match(/<div class="hint pass-hint" id="adm-pass-hint"[^>]*>([\s\S]*?)<\/div>/);
+  assert.ok(hint, 'kein #adm-pass-hint');
+  assert.match(hint[0], /aria-live="polite"/);
+  assert.match(hint[1], /data-i18n="admin\.passHint"/);
+  assert.match(hint[1], /data-i18n="admin\.passOk"[^>]*hidden/);
+  for (const locale of SUPPORTED_LOCALES) {
+    const a = loadLocale(locale).admin;
+    assert.ok(a.passHint && a.passOk, `${locale}: admin.passHint/passOk fehlen`);
+    assert.equal(a.passPlaceholder, undefined, `${locale}: admin.passPlaceholder ist tot`);
+  }
+
+  const src = html.match(/const ADMIN_PASS_MIN = (\d+);\nconst passLongEnough = [^\n]+/);
+  assert.ok(src, 'ADMIN_PASS_MIN/passLongEnough nicht gefunden');
+  assert.equal(Number(src[1]), 8, 'die Mindestlaenge weicht vom Server ab (8)');
+  const spans = ['short', 'ok'].map(state => fakeEl({ dataset: { passState: state }, hidden: state === 'ok' }));
+  const hintEl = fakeEl({ dataset: { state: 'short' }, querySelectorAll: () => spans });
+  const pass = { value: '' };
+  const { renderPassHint, passLongEnough } = new Function('$', `
+    ${src[0]}
+    ${fnSource('renderPassHint')}
+    return { renderPassHint, passLongEnough };
+  `)(id => (id === 'adm-pass' ? pass : hintEl));
+  pass.value = 'abc'; renderPassHint();
+  assert.equal(hintEl.dataset.state, 'short');
+  pass.value = 'abcdefgh'; renderPassHint();
+  assert.equal(hintEl.dataset.state, 'ok', 'acht Zeichen reichen dem Hinweis nicht');
+  assert.deepEqual(spans.map(s => s.hidden), [true, false], 'der Satz wechselt nicht mit dem Zustand');
+  pass.value = 'abcdefg'; renderPassHint();
+  assert.deepEqual(spans.map(s => s.hidden), [false, true], 'der Rueckweg unter 8 schaltet nicht zurueck');
+  // "u" + kombinierendes Trema: 8 Codeeinheiten roh, 7 nach NFC - der Server sagt nein.
+  assert.equal(passLongEnough('abcdefü'), false, 'passLongEnough zaehlt nicht wie der Server (NFC)');
+  assert.match(html, /\$\('adm-pass'\)\.addEventListener\('input', renderPassHint\)/, 'der Hinweis ist nicht verdrahtet');
+  assert.match(html, /if \(!passLongEnough\(p\)\) \{ fail\('adm-err'/, 'createAdmin prueft anders als der Hinweis');
+
+  // Ein Fehler haengt das Banner VOR die eigene Beschreibung; die Korrektur gibt sie zurueck.
+  assert.match(fnSource('fail'), /\[bannerId, el\.dataset\.describedby\]\.filter\(Boolean\)\.join\(' '\)/,
+    'fail() ersetzt die eigene Beschreibung, statt das Banner davorzuhaengen');
+  const clearFieldInvalid = new Function(`${fnSource('clearFieldInvalid')}; return clearFieldInvalid;`)();
+  const field = fakeEl({ dataset: { describedby: 'adm-pass-hint' } });
+  field.setAttribute('aria-invalid', 'true');
+  field.setAttribute('aria-describedby', 'adm-err adm-pass-hint');
+  clearFieldInvalid({ target: field });
+  assert.equal(field.getAttribute('aria-describedby'), 'adm-pass-hint', 'die Korrektur raeumt den eigenen Hinweis mit weg');
+  assert.match(fnSource('clearInvalid'), /dataset\?\.describedby/, 'clearInvalid raeumt den eigenen Hinweis mit weg');
+});
+
+/* Vor dem Admin-Schritt liegt nur der erledigte Docker-Schirm; zurueck hinter
+ * den Container-Start fuehrt kein Weg. "Zurueck" fuehrte auf einen Schirm
+ * ohne Aufgabe. */
+test('der Admin-Schritt hat kein "Zurueck" auf den erledigten Docker-Schirm', () => {
+  const flows = literal('FLOWS');
+  for (const [name, steps] of Object.entries(flows)) {
+    assert.equal(steps[steps.indexOf('admin') - 1], 'docker', `${name}: vor admin liegt nicht mehr docker - Regel pruefen`);
+  }
+  assert.doesNotMatch(stepMarkup('admin'), /data-back/, 'admin traegt wieder einen Zurueck-Knopf');
+});
+
+/* Die Fussleiste des Docker-Schirms trug "Protokoll ausblenden" neben
+ * "Erneut versuchen" und brach bei 360px auf Deutsch zweizeilig um. Der
+ * Umschalter steht jetzt beim Protokoll und sagt seinen Zustand an. */
+test('Docker: der Protokoll-Umschalter steht beim Protokoll, die Fussleiste traegt nur die Primaeraktion', () => {
+  const docker = stepMarkup('docker');
+  const foot = docker.match(/<div class="card-foot" id="dkr-foot"[^>]*>([\s\S]*?)<\/div>/);
+  assert.ok(foot, 'keine Docker-Fussleiste');
+  assert.deepEqual([...foot[1].matchAll(/<button[^>]*id="([^"]+)"/g)].map(m => m[1]), ['dkr-next'],
+    'in der Docker-Fussleiste steht mehr als die Primaeraktion');
+  const toggle = docker.match(/<button[^>]*id="dkr-logs-toggle"[^>]*>/);
+  assert.ok(toggle && docker.indexOf(toggle[0]) < docker.indexOf('id="dkr-foot"'), 'der Umschalter steht nicht im Inhalt');
+  assert.match(toggle[0], /aria-controls="dkr-log"/);
+  assert.match(toggle[0], /aria-expanded="false"/);
+  assert.match(html, /\$\('dkr-logs-toggle'\)\.setAttribute\('aria-expanded', String\(open\)\)/, 'der Umschalter sagt seinen Zustand nicht an');
+  assert.match(fnSource('restartDocker'), /setAttribute\('aria-expanded', 'false'\)/, 'ein Neustart laesst den Umschalter "offen" stehen');
+});
+
+test('die Protokollbox hat den Radius ihrer Nachbarn, keinen 4px-Sonderfall', () => {
+  const radius = declared(s => s === '.log-box', 'border-radius');
+  assert.equal(radius, declared(s => s === '.warn-banner', 'border-radius'),
+    `.log-box hat ${radius}, das Warnbanner darueber einen anderen Radius`);
+});
+
+test('die Einfach-Karte zeigt keinen Haken, der wie "schon ausgewaehlt" liest', () => {
+  const card = html.match(/<button type="button" class="mode-card is-primary" id="mode-simple">([\s\S]*?)<\/button>/);
+  assert.ok(card, 'keine Einfach-Karte');
+  const icon = card[1].match(/<span class="mode-card__icon"[^>]*>([\s\S]*?)<\/span>/)[1];
+  assert.doesNotMatch(icon, /m5 12 5 5L20 7|M20 6 9 17l-5-5|circle-check/, 'das Icon ist wieder ein Haken');
+});
+
+test('Warnbanner tragen ein Lucide-SVG, kein Unicode-Glyph', () => {
+  assert.doesNotMatch(html, /&#x26A0;|⚠/, 'U+26A0 steht wieder als Icon im Markup');
+  const icons = [...html.matchAll(/<span class="warn-icon"[^>]*>([\s\S]*?)<\/span>/g)];
+  assert.ok(icons.length >= 5, `nur ${icons.length} Warn-Icons gefunden`);
+  for (const [, inner] of icons) assert.match(inner, /^<svg viewBox="0 0 24 24">/, 'Warn-Icon ohne SVG');
+});
+
+test('der Kopf traegt eine Meta-Beschreibung (Lighthouse SEO)', () => {
+  const head = html.slice(0, html.indexOf('</head>'));
+  const meta = head.match(/<meta name="description" content="([^"]+)">/);
+  assert.ok(meta && meta[1].length >= 50, 'keine oder eine leere <meta name="description">');
+});
+
+/* Der erste Frame malte bis zum Laden der Uebersetzungen das Desktop-Raster
+ * mit Schrittliste, dann sprang die Marke in die Mitte (CLS). Das Markup
+ * steht deshalb schon im Layout des Einstiegs. */
+test('der erste Frame steht schon im Layout des Einstiegs (keine Verschiebung beim Laden)', () => {
+  const shell = html.match(/<div class="([^"]*)" id="shell">/);
+  assert.ok(shell, 'kein #shell');
+  const solo = literal('SOLO_STEPS');
+  const first = literal('FLOWS').advanced[0];
+  assert.ok([...solo].includes(first), `SOLO_STEPS ohne ${first} - Regel pruefen`);
+  assert.match(shell[1], /\bshell--solo\b/, 'das Markup beginnt im Zwei-Spalten-Raster, renderStep() springt dann auf solo');
 });

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title data-i18n="title">Yuvomi Setup</title>
+  <meta name="description" content="Set up your self-hosted Yuvomi family planner: server, security keys, integrations and the first admin account.">
   <!-- Fallback-Tokens VOR dem tokens.css-Link: lädt tokens.css (inkl. Dark-Mode-
        Media-Query), gewinnen dessen spätere :root-Regeln per Cascade. Fehlt
        tokens.css (falscher OIKOS_INSTALLER_ROOT, Packaging-/Volume-Fehler), bleibt
@@ -586,6 +587,22 @@
        in die zweite. min-width: 0 verhindert, dass der Feldinhalt die Zeile
        aufspannt und den Umbruch aushebelt. */
     .secret-row input { flex: 1 1 100%; min-width: 0; font-family: var(--font-mono); font-size: var(--text-sm); }
+    /* Passwortzeilen (Admin, SMTP, WebDAV, Drive) tragen nur ein Auge neben
+       einem gewoehnlichen Passwort, keinen 64-Zeichen-Schluessel. Mit der
+       Basis 100 % der Schluesselzeile rutschte das Auge auch auf dem Desktop
+       allein unter das Feld. Hier bleibt es daneben, und das Feld traegt die
+       Schrift der uebrigen Felder (16px - darunter zoomt iOS beim Fokus). */
+    .pw-row { flex-wrap: nowrap; }
+    .pw-row input { flex: 1 1 auto; font-family: var(--font-sans); font-size: var(--text-base); }
+    /* Der Haken steht HINTER dem Satz und ist bis zur Mindestlaenge nur
+       unsichtbar: vorne haette er den Hinweis gegen alle anderen eingerueckt
+       oder beim achten Zeichen seitlich geschoben. */
+    .pass-hint { display: flex; align-items: center; gap: 6px; }
+    .pass-hint__mark {
+      width: 14px; height: 14px; flex-shrink: 0; fill: none; stroke: var(--color-success);
+      stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; visibility: hidden;
+    }
+    .pass-hint[data-state="ok"] .pass-hint__mark { visibility: visible; }
     /* Footnote der App-Skala (13/18), in Sekundaertext statt Tertiaer: das ist
        erklaerende Prosa fuer Laien, keine Metazeile, und sie braucht den
        Kontrast. Auf 12px war sie einmal kleiner als in der fertigen App; die
@@ -807,11 +824,14 @@
     .phase-meta { padding: 8px 16px 0; }
     .elapsed  { font-size: var(--type-caption); color: var(--color-text-secondary); line-height: 1.38; }
     .phase-meta + .warn-banner { margin-top: 16px; }
+    /* Radius --radius-sm wie das Warnbanner direkt darueber: mit 4px stand
+       die Box als einzige eckige Flaeche zwischen 10px-Bannern und 16px-Gruppen
+       (frueher sogar 4px IN einer 10px-Box - nicht konzentrisch). */
     .log-box  {
       display: none; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-secondary);
       white-space: pre-wrap; max-height: 180px; overflow-y: auto;
-      margin-top: 12px; padding: 10px; background: var(--color-surface-2);
-      border: 1px solid var(--color-border); border-radius: var(--radius-xs);
+      margin-top: 12px; padding: 10px 12px; background: var(--color-surface-2);
+      border: 1px solid var(--color-border); border-radius: var(--radius-sm);
     }
     /* Die Box ist per Tastatur fokussier- und scrollbar (tabindex im Markup):
        im Fehlerfall ist das Protokoll die einzige Diagnose. */
@@ -834,7 +854,6 @@
        Zeilen mit einem Strich. Leiser als die Werte darueber: sie meldet eine
        Abwesenheit, keine Entscheidung. */
     .rv-row--unset dd { color: var(--color-text-secondary); }
-    .masked      { font-family: var(--font-mono); letter-spacing: 3px; color: var(--color-text-secondary); }
     .done-wrap   { text-align: center; padding: 20px 0 8px; }
     /* Der Abschluss trug ein 🎉-Systemsemoji: der einzige Bildinhalt der ganzen
        Reise, auf jedem Betriebssystem anders gerendert und gegen PRODUCT.md:22
@@ -874,7 +893,6 @@
     .open-link--muted:hover { background: color-mix(in srgb, var(--color-accent) var(--tint-state, 12%), transparent); }
     .done-actions { display: flex; flex-direction: column; align-items: center; gap: 14px; }
     .done-actions .open-link, .done-actions .btn { width: 100%; max-width: 300px; }
-    .done-check { color: var(--color-success); }
 
     /* „Als Naechstes" auf dem Abschluss. Zeilen in EINER Inset-Gruppe - dieselbe
        Grammatik wie .ready-list im Einfach-Pfad und wie jede Gruppe davor,
@@ -924,6 +942,11 @@
        etablierten Kanal wegnehmen, um eine Schwelle zu erfuellen, die fuer
        dekorative Icons nicht gilt. */
     .warn-banner .warn-icon { color: var(--color-warning); font-size: var(--text-base); line-height: 1.4; flex-shrink: 0; }
+    /* Das Warnzeichen war das Unicode-Glyph U+26A0: je nach System ein buntes
+       Emoji oder ein Schriftzeichen in fremder Strichstaerke, neben lauter
+       Lucide-Linien. Jetzt Lucide "triangle-alert" in der Bannerfarbe; 2px
+       nach unten, damit es auf der ersten Textzeile (14px x 1.5) sitzt. */
+    .warn-icon svg { display: block; width: 18px; height: 18px; margin-top: 2px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
     /* .field-emphasis ist gegangen: eine violett getoente Box mit violettem Label
        in einer weissen Gruppe waere Kasten-in-Kasten UND eine zweite violette
@@ -1135,7 +1158,13 @@
        Die Liste steht im DOM VOR dem Inhalt, weil sie dort auch sichtbar steht
        (WCAG 1.3.2); showStep() setzt den Fokus trotzdem auf die H2 des Schritts,
        die Liste ist per Shift+Tab von dort aus der naechste Halt. -->
-  <div class="shell" id="shell">
+  <!-- shell--solo im Markup = das Layout, das renderStep() fuer den Einstieg
+       setzt. Ohne die Klasse malte der erste Frame bis zum Laden der
+       Uebersetzungen das Desktop-Raster, dann sprang die Marke in die Mitte -
+       eine Layoutverschiebung beim Laden. Der Willkommen-Schritt bleibt bis
+       dahin bewusst unsichtbar: englischer Text, der sich eine Sekunde spaeter
+       in eine andere Sprache umbricht, verschoebe wieder. -->
+  <div class="shell shell--solo" id="shell">
   <div class="rail">
   <!-- Absender der Reise. Die Wortmarke ist ein Eigenname und bleibt in jeder
        Sprache gleich, braucht also keinen Locale-Key. -->
@@ -1214,8 +1243,11 @@
         <div class="mode-grid">
           <button type="button" class="mode-card is-primary" id="mode-simple">
             <div class="mode-card__top">
+              <!-- Lucide "zap" statt eines Hakens: der Haken las sich auf der
+                   einzigen hervorgehobenen Karte wie "schon ausgewaehlt".
+                   Der Blitz sagt, was der Weg verspricht - schnell fertig. -->
               <span class="mode-card__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>
+                <svg viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>
               </span>
               <div>
                 <div class="mode-card__title" data-i18n="welcome.simpleTitle">Simple setup</div>
@@ -1277,7 +1309,7 @@
              gesperrt und lenkt in den Erweitert-Pfad um (startFlow), wo
              #cfg-existing warnt. -->
         <div class="warn-banner" role="note">
-          <span class="warn-icon" aria-hidden="true">&#x26A0;</span>
+          <span class="warn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
           <span data-i18n="simple.backupReminder">After setup, back up the generated .env file - it holds your only encryption keys.</span>
         </div>
         <button type="button" class="link-btn" id="simple-to-advanced" data-i18n="simple.switchAdvanced">Need more options? Switch to advanced setup</button>
@@ -1300,7 +1332,7 @@
       </div>
       <div class="card-body">
         <div class="warn-banner" id="cfg-existing" role="note" style="display:none">
-          <span class="warn-icon" aria-hidden="true">&#x26A0;</span>
+          <span class="warn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
           <span data-i18n="config.existing">Existing configuration detected - your current .env file will be backed up before saving.</span>
         </div>
         <!-- Wie #welcome-prereq: Text zur Laufzeit, kein data-i18n. -->
@@ -1379,7 +1411,7 @@
       </div>
       <div class="card-body">
         <div class="danger-banner" role="note">
-          <span class="warn-icon" aria-hidden="true">&#x26A0;</span>
+          <span class="warn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
           <span data-i18n="secrets.dangerWarn">Save these keys now. If you lose them, your encrypted data cannot be recovered - there is no reset.</span>
         </div>
         <div class="info-banner" id="sec-preserved" style="display:none" role="note" data-i18n="secrets.preserved">
@@ -1638,7 +1670,7 @@
           </div>
           <div class="field">
             <label for="email-pass" data-i18n="email.passLabel">Password</label>
-            <div class="secret-row">
+            <div class="secret-row pw-row">
               <input type="password" id="email-pass" autocomplete="new-password">
               <button type="button" class="btn btn-ghost btn-sm" data-eye="email-pass" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
                 <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1748,7 +1780,7 @@
             </div>
             <div class="field">
               <label for="adv-webdav-backup-password" data-i18n="advanced.webdavBackupPasswordLabel">Password</label>
-              <div class="secret-row">
+              <div class="secret-row pw-row">
                 <input type="password" id="adv-webdav-backup-password" autocomplete="new-password">
                 <button type="button" class="btn btn-ghost btn-sm" data-eye="adv-webdav-backup-password" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
                   <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1811,7 +1843,7 @@
             </div>
             <div class="field">
               <label for="adv-document-webdav-password" data-i18n="advanced.documentWebdavPasswordLabel">Password</label>
-              <div class="secret-row">
+              <div class="secret-row pw-row">
                 <input type="password" id="adv-document-webdav-password" autocomplete="new-password">
                 <button type="button" class="btn btn-ghost btn-sm" data-eye="adv-document-webdav-password" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
                   <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1842,7 +1874,7 @@
             </div>
             <div class="field">
               <label for="adv-document-google-drive-client-secret" data-i18n="advanced.documentGoogleDriveClientSecretLabel">Own client secret (optional)</label>
-              <div class="secret-row">
+              <div class="secret-row pw-row">
                 <input type="password" id="adv-document-google-drive-client-secret" autocomplete="new-password">
                 <button type="button" class="btn btn-ghost btn-sm" data-eye="adv-document-google-drive-client-secret" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
                   <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1872,7 +1904,7 @@
 
     <div class="step" id="step-advanced">
       <div class="card-head">
-        <div class="step-tag" data-i18n="advanced.tag">Advanced · optional</div>
+        <div class="step-tag"></div>
         <h2 tabindex="-1" data-i18n="advanced.title">Advanced Settings</h2>
         <p data-i18n="advanced.subtitle">Single sign-on, access to your home network, and a few fine adjustments. All optional.</p>
       </div>
@@ -1882,7 +1914,7 @@
         <div class="inset-group">
         <div class="toggle-card" data-setup="oidc-issuer oidc-client-id oidc-client-secret">
           <button type="button" class="toggle-head" data-toggle="oidc-body" aria-expanded="false" aria-controls="oidc-body">
-            <span data-i18n="advanced.oidc">Single Sign-On (OIDC)</span>
+            <span data-i18n="advanced.oidc">Single sign-on (OIDC)</span>
             <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="oidc-body">
@@ -2066,7 +2098,7 @@
             <button type="button" class="group-edit" id="rve-advanced" data-edit="advanced" aria-labelledby="rve-advanced rvg-advanced" data-i18n="review.edit">Change</button>
           </div>
           <dl class="inset-group">
-            <div class="rv-row"><dt data-i18n="review.oidc">Single Sign-On</dt><dd id="rv-oidc"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.oidc">Single sign-on</dt><dd id="rv-oidc"></dd></div>
             <!-- Die SSRF-Aufhebungen: eine Pruefseite, die ausgerechnet die
                  sicherheitsrelevanten Schalter auslaesst, prueft das Falsche. -->
             <div class="rv-row"><dt data-i18n="review.privateNetwork">Private-network access</dt><dd id="rv-private-network"></dd></div>
@@ -2141,17 +2173,21 @@
           <span id="dkr-text">Downloading image</span>
         </div>
         <div class="warn-banner" id="dkr-stalled" role="status" style="display:none">
-          <span class="warn-icon" aria-hidden="true">&#x26A0;</span>
+          <span class="warn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
           <span data-i18n="docker.stalled">This is taking longer than usual. The log below shows why.</span>
         </div>
         <!-- tabindex: die Box scrollt, und im Fehlerfall ist das Protokoll die
              einzige Diagnose - ohne Fokus war sie per Tastatur unscrollbar
              (WCAG 2.1.1). -->
+        <!-- Der Umschalter steht beim Protokoll, nicht in der Fussleiste: dort
+             brach er neben "Erneut versuchen" bei 360px auf Deutsch zweizeilig
+             um (336px Bedarf, 328px Platz), und er gehoert zu dem, was er
+             aufklappt - das Banner darueber sagt "das Protokoll unten".
+             Kein data-i18n: wechselt zwischen Anzeigen und Verbergen. -->
+        <button type="button" class="btn btn-ghost btn-sm" id="dkr-logs-toggle" aria-controls="dkr-log" aria-expanded="false" style="display:none">Show log</button>
         <div class="log-box" id="dkr-log" tabindex="0" role="region" aria-label="Container log" data-i18n-aria="docker.logLabel"></div>
       </div>
       <div class="card-foot" id="dkr-foot" style="display:none">
-        <!-- Kein data-i18n: wechselt zwischen Anzeigen und Verbergen. -->
-        <button class="btn btn-ghost" id="dkr-logs-toggle" style="display:none">Show log</button>
         <!-- Kein data-i18n: zustandsbehaftet (siehe setDockerPrimary). -->
         <button class="btn btn-primary" id="dkr-next">Continue to Admin Setup</button>
       </div>
@@ -2180,23 +2216,46 @@
         </div>
         <div class="field">
           <label for="adm-pass" data-i18n="admin.passLabel">Password</label>
-          <div class="secret-row">
-            <input type="password" id="adm-pass" placeholder="At least 8 characters" data-i18n-ph="admin.passPlaceholder" autocomplete="new-password" required aria-required="true">
+          <!-- Die Mindestlaenge steht als Hinweis UNTER dem Feld statt als
+               Platzhalter darin: der verschwand beim ersten Zeichen, genau
+               dann, wenn man ihn braucht. data-describedby merkt sich die
+               eigene Beschreibung, damit fail()/clearFieldInvalid() sie nach
+               einem Fehler zurueckgeben statt sie mit wegzuraeumen. -->
+          <div class="secret-row pw-row">
+            <input type="password" id="adm-pass" autocomplete="new-password" required aria-required="true" aria-describedby="adm-pass-hint" data-describedby="adm-pass-hint">
             <button type="button" class="btn btn-ghost btn-sm" data-eye="adm-pass" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
               <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
               <svg class="icon-svg icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 7 10 7a9.12 9.12 0 0 0 5.4-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
             </button>
           </div>
+          <!-- Leise Rueckmeldung beim Tippen, keine Staerke-Ampel: der Server
+               prueft nur die Laenge, eine Ampel wuerde eine Regel erfinden.
+               Zwei Saetze mit data-i18n, umgeschaltet per hidden - so uebersteht
+               der Zustand einen Sprachwechsel. aria-live sagt nur den Wechsel an. -->
+          <div class="hint pass-hint" id="adm-pass-hint" data-state="short" aria-live="polite">
+            <span data-pass-state="short" data-i18n="admin.passHint">At least 8 characters</span>
+            <span data-pass-state="ok" data-i18n="admin.passOk" hidden>Long enough</span>
+            <svg class="pass-hint__mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
         </div>
         <div class="field">
           <label for="adm-conf" data-i18n="admin.confLabel">Confirm Password</label>
-          <input type="password" id="adm-conf" autocomplete="new-password" required aria-required="true">
+          <div class="secret-row pw-row">
+            <input type="password" id="adm-conf" autocomplete="new-password" required aria-required="true">
+            <button type="button" class="btn btn-ghost btn-sm" data-eye="adm-conf" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
+              <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="icon-svg icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 7 10 7a9.12 9.12 0 0 0 5.4-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+            </button>
+          </div>
         </div>
         </div>
         <div class="error-banner" id="adm-err" role="alert"></div>
       </div>
+      <!-- Kein "Zurueck": davor liegt nur der erledigte Docker-Schirm, und
+           zurueck hinter den Container-Start fuehrt kein Weg mehr - die .env
+           steht, der Container laeuft. Ein Knopf, der auf einen Schirm ohne
+           Aufgabe fuehrt, waere ein Umweg mit Fragezeichen. -->
       <div class="card-foot">
-        <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
         <button class="btn btn-primary" id="adm-next" data-i18n="admin.create">Create Account</button>
       </div>
     </div>
@@ -2221,7 +2280,7 @@
                Rerun-Aussage verschlucken. localize() setzt ihn stattdessen. -->
           <p id="done-subtitle">Your family planner is running and your admin account is set up.</p>
           <div class="warn-banner" role="note" style="text-align:start">
-            <span class="warn-icon" aria-hidden="true">&#x26A0;</span>
+            <span class="warn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
             <span data-i18n="done.backupReminder">Remember to back up your .env file now - it holds your keys.</span>
           </div>
           <div class="done-actions">
@@ -2262,7 +2321,7 @@
             </a>
             <a class="next-step" id="next-modules" href="#" target="_blank" rel="noopener">
               <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-              <span><b data-i18n="done.nextModules">Choose your modules</b><br><span data-i18n="done.nextModulesDesc">Turn on what your household actually uses and hide the rest.</span></span>
+              <span><b data-i18n="done.nextModules">Active modules</b><br><span data-i18n="done.nextModulesDesc">Turn on what your household actually uses and hide the rest.</span></span>
             </a>
             <a class="next-step" id="next-region" href="#" target="_blank" rel="noopener">
               <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
@@ -3207,8 +3266,11 @@ function showErr(id, msg) {
 function clearInvalid(root = document) {
   root.querySelectorAll('[aria-invalid="true"]').forEach(el => {
     el.removeAttribute('aria-invalid');
-    // Nur fail() setzt describedby; mit der Markierung geht auch die Bindung.
-    el.removeAttribute('aria-describedby');
+    // fail() haengt das Banner an; mit der Markierung geht die Bindung, die
+    // eigene Beschreibung des Feldes (data-describedby) kommt zurueck.
+    const own = el.dataset?.describedby;
+    if (own) el.setAttribute('aria-describedby', own);
+    else el.removeAttribute('aria-describedby');
   });
 }
 
@@ -3221,7 +3283,10 @@ function clearFieldInvalid(e) {
   const el = e.target;
   if (el.getAttribute?.('aria-invalid') !== 'true') return;
   el.removeAttribute('aria-invalid');
-  el.removeAttribute('aria-describedby');
+  // Das Banner geht, der eigene Hinweis (z. B. die Mindestlaenge) bleibt.
+  const own = el.dataset?.describedby;
+  if (own) el.setAttribute('aria-describedby', own);
+  else el.removeAttribute('aria-describedby');
 }
 document.addEventListener('input', clearFieldInvalid);
 document.addEventListener('change', clearFieldInvalid);
@@ -3244,7 +3309,9 @@ function fail(bannerId, msg, inputId) {
     el.setAttribute('aria-invalid', 'true');
     // Meldung programmatisch ans Feld binden: wer spaeter zum Feld
     // zurueckkehrt, hoert den Grund, nicht nur "ungueltig" (WCAG 3.3.1/1.3.1).
-    el.setAttribute('aria-describedby', bannerId);
+    // Die eigene Beschreibung bleibt dahinter stehen: der Grund zuerst, dann
+    // die Regel, gegen die er verstoesst ("mindestens 8 Zeichen").
+    el.setAttribute('aria-describedby', [bannerId, el.dataset.describedby].filter(Boolean).join(' '));
     el.focus({ preventScroll: true });
     // Liegt das Feld ueber dem Bildschirm, fuehrt es (das Banner folgt
     // darunter); sonst das Banner, damit Feld UND Grund zu sehen sind.
@@ -4094,6 +4161,7 @@ $('dkr-logs-toggle').addEventListener('click', () => {
   log.style.display = open ? 'block' : 'none';
   logsOpen = open;
   $('dkr-logs-toggle').textContent = t(logsOpen ? 'docker.hideLogs' : 'docker.showLogs');
+  $('dkr-logs-toggle').setAttribute('aria-expanded', String(open));
   if (open) log.scrollTop = log.scrollHeight;
 });
 
@@ -4168,6 +4236,7 @@ function restartDocker() {
   $('dkr-logs-toggle').style.display = 'none';
   logsOpen = false;
   $('dkr-logs-toggle').textContent = t('docker.showLogs');
+  $('dkr-logs-toggle').setAttribute('aria-expanded', 'false');
   $('dkr-foot').style.display = 'none';
   startDocker();
 }
@@ -4202,6 +4271,24 @@ function dockerFailed(logs) {
 
 $('adm-next').addEventListener('click', createAdmin);
 
+// Dieselbe Regel wie der Server (server/auth.js, /auth/setup): Laenge nach
+// NFC-Normalisierung, mindestens 8. Ein Umlaut aus zwei Codepunkten zaehlt dort
+// einfach - hier also auch, sonst sagte der Hinweis "reicht", der Server nein.
+const ADMIN_PASS_MIN = 8;
+const passLongEnough = p => p.normalize('NFC').length >= ADMIN_PASS_MIN;
+
+/** Hinweis unter dem Admin-Passwort: "Mindestens 8 Zeichen" oder "reicht". */
+function renderPassHint() {
+  const ok = passLongEnough($('adm-pass').value);
+  const hint = $('adm-pass-hint');
+  if (hint.dataset.state === (ok ? 'ok' : 'short')) return;
+  hint.dataset.state = ok ? 'ok' : 'short';
+  hint.querySelectorAll('[data-pass-state]').forEach(el => {
+    el.hidden = el.dataset.passState !== hint.dataset.state;
+  });
+}
+$('adm-pass').addEventListener('input', renderPassHint);
+
 async function createAdmin() {
   clearInvalid();
   const u  = $('adm-user').value.trim();
@@ -4210,7 +4297,7 @@ async function createAdmin() {
   const c  = $('adm-conf').value;
   if (!u || !dn || !p) { fail('adm-err', t('admin.errAll'), !u ? 'adm-user' : !dn ? 'adm-name' : 'adm-pass'); return; }
   if (!/^[a-zA-Z0-9._-]{3,64}$/.test(u)) { fail('adm-err', t('admin.errUser'), 'adm-user'); return; }
-  if (p.length < 8) { fail('adm-err', t('admin.errPass'), 'adm-pass'); return; }
+  if (!passLongEnough(p)) { fail('adm-err', t('admin.errPass'), 'adm-pass'); return; }
   if (p !== c) { fail('adm-err', t('admin.errMatch'), 'adm-conf'); return; }
 
   const btn = $('adm-next');

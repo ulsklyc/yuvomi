@@ -166,7 +166,8 @@
     "userHint": "3-64 caracteres: letras, números, . - _",
     "nameLabel": "Nome de exibição",
     "passLabel": "Senha",
-    "passPlaceholder": "Pelo menos 8 caracteres",
+    "passHint": "Pelo menos 8 caracteres",
+    "passOk": "Comprimento suficiente",
     "confLabel": "Confirmar senha",
     "creating": "Criando …",
     "create": "Criar conta",
@@ -188,7 +189,7 @@
     "nextTitle": "A seguir",
     "nextInvite": "Convide sua família",
     "nextInviteDesc": "Crie links de convite para que cada pessoa escolha a própria senha.",
-    "nextModules": "Escolha seus módulos",
+    "nextModules": "Módulos ativos",
     "nextModulesDesc": "Ative o que sua casa realmente usa e esconda o resto.",
     "nextRegion": "Região e idioma",
     "nextRegionDesc": "Ajuste moeda, formato de data e feriados ao lugar onde você mora.",
@@ -197,7 +198,6 @@
     "subtitleExisting": "O Yuvomi está em execução. Esta instalação já tem uma conta de administrador - entre com suas credenciais existentes."
   },
   "advanced": {
-    "tag": "Avançado · opcional",
     "title": "Configurações avançadas",
     "subtitle": "Login único, acesso à sua rede doméstica e alguns ajustes finos. Tudo opcional.",
     "proxyLabel": "Como o Yuvomi é exposto?",

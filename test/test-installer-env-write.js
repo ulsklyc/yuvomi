@@ -1108,8 +1108,10 @@ async function withFakeSetup(respond, fn) {
       res.end(JSON.stringify(payload));
     });
   });
-  // `localhost`, weil der Proxy genau diesen Namen anspricht.
-  await new Promise(r => upstream.listen(0, 'localhost', r));
+  // 127.0.0.1, nicht `localhost`: test-suite-chain.js verlangt die Loopback-IP
+  // als zweites Argument. Der Proxy spricht `localhost` an; Node probiert beim
+  // Verbinden beide Familien (autoSelectFamily), also erreicht er auch diese.
+  await new Promise(r => upstream.listen(0, '127.0.0.1', r));
   const { port } = upstream.address();
   const dir = mkdtempSync(join(tmpdir(), 'yuvomi-setup-lang-'));
   try {

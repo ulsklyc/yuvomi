@@ -166,7 +166,8 @@
     "userHint": "3-64 tecken: bokstäver, siffror, . - _",
     "nameLabel": "Visningsnamn",
     "passLabel": "Lösenord",
-    "passPlaceholder": "Minst 8 tecken",
+    "passHint": "Minst 8 tecken",
+    "passOk": "Tillräckligt långt",
     "confLabel": "Bekräfta lösenord",
     "creating": "Skapar …",
     "create": "Skapa konto",
@@ -188,7 +189,7 @@
     "nextTitle": "Härnäst",
     "nextInvite": "Bjud in familjen",
     "nextInviteDesc": "Skapa inbjudningslänkar så att alla väljer sitt eget lösenord.",
-    "nextModules": "Välj dina moduler",
+    "nextModules": "Aktiva moduler",
     "nextModulesDesc": "Slå på det hushållet faktiskt använder och göm resten.",
     "nextRegion": "Region och språk",
     "nextRegionDesc": "Ställ in valuta, datumformat och helgdagar efter där du bor.",
@@ -197,7 +198,6 @@
     "subtitleExisting": "Yuvomi körs. Den här installationen har redan ett administratörskonto - logga in med dina befintliga uppgifter."
   },
   "advanced": {
-    "tag": "Avancerat · valfritt",
     "title": "Avancerade inställningar",
     "subtitle": "Enkel inloggning, åtkomst till ditt hemnätverk och några finjusteringar. Allt är valfritt.",
     "proxyLabel": "Hur exponeras Yuvomi?",

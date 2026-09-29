@@ -166,7 +166,8 @@
     "userHint": "3-64 个字符：字母、数字、. - _",
     "nameLabel": "显示名称",
     "passLabel": "密码",
-    "passPlaceholder": "至少 8 个字符",
+    "passHint": "至少 8 个字符",
+    "passOk": "长度已足够",
     "confLabel": "确认密码",
     "creating": "正在创建 …",
     "create": "创建账户",
@@ -188,7 +189,7 @@
     "nextTitle": "接下来",
     "nextInvite": "邀请家人",
     "nextInviteDesc": "创建邀请链接，让每个人自己设置密码。",
-    "nextModules": "选择模块",
+    "nextModules": "启用的模块",
     "nextModulesDesc": "打开家里真正会用的模块，隐藏其余部分。",
     "nextRegion": "地区与语言",
     "nextRegionDesc": "按所在地设置货币、日期格式和节假日。",
@@ -197,7 +198,6 @@
     "subtitleExisting": "Yuvomi 正在运行。此安装已有管理员账户，请使用你现有的凭据登录。"
   },
   "advanced": {
-    "tag": "高级 · 可选",
     "title": "高级设置",
     "subtitle": "单点登录、访问家庭网络，以及几项细节设置。全部可选。",
     "proxyLabel": "Yuvomi 如何对外提供服务？",
