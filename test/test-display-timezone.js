@@ -491,3 +491,70 @@ test('die Haushaltszone wird beim Laden und beim Umstellen gespiegelt', () => {
   assert.match(settings, /timezone_effective:\s*loaded\.timezone_effective/,
     'render() reicht die geltende Zone nicht an das Automatik-Label durch');
 });
+
+// --------------------------------------------------------------------------
+// Wanduhrzeit der Haushaltszone -> Zeitpunkt (#1522)
+//
+// Der Erinnerungsvorlauf in Kalender und Aufgaben rechnet von einer
+// Wanduhrzeit der Haushaltszone auf `remind_at`, einen Zeitpunkt. Der Server
+// tut dasselbe mit `localToUTCPrecise()` (#1300, #1341) - Dialog und Server
+// muessen denselben Anker haben, sonst wandert ein gespeicherter Vorlauf beim
+// naechsten Verschieben. Deshalb der Vergleich gegen die Serverfunktion selbst,
+// nicht gegen abgeschriebene Erwartungswerte: ueber Zonen mit beiden
+// Vorzeichen, halben und Dreiviertelstunden (Chatham, Lord Howe mit einer
+// 30-Minuten-Umstellung), und ueber die Umstelltage im Viertelstundenraster.
+// --------------------------------------------------------------------------
+
+test('wallTimeToInstantMs rechnet wie localToUTCPrecise - auch in Luecke und Doppelstunde', async () => {
+  const { localToUTCPrecise } = await import('../server/utils/timezone.js');
+  const zones = [
+    'Europe/Berlin', 'America/New_York', 'Pacific/Chatham', 'Australia/Lord_Howe',
+    'Asia/Kolkata', 'Pacific/Honolulu', 'UTC',
+  ];
+  const days = ['2026-03-08', '2026-03-29', '2026-04-05', '2026-09-18', '2026-09-27', '2026-10-04', '2026-10-25', '2026-11-01'];
+  const pad = (n) => String(n).padStart(2, '0');
+  let compared = 0;
+  let gaps = 0;
+  let folds = 0;
+  const wrong = [];
+  for (const zone of zones) {
+    for (const day of days) {
+      for (let minute = 0; minute < 24 * 60; minute += 15) {
+        const wall = `${day}T${pad(Math.floor(minute / 60))}:${pad(minute % 60)}:00`;
+        const expected = Date.parse(localToUTCPrecise(wall, zone));
+        const actual = tz.wallTimeToInstantMs(wall, zone);
+        compared += 1;
+        const candidates = tz.wallTimeCandidates(wall, zone).length;
+        if (candidates === 0) gaps += 1;
+        if (candidates > 1) folds += 1;
+        if (actual !== expected) wrong.push(`${zone} ${wall}: ${new Date(actual).toISOString()} statt ${new Date(expected).toISOString()}`);
+      }
+    }
+  }
+  assert.deepEqual(wrong.slice(0, 10), [], `${wrong.length} Abweichungen vom Server`);
+  // Ohne diese Zaehler waere der Vergleich auch dann gruen, wenn das Raster an
+  // den Umstellungen vorbeiliefe - genau dort liegen die zwei Sonderfaelle.
+  assert.ok(gaps >= 4, `das Raster trifft nicht existierende Ortszeiten (${gaps})`);
+  assert.ok(folds >= 4, `das Raster trifft doppelte Ortszeiten (${folds})`);
+  assert.ok(compared > 5000);
+});
+
+test('wallTimeToInstantMs: Formen, Rueckfall und unlesbare Werte', () => {
+  // Minuten ohne Sekunden, ein reines Datum als Mitternacht - wie
+  // `storedToInstantMsPrecise` auf dem Server.
+  assert.equal(tz.wallTimeToInstantMs('2026-09-18T09:00', 'Europe/Berlin'), Date.parse('2026-09-18T07:00:00Z'));
+  assert.equal(tz.wallTimeToInstantMs('2026-09-18', 'Europe/Berlin'), Date.parse('2026-09-17T22:00:00Z'));
+  // Ein Wert mit eigener Zone ist bereits ein Zeitpunkt und wird nicht umgerechnet.
+  assert.equal(tz.wallTimeToInstantMs('2026-09-18T09:00:00Z', 'Europe/Berlin'), Date.parse('2026-09-18T09:00:00Z'));
+  assert.equal(tz.wallTimeToInstantMs('2026-09-18T09:00:00+02:00', 'America/New_York'), Date.parse('2026-09-18T07:00:00Z'));
+  // Ohne gesetzte Haushaltszone bleibt es beim Browser (hier America/Toronto) -
+  // dieselbe Regel wie ueberall in dieser Datei.
+  assert.equal(displayTimeZone(), null);
+  assert.equal(tz.wallTimeToInstantMs('2026-09-18T09:00'), new Date('2026-09-18T09:00').getTime());
+  assert.equal(tz.wallTimeToInstantMs('2026-09-18T09:00'), Date.parse('2026-09-18T13:00:00Z'));
+  // Mit gesetzter Zone gilt sie auch ohne ausdruecklichen Parameter.
+  assert.equal(withZone('Europe/Berlin', () => tz.wallTimeToInstantMs('2026-09-18T09:00')), Date.parse('2026-09-18T07:00:00Z'));
+  for (const bad of ['', null, undefined, 'kein Datum', '2026-13-45T09:00']) {
+    assert.equal(tz.wallTimeToInstantMs(bad, 'Europe/Berlin'), null, `${String(bad)} ist unlesbar`);
+  }
+});

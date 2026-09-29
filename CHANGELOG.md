@@ -766,6 +766,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only when it is a different one. When the row already says "Today" or "Tomorrow", the word
   appears once. The last visit of the household help reads backwards ("Yesterday", "10.09.").
 
+- **Reminders of events and tasks keep their lead on a device in another time zone** (#1522).
+  With a household time zone set, the event dialog and the task dialog read the start or due
+  time in the zone of the device instead of the household's. On a phone or laptop set to another
+  zone, a reminder "1 hour before" was saved hours off, and opening it again showed a different
+  lead or "after the start". Both dialogs now read the time in the household zone, including on
+  the days the clocks change, the same way the server does.
+
+- **The note category hints no longer suggest that notes are private** (#1514). A personal
+  category is only visible to you, but a note filed under it is still visible to every household
+  member, just without that category. The hint next to the category type and the hint in the
+  category manager now say so.
 - **The reminder list for new tasks says why it is empty.** Without a CalDAV reminder list enabled
   for tasks, the section under Settings → Modules → Tasks now explains what a reminder list is and
   that an admin enables it, and admins get a link to Reminder sync. If the lists cannot be loaded,

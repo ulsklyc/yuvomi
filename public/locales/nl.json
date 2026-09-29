@@ -1124,11 +1124,11 @@
         "removeAction": "Categorie {{name}} verwijderen",
         "createAction": "‘{{name}}’ maken en toewijzen",
         "scopeLabel": "Categorietype",
-        "scopeHelp": "Alleen jij kunt persoonlijke categorieën zien en beheren. Alle huishoudleden kunnen huishoudcategorieën gebruiken; rechten bepalen wie ze mag beheren.",
+        "scopeHelp": "Alleen jij kunt persoonlijke categorieën zien en beheren. Notities daarin blijven zichtbaar voor het hele huishouden. Alle huishoudleden kunnen huishoudcategorieën gebruiken; rechten bepalen wie ze mag beheren.",
         "moreAction": "{{count}} extra categorieën",
         "moreAction_one": "{{count}} extra categorie",
         "moreAction_few": "{{count}} extra categorieën",
-        "personalManagementHint": "Hier kun je je persoonlijke categorieën beheren. Huishoudcategorieën blijven beschikbaar in de notitie-editor, maar je hebt geen toestemming om ze te beheren."
+        "personalManagementHint": "Hier kun je je persoonlijke categorieën beheren. Alleen jij ziet ze; notities daarin zijn zichtbaar voor het hele huishouden. Huishoudcategorieën blijven beschikbaar in de notitie-editor, maar je hebt geen toestemming om ze te beheren."
     },
     "notes": {
         "title": "Bord",

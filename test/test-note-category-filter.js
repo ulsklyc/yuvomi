@@ -301,6 +301,26 @@ test('all supported locales contain every note-category translation', () => {
   }
 });
 
+test('category hints say that notes in a personal category stay visible to the household (#1514)', () => {
+  // Nur die KATEGORIE ist persoenlich: GET /notes liefert jede Notiz an jedes
+  // Mitglied, hydrateNotesWithCategories() filtert nur die Kategorien der
+  // Notiz. Ein Hinweis, der allein "nur du siehst sie" sagt, wird als Aussage
+  // ueber die Notiz gelesen. Beide Hinweise zaehlen: scopeHelp erscheint nur
+  // mit Bereichswahl (wer den Haushaltskatalog verwalten darf), alle anderen
+  // sehen im Kategorie-Manager nur personalManagementHint.
+  const directory = new URL('../public/locales/', import.meta.url);
+  const expectations = {
+    'de.json': /Notizen[^.]*sichtbar/,
+    'en.json': /notes[^.]*visible/i,
+  };
+  for (const [file, pattern] of Object.entries(expectations)) {
+    const locale = JSON.parse(readFileSync(new URL(file, directory), 'utf8'));
+    for (const key of ['scopeHelp', 'personalManagementHint']) {
+      assert.match(locale.noteCategories[key], pattern, `${file}: noteCategories.${key} must say the notes stay visible`);
+    }
+  }
+});
+
 test('permission module rerender keeps capability controls in the editor', () => {
   const source = readFileSync(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
   const rebuild = source.match(/function rebuildModuleWidgets\([\s\S]*?\n\}/)?.[0] || '';

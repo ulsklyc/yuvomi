@@ -1124,11 +1124,11 @@
         "removeAction": "Gỡ danh mục {{name}}",
         "createAction": "Tạo và gán “{{name}}”",
         "scopeLabel": "Loại danh mục",
-        "scopeHelp": "Chỉ bạn có thể xem và quản lý danh mục cá nhân. Mọi thành viên đều có thể dùng danh mục gia đình; quyền truy cập quyết định ai được quản lý chúng.",
+        "scopeHelp": "Chỉ bạn có thể xem và quản lý danh mục cá nhân. Ghi chú trong đó vẫn hiển thị với cả gia đình. Mọi thành viên đều có thể dùng danh mục gia đình; quyền truy cập quyết định ai được quản lý chúng.",
         "moreAction": "Thêm {{count}} danh mục",
         "moreAction_one": "Thêm {{count}} danh mục",
         "moreAction_few": "Thêm {{count}} danh mục",
-        "personalManagementHint": "Bạn có thể quản lý các danh mục cá nhân tại đây. Danh mục gia đình vẫn có trong trình sửa ghi chú, nhưng bạn không có quyền quản lý chúng."
+        "personalManagementHint": "Bạn có thể quản lý các danh mục cá nhân tại đây. Chỉ bạn thấy chúng; ghi chú trong đó vẫn hiển thị với cả gia đình. Danh mục gia đình vẫn có trong trình sửa ghi chú, nhưng bạn không có quyền quản lý chúng."
     },
     "notes": {
         "title": "Bảng ghi chú",

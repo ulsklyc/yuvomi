@@ -1124,11 +1124,11 @@
         "removeAction": "Retirer la catégorie {{name}}",
         "createAction": "Créer et attribuer « {{name}} »",
         "scopeLabel": "Type de catégorie",
-        "scopeHelp": "Vous seul pouvez voir et gérer vos catégories personnelles. Tous les membres du foyer peuvent utiliser les catégories du foyer ; les autorisations déterminent qui peut les gérer.",
+        "scopeHelp": "Vous seul pouvez voir et gérer vos catégories personnelles. Les notes qui s’y trouvent restent visibles par tout le foyer. Tous les membres du foyer peuvent utiliser les catégories du foyer ; les autorisations déterminent qui peut les gérer.",
         "moreAction": "{{count}} catégories supplémentaires",
         "moreAction_one": "{{count}} catégorie supplémentaire",
         "moreAction_few": "{{count}} catégories supplémentaires",
-        "personalManagementHint": "Vous pouvez gérer ici vos catégories personnelles. Les catégories du foyer restent disponibles dans l’éditeur de notes, mais vous n’avez pas l’autorisation de les gérer."
+        "personalManagementHint": "Vous pouvez gérer ici vos catégories personnelles. Vous seul les voyez ; les notes qui s’y trouvent sont visibles par tout le foyer. Les catégories du foyer restent disponibles dans l’éditeur de notes, mais vous n’avez pas l’autorisation de les gérer."
     },
     "notes": {
         "title": "Notes",

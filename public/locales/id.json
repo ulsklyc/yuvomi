@@ -1138,11 +1138,11 @@
         "removeAction": "Hapus kategori {{name}}",
         "createAction": "Buat dan tetapkan “{{name}}”",
         "scopeLabel": "Jenis kategori",
-        "scopeHelp": "Hanya Anda yang dapat melihat dan mengelola kategori pribadi. Semua anggota rumah tangga dapat memakai kategori rumah tangga; izin mengatur siapa yang dapat mengelolanya.",
+        "scopeHelp": "Hanya Anda yang dapat melihat dan mengelola kategori pribadi. Catatan di dalamnya tetap terlihat oleh seluruh rumah tangga. Semua anggota rumah tangga dapat memakai kategori rumah tangga; izin mengatur siapa yang dapat mengelolanya.",
         "moreAction": "{{count}} kategori lainnya",
         "moreAction_one": "{{count}} kategori lainnya",
         "moreAction_few": "{{count}} kategori lainnya",
-        "personalManagementHint": "Anda dapat mengelola kategori pribadi di sini. Kategori rumah tangga tetap tersedia di editor catatan, tetapi Anda tidak memiliki izin untuk mengelolanya."
+        "personalManagementHint": "Anda dapat mengelola kategori pribadi di sini. Hanya Anda yang melihatnya; catatan di dalamnya terlihat oleh seluruh rumah tangga. Kategori rumah tangga tetap tersedia di editor catatan, tetapi Anda tidak memiliki izin untuk mengelolanya."
     },
     "notes": {
         "title": "Catatan",
