@@ -287,6 +287,97 @@ test('POST /webdav/test: explizite Overrides werden verwendet', async () => {
   assert.equal(r.body.data.ok, true);
 });
 
+// ── Neuer Server oder Benutzer braucht das Passwort neu ─────────────────────────
+// Dieselbe Regel wie bei CalDAV und CardDAV (server/utils/credential-origin.js):
+// Verbindungstest und Speichern nahmen eine neue Adresse ohne neues Passwort an,
+// und der Test schickte das GESPEICHERTE Passwort per Basic Auth dorthin. Ein
+// zweiter Loopback-Server (anderer Port = anderer Origin) spielt den fremden
+// Host und schneidet jeden Authorization-Header mit.
+const foreignSeen = [];
+const foreignServer = http.createServer((req, res) => {
+  foreignSeen.push({ method: req.method, authorization: req.headers.authorization || null });
+  req.resume();
+  req.on('end', () => { res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="x"' }); res.end(); });
+});
+const foreignBase = await new Promise((r) => foreignServer.listen(0, '127.0.0.1', () => {
+  r(`http://127.0.0.1:${foreignServer.address().port}`);
+}));
+test.after(() => foreignServer.close());
+const storedSecretLeaked = () => foreignSeen.some((r) => r.authorization
+  && Buffer.from(r.authorization.replace(/^Basic /, ''), 'base64').toString().includes('s3cret'));
+
+test('POST /webdav/test: neuer Server ohne Passwort → 400 password_required, nichts gesendet', async () => {
+  foreignSeen.length = 0;
+  const r = await call('POST', '/webdav/test', { actor: ADM, body: { url: foreignBase, password: '****' } });
+  assert.equal(storedSecretLeaked(), false, 'gespeichertes Passwort beim fremden Host angekommen');
+  assert.equal(foreignSeen.length, 0, `der fremde Host sah ${foreignSeen.length} Anfragen`);
+  assert.equal(r.status, 400);
+  assert.equal(r.body.errorCode, 'password_required');
+});
+
+test('POST /webdav/test: neuer Benutzer ohne Passwort → 400 password_required', async () => {
+  davSeen.length = 0;
+  const r = await call('POST', '/webdav/test', { actor: ADM, body: { username: 'someone-else' } });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.errorCode, 'password_required');
+  assert.equal(davSeen.length, 0, 'kein Verbindungsversuch');
+});
+
+test('PUT /webdav/config: neuer Server ohne Passwort → 400 password_required, nichts gespeichert', async () => {
+  for (const body of [
+    { enabled: true, url: foreignBase, username: 'dav', remotePath: '/backups/', keep: 7 },
+    { enabled: true, url: davBase.replace('http://', 'https://'), username: 'dav', keep: 7 },
+    { enabled: true, url: davBase, username: 'someone-else', keep: 7 },
+  ]) {
+    const r = await call('PUT', '/webdav/config', { actor: ADM, body });
+    assert.equal(r.status, 400, JSON.stringify(body));
+    assert.equal(r.body.errorCode, 'password_required', JSON.stringify(body));
+  }
+  const status = await call('GET', '/webdav/config', { actor: ADM });
+  assert.equal(status.body.data.url, davBase, 'Adresse unveraendert');
+  assert.equal(status.body.data.username, 'dav', 'Benutzer unveraendert');
+  foreignSeen.length = 0;
+  const probe = await call('POST', '/webdav/test', { actor: ADM, body: {} });
+  assert.equal(probe.status, 200, 'der Test geht weiter an den bisherigen Server');
+  assert.equal(foreignSeen.length, 0);
+});
+
+test('PUT /webdav/config: derselbe Server mit anderem Pfad braucht kein Passwort', async () => {
+  const r = await call('PUT', '/webdav/config', {
+    actor: ADM,
+    body: { enabled: true, url: `${davBase}/dav/`, username: 'dav', remotePath: '/backups/', keep: 7 },
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.url, `${davBase}/dav/`);
+  assert.equal(r.body.data.password, '****', 'Passwort bleibt gespeichert');
+  const back = await call('PUT', '/webdav/config', { actor: ADM, body: { url: davBase } });
+  assert.equal(back.status, 200);
+});
+
+test('PUT /webdav/config: die Maske aus GET ist kein neues Passwort', async () => {
+  // GET liefert das Passwort als Maske. Ein Client, der das Formular unveraendert
+  // zurueckschickt, sendet genau diesen Wert - er darf das gespeicherte Passwort
+  // weder ueberschreiben noch als neues Passwort fuer einen neuen Server gelten.
+  const storedPassword = () => database().prepare("SELECT value FROM sync_config WHERE key = 'webdav_backup_password'").get()?.value;
+  const mask = (await call('GET', '/webdav/config', { actor: ADM })).body.data.password;
+  assert.equal(storedPassword(), 's3cret', 'Vorbedingung');
+  const same = await call('PUT', '/webdav/config', { actor: ADM, body: { url: davBase, username: 'dav', password: mask } });
+  assert.equal(same.status, 200);
+  assert.equal(storedPassword(), 's3cret', 'die Maske ueberschreibt das gespeicherte Passwort nicht');
+  const moved = await call('PUT', '/webdav/config', { actor: ADM, body: { url: foreignBase, password: mask } });
+  assert.equal(moved.status, 400);
+  assert.equal(moved.body.errorCode, 'password_required');
+  assert.equal(storedPassword(), 's3cret');
+});
+
+test('PUT /webdav/config: neuer Server MIT neuem Passwort wird gespeichert', async () => {
+  const r = await call('PUT', '/webdav/config', { actor: ADM, body: { url: foreignBase, password: 'other-secret' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.url, foreignBase);
+  const back = await call('PUT', '/webdav/config', { actor: ADM, body: { url: davBase, password: 's3cret' } });
+  assert.equal(back.status, 200);
+});
+
 test('GET /webdav/files: nicht erreichbares Ziel → 500', async () => {
   // Konfig auf einen refused-Port umbiegen: listRemoteBackups wirft → catch → 500.
   const put = await call('PUT', '/webdav/config', {
