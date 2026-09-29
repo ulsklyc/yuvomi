@@ -337,3 +337,101 @@ test('#1431 ein Restore ueber /api/v1/backup/restore/ (mit Schraegstrich) wartet
   const body = await res.text();
   assert.equal(res.status, 200, `Restore mit Schraegstrich: ${res.status} ${body}`);
 });
+
+// ---------------------------------------------------------------------------
+// Restarbeit #1441
+// ---------------------------------------------------------------------------
+
+/**
+ * Die Anmeldung an `bcrypt.compare` anhalten: sie hat den Nutzer dann schon
+ * gelesen und schreibt die Sitzung erst danach - genau die Luecke, in die ein
+ * Restore fallen kann.
+ */
+async function holdLoginAtPasswordCheck() {
+  const bcrypt = (await import('bcrypt')).default;
+  const realCompare = bcrypt.compare;
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  let reached;
+  const atCompare = new Promise((resolve) => { reached = resolve; });
+  bcrypt.compare = async (...args) => {
+    reached();
+    await gate;
+    return realCompare.apply(bcrypt, args);
+  };
+  return { atCompare, release, restoreCompare: () => { bcrypt.compare = realCompare; } };
+}
+
+/** Eine frische Anmeldung per http.request, damit der Test sie abbrechen kann. */
+function startLogin() {
+  const body = JSON.stringify({ username: 'admin', password: 'adminpass123' });
+  const url = new URL(`${BASE}/api/v1/auth/login`);
+  let resolveAnswer;
+  const answer = new Promise((resolve) => { resolveAnswer = resolve; });
+  const req = http.request({
+    host: url.hostname, port: url.port, path: url.pathname, method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': String(Buffer.byteLength(body)) },
+  }, (res) => {
+    res.resume();
+    res.on('end', () => resolveAnswer({ status: res.statusCode, cookie: res.headers['set-cookie'] }));
+  });
+  req.on('error', () => resolveAnswer({ status: 0, cookie: null }));
+  req.end(body);
+  return { answer, abort: () => req.destroy() };
+}
+
+function sessionCount() {
+  return dbmod.get().prepare('SELECT COUNT(*) AS n FROM sessions').get().n;
+}
+
+/**
+ * Restore starten, waehrend die Anmeldung am Passwortvergleich haengt, und die
+ * Anmeldung erst freigeben, wenn der Restore fertig ist - hoechstens nach
+ * `holdMs`. Wartet der Restore auf die Anmeldung, laeuft die Frist ab und die
+ * Anmeldung schreibt in die ALTE Datenbank; tut er es nicht, schreibt sie nach
+ * dem Tausch in die eingespielte.
+ */
+async function restoreDuringHeldLogin({ abortClient = false, holdMs = 3000 } = {}) {
+  const backupPath = join(tempDir('yuvomi-test-restore-server-'), 'backup.db');
+  await dbmod.backupToFile(backupPath);
+  const sessionsInBackup = sessionCount();
+  const held = await holdLoginAtPasswordCheck();
+  let restoreOutcome;
+  try {
+    const login = startLogin();
+    await held.atCompare;
+    if (abortClient) {
+      login.abort();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    const restore = dbmod.restoreFromFile(backupPath).then(() => 'eingespielt', (err) => err.reason ?? err.message);
+    let timer;
+    restoreOutcome = await Promise.race([
+      restore.then((outcome) => `vor der Anmeldung ${outcome}`),
+      new Promise((resolve) => { timer = setTimeout(() => resolve('wartet auf die Anmeldung'), holdMs); }),
+    ]);
+    clearTimeout(timer);
+    held.release();
+    await login.answer;
+    await restore;
+    // Die Sitzung schreibt express-session beim Beenden der Antwort; einen
+    // Tick Luft, falls der Client schon weg ist.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  } finally {
+    held.release();
+    held.restoreCompare();
+  }
+  return { restoreOutcome, sessionsInBackup, sessionsAfter: sessionCount() };
+}
+
+test('#1441 eine Anmeldung, die vor dem Restore begann, wird abgewartet und schreibt ihre Sitzung nicht in die eingespielte Datenbank', async () => {
+  const { restoreOutcome, sessionsInBackup, sessionsAfter } = await restoreDuringHeldLogin();
+  assert.equal(sessionsAfter, sessionsInBackup, 'die eingespielte Datenbank traegt genau die Sitzungen des Backups');
+  assert.equal(restoreOutcome, 'wartet auf die Anmeldung', 'der Restore wartet die laufende Anmeldung ab');
+});
+
+test('#1441 legt der Client waehrend der Anmeldung auf, wird ihr Handler trotzdem abgewartet', async () => {
+  const { restoreOutcome, sessionsInBackup, sessionsAfter } = await restoreDuringHeldLogin({ abortClient: true });
+  assert.equal(sessionsAfter, sessionsInBackup, 'die eingespielte Datenbank traegt genau die Sitzungen des Backups');
+  assert.equal(restoreOutcome, 'wartet auf die Anmeldung', 'der Restore wartet den noch laufenden Handler ab');
+});

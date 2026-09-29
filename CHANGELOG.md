@@ -736,6 +736,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that an admin enables it, and admins get a link to Reminder sync. If the lists cannot be loaded,
   the section shows an error with "Try again" instead of claiming that no list is enabled. The
   section is now called "Reminder list for new tasks" (#1516).
+
+- **A restore no longer lets a sign-in or a provider connection write into the restored
+  database.** A restore waited for requests that were already writing, but not for sign-ins,
+  password resets and invitations, and not for the return from Google, Outlook, Google Drive or
+  single sign-on, which wait for the provider before they write. A sign-in that had read the
+  account before the restore could write its session into the restored database afterwards. The
+  restore now waits for these too, and a request whose browser gave up (a slow upload, for
+  example) is waited for until its work is done instead of only until the connection closed, for
+  at most the minute a restore waits anyway. While the database is closed during a restore,
+  `/API/v1/...` and other spellings Express accepts get the same "restore in progress" answer as
+  `/api/v1/...` instead of an internal error. The documented Docker Compose restore command now
+  also flushes to disk after moving the old write-ahead log aside, so a power loss right after it
+  cannot keep the restored database next to the old log; if you saved a copy of the command, take
+  the new one from the guide or from Settings, Administration, Backup and restore. A restore on
+  Node running natively on Windows no longer stops with `EPERM` while writing the restored copy to
+  disk; Docker installs were not affected. (#1441)
+
 - **Saving an event no longer removes the shares on its attachment.** Every save of an event with
   an attachment, even one that only changed the title or the time, removed the shares the owner
   had added in Documents for people who are not on the event. A member who may not manage the

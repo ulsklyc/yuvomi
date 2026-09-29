@@ -496,7 +496,7 @@ test('die öffentlichen Routen liegen vor dem globalen requireAuth der App', asy
   // auth-Router dahinter, gäbe /join für jeden Ausgeloggten nur noch 401.
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
-  const mounted = src.indexOf("app.use('/api/v1/auth', authRouter)");
+  const mounted = src.indexOf("app.use('/api/v1/auth', trackAdmittedWrite, authRouter)");
   const guarded = src.indexOf("app.use('/api/v1', requireAuth)");
   assert.ok(mounted > -1 && guarded > -1, 'Einhängepunkte in server/index.js nicht gefunden');
   assert.ok(mounted < guarded, 'der auth-Router muss vor dem globalen requireAuth eingehängt sein');

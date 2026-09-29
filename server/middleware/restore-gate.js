@@ -39,8 +39,13 @@ function isRestorePath(pathOnly) {
   return pathOnly.replace(/\/+$/, '').toLowerCase() === RESTORE_PATH;
 }
 
-/** Pfade, deren Antworten die Datenbank brauchen. Statische Dateien gehoeren nicht dazu. */
-function needsDatabase(pathOnly) {
+/**
+ * Pfade, deren Antworten die Datenbank brauchen. Statische Dateien gehoeren nicht dazu.
+ * Ohne Beachtung der Gross- und Kleinschreibung wie Express: `/API/v1/...`
+ * erreicht dieselben Router und scheiterte sonst mit 500 statt 503 (#1441).
+ */
+function needsDatabase(rawPath) {
+  const pathOnly = rawPath.toLowerCase();
   return pathOnly.startsWith('/api/') || pathOnly === '/mcp' || pathOnly.startsWith('/mcp/')
     // ICS-Abos lesen Termine, das OpenAPI-Dokument prueft die Sitzung (Review #1431).
     || pathOnly.startsWith('/feed/') || pathOnly === '/openapi.json';
@@ -83,11 +88,18 @@ export function createRestoreWriteGate(isRestoreRunning, isDatabaseOpen = () => 
  * OIDC-Start legen dort ihren `state` ab): waehrend eines Restores kann der
  * Store nichts speichern, und ein Redirect ohne gespeicherten `state` endet
  * erst beim Anbieter-Callback - deshalb vorher 503 (Codex-Befund in #1431).
+ *
+ * Zugelassen wird die Anfrage bis zu ihrem Ende festgehalten wie eine
+ * schreibende (#1441): die Callbacks (Google Calendar, Outlook, Google Drive,
+ * `/oidc/callback`) warten auf den Anbieter und schreiben erst danach Tokens,
+ * eine Verknuepfung oder einen neuen Nutzer. Ein Restore, der in diese Wartezeit
+ * faellt, wartet sie ab - sonst landete das in der eingespielten Datenbank.
  * @type {import('express').RequestHandler}
  */
 export function refuseWhileRestoring(_req, res, next) {
-  if (!restoreStateRunning()) return next();
-  return refuse(res, 503, RESTORE_WRITE_REFUSED_MESSAGE);
+  if (restoreStateRunning()) return refuse(res, 503, RESTORE_WRITE_REFUSED_MESSAGE);
+  trackWriteRequest(res);
+  return next();
 }
 
 /**

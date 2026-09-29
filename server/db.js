@@ -10782,9 +10782,18 @@ async function stageDatabaseCopy(from, stagingPath) {
   await unlinkIfExists(stagingPath);
   await fs.copyFile(from, stagingPath);
   await adoptDatabaseAttributes(stagingPath);
-  // Lesend genuegt fuer fsync - und klappt auch, wenn die Datei keine
-  // Schreibrechte traegt.
-  const handle = await fs.open(stagingPath, 'r');
+  // Schreibend oeffnen, wo es geht: Windows (FlushFileBuffers) verlangt fuer
+  // fsync einen Handle mit Schreibrecht und antwortet sonst mit EPERM - ein
+  // Restore unter Node nativ auf Windows blieb daran stehen (#1441). Traegt
+  // die Datei keine Schreibrechte, genuegt ausserhalb von Windows ein lesender
+  // Handle wie bisher.
+  let handle;
+  try {
+    handle = await fs.open(stagingPath, 'r+');
+  } catch (err) {
+    if (err?.code !== 'EACCES' && err?.code !== 'EPERM') throw err;
+    handle = await fs.open(stagingPath, 'r');
+  }
   try {
     await handle.sync();
   } finally {

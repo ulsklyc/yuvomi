@@ -84,7 +84,30 @@ export function trackWriteRequest(res) {
   activeWriteRequests.add(tracked);
   res[TRACKED] = done;
   res.once('finish', done);
-  res.once('close', done);
+  // Freigegeben wird, wenn der Handler seine Antwort beendet - nicht schon,
+  // wenn der Client auflegt (#1441). Nach einem Abbruch feuert 'finish' nie,
+  // der Handler laeuft aber weiter (etwa ein langsamer Upload) und schriebe
+  // nach dem Tausch in die eingespielte Datenbank. Deshalb zaehlt der Aufruf
+  // von `end()` selbst.
+  if (typeof res.end === 'function') {
+    const end = res.end;
+    res.end = function endAndRelease(...args) {
+      try {
+        return end.apply(this, args);
+      } finally {
+        done();
+      }
+    };
+  }
+  res.once('close', () => {
+    if (res.writableEnded) return done();
+    // Client weg, Handler womoeglich noch dabei: auf sein Ende warten, aber
+    // begrenzt - ein Handler, der nie endet, hielte sonst jeden kuenftigen
+    // Restore auf.
+    const timer = setTimeout(done, abandonedWriteGraceMs);
+    timer.unref?.();
+    finished.then(() => clearTimeout(timer));
+  });
 }
 
 /**
@@ -123,6 +146,18 @@ export function restoreWaitTimeoutMs() {
 /** NUR FUER TESTS: die Frist kuerzer stellen; ohne Argument zurueck auf den Standard. */
 export function setRestoreWaitTimeoutForTests(ms = RESTORE_WAIT_TIMEOUT_MS) {
   waitTimeoutMs = ms;
+}
+
+/**
+ * Wie lange eine Anfrage nach dem Abbruch durch den Client hoechstens noch
+ * festgehalten wird, falls ihr Handler nie endet (#1441). So lang wie die
+ * Frist, die ein Restore ohnehin wartet.
+ */
+let abandonedWriteGraceMs = RESTORE_WAIT_TIMEOUT_MS;
+
+/** NUR FUER TESTS: die Frist nach einem Client-Abbruch kuerzer stellen; ohne Argument zurueck. */
+export function setAbandonedWriteGraceForTests(ms = RESTORE_WAIT_TIMEOUT_MS) {
+  abandonedWriteGraceMs = ms;
 }
 
 /**
