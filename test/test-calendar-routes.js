@@ -4796,6 +4796,62 @@ test('Farb-Heilung: eine Bearbeitung ohne Farbwechsel laesst den Schnappschuss s
   }
 });
 
+test('Farb-Heilung: die Vormerkliste nimmt nur Termine von vor dem Fix auf (#1442)', async () => {
+  // Ein Schnappschuss nimmt ohnehin nur Zeilen von vor Migration 166 auf. Eine
+  // juengere Zeile auf der Vormerkliste liesse sie nur wachsen, und jede
+  // Umfaerbung laese und schriebe die ganze Liste neu.
+  const cutoff = db.prepare('SELECT applied_at FROM schema_migrations WHERE version = 166').get().applied_at;
+  const fresh = insertEvent({ title: 'Neu', external_source: 'caldav', color: '#4A90E2', user_modified: 1 });
+  const old = insertEvent({ title: 'Alt', external_source: 'caldav', color: '#4A90E2', user_modified: 1 });
+  db.prepare("UPDATE calendar_events SET created_at = datetime(?, '+1 day') WHERE id = ?").run(cutoff, fresh);
+  db.prepare("UPDATE calendar_events SET created_at = '2020-01-01 00:00:00' WHERE id = ?").run(old);
+  const chosen = () => db.prepare("SELECT value FROM sync_config WHERE key = 'caldav_legacy_color_heal_chosen'").get()?.value;
+  try {
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%'").run();
+    assert.equal((await call('PUT', `/${fresh}`, { body: { color: '#3CA368' } })).status, 200);
+    assert.equal(chosen(), undefined, 'eine Zeile nach dem Fix kommt nicht auf die Liste');
+
+    assert.equal((await call('PUT', `/${old}`, { body: { color: '#3CA368' } })).status, 200);
+    assert.deepEqual(JSON.parse(chosen()), [old], 'eine Altzeile schon');
+
+    // Stand von vor #1442: die Liste traegt auch juengere Zeilen. Die naechste
+    // Wahl an einer Altzeile raeumt sie mit ab.
+    db.prepare("UPDATE sync_config SET value = ? WHERE key = 'caldav_legacy_color_heal_chosen'")
+      .run(JSON.stringify([old, fresh]));
+    assert.equal((await call('PUT', `/${old}`, { body: { color: '#E24A4A' } })).status, 200);
+    assert.deepEqual(JSON.parse(chosen()), [old]);
+  } finally {
+    db.prepare('DELETE FROM calendar_events WHERE id IN (?, ?)').run(fresh, old);
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%'").run();
+  }
+});
+
+test('Farb-Heilung: der Schnappschuss eines Kontos faellt mit dem Ende seiner Frist, der Fristbeginn bleibt (#1442)', async () => {
+  const id = insertEvent({ title: 'Frist vorbei', external_source: 'caldav', color: '#4A90E2', user_modified: 1 });
+  const ended = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
+  const running = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  const value = (key) => db.prepare('SELECT value FROM sync_config WHERE key = ?').get(key)?.value;
+  db.prepare(`INSERT INTO sync_config (key, value) VALUES
+      ('caldav_legacy_color_heal_since_72', ?), ('caldav_legacy_color_heal_snapshot_72', ?),
+      ('caldav_legacy_color_heal_since_73', 'never'), ('caldav_legacy_color_heal_snapshot_73', ?),
+      ('caldav_legacy_color_heal_since_74', ?), ('caldav_legacy_color_heal_snapshot_74', ?)`)
+    .run(ended, JSON.stringify({ [id]: '#4a90e2', 1: '#4a90e2' }), JSON.stringify({ 1: '#4a90e2' }),
+      running, JSON.stringify({ [id]: '#4a90e2', 1: '#4a90e2' }));
+  try {
+    assert.equal((await call('PUT', `/${id}`, { body: { color: '#3CA368' } })).status, 200);
+    assert.equal(value('caldav_legacy_color_heal_snapshot_72'), undefined, 'Frist abgelaufen');
+    assert.equal(value('caldav_legacy_color_heal_snapshot_73'), undefined, 'Heilung aus');
+    assert.deepEqual(JSON.parse(value('caldav_legacy_color_heal_snapshot_74')), { 1: '#4a90e2' }, 'laufende Frist');
+    // Ohne den Fristbeginn finge die Frist mit dem naechsten Lauf neu an.
+    assert.equal(value('caldav_legacy_color_heal_since_72'), ended);
+    assert.equal(value('caldav_legacy_color_heal_since_73'), 'never');
+    assert.equal(value('caldav_legacy_color_heal_since_74'), running);
+  } finally {
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%'").run();
+  }
+});
+
 test('Farb-Heilung: eine Farbwahl vor dem ersten Heil-Lauf kommt nicht in den Schnappschuss (#1270)', async () => {
   // Ein Konto legt den Schnappschuss erst bei seinem ersten Heil-Lauf an -
   // fuer ein neu angelegtes oder umgehaengtes Konto erst beim naechsten Takt.

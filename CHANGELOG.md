@@ -740,6 +740,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that an admin enables it, and admins get a link to Reminder sync. If the lists cannot be loaded,
   the section shows an error with "Try again" instead of claiming that no list is enabled. The
   section is now called "Reminder list for new tasks" (#1516).
+
+- **Recolouring a CalDAV event no longer grows a list that is never emptied** (#1442). Every
+  colour chosen in Yuvomi for an event from a CalDAV calendar was noted so the one-time colour
+  repair from 2.69.0 would leave it alone, and that list only grew; each recolour read and rewrote
+  all of it. Only events from before the colour fix of 2.49.0 are noted now, since the repair never
+  touches newer ones, and an account's repair data is removed once its 30-day window has ended.
+
 - **Saving an event no longer removes the shares on its attachment.** Every save of an event with
   an attachment, even one that only changed the title or the time, removed the shares the owner
   had added in Documents for people who are not on the event. A member who may not manage the
