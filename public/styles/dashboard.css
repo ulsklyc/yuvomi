@@ -5780,9 +5780,11 @@ button.today-cockpit__more--link {
    * test:dashboard-surface-browser). Klebt er, fuellt sein Grund den Streifen
    * bis zur Kante - der Inhalt scrollt DARUNTER durch, nicht zwischen Knopf und
    * Kante hindurch -, und unten haelt er den Abstand der Flaeche, mindestens
-   * aber die Safe-Area (Home-Indikator). */
+   * aber die Safe-Area (Home-Indikator). `--nav-tail` ist im Wandmodus 0
+   * (layout.css, Leiste ausgeblendet) - dieselbe Regel wie jede klebende
+   * Fusszeile im Inhalt (test:mobile-chrome). */
   position: sticky;
-  bottom: 0;
+  bottom: var(--nav-tail);
   z-index: 1;
   margin-block: calc(-1 * var(--space-2)) calc(-1 * var(--wall-pad));
   padding-block: var(--space-2) max(var(--wall-pad), var(--safe-area-inset-bottom));
