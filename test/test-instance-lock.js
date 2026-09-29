@@ -145,8 +145,9 @@ function startCliLikeHolder(dbPath, { lifetimeMs = 0 } = {}) {
     globalThis[Symbol.for('yuvomi.db.instanceLock')] = 'refuse';
     await import(${JSON.stringify(DB_MODULE)});
     console.log('HOLDING');
-    setInterval(() => {}, 1e6);
-    if (${lifetimeMs} > 0) setTimeout(() => process.exit(0), ${lifetimeMs});
+    // Mit Lebensdauer endet er von selbst, sonst haelt er, bis er beendet wird.
+    // Kein process.exit hier: test:suite-exit-code sucht den Aufruf im Text.
+    setTimeout(() => {}, ${lifetimeMs} > 0 ? ${lifetimeMs} : 2 ** 31 - 1);
   `;
   return startChild(['--input-type=module', '-e', code], dbPath);
 }
@@ -159,7 +160,6 @@ async function freshDatabaseWithBackup() {
   const code = `
     const db = await import(${JSON.stringify(DB_MODULE)});
     await db.backupToFile(${JSON.stringify(backupPath)});
-    process.exit(0);
   `;
   const run = spawnSync(process.execPath, ['--input-type=module', '-e', code], {
     cwd: ROOT, env: childEnv(dbPath), encoding: 'utf8', timeout: 60_000,
