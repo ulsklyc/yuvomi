@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **First-run setup keeps the chosen language.** The setup page now tells the server which
+  language it is shown in, so birthday events and other titles the server writes start out in that
+  language instead of English. `POST /api/v1/auth/setup` accepts optional `language` and `timezone`
+  fields for the same purpose; requests without them behave as before.
+
 - **The search opens places and actions, not only entries.** Typing "Schedule" or "new" now
   offers a "Go to" section with every module in your navigation and every settings sheet, and a
   "Create new" section that opens the page and starts its add action, both above the entries found.
