@@ -731,6 +731,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Counts read correctly in Czech, Polish, Russian, Ukrainian and Arabic** (#1473). These
+  languages need more than a singular and a plural: Czech, Polish, Russian and Ukrainian have their
+  own form for 2 to 4 (and 22 to 24), Arabic has a dual for 2 and a separate form from 11 to 99.
+  For about 110 counters across the overview, tasks, settings, documents and other modules only the
+  singular and the form for 5 and more existed, so "za 2 dní" appeared instead of "za 2 dny" and
+  "خلال 2 أيام" instead of "خلال يومين". Every counter now carries every form its language uses, and
+  a test fails for any new counter that misses one.
+
 - **The family card no longer misses an evening appointment on a busy day** (#1449). The card took
   its appointments from the calendar tile, which stops at five coming ones and follows its "Only
   mine" option: a child's evening appointment could be cut off, and with "Only mine" every other
