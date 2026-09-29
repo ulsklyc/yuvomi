@@ -39,6 +39,8 @@ import { passwordResetService as defaultResetService } from './services/password
 import { inviteService as defaultInviteService } from './services/invites.js';
 import { parseScopes, serializeScopes, normalizeScopes } from './scopes.js';
 import { hashPassword, normalizePassword, verifyPassword } from './utils/password.js';
+import { getSupportedLocales, isSupportedLocale, resolveHouseholdLocale } from './utils/i18n.js';
+import { isValidTimeZone } from './utils/timezone.js';
 import { accountIdsByEmail } from './utils/email-match.js';
 import {
   resolvePermissions, buildSessionModuleAccess, clientPermissions,
@@ -2396,8 +2398,28 @@ router.get('/oidc/callback', refuseWhileRestoring, async (req, res) => {
  * POST /api/v1/auth/setup
  * First-run bootstrap: creates the first admin when no users exist.
  * Returns 403 if any user already exists.
- * Body: { username: string, display_name: string, password: string }
+ * Body: { username: string, display_name: string, password: string,
+ *         language?: string, timezone?: string }
  * Response: { user: { id, username, display_name, avatar_color, role } }
+ *
+ * `language` und `timezone` sind optional und additiv (die Route ist Teil der
+ * zugesagten `/api/v1`-Oberflaeche): fehlen sie, oder sind sie `null`/leer,
+ * verhaelt sich das Setup exakt wie vorher. Unbekannte Felder im Body werden
+ * weiterhin still ignoriert - darauf verlaesst sich der Web-Installer, der die
+ * Felder auch an aeltere Images schicken darf.
+ *
+ * Die Anzeigesprache eines Nutzers kennt der Server nicht (sie lebt im
+ * localStorage des Geraets, siehe public/i18n.js). Was er kennt, ist die
+ * Datensprache des Haushalts (`sync_config.language`), und genau die fiel beim
+ * Setup bisher still auf Englisch. `language` setzt deshalb sie - aber nur,
+ * wenn die Automatik (Region → Englisch) nicht ohnehin dasselbe ergaebe. Ein
+ * explizites `en` wuerde sonst eine spaetere Regionswahl ueberstimmen, die die
+ * Datensprache heute noch mitzieht.
+ *
+ * Region, Waehrung und Datumsformat bleiben unberuehrt: aus einer Sprache folgt
+ * keine Region (`de` kann DE, AT oder CH sein), und es gibt keine Ableitung,
+ * die das entscheiden koennte. `timezone` schreibt `household_timezone`, mit
+ * derselben Pruefung wie PUT /preferences.
  */
 router.post('/setup', loginLimiter, async (req, res) => {
   try {
@@ -2425,6 +2447,14 @@ router.post('/setup', loginLimiter, async (req, res) => {
     if (normalizePassword(password).length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters long.', code: 400 });
     }
+    // `null` und '' zaehlen als "nicht gesendet", wie bei PUT /preferences.
+    const { language = null, timezone = null } = req.body;
+    if (language !== null && language !== '' && !isSupportedLocale(language)) {
+      return res.status(400).json({ error: `Unsupported language. Allowed: ${getSupportedLocales().join(', ')}`, code: 400 });
+    }
+    if (timezone !== null && timezone !== '' && !isValidTimeZone(timezone)) {
+      return res.status(400).json({ error: 'Invalid time zone. Expected an IANA zone such as "Europe/Berlin".', code: 400 });
+    }
 
     const avatarColor = avatarColors[Math.floor(Math.random() * avatarColors.length)];
     const hash = await hashPassword(password);
@@ -2442,6 +2472,17 @@ router.post('/setup', loginLimiter, async (req, res) => {
           displayName: display_name,
           actorUserId: created.lastInsertRowid,
         });
+        // In derselben Transaktion: scheitert das Anlegen, bleibt auch keine
+        // halbe Haushaltseinstellung zurueck.
+        const setCfg = db.get().prepare(`
+          INSERT INTO sync_config (key, value) VALUES (?, ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+                                         updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+        `);
+        if (language && language !== resolveHouseholdLocale(db.get(), { ignoreExplicit: true })) {
+          setCfg.run('language', language);
+        }
+        if (timezone) setCfg.run('household_timezone', timezone);
         return created;
       });
     } catch (txErr) {
