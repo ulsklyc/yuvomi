@@ -135,7 +135,7 @@
     "running": "El contenedor está sano y en ejecución",
     "failed": "El contenedor no se pudo iniciar",
     "unknownError": "Error desconocido",
-    "toAdmin": "Continuar con la configuración del administrador",
+    "toAdmin": "Configurar el administrador",
     "retry": "Reintentar",
     "phasePull": "Descargando la imagen",
     "phaseBoot": "Iniciando el contenedor",
@@ -145,7 +145,15 @@
     "showLogs": "Mostrar registro",
     "hideLogs": "Ocultar registro",
     "timedOut": "Sin respuesta tras 15 minutos. Revisa el registro e inténtalo de nuevo.",
-    "logLabel": "Registro del contenedor"
+    "logLabel": "Registro del contenedor",
+    "stepPull": "Descargar la imagen",
+    "stepBoot": "Iniciar el contenedor",
+    "stepHealth": "Comprobación de estado",
+    "stepFailed": "(error)",
+    "doneTitle": "Yuvomi está en marcha",
+    "doneSubtitle": "El contenedor ha superado la comprobación de estado.",
+    "doneIn": "Listo en {{n}} s",
+    "failedSubtitle": "El registro de abajo muestra qué ha fallado."
   },
   "admin": {
     "title": "Crear cuenta de administrador",

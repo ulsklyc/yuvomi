@@ -226,7 +226,15 @@
     "showLogs": "Tampilkan log",
     "hideLogs": "Sembunyikan log",
     "timedOut": "Tidak ada respons setelah 15 menit. Periksa log dan coba lagi.",
-    "logLabel": "Log kontainer"
+    "logLabel": "Log kontainer",
+    "stepPull": "Unduh image",
+    "stepBoot": "Jalankan kontainer",
+    "stepHealth": "Pemeriksaan kesehatan",
+    "stepFailed": "(gagal)",
+    "doneTitle": "Yuvomi sudah berjalan",
+    "doneSubtitle": "Kontainer lolos pemeriksaan kesehatan.",
+    "doneIn": "Selesai dalam {{n}} d",
+    "failedSubtitle": "Log di bawah menunjukkan apa yang salah."
   },
   "admin": {
     "title": "Buat akun admin",

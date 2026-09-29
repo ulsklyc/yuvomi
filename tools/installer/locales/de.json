@@ -226,7 +226,15 @@
     "showLogs": "Protokoll anzeigen",
     "hideLogs": "Protokoll ausblenden",
     "timedOut": "Nach 15 Minuten kam keine Rückmeldung. Prüfe das Protokoll und versuche es erneut.",
-    "logLabel": "Container-Protokoll"
+    "logLabel": "Container-Protokoll",
+    "stepPull": "Image laden",
+    "stepBoot": "Container starten",
+    "stepHealth": "Health-Check",
+    "stepFailed": "(fehlgeschlagen)",
+    "doneTitle": "Yuvomi läuft",
+    "doneSubtitle": "Der Container hat den Health-Check bestanden.",
+    "doneIn": "Fertig in {{n}} s",
+    "failedSubtitle": "Das Protokoll unten zeigt, woran es lag."
   },
   "admin": {
     "title": "Admin-Konto erstellen",

@@ -226,7 +226,15 @@
     "showLogs": "로그 표시",
     "hideLogs": "로그 숨기기",
     "timedOut": "15분이 지나도 응답이 없습니다. 로그를 확인한 뒤 다시 시도하세요.",
-    "logLabel": "컨테이너 로그"
+    "logLabel": "컨테이너 로그",
+    "stepPull": "이미지 내려받기",
+    "stepBoot": "컨테이너 시작",
+    "stepHealth": "상태 검사",
+    "stepFailed": "(실패)",
+    "doneTitle": "Yuvomi 실행 중",
+    "doneSubtitle": "컨테이너가 상태 검사를 통과했습니다.",
+    "doneIn": "{{n}}초 만에 완료",
+    "failedSubtitle": "아래 로그에서 무엇이 잘못되었는지 확인하세요."
   },
   "admin": {
     "title": "관리자 계정 만들기",

@@ -226,7 +226,15 @@
     "showLogs": "Logboek tonen",
     "hideLogs": "Logboek verbergen",
     "timedOut": "Geen reactie na 15 minuten. Bekijk het logboek en probeer het opnieuw.",
-    "logLabel": "Containerlogboek"
+    "logLabel": "Containerlogboek",
+    "stepPull": "Image downloaden",
+    "stepBoot": "Container starten",
+    "stepHealth": "Health check",
+    "stepFailed": "(mislukt)",
+    "doneTitle": "Yuvomi draait",
+    "doneSubtitle": "De container heeft de health check doorstaan.",
+    "doneIn": "Klaar in {{n}} s",
+    "failedSubtitle": "Het logboek hieronder laat zien wat er misging."
   },
   "admin": {
     "title": "Beheerdersaccount aanmaken",

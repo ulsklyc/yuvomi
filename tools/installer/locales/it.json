@@ -135,7 +135,7 @@
     "running": "Il container è integro e in esecuzione",
     "failed": "Impossibile avviare il container",
     "unknownError": "Errore sconosciuto",
-    "toAdmin": "Continua con la configurazione dell'amministratore",
+    "toAdmin": "Configura l’amministratore",
     "retry": "Riprova",
     "phasePull": "Download dell’immagine",
     "phaseBoot": "Avvio del container",
@@ -145,7 +145,15 @@
     "showLogs": "Mostra registro",
     "hideLogs": "Nascondi registro",
     "timedOut": "Nessuna risposta dopo 15 minuti. Controlla il registro e riprova.",
-    "logLabel": "Log del container"
+    "logLabel": "Log del container",
+    "stepPull": "Scarica l’immagine",
+    "stepBoot": "Avvia il container",
+    "stepHealth": "Controllo di integrità",
+    "stepFailed": "(non riuscito)",
+    "doneTitle": "Yuvomi è in esecuzione",
+    "doneSubtitle": "Il container ha superato il controllo di integrità.",
+    "doneIn": "Completato in {{n}} s",
+    "failedSubtitle": "Il registro qui sotto mostra cosa è andato storto."
   },
   "admin": {
     "title": "Crea account amministratore",

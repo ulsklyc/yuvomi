@@ -145,7 +145,15 @@
     "showLogs": "Show log",
     "hideLogs": "Hide log",
     "timedOut": "No response after 15 minutes. Check the log and try again.",
-    "logLabel": "Container log"
+    "logLabel": "Container log",
+    "stepPull": "Download image",
+    "stepBoot": "Start container",
+    "stepHealth": "Health check",
+    "stepFailed": "(failed)",
+    "doneTitle": "Yuvomi is running",
+    "doneSubtitle": "The container passed its health check.",
+    "doneIn": "Done in {{n}}s",
+    "failedSubtitle": "The log below shows what went wrong."
   },
   "admin": {
     "title": "Create Admin Account",

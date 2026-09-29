@@ -145,7 +145,15 @@
     "showLogs": "Napló megjelenítése",
     "hideLogs": "Napló elrejtése",
     "timedOut": "15 perc után sem érkezett válasz. Nézd meg a naplót, és próbáld újra.",
-    "logLabel": "Konténernapló"
+    "logLabel": "Konténernapló",
+    "stepPull": "Rendszerkép letöltése",
+    "stepBoot": "Konténer indítása",
+    "stepHealth": "Állapotellenőrzés",
+    "stepFailed": "(sikertelen)",
+    "doneTitle": "A Yuvomi fut",
+    "doneSubtitle": "A konténer átment az állapotellenőrzésen.",
+    "doneIn": "Kész {{n}}s alatt",
+    "failedSubtitle": "Az alábbi napló megmutatja, mi romlott el."
   },
   "admin": {
     "title": "Adminisztrátor fiók létrehozása",

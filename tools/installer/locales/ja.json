@@ -145,7 +145,15 @@
     "showLogs": "ログを表示",
     "hideLogs": "ログを隠す",
     "timedOut": "15 分たっても応答がありません。ログを確認してもう一度お試しください。",
-    "logLabel": "コンテナのログ"
+    "logLabel": "コンテナのログ",
+    "stepPull": "イメージのダウンロード",
+    "stepBoot": "コンテナーの起動",
+    "stepHealth": "ヘルスチェック",
+    "stepFailed": "（失敗）",
+    "doneTitle": "Yuvomi が稼働しています",
+    "doneSubtitle": "コンテナはヘルスチェックに合格しました。",
+    "doneIn": "{{n}} 秒で完了",
+    "failedSubtitle": "下のログで原因を確認できます。"
   },
   "admin": {
     "title": "管理者アカウントを作成",

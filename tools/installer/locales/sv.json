@@ -145,7 +145,15 @@
     "showLogs": "Visa logg",
     "hideLogs": "Dölj logg",
     "timedOut": "Inget svar efter 15 minuter. Kontrollera loggen och försök igen.",
-    "logLabel": "Containerlogg"
+    "logLabel": "Containerlogg",
+    "stepPull": "Hämta avbild",
+    "stepBoot": "Starta containern",
+    "stepHealth": "Hälsokontroll",
+    "stepFailed": "(misslyckades)",
+    "doneTitle": "Yuvomi körs",
+    "doneSubtitle": "Containern klarade hälsokontrollen.",
+    "doneIn": "Klart på {{n}} s",
+    "failedSubtitle": "Loggen nedan visar vad som gick fel."
   },
   "admin": {
     "title": "Skapa administratörskonto",

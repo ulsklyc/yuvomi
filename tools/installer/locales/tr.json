@@ -145,7 +145,15 @@
     "showLogs": "Günlüğü göster",
     "hideLogs": "Günlüğü gizle",
     "timedOut": "15 dakika sonra yanıt alınamadı. Günlüğü kontrol edip yeniden deneyin.",
-    "logLabel": "Konteyner günlüğü"
+    "logLabel": "Konteyner günlüğü",
+    "stepPull": "Görüntüyü indir",
+    "stepBoot": "Kapsayıcıyı başlat",
+    "stepHealth": "Sağlık denetimi",
+    "stepFailed": "(başarısız)",
+    "doneTitle": "Yuvomi çalışıyor",
+    "doneSubtitle": "Kapsayıcı sağlık denetimini geçti.",
+    "doneIn": "{{n}} sn'de tamamlandı",
+    "failedSubtitle": "Aşağıdaki günlük neyin ters gittiğini gösteriyor."
   },
   "admin": {
     "title": "Yönetici Hesabı Oluştur",

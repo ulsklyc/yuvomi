@@ -226,7 +226,15 @@
     "showLogs": "Zobrazit protokol",
     "hideLogs": "Skrýt protokol",
     "timedOut": "Po 15 minutách žádná odpověď. Zkontrolujte protokol a zkuste to znovu.",
-    "logLabel": "Protokol kontejneru"
+    "logLabel": "Protokol kontejneru",
+    "stepPull": "Stažení obrazu",
+    "stepBoot": "Spuštění kontejneru",
+    "stepHealth": "Kontrola stavu",
+    "stepFailed": "(selhalo)",
+    "doneTitle": "Yuvomi běží",
+    "doneSubtitle": "Kontejner prošel kontrolou stavu.",
+    "doneIn": "Hotovo za {{n}} s",
+    "failedSubtitle": "Protokol níže ukazuje, co se pokazilo."
   },
   "admin": {
     "title": "Vytvoření účtu správce",

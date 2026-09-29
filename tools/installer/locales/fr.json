@@ -135,7 +135,7 @@
     "running": "Le conteneur est sain et en cours d'exécution",
     "failed": "Le conteneur n'a pas pu démarrer",
     "unknownError": "Erreur inconnue",
-    "toAdmin": "Continuer vers la configuration de l'administrateur",
+    "toAdmin": "Configurer l’administrateur",
     "retry": "Réessayer",
     "phasePull": "Téléchargement de l’image",
     "phaseBoot": "Démarrage du conteneur",
@@ -145,7 +145,15 @@
     "showLogs": "Afficher le journal",
     "hideLogs": "Masquer le journal",
     "timedOut": "Aucune réponse après 15 minutes. Consultez le journal et réessayez.",
-    "logLabel": "Journal du conteneur"
+    "logLabel": "Journal du conteneur",
+    "stepPull": "Télécharger l’image",
+    "stepBoot": "Démarrer le conteneur",
+    "stepHealth": "Contrôle de santé",
+    "stepFailed": "(échec)",
+    "doneTitle": "Yuvomi est en marche",
+    "doneSubtitle": "Le conteneur a passé son contrôle de santé.",
+    "doneIn": "Terminé en {{n}} s",
+    "failedSubtitle": "Le journal ci-dessous indique ce qui s’est mal passé."
   },
   "admin": {
     "title": "Créer un compte administrateur",

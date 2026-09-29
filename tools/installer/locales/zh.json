@@ -145,7 +145,15 @@
     "showLogs": "显示日志",
     "hideLogs": "隐藏日志",
     "timedOut": "15 分钟内没有响应。请查看日志后重试。",
-    "logLabel": "容器日志"
+    "logLabel": "容器日志",
+    "stepPull": "下载镜像",
+    "stepBoot": "启动容器",
+    "stepHealth": "健康检查",
+    "stepFailed": "（失败）",
+    "doneTitle": "Yuvomi 正在运行",
+    "doneSubtitle": "容器已通过健康检查。",
+    "doneIn": "用时 {{n}} 秒完成",
+    "failedSubtitle": "下方日志显示了出错原因。"
   },
   "admin": {
     "title": "创建管理员账户",

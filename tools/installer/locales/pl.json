@@ -145,7 +145,15 @@
     "showLogs": "Pokaż dziennik",
     "hideLogs": "Ukryj dziennik",
     "timedOut": "Brak odpowiedzi po 15 minutach. Sprawdź dziennik i spróbuj ponownie.",
-    "logLabel": "Dziennik kontenera"
+    "logLabel": "Dziennik kontenera",
+    "stepPull": "Pobranie obrazu",
+    "stepBoot": "Uruchomienie kontenera",
+    "stepHealth": "Kontrola stanu",
+    "stepFailed": "(niepowodzenie)",
+    "doneTitle": "Yuvomi działa",
+    "doneSubtitle": "Kontener przeszedł kontrolę stanu.",
+    "doneIn": "Gotowe w {{n}} s",
+    "failedSubtitle": "Dziennik poniżej pokazuje, co poszło nie tak."
   },
   "admin": {
     "title": "Utwórz konto administratora",

@@ -226,7 +226,15 @@
     "showLogs": "Ipakita ang log",
     "hideLogs": "Itago ang log",
     "timedOut": "Walang tugon pagkatapos ng 15 minuto. Suriin ang log at subukang muli.",
-    "logLabel": "Log ng container"
+    "logLabel": "Log ng container",
+    "stepPull": "I-download ang image",
+    "stepBoot": "Simulan ang container",
+    "stepHealth": "Health check",
+    "stepFailed": "(nabigo)",
+    "doneTitle": "Tumatakbo na ang Yuvomi",
+    "doneSubtitle": "Pumasa ang container sa health check.",
+    "doneIn": "Natapos sa loob ng {{n}}s",
+    "failedSubtitle": "Ipinapakita ng log sa ibaba kung ano ang nagkamali."
   },
   "admin": {
     "title": "Gumawa ng Admin Account",

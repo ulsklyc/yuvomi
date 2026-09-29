@@ -145,7 +145,15 @@
     "showLogs": "Hiện nhật ký",
     "hideLogs": "Ẩn nhật ký",
     "timedOut": "Không có phản hồi sau 15 phút. Hãy kiểm tra nhật ký và thử lại.",
-    "logLabel": "Nhật ký container"
+    "logLabel": "Nhật ký container",
+    "stepPull": "Tải image",
+    "stepBoot": "Khởi động container",
+    "stepHealth": "Kiểm tra tình trạng",
+    "stepFailed": "(thất bại)",
+    "doneTitle": "Yuvomi đang chạy",
+    "doneSubtitle": "Container đã vượt qua kiểm tra tình trạng.",
+    "doneIn": "Hoàn tất sau {{n}}s",
+    "failedSubtitle": "Nhật ký bên dưới cho biết lỗi ở đâu."
   },
   "admin": {
     "title": "Tạo tài khoản Admin",

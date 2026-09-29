@@ -53,16 +53,21 @@ test('jedes error-banner trägt role="alert"', () => {
 });
 
 test('die Docker-Statuszeile ist eine Live-Region', () => {
-  const row = html.match(/<div[^>]*class="status-row"[^>]*>/);
+  // Seit der Phasen-Checkliste ist sie visuell versteckt (class="vh status-row"):
+  // sichtbar steht dasselbe in der Liste, die Region traegt nur die Ansage.
+  const row = html.match(/<div[^>]*class="[^"]*\bstatus-row\b[^"]*"[^>]*>/);
   assert.ok(row, 'status-row nicht gefunden');
   assert.match(row[0], /role="status"/, 'status-row braucht role="status"');
   assert.match(row[0], /aria-live="polite"/, 'status-row braucht aria-live="polite"');
 });
 
-test('der Spinner ist für Screenreader ausgeblendet', () => {
-  const spinner = html.match(/<div[^>]*class="spinner"[^>]*>/);
-  assert.ok(spinner, 'spinner nicht gefunden');
-  assert.match(spinner[0], /aria-hidden="true"/, 'Spinner braucht aria-hidden="true"');
+// Der Spinner ist seit der Phasen-Checkliste das Zeichen der laufenden Phase.
+// Regel wie vorher: jedes Zustandszeichen ist reine Grafik und fuer
+// Screenreader ausgeblendet - der Zustand steht als Text daneben.
+test('die Zustandszeichen des Docker-Schirms sind für Screenreader ausgeblendet', () => {
+  const marks = [...html.matchAll(/<span[^>]*class="phase__mark"[^>]*>/g)];
+  assert.equal(marks.length, 3, `erwartet drei Phasenzeichen, gefunden ${marks.length}`);
+  for (const m of marks) assert.match(m[0], /aria-hidden="true"/, `Phasenzeichen ohne aria-hidden: ${m[0]}`);
 });
 
 // ── 1.4 Fokus-Management bei Schrittwechsel ───────────────────────────────────
@@ -979,7 +984,10 @@ test('die Schrittliste folgt dem Weg: erledigt anklickbar, aktuell markiert, kom
       `Eintrag ${m[1]} ist kein Knopf mit data-goto`);
   }
   assert.match(html, /<nav class="steps-nav"[^>]*aria-label=[^>]*>\s*<ol/, 'die Liste ist kein <nav> mit <ol>');
-  assert.match(fnSource('showStep'), /renderStepNav\(\)/, 'showStep aktualisiert die Liste nicht');
+  // showStep zeichnet ueber renderStep (seit dem Schrittwechsel mit Richtung
+  // auch aus dem Rueckruf einer View Transition) - der Weg muss durchgehen.
+  assert.match(fnSource('showStep'), /renderStep\(\)/, 'showStep zeichnet den Schritt nicht');
+  assert.match(fnSource('renderStep'), /renderStepNav\(\)/, 'renderStep aktualisiert die Liste nicht');
 
   const make = () => [...numbered].map(name => {
     const button = {
@@ -1390,4 +1398,445 @@ test('Fehler und Akkordeons scrollen nur so weit wie noetig, unter reduced-motio
   // Die schwebende Fussleiste verdeckt sonst, was nearest fuer sichtbar haelt.
   const pad = boxSide(sel => sel === 'html', 'scroll-padding', 'bottom', m => m === null);
   assert.ok(pad >= 73, `scroll-padding unten ist ${pad}px, die Fussleiste ist 73px hoch`);
+});
+
+// ── Bewegung (Critique 2026-09-29, animate) ───────────────────────────────────
+
+/** Werteliste einer Deklaration an Kommas der obersten Ebene (var()/calc() bleiben ganz). */
+function splitTop(value, sep = ',') {
+  const out = [];
+  let depth = 0, cur = '';
+  for (const ch of value) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    if (depth === 0 && (sep === ',' ? ch === ',' : /\s/.test(ch))) {
+      if (cur.trim()) out.push(cur.trim());
+      cur = '';
+    } else cur += ch;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out;
+}
+
+/** Alle transition-/animation-Deklarationen der <style>-Bloecke, auch in @supports. */
+function motionDeclarations() {
+  const css = stylesheet(html);
+  return [...css.matchAll(/(?:^|[;{\s])((?:transition|animation)(?:-[a-z-]+)?)\s*:\s*([^;{}]+)/g)]
+    .map(m => ({ prop: m[1], value: m[2].trim() }))
+    // Custom Properties (--ease-out) und view-transition-name sind keine Bewegung.
+    .filter(d => !/^(?:transition|animation)-(?:behavior|property|name|iteration-count|direction|fill-mode|play-state|composition)$/.test(d.prop));
+}
+
+const TIME = /^-?[\d.]+m?s$/;
+const isTokenTime = v => /^var\(--duration-[\w-]+\)$/.test(v) || (/^calc\(/.test(v) && /var\(--duration-/.test(v) && !/[\d.]+m?s\b/.test(v));
+const isZero = v => /^0(?:\.0+)?m?s?$/.test(v);
+const isTimeLike = v => TIME.test(v) || /^var\(--duration-/.test(v) || /^calc\(.*--duration-/.test(v);
+const EASING_KEYWORD = /^(?:ease|ease-in|ease-out|ease-in-out|step-start|step-end)$/;
+const isTokenEasing = v => /^var\(--ease-[\w-]+\)$/.test(v) || v === 'linear' || /^steps\(/.test(v);
+
+/* Eine Bewegungssprache: Dauer aus --duration-*, Kurve aus --ease-* (linear nur
+ * fuer Endlosdrehung und diskrete Schalter). Die Materialkurve am Balken und
+ * nackte `.15s` hatten jede Stelle anders klingen lassen. Geprueft wird die
+ * WIRKUNG: eine Transition ohne Kurve laeuft mit `ease` (Browser-Vorgabe), das
+ * zaehlt genauso wie ein ausgeschriebenes `ease`. */
+test('jede Transition und Animation rechnet mit den Motion-Tokens der App', () => {
+  const decls = motionDeclarations();
+  assert.ok(decls.length >= 15, `nur ${decls.length} Bewegungs-Deklarationen gefunden - der Scanner greift nicht`);
+  const bad = [];
+  for (const { prop, value } of decls) {
+    if (value === 'none') continue;
+    if (/-(?:duration|delay)$/.test(prop)) {
+      for (const v of splitTop(value)) if (!isTokenTime(v) && !isZero(v)) bad.push(`${prop}: ${value}`);
+      continue;
+    }
+    if (/-timing-function$/.test(prop)) {
+      for (const v of splitTop(value)) if (!isTokenEasing(v)) bad.push(`${prop}: ${value}`);
+      continue;
+    }
+    for (const item of splitTop(value)) {
+      if (item === 'none') continue;
+      const parts = splitTop(item, ' ');
+      const times = parts.filter(isTimeLike);
+      const easing = parts.filter(p => EASING_KEYWORD.test(p) || /^cubic-bezier\(/.test(p) || isTokenEasing(p));
+      if (!times.length) { bad.push(`${prop}: ${item} (ohne Dauer)`); continue; }
+      for (const tm of times) if (!isTokenTime(tm) && !isZero(tm)) bad.push(`${prop}: ${item} (Dauer ${tm})`);
+      const moving = !isZero(times[0]);
+      if (easing.some(e => !isTokenEasing(e))) bad.push(`${prop}: ${item} (Kurve)`);
+      else if (moving && !easing.length) bad.push(`${prop}: ${item} (ohne Kurve = ease)`);
+    }
+  }
+  assert.deepEqual(bad, [], `Bewegung ausserhalb der Motion-Tokens:\n  ${bad.join('\n  ')}`);
+});
+
+/** @keyframes-Bloecke der <style>-Bloecke: Name -> Rumpf. */
+function keyframes() {
+  const css = stylesheet(html);
+  const map = new Map();
+  for (const m of css.matchAll(/@keyframes\s+([\w-]+)\s*\{/g)) {
+    let depth = 1, k = m.index + m[0].length;
+    while (k < css.length && depth > 0) { if (css[k] === '{') depth++; else if (css[k] === '}') depth--; k++; }
+    map.set(m[1], css.slice(m.index + m[0].length, k - 1));
+  }
+  return map;
+}
+
+const MOVING = /\b(?:transform|translate|rotate|scale|grid-template-rows|block-size|inline-size|height|width|margin[\w-]*|top|left|right|bottom)\b/;
+
+/* Reduced-Motion ist ein eigener Zweig, kein Nebeneffekt: jede Animation und
+ * jede Transition, die etwas BEWEGT (Gleiten, Drehen, Aufziehen), bekommt unter
+ * `prefers-reduced-motion: reduce` eine Regel fuer denselben Selektor - und die
+ * darf selbst nichts mehr bewegen (Blende, Puls, sofort). Vorher stand der
+ * Spinner dort einfach still und der Schirm wirkte, als haenge er. */
+test('jede Animation und jede bewegte Transition hat einen reduced-motion-Zweig ohne Bewegung', () => {
+  const frames = keyframes();
+  const isReduce = media => media !== null && /prefers-reduced-motion:\s*reduce/.test(media);
+  const reduceRules = RULES.filter(r => isReduce(r.media));
+  assert.ok(reduceRules.length >= 8, 'der reduced-motion-Block fehlt oder ist leer');
+  const value = (body, prop) => body.match(new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`))?.[1].trim() ?? null;
+
+  const missing = [];
+  for (const rule of RULES) {
+    if (isReduce(rule.media)) continue;
+    const anim = value(rule.body, 'animation') ?? value(rule.body, 'animation-name');
+    const names = anim && anim !== 'none' ? splitTop(anim).map(i => splitTop(i, ' ').find(p => frames.has(p))).filter(Boolean) : [];
+    const trans = value(rule.body, 'transition');
+    const moves = trans && trans !== 'none' && splitTop(trans).some(i => MOVING.test(splitTop(i, ' ')[0]));
+    if (!names.length && !moves) continue;
+    const branch = reduceRules.filter(r => r.selector === rule.selector);
+    if (names.length && !branch.some(r => value(r.body, 'animation') ?? value(r.body, 'animation-name'))) {
+      missing.push(`${rule.selector}: Animation ${names.join(', ')} ohne reduced-motion-Zweig`);
+    }
+    if (moves && !branch.some(r => value(r.body, 'transition'))) {
+      missing.push(`${rule.selector}: bewegte Transition (${trans}) ohne reduced-motion-Zweig`);
+    }
+  }
+  assert.deepEqual(missing, [], missing.join('\n'));
+
+  // Und der Zweig selbst bewegt nichts.
+  const still = [];
+  for (const r of reduceRules) {
+    const anim = value(r.body, 'animation');
+    for (const item of anim && anim !== 'none' ? splitTop(anim) : []) {
+      const name = splitTop(item, ' ').find(p => frames.has(p));
+      if (name && MOVING.test(frames.get(name))) still.push(`${r.selector}: ${name} bewegt (${frames.get(name).trim()})`);
+    }
+    const trans = value(r.body, 'transition');
+    for (const item of trans && trans !== 'none' ? splitTop(trans) : []) {
+      if (MOVING.test(splitTop(item, ' ')[0])) still.push(`${r.selector}: transition ${item}`);
+    }
+  }
+  assert.deepEqual(still, [], `reduced-motion bewegt weiter:\n  ${still.join('\n  ')}`);
+
+  // Der Spinner steht dort nicht still, er pulsiert (Deckkraft).
+  const pulse = reduceRules.find(r => /\.phase\[data-state="active"\] \.phase__mark::after/.test(r.selector));
+  const pulseName = pulse && splitTop(value(pulse.body, 'animation') ?? '', ' ').find(p => frames.has(p));
+  assert.ok(pulseName && /opacity/.test(frames.get(pulseName)) && /infinite/.test(value(pulse.body, 'animation')),
+    'die laufende Phase zeigt unter reduced-motion keine Bewegung-freie Aktivitaet (Puls)');
+  // Der Schrittwechsel blendet dort hoechstens 150ms.
+  const fade = reduceRules.find(r => r.selector.startsWith('html:not(.step-vt)[data-step-dir]'));
+  const fadeDur = fade && splitTop(value(fade.body, 'animation'), ' ').find(isTimeLike);
+  assert.ok(fadeDur && toPx(resolveVar(fadeDur).replace('ms', 'px')) <= 150,
+    `der Schrittwechsel unter reduced-motion dauert ${fadeDur} (hoechstens 150ms)`);
+});
+
+/* Schrittwechsel mit Richtung: vorwaerts von der Leserichtung her, zurueck von
+ * der Gegenseite, in RTL gespiegelt. Nur die Inhaltsspalte traegt waehrend der
+ * View Transition einen Namen, die Fussleiste steht unter eigenem Namen still,
+ * und der CSS-Rueckfall laesst sie ebenfalls aus. */
+test('der Schrittwechsel gleitet in Leserichtung, RTL gespiegelt, ohne die Fussleiste', () => {
+  const shift = sel => toPx(declared(s => s === sel, '--step-shift'));
+  assert.ok(shift('html[data-step-dir="forward"]') > 0, 'vorwaerts kommt der Schritt nicht von rechts');
+  assert.ok(shift('html[data-step-dir="back"]') < 0, 'zurueck kommt der Schritt nicht von links');
+  assert.ok(shift('html[dir="rtl"][data-step-dir="forward"]') < 0, 'RTL vorwaerts ist nicht gespiegelt');
+  assert.ok(shift('html[dir="rtl"][data-step-dir="back"]') > 0, 'RTL zurueck ist nicht gespiegelt');
+  for (const sel of ['html[data-step-dir="forward"]', 'html[data-step-dir="back"]']) {
+    const px = Math.abs(shift(sel));
+    assert.ok(px >= 8 && px <= 16, `der Weg ist ${px}px (8-16px)`);
+  }
+  const frames = keyframes();
+  assert.match(frames.get('step-in'), /translateX\(var\(--step-shift/, 'step-in nutzt die Richtung nicht');
+
+  // CSS-Rueckfall: der neue Schritt faehrt ein, die Fussleiste nicht.
+  const fallback = RULES.find(r => r.media === null && /\[data-step-dir\] \.step\.active > /.test(r.selector) && /animation:\s*step-in/.test(r.body));
+  assert.ok(fallback, 'der CSS-Rueckfall fuer den Schrittwechsel fehlt');
+  assert.match(fallback.selector, /:not\(\.card-foot\)/, 'der CSS-Rueckfall bewegt die Fussleiste mit');
+  assert.match(fallback.selector, /html:not\(\.step-vt\)/, 'der CSS-Rueckfall laeuft auch waehrend der View Transition');
+
+  // View Transition: Namen nur waehrend des Wechsels, Wurzel lebend, Fussleiste still.
+  const vtName = sel => declared(s => s === sel, 'view-transition-name');
+  assert.equal(vtName('html.step-vt .card'), 'step', 'die Inhaltsspalte traegt waehrend des Wechsels keinen Namen');
+  assert.equal(vtName('.card'), null, 'die Inhaltsspalte traegt dauerhaft einen Namen (Backdrop Root, Glas der Fussleiste)');
+  assert.equal(vtName('html.step-vt .step.active > .card-foot'), 'step-foot', 'die Fussleiste gleitet mit der Spalte');
+  assert.equal(declared(s => s === '::view-transition-old(step-foot)', 'display'), 'none');
+  assert.equal(declared(s => s === '::view-transition-new(step-foot)', 'animation'), 'none');
+  assert.equal(declared(s => s === '::view-transition-old(root)', 'display'), 'none', 'die Wurzel blendet mit - Schrittliste und Balken wuerden doppelt gezeichnet');
+  assert.equal(declared(s => s === '::view-transition-new(root)', 'animation'), 'none');
+  assert.match(declared(s => s === '::view-transition-new(step)', 'animation'), /^step-in\b/);
+  assert.match(declared(s => s === '::view-transition-old(step)', 'animation'), /^step-out\b/);
+});
+
+/** Ein kleines Element-Double fuer die ausgefuehrten Pruefungen. */
+function fakeEl(extra = {}) {
+  const classes = new Set();
+  const attrs = {};
+  return {
+    style: {}, dataset: {}, textContent: '', focused: 0,
+    classList: {
+      add: c => classes.add(c), remove: c => classes.delete(c), contains: c => classes.has(c),
+      toggle: (c, on) => { const v = on ?? !classes.has(c); if (v) classes.add(c); else classes.delete(c); return v; },
+    },
+    setAttribute(k, v) { attrs[k] = String(v); }, getAttribute(k) { return attrs[k] ?? null; },
+    removeAttribute(k) { delete attrs[k]; }, focus() { this.focused++; },
+    attrs, classes, ...extra,
+  };
+}
+
+/* swapStep wird AUSGEFUEHRT: ohne API, verdeckt oder unter reduced-motion
+ * sofort und mit Richtung am <html> (CSS-Rueckfall); sonst als View
+ * Transition, deren Rueckruf den Tausch macht, und danach sind Klasse und
+ * Richtung wieder weg - sonst startete die CSS-Animation am stehenden Schritt
+ * ein zweites Mal. */
+test('swapStep: View Transition mit Richtung, sonst sofort mit CSS-Rueckfall', async () => {
+  const src = `${fnSource('canViewTransition')}\nlet stepTransition = null;\n${fnSource('swapStep')}\nreturn swapStep;`;
+  const make = ({ api = true, hidden = false, reduce = false } = {}) => {
+    const root = fakeEl();
+    const listeners = [];
+    const doc = {
+      documentElement: root, visibilityState: hidden ? 'hidden' : 'visible',
+      addEventListener: (...a) => listeners.push(a), removeEventListener() {},
+      transitions: [],
+    };
+    if (api) {
+      doc.startViewTransition = cb => {
+        let resolve;
+        const vt = {
+          cb, skipped: false, ready: Promise.resolve(),
+          finished: new Promise(r => { resolve = r; }),
+          skipTransition() { this.skipped = true; },
+          end() { resolve(); },
+        };
+        doc.transitions.push(vt);
+        return vt;
+      };
+    }
+    const swapStep = new Function('document', 'matchMedia', src)(doc, q => ({ matches: reduce && /reduce/.test(q) }));
+    return { swapStep, doc, root };
+  };
+
+  // Rueckfall: sofort, Richtung gesetzt, kein step-vt.
+  for (const opts of [{ api: false }, { hidden: true }, { reduce: true }]) {
+    const { swapStep, doc, root } = make(opts);
+    let ran = 0;
+    swapStep(() => ran++, 'back', true);
+    assert.equal(ran, 1, `${JSON.stringify(opts)}: der Tausch lief nicht sofort`);
+    assert.equal(root.dataset.stepDir, 'back', `${JSON.stringify(opts)}: die Richtung fehlt fuer den CSS-Rueckfall`);
+    assert.equal(root.classes.has('step-vt'), false);
+    assert.equal(doc.transitions.length, 0, `${JSON.stringify(opts)}: es lief trotzdem eine View Transition`);
+  }
+  // Ohne Animation (Kette, erster Aufruf): sofort und ohne Richtung.
+  {
+    const { swapStep, doc, root } = make();
+    let ran = 0;
+    swapStep(() => ran++, '', false);
+    assert.equal(ran, 1);
+    assert.equal(root.dataset.stepDir, undefined);
+    assert.equal(doc.transitions.length, 0);
+  }
+  // View Transition: Tausch im Rueckruf, Klasse waehrenddessen, danach aufgeraeumt.
+  {
+    const { swapStep, doc, root } = make();
+    let ran = 0;
+    swapStep(() => ran++, 'forward', true);
+    assert.equal(ran, 0, 'der Tausch lief vor der Aufnahme des alten Bildes');
+    assert.equal(doc.transitions.length, 1);
+    assert.equal(root.classes.has('step-vt'), true, 'die Namen stehen nicht waehrend des Wechsels');
+    assert.equal(root.dataset.stepDir, 'forward');
+    doc.transitions[0].cb();
+    assert.equal(ran, 1);
+    doc.transitions[0].end();
+    await new Promise(r => setTimeout(r, 0));
+    assert.equal(root.classes.has('step-vt'), false, 'step-vt bleibt nach dem Wechsel stehen');
+    assert.equal(root.dataset.stepDir, undefined, 'die Richtung bleibt stehen - die CSS-Animation liefe ein zweites Mal');
+  }
+  // Ein sofortiger Wechsel mitten in einer Transition bricht sie ab, und ihr
+  // spaetes Ende raeumt den neuen Stand nicht ab.
+  {
+    const { swapStep, doc, root } = make();
+    swapStep(() => {}, 'forward', true);
+    swapStep(() => {}, 'back', false);
+    assert.equal(doc.transitions[0].skipped, true, 'die ueberholte Transition laeuft weiter');
+    assert.equal(root.dataset.stepDir, 'back');
+    doc.transitions[0].end();
+    await new Promise(r => setTimeout(r, 0));
+    assert.equal(root.dataset.stepDir, 'back', 'das Ende der alten Transition loeschte die neue Richtung');
+  }
+});
+
+/* showStep bestimmt die Richtung aus dem Zustand, und ein ueberholter Rueckruf
+ * zeichnet nicht mehr (er risse Fokus und Scrollstand an sich). next() wechselt
+ * auf dem Rueckweg zur Pruefseite ohne Bildwechsel, weil sofort der naechste
+ * Klick folgt und dessen Pruefung den Schritt sichtbar braucht. */
+test('showStep: Richtung aus dem Zustand, nur der juengste Wechsel zeichnet, Ketten ohne Bildwechsel', () => {
+  const calls = [];
+  const h = new Function('swapStep', 'renderStep', 'onEnterStep', `
+    let currentStep = 2, stepSwap = 0;
+    const flow = ['welcome', 'config', 'secrets', 'weather', 'review'];
+    const clearInvalid = () => {}, setProgress = () => {};
+    ${fnSource('showStep')}
+    return { showStep, get step() { return currentStep; } };
+  `)((update, dir, animate) => calls.push({ update, dir, animate }), () => calls.push('render'), () => {});
+  h.showStep(3);
+  h.showStep(1);
+  h.showStep(1);
+  h.showStep(4, { animate: false });
+  assert.deepEqual(calls.map(c => [c.dir, c.animate]), [['forward', true], ['back', true], ['', false], ['forward', false]]);
+  // Nur der juengste Rueckruf zeichnet.
+  calls[0].update();
+  assert.equal(calls.includes('render'), false, 'ein ueberholter Wechsel zeichnete noch');
+  calls[3].update();
+  assert.equal(calls.filter(c => c === 'render').length, 1);
+
+  const next = fnSource('next');
+  assert.match(next, /showStep\(target, \{ animate: !\(reviewReturn !== null && target > reviewReturn\) \}\)/,
+    'next() wechselt in der Kette zur Pruefseite mit Bildwechsel');
+  assert.match(fnSource('renderStep'), /\.focus\(\{ preventScroll: true \}\)/, 'renderStep fokussiert die H2 nicht');
+});
+
+/* Akkordeons gleiten auf und zu (Rasterzeile 0fr -> 1fr, --ease-in-out wie jede
+ * Hoehe der App) und bleiben zugeklappt fuer Tastatur und Screenreader
+ * unerreichbar: visibility hidden, und beim Zuklappen erst NACH dem Gleiten. */
+test('Akkordeons gleiten, bleiben zugeklappt unerreichbar und holen sich erst danach in Sicht', () => {
+  const base = m => m === null;
+  const get = (sel, prop) => declared(s => s === sel, prop, base);
+  assert.equal(get('.toggle-card', 'display'), 'grid');
+  assert.equal(get('.toggle-card', 'grid-template-rows'), 'auto 0fr', 'zugeklappt ist die Inhaltszeile nicht 0');
+  assert.equal(get('.toggle-card:has(> .toggle-body.open)', 'grid-template-rows'), 'auto 1fr');
+  assert.match(get('.toggle-card', 'transition'), /^grid-template-rows var\(--duration-[\w-]+\) var\(--ease-in-out\)/);
+
+  const hiddenClosed = get('.toggle-body', 'visibility') === 'hidden' || get('.toggle-body', 'display') === 'none';
+  assert.ok(hiddenClosed, 'ein zugeklapptes Akkordeon ist fuer Tastatur und Screenreader erreichbar');
+  assert.notEqual(get('.toggle-body.open', 'visibility'), 'hidden');
+  assert.notEqual(get('.toggle-body.open', 'display'), 'none');
+  // Zuklappen: Sichtbarkeit erst nach der Dauer der Zeile; aufklappen: sofort.
+  const dur = v => toPx(resolveVar(v).replace('ms', 'px'));
+  const rowDur = dur(splitTop(get('.toggle-card', 'transition'), ' ')[1]);
+  const vis = splitTop(get('.toggle-body', 'transition'), ' ');
+  assert.equal(vis[0], 'visibility');
+  assert.ok(dur(vis[vis.length - 1]) >= rowDur, 'der Inhalt verschwindet, bevor die Zeile zugeglitten ist');
+  assert.ok(isZero(get('.toggle-body.open', 'transition-delay') ?? ''), 'beim Aufklappen wartet die Sichtbarkeit');
+  // Auf 0 kommt die Zeile nur ohne eigenes Mass: kein Polster, keine Kante.
+  for (const side of ['top', 'bottom']) {
+    assert.equal(boxSide(s => s === '.toggle-body', 'padding', side, base) ?? 0, 0, `.toggle-body traegt Polster ${side}`);
+  }
+  assert.equal(get('.toggle-body', 'border-top'), null, '.toggle-body traegt eine Kante, zugeklappt bliebe 1px stehen');
+  assert.equal(get('.toggle-body', 'overflow'), 'hidden');
+
+  // <details> "Mehr erfahren" gleitet, wo ::details-content existiert.
+  assert.equal(get('.hint-more::details-content', 'block-size'), '0');
+  assert.equal(get('.hint-more[open]::details-content', 'block-size'), 'auto');
+  assert.equal(get('.hint-more', 'interpolate-size'), 'allow-keywords');
+  assert.match(get('.hint-more::details-content', 'transition'), /content-visibility [^,]*allow-discrete/,
+    'zugeklappt bliebe der Text sichtbar/erreichbar, bis die Hoehe 0 ist - content-visibility muss mitschalten');
+
+  // In Sicht erst nach dem Aufziehen.
+  assert.match(html, /afterTransition\(card, \(\) => reveal\(card \|\| toggleBtn\)\)/, 'das Akkordeon holt sich vor dem Aufziehen in Sicht');
+  const after = new Function('getComputedStyle', 'setTimeout', `${fnSource('afterTransition')}; return afterTransition;`);
+  let ran = 0;
+  after(() => ({ transitionDuration: '0s' }), () => {})({}, () => ran++);
+  assert.equal(ran, 1, 'ohne Transition (reduced-motion) wartet afterTransition');
+  const listeners = {};
+  let timer = null;
+  const el = { addEventListener: (n, f) => { listeners[n] = f; }, removeEventListener: n => { delete listeners[n]; } };
+  after(() => ({ transitionDuration: '0.25s, 0s' }), (f, ms) => { timer = { f, ms }; })(el, () => ran++);
+  assert.equal(ran, 1, 'afterTransition lief vor dem Ende');
+  assert.ok(timer.ms >= 250, `der Rueckfall-Zeitgeber (${timer.ms}ms) ist kuerzer als die Transition`);
+  listeners.transitionend({ target: {} });
+  assert.equal(ran, 1, 'das Ende einer Kind-Transition zaehlte');
+  listeners.transitionend({ target: el });
+  timer.f();
+  assert.equal(ran, 2, 'afterTransition lief nicht genau einmal');
+});
+
+/* Docker-Schirm: drei Phasen als Checkliste. Ausgefuehrt: der Stand zaehlt nur
+ * vorwaerts, erledigte Phasen haben ihren Haken, die laufende aria-current,
+ * nach dem Erfolg ist alles fertig, Titel und Zaehler sagen es, der Fokus geht
+ * auf den neuen Titel. Im Fehler wird die Phase markiert, in der es stand. */
+test('Docker-Schirm: Phasen-Checkliste, Erfolg mit neuem Titel und Fokus, Fehler an der richtigen Phase', () => {
+  const ids = ['dkr-title', 'dkr-subtitle', 'dkr-elapsed', 'dkr-expect', 'dkr-stalled', 'dkr-logs-toggle', 'dkr-log', 'dkr-foot', 'dkr-text'];
+  const make = () => {
+    const els = Object.fromEntries(ids.map(id => [id, fakeEl()]));
+    const rows = ['pull', 'boot', 'health'].map(p => {
+      const note = fakeEl();
+      return fakeEl({ dataset: { phase: p }, note, querySelector: () => note });
+    });
+    const doc = { querySelectorAll: () => rows };
+    const h = new Function('document', '$', 't', `
+      const PHASE_KEYS = { pull: 'docker.phasePull', boot: 'docker.phaseBoot', health: 'docker.phaseHealth' };
+      const PHASE_ORDER = ${JSON.stringify(literal('PHASE_ORDER'))};
+      let phaseReached = 0, dockerOutcome = null, dockerDoneSecs = null, dockerTextKey = 'docker.phasePull';
+      let dockerDone = false, pollInterval = null, dockerStart = Date.now() - 34_000;
+      let flow = ['review', 'docker'], currentStep = 1;
+      const clearInterval = () => {}, setDockerPrimary = () => {}, next = () => {}, restartDocker = () => {};
+      ${fnSource('setDockerText')}
+      ${fnSource('reachPhase')}
+      ${fnSource('setPhase')}
+      ${fnSource('renderPhases')}
+      ${fnSource('setDockerHead')}
+      ${fnSource('dockerSucceeded')}
+      ${fnSource('dockerFailed')}
+      return { setPhase, reachPhase, dockerSucceeded, dockerFailed };
+    `)(doc, id => els[id], (k, p) => (p ? `${k}:${p.n}` : k));
+    return { h, els, rows };
+  };
+  const states = rows => rows.map(r => r.dataset.state).join(' ');
+
+  {
+    const { h, els, rows } = make();
+    h.setPhase('pull');
+    assert.equal(states(rows), 'active waiting waiting');
+    assert.equal(rows[0].getAttribute('aria-current'), 'step');
+    h.setPhase('health');
+    assert.equal(states(rows), 'done done active');
+    assert.equal(rows[0].note.textContent, 'common.stepDone', 'eine erledigte Phase sagt es dem Screenreader nicht');
+    h.setPhase('boot');
+    assert.equal(states(rows), 'done done active', 'ein Rueckfall des Servers nahm einen Haken weg');
+    assert.equal(els['dkr-text'].textContent, 'docker.phaseHealth');
+    h.dockerSucceeded();
+    assert.equal(states(rows), 'done done done');
+    assert.equal(rows[2].getAttribute('aria-current'), null);
+    assert.equal(els['dkr-title'].dataset.i18n, 'docker.doneTitle', 'der Titel nennt den Erfolg nicht');
+    assert.equal(els['dkr-title'].textContent, 'docker.doneTitle');
+    assert.equal(els['dkr-subtitle'].dataset.i18n, 'docker.doneSubtitle');
+    assert.equal(els['dkr-elapsed'].textContent, 'docker.doneIn:34', 'der Zaehler friert nicht als "fertig in N s" ein');
+    assert.equal(els['dkr-title'].focused, 1, 'der Fokus geht nicht auf den neuen Titel');
+    assert.equal(els['dkr-text'].textContent, 'docker.running', 'die Live-Region sagt den Erfolg nicht an');
+  }
+  {
+    const { h, els, rows } = make();
+    h.setPhase('pull');
+    h.reachPhase('boot');   // wie pollDocker bei status: error, phase: boot
+    h.dockerFailed('log');
+    assert.equal(states(rows), 'done failed waiting', 'die gescheiterte Phase ist nicht markiert');
+    assert.equal(rows[1].note.textContent, 'docker.stepFailed');
+    assert.equal(els['dkr-title'].dataset.i18n, 'docker.failed');
+    assert.equal(els['dkr-log'].style.display, 'block', 'das Protokoll bleibt im Fehler nicht stehen');
+    assert.equal(els['dkr-foot'].style.display, 'flex', 'Erneut versuchen fehlt im Fehler');
+    assert.equal(els['dkr-title'].focused, 0, 'der Fehler reisst den Fokus an sich');
+  }
+  {
+    const { h, rows } = make();
+    h.setPhase('pull');
+    h.reachPhase('engine');   // keine Engine: nichts ist gestartet
+    h.dockerFailed('Missing: docker');
+    assert.equal(states(rows), 'failed waiting waiting');
+  }
+  // pollDocker rueckt die gemeldete Phase vor, bevor es scheitert.
+  assert.match(fnSource('pollDocker'), /reachPhase\(d\.phase\);\s*dockerFailed/, 'pollDocker markiert die vom Server gemeldete Phase nicht');
+  // Ein Neustart setzt Titel, Stand und Zaehler zurueck.
+  assert.match(fnSource('restartDocker'), /setDockerHead\('docker\.title', 'docker\.subtitle'\)/);
+  assert.match(html, /async function startDocker\(\) \{[\s\S]*?phaseReached = 0;[\s\S]*?dockerOutcome = null;/, 'startDocker setzt den Phasenstand nicht zurueck');
+  // Sprachwechsel zeichnet Liste und Endwert neu.
+  const localize = fnSource('localize');
+  assert.match(localize, /renderPhases\(\)/, 'ein Sprachwechsel laesst die Zustandstexte der Liste in der alten Sprache');
+  assert.match(localize, /docker\.doneIn/, 'ein Sprachwechsel verliert "fertig in N s"');
 });
