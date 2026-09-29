@@ -377,8 +377,18 @@ function createPaymentTask(database, worker, checkIn, amount, actorId, title = n
   return result.lastInsertRowid;
 }
 
+/**
+ * Der Tag (YYYY-MM-DD) und die Uhrzeit (HH:MM:SS) eines gespeicherten
+ * `check_in` auf der Uhr des Haushalts. `check_in.slice(0, 10)` ist der
+ * UTC-Tag: ein Besuch um 00:30 in Berlin stand sonst am Vortag (#1540).
+ */
+function householdWallOf(checkIn, tz) {
+  const ms = storedToInstantMs(checkIn, tz);
+  return ms === null ? null : utcToWall(new Date(ms).toISOString(), tz);
+}
+
 function updateVisitLinks(database, session, worker, checkIn, dailyRate, extras, eventTitle = null, paymentTitle = null, paymentDescription = null) {
-  const visitDate = checkIn.slice(0, 10);
+  const visitDate = householdWallOf(checkIn, householdTimeZone(database))?.date ?? checkIn.slice(0, 10);
   if (session.calendar_event_id) {
     // Datum, Titel und Farbe des Termins stehen in MIRRORED_FIELDS. Ein Besuch,
     // den der Apple-Sync bereits hochgeladen hat, trägt external_source='apple'
@@ -1116,8 +1126,16 @@ router.put('/visits/:id', (req, res) => {
       effectiveDailyRate = computeHourlyAmount(vMinutesWorked.value, existing.hourly_rate || 0);
     }
 
-    const originalTime = existing.check_in?.slice(11) || '09:00:00.000Z';
-    const checkIn = `${vDate.value}T${originalTime}`;
+    // Der Tag im Formular ist der des Haushalts, die Uhrzeit bleibt die des
+    // Besuchs auf derselben Uhr (#1540). Hier stand der UTC-Tag mit der
+    // UTC-Uhrzeit: wer einen Besuch um 00:30 in Berlin auf seinen eigenen Tag
+    // „korrigierte", schob ihn um einen Tag. Unveraenderter Tag = unveraenderter
+    // Zeitpunkt, damit ein reines Betragsupdate den Besuch nicht bewegt.
+    const tz = householdTimeZone(db.get());
+    const originalWall = householdWallOf(existing.check_in, tz);
+    const checkIn = originalWall?.date === vDate.value
+      ? existing.check_in
+      : new Date(localToUTCPrecise(`${vDate.value}T${originalWall?.time ?? '09:00:00'}`, tz)).toISOString();
     const worker = existing.worker_id ? loadWorkerById(existing.worker_id) : null;
     db.get().transaction(() => {
       db.get().prepare(`

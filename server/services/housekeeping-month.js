@@ -3,10 +3,12 @@
  * Zweck: In welchen Monat ein Besuch faellt, fuer das Modul UND die Uebersicht.
  * Abhaengigkeiten: utils/timezone.js, utils/interval-date.js
  *
- * `check_in` ist ein UTC-Instant (`toISOString()` beim Check-in), aeltere
- * Zeilen tragen daneben zonenlose Wanduhrzeit. `substr(check_in, 1, 7)` ist
- * deshalb der UTC-Monat: ein Besuch am Ersten um 00:30 Berliner Zeit stand im
- * Vormonat, westlich von UTC einer am Letzten abends schon im naechsten. #1387
+ * `check_in` ist ein UTC-Instant: der Check-in schreibt `toISOString()`, das
+ * Bearbeiten ebenso (#1540), und kein Codepfad hat je eine andere Form
+ * geschrieben. Zonenlose Wanduhrzeit liest `storedToInstantMs()` trotzdem mit -
+ * als Absicherung fuer von Hand eingespielte Zeilen, nicht als Bestandsform.
+ * `substr(check_in, 1, 7)` ist der UTC-Monat: ein Besuch am Ersten um 00:30
+ * Berliner Zeit stand im Vormonat, westlich von UTC einer am Letzten abends schon im naechsten. #1387
  * hat das Modul umgestellt, die Uebersicht zaehlte weiter so (#1451) - zwei
  * Zahlen fuer denselben Monat. Beide lesen jetzt hier.
  */
@@ -46,7 +48,7 @@ export function householdMonthRange(monthValue, tz) {
  * Die ABGESCHLOSSENEN Besuche eines Haushaltsmonats: Anzahl und offener
  * Betrag (unbezahlt, Tagessatz plus Extras) - die Zahlen der Uebersicht.
  *
- * Der Textvergleich allein traegt nur die Instant-Form: zonenlose Wanduhrzeit
+ * Der Textvergleich allein traegt nur die Instant-Form: eine zonenlose Zeile
  * ('2026-09-30T23:30:00') sortiert als Text nach '2026-09-30T22:00:00.000Z'
  * und fiele in Berlin in den Oktober. SQL holt deshalb ein Fenster mit einem
  * Tag Rand je Seite, und entschieden wird Zeile fuer Zeile ueber
