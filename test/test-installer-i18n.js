@@ -265,3 +265,74 @@ test('der Sprachumschalter bietet genau die unterstuetzten Sprachen an', () => {
     `Optionsliste weicht von SUPPORTED_LOCALES ab. Nur im Select: ${offered.filter(l => !supported.includes(l))}; `
     + `nur in SUPPORTED_LOCALES: ${supported.filter(l => !offered.includes(l))}`);
 });
+
+/* Die Sprache, die der Installer als `language` an /api/v1/auth/setup reicht,
+ * muss die App kennen - in BEIDE Richtungen gemessen.
+ *
+ * Die App nimmt nur Codes aus getSupportedLocales() an (server/utils/i18n.js),
+ * und die kommen aus den Dateinamen in public/locales/ - Kurzcodes wie `de`,
+ * `pt`, `fil`. Hiesse eine Installer-Locale einmal `pt-BR` oder `zh-Hans`,
+ * waehrend die App `pt`/`zh` fuehrt, bekaeme genau dieser Haushalt still eine
+ * englische Datensprache (der Proxy wiederholt nach einem 400 ohne Sprache).
+ * Gelesen wird die echte Funktion, nicht eine abgeschriebene Liste: kommt in
+ * der App eine Sprache dazu, faellt die Rueckrichtung hier auf. */
+test('jede Installer-Sprache ist eine App-Sprache, und umgekehrt', async () => {
+  const { getSupportedLocales } = await import('../server/utils/i18n.js');
+  const { SETUP_LANGUAGES, setupLanguage } = await import('../tools/installer/install-server.js');
+  const app = getSupportedLocales();
+  assert.ok(app.length >= 2, `getSupportedLocales() lieferte nur ${app} - der Leser greift nicht`);
+
+  const installer = [...SETUP_LANGUAGES].sort();
+  assert.deepEqual(installer, [...SUPPORTED_LOCALES].sort(),
+    'die Allowlist des Proxys muss aus den Installer-Locales kommen');
+
+  const unknownToApp = installer.filter(l => !app.includes(l));
+  assert.deepEqual(unknownToApp, [],
+    `Installer-Sprachen, die /auth/setup mit 400 ablehnen wuerde: ${unknownToApp}. `
+    + 'Code auf den App-Code abbilden (setupLanguage) statt ihn roh weiterzureichen.');
+  const missingInInstaller = app.filter(l => !installer.includes(l));
+  assert.deepEqual(missingInInstaller, [],
+    `App-Sprachen ohne Installer-Locale: ${missingInInstaller} - wer sie spricht, kann sie im Wizard nicht waehlen.`);
+
+  for (const l of installer) assert.equal(setupLanguage(l), l, `${l} muss unveraendert durchgehen`);
+});
+
+/* Begriffe, die der Installer mit der App teilt, heissen in jeder Sprache wie
+ * in der App - der Nutzer sucht sie dort wieder. Gelesen aus public/locales,
+ * nicht abgeschrieben: benennt die App einen Begriff um, faellt es hier auf.
+ * Anlass (Critique 2026-09-29): "Module waehlen" fuehrte auf das Blatt "Aktive
+ * Module", "Single Sign-On" hiess in der App "Single Sign-on", und der
+ * deutsche Installer sagte "Dokumentspeicher" und "Passwort-Reset". */
+/* Bewusste Ausnahme mit Verfallsdatum an BEIDEN Enden: die nl-Pruefzeile sagt
+ * "Single sign-on", die App "Eenmalige aanmelding" (die Ueberschrift im
+ * Erweitert-Schritt ist schon angeglichen). Die Angleichung senkt die Zahl
+ * englischer Werte in nl - und test/test-i18n-translated.js verlangt dann,
+ * dass test/i18n-translated-baseline.json mitsinkt. Die Datei liegt ausserhalb
+ * dessen, was der Installer-Zweig bis zum Release aendern darf (main ist
+ * eingefroren). Folge-Ticket: nl angleichen UND die Baseline senken, dann
+ * diesen Eintrag loeschen. Faellt rot, sobald nl von selbst passt. */
+const SSO_TERM_PENDING = { nl: 'Single sign-on' };
+
+test('geteilte Begriffe heissen wie in der App', () => {
+  const appLocale = locale => JSON.parse(readFileSync(new URL(`../public/locales/${locale}.json`, import.meta.url), 'utf8'));
+  for (const [locale, value] of Object.entries(SSO_TERM_PENDING)) {
+    assert.notEqual(appLocale(locale).settings.oidcLinkTitle, value,
+      `${locale}: die App sagt inzwischen selbst "${value}" - Ausnahme loeschen`);
+    assert.equal(loadLocale(locale).review.oidc, value,
+      `${locale}: review.oidc ist angeglichen - Ausnahme in SSO_TERM_PENDING loeschen`);
+  }
+  for (const locale of SUPPORTED_LOCALES) {
+    const inst = loadLocale(locale);
+    const app = appLocale(locale).settings;
+    assert.equal(inst.done.nextModules, app.pageActiveModules,
+      `${locale}: der Link auf die aktiven Module heisst anders als das Blatt in der App`);
+    assert.ok(inst.advanced.oidc.startsWith(app.oidcLinkTitle),
+      `${locale}: advanced.oidc "${inst.advanced.oidc}" beginnt nicht mit dem App-Begriff "${app.oidcLinkTitle}"`);
+    if (locale in SSO_TERM_PENDING) continue;
+    assert.equal(inst.review.oidc, app.oidcLinkTitle, `${locale}: review.oidc weicht vom App-Begriff ab`);
+  }
+  const de = JSON.stringify(loadLocale('de'));
+  assert.doesNotMatch(de, /Dokumentspeicher/, 'de: "Dokumentspeicher" statt "Dokumentenspeicher" (App)');
+  assert.doesNotMatch(de, /Passwort-Reset/, 'de: "Passwort-Reset" statt "Passwort zuruecksetzen" (App)');
+  assert.match(loadLocale('de').storage.sectionDocuments, new RegExp(appLocale('de').settings.pageDocumentStorage));
+});

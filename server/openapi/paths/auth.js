@@ -222,8 +222,10 @@ export function authPaths() {
         tag: 'Auth',
         auth: false,
         requestBody: jsonBody('#/components/schemas/SetupRequest'),
+        description: 'Unknown body fields are ignored. `language` and `timezone` are optional; servers before they were added ignore them as well.',
         responses: {
           201: { description: 'Admin user created' },
+          400: { $ref: '#/components/responses/BadRequest' },
           403: { $ref: '#/components/responses/Forbidden' },
           409: { description: 'Username already taken' },
         },

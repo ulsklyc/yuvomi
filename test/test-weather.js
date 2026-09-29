@@ -490,3 +490,82 @@ test('GET /icon/:code: das Icon landet nicht im HTTP-Cache', async () => {
     assert.equal(res.headers.get('cache-control'), 'no-store');
   } finally { await close(); }
 });
+
+// ----------------------------------------------------------------
+// Quellenermittlung (services/weather-source.js). Die Vorrangregel steht
+// EINMAL dort; der Proxy holt damit seine Daten, die Admin-Seite zeigt damit
+// an, woher das Wetter kommt. Vorher las die Seite nur die Datenbank und sagte
+// "Nicht konfiguriert", waehrend das Widget Wetter aus der `.env` zeigte.
+// ----------------------------------------------------------------
+const { resolveWeatherSource } = await import('../server/services/weather-source.js');
+
+const ENV_OM = { WEATHER_LAT: '52.52', WEATHER_LON: '13.41', WEATHER_CITY: 'Berlin', WEATHER_UNITS: 'imperial' };
+const ENV_OWM = { OPENWEATHER_API_KEY: 'owm-secret-key-123', OPENWEATHER_CITY: 'Hamburg' };
+const DB_OM = { weather_provider: 'open-meteo', weather_lat: '48.14', weather_lon: '11.58', weather_city: 'München' };
+
+// Szenario -> erwartete Quelle/Anbieter. Die Datenbank gewinnt, ein gesetzter,
+// aber unvollstaendiger DB-Anbieter sperrt die `.env` (dann gar kein Wetter).
+const SOURCE_CASES = [
+  { name: 'nichts konfiguriert', env: {}, db: {}, source: 'none', provider: null },
+  { name: 'nur WEATHER_*', env: ENV_OM, db: {}, source: 'env', provider: 'open-meteo' },
+  { name: 'nur OPENWEATHER_* (Legacy)', env: ENV_OWM, db: {}, source: 'env', provider: 'openweathermap' },
+  { name: 'WEATHER_* vor OPENWEATHER_*', env: { ...ENV_OM, ...ENV_OWM }, db: {}, source: 'env', provider: 'open-meteo' },
+  { name: 'DB gewinnt gegen WEATHER_*', env: ENV_OM, db: DB_OM, source: 'db', provider: 'open-meteo' },
+  { name: 'DB gewinnt gegen OPENWEATHER_*', env: ENV_OWM, db: DB_OM, source: 'db', provider: 'open-meteo' },
+  { name: 'DB-Koordinaten ohne Anbieter gewinnen', env: ENV_OM,
+    db: { weather_lat: '48.14', weather_lon: '11.58' }, source: 'db', provider: 'open-meteo' },
+  { name: 'DB-Anbieter OWM mit Key aus der .env', env: ENV_OWM,
+    db: { weather_provider: 'openweathermap' }, source: 'db', provider: 'openweathermap' },
+  { name: 'DB-Anbieter OWM ohne Key sperrt WEATHER_*', env: ENV_OM,
+    db: { weather_provider: 'openweathermap' }, source: 'none', provider: null },
+  { name: 'DB-Anbieter Open-Meteo ohne Koordinaten sperrt WEATHER_*', env: ENV_OM,
+    db: { weather_provider: 'open-meteo' }, source: 'none', provider: null },
+];
+
+function storedFrom(db) {
+  return {
+    provider: db.weather_provider ?? null,
+    lat: db.weather_lat ?? null,
+    lon: db.weather_lon ?? null,
+    city: db.weather_city ?? null,
+    units: db.weather_units ?? null,
+  };
+}
+
+test('resolveWeatherSource: DB vor .env, WEATHER_* vor OPENWEATHER_*', () => {
+  for (const c of SOURCE_CASES) {
+    const got = resolveWeatherSource(storedFrom(c.db), c.env);
+    assert.equal(got.source, c.source, `${c.name}: Quelle`);
+    assert.equal(got.provider, c.provider, `${c.name}: Anbieter`);
+  }
+});
+
+test('resolveWeatherSource: env-Quelle traegt Stadt, Koordinaten und Einheit - nie den Key', () => {
+  assert.deepEqual(resolveWeatherSource(storedFrom({}), { ...ENV_OM, ...ENV_OWM }), {
+    source: 'env', provider: 'open-meteo', lat: '52.52', lon: '13.41', city: 'Berlin', units: 'imperial',
+  });
+  const owm = resolveWeatherSource(storedFrom({}), { ...ENV_OWM, OPENWEATHER_UNITS: 'imperial' });
+  assert.deepEqual(owm, {
+    source: 'env', provider: 'openweathermap', lat: null, lon: null, city: 'Hamburg', units: 'imperial',
+  });
+  for (const c of SOURCE_CASES) {
+    const json = JSON.stringify(resolveWeatherSource(storedFrom(c.db), c.env));
+    assert.ok(!json.includes(ENV_OWM.OPENWEATHER_API_KEY), `${c.name}: API-Key im Ergebnis`);
+  }
+});
+
+test('der Proxy folgt derselben Quellenermittlung wie die Admin-Seite', async () => {
+  // Der Proxy antwortet mit dem Anbieter, den resolveWeatherSource nennt -
+  // sonst zeigte die Admin-Seite eine andere Quelle als das Dashboard.
+  const ANY_FETCH = async (url) => (new URL(String(url)).hostname === 'api.open-meteo.com'
+    ? OM_FETCH(url)
+    : OWM_FETCH(url));
+  for (const c of SOURCE_CASES) {
+    const { baseUrl, close } = await startApp({ env: c.env, db: c.db, fetchFn: ANY_FETCH });
+    try {
+      const { body } = await getJson(baseUrl);
+      assert.equal(body.data?.provider ?? null, c.provider, `${c.name}: Proxy`);
+    } finally { await close(); }
+  }
+  for (const k of [...BASE_ENV_KEYS, 'OPENWEATHER_UNITS']) delete process.env[k];
+});
