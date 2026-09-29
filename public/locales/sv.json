@@ -2147,6 +2147,7 @@
         "backupWebdavTriggeredToast": "Säkerhetskopia uppladdad till WebDAV.",
         "backupWebdavTestSuccess": "Anslutning lyckades - {{files}} säkerhetskopia(or) hittades.",
         "backupWebdavTestFailed": "Anslutning misslyckades: {{error}}",
+        "backupWebdavPasswordRequired": "En annan server eller ett annat användarnamn kräver lösenordet igen.",
         "backupWebdavLastUpload": "Senaste uppladdning",
         "backupWebdavLastError": "Senaste fel",
         "backupWebdavNeverUploaded": "Ingen uppladdning ännu",

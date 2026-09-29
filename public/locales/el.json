@@ -2147,6 +2147,7 @@
         "backupWebdavTriggeredToast": "Το αντίγραφο ασφαλείας μεταφορτώθηκε στο WebDAV.",
         "backupWebdavTestSuccess": "Επιτυχής σύνδεση - βρέθηκαν {{files}} αντίγραφα ασφαλείας.",
         "backupWebdavTestFailed": "Η σύνδεση απέτυχε: {{error}}",
+        "backupWebdavPasswordRequired": "Για διαφορετικό διακομιστή ή όνομα χρήστη, εισήγαγε ξανά τον κωδικό πρόσβασης.",
         "backupWebdavLastUpload": "Τελευταία μεταφόρτωση",
         "backupWebdavLastError": "Τελευταίο σφάλμα",
         "backupWebdavNeverUploaded": "Καμία μεταφόρτωση ακόμη",

@@ -2147,6 +2147,7 @@
         "backupWebdavTriggeredToast": "تم رفع النسخة الاحتياطية إلى WebDAV بنجاح.",
         "backupWebdavTestSuccess": "نجح الاتصال - تم العثور على {{files}} نسخة احتياطية.",
         "backupWebdavTestFailed": "فشل الاتصال: {{error}}",
+        "backupWebdavPasswordRequired": "يتطلب خادم أو اسم مستخدم مختلف إدخال كلمة المرور مرة أخرى.",
         "backupWebdavLastUpload": "آخر رفع",
         "backupWebdavLastError": "آخر خطأ",
         "backupWebdavNeverUploaded": "لا يوجد رفع بعد",

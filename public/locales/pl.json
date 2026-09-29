@@ -2159,6 +2159,7 @@
         "backupWebdavTriggeredToast": "Kopia zapasowa przesłana na WebDAV.",
         "backupWebdavTestSuccess": "Połączenie udane - znaleziono {{files}} kopię(kopii).",
         "backupWebdavTestFailed": "Połączenie nieudane: {{error}}",
+        "backupWebdavPasswordRequired": "Dla innego serwera lub nazwy użytkownika wpisz hasło ponownie.",
         "backupWebdavLastUpload": "Ostatnie przesłanie",
         "backupWebdavLastError": "Ostatni błąd",
         "backupWebdavNeverUploaded": "Brak przesłanych kopii",

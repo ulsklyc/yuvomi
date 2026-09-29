@@ -2182,6 +2182,7 @@
         "backupWebdavTriggeredToast": "Matagumpay na na-upload ang backup sa WebDAV.",
         "backupWebdavTestSuccess": "Matagumpay ang koneksyon - {{files}} backup ang natagpuan.",
         "backupWebdavTestFailed": "Nabigo ang koneksyon: {{error}}",
+        "backupWebdavPasswordRequired": "Kailangang ilagay muli ang password para sa ibang server o username.",
         "backupWebdavLastUpload": "Huling upload",
         "backupWebdavLastError": "Huling error",
         "backupWebdavNeverUploaded": "Wala pang upload",

@@ -2159,6 +2159,7 @@
         "backupWebdavTriggeredToast": "Cadangan berhasil diunggah ke WebDAV.",
         "backupWebdavTestSuccess": "Koneksi berhasil - {{files}} cadangan ditemukan.",
         "backupWebdavTestFailed": "Koneksi gagal: {{error}}",
+        "backupWebdavPasswordRequired": "Server atau nama pengguna yang berbeda memerlukan kata sandi lagi.",
         "backupWebdavLastUpload": "Unggahan terakhir",
         "backupWebdavLastError": "Kesalahan terakhir",
         "backupWebdavNeverUploaded": "Belum ada unggahan",

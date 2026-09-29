@@ -11,6 +11,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
+import { sameCredentialOrigin } from '../utils/credential-origin.js';
 
 const log = createLogger('BackupWebDAV');
 
@@ -118,6 +119,30 @@ export function getConfig() {
   const keep     = Math.max(1, parseInt(keepRaw, 10) || 7);
 
   return { enabled, url, username, password, remotePath, keep };
+}
+
+/**
+ * Ob eine Anfrage fuer Verbindungstest oder Speichern das Passwort neu braucht.
+ *
+ * DAS GESPEICHERTE PASSWORT GEHOERT ZU EINEM SERVER UND EINEM BENUTZER, wie bei
+ * CalDAV und CardDAV (server/utils/credential-origin.js). Eine neue Adresse mit
+ * anderem Schema, Host oder Port, oder ein anderer Benutzername, ohne neues
+ * Passwort: sonst schickte der Verbindungstest das gespeicherte Passwort per
+ * Basic Auth an die neue Adresse, und ein gespeicherter Wechsel taete es beim
+ * naechsten Backup. Ein anderer Pfad auf demselben Server braucht nichts.
+ * `****` ist die Maske aus `getStatus()` und zaehlt nicht als Passwort.
+ *
+ * @param {{ url?: string|null, username?: string|null, password?: string|null }} next
+ * @returns {boolean}
+ */
+export function passwordRequired({ url, username, password } = {}) {
+  if (typeof password === 'string' && password !== '' && password !== '****') return false;
+  const cfg = getConfig();
+  if (!cfg.password) return false;
+  const nextUrl = typeof url === 'string' ? url.trim() : '';
+  const nextUser = typeof username === 'string' ? username.trim() : '';
+  return Boolean((nextUrl && !sameCredentialOrigin(nextUrl, cfg.url ?? ''))
+    || (nextUser && nextUser !== cfg.username));
 }
 
 /**

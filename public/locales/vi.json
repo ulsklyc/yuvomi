@@ -2368,6 +2368,7 @@
         "backupWebdavSaved": "Đã lưu cấu hình WebDAV.",
         "backupWebdavTestBtn": "Kiểm tra kết nối",
         "backupWebdavTestFailed": "Kết nối thất bại: {{error}}",
+        "backupWebdavPasswordRequired": "Máy chủ hoặc tên người dùng khác cần nhập lại mật khẩu.",
         "backupWebdavTestSuccess": "Kết nối thành công - tìm thấy {{files}} bản sao lưu.",
         "backupWebdavTitle": "Đích sao lưu WebDAV",
         "backupWebdavTriggerBtn": "Tải lên ngay",

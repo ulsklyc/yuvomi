@@ -2147,6 +2147,7 @@
         "backupWebdavTriggeredToast": "备份已成功上传到 WebDAV。",
         "backupWebdavTestSuccess": "连接成功 - 找到 {{files}} 个备份。",
         "backupWebdavTestFailed": "连接失败：{{error}}",
+        "backupWebdavPasswordRequired": "更换服务器或用户名后，需要重新输入密码。",
         "backupWebdavLastUpload": "上次上传",
         "backupWebdavLastError": "上次错误",
         "backupWebdavNeverUploaded": "尚未上传",

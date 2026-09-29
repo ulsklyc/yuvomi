@@ -2147,6 +2147,7 @@
         "backupWebdavTriggeredToast": "Backup caricato su WebDAV con successo.",
         "backupWebdavTestSuccess": "Connessione riuscita - trovati {{files}} backup.",
         "backupWebdavTestFailed": "Connessione fallita: {{error}}",
+        "backupWebdavPasswordRequired": "Per un altro server o un altro nome utente inserisci di nuovo la password.",
         "backupWebdavLastUpload": "Ultimo caricamento",
         "backupWebdavLastError": "Ultimo errore",
         "backupWebdavNeverUploaded": "Nessun caricamento ancora",

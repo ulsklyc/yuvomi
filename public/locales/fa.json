@@ -2159,6 +2159,7 @@
         "backupWebdavTriggeredToast": "پشتیبان با موفقیت روی WebDAV بارگذاری شد.",
         "backupWebdavTestSuccess": "اتصال موفق - {{files}} پشتیبان یافت شد.",
         "backupWebdavTestFailed": "اتصال ناموفق: {{error}}",
+        "backupWebdavPasswordRequired": "برای سرور یا نام کاربری دیگر، رمز عبور را دوباره وارد کنید.",
         "backupWebdavLastUpload": "آخرین بارگذاری",
         "backupWebdavLastError": "آخرین خطا",
         "backupWebdavNeverUploaded": "هنوز بارگذاری نشده",

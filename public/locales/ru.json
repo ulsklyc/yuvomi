@@ -2147,6 +2147,7 @@
         "backupWebdavTriggeredToast": "Резервная копия успешно загружена на WebDAV.",
         "backupWebdavTestSuccess": "Соединение успешно - найдено {{files}} копий.",
         "backupWebdavTestFailed": "Ошибка соединения: {{error}}",
+        "backupWebdavPasswordRequired": "Для другого сервера или имени пользователя введите пароль ещё раз.",
         "backupWebdavLastUpload": "Последняя загрузка",
         "backupWebdavLastError": "Последняя ошибка",
         "backupWebdavNeverUploaded": "Загрузок ещё не было",

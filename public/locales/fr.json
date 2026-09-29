@@ -2147,6 +2147,7 @@
         "backupWebdavTriggeredToast": "Sauvegarde téléversée sur WebDAV avec succès.",
         "backupWebdavTestSuccess": "Connexion réussie - {{files}} sauvegarde(s) trouvée(s).",
         "backupWebdavTestFailed": "Échec de la connexion : {{error}}",
+        "backupWebdavPasswordRequired": "Pour un autre serveur ou un autre nom d’utilisateur, saisis à nouveau le mot de passe.",
         "backupWebdavLastUpload": "Dernier téléversement",
         "backupWebdavLastError": "Dernière erreur",
         "backupWebdavNeverUploaded": "Aucun téléversement pour l'instant",

@@ -2147,6 +2147,7 @@
         "backupWebdavTriggeredToast": "Yedekleme WebDAV'a başarıyla yüklendi.",
         "backupWebdavTestSuccess": "Bağlantı başarılı - {{files}} yedek bulundu.",
         "backupWebdavTestFailed": "Bağlantı başarısız: {{error}}",
+        "backupWebdavPasswordRequired": "Farklı bir sunucu veya kullanıcı adı için parolayı yeniden gir.",
         "backupWebdavLastUpload": "Son yükleme",
         "backupWebdavLastError": "Son hata",
         "backupWebdavNeverUploaded": "Henüz yükleme yapılmadı",
