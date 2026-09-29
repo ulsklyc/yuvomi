@@ -752,6 +752,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "خلال 2 أيام" instead of "خلال يومين". Every counter now carries every form its language uses, only
   in that language, and a test fails for any new counter that misses one.
 
+- **Counts no longer show "1" for 21, 0 or 5 in some languages** (#1549). In Russian and Ukrainian
+  the singular form also serves 21, 31, 101 and so on, in French, Portuguese, Hindi and Persian it
+  also serves 0, and in Filipino most numbers. About 90 of these forms had a fixed "1" or a word
+  like "every month" instead of the number, so a day with 21 events read "1 событие" in Russian and
+  a day with 5 events read "1 kaganapan" in Filipino. They now show the actual number; a fixed
+  wording stays only where the screen can never show another number, and a test checks that.
+
 - **"Change all future occurrences" no longer ends a recurring payment** (#1546). Editing a later
   month of a series and choosing "Change all future occurrences" sent the recurrence settings of
   that single month along, and a generated month carries none: the series was switched off, every
@@ -799,6 +806,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   just to correct the amount, moved its calendar entry and payment task there. Correcting the date
   moved the visit itself a day later. The dialog now shows the household's day, and a new day
   keeps the visit's time on the household's clock.
+
+- **Housekeeping check-in and "today" follow the household's clock** (#1556). The page took the
+  day and time zone from the device: on a phone set to another time zone, a check-in at 00:30 in
+  Berlin put the calendar entry and payment task on the day before, and the staff card showed
+  yesterday evening's visit as today's. Even in the household's zone, the day ended an hour early
+  or late on the days the clocks change. With a household time zone set, the server now decides the
+  day in that zone, also for a page still open from before the update. For API users:
+  `/api/v1/housekeeping/workers`, `/worker`, `/dashboard` and the check-in take an optional
+  `timezone`; `local_date` and `timezone_offset_minutes` count only without a household time zone.
 
 - **The wall display stays dark after a reload at night** (#1453). Reloading the wall between 22:00
   and 06:00 with the theme set to Automatic or Light left the dimmed night surface in the light

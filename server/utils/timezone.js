@@ -62,12 +62,29 @@ export function serverTimeZone() {
  * @returns {string} IANA-Zone
  */
 export function householdTimeZone(database) {
+  return configuredHouseholdTimeZone(database) ?? serverTimeZone();
+}
+
+/**
+ * Die Zone, die der Haushalt AUSDRÜCKLICH gewählt hat - oder `null`.
+ *
+ * `householdTimeZone()` ist nie leer, weil sie auf `TZ` zurückfällt. Das ist
+ * die richtige Antwort für jede Frage, die nur der Server stellt. Wo eine
+ * Oberfläche mitredet, fehlt ihr damit aber eine Unterscheidung: ohne
+ * Einstellung liest die Anzeige die Zone des Browsers (public/utils/timezone.js
+ * spiegelt bewusst `timezone`, nicht `timezone_effective`), der Server `TZ`,
+ * im Container meist UTC. Erst die gesetzte Zone ist eine Aussage über den
+ * Haushalt, die beide Seiten teilen.
+ * @param {object|null} database  better-sqlite3-Connection
+ * @returns {string|null} IANA-Zone oder null
+ */
+export function configuredHouseholdTimeZone(database) {
   try {
     const stored = database?.prepare('SELECT value FROM sync_config WHERE key = ?')
       .get('household_timezone')?.value;
     if (isValidTimeZone(stored)) return stored;
-  } catch { /* Tabelle fehlt oder DB zu: Rückfall unten */ }
-  return serverTimeZone();
+  } catch { /* Tabelle fehlt oder DB zu: keine Einstellung */ }
+  return null;
 }
 
 /**
