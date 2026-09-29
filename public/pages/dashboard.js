@@ -12,6 +12,7 @@ import { t, formatDate, formatDayMonth, formatTime, timeSuffix, getLocale, getNu
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
 import { buildWeekStrip } from '/utils/week-strip.js';
+import { relativeDateLabel, housekeepingSinceLabel } from '/utils/day-label.js';
 import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
 // `todayKey` heisst hier schon ein Parameter (bzw. eine lokale Bindung), der den
 // Bezugstag traegt - der Import kommt deshalb unter eigenem Namen herein.
@@ -136,6 +137,14 @@ function householdNowStamp(now = new Date()) {
   return householdStamp(now);
 }
 
+/** Geburtstags-Termine tragen serverseitig einen sprachneutralen Titel (#524) -
+ * in beiden Terminlisten der Antwort, der der Kachel und der der Familienkarte. */
+function localizeEventLists(payload) {
+  for (const key of ['upcomingEvents', 'familyEvents']) {
+    if (Array.isArray(payload?.[key])) payload[key] = payload[key].map(localizeBirthdayEvent);
+  }
+}
+
 /**
  * Ist dieser Termin vorbei (#1449)? „Vorbei" heisst: sein ENDE liegt hinter
  * uns, gelesen in der Wanduhr des Haushalts - dieselbe Regel wie serverseitig
@@ -153,6 +162,56 @@ function eventHasEnded(event, nowStamp) {
   if (end.length <= 10) return false;
   const endStamp = householdStamp(end);
   return endStamp !== '' && endStamp <= nowStamp;
+}
+
+/**
+ * Wo die Uebersicht einen Termin HEUTE fuehrt (#1457).
+ *
+ * `upcomingEvents` bringt seit #1457 auch, was vor heute begann und heute
+ * noch laeuft - die Reise von gestern 18:00 bis morgen 12:00. Nach ihrem
+ * Beginn stuende sie auf gestern und fiele aus Kachel, Heute-Blatt, Wand und
+ * Familienkarte; mit ihrer Startzeit neben den heutigen Eintraegen log sie.
+ * Hier bekommt sie deshalb den Tag heute und die Form, die der Kalender fuer
+ * denselben Tag waehlt (agendaSegmentKind): endet sie heute, heisst es
+ * „bis 12:00" (`until`), laeuft sie weiter, steht sie wie ganztaegig da.
+ *
+ * `day`     der Tag der Zeile (Haushaltszone)
+ * `carried` begann vor heute und reicht in heute
+ * `allDay`  ganztaegig oder ueber heute hinweg
+ * `until`   das Ende, wenn ein mitgetragener Termin heute endet, sonst null
+ */
+function overviewEventSpan(event, todayKey) {
+  const raw = String(event?.start_datetime || '');
+  const allDay = Boolean(event?.all_day) || raw.length <= 10;
+  const day = eventOccurrenceDateKey(event);
+  if (!day || !todayKey || day >= todayKey || !eventReachesInto(event, todayKey, allDay)) {
+    return { day, carried: false, allDay, until: null };
+  }
+  const end = String(event?.end_datetime || '');
+  // Ein Ende um genau 00:00 schliesst den Tag davor (#804): bis Mitternacht
+  // heisst „bis heute 24:00", nicht „laeuft morgen weiter".
+  const endsToday = !allDay && end.length > 10 && (zonedDateKey(end) === todayKey
+    || householdStamp(end) === `${addLocalDays(todayKey, 1)}T00:00`);
+  return { day: todayKey, carried: true, allDay: allDay || !endsToday, until: endsToday ? end : null };
+}
+
+/** Reicht der Termin ueber die Mitternacht vor `dayKey` hinaus? Ganztaegig inklusiv, wie im Kalender. */
+function eventReachesInto(event, dayKey, allDay) {
+  const raw = String(event?.start_datetime || '');
+  if (allDay) {
+    const startKey = raw.slice(0, 10);
+    const endKey = event?.end_datetime ? String(event.end_datetime).slice(0, 10) : startKey;
+    return (endKey > startKey ? endKey : startKey) >= dayKey;
+  }
+  const endStamp = householdStamp(String(event?.end_datetime || raw));
+  return endStamp !== '' && endStamp > `${dayKey}T00:00`;
+}
+
+/** Die Zeitangabe eines Termins auf der Uebersicht: „bis 12:00", „Ganztaegig" oder der Beginn. */
+function overviewEventTime(event, span) {
+  if (span.until) return t('dashboard.todayUntil', { time: formatTime(span.until) });
+  if (span.allDay) return t('dashboard.allDay');
+  return formatTime(event.start_datetime);
 }
 
 function getAppName() {
@@ -575,69 +634,8 @@ function mastheadDateLabel(now = new Date()) {
   }).format(zonedUTCProxy(now));
 }
 
-// Relatives Datumslabel: „Heute"/„Morgen", sonst das locale-formatierte Datum.
-// Eigene Funktion, damit Aufrufer nur den Datumsteil brauchen, ohne ein
-// zusammengesetztes „Datum, Zeit" per Komma zu zerschneiden (locale-fragil:
-// manche Locales setzen selbst ein Komma ins Datum).
-/**
- * „Heute"/„Morgen", sonst das Datum in Locale-Schreibweise.
- *
- * NIMMT EINEN DATUMS-KEY ODER EINEN ZEITPUNKT, und der Unterschied ist genau
- * der, den utils/timezone.js fuehrt: ein Key ('2026-08-25') ist zonenlos und
- * wird GELESEN, ein Zeitpunkt traegt seine Zone und wird UMGERECHNET.
- *
- * DIE PFLICHT LIEGT BEIM AUFRUFER. Ein `Date`, das jemand aus einem Key gebaut
- * hat, ist die gefaehrliche Mitte: `parseLocalDateKey('2026-08-25')` ist
- * Mitternacht der BROWSER-Zone und sieht damit aus wie ein Zeitpunkt, meint aber
- * einen Kalendertag. Durch die Anzeigezone gerechnet ist es einen Tag daneben -
- * derselbe Fehler, gegen den dieser Fix angetreten ist, nur ueber einen anderen
- * Weg. Wer einen Key hat, gibt den KEY her und baut kein Date daraus (#851).
- *
- * `zonedDateKey` unterscheidet die beiden Formen selbst: einen zonenlosen String
- * liest es, einen Zeitpunkt rechnet es um. Ein zweiter Zweig hier waere ein
- * Duplikat dieser Regel und wuerde beim naechsten Mal auseinanderlaufen.
- *
- * Vorher stand hier `d.toDateString() === new Date().toDateString()` - beide
- * Seiten in der Browser-Zone, also fuer jeden Betrachter ein anderes „heute".
- */
-/*
- * NACH „MORGEN" KOMMT DER WOCHENTAG, NICHT DAS JAHR. Hier sprang das Label
- * direkt auf „26.09.2026" - drei Tage voraus mit Jahreszahl, wo ein Mensch
- * „Sa." sagt (Critique 2026-09-23). Die Stufen: heute, morgen, bis sechs Tage
- * voraus der kurze Wochentag (ab sieben waere er mehrdeutig: „Mi." hiesse
- * heute oder in einer Woche), danach Tag und Monat, das Jahr nur, wenn es
- * nicht das laufende ist. Vergangenes bekommt nie einen Wochentag - „Mo." fuer
- * letzten Montag liest sich als der naechste.
- *
- * Gerechnet wird auf den KEYS der Haushaltszone, nie auf einem `Date`: der
- * Abstand kommt aus `Date.UTC` ueber Jahr/Monat/Tag (zonenfrei und
- * sommerzeitfest), der Name aus demselben UTC-Mittag mit `timeZone: 'UTC'` -
- * die Technik von `zonedUTCProxy`. Der Name folgt der App-Sprache
- * (`getLocale`), Tag und Monat der Datumsschreibweise der Region.
- */
-const WEEKDAY_LABEL_DAYS = 6;
-
-function dayKeyNoonUtc(key) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
-  return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12) : NaN;
-}
-
-function relativeDateLabel(value) {
-  if (value === null || value === undefined || value === '') return '';
-  const day = zonedDateKey(value);
-  if (!day) return formatDate(value);
-  const today = householdToday();
-  if (day === today) return t('common.today');
-  if (day === addLocalDays(today, 1)) return t('common.tomorrow');
-  const dayNoon = dayKeyNoonUtc(day);
-  const ahead = Math.round((dayNoon - dayKeyNoonUtc(today)) / 86400000);
-  if (ahead > 1 && ahead <= WEEKDAY_LABEL_DAYS) {
-    return new Intl.DateTimeFormat(getLocale(), { weekday: 'short', timeZone: 'UTC' }).format(new Date(dayNoon));
-  }
-  // Der KEY geht an die Formatierer, nicht `value`: ein Zeitpunkt ist oben
-  // schon in die Anzeigezone umgerechnet, ein zweites Mal waere doppelt.
-  return day.slice(0, 4) === today.slice(0, 4) ? formatDayMonth(day) : formatDate(day);
-}
+// `relativeDateLabel` wohnt in utils/day-label.js: das Heute-Blatt braucht
+// dieselbe Stufung (#1452), und eine zweite Fassung liefe auseinander.
 
 function formatDateTime(isoString) {
   if (!isoString) return '';
@@ -914,7 +912,7 @@ function buildTodayHighlights(data) {
   const today = householdToday();
   const todayEvents = events.filter((e) => {
     if (!e.start_datetime) return true;
-    const dayKey = eventOccurrenceDateKey(e);
+    const dayKey = overviewEventSpan(e, today).day;
     return dayKey ? dayKey === today : true;
   });
   const nextEvent = todayEvents[0] ?? null;
@@ -983,17 +981,20 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
 
   if (includeCalendar) {
     for (const event of events) {
-      if (eventOccurrenceDateKey(event) !== todayKey) continue;
+      const span = overviewEventSpan(event, todayKey);
+      if (span.day !== todayKey) continue;
       // Das Blatt verspricht, was heute NOCH ansteht (#1449): ein beendeter
       // Termin verlaesst es. Die Termin-Kachel behaelt ihn zurueckgetreten.
       if (eventHasEnded(event, nowStamp)) continue;
-      const start = eventStartDate(event);
-      const timed = !event.all_day && start && String(event.start_datetime).length > 10;
+      // Der Platz im Tag nach der Wanduhr des HAUSHALTS: hier stand
+      // `getHours()` eines Date, also die Zone des Geraets (#1457). Was schon
+      // vor heute begann, steht oben bei den ganztaegigen.
+      const time = !span.allDay && !span.carried ? zonedTimeKey(event.start_datetime) : '';
       rows.push({
         kind: 'event',
         objectId: event.id,
-        sortKey: timed ? `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}` : '00:01',
-        timeLabel: timed ? formatTime(start) : t('dashboard.allDay'),
+        sortKey: time || '00:01',
+        timeLabel: overviewEventTime(event, span),
         title: event.title,
         sub: t('dashboard.todayEvent'),
         icon: 'calendar',
@@ -1163,7 +1164,7 @@ const UPCOMING_EVENTS_SHOWN = 5;
 function renderUpcomingEvents(allEvents, { now = new Date() } = {}) {
   const todayKey = zonedDateKey(now);
   const nowStamp = householdNowStamp(now);
-  const endedToday = allEvents.filter((e) => eventOccurrenceDateKey(e) === todayKey && eventHasEnded(e, nowStamp));
+  const endedToday = allEvents.filter((e) => overviewEventSpan(e, todayKey).day === todayKey && eventHasEnded(e, nowStamp));
   const ended = endedToday.slice(-ENDED_EVENTS_SHOWN);
   const folded = endedToday.length - ended.length;
   const ahead = allEvents.filter((e) => !endedToday.includes(e)).slice(0, UPCOMING_EVENTS_SHOWN);
@@ -1182,12 +1183,15 @@ function renderUpcomingEvents(allEvents, { now = new Date() } = {}) {
   // Browser-Zone und machte „heute" zu einer Frage an das Geraet (#851).
   const today = todayKey;
   const items = events.map((e) => {
-    const d = eventStartDate(e) ?? new Date(e.start_datetime);
-    const dayKey = eventOccurrenceDateKey(e);
+    const span = overviewEventSpan(e, today);
+    const dayKey = span.day;
     const isToday = dayKey === today;
     const isEnded = ended.includes(e);
     const _suffix = timeSuffix();
-    const timeStr = e.all_day ? t('dashboard.allDay') : `${formatTime(d)}${_suffix ? ' ' + _suffix : ''}`.trim();
+    // Was gestern begann, nennt nicht seine Startzeit von gestern (#1457).
+    const timeStr = span.until || span.allDay
+      ? overviewEventTime(e, span)
+      : `${formatTime(e.start_datetime)}${_suffix ? ' ' + _suffix : ''}`.trim();
     const badge = isEnded
       ? `<span class="event-time-badge">${esc(t('dashboard.eventEnded'))}</span>`
       : `<span class="event-time-badge ${isToday ? 'event-time-badge--today' : ''}">${isToday ? t('common.today') : relativeDateLabel(dayKey)}</span>`;
@@ -1356,6 +1360,17 @@ function listMoreLine(key, rest) {
   return rest > 0 ? `<p class="widget-list-more">${esc(t(key, { count: rest }))}</p>` : '';
 }
 
+/* DATUM UND ABSTAND IN EINER ZEILE (#1454). Das Datum folgt der Stufung der
+ * Uebersicht (`relativeDateLabel`: Wochentag bis sechs Tage voraus, dann Tag
+ * und Monat, das Jahr nur, wenn es ein anderes ist) - hier stand `formatDate`
+ * mit Jahr, drei Tage voraus („26.09.2026 · 3 Tage"), neben einem Termin, der
+ * „Sa." sagte. Heute und morgen sagen beide Haelften dasselbe Wort; dann steht
+ * es einmal da. */
+function dateAndCount(dateLabel, countLabel) {
+  if (!dateLabel || dateLabel === countLabel) return countLabel;
+  return `${esc(dateLabel)} · ${countLabel}`;
+}
+
 export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
   // Der Vorrat kommt fuer die groesste Fassung vom Server (routes/dashboard.js);
   // was davon erscheint, entscheidet die Kachel. Die Badge zaehlte hier die
@@ -1399,7 +1414,7 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
         </div>
         <div class="birthday-widget-item__body">
           <div class="birthday-widget-item__name">${esc(b.name)}</div>
-          <div class="birthday-widget-item__meta">${formatDate(b.next_date ?? b.next_birthday)} · ${daysLabel}</div>
+          <div class="birthday-widget-item__meta">${dateAndCount(relativeDateLabel(b.next_date ?? b.next_birthday), daysLabel)}</div>
         </div>
         ${occasionLabel ? `<div class="birthday-widget-item__age">${esc(occasionLabel)}</div>` : ''}
       </div>
@@ -1439,6 +1454,10 @@ function renderCountdowns(allItems, size, total = null) {
   const rows = items.map((c) => {
     const phrase = countdownPhrase(c.days_until);
     const label = phrase.count === undefined ? t(phrase.key) : t(phrase.key, { count: phrase.count });
+    // Sagt der Zaehler rechts schon „Heute"/„Morgen", traegt die Zeile kein
+    // zweites (#1454).
+    const when = relativeDateLabel(c.date);
+    const meta = when && when !== label ? `<div class="countdown-item__meta">${esc(when)}</div>` : '';
     // Die Farbe des Termins trägt die Zeile als schmale Marke - dieselbe
     // Zuordnung, die er im Kalender hat. Eine Aufgabe hat keine, sie bekommt
     // den Modulton.
@@ -1468,7 +1487,7 @@ function renderCountdowns(allItems, size, total = null) {
         </span>
         <div class="countdown-item__body">
           <div class="countdown-item__title">${esc(c.title)}</div>
-          <div class="countdown-item__meta">${formatDate(c.date)}</div>
+          ${meta}
         </div>
         <div class="countdown-item__days countdown-item__days--${countdownRank(c.days_until)}">${esc(label)}</div>
       </div>
@@ -1729,21 +1748,24 @@ function renderQuickLinks(items) {
  * (`householdStamp`) - das Geraet hat keine Stimme. Unter den heutigen geht
  * ein Termin mit Uhrzeit dem ganztaegigen vor.
  *
- * Noch offen aus #1449 und bewusst nicht hier: die Karte leiht sich weiter die
- * Liste der Kalenderkachel (fuenf Eintraege, ihr „nur meine"-Filter).
+ * Die Termine kommen seit #1449 aus `familyEvents`, eigens je Mitglied
+ * geladen - nicht mehr aus der Liste der Kalenderkachel (fuenf Eintraege, ihr
+ * „nur meine"-Filter).
  */
 function familyAgenda(events, shownIds, todayKey, now = new Date()) {
   const nowStamp = householdNowStamp(now);
   const items = events.map((event) => {
     const raw = String(event?.start_datetime || '');
-    const allDay = Boolean(event?.all_day) || raw.length <= 10;
-    const day = allDay ? raw.slice(0, 10) : eventOccurrenceDateKey(event);
-    const start = allDay ? '' : householdStamp(raw);
+    // Was vor heute begann und heute noch laeuft, ist ein Termin von HEUTE
+    // (#1457) - ganztaegig, wenn es ueber heute hinausgeht, sonst „bis".
+    const span = overviewEventSpan(event, todayKey);
+    const { day, allDay, until } = span;
+    const start = allDay ? '' : span.carried ? `${todayKey}T00:00` : householdStamp(raw);
     const people = new Set((Array.isArray(event?.assigned_users) ? event.assigned_users : [])
       .map((a) => Number(a.id))
       .filter((id) => shownIds.has(id)));
     const ended = !allDay && eventHasEnded(event, nowStamp);
-    return { event, day, allDay, start, ended, people, shared: people.size >= 2 };
+    return { event, day, allDay, until, start, ended, people, shared: people.size >= 2 };
   }).filter((item) => item.day && item.day >= todayKey && item.people.size > 0);
 
   const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -1766,7 +1788,10 @@ function familyAgenda(events, shownIds, todayKey, now = new Date()) {
 /** „10:00 Zahnarzt" heute, „Sa. · Zahnarzt" an einem spaeteren Tag (escaped). */
 function familyEventLabel(item, todayKey) {
   const title = esc(item.event.title);
-  if (item.day === todayKey) return item.allDay ? title : `${esc(formatTime(item.event.start_datetime))} ${title}`;
+  if (item.day === todayKey) {
+    if (item.until) return `${esc(t('dashboard.todayUntil', { time: formatTime(item.until) }))} ${title}`;
+    return item.allDay ? title : `${esc(formatTime(item.event.start_datetime))} ${title}`;
+  }
   return `${esc(relativeDateLabel(item.day))} · ${title}`;
 }
 
@@ -1808,7 +1833,12 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
     (Array.isArray(data?.memberTodayTasks) ? data.memberTodayTasks : [])
       .map((r) => [r.user_id, Number(r.open_count) || 0])
   );
-  const events = Array.isArray(data?.upcomingEvents) ? data.upcomingEvents : [];
+  // Eigene Termine je Mitglied (#1449): die Liste der Kachel ist bei fuenf
+  // Kommenden gedeckelt und traegt deren „nur meine". Ein aelterer Server ohne
+  // `familyEvents` faellt auf sie zurueck.
+  const events = Array.isArray(data?.familyEvents)
+    ? data.familyEvents
+    : Array.isArray(data?.upcomingEvents) ? data.upcomingEvents : [];
   const todayKey = householdToday();
   // S-18 (UX-Audit): dieselbe Schichtplan-Kachel, direkt daneben, widersprach
   // dieser Zeile - eine Person mit einer echten Schicht heute stand hier
@@ -2263,7 +2293,7 @@ function metricTileFor(id, data, currency, sheetSpeaks = new Set()) {
           : hk.unpaidAmount > 0
             ? t('dashboard.housekeepingUnpaid', { amount: formatCurrency(hk.unpaidAmount, currency) })
             : hk.lastVisit
-              ? t('dashboard.housekeepingLastVisit', { date: formatDate(hk.lastVisit) })
+              ? t('dashboard.housekeepingLastVisit', { date: earnedWhenLabel(hk.lastVisit) })
               : t('dashboard.housekeepingNoVisits'),
       };
     }
@@ -2715,6 +2745,12 @@ function renderCycleWidget(cycle) {
   const phaseLabel = t(CYCLE_WIDGET_PHASE_KEYS[prediction.phase] || CYCLE_WIDGET_PHASE_KEYS[PHASE.FOLLICULAR]);
   const dayText = t('health.cycle.ring.cycleDay', { day: prediction.cycleDay });
   const countdown = cycleWidgetCountdown(prediction);
+  // Dieselbe Stufung wie jedes kommende Datum der Uebersicht (#1454); sagt der
+  // Zaehler schon „heute", steht das Wort nicht zweimal da.
+  const nextLabel = relativeDateLabel(prediction.nextStart);
+  const cycleDate = nextLabel && nextLabel.toLowerCase() !== countdown.toLowerCase()
+    ? `<span class="cycle-widget__date">${esc(nextLabel)}</span>`
+    : '';
   const phaseColor = CYCLE_WIDGET_PHASE_COLOR[prediction.phase] || 'var(--module-health)';
 
   // Mini-Fortschrittsring: Zyklustag / Ø-Zyklus als einzelner Bogen in Phasenfarbe.
@@ -2743,7 +2779,7 @@ function renderCycleWidget(cycle) {
             <span class="cycle-widget__next-label">${esc(t('health.cycle.status.nextPeriod'))}</span>
             <span class="cycle-widget__countdown">${esc(countdown)}</span>
           </span>
-          <span class="cycle-widget__date">${esc(formatDate(prediction.nextStart))}</span>
+          ${cycleDate}
         </div>
       </div>
     </div>
@@ -3154,14 +3190,6 @@ function renderWasteWidget(waste, size) {
 // Haushaltshilfe-Widget (Anwesenheit + offene Zahlung)
 // --------------------------------------------------------
 
-/** „08:00" fuer einen Beginn heute, „22.09., 08:00" fuer einen aelteren -
- * eine offene Sitzung von gestern ist eine vergessene Abmeldung, keine
- * Anwesenheit, und die blosse Uhrzeit verschwiege genau das. */
-function housekeepingSinceLabel(since) {
-  const time = formatTime(since);
-  return zonedDateKey(since) === householdToday() ? time : `${relativeDateLabel(since)}, ${time}`;
-}
-
 function renderHousekeepingWidget(hk, currency) {
   if (!hk?.configured) {
     return `<div class="widget widget--housekeeping">
@@ -3189,7 +3217,7 @@ function renderHousekeepingWidget(hk, currency) {
     : `<div class="housekeeping-widget__status">
         <span class="housekeeping-widget__dot housekeeping-widget__dot--idle" aria-hidden="true"></span>
         <div class="housekeeping-widget__lines">
-          <div class="housekeeping-widget__state">${hk.lastVisit ? t('dashboard.housekeepingLastVisit', { date: formatDate(hk.lastVisit) }) : t('dashboard.housekeepingNoVisits')}</div>
+          <div class="housekeeping-widget__state">${hk.lastVisit ? t('dashboard.housekeepingLastVisit', { date: earnedWhenLabel(hk.lastVisit) }) : t('dashboard.housekeepingNoVisits')}</div>
           <div class="housekeeping-widget__sub">${t('dashboard.housekeepingVisitsMonth', { count: visits })}</div>
         </div>
       </div>`;
@@ -5943,9 +5971,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Geburtstags-Termine tragen serverseitig einen sprachneutralen Titel
     // („Birthday: <Name>"); anhand von birthday_name in die aktive Sprache
     // übersetzen (Issue #524).
-    if (Array.isArray(data?.upcomingEvents)) {
-      data.upcomingEvents = data.upcomingEvents.map(localizeBirthdayEvent);
-    }
+    localizeEventLists(data);
     setCountdownAvailability(data?.countdowns);
     weather      = weatherRes.data ?? null;
     weatherAutoLocate = Boolean(prefsRes.data?.weather_user?.auto_locate ?? prefsRes.data?.weather_auto_locate);
@@ -5966,9 +5992,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       try {
         const filtered = await api.get(dashboardQuery(widgetConfig));
         if (signal.aborted) return;
-        if (Array.isArray(filtered?.upcomingEvents)) {
-          filtered.upcomingEvents = filtered.upcomingEvents.map(localizeBirthdayEvent);
-        }
+        localizeEventLists(filtered);
         data = filtered;
         setCountdownAvailability(data?.countdowns);
       } catch { /* die ungefilterte Antwort steht bereits - lieber mehr als nichts */ }
@@ -6076,9 +6100,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     if (dashboardQuery(widgetConfig) === previousQuery) return;
     try {
       const fresh = await api.get(dashboardQuery(widgetConfig));
-      if (Array.isArray(fresh?.upcomingEvents)) {
-        fresh.upcomingEvents = fresh.upcomingEvents.map(localizeBirthdayEvent);
-      }
+      localizeEventLists(fresh);
       fresh.cycle = data.cycle;
       fresh.schedule = data.schedule;
       fresh.waste = data.waste;
@@ -6764,9 +6786,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     try {
       const fresh = await api.get(dashboardQuery(widgetConfig));
       if (signal.aborted) return;
-      if (Array.isArray(fresh?.upcomingEvents)) {
-        fresh.upcomingEvents = fresh.upcomingEvents.map(localizeBirthdayEvent);
-      }
+      localizeEventLists(fresh);
       // Der owner-only Zyklus-Slice reist unveraendert mit: /dashboard
       // liefert ihn nie, ein Refresh darf ihn nicht auf „nie geladen"
       // zurückwerfen.
@@ -6897,7 +6917,10 @@ function todayFingerprint(data, cfg, now = new Date()) {
   if (!data) return '';
   const model = buildTodayCockpitModel(data, cfg, { now });
   const nowStamp = householdNowStamp(now);
-  const ended = (Array.isArray(data.upcomingEvents) ? data.upcomingEvents : [])
+  // Beide Terminlisten: auch die Familienkarte wechselt am Ende eines Termins
+  // auf den naechsten oder auf „fuer heute durch" (#1449).
+  const ended = ['upcomingEvents', 'familyEvents']
+    .flatMap((key) => (Array.isArray(data[key]) ? data[key] : []))
     .filter((event) => eventHasEnded(event, nowStamp))
     .map((event) => `${event.id}@${event.start_datetime}`);
   return JSON.stringify([
@@ -7011,3 +7034,7 @@ function wireWeatherRefresh(container, onUpdated = null, signal) {
 // Zeile statt Verlaengerung der langen `__test`-Liste oben, damit parallele
 // Aenderungen an beiden nicht in derselben Zeile kollidieren.
 Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderDashboardLayout });
+
+// Test-Tor fuer die Uebersichts-Bugs vom 2026-09-29 (#1449, #1451-#1457).
+Object.assign(__test, { renderBudgetWidget });
+Object.assign(__test, { renderCountdowns, renderHousekeepingWidget, renderCycleWidget, todayFingerprint });

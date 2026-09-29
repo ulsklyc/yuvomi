@@ -7,7 +7,12 @@
  * abgelegt (ohne abschließendes "Z"). Daher muss es hier ebenfalls als UTC
  * interpretiert werden — sonst entsteht ein doppelter Zeitzonen-Offset, der
  * sich bei jedem Speichern erneut aufaddiert (Issue #354).
+ *
+ * Die Faelligkeit ist dagegen WANDUHRZEIT der Haushaltszone und wird ueber
+ * `dueInstantMs` in einen Zeitpunkt umgerechnet - nicht per `new Date()`, das
+ * die Ziffern in der Zone des Geraets liest (#1522).
  */
+import { wallTimeToInstantMs } from './timezone.js';
 
 const TZ_SUFFIX = /[zZ]|[+-]\d{2}:?\d{2}$/;
 
@@ -22,17 +27,24 @@ export function parseRemindAtAsUtc(value) {
 }
 
 /**
- * Millisekunden-Versatz zwischen Fälligkeit (lokal) und Erinnerung (UTC).
+ * Die Faelligkeit als Zeitpunkt: Datum plus Uhrzeit, ohne Uhrzeit 23:59:59 -
+ * gelesen in der Haushaltszone, nicht in der des Geraets (#1522).
+ * @returns {number|null} ms seit Epoch, oder null bei unlesbarer Faelligkeit
+ */
+function dueInstantMs(dueDate, dueTime) {
+  return wallTimeToInstantMs(`${dueDate}T${dueTime || '23:59:59'}`);
+}
+
+/**
+ * Millisekunden-Versatz zwischen Fälligkeit (Haushaltszone) und Erinnerung (UTC).
  * @returns {number|null} positiver Versatz in ms, oder null bei fehlenden Daten
  */
 export function parseOffsetMsFromReminder(task, reminder) {
   if (!task?.due_date || !reminder?.remind_at) return null;
-  const due = task.due_time
-    ? new Date(`${task.due_date}T${task.due_time}`)
-    : new Date(`${task.due_date}T23:59:59`);
+  const due = dueInstantMs(task.due_date, task.due_time);
   const remind = parseRemindAtAsUtc(reminder.remind_at);
-  if (Number.isNaN(due.getTime()) || Number.isNaN(remind.getTime())) return null;
-  return due.getTime() - remind.getTime();
+  if (due === null || Number.isNaN(remind.getTime())) return null;
+  return due - remind.getTime();
 }
 
 const PRESET_MAP = new Map([
@@ -138,7 +150,7 @@ export function remindAtFromPreset(preset, {
     if (offsetMs === undefined) return null;
   }
 
-  const due = new Date(`${dueDate}T${dueTime || '23:59:59'}`);
-  if (Number.isNaN(due.getTime())) return null;
-  return new Date(due.getTime() - offsetMs).toISOString().slice(0, 19);
+  const due = dueInstantMs(dueDate, dueTime);
+  if (due === null) return null;
+  return new Date(due - offsetMs).toISOString().slice(0, 19);
 }

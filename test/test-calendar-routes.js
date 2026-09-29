@@ -1001,6 +1001,77 @@ test('default-assignee-backfill - Vorschau und Bestaetigung haben dieselbe Oberg
   }
 });
 
+test('default-assignee-backfill - die Bestaetigung prueft die Umzuege in Happen mit EINER vorbereiteten Abfrage (#1440)', async () => {
+  // Eine volle Seite sind 5000 Umzuege. Je Eintrag eine frisch vorbereitete
+  // Abfrage, alle ohne Pause, blockierte den Server fuer die ganze Pruefung.
+  const route = '/external-calendars/default-assignee-backfill';
+  const { backfillBatch } = await import('../server/services/sync-assignment.js');
+  const { ids, cleanup } = seedMovedFixture();
+  const original = db.prepare;
+  const saved = backfillBatch.size;
+  let prepared = 0;
+  const log = [];
+  try {
+    const counted = (await call('GET', route)).body.data;
+    const moves = counted.moved.filter((m) => MOVED_KEYS.some((k) => ids[k] === m.event_id)).map(pick);
+    assert.equal(moves.length, 5, 'Vorbedingung: fuenf abgehakte Umzuege');
+    backfillBatch.size = 2;
+    // Jede Punktabfrage der Umzugsregel wird gezaehlt, jede Ausfuehrung notiert.
+    // Beim ersten Aufruf reiht sich ein Rivale ein: steht er vor dem dritten
+    // Aufruf im Protokoll, hat die Pruefung nach dem ersten Happen Luft gegeben.
+    db.prepare = function prepareSpy(sql) {
+      const stmt = original.call(this, sql);
+      if (!String(sql).includes('JOIN event_assignments cur') || !String(sql).includes('e.id = @eventId')) return stmt;
+      prepared += 1;
+      const get = stmt.get.bind(stmt);
+      stmt.get = (...args) => {
+        if (!log.length) setImmediate(() => log.push('rivale'));
+        log.push('get');
+        return get(...args);
+      };
+      return stmt;
+    };
+    const applied = await call('POST', route, { body: {
+      expected_count: counted.count, expected_token: counted.token, moves,
+    } });
+    db.prepare = original;
+    assert.equal(applied.status, 200, JSON.stringify(applied.body));
+    assert.equal(applied.body.data.assigned, counted.count + moves.length);
+    assert.equal(prepared, 2, 'je eine vorbereitete Abfrage fuer Pruefung und Schreiben, nicht eine je Eintrag');
+    assert.equal(log.indexOf('rivale'), 2, `Luft nach dem ersten Happen der Pruefung: ${log.join(' ')}`);
+  } finally {
+    db.prepare = original;
+    backfillBatch.size = saved;
+    cleanup();
+  }
+});
+
+test('default-assignee-backfill - ein veralteter Umzug im letzten Happen: 409, nichts geschrieben (#1440)', async () => {
+  const route = '/external-calendars/default-assignee-backfill';
+  const { backfillBatch } = await import('../server/services/sync-assignment.js');
+  const { ids, cleanup, HAND } = seedMovedFixture();
+  const saved = backfillBatch.size;
+  try {
+    const counted = (await call('GET', route)).body.data;
+    const moves = MOVED_KEYS.map((k) => pick(counted.moved.find((m) => m.event_id === ids[k])));
+    // Der letzte abgehakte Termin ist inzwischen von Hand zugewiesen.
+    db.prepare('UPDATE calendar_events SET assigned_to = ? WHERE id = ?').run(HAND, ids.movedApple);
+    db.prepare('UPDATE event_assignments SET user_id = ? WHERE event_id = ?').run(HAND, ids.movedApple);
+    backfillBatch.size = 2;
+    const refused = await call('POST', route, { body: {
+      expected_count: counted.count, expected_token: counted.token, moves,
+    } });
+    assert.equal(refused.status, 409);
+    for (const key of ['moved', 'movedSeries', 'movedGoogle']) {
+      assert.deepEqual(assignmentOf(ids[key]), { assignedTo: MARIA.id, users: [MARIA.id] }, `${key}: nichts geschrieben`);
+    }
+    assert.deepEqual(assignmentOf(ids.movedRows), { assignedTo: null, users: [MARIA.id] });
+  } finally {
+    backfillBatch.size = saved;
+    cleanup();
+  }
+});
+
 test('default-assignee-backfill - die Bestaetigung bindet jeden abgehakten Termin (#1307, #1171)', async () => {
   const route = '/external-calendars/default-assignee-backfill';
   const { ids, cleanup } = seedMovedFixture();
@@ -4790,6 +4861,62 @@ test('Farb-Heilung: eine Bearbeitung ohne Farbwechsel laesst den Schnappschuss s
     assert.equal((await call('PUT', `/${id}`, { body: { title: 'Nur Titel neu', color: '#4a90e2' } })).status, 200);
     assert.deepEqual(JSON.parse(db.prepare("SELECT value FROM sync_config WHERE key = 'caldav_legacy_color_heal_snapshot_71'").get().value),
       { [id]: '#4a90e2' });
+  } finally {
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%'").run();
+  }
+});
+
+test('Farb-Heilung: die Vormerkliste nimmt nur Termine von vor dem Fix auf (#1442)', async () => {
+  // Ein Schnappschuss nimmt ohnehin nur Zeilen von vor Migration 166 auf. Eine
+  // juengere Zeile auf der Vormerkliste liesse sie nur wachsen, und jede
+  // Umfaerbung laese und schriebe die ganze Liste neu.
+  const cutoff = db.prepare('SELECT applied_at FROM schema_migrations WHERE version = 166').get().applied_at;
+  const fresh = insertEvent({ title: 'Neu', external_source: 'caldav', color: '#4A90E2', user_modified: 1 });
+  const old = insertEvent({ title: 'Alt', external_source: 'caldav', color: '#4A90E2', user_modified: 1 });
+  db.prepare("UPDATE calendar_events SET created_at = datetime(?, '+1 day') WHERE id = ?").run(cutoff, fresh);
+  db.prepare("UPDATE calendar_events SET created_at = '2020-01-01 00:00:00' WHERE id = ?").run(old);
+  const chosen = () => db.prepare("SELECT value FROM sync_config WHERE key = 'caldav_legacy_color_heal_chosen'").get()?.value;
+  try {
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%'").run();
+    assert.equal((await call('PUT', `/${fresh}`, { body: { color: '#3CA368' } })).status, 200);
+    assert.equal(chosen(), undefined, 'eine Zeile nach dem Fix kommt nicht auf die Liste');
+
+    assert.equal((await call('PUT', `/${old}`, { body: { color: '#3CA368' } })).status, 200);
+    assert.deepEqual(JSON.parse(chosen()), [old], 'eine Altzeile schon');
+
+    // Stand von vor #1442: die Liste traegt auch juengere Zeilen. Die naechste
+    // Wahl an einer Altzeile raeumt sie mit ab.
+    db.prepare("UPDATE sync_config SET value = ? WHERE key = 'caldav_legacy_color_heal_chosen'")
+      .run(JSON.stringify([old, fresh]));
+    assert.equal((await call('PUT', `/${old}`, { body: { color: '#E24A4A' } })).status, 200);
+    assert.deepEqual(JSON.parse(chosen()), [old]);
+  } finally {
+    db.prepare('DELETE FROM calendar_events WHERE id IN (?, ?)').run(fresh, old);
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%'").run();
+  }
+});
+
+test('Farb-Heilung: der Schnappschuss eines Kontos faellt mit dem Ende seiner Frist, der Fristbeginn bleibt (#1442)', async () => {
+  const id = insertEvent({ title: 'Frist vorbei', external_source: 'caldav', color: '#4A90E2', user_modified: 1 });
+  const ended = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
+  const running = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  const value = (key) => db.prepare('SELECT value FROM sync_config WHERE key = ?').get(key)?.value;
+  db.prepare(`INSERT INTO sync_config (key, value) VALUES
+      ('caldav_legacy_color_heal_since_72', ?), ('caldav_legacy_color_heal_snapshot_72', ?),
+      ('caldav_legacy_color_heal_since_73', 'never'), ('caldav_legacy_color_heal_snapshot_73', ?),
+      ('caldav_legacy_color_heal_since_74', ?), ('caldav_legacy_color_heal_snapshot_74', ?)`)
+    .run(ended, JSON.stringify({ [id]: '#4a90e2', 1: '#4a90e2' }), JSON.stringify({ 1: '#4a90e2' }),
+      running, JSON.stringify({ [id]: '#4a90e2', 1: '#4a90e2' }));
+  try {
+    assert.equal((await call('PUT', `/${id}`, { body: { color: '#3CA368' } })).status, 200);
+    assert.equal(value('caldav_legacy_color_heal_snapshot_72'), undefined, 'Frist abgelaufen');
+    assert.equal(value('caldav_legacy_color_heal_snapshot_73'), undefined, 'Heilung aus');
+    assert.deepEqual(JSON.parse(value('caldav_legacy_color_heal_snapshot_74')), { 1: '#4a90e2' }, 'laufende Frist');
+    // Ohne den Fristbeginn finge die Frist mit dem naechsten Lauf neu an.
+    assert.equal(value('caldav_legacy_color_heal_since_72'), ended);
+    assert.equal(value('caldav_legacy_color_heal_since_73'), 'never');
+    assert.equal(value('caldav_legacy_color_heal_since_74'), running);
   } finally {
     db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
     db.prepare("DELETE FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%'").run();

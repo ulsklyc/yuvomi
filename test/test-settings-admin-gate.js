@@ -73,7 +73,9 @@ function collectMounts() {
   const index = read('server/index.js');
   const imports = importMap(index);
   const top = [];
-  for (const m of index.matchAll(/app\.use\('(\/api\/v1\/[^']+)',\s*(\w+)\)/g)) {
+  // Middleware vor dem Router (etwa `trackAdmittedWrite` vor dem auth-Router,
+  // #1441) darf dazwischenstehen: gezaehlt wird der letzte Name.
+  for (const m of index.matchAll(/app\.use\('(\/api\/v1\/[^']+)',\s*(?:\w+\s*,\s*)*(\w+)\)/g)) {
     const file = imports.get(m[2]);
     if (file) top.push({ prefix: m[1].replace('/api/v1', ''), file: file.replace(/^\.\//, 'server/') });
   }
