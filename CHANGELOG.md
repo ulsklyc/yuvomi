@@ -731,6 +731,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The family card no longer misses an evening appointment on a busy day** (#1449). The card took
+  its appointments from the calendar tile, which stops at five coming ones and follows its "Only
+  mine" option: a child's evening appointment could be cut off, and with "Only mine" every other
+  member read as free. The card now loads each member's appointments of the day on its own, ignores
+  "Only mine", and switches to the next appointment or to "Done for today" when one ends, without a
+  reload.
+
+- **A trip that began yesterday shows on today's overview** (#1457). Appointments were picked by
+  their start, so a trip, a hospital stay or a school camp that started yesterday and runs until
+  tomorrow was missing from the calendar tile, the today sheet, the wall display and the family
+  card, although the week strip showed it. They now appear as today's, marked all-day while they
+  continue and "until 12:00" on the day they end, never with yesterday's start time. The time of an
+  appointment in the today sheet also follows the household's clock instead of the device's.
+
+- **The overview counts housekeeping visits in the household's month** (#1451). Visits and the
+  unpaid amount in the metric tile and the Housekeeping widget went by the UTC month of the check-in:
+  in Berlin a visit on the 1st at 00:30 counted in the previous month, west of UTC a visit on the
+  evening of the last day in the next one. The overview now uses the same month boundaries as the
+  Housekeeping module, so both show the same number.
+
+- **The wall display stays dark after a reload at night** (#1453). Reloading the wall between 22:00
+  and 06:00 with the theme set to Automatic or Light left the dimmed night surface in the light
+  theme until the morning. The wall now forces the dark theme on every check during the night and
+  restores your theme at 06:00; the theme you chose is not changed.
+
+- **The today sheet dates a check-in from an earlier day** (#1452). A household help who checked
+  in yesterday and was never checked out read as "since 08:30" and sat between today's 08:00 and
+  09:00 rows, as if they had arrived this morning. The row now names the date, the same way the
+  metric tile does, and stands at the top with the all-day rows.
+
+- **Birthdays, countdowns and the next cycle start on the overview drop the year** (#1454). They
+  read like the other dates there: the weekday up to six days ahead, then day and month, the year
+  only when it is a different one. When the row already says "Today" or "Tomorrow", the word
+  appears once. The last visit of the household help reads backwards ("Yesterday", "10.09.").
+
+- **Reminders of events and tasks keep their lead on a device in another time zone** (#1522).
+  With a household time zone set, the event dialog and the task dialog read the start or due
+  time in the zone of the device instead of the household's. On a phone or laptop set to another
+  zone, a reminder "1 hour before" was saved hours off, and opening it again showed a different
+  lead or "after the start". Both dialogs now read the time in the household zone, including on
+  the days the clocks change, the same way the server does.
+
+- **The note category hints no longer suggest that notes are private** (#1514). A personal
+  category is only visible to you, but a note filed under it is still visible to every household
+  member, just without that category. The hint next to the category type and the hint in the
+  category manager now say so.
 - **The reminder list for new tasks says why it is empty.** Without a CalDAV reminder list enabled
   for tasks, the section under Settings → Modules → Tasks now explains what a reminder list is and
   that an admin enables it, and admins get a link to Reminder sync. If the lists cannot be loaded,
@@ -752,6 +798,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the new one from the guide or from Settings, Administration, Backup and restore. A restore on
   Node running natively on Windows no longer stops with `EPERM` while writing the restored copy to
   disk; Docker installs were not affected. (#1441)
+- **Confirming a long list of moved events no longer holds up the server** (#1440). When an admin
+  confirmed a page of moved events under Settings > Sync, every picked entry was checked with a
+  query prepared anew for it, and a full page of up to 5,000 ran without a pause, so other requests
+  waited meanwhile. The check now prepares its query once and lets other requests through after
+  every 50 entries. An entry that no longer matches still stops the whole confirmation with nothing
+  written.
+
+- **Recolouring a CalDAV event no longer grows a list that is never emptied** (#1442). Every
+  colour chosen in Yuvomi for an event from a CalDAV calendar was noted so the one-time colour
+  repair from 2.69.0 would leave it alone, and that list only grew; each recolour read and rewrote
+  all of it. Only events from before the colour fix of 2.49.0 are noted now, since the repair never
+  touches newer ones, and an account's repair data is removed once its 30-day window has ended.
 
 - **Saving an event no longer removes the shares on its attachment.** Every save of an event with
   an attachment, even one that only changed the title or the time, removed the shares the owner

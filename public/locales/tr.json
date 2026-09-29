@@ -1124,11 +1124,11 @@
         "removeAction": "{{name}} kategorisini kaldır",
         "createAction": "“{{name}}” oluştur ve ata",
         "scopeLabel": "Kategori türü",
-        "scopeHelp": "Kişisel kategorileri yalnızca siz görebilir ve yönetebilirsiniz. Hane kategorilerini tüm üyeler kullanabilir; kimlerin yönetebileceğini izinler belirler.",
+        "scopeHelp": "Kişisel kategorileri yalnızca siz görebilir ve yönetebilirsiniz. İçlerindeki notlar tüm hane tarafından görülebilir olmaya devam eder. Hane kategorilerini tüm üyeler kullanabilir; kimlerin yönetebileceğini izinler belirler.",
         "moreAction": "{{count}} kategori daha",
         "moreAction_one": "{{count}} kategori daha",
         "moreAction_few": "{{count}} kategori daha",
-        "personalManagementHint": "Kişisel kategorilerinizi burada yönetebilirsiniz. Hane kategorileri not düzenleyicide kullanılmaya devam eder, ancak bunları yönetme izniniz yoktur."
+        "personalManagementHint": "Kişisel kategorilerinizi burada yönetebilirsiniz. Bunları yalnızca siz görürsünüz; içlerindeki notları ise tüm hane görebilir. Hane kategorileri not düzenleyicide kullanılmaya devam eder, ancak bunları yönetme izniniz yoktur."
     },
     "notes": {
         "title": "Notlar",

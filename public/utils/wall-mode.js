@@ -180,21 +180,32 @@ export function syncWallMode(path = location.pathname) {
   const night = active && isWallNight();
   const wasNight = root.hasAttribute('data-wall-night');
 
+  const themeBefore = root.getAttribute('data-theme');
+
   root.toggleAttribute('data-wall-mode', active);
   root.toggleAttribute('data-wall-night', night);
 
-  if (night && !wasNight) {
+  // NACHTS ENTSCHEIDET DER GEWOLLTE ZUSTAND, NICHT DIE ERINNERUNG (#1453).
+  // Hier stand `night && !wasNight` - das Attribut als Gedaechtnis des letzten
+  // Aufrufs. Nach einem Reload in der Nacht hatte theme-init.js es aber schon
+  // gesetzt, und die Router-Init danach das gespeicherte Theme zurueckgestellt
+  // („Automatisch" ohne, „Hell" mit `light`): Nacht und schon Nacht, kein
+  // Zweig, die Wand blieb bis 06:00 hell. Nachts wird deshalb bei JEDEM Aufruf
+  // dunkel erzwungen, und nur der Wechsel zum Tag stellt zurueck.
+  if (night) {
     // Erzwungen, nicht gespeichert: `yuvomi-theme` bleibt, wie der Nutzer es
     // gewaehlt hat.
-    root.setAttribute('data-theme', 'dark');
-  } else if (!night && wasNight) {
+    if (themeBefore !== 'dark') root.setAttribute('data-theme', 'dark');
+  } else if (wasNight) {
     restoreUserTheme();
   }
 
   // Die Statusbar der installierten PWA haengt am `data-theme` der Wurzel
   // (router.js: setThemeColor liest es). Ohne dieses Nachziehen stuende ueber
   // der abgedunkelten Nachtflaeche eine helle Leiste.
-  if (night !== wasNight) window.yuvomi?.restoreThemeColor?.();
+  if (night !== wasNight || root.getAttribute('data-theme') !== themeBefore) {
+    window.yuvomi?.restoreThemeColor?.();
+  }
 
   return active;
 }

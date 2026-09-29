@@ -225,6 +225,67 @@ export function wallTimeInstant(value, zone, original = null, offsetMinutes = nu
   return (candidates.find((candidate) => candidate.offsetMinutes === preferred) || candidates[0]).instant;
 }
 
+/** Zonen-Offset (ms, Wanduhr minus UTC) an einem Zeitpunkt. */
+function offsetMsAt(ms, zone) {
+  return wallEpoch(wallTimeValue(ms, zone)) - ms;
+}
+
+/**
+ * Eine Wanduhrzeit der Haushaltszone als Zeitpunkt (ms seit Epoch) - #1522.
+ *
+ * Fuer alles, was von einem gespeicherten Beginn oder einer Faelligkeit auf
+ * einen ZEITPUNKT rechnet: der Erinnerungsvorlauf in Kalender und Aufgaben.
+ * `new Date('2026-09-18T09:00')` liest die Ziffern in der Zone des GERAETS;
+ * gemeint sind sie in der des Haushalts, und `remind_at` ist ein Zeitpunkt.
+ * Auf einem Geraet ausserhalb der Haushaltszone lag jede Erinnerung um den
+ * Zonenabstand daneben.
+ *
+ * Spiegel von `storedToInstantMsPrecise` in server/utils/timezone.js, und an
+ * den Raendern bewusst mit DERSELBEN Antwort, weil der Server Erinnerungen beim
+ * Verschieben eines Termins mit ihr nachfuehrt (#1300): eine Ortszeit, die es
+ * wegen der Umstellung nicht gibt, wird um die Luecke vorgeschoben, von einer
+ * doppelten gilt die, auf die der Fixpunkt fuehrt (siehe `localToUTCPrecise`
+ * dort). `wallTimeInstant` oben ist eine andere Frage: dort waehlt der Mensch
+ * die Seite der Doppelstunde, und eine fehlende Stunde ist ein Eingabefehler.
+ *
+ * Formen wie auf dem Server: ein Wert mit eigener Zone ist schon ein Zeitpunkt,
+ * ein reines Datum beginnt um Mitternacht, fehlende Sekunden sind 0.
+ * Ohne gesetzte Haushaltszone bleibt es beim Browser - dieselbe Regel wie
+ * ueberall in dieser Datei.
+ *
+ * @param {string} value  'YYYY-MM-DD', 'YYYY-MM-DDTHH:MM[:SS]' oder mit Zone
+ * @param {string|null} [timeZone] IANA-Zone; Vorgabe ist die Anzeigezone
+ * @returns {number|null} ms seit Epoch, oder null bei unlesbarem Wert
+ */
+export function wallTimeToInstantMs(value, timeZone = displayTimeZone()) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  if (hasExplicitZone(raw)) {
+    const ms = Date.parse(raw);
+    return Number.isNaN(ms) ? null : ms;
+  }
+  const local = raw.length <= 10 ? `${raw}T00:00:00` : (raw.length === 16 ? `${raw}:00` : raw);
+  if (!isValidTimeZone(timeZone)) {
+    const ms = new Date(local).getTime();
+    return Number.isNaN(ms) ? null : ms;
+  }
+  const naive = wallEpoch(local);
+  if (Number.isNaN(naive)) return null;
+
+  // Zwei-Pass-Fixpunkt wie `localToUTCPrecise`: Offset an der naiven Stelle,
+  // damit korrigieren, den Offset an der korrigierten Stelle erneut ablesen.
+  const o1 = offsetMsAt(naive, timeZone);
+  const guessA = naive - o1;
+  const o2 = offsetMsAt(guessA, timeZone);
+  if (o2 === o1) return guessA;
+  const guessB = naive - o2;
+  if (offsetMsAt(guessB, timeZone) === o2) return guessB;
+  // Kein Fixpunkt: die Ortszeit liegt in der Luecke der Umstellung. Der
+  // spaetere Kandidat ist sie um die Luecke vorgeschoben - unabhaengig vom
+  // Vorzeichen des Offsets (Berlin und New York liegen hier verschieden).
+  return Math.max(guessA, guessB);
+}
+
 /**
  * Der Kalendertag eines Zeitwerts in der Anzeigezone (YYYY-MM-DD).
  * @param {Date|string|number} value

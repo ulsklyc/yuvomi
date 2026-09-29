@@ -1124,11 +1124,11 @@
         "removeAction": "Remove category {{name}}",
         "createAction": "Create and assign “{{name}}”",
         "scopeLabel": "Category type",
-        "scopeHelp": "Only you can see and manage personal categories. Every household member can use household categories; permissions control who can manage them.",
+        "scopeHelp": "Only you can see and manage personal categories. Notes in them stay visible to the whole household. Every household member can use household categories; permissions control who can manage them.",
         "moreAction": "{{count}} more categories",
         "moreAction_one": "{{count}} more category",
         "moreAction_few": "{{count}} more categories",
-        "personalManagementHint": "You can manage your personal categories here. Household categories remain available in the note editor, but you do not have permission to manage them."
+        "personalManagementHint": "You can manage your personal categories here. Only you see them; notes in them are visible to the whole household. Household categories remain available in the note editor, but you do not have permission to manage them."
     },
     "notes": {
         "title": "Board",
