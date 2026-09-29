@@ -1014,13 +1014,17 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
     for (const task of tasks) {
       if (!task.due_date || task.due_date > todayKey) continue;
       const overdue = task.due_date < todayKey;
-      const due = !overdue && task.due_time ? new Date(`${task.due_date}T${task.due_time}`) : null;
-      const dueValid = due && !Number.isNaN(due.getTime());
+      // Faelligkeit ist zonenlose Wanduhrzeit des Haushalts: Stempel, kein Date
+      // (#1534). `new Date(stempel)` las die Ziffern in der Zone des GERAETS,
+      // und `formatTime` rechnete den Zeitpunkt danach in die Haushaltszone -
+      // auf einem Geraet in New York stand an „bis 18:00" in Berlin „bis 00:00".
+      const dueTime = !overdue && task.due_time ? String(task.due_time).slice(0, 5) : null;
+      const dueValid = dueTime && /^\d{2}:\d{2}$/.test(dueTime);
       rows.push({
         kind: 'task',
         objectId: task.id,
-        sortKey: overdue ? '00:00' : dueValid ? `${String(due.getHours()).padStart(2, '0')}:${String(due.getMinutes()).padStart(2, '0')}` : '00:02',
-        timeLabel: overdue ? t('dashboard.overdue') : dueValid ? t('dashboard.todayUntil', { time: formatTime(due) }) : '',
+        sortKey: overdue ? '00:00' : dueValid ? dueTime : '00:02',
+        timeLabel: overdue ? t('dashboard.overdue') : dueValid ? t('dashboard.todayUntil', { time: formatTime(`${task.due_date}T${dueTime}`) }) : '',
         overdue,
         title: task.title,
         // Begonnenes sagt es in der Unterzeile, nicht mit einem weiteren Zeichen

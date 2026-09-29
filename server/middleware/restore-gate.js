@@ -41,14 +41,22 @@ function isRestorePath(pathOnly) {
 
 /**
  * Pfade, deren Antworten die Datenbank brauchen. Statische Dateien gehoeren nicht dazu.
+ * Eine neue Top-Level-Route gehoert hierher oder mit Begruendung in die
+ * Allowlist von test/test-restore-gate-routes.js - die Suite liest den
+ * Router-Stack der App und wird sonst rot (#1531).
  * Ohne Beachtung der Gross- und Kleinschreibung wie Express: `/API/v1/...`
  * erreicht dieselben Router und scheiterte sonst mit 500 statt 503 (#1441).
  */
-function needsDatabase(rawPath) {
+export function needsDatabase(rawPath) {
   const pathOnly = rawPath.toLowerCase();
-  return pathOnly.startsWith('/api/') || pathOnly === '/mcp' || pathOnly.startsWith('/mcp/')
+  // Express 5 nimmt angehaengte Schraegstriche mit (`/openapi.json/`, `/docs//`
+  // erreichen dieselbe Route) - exakte Vergleiche also ohne sie (Review #1537).
+  const bare = pathOnly.replace(/\/+$/, '');
+  return pathOnly.startsWith('/api/') || bare === '/mcp' || pathOnly.startsWith('/mcp/')
     // ICS-Abos lesen Termine, das OpenAPI-Dokument prueft die Sitzung (Review #1431).
-    || pathOnly.startsWith('/feed/') || pathOnly === '/openapi.json';
+    || pathOnly.startsWith('/feed/') || bare === '/openapi.json'
+    // Ausserhalb von production prueft /docs Token und Sitzung (#1531).
+    || bare === '/docs';
 }
 
 function refuse(res, status, error) {
