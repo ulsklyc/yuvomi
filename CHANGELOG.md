@@ -736,8 +736,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own form for 2 to 4 (and 22 to 24), Arabic has a dual for 2 and a separate form from 11 to 99.
   For about 110 counters across the overview, tasks, settings, documents and other modules only the
   singular and the form for 5 and more existed, so "za 2 dní" appeared instead of "za 2 dny" and
-  "خلال 2 أيام" instead of "خلال يومين". Every counter now carries every form its language uses, and
-  a test fails for any new counter that misses one.
+  "خلال 2 أيام" instead of "خلال يومين". Every counter now carries every form its language uses, only
+  in that language, and a test fails for any new counter that misses one.
 
 - **The API documentation page answers "restore in progress" during a restore** (#1531). Outside
   production, `/docs` checks the API token or session, and while a restore had the database closed

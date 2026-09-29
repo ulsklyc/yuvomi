@@ -496,6 +496,10 @@ test('tschechische Fastenanzeige dekliniert zusaetzliche Tage', async () => {
 // Null gebraeuchlich ist). Die Kategorien kommen aus der Laufzeit, nicht aus einer
 // Liste - eine neue Sprache mit `few` ist ab ihrer ersten Datei geprueft.
 //
+// Die Varianten stehen NUR in den Sprachen, die sie waehlen: de.json ist die
+// Rueckfall-Locale von t() und traegt nur one/other, sonst zoege eine Sprache ohne
+// die Variante den deutschen Text (Paritaetsregel: test/i18n-plural-keys.js).
+//
 // Bis #1473 fror FEW_GAPS_LEGACY 110 Luecken ein; die Karte ist leer und
 // entfernt, der Guard ist strikt.
 // ---------------------------------------------------------------------------
@@ -539,7 +543,7 @@ test('zaehlende Schluessel tragen in jeder Sprache jede ganzzahlige Pluralkatego
     }
   }
   assert.deepEqual(fehlt, [], `${fehlt.length} Pluralvarianten fehlen oder sind leer - echte Form je Sprache anlegen`
-    + ' (andere Locales: Basiswert, damit die Schluessel zu de.json passen)');
+    + ' (nur in dieser Sprache - de und die uebrigen Locales tragen sie nicht, siehe test/i18n-plural-keys.js)');
 });
 
 test('t() waehlt in cs, pl, ru, uk und ar die Form fuer 2, 5 und 11 (#1473)', async () => {

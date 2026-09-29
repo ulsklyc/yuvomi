@@ -8,6 +8,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { SETTINGS_DOMAINS, SETTINGS_LEAVES } from '../public/settings/registry.js';
 import { eachRule } from './css-rules.js';
+import { keySetDiff } from './i18n-plural-keys.js';
 import { withoutHtmlComments, withoutBlockComments, withoutCommentsKeepingLines } from './source-text.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r/g, '');
@@ -7246,8 +7247,9 @@ test('phase 7 locale files keep the de reference key set complete', () => {
   for (const file of LOCALES) {
     const data = JSON.parse(readFileSync(new URL(file, LOCALE_DIR), 'utf8'));
     const keys = new Set(flattenLocaleKeys(data));
-    const missing = [...referenceKeys].filter((key) => !keys.has(key));
-    const extra = [...keys].filter((key) => !referenceKeys.has(key));
+    // Zusaetzlich erlaubt: die Pluralvarianten der eigenen Sprache (#1473, Regel
+    // in test/i18n-plural-keys.js) - `_few` in cs.json, nicht in en.json.
+    const { missing, extra } = keySetDiff(referenceKeys, keys, file.replace(/\.json$/, ''));
 
     assert.deepEqual(missing, [], `${file} is missing locale keys`);
     assert.deepEqual(extra, [], `${file} has extra locale keys`);
