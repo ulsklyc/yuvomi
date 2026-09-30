@@ -291,7 +291,7 @@ function readmeGroups(md) {
 function pageGroups(html, lang) {
   const block = dictBlock(html, lang);
   const from = html.indexOf('id="modGrid"');
-  const grid = html.slice(from, html.indexOf('id="modToggle"', from)).replace(/<!--[\s\S]*?-->/g, '');
+  const grid = html.slice(from, html.indexOf('id="modToggle"', from)).replace(/<!--[\s\S]*?-->/g, ' ');
   return grid.split(/data-t="grp_/).slice(1).map((chunk) => ({
     label: stripTags(unescapeJs(dictValue(block, `grp_${chunk.slice(0, chunk.indexOf('"'))}`) || '')),
     names: [...chunk.matchAll(/class="(?:feat-row|mod-card)"[\s\S]*?data-t="(f_[a-z]+_k|m_[a-z]+_t)"/g)]
