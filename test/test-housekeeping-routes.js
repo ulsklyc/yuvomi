@@ -20,6 +20,7 @@ const { default: housekeepingRouter } = await import('../server/routes/housekeep
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
 const { computeHourlyAmount } = await import('../server/services/housekeeping-billing.js');
 const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
+const { householdTimeZone, utcToWall } = await import('../server/utils/timezone.js');
 const db = dbmod.get();
 
 const ADMIN = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')`).run().lastInsertRowid;
@@ -424,9 +425,31 @@ test('setup: Payment-Tasks aktivieren', () => {
   assert.equal(row.value, '1');
 });
 
+// Check-in und Bearbeiten dieses Blocks laufen auf einer festen Uhr: 30.09.
+// um 00:19 in Berlin, einer Zone oestlich von UTC, kurz nach Mitternacht
+// (#1574). `check_in` ist ein Zeitpunkt, und seit #1543 behaelt ein neuer Tag
+// die Uhrzeit des Haushalts - der Besuch am 10.04. um 00:19 steht deshalb als
+// `2025-04-09T22:19Z` in der Tabelle. Auf der echten Uhr war der Test lokal
+// zwischen 00 und 02 Uhr MESZ rot und in der UTC-CI nie; die feste Uhr zeigt
+// den Fall zu jeder Stunde und in jeder Umgebung.
+const PAY_CLOCK = { zone: 'Europe/Berlin', now: '2026-09-29T22:19:00.000Z' };
+
+async function atPayClock(fn) {
+  const prevTz = process.env.TZ;
+  process.env.TZ = PAY_CLOCK.zone;
+  mock.timers.enable({ apis: ['Date'], now: new Date(PAY_CLOCK.now) });
+  try {
+    return await fn();
+  } finally {
+    mock.timers.reset();
+    if (prevTz === undefined) delete process.env.TZ;
+    else process.env.TZ = prevTz;
+  }
+}
+
 let PAY_SESSION_ID;
 let PAYMENT_TASK_ID;
-test('check-in: erzeugt verknüpfte Bezahl-Aufgabe', async () => {
+test('check-in: erzeugt verknüpfte Bezahl-Aufgabe', () => atPayClock(async () => {
   // Der Lifecycle-Besuch von oben wurde gelöscht -> heute wieder buchbar.
   const r = await call('POST', '/work-sessions/check-in', { as: ADM, body: { worker_id: WORKER_ID, daily_rate: 50, extras: 0 } });
   assert.equal(r.status, 201);
@@ -438,7 +461,7 @@ test('check-in: erzeugt verknüpfte Bezahl-Aufgabe', async () => {
   const task = db.prepare('SELECT title, status FROM tasks WHERE id = ?').get(PAYMENT_TASK_ID);
   assert.ok(task.title.includes('Putzhilfe'), 'Aufgabentitel nennt den Worker');
   assert.equal(task.status, 'open');
-});
+}));
 
 test('GET /visits/:id: liefert Besuch inkl. payment_task-Felder', async () => {
   const r = await call('GET', `/visits/${PAY_SESSION_ID}`, { as: ADM });
@@ -449,12 +472,15 @@ test('GET /visits/:id: liefert Besuch inkl. payment_task-Felder', async () => {
   assert.equal(r.body.data.total_amount, 50);
 });
 
-test('PUT /visits/:id: Datum+Betrag aktualisiert Besuch, Aufgabe und Kalender-Event', async () => {
+test('PUT /visits/:id: Datum+Betrag aktualisiert Besuch, Aufgabe und Kalender-Event', () => atPayClock(async () => {
   const r = await call('PUT', `/visits/${PAY_SESSION_ID}`, { as: ADM, body: { date: '2025-04-10', daily_rate: 80 } });
   assert.equal(r.status, 200);
   const session = db.prepare('SELECT daily_rate, check_in FROM housekeeping_work_sessions WHERE id = ?').get(PAY_SESSION_ID);
   assert.equal(session.daily_rate, 80);
-  assert.equal(session.check_in.slice(0, 10), '2025-04-10');
+  // Der Tag des Haushalts, nicht `check_in.slice(0, 10)`: das ist der UTC-Tag
+  // des Zeitpunkts, hier der 09.04.
+  assert.equal(utcToWall(session.check_in, householdTimeZone(db))?.date, '2025-04-10');
+  assert.equal(session.check_in, '2025-04-09T22:19:00.000Z', 'dieselbe Uhrzeit des Haushalts, 00:19');
   // Aufgaben-Zweig von updateVisitLinks: due_date und Betrag in der Beschreibung.
   const task = db.prepare('SELECT due_date, description FROM tasks WHERE id = ?').get(PAYMENT_TASK_ID);
   assert.equal(task.due_date, '2025-04-10');
@@ -462,7 +488,7 @@ test('PUT /visits/:id: Datum+Betrag aktualisiert Besuch, Aufgabe und Kalender-Ev
   // Event-Zweig von updateVisitLinks: start_datetime auf das neue Datum.
   const event = db.prepare('SELECT start_datetime FROM calendar_events WHERE id = (SELECT calendar_event_id FROM housekeeping_work_sessions WHERE id = ?)').get(PAY_SESSION_ID);
   assert.equal(event.start_datetime, '2025-04-10');
-});
+}));
 
 test('POST /visits/:id/pay: markiert verknüpfte Aufgabe als done', async () => {
   const r = await call('POST', `/visits/${PAY_SESSION_ID}/pay`, { as: ADM });
