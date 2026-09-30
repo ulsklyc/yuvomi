@@ -375,7 +375,8 @@
         "optionCalendarBirthdaysHint": "Unchecked, birthdays stay out of this tile - the calendar still shows them.",
         "nutritionNoTarget": "No daily target set yet.",
         "nutritionEntries": "{{count}} entries today",
-        "nutritionEntries_one": "{{count}} entry today"
+        "nutritionEntries_one": "{{count}} entry today",
+        "weatherUnavailable": "Weather currently unavailable"
     },
     "tasks": {
         "manageCategories": "Manage categories",

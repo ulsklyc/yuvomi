@@ -375,7 +375,8 @@
         "optionCalendarBirthdaysHint": "Sans la coche, les anniversaires n'apparaissent pas dans cette carte - le calendrier les garde.",
         "nutritionNoTarget": "Aucun objectif quotidien défini.",
         "nutritionEntries": "{{count}} entrées aujourd’hui",
-        "nutritionEntries_one": "{{count}} entrée aujourd’hui"
+        "nutritionEntries_one": "{{count}} entrée aujourd’hui",
+        "weatherUnavailable": "Météo momentanément indisponible"
     },
     "tasks": {
         "manageCategories": "Gérer les catégories",

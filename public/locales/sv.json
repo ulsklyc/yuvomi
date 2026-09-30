@@ -375,7 +375,8 @@
         "optionCalendarBirthdaysHint": "Utan bock hålls födelsedagar utanför den här rutan - i kalendern står de kvar.",
         "nutritionNoTarget": "Inget dagsmål angivet än.",
         "nutritionEntries": "{{count}} poster idag",
-        "nutritionEntries_one": "{{count}} post idag"
+        "nutritionEntries_one": "{{count}} post idag",
+        "weatherUnavailable": "Vädret är inte tillgängligt just nu"
     },
     "tasks": {
         "manageCategories": "Hantera kategorier",

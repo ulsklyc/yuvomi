@@ -437,7 +437,8 @@ function maybeHintCustomize(container) {
 // hängt an Haushaltskontext und Modul-Schaltern.
 
 // Widget → Modul-Slug für die „Modul deaktiviert?"-Prüfung. Widgets ohne Eintrag
-// (family, weather) sind immer verfügbar. Modulweit, damit Grid-Filter und
+// haengen an keinem Modul; eigene Verfuegbarkeitsregeln (family, countdown,
+// weather) stehen in `isWidgetModuleEnabled`. Modulweit, damit Grid-Filter und
 // Wieder-Einblenden-Leiste dieselbe Sichtbarkeitsregel teilen.
 // `split-expenses` ist kein Widget, sondern eine Kachel der Kennzahlreihe -
 // steht aber hier, weil `isWidgetModuleEnabled()` auch die Kacheln filtert, und
@@ -512,6 +513,44 @@ function setCountdownAvailability(items) {
   countdownAvailable = Array.isArray(items) && visibleCountdowns(items).length > 0;
 }
 
+/* DAS WETTER IST VERFUEGBAR, SOBALD ES EINGERICHTET IST - NICHT ERST, WENN DER
+ * ANBIETER ANTWORTET. Bis v2.70.0 hing die Kachel an der Antwort selbst: ein
+ * Fehlschlag beim Anbieter lieferte `{ data: null }`, der Renderer gab '' zurueck,
+ * und die Kachel verschwand genau so, wie es die Notiz am Countdown beschreibt -
+ * aus dem Raster, aus der Anpassen-Ablage (sie blieb `visible: true`) und mit
+ * ihr aus der Kopfzeile, die ihr Wetter der Kachel ueberlaesst.
+ *
+ * Jetzt zwei Faelle:
+ *   - nicht eingerichtet: die Kachel ist NICHT VERFUEGBAR wie ein abgeschaltetes
+ *     Modul (dieselbe Regel wie Countdown und Familie). Ein Einrichtungshinweis
+ *     waere eine Kachel, die allen Mitgliedern eine Aufgabe zeigt, die nur der
+ *     Admin erledigen kann, und ab Werk im Raster jedes Haushalts ohne Wetter
+ *     stuende. Der Weg dorthin sind die Einstellungen;
+ *   - eingerichtet, aber gescheitert: die Kachel bleibt stehen und sagt ruhig,
+ *     dass es gerade kein Wetter gibt (`renderWeatherUnavailable`).
+ *
+ * Woher „eingerichtet": der Grund, den der Wetter-Proxy selbst nennt
+ * (`reason`). Er kennt die ganze Regel, samt Standort je Mitglied und
+ * unvollstaendiger Einrichtung - `weather_source` aus /preferences beschreibt
+ * nur den Haushalt. Die Praeferenzen sind der Rueckfall fuer den Fall, dass die
+ * Anfrage selbst scheiterte und der Server gar nichts sagen konnte. */
+let weatherAvailable = false;
+
+function weatherAvailableFrom(res, prefs) {
+  if (res?.data) return true;
+  if (res?.reason === 'not_configured') return false;
+  // `upstream_error` und jeder kuenftige Grund: eingerichtet. Im Zweifel bleibt
+  // die Kachel erreichbar - das Gegenteil war der Fehler.
+  if (res?.reason) return true;
+  const household = prefs?.weather_source?.source;
+  const user = prefs?.weather_user;
+  return Boolean((household && household !== 'none') || (user?.lat && user?.lon));
+}
+
+function setWeatherAvailability(res, prefs) {
+  weatherAvailable = weatherAvailableFrom(res, prefs);
+}
+
 // Aus welchem Modul ein Countdown stammt, entscheidet über ihn: wer den
 // Kalender abgeschaltet hat, soll dessen Einträge auch hier nicht sehen. Die
 // Kachel als Ganzes gehört keinem Modul (siehe PERMISSION_WIDGETS), ihre
@@ -554,6 +593,7 @@ function isWidgetModuleEnabled(id) {
   if (id === 'family' && isSoloHousehold()) return false;
   if (id === 'fasting' && !canUseFasting()) return false;
   if (id === 'countdown' && !countdownAvailable) return false;
+  if (id === 'weather' && !weatherAvailable) return false;
   return true;
 }
 
@@ -4500,7 +4540,9 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     meals: () => renderTodayMeals(data.todayMeals ?? [], visibleMealTypes),
     notes: (size) => renderPinnedNotes(data.pinnedNotes ?? [], size, data.notesTotal),
     shopping: () => renderShoppingLists(data.shoppingLists ?? [], data.shoppingOpenCount, data.shoppingOpenLists),
-    weather: () => (weather ? renderWeatherWidget(weather) : ''),
+    // Hier ankommen heisst eingerichtet (`isWidgetModuleEnabled`); fehlt das
+    // Wetter trotzdem, sagt die Kachel es, statt zu verschwinden.
+    weather: () => (weather ? renderWeatherWidget(weather) : renderWeatherUnavailable()),
     clock: () => renderClockWidget(),
     quicklinks: () => renderQuickLinks(data.quicklinks ?? []),
     // Die Kachelreihe braucht als einziges Widget zu wissen, wer sonst noch
@@ -4998,6 +5040,26 @@ function renderWeatherWidget(weather) {
           <span class="weather-widget__glyph">${iconHtml(current.icon, 'weather-widget__icon', 80, descText(current.desc))}</span>
         </div>
         ${forecast.length ? `<div class="weather-forecast">${forecastHtml}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+// Eingerichtet, aber gerade kein Wetter (Anbieter aus, Netz weg). Dieselbe
+// Leerzustand-Grammatik wie die uebrigen Kacheln, aber kein `role="alert"` wie
+// die Fehlerkachel: das hier ist ein Zustand, den der Nutzer nicht verschuldet
+// und nicht beheben muss, und er soll nicht bei jedem Aufbau vorgelesen werden.
+// Der Aktualisieren-Knopf bleibt - er ist der Weg zurueck, und
+// `wireWeatherRefresh` tauscht die Kachel bei Erfolg aus.
+function renderWeatherUnavailable() {
+  return `
+    <div class="widget widget--weather weather-widget weather-widget--unavailable" id="weather-widget">
+      ${widgetHeader('weather', t('dashboard.weather'), null, null, null, 'dashboard')}
+      <button class="weather-widget__refresh" id="weather-refresh-btn" aria-label="${t('dashboard.weatherRefresh')}" title="${t('dashboard.weatherRefreshTitle')}">
+        <i data-lucide="refresh-cw" class="icon-md" aria-hidden="true"></i>
+      </button>
+      <div class="widget__empty">
+        <i data-lucide="cloud-off" class="empty-state__icon" aria-hidden="true"></i>
+        <div>${t('dashboard.weatherUnavailable')}</div>
       </div>
     </div>`;
 }
@@ -5971,7 +6033,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Ein Stand von vorhin darf keine Kachel versprechen: erst nach dem Laden
   // wieder wahr (siehe die Notiz an `countdownAvailable`).
   setCountdownAvailability([]);
+  setWeatherAvailability(null, null);
   let weather      = null;
+  let weatherPrefs = null;
   let weatherAutoLocate = false;
   let widgetConfig = buildDefaultWidgetConfig();
   let savedWidgetConfig = buildDefaultWidgetConfig();
@@ -6023,6 +6087,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
     localizeEventLists(data);
     setCountdownAvailability(data?.countdowns);
     weather      = weatherRes.data ?? null;
+    weatherPrefs = prefsRes.data ?? null;
+    setWeatherAvailability(weatherRes, weatherPrefs);
     weatherAutoLocate = Boolean(prefsRes.data?.weather_user?.auto_locate ?? prefsRes.data?.weather_auto_locate);
     widgetConfig = normalizeDashboardConfigWithExtensions(prefsRes.data?.dashboard_widgets ?? buildDefaultWidgetConfig());
     savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
@@ -6697,7 +6763,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const mastheadSlim = cockpitHtml ? '' : ' dashboard-masthead--slim';
     // Kein Wetter-Echo: die Masthead-Zeile spricht nur, wenn die Wetter-Karte
     // nicht ohnehin im Raster sichtbar ist (Opt-in fürs Wandtablet).
-    const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible);
+    // Eine nicht verfuegbare Karte steht nicht im Raster, spricht also auch
+    // nicht fuer die Zeile.
+    const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
     // Wer hatte den Fokus? Nach dem setHtml gibt es sein Element nicht mehr
     // (siehe focusKeyOf / restoreFocusAfterRebuild).
     const focused = document.activeElement;
@@ -6926,7 +6994,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Anker ist der Datensatz, nicht der Karten-Button: seit dem Masthead-Umzug
   // kann Wetter sichtbar sein (Zeile), ohne dass die Karte samt Refresh-Button
   // im Raster steht - auch die Zeile darf nicht den ganzen Tag alt werden.
-  if (weather) {
+  // Eingerichtet reicht: eine Kachel, die gerade kein Wetter hat, soll es
+  // nachholen, sobald der Anbieter wieder antwortet.
+  if (weatherAvailable) {
     const doAutoRefresh = async () => {
       try {
         await maybeUpdateAutoLocation({
@@ -6937,6 +7007,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         const res = await api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null }));
         if (signal.aborted) return;
         weather = res.data ?? null;
+        setWeatherAvailability(res, weatherPrefs);
         rebuildDashboard(widgetConfig);
       } catch { /* Hintergrund-Timer: bewusst still — der Nutzer hat nichts
                    angestoßen, ein Toast alle 30 Min wäre reiner Lärm. */ }
@@ -7024,7 +7095,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
+export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

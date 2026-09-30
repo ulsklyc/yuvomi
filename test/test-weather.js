@@ -6,7 +6,7 @@ const BASE_ENV_KEYS = ['OPENWEATHER_API_KEY', 'OPENWEATHER_CITY', 'WEATHER_LAT',
 
 // Spin up the weather router with injected cfgGet (DB) + fetchFn (upstream).
 // Returns { baseUrl, close }.
-async function startApp({ env = {}, db = {}, fetchFn, userId } = {}) {
+async function startApp({ env = {}, db = {}, fetchFn, userId, logger } = {}) {
   for (const k of BASE_ENV_KEYS) delete process.env[k];
   Object.assign(process.env, env);
 
@@ -14,6 +14,7 @@ async function startApp({ env = {}, db = {}, fetchFn, userId } = {}) {
   const router = buildRouter({
     cfgGet: (key) => (key in db ? db[key] : null),
     fetchFn,
+    ...(logger ? { logger } : {}),
   });
 
   const app = express();
@@ -76,12 +77,105 @@ async function getJson(baseUrl) {
   return { status: res.status, body: await res.json() };
 }
 
-test('no provider configured → { data: null }', async () => {
+test('no provider configured → { data: null, reason: not_configured }', async () => {
   const { baseUrl, close } = await startApp({});
   try {
     const { status, body } = await getJson(baseUrl);
     assert.equal(status, 200);
-    assert.deepEqual(body, { data: null });
+    assert.deepEqual(body, { data: null, reason: 'not_configured' });
+  } finally { await close(); }
+});
+
+// --------------------------------------------------------
+// Eingerichtet, aber gescheitert: ein eigener Grund und eine Log-Zeile
+// --------------------------------------------------------
+// Vorher war jede leere Antwort `{ data: null }` - der Client konnte "gibt es
+// hier nicht" von "gerade kaputt" nicht unterscheiden und liess die Kachel in
+// beiden Faellen verschwinden, samt ihrem Platz in der Anpassen-Ablage. Und
+// wer als Betreiber nachsah, fand hoechstens eine Zeile ohne Anbieter.
+
+function spyLogger() {
+  const lines = [];
+  const push = (level) => (msg) => lines.push({ level, msg: String(msg) });
+  return { lines, debug: push('debug'), info: push('info'), warn: push('warn'), error: push('error') };
+}
+
+const OM_DB = { weather_provider: 'open-meteo', weather_lat: '51.51', weather_lon: '7.47' };
+
+test('Open-Meteo antwortet mit HTTP 503 → upstream_error, Log nennt Anbieter und Status', async () => {
+  const logger = spyLogger();
+  const { baseUrl, close } = await startApp({
+    db: OM_DB, logger,
+    fetchFn: async () => ({ ok: false, status: 503, json: async () => ({}) }),
+  });
+  try {
+    const { status, body } = await getJson(baseUrl);
+    assert.equal(status, 200);
+    assert.deepEqual(body, { data: null, reason: 'upstream_error' });
+    const warn = logger.lines.filter((l) => l.level === 'warn');
+    assert.equal(warn.length, 1, 'genau eine Zeile');
+    assert.match(warn[0].msg, /Open-Meteo/);
+    assert.match(warn[0].msg, /503/);
+    assert.ok(!/51\.51|7\.47/.test(warn[0].msg), 'keine Koordinaten im Log');
+  } finally { await close(); }
+});
+
+test('Netzfehler (ENOTFOUND) → upstream_error, Log nennt den Fehlercode, nie die URL', async () => {
+  const logger = spyLogger();
+  const { baseUrl, close } = await startApp({
+    env: { OPENWEATHER_API_KEY: 'geheim-123' },
+    db: { weather_provider: 'openweathermap' },
+    logger,
+    fetchFn: async (url) => {
+      const err = new TypeError(`fetch failed for ${url}`);
+      err.cause = { code: 'ENOTFOUND' };
+      throw err;
+    },
+  });
+  try {
+    const { body } = await getJson(baseUrl);
+    assert.deepEqual(body, { data: null, reason: 'upstream_error' });
+    const warn = logger.lines.filter((l) => l.level === 'warn');
+    assert.equal(warn.length, 1);
+    assert.match(warn[0].msg, /openweathermap/);
+    assert.match(warn[0].msg, /ENOTFOUND/);
+    assert.ok(!warn[0].msg.includes('geheim-123'), 'der API-Key steht nicht im Log');
+  } finally { await close(); }
+});
+
+test('ein ausgefallener Anbieter schreibt EINE Zeile je Cache-Periode, nicht eine je Aufruf', async () => {
+  const logger = spyLogger();
+  const { baseUrl, close } = await startApp({
+    db: OM_DB, logger,
+    fetchFn: async () => ({ ok: false, status: 500, json: async () => ({}) }),
+  });
+  try {
+    for (let i = 0; i < 5; i += 1) {
+      const { body } = await getJson(baseUrl);
+      assert.equal(body.reason, 'upstream_error', `Aufruf ${i + 1}: der Grund bleibt`);
+    }
+    assert.equal(logger.lines.filter((l) => l.level === 'warn').length, 1);
+  } finally { await close(); }
+});
+
+test('OpenWeatherMap gewaehlt, aber ohne API-Key → not_configured, und das Log sagt warum', async () => {
+  const logger = spyLogger();
+  const { baseUrl, close } = await startApp({ db: { weather_provider: 'openweathermap' }, logger });
+  try {
+    const { body } = await getJson(baseUrl);
+    assert.deepEqual(body, { data: null, reason: 'not_configured' });
+    const warn = logger.lines.filter((l) => l.level === 'warn');
+    assert.equal(warn.length, 1);
+    assert.match(warn[0].msg, /OPENWEATHER_API_KEY/);
+  } finally { await close(); }
+});
+
+test('gar nichts eingerichtet: kein Log - das ist kein Befund', async () => {
+  const logger = spyLogger();
+  const { baseUrl, close } = await startApp({ logger });
+  try {
+    await getJson(baseUrl);
+    assert.equal(logger.lines.length, 0);
   } finally { await close(); }
 });
 

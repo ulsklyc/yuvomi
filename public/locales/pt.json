@@ -375,7 +375,8 @@
         "optionCalendarBirthdaysHint": "Sem seleção, os aniversários ficam fora deste cartão; no calendário continuam.",
         "nutritionNoTarget": "Ainda sem objetivo diário definido.",
         "nutritionEntries": "{{count}} registos hoje",
-        "nutritionEntries_one": "{{count}} registo hoje"
+        "nutritionEntries_one": "{{count}} registo hoje",
+        "weatherUnavailable": "Clima indisponível no momento"
     },
     "tasks": {
         "manageCategories": "Gerir categorias",

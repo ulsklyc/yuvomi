@@ -465,7 +465,8 @@
         "nutritionEntries": "Dzisiaj {{count}} wpisów",
         "nutritionEntries_one": "Dzisiaj {{count}} wpis",
         "nutritionEntries_few": "Dzisiaj {{count}} wpisy",
-        "nutritionEntries_many": "Dzisiaj {{count}} wpisów"
+        "nutritionEntries_many": "Dzisiaj {{count}} wpisów",
+        "weatherUnavailable": "Pogoda jest obecnie niedostępna"
     },
     "tasks": {
         "manageCategories": "Zarządzaj kategoriami",

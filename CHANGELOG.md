@@ -48,6 +48,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The weather tile no longer vanishes when the weather provider fails.** With weather set up
+  (Open-Meteo or OpenWeatherMap), a failed request to the provider removed the tile from the
+  overview, from the hidden widgets you can add back under Customize, and took the weather line in
+  the header with it. The tile now stays in place and says the weather is currently unavailable,
+  with its refresh button to try again, and picks the weather up on the next automatic refresh.
+  Without any weather set up, the tile is not offered at all, like a switched-off module. The server
+  log now names the provider and the cause of a failed request (HTTP status or error code, or a
+  missing API key), at most once per half hour per cause, and `GET /api/v1/weather` answers
+  `{ data: null, reason }` with `not_configured` or `upstream_error`.
+
 - **Members who may write to the meal plan can now edit and delete recipes somebody else added
   (#1577).** Saving a recipe that another member had created failed with "Not authorized", even
   for an admin, because editing and deleting were tied to whoever created the recipe. Recipes belong

@@ -375,7 +375,8 @@
         "optionCalendarBirthdaysHint": "Nếu bỏ chọn, sinh nhật sẽ không xuất hiện trong thẻ này - trên lịch vẫn còn.",
         "nutritionNoTarget": "Chưa đặt mục tiêu hằng ngày.",
         "nutritionEntries": "{{count}} mục hôm nay",
-        "nutritionEntries_one": "{{count}} mục hôm nay"
+        "nutritionEntries_one": "{{count}} mục hôm nay",
+        "weatherUnavailable": "Hiện không có dữ liệu thời tiết"
     },
     "tasks": {
         "manageCategories": "Quản lý danh mục",

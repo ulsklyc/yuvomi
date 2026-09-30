@@ -375,7 +375,8 @@
         "optionCalendarBirthdaysHint": "チェックを外すと、このタイルに誕生日は表示されません。カレンダーには残ります。",
         "nutritionNoTarget": "1日の目標はまだ設定されていません。",
         "nutritionEntries": "今日の記録 {{count}} 件",
-        "nutritionEntries_one": "今日の記録 {{count}} 件"
+        "nutritionEntries_one": "今日の記録 {{count}} 件",
+        "weatherUnavailable": "現在、天気を取得できません"
     },
     "tasks": {
         "manageCategories": "カテゴリーを管理",

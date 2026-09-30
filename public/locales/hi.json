@@ -375,7 +375,8 @@
         "optionCalendarBirthdaysHint": "बिना निशान के जन्मदिन इस टाइल में नहीं दिखते - कैलेंडर में वे बने रहते हैं।",
         "nutritionNoTarget": "अभी तक कोई दैनिक लक्ष्य नहीं।",
         "nutritionEntries": "आज {{count}} प्रविष्टियाँ",
-        "nutritionEntries_one": "आज {{count}} प्रविष्टि"
+        "nutritionEntries_one": "आज {{count}} प्रविष्टि",
+        "weatherUnavailable": "मौसम अभी उपलब्ध नहीं है"
     },
     "tasks": {
         "manageCategories": "श्रेणियाँ प्रबंधित करें",

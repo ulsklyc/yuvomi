@@ -389,7 +389,8 @@
         "optionCalendarBirthdaysHint": "Tanpa centang, ulang tahun tidak muncul di kartu ini - di kalender tetap ada.",
         "nutritionNoTarget": "Belum ada target harian.",
         "nutritionEntries": "{{count}} catatan hari ini",
-        "nutritionEntries_one": "{{count}} catatan hari ini"
+        "nutritionEntries_one": "{{count}} catatan hari ini",
+        "weatherUnavailable": "Cuaca sedang tidak tersedia"
     },
     "tasks": {
         "manageCategories": "Kelola kategori",

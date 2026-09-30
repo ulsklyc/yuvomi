@@ -711,3 +711,85 @@ test('Raster: ohne Loch schweigt der Hinweis', async () => {
   await page.close();
   assert.ok(!hint, 'Ein Hinweis ohne Loch ist Laerm');
 });
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Wetter: eingerichtet, aber gescheitert, verschwindet nicht (v2.70.0)
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/* Gemeldet produktiv mit Open-Meteo: die Wetterkachel fehlte im Raster, in der
+ * Anpassen-Ablage UND in der Kopfzeile. Der Client machte aus jedem Fehlschlag
+ * `{ data: null }`, der Renderer gab dafuer '' zurueck, und eine Kachel, die
+ * `visible: true` bleibt und nichts zeichnet, ist aus der Oberflaeche heraus
+ * nicht mehr erreichbar. Die Sonde antwortet an Stelle des Anbieters, damit sie
+ * nicht vom Netz abhaengt. */
+function answerWeather(page, reply) {
+  page.__yuvomiRequestInterceptor = (req) => {
+    if (!/\/api\/v1\/weather\?/.test(req.url())) return false;
+    if (reply === 'abort') req.abort('failed');
+    else req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(reply) });
+    return true;
+  };
+}
+
+async function weatherState(page) {
+  return page.evaluate(() => {
+    const tile = document.querySelector('#dashboard-widget-grid [data-widget-id="weather"]');
+    return {
+      tile: !!tile,
+      unavailable: !!tile?.querySelector('.weather-widget--unavailable'),
+      text: tile?.querySelector('.widget__empty')?.textContent.trim() ?? null,
+      refresh: !!tile?.querySelector('#weather-refresh-btn'),
+      chip: !!document.querySelector('[data-widget-show="weather"]'),
+      grid: [...document.querySelectorAll('#dashboard-widget-grid > .widget-wrapper')].map((w) => w.dataset.widgetId),
+    };
+  });
+}
+
+for (const [label, reply] of [
+  ['der Anbieter scheitert (upstream_error)', { data: null, reason: 'upstream_error' }],
+  ['die Anfrage selbst scheitert (Seed hat Wetter eingerichtet)', 'abort'],
+]) {
+  test(`Wetter: ${label} - die Kachel bleibt im Raster und sagt es`, async () => {
+    const page = await openPage(harness, { device: 'desktop' });
+    answerWeather(page, reply);
+    await saveLayout(page, [{ id: 'weather', size: '2x1' }, { id: 'notes', size: '1x1' }]);
+    await gotoRoute(page, '/');
+    const s = await weatherState(page);
+    await page.close();
+
+    assert.ok(s.grid.includes('notes'), `Reichweite: das Raster steht (${s.grid.join(', ')})`);
+    assert.ok(s.tile, `die Wetterkachel fehlt im Raster (${s.grid.join(', ')})`);
+    assert.ok(s.unavailable, 'die Kachel zeigt den Zustand "gerade nicht verfuegbar"');
+    assert.equal(s.text, 'Wetter gerade nicht verfügbar');
+    assert.ok(s.refresh, 'der Aktualisieren-Knopf bleibt als Weg zurueck');
+  });
+}
+
+test('Wetter: ausgeblendet und gescheitert - die Ablage bietet die Kachel weiter an', async () => {
+  const page = await openPage(harness, { device: 'desktop' });
+  answerWeather(page, { data: null, reason: 'upstream_error' });
+  await saveLayout(page, [{ id: 'notes', size: '1x1' }]);
+  await gotoRoute(page, '/');
+  await enterEditMode(page);
+  const s = await weatherState(page);
+  await page.close();
+  assert.ok(s.chip, 'eingerichtetes Wetter bleibt in der Anpassen-Ablage');
+});
+
+test('Wetter: nicht eingerichtet - weder im Raster noch in der Ablage, wie ein abgeschaltetes Modul', async () => {
+  const page = await openPage(harness, { device: 'desktop' });
+  answerWeather(page, { data: null, reason: 'not_configured' });
+  await saveLayout(page, [{ id: 'weather', size: '2x1' }, { id: 'notes', size: '1x1' }]);
+  await gotoRoute(page, '/');
+  const view = await weatherState(page);
+  await saveLayout(page, [{ id: 'notes', size: '1x1' }]);
+  await gotoRoute(page, '/');
+  await enterEditMode(page);
+  const edit = await weatherState(page);
+  await page.close();
+
+  assert.ok(view.grid.includes('notes'), `Reichweite: das Raster steht (${view.grid.join(', ')})`);
+  assert.ok(!view.tile, 'ohne Einrichtung gibt es keine Wetterkachel');
+  assert.ok(edit.grid.length > 0, 'Reichweite: der Bearbeiten-Modus steht');
+  assert.ok(!edit.chip, 'und auch keinen Chip, der eine leere Kachel zurueckholen wuerde');
+});

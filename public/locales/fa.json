@@ -389,7 +389,8 @@
         "optionCalendarBirthdaysHint": "بدون تیک، تولدها در این کارت نمایش داده نمی‌شوند؛ در تقویم همچنان هستند.",
         "nutritionNoTarget": "هنوز هدف روزانه‌ای تعیین نشده است.",
         "nutritionEntries": "{{count}} رکورد امروز",
-        "nutritionEntries_one": "{{count}} رکورد امروز"
+        "nutritionEntries_one": "{{count}} رکورد امروز",
+        "weatherUnavailable": "آب‌وهوا در حال حاضر در دسترس نیست"
     },
     "tasks": {
         "manageCategories": "مدیریت دسته‌ها",

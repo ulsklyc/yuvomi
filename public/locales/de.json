@@ -389,7 +389,8 @@
         "optionCalendarBirthdaysHint": "Ohne Haken bleiben Geburtstage aus dieser Kachel - im Kalender stehen sie weiter.",
         "nutritionNoTarget": "Noch kein Tagesziel gesetzt.",
         "nutritionEntries": "{{count}} Einträge heute",
-        "nutritionEntries_one": "{{count}} Eintrag heute"
+        "nutritionEntries_one": "{{count}} Eintrag heute",
+        "weatherUnavailable": "Wetter gerade nicht verfügbar"
     },
     "tasks": {
         "manageCategories": "Kategorien verwalten",

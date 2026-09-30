@@ -375,7 +375,8 @@
         "optionCalendarBirthdaysHint": "İşaret kaldırılınca doğum günleri bu kartta görünmez, takvimde kalmaya devam eder.",
         "nutritionNoTarget": "Henüz günlük hedef belirlenmedi.",
         "nutritionEntries": "Bugün {{count}} kayıt",
-        "nutritionEntries_one": "Bugün {{count}} kayıt"
+        "nutritionEntries_one": "Bugün {{count}} kayıt",
+        "weatherUnavailable": "Hava durumu şu anda kullanılamıyor"
     },
     "tasks": {
         "manageCategories": "Kategorileri yönet",

@@ -375,7 +375,8 @@
         "optionCalendarBirthdaysHint": "Senza spunta i compleanni restano fuori da questa scheda; nel calendario ci sono ancora.",
         "nutritionNoTarget": "Nessun obiettivo giornaliero impostato.",
         "nutritionEntries": "{{count}} voci oggi",
-        "nutritionEntries_one": "{{count}} voce oggi"
+        "nutritionEntries_one": "{{count}} voce oggi",
+        "weatherUnavailable": "Meteo al momento non disponibile"
     },
     "tasks": {
         "manageCategories": "Gestisci categorie",

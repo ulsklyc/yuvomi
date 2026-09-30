@@ -451,7 +451,8 @@
         "nutritionEntries": "Сегодня {{count}} записей",
         "nutritionEntries_one": "Сегодня {{count}} запись",
         "nutritionEntries_few": "Сегодня {{count}} записи",
-        "nutritionEntries_many": "Сегодня {{count}} записей"
+        "nutritionEntries_many": "Сегодня {{count}} записей",
+        "weatherUnavailable": "Погода сейчас недоступна"
     },
     "tasks": {
         "manageCategories": "Управление категориями",
