@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The mobile tab bar is more glass and lets more of the page show through.** The floating
+  capsule at the bottom of the screen is thinner (66 % instead of 86 % in light, 50 % instead of
+  88 % in dark), blurs and saturates what scrolls beneath it more strongly, and carries a light
+  sheen and a finer bright rim. Tab labels are now in the main text color, so they stay readable
+  over photos and colored cards; the active tab keeps its violet label, filled icon and pill.
+  With reduced transparency or increased contrast turned on, and in browsers without backdrop
+  blur, the capsule stays opaque as before.
+
 ## [2.71.0] - 2026-09-30
 
 ### Added

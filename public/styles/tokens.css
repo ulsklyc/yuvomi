@@ -1582,6 +1582,33 @@
   /* a) Glass-Hintergründe */
   --_glass-bg-elevated: rgba(250, 250, 252, 0.86);
   --glass-bg-elevated:  var(--_glass-bg-elevated);
+  /* a1) Die schwebende Tab-Bar-Kapsel: duenneres Glas als die uebrigen
+   * Chrome-Flaechen (Entscheid von Ulas 2026-10-01: "mehr Glas im Hintergrund,
+   * transparenter"). Vier Werte gehoeren zusammen und sind gemeinsam gemessen:
+   *   --glass-bg-capsule    die Toenung: 0.86 -> 0.66 hell, 0.88 -> 0.50 dunkel.
+   *   --glass-capsule-tone  ein Ton-Filter auf dem Hintergrund, NACH Blur und
+   *                         Saettigung. Hell ist er neutral; dunkel staucht er
+   *                         helle Inhalte unter der Kapsel zum Glas hin, damit
+   *                         Farbe durchscheint, ohne die hellen Zeichen zu
+   *                         ueberstrahlen (Apples dunkles Material macht das
+   *                         ebenso).
+   *   --lg-capsule-saturate die Saettigung, eine Stufe ueber dem uebrigen Glas.
+   *   Labelfarbe            die inaktiven Labels stehen in --color-text-primary
+   *                         (layout.css, `.nav-bottom .nav-item__label`) - mit
+   *                         Tertiaertext war die alte Deckung schon die Grenze.
+   * Gemessen am gerenderten Pixel (390x844, Chromium, dunkelster bzw. hellster
+   * Punkt der Flaeche) gegen den unguenstigsten REALISTISCHEN Grund unter der
+   * Kapsel - Buehne, Karte, Textzeilen, ein mittelgraues Foto, dunkel dazu eine
+   * Akzentflaeche: Label hell >= 11.1:1, dunkel >= 11.2:1; aktives Label auf
+   * der Pille hell >= 4.58:1, dunkel >= 4.6:1 (diese beiden binden); Modul-
+   * Zeichen hell >= 3.3:1, dunkel >= 4.6:1. Wer einen der vier Werte anfasst,
+   * misst alle neu. Ohne backdrop-filter bleibt --glass-bg-elevated (glass.css,
+   * Abschnitt 1); prefers-reduced-transparency und prefers-contrast: more
+   * kippen die Toenung auf --color-surface (Bloecke unten). */
+  --_glass-bg-capsule:   rgba(250, 250, 252, 0.66);
+  --glass-bg-capsule:    var(--_glass-bg-capsule);
+  --_glass-capsule-tone: brightness(1);
+  --glass-capsule-tone:  var(--_glass-capsule-tone);
   --_glass-border:      rgba(255, 255, 255, 0.65);
   --glass-border:       var(--_glass-border);
   --_glass-border-subtle: rgba(255, 255, 255, 0.38);
@@ -1629,6 +1656,12 @@
    * dort der einzige Materialbeweis. */
   --_glass-sheen: rgba(255, 255, 255, 0.35);
   --glass-sheen:  var(--_glass-sheen);
+  /* Lichtfang der Tab-Bar-Kapsel: laeuft von der Oberkante bis knapp unter
+   * die Mitte aus (glass.css, Abschnitt 1). Im Dunkeln bewusst leise - die
+   * Zeichen dort sind hell, und ein kraeftiger Sheen hinter ihnen kostete
+   * genau den Kontrast, den der Ton-Filter oben erkauft. */
+  --_glass-sheen-capsule: rgba(255, 255, 255, 0.40);
+  --glass-sheen-capsule:  var(--_glass-sheen-capsule);
 
   /* d2) Inset-Specular: Oberrand-Sheen für Glass-Elemente (volle inset-Kurzform)
    *
@@ -1660,6 +1693,13 @@
    * 2026-08-09 an beiden Stellen als rohes rgba, eine Zeile unter dem oberen
    * Specular, der den Schalter korrekt las. */
   --glass-inset-bottom-lift:  inset 0 -1px 0 rgba(255, 255, 255, calc(0.04 * var(--glass-inset-strength)));
+  /* Glanzrand der Tab-Bar-Kapsel: Oberkanten-Licht plus eine feine Kante rund
+   * um die Scheibe, die das duennere Glas als Koerper fasst. Am selben Schalter
+   * wie alle Insets; die Staerke je Theme steht in --_glass-capsule-rim-*. */
+  --_glass-capsule-rim-top:  0.60;
+  --_glass-capsule-rim-edge: 0.45;
+  --glass-inset-capsule:      inset 0 1px 0 rgba(255, 255, 255, calc(var(--_glass-capsule-rim-top) * var(--glass-inset-strength))),
+                              inset 0 0 0 0.5px rgba(255, 255, 255, calc(var(--_glass-capsule-rim-edge) * var(--glass-inset-strength)));
   --glass-inset-thumb:        inset 0  1px 0 rgba(255, 255, 255, calc(0.90 * var(--glass-inset-strength))),
                               inset 0 -1px 0 rgba(0, 0, 0, calc(0.08 * var(--glass-inset-strength)));
   --glass-inset-input:        inset 0  1px 2px rgba(0, 0, 0, calc(0.04 * var(--glass-inset-strength)));
@@ -1712,6 +1752,7 @@
   --app-backdrop-secondary-strength: var(--_app-backdrop-secondary-strength);
   --lg-blob-opacity:   0.16;
   --lg-glass-saturate: 200%;    /* Backdrop-Sättigung erhöhter Glass-Flächen */
+  --lg-capsule-saturate: 220%;  /* Tab-Bar-Kapsel: duenneres Glas, sattere Durchsicht (a1) */
   --lg-specular:       0.22;    /* Stärke des Inset-Top-Highlights */
 
   /* i) Maskenstopp — voll deckend. KEIN FARBWERT.
@@ -2131,6 +2172,13 @@
      * die Tab-Bar stand als kuehle Scheibe auf der warmen Buehne. Jetzt die
      * Glas-Fassung der eigenen Surface (#2D2A27-Basis), gleiche Deckung. */
     --_glass-bg-elevated:      rgba(45, 42, 39, 0.88);
+    /* Kapsel (a1 im Light-Block): gleiche Toenung wie oben, duenner; der
+     * Ton-Filter dunkelt statt aufzuhellen, weil die Zeichen hier hell sind. */
+    --_glass-bg-capsule:       rgba(45, 42, 39, 0.50);
+    --_glass-capsule-tone:     contrast(0.65) brightness(0.4);
+    --_glass-sheen-capsule:    rgba(255, 255, 255, 0.07);
+    --_glass-capsule-rim-top:  0.18;
+    --_glass-capsule-rim-edge: 0.10;
     --_glass-border:           rgba(255, 255, 255, 0.12);
     --_sheet-grabber:         var(--glass-border);
     --_glass-border-subtle:    rgba(255, 255, 255, 0.14);
@@ -2349,6 +2397,12 @@
 
     /* Glass — warm statt iOS-Neutralgrau (Media-Block oben) */
     --_glass-bg-elevated:     rgba(45, 42, 39, 0.88);
+    /* Kapsel - Zwilling des prefers-color-scheme-Blocks. */
+    --_glass-bg-capsule:      rgba(45, 42, 39, 0.50);
+    --_glass-capsule-tone:    contrast(0.65) brightness(0.4);
+    --_glass-sheen-capsule:   rgba(255, 255, 255, 0.07);
+    --_glass-capsule-rim-top:  0.18;
+    --_glass-capsule-rim-edge: 0.10;
     --_glass-border:          rgba(255, 255, 255, 0.12);
     --_sheet-grabber:         var(--glass-border);
     --_glass-border-subtle:   rgba(255, 255, 255, 0.14);
@@ -2374,6 +2428,7 @@
 @media (prefers-reduced-transparency: reduce) {
   :root {
     --glass-bg-elevated: var(--color-surface);
+    --glass-bg-capsule:  var(--color-surface);
     --glass-bg-card:     var(--color-surface);
     --glass-bg-card-hover: var(--color-surface-2);
     --glass-border:      var(--color-border);
@@ -2381,6 +2436,7 @@
     --glass-highlight:        transparent;
     --glass-highlight-subtle: transparent;
     --glass-sheen:            transparent;
+    --glass-sheen-capsule:    transparent;
     --glass-tint-strength: 0%;
     --blur-2xs: blur(0px);
     --blur-xs:  blur(0px);
@@ -2411,11 +2467,13 @@
      * #F2F2F7 ist 1,12:1 - unlesbar, ausgerechnet im Modus fuer Menschen, die
      * mehr Kontrast brauchen. */
     --glass-bg-elevated: var(--color-surface);
+    --glass-bg-capsule:  var(--color-surface);
     --glass-border:      var(--color-text-primary);
     --glass-border-subtle: var(--color-text-secondary);
     --glass-highlight:        transparent;
     --glass-highlight-subtle: transparent;
     --glass-sheen:            transparent;
+    --glass-sheen-capsule:    transparent;
     --blur-2xs: blur(0px);
     --blur-xs:  blur(0px);
     --blur-sm:  blur(0px);
