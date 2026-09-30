@@ -1301,7 +1301,7 @@
       ho_title:'The modules <em>talk to each other</em>',
       ho_desc:'This is the part a folder full of separate apps cannot do. What happens in one module shows up where you need it, without anyone re-typing it.',
       ho_1_a:'Meal plan for the week', ho_1_b:'Ingredients on the shopping list',
-      ho_1_d:"One tap sends every ingredient from the week's plan to the shared list, sorted by aisle. Nobody transcribes a recipe into a notes app again.",
+      ho_1_d:'One import sends every ingredient from the week\'s plan to the shared list, sorted by aisle, with the next seven days pre-selected. Nobody transcribes a recipe into a notes app again.',
       ho_2_a:'A chore gets ticked off', ho_2_b:"Points land on your kid's balance",
       ho_2_d:'Any task can carry points. They go to whoever did it - the assignee, or the person picked when it is ticked off - and buy rewards from a catalog you control.',
       ho_3_a:'A receipt gets filed', ho_3_b:'It’s attached to the expense',
@@ -1354,7 +1354,7 @@
       m_notes_t:'Notes', m_notes_d:'Colored Markdown sticky notes for recipes, memos and quick reminders, sorted into personal or household categories, with checklists you tick off by tapping them.',
       m_contacts_t:'Contacts', m_contacts_d:'A shared contact directory with CardDAV sync and vCard import/export.',
       m_cal_t:'Calendar', m_cal_d:'Two-way sync with Google and CalDAV, one-way push to Outlook.com via Microsoft Graph, public ICS subscriptions, recurring events, holiday overlays and per-event visibility.',
-      m_shop_t:'Shopping', m_shop_d:'Collaborative lists grouped by aisle and ordered to match your shop, with swipe gestures and one-tap import from the meal plan.',
+      m_shop_t:'Shopping', m_shop_d:'Collaborative lists grouped by aisle and ordered to match your shop, with swipe gestures and an import from the meal plan.',
       m_bday_t:'Birthdays', m_bday_d:'Birthday tracker with optional name days, automatic annual calendar events, age display and custom reminders.',
       m_house_t:'Housekeeping', m_house_d:'Manage household staff: schedules, check-in/out, daily or hourly billing, chores and supplies.',
       m_inv_t:'Inventory', m_inv_d:'What you own: brand, model, serial number, storage location, purchase price, warranty and condition, with linked receipts and bookings. Off by default; households turn it on.',
@@ -1424,7 +1424,7 @@
       ho_title:'Die Module <em>reden miteinander</em>',
       ho_desc:'Genau das kann ein Ordner voller einzelner Apps nicht. Was in einem Modul passiert, taucht dort auf, wo ihr es braucht, ohne dass es jemand abtippt.',
       ho_1_a:'Mahlzeitenplan für die Woche', ho_1_b:'Zutaten auf der Einkaufsliste',
-      ho_1_d:'Ein Tipp schickt alle Zutaten der Wochenplanung auf die geteilte Liste, nach Gang sortiert. Niemand überträgt mehr ein Rezept in eine Notiz-App.',
+      ho_1_d:'Ein Import schickt alle Zutaten der Wochenplanung nach Gang sortiert auf die geteilte Liste; die nächsten sieben Tage sind schon ausgewählt. Niemand überträgt mehr ein Rezept in eine Notiz-App.',
       ho_2_a:'Eine Aufgabe wird abgehakt', ho_2_b:'Punkte landen auf dem Konto des Kindes',
       ho_2_d:'Jede Aufgabe kann Punkte tragen. Die bekommt, wer sie erledigt hat: die zugewiesene Person oder die beim Abhaken ausgewählte. Eingelöst werden sie gegen Belohnungen aus einem Katalog, den ihr bestimmt.',
       ho_3_a:'Ein Beleg wird abgelegt', ho_3_b:'Er hängt an der Buchung',
@@ -1474,7 +1474,7 @@
       m_notes_t:'Notizen', m_notes_d:'Farbige Markdown-Haftnotizen für Rezepte, Memos und schnelle Erinnerungen, in persönlichen oder Haushalts-Kategorien, mit Checklisten, die man antippt statt zu bearbeiten.',
       m_contacts_t:'Kontakte', m_contacts_d:'Ein geteiltes Kontaktverzeichnis mit CardDAV-Sync und vCard-Import/-Export.',
       m_cal_t:'Kalender', m_cal_d:'Sync in beide Richtungen mit Google und CalDAV, einseitiger Push nach Outlook.com via Microsoft Graph, öffentliche ICS-Abos, wiederkehrende Termine, Feiertags-Overlays und Sichtbarkeit pro Termin.',
-      m_shop_t:'Einkauf', m_shop_d:'Gemeinsame Listen nach Gang gruppiert und passend zum eigenen Laden sortiert, mit Wischgesten und Ein-Tipp-Import aus dem Essensplan.',
+      m_shop_t:'Einkauf', m_shop_d:'Gemeinsame Listen nach Gang gruppiert und passend zum eigenen Laden sortiert, mit Wischgesten und einem Import aus dem Essensplan.',
       m_bday_t:'Geburtstage', m_bday_d:'Geburtstags-Tracker mit optionalen Namenstagen, automatischen jährlichen Kalendereinträgen, Altersanzeige und Erinnerungen.',
       m_house_t:'Haushaltshilfe', m_house_d:'Haushaltspersonal verwalten: Pläne, Ein-/Ausstempeln, Tages- oder Stundenabrechnung, Hausarbeiten und Bedarf.',
       m_inv_t:'Inventar', m_inv_d:'Was ihr besitzt: Marke, Modell, Seriennummer, Lagerort, Kaufpreis, Garantie und Zustand, mit verknüpften Belegen und Buchungen. Standardmäßig aus; Haushalte schalten es ein.',
@@ -1718,7 +1718,7 @@
             <span class="ho-label" data-t="ho_1_b">Ingredients on the shopping list</span>
           </span>
         </div>
-        <p class="ho-note" data-t="ho_1_d">One tap sends every ingredient from the week's plan to the shared list, sorted by aisle. Nobody transcribes a recipe into a notes app again.</p>
+        <p class="ho-note" data-t="ho_1_d">One import sends every ingredient from the week's plan to the shared list, sorted by aisle, with the next seven days pre-selected. Nobody transcribes a recipe into a notes app again.</p>
       </li>
       <li class="ho-row reveal">
         <div class="ho-flow">
@@ -1920,7 +1920,7 @@
           </div>
           <div class="mod-card" style="--m: var(--m-shopping)">
             <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>
-            <h4 data-t="m_shop_t">Shopping</h4><p data-t="m_shop_d">Collaborative lists grouped by aisle and ordered to match your shop, with swipe gestures and one-tap import from the meal plan.</p>
+            <h4 data-t="m_shop_t">Shopping</h4><p data-t="m_shop_d">Collaborative lists grouped by aisle and ordered to match your shop, with swipe gestures and an import from the meal plan.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-pantry)">
             <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14a1 1 0 0 1 1 1v3H4V4a1 1 0 0 1 1-1z"/><path d="M4 7h16v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><line x1="10" y1="12" x2="14" y2="12"/></svg></div>

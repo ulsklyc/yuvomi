@@ -2841,6 +2841,12 @@ test('die Guards aus (15) erkennen den Schaden, gegen den sie gebaut sind', () =
  * `never` ist ein Satz, der nicht zurueckkommen darf.
  */
 const R2_CLAIMS = [
+  // Wochenplan -> Einkaufsliste (Critique 2026-09-30): ein Import-Dialog mit
+  // vorbelegtem Zeitraum, den jemand bestaetigt - kein Tipp. Die Route
+  // week-to-shopping-list hat keinen UI-Aufrufer.
+  { where: 'ho_1_d', says: { en: /^One import sends every ingredient from the week's plan to the shared list, sorted by aisle, with the next seven days pre-selected\./, de: /^Ein Import schickt alle Zutaten der Wochenplanung nach Gang sortiert auf die geteilte Liste; die nächsten sieben Tage sind schon ausgewählt\./ },
+    holds: (s) => /\/import-meal-plan`/.test(s.shoppingPage) && /addLocalDays\(today, 6\)/.test(s.shoppingPage),
+    what: 'Import-Dialog mit vorausgewaehlten sieben Tagen (public/pages/shopping.js openMealPlanImport)' },
   // Vorrat
   { where: 'ho_4_b', says: { en: /^One tap puts it on the shopping list$/, de: /^Ein Tipp setzt es auf die Einkaufsliste$/ },
     holds: (s) => /dataset\.action = 'to-shopping'/.test(s.pantryPage) && /\/import-pantry/.test(s.pantryPage),
@@ -2879,12 +2885,15 @@ const R2_NEVER = [
   /speaks up before one of them/i, /bevor eines davon erreicht ist/,
   /credits? (whoever it was assigned to|the assigned member)/i, /assigned member's account/i,
   /dem zuständigen Mitglied gutgeschrieben/, /landen auf dem Konto der zugewiesenen Person/,
+  /One tap sends every ingredient/i, /Ein Tipp schickt alle Zutaten/,
+  /one-tap import from the meal plan/i, /Ein-Tipp-Import aus dem Essensplan/,
 ];
 
 function r2Sources() {
   const src = (p) => readFileSync(resolve(ROOT, p), 'utf8');
   return {
     pantryPage: src('public/pages/pantry.js'),
+    shoppingPage: src('public/pages/shopping.js'),
     pantryReminders: src('server/services/pantry-reminders.js'),
     rewards: src('server/services/rewards.js'),
     twoFactor: src('server/services/two-factor.js'),
@@ -2935,6 +2944,14 @@ test('der Guard aus (16) erkennt den Schaden, gegen den er gebaut ist', () => {
   assert.ok(hit(f1, /m_rewards_d \(en\) sagt wieder/), f1.join(' | '));
   const oldReadme = { ...real, readmes: { ...real.readmes, 'README.md': real.readmes['README.md'].replace('goes on the list with one tap', 'is already on the list') } };
   assert.ok(hit(r2Findings(html, oldReadme), /README\.md sagt wieder/), 'README-Satz faellt nicht auf');
+  // Die Uebergabe Wochenplan -> Einkauf wird wieder zum Tipp.
+  const oneTap = html.replace("ho_1_d:'One import sends every ingredient", "ho_1_d:'One tap sends every ingredient")
+    .replace('with swipe gestures and an import from the meal plan', 'with swipe gestures and one-tap import from the meal plan');
+  assert.notEqual(oneTap, html, 'Vorbedingung: ho_1_d steht so im Woerterbuch');
+  const f2 = r2Findings(oneTap, real);
+  assert.ok(hit(f2, /ho_1_d \(en\) sagt nicht mehr/) && hit(f2, /ho_1_d \(en\) sagt wieder/) && hit(f2, /m_shop_d \(en\) sagt wieder/), f2.join(' | '));
+  const noImport = { ...real, shoppingPage: real.shoppingPage.replace('addLocalDays(today, 6)', 'addLocalDays(today, 0)') };
+  assert.ok(hit(r2Findings(html, noImport), /ho_1_d \(de\): haengt an Import-Dialog/), 'Import-Guard blind');
   // Der Code verliert, woran die Zusage haengt.
   const lowStock = { ...real, pantryReminders: real.pantryReminders + '\nconst low = item.min_quantity;' };
   assert.ok(hit(r2Findings(html, lowStock), /ho_4_d \(de\): haengt an Erinnerungen nur an Ablaufdaten/), 'Vorrats-Erinnerung blind');
