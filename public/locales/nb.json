@@ -134,7 +134,7 @@
     "health": "Helse",
     "rewards": "Belønninger",
     "pantry": "Spiskammer",
-    "inventory": "Lager",
+    "inventory": "Inventar",
     "schedule": "Planlegging"
   },
   "dashboard": {
@@ -2024,7 +2024,7 @@
       "family": "Familie",
       "dashboard": "Oversikt",
       "search": "Søk",
-      "inventory": "Lager",
+      "inventory": "Inventar",
       "waste": "Avfallshåndtering"
     },
     "ics": {
@@ -3225,13 +3225,13 @@
     "imageHint": "Ett bilde per oppskrift. Det vises i måltidsplanleggeren og på oversiktstilen.",
     "imageTooLarge": "Bildet er fortsatt for stort etter endring av størrelse.",
     "ingredientMatchNone": "Ingen treff",
-    "ingredientMatchOpen": "Koble {{count}} ingredienser til lageret",
-    "ingredientMatchOpen_one": "Koble {{count}} ingrediens til lageret",
-    "ingredientMatchOpen_few": "Koble {{count}} ingredienser til lageret",
-    "ingredientMatchOpen_two": "Koble {{count}} ingredienser til lageret",
-    "ingredientMatchOpen_many": "Koble {{count}} ingredienser til lageret",
-    "ingredientMatchBulkTitle": "Koble ingredienser til lageret",
-    "ingredientMatchBulkHint": "Velg hvilken rad i lageret hver ingrediens tilhører. Yuvomi gjetter ikke – bare det du bekrefter her teller.",
+    "ingredientMatchOpen": "Koble {{count}} ingredienser til inventaret",
+    "ingredientMatchOpen_one": "Koble {{count}} ingrediens til inventaret",
+    "ingredientMatchOpen_few": "Koble {{count}} ingredienser til inventaret",
+    "ingredientMatchOpen_two": "Koble {{count}} ingredienser til inventaret",
+    "ingredientMatchOpen_many": "Koble {{count}} ingredienser til inventaret",
+    "ingredientMatchBulkTitle": "Koble ingredienser til inventaret",
+    "ingredientMatchBulkHint": "Velg hvilken rad i inventaret hver ingrediens tilhører. Yuvomi gjetter ikke – bare det du bekrefter her teller.",
     "ingredientMatchAction": "Koble {{name}} til en hylle i skapet",
     "ingredientMatchTitle": "Koble {{name}}",
     "ingredientMatchLabel": "Hylle i skapet ditt",
@@ -3288,7 +3288,7 @@
     "goNotes": "Notater",
     "goKitchen": "Kjøkken",
     "goHealth": "Helse",
-    "goInventory": "Lager"
+    "goInventory": "Inventar"
   },
   "quickLinks": {
     "manageTitle": "Hurtiglenker",
@@ -3535,7 +3535,7 @@
     "storageGoogleDrive": "Google Drive",
     "budgetFolder": "Kvitteringer",
     "splitExpensesFolder": "Delt utgifter",
-    "inventoryFolder": "Lager",
+    "inventoryFolder": "Inventar",
     "tasksFolder": "Oppgaver",
     "newSubfolder": "Ny undermappe",
     "moveFolder": "Flytt mappe",
@@ -4512,7 +4512,7 @@
         "inactive": "Inaktiv"
       },
       "stock": {
-        "label": "Lager",
+        "label": "Inventar",
         "low": "Påfyll",
         "out": "Tom"
       },
@@ -4520,7 +4520,7 @@
         "name": "Navn",
         "dosageText": "Dosering",
         "form": "Form",
-        "stockQty": "Lager",
+        "stockQty": "Inventar",
         "stockUnit": "Enhet",
         "refillThreshold": "Påfyllingsgrense",
         "note": "Notat",
@@ -4530,7 +4530,7 @@
         "minInterval": "Minimum intervall (timer)",
         "minIntervalHint": "Nedtellingen beregnes fra denne og forrige dose som ble tatt.",
         "prnDose": "Dose per inntak",
-        "prnDoseHint": "Trekkes fra lageret ved hver behovsdose."
+        "prnDoseHint": "Trekkes fra inventaret ved hver behovsdose."
       },
       "schedule": {
         "title": "Planlegging",
@@ -5591,7 +5591,7 @@
     }
   },
   "inventory": {
-    "title": "Lager",
+    "title": "Inventar",
     "searchPlaceholder": "Søk i beholdning",
     "addItem": "Legg til element",
     "namePlaceholder": "f.eks. MacBook Air",
@@ -5675,12 +5675,12 @@
     "metricItemsLabel": "Elementer",
     "metricValueLabel": "Total verdi",
     "metricAttentionLabel": "Trenger oppmerksomhet",
-    "navLabelAttention": "Lager, {{count}} trenger oppmerksomhet",
+    "navLabelAttention": "Inventar, {{count}} trenger oppmerksomhet",
     "warrantyMonthsValue_one": "{{count}} måned",
     "warrantyMonthsValue": "{{count}} måneder",
     "filterGroupLabel": "Filtrer elementer",
     "photoLabel": "Bilde",
-    "backToInventory": "Tilbake til lager",
+    "backToInventory": "Tilbake til Inventar",
     "searchInCategoryPlaceholder": "Søk i {{category}}",
     "removePhoto": "Fjern bilde",
     "trackedDatesLabel": "Spore datoer",
@@ -5705,7 +5705,7 @@
     "warrantyChipExpired": "Garanti utløpt",
     "icsWarrantySummary": "Garanti utløper: {{name}}",
     "icsTrackedDateSummary": "{{label}}: {{name}}",
-    "icsCalendarName": "Yuvomi Lager",
+    "icsCalendarName": "Yuvomi Inventar",
     "removeBookingAction": "Fjern \"{{title}}\"",
     "photoTooLarge": "Bildet er fortsatt for stort etter endring av størrelse.",
     "accountUsernameLabel": "Registrert under",
