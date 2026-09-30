@@ -74,23 +74,14 @@ nav,
     overscroll-behavior-y: contain;
   }
 
-  /* iOS PWA: Home-Indicator-Bereich unter der Nav füllen.
-   * position:fixed ist erforderlich, damit body::after auch dann sichtbar ist,
-   * wenn der App-Shell-Inhalt den Home-Indicator-Bereich nicht erreicht.
-   * Funktioniert nur wenn html KEIN overflow:hidden hat (iOS Safari Bug:
-   * overflow:hidden auf <html> clippt position:fixed-Elemente). */
-  body::after {
-    content: '';
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: env(safe-area-inset-bottom, 0px);
-    background-color: color-mix(in srgb, var(--color-surface) 85%, transparent);
-    /* Derselbe Blur wie die Tab-Bar darueber (glass.css): der Streifen ist
-     * deren Fortsetzung in die Safe-Area, nicht eine eigene Flaeche. */
-    backdrop-filter: var(--blur-md) saturate(180%);
-    -webkit-backdrop-filter: var(--blur-md) saturate(180%);
-    z-index: calc(var(--z-nav) - 1);
-  }
+  /* KEINE EIGENE FLAECHE IM HOME-INDICATOR-BEREICH. Hier stand ein
+   * `body::after` (fixed, bottom: 0, Hoehe der unteren Safe-Area, Surface-Grund
+   * mit Blur), gebaut als Fortsetzung einer DECKENDEN Tab-Leiste in die
+   * Safe-Area. Die Leiste ist seit dem Liquid-Glass-Umbau eine transparente
+   * Zone mit schwebender Kapsel, und seit der Inhalt unter ihr laeuft (#1475)
+   * schnitt der Streifen ihn 34px ueber dem Displayrand ab: in der
+   * installierten App ein dunkler Balken unter der Navigation, der Tipps
+   * schluckte. Die Safe-Area gehoert jetzt der Zone `.nav-bottom` als
+   * padding-bottom, darunter scrollt der Inhalt bis zum Rand.
+   * Guard: test:mobile-chrome (3). */
 }

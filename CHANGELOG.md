@@ -48,6 +48,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **In the installed app on an iPhone, no dark strip sits under the tab bar any more.** Below the
+  floating tab bar, a bar the height of the home indicator area covered the page in the surface
+  colour. It was built to continue an opaque tab bar to the screen edge. Since 2.70.0 the page
+  scrolls on under the tab bar, so the strip cut it off above the edge and took taps meant for the
+  row behind it. The page now runs to the edge of the screen. Only the app added to the home screen
+  was affected, not the browser tab.
+
 - **Members who may write to the meal plan can now edit and delete recipes somebody else added
   (#1577).** Saving a recipe that another member had created failed with "Not authorized", even
   for an admin, because editing and deleting were tied to whoever created the recipe. Recipes belong

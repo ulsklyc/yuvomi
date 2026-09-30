@@ -13233,10 +13233,10 @@ test('the collapsing header is wired once, by the shell', () => {
  * beide verworfen:
  *
  * (a) „Der Blur steht in einem `@supports`-Block." Klingt nach dem Wortlaut der
- *     Regel und ist die falsche Frage. Sechs Flaechen setzen ihn ausserhalb
+ *     Regel und ist die falsche Frage. Fuenf Flaechen setzen ihn ausserhalb
  *     (`.onboarding-overlay`, `.document-viewer__pdf-indicator`,
- *     `.more-backdrop`, `.search-overlay`, `.modal-overlay`, `body::after` in
- *     pwa.css) und KEINE davon ist ein Verstoss: der
+ *     `.more-backdrop`, `.search-overlay`, `.modal-overlay`) und KEINE davon
+ *     ist ein Verstoss: der
  *     Zugaenglichkeits-Fallback dieser App haengt nicht am Block, sondern am
  *     TOKEN. `--blur-2xs..lg` kippen unter `prefers-reduced-transparency` und
  *     `prefers-contrast: more` selbst auf `blur(0px)` - beide Bloecke stehen in
