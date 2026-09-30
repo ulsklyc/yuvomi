@@ -67,6 +67,7 @@ export const REGION_PRESETS = {
   'fr-FR': { currency: 'EUR', date_format: 'dmy_slash', time_format: '24h' },
   'it-IT': { currency: 'EUR', date_format: 'dmy_slash', time_format: '24h' },
   'sv-SE': { currency: 'SEK', date_format: 'ymd', time_format: '24h' },
+  'nb-NO': { currency: 'NOK', date_format: 'dmy', time_format: '24h' },
   'pl-PL': { currency: 'PLN', date_format: 'dmy', time_format: '24h' },
   'cs-CZ': { currency: 'CZK', date_format: 'dmy', time_format: '24h' },
   'uk-UA': { currency: 'UAH', date_format: 'dmy', time_format: '24h' },
