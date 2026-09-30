@@ -120,6 +120,19 @@ test('der Schluessel ist eindeutig - ein zweiter Ordner kann ihn nicht bekommen'
   );
 });
 
+/**
+ * Sprachen, die es beim Lauf von v157 noch nicht gab. Ihr Bestandsordner kann
+ * nur unter ihrem Namen existieren, wenn die Sprache vorher schon auswaehlbar
+ * war - ein Ordner, den sie seitdem anlegt, entsteht ueber ensureModuleFolder
+ * gleich mit Schluessel. Die Namensliste einer ausgelieferten Migration waechst
+ * nicht nach (MIGRATIONS ist append-only), also nimmt der Reichweiten-Nachweis
+ * diese Namen aus. Jede Ausnahme muss einen Namen treffen, den die Migration
+ * wirklich nicht findet - sonst ist sie ueberfluessig und faellt auf.
+ */
+const LOCALES_AFTER_V157 = {
+  'pt-BR.json': 'pt-BR kam mit #1437 dazu; sein "Comprovantes" gab es als Bestandsordner nie',
+};
+
 test('die Namensliste der Migration deckt jede ausgelieferte Uebersetzung ab', () => {
   // Reichweiten-Nachweis. Faellt eine Sprache aus der Liste, bleibt ihr
   // Bestandsordner ungebunden - und der Fehler zeigt sich erst Jahre spaeter
@@ -129,6 +142,7 @@ test('die Namensliste der Migration deckt jede ausgelieferte Uebersetzung ab', (
   assert.ok(locales.length >= 20, `zu wenige Locales gefunden (${locales.length})`);
 
   const ungebunden = [];
+  const nachV157 = new Set();
   for (const file of locales) {
     const json = JSON.parse(readFileSync(new URL(`../public/locales/${file}`, import.meta.url), 'utf8'));
     for (const key of MODULE_FOLDER_KEYS) {
@@ -139,13 +153,17 @@ test('die Namensliste der Migration deckt jede ausgelieferte Uebersetzung ab', (
       migration157.up(conn);
       const [row] = rows(conn);
       if (row.module_key !== key) {
-        ungebunden.push(`${file}: ${JSON.stringify(name)} -> ${row.module_key ?? 'nichts'} statt ${key}`);
+        const hit = `${file}: ${JSON.stringify(name)} -> ${row.module_key ?? 'nichts'} statt ${key}`;
+        if (file in LOCALES_AFTER_V157) nachV157.add(file);
+        else ungebunden.push(hit);
       }
       conn.close();
     }
   }
   assert.deepEqual(ungebunden, [],
     `Bestandsordner, die die Migration nicht findet:\n  ${ungebunden.join('\n  ')}`);
+  assert.deepEqual([...nachV157].sort(), Object.keys(LOCALES_AFTER_V157).sort(),
+    'Eine Ausnahme in LOCALES_AFTER_V157 trifft keinen Namen mehr, den die Migration nicht findet.');
 });
 
 // --------------------------------------------------------

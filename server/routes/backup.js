@@ -153,6 +153,18 @@ router.post('/trigger', requireAdmin, async (req, res) => {
 // ─── WebDAV backup target ──────────────────────────────────────────────────────
 
 /**
+ * Neuer Server oder Benutzer ohne neues Passwort - eine fehlende Eingabe, keine
+ * Stoerung. `errorCode` uebersetzt der Client (admin-backup.js).
+ */
+function passwordRequiredResponse(res) {
+  return res.status(400).json({
+    error: 'A new server or username needs the password again.',
+    errorCode: 'password_required',
+    code: 400,
+  });
+}
+
+/**
  * GET /api/v1/backup/webdav/config
  * Returns current WebDAV configuration (password masked).
  */
@@ -182,6 +194,11 @@ router.put('/webdav/config', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'keep must be a positive integer.', code: 400 });
     }
 
+    // Neuer Server oder Benutzer braucht das Passwort neu (passwordRequired).
+    if (webdavBackup.passwordRequired({ url, username, password })) {
+      return passwordRequiredResponse(res);
+    }
+
     webdavBackup.saveConfig({ enabled, url, username, password, remotePath, keep });
     res.json({ data: webdavBackup.getStatus() });
   } catch (err) {
@@ -198,10 +215,14 @@ router.put('/webdav/config', requireAdmin, async (req, res) => {
 router.post('/webdav/test', requireAdmin, async (req, res) => {
   try {
     const { url, username, password, remotePath } = req.body ?? {};
+    // VOR jeder Anfrage: sonst ginge das gespeicherte Passwort an die neue Adresse.
+    if (webdavBackup.passwordRequired({ url, username, password })) {
+      return passwordRequiredResponse(res);
+    }
     const overrides = {};
     if (url)        overrides.url        = url;
     if (username)   overrides.username   = username;
-    if (password && password !== '****') overrides.password = password;
+    if (password && password !== webdavBackup.PASSWORD_MASK) overrides.password = password;
     if (remotePath) overrides.remotePath = remotePath;
 
     const result = await webdavBackup.testConnection(overrides);

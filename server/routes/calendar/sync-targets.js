@@ -18,6 +18,7 @@
 
 import express from 'express';
 import { mayWriteModule } from '../../permissions.js';
+import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 
 import { createLogger } from '../../logger.js';
 import * as googleCalendar from '../../services/google-calendar.js';
@@ -110,8 +111,11 @@ function listOutlookTargets() {
  *
  * Jede Quelle faellt einzeln auf eine leere Liste zurueck: ein abgelaufenes
  * Google-Token darf die CalDAV-Ziele nicht verschlucken (und umgekehrt).
+ *
+ * Die Google-Liste kann das Token erneuern, und der `tokens`-Listener speichert
+ * es nach dem Warten auf Google - deshalb `refuseWhileRestoring` (#1551).
  */
-router.get('/sync-targets', async (req, res) => {
+router.get('/sync-targets', refuseWhileRestoring, async (req, res) => {
   try {
     // Dieselbe Erwaegung wie bei /tasks/sync-targets: die Liste fuellt das
     // Ziel-Feld des Termindialogs und nennt dabei die angebundenen Konten mit

@@ -6,6 +6,9 @@
  * Usage:
  *   node --import dotenv/config scripts/restore-backup.js /path/to/yuvomi-backup.db
  *
+ * Refuses while a Yuvomi server uses the database (#1530): both hold a lock on
+ * `<DB_PATH>.lock`, see server/utils/instance-lock.js.
+ *
  * Backup from ANOTHER installation (#1267): pass that installation's
  * DB_ENCRYPTION_KEY on stdin - never as an argument, where it would show up in
  * the process list and the shell history. The backup is re-encrypted with this
@@ -58,6 +61,11 @@ const resolved = path.resolve(backupPath);
 // dieser eine Fall wird dadurch zurückgestellt, siehe Auto-Init am Ende von
 // db.js; eine gesunde Datenbank öffnet der Import weiter wie bisher.
 globalThis[Symbol.for('yuvomi.db.restoreTarget')] = true;
+// Dieselbe Instanzsperre wie der Server (#1530), fuer den ganzen Lauf: haelt
+// ein laufender Server sie, bricht der Restore ab, bevor er etwas anfasst - er
+// tauschte die Datei sonst unter dessen offener Verbindung aus. Ein Server, der
+// waehrenddessen startet, wartet bis zum Ende dieses Prozesses.
+globalThis[Symbol.for('yuvomi.db.instanceLock')] = 'refuse';
 
 let backupKey = null;
 let exitCode = 1;
@@ -84,7 +92,9 @@ try {
   }
   exitCode = 0;
 } catch (err) {
-  console.error(`Restore failed: ${err?.message || err}`);
+  // Die Meldung der Sperre nennt schon, was zu tun ist (server/utils/instance-lock.js).
+  const refused = err?.code === 'YUVOMI_INSTANCE_LOCKED';
+  console.error(`${refused ? 'Restore refused' : 'Restore failed'}: ${err?.message || err}`);
 } finally {
   // Der Schluessel lebt nur fuer diesen Restore - auch wenn er scheitert.
   backupKey?.fill(0);

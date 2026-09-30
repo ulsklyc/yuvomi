@@ -56,7 +56,7 @@ import { quickLinkHost } from '/utils/quick-link-url.js';
 import { hasIcon } from '/utils/lucide-icons.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { openQuickLinksManager } from '/components/quick-links-manager.js';
-import { attachOverlay } from '/utils/overlay-history.js';
+import { attachOverlay, pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
 import { mealTypeList, primeMealTypeNames } from '/utils/meal-types.js';
 import { recipeThumbHtml, wireRecipeThumbs } from '/utils/recipe-thumb.js';
 import { wireNoteCategoryOverflow } from '/utils/note-category-overflow.js';
@@ -65,6 +65,41 @@ import { nextRewardGoal } from '/utils/reward-goal.js';
 
 // Hält den AbortController des aktuellen FAB-Listeners - wird bei jedem render() erneuert.
 let _fabController = null;
+
+/* DIE WAND HAELT DEN EINEN HISTORY-MARKER (#1559). Zurueck beendete sie nicht:
+ * es gab keinen Eintrag und keinen `popstate`-Handler, in der installierten App
+ * schloss die Geste die App, und beim naechsten Start stand die Wand wieder da.
+ * Sie meldet sich deshalb im Overlay-Register an wie jeder Dialog - derselbe
+ * EINE Marker (utils/overlay-history.js), keine zweite Buchhaltung.
+ *
+ * Angemeldet wird, solange die Flaeche STEHT, nicht beim Einschalten: der Modus
+ * ist gemerkt und steht nach einem Neustart ohne jeden Klick wieder da. Auch
+ * dann fuehrt Zurueck erst aus der Wand auf die Uebersicht und nicht aus der
+ * App. Die Flaeche baut sich oft neu (Timer, Minutentakt, Laden) - der Token
+ * ueberlebt das, und `_wallLeave` zeigt auf den Ausstieg des juengsten Aufbaus.
+ *
+ * `force` (Navigation, Sitzungsende) gibt nur den Marker frei, der Modus BLEIBT
+ * gemerkt: wer per Kurzbefehl woandershin geht, hat die Wand nicht abbestellt.
+ * Sie gilt ohnehin nur auf `/` (isWallRoute). */
+let _wallOverlay = null;
+let _wallLeave = null;
+
+function holdWallMarker(leave) {
+  _wallLeave = leave;
+  if (_wallOverlay !== null && isOverlayOpen(_wallOverlay)) return;
+  _wallOverlay = pushOverlay(({ force }) => {
+    _wallOverlay = null;
+    if (!force) _wallLeave?.();
+  });
+}
+
+function releaseWallMarker() {
+  _wallLeave = null;
+  if (_wallOverlay === null) return;
+  const token = _wallOverlay;
+  _wallOverlay = null;
+  dropOverlay(token);
+}
 
 const noteCategoryName = (category) => String(category?.name || '');
 const noteCategoryScope = (category) => t(
@@ -402,7 +437,8 @@ function maybeHintCustomize(container) {
 // hängt an Haushaltskontext und Modul-Schaltern.
 
 // Widget → Modul-Slug für die „Modul deaktiviert?"-Prüfung. Widgets ohne Eintrag
-// (family, weather) sind immer verfügbar. Modulweit, damit Grid-Filter und
+// haengen an keinem Modul; eigene Verfuegbarkeitsregeln (family, countdown,
+// weather) stehen in `isWidgetModuleEnabled`. Modulweit, damit Grid-Filter und
 // Wieder-Einblenden-Leiste dieselbe Sichtbarkeitsregel teilen.
 // `split-expenses` ist kein Widget, sondern eine Kachel der Kennzahlreihe -
 // steht aber hier, weil `isWidgetModuleEnabled()` auch die Kacheln filtert, und
@@ -477,6 +513,44 @@ function setCountdownAvailability(items) {
   countdownAvailable = Array.isArray(items) && visibleCountdowns(items).length > 0;
 }
 
+/* DAS WETTER IST VERFUEGBAR, SOBALD ES EINGERICHTET IST - NICHT ERST, WENN DER
+ * ANBIETER ANTWORTET. Bis v2.70.0 hing die Kachel an der Antwort selbst: ein
+ * Fehlschlag beim Anbieter lieferte `{ data: null }`, der Renderer gab '' zurueck,
+ * und die Kachel verschwand genau so, wie es die Notiz am Countdown beschreibt -
+ * aus dem Raster, aus der Anpassen-Ablage (sie blieb `visible: true`) und mit
+ * ihr aus der Kopfzeile, die ihr Wetter der Kachel ueberlaesst.
+ *
+ * Jetzt zwei Faelle:
+ *   - nicht eingerichtet: die Kachel ist NICHT VERFUEGBAR wie ein abgeschaltetes
+ *     Modul (dieselbe Regel wie Countdown und Familie). Ein Einrichtungshinweis
+ *     waere eine Kachel, die allen Mitgliedern eine Aufgabe zeigt, die nur der
+ *     Admin erledigen kann, und ab Werk im Raster jedes Haushalts ohne Wetter
+ *     stuende. Der Weg dorthin sind die Einstellungen;
+ *   - eingerichtet, aber gescheitert: die Kachel bleibt stehen und sagt ruhig,
+ *     dass es gerade kein Wetter gibt (`renderWeatherUnavailable`).
+ *
+ * Woher „eingerichtet": der Grund, den der Wetter-Proxy selbst nennt
+ * (`reason`). Er kennt die ganze Regel, samt Standort je Mitglied und
+ * unvollstaendiger Einrichtung - `weather_source` aus /preferences beschreibt
+ * nur den Haushalt. Die Praeferenzen sind der Rueckfall fuer den Fall, dass die
+ * Anfrage selbst scheiterte und der Server gar nichts sagen konnte. */
+let weatherAvailable = false;
+
+function weatherAvailableFrom(res, prefs) {
+  if (res?.data) return true;
+  if (res?.reason === 'not_configured') return false;
+  // `upstream_error` und jeder kuenftige Grund: eingerichtet. Im Zweifel bleibt
+  // die Kachel erreichbar - das Gegenteil war der Fehler.
+  if (res?.reason) return true;
+  const household = prefs?.weather_source?.source;
+  const user = prefs?.weather_user;
+  return Boolean((household && household !== 'none') || (user?.lat && user?.lon));
+}
+
+function setWeatherAvailability(res, prefs) {
+  weatherAvailable = weatherAvailableFrom(res, prefs);
+}
+
 // Aus welchem Modul ein Countdown stammt, entscheidet über ihn: wer den
 // Kalender abgeschaltet hat, soll dessen Einträge auch hier nicht sehen. Die
 // Kachel als Ganzes gehört keinem Modul (siehe PERMISSION_WIDGETS), ihre
@@ -519,6 +593,7 @@ function isWidgetModuleEnabled(id) {
   if (id === 'family' && isSoloHousehold()) return false;
   if (id === 'fasting' && !canUseFasting()) return false;
   if (id === 'countdown' && !countdownAvailable) return false;
+  if (id === 'weather' && !weatherAvailable) return false;
   return true;
 }
 
@@ -1014,13 +1089,17 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
     for (const task of tasks) {
       if (!task.due_date || task.due_date > todayKey) continue;
       const overdue = task.due_date < todayKey;
-      const due = !overdue && task.due_time ? new Date(`${task.due_date}T${task.due_time}`) : null;
-      const dueValid = due && !Number.isNaN(due.getTime());
+      // Faelligkeit ist zonenlose Wanduhrzeit des Haushalts: Stempel, kein Date
+      // (#1534). `new Date(stempel)` las die Ziffern in der Zone des GERAETS,
+      // und `formatTime` rechnete den Zeitpunkt danach in die Haushaltszone -
+      // auf einem Geraet in New York stand an „bis 18:00" in Berlin „bis 00:00".
+      const dueTime = !overdue && task.due_time ? String(task.due_time).slice(0, 5) : null;
+      const dueValid = dueTime && /^\d{2}:\d{2}$/.test(dueTime);
       rows.push({
         kind: 'task',
         objectId: task.id,
-        sortKey: overdue ? '00:00' : dueValid ? `${String(due.getHours()).padStart(2, '0')}:${String(due.getMinutes()).padStart(2, '0')}` : '00:02',
-        timeLabel: overdue ? t('dashboard.overdue') : dueValid ? t('dashboard.todayUntil', { time: formatTime(due) }) : '',
+        sortKey: overdue ? '00:00' : dueValid ? dueTime : '00:02',
+        timeLabel: overdue ? t('dashboard.overdue') : dueValid ? t('dashboard.todayUntil', { time: formatTime(`${task.due_date}T${dueTime}`) }) : '',
         overdue,
         title: task.title,
         // Begonnenes sagt es in der Unterzeile, nicht mit einem weiteren Zeichen
@@ -4461,7 +4540,9 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     meals: () => renderTodayMeals(data.todayMeals ?? [], visibleMealTypes),
     notes: (size) => renderPinnedNotes(data.pinnedNotes ?? [], size, data.notesTotal),
     shopping: () => renderShoppingLists(data.shoppingLists ?? [], data.shoppingOpenCount, data.shoppingOpenLists),
-    weather: () => (weather ? renderWeatherWidget(weather) : ''),
+    // Hier ankommen heisst eingerichtet (`isWidgetModuleEnabled`); fehlt das
+    // Wetter trotzdem, sagt die Kachel es, statt zu verschwinden.
+    weather: () => (weather ? renderWeatherWidget(weather) : renderWeatherUnavailable()),
     clock: () => renderClockWidget(),
     quicklinks: () => renderQuickLinks(data.quicklinks ?? []),
     // Die Kachelreihe braucht als einziges Widget zu wissen, wer sonst noch
@@ -4963,6 +5044,26 @@ function renderWeatherWidget(weather) {
     </div>`;
 }
 
+// Eingerichtet, aber gerade kein Wetter (Anbieter aus, Netz weg). Dieselbe
+// Leerzustand-Grammatik wie die uebrigen Kacheln, aber kein `role="alert"` wie
+// die Fehlerkachel: das hier ist ein Zustand, den der Nutzer nicht verschuldet
+// und nicht beheben muss, und er soll nicht bei jedem Aufbau vorgelesen werden.
+// Der Aktualisieren-Knopf bleibt - er ist der Weg zurueck, und
+// `wireWeatherRefresh` tauscht die Kachel bei Erfolg aus.
+function renderWeatherUnavailable() {
+  return `
+    <div class="widget widget--weather weather-widget weather-widget--unavailable" id="weather-widget">
+      ${widgetHeader('weather', t('dashboard.weather'), null, null, null, 'dashboard')}
+      <button class="weather-widget__refresh" id="weather-refresh-btn" aria-label="${t('dashboard.weatherRefresh')}" title="${t('dashboard.weatherRefreshTitle')}">
+        <i data-lucide="refresh-cw" class="icon-md" aria-hidden="true"></i>
+      </button>
+      <div class="widget__empty">
+        <i data-lucide="cloud-off" class="empty-state__icon" aria-hidden="true"></i>
+        <div>${t('dashboard.weatherUnavailable')}</div>
+      </div>
+    </div>`;
+}
+
 // --------------------------------------------------------
 // Uhr-Widget (#651)
 // --------------------------------------------------------
@@ -5274,14 +5375,16 @@ function renderWallError() {
 /**
  * Die ganze Flaeche.
  *
- * DER AUSSTIEG IST LEISE DA, NICHT VERSTECKT. Ein sichtbarer Knopf
- * widerspraeche der ruhigen Flaeche, ein unsichtbarer waere eine Falle - also
- * steht er immer im DOM und ist immer per Tastatur erreichbar, traegt aber im
- * Ruhezustand nur sein Zeichen. Jede Beruehrung hebt ihn fuer ein paar Sekunden
- * auf die volle Kapsel samt Beschriftung (`data-wall-awake`, siehe
- * `wireWallSurface`). Seit dem Kuechentimer (#844) ist der Ausstieg nicht mehr
- * das Einzige, was man beruehren kann - dessen Startknoepfe stehen daneben und
- * ruhen genauso leise, aber sichtbar. Damit ein Tipp, der die Wand nur wecken
+ * DER AUSSTIEG IST LEISE DA, NICHT VERSTECKT. Ein voller Knopf widerspraeche
+ * der ruhigen Flaeche, ein unsichtbarer waere eine Falle - also steht er immer
+ * im DOM, immer im Bild (der Fuss klebt an der Unterkante, #1559) und immer mit
+ * seinem Wort, in Sekundaerfarbe ohne Kapsel. Bis #1559 trug er in Ruhe nur
+ * sein Zeichen, und genau daran fand jemand nicht mehr hinaus (D#1494). Jede
+ * Beruehrung hebt ihn fuer ein paar Sekunden auf die volle Kapsel
+ * (`data-wall-awake`, siehe `wireWallSurface`). Seit dem Kuechentimer (#844)
+ * ist der Ausstieg nicht mehr das Einzige, was man beruehren kann - dessen
+ * Startknoepfe stehen daneben und ruhen genauso leise, aber sichtbar. Damit
+ * ein Tipp, der die Wand nur wecken
  * sollte, keinen Timer startet, weckt der erste Zeiger auf eine schlafende
  * Wand dort nur (wall-timer.js).
  */
@@ -5334,7 +5437,8 @@ function renderWallSurface(data, weather, { failed = false, loading = false, upd
 /**
  * Verdrahtet die einzige Interaktion der Flaeche: den Ausstieg.
  *
- * Zwei Wege hinaus, und beide sind derselbe: der Knopf und die Escape-Taste.
+ * Drei Wege hinaus, und alle sind derselbe: der Knopf, die Escape-Taste und
+ * seit #1559 Zurueck (`wireWallExit`).
  * Das Wecken haengt an den Ereignissen, die auch der Screensaver hoert - es
  * verbraucht sie aber nicht, sondern setzt nur ein Attribut.
  */
@@ -5370,6 +5474,7 @@ function wireWallSurface(container, rerender, signal) {
  */
 function wireWallExit(container, rerender, signal) {
   const leave = () => {
+    releaseWallMarker();
     exitWallMode();
     // Der Toast sagt, WO der Weg zurueck liegt - wer versehentlich aussteigt,
     // soll nicht suchen muessen. Der Name kommt aus dem Schluessel des Knopfes
@@ -5393,6 +5498,9 @@ function wireWallExit(container, rerender, signal) {
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') leave();
   }, { signal });
+  // Der dritte Weg hinaus: Zurueck (#1559). Er schliesst die Wand wie ein
+  // Dialog - `handleBackNavigation` ruft `leave`, der Router navigiert nicht.
+  holdWallMarker(leave);
 }
 
 // --------------------------------------------------------
@@ -5899,6 +6007,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
   `);
 
   const rerender = () => render(container, { user, signal: routeSignal });
+  // Steht keine Wand mehr (Ausstieg, Einstellungen), gehoert der Marker nicht
+  // mehr ihr - sonst kostete die naechste Zurueck-Geste einen Tipp ins Leere.
+  if (!wallMode) releaseWallMarker();
 
   // DER TIMER HAENGT NICHT AN DEN DATEN (Review zu #844). Die Wandflaeche wird
   // erst verdrahtet, wenn das Dashboard geladen hat - der Timer aber ist von
@@ -5922,7 +6033,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Ein Stand von vorhin darf keine Kachel versprechen: erst nach dem Laden
   // wieder wahr (siehe die Notiz an `countdownAvailable`).
   setCountdownAvailability([]);
+  setWeatherAvailability(null, null);
   let weather      = null;
+  let weatherPrefs = null;
   let weatherAutoLocate = false;
   let widgetConfig = buildDefaultWidgetConfig();
   let savedWidgetConfig = buildDefaultWidgetConfig();
@@ -5974,6 +6087,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
     localizeEventLists(data);
     setCountdownAvailability(data?.countdowns);
     weather      = weatherRes.data ?? null;
+    weatherPrefs = prefsRes.data ?? null;
+    setWeatherAvailability(weatherRes, weatherPrefs);
     weatherAutoLocate = Boolean(prefsRes.data?.weather_user?.auto_locate ?? prefsRes.data?.weather_auto_locate);
     widgetConfig = normalizeDashboardConfigWithExtensions(prefsRes.data?.dashboard_widgets ?? buildDefaultWidgetConfig());
     savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
@@ -6648,7 +6763,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const mastheadSlim = cockpitHtml ? '' : ' dashboard-masthead--slim';
     // Kein Wetter-Echo: die Masthead-Zeile spricht nur, wenn die Wetter-Karte
     // nicht ohnehin im Raster sichtbar ist (Opt-in fürs Wandtablet).
-    const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible);
+    // Eine nicht verfuegbare Karte steht nicht im Raster, spricht also auch
+    // nicht fuer die Zeile.
+    const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
     // Wer hatte den Fokus? Nach dem setHtml gibt es sein Element nicht mehr
     // (siehe focusKeyOf / restoreFocusAfterRebuild).
     const focused = document.activeElement;
@@ -6698,6 +6815,14 @@ export async function render(container, { user, signal: routeSignal = null } = {
     }, { signal: signal });
     container.querySelector('#dashboard-wall-enter')?.addEventListener('click', () => {
       enterWallMode();
+      // EIN KNOPF OHNE WORT SCHALTET DIE GANZE SHELL AB (#1559, D#1494): wer
+      // ihn aus Neugier antippt, steht ohne Seitenleiste und Tab-Leiste da.
+      // Eine Zeile sagt, was das ist und wie man herauskommt - der Name des
+      // Ausstiegs kommt aus dessen Schluessel, wie beim Gegenstueck
+      // `wallExited`, damit die Wegbeschreibung nicht vom Knopf wegdriftet.
+      window.yuvomi?.showToast(t('dashboard.wallEntered', {
+        action: t('dashboard.wallExit'),
+      }), 'default', 8000);
       rerender();
     }, { signal: signal });
     container.querySelector('#dashboard-customize-btn')?.addEventListener('click', () => {
@@ -6869,7 +6994,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Anker ist der Datensatz, nicht der Karten-Button: seit dem Masthead-Umzug
   // kann Wetter sichtbar sein (Zeile), ohne dass die Karte samt Refresh-Button
   // im Raster steht - auch die Zeile darf nicht den ganzen Tag alt werden.
-  if (weather) {
+  // Eingerichtet reicht: eine Kachel, die gerade kein Wetter hat, soll es
+  // nachholen, sobald der Anbieter wieder antwortet.
+  if (weatherAvailable) {
     const doAutoRefresh = async () => {
       try {
         await maybeUpdateAutoLocation({
@@ -6880,6 +7007,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         const res = await api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null }));
         if (signal.aborted) return;
         weather = res.data ?? null;
+        setWeatherAvailability(res, weatherPrefs);
         rebuildDashboard(widgetConfig);
       } catch { /* Hintergrund-Timer: bewusst still — der Nutzer hat nichts
                    angestoßen, ein Toast alle 30 Min wäre reiner Lärm. */ }
@@ -6967,7 +7095,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
+export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

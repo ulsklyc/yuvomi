@@ -345,7 +345,7 @@ without this repository's private tooling.
 
 - Web Component prefix: `yuvomi-` (one component per file). Not every file in `public/components/` is a Web Component: most are ES modules that export functions, such as `openModal`, `openDetailView` or `renderUserMultiSelect`.
 - All UI text via i18n keys (`t('key')`) - never hardcode text in components. German (`de`) is the reference locale.
-- **Adding a new i18n key:** add it to **all** files in `public/locales/` (24 languages; a
+- **Adding a new i18n key:** add it to **all** files in `public/locales/` (25 languages; a
   non-German value may start as the English text). The JSON files are 4-space indented
   and nested - edit them in place, never reserialize a whole file. A key interpolating a
   numeric `count` needs an `_one` singular variant (`{{count}}` placeholder), otherwise

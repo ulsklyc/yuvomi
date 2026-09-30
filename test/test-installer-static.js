@@ -86,3 +86,127 @@ test('install.html enthält keine alten Hardcode-Tokens mehr', () => {
     assert.ok(!src.includes(needle), `Alter Token "${needle}" noch in install.html vorhanden`);
   }
 });
+
+// ── "Als Naechstes": jedes Ziel ist ein echtes Einstellungsblatt ──────────────
+//
+// Der Link "Module waehlen" zeigte auf /settings/modules/options. Das war bis
+// #1489 ein Blatt und ist seither ein Alt-Pfad, den die App ins Budget-Blatt
+// weiterleitet - wer nach der Installation Module waehlen wollte, landete bei
+// den Budget-Optionen. Nichts hat es bemerkt: die Adresse lebte als Text in
+// install.html, die Wahrheit in public/settings/registry.js, ohne Naht.
+//
+// Die Allowlist kommt aus der Registry selbst (SETTINGS_LEAVES), die Sperrliste
+// aus ihren Weiterleitungen (RENAMED_SETTINGS_SOURCE_PATHS). Ein kuenftiger
+// Umbau der Einstellungen macht diesen Guard rot, nicht die Nutzer ratlos.
+test('die Ziele der naechsten Schritte sind echte Einstellungsblaetter, keine Weiterleitungen', async () => {
+  const { SETTINGS_LEAVES, RENAMED_SETTINGS_SOURCE_PATHS } = await import('../public/settings/registry.js');
+  const src = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
+
+  const leaves = new Set(SETTINGS_LEAVES.map(leaf => leaf.path));
+  const redirects = new Set(RENAMED_SETTINGS_SOURCE_PATHS);
+  assert.ok(leaves.size > 0 && redirects.size > 0, 'Registry liefert keine Pfade - der Import greift nicht');
+
+  // Aus dem Markup gezaehlt, nicht angenommen: jeder verlinkte naechste Schritt.
+  const anchors = [...src.matchAll(/<a\b[^>]*\bid="(next-[\w-]+)"/g)].map(m => m[1]);
+  assert.ok(anchors.length > 0, 'keine next-*-Links im Markup gefunden - der Scanner greift nicht');
+
+  const targets = new Map();
+  for (const [, id, path] of src.matchAll(/\$\('(next-[\w-]+)'\)\.href\s*=\s*`\$\{appUrl\}([^`]*)`/g)) {
+    targets.set(id, path);
+  }
+
+  const problems = [];
+  for (const id of anchors) {
+    if (!targets.has(id)) {
+      problems.push(`${id}: keine lesbare href-Zuweisung (\`\${appUrl}/pfad\`) gefunden`);
+      continue;
+    }
+    const path = targets.get(id).split(/[?#]/)[0];
+    if (redirects.has(path)) problems.push(`${id}: ${path} ist eine Weiterleitung, kein Blatt`);
+    else if (!leaves.has(path)) problems.push(`${id}: ${path} ist kein Blatt aus SETTINGS_LEAVES`);
+  }
+  assert.deepEqual(problems, [], problems.join(' | '));
+});
+
+// ── Pfade in den Hinweisen: "Einstellungen → Bereich → Blatt" gibt es ────────
+//
+// Dieselbe Naht wie oben, nur als Text: vier Hinweise des Wizards nannten nach
+// dem Einstellungs-Umbau (#1489) Pfade, die es nicht mehr gab (#1574) -
+// "Einstellungen → Integrationen", "→ Darstellung", "→ E-Mail (SMTP)",
+// "→ Kalender", ohne den Bereich dazwischen. In jeder Sprache.
+//
+// Die gueltigen Pfade kommen aus der Registry und den App-Locales derselben
+// Sprache: Einstellungen (`nav.settings`), Bereich (SETTINGS_DOMAINS), Blatt
+// (SETTINGS_LEAVES, nur Blaetter DIESES Bereichs). Jeder Pfeil zwischen zwei
+// Woertern muss zu so einem Pfad gehoeren - ein Pfad ohne Bereich, mit einem
+// Blatt aus dem falschen Bereich oder eine Ebene zu tief faellt auf. Nach dem
+// Blatt wird nichts verlangt: im Koreanischen haengt die Partikel direkt dran.
+test('Einstellungs-Pfade in Hinweisen, Fallbacks und README gibt es in der App', async () => {
+  const { SETTINGS_DOMAINS, SETTINGS_LEAVES } = await import('../public/settings/registry.js');
+  const { SUPPORTED_LOCALES } = await import('../tools/installer/i18n-mini.js');
+  const readJson = rel => JSON.parse(readFileSync(new URL(rel, import.meta.url), 'utf8'));
+  const lookup = (obj, key) => key.split('.').reduce((o, k) => o?.[k], obj);
+  // Ein Pfeil ZWISCHEN zwei Woertern; "Yuvomi oeffnen →" am Ende ist keiner.
+  const ARROW = /(?<=\S)\s[→←]\s(?=\S)/g;
+  const hasArrow = text => (text.match(ARROW)?.length ?? 0) > 0;
+
+  function pathProblems(label, text, app) {
+    const settings = lookup(app, 'nav.settings');
+    const problems = [];
+    let paths = 0;
+    for (const arrow of ['→', '←']) {
+      const head = `${settings} ${arrow} `;
+      for (let at = text.indexOf(head); at !== -1; at = text.indexOf(head, at + head.length)) {
+        paths += 1;
+        const rest = text.slice(at + head.length);
+        const hit = SETTINGS_LEAVES.some((leaf) => {
+          const domain = SETTINGS_DOMAINS.find((d) => d.id === leaf.domainId);
+          const tail = `${lookup(app, domain.labelKey)} ${arrow} ${lookup(app, leaf.labelKey)}`;
+          return rest.startsWith(tail) && !rest.slice(tail.length).startsWith(` ${arrow}`);
+        });
+        if (!hit) problems.push(`${label}: "${text.slice(at, at + head.length + 40)}…" ist kein Pfad aus der Registry`);
+      }
+    }
+    const arrows = text.match(ARROW)?.length ?? 0;
+    if (arrows !== paths * 2) {
+      problems.push(`${label}: ${arrows} Pfeile zwischen Woertern, aber ${paths} Pfad(e) "${settings} → Bereich → Blatt"`);
+    }
+    return { problems, paths };
+  }
+
+  const problems = [];
+  const seen = new Map();
+  for (const locale of SUPPORTED_LOCALES) {
+    const app = readJson(`../public/locales/${locale}.json`);
+    const inst = readJson(`../tools/installer/locales/${locale}.json`);
+    const walk = (obj, prefix) => {
+      for (const [k, v] of Object.entries(obj)) {
+        const key = prefix ? `${prefix}.${k}` : k;
+        if (v && typeof v === 'object') { walk(v, key); continue; }
+        if (typeof v !== 'string' || !hasArrow(v)) continue;
+        const result = pathProblems(`${locale} ${key}`, v, app);
+        problems.push(...result.problems);
+        if (result.paths) seen.set(locale, (seen.get(locale) ?? 0) + 1);
+      }
+    };
+    walk(inst, '');
+  }
+
+  const en = readJson('../public/locales/en.json');
+  const html = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
+  let htmlPaths = 0;
+  for (const [, key, text] of html.matchAll(/data-i18n="([\w.]+)"[^>]*>([^<]*)</g)) {
+    if (!hasArrow(text)) continue;
+    const result = pathProblems(`install.html ${key}`, text, en);
+    problems.push(...result.problems);
+    htmlPaths += result.paths;
+  }
+  const readme = readFileSync(new URL('../tools/installer/README.md', import.meta.url), 'utf8');
+  const readmeResult = pathProblems('tools/installer/README.md', readme, en);
+  problems.push(...readmeResult.problems);
+
+  // Gezaehlt, nicht angenommen: findet der Scanner nichts, prueft er nichts.
+  assert.equal(seen.size, SUPPORTED_LOCALES.length, `nur ${seen.size} Sprachen mit Pfad gefunden - der Scanner greift nicht`);
+  assert.ok(htmlPaths > 0 && readmeResult.paths > 0, 'keine Pfade in install.html oder README - der Scanner greift nicht');
+  assert.deepEqual(problems, [], problems.join('\n'));
+});

@@ -20,6 +20,7 @@ const { default: housekeepingRouter } = await import('../server/routes/housekeep
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
 const { computeHourlyAmount } = await import('../server/services/housekeeping-billing.js');
 const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
+const { householdTimeZone, utcToWall } = await import('../server/utils/timezone.js');
 const db = dbmod.get();
 
 const ADMIN = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')`).run().lastInsertRowid;
@@ -181,7 +182,10 @@ test('check-in: nach dem Auschecken ist am selben Tag eine zweite Session erlaub
     'SELECT id, check_in, check_out, daily_rate FROM housekeeping_work_sessions WHERE worker_id = ? ORDER BY id',
   ).all(WORKER_ID);
   assert.equal(rows.length, 2, 'zwei Sessions am selben Tag');
-  assert.equal(rows[0].check_in.slice(0, 10), rows[1].check_in.slice(0, 10), 'derselbe Tag');
+  // Der Tag des Haushalts, nicht `check_in.slice(0, 10)` (der UTC-Tag): die
+  // Route rechnet "heute" in der Haushaltszone (`localDayContext`).
+  const householdDay = (iso) => utcToWall(iso, householdTimeZone(db))?.date;
+  assert.equal(householdDay(rows[0].check_in), householdDay(rows[1].check_in), 'derselbe Tag');
   assert.ok(rows[0].check_out, 'die erste ist abgeschlossen');
   assert.equal(rows[1].check_out, null, 'die zweite ist offen');
   assert.equal(rows[0].daily_rate, 50, 'die erste behaelt ihren eigenen Satz');
@@ -424,9 +428,31 @@ test('setup: Payment-Tasks aktivieren', () => {
   assert.equal(row.value, '1');
 });
 
+// Check-in und Bearbeiten dieses Blocks laufen auf einer festen Uhr: 30.09.
+// um 00:19 in Berlin, einer Zone oestlich von UTC, kurz nach Mitternacht
+// (#1574). `check_in` ist ein Zeitpunkt, und seit #1543 behaelt ein neuer Tag
+// die Uhrzeit des Haushalts - der Besuch am 10.04. um 00:19 steht deshalb als
+// `2025-04-09T22:19Z` in der Tabelle. Auf der echten Uhr war der Test lokal
+// zwischen 00 und 02 Uhr MESZ rot und in der UTC-CI nie; die feste Uhr zeigt
+// den Fall zu jeder Stunde und in jeder Umgebung.
+const PAY_CLOCK = { zone: 'Europe/Berlin', now: '2026-09-29T22:19:00.000Z' };
+
+async function atPayClock(fn) {
+  const prevTz = process.env.TZ;
+  process.env.TZ = PAY_CLOCK.zone;
+  mock.timers.enable({ apis: ['Date'], now: new Date(PAY_CLOCK.now) });
+  try {
+    return await fn();
+  } finally {
+    mock.timers.reset();
+    if (prevTz === undefined) delete process.env.TZ;
+    else process.env.TZ = prevTz;
+  }
+}
+
 let PAY_SESSION_ID;
 let PAYMENT_TASK_ID;
-test('check-in: erzeugt verknüpfte Bezahl-Aufgabe', async () => {
+test('check-in: erzeugt verknüpfte Bezahl-Aufgabe', () => atPayClock(async () => {
   // Der Lifecycle-Besuch von oben wurde gelöscht -> heute wieder buchbar.
   const r = await call('POST', '/work-sessions/check-in', { as: ADM, body: { worker_id: WORKER_ID, daily_rate: 50, extras: 0 } });
   assert.equal(r.status, 201);
@@ -438,7 +464,7 @@ test('check-in: erzeugt verknüpfte Bezahl-Aufgabe', async () => {
   const task = db.prepare('SELECT title, status FROM tasks WHERE id = ?').get(PAYMENT_TASK_ID);
   assert.ok(task.title.includes('Putzhilfe'), 'Aufgabentitel nennt den Worker');
   assert.equal(task.status, 'open');
-});
+}));
 
 test('GET /visits/:id: liefert Besuch inkl. payment_task-Felder', async () => {
   const r = await call('GET', `/visits/${PAY_SESSION_ID}`, { as: ADM });
@@ -449,12 +475,15 @@ test('GET /visits/:id: liefert Besuch inkl. payment_task-Felder', async () => {
   assert.equal(r.body.data.total_amount, 50);
 });
 
-test('PUT /visits/:id: Datum+Betrag aktualisiert Besuch, Aufgabe und Kalender-Event', async () => {
+test('PUT /visits/:id: Datum+Betrag aktualisiert Besuch, Aufgabe und Kalender-Event', () => atPayClock(async () => {
   const r = await call('PUT', `/visits/${PAY_SESSION_ID}`, { as: ADM, body: { date: '2025-04-10', daily_rate: 80 } });
   assert.equal(r.status, 200);
   const session = db.prepare('SELECT daily_rate, check_in FROM housekeeping_work_sessions WHERE id = ?').get(PAY_SESSION_ID);
   assert.equal(session.daily_rate, 80);
-  assert.equal(session.check_in.slice(0, 10), '2025-04-10');
+  // Der Tag des Haushalts, nicht `check_in.slice(0, 10)`: das ist der UTC-Tag
+  // des Zeitpunkts, hier der 09.04.
+  assert.equal(utcToWall(session.check_in, householdTimeZone(db))?.date, '2025-04-10');
+  assert.equal(session.check_in, '2025-04-09T22:19:00.000Z', 'dieselbe Uhrzeit des Haushalts, 00:19');
   // Aufgaben-Zweig von updateVisitLinks: due_date und Betrag in der Beschreibung.
   const task = db.prepare('SELECT due_date, description FROM tasks WHERE id = ?').get(PAYMENT_TASK_ID);
   assert.equal(task.due_date, '2025-04-10');
@@ -462,7 +491,7 @@ test('PUT /visits/:id: Datum+Betrag aktualisiert Besuch, Aufgabe und Kalender-Ev
   // Event-Zweig von updateVisitLinks: start_datetime auf das neue Datum.
   const event = db.prepare('SELECT start_datetime FROM calendar_events WHERE id = (SELECT calendar_event_id FROM housekeeping_work_sessions WHERE id = ?)').get(PAY_SESSION_ID);
   assert.equal(event.start_datetime, '2025-04-10');
-});
+}));
 
 test('POST /visits/:id/pay: markiert verknüpfte Aufgabe als done', async () => {
   const r = await call('POST', `/visits/${PAY_SESSION_ID}/pay`, { as: ADM });
@@ -976,7 +1005,14 @@ test('Dringlichkeit: der Faelligkeitstag ist ein Tag des Haushalts (westlich von
 });
 
 // Ein Besuch am 01.10. um 00:30 Berliner Zeit ist in UTC noch der 30.09.
-const OCTOBER_VISIT_AT = '2026-09-30T22:30:00.000Z';
+//
+// Die Monatsgrenze liegt bewusst in einem vergangenen Jahr (#1574): andere
+// Tests dieser Suite checken zur echten Uhr ein und lassen ihre Besuche
+// stehen. Lag die Probe im Oktober 2026, kamen diese Besuche im ganzen Oktober
+// 2026 in dieselben Monatslisten, und die Suite war einen Monat lang rot - auch
+// in der UTC-CI. Ein Monat, den die echte Uhr nie wieder erreicht, bleibt
+// allein mit dem Besuch dieser Tests.
+const OCTOBER_VISIT_AT = '2024-09-30T22:30:00.000Z';
 
 function insertVisitAt(checkIn) {
   return db.prepare(`
@@ -989,20 +1025,18 @@ test('Monatsgrenze: ein Besuch gehoert zum Monat des Haushalts, nicht zum UTC-Mo
   setHouseholdZone('Europe/Berlin');
   const visitId = insertVisitAt(OCTOBER_VISIT_AT);
   try {
-    const october = await call('GET', '/visits?month=2026-10', { as: ADM });
+    const october = await call('GET', '/visits?month=2024-10', { as: ADM });
     assert.equal(october.status, 200);
     assert.deepEqual(october.body.data.visits.map((v) => v.id), [visitId], 'der Besuch steht im Oktober');
     assert.equal(october.body.data.totals.total, 55);
 
-    // Andere Tests dieser Suite checken zur echten Uhr ein, der September kann
-    // also Besuche haben - gefragt wird nur nach diesem einen.
-    const september = await call('GET', '/visits?month=2026-09', { as: ADM });
+    const september = await call('GET', '/visits?month=2024-09', { as: ADM });
     assert.equal(september.body.data.visits.some((v) => v.id === visitId), false, 'und nicht im September');
 
-    const sessions = await call('GET', '/work-sessions?month=2026-10', { as: ADM });
+    const sessions = await call('GET', '/work-sessions?month=2024-10', { as: ADM });
     assert.deepEqual(sessions.body.data.map((v) => v.id), [visitId]);
 
-    const summary = await call('GET', '/summary?month=2026-10', { as: ADM });
+    const summary = await call('GET', '/summary?month=2024-10', { as: ADM });
     assert.equal(summary.body.data.summary.session_count, 1);
     assert.equal(summary.body.data.summary.total_amount, 55);
   } finally {
@@ -1014,23 +1048,23 @@ test('Monatsgrenze: ein Besuch gehoert zum Monat des Haushalts, nicht zum UTC-Mo
 test('Monatsgrenze: ohne ?month= gilt der laufende Monat des Haushalts', async () => {
   setHouseholdZone('Europe/Berlin');
   // 01.10. 01:00 in Berlin, in UTC noch September.
-  const CLOCK = '2026-09-30T23:00:00.000Z';
-  const septemberTotal = (data) => data.monthly_payments.find((row) => row.month === '2026-09')?.total ?? 0;
+  const CLOCK = '2024-09-30T23:00:00.000Z';
+  const septemberTotal = (data) => data.monthly_payments.find((row) => row.month === '2024-09')?.total ?? 0;
   const baseline = await atClock(CLOCK, () => call('GET', '/dashboard', { as: ADM }));
   const visitId = insertVisitAt(OCTOBER_VISIT_AT);
   try {
     await atClock(CLOCK, async () => {
       const visits = await call('GET', '/visits', { as: ADM });
-      assert.equal(visits.body.data.month, '2026-10');
+      assert.equal(visits.body.data.month, '2024-10');
       assert.deepEqual(visits.body.data.visits.map((v) => v.id), [visitId]);
 
       const summary = await call('GET', '/summary', { as: ADM });
-      assert.equal(summary.body.data.summary.month, '2026-10');
+      assert.equal(summary.body.data.summary.month, '2024-10');
       assert.equal(summary.body.data.summary.session_count, 1);
 
       const dashboard = await call('GET', '/dashboard', { as: ADM });
       assert.equal(dashboard.body.data.visits_this_month, 1, 'die Kachel zaehlt den Besuch im Oktober');
-      const chartRow = dashboard.body.data.monthly_payments.find((row) => row.month === '2026-10');
+      const chartRow = dashboard.body.data.monthly_payments.find((row) => row.month === '2024-10');
       assert.equal(chartRow?.total, 55, 'die Monatsgrafik bucht ihn auf den Oktober');
       assert.equal(septemberTotal(dashboard.body.data), septemberTotal(baseline.body.data),
         'und nicht auf den September');
@@ -1048,7 +1082,7 @@ test('Monatsgrenze: eine am Monatsersten frueh erledigte Aufgabe zaehlt im neuen
     VALUES ('Monatsprobe', 'Flur', 30, ?, ?)
   `).run(OCTOBER_VISIT_AT, ADMIN).lastInsertRowid;
   try {
-    const before = await atClock('2026-10-15T10:00:00.000Z', () => call('GET', '/dashboard', { as: ADM }));
+    const before = await atClock('2024-10-15T10:00:00.000Z', () => call('GET', '/dashboard', { as: ADM }));
     assert.equal(before.body.data.finished_tasks_this_month, 1);
   } finally {
     db.prepare('DELETE FROM housekeeping_decay_tasks WHERE id = ?').run(id);
@@ -1186,7 +1220,8 @@ test('Beleg: jeder Serialisierer maskiert die ID - Arbeiter, Status, Dashboard, 
     assert.equal(checkedOut.status, 200);
     assert.deepEqual(receiptOf(checkedOut.body.data), masked, 'Check-out-Antwort');
 
-    const date = checkedOut.body.data.check_in.slice(0, 10);
+    // Der Tag, den das Formular zeigt: der des Haushalts, nicht der UTC-Tag.
+    const date = utcToWall(checkedOut.body.data.check_in, householdTimeZone(db))?.date;
     const edited = await call('PUT', `/visits/${visitId}`, { as: MEM, body: { date, daily_rate: 40, extras: 0 } });
     assert.equal(edited.status, 200);
     assert.deepEqual(receiptOf(edited.body.data), masked, 'PUT-Antwort');
@@ -1366,6 +1401,215 @@ test('ein umgefaerbter gespiegelter Besuch faellt aus dem Schnappschuss der Farb
   } finally {
     db.prepare("DELETE FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%'").run();
   }
+});
+
+// --------------------------------------------------------------------------
+// Besuch bearbeiten: der Tag ist der des HAUSHALTS (#1540)
+// --------------------------------------------------------------------------
+// `check_in` ist ein UTC-Instant. Das Formular zeigte `check_in.slice(0, 10)`,
+// den UTC-Tag, und `updateVisitLinks` legte Termin und Zahlungsaufgabe auf
+// denselben. Ein Besuch am 1. Oktober um 00:30 in Berlin (30.09. 22:30Z) sprang
+// beim Bearbeiten - auch wenn nur der Betrag geaendert wurde - auf den
+// 30. September; wer den Tag im Formular auf den 1. „korrigierte", schob den
+// Besuch selbst auf den 2. um 00:30. Der Tag im Formular ist jetzt der des
+// Haushalts, die Uhrzeit des Besuchs bleibt die des Haushalts.
+
+function seedLinkedVisit(workerId, checkIn, day) {
+  const eventId = db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, all_day, created_by, external_source)
+    VALUES ('Besuch', ?, 1, ?, 'local')
+  `).run(day, ADMIN).lastInsertRowid;
+  const taskId = db.prepare(`
+    INSERT INTO tasks (title, due_date, priority, category, status, created_by)
+    VALUES ('Zahlung', ?, 'medium', 'household', 'open', ?)
+  `).run(day, ADMIN).lastInsertRowid;
+  return db.prepare(`
+    INSERT INTO housekeeping_work_sessions (worker_id, check_in, check_out, daily_rate, extras, calendar_event_id, payment_task_id, created_by)
+    VALUES (?, ?, ?, 40, 0, ?, ?, ?)
+  `).run(workerId, checkIn, checkIn, eventId, taskId, ADMIN).lastInsertRowid;
+}
+
+function visitState(id) {
+  return db.prepare(`
+    SELECT hws.check_in, e.start_datetime AS event_day, t.due_date AS task_day
+    FROM housekeeping_work_sessions hws
+    JOIN calendar_events e ON e.id = hws.calendar_event_id
+    JOIN tasks t ON t.id = hws.payment_task_id
+    WHERE hws.id = ?
+  `).get(id);
+}
+
+async function inHouseholdZone(zone, fn) {
+  const prevTz = process.env.TZ;
+  process.env.TZ = 'America/New_York'; // Server-Prozess bewusst in einer dritten Zone
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('household_timezone', ?)").run(zone);
+  try {
+    await fn();
+  } finally {
+    db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run();
+    if (prevTz === undefined) delete process.env.TZ;
+    else process.env.TZ = prevTz;
+  }
+}
+
+test('#1540 Besuch bearbeiten: nur den Betrag aendern laesst Tag und Uhrzeit des Haushalts stehen', () => inHouseholdZone('Europe/Berlin', async () => {
+  const workerId = await freshWorker('Nachtbesuch');
+  const id = seedLinkedVisit(workerId, '2026-09-30T22:30:00.000Z', '2026-10-01');
+  const r = await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-10-01', daily_rate: 40, extras: 5 } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(visitState(id), { check_in: '2026-09-30T22:30:00.000Z', event_day: '2026-10-01', task_day: '2026-10-01' });
+}));
+
+test('#1540 Besuch bearbeiten: ein neuer Tag behaelt die Uhrzeit des Haushalts, auch ueber die Zeitumstellung', () => inHouseholdZone('Europe/Berlin', async () => {
+  const workerId = await freshWorker('Umzug');
+  const id = seedLinkedVisit(workerId, '2026-09-30T22:30:00.000Z', '2026-10-01');
+  await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-10-05', daily_rate: 40 } });
+  assert.deepEqual(visitState(id), { check_in: '2026-10-04T22:30:00.000Z', event_day: '2026-10-05', task_day: '2026-10-05' });
+  // 26.10. ist nach der Umstellung: 00:30 MEZ ist 23:30Z am Vortag.
+  await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-10-26', daily_rate: 40 } });
+  assert.deepEqual(visitState(id), { check_in: '2026-10-25T23:30:00.000Z', event_day: '2026-10-26', task_day: '2026-10-26' });
+}));
+
+test('#1540 Besuch bearbeiten: Haushalt in UTC - unveraendert', () => inHouseholdZone('UTC', async () => {
+  const workerId = await freshWorker('Nullzone');
+  const id = seedLinkedVisit(workerId, '2026-09-30T22:30:00.000Z', '2026-09-30');
+  await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-09-30', daily_rate: 40, extras: 5 } });
+  assert.deepEqual(visitState(id), { check_in: '2026-09-30T22:30:00.000Z', event_day: '2026-09-30', task_day: '2026-09-30' });
+  await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-10-02', daily_rate: 40 } });
+  assert.deepEqual(visitState(id), { check_in: '2026-10-02T22:30:00.000Z', event_day: '2026-10-02', task_day: '2026-10-02' });
+}));
+
+test('#1540 ohne eingestellte Haushaltszone: der Tag, den das Formular zeigte, entscheidet (Review)', async () => {
+  // Ohne `household_timezone` liest die Oberflaeche die Zone des BROWSERS, der
+  // Server `TZ` bzw. die Systemzone - im Container meist UTC. Ein Besuch um
+  // 00:30 in Berlin steht im Formular am 1., auf der Server-Uhr am 30.09.
+  // Verglich der Server den eingereichten Tag mit SEINEM, hielt er ein reines
+  // Betragsupdate fuer einen neuen Tag und schob den Besuch um 24 Stunden.
+  // Das Formular schickt deshalb den Tag mit, den es vorbelegt hat.
+  const prevTz = process.env.TZ;
+  process.env.TZ = 'UTC';
+  db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run();
+  try {
+    const workerId = await freshWorker('Ohnezone');
+    const id = seedLinkedVisit(workerId, '2026-09-30T22:30:00.000Z', '2026-10-01');
+    await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-10-01', original_date: '2026-10-01', daily_rate: 40, extras: 5 } });
+    assert.deepEqual(visitState(id), { check_in: '2026-09-30T22:30:00.000Z', event_day: '2026-10-01', task_day: '2026-10-01' },
+      'nur der Betrag geaendert: der Besuch bleibt, wo er war');
+    await call('PUT', `/visits/${id}`, { as: ADM, body: { date: '2026-10-05', original_date: '2026-10-01', daily_rate: 40 } });
+    assert.deepEqual(visitState(id), { check_in: '2026-10-04T22:30:00.000Z', event_day: '2026-10-05', task_day: '2026-10-05' },
+      'vier Tage spaeter, dieselbe Uhrzeit');
+  } finally {
+    if (prevTz === undefined) delete process.env.TZ;
+    else process.env.TZ = prevTz;
+  }
+});
+
+// --------------------------------------------------------------------------
+// "Heute" der Haushaltshilfe ist der Tag des HAUSHALTS (#1556)
+// --------------------------------------------------------------------------
+// Check-in und Tagesabfrage lasen `local_date` und `timezone_offset_minutes`
+// von der Uhr des GERAETS und fielen ohne sie auf die Zone des Server-Prozesses
+// zurueck. Ein Geraet in New York legte den Check-in um 00:30 in Berlin auf den
+// Vortag und zeigte den Besuch von gestern Abend als heutigen. Und selbst ein
+// Geraet im Haushalt rechnete den GANZEN Tag mit dem Offset von JETZT: an den
+// Umstelltagen verschob das die Tagesgrenze um eine Stunde.
+
+async function atHouseholdClock({ zone, processTz, now }, fn) {
+  const prevTz = process.env.TZ;
+  process.env.TZ = processTz;
+  setHouseholdZone(zone);
+  setConfig(PAYMENT_TASKS_KEY, '1');
+  mock.timers.enable({ apis: ['Date'], now: new Date(now) });
+  try {
+    return await fn();
+  } finally {
+    mock.timers.reset();
+    db.prepare('DELETE FROM sync_config WHERE key = ?').run(PAYMENT_TASKS_KEY);
+    setHouseholdZone(null);
+    if (prevTz === undefined) delete process.env.TZ;
+    else process.env.TZ = prevTz;
+  }
+}
+
+const PAYMENT_TASKS_KEY = 'housekeeping_payment_tasks';
+
+async function todaySessionId(path, workerId) {
+  const r = await call('GET', path, { as: ADM });
+  assert.equal(r.status, 200, `${path}: ${r.status}`);
+  const list = r.body.data.workers ?? r.body.data;
+  return list.find((w) => w.id === workerId)?.today_session?.id ?? null;
+}
+
+// Ein Geraet in New York am 30.09. um 18:30 - in Berlin ist es schon der 1.10., 00:30.
+const NY_DEVICE = 'local_date=2026-09-30&timezone_offset_minutes=240';
+
+test('#1556 Check-in nach Mitternacht: Termin, Zahlungsaufgabe und "heute" folgen dem Haushalt, nicht dem Geraet', () => atHouseholdClock(
+  { zone: 'Europe/Berlin', processTz: 'America/New_York', now: '2026-09-30T22:30:00.000Z' },
+  async () => {
+    const workerId = await freshWorker('Mitternacht');
+    // Gestern Abend, 21:00 in Berlin.
+    seedLinkedVisit(workerId, '2026-09-30T19:00:00.000Z', '2026-09-30');
+    assert.equal(await todaySessionId(`/workers?${NY_DEVICE}`, workerId), null, 'Geraet in New York: gestern ist nicht heute');
+    assert.equal(await todaySessionId('/workers', workerId), null, 'ohne Parameter: nicht die Zone des Server-Prozesses');
+    assert.equal(await todaySessionId('/dashboard', workerId), null, 'Uebersicht: dieselbe Frage');
+
+    const r = await call('POST', '/work-sessions/check-in', {
+      as: ADM,
+      body: { worker_id: workerId, daily_rate: 40, local_date: '2026-09-30', timezone_offset_minutes: 240 },
+    });
+    assert.equal(r.status, 201);
+    assert.deepEqual(visitState(r.body.data.id), { check_in: '2026-09-30T22:30:00.000Z', event_day: '2026-10-01', task_day: '2026-10-01' });
+    assert.equal(await todaySessionId(`/workers?${NY_DEVICE}`, workerId), r.body.data.id, 'der neue Besuch ist der heutige');
+  },
+));
+
+test('#1556 Umstelltage: die Tagesgrenzen sind die des ganzen Haushaltstags, nicht der Offset von jetzt', async () => {
+  // 25.10.2026 hat 25 Stunden. Um 23:45 MEZ (Offset -60) begann der Tag noch in
+  // MESZ um 22:00Z des Vortags - der Besuch um 00:30 MESZ ist von heute.
+  await atHouseholdClock({ zone: 'Europe/Berlin', processTz: 'America/New_York', now: '2026-10-25T22:45:00.000Z' }, async () => {
+    const workerId = await freshWorker('Herbst');
+    const early = seedLinkedVisit(workerId, '2026-10-24T22:30:00.000Z', '2026-10-25');
+    assert.equal(await todaySessionId('/workers?local_date=2026-10-25&timezone_offset_minutes=-60', workerId), early);
+    assert.equal(await todaySessionId('/workers', workerId), early);
+  });
+  // 29.03.2026 hat 23 Stunden. Um 23:30 MESZ (Offset -120) begann der Tag noch in
+  // MEZ um 23:00Z des Vortags - der Besuch um 23:30 MEZ am 28. ist von gestern.
+  await atHouseholdClock({ zone: 'Europe/Berlin', processTz: 'America/New_York', now: '2026-03-29T21:30:00.000Z' }, async () => {
+    const workerId = await freshWorker('Fruehling');
+    seedLinkedVisit(workerId, '2026-03-28T22:30:00.000Z', '2026-03-28');
+    assert.equal(await todaySessionId('/workers?local_date=2026-03-29&timezone_offset_minutes=-120', workerId), null);
+    assert.equal(await todaySessionId('/workers', workerId), null);
+  });
+});
+
+test('#1556 ohne eingestellte Haushaltszone: die Zone der Oberflaeche entscheidet, auch am Umstelltag', async () => {
+  // Ohne `household_timezone` liest die Oberflaeche die Zone des Browsers, der
+  // Server `TZ` - im Container meist UTC. Die Oberflaeche schickt deshalb ihre
+  // Zone mit, und der Server rechnet den Tag darin.
+  await atHouseholdClock({ zone: null, processTz: 'UTC', now: '2026-10-25T22:45:00.000Z' }, async () => {
+    const workerId = await freshWorker('OhnezoneHerbst');
+    const early = seedLinkedVisit(workerId, '2026-10-24T22:30:00.000Z', '2026-10-25');
+    assert.equal(await todaySessionId('/workers?timezone=Europe%2FBerlin', workerId), early);
+    assert.equal(await todaySessionId('/dashboard?timezone=Europe%2FBerlin', workerId), early, 'die Uebersicht liest dieselbe Angabe (Review)');
+    // Eine unbekannte Zone wirft nicht, sie faellt auf die Uhr des Servers.
+    assert.equal(await todaySessionId('/workers?timezone=Mars%2FOlympus', workerId), null);
+  });
+  await atHouseholdClock({ zone: null, processTz: 'UTC', now: '2026-09-30T22:30:00.000Z' }, async () => {
+    const workerId = await freshWorker('OhnezoneNacht');
+    const r = await call('POST', '/work-sessions/check-in', { as: ADM, body: { worker_id: workerId, daily_rate: 40, timezone: 'Europe/Berlin' } });
+    assert.equal(r.status, 201);
+    assert.deepEqual(visitState(r.body.data.id), { check_in: '2026-09-30T22:30:00.000Z', event_day: '2026-10-01', task_day: '2026-10-01' });
+    await call('POST', '/work-sessions/check-out', { as: ADM, body: { worker_id: workerId } });
+    // Eine Oberflaeche aus dem Cache des Service Workers schickt noch Tag und
+    // Offset des Geraets. Ohne Haushaltszone ist das weiter die einzige Angabe
+    // ueber den Haushalt, die der Server hat.
+    const legacy = await call('POST', '/work-sessions/check-in', {
+      as: ADM,
+      body: { worker_id: workerId, daily_rate: 40, local_date: '2026-10-01', timezone_offset_minutes: -120 },
+    });
+    assert.equal(legacy.status, 201);
+    assert.equal(visitState(legacy.body.data.id).event_day, '2026-10-01');
+  });
 });
 
 test('teardown: Server schließen', async () => {

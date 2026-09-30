@@ -4,6 +4,7 @@
  * Abhängigkeiten: express, helmet, server/db.js, server/auth.js, server/routes/*
  */
 
+import './utils/claim-instance-lock.js';
 import express from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -17,6 +18,7 @@ import { router as authRouter, sessionMiddleware, requireAuth, requireAdmin, isP
 import { csrfMiddleware } from './middleware/csrf.js';
 import idempotencyMiddleware from './middleware/idempotency.js';
 import { createRestoreWriteGate, trackAdmittedWrite } from './middleware/restore-gate.js';
+import { runExternalJob } from './utils/restore-state.js';
 import { createErrorHandler } from './middleware/error-handler.js';
 import { buildOpenApiSpec } from './openapi.js';
 import * as googleCalendar from './services/google-calendar.js';
@@ -185,8 +187,9 @@ app.use(createRestoreWriteGate(db.isRestoreRunning, db.isDatabaseOpen));
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
 
-// JSON-Parse-Fehler abfangen (gibt sonst HTML zurück)
-app.use((err, req, res, next) => {
+// JSON-Parse-Fehler abfangen (gibt sonst HTML zurück). Benannt, weil
+// test/test-restore-gate-routes.js globale Middleware am Namen erkennt (#1531).
+app.use(function bodyParseErrorHandler(err, req, res, next) {
   if (err.type === 'entity.parse.failed') {
     return res.status(400).json({ error: 'Invalid JSON in request body.', code: 400 });
   }
@@ -826,9 +829,19 @@ const server = app.listen(PORT, BIND_ADDRESS, () => {
   // zwei Timer offen - und Suiten, die server/index.js als Programm
   // importieren, muessten den Prozess mit `process.exit(0)` erschlagen, was
   // den Exit-Code von node:test ueberschreibt (siehe test/server-ready.js).
+  //
+  // Der Takt selbst als Job (#1532): `runSync` liest vor dem ersten Lauf
+  // synchron die DB (`getStatus()`). Faellt der Takt in einen Restore bei
+  // geschlossener Verbindung, wirft `db.get()`, und aus der async-Funktion
+  // wird eine Rejection ohne Handler - Node beendet den Prozess mitten im
+  // Tausch. Waehrend eines Restores faellt der Takt deshalb aus; die
+  // einzelnen Laeufe sind ohnehin Jobs.
+  const syncTick = () => {
+    runExternalJob(runSync).catch((e) => logSync.error('Sync tick failed:', e.message));
+  };
   setTimeout(() => {
-    runSync();
-    setInterval(runSync, SYNC_INTERVAL_MS).unref();
+    syncTick();
+    setInterval(syncTick, SYNC_INTERVAL_MS).unref();
     logSync.info(`Auto-sync active every ${SYNC_INTERVAL_MS / 60_000} minutes.`);
   }, 10_000).unref();
 

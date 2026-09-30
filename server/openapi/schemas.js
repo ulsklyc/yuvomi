@@ -841,6 +841,20 @@ export const schemas = {
             username: { type: 'string' },
             display_name: { type: 'string' },
             password: { type: 'string' },
+            language: {
+              type: 'string',
+              nullable: true,
+              description: 'Optional. Language code of a supported app locale (e.g. `de`, `pt`, `fil`). '
+                + 'Sets the household data language (the language of server-generated titles such as birthday events), '
+                + 'unless the automatic choice already yields it. Region, currency and date format are not derived from it. '
+                + 'Unsupported values are rejected with 400; omitted, null or empty keeps the previous behaviour.',
+            },
+            timezone: {
+              type: 'string',
+              nullable: true,
+              description: 'Optional. IANA time zone of the household (e.g. `Europe/Berlin`). '
+                + 'Unknown zones are rejected with 400; omitted, null or empty keeps the fallback to TZ, the system zone and UTC.',
+            },
           },
           required: ['username', 'display_name', 'password'],
         },

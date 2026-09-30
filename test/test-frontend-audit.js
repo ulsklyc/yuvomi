@@ -8,6 +8,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { SETTINGS_DOMAINS, SETTINGS_LEAVES } from '../public/settings/registry.js';
 import { eachRule } from './css-rules.js';
+import { keySetDiff } from './i18n-plural-keys.js';
 import { withoutHtmlComments, withoutBlockComments, withoutCommentsKeepingLines } from './source-text.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r/g, '');
@@ -7246,8 +7247,9 @@ test('phase 7 locale files keep the de reference key set complete', () => {
   for (const file of LOCALES) {
     const data = JSON.parse(readFileSync(new URL(file, LOCALE_DIR), 'utf8'));
     const keys = new Set(flattenLocaleKeys(data));
-    const missing = [...referenceKeys].filter((key) => !keys.has(key));
-    const extra = [...keys].filter((key) => !referenceKeys.has(key));
+    // Zusaetzlich erlaubt: die Pluralvarianten der eigenen Sprache (#1473, Regel
+    // in test/i18n-plural-keys.js) - `_few` in cs.json, nicht in en.json.
+    const { missing, extra } = keySetDiff(referenceKeys, keys, file.replace(/\.json$/, ''));
 
     assert.deepEqual(missing, [], `${file} is missing locale keys`);
     assert.deepEqual(extra, [], `${file} has extra locale keys`);
@@ -7943,6 +7945,137 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
   const staleExceptions = [...NOT_A_FIELD.keys()].filter((key) => !usedExceptions.has(key));
   assert.deepEqual(staleExceptions, [],
     'NOT_A_FIELD nennt Selektoren, die keine Regel mit Kartenkante mehr treffen - Eintrag entfernen.');
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Die ausgeschaltete Schalterbahn haelt 3:1 (#1572)
+ *
+ * Die `.toggle`-Bahn stand im Aus-Zustand auf --neutral-300: gerendert 1,65:1
+ * auf Weiss und 1,46:1 auf dem dunklen -raised. Ein Schalter, der aus war,
+ * verschwand in seiner Zeile - WCAG 1.4.11 verlangt fuer die Grenze eines
+ * Bedienelements 3:1. Die Bahn selbst ist die Grenze (randlose Kapsel), also
+ * misst der Guard ihre Fuellung.
+ *
+ * Abgeleitet, nicht behauptet: Bahn- und Knopffarbe liest er aus den Regeln
+ * (`.toggle__track` und sein `::after`), nicht aus einem Token-Namen, und
+ * rechnet sie gegen jede Flaeche, auf der ein Schalter steht - Karte, Modal,
+ * Settings-Blatt (-work, -raised), Modal-Feldgrund (-2), Buehne, erhoehte
+ * Flaeche und die Zeile im Hover (`.toggle-row:hover` wechselt auf
+ * --color-surface-hover, erhoeht auf -elevated-hover). Dazu der Knopf gegen
+ * die Bahn: im Aus-Zustand traegt er den Zustand, eine Bahn in Knopffarbe
+ * liesse die Position nicht erkennen. Beide Dark-Bloecke, weil beide gelten.
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('die ausgeschaltete Schalterbahn haelt 3:1 auf jeder Flaeche, auf der ein Schalter steht', () => {
+  const { light, dark } = themeTokenMaps();
+  const scheme = darkSchemeBlock(read('../public/styles/tokens.css'));
+  assert.ok(scheme, 'prefers-color-scheme-Dark-Block in tokens.css nicht gefunden');
+  const darkScheme = new Map(light);
+  for (const [k, v] of parseTokenMap(scheme[1])) darkScheme.set(k, v);
+
+  const styles = new URL('../public/styles/', import.meta.url);
+  const rules = readdirSync(styles)
+    .filter((entry) => entry.endsWith('.css') && entry !== 'tokens.css')
+    .flatMap((file) => [...eachRule(readFileSync(new URL(file, styles), 'utf8'))].map((rule) => ({ ...rule, file })));
+  const background = (body) => {
+    let found = null;
+    for (const m of body.matchAll(/(?:^|;)\s*background(?:-color)?\s*:\s*([^;]+)/g)) found = m[1].trim();
+    return found;
+  };
+  const tokenOf = (value) => String(value ?? '').match(/^var\(\s*(--[\w-]+)\s*\)$/)?.[1] ?? null;
+
+  // Die Bahn im Ruhezustand: jede Regel, deren Glied auf `.toggle__track` endet,
+  // ohne :checked (an) und ohne :disabled (von 1.4.11 ausgenommen).
+  const offTrack = rules.flatMap(({ selector, body, file }) => selector.split(',')
+    .map((part) => part.trim())
+    .filter((part) => /\.toggle__track$/.test(part) && !/:checked|:disabled/.test(part))
+    .map((part) => ({ part, file, value: background(body) })))
+    .filter(({ value }) => value);
+  assert.ok(offTrack.some(({ part, file }) => part === '.toggle__track' && file === 'layout.css'),
+    `Die Basisregel .toggle__track (layout.css) mit Hintergrund wurde nicht gefunden - der Guard misst nichts. Gefunden: ${offTrack.map(({ file, part }) => `${file} ${part}`).join(', ')}`);
+  const knob = rules.find(({ selector, file }) => file === 'layout.css' && selector.trim() === '.toggle__track::after');
+  const knobToken = tokenOf(knob && background(knob.body));
+  assert.ok(knobToken, 'Der Knopf (.toggle__track::after, layout.css) setzt keinen Token-Hintergrund - der Guard misst nichts.');
+
+  const GROUNDS = [
+    '--color-surface', '--color-surface-work', '--color-surface-raised', '--color-surface-2', '--color-bg',
+    '--color-surface-elevated', '--color-surface-hover', '--color-surface-elevated-hover',
+  ];
+  const findings = [];
+  for (const { part, file, value } of offTrack) {
+    const token = tokenOf(value);
+    if (!token) { findings.push(`${file} ${part}: Bahn ohne Token (${value})`); continue; }
+    for (const [theme, map] of [['light', light], ['dark [data-theme]', dark], ['dark prefers-color-scheme', darkScheme]]) {
+      const track = resolveColor(token, map);
+      if (!/^#[0-9a-f]{6}$/i.test(track ?? '')) { findings.push(`${theme}: ${token} loest nicht auf eine Hex-Farbe auf (${track})`); continue; }
+      for (const ground of GROUNDS) {
+        const bg = resolveColor(ground, map);
+        assert.ok(/^#[0-9a-f]{6}$/i.test(bg ?? ''), `${theme}: ${ground} loest nicht auf eine Hex-Farbe auf (${bg})`);
+        const ratio = contrastRatio(track, bg);
+        if (ratio + 0.005 < 3) findings.push(`${theme}: ${file} ${part} ${token} (${track}) auf ${ground} (${bg}) ${ratio.toFixed(2)}:1`);
+      }
+      const knobHex = resolveColor(knobToken, map);
+      const knobRatio = contrastRatio(knobHex, track);
+      if (knobRatio + 0.005 < 3) findings.push(`${theme}: Knopf ${knobToken} (${knobHex}) auf ${token} (${track}) ${knobRatio.toFixed(2)}:1`);
+    }
+  }
+  assert.deepEqual(findings, [],
+    'Die ausgeschaltete Schalterbahn unterschreitet 3:1 (WCAG 1.4.11) - gegen eine Flaeche, auf der Schalter stehen, oder gegen ihren Knopf. '
+    + 'Die Bahn traegt --color-switch-off (tokens.css, #1572).');
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Der Schalterknopf spiegelt in RTL (#1572)
+ *
+ * In `ar` und `fa` setzt die App `dir=rtl`. Apple (und jede RTL-Plattform)
+ * spiegelt den Schalter: "an" steht auf der fuehrenden Seite, in RTL also
+ * links. Die App liess den Knopf physisch rechts einrasten (`left: 3px`,
+ * `translateX(18px)`), der Installer spiegelt seit #1571 - zwei Schalter,
+ * zwei Richtungen.
+ *
+ * Zwei Haelften, beide ueber den Regelscanner:
+ *   1. keine Knopfregel setzt `left`/`right` - die Ruhelage ist logisch
+ *      (`inset-inline-start`), und mindestens eine Knopfregel setzt sie;
+ *   2. jede Knopfregel mit `translateX(N)` hat im selben At-Kontext ihr
+ *      `[dir="rtl"]`-Gegenstueck mit `translateX(-N)` - translateX kennt
+ *      keine Schreibrichtung, sonst liefe der Knopf in RTL aus der Bahn.
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('der Schalterknopf spiegelt in RTL: an steht auf der fuehrenden Seite', () => {
+  const styles = new URL('../public/styles/', import.meta.url);
+  const RTL = /\[dir="rtl"\]\s*/g;
+  const KNOB = /\.toggle__track::after$/;
+  const physical = [];
+  const logical = [];
+  const moves = [];
+  const rtlMoves = new Map();
+
+  for (const file of readdirSync(styles).filter((n) => n.endsWith('.css'))) {
+    for (const { selector, body, at } of eachRule(read(`../public/styles/${file}`))) {
+      const parts = selector.split(',').map((part) => part.trim()).filter((part) => KNOB.test(part));
+      if (!parts.length) continue;
+      const shift = body.match(/(?:^|;)\s*transform\s*:\s*translateX\(\s*(-?[\d.]+)px\s*\)/)?.[1];
+      for (const part of parts) {
+        const isRtl = RTL.test(part);
+        RTL.lastIndex = 0;
+        if (/(?:^|;)\s*(?:left|right)\s*:/.test(body)) physical.push(`${file} {${part}}`);
+        if (/(?:^|;)\s*inset-inline-start\s*:/.test(body)) logical.push(`${file} {${part}}`);
+        if (shift === undefined) continue;
+        const key = `${file}||${at.join(' | ')}||${part.replace(RTL, '').trim()}`;
+        if (isRtl) rtlMoves.set(key, Number(shift));
+        else moves.push({ key, file, part, shift: Number(shift) });
+      }
+    }
+  }
+
+  // Reichweite vor dem Urteil - ohne Fundstellen prueft die Zusicherung nichts.
+  assert.ok(moves.length >= 1, `erwartet: eine Knopfregel mit translateX, gefunden: ${moves.length}`);
+  assert.deepEqual(physical, [],
+    'Der Schalterknopf steht physisch (left/right) - in RTL bleibt er rechts. Ruhelage per inset-inline-start.');
+  assert.ok(logical.length >= 1, 'Keine Knopfregel setzt inset-inline-start - die Ruhelage folgt der Schreibrichtung nicht.');
+  const unmirrored = moves
+    .filter(({ key, shift }) => rtlMoves.get(key) !== -shift)
+    .map(({ file, part, shift, key }) => `${file} {${part}}: translateX(${shift}px), RTL-Gegenstueck ${rtlMoves.has(key) ? `translateX(${rtlMoves.get(key)}px)` : 'fehlt'}`);
+  assert.deepEqual(unmirrored, [],
+    'Der Weg des Schalterknopfs braucht in RTL das umgekehrte Vorzeichen ([dir="rtl"] ... translateX(-N)), sonst rastet "an" auf der falschen Seite ein.');
 });
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -12174,6 +12307,13 @@ test('row lists sit in exactly one carrier', () => {
   // Werte werden ausgelesen und geprueft, nicht per Lookahead ausgeschlossen:
   // `border-radius:\s*(?!0)` ist wahr, sobald `\s*` leer matchen darf - der
   // Lookahead sieht dann das Leerzeichen statt der Null.
+  //
+  // UEBER `eachRule()`, NICHT UEBER DEN ROHEN TEXT (#1456). Die erste Fassung
+  // las die Stylesheets mit eigenen Regexen, und `(?:^|;)\s*border-radius:`
+  // beginnt nie hinter einem Kommentar: in `.countdown-item` steht einer
+  // zwischen dem vorigen `;` und dem Radius, und der Guard sah ihn nicht. Das
+  // Urteil ueber die Zeile fiel damit am Kommentar, nicht an der Regel.
+  // `eachRule()` streift Kommentare vorher ab.
   const declared = (body, prop) => {
     const hits = [...body.matchAll(new RegExp(`(?:^|;)\\s*${prop}:([^;]*)`, 'g'))];
     return hits.map((m) => m[1].trim());
@@ -12185,33 +12325,62 @@ test('row lists sit in exactly one carrier', () => {
     { prop: 'background-color', isCard: (v) => /^var\(--color-surface(-work|-raised|-elevated)?\)$/.test(v) },
   ];
 
+  // BENANNTE AUSNAHMEN, und jede muss noch gesehen werden: ein Eintrag, den
+  // der Guard nicht mehr trifft, ist eine Ausnahme ohne Gegenstand und faellt
+  // unten als veraltet auf. Der Schluessel traegt den WERT - ein anderer
+  // Radius an derselben Zeile ist wieder ein Befund.
+  const EXEMPT = new Map([
+    ['dashboard.css .countdown-item border-radius: var(--radius-sm)',
+      'Radius fuer Fokusring und Hover-Flaeche, keine Flaeche und kein Schatten im Ruhezustand '
+      + '(Begruendung am Selektor). Ob ein solcher Radius an einer flachen Zeile als Kartenmerkmal '
+      + 'zaehlt, ist offen (#1456) - `.list-row` traegt keinen.'],
+  ]);
+  const exemptSeen = new Set();
+  let rowCount = 0;
+
   const offenders = [];
   for (const name of files) {
-    const css = read(`../public/styles/${name}`);
-    // `X + X { … border-top … }` — derselbe Selektor auf beiden Seiten ist die
+    const rules = [...eachRule(read(`../public/styles/${name}`))];
+    const parts = (rule) => rule.selector.split(',').map((part) => part.trim());
+    // `X + X { … border-top … }` - derselbe Selektor auf beiden Seiten ist die
     // Signatur der Haarlinien-Trennung (im Unterschied zu `.a + .b`, das ein
     // Geschwister-Abstand sein kann).
-    const seen = new Set();
-    for (const m of css.matchAll(/(?:^|[},])\s*(\.[\w-]+)\s*\+\s*\1\s*\{([^}]*)\}/g)) {
-      const [, selector, body] = m;
-      if (!/border-top:/.test(body)) continue;
-      if (seen.has(selector)) continue;
-      seen.add(selector);
+    const rows = new Set();
+    for (const rule of rules) {
+      if (!/(?:^|;)\s*border-top:/.test(rule.body)) continue;
+      for (const part of parts(rule)) {
+        const pair = part.match(/^(\.[\w-]+)\s*\+\s*\1$/);
+        if (pair) rows.add(pair[1]);
+      }
+    }
 
-      // Basisregel des Selektors: exakt `X {`, nicht `.foo X {` und nicht
-      // `X--modifier {` (cssRuleBody matcht ungebunden, siehe Handoff-Falle).
-      const base = css.match(new RegExp(`(?:^|[},])\\s*\\${selector}\\s*\\{([^}]*)\\}`, 'm'));
-      if (!base) continue;
-      for (const marker of CARD_MARKERS) {
-        for (const value of declared(base[1], marker.prop)) {
-          if (marker.isCard(value)) {
-            offenders.push(`${name} ${selector} traegt ${marker.prop}: ${value} — eine Zeile in einer Liste ist keine Karte`);
+    rowCount += rows.size;
+
+    // Basisregel des Selektors: exakt `X`, nicht `.foo X` und nicht
+    // `X--modifier` - in jeder Regel, die ihn fuehrt, auch in einem At-Block.
+    for (const selector of rows) {
+      for (const rule of rules) {
+        if (!parts(rule).includes(selector)) continue;
+        for (const marker of CARD_MARKERS) {
+          for (const value of declared(rule.body, marker.prop)) {
+            if (!marker.isCard(value)) continue;
+            const id = `${name} ${selector} ${marker.prop}: ${value}`;
+            if (EXEMPT.has(id)) {
+              exemptSeen.add(id);
+              continue;
+            }
+            offenders.push(`${name} ${selector} traegt ${marker.prop}: ${value} - eine Zeile in einer Liste ist keine Karte`);
           }
         }
       }
     }
   }
+
+  // Ein Guard, der keine Zeilenliste gefunden hat, darf nicht urteilen.
+  assert.ok(rowCount > 0, 'Keine `X + X { border-top }`-Zeile gefunden - der Guard hat nichts gemessen.');
   assert.deepEqual(offenders, []);
+  assert.deepEqual([...EXEMPT.keys()].filter((id) => !exemptSeen.has(id)), [],
+    'Ausnahmen, die der Guard nicht mehr trifft - Eintrag streichen');
 });
 
 // --------------------------------------------------------------------------
@@ -13195,10 +13364,10 @@ test('the collapsing header is wired once, by the shell', () => {
  * beide verworfen:
  *
  * (a) „Der Blur steht in einem `@supports`-Block." Klingt nach dem Wortlaut der
- *     Regel und ist die falsche Frage. Sechs Flaechen setzen ihn ausserhalb
+ *     Regel und ist die falsche Frage. Fuenf Flaechen setzen ihn ausserhalb
  *     (`.onboarding-overlay`, `.document-viewer__pdf-indicator`,
- *     `.more-backdrop`, `.search-overlay`, `.modal-overlay`, `body::after` in
- *     pwa.css) und KEINE davon ist ein Verstoss: der
+ *     `.more-backdrop`, `.search-overlay`, `.modal-overlay`) und KEINE davon
+ *     ist ein Verstoss: der
  *     Zugaenglichkeits-Fallback dieser App haengt nicht am Block, sondern am
  *     TOKEN. `--blur-2xs..lg` kippen unter `prefers-reduced-transparency` und
  *     `prefers-contrast: more` selbst auf `blur(0px)` - beide Bloecke stehen in

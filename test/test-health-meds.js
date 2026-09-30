@@ -413,3 +413,60 @@ test('Dosis-Knoepfe: Name nennt das Medikament, kein Haken-Kreis, beide Renderer
     assert.ok(Number(grenze[1]) * 16 < 324, `${at.join(' ')}: bei 390px (Container 324px) muss „Einnehmen" stehen bleiben`);
   }
 });
+
+// --------------------------------------------------------
+// Einnahmeprotokoll: die Uhrzeit ist die des Haushalts (#1539)
+// --------------------------------------------------------
+// `taken_at`/`scheduled_at` sind Wanduhrzeit des Haushalts. Das Protokoll
+// reichte `new Date(taken_at)` an `formatTime` - ein Zeitpunkt der GERAETE-
+// Zone, den `formatTime` danach in die Haushaltszone umrechnet. Der Prozess
+// laeuft deshalb in New York, der Haushalt in Berlin. Der Stub von
+// `formatTime` gibt sein Argument als Text zurueck; gelesen wird es ueber
+// `zonedTimeKey`, dieselbe Umrechnung wie im echten `formatTime`.
+
+const tzModule = await import('/utils/timezone.js');
+
+function medLogTimes(logs) {
+  healthHelpers.setViewStateForTest('meds', {
+    list: [{ id: 1, name: 'Ibuprofen', active: 1 }], logsByMed: { 1: logs }, personId: 5, meId: 5,
+  });
+  const html = healthHelpers.medLogHistoryMarkup();
+  return [...html.matchAll(/health-medlog__time">([^<]*)</g)].map(([, label]) => {
+    const [day, time] = label.split(' · ');
+    return [tzModule.zonedDateKey(day), tzModule.zonedTimeKey(time)];
+  });
+}
+
+async function withZones(processZone, householdZone, fn) {
+  const prevTz = process.env.TZ;
+  process.env.TZ = processZone;
+  tzModule.setDisplayTimeZone(householdZone);
+  try {
+    await fn();
+  } finally {
+    tzModule.setDisplayTimeZone(null);
+    healthHelpers.setViewStateForTest('meds', { list: [], logsByMed: {} });
+    if (prevTz === undefined) delete process.env.TZ;
+    else process.env.TZ = prevTz;
+  }
+}
+
+const LOGS = [
+  { id: 1, status: 'taken', schedule_id: 3, scheduled_at: '2026-06-15T08:00', taken_at: '2026-06-15T08:10' },
+  { id: 2, status: 'pending', schedule_id: 3, scheduled_at: '2026-06-14T20:00', taken_at: null },
+  // Ohne beide Zeiten steht created_at da - ein UTC-Instant (…Z): 23:30Z ist in Berlin 01:30 am Folgetag.
+  { id: 3, status: 'skipped', schedule_id: null, scheduled_at: null, taken_at: null, created_at: '2026-06-12T23:30:00Z' },
+];
+
+test('#1539: Einnahmeprotokoll zeigt die Uhrzeit des Haushalts, nicht die des Geraets', () => withZones('America/New_York', 'Europe/Berlin', () => {
+  assert.equal(new Date('2026-06-15T12:00').getTimezoneOffset(), 240, 'Prozess muss in New York laufen');
+  assert.deepEqual(medLogTimes(LOGS), [
+    ['2026-06-15', '08:10'], ['2026-06-14', '20:00'], ['2026-06-13', '01:30'],
+  ]);
+}));
+
+test('#1539: Einnahmeprotokoll mit Geraet in der Haushaltszone - Wanduhrzeit unveraendert, created_at am Tag des Haushalts', () => withZones('Europe/Berlin', 'Europe/Berlin', () => {
+  assert.deepEqual(medLogTimes(LOGS), [
+    ['2026-06-15', '08:10'], ['2026-06-14', '20:00'], ['2026-06-13', '01:30'],
+  ]);
+}));

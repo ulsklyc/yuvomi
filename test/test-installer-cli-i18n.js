@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 import { SUPPORTED_LOCALES } from '../tools/installer/i18n-mini.js';
 
@@ -27,7 +28,9 @@ const referenceVars = localeVars(REFERENCE);
 
 test('für jede unterstützte Locale existiert genau eine CLI-Locale-Datei', () => {
   const files = readdirSync(new URL(CLI_LOCALES_DIR)).filter(f => f.endsWith('.sh')).sort();
-  assert.deepEqual(files, [...SUPPORTED_LOCALES].sort().map(l => `${l}.sh`));
+  // Erst abbilden, dann sortieren: `pt-BR.sh` steht vor `pt.sh` ('-' < '.'),
+  // der Code `pt-BR` aber hinter `pt`.
+  assert.deepEqual(files, [...SUPPORTED_LOCALES].map(l => `${l}.sh`).sort());
 });
 
 test('Referenz en.sh definiert eine nichtleere Schlüsselmenge', () => {
@@ -83,6 +86,33 @@ test('SUPPORTED_LOCALES in install.sh deckt sich mit i18n-mini.js', () => {
   const locales = m[1].trim().split(/\s+/).sort();
   assert.deepEqual(locales, [...SUPPORTED_LOCALES].sort(),
     'SUPPORTED_LOCALES in install.sh weicht von i18n-mini.js ab');
+});
+
+// Eine Locale mit Region (pt-BR, #1437) muss aus der Umgebung ankommen:
+// `LANG=pt_BR.UTF-8` hiess bisher `pt`, weil normalize_locale alles ab dem
+// Unterstrich abschnitt. Die Funktion laeuft hier isoliert - install.sh selbst
+// startet am Ende den Wizard - und unter der bash, die gerade da ist; auf macOS
+// ist das die 3.2, die `${x,,}` nicht kennt.
+test('normalize_locale nimmt erst Sprache mit Region, dann die Basissprache', () => {
+  const sh = readFileSync(INSTALL_SH, 'utf8');
+  const start = sh.indexOf('SUPPORTED_LOCALES=(');
+  const end = sh.indexOf('resolve_locale()');
+  assert.ok(start !== -1 && end > start, 'normalize_locale nicht in install.sh gefunden');
+  const fn = sh.slice(start, end);
+  const run = (raw) => execFileSync('bash', ['-c', `set -euo pipefail\n${fn}\nnormalize_locale "$1"`, 'probe', raw],
+    { encoding: 'utf8' });
+
+  assert.equal(run('pt_BR.UTF-8'), 'pt-BR');
+  assert.equal(run('PT_br'), 'pt-BR');
+  assert.equal(run('pt-BR'), 'pt-BR', 'so kommt es ueber --lang');
+  assert.equal(run('pt_PT.UTF-8'), 'pt');
+  assert.equal(run('pt'), 'pt');
+  assert.equal(run('de_DE.UTF-8'), 'de');
+  assert.equal(run('de_DE@euro'), 'de');
+  assert.equal(run('fil_PH.UTF-8'), 'fil');
+  assert.equal(run('zh_TW.UTF-8'), 'zh');
+  assert.equal(run('C.UTF-8'), 'en');
+  assert.equal(run(''), 'en');
 });
 
 // ── Generator-Quelle ist nicht erforderlich, aber Verzeichnis muss existieren ─

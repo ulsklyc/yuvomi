@@ -5268,6 +5268,18 @@ button.today-cockpit__more--link {
   display: none;
 }
 
+/* Meldungen stehen auf der Wand OBEN (#1559). Unten liegt der Fuss mit
+ * Ausstieg und Timer-Startknoepfen, und der Stapel rechnet dort mit einer
+ * Tab-Leiste, die hier gar nicht steht: der Hinweis beim Einschalten lag am
+ * Telefon acht Sekunden lang auf „5 Min" und nahm den Tipp. Oben steht nur die
+ * Uhr, die nichts annimmt. Die Lage neben einem offenen Dialog
+ * (`[data-dock]`, utils/toast-placement.js) bleibt dessen Sache. */
+[data-wall-mode] .shell-bottom-stack:not([data-dock]) {
+  top: calc(var(--safe-area-inset-top) + var(--space-4));
+  bottom: auto;
+  left: 50%;
+}
+
 .dashboard--wall {
   padding: 0;
   margin: 0;
@@ -5756,6 +5768,27 @@ button.today-cockpit__more--link {
   grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
   align-items: center;
   gap: var(--space-4);
+  /* DER FUSS KLEBT AN DER UNTERKANTE, WENN DIE FLAECHE LAENGER IST ALS DAS BILD
+   * (#1559). Auf 390x844 lag der Ausstieg bei y=832-880, auf 375x667 ganz
+   * darunter: der einzige Weg hinaus nur per Scrollen erreichbar, und nichts
+   * sagte das. Keine Regel nach Geraeteklasse (d697fa1e4) - `sticky` greift nur,
+   * wenn der Platz fehlt; passt die Wand ins Bild, steht der Fuss wie bisher
+   * unter der Buehne.
+   *
+   * Polster und Gegenrand heben sich im Fluss auf: der Fuss nimmt keine Zeile
+   * mehr Platz ein als vorher (1280x800 passt weiter, siehe
+   * test:dashboard-surface-browser). Klebt er, fuellt sein Grund den Streifen
+   * bis zur Kante - der Inhalt scrollt DARUNTER durch, nicht zwischen Knopf und
+   * Kante hindurch -, und unten haelt er den Abstand der Flaeche, mindestens
+   * aber die Safe-Area (Home-Indikator). `--nav-tail` ist im Wandmodus 0
+   * (layout.css, Leiste ausgeblendet) - dieselbe Regel wie jede klebende
+   * Fusszeile im Inhalt (test:mobile-chrome). */
+  position: sticky;
+  bottom: var(--nav-tail);
+  z-index: 1;
+  margin-block: calc(-1 * var(--space-2)) calc(-1 * var(--wall-pad));
+  padding-block: var(--space-2) max(var(--wall-pad), var(--safe-area-inset-bottom));
+  background: var(--color-bg);
 }
 
 .wall__foot > :first-child {
@@ -5802,21 +5835,23 @@ button.today-cockpit__more--link {
  * fremde Klasse getragen oder ihre Werte kopiert; beides ist ein Vokabular, das
  * beim nächsten Anfassen auseinanderläuft.
  *
- * LEISE DA, HELL AUF BERÜHRUNG. Ein dauerhaft voller Knopf widerspräche der
- * ruhigen Fläche, ein unsichtbarer wäre eine Falle. Im Ruhezustand steht
- * deshalb nur das Zeichen da - in Sekundärfarbe, also weiterhin AA und
- * weiterhin fokussierbar. Jede Berührung setzt `data-wall-awake` und hebt ihn
- * für sechs Sekunden auf die volle Kapsel samt Beschriftung.
+ * LEISE, ABER MIT WORT; HELL AUF BERÜHRUNG. Ein dauerhaft voller Knopf
+ * widerspräche der ruhigen Fläche, ein unsichtbarer wäre eine Falle. Bis #1559
+ * stand im Ruhezustand nur das Zeichen da, und das WAR die Falle: wer den
+ * Modus aus Versehen eingeschaltet hatte, sah ein graues Symbol ohne Namen und
+ * fand nicht hinaus (D#1494). Das Wort steht deshalb immer da, in
+ * Sekundärfarbe ohne Kapsel - die Ruhe kommt aus der Farbe, nicht aus dem
+ * Weglassen. Jede Berührung setzt `data-wall-awake` und hebt den Knopf für
+ * sechs Sekunden auf die volle Kapsel.
  *
- * Die Beschriftung wird ein- und ausgeblendet, nicht animiert: eine Breiten-
- * Transition wäre eine Layout-Animation für einen Zustand, den ohnehin niemand
- * beobachtet, der zwei Meter entfernt steht. Bewegt wird nur Farbe. */
+ * Das Polster ist in beiden Zuständen dasselbe: der Knopf ändert beim Wecken
+ * seine Breite nicht, nur Grund, Kante und Schrift. Bewegt wird nur Farbe. */
 .wall__foot-btn {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   min-height: var(--target-lg);
-  padding: 0 var(--space-2);
+  padding: 0 var(--space-4);
   border: 1px solid transparent;
   border-radius: var(--radius-full);
   background: transparent;
@@ -5833,23 +5868,12 @@ button.today-cockpit__more--link {
   flex-shrink: 0;
 }
 
-.wall__foot-btn-label {
-  display: none;
-}
-
 .wall__foot-btn:hover,
 .wall__foot-btn:focus-visible,
 .wall[data-wall-awake] .wall__foot-btn {
-  padding: 0 var(--space-4);
   border-color: var(--color-border);
   background: var(--color-surface);
   color: var(--color-text-primary);
-}
-
-.wall__foot-btn:hover .wall__foot-btn-label,
-.wall__foot-btn:focus-visible .wall__foot-btn-label,
-.wall[data-wall-awake] .wall__foot-btn-label {
-  display: inline;
 }
 
 .wall__foot-btn:focus-visible {

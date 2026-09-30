@@ -23,17 +23,25 @@ ask()     { printf "%s%s%s " "$BOLD" "$*" "$RESET"; }
 # der Umgebung (OIKOS_INSTALLER_LANG > LC_ALL > LC_MESSAGES > LANG), analog der App.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLI_LOCALES_DIR="$SCRIPT_DIR/tools/installer/locales/cli"
-SUPPORTED_LOCALES=(de en es fr it sv el ru tr zh ja ar hi pt uk pl nl cs vi hu ko id fa fil)
+SUPPORTED_LOCALES=(de en es fr it sv el ru tr zh ja ar hi pt-BR pt uk pl nl cs vi hu ko id fa fil)
 FALLBACK_LOCALE=en
 ACTIVE_LOCALE=$FALLBACK_LOCALE
 
 in_array() { local needle="$1"; shift; local e; for e in "$@"; do [ "$e" = "$needle" ] && return 0; done; return 1; }
 
-# Rohen Locale-Tag (z. B. de_DE.UTF-8) auf eine unterstützte Basissprache abbilden.
+# Rohen Locale-Tag (z. B. de_DE.UTF-8, pt_BR.UTF-8, --lang pt-BR) auf eine
+# unterstützte Locale abbilden: erst Sprache mit Region (pt-BR), dann die
+# Basissprache (de). Gross/klein ueber tr statt ${x,,} - das kennt die bash 3.2
+# von macOS nicht und brach dort mit "bad substitution" ab.
 normalize_locale() {
-  local raw="${1:-}"
-  raw="${raw%%.*}"; raw="${raw%%@*}"; raw="${raw%%_*}"; raw="${raw,,}"
-  if in_array "$raw" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$raw"
+  local raw="${1:-}" lang region=""
+  raw="${raw%%.*}"; raw="${raw%%@*}"; raw="${raw//_/-}"
+  lang="$(printf '%s' "${raw%%-*}" | tr '[:upper:]' '[:lower:]')"
+  case "$raw" in
+    *-*) region="$(printf '%s' "${raw#*-}" | tr '[:lower:]' '[:upper:]')"; region="${region%%-*}" ;;
+  esac
+  if [ -n "$region" ] && in_array "$lang-$region" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$lang-$region"
+  elif in_array "$lang" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$lang"
   else printf '%s' "$FALLBACK_LOCALE"; fi
 }
 

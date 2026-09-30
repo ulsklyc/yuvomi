@@ -17,6 +17,12 @@ const RECEIPT_WRITE_NOTE = '`receipt_document_id` links a receipt. A caller who 
   + 'access to the Documents module (for API tokens a `documents` scope), otherwise 403; a document the caller cannot see is '
   + 'not linked. A caller who can see the stored receipt may clear it with `null`.';
 
+// Der Tag der Haushaltshilfe (#1556): die Haushaltszone vor jeder Angabe des Clients.
+const HOUSEHOLD_DAY_NOTE = ' The household day decides `today_session` and the date of the calendar entry and payment task of a check-in. '
+  + 'With a household time zone set, that zone decides and client values are ignored. Otherwise the optional `timezone` (IANA name, query or body) '
+  + 'the client displays in decides, then the time zone of the server. Clients that send no `timezone` may still send `local_date` with '
+  + '`timezone_offset_minutes`; up to v2.69.1 these decided even with a household time zone set.';
+
 // `last_completed` ist ein Zeitpunkt; ein Offset wird der UTC-Instant (#1364).
 const LAST_COMPLETED_INPUT = '`last_completed` with `Z` or a numeric offset is read as an instant and stored as a UTC '
   + 'instant (`YYYY-MM-DDTHH:MM:SS.sssZ`), the same form `/complete` writes. A value without offset is household '
@@ -26,17 +32,17 @@ const LAST_COMPLETED_INPUT = '`last_completed` with `Z` or a numeric offset is r
 export function housekeepingPaths() {
   return {
     '/api/v1/housekeeping/dashboard': {
-      get: op({ summary: 'Get housekeeping dashboard', tag: 'Housekeeping', description: RECEIPT_NOTE }),
+      get: op({ summary: 'Get housekeeping dashboard', tag: 'Housekeeping', description: RECEIPT_NOTE + HOUSEHOLD_DAY_NOTE }),
     },
     '/api/v1/housekeeping/task-templates': {
       get: op({ summary: 'List housekeeping task templates', tag: 'Housekeeping' }),
     },
     '/api/v1/housekeeping/worker': {
-      get: op({ summary: 'Get primary housekeeper profile', tag: 'Housekeeping', description: RECEIPT_NOTE }),
+      get: op({ summary: 'Get primary housekeeper profile', tag: 'Housekeeping', description: RECEIPT_NOTE + HOUSEHOLD_DAY_NOTE }),
       post: op({ summary: 'Create or update housekeeper profile', tag: 'Housekeeping', admin: true, stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/housekeeping/workers': {
-      get: op({ summary: 'List housekeeper profiles', tag: 'Housekeeping', description: RECEIPT_NOTE }),
+      get: op({ summary: 'List housekeeper profiles', tag: 'Housekeeping', description: RECEIPT_NOTE + HOUSEHOLD_DAY_NOTE }),
     },
     '/api/v1/housekeeping/summary': {
       get: op({ summary: 'Get monthly housekeeping summary', tag: 'Housekeeping', description: RECEIPT_NOTE }),
@@ -45,7 +51,7 @@ export function housekeepingPaths() {
       get: op({ summary: 'List housekeeping work sessions for a month', tag: 'Housekeeping', description: RECEIPT_NOTE }),
     },
     '/api/v1/housekeeping/work-sessions/check-in': {
-      post: op({ summary: 'Check in a housekeeper', tag: 'Housekeeping', stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Check in a housekeeper', tag: 'Housekeeping', description: HOUSEHOLD_DAY_NOTE.trim(), stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/housekeeping/work-sessions/check-out': {
       post: op({ summary: 'Check out a housekeeper', tag: 'Housekeeping', stateChanging: true, requestBody: jsonBody(null) }),

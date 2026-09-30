@@ -10,7 +10,7 @@ node tools/installer/install-server.js
 # Open http://localhost:8090
 ```
 
-Requires Node.js 22+ on the host. The browser-based wizard is fully localized (24 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
+Requires Node.js 22+ on the host. The browser-based wizard is fully localized (25 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
 
 ### Option B — CLI Installer (Linux / macOS)
 
@@ -19,7 +19,7 @@ git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
 bash install.sh
 ```
 
-The script checks prerequisites, generates security keys, asks for the base URL your household will use, configures optional integrations (weather via Open-Meteo coordinates, calendars, document storage), starts the container (Docker or Podman — auto-detected), and creates your admin account. Like the web installer, it is fully localized in 24 languages and auto-detects yours from the shell environment (`LANG`/`LC_ALL`).
+The script checks prerequisites, generates security keys, asks for the base URL your household will use, configures optional integrations (weather via Open-Meteo coordinates, calendars, document storage), starts the container (Docker or Podman — auto-detected), and creates your admin account. Like the web installer, it is fully localized in 25 languages and auto-detects yours from the shell environment (`LANG`/`LC_ALL`).
 
 Running it again on an existing installation is safe, in two ways:
 
@@ -28,7 +28,7 @@ Running it again on an existing installation is safe, in two ways:
 
 > **Base URL.** The script asks for the absolute origin your household will open (default `http://<host>:<port>`) and writes it as `BASE_URL`. Behind a reverse proxy, enter the public address there — for example `https://yuvomi.example.com`. Without it the server sends no password-reset or invitation emails at all, because it deliberately does not trust the request's `Host` header.
 
-Force a specific language with `--lang` (one of `de en es fr it sv el ru tr zh ja ar hi pt uk pl nl cs vi hu ko id fa fil`):
+Force a specific language with `--lang` (one of `de en es fr it sv el ru tr zh ja ar hi pt-BR pt uk pl nl cs vi hu ko id fa fil`):
 
 ```bash
 bash install.sh --lang de
@@ -45,17 +45,34 @@ bash install.sh --env-file /path/to/.env
 ```bash
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example
-cp .env.example .env  # set SESSION_SECRET and DB_ENCRYPTION_KEY
+cp .env.example .env
+openssl rand -hex 32   # SESSION_SECRET
+openssl rand -hex 32   # DB_ENCRYPTION_KEY
+```
+
+> **Now open `.env` and replace both `REPLACE_WITH_…` placeholders** with the two values you just
+> generated, in that order, and write the second one down: it is the database key, and nothing can
+> recover it. With a placeholder left in, Yuvomi refuses to start. To run without encryption, clear
+> the `DB_ENCRYPTION_KEY` line instead of filling it.
+
+```bash
 docker compose up -d
 ```
 
-**Podman (RHEL / Fedora / CentOS Stream):** grab `podman-compose.yml` instead — it
+**Podman (RHEL / Fedora / CentOS Stream):** grab `podman-compose.yml` instead - it
 adds the SELinux `:Z` relabel so the rootless container can write to its volumes:
 
 ```bash
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/podman-compose.yml
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example
-cp .env.example .env  # set SESSION_SECRET and DB_ENCRYPTION_KEY
+cp .env.example .env
+openssl rand -hex 32   # SESSION_SECRET
+openssl rand -hex 32   # DB_ENCRYPTION_KEY
+```
+
+Fill in `.env` as described above, then start it:
+
+```bash
 podman compose -f podman-compose.yml up -d   # or: podman-compose -f podman-compose.yml up -d
 ```
 
@@ -234,17 +251,17 @@ node tools/installer/install-server.js
 
 #### 3. Open the Wizard
 
-Open your browser and navigate to **http://localhost:8090**. The wizard detects your browser language (24 languages supported), verifies that a container engine is available (Docker with Compose v2, or Podman with `podman compose` / `podman-compose`), and reports an existing `.env` file as well as a running container before you start. When it finds one, the **simple setup is disabled** and you continue with the advanced setup: the simple path writes fixed values for host, port, `SESSION_SECURE` and `TRUST_PROXY`, which would silently downgrade an installation that already runs behind a reverse proxy. The wizard then guides you through:
+Open your browser and navigate to **http://localhost:8090**. The wizard detects your browser language (25 languages supported), verifies that a container engine is available (Docker with Compose v2, or Podman with `podman compose` / `podman-compose`), and reports an existing `.env` file as well as a running container before you start. When it finds one, the **simple setup is disabled** and you continue with the advanced setup: the simple path writes fixed values for host, port, `SESSION_SECURE` and `TRUST_PROXY`, which would silently downgrade an installation that already runs behind a reverse proxy. The wizard then guides you through:
 
-- Basics - domain/IP, HTTP host port (`OIKOS_HTTP_PORT`), timezone (`TZ`, which pre-sets the household zone; that one is changeable later under Settings → Personal → Appearance → Region), how Yuvomi is exposed (`SESSION_SECURE`, `TRUST_PROXY`) and the public address (`BASE_URL`). The exposure choice follows the host you enter, and the wizard rejects an `http://` address combined with enforced secure cookies - nobody could sign in to that combination. A typed public address only counts once it names a full `http://` or `https://` origin; until then the wizard keeps the address it derives from host and port. A timezone the browser does not recognise (`Europe/Berln`) is refused on the spot instead of silently falling back to UTC
+- Basics - domain/IP, HTTP host port (`OIKOS_HTTP_PORT`), timezone (`TZ`, which pre-sets the household zone; that one is changeable later under Settings → Account → Appearance → Region), how Yuvomi is exposed (`SESSION_SECURE`, `TRUST_PROXY`) and the public address (`BASE_URL`). The exposure choice follows the host you enter, and the wizard rejects an `http://` address combined with enforced secure cookies - nobody could sign in to that combination. A typed public address only counts once it names a full `http://` or `https://` origin; until then the wizard keeps the address it derives from host and port. A timezone the browser does not recognise (`Europe/Berln`) is refused on the spot instead of silently falling back to UTC
 - Security key generation (`SESSION_SECRET`, `DB_ENCRYPTION_KEY`) — on a re-run, keys already present in your `.env` are kept rather than regenerated, so running the wizard again on a live installation cannot lock you out of your encrypted database
-- Optional integrations (weather, Google Calendar, Apple CalDAV)
+- Optional integrations (weather, Google Calendar, Outlook, Apple CalDAV)
 - Email/SMTP for the "forgot password" flow (`EMAIL_SMTP_*`, `EMAIL_FROM_*`)
-- Storage & backups — the host data folder (`DATA_DIR`), automatic backups, off-site WebDAV backups and the three document storage options. Everything that decides where data lives
+- Storage & backups — the host data folder (`DATA_DIR`), the upload limit for every file (`MAX_UPLOAD_MB`, 1-100 MB), automatic backups, off-site WebDAV backups and the three document storage options. Everything that decides where data lives
 - Advanced settings - Single Sign-On (OIDC), the four home-network permissions for calendar subscriptions, recipe mirrors, waste collection feeds and a WebDAV target (they lift the SSRF protection and are asked as one group), the calendar sync interval, live currency rates and the Web-Push contact. Everything that decides what Yuvomi connects to
 - Writing your `.env` file (an existing `.env` is backed up to `.env.bak-<timestamp>` first)
 - Starting the container (via Docker or Podman, whichever was detected)
-- Creating your admin account
+- Creating your admin account, in the language you set up in
 
 The final screen lets you **download a copy of your `.env`** — keep it safe, as it holds the encryption keys that cannot be recovered if lost. The file is fetched from the server rather than rebuilt in the browser, so it contains the real values, including keys carried over from an earlier run that the browser itself never receives. If the download fails (most likely because the installer has already shut down), the screen says so instead of reporting success, and points you at the `.env` on disk.
 
@@ -296,9 +313,9 @@ docker compose up -d
 Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no Node.js installation needed.
 
 > **Pinning a version.** Every release is also published under immutable tags:
-> `2.69.1` (exact version), `2.69` (latest patch of that minor), plus a moving `main`
+> `2.71.0` (exact version), `2.71` (latest patch of that minor), plus a moving `main`
 > tag for the current development state. To pin production to a known-good release,
-> set `image: ghcr.io/ulsklyc/yuvomi:2.69.1` in your compose file and bump it
+> set `image: ghcr.io/ulsklyc/yuvomi:2.71.0` in your compose file and bump it
 > deliberately; `latest` always points at the newest release.
 
 > **Verifying what you pull.** Every image the publish workflow builds is signed at build
@@ -307,7 +324,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > image you are about to run is one GitHub built from a release tag of this repository:
 >
 > ```bash
-> cosign verify ghcr.io/ulsklyc/yuvomi:2.69.1 \
+> cosign verify ghcr.io/ulsklyc/yuvomi:2.71.0 \
 >   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
 >   --certificate-identity-regexp '^https://github.com/ulsklyc/yuvomi/.github/workflows/docker-publish.yml@refs/tags/v'
 > ```
@@ -316,7 +333,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > anything else means the image is not one this repository released. The `main` tag is
 > signed too, under `refs/heads/main`, which the pattern above deliberately excludes. Tags
 > published before September 2026 carry no signature. Provenance and SBOM travel inside the
-> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.69.1 --format '{{ json .Provenance }}'`.
+> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.71.0 --format '{{ json .Provenance }}'`.
 
 Continue with [Step 4 — Verify](#4-verify-the-container-is-running).
 
@@ -361,7 +378,7 @@ docker compose logs -f
 You should see output like:
 
 ```
-yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.69.1
+yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.71.0
 yuvomi  | [Yuvomi] Environment: production
 yuvomi  | [Sync] Auto-sync active every 15 minutes.
 ```
@@ -511,7 +528,7 @@ All configuration happens in the `.env` file. The container reads these values o
 | `BIND_ADDRESS` | Address the Express server listens on. Unset means all interfaces, and a container needs exactly that: the published port only reaches the app this way, so leave it unset for Docker, Podman, Unraid, TrueNAS and Umbrel. Set it to `127.0.0.1` when Node runs directly on the host behind a reverse proxy on that host. It has to be an IP address: a host name, `localhost` included, is refused at startup, because the MCP bridge would resolve it again on every call and could reach another machine with the caller's credentials. An IPv6 address with a zone ID (`fe80::1%eth0`) is refused at startup: no URL can reach it, so the built-in MCP bridge could never call the API back. Not to be confused with `OIKOS_HTTP_BIND`, which decides where the container engine publishes the port. | all interfaces | No |
 | `OIKOS_HTTP_PORT` | Host port that the compose file maps to the container's port 3000. Change this to expose Yuvomi on a different host port; the app inside the container always listens on 3000. | `3000` | No |
 | `OIKOS_HTTP_BIND` | Host bind address for the published port (`podman-compose.yml` only). Set to `127.0.0.1` for rootless Podman behind a reverse proxy on the same host. | `0.0.0.0` | No |
-| `TZ` | Container timezone (e.g. `Europe/Berlin`). Affects log timestamps and the automated-backup schedule, and is the **default** for the household zone. Since v2.34.0 the household zone is a setting of its own (Settings → Personal → Appearance → Region), and where both exist the setting wins: `TZ` lives in the compose file, which is out of reach on Umbrel, TrueNAS and Unraid, and it also drives things that have nothing to do with the family calendar. Whichever applies is the zone used wherever a time carries none of its own: the calendar day server-side jobs call "today" (upcoming events, countdowns, recurring split expenses, birthdays), events pushed to Google Calendar when the target calendar reports no zone, events pushed to Outlook, events pushed to a CalDAV server (#938 - before that they carried no zone at all, leaving every server free to read them on its own clock), the due times of CalDAV reminders synced into Tasks, and the times in the exported calendar feed (`/feed/calendar/<token>.ics`), which subscribers read in this zone - a wrong zone shifts every appointment for everyone subscribed. **Since v2.36.0 the app's own display follows it too**, so a device travelling in another zone shows the household's clock rather than its own; that half applies only when the setting is set, since `TZ` alone leaves the display on the browser as before. | `UTC` | No |
+| `TZ` | Container timezone (e.g. `Europe/Berlin`). Affects log timestamps and the automated-backup schedule, and is the **default** for the household zone. Since v2.34.0 the household zone is a setting of its own (Settings → Account → Appearance → Region), and where both exist the setting wins: `TZ` lives in the compose file, which is out of reach on Umbrel, TrueNAS and Unraid, and it also drives things that have nothing to do with the family calendar. Whichever applies is the zone used wherever a time carries none of its own: the calendar day server-side jobs call "today" (upcoming events, countdowns, recurring split expenses, birthdays), events pushed to Google Calendar when the target calendar reports no zone, events pushed to Outlook, events pushed to a CalDAV server (#938 - before that they carried no zone at all, leaving every server free to read them on its own clock), the due times of CalDAV reminders synced into Tasks, and the times in the exported calendar feed (`/feed/calendar/<token>.ics`), which subscribers read in this zone - a wrong zone shifts every appointment for everyone subscribed. **Since v2.36.0 the app's own display follows it too**, so a device travelling in another zone shows the household's clock rather than its own; that half applies only when the setting is set, since `TZ` alone leaves the display on the browser as before. | `UTC` | No |
 | `NODE_ENV` | Runtime environment | `production` | No |
 | `LOG_LEVEL` | Lowest severity written to the container log (`debug`, `info`, `warn`, `error`). Set to `debug` to see the per-run detail of the calendar, contact and holiday sync, which stays quiet at `info` when a run has nothing to do. | `info` | No |
 | `TRUST_PROXY` | Number of reverse-proxy hops to trust, or a subnet string (e.g. `1`, `172.16.0.0/12`, `loopback`). The default already trusts a single hop, so `req.ip` returns the real client IP behind one Caddy/Nginx/Traefik proxy without any configuration. Set to `loopback` for direct, proxy-less deployments, or to a subnet/higher hop count behind multiple proxy layers. Numeric values are treated as a hop count; named values (`loopback`, `linklocal`, `uniquelocal`) work as expected. | `1` | No |
@@ -538,7 +555,7 @@ openssl rand -hex 32
 Push notifications deliver due reminders to a device as system notifications even when the app
 is closed. **Requires HTTPS** (the Push API and service workers only work over a secure origin —
 see [HTTPS / Reverse Proxy](#https--reverse-proxy-nginx)). Each device opts in under
-Settings → Personal → Notifications.
+Settings → Account → Notifications.
 
 Admins can also add household Gotify, ntfy, generic HTTP webhook or email channels on the same
 settings page. These channels are configured in the UI and do not require environment variables. The
@@ -555,7 +572,7 @@ stops delivering until the switch is set, and records the reason on the channel.
 
 An **email** channel is the exception: it has no base URL and no credentials of its own. It reuses
 the app-wide SMTP access that already sends password resets and invitations, so configure
-Settings → Email (or `EMAIL_SMTP_*`) first - the provider list marks email as not ready until you
+Settings → Household → Email (or `EMAIL_SMTP_*`) first - the provider list marks email as not ready until you
 have. Each channel holds one recipient address; add a second channel for a second recipient. Set
 `BASE_URL` if you want the reminder mails to carry a link back into the app.
 
@@ -568,7 +585,7 @@ without needing a service-specific adapter; see the
 |----------|-------------|---------|----------|
 | `VAPID_PUBLIC_KEY` | VAPID public key. Auto-generated on first use and stored in the database if unset. | auto | No |
 | `VAPID_PRIVATE_KEY` | VAPID private key. Set together with the public key to pin a fixed pair across redeployments. | auto | No |
-| `VAPID_SUBJECT` | Contact URI (`mailto:` address or `https:` origin) sent to push services. Must be routable — Apple rejects a `localhost`, `.local` or otherwise unreachable subject with `403 BadJwtToken`, which disables push on iOS while Android keeps working. Falls back to the sender address from Settings → Administration → Email, then to `BASE_URL`, then to a placeholder. | derived, see description | No |
+| `VAPID_SUBJECT` | Contact URI (`mailto:` address or `https:` origin) sent to push services. Must be routable — Apple rejects a `localhost`, `.local` or otherwise unreachable subject with `403 BadJwtToken`, which disables push on iOS while Android keeps working. Falls back to the sender address from Settings → Household → Email, then to `BASE_URL`, then to a placeholder. | derived, see description | No |
 
 Generate a fixed key pair (optional):
 
@@ -616,7 +633,7 @@ household notification channel** next to Gotify, ntfy and webhooks, and **sendin
 to whichever household member is doing the run. All three share one SMTP configuration - there is
 no second set of credentials per channel. Set `BASE_URL` as well if you want reminder mails to
 carry a link back into the app; without it they arrive without one rather than with a dead one.
-Can also be configured in Settings → Administration → Email. Precedence is per field, like WebDAV document storage
+Can also be configured in Settings → Household → Email. Precedence is per field, like WebDAV document storage
 below: every non-empty environment value overrides only its corresponding database value and
 makes exactly that field read-only in the settings UI; empty values fall back to the database.
 
@@ -634,9 +651,9 @@ makes exactly that field read-only in the settings UI; empty values fall back to
 \* Not required to start Yuvomi. Without it (or without SMTP configured) the self-service reset
 cannot deliver a mail, so the login page hides the "Forgot password" link entirely rather than
 offering a dead end — an admin can still reset a member's password directly under
-Settings → Administration → Family.
+Settings → Household → Family.
 
-The "Test connection" button in Settings → Administration → Email verifies the SMTP connection and
+The "Test connection" button in Settings → Household → Email verifies the SMTP connection and
 sends a probe email to the signed-in admin's own linked address. The SMTP password is never
 returned by the API once saved; it is stored in the database the same way as other integration
 credentials (e.g. the Apple app-specific password), with encryption-at-rest available via the
@@ -644,7 +661,7 @@ optional `DB_ENCRYPTION_KEY`.
 
 ### Immich Photo Screensaver (Optional)
 
-Connect a self-hosted Immich server under **Settings → Administration → Immich** to show random
+Connect a self-hosted Immich server under **Settings → Household → Integrations → Immich** to show random
 photos after five minutes without activity. The administration page can test the connection and
 open an immediate preview. An optional album UUID limits the selection; otherwise Yuvomi uses the
 whole accessible library. The Immich API key needs `asset.read` and `asset.view` permissions.
@@ -755,7 +772,7 @@ environment:
 
 ### WebDAV Document Storage (Optional)
 
-Admins can configure **Settings → Sync → Document storage** as the global destination for all
+Admins can configure **Settings → Modules → Documents → Document storage** as the global destination for all
 new document files, including calendar attachments. Existing local documents are not migrated.
 Uploads fail closed: if WebDAV cannot accept the file, Yuvomi rejects the upload instead of silently
 storing it in SQLite. Disabling WebDAV changes only future uploads; existing WebDAV documents remain
@@ -804,7 +821,7 @@ Drive files and never creates public permissions.
 | `GOOGLE_DRIVE_CLIENT_SECRET` | Optional Drive-specific OAuth client secret | Reuses `GOOGLE_CLIENT_SECRET` | No |
 | `GOOGLE_DRIVE_REDIRECT_URI` | Exact Drive Documents callback URL | — | Yes when Drive is configured |
 
-After deployment, open **Settings → Sync → Document storage**, connect Google Drive, test the
+After deployment, open **Settings → Modules → Documents → Document storage**, connect Google Drive, test the
 connection, then explicitly select Google Drive as the upload destination. Connecting does not
 activate it. New files are placed in the visible private `Yuvomi/Documents` folder; the opaque Drive
 file ID is stored in SQLite. The environment-managed local-folder backend still takes precedence.
@@ -823,7 +840,7 @@ Drive token state without revoking shared Google credentials.
 
 ### Weather (Optional)
 
-The weather widget defaults to **Open-Meteo** — free, ECMWF-backed, and requiring **no API key**. Just set your coordinates (find them on [openstreetmap.org](https://www.openstreetmap.org) or Google Maps). You can also configure this in-app under **Settings → Administration → Household weather** (admin only), which takes precedence over the environment variables and acts as the household default. Any user can additionally set their own personal location under **Settings → Personal → My Weather**, which overrides the household default just for their own dashboard widget.
+The weather widget defaults to **Open-Meteo** — free, ECMWF-backed, and requiring **no API key**. Just set your coordinates (find them on [openstreetmap.org](https://www.openstreetmap.org) or Google Maps). You can also configure this in-app under **Settings → Household → Integrations → Household weather** (admin only), which takes precedence over the environment variables and acts as the household default. While no location is saved there, that page names the weather configured through the environment variables and shows its location and units read-only; removing a saved location hands over to the environment variables again. Any user can additionally set their own personal location under **Settings → Account → My Weather**, which overrides the household default just for their own dashboard widget.
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
@@ -873,7 +890,7 @@ the same kind, listed in the same table.
 | `GOOGLE_CLIENT_SECRET` | OAuth 2.0 Client Secret | - | No |
 | `GOOGLE_REDIRECT_URI` | OAuth callback URL | `https://<YOUR-DOMAIN>/api/v1/calendar/google/callback` | No |
 
-After connecting, enable the calendars to sync under **Settings → Sync**. The sync runs both ways:
+After connecting, enable the calendars to sync under **Settings → Modules → Calendar → Calendar sync**. The sync runs both ways:
 events created, edited, deleted, or moved to another calendar in Yuvomi are applied in Google as
 well, and changes made in Google flow back. Outbound changes are attempted immediately and retried
 by the next sync run (`SYNC_INTERVAL_MINUTES`) if Google is unreachable. A calendar is only written
@@ -911,14 +928,14 @@ One-way push **Yuvomi → Outlook.com** for personal Microsoft accounts (outlook
 4. After creation, copy the **Application (client) ID** → `MS_CLIENT_ID`.
 5. **Certificates & secrets → New client secret** → copy the secret **Value** (shown only once) → `MS_CLIENT_SECRET`. Note the expiry (max. 24 months) — you must create a new secret before it expires.
 6. API permissions are requested dynamically via OAuth scopes (`Calendars.ReadWrite`, `User.Read`, `offline_access` — delegated); no admin consent is needed for personal accounts.
-7. Set the three `MS_*` variables in `.env`, restart Yuvomi, then connect each family member's account under **Settings → Synchronization → More providers → Outlook** (admin only).
+7. Set the three `MS_*` variables in `.env`, restart Yuvomi, then connect each family member's account under **Settings → Modules → Calendar → Calendar sync → More providers → Outlook** (admin only).
 8. After connecting, no calendars are enabled yet. Recommended setup: create a **dedicated calendar in Outlook** (e.g. "Yuvomi"), refresh the calendar list, pick it as the **auto-sync target calendar**, and choose which family member the account belongs to — from then on all Yuvomi events visible to that person are pushed there automatically, with assigned members appended to the title (`Dinner (Anna, Ben)`). Alternatively (or additionally), individual events can pick an explicit Outlook target in the event dialog; an explicit target overrides the auto-sync calendar for that event.
 
 **Limitations (one-way push):** recurring events support Yuvomi's RRULE subset only; excluded single occurrences (EXDATE) are not propagated; no attendees, reminders, attachments, or colors. **Times follow the household zone since v2.34.0 (#829)** - until then `Europe/Berlin` was hard-coded here, justified as parity with the Google outbound sync although that one already read the target calendar's own zone and only fell back to `TZ`; a household in Toronto pushed every appointment six hours out. Refresh tokens for personal accounts expire after ~90 days of inactivity — the account then shows a "reconnect" button.
 
 ### Apple Calendar Sync — Legacy Single-Account (Optional)
 
-> **Note:** Since v0.44.0, multi-account CalDAV (iCloud, Nextcloud, Radicale, Baikal) is managed through **Settings → Synchronization** in the UI. These env vars configure a single Apple CalDAV account at startup and remain supported for backwards compatibility.
+> **Note:** Since v0.44.0, multi-account CalDAV (iCloud, Nextcloud, Radicale, Baikal) is managed through **Settings → Modules → Calendar → Calendar sync** in the UI. These env vars configure a single Apple CalDAV account at startup and remain supported for backwards compatibility.
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
@@ -944,7 +961,7 @@ upgrade to v1.52.0 need one sync run before edits and deletions can reach them.
 ### Two-Factor Authentication (Optional)
 
 Nothing to configure — there is no environment variable, and Yuvomi never reaches the network for
-this. Each member turns it on for themselves under **Settings → Personal → Account**: scan the QR
+this. Each member turns it on for themselves under **Settings → Account → Account**: scan the QR
 code with any authenticator app (or type the secret by hand), enter the six-digit code once, and
 store the ten recovery codes that appear. They are shown exactly once; afterwards the server only
 holds their hashes.
@@ -955,7 +972,7 @@ once — for the case where the device is gone.
 **Turning it off asks for a code, not the password.** Against a hijacked session only the second
 factor helps, and accounts that sign in via SSO have no password to prove anything with.
 
-**Household-wide requirement.** Under **Settings → Administration → Family**, an admin sees who has
+**Household-wide requirement.** Under **Settings → Household → Family**, an admin sees who has
 already set it up and can make it mandatory. The requirement blocks *turning off* and puts a notice
 on every account page without a second factor — it deliberately does not reject sessions that
 already exist, because in a household where nobody has set it up yet that would lock everyone out,
@@ -986,12 +1003,12 @@ Pocket ID documents Yuvomi as one of its [client examples](https://pocket-id.org
 
 When all four OIDC variables are set, a **"Sign in with SSO"** button appears on the login page. The flow uses Authorization Code + PKCE (S256) with a nonce. On first login, the user is matched by their OIDC `sub`. If no match exists, an existing local account is linked automatically **only when the provider reports a verified email (`email_verified: true`), exactly one account not yet linked holds that email address, and that address can only have been set by an admin** - that is, the account has no password ("SSO sign-in only", see below) or it is an admin account. Guests of shared expenses are never linked this way and do not count. Two things are refused instead of guessed, and neither creates an account:
 
-- **The address is on more than one account.** The sign-in is refused with "Your email address belongs to more than one account here"; keep the address on one account only (Settings → Administration → Family) and have the person sign in again.
-- **The address belongs to a member account that has a password.** A member maintains their own address and could enter someone else's, so the first SSO sign-in of that other person would land in the member's account. The sign-in is refused with a message that points to the fix: the person signs in with their password and links SSO under **Settings → Account → Single sign-on**, or an admin switches the account to "SSO sign-in only" under **Settings → Administration → Family**, after which the next SSO sign-in links it.
+- **The address is on more than one account.** The sign-in is refused with "Your email address belongs to more than one account here"; keep the address on one account only (Settings → Household → Family) and have the person sign in again.
+- **The address belongs to a member account that has a password.** A member maintains their own address and could enter someone else's, so the first SSO sign-in of that other person would land in the member's account. The sign-in is refused with a message that points to the fix: the person signs in with their password and links SSO under **Settings → Account → Single sign-on**, or an admin switches the account to "SSO sign-in only" under **Settings → Household → Family**, after which the next SSO sign-in links it.
 
 Unverified emails never take over an existing account; without a match a new account is provisioned (unless `OIDC_ALLOW_SIGNUP=false`). If your provider omits the `email_verified` claim, set `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` to enable linking. A member cannot set an email address on their own profile, their own contact or a shared-expense guest that already belongs to another account; an admin can, for example for a shared family mailbox, and SSO then treats that address as ambiguous.
 
-**Who gets an account.** By default every identity your provider accepts gets one on first sign-in - convenient for a provider you run for this household alone, but a directory is a list of people, not a list of household members. Set `OIDC_ALLOW_SIGNUP=false` and provisioning stops: an unknown identity is turned away with "There is no account here yet for this SSO sign-in" instead of the generic SSO error, while known accounts sign in as before. Linking still happens too, which is what makes the switch usable: create the account under **Settings → Administration → Family** with the member's email address and "SSO sign-in only" switched on, and their first SSO sign-in binds the two together (the provider must report `email_verified: true`, or the account owner links it themselves under **Settings → Account → Single sign-on**).
+**Who gets an account.** By default every identity your provider accepts gets one on first sign-in - convenient for a provider you run for this household alone, but a directory is a list of people, not a list of household members. Set `OIDC_ALLOW_SIGNUP=false` and provisioning stops: an unknown identity is turned away with "There is no account here yet for this SSO sign-in" instead of the generic SSO error, while known accounts sign in as before. Linking still happens too, which is what makes the switch usable: create the account under **Settings → Household → Family** with the member's email address and "SSO sign-in only" switched on, and their first SSO sign-in binds the two together (the provider must report `email_verified: true`, or the account owner links it themselves under **Settings → Account → Single sign-on**).
 
 **Making SSO the only way in.** Even with SSO configured, Yuvomi keeps a second door open: the login form stays, password reset stays, and every account carries a password hash. Set `AUTH_ALLOW_PASSWORD_LOGIN=false` and that door closes - the login page shows nothing but the SSO button, `POST /auth/login` is refused outright (the rule sits on the route, not just on the page), and password reset disappears with it rather than staying as a route that can still send mail. **One exception is offered, and only where it applies (#962):** guests of shared expenses stay exempt from the switch, because they are external people with no entry in your identity provider, so a household that has such guests keeps a second button for them. A household that has none sees no second button - it used to appear regardless, which looked like a hole in the bolt you had just closed.
 
@@ -999,12 +1016,12 @@ Three things are deliberate:
 
 - **The switch only takes effect once somebody can actually get in through SSO.** Two conditions: all four OIDC variables set, and at least one administrator account already linked to the provider. Until then password login stays on and the server says so on startup. The second condition is what makes a fresh install work - it creates its first administrator through `/setup` with a password, and that account would otherwise be dead the moment it was created, with `/setup` closed behind it. Sign in once through SSO to link the admin account (an admin account links through its verified email address; otherwise use **Settings → Account → Single sign-on**), and the switch takes hold from then on. Members who still have a password link the same way before the switch takes hold, or an admin switches their accounts to "SSO sign-in only".
 - **Invitations adapt.** While the switch is in effect, accepting an invitation creates an account with no password, linked on first SSO sign-in through the invitation's email address. An invitation without an email address is refused rather than consumed into an account nobody can reach.
-- **Existing passwords are not touched.** Setting the variable back to `true` restores the form exactly as it was. Removing a password is a per-account decision instead: **Settings → Administration → Family** offers "SSO sign-in only" both when creating a member and when editing one. An account switched this way carries a placeholder no password can ever match; switching it back requires setting a new password in the same step, so the account is never left with no way in at all.
+- **Existing passwords are not touched.** Setting the variable back to `true` restores the form exactly as it was. Removing a password is a per-account decision instead: **Settings → Household → Family** offers "SSO sign-in only" both when creating a member and when editing one. An account switched this way carries a placeholder no password can ever match; switching it back requires setting a new password in the same step, so the account is never left with no way in at all.
 - **Recovery is a documented `.env` change.** If the identity provider becomes unreachable, remove the line and restart. A break-glass admin account with a password would defeat the point of the switch, so there is none.
 
-**Creating an account without a password.** Preparing an account for an SSO user used to mean inventing a password - and the invented password stayed a working credential. With OIDC configured, the "SSO sign-in only" toggle under **Settings → Administration → Family** creates the account without one. Such an account needs an email address, and one that belongs to no other member: an account with no password and no linkable identity could never be signed into, because a matching *username* deliberately never links. This works whether or not `AUTH_ALLOW_PASSWORD_LOGIN` is set, so a household can run mixed: some members with a password, some SSO-only.
+**Creating an account without a password.** Preparing an account for an SSO user used to mean inventing a password - and the invented password stayed a working credential. With OIDC configured, the "SSO sign-in only" toggle under **Settings → Household → Family** creates the account without one. Such an account needs an email address, and one that belongs to no other member: an account with no password and no linkable identity could never be signed into, because a matching *username* deliberately never links. This works whether or not `AUTH_ALLOW_PASSWORD_LOGIN` is set, so a household can run mixed: some members with a password, some SSO-only.
 
-**Username of a newly provisioned account.** The name is taken from the first claim that yields something usable: `preferred_username`, then the non-standard `username` claim (Synology DSM SSO sends the plain account name there, where `sub` still carries the directory part), then `sub`. The email address is deliberately not a candidate: a household often shares one address across several members, so it identifies nobody, and its domain part only makes the name unwieldy. Whichever claim wins is reduced to the format every username in Yuvomi follows (`a-z A-Z 0-9 . _ -`, 3 to 64 characters), with accents transliterated and anything else turned into a hyphen. Admins can rename the account afterwards under **Settings → Administration → Family**; sign-in keeps working either way, because the identity hangs on `sub`, not on the name.
+**Username of a newly provisioned account.** The name is taken from the first claim that yields something usable: `preferred_username`, then the non-standard `username` claim (Synology DSM SSO sends the plain account name there, where `sub` still carries the directory part), then `sub`. The email address is deliberately not a candidate: a household often shares one address across several members, so it identifies nobody, and its domain part only makes the name unwieldy. Whichever claim wins is reduced to the format every username in Yuvomi follows (`a-z A-Z 0-9 . _ -`, 3 to 64 characters), with accents transliterated and anything else turned into a hyphen. Admins can rename the account afterwards under **Settings → Household → Family**; sign-in keeps working either way, because the identity hangs on `sub`, not on the name.
 
 **Linking an existing account yourself.** A matching *username* deliberately never links: anyone who names themselves `admin` at the identity provider would otherwise take over the local admin account. If neither the `sub` nor a verified email matches, the first SSO sign-in therefore creates a separate account - same name with a numeric suffix (`test1-1`), and the original account's data stays where it is. (A verified email that matches a member account with a password no longer does this: that sign-in is refused and names this card as the way in.) The way to merge the two is to sign in locally and open **Settings → Account → Single sign-on**, where "Link SSO account" runs the same provider flow and binds the resulting `sub` to the account you are signed in as. Being signed in is the point: the session names the local account and the provider names the remote one, which together prove ownership of both. Linking is refused when that `sub` already belongs to another account. The same card removes a link again - except on an account that was created through SSO, because it holds no password and the link is its only way in; set a password first.
 
@@ -1023,7 +1040,7 @@ domains and inspect those sites directly; they do not scrape search-engine image
 
 ### Automated Backups (Optional)
 
-Built-in cron-based database backup (default: 2 AM daily, keep last 7 copies). Status and manual trigger available in **Settings → Administration → Backup and restore**.
+Built-in cron-based database backup (default: 2 AM daily, keep last 7 copies). Status and manual trigger available in **Settings → Household → Backup and restore**.
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
@@ -1033,7 +1050,7 @@ Built-in cron-based database backup (default: 2 AM daily, keep last 7 copies). S
 | `BACKUP_KEEP` | Number of most-recent backup files to retain | `7` | No |
 | `BACKUP_UPLOAD_LIMIT` | Maximum size of a backup file uploaded for restore through the admin UI (Express body-limit syntax). Raise it when restoring a database larger than the default. | `100mb` | No |
 
-**WebDAV backup target (optional):** After each local backup, Yuvomi can automatically upload the file to any WebDAV-compatible server (Nextcloud, ownCloud, Hetzner Storage Box, Infomaniak kDrive, etc.). Configure in **Settings → Administration → Backup and restore → WebDAV Backup Target**, or via environment variables (env vars take precedence over the UI):
+**WebDAV backup target (optional):** After each local backup, Yuvomi can automatically upload the file to any WebDAV-compatible server (Nextcloud, ownCloud, Hetzner Storage Box, Infomaniak kDrive, etc.). Configure in **Settings → Household → Backup and restore → WebDAV Backup Target**, or via environment variables (env vars take precedence over the UI):
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
@@ -1244,6 +1261,8 @@ update, and a backup written by a newer version is refused with a message to upd
 
 The SQLite database lives in the host folder configured through `DATA_DIR` and is mounted at `/data` inside the container. The database file is `/data/yuvomi.db`.
 
+Next to it, Yuvomi keeps `yuvomi.db.lock` while it runs (see [Restore](#restore)); leave it in place.
+
 Scheduled backups are written to the host folder configured through `BACKUP_DIR` and mounted at `/backups` inside the container.
 
 > **WebDAV documents are outside the database.** A SQLite/database backup contains their metadata
@@ -1259,7 +1278,7 @@ docker compose exec yuvomi node -e "import('./server/db.js').then(async db => { 
 docker cp yuvomi:/data/yuvomi-backup.db ./yuvomi-backup-$(date +%Y%m%d).db
 ```
 
-Admins can also download a backup from **Settings → Administration → Backup and restore**.
+Admins can also download a backup from **Settings → Household → Backup and restore**.
 
 If you want to store the database and backups in specific local folders, set these in `.env` before starting Compose:
 
@@ -1270,7 +1289,7 @@ BACKUP_DIR=./backups
 
 ### Restore
 
-Admins can restore a backup from **Settings → Administration → Backup and restore**. For operational restores via Docker Compose, stop the running app, mount the backup into a temporary container that uses the same Docker volume, and replace the database file:
+Admins can restore a backup from **Settings → Household → Backup and restore**. For operational restores via Docker Compose, stop the running app, mount the backup into a temporary container that uses the same Docker volume, and replace the database file:
 
 ```bash
 SERVICE=yuvomi
@@ -1290,7 +1309,11 @@ For a local CLI restore outside Docker, stop Yuvomi first, set the same environm
 DB_PATH=/path/to/yuvomi.db node --import dotenv/config scripts/restore-backup.js ./yuvomi-backup-20260401.db
 ```
 
-The restore helper validates that the file is a Yuvomi database and undamaged (every page is checked), and refuses one written by a newer Yuvomi than the one running (update first, then restore), before replacing the active database. The replacement is written next to the database file and swapped in with a single rename, so an interrupted restore leaves the old database in place. It also keeps a pre-restore copy next to the database file for emergency rollback. The CLI restore is not coordinated with a running server - a restore from the settings page at the same time, or the server's open connection to the replaced file, would work against it - so run it only while Yuvomi is stopped.
+The restore helper validates that the file is a Yuvomi database and undamaged (every page is checked), and refuses one written by a newer Yuvomi than the one running (update first, then restore), before replacing the active database. The replacement is written next to the database file and swapped in with a single rename, so an interrupted restore leaves the old database in place. It also keeps a pre-restore copy next to the database file for emergency rollback. Yuvomi has to be stopped for a CLI restore: the restore refuses to run while a Yuvomi server uses the database (`Restore refused: A Yuvomi server is using ...`), and a server that starts while a CLI restore runs waits until it has finished, with a log line every 30 seconds. Both hold a lock on `yuvomi.db.lock` next to the database file. The operating system holds that lock and drops it when the process ends, also after a crash, so there is nothing to clean up.
+
+- **Never delete `yuvomi.db.lock`** while Yuvomi runs: a new file would carry a new lock, and a CLI restore would no longer see the running server. Deleting it while Yuvomi is stopped is harmless; it is recreated on the next start. It is a few kilobytes and can go into backups of the data folder.
+- The lock works between processes that share one kernel: a server and a CLI restore on the same host, in the same container or in two containers on the same volume. It does not reach across machines, and not from macOS or Windows into a container of Docker Desktop through a bind mount - a CLI restore on the host does not see a server in the container there. On NFS mounted with `nolock` and SMB mounted with `nobrl`, locks only apply on the host that took them. SQLite depends on the same locks for the database itself, which is why the database should not be shared between machines at all.
+- If the file system cannot take the lock at all (the file cannot be created or written, or locks are not supported), Yuvomi and the CLI restore log `Could not lock ...` and carry on without it, as before this lock existed. Then nothing stops a CLI restore next to a running server.
 
 ### Moving to a new server (backup from another installation)
 
@@ -1298,7 +1321,7 @@ A backup carries the encryption of the installation that wrote it, so a new inst
 
 Instead, restore with the old installation's key as the **backup key**:
 
-- **Settings → Administration → Backup and restore:** upload the file. When it does not open with this installation's key, the dialog asks for the backup key - enter the old installation's `DB_ENCRYPTION_KEY` and restore again.
+- **Settings → Household → Backup and restore:** upload the file. When it does not open with this installation's key, the dialog asks for the backup key - enter the old installation's `DB_ENCRYPTION_KEY` and restore again.
 - **API:** send the key as base64 of its UTF-8 bytes in the `X-Backup-Key` header of `POST /api/v1/backup/restore`. It is never read from the URL.
 - **CLI:** pass the key on stdin, never as an argument (it would show up in the process list):
 
@@ -1435,6 +1458,53 @@ To relabel existing host folders manually:
 ```bash
 chcon -Rt container_file_t ./data ./backups ./modules ./documents
 ```
+
+</details>
+
+<details>
+<summary>Weather, calendar subscriptions and other outside services stop working (rootless Podman)</summary>
+
+The app itself works, but everything that reaches out to the internet fails: the weather tile says
+"Weather currently unavailable", ICS subscriptions and CalDAV to outside servers stop updating. The
+log shows `fetch failed`:
+
+```bash
+podman logs oikos 2>&1 | grep '"level":"warn"' | tail
+```
+
+In production the log lines are JSON, so search for `"mod":"Weather"` rather than `[Weather]`.
+Test from inside the container:
+
+```bash
+podman exec oikos node -e "fetch('https://api.open-meteo.com').then(r=>console.log(r.status)).catch(e=>console.log('ERR',e.cause?.code))"
+```
+
+Any HTTP status (400 is fine here) means the container can reach the internet. `ERR ENETUNREACH`
+means it has no route out, even when name lookups still work. Check the container's routing
+table:
+
+```bash
+podman exec oikos cat /proc/net/route
+```
+
+If it shows only the header line, the rootless default network (`pasta`) left the container without
+any route. Restarting does not always help. Switch the unit to the rootless bridge network by adding
+this line under `[Container]` in `~/.config/containers/systemd/oikos.container`:
+
+```ini
+Network=podman
+```
+
+Then reload and restart:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user restart oikos
+```
+
+On the bridge network Yuvomi sees the bridge gateway instead of each client's address. Behind a
+reverse proxy that sets `X-Forwarded-For` this makes no difference; without one, sign-in lockout
+and rate limits count all clients as one.
 
 </details>
 

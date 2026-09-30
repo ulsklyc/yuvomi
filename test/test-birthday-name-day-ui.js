@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { getSupportedLocales } from '../public/i18n.js';
 import { readdirSync, readFileSync } from 'node:fs';
 
 const birthdays = await import('../public/pages/birthdays.js');
@@ -73,7 +74,7 @@ test('person list renders the name-day countdown, date and label after the birth
 test('name-day list label exists in every supported locale', () => {
   const localeDir = new URL('../public/locales/', import.meta.url);
   const files = readdirSync(localeDir).filter((file) => file.endsWith('.json'));
-  assert.equal(files.length, 24);
+  assert.equal(files.length, getSupportedLocales().length);
   for (const file of files) {
     const locale = JSON.parse(readFileSync(new URL(file, localeDir), 'utf8'));
     assert.equal(typeof locale.birthdays.celebratesNameDay, 'string', file);

@@ -24,7 +24,8 @@ import { tempDir } from './tmp-dir.js';
 
 const { baseUrl: BASE, server } = await startTestServer({
   name: 'restore-server',
-  env: { SESSION_SECRET: 'test-restore-server-secret-min-32-chars' },
+  // BASE_URL: ohne ihn verschickt /forgot-password keinen Link (#1532).
+  env: { SESSION_SECRET: 'test-restore-server-secret-min-32-chars', BASE_URL: 'http://127.0.0.1' },
 });
 const dbmod = await import('../server/db.js');
 
@@ -434,4 +435,247 @@ test('#1441 legt der Client waehrend der Anmeldung auf, wird ihr Handler trotzde
   const { restoreOutcome, sessionsInBackup, sessionsAfter } = await restoreDuringHeldLogin({ abortClient: true });
   assert.equal(sessionsAfter, sessionsInBackup, 'die eingespielte Datenbank traegt genau die Sitzungen des Backups');
   assert.equal(restoreOutcome, 'wartet auf die Anmeldung', 'der Restore wartet den noch laufenden Handler ab');
+});
+
+// ---------------------------------------------------------------------------
+// #1532: Arbeit, die nach der Antwort weiterlaeuft
+// ---------------------------------------------------------------------------
+
+/**
+ * Einen Restore neben einer haengenden Arbeit laufen lassen und die Arbeit erst
+ * freigeben, wenn der Restore fertig ist - hoechstens nach `holdMs`. Wartet der
+ * Restore auf sie, laeuft die Frist ab; tut er es nicht, ist er vorher fertig.
+ */
+async function restoreBesideHeldWork(backupPath, release, { holdMs = 3000 } = {}) {
+  const restore = dbmod.restoreFromFile(backupPath).then(() => 'eingespielt', (err) => err.reason ?? err.message);
+  let timer;
+  const outcome = await Promise.race([
+    restore.then((result) => `vor der Arbeit ${result}`),
+    new Promise((resolve) => { timer = setTimeout(() => resolve('wartet auf die Arbeit'), holdMs); }),
+  ]);
+  clearTimeout(timer);
+  release();
+  await restore;
+  return outcome;
+}
+
+function heldGate() {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  let reached;
+  const atGate = new Promise((resolve) => { reached = resolve; });
+  return { gate, atGate, reached, release };
+}
+
+async function csrfToken() {
+  const res = await fetch(`${BASE}/api/v1/notes`, { headers: { Cookie: COOKIE } });
+  const token = res.headers.get('x-csrf-token');
+  assert.ok(token, 'Vorbedingung: ein CSRF-Token');
+  return token;
+}
+
+test('#1532 die Reset-Mail nach der Antwort wird abgewartet und schreibt kein Token in die eingespielte Datenbank', async () => {
+  const database = dbmod.get();
+  const admin = database.prepare("SELECT id FROM users WHERE username = 'admin'").get();
+  const contact = database.prepare('SELECT id FROM contacts WHERE family_user_id = ?').get(admin.id);
+  if (contact) database.prepare("UPDATE contacts SET email = 'admin@example.org' WHERE id = ?").run(contact.id);
+  else database.prepare("INSERT INTO contacts (name, email, family_user_id) VALUES ('Admin', 'admin@example.org', ?)").run(admin.id);
+  database.prepare('DELETE FROM password_resets').run();
+
+  const { emailService } = await import('../server/services/email.js');
+  const real = { isConfigured: emailService.isConfigured, sendMail: emailService.sendMail };
+  const held = heldGate();
+  let mails = 0;
+  emailService.isConfigured = () => true;
+  emailService.sendMail = async () => {
+    mails += 1;
+    held.reached();
+    await held.gate;
+    return {};
+  };
+  const backupPath = join(tempDir('yuvomi-test-restore-server-'), 'backup.db');
+  let outcome;
+  try {
+    await dbmod.backupToFile(backupPath);
+    const ask = () => fetch(`${BASE}/api/v1/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: 'admin' }),
+    });
+    // Der erste Antrag legt sein Token an und haengt im Versand; der zweite
+    // wartet in der Kette auf ihn und legt sein Token erst danach an.
+    assert.equal((await ask()).status, 200, 'Vorbedingung: erster Antrag');
+    await held.atGate;
+    assert.equal((await ask()).status, 200, 'Vorbedingung: zweiter Antrag');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    outcome = await restoreBesideHeldWork(backupPath, held.release);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  } finally {
+    held.release();
+    emailService.isConfigured = real.isConfigured;
+    emailService.sendMail = real.sendMail;
+  }
+  assert.equal(mails >= 1, true, 'Vorbedingung: der Versand wurde erreicht');
+  const tokens = dbmod.get().prepare('SELECT COUNT(*) AS n FROM password_resets').get().n;
+  assert.equal(tokens, 0, 'die eingespielte Datenbank traegt nur die Tokens des Backups (keine)');
+  assert.equal(outcome, 'wartet auf die Arbeit', 'der Restore wartet den Versand nach der Antwort ab');
+});
+
+test('#1532 der Erwaehnungs-Push nach der Antwort wird abgewartet und schreibt nicht in die eingespielte Datenbank', async () => {
+  const csrf = await csrfToken();
+  const headers = { Cookie: COOKIE, 'X-CSRF-Token': csrf, 'Content-Type': 'application/json' };
+  const created = await fetch(`${BASE}/api/v1/auth/users`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ username: 'bea1532', display_name: 'Bea', password: 'beapass1234' }),
+  });
+  assert.ok([200, 201].includes(created.status), `Vorbedingung: zweites Mitglied (${created.status} ${await created.text()})`);
+  const bea = dbmod.get().prepare("SELECT id FROM users WHERE username = 'bea1532'").get();
+  const task = await fetch(`${BASE}/api/v1/tasks`, { method: 'POST', headers, body: JSON.stringify({ title: 'Erwaehnung #1532' }) });
+  assert.equal(task.status, 201, 'Vorbedingung: eine Aufgabe');
+  const taskId = (await task.json()).data.id;
+  const endpoint = 'https://push.example.org/1532';
+  dbmod.get().prepare('INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)')
+    .run(bea.id, endpoint, 'p256dh-1532', 'auth-1532');
+
+  const webpush = (await import('web-push')).default;
+  const realSend = webpush.sendNotification;
+  const held = heldGate();
+  let pushes = 0;
+  webpush.sendNotification = async () => {
+    pushes += 1;
+    held.reached();
+    await held.gate;
+    return { statusCode: 201 };
+  };
+  const backupPath = join(tempDir('yuvomi-test-restore-server-'), 'backup.db');
+  let outcome;
+  try {
+    await dbmod.backupToFile(backupPath);
+    const comment = await fetch(`${BASE}/api/v1/tasks/${taskId}/comments`, {
+      method: 'POST', headers, body: JSON.stringify({ comment: '@Bea schau mal' }),
+    });
+    assert.equal(comment.status, 201, 'Vorbedingung: der Kommentar');
+    await held.atGate;
+    outcome = await restoreBesideHeldWork(backupPath, held.release);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  } finally {
+    held.release();
+    webpush.sendNotification = realSend;
+  }
+  assert.equal(pushes, 1, 'Vorbedingung: der Push wurde erreicht');
+  const row = dbmod.get().prepare('SELECT last_used_at FROM push_subscriptions WHERE endpoint = ?').get(endpoint);
+  assert.equal(row?.last_used_at ?? null, null, 'die eingespielte Datenbank traegt den Stand des Backups (nie benutzt)');
+  assert.equal(outcome, 'wartet auf die Arbeit', 'der Restore wartet den Push nach der Antwort ab');
+});
+
+test('#1532 der Kalender-Sofortversuch beginnt waehrend eines Restores nicht, auch bei geschlossener Verbindung', async () => {
+  const outbound = await import('../server/services/calendar-outbound.js');
+  const restore = await restoreHeldWhileCopying({ phase: 'closed' });
+  let result;
+  try {
+    assert.equal(dbmod.isDatabaseOpen(), false, 'Vorbedingung: die Verbindung ist zu');
+    result = await outbound.flushOutbound().then((value) => value, (err) => ({ geworfen: err.message }));
+  } finally {
+    restore.release();
+    await restore.done;
+  }
+  assert.deepEqual(result, { success: false, skipped: 'restore_in_progress' });
+});
+
+// ---------------------------------------------------------------------------
+// #1551: GET-Anfragen, die nach einem await schreiben
+// ---------------------------------------------------------------------------
+
+/**
+ * Ein Outlook-Konto mit gueltigem Token (kein Refresh noetig) und ein
+ * `fetch`, das Graph beantwortet - auf Wunsch erst nach `held.release()`. `?refresh=true` holt die Kalenderliste von Graph
+ * und schreibt sie danach in `outlook_calendar_selection` - eine GET-Anfrage,
+ * die nach einem await schreibt.
+ */
+function outlookGraph({ hold = true } = {}) {
+  const envKeys = ['MS_CLIENT_ID', 'MS_CLIENT_SECRET', 'MS_REDIRECT_URI'];
+  const env = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+  process.env.MS_CLIENT_ID = 'client-1551';
+  process.env.MS_CLIENT_SECRET = 'secret-1551';
+  process.env.MS_REDIRECT_URI = 'http://127.0.0.1/api/v1/calendar/outlook/callback';
+  const database = dbmod.get();
+  database.prepare('DELETE FROM outlook_calendar_selection').run();
+  database.prepare('DELETE FROM outlook_accounts').run();
+  const accountId = database.prepare(`
+    INSERT INTO outlook_accounts (name, access_token, refresh_token, token_expiry)
+    VALUES ('Outlook 1551', 'access-1551', 'refresh-1551', ?)
+  `).run(new Date(Date.now() + 60 * 60 * 1000).toISOString()).lastInsertRowid;
+
+  const held = heldGate();
+  let graphCalls = 0;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (!String(url).startsWith('https://graph.microsoft.com/')) return realFetch(url, options);
+    graphCalls += 1;
+    if (hold) {
+      held.reached();
+      await held.gate;
+    }
+    return new Response(JSON.stringify({ value: [{ id: 'cal-1551', name: 'Familie', hexColor: '#123456', canEdit: true }] }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    });
+  };
+  const restoreEnv = () => {
+    globalThis.fetch = realFetch;
+    for (const key of envKeys) {
+      if (env[key] === undefined) delete process.env[key];
+      else process.env[key] = env[key];
+    }
+  };
+  return { accountId, held, graphCalls: () => graphCalls, restoreEnv };
+}
+
+test('#1551 eine GET-Anfrage, die nach dem Warten auf Graph schreibt, wird abgewartet und schreibt nicht in die eingespielte Datenbank', async () => {
+  const outlook = outlookGraph();
+  const backupPath = join(tempDir('yuvomi-test-restore-server-'), 'backup.db');
+  let outcome;
+  let status;
+  try {
+    await dbmod.backupToFile(backupPath);
+    const request = fetch(`${BASE}/api/v1/calendar/outlook/accounts/${outlook.accountId}/calendars?refresh=true`, {
+      headers: { Cookie: COOKIE },
+    });
+    await outlook.held.atGate;
+    outcome = await restoreBesideHeldWork(backupPath, outlook.held.release);
+    const res = await request;
+    status = res.status;
+    await res.arrayBuffer();
+  } finally {
+    outlook.held.release();
+    outlook.restoreEnv();
+  }
+  assert.equal(outlook.graphCalls(), 1, 'Vorbedingung: die Anfrage hat Graph erreicht');
+  assert.equal(status, 200, 'die Anfrage selbst gelingt');
+  const rows = dbmod.get().prepare('SELECT COUNT(*) AS n FROM outlook_calendar_selection').get().n;
+  assert.equal(rows, 0, 'die eingespielte Datenbank traegt die Kalenderauswahl des Backups (keine)');
+  assert.equal(outcome, 'wartet auf die Arbeit', 'der Restore wartet die GET-Anfrage ab');
+});
+
+test('#1551 waehrend eines Restores beginnt eine GET-Anfrage, die nach einem await schreibt, gar nicht erst', async () => {
+  // Graph antwortet sofort: ohne Abweisung schriebe die Anfrage danach in die
+  // gesperrte Verbindung.
+  const outlook = outlookGraph({ hold: false });
+  const restore = await restoreHeldWhileCopying();
+  let status;
+  let body;
+  try {
+    const res = await fetch(`${BASE}/api/v1/calendar/outlook/accounts/${outlook.accountId}/calendars?refresh=true`, {
+      headers: { Cookie: COOKIE },
+    });
+    status = res.status;
+    body = await res.json().catch(() => ({}));
+  } finally {
+    restore.release();
+    await restore.done;
+    outlook.restoreEnv();
+  }
+  assert.equal(status, 503, 'abgewiesen statt nach dem Warten auf Graph in die gesperrte Verbindung zu schreiben');
+  assert.equal(body.reason, 'restore_in_progress');
+  assert.equal(outlook.graphCalls(), 0, 'Graph wurde gar nicht erst gefragt');
 });

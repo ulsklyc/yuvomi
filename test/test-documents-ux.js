@@ -7,6 +7,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { getSupportedLocales } from '../public/i18n.js';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -524,7 +525,13 @@ test('every supported locale contains the complete folder-upload text set', () =
   for (const file of files) {
     const strings = JSON.parse(read(`../public/locales/${file}`)).documents?.folderUpload;
     assert.ok(strings, `${file}: documents.folderUpload is missing`);
-    assert.deepEqual(Object.keys(strings).sort(), expectedKeys, `${file}: key set does not match`);
+    // Pluralvarianten der eigenen Sprache (cs `uploadAction_few`) sind erlaubt, alle
+    // anderen Abweichungen nicht - dieselbe Regel wie test:i18n (#1473).
+    const reference = new Set(expectedKeys);
+    const own = Object.keys(strings)
+      .filter((key) => reference.has(key) || !allowedPluralVariant(key, reference, file.replace(/\.json$/, '')))
+      .sort();
+    assert.deepEqual(own, expectedKeys, `${file}: key set does not match`);
     for (const key of expectedKeys) {
       assert.equal(typeof strings[key], 'string', `${file}: ${key} is not a string`);
       assert.notEqual(strings[key].trim(), '', `${file}: ${key} is empty`);
@@ -558,6 +565,7 @@ test('new folder-upload locale copy does not introduce em or en dashes', () => {
 // Teilen ueber das Teilen-Menue des Geraets (D#1014)
 // --------------------------------------------------------
 import { SHAREABLE_MIME, isShareableMime, fileShareSupport } from '../public/utils/web-share.js';
+import { allowedPluralVariant } from './i18n-plural-keys.js';
 
 test('die Teilbarkeit eines Typs wohnt in web-share.js und ist eine Teilmenge der Upload-Typen', () => {
   // Die Web Share API kennt keine Office-Formate. Wer die Liste im Viewer ein
@@ -1735,7 +1743,7 @@ test('das Sammel-Loeschen sagt, dass es keinen Papierkorb gibt - in jeder Sprach
   assert.match(de.documents.bulkDeleteConfirmDetail ?? '', /endgültig/);
   const dir = resolve(HERE, '../public/locales');
   const locales = readdirSync(dir).filter((f) => f.endsWith('.json'));
-  assert.equal(locales.length, 24);
+  assert.equal(locales.length, getSupportedLocales().length);
   for (const file of locales) {
     const value = JSON.parse(readFileSync(resolve(dir, file), 'utf8')).documents?.bulkDeleteConfirmDetail;
     assert.ok(typeof value === 'string' && value.trim().length > 0, `${file}: documents.bulkDeleteConfirmDetail fehlt`);

@@ -167,6 +167,27 @@ test('(3) nichts im Inhalt klebt mit bottom: 0 an der Unterkante - dort liegt di
     'eine klebende Fusszeile im Inhalt nimmt `bottom: var(--nav-tail)` - mit 0 klebt sie hinter dem Glas');
 });
 
+test('(3) unter der Kapsel liegt keine feste Flaeche im Home-Indicator-Bereich', () => {
+  // Die Zone unter der Kapsel gehoert dem Inhalt, bis zum Displayrand. In pwa.css
+  // stand fuer installierte Apps ein `body::after` (fixed, bottom: 0, Hoehe der
+  // unteren Safe-Area, Surface-Grund), gebaut als Fortsetzung einer deckenden
+  // Tab-Leiste. Seit der Inhalt unter der Kapsel laeuft (#1475), schnitt es ihn
+  // 34px ueber dem Rand ab: auf dem iPhone ein dunkler Streifen unter der
+  // Navigation, und Tipps in dem Streifen gingen an body statt an die Zeile.
+  const offenders = [];
+  for (const { file, css } of sheets) {
+    for (const r of rules(css)) {
+      if (decl(r.body, 'position') !== 'fixed') continue;
+      const bottom = decl(r.body, 'bottom');
+      if (bottom === null || !/^0(px)?$/.test(bottom)) continue;
+      const height = decl(r.body, 'height') ?? '';
+      if (/safe-area-inset-bottom/.test(height)) offenders.push(`${file}: ${r.selector}`);
+    }
+  }
+  assert.deepEqual(offenders, [],
+    'die untere Safe-Area traegt die Kapselzone als padding (.nav-bottom), keine eigene Flaeche am Rand');
+});
+
 test('(4) die Suche nimmt mobil ihre Icon-Form auch in einem Wrapper-Slot', () => {
   const iconForm = rules(layoutCss).filter((r) => /\.page-search:not\(:focus-within\):not\(:has\(input:not\(:placeholder-shown\)\)\)$/.test(r.selector)
     && decl(r.body, 'width') === 'var(--target-base)');

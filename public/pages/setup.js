@@ -6,7 +6,7 @@
  */
 
 import { auth, ApiError } from '/api.js';
-import { t } from '/i18n.js';
+import { getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 
 const VERSION_URL = '/api/v1/version';
@@ -151,7 +151,9 @@ export async function render(container) {
     submitBtn.insertBefore(spinner, labelEl);
 
     try {
-      await auth.setup(username, displayName, password);
+      // Die Sprache, in der diese Seite gerade steht: der Server macht daraus
+      // die Datensprache des Haushalts, statt still auf Englisch zu fallen.
+      await auth.setup(username, displayName, password, getLocale());
       // Setup erfolgreich -> direkt einloggen
       const result = await auth.login(username, password);
       window.yuvomi.navigate('/', result.user);

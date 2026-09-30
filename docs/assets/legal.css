@@ -1,0 +1,224 @@
+/* ============================================================================
+   Yuvomi - the legal pages (privacy.html, datenschutz.html, impressum.html)
+   ============================================================================
+
+   Loaded after site.css, which carries the tokens, the focus ring and the skip
+   link. This file is the column layout the three pages share.
+
+   It used to be three inline <style> blocks: privacy.html and datenschutz.html
+   carried byte-identical copies, impressum.html a third that had already
+   drifted (its own focus-ring literals, a 4px radius that was --r-xs
+   everywhere else). The twins now have no <style> of their own at all -
+   test:docs-landing holds that - and impressum.html keeps only the few rules
+   that are really its own (the key/value grid of its info blocks).
+   ========================================================================= */
+
+/* Seiteneigenes Mass: ein Rechtstext ist eine Spalte, keine Landing-Page. */
+:root { --maxw: 820px; }
+
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--ff);
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--text-1);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; width: 100%; }
+
+/* Header: the site's one bar (.topbar, .bar-row, .nav-logo, .nav-controls,
+   .nav-btn from site.css) - fixed, glass, --bar-h high, the same capsules as
+   index.html and install.html. The order follows install.html: logo, the way
+   back ("Overview"/"Übersicht"), the language switch (privacy/datenschutz
+   only, a link to the other document), the theme toggle. Until round 2 these
+   pages drew a header of their own: opaque, 81px, not fixed, 14px controls,
+   under a comment that already called it "one header". The text column
+   stays the page's own 820px; the bar's row sits on the landing page's
+   column (--bar-maxw in site.css), so the logo keeps its place between pages.
+
+   On a phone the row did not fit: the wordmark yields to the icon (as on the
+   other pages), and below 400px the way back keeps its chevron and drops its
+   label from view - the logo beside it leads to the same page, and the label
+   stays in the link's name. */
+@media (max-width: 480px) {
+  .topbar .nav-logo { font-size: 0; gap: 0; margin-right: 8px; min-width: 44px; }
+}
+@media (max-width: 400px) {
+  .nav-back { padding: 0; }
+  .nav-back-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+.nav-back { position: relative; }
+
+main { flex: 1; padding: calc(var(--bar-h) + 48px) 0 64px; }
+
+h1 {
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin-bottom: 8px;
+  color: var(--text-1);
+}
+.subtitle {
+  color: var(--text-3);
+  font-size: 15px;
+  margin-bottom: 40px;
+}
+
+h2 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 36px 0 12px;
+  color: var(--text-1);
+}
+h2:first-of-type { margin-top: 0; }
+/* Every section carries an id, so a single section can be linked to
+   directly; the jump lands a little below the fixed bar. */
+main h2 { scroll-margin-top: calc(var(--bar-h) + 24px); }
+h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 20px 0 8px;
+  color: var(--text-2);
+}
+
+p { margin-bottom: 12px; color: var(--text-1); }
+/* Zeilenlaenge: die 820px-Spalte liess den Rechtstext bis 129 Zeichen laufen
+   (gemessen 1440px). Die Spalte bleibt so breit - Tabellen und das
+   Inhaltsverzeichnis brauchen sie -, der Fliesstext endet bei 54ch, gemessen
+   im Schnitt ~68 und hoechstens ~78 Zeichen. `ch` ist die Breite der Null,
+   in dieser Schrift deutlich breiter als ein Durchschnittszeichen: 62ch
+   ergaben 78 im Schnitt. Nachmessen, nicht rechnen. */
+main p, main li { max-width: 54ch; }
+ul { margin: 0 0 12px 22px; }
+li { margin-bottom: 4px; }
+address { font-style: normal; }
+code { font-family: var(--ff-mono); font-size: 13px; background: var(--bg-alt); padding: 1px 5px; border-radius: var(--r-xs); }
+
+a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; word-break: break-word; }
+/* Trefferflaeche der Links im Satz (Adressen, Aufsichtsbehoerde, Verweise):
+   18px Zeile, SC 2.5.8 will 24. Senkrechtes Polster an einem Inline-Element
+   nimmt Klicks an, ohne die Zeilenhoehe zu aendern. */
+main :is(p, address, li, dd, small) > a, .legal-disclaimer a { padding-block: 4px; }
+a:hover { color: var(--accent-hover); }
+
+.legal-disclaimer {
+  background: var(--bg-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.legal-disclaimer strong { color: var(--text-1); }
+.en-summary {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-3);
+  margin-bottom: 40px;
+}
+.en-summary strong { color: var(--text-2); }
+
+.info-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 4px 24px;
+  margin: 12px 0 16px;
+  box-shadow: var(--shadow-sm);
+}
+.info-block p:first-child { margin-top: 14px; }
+.info-block p:last-child { margin-bottom: 14px; }
+
+table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; font-size: 14px; }
+th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+th { background: var(--bg-alt); font-weight: 600; color: var(--text-2); }
+/* Wide tables scroll inside their own box on phones instead of forcing page
+   overflow. The box does the scrolling, not the table: `display: block` on a
+   <table> strips its table role in the accessibility tree, so the phone
+   layout used to hand screen-reader users four unrelated cell runs. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media (max-width: 600px) {
+  .table-scroll table { white-space: nowrap; }
+}
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+.small { font-size: 13px; color: var(--text-3); }
+
+/* In-page table of contents (navigation aid; legal text unchanged). */
+.toc { margin: 28px 0 10px; padding: 20px 22px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); }
+.toc-title { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 0 12px; }
+.toc-list { margin: 0; padding-left: 1.5em; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 24px; }
+.toc-list li { margin: 0; }
+/* 44px targets. These are a list of links, not links inside a sentence, so
+   the inline exception to SC 2.5.8 does not cover them - they measured 18px.
+   The row gap goes to 0 because the padding now does that work. */
+.toc-list a { color: var(--text-2); font-size: 0.9rem; line-height: 1.5; text-decoration: none;
+  display: inline-flex; align-items: center; min-height: 44px; padding: 2px 0; }
+.toc-list a:hover { color: var(--accent); text-decoration: underline; }
+@media (max-width: 560px) { .toc-list { grid-template-columns: 1fr; } }
+
+footer.bot {
+  border-top: 1px solid var(--border);
+  background: var(--bg-alt);
+  padding: 24px 0;
+  margin-top: auto;
+}
+footer.bot .wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-3);
+}
+footer.bot a { color: var(--text-2); text-decoration: none; }
+footer.bot a:hover { color: var(--accent); }
+footer.bot nav { display: flex; gap: 14px; flex-wrap: wrap; }
+footer.bot nav a { padding: 6px 2px; min-height: 44px; display: inline-flex; align-items: center; }
+
+/* Long legal sections with the table of contents at the very top and no way
+   back to it on a phone. Appears only once you are past the first screen. */
+.to-top { position: fixed; right: 16px; bottom: 16px; z-index: 90;
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
+  background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
+  border-radius: var(--r-full); box-shadow: var(--shadow-md); font-size: 0.85rem; font-weight: 600; text-decoration: none;
+  opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity .2s, transform .2s, visibility .2s; }
+.to-top.show { opacity: 1; visibility: visible; transform: none; }
+.to-top:hover { border-color: var(--border-strong); }
+.to-top svg { width: 15px; height: 15px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .to-top { transition: none; }
+}
+
+/* Print. A privacy notice and an Impressum are the pages on this site most
+   likely to end up on paper or in a PDF, and they printed with the floating
+   "Nach oben" pill over the text and every external reference as a bare
+   underlined word. */
+@media print {
+  html { scroll-behavior: auto; }
+  body { background: #fff; color: #000; }
+  .to-top { display: none !important; }
+  main { padding-top: 24px; }
+  .info-block, .toc { background: transparent; }
+  .info-block, .toc, table, tr { break-inside: avoid; }
+  h2 { break-after: avoid; }
+  a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; word-break: break-all; }
+}

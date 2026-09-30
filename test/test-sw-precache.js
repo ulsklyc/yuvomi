@@ -38,7 +38,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createContext, runInContext } from 'node:vm';
 import { posix } from 'node:path';
@@ -322,6 +322,20 @@ test('keine Doppeleinträge zwischen den Precache-Listen', () => {
   const all = [...APP_SHELL, ...PAGE_MODULES, ...APP_LOCALES];
   const dupes = all.filter((p, i) => all.indexOf(p) !== i);
   assert.deepEqual([...new Set(dupes)], [], `Mehrfach precacht: ${dupes.join(', ')}`);
+});
+
+test('jede Locale-Datei ist precacht', () => {
+  // i18n.js holt die Sprache per fetch('/locales/<code>.json'), nicht per
+  // Import - der Modulgraph-Guard oben sieht die Dateien deshalb nie. Fehlt
+  // eine hier, faellt die Sprache offline still auf den Default zurueck,
+  // waehrend sie online tadellos laedt. pt-BR (#1437) kam mit Datei und
+  // Eintrag in SUPPORTED_LOCALES, aber ohne Zeile in APP_LOCALES.
+  const files = readdirSync(new URL('../public/locales/', import.meta.url))
+    .filter((file) => file.endsWith('.json'))
+    .map((file) => `/locales/${file}`)
+    .sort();
+  assert.deepEqual([...APP_LOCALES].sort(), files,
+    'APP_LOCALES in public/sw.js deckt sich nicht mit public/locales/*.json');
 });
 
 test('jedes Settings-Blatt der Registry ist precacht', () => {

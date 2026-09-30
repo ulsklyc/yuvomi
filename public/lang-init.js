@@ -15,7 +15,7 @@
 // `fil` kam am 04.08.2026 dazu und fehlte hier bis zum 21.09.2026 (#1324), also
 // bekam ein philippinisches System lang="en" auf einen Body auf Filipino.
 (function() {
-  var SUPPORTED = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi', 'hu', 'ko', 'id', 'fa', 'fil'];
+  var SUPPORTED = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt-BR', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi', 'hu', 'ko', 'id', 'fa', 'fil'];
   var STORAGE_KEY = 'yuvomi-locale';
   // Regionen, die eine Schrift implizieren: ein Browser meldet `zh-TW`, nie
   // `zh-Hant-TW`. `CN` und `SG` fehlen bewusst - unser `zh` ist Vereinfacht.

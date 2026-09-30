@@ -55,9 +55,9 @@ const LOCALE_FILE_RE = /^([a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A-Z]{2})?)\.json$/;
 
 /**
  * Der Locale-Code eines Dateinamens, oder null. Exportiert, weil der Bestand
- * die Erweiterung nicht misst: alle 24 Dateien heissen `xx.json` oder
- * `xxx.json`, ein Test ueber getSupportedLocales() liefe an jeder Subtag-Form
- * vorbei. getSupportedLocales() ruft genau diese Funktion, es gibt also keinen
+ * die Erweiterung kaum misst: bis auf `pt-BR.json` (#1437) heissen alle
+ * Dateien `xx.json` oder `xxx.json`, ein Test ueber getSupportedLocales() liefe
+ * an jeder Schrift-Form vorbei. getSupportedLocales() ruft genau diese Funktion, es gibt also keinen
  * zweiten Pfad, der auseinanderlaufen koennte.
  */
 export function localeFromFileName(file) {
@@ -82,18 +82,25 @@ export function isRegionTag(region) {
 }
 
 /**
- * Der Sprachteil eines Regions-Tags, oder null: `fil-PH` -> `fil`,
- * `zh-Hant-TW` -> `zh`.
+ * Die spezifischste unterstuetzte Locale einer Region, oder null: erst der
+ * volle Tag, dann ohne den jeweils letzten Subtag - `pt-BR` -> `pt-BR`,
+ * `pt-PT` -> `pt`, `zh-Hant-TW` -> `zh-Hant` -> `zh`, `fil-PH` -> `fil`.
+ * Dieselbe Richtung wie pickLocale() in public/i18n.js fuer Browser-Tags.
  *
- * Ohne den Schrift-Subtag, weil die Locale-Dateien reine Sprachcodes tragen -
- * `zh.json`, nicht `zh-Hant.json`. Faende `resolveHouseholdLocale` hier
- * `zh-Hant`, liefe es an `isSupportedLocale` vorbei und fiele auf Englisch
- * zurueck, obwohl der Haushalt eine chinesische Region gewaehlt hat. Traegt der
- * Ordner eines Tages `zh-Hant.json`, gehoert hier eine Kette hin, die erst den
- * vollen Sprachteil und dann den blossen Sprachcode versucht.
+ * Bis #1437 stand hier der blosse Sprachteil, weil jede Locale-Datei einen
+ * reinen Sprachcode trug. Mit `pt-BR.json` schrieb ein brasilianischer
+ * Haushalt seine Geburtstagstitel dann auf europaeischem Portugiesisch,
+ * obwohl die passende Datei daneben lag.
  */
-export function regionLanguage(region) {
-  return typeof region === 'string' ? (REGION_RE.exec(region)?.[1] ?? null) : null;
+export function regionLocale(region) {
+  if (!isRegionTag(region)) return null;
+  const teile = region.split('-');
+  while (teile.length) {
+    const tag = teile.join('-');
+    if (isSupportedLocale(tag)) return tag;
+    teile.pop();
+  }
+  return null;
 }
 
 let supportedLocales = null;
@@ -236,8 +243,8 @@ function cfgValue(database, key) {
 /**
  * Datensprache des Haushalts.
  *
- * Reihenfolge: explizit gesetzte `language` → Sprachteil der `region`
- * (`de-DE` → `de`) → Englisch. Die Ableitung aus der Region ist der Grund,
+ * Reihenfolge: explizit gesetzte `language` → spezifischste Locale der
+ * `region` (`de-DE` → `de`, `pt-BR` → `pt-BR`) → Englisch. Die Ableitung aus der Region ist der Grund,
  * warum die meisten Haushalte nichts einstellen müssen: wer seine Region auf
  * "Deutschland" gesetzt hat, bekommt deutsche Titel, ohne davon zu wissen.
  *
@@ -267,8 +274,8 @@ export function resolveHouseholdLocale(database, { ignoreExplicit = false } = {}
     if (isSupportedLocale(explicit)) return explicit;
   }
 
-  const ausDerRegion = regionLanguage(cfgValue(database, 'region'));
-  if (isSupportedLocale(ausDerRegion)) return ausDerRegion;
+  const ausDerRegion = regionLocale(cfgValue(database, 'region'));
+  if (ausDerRegion) return ausDerRegion;
 
   return DEFAULT_LOCALE;
 }

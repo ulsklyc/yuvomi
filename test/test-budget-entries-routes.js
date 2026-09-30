@@ -692,6 +692,318 @@ test('PUT /:id/series: fremder Nutzer im personal-Modus → 403 (kein Bypass)', 
   assert.equal(db.prepare('SELECT title FROM budget_entries WHERE id = ?').get(parent).title, 'a-series', 'unverändert');
 });
 
+// ── #1035: das Original ist eine gewoehnliche Buchung, die Serie hat eine eigene Definition ──
+//
+// Bis v2.70 war die erste Zeile einer Serie zweierlei: Vorlage fuer jedes
+// kuenftige Vorkommen UND die erste, von Hand erfasste Buchung. "Alle
+// kuenftigen aendern" schrieb deshalb auf eine Buchung, die Jahre zurueckliegen
+// konnte. Die Tests hier messen beide Seiten der Trennung: die alte Buchung
+// bleibt, wie sie war, und die kuenftigen Vorkommen tragen trotzdem den neuen
+// Stand - letzteres ueber die echte Materialisierung (GET eines Monats, der
+// sicher noch keine Instanz hat), nicht ueber einen Blick in eine Tabelle.
+const accountTotal = (accountId) => db.prepare(
+  'SELECT COALESCE(SUM(amount), 0) AS s FROM budget_entries WHERE account_id = ?'
+).get(accountId).s;
+const entryRow = (id) => db.prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
+const newAccount = (name) => db.prepare(
+  'INSERT INTO budget_accounts (name, created_by) VALUES (?, ?)'
+).run(name, A).lastInsertRowid;
+/** Materialisiert `month` ueber die Route und liefert das Vorkommen der Serie darin. */
+async function generatedIn(month, anchorId) {
+  const r = await call('GET', `/?month=${month}`);
+  assert.equal(r.status, 200);
+  return db.prepare(
+    'SELECT * FROM budget_entries WHERE recurrence_parent_id = ? AND date BETWEEN ? AND ?'
+  ).get(anchorId, `${month}-01`, `${month}-31`);
+}
+
+test('#1035: Kontowechsel "alle kuenftigen" verschiebt die Originalbuchung von 2020 nicht', async () => {
+  // Der gemessene Fall aus dem Issue: Serie ab 05.01.2020 auf "Alt", eine
+  // Instanz 05.02.2020, beide -900. Der Wechsel kommt von der Instanz aus.
+  const alt = newAccount('Alt-1035');
+  const neu = newAccount('Neu-1035');
+  const series = await call('POST', '/', { body: {
+    title: 'Miete', amount: -900, category: 'housing', subcategory: 'rent_mortgage',
+    date: '2020-01-05', is_recurring: 1, recurrence_interval: 'monthly', account_id: alt,
+  } });
+  assert.equal(series.status, 201);
+  const anchor = series.body.data.id;
+  const instance = insertEntry({
+    title: 'Miete', amount: -900, category: 'housing', subcategory: 'rent_mortgage',
+    date: '2020-02-05', recurrence_parent_id: anchor, account_id: alt,
+  });
+  assert.equal(accountTotal(alt), -1800);
+
+  const r = await call('PUT', `/${instance}/series`, { body: { account_id: neu } });
+  assert.equal(r.status, 200);
+
+  assert.equal(entryRow(anchor).account_id, alt,
+    'die Buchung vom 05.01.2020 bleibt auf dem Konto, von dem sie abging');
+  assert.equal(entryRow(instance).account_id, alt, 'die Instanz vom 05.02.2020 ebenso');
+  assert.equal(accountTotal(alt), -1800, 'Saldo Alt unveraendert');
+  assert.equal(accountTotal(neu), 0, 'Saldo Neu unveraendert');
+
+  const next = await generatedIn('2099-12', anchor);
+  assert.ok(next, 'die Serie laeuft weiter');
+  assert.equal(next.account_id, neu, 'kuenftige Vorkommen laufen ueber das neue Konto');
+});
+
+test('#1035: Titel, Betrag, Kategorie und Unterkategorie gelten ab heute, nicht fuer die erste Buchung', async () => {
+  // "It is not only the account": dieselbe Zeile traegt vier weitere Werte,
+  // und die Route hat sie schon immer mit umgeschrieben.
+  const series = await call('POST', '/', { body: {
+    title: 'Strom', amount: -80, category: 'housing', subcategory: 'utilities',
+    date: '2020-01-05', is_recurring: 1, recurrence_interval: 'monthly',
+  } });
+  const anchor = series.body.data.id;
+  const past = insertEntry({
+    title: 'Strom', amount: -80, category: 'housing', subcategory: 'utilities',
+    date: '2020-02-05', recurrence_parent_id: anchor,
+  });
+  const future = insertEntry({
+    title: 'Strom', amount: -80, category: 'housing', subcategory: 'utilities',
+    date: '2099-10-05', recurrence_parent_id: anchor,
+  });
+
+  const r = await call('PUT', `/${past}/series`, { body: {
+    title: 'Strom neu', amount: -95, category: 'transport', subcategory: 'fuel',
+  } });
+  assert.equal(r.status, 200);
+
+  const first = entryRow(anchor);
+  assert.deepEqual(
+    [first.title, first.amount, first.category, first.subcategory],
+    ['Strom', -80, 'housing', 'utilities'],
+    'die Originalbuchung von 2020 behaelt alle vier Werte',
+  );
+  const before = entryRow(past);
+  assert.deepEqual([before.title, before.amount, before.category, before.subcategory],
+    ['Strom', -80, 'housing', 'utilities'], 'die gebuchte Instanz von 2020 ebenso');
+  const later = entryRow(future);
+  assert.deepEqual([later.title, later.amount, later.category, later.subcategory],
+    ['Strom neu', -95, 'transport', 'fuel'], 'die vorhandene kuenftige Instanz zieht nach');
+  const fresh = await generatedIn('2099-11', anchor);
+  assert.deepEqual([fresh.title, fresh.amount, fresh.category, fresh.subcategory],
+    ['Strom neu', -95, 'transport', 'fuel'], 'ein neu entstehendes Vorkommen traegt den neuen Stand');
+});
+
+test('#1035: eine Einzel-Korrektur der ersten Buchung ist keine Aenderung der Serie', async () => {
+  // Die Gegenrichtung: solange das Original die Vorlage war, schrieb eine
+  // Korrektur NUR dieser Buchung (Nachzahlung im ersten Monat) in jedes
+  // kuenftige Vorkommen weiter.
+  const series = await call('POST', '/', { body: {
+    title: 'Wasser', amount: -30, category: 'housing', subcategory: 'utilities',
+    date: '2020-01-05', is_recurring: 1, recurrence_interval: 'monthly',
+  } });
+  const anchor = series.body.data.id;
+  const fix = await call('PUT', `/${anchor}`, { body: { title: 'Wasser mit Nachzahlung', amount: -130 } });
+  assert.equal(fix.status, 200);
+  assert.equal(entryRow(anchor).title, 'Wasser mit Nachzahlung', 'die Buchung selbst ist korrigiert');
+
+  const fresh = await generatedIn('2099-09', anchor);
+  assert.equal(fresh.title, 'Wasser', 'die Serie behaelt ihren Titel');
+  assert.equal(fresh.amount, -30, 'und ihren Betrag');
+});
+
+test('#1035: liegt die erste Buchung selbst noch vor uns, zieht sie mit', async () => {
+  // Der Schnitt ist fuer alle Buchungen derselbe - auch fuer die erste. Eine
+  // Serie, die naechsten Monat beginnt, hat noch nichts gebucht.
+  const series = await call('POST', '/', { body: {
+    title: 'Kita', amount: -300, category: 'housing', subcategory: 'utilities',
+    date: '2099-01-07', is_recurring: 1, recurrence_interval: 'monthly',
+  } });
+  const anchor = series.body.data.id;
+  const r = await call('PUT', `/${anchor}/series`, { body: { title: 'Kita neu', amount: -320 } });
+  assert.equal(r.status, 200);
+  assert.equal(entryRow(anchor).title, 'Kita neu');
+  assert.equal(entryRow(anchor).amount, -320);
+});
+
+test('#1035: Sichtbarkeit gilt fuer die ganze Serie, die erste Buchung eingeschlossen (gewollt)', async () => {
+  // Bewusst RUECKWIRKEND, anders als die Werte: wer eine Serie privat stellt,
+  // meint auch ihre alten Buchungen - eine private Serie, deren Vergangenheit
+  // im Haushalt sichtbar bliebe, waere die Ueberraschung (Entscheidung in #1035).
+  const series = await call('POST', '/', { body: {
+    title: 'Therapie', amount: -60, category: 'housing', subcategory: 'utilities',
+    date: '2020-01-05', is_recurring: 1, recurrence_interval: 'monthly', visibility: 'shared',
+  } });
+  const anchor = series.body.data.id;
+  const past = insertEntry({ title: 'Therapie', amount: -60, date: '2020-02-05', recurrence_parent_id: anchor });
+  setMode('personal');
+  const r = await call('PUT', `/${past}/series`, { body: { visibility: 'private' } });
+  assert.equal(r.status, 200);
+  assert.equal(entryRow(anchor).visibility, 'private', 'die erste Buchung von 2020');
+  assert.equal(entryRow(past).visibility, 'private', 'die gebuchte Instanz von 2020');
+  const fresh = await generatedIn('2099-08', anchor);
+  assert.equal(fresh.visibility, 'private', 'und jedes kuenftige Vorkommen');
+});
+
+test('#1035: eine beendete Serie erzeugt nichts mehr, eine neu begonnene startet mit den Werten der Buchung', async () => {
+  const series = await call('POST', '/', { body: {
+    title: 'Zeitung', amount: -20, category: 'housing', subcategory: 'utilities',
+    date: '2020-01-05', is_recurring: 1, recurrence_interval: 'monthly',
+  } });
+  const anchor = series.body.data.id;
+  assert.equal((await call('PUT', `/${anchor}`, { body: { is_recurring: false } })).status, 200);
+  assert.equal(await generatedIn('2099-07', anchor), undefined, 'beendet heisst beendet');
+
+  assert.equal((await call('PUT', `/${anchor}`, { body: { is_recurring: true, title: 'Zeitung digital' } })).status, 200);
+  const fresh = await generatedIn('2099-06', anchor);
+  assert.ok(fresh, 'wieder begonnen');
+  assert.equal(fresh.title, 'Zeitung digital');
+});
+
+test('#1035: eine Einzelbuchung, die per Bearbeiten zur Serie wird, ist deren Vorlage', async () => {
+  const plain = insertEntry({ title: 'Einzeln', amount: -12, category: 'housing', subcategory: 'utilities', date: '2020-03-09' });
+  const r = await call('PUT', `/${plain}`, { body: { is_recurring: true, title: 'Jetzt monatlich' } });
+  assert.equal(r.status, 200);
+  const fresh = await generatedIn('2099-05', plain);
+  assert.ok(fresh, 'die neue Serie erzeugt Vorkommen');
+  assert.equal(fresh.title, 'Jetzt monatlich');
+  assert.equal(fresh.amount, -12);
+});
+
+// ── #1546: "Alle zukuenftigen" aus einem Vorkommen beendet die Serie nicht ──────
+//
+// Der Bearbeiten-Dialog eines Vorkommens schickte die Rhythmus-Felder DIESES
+// Vorkommens mit: is_recurring 0 und die Spalten-Defaults. Gemessen im echten
+// Browser gegen den echten Router (test:budget-series-edit-browser): die Serie
+// war danach beendet, jedes Vorkommen ab heute geloescht. Die Tests hier
+// schicken genau diesen Body.
+const addMonths1546 = (ym, n) => {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+};
+/** Serie ueber die Route anlegen und die Monate um heute materialisieren. */
+async function runningSeries1546(fields) {
+  const created = await call('POST', '/', { body: {
+    title: 'Miete', amount: -900, category: 'housing', subcategory: 'rent_mortgage', is_recurring: 1, ...fields,
+  } });
+  assert.equal(created.status, 201);
+  const anchor = created.body.data.id;
+  const now = todayKeyOf1546().slice(0, 7);
+  for (let i = -2; i <= 3; i++) await call('GET', `/?month=${addMonths1546(now, i)}`);
+  return anchor;
+}
+// Derselbe Tag, an dem die Route schneidet: Haushaltszone, nicht UTC.
+const { todayKey: todayKey1546 } = await import('../server/utils/timezone.js');
+const todayKeyOf1546 = () => todayKey1546(db);
+const occurrences1546 = (anchor) => db.prepare(
+  'SELECT * FROM budget_entries WHERE recurrence_parent_id = ? ORDER BY date'
+).all(anchor);
+
+test('#1546: der alte Dialog-Body eines Vorkommens beendet die Serie nicht mehr', async () => {
+  const start = `${addMonths1546(todayKeyOf1546().slice(0, 7), -3)}-05`;
+  const anchor = await runningSeries1546({ date: start, recurrence_interval: 'weekly', recurrence_interval_count: 2 });
+  const before = occurrences1546(anchor);
+  const occurrence = before.find((r) => r.date < todayKeyOf1546());
+  const future = before.filter((r) => r.date > todayKeyOf1546()).map((r) => r.id);
+  assert.ok(occurrence && future.length, 'Vorkommen vor und nach heute vorhanden');
+
+  // Genau das schickte der Dialog (gemessen): Werte des Vorkommens, Rhythmus
+  // aus dessen Spalten-Defaults.
+  const r = await call('PUT', `/${occurrence.id}/series`, { body: {
+    title: 'Miete neu', amount: -900, category: 'housing', subcategory: 'rent_mortgage', date: occurrence.date,
+    is_recurring: 0, recurrence_interval: 'monthly', recurrence_interval_count: 1,
+    recurrence_virtual: 0, recurrence_confirm: 0,
+  } });
+  assert.equal(r.status, 400, 'laut abgewiesen statt still ausgefuehrt');
+  assert.match(r.body.error, /cannot end the series/);
+
+  const a = entryRow1546(anchor);
+  assert.equal(a.is_recurring, 1, 'die Serie laeuft weiter');
+  assert.equal(a.recurrence_interval, 'weekly', 'ihr Rhythmus bleibt');
+  assert.equal(a.recurrence_interval_count, 2);
+  for (const id of future) assert.ok(entryRow1546(id), `kuenftiges Vorkommen ${id} bleibt stehen`);
+  assert.equal(entryRow1546(occurrence.id).title, 'Miete', 'eine abgewiesene Anfrage schreibt nichts');
+});
+
+test('#1546: ohne Rhythmus-Felder aendert "alle kuenftigen" die Werte und laesst den Rhythmus stehen', async () => {
+  const start = `${addMonths1546(todayKeyOf1546().slice(0, 7), -3)}-05`;
+  const anchor = await runningSeries1546({ date: start, recurrence_interval: 'weekly', recurrence_interval_count: 2 });
+  const occurrence = occurrences1546(anchor).find((r) => r.date < todayKeyOf1546());
+  const futureBefore = occurrences1546(anchor).filter((r) => r.date >= todayKeyOf1546()).map((r) => r.id);
+
+  const r = await call('PUT', `/${occurrence.id}/series`, { body: { title: 'Miete neu' } });
+  assert.equal(r.status, 200);
+  const a = entryRow1546(anchor);
+  assert.equal(a.is_recurring, 1);
+  assert.equal(a.recurrence_interval, 'weekly');
+  const futureAfter = occurrences1546(anchor).filter((row) => row.date >= todayKeyOf1546());
+  assert.deepEqual(futureAfter.map((row) => row.id), futureBefore, 'dieselben Zeilen, nicht neu gebaut');
+  assert.ok(futureAfter.every((row) => row.title === 'Miete neu'), 'mit dem neuen Titel');
+});
+
+test('#1546: is_recurring true bleibt erlaubt', async () => {
+  const anchor = await runningSeries1546({ date: `${addMonths1546(todayKeyOf1546().slice(0, 7), -1)}-07` });
+  const r = await call('PUT', `/${anchor}/series`, { body: { is_recurring: true, title: 'Miete' } });
+  assert.equal(r.status, 200);
+  assert.equal(entryRow1546(anchor).is_recurring, 1);
+});
+
+test('#1546: eine virtuelle Serie behaelt ihr virtual-Flag und ihren Periodenbetrag', async () => {
+  const start = `${addMonths1546(todayKeyOf1546().slice(0, 7), -3)}-09`;
+  const anchor = await runningSeries1546({
+    date: start, amount: -1200, recurrence_interval: 'yearly', recurrence_virtual: 1,
+  });
+  const occurrence = occurrences1546(anchor).find((r) => r.date < todayKeyOf1546());
+  assert.equal(occurrence.amount, -100, 'ein Vorkommen traegt den Monatsanteil');
+
+  const r = await call('PUT', `/${occurrence.id}/series`, { body: { title: 'Police neu' } });
+  assert.equal(r.status, 200);
+  const a = entryRow1546(anchor);
+  assert.equal(a.recurrence_virtual, 1, 'virtuell bleibt virtuell');
+  assert.equal(a.recurrence_interval, 'yearly');
+  assert.equal(a.recurrence_full_amount, -1200, 'Periodenbetrag unveraendert');
+});
+
+test('#1546: ein ueber ein Vorkommen geaenderter Betrag einer virtuellen Serie ist dessen Monatsanteil', async () => {
+  // Das Vorkommen zeigt 100 im Monat. Wer dort 110 eintraegt, meint 110 im
+  // Monat - als Periodenbetrag gelesen, waeren daraus 9,17 geworden.
+  const start = `${addMonths1546(todayKeyOf1546().slice(0, 7), -3)}-10`;
+  const anchor = await runningSeries1546({
+    date: start, amount: -1200, recurrence_interval: 'yearly', recurrence_virtual: 1,
+  });
+  const occurrence = occurrences1546(anchor).find((r) => r.date < todayKeyOf1546());
+  const r = await call('PUT', `/${occurrence.id}/series`, { body: { amount: -110 } });
+  assert.equal(r.status, 200);
+  const later = occurrences1546(anchor).filter((row) => row.date >= todayKeyOf1546());
+  assert.ok(later.length && later.every((row) => row.amount === -110), 'kuenftige Vorkommen tragen 110 im Monat');
+  // Der Periodenbetrag gehoert der Definition (#1035); die erste Buchung liegt
+  // drei Monate zurueck, ist gebucht und behaelt ihren.
+  const def = db.prepare('SELECT * FROM budget_series WHERE anchor_id = ?').get(anchor);
+  assert.equal(def.full_amount, -1320, 'Periodenbetrag 12 x 110');
+  assert.equal(def.amount, -110, 'Vorlage fuer kuenftige Monate: der Anteil');
+  assert.equal(entryRow1546(anchor).recurrence_full_amount, -1200, 'die gebuchte erste Buchung bleibt');
+  assert.ok(def.updated_at >= def.created_at && /T.*Z$/.test(def.updated_at),
+    'die Serien-Aenderung fuehrt updated_at der Definition nach');
+  assert.equal(entryRow1546(anchor).recurrence_virtual, 1);
+});
+
+test('#1546: eine so beendete Serie laesst sich an ihrer ersten Buchung wieder starten', async () => {
+  // Der Weg fuer Bestaende, die der Fehler schon beendet hat: erste Buchung
+  // oeffnen, "wiederkehrend" wieder einschalten, Rhythmus wieder waehlen. Die
+  // geloeschten Vorkommen kommen beim naechsten Oeffnen ihres Monats zurueck -
+  // sie waren erzeugt, nicht als uebersprungen vermerkt. Belege und einmalige
+  // Aenderungen daran kommen nicht zurueck.
+  const now = todayKeyOf1546().slice(0, 7);
+  const anchor = await runningSeries1546({ date: `${addMonths1546(now, -3)}-11` });
+  // Der Schaden, wie ihn die alte Route hinterliess:
+  db.prepare('UPDATE budget_entries SET is_recurring = 0 WHERE id = ?').run(anchor);
+  db.prepare('DELETE FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ?').run(anchor, todayKeyOf1546());
+  const next = addMonths1546(now, 1);
+  await call('GET', `/?month=${next}`);
+  assert.equal(occurrences1546(anchor).filter((r) => r.date.startsWith(next)).length, 0, 'beendet: nichts');
+
+  const r = await call('PUT', `/${anchor}`, { body: { is_recurring: true, recurrence_interval: 'monthly' } });
+  assert.equal(r.status, 200);
+  await call('GET', `/?month=${next}`);
+  assert.equal(occurrences1546(anchor).filter((row) => row.date.startsWith(next)).length, 1,
+    'das Vorkommen des naechsten Monats ist wieder da');
+});
+const entryRow1546 = (id) => db.prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
+
 // ── DELETE /:id/series ───────────────────────────────────────────────────────────
 test('DELETE /:id/series: unbekannte id → 404', async () => {
   const r = await call('DELETE', '/999999/series');
@@ -862,9 +1174,14 @@ test('PUT /:id/series: kuenftige Instanzen ziehen nach, bereits gebuchte nicht',
   } });
 
   const who = (id) => db.prepare('SELECT user_id FROM budget_entry_responsibles WHERE entry_id = ? ORDER BY user_id').all(id).map((r) => r.user_id);
-  assert.deepEqual(who(pid), [B], 'das Original traegt die neue Zustaendigkeit');
+  // Bis #1035 trug das Original hier [B]: es war zugleich die Vorlage. Die
+  // erste Buchung ist aber vom 05.01.2020 - wer damals zustaendig war, bleibt
+  // es, genau wie an der Instanz vom Februar.
+  assert.deepEqual(who(pid), [A], 'die erste Buchung von 2020 bleibt, wie sie war');
   assert.deepEqual(who(future), [B], 'kuenftige Instanz zieht nach');
   assert.deepEqual(who(past), [A], 'eine gebuchte Vergangenheit bleibt, wie sie war');
+  const fresh = await generatedIn('2099-04', pid);
+  assert.deepEqual(who(fresh.id), [B], 'ein neu entstehendes Vorkommen erbt die neue Zustaendigkeit');
 });
 
 // ── GET /?q= - Suche im Hauptbuch (Re-Critique 2026-09-27, C6) ───────────────

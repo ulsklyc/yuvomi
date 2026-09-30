@@ -31,8 +31,11 @@ export function dictBlock(html, lang) {
  * und der Guard vergliche gegen einen halben String.
  */
 export function dictValue(block, key) {
-  const m = block.match(new RegExp(`\\b${key}:'((?:[^'\\\\]|\\\\.)*)'`));
-  return m ? m[1] : null;
+  // Beide Quote-Arten: Werte mit Apostroph stehen in doppelten Anfuehrungszeichen
+  // (`ho_2_b:"...kid's..."`). Nur `'` zu lesen hiess, genau diese 14 Werte gab es
+  // fuer jeden Guard nicht - null statt Text, und der Guard lief still vorbei.
+  const m = block.match(new RegExp(`\\b${key}:(?:'((?:[^'\\\\]|\\\\.)*)'|"((?:[^"\\\\]|\\\\.)*)")`));
+  return m ? (m[1] ?? m[2]) : null;
 }
 
 /**

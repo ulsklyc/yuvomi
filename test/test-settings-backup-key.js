@@ -8,6 +8,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { getSupportedLocales } from '../public/i18n.js';
 import { readFileSync, readdirSync } from 'node:fs';
 
 const { backupKeyFieldHtml, keyFieldAfterError, keyFieldDescribedBy, encodeBackupKey } = await import('../public/settings/backup-key.js');
@@ -269,7 +270,7 @@ test('Fehlertext: jeder bekannte Grund hat einen eigenen Key, ein unbekannter de
 test('Fehlertext: own_key_missing und backup_key_wrong nennen auch „keine Yuvomi-Datenbank"', () => {
   const locales = new URL('../public/locales/', import.meta.url);
   const files = readdirSync(locales).filter((name) => name.endsWith('.json'));
-  assert.equal(files.length, 24, 'Vorbedingung: alle Sprachen gelesen');
+  assert.equal(files.length, getSupportedLocales().length, 'Vorbedingung: alle Sprachen gelesen');
   for (const file of files) {
     const s = JSON.parse(readFileSync(new URL(file, locales), 'utf8')).settings;
     for (const key of ['backupRestoreErrorNeverEncrypted', 'backupRestoreErrorKeyRightButNotDb', 'backupRestoreErrorNothingChanged']) {
@@ -394,4 +395,15 @@ test('Sperre: waehrend des Requests loest ein zweiter Klick keinen zweiten Resto
   assert.equal(api.calls(), 1, 'ein Restore');
   assert.equal(modal.calls(), 1, 'keine zweite Rueckfrage');
   assert.equal(f.btn.hasAttribute('aria-disabled'), false, 'nach der Antwort wieder frei');
+});
+
+test('WebDAV: password_required wird uebersetzt, andere Fehler behalten den Servertext', async () => {
+  // Neuer Server oder Benutzer ohne neues Passwort (server/routes/backup.js):
+  // die englische Entwicklernotiz des Servers darf nicht im Formular landen.
+  const { webdavErrorMessage } = await import('../public/settings/pages/admin-backup.js');
+  assert.equal(
+    webdavErrorMessage({ message: 'A new server or username needs the password again.', data: { errorCode: 'password_required' } }),
+    'settings.backupWebdavPasswordRequired',
+  );
+  assert.equal(webdavErrorMessage({ message: 'Authentication failed (401).', data: { code: 400 } }), 'Authentication failed (401).');
 });

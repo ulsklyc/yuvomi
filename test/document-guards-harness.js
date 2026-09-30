@@ -307,95 +307,114 @@ export async function startHarness() {
   let port = null;
   let baseUrl = external;
 
-  if (!external) {
-    tmpDir = tempDir('yuvomi-document-guards-');
-    dbPath = join(tmpDir, 'guards.db');
-    port = await freePort();
-    baseUrl = `http://127.0.0.1:${port}`;
+  let migrator = null;
+  let browser = null;
 
-    // Erster Start migriert das leere Schema. Der Seed laeuft danach als
-    // eigener Prozess auf derselben Datei - deshalb muss der Server dafuer
-    // aus dem Weg sein, statt parallel auf die WAL zu schreiben.
-    const migrator = startServer(dbPath, port);
-    await waitForHttp(baseUrl);
-    await stopServer(migrator);
+  // SCHEITERT EIN SCHRITT NACH DEM ERSTEN SERVERSTART, RAEUMT ER AUF (#1446).
+  // Warf `puppeteer.launch()` - etwa weil der gepinnte Chrome lokal fehlt -,
+  // stoppte niemand den eben gestarteten Server: der Kindprozess hielt den
+  // Testprozess am Leben, die Suite hing statt rot zu werden, und wer sie
+  // abbrach, liess den Server laufen. Dasselbe galt fuer eine gescheiterte
+  // Anmeldung, den Erinnerungs-Abgleich und einen Server, der nicht hochkam.
+  // Deshalb laeuft alles bis zur Rueckgabe in EINEM try, und der Fehler geht
+  // unveraendert weiter - er ist die Meldung, die der Lauf braucht.
+  try {
+    if (!external) {
+      tmpDir = tempDir('yuvomi-document-guards-');
+      dbPath = join(tmpDir, 'guards.db');
+      port = await freePort();
+      baseUrl = `http://127.0.0.1:${port}`;
 
-    await run(process.execPath, ['scripts/seed-demo.js', '--db', dbPath, '--locale', 'de']);
+      // Erster Start migriert das leere Schema. Der Seed laeuft danach als
+      // eigener Prozess auf derselben Datei - deshalb muss der Server dafuer
+      // aus dem Weg sein, statt parallel auf die WAL zu schreiben.
+      migrator = startServer(dbPath, port);
+      await waitForHttp(baseUrl);
+      await stopServer(migrator);
 
-    server = startServer(dbPath, port);
-    await waitForHttp(baseUrl);
-  }
+      await run(process.execPath, ['scripts/seed-demo.js', '--db', dbPath, '--locale', 'de']);
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
-  });
-
-  // EINMAL anmelden, Cookie an alle Seiten weiterreichen.
-  //
-  // WARUM NICHT PRO SEITE: `/api/v1/auth/login` haengt hinter einem Limiter mit
-  // fuenf Versuchen pro Minute. Eine Suite, die pro Sprache und pro
-  // Geraet-Theme-Paar neu anmeldet, faellt beim zweiten Lauf hintereinander in
-  // ihn hinein - und der Fehler sieht dann aus wie ein fehlender Seed.
-  const cookies = await loginCookies(baseUrl);
-
-  // DER STAND NACH SEED UND ANMELDUNG IST DER AUSGANGSPUNKT JEDER SONDE (#1104).
-  // Die Anmeldung gehoert in den Snapshot, weil die Sitzung in der Datenbank
-  // liegt (`sessions`): nach dem Zuruecksetzen ist das Cookie oben wieder gueltig,
-  // und der Login-Limiter sieht keinen zweiten Versuch.
-  let snapshotPath = null;
-  if (!external) {
-    // Ein Abgleich als die angemeldete Person legt die Geburtstagstermine und
-    // ihre Erinnerungen an; danach verwirft `dismissAllReminders` sie (#1160).
-    const pending = await fetch(`${baseUrl}/api/v1/reminders/pending`, {
-      headers: { Cookie: cookies.map((c) => `${c.name}=${c.value}`).join('; ') },
-    });
-    if (!pending.ok) throw new Error(`Abgleich der Erinnerungen fehlgeschlagen (${pending.status})`);
-    await stopServer(server);
-    dismissAllReminders(dbPath);
-    mkdirSync(join(tmpDir, 'snapshot'));
-    snapshotPath = join(tmpDir, 'snapshot', 'guards.db');
-    copyDatabase(dbPath, snapshotPath);
-    server = startServer(dbPath, port);
-    await waitForHttp(baseUrl);
-  }
-
-  const harness = {
-    baseUrl,
-    browser,
-    cookies,
-    context: await browser.createBrowserContext(),
-    // Hat seit dem letzten Zuruecksetzen eine Seite den Server erreicht? Eine
-    // Sonde ohne Browser (etwa der Abgleich zweier Listen) laesst ihn
-    // unberuehrt, und dafuer den Server neu zu starten kostet nur Zeit.
-    touched: false,
-
-    /**
-     * Stellt den Ausgangsstand wieder her: zuerst ein frischer Browser-Kontext,
-     * damit keine Seite der vorigen Sonde weiter anfragt (Cookies, localStorage
-     * und Cache gehen mit), dann ein Neustart auf dem Snapshot. Der Neustart
-     * leert das Limit, weil es im Speicher des Prozesses liegt, und die Kopie
-     * nimmt jede Zeile zurueck, die eine Sonde angelegt und nicht wieder
-     * geloescht hat.
-     */
-    async reset() {
-      await harness.context.close();
-      harness.context = await browser.createBrowserContext();
-      if (external || !harness.touched) return;
-      await stopServer(server);
-      copyDatabase(snapshotPath, dbPath);
       server = startServer(dbPath, port);
       await waitForHttp(baseUrl);
-      harness.touched = false;
-    },
+    }
 
-    async close() {
-      await browser.close();
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-dev-shm-usage'],
+    });
+
+    // EINMAL anmelden, Cookie an alle Seiten weiterreichen.
+    //
+    // WARUM NICHT PRO SEITE: `/api/v1/auth/login` haengt hinter einem Limiter mit
+    // fuenf Versuchen pro Minute. Eine Suite, die pro Sprache und pro
+    // Geraet-Theme-Paar neu anmeldet, faellt beim zweiten Lauf hintereinander in
+    // ihn hinein - und der Fehler sieht dann aus wie ein fehlender Seed.
+    const cookies = await loginCookies(baseUrl);
+
+    // DER STAND NACH SEED UND ANMELDUNG IST DER AUSGANGSPUNKT JEDER SONDE (#1104).
+    // Die Anmeldung gehoert in den Snapshot, weil die Sitzung in der Datenbank
+    // liegt (`sessions`): nach dem Zuruecksetzen ist das Cookie oben wieder gueltig,
+    // und der Login-Limiter sieht keinen zweiten Versuch.
+    let snapshotPath = null;
+    if (!external) {
+      // Ein Abgleich als die angemeldete Person legt die Geburtstagstermine und
+      // ihre Erinnerungen an; danach verwirft `dismissAllReminders` sie (#1160).
+      const pending = await fetch(`${baseUrl}/api/v1/reminders/pending`, {
+        headers: { Cookie: cookies.map((c) => `${c.name}=${c.value}`).join('; ') },
+      });
+      if (!pending.ok) throw new Error(`Abgleich der Erinnerungen fehlgeschlagen (${pending.status})`);
       await stopServer(server);
-      if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
-    },
-  };
-  return harness;
+      dismissAllReminders(dbPath);
+      mkdirSync(join(tmpDir, 'snapshot'));
+      snapshotPath = join(tmpDir, 'snapshot', 'guards.db');
+      copyDatabase(dbPath, snapshotPath);
+      server = startServer(dbPath, port);
+      await waitForHttp(baseUrl);
+    }
+
+    const harness = {
+      baseUrl,
+      browser,
+      cookies,
+      context: await browser.createBrowserContext(),
+      // Hat seit dem letzten Zuruecksetzen eine Seite den Server erreicht? Eine
+      // Sonde ohne Browser (etwa der Abgleich zweier Listen) laesst ihn
+      // unberuehrt, und dafuer den Server neu zu starten kostet nur Zeit.
+      touched: false,
+
+      /**
+       * Stellt den Ausgangsstand wieder her: zuerst ein frischer Browser-Kontext,
+       * damit keine Seite der vorigen Sonde weiter anfragt (Cookies, localStorage
+       * und Cache gehen mit), dann ein Neustart auf dem Snapshot. Der Neustart
+       * leert das Limit, weil es im Speicher des Prozesses liegt, und die Kopie
+       * nimmt jede Zeile zurueck, die eine Sonde angelegt und nicht wieder
+       * geloescht hat.
+       */
+      async reset() {
+        await harness.context.close();
+        harness.context = await browser.createBrowserContext();
+        if (external || !harness.touched) return;
+        await stopServer(server);
+        copyDatabase(snapshotPath, dbPath);
+        server = startServer(dbPath, port);
+        await waitForHttp(baseUrl);
+        harness.touched = false;
+      },
+
+      async close() {
+        await browser.close();
+        await stopServer(server);
+        if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
+      },
+    };
+    return harness;
+  } catch (err) {
+    await browser?.close().catch(() => {});
+    await stopServer(migrator);
+    await stopServer(server);
+    if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
+    throw err;
+  }
 }
 
 /**

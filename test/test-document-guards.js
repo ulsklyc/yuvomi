@@ -1294,16 +1294,49 @@ async function measureTargets(page, min) {
     const out = [];
     els.forEach((el, i) => {
       const r = rects[i];
-      const cx = Math.round(r.left + r.width / 2);
-      const cy = Math.round(r.top + r.height / 2);
+      let cx = Math.round(r.left + r.width / 2);
+      let cy = Math.round(r.top + r.height / 2);
       // Ein Ziel, dessen eigenes Zentrum es nicht selbst trifft, ist verdeckt
       // oder ausserhalb des Viewports - dort misst die Sonde nichts, statt
       // etwas Falsches zu messen.
+      // Das Label, das dieses Element bedient (Falle 4 unten): ein Treffer
+      // darin trifft das Element. Ein Schalter ist ein unsichtbarer Input
+      // unter seiner gezeichneten Spur (`.toggle__track`) - ohne diese
+      // Beziehung galt JEDER Schalter der Settings-Blaetter als verdeckt und
+      // wurde nie gemessen (gefunden mit der Liste unten, #1456).
+      const labelFound = el.closest('label') ?? (el.id ? document.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null);
+      const ownLabel = labelFound && (labelFound.control === el || labelFound.contains(el)) ? labelFound : null;
       const mine = (x, y) => {
         const hit = document.elementFromPoint(x, y);
-        return !!hit && (hit === el || el.contains(hit));
+        return !!hit && (hit === el || el.contains(hit) || (!!ownLabel && ownLabel.contains(hit)));
       };
-      if (!mine(cx, cy)) return;
+      // ABER SIE SAGT, WAS SIE NICHT GEMESSEN HAT (#1456). Das Auslassen blieb
+      // bis dahin spurlos: ein Bauteil, das in JEDER Lage unter dem Kopf, dem
+      // FAB, der Tab-Leiste oder einem offenen Blatt lag, wurde nie gemessen
+      // und nie genannt, und der Zaehler hielt auf den uebrigen Zielen. Die
+      // Zeile traegt deshalb, was das Zentrum stattdessen traf.
+      // EIN UMBROCHENER LINK HAT SEINE MITTE ZWISCHEN DEN ZEILEN. Das Rechteck
+      // eines zweizeiligen Inline-Links reicht ueber beide Zeilen, und sein
+      // Zentrum liegt auf dem Text daneben (`Zur Anleitung` in einem Hinweis
+      // der Dokumente-Einstellungen, mobil). Getastet wird dann von der Mitte
+      // des ersten Zeilenstuecks aus, das das Element selbst trifft.
+      if (!mine(cx, cy)) {
+        const fragment = [...el.getClientRects()]
+          .map((f) => [Math.round(f.left + f.width / 2), Math.round(f.top + f.height / 2)])
+          .find(([x, y]) => mine(x, y));
+        if (fragment) [cx, cy] = fragment;
+      }
+      if (!mine(cx, cy)) {
+        const hit = document.elementFromPoint(cx, cy);
+        out.push({
+          key: key(el),
+          covered: true,
+          by: hit
+            ? `${hit.tagName.toLowerCase()}${hit.classList.length ? `.${[...hit.classList].join('.')}` : ''}`
+            : '(ausserhalb des Viewports)',
+        });
+        return;
+      }
       const reach = (dx, dy) => {
         let n = 0;
         while (n < min && mine(cx + dx * (n + 1), cy + dy * (n + 1))) n += 1;
@@ -1328,9 +1361,8 @@ async function measureTargets(page, min) {
       // sondern eine HTML-Beziehung - und die ist eine Regel, keine
       // Ausnahmeliste: `label.control` bzw. `label[for]` sagt verbindlich,
       // welches Element das Label bedient.
-      const label = el.closest('label') ?? (el.id ? document.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null);
-      if (label && (label.control === el || label.contains(el))) {
-        const lr = label.getBoundingClientRect();
+      if (ownLabel) {
+        const lr = ownLabel.getBoundingClientRect();
         if (lr.width > 0 && lr.height > 0) {
           w = Math.max(w, lr.width);
           h = Math.max(h, lr.height);
@@ -1452,39 +1484,54 @@ async function measureTargets(page, min) {
  *
  * Die App hat ZWEI Scrollport-Architekturen (Handoff §6): meist scrollt die
  * Seite, in Kueche und Budget ist der Modul-Root `overflow: hidden` und ein
- * Container darin scrollt. Gesucht wird deshalb der Container mit dem groessten
- * Ueberhang, nicht ein fester Knoten.
+ * Container darin scrollt. Gesucht wird deshalb nach Ueberhang, nicht ein
+ * fester Knoten.
+ *
+ * JEDER CONTAINER, NICHT NUR DER GROESSTE (#1456). Bis dahin scrollte die
+ * Sonde nur den Container mit dem groessten Ueberhang. Auf den Desktop-
+ * Settings-Blaettern ist das die Blattliste links (`.settings-shell__navigation`),
+ * nicht der Inhalt - die Sonde sah dort nie mehr als den ersten Bildschirm
+ * eines Blatts. In der Aufgaben-Detailspalte blieb der Kommentar-Knopf unter
+ * der Fussleiste, weil die Spalte neben der Liste selbst scrollt. Jetzt faehrt
+ * sie den groessten Container zuerst ab wie bisher und danach jeden weiteren,
+ * der im Bild liegt - der vorige bleibt dabei an seinem Ende stehen.
  */
 async function measureScrolled(page, min, maxSteps = 6) {
-  const pick = () => {
-    const el = document.scrollingElement;
-    let best = el;
-    let bestOver = el.scrollHeight - el.clientHeight;
+  const count = await page.evaluate(() => {
+    const over = (el) => el.scrollHeight - el.clientHeight;
+    const list = [document.scrollingElement];
     for (const node of document.querySelectorAll('*')) {
       const cs = getComputedStyle(node);
       if (!/auto|scroll/.test(cs.overflowY)) continue;
-      const over = node.scrollHeight - node.clientHeight;
-      if (over > bestOver) { best = node; bestOver = over; }
+      if (over(node) <= 1) continue;
+      const r = node.getBoundingClientRect();
+      if (r.bottom <= 0 || r.top >= innerHeight || r.right <= 0 || r.left >= innerWidth) continue;
+      list.push(node);
     }
-    return best;
-  };
-  const out = [];
-  await page.evaluate(pick).catch(() => {});
-  for (let step = 0; step < maxSteps; step += 1) {
-    out.push(await measureTargets(page, min));
-    const moved = await page.evaluate((pickSrc) => {
-      // eslint-disable-next-line no-new-func
-      const el = new Function(`return (${pickSrc})()`)();
-      const before = el.scrollTop;
-      // 70 % statt 100 %: was genau auf der Falz sitzt, wuerde sonst in keiner
-      // der beiden Messungen vollstaendig im Bild stehen.
-      el.scrollTop = before + el.clientHeight * 0.7;
-      return el.scrollTop > before + 1;
-    }, pick.toString());
-    if (!moved) break;
-    // Der kollabierende Kopf und die Sticky-Leisten brauchen einen Frame, sonst
-    // misst die Sonde eine Zwischenposition.
-    await new Promise((r) => { setTimeout(r, 250); });
+    // Der groesste zuerst, wie bisher - seine Messungen bleiben die ersten.
+    list.sort((a, b) => over(b) - over(a));
+    window.__yuvomiProbeScrollers = list;
+    return list.length;
+  }).catch(() => 0);
+
+  const out = [await measureTargets(page, min)];
+  for (let index = 0; index < count; index += 1) {
+    for (let step = 1; step < maxSteps; step += 1) {
+      const moved = await page.evaluate((i) => {
+        const el = window.__yuvomiProbeScrollers?.[i];
+        if (!el || !el.isConnected) return false;
+        const before = el.scrollTop;
+        // 70 % statt 100 %: was genau auf der Falz sitzt, wuerde sonst in keiner
+        // der beiden Messungen vollstaendig im Bild stehen.
+        el.scrollTop = before + el.clientHeight * 0.7;
+        return el.scrollTop > before + 1;
+      }, index).catch(() => false);
+      if (!moved) break;
+      // Der kollabierende Kopf und die Sticky-Leisten brauchen einen Frame, sonst
+      // misst die Sonde eine Zwischenposition.
+      await new Promise((r) => { setTimeout(r, 250); });
+      out.push(await measureTargets(page, min));
+    }
   }
   return out;
 }
@@ -1507,10 +1554,20 @@ describe('Sonde 4 - eine Reihe traegt ihre Dichte, ein Einzelziel ist allein tre
       // darunter - erst mit dieser Menge ist das Urteil vollstaendig.
       const rowBuilt = new Set();
       let seen = 0;
+      // Bauteile, die gemessen wurden, und solche, die NUR verdeckt vorkamen.
+      const measured = new Set();
+      const coveredOnly = new Map(); // key -> { pages, by }
       for (const name of sweep('Sonde 4')) {
         await gotoRoute(page, ALL_ROUTES[name]);
         for (const rows of await measureScrolled(page, min)) {
           for (const row of rows) {
+            if (row.covered) {
+              if (!coveredOnly.has(row.key)) coveredOnly.set(row.key, { pages: new Set(), by: new Set() });
+              coveredOnly.get(row.key).pages.add(name);
+              coveredOnly.get(row.key).by.add(row.by);
+              continue;
+            }
+            measured.add(row.key);
             // DER ZAEHLER STEHT IN DER MESSUNG, NICHT DAVOR. Bis 2026-08-09
             // zaehlte er `querySelectorAll(...).length` - rohe DOM-Knoten, in
             // den Tausenden. `measureTargets()` steigt aber pro Element bei
@@ -1584,6 +1641,19 @@ describe('Sonde 4 - eine Reihe traegt ihre Dichte, ein Einzelziel ist allein tre
         + 'Zielgroesse in mindestens einer Achse, ein eingeengtes erfuellt WCAG '
         + '2.5.8. Wer kompakt aussehen und voll treffen will, dehnt seine Flaeche '
         + 'per ::before aus - .weather-widget__refresh ist der Musterfall.');
+
+      // DER ZAEHLER IST GLOBAL, DIE BLINDHEIT NICHT (#1456). `seen >= 600`
+      // haelt auf ein paar hundert anderen Zielen, auch wenn ein ganzes Bauteil
+      // in jeder Lage jedes Zustands verdeckt war. Ein Bauteil, das im Dokument
+      // stand und NIE gemessen wurde, ist deshalb ein eigener Befund - mit den
+      // Zustaenden und dem, was sein Zentrum stattdessen traf.
+      const neverMeasured = [...coveredOnly]
+        .filter(([key]) => !measured.has(key))
+        .map(([key, { pages, by }]) => `${key}: auf ${[...pages].join(', ')} verdeckt von ${[...by].join(' | ')}`);
+      assert.deepEqual(neverMeasured.sort(), [],
+        `Bauteile, die bei ${device} im Dokument standen und in keiner Lage gemessen wurden - `
+        + 'ihr Zentrum lag in jedem Zustand und jeder Scrollposition unter einem anderen Element '
+        + 'oder ausserhalb des Viewports. Die Sonde weiss ueber sie nichts.');
     });
   }
 });
@@ -3535,12 +3605,14 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
   test('desktop 1280x900', async () => {
     const page = await openPage(harness, { device: 'desktop', theme: 'light', locale: 'de' });
     const offenders = [];
-    let seen = 0;
+    // Zustaende, in denen die Vorbedingung fehlte - JE ZUSTAND, nicht als Summe.
+    const unmeasured = [];
 
     for (const name of sweep('Sonde 16')) {
       await gotoRoute(page, ALL_ROUTES[name]);
       const found = await page.evaluate(() => {
-        const out = { animated: 0, offenders: [] };
+        const out = { animated: 0, blobs: 0, blobsRunning: 0, offenders: [] };
+        out.blobs = document.querySelectorAll('.lg-blob').length;
         for (const el of document.querySelectorAll('*')) {
           const cs = getComputedStyle(el);
           // `infinite` liest sich berechnet als 'infinite'; mehrere Animationen
@@ -3553,6 +3625,7 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
             && cs.animationDuration.split(',').some((v) => parseFloat(v) > 0);
           if (!endless || !running) continue;
           out.animated += 1;
+          if (el.classList.contains('lg-blob')) out.blobsRunning += 1;
           const filter = cs.filter;
           if (filter && filter !== 'none') {
             out.offenders.push(`${el.tagName.toLowerCase()}.${el.className || '(ohne Klasse)'} -> ${filter}`);
@@ -3560,7 +3633,10 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
         }
         return out;
       });
-      seen += found.animated;
+      if (found.blobs === 0 || found.blobsRunning < found.blobs) {
+        unmeasured.push(`${name}: ${found.blobs} .lg-blob, davon ${found.blobsRunning} endlos animiert `
+          + `(${found.animated} dauerlaufende Animationen insgesamt)`);
+      }
       for (const o of found.offenders) offenders.push(`${name}: ${o}`);
     }
     await page.close();
@@ -3568,12 +3644,19 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
     // Dieselbe Zusicherung wie bei den Sonden 3, 4 und 15, und hier ist sie
     // besonders leicht zu verlieren: waeren die Blobs eines Tages nicht mehr
     // animiert, faende die Sonde nichts mehr zu pruefen und bliebe still gruen.
-    // Der lebende Backdrop laeuft auf JEDER Route, also sind vier Blobs mal der
-    // Zahl der abgefahrenen Zustaende die Untergrenze.
-    assert.ok(seen >= 4 * sweep('Sonde 16').length,
-      `Nur ${seen} dauerlaufende Animationen ueber ${sweep('Sonde 16').length} Zustaende `
-      + '- die Sonde hat nichts gemessen, statt nichts zu finden. Laeuft der lebende '
-      + 'Backdrop (.lg-blob) noch?');
+    //
+    // JE ZUSTAND, NICHT ALS SUMME (#1456). Die erste Fassung verlangte vier
+    // Animationen mal die Zahl der Zustaende. Ein Volllauf sah 125 von 192 und
+    // konnte nicht sagen, welche Zustaende zu kurz kamen; und ein Lauf, in dem
+    // einigen die Shell fehlte, waehrend andere Spinner oder Skelette trugen,
+    // blieb gruen, obwohl jene Zustaende nie geprueft waren. Die Vorbedingung
+    // ist der lebende Backdrop, und der steht in JEDEM Zustand: mindestens ein
+    // `.lg-blob`, und jeder davon laeuft endlos. Fehlt er, nennt die Meldung
+    // den Zustand - die Zahl der Blobs kommt aus dem Dokument, nicht von hier.
+    assert.deepEqual(unmeasured, [],
+      'Zustaende ohne laufenden Backdrop - dort hat die Sonde nichts gemessen, statt nichts '
+      + 'zu finden. Fehlt die Shell (Route nicht aufgebaut, auf /login gelandet), oder laufen '
+      + `die .lg-blob nicht mehr?\n  ${unmeasured.join('\n  ')}`);
 
     assert.deepEqual(offenders.sort(), [],
       'Ein endlos animiertes Element traegt einen `filter` und rastert ihn damit pro '

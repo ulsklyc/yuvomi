@@ -1,10 +1,12 @@
-<!-- version: 2.69.1 -->
-This is a security update and updating is recommended. It closes two places where an ordinary household member could reach further than their role allows.
+<!-- version: 2.71.0 -->
+This update adds Brazilian Portuguese and fixes several things people ran into after 2.70.0.
 
-Only admins can manage CardDAV contact accounts now. Until this release, a member could change the server address of a household CardDAV account, and the next sync sent the stored credentials to that server. Members keep reading and editing contacts as before.
+Brazilian Portuguese is now its own language in the app, next to the existing Portuguese. A browser set to Brazilian Portuguese picks it on its own.
 
-The first single sign-on of a household member can no longer be steered by another member through their own profile email address. If you use SSO: a member whose account has a password and is not yet linked to SSO is no longer linked by email address. Their first SSO sign-in shows a message asking them to sign in with their password and link SSO under Settings, Account. Alternatively, an admin can switch the account to "SSO sign-in only" under Settings, Administration, Family. Accounts that are already linked are not affected.
+Changing a recurring budget payment for all future months no longer rewrites its first booking, which could lie years back and move old amounts to another account. Members who may edit the meal plan can now edit and delete recipes that someone else added; before, saving failed with "Not authorized", even for an admin.
 
-There are no database changes in this update.
+When the weather service cannot be reached, the weather tile now stays on the overview and says the weather is currently unavailable, instead of disappearing without a trace. In the app added to an iPhone home screen, the dark strip below the tab bar is gone. Switches that are off are easier to see, and in Arabic and Persian "on" sits on the left.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.69.1
+The update runs one database migration on first start. It gives every recurring budget payment a definition of its own, without changing any existing entry. No action is needed; as always, a backup before updating is a good idea.
+
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.71.0

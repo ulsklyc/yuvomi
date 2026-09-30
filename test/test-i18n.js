@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
+import { keySetDiff, foreignReferenceVariants } from './i18n-plural-keys.js';
 
 const LOCALES_DIR = new URL('../public/locales/', import.meta.url);
 const I18N_PATH = new URL('../public/i18n.js', import.meta.url);
@@ -99,20 +100,25 @@ test('jede Locale trägt die vollständige Bestätigung für verwaiste Kalender-
   }
 });
 
-// Jede Locale trägt denselben Schlüsselsatz wie de.json - auch Pluralvarianten
-// für CLDR-Kategorien, die die Sprache gar nicht kennt (`_few` im Englischen,
-// `_one` im Japanischen). Das ist Absicht und kein toter Ballast, den man
-// aufräumen sollte: t() wählt die Kategorie über Intl.PluralRules und fällt
-// sonst auf den Basisschlüssel zurück, sodass eine ungenutzte Variante folgenlos
-// ist - während ein Schlüsselsatz, der sich je Sprache unterscheidet, jedes
-// Übersetzungs-Diff zur Einzelfallprüfung machen würde.
+// Jede Locale trägt den Schlüsselsatz von de.json und darüber hinaus genau die
+// Pluralvarianten, die ihre Sprache braucht (#1473): `<key>_<kategorie>` ist
+// erlaubt, wenn de.json `<key>_one` hat und Intl.PluralRules(locale) die
+// Kategorie kennt - `_few` in cs.json ja, `_two` in cs.json nein. Die Regel steht
+// in test/i18n-plural-keys.js, weil test-frontend-audit.js denselben Abgleich
+// fährt. Bis #1473 galt „jede Locale trägt jede Variante" - dann trug de.json
+// `_few`, und weil de die Rückfall-Locale von t() ist, stand überall dort, wo eine
+// Sprache die Variante nicht hatte, der deutsche Text.
+test(`${REFERENCE}.json trägt nur Pluralvarianten, die das Deutsche selbst wählt`, () => {
+  assert.deepEqual(foreignReferenceVariants(reference, REFERENCE), [],
+    `${REFERENCE}.json trägt Varianten fremder Kategorien - sie gehören in die Sprachen, die sie wählen`);
+});
+
 for (const locale of LOCALES) {
   if (locale === REFERENCE) continue;
 
-  test(`${locale}.json ist schlüsselidentisch zur Referenz ${REFERENCE}.json`, () => {
+  test(`${locale}.json ist schlüsselidentisch zur Referenz ${REFERENCE}.json (plus eigene Pluralvarianten)`, () => {
     const keys = flatten(JSON.parse(readLocale(locale)));
-    const missing = referenceKeys.filter(k => !keys.has(k));
-    const extra = [...keys.keys()].filter(k => !reference.has(k));
+    const { missing, extra } = keySetDiff(reference, keys, locale);
     assert.deepEqual(missing, [], `${locale}.json fehlen Schlüssel: ${missing.slice(0, 20).join(', ')}`);
     assert.deepEqual(extra, [], `${locale}.json hat überzählige Schlüssel: ${extra.slice(0, 20).join(', ')}`);
   });
@@ -130,7 +136,11 @@ for (const locale of LOCALES) {
   test(`${locale}.json nutzt dieselben Platzhalter wie die Referenz`, () => {
     const keys = flatten(JSON.parse(readLocale(locale)));
     const mismatches = [];
-    for (const [key, refValue] of reference) {
+    // Auch die Varianten, die nur diese Locale trägt (cs `_few`): sie stehen nicht
+    // in der Referenz und würden von einer Schleife über de.json nie erreicht.
+    const own = [...keys.keys()].filter(k => !reference.has(k) && PLURAL_SUFFIX.test(k))
+      .map(k => [k, undefined]);
+    for (const [key, refValue] of [...reference, ...own]) {
       if (!keys.has(key)) continue;
       const actual = placeholders(keys.get(key));
       const variant = PLURAL_SUFFIX.test(key);
@@ -366,7 +376,8 @@ test('Server und Frontend kennen dieselben Sprachen', async () => {
 //
 // Deshalb prüft dieser Test den Leser als Funktion, mit Eingaben, die im
 // Repository nicht vorkommen. Ein Test, der ihn nur auf den echten Bestand
-// anwendet, misst nichts: dort tragen alle 24 Codes Kleinbuchstaben.
+// anwendet, misst wenig: dort traegt einzig `pt-BR` (#1437) Grossbuchstaben,
+// und eine Schrift wie `zh-Hant` gar keiner.
 test('der Leser von SUPPORTED_LOCALES verschluckt keinen Code', () => {
   const quelle = "const SUPPORTED_LOCALES = ['de', 'fil', 'zh-Hant', 'pt-BR', 'sr-Latn-RS'];";
   assert.deepEqual(parseSupportedLocales(quelle),
@@ -377,6 +388,7 @@ test('der Leser von SUPPORTED_LOCALES verschluckt keinen Code', () => {
   // Die echte Liste geht durch denselben Leser - unverändert und vollzählig.
   assert.equal(LOCALES.length, new Set(LOCALES).size, 'doppelter Code in SUPPORTED_LOCALES');
   assert.ok(LOCALES.includes('fil'), 'fil fehlt - der Code aus #1322');
+  assert.ok(LOCALES.includes('pt-BR'), 'pt-BR fehlt - der erste Code mit Region (#1437)');
 });
 
 // Die Serverliste entsteht aus DATEINAMEN, und das Muster dahinter hat dieselbe
@@ -386,9 +398,10 @@ test('der Leser von SUPPORTED_LOCALES verschluckt keinen Code', () => {
 // optional Schrift, optional Region.
 //
 // Geprueft wird hier `localeFromFileName`, nicht `getSupportedLocales()`: der
-// Bestand traegt 24 Dateien der Form `xx.json`/`xxx.json` und keine einzige mit
-// Subtag, ein Test ueber die fertige Liste liefe also an der Erweiterung vorbei
-// und waere gruen, egal was das Muster erlaubt. Der Test darunter haengt die
+// Bestand traegt bis auf `pt-BR.json` (#1437) nur Dateien der Form
+// `xx.json`/`xxx.json` und keine mit Schrift-Subtag, ein Test ueber die fertige
+// Liste liefe also an der Erweiterung vorbei und waere gruen, egal was das
+// Muster erlaubt. Der Test darunter haengt die
 // Funktion an ihren Aufrufer, damit dieser Zugriff keine zweite Wahrheit wird.
 test('ein Locale-Dateiname darf Schrift- und Regions-Subtags tragen', async () => {
   const { localeFromFileName } = await import('../server/utils/i18n.js');
@@ -446,6 +459,7 @@ test('die Serverliste traegt jede Locale-Datei des Ordners', async () => {
   assert.equal(getSupportedLocales().length, dateien,
     'Die Serverliste ist kuerzer als der Ordner - eine Datei faellt aus dem Muster.');
   assert.ok(getSupportedLocales().includes('fil'), 'fil fehlt - der Code aus #1322');
+  assert.ok(getSupportedLocales().includes('pt-BR'), 'pt-BR fehlt - der erste Code mit Region (#1437)');
 });
 
 // CLAUDE.md: ueberall `-` statt Gedankenstrich, auch in UI-Texten (Kritik
