@@ -2,8 +2,9 @@
  * Test: Rezepte-Routen (Härtung, Coverage-Track)
  * Zweck: End-to-End über den echten Recipes-Router - härtet die bislang komplett
  *        ungetestete Route-Schicht ab. Fokus: Validierung (400), Nicht-gefunden
- *        (404), Autorisierungs-Gate (403 owner-only, KEIN Admin-Bypass bei
- *        PUT/DELETE), Zutaten-Regeln (leerer Name übersprungen, category-Default
+ *        (404), kein Besitzer-Riegel bei PUT/DELETE (#1577: das Modulrecht
+ *        genuegt, `meals: read` weist der Modul-Riegel ab - gemessen in
+ *        test-recipe-transfer-gate.js), Zutaten-Regeln (leerer Name übersprungen, category-Default
  *        'Sonstiges', quantity leer→null, Längen-Slicing), meal_types-Normalisierung
  *        (Default alle-4, Dedup, Invalides verworfen), Replace-Set der Zutaten bei
  *        PUT und CASCADE-Löschung. Persistenz jeweils per DB-Assertion belegt.
@@ -28,6 +29,7 @@ const db = dbmod.get();
 
 const OWNER = db.prepare(`INSERT INTO users (username, display_name, avatar_color, password_hash, role) VALUES ('owner','Owner','#112233','x','member')`).run().lastInsertRowid;
 const ADMIN = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')`).run().lastInsertRowid;
+const MEMBER2 = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('member2','Member Zwei','x','member')`).run().lastInsertRowid;
 
 // Aktueller Akteur wird zur Request-Zeit gelesen → pro Test umschaltbar.
 let actor = { id: OWNER, role: 'member' };
@@ -157,17 +159,26 @@ test('PUT /:id: nicht existent → 404', async () => {
   assert.equal(r.status, 404);
 });
 
-test('PUT /:id: Fremdrezept trotz Admin-Rolle → 403 (kein Admin-Bypass), DB unverändert', async () => {
-  const own = await call('POST', '/', { title: 'Owners Rezept', notes: 'geheim' });
-  const id = own.body.data.id;
-  actor = { id: ADMIN, role: 'admin' };
-  const r = await call('PUT', `/${id}`, { title: 'Gekapert', notes: 'weg' });
-  actor = { id: OWNER, role: 'member' };
-  assert.equal(r.status, 403);
-  const row = db.prepare('SELECT title, notes FROM recipes WHERE id = ?').get(id);
-  assert.equal(row.title, 'Owners Rezept'); // unverändert
-  assert.equal(row.notes, 'geheim');
-});
+// #1577 (Entscheidung 30.09.2026): Rezepte gehoeren dem Haushalt. Wer das
+// Modul schreiben darf, bearbeitet jedes Rezept - kein Besitzer-Riegel, und
+// ausdruecklich auch fuer ein Mitglied ohne Admin-Rolle, denn die Regel ist
+// das Modulrecht, nicht die Rolle. `meals: read` weist der Modul-Riegel in
+// server/index.js ab (test-recipe-transfer-gate.js, echte Gates).
+for (const who of [{ id: MEMBER2, role: 'member', label: 'anderes Mitglied' }, { id: ADMIN, role: 'admin', label: 'Admin' }]) {
+  test(`PUT /:id: ${who.label} bearbeitet ein fremdes Rezept samt Zutaten (#1577)`, async () => {
+    const own = await call('POST', '/', { title: 'Owners Rezept', notes: 'alt', ingredients: [{ name: 'Mehl' }] });
+    const id = own.body.data.id;
+    actor = { id: who.id, role: who.role };
+    const r = await call('PUT', `/${id}`, { title: 'Verbessert', notes: 'neu', ingredients: [{ name: 'Dinkelmehl' }] });
+    actor = { id: OWNER, role: 'member' };
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const row = db.prepare('SELECT title, notes, created_by FROM recipes WHERE id = ?').get(id);
+    assert.equal(row.title, 'Verbessert');
+    assert.equal(row.notes, 'neu');
+    assert.equal(row.created_by, OWNER, 'wer es angelegt hat, bleibt stehen');
+    assert.deepEqual(ingredientRows(id).map((x) => x.name), ['Dinkelmehl']);
+  });
+}
 
 test('PUT /:id: Eigentümer aktualisiert Felder und ersetzt Zutaten (Replace-Set)', async () => {
   const created = await call('POST', '/', {
@@ -213,15 +224,18 @@ test('DELETE /:id: nicht existent → 404', async () => {
   assert.equal(r.status, 404);
 });
 
-test('DELETE /:id: Fremdrezept trotz Admin-Rolle → 403 (kein Admin-Bypass)', async () => {
-  const own = await call('POST', '/', { title: 'Nicht löschbar' });
-  const id = own.body.data.id;
-  actor = { id: ADMIN, role: 'admin' };
-  const r = await call('DELETE', `/${id}`);
-  actor = { id: OWNER, role: 'member' };
-  assert.equal(r.status, 403);
-  assert.ok(db.prepare('SELECT id FROM recipes WHERE id = ?').get(id)); // noch da
-});
+for (const who of [{ id: MEMBER2, role: 'member', label: 'anderes Mitglied' }, { id: ADMIN, role: 'admin', label: 'Admin' }]) {
+  test(`DELETE /:id: ${who.label} löscht ein fremdes Rezept → 204 (#1577)`, async () => {
+    const own = await call('POST', '/', { title: 'Fremd gelöscht', ingredients: [{ name: 'Z' }] });
+    const id = own.body.data.id;
+    actor = { id: who.id, role: who.role };
+    const r = await call('DELETE', `/${id}`);
+    actor = { id: OWNER, role: 'member' };
+    assert.equal(r.status, 204);
+    assert.equal(db.prepare('SELECT id FROM recipes WHERE id = ?').get(id), undefined);
+    assert.equal(ingredientRows(id).length, 0);
+  });
+}
 
 test('DELETE /:id: Eigentümer löscht → 204, Zutaten kaskadieren mit', async () => {
   const created = await call('POST', '/', {
@@ -332,8 +346,8 @@ test('POST /:id/to-shopping-list: Nicht-Eigentümer darf übernehmen (kein owner
   const created = await call('POST', '/', { title: 'Geteilt', ingredients: [{ name: 'Reis' }] });
   const id = created.body.data.id;
 
-  // Rezepte sind Haushaltswissen: wer kocht, darf einkaufen - anders als bei
-  // PUT/DELETE, die owner-only bleiben.
+  // Rezepte sind Haushaltswissen: wer kocht, darf einkaufen - wie bei
+  // PUT/DELETE gibt es keinen Besitzer-Riegel (#1577).
   actor = { id: ADMIN, role: 'admin' };
   const r = await call('POST', `/${id}/to-shopping-list`, { listId });
   actor = { id: OWNER, role: 'member' };
@@ -425,10 +439,16 @@ function registerMirrorTests(provider) {
 
   test(`PUT /:id: gespiegeltes Rezept (${provider}) → 403, auch für den Nutzer, der den Account angelegt hat`, async () => {
     const { recipeId } = mirroredRecipe('Unveränderlich', `mirror-put-test-${provider}`, provider);
-    // OWNER ist zugleich created_by dieses Mirror-Rezepts (via recipe_provider_accounts.created_by) -
-    // der bloße created_by-Vergleich würde das durchlassen; das provider_account_id-Gate muss davor greifen.
+    // OWNER ist zugleich created_by dieses Mirror-Rezepts (via recipe_provider_accounts.created_by),
+    // MEMBER2 ist es nicht - seit #1577 gibt es keinen Besitzer-Riegel mehr, also
+    // muss das provider_account_id-Gate fuer beide allein greifen.
     const r = await call('PUT', `/${recipeId}`, { title: 'Gehackt' });
     assert.equal(r.status, 403);
+    actor = { id: MEMBER2, role: 'member' };
+    const r2 = await call('PUT', `/${recipeId}`, { title: 'Gehackt' });
+    actor = { id: OWNER, role: 'member' };
+    assert.equal(r2.status, 403);
+    assert.match(r2.body.error, /Mirrored/);
     const row = db.prepare('SELECT title FROM recipes WHERE id = ?').get(recipeId);
     assert.equal(row.title, 'Unveränderlich');
   });
@@ -437,6 +457,11 @@ function registerMirrorTests(provider) {
     const { recipeId } = mirroredRecipe('Unlöschbar', `mirror-delete-test-${provider}`, provider);
     const r = await call('DELETE', `/${recipeId}`);
     assert.equal(r.status, 403);
+    actor = { id: MEMBER2, role: 'member' };
+    const r2 = await call('DELETE', `/${recipeId}`);
+    actor = { id: OWNER, role: 'member' };
+    assert.equal(r2.status, 403);
+    assert.match(r2.body.error, /Mirrored/);
     assert.ok(db.prepare('SELECT id FROM recipes WHERE id = ?').get(recipeId));
   });
 

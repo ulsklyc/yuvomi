@@ -30,8 +30,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-/** Die drei Dateien, die SQLite anlegt - WAL und Journal gehoeren dazu. */
-const SUFFIXES = ['', '-wal', '-shm', '-journal'];
+/**
+ * Die Dateien, die SQLite anlegt - WAL und Journal gehoeren dazu -, dazu die
+ * Instanzsperre, die jeder Server neben seiner Datenbank haelt (#1530).
+ */
+const SUFFIXES = ['', '-wal', '-shm', '-journal', '.lock'];
 
 function removeAll(dbPath) {
   for (const suffix of SUFFIXES) {

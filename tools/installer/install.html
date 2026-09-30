@@ -1450,7 +1450,7 @@
           <!-- TZ ist nur die Vorbelegung der Haushaltszone (#829); die App fuehrt
                sie als eigene Einstellung. Wer das nicht weiss, haelt das Feld fuer
                endgueltig und sucht spaeter in der .env statt in der App. -->
-          <div class="hint" data-i18n="config.tzHint">Used as the household default. You can change it later in the app under Settings → Appearance.</div>
+          <div class="hint" data-i18n="config.tzHint">Used as the household default. You can change it later in the app under Settings → Account → Appearance.</div>
         </div>
         </div>
 
@@ -1575,7 +1575,7 @@
                Haushalts-Standort der App. Der gespeicherte Standort gewinnt
                (#1568) - ohne diesen Satz wirkt eine spaetere Aenderung hier wie
                ein Fehler, weil die App weiter ihren eigenen Wert zeigt. -->
-          <div class="hint" data-i18n="weather.appHint">These values apply until a household location is saved in the app under Settings → Integrations.</div>
+          <div class="hint" data-i18n="weather.appHint">These values apply until a household location is saved in the app under Settings → Household → Integrations.</div>
         </div>
         <div class="inset-sub" id="wea-fields" style="display:none">
           <div class="field">
@@ -1713,7 +1713,7 @@
         </div>
         </div>
         <!-- Der Ausweg zur Legacy-Zeile, sichtbar ohne Aufklappen. -->
-        <p class="group-note" data-i18n="calendar.moreInApp">Add more CalDAV accounts, such as Nextcloud or a second iCloud account, in the app under Settings → Calendar.</p>
+        <p class="group-note" data-i18n="calendar.moreInApp">Add more CalDAV accounts, such as Nextcloud or a second iCloud account, in the app under Settings → Modules → Calendar.</p>
       </div>
       <div class="card-foot">
         <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
@@ -1736,7 +1736,7 @@
           <!-- Die .env gewinnt ueber die Datenbank, und die App sperrt jedes Feld,
                das die Umgebung setzt (admin-email.js). Wer SMTP in der App testen
                und nachstellen will, muss das VOR dieser Entscheidung wissen. -->
-          <div class="hint" data-i18n="email.appHint">Whatever you enter here is read-only in the app. If you'd rather manage and test SMTP in the app under Settings → Email (SMTP), skip this step.</div>
+          <div class="hint" data-i18n="email.appHint">Whatever you enter here is read-only in the app. If you'd rather manage and test SMTP in the app under Settings → Household → Email (SMTP), skip this step.</div>
         </div>
         </div>
         <!-- Eingeschaltet folgen zwei Gruppen entlang der Frage, die sie

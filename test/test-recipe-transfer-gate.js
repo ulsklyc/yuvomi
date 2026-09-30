@@ -17,6 +17,12 @@
  *        sonst am Guard gefaltet (GHSA-cvwj, test-module-gate-path-case.js).
  *
  *        Gemessen wird der EFFEKT mit: nach einem 403 ist kein Artikel entstanden.
+ *
+ *        Dazu #1577 (Entscheidung 30.09.2026): Bearbeiten und Loeschen eines
+ *        Rezepts haengen NUR am Modulrecht. Ein Mitglied mit `meals: write`
+ *        aendert und loescht auch ein Rezept, das jemand anderes angelegt hat;
+ *        mit `meals: read` weist der Modul-Riegel es ab. Hier und nicht in
+ *        test-recipes-routes.js, weil nur dieser Aufbau den echten Riegel faehrt.
  * Ausfuehren: npm run test:recipe-transfer-gate
  */
 import { test } from 'node:test';
@@ -142,6 +148,33 @@ test('meals: read - jeder andere Schreibweg unter /recipes bleibt zu', async () 
   assert.equal((await member('POST', `/recipes/${id}/to-shopping-listX`, { listId: LIST })).status, 403, 'kein startsWith');
   const titel = db.prepare('SELECT title FROM recipes WHERE id = ?').get(id).title;
   assert.notEqual(titel, 'umbenannt', 'das Rezept blieb unveraendert');
+});
+
+test('meals: write - Mitglied bearbeitet und loescht ein Rezept, das der Admin angelegt hat (#1577)', async () => {
+  await setAccess({ meals: 'write' });
+  const { id } = await seedRecipe();
+  const put = await member('PUT', `/recipes/${id}`, { title: 'vom Mitglied verbessert', ingredients: [{ name: 'Dinkel' }] });
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  const row = db.prepare('SELECT title, created_by FROM recipes WHERE id = ?').get(id);
+  assert.equal(row.title, 'vom Mitglied verbessert');
+  assert.notEqual(row.created_by, memberId, 'Vorbedingung: das Rezept ist ein fremdes');
+  const del = await member('DELETE', `/recipes/${id}`);
+  assert.equal(del.status, 204);
+  assert.equal(db.prepare('SELECT id FROM recipes WHERE id = ?').get(id), undefined);
+});
+
+test('meals: read - ein fremdes Rezept bleibt unveraendert und bestehen (#1577)', async () => {
+  await setAccess({ meals: 'read' });
+  const { id } = await seedRecipe();
+  const put = await member('PUT', `/recipes/${id}`, { title: 'umbenannt' });
+  assert.equal(put.status, 403);
+  assert.match(put.body.error, /read-only/);
+  const del = await member('DELETE', `/recipes/${id}`);
+  assert.equal(del.status, 403);
+  assert.match(del.body.error, /read-only/);
+  const row = db.prepare('SELECT title FROM recipes WHERE id = ?').get(id);
+  assert.ok(row, 'das Rezept steht noch');
+  assert.notEqual(row.title, 'umbenannt');
 });
 
 test('meals: read - Mahlzeit -> Einkauf bleibt bei meals: write (die Route schreibt in den Plan)', async () => {

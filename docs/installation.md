@@ -1261,6 +1261,8 @@ update, and a backup written by a newer version is refused with a message to upd
 
 The SQLite database lives in the host folder configured through `DATA_DIR` and is mounted at `/data` inside the container. The database file is `/data/yuvomi.db`.
 
+Next to it, Yuvomi keeps `yuvomi.db.lock` while it runs (see [Restore](#restore)); leave it in place.
+
 Scheduled backups are written to the host folder configured through `BACKUP_DIR` and mounted at `/backups` inside the container.
 
 > **WebDAV documents are outside the database.** A SQLite/database backup contains their metadata
@@ -1307,7 +1309,11 @@ For a local CLI restore outside Docker, stop Yuvomi first, set the same environm
 DB_PATH=/path/to/yuvomi.db node --import dotenv/config scripts/restore-backup.js ./yuvomi-backup-20260401.db
 ```
 
-The restore helper validates that the file is a Yuvomi database and undamaged (every page is checked), and refuses one written by a newer Yuvomi than the one running (update first, then restore), before replacing the active database. The replacement is written next to the database file and swapped in with a single rename, so an interrupted restore leaves the old database in place. It also keeps a pre-restore copy next to the database file for emergency rollback. The CLI restore is not coordinated with a running server - a restore from the settings page at the same time, or the server's open connection to the replaced file, would work against it - so run it only while Yuvomi is stopped.
+The restore helper validates that the file is a Yuvomi database and undamaged (every page is checked), and refuses one written by a newer Yuvomi than the one running (update first, then restore), before replacing the active database. The replacement is written next to the database file and swapped in with a single rename, so an interrupted restore leaves the old database in place. It also keeps a pre-restore copy next to the database file for emergency rollback. Yuvomi has to be stopped for a CLI restore: the restore refuses to run while a Yuvomi server uses the database (`Restore refused: A Yuvomi server is using ...`), and a server that starts while a CLI restore runs waits until it has finished, with a log line every 30 seconds. Both hold a lock on `yuvomi.db.lock` next to the database file. The operating system holds that lock and drops it when the process ends, also after a crash, so there is nothing to clean up.
+
+- **Never delete `yuvomi.db.lock`** while Yuvomi runs: a new file would carry a new lock, and a CLI restore would no longer see the running server. Deleting it while Yuvomi is stopped is harmless; it is recreated on the next start. It is a few kilobytes and can go into backups of the data folder.
+- The lock works between processes that share one kernel: a server and a CLI restore on the same host, in the same container or in two containers on the same volume. It does not reach across machines, and not from macOS or Windows into a container of Docker Desktop through a bind mount - a CLI restore on the host does not see a server in the container there. On NFS mounted with `nolock` and SMB mounted with `nobrl`, locks only apply on the host that took them. SQLite depends on the same locks for the database itself, which is why the database should not be shared between machines at all.
+- If the file system cannot take the lock at all (the file cannot be created or written, or locks are not supported), Yuvomi and the CLI restore log `Could not lock ...` and carry on without it, as before this lock existed. Then nothing stops a CLI restore next to a running server.
 
 ### Moving to a new server (backup from another installation)
 
