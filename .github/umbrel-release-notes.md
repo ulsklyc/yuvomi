@@ -1,10 +1,14 @@
-<!-- version: 2.69.1 -->
-This is a security update and updating is recommended. It closes two places where an ordinary household member could reach further than their role allows.
+<!-- version: 2.70.0 -->
+This is a large interface update with security fixes, and updating is recommended.
 
-Only admins can manage CardDAV contact accounts now. Until this release, a member could change the server address of a household CardDAV account, and the next sync sent the stored credentials to that server. Members keep reading and editing contacts as before.
+Deleting a document folder no longer reveals documents or linked records you are not allowed to see. The WebDAV backup target and CalDAV accounts now ask for the password again when their server or username changes, instead of sending the stored password to the new address. Documents and images are no longer kept in the browser's cache after you sign out.
 
-The first single sign-on of a household member can no longer be steered by another member through their own profile email address. If you use SSO: a member whose account has a password and is not yet linked to SSO is no longer linked by email address. Their first SSO sign-in shows a message asking them to sign in with their password and link SSO under Settings, Account. Alternatively, an admin can switch the account to "SSO sign-in only" under Settings, Administration, Family. Accounts that are already linked are not affected.
+Settings are reorganised into Account, Household and Modules, with one sheet per module; on a desktop the list stays beside the open sheet. The web installer now looks and works like the app, and first-run setup keeps the language you chose.
 
-There are no database changes in this update.
+The calendar gives phones more room: the header takes two rows, you can swipe between months, weeks and days, and the month shows the selected day below the grid. New events in the week and day views come from a double-click or a long press, so a click beside an event only closes it. On a phone the overview starts with what is due today, and the wall display keeps its exit button in view and leaves with the back button.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.69.1
+Search finds parts of words across every module and opens places and actions. Documents show a preview of the file itself, vital readings and lab values can be edited, and counted texts use the right plural forms in Czech, Polish, Russian, Ukrainian and Arabic. Many dates now follow the household's time zone instead of the device's or the server's, including medication reminders, housekeeping visits and "due today".
+
+The update runs one database migration on first start. It removes shared-expense ledger rows whose expense no longer exists, so balances only count real expenses. No action is needed; as always, a backup before updating is a good idea.
+
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.70.0

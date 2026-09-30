@@ -2,14 +2,16 @@
  * Modul: Wetter-Proxy (Weather)
  * Zweck: Serverseitiger Proxy für Open-Meteo (Default, kein API-Key) und
  *        OpenWeatherMap (Legacy, via .env). Provider-Auflösung: DB-Präferenzen
- *        zuerst, dann Env-Vars.
- * Abhängigkeiten: express, db (sync_config), natives global fetch (Node >=22)
+ *        zuerst, dann Env-Vars (services/weather-source.js).
+ * Abhängigkeiten: express, db (sync_config), services/weather-source,
+ *                 natives global fetch (Node >=22)
  */
 
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import { utcDateKey } from '../utils/timezone.js';
+import { resolveWeatherSource } from '../services/weather-source.js';
 
 const log = createLogger('Weather');
 
@@ -91,41 +93,23 @@ export function buildRouter({ cfgGet: cfgGetFn = cfgGet, fetchFn = null } = {}) 
   router.get('/', async (req, res) => {
     try {
       // ── 1. Resolve provider ──────────────────────────────────
+      // Die Vorrangregel (Datenbank vor `.env`) steht EINMAL in
+      // services/weather-source.js - die Admin-Seite zeigt ihre Quelle aus
+      // derselben Funktion an.
       const userId = req.authUserId;
-      const dbProvider = cfgGetFn('weather_provider');
-      const dbLat      = effective('weather_lat', userId);
-      const dbLon      = effective('weather_lon', userId);
-      const dbCity     = effective('weather_city', userId) ?? '';
-      const dbUnits    = effective('weather_units', userId) ?? 'metric';
+      const resolved = resolveWeatherSource({
+        provider: cfgGetFn('weather_provider'),
+        lat:      effective('weather_lat', userId),
+        lon:      effective('weather_lon', userId),
+        city:     effective('weather_city', userId),
+        units:    effective('weather_units', userId),
+      });
+      if (resolved.source === 'none') return res.json({ data: null });
 
-      const envLat   = process.env.WEATHER_LAT;
-      const envLon   = process.env.WEATHER_LON;
-      const envCity  = process.env.WEATHER_CITY ?? '';
-      const envUnits = process.env.WEATHER_UNITS ?? 'metric';
+      const { provider, lat, lon, city, units } = resolved;
       const owmKey   = process.env.OPENWEATHER_API_KEY;
-      const owmCity  = String(req.query.city || process.env.OPENWEATHER_CITY || 'Berlin');
+      const owmCity  = String(req.query.city || resolved.city);
       const owmLang  = String(req.query.lang  || process.env.OPENWEATHER_LANG || 'en');
-
-      let provider, lat, lon, city, units;
-
-      if (dbProvider === 'open-meteo' && dbLat && dbLon) {
-        provider = 'open-meteo';
-        lat = dbLat; lon = dbLon; city = dbCity; units = dbUnits;
-      } else if (dbProvider === 'openweathermap' && owmKey) {
-        provider = 'openweathermap';
-        units = dbUnits !== 'metric' ? dbUnits : (process.env.OPENWEATHER_UNITS ?? 'metric');
-      } else if (!dbProvider && dbLat && dbLon) {
-        provider = 'open-meteo';
-        lat = dbLat; lon = dbLon; city = dbCity; units = dbUnits;
-      } else if (!dbProvider && envLat && envLon) {
-        provider = 'open-meteo';
-        lat = envLat; lon = envLon; city = envCity; units = envUnits;
-      } else if (!dbProvider && owmKey) {
-        provider = 'openweathermap';
-        units = process.env.OPENWEATHER_UNITS ?? 'metric';
-      } else {
-        return res.json({ data: null });
-      }
 
       // ── 2. Cache check ───────────────────────────────────────
       const cacheKey = provider === 'open-meteo'

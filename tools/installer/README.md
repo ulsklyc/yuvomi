@@ -44,24 +44,33 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
      creating your admin account. Two or three clicks, no jargon.
    - **Advanced setup** — walks every option, step by step. Security keys are
      still pre-generated (regenerate any time), and each screen is optional:
-     - **Basics** — domain/IP, HTTP host port (`OIKOS_HTTP_PORT`), timezone (`TZ`,
+     - **Basics** - domain/IP, HTTP host port (`OIKOS_HTTP_PORT`), timezone (`TZ`,
        which also pre-sets the household zone - changeable later in the app),
        how Yuvomi is exposed (`SESSION_SECURE`, `TRUST_PROXY`) and the public
        address (`BASE_URL`). The exposure choice follows the host you enter, and the
        combination of an `http://` address with enforced secure cookies is rejected -
        nobody could sign in to that. A timezone the browser does not recognise
        (`Europe/Berln`) is refused on the spot instead of falling back to UTC
-     - **Security keys** — `SESSION_SECRET` and `DB_ENCRYPTION_KEY` (pre-filled
+     - **Security keys** - `SESSION_SECRET` and `DB_ENCRYPTION_KEY` (pre-filled
        on a fresh install; existing keys are kept, see below)
-     - **Weather** — Open-Meteo coordinates (no API key)
-     - **Calendar** — Google Calendar and Apple CalDAV
-     - **Email** — SMTP (`EMAIL_SMTP_*`, `EMAIL_FROM_*`); enables password-reset
+     - **Weather** - Open-Meteo coordinates (no API key). They apply until a
+       household location is saved in the app (Settings → Household → Integrations), which
+       then takes precedence
+     - **Calendar** - Google Calendar, Outlook (Microsoft Graph) and Apple iCloud
+       CalDAV, the last one marked *legacy*: the `.env` holds exactly one iCloud
+       account, while further CalDAV accounts (Nextcloud, a second iCloud) are
+       added in the app under Settings → Modules → Calendar
+     - **Email** - SMTP (`EMAIL_SMTP_*`, `EMAIL_FROM_*`); enables password-reset
        emails, email as a household notification channel, and sending a shopping
-       list to a member; a port outside 1-65535 is refused on the spot
-     - **Storage & backups** — the host data folder (`DATA_DIR`), automatic backups,
+       list to a member; a port outside 1-65535 is refused on the spot. Values set
+       here are read-only in the app - leave the step empty to manage and test
+       SMTP in the app instead
+     - **Storage & backups** - the host data folder (`DATA_DIR`), the upload limit
+       for every file (`MAX_UPLOAD_MB`, 1-100 MB, empty keeps the server default
+       of 5 MB; anything else is refused on the spot), automatic backups,
        off-site WebDAV backups (`WEBDAV_BACKUP_*`), and local-folder, WebDAV or
        Google Drive document storage. Everything that decides *where data lives*
-     - **Advanced** — Single Sign-On (OIDC, including whether SSO becomes the only
+     - **Advanced** - Single Sign-On (OIDC, including whether SSO becomes the only
        way in), the four home-network permissions
        (calendar subscriptions, recipe mirrors, waste collection feeds, WebDAV
        target - they lift the SSRF protection and are asked as one group), the calendar sync interval, live
@@ -94,12 +103,23 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
 5. Starts the container (`docker compose up -d`, or `podman compose -f
    podman-compose.yml up -d` / `podman-compose -f podman-compose.yml up -d`)
 6. Polls the health endpoint until the container is ready
-7. Creates your first admin account via `POST /api/v1/auth/setup`
+7. Creates your first admin account via `POST /api/v1/auth/setup` and passes
+   the wizard's current language along as `language`, which the app keeps as
+   the household's data language (birthday titles, calendar export). The proxy
+   forwards only codes both the installer and the app know (a guard in
+   `test-installer-i18n.js` compares the two lists); if an image rejects the code
+   with 400, it retries once without it, so the account never fails over the
+   language. `timezone` is deliberately not sent: `TZ` in the `.env` already
+   pre-sets the household zone, and a stored zone would decouple the two
 8. Offers to download the written `.env` on the final screen — the only backup
    of newly generated encryption keys, which cannot be recovered if lost. The
    download is served from disk (`GET /api/env-file`), so it is the file itself,
    including values carried over from a previous run and the two secrets the
-   wizard itself never sees. Same loopback guard as every other API route
+   wizard itself never sees. Same loopback guard as every other API route.
+   Below it, links into the running app for what comes next: invite the
+   family, choose modules, and set region & language (currency, date format,
+   holidays) - a language does not imply a region, so the wizard leaves that
+   choice to the app
 
 The local-folder document-storage fields are optional. Setting `DOCUMENT_STORAGE_LOCAL_ENABLED=true`
 writes new document files (including calendar attachments) to `DOCUMENT_STORAGE_LOCAL_PATH` (default
@@ -124,7 +144,7 @@ The Google Drive Documents fields configure OAuth only. `GOOGLE_DRIVE_CLIENT_ID`
 `GOOGLE_DRIVE_CLIENT_SECRET` are optional paired overrides; when both are empty, the runtime reuses
 `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. `GOOGLE_DRIVE_REDIRECT_URI` is always Drive-specific
 and must exactly match `/api/v1/documents/storage/google-drive/callback`. After installation, connect
-and test Drive in **Settings → Sync → Document storage**, then explicitly select it. OAuth
+and test Drive in **Settings → Modules → Documents**, then explicitly select it. OAuth
 success alone never changes the upload destination.
 
 > SQLite/database backups do not contain document binaries stored in a local folder, on WebDAV, or
@@ -170,7 +190,11 @@ v2.0.0 redesign, and the `/fonts/` route went with the typeface it carried.
 An inline fallback token block (with a dark-mode variant) precedes the
 `tokens.css` link, so the wizard stays legible even if that stylesheet cannot be
 served; its values mirror the current tokens, because a fallback that shows the
-previous release sends the diagnosis in the wrong direction. The wizard meets WCAG 2.1 AA
+previous release sends the diagnosis in the wrong direction. The layout follows the app's settings screens: options sit in grouped inset
+lists with the app's switches for on/off settings, wide screens show a step list
+beside the content (finished steps can be revisited, and the Docker start has its
+own entry), the action bar stays in reach at every width, and the review page
+is grouped by topic with an edit link per group. The wizard meets WCAG 2.1 AA
 (keyboard-operable accordions, ARIA live regions for Docker status, focus
 management, labelled controls, a `<main>` landmark, and field-level error
 identification - `aria-invalid` plus focus, with the error banner relocated

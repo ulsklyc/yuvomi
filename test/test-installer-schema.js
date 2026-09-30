@@ -311,6 +311,125 @@ test('das gesendete env-Objekt erfindet keine Keys ausserhalb des Schemas', () =
     `install.html sendet Keys ohne Schema-Eintrag (sanitizeEnv wirft sie weg): ${extra.join(', ')}`);
 });
 
+/* Jeder Schluessel, den buildEnv() schreibt, hat ein Eingabefeld.
+ *
+ * MAX_UPLOAD_MB stand im Schema, in S und in buildEnv - die beiden Guards
+ * darueber waren gruen. Nur schrieb keine Zeile im Wizard je etwas in
+ * S.MAX_UPLOAD_MB: der Wert ging immer leer hinaus, und wer groessere Dateien
+ * wollte, musste die .env von Hand anfassen. "Wird gesendet" heisst nicht
+ * "laesst sich einstellen".
+ *
+ * Der Guard geht deshalb vom gesendeten Wert zurueck zu seiner Quelle: fuer
+ * jedes `KEY: S.prop` in buildEnv() sammelt er die Zuweisungen an S.prop
+ * (auch als Objekt-Eigenschaft, etwa oidcCore), folgt lokalen Variablen und
+ * aufgerufenen Funktionen bis zur Tiefe 3 und verlangt am Ende ein $('id'),
+ * dessen id im Markup ein <input>, <select> oder <textarea> ist. Was
+ * absichtlich aus einer ENTSCHEIDUNG statt aus einem Feld abgeleitet wird,
+ * steht mit Begruendung und dem steuernden Feld in der Ausnahmekarte. */
+const DERIVED_NOT_TYPED = {
+  SESSION_SECURE: {
+    control: 'adv-proxy',
+    reason: 'Folgt aus der Proxy-Wahl im Grundkonfigurations-Schritt (Literal je Zweig): '
+      + 'ein eigenes Feld liesse sichere Cookies und Proxy-Wahl auseinanderlaufen.',
+  },
+  TRUST_PROXY: {
+    control: 'adv-proxy',
+    reason: 'Folgt aus derselben Proxy-Wahl wie SESSION_SECURE; die beiden Werte gibt es '
+      + 'nur als Paar, ein Feld je Wert erlaubte unsinnige Kombinationen.',
+  },
+};
+
+function fieldSources() {
+  const html = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
+  const script = html.slice(html.indexOf('<script type="module">'));
+  const body = script.match(/function buildEnv\(\)\s*\{\s*return\s*\{([\s\S]*?)\n\s*\};/);
+  assert.ok(body, 'buildEnv() in install.html nicht gefunden');
+  const pairs = [...body[1].matchAll(/\b([A-Z][A-Z0-9_]*)\s*:\s*S\.(\w+)/g)].map(m => [m[1], m[2]]);
+  const controls = new Set([...html.matchAll(/<(?:input|select|textarea)\b[^>]*\bid="([^"]+)"/g)].map(m => m[1]));
+  const esc = str => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const all = re => [...script.matchAll(re)].map(m => m[1]);
+  const expand = (expr, depth, seen) => {
+    let text = expr;
+    if (depth === 0) return text;
+    for (const [, name, call] of expr.matchAll(/\b([a-z]\w*)\b(\s*\()?/g)) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      const parts = call
+        ? all(new RegExp(`\\nfunction ${esc(name)}\\([^)]*\\)\\s*\\{([\\s\\S]*?)\\n\\}`, 'g'))
+        : all(new RegExp(`\\b(?:const|let)\\s+(?:[^;]*?[\\s,])?${esc(name)}\\s*=(?!=)([^;]*);`, 'g'));
+      for (const part of parts) text += ' ' + expand(part, depth - 1, seen);
+    }
+    return text;
+  };
+  const fields = new Map();
+  for (const [key, prop] of pairs) {
+    const ids = new Set();
+    const sources = [
+      ...all(new RegExp(`\\bS\\.${esc(prop)}\\s*=(?!=)([\\s\\S]*?);`, 'g')),
+      ...all(new RegExp(`(?:^|[\\s{,])${esc(prop)}\\s*:\\s*([^,\\n}]+)`, 'g')),
+    ];
+    for (const src of sources) {
+      for (const [, id] of expand(src, 3, new Set()).matchAll(/\$\('([\w-]+)'\)/g)) {
+        if (controls.has(id)) ids.add(id);
+      }
+    }
+    fields.set(key, ids);
+  }
+  return { fields, controls, script };
+}
+
+test('jeder von buildEnv geschriebene Schluessel hat ein Eingabefeld oder eine begruendete Ausnahme', () => {
+  const { fields } = fieldSources();
+  // Ein Scanner, der nichts findet, darf nicht urteilen.
+  assert.ok(fields.size >= 50, `nur ${fields.size} Schluessel in buildEnv() erkannt - der Leser greift nicht`);
+  const withField = [...fields.values()].filter(ids => ids.size > 0).length;
+  assert.ok(withField >= 50, `nur ${withField} Schluessel mit Feld erkannt - die Aufloesung greift nicht`);
+
+  const orphans = [...fields].filter(([key, ids]) => ids.size === 0 && !(key in DERIVED_NOT_TYPED)).map(([key]) => key);
+  assert.deepEqual(orphans, [],
+    `buildEnv() schreibt diese Schluessel, aber kein Feld im Wizard setzt sie: ${orphans.join(', ')}. `
+    + 'Feld anlegen (und im Klick-Handler in S schreiben) oder mit Begruendung in DERIVED_NOT_TYPED.');
+});
+
+test('die Ausnahmekarte der feldlosen Schluessel traegt keine Karteileichen', () => {
+  const { fields, controls, script } = fieldSources();
+  for (const [key, { control, reason }] of Object.entries(DERIVED_NOT_TYPED)) {
+    assert.ok(fields.has(key), `${key} ist ausgenommen, wird von buildEnv() aber gar nicht geschrieben`);
+    assert.equal(fields.get(key).size, 0, `${key} hat inzwischen ein Feld - die Ausnahme deckt nichts mehr`);
+    assert.ok(controls.has(control), `${key}: das steuernde Feld #${control} gibt es nicht`);
+    assert.ok(script.includes(`$('${control}')`), `${key}: #${control} wird im Skript nie gelesen`);
+    assert.ok(reason.length > 30, `${key} braucht eine echte Begruendung`);
+  }
+});
+
+test('das Upload-Limit prueft dieselben Grenzen wie der Server und meldet am Feld', () => {
+  // Der Server rundet ab und klemmt still auf MIN_MB..MAX_MB
+  // (server/utils/upload-limit.js). Nimmt der Wizard mehr an, steht in der .env
+  // ein Wert, den die App nie benutzt - geprueft wird deshalb gegen die
+  // Konstanten dort, nicht gegen eine abgeschriebene Zahl.
+  const server = readFileSync(new URL('../server/utils/upload-limit.js', import.meta.url), 'utf8');
+  const min = Number(server.match(/const MIN_MB\s*=\s*(\d+);/)?.[1]);
+  const max = Number(server.match(/const MAX_MB\s*=\s*(\d+);/)?.[1]);
+  const def = server.match(/const DEFAULT_MB\s*=\s*(\d+);/)?.[1];
+  assert.ok(min && max && def, 'Grenzen in upload-limit.js nicht gefunden');
+  assert.equal(ENV_SCHEMA.find(e => e.key === 'MAX_UPLOAD_MB').default, def, 'Schema-Default weicht vom Server ab');
+
+  const html = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
+  const handler = html.slice(html.indexOf("$('storage-next').addEventListener"));
+  const block = handler.slice(0, handler.indexOf('\n});'));
+  const cond = block.match(/if \((maxUpload && [^\n]+)\) \{\s*\n\s*fail\('storage-err', t\('storage\.errMaxUpload'\), 'adv-max-upload'\);/);
+  assert.ok(cond, 'storage-next prueft adv-max-upload nicht mit Meldung am Feld');
+  assert.match(block, /S\.MAX_UPLOAD_MB = maxUpload;/, 'der gepruefte Wert wird nicht in S geschrieben');
+  // Die Bedingung AUSFUEHREN, nicht nachlesen.
+  const rejects = new Function('maxUpload', `return Boolean(${cond[1]});`);
+  for (const ok of ['', String(min), String(def), String(max)]) assert.equal(rejects(ok), false, `${JSON.stringify(ok)} muss durchgehen`);
+  for (const bad of [String(min - 1), String(max + 1), '7.5', '1e2', '-5', 'abc', '05']) {
+    assert.ok(rejects(bad), `${JSON.stringify(bad)} muss abgelehnt werden - der Server naehme etwas anderes`);
+  }
+  const placeholder = html.match(/<input[^>]*id="adv-max-upload"[^>]*>/)?.[0].match(/placeholder="(\d+)"/)?.[1];
+  assert.equal(placeholder, def, 'der Platzhalter muss den Server-Default zeigen');
+});
+
 test('ENV_SCHEMA enthält alle Original-Keys, TZ, OIKOS_HTTP_PORT, P5, Subscriptions und Dokument-WebDAV', () => {
   assert.equal(ENV_SCHEMA.length, TOTAL_KEYS);
   const keys = ENV_SCHEMA.map(e => e.key);

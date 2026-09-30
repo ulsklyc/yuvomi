@@ -24,6 +24,10 @@
  * text/gradients/shadows, with the brand font (Plus Jakarta Sans) embedded as
  * base64, then resized with sharp.
  *
+ * CLAIM: headline and sub are the hero of docs/index.html (T.en hero_h1_pre +
+ * hero_h1_em, hero_sub), the chips its four named modules. A shared link should
+ * promise what the page it opens says; change them together.
+ *
  * Usage:  node scripts/generate-social-preview.mjs
  */
 
@@ -52,6 +56,7 @@ const ICON = {
   calendar: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
   meals:    '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
   budget:   '<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>',
+  shopping: '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
 };
 
 const chip = (icon, label) => `
@@ -247,15 +252,15 @@ body::after {
 
   <div class="kicker"><span class="dot"></span>Self-hosted · Open Source</div>
 
-  <h1 class="headline">The family planner<br>that's <span class="grad">truly yours.</span></h1>
+  <h1 class="headline">One home <span class="grad">instead of many subscriptions.</span></h1>
 
-  <p class="sub">Tasks, calendar, meals, shopping and budget — private by design, beautifully organized on your own server.</p>
+  <p class="sub">The self-hosted family planner: tasks, calendar, budget and shopping on a server you own. For a family, a couple, or just you.</p>
 
   <div class="chips">
     ${chip('tasks', 'Tasks')}
     ${chip('calendar', 'Calendar')}
-    ${chip('meals', 'Meals')}
     ${chip('budget', 'Budget')}
+    ${chip('shopping', 'Shopping')}
   </div>
 
   <div class="meta">

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Every page of yuvomi.cloud, each under its canonical URL (the
+     <link rel="canonical"> of that page). No lastmod: a hand-kept date goes
+     stale faster than the pages do. test:docs-landing checks that this list
+     and the pages in docs/ stay the same set. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://yuvomi.cloud/</loc></url>
+  <url><loc>https://yuvomi.cloud/install.html</loc></url>
+  <url><loc>https://yuvomi.cloud/privacy.html</loc></url>
+  <url><loc>https://yuvomi.cloud/datenschutz.html</loc></url>
+  <url><loc>https://yuvomi.cloud/impressum.html</loc></url>
+</urlset>

@@ -26,148 +26,21 @@
   <meta name="twitter:title" content="Impressum - Yuvomi">
   <meta name="twitter:description" content="Impressum und Anbieterkennzeichnung für yuvomi.cloud.">
   <meta name="twitter:image" content="https://yuvomi.cloud/twitter-image.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
-  <!-- Geteiltes Token-System der vier Seiten. Frueher stand es hier viermal,
-       und dieser Rechtstext hielt eine abgespeckte Teilmenge, die von der
-       Startseite, auf die er verlinkt, unbemerkt abweichen konnte. -->
+  <!-- site.css: Tokens und Bauteile aller fuenf Seiten. legal.css: die
+       Spaltenseite der drei Rechtstexte. Hier stand frueher ein eigener
+       Style-Block, auf privacy.html und datenschutz.html byteweise gleich. -->
   <link rel="stylesheet" href="assets/site.css">
+  <link rel="stylesheet" href="assets/legal.css">
   <style>
-    /* Seiteneigenes Mass: ein Rechtstext ist eine Spalte, keine Landing-Page. */
-    :root { --maxw: 820px; }
-
-    html { scroll-behavior: smooth; }
-    body {
-      font-family: var(--ff);
-      font-size: 16px;
-      line-height: 1.65;
-      color: var(--text-1);
-      background: var(--bg);
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; width: 100%; }
-
-    /* Bis zur Re-Kritik hatten die beiden Rechtsseiten als einzige keinen
-       Theme-Umschalter - vier Laeufe lang gemeldet. Sie uebernahmen zwar die
-       Wahl von den Hauptseiten, aber wer aus einer Suche direkt hier landet,
-       hatte keine. Und genau diese Seite ist der einzige Beleg fuer die
-       "0 Tracker" der Startseite, wird also durchaus direkt aufgerufen. */
-    .top-actions { display: flex; align-items: center; gap: 14px; }
-    .theme-btn {
-      display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0;
-      border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--bg);
-      color: var(--text-2); cursor: pointer; transition: border-color .15s, color .15s;
-    }
-    .theme-btn:hover { border-color: var(--border-strong); color: var(--text-1); }
-    .theme-btn svg { width: 17px; height: 17px; }
-    header.top {
-      border-bottom: 1px solid var(--border);
-      background: var(--surface);
-      padding: 18px 0;
-    }
-    header.top .wrap {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .nav-logo {
-      display: inline-flex;
-      align-items: center;
-      min-height: 44px;
-      gap: 10px;
-      font-weight: 700;
-      font-size: 18px;
-      color: var(--text-1);
-      text-decoration: none;
-    }
-    .nav-logo svg { width: 28px; height: 28px; }
-    .back-link {
-      display: inline-flex;
-      align-items: center;
-      min-height: 44px;
-      color: var(--text-2);
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 500;
-      padding: 8px 14px;
-      border-radius: var(--r-md);
-      border: 1px solid var(--border);
-      transition: all .18s ease;
-    }
-    .back-link:hover {
-      color: var(--accent);
-      border-color: var(--accent);
-      background: var(--accent-soft);
-    }
-
-    main { flex: 1; padding: 48px 0 64px; }
-
-    h1 {
-      font-size: clamp(28px, 4vw, 40px);
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      line-height: 1.15;
-      margin-bottom: 8px;
-      color: var(--text-1);
-    }
-    .subtitle {
-      color: var(--text-3);
-      font-size: 15px;
-      margin-bottom: 40px;
-    }
-
-    h2 {
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      margin: 36px 0 12px;
-      color: var(--text-1);
-    }
-    h2:first-of-type { margin-top: 0; }
-    /* Every section carries an id, so "Haftung für Links" can be linked to
-       directly - datenschutz.html has had that since it grew a table of
-       contents, and this page had neither. No table of contents here on
-       purpose: nine short sections fit in about two screens, where a 9-entry
-       index is a second thing to read rather than a way past the first. */
-    main h2 { scroll-margin-top: 24px; }
-
-    p { margin-bottom: 12px; color: var(--text-1); overflow-wrap: anywhere; }
-
-    a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
-    a:hover { color: var(--accent-hover); }
-
-    .legal-disclaimer {
-      background: var(--bg-alt);
-      border: 1px solid var(--border-strong);
-      border-radius: var(--r-md);
-      padding: 16px 20px;
-      margin-bottom: 20px;
-      font-size: 14px;
-      color: var(--text-2);
-    }
-    .en-summary {
-      font-size: 13px;
-      line-height: 1.6;
-      color: var(--text-3);
-      margin-bottom: 40px;
-    }
-    .en-summary strong { color: var(--text-2); }
-    .legal-disclaimer strong { color: var(--text-1); }
-    .legal-disclaimer code { font-family: var(--ff-mono); font-size: 13px; }
-
-    .info-block {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--r-lg);
-      padding: 20px 24px;
-      margin-bottom: 16px;
-      box-shadow: var(--shadow-sm);
-    }
+    /* Nur, was dem Impressum allein gehoert (alles andere: assets/legal.css).
+       Seine Infobloecke sind Schluessel/Wert-Paare (dl) statt Absaetzen,
+       brauchen also Polster statt Absatzraender; und lange Adressen und URLs
+       brechen auch im Fliesstext. */
+    .info-block { padding: 20px 24px; margin: 0 0 16px; }
     .info-block dl { display: grid; grid-template-columns: 200px 1fr; gap: 8px 24px; }
     .info-block dt { color: var(--text-3); font-size: 14px; font-weight: 600; }
     .info-block dd { color: var(--text-1); font-size: 15px; word-break: break-word; }
@@ -175,76 +48,10 @@
       .info-block dl { grid-template-columns: 1fr; gap: 2px 0; }
       .info-block dd { margin-bottom: 12px; }
     }
-
-    .small { font-size: 13px; color: var(--text-3); }
-
-    footer.bot {
-      border-top: 1px solid var(--border);
-      background: var(--bg-alt);
-      padding: 24px 0;
-      margin-top: auto;
-    }
-    footer.bot .wrap {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 13px;
-      color: var(--text-3);
-    }
-    footer.bot a { color: var(--text-2); text-decoration: none; }
-    footer.bot a:hover { color: var(--accent); }
-    footer.bot nav { display: flex; gap: 14px; flex-wrap: wrap; }
-    footer.bot nav a { padding: 6px 2px; min-height: 44px; display: inline-flex; align-items: center; }
-  
-    /* These two pages relied on the UA default focus ring; match the other pages. */
-    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
-
-    /* Skip link: index and install put 26 focusable nodes between the top of the
-       page and the content, so keyboard users need a way past the nav. */
-    .skip-link { position: absolute; left: -9999px; top: 0; z-index: 200; }
-    .skip-link:focus { left: 8px; top: 8px; padding: 12px 18px; display: inline-flex; align-items: center; min-height: 44px;
-      background: var(--surface); color: var(--text-1);
-      border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-md); font-weight: 600; }
-  
-    /* 14 dense legal sections with a table of contents at the very top and no way
-       back to it on a phone. Appears only once you are past the first screen. */
-    .to-top { position: fixed; right: 16px; bottom: 16px; z-index: 90;
-      display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
-      background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
-      border-radius: var(--r-full); box-shadow: var(--shadow-md); font-size: 0.85rem; font-weight: 600;
-      opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity .2s, transform .2s, visibility .2s; }
-    .to-top.show { opacity: 1; visibility: visible; transform: none; }
-    .to-top:hover { text-decoration: none; border-color: var(--border-strong); }
-    .to-top svg { width: 15px; height: 15px; }
-  
-    /* These two pages had no reduced-motion guard at all. */
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-      }
-      .to-top { transition: none; }
-    }
-
-    /* Print. An Impressum is routinely printed or archived as a PDF, and it
-       printed with the floating "Nach oben" pill over the text and every
-       external reference as a bare underlined word. */
-    @media print {
-      html { scroll-behavior: auto; }
-      body { background: #fff; color: #000; }
-      .skip-link, .to-top, .back-link { display: none !important; }
-      header.top, .info-block { background: transparent; }
-      .info-block { break-inside: avoid; }
-      h2 { break-after: avoid; }
-      a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; word-break: break-all; }
-    }
+    p { overflow-wrap: anywhere; }
   </style>
   <script>
-    /* Honor the theme the visitor picked on the main pages (no toggle here). */
+    /* Honor the theme picked on any page before the first paint; the bar's toggle writes the same key. */
     (function(){
       try {
         var t = localStorage.getItem('yuvomi-theme') || localStorage.getItem('oikos-theme');
@@ -256,8 +63,9 @@
 <body>
 <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
 
-<header class="top">
-  <div class="wrap">
+<header class="site-bar">
+ <div class="topbar">
+  <div class="wrap bar-row">
     <a href="index.html" class="nav-logo">
       <svg viewBox="0 0 160 160" fill="none" aria-hidden="true">
         <defs>
@@ -272,14 +80,15 @@
       </svg>
       Yuvomi
     </a>
-    <div class="top-actions">
-      <button class="theme-btn" id="themeBtn" type="button" aria-pressed="false" aria-label="Design umschalten">
+    <div class="nav-controls">
+      <a href="index.html" class="nav-btn nav-back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg><span class="nav-back-label">Übersicht</span></a>
+      <button class="nav-btn" id="themeBtn" type="button" aria-pressed="false" aria-label="Design umschalten">
         <svg aria-hidden="true" id="sunIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         <svg aria-hidden="true" id="moonIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
-      <a href="index.html" class="back-link">&larr; Zur Startseite</a>
     </div>
   </div>
+ </div>
 </header>
 
 <main id="main-content" tabindex="-1">
@@ -299,7 +108,7 @@
       <strong>In English:</strong> This page is the provider identification (Impressum) legally required for
       <code>yuvomi.cloud</code> under German law (§ 5 DDG) and applies to this website and its open-source project.
       The contact details below exist solely to meet that obligation. For how data is handled, see the
-      <a href="datenschutz.html">Privacy Policy</a>.
+      <a href="privacy.html">Privacy Policy</a>.
     </p>
 
     <h2 id="im-anbieter">Anbieter / Diensteanbieter</h2>
@@ -405,9 +214,11 @@
     <span>&copy; <span id="year">2026</span> Ulas Kalayci · Yuvomi</span>
     <nav aria-label="Fußzeile">
       <a href="index.html">Startseite</a>
+      <a href="https://github.com/ulsklyc/yuvomi" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/ulsklyc/yuvomi/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+      <a href="https://github.com/ulsklyc/yuvomi/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Mitmachen</a>
       <a href="impressum.html">Impressum</a>
       <a href="datenschutz.html">Datenschutz</a>
-      <a href="https://github.com/ulsklyc/yuvomi" target="_blank" rel="noopener">GitHub</a>
     </nav>
   </div>
 </footer>

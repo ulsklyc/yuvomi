@@ -582,3 +582,100 @@ test('#1532 der Kalender-Sofortversuch beginnt waehrend eines Restores nicht, au
   }
   assert.deepEqual(result, { success: false, skipped: 'restore_in_progress' });
 });
+
+// ---------------------------------------------------------------------------
+// #1551: GET-Anfragen, die nach einem await schreiben
+// ---------------------------------------------------------------------------
+
+/**
+ * Ein Outlook-Konto mit gueltigem Token (kein Refresh noetig) und ein
+ * `fetch`, das Graph beantwortet - auf Wunsch erst nach `held.release()`. `?refresh=true` holt die Kalenderliste von Graph
+ * und schreibt sie danach in `outlook_calendar_selection` - eine GET-Anfrage,
+ * die nach einem await schreibt.
+ */
+function outlookGraph({ hold = true } = {}) {
+  const envKeys = ['MS_CLIENT_ID', 'MS_CLIENT_SECRET', 'MS_REDIRECT_URI'];
+  const env = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+  process.env.MS_CLIENT_ID = 'client-1551';
+  process.env.MS_CLIENT_SECRET = 'secret-1551';
+  process.env.MS_REDIRECT_URI = 'http://127.0.0.1/api/v1/calendar/outlook/callback';
+  const database = dbmod.get();
+  database.prepare('DELETE FROM outlook_calendar_selection').run();
+  database.prepare('DELETE FROM outlook_accounts').run();
+  const accountId = database.prepare(`
+    INSERT INTO outlook_accounts (name, access_token, refresh_token, token_expiry)
+    VALUES ('Outlook 1551', 'access-1551', 'refresh-1551', ?)
+  `).run(new Date(Date.now() + 60 * 60 * 1000).toISOString()).lastInsertRowid;
+
+  const held = heldGate();
+  let graphCalls = 0;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (!String(url).startsWith('https://graph.microsoft.com/')) return realFetch(url, options);
+    graphCalls += 1;
+    if (hold) {
+      held.reached();
+      await held.gate;
+    }
+    return new Response(JSON.stringify({ value: [{ id: 'cal-1551', name: 'Familie', hexColor: '#123456', canEdit: true }] }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    });
+  };
+  const restoreEnv = () => {
+    globalThis.fetch = realFetch;
+    for (const key of envKeys) {
+      if (env[key] === undefined) delete process.env[key];
+      else process.env[key] = env[key];
+    }
+  };
+  return { accountId, held, graphCalls: () => graphCalls, restoreEnv };
+}
+
+test('#1551 eine GET-Anfrage, die nach dem Warten auf Graph schreibt, wird abgewartet und schreibt nicht in die eingespielte Datenbank', async () => {
+  const outlook = outlookGraph();
+  const backupPath = join(tempDir('yuvomi-test-restore-server-'), 'backup.db');
+  let outcome;
+  let status;
+  try {
+    await dbmod.backupToFile(backupPath);
+    const request = fetch(`${BASE}/api/v1/calendar/outlook/accounts/${outlook.accountId}/calendars?refresh=true`, {
+      headers: { Cookie: COOKIE },
+    });
+    await outlook.held.atGate;
+    outcome = await restoreBesideHeldWork(backupPath, outlook.held.release);
+    const res = await request;
+    status = res.status;
+    await res.arrayBuffer();
+  } finally {
+    outlook.held.release();
+    outlook.restoreEnv();
+  }
+  assert.equal(outlook.graphCalls(), 1, 'Vorbedingung: die Anfrage hat Graph erreicht');
+  assert.equal(status, 200, 'die Anfrage selbst gelingt');
+  const rows = dbmod.get().prepare('SELECT COUNT(*) AS n FROM outlook_calendar_selection').get().n;
+  assert.equal(rows, 0, 'die eingespielte Datenbank traegt die Kalenderauswahl des Backups (keine)');
+  assert.equal(outcome, 'wartet auf die Arbeit', 'der Restore wartet die GET-Anfrage ab');
+});
+
+test('#1551 waehrend eines Restores beginnt eine GET-Anfrage, die nach einem await schreibt, gar nicht erst', async () => {
+  // Graph antwortet sofort: ohne Abweisung schriebe die Anfrage danach in die
+  // gesperrte Verbindung.
+  const outlook = outlookGraph({ hold: false });
+  const restore = await restoreHeldWhileCopying();
+  let status;
+  let body;
+  try {
+    const res = await fetch(`${BASE}/api/v1/calendar/outlook/accounts/${outlook.accountId}/calendars?refresh=true`, {
+      headers: { Cookie: COOKIE },
+    });
+    status = res.status;
+    body = await res.json().catch(() => ({}));
+  } finally {
+    restore.release();
+    await restore.done;
+    outlook.restoreEnv();
+  }
+  assert.equal(status, 503, 'abgewiesen statt nach dem Warten auf Graph in die gesperrte Verbindung zu schreiben');
+  assert.equal(body.reason, 'restore_in_progress');
+  assert.equal(outlook.graphCalls(), 0, 'Graph wurde gar nicht erst gefragt');
+});

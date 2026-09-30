@@ -8,7 +8,7 @@ tracking, retry, and deduplication flow as the other notification providers.
 
 Only administrators can manage household notification channels.
 
-1. Open **Settings → Personal → Notifications**.
+1. Open **Settings → Account → Notifications**.
 2. Under **Household channels**, select **Add channel**.
 3. Choose **Webhook** as the provider and enter a name.
 4. Enter the complete HTTP or HTTPS endpoint URL.

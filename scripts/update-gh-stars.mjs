@@ -39,7 +39,9 @@ const patterns = (stars) => [
   {
     file: 'index.html',
     re: /(<span id="gh-stars-proof" data-gh-stars>)[^<]*(<\/span>)/,
-    replacement: `$1${stars} ·$2`,
+    // No trailing " ·": the proof bar draws its separators in CSS (.proof .pi)
+    // so that none is left dangling at the end of a wrapped line.
+    replacement: `$1${stars}$2`,
   },
   {
     file: 'index.html',

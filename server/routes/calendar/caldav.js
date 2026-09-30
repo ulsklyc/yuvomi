@@ -8,6 +8,7 @@ import express from 'express';
 import * as caldavSync from '../../services/caldav-sync.js';
 import * as caldavReminders from '../../services/caldav-reminders-sync.js';
 import { requireAdmin } from '../../auth.js';
+import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
@@ -78,7 +79,9 @@ router.delete('/caldav/accounts/:id', requireAdmin, (req, res) => {
 
 // Calendar Selection
 
-router.get('/caldav/accounts/:id/calendars', requireAdmin, async (req, res) => {
+// `?refresh=true` schreibt die Kalenderliste nach dem Abruf neu: waehrend eines
+// Restores 503, sonst festgehalten wie eine schreibende Anfrage (#1551).
+router.get('/caldav/accounts/:id/calendars', requireAdmin, refuseWhileRestoring, async (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
     const refresh = req.query.refresh === 'true';
@@ -153,7 +156,8 @@ router.get('/caldav/status', (req, res) => {
 
 // Reminder-list discovery & selection
 
-router.get('/caldav/accounts/:id/reminder-lists', requireAdmin, async (req, res) => {
+// Der erste Aufruf und `?refresh=true` schreiben die Listen nach dem Abruf (#1551).
+router.get('/caldav/accounts/:id/reminder-lists', requireAdmin, refuseWhileRestoring, async (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
     const refresh = req.query.refresh === 'true';

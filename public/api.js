@@ -285,7 +285,9 @@ const auth = {
     setOtherReaders(res?.othersCanRead);
     return res;
   },
-  setup: (username, display_name, password) => api.post('/auth/setup', { username, display_name, password }),
+  // `language` ist optional: fehlt es, laesst JSON.stringify das Feld weg, und
+  // der Server verhaelt sich wie vor seiner Einfuehrung.
+  setup: (username, display_name, password, language) => api.post('/auth/setup', { username, display_name, password, language }),
   getUsers: () => api.get('/auth/users'),
   // DER HAUSHALT KANN SICH AENDERN, UND DANN AENDERT SICH, WAS GEFRAGT WIRD.
   // `householdSize` kommt sonst nur aus /auth/me und /auth/login, wird also

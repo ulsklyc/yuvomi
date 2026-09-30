@@ -22,7 +22,7 @@ Yuvomi's server can reach Immich.
 ## Configure in Yuvomi
 
 1. Sign in as an administrator.
-2. Open **Settings → Administration → Immich**.
+2. Open **Settings → Household → Integrations → Immich**.
 3. Enter the Immich server URL. Both the server root and a URL ending in `/api` are accepted.
 4. Enter the API key.
 5. Optionally enter an Immich album UUID. Leave it empty to use the whole library.
