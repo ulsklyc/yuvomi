@@ -285,6 +285,28 @@ test('die Liste ruft die Sortierung mit der Uhr des Haushalts auf', () => {
   });
 });
 
+// Ohne Uhrzeit heisst "bis Tagesende", also NACH einer Aufgabe, die ausdruecklich
+// um 23:59 faellig ist - auch wenn die ohne Uhrzeit die hoehere Prioritaet hat.
+// Ein gemeinsamer Stempel 23:59 liess den Vergleich auf die Prioritaet fallen
+// (Codex-Befund in #1590); die fruehere Fassung und die Uebersicht rechnen
+// Tagesende als 23:59:59.
+const TAGESENDE_OHNE_ZEIT = { id: 803, title: 'Ohne Zeit', category: 'household', priority: "urgent", status: "open", due_date: "2026-10-05", due_time: null };
+const TAGESENDE_UM_2359 = { id: 804, title: "Um 23:59", category: 'household', priority: "low", status: "open", due_date: "2026-10-05", due_time: "23:59" };
+
+test("eine Aufgabe ohne Uhrzeit steht hinter einer, die um 23:59 faellig ist", () => {
+  withZones("Europe/Berlin", "Europe/Berlin", () => {
+    const vormittags = tasks.taskSortNow(new Date("2026-10-05T08:00:00Z"));
+    const sorted = [TAGESENDE_OHNE_ZEIT, TAGESENDE_UM_2359].sort((a, b) => tasks.sortTasks(a, b, vormittags));
+    assert.deepEqual(sorted.map((t) => t.title), ["Um 23:59", 'Ohne Zeit'],
+      "Tagesende kommt nach 23:59, die Prioritaet entscheidet erst bei gleicher Faelligkeit");
+    // Um 23:59 ist die Aufgabe ohne Uhrzeit noch nicht ueberfaellig, die um 23:59 schon nicht mehr offen im Soll.
+    const um2359 = tasks.taskSortNow(new Date("2026-10-05T21:59:30Z"));
+    const spaet = [TAGESENDE_OHNE_ZEIT, TAGESENDE_UM_2359].sort((a, b) => tasks.sortTasks(a, b, um2359));
+    assert.deepEqual(spaet.map((t) => t.title), ["Um 23:59", 'Ohne Zeit'],
+      "um 23:59 ist die Aufgabe ohne Uhrzeit noch am selben Tag faellig, nicht ueberfaellig");
+  });
+});
+
 // ── Der Start-Badge fragt den Tag des Haushalts ─────────────────────────────
 /* `renderStartDateBadge` verglich `new Date(); setHours(0, 0, 0, 0)` mit
  * `new Date(key + 'T00:00:00')` - zweimal Mitternacht der GERAETE-Zone - und

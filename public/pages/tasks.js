@@ -673,7 +673,7 @@ function renderTaskCard(task, opts = {}) {
 }
 
 /* Effektive Faelligkeit als Wanduhr-Stempel des Haushalts ('YYYY-MM-DDTHH:MM'),
- * ohne due_time das Tagesende.
+ * ohne due_time das Tagesende ('T23:59:59').
  *
  * `due_date`/`due_time` sind zonenlose Wanduhrzeit - dieselbe Regel wie in
  * `formatDueDate` (utils/task-fields.js). Hier stand ein Umweg ueber
@@ -685,7 +685,9 @@ function renderTaskCard(task, opts = {}) {
 function effectiveDue(task) {
   if (!task.due_date) return null;
   const day = String(task.due_date).slice(0, 10);
-  const time = task.due_time ? String(task.due_time).slice(0, 5) : '23:59';
+  // Ohne Uhrzeit das Tagesende 23:59:59: als Text hinter einem ausdruecklichen
+  // 23:59, sonst fiele der Vergleich bei Gleichstand auf die Prioritaet.
+  const time = task.due_time ? String(task.due_time).slice(0, 5) : '23:59:59';
   return `${day}T${time}`;
 }
 
