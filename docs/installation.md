@@ -1462,6 +1462,53 @@ chcon -Rt container_file_t ./data ./backups ./modules ./documents
 </details>
 
 <details>
+<summary>Weather, calendar subscriptions and other outside services stop working (rootless Podman)</summary>
+
+The app itself works, but everything that reaches out to the internet fails: the weather tile says
+"Weather currently unavailable", ICS subscriptions and CalDAV to outside servers stop updating. The
+log shows `fetch failed`:
+
+```bash
+podman logs oikos 2>&1 | grep '"level":"warn"' | tail
+```
+
+In production the log lines are JSON, so search for `"mod":"Weather"` rather than `[Weather]`.
+Test from inside the container:
+
+```bash
+podman exec oikos node -e "fetch('https://api.open-meteo.com').then(r=>console.log(r.status)).catch(e=>console.log('ERR',e.cause?.code))"
+```
+
+Any HTTP status (400 is fine here) means the container can reach the internet. `ERR ENETUNREACH`
+means it has no route out, even when name lookups still work. Check the container's routing
+table:
+
+```bash
+podman exec oikos cat /proc/net/route
+```
+
+If it shows only the header line, the rootless default network (`pasta`) left the container without
+any route. Restarting does not always help. Switch the unit to the rootless bridge network by adding
+this line under `[Container]` in `~/.config/containers/systemd/oikos.container`:
+
+```ini
+Network=podman
+```
+
+Then reload and restart:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user restart oikos
+```
+
+On the bridge network Yuvomi sees the bridge gateway instead of each client's address. Behind a
+reverse proxy that sets `X-Forwarded-For` this makes no difference; without one, sign-in lockout
+and rate limits count all clients as one.
+
+</details>
+
+<details>
 <summary>Container starts but page is not reachable</summary>
 
 1. Check the container status:
