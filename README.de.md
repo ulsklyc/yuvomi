@@ -31,7 +31,7 @@
     <img src="docs/screenshots/de/dashboard-light-web.webp" alt="Die Yuvomi-Übersicht: Termine, Aufgaben und Einkauf des Tages für die ganze Familie, darunter Familie, Budget und Geburtstage" width="820">
   </picture>
 
-  <sub><b>20</b> Module&nbsp;&nbsp;·&nbsp; <b>25</b> Sprachen&nbsp;&nbsp;·&nbsp; <b>0</b> Tracker&nbsp;&nbsp;·&nbsp; optionale&nbsp;<b>AES&#8209;256</b>&#8209;Datenbankverschlüsselung</sub>
+  <sub><b>20</b> Module&nbsp;&nbsp;·&nbsp; <b>26</b> Sprachen&nbsp;&nbsp;·&nbsp; <b>0</b> Tracker&nbsp;&nbsp;·&nbsp; optionale&nbsp;<b>AES&#8209;256</b>&#8209;Datenbankverschlüsselung</sub>
 </div>
 
 Die meisten Haushalte kleben ihren Alltag aus einem Dutzend Bezahl-Apps zusammen, jede mit eigenem
@@ -195,7 +195,7 @@ Auf **Proxmox** laufen dieselben Schritte in einem kleinen Debian-LXC: siehe die
 
 ### Geführte Einrichtung
 
-Ein Einrichtungsassistent im Browser, in 25 Sprachen. Er erkennt Docker oder Podman, richtet Single
+Ein Einrichtungsassistent im Browser, in 26 Sprachen. Er erkennt Docker oder Podman, richtet Single
 Sign-on und geplante Backups ein, bereitet Yuvomi auf einen HTTPS-Reverse-Proxy vor (das Zertifikat
 bleibt Sache des Proxys), startet dann den Container und legt euer Admin-Konto an.
 
@@ -251,7 +251,7 @@ Yuvomi wurde von **Oikos** umbenannt, um einen Markenkonflikt mit einem unabhän
 - **Apple HIG in der Liquid-Glass-Sprache** - Systemschrift und Apples Typoskala, Kapsel-Bedienelemente, eingerückte Listengruppen und federnde Bewegung, in Hell und Dunkel gegen WCAG AA geprüft.
 - **Privatsphäre zuerst** - vollständig selbstgehostet, optionale SQLCipher-AES-256-Datenbankverschlüsselung, keine Telemetrie.
 - **Anmeldung für einen ganzen Haushalt** - Zwei-Faktor-Anmeldung, Einladungslinks, optionaler Passwort-Reset per E-Mail und Single Sign-on mit jedem OIDC-Anbieter; siehe [wie sicher der Zugang von außen ist](#bevor-ihr-euch-festlegt).
-- **25 Sprachen** mit automatischer Erkennung. Eine eigene Haushaltseinstellung bestimmt die Sprache der Einträge, die Yuvomi selbst anlegt - so spricht ein exportierter Kalender die Sprache eures Haushalts statt Englisch.
+- **26 Sprachen** mit automatischer Erkennung. Eine eigene Haushaltseinstellung bestimmt die Sprache der Einträge, die Yuvomi selbst anlegt - so spricht ein exportierter Kalender die Sprache eures Haushalts statt Englisch.
 
 <p align="center">
   <img src="https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white" alt="Express">

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Norwegian Bokmål as the 26th language** (#1529, translated by @nilsanmy). The app, the web
+  installer and the command-line installer speak Norwegian Bokmål. A Norwegian Bokmål browser or
+  `LANG=nb_NO.UTF-8` picks it on its own, and the new region "Norwegian Bokmål (Norway)" sets
+  kroner, day.month.year and the 24-hour clock in one step. A household on that region without
+  its own data language also gets Norwegian for the entries Yuvomi writes itself.
+
 ## [2.71.0] - 2026-09-30
 
 ### Added
