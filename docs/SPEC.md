@@ -628,6 +628,8 @@ Reusable recipe cards that can be pre-filled into meal slots.
 
 UNIQUE partial index on `(provider_account_id, provider_recipe_id)` where `provider_account_id IS NOT NULL`.
 
+**Who may change it.** Anyone with write access to the `meals` module may edit or delete any native recipe of the household, whoever created it (#1577); `created_by` records the author and grants nothing. Read-only access is refused by the module gate, and a mirrored recipe (`provider_account_id` set) is refused with 403 for everybody, its creator included.
+
 ### Recipe Ingredients
 | Column | Type | Constraint |
 |--------|------|-----------|

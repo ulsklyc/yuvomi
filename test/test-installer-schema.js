@@ -145,12 +145,12 @@ const INTENTIONALLY_NOT_IN_INSTALLER = {
   OPENWEATHER_LANG: 'Legacy-Wetterprovider.',
 
   // In der App einzurichten, nicht bei der Installation: der Bildschirmschoner
-  // (#693) wird unter Einstellungen → Verwaltung → Immich verbunden, samt
-  // Verbindungstest und Vorschau. Ein API-Schlüssel im Wizard hieße, ihn vor
-  // der ersten Anmeldung zu erfragen - und Immich läuft bei den meisten noch
-  // gar nicht, wenn Yuvomi installiert wird. Die Env-Variablen bleiben als
-  // zweiter Weg für Setups, die alles deklarativ halten.
-  IMMICH_URL: 'In der App unter Verwaltung → Immich einzurichten; Env ist der deklarative Zweitweg.',
+  // (#693) wird unter Einstellungen → Haushalt → Integrationen → Immich
+  // verbunden, samt Verbindungstest und Vorschau. Ein API-Schlüssel im Wizard
+  // hieße, ihn vor der ersten Anmeldung zu erfragen - und Immich läuft bei den
+  // meisten noch gar nicht, wenn Yuvomi installiert wird. Die Env-Variablen
+  // bleiben als zweiter Weg für Setups, die alles deklarativ halten.
+  IMMICH_URL: 'In der App unter Haushalt → Integrationen → Immich einzurichten; Env ist der deklarative Zweitweg.',
   // Benachrichtigungskanaele entstehen in der App, lange nach der Installation.
   // Anders als bei ICS-Abos und Rezept-Spiegeln scheitert der LAN-Fall hier
   // nicht stumm: das Kanalformular lehnt eine private Adresse ab und nennt den
@@ -942,7 +942,7 @@ test('Optionale Dokument-WebDAV-Werte erzeugen keine TrueNAS- oder Umbrel-Fragen
 //
 // Die SMTP-Felder sind seit dem Critique env-gesteuert: steht die Variable in
 // der Umgebung, gewinnt sie, wird NICHT in die Datenbank geschrieben und ist in
-// Settings > Administration gesperrt. Die Sperre gilt pro Feld.
+// Einstellungen → Haushalt → E-Mail (SMTP) gesperrt. Die Sperre gilt pro Feld.
 //
 // Damit wird ein harmlos aussehender Compose-Default zur Falle: ein
 // `EMAIL_SMTP_PORT=${EMAIL_SMTP_PORT:-587}` setzt die Variable für JEDEN
