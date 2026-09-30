@@ -741,8 +741,18 @@ test('PR2 #975 - das zusammengesetzte Kalenderformular und seine Seriennamen ble
       'nach dem Umschalten bestimmt das echte Ganztagsfeld die Vorschau');
 
     await page.click('#modal-save');
-    await page.waitForFunction((eventTitle) => [...document.querySelectorAll('.month-day__event span')]
-      .some((el) => el.textContent === eventTitle), {}, title);
+    // Die Serie beginnt am 15.09. mit BYMONTHDAY=-1: ihr erstes Vorkommen ist der
+    // 30.09., der 15.09. selbst ist keines. Jeder Monat ab dann traegt eines an
+    // seinem letzten Tag - dort muss die neue Serie stehen, ohne Neuladen. Bis
+    // hierhin stand nach dem Anlegen nur die Stammzeile auf ihrem Beginn im
+    // Raster: im September als Chip am 15.09. (kein Vorkommen, aber die alte
+    // Fassung dieser Sonde wartete genau darauf), ab Oktober gar nicht mehr.
+    await page.waitForFunction((eventTitle) => {
+      const inMonth = [...document.querySelectorAll('.month-day:not(.month-day--outside)')];
+      const lastDay = inMonth.at(-1);
+      return Boolean(lastDay) && [...lastDay.querySelectorAll('.month-day__event span')]
+        .some((el) => el.textContent === eventTitle);
+    }, {}, title);
     const monthA11y = await page.evaluate((eventTitle) => {
       const chip = [...document.querySelectorAll('.month-day__event')]
         .find((el) => el.querySelector('span:last-child')?.textContent === eventTitle);

@@ -457,6 +457,10 @@ npm run test:installer-a11y  # Zielgrößen, Kontrast und Fokus des Web-Installe
 # generischen Hinweis, wenn eine konkrete Monatsletzten-Vorschau nicht belegbar ist.
 # test:document-guards bedient zusätzlich das echte Kalender-Modal: Zeit- und
 # Ganztagsdatum, live UNTIL sowie die zugänglichen Monats-/Agenda-Namen nach Lucide.
+# Seit 2026-10-01 wartet sie nach dem Anlegen auf das Vorkommen am Monatsletzten des
+# ANGEZEIGTEN Monats, nicht auf irgendeinen Chip: die alte Fassung war im September gruen
+# ueber der Stammzeile am 15.09. (kein Vorkommen) und lief ab dem Monatswechsel ins
+# Timeout. Gegen den Stand ohne Neuladen nach dem Anlegen einer Serie rot.
 ```
 
 ## Focused linked occurrence suite

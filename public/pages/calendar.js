@@ -8059,7 +8059,13 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
 
     if (mode === 'create') {
       const res = await api.post('/calendar', body);
-      state.events.push(res.data);
+      // Eine neue Serie ist erst nach der Expansion des Servers darstellbar:
+      // die Antwort ist die Stammzeile, und ihr Beginn muss kein Vorkommen sein
+      // (Beginn 15., BYMONTHDAY=-1 -> erstes Vorkommen am Monatsletzten). Sie
+      // anzuhaengen zeigte einen Chip auf einem Tag ohne Termin und keines der
+      // echten Vorkommen, bis zur naechsten Navigation.
+      if (body.recurrence_rule) reloadAfter = true;
+      else state.events.push(res.data);
       savedEventId = res.data?.id;
     } else {
       const localRecurring = isLocalRecurringSeries(event);
