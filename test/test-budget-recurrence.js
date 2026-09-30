@@ -14,6 +14,13 @@ import {
   normalizeIntervalCount,
   effectiveMonthly,
 } from '../server/routes/budget.js';
+import { MIGRATIONS } from '../server/db.js';
+
+// Die Serien-Definition (#1035) kommt aus der ECHTEN Migration, nicht aus einer
+// Abschrift: ihre Trigger legen die Definition fuer jedes eingefuegte Original
+// an, und eine Kopie davon wuerde hier genauso altern wie das Tabellenschema
+// darunter (siehe Kommentar an visibility).
+const SERIES_MIGRATION = MIGRATIONS.find((m) => m.description.includes('(#1035)'));
 
 let passed = 0;
 let failed = 0;
@@ -80,6 +87,7 @@ function freshDb() {
     INSERT INTO users (username, display_name, password_hash, role)
       VALUES ('admin', 'Admin', 'x', 'admin');
   `);
+  db.exec(SERIES_MIGRATION.up);
   return db;
 }
 
@@ -438,7 +446,9 @@ test('Instanz erbt die Zustaendigen der Serie - auch die virtuelle', () => {
   for (const virtual of [0, 1]) {
     const db = freshDb();
     const pid = insertParent(db, { amount: -90000, date: '2026-08-05', virtual, full: virtual ? -90000 : null });
-    db.prepare('INSERT INTO budget_entry_responsibles (entry_id, user_id) VALUES (?, 1)').run(pid);
+    // Die Zustaendigen der SERIE stehen seit #1035 in ihrer Definition; die
+    // des Originals beschreiben nur dessen eigene Buchung.
+    db.prepare('INSERT INTO budget_series_responsibles (anchor_id, user_id) VALUES (?, 1)').run(pid);
 
     generateRecurringInstances(db, '2026-09');
 

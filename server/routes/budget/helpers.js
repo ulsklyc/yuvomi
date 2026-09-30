@@ -308,21 +308,36 @@ export function occurrenceDatesInMonth(startDate, interval, count, month) {
  * Erstellt fehlende Instanzen wiederkehrender Budget-Einträge für den angefragten Monat.
  * Läuft idempotent - bereits vorhandene oder explizit übersprungene Instanzen werden ignoriert.
  *
- * Virtuelle Serien (recurrence_virtual = 1) halten im Original bereits den
+ * Virtuelle Serien (recurrence_virtual = 1) halten in der Definition bereits den
  * geglätteten Monatsanteil (amount); es wird in JEDEM Monat eine Instanz erzeugt.
  * Nicht-virtuelle Serien erzeugen den vollen Betrag nur in Fälligkeitsmonaten
  * (an den Tagen aus occurrenceDatesInMonth).
+ *
+ * DIE WERTE KOMMEN AUS DER DEFINITION, NICHT VOM ANKER (#1035). Titel, Betrag,
+ * Kategorie, Unterkategorie, Konto, Sichtbarkeit und Zustaendige stehen in
+ * `budget_series` / `budget_series_responsibles`; der Anker - die erste, von
+ * Hand erfasste Buchung - traegt nur noch seine eigenen. Bis v227 las diese
+ * Funktion sie von dort, und deshalb schrieb jede Serien-Aenderung auf eine
+ * Buchung, die schon passiert war. Vom Anker kommen weiterhin der Starttag
+ * (`date`), der Rhythmus und Ersteller/Eigentuemer, die nie wechseln.
  * @param {import('better-sqlite3-multiple-ciphers').Database} database
  * @param {string} month  YYYY-MM
  */
 export function generateRecurringInstances(database, month) {
   const [y, m] = month.split('-').map(Number);
 
-  // Alle Serien-Originale, die vor diesem Monat begonnen haben
+  // Alle laufenden Serien, die vor diesem Monat begonnen haben. Ob eine Zeile
+  // eine Serie traegt, sagt die Definition - nicht mehr
+  // `recurrence_parent_id IS NULL`, das seit #1035 nur "von Hand erfasst" heisst.
   const originals = database.prepare(`
-    SELECT * FROM budget_entries
-    WHERE is_recurring = 1 AND recurrence_parent_id IS NULL
-      AND strftime('%Y-%m', date) < ?
+    SELECT a.id, a.date, a.created_by, a.owner_id,
+           a.recurrence_interval, a.recurrence_interval_count,
+           a.recurrence_virtual, a.recurrence_confirm,
+           s.title, s.amount, s.category, s.subcategory, s.account_id, s.visibility
+      FROM budget_series s
+      JOIN budget_entries a ON a.id = s.anchor_id
+     WHERE a.is_recurring = 1
+       AND strftime('%Y-%m', a.date) < ?
   `).all(month);
 
   const skipStmt = database.prepare(
@@ -337,10 +352,11 @@ export function generateRecurringInstances(database, month) {
        created_by, owner_id, visibility, is_pending, account_id)
     VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
   `);
-  // Die Zustaendigen des Originals auf die frische Instanz kopieren (#1057).
+  // Die Zustaendigen der Serie auf die frische Instanz kopieren (#1057) - aus
+  // der Definition, nicht vom Anker (#1035).
   const copyResponsiblesStmt = database.prepare(`
     INSERT OR IGNORE INTO budget_entry_responsibles (entry_id, user_id)
-    SELECT ?, user_id FROM budget_entry_responsibles WHERE entry_id = ?
+    SELECT ?, user_id FROM budget_series_responsibles WHERE anchor_id = ?
   `);
 
   for (const orig of originals) {
@@ -364,7 +380,7 @@ export function generateRecurringInstances(database, month) {
       if (skipStmt.get(orig.id, date)) continue;
       if (existsStmt.get(orig.id, date)) continue;
 
-      // Materialisierte Instanz erbt Eigentümer + Sichtbarkeit des Serien-Originals
+      // Materialisierte Instanz erbt Eigentümer + Sichtbarkeit der Serie
       // (#476/#505). Ohne das würde jede Instanz owner_id=NULL + visibility='shared'
       // (Spalten-Default) bekommen: eine private Serie würde im Haushalt sichtbar und
       // für die Eigentümer:in in scope=mine unsichtbar.
@@ -836,6 +852,45 @@ export function replaceResponsibles(entryId, rawUserIds) {
 }
 
 /**
+ * Die Zustaendigen einer Serien-DEFINITION ersetzen (#1035) - dieselbe Regel
+ * wie replaceResponsibles(), nur fuer die Vorlage statt fuer eine Buchung.
+ * Ohne Definition (Serie beendet) gibt es nichts zu schreiben.
+ *
+ * @param {number} anchorId
+ * @param {Array<number>|undefined} rawUserIds
+ */
+export function replaceSeriesResponsibles(anchorId, rawUserIds) {
+  if (rawUserIds === undefined) return;
+  if (!db.get().prepare('SELECT 1 FROM budget_series WHERE anchor_id = ?').get(anchorId)) return;
+  const ids = Array.isArray(rawUserIds)
+    ? [...new Set(rawUserIds.map(Number).filter((n) => Number.isInteger(n) && n > 0))]
+    : [];
+  db.get().prepare('DELETE FROM budget_series_responsibles WHERE anchor_id = ?').run(anchorId);
+  const ins = db.get().prepare(`
+    INSERT OR IGNORE INTO budget_series_responsibles (anchor_id, user_id)
+    SELECT ?, id FROM users WHERE id = ?
+  `);
+  for (const id of ids) ins.run(anchorId, id);
+}
+
+/**
+ * Wird eine Buchung zur Serie, ist sie deren Vorlage - auch fuer die
+ * Zustaendigen (#1035). Die Werte uebernimmt der Trigger aus v228; die
+ * Zustaendigen liegen in einer eigenen Tabelle und werden erst NACH dem
+ * Insert/Update der Buchung geschrieben, deshalb hier.
+ *
+ * @param {number} anchorId
+ */
+export function seedSeriesResponsibles(anchorId) {
+  if (!db.get().prepare('SELECT 1 FROM budget_series WHERE anchor_id = ?').get(anchorId)) return;
+  db.get().prepare('DELETE FROM budget_series_responsibles WHERE anchor_id = ?').run(anchorId);
+  db.get().prepare(`
+    INSERT OR IGNORE INTO budget_series_responsibles (anchor_id, user_id)
+    SELECT entry_id, user_id FROM budget_entry_responsibles WHERE entry_id = ?
+  `).run(anchorId);
+}
+
+/**
  * Wer unter den mitgeschickten Zustaendigen NEU waere und kein Haushaltsmitglied
  * ist (#1207) - gegen den gespeicherten Stand des Eintrags `entryId`: wer dort
  * schon steht, bleibt gueltig. `undefined` heisst "nicht mitgeschickt", wie in
@@ -846,12 +901,15 @@ export function replaceResponsibles(entryId, rawUserIds) {
  * @param {Array<number>|undefined} rawUserIds
  * @returns {number[]}
  */
-export function responsibleNonMembers(entryId, rawUserIds) {
+export function responsibleNonMembers(entryId, rawUserIds, { series = false } = {}) {
   if (!Array.isArray(rawUserIds)) return [];
   const ids = rawUserIds.map(Number).filter((n) => Number.isInteger(n) && n > 0);
-  const stored = entryId == null
-    ? []
-    : db.get().prepare('SELECT user_id FROM budget_entry_responsibles WHERE entry_id = ?').all(entryId).map((r) => r.user_id);
+  // Fuer eine Serien-Aenderung zaehlt der Stand der Definition (#1035), nicht
+  // der ihrer ersten Buchung.
+  const sql = series
+    ? 'SELECT user_id FROM budget_series_responsibles WHERE anchor_id = ?'
+    : 'SELECT user_id FROM budget_entry_responsibles WHERE entry_id = ?';
+  const stored = entryId == null ? [] : db.get().prepare(sql).all(entryId).map((r) => r.user_id);
   return newNonMembers(ids, { stored });
 }
 

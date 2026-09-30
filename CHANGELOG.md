@@ -58,6 +58,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   missing API key), at most once per half hour per cause, and `GET /api/v1/weather` answers
   `{ data: null, reason }` with `not_configured` or `upstream_error`.
 
+- **A switch that is off is easy to see, and in Arabic and Persian "on" sits on the left.** The
+  track of a switch that is off was a light grey that nearly vanished into its row, in light and
+  dark mode alike; it is now dark enough to stand out against every surface a switch appears on,
+  also while the pointer rests on the row. In right-to-left languages the knob now moves to the
+  left when a switch is on, as on iPhone and in the web installer. The installer's switches get
+  the same track colour.
+
 - **Members who may write to the meal plan can now edit and delete recipes somebody else added
   (#1577).** Saving a recipe that another member had created failed with "Not authorized", even
   for an admin, because editing and deleting were tied to whoever created the recipe. Recipes belong
@@ -90,6 +97,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   crash, so nothing is left to clean up. Do not delete `yuvomi.db.lock` while Yuvomi runs. If the
   file cannot be created or locked, Yuvomi logs a warning and works as before; the lock does not
   reach across machines (NFS with `nolock`) or from a Docker Desktop host into its containers.
+
+- **Changing a recurring payment for all future months no longer rewrites its first booking**
+  (#1035). The first entry of a series was also its template, so choosing "Change all future
+  occurrences" changed the title, amount, category, subcategory, account and responsible members of
+  a booking that could lie years back. Moving a rent series to a new account moved the rent of
+  January 2020 with it, and both account balances were wrong afterwards. A series now keeps its own
+  definition: the change applies to the series and to every entry from today on, while entries
+  already booked, the first one included, keep their values. Correcting only the first entry no
+  longer changes every future month either, and editing it now asks "only this or all future", like
+  every other entry of the series; switching "Recurring" off there still ends the series without
+  that question. Visibility still applies to the whole series on purpose: whoever
+  makes a series private means its past entries too. Existing series are carried over on update
+  without changing any entry.
 
 ## [2.70.0] - 2026-09-30
 

@@ -32,8 +32,9 @@
          WCAG 1.4.11 verlangt fuer die Kante eines Bedienelements 3:1. */
       --neutral-500: #8C8880;
       --color-border-control: var(--neutral-500);
-      /* Bahn eines ausgeschalteten Schalters (.toggle__track), wie in der App. */
-      --neutral-300: #CFC9BC;
+      /* Bahn eines ausgeschalteten Schalters (.toggle__track), wie in der App:
+         3:1 gegen die Karte und die Zeile im Hover (WCAG 1.4.11, #1572). */
+      --color-switch-off: #88847C;
       --color-text-primary: #1D1B17;
       --color-text-secondary: #63615B;
       --color-text-tertiary: #6B675F;
@@ -113,7 +114,7 @@
         --color-text-placeholder: #A9A39A; --color-text-tertiary: #A9A39A;
         --color-border-subtle: #3E3933;
         --color-accent: #A78BFA; --color-accent-hover: #BCA6FC; --color-ink-on-vivid: #0A0A0C;
-        --neutral-950: #FBFAF7; --neutral-500: #948E85; --neutral-300: #514B45;
+        --neutral-950: #FBFAF7; --neutral-500: #948E85; --color-switch-off: #948E85;
         --color-success: #30D158; --color-warning: #FF9F0A; --color-danger: #FF6961;
         /* Inkl. des 1px-Kantenrings aus tokens.css (Dark-Kur 2026-08-17): ein
            reiner Schwarz-Wurf ist auf der Kohle-Buehne unsichtbar, die Karte
@@ -511,7 +512,7 @@
     .toggle__track {
       position: relative; width: 44px; height: 26px; flex-shrink: 0;
       border-radius: var(--radius-full);
-      background-color: var(--neutral-300);
+      background-color: var(--color-switch-off);
       transition: background-color var(--duration-sm) var(--ease-out);
     }
     /* Der Knopf traegt den Glanz der App (Specular oben, Schattenkante unten). */

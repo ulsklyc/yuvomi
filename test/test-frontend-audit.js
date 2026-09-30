@@ -7948,6 +7948,137 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
 });
 
 /* ────────────────────────────────────────────────────────────────────────────
+ * Die ausgeschaltete Schalterbahn haelt 3:1 (#1572)
+ *
+ * Die `.toggle`-Bahn stand im Aus-Zustand auf --neutral-300: gerendert 1,65:1
+ * auf Weiss und 1,46:1 auf dem dunklen -raised. Ein Schalter, der aus war,
+ * verschwand in seiner Zeile - WCAG 1.4.11 verlangt fuer die Grenze eines
+ * Bedienelements 3:1. Die Bahn selbst ist die Grenze (randlose Kapsel), also
+ * misst der Guard ihre Fuellung.
+ *
+ * Abgeleitet, nicht behauptet: Bahn- und Knopffarbe liest er aus den Regeln
+ * (`.toggle__track` und sein `::after`), nicht aus einem Token-Namen, und
+ * rechnet sie gegen jede Flaeche, auf der ein Schalter steht - Karte, Modal,
+ * Settings-Blatt (-work, -raised), Modal-Feldgrund (-2), Buehne, erhoehte
+ * Flaeche und die Zeile im Hover (`.toggle-row:hover` wechselt auf
+ * --color-surface-hover, erhoeht auf -elevated-hover). Dazu der Knopf gegen
+ * die Bahn: im Aus-Zustand traegt er den Zustand, eine Bahn in Knopffarbe
+ * liesse die Position nicht erkennen. Beide Dark-Bloecke, weil beide gelten.
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('die ausgeschaltete Schalterbahn haelt 3:1 auf jeder Flaeche, auf der ein Schalter steht', () => {
+  const { light, dark } = themeTokenMaps();
+  const scheme = darkSchemeBlock(read('../public/styles/tokens.css'));
+  assert.ok(scheme, 'prefers-color-scheme-Dark-Block in tokens.css nicht gefunden');
+  const darkScheme = new Map(light);
+  for (const [k, v] of parseTokenMap(scheme[1])) darkScheme.set(k, v);
+
+  const styles = new URL('../public/styles/', import.meta.url);
+  const rules = readdirSync(styles)
+    .filter((entry) => entry.endsWith('.css') && entry !== 'tokens.css')
+    .flatMap((file) => [...eachRule(readFileSync(new URL(file, styles), 'utf8'))].map((rule) => ({ ...rule, file })));
+  const background = (body) => {
+    let found = null;
+    for (const m of body.matchAll(/(?:^|;)\s*background(?:-color)?\s*:\s*([^;]+)/g)) found = m[1].trim();
+    return found;
+  };
+  const tokenOf = (value) => String(value ?? '').match(/^var\(\s*(--[\w-]+)\s*\)$/)?.[1] ?? null;
+
+  // Die Bahn im Ruhezustand: jede Regel, deren Glied auf `.toggle__track` endet,
+  // ohne :checked (an) und ohne :disabled (von 1.4.11 ausgenommen).
+  const offTrack = rules.flatMap(({ selector, body, file }) => selector.split(',')
+    .map((part) => part.trim())
+    .filter((part) => /\.toggle__track$/.test(part) && !/:checked|:disabled/.test(part))
+    .map((part) => ({ part, file, value: background(body) })))
+    .filter(({ value }) => value);
+  assert.ok(offTrack.some(({ part, file }) => part === '.toggle__track' && file === 'layout.css'),
+    `Die Basisregel .toggle__track (layout.css) mit Hintergrund wurde nicht gefunden - der Guard misst nichts. Gefunden: ${offTrack.map(({ file, part }) => `${file} ${part}`).join(', ')}`);
+  const knob = rules.find(({ selector, file }) => file === 'layout.css' && selector.trim() === '.toggle__track::after');
+  const knobToken = tokenOf(knob && background(knob.body));
+  assert.ok(knobToken, 'Der Knopf (.toggle__track::after, layout.css) setzt keinen Token-Hintergrund - der Guard misst nichts.');
+
+  const GROUNDS = [
+    '--color-surface', '--color-surface-work', '--color-surface-raised', '--color-surface-2', '--color-bg',
+    '--color-surface-elevated', '--color-surface-hover', '--color-surface-elevated-hover',
+  ];
+  const findings = [];
+  for (const { part, file, value } of offTrack) {
+    const token = tokenOf(value);
+    if (!token) { findings.push(`${file} ${part}: Bahn ohne Token (${value})`); continue; }
+    for (const [theme, map] of [['light', light], ['dark [data-theme]', dark], ['dark prefers-color-scheme', darkScheme]]) {
+      const track = resolveColor(token, map);
+      if (!/^#[0-9a-f]{6}$/i.test(track ?? '')) { findings.push(`${theme}: ${token} loest nicht auf eine Hex-Farbe auf (${track})`); continue; }
+      for (const ground of GROUNDS) {
+        const bg = resolveColor(ground, map);
+        assert.ok(/^#[0-9a-f]{6}$/i.test(bg ?? ''), `${theme}: ${ground} loest nicht auf eine Hex-Farbe auf (${bg})`);
+        const ratio = contrastRatio(track, bg);
+        if (ratio + 0.005 < 3) findings.push(`${theme}: ${file} ${part} ${token} (${track}) auf ${ground} (${bg}) ${ratio.toFixed(2)}:1`);
+      }
+      const knobHex = resolveColor(knobToken, map);
+      const knobRatio = contrastRatio(knobHex, track);
+      if (knobRatio + 0.005 < 3) findings.push(`${theme}: Knopf ${knobToken} (${knobHex}) auf ${token} (${track}) ${knobRatio.toFixed(2)}:1`);
+    }
+  }
+  assert.deepEqual(findings, [],
+    'Die ausgeschaltete Schalterbahn unterschreitet 3:1 (WCAG 1.4.11) - gegen eine Flaeche, auf der Schalter stehen, oder gegen ihren Knopf. '
+    + 'Die Bahn traegt --color-switch-off (tokens.css, #1572).');
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Der Schalterknopf spiegelt in RTL (#1572)
+ *
+ * In `ar` und `fa` setzt die App `dir=rtl`. Apple (und jede RTL-Plattform)
+ * spiegelt den Schalter: "an" steht auf der fuehrenden Seite, in RTL also
+ * links. Die App liess den Knopf physisch rechts einrasten (`left: 3px`,
+ * `translateX(18px)`), der Installer spiegelt seit #1571 - zwei Schalter,
+ * zwei Richtungen.
+ *
+ * Zwei Haelften, beide ueber den Regelscanner:
+ *   1. keine Knopfregel setzt `left`/`right` - die Ruhelage ist logisch
+ *      (`inset-inline-start`), und mindestens eine Knopfregel setzt sie;
+ *   2. jede Knopfregel mit `translateX(N)` hat im selben At-Kontext ihr
+ *      `[dir="rtl"]`-Gegenstueck mit `translateX(-N)` - translateX kennt
+ *      keine Schreibrichtung, sonst liefe der Knopf in RTL aus der Bahn.
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('der Schalterknopf spiegelt in RTL: an steht auf der fuehrenden Seite', () => {
+  const styles = new URL('../public/styles/', import.meta.url);
+  const RTL = /\[dir="rtl"\]\s*/g;
+  const KNOB = /\.toggle__track::after$/;
+  const physical = [];
+  const logical = [];
+  const moves = [];
+  const rtlMoves = new Map();
+
+  for (const file of readdirSync(styles).filter((n) => n.endsWith('.css'))) {
+    for (const { selector, body, at } of eachRule(read(`../public/styles/${file}`))) {
+      const parts = selector.split(',').map((part) => part.trim()).filter((part) => KNOB.test(part));
+      if (!parts.length) continue;
+      const shift = body.match(/(?:^|;)\s*transform\s*:\s*translateX\(\s*(-?[\d.]+)px\s*\)/)?.[1];
+      for (const part of parts) {
+        const isRtl = RTL.test(part);
+        RTL.lastIndex = 0;
+        if (/(?:^|;)\s*(?:left|right)\s*:/.test(body)) physical.push(`${file} {${part}}`);
+        if (/(?:^|;)\s*inset-inline-start\s*:/.test(body)) logical.push(`${file} {${part}}`);
+        if (shift === undefined) continue;
+        const key = `${file}||${at.join(' | ')}||${part.replace(RTL, '').trim()}`;
+        if (isRtl) rtlMoves.set(key, Number(shift));
+        else moves.push({ key, file, part, shift: Number(shift) });
+      }
+    }
+  }
+
+  // Reichweite vor dem Urteil - ohne Fundstellen prueft die Zusicherung nichts.
+  assert.ok(moves.length >= 1, `erwartet: eine Knopfregel mit translateX, gefunden: ${moves.length}`);
+  assert.deepEqual(physical, [],
+    'Der Schalterknopf steht physisch (left/right) - in RTL bleibt er rechts. Ruhelage per inset-inline-start.');
+  assert.ok(logical.length >= 1, 'Keine Knopfregel setzt inset-inline-start - die Ruhelage folgt der Schreibrichtung nicht.');
+  const unmirrored = moves
+    .filter(({ key, shift }) => rtlMoves.get(key) !== -shift)
+    .map(({ file, part, shift, key }) => `${file} {${part}}: translateX(${shift}px), RTL-Gegenstueck ${rtlMoves.has(key) ? `translateX(${rtlMoves.get(key)}px)` : 'fehlt'}`);
+  assert.deepEqual(unmirrored, [],
+    'Der Weg des Schalterknopfs braucht in RTL das umgekehrte Vorzeichen ([dir="rtl"] ... translateX(-N)), sonst rastet "an" auf der falschen Seite ein.');
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
  * Das Etikett einer Listenzeile haelt 4.5:1 auch in jedem Zustand, der es
  * zuruecknimmt - gerechnet mit der Deckung, nicht nur mit der Farbe
  *

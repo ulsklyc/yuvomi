@@ -6550,7 +6550,8 @@ textarea::placeholder {
   position: relative;
   width: 44px;
   height: 26px;
-  background-color: var(--neutral-300);
+  /* 3:1 gegen jede Flaeche, auf der ein Schalter steht (#1572, Werte in tokens.css). */
+  background-color: var(--color-switch-off);
   border-radius: var(--radius-full);
   transition: background-color var(--transition-fast);
   flex-shrink: 0;
@@ -6560,7 +6561,7 @@ textarea::placeholder {
   content: '';
   position: absolute;
   top: 3px;
-  left: 3px;
+  inset-inline-start: 3px;
   width: 20px;
   height: 20px;
   background: var(--color-surface);
@@ -6583,6 +6584,14 @@ textarea::placeholder {
 
 .toggle input:checked + .toggle__track::after {
   transform: translateX(18px);
+}
+
+/* In RTL steht "an" auf der fuehrenden Seite, also links - wie bei Apple und
+ * im Installer (#1571). Der Knopf startet per inset-inline-start schon auf der
+ * richtigen Seite; nur sein Weg braucht das Vorzeichen, translateX kennt keine
+ * Schreibrichtung (#1572). */
+[dir="rtl"] .toggle input:checked + .toggle__track::after {
+  transform: translateX(-18px);
 }
 
 .toggle input:focus-visible + .toggle__track {
