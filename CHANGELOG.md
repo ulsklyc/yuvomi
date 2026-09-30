@@ -55,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   made each browser resolve that name even with Open-Meteo as the weather source. Nothing in the
   browser talks to OpenWeatherMap directly: its icons come through Yuvomi's own server.
 
+- **The web installer's weather step names the current place for the household location.** It
+  said Settings → Integrations; since the settings were reorganised in 2.70.0 the location is
+  saved under Settings → Household → Integrations, in all 24 installer languages.
+
 ## [2.70.0] - 2026-09-30
 
 ### Added
