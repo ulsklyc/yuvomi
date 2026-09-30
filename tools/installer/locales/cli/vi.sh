@@ -105,3 +105,9 @@ MSG_document_google_drive_client_secret="  Mã bí mật ứng dụng khách ghi
 MSG_document_google_drive_err_pair="ID ứng dụng khách và mã bí mật Google Drive phải được đặt cùng nhau hoặc đều để trống."
 MSG_document_google_drive_err_credentials="Google Drive cần cặp thông tin xác thực OAuth riêng hoặc thông tin xác thực Google Calendar đã được cấu hình."
 MSG_review_document_google_drive="Tài liệu Google Drive"
+# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst: klein, durch
+# Leerzeichen getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein
+# Prompt in [x/N], [X/n] oder [M] zeigt, muss hier stehen (test:installer-cli-i18n).
+MSG_yes_chars="y yes"
+MSG_no_chars="n no"
+MSG_manual_chars="m"

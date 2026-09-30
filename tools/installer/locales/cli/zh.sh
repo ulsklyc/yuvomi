@@ -108,3 +108,9 @@ MSG_document_google_drive_client_secret="  覆盖客户端密钥（留空则复�
 MSG_document_google_drive_err_pair="Google Drive 客户端 ID 和密钥必须同时填写或同时留空。"
 MSG_document_google_drive_err_credentials="Google Drive 需要单独的 OAuth 凭据对，或已配置的 Google 日历凭据。"
 MSG_review_document_google_drive="Google Drive 文档"
+# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst: klein, durch
+# Leerzeichen getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein
+# Prompt in [x/N], [X/n] oder [M] zeigt, muss hier stehen (test:installer-cli-i18n).
+MSG_yes_chars="y yes"
+MSG_no_chars="n no"
+MSG_manual_chars="m"

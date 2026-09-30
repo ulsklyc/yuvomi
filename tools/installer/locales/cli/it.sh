@@ -108,3 +108,9 @@ MSG_document_google_drive_client_secret="  Client secret alternativo (vuoto: riu
 MSG_document_google_drive_err_pair="L’ID client e il client secret di Google Drive devono essere entrambi impostati o entrambi vuoti."
 MSG_document_google_drive_err_credentials="Google Drive richiede una propria coppia OAuth o credenziali di Google Calendar configurate."
 MSG_review_document_google_drive="Doc. Google Drive"
+# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst: klein, durch
+# Leerzeichen getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein
+# Prompt in [x/N], [X/n] oder [M] zeigt, muss hier stehen (test:installer-cli-i18n).
+MSG_yes_chars="s si sì"
+MSG_no_chars="n no"
+MSG_manual_chars="m"

@@ -108,3 +108,9 @@ MSG_document_google_drive_client_secret="  Özel istemci gizli anahtarı (boşsa
 MSG_document_google_drive_err_pair="Google Drive istemci kimliği ve gizli anahtarı birlikte ayarlanmalı veya ikisi de boş bırakılmalıdır."
 MSG_document_google_drive_err_credentials="Google Drive için kendi OAuth çifti ya da yapılandırılmış Google Takvim kimlik bilgileri gerekir."
 MSG_review_document_google_drive="Google Drive belgeleri"
+# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst: klein, durch
+# Leerzeichen getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein
+# Prompt in [x/N], [X/n] oder [M] zeigt, muss hier stehen (test:installer-cli-i18n).
+MSG_yes_chars="e evet"
+MSG_no_chars="h hayır hayir"
+MSG_manual_chars="m"

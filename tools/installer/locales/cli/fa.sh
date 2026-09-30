@@ -108,3 +108,9 @@ MSG_document_google_drive_client_secret="  رمز سرویس‌گیرندهٔ ا
 MSG_document_google_drive_err_pair="شناسه و رمز سرویس‌گیرندهٔ Google Drive باید هر دو تنظیم شوند یا هر دو خالی باشند."
 MSG_document_google_drive_err_credentials="Google Drive به جفت OAuth اختصاصی خود یا اعتبارنامه‌های پیکربندی‌شدهٔ تقویم Google نیاز دارد."
 MSG_review_document_google_drive="اسناد Google Drive"
+# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst: klein, durch
+# Leerzeichen getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein
+# Prompt in [x/N], [X/n] oder [M] zeigt, muss hier stehen (test:installer-cli-i18n).
+MSG_yes_chars="y yes"
+MSG_no_chars="n no"
+MSG_manual_chars="m"

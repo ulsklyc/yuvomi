@@ -68,6 +68,26 @@ t() {
   printf "$fmt" "$@"
 }
 
+# Antworten auf Ja/Nein- und Auswahlfragen. Die Prompts zeigen den Buchstaben
+# ihrer Sprache ([j/N], [s/N], [e/H], [R]učně ...), gelesen wurde aber nur `y`,
+# `n` und `m`: wer auf Deutsch der Anzeige folgte und "j" tippte, bekam still
+# ein Nein, und auf Tuerkisch brach "h" die Zusammenfassung nicht ab. y/yes,
+# n/no und m gelten immer, dazu die Woerter aus MSG_yes_chars, MSG_no_chars und
+# MSG_manual_chars der aktiven Locale (en.sh legt die Basis). Kleinschreibung
+# ueber tr statt ${x,,}, aus demselben Grund wie in normalize_locale.
+answer_matches() {
+  local answer word
+  answer="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
+  [ -n "$answer" ] || return 1
+  for word in $2; do
+    [ "$answer" = "$word" ] && return 0
+  done
+  return 1
+}
+is_yes()    { answer_matches "${1:-}" "y yes ${MSG_yes_chars:-}"; }
+is_no()     { answer_matches "${1:-}" "n no ${MSG_no_chars:-}"; }
+is_manual() { answer_matches "${1:-}" "m ${MSG_manual_chars:-}"; }
+
 ACTIVE_LOCALE="$(resolve_locale)"
 load_locale "$ACTIVE_LOCALE"
 
@@ -162,7 +182,10 @@ check_prereqs() {
     warn "$(t prereq.engine_missing)"
     ok=0
   fi
-  [ $ok -eq 0 ] && err "$(t prereq.fix)"
+  # if statt `[ ... ] && err`: als letzte Zeile gab die Kurzform bei erfuellten
+  # Voraussetzungen 1 zurueck, und `set -e` beendete den Installer lautlos
+  # direkt nach der Pruefung. Dasselbe gilt fuer die Abbruchfrage in review_and_confirm.
+  if [ $ok -eq 0 ]; then err "$(t prereq.fix)"; fi
 }
 
 # ── Step 1: Basic config ───────────────────────────────────────────────────────
@@ -272,7 +295,7 @@ configure_secrets() {
 
     ask "$(t secrets.choice)"
     read -r choice
-    if [ "${choice,,}" = "m" ]; then
+    if is_manual "$choice"; then
       ask "$(t secrets.enter)"
       local val; read -rs val; printf "\n"
       printf -v "$varname" '%s' "$val"
@@ -304,7 +327,7 @@ configure_weather() {
 
   ask "$(t weather.enable)"
   read -r want_weather
-  if [ "${want_weather,,}" = "y" ]; then
+  if is_yes "$want_weather"; then
     info "$(t weather.coords_hint)"
 
     # Leere Eingabe bricht ab statt erneut zu fragen. Ohne diesen Ausstieg ist
@@ -340,7 +363,7 @@ configure_calendar() {
 
   ask "$(t calendar.google_enable)"
   read -r want_google
-  if [ "${want_google,,}" = "y" ]; then
+  if is_yes "$want_google"; then
     info "$(t calendar.google_hint)"
     info "$(t calendar.redirect_hint "${YUVOMI_BASE_URL}/api/v1/calendar/google/callback")"
     ask "$(t calendar.client_id)"; read -r GOOGLE_CLIENT_ID
@@ -350,7 +373,7 @@ configure_calendar() {
 
   ask "$(t calendar.apple_enable)"
   read -r want_apple
-  if [ "${want_apple,,}" = "y" ]; then
+  if is_yes "$want_apple"; then
     info "$(t calendar.apple_hint)"
     ask "$(t calendar.apple_id)"; read -r APPLE_USERNAME
     ask "$(t calendar.apple_pass)"; read -rs APPLE_APP_SPECIFIC_PASSWORD; printf "\n"
@@ -358,7 +381,7 @@ configure_calendar() {
 
   ask "$(t calendar.outlook_enable)"
   read -r want_outlook
-  if [ "${want_outlook,,}" = "y" ]; then
+  if is_yes "$want_outlook"; then
     info "$(t calendar.outlook_hint)"
     info "$(t calendar.redirect_hint "${YUVOMI_BASE_URL}/api/v1/calendar/outlook/callback")"
     ask "$(t calendar.client_id)"; read -r MS_CLIENT_ID
@@ -384,7 +407,7 @@ configure_document_storage() {
   info "$(t document_local.hint)"
   ask "$(t document_local.enable)"
   read -r want_document_local
-  if [ "${want_document_local,,}" = "y" ]; then
+  if is_yes "$want_document_local"; then
     DOCUMENT_STORAGE_LOCAL_ENABLED='true'
     ask "$(t document_local.path)"; read -r DOCUMENT_STORAGE_LOCAL_PATH
     DOCUMENT_STORAGE_LOCAL_PATH="${DOCUMENT_STORAGE_LOCAL_PATH:-/documents}"
@@ -394,7 +417,7 @@ configure_document_storage() {
   info "$(t document_webdav.hint)"
   ask "$(t document_webdav.enable)"
   read -r want_document_webdav
-  if [ "${want_document_webdav,,}" = "y" ]; then
+  if is_yes "$want_document_webdav"; then
     DOCUMENT_STORAGE_WEBDAV_ENABLED='true'
     ask "$(t document_webdav.url)"; read -r DOCUMENT_STORAGE_WEBDAV_URL
     ask "$(t document_webdav.username)"; read -r DOCUMENT_STORAGE_WEBDAV_USERNAME
@@ -407,7 +430,7 @@ configure_document_storage() {
   info "$(t document_google_drive.hint)"
   ask "$(t document_google_drive.enable)"
   read -r want_document_google_drive
-  if [ "${want_document_google_drive,,}" = "y" ]; then
+  if is_yes "$want_document_google_drive"; then
     info "$(t document_google_drive.redirect_hint "${YUVOMI_BASE_URL}/api/v1/documents/storage/google-drive/callback")"
     ask "$(t document_google_drive.client_id)"; read -r GOOGLE_DRIVE_CLIENT_ID
     ask "$(t document_google_drive.client_secret)"; read -rs GOOGLE_DRIVE_CLIENT_SECRET; printf "\n"
@@ -446,7 +469,7 @@ review_and_confirm() {
   printf "\n"
   ask "$(t review.proceed)"
   read -r confirm
-  [ "${confirm,,}" = "n" ] && { info "$(t review.aborted)"; exit 0; }
+  if is_no "$confirm"; then info "$(t review.aborted)"; exit 0; fi
 }
 
 # Die Schlüssel, die dieser Dialog selbst belegt. Alles andere in einer
@@ -615,7 +638,9 @@ create_admin() {
     -H "Content-Type: application/json" \
     -d "$payload")
   http_code=$(printf '%s' "$response" | tail -n1)
-  body=$(printf '%s' "$response" | head -n-1)
+  # sed '$d' statt head -n-1: das BSD-head von macOS kennt keine negative Zeilenzahl,
+  # und `set -e` beendete den Installer nach dem Anlegen des Kontos ohne Meldung.
+  body=$(printf '%s' "$response" | sed '$d')
 
   # Die Adresse, unter der der Haushalt die App tatsächlich öffnet, nicht die,
   # auf die der Container hört. Hinter einem Proxy sind das zwei verschiedene,
