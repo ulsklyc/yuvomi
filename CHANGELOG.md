@@ -48,6 +48,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Members who may write to the meal plan can now edit and delete recipes somebody else added
+  (#1577).** Saving a recipe that another member had created failed with "Not authorized", even
+  for an admin, because editing and deleting were tied to whoever created the recipe. Recipes belong
+  to the household like tasks, shopping and notes: write access to the meal plan is what counts. A
+  member with read-only access still cannot change them, and recipes mirrored from Mealie or Tandoor
+  stay read-only for everybody. Deleting someone else's recipe looked like it worked because the row
+  disappears at once, but it came back after the undo window with the same error.
+
 - **Pairing a display in German says "Tablet", not "Tablett".** "Tablett" is a serving tray; the
   four strings of the display pairing now use the word the website and the README use.
 
