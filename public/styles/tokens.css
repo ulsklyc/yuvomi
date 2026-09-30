@@ -116,6 +116,23 @@
   --color-border-subtle:  var(--neutral-150);
   --color-border-strong:  var(--neutral-300);  /* kräftigere Trennlinie (Hover, betonte Rahmen) */
   --color-border-control: var(--neutral-500);  /* Ruhekante von Eingabefeldern, 3:1 (WCAG 1.4.11) */
+  /* DIE BAHN EINES AUSGESCHALTETEN SCHALTERS (#1572). Die `.toggle`-Bahn stand
+   * auf --neutral-300 und lag gerendert bei 1,65:1 auf Weiss und 1,46:1 auf
+   * dem dunklen -raised - ein Schalter, der aus war, verschwand in seiner
+   * Zeile. WCAG 1.4.11 verlangt fuer die Grenze eines Bedienelements 3:1.
+   *
+   * Die Bahn selbst traegt die Grenze, keine zusaetzliche Kante: die Form
+   * bleibt Apples randlose Kapsel, und der Knopf (--color-surface) steht auf
+   * der dunkleren Bahn mit demselben Abstand, der Zustand bleibt also auch am
+   * Knopf ablesbar. Light liegt eine Spur unter --neutral-500, weil die
+   * Schalterzeile im Hover auf --color-surface-hover wechselt und die
+   * Rampenstufe dort 2,94 truege; #88847C haelt 3,72 auf Weiss, 3,36 auf der
+   * Buehne, 3,10 auf dem Hover. Dark ist die Rampenstufe --_neutral-500:
+   * 4,51 auf -surface, 3,86 auf -raised und dem Hover, 3,25 auf dem Hover
+   * der erhoehten Flaeche. Guard: test-frontend-audit.js, "die ausgeschaltete
+   * Schalterbahn haelt 3:1". Der Installer traegt dieselben Werte inline. */
+  --_color-switch-off:    #88847C;
+  --color-switch-off:     var(--_color-switch-off);
   /* ZURUECKGENOMMEN IST EIN MUSTER, KEINE DECKUNG (#1230, Entscheidung Ulas
    * 2026-09-15). Erledigte und abgelegte Aufgaben, archivierte Konten,
    * pausierte und abgeschlossene Abos, inaktive Medikamente und Praemien,
@@ -1914,6 +1931,9 @@
     --color-border-subtle: #3E3933;  /* Trenner, ruhige Kartenkante */
     --color-border:        #47423B;  /* Standardkante (Karten, Gruppen); Feldkanten: --color-border-control */
     --color-border-strong: #6F6A61;  /* Hover, betonte Rahmen (~2.7:1) */
+    /* Bahn des ausgeschalteten Schalters (#1572, Werte im :root-Block). Als Hex,
+     * nicht als var(): die Naht zum Installer-Fallback vergleicht Wert fuer Wert. */
+    --_color-switch-off:   #948E85;  /* = --_neutral-500 */
 
     --_sidebar-bg:           #221F1D;
     --_sidebar-shadow-light: rgba(255, 255, 255, 0.04);
@@ -2176,6 +2196,7 @@
     --color-border-subtle: #3E3933;
     --color-border:        #47423B;
     --color-border-strong: #6F6A61;
+    --_color-switch-off:   #948E85;  /* = --_neutral-500 */
 
     /* Sidebar */
     --_sidebar-bg:           #221F1D;

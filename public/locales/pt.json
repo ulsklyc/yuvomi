@@ -1666,7 +1666,7 @@
         "loanPaidInstallmentsHint": "Para um empréstimo que já está em curso. Estas parcelas são registadas, mas não lançadas no orçamento.",
         "loanPaymentTypeLocked": "Receita ou despesa segue o tipo de empréstimo e é alterada lá.",
         "planHistoricNote": "Medido em relação ao seu plano atual. O Yuvomi não guarda qual era o plano num mês anterior.",
-        "recurringEditSeriesHint": "O primeiro lançamento da série é também o seu modelo - título, valor, categoria e conta mudam lá também, mesmo que esteja no passado.",
+        "recurringEditSeriesHint": "As alterações valem a partir de hoje. Os lançamentos já registados, incluindo o primeiro, mantêm os seus valores. Apenas a visibilidade se aplica a toda a série.",
         "responsibleLabel": "Responsável",
         "responsibleHint": "Quem trata deste lançamento. Não movimenta dinheiro - para acertar contas use as despesas partilhadas.",
         "responsibleFilterTo": "Apenas lançamentos de {{name}}",

@@ -1666,7 +1666,7 @@
         "loanPaidInstallmentsHint": "すでに返済中のローン用です。これらの回は記録されますが、家計簿には計上されません。",
         "loanPaymentTypeLocked": "収入か支出かは貸付・借入の別に従い、そちらで変更します。",
         "planHistoricNote": "現在の予算計画と比較しています。Yuvomi は過去の月の計画内容を保存していません。",
-        "recurringEditSeriesHint": "シリーズの最初の項目はテンプレートでもあります。タイトル、金額、カテゴリー、口座はそこでも変更され、過去の日付であっても同様です。",
+        "recurringEditSeriesHint": "変更は今日から適用されます。すでに記帳済みの項目は、最初の項目も含めて値がそのまま残ります。公開範囲だけはシリーズ全体に適用されます。",
         "responsibleLabel": "担当",
         "responsibleHint": "この記録を担当する人。お金は動きません。精算は共有支出で行います。",
         "responsibleFilterTo": "{{name}} の記録のみ",

@@ -1666,7 +1666,7 @@
         "loanPaidInstallmentsHint": "Per un prestito già in corso. Queste rate vengono registrate ma non contabilizzate nel budget.",
         "loanPaymentTypeLocked": "Entrata o uscita segue il tipo di prestito e si modifica lì.",
         "planHistoricNote": "Misurato sul tuo piano attuale. Yuvomi non conserva quale fosse il piano in un mese precedente.",
-        "recurringEditSeriesHint": "La prima registrazione della serie è anche il suo modello - titolo, importo, categoria e conto cambiano anche lì, anche se è nel passato.",
+        "recurringEditSeriesHint": "Le modifiche valgono da oggi in poi. Le voci già registrate, compresa la prima, mantengono i loro valori. Solo la visibilità vale per l'intera serie.",
         "responsibleLabel": "Responsabile",
         "responsibleHint": "Chi si occupa di questa registrazione. Non muove denaro: per i conti ci sono le spese condivise.",
         "responsibleFilterTo": "Solo registrazioni di {{name}}",

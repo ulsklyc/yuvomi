@@ -1680,7 +1680,7 @@
         "loanPaidInstallmentsHint": "Für ein Darlehen, das schon läuft. Diese Raten werden nachgetragen, aber nicht ins Budget gebucht.",
         "loanPaymentTypeLocked": "Einnahme oder Ausgabe folgt der Art des Darlehens und wird dort geändert.",
         "planHistoricNote": "Gemessen an deinem aktuellen Plan. Yuvomi merkt sich nicht, was der Plan in einem früheren Monat war.",
-        "recurringEditSeriesHint": "Die erste Buchung der Serie ist zugleich ihre Vorlage - Titel, Betrag, Kategorie und Konto ändern sich dort mit, auch wenn sie in der Vergangenheit liegt.",
+        "recurringEditSeriesHint": "Änderungen gelten ab heute. Bereits gebuchte Einträge, auch der erste, behalten ihre Werte. Nur die Sichtbarkeit gilt für die ganze Serie.",
         "responsibleLabel": "Zuständig",
         "responsibleHint": "Wer sich um diese Buchung kümmert. Bewegt kein Geld - zum Abrechnen gibt es die geteilten Ausgaben.",
         "responsibleFilterTo": "Nur Buchungen von {{name}}",

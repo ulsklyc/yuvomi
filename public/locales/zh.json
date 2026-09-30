@@ -1666,7 +1666,7 @@
         "loanPaidInstallmentsHint": "适用于已在还款的借贷。这些期数会被记录，但不会计入预算。",
         "loanPaymentTypeLocked": "属于收入还是支出取决于借贷类型，请在那里更改。",
         "planHistoricNote": "与你当前的预算计划对比。Yuvomi 不会保存过去某个月的计划金额。",
-        "recurringEditSeriesHint": "系列的第一条条目同时也是它的模板：标题、金额、分类和账户也会在那里一起更改，即使它已是过去的日期。",
+        "recurringEditSeriesHint": "更改从今天起生效。已记账的条目（包括第一条）保留其原有数值。只有可见范围适用于整个系列。",
         "responsibleLabel": "负责人",
         "responsibleHint": "由谁负责这笔记录。不会转移金钱，结算请使用共享支出。",
         "responsibleFilterTo": "仅显示 {{name}} 的记录",

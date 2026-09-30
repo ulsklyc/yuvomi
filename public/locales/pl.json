@@ -1828,7 +1828,7 @@
         "loanPaidInstallmentsHint": "Dla pożyczki, która już trwa. Te raty zostaną uzupełnione, ale nie trafią do budżetu.",
         "loanPaymentTypeLocked": "Przychód lub wydatek wynika z rodzaju pożyczki i tam się go zmienia.",
         "planHistoricNote": "Mierzone względem Twojego bieżącego planu. Yuvomi nie zapisuje, jaki był plan we wcześniejszym miesiącu.",
-        "recurringEditSeriesHint": "Pierwszy wpis serii jest zarazem jej szablonem - tytuł, kwota, kategoria i konto zmieniają się także tam, nawet jeśli jest w przeszłości.",
+        "recurringEditSeriesHint": "Zmiany obowiązują od dziś. Już zaksięgowane wpisy, łącznie z pierwszym, zachowują swoje wartości. Tylko widoczność dotyczy całej serii.",
         "responsibleLabel": "Odpowiedzialny",
         "responsibleHint": "Kto zajmuje się tym wpisem. Nie przenosi pieniędzy - do rozliczeń służą wydatki wspólne.",
         "responsibleFilterTo": "Tylko wpisy: {{name}}",

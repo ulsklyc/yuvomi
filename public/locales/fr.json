@@ -1666,7 +1666,7 @@
         "loanPaidInstallmentsHint": "Pour un prêt déjà en cours. Ces échéances sont enregistrées mais non comptabilisées dans le budget.",
         "loanPaymentTypeLocked": "Revenu ou dépense suit le type de prêt et se modifie à cet endroit.",
         "planHistoricNote": "Mesuré par rapport à votre plan actuel. Yuvomi ne conserve pas le plan tel qu’il était un mois plus tôt.",
-        "recurringEditSeriesHint": "La première écriture de la série est aussi son modèle - titre, montant, catégorie et compte y changent également, même si elle est passée.",
+        "recurringEditSeriesHint": "Les modifications s'appliquent à partir d'aujourd'hui. Les entrées déjà comptabilisées, y compris la première, gardent leurs valeurs. Seule la visibilité s'applique à toute la série.",
         "responsibleLabel": "Responsable",
         "responsibleHint": "Qui s'occupe de cette écriture. N'entraîne aucun mouvement d'argent - utilisez les dépenses partagées pour régler.",
         "responsibleFilterTo": "Uniquement les écritures de {{name}}",

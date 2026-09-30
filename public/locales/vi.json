@@ -1666,7 +1666,7 @@
         "loanPaidInstallmentsHint": "Dành cho khoản vay đang trả dở. Các kỳ này được ghi nhận nhưng không hạch toán vào ngân sách.",
         "loanPaymentTypeLocked": "Thu nhập hay chi phí phụ thuộc vào loại khoản vay và được thay đổi ở đó.",
         "planHistoricNote": "Được đối chiếu với kế hoạch hiện tại của bạn. Yuvomi không lưu kế hoạch của tháng trước đó.",
-        "recurringEditSeriesHint": "Mục đầu tiên của chuỗi cũng chính là mẫu của nó - tiêu đề, số tiền, danh mục và tài khoản cũng thay đổi ở đó, ngay cả khi nó đã ở trong quá khứ.",
+        "recurringEditSeriesHint": "Thay đổi có hiệu lực từ hôm nay. Các mục đã ghi sổ, kể cả mục đầu tiên, giữ nguyên giá trị. Chỉ phạm vi hiển thị áp dụng cho toàn bộ chuỗi.",
         "responsibleLabel": "Người phụ trách",
         "responsibleHint": "Ai lo khoản này. Không chuyển tiền - dùng chi tiêu chung để thanh toán với nhau.",
         "responsibleFilterTo": "Chỉ các mục của {{name}}",

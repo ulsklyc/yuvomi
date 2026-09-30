@@ -1666,7 +1666,7 @@
         "loanPaidInstallmentsHint": "For a loan that is already running. These installments are recorded but not booked to the budget.",
         "loanPaymentTypeLocked": "Income or expense follows the loan type and is changed there.",
         "planHistoricNote": "Measured against your current plan. Yuvomi does not record what the plan was in an earlier month.",
-        "recurringEditSeriesHint": "The series' first entry is also its template - title, amount, category and account change there too, even if it lies in the past.",
+        "recurringEditSeriesHint": "Changes apply from today on. Entries already booked, the first one included, keep their values. Only visibility applies to the whole series.",
         "responsibleLabel": "Responsible",
         "responsibleHint": "Who takes care of this entry. Moves no money - use Split Expenses to settle up.",
         "responsibleFilterTo": "Only entries for {{name}}",

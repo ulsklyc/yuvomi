@@ -1666,7 +1666,7 @@
         "loanPaidInstallmentsHint": "Voor een lening die al loopt. Deze termijnen worden vastgelegd, maar niet in het budget geboekt.",
         "loanPaymentTypeLocked": "Inkomst of uitgave volgt de soort lening en wordt daar gewijzigd.",
         "planHistoricNote": "Gemeten aan je huidige plan. Yuvomi bewaart niet wat het plan in een eerdere maand was.",
-        "recurringEditSeriesHint": "De eerste boeking van de reeks is tegelijk het sjabloon - titel, bedrag, categorie en rekening veranderen daar mee, ook als die in het verleden ligt.",
+        "recurringEditSeriesHint": "Wijzigingen gelden vanaf vandaag. Al geboekte posten, ook de eerste, behouden hun waarden. Alleen de zichtbaarheid geldt voor de hele reeks.",
         "responsibleLabel": "Verantwoordelijk",
         "responsibleHint": "Wie deze boeking regelt. Verplaatst geen geld - afrekenen doe je bij gedeelde uitgaven.",
         "responsibleFilterTo": "Alleen boekingen van {{name}}",

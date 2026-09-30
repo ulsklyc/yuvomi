@@ -1680,7 +1680,7 @@
         "loanPaidInstallmentsHint": "이미 상환 중인 대출용입니다. 해당 회차는 기록되지만 가계부에는 반영되지 않습니다.",
         "loanPaymentTypeLocked": "수입인지 지출인지는 대출 유형을 따르며 거기에서 변경합니다.",
         "planHistoricNote": "현재 계획을 기준으로 비교한 값입니다. Yuvomi는 이전 달의 계획이 얼마였는지 보관하지 않습니다.",
-        "recurringEditSeriesHint": "시리즈의 첫 항목은 동시에 템플릿이기도 합니다. 제목, 금액, 카테고리, 계좌가 그곳에서도 함께 바뀌며, 과거 날짜여도 마찬가지입니다.",
+        "recurringEditSeriesHint": "변경 사항은 오늘부터 적용됩니다. 이미 기록된 항목은 첫 항목을 포함해 기존 값을 유지합니다. 공개 범위만 시리즈 전체에 적용됩니다.",
         "responsibleLabel": "담당",
         "responsibleHint": "이 항목을 맡은 사람입니다. 돈은 이동하지 않으며, 정산은 공동 지출에서 합니다.",
         "responsibleFilterTo": "{{name}}의 항목만",

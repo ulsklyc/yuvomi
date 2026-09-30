@@ -1666,7 +1666,7 @@
         "loanPaidInstallmentsHint": "Para un préstamo que ya está en curso. Estas cuotas se registran, pero no se contabilizan en el presupuesto.",
         "loanPaymentTypeLocked": "Que sea ingreso o gasto depende del tipo de préstamo y se cambia allí.",
         "planHistoricNote": "Medido con tu plan actual. Yuvomi no guarda cuál era el plan en un mes anterior.",
-        "recurringEditSeriesHint": "El primer apunte de la serie es también su plantilla - título, importe, categoría y cuenta cambian también ahí, aunque esté en el pasado.",
+        "recurringEditSeriesHint": "Los cambios se aplican a partir de hoy. Las entradas ya registradas, incluida la primera, conservan sus valores. Solo la visibilidad se aplica a toda la serie.",
         "responsibleLabel": "Responsable",
         "responsibleHint": "Quién se ocupa de este apunte. No mueve dinero: para saldar cuentas están los gastos compartidos.",
         "responsibleFilterTo": "Solo apuntes de {{name}}",

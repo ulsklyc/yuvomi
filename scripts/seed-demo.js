@@ -158,6 +158,9 @@ const WIPE = [
   'search_index',
   'shopping_item_tags', 'shopping_items', 'shopping_lists',
   'budget_entry_attachments',
+  // Serien-Definitionen (#1035) haengen per CASCADE am Anker - die greift hier
+  // aber nicht, weil der Wipe mit foreign_keys = OFF laeuft.
+  'budget_series_responsibles', 'budget_series',
   'budget_loan_payments', 'budget_loans', 'budget_recurrence_skipped', 'budget_entries',
   'budget_plans', 'budget_accounts',
   'contact_phones', 'contact_emails', 'contact_addresses', 'contacts',

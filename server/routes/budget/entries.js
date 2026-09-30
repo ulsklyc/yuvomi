@@ -21,6 +21,7 @@ import {
   validCategoryKeys, defaultCategory, validateSubcategory, validateAccountRef,
   entryWithLoanMeta, refreshLoanStatus, fromBudgetAmount, bookingFor,
   RESPONSIBLE_USERS_SQL, replaceResponsibles, withResponsibles, responsibleNonMembers,
+  replaceSeriesResponsibles, seedSeriesResponsibles,
 } from './helpers.js';
 import { nonMemberMessage } from '../../services/household-members.js';
 
@@ -402,6 +403,9 @@ router.post('/', (req, res) => {
     replaceAttachments(result.lastInsertRowid, req.body.attachment_document_ids, documentViewer(req));
     // Zustaendige (#1057) - ein Etikett neben der Buchung, keine Forderung.
     replaceResponsibles(result.lastInsertRowid, req.body.responsible_user_ids);
+    // Eine neue Serie ist ihre eigene Vorlage (#1035): die Werte legt der
+    // Trigger aus v228 an, die Zustaendigen kommen erst hier dazu.
+    if (isRecurring) seedSeriesResponsibles(result.lastInsertRowid);
 
     const entry = entryWithLoanMeta(result.lastInsertRowid);
 
@@ -416,10 +420,12 @@ router.post('/', (req, res) => {
 
 /**
  * PUT /api/v1/budget/:id/series
- * Aktualisiert das Serien-Original und löscht zukünftige Instanzen (ab aktuellem Monat),
- * sodass sie beim nächsten Monatsaufruf mit den neuen Werten neu erzeugt werden.
- * Body: wie PUT /:id (date wird ignoriert – das Datum des Originals bleibt erhalten)
- * Response: { data: Parent-Entry }
+ * Ändert eine Serie "für alle künftigen": ihre Definition (budget_series) und
+ * jede Buchung der Serie ab heute (Haushaltszone). Was davor liegt, ist gebucht
+ * und bleibt - die erste Buchung eingeschlossen (#1035). Einzige Ausnahme ist
+ * die Sichtbarkeit, die bewusst für die ganze Serie gilt.
+ * Body: wie PUT /:id (date wird ignoriert - der Starttag der Serie bleibt)
+ * Response: { data: Anker-Buchung + series: Definition | null }
  */
 router.put('/:id/series', (req, res) => {
   try {
@@ -433,6 +439,18 @@ router.put('/:id/series', (req, res) => {
 
     const parent = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(parentId);
     if (!parent) return res.status(404).json({ error: 'Series parent not found', code: 404 });
+
+    // DIE VORLAGE IST DIE DEFINITION, NICHT DIE ERSTE BUCHUNG (#1035). Bis v227
+    // war der Anker beides, und diese Route schrieb Titel, Betrag, Kategorie,
+    // Unterkategorie, Konto und Zustaendige per `WHERE id = parentId` auf eine
+    // Buchung, die Jahre zurueckliegen konnte - die Miete von 2020 zog auf das
+    // neue Konto um. Fehlt die Definition, ist die Serie beendet; dann bleibt
+    // der Anker die Grundlage, wie bei jedem Neubeginn (Trigger aus v228).
+    const series = db.get().prepare('SELECT * FROM budget_series WHERE anchor_id = ?').get(parentId);
+    const base = series ?? {
+      title: parent.title, amount: parent.amount, full_amount: parent.recurrence_full_amount,
+      category: parent.category, subcategory: parent.subcategory,
+    };
 
     const checks = [];
     if (req.body.title    !== undefined) checks.push(str(req.body.title,    'Titel',  { max: MAX_TITLE, required: false }));
@@ -465,17 +483,18 @@ router.put('/:id/series', (req, res) => {
         code: 400,
       });
     }
-    // Neu nur Haushaltsmitglieder (#1207), gegen den Stand der Serie.
-    const strangers = responsibleNonMembers(parentId, req.body.responsible_user_ids);
+    // Neu nur Haushaltsmitglieder (#1207), gegen den Stand der Serie - ihrer
+    // Definition, nicht ihrer ersten Buchung (#1035).
+    const strangers = responsibleNonMembers(parentId, req.body.responsible_user_ids, { series: true });
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
 
     const { title, amount, category, subcategory: requestedSubcategory, is_recurring, recurrence_rule } = req.body;
-    const finalTitle    = title     !== undefined ? title.trim()                        : parent.title;
-    const finalAmount   = amount    !== undefined ? Number(amount)                     : parent.amount;
-    const finalCategory = category  !== undefined ? category                           : parent.category;
+    const finalTitle    = title     !== undefined ? title.trim()                        : base.title;
+    const finalAmount   = amount    !== undefined ? Number(amount)                     : base.amount;
+    const finalCategory = category  !== undefined ? category                           : base.category;
     const finalSubcat   = requestedSubcategory !== undefined
-      ? (validateSubcategory(finalCategory, requestedSubcategory) ?? parent.subcategory)
-      : parent.subcategory;
+      ? (validateSubcategory(finalCategory, requestedSubcategory) ?? base.subcategory)
+      : base.subcategory;
     const finalRecurring = is_recurring !== undefined ? (is_recurring ? 1 : 0) : parent.is_recurring;
     const finalInterval  = req.body.recurrence_interval !== undefined
       ? req.body.recurrence_interval
@@ -503,17 +522,20 @@ router.put('/:id/series', (req, res) => {
         ? cents(shareFromOccurrence
           ? finalAmount * 12 / occurrencesPerYear(finalInterval, finalCount)
           : finalAmount)
-        : (parent.recurrence_full_amount ?? parent.amount))
+        : (base.full_amount ?? base.amount))
       : null;
     const storeAmount    = shareFromOccurrence
       ? cents(finalAmount)
       : (finalVirtual ? effectiveMonthly(finalFull, finalInterval, finalCount) : finalAmount);
     const finalRrule     = recurrence_rule !== undefined ? (recurrence_rule || null) : parent.recurrence_rule;
 
-    // Sichtbarkeit ist eine Serien-Eigenschaft (#476/#505): eine Änderung wirkt auf
-    // Parent UND alle bereits materialisierten Instanzen, sonst blieben Alt-Instanzen
-    // auf dem alten Wert (privat→geteilt = Leak). Künftige Instanzen werden gelöscht
-    // und erben den neuen Wert bei der Neu-Generierung (generateRecurringInstances).
+    // SICHTBARKEIT GILT BEWUSST RUECKWIRKEND, fuer die ganze Serie (#476/#505,
+    // Entscheidung in #1035). Anders als die Werte oben ist sie keine Tatsache
+    // ueber eine einzelne Buchung, sondern eine Aussage ueber die Serie: wer sie
+    // privat stellt, meint auch ihre alten Buchungen, und eine private Serie,
+    // deren Vergangenheit im Haushalt sichtbar bliebe, waere die Ueberraschung
+    // (privat->geteilt waere dazu ein Leck in die andere Richtung). Sie trifft
+    // deshalb die Definition, den Anker und JEDE Instanz ohne Datumsschnitt.
     const nextVisibility = req.body.visibility !== undefined
       ? normalizeBudgetVisibility(req.body.visibility)
       : null;
@@ -524,11 +546,9 @@ router.put('/:id/series', (req, res) => {
     // nachtragen und "alle künftigen ändern" wählen: die Route ignorierte das Feld und
     // löschte die Instanz gleich darauf mit weg.
     //
-    // Anders als die Sichtbarkeit wirkt sie NICHT auf bereits vergangene Instanzen.
-    // Sichtbarkeit muss rückwirkend gelten, weil ein zu weiter Alt-Wert ein Leck ist;
-    // ein Konto ist eine Tatsache über eine bereits erfolgte Abbuchung. Die künftigen
-    // erben den neuen Wert ohnehin, weil sie unten gelöscht und von
-    // generateRecurringInstances neu erzeugt werden.
+    // Anders als die Sichtbarkeit wirkt sie NICHT auf bereits vergangene Buchungen -
+    // auch nicht auf die erste (#1035). Ein Konto ist eine Tatsache über eine bereits
+    // erfolgte Abbuchung.
     const accountProvided = req.body.account_id !== undefined;
     let accountValue = null;
     if (accountProvided) {
@@ -544,8 +564,7 @@ router.put('/:id/series', (req, res) => {
     // liegt die Buchung vom 1. bereits hinter uns, wurde aber mitgeloescht und
     // aus dem Original neu erzeugt. Solange nur Titel und Betrag wanderten, fiel
     // das kaum auf; seit das Konto mitkommt, zieht eine bereits erfolgte
-    // Abbuchung auf ein anderes Konto um und verfaelscht dessen Saldo. Der Fehler
-    // war schon da, dieser PR macht ihn wirksam - also faellt er hier mit.
+    // Abbuchung auf ein anderes Konto um und verfaelscht dessen Saldo.
     // Nebenbei bleiben damit die Belege vergangener Buchungen erhalten, die die
     // CASCADE bisher mitnahm (siehe #583 weiter unten).
     //
@@ -556,30 +575,63 @@ router.put('/:id/series', (req, res) => {
     // Tag, den die Kontoansicht bereits als vergangen fuehrt - und erzeugt ihn
     // mit dem neuen Konto neu. Dieselbe Zone auf beiden Seiten, sonst ist der
     // Schnitt eine andere Grenze als die, an der die Zahlen abgelesen werden.
+    //
+    // Der Schnitt gilt fuer JEDE Buchung der Serie gleich, die erste
+    // eingeschlossen (#1035): sie ist eine gewoehnliche Buchung. Liegt sie
+    // selbst noch vor uns (die Serie beginnt naechsten Monat), zieht sie mit.
     const cutoffDate = todayKey(db.get());
+    const anchorAhead = parent.date >= cutoffDate;
 
     db.get().transaction(() => {
+      // 1. Der Anker: Rhythmus und Serienschalter immer - sie haben nur eine
+      //    Bedeutung. Beendet `is_recurring = 0` die Serie, raeumt der Trigger
+      //    aus v228 die Definition ab; ein Neubeginn legt sie aus dem Anker an
+      //    und bekommt in Schritt 3 die Werte dieser Anfrage.
       db.get().prepare(`
         UPDATE budget_entries SET
-          title                  = ?,
-          amount                 = ?,
-          category               = ?,
-          subcategory            = ?,
-          is_recurring           = ?,
-          recurrence_rule        = ?,
-          recurrence_interval    = ?,
+          is_recurring              = ?,
+          recurrence_rule           = ?,
+          recurrence_interval       = ?,
           recurrence_interval_count = ?,
-          recurrence_virtual     = ?,
-          recurrence_confirm     = ?,
-          recurrence_full_amount = ?,
-          visibility             = COALESCE(?, visibility),
-          account_id             = CASE WHEN ? = 1 THEN ? ELSE account_id END
+          recurrence_virtual        = ?,
+          recurrence_confirm        = ?,
+          visibility                = COALESCE(?, visibility)
         WHERE id = ?
-      `).run(finalTitle, storeAmount, finalCategory, finalSubcat,
-             finalRecurring, finalRrule, finalInterval, finalCount, finalVirtual,
-             finalConfirm, finalFull, nextVisibility,
+      `).run(finalRecurring, finalRrule, finalInterval, finalCount, finalVirtual,
+             finalConfirm, nextVisibility, parentId);
+
+      // 2. Seine WERTE nur, wenn er noch nicht gebucht ist.
+      if (anchorAhead) {
+        db.get().prepare(`
+          UPDATE budget_entries SET
+            title                  = ?,
+            amount                 = ?,
+            category               = ?,
+            subcategory            = ?,
+            recurrence_full_amount = ?,
+            account_id             = CASE WHEN ? = 1 THEN ? ELSE account_id END
+          WHERE id = ?
+        `).run(finalTitle, storeAmount, finalCategory, finalSubcat, finalFull,
+               accountProvided ? 1 : 0, accountValue, parentId);
+      }
+
+      // 3. Die Definition - die Vorlage fuer jedes Vorkommen, das noch entsteht.
+      db.get().prepare(`
+        UPDATE budget_series SET
+          title       = ?,
+          amount      = ?,
+          full_amount = ?,
+          category    = ?,
+          subcategory = ?,
+          visibility  = COALESCE(?, visibility),
+          account_id  = CASE WHEN ? = 1 THEN ? ELSE account_id END,
+          updated_at  = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+        WHERE anchor_id = ?
+      `).run(finalTitle, storeAmount, finalFull, finalCategory, finalSubcat, nextVisibility,
              accountProvided ? 1 : 0, accountValue, parentId);
 
+      // 4. Die vorhandenen Instanzen ab heute.
+      //
       // LÖSCHEN NUR, WENN SICH DIE TERMINE VERSCHIEBEN.
       //
       // Bis hierher war der einzige Weg, künftige Instanzen an eine geänderte
@@ -587,8 +639,8 @@ router.put('/:id/series', (req, res) => {
       // Das ist richtig, wenn sich der Rhythmus ändert - dann liegen die
       // Termine anderswo. Für eine reine Wertänderung ist es zu grob: die
       // Zeilen verlieren ihre Identität, ihre Belege gehen über die CASCADE
-      // mit (#583), und sie kommen mit allem zurück, was am Original steht -
-      // auch mit einem Konto, das sie vorher bewusst nicht hatten.
+      // mit (#583), und sie kommen mit allem zurück, was an der Definition
+      // steht - auch mit einem Konto, das sie vorher bewusst nicht hatten.
       //
       // Ändert sich nur ein Wert, werden die vorhandenen Zeilen deshalb
       // aktualisiert statt ersetzt. Der Schnitt bleibt derselbe: was vor
@@ -604,10 +656,10 @@ router.put('/:id/series', (req, res) => {
           DELETE FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ?
         `).run(parentId, cutoffDate);
       } else {
-        // `account_id` folgt derselben CASE-Form wie am Original: ein nicht
-        // mitgesendetes Feld lässt die Zuordnung in Ruhe. Eine virtuelle Serie
-        // gibt ihr Konto nicht weiter - ihre Instanzen sind Planwerte, und
-        // `generateRecurringInstances` hält es genauso.
+        // `account_id` folgt derselben CASE-Form wie an der Definition: ein
+        // nicht mitgesendetes Feld lässt die Zuordnung in Ruhe. Eine virtuelle
+        // Serie gibt ihr Konto nicht weiter - ihre Instanzen sind Planwerte,
+        // und `generateRecurringInstances` hält es genauso.
         db.get().prepare(`
           UPDATE budget_entries SET
             title       = ?,
@@ -623,6 +675,7 @@ router.put('/:id/series', (req, res) => {
                parentId, cutoffDate);
       }
 
+      // 5. Sichtbarkeit: jede Instanz, ohne Schnitt (siehe nextVisibility).
       if (nextVisibility) {
         db.get().prepare(`
           UPDATE budget_entries SET visibility = ? WHERE recurrence_parent_id = ?
@@ -637,11 +690,11 @@ router.put('/:id/series', (req, res) => {
     //
     // DIE ZUSTAENDIGKEIT DAGEGEN GEHOERT DER SERIE (#1057): "wer kuemmert sich
     // um die Wasserrechnung" ist keine Eigenschaft des einzelnen Monats. Sie
-    // folgt deshalb denselben Schnitt wie Titel und Betrag daneben - ab
-    // cutoffDate, also ab heute. Eine bereits materialisierte Instanz aus der
-    // Vergangenheit behaelt, wer damals zustaendig war; wer die Rechnung
-    // uebernimmt, uebernimmt sie nicht rueckwirkend. Gemessen: Juni-Instanz
-    // bleibt bei der alten Person, Dezember zieht nach.
+    // folgt deshalb demselben Schnitt wie Titel und Betrag daneben - ab
+    // cutoffDate, also ab heute: in die Definition, in jede Buchung ab heute,
+    // und in den Anker nur, wenn er selbst noch vor uns liegt (#1035). Eine
+    // bereits gebuchte Buchung behaelt, wer damals zustaendig war; wer die
+    // Rechnung uebernimmt, uebernimmt sie nicht rueckwirkend.
     //
     // WAS DER SCHNITT NICHT LEISTET, und das gilt fuer jedes Serienfeld gleich:
     // ein Monat, der noch NIE geoeffnet wurde, hat noch keine Instanz. Sie
@@ -651,7 +704,8 @@ router.put('/:id/series', (req, res) => {
     // neuen Titel saehe.
     if (req.body.responsible_user_ids !== undefined) {
       db.get().transaction(() => {
-        replaceResponsibles(parentId, req.body.responsible_user_ids);
+        replaceSeriesResponsibles(parentId, req.body.responsible_user_ids);
+        if (anchorAhead) replaceResponsibles(parentId, req.body.responsible_user_ids);
         const future = db.get().prepare(
           'SELECT id FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ?'
         ).all(parentId, cutoffDate);
@@ -660,7 +714,15 @@ router.put('/:id/series', (req, res) => {
     }
 
     const updated = entryWithLoanMeta(parentId);
-    res.json({ data: { ...updated, attachments: attachmentsFor(parentId, documentViewer(req)) } });
+    const definition = db.get().prepare(`
+      SELECT title, amount, full_amount, category, subcategory, account_id, visibility
+        FROM budget_series WHERE anchor_id = ?
+    `).get(parentId) ?? null;
+    res.json({ data: {
+      ...updated,
+      series: definition,
+      attachments: attachmentsFor(parentId, documentViewer(req)),
+    } });
   } catch (err) {
     log.error('PUT /budget/:id/series error:', err);
     res.status(500).json({ error: 'Internal error', code: 500 });
@@ -873,6 +935,13 @@ router.put('/:id', (req, res) => {
     // Dieselbe Zurueckhaltung wie bei den Belegen: nur anfassen, wenn das Feld
     // mitkommt (#1057). replaceResponsibles() prueft das selbst.
     replaceResponsibles(id, req.body.responsible_user_ids);
+    // Wird eine Einzelbuchung hier zur Serie, ist sie deren Vorlage (#1035) -
+    // die Werte uebernimmt der Trigger aus v228, die Zustaendigen dieser Aufruf.
+    // Eine Buchung, die schon Serie WAR, bleibt dagegen nur Buchung: ihre Werte
+    // aendern hier die erste Buchung, nicht die Definition.
+    if (!entry.is_recurring && finalRecurring && entry.recurrence_parent_id == null) {
+      seedSeriesResponsibles(id);
+    }
 
     const updated = entryWithLoanMeta(id);
 

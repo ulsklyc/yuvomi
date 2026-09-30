@@ -1680,7 +1680,7 @@
         "loanPaidInstallmentsHint": "Untuk pinjaman yang sudah berjalan. Cicilan ini dicatat, tetapi tidak dibukukan ke anggaran.",
         "loanPaymentTypeLocked": "Pemasukan atau pengeluaran mengikuti jenis pinjaman dan diubah di sana.",
         "planHistoricNote": "Diukur terhadap rencana Anda saat ini. Yuvomi tidak menyimpan berapa rencana pada bulan sebelumnya.",
-        "recurringEditSeriesHint": "Entri pertama dalam seri ini sekaligus templatnya - judul, jumlah, kategori, dan akun ikut berubah di sana, meskipun sudah lewat.",
+        "recurringEditSeriesHint": "Perubahan berlaku mulai hari ini. Entri yang sudah dibukukan, termasuk yang pertama, tetap dengan nilainya. Hanya visibilitas yang berlaku untuk seluruh seri.",
         "responsibleLabel": "Penanggung jawab",
         "responsibleHint": "Siapa yang mengurus entri ini. Tidak memindahkan uang - untuk penyelesaian gunakan pengeluaran bersama.",
         "responsibleFilterTo": "Hanya entri {{name}}",

@@ -1680,7 +1680,7 @@
         "loanPaidInstallmentsHint": "Para sa utang na tumatakbo na. Naitatala ang mga hulog na ito ngunit hindi ibinibilang sa badyet.",
         "loanPaymentTypeLocked": "Ang kita o gastos ay sumusunod sa uri ng utang at doon binabago.",
         "planHistoricNote": "Sinusukat laban sa iyong kasalukuyang plano. Hindi itinatala ng Yuvomi kung ano ang plano noong nakaraang buwan.",
-        "recurringEditSeriesHint": "Ang unang entry ng serye ay siya ring template nito - nagbabago rin doon ang pamagat, halaga, kategorya at account, kahit nakaraan na ito.",
+        "recurringEditSeriesHint": "Magkakabisa ang mga pagbabago simula ngayong araw. Ang mga entry na naitala na, kasama ang una, ay mananatili sa kanilang mga halaga. Ang visibility lang ang para sa buong serye.",
         "responsibleLabel": "Responsable",
         "responsibleHint": "Kung sino ang nag-aasikaso ng entry na ito. Walang perang inililipat - gamitin ang shared expenses para maghatian.",
         "responsibleFilterTo": "Mga entry lang ni {{name}}",
