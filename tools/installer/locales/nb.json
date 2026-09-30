@@ -166,7 +166,7 @@
     "backupReminder": "Husk å sikkerhetskopiere .env-filen din nå - den inneholder nøklene dine.",
     "download": "Last ned .env-filen",
     "savedTo": "Lagret til {{path}}",
-    "downloadFailed": "Filen kunne ikke lastes inn – installatøren er mest sannsynlig allerede avsluttet. Nøklene dine finnes i .env-filen på serveren din.",
+    "downloadFailed": "Filen kunne ikke lastes inn - installatøren er mest sannsynlig allerede avsluttet. Nøklene dine finnes i .env-filen på serveren din.",
     "serverStops": "Installatøren vil slå seg av om noen minutter. Last ned filen før du lukker denne fanen.",
     "nextTitle": "Neste steg",
     "nextInvite": "Inviter familien din",
@@ -174,8 +174,8 @@
     "nextModules": "Velg dine moduler",
     "nextModulesDesc": "Slå på det husholdningen din faktisk bruker og skjul resten.",
     "nextInstall": "Installer det på telefonene dine",
-    "nextInstallDesc": "Åpne Yuvomi på en telefon og legg den til på hjemmeskjermen – den fungerer offline.",
-    "subtitleExisting": "Yuvomi kjører. Denne installasjonen har allerede en administratorkonto – logg inn med dine eksisterende påloggingsdetaljer."
+    "nextInstallDesc": "Åpne Yuvomi på en telefon og legg den til på hjemmeskjermen - den fungerer offline.",
+    "subtitleExisting": "Yuvomi kjører. Denne installasjonen har allerede en administratorkonto - logg inn med dine eksisterende påloggingsdetaljer."
   },
   "advanced": {
     "tag": "Avansert · valgfritt",
