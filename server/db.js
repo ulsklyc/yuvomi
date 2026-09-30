@@ -9962,13 +9962,25 @@ const MIGRATIONS = [
     // generateRecurringInstances() liest bei NULL das Datum des Ankers, also
     // genau das Verhalten bis v228.
     //
-    // Idempotent: die Spalte kommt nur dazu, wenn sie fehlt, und gefuellt wird
-    // nur, was noch keinen Starttag hat - ein zweiter Lauf ueberschreibt keinen
-    // inzwischen geaenderten.
+    // GRID_FROM: ab welchem Tag das heutige Raster gilt. Eine Serien-Aenderung,
+    // die das Raster verschiebt (Starttag oder Rhythmus), raeumt nur ab heute
+    // ab; was davor liegt, ist gebucht und steht auf dem alten Raster. Der
+    // Monatsaufruf kennt das alte Raster nicht mehr und legte in einem schon
+    // gefuellten vergangenen Monat ein zweites Vorkommen daneben (Review-Befund
+    // in #1585). Vor grid_from erzeugt generateRecurringInstances() deshalb
+    // nichts. NULL = das Raster galt schon immer, keine Grenze - der Bestand
+    // bleibt, wie er ist.
+    //
+    // Idempotent: jede Spalte kommt nur dazu, wenn sie fehlt, und gefuellt
+    // wird nur, was noch keinen Starttag hat - ein zweiter Lauf ueberschreibt
+    // keinen inzwischen geaenderten.
     up(db) {
       const columns = db.prepare('PRAGMA table_info(budget_series)').all().map((c) => c.name);
       if (!columns.includes('start_date')) {
         db.exec('ALTER TABLE budget_series ADD COLUMN start_date TEXT');
+      }
+      if (!columns.includes('grid_from')) {
+        db.exec('ALTER TABLE budget_series ADD COLUMN grid_from TEXT');
       }
       db.exec(`
         UPDATE budget_series

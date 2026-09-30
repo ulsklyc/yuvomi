@@ -315,7 +315,8 @@ const SERIES_SELECT = `
     SELECT a.id, COALESCE(s.start_date, a.date) AS start_date, a.created_by, a.owner_id,
            a.recurrence_interval, a.recurrence_interval_count,
            a.recurrence_virtual, a.recurrence_confirm,
-           s.title, s.amount, s.category, s.subcategory, s.account_id, s.visibility
+           s.title, s.amount, s.category, s.subcategory, s.account_id, s.visibility,
+           s.grid_from
       FROM budget_series s
       JOIN budget_entries a ON a.id = s.anchor_id
      WHERE a.is_recurring = 1`;
@@ -349,6 +350,13 @@ function occurrenceWriter(database) {
   `);
 
   return (orig, date) => {
+    // VOR DER LETZTEN RASTERAENDERUNG ENTSTEHT NICHTS (#1545, Review-Befund in
+    // #1585). Hat eine Serien-Aenderung den Starttag oder den Rhythmus
+    // verschoben, stehen die Buchungen davor auf dem ALTEN Raster - ein
+    // Vorkommen auf dem neuen daneben waere eine zweite Buchung fuer denselben
+    // Zeitraum. Ein Monat davor, der noch nie aufgeschlagen wurde, bleibt
+    // deshalb leer: welches Raster damals galt, weiss die Serie nicht mehr.
+    if (orig.grid_from && date < orig.grid_from) return;
     // Übersprungen (eine gelöschte Instanz) oder schon vorhanden? Beides wird am
     // Fälligkeitstag geprüft, nicht am Monat: eine Wochenserie hat mehrere pro
     // Monat, und ein gelöschter Dienstag darf die übrigen nicht mitnehmen.

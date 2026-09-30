@@ -101,7 +101,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   series it changed which days came up at all. A series now keeps its own start day. To move it,
   change the date on the first entry and choose "Change all future occurrences": the occurrences
   from today on move to the new day, while the first entry keeps its date once it is booked. On
-  update every series keeps the start day it had, so no date changes.
+  update every series keeps the start day it had, so no date changes. After a series is moved to a
+  new day or given a new rhythm, opening a past month no longer adds a second booking on the new
+  day next to the one already there; months before the change are no longer filled in.
 
 ## [2.70.0] - 2026-09-30
 

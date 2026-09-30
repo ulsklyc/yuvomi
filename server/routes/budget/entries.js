@@ -686,6 +686,12 @@ router.put('/:id/series', (req, res) => {
         db.get().prepare(`
           DELETE FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ?
         `).run(parentId, cutoffDate);
+        // Das neue Raster gilt ab heute, auch fuer den Monatsaufruf: davor
+        // steht der Bestand auf dem alten, und ein Vorkommen auf dem neuen
+        // daneben waere eine zweite Buchung fuer denselben Zeitraum (Review-
+        // Befund in #1585). Siehe occurrenceWriter().
+        db.get().prepare('UPDATE budget_series SET grid_from = ? WHERE anchor_id = ?')
+          .run(cutoffDate, parentId);
         // Ein verlegter Starttag bei schon gebuchter erster Buchung: das
         // Vorkommen am neuen Starttag legt kein Monatsaufruf an (siehe
         // materializeSeriesStart), also hier - wenn es ab heute liegt.

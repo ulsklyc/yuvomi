@@ -99,6 +99,7 @@ test('jede laufende Serie bekommt genau eine Definition mit den Werten ihres Ori
     anchor_id: ids.rent, title: 'Miete', amount: -900, full_amount: null,
     category: 'housing', subcategory: 'rent_mortgage', account_id: giro, visibility: 'shared',
     start_date: '2020-01-05', // v229 (#1545), aus dem Datum des Originals
+    grid_from: null, // v229: keine Rasteraenderung, keine Grenze
   });
   const policy = definition(db, ids.policy);
   assert.equal(policy.amount, -100, 'virtuell: der geglaettete Monatsanteil, wie am Original');
@@ -271,6 +272,10 @@ test('v229: jede laufende Serie bekommt als Starttag das Datum ihrer ersten Buch
   assert.equal(definition(db, ids.gym).start_date, '2020-01-12');
   assert.equal(definition(db, ids.late).start_date, '2024-03-13', 'auch die Definition aus dem v228-Trigger');
   assert.equal(db.prepare('SELECT COUNT(*) AS c FROM budget_series WHERE start_date IS NULL').get().c, 0);
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS c FROM budget_series WHERE grid_from IS NOT NULL').get().c,
+    0, 'grid_from bleibt leer: das Raster des Bestands galt schon immer, vergangene Monate entstehen wie bisher',
+  );
   db.close();
 });
 

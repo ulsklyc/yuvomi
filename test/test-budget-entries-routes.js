@@ -1363,3 +1363,39 @@ test('#1545: liegt die erste Buchung noch vor uns, darf der Starttag auch fruehe
   await generatedIn('2099-07', pid);
   assert.deepEqual(seriesDates(pid, '2099-07'), ['2099-07-05']);
 });
+
+// Review-Befund in #1585: nach einem verlegten Starttag (oder einem neuen
+// Rhythmus) raeumt die Serien-Aenderung nur ab heute ab. Ein vergangener Monat,
+// der seine Vorkommen schon hat, bekam beim naechsten Aufruf ein zweites auf
+// dem neuen Raster daneben - zwei Buchungen fuer einen Zeitraum, beide in jeder
+// Summe und im Kontosaldo. Vor heute wird deshalb nach einer Rasteraenderung
+// nichts mehr erzeugt.
+
+test('#1545: ein verlegter Starttag legt in vergangenen Monaten kein zweites Vorkommen an', async () => {
+  const pid = insertEntry({ title: 'Raster 1545', amount: -70, date: '2000-01-05', is_recurring: 1 });
+  await generatedIn('2000-03', pid);
+  await generatedIn('2000-08', pid);
+  assert.deepEqual(seriesDates(pid, '2000-03'), ['2000-03-05']);
+  // Tag im selben Monat wie die erste Buchung verschoben ...
+  assert.equal((await call('PUT', `/${pid}/series`, { body: { start_date: '2000-01-04' } })).status, 200);
+  await generatedIn('2000-03', pid);
+  assert.deepEqual(seriesDates(pid, '2000-03'), ['2000-03-05'], 'Maerz bleibt bei seiner einen Buchung');
+  // ... und in einen spaeteren vergangenen Monat.
+  assert.equal((await call('PUT', `/${pid}/series`, { body: { start_date: '2000-06-20' } })).status, 200);
+  await generatedIn('2000-08', pid);
+  assert.deepEqual(seriesDates(pid, '2000-08'), ['2000-08-05'], 'August ebenso');
+  await generatedIn('2099-08', pid);
+  assert.deepEqual(seriesDates(pid, '2099-08'), ['2099-08-20'], 'ab heute gilt das neue Raster');
+});
+
+test('#1545: auch ein neuer Rhythmus legt in vergangenen Monaten kein zweites Vorkommen an', async () => {
+  const pid = insertEntry({ title: 'Rhythmus 1545', amount: -70, date: '2000-01-05', is_recurring: 1 });
+  await generatedIn('2000-03', pid);
+  assert.equal((await call('PUT', `/${pid}/series`, {
+    body: { recurrence_interval: 'weekly', recurrence_interval_count: 1 },
+  })).status, 200);
+  await generatedIn('2000-03', pid);
+  assert.deepEqual(seriesDates(pid, '2000-03'), ['2000-03-05'], 'keine Wochentermine neben der Maerz-Buchung');
+  await generatedIn('2099-08', pid);
+  assert.ok(seriesDates(pid, '2099-08').length >= 4, 'ab heute woechentlich');
+});
