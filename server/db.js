@@ -9982,6 +9982,13 @@ const MIGRATIONS = [
       if (!columns.includes('grid_from')) {
         db.exec('ALTER TABLE budget_series ADD COLUMN grid_from TEXT');
       }
+      // "Gibt es das Vorkommen an diesem Tag schon?" fragt occurrenceWriter()
+      // fuer jedes Vorkommen. Mit dem Index nur auf recurrence_parent_id las
+      // die Frage jede Buchung der Serie - beim Einfrieren der Vergangenheit
+      // vor einer Rasteraenderung (#1585) quadratisch: gemessen 290 s fuer
+      // eine Wochenserie ueber 100.000 Vorkommen. Ein kuenftiger Rebuild von
+      // budget_entries (wie v156) muss ihn mit anlegen.
+      db.exec('CREATE INDEX IF NOT EXISTS idx_budget_parent_date ON budget_entries(recurrence_parent_id, date)');
       db.exec(`
         UPDATE budget_series
            SET start_date = (SELECT e.date FROM budget_entries e WHERE e.id = budget_series.anchor_id)

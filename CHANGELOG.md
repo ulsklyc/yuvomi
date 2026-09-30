@@ -103,7 +103,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from today on move to the new day, while the first entry keeps its date once it is booked. On
   update every series keeps the start day it had, so no date changes. After a series is moved to a
   new day or given a new rhythm, opening a past month no longer adds a second booking on the new
-  day next to the one already there; months before the change are no longer filled in.
+  day next to the one already there: before the change, every past month of the series is filled
+  in with its bookings on the old days, so none is missing and none is doubled. This also holds
+  when the rhythm is changed on the first entry with "Only this occurrence", which until now left
+  the old bookings standing and added the new ones beside them.
 
 ## [2.70.0] - 2026-09-30
 

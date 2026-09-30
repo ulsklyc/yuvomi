@@ -21,7 +21,7 @@ import {
   validCategoryKeys, defaultCategory, validateSubcategory, validateAccountRef,
   entryWithLoanMeta, refreshLoanStatus, fromBudgetAmount, bookingFor,
   RESPONSIBLE_USERS_SQL, replaceResponsibles, withResponsibles, responsibleNonMembers,
-  replaceSeriesResponsibles, seedSeriesResponsibles, materializeSeriesStart,
+  replaceSeriesResponsibles, seedSeriesResponsibles, materializeSeriesStart, freezeSeriesPast,
 } from './helpers.js';
 import { nonMemberMessage } from '../../services/household-members.js';
 
@@ -608,7 +608,24 @@ router.put('/:id/series', (req, res) => {
       });
     }
 
+    // Verschieben sich die Termine (Rhythmus oder Starttag)? Dann gilt ab heute
+    // ein neues Raster - Schritt 0 und 4.
+    const rhythmChanged = finalInterval !== parent.recurrence_interval
+      || finalCount !== parent.recurrence_interval_count
+      || finalVirtual !== parent.recurrence_virtual
+      || finalRrule !== parent.recurrence_rule
+      || finalRecurring !== parent.is_recurring
+      || startChanged;
+
     db.get().transaction(() => {
+      // 0. DIE VERGANGENHEIT EINFRIEREN, solange das alte Raster noch gilt
+      //    (Entscheidung in #1585). Ab Schritt 4 entsteht vor heute nichts mehr
+      //    (grid_from); ein Monat, der nie aufgeschlagen wurde, bekommt seine
+      //    Vorkommen deshalb jetzt - auf dem alten Raster, mit den Werten der
+      //    Definition vor dieser Aenderung. Ohne Definition (beendete Serie,
+      //    die hier neu beginnt) gibt es kein altes Raster.
+      if (rhythmChanged && series) freezeSeriesPast(db.get(), parentId, cutoffDate);
+
       // 1. Der Anker: Rhythmus und Serienschalter immer - sie haben nur eine
       //    Bedeutung. Beendet `is_recurring = 0` die Serie, raeumt der Trigger
       //    aus v228 die Definition ab; ein Neubeginn legt sie aus dem Anker an
@@ -675,21 +692,14 @@ router.put('/:id/series', (req, res) => {
       // Ändert sich nur ein Wert, werden die vorhandenen Zeilen deshalb
       // aktualisiert statt ersetzt. Der Schnitt bleibt derselbe: was vor
       // heute liegt, ist gebucht und wird nicht mehr angefasst.
-      const rhythmChanged = finalInterval !== parent.recurrence_interval
-        || finalCount !== parent.recurrence_interval_count
-        || finalVirtual !== parent.recurrence_virtual
-        || finalRrule !== parent.recurrence_rule
-        || finalRecurring !== parent.is_recurring
-        || startChanged;
-
       if (rhythmChanged) {
         db.get().prepare(`
           DELETE FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ?
         `).run(parentId, cutoffDate);
         // Das neue Raster gilt ab heute, auch fuer den Monatsaufruf: davor
-        // steht der Bestand auf dem alten, und ein Vorkommen auf dem neuen
-        // daneben waere eine zweite Buchung fuer denselben Zeitraum (Review-
-        // Befund in #1585). Siehe occurrenceWriter().
+        // steht der Bestand auf dem alten (Schritt 0), und ein Vorkommen auf
+        // dem neuen daneben waere eine zweite Buchung fuer denselben Zeitraum
+        // (Review-Befund in #1585). Siehe occurrenceWriter().
         db.get().prepare('UPDATE budget_series SET grid_from = ? WHERE anchor_id = ?')
           .run(cutoffDate, parentId);
         // Ein verlegter Starttag bei schon gebuchter erster Buchung: das
@@ -916,7 +926,26 @@ router.put('/:id', (req, res) => {
       assertDocumentLinkTargetsAvailable(db.get(), req.body.attachment_document_ids, documentViewer(req));
     }
 
+    // DER RHYTHMUS STEHT AM ANKER und gilt fuer die ganze Serie - auch wenn er
+    // hier, ueber "nur dieser Eintrag" an der ersten Buchung, geaendert wird.
+    // Das ist dieselbe Rasteraenderung wie ueber PUT /:id/series und bekommt
+    // dieselbe Behandlung (#1545, Entscheidung in #1585): Vergangenheit im
+    // alten Raster einfrieren, Vorkommen ab heute neu bauen, davor nichts mehr
+    // erzeugen. Bis hierher blieben vergangene und kuenftige Vorkommen im alten
+    // Raster stehen, und der Monatsaufruf legte die des neuen daneben.
+    const finalRrule = recurrence_rule !== undefined ? (recurrence_rule || null) : entry.recurrence_rule;
+    const runningSeries = entry.is_recurring && finalRecurring && entry.recurrence_parent_id == null
+      && db.get().prepare('SELECT 1 FROM budget_series WHERE anchor_id = ?').get(id);
+    const gridChanged = Boolean(runningSeries) && (
+      finalInterval !== entry.recurrence_interval
+      || finalCount !== entry.recurrence_interval_count
+      || finalVirtual !== entry.recurrence_virtual
+      || finalRrule !== entry.recurrence_rule);
+    const cutoffDate = gridChanged ? todayKey(db.get()) : null;
+
     const tx = db.get().transaction(() => {
+      if (gridChanged) freezeSeriesPast(db.get(), id, cutoffDate);
+
       db.get().prepare(`
         UPDATE budget_entries
         SET title                  = COALESCE(?, title),
@@ -941,7 +970,7 @@ router.put('/:id', (req, res) => {
         subcategory !== undefined ? subcategory : null,
         date ?? null,
         finalRecurring,
-        recurrence_rule !== undefined ? (recurrence_rule || null) : entry.recurrence_rule,
+        finalRrule,
         finalInterval,
         finalCount,
         finalVirtual,
@@ -965,6 +994,12 @@ router.put('/:id', (req, res) => {
           linkedPayment.id
         );
         refreshLoanStatus(linkedPayment.loan_id);
+      }
+
+      if (gridChanged) {
+        db.get().prepare('DELETE FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ?')
+          .run(id, cutoffDate);
+        db.get().prepare('UPDATE budget_series SET grid_from = ? WHERE anchor_id = ?').run(cutoffDate, id);
       }
     });
     tx();

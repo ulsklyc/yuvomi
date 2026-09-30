@@ -1399,3 +1399,67 @@ test('#1545: auch ein neuer Rhythmus legt in vergangenen Monaten kein zweites Vo
   await generatedIn('2099-08', pid);
   assert.ok(seriesDates(pid, '2099-08').length >= 4, 'ab heute woechentlich');
 });
+
+// Entscheidung in #1585 ("Vergangenheit einfrieren"): vor einer Rasteraenderung
+// entstehen alle noch fehlenden Vorkommen vom Start bis gestern im ALTEN Raster.
+// Ohne das bliebe ein vergangener Monat, der nie aufgeschlagen wurde, leer -
+// vor grid_from entsteht nichts mehr, und das alte Raster kennt danach niemand.
+
+test('#1585: ein nie geoeffneter vergangener Monat traegt nach einem Rhythmuswechsel die alten Buchungen', async () => {
+  const pid = insertEntry({ title: 'Einfrieren R 1545', amount: -40, date: '2000-01-05', is_recurring: 1 });
+  const r = await call('PUT', `/${pid}/series`, {
+    body: { title: 'Neuer Titel', recurrence_interval: 'weekly', recurrence_interval_count: 1 },
+  });
+  assert.equal(r.status, 200);
+  await generatedIn('2000-05', pid);
+  assert.deepEqual(seriesDates(pid, '2000-05'), ['2000-05-05'], 'Mai 2000 im alten, monatlichen Raster');
+  const may = db.prepare("SELECT title FROM budget_entries WHERE recurrence_parent_id = ? AND date = '2000-05-05'").get(pid);
+  assert.equal(may.title, 'Einfrieren R 1545', 'mit den Werten vor der Aenderung');
+  await generatedIn('2099-08', pid);
+  assert.ok(seriesDates(pid, '2099-08').length >= 4, 'ab heute woechentlich');
+});
+
+test('#1585: ein nie geoeffneter vergangener Monat traegt nach einem verlegten Starttag die alten Buchungen', async () => {
+  const pid = insertEntry({ title: 'Einfrieren S 1545', amount: -40, date: '2000-01-05', is_recurring: 1 });
+  assert.equal((await call('PUT', `/${pid}/series`, { body: { start_date: '2000-01-20' } })).status, 200);
+  await generatedIn('2003-07', pid);
+  assert.deepEqual(seriesDates(pid, '2003-07'), ['2003-07-05']);
+  await generatedIn('2099-08', pid);
+  assert.deepEqual(seriesDates(pid, '2099-08'), ['2099-08-20']);
+});
+
+test('#1585: Einfrieren legt nichts doppelt an und keinen geloeschten Monat wieder an', async () => {
+  const pid = insertEntry({ title: 'Einfrieren D 1545', amount: -40, date: '2000-01-05', is_recurring: 1 });
+  await generatedIn('2000-02', pid);
+  await generatedIn('2000-03', pid);
+  const march = db.prepare("SELECT id FROM budget_entries WHERE recurrence_parent_id = ? AND date = '2000-03-05'").get(pid).id;
+  assert.equal((await call('DELETE', `/${march}`)).status, 204);
+  assert.equal((await call('PUT', `/${pid}/series`, { body: { recurrence_interval_count: 2 } })).status, 200);
+  assert.deepEqual(seriesDates(pid, '2000-02'), ['2000-02-05']);
+  assert.deepEqual(seriesDates(pid, '2000-03'), [], 'die geloeschte Maerz-Buchung bleibt geloescht');
+  const perMonth = db.prepare(`
+    SELECT strftime('%Y-%m', date) AS m, COUNT(*) AS c FROM budget_entries
+    WHERE recurrence_parent_id = ? GROUP BY m HAVING c > 1
+  `).all(pid);
+  assert.deepEqual(perMonth, [], 'kein Monat mit zwei Buchungen');
+});
+
+test('#1585: Rhythmuswechsel ueber PUT /:id an der ersten Buchung - Vergangenheit eingefroren, ab heute neu, keine Doubletten', async () => {
+  const pid = insertEntry({ title: 'Einfrieren A 1545', amount: -40, date: '2000-01-05', is_recurring: 1 });
+  await generatedIn('2000-03', pid);
+  await generatedIn('2099-08', pid);
+  assert.deepEqual(seriesDates(pid, '2099-08'), ['2099-08-05']);
+  const r = await call('PUT', `/${pid}`, { body: { recurrence_interval: 'weekly', recurrence_interval_count: 1 } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(seriesDates(pid, '2099-08'), [], 'das kuenftige Vorkommen im alten Raster ist weg');
+  await generatedIn('2000-03', pid);
+  assert.deepEqual(seriesDates(pid, '2000-03'), ['2000-03-05'], 'kein Wochentermin neben der Maerz-Buchung');
+  await generatedIn('2001-06', pid);
+  assert.deepEqual(seriesDates(pid, '2001-06'), ['2001-06-05'], 'nie geoeffneter Monat im alten Raster');
+  await generatedIn('2099-08', pid);
+  const aug = seriesDates(pid, '2099-08');
+  assert.ok(aug.length >= 4, 'ab heute woechentlich');
+  for (const d of aug) {
+    assert.equal(new Date(`${d}T00:00:00Z`).getUTCDay(), 3, `${d}: nur Mittwoche wie der Starttag, kein Rest des alten Rasters`);
+  }
+});

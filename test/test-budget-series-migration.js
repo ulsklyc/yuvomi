@@ -276,6 +276,8 @@ test('v229: jede laufende Serie bekommt als Starttag das Datum ihrer ersten Buch
     db.prepare('SELECT COUNT(*) AS c FROM budget_series WHERE grid_from IS NOT NULL').get().c,
     0, 'grid_from bleibt leer: das Raster des Bestands galt schon immer, vergangene Monate entstehen wie bisher',
   );
+  const idx = db.prepare("SELECT name FROM pragma_index_list('budget_entries') WHERE name = 'idx_budget_parent_date'").get();
+  assert.ok(idx, 'Index fuer die Frage "gibt es das Vorkommen an diesem Tag schon?"');
   db.close();
 });
 

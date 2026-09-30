@@ -327,7 +327,7 @@ const SERIES_SELECT = `
  * an der aus einer Definition eine Buchung wird: generateRecurringInstances()
  * und materializeSeriesStart() teilen sie.
  * @param {import('better-sqlite3-multiple-ciphers').Database} database
- * @returns {(orig: object, date: string) => void}
+ * @returns {(orig: object, date: string) => boolean} true, wenn eine Buchung entstand
  */
 function occurrenceWriter(database) {
   const skipStmt = database.prepare(
@@ -356,12 +356,12 @@ function occurrenceWriter(database) {
     // Vorkommen auf dem neuen daneben waere eine zweite Buchung fuer denselben
     // Zeitraum. Ein Monat davor, der noch nie aufgeschlagen wurde, bleibt
     // deshalb leer: welches Raster damals galt, weiss die Serie nicht mehr.
-    if (orig.grid_from && date < orig.grid_from) return;
+    if (orig.grid_from && date < orig.grid_from) return false;
     // Übersprungen (eine gelöschte Instanz) oder schon vorhanden? Beides wird am
     // Fälligkeitstag geprüft, nicht am Monat: eine Wochenserie hat mehrere pro
     // Monat, und ein gelöschter Dienstag darf die übrigen nicht mitnehmen.
-    if (skipStmt.get(orig.id, date)) return;
-    if (existsStmt.get(orig.id, date)) return;
+    if (skipStmt.get(orig.id, date)) return false;
+    if (existsStmt.get(orig.id, date)) return false;
 
     // Materialisierte Instanz erbt Eigentümer + Sichtbarkeit der Serie
     // (#476/#505). Ohne das würde jede Instanz owner_id=NULL + visibility='shared'
@@ -398,7 +398,29 @@ function occurrenceWriter(database) {
     // genauso richtig wie an der Zahlung. Als eigene Anweisung statt im
     // INSERT, weil die Zustaendigkeit in einer n:m-Tabelle liegt.
     copyResponsiblesStmt.run(created.lastInsertRowid, orig.id);
+    return true;
   };
+}
+
+/**
+ * Die Faelligkeitstage einer Serie (Zeile aus SERIES_SELECT) in einem Monat.
+ *
+ * Virtuelle Serien tragen in der Definition bereits den Monatsanteil: sie
+ * kommen in JEDEM Monat einmal vor, am Tag des Starts, unabhaengig vom
+ * Rhythmus - auch Wochenserien, deren Anteil sonst ueber den Monat verstreut
+ * laege, ohne dass eine der Buchungen die Zahlung waere.
+ * @param {object} orig
+ * @param {string} month  YYYY-MM
+ * @returns {string[]}
+ */
+function seriesDatesInMonth(orig, month) {
+  if (!orig.recurrence_virtual) {
+    return occurrenceDatesInMonth(orig.start_date, orig.recurrence_interval || 'monthly',
+      orig.recurrence_interval_count, month);
+  }
+  const [y, m] = month.split('-').map(Number);
+  const day = Math.min(parseInt(orig.start_date.split('-')[2], 10), new Date(Date.UTC(y, m, 0)).getUTCDate());
+  return [`${month}-${String(day).padStart(2, '0')}`];
 }
 
 /**
@@ -427,8 +449,6 @@ function occurrenceWriter(database) {
  * @param {string} month  YYYY-MM
  */
 export function generateRecurringInstances(database, month) {
-  const [y, m] = month.split('-').map(Number);
-
   // Alle laufenden Serien, die vor diesem Monat begonnen haben.
   const originals = database.prepare(`
     ${SERIES_SELECT}
@@ -438,20 +458,7 @@ export function generateRecurringInstances(database, month) {
   const writeOccurrence = occurrenceWriter(database);
 
   for (const orig of originals) {
-    const interval = orig.recurrence_interval || 'monthly';
-
-    // Virtuelle Serien tragen im Original bereits den Monatsanteil: sie kommen in
-    // JEDEM Monat einmal vor, unabhängig vom Rhythmus - auch bei Wochenserien,
-    // deren Anteil sonst über den Monat verstreut läge, ohne dass eine der
-    // Buchungen die Zahlung wäre.
-    const dates = orig.recurrence_virtual
-      ? [`${month}-${String(Math.min(
-          parseInt(orig.start_date.split('-')[2], 10),
-          new Date(Date.UTC(y, m, 0)).getUTCDate(),
-        )).padStart(2, '0')}`]
-      : occurrenceDatesInMonth(orig.start_date, interval, orig.recurrence_interval_count, month);
-
-    for (const date of dates) writeOccurrence(orig, date);
+    for (const date of seriesDatesInMonth(orig, month)) writeOccurrence(orig, date);
   }
 }
 
@@ -471,6 +478,59 @@ export function generateRecurringInstances(database, month) {
 export function materializeSeriesStart(database, anchorId) {
   const orig = database.prepare(`${SERIES_SELECT} AND a.id = ?`).get(anchorId);
   if (orig) occurrenceWriter(database)(orig, orig.start_date);
+}
+
+/**
+ * Friert die Vergangenheit einer Serie ein, BEVOR sich ihr Raster aendert
+ * (#1545, Entscheidung in #1585): jedes Vorkommen vom Monat nach dem Start
+ * bis vor `cutoffDate`, das noch nicht angelegt ist, entsteht jetzt - im
+ * ALTEN Raster, mit den Werten der Definition, wie es ein Aufruf des Monats
+ * vor der Aenderung angelegt haette.
+ *
+ * Ohne das waere ein vergangener Monat, der nie aufgeschlagen wurde, nach der
+ * Aenderung leer: vor grid_from entsteht nichts mehr, und das alte Raster
+ * kennt danach niemand. Vorhandene und geloeschte (uebersprungene) Vorkommen
+ * laesst occurrenceWriter() stehen, ein zweiter Aufruf legt also nichts
+ * doppelt an. Laeuft in der Transaktion des Aufrufers, vor jeder Aenderung
+ * an Anker und Definition.
+ *
+ * Menge: der kleinste Schritt ist eine Woche (52 im Jahr). Gemessen, einmalig
+ * je Aenderung: woechentlich seit 2000 rund 1400 Zeilen in 24 ms, seit 1970
+ * rund 3000 in 54 ms; das Aeusserste, was die Datumspruefung zulaesst
+ * (woechentlich seit dem Jahr 1000), rund 54.000 in 0,9 s. Linear nur dank
+ * idx_budget_parent_date (v229) - ohne ihn las jede Existenzfrage alle
+ * Buchungen der Serie. Eine Obergrenze gibt es deshalb nicht: sie risse
+ * genau die Luecken wieder auf, die das Einfrieren schliesst.
+ * @param {import('better-sqlite3-multiple-ciphers').Database} database
+ * @param {number} anchorId
+ * @param {string} cutoffDate  YYYY-MM-DD, heute in der Haushaltszone
+ * @returns {number} neu angelegte Vorkommen
+ */
+export function freezeSeriesPast(database, anchorId, cutoffDate) {
+  const orig = database.prepare(`${SERIES_SELECT} AND a.id = ?`).get(anchorId);
+  if (!orig) return 0;
+  const writeOccurrence = occurrenceWriter(database);
+  const lastMonth = cutoffDate.slice(0, 7);
+  // Wie generateRecurringInstances(): ab dem Monat NACH dem Starttag (dessen
+  // Monat gehoert der ersten Buchung), und vor einer frueheren
+  // Rasteraenderung entsteht ohnehin nichts (grid_from) - dort beginnen.
+  let [y, m] = orig.start_date.slice(0, 7).split('-').map(Number);
+  m += 1;
+  if (orig.grid_from) {
+    const [gy, gm] = orig.grid_from.slice(0, 7).split('-').map(Number);
+    if (gy * 12 + gm > y * 12 + m) { y = gy; m = gm; }
+  }
+  let created = 0;
+  for (;;) {
+    if (m > 12) { y += 1; m = 1; }
+    const month = `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}`;
+    if (month > lastMonth) break;
+    for (const date of seriesDatesInMonth(orig, month)) {
+      if (date < cutoffDate && writeOccurrence(orig, date)) created += 1;
+    }
+    m += 1;
+  }
+  return created;
 }
 
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
