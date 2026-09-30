@@ -307,12 +307,29 @@ test('der Guard sieht ueberhaupt Dateien - sonst waere er gruen und blind', () =
   assert.ok(SOURCES.some((s) => s.rel === path.join('pages', 'calendar.js')));
 });
 
+/** `const x = new Date(`${key}T00:00:00`)` - ein Datums-Key, zur Browser-Mitternacht gemacht. */
+const KEY_DATE_BINDING = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new Date\(\s*`\$\{[^`]*\}T00:00(?::00)?`\s*\)/;
+
 test('formatDate/formatTime bekommen keinen Date-Umweg um einen Datums-Key', () => {
   // `formatDate(new Date(key + 'T00:00:00'))` ist Mitternacht der BROWSER-Zone.
   // In einer Haushaltszone westlich davon zeigt das den Vortag. Der Key gehoert
   // direkt hinein - formatDate() kennt die reine Datumsform.
   const pattern = /format(?:Date|DayMonth|Time)\(\s*new Date\(\s*`\$\{[^`]*\}T00:00:00`/;
   const offenders = SOURCES.filter((s) => pattern.test(s.code)).map((s) => s.rel);
+  // Derselbe Umweg mit einem Namen dazwischen: `const d = new Date(`${key}T00:00:00`)`
+  // und ein paar Zeilen spaeter `formatDate(d)`. Das Muster darueber sah nur
+  // den Ausdruck IM Aufruf, und so stand der Start-Badge der Aufgaben daneben.
+  for (const s of SOURCES) {
+    const lines = s.code.split('\n');
+    lines.forEach((line, i) => {
+      const bound = KEY_DATE_BINDING.exec(line);
+      if (!bound) return;
+      const window = lines.slice(i, i + 12).join('\n');
+      if (new RegExp(`format(?:Date|DayMonth|Time)\\(\\s*${bound[1]}\\s*[,)]`).test(window)) {
+        offenders.push(`${s.rel}:${i + 1} (${bound[1]})`);
+      }
+    });
+  }
   assert.deepEqual(offenders, [], 'Datums-Key direkt an formatDate() uebergeben');
 });
 
@@ -377,11 +394,14 @@ test('kein Frontend-Modul baut sich sein eigenes "jetzt" aus der Browser-Uhr', (
       const bound = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new Date\(\s*\)/.exec(line);
       if (bound) {
         const window = lines.slice(i, i + 12).join('\n');
-        const getter = new RegExp(`\\b${bound[1]}\\.get(?:Hours|Minutes|Date|Day|FullYear|Month)\\(`);
+        // Auch die SETTER: `today.setHours(0, 0, 0, 0)` macht aus "jetzt" die
+        // Mitternacht des Geraets, also "heute" nach der Browser-Uhr - so stand
+        // der Start-Badge der Aufgaben neben dem Guard.
+        const getter = new RegExp(`\\b${bound[1]}\\.[gs]et(?:Hours|Minutes|Date|Day|FullYear|Month)\\(`);
         if (getter.test(window)) offenders.push(`${s.rel}:${i + 1} (${bound[1]})`);
         return;
       }
-      if (/new Date\(\s*\)\s*\.\s*get(?:Hours|Minutes|Date|Day|FullYear|Month)\(/.test(line)) {
+      if (/new Date\(\s*\)\s*\.\s*[gs]et(?:Hours|Minutes|Date|Day|FullYear|Month)\(/.test(line)) {
         offenders.push(`${s.rel}:${i + 1}`);
       }
     });
@@ -425,6 +445,10 @@ test('der Guard erkennt die Schreibweise, an der er vorbeigesehen hat', () => {
   // Ein Wert im Konstruktor ist kein "jetzt".
   assert.equal(bound.test('const d = new Date(iso);'), false);
   assert.equal(bound.test('const d = new Date(y, m, 1);'), false);
+  // Der Umweg eines Datums-Keys ueber einen Namen (Start-Badge der Aufgaben).
+  assert.equal(KEY_DATE_BINDING.exec('  const startDay = new Date(`${startDateStr}T00:00:00`);')?.[1], 'startDay');
+  assert.equal(KEY_DATE_BINDING.test('const d = new Date(`${day}T${time}`);'), false,
+    'eine Wanduhrzeit mit Uhrzeit ist kein Datums-Key');
 });
 
 test('utils/timezone.js ist die einzige Stelle mit einem zonenbehafteten Formatter', () => {

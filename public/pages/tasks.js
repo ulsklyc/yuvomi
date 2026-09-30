@@ -319,14 +319,20 @@ function renderDueDate(dateStr, timeStr, isDone = false) {
   </span>`;
 }
 
+/* Der Start-Badge vergleicht KEYS, und "heute" ist der Tag des Haushalts.
+ *
+ * Hier stand `new Date(); setHours(0, 0, 0, 0)` gegen `new Date(key + 'T00:00:00')`:
+ * beides Mitternacht der GERAETE-Zone. Mit Haushalt in Berlin und Telefon in
+ * New York stand kurz nach Berliner Mitternacht an einer ab heute laufenden
+ * Aufgabe noch "Beginnt am ...". Und `formatDate` bekam das Date statt des Keys
+ * und rechnete es in die Anzeigezone um - mit Geraet in Berlin und Haushalt auf
+ * Honolulu zeigte der Badge den Vortag. */
 function renderStartDateBadge(startDateStr) {
   if (!startDateStr) return '';
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const startDay = new Date(`${startDateStr}T00:00:00`);
-  if (startDay <= today) return '';
+  const startKey = String(startDateStr).slice(0, 10);
+  if (startKey <= todayKey()) return '';
   return `<span class="due-date">
-    <i data-lucide="calendar-clock" class="icon-sm" aria-hidden="true"></i> <span class="due-date__label">${t('tasks.startsOn', { date: formatDate(startDay) })}</span>
+    <i data-lucide="calendar-clock" class="icon-sm" aria-hidden="true"></i> <span class="due-date__label">${t('tasks.startsOn', { date: formatDate(startKey) })}</span>
   </span>`;
 }
 

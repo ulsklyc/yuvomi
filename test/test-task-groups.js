@@ -285,6 +285,40 @@ test('die Liste ruft die Sortierung mit der Uhr des Haushalts auf', () => {
   });
 });
 
+// ── Der Start-Badge fragt den Tag des Haushalts ─────────────────────────────
+/* `renderStartDateBadge` verglich `new Date(); setHours(0, 0, 0, 0)` mit
+ * `new Date(key + 'T00:00:00')` - zweimal Mitternacht der GERAETE-Zone - und
+ * reichte `formatDate` das Date statt des Keys. Geprueft ueber den Aufrufer
+ * `renderTaskCard` (der Badge steht nur ohne Faelligkeit), mit festgenagelter
+ * Prozess-Zone, Anzeigezone und Uhr. */
+
+const START_TASK = { id: 811, title: 'Startet', category: 'household', priority: 'low', status: 'open', due_date: null, start_date: null };
+
+test('der Start-Badge verschwindet, sobald im Haushalt der Starttag da ist', (t) => {
+  // 22:30Z: in Berlin (Haushalt) schon der 2. um 00:30, in New York (Geraet)
+  // noch der 1. um 18:30.
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-01T22:30:00Z') });
+  withZones('America/New_York', 'Europe/Berlin', () => {
+    const heute = tasks.renderTaskCard({ ...START_TASK, start_date: '2026-10-02' });
+    assert.ok(!heute.includes('tasks.startsOn'),
+      'im Haushalt ist der 2. schon heute - kein "Beginnt am"');
+    const morgen = tasks.renderTaskCard({ ...START_TASK, start_date: '2026-10-03' });
+    assert.ok(morgen.includes('tasks.startsOn'), 'der Folgetag des Haushalts bekommt den Badge');
+  });
+});
+
+test('der Start-Badge reicht formatDate den Datums-Key, nicht ein Date', (t) => {
+  // Ein Date auf Berliner Mitternacht ist auf Honolulu noch der Vortag, und
+  // `formatDate` rechnet ein Date in die Anzeigezone um. Der i18n-Stub gibt
+  // zurueck, was er bekommt - der Key muss also unveraendert ankommen.
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-01T12:00:00Z') });
+  withZones('Europe/Berlin', 'Pacific/Honolulu', () => {
+    const html = tasks.renderTaskCard({ ...START_TASK, start_date: '2026-10-20' });
+    assert.ok(html.includes('tasks.startsOn{"date":"2026-10-20"}'),
+      `formatDate bekommt den Key, erhalten: ${/tasks\.startsOn[^<]*/.exec(html)?.[0]}`);
+  });
+});
+
 // --------------------------------------------------------
 // Filterachse Kategorie (D#1017): der Server kannte `?category=` seit #825,
 // das Panel bot die Achse nie an. Der Filterzustand muss sie tragen, der

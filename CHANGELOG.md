@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that day. The order now compares the due date and time as entered, and "now" is the household's
   time, like the due label and the grouping next to it.
 
+- **A task's "Starts on" badge follows the household's day.** The badge on a task without a due
+  date compared its start date with midnight on the device. On a device in another time zone it
+  stayed on a task that had already started in the household, or left too early. The date in the
+  badge could also show the day before, for example with the device in Berlin and the household
+  set to Honolulu.
+
 ## [2.71.0] - 2026-09-30
 
 ### Added
