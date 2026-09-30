@@ -55,9 +55,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   made each browser resolve that name even with Open-Meteo as the weather source. Nothing in the
   browser talks to OpenWeatherMap directly: its icons come through Yuvomi's own server.
 
-- **The web installer's weather step names the current place for the household location.** It
-  said Settings → Integrations; since the settings were reorganised in 2.70.0 the location is
-  saved under Settings → Household → Integrations, in all 24 installer languages.
+- **The web installer's hints name the current places in the app's settings.** Since the settings
+  were reorganised in 2.70.0, four hints pointed to pages that no longer exist. The household
+  location is saved under Settings → Household → Integrations (was Settings → Integrations), SMTP is
+  managed under Settings → Household → Email (SMTP), the timezone is changed under Settings →
+  Account → Appearance, and further CalDAV accounts are added under Settings → Modules → Calendar,
+  in all 24 installer languages.
 
 - **A command-line restore refuses to run while Yuvomi is running** (#1530). `scripts/restore-backup.js`
   replaced the database without knowing whether a server was working on it: the file changed under
