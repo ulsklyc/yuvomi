@@ -75,7 +75,11 @@ function codeBlocks(md) {
  * NACH dem Block, der schon durchgelaufen war.
  */
 function startsAfterHumanStep(md) {
-  return codeBlocks(md).filter((b) => /docker compose up -d/.test(b) && /cp .env.example .env/.test(b));
+  // Beide Engines und beide Podman-Schreibweisen: docs/installation.md traegt
+  // einen eigenen Podman-Block (`podman compose -f ... up -d`), und genau der
+  // war bis 2026-09-30 so verschmolzen wie der Docker-Block darueber.
+  const start = /\b(?:docker|podman)[ -]compose\b[^\n]*\bup -d\b/;
+  return codeBlocks(md).filter((b) => start.test(b) && /cp .env.example .env/.test(b));
 }
 
 for (const lang of Object.keys(READMES)) {
@@ -113,6 +117,32 @@ test('der Install-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   assert.equal(startsAfterHumanStep(damaged).length, 1,
     'Der Guard muss genau die Fassung rot machen, die bis 2026-08-16 in der README stand.');
   assert.equal(startsAfterHumanStep(read('README.md')).length, 0);
+
+  // Die Podman-Fassung aus docs/installation.md bis 2026-09-30.
+  const podman = [
+    '```bash',
+    'cp .env.example .env  # set SESSION_SECRET and DB_ENCRYPTION_KEY',
+    'podman compose -f podman-compose.yml up -d   # or: podman-compose -f podman-compose.yml up -d',
+    '```',
+  ].join('\n');
+  assert.equal(startsAfterHumanStep(podman).length, 1, 'Der Podman-Start im selben Block faellt nicht auf.');
+});
+
+// Dieselbe Falle in der ausfuehrlichen Anleitung. Die README war seit
+// 2026-08-16 getrennt; docs/installation.md "Option C" legte die .env weiter im
+// selben Block an, der auch startete - ohne `openssl rand` und fuer Docker UND
+// Podman (Critique 2026-09-30).
+test('docs/installation.md: kein Copy-Block legt die .env an und startet', () => {
+  const md = read('docs/installation.md');
+  assert.deepEqual(startsAfterHumanStep(md), [],
+    'docs/installation.md: ein Copy-Block legt die .env an UND startet den Container. '
+    + 'Secrets erzeugen, .env von Hand fuellen, dann erst in einem eigenen Block starten.');
+  // Ohne diese Vorbedingung waere der Test gruen, weil es gar keinen
+  // Kurzweg mehr gibt, den er pruefen koennte.
+  const quick = md.split(/^### /m).find((s) => /^Option C .*Manual/.test(s));
+  assert.ok(quick, 'Abschnitt "Option C - Manual" nicht gefunden - Muster veraltet?');
+  assert.match(quick, /openssl rand -hex 32/, 'Der Kurzweg sagt nicht, wie man die Secrets erzeugt.');
+  assert.match(quick, /REPLACE_WITH_/, 'Der Kurzweg nennt den Platzhalter nicht, den man ersetzen muss.');
 });
 
 // ── (2) Behauptete Zahlen == gezaehlte Zahlen ───────────────────────────────
@@ -351,3 +381,170 @@ for (const lang of Object.keys(READMES)) {
       'CLAUDE.md: immer "-", nie "—" oder "–".\n  ' + hits.join('\n  '));
   });
 }
+
+// ── (6) Saetze, die der Code halten muss (Critique 2026-09-30) ──────────────
+
+/**
+ * Die Critique vom 2026-09-30 fand in der README Saetze, die mehr versprachen
+ * als der Code: "The week's meal plan writes the shopping list" (es ist ein
+ * Import-Dialog, den jemand bestaetigt), "Turn on what your household needs"
+ * (die Module sind an; drei starten aus, vier lassen sich gar nicht schalten),
+ * "configures HTTPS" (der Installer setzt Proxy- und Cookie-Werte, ein
+ * Zertifikat holt er nicht), eine LAN-Zeile, die drei von sechs Schaltern
+ * nannte, und ein Web-Installer ohne den Hinweis, dass er nur auf 127.0.0.1
+ * lauscht.
+ *
+ * Jede Zeile hier: was BEIDE READMEs sagen, und woran es im Code haengt. Faellt
+ * eins von beidem, wird der Test rot - der Satz ist umformuliert (dann die
+ * Zeile hier nachziehen) oder der Code haelt ihn nicht mehr.
+ */
+const README_FACTS = [
+  { says: { en: /One import turns the week's meal plan into a shopping list/, de: /Ein Import macht aus dem Wochenplan eine Einkaufsliste/ },
+    holds: (s) => /\/import-meal-plan`/.test(s.shoppingPage) && /addLocalDays\(today, 6\)/.test(s.shoppingPage) && /mi\.category/.test(s.shoppingRoutes),
+    what: 'Import-Dialog mit vorausgewaehlten sieben Tagen, Kategorie der Zutat (public/pages/shopping.js, server/routes/shopping.js import-meal-plan)' },
+  { says: { en: /one button books what you ticked off back into the pantry, with amount and unit/, de: /bucht ein Knopf, was ihr abgehakt habt, mit Menge und Einheit zur[uü]ck in den Vorrat/ },
+    holds: (s) => /async function openPantryTransfer/.test(s.shoppingPage) && /pantry-transfer__qty/.test(s.shoppingPage) && /pantry-transfer__unit/.test(s.shoppingPage),
+    what: 'Uebernahme-Dialog Einkauf -> Vorrat mit Menge und Einheit (public/pages/shopping.js openPantryTransfer)' },
+  { says: { en: /Inventory,\s+Waste collection and Schedule start switched off/, de: /Inventar,\s+Entsorgung und Schichtplan sind anfangs aus/ },
+    holds: (s) => ['inventory', 'waste', 'schedule'].every((m) => new RegExp(`disabled\\.push\\('${m}'\\)`).test(s.db) && s.toggleable.includes(m)),
+    what: 'Migrationen in server/db.js schalten die drei ab, TOGGLEABLE_MODULES (server/routes/preferences.js) kennt sie' },
+  { says: { en: /amd64 and arm64 \(Raspberry Pi 4\/5\)/, de: /amd64 und arm64 \(Raspberry Pi 4\/5\)/ },
+    holds: (s) => /platforms:\s*linux\/amd64,\s*linux\/arm64/.test(s.dockerPublish),
+    what: 'Multi-Arch-Build (.github/workflows/docker-publish.yml platforms)' },
+  { says: { en: /With a placeholder left in, Yuvomi refuses to start/, de: /Bleibt ein Platzhalter stehen, startet Yuvomi nicht/ },
+    holds: (s) => /SESSION_SECRET\.startsWith\('REPLACE_WITH_'\)\) \{\s*throw/.test(s.auth) && /if \(!existsSync\(DB_PATH\)\) \{\s*throw/.test(s.db),
+    what: 'Startabbruch bei Platzhaltern (server/auth.js SESSION_SECRET, server/db.js assertKeyIsNotPlaceholder)' },
+  { says: { en: /ssh -L 8090:localhost:8090/, de: /ssh -L 8090:localhost:8090/ },
+    holds: (s) => /server\.listen\(PORT, '127\.0\.0\.1'/.test(s.installer),
+    what: 'Web-Installer lauscht nur auf 127.0.0.1 (tools/installer/install-server.js) - faellt das, ist der Tunnel-Hinweis ueberfluessig' },
+  { says: { en: /optional WebDAV upload/, de: /optionalem WebDAV-Upload/ },
+    holds: (s) => s.backupWebdav && /WEBDAV_BACKUP_URL/.test(s.envExample),
+    what: 'WebDAV-Backupziel (server/services/backup-webdav.js, .env.example WEBDAV_BACKUP_*)' },
+  { says: { en: /a backup from another installation restores right in the browser/, de: /Backup einer anderen Installation spielt ihr direkt im Browser zur[uü]ck/ },
+    holds: (s) => /backupKeyFromHeader\(req\)/.test(s.backupRoute) && /restoreFromFile\(uploadPath, \{ backupKey \}\)/.test(s.backupRoute),
+    what: 'Wiederherstellen mit dem Schluessel der anderen Installation (server/routes/backup.js, seit 2.69.0)' },
+  { says: { en: /medications, warranties, best-before dates, expiring documents/, de: /Medikamente, Garantien, Mindesthaltbarkeit, ablaufende Dokumente/ },
+    holds: (s) => s.medicationScheduler && /document_expiry:/.test(s.reminderOrigins),
+    what: 'Medikamenten-Erinnerungen (server/services/medication-scheduler.js) und Dokumentablauf (reminder-origins.js)' },
+];
+
+/** Saetze, die nicht zurueckkommen duerfen - in beiden READMEs. */
+const README_NEVER = [
+  /writes the shopping list/i, /schreibt die Einkaufsliste/,
+  /the reward catalog spends them/i, /Belohnungskatalog gibt sie aus/,
+  /Turn on what your household needs/i, /Schalte an, was dein Haushalt braucht/,
+  /optional cloud upload/i, /Cloud-Upload/,
+];
+
+/**
+ * Der Installer holt kein Zertifikat. Dieselbe Uebertreibung stand in der
+ * README ("configures HTTPS") und auf der Homepage (`quick_note`: "handles
+ * HTTPS", "kuemmert sich um HTTPS") - deshalb gegen alle drei Flaechen und die
+ * Installationsseite, Markup und Woerterbuch in einem Zug.
+ */
+const INSTALLER_HTTPS_NEVER = [/configures HTTPS/i, /handles HTTPS/i, /richtet HTTPS,/, /k[uü]mmert sich um HTTPS/];
+
+/**
+ * Jeder Schalter `*_ALLOW_PRIVATE_NETWORK` aus .env.example und der Begriff,
+ * unter dem ihn die LAN-Zeile nennt. Ein neuer Schalter, der hier fehlt, macht
+ * den Test rot - die LAN-Zeile nannte bis 2026-09-30 drei von sechs.
+ */
+const LAN_BLOCKED = {
+  ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK: { en: /calendar subscriptions/, de: /Kalender-Abos/ },
+  NOTIFICATION_ALLOW_PRIVATE_NETWORK: { en: /notification channels/, de: /Benachrichtigungskan[aä]le/ },
+  DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK: { en: /WebDAV document storage/, de: /WebDAV-Dokumentenspeicher/ },
+  RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK: { en: /recipe mirrors/, de: /Rezept-Spiegel/ },
+  WASTE_SOURCE_ALLOW_PRIVATE_NETWORK: { en: /waste-collection feeds/, de: /Abfuhr-Feeds/ },
+};
+/** Die Gegenrichtung: Schalter, die ab Werk OFFEN stehen (Default true). */
+const LAN_OPEN = {
+  DMS_ALLOW_PRIVATE_NETWORK: { en: /Paperless and Papra are the exception/, de: /Paperless und Papra sind die Ausnahme/ },
+};
+
+function factSources() {
+  const src = (p) => read(p);
+  const prefs = src('server/routes/preferences.js');
+  const toggleable = (prefs.match(/TOGGLEABLE_MODULES = \[([\s\S]*?)\]/) || [, ''])[1];
+  return {
+    readmes: { en: readme('en'), de: readme('de') },
+    shoppingPage: src('public/pages/shopping.js'),
+    shoppingRoutes: src('server/routes/shopping.js'),
+    db: src('server/db.js'),
+    toggleable: [...toggleable.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]),
+    dockerPublish: src('.github/workflows/docker-publish.yml'),
+    auth: src('server/auth.js'),
+    installer: src('tools/installer/install-server.js'),
+    envExample: src('.env.example'),
+    backupWebdav: existsSync(resolve(ROOT, 'server/services/backup-webdav.js')),
+    backupRoute: src('server/routes/backup.js'),
+    medicationScheduler: existsSync(resolve(ROOT, 'server/services/medication-scheduler.js')),
+    reminderOrigins: src('server/services/reminder-origins.js'),
+    pages: { 'docs/index.html': src('docs/index.html'), 'docs/install.html': src('docs/install.html') },
+  };
+}
+
+/** Alles, was an (6) nicht stimmt, als lesbare Zeilen. */
+function factFindings(s) {
+  const found = [];
+  for (const lang of Object.keys(READMES)) {
+    const file = READMES[lang];
+    // Umbrueche und Blockquote-Marken weg: die Saetze stehen umbrochen, teils als `>`-Zitat.
+    const md = s.readmes[lang].replace(/\n>?\s*/g, ' ');
+    for (const f of README_FACTS) {
+      if (!f.says[lang].test(md)) found.push(`${file} sagt nicht mehr ${f.says[lang]} - README_FACTS nachziehen`);
+      else if (!f.holds(s)) found.push(`${file}: haengt an ${f.what}, und das haelt nicht mehr`);
+    }
+    for (const re of README_NEVER) if (re.test(md)) found.push(`${file} sagt wieder ${re}`);
+    for (const re of INSTALLER_HTTPS_NEVER) if (re.test(md)) found.push(`${file} sagt wieder ${re} (der Installer holt kein Zertifikat)`);
+
+    const lan = s.readmes[lang].match(/^- \*\*(?:Your|Dein|Euer) LAN\*\* - (.+)$/m);
+    if (!lan) { found.push(`${file}: LAN-Zeile nicht gefunden - Muster veraltet?`); continue; }
+    const flags = [...s.envExample.matchAll(/^#?\s*([A-Z_]+_ALLOW_PRIVATE_NETWORK)=(true|false)\b/gm)];
+    if (flags.length < 5) found.push(`.env.example: nur ${flags.length} *_ALLOW_PRIVATE_NETWORK-Schalter gefunden - Muster veraltet?`);
+    for (const [, flag, dflt] of flags) {
+      const map = dflt === 'false' ? LAN_BLOCKED : LAN_OPEN;
+      if (!map[flag]) found.push(`${flag}=${dflt} steht in .env.example, aber nicht in ${dflt === 'false' ? 'LAN_BLOCKED' : 'LAN_OPEN'} - die LAN-Zeile nennt ihn nicht`);
+      else if (!map[flag][lang].test(lan[1])) found.push(`${file}: die LAN-Zeile nennt ${flag} nicht (${map[flag][lang]})`);
+    }
+  }
+  for (const [page, html] of Object.entries(s.pages)) {
+    for (const re of INSTALLER_HTTPS_NEVER) if (re.test(html)) found.push(`${page} sagt wieder ${re} (der Installer holt kein Zertifikat)`);
+  }
+  return found;
+}
+
+test('README.md + README.de.md: die Saetze aus der Critique vom 2026-09-30 sagen nur, was der Code haelt', () => {
+  assert.deepEqual(factFindings(factSources()), []);
+});
+
+test('der Guard aus (6) erkennt den Schaden, gegen den er gebaut ist', () => {
+  const real = factSources();
+  const hit = (list, re) => list.some((l) => re.test(l));
+  const withReadme = (lang, from, to) => {
+    assert.ok(real.readmes[lang].includes(from), `Vorbedingung: "${from}" steht in ${READMES[lang]}`);
+    return { ...real, readmes: { ...real.readmes, [lang]: real.readmes[lang].replace(from, to) } };
+  };
+
+  // Die alten Saetze kommen zurueck.
+  const f1 = factFindings(withReadme('en', "One import turns the week's meal plan into a shopping list", "The week's meal plan writes the shopping list"));
+  assert.ok(hit(f1, /README\.md sagt nicht mehr/) && hit(f1, /README\.md sagt wieder \/writes the shopping list/), f1.join(' | '));
+  const f2 = factFindings(withReadme('de', 'richtet Single', 'richtet HTTPS, Single'));
+  assert.ok(hit(f2, /README\.de\.md sagt wieder \/richtet HTTPS,/), f2.join(' | '));
+  const oldPage = real.pages['docs/index.html'].replace('sets up SSO and backups and prepares Yuvomi for your HTTPS reverse proxy', 'handles HTTPS, SSO and backups for you');
+  assert.notEqual(oldPage, real.pages['docs/index.html'], 'Vorbedingung: quick_note steht so auf der Homepage');
+  assert.ok(hit(factFindings({ ...real, pages: { ...real.pages, 'docs/index.html': oldPage } }), /docs\/index\.html sagt wieder \/handles HTTPS/));
+
+  // Die LAN-Zeile verliert einen Schalter, und .env.example bekommt einen neuen.
+  const f3 = factFindings(withReadme('en', 'notification channels (webhook, Gotify, ntfy), ', ''));
+  assert.ok(hit(f3, /README\.md: die LAN-Zeile nennt NOTIFICATION_ALLOW_PRIVATE_NETWORK nicht/), f3.join(' | '));
+  const f4 = factFindings({ ...real, envExample: real.envExample + '\n# IMMICH_ALLOW_PRIVATE_NETWORK=false\n' });
+  assert.ok(hit(f4, /IMMICH_ALLOW_PRIVATE_NETWORK=false steht in \.env\.example, aber nicht in LAN_BLOCKED/), f4.join(' | '));
+
+  // Der Code verliert, woran die Zusage haengt.
+  const f5 = factFindings({ ...real, installer: real.installer.replace("server.listen(PORT, '127.0.0.1'", "server.listen(PORT, '0.0.0.0'") });
+  assert.ok(hit(f5, /haengt an Web-Installer lauscht nur auf 127\.0\.0\.1/), f5.join(' | '));
+  const f6 = factFindings({ ...real, db: real.db.replace("disabled.push('waste')", "void 0") });
+  assert.ok(hit(f6, /haengt an Migrationen in server\/db\.js/), f6.join(' | '));
+  const f7 = factFindings({ ...real, dockerPublish: real.dockerPublish.replace('linux/amd64,linux/arm64', 'linux/amd64') });
+  assert.ok(hit(f7, /haengt an Multi-Arch-Build/), f7.join(' | '));
+});

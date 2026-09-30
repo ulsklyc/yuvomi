@@ -21,6 +21,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only the evening dose is still open today. Only a database filled by `scripts/seed-demo.js` is
   affected.
 
+- **The README says only what Yuvomi does, and the manual install no longer starts on the
+  placeholder keys.** The meal plan becomes a shopping list through an import you confirm, not on
+  its own, and booking a shop back into the pantry is its own dialog with amount and unit. Modules
+  are switched off, not on, and Inventory, Waste collection and Schedule start off. The line about
+  the local network names all five integrations that stay blocked on private addresses until you
+  opt in, and that Paperless and Papra may reach them out of the box. The guided setup prepares
+  Yuvomi for an HTTPS reverse proxy but fetches no certificate, which the README and the website now
+  say instead of "configures HTTPS", and it answers only on the server itself, so the README shows
+  the SSH tunnel for other devices. The README also names arm64 (Raspberry Pi 4/5), that Yuvomi
+  refuses to start with a placeholder key, WebDAV as backup target, restoring another
+  installation's backup and the Proxmox guide. In `docs/installation.md`, the short Docker and
+  Podman commands created `.env` and started the container in one copy block; the secrets are now
+  generated first, the placeholders replaced by hand, and the start follows in a block of its own.
+
+### Fixed
+
+- **Pairing a display in German says "Tablet", not "Tablett".** "Tablett" is a serving tray; the
+  four strings of the display pairing now use the word the website and the README use.
+
+- **The app no longer looks up openweathermap.org on every load.** A leftover `dns-prefetch` hint
+  made each browser resolve that name even with Open-Meteo as the weather source. Nothing in the
+  browser talks to OpenWeatherMap directly: its icons come through Yuvomi's own server.
+
 ## [2.70.0] - 2026-09-30
 
 ### Added

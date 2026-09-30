@@ -59,14 +59,15 @@ eigenständig - nutze, was passt, und schalte ab, was nicht passt.
 
 Das ist der Teil, den ein Ordner voller Einzel-Apps nicht kann:
 
-- **Der Wochenplan schreibt die Einkaufsliste.** Donnerstag geplant, und die Zutaten stehen auf der Liste, bevor jemand losgeht.
-- **Das letzte Glas aus dem Vorrat kommt mit einem Tipp auf die Liste.** Was nach dem Einkauf abgehakt ist, bucht sich mit Menge und Einheit zurück in den Vorrat.
-- **Eine erledigte Aufgabe zahlt aus.** Punkte auf einer Aufgabe bekommt, wer sie erledigt hat - die zugewiesene Person oder die beim Abhaken ausgewählte -, und der Belohnungskatalog gibt sie aus.
+- **Ein Import macht aus dem Wochenplan eine Einkaufsliste.** Die nächsten sieben Tage sind vorausgewählt, und jede Zutat landet nach Gang sortiert auf der gemeinsamen Liste.
+- **Das letzte Glas aus dem Vorrat kommt mit einem Tipp auf die Liste.** Nach dem Einkauf bucht ein Knopf, was ihr abgehakt habt, mit Menge und Einheit zurück in den Vorrat.
+- **Eine erledigte Aufgabe zahlt aus.** Punkte auf einer Aufgabe bekommt, wer sie erledigt hat - die zugewiesene Person oder die beim Abhaken ausgewählte -, und eingelöst werden sie in einem Belohnungskatalog, den ihr selbst bestimmt.
 - **Ein abgelegter Beleg hängt an der Buchung.** Einmal hochgeladen, gehört er gleichzeitig zur Buchung, zur geteilten Ausgabe und zum Inventargegenstand.
 
 ## Die zwanzig Module
 
-Schalte an, was dein Haushalt braucht; der Rest bleibt aus dem Weg.
+Schaltet ab, was euer Haushalt nicht braucht, und es verschwindet für alle aus dem Menü. Inventar,
+Entsorgung und Schichtplan sind anfangs aus.
 
 | Modul | In einer Zeile |
 |---|---|
@@ -87,9 +88,9 @@ Schalte an, was dein Haushalt braucht; der Rest bleibt aus dem Weg.
 | **Notizen &amp; Kontakte** | Markdown-Haftnotizen mit antippbaren Checklisten, dazu Kontakte mit CardDAV-Sync und vCard-Import/-Export. |
 | **Geburtstage** | Geburtstage und optionale Namenstage, mit Kalendereinträgen, Alter und Erinnerungen. |
 | **Familie** | Mitgliedsprofile mit Rollen und Einladungslinks, über die neue Mitglieder ihr Passwort selbst wählen. |
-| **Erinnerungen** | An Aufgaben, Termine, Garantien, Mindesthaltbarkeit und Abfuhr - in der App, per Push, Gotify, ntfy, Webhook oder E-Mail. |
+| **Erinnerungen** | An Aufgaben, Termine, Medikamente, Garantien, Mindesthaltbarkeit, ablaufende Dokumente und Abfuhr - in der App, per Push, Gotify, ntfy, Webhook oder E-Mail. |
 | **API-Token** | Bearer-Token mit OpenAPI-3.1-Spezifikation und eingebautem MCP-Endpunkt für KI-Agenten. |
-| **Backup** | Manuelle und geplante Sicherungen mit Rollback vor dem Wiederherstellen und optionalem Cloud-Upload. |
+| **Backup** | Manuelle und geplante Sicherungen mit optionalem WebDAV-Upload und Rollback vor dem Wiederherstellen; auch das Backup einer anderen Installation spielt ihr direkt im Browser zurück. |
 
 Zwei Dinge gibt es nur auf dem eigenen Server: der **Wandmodus** macht aus dem Küchen-Tablet eine
 Anzeige, die man quer durch den Raum liest, und ein **Immich-Bildschirmschoner** lässt die eigenen
@@ -121,12 +122,12 @@ Such dir deinen Weg aus: [Docker oder Podman](#docker-oder-podman) für volle Ko
 [geführte Einrichtung](#geführte-einrichtung) im Browser oder den
 [App-Store deines NAS](#aus-dem-app-store-deines-nas) ganz ohne Terminal.
 
-- **Image** - `ghcr.io/ulsklyc/`<wbr>`yuvomi:latest`, rund 500 MB.
+- **Image** - `ghcr.io/ulsklyc/`<wbr>`yuvomi:latest`, rund 500 MB, für amd64 und arm64 (Raspberry Pi 4/5).
 - **Braucht** - 256 MB RAM und einen Port, standardmäßig 3000.
 - **Browser** - alles wie vorgesehen ab Chrome und Edge 117, Firefox 129 und Safari 17.5. Bis hinunter zu Chrome 87, Firefox 79 und Safari 14.1 (iOS 14.5) startet und scrollt es noch, schlichter und mit einzelnen fehlenden Funktionen ([gemessen am 21. September 2026](docs/installation.md#browser-support)).
 - **Schreibt** - vier Volumes, die dir gehören: Daten, Backups, Module, Dokumente.
 - **Nach außen** - ab Werk eine Update-Abfrage an die GitHub-Releases-API. Blockier sie, und nichts geht kaputt, nur der Hinweis auf eine neuere Version bleibt aus. Alles andere geht erst nach außen, wenn du eine Funktion nutzt oder einschaltest, die es braucht: das Öffnen der Kalender-Einstellungen lädt die Liste der Feiertagsländer von openholidaysapi.org, die Logo-Suche für ein Abo ruft die Website des Dienstes auf, und Wetter, Feiertage, Wechselkurse, Kalender- und Kontakte-Sync, Rezept-Spiegel, Immich, Paperless oder Papra, Push- und Benachrichtigungskanäle, Cloud-Speicher und Backup verbinden sich erst, wenn du sie einschaltest.
-- **Dein LAN** - Kalender-Abos, WebDAV-Speicher und Rezept-Spiegel unter privaten oder internen Adressen bleiben blockiert, bis du sie freigibst ([wie](docs/installation.md#environment-variables)).
+- **Dein LAN** - Kalender-Abos, Benachrichtigungskanäle (Webhook, Gotify, ntfy), WebDAV-Dokumentenspeicher, Rezept-Spiegel und Abfuhr-Feeds unter privaten oder internen Adressen bleiben blockiert, bis ihr sie freigebt ([wie](docs/installation.md#environment-variables)). Paperless und Papra sind die Ausnahme: sie dürfen ab Werk ins LAN.
 - **Schlüssel** - optional, aber ohne Weg zurück: ein verlorener oder geänderter Schlüssel öffnet die Datenbank nie wieder, weder für dich noch für uns. Die geführte Einrichtung und Umbrel erzeugen ihn für dich; mit Compose, TrueNAS oder Unraid setzt du ihn selbst, also schreib ihn auf.
 - **Deine Daten** - eine SQLite-Datei unter `/data/yuvomi.db`, dazu Ordner, WebDAV oder Drive, falls die Dokumente dort liegen.
 
@@ -146,8 +147,8 @@ openssl rand -hex 32   # DB_ENCRYPTION_KEY
 
 > **Öffne jetzt `.env` und ersetze beide `REPLACE_WITH_…`-Platzhalter** durch die zwei eben
 > erzeugten Werte, in dieser Reihenfolge, und schreib den zweiten auf: er ist der
-> Datenbankschlüssel, und nichts kann ihn wiederherstellen. Ohne Verschlüsselung: die Zeile leeren
-> statt sie zu füllen.
+> Datenbankschlüssel, und nichts kann ihn wiederherstellen. Bleibt ein Platzhalter stehen, startet
+> Yuvomi nicht. Ohne Verschlüsselung: die Zeile `DB_ENCRYPTION_KEY` leeren statt sie zu füllen.
 
 ```bash
 docker compose up -d
@@ -158,17 +159,24 @@ die Seite nicht, nennt `docker compose logs` (unter Podman `podman compose -f po
 meist den Grund, und die
 [Fehlersuche](docs/installation.md#troubleshooting) deckt die häufigen Fälle ab.
 
+Auf **Proxmox** laufen dieselben Schritte in einem kleinen Debian-LXC: siehe die
+[Proxmox-Anleitung auf yuvomi.cloud](https://yuvomi.cloud/install.html#proxmox).
+
 ### Geführte Einrichtung
 
-Ein Einrichtungsassistent im Browser, in 24 Sprachen. Er erkennt Docker oder Podman, richtet HTTPS,
-Single Sign-on und geplante Backups ein, startet dann den Container und legt dein Admin-Konto an.
+Ein Einrichtungsassistent im Browser, in 24 Sprachen. Er erkennt Docker oder Podman, richtet Single
+Sign-on und geplante Backups ein, bereitet Yuvomi auf einen HTTPS-Reverse-Proxy vor (das Zertifikat
+bleibt Sache des Proxys), startet dann den Container und legt euer Admin-Konto an.
 
 ```bash
 git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
 node tools/installer/install-server.js
 ```
 
-Öffne **http://localhost:8090**. Braucht Node.js 22+ auf dem Host; der Container bringt sein eigenes Node 24 mit.
+Öffnet **http://localhost:8090** auf dem Server selbst; woanders antwortet der Assistent nicht. Von
+einem anderen Gerät aus öffnet ihr zuerst einen Tunnel, `ssh -L 8090:localhost:8090 user@server`,
+und dann dort dieselbe Adresse. Braucht Node.js 22+ auf dem Host; der Container bringt sein eigenes
+Node 24 mit.
 
 ### Aus dem App-Store deines NAS
 

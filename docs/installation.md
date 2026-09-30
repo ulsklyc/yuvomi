@@ -45,17 +45,34 @@ bash install.sh --env-file /path/to/.env
 ```bash
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example
-cp .env.example .env  # set SESSION_SECRET and DB_ENCRYPTION_KEY
+cp .env.example .env
+openssl rand -hex 32   # SESSION_SECRET
+openssl rand -hex 32   # DB_ENCRYPTION_KEY
+```
+
+> **Now open `.env` and replace both `REPLACE_WITH_…` placeholders** with the two values you just
+> generated, in that order, and write the second one down: it is the database key, and nothing can
+> recover it. With a placeholder left in, Yuvomi refuses to start. To run without encryption, clear
+> the `DB_ENCRYPTION_KEY` line instead of filling it.
+
+```bash
 docker compose up -d
 ```
 
-**Podman (RHEL / Fedora / CentOS Stream):** grab `podman-compose.yml` instead — it
+**Podman (RHEL / Fedora / CentOS Stream):** grab `podman-compose.yml` instead - it
 adds the SELinux `:Z` relabel so the rootless container can write to its volumes:
 
 ```bash
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/podman-compose.yml
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example
-cp .env.example .env  # set SESSION_SECRET and DB_ENCRYPTION_KEY
+cp .env.example .env
+openssl rand -hex 32   # SESSION_SECRET
+openssl rand -hex 32   # DB_ENCRYPTION_KEY
+```
+
+Fill in `.env` as described above, then start it:
+
+```bash
 podman compose -f podman-compose.yml up -d   # or: podman-compose -f podman-compose.yml up -d
 ```
 

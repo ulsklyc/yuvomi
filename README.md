@@ -59,14 +59,15 @@ independent, so you use what fits and switch off what doesn't.
 
 This is the part a folder full of separate apps cannot do:
 
-- **The week's meal plan writes the shopping list.** Plan Thursday, and the ingredients are on the list before anyone walks to the shop.
-- **The last jar out of the pantry goes on the list with one tap.** Tick items off after a shop and they book back into the pantry with their quantity.
-- **A ticked-off chore pays out.** Points on a task go to whoever did it - the assignee, or the person picked when it is ticked off - and the reward catalog spends them.
+- **One import turns the week's meal plan into a shopping list.** The next seven days come pre-selected, and every ingredient lands on the shared list, sorted by aisle.
+- **The last jar out of the pantry goes on the list with one tap.** After the shop, one button books what you ticked off back into the pantry, with amount and unit.
+- **A ticked-off chore pays out.** Points on a task go to whoever did it - the assignee, or the person picked when it is ticked off - and are spent in a reward catalog you control.
 - **A filed receipt hangs on the booking.** Upload it once and it belongs to the transaction, the shared expense and the inventory item at the same time.
 
 ## The twenty modules
 
-Turn on what your household needs; the rest stays out of the way.
+Switch off what your household doesn't need, and it disappears from everyone's menu. Inventory,
+Waste collection and Schedule start switched off.
 
 | Module | In one line |
 |---|---|
@@ -87,9 +88,9 @@ Turn on what your household needs; the rest stays out of the way.
 | **Notes &amp; Contacts** | Markdown sticky notes with tappable checklists, plus contacts with CardDAV sync and vCard import/export. |
 | **Birthdays** | Birthdays and optional name days, with calendar entries, ages and reminders. |
 | **Family** | Member profiles with roles, and invite links where new members pick their own password. |
-| **Reminders** | For tasks, events, warranties, best-before dates and pickups - in-app, push, Gotify, ntfy, webhook or email. |
+| **Reminders** | For tasks, events, medications, warranties, best-before dates, expiring documents and pickups - in-app, push, Gotify, ntfy, webhook or email. |
 | **API Tokens** | Bearer tokens with an OpenAPI 3.1 spec and a built-in MCP endpoint for AI agents. |
-| **Backup** | Manual and scheduled backups with pre-restore rollback and optional cloud upload. |
+| **Backup** | Manual and scheduled backups with optional WebDAV upload and pre-restore rollback; a backup from another installation restores right in the browser. |
 
 Two more things you only get on your own server: **wall mode** turns the kitchen tablet into a
 readable-from-across-the-room display, and an **Immich screensaver** rotates your own photos when
@@ -121,12 +122,12 @@ Pick your way in: [Docker or Podman](#docker-or-podman) for full control, the
 [guided setup](#guided-setup) wizard in your browser, or your [NAS app store](#from-your-nas-app-store)
 without a terminal.
 
-- **Image** - `ghcr.io/ulsklyc/`<wbr>`yuvomi:latest`, about 500 MB.
+- **Image** - `ghcr.io/ulsklyc/`<wbr>`yuvomi:latest`, about 500 MB, for amd64 and arm64 (Raspberry Pi 4/5).
 - **Needs** - 256 MB RAM and one port, 3000 by default.
 - **Browsers** - everything as designed from Chrome and Edge 117, Firefox 129 and Safari 17.5. Down to Chrome 87, Firefox 79 and Safari 14.1 (iOS 14.5) it still starts and scrolls, with a plainer look and some features missing ([measured 21 September 2026](docs/installation.md#browser-support)).
 - **Writes** - four volumes you own: data, backups, modules, documents.
 - **Outbound** - out of the box, one update check against the GitHub releases API. Block it and nothing breaks, only the hint about a newer version stays away. Everything else reaches out only when you use or switch on a feature that needs it: opening the calendar settings loads the list of holiday countries from openholidaysapi.org, finding a logo for a subscription looks up the service's website, and weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.
-- **Your LAN** - calendar subscriptions, WebDAV storage and recipe mirrors on private or internal addresses stay blocked until you opt in ([how](docs/installation.md#environment-variables)).
+- **Your LAN** - calendar subscriptions, notification channels (webhook, Gotify, ntfy), WebDAV document storage, recipe mirrors and waste-collection feeds on private or internal addresses stay blocked until you opt in ([how](docs/installation.md#environment-variables)). Paperless and Papra are the exception: they may reach the LAN out of the box.
 - **Encryption key** - optional, but there is no way back: a lost or changed key never opens the database again, not by you and not by us. The guided setup and Umbrel generate one for you; with Compose, TrueNAS or Unraid you set it yourself, so write it down.
 - **Your data** - one SQLite file at `/data/yuvomi.db`, plus the folder, WebDAV or Drive if you moved documents there.
 
@@ -146,7 +147,8 @@ openssl rand -hex 32   # DB_ENCRYPTION_KEY
 
 > **Now open `.env` and replace both `REPLACE_WITH_…` placeholders** with the two values you just
 > generated, in that order, and write the second one down: it is the database key, and nothing can
-> recover it. To run without encryption, clear the line instead of filling it.
+> recover it. With a placeholder left in, Yuvomi refuses to start. To run without encryption, clear
+> the `DB_ENCRYPTION_KEY` line instead of filling it.
 
 ```bash
 docker compose up -d
@@ -157,17 +159,23 @@ page does not load, `docker compose logs` (on Podman, `podman compose -f podman-
 usually names the reason, and the
 [troubleshooting guide](docs/installation.md#troubleshooting) covers the common ones.
 
+On **Proxmox**, the same steps run inside a small Debian LXC: see the
+[Proxmox guide on yuvomi.cloud](https://yuvomi.cloud/install.html#proxmox).
+
 ### Guided setup
 
-A setup wizard in your browser, in 24 languages. It detects Docker or Podman, configures HTTPS,
-single sign-on and scheduled backups, then starts the container and creates your admin account.
+A setup wizard in your browser, in 24 languages. It detects Docker or Podman, sets up single sign-on
+and scheduled backups, prepares Yuvomi for an HTTPS reverse proxy (the certificate stays with your
+proxy), then starts the container and creates your admin account.
 
 ```bash
 git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
 node tools/installer/install-server.js
 ```
 
-Open **http://localhost:8090**. Needs Node.js 22+ on the host; the container ships its own Node 24.
+Open **http://localhost:8090** on the server itself; the wizard answers nowhere else. From another
+device, open a tunnel first, `ssh -L 8090:localhost:8090 user@server`, then open the same address
+there. Needs Node.js 22+ on the host; the container ships its own Node 24.
 
 ### From your NAS app store
 

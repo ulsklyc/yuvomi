@@ -1372,7 +1372,7 @@
       plat_unraid:'A Community Apps template: add it straight from the Unraid Apps tab.',
       plat_oneclick:'1-click', plat_start:'Start here', plat_guide:'Guide', to_top:'Back to top',
       quick_env:'<b>Now open <code>.env</code> and replace both <code>REPLACE_WITH_…</code> placeholders</b> with the two values you just generated. Yuvomi does not start while a placeholder is still in there. Keep a copy of the key with your other passwords. To run without encryption, clear the <code>DB_ENCRYPTION_KEY</code> line instead.',
-      quick_note:'Then open <code>http://localhost:3000</code>. The first visit walks you through creating your admin account. Prefer a guided setup? The <a href="install.html#installer">step-by-step installer</a> handles HTTPS, SSO and backups for you.', cta_title:'Set it up once. <em>Then the whole family plans with it.</em>', cta_desc:'After that it belongs to the household: on every phone and on the kitchen wall, with no account with us, no subscription and nothing of ours in between.',
+      quick_note:'Then open <code>http://localhost:3000</code>. The first visit walks you through creating your admin account. Prefer a guided setup? The <a href="install.html#installer">step-by-step installer</a> sets up SSO and backups and prepares Yuvomi for your HTTPS reverse proxy.', cta_title:'Set it up once. <em>Then the whole family plans with it.</em>', cta_desc:'After that it belongs to the household: on every phone and on the kitchen wall, with no account with us, no subscription and nothing of ours in between.',
       /* "Get started" brach als einziger CTA die Installieren-Verbfamilie
          (nav, hero, Sprungmenue sagen alle "Install") - gleiches Ziel, gleiches
          Icon, also auch dasselbe Verb. */
@@ -1492,7 +1492,7 @@
       plat_unraid:'Ein Community-Apps-Template: direkt über den Unraid-Apps-Tab hinzufügen.',
       plat_oneclick:'1 Klick', plat_start:'Hier starten', plat_guide:'Anleitung', to_top:'Nach oben',
       quick_env:'<b>Öffnet jetzt <code>.env</code> und ersetzt beide <code>REPLACE_WITH_…</code>-Platzhalter</b> durch die zwei eben erzeugten Werte. Solange noch ein Platzhalter drinsteht, startet Yuvomi nicht. Legt eine Kopie des Schlüssels zu euren anderen Passwörtern. Wer ohne Verschlüsselung fahren will, leert stattdessen die Zeile <code>DB_ENCRYPTION_KEY</code>.',
-      quick_note:'Dann <code>http://localhost:3000</code> öffnen. Beim ersten Aufruf legt ihr euer Admin-Konto an. Lieber geführt? Der <a href="install.html#installer">schrittweise Installer</a> kümmert sich um HTTPS, SSO und Backups.', cta_title:'Einmal einrichten. <em>Dann plant die ganze Familie mit.</em>', cta_desc:'Danach gehört es dem Haushalt: auf jedem Handy und an der Küchenwand, ohne Konto bei uns, ohne Abo und ohne etwas von uns dazwischen.',
+      quick_note:'Dann <code>http://localhost:3000</code> öffnen. Beim ersten Aufruf legt ihr euer Admin-Konto an. Lieber geführt? Der <a href="install.html#installer">schrittweise Installer</a> richtet SSO und Backups ein und bereitet Yuvomi auf euren HTTPS-Reverse-Proxy vor.', cta_title:'Einmal einrichten. <em>Dann plant die ganze Familie mit.</em>', cta_desc:'Danach gehört es dem Haushalt: auf jedem Handy und an der Küchenwand, ohne Konto bei uns, ohne Abo und ohne etwas von uns dazwischen.',
       cta_install:'Yuvomi installieren', cta_family:'Was die Familie davon hat',
       footer_heart:'Mit Sorgfalt gebaut für Haushalte, die Privatsphäre und Einfachheit schätzen.',
       foot_product:'Produkt', foot_screens:'Screenshots', foot_install:'Installieren', foot_docs:'Doku & Spec',
@@ -2171,7 +2171,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
         <span data-t="quick_env"><b>Now open <code>.env</code> and replace both <code>REPLACE_WITH_…</code> placeholders</b> with the two values you just generated. Yuvomi does not start while a placeholder is still in there. Keep a copy of the key with your other passwords. To run without encryption, clear the <code>DB_ENCRYPTION_KEY</code> line instead.</span>
       </p>
       <div class="code-wrap code-wrap--single"><div class="code-block"><span class="cmd">docker compose up -d</span></div><button class="copy-btn" type="button" data-copy="docker compose up -d"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
-      <p class="quick-note" data-t="quick_note">Then open <code>http://localhost:3000</code>. The first visit walks you through creating your admin account. Prefer a guided setup? The <a href="install.html#installer">step-by-step installer</a> handles HTTPS, SSO and backups for you.</p>
+      <p class="quick-note" data-t="quick_note">Then open <code>http://localhost:3000</code>. The first visit walks you through creating your admin account. Prefer a guided setup? The <a href="install.html#installer">step-by-step installer</a> sets up SSO and backups and prepares Yuvomi for your HTTPS reverse proxy.</p>
     </div>
   </div>
 </section>
