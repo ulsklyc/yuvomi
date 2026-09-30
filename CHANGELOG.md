@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **In the demo data, today's morning dose is already taken.** At the evening hour the screenshots
+  are taken, an open 08:00 dose showed as overdue in red on the overview and in the wall mode; now
+  only the evening dose is still open today. Only a database filled by `scripts/seed-demo.js` is
+  affected.
+
 ## [2.70.0] - 2026-09-30
 
 ### Added

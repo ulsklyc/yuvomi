@@ -1256,7 +1256,7 @@ const insertMedLog = db.prepare(`
   INSERT INTO medication_logs (medication_id, schedule_id, scheduled_at, status, taken_at, dose_qty)
   VALUES (?, ?, ?, ?, ?, ?)
 `);
-// Daily supplements with a schedule + a week of adherence logs (today still pending)
+// Daily supplements with a schedule + a week of adherence logs (evening dose still open today)
 const vitDId = insertMed.run(lindaId, L('Vitamin D3', 'Vitamin D3'), L('1000 IU', '1000 IE'), 'tablet', 1, 0, 42,
   L('tablets', 'Tabletten'), 10, L('With breakfast', 'Zum Frühstück')).lastInsertRowid;
 const vitDSched = insertMedSched.run(vitDId, '08:00', 127, 1, daysFromNow(-40)).lastInsertRowid;
@@ -1266,11 +1266,12 @@ const ironSched = insertMedSched.run(ironId, '20:00', 127, 1, daysFromNow(-25)).
 // As-needed medication (no schedule)
 insertMed.run(lindaId, 'Ibuprofen', '400 mg', 'tablet', 1, 1, 20,
   L('tablets', 'Tabletten'), 5, L('For headaches - max 3/day', 'Bei Kopfschmerzen - höchstens 3 pro Tag'));
-// Adherence logs: last 6 days taken, today pending
+// Adherence logs: the morning dose is taken every day INCLUDING today, only the
+// evening iron is still open today. The screenshot clock stands at 18:10: an
+// open 08:00 dose would read as overdue (red) on the overview and the wall mode,
+// the evening dose reads as the next thing to do.
 for (let d = -6; d <= 0; d++) {
-  const status = d === 0 ? 'pending' : 'taken';
-  const takenAt = d === 0 ? null : dateTimeFromNow(d, 8, 12);
-  insertMedLog.run(vitDId, vitDSched, dateTimeFromNow(d, 8, 0), status, takenAt, 1);
+  insertMedLog.run(vitDId, vitDSched, dateTimeFromNow(d, 8, 0), 'taken', dateTimeFromNow(d, 8, 12), 1);
 }
 for (let d = -6; d <= 0; d++) {
   const taken = d < 0 && d !== -3;                 // one missed dose for realism
