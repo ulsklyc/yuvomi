@@ -3474,7 +3474,7 @@
         "expiryValidUntil": "Gyldig til {{date}}",
         "expiryEndsOn": "Utløper {{date}}",
         "expiryEndedOn": "Utløp {{date}}",
-        "categoryHint": "Hvilken type dokument det er, som Finans, Forsikring eller Skole.",
+        "categoryHint": "Hvilken type dokument det er, som Økonomi, Forsikring eller Skole.",
         "folderHint": "Hvor det er arkivert, i mapper du oppretter selv.",
         "categoryFilterLabel": "Kategori (dokumenttype)",
         "folderFilterLabel": "Mappe (hvor det er arkivert)",

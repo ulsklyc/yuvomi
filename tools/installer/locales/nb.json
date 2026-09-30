@@ -205,7 +205,7 @@
     "proxyBehindHttps": "Bak en reverse proxy med HTTPS (Caddy, nginx, Traefik)",
     "proxyDirect": "Direkte tilgang over localhost / HTTP",
     "proxyHint": "Velg \"Direkte tilgang\" hvis du åpner Yuvomi over http:// - ellers kan du ikke logge inn. Bak en reverse proxy med HTTPS, velg det første alternativet.",
-    "oidc": "Single Sign-On (OIDC)",
+    "oidc": "Single sign-on (OIDC)",
     "oidcHint": "Fyll ut alle fire feltene for å aktivere SSO, eller la dem stå tomme.",
     "oidcIssuerLabel": "Utsteder-URL",
     "oidcClientIdLabel": "Klient-ID",
