@@ -26,7 +26,7 @@
   <meta property="og:site_name" content="Yuvomi">
   <meta property="og:locale" content="en_US">
   <meta property="og:locale:alternate" content="de_DE">
-  <meta property="og:image:alt" content="Yuvomi - the self-hosted family planner, shown on desktop and mobile">
+  <meta property="og:image:alt" content="Yuvomi - one home instead of many subscriptions, beside the overview of the self-hosted family planner in a browser window">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Yuvomi - The Self-Hosted Family Planner">
   <meta name="twitter:description" content="Tasks, shopping, meals, calendar, budget - for families, couples and one-person households. All self-hosted, no cloud dependency.">
@@ -530,14 +530,21 @@
        Titelteil); das Markenzeichen steht klein neben dem Kopf, die drei
        Momente darunter nebeneinander - drei gleichrangige Szenen, keine Liste. */
     .family { padding: 88px 0; }
-    .fam-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 132px);
-      grid-template-areas: "head art" "list list"; gap: 44px 48px; align-items: end; }
-    .fam-art { grid-area: art; width: 100%; justify-self: end; }
-    .fam-art svg { display: block; width: 100%; height: auto; overflow: visible; }
-    /* Drei gleich starke Flaechen: wo zwei sich decken, verdoppelt sich die
-       Deckkraft von selbst - dieselben "helleren Linsen" wie im Logo, nur als
-       Tinte auf Papier statt als Licht auf Violett. */
-    .fam-circles circle { fill: var(--accent); fill-opacity: 0.16; stroke: var(--accent); stroke-opacity: 0.5; stroke-width: 0.8; }
+    .fam-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+      grid-template-areas: "head shot" "list list"; gap: 48px 56px; align-items: center; }
+    /* Rahmen wie die Galerie (Radius, Kante, Schatten, Hof in der Akzentfarbe),
+       aber OHNE deren Telefon-Tausch unter 860px: es gibt keine Telefon-
+       Variante, das Tablet bleibt quer. */
+    .fam-shot { grid-area: shot; position: relative; }
+    .fam-shot::before {
+      content: ''; position: absolute; inset: -8% 4%; z-index: -1; border-radius: 50%;
+      background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 20%, transparent), transparent 72%);
+      filter: blur(46px); opacity: 0.75;
+    }
+    .fam-shot img {
+      display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; border-radius: var(--r-xl);
+      border: 1px solid var(--border); box-shadow: var(--shadow-xl);
+    }
     .fam-head { grid-area: head; }
     .fam-list { grid-area: list; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px;
       padding-top: 36px; border-top: 1px solid var(--border); }
@@ -550,9 +557,14 @@
     @media (max-width: 1024px) {
       .fam-list { grid-template-columns: minmax(0, 1fr); gap: 26px; padding-top: 30px; }
     }
+    @media (max-width: 860px) {
+      .fam-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "shot" "list"; gap: 32px; }
+      .fam-shot { max-width: 640px; }
+    }
     @media (max-width: 600px) {
       .family { padding: 64px 0; }
-      .fam-grid { grid-template-columns: minmax(0, 1fr) 64px; gap: 28px 16px; align-items: start; }
+      .fam-grid { gap: 28px; }
+      .fam-shot img { border-radius: var(--r-lg); }
       .fam-item { grid-template-columns: 38px minmax(0, 1fr); gap: 13px; }
       .fam-ico { width: 38px; height: 38px; }
       .fam-ico svg { width: 19px; height: 19px; }
@@ -1094,7 +1106,8 @@
       .hero-frame { box-shadow: none !important; }
       .hero, section { padding: 20px 0 !important; }
       .gal-item, .feat-row, .mod-card, .swap-row, .plat-card, .ho-row, .fam-item { break-inside: avoid; }
-      .mod-group-head, .fam-art { break-after: avoid; }
+      .mod-group-head { break-after: avoid; }
+      .fam-shot { break-inside: avoid; }
       /* Paper has no hover and no href, so external targets go inline. Internal
          anchors stay bare - "(#screens)" tells a reader nothing. */
       a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; word-break: break-all; }
@@ -1196,9 +1209,9 @@
              ohne sie hier haette das Skript erst die 2752px-Desktopaufnahme
              geholt und applyShots sie danach ersetzt - also genau der doppelte
              Download, den dieser Kommentar zu verhindern verspricht. -->
-        <img class="sc" data-shot-profile="lead" data-light="screenshots/dashboard-light-web.png" data-dark="screenshots/dashboard-dark-web.png" data-light-m="screenshots/dashboard-light-mobile.png" data-dark-m="screenshots/dashboard-dark-mobile.png" alt="Yuvomi dashboard showing today's tasks, calendar, meals and shopping at a glance" data-alt-t="alt_hero" width="1400" height="1050" loading="eager" fetchpriority="high" decoding="async" id="heroShot">
+        <img class="sc" data-shot-profile="lead" data-light="screenshots/dashboard-light-web.png" data-dark="screenshots/dashboard-dark-web.png" data-light-m="screenshots/dashboard-light-mobile.png" data-dark-m="screenshots/dashboard-dark-mobile.png" alt="Yuvomi overview showing what is on today for the whole family, with the family and budget cards below" data-alt-t="alt_hero" width="1400" height="1050" loading="eager" fetchpriority="high" decoding="async" id="heroShot">
         <script>document.getElementById('heroShot')&&(function(i){try{var t=localStorage.getItem('yuvomi-theme')||localStorage.getItem('oikos-theme'),d=t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches),l=localStorage.getItem('yuvomi-lang')||localStorage.getItem('oikos-lang')||((navigator.language||'en').toLowerCase().indexOf('de')===0?'de':'en'),m=matchMedia('(max-width:860px)').matches,k=d?'dark':'light',b=i.dataset[m&&i.dataset[k+'M']?k+'M':k],p=l!=='en'?b.replace('screenshots/','screenshots/'+l+'/'):b;i.onerror=function(){i.onerror=null;i.srcset='';i.src=b;};i.srcset=p.replace(/\.png$/,'@1x.webp')+' 1x, '+p.replace(/\.png$/,'.webp')+' 2x';i.src=p.replace(/\.png$/,'.webp');}catch(e){i.src=i.dataset.light;}})(document.getElementById('heroShot'));</script>
-        <noscript><img class="sc" src="screenshots/dashboard-light-web.png" alt="Yuvomi dashboard showing today's tasks, calendar, meals and shopping at a glance" width="1400" height="1050"></noscript>
+        <noscript><img class="sc" src="screenshots/dashboard-light-web.png" alt="Yuvomi overview showing what is on today for the whole family, with the family and budget cards below" width="1400" height="1050"></noscript>
       </div>
       <!-- Einkaufsliste statt Aufgaben: dieselbe Aufgaben-Aufnahme traegt die
            Planen-Karte weiter unten, dort in lesbarer Groesse (Critique Runde 2).
@@ -1293,7 +1306,7 @@
       ho_2_d:'Any task can carry points. They go to whoever did it - the assignee, or the person picked when it is ticked off - and buy rewards from a catalog you control.',
       ho_3_a:'A receipt gets filed', ho_3_b:'It’s attached to the expense',
       ho_3_d:'Attach it to the budget entry from the documents you already keep, or upload it on the spot. Filed once, findable from both sides.',
-      alt_hero:"Yuvomi dashboard showing today's tasks, calendar, meals and shopping at a glance",
+      alt_hero:"Yuvomi overview showing what is on today for the whole family, with the family and budget cards below",
       alt_hero_m:"Yuvomi shopping list on mobile",
       alt_f_health_m:"Health vitals on mobile",
       alt_f_tasks_m:"Tasks on mobile",
@@ -1318,6 +1331,7 @@
       gal_desc:'No demo account, no sales call. The screens your family opens every day, at the size you will actually use them. The rest are further down.',
       gal_meals_k:'Meals', gal_meals_c:'<b>Every meal of the week, planned in one place.</b> Breakfast to snacks, dragged into place and there for everyone in the house.',
       alt_gal_meals:'Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks',
+      alt_fam_wall:"Yuvomi wall mode on a landscape tablet: the time in large type, today's tasks and doses, who is up today, the weather and one-tap kitchen timers",
       gal_cal_k:'Calendar', gal_cal_c:'<b>Google, iCloud and Nextcloud, finally in one calendar.</b> Two-way sync, so an appointment added here lands on every phone in the house.',
       proof_modules:'modules', proof_langs:'languages', proof_telemetry:'trackers', proof_mit:'MIT licensed', feat_title:'Everything your household needs',
       /* "for families" war die eine Stelle, die die Solo-Zusage des Heros
@@ -1415,7 +1429,7 @@
       ho_2_d:'Jede Aufgabe kann Punkte tragen. Die bekommt, wer sie erledigt hat: die zugewiesene Person oder die beim Abhaken ausgewählte. Eingelöst werden sie gegen Belohnungen aus einem Katalog, den ihr bestimmt.',
       ho_3_a:'Ein Beleg wird abgelegt', ho_3_b:'Er hängt an der Buchung',
       ho_3_d:'Hängt ihn aus euren vorhandenen Dokumenten an den Budget-Eintrag oder ladet ihn direkt hoch. Einmal ablegen, von beiden Seiten auffindbar.',
-      alt_hero:"Yuvomi-Übersicht: Aufgaben, Kalender, Mahlzeiten und Einkauf des Tages auf einen Blick",
+      alt_hero:"Yuvomi-Übersicht: was heute für die ganze Familie ansteht, darunter die Karten für Familie und Budget",
       alt_hero_m:"Yuvomi-Einkaufsliste auf dem Handy",
       alt_f_health_m:"Gesundheitswerte auf dem Handy",
       alt_f_tasks_m:"Aufgaben auf dem Handy",
@@ -1440,6 +1454,7 @@
       gal_desc:'Kein Demo-Konto, kein Verkaufsgespräch. Die Bildschirme, die eure Familie täglich öffnet, in der Größe, in der ihr sie wirklich nutzt. Der Rest kommt weiter unten.',
       gal_meals_k:'Mahlzeiten', gal_meals_c:'<b>Alle Mahlzeiten der Woche, an einem Ort geplant.</b> Vom Frühstück bis zum Snack, per Ziehen verteilt und für alle im Haus da.',
       alt_gal_meals:'Yuvomi-Essensplaner mit einer Woche Frühstück, Mittag- und Abendessen und Snacks',
+      alt_fam_wall:'Yuvomi im Wand-Modus auf einem Tablet im Querformat: die Uhrzeit in großer Schrift, die Aufgaben und Dosen des Tages, wer heute dran ist, das Wetter und Küchentimer auf Fingertipp',
       gal_cal_k:'Kalender', gal_cal_c:'<b>Google, iCloud und Nextcloud, endlich in einem Kalender.</b> Sync in beide Richtungen, damit ein hier eingetragener Termin auf jedem Handy im Haus landet.',
       proof_modules:'Module', proof_langs:'Sprachen', proof_telemetry:'Tracker', proof_mit:'MIT-lizenziert', feat_title:'Alles, was euer Haushalt braucht',
       feat_desc:'Gegliedert wie in der App selbst. Was euer Haushalt nicht braucht, schaltet ein Admin für alle ab, und es verschwindet aus dem Menü.',
@@ -1770,25 +1785,20 @@
      anderen): ohne Marke stand die Sektion als einziger linksbuendiger Kopf
      ausserhalb des Seitensystems. Dafuer gab das Band "Was es ersetzt" seine
      Marke ab - hoechstens die Haelfte der Sektionen darf eine tragen.
-     Das Bild ist nur das Markenmotiv, ohne Symbole darin: die drei Symbole
-     stehen schon an den Momenten daneben, im Bild wiederholt sagten sie
-     nichts Neues. Ein Wand-Modus-Screenshot kommt erst mit der naechsten
-     Aufnahme-Pipeline, und ein leerer Bildplatz waere schlechter als keiner. -->
+     Das Bild war bis v2.70.0 nur das Markenmotiv (drei Kreise), weil ein
+     leerer Bildplatz schlechter gewesen waere als keiner; seit der Aufnahme
+     nach dem Release steht dort der Wand-Modus selbst, der erste der drei
+     Momente darunter. -->
 <section class="family" id="family">
   <div class="wrap">
     <div class="fam-grid">
-      <!-- Die drei Kreise aus logo.svg, in denselben Koordinaten, als ruhige
-           Tinte statt als Plakette: die Ueberschneidungen werden von selbst
-           dunkler. Farbe aus --accent, folgt also beiden Themes. Rein
-           dekorativ. -->
-      <div class="fam-art reveal" aria-hidden="true">
-        <svg viewBox="33 41 96 93" fill="none" focusable="false">
-          <g class="fam-circles">
-            <circle cx="64" cy="72" r="27"/>
-            <circle cx="100" cy="78" r="25"/>
-            <circle cx="80" cy="106" r="24"/>
-          </g>
-        </svg>
+      <!-- Der Wand-Modus selbst, seit v2.70.0 aus der Aufnahme-Pipeline
+           (dashboard-wall-*-web, Tablet quer). Er ersetzt die Kreis-Grafik, die
+           bis dahin den Platz hielt. Nur eine Web-Variante: das Motiv IST das
+           Tablet, am Telefon bleibt es quer und stapelt unter dem Kopf. -->
+      <div class="fam-shot reveal">
+        <img class="sc" data-light="screenshots/dashboard-wall-light-web.png" data-dark="screenshots/dashboard-wall-dark-web.png" data-sizes="(max-width: 860px) 92vw, (min-width: 1248px) 600px, 50vw" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's tasks and doses, who is up today, the weather and one-tap kitchen timers" data-alt-t="alt_fam_wall" loading="lazy" decoding="async" width="1400" height="1050">
+        <noscript><img class="sc" src="screenshots/dashboard-wall-light-web.png" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's tasks and doses, who is up today, the weather and one-tap kitchen timers" loading="lazy" width="1400" height="1050"></noscript>
       </div>
       <div class="sec-head lead fam-head reveal">
         <span class="eyebrow" data-t="fam_eyebrow">For the family</span>

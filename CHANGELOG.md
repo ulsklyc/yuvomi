@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The website and README screenshots show v2.70.0, and the family section shows the wall mode.**
+  Every screenshot on yuvomi.cloud and in both READMEs was taken again against 2.70.0, in English
+  and German, light and dark. In the section for the family, a screenshot of the wall mode on a
+  landscape tablet takes the place of the three-circle drawing, loaded as WebP in the current theme
+  and language like the other screenshots. The preview image a shared link shows now carries the
+  headline and modules of the page it opens.
+
 - **In the demo data, today's morning dose is already taken.** At the evening hour the screenshots
   are taken, an open 08:00 dose showed as overdue in red on the overview and in the wall mode; now
   only the evening dose is still open today. Only a database filled by `scripts/seed-demo.js` is

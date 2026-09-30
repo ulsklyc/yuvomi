@@ -31,7 +31,7 @@
 
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/de/dashboard-dark-web.webp">
-    <img src="docs/screenshots/de/dashboard-light-web.webp" alt="Das Yuvomi-Dashboard: Aufgaben, Termine, Mahlzeiten und Einkaufsliste des Tages auf einem Bildschirm" width="820">
+    <img src="docs/screenshots/de/dashboard-light-web.webp" alt="Die Yuvomi-Übersicht: Termine, Aufgaben und Einkauf des Tages für die ganze Familie, darunter Familie, Budget und Geburtstage" width="820">
   </picture>
 
   <sub><b>20</b> Module&nbsp;&nbsp;·&nbsp; <b>24</b> Sprachen&nbsp;&nbsp;·&nbsp; <b>0</b> Tracker&nbsp;&nbsp;·&nbsp; optionale&nbsp;<b>AES&#8209;256</b>&#8209;Datenbankverschlüsselung&nbsp;&nbsp;·&nbsp; <b>MIT</b></sub>
