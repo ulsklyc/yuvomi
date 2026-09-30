@@ -793,3 +793,116 @@ test('Wetter: nicht eingerichtet - weder im Raster noch in der Ablage, wie ein a
   assert.ok(edit.grid.length > 0, 'Reichweite: der Bearbeiten-Modus steht');
   assert.ok(!edit.chip, 'und auch keinen Chip, der eine leere Kachel zurueckholen wuerde');
 });
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Der FAB nach einem Neuaufbau aus der Seite heraus (#1588)
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/* DIE UEBERSICHT BAUT SICH AUCH OHNE ROUTER NEU AUF - beim Verlassen des
+ * Wand-Modus, nach „erneut versuchen", nach einer Aenderung aus einer Kachel.
+ * Der Router hebt den FAB nur in renderPage() in die Shell-Ebene (#634) und
+ * zeichnet sein Glyph erst in updateNav(); ein Neuaufbau an ihm vorbei liess
+ * den Knopf im Scrollport stehen. Gemeldet am Telefon: das Plus fehlte, und die
+ * Tab-Kapsel hielt ihr hinteres Ende nicht mehr frei - ihre Reserve haengt an
+ * `.fab-layer .page-fab`, die fuenf Slots wurden breiter und „Mehr" lag unter
+ * dem Knopf. Gemessen wird deshalb, was man sieht: wo der Knopf haengt, ob er
+ * ein Glyph hat und ob ein Tab-Slot unter ihm liegt. */
+async function fabOverCapsule(page) {
+  await page.waitForFunction(() => {
+    const fab = document.querySelector('#fab-main');
+    return fab && !document.documentElement.hasAttribute('data-wall-mode');
+  }, { timeout: 10000 });
+  await freeze(page);
+  await wait(300);
+  return page.evaluate(() => {
+    const fab = document.querySelector('#fab-main');
+    const f = fab.getBoundingClientRect();
+    const slots = [...document.querySelectorAll('.nav-bottom__items > .nav-item')];
+    return {
+      count: document.querySelectorAll('#fab-main').length,
+      inLayer: !!fab.closest('#fab-layer'),
+      glyph: !!fab.querySelector('svg'),
+      slots: slots.length,
+      under: slots
+        .map((el) => ({ el, r: el.getBoundingClientRect() }))
+        .filter(({ r }) => r.width > 0 && r.left < f.right - 1 && r.right > f.left + 1
+          && r.top < f.bottom && r.bottom > f.top)
+        .map(({ el }) => el.id || el.dataset.route || el.className),
+    };
+  });
+}
+
+function assertFabDocked(state, when) {
+  assert.ok(state.slots >= 3, `Reichweite (${when}): nur ${state.slots} Tab-Slots gesehen`);
+  // Gesammelt statt einzeln: rot soll jeder Befund auf einmal stehen, nicht
+  // nur der erste.
+  const findings = [];
+  if (state.count !== 1) findings.push(`${state.count} Knoepfe #fab-main im Dokument`);
+  if (!state.inLayer) findings.push('der FAB haengt im Scrollport statt in der Shell-Ebene');
+  if (!state.glyph) findings.push('der FAB hat kein Plus');
+  if (state.under.length) findings.push(`unter dem FAB liegt ein Tab-Slot (${state.under.join(', ')})`);
+  assert.deepEqual(findings, [], `${when}:\n${findings.join('\n')}`);
+}
+
+/* DER UMGEKEHRTE WEG: beim Betreten bringt der Neuaufbau KEINEN FAB mit, und
+ * der alte haengt schon in der Shell-Ebene neben dem Container. Geraeumt wurde
+ * er bis dahin erst nach der Antwort von `/dashboard` - solange sie laeuft,
+ * stand das Plus bedienbar auf einer Flaeche, die nichts anlegt. Die Anfrage
+ * wird deshalb angehalten: gemessen wird der Moment, bevor die Daten da sind. */
+test('FAB: beim Betreten des Wand-Modus steht keiner auf der Wand, auch solange die Daten laden (mobile, #1588)', async () => {
+  const page = await openPage(harness, { device: 'mobile' });
+  await page.waitForSelector('#fab-layer #fab-main');
+  const held = [];
+  page.__yuvomiRequestInterceptor = (req) => {
+    if (!/\/api\/v1\/dashboard(\?|$)/.test(req.url())) return false;
+    held.push(req);
+    return true;
+  };
+  await page.click('#dashboard-wall-enter');
+  await page.waitForSelector('.wall #wall-exit');
+  await wait(300);
+  const state = await page.evaluate(() => ({
+    wall: document.documentElement.hasAttribute('data-wall-mode'),
+    fabs: document.querySelectorAll('#fab-main, #fab-layer .page-fab').length,
+  }));
+  const pending = held.length;
+  page.__yuvomiRequestInterceptor = null;
+  for (const req of held) req.continue();
+  await page.close();
+  assert.ok(state.wall, 'Reichweite: die Wand steht');
+  assert.ok(pending >= 1, 'Reichweite: die Anfrage an /dashboard wurde gar nicht angehalten');
+  assert.equal(state.fabs, 0, `auf der Wand stehen ${state.fabs} FAB, solange die Daten laden`);
+});
+
+test('FAB: nach dem Verlassen des Wand-Modus steht er in der Shell-Ebene, mit Plus, neben der Kapsel (mobile, #1588)', async () => {
+  const page = await openPage(harness, { device: 'mobile' });
+  assertFabDocked(await fabOverCapsule(page), 'vor dem Wand-Modus');
+  await page.click('#dashboard-wall-enter');
+  await page.waitForSelector('.wall #wall-exit');
+  // Die Wand hat sich gesetzt: der Knopf der Vorseite ist aus der Shell-Ebene
+  // geraeumt, wie nach jeder Weile an der Wand.
+  await page.waitForFunction(() => !document.querySelector('#fab-main'), { timeout: 10000 });
+  await page.click('#wall-exit');
+  const after = await fabOverCapsule(page);
+  await page.close();
+  assertFabDocked(after, 'nach dem Verlassen');
+});
+
+test('FAB: nach "erneut versuchen" steht er in der Shell-Ebene, mit Plus, neben der Kapsel (mobile, #1588)', async () => {
+  const page = await openPage(harness, { device: 'mobile' });
+  let failNext = true;
+  page.__yuvomiRequestInterceptor = (req) => {
+    if (!failNext || !/\/api\/v1\/dashboard(\?|$)/.test(req.url())) return false;
+    failNext = false;
+    req.respond({ status: 500, contentType: 'application/json', body: '{"error":"probe"}' });
+    return true;
+  };
+  await gotoRoute(page, '/');
+  await page.waitForSelector('#dashboard-retry');
+  assert.equal(failNext, false, 'Reichweite: die Uebersicht hat die gescheiterte Anfrage gar nicht gestellt');
+  await page.click('#dashboard-retry');
+  await page.waitForSelector('#dashboard-widget-grid .widget-wrapper');
+  const after = await fabOverCapsule(page);
+  await page.close();
+  assertFabDocked(after, 'nach erneut versuchen');
+});
