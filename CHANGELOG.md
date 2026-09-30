@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The task list orders a day's tasks by the household's clock, not the device's.** The order
+  inside a group and a board column read the due time in the device's time zone. On a device whose
+  zone skips an hour for daylight saving time, a task due in that hour moved an hour later and
+  showed up after a task due later the same day, even when the household's own zone has no such gap
+  that day. The order now compares the due date and time as entered, and "now" is the household's
+  time, like the due label and the grouping next to it.
+
 ## [2.71.0] - 2026-09-30
 
 ### Added

@@ -35,7 +35,7 @@ import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { todayKey, parseLocalDateKey } from '/utils/date.js';
 import { makeSortable } from '/utils/sortable.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
-import { zonedDateKey } from '/utils/timezone.js';
+import { zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { historyDayLabel } from '/utils/day-label.js';
 import {
   PRIORITIES, PRIO_ORDER, STATUSES, FILTER_STATUSES, PRIORITY_LABELS, STATUS_LABELS, statusLabel,
@@ -666,25 +666,39 @@ function renderTaskCard(task, opts = {}) {
     </div>`;
 }
 
-// Effektive Fälligkeit: mit due_time wenn vorhanden, sonst 23:59:59 des Tages
+/* Effektive Faelligkeit als Wanduhr-Stempel des Haushalts ('YYYY-MM-DDTHH:MM'),
+ * ohne due_time das Tagesende.
+ *
+ * `due_date`/`due_time` sind zonenlose Wanduhrzeit - dieselbe Regel wie in
+ * `formatDueDate` (utils/task-fields.js). Hier stand ein Umweg ueber
+ * `new Date(`${due_date}T${due_time}`)`, und der las die Ziffern in der Zone des
+ * GERAETS: in dessen Zeitumstellungs-Luecke rueckte eine Uhrzeit um eine Stunde
+ * vor und ueberholte eine spaetere Aufgabe desselben Tages, und "jetzt" war die
+ * Uhr des Geraets statt die des Haushalts. Als Stempel derselben Zone sind beide
+ * Seiten als Text vergleichbar. */
 function effectiveDue(task) {
   if (!task.due_date) return null;
-  return task.due_time
-    ? new Date(`${task.due_date}T${task.due_time}`)
-    : new Date(`${task.due_date}T23:59:59`);
+  const day = String(task.due_date).slice(0, 10);
+  const time = task.due_time ? String(task.due_time).slice(0, 5) : '23:59';
+  return `${day}T${time}`;
+}
+
+/** Jetzt als Wanduhr-Stempel des Haushalts - einmal je Sortierlauf, nicht je Vergleich. */
+function taskSortNow(now = new Date()) {
+  return `${zonedDateKey(now)}T${zonedTimeKey(now)}`;
 }
 
 // Einheitliche Sortierung: überfällig zuerst → Datum/Zeit ASC → Prio als Tiebreaker
-function sortTasks(a, b, now) {
-  const aDate = effectiveDue(a);
-  const bDate = effectiveDue(b);
-  const aOver = aDate && aDate < now ? 1 : 0;
-  const bOver = bDate && bDate < now ? 1 : 0;
+function sortTasks(a, b, nowStamp) {
+  const aDue = effectiveDue(a);
+  const bDue = effectiveDue(b);
+  const aOver = aDue && aDue < nowStamp ? 1 : 0;
+  const bOver = bDue && bDue < nowStamp ? 1 : 0;
   if (bOver !== aOver) return bOver - aOver;
-  if (!aDate && !bDate) return (PRIO_ORDER[a.priority] ?? 4) - (PRIO_ORDER[b.priority] ?? 4);
-  if (!aDate) return 1;
-  if (!bDate) return -1;
-  if (aDate.getTime() !== bDate.getTime()) return aDate < bDate ? -1 : 1;
+  if (!aDue && !bDue) return (PRIO_ORDER[a.priority] ?? 4) - (PRIO_ORDER[b.priority] ?? 4);
+  if (!aDue) return 1;
+  if (!bDue) return -1;
+  if (aDue !== bDue) return aDue < bDue ? -1 : 1;
   return (PRIO_ORDER[a.priority] ?? 4) - (PRIO_ORDER[b.priority] ?? 4);
 }
 
@@ -715,7 +729,7 @@ function renderTaskGroups(tasks, groupMode) {
       });
   }
 
-  const now = new Date();
+  const now = taskSortNow();
   const groups = groupBy(tasks, groupMode);
   return groups.map(({ id, label, tasks: groupTasks }) => {
     const sorted = [...groupTasks].sort((a, b) => sortTasks(a, b, now));
@@ -2658,7 +2672,7 @@ function renderKanban(container) {
     else grouped['open'].push(t);
   }
 
-  const now = new Date();
+  const now = taskSortNow();
   for (const col of cols) {
     grouped[col.status].sort((a, b) => sortTasks(a, b, now));
   }
@@ -5522,6 +5536,9 @@ export async function render(container, { user, signal } = {}) {
 // Testfläche: nur reine Funktionen, deren Vertrag außerhalb dieser Datei zählt.
 export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
+  // Die Reihenfolge innerhalb einer Gruppe (ihr Aufrufer `renderTaskGroups`
+  // steht weiter unten): Wanduhr des Haushalts, nicht die des Geraets.
+  sortTasks, taskSortNow,
   // `?due=today` (Re-Critique 2026-09-27): was die Adresse setzt, was die
   // Liste daraus zeigt, und dass das Blatt es wieder nimmt - samt Adresse.
   dueTodayFromSearch, isDueByToday, applyDueTodayFromAddress,
