@@ -8,6 +8,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { getSupportedLocales } from '../public/i18n.js';
 import { readFileSync, readdirSync } from 'node:fs';
 
 const { backupKeyFieldHtml, keyFieldAfterError, keyFieldDescribedBy, encodeBackupKey } = await import('../public/settings/backup-key.js');
@@ -269,7 +270,7 @@ test('Fehlertext: jeder bekannte Grund hat einen eigenen Key, ein unbekannter de
 test('Fehlertext: own_key_missing und backup_key_wrong nennen auch „keine Yuvomi-Datenbank"', () => {
   const locales = new URL('../public/locales/', import.meta.url);
   const files = readdirSync(locales).filter((name) => name.endsWith('.json'));
-  assert.equal(files.length, 24, 'Vorbedingung: alle Sprachen gelesen');
+  assert.equal(files.length, getSupportedLocales().length, 'Vorbedingung: alle Sprachen gelesen');
   for (const file of files) {
     const s = JSON.parse(readFileSync(new URL(file, locales), 'utf8')).settings;
     for (const key of ['backupRestoreErrorNeverEncrypted', 'backupRestoreErrorKeyRightButNotDb', 'backupRestoreErrorNothingChanged']) {

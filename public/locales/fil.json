@@ -389,7 +389,8 @@
         "optionCalendarBirthdaysHint": "Kapag hindi nakatsek, hindi lumalabas ang mga kaarawan sa tile na ito - nasa kalendaryo pa rin sila.",
         "nutritionNoTarget": "Wala pang pang-araw-araw na target.",
         "nutritionEntries": "{{count}} tala ngayong araw",
-        "nutritionEntries_one": "{{count}} tala ngayong araw"
+        "nutritionEntries_one": "{{count}} tala ngayong araw",
+        "weatherUnavailable": "Hindi available ang panahon sa ngayon"
     },
     "tasks": {
         "manageCategories": "Pamahalaan ang mga kategorya",

@@ -884,8 +884,8 @@
    * sie faerbt nicht). Der Kanon der Messlatte (Apple Kalender, Fantastical)
    * setzt die Zeitleisten-Kante im Vollton, und die User-Farben-Regel erlaubt
    * die Nutzerfarbe ausdruecklich als BORDER. Die Fuellung bleibt beim
-   * gemessenen 16-%-Rezept, die Tinte beim 38-%-Mix - beide Zusagen gelten
-   * unveraendert, die Kante traegt die Farbe. */
+   * gemessenen 16-%-Rezept, die Tinte beim 35-%-Mix (siehe oben) - die Kante
+   * traegt die Farbe. */
   border-inline-start: var(--cal-event-edge) solid var(--ev-color);
   /* `clip` STATT `hidden`, DAMIT DER TITEL KLEBEN KANN.
    *

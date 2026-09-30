@@ -376,7 +376,8 @@ test('Server und Frontend kennen dieselben Sprachen', async () => {
 //
 // Deshalb prüft dieser Test den Leser als Funktion, mit Eingaben, die im
 // Repository nicht vorkommen. Ein Test, der ihn nur auf den echten Bestand
-// anwendet, misst nichts: dort tragen alle 24 Codes Kleinbuchstaben.
+// anwendet, misst wenig: dort traegt einzig `pt-BR` (#1437) Grossbuchstaben,
+// und eine Schrift wie `zh-Hant` gar keiner.
 test('der Leser von SUPPORTED_LOCALES verschluckt keinen Code', () => {
   const quelle = "const SUPPORTED_LOCALES = ['de', 'fil', 'zh-Hant', 'pt-BR', 'sr-Latn-RS'];";
   assert.deepEqual(parseSupportedLocales(quelle),
@@ -387,6 +388,7 @@ test('der Leser von SUPPORTED_LOCALES verschluckt keinen Code', () => {
   // Die echte Liste geht durch denselben Leser - unverändert und vollzählig.
   assert.equal(LOCALES.length, new Set(LOCALES).size, 'doppelter Code in SUPPORTED_LOCALES');
   assert.ok(LOCALES.includes('fil'), 'fil fehlt - der Code aus #1322');
+  assert.ok(LOCALES.includes('pt-BR'), 'pt-BR fehlt - der erste Code mit Region (#1437)');
 });
 
 // Die Serverliste entsteht aus DATEINAMEN, und das Muster dahinter hat dieselbe
@@ -396,9 +398,10 @@ test('der Leser von SUPPORTED_LOCALES verschluckt keinen Code', () => {
 // optional Schrift, optional Region.
 //
 // Geprueft wird hier `localeFromFileName`, nicht `getSupportedLocales()`: der
-// Bestand traegt 24 Dateien der Form `xx.json`/`xxx.json` und keine einzige mit
-// Subtag, ein Test ueber die fertige Liste liefe also an der Erweiterung vorbei
-// und waere gruen, egal was das Muster erlaubt. Der Test darunter haengt die
+// Bestand traegt bis auf `pt-BR.json` (#1437) nur Dateien der Form
+// `xx.json`/`xxx.json` und keine mit Schrift-Subtag, ein Test ueber die fertige
+// Liste liefe also an der Erweiterung vorbei und waere gruen, egal was das
+// Muster erlaubt. Der Test darunter haengt die
 // Funktion an ihren Aufrufer, damit dieser Zugriff keine zweite Wahrheit wird.
 test('ein Locale-Dateiname darf Schrift- und Regions-Subtags tragen', async () => {
   const { localeFromFileName } = await import('../server/utils/i18n.js');
@@ -456,6 +459,7 @@ test('die Serverliste traegt jede Locale-Datei des Ordners', async () => {
   assert.equal(getSupportedLocales().length, dateien,
     'Die Serverliste ist kuerzer als der Ordner - eine Datei faellt aus dem Muster.');
   assert.ok(getSupportedLocales().includes('fil'), 'fil fehlt - der Code aus #1322');
+  assert.ok(getSupportedLocales().includes('pt-BR'), 'pt-BR fehlt - der erste Code mit Region (#1437)');
 });
 
 // CLAUDE.md: ueberall `-` statt Gedankenstrich, auch in UI-Texten (Kritik

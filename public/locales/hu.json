@@ -375,7 +375,8 @@
         "optionCalendarBirthdaysHint": "Pipa nélkül a születésnapok kimaradnak ebből a csempéből, a naptárban továbbra is ott vannak.",
         "nutritionNoTarget": "Még nincs napi cél beállítva.",
         "nutritionEntries": "Ma {{count}} bejegyzés",
-        "nutritionEntries_one": "Ma {{count}} bejegyzés"
+        "nutritionEntries_one": "Ma {{count}} bejegyzés",
+        "weatherUnavailable": "Az időjárás jelenleg nem érhető el"
     },
     "tasks": {
         "manageCategories": "Kategóriák kezelése",

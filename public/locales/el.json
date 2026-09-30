@@ -375,7 +375,8 @@
         "optionCalendarBirthdaysHint": "Χωρίς επιλογή τα γενέθλια λείπουν από αυτό το πλακίδιο, στο ημερολόγιο παραμένουν.",
         "nutritionNoTarget": "Δεν έχει οριστεί ημερήσιος στόχος.",
         "nutritionEntries": "{{count}} καταχωρίσεις σήμερα",
-        "nutritionEntries_one": "{{count}} καταχώριση σήμερα"
+        "nutritionEntries_one": "{{count}} καταχώριση σήμερα",
+        "weatherUnavailable": "Ο καιρός δεν είναι διαθέσιμος αυτή τη στιγμή"
     },
     "tasks": {
         "manageCategories": "Διαχείριση κατηγοριών",

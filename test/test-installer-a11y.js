@@ -600,6 +600,32 @@ test('Primäraktionen des Installers erfüllen AA auf Akzentgrund, in beiden The
   }
 });
 
+/* Die ausgeschaltete Schalterbahn haelt 3:1, in beiden Themes (#1572).
+ *
+ * Die Bahn stand wie in der App auf --neutral-300 und lag bei 1,65:1 auf der
+ * Karte - ein Schalter, der aus war, war kaum zu sehen (WCAG 1.4.11). Die App
+ * haelt das in test-frontend-audit.js ueber ihre Regeln; der Installer ist eine
+ * Einzeldatei mit eigenem Fallback und braucht die Zusicherung hier. Dass die
+ * Werte zu tokens.css passen, haelt "der Inline-Fallback stimmt Wert fuer Wert". */
+test('die ausgeschaltete Schalterbahn des Installers haelt 3:1, in beiden Themes', () => {
+  assert.match(html, /\.toggle__track\s*\{[^}]*background-color:\s*var\(--color-switch-off\)/,
+    'die Bahn (.toggle__track) muss --color-switch-off tragen, sonst misst dieser Guard eine Farbe, die keiner zeigt');
+  const htmlDark = html.indexOf('@media (prefers-color-scheme: dark)');
+  assert.ok(htmlDark > 0, 'Dark-Block im Inline-Fallback nicht gefunden');
+
+  const paare = [];
+  for (const [theme, from] of [['hell', 0], ['dunkel', htmlDark]]) {
+    const track = cssVar(html, '--color-switch-off', from);
+    // Karte (--color-surface) und Buehne (--color-bg); der Knopf traegt --color-surface.
+    for (const ground of ['--color-surface', '--color-bg']) paare.push([theme, track, ground, cssVar(html, ground, from)]);
+  }
+  for (const [theme, track, ground, bg] of paare) {
+    const ratio = contrastRatio(track, bg);
+    assert.ok(ratio >= 3,
+      `Inline-Fallback ${theme}: Schalterbahn ${track} auf ${ground} (${bg}) erreicht nur ${ratio.toFixed(2)}:1, WCAG 1.4.11 verlangt 3:1`);
+  }
+});
+
 test('der Installer nutzt kein --color-text-on-accent (folgt dem Theme nicht)', () => {
   // tokens.css definiert --color-text-on-accent als statisches Weiß und
   // redefiniert es in KEINEM Dark-Block. Auf einer Fläche, die im Dark-Mode
@@ -2069,8 +2095,8 @@ test('jede Boolean-Einstellung ist ein Schalter der App, keine nackte Checkbox',
   assert.equal(val('.toggle input:checked + .toggle__track::after', 'transform'), 'translateX(18px)');
   assert.equal(val('html[dir="rtl"] .toggle input:checked + .toggle__track::after', 'transform'), 'translateX(-18px)',
     'in RTL laeuft der Knopf aus der Bahn');
-  // Farben aus Tokens: aus = --neutral-300, an = Akzent, Knopf = Flaeche.
-  assert.equal(val('.toggle__track', 'background-color'), 'var(--neutral-300)');
+  // Farben aus Tokens: aus = --color-switch-off (#1572), an = Akzent, Knopf = Flaeche.
+  assert.equal(val('.toggle__track', 'background-color'), 'var(--color-switch-off)');
   assert.equal(val('.toggle input:checked + .toggle__track', 'background-color'), 'var(--color-accent)');
   assert.equal(val('.toggle__track::after', 'background'), 'var(--color-surface)');
   // Bewegung wie die App: aus ruhig, an federnd.
@@ -2080,12 +2106,12 @@ test('jede Boolean-Einstellung ist ein Schalter der App, keine nackte Checkbox',
   assert.match(val('label.toggle-row:has(input:focus-visible)', 'box-shadow') ?? '', /var\(--color-accent\)/,
     'der Schalter zeigt keinen Tastaturfokus');
   assert.ok(Number(val('.toggle input:disabled + .toggle__track', 'opacity')) < 1, 'ein gesperrter Schalter sieht aus wie ein freier');
-  // Jedes neue Token steht im Fallback, --neutral-300 in beiden Themes.
-  for (const name of ['--neutral-300', '--ease-glass', '--glass-inset-thumb']) {
+  // Jedes neue Token steht im Fallback, --color-switch-off in beiden Themes.
+  for (const name of ['--color-switch-off', '--ease-glass', '--glass-inset-thumb']) {
     assert.ok(ROOT_VARS.has(name), `${name} fehlt im Inline-Fallback`);
   }
   const dark = html.slice(html.indexOf('@media (prefers-color-scheme: dark)'), html.indexOf('</style>'));
-  assert.match(dark, /--neutral-300:\s*#/, '--neutral-300 fehlt im Dunkel-Fallback');
+  assert.match(dark, /--color-switch-off:\s*#/, '--color-switch-off fehlt im Dunkel-Fallback');
 });
 
 /* Der Docker-Schritt hatte in der Liste keinen Eintrag: waehrend des laengsten

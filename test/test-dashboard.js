@@ -3704,6 +3704,31 @@ test('Wetter: ohne Bezugstag gibt es kein "Heute"', async () => {
   }
 });
 
+test('Wetter-Verfuegbarkeit: der Grund des Proxys entscheidet, die Praeferenzen nur ohne Antwort', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const avail = __test.weatherAvailableFrom;
+  const HH = { weather_source: { source: 'db' }, weather_user: {} };
+  const NONE = { weather_source: { source: 'none' }, weather_user: { lat: null, lon: null } };
+  const MEMBER = { weather_source: { source: 'none' }, weather_user: { lat: '51.5', lon: '7.4' } };
+  assert(avail({ data: { current: {} } }, NONE) === true, 'Daten sind immer verfuegbar');
+  assert(avail({ data: null, reason: 'upstream_error' }, NONE) === true, 'gescheitert heisst eingerichtet');
+  assert(avail({ data: null, reason: 'not_configured' }, HH) === false,
+    'der Proxy kennt die ganze Regel - sein "nicht eingerichtet" schlaegt die Haushaltsquelle');
+  // Die Anfrage selbst scheiterte (`.catch` im Client): kein Grund, also die Praeferenzen.
+  assert(avail({ data: null }, HH) === true, 'Haushalt eingerichtet');
+  assert(avail({ data: null }, MEMBER) === true, 'Standort des Mitglieds zaehlt mit');
+  assert(avail({ data: null }, NONE) === false, 'nichts eingerichtet');
+  assert(avail(null, null) === false, 'vor dem Laden verspricht nichts eine Kachel');
+});
+
+test('Wetter-Karte ohne Wetter: ruhiger Zustand, kein Alarm, Aktualisieren bleibt', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const html = __test.renderWeatherUnavailable();
+  assert(html.includes('dashboard.weatherUnavailable'), 'der Zustand sagt, was los ist');
+  assert(html.includes('id="weather-refresh-btn"'), 'der Weg zurueck bleibt');
+  assert(!/role="alert"/.test(html), 'kein Alarm bei jedem Aufbau');
+});
+
 test('Wetter-Karte: die Reihe beginnt beschriftet mit morgen, nicht mit "Heute"', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   const html = __test.renderWeatherWidget(WEATHER_FIXTURE);

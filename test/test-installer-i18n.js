@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { createInstallerServer } from '../tools/installer/install-server.js';
-import { SUPPORTED_LOCALES } from '../tools/installer/i18n-mini.js';
+import { SUPPORTED_LOCALES, resolveLocale } from '../tools/installer/i18n-mini.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const LOCALES_DIR = new URL('../tools/installer/locales/', import.meta.url);
@@ -62,7 +62,9 @@ const referenceKeys = flattenKeys(loadLocale(REFERENCE));
 
 test('für jede unterstützte Locale existiert genau eine Locale-Datei', () => {
   const files = readdirSync(new URL(LOCALES_DIR)).filter(f => f.endsWith('.json')).sort();
-  assert.deepEqual(files, [...SUPPORTED_LOCALES].sort().map(l => `${l}.json`));
+  // Erst abbilden, dann sortieren: `pt-BR.json` steht vor `pt.json` ('-' < '.'),
+  // der Code `pt-BR` aber hinter `pt`.
+  assert.deepEqual(files, [...SUPPORTED_LOCALES].map(l => `${l}.json`).sort());
 });
 
 for (const locale of SUPPORTED_LOCALES) {
@@ -264,6 +266,20 @@ test('der Sprachumschalter bietet genau die unterstuetzten Sprachen an', () => {
   assert.deepEqual(offered, supported,
     `Optionsliste weicht von SUPPORTED_LOCALES ab. Nur im Select: ${offered.filter(l => !supported.includes(l))}; `
     + `nur in SUPPORTED_LOCALES: ${supported.filter(l => !offered.includes(l))}`);
+});
+
+// Der Web-Installer loest wie die App auf: erst der volle Tag, dann die
+// Basissprache. Er nahm bisher nur den Teil vor dem ersten Bindestrich, und ein
+// brasilianischer Browser bekam `pt` (#1437).
+test('resolveLocale nimmt erst den vollen Tag, dann die Basissprache', () => {
+  assert.equal(resolveLocale(['pt-BR']), 'pt-BR');
+  assert.equal(resolveLocale(['pt-br']), 'pt-BR');
+  assert.equal(resolveLocale(['pt-PT']), 'pt');
+  assert.equal(resolveLocale(['pt']), 'pt');
+  assert.equal(resolveLocale(['de-AT']), 'de');
+  assert.equal(resolveLocale(['fil-PH']), 'fil');
+  assert.equal(resolveLocale(['th-TH', 'nl-BE']), 'nl');
+  assert.equal(resolveLocale(['th-TH']), 'en');
 });
 
 /* Die Sprache, die der Installer als `language` an /api/v1/auth/setup reicht,

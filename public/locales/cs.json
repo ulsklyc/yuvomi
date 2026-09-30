@@ -413,7 +413,8 @@
         "nutritionNoTarget": "Denní cíl zatím není nastaven.",
         "nutritionEntries": "Dnes {{count}} záznamů",
         "nutritionEntries_one": "Dnes {{count}} záznam",
-        "nutritionEntries_few": "Dnes {{count}} záznamy"
+        "nutritionEntries_few": "Dnes {{count}} záznamy",
+        "weatherUnavailable": "Počasí momentálně není k dispozici"
     },
     "tasks": {
         "manageCategories": "Spravovat kategorie",

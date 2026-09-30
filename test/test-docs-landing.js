@@ -2577,7 +2577,8 @@ test('die Such-, Symbol- und Beleg-Guards erkennen den Schaden, gegen den sie ge
   assert.notEqual(otherFile, html);
   assert.match(proofLinkFindings(otherFile).join(), /enthaelt die Versionspruefung nicht/);
   // Trennpunkte: als Text zurueck, und das Sternskript schreibt ihn wieder.
-  const textSep = html.replace('<span class="pi"><b>24</b>', '<span class="sep">·</span>\n    <span class="pi"><b>24</b>');
+  // Ohne die Sprachzahl im Muster: sie waechst mit jeder neuen Sprache (24 -> 25 mit pt-BR).
+  const textSep = html.replace(/<span class="pi"><b>\d+<\/b> <span data-t="proof_langs">/, '<span class="sep">·</span>\n    $&');
   assert.notEqual(textSep, html);
   assert.equal(proofSeparatorFindings(textSep, repo('scripts/update-gh-stars.mjs')).length, 1);
   const oldScript = repo('scripts/update-gh-stars.mjs').replace(/(gh-stars-proof[\s\S]*?replacement:\s*`)\$1\$\{stars\}\$2`/, '$1$1${stars} ·$2`');

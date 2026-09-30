@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { getSupportedLocales } from '../public/i18n.js';
 import { readdirSync, readFileSync } from 'node:fs';
 import {
   noteMatchesCategories,
@@ -287,7 +288,7 @@ test('all supported locales contain every note-category translation', () => {
     'moreAction', 'moreAction_one', 'personalManagementHint',
   ];
   const files = readdirSync(directory).filter((file) => file.endsWith('.json'));
-  assert.equal(files.length, 24);
+  assert.equal(files.length, getSupportedLocales().length);
   for (const file of files) {
     const locale = JSON.parse(readFileSync(new URL(file, directory), 'utf8'));
     for (const key of keys) {

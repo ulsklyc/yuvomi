@@ -664,7 +664,9 @@ test('R14 P2: Anpassen mobil ist eine kompakte Liste - Name, Griff, Auge - und d
   const cfg = [
     { id: 'notes', visible: true, size: '1x2' },
     { id: 'budget', visible: true, size: '1x1' },
-    { id: 'weather', visible: false, size: '1x1' },
+    // Die Uhr, nicht das Wetter: das Wetter ist erst verfuegbar, wenn der
+    // Wetter-Proxy es eingerichtet meldet, und diese Sonde laedt nichts.
+    { id: 'clock', visible: false, size: '1x1' },
   ];
   global.window ??= { yuvomi: null };
   const html = renderDashboardLayout(cfg, {}, null, 'EUR', { editing: true });

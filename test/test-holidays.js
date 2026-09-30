@@ -563,6 +563,23 @@ test('sync: Brazil local fallback follows the data language, not the country', a
   assert.ok(!names.includes('Natal'));
 });
 
+// Die Feiertagsnamen tragen einen Sprachcode ohne Region (`PT`, bei der API wie
+// im lokalen Fallback). Seit pt-BR eine eigene Datensprache ist (#1437), liefert
+// resolveHouseholdLocale auch `pt-BR` - hochgestellt `PT-BR`, das keinen Namen
+// trifft, und ein brasilianischer Haushalt bekaeme seine Feiertage auf Englisch.
+test('sync: a data language with a region picks the names of its language (pt-BR)', async () => {
+  __setFetchImpl(makeApiMock());
+  setConfig({ holiday_country: 'BR', holiday_show_public: '1', holiday_show_school: '0', language: 'pt-BR' });
+
+  await sync(true);
+
+  const names = db.prepare(
+    "SELECT name FROM holiday_cache WHERE country='BR' AND type='public' AND year=? ORDER BY start_date"
+  ).all(new Date().getFullYear()).map((row) => row.name);
+  assert.ok(names.includes('Natal'), `PT-Fassung erwartet, bekam: ${names.join(', ')}`);
+  assert.ok(!names.includes('Christmas Day'));
+});
+
 test('sync: throttles automatic sync if executed within 30 days', async () => {
   const mock = makeApiMock();
   __setFetchImpl(mock);

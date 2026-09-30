@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.71.0] - 2026-09-30
+
+### Added
+
+- **Brazilian Portuguese as its own language** (#1437, translated by @dareoon). The app, the
+  web installer and the command-line installer speak pt-BR as the 25th language, next to the
+  existing Portuguese. A Brazilian browser or `LANG=pt_BR.UTF-8` picks it on its own, as does a
+  household whose region is Brazil for the entries Yuvomi writes itself; every other Portuguese
+  region keeps `pt`. Holiday names in Brazil stay Portuguese under the new data language.
+
 ### Changed
 
 - **The website and README screenshots show v2.70.0, and the family section shows the wall mode.**
@@ -46,7 +56,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wider than a phone screen. The website says the week's meal plan reaches the shopping list
   through one import, not one tap.
 
+- **The installation guide covers rootless Podman without a route to the internet.** The app
+  works, but everything that reaches outside fails: the weather tile says the weather is currently
+  unavailable, and ICS subscriptions and CalDAV to outside servers stop updating. A new entry under
+  troubleshooting in `docs/installation.md` shows how to recognise it (a test from inside the
+  container ends in `ENETUNREACH`, its routing table is empty) and the fix, `Network=podman` in the
+  Quadlet unit, together with what the bridge network changes for sign-in lockout and rate limits
+  without a reverse proxy.
+
 ### Fixed
+
+- **The weather tile no longer vanishes when the weather provider fails.** With weather set up
+  (Open-Meteo or OpenWeatherMap), a failed request to the provider removed the tile from the
+  overview, from the hidden widgets you can add back under Customize, and took the weather line in
+  the header with it. The tile now stays in place and says the weather is currently unavailable,
+  with its refresh button to try again, and picks the weather up on the next automatic refresh.
+  Without any weather set up, the tile is not offered at all, like a switched-off module. The server
+  log now names the provider and the cause of a failed request (HTTP status or error code, or a
+  missing API key), at most once per half hour per cause, and `GET /api/v1/weather` answers
+  `{ data: null, reason }` with `not_configured` or `upstream_error`.
+
+- **A switch that is off is easy to see, and in Arabic and Persian "on" sits on the left.** The
+  track of a switch that is off was a light grey that nearly vanished into its row, in light and
+  dark mode alike; it is now dark enough to stand out against every surface a switch appears on,
+  also while the pointer rests on the row. In right-to-left languages the knob now moves to the
+  left when a switch is on, as on iPhone and in the web installer. The installer's switches get
+  the same track colour.
+
+- **In the installed app on an iPhone, no dark strip sits under the tab bar any more.** Below the
+  floating tab bar, a bar the height of the home indicator area covered the page in the surface
+  colour. It was built to continue an opaque tab bar to the screen edge. Since 2.70.0 the page
+  scrolls on under the tab bar, so the strip cut it off above the edge and took taps meant for the
+  row behind it. The page now runs to the edge of the screen. Only the app added to the home screen
+  was affected, not the browser tab.
 
 - **Members who may write to the meal plan can now edit and delete recipes somebody else added
   (#1577).** Saving a recipe that another member had created failed with "Not authorized", even
@@ -68,7 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   location is saved under Settings → Household → Integrations (was Settings → Integrations), SMTP is
   managed under Settings → Household → Email (SMTP), the timezone is changed under Settings →
   Account → Appearance, and further CalDAV accounts are added under Settings → Modules → Calendar,
-  in all 24 installer languages.
+  in every installer language.
 
 - **A command-line restore refuses to run while Yuvomi is running** (#1530). `scripts/restore-backup.js`
   replaced the database without knowing whether a server was working on it: the file changed under

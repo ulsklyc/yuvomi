@@ -14,7 +14,7 @@ import { CURRENCY_CODES } from '../public/utils/currency-codes.js';
 import { REGION_TAG, formatUnit, getNumberFormat } from '../public/i18n.js';
 import { withoutCommentsKeepingLines } from './source-text.js';
 import { withLocales } from './i18n-env.js';
-import { isRegionTag, regionLanguage } from '../server/utils/i18n.js';
+import { isRegionTag, regionLocale, resolveHouseholdLocale } from '../server/utils/i18n.js';
 
 // Die Formprüfung aus getFormatLocale() wird IMPORTIERT, nicht gespiegelt. Bis
 // 20.09.2026 stand hier eine Kopie des Musters, und eine Kopie belegt nur, dass
@@ -530,8 +530,11 @@ test('jede ausgelieferte Sprache hat mindestens ein Region-Preset (#297)', async
 
   assert.ok(locales.length > 0, 'public/locales/ muss Sprachdateien enthalten');
 
-  const languagesWithRegion = new Set(REGION_CODES.map((code) => code.split('-')[0]));
-  const orphans = locales.filter((locale) => !languagesWithRegion.has(locale));
+  // Eine Locale mit Region im Namen (pt-BR, #1437) ist durch genau diesen
+  // Preset gedeckt; der blosse Sprachteil `pt` passte zu keiner Locale-Datei
+  // namens `pt-BR` und hielt sie fuer verwaist.
+  const hasRegion = (locale) => REGION_CODES.some((code) => code === locale || code.startsWith(`${locale}-`));
+  const orphans = locales.filter((locale) => !hasRegion(locale));
 
   assert.deepEqual(
     orphans,
@@ -573,17 +576,40 @@ test('every region preset passes both shape checks', () => {
     `Diese Presets stehen im Dropdown, werden aber als Region abgewiesen: ${abgewiesen.join(', ')}`);
 });
 
-// Der Sprachteil ist das, was aus einer Region eine Datensprache macht
-// (resolveHouseholdLocale). Er trägt den Schrift-Subtag NICHT, weil die
-// Locale-Dateien reine Sprachcodes heissen: aus `zh-Hant-TW` muss `zh` werden,
-// sonst fiele ein chinesischer Haushalt auf Englisch zurück.
-test('the language part of a region drops the script subtag', () => {
-  assert.equal(regionLanguage('fil-PH'), 'fil');
-  assert.equal(regionLanguage('de-DE'), 'de');
-  assert.equal(regionLanguage('zh-Hant-TW'), 'zh');
-  assert.equal(regionLanguage('sr-Latn-RS'), 'sr');
-  assert.equal(regionLanguage('custom'), null);
-  assert.equal(regionLanguage(null), null);
+// regionLocale() macht aus einer Region eine Datensprache
+// (resolveHouseholdLocale). Solange es keine `zh-Hant.json` gibt, muss aus
+// `zh-Hant-TW` `zh` werden, sonst fiele ein chinesischer Haushalt auf
+// Englisch zurück; eine Sprache ohne Datei liefert null statt eines Codes,
+// den niemand laden kann.
+test('a region yields its most specific supported locale', () => {
+  assert.equal(regionLocale('fil-PH'), 'fil');
+  assert.equal(regionLocale('de-DE'), 'de');
+  assert.equal(regionLocale('pt-BR'), 'pt-BR');
+  assert.equal(regionLocale('pt-PT'), 'pt');
+  assert.equal(regionLocale('zh-Hant-TW'), 'zh');
+  assert.equal(regionLocale('sr-Latn-RS'), null);
+  assert.equal(regionLocale('custom'), null);
+  assert.equal(regionLocale(null), null);
+});
+
+// Eine Region, deren voller Tag selbst eine Locale ist, bekommt diese Locale
+// und nicht nur ihren Sprachteil: ein brasilianischer Haushalt schrieb bis
+// #1437 seine Geburtstagstitel auf europaeischem Portugiesisch, obwohl pt-BR
+// daneben lag. Dieselbe Richtung wie pickLocale() im Frontend - der volle Tag,
+// dann ohne den jeweils letzten Subtag.
+test('a region resolves to the most specific supported data language', () => {
+  const household = (cfg) => ({
+    prepare: () => ({ get: (key) => (key in cfg ? { value: cfg[key] } : undefined) }),
+  });
+  assert.equal(resolveHouseholdLocale(household({ region: 'pt-BR' })), 'pt-BR');
+  assert.equal(resolveHouseholdLocale(household({ region: 'pt-PT' })), 'pt');
+  assert.equal(resolveHouseholdLocale(household({ region: 'de-AT' })), 'de');
+  assert.equal(resolveHouseholdLocale(household({ region: 'fil-PH' })), 'fil');
+  assert.equal(resolveHouseholdLocale(household({ region: 'zh-Hant-TW' })), 'zh');
+  assert.equal(resolveHouseholdLocale(household({ region: 'sr-Latn-RS' })), 'en');
+  assert.equal(resolveHouseholdLocale(household({ region: 'custom' })), 'en');
+  assert.equal(resolveHouseholdLocale(household({ language: 'pt', region: 'pt-BR' })), 'pt',
+    'Eine ausdruecklich gewaehlte Sprache schlaegt die Region weiterhin.');
 });
 
 // DER DEMO-SEED MUSS AUF EINER REGION LANDEN. Er schrieb `date_format:

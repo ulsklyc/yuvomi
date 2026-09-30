@@ -375,7 +375,8 @@
         "optionCalendarBirthdaysHint": "取消勾选后，此卡片不再显示生日，日历中仍会保留。",
         "nutritionNoTarget": "尚未设置每日目标。",
         "nutritionEntries": "今天 {{count}} 条记录",
-        "nutritionEntries_one": "今天 {{count}} 条记录"
+        "nutritionEntries_one": "今天 {{count}} 条记录",
+        "weatherUnavailable": "天气暂时不可用"
     },
     "tasks": {
         "manageCategories": "管理类别",

@@ -173,7 +173,7 @@ Optional `capabilities` block in `module.json` registers your module with the sa
 
 Third-party modules integrate with the same `t('key')` helper as core UI (`import { t } from '/i18n.js'`).
 
-**Supported languages:** the same 24 locales as Yuvomi core (`getSupportedLocales()` / files under `public/locales/`). You may ship all of them, a subset, or only your default - the runtime never shows raw i18n keys in shell UI.
+**Supported languages:** the same 25 locales as Yuvomi core (`getSupportedLocales()` / files under `public/locales/`). You may ship all of them, a subset, or only your default - the runtime never shows raw i18n keys in shell UI.
 
 **Ship translation files** under `locales/{locale}.json` in your module folder (for example `locales/de.json`, `locales/en.json`, `locales/ru.json`). Yuvomi scans that folder at module load and exposes metadata on `GET /api/v1/modules`:
 

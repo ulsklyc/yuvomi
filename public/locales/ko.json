@@ -389,7 +389,8 @@
         "optionCalendarBirthdaysHint": "체크를 해제하면 이 타일에 생일이 표시되지 않습니다. 캘린더에는 그대로 남습니다.",
         "nutritionNoTarget": "아직 하루 목표가 없습니다.",
         "nutritionEntries": "오늘 기록 {{count}}건",
-        "nutritionEntries_one": "오늘 기록 {{count}}건"
+        "nutritionEntries_one": "오늘 기록 {{count}}건",
+        "weatherUnavailable": "현재 날씨를 불러올 수 없습니다"
     },
     "tasks": {
         "manageCategories": "카테고리 관리",

@@ -7,6 +7,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { getSupportedLocales } from '../public/i18n.js';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -1742,7 +1743,7 @@ test('das Sammel-Loeschen sagt, dass es keinen Papierkorb gibt - in jeder Sprach
   assert.match(de.documents.bulkDeleteConfirmDetail ?? '', /endgültig/);
   const dir = resolve(HERE, '../public/locales');
   const locales = readdirSync(dir).filter((f) => f.endsWith('.json'));
-  assert.equal(locales.length, 24);
+  assert.equal(locales.length, getSupportedLocales().length);
   for (const file of locales) {
     const value = JSON.parse(readFileSync(resolve(dir, file), 'utf8')).documents?.bulkDeleteConfirmDetail;
     assert.ok(typeof value === 'string' && value.trim().length > 0, `${file}: documents.bulkDeleteConfirmDetail fehlt`);

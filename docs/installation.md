@@ -10,7 +10,7 @@ node tools/installer/install-server.js
 # Open http://localhost:8090
 ```
 
-Requires Node.js 22+ on the host. The browser-based wizard is fully localized (24 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
+Requires Node.js 22+ on the host. The browser-based wizard is fully localized (25 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
 
 ### Option B — CLI Installer (Linux / macOS)
 
@@ -19,7 +19,7 @@ git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
 bash install.sh
 ```
 
-The script checks prerequisites, generates security keys, asks for the base URL your household will use, configures optional integrations (weather via Open-Meteo coordinates, calendars, document storage), starts the container (Docker or Podman — auto-detected), and creates your admin account. Like the web installer, it is fully localized in 24 languages and auto-detects yours from the shell environment (`LANG`/`LC_ALL`).
+The script checks prerequisites, generates security keys, asks for the base URL your household will use, configures optional integrations (weather via Open-Meteo coordinates, calendars, document storage), starts the container (Docker or Podman — auto-detected), and creates your admin account. Like the web installer, it is fully localized in 25 languages and auto-detects yours from the shell environment (`LANG`/`LC_ALL`).
 
 Running it again on an existing installation is safe, in two ways:
 
@@ -28,7 +28,7 @@ Running it again on an existing installation is safe, in two ways:
 
 > **Base URL.** The script asks for the absolute origin your household will open (default `http://<host>:<port>`) and writes it as `BASE_URL`. Behind a reverse proxy, enter the public address there — for example `https://yuvomi.example.com`. Without it the server sends no password-reset or invitation emails at all, because it deliberately does not trust the request's `Host` header.
 
-Force a specific language with `--lang` (one of `de en es fr it sv el ru tr zh ja ar hi pt uk pl nl cs vi hu ko id fa fil`):
+Force a specific language with `--lang` (one of `de en es fr it sv el ru tr zh ja ar hi pt-BR pt uk pl nl cs vi hu ko id fa fil`):
 
 ```bash
 bash install.sh --lang de
@@ -251,7 +251,7 @@ node tools/installer/install-server.js
 
 #### 3. Open the Wizard
 
-Open your browser and navigate to **http://localhost:8090**. The wizard detects your browser language (24 languages supported), verifies that a container engine is available (Docker with Compose v2, or Podman with `podman compose` / `podman-compose`), and reports an existing `.env` file as well as a running container before you start. When it finds one, the **simple setup is disabled** and you continue with the advanced setup: the simple path writes fixed values for host, port, `SESSION_SECURE` and `TRUST_PROXY`, which would silently downgrade an installation that already runs behind a reverse proxy. The wizard then guides you through:
+Open your browser and navigate to **http://localhost:8090**. The wizard detects your browser language (25 languages supported), verifies that a container engine is available (Docker with Compose v2, or Podman with `podman compose` / `podman-compose`), and reports an existing `.env` file as well as a running container before you start. When it finds one, the **simple setup is disabled** and you continue with the advanced setup: the simple path writes fixed values for host, port, `SESSION_SECURE` and `TRUST_PROXY`, which would silently downgrade an installation that already runs behind a reverse proxy. The wizard then guides you through:
 
 - Basics - domain/IP, HTTP host port (`OIKOS_HTTP_PORT`), timezone (`TZ`, which pre-sets the household zone; that one is changeable later under Settings → Account → Appearance → Region), how Yuvomi is exposed (`SESSION_SECURE`, `TRUST_PROXY`) and the public address (`BASE_URL`). The exposure choice follows the host you enter, and the wizard rejects an `http://` address combined with enforced secure cookies - nobody could sign in to that combination. A typed public address only counts once it names a full `http://` or `https://` origin; until then the wizard keeps the address it derives from host and port. A timezone the browser does not recognise (`Europe/Berln`) is refused on the spot instead of silently falling back to UTC
 - Security key generation (`SESSION_SECRET`, `DB_ENCRYPTION_KEY`) — on a re-run, keys already present in your `.env` are kept rather than regenerated, so running the wizard again on a live installation cannot lock you out of your encrypted database
@@ -313,9 +313,9 @@ docker compose up -d
 Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no Node.js installation needed.
 
 > **Pinning a version.** Every release is also published under immutable tags:
-> `2.70.0` (exact version), `2.70` (latest patch of that minor), plus a moving `main`
+> `2.71.0` (exact version), `2.71` (latest patch of that minor), plus a moving `main`
 > tag for the current development state. To pin production to a known-good release,
-> set `image: ghcr.io/ulsklyc/yuvomi:2.70.0` in your compose file and bump it
+> set `image: ghcr.io/ulsklyc/yuvomi:2.71.0` in your compose file and bump it
 > deliberately; `latest` always points at the newest release.
 
 > **Verifying what you pull.** Every image the publish workflow builds is signed at build
@@ -324,7 +324,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > image you are about to run is one GitHub built from a release tag of this repository:
 >
 > ```bash
-> cosign verify ghcr.io/ulsklyc/yuvomi:2.70.0 \
+> cosign verify ghcr.io/ulsklyc/yuvomi:2.71.0 \
 >   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
 >   --certificate-identity-regexp '^https://github.com/ulsklyc/yuvomi/.github/workflows/docker-publish.yml@refs/tags/v'
 > ```
@@ -333,7 +333,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > anything else means the image is not one this repository released. The `main` tag is
 > signed too, under `refs/heads/main`, which the pattern above deliberately excludes. Tags
 > published before September 2026 carry no signature. Provenance and SBOM travel inside the
-> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.70.0 --format '{{ json .Provenance }}'`.
+> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.71.0 --format '{{ json .Provenance }}'`.
 
 Continue with [Step 4 — Verify](#4-verify-the-container-is-running).
 
@@ -378,7 +378,7 @@ docker compose logs -f
 You should see output like:
 
 ```
-yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.70.0
+yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.71.0
 yuvomi  | [Yuvomi] Environment: production
 yuvomi  | [Sync] Auto-sync active every 15 minutes.
 ```
@@ -1458,6 +1458,53 @@ To relabel existing host folders manually:
 ```bash
 chcon -Rt container_file_t ./data ./backups ./modules ./documents
 ```
+
+</details>
+
+<details>
+<summary>Weather, calendar subscriptions and other outside services stop working (rootless Podman)</summary>
+
+The app itself works, but everything that reaches out to the internet fails: the weather tile says
+"Weather currently unavailable", ICS subscriptions and CalDAV to outside servers stop updating. The
+log shows `fetch failed`:
+
+```bash
+podman logs oikos 2>&1 | grep '"level":"warn"' | tail
+```
+
+In production the log lines are JSON, so search for `"mod":"Weather"` rather than `[Weather]`.
+Test from inside the container:
+
+```bash
+podman exec oikos node -e "fetch('https://api.open-meteo.com').then(r=>console.log(r.status)).catch(e=>console.log('ERR',e.cause?.code))"
+```
+
+Any HTTP status (400 is fine here) means the container can reach the internet. `ERR ENETUNREACH`
+means it has no route out, even when name lookups still work. Check the container's routing
+table:
+
+```bash
+podman exec oikos cat /proc/net/route
+```
+
+If it shows only the header line, the rootless default network (`pasta`) left the container without
+any route. Restarting does not always help. Switch the unit to the rootless bridge network by adding
+this line under `[Container]` in `~/.config/containers/systemd/oikos.container`:
+
+```ini
+Network=podman
+```
+
+Then reload and restart:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user restart oikos
+```
+
+On the bridge network Yuvomi sees the bridge gateway instead of each client's address. Behind a
+reverse proxy that sets `X-Forwarded-For` this makes no difference; without one, sign-in lockout
+and rate limits count all clients as one.
 
 </details>
 

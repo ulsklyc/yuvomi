@@ -292,7 +292,7 @@ argument.
   ([CONTRIBUTING.md](../CONTRIBUTING.md#what-a-human-guarantees)); two automated reviewers
   comment on every pull request and merge nothing. A required second approval with one person
   holding the key would be theatre. *Opens with:* the same second maintainer.
-- **No translation platform.** The 24 locales live in the repository as JSON, and a guard
+- **No translation platform.** The 25 locales live in the repository as JSON, and a guard
   (`test:i18n-translated`) refuses a locale that regresses toward untranslated English. A hosted
   platform would not run that guard, so a pull request from it could turn a translated file back
   into a copy of the reference without anyone seeing it. Translations arrive as pull requests

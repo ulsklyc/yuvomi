@@ -7,6 +7,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { getSupportedLocales } from '../public/i18n.js';
 import { readFileSync, existsSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -252,10 +253,9 @@ test('category-manager.css: respektiert prefers-reduced-motion', () => {
 // i18n: dragHandle + reorderAnnounce in allen Locales
 // --------------------------------------------------------
 
-const LOCALES = [
-  'ar', 'cs', 'de', 'el', 'en', 'es', 'fa', 'fr', 'hi', 'hu', 'id', 'it',
-  'ja', 'ko', 'nl', 'pl', 'pt', 'ru', 'sv', 'tr', 'uk', 'vi', 'zh',
-];
+// Aus SUPPORTED_LOCALES statt als Liste: die Liste hier kannte 23 Sprachen,
+// `fil` (v1.78.0) und `pt-BR` (#1437) kamen dazu, ohne dass sie mitwuchs.
+const LOCALES = getSupportedLocales();
 
 test('locales: category.dragHandle und category.reorderAnnounce existieren in allen Sprachen', () => {
   const missing = [];

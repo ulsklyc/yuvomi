@@ -375,7 +375,8 @@
         "optionCalendarBirthdaysHint": "Sin marcar, los cumpleaños no aparecen en esta tarjeta; en el calendario siguen estando.",
         "nutritionNoTarget": "Aún no hay objetivo diario.",
         "nutritionEntries": "{{count}} registros hoy",
-        "nutritionEntries_one": "{{count}} registro hoy"
+        "nutritionEntries_one": "{{count}} registro hoy",
+        "weatherUnavailable": "El tiempo no está disponible en este momento"
     },
     "tasks": {
         "manageCategories": "Gestionar categorías",

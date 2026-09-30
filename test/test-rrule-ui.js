@@ -23,6 +23,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { getSupportedLocales } from '../public/i18n.js';
 
 const {
   parseRRule, buildRRule, describeRRule, renderRRuleFields, getRRuleValues,
@@ -421,7 +422,7 @@ test('Vorschau und Serienmarke sind in allen unterstützten Sprachen vollständi
   const { readFileSync, readdirSync } = await import('node:fs');
   const dir = new URL('../public/locales/', import.meta.url);
   const sprachen = readdirSync(dir).filter((f) => f.endsWith('.json'));
-  assert.equal(sprachen.length, 24, 'der Test muss die vollständige unterstützte Sprachliste sehen');
+  assert.equal(sprachen.length, getSupportedLocales().length, 'der Test muss die vollständige unterstützte Sprachliste sehen');
 
   for (const datei of sprachen) {
     const locale = JSON.parse(readFileSync(new URL(datei, dir), 'utf8'));

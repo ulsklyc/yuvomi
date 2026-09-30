@@ -13,6 +13,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { getSupportedLocales } from '../public/i18n.js';
 import { readFileSync, readdirSync } from 'node:fs';
 
 const { withoutBlockComments } = await import('./source-text.js');
@@ -641,7 +642,7 @@ test('Die Schlüssel beider Rückfragen stehen in allen Locales', () => {
   const locales = readdirSync(dir)
     .filter((file) => file.endsWith('.json'))
     .map((file) => file.replace(/\.json$/, ''));
-  assert.equal(locales.length, 24);
+  assert.equal(locales.length, getSupportedLocales().length);
   for (const loc of locales) {
     const cal = JSON.parse(readFileSync(new URL(`${loc}.json`, dir), 'utf-8')).calendar;
     for (const k of keys) {
@@ -667,7 +668,7 @@ test('whole-series-only warnings are meaningful in every locale and use no dash 
   ];
   const dir = new URL('../public/locales/', import.meta.url);
   const locales = readdirSync(dir).filter((file) => file.endsWith('.json'));
-  assert.equal(locales.length, 24);
+  assert.equal(locales.length, getSupportedLocales().length);
   for (const file of locales) {
     const cal = JSON.parse(readFileSync(new URL(file, dir), 'utf-8')).calendar;
     for (const key of keys) {

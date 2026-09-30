@@ -375,7 +375,8 @@
         "optionCalendarBirthdaysHint": "Zonder vinkje blijven verjaardagen weg uit deze tegel - in de agenda staan ze nog.",
         "nutritionNoTarget": "Nog geen dagdoel ingesteld.",
         "nutritionEntries": "{{count}} items vandaag",
-        "nutritionEntries_one": "{{count}} item vandaag"
+        "nutritionEntries_one": "{{count}} item vandaag",
+        "weatherUnavailable": "Weer momenteel niet beschikbaar"
     },
     "tasks": {
         "manageCategories": "Categorieën beheren",
