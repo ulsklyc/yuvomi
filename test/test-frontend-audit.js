@@ -17849,7 +17849,7 @@ test('dashboard: Timer und Listener haengen am Signal des eigenen Aufbaus, nicht
   assert.doesNotMatch(render, /_fabController\.signal/,
     'render() verdrahtet ueber `signal` (lokal), nicht ueber `_fabController.signal`');
   // Der Neuaufbau ist seit #1588 ein Block: nach dem synchronen Teil holt er
-  // den FAB in die Shell-Ebene (window.yuvomi.adoptPageFab, gemessen in
+  // den FAB in die Shell-Ebene (window.yuvomi.replacePageFab, gemessen in
   // test:dashboard-surface-browser). Das Signal reicht er unveraendert weiter.
   assert.match(render, /const rerender = \(\) => \{\s*const done = render\(container, \{ user, signal: routeSignal \}\);/,
     'ein Neuaufbau reicht das Router-Signal weiter, sonst ueberlebt er das Verlassen der Seite');

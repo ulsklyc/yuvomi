@@ -844,6 +844,36 @@ function assertFabDocked(state, when) {
   assert.deepEqual(findings, [], `${when}:\n${findings.join('\n')}`);
 }
 
+/* DER UMGEKEHRTE WEG: beim Betreten bringt der Neuaufbau KEINEN FAB mit, und
+ * der alte haengt schon in der Shell-Ebene neben dem Container. Geraeumt wurde
+ * er bis dahin erst nach der Antwort von `/dashboard` - solange sie laeuft,
+ * stand das Plus bedienbar auf einer Flaeche, die nichts anlegt. Die Anfrage
+ * wird deshalb angehalten: gemessen wird der Moment, bevor die Daten da sind. */
+test('FAB: beim Betreten des Wand-Modus steht keiner auf der Wand, auch solange die Daten laden (mobile, #1588)', async () => {
+  const page = await openPage(harness, { device: 'mobile' });
+  await page.waitForSelector('#fab-layer #fab-main');
+  const held = [];
+  page.__yuvomiRequestInterceptor = (req) => {
+    if (!/\/api\/v1\/dashboard(\?|$)/.test(req.url())) return false;
+    held.push(req);
+    return true;
+  };
+  await page.click('#dashboard-wall-enter');
+  await page.waitForSelector('.wall #wall-exit');
+  await wait(300);
+  const state = await page.evaluate(() => ({
+    wall: document.documentElement.hasAttribute('data-wall-mode'),
+    fabs: document.querySelectorAll('#fab-main, #fab-layer .page-fab').length,
+  }));
+  const pending = held.length;
+  page.__yuvomiRequestInterceptor = null;
+  for (const req of held) req.continue();
+  await page.close();
+  assert.ok(state.wall, 'Reichweite: die Wand steht');
+  assert.ok(pending >= 1, 'Reichweite: die Anfrage an /dashboard wurde gar nicht angehalten');
+  assert.equal(state.fabs, 0, `auf der Wand stehen ${state.fabs} FAB, solange die Daten laden`);
+});
+
 test('FAB: nach dem Verlassen des Wand-Modus steht er in der Shell-Ebene, mit Plus, neben der Kapsel (mobile, #1588)', async () => {
   const page = await openPage(harness, { device: 'mobile' });
   assertFabDocked(await fabOverCapsule(page), 'vor dem Wand-Modus');

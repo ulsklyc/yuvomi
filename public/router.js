@@ -5073,14 +5073,21 @@ window.yuvomi = {
   // zweites Mal holen zu lassen. Begruendung an `primeModuleCountsFrom`.
   primeModuleCountsFrom,
   // Fuer eine Seite, die sich SELBST neu aufbaut, ohne dass der Router
-  // navigiert - die Uebersicht beim Verlassen des Wand-Modus, nach „erneut
-  // versuchen" oder einer Aenderung aus einer Kachel. Ihr FAB entsteht dann im
-  // Scrollport, und renderPage() hebt ihn nicht in die Shell-Ebene: das Glyph
-  // blieb ungezeichnet (die Icons zeichnet sonst erst updateNav()), und die
-  // Tab-Kapsel hielt ihr hinteres Ende nicht mehr frei, weil ihre Reserve an
-  // `.fab-layer .page-fab` haengt - die Slots liefen unter den Knopf (#1588).
-  // Dieselbe Funktion wie beim Seitenwechsel, samt Kurzbefehl und Glyph.
-  adoptPageFab: () => {
+  // navigiert - die Uebersicht beim Betreten und Verlassen des Wand-Modus, nach
+  // „erneut versuchen" oder einer Aenderung aus einer Kachel. renderPage()
+  // laeuft dann nicht, und mit ihm fehlten beide Haelften des FAB-Wechsels
+  // (#1588):
+  //   - clearPageFab(): der Knopf des vorigen Aufbaus haengt schon in der
+  //     Shell-Ebene neben dem Container. Bringt der neue Aufbau keinen mit (die
+  //     Wand), stand der alte bedienbar auf der Wand, bis die Seite ihn nach
+  //     ihren Daten selbst raeumte.
+  //   - adoptPageFab(): bringt er einen mit, blieb der im Scrollport - ohne
+  //     Glyph (die Icons zeichnet sonst erst updateNav()), und die Tab-Kapsel
+  //     hielt ihr hinteres Ende nicht mehr frei, weil ihre Reserve an
+  //     `.fab-layer .page-fab` haengt: die Slots liefen unter den Knopf.
+  // Aufzurufen direkt nach dem synchronen Teil von render(), wie in renderPage().
+  replacePageFab: () => {
+    clearPageFab();
     const fab = adoptPageFab();
     if (fab) {
       markFabShortcut(fab);

@@ -6007,14 +6007,14 @@ export async function render(container, { user, signal: routeSignal = null } = {
   `);
 
   // Ein Neuaufbau AUS DER SEITE HERAUS laeuft nicht durch renderPage() im
-  // Router, und damit an dessen Umzug des FAB in die Shell-Ebene vorbei (#634).
-  // Der synchrone Teil von render() hat den Speed-Dial schon in den Container
-  // gelegt; von dort holt ihn derselbe Router-Schritt wie beim Seitenwechsel.
-  // Ohne ihn stand der Knopf nach dem Verlassen des Wand-Modus ohne Plus da,
-  // und die Tab-Leiste lief unter ihm durch (#1588).
+  // Router, und damit an dessen FAB-Wechsel vorbei (#634): den alten Knopf aus
+  // der Shell-Ebene raeumen, den neuen aus dem Container dorthin heben. Der
+  // synchrone Teil von render() hat den Speed-Dial schon gelegt - oder, auf der
+  // Wand, keinen. Ohne diesen Schritt stand beim Betreten der alte Knopf auf der
+  // Wand und nach dem Verlassen der neue ohne Plus im Scrollport (#1588).
   const rerender = () => {
     const done = render(container, { user, signal: routeSignal });
-    window.yuvomi?.adoptPageFab?.();
+    window.yuvomi?.replacePageFab?.();
     return done;
   };
   // Steht keine Wand mehr (Ausstieg, Einstellungen), gehoert der Marker nicht
