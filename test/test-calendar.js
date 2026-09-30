@@ -3325,7 +3325,9 @@ test('#1064: eine ausgeblendete Quelle zaehlt am Filterknopf als ein Filter', ()
 // --------------------------------------------------------
 test('scheduleEnabled() verlangt zusaetzlich moduleAccess(\'schedule\') !== \'none\', wie wasteEnabled() es fuer waste tut', () => {
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
-  assert(/import \{ moduleAccess \} from '\/permissions\.js';/.test(src), 'moduleAccess muss importiert sein');
+  // Gleich, ob allein oder mit anderen Namen aus demselben Modul importiert:
+  // die Regel ist "moduleAccess kommt aus /permissions.js", nicht die Schreibweise der Zeile.
+  assert(/import \{[^}]*\bmoduleAccess\b[^}]*\} from '\/permissions\.js';/.test(src), 'moduleAccess muss importiert sein');
   const fnBody = src.slice(src.indexOf('function scheduleEnabled()'), src.indexOf('function wasteEnabled()'));
   assert(/isModuleDisabled\?\.\('schedule'\)/.test(fnBody), 'die bestehende Abschaltungs-Pruefung darf nicht verschwinden');
   assert(/moduleAccess\('schedule'\) !== 'none'/.test(fnBody),

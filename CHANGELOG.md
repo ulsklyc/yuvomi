@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the rhythm is changed on the first entry with "Only this occurrence", which until now left
   the old bookings standing and added the new ones beside them.
 
+- **After leaving wall mode on the phone, the plus button and the tab bar look as before** (#1588).
+  Leaving wall mode redrew the overview without taking its plus button out of the page: the button
+  lost its plus sign, the tab bar stopped leaving room for it, its tabs grew wider and "More" slid
+  under the button. The same happened after "Try again" on an overview that had failed to load.
+  In both cases the button now takes its usual place next to the tab bar. Entering wall mode no
+  longer leaves the plus button on the wall while the overview loads.
+
 - **The task list orders a day's tasks by the household's clock, not the device's.** The order
   inside a group and a board column read the due time in the device's time zone. On a device whose
   zone skips an hour for daylight saving time, a task due in that hour moved an hour later and
