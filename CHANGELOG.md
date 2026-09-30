@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Correcting the date of a series' first entry no longer moves the rest of the series** (#1545).
+  Every later occurrence of a recurring payment is counted from its start day, and that was still
+  the date of the first entry. Correcting it with "Only this occurrence" (the rent was debited on
+  the 6th, not the 5th) moved every month not yet shown to the 6th, and for a weekly or "every N"
+  series it changed which days came up at all. A series now keeps its own start day. To move it,
+  change the date on the first entry and choose "Change all future occurrences": the occurrences
+  from today on move to the new day, while the first entry keeps its date once it is booked. On
+  update every series keeps the start day it had, so no date changes. After a series is moved to a
+  new day or given a new rhythm, opening a past month no longer adds a second booking on the new
+  day next to the one already there: before the change, every past month of the series is filled
+  in with its bookings on the old days, so none is missing and none is doubled. This also holds
+  when the rhythm is changed on the first entry with "Only this occurrence", which until now left
+  the old bookings standing and added the new ones beside them.
+
 - **The command-line installer takes the answer its own prompt shows.** In German, Swedish, Dutch,
   Spanish, Portuguese, Italian, French, Polish, Czech and Turkish the yes/no questions show the
   local letter - `[j/N]`, `[s/N]`, `[e/H]` - but `install.sh` only understood `y`, so typing `j`

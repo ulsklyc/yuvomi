@@ -4524,6 +4524,13 @@ function occurrenceSeriesBody(body, entry) {
  * Verglichen wird mit dem, was das Formular zeigt: bei einer virtuellen Serie
  * ist das der Periodenbetrag, nicht der Monatsanteil in `amount`.
  *
+ * Das DATUM gehoert wie der Rhythmus hierher (#1545): die Serie hat einen
+ * eigenen Starttag, und nur von der ersten Buchung aus laesst er sich
+ * verlegen. Geht nur mit, wenn es hier geaendert wurde - nach einer
+ * Einzelkorrektur ("abgebucht am 6., nicht am 5.") zeigt das Formular das
+ * Datum der Buchung, nicht den Starttag, und unveraendert mitgeschickt
+ * verschoebe es das Raster der ganzen Serie.
+ *
  * @param {object} body   der Body, den der Dialog gebaut hat
  * @param {object} entry  die erste Buchung der Serie
  * @returns {object}
@@ -4532,12 +4539,15 @@ function anchorSeriesBody(body, entry) {
   const shown = entry.recurrence_virtual && entry.recurrence_full_amount != null
     ? entry.recurrence_full_amount
     : entry.amount;
-  return changedSeriesBody(body, entry, { amount: Number(shown), keepRhythm: true });
+  const out = changedSeriesBody(body, entry, { amount: Number(shown), keepRhythm: true });
+  if (body.date && body.date !== entry.date) out.start_date = body.date;
+  return out;
 }
 
 /**
  * Nur die Werte, die im Formular von `entry` abweichen; Datum und Belege nie
- * (sie gehoeren der einzelnen Buchung), den Rhythmus nur mit `keepRhythm`.
+ * (sie gehoeren der einzelnen Buchung - den Starttag der Serie setzt
+ * anchorSeriesBody() eigens), den Rhythmus nur mit `keepRhythm`.
  */
 function changedSeriesBody(body, entry, { amount, keepRhythm }) {
   const before = {

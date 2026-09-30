@@ -1859,7 +1859,7 @@ test('anchorSeriesBody: Rhythmus mit, Werte nur geaendert, Betrag gegen den geze
   const anchor = {
     id: 1, recurrence_parent_id: null, is_recurring: 1, title: 'Versicherung', amount: -100,
     recurrence_virtual: 1, recurrence_full_amount: -1200, category: 'housing', subcategory: 'insurance',
-    account_id: 7, visibility: 'shared', responsible_users: [{ id: 2 }],
+    account_id: 7, visibility: 'shared', responsible_users: [{ id: 2 }], date: '2026-01-15',
   };
   const dialogBody = {
     title: 'Versicherung', amount: -1200, category: 'housing', subcategory: 'insurance', date: '2026-01-15',
@@ -1874,6 +1874,30 @@ test('anchorSeriesBody: Rhythmus mit, Werte nur geaendert, Betrag gegen den geze
   assert.equal(changed.title, 'Haftpflicht');
   assert.equal(changed.amount, -1320);
   assert.ok(!('date' in changed), 'das Datum gehoert der Buchung');
+  assert.ok(!('start_date' in changed), 'ein unveraendertes Datum verlegt den Starttag nicht');
+});
+
+test('anchorSeriesBody: ein geaendertes Datum geht als start_date mit, nie als date (#1545)', () => {
+  // Nach einer Einzelkorrektur ("abgebucht am 6., nicht am 5.") traegt die
+  // erste Buchung den 6., die Serie startet weiter am 5. Das Formular zeigt
+  // den 6. - unveraendert darf es den Starttag nicht mitnehmen, sonst
+  // verschoebe "nur den Titel aendern" das Raster der ganzen Serie.
+  const anchor = {
+    id: 1, recurrence_parent_id: null, is_recurring: 1, title: 'Miete', amount: -900, date: '2020-01-06',
+    category: 'housing', subcategory: 'rent_mortgage', account_id: 7, visibility: 'shared', responsible_users: [],
+  };
+  const dialogBody = {
+    title: 'Miete', amount: -900, category: 'housing', subcategory: 'rent_mortgage', date: '2020-01-06',
+    is_recurring: 1, recurrence_interval: 'monthly', recurrence_interval_count: 1,
+    recurrence_virtual: 0, recurrence_confirm: 0, account_id: 7, responsible_user_ids: [],
+  };
+  assert.ok(!('start_date' in budgetUi.anchorSeriesBody({ ...dialogBody, title: 'Kaltmiete' }, anchor)));
+  const moved = budgetUi.anchorSeriesBody({ ...dialogBody, date: '2020-01-07' }, anchor);
+  assert.equal(moved.start_date, '2020-01-07');
+  assert.ok(!('date' in moved), 'das Datum der Buchung bleibt ihr eigenes');
+  // Ein Vorkommen verlegt den Starttag nie - wie den Rhythmus (#1546).
+  const occurrence = { ...anchor, id: 4, recurrence_parent_id: 1, is_recurring: 0, date: '2026-09-06' };
+  assert.ok(!('start_date' in budgetUi.occurrenceSeriesBody({ ...dialogBody, date: '2026-09-09' }, occurrence)));
 });
 
 test('Bearbeiten eines Vorkommens zeigt den Wiederholungs-Schalter nicht (#1546)', () => {
