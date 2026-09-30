@@ -5072,6 +5072,22 @@ window.yuvomi = {
   // Die Uebersichtsseite reicht ihre `/dashboard`-Antwort herein, statt sie ein
   // zweites Mal holen zu lassen. Begruendung an `primeModuleCountsFrom`.
   primeModuleCountsFrom,
+  // Fuer eine Seite, die sich SELBST neu aufbaut, ohne dass der Router
+  // navigiert - die Uebersicht beim Verlassen des Wand-Modus, nach „erneut
+  // versuchen" oder einer Aenderung aus einer Kachel. Ihr FAB entsteht dann im
+  // Scrollport, und renderPage() hebt ihn nicht in die Shell-Ebene: das Glyph
+  // blieb ungezeichnet (die Icons zeichnet sonst erst updateNav()), und die
+  // Tab-Kapsel hielt ihr hinteres Ende nicht mehr frei, weil ihre Reserve an
+  // `.fab-layer .page-fab` haengt - die Slots liefen unter den Knopf (#1588).
+  // Dieselbe Funktion wie beim Seitenwechsel, samt Kurzbefehl und Glyph.
+  adoptPageFab: () => {
+    const fab = adoptPageFab();
+    if (fab) {
+      markFabShortcut(fab);
+      window.lucide?.createIcons({ el: fab.closest('.page-fab-group') ?? fab });
+    }
+    return fab;
+  },
   applyTheme: (value) => {
     if (value === 'dark') {
       document.documentElement.setAttribute('data-theme', 'dark');

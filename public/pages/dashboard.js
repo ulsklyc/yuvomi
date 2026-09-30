@@ -6006,7 +6006,17 @@ export async function render(container, { user, signal: routeSignal = null } = {
     ${wallMode ? '' : renderFab()}
   `);
 
-  const rerender = () => render(container, { user, signal: routeSignal });
+  // Ein Neuaufbau AUS DER SEITE HERAUS laeuft nicht durch renderPage() im
+  // Router, und damit an dessen Umzug des FAB in die Shell-Ebene vorbei (#634).
+  // Der synchrone Teil von render() hat den Speed-Dial schon in den Container
+  // gelegt; von dort holt ihn derselbe Router-Schritt wie beim Seitenwechsel.
+  // Ohne ihn stand der Knopf nach dem Verlassen des Wand-Modus ohne Plus da,
+  // und die Tab-Leiste lief unter ihm durch (#1588).
+  const rerender = () => {
+    const done = render(container, { user, signal: routeSignal });
+    window.yuvomi?.adoptPageFab?.();
+    return done;
+  };
   // Steht keine Wand mehr (Ausstieg, Einstellungen), gehoert der Marker nicht
   // mehr ihr - sonst kostete die naechste Zurueck-Geste einen Tipp ins Leere.
   if (!wallMode) releaseWallMarker();

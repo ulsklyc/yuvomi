@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **After leaving wall mode on the phone, the plus button and the tab bar look as before** (#1588).
+  Leaving wall mode redrew the overview without taking its plus button out of the page: the button
+  lost its plus sign, the tab bar stopped leaving room for it, its tabs grew wider and "More" slid
+  under the button. The same happened after "Try again" on an overview that had failed to load.
+  In both cases the button now takes its usual place next to the tab bar.
+
 ## [2.71.0] - 2026-09-30
 
 ### Added
