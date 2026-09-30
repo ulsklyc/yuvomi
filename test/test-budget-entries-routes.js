@@ -1333,3 +1333,33 @@ test('#1545: ein ungueltiger Starttag wird abgewiesen', async () => {
   }
   assert.equal(startOf(pid), '2000-01-05');
 });
+
+test('#1545: vor den Monat der gebuchten ersten Buchung laesst sich der Starttag nicht legen', async () => {
+  // Der Monatsaufruf laesst nur den MONAT des Starttags aus - er gehoert der
+  // ersten Buchung. Laege der Starttag einen Monat frueher, entstuende im Monat
+  // der ersten Buchung ein zweites Vorkommen neben ihr (Review-Befund in #1585),
+  // und davor Buchungen, die es vor dem Beginn der Serie nie gab.
+  const pid = insertEntry({ title: 'Frueher 1545', amount: -50, date: '2000-02-05', is_recurring: 1 });
+  const r = await call('PUT', `/${pid}/series`, { body: { start_date: '2000-01-05' } });
+  assert.equal(r.status, 400);
+  assert.equal(startOf(pid), '2000-02-05');
+  await generatedIn('2000-02', pid);
+  assert.deepEqual(seriesDates(pid, '2000-02'), [], 'keine Doublette neben der ersten Buchung');
+  // Im selben Monat bleibt es erlaubt: "ab jetzt am 4. statt am 5.".
+  const same = await call('PUT', `/${pid}/series`, { body: { start_date: '2000-02-04' } });
+  assert.equal(same.status, 200);
+  assert.equal(startOf(pid), '2000-02-04');
+  await generatedIn('2000-02', pid);
+  assert.deepEqual(seriesDates(pid, '2000-02'), []);
+});
+
+test('#1545: liegt die erste Buchung noch vor uns, darf der Starttag auch frueher liegen - sie zieht mit', async () => {
+  const pid = insertEntry({ title: 'Vorgezogen 1545', amount: -50, date: '2099-08-05', is_recurring: 1 });
+  const r = await call('PUT', `/${pid}/series`, { body: { start_date: '2099-06-05' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.date, '2099-06-05');
+  await generatedIn('2099-06', pid);
+  assert.deepEqual(seriesDates(pid, '2099-06'), []);
+  await generatedIn('2099-07', pid);
+  assert.deepEqual(seriesDates(pid, '2099-07'), ['2099-07-05']);
+});

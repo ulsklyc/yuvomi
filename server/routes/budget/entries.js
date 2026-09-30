@@ -594,6 +594,19 @@ router.put('/:id/series', (req, res) => {
     const currentStart = series?.start_date ?? parent.date;
     const finalStart   = req.body.start_date !== undefined ? req.body.start_date : currentStart;
     const startChanged = finalStart !== currentStart;
+    // NICHT VOR DEN MONAT DER GEBUCHTEN ERSTEN BUCHUNG. Der Monatsaufruf laesst
+    // nur den Monat des Starttags aus - er gehoert der ersten Buchung. Laege
+    // der Starttag einen Monat frueher, entstuende in ihrem Monat ein zweites
+    // Vorkommen neben ihr, und davor Buchungen, die es vor dem Beginn der
+    // Serie nie gab (Review-Befund in #1585). Im selben Monat ist der Tag frei
+    // ("ab jetzt am 4. statt am 5."); liegt die erste Buchung noch vor uns,
+    // zieht sie ohnehin mit.
+    if (startChanged && !anchorAhead && finalStart.slice(0, 7) < parent.date.slice(0, 7)) {
+      return res.status(400).json({
+        error: 'The start day of a series cannot lie in a month before its first entry once that entry is booked.',
+        code: 400,
+      });
+    }
 
     db.get().transaction(() => {
       // 1. Der Anker: Rhythmus und Serienschalter immer - sie haben nur eine
