@@ -35,6 +35,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Podman commands created `.env` and started the container in one copy block; the secrets are now
   generated first, the placeholders replaced by hand, and the start follows in a block of its own.
 
+- **The README opens as a family planner and leads to the website.** The first line says what
+  Yuvomi is, "The self-hosted family planner", with the website's claim beneath it, and the tour on
+  yuvomi.cloud is now the first link, again under Documentation and in the footer. A new section
+  shows the wall mode and what the family gets: the kitchen tablet, the app on every phone, invite
+  links and access per role. The twenty modules appear as five groups in the order of the app menu,
+  with the full table one click away, and the requirements, outbound connections and LAN rules
+  fold away under the install steps. A new question explains how safe access from outside is. The
+  German README now addresses its readers as "ihr" like the website, and its tables no longer run
+  wider than a phone screen. The website says the week's meal plan reaches the shopping list
+  through one import, not one tap.
+
 ### Fixed
 
 - **Pairing a display in German says "Tablet", not "Tablett".** "Tablett" is a serving tray; the

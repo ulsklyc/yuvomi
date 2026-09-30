@@ -37,7 +37,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { dictBlock, dictKeysMatching, dictValue, stripTags } from './docs-dict.js';
+import { dictBlock, dictKeysMatching, dictValue, stripTags, unescapeJs } from './docs-dict.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const READMES = { en: 'README.md', de: 'README.de.md' };
@@ -270,6 +270,89 @@ test('jeder Modulname der Homepage steht in der README-Modultabelle', () => {
     + '\nDie Tabelle in README.md ist die kanonische Modulliste (CLAUDE.md).');
 });
 
+// ── (3b) Die Gruppenzeilen ueber der Modultabelle ───────────────────────────
+
+/**
+ * Seit der Critique vom 2026-09-30 steht die Modultabelle in einem <details>,
+ * und sichtbar bleiben fuenf Gruppenzeilen in der Reihenfolge des App-Menues
+ * (`- **Plan** - Tasks · Calendar · …`). Die Homepage (#modules) zeigt dieselben
+ * Gruppen, und `test-docs-landing.js` haelt sie gegen `public/router.js`. Hier:
+ * README-Gruppen == Homepage-Gruppen (Name, Reihenfolge, Mitglieder), je
+ * Sprache, und die Gruppenzeilen nennen genau die Module der Tabelle - eine
+ * Zeile "A & B" darf als A und B in zwei Gruppen stehen (Notizen bei Planen,
+ * Kontakte bei Menschen), aber nur beide zusammen.
+ */
+function readmeGroups(md) {
+  const sec = md.split(/^## /m).find((s) => claimedModuleWord(`## ${s.split('\n')[0]}`)) || '';
+  return [...sec.matchAll(/^- \*\*(.+?)\*\* - (.+)$/gm)]
+    .map((m) => ({ label: m[1].trim(), names: m[2].split(' · ').map((n) => n.replace(/&amp;/g, '&').trim()) }));
+}
+
+function pageGroups(html, lang) {
+  const block = dictBlock(html, lang);
+  const from = html.indexOf('id="modGrid"');
+  const grid = html.slice(from, html.indexOf('id="modToggle"', from)).replace(/<!--[\s\S]*?-->/g, '');
+  return grid.split(/data-t="grp_/).slice(1).map((chunk) => ({
+    label: stripTags(unescapeJs(dictValue(block, `grp_${chunk.slice(0, chunk.indexOf('"'))}`) || '')),
+    names: [...chunk.matchAll(/class="(?:feat-row|mod-card)"[\s\S]*?data-t="(f_[a-z]+_k|m_[a-z]+_t)"/g)]
+      .map((m) => stripTags(unescapeJs(dictValue(block, m[1]) || m[1]))),
+  }));
+}
+
+/** Abweichungen zwischen Gruppenzeilen, Homepage-Gruppen und Modultabelle, als lesbare Zeilen. */
+function groupFindings(md, html, lang) {
+  const found = [];
+  const readmeG = readmeGroups(md);
+  const pageG = pageGroups(html, lang);
+  if (pageG.length < 4) return [`Homepage (${lang}): nur ${pageG.length} Modulgruppen gefunden - Muster veraltet?`];
+  if (readmeG.length !== pageG.length) found.push(`${readmeG.length} Gruppenzeilen, die Homepage zeigt ${pageG.length} Gruppen`);
+  const low = (list) => list.map((n) => n.toLowerCase()).join(' · ');
+  pageG.forEach((pg, i) => {
+    const rg = readmeG[i];
+    if (!rg) return;
+    if (rg.label !== pg.label) found.push(`Gruppe ${i + 1}: README "${rg.label}", Homepage "${pg.label}"`);
+    if (low(rg.names) !== low(pg.names)) found.push(`Gruppe "${pg.label}": README ${rg.names.join(' · ')} / Homepage ${pg.names.join(' · ')}`);
+  });
+  const inGroups = readmeG.flatMap((g) => g.names.map((n) => n.toLowerCase()));
+  const used = new Set();
+  for (const row of moduleRows(md)) {
+    const name = row.name.toLowerCase();
+    const parts = inGroups.includes(name) ? [name] : name.split(' & ');
+    if (!parts.every((p) => inGroups.includes(p))) found.push(`Tabellenzeile "${row.name}" steht in keiner Gruppenzeile`);
+    parts.forEach((p) => used.add(p));
+  }
+  for (const n of inGroups) if (!used.has(n)) found.push(`Gruppenzeile nennt "${n}", die Tabelle nicht`);
+  if (inGroups.length !== new Set(inGroups).size) found.push('ein Modul steht in zwei Gruppenzeilen');
+  return found;
+}
+
+for (const lang of Object.keys(READMES)) {
+  test(`${READMES[lang]}: die Gruppenzeilen sind die Menuegruppen der Homepage und nennen jedes Modul der Tabelle`, () => {
+    assert.deepEqual(groupFindings(readme(lang), read('docs/index.html'), lang), []);
+  });
+}
+
+test('der Gruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const md = readme('en');
+  const html = read('docs/index.html');
+  const hit = (list, re) => list.some((l) => re.test(l));
+  const swap = (from, to) => {
+    assert.ok(md.includes(from), `Vorbedingung: "${from}" steht in README.md`);
+    return groupFindings(md.replace(from, to), html, 'en');
+  };
+  // Kontakte zurueck zu den Notizen (der Anlass von Runde 2 auf der Homepage).
+  const f1 = swap('Schedule · Notes\n', 'Schedule · Notes · Contacts\n');
+  assert.ok(hit(f1, /Gruppe "Plan"/) && hit(f1, /zwei Gruppenzeilen/), f1.join(' | '));
+  // Ein Modul fehlt in den Gruppenzeilen, steht aber in der Tabelle.
+  assert.ok(hit(swap(' · Waste collection', ''), /Tabellenzeile "Waste collection" steht in keiner Gruppenzeile/));
+  // Eine Gruppe umbenannt.
+  assert.ok(hit(swap('- **People** - ', '- **Persons** - '), /Gruppe 3: README "Persons", Homepage "People"/));
+  // Die Homepage bekommt ein Modul, das die Gruppenzeilen nicht kennen.
+  const more = html.replace('<h4 data-t="m_backup_t">', '<h4 data-t="m_backup_t">x</h4></div><div class="mod-card"><h4 data-t="m_bday_t">');
+  assert.notEqual(more, html, 'Vorbedingung: m_backup_t steht als <h4> im Markup');
+  assert.ok(hit(groupFindings(md, more, 'en'), /Gruppe "Settings"/));
+});
+
 // ── (4) EN und DE bleiben strukturgleich ────────────────────────────────────
 
 const shape = (md) => ({
@@ -373,6 +456,19 @@ for (const lang of Object.keys(READMES)) {
     assert.ok(scanned >= 0);
   });
 
+  test(`${READMES[lang]}: jedes Bild hat einen Alt-Text`, () => {
+    // GitHub packt jedes <img> ausserhalb eines <picture> in einen Link auf die
+    // Bilddatei. Mit alt="" hat dieser Link keinen Namen (axe link-name) - so
+    // stand das Logo bis 2026-09-30 zweimal in jeder README.
+    const imgs = [...readme(lang).matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
+    assert.ok(imgs.length >= 5, `nur ${imgs.length} Bilder gefunden - Muster veraltet?`);
+    // Den Wert erst herausloesen und dann pruefen: ein `\S` im Muster selbst
+    // passte auf das schliessende Anfuehrungszeichen von alt="" und liess das
+    // leere Logo durch (Gegenprobe 2026-09-30).
+    const nameless = imgs.filter((tag) => !(tag.match(/\balt="([^"]*)"/)?.[1] || '').trim());
+    assert.deepEqual(nameless, [], 'Bilder ohne Alt-Text (GitHub verlinkt sie, der Link bliebe namenlos)');
+  });
+
   test(`${READMES[lang]}: kein Em- oder En-Dash`, () => {
     const hits = readme(lang).split('\n')
       .map((line, i) => (/[–—]/.test(line) ? `${i + 1}: ${line.trim()}` : null))
@@ -426,6 +522,33 @@ const README_FACTS = [
   { says: { en: /medications, warranties, best-before dates, expiring documents/, de: /Medikamente, Garantien, Mindesthaltbarkeit, ablaufende Dokumente/ },
     holds: (s) => s.medicationScheduler && /document_expiry:/.test(s.reminderOrigins),
     what: 'Medikamenten-Erinnerungen (server/services/medication-scheduler.js) und Dokumentablauf (reminder-origins.js)' },
+  // Die Familien-Sektion (RD2 derselben Critique), aus docs/index.html fam_1..3 abgeleitet:
+  // dieselben Stellen im Code, an denen test-docs-landing.js (10) die Homepage haelt.
+  { says: { en: /pick who did it, and the points go to them/, de: /ausw[aä]hlen, wer sie erledigt hat, und die Punkte gehen an diese Person/ },
+    holds: (s) => s.display.includes("method: 'PATCH', pattern: /^\\/tasks\\/\\d+\\/status$/") && /if \(doneByUserId\) return enrolled\.has\(doneByUserId\)/.test(s.rewards),
+    what: 'das Wand-Tablet hakt fuer eine gewaehlte Person ab (server/display-scopes.js PATCH /tasks/:id/status, server/services/rewards.js)' },
+  { says: { en: /the last shopping list you opened stays readable without signal/, de: /die zuletzt ge[oö]ffnete Einkaufsliste bleibt lesbar/ },
+    holds: (s) => /API_CACHE_WHITELIST = \[[^\]]*'\/shopping'/.test(s.sw),
+    what: "Offline-Cache der Einkaufsliste (public/sw.js API_CACHE_WHITELIST '/shopping')" },
+  { says: { en: /each module is full, read only or not at all/, de: /jedes Modul voll, nur lesen oder gar nicht/ },
+    holds: (s) => /MODULE_ACCESS_LEVELS = Object\.freeze\(\['none', 'read', 'write'\]\)/.test(s.permissions),
+    what: 'drei Zugriffsstufen je Modul (server/permissions.js MODULE_ACCESS_LEVELS)' },
+  { says: { en: /a child without a phone gets an account created directly/, de: /ein Kind ohne Handy bekommt sein Konto direkt angelegt/ },
+    holds: (s) => /FAMILY_ROLES = Object\.freeze\(\[[^\]]*'child'/.test(s.permissions),
+    what: "Kind als Familienrolle (server/permissions.js FAMILY_ROLES 'child')" },
+  // "Wie sicher ist der Zugang von aussen?" (Before you commit), wie long_a4 der Homepage.
+  { says: { en: /an admin can require it for the whole household/, de: /ein Admin kann ihn f[uü]r den ganzen Haushalt verlangen/ },
+    holds: (s) => /export function setRequiredForHousehold/.test(s.twoFactor) && /user_recovery_codes/.test(s.twoFactor),
+    what: 'haushaltsweite 2FA-Pflicht und Wiederherstellungscodes (server/services/two-factor.js)' },
+  { says: { en: /join through an invite link and pick their own password/, de: /kommen per Einladungslink und w[aä]hlen ihr Passwort selbst/ },
+    holds: (s) => /\.post\('\/invites\/accept'/.test(s.auth),
+    what: 'Einladung annehmen mit eigenem Passwort (server/auth.js POST /invites/accept)' },
+  { says: { en: /password login can be switched off for the household/, de: /l[aä]sst sich die Passwort-Anmeldung f[uü]r den Haushalt abschalten/ },
+    holds: (s) => /export function isPasswordLoginEnabled/.test(s.auth) && /AUTH_ALLOW_PASSWORD_LOGIN=false/.test(s.envExample),
+    what: 'SSO als einziger Weg (server/auth.js isPasswordLoginEnabled, .env.example AUTH_ALLOW_PASSWORD_LOGIN)' },
+  { says: { en: /signed out from any of your other devices/, de: /von jedem eurer anderen Ger[aä]te aus ab/ },
+    holds: (s) => /router\.post\('\/logout-others'/.test(s.auth),
+    what: 'andere Sitzungen beenden (server/auth.js POST /logout-others)' },
 ];
 
 /** Saetze, die nicht zurueckkommen duerfen - in beiden READMEs. */
@@ -434,6 +557,8 @@ const README_NEVER = [
   /the reward catalog spends them/i, /Belohnungskatalog gibt sie aus/,
   /Turn on what your household needs/i, /Schalte an, was dein Haushalt braucht/,
   /optional cloud upload/i, /Cloud-Upload/,
+  // Der Import aus dem Essensplan ist ein Dialog (Zeitraum vorbelegt, bestaetigen), kein Tipp.
+  /one-tap import from the meal plan/i, /Ein-Tipp-Import aus dem Essensplan/,
 ];
 
 /**
@@ -479,6 +604,11 @@ function factSources() {
     backupRoute: src('server/routes/backup.js'),
     medicationScheduler: existsSync(resolve(ROOT, 'server/services/medication-scheduler.js')),
     reminderOrigins: src('server/services/reminder-origins.js'),
+    display: src('server/display-scopes.js'),
+    rewards: src('server/services/rewards.js'),
+    sw: src('public/sw.js'),
+    permissions: src('server/permissions.js'),
+    twoFactor: src('server/services/two-factor.js'),
     pages: { 'docs/index.html': src('docs/index.html'), 'docs/install.html': src('docs/install.html') },
   };
 }
@@ -547,4 +677,10 @@ test('der Guard aus (6) erkennt den Schaden, gegen den er gebaut ist', () => {
   assert.ok(hit(f6, /haengt an Migrationen in server\/db\.js/), f6.join(' | '));
   const f7 = factFindings({ ...real, dockerPublish: real.dockerPublish.replace('linux/amd64,linux/arm64', 'linux/amd64') });
   assert.ok(hit(f7, /haengt an Multi-Arch-Build/), f7.join(' | '));
+  const f8 = factFindings({ ...real, display: real.display.replace(/method: 'PATCH'/, "method: 'GET'") });
+  assert.ok(hit(f8, /haengt an das Wand-Tablet hakt/), f8.join(' | '));
+  const f9 = factFindings({ ...real, auth: real.auth.replace("router.post('/logout-others'", "router.post('/logout-all'") });
+  assert.ok(hit(f9, /README\.de\.md: haengt an andere Sitzungen beenden/), f9.join(' | '));
+  const f10 = factFindings(withReadme('en', 'with swipe gestures and an import from the meal plan', 'with swipe gestures and one-tap import from the meal plan'));
+  assert.ok(hit(f10, /README\.md sagt wieder \/one-tap import/), f10.join(' | '));
 });
