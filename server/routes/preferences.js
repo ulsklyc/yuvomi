@@ -14,6 +14,7 @@ import { isAdminRequest } from '../middleware/require-admin.js';
 import { getSupportedLocales, isRegionTag, isSupportedLocale, resolveHouseholdLocale } from '../utils/i18n.js';
 import { householdTimeZone, isValidTimeZone } from '../utils/timezone.js';
 import { retitleBirthdayEvents } from '../services/birthdays.js';
+import { resolveWeatherSource } from '../services/weather-source.js';
 import { DEFAULT_OVERDUE_GRACE_DAYS } from '../services/countdowns.js';
 import { isWidgetId } from '../services/module-capabilities.js';
 import { listVisibleCategories } from '../services/note-categories.js';
@@ -391,6 +392,22 @@ function weatherUserOverride(userId) {
   };
 }
 
+// Woher das Wetter des HAUSHALTS kommt: 'db' (hier gespeichert), 'env'
+// (`WEATHER_*`/`OPENWEATHER_*` aus der `.env`, z. B. vom Web-Installer) oder
+// 'none'. Dieselbe Regel wie im Wetter-Proxy, damit die Admin-Seite nicht
+// "Nicht konfiguriert" sagt, waehrend das Dashboard Wetter zeigt. Der
+// Standort je Mitglied bleibt bewusst aussen vor - er ist keine
+// Haushaltseinstellung. Ein API-Key steht nie in der Antwort.
+function householdWeatherSource() {
+  return resolveWeatherSource({
+    provider: cfgGet('weather_provider'),
+    lat:      cfgGet('weather_lat'),
+    lon:      cfgGet('weather_lon'),
+    city:     cfgGet('weather_city'),
+    units:    cfgGet('weather_units'),
+  });
+}
+
 // --------------------------------------------------------
 // Widget-Hilfsfunktionen
 // --------------------------------------------------------
@@ -638,6 +655,7 @@ router.get('/', (req, res) => {
         weather_units:    cfgGet('weather_units')    ?? 'metric',
         weather_auto_locate: cfgGet('weather_auto_locate') === '1',
         weather_user: weatherUserOverride(req.authUserId),
+        weather_source: householdWeatherSource(),
         holiday_country:       cfgGet('holiday_country')       ?? null,
         holiday_subdivision:   cfgGet('holiday_subdivision')   ?? null,
         holiday_group:         cfgGet('holiday_group')         ?? null,
@@ -1145,14 +1163,21 @@ router.put('/', (req, res) => {
         if (weather_provider === null) cfgDelete('weather_provider');
         else cfgSet('weather_provider', weather_provider);
       }
-      if (weather_lat !== undefined) {
+      // `null` loescht die Koordinaten des Haushalts. Ohne das blieben sie beim
+      // Entfernen des Anbieters liegen, und der Proxy nahm sie weiter - die
+      // `.env`-Werte kamen nie wieder zum Zug.
+      if (weather_lat === null) {
+        cfgDelete('weather_lat');
+      } else if (weather_lat !== undefined) {
         const v = parseFloat(weather_lat);
         if (isNaN(v) || v < -90 || v > 90) {
           return res.status(400).json({ error: 'Ungültiger Breitengrad (–90 bis 90).', code: 400 });
         }
         cfgSet('weather_lat', String(v));
       }
-      if (weather_lon !== undefined) {
+      if (weather_lon === null) {
+        cfgDelete('weather_lon');
+      } else if (weather_lon !== undefined) {
         const v = parseFloat(weather_lon);
         if (isNaN(v) || v < -180 || v > 180) {
           return res.status(400).json({ error: 'Ungültiger Längengrad (–180 bis 180).', code: 400 });

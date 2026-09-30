@@ -1,31 +1,51 @@
 /* ============================================================================
-   Yuvomi - Design tokens for the GitHub Pages site
+   Yuvomi - shared stylesheet of the GitHub Pages site (yuvomi.cloud)
    ============================================================================
 
-   ONE COPY, FOUR PAGES. index.html, install.html, datenschutz.html and
-   impressum.html each carried their own `:root` block. The four had already
-   drifted apart - `--m-split` alone held three different dark values, and the
-   legal pages defined a subset that silently diverged from the landing page
-   they are linked from. A shared file cannot drift from itself.
+   WHO LOADS IT. All five pages: index.html, install.html, privacy.html,
+   datenschutz.html and impressum.html. The three legal pages also load
+   assets/legal.css, which holds the column layout they share. Everything else
+   a page needs stays in its own <style> block.
 
-   The page keeps its OWN token names (`--bg`, `--accent`, `--m-*`) and does not
-   load the app's `public/styles/tokens.css`: a static site should not depend on
-   the application's stylesheet, and the app's ladder carries far more rungs
-   than a landing page needs. What is shared is the VALUES - every colour below
-   is an app token, named in the comment beside it.
+   WHAT IS IN IT. Two things:
+   1. The tokens. The page keeps its OWN names (--bg, --accent, --m-*) and does
+      not load the app's public/styles/tokens.css: a static site should not
+      depend on the application's stylesheet, and the app's ladder carries far
+      more rungs than a landing page needs.
+   2. The few components every page draws the same way - the top bar with
+      its logo and capsule controls, focus ring, skip link, buttons, the code
+      plate, the reveal-on-scroll fade. index.html and install.html each
+      carried their own copy of these and had drifted apart (different button
+      padding, code-plate corners, reveal distance, and a copy chip that
+      turned green-on-white in one page's dark mode only); the legal pages
+      drew a second, opaque 81px header of their own until round 2.
 
-   Why they follow the app at all: the page is largely made OF the app. Twenty-
-   two screenshots show the shipped interface, and after the v2.0.0 redesign
-   they are cool grey on Apple Indigo while this page was still warm linen on
-   #6c3aed. A landing page may be louder than the tool it sells, but it should
-   not preview a version that no longer exists.
+   WHERE THE VALUES COME FROM. Most colours, shadows and radii are app tokens,
+   and the comment beside each one names its source in tokens.css. Not all of
+   them are: the type scale, --r-sm/--r-2xl, the device-frame radii, the hero
+   shadow and the code plate are the page's own and say so. The module
+   family tones are checked against tokens.css by test:docs-landing: eight
+   --f-* here, and the app's ninth family (overview) is --accent itself.
+
+   Why they follow the app at all: the page is largely made OF the app. Its
+   screenshots show the shipped interface; a landing page may be louder than
+   the tool it sells, but it should not preview a version that no longer
+   exists.
+
+   THE TWIN LIST. The dark palette is written down TWICE, on purpose: once for
+   the theme toggle ([data-theme="dark"]) and once for visitors who never
+   touched it (prefers-color-scheme, unless they chose light). CSS has no way
+   to give one declaration block to a plain selector and a media-gated one at
+   the same time. The two lists have drifted before (--success-ink missing in
+   one, --m-split with three dark values), so test:docs-landing now compares
+   them declaration by declaration. Change one, change both.
    ========================================================================= */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
   /* The system stack, same as the app's --font-sans. Plus Jakarta Sans left the
-     app with the redesign and now leaves this page too.
+     app with the redesign and left this page too.
 
      The woff2 files under docs/fonts/ STAY: scripts/build-umbrel-gallery.mjs and
      scripts/generate-social-preview.mjs embed them when they render the store
@@ -44,114 +64,139 @@
   --bg: #FBFAF7;             /* --neutral-50  */
   --bg-alt: #F5F3ED;         /* --neutral-100, the app's grouped background */
   --surface: #FFFFFF;        /* --color-surface */
-  --border: #E4E0D7;         /* --neutral-200 */
-  --border-strong: #CFC9BC;  /* --neutral-300 */
+  --border: #E4E0D7;         /* --color-border (--neutral-200) */
+  --border-strong: #CFC9BC;  /* --color-border-strong (--neutral-300) */
   --text-1: #1D1B17;         /* --neutral-900, Label */
   --text-2: #4A4741;         /* --neutral-700 */
   --text-3: #63615B;         /* --neutral-600, AA on both grounds (6.19:1 / 5.58:1) */
+  /* The far end of the ramp. Only the primary fill below mixes with it, the
+     way the app's .btn--primary does. */
+  --neutral-950: #0E0D0B;    /* --neutral-950 */
 
   --accent: #6C3AED;         /* --color-accent, the violet of the app icon */
   --accent-hover: #5B2FD4;   /* --color-accent-hover */
-  --accent-ink: #FFFFFF;     /* --color-ink-on-vivid; 6.10:1 on --accent */
+  --accent-ink: #FFFFFF;     /* --color-ink-on-vivid; ink on every violet fill */
+
+  /* The primary button's surface: the app's .btn--primary recipe (layout.css),
+     the voice darkened slightly, deeper on hover. In light the mix goes toward
+     near-black, in dark toward near-white, because --neutral-950 flips - so
+     --accent-ink reads on it in both themes without a second pair of values. */
+  --accent-fill: color-mix(in srgb, var(--accent) 88%, var(--neutral-950));
+  --accent-fill-hover: color-mix(in srgb, var(--accent) 76%, var(--neutral-950));
 
   /* Derived from --accent instead of restated per theme, which is why neither
      appears in the dark block below. The percentages are the app's tint scale
      (tokens.css 6b): 16% is `--tint-surface`, the step where the tint IS the
-     element; 70% is `--tint-ink`, the readable step of the same hue.
-     Measured: 7.06:1 light, 6.13:1 dark. */
+     element; --tint-ink (70%) is the readable step of the same hue. */
+  --tint-ink: 70%;           /* --tint-ink: accent text on an accent-tinted ground */
   --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--surface));
-  /* Ziffer auf --accent-soft. Im Light traegt das --accent selbst (4.65:1), im
-     Dark nicht: --accent #A78BFA auf dem dortigen --accent-soft #3b3445 misst
-     4.38:1 bei noetigen 4.5:1, und 16.8px/700 ist keine "large text"-Ausnahme
-     (dafuer braeuchte es >=18.66px bold). Drei unabhaengige Messverfahren kamen
-     auf denselben Wert (Critique 2026-08-16). Der Dark-Wert ist bewusst das
-     schon vorhandene --accent-hover (5.67:1) statt eines neuen Violettwerts.
-     ACHTUNG: beide Dark-Pfade pflegen, sonst driftet es wie seinerzeit --m-split. */
+  /* Ziffer/Text auf --accent-soft. Im Light traegt das --accent selbst, im
+     Dark nicht: --accent #A78BFA auf dem dortigen --accent-soft liegt unter
+     4.5:1, und 16.8px/700 ist keine "large text"-Ausnahme. Der Dark-Wert ist
+     bewusst das schon vorhandene --accent-hover statt eines neuen Violettwerts.
+     Steht in BEIDEN Dark-Listen (siehe THE TWIN LIST oben). */
   --accent-on-soft: var(--accent);
-  --accent-deep: color-mix(in srgb, var(--accent) 70%, var(--text-1));
+  --accent-deep: color-mix(in srgb, var(--accent) var(--tint-ink), var(--text-1));
   --accent-glow: color-mix(in srgb, var(--accent) 16%, transparent);
 
-  /* Focus ring, overridable per surface. --accent clears SC 2.4.11 on every
-     paper surface but not on the fixed near-black code plate, which is the
-     same colour in both themes and carries --code-accent instead. */
+  /* Focus ring: the app's --focus-ring-color / --focus-ring-offset. The colour
+     is overridable per surface - --accent clears SC 2.4.11 on every paper
+     surface but not on the fixed near-black code plate, which is the same
+     colour in both themes and carries --code-accent instead. */
   --focus-ring: var(--accent);
+  --focus-offset: 2px;       /* --focus-ring-offset */
 
-  /* Module accent signature, from the app's --module-* tokens. Calendar moved
-     to azure when the app colour became the violet of the icon: next to it,
-     the old Violet-700 was the same tone. */
-  --m-tasks: #157F3D;
-  --m-calendar: #00668F;
-  --m-meals: #C2410C;
-  /* Vorrat zieht in der App aus derselben Familie wie Mahlzeiten
-     (tokens.css: --module-pantry und --module-meals sind beide
-     --_family-kitchen). Als Referenz statt als Hexwert notiert: so folgt es den
-     beiden Dark-Bloecken von selbst und kann nicht wie --m-split auseinander
-     laufen. Fehlte, seit die vierte Handoff-Zeile es benutzt - das leere Token
-     liess ausgerechnet die Solo-Zeile ohne Farbe. */
-  --m-pantry: var(--m-meals);
-  /* Der Schichtplan zieht in der App aus derselben Familie wie der Kalender
-     (tokens.css: --module-schedule und --module-calendar sind beide
-     --_family-time). Wie --m-pantry als Referenz notiert: so folgt es den
-     beiden Dark-Bloecken von selbst. */
-  --m-schedule: var(--m-calendar);
-  /* Waste collection zieht in der App aus derselben Familie wie Aufgaben/
-     Haushaltshilfe/Belohnungen (tokens.css: --module-waste ist
-     --_family-work, wie die drei anderen). Als Referenz notiert wie
-     --m-pantry/--m-schedule oben. */
-  --m-waste: var(--m-tasks);
-  --m-recipes: #0C7C5B;
-  --m-shopping: #CF236F;
-  --m-notes: #9D6007;
-  --m-contacts: #0969DA;
-  --m-birthdays: #CE2A63;
-  --m-budget: #0F766E;
-  --m-documents: #42587E;
-  /* Inventory shares the app's records family with Documents on purpose - there
-     the two are told apart by their seal, not by their tone. */
-  --m-inventory: #42587E;
-  --m-housekeeping: #7C3AED;
-  --m-health: #9E1E88;
-  --m-rewards: #BA4468;
-  --m-split: #1975A5;
-  /* Infrastruktur, kein Modul. Backup und API-Tokens trugen hier die Toene von
-     Aufgaben und Gemeinsamen Ausgaben - eine Farbe, die in der App eine
-     Zugehoerigkeit BEDEUTET, auf einer Karte, die keine hat. Der Neutralton ist
-     der der App (--_family-neutral) und sagt zusaetzlich: das hier schaltet ihr
-     nicht an und aus. Gemessen als Grafik (3:1 verlangt): 5.04:1 auf --surface,
-     4.82:1 auf --bg. */
-  --m-infra: #677079;
+  /* Semantic colours. Only install.html and the "1 click" badges use them, but
+     they are theme-switched, and a theme-switched token kept per page is a
+     third and fourth copy of the twin list. Values: --color-success,
+     --color-*-light (the "soft" fills) and --color-*-ink (the readable step). */
+  --success: #1E7B35;        /* --color-success */
+  --success-soft: #DFF6E4;   /* --color-success-light */
+  --success-ink: #186A2C;    /* --color-success-ink */
+  --warning: #A85D00;        /* --color-warning */
+  --warning-soft: #FFF0D9;   /* --color-warning-light */
+  --warn-ink: #8F4F00;       /* --color-warning-ink */
+  --danger-ink: #B80012;     /* --color-danger-ink */
+  --info: #0663C7;           /* --color-info */
+  --info-soft: #E0EFFF;      /* --color-info-light */
+
+  /* Module accents: the app's family tones (tokens.css section 4,
+     --_family-*) - eight written down here, the ninth is --accent (below). The app gave up one tone per module for one tone per area
+     of life - modules of the same area share it and are told apart by their
+     icon. This page still carried six single-module tones from before that
+     (recipes teal, shopping pink, notes amber, contacts blue, housekeeping and
+     rewards in their own hues), so its "same colour, same area" said
+     something the app no longer says.
+
+     Only the --f-* values are written down, here and in the two dark lists;
+     every --m-* is an alias and follows by itself. The overview family is not
+     listed: in the app it IS --color-accent (--accent here). */
+  --f-time: #00668F;         /* --_family-time: calendar, shifts, reminders */
+  --f-work: #157F3D;         /* --_family-work: tasks, housekeeping, waste, rewards */
+  --f-kitchen: #C2410C;      /* --_family-kitchen: meals, recipes, shopping, pantry */
+  --f-money: #0F766E;        /* --_family-money: budget, split expenses */
+  --f-people: #CE2A63;       /* --_family-people: contacts, birthdays */
+  --f-health: #9E1E88;       /* --_family-health */
+  --f-records: #42587E;      /* --_family-records: documents, notes, inventory */
+  --f-neutral: #677079;      /* --_family-neutral: settings */
+
+  /* The module -> family map, exactly as tokens.css maps --module-*. Settings
+     is the app's --module-settings: family members, API tokens and backup all
+     live on the settings page there, and none of them belongs to an area of
+     life. Reminders keep their own --module-reminders (time). */
+  --m-tasks: var(--f-work);
+  --m-housekeeping: var(--f-work);
+  --m-waste: var(--f-work);
+  --m-rewards: var(--f-work);
+  --m-calendar: var(--f-time);
+  --m-schedule: var(--f-time);
+  --m-reminders: var(--f-time);
+  --m-meals: var(--f-kitchen);
+  --m-recipes: var(--f-kitchen);
+  --m-shopping: var(--f-kitchen);
+  --m-pantry: var(--f-kitchen);
+  --m-budget: var(--f-money);
+  --m-contacts: var(--f-people);
+  --m-birthdays: var(--f-people);
+  --m-health: var(--f-health);
+  --m-documents: var(--f-records);
+  --m-notes: var(--f-records);
+  --m-inventory: var(--f-records);
+  --m-settings: var(--f-neutral);
 
   /* The code plate keeps ONE palette in both themes - it is a terminal, and a
-     terminal does not turn white. It now borrows the app's dark neutrals so it
-     reads as the same material as a dark-mode card. --code-accent doubles as
-     the focus ring there.
+     terminal does not turn white. --code-bg #262422 is the app's FORMER dark
+     card surface (replaced by #2B2825 in its dark-mode pass of 2026-08-17),
+     kept here on purpose for the code palette: on the current #2B2825
+     --code-comment would fall to 4.51:1. It no longer names a live app token.
+     --code-accent doubles as the focus ring on the plate.
 
-     Ratios against --code-bg, recomputed 2026-08-20 - all four pass AA:
+     Ratios against --code-bg - all four pass AA:
        --code-text     13.94:1
        --code-val      10.07:1
-       --code-accent    5.68:1   (was documented as 5.66)
-       --code-comment   4.76:1   (was documented as 5.22 - the comment
-                                  overstated it by 0.46 and no measurement
-                                  ever caught up with the note)
-     --code-val was a raw #7ee787 in install.html, the only one of the four
-     plate colours without a token. */
+       --code-accent    5.68:1
+       --code-comment   4.76:1
+     --code-ok / --code-fail are the copy button's two feedback states. They
+     sit on the plate too, so they are as theme-independent as the plate:
+     white ink on --color-success / --color-warning (light) holds 5.33:1 /
+     4.98:1 on any ground. install.html had them on the theme-switched
+     --success/--warning, which in dark mode put white on #30D158 (2.0:1). */
   --code-bg: #262422;
   --code-text: #F5F3ED;
   --code-comment: #948E85;
   --code-accent: #A78BFA;
   --code-val: #7ee787;
+  --code-ok: #1E7B35;
+  --code-fail: #A85D00;
 
-  /* --r-xs is the inline-chip radius. It existed as a hardcoded 4px in five
-     places and as a stray 5px in two more, on a scale that starts at 8px.
-     This scale stays the PAGE's own: a landing page's card corner is not an
+  /* Radii. --r-lg and --r-xl are the app's --radius-lg / --radius-xl; the rest
+     of the scale stays the PAGE's own: a landing page's card corner is not an
      app control, and --radius-sm moved to 10px in the app for touch targets
-     that do not exist here. */
-  --r-xs: 4px; --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 22px; --r-2xl: 28px; --r-full: 999px;
+     that do not exist here. --r-xs is the inline-chip radius. --r-full is the
+     capsule every button wears, as in the app. */
+  --r-xs: 4px; --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 26px; --r-2xl: 28px; --r-full: 999px;
   /* Device-frame radii, deliberately off the UI scale: they trace the corner
-     of a photographed phone, not a card. They had drifted to three raw
-     literals - 26px on .hero-float and the carousel, 20px on .feat-mobile,
-     --r-2xl on the narrow gallery frame - which is why the same phone wore a
-     different corner in three places. The inset variant is a third of the
+     of a photographed phone, not a card. The inset variant is a third of the
      width, where the full radius reads as a squircle. */
   --r-phone: 26px; --r-phone-inset: 20px;
 
@@ -160,144 +205,302 @@
      Handyaufnahmen sind 1320x2867; .feat-phone stand auf 1320/1780 und
      .mod-shot img auf 1320/1900, also auf erfundenen Zuschnitten, die die
      Aufnahme unten abschnitten und aus dem Telefon ein gedrungenes Tablet
-     machten. Dieselbe Drift wie bei den Radien eine Zeile hoeher, nur eine
-     Ebene groeber: .hero-float und der schmale Galerierahmen fuehrten daneben
-     das echte Mass. Ein Name, ein Verhaeltnis. */
+     machten. Ein Name, ein Verhaeltnis. */
   --ar-phone: 1320 / 2867;
 
-  /* Neutral shadows, like the app's. They used to carry a warm tint
-     (rgba(18,14,8,…)) that belonged to the linen palette. */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05), 0 1px 4px rgba(0,0,0,0.04);
-  --shadow-md: 0 2px 10px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
-  --shadow-lg: 0 10px 30px rgba(0,0,0,0.12), 0 3px 8px rgba(0,0,0,0.05);
-  --shadow-xl: 0 22px 60px rgba(0,0,0,0.18), 0 6px 16px rgba(0,0,0,0.07);
+  /* Shadows: the app's --shadow-sm..xl. --shadow-hero is the page's own, one
+     step past xl for the single large screenshot. */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.04);
+  --shadow-md: 0 2px 10px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.04);
+  --shadow-xl: 0 18px 56px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.06);
   --shadow-hero: 0 32px 80px rgba(0,0,0,0.20), 0 10px 30px rgba(0,0,0,0.08);
 
-  --glass-bg: rgba(255,255,255,0.70);
+  /* Glass for the top bar and the two floating badges: --color-surface-glass
+     and --glass-border. The blur is the page's own. Both turn opaque under
+     prefers-reduced-transparency and prefers-contrast (end of the token
+     section). */
+  --glass-bg: rgba(250,250,252,0.62);
   --glass-border: rgba(255,255,255,0.65);
   --glass-blur: blur(18px) saturate(180%);
 
-  /* One curve, one name. Both pages used to call this --ease-spring with
-     different values, and index declared it twice on top of that. Exponential
-     ease-out: nothing here is a glass element, and overshoot on a hover lift
-     reads as wobble. */
+  /* The top bar's height, one value for all five pages: the legal pages pad
+     their column by it, index and install their heroes. */
+  --bar-h: 62px;
+  /* ...and its row's column: the landing page's (index.html --maxw, 24px
+     gutter), so the logo does not jump between pages. The legal pages keep
+     their 820px text column and install.html its 1160px one below the bar;
+     only the row lines up. test:docs-landing holds the two values equal. */
+  --bar-maxw: 1200px;
+
+  /* One curve, one name. Exponential ease-out: nothing here is a glass
+     element, and overshoot on a hover reads as wobble. */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-
-  --success-ink: #186A2C;   /* --color-success-ink */
-  --warn-ink: #8F4F00;      /* --color-warning-ink */
-
-  --grain: 0.025;
 }
 
-/* The explicit choice from the theme toggle. */
+/* The explicit choice from the theme toggle. First of the two dark lists. */
 [data-theme="dark"] {
-  /* The app's dark ground is warm charcoal (#191816) and its card a distinct
-     step above it (#262422). It moved off the near-black floor it stood on
-     until v2.1.0, where cards had nothing to separate from. --bg-alt goes DOWN
-     from --bg, as it did before, so an alternating band still reads as
-     recessed. */
+  /* The app's dark ground is warm charcoal (#191816), and its card a distinct
+     step above it - #2B2825 since the app's dark-mode pass of 2026-08-17,
+     where the old #262422 separated from the ground by only 1.15:1. --bg-alt
+     goes DOWN from --bg, so an alternating band still reads as recessed. */
   --bg: #191816;             /* --neutral-100 (dark) */
   --bg-alt: #0F0E0D;         /* --neutral-50 (dark) */
-  --surface: #262422;        /* --color-surface (dark) */
-  --border: #454039;         /* --color-border (dark), set apart from the ramp */
-  --border-strong: #4E4A44;  /* --neutral-300 (dark) */
+  --surface: #2B2825;        /* --color-surface (dark) */
+  --border: #47423B;         /* --color-border (dark), set apart from the ramp */
+  --border-strong: #6F6A61;  /* --color-border-strong (dark) */
   --text-1: #F5F3ED;         /* --neutral-900 (dark) */
   --text-2: #CBC5BC;         /* --neutral-700 (dark) */
-  --text-3: #B4AEA5;         /* --neutral-600 (dark), ~6.9:1 on --surface */
+  --text-3: #B4AEA5;         /* --neutral-600 (dark), 6.66:1 on --surface */
+  --neutral-950: #FBFAF7;    /* --neutral-950 (dark) */
 
   --accent: #A78BFA;         /* --color-accent (dark) */
   --accent-hover: #BCA6FC;   /* --color-accent-hover (dark) */
-  --accent-on-soft: #BCA6FC; /* siehe :root - beide Dark-Pfade */
-  --accent-ink: #191816;     /* --color-ink-on-vivid (dark) */
-  /* A touch stronger than light, as before - a glow has less to work with on a
-     dark ground. --accent-soft and --accent-deep need no entry: they are
-     color-mix on --accent and --surface/--text-1, which all moved above. */
+  --accent-on-soft: #BCA6FC; /* see :root */
+  --accent-ink: #0A0A0C;     /* --color-ink-on-vivid (dark) */
+  /* A touch stronger than light - a glow has less to work with on a dark
+     ground. --accent-soft, --accent-deep and --accent-fill need no entry: they
+     are color-mix on tokens that all moved above. */
   --accent-glow: color-mix(in srgb, var(--accent) 22%, transparent);
 
-  --m-tasks: #4ADE80;
-  --m-calendar: #4CB8F0;
-  --m-meals: #FB923C;
-  --m-recipes: #2ECC99;
-  --m-shopping: #F472B6;
-  --m-notes: #FCD34D;
-  --m-contacts: #60A5FA;
-  --m-birthdays: #FB7185;
-  --m-budget: #2DD4BF;
-  --m-documents: #7E9BCC;
-  --m-inventory: #7E9BCC;
-  --m-housekeeping: #C4B5FD;
-  --m-health: #DB60CB;
-  --m-rewards: #E68CA6;
-  --m-split: #2FB6E8;
-  --m-infra: #A2ACB6;
+  --success: #30D158;
+  --success-soft: #0E2E17;
+  --success-ink: #6ADE87;
+  --warning: #FF9F0A;
+  --warning-soft: #33230A;
+  --warn-ink: #FFB84A;
+  --danger-ink: #FF857E;
+  --info: #409CFF;
+  --info-soft: #10263E;
+
+  --f-time: #4CB8F0;
+  --f-work: #4ADE80;
+  --f-kitchen: #FB923C;
+  --f-money: #2DD4BF;
+  --f-people: #FB7185;
+  --f-health: #DB60CB;
+  --f-records: #7E9BCC;
+  --f-neutral: #94A3B8;
 
   /* The code plate is deliberately NOT mirrored: it is the one surface that
      keeps its own palette in both themes. */
 
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.30);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.38);
-  --shadow-lg: 0 12px 30px rgba(0,0,0,0.48);
-  --shadow-xl: 0 22px 60px rgba(0,0,0,0.60);
-  --shadow-hero: 0 32px 80px rgba(0,0,0,0.66), 0 10px 30px rgba(0,0,0,0.30);
+  /* A black drop shadow is invisible on warm charcoal. The app answers that
+     with a 1px white ring built into each step (tokens.css, dark block), and so
+     does this page now. */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.30), 0 0 0 1px rgba(255,255,255,0.06);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.40), 0 0 0 1px rgba(255,255,255,0.06);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,0.50), 0 0 0 1px rgba(255,255,255,0.05);
+  --shadow-xl: 0 18px 56px rgba(0,0,0,0.65), 0 4px 12px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,255,255,0.05);
+  --shadow-hero: 0 32px 80px rgba(0,0,0,0.66), 0 10px 30px rgba(0,0,0,0.30), 0 0 0 1px rgba(255,255,255,0.05);
 
-  --glass-bg: rgba(28,28,30,0.66);
-  --glass-border: rgba(255,255,255,0.10);
-
-  --success-ink: #6ADE87;   /* --color-success-ink (dark) */
-  --warn-ink: #FFB84A;      /* --color-warning-ink (dark) */
+  --glass-bg: rgba(43,40,37,0.66);
+  --glass-border: rgba(255,255,255,0.12);
 }
 
 /* The system preference, for visitors who never touched the toggle - the
    common case, since the head script only sets data-theme when localStorage
-   holds one. This block used to be a hand-copied twin of the one above and
-   went out of sync twice (--success-ink was missing entirely, leaving the
-   "1 click" badges at 2.45:1 for exactly these visitors; --m-split held a
-   third value). It now inherits instead of repeating: one declaration list,
-   two selectors. */
+   holds one. Second of the two dark lists: same declarations, same values,
+   same order as the block above (test:docs-landing compares them). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #191816;
     --bg-alt: #0F0E0D;
-    --surface: #262422;
-    --border: #454039;
-    --border-strong: #4E4A44;
+    --surface: #2B2825;
+    --border: #47423B;
+    --border-strong: #6F6A61;
     --text-1: #F5F3ED;
     --text-2: #CBC5BC;
     --text-3: #B4AEA5;
+    --neutral-950: #FBFAF7;
 
     --accent: #A78BFA;
     --accent-hover: #BCA6FC;
     --accent-on-soft: #BCA6FC;
-    --accent-ink: #191816;
+    --accent-ink: #0A0A0C;
     --accent-glow: color-mix(in srgb, var(--accent) 22%, transparent);
 
-    --m-tasks: #4ADE80;
-    --m-calendar: #4CB8F0;
-    --m-meals: #FB923C;
-    --m-recipes: #2ECC99;
-    --m-shopping: #F472B6;
-    --m-notes: #FCD34D;
-    --m-contacts: #60A5FA;
-    --m-birthdays: #FB7185;
-    --m-budget: #2DD4BF;
-    --m-documents: #7E9BCC;
-    --m-inventory: #7E9BCC;
-    --m-housekeeping: #C4B5FD;
-    --m-health: #DB60CB;
-    --m-rewards: #E68CA6;
-    --m-split: #2FB6E8;
-    --m-infra: #A2ACB6;
-
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.30);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.38);
-    --shadow-lg: 0 12px 30px rgba(0,0,0,0.48);
-    --shadow-xl: 0 22px 60px rgba(0,0,0,0.60);
-    --shadow-hero: 0 32px 80px rgba(0,0,0,0.66), 0 10px 30px rgba(0,0,0,0.30);
-
-    --glass-bg: rgba(28,28,30,0.66);
-    --glass-border: rgba(255,255,255,0.10);
-
+    --success: #30D158;
+    --success-soft: #0E2E17;
     --success-ink: #6ADE87;
+    --warning: #FF9F0A;
+    --warning-soft: #33230A;
     --warn-ink: #FFB84A;
+    --danger-ink: #FF857E;
+    --info: #409CFF;
+    --info-soft: #10263E;
+
+    --f-time: #4CB8F0;
+    --f-work: #4ADE80;
+    --f-kitchen: #FB923C;
+    --f-money: #2DD4BF;
+    --f-people: #FB7185;
+    --f-health: #DB60CB;
+    --f-records: #7E9BCC;
+    --f-neutral: #94A3B8;
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.30), 0 0 0 1px rgba(255,255,255,0.06);
+    --shadow-md: 0 4px 14px rgba(0,0,0,0.40), 0 0 0 1px rgba(255,255,255,0.06);
+    --shadow-lg: 0 8px 28px rgba(0,0,0,0.50), 0 0 0 1px rgba(255,255,255,0.05);
+    --shadow-xl: 0 18px 56px rgba(0,0,0,0.65), 0 4px 12px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,255,255,0.05);
+    --shadow-hero: 0 32px 80px rgba(0,0,0,0.66), 0 10px 30px rgba(0,0,0,0.30), 0 0 0 1px rgba(255,255,255,0.05);
+
+    --glass-bg: rgba(43,40,37,0.66);
+    --glass-border: rgba(255,255,255,0.12);
   }
+}
+
+/* Glass off, as in the app (tokens.css "Accessibility: prefers-reduced-
+   transparency" / "prefers-contrast: more"): the top bar becomes the opaque
+   card surface without blur; under more contrast its edge takes the text
+   colour. The selectors repeat those of the lists above - :root and the
+   media twin :root:not([data-theme="light"]), whose higher specificity would
+   otherwise keep the dark glass - so the fallback wins in every theme. Every
+   backdrop-filter on the site reads --glass-blur (test:docs-landing), so
+   this one switch reaches all of them. */
+@media (prefers-reduced-transparency: reduce) {
+  :root, :root:not([data-theme="light"]) {
+    --glass-bg: var(--surface);
+    --glass-blur: none;
+    --glass-border: var(--border);
+  }
+}
+@media (prefers-contrast: more) {
+  :root, :root:not([data-theme="light"]) {
+    --glass-bg: var(--surface);
+    --glass-blur: none;
+    --glass-border: var(--text-1);
+  }
+}
+
+/* ===== Shared components ================================================== */
+
+/* The top bar. ONE bar for all five pages: fixed, --bar-h high, glass over
+   the page. The legal pages used to draw their own - opaque, 81px, not
+   fixed, with differently sized controls - so a visitor crossing from the
+   install guide to the privacy notice changed websites for one click.
+   Markup: <header class="site-bar"> (the banner landmark, unstyled) holds
+   .topbar (this rule), inside it .bar-row on the landing page's column
+   (--bar-maxw, whatever column class it carries); the controls on its right are .nav-btn capsules in a
+   .nav-controls group (index.html groups its larger set as .nav-right).
+   The glass sits on .topbar, NOT on the header: backdrop-filter makes an
+   element the containing block of its fixed descendants, and index.html's
+   install pill is fixed to the thumb zone from inside that header - on the
+   header it jumped to the top of the screen. */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: var(--bar-h);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--border);
+}
+.bar-row { display: flex; align-items: center; justify-content: space-between; height: 100%; }
+/* The row sits on --bar-maxw on every page, whatever column class it
+   borrows (.wrap, .container-wide). 48px is the landing page's two gutters;
+   a page with a narrower gutter (install.html: 22px) sets --bar-pad, and the
+   column widens by the difference, so the logo lands on the same x on a wide
+   screen and on the page's own gutter on a narrow one. Two classes, so it
+   wins over the single-class column rules in legal.css and the inline styles. */
+.topbar .bar-row { max-width: calc(var(--bar-maxw) - 48px + 2 * var(--bar-pad, 24px)); margin-inline: auto; padding-inline: var(--bar-pad, 24px); }
+.nav-logo { display: flex; align-items: center; gap: 11px; flex-shrink: 0; min-height: 44px; margin-right: 12px;
+  font-weight: 700; font-size: 1.2rem; letter-spacing: -0.02em; color: var(--text-1); text-decoration: none; }
+.nav-logo:hover { color: var(--text-1); text-decoration: none; }
+.nav-logo svg { width: 34px; height: 34px; filter: drop-shadow(0 3px 8px var(--accent-glow)); }
+.nav-controls { display: flex; align-items: center; gap: 8px; }
+/* More contrast: the bar's lower edge in the text colour, as the app does
+   with its glass edge. After the base rule, which sets the whole border. */
+@media (prefers-contrast: more) {
+  .topbar { border-bottom-color: var(--text-1); }
+}
+
+/* Focus ring, as in the app: 2px in the voice, 2px away. Every page used to
+   write this rule itself, the legal pages with raw literals. */
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: var(--focus-offset); border-radius: var(--r-xs); }
+
+/* Skip link: index and install put two dozen focusable nodes between the top
+   of the page and the content, so keyboard users need a way past the nav. */
+.skip-link { position: absolute; left: -9999px; top: 0; z-index: 200; text-decoration: none; }
+.skip-link:focus { left: 8px; top: 8px; padding: 12px 18px; display: inline-flex; align-items: center; min-height: 44px;
+  background: var(--surface); color: var(--text-1);
+  border: 1px solid var(--border); border-radius: var(--r-full); box-shadow: var(--shadow-md); font-weight: 600; }
+
+/* Buttons. ONE shape, as in the app (DESIGN.md "Die Eine-Buttonform-Regel"):
+   the capsule, for every element that triggers an action and carries its own
+   surface or edge. The app's primary is a flat accent surface with a quiet
+   shadow; this page's used to lift 2px on hover under a violet glow, which the
+   app never did. Secondary is the app's too: transparent, accent ink, 1.5px
+   edge, a tint on hover. index.html and install.html each had a copy of these
+   rules with different padding. */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  min-height: 48px; padding: 14px 26px; border: 1.5px solid transparent; border-radius: var(--r-full);
+  font-family: var(--ff); font-size: 1rem; font-weight: 600; line-height: 1.4;
+  white-space: nowrap; text-decoration: none; cursor: pointer;
+  transition: background-color .15s, border-color .15s, box-shadow .15s, color .15s, transform .15s;
+}
+.btn:hover { text-decoration: none; }
+.btn:active { transform: scale(0.98); }
+.btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+.btn-primary { background: var(--accent-fill); color: var(--accent-ink); box-shadow: var(--shadow-sm); }
+.btn-primary:hover { background: var(--accent-fill-hover); color: var(--accent-ink); box-shadow: var(--shadow-md); }
+.btn-secondary { background: transparent; color: var(--accent); border-color: var(--border); }
+.btn-secondary:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: var(--accent); color: var(--accent); }
+
+/* The header controls of every page (back to the overview, language, theme,
+   GitHub): small capsules with a hairline edge. */
+.nav-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; min-width: 44px; /* WCAG touch target (both axes) */
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--r-full);
+  background: none; color: var(--text-2); cursor: pointer; text-decoration: none; white-space: nowrap;
+  font-family: var(--ff); font-size: 0.82rem; font-weight: 600;
+  transition: background-color .15s, color .15s, border-color .15s, transform .15s;
+}
+.nav-btn:hover { background: var(--surface); color: var(--text-1); border-color: var(--border-strong); text-decoration: none; }
+.nav-btn:active { transform: scale(0.95); }
+.nav-btn svg { width: 16px; height: 16px; }
+
+/* The code plate and its copy button, identical on both pages that draw one.
+   The span classes are the page's own syntax colours: .cmd for the command a
+   reader types, .val for a value, .comment for the aside. */
+.code-wrap, .code-block { --focus-ring: var(--code-accent); }
+.code-wrap { position: relative; }
+.code-block { background: var(--code-bg); color: var(--code-text); border-radius: var(--r-lg); padding: 20px 24px;
+  font-family: var(--ff-mono); font-size: 0.84rem; line-height: 1.85; overflow-x: auto; white-space: pre; tab-size: 2;
+  box-shadow: var(--shadow-md); border: 1px solid rgba(255,255,255,0.06); }
+.code-block .cmd { color: var(--code-accent); font-weight: 600; }
+.code-block .val { color: var(--code-val); }
+.code-block .comment { color: var(--code-comment); }
+/* The button gets its own band at the top of the plate instead of a
+   padding-right gutter. `padding-right` only protects the first screenful:
+   the button is absolutely positioned, so any line longer than the plate
+   scrolls straight underneath it (on the German pages "Kopieren" hid 17% of
+   the readable width at 390px). Keyed on :has(), because some plates carry no
+   button and a blanket padding would open an empty band above them. */
+.code-wrap:has(> .copy-btn) .code-block { padding-top: 52px; }
+.copy-btn { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  min-height: 44px; padding: 7px 13px; border: 1px solid rgba(255,255,255,0.14); border-radius: var(--r-full);
+  background: rgba(255,255,255,0.08); color: var(--code-text); cursor: pointer;
+  font-family: var(--ff); font-size: 0.75rem; font-weight: 600; transition: background-color .15s, color .15s, border-color .15s; }
+.copy-btn:hover { background: rgba(255,255,255,0.18); color: #fff; }
+.copy-btn.copied { background: var(--code-ok); border-color: var(--code-ok); color: #fff; }
+.copy-btn.failed { background: var(--code-fail); border-color: var(--code-fail); color: #fff; }
+.copy-btn svg { width: 13px; height: 13px; }
+
+/* Reveal on scroll. Both pages add .vis when an element enters the viewport;
+   .d1-.d3 stagger siblings. Content must never ship hidden without JS (this
+   audience often disables it), under reduced motion, or on paper. */
+.reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s var(--ease-out), transform .6s var(--ease-out); }
+.reveal.vis { opacity: 1; transform: none; }
+.d1 { transition-delay: .08s; } .d2 { transition-delay: .16s; } .d3 { transition-delay: .24s; }
+html:not(.js) .reveal { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; }
+}
+@media print {
+  .skip-link, .copy-btn { display: none !important; }
+  /* Fixed elements repeat on every printed page. index and install drop the
+     bar on paper; the legal pages keep their logo in the flow. */
+  .topbar { position: static; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .topbar .nav-btn { display: none; }
+  .reveal { opacity: 1 !important; transform: none !important; }
 }

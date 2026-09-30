@@ -7,7 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The website and README screenshots show v2.70.0, and the family section shows the wall mode.**
+  Every screenshot on yuvomi.cloud and in both READMEs was taken again against 2.70.0, in English
+  and German, light and dark. In the section for the family, a screenshot of the wall mode on a
+  landscape tablet takes the place of the three-circle drawing, loaded as WebP in the current theme
+  and language like the other screenshots. The preview image a shared link shows now carries the
+  headline and modules of the page it opens.
+
+- **In the demo data, today's morning dose is already taken.** At the evening hour the screenshots
+  are taken, an open 08:00 dose showed as overdue in red on the overview and in the wall mode; now
+  only the evening dose is still open today. Only a database filled by `scripts/seed-demo.js` is
+  affected.
+
+- **The README says only what Yuvomi does, and the manual install no longer starts on the
+  placeholder keys.** The meal plan becomes a shopping list through an import you confirm, not on
+  its own, and booking a shop back into the pantry is its own dialog with amount and unit. Modules
+  are switched off, not on, and Inventory, Waste collection and Schedule start off. The line about
+  the local network names all five integrations that stay blocked on private addresses until you
+  opt in, and that Paperless and Papra may reach them out of the box. The guided setup prepares
+  Yuvomi for an HTTPS reverse proxy but fetches no certificate, which the README and the website now
+  say instead of "configures HTTPS", and it answers only on the server itself, so the README shows
+  the SSH tunnel for other devices. The README also names arm64 (Raspberry Pi 4/5), that Yuvomi
+  refuses to start with a placeholder key, WebDAV as backup target, restoring another
+  installation's backup and the Proxmox guide. In `docs/installation.md`, the short Docker and
+  Podman commands created `.env` and started the container in one copy block; the secrets are now
+  generated first, the placeholders replaced by hand, and the start follows in a block of its own.
+
+- **The README opens as a family planner and leads to the website.** The first line says what
+  Yuvomi is, "The self-hosted family planner", with the website's claim beneath it, and the tour on
+  yuvomi.cloud is now the first link, again under Documentation and in the footer. A new section
+  shows the wall mode and what the family gets: the kitchen tablet, the app on every phone, invite
+  links and access per role. The twenty modules appear as five groups in the order of the app menu,
+  with the full table one click away, and the requirements, outbound connections and LAN rules
+  fold away under the install steps. A new question explains how safe access from outside is. The
+  German README now addresses its readers as "ihr" like the website, and its tables no longer run
+  wider than a phone screen. The website says the week's meal plan reaches the shopping list
+  through one import, not one tap.
+
+### Fixed
+
+- **Pairing a display in German says "Tablet", not "Tablett".** "Tablett" is a serving tray; the
+  four strings of the display pairing now use the word the website and the README use.
+
+- **The app no longer looks up openweathermap.org on every load.** A leftover `dns-prefetch` hint
+  made each browser resolve that name even with Open-Meteo as the weather source. Nothing in the
+  browser talks to OpenWeatherMap directly: its icons come through Yuvomi's own server.
+
+- **A command-line restore refuses to run while Yuvomi is running** (#1530). `scripts/restore-backup.js`
+  replaced the database without knowing whether a server was working on it: the file changed under
+  the server's open connection, and the server kept writing to the old one. Yuvomi and the restore
+  now both hold a lock on `yuvomi.db.lock` next to the database. The restore stops with "Restore
+  refused" while a server holds it, and a server that starts during a command-line restore waits
+  until it has finished, with a log line every 30 seconds. A second server on the same database
+  waits the same way. The operating system drops the lock when the process ends, also after a
+  crash, so nothing is left to clean up. Do not delete `yuvomi.db.lock` while Yuvomi runs. If the
+  file cannot be created or locked, Yuvomi logs a warning and works as before; the lock does not
+  reach across machines (NFS with `nolock`) or from a Docker Desktop host into its containers.
+
+## [2.70.0] - 2026-09-30
+
 ### Added
+
+- **First-run setup keeps the chosen language.** The setup page now tells the server which
+  language it is shown in, so birthday events and other titles the server writes start out in that
+  language instead of English. `POST /api/v1/auth/setup` accepts optional `language` and `timezone`
+  fields for the same purpose; requests without them behave as before.
 
 - **The search opens places and actions, not only entries.** Typing "Schedule" or "new" now
   offers a "Go to" section with every module in your navigation and every settings sheet, and a
@@ -107,6 +173,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a suggestion without saving the dialog.
 
 ### Changed
+
+- **The demo data shows an ordinary family day on any date.** Three tasks for Linda, Alex and Leo
+  are due today, today brings an all-day sports day and an evening movie night, and the weekly
+  classes start in the first week of the month, so the overview no longer says "Nothing else today"
+  beside "No tasks assigned for today" and the month view is filled from the 1st. Six single
+  events are spread across the whole current month, never on today, so the month is not empty
+  before today either. Every meal of today is planned, and this week's Friday pizza exists before
+  the meal plan is opened. Height and head circumference have a value, so no vitals card reads
+  "No value yet". Only a database filled by `scripts/seed-demo.js` is affected. The screenshot
+  script pins the browser clock to the evening, so the overview shows dinner, can write to another
+  folder and capture single motifs, and adds a wall-mode shot.
+
+- **The website speaks to the whole family, and its module list follows the app's menu.** A new
+  section shows three moments from the family's side - the tablet on the kitchen wall, the app on
+  every phone and an invite with the right access for each role - drawn with the three circles of
+  the logo instead of a mock screenshot. The module section is grouped like the app's navigation
+  (Plan, Household, People, Finance, plus what lives in Settings) instead of one long row of cards,
+  and the handoffs show the item travelling from one module to the next once as they scroll in.
+  The hero no longer tilts, the grain overlay is gone, the first gallery screen is the meal week
+  instead of a repeat of the hero, and the page ends on the family call to action rather than on
+  the key warning, which stays in full on the install page.
+
+- **The website wears the app's colours and buttons.** Module colours follow the app's areas of
+  life (kitchen orange for meals, recipes, shopping and pantry; one green for tasks, housekeeping
+  and rewards), dark mode uses the app's warmer card and border tones, and every button is a flat
+  capsule like in the app instead of a lifted, glowing rectangle. The copy button on the install
+  page no longer shows white text on bright green in dark mode, and the legal pages keep their
+  header on one line on a phone.
+
+- **The website says less and promises only what the app does.** "What it replaces" is a short
+  band of six pairs instead of a ten-row table, the module catalog shows names first and puts the
+  descriptions behind "Show descriptions" on every screen size, and contacts sit under People as in
+  the app's menu. The pantry handoff no longer claims the last jar is "already" on the list (one
+  tap puts it there, and reminders are about best-before dates only), points are described as going
+  to whoever did the task, and a fourth question before you commit answers how safe access from
+  outside is: two-factor sign-in that an admin can require, invite links, SSO-only login and
+  signing out other devices. The same two sentences are corrected in the README. The page is about
+  1,350px shorter on a desktop and 800px shorter on a phone.
+
+- **The web installer looks and works like the app.** A step list on the desktop jumps back to
+  finished steps and stays with you while Yuvomi starts, on/off options are switches as in the app,
+  a phone shows more of each step, and the review groups your answers with a "Change" link each. The language you set up in carries over to the app, the upload limit can be
+  set, and the "Active modules" link on the last page no longer opens the budget.
 
 - **New events in the calendar's week and day come from a double-click or a long press, not a
   click.** A single click or tap on empty time now only closes what is open, such as an event's
@@ -377,8 +486,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   larger target.
 
   **Phones:** on a 390x844 phone two bookings are visible straight away instead of none. The
-  balance leads the month summary with the income and expense cards below it, and the change
-  against the previous month is back on every card. Wherever the overview has a single column
+  balance leads the month summary (on a phone as one row with income and expenses inline, see
+  "Budget on a phone starts with the bookings"). Wherever the overview has a single column
   (phones, and laptops with the sidebar open) the category chart shows the three largest expenses,
   with "All categories" in its heading to expand it. "Manage categories", the CSV export and
   grouping by person are one menu next to "Transactions". When you scroll, the "Budget" title
@@ -418,11 +527,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are added with the "+" in the header like on every other tab - the "Add account" button only
   appears while there are no accounts yet.
 
-- **The calendar gives phones more room for events.** Filter and search moved next to the view
-  switcher, so the calendar header on a phone is 166px instead of 230px, and when you scroll the
-  week, day or agenda, the page title folds away completely and leaves only the date navigation
-  and the view switcher (121px). The month now shows 65 % of the screen instead of 56 %, the week
-  nine hours instead of six and a half. The week's day headings sit in one line with the date and
+- **The calendar gives phones more room for events.** The calendar header on a phone is shorter
+  (see "The calendar header on a phone takes two rows"), and when you scroll the week, day or
+  agenda, the page title folds away completely and leaves only the date navigation. The month and
+  the week show more of their grid than before. The week's day headings sit in one line with the date and
   the hour column is narrower. The period label keeps its width, so the arrows no longer jump
   when you switch views, and on wide screens they sit next to the label instead of at the far
   ends of the header.
@@ -526,8 +634,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The new document dialog shows the expiry date right away**, next to its reminder, which appears
   once a date is set, and has a Cancel button.
 
-- **Bulk actions without a selection step back instead of warning.** Archive and Delete stay in the
-  selection bar, dimmed, until a document is picked.
+- **Bulk actions without a selection step back instead of warning.** Archive, in the tools menu
+  while selecting, stays dimmed until a document is picked.
 
 - **A search that finds nothing offers the other view.** When the archive holds matches for a search
   among active documents, or the other way round, the empty result offers to search there.
@@ -711,9 +819,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arrange, and each tile offers one size menu with only the sizes that change something there. The
   first tile now starts on the first screen.
 
-- **The kitchen tabs fit a phone, with search in the same row.** In Recipes and Pantry the search
-  button and "..." sit in the kitchen tab row instead of a row of their own, and the four tabs fit
-  down to 375px without scrolling.
+- **The kitchen tabs fit a phone.** The four tabs fit down to 375px without scrolling; the search
+  and tools of Recipes and Pantry sit in the context row below them (see "The kitchen head on a
+  phone follows one rule").
 
 - **The shift plan's statistics period is a menu on narrow screens** instead of a segmented control
   that scrolled sideways.
@@ -731,30 +839,125 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **"Due today" stays readable on the selected task.** On a wide screen the task open on the
+  right is highlighted in the list, and on that highlight "Due today" and "Overdue" fell below
+  the 4.5:1 contrast the rest of the app keeps. Both now use the darker text shade there.
+
+- **The website no longer states things the app does not do.** The quick start said a database
+  left on the placeholder key gets encrypted with a public value; Yuvomi does not start on the
+  placeholders at all, and the note now says so. The install page promised a two-command Docker
+  setup where the steps are a handful of commands plus one edit in `.env`. The site and both
+  READMEs named OpenAPI 3.0 while the server delivers 3.1 and called documents "tagged", and "turn
+  on what fits" stood over four modules that cannot be switched off. The outbound note now lists
+  every service that connects once you switch it on, as the README does.
+
+- **The install page's steps and fixes match the files they describe.** A busy port is now moved
+  with `OIKOS_HTTP_PORT` in `.env` instead of by editing the compose file, and the database reset
+  removes the data folder, which `docker compose down -v` never touched. Step 2 names the
+  `REPLACE_WITH_…` placeholders and how to edit `.env`, a new first fix covers a container that
+  keeps restarting on them, and the Docker path switches its commands to Podman. Portainer and
+  Windows get a note each, and the last step shows the right address for Proxmox and the web
+  installer.
+
+- **Every install path on the website runs to the end.** The Proxmox steps installed a Debian
+  package that does not exist in Debian 13 and created the container from a template that was
+  never downloaded; they now fetch the current template with `pveam` and install `docker-compose`,
+  and the Docker steps sit in the Proxmox tab itself, so the page ends on the container's address
+  instead of `localhost`. The web installer names the SSH tunnel for opening it from another
+  device and points servers without a browser to `bash install.sh`. After choosing Podman,
+  troubleshooting, restarts and updates show Podman commands too. Umbrel no longer reads as if it
+  had asked for the keys it generates itself, TrueNAS calls the database key optional like its
+  own form, and the encryption decision comes before the first start. On a phone the download
+  commands wrap, so the file name is visible.
+- **The website loads less and keeps one header on every page.** On a desktop the landing page
+  no longer downloads a 414 KB English screenshot in PNG alongside the one it shows (about 180 KB of
+  images instead of up to 590 KB); only visitors without JavaScript get the PNGs. No screenshot
+  appears twice any more, the dot in "Why one app" travels along the arrow instead of across the
+  first label, the expanded Household group has no gap between its entries, and at 320px the header
+  fits the screen. The privacy notice, Datenschutz and Impressum use the same glass header as the
+  other pages, with the logo in the same place on all five, and with "reduce transparency" or "increase contrast" switched on in the system the
+  header turns solid, as in the app.
+
+- **The website is easier to use on a phone and with a keyboard.** The Install button at the
+  bottom of the phone screen stays while you read and only steps aside over the command blocks and
+  the closing buttons; it used to vanish on every downward scroll. The section menu no longer hangs
+  off the left edge on a phone, fits its longest entry on one line and closes with Escape or when
+  focus moves on. Links inside sentences are underlined and easier to tap, long captions and legal
+  text wrap at a readable width, and the German page no longer shows English first and then jumps
+  on a slow connection. The legal pages share the install page's header and footer links. With
+  JavaScript off, the home page no longer shows an empty box above the dashboard picture.
+
+- **The website's evidence links show what they claim.** "0 trackers" now opens the README's
+  full list of outbound connections instead of the website's own privacy policy, and the source
+  link says it leads to the update check. The quick start names the image's architectures, amd64
+  and arm64 including Raspberry Pi 4 and 5. Every page has a home-screen and PNG icon, search
+  engines get a sitemap and a description of the app, the German page carries a German
+  description, and on a phone no separator dot is left hanging at the end of the stats line. The
+  English note on the imprint links the English privacy policy.
+
+- **The weather settings show weather configured by the server.** A location set during
+  installation (`WEATHER_*`, or the legacy `OPENWEATHER_*`) showed weather on the overview while
+  the admin weather page said "Not configured". The page now names that source, shows its location
+  and units read-only, and says that a location saved here takes precedence and how to turn the
+  server setting off. Removing a saved location now also removes its coordinates, so the server
+  setting applies again, and the page says so. `GET /api/v1/preferences` reports the source as
+  `weather_source`, without any API key.
+
+- **Wall mode can be left on a phone** (#1559). "Leave wall mode" was below the bottom edge on
+  phones and showed only a grey icon until the screen was touched, and the back button closed the
+  app instead of leaving wall mode, which was still on at the next start. The exit now stays at the
+  bottom of the screen at every size and always shows its label, the back button or gesture leaves
+  wall mode (also right after a restart in wall mode), and turning it on says in one line what it is
+  and how to leave it.
+
+- **A restore waits for pages that save something after asking another service** (#1551). Some
+  pages that only show data still save something once an answer comes back: a renewed Google token
+  when the calendar list, the sync targets of the event dialog or a Google Drive document are
+  loaded, the calendar list of an Outlook or CalDAV account when it is refreshed or loaded for the
+  first time, and the exchange rates on the subscriptions page. A restore did not wait for them, so
+  this could land in the restored database or fail on the closed one. A restore now waits for them,
+  and while it runs these pages answer "try again" instead of starting. A new page that waits for
+  another service now fails a test until it is covered or marked as only reading.
+- **Deleting the first entry of a recurring budget payment says that it ends the series** (#1544).
+  The series hangs on its first entry, so "Only this occurrence" there also ends the whole series:
+  the entries already created stay as single entries and no new ones follow. The dialog now says so
+  before you choose; deleting a later entry works as before.
+
+- **Counts read correctly in Czech, Polish, Russian, Ukrainian and Arabic** (#1473). These
+  languages need more than a singular and a plural: Czech, Polish, Russian and Ukrainian have their
+  own form for 2 to 4 (and 22 to 24), Arabic has a dual for 2 and a separate form from 11 to 99.
+  For about 110 counters across the overview, tasks, settings, documents and other modules only the
+  singular and the form for 5 and more existed, so "za 2 dní" appeared instead of "za 2 dny" and
+  "خلال 2 أيام" instead of "خلال يومين". Every counter now carries every form its language uses, only
+  in that language, and a test fails for any new counter that misses one.
+
+- **Counts no longer show "1" for 21, 0 or 5 in some languages** (#1549). In Russian and Ukrainian
+  the singular form also serves 21, 31, 101 and so on, in French, Portuguese, Hindi and Persian it
+  also serves 0, and in Filipino most numbers. About 90 of these forms had a fixed "1" or a word
+  like "every month" instead of the number, so a day with 21 events read "1 событие" in Russian and
+  a day with 5 events read "1 kaganapan" in Filipino. They now show the actual number; a fixed
+  wording stays only where the screen can never show another number, and a test checks that.
+- **"Change all future occurrences" no longer ends a recurring payment** (#1546). Editing a later
+  month of a series and choosing "Change all future occurrences" sent the recurrence settings of
+  that single month along, and a generated month carries none: the series was switched off, every
+  occurrence from today on was deleted, and a weekly, yearly or virtual series was reset to monthly,
+  while the message said the change was saved. The dialog now sends only what you changed, and the
+  recurrence of a series is edited on its first entry; a generated month no longer shows the
+  "Recurring" switch. Changing the amount of a virtual series from one of its months now counts as
+  that month's share. **Series ended this way do not come back by themselves:** open the first entry
+  of the series (the search finds it by its title), switch "Recurring" on again and choose its
+  rhythm again. The missing months reappear when you open them; receipts and one-off changes that
+  were attached to the deleted months are gone. For API users: `PUT /api/v1/budget/:id/series` now
+  answers `is_recurring: false` with 400 instead of ending the series; end a series with
+  `PUT /api/v1/budget/:id` and `is_recurring: false` on its first entry, or delete it with
+  `DELETE /api/v1/budget/:id/series`.
+
 - **The API documentation page answers "restore in progress" during a restore** (#1531). Outside
   production, `/docs` checks the API token or session, and while a restore had the database closed
   a request with a token ended in an internal error instead of the "restore in progress" answer
   every other page that needs the database gives. The same happened to `/openapi.json/` with a
   trailing slash, which reaches the same route. A new test now reads every top-level route from
   the running app and fails when one is neither covered by the restore gate nor listed with a reason.
-
-- **The family card no longer misses an evening appointment on a busy day** (#1449). The card took
-  its appointments from the calendar tile, which stops at five coming ones and follows its "Only
-  mine" option: a child's evening appointment could be cut off, and with "Only mine" every other
-  member read as free. The card now loads each member's appointments of the day on its own, ignores
-  "Only mine", and switches to the next appointment or to "Done for today" when one ends, without a
-  reload.
-
-- **A command-line restore refuses to run while Yuvomi is running** (#1530). `scripts/restore-backup.js`
-  replaced the database without knowing whether a server was working on it: the file changed under
-  the server's open connection, and the server kept writing to the old one. Yuvomi and the restore
-  now both hold a lock on `yuvomi.db.lock` next to the database. The restore stops with "Restore
-  refused" while a server holds it, and a server that starts during a command-line restore waits
-  until it has finished, with a log line every 30 seconds. A second server on the same database
-  waits the same way. The operating system drops the lock when the process ends, also after a
-  crash, so nothing is left to clean up. Do not delete `yuvomi.db.lock` while Yuvomi runs. If the
-  file cannot be created or locked, Yuvomi logs a warning and works as before; the lock does not
-  reach across machines (NFS with `nolock`) or from a Docker Desktop host into its containers.
 
 - **A trip that began yesterday shows on today's overview** (#1457). Appointments were picked by
   their start, so a trip, a hospital stay or a school camp that started yesterday and runs until
@@ -768,6 +971,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in Berlin a visit on the 1st at 00:30 counted in the previous month, west of UTC a visit on the
   evening of the last day in the next one. The overview now uses the same month boundaries as the
   Housekeeping module, so both show the same number.
+
+- **Editing a housekeeping visit keeps its day** (#1540). The edit dialog showed the UTC day of
+  the visit: in Berlin a visit on the 1st at 00:30 appeared on the day before, and saving it, even
+  just to correct the amount, moved its calendar entry and payment task there. Correcting the date
+  moved the visit itself a day later. The dialog now shows the household's day, and a new day
+  keeps the visit's time on the household's clock.
+
+- **Housekeeping check-in and "today" follow the household's clock** (#1556). The page took the
+  day and time zone from the device: on a phone set to another time zone, a check-in at 00:30 in
+  Berlin put the calendar entry and payment task on the day before, and the staff card showed
+  yesterday evening's visit as today's. Even in the household's zone, the day ended an hour early
+  or late on the days the clocks change. With a household time zone set, the server now decides the
+  day in that zone, also for a page still open from before the update. For API users:
+  `/api/v1/housekeeping/workers`, `/worker`, `/dashboard` and the check-in take an optional
+  `timezone`; `local_date` and `timezone_offset_minutes` count only without a household time zone.
 
 - **The wall display stays dark after a reload at night** (#1453). Reloading the wall between 22:00
   and 06:00 with the theme set to Automatic or Light left the dimmed night surface in the light
@@ -797,6 +1015,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   task due at 18:00 could read "until 00:00". It now shows the due time as entered, like the task
   list does.
 
+- **Medication reminders come at the household's time** (#1539). The scheduler read the day and
+  the time on the server's clock. With a household time zone set and the server running in
+  another zone, such as UTC in a container, a dose planned for 08:00 in Berlin was due at 10:00,
+  and near midnight a dose could land on the wrong day. Doses are now due on the household's day
+  and clock, also on the days the clocks change. The intake log in Health also shows the times
+  as recorded on a device in another time zone.
+
 - **The note category hints no longer suggest that notes are private** (#1514). A personal
   category is only visible to you, but a note filed under it is still visible to every household
   member, just without that category. The hint next to the category type and the hint in the
@@ -819,7 +1044,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/api/v1/...` instead of an internal error. The documented Docker Compose restore command now
   also flushes to disk after moving the old write-ahead log aside, so a power loss right after it
   cannot keep the restored database next to the old log; if you saved a copy of the command, take
-  the new one from the guide or from Settings, Administration, Backup and restore. A restore on
+  the new one from the guide or from Settings, Household, Backup and restore. A restore on
   Node running natively on Windows no longer stops with `EPERM` while writing the restored copy to
   disk; Docker installs were not affected. (#1441)
 
@@ -831,8 +1056,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start. The automatic calendar sync no longer stops the server when its timer fires in the moment
   a restore has the database closed. (#1532)
 - **Confirming a long list of moved events no longer holds up the server** (#1440). When an admin
-  confirmed a page of moved events under Settings > Sync, every picked entry was checked with a
-  query prepared anew for it, and a full page of up to 5,000 ran without a pause, so other requests
+  confirmed a page of moved events in the calendar sync settings, every picked entry was checked
+  with a query prepared anew for it, and a full page of up to 5,000 ran without a pause, so other requests
   waited meanwhile. The check now prepares its query once and lets other requests through after
   every 50 entries. An entry that no longer matches still stops the whole confirmation with nothing
   written.
@@ -1027,8 +1252,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "5.550 €" are no longer cut off.
 
 - **Adding a family member keeps your place.** "Add member" opened its form below the two-factor
-  card and dropped the keyboard focus. The form now opens right under the member list with the
-  first field focused, and Cancel returns to the button; cancelling an invite does the same.
+  card and dropped the keyboard focus. The form now opens in a dialog (see "Family members and
+  invites are added in a dialog"), and Cancel returns the focus to the button; cancelling an invite
+  does the same.
 
 - **The gift icon on reward cards is back.** In the narrow catalog cards on a desktop the icons of
   "Redeem" and the price shrank to a dot. They keep their size now, and price and buttons move to
@@ -1056,7 +1282,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   next to it, and "Open in Maps" dropped onto a line of its own. The popover now follows the phone
   sheet: Delete at the start, Edit as the main button at the end, below the other actions.
 
-- **Switching the calendar view no longer moves the view tabs on a phone.** Week and day scroll to
+- **Switching the calendar view no longer folds the header on a phone.** Week and day scroll to
   the current hour when they open, and the header took that for your own scrolling: it folded the
   title away, and the tabs jumped 45px up under your finger. Only scrolling you do yourself folds
   the header now, in every module that has one (budget, calendar, notes, contacts). Once folded, it
@@ -1087,9 +1313,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Finished appointments step back** (#1449). The event tile's limit of five counts only what is
   still coming, and finished events sit stepped back above it; in the today sheet and on the wall
-  they leave at their end time without a reload. The family card shows each member's next
-  appointment instead of the first one of the day, says "Done for today" after the last one, and
-  shows an appointment shared by several members once. Event tile and family card use the same
+  they leave at their end time without a reload. The family card loads each member's appointments of
+  the day on its own instead of taking them from the event tile (which stops at five and follows
+  "Only mine", so a child's evening appointment could be cut off and other members read as free),
+  shows each member's next appointment instead of the first one of the day, says "Done for today"
+  after the last one, and shows an appointment shared by several members once. Event tile and family card use the same
   rule for "finished".
 
 - **Synced events land on the right day on the overview.** Events that come from an external
@@ -1143,9 +1371,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   highlight while the cursor stays in the field, and reach the start tiles when the field is empty.
 
 - **A click beside an event popover only closes it.** Clicking an empty spot in the week or day
-  view to dismiss an open event used to start a new event at the same time. The first click now
-  just closes the popover, a second click adds an event. This holds for every popover of the
-  detail view.
+  view to dismiss an open event used to start a new event at the same time. A click now just closes
+  the popover; new events come from a double-click or a long press (see "New events in the
+  calendar's week and day"). This holds for every popover of the detail view.
 
 - **Messages no longer cover the buttons of a detail column.** With list and detail side by side
   on a desktop, a message sat over Delete at the foot of the detail column. It now moves out of the
@@ -1169,6 +1397,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   against the edge of their tinted panel.
 
 ### Security
+
+- **Deleting a folder no longer tells you about records and documents you may not see.** Before
+  deleting a folder the app asks the server what the deletion would affect. That answer counted,
+  per module, the calendar events, housekeeping visits, shared expenses, tasks, budget entries and
+  inventory items linked to the documents in the folder, without checking whether you may open
+  that module or see those records. A member without access to the budget, or an API token
+  limited to `documents:read`, learned how many bookings link to a document, and a member learned
+  about links from another member's private event or task; the confirmation code in the same
+  answer changed with them. The counts now include only modules you may open and only records
+  you can see there. Deleting a folder together with its documents also gave hidden documents
+  away: when the folder held another member's private document, the request was refused with a
+  different answer than when it did not, so a member with write access to documents could test
+  any folder for private documents of others. Such a document is now left alone instead: it is
+  not deleted, keeps its sharing and only loses its folder, exactly as when you keep the
+  documents, and the answer is the same whether it is there or not. This replaces the refusal
+  described in 2.68.1 and 2.69.0; nobody can delete a document through a folder that they cannot
+  see, administrators included. When a document arrived in the folder while a deletion was still
+  running, the partial result named it even if it was private to someone else; it now names only
+  documents you can see. For API clients: in the response of
+  `GET /api/v1/documents/folders/{id}/delete-impact`, `linked_records` has `null` for a module the
+  caller may not read (member right or token scope; shared expenses follow `budget`), not a
+  count. `DELETE /api/v1/documents/folders/{id}?documents=delete` now compares the snapshot
+  first (409 `FOLDER_CONTENT_CHANGED`) and answers 403 `FOLDER_DOCUMENTS_NOT_MANAGEABLE` only
+  for a visible document the caller may not manage; `deleted_documents` and `failed_documents`
+  cover only visible documents.
+- **The WebDAV backup target moved to another server or username needs its password again.**
+  The connection test in Settings -> Household -> Backup and restore, and the API behind it, took
+  a new server address with the password field left as it was and tested it with the stored
+  password, so the password went to that server; saving the change kept the stored password for
+  the next backup. Both are admin-only. They now follow the rule of CalDAV and CardDAV accounts:
+  the stored password is kept only while the server (scheme, host and port) and the username stay
+  the same. Otherwise the test and the save are refused with `400` and the error code
+  `password_required`, no connection is made and nothing is saved, and the form asks for the
+  password again. A different path on the same server keeps working without it. The mask `****`
+  the API shows in place of the password now counts as "unchanged" when it is sent back; until
+  then saving it through the API replaced the stored password with the mask itself.
 
 - **A CalDAV account moved to another server or username needs its password again.** Editing an
   account through the API with a new server address but without a password tested the connection

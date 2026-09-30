@@ -392,6 +392,16 @@ async function loadWebdavConfig(container) {
   }
 }
 
+/**
+ * Fehlermeldung einer WebDAV-Anfrage: `password_required` (neuer Server oder
+ * Benutzer ohne neues Passwort) uebersetzt, sonst der Text des Servers.
+ * Exportiert fuer test/test-settings-backup-key.js.
+ */
+export function webdavErrorMessage(err) {
+  if (err?.data?.errorCode === 'password_required') return t('settings.backupWebdavPasswordRequired');
+  return err?.message ?? t('common.errorGeneric');
+}
+
 function bindWebdavBackupEvents(container) {
   const form = container.querySelector('#backup-webdav-form');
   const testBtn = container.querySelector('#webdav-test-btn');
@@ -437,7 +447,9 @@ function bindWebdavBackupEvents(container) {
       }
     } catch (err) {
       if (resultEl) {
-        resultEl.textContent = t('settings.backupWebdavTestFailed', { error: err.message });
+        resultEl.textContent = err?.data?.errorCode === 'password_required'
+          ? webdavErrorMessage(err)
+          : t('settings.backupWebdavTestFailed', { error: err.message });
         resultEl.className = 'form-hint form-hint--danger';
       }
     } finally {
@@ -465,7 +477,7 @@ function bindWebdavBackupEvents(container) {
       window.yuvomi?.showToast(t('settings.backupWebdavSaved'), 'success');
       loadWebdavConfig(container);
     } catch (err) {
-      window.yuvomi?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(webdavErrorMessage(err), 'danger');
     } finally {
       if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = t('settings.backupWebdavSaveBtn'); }
     }

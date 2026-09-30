@@ -50,7 +50,9 @@ The same rule was reached three times, each time from a different module:
   the ownership check for admins, so an admin could permanently delete a member's private
   document that the single-document path would not even show them. Decided in review: the
   visibility rule stands and admins do not override it. The subtree is selected through the
-  one visibility rule and refused as soon as one row in it is invisible to the caller;
+  one visibility rule, and a row in it that is invisible to the caller is never deleted - at
+  first by refusing the whole subtree, later by leaving that row in place with only its folder
+  cleared, because a refusal that depends on a hidden row tells the caller it is there;
   sharing a single document deliberately is the owner's act, and that path already exists.
 
 The task lock in v2.30.0 rests on the same reasoning from the other side: a family role says

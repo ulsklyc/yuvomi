@@ -350,3 +350,32 @@ test('503 mit reason restore_in_progress: uebersetzte Meldung statt englischem S
     },
   );
 });
+
+// ─── Setup: die Sprache der Setup-Seite reist mit ───────────────────────────
+
+test('auth.setup: schickt language mit, und laesst das Feld ohne Angabe weg', async () => {
+  setup();
+  const bodies = [];
+  _mockFetch = (url, opts) => {
+    bodies.push({ url: String(url), body: JSON.parse(opts.body) });
+    return mockResponse(201, { user: { id: 1 } });
+  };
+
+  await auth.setup('admin', 'Admin', 'password123', 'de');
+  await auth.setup('admin', 'Admin', 'password123');
+
+  assert.match(bodies[0].url, /\/auth\/setup$/);
+  assert.equal(bodies[0].body.language, 'de');
+  // Ohne Angabe darf der Schluessel gar nicht erst im Body stehen: ein
+  // Server vor der Erweiterung sieht dann exakt den alten Body.
+  assert.equal(Object.hasOwn(bodies[1].body, 'language'), false);
+  assert.deepEqual(Object.keys(bodies[1].body).sort(), ['display_name', 'password', 'username']);
+});
+
+test('OpenAPI beschreibt language und timezone als optionale Setup-Felder', () => {
+  const schema = openApi.components.schemas.SetupRequest;
+  assert.equal(schema.properties.language?.type, 'string');
+  assert.equal(schema.properties.timezone?.type, 'string');
+  assert.deepEqual(schema.required, ['username', 'display_name', 'password']);
+  assert.ok(openApi.paths['/api/v1/auth/setup'].post.responses[400]);
+});

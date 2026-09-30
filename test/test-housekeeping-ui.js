@@ -25,7 +25,7 @@
  *        laeuft noch.
  * Ausführen: node --loader ./test/test-browser-loader.mjs --test test/test-housekeeping-ui.js
  */
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
 globalThis.window = globalThis.window ?? {};
@@ -701,4 +701,59 @@ test('Haushaltshilfe spricht EINEN Namen: Reiter "Uebersicht", Kennzahlen mit Ze
   assert.equal(de.finishedChores, 'Erledigt im Monat');
   assert.deepEqual(Object.entries(de).filter(([, v]) => typeof v === 'string' && /Hauspflege/.test(v)).map(([k]) => k), [],
     'kein zweiter Name neben "Haushaltshilfe"');
+});
+
+// ---------------------------------------------------------------------------
+// #1556: "heute" ist der Tag des Haushalts, nicht der des Geraets
+// ---------------------------------------------------------------------------
+// Tagesabfrage und Check-in schickten `local_date` und
+// `timezone_offset_minutes` von der Uhr des Geraets. Ein Geraet in New York
+// legte den Check-in um 00:30 in Berlin auf den Vortag. Die Seite schickt jetzt
+// die Zone, in der sie anzeigt; den Tag rechnet der Server (test-housekeeping-
+// routes.js misst die Serverseite).
+test('#1556 Tagesabfrage und Check-in lesen den Tag des Haushalts, nicht Tag und Offset des Geraets', async () => {
+  const tz = await import('/utils/timezone.js');
+  const prevTz = process.env.TZ;
+  const gets = [];
+  const posts = [];
+  globalThis.__apiStub = {
+    get: async (url) => { gets.push(url); return { data: null }; },
+    post: async (url, body) => { posts.push({ url, body }); return { data: {} }; },
+  };
+  // Geraet in New York am 30.09. um 18:30 - im Haushalt (Berlin) ist es der 1.10., 00:30.
+  process.env.TZ = 'America/New_York';
+  tz.setDisplayTimeZone('Europe/Berlin');
+  mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-30T22:30:00.000Z') });
+  try {
+    await hk.loadData();
+    hk.state().workers = [{ id: 7, display_name: 'Maria', rate_type: 'daily', daily_rate: 40, current_session: null }];
+    await hk.toggleSession(fakeContainer(), 7);
+  } finally {
+    mock.timers.reset();
+    tz.setDisplayTimeZone(null);
+    if (prevTz === undefined) delete process.env.TZ;
+    else process.env.TZ = prevTz;
+    delete globalThis.__apiStub;
+  }
+  const workersUrl = gets.find((url) => url.startsWith('/housekeeping/workers?'));
+  assert.ok(workersUrl, 'die Tagesabfrage laeuft');
+  const query = new URLSearchParams(workersUrl.split('?')[1]);
+  // Die Uebersicht fragt nach demselben Tag (Review): sonst rechnete der Server
+  // ihn ohne Haushaltszone in seiner eigenen.
+  const dashboardUrl = gets.find((url) => url.startsWith('/housekeeping/dashboard'));
+  const dashboardQuery = new URLSearchParams(dashboardUrl?.split('?')[1] ?? '');
+  const checkIn = posts.find((p) => p.url === '/housekeeping/work-sessions/check-in')?.body;
+  assert.ok(checkIn, 'der Check-in laeuft');
+  const sent = [
+    ['Tagesabfrage', query.get('local_date'), query.get('timezone_offset_minutes'), query.get('timezone')],
+    ['Check-in', checkIn.local_date, checkIn.timezone_offset_minutes, checkIn.timezone],
+    ['Uebersicht', dashboardQuery.get('local_date'), dashboardQuery.get('timezone_offset_minutes'), dashboardQuery.get('timezone')],
+  ];
+  for (const [where, day, offset, zone] of sent) {
+    // Ohne `timezone` nimmt der Server Tag und Offset als Angabe eines alten Clients.
+    assert.ok(day == null || day === '2026-10-01', `${where}: kein Tag des Geraets (${day})`);
+    assert.equal(offset ?? null, null, `${where}: kein Offset des Geraets`);
+    assert.equal(zone, 'Europe/Berlin', `${where}: die Zone der Anzeige`);
+  }
+  assert.match(checkIn.payment_description, /"date":"2026-10-01"/, 'die Zahlungsaufgabe nennt den Tag des Haushalts');
 });

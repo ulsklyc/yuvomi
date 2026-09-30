@@ -115,8 +115,10 @@ router.get('/google/status', (req, res) => {
  * GET /api/v1/calendar/google/calendars
  * Admin only. Listet die verfügbaren Google-Kalender des verbundenen Accounts.
  * Response: { data: [{ id, summary, primary, backgroundColor, selected }] }
+ * Erneuert der Client dabei sein Token, speichert der `tokens`-Listener es nach
+ * dem Warten auf Google - deshalb `refuseWhileRestoring` (#1551).
  */
-router.get('/google/calendars', requireAdmin, async (req, res) => {
+router.get('/google/calendars', requireAdmin, refuseWhileRestoring, async (req, res) => {
   try {
     const data = await googleCalendar.listCalendars();
     res.json({ data });

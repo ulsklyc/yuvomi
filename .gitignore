@@ -98,6 +98,7 @@ docs/installer-phase-prompts.md
 # Text files with tokens/keys (safety net)
 *.txt
 !public/robots.txt
+!docs/robots.txt
 
 # Screenshot generation scripts (dev tooling, not part of the app)
 create-screenshots*.js

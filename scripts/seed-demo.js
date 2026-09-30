@@ -9,7 +9,8 @@
  *   - Users: alex (admin/dad), linda (admin/mom), emma & leo (children), maria (housekeeper)
  *   - Tasks (categories, priorities, statuses, start/due dates, multi-assignment, tags, points)
  *   - Calendar events (appointments, activities, recurring, assignments)
- *   - Meals (full week, all slots) linked to recipes, plus a recurring meal template
+ *   - Meals (full week, all slots incl. today) linked to recipes,
+ *     plus a recurring meal template with this week's occurrence
  *   - Recipes with ingredients
  *   - Shopping list with items and tags
  *   - Pantry (stock across every location, expiring + low-stock items)
@@ -116,6 +117,37 @@ function mondayOffset() {
 /** Datum des i-ten Wochentags dieser Woche. i: 0 = Montag … 6 = Sonntag. */
 function weekDayKey(i) {
   return daysFromNow(mondayOffset() + i);
+}
+
+/**
+ * Der erste Tag DIESES Monats, der auf einen der Wochentage faellt
+ * (0 = Sonntag … 6 = Samstag, wie getDay()). Die Wochenserien beginnen dort
+ * statt „in zwei Tagen": die Monatsansicht des Kalenders war sonst bis heute
+ * leer, am Monatsende also fast ganz. Lokaler Tag wie dateKey(), kein UTC.
+ */
+function firstInMonthKey(weekdays) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(1);
+  while (!weekdays.includes(d.getDay())) d.setDate(d.getDate() + 1);
+  return dateKey(d);
+}
+
+/**
+ * Ein Tag DIESES Monats fuer die ueber den Monat verteilten Einzeltermine.
+ * Nur Tage bis 28, damit es jeden Monat gibt (auch den Februar). Faellt der
+ * Tag auf heute, weicht der Termin auf den Vortag aus: das Tagesblatt der
+ * Uebersicht bleibt dann bei dem, was die Saat dort bewusst hinstellt, statt
+ * je nach Kalendertag eine Zeile mehr zu tragen. Die Tage der Liste liegen
+ * deshalb mindestens zwei auseinander, der Vortag kollidiert nie. Lokaler Tag
+ * wie dateKey(), kein UTC.
+ */
+function spreadInMonthKey(day) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const today = d.getDate();
+  d.setDate(day === today ? day - 1 : day);
+  return dateKey(d);
 }
 
 // ── Wipe existing data (keep category/migration tables) ──────────────────────
@@ -352,19 +384,24 @@ const TAG = {
   garden:   L('garden',    'garten'),
 };
 
+// DREI AUFGABEN SIND HEUTE FAELLIG, je eine fuer Linda, Alex und Leo: das
+// Tagesblatt der Uebersicht zeigt nur, was bis heute faellig ist, und die
+// Familienkarte zaehlt genau das je Mitglied. Ohne sie stand im Screenshot
+// „Heute frei" neben „No tasks assigned for today" - eine Demo ohne Alltag.
+// Nicht die Stromrechnung: an ihr haengt unten eine Erinnerung in zwei Tagen.
 const tasks = [
   [L('Book dentist appointment',    'Zahnarzttermin vereinbaren'),       L('Annual check-up for the whole family',  'Jahreskontrolle für die ganze Familie'), 'health',    'high',   'open',        null,            daysFromNow(3),  alexId, alexId, [alexId],          []],
   [L('Pay electricity bill',        'Stromrechnung bezahlen'),           L('Due end of month - online banking',     'Fällig zum Monatsende - Online-Banking'), 'finance',   'urgent', 'open',        null,            daysFromNow(2),  alexId, alexId, [alexId],          [TAG.urgent, TAG.paperwork]],
   [L('Renew car insurance',         'Kfz-Versicherung verlängern'),      L('Compare quotes first',                  'Vorher Angebote vergleichen'),            'finance',   'high',   'open',        null,            daysFromNow(10), alexId, alexId, [alexId],          [TAG.car, TAG.paperwork]],
   [L('Fix leaking bathroom faucet', 'Tropfenden Wasserhahn reparieren'), L('Replace washer, tools in the basement', 'Dichtung tauschen, Werkzeug im Keller'),  'repair',    'medium', 'open',        null,            daysFromNow(7),  lindaId, alexId, [lindaId],         []],
-  [L('Order birthday cake',         'Geburtstagstorte bestellen'),       L("Emma's birthday - chocolate cake",      'Emmas Geburtstag - Schokoladentorte'),    'household', 'high',   'open',        null,            daysFromNow(5),  lindaId, lindaId, [lindaId],        [TAG.kids]],
+  [L('Order birthday cake',         'Geburtstagstorte bestellen'),       L("Emma's birthday - chocolate cake",      'Emmas Geburtstag - Schokoladentorte'),    'household', 'high',   'open',        null,            daysFromNow(0),  lindaId, lindaId, [lindaId],        [TAG.kids]],
   [L('Clean out the garage',        'Garage ausmisten'),                 L('Donate old things to charity',          'Altes an die Kleiderkammer spenden'),     'household', 'low',    'open',        daysFromNow(7),  daysFromNow(14), alexId, alexId, [alexId, lindaId], []],
   [L('Sign school permission slip', 'Einverständnis für Schulausflug'),  L('Field trip to the science museum',      'Ausflug ins Naturkundemuseum'),           'school',    'urgent', 'open',        null,            daysFromNow(1),  lindaId, lindaId, [lindaId],        [TAG.urgent, TAG.school]],
-  [L('Renew library cards',         'Büchereiausweise verlängern'),      L('All three cards expired last month',    'Alle drei sind letzten Monat abgelaufen'),'household', 'low',    'open',        null,            daysFromNow(20), alexId, alexId, [alexId],          []],
+  [L('Renew library cards',         'Büchereiausweise verlängern'),      L('All three cards expired last month',    'Alle drei sind letzten Monat abgelaufen'),'household', 'low',    'open',        null,            daysFromNow(0),  alexId, alexId, [alexId],          []],
   [L('Plan summer holiday',         'Sommerurlaub planen'),              L('Italy or Croatia - check flights',      'Italien oder Kroatien - Flüge prüfen'),   'leisure',   'medium', 'open',        daysFromNow(3),  daysFromNow(30), alexId, alexId, [alexId, lindaId], [TAG.holiday]],
   [L('Tax return 2025',             'Steuererklärung 2025'),             L('Documents ready in the folder',         'Unterlagen liegen im Ordner bereit'),     'finance',   'high',   'in_progress', null,            daysFromNow(18), alexId, alexId, [alexId],          [TAG.paperwork]],
   [L('Tidy bedroom',                'Kinderzimmer aufräumen'),           L('Put away laundry & toys',               'Wäsche und Spielzeug wegräumen'),         'household', 'low',    'open',        null,            daysFromNow(1),  emmaId, lindaId, [emmaId],          [TAG.kids]],
-  [L('Practice piano',              'Klavier üben'),                     L('20 minutes - recital piece',            '20 Minuten - Stück fürs Vorspiel'),       'school',    'medium', 'open',        null,            daysFromNow(2),  leoId,  lindaId, [leoId],           [TAG.kids, TAG.school]],
+  [L('Practice piano',              'Klavier üben'),                     L('20 minutes - recital piece',            '20 Minuten - Stück fürs Vorspiel'),       'school',    'medium', 'open',        null,            daysFromNow(0),  leoId,  lindaId, [leoId],           [TAG.kids, TAG.school]],
   [L('Grocery run',                 'Wocheneinkauf erledigen'),          L('See the shopping list for details',     'Details stehen auf dem Einkaufszettel'),  'shopping',  'medium', 'done',        null,            daysFromNow(-1), lindaId, lindaId, [lindaId],        []],
   [L('Call insurance about claim',  'Versicherung wegen Schaden anrufen'),L('Reference: CLM-2025-0492',             'Vorgang: CLM-2025-0492'),                 'finance',   'high',   'done',        null,            daysFromNow(-3), alexId, alexId, [alexId],          [TAG.paperwork]],
   [L('Oil change - VW Golf',        'Ölwechsel - VW Golf'),              L('Every 15,000 km / 12 months',           'Alle 15.000 km / 12 Monate'),             'repair',    'medium', 'open',        null,            daysFromNow(6),  alexId, alexId, [alexId],          [TAG.car]],
@@ -395,22 +432,44 @@ const insertEvent = db.prepare(`
 `);
 const insertEventAssign = db.prepare('INSERT OR IGNORE INTO event_assignments (event_id, user_id) VALUES (?, ?)');
 
+// Heute steht immer etwas an: ein ganztaegiger Termin (bleibt im Tagesblatt,
+// egal wann der Screenshot laeuft) und einer am Abend (endet erst um 22 Uhr).
+// Beendete Termine verlassen das Blatt (#1449) - ein Vormittagstermin waere
+// bei einem Lauf am Nachmittag schon wieder weg. Dazu ein Termin am Ersten,
+// damit die erste Zeile der Monatsansicht nicht leer ist.
+//
+// Die Einzeltermine unter „Ueber den Monat verteilt" liegen auf festen Tagen
+// DIESES Monats, also auch VOR heute: alles andere ist relativ zu heute
+// geplant, und am Monatsletzten stand die Monatsansicht bis auf die
+// Wochenserien leer. Die Zukunftstermine darunter bleiben fuer die
+// Wochenvorschau.
 const events = [
+  // Ueber den Monat verteilt (spreadInMonthKey: nie heute, siehe dort)
+  [L('Haircut - Emma',            'Friseur - Emma'),           L('Just a trim this time',              'Diesmal nur Spitzen schneiden'),        spreadInMonthKey(4) + 'T15:30',  spreadInMonthKey(4) + 'T16:15',  0, L('Salon Anna', 'Salon Anna'),                    '#EC4899', 'scissors', null,                      emmaId, lindaId, [emmaId, lindaId]],
+  [L('School Photo Day',          'Fototag in der Schule'),    L('Leo - the blue shirt, not the hoodie', 'Leo - das blaue Hemd, nicht den Hoodie'), spreadInMonthKey(8) + 'T00:00', spreadInMonthKey(8) + 'T00:00', 1, L('Westpark Primary School', 'Grundschule Westpark'), '#8B5CF6', 'camera', null,              leoId, lindaId, [leoId]],
+  [L('Recycling Centre Run',      'Fahrt zum Wertstoffhof'),   L('Old bike, paint tins, cardboard',    'Altes Fahrrad, Farbeimer, Kartons'),    spreadInMonthKey(13) + 'T10:00', spreadInMonthKey(13) + 'T11:00', 0, L('Recycling Centre North', 'Wertstoffhof Nord'), '#6B7280', 'car',      null,                      alexId, alexId, [alexId]],
+  [L('Eye Test - Emma',           'Augenarzt - Emma'),         L('Bring the old glasses',              'Alte Brille mitnehmen'),                spreadInMonthKey(17) + 'T14:00', spreadInMonthKey(17) + 'T14:45', 0, L('Dr. Hoffmann - Eye Clinic', 'Dr. Hoffmann - Augenpraxis'), '#EF4444', 'stethoscope', null,   emmaId, lindaId, [emmaId, lindaId]],
+  [L('Dinner with the Schmidts',  'Abendessen bei Schmidts'),  L('We bring dessert',                   'Wir bringen den Nachtisch mit'),        spreadInMonthKey(21) + 'T19:00', spreadInMonthKey(21) + 'T22:00', 0, L("The Schmidts' place", 'Bei Schmidts'),        '#14B8A6', 'utensils', null,                      alexId, lindaId, [alexId, lindaId, emmaId, leoId]],
+  [L("Finn's Birthday Party",     'Kindergeburtstag bei Finn'), L('Leo - present is in the hall cupboard', 'Leo - das Geschenk liegt im Flurschrank'), spreadInMonthKey(26) + 'T14:30', spreadInMonthKey(26) + 'T17:30', 0, L("Finn's house", 'Bei Finn'), '#F59E0B', 'party-popper', null,          leoId, lindaId, [leoId]],
+  // Relativ zu heute
+  [L('Sports Day - Leo',          'Sportfest - Leo'),          L('Trainers, cap and a packed lunch',   'Turnschuhe, Kappe und Lunchpaket'),     daysFromNow(0) + 'T00:00',  daysFromNow(0) + 'T00:00',  1, L('Sports Ground West', 'Sportplatz West'),      '#F97316', 'calendar', null,                      leoId, lindaId, [leoId, lindaId]],
+  [L('Family Movie Night',        'Filmabend'),                L('Emma picks the film this time',      'Diesmal sucht Emma den Film aus'),      daysFromNow(0) + 'T20:00',  daysFromNow(0) + 'T22:00',  0, L('Home', 'Zu Hause'),                           '#14B8A6', 'calendar', null,                      lindaId, lindaId, [alexId, lindaId, emmaId, leoId]],
+  [L('Book Club',                 'Lesekreis'),                L("At Sarah's - bring the novel",       'Bei Sarah - Roman mitbringen'),         thisMonthDate(1) + 'T19:30', thisMonthDate(1) + 'T21:30', 0, L("Sarah's place", 'Bei Sarah'),               '#EC4899', 'calendar', null,                      lindaId, lindaId, [lindaId]],
   [L("Emma's Birthday Party",     'Emmas Geburtstagsfeier'),   L('Bouncy castle & cake at home',       'Hüpfburg und Kuchen zu Hause'),         daysFromNow(5) + 'T14:00',  daysFromNow(5) + 'T17:00',  0, L('Home', 'Zu Hause'),                           '#F59E0B', 'cake',     null,                      lindaId, lindaId, [lindaId, emmaId]],
   [L('Dentist - Family',          'Zahnarzt - Familie'),       L('Dr. Müller, bring insurance cards',  'Dr. Müller, Versichertenkarten mitnehmen'), daysFromNow(3) + 'T10:00', daysFromNow(3) + 'T11:30', 0, L('Dental Practice Müller', 'Zahnarztpraxis Müller'), '#EF4444', 'tooth', null,                lindaId, alexId, [alexId, lindaId, emmaId, leoId]],
   [L('Parent-Teacher Evening',    'Elternabend'),              L('Room 12, bring the report card',     'Raum 12, Zeugnis mitbringen'),          daysFromNow(9) + 'T18:30',  daysFromNow(9) + 'T20:00',  0, L('Westpark Primary School', 'Grundschule Westpark'), '#8B5CF6', 'calendar', null,               lindaId, lindaId, [lindaId, alexId]],
   [L('Science Museum Field Trip', 'Ausflug ins Naturkundemuseum'), L('Emma - permission slip signed',  'Emma - Einverständnis unterschrieben'), daysFromNow(1) + 'T08:30',  daysFromNow(1) + 'T15:00',  0, L('Natural History Museum', 'Naturkundemuseum'),  '#06B6D4', 'calendar', null,                      emmaId, lindaId, [emmaId]],
   [L("Family BBQ at Grandma's",   'Grillen bei Oma'),          L('Bring potato salad',                 'Kartoffelsalat mitbringen'),            daysFromNow(12) + 'T13:00', daysFromNow(12) + 'T19:00', 0, L("Grandma's Garden", 'Omas Garten'),            '#F59E0B', 'calendar', null,                      alexId, alexId, [alexId, lindaId, emmaId, leoId]],
   [L('Car Service Appointment',   'Werkstatttermin'),          L('VW Golf - oil change + tyre check',  'VW Golf - Ölwechsel + Reifencheck'),    daysFromNow(6) + 'T09:00',  daysFromNow(6) + 'T10:30',  0, 'AutoHaus König',                                '#6B7280', 'calendar', null,                      alexId, alexId, [alexId]],
-  [L('Yoga Class',                'Yoga-Kurs'),                L('Weekly - bring a mat',               'Wöchentlich - Matte mitbringen'),       daysFromNow(2) + 'T19:00',  daysFromNow(2) + 'T20:00',  0, 'FitLife Studio',                                '#10B981', 'calendar', 'FREQ=WEEKLY;BYDAY=TU',    lindaId, lindaId, [lindaId]],
+  [L('Yoga Class',                'Yoga-Kurs'),                L('Weekly - bring a mat',               'Wöchentlich - Matte mitbringen'),       firstInMonthKey([2]) + 'T19:00', firstInMonthKey([2]) + 'T20:00', 0, 'FitLife Studio',                                '#10B981', 'calendar', 'FREQ=WEEKLY;BYDAY=TU',    lindaId, lindaId, [lindaId]],
   [L("Mum's Birthday",            'Mamas Geburtstag'),         '',                                                                              daysFromNow(8) + 'T00:00',  daysFromNow(8) + 'T00:00',  1, '',                                              '#EC4899', 'cake',     null,                      alexId, alexId, [alexId, lindaId]],
   [L('Company All-Hands',         'Betriebsversammlung'),      L('Q2 results + roadmap presentation',  'Quartalszahlen + Roadmap-Vorstellung'), daysFromNow(4) + 'T10:00',  daysFromNow(4) + 'T12:00',  0, L('Office - Conference Room B', 'Büro - Besprechungsraum B'), '#2563EB', 'calendar', null,          alexId, alexId, [alexId]],
-  [L('Football Training - Leo',   'Fußballtraining - Leo'),    L('Boots & water bottle',               'Schuhe und Trinkflasche'),              daysFromNow(2) + 'T17:00',  daysFromNow(2) + 'T18:30',  0, L('Sports Ground West', 'Sportplatz West'),      '#F97316', 'calendar', 'FREQ=WEEKLY;BYDAY=TU,SA', leoId, lindaId, [leoId]],
-  [L('Piano Lesson - Leo',        'Klavierstunde - Leo'),      L('Weekly lesson with Ms. Klein',       'Wöchentlich bei Frau Klein'),           daysFromNow(3) + 'T16:00',  daysFromNow(3) + 'T16:45',  0, L('Music School Dortmund', 'Musikschule Dortmund'), '#8B5CF6', 'calendar', 'FREQ=WEEKLY;BYDAY=TH', leoId, lindaId, [leoId]],
+  [L('Football Training - Leo',   'Fußballtraining - Leo'),    L('Boots & water bottle',               'Schuhe und Trinkflasche'),              firstInMonthKey([2, 6]) + 'T17:00', firstInMonthKey([2, 6]) + 'T18:30', 0, L('Sports Ground West', 'Sportplatz West'),      '#F97316', 'calendar', 'FREQ=WEEKLY;BYDAY=TU,SA', leoId, lindaId, [leoId]],
+  [L('Piano Lesson - Leo',        'Klavierstunde - Leo'),      L('Weekly lesson with Ms. Klein',       'Wöchentlich bei Frau Klein'),           firstInMonthKey([4]) + 'T16:00', firstInMonthKey([4]) + 'T16:45', 0, L('Music School Dortmund', 'Musikschule Dortmund'), '#8B5CF6', 'calendar', 'FREQ=WEEKLY;BYDAY=TH', leoId, lindaId, [leoId]],
   [L('Holiday Planning Evening',  'Urlaubsplanung'),           L('Italy vs Croatia - laptops out',     'Italien oder Kroatien - Laptops raus'), daysFromNow(3) + 'T21:00',  daysFromNow(3) + 'T22:00',  0, L('Home', 'Zu Hause'),                           '#14B8A6', 'calendar', null,                      alexId, lindaId, [alexId, lindaId]],
   [L('GP Appointment - Alex',     'Hausarzttermin - Alex'),    L('Annual health check',                'Jährlicher Gesundheits-Check'),         daysFromNow(15) + 'T11:00', daysFromNow(15) + 'T11:30', 0, L('Dr. Weber - City Practice', 'Dr. Weber - Praxis am Markt'), '#EF4444', 'stethoscope', null,   alexId, alexId, [alexId]],
   [L('Weekend City Break',        'Städtereise übers Wochenende'), L('Hotel booked - just pack the bags!', 'Hotel gebucht - nur noch packen!'), daysFromNow(20) + 'T00:00', daysFromNow(22) + 'T00:00', 1, 'Amsterdam',                                     '#0EA5E9', 'plane',    null,                      alexId, alexId, [alexId, lindaId]],
-  [L('Swimming - Emma',           'Schwimmen - Emma'),         L('Westbad - goggles & towel',          'Westbad - Brille und Handtuch'),        daysFromNow(4) + 'T16:00',  daysFromNow(4) + 'T17:00',  0, L('Westbad Pool', 'Westbad'),                    '#06B6D4', 'calendar', 'FREQ=WEEKLY;BYDAY=FR',    emmaId, lindaId, [emmaId]],
+  [L('Swimming - Emma',           'Schwimmen - Emma'),         L('Westbad - goggles & towel',          'Westbad - Brille und Handtuch'),        firstInMonthKey([5]) + 'T16:00', firstInMonthKey([5]) + 'T17:00', 0, L('Westbad Pool', 'Westbad'),                    '#06B6D4', 'calendar', 'FREQ=WEEKLY;BYDAY=FR',    emmaId, lindaId, [emmaId]],
 ];
 const eventIdByTitle = {};
 for (const [title, description, start, end, all_day, location, color, icon, rrule, assigned_to, created_by, assignees] of events) {
@@ -499,6 +558,13 @@ const mealPlan = [
   [ 6, 'dinner',    L('Lamb chops & couscous',       'Lammkoteletts mit Couscous'),  L('Mint yoghurt dressing',     'Minzjoghurt-Dressing')],
   [ 6, 'snack',     L('Fruit salad',                 'Obstsalat'),                   ''],
 ];
+// Auch HEUTE ist jeder Slot belegt: ein Essensplan, in dem ausgerechnet der
+// heutige Tag Fruehstueck und Mittag frei hat, sieht wie ein Loch aus. Welche
+// Mahlzeit die Uebersicht zeigt, waehlt sie nach der Tageszeit
+// (selectTodayMeal in public/pages/dashboard.js: vor 12 Uhr Fruehstueck, bis
+// 18 Uhr Mittag, danach Abendessen). Dass es das Abendessen ist, sichert der
+// Screenshot-Lauf mit seiner gestellten Browser-Uhr (SHOT_CLOCK in
+// scripts/take-screenshots.mjs), nicht mehr diese Saat.
 for (const [weekday, type, title, notes] of mealPlan) {
   const recipeId = recipeIdByTitle[title] ?? null;
   const mid = insertMeal.run(weekDayKey(weekday), type, title, notes, recipeId, alexId).lastInsertRowid;
@@ -535,6 +601,20 @@ const insertTemplateIng = db.prepare(`
   [L('Mozzarella', 'Mozzarella'), '250 g', CAT.dairy],
   [L('Tomato sauce', 'Tomatensoße'), '200 g', CAT.other],
 ].forEach(([n, q, c]) => insertTemplateIng.run(pizzaTemplateId, n, q, c));
+
+// Das Vorkommen DIESER Woche legt der Seed selbst an, so wie es
+// materializeRecurringMeals (server/routes/meals.js) beim ersten Laden der
+// Woche taete: die Uebersicht laeuft vor dem Essensplan und materialisiert
+// nicht - an einem Freitag stand dort sonst kein Abendessen. Mit gesetzter
+// recurrence_template_id legt der Server es nicht ein zweites Mal an.
+const pizzaMealId = db.prepare(`
+  INSERT INTO meals (date, meal_type, title, notes, recipe_id, recurrence_template_id, created_by)
+  SELECT ?, meal_type, title, notes, recipe_id, id, created_by FROM meal_recurrence_templates WHERE id = ?
+`).run(weekDayKey(4), pizzaTemplateId).lastInsertRowid;
+db.prepare(`
+  INSERT INTO meal_ingredients (meal_id, name, quantity, category)
+  SELECT ?, name, quantity, category FROM meal_recurrence_ingredients WHERE template_id = ? ORDER BY id
+`).run(pizzaMealId, pizzaTemplateId);
 
 // ── Shopping List ─────────────────────────────────────────────────────────────
 
@@ -1116,6 +1196,12 @@ const insertVital = db.prepare(`
 // SpO₂ (%) and temperature (°C)
 [[-10, 98], [-2, 99]].forEach(([d, v]) => insertVital.run(lindaId, 'spo2', v, null, null, '%', dateTimeFromNow(d, 8, 30), null));
 insertVital.run(lindaId, 'temp', 36.7, null, null, '°C', dateTimeFromNow(-5, 20, 0), null);
+// Koerpermasse (#683): ohne je einen Wert standen beide Kacheln im Screenshot
+// auf „No value yet". Der Kopfumfang traegt eine Notiz, die ihn bei einer
+// Erwachsenen erklaert.
+insertVital.run(lindaId, 'height', 168, null, null, 'cm', dateTimeFromNow(-40, 9, 0), null);
+insertVital.run(lindaId, 'head_circumference', 56.5, null, null, 'cm', dateTimeFromNow(-12, 18, 0),
+  L('Sized for the new bike helmet', 'Für den neuen Fahrradhelm gemessen'));
 // Sleep (decimal hours, measured_at = the morning the night ended)
 [[-13, 7.5], [-12, 6.75], [-11, 7.25], [-10, 8.0], [-9, 6.5], [-8, 7.0], [-7, 7.75],
  [-6, 7.25], [-5, 6.25], [-4, 7.5], [-3, 8.25], [-2, 7.0], [-1, 7.5]]
@@ -1170,7 +1256,7 @@ const insertMedLog = db.prepare(`
   INSERT INTO medication_logs (medication_id, schedule_id, scheduled_at, status, taken_at, dose_qty)
   VALUES (?, ?, ?, ?, ?, ?)
 `);
-// Daily supplements with a schedule + a week of adherence logs (today still pending)
+// Daily supplements with a schedule + a week of adherence logs (evening dose still open today)
 const vitDId = insertMed.run(lindaId, L('Vitamin D3', 'Vitamin D3'), L('1000 IU', '1000 IE'), 'tablet', 1, 0, 42,
   L('tablets', 'Tabletten'), 10, L('With breakfast', 'Zum Frühstück')).lastInsertRowid;
 const vitDSched = insertMedSched.run(vitDId, '08:00', 127, 1, daysFromNow(-40)).lastInsertRowid;
@@ -1180,11 +1266,12 @@ const ironSched = insertMedSched.run(ironId, '20:00', 127, 1, daysFromNow(-25)).
 // As-needed medication (no schedule)
 insertMed.run(lindaId, 'Ibuprofen', '400 mg', 'tablet', 1, 1, 20,
   L('tablets', 'Tabletten'), 5, L('For headaches - max 3/day', 'Bei Kopfschmerzen - höchstens 3 pro Tag'));
-// Adherence logs: last 6 days taken, today pending
+// Adherence logs: the morning dose is taken every day INCLUDING today, only the
+// evening iron is still open today. The screenshot clock stands at 18:10: an
+// open 08:00 dose would read as overdue (red) on the overview and the wall mode,
+// the evening dose reads as the next thing to do.
 for (let d = -6; d <= 0; d++) {
-  const status = d === 0 ? 'pending' : 'taken';
-  const takenAt = d === 0 ? null : dateTimeFromNow(d, 8, 12);
-  insertMedLog.run(vitDId, vitDSched, dateTimeFromNow(d, 8, 0), status, takenAt, 1);
+  insertMedLog.run(vitDId, vitDSched, dateTimeFromNow(d, 8, 0), 'taken', dateTimeFromNow(d, 8, 12), 1);
 }
 for (let d = -6; d <= 0; d++) {
   const taken = d < 0 && d !== -3;                 // one missed dose for realism

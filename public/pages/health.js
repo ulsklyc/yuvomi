@@ -2942,9 +2942,14 @@ function medLogHistoryMarkup() {
     // Uebersprungen und ausstehend sind beide "nicht genommen" und treten
     // gleich weit zurueck; unterscheiden tut sie das Wort daneben.
     const muted = e.status !== 'taken';
+    // Den Wert selbst an die Formatierer, kein `new Date(d)` (#1539): `taken_at`
+    // und `scheduled_at` sind Wanduhrzeit des Haushalts, ein Date daraus waere
+    // ein Zeitpunkt der GERAETE-Zone, und `formatTime` rechnete ihn danach in
+    // die Haushaltszone um. `created_at` traegt sein `Z` und wird umgerechnet -
+    // der Tag deshalb ueber `zonedDateKey`, nicht ueber die ersten zehn Zeichen.
     const d = String(e.at);
     const timeLabel = d.length >= 16
-      ? `${formatDate(d.slice(0, 10))} · ${formatTime(new Date(d))}`
+      ? `${formatDate(zonedDateKey(d))} · ${formatTime(d)}`
       : formatDate(d.slice(0, 10));
     // Drei Staende, nicht zwei: das Protokoll kannte nur "uebersprungen" und
     // "sonst genommen" und schrieb damit "Genommen" unter jede ausstehende

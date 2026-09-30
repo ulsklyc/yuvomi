@@ -3167,7 +3167,14 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
             * Regel wie in utils/household.js). */ ''}
         ${responsiblePickerHtml({ members: state.members, entry, isEdit })}
 
-        <div class="form-group">
+        ${/* Ein erzeugtes Vorkommen traegt den Rhythmus seiner Serie NICHT
+            * (#1546): is_recurring ist 0, Intervall und Schalter sind
+            * Spalten-Defaults. Hier vorbelegt stuende "nicht wiederkehrend,
+            * monatlich" - und genau das ging mit "alle kuenftigen" an die Serie
+            * und beendete sie. Der Rhythmus wird an der ersten Buchung geaendert;
+            * am Vorkommen bleibt das Feld weg (im DOM, versteckt, weil der
+            * Speichern-Pfad es liest). */ ''}
+        <div class="form-group" ${isEdit && entry.recurrence_parent_id ? 'hidden' : ''}>
           <label class="toggle">
             <input type="checkbox" id="bm-recurring" ${isEdit && entry.is_recurring ? 'checked' : ''}>
             <span class="toggle__track"></span>
@@ -3583,7 +3590,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
               if (seriesBody.account_id === null && entry.account_id == null) {
                 delete seriesBody.account_id;
               }
-              await api.put(`/budget/${entry.id}/series`, seriesBody);
+              await api.put(`/budget/${entry.id}/series`, occurrenceSeriesBody(seriesBody, entry));
               window.yuvomi?.showToast(t('budget.recurringSeriesSaved'), 'success');
             } else {
               const res = await api.put(`/budget/${entry.id}`, await withReceipts());
@@ -4395,11 +4402,18 @@ async function deleteEntry(id) {
   const inMonth = state.entries.some((e) => e.id === id);
 
   if (entry && (entry.is_recurring || entry.recurrence_parent_id)) {
+    // #1544: die Serie haengt an ihrer ersten Buchung (ohne recurrence_parent_id,
+    // seit #1035 per `budget_series.anchor_id` mit ON DELETE CASCADE). Loescht
+    // "Nur dieser Eintrag" genau diese Buchung, endet die ganze Serie: die
+    // angelegten Vorkommen bleiben als Einzelbuchungen (ON DELETE SET NULL),
+    // kuenftige Monate bleiben leer. Das Verhalten bleibt, der Dialog sagt es.
+    const isSeriesStart = Boolean(entry.is_recurring) && !entry.recurrence_parent_id;
     const scope = await recurringChoiceModal({
       title: t('budget.recurringSeriesScope'),
       thisLabel: t('budget.recurringThisOnly'),
       seriesLabel: t('budget.recurringEntireSeries'),
       seriesDanger: true,
+      note: isSeriesStart ? t('budget.recurringDeleteFirstHint') : '',
     });
     if (scope === null) return;
     if (scope === 'series') { await deleteEntrySeries(id); return; }
@@ -4446,14 +4460,67 @@ async function deleteEntry(id) {
 // Hilfsfunktion
 // --------------------------------------------------------
 
+/** Felder, die den Rhythmus einer Serie beschreiben - nie Werte einer Buchung. */
+const SERIES_RHYTHM_FIELDS = new Set([
+  'is_recurring', 'recurrence_interval', 'recurrence_interval_count',
+  'recurrence_virtual', 'recurrence_confirm', 'recurrence_rule',
+]);
+
+/**
+ * Der Body fuer "Alle zukuenftigen" aus einem VORKOMMEN heraus (#1546).
+ *
+ * Das Formular ist mit den Werten DIESES Vorkommens vorbelegt. Fuer die Werte
+ * ist das richtig, fuer den Rhythmus nicht: ein erzeugtes Vorkommen traegt
+ * is_recurring = 0 und die Spalten-Defaults (monatlich, alle 1, nicht virtuell,
+ * ohne Bestaetigung). Gingen die an PUT /budget/:id/series, beendete das die
+ * Serie, loeschte jedes Vorkommen ab heute und setzte eine Wochen-, Jahres-
+ * oder virtuelle Serie auf "monatlich" zurueck - gemessen, still, mit
+ * Erfolgs-Toast. Der Rhythmus faellt deshalb ganz weg; er wird an der ersten
+ * Buchung geaendert.
+ *
+ * Von den Werten geht nur mit, was der Nutzer GEAENDERT hat. Ein Vorkommen kann
+ * einen einmaligen Betrag tragen (Nachzahlung im Maerz); wer an ihm nur den
+ * Titel der Serie korrigiert, soll den Maerz-Betrag nicht in jeden kuenftigen
+ * Monat schreiben. Und bei einer virtuellen Serie ist der Betrag des Vorkommens
+ * der Monatsanteil, nicht der Periodenbetrag der Serie - unveraendert
+ * mitgeschickt wuerde er ein zweites Mal geglaettet. Datum und Belege gehoeren
+ * ohnehin der einzelnen Buchung.
+ *
+ * @param {object} body   der Body, den der Dialog gebaut hat
+ * @param {object} entry  das Vorkommen, an dem der Dialog geoeffnet wurde
+ * @returns {object}
+ */
+function occurrenceSeriesBody(body, entry) {
+  const before = {
+    title: entry.title ?? '',
+    amount: Number(entry.amount),
+    category: entry.category ?? '',
+    subcategory: entry.subcategory ?? '',
+    account_id: entry.account_id ?? null,
+    visibility: entry.visibility,
+    responsible_user_ids: (entry.responsible_users ?? []).map((u) => u.id),
+  };
+  const same = (a, b) => (Array.isArray(a) && Array.isArray(b)
+    ? a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i])
+    : a === b);
+  const out = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (SERIES_RHYTHM_FIELDS.has(key) || key === 'date' || key === 'attachment_document_ids') continue;
+    if (key in before && same(key === 'amount' ? Number(value) : value, before[key])) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
 /**
  * Zeigt ein Modal mit zwei Wahloptionen für wiederkehrende Einträge.
  * Gibt 'this' | 'series' | null (abgebrochen) zurück.
  *
  * `note` steht ÜBER den Knöpfen, nicht darunter: der Hinweis soll gelesen
  * werden, bevor die Wahl fällt, und die gestapelten Knöpfe sind das Ende des
- * Dialogs. Optional, weil ihn nur das Bearbeiten braucht - beim Löschen sagt
- * „Gesamte Serie löschen" schon alles.
+ * Dialogs. Optional: das Bearbeiten nennt ihn immer, das Löschen nur an der
+ * ersten Buchung einer Serie (#1544) - dort beendet auch „Nur dieser Eintrag"
+ * die Serie, an einem Vorkommen sagen die Knöpfe schon alles.
  */
 function recurringChoiceModal({ title, thisLabel, seriesLabel, seriesDanger = false, note = '' }) {
   return new Promise((resolve) => {
@@ -4528,6 +4595,8 @@ async function deleteEntrySeries(id) {
 // statt Quelltext-Regex.
 export const __test = {
   monthNavHtml,
+  // #1546: was "alle kuenftigen" aus einem Vorkommen an die Serie schickt.
+  occurrenceSeriesBody,
   // Critique 2026-09-25, Mobil: Top-3-Auswahl des Diagramms und das EINE
   // Werkzeug-Menue der Buchungsliste, als Programm statt als Quelltext.
   categoryBlocks,
@@ -4544,6 +4613,8 @@ export const __test = {
   tabSearch,
   writeTabToUrl,
   summaryWith,
+  // #1544: der Loeschdialog einer Serienbuchung, als Programm gefahren.
+  deleteEntry,
   deleteEntrySeries,
   subcategoryChoice,
   currentMonth,

@@ -4183,6 +4183,108 @@ test('Baender: im Nachbarmonat toent das Band zurueck wie der Chip der Zelle, ni
   assert(!/opacity|filter/.test(band.body), 'nie ueber Opacity auf Text');
 });
 
+test('Baender in RTL: offene Kante, Chevron und Nachbarmonat-Toenung kippen mit der Schreibrichtung (#1467)', () => {
+  // Das Raster kippt in RTL selbst: Spalte 1 steht rechts, `first` und
+  // --band-out-start zaehlen vom Zeilenanfang. Was an einer SEITE des Bands
+  // haengt, muss darum logisch sein oder unter [dir="rtl"] eigens kippen.
+  const all = [...eachRule(calendarCss)];
+  const where = (r) => `${r.selector.trim()}${r.at.length ? ` (in ${r.at.join(' ')})` : ''}`;
+  const rule = (sel) => {
+    const found = all.find((r) => r.at.length === 0 && r.selector.trim() === sel);
+    assert(found, `Regel nicht gefunden: ${sel}`);
+    return found;
+  };
+  // Jede Regel, deren Selektorliste die Klasse traegt - auch in @media und
+  // spaeter im File -, damit eine Ueberschreibung nicht durchrutscht.
+  const withClass = (cls) => {
+    const re = new RegExp(`${cls.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`);
+    return all.filter((r) => r.selector.split(',').some((s) => re.test(s)));
+  };
+  const physical = /(?:^|[;\s])(?:margin|padding|border)-(?:left|right)\b|border-(?:top|bottom)-(?:left|right)-radius|(?:^|[;\s])(?:left|right)\s*:|translateX/;
+  // Kurzschreibweisen mit verschiedenen Werten links und rechts sind genauso
+  // physisch: `margin: 0 var(--band-me) 0 var(--band-ms)` setzt den Einzug in
+  // RTL auf die falsche Seite. Drei Werte (`a b c`) sind seitengleich, weil
+  // der mittlere Wert fuer links UND rechts gilt.
+  const words = (value) => {
+    const out = [];
+    let depth = 0;
+    let cur = '';
+    for (const ch of value.trim()) {
+      if (ch === '(') depth += 1;
+      if (ch === ')') depth -= 1;
+      if (/\s/.test(ch) && depth === 0) {
+        if (cur) out.push(cur);
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    if (cur) out.push(cur);
+    return out;
+  };
+  const lopsided = (body) => [...body.matchAll(/(?:^|[;{\s])(margin|padding|inset|border-radius)\s*:\s*([^;]+)/g)]
+    .filter(([, prop, raw]) => {
+      const value = raw.replace(/!important/, '').trim();
+      if (prop !== 'border-radius') {
+        const v = words(value);
+        return v.length === 4 && v[1] !== v[3];
+      }
+      // Radius: gespiegelt tauschen oben-links/oben-rechts und unten-links/unten-rechts.
+      return value.split('/').some((half) => {
+        const [tl, tr = tl, br = tl, bl = tr] = words(half);
+        return tl !== tr || br !== bl;
+      });
+    })
+    .map(([, prop, raw]) => `${prop}: ${raw.trim()}`);
+
+  // (1) Offene Kante, Einzug und Rundung: nur logische Eigenschaften, in
+  // jeder Regel dieser Klassen.
+  for (const cls of ['.cal-band', '.cal-band--before', '.cal-band--after']) {
+    for (const r of withClass(cls)) {
+      if (/\[dir=/.test(r.selector)) continue;
+      assert(!physical.test(r.body), `${where(r)} haengt an einer physischen Seite: ${r.body}`);
+      const odd = lopsided(r.body);
+      assert(odd.length === 0, `${where(r)} setzt links und rechts verschieden: ${odd.join('; ')}`);
+    }
+  }
+  const band = rule('.month-bands > .cal-band');
+  assert(/margin-inline:\s*var\(--band-ms\)\s+var\(--band-me\)/.test(band.body),
+    `der Einzug des Bands laeuft ueber margin-inline mit --band-ms/--band-me: ${band.body}`);
+  const after = rule('.cal-band--after');
+  assert(/border-start-end-radius:\s*0/.test(after.body) && /border-end-end-radius:\s*0/.test(after.body),
+    'das offene Ende verliert die Rundung am Zeilenende');
+
+  // (2) Das Zeichen: vorn ein Chevron nach links, hinten nach rechts, beide
+  // unter RTL gespiegelt, das hintere per logischem auto-Rand am Zeilenende.
+  const ev = bandEvent(21, '2026-10-30', '2026-11-02');
+  const html = ['2026-10-26', '2026-11-02']
+    .map((monday) => calendarHelpers.monthBandsHtml(segmentsFor([ev], bandDays(monday)))).join('');
+  assert(/data-lucide="chevron-left" class="cal-band__cont cal-band__cont--before"/.test(html)
+    && /data-lucide="chevron-right" class="cal-band__cont cal-band__cont--after"/.test(html),
+    `vorn chevron-left, hinten chevron-right: ${html}`);
+  const mirror = rule('[dir="rtl"] .cal-band__cont');
+  assert(/transform:\s*scaleX\(-1\)/.test(mirror.body), 'in RTL zeigt das Zeichen zur anderen Seite');
+  // Nur die RTL-Regel darf das Zeichen transformieren - ein spaeteres
+  // `transform: none` wuerde die Spiegelung still aufheben.
+  const transforms = withClass('.cal-band__cont').filter((r) => r !== mirror && /(?:^|[;\s])transform\s*:/.test(r.body));
+  assert(transforms.length === 0, `weitere transform-Regeln am Zeichen: ${transforms.map(where).join(', ')}`);
+  const toEnd = withClass('.cal-band__cont--after');
+  assert(toEnd.some((r) => /margin-inline-start:\s*auto/.test(r.body)), 'das hintere Zeichen steht am Zeilenende');
+  for (const r of toEnd) {
+    assert(!physical.test(r.body), `${where(r)} haengt an einer physischen Seite: ${r.body}`);
+  }
+
+  // (3) Die Toenung: die Stopps messen vom Anfang des Bands (--band-ms, die
+  // Spalten ab `first`); physisch ist nur die Richtung des Verlaufs, und die
+  // kippt unter RTL mit, sonst laege die Grenze in der gespiegelten Spalte.
+  const tint = rule('.month-bands > .cal-band--outside');
+  assert(/linear-gradient\(to var\(--band-to, right\),/.test(tint.body), `Richtung ueber --band-to: ${tint.body}`);
+  assert(/--band-a:[^;]*var\(--band-out-start\)[^;]*var\(--band-ms\)/.test(tint.body)
+    && /--band-b:[^;]*var\(--band-out-end\)[^;]*var\(--band-ms\)/.test(tint.body),
+    'beide Stopps messen vom Anfang des Bands');
+  const rtl = rule('[dir="rtl"] .month-bands > .cal-band--outside');
+  assert(/--band-to:\s*left/.test(rtl.body), 'in RTL laeuft der Verlauf von rechts nach links');
+});
 test('Monatszelle: der Fokusring liegt ueber der Band-Schicht, die Zelle nicht', () => {
   // Ein Band liegt in `.month-bands` (z-index 1) ueber den Zellen. Hob sich die
   // fokussierte Zelle mit z-index 1 an, malte die spaetere Schicht trotzdem

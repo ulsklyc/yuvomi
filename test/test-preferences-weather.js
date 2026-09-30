@@ -206,3 +206,102 @@ test('weather_user is isolated per authUserId', async () => {
     assert.equal(body.data.weather_user.lat, '52.52');
   } finally { await close(); }
 });
+
+// ----------------------------------------------------------------
+// weather_source: woher das Wetter des Haushalts kommt. Der Web-Installer
+// schreibt WEATHER_* in die .env, das Dashboard zeigte damit Wetter, die
+// Admin-Seite aber "Nicht konfiguriert" - sie las nur die Datenbank.
+// ----------------------------------------------------------------
+const WEATHER_ENV_KEYS = ['WEATHER_LAT', 'WEATHER_LON', 'WEATHER_CITY', 'WEATHER_UNITS',
+  'OPENWEATHER_API_KEY', 'OPENWEATHER_CITY', 'OPENWEATHER_UNITS'];
+const OWM_KEY = 'owm-secret-key-123';
+
+async function withWeatherEnv(env, fn) {
+  const saved = Object.fromEntries(WEATHER_ENV_KEYS.map((k) => [k, process.env[k]]));
+  for (const k of WEATHER_ENV_KEYS) delete process.env[k];
+  Object.assign(process.env, env);
+  currentRole = 'admin';
+  const { baseUrl, close } = await startApp();
+  const put = (body) => fetch(`${baseUrl}/`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const source = async () => {
+    const res = await fetch(`${baseUrl}/`);
+    const text = await res.text();
+    assert.ok(!text.includes(OWM_KEY), 'der API-Key steht in der Antwort');
+    return JSON.parse(text).data.weather_source;
+  };
+  try {
+    // Die Suite teilt sich eine Datenbank - mit leerem Haushaltswetter beginnen.
+    assert.equal((await put({ weather_provider: null, weather_lat: null, weather_lon: null, weather_city: '' })).status, 200);
+    await fn({ put, source });
+  } finally {
+    await close();
+    for (const k of WEATHER_ENV_KEYS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  }
+}
+
+test('weather_source: none ohne Datenbank und ohne .env', async () => {
+  await withWeatherEnv({}, async ({ source }) => {
+    assert.deepEqual(await source(), { source: 'none', provider: null, lat: null, lon: null, city: null, units: null });
+  });
+});
+
+test('weather_source: env meldet Stadt, Koordinaten und Einheit aus WEATHER_*', async () => {
+  await withWeatherEnv({ WEATHER_LAT: '52.52', WEATHER_LON: '13.4', WEATHER_CITY: 'Berlin', OPENWEATHER_API_KEY: OWM_KEY },
+    async ({ source }) => {
+      assert.deepEqual(await source(), {
+        source: 'env', provider: 'open-meteo', lat: '52.52', lon: '13.4', city: 'Berlin', units: 'metric',
+      });
+    });
+});
+
+test('weather_source: OPENWEATHER_* (Legacy) ist ebenfalls env - ohne Key im Payload', async () => {
+  await withWeatherEnv({ OPENWEATHER_API_KEY: OWM_KEY, OPENWEATHER_CITY: 'Hamburg' }, async ({ source }) => {
+    assert.deepEqual(await source(), {
+      source: 'env', provider: 'openweathermap', lat: null, lon: null, city: 'Hamburg', units: 'metric',
+    });
+  });
+});
+
+test('weather_source: gespeicherter Standort gewinnt, Entfernen gibt die .env frei', async () => {
+  await withWeatherEnv({ WEATHER_LAT: '52.52', WEATHER_LON: '13.4', WEATHER_CITY: 'Berlin' }, async ({ put, source }) => {
+    assert.equal((await put({ weather_provider: 'open-meteo', weather_lat: '48.14', weather_lon: '11.58', weather_city: 'München' })).status, 200);
+    const stored = await source();
+    assert.equal(stored.source, 'db');
+    assert.equal(stored.city, 'München');
+
+    // Genau das schickt der Entfernen-Knopf der Admin-Seite.
+    assert.equal((await put({ weather_provider: null, weather_lat: null, weather_lon: null, weather_city: '' })).status, 200);
+    const after = await source();
+    assert.equal(after.source, 'env', 'nach dem Entfernen greift wieder die .env');
+    assert.equal(after.city, 'Berlin');
+  });
+});
+
+test('weather_source: nur den Anbieter zu entfernen laesst die Koordinaten wirken', async () => {
+  // Der Proxy nimmt Koordinaten auch ohne Anbieter - die Quelle bleibt db, und
+  // die Admin-Seite zeigt deshalb weiter einen Entfernen-Knopf.
+  await withWeatherEnv({ WEATHER_LAT: '52.52', WEATHER_LON: '13.4' }, async ({ put, source }) => {
+    await put({ weather_provider: 'open-meteo', weather_lat: '48.14', weather_lon: '11.58' });
+    await put({ weather_provider: null });
+    assert.deepEqual(
+      { source: (await source()).source, provider: (await source()).provider },
+      { source: 'db', provider: 'open-meteo' },
+    );
+  });
+});
+
+test('PUT /preferences weather_lat/weather_lon = null loescht die Koordinaten', async () => {
+  await withWeatherEnv({}, async ({ put }) => {
+    await put({ weather_lat: '48.14', weather_lon: '11.58' });
+    const res = await put({ weather_lat: null, weather_lon: null });
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(body.data.weather_lat, null);
+    assert.equal(body.data.weather_lon, null);
+  });
+});

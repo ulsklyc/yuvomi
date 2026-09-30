@@ -1653,6 +1653,53 @@ test('weather geolocation callbacks only update the active leaf', () => {
   );
 });
 
+// Die Admin-Seite las nur die Datenbank: Wetter aus der `.env` (Web-Installer)
+// lief auf dem Dashboard, die Seite sagte "Nicht konfiguriert" und bot nichts
+// an. Die Quelle meldet jetzt der Server (`weather_source`), die Seite zeigt sie.
+test('admin weather page shows weather configured by the server', async () => {
+  const { weatherSourceOf, weatherSourceHtml, canRemoveStoredWeather } = await import('/settings/pages/admin-weather.js');
+
+  const env = weatherSourceOf({
+    weather_provider: null,
+    weather_source: { source: 'env', provider: 'open-meteo', lat: '52.52', lon: '13.4', city: 'Berlin', units: 'metric' },
+  });
+  const envHtml = weatherSourceHtml(env);
+  assert.match(envHtml, /settings\.weatherProviderOpenMeteoEnv/);
+  assert.doesNotMatch(envHtml, /settings\.weatherProviderNone/);
+  assert.match(envHtml, /Berlin \(52\.52, 13\.4\)/, 'Stadt und Koordinaten stehen schreibgeschuetzt da');
+  assert.match(envHtml, /settings\.weatherEnvHint\{"vars":"WEATHER_\*"\}/, 'der Weg zum Abschalten steht dabei');
+  assert.equal(canRemoveStoredWeather(env), false, 'die .env laesst sich hier nicht entfernen');
+
+  const owm = weatherSourceOf({
+    weather_source: { source: 'env', provider: 'openweathermap', lat: null, lon: null, city: 'Hamburg', units: 'metric' },
+  });
+  const owmHtml = weatherSourceHtml(owm);
+  assert.match(owmHtml, /settings\.weatherProviderOwm/);
+  assert.match(owmHtml, /settings\.weatherEnvHint\{"vars":"OPENWEATHER_\*"\}/);
+
+  // Koordinaten ohne Anbieter nimmt der Proxy auch - die Seite darf sie nicht
+  // "Nicht konfiguriert" nennen und muss sie entfernen lassen.
+  const stored = weatherSourceOf({
+    weather_provider: null,
+    weather_source: { source: 'db', provider: 'open-meteo', lat: '48.14', lon: '11.58', city: '', units: 'metric' },
+  });
+  assert.match(weatherSourceHtml(stored), /settings\.weatherProviderOpenMeteo\b(?!Env)/);
+  assert.doesNotMatch(weatherSourceHtml(stored), /weatherEnvHint/);
+  assert.equal(canRemoveStoredWeather(stored), true);
+
+  const none = weatherSourceOf({ weather_source: { source: 'none', provider: null } });
+  assert.match(weatherSourceHtml(none), /settings\.weatherProviderNone/);
+  assert.equal(canRemoveStoredWeather(none), false);
+
+  // Die Seite entscheidet den Vorrang nicht selbst: sie liest `weather_source`
+  // und nicht `weather_provider`, und das Entfernen loescht die Koordinaten
+  // mit - sonst kaeme die `.env` danach nie wieder zum Zug.
+  const source = await readFile(new URL('../public/settings/pages/admin-weather.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /preferences\.weather_provider\s*===/);
+  assert.match(source, /savePreferences\(\{ weather_provider: null, weather_lat: null, weather_lon: null, weather_city: '' \}\)/);
+  assert.match(source, /next\.source === 'env' \? t\('settings\.weatherRemovedEnv'\)/);
+});
+
 // Die Koordinatenvalidierung lag doppelt in admin-weather und personal-weather
 // (Critique 2026-07-27) und liegt jetzt einmal in weather-location.js.
 test('hasValidWeatherCoords rejects empty, non-numeric and out-of-range input', () => {

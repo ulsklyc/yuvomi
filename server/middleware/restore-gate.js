@@ -102,6 +102,12 @@ export function createRestoreWriteGate(isRestoreRunning, isDatabaseOpen = () => 
  * `/oidc/callback`) warten auf den Anbieter und schreiben erst danach Tokens,
  * eine Verknuepfung oder einen neuen Nutzer. Ein Restore, der in diese Wartezeit
  * faellt, wartet sie ab - sonst landete das in der eingespielten Datenbank.
+ *
+ * Dasselbe gilt fuer jede GET-Route, die nach einem `await` schreibt (#1551):
+ * der `tokens`-Listener der Google-Clients speichert ein erneuertes Token, die
+ * Kalenderlisten von Outlook und CalDAV werden nach dem Abruf neu geschrieben,
+ * der Wechselkurs-Cache nach dem Abruf bei Fixer. `test:after-response-jobs`
+ * findet solche Routen ueber den Aufrufgraphen und verlangt diesen Riegel.
  * @type {import('express').RequestHandler}
  */
 export function refuseWhileRestoring(_req, res, next) {

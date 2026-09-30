@@ -19,14 +19,10 @@ import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { pathAccess, mayWritePath } from '/utils/module-access.js';
 import { todayKey } from '/utils/date.js';
-import { zonedDateKey } from '/utils/timezone.js';
+import { displayTimeZone, zonedDateKey } from '/utils/timezone.js';
 import { USER_COLOR_DEFAULT } from '/utils/color.js';
 
 
-
-function localDate(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 // "2026-07" ist ein API-Schlüssel, kein Anzeigetext: Leser bekommen den
 // lokalisierten Monatsnamen (Audit A2-23).
@@ -35,11 +31,20 @@ function formatMonthLabel(ym, opts = { month: 'long', year: 'numeric' }) {
   return new Intl.DateTimeFormat(getLocale(), opts).format(new Date(`${ym}-01T00:00:00`));
 }
 
+/**
+ * Die Zone, in der diese Seite "heute" liest: die des Haushalts, ohne
+ * Einstellung die des Browsers - dieselbe, aus der `todayKey()` den Tag nimmt.
+ * Der Server rechnet darin den Tag und seine Grenzen; ist eine Haushaltszone
+ * eingestellt, nimmt er ohnehin seine (#1556). Tag und Offset des Geraets
+ * gingen hier vorher mit und legten den Check-in auf Reisen auf den Tag des
+ * Geraets.
+ */
+function dayTimeZone() {
+  return displayTimeZone() || Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+}
+
 function localDayParams() {
-  return new URLSearchParams({
-    local_date: localDate(),
-    timezone_offset_minutes: String(new Date().getTimezoneOffset()),
-  });
+  return new URLSearchParams({ timezone: dayTimeZone() });
 }
 
 let state = {
@@ -57,7 +62,7 @@ let state = {
   workers: [],
   workerAvatar: undefined,
   selectedStaffId: null,
-  staffLogMonth: localDate().slice(0, 7),
+  staffLogMonth: todayKey().slice(0, 7),
   staffVisits: [],
   currency: 'EUR',
 };
@@ -189,7 +194,7 @@ function templateLabel(template, field) {
 }
 
 function visitTextPayload(worker, dateValue, dailyRate, extras) {
-  const visitDate = dateValue || localDate();
+  const visitDate = dateValue || todayKey();
   const total = Number(dailyRate || 0) + Number(extras || 0);
   const name = worker?.display_name || t('housekeeping.staff');
   return {
@@ -243,7 +248,7 @@ async function loadData() {
   const reportSeq = ++reportFetchSeq;
   const reportMonth = state.reportMonth;
   const [dashboard, tasks, current, report, templates, workers, prefs] = await Promise.all([
-    api.get('/housekeeping/dashboard'),
+    api.get(`/housekeeping/dashboard?${dayParams.toString()}`),
     api.get('/housekeeping/decay-tasks'),
     api.get('/housekeeping/visits'),
     // Der Berichte-Tab behaelt seinen Monat ueber jedes Neuladen (#1137). Jede
@@ -258,7 +263,7 @@ async function loadData() {
   state.dashboard = dashboard.data;
   state.tasks = tasks.data || [];
   const currentReport = current.data || { visits: [], totals: {} };
-  state.currentMonth = currentReport.month || localDate().slice(0, 7);
+  state.currentMonth = currentReport.month || todayKey().slice(0, 7);
   // Die Uebersicht zeigt die juengsten Besuche, egal welchen Monat der
   // Berichte-Tab gerade offen hat.
   state.recentVisits = currentReport.visits || [];
@@ -412,9 +417,8 @@ async function toggleSession(container, workerId) {
         worker_id: worker.id,
         daily_rate: worker.rate_type === 'hourly' ? 0 : (worker.daily_rate || 0),
         extras: 0,
-        local_date: localDate(),
-        timezone_offset_minutes: new Date().getTimezoneOffset(),
-        ...visitTextPayload(worker, localDate(), worker.rate_type === 'hourly' ? 0 : (worker.daily_rate || 0), 0),
+        timezone: dayTimeZone(),
+        ...visitTextPayload(worker, todayKey(), worker.rate_type === 'hourly' ? 0 : (worker.daily_rate || 0), 0),
       });
       window.yuvomi?.showToast(t('housekeeping.checkedInToast'), 'success');
     }
@@ -1063,7 +1067,7 @@ function visitPaymentMeta(visit) {
 }
 
 function currentMonthKey() {
-  return state.currentMonth || localDate().slice(0, 7);
+  return state.currentMonth || todayKey().slice(0, 7);
 }
 
 function shiftMonth(ym, dir) {
@@ -1491,7 +1495,7 @@ function renderStaff(content) {
     });
   });
   content.querySelector('#housekeeping-staff-month')?.addEventListener('change', async (event) => {
-    state.staffLogMonth = event.currentTarget.value || localDate().slice(0, 7);
+    state.staffLogMonth = event.currentTarget.value || todayKey().slice(0, 7);
     try {
       await loadStaffVisits();
       renderStaff(content);
@@ -1727,6 +1731,11 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
     return;
   }
   const worker = state.workers.find((item) => String(item.id) === String(visit.worker_id)) || null;
+  // Der Tag des Besuchs auf der Uhr des Haushalts, nicht `check_in.slice(0, 10)`
+  // (der UTC-Tag, #1540). Er geht beim Speichern als `original_date` mit: der
+  // Server verschiebt den Besuch um den Abstand zu DIESEM Tag, weil seine Uhr
+  // ohne eingestellte Haushaltszone eine andere sein kann als die des Browsers.
+  const visitDay = zonedDateKey(visit.check_in);
   openModal({
     title: t('housekeeping.editVisit'),
     size: 'md',
@@ -1734,7 +1743,7 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
       <form id="housekeeping-visit-form" class="housekeeping-worker-form">
         <label class="housekeeping-field">
           <span>${esc(t('housekeeping.visitDate'))}</span>
-          <yuvomi-datepicker name="date" type="date" value="${esc(visit.check_in.slice(0, 10))}"></yuvomi-datepicker>
+          <yuvomi-datepicker name="date" type="date" value="${esc(visitDay)}"></yuvomi-datepicker>
         </label>
         <div class="housekeeping-form-grid">
           ${visit.rate_type === 'hourly' ? `
@@ -1831,6 +1840,7 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
           }
           await api.put(`/housekeeping/visits/${visit.id}`, {
             date: dateValue,
+            original_date: visitDay,
             ...(visit.rate_type === 'hourly'
               ? { minutes_worked: minutesWorked }
               : { daily_rate: dailyRate }),

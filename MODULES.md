@@ -133,7 +133,7 @@ Yuvomi's CSRF token protects Yuvomi's endpoints, not a module's. State-changing 
 - the service's own double-submit CSRF cookie and header pair;
 - an endpoint-specific role or ownership check.
 
-Scheduled jobs have no session. Issue an API token under Settings -> Administration -> API access (admin-only, so a module that needs one has to ask the household's admin for it) with only the scopes the module needs - for core modules `budget:read` and `budget:write`, for extension modules `ext:<module-id>:read` / `:write` - and keep it in the service's secrets, never in the module folder, a Compose file, or browser storage. Keep the service's own state in the service's own database, and treat stored secrets as write-only: expose `has_api_token: true`, never a fragment of the token itself.
+Scheduled jobs have no session. Issue an API token under Settings -> Household -> API access (admin-only, so a module that needs one has to ask the household's admin for it) with only the scopes the module needs - for core modules `budget:read` and `budget:write`, for extension modules `ext:<module-id>:read` / `:write` - and keep it in the service's secrets, never in the module folder, a Compose file, or browser storage. Keep the service's own state in the service's own database, and treat stored secrets as write-only: expose `has_api_token: true`, never a fragment of the token itself.
 
 When your module declares `capabilities.api.prefix`, enforce household permissions on the sidecar: after resolving the session through `GET /api/v1/auth/me`, deny requests when `permissions.modules['ext:<module-id>'] === 'none'`, and treat `'read'` as read-only for mutating routes.
 
@@ -220,7 +220,7 @@ Rules:
 
 - `manifestVersion` declares the **format** your manifest is written in, not the version of your module (that is `version`). It is an integer; this Yuvomi reads up to **1**. Omit it and 1 is assumed, so manifests written before this field keep working. A manifest declaring a *higher* version is rejected outright rather than read in part: loading it halfway would mean silently ignoring fields it considers essential, and the operator would see a module that runs and does something other than what it says. The error names both numbers.
 - **What a version bump means for you:** new optional fields never require one - an older manifest simply omits them and behaves as before. The number only moves when a field is removed or renamed, and when it does, this Yuvomi keeps reading the older format as well. A guard in `test/test-modules.js` enforces that: it drives a manifest carrying every promised field through the real normaliser, so dropping one turns the suite red rather than turning somebody's widget blank.
-- Permission module key: `ext:<module-id>` (appears in Settings -> Administration -> Roles & permissions).
+- Permission module key: `ext:<module-id>` (appears in Settings -> Household -> Roles & permissions).
 - Widget id in the dashboard: `<module-id>:<widget-id>` (namespace avoids collisions with core widgets).
 - `capabilities.permissions.module` is required when you declare widgets and/or `api.prefix`.
 - `capabilities.api.prefix`, when declared, must be exactly `/api/extensions/<module-id>` (trailing slash optional). Any other prefix - including a core path such as `/api/tasks` - is rejected and the module loads as errored.
@@ -236,7 +236,7 @@ Serve a sidecar from the same origin under `/api/extensions/<module-id>/` (Traef
 
 Yuvomi scans `modules/` and validates each `module.json`. Invalid modules are shown as errored in Settings and are not loaded. Disabled modules are not served to the browser and do not appear in navigation. If a module page fails while rendering, Yuvomi shows an error for that page without changing core application code.
 
-Admins enable and disable modules in Settings -> Modules -> Active modules. Ordering is a separate, personal matter and lives in Settings -> Personal -> Navigation, where every member also decides which modules they want in their own navigation - hiding one there removes it from that member's sidebar and mobile favourites without taking it from the household. Copying a new folder into `modules/` makes it appear in both places automatically.
+Admins enable and disable modules in Settings -> Modules -> Active modules. Ordering is a separate, personal matter and lives in Settings -> Modules -> Navigation, where every member also decides which modules they want in their own navigation - hiding one there removes it from that member's sidebar and mobile favourites without taking it from the household. Copying a new folder into `modules/` makes it appear in both places automatically.
 
 ## Compatibility Across Yuvomi Releases
 

@@ -395,3 +395,14 @@ test('Sperre: waehrend des Requests loest ein zweiter Klick keinen zweiten Resto
   assert.equal(modal.calls(), 1, 'keine zweite Rueckfrage');
   assert.equal(f.btn.hasAttribute('aria-disabled'), false, 'nach der Antwort wieder frei');
 });
+
+test('WebDAV: password_required wird uebersetzt, andere Fehler behalten den Servertext', async () => {
+  // Neuer Server oder Benutzer ohne neues Passwort (server/routes/backup.js):
+  // die englische Entwicklernotiz des Servers darf nicht im Formular landen.
+  const { webdavErrorMessage } = await import('../public/settings/pages/admin-backup.js');
+  assert.equal(
+    webdavErrorMessage({ message: 'A new server or username needs the password again.', data: { errorCode: 'password_required' } }),
+    'settings.backupWebdavPasswordRequired',
+  );
+  assert.equal(webdavErrorMessage({ message: 'Authentication failed (401).', data: { code: 400 } }), 'Authentication failed (401).');
+});

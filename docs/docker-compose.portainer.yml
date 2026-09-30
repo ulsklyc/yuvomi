@@ -72,7 +72,7 @@ services:
       # Log timestamps and the backup schedule, and the DEFAULT for the household
       # zone (which applies wherever a time carries no zone of its own). Since
       # v2.34.0 the household zone is also a setting in the app (Settings >
-      # Personal > Appearance > Region) and that setting wins where both exist.
+      # Account > Appearance > Region) and that setting wins where both exist.
       - TZ=${TZ:-UTC}
       # Weather (optional) - Open-Meteo (recommended, free, no API key)
       - WEATHER_LAT=${WEATHER_LAT:-}
@@ -85,7 +85,7 @@ services:
       - OPENWEATHER_UNITS=${OPENWEATHER_UNITS:-metric}
       - OPENWEATHER_LANG=${OPENWEATHER_LANG:-en}
       # Email / SMTP (optional). Without a host, "forgot password" stays off.
-      # Can also be configured later under Settings > Administration; a value
+      # Can also be configured later under Settings > Household > Email; a value
       # set here always wins and the field is then LOCKED in the UI.
       #
       # That is why none of these may carry a non-empty default: a default of

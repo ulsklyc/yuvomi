@@ -8,6 +8,13 @@
  * Usage:  node scripts/take-screenshots.mjs              (English → docs/screenshots/)
  *         SHOT_LOCALE=de node scripts/take-screenshots.mjs  (German → docs/screenshots/de/)
  *
+ * Optional environment:
+ *   SHOT_OUT_DIR=/some/dir   write there instead of docs/screenshots[/<locale>]
+ *                            (for trying out a motif without touching the
+ *                            published set; the locale is NOT appended)
+ *   SHOT_ONLY=a,b            capture only these motif names (e.g. dashboard-wall)
+ *   SHOT_CLOCK=HH:MM         browser wall-clock time for the run, default 18:10
+ *
  * Side effects: writes a temporary database to /tmp/yuvomi-screenshot.db
  *               and starts a server on port 3099. Both are cleaned up on exit.
  */
@@ -26,13 +33,39 @@ const SCREENSHOT_DIR = resolve(ROOT, 'docs', 'screenshots');
 // docs/screenshots/<locale>/ sub-folder with identical basenames, so the landing
 // page can derive the localized path by inserting the locale segment.
 const LOCALE      = (process.env.SHOT_LOCALE || 'en').toLowerCase();
-const OUT_DIR     = LOCALE === 'en' ? SCREENSHOT_DIR : resolve(SCREENSHOT_DIR, LOCALE);
+const OUT_DIR     = process.env.SHOT_OUT_DIR
+  ? resolve(process.env.SHOT_OUT_DIR)
+  : LOCALE === 'en' ? SCREENSHOT_DIR : resolve(SCREENSHOT_DIR, LOCALE);
+const ONLY        = new Set(String(process.env.SHOT_ONLY || '').split(',').map((s) => s.trim()).filter(Boolean));
 // BCP-47 tag for the browser context (drives Intl date/number/currency formatting).
 const CONTEXT_LOCALE = { en: 'en-US', de: 'de-DE' }[LOCALE] || 'en-US';
 const DEMO_DB     = '/tmp/yuvomi-screenshot.db';
 const PORT        = 3099;
 const BASE_URL    = `http://localhost:${PORT}`;
 const SESSION_SECRET = 'screenshots_secret_123';
+
+// Die Uhr des BROWSERS steht fuer den ganzen Lauf auf heute, SHOT_CLOCK
+// (lokale Zeit der Maschine, wie der Seed-Tag). Drei Dinge im Bild haengen an
+// der Tageszeit, und ohne gestellte Uhr hing das Motiv daran, wann jemand das
+// Skript startet:
+//   - welche Mahlzeit die Uebersicht zeigt (selectTodayMeal: vor 12 Uhr
+//     Fruehstueck, bis 18 Uhr Mittag) - der Seed plant heute alle Slots,
+//     gezeigt werden soll das Abendessen;
+//   - welche Termine das Tagesblatt noch fuehrt (beendete fallen raus, #1449);
+//   - ob der Wand-Modus hell ist: zwischen 22 und 6 Uhr erzwingt er Dunkel
+//     (WALL_NIGHT_FROM/TO in public/utils/wall-mode.js), das helle Motiv waere
+//     nachts dunkel.
+// 18:10 liegt nach dem Mittagsfenster, vor dem Filmabend (20 Uhr) und weit vor
+// der Nachtabsenkung. Nur der Browser: der Server laeuft auf der echten Uhr und
+// filtert „ab jetzt" selbst - ein Lauf nach 22 Uhr verliert den Filmabend
+// trotzdem. Die Zone ist die der Maschine, der Seed setzt keine Haushaltszone.
+const SHOT_CLOCK = /^\d{2}:\d{2}$/.test(process.env.SHOT_CLOCK || '') ? process.env.SHOT_CLOCK : '18:10';
+function shotClockTime() {
+  const [h, m] = SHOT_CLOCK.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d;
+}
 
 mkdirSync(OUT_DIR, { recursive: true });
 
@@ -119,7 +152,20 @@ const MODULES = [
   { path: '/health/meds',     name: 'health-meds'     },
   { path: '/health/labs',     name: 'health-labs'     },
   { path: '/health/activity', name: 'health-activity' },
+  // Der Wand-Modus: kein Route-Eintrag, sondern ein geraetelokaler Zustand der
+  // Uebersicht (public/utils/wall-mode.js, Schluessel `yuvomi-wall-mode`).
+  // Deshalb `wall: true` statt eines Pfads, und nur im Tablet-Querformat des
+  // web-Profils (1376x1032) - so haengt das Wandtablett. Am Ende der Liste,
+  // damit kein anderes Motiv den Zustand erbt.
+  { path: '/',                name: 'dashboard-wall', wall: true, devices: ['web'] },
 ];
+
+// Ein vertippter Name in SHOT_ONLY liefe sonst gruen durch und fotografierte nichts.
+const unknownOnly = [...ONLY].filter((name) => !MODULES.some((m) => m.name === name));
+if (unknownOnly.length) {
+  console.error(`SHOT_ONLY names no motif: ${unknownOnly.join(', ')}`);
+  process.exit(1);
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -218,13 +264,25 @@ async function login(context, page) {
 }
 
 async function captureModule(page, dev, theme, mod) {
-  // Navigate to the module path
-  await page.evaluate((path) => {
-    if (window.navigate) window.navigate(path);
-    else { window.history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')); }
-  }, mod.path);
+  if (mod.wall) {
+    // Den Zustand setzen und die Uebersicht NEU laden statt navigieren: stand
+    // die Seite schon auf `/`, rendert ein navigate('/') nicht neu, und
+    // syncWallMode laeuft nur beim Routen. Die Init-Flags (Theme, Locale)
+    // setzt addInitScript beim Neuladen wieder.
+    await page.evaluate(() => localStorage.setItem('yuvomi-wall-mode', '1'));
+    await page.goto(`${BASE_URL}${mod.path}`, { waitUntil: 'domcontentloaded' });
+    await waitForPageLoad(page);
+    await page.waitForSelector('.wall', { timeout: 8000 });
+    await wait(1200);
+  } else {
+    // Navigate to the module path
+    await page.evaluate((path) => {
+      if (window.navigate) window.navigate(path);
+      else { window.history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')); }
+    }, mod.path);
 
-  await waitForPageLoad(page);
+    await waitForPageLoad(page);
+  }
 
   // Click sub-tab if specified (e.g. split-expenses within budget,
   // or the housekeeping staff/reports tabs). mod.tab is a CSS selector.
@@ -247,6 +305,7 @@ async function captureModule(page, dev, theme, mod) {
 
   const filepath = `${OUT_DIR}/${mod.name}-${theme}-${dev.name}.png`;
   await page.screenshot({ path: filepath });
+  if (mod.wall) await page.evaluate(() => localStorage.removeItem('yuvomi-wall-mode'));
 
   const flag = empty ? '  ⚠️  LOOKS EMPTY' : '';
   console.log(`  ✓ ${mod.name}-${theme}-${dev.name}.png  (text:${sig.len}, nodes:${sig.nodes})${flag}`);
@@ -382,7 +441,9 @@ async function main() {
     await warmWeatherCache(browser);
     console.log(`Server ready at ${BASE_URL}\n`);
 
+    console.log(`Browser clock: ${shotClockTime().toString()} (SHOT_CLOCK ${SHOT_CLOCK})`);
     for (const dev of DEVICES) {
+      if (ONLY.size && !MODULES.some((m) => ONLY.has(m.name) && (!m.devices || m.devices.includes(dev.name)))) continue;
       const renderW = Math.round(dev.viewport.w / dev.zoom);
       const DSF     = dev.target.w / renderW;
       const renderH = Math.round(dev.target.h / DSF);
@@ -400,6 +461,8 @@ async function main() {
           colorScheme:       theme === 'dark' ? 'dark' : 'light',
         });
         await context.addInitScript(initFlags, { theme, locale: LOCALE });
+        // Vor der ersten Seite installieren; die Zeit laeuft danach normal weiter.
+        await context.clock.install({ time: shotClockTime() });
 
         const page = await context.newPage();
         try {
@@ -409,6 +472,8 @@ async function main() {
           await wait(400);
 
           for (const mod of MODULES) {
+            if (ONLY.size && !ONLY.has(mod.name)) continue;
+            if (mod.devices && !mod.devices.includes(dev.name)) continue;
             try {
               const res = await captureModule(page, dev, theme, mod);
               if (res.empty) warnings.push(res.name);
@@ -427,7 +492,7 @@ async function main() {
     await browser.close();
   }
 
-  console.log(`\nDone! Screenshots saved to docs/screenshots/`);
+  console.log(`\nDone! Screenshots saved to ${OUT_DIR}/`);
   if (warnings.length) {
     console.log(`\n⚠️  ${warnings.length} screenshot(s) may be empty or failed:`);
     for (const w of warnings) console.log(`   - ${w}`);

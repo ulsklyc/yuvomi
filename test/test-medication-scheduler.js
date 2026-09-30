@@ -243,3 +243,85 @@ test('ohne Medikamentennamen traegt die Betreuer-Erinnerung Name und Fallback-Ru
   assert.equal(m.pushed[0].payload.body, 'Medication reminder');
   assert.equal(m.pushed[1].payload.body, 'anna: Medication reminder');
 });
+
+// --------------------------------------------------------
+// Faellig nach der Uhr des HAUSHALTS, nicht des Servers (#1539)
+// --------------------------------------------------------
+// `time_of_day` und `scheduled_at` sind Wanduhrzeit des Haushalts. Der
+// Scheduler las Tag und Uhrzeit mit getDate()/getHours() - der Zone des
+// Server-PROZESSES. Mit `TZ=UTC` im Container und einem Haushalt in Berlin kam
+// die Erinnerung fuer 08:00 um 10:00. Der Prozess laeuft hier deshalb in einer
+// anderen Zone als der Haushalt; der letzte Fall haelt beide gleich.
+
+function inProcessZone(zone, fn) {
+  return async () => {
+    const prev = process.env.TZ;
+    process.env.TZ = zone;
+    try {
+      await fn();
+    } finally {
+      if (prev === undefined) delete process.env.TZ;
+      else process.env.TZ = prev;
+    }
+  };
+}
+
+function setHouseholdZone(db, zone) {
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('household_timezone', ?)").run(zone);
+}
+
+async function runAt(db, iso) {
+  const m = makeMocks();
+  const res = await processDueMedications({ database: db, now: new Date(iso), ...m });
+  const logs = db.prepare('SELECT scheduled_at FROM medication_logs ORDER BY id').all().map((r) => r.scheduled_at);
+  return { res, logs };
+}
+
+function berlinSchedule(time, opts = {}) {
+  const db = buildTestDb();
+  setHouseholdZone(db, opts.zone ?? 'Europe/Berlin');
+  const user = seedUser(db, 'alice');
+  seedSchedule(db, seedMed(db, user), { time, daysMask: opts.daysMask ?? null });
+  return db;
+}
+
+test('#1539: Prozess UTC, Haushalt Berlin - 08:00 ist um 08:00 Berliner Zeit faellig', inProcessZone('UTC', async () => {
+  assert.equal(new Date('2026-06-15T12:00').getTimezoneOffset(), 0, 'Prozess muss in UTC laufen');
+  const db = berlinSchedule('08:00');
+  // 07:30 in Berlin (05:30Z): noch nicht.
+  assert.deepEqual((await runAt(db, '2026-06-15T05:30:00Z')).logs, []);
+  // 08:30 in Berlin (06:30Z): faellig, als Wanduhrzeit des Haushalts gespeichert.
+  const { res, logs } = await runAt(db, '2026-06-15T06:30:00Z');
+  assert.equal(res.created, 1);
+  assert.deepEqual(logs, ['2026-06-15T08:00']);
+}));
+
+test('#1539: der Kalendertag und der Wochentag sind die des Haushalts', inProcessZone('UTC', async () => {
+  // Montag 21:00 in New York ist Dienstag 01:00 UTC. Ein Plan nur fuer Montag
+  // (Bit 0) um 20:00 ist faellig - fuer Montag, nicht fuer Dienstag.
+  const db = berlinSchedule('20:00', { zone: 'America/New_York', daysMask: 1 });
+  const { res, logs } = await runAt(db, '2026-06-16T01:00:00Z');
+  assert.equal(res.created, 1);
+  assert.deepEqual(logs, ['2026-06-15T20:00']);
+}));
+
+test('#1539: an beiden Zeitumstellungen folgt die Faelligkeit der Uhr des Haushalts', inProcessZone('UTC', async () => {
+  // 29.03.2026: Berlin springt auf CEST, 08:00 ist 06:00Z.
+  const spring = berlinSchedule('08:00');
+  assert.deepEqual((await runAt(spring, '2026-03-29T05:59:00Z')).logs, [], '07:59 CEST');
+  assert.deepEqual((await runAt(spring, '2026-03-29T06:00:00Z')).logs, ['2026-03-29T08:00'], '08:00 CEST');
+  // 25.10.2026: zurueck auf CET, 08:00 ist 07:00Z.
+  const autumn = berlinSchedule('08:00');
+  assert.deepEqual((await runAt(autumn, '2026-10-25T06:59:00Z')).logs, [], '07:59 CET');
+  assert.deepEqual((await runAt(autumn, '2026-10-25T07:00:00Z')).logs, ['2026-10-25T08:00'], '08:00 CET');
+  // Die doppelte Stunde 02:00-03:00 erzeugt keinen zweiten Log.
+  const fold = berlinSchedule('02:30');
+  assert.deepEqual((await runAt(fold, '2026-10-25T00:45:00Z')).logs, ['2026-10-25T02:30'], 'erste 02:45 (CEST)');
+  assert.deepEqual((await runAt(fold, '2026-10-25T01:45:00Z')).logs, ['2026-10-25T02:30'], 'zweite 02:45 (CET)');
+}));
+
+test('#1539: Prozess und Haushalt in derselben Zone - unveraendert', inProcessZone('Europe/Berlin', async () => {
+  const db = berlinSchedule('08:00');
+  assert.deepEqual((await runAt(db, '2026-06-15T05:30:00Z')).logs, []);
+  assert.deepEqual((await runAt(db, '2026-06-15T06:30:00Z')).logs, ['2026-06-15T08:00']);
+}));

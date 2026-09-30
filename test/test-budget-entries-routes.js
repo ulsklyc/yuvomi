@@ -692,6 +692,140 @@ test('PUT /:id/series: fremder Nutzer im personal-Modus → 403 (kein Bypass)', 
   assert.equal(db.prepare('SELECT title FROM budget_entries WHERE id = ?').get(parent).title, 'a-series', 'unverändert');
 });
 
+// ── #1546: "Alle zukuenftigen" aus einem Vorkommen beendet die Serie nicht ──────
+//
+// Der Bearbeiten-Dialog eines Vorkommens schickte die Rhythmus-Felder DIESES
+// Vorkommens mit: is_recurring 0 und die Spalten-Defaults. Gemessen im echten
+// Browser gegen den echten Router (test:budget-series-edit-browser): die Serie
+// war danach beendet, jedes Vorkommen ab heute geloescht. Die Tests hier
+// schicken genau diesen Body.
+const addMonths1546 = (ym, n) => {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+};
+/** Serie ueber die Route anlegen und die Monate um heute materialisieren. */
+async function runningSeries1546(fields) {
+  const created = await call('POST', '/', { body: {
+    title: 'Miete', amount: -900, category: 'housing', subcategory: 'rent_mortgage', is_recurring: 1, ...fields,
+  } });
+  assert.equal(created.status, 201);
+  const anchor = created.body.data.id;
+  const now = todayKeyOf1546().slice(0, 7);
+  for (let i = -2; i <= 3; i++) await call('GET', `/?month=${addMonths1546(now, i)}`);
+  return anchor;
+}
+// Derselbe Tag, an dem die Route schneidet: Haushaltszone, nicht UTC.
+const { todayKey: todayKey1546 } = await import('../server/utils/timezone.js');
+const todayKeyOf1546 = () => todayKey1546(db);
+const occurrences1546 = (anchor) => db.prepare(
+  'SELECT * FROM budget_entries WHERE recurrence_parent_id = ? ORDER BY date'
+).all(anchor);
+
+test('#1546: der alte Dialog-Body eines Vorkommens beendet die Serie nicht mehr', async () => {
+  const start = `${addMonths1546(todayKeyOf1546().slice(0, 7), -3)}-05`;
+  const anchor = await runningSeries1546({ date: start, recurrence_interval: 'weekly', recurrence_interval_count: 2 });
+  const before = occurrences1546(anchor);
+  const occurrence = before.find((r) => r.date < todayKeyOf1546());
+  const future = before.filter((r) => r.date > todayKeyOf1546()).map((r) => r.id);
+  assert.ok(occurrence && future.length, 'Vorkommen vor und nach heute vorhanden');
+
+  // Genau das schickte der Dialog (gemessen): Werte des Vorkommens, Rhythmus
+  // aus dessen Spalten-Defaults.
+  const r = await call('PUT', `/${occurrence.id}/series`, { body: {
+    title: 'Miete neu', amount: -900, category: 'housing', subcategory: 'rent_mortgage', date: occurrence.date,
+    is_recurring: 0, recurrence_interval: 'monthly', recurrence_interval_count: 1,
+    recurrence_virtual: 0, recurrence_confirm: 0,
+  } });
+  assert.equal(r.status, 400, 'laut abgewiesen statt still ausgefuehrt');
+  assert.match(r.body.error, /cannot end the series/);
+
+  const a = entryRow1546(anchor);
+  assert.equal(a.is_recurring, 1, 'die Serie laeuft weiter');
+  assert.equal(a.recurrence_interval, 'weekly', 'ihr Rhythmus bleibt');
+  assert.equal(a.recurrence_interval_count, 2);
+  for (const id of future) assert.ok(entryRow1546(id), `kuenftiges Vorkommen ${id} bleibt stehen`);
+  assert.equal(entryRow1546(occurrence.id).title, 'Miete', 'eine abgewiesene Anfrage schreibt nichts');
+});
+
+test('#1546: ohne Rhythmus-Felder aendert "alle kuenftigen" die Werte und laesst den Rhythmus stehen', async () => {
+  const start = `${addMonths1546(todayKeyOf1546().slice(0, 7), -3)}-05`;
+  const anchor = await runningSeries1546({ date: start, recurrence_interval: 'weekly', recurrence_interval_count: 2 });
+  const occurrence = occurrences1546(anchor).find((r) => r.date < todayKeyOf1546());
+  const futureBefore = occurrences1546(anchor).filter((r) => r.date >= todayKeyOf1546()).map((r) => r.id);
+
+  const r = await call('PUT', `/${occurrence.id}/series`, { body: { title: 'Miete neu' } });
+  assert.equal(r.status, 200);
+  const a = entryRow1546(anchor);
+  assert.equal(a.is_recurring, 1);
+  assert.equal(a.recurrence_interval, 'weekly');
+  const futureAfter = occurrences1546(anchor).filter((row) => row.date >= todayKeyOf1546());
+  assert.deepEqual(futureAfter.map((row) => row.id), futureBefore, 'dieselben Zeilen, nicht neu gebaut');
+  assert.ok(futureAfter.every((row) => row.title === 'Miete neu'), 'mit dem neuen Titel');
+});
+
+test('#1546: is_recurring true bleibt erlaubt', async () => {
+  const anchor = await runningSeries1546({ date: `${addMonths1546(todayKeyOf1546().slice(0, 7), -1)}-07` });
+  const r = await call('PUT', `/${anchor}/series`, { body: { is_recurring: true, title: 'Miete' } });
+  assert.equal(r.status, 200);
+  assert.equal(entryRow1546(anchor).is_recurring, 1);
+});
+
+test('#1546: eine virtuelle Serie behaelt ihr virtual-Flag und ihren Periodenbetrag', async () => {
+  const start = `${addMonths1546(todayKeyOf1546().slice(0, 7), -3)}-09`;
+  const anchor = await runningSeries1546({
+    date: start, amount: -1200, recurrence_interval: 'yearly', recurrence_virtual: 1,
+  });
+  const occurrence = occurrences1546(anchor).find((r) => r.date < todayKeyOf1546());
+  assert.equal(occurrence.amount, -100, 'ein Vorkommen traegt den Monatsanteil');
+
+  const r = await call('PUT', `/${occurrence.id}/series`, { body: { title: 'Police neu' } });
+  assert.equal(r.status, 200);
+  const a = entryRow1546(anchor);
+  assert.equal(a.recurrence_virtual, 1, 'virtuell bleibt virtuell');
+  assert.equal(a.recurrence_interval, 'yearly');
+  assert.equal(a.recurrence_full_amount, -1200, 'Periodenbetrag unveraendert');
+});
+
+test('#1546: ein ueber ein Vorkommen geaenderter Betrag einer virtuellen Serie ist dessen Monatsanteil', async () => {
+  // Das Vorkommen zeigt 100 im Monat. Wer dort 110 eintraegt, meint 110 im
+  // Monat - als Periodenbetrag gelesen, waeren daraus 9,17 geworden.
+  const start = `${addMonths1546(todayKeyOf1546().slice(0, 7), -3)}-10`;
+  const anchor = await runningSeries1546({
+    date: start, amount: -1200, recurrence_interval: 'yearly', recurrence_virtual: 1,
+  });
+  const occurrence = occurrences1546(anchor).find((r) => r.date < todayKeyOf1546());
+  const r = await call('PUT', `/${occurrence.id}/series`, { body: { amount: -110 } });
+  assert.equal(r.status, 200);
+  const later = occurrences1546(anchor).filter((row) => row.date >= todayKeyOf1546());
+  assert.ok(later.length && later.every((row) => row.amount === -110), 'kuenftige Vorkommen tragen 110 im Monat');
+  assert.equal(entryRow1546(anchor).recurrence_full_amount, -1320, 'Periodenbetrag 12 x 110');
+  assert.equal(entryRow1546(anchor).recurrence_virtual, 1);
+});
+
+test('#1546: eine so beendete Serie laesst sich an ihrer ersten Buchung wieder starten', async () => {
+  // Der Weg fuer Bestaende, die der Fehler schon beendet hat: erste Buchung
+  // oeffnen, "wiederkehrend" wieder einschalten, Rhythmus wieder waehlen. Die
+  // geloeschten Vorkommen kommen beim naechsten Oeffnen ihres Monats zurueck -
+  // sie waren erzeugt, nicht als uebersprungen vermerkt. Belege und einmalige
+  // Aenderungen daran kommen nicht zurueck.
+  const now = todayKeyOf1546().slice(0, 7);
+  const anchor = await runningSeries1546({ date: `${addMonths1546(now, -3)}-11` });
+  // Der Schaden, wie ihn die alte Route hinterliess:
+  db.prepare('UPDATE budget_entries SET is_recurring = 0 WHERE id = ?').run(anchor);
+  db.prepare('DELETE FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ?').run(anchor, todayKeyOf1546());
+  const next = addMonths1546(now, 1);
+  await call('GET', `/?month=${next}`);
+  assert.equal(occurrences1546(anchor).filter((r) => r.date.startsWith(next)).length, 0, 'beendet: nichts');
+
+  const r = await call('PUT', `/${anchor}`, { body: { is_recurring: true, recurrence_interval: 'monthly' } });
+  assert.equal(r.status, 200);
+  await call('GET', `/?month=${next}`);
+  assert.equal(occurrences1546(anchor).filter((row) => row.date.startsWith(next)).length, 1,
+    'das Vorkommen des naechsten Monats ist wieder da');
+});
+const entryRow1546 = (id) => db.prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
+
 // ── DELETE /:id/series ───────────────────────────────────────────────────────────
 test('DELETE /:id/series: unbekannte id → 404', async () => {
   const r = await call('DELETE', '/999999/series');

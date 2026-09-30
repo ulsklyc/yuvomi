@@ -56,7 +56,7 @@ import { quickLinkHost } from '/utils/quick-link-url.js';
 import { hasIcon } from '/utils/lucide-icons.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { openQuickLinksManager } from '/components/quick-links-manager.js';
-import { attachOverlay } from '/utils/overlay-history.js';
+import { attachOverlay, pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
 import { mealTypeList, primeMealTypeNames } from '/utils/meal-types.js';
 import { recipeThumbHtml, wireRecipeThumbs } from '/utils/recipe-thumb.js';
 import { wireNoteCategoryOverflow } from '/utils/note-category-overflow.js';
@@ -65,6 +65,41 @@ import { nextRewardGoal } from '/utils/reward-goal.js';
 
 // Hält den AbortController des aktuellen FAB-Listeners - wird bei jedem render() erneuert.
 let _fabController = null;
+
+/* DIE WAND HAELT DEN EINEN HISTORY-MARKER (#1559). Zurueck beendete sie nicht:
+ * es gab keinen Eintrag und keinen `popstate`-Handler, in der installierten App
+ * schloss die Geste die App, und beim naechsten Start stand die Wand wieder da.
+ * Sie meldet sich deshalb im Overlay-Register an wie jeder Dialog - derselbe
+ * EINE Marker (utils/overlay-history.js), keine zweite Buchhaltung.
+ *
+ * Angemeldet wird, solange die Flaeche STEHT, nicht beim Einschalten: der Modus
+ * ist gemerkt und steht nach einem Neustart ohne jeden Klick wieder da. Auch
+ * dann fuehrt Zurueck erst aus der Wand auf die Uebersicht und nicht aus der
+ * App. Die Flaeche baut sich oft neu (Timer, Minutentakt, Laden) - der Token
+ * ueberlebt das, und `_wallLeave` zeigt auf den Ausstieg des juengsten Aufbaus.
+ *
+ * `force` (Navigation, Sitzungsende) gibt nur den Marker frei, der Modus BLEIBT
+ * gemerkt: wer per Kurzbefehl woandershin geht, hat die Wand nicht abbestellt.
+ * Sie gilt ohnehin nur auf `/` (isWallRoute). */
+let _wallOverlay = null;
+let _wallLeave = null;
+
+function holdWallMarker(leave) {
+  _wallLeave = leave;
+  if (_wallOverlay !== null && isOverlayOpen(_wallOverlay)) return;
+  _wallOverlay = pushOverlay(({ force }) => {
+    _wallOverlay = null;
+    if (!force) _wallLeave?.();
+  });
+}
+
+function releaseWallMarker() {
+  _wallLeave = null;
+  if (_wallOverlay === null) return;
+  const token = _wallOverlay;
+  _wallOverlay = null;
+  dropOverlay(token);
+}
 
 const noteCategoryName = (category) => String(category?.name || '');
 const noteCategoryScope = (category) => t(
@@ -5278,14 +5313,16 @@ function renderWallError() {
 /**
  * Die ganze Flaeche.
  *
- * DER AUSSTIEG IST LEISE DA, NICHT VERSTECKT. Ein sichtbarer Knopf
- * widerspraeche der ruhigen Flaeche, ein unsichtbarer waere eine Falle - also
- * steht er immer im DOM und ist immer per Tastatur erreichbar, traegt aber im
- * Ruhezustand nur sein Zeichen. Jede Beruehrung hebt ihn fuer ein paar Sekunden
- * auf die volle Kapsel samt Beschriftung (`data-wall-awake`, siehe
- * `wireWallSurface`). Seit dem Kuechentimer (#844) ist der Ausstieg nicht mehr
- * das Einzige, was man beruehren kann - dessen Startknoepfe stehen daneben und
- * ruhen genauso leise, aber sichtbar. Damit ein Tipp, der die Wand nur wecken
+ * DER AUSSTIEG IST LEISE DA, NICHT VERSTECKT. Ein voller Knopf widerspraeche
+ * der ruhigen Flaeche, ein unsichtbarer waere eine Falle - also steht er immer
+ * im DOM, immer im Bild (der Fuss klebt an der Unterkante, #1559) und immer mit
+ * seinem Wort, in Sekundaerfarbe ohne Kapsel. Bis #1559 trug er in Ruhe nur
+ * sein Zeichen, und genau daran fand jemand nicht mehr hinaus (D#1494). Jede
+ * Beruehrung hebt ihn fuer ein paar Sekunden auf die volle Kapsel
+ * (`data-wall-awake`, siehe `wireWallSurface`). Seit dem Kuechentimer (#844)
+ * ist der Ausstieg nicht mehr das Einzige, was man beruehren kann - dessen
+ * Startknoepfe stehen daneben und ruhen genauso leise, aber sichtbar. Damit
+ * ein Tipp, der die Wand nur wecken
  * sollte, keinen Timer startet, weckt der erste Zeiger auf eine schlafende
  * Wand dort nur (wall-timer.js).
  */
@@ -5338,7 +5375,8 @@ function renderWallSurface(data, weather, { failed = false, loading = false, upd
 /**
  * Verdrahtet die einzige Interaktion der Flaeche: den Ausstieg.
  *
- * Zwei Wege hinaus, und beide sind derselbe: der Knopf und die Escape-Taste.
+ * Drei Wege hinaus, und alle sind derselbe: der Knopf, die Escape-Taste und
+ * seit #1559 Zurueck (`wireWallExit`).
  * Das Wecken haengt an den Ereignissen, die auch der Screensaver hoert - es
  * verbraucht sie aber nicht, sondern setzt nur ein Attribut.
  */
@@ -5374,6 +5412,7 @@ function wireWallSurface(container, rerender, signal) {
  */
 function wireWallExit(container, rerender, signal) {
   const leave = () => {
+    releaseWallMarker();
     exitWallMode();
     // Der Toast sagt, WO der Weg zurueck liegt - wer versehentlich aussteigt,
     // soll nicht suchen muessen. Der Name kommt aus dem Schluessel des Knopfes
@@ -5397,6 +5436,9 @@ function wireWallExit(container, rerender, signal) {
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') leave();
   }, { signal });
+  // Der dritte Weg hinaus: Zurueck (#1559). Er schliesst die Wand wie ein
+  // Dialog - `handleBackNavigation` ruft `leave`, der Router navigiert nicht.
+  holdWallMarker(leave);
 }
 
 // --------------------------------------------------------
@@ -5903,6 +5945,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
   `);
 
   const rerender = () => render(container, { user, signal: routeSignal });
+  // Steht keine Wand mehr (Ausstieg, Einstellungen), gehoert der Marker nicht
+  // mehr ihr - sonst kostete die naechste Zurueck-Geste einen Tipp ins Leere.
+  if (!wallMode) releaseWallMarker();
 
   // DER TIMER HAENGT NICHT AN DEN DATEN (Review zu #844). Die Wandflaeche wird
   // erst verdrahtet, wenn das Dashboard geladen hat - der Timer aber ist von
@@ -6702,6 +6747,14 @@ export async function render(container, { user, signal: routeSignal = null } = {
     }, { signal: signal });
     container.querySelector('#dashboard-wall-enter')?.addEventListener('click', () => {
       enterWallMode();
+      // EIN KNOPF OHNE WORT SCHALTET DIE GANZE SHELL AB (#1559, D#1494): wer
+      // ihn aus Neugier antippt, steht ohne Seitenleiste und Tab-Leiste da.
+      // Eine Zeile sagt, was das ist und wie man herauskommt - der Name des
+      // Ausstiegs kommt aus dessen Schluessel, wie beim Gegenstueck
+      // `wallExited`, damit die Wegbeschreibung nicht vom Knopf wegdriftet.
+      window.yuvomi?.showToast(t('dashboard.wallEntered', {
+        action: t('dashboard.wallExit'),
+      }), 'default', 8000);
       rerender();
     }, { signal: signal });
     container.querySelector('#dashboard-customize-btn')?.addEventListener('click', () => {
