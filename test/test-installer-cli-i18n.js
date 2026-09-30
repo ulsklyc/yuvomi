@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  readFileSync, readdirSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, copyFileSync, cpSync,
+  readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync, copyFileSync, cpSync,
   chmodSync, rmSync,
 } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { SUPPORTED_LOCALES } from '../tools/installer/i18n-mini.js';
+import { tempDir } from './tmp-dir.js';
 
 const CLI_LOCALES_DIR = new URL('../tools/installer/locales/cli/', import.meta.url);
 const INSTALL_SH = new URL('../install.sh', import.meta.url);
@@ -327,7 +327,7 @@ test('install.sh vergleicht Antworten nur ueber die Helfer und ohne bash-4-Synta
 // einem docker-Stub, der `compose up` verweigert, damit nichts gestartet wird.
 
 function runInstaller(bin, locale, lines, { up = 'refuse' } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'yuvomi-cli-yes-'));
+  const dir = tempDir('yuvomi-cli-yes-');
   try {
     copyFileSync(INSTALL_SH, join(dir, 'install.sh'));
     cpSync(new URL(CLI_LOCALES_DIR), join(dir, 'tools/installer/locales/cli'), { recursive: true });
