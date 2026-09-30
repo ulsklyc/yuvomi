@@ -21,6 +21,8 @@ import { MIGRATIONS } from '../server/db.js';
 // an, und eine Kopie davon wuerde hier genauso altern wie das Tabellenschema
 // darunter (siehe Kommentar an visibility).
 const SERIES_MIGRATION = MIGRATIONS.find((m) => m.description.includes('(#1035)'));
+// Der eigene Starttag der Definition (#1545) legt die Trigger neu an.
+const START_DATE_MIGRATION = MIGRATIONS.find((m) => m.description.includes('(#1545)'));
 
 let passed = 0;
 let failed = 0;
@@ -88,6 +90,7 @@ function freshDb() {
       VALUES ('admin', 'Admin', 'x', 'admin');
   `);
   db.exec(SERIES_MIGRATION.up);
+  START_DATE_MIGRATION.up(db);
   return db;
 }
 
