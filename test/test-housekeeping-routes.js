@@ -182,7 +182,10 @@ test('check-in: nach dem Auschecken ist am selben Tag eine zweite Session erlaub
     'SELECT id, check_in, check_out, daily_rate FROM housekeeping_work_sessions WHERE worker_id = ? ORDER BY id',
   ).all(WORKER_ID);
   assert.equal(rows.length, 2, 'zwei Sessions am selben Tag');
-  assert.equal(rows[0].check_in.slice(0, 10), rows[1].check_in.slice(0, 10), 'derselbe Tag');
+  // Der Tag des Haushalts, nicht `check_in.slice(0, 10)` (der UTC-Tag): die
+  // Route rechnet "heute" in der Haushaltszone (`localDayContext`).
+  const householdDay = (iso) => utcToWall(iso, householdTimeZone(db))?.date;
+  assert.equal(householdDay(rows[0].check_in), householdDay(rows[1].check_in), 'derselbe Tag');
   assert.ok(rows[0].check_out, 'die erste ist abgeschlossen');
   assert.equal(rows[1].check_out, null, 'die zweite ist offen');
   assert.equal(rows[0].daily_rate, 50, 'die erste behaelt ihren eigenen Satz');
@@ -1002,7 +1005,14 @@ test('Dringlichkeit: der Faelligkeitstag ist ein Tag des Haushalts (westlich von
 });
 
 // Ein Besuch am 01.10. um 00:30 Berliner Zeit ist in UTC noch der 30.09.
-const OCTOBER_VISIT_AT = '2026-09-30T22:30:00.000Z';
+//
+// Die Monatsgrenze liegt bewusst in einem vergangenen Jahr (#1574): andere
+// Tests dieser Suite checken zur echten Uhr ein und lassen ihre Besuche
+// stehen. Lag die Probe im Oktober 2026, kamen diese Besuche im ganzen Oktober
+// 2026 in dieselben Monatslisten, und die Suite war einen Monat lang rot - auch
+// in der UTC-CI. Ein Monat, den die echte Uhr nie wieder erreicht, bleibt
+// allein mit dem Besuch dieser Tests.
+const OCTOBER_VISIT_AT = '2024-09-30T22:30:00.000Z';
 
 function insertVisitAt(checkIn) {
   return db.prepare(`
@@ -1015,20 +1025,18 @@ test('Monatsgrenze: ein Besuch gehoert zum Monat des Haushalts, nicht zum UTC-Mo
   setHouseholdZone('Europe/Berlin');
   const visitId = insertVisitAt(OCTOBER_VISIT_AT);
   try {
-    const october = await call('GET', '/visits?month=2026-10', { as: ADM });
+    const october = await call('GET', '/visits?month=2024-10', { as: ADM });
     assert.equal(october.status, 200);
     assert.deepEqual(october.body.data.visits.map((v) => v.id), [visitId], 'der Besuch steht im Oktober');
     assert.equal(october.body.data.totals.total, 55);
 
-    // Andere Tests dieser Suite checken zur echten Uhr ein, der September kann
-    // also Besuche haben - gefragt wird nur nach diesem einen.
-    const september = await call('GET', '/visits?month=2026-09', { as: ADM });
+    const september = await call('GET', '/visits?month=2024-09', { as: ADM });
     assert.equal(september.body.data.visits.some((v) => v.id === visitId), false, 'und nicht im September');
 
-    const sessions = await call('GET', '/work-sessions?month=2026-10', { as: ADM });
+    const sessions = await call('GET', '/work-sessions?month=2024-10', { as: ADM });
     assert.deepEqual(sessions.body.data.map((v) => v.id), [visitId]);
 
-    const summary = await call('GET', '/summary?month=2026-10', { as: ADM });
+    const summary = await call('GET', '/summary?month=2024-10', { as: ADM });
     assert.equal(summary.body.data.summary.session_count, 1);
     assert.equal(summary.body.data.summary.total_amount, 55);
   } finally {
@@ -1040,23 +1048,23 @@ test('Monatsgrenze: ein Besuch gehoert zum Monat des Haushalts, nicht zum UTC-Mo
 test('Monatsgrenze: ohne ?month= gilt der laufende Monat des Haushalts', async () => {
   setHouseholdZone('Europe/Berlin');
   // 01.10. 01:00 in Berlin, in UTC noch September.
-  const CLOCK = '2026-09-30T23:00:00.000Z';
-  const septemberTotal = (data) => data.monthly_payments.find((row) => row.month === '2026-09')?.total ?? 0;
+  const CLOCK = '2024-09-30T23:00:00.000Z';
+  const septemberTotal = (data) => data.monthly_payments.find((row) => row.month === '2024-09')?.total ?? 0;
   const baseline = await atClock(CLOCK, () => call('GET', '/dashboard', { as: ADM }));
   const visitId = insertVisitAt(OCTOBER_VISIT_AT);
   try {
     await atClock(CLOCK, async () => {
       const visits = await call('GET', '/visits', { as: ADM });
-      assert.equal(visits.body.data.month, '2026-10');
+      assert.equal(visits.body.data.month, '2024-10');
       assert.deepEqual(visits.body.data.visits.map((v) => v.id), [visitId]);
 
       const summary = await call('GET', '/summary', { as: ADM });
-      assert.equal(summary.body.data.summary.month, '2026-10');
+      assert.equal(summary.body.data.summary.month, '2024-10');
       assert.equal(summary.body.data.summary.session_count, 1);
 
       const dashboard = await call('GET', '/dashboard', { as: ADM });
       assert.equal(dashboard.body.data.visits_this_month, 1, 'die Kachel zaehlt den Besuch im Oktober');
-      const chartRow = dashboard.body.data.monthly_payments.find((row) => row.month === '2026-10');
+      const chartRow = dashboard.body.data.monthly_payments.find((row) => row.month === '2024-10');
       assert.equal(chartRow?.total, 55, 'die Monatsgrafik bucht ihn auf den Oktober');
       assert.equal(septemberTotal(dashboard.body.data), septemberTotal(baseline.body.data),
         'und nicht auf den September');
@@ -1074,7 +1082,7 @@ test('Monatsgrenze: eine am Monatsersten frueh erledigte Aufgabe zaehlt im neuen
     VALUES ('Monatsprobe', 'Flur', 30, ?, ?)
   `).run(OCTOBER_VISIT_AT, ADMIN).lastInsertRowid;
   try {
-    const before = await atClock('2026-10-15T10:00:00.000Z', () => call('GET', '/dashboard', { as: ADM }));
+    const before = await atClock('2024-10-15T10:00:00.000Z', () => call('GET', '/dashboard', { as: ADM }));
     assert.equal(before.body.data.finished_tasks_this_month, 1);
   } finally {
     db.prepare('DELETE FROM housekeeping_decay_tasks WHERE id = ?').run(id);
@@ -1212,7 +1220,8 @@ test('Beleg: jeder Serialisierer maskiert die ID - Arbeiter, Status, Dashboard, 
     assert.equal(checkedOut.status, 200);
     assert.deepEqual(receiptOf(checkedOut.body.data), masked, 'Check-out-Antwort');
 
-    const date = checkedOut.body.data.check_in.slice(0, 10);
+    // Der Tag, den das Formular zeigt: der des Haushalts, nicht der UTC-Tag.
+    const date = utcToWall(checkedOut.body.data.check_in, householdTimeZone(db))?.date;
     const edited = await call('PUT', `/visits/${visitId}`, { as: MEM, body: { date, daily_rate: 40, extras: 0 } });
     assert.equal(edited.status, 200);
     assert.deepEqual(receiptOf(edited.body.data), masked, 'PUT-Antwort');
