@@ -265,11 +265,12 @@ const MS_PER_DAY = 86_400_000;
 /**
  * Alle Fälligkeitstage einer Serie innerhalb eines Monats, aufsteigend.
  *
- * Der Starttag selbst zählt nicht mit: er ist der Eintrag, der die Serie trägt.
+ * Der Starttag selbst zählt nicht mit: dieses Vorkommen ist die erste Buchung,
+ * die die Serie trägt - auch wenn ihr Datum seither einzeln korrigiert wurde.
  * Wochenserien liefern hier mehrere Tage - genau daran hing bisher, dass es
  * keine gab: die Materialisierung kannte nur einen Termin je Monat.
  *
- * @param {string} startDate  YYYY-MM-DD, Datum des Serien-Originals
+ * @param {string} startDate  YYYY-MM-DD, Starttag der Serie (budget_series.start_date)
  * @param {string} interval   'weekly' | 'monthly' | 'yearly'
  * @param {number} count      Anzahl der Einheiten zwischen zwei Vorkommen
  * @param {string} month      YYYY-MM
@@ -305,41 +306,29 @@ export function occurrenceDatesInMonth(startDate, interval, count, month) {
 }
 
 /**
- * Erstellt fehlende Instanzen wiederkehrender Budget-Einträge für den angefragten Monat.
- * Läuft idempotent - bereits vorhandene oder explizit übersprungene Instanzen werden ignoriert.
- *
- * Virtuelle Serien (recurrence_virtual = 1) halten in der Definition bereits den
- * geglätteten Monatsanteil (amount); es wird in JEDEM Monat eine Instanz erzeugt.
- * Nicht-virtuelle Serien erzeugen den vollen Betrag nur in Fälligkeitsmonaten
- * (an den Tagen aus occurrenceDatesInMonth).
- *
- * DIE WERTE KOMMEN AUS DER DEFINITION, NICHT VOM ANKER (#1035). Titel, Betrag,
- * Kategorie, Unterkategorie, Konto, Sichtbarkeit und Zustaendige stehen in
- * `budget_series` / `budget_series_responsibles`; der Anker - die erste, von
- * Hand erfasste Buchung - traegt nur noch seine eigenen. Bis v227 las diese
- * Funktion sie von dort, und deshalb schrieb jede Serien-Aenderung auf eine
- * Buchung, die schon passiert war. Vom Anker kommen weiterhin der Starttag
- * (`date`), der Rhythmus und Ersteller/Eigentuemer, die nie wechseln.
- * @param {import('better-sqlite3-multiple-ciphers').Database} database
- * @param {string} month  YYYY-MM
+ * Die Serien einer Abfrage: Starttag und Werte aus der Definition, Rhythmus
+ * und Eigentuemer vom Anker (#1035, #1545). Ob eine Zeile eine Serie traegt,
+ * sagt die Definition - nicht mehr `recurrence_parent_id IS NULL`, das seit
+ * #1035 nur "von Hand erfasst" heisst.
  */
-export function generateRecurringInstances(database, month) {
-  const [y, m] = month.split('-').map(Number);
-
-  // Alle laufenden Serien, die vor diesem Monat begonnen haben. Ob eine Zeile
-  // eine Serie traegt, sagt die Definition - nicht mehr
-  // `recurrence_parent_id IS NULL`, das seit #1035 nur "von Hand erfasst" heisst.
-  const originals = database.prepare(`
-    SELECT a.id, a.date, a.created_by, a.owner_id,
+const SERIES_SELECT = `
+    SELECT a.id, COALESCE(s.start_date, a.date) AS start_date, a.created_by, a.owner_id,
            a.recurrence_interval, a.recurrence_interval_count,
            a.recurrence_virtual, a.recurrence_confirm,
            s.title, s.amount, s.category, s.subcategory, s.account_id, s.visibility
       FROM budget_series s
       JOIN budget_entries a ON a.id = s.anchor_id
-     WHERE a.is_recurring = 1
-       AND strftime('%Y-%m', a.date) < ?
-  `).all(month);
+     WHERE a.is_recurring = 1`;
 
+/**
+ * Schreibt ein Vorkommen einer Serie an einem Tag - oder nichts, wenn es dort
+ * schon eines gibt oder es geloescht (uebersprungen) wurde. Die eine Stelle,
+ * an der aus einer Definition eine Buchung wird: generateRecurringInstances()
+ * und materializeSeriesStart() teilen sie.
+ * @param {import('better-sqlite3-multiple-ciphers').Database} database
+ * @returns {(orig: object, date: string) => void}
+ */
+function occurrenceWriter(database) {
   const skipStmt = database.prepare(
     'SELECT 1 FROM budget_recurrence_skipped WHERE parent_id = ? AND date = ?'
   );
@@ -359,6 +348,87 @@ export function generateRecurringInstances(database, month) {
     SELECT ?, user_id FROM budget_series_responsibles WHERE anchor_id = ?
   `);
 
+  return (orig, date) => {
+    // Übersprungen (eine gelöschte Instanz) oder schon vorhanden? Beides wird am
+    // Fälligkeitstag geprüft, nicht am Monat: eine Wochenserie hat mehrere pro
+    // Monat, und ein gelöschter Dienstag darf die übrigen nicht mitnehmen.
+    if (skipStmt.get(orig.id, date)) return;
+    if (existsStmt.get(orig.id, date)) return;
+
+    // Materialisierte Instanz erbt Eigentümer + Sichtbarkeit der Serie
+    // (#476/#505). Ohne das würde jede Instanz owner_id=NULL + visibility='shared'
+    // (Spalten-Default) bekommen: eine private Serie würde im Haushalt sichtbar und
+    // für die Eigentümer:in in scope=mine unsichtbar.
+    // Verlangt die Serie eine Bestätigung (#637), entsteht die Buchung als
+    // erwartet: sichtbar und planbar, aber in keiner Summe. Der Ursprung
+    // selbst bleibt eine echte Buchung - er wurde von Hand eingetragen.
+    // Das KONTO gehört in dieselbe Liste (#973): eine Dauerlastschrift geht
+    // jeden Monat vom selben Konto ab. Es fehlte hier, seit es die Spalte
+    // gibt, und die Wirkung war unauffällig, weil nur die erste Buchung von
+    // Hand entsteht - ab dem zweiten Monat trug die Instanz kein Konto, und
+    // wer nach Konto filtert, sah die Serie ab dort nicht mehr.
+    //
+    // AUSSER bei einer virtuellen Serie, und das ist keine Feinheit:
+    // deren Instanzen sind Planwerte, keine Zahlungen. 1200 im Jahr stehen
+    // dort als 100 je Monat, während die Bank einmal 1200 abbucht.
+    // `listAccounts()` summiert jeden nicht-erwarteten Eintrag mit Konto in
+    // den Saldo, und die Instanz trägt kein eigenes `recurrence_virtual` -
+    // die Saldo-Abfrage könnte einen Planwert also gar nicht erkennen.
+    // Gemessen: acht Monate einer virtuellen Jahresserie ergaben -800
+    // Kontosaldo für eine Abbuchung, die noch gar nicht stattgefunden hat.
+    // Ohne Konto bleibt der Saldo exakt so, wie er vor #973 war.
+    const inheritsAccount = orig.recurrence_virtual ? null : (orig.account_id ?? null);
+    const created = insertStmt.run(
+      orig.title, orig.amount, orig.category, orig.subcategory || '', date,
+      orig.id, orig.created_by, orig.owner_id, orig.visibility || 'shared',
+      orig.recurrence_confirm ? 1 : 0, inheritsAccount,
+    );
+
+    // ZUSTAENDIGE ERBEN MIT (#1057). Anders als das Konto gilt das auch fuer
+    // virtuelle Serien: das Etikett bewegt kein Geld, es kann also keinen
+    // Saldo verfaelschen - und "wer kuemmert sich darum" ist am Planwert
+    // genauso richtig wie an der Zahlung. Als eigene Anweisung statt im
+    // INSERT, weil die Zustaendigkeit in einer n:m-Tabelle liegt.
+    copyResponsiblesStmt.run(created.lastInsertRowid, orig.id);
+  };
+}
+
+/**
+ * Erstellt fehlende Instanzen wiederkehrender Budget-Einträge für den angefragten Monat.
+ * Läuft idempotent - bereits vorhandene oder explizit übersprungene Instanzen werden ignoriert.
+ *
+ * Virtuelle Serien (recurrence_virtual = 1) halten in der Definition bereits den
+ * geglätteten Monatsanteil (amount); es wird in JEDEM Monat eine Instanz erzeugt.
+ * Nicht-virtuelle Serien erzeugen den vollen Betrag nur in Fälligkeitsmonaten
+ * (an den Tagen aus occurrenceDatesInMonth).
+ *
+ * DIE WERTE KOMMEN AUS DER DEFINITION, NICHT VOM ANKER (#1035). Titel, Betrag,
+ * Kategorie, Unterkategorie, Konto, Sichtbarkeit und Zustaendige stehen in
+ * `budget_series` / `budget_series_responsibles`; der Anker - die erste, von
+ * Hand erfasste Buchung - traegt nur noch seine eigenen. Bis v227 las diese
+ * Funktion sie von dort, und deshalb schrieb jede Serien-Aenderung auf eine
+ * Buchung, die schon passiert war. Vom Anker kommen weiterhin der Rhythmus und
+ * Ersteller/Eigentuemer, die nie wechseln.
+ *
+ * AUCH DER STARTTAG KOMMT AUS DER DEFINITION (#1545), nicht aus dem Datum der
+ * ersten Buchung. Aus ihm folgt das ganze Raster (Tag im Monat, Wochentag,
+ * "alle N"); stand er am Anker, verschob eine Korrektur NUR der ersten Buchung
+ * jedes Vorkommen, das noch nicht angelegt war. Ohne Starttag (eine Zeile, die
+ * an v229 vorbei entstand) gilt das Datum des Ankers - das Verhalten bis v228.
+ * @param {import('better-sqlite3-multiple-ciphers').Database} database
+ * @param {string} month  YYYY-MM
+ */
+export function generateRecurringInstances(database, month) {
+  const [y, m] = month.split('-').map(Number);
+
+  // Alle laufenden Serien, die vor diesem Monat begonnen haben.
+  const originals = database.prepare(`
+    ${SERIES_SELECT}
+       AND strftime('%Y-%m', COALESCE(s.start_date, a.date)) < ?
+  `).all(month);
+
+  const writeOccurrence = occurrenceWriter(database);
+
   for (const orig of originals) {
     const interval = orig.recurrence_interval || 'monthly';
 
@@ -368,55 +438,31 @@ export function generateRecurringInstances(database, month) {
     // Buchungen die Zahlung wäre.
     const dates = orig.recurrence_virtual
       ? [`${month}-${String(Math.min(
-          parseInt(orig.date.split('-')[2], 10),
+          parseInt(orig.start_date.split('-')[2], 10),
           new Date(Date.UTC(y, m, 0)).getUTCDate(),
         )).padStart(2, '0')}`]
-      : occurrenceDatesInMonth(orig.date, interval, orig.recurrence_interval_count, month);
+      : occurrenceDatesInMonth(orig.start_date, interval, orig.recurrence_interval_count, month);
 
-    for (const date of dates) {
-      // Übersprungen (eine gelöschte Instanz) oder schon vorhanden? Beides wird am
-      // Fälligkeitstag geprüft, nicht am Monat: eine Wochenserie hat mehrere pro
-      // Monat, und ein gelöschter Dienstag darf die übrigen nicht mitnehmen.
-      if (skipStmt.get(orig.id, date)) continue;
-      if (existsStmt.get(orig.id, date)) continue;
-
-      // Materialisierte Instanz erbt Eigentümer + Sichtbarkeit der Serie
-      // (#476/#505). Ohne das würde jede Instanz owner_id=NULL + visibility='shared'
-      // (Spalten-Default) bekommen: eine private Serie würde im Haushalt sichtbar und
-      // für die Eigentümer:in in scope=mine unsichtbar.
-      // Verlangt die Serie eine Bestätigung (#637), entsteht die Buchung als
-      // erwartet: sichtbar und planbar, aber in keiner Summe. Der Ursprung
-      // selbst bleibt eine echte Buchung - er wurde von Hand eingetragen.
-      // Das KONTO gehört in dieselbe Liste (#973): eine Dauerlastschrift geht
-      // jeden Monat vom selben Konto ab. Es fehlte hier, seit es die Spalte
-      // gibt, und die Wirkung war unauffällig, weil nur die erste Buchung von
-      // Hand entsteht - ab dem zweiten Monat trug die Instanz kein Konto, und
-      // wer nach Konto filtert, sah die Serie ab dort nicht mehr.
-      //
-      // AUSSER bei einer virtuellen Serie, und das ist keine Feinheit:
-      // deren Instanzen sind Planwerte, keine Zahlungen. 1200 im Jahr stehen
-      // dort als 100 je Monat, während die Bank einmal 1200 abbucht.
-      // `listAccounts()` summiert jeden nicht-erwarteten Eintrag mit Konto in
-      // den Saldo, und die Instanz trägt kein eigenes `recurrence_virtual` -
-      // die Saldo-Abfrage könnte einen Planwert also gar nicht erkennen.
-      // Gemessen: acht Monate einer virtuellen Jahresserie ergaben -800
-      // Kontosaldo für eine Abbuchung, die noch gar nicht stattgefunden hat.
-      // Ohne Konto bleibt der Saldo exakt so, wie er vor #973 war.
-      const inheritsAccount = orig.recurrence_virtual ? null : (orig.account_id ?? null);
-      const created = insertStmt.run(
-        orig.title, orig.amount, orig.category, orig.subcategory || '', date,
-        orig.id, orig.created_by, orig.owner_id, orig.visibility || 'shared',
-        orig.recurrence_confirm ? 1 : 0, inheritsAccount,
-      );
-
-      // ZUSTAENDIGE ERBEN MIT (#1057). Anders als das Konto gilt das auch fuer
-      // virtuelle Serien: das Etikett bewegt kein Geld, es kann also keinen
-      // Saldo verfaelschen - und "wer kuemmert sich darum" ist am Planwert
-      // genauso richtig wie an der Zahlung. Als eigene Anweisung statt im
-      // INSERT, weil die Zustaendigkeit in einer n:m-Tabelle liegt.
-      copyResponsiblesStmt.run(created.lastInsertRowid, orig.id);
-    }
+    for (const date of dates) writeOccurrence(orig, date);
   }
+}
+
+/**
+ * Legt das Vorkommen AM Starttag einer Serie an (#1545).
+ *
+ * generateRecurringInstances() laesst den Starttag bewusst aus: dieses
+ * Vorkommen ist die erste Buchung, der Anker - auch nachdem ihr Datum einzeln
+ * korrigiert wurde. Verlegt "alle kuenftigen aendern" den Starttag aber,
+ * waehrend die erste Buchung schon gebucht ist, bleibt sie, wo sie war (sie
+ * behaelt ihre Werte, #1035), und der neue Starttag hat keine Buchung. Liegt
+ * er ab heute, entsteht sie hier; was davor liegt, ist gebucht und wird von
+ * einer Serien-Aenderung nicht mehr angefasst.
+ * @param {import('better-sqlite3-multiple-ciphers').Database} database
+ * @param {number} anchorId
+ */
+export function materializeSeriesStart(database, anchorId) {
+  const orig = database.prepare(`${SERIES_SELECT} AND a.id = ?`).get(anchorId);
+  if (orig) occurrenceWriter(database)(orig, orig.start_date);
 }
 
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

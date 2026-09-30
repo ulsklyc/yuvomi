@@ -94,6 +94,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   makes a series private means its past entries too. Existing series are carried over on update
   without changing any entry.
 
+- **Correcting the date of a series' first entry no longer moves the rest of the series** (#1545).
+  Every later occurrence of a recurring payment is counted from its start day, and that was still
+  the date of the first entry. Correcting it with "Only this occurrence" (the rent was debited on
+  the 6th, not the 5th) moved every month not yet shown to the 6th, and for a weekly or "every N"
+  series it changed which days came up at all. A series now keeps its own start day. To move it,
+  change the date on the first entry and choose "Change all future occurrences": the occurrences
+  from today on move to the new day, while the first entry keeps its date once it is booked. On
+  update every series keeps the start day it had, so no date changes.
+
 ## [2.70.0] - 2026-09-30
 
 ### Added

@@ -17,6 +17,8 @@
  *            Router vorbei einfuegt (Demo-Seed, Tests), und raeumen sie beim
  *            Beenden der Serie wieder ab; das Loeschen der ersten Buchung nimmt
  *            sie per CASCADE mit.
+ *        v229 (#1545) gibt der Definition ihren eigenen Starttag, gefuellt aus
+ *        dem Datum der ersten Buchung; geprueft an der echten Kette bis v228.
  * Ausfuehren: node --test test/test-budget-series-migration.js
  */
 
@@ -30,7 +32,7 @@ import { tempDir } from './tmp-dir.js';
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.DB_PATH = join(tempDir('yuvomi-seriesmig-'), 'unused.db');
 const { MIGRATIONS, migrate } = await import('../server/db.js');
-const { generateRecurringInstances } = await import('../server/routes/budget/helpers.js');
+const { generateRecurringInstances, occurrenceDatesInMonth } = await import('../server/routes/budget/helpers.js');
 
 const V = MIGRATIONS.find((m) => m.description === 'Budget: a series keeps its own definition, the first booking is an ordinary entry (#1035)');
 
@@ -96,6 +98,7 @@ test('jede laufende Serie bekommt genau eine Definition mit den Werten ihres Ori
   assert.deepEqual(rent, {
     anchor_id: ids.rent, title: 'Miete', amount: -900, full_amount: null,
     category: 'housing', subcategory: 'rent_mortgage', account_id: giro, visibility: 'shared',
+    start_date: '2020-01-05', // v229 (#1545), aus dem Datum des Originals
   });
   const policy = definition(db, ids.policy);
   assert.equal(policy.amount, -100, 'virtuell: der geglaettete Monatsanteil, wie am Original');
@@ -224,5 +227,102 @@ test('das Loeschen der ersten Buchung nimmt Definition und Zustaendige mit', () 
   db.prepare('DELETE FROM budget_entries WHERE id = ?').run(ids.rent);
   assert.equal(definition(db, ids.rent), undefined);
   assert.equal(db.prepare('SELECT COUNT(*) AS c FROM budget_series_responsibles').get().c, 0);
+  db.close();
+});
+
+// ── v229 (#1545): die Definition bekommt ihren eigenen Starttag ─────────────
+//
+// Bis v228 war der Starttag das Datum der ersten Buchung. v229 legt ihn in die
+// Definition. Geprueft an einer Datenbank, die die echte Kette bis v228
+// gefahren hat - mit einer Serie, deren Definition der v228-Trigger (ohne
+// Starttag) nach der Migration angelegt hat, wie es jede laufende
+// Installation zwischen v228 und v229 tut.
+
+const V229 = MIGRATIONS.find((m) => m.description === 'Budget: a series keeps its own start date (#1545)');
+
+/** Stand direkt vor v229: echte Kette bis v228, Bestand aus legacyDb() plus Nachzuegler. */
+function v228Db() {
+  const fixture = legacyDb();
+  const { db, users } = fixture;
+  migrate(db, MIGRATIONS.filter((m) => m.version < V229.version));
+  // Nach v228 angelegt: die Definition kommt aus dem v228-Trigger.
+  fixture.ids.late = db.prepare(`
+    INSERT INTO budget_entries (title, amount, category, subcategory, date, is_recurring,
+      recurrence_interval, recurrence_interval_count, created_by)
+    VALUES ('Kurs', -25, 'housing', 'utilities', '2024-03-13', 1, 'weekly', 3, ?)
+  `).run(users.a).lastInsertRowid;
+  return fixture;
+}
+
+test('v229: Vorbedingung - angehaengt nach v228', () => {
+  assert.ok(V229, 'Migration fuer #1545 fehlt');
+  assert.ok(V229.version > V.version, `v${V229.version} muss nach v${V.version} kommen`);
+});
+
+test('v229: jede laufende Serie bekommt als Starttag das Datum ihrer ersten Buchung', () => {
+  const { db, ids } = v228Db();
+  assert.equal(
+    db.prepare("SELECT COUNT(*) AS c FROM pragma_table_info('budget_series') WHERE name = 'start_date'").get().c,
+    0, 'vor v229 gibt es die Spalte nicht',
+  );
+  migrate(db, MIGRATIONS);
+  assert.equal(definition(db, ids.rent).start_date, '2020-01-05');
+  assert.equal(definition(db, ids.policy).start_date, '2020-01-09');
+  assert.equal(definition(db, ids.gym).start_date, '2020-01-12');
+  assert.equal(definition(db, ids.late).start_date, '2024-03-13', 'auch die Definition aus dem v228-Trigger');
+  assert.equal(db.prepare('SELECT COUNT(*) AS c FROM budget_series WHERE start_date IS NULL').get().c, 0);
+  db.close();
+});
+
+test('v229: keine Buchung aendert sich, und es entstehen dieselben Vorkommen wie vorher', () => {
+  // "Vorher" ist das Raster aus dem Datum der ersten Buchung - genau das, was
+  // der Leser bis v228 an occurrenceDatesInMonth() gab.
+  const { db, ids } = v228Db();
+  const entriesBefore = everyEntry(db);
+  const anchorDate = (id) => db.prepare('SELECT date FROM budget_entries WHERE id = ?').get(id).date;
+  const expected = [
+    ...occurrenceDatesInMonth(anchorDate(ids.rent), 'monthly', 1, '2031-03').map((date) => [ids.rent, date]),
+    [ids.policy, '2031-03-09'], // virtuell: jeden Monat am Tag des Starts
+    ...occurrenceDatesInMonth(anchorDate(ids.gym), 'weekly', 2, '2031-03').map((date) => [ids.gym, date]),
+    ...occurrenceDatesInMonth(anchorDate(ids.late), 'weekly', 3, '2031-03').map((date) => [ids.late, date]),
+  ].sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1]));
+  assert.ok(expected.length >= 5, 'Miete, Police und zwei Wochenserien');
+
+  migrate(db, MIGRATIONS);
+  assert.deepEqual(everyEntry(db), entriesBefore);
+  generateRecurringInstances(db, '2031-03');
+  const got = db.prepare(`
+    SELECT recurrence_parent_id AS p, date FROM budget_entries
+    WHERE date BETWEEN '2031-03-01' AND '2031-03-31' ORDER BY p, date
+  `).all().map((r) => [r.p, r.date]);
+  assert.deepEqual(got, expected);
+  db.close();
+});
+
+test('v229: ein zweiter Lauf ueberschreibt keinen inzwischen verlegten Starttag', () => {
+  const { db, ids } = v228Db();
+  migrate(db, MIGRATIONS);
+  db.prepare("UPDATE budget_series SET start_date = '2020-01-06' WHERE anchor_id = ?").run(ids.rent);
+  V229.up(db);
+  assert.equal(definition(db, ids.rent).start_date, '2020-01-06');
+  assert.equal(definition(db, ids.gym).start_date, '2020-01-12');
+  db.close();
+});
+
+test('v229: die Trigger nehmen den Starttag aus der Buchung mit', () => {
+  const { db, ids, users } = v228Db();
+  migrate(db, MIGRATIONS);
+  const id = db.prepare(`
+    INSERT INTO budget_entries (title, amount, category, subcategory, date, is_recurring, created_by)
+    VALUES ('Seed', -5, 'housing', 'utilities', '2025-04-17', 1, ?)
+  `).run(users.a).lastInsertRowid;
+  assert.equal(definition(db, id).start_date, '2025-04-17', 'neue Serie');
+  // Beenden und mit anderem Datum neu beginnen: der Neubeginn ist der Starttag.
+  db.prepare('UPDATE budget_entries SET is_recurring = 0 WHERE id = ?').run(ids.rent);
+  db.prepare("UPDATE budget_entries SET is_recurring = 1, date = '2026-02-03' WHERE id = ?").run(ids.rent);
+  assert.equal(definition(db, ids.rent).start_date, '2026-02-03', 'Neubeginn');
+  // Ein Update nur des Datums fasst den Starttag nicht an (#1545).
+  db.prepare("UPDATE budget_entries SET date = '2026-02-04' WHERE id = ?").run(ids.rent);
+  assert.equal(definition(db, ids.rent).start_date, '2026-02-03');
   db.close();
 });

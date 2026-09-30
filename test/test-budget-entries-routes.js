@@ -1238,3 +1238,98 @@ test('GET /?q=: begrenzt die Treffer und sagt es', async () => {
   const leer = await call('GET', '/?q=%20%20');
   assert.equal(leer.status, 400, 'eine leere Suche ist keine Monatsliste ohne Monat');
 });
+
+// ── #1545: die Serie hat ihren eigenen Starttag ─────────────────────────────
+//
+// Bis v228 war der Starttag das Datum der ersten Buchung: occurrenceDatesInMonth()
+// leitet jedes spaetere Vorkommen aus ihm ab. Eine Korrektur NUR der ersten
+// Buchung ("abgebucht am 6., nicht am 5.") verschob deshalb das Raster jedes
+// Vorkommens, das noch nicht angelegt war. Seit v229 steht der Starttag in der
+// Definition; verlegen laesst er sich nur ausdruecklich ueber `start_date`.
+
+const seriesDates = (anchorId, month) => db.prepare(
+  'SELECT date FROM budget_entries WHERE recurrence_parent_id = ? AND date BETWEEN ? AND ? ORDER BY date'
+).all(anchorId, `${month}-01`, `${month}-31`).map((r) => r.date);
+const startOf = (anchorId) => db.prepare('SELECT start_date FROM budget_series WHERE anchor_id = ?').get(anchorId)?.start_date;
+
+test('#1545: Datumskorrektur NUR der ersten Buchung verschiebt keine kuenftigen Vorkommen (monatlich)', async () => {
+  const pid = insertEntry({ title: 'Miete 1545', amount: -900, date: '2000-01-05', is_recurring: 1 });
+  const r = await call('PUT', `/${pid}`, { body: { date: '2000-01-06' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.date, '2000-01-06', 'die Buchung selbst ist korrigiert');
+  await generatedIn('2099-12', pid);
+  assert.deepEqual(seriesDates(pid, '2099-12'), ['2099-12-05'], 'das Raster bleibt am 5.');
+  assert.equal(startOf(pid), '2000-01-05');
+});
+
+test('#1545: Datumskorrektur NUR der ersten Buchung laesst auch das Wochenraster stehen', async () => {
+  // Alle zwei Wochen ab Mittwoch, 5.1.2000 - korrigiert auf Donnerstag, den 6.
+  // Bis v228 lagen danach ALLE kuenftigen Vorkommen auf einem Donnerstag.
+  const pid = insertEntry({ title: 'Kurs 1545', amount: -20, date: '2000-01-05', is_recurring: 1, recurrence_interval: 'weekly' });
+  db.prepare('UPDATE budget_entries SET recurrence_interval_count = 2 WHERE id = ?').run(pid);
+  const before = (await call('PUT', `/${pid}`, { body: { date: '2000-01-06' } })).status;
+  assert.equal(before, 200);
+  await generatedIn('2099-12', pid);
+  const dates = seriesDates(pid, '2099-12');
+  assert.ok(dates.length >= 2);
+  for (const d of dates) {
+    assert.equal(new Date(`${d}T00:00:00Z`).getUTCDay(), 3, `${d} liegt auf einem Mittwoch wie der Starttag`);
+  }
+});
+
+test('#1545: "alle kuenftigen" mit start_date verlegt das Raster, die gebuchte erste Buchung bleibt', async () => {
+  const pid = insertEntry({ title: 'Strom 1545', amount: -80, date: '2000-01-05', is_recurring: 1 });
+  await generatedIn('2099-11', pid);
+  assert.deepEqual(seriesDates(pid, '2099-11'), ['2099-11-05']);
+  const r = await call('PUT', `/${pid}/series`, { body: { start_date: '2000-01-06' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.series.start_date, '2000-01-06');
+  assert.equal(r.body.data.date, '2000-01-05', 'die erste Buchung ist gebucht und behaelt ihr Datum');
+  assert.deepEqual(seriesDates(pid, '2099-11'), [], 'die kuenftige Instanz faellt wie bei einem Rhythmuswechsel');
+  await generatedIn('2099-11', pid);
+  assert.deepEqual(seriesDates(pid, '2099-11'), ['2099-11-06'], 'und entsteht am neuen Tag neu');
+});
+
+test('#1545: `date` im Serien-Body bleibt wirkungslos, nur start_date verlegt den Starttag', async () => {
+  const pid = insertEntry({ title: 'Wasser 1545', amount: -30, date: '2000-01-05', is_recurring: 1 });
+  await generatedIn('2099-10', pid);
+  const r = await call('PUT', `/${pid}/series`, { body: { title: 'Wasser neu', date: '2000-01-09' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.series.start_date, '2000-01-05');
+  assert.deepEqual(seriesDates(pid, '2099-10'), ['2099-10-05']);
+});
+
+test('#1545: liegt die erste Buchung noch vor uns, zieht sie mit dem Starttag mit', async () => {
+  const pid = insertEntry({ title: 'Abo 1545', amount: -10, date: '2099-06-05', is_recurring: 1 });
+  const r = await call('PUT', `/${pid}/series`, { body: { start_date: '2099-06-07' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.date, '2099-06-07');
+  assert.equal(startOf(pid), '2099-06-07');
+  await generatedIn('2099-07', pid);
+  assert.deepEqual(seriesDates(pid, '2099-07'), ['2099-07-07']);
+  assert.deepEqual(seriesDates(pid, '2099-06'), [], 'der Starttag ist die erste Buchung, keine zweite');
+});
+
+test('#1545: ein Starttag ab heute bei gebuchter erster Buchung bekommt sein Vorkommen', async () => {
+  // Der Monatsaufruf legt den Starttag nie an - das ist die erste Buchung. Bleibt
+  // die gebucht stehen, haette der neue Starttag sonst keine Buchung.
+  const pid = insertEntry({ title: 'Garten 1545', amount: -15, date: '2000-01-05', is_recurring: 1 });
+  const r = await call('PUT', `/${pid}/series`, { body: { start_date: '2099-03-06' } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(seriesDates(pid, '2099-03'), ['2099-03-06']);
+  await generatedIn('2099-03', pid);
+  assert.deepEqual(seriesDates(pid, '2099-03'), ['2099-03-06'], 'kein zweites am selben Tag');
+  await generatedIn('2099-02', pid);
+  assert.deepEqual(seriesDates(pid, '2099-02'), [], 'vor dem neuen Starttag entsteht nichts');
+  await generatedIn('2099-04', pid);
+  assert.deepEqual(seriesDates(pid, '2099-04'), ['2099-04-06']);
+});
+
+test('#1545: ein ungueltiger Starttag wird abgewiesen', async () => {
+  const pid = insertEntry({ title: 'Fehler 1545', amount: -1, date: '2000-01-05', is_recurring: 1 });
+  for (const start_date of ['2000-02-30', '05.01.2000', null]) {
+    const r = await call('PUT', `/${pid}/series`, { body: { start_date } });
+    assert.equal(r.status, 400, String(start_date));
+  }
+  assert.equal(startOf(pid), '2000-01-05');
+});

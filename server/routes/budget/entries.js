@@ -21,7 +21,7 @@ import {
   validCategoryKeys, defaultCategory, validateSubcategory, validateAccountRef,
   entryWithLoanMeta, refreshLoanStatus, fromBudgetAmount, bookingFor,
   RESPONSIBLE_USERS_SQL, replaceResponsibles, withResponsibles, responsibleNonMembers,
-  replaceSeriesResponsibles, seedSeriesResponsibles,
+  replaceSeriesResponsibles, seedSeriesResponsibles, materializeSeriesStart,
 } from './helpers.js';
 import { nonMemberMessage } from '../../services/household-members.js';
 
@@ -424,7 +424,8 @@ router.post('/', (req, res) => {
  * jede Buchung der Serie ab heute (Haushaltszone). Was davor liegt, ist gebucht
  * und bleibt - die erste Buchung eingeschlossen (#1035). Einzige Ausnahme ist
  * die Sichtbarkeit, die bewusst für die ganze Serie gilt.
- * Body: wie PUT /:id (date wird ignoriert - der Starttag der Serie bleibt)
+ * Body: wie PUT /:id, dazu optional start_date (YYYY-MM-DD, der Starttag der
+ * Serie, #1545). `date` wird ignoriert: es ist das Datum einer Buchung.
  * Response: { data: Anker-Buchung + series: Definition | null }
  */
 router.put('/:id/series', (req, res) => {
@@ -459,6 +460,7 @@ router.put('/:id/series', (req, res) => {
     if (req.body.recurrence_rule !== undefined) checks.push(rrule(req.body.recurrence_rule, 'Wiederholung'));
     if (req.body.recurrence_interval !== undefined) checks.push(oneOf(req.body.recurrence_interval, RECURRENCE_INTERVAL_KEYS, 'Intervall'));
     if (req.body.recurrence_interval_count !== undefined) checks.push(intervalCountCheck(req.body.recurrence_interval_count));
+    if (req.body.start_date !== undefined) checks.push(validateDate(req.body.start_date, 'start_date', true));
     const errors = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     // EINE SERIEN-AENDERUNG BEENDET DIE SERIE NICHT (#1546).
@@ -582,6 +584,17 @@ router.put('/:id/series', (req, res) => {
     const cutoffDate = todayKey(db.get());
     const anchorAhead = parent.date >= cutoffDate;
 
+    // DER STARTTAG GEHOERT DER DEFINITION (#1545). Er aendert sich nur, wenn
+    // die Anfrage ihn ausdruecklich als `start_date` nennt - nie ueber `date`:
+    // das ist das Datum der Buchung, an der der Dialog offen war, und Clients
+    // haben es hier jahrelang mitgeschickt, weil diese Route es ignorierte.
+    // Ein neuer Starttag verschiebt das Raster und wird deshalb wie ein
+    // geaenderter Rhythmus behandelt (Schritt 4). Die erste Buchung zieht mit,
+    // solange sie selbst noch vor uns liegt - wie ihre Werte in Schritt 2.
+    const currentStart = series?.start_date ?? parent.date;
+    const finalStart   = req.body.start_date !== undefined ? req.body.start_date : currentStart;
+    const startChanged = finalStart !== currentStart;
+
     db.get().transaction(() => {
       // 1. Der Anker: Rhythmus und Serienschalter immer - sie haben nur eine
       //    Bedeutung. Beendet `is_recurring = 0` die Serie, raeumt der Trigger
@@ -600,7 +613,8 @@ router.put('/:id/series', (req, res) => {
       `).run(finalRecurring, finalRrule, finalInterval, finalCount, finalVirtual,
              finalConfirm, nextVisibility, parentId);
 
-      // 2. Seine WERTE nur, wenn er noch nicht gebucht ist.
+      // 2. Seine WERTE nur, wenn er noch nicht gebucht ist - und mit ihnen
+      //    sein Datum, wenn der Starttag sich aendert (#1545).
       if (anchorAhead) {
         db.get().prepare(`
           UPDATE budget_entries SET
@@ -609,10 +623,12 @@ router.put('/:id/series', (req, res) => {
             category               = ?,
             subcategory            = ?,
             recurrence_full_amount = ?,
-            account_id             = CASE WHEN ? = 1 THEN ? ELSE account_id END
+            account_id             = CASE WHEN ? = 1 THEN ? ELSE account_id END,
+            date                   = CASE WHEN ? = 1 THEN ? ELSE date END
           WHERE id = ?
         `).run(finalTitle, storeAmount, finalCategory, finalSubcat, finalFull,
-               accountProvided ? 1 : 0, accountValue, parentId);
+               accountProvided ? 1 : 0, accountValue,
+               startChanged ? 1 : 0, finalStart, parentId);
       }
 
       // 3. Die Definition - die Vorlage fuer jedes Vorkommen, das noch entsteht.
@@ -625,10 +641,11 @@ router.put('/:id/series', (req, res) => {
           subcategory = ?,
           visibility  = COALESCE(?, visibility),
           account_id  = CASE WHEN ? = 1 THEN ? ELSE account_id END,
+          start_date  = ?,
           updated_at  = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
         WHERE anchor_id = ?
       `).run(finalTitle, storeAmount, finalFull, finalCategory, finalSubcat, nextVisibility,
-             accountProvided ? 1 : 0, accountValue, parentId);
+             accountProvided ? 1 : 0, accountValue, finalStart, parentId);
 
       // 4. Die vorhandenen Instanzen ab heute.
       //
@@ -649,12 +666,19 @@ router.put('/:id/series', (req, res) => {
         || finalCount !== parent.recurrence_interval_count
         || finalVirtual !== parent.recurrence_virtual
         || finalRrule !== parent.recurrence_rule
-        || finalRecurring !== parent.is_recurring;
+        || finalRecurring !== parent.is_recurring
+        || startChanged;
 
       if (rhythmChanged) {
         db.get().prepare(`
           DELETE FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ?
         `).run(parentId, cutoffDate);
+        // Ein verlegter Starttag bei schon gebuchter erster Buchung: das
+        // Vorkommen am neuen Starttag legt kein Monatsaufruf an (siehe
+        // materializeSeriesStart), also hier - wenn es ab heute liegt.
+        if (startChanged && !anchorAhead && finalStart >= cutoffDate) {
+          materializeSeriesStart(db.get(), parentId);
+        }
       } else {
         // `account_id` folgt derselben CASE-Form wie an der Definition: ein
         // nicht mitgesendetes Feld lässt die Zuordnung in Ruhe. Eine virtuelle
@@ -715,7 +739,7 @@ router.put('/:id/series', (req, res) => {
 
     const updated = entryWithLoanMeta(parentId);
     const definition = db.get().prepare(`
-      SELECT title, amount, full_amount, category, subcategory, account_id, visibility
+      SELECT title, amount, full_amount, category, subcategory, account_id, visibility, start_date
         FROM budget_series WHERE anchor_id = ?
     `).get(parentId) ?? null;
     res.json({ data: {
@@ -938,7 +962,8 @@ router.put('/:id', (req, res) => {
     // Wird eine Einzelbuchung hier zur Serie, ist sie deren Vorlage (#1035) -
     // die Werte uebernimmt der Trigger aus v228, die Zustaendigen dieser Aufruf.
     // Eine Buchung, die schon Serie WAR, bleibt dagegen nur Buchung: ihre Werte
-    // aendern hier die erste Buchung, nicht die Definition.
+    // aendern hier die erste Buchung, nicht die Definition - ihr Datum
+    // eingeschlossen, der Starttag steht in der Definition (#1545).
     if (!entry.is_recurring && finalRecurring && entry.recurrence_parent_id == null) {
       seedSeriesResponsibles(id);
     }
