@@ -461,6 +461,9 @@ npm run test:installer-a11y  # Zielgrößen, Kontrast und Fokus des Web-Installe
 # ANGEZEIGTEN Monats, nicht auf irgendeinen Chip: die alte Fassung war im September gruen
 # ueber der Stammzeile am 15.09. (kein Vorkommen) und lief ab dem Monatswechsel ins
 # Timeout. Gegen den Stand ohne Neuladen nach dem Anlegen einer Serie rot.
+# Daneben zwei Faelle fuer dieses Neuladen: scheitert das GET danach oder kommt es aus dem
+# SW-Cache (`x-cached-at`), steht die neue Serie trotzdem als Stammzeile an ihrem Beginn.
+# Gegen den Stand ohne Rueckfall beide rot, mit `fresh = true` statt `!fromCache` der Cache-Fall.
 ```
 
 ## Focused linked occurrence suite
