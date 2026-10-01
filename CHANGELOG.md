@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The mobile tab bar is more glass and lets more of the page show through.** The floating
+  capsule at the bottom of the screen is thinner (66 % instead of 86 % in light, 50 % instead of
+  88 % in dark), blurs and saturates what scrolls beneath it more strongly, and carries a light
+  sheen and a finer bright rim. Tab labels are now in the main text color, so they stay readable
+  over photos and colored cards; the active tab keeps its violet label, filled icon and pill.
+  With reduced transparency or increased contrast turned on, and in browsers without backdrop
+  blur, the capsule stays opaque as before.
+
 ### Fixed
 
 - **Correcting the date of a series' first entry no longer moves the rest of the series** (#1545).
@@ -29,6 +39,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   under the button. The same happened after "Try again" on an overview that had failed to load.
   In both cases the button now takes its usual place next to the tab bar. Entering wall mode no
   longer leaves the plus button on the wall while the overview loads.
+
+- **The task list orders a day's tasks by the household's clock, not the device's.** The order
+  inside a group and a board column read the due time in the device's time zone. On a device whose
+  zone skips an hour for daylight saving time, a task due in that hour moved an hour later and
+  showed up after a task due later the same day, even when the household's own zone has no such gap
+  that day. The order now compares the due date and time as entered, and "now" is the household's
+  time, like the due label and the grouping next to it.
+
+- **A task's "Starts on" badge follows the household's day.** The badge on a task without a due
+  date compared its start date with midnight on the device. On a device in another time zone it
+  stayed on a task that had already started in the household, or left too early. The date in the
+  badge could also show the day before, for example with the device in Berlin and the household
+  set to Honolulu.
 
 - **The command-line installer takes the answer its own prompt shows.** In German, Swedish, Dutch,
   Spanish, Portuguese, Italian, French, Polish, Czech and Turkish the yes/no questions show the
