@@ -2420,6 +2420,7 @@ test('wer an der Frische haengt UND offline gecacht wird, liest ueber getWithSou
     /const pending[A-Z]\w*\s*=\s*new Map\(/, // aeltere Schreibweise desselben
     /const settledAt\s*=\s*new Map\(/,       // Bestaetigungszeit je Eintrag
     /^\s*\w*[sS]tale:\s/m,                   // Referenzlisten mit Frische-Flag
+    /\{\s*fresh:\s/,                         // Ladeergebnis mit Frische-Flag
   ];
 
   const sw = read('../public/sw.js');

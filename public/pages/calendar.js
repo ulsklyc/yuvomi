@@ -1940,6 +1940,12 @@ async function openTaskFromCalendar(taskId) {
   }
 }
 
+/** Steht die Serie mit dieser Stamm-ID im Zustand, als Stammzeile oder Vorkommen? */
+function includesSeries(events, seriesId) {
+  const id = Number(seriesId);
+  return events.some((ev) => Number(ev.series_id ?? ev.id) === id || Number(ev.id) === id);
+}
+
 /**
  * Nur die Kalender-Events der aktuell gewählten Ansicht neu laden (ohne Tasks/Feiertage).
  * Für serienweite Bearbeitungen (#532), bei denen sich lediglich die Expansion
@@ -1947,14 +1953,29 @@ async function openTaskFromCalendar(taskId) {
  * Die Ansicht wird aus Cursor + View neu berechnet statt aus rangeFrom/rangeTo
  * gelesen: ein Delete-Commit kann genau während eines Navigations-Loads fällig
  * werden, und dann gehört die autoritative Antwort bereits zum neuen Cursor.
+ *
+ * `fresh` ist nur wahr, wenn eine Netzantwort angekommen UND angewendet ist: ein
+ * Fehler, ein Cache-Treffer des Service Workers oder eine von einem neueren Laden
+ * ueberholte Antwort lassen den Aufrufer wissen, dass sein Schreibvorgang im
+ * Zustand womoeglich fehlt.
+ * @returns {Promise<{fresh: boolean}>}
  */
 async function reloadCalendarEventsOnly() {
+  let fresh = false;
+  let applied = false;
   try {
     const { from, to } = getRangeForView(state.view, state.cursor);
     const selection = { view: state.view, cursor: state.cursor, from, to };
     const win = fetchWindow(from, to);
-    await calendarLoads.run(
-      () => api.get(`/calendar?from=${win.from}&to=${win.to}`),
+    applied = await calendarLoads.run(
+      async () => {
+        // Die Herkunft gehoert zum Ergebnis: eine Antwort aus dem Offline-Cache
+        // des Service Workers ist ein Stand von VOR dem Schreibvorgang, der
+        // dieses Neuladen ausgeloest hat.
+        const { data, fromCache } = await api.getWithSource(`/calendar?from=${win.from}&to=${win.to}`);
+        fresh = !fromCache;
+        return data;
+      },
       {
         isCurrent: () => {
           const selected = getRangeForView(state.view, state.cursor);
@@ -1971,7 +1992,9 @@ async function reloadCalendarEventsOnly() {
     );
   } catch (err) {
     console.error('[Calendar] reloadCalendarEventsOnly Fehler:', err);
+    return { fresh: false };
   }
+  return { fresh: applied && fresh };
 }
 
 /**
@@ -8056,10 +8079,21 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     // Serien-Scopes ändern die Expansion (Split/EXDATE): danach den sichtbaren
     // Bereich neu laden, damit der Server korrekt expandiert (#532).
     let reloadAfter = false;
+    let createdSeries = null;
 
     if (mode === 'create') {
       const res = await api.post('/calendar', body);
-      state.events.push(res.data);
+      // Eine neue Serie ist erst nach der Expansion des Servers darstellbar:
+      // die Antwort ist die Stammzeile, und ihr Beginn muss kein Vorkommen sein
+      // (Beginn 15., BYMONTHDAY=-1 -> erstes Vorkommen am Monatsletzten). Sie
+      // anzuhaengen zeigte einen Chip auf einem Tag ohne Termin und keines der
+      // echten Vorkommen, bis zur naechsten Navigation.
+      if (body.recurrence_rule) {
+        reloadAfter = true;
+        createdSeries = res.data;
+      } else {
+        state.events.push(res.data);
+      }
       savedEventId = res.data?.id;
     } else {
       const localRecurring = isLocalRecurringSeries(event);
@@ -8154,7 +8188,14 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     if (savedEventId) refreshReminders();
 
     if (reloadAfter) {
-      await reloadCalendarEventsOnly();
+      const reload = await reloadCalendarEventsOnly();
+      // Scheitert das Neuladen oder kommt es aus dem Cache, kennt der Zustand
+      // die neue Serie nicht. Dann steht sie wie vor dem Neuladen als
+      // Stammzeile an ihrem Beginn - lieber dort als gar nicht, bis die
+      // naechste Navigation die Vorkommen holt.
+      if (createdSeries && !reload.fresh && !includesSeries(state.events, createdSeries.id)) {
+        state.events.push(createdSeries);
+      }
     }
 
     closeModal({ force: true });

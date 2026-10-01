@@ -741,8 +741,18 @@ test('PR2 #975 - das zusammengesetzte Kalenderformular und seine Seriennamen ble
       'nach dem Umschalten bestimmt das echte Ganztagsfeld die Vorschau');
 
     await page.click('#modal-save');
-    await page.waitForFunction((eventTitle) => [...document.querySelectorAll('.month-day__event span')]
-      .some((el) => el.textContent === eventTitle), {}, title);
+    // Die Serie beginnt am 15.09. mit BYMONTHDAY=-1: ihr erstes Vorkommen ist der
+    // 30.09., der 15.09. selbst ist keines. Jeder Monat ab dann traegt eines an
+    // seinem letzten Tag - dort muss die neue Serie stehen, ohne Neuladen. Bis
+    // hierhin stand nach dem Anlegen nur die Stammzeile auf ihrem Beginn im
+    // Raster: im September als Chip am 15.09. (kein Vorkommen, aber die alte
+    // Fassung dieser Sonde wartete genau darauf), ab Oktober gar nicht mehr.
+    await page.waitForFunction((eventTitle) => {
+      const inMonth = [...document.querySelectorAll('.month-day:not(.month-day--outside)')];
+      const lastDay = inMonth.at(-1);
+      return Boolean(lastDay) && [...lastDay.querySelectorAll('.month-day__event span')]
+        .some((el) => el.textContent === eventTitle);
+    }, {}, title);
     const monthA11y = await page.evaluate((eventTitle) => {
       const chip = [...document.querySelectorAll('.month-day__event')]
         .find((el) => el.querySelector('span:last-child')?.textContent === eventTitle);
@@ -770,6 +780,70 @@ test('PR2 #975 - das zusammengesetzte Kalenderformular und seine Seriennamen ble
     await page.close();
   }
 });
+
+/* Eine neue Serie laedt nach dem Anlegen den sichtbaren Bereich neu, statt die
+ * Stammzeile anzuhaengen (siehe die Sonde darueber). Dieses Neuladen darf sie
+ * nicht verlieren: scheitert das GET nach dem POST, oder kommt es aus dem
+ * Offline-Cache des Service Workers (`x-cached-at`, ein Stand von VOR dem
+ * Anlegen), steht die Serie danach trotzdem im Zustand - als Stammzeile an
+ * ihrem Beginn, wie vor dem Neuladen. Sonst schloss der Dialog mit "Termin
+ * erstellt", und der Termin fehlte bis zur naechsten Navigation ganz. */
+for (const [name, answer] of [
+  ['GET scheitert', (req) => req.abort('failed')],
+  ['GET kommt aus dem Cache', (req) => req.respond({
+    status: 200,
+    contentType: 'application/json',
+    headers: { 'x-cached-at': String(Date.now() - 60_000) },
+    body: JSON.stringify({ data: [] }),
+  })],
+]) {
+  test(`neue Serie bleibt sichtbar, wenn das Neuladen danach nichts Frisches liefert (${name})`, async () => {
+    const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+    const title = `Serie ohne Neuladen ${randomUUID().slice(0, 8)}`;
+    try {
+      await gotoRoute(page, '/calendar');
+      await page.click('#cal-view-tab-day');
+      await page.waitForSelector('#cal-view-tab-day[aria-selected="true"]');
+      await page.click('#fab-new-event');
+      await page.waitForSelector('#modal-title');
+      await page.evaluate((eventTitle) => {
+        const change = (el) => el.dispatchEvent(new Event('change', { bubbles: true }));
+        document.querySelector('#modal-title').value = eventTitle;
+        for (const [selector, value] of [['#modal-start-time', '10:00'], ['#modal-end-time', '11:00']]) {
+          const el = document.querySelector(selector);
+          el.value = value;
+          change(el);
+        }
+        const freq = document.querySelector('#event-rrule-freq');
+        freq.value = 'WEEKLY';
+        change(freq);
+      }, title);
+
+      let posted = false;
+      let answered = 0;
+      page.__yuvomiRequestInterceptor = (req) => {
+        const url = new URL(req.url());
+        if (url.pathname !== '/api/v1/calendar') return false;
+        if (req.method() === 'POST') { posted = true; return false; }
+        if (req.method() !== 'GET' || !posted || answered > 0) return false;
+        answered += 1;
+        answer(req);
+        return true;
+      };
+      const created = page.waitForResponse((res) => res.request().method() === 'POST'
+        && new URL(res.url()).pathname === '/api/v1/calendar');
+      await page.click('#modal-save');
+      const id = (await (await created).json()).data.id;
+      await page.waitForFunction(() => !document.querySelector('#modal-title'));
+      assert.equal(answered, 1, 'das Neuladen nach dem Anlegen muss die praeparierte Antwort bekommen haben');
+      const shown = await page.evaluate((eventId) => document.querySelectorAll(`[data-id="${eventId}"]`).length, id);
+      assert.ok(shown > 0, `die neue Serie ${id} fehlt in der Tagesansicht ihres Beginns`);
+    } finally {
+      page.__yuvomiRequestInterceptor = null;
+      await page.close();
+    }
+  });
+}
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Sonde 1: Kopf-Ueberlauf
