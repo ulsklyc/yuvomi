@@ -447,8 +447,14 @@ test('jeder Weg zu einer bestehenden Aufgabe führt in die Detailansicht', async
   // der Schwelle ueber EINEN Weg (`openTaskSheet`, zugleich `openNarrow` des
   // Bausteins); ab der Schwelle zeichnet `renderTaskPane` dieselbe Ansicht in
   // die Detailspalte - mit `{ pane }`, also nicht als Sheet.
+  //
+  // Verlauf in Liste + Detail (#1550): ein Verlaufseintrag hat keinen eigenen
+  // Aufruf mehr, er geht durch denselben Baustein (`openHistoryEntry` ->
+  // `taskMd.open`, darunter `openTaskSheet`) - daher einer weniger.
   const detailCalls = [...src.matchAll(/^\s+openTaskView\(task, reminder, container\);$/gm)];
-  assert.equal(detailCalls.length, 4, 'Kanban, Verlauf, Wischen und openTaskSheet (Listenzeile/Stift/Deep-Link)');
+  assert.equal(detailCalls.length, 3, 'Kanban, Wischen und openTaskSheet (Listenzeile/Stift/Deep-Link/Verlauf)');
+  assert.match(src, /function openHistoryEntry\(id, trigger, container\) \{\n  if \(taskMd\) taskMd\.open\(id, trigger\);\n  else openTaskSheet\(id, container\);/,
+    'der Verlauf fuehrt ueber den Baustein bzw. openTaskSheet in dieselbe Ansicht');
   assert.match(src, /openTaskView\(task, reminder, container, \{ pane: body \}\)/,
     'die Detailspalte zeigt dieselbe Leseansicht, nicht eine eigene');
 
