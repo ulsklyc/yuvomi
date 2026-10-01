@@ -35,8 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   local letter - `[j/N]`, `[s/N]`, `[e/H]` - but `install.sh` only understood `y`, so typing `j`
   for the weather widget, calendar sync or document storage silently answered no. Turkish `h` at
   the final "proceed?" did not cancel, and the Czech and Dutch letter for entering a key by hand
-  generated one instead. Every language now accepts its own letter and word as well as `y`/`yes`
-  and `n`/`no`.
+  generated one instead. Every language now accepts the letter its prompt shows and its own word
+  for yes and no - `ja`, `sí`, `да`, `はい`, `نعم` and so on, also typed in capitals - as well as
+  `y`/`yes` and `n`/`no`.
 - **The command-line installer now gets through all seven steps, on macOS as well.** The
   interactive setup ended without a message right after the prerequisite check, and after the
   summary it stopped before writing `.env`. On macOS two more stops were waiting behind those:

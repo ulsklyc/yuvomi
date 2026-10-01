@@ -108,9 +108,10 @@ MSG_document_google_drive_client_secret="  Παράκαμψη μυστικού �
 MSG_document_google_drive_err_pair="Το αναγνωριστικό και το μυστικό πελάτη του Google Drive πρέπει είτε να οριστούν και τα δύο είτε να παραμείνουν και τα δύο κενά."
 MSG_document_google_drive_err_credentials="Το Google Drive χρειάζεται δικό του ζεύγος OAuth ή ρυθμισμένα διαπιστευτήρια Google Calendar."
 MSG_review_document_google_drive="Έγγραφα Google Drive"
-# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst: klein, durch
-# Leerzeichen getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein
-# Prompt in [x/N], [X/n] oder [M] zeigt, muss hier stehen (test:installer-cli-i18n).
-MSG_yes_chars="y yes"
-MSG_no_chars="n no"
+# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst, durch Leerzeichen
+# getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein Prompt in [x/N],
+# [X/n] oder [M] zeigt, muss hier stehen. Gross/klein faltet install.sh nur fuer A-Z: ein Wort
+# mit anderen Zeichen steht auch in Grossbuchstaben und gross geschrieben da (test:installer-cli-i18n).
+MSG_yes_chars="ναι ΝΑΙ Ναι"
+MSG_no_chars="όχι οχι Όχι ΟΧΙ Οχι"
 MSG_manual_chars="m"

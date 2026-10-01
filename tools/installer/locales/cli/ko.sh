@@ -108,9 +108,10 @@ MSG_document_google_drive_client_secret="  재정의할 클라이언트 시크�
 MSG_document_google_drive_err_pair="Google Drive 클라이언트 ID와 시크릿은 둘 다 설정하거나 둘 다 비워 두어야 합니다."
 MSG_document_google_drive_err_credentials="Google Drive에는 자체 OAuth 자격 증명 쌍 또는 구성된 Google 캘린더 자격 증명이 필요합니다."
 MSG_review_document_google_drive="Google Drive 문서"
-# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst: klein, durch
-# Leerzeichen getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein
-# Prompt in [x/N], [X/n] oder [M] zeigt, muss hier stehen (test:installer-cli-i18n).
-MSG_yes_chars="y yes"
-MSG_no_chars="n no"
+# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst, durch Leerzeichen
+# getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein Prompt in [x/N],
+# [X/n] oder [M] zeigt, muss hier stehen. Gross/klein faltet install.sh nur fuer A-Z: ein Wort
+# mit anderen Zeichen steht auch in Grossbuchstaben und gross geschrieben da (test:installer-cli-i18n).
+MSG_yes_chars="예 네"
+MSG_no_chars="아니요 아니오"
 MSG_manual_chars="m"

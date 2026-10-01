@@ -108,9 +108,10 @@ MSG_document_google_drive_client_secret="  Własny klucz tajny klienta (pusty u�
 MSG_document_google_drive_err_pair="Identyfikator klienta i klucz tajny Google Drive muszą być ustawione razem albo oba pozostawione puste."
 MSG_document_google_drive_err_credentials="Google Drive wymaga własnej pary OAuth albo skonfigurowanych danych logowania Kalendarza Google."
 MSG_review_document_google_drive="Dokumenty Google Drive"
-# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst: klein, durch
-# Leerzeichen getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein
-# Prompt in [x/N], [X/n] oder [M] zeigt, muss hier stehen (test:installer-cli-i18n).
+# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst, durch Leerzeichen
+# getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein Prompt in [x/N],
+# [X/n] oder [M] zeigt, muss hier stehen. Gross/klein faltet install.sh nur fuer A-Z: ein Wort
+# mit anderen Zeichen steht auch in Grossbuchstaben und gross geschrieben da (test:installer-cli-i18n).
 MSG_yes_chars="t tak"
 MSG_no_chars="n nie"
 MSG_manual_chars="m"

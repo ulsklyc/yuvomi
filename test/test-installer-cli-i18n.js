@@ -239,6 +239,18 @@ for (const bin of BASHES) {
       ['is_no', 'tr', 'h', 'yes'], ['is_no', 'tr', 'H', 'yes'], ['is_no', 'tr', 'e', 'no'],
       ['is_manual', 'en', 'M', 'yes'], ['is_manual', 'en', '', 'no'], ['is_manual', 'en', 'g', 'no'],
       ['is_manual', 'nl', 'h', 'yes'], ['is_manual', 'cs', 'R', 'yes'], ['is_manual', 'cs', 'g', 'no'],
+      // Gross geschrieben ausserhalb von A-Z: tr faltet das nicht, die Locale fuehrt es.
+      ['is_yes', 'es', 'SÍ', 'yes'], ['is_yes', 'es', 'Sí', 'yes'], ['is_yes', 'it', 'SÌ', 'yes'],
+      ['is_no', 'pt', 'NÃO', 'yes'], ['is_no', 'pt-BR', 'Não', 'yes'],
+      ['is_no', 'tr', 'HAYİR', 'yes'], ['is_no', 'tr', 'HAYIR', 'yes'], ['is_no', 'tr', 'Hayır', 'yes'],
+      ['is_yes', 'ru', 'ДА', 'yes'], ['is_yes', 'ru', 'Да', 'yes'], ['is_no', 'ru', 'НЕТ', 'yes'],
+      ['is_yes', 'ru', 'НЕТ', 'no'], ['is_yes', 'el', 'ΝΑΙ', 'yes'], ['is_no', 'el', 'Όχι', 'yes'],
+      ['is_yes', 'uk', 'ТАК', 'yes'], ['is_no', 'vi', 'KHÔNG', 'yes'],
+      // Eigene Schrift: die Woerter der Sprache, nicht nur y/n.
+      ['is_yes', 'ar', 'نعم', 'yes'], ['is_no', 'ar', 'لا', 'yes'], ['is_no', 'fa', 'خیر', 'yes'],
+      ['is_yes', 'hi', 'हाँ', 'yes'], ['is_yes', 'ja', 'はい', 'yes'], ['is_no', 'ja', 'いいえ', 'yes'],
+      ['is_yes', 'ko', '네', 'yes'], ['is_yes', 'zh', '是', 'yes'], ['is_no', 'zh', '否', 'yes'],
+      ['is_yes', 'zh', '否', 'no'], ['is_yes', 'ru', 'y', 'yes'], ['is_no', 'ja', 'n', 'yes'],
     ];
     const wrong = cases
       .map(([fn, locale, input, want]) => [fn, locale, input, want, answer(bin, fn, locale, input)])
@@ -253,6 +265,10 @@ function localeValues(locale) {
   const src = readFileSync(new URL(`${locale}.sh`, CLI_LOCALES_DIR), 'utf8');
   return new Map([...src.matchAll(/^(MSG_[A-Za-z0-9_]+)="(.*)"$/gm)].map(m => [m[1], m[2]]));
 }
+
+/** answer_matches in JS: roh oder nur A-Z gefaltet (LC_ALL=C tr A-Z a-z). */
+const asciiLower = s => s.replace(/[A-Z]/g, c => c.toLowerCase());
+const accepts = (words, input) => words.has(input) || words.has(asciiLower(input));
 
 /** Was is_yes/is_no/is_manual in dieser Locale annehmen - Spiegel des Helfers. */
 function acceptedWords(values) {
@@ -284,9 +300,9 @@ test('jeder Ja/Nein-Prompt nimmt die Buchstaben an, die er anzeigt', () => {
       const m = value.match(PROMPT);
       if (!m) continue;
       prompts++;
-      const [yes, no] = [m[1].toLowerCase(), m[2].toLowerCase()];
-      if (!accepted.yes.has(yes)) offenders.push(`${locale}.sh ${key}: zeigt "${m[1]}" als Ja, MSG_yes_chars nimmt es nicht an`);
-      if (!accepted.no.has(no)) offenders.push(`${locale}.sh ${key}: zeigt "${m[2]}" als Nein, MSG_no_chars nimmt es nicht an`);
+      const [yes, no] = [m[1], m[2]];
+      if (!accepts(accepted.yes, yes)) offenders.push(`${locale}.sh ${key}: zeigt "${m[1]}" als Ja, MSG_yes_chars nimmt es nicht an`);
+      if (!accepts(accepted.no, no)) offenders.push(`${locale}.sh ${key}: zeigt "${m[2]}" als Nein, MSG_no_chars nimmt es nicht an`);
     }
     if (prompts !== expected) offenders.push(`${locale}.sh: ${prompts} Ja/Nein-Prompts erkannt, en.sh hat ${expected}`);
     const both = [...accepted.yes].filter(w => accepted.no.has(w));
@@ -295,16 +311,59 @@ test('jeder Ja/Nein-Prompt nimmt die Buchstaben an, die er anzeigt', () => {
   assert.deepEqual(offenders, [], offenders.join('\n'));
 });
 
+// Gross/klein faltet install.sh nur fuer A-Z (bash 3.2 kennt ${x,,} nicht, tr
+// faltet je nach System verschieden). Ein Wort mit anderen Zeichen muss deshalb
+// auch in Grossbuchstaben und gross geschrieben in der Liste stehen - sonst ist
+// `SÍ`, `НЕТ` oder das tuerkische `HAYİR` still eine andere Antwort.
+test('jedes Antwortwort wird auch gross geschrieben angenommen', () => {
+  const offenders = [];
+  for (const locale of SUPPORTED_LOCALES) {
+    const values = localeValues(locale);
+    for (const key of ['MSG_yes_chars', 'MSG_no_chars', 'MSG_manual_chars']) {
+      const words = new Set((values.get(key) ?? '').split(/\s+/).filter(Boolean));
+      for (const w of words) {
+        const variants = [w.toLocaleUpperCase(locale), w[0].toLocaleUpperCase(locale) + w.slice(1)];
+        for (const v of variants) {
+          if (!accepts(words, v)) offenders.push(`${locale}.sh ${key}: "${w}" fehlt als "${v}"`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], offenders.join('\n'));
+});
+
+// Eine Locale, deren Liste nur y/yes bzw. n/no traegt, nimmt das Wort ihrer
+// eigenen Sprache nicht an - so standen ar, el, fa, hi, ja, ru, uk und zh da.
+test('jede Locale nimmt ihr eigenes Ja und Nein an, nicht nur y/n', () => {
+  const PLACEHOLDER = new Set(['y', 'yes', 'n', 'no']);
+  // Ausnahmen, in denen das englische Wort das eigene ist: "no" heisst auf
+  // Spanisch und Italienisch nein. Wird ein Eintrag ueberfluessig, meldet der
+  // Test das, damit die Karte nicht still waechst.
+  const SAME_AS_ENGLISH = new Set(['es MSG_no_chars', 'it MSG_no_chars']);
+  const offenders = [];
+  for (const locale of SUPPORTED_LOCALES.filter(l => l !== REFERENCE)) {
+    const values = localeValues(locale);
+    for (const key of ['MSG_yes_chars', 'MSG_no_chars']) {
+      const words = (values.get(key) ?? '').split(/\s+/).filter(Boolean);
+      const onlyPlaceholder = !words.some(w => !PLACEHOLDER.has(w));
+      const excepted = SAME_AS_ENGLISH.has(`${locale} ${key}`);
+      if (onlyPlaceholder && !excepted) offenders.push(`${locale}.sh ${key}: nur ${words.join(' ') || '(leer)'}`);
+      if (!onlyPlaceholder && excepted) offenders.push(`${locale}.sh ${key}: Ausnahme in SAME_AS_ENGLISH ist ueberfluessig`);
+    }
+  }
+  assert.deepEqual(offenders, [], offenders.join('\n'));
+});
+
 test('die Schluesselwahl nimmt den angezeigten Buchstaben fuer "manuell" an', () => {
   const offenders = [];
   for (const locale of SUPPORTED_LOCALES) {
     const values = localeValues(locale);
-    const letters = [...(values.get('MSG_secrets_choice') ?? '').matchAll(/\[(\p{L})\]/gu)].map(m => m[1].toLowerCase());
+    const letters = [...(values.get('MSG_secrets_choice') ?? '').matchAll(/\[(\p{L})\]/gu)].map(m => m[1]);
     if (letters.length < 2) { offenders.push(`${locale}.sh: MSG_secrets_choice zeigt keine zwei [X]-Buchstaben`); continue; }
     const [generate, manual] = letters;
     const accepted = acceptedWords(values).manual;
-    if (!accepted.has(manual)) offenders.push(`${locale}.sh: zeigt "${manual}" fuer manuell, MSG_manual_chars nimmt es nicht an`);
-    if (accepted.has(generate)) offenders.push(`${locale}.sh: "${generate}" steht fuer Generieren und gilt trotzdem als manuell`);
+    if (!accepts(accepted, manual)) offenders.push(`${locale}.sh: zeigt "${manual}" fuer manuell, MSG_manual_chars nimmt es nicht an`);
+    if (accepts(accepted, generate)) offenders.push(`${locale}.sh: "${generate}" steht fuer Generieren und gilt trotzdem als manuell`);
   }
   assert.deepEqual(offenders, [], offenders.join('\n'));
 });

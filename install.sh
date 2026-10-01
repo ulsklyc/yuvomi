@@ -73,14 +73,20 @@ t() {
 # `n` und `m`: wer auf Deutsch der Anzeige folgte und "j" tippte, bekam still
 # ein Nein, und auf Tuerkisch brach "h" die Zusammenfassung nicht ab. y/yes,
 # n/no und m gelten immer, dazu die Woerter aus MSG_yes_chars, MSG_no_chars und
-# MSG_manual_chars der aktiven Locale (en.sh legt die Basis). Kleinschreibung
-# ueber tr statt ${x,,}, aus demselben Grund wie in normalize_locale.
+# MSG_manual_chars der aktiven Locale (en.sh legt die Basis).
+#
+# Gross/klein: ${x,,} kennt die bash 3.2 von macOS nicht (siehe
+# normalize_locale), und `tr '[:upper:]'` faltet je nach System und Locale
+# verschieden - GNU-tr nur ASCII, BSD-tr unter UTF-8 auch Í. Deshalb wird hier
+# nur A-Z gefaltet, unter LC_ALL=C auf allen Systemen gleich, und die Antwort
+# zusaetzlich roh verglichen. Woerter mit anderen Zeichen (sí, НЕТ, ΝΑΙ, HAYİR)
+# stehen dafuer in der Locale auch gross; test:installer-cli-i18n prueft das.
 answer_matches() {
-  local answer word
-  answer="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
-  [ -n "$answer" ] || return 1
+  local raw="${1:-}" folded word
+  [ -n "$raw" ] || return 1
+  folded="$(printf '%s' "$raw" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')"
   for word in $2; do
-    [ "$answer" = "$word" ] && return 0
+    if [ "$raw" = "$word" ] || [ "$folded" = "$word" ]; then return 0; fi
   done
   return 1
 }
