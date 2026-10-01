@@ -116,6 +116,7 @@ test('normalize_locale nimmt erst Sprache mit Region, dann die Basissprache', ()
   assert.equal(run('de_DE.UTF-8'), 'de');
   assert.equal(run('de_DE@euro'), 'de');
   assert.equal(run('fil_PH.UTF-8'), 'fil');
+  assert.equal(run('nb_NO.UTF-8'), 'nb', 'Norwegisch bokmaal aus der Shell (#1529)');
   assert.equal(run('zh_TW.UTF-8'), 'zh');
   assert.equal(run('C.UTF-8'), 'en');
   assert.equal(run(''), 'en');

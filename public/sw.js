@@ -264,6 +264,7 @@ const APP_LOCALES = [
   '/locales/it.json',
   '/locales/ja.json',
   '/locales/ko.json',
+  '/locales/nb.json',
   '/locales/nl.json',
   '/locales/pl.json',
   '/locales/pt-BR.json',

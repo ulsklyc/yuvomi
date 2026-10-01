@@ -213,6 +213,7 @@ test('keine der unterstuetzten Sprachen loest anders auf als bisher', () => {
   assert.equal(pickLocale(['pt'], alle), 'pt');
   assert.equal(pickLocale(['en-US'], alle), 'en');
   assert.equal(pickLocale(['fil-PH'], alle), 'fil');
+  assert.equal(pickLocale(['nb-NO'], alle), 'nb');
   assert.equal(pickLocale(['zh-TW'], alle), 'zh',
     'Ohne eine traditionelle Locale im Bestand bleibt `zh` die Antwort.');
   assert.equal(pickLocale(['th-TH'], alle), 'en');
@@ -222,7 +223,7 @@ test('keine der unterstuetzten Sprachen loest anders auf als bisher', () => {
 test('lang-init.js loest dieselben Tags auf wie i18n.js', () => {
   const alle = getSupportedLocales();
   for (const tag of ['zh-TW', 'zh-CN', 'de-AT', 'pt-BR', 'pt-PT', 'pt', 'th-TH', 'en-US', 'fil-PH',
-    'fil', 'ZH-hant-TW', 'ar-EG', 'fa-IR', 'id-ID', 'xx-YY', '']) {
+    'fil', 'nb-NO', 'ZH-hant-TW', 'ar-EG', 'fa-IR', 'id-ID', 'xx-YY', '']) {
     assert.equal(runLangInit({ languages: [tag] }), pickLocale([tag], alle),
       `Die beiden Fassungen der Resolve-Logik beantworten ${tag || '(leer)'} verschieden. `
       + 'Der Body rendert dann in der einen Sprache und das lang-Attribut nennt die andere.');

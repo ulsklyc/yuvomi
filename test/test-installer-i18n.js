@@ -278,6 +278,7 @@ test('resolveLocale nimmt erst den vollen Tag, dann die Basissprache', () => {
   assert.equal(resolveLocale(['pt']), 'pt');
   assert.equal(resolveLocale(['de-AT']), 'de');
   assert.equal(resolveLocale(['fil-PH']), 'fil');
+  assert.equal(resolveLocale(['nb-NO']), 'nb');
   assert.equal(resolveLocale(['th-TH', 'nl-BE']), 'nl');
   assert.equal(resolveLocale(['th-TH']), 'en');
 });
