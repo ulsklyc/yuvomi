@@ -19,12 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A new recurring event shows up on its real days right away.** After creating a series, the
-  calendar only placed the event on the start date typed into the form, which is not always one of
-  its days: a series starting on the 15th that repeats on the last day of the month showed an entry
-  on the 15th and none on the 30th or 31st. Its other occurrences in the open month or week only
-  appeared after switching views. The calendar now loads the series from the server after saving,
-  so every occurrence in view is shown and none on a day without one.
 - **Correcting the date of a series' first entry no longer moves the rest of the series** (#1545).
   Every later occurrence of a recurring payment is counted from its start day, and that was still
   the date of the first entry. Correcting it with "Only this occurrence" (the rent was debited on
@@ -58,6 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stayed on a task that had already started in the household, or left too early. The date in the
   badge could also show the day before, for example with the device in Berlin and the household
   set to Honolulu.
+- **A new recurring event shows up on its real days right away.** After creating a series, the
+  calendar only placed the event on the start date typed into the form, which is not always one of
+  its days: a series starting on the 15th that repeats on the last day of the month showed an entry
+  on the 15th and none on the 30th or 31st. Its other occurrences in the open month or week only
+  appeared after switching views. The calendar now loads the series from the server after saving,
+  so every occurrence in view is shown and none on a day without one. If that reload fails or only
+  reaches the offline copy, the new series still shows on its start day as before.
 
 ## [2.71.0] - 2026-09-30
 
