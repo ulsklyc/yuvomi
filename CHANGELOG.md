@@ -68,7 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the final "proceed?" did not cancel, and the Czech and Dutch letter for entering a key by hand
   generated one instead. Every language now accepts the letter its prompt shows and its own word
   for yes and no - `ja`, `sí`, `да`, `はい`, `نعم` and so on, also typed in capitals - as well as
-  `y`/`yes` and `n`/`no`.
+  `y`/`yes` and `n`/`no`. The three document-storage questions, which showed `[y/N]` in those
+  languages, now show the same letter as every other question.
 - **The command-line installer now gets through all seven steps, on macOS as well.** The
   interactive setup ended without a message right after the prerequisite check, and after the
   summary it stopped before writing `.env`. On macOS two more stops were waiting behind those:

@@ -312,6 +312,28 @@ test('jeder Ja/Nein-Prompt nimmt die Buchstaben an, die er anzeigt', () => {
   assert.deepEqual(offenders, [], offenders.join('\n'));
 });
 
+// Angenommen werden y/n immer, angezeigt werden soll aber in einer Sprache ueberall
+// dasselbe Paar: de fragte die drei Dokument-Prompts mit [y/N], alles andere mit [j/N].
+// Gross/klein steht fuer den Default ([J/n] vs. [j/N]) und zaehlt hier nicht.
+test('jede Locale zeigt in allen Ja/Nein-Prompts dieselben Buchstaben', () => {
+  const PROMPT = /\[(\p{L})\/(\p{L})\]/u;
+  const offenders = [];
+  for (const locale of SUPPORTED_LOCALES) {
+    const pairs = new Map();
+    for (const [key, value] of localeValues(locale)) {
+      const m = value.match(PROMPT);
+      if (!m) continue;
+      const pair = `${m[1].toLocaleLowerCase(locale)}/${m[2].toLocaleLowerCase(locale)}`;
+      if (!pairs.has(pair)) pairs.set(pair, []);
+      pairs.get(pair).push(key);
+    }
+    if (pairs.size > 1) {
+      offenders.push(`${locale}.sh zeigt ${pairs.size} Paare: ${[...pairs].map(([p, keys]) => `[${p}] in ${keys.join(', ')}`).join(' | ')}`);
+    }
+  }
+  assert.deepEqual(offenders, [], offenders.join('\n'));
+});
+
 // Gross/klein faltet install.sh nur fuer A-Z (bash 3.2 kennt ${x,,} nicht, tr
 // faltet je nach System verschieden). Ein Wort mit anderen Zeichen muss deshalb
 // auch in Grossbuchstaben und gross geschrieben in der Liste stehen - sonst ist
