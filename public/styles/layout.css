@@ -1928,11 +1928,12 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * Text und muesste 4.5:1 halten - was sieben der neun Familientoene reissen.
    *
    * GEMESSEN GEGEN DIE KAPSEL, NICHT GEGEN DIE SEITE: die Leiste ist Glas
-   * (rgba .86 plus backdrop-filter), der echte Grund des Zeichens also die
-   * Mischung aus Kapsel und Seite - im Light #F9F9FA, im Dark #2B2825. Ueber
-   * alle neun Familientoene: Light 4,79-6,81:1, Dark 4,57-8,41:1. Beide Bereiche
-   * liegen nicht nur ueber der 3:1-Grafikschwelle, sondern ueber der
-   * 4.5:1-Textschwelle - der Ton ist hier also nicht die Grenze.
+   * (--glass-bg-capsule plus backdrop-filter), der echte Grund des Zeichens
+   * also die Mischung aus Kapsel und dem, was darunter scrollt. Seit dem
+   * duenneren Kapselglas (2026-10-01) ist der Ton eine der Grenzen: ueber
+   * einem mittelgrauen Foto haelt der schwaechste Familienton hell 3,3:1,
+   * dunkel 4,6:1 - ueber der 3:1-Grafikschwelle, nicht mehr ueber 4.5:1. Die
+   * Rechnung steht in tokens.css (a1).
    *
    * Die Eine-Stimme-Regel bleibt heil: Kapsel, gleitender Indikator, Label,
    * Fokusring und FAB tragen weiter --color-accent. Gewechselt hat das
@@ -2034,6 +2035,15 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
  * und nicht in einer zweiten mit gleichem Selektor. */
 .nav-bottom .nav-item__label {
   font-size: var(--type-micro);
+  /* PRIMAER- STATT TERTIAERTEXT (2026-10-01, duenneres Kapselglas). Das Label
+   * ist der einzige TEXT auf dem Glas und damit die Groesse, die bestimmt, wie
+   * duenn es sein darf: gegen ein mittelgraues Foto unter der Kapsel hielt
+   * Tertiaertext schon bei der alten Deckung (0.86) nur 4.6:1 - jede weitere
+   * Durchsicht haette AA gerissen, Sekundaertext haette kaum etwas gewonnen.
+   * Die Rechnung steht in tokens.css (a1). Aktiv bleibt erkennbar, weil der
+   * aktive Tab Akzentfarbe, Halbfett, gefuelltes Zeichen UND die Pille traegt
+   * (Regel unten) - drei Kanaele neben der Farbe. */
+  color: var(--color-text-primary);
   white-space: normal;
   display: -webkit-box;
   -webkit-box-orient: vertical;

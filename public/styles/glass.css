@@ -22,15 +22,25 @@
  * (.nav-bottom__items), nicht mehr auf der Bar-Zone (Liquid Glass).
  * Der Schatten der Kapsel steht vollstaendig in §41 - hier stand er ein
  * zweites Mal, wortgleich, und wurde von dort ohnehin ueberschrieben. */
+/* Ausserhalb von @supports der DECKENDERE Grund: ohne backdrop-filter liefe
+ * der Inhalt ungefiltert durch das duenne Kapselglas, also traegt die Kapsel
+ * dort die Deckung der uebrigen Chrome-Flaechen. Der Lichtfang steht ebenfalls
+ * hier - er ist Material, kein Blur, und kippt mit seinem Token unter
+ * reduzierter Transparenz und erhoehtem Kontrast auf transparent. */
 .nav-bottom__items {
   background-color: var(--glass-bg-elevated);
+  background-image: linear-gradient(to bottom, var(--glass-sheen-capsule), transparent 45%);
 }
 
-/* Blur nur wenn unterstützt (webkit-Fallback für Safari < 18) */
+/* Blur nur wenn unterstützt (webkit-Fallback für Safari < 18). Erst mit Blur
+ * wird das Glas duenn (--glass-bg-capsule): Toenung, Ton-Filter, Saettigung
+ * und Labelfarbe sind gemeinsam gemessen, die Rechnung steht in tokens.css
+ * (a1). */
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
   .nav-bottom__items {
-    backdrop-filter: var(--blur-md) saturate(var(--lg-glass-saturate));
-    -webkit-backdrop-filter: var(--blur-md) saturate(var(--lg-glass-saturate));
+    background-color: var(--glass-bg-capsule);
+    backdrop-filter: var(--blur-lg) saturate(var(--lg-capsule-saturate)) var(--glass-capsule-tone);
+    -webkit-backdrop-filter: var(--blur-lg) saturate(var(--lg-capsule-saturate)) var(--glass-capsule-tone);
   }
 }
 
@@ -1088,8 +1098,11 @@ textarea.form-input {
  * Begruendung, warum es nicht --glass-shadow-md ist, steht am Token.
  * ================================================================ */
 .nav-bottom__items {
+  /* Der Glanzrand der Kapsel ist kraeftiger als der Specular der Sidebar
+   * (--glass-inset-capsule, tokens.css): das duennere Glas braucht eine
+   * gefasste Kante, sonst verschwimmt es mit dem, was darunter scrollt. */
   box-shadow:
-    inset 0 var(--space-px) 0 color-mix(in srgb, white calc(var(--lg-specular) * 100%), transparent),
+    var(--glass-inset-capsule),
     var(--glass-inset-bottom-lift),
     var(--glass-shadow-capsule);
 }

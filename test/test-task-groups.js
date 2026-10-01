@@ -228,6 +228,119 @@ test('die Wanduhrzeit geht als Stempel an die Formatierer, nicht als Date', () =
   }
 });
 
+// ── Die Reihenfolge in der Gruppe geht nach der Wanduhr des Haushalts ──────
+/* `sortTasks` baute aus `due_date`/`due_time` ein `new Date(...)` und las die
+ * Ziffern damit in der Zone des GERAETS. Die Gruppierung und die Beschriftung
+ * daneben folgen laengst der Haushaltszone (siehe oben); die Reihenfolge war
+ * die letzte Uhr der Liste, die es nicht tat.
+ *
+ * Sichtbar wird das in der Zeitumstellungs-Luecke des Geraets: in New York gibt
+ * es am 2026-03-08 kein 02:30, `new Date('2026-03-08T02:30')` rueckt auf 03:30
+ * EDT vor und ueberholt damit eine 03:15 faellige Aufgabe. Fuer einen Haushalt
+ * in Berlin ist 02:30 an dem Tag eine gewoehnliche Uhrzeit und kommt zuerst.
+ * Die Rangstufe "ueberfaellig zuerst" allein verschiebt dagegen nichts: wer
+ * ueberfaellig ist, hat ohnehin den frueheren Stempel.
+ *
+ * Beide Zonen sind festgenagelt - die des Prozesses (das Geraet) UND die
+ * Anzeigezone (der Haushalt). In der UTC-CI gaebe es keine Luecke, ein Test
+ * ohne `TZ` waere gruen und blind. Der Zeitpunkt ist fest und liegt kurz vor
+ * Mitternacht des Geraets, als dort noch der Vortag war. */
+
+const LUECKE_FRUEH = { id: 801, title: 'Frueh', category: 'household', priority: 'low', status: 'open', due_date: '2026-03-08', due_time: '02:30' };
+const LUECKE_SPAET = { id: 802, title: 'Spaet', category: 'household', priority: 'low', status: 'open', due_date: '2026-03-08', due_time: '03:15' };
+
+function withZones(deviceZone, householdZone, fn) {
+  const prevTz = process.env.TZ;
+  process.env.TZ = deviceZone;
+  tzModule.setDisplayTimeZone(householdZone);
+  try {
+    return fn();
+  } finally {
+    tzModule.setDisplayTimeZone(null);
+    if (prevTz === undefined) delete process.env.TZ; else process.env.TZ = prevTz;
+  }
+}
+
+test('sortTasks ordnet nach der Wanduhr des Haushalts, nicht nach der Zone des Geraets', () => {
+  withZones('America/New_York', 'Europe/Berlin', () => {
+    // Gegenprobe der Umgebung: ohne Luecke im Geraet misst der Fall nichts.
+    assert.equal(new Date('2026-03-08T02:30').getHours(), 3,
+      'die Prozesszone muss am 2026-03-08 eine Luecke um 02:30 haben');
+    // 04:59Z: in New York der 7. um 23:59, in Berlin der 8. um 05:59.
+    const now = tasks.taskSortNow(new Date('2026-03-08T04:59:00Z'));
+    const sorted = [LUECKE_SPAET, LUECKE_FRUEH].sort((a, b) => tasks.sortTasks(a, b, now));
+    assert.deepEqual(sorted.map((t) => t.title), ['Frueh', 'Spaet'],
+      '02:30 kommt vor 03:15 - im Haushalt gibt es die Uhrzeit, und sie ist die fruehere');
+  });
+});
+
+test('die Liste ruft die Sortierung mit der Uhr des Haushalts auf', () => {
+  // Der Aufrufer, nicht nur die Regel: `renderTaskGroups` bildet "jetzt" selbst.
+  withZones('America/New_York', 'Europe/Berlin', () => {
+    const html = tasks.renderTaskGroups([LUECKE_SPAET, LUECKE_FRUEH], 'category');
+    const frueh = html.indexOf('data-swipe-id="801"');
+    const spaet = html.indexOf('data-swipe-id="802"');
+    assert.ok(frueh >= 0 && spaet >= 0, 'beide Aufgaben muessen in der Liste stehen');
+    assert.ok(frueh < spaet, 'in der Liste steht 02:30 vor 03:15');
+  });
+});
+
+// Ohne Uhrzeit heisst "bis Tagesende", also NACH einer Aufgabe, die ausdruecklich
+// um 23:59 faellig ist - auch wenn die ohne Uhrzeit die hoehere Prioritaet hat.
+// Ein gemeinsamer Stempel 23:59 liess den Vergleich auf die Prioritaet fallen
+// (Codex-Befund in #1590); die fruehere Fassung und die Uebersicht rechnen
+// Tagesende als 23:59:59.
+const TAGESENDE_OHNE_ZEIT = { id: 803, title: 'Ohne Zeit', category: 'household', priority: "urgent", status: "open", due_date: "2026-10-05", due_time: null };
+const TAGESENDE_UM_2359 = { id: 804, title: "Um 23:59", category: 'household', priority: "low", status: "open", due_date: "2026-10-05", due_time: "23:59" };
+
+test("eine Aufgabe ohne Uhrzeit steht hinter einer, die um 23:59 faellig ist", () => {
+  withZones("Europe/Berlin", "Europe/Berlin", () => {
+    const vormittags = tasks.taskSortNow(new Date("2026-10-05T08:00:00Z"));
+    const sorted = [TAGESENDE_OHNE_ZEIT, TAGESENDE_UM_2359].sort((a, b) => tasks.sortTasks(a, b, vormittags));
+    assert.deepEqual(sorted.map((t) => t.title), ["Um 23:59", 'Ohne Zeit'],
+      "Tagesende kommt nach 23:59, die Prioritaet entscheidet erst bei gleicher Faelligkeit");
+    // Um 23:59 ist die Aufgabe ohne Uhrzeit noch nicht ueberfaellig, die um 23:59 schon nicht mehr offen im Soll.
+    const um2359 = tasks.taskSortNow(new Date("2026-10-05T21:59:30Z"));
+    const spaet = [TAGESENDE_OHNE_ZEIT, TAGESENDE_UM_2359].sort((a, b) => tasks.sortTasks(a, b, um2359));
+    assert.deepEqual(spaet.map((t) => t.title), ["Um 23:59", 'Ohne Zeit'],
+      "um 23:59 ist die Aufgabe ohne Uhrzeit noch am selben Tag faellig, nicht ueberfaellig");
+  });
+});
+
+// ── Der Start-Badge fragt den Tag des Haushalts ─────────────────────────────
+/* `renderStartDateBadge` verglich `new Date(); setHours(0, 0, 0, 0)` mit
+ * `new Date(key + 'T00:00:00')` - zweimal Mitternacht der GERAETE-Zone - und
+ * reichte `formatDate` das Date statt des Keys. Geprueft ueber den Aufrufer
+ * `renderTaskCard` (der Badge steht nur ohne Faelligkeit), mit festgenagelter
+ * Prozess-Zone, Anzeigezone und Uhr. */
+
+const START_TASK = { id: 811, title: 'Startet', category: 'household', priority: 'low', status: 'open', due_date: null, start_date: null };
+
+test('der Start-Badge verschwindet, sobald im Haushalt der Starttag da ist', (t) => {
+  // 22:30Z: in Berlin (Haushalt) schon der 2. um 00:30, in New York (Geraet)
+  // noch der 1. um 18:30.
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-01T22:30:00Z') });
+  withZones('America/New_York', 'Europe/Berlin', () => {
+    const heute = tasks.renderTaskCard({ ...START_TASK, start_date: '2026-10-02' });
+    assert.ok(!heute.includes('tasks.startsOn'),
+      'im Haushalt ist der 2. schon heute - kein "Beginnt am"');
+    const morgen = tasks.renderTaskCard({ ...START_TASK, start_date: '2026-10-03' });
+    assert.ok(morgen.includes('tasks.startsOn'), 'der Folgetag des Haushalts bekommt den Badge');
+  });
+});
+
+test('der Start-Badge reicht formatDate den Datums-Key, nicht ein Date', (t) => {
+  // Ein Date auf Berliner Mitternacht ist auf Honolulu noch der Vortag, und
+  // `formatDate` rechnet ein Date in die Anzeigezone um. Der i18n-Stub gibt
+  // zurueck, was er bekommt - der Key muss also unveraendert ankommen.
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-01T12:00:00Z') });
+  withZones('Europe/Berlin', 'Pacific/Honolulu', () => {
+    const html = tasks.renderTaskCard({ ...START_TASK, start_date: '2026-10-20' });
+    assert.ok(html.includes('tasks.startsOn{"date":"2026-10-20"}'),
+      `formatDate bekommt den Key, erhalten: ${/tasks\.startsOn[^<]*/.exec(html)?.[0]}`);
+  });
+});
+
 // --------------------------------------------------------
 // Filterachse Kategorie (D#1017): der Server kannte `?category=` seit #825,
 // das Panel bot die Achse nie an. Der Filterzustand muss sie tragen, der
