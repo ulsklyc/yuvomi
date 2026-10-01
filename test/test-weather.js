@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 
-const BASE_ENV_KEYS = ['OPENWEATHER_API_KEY', 'OPENWEATHER_CITY', 'WEATHER_LAT', 'WEATHER_LON', 'WEATHER_CITY', 'WEATHER_UNITS'];
+const BASE_ENV_KEYS = ['OPENWEATHER_API_KEY', 'OPENWEATHER_CITY', 'OPENWEATHER_LANG', 'WEATHER_LAT', 'WEATHER_LON', 'WEATHER_CITY', 'WEATHER_UNITS'];
 
 // Spin up the weather router with injected cfgGet (DB) + fetchFn (upstream).
 // Returns { baseUrl, close }.
@@ -221,6 +221,43 @@ test('OWM legacy via env: provider + raw OWM icon code', async () => {
     assert.equal(body.data.city, 'Hamburg');
     assert.equal(body.data.current.icon, '04d');
   } finally { await close(); }
+});
+
+// #1523: `lang` ging unveraendert an OWM. Der Client schickt seine App-Locale,
+// OWM hat eigene Codes - `pt-BR` heisst dort `pt_br`, `ko` `kr`, `cs` `cz`, und
+// einen unbekannten Code beantwortet OWM auf Englisch statt mit einem Fehler.
+// Gemessen wird die URL, die wirklich hinausgeht, in BEIDEN Abrufen.
+async function owmLangSent({ query, env = {} }) {
+  const sent = [];
+  const fetchFn = (url) => {
+    sent.push(new URL(String(url)).searchParams.getAll('lang'));
+    return OWM_FETCH(url);
+  };
+  const { baseUrl, close } = await startApp({
+    env: { OPENWEATHER_API_KEY: 'key123', OPENWEATHER_CITY: 'Hamburg', ...env },
+    fetchFn,
+  });
+  try {
+    const res = await fetch(`${baseUrl}/${query === undefined ? '' : `?lang=${encodeURIComponent(query)}`}`);
+    assert.equal(res.status, 200);
+  } finally { await close(); }
+  assert.equal(sent.length, 2, 'aktuelles Wetter und Vorhersage');
+  return sent;
+}
+
+test('OWM: die App-Locale geht als OWM-Code hinaus, nicht wie geschrieben (#1523)', async () => {
+  for (const [appLocale, owmCode] of [['pt-BR', 'pt_br'], ['ko', 'kr'], ['cs', 'cz'], ['zh', 'zh_cn'], ['nb', 'no'], ['de', 'de']]) {
+    assert.deepEqual(await owmLangSent({ query: appLocale }), [[owmCode], [owmCode]], `lang=${appLocale}`);
+  }
+});
+
+test('OWM: was OWM nicht kennt, geht nicht in die URL - OPENWEATHER_LANG, sonst Englisch (#1523)', async () => {
+  assert.deepEqual(await owmLangSent({ query: 'fil' }), [['en'], ['en']], 'Filipino kennt OWM nicht');
+  assert.deepEqual(await owmLangSent({ query: 'fil', env: { OPENWEATHER_LANG: 'zh_tw' } }), [['zh_tw'], ['zh_tw']],
+    'OPENWEATHER_LANG ist der Rueckfall des Betreibers und traegt einen OWM-Code');
+  assert.deepEqual(await owmLangSent({ query: undefined, env: { OPENWEATHER_LANG: 'ua' } }), [['ua'], ['ua']]);
+  // Vorher landete der Wert roh in der Query: ein `&` darin setzte eigene Parameter.
+  assert.deepEqual(await owmLangSent({ query: 'de&units=imperial' }), [['en'], ['en']]);
 });
 
 test('per-user override beats household coords', async () => {

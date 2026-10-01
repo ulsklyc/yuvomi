@@ -1,3 +1,5 @@
+import { DEFAULT_LOCALE, getSupportedLocales } from '../utils/i18n.js';
+
 function authSecurity() {
   return [{ bearerAuth: [] }, { apiKeyAuth: [] }, { cookieAuth: [] }];
 }
@@ -120,16 +122,21 @@ function stringPathParam(name, description) {
   };
 }
 
+// Die Werte kommen aus den Locale-Dateien (getSupportedLocales), dieselbe Quelle,
+// aus der die Route ihren `lang` aufloest. Bis #1523 stand hier eine Liste mit
+// 15 Codes, und jede spaeter hinzugekommene Sprache war als ungueltig
+// dokumentiert, obwohl die Route sie bediente.
 function langParam() {
+  const locales = getSupportedLocales();
   return {
     name: 'lang',
     in: 'query',
     required: false,
-    description: 'Language code for localized labels. Supported values: ar, de, el, en, es, fr, hi, it, ja, pt, ru, sv, tr, uk, zh. Defaults to en.',
+    description: `Language code for localized labels. Supported values: ${locales.join(', ')}. Defaults to ${DEFAULT_LOCALE}.`,
     schema: {
       type: 'string',
-      default: 'en',
-      enum: ['ar', 'de', 'el', 'en', 'es', 'fr', 'hi', 'it', 'ja', 'pt', 'ru', 'sv', 'tr', 'uk', 'zh'],
+      default: DEFAULT_LOCALE,
+      enum: [...locales],
     },
   };
 }

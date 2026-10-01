@@ -132,6 +132,38 @@ export function isSupportedLocale(locale) {
 }
 
 /**
+ * Die spezifischste unterstuetzte Locale eines frei eingegebenen Sprach-Tags,
+ * oder null. Fuer Werte, die von aussen kommen (`?lang=` der API): Gross- und
+ * Kleinschreibung und `_` statt `-` werden in BCP-47-Form gebracht, dann faellt
+ * wie bei regionLocale() Subtag fuer Subtag weg - `pt_br` -> `pt-BR`,
+ * `pt-PT` -> `pt`, `DE-de` -> `de`.
+ *
+ * #1523: Vorher hielt jede Stelle, die so einen Wert annimmt, ihre eigene Liste
+ * (Budget-Kategorien, die OpenAPI-Beschreibung), und keine wuchs mit, als
+ * Sprachen dazukamen. Diese Funktion liest dieselben Dateien wie
+ * getSupportedLocales() und hat keine Liste, die zurueckbleiben koennte.
+ */
+export function supportedLocaleFor(tag) {
+  if (typeof tag !== 'string') return null;
+  const teile = tag.trim().replace(/_/g, '-').split('-');
+  // Sprache aus Buchstaben, danach Schrift oder Region - auch numerisch (`es-419`).
+  if (!/^[A-Za-z]{2,8}$/.test(teile[0]) || teile.slice(1).some((teil) => !/^[A-Za-z0-9]{1,8}$/.test(teil))) return null;
+  teile[0] = teile[0].toLowerCase();
+  for (let i = 1; i < teile.length; i++) {
+    const teil = teile[i];
+    teile[i] = teil.length === 4
+      ? teil[0].toUpperCase() + teil.slice(1).toLowerCase()
+      : teil.toUpperCase();
+  }
+  while (teile.length) {
+    const kandidat = teile.join('-');
+    if (isSupportedLocale(kandidat)) return kandidat;
+    teile.pop();
+  }
+  return null;
+}
+
+/**
  * Übersetzungsobjekt einer Sprache, gecacht. Liefert bei fehlender oder
  * kaputter Datei `null` statt zu werfen - eine Übersetzung darf nie der Grund
  * sein, warum ein Route-Handler 500 wirft.

@@ -12,6 +12,7 @@ import express from 'express';
 import * as db from '../db.js';
 import { utcDateKey } from '../utils/timezone.js';
 import { resolveWeatherSource } from '../services/weather-source.js';
+import { supportedLocaleFor } from '../utils/i18n.js';
 
 const log = createLogger('Weather');
 
@@ -54,6 +55,77 @@ function cfgGet(key) {
 function cityParam(city) {
   const c = String(city).trim();
   return /^\d+$/.test(c) ? `id=${encodeURIComponent(c)}` : `q=${encodeURIComponent(c)}`;
+}
+
+// ----------------------------------------------------------------
+// OpenWeatherMap-Sprachcodes (#1523)
+//
+// OWM hat eigene Codes, nicht BCP-47: Koreanisch heisst `kr`, Tschechisch `cz`,
+// Brasilianisch `pt_br`. Vorher ging `lang` unveraendert hinaus, und eine
+// App-Sprache, die OWM anders schreibt, bekam Englisch oder eine falsche
+// Variante.
+//
+// Die Liste ist die der Anbieter-Doku, abgeschrieben am 2026-10-01 von
+// https://openweathermap.org/current#multi (die 5-Tage-Vorhersage unter
+// /forecast5 fuehrt dieselbe). `la` ist dort Lettisch, nicht Latein, und `sp`
+// steht neben `es` - deshalb gilt ein App-Code NIE schon darum, weil er in
+// dieser Liste vorkommt, sondern nur ueber die Zuordnung darunter.
+// ----------------------------------------------------------------
+export const OWM_LANGUAGES = new Set([
+  'sq', 'af', 'ar', 'az', 'eu', 'be', 'bg', 'ca', 'zh_cn', 'zh_tw', 'hr', 'cz',
+  'da', 'nl', 'en', 'fi', 'fr', 'gl', 'de', 'el', 'he', 'hi', 'hu', 'is', 'id',
+  'it', 'ja', 'kr', 'ku', 'la', 'lt', 'mk', 'no', 'fa', 'pl', 'pt', 'pt_br',
+  'ro', 'ru', 'sr', 'sk', 'sl', 'sp', 'es', 'sv', 'se', 'th', 'tr', 'ua', 'uk',
+  'vi', 'zu',
+]);
+
+// Jede App-Sprache steht hier, auch die gleich geschriebenen: eine neue
+// Locale-Datei ohne Zeile macht test:language-lists rot, statt still auf
+// Englisch zu fallen. `null` heisst: OWM uebersetzt diese Sprache nicht, bewusst
+// Englisch (bzw. OPENWEATHER_LANG).
+export const OWM_LANG_BY_LOCALE = Object.freeze({
+  ar: 'ar',
+  cs: 'cz',
+  de: 'de',
+  el: 'el',
+  en: 'en',
+  es: 'es',
+  fa: 'fa',
+  fil: null,
+  fr: 'fr',
+  hi: 'hi',
+  hu: 'hu',
+  id: 'id',
+  it: 'it',
+  ja: 'ja',
+  ko: 'kr',
+  nb: 'no',
+  nl: 'nl',
+  pl: 'pl',
+  pt: 'pt',
+  'pt-BR': 'pt_br',
+  ru: 'ru',
+  sv: 'sv',
+  tr: 'tr',
+  uk: 'uk',
+  vi: 'vi',
+  zh: 'zh_cn',
+});
+
+/**
+ * Der OWM-Code fuer einen eingehenden Sprachwert, oder null. Der Client schickt
+ * seine App-Locale; OPENWEATHER_LANG ist laut Doku ein OWM-Code (`zh_tw` muss
+ * dort weiter gehen). Darum: erst die App-Locale, dann ein OWM-Code wie
+ * geschrieben, zuletzt ein Tag mit Region (`de-AT` -> `de`). Was nichts davon
+ * ist, geht nicht in die URL.
+ */
+export function owmLanguage(raw) {
+  if (typeof raw !== 'string') return null;
+  const value = raw.trim();
+  if (Object.hasOwn(OWM_LANG_BY_LOCALE, value)) return OWM_LANG_BY_LOCALE[value];
+  if (OWM_LANGUAGES.has(value.toLowerCase())) return value.toLowerCase();
+  const locale = supportedLocaleFor(value);
+  return locale && Object.hasOwn(OWM_LANG_BY_LOCALE, locale) ? OWM_LANG_BY_LOCALE[locale] : null;
 }
 
 // ----------------------------------------------------------------
@@ -154,7 +226,7 @@ export function buildRouter({ cfgGet: cfgGetFn = cfgGet, fetchFn = null, logger 
       provider = resolved.provider;
       const owmKey   = process.env.OPENWEATHER_API_KEY;
       const owmCity  = String(req.query.city || resolved.city);
-      const owmLang  = String(req.query.lang  || process.env.OPENWEATHER_LANG || 'en');
+      const owmLang  = owmLanguage(req.query.lang) ?? owmLanguage(process.env.OPENWEATHER_LANG) ?? 'en';
 
       // ── 2. Cache check ───────────────────────────────────────
       const cacheKey = provider === 'open-meteo'

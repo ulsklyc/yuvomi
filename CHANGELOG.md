@@ -84,6 +84,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   substitution", and after the admin account was created a `head` option macOS does not know
   ended the run before the success message.
 
+- **Budget categories, the API reference and OpenWeatherMap descriptions follow every app
+  language** (#1523). Three places kept a language list of their own that stopped growing with
+  the app: asked for their categories in Portuguese (Brazil), Hungarian, Korean, Indonesian,
+  Persian, Filipino or Norwegian Bokmål, the budget answered in English, or in European
+  Portuguese for Brazil, and the API reference listed only 15 languages as valid for `lang`.
+  Both now take their languages from the app's own translations, so a new language works there
+  from its first day. The weather tile with OpenWeatherMap now asks for the language in the
+  spelling OpenWeatherMap documents (`pt_br`, `zh_cn`, `cz`, `kr`, `no`) instead of the app's
+  code, which it does not list for Brazilian Portuguese, Chinese, Czech, Korean and Norwegian.
+  Filipino, which OpenWeatherMap does not offer, uses `OPENWEATHER_LANG` and otherwise English.
+
 ## [2.71.0] - 2026-09-30
 
 ### Added

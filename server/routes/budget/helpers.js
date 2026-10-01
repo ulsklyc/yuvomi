@@ -14,6 +14,7 @@ import {
 } from '../../services/budget-visibility.js';
 import { computeLoanSchedule, remainingPrincipalFromPayments, remainingInstallmentsForBalance } from '../../services/loan-amortization.js';
 import { todayKey } from '../../utils/timezone.js';
+import { DEFAULT_LOCALE, supportedLocaleFor } from '../../utils/i18n.js';
 import { newNonMembers } from '../../services/household-members.js';
 
 // --------------------------------------------------------
@@ -94,10 +95,6 @@ export function mayEdit(req, row) {
 }
 
 const LOCALE_CACHE = new Map();
-const SUPPORTED_LANGS = new Set([
-  'ar', 'cs', 'de', 'el', 'en', 'es', 'fr', 'hi', 'it', 'ja',
-  'nl', 'pl', 'pt', 'ru', 'sv', 'tr', 'uk', 'vi', 'zh',
-]);
 const CATEGORY_LABEL_KEYS = {
   housing: 'catHousing',
   food: 'catFood',
@@ -157,10 +154,11 @@ const SUBCATEGORY_LABEL_KEYS = {
   subscription_other: 'subcatSubscriptionOther',
 };
 
+// Die Sprachen kommen aus den Locale-Dateien selbst (supportedLocaleFor), nicht
+// aus einer Liste hier: die alte hielt 19 Codes, und jede spaeter hinzugekommene
+// Sprache bekam ihre Kategorienamen still auf Englisch (#1523).
 export function normalizeLang(raw) {
-  const lang = String(raw || 'en').trim().toLowerCase();
-  const base = lang.split(/[-_]/)[0];
-  return SUPPORTED_LANGS.has(base) ? base : 'en';
+  return supportedLocaleFor(raw) ?? DEFAULT_LOCALE;
 }
 
 export function budgetMessages(lang) {
