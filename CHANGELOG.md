@@ -94,6 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   spelling OpenWeatherMap documents (`pt_br`, `zh_cn`, `cz`, `kr`, `no`) instead of the app's
   code, which it does not list for Brazilian Portuguese, Chinese, Czech, Korean and Norwegian.
   Filipino, which OpenWeatherMap does not offer, uses `OPENWEATHER_LANG` and otherwise English.
+  `OPENWEATHER_LANG` is that fallback and takes an OpenWeatherMap code; a code OpenWeatherMap does
+  not list is now ignored in favour of English, as the installation guide and `.env.example` say.
 
 ## [2.71.0] - 2026-09-30
 

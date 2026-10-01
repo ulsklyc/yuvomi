@@ -856,7 +856,7 @@ The weather widget defaults to **Open-Meteo** — free, ECMWF-backed, and requir
 | `OPENWEATHER_API_KEY` | API key from [openweathermap.org](https://openweathermap.org/api) | - | No |
 | `OPENWEATHER_CITY` | City name for weather display | `Berlin` | No |
 | `OPENWEATHER_UNITS` | Unit system (`metric` or `imperial`) | `metric` | No |
-| `OPENWEATHER_LANG` | Language for weather descriptions | `en` | No |
+| `OPENWEATHER_LANG` | Fallback language for weather descriptions, as an OpenWeatherMap code (`en`, `de`, `zh_tw`, ...). The dashboard asks in each member's app language; this value applies only when OpenWeatherMap does not offer that language (Filipino) or a request names none. A code OpenWeatherMap does not list is ignored, and English is used instead. | `en` | No |
 
 ### Calendar Subscriptions — ICS Feeds (Optional)
 

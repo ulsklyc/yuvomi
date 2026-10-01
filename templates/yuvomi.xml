@@ -100,7 +100,7 @@ After the container starts, open the WebUI - the first visit guides you through 
   <Config Name="OPENWEATHER_API_KEY" Target="OPENWEATHER_API_KEY" Default="" Mode="" Description="Optional (legacy). OpenWeatherMap API key to enable the weather widget. Prefer the keyless Open-Meteo variables above." Type="Variable" Display="advanced" Required="false" Mask="true"/>
   <Config Name="OPENWEATHER_CITY" Target="OPENWEATHER_CITY" Default="" Mode="" Description="Optional (legacy). City for the OpenWeatherMap weather widget, e.g. Berlin." Type="Variable" Display="advanced" Required="false" Mask="false"/>
   <Config Name="OPENWEATHER_UNITS" Target="OPENWEATHER_UNITS" Default="metric" Mode="" Description="Optional (legacy). Unit system for temperatures: metric (°C) or imperial (°F)." Type="Variable" Display="advanced" Required="false" Mask="false">metric</Config>
-  <Config Name="OPENWEATHER_LANG" Target="OPENWEATHER_LANG" Default="en" Mode="" Description="Optional (legacy). Language code for OpenWeatherMap descriptions, e.g. en, de, fr." Type="Variable" Display="advanced" Required="false" Mask="false">en</Config>
+  <Config Name="OPENWEATHER_LANG" Target="OPENWEATHER_LANG" Default="en" Mode="" Description="Optional (legacy). Fallback language for OpenWeatherMap descriptions when a member's app language is not offered, as an OpenWeatherMap code, e.g. en, de, zh_tw. Unknown codes fall back to English." Type="Variable" Display="advanced" Required="false" Mask="false">en</Config>
 
   <!-- Google Calendar (optional) -->
   <Config Name="GOOGLE_CLIENT_ID" Target="GOOGLE_CLIENT_ID" Default="" Mode="" Description="Optional. Google OAuth 2.0 client ID for Google Calendar sync." Type="Variable" Display="advanced" Required="false" Mask="false"/>
