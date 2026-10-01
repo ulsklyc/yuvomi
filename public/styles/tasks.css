@@ -41,9 +41,9 @@
 /* --------------------------------------------------------
  * Liste + Detail (Breitenregel, DESIGN.md; utils/master-detail.js)
  *
- * Nur in der Listenansicht (tasks.js, syncViewChrome). Die Geometrie der
- * Spalten gehoert der Shell (`.split-view` in layout.css); hier steht nur,
- * was DIESE Seite dafuer mitbringen muss.
+ * In der Liste und im Verlauf (#1550), nicht im Brett (tasks.js,
+ * syncViewChrome). Die Geometrie der Spalten gehoert der Shell (`.split-view`
+ * in layout.css); hier steht nur, was DIESE Seite dafuer mitbringen muss.
  * -------------------------------------------------------- */
 
 /* Der Baustein steht in `.tasks-body`, und der polstert schon beide Kanten -

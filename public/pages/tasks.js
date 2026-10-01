@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
 import { openModal as openSharedModal, closeModal, wireBlurValidation, validateAll, btnSuccess, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender } from '/components/modal.js';
-import { stagger, vibrate, scheduleUndoableDelete, animationSettled, collapseOut, expandIn } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, animationSettled, collapseOut, expandIn, wireScrollFade } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -3191,8 +3191,17 @@ function renderHistoryEntry(entry) {
   // Der Avatar traegt hier NICHTS bei, was nicht daneben stuende: der Name
   // steht als Text in der Metazeile. Ohne aria-hidden liest die Sprachausgabe
   // „AJ ... Alex Johnson" - derselbe Mensch zweimal, einmal als Kuerzel.
+  //
+  // LISTE + DETAIL (#1550): die Zeile ist eine Zeile des Bausteins wie eine
+  // Aufgabe in der Liste. `data-md-id` ist die AUFGABE, nicht der Vorgang -
+  // `?open=` nennt in der ganzen App eine Aufgabe, und eine Aufgabe ist
+  // hoechstens einmal erledigt (uniq_task_completion), also traegt keine
+  // zweite Zeile dieselbe ID. `data-task-id` laesst das Loeschen aus der
+  // Spalte die Zeile sofort ausblenden (taskRowsIn in task-detail.js), wie in
+  // der Liste. Die Zeile ist selbst der Knopf, also braucht sie kein
+  // `data-md-focus`: Pfeile, Enter und Esc landen auf ihr.
   return `
-    <button type="button" class="list-row history-row" data-history-task="${entry.task_id}">
+    <button type="button" class="list-row history-row" data-history-task="${entry.task_id}" data-md-id="${entry.task_id}" data-task-id="${entry.task_id}">
       <span class="history-row__avatar" aria-hidden="true">${avatar}</span>
       <span class="list-row__main history-row__main">
         <span class="list-row__name">${esc(entry.title)}</span>
@@ -3275,6 +3284,10 @@ function wireHistoryPeople(root, container) {
   // Kapsel von der Stelle der alten gleiten.
   const people = root.querySelector('.history-people');
   if (people) attachSegmentIndicator(people, { key: 'tasks-history-people' });
+  // Die Reihe scrollt, sobald sie nicht passt - in der Listenbahn neben dem
+  // Detail (#1550, 420-520px) schon mit vier Mitgliedern. Ohne Anriss saehe
+  // sie dort vollstaendig aus (DESIGN.md, Scroll-Affordanz).
+  wireScrollFade(people);
   root.querySelectorAll('[data-history-user]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const raw = btn.dataset.historyUser;
@@ -3284,9 +3297,12 @@ function wireHistoryPeople(root, container) {
   });
 }
 
-function renderHistory(container) {
+function renderHistory(container, { afterWrite = false, quiet = false } = {}) {
   const listEl = container.querySelector('#task-list');
   if (!listEl) return;
+  // Die Reihenfolge VOR dem Neuzeichnen - fuer das Weiterruecken der Spalte,
+  // wie in der Liste (syncHistoryPane).
+  const orderBefore = mdRowIds(listEl);
 
   if (state.history.error) {
     // Die Personenauswahl bleibt STEHEN. Ohne sie war ein Fehler unter einem
@@ -3306,6 +3322,7 @@ function renderHistory(container) {
     });
     wireHistoryPeople(listEl, container);
     if (window.lucide) window.lucide.createIcons({ el: listEl });
+    syncHistoryPane(listEl, orderBefore, { afterWrite, quiet });
     return;
   }
 
@@ -3353,25 +3370,34 @@ function renderHistory(container) {
     loadHistory(container, { append: true });
   });
   listEl.querySelectorAll('[data-history-task]').forEach((row) => {
-    row.addEventListener('click', () => openTaskFromHistory(row.dataset.historyTask, container));
+    row.addEventListener('click', () => openHistoryEntry(row.dataset.historyTask, row, container));
   });
+  syncHistoryPane(listEl, orderBefore, { afterWrite, quiet });
 }
 
-/** Ein Verlaufseintrag führt zu seiner Aufgabe - der einzige Weg von hier weg. */
-async function openTaskFromHistory(id, container) {
-  try {
-    const [task, reminder] = await Promise.all([loadTaskForEdit(id), loadReminderForTask(id)]);
-    openTaskView(task, reminder, container);
-  } catch (err) {
-    window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
-  }
+/**
+ * Ein Verlaufseintrag fuehrt zu seiner Aufgabe - der einzige Weg von hier weg.
+ *
+ * DERSELBE WEG WIE DER TITEL EINER AUFGABE IN DER LISTE (#1550): ab der
+ * Schwelle waehlt der Klick die Zeile aus und die Aufgabe steht rechts in der
+ * Spalte, darunter geht ihr Blatt auf (openTaskSheet ueber `openNarrow`).
+ * Bis dahin oeffnete der Verlauf das Blatt auf jeder Breite selbst, und neben
+ * der 720px-Bahn blieb die rechte Haelfte leer.
+ */
+function openHistoryEntry(id, trigger, container) {
+  if (taskMd) taskMd.open(id, trigger);
+  else openTaskSheet(id, container);
 }
 
 /**
  * Verlauf laden. `append` hängt die nächste Seite an, alles andere fängt vorn
  * an - ein Personenwechsel darf keine Mischung aus zwei Abfragen stehen lassen.
+ *
+ * `afterWrite`: nachgeladen, weil etwas geschrieben wurde (renderTaskList) -
+ * die Spalte zieht dann nach (syncHistoryPane); `quiet`: die Aenderung kam
+ * aus der Spalte selbst, sie zeigt sie schon.
  */
-async function loadHistory(container, { append = false } = {}) {
+async function loadHistory(container, { append = false, afterWrite = false, quiet = false } = {}) {
   // Ein zweiter Aufruf, waehrend einer laeuft, WARTET auf den ersten und faehrt
   // dann selbst - er wird nicht verworfen. Ein blosses `return` hier hatte den
   // Klick auf ein Personen-Chip stillschweigend geschluckt: `userId` war schon
@@ -3402,7 +3428,7 @@ async function loadHistory(container, { append = false } = {}) {
   } finally {
     state.history.loading = null;
     release();
-    renderHistory(container);
+    renderHistory(container, { afterWrite, quiet });
   }
 }
 
@@ -3421,8 +3447,9 @@ function renderTaskList(container, { paneQuiet = false } = {}) {
     // dort aendert sich der Verlauf mit: ein wieder geoeffneter Haken loescht
     // seinen Eintrag serverseitig. Ohne das Nachladen blieb die zurueckgenommene
     // Erledigung stehen, bis jemand die Ansicht verliess.
-    loadHistory(container);
-    return;
+    // Das Versprechen geht zurueck: render() wartet beim Einstieg darauf, bevor
+    // es Liste + Detail einhaengt (der Deep-Link braucht die Zeilen).
+    return loadHistory(container, { afterWrite: true, quiet: paneQuiet });
   }
   // VOR der Kanban-Weiche: nach einem Ladefehler ist `state.tasks` ebenfalls
   // leer, und beide Ansichten haengen an demselben `#task-list`. Nur die
@@ -4153,13 +4180,17 @@ function syncViewChrome(container) {
   // Die Gegenrichtung - Seite auf Lesemass, Kopf freigeben - gibt es nicht:
   // PAGE-016 verlangt, dass ein Mass, das etwas kappt, im Kopf sichtbar ist.
   container.querySelector('.tasks-page')?.classList.toggle('is-reading-measure', !isKanbanMode());
-  // LISTE + DETAIL NUR IN DER LISTE. Das Brett ist Flaeche, der Verlauf zeigt
-  // Vorgaenge - dort gibt es keine Zeile, deren Detail rechts stehen koennte.
-  // Ohne die Klasse ist die Wurzel auch kein Container: die Detailspalte
-  // bleibt verborgen, und nichts im Brett bezieht sich auf einen neuen
-  // Containing Block (Drag-Ghosts, fixierte Ebenen).
-  container.querySelector('.tasks-page')?.classList.toggle('app-page--list-detail', isList);
-  if (!isList && taskMd?.selectedId() != null) taskMd.clear({ history: 'replace' });
+  // LISTE + DETAIL IN LISTE UND VERLAUF (#1550, Entscheidung 2026-09-29). Ab
+  // der Schwelle steht neben einem Verlaufseintrag seine Aufgabe, so wie neben
+  // einer Zeile der Liste - damit enden Liste, Brett und Verlauf an derselben
+  // Aussenkante. Unter der Schwelle behaelt der Verlauf wie die Liste die
+  // Lesebahn (`is-reading-measure` oben). Bis dahin endete er bei 1440 436px
+  // vor dem Kopf: die leere rechte Haelfte, die die Breitenregel nicht mehr
+  // zulaesst. Das Brett bleibt Flaeche; ohne die Klasse ist die Wurzel dort
+  // auch kein Container: die Detailspalte bleibt verborgen, und nichts im
+  // Brett bezieht sich auf einen neuen Containing Block (Drag-Ghosts,
+  // fixierte Ebenen). Die Auswahl raeumt setViewMode bei jedem Wechsel ab.
+  container.querySelector('.tasks-page')?.classList.toggle('app-page--list-detail', !isKanbanMode());
   syncSplitHeight(container);
 
   // Suche, Filter und Sammelauswahl fragen alle nach AUFGABEN. Der Verlauf
@@ -4216,6 +4247,14 @@ function setViewMode(container, mode) {
   if (mode === 'history') state.viewBeforeHistory = state.viewMode;
   state.viewMode = mode;
   localStorage.setItem('yuvomi-tasks-view', state.viewMode);
+  // DIE AUSWAHL GEHOERT ZU DEN ZEILEN DER ANSICHT, DIE GEHT. Liste und Verlauf
+  // teilen sich EINE Spalte (#1550), aber nicht ihre Zeilen: eine Aufgabe aus
+  // der Liste stuende rechts neben einem Verlauf ohne ihre Zeile. Ein Wechsel
+  // ist ein neuer Zusammenhang wie ein Ordnerwechsel in Mail - die neue
+  // Ansicht waehlt ihre erste Zeile vor, sobald sie steht (`repick`), das
+  // Brett gar keine (dort steht keine Spalte). Ersetzt, nicht gestapelt: der
+  // Wechsel selbst schreibt keinen Zurueck-Schritt.
+  taskMd?.clear({ history: 'replace', repick: true });
   renderFilters(container);
   syncViewChrome(container);
 
@@ -4934,10 +4973,12 @@ function openTaskView(task, reminder, container, { pane = null } = {}) {
 // Liste + Detail (Breitenregel, DESIGN.md; utils/master-detail.js)
 //
 // Ab der Schwelle steht rechts neben der Liste das Detail der AUSGEWAEHLTEN
-// Aufgabe - wie in Erinnerungen auf dem Mac. Nur in der Listenansicht: das
-// Brett braucht die ganze Flaeche, und der Verlauf zeigt Vorgaenge, keine
-// Aufgaben. Die Wurzel traegt `.app-page--list-detail` deshalb nur dort
-// (syncViewChrome), darunter und im Brett bleibt alles, wie es war.
+// Aufgabe - wie in Erinnerungen auf dem Mac. In der Liste und im Verlauf
+// (#1550: neben einem Eintrag steht seine Aufgabe), nicht im Brett: das
+// braucht die ganze Flaeche. Die Wurzel traegt `.app-page--list-detail`
+// deshalb nur dort (syncViewChrome), darunter und im Brett bleibt alles, wie
+// es war. Beide Ansichten zeichnen in dasselbe `#task-list` und teilen sich
+// EINE Instanz des Bausteins (es gibt je Seite hoechstens eine).
 //
 // Die Adresse ist `?open=<id>` und nicht `?id=`: diesen Deep-Link gibt es seit
 // der globalen Suche (router.js), und EIN Parameter fuer beide Regime heisst,
@@ -5014,6 +5055,37 @@ function syncPaneAfterRender(listEl, orderBefore, { quiet = false } = {}) {
   }
   if (filteredTasks().some((task) => String(task.id) === selected)) return;
   moveSelectionOn(listEl, orderBefore, selected);
+}
+
+/**
+ * Dasselbe fuer den Verlauf (#1550) - nach jedem Neuzeichnen seiner Eintraege.
+ *
+ * Der Verlauf hat keinen eigenen Bestand an Aufgaben, an dem sich ein
+ * Fingerabdruck messen liesse (`taskSig` liest `state.tasks`, und dort steht
+ * eine erledigte Aufgabe unter dem Statusfilter gar nicht). Die Frage ist
+ * deshalb, WARUM neu gezeichnet wurde:
+ *
+ * - Nach einem Schreibvorgang (`afterWrite`, renderTaskList): die Zeile steht
+ *   noch, dann malt das Detail neu - ausser die Aenderung kam aus ihm selbst
+ *   (`quiet`). Ist sie weg (Haken zurueckgenommen, geloescht), rueckt die
+ *   Auswahl auf die Nachbarin wie in der Liste.
+ * - Sonst (Person gewechselt, Erneut versuchen, „Mehr anzeigen"): ein neuer
+ *   Zusammenhang oder nur mehr Zeilen. Das entscheidet der Baustein selbst
+ *   (refresh): bleibt die Zeile, bleibt die Auswahl; fiel eine gezeigte weg,
+ *   steht die erste rechts.
+ */
+function syncHistoryPane(listEl, orderBefore, { afterWrite = false, quiet = false } = {}) {
+  if (!taskMd) return;
+  const selected = taskMd.selectedId();
+  if (selected == null) { taskMd.refresh(); return; }
+  if (listEl.querySelector(`[data-md-id="${CSS.escape(selected)}"]`)) {
+    const repaint = paneRepaintDue || (afterWrite && !quiet);
+    paneRepaintDue = false;
+    taskMd.refresh({ repaint });
+    return;
+  }
+  if (afterWrite) moveSelectionOn(listEl, orderBefore, selected);
+  else taskMd.refresh();
 }
 
 /** Die ausgewaehlte Zeile ist weg: auf die Nachbarin oder in den Leerzustand. */
@@ -5378,7 +5450,7 @@ export async function render(container, { user, signal } = {}) {
   // Initiales Skeleton (all values are from i18n keys or hardcoded constants, no user data)
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <div class="tasks-page app-page app-page--full${state.viewMode === 'list' ? ' app-page--list-detail' : ''}" data-composition="full">
+    <div class="tasks-page app-page app-page--full${state.viewMode !== 'kanban' ? ' app-page--list-detail' : ''}" data-composition="full">
       <div class="page-toolbar page-toolbar--wrap tasks-toolbar">
         <h1 class="page-toolbar__title">${t('tasks.title')}</h1>
         ${renderPageSearch({
@@ -5525,7 +5597,7 @@ export async function render(container, { user, signal } = {}) {
   renderFilters(container);
   // Im Verlauf holt renderTaskList den Bestand selbst nach - er steckt nicht in
   // `/tasks`, und sein Ladefehler ist ein eigener.
-  renderTaskList(container);
+  const firstPaint = renderTaskList(container);
 
   wirePageSearch(container, {
     id: 'tasks-search',
@@ -5537,7 +5609,12 @@ export async function render(container, { user, signal } = {}) {
 
   // Liste + Detail einhaengen - erst jetzt, weil die Zeilen stehen muessen:
   // der Deep-Link `?open=<id>` waehlt ab der Schwelle seine Zeile aus und
-  // oeffnet darunter (und im Brett) die Detailansicht wie bisher.
+  // oeffnet darunter (und im Brett) die Detailansicht wie bisher. Der Verlauf
+  // zeichnet seine Zeilen erst nach einer eigenen Anfrage (#1550): ohne das
+  // Warten fehlte die Zeile beim Einhaengen, und ein `?open=` auf einen
+  // Eintrag ginge als Blatt ueber der Spalte auf statt ihn auszuwaehlen.
+  // `loadHistory` faengt seinen Fehler selbst ab und wirft nie.
+  if (state.viewMode === 'history') await firstPaint;
   mountTaskSplit(container, signal);
 }
 
@@ -5633,6 +5710,11 @@ export const __test = {
   mountTaskSplit,
   // Sammel-Loeschen: was die Spalte tut, waehrend das Rueckgaengig-Fenster laeuft.
   handleBulkDelete,
+  // Der Verlauf in Liste + Detail (#1550): welche Ansicht die Spalte bekommt
+  // (Klassen an der Wurzel), dass ein Wechsel die Auswahl der alten Ansicht
+  // abraeumt und die Vorwahl wieder scharf stellt, was eine Zeile traegt, wohin
+  // ihr Klick fuehrt und was nach dem Neuzeichnen mit der Auswahl geschieht.
+  syncViewChrome, setViewMode, renderHistoryEntry, openHistoryEntry, syncHistoryPane, renderTaskList,
   // Der Lader steht hier, weil die PRAEMISSE des gesperrten Zweigs an ihm
   // haengt: dass `calendar: read` die Erinnerung wirklich bekommt. War das nur
   // Prosa, liess sich das `none` still zu `!== write` verengen und der ganze

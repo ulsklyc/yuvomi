@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Task history shows the selected task beside it on wide screens** (#1550). From the width
+  at which the task list becomes list and detail (a main column of about 1040px, so a 1280px
+  laptop with the sidebar open and anything wider), the history entries stand on the left and
+  the task of the selected entry opens on the right, as in the list: the first entry is
+  selected when you open History, arrow keys move through the entries, the back button returns
+  to the previous one, and a link with `?open=` selects its entry. List, Board and History now
+  end at the same outer edge; until now History ended 436px short of the header at 1440px.
+  Below that width History keeps its narrower reading lane and an entry still opens its task as
+  a sheet. Switching between List and History selects the first row of the view you switch to,
+  and the person filter in History fades at its edge when it does not fit.
 - **The mobile tab bar is more glass and lets more of the page show through.** The floating
   capsule at the bottom of the screen is thinner (66 % instead of 86 % in light, 50 % instead of
   88 % in dark), blurs and saturates what scrolls beneath it more strongly, and carries a light

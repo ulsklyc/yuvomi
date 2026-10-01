@@ -1212,7 +1212,7 @@ Kernseite fuehrt es. Die Zuordnung aller Seiten:
 | `housekeeping.js` Haushaltshilfe | Lesemass | `reading` (vorher `data`) |
 | `birthdays.js` Geburtstage | Liste + Detail | `reading` + `list-detail` |
 | `contacts.js` Kontakte | Liste + Detail | `reading` + `list-detail` |
-| `tasks.js` Aufgaben | Liste + Detail | `full` + `list-detail` in der Liste; Kanban ist Flaeche |
+| `tasks.js` Aufgaben | Liste + Detail | `full` + `list-detail` in Liste und Verlauf (#1550: neben dem Eintrag seine Aufgabe); Kanban ist Flaeche |
 | `recipes.js` Rezepte | Liste + Detail | `reading` + `list-detail` |
 | `inventory.js` Inventar | Liste + Detail | `reading` + `list-detail` (vorher `data`) |
 | `calendar.js` Kalender | Liste + Detail | `full` + `list-detail` in der Agenda; Monat, Woche, Tag sind Flaeche |

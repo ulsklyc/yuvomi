@@ -4574,6 +4574,13 @@ The surface carries four things, in this order: **the time**, large (this is whe
   cannot change anything. See [Task Completions](#task-completions-migration-v161-791) for the data
   model and why the view starts empty. A recurring task additionally carries **Last completed** in
   its detail view, across the whole repetition chain rather than just the instance currently open.
+  **From the split threshold History is list + detail like the List (#1550):** the entries stand on
+  the left and the task of the selected entry on the right, with the same address (`?open=<task id>`,
+  the first entry preselected via `replaceState`), arrow keys, Enter/Esc and back gesture as the List;
+  an entry whose task was deleted in the meantime falls back to the empty column. List, Board and
+  History then end at the same outer edge. Below the threshold History keeps the 720px reading lane
+  and an entry opens its task as a sheet, as before. Switching between List and History clears the
+  selection of the view being left and preselects the first row of the new one.
 - View mode persisted in localStorage; URL parameter `?view=kanban` (or `?view=history`) overrides (useful for tablet kiosk setups)
 
 **Features:**

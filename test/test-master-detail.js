@@ -815,6 +815,35 @@ test('Vorwahl: eigene Wahl per Funktion, spaete Liste per refresh(), Esc bleibt 
   handle.destroy();
 });
 
+test('Vorwahl: clear({ repick }) stellt sie wieder scharf - die Liste wechselt den Zusammenhang (#1550)', () => {
+  // Aufgaben zeichnen Liste und Verlauf in dieselbe Spalte. Ein Wechsel der
+  // Ansicht ist wie ein Ordnerwechsel in Mail: die neue zeigt ihre erste
+  // Zeile rechts. Ein schlichtes clear() (Esc) laesst dagegen den Leerzustand.
+  const p = makePage();
+  const handle = p.mount({ preselect: true });
+  assert.equal(handle.selectedId(), '1');
+  handle.open('4');
+  handle.clear();
+  handle.refresh();
+  assert.equal(handle.selectedId(), null, 'ohne repick: der Leerzustand bleibt');
+  handle.open('4');
+  handle.clear({ history: 'replace', repick: true });
+  assert.equal(handle.selectedId(), null, 'repick waehlt nicht selbst - die neuen Zeilen stehen noch nicht');
+  assert.equal(location.search, '', 'die alte Auswahl ist aus der Adresse');
+  handle.refresh();
+  assert.equal(handle.selectedId(), '1', 'der naechste refresh() mit Zeilen waehlt die erste');
+  assert.deepEqual(historyLog.at(-1), ['replace', '/contacts?open=1'], 'ersetzend, kein Zurueck-Schritt');
+  handle.destroy();
+
+  // Unter der Schwelle waehlt auch eine scharfe Vorwahl nichts.
+  const narrow = makePage({ split: false });
+  const h2 = narrow.mount({ preselect: true });
+  h2.clear({ repick: true });
+  h2.refresh();
+  assert.equal(h2.selectedId(), null);
+  h2.destroy();
+});
+
 test('Vorwahl: beim Wechsel schmal -> Spalte, ohne gemerkte Auswahl', () => {
   const observers = [];
   global.ResizeObserver = class { constructor(cb) { this.cb = cb; observers.push(this); } observe() {} disconnect() {} };

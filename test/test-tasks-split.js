@@ -16,6 +16,11 @@
  *      aus dem Detail selbst. Verlaesst die Zeile die Ansicht, rueckt die
  *      Auswahl auf die Nachbarin (erst darunter, dann darueber), sonst
  *      Leerzustand.
+ *   3. DER VERLAUF STEHT IN DERSELBEN SPALTE (#1550). Ab der Schwelle steht
+ *      neben einem Verlaufseintrag seine Aufgabe, so wie neben einer Zeile der
+ *      Liste - dieselbe Instanz des Bausteins, dieselbe Adresse (`?open=`),
+ *      dieselbe Tastatur. Bis dahin endete der Verlauf auf der 720px-Bahn und
+ *      liess bei 1440 436px vor der Kopfkante leer.
  *
  * Ausfuehren: npm run test:tasks-split
  */
@@ -516,4 +521,191 @@ test('Sammel-Loeschen mit der angezeigten Aufgabe: die Spalte rueckt sofort weit
   } finally {
     delete globalThis.__undoStub;
   }
+});
+
+// ── 3. Der Verlauf in Liste + Detail (#1550) ──────────────────────────────
+
+/** Eine Seitenwurzel, deren Klassen der Test liest - sonst nichts im Baum. */
+function viewContainer() {
+  const classes = new Set(['tasks-page', 'app-page', 'app-page--full']);
+  const page = {
+    classList: {
+      toggle: (name, on) => { if (on) classes.add(name); else classes.delete(name); return on; },
+      add: (name) => classes.add(name),
+      remove: (name) => classes.delete(name),
+      contains: (name) => classes.has(name),
+    },
+    querySelector: () => null,
+  };
+  return {
+    classes,
+    isConnected: true,
+    querySelector: (sel) => (sel === '.tasks-page' ? page : null),
+    querySelectorAll: () => [],
+  };
+}
+
+test('Liste und Verlauf sind Liste + Detail mit Lesebahn darunter, das Brett ist Flaeche', () => {
+  const before = tasks.state.viewMode;
+  try {
+    for (const [mode, splitAllowed] of [['list', true], ['history', true], ['kanban', false]]) {
+      tasks.state.viewMode = mode;
+      const c = viewContainer();
+      tasks.syncViewChrome(c);
+      assert.equal(c.classes.has('app-page--list-detail'), splitAllowed,
+        `${mode}: die Wurzel ${splitAllowed ? 'muss' : 'darf nicht'} der Container der Schwelle sein`
+        + (mode === 'history' ? ' - ohne ihn endet der Verlauf bei 1440 436px vor der Kopfkante (#1550)' : ''));
+      // Unter der Schwelle: Liste und Verlauf behalten die 720px-Bahn, das Brett nicht.
+      assert.equal(c.classes.has('is-reading-measure'), splitAllowed, `${mode}: Lesebahn unter der Schwelle`);
+    }
+  } finally {
+    tasks.state.viewMode = before;
+  }
+});
+
+test('ein Ansichtswechsel raeumt die Auswahl der alten Ansicht ab und stellt die Vorwahl wieder scharf', () => {
+  // Liste und Verlauf teilen sich EINE Spalte, aber nicht ihre Zeilen: ohne
+  // das Abraeumen stuende eine Aufgabe der Liste rechts neben dem Verlauf.
+  const before = tasks.state.viewMode;
+  const savedRaf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = () => 0;
+  try {
+    for (const [from, to] of [['list', 'history'], ['history', 'list'], ['history', 'kanban'], ['kanban', 'history']]) {
+      tasks.state.viewMode = from;
+      const { md, calls } = fakeMd('5');
+      tasks.useTaskMd(md);
+      tasks.setViewMode(viewContainer(), to);
+      assert.deepEqual(calls, [['clear', { history: 'replace', repick: true }]],
+        `${from} -> ${to}: die Auswahl geht ersetzend, und die neue Ansicht waehlt ihre erste Zeile vor`);
+    }
+  } finally {
+    tasks.state.viewMode = before;
+    globalThis.requestAnimationFrame = savedRaf;
+    tasks.useTaskMd(null);
+  }
+});
+
+test('eine Verlaufszeile ist eine Zeile des Bausteins: ihre ID ist die Aufgabe', () => {
+  const html = tasks.renderHistoryEntry({
+    id: 31, task_id: 7, title: 'Tisch decken', completed_at: '2026-09-30T08:00:00Z',
+    user_id: 2, person_name: 'Linda', is_recurring: 0,
+  });
+  assert.match(html, /<button type="button" class="list-row history-row"/, 'die Zeile ist selbst der Knopf');
+  assert.match(html, /data-md-id="7"/, 'ohne data-md-id findet der Baustein die Zeile nicht - keine Auswahl, keine Pfeiltasten');
+  assert.doesNotMatch(html, /data-md-id="31"/, '?open= nennt eine Aufgabe, nie einen Vorgang');
+  assert.match(html, /data-task-id="7"/, 'Loeschen aus der Spalte blendet die Zeile sofort aus (taskRowsIn)');
+});
+
+test('ein Klick auf einen Eintrag geht durch den Baustein: Spalte ab der Schwelle, darunter das Blatt', async () => {
+  const opened = [];
+  const md = { open: (id, trigger) => opened.push([id, trigger]) };
+  const trigger = { isRow: true };
+  tasks.useTaskMd(md);
+  try {
+    tasks.openHistoryEntry('7', trigger, {});
+    assert.deepEqual(opened, [['7', trigger]], 'der Baustein entscheidet: auswaehlen oder Blatt');
+  } finally {
+    tasks.useTaskMd(null);
+  }
+  // Ohne Baustein (noch nicht eingehaengt): das Blatt wie bisher.
+  const views = [];
+  globalThis.__apiStub = { get: (path) => Promise.resolve({ data: String(path).startsWith('/tasks/') ? { ...BASIS, status: 'done' } : null }) };
+  globalThis.__openDetailView = (options) => views.push({ title: options.title, pane: options.pane ?? null });
+  try {
+    tasks.openHistoryEntry('7', trigger, {});
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    assert.deepEqual(views, [{ title: 'Tisch decken', pane: null }]);
+  } finally {
+    delete globalThis.__apiStub;
+    delete globalThis.__openDetailView;
+  }
+});
+
+test('Verlauf neu gezeichnet: Auswahl halten, nach einem Schreibvorgang neu malen, weitergehen oder dem Baustein ueberlassen', () => {
+  // Steht die Zeile noch und wurde nur geblaettert oder gefiltert: Auswahl
+  // bleibt, das Detail malt NICHT neu.
+  let { md, calls } = fakeMd('2');
+  tasks.useTaskMd(md);
+  try {
+    tasks.syncHistoryPane(listOf([1, 2, 3]), ['1', '2', '3']);
+    assert.deepEqual(calls, [['refresh', { repaint: false }]]);
+
+    // Nach einem Schreibvorgang (gespeichertes Formular): das Detail zieht nach.
+    calls.length = 0;
+    tasks.syncHistoryPane(listOf([1, 2, 3]), ['1', '2', '3'], { afterWrite: true });
+    assert.deepEqual(calls, [['refresh', { repaint: true }]],
+      'der Verlauf hat keinen Bestand fuer einen Fingerabdruck - ohne Neumalen stuende die alte Fassung rechts');
+
+    // Kam die Aenderung aus der Spalte selbst, bleibt der Fokus im Knopf.
+    calls.length = 0;
+    tasks.syncHistoryPane(listOf([1, 2, 3]), ['1', '2', '3'], { afterWrite: true, quiet: true });
+    assert.deepEqual(calls, [['refresh', { repaint: false }]]);
+
+    // Eine Aktion der Spalte (Wieder oeffnen) hat sie abgemeldet: neu malen.
+    tasks.onPaneActionClosed({ querySelector: () => null });
+    calls.length = 0;
+    tasks.syncHistoryPane(listOf([1, 2, 3]), ['1', '2', '3'], { afterWrite: true, quiet: true });
+    assert.deepEqual(calls, [['refresh', { repaint: true }]]);
+
+    // Haken zurueckgenommen oder geloescht: der Eintrag ist weg, die Auswahl
+    // rueckt auf die Nachbarin darunter - wie in der Liste, per replace.
+    calls.length = 0;
+    tasks.syncHistoryPane(listOf([1, 3]), ['1', '2', '3'], { afterWrite: true });
+    assert.deepEqual(calls.map(([op, id, o]) => [op, id, o?.history]), [['select', '3', 'replace']]);
+
+    // Eine andere Person gewaehlt: neuer Zusammenhang, das entscheidet der
+    // Baustein (erste Zeile, wenn die gezeigte wegfiel) - kein Weiterruecken.
+    ({ md, calls } = fakeMd('2'));
+    tasks.useTaskMd(md);
+    tasks.syncHistoryPane(listOf([4, 5]), ['1', '2', '3']);
+    assert.deepEqual(calls, [['refresh', {}]]);
+
+    // Ohne Auswahl nur die Vorwahl/Markierung.
+    ({ md, calls } = fakeMd(null));
+    tasks.useTaskMd(md);
+    tasks.syncHistoryPane(listOf([1]), []);
+    assert.deepEqual(calls, [['refresh', {}]]);
+  } finally {
+    tasks.useTaskMd(null);
+  }
+});
+
+test('der Verlauf zeichnet seine Zeilen, BEVOR Liste + Detail eingehaengt wird (Deep-Link auf einen Eintrag)', async () => {
+  // Im Verlauf kommen die Zeilen aus einer eigenen Anfrage. Haengte render()
+  // den Baustein vorher ein, fehlte die Zeile zu `?open=` - und der Rueckfall
+  // fuer „Aufgabe ohne Zeile" oeffnete ein Blatt ueber der Spalte.
+  const before = tasks.state.viewMode;
+  const history = tasks.state.history;
+  let rendered = false;
+  const listEl = {
+    querySelectorAll: () => [],
+    querySelector: () => null,
+    replaceChildren() {},
+    insertAdjacentHTML: (_pos, html) => { if (/data-md-id="7"/.test(html)) rendered = true; },
+  };
+  const container = { querySelector: (sel) => (sel === '#task-list' ? listEl : null) };
+  globalThis.__apiStub = {
+    get: (path) => Promise.resolve(String(path).startsWith('/tasks/completions')
+      ? { data: [{ id: 1, task_id: 7, title: 'Tisch decken', completed_at: '2026-09-30T08:00:00Z', user_id: 2, person_name: 'Linda' }], has_more: false }
+      : { data: null }),
+  };
+  tasks.state.viewMode = 'history';
+  tasks.state.history = { entries: [], hasMore: false, cursor: null, userId: null, loading: null, error: null };
+  try {
+    const firstPaint = tasks.renderTaskList(container);
+    assert.ok(firstPaint && typeof firstPaint.then === 'function', 'renderTaskList gibt im Verlauf das Laden zurueck');
+    assert.equal(rendered, false);
+    await firstPaint;
+    assert.equal(rendered, true, 'nach dem Warten stehen die Zeilen');
+  } finally {
+    delete globalThis.__apiStub;
+    tasks.state.viewMode = before;
+    tasks.state.history = history;
+  }
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  const render = src.slice(src.indexOf('export async function render('));
+  const awaitAt = render.indexOf("if (state.viewMode === 'history') await firstPaint;");
+  const mountAt = render.indexOf('mountTaskSplit(container, signal);');
+  assert.ok(awaitAt > 0 && mountAt > awaitAt, 'render() wartet im Verlauf auf die Zeilen, bevor es den Baustein einhaengt');
 });

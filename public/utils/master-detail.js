@@ -391,12 +391,22 @@ export function mountMasterDetail({
     else if (focus === 'detail') detailEl.focus();
   }
 
-  function clear({ history: mode = 'replace' } = {}) {
+  /**
+   * Hebt die Auswahl auf.
+   * @param {{history?: 'push'|'replace'|'none', repick?: boolean}} [opts]
+   *   `repick`: die Liste wechselt gleich ihren Zusammenhang (Aufgaben: Liste
+   *   und Verlauf in derselben Spalte). Die Vorwahl wird wieder scharf - wie
+   *   wenn eine gezeigte Zeile wegfaellt (refresh) -, und der naechste
+   *   refresh() mit Zeilen waehlt die erste, wie Mail beim Ordnerwechsel.
+   *   Ohne `repick` bleibt es beim Leerzustand (Esc: der Nutzer hat abgewaehlt).
+   */
+  function clear({ history: mode = 'replace', repick = false } = {}) {
     selected = null;
     renderSeq += 1;
     markSelection();
     showEmpty();
     writeHistory(mode, hrefFor, null);
+    if (repick) autoPick = preselect !== false;
   }
 
   /** Ein laufendes Oeffnen unter der Schwelle ist ueberholt. */
