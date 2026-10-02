@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An event that ends at midnight is drawn at its full length in the week and day view**
+  (#1607). An event from 23:00 to 00:00 appeared as a 30-minute strip, and one from 22:00 to
+  00:00 as well: an end at exactly 00:00 was read as "ends at minute 0 of the same day". It now
+  runs to the end of the day, and it shares its column correctly with events that overlap it.
+  Events of 24 hours or more stay in the all-day row as before.
 - **A recurring event found in the global search opens at its next date, not in its first year**
   (#1607). The search behind Cmd/Ctrl+K listed a series with the date of its very first
   occurrence, and the link opened the calendar there: a birthday from 1990 opened October 1990.

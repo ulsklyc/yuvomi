@@ -4682,11 +4682,19 @@ function clickedTime(e, colEl) {
  * Ohne `dayStr` bleibt es beim ungeklammerten Fenster - der Aufrufer, der
  * keinen Tag nennt, fragt nach dem Termin, nicht nach seinem Anteil an einem
  * Tag.
+ *
+ * "ENDET SPAETER" FRAGT DEN ECHTEN ENDTAG, NICHT eventEndDate() (#1607).
+ * eventEndDate() zieht ein Ende um exakt 00:00 auf den Vortag - richtig fuer
+ * die Frage, auf welchen Tagen der Termin STEHT (#804), falsch fuer die Frage,
+ * wie lang er an diesem Tag ist: 23:00-00:00 galt damit als "endet heute um
+ * 00:00", also 0 Minuten, also vor dem Start, und stand als Strich von der
+ * Mindesthoehe im Raster. Mitternacht am Folgetag ist das Tagesende. Fuer
+ * jedes andere Ende sind beide Tage derselbe.
  */
 function timeRangeForEvent(ev, dayStr = null) {
   const beginntFrueher = !!dayStr && dayStr > localDate(ev.start_datetime);
   const start = beginntFrueher ? 0 : timeToMinutes(localTime(ev.start_datetime));
-  const endetSpaeter = !!dayStr && !!ev.end_datetime && dayStr < eventEndDate(ev);
+  const endetSpaeter = !!dayStr && !!ev.end_datetime && dayStr < localDate(ev.end_datetime);
   const end = ev.end_datetime
     ? (endetSpaeter ? 24 * 60 : timeToMinutes(localTime(ev.end_datetime)))
     : start + 60;

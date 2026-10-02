@@ -4892,6 +4892,123 @@ test('Z2: Hinweis im leeren Tag nennt die Geste des Zeigers, nicht den Einzelkli
 });
 
 // --------------------------------------------------------
+// #1607 (M4b): ein Termin, der um exakt 00:00 endet
+//
+// 23:00-00:00 stand als 30-Minuten-Strich im Raster. eventEndDate() zieht ein
+// Ende um 00:00 auf den Starttag (#804, richtig fuer die TAGESZUORDNUNG: der
+// Termin gehoert dem Abend). timeRangeForEvent() fragte denselben Helfer aber
+// nach der LAENGE: "endet nicht spaeter als dieser Tag", also Ende = 00:00 = 0
+// Minuten, also vor dem Start, also die Mindesthoehe von 30 Minuten.
+// Mitternacht am Folgetag ist das Tagesende, 24 * 60.
+//
+// Feste Kalendertage (Juni 2026, keine Zeitumstellung) und, wo ein Instant im
+// Spiel ist, eine ausdruecklich gesetzte Anzeigezone.
+// --------------------------------------------------------
+
+function endsAtMidnight(startTime, extra = {}) {
+  return {
+    id: 4401, title: 'Spaetschicht', all_day: 0, assigned_users: [],
+    start_datetime: `2026-06-14T${startTime}`, end_datetime: '2026-06-15T00:00',
+    ...extra,
+  };
+}
+
+test('renderDayView: 23:00 bis 00:00 ist eine Stunde hoch, kein 30-Minuten-Strich (#1607)', () => {
+  withOvernightState({ cursor: '2026-06-14', events: [endsAtMidnight('23:00')] }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderDayView(container);
+    const bloecke = timedBlocks(container.html);
+    assert(bloecke.length === 1 && bloecke[0].id === 4401, `ein Zeitblock erwartet: ${JSON.stringify(bloecke)}`);
+    assert(bloecke[0].top === hourOffset(23 * 60), `Beginn 23:00: ${bloecke[0].top}`);
+    assert(bloecke[0].height === `calc(${hourOffset(60)} - 4px)`,
+      `der Block reicht bis Mitternacht, also eine Stunde: ${bloecke[0].height}`);
+  });
+});
+
+test('renderDayView: 22:00 bis 00:00 ist zwei Stunden hoch (#1607)', () => {
+  withOvernightState({ cursor: '2026-06-14', events: [endsAtMidnight('22:00')] }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderDayView(container);
+    const bloecke = timedBlocks(container.html);
+    assert(bloecke.length === 1, `ein Zeitblock erwartet: ${JSON.stringify(bloecke)}`);
+    assert(bloecke[0].top === hourOffset(22 * 60), `Beginn 22:00: ${bloecke[0].top}`);
+    assert(bloecke[0].height === `calc(${hourOffset(2 * 60)} - 4px)`, `zwei Stunden: ${bloecke[0].height}`);
+  });
+});
+
+test('renderWeekView: der Termin bis 00:00 steht nur am Abend, eine Stunde hoch (#1607)', () => {
+  withOvernightState({ events: [endsAtMidnight('23:00')] }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderWeekView(container);
+    const html = container.html;
+    const abend = timedBlocks(weekColumnHtml(html, '2026-06-14'));
+    const folgetag = timedBlocks(weekColumnHtml(html, '2026-06-15'));
+    assert(abend.length === 1, `der 14. zeigt den Block: ${JSON.stringify(abend)}`);
+    assert(abend[0].height === `calc(${hourOffset(60)} - 2px)`, `eine Stunde: ${abend[0].height}`);
+    assert(folgetag.length === 0,
+      `ein Ende um 00:00 gehoert dem Abend (#804) - der 15. bleibt leer: ${JSON.stringify(folgetag)}`);
+    assert(!html.slice(0, html.indexOf('week-view__scroll')).includes('class="allday-event"'),
+      'und in der Ganztags-Zeile steht er auch nicht');
+  });
+});
+
+test('layoutOverlaps: 23:00 bis 00:00 teilt sich die Spalte mit 23:30 (#1607)', () => {
+  const spaet = endsAtMidnight('23:00');
+  const anruf = {
+    id: 4402, title: 'Anruf', all_day: 0, assigned_users: [],
+    start_datetime: '2026-06-14T23:30', end_datetime: '2026-06-14T23:45',
+  };
+  const layout = calendarHelpers.layoutOverlaps([spaet, anruf], '2026-06-14');
+  assert(layout.get(spaet)?.totalCols === 2 && layout.get(anruf)?.totalCols === 2,
+    'als 23:00-23:30 gerechnet endete der Termin genau dort, wo der Anruf beginnt, und beide '
+    + `lagen deckungsgleich uebereinander: ${JSON.stringify([layout.get(spaet), layout.get(anruf)])}`);
+});
+
+test('ein Instant, der in der Anzeigezone um 00:00 endet, reicht ebenfalls bis zum Tagesende (#1607)', () => {
+  // 21:00Z-22:00Z ist in Berlin (Sommerzeit, +2) 23:00-00:00, in UTC 21:00-22:00.
+  // Beide Antworten sind eine Stunde hoch, aber an VERSCHIEDENEN Stellen - eine
+  // Rechnung am UTC-Tag oder an der Rechnerzone laege in einer der beiden falsch.
+  const instant = endsAtMidnight('23:00', { start_datetime: '2026-06-14T21:00:00Z', end_datetime: '2026-06-14T22:00:00Z' });
+  for (const [zone, beginn] of [['Europe/Berlin', 23 * 60], ['UTC', 21 * 60]]) {
+    withDisplayTimeZone(zone, () => {
+      withOvernightState({ cursor: '2026-06-14', events: [instant] }, () => {
+        const container = fakeContainer();
+        calendarHelpers.renderDayView(container);
+        const bloecke = timedBlocks(container.html);
+        assert(bloecke.length === 1, `${zone}: ein Zeitblock erwartet: ${JSON.stringify(bloecke)}`);
+        assert(bloecke[0].top === hourOffset(beginn), `${zone}: Beginn ${bloecke[0].top}`);
+        assert(bloecke[0].height === `calc(${hourOffset(60)} - 4px)`, `${zone}: eine Stunde: ${bloecke[0].height}`);
+      });
+    });
+  }
+});
+
+test('Mehrtaegige ab 24 Stunden bleiben in der Ganztags-Zeile, auch mit Ende um 00:00 (#1607, Regel aus #1323)', () => {
+  // Die Aenderung darf nur die HOEHE eines Zeitblocks treffen, nicht die Frage,
+  // WER ein Zeitblock ist. 45 Stunden (14. 14:00 bis 16. 11:00) und 38 Stunden
+  // mit Ende um Mitternacht (14. 10:00 bis 16. 00:00, gehoert bis zum 15.).
+  const lang = longTimedEvent();
+  const bisMitternacht = longTimedEvent({ id: 4403, start_datetime: '2026-06-14T10:00', end_datetime: '2026-06-16T00:00' });
+  for (const ev of [lang, bisMitternacht]) {
+    assert(calendarHelpers.isAllDayLike(ev) === true, `${ev.id}: ab 24 Stunden Ganztags-Zeile`);
+    withOvernightState({ events: [ev] }, () => {
+      const container = fakeContainer();
+      calendarHelpers.renderWeekView(container);
+      assert(timedBlocks(container.html).length === 0,
+        `${ev.id}: kein Zeitblock im Raster: ${JSON.stringify(timedBlocks(container.html))}`);
+      assert(container.html.includes(`data-id="${ev.id}"`), `${ev.id}: der Termin steht in der Ganztags-Zeile`);
+    });
+  }
+  assert(calendarHelpers.eventEndDate(bisMitternacht) === '2026-06-15', 'das Ende um 00:00 gehoert weiter dem Vortag (#804)');
+  assert(calendarHelpers.eventEndDate(lang) === '2026-06-16', 'der lange Termin endet unveraendert am 16.');
+  // Und der kurze Nacht-Termin aus #1313 bleibt, wie er war.
+  const nacht = overnightEvent();
+  const kopf = calendarHelpers.layoutOverlaps([nacht], '2026-06-14');
+  const schwanz = calendarHelpers.layoutOverlaps([nacht], '2026-06-15');
+  assert(kopf.get(nacht)?.totalCols === 1 && schwanz.get(nacht)?.totalCols === 1, '22:00-01:30 unveraendert');
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 console.log(`\n[Calendar-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);
