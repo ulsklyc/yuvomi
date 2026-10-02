@@ -73,7 +73,7 @@
             "private": "Solo io",
             "hint": "Determina chi può vedere questa voce in Yuvomi.",
             "assigneesNobodyHint": "Senza assegnatari, solo tu vedi questa voce.",
-            "privateAssignedHint": "Le persone assegnate non vedono questa voce e non ricevono promemoria. Scegli «Solo assegnatari» se devono vederla."
+            "privateAssignedHint": "Le persone assegnate non vedono questa voce. Scegli «Solo assegnatari» se devono vederla."
         },
         "toShoppingListNamed": "Aggiungi {{title}} alla lista della spesa",
         "emailInUse": "Questo indirizzo email appartiene già a un altro account."

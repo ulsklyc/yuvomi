@@ -19,8 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The event and task forms say when "Only me" is combined with assigned people.** Visibility
   "Only me" means only the person who created the entry sees it, so the people assigned to it
-  do not see it and are not reminded. The form now shows a hint for that combination and points
-  to "Assignees only" for an entry they should see. Nothing is blocked and the assignment
+  do not see it. The form now shows a hint for that combination and points to "Assignees only"
+  for an entry they should see. Nothing is blocked and the assignment
   stays as it is.
 - **Task history shows the selected task beside it on wide screens** (#1550). From the width
   at which the task list becomes list and detail (a main column of about 1040px, so a 1280px

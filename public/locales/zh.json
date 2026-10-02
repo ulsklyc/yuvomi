@@ -73,7 +73,7 @@
             "private": "仅自己",
             "hint": "控制谁可以在 Yuvomi 中看到此条目。",
             "assigneesNobodyHint": "未指定任何人时，只有你能看到此条目。",
-            "privateAssignedHint": "被分配的人看不到此条目，也不会收到提醒。如果希望他们看到，请选择“仅限被分配者”。"
+            "privateAssignedHint": "被分配的人看不到此条目。如果希望他们看到，请选择“仅限被分配者”。"
         },
         "toShoppingListNamed": "将{{title}}加入购物清单",
         "emailInUse": "此电子邮件地址已属于另一个账户。"

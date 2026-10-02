@@ -73,7 +73,7 @@
             "private": "Hanya saya",
             "hint": "Menentukan siapa yang dapat melihat entri ini di Yuvomi.",
             "assigneesNobodyHint": "Tanpa penerima tugas, hanya kamu yang melihat entri ini.",
-            "privateAssignedHint": "Orang yang ditugaskan tidak melihat entri ini dan tidak diingatkan. Pilih \"Hanya yang ditugaskan\" jika mereka perlu melihatnya."
+            "privateAssignedHint": "Orang yang ditugaskan tidak melihat entri ini. Pilih \"Hanya yang ditugaskan\" jika mereka perlu melihatnya."
         },
         "toShoppingListNamed": "Tambahkan {{title}} ke daftar belanja",
         "emailInUse": "Alamat email ini sudah dimiliki akun lain."

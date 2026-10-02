@@ -404,8 +404,8 @@ test('#1332: ein bestehender Termin mit zwei Personen zieht nicht um und erklaer
 // "Nur ich" mit zugewiesenen Personen
 //
 // `private` heisst: nur wer den Termin angelegt hat, sieht ihn. Das Formular
-// laesst trotzdem Personen zuweisen - sie sehen den Termin dann nicht und
-// werden nicht erinnert. Verboten wird die Kombination nicht (Bestandsdaten
+// laesst trotzdem Personen zuweisen - sie sehen den Termin dann nicht.
+// Verboten wird die Kombination nicht (Bestandsdaten
 // und API-Clients bleiben gueltig), der Dialog sagt es. Gemessen am selben
 // Aufrufer wie oben: Markup aus `buildEventModalContent`, Verdrahtung ueber
 // `wireEventForm`, die Hand an Auswahl und Kaestchen.

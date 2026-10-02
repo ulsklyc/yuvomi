@@ -7123,7 +7123,7 @@ function applyDefaultSyncTarget(selectElement) {
 // - „Nur Zugewiesene" ohne Person: dann sieht faktisch nur der Ersteller den
 //   Termin (#474 Guard).
 // - „Nur ich" mit mindestens einer Person: die Zugewiesenen sehen den Termin
-//   nicht und werden nicht erinnert. Die Kombination bleibt erlaubt und die
+//   nicht. Die Kombination bleibt erlaubt und die
 //   Zuweisung stehen - Bestandsdaten und API-Clients fuehren sie.
 function wireVisibilityWarning(panel, selectSel, msName, warnSel, privateWarnSel) {
   const select = panel.querySelector(selectSel);
