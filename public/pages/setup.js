@@ -8,11 +8,32 @@
 import { auth, ApiError } from '/api.js';
 import { getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { isValidTimeZone } from '/utils/timezone.js';
 
 const VERSION_URL = '/api/v1/version';
 const DEFAULT_APP_NAME = 'Yuvomi';
 const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
 const USERNAME_RE = /^[a-zA-Z0-9._-]{3,64}$/;
+
+// Ein Browser, der seine Zone verschweigt (Firefox mit resistFingerprinting,
+// Headless), meldet UTC. Als Haushaltszone gespeichert waere das eine
+// ausdrueckliche Wahl und ueberstimmte ein gesetztes `TZ` des Containers.
+const UNTELLING_ZONES = new Set(['UTC', 'Etc/UTC', 'Etc/GMT', 'GMT', 'Etc/Unknown']);
+
+/**
+ * Die Zone, in der dieser Browser steht - oder `undefined`, wenn er keine
+ * brauchbare nennt. Ohne sie faellt der Server auf `TZ` zurueck (im Container
+ * meist UTC), und "heute" liegt oestlich von UTC stundenlang auf gestern.
+ * @returns {string|undefined} IANA-Zone
+ */
+function browserTimeZone() {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return isValidTimeZone(zone) && !UNTELLING_ZONES.has(zone) ? zone : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function getStoredAppName() {
   return localStorage.getItem(APP_NAME_STORAGE_KEY) || DEFAULT_APP_NAME;
@@ -153,7 +174,20 @@ export async function render(container) {
     try {
       // Die Sprache, in der diese Seite gerade steht: der Server macht daraus
       // die Datensprache des Haushalts, statt still auf Englisch zu fallen.
-      await auth.setup(username, displayName, password, getLocale());
+      // Dazu die Zone dieses Browsers als Haushaltszone, sonst rechnet der
+      // Server "heute" in der Zone des Containers.
+      const language = getLocale();
+      const timezone = browserTimeZone();
+      try {
+        await auth.setup(username, displayName, password, language, timezone);
+      } catch (err) {
+        // Der Server prueft die Zone gegen SEINE ICU-Daten und antwortet bei
+        // einer unbekannten mit 400. Das darf kein Admin-Konto kosten: einmal
+        // ohne Zone wiederholen, sie ist in den Einstellungen nachtraeglich
+        // waehlbar. Ein 400 aus anderem Grund kommt unveraendert zurueck.
+        if (!(err instanceof ApiError && err.status === 400 && timezone)) throw err;
+        await auth.setup(username, displayName, password, language);
+      }
       // Setup erfolgreich -> direkt einloggen
       const result = await auth.login(username, password);
       window.yuvomi.navigate('/', result.user);

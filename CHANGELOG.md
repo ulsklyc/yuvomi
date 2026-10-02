@@ -37,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A new household starts in its own time zone** (#1607). The first-run page now sends the
+  browser's time zone along, and the server stores it as the household time zone. Until now a
+  fresh install had none, so the server counted "today" in the container's zone, usually UTC:
+  east of UTC the dashboard showed no meals for today and overdue tasks were not counted as
+  overdue during the first hours of the day, west of UTC the day turned over hours early in
+  the evening. A browser that reports no usable zone, or only UTC, sends nothing and the server
+  falls back to `TZ` as before. Households that already exist are not changed - an admin sets
+  the zone once in the settings under "Time zone".
 - **Correcting the date of a series' first entry no longer moves the rest of the series** (#1545).
   Every later occurrence of a recurring payment is counted from its start day, and that was still
   the date of the first entry. Correcting it with "Only this occurrence" (the rent was debited on
