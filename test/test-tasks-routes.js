@@ -1198,7 +1198,13 @@ test('PATCH status: das Zuruecknehmen holt die Punkte der benannten Person zurue
   await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'open' } });
 
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM task_completions WHERE task_id = ?').get(id).n, 0);
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM reward_ledger WHERE task_id = ? AND type = 'earn'").get(id).n, 0);
+  // Seit #1607 bleibt die earn-Zeile stehen und eine Gegenbuchung hebt sie auf:
+  // gemessen wird deshalb, was bei der Person ankommt, nicht die Zeilenzahl.
+  const rows = db.prepare('SELECT user_id, delta, type FROM reward_ledger WHERE task_id = ? ORDER BY id ASC').all(id);
+  assert.deepEqual(rows, [
+    { user_id: BOB, delta: 9, type: 'earn' },
+    { user_id: BOB, delta: -9, type: 'reversal' },
+  ], 'die Gegenbuchung trifft die benannte Person, nicht die abhakende');
 });
 
 test('PATCH status: eine Person ausserhalb des Haushalts wird abgewiesen', async () => {
@@ -1286,4 +1292,226 @@ test('PATCH status: eine bereits erledigte Aufgabe nimmt keine neue Benennung an
   const again = await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done', done_by_user_id: 999999 } });
   assert.equal(again.status, 200);
   assert.equal(db.prepare('SELECT done_by_user_id FROM task_completions WHERE task_id = ?').get(id).done_by_user_id, BOB);
+});
+
+// --------------------------------------------------------
+// Wiederöffnen bucht gegen, statt die Gutschrift zu löschen (#1607)
+// --------------------------------------------------------
+
+/** Ein frisches, teilnehmendes Mitglied - die Salden der anderen Tests stören nicht. */
+function seedEarner(prefix) {
+  const id = seedUser(prefix, 'member');
+  db.prepare('INSERT INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(id);
+  return id;
+}
+
+const ledgerOf = (userId) => db.prepare(
+  'SELECT delta, type, task_id FROM reward_ledger WHERE user_id = ? ORDER BY id ASC',
+).all(userId);
+const balanceOf = (userId) => db.prepare(
+  'SELECT COALESCE(SUM(delta), 0) AS n FROM reward_ledger WHERE user_id = ?',
+).get(userId).n;
+
+test('Wiederöffnen lässt die Gutschrift im Verlauf stehen und bucht sie sichtbar zurück (#1607)', async () => {
+  const admin = { id: ALICE, role: 'admin' };
+  const kid = seedEarner('kid-reopen');
+  const created = await call('POST', '/', { as: admin, body: { title: `reopen-${randomUUID().slice(0, 8)}`, points: 60, assigned_to: [kid] } });
+  const id = created.body.data.id;
+
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done' } });
+  // Die Meldung: 50 Punkte sind schon für eine Prämie reserviert.
+  db.prepare("INSERT INTO reward_ledger (user_id, delta, type, reason) VALUES (?, -50, 'redeem', 'Eis')").run(kid);
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'open' } });
+
+  assert.deepEqual(ledgerOf(kid), [
+    { delta: 60, type: 'earn', task_id: id },
+    { delta: -50, type: 'redeem', task_id: null },
+    { delta: -60, type: 'reversal', task_id: id },
+  ], 'der Verlauf erzählt alle drei Schritte');
+  assert.equal(balanceOf(kid), -50, 'der Saldo ist ehrlich im Minus und erklärt sich aus dem Verlauf');
+});
+
+test('Erneutes Erledigen nach dem Wiederöffnen vergibt genau einmal neu (#1607)', async () => {
+  const admin = { id: ALICE, role: 'admin' };
+  const kid = seedEarner('kid-redo');
+  const created = await call('POST', '/', { as: admin, body: { title: `redo-${randomUUID().slice(0, 8)}`, points: 30, assigned_to: [kid] } });
+  const id = created.body.data.id;
+
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done' } });
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'open' } });
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done' } });
+  // done -> done ist kein Übergang und darf nichts buchen.
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done' } });
+
+  assert.deepEqual(ledgerOf(kid).map((r) => [r.type, r.delta]), [
+    ['earn', 30], ['reversal', -30], ['earn', 30],
+  ]);
+  assert.equal(balanceOf(kid), 30);
+
+  // Zweimal zurück: die zweite Rücknahme findet nichts Offenes mehr.
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'open' } });
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'in_progress' } });
+  assert.equal(balanceOf(kid), 0);
+  assert.equal(ledgerOf(kid).length, 4, 'open -> in_progress bucht nicht noch einmal gegen');
+});
+
+test('Eine wiederkehrende Aufgabe bucht beim Weiterrollen keine Gegenbuchung (#1607)', async () => {
+  // Die Serie setzt nie dieselbe Zeile zurück: Erledigen legt eine NEUE
+  // Instanz an, die erledigte bleibt 'done'. Es gibt also keinen Übergang
+  // weg von 'done', an dem eine Gegenbuchung hängen könnte.
+  const admin = { id: ALICE, role: 'admin' };
+  const kid = seedEarner('kid-serie');
+  const created = await call('POST', '/', {
+    as: admin,
+    body: {
+      title: `serie-${randomUUID().slice(0, 8)}`, points: 10, assigned_to: [kid],
+      is_recurring: true, recurrence_rule: 'FREQ=WEEKLY', due_date: '2031-03-03',
+    },
+  });
+  const id = created.body.data.id;
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done' } });
+
+  const followup = db.prepare('SELECT id, status FROM tasks WHERE recurrence_origin_id = ? AND parent_task_id IS NULL').get(id);
+  assert.equal(followup.status, 'open', 'die Folgeinstanz ist eine eigene Zeile');
+  assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get(id).status, 'done');
+  assert.deepEqual(ledgerOf(kid).map((r) => [r.type, r.delta, r.task_id]), [['earn', 10, id]]);
+});
+
+// --------------------------------------------------------
+// Eine Serie zahlt je Person einmal am Tag (#1603)
+//
+// DIE UHR IST FESTGENAGELT. Der Deckel fragt "heute" - mit der echten Uhr
+// wäre ein Test um Mitternacht entweder rot oder sagte nichts. Gemockt wird nur
+// `Date` (nicht die Timer, an denen fetch und der Server hängen): daraus liest
+// der Deckel den Tag, und daraus schreibt er den Zeitpunkt der Gutschrift.
+// Die Zone steht ausdrücklich, damit der Lauf nicht an `TZ` der Maschine hängt.
+// --------------------------------------------------------
+
+function pinClock(t, iso) {
+  db.prepare("INSERT INTO sync_config (key, value) VALUES ('household_timezone', 'Europe/Berlin') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run();
+  t.mock.timers.enable({ apis: ['Date'], now: new Date(iso) });
+  t.after(() => db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run());
+}
+
+for (const fromCompletion of [true, false]) {
+  test(`Serie ${fromCompletion ? 'ab Erledigung' : 'ab Fälligkeit'}: mehrfaches Abhaken am selben Tag bringt eine Gutschrift (#1603)`, async (t) => {
+    pinClock(t, '2031-03-03T09:00:00Z');
+    const admin = { id: ALICE, role: 'admin' };
+    const kid = seedEarner(`kid-deckel-${fromCompletion ? 'e' : 'f'}`);
+    const title = `deckel-${randomUUID().slice(0, 8)}`;
+    const created = await call('POST', '/', {
+      as: admin,
+      body: {
+        title, points: 10, assigned_to: [kid], is_recurring: true, recurrence_rule: 'FREQ=DAILY',
+        recurrence_from_completion: fromCompletion, due_date: '2031-03-04',
+      },
+    });
+    assert.equal(created.status, 201);
+
+    // Dreimal hintereinander: jeder Haken legt eine NEUE Instanz an, die sich
+    // sofort wieder abhaken lässt.
+    let id = created.body.data.id;
+    for (let i = 0; i < 3; i++) {
+      const r = await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done' } });
+      assert.equal(r.status, 200, 'das Abhaken selbst bleibt erlaubt');
+      const next = followupOf(id);
+      assert.ok(next, 'und rollt die Serie weiter');
+      id = next.id;
+    }
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM tasks WHERE title = ? AND status = 'done'").get(title).n, 3);
+    assert.equal(balanceOf(kid), 10, 'drei Haken an einem Tag sind eine Gutschrift');
+
+    // Am nächsten Haushaltstag zahlt die Serie wieder - genau einmal.
+    t.mock.timers.setTime(new Date('2031-03-04T09:00:00Z').getTime());
+    await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done' } });
+    await call('PATCH', `/${followupOf(id).id}/status`, { as: admin, body: { status: 'done' } });
+    assert.equal(balanceOf(kid), 20);
+  });
+}
+
+test('Serie: die Gutschrift einer GELÖSCHTEN Vorgängerin sperrt die Folgeinstanz weiter (#1603)', async (t) => {
+  // Das Löschen der erledigten Instanz nimmt der Folgeinstanz den Verweis
+  // (recurrence_origin_id ist ON DELETE SET NULL) und der Gutschrift die
+  // task_id. Hinge der Deckel an der Kette, wäre "erledigen, löschen,
+  // erledigen" derselbe Punktehahn wie vorher, nur mit einem Klick mehr.
+  pinClock(t, '2031-03-10T09:00:00Z');
+  const admin = { id: ALICE, role: 'admin' };
+  const kid = seedEarner('kid-geloescht');
+  const created = await call('POST', '/', {
+    as: admin,
+    body: { title: `geloescht-${randomUUID().slice(0, 8)}`, points: 10, assigned_to: [kid], is_recurring: true, recurrence_rule: 'FREQ=DAILY', due_date: '2031-03-11' },
+  });
+  const a = created.body.data.id;
+  await call('PATCH', `/${a}/status`, { as: admin, body: { status: 'done' } });
+  const b = followupOf(a).id;
+  assert.equal(db.prepare('SELECT recurrence_series_id FROM tasks WHERE id = ?').get(b).recurrence_series_id, a, 'die Serie reist als Wert mit');
+  assert.equal((await call('DELETE', `/${a}`, { as: admin })).status < 300, true);
+  assert.equal(db.prepare('SELECT recurrence_origin_id FROM tasks WHERE id = ?').get(b).recurrence_origin_id, null, 'Vorbedingung: der Verweis ist weg');
+
+  await call('PATCH', `/${b}/status`, { as: admin, body: { status: 'done' } });
+  assert.equal(balanceOf(kid), 10, 'die Gutschrift der gelöschten Instanz zählt für heute weiter');
+});
+
+test('Serie: eine Teilaufgabe zahlt am selben Tag nicht noch einmal, auch wenn die Folgeinstanz seit Tagen steht (#1603)', async (t) => {
+  // Die Hauptaufgabe wird am 1. abgehakt, ihre Teilaufgabe bleibt liegen. Die
+  // Folgeinstanz mit der KOPIE der Teilaufgabe steht dann vier Tage herum. Am
+  // 5. werden Original und Kopie abgehakt: dieselbe Teilaufgabe, derselbe Tag.
+  pinClock(t, '2031-04-01T09:00:00Z');
+  const admin = { id: ALICE, role: 'admin' };
+  const kid = seedEarner('kid-teilaufgabe');
+  const created = await call('POST', '/', {
+    as: admin,
+    body: { title: `teil-${randomUUID().slice(0, 8)}`, points: 0, is_recurring: true, recurrence_rule: 'FREQ=DAILY', due_date: '2031-04-02' },
+  });
+  const a = created.body.data.id;
+  const sub = await call('POST', '/', { as: admin, body: { title: 'Schritt', points: 5, parent_task_id: a, assigned_to: [kid] } });
+  assert.equal(sub.status, 201);
+  const sa = sub.body.data.id;
+  await call('PATCH', `/${a}/status`, { as: admin, body: { status: 'done' } });
+  const b = followupOf(a).id;
+  const sb = db.prepare('SELECT id FROM tasks WHERE parent_task_id = ?').get(b).id;
+
+  t.mock.timers.setTime(new Date('2031-04-05T09:00:00Z').getTime());
+  await call('PATCH', `/${sa}/status`, { as: admin, body: { status: 'done' } });
+  assert.equal(balanceOf(kid), 5);
+  await call('PATCH', `/${sb}/status`, { as: admin, body: { status: 'done' } });
+  assert.equal(balanceOf(kid), 5, 'Original und Kopie am selben Tag: eine Gutschrift');
+
+  // Und über mehrere Generationen: die Kopie der Kopie gehört zur selben Serie.
+  await call('PATCH', `/${b}/status`, { as: admin, body: { status: 'done' } });
+  const sc = db.prepare('SELECT id FROM tasks WHERE parent_task_id = ?').get(followupOf(b).id).id;
+  await call('PATCH', `/${sc}/status`, { as: admin, body: { status: 'done' } });
+  assert.equal(balanceOf(kid), 5);
+  assert.deepEqual(
+    db.prepare('SELECT recurrence_series_id AS s FROM tasks WHERE id IN (?, ?) ORDER BY id').all(sb, sc).map((r) => r.s),
+    [sa, sa], 'jede Kopie trägt die erste Teilaufgabe als Serie, nicht ihre direkte Vorgängerin',
+  );
+});
+
+test('Serie: Original und Kopie einer Teilaufgabe zahlen auch in umgekehrter Reihenfolge nur einmal (#1603)', async (t) => {
+  // Der Weg aus dem Review: S1 abhaken, Elternaufgabe erledigen (S2 entsteht),
+  // S1 wieder öffnen, S2 abhaken, S1 erneut abhaken. Eine Suche, die von S1 aus
+  // nur RÜCKWÄRTS über die Vorgänger läuft, findet die Gutschrift der jüngeren
+  // Kopie S2 nie - und Teilaufgaben stehen nicht im Verlauf, über den sich die
+  // Serie sonst in beide Richtungen fände.
+  pinClock(t, '2031-05-05T09:00:00Z');
+  const admin = { id: ALICE, role: 'admin' };
+  const kid = seedEarner('kid-rueckwaerts');
+  const created = await call('POST', '/', {
+    as: admin,
+    body: { title: `rueck-${randomUUID().slice(0, 8)}`, points: 0, is_recurring: true, recurrence_rule: 'FREQ=DAILY', due_date: '2031-05-06' },
+  });
+  const tId = created.body.data.id;
+  const s1 = (await call('POST', '/', { as: admin, body: { title: 'Schritt', points: 5, parent_task_id: tId, assigned_to: [kid] } })).body.data.id;
+  const tick = (id, status) => call('PATCH', `/${id}/status`, { as: admin, body: { status } });
+
+  await tick(s1, 'done');
+  await tick(tId, 'done');
+  const s2 = db.prepare('SELECT id FROM tasks WHERE parent_task_id = ?').get(followupOf(tId).id).id;
+  await tick(s1, 'open');
+  assert.equal(balanceOf(kid), 0);
+  await tick(s2, 'done');
+  assert.equal(balanceOf(kid), 5, 'S2 zahlt: die Gutschrift von S1 ist zurückgenommen');
+  await tick(s1, 'done');
+  assert.equal(balanceOf(kid), 5, 'S1 zahlt nicht noch einmal: die Serie ist für heute über S2 vergütet');
 });

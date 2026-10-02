@@ -227,3 +227,26 @@ test('alle Spaltenkoepfe gleich hoch: die Archiv-Aktion ist eine kompakte Zeilen
   const treffer = regeln.find((r) => r.selector.trim() === '.row-action.kanban-col__action::before');
   assert.match(treffer?.body ?? '', /--target-base/, 'die Treffflaeche waechst auf die Zielgroesse');
 });
+
+// #1607: eine gesperrte Aufgabe (`task.locked`, "nur die Zugewiesenen duerfen
+// aendern") trug ihr Schloss in der Liste, im Brett nicht - wer die Ansicht
+// wechselte, verlor die Auskunft und erfuhr sie erst am abgelehnten Zug.
+test('eine gesperrte Aufgabe traegt ihr Schloss auch auf der Brettkarte', () => {
+  const gesperrt = { ...AUFGABE(7, 'open'), locked: 1 };
+  const schloss = (html) => /<span[^>]*>\s*<i data-lucide="lock"[^>]*><\/i>\s*<\/span>/.exec(html)?.[0] ?? null;
+
+  const inListe = schloss(tasks.renderTaskCard(gesperrt));
+  assert.ok(inListe, 'die Listenzeile zeigt kein Schloss - die Sonde findet das Vorbild nicht');
+  assert.match(inListe, /role="img"/);
+  assert.match(inListe, /aria-label="tasks\.lockedBadge"/, 'das Zeichen nennt seinen Zustand');
+
+  const karte = tasks.renderKanbanCard(gesperrt);
+  assert.equal(schloss(karte), inListe, 'die Brettkarte zeigt nicht dasselbe Zeichen wie die Liste');
+  const meta = /<div class="kanban-card__meta">([\s\S]*?)<\/div>/.exec(karte)?.[1] ?? '';
+  assert.ok(schloss(meta), 'das Schloss steht nicht in der Metazeile der Karte');
+
+  // Und die andere Richtung: ohne Sperre kein Schloss, in keiner Ansicht.
+  const offen = AUFGABE(8, 'open');
+  assert.equal(schloss(tasks.renderKanbanCard(offen)), null);
+  assert.equal(schloss(tasks.renderTaskCard(offen)), null);
+});

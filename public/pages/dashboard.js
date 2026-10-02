@@ -2560,6 +2560,9 @@ function sizeSpans(size) {
 
 /** Der Satz zur naechsten Praemie - fuer Balken und Kennzahlkachel derselbe. */
 function rewardGoalLabel(balance, catalog, goal = nextRewardGoal(balance, catalog)) {
+  // Ein Minus steht nie ohne Satz da (#1607) - derselbe Satz und dieselbe
+  // Reihenfolge wie nextRewardHint() auf der Belohnungsseite.
+  if (Number(balance) < 0) return t('rewards.balanceBelowZero');
   if (!goal) return t('rewards.noRewardsYet');
   if (goal.reached) return t('rewards.canRedeemNow');
   return t('rewards.remainingToReward', { points: formatPoints(goal.missing), reward: goal.target.name });

@@ -106,6 +106,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the evening. A browser that reports no usable zone, or only UTC, sends nothing and the server
   falls back to `TZ` as before. Households that already exist are not changed - an admin sets
   the zone once in the settings under "Time zone".
+- **Reopening a completed task no longer erases its points from the history** (#1607). Reopening
+  a task used to delete its earning. If the points were already in a reward request, the balance
+  went below zero and the history showed only the request, neither the earning nor that it had
+  been taken back. The earning now stays in the history and reopening adds a second entry,
+  "Reopened: <task>", that takes the same points back. Completing the task again awards them
+  again. A balance can still go below zero this way; the page and the overview tile now say so
+  next to the number, the next points make up for it, and a pending request stays pending for
+  the parents to decide - with the current balance shown beside it when it is below zero.
+  Earnings that earlier versions deleted on reopening are not restored.
+
+- **A recurring task gives its points once a day, not once per tick** (#1603). Ticking off a
+  recurring task creates its next occurrence right away, and that one could be ticked off again
+  at once - each time for the full points. A recurring task now pays each person at most once
+  per day; the day is the household's, not UTC. Ticking off still works and still moves the
+  series on, and reopening a task and completing it again on the same day keeps its points. The
+  same holds for subtasks that carry points. If you catch up two missed occurrences of the same
+  task on one day, they count once.
+
 - **Correcting the date of a series' first entry no longer moves the rest of the series** (#1545).
   Every later occurrence of a recurring payment is counted from its start day, and that was still
   the date of the first entry. Correcting it with "Only this occurrence" (the rent was debited on
@@ -175,6 +193,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Filipino, which OpenWeatherMap does not offer, uses `OPENWEATHER_LANG` and otherwise English.
   `OPENWEATHER_LANG` is that fallback and takes an OpenWeatherMap code; a code OpenWeatherMap does
   not list is now ignored in favour of English, as the installation guide and `.env.example` say.
+- **Shared expenses say why an amount cannot be saved** (#1607). An amount of 0, a negative
+  amount or one written with thousands separators (`10,000` in Korea or the US, `10.000` in
+  Germany) only greyed out the Save button. The reason now appears under the amount once you
+  leave the field, with an example of the expected spelling. An amount with more decimals than
+  the currency has, such as `10.000` for won, was sent and came back as an English server
+  message; it is now caught at the field in your language, also for exact shares and when
+  recording a payment. An exact share that is empty, 0 or negative is caught there as well, even
+  when the shares add up. Over the API, a negative amount, share or payment was never stored,
+  but the answer was the database's raw constraint text; it is now "must be greater than
+  zero", and `-0` no longer slips through as a share of 0. The running total of a split follows
+  the household's number format and the expense's currency instead of always reading like
+  `33.00`.
+
+- **The "discard changes" question has two different buttons in every language** (#1607). In
+  Korean, Italian and Ukrainian both buttons said "Cancel", in Turkish and Russian the two words
+  were nearly the same, so it was unclear which one throws the input away. The discarding button
+  now says "discard" there, and the question above it uses the same verb. The same applied to the
+  question when leaving the permissions sheet with unsaved changes in Korean, Italian and
+  Russian.
+
+- **Saving a name dialog with an empty field says so instead of closing** (#1607). Creating a
+  shopping list with an empty name closed the dialog without a message and without a list. The
+  same dialog asks for the new name of a list, folder, category or subtask and for a custom
+  reminder time, and behaved the same there. It now stays open and marks the field as required;
+  Cancel and Escape still close it.
+
+- **A rejected default visibility in the Health settings jumps back** (#1607). When the server
+  refused a change to the default visibility of a health area, the error appeared but the field
+  kept showing the new value, so the sheet implied a sharing change that never happened. The
+  field now returns to the saved value, like the switches above it.
+
+- **Settings no longer show the sheet of a module you have no access to** (#1607). A member whose
+  permission for a module is "No access" still found that module's sheet under Settings, open and
+  operable, next to a "no access" error; the server refused every change. The sheet is now gone
+  from the list, from the settings search and from its direct address, as the module already was
+  from the navigation. With "Read only" the sheet stays.
+
+- **The board shows the lock of a locked task** (#1607). A task that only its assignees may
+  change carried its lock in the list but lost it on the board card. The card now shows the same
+  sign.
+- **Ticking off a recurring task now says when it comes back** (#1603). Completing a recurring
+  task creates its next occurrence at once, so the list, the board and the Overview tile showed
+  an open task that looked just like the one you had ticked off - with "repeat from completion"
+  even with the same date - and the tick seemed to have done nothing. Every way of completing
+  it now answers with "Done - next due <date>": the Complete button and the "who did it" choice
+  in the task view (also when opened from Overview or the calendar), the checkbox, the swipe and
+  the person choice in the list, moving a card to Done on the board, and the wall display. With
+  a named person it is one message that says both. The undo in the list stays. For API clients,
+  `PATCH /api/v1/tasks/{id}/status` additionally returns `next_due_date`, the due date of the
+  next occurrence that is not yet done, or `null`.
 
 ## [2.71.0] - 2026-09-30
 

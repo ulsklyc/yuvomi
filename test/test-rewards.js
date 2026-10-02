@@ -14,6 +14,7 @@ import { MIGRATIONS, _setTestDatabase } from '../server/db.js';
 import {
   awardForCompletion, reverseTaskEarnings, syncTaskRewards, getBalance, isEnrolled,
 } from '../server/services/rewards.js';
+import { syncTaskCompletion } from '../server/services/task-completions.js';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 const { default: rewardsRouter } = await import('../server/routes/rewards.js');
@@ -90,6 +91,222 @@ test('syncTaskRewards: done→open storniert die Vergabe', () => {
   assert.equal(getBalance(db, child1), before + 40);
   syncTaskRewards(db, taskId, 'done', 'open', admin);
   assert.equal(getBalance(db, child1), before, 'Storno stellt Saldo wieder her');
+});
+
+test('v230 läuft ein zweites Mal durch, ohne etwas doppelt anzulegen', () => {
+  const v230 = MIGRATIONS.find((m) => m.version === 230);
+  assert.doesNotThrow(() => v230.up(db));
+  for (const [table, column] of [['tasks', 'recurrence_series_id'], ['reward_ledger', 'series_id'], ['reward_ledger', 'reverses_id']]) {
+    const n = db.prepare(`PRAGMA table_info(${table})`).all().filter((c) => c.name === column).length;
+    assert.equal(n, 1, `${table}.${column}`);
+  }
+});
+
+test('uniq_reward_earn ist gefallen, die Netto-Frage hat ihren Index (v230, #1607)', () => {
+  const names = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'reward_ledger'").all().map((r) => r.name);
+  assert.ok(!names.includes('uniq_reward_earn'), 'der eindeutige Index verschluckte die Neuvergabe nach dem Wiederöffnen');
+  assert.ok(names.includes('idx_reward_ledger_task'));
+});
+
+test('Wiederöffnen bucht gegen und lässt die earn-Zeile stehen (#1607)', () => {
+  const before = getBalance(db, child1);
+  const taskId = makeTask(40, [child1]);
+  syncTaskRewards(db, taskId, 'open', 'done', admin);
+  syncTaskRewards(db, taskId, 'done', 'open', child1);
+  const rows = db.prepare('SELECT delta, type, reason, created_by FROM reward_ledger WHERE task_id = ? ORDER BY id ASC').all(taskId);
+  assert.deepEqual(rows, [
+    { delta: 40, type: 'earn', reason: 'Chore', created_by: admin },
+    { delta: -40, type: 'reversal', reason: 'Chore', created_by: child1 },
+  ], 'die Gegenbuchung trägt den Aufgabentitel und wer zurückgenommen hat');
+  assert.equal(getBalance(db, child1), before);
+
+  const [earn, reversal] = db.prepare('SELECT id, series_id, reverses_id FROM reward_ledger WHERE task_id = ? ORDER BY id ASC').all(taskId);
+  assert.equal(earn.series_id, taskId, 'die Gutschrift trägt ihre Serie - ein erstes Vorkommen ist seine eigene');
+  assert.equal(reversal.reverses_id, earn.id, 'die Gegenbuchung zeigt auf ihre Gutschrift, nicht nur auf dieselbe Aufgabe');
+
+  // Ein zweites Zurücknehmen findet nichts Offenes mehr.
+  reverseTaskEarnings(db, taskId, admin);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM reward_ledger WHERE task_id = ?').get(taskId).n, 2);
+});
+
+test('Die Gegenbuchung nimmt den GEBUCHTEN Betrag, nicht den heutigen Punktwert (#1607)', () => {
+  const before = getBalance(db, child1);
+  const taskId = makeTask(40, [child1]);
+  syncTaskRewards(db, taskId, 'open', 'done', admin);
+  db.prepare('UPDATE tasks SET points = 5 WHERE id = ?').run(taskId);
+  syncTaskRewards(db, taskId, 'done', 'open', admin);
+  assert.equal(getBalance(db, child1), before, 'sonst blieben 35 Punkte für eine offene Aufgabe stehen');
+  // Die Neuvergabe nimmt dann den neuen Wert.
+  syncTaskRewards(db, taskId, 'open', 'done', admin);
+  assert.equal(getBalance(db, child1), before + 5);
+});
+
+test('Wechselt die Zuweisung zwischen Erledigen und Wiederöffnen, trifft die Gegenbuchung den Empfänger (#1607)', () => {
+  db.prepare('INSERT OR IGNORE INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(child2);
+  const b1 = getBalance(db, child1);
+  const b2 = getBalance(db, child2);
+  const taskId = makeTask(12, [child1]);
+  syncTaskRewards(db, taskId, 'open', 'done', admin);
+  db.prepare('UPDATE task_assignments SET user_id = ? WHERE task_id = ?').run(child2, taskId);
+  syncTaskRewards(db, taskId, 'done', 'open', admin);
+  assert.equal(getBalance(db, child1), b1, 'child1 hatte die Punkte und gibt sie zurück');
+  assert.equal(getBalance(db, child2), b2, 'child2 hatte nie welche');
+  db.prepare('DELETE FROM reward_participants WHERE user_id = ?').run(child2);
+});
+
+// --------------------------------------------------------
+// Eine Serie zahlt je Person einmal am Tag (#1603)
+// --------------------------------------------------------
+
+/**
+ * Folgeinstanz OHNE recurrence_series_id - so, wie sie in einem Bestand von vor
+ * v230 steht: neue Zeile, zeigt nur auf die Vorgängerin. Die Tests darunter
+ * halten damit den RÜCKFALL fest (Serie = Wurzel der Kette). Den Weg mit
+ * mitreisender Kennung, auch über ein gelöschtes Vorkommen hinweg, fährt
+ * test:tasks-routes über die echte Route.
+ */
+function makeFollowup(originId, points, assignees = []) {
+  const id = db.prepare(`INSERT INTO tasks (title, status, created_by, points, is_recurring, recurrence_rule, recurrence_origin_id)
+    VALUES ('Chore', 'open', ?, ?, 1, 'FREQ=DAILY', ?)`).run(admin, points, originId).lastInsertRowid;
+  const ins = db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)');
+  for (const uid of assignees) ins.run(id, uid);
+  return id;
+}
+
+/** Abhaken wie die Route: erst die Punkte, dann der Verlauf - mit festgenagelter Uhr. */
+function complete(taskId, when, { by = admin, doneBy = null } = {}) {
+  syncTaskRewards(db, taskId, 'open', 'done', by, doneBy, { now: new Date(when) });
+  syncTaskCompletion(db, taskId, 'open', 'done', by, doneBy);
+}
+function reopen(taskId, when, { by = admin } = {}) {
+  syncTaskRewards(db, taskId, 'done', 'open', by, null, { now: new Date(when) });
+  syncTaskCompletion(db, taskId, 'done', 'open', by, null);
+}
+function setZone(zone) {
+  db.prepare("INSERT INTO sync_config (key, value) VALUES ('household_timezone', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(zone);
+}
+
+test('Serie: die zweite Instanz am selben Haushaltstag bringt keine zweite Gutschrift (#1603)', () => {
+  setZone('Europe/Berlin');
+  const before = getBalance(db, child1);
+  const a = makeTask(10, [child1]);
+  complete(a, '2031-03-03T09:00:00Z');
+  const b = makeFollowup(a, 10, [child1]);
+  complete(b, '2031-03-03T09:00:05Z');
+  const c = makeFollowup(b, 10, [child1]);
+  complete(c, '2031-03-03T20:00:00Z');
+  assert.equal(getBalance(db, child1), before + 10, 'drei Haken an einem Tag sind eine Gutschrift');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM task_completions WHERE task_id IN (?, ?, ?)').get(a, b, c).n, 3,
+    'das Abhaken selbst bleibt erlaubt und steht im Verlauf');
+
+  // Am nächsten Tag zahlt die Serie wieder.
+  const e = makeFollowup(c, 10, [child1]);
+  complete(e, '2031-03-04T09:00:00Z');
+  assert.equal(getBalance(db, child1), before + 20);
+});
+
+test('Serie: der Tag ist der Haushaltstag, nicht der UTC-Tag (#1603)', () => {
+  // 10:00Z und 12:00Z liegen am selben UTC-Tag. In Auckland (UTC+13 im März)
+  // ist das 23:00 am 3. und 01:00 am 4. - zwei Tage, zwei Gutschriften.
+  setZone('Pacific/Auckland');
+  const before = getBalance(db, child1);
+  const a = makeTask(10, [child1]);
+  complete(a, '2031-03-03T10:00:00Z');
+  const b = makeFollowup(a, 10, [child1]);
+  complete(b, '2031-03-03T12:00:00Z');
+  assert.equal(getBalance(db, child1), before + 20, 'über Mitternacht der Haushaltszone hinweg zahlt die Serie zweimal');
+
+  // Umgekehrt: 23:30Z am 3. und 00:30Z am 4. sind zwei UTC-Tage, in Auckland
+  // aber derselbe 4. (12:30 und 13:30) - eine Gutschrift.
+  const c = makeTask(10, [child1]);
+  complete(c, '2031-03-03T23:30:00Z');
+  const e = makeFollowup(c, 10, [child1]);
+  complete(e, '2031-03-04T00:30:00Z');
+  assert.equal(getBalance(db, child1), before + 30, 'zwei UTC-Tage, ein Haushaltstag: der Deckel greift');
+  setZone('Europe/Berlin');
+});
+
+test('Serie: der Deckel gilt je Person (#1603)', () => {
+  db.prepare('INSERT OR IGNORE INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(child2);
+  const b1 = getBalance(db, child1);
+  const b2 = getBalance(db, child2);
+  const a = makeTask(10, [child1, child2]);
+  complete(a, '2031-04-01T09:00:00Z');
+  assert.equal(getBalance(db, child1), b1 + 10);
+  assert.equal(getBalance(db, child2), b2 + 10, 'mehrere Zugewiesene: jede Person bekommt ihre eine Gutschrift');
+
+  // Die zweite Instanz erledigt nachweislich child2 - child2 ist für heute
+  // schon vergütet, child1 wird nicht benannt und bekommt auch nichts.
+  const b = makeFollowup(a, 10, [child1, child2]);
+  complete(b, '2031-04-01T10:00:00Z', { doneBy: child2 });
+  assert.equal(getBalance(db, child1), b1 + 10);
+  assert.equal(getBalance(db, child2), b2 + 10);
+
+  // Eine Person, die heute für diese Serie noch nichts bekommen hat, bekommt es.
+  const x = makeTask(10, [child1]);
+  complete(x, '2031-04-02T09:00:00Z');
+  const y = makeFollowup(x, 10, [child1]);
+  complete(y, '2031-04-02T10:00:00Z', { doneBy: child2 });
+  assert.equal(getBalance(db, child2), b2 + 20, 'child1 war vergütet, child2 für diese Serie heute noch nicht');
+  db.prepare('DELETE FROM reward_participants WHERE user_id = ?').run(child2);
+});
+
+test('Serie: Wiederöffnen und erneut Erledigen am selben Tag verliert die Gutschrift nicht (#1603, #1607)', () => {
+  const before = getBalance(db, child1);
+  const a = makeTask(10, [child1]);
+  complete(a, '2031-05-01T09:00:00Z');
+  reopen(a, '2031-05-01T09:01:00Z');
+  assert.equal(getBalance(db, child1), before);
+  complete(a, '2031-05-01T09:02:00Z');
+  assert.equal(getBalance(db, child1), before + 10, 'die eigene, zurückgenommene Gutschrift sperrt die Neuvergabe nicht');
+
+  // Und mit einer gedeckelten Folgeinstanz dazwischen: die zurückgenommene
+  // Gutschrift der Vorgängerin zählt nicht mehr als "heute schon vergütet".
+  const b = makeFollowup(a, 10, [child1]);
+  complete(b, '2031-05-01T09:03:00Z');
+  assert.equal(getBalance(db, child1), before + 10, 'gedeckelt');
+  reopen(b, '2031-05-01T09:04:00Z');
+  reopen(a, '2031-05-01T09:05:00Z');
+  assert.equal(getBalance(db, child1), before);
+  complete(a, '2031-05-01T09:06:00Z');
+  assert.equal(getBalance(db, child1), before + 10);
+});
+
+test('Serie: auch die Teilaufgaben einer Folgeinstanz zahlen am selben Tag nicht noch einmal (#1603)', () => {
+  // Teilaufgaben tragen eigene Punkte und werden mit jeder Folgeinstanz neu
+  // angelegt (recurrence_origin_id zeigt auf die Teilaufgabe der Vorgängerin).
+  // Im Verlauf stehen sie bewusst nicht - der Deckel darf deshalb nicht allein
+  // an task_completions hängen, sonst bliebe die Lücke über die Checkliste offen.
+  const before = getBalance(db, child1);
+  const sub = (parent, origin, createdAt) => db.prepare(`INSERT INTO tasks
+      (title, status, created_by, points, parent_task_id, recurrence_origin_id, created_at)
+    VALUES ('Schritt', 'open', ?, 5, ?, ?, ?)`).run(admin, parent, origin, createdAt).lastInsertRowid;
+  const assign = (id) => db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(id, child1);
+
+  const a = makeTask(0, [child1]);
+  const sa = sub(a, null, '2031-07-01T08:00:00Z'); assign(sa);
+  complete(sa, '2031-07-01T09:00:00Z');
+  complete(a, '2031-07-01T09:00:10Z');
+  assert.equal(getBalance(db, child1), before + 5);
+
+  // Die Folgeinstanz entsteht mit dem Abhaken der Vorgängerin - ihr
+  // Anlagezeitpunkt IST deren Erledigung.
+  const b = makeFollowup(a, 0, [child1]);
+  const sb = sub(b, sa, '2031-07-01T09:00:10Z'); assign(sb);
+  complete(sb, '2031-07-01T09:01:00Z');
+  assert.equal(getBalance(db, child1), before + 5, 'dieselbe Teilaufgabe, derselbe Tag: eine Gutschrift');
+
+  const c = makeFollowup(b, 0, [child1]);
+  const sc = sub(c, sb, '2031-07-01T09:01:10Z'); assign(sc);
+  complete(sc, '2031-07-02T09:00:00Z');
+  assert.equal(getBalance(db, child1), before + 10, 'am nächsten Tag zahlt sie wieder');
+});
+
+test('Serie: zwei verschiedene Serien am selben Tag zahlen beide (#1603)', () => {
+  const before = getBalance(db, child1);
+  complete(makeTask(10, [child1]), '2031-06-01T09:00:00Z');
+  complete(makeTask(10, [child1]), '2031-06-01T09:00:00Z');
+  assert.equal(getBalance(db, child1), before + 20, 'der Deckel hängt an der Serie, nicht am Tag');
 });
 
 test('Ohne Zuweisung erhält die handelnde Person (Kiosk)', () => {

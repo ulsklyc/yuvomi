@@ -1738,7 +1738,17 @@ export function promptModal(label, defaultValue = '') {
 
         form.addEventListener('submit', (e) => {
           e.preventDefault();
-          finish(input.value.trim() || null);
+          // Ein leeres Feld ist keine Antwort (#1607). Bis dahin loeste es mit
+          // null auf - demselben Wert wie Abbrechen -, der Dialog ging zu und
+          // nichts geschah: Speichern sah aus wie ein Fehler ohne Text. null
+          // heisst jetzt nur noch "abgebrochen"; kein Aufrufer liest ein leeres
+          // Feld als gueltige Eingabe.
+          const value = input.value.trim();
+          if (!value) {
+            reportFieldError(input, t('common.required'));
+            return;
+          }
+          finish(value);
         });
 
         cancel.addEventListener('click', () => finish(null));

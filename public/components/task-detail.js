@@ -49,7 +49,7 @@ import { historyDayLabel } from '/utils/day-label.js';
 import {
   FALLBACK_CATEGORY, PRIORITY_LABELS, STATUS_LABELS, statusLabel,
   isArchived, canEditTaskDefinition, catLabel, normalizeTagList,
-  docMime, docHref, docIcon, formatDueDate,
+  docMime, docHref, docIcon, formatDueDate, seriesDoneText,
 } from '/utils/task-fields.js';
 
 // --------------------------------------------------------
@@ -1291,12 +1291,17 @@ function wireDetailDoerMenu(task, doers, ctx, close, pane = null) {
   if (window.lucide) window.lucide.createIcons({ el: panel });
 }
 
+// Ein Datum will gelesen werden: laenger als die drei Sekunden der Vorgabe,
+// dieselbe Frist wie die Quittungen der Liste.
+const SERIES_TOAST_MS = 5000;
+
 async function completeFor(task, person, button, ctx, close) {
   const stop = btnLoading(button);
   const siblings = statusActionButtons().filter((el) => el !== button);
   siblings.forEach((el) => { el.disabled = true; });
+  let response;
   try {
-    await api.patch(`/tasks/${task.id}/status`, { status: 'done', done_by_user_id: person.id });
+    response = await api.patch(`/tasks/${task.id}/status`, { status: 'done', done_by_user_id: person.id });
   } catch (err) {
     stop();
     siblings.forEach((el) => { el.disabled = false; });
@@ -1304,7 +1309,12 @@ async function completeFor(task, person, button, ctx, close) {
     return;
   }
   task.status = 'done';
-  window.yuvomi.showToast(t('tasks.doneByToast', { name: person.display_name ?? '' }));
+  // EIN Toast, nie zwei: bei einer Serie sagt derselbe Satz, wer es war UND
+  // wann es weitergeht (#1603).
+  const name = person.display_name ?? '';
+  const seriesText = seriesDoneText(response, { name });
+  if (seriesText) window.yuvomi.showToast(seriesText, 'default', SERIES_TOAST_MS);
+  else window.yuvomi.showToast(t('tasks.doneByToast', { name }));
   await afterConfirmedWrite(ctx, close);
 }
 
@@ -1349,8 +1359,9 @@ async function advanceTaskStatus(task, status, button, ctx, close = closeDetailV
   // Spinner gehoert an den Knopf, den jemand gedrueckt hat.
   const siblings = statusActionButtons().filter((el) => el !== button);
   siblings.forEach((el) => { el.disabled = true; });
+  let response;
   try {
-    await api.patch(`/tasks/${task.id}/status`, { status });
+    response = await api.patch(`/tasks/${task.id}/status`, { status });
   } catch (err) {
     task.status = previous;
     stop();
@@ -1361,6 +1372,12 @@ async function advanceTaskStatus(task, status, button, ctx, close = closeDetailV
     return;
   }
   task.status = status;
+  // Eine erledigte Serie sagt, wann es weitergeht (#1603): die Ansicht schliesst
+  // gleich, und die Umgebung zeigt danach eine offene Zeile, die aussieht wie
+  // diese. Ohne Serie bleibt es still wie bisher - der Knopf selbst und die
+  // verschwindende Zeile sind dort die Quittung.
+  const seriesText = status === 'done' ? seriesDoneText(response) : null;
+  if (seriesText) window.yuvomi.showToast(seriesText, 'default', SERIES_TOAST_MS);
   await afterConfirmedWrite(ctx, close);
 }
 
@@ -1488,4 +1505,4 @@ function seriesHistoryNode(task) {
  * der sich die Nur-lesen-Regel (#467) an dieser Ansicht MESSEN laesst - alles
  * andere hier haengt an `openDetailView` und damit am echten DOM.
  */
-export const __test = { subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, DOER_BUTTON_ID };
+export const __test = { subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, DOER_BUTTON_ID, completeFor };

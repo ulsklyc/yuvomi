@@ -106,8 +106,14 @@ export function recordCompletion(d, taskId, actingUserId, doneByUserId = null) {
 
 /**
  * Erledigung zurücknehmen. Löscht statt gegenzubuchen - ein Haken, der dreimal
- * hin und her geht, ist kein Verlauf, sondern Rauschen (dieselbe Entscheidung
- * wie reverseTaskEarnings).
+ * hin und her geht, ist kein Verlauf, sondern Rauschen.
+ *
+ * DER LEDGER ENTSCHEIDET SEIT #1607 ANDERS, und der Unterschied ist gewollt:
+ * reverseTaskEarnings bucht gegen, weil an einer Gutschrift ein SALDO hängt,
+ * den andere Buchungen (eine Einlösung) schon verbraucht haben können - dort
+ * muss die Geschichte den Stand erklären. Ein Verlaufseintrag trägt keinen
+ * Saldo: ist der Haken zurückgenommen, ist die Aufgabe nicht erledigt, und
+ * mehr gibt es darüber nicht zu sagen.
  */
 export function revokeCompletion(d, taskId) {
   d.prepare('DELETE FROM task_completions WHERE task_id = ?').run(taskId);
