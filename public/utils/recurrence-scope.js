@@ -245,6 +245,28 @@ function formatLocalDateTime(date) {
 }
 
 /**
+ * Endet die Regel vor dem Tag, an dem die Serie beginnt? (#1607)
+ *
+ * Dieselbe Frage wie `endsBeforeStart` in server/services/recurrence.js, und
+ * dieselbe Antwort: verglichen werden Kalendertage, ein Ende am Starttag ist
+ * eine Serie mit einem Vorkommen. Die Schluessel werden als Text verglichen -
+ * ein Date dazwischen laese die Browser-Zone mit.
+ *
+ * Wohnt hier und nicht in rrule-ui.js: der Kalender fragt beim Speichern, und
+ * dieses Modul ist DOM-frei (rrule-ui.js ist im Test-Loader ein Stub).
+ *
+ * @param {string|null} rule       RRULE mit oder ohne Praefix
+ * @param {string} startDate       YYYY-MM-DD oder YYYY-MM-DDTHH:MM
+ * @returns {boolean}
+ */
+export function seriesEndsBeforeStart(rule, startDate) {
+  const start = String(startDate ?? '').slice(0, 10);
+  const until = /(?:^|[;:])UNTIL=(\d{4})(\d{2})(\d{2})/i.exec(String(rule ?? ''));
+  if (!until || !DATE_KEY_RE.test(start)) return false;
+  return `${until[1]}-${until[2]}-${until[3]}` < start;
+}
+
+/**
  * Kürzt eine RRULE so, dass alle Vorkommen AB `occurrenceDateKey` entfallen.
  * Setzt UNTIL auf den Vortag (inklusive Grenze in der Expansion) und entfernt ein
  * evtl. vorhandenes UNTIL/COUNT. Reihenfolge bleibt FREQ;INTERVAL;BYDAY;UNTIL,

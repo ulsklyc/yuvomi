@@ -990,6 +990,7 @@
         "iconWeather": "मौसम",
         "invalidDate": "चयनित प्रारूप में मान्य तारीख का उपयोग करें।",
         "endBeforeStart": "समाप्ति तिथि आरंभ तिथि से पहले नहीं हो सकती।",
+        "recurrenceEndBeforeStart": "दोहराव का अंत शुरुआती तारीख से पहले नहीं हो सकता।",
         "attachmentLabel": "अनुलग्नक",
         "attachmentHint": "छवि, PDF या दस्तावेज़। छवियाँ कार्यक्रम के विवरण में दिखती हैं।",
         "attachmentFallback": "Attachment",

@@ -990,6 +990,7 @@
         "iconWeather": "Vær",
         "invalidDate": "Bruk en gyldig dato i det valgte datoformatet.",
         "endBeforeStart": "Sluttdatoen kan ikke være før startdatoen.",
+        "recurrenceEndBeforeStart": "Slutten på gjentakelsen kan ikke være før startdatoen.",
         "caldavTargetLabel": "Synkroniser med CalDAV",
         "caldavTargetLocal": "Lagre lokalt kun",
         "caldavTargetHint": "Velg en CalDAV-kalender for å synkronisere denne hendelsen.",

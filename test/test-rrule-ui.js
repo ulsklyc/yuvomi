@@ -825,3 +825,53 @@ test('der Kalender meldet JEDE Startaenderung an die Wochentags-Vorauswahl (#160
   assert.ok(toggle.slice(0, toggle.indexOf('});')).includes('recurrenceBinding.refreshStartDate()'),
     'der Ganztags-Schalter wechselt das aktive Startfeld');
 });
+
+// --------------------------------------------------------
+// #1607 (9): ein Serienende vor dem Start. Der Dialog pruefte am Ende-Feld nur,
+// ob das Datum gueltig ist; "taeglich, bis 30.09." an einem 2. Oktober ging
+// durch und wurde gespeichert. Die Regel ist dieselbe wie auf dem Server
+// (`endsBeforeStart` in server/services/recurrence.js): verglichen werden
+// Kalendertage, ein Ende am Starttag ist gueltig.
+// --------------------------------------------------------
+
+test('seriesEndsBeforeStart erkennt ein Ende vor dem Starttag, nicht am Starttag (#1607)', async () => {
+  const { seriesEndsBeforeStart } = await import('../public/utils/recurrence-scope.js');
+  assert.equal(typeof seriesEndsBeforeStart, 'function', 'die Pruefung fehlt');
+  const { endsBeforeStart } = await import('../server/services/recurrence.js');
+  const faelle = [
+    ['FREQ=DAILY;UNTIL=20260930T235959Z', '2026-10-02T09:00', true],
+    ['FREQ=DAILY;UNTIL=20260930T235959Z', '2026-10-02', true],
+    ['RRULE:FREQ=WEEKLY;UNTIL=20260930', '2026-10-01', true],
+    ['FREQ=DAILY;UNTIL=20261002T235959Z', '2026-10-02T23:30', false],
+    ['FREQ=DAILY;UNTIL=20261003T235959Z', '2026-10-02T09:00', false],
+    ['FREQ=DAILY;COUNT=3', '2026-10-02T09:00', false],
+    ['FREQ=DAILY', '2026-10-02T09:00', false],
+    [null, '2026-10-02T09:00', false],
+    ['FREQ=DAILY;UNTIL=20260930T235959Z', '', false],
+  ];
+  for (const [rule, start, erwartet] of faelle) {
+    assert.equal(seriesEndsBeforeStart(rule, start), erwartet, `Oberflaeche: ${rule} ab ${start}`);
+    // EINE Regel an beiden Enden: sonst zeigt der Dialog keinen Fehler und der
+    // Server antwortet mit 400, oder umgekehrt.
+    assert.equal(endsBeforeStart(start, rule), erwartet, `Server: ${rule} ab ${start}`);
+  }
+});
+
+test('das Formular des Kalenders meldet ein Serienende vor dem Start am Ende-Feld (#1607)', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const quelle = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const von = quelle.indexOf('async function saveEvent(');
+  const save = quelle.slice(von, quelle.indexOf('\nasync function ', von + 10));
+  const pruefung = save.indexOf('seriesEndsBeforeStart(');
+  assert.ok(pruefung !== -1, 'saveEvent fragt nicht, ob die Serie vor ihrem Start endet');
+  assert.ok(pruefung < save.indexOf("api.post('/calendar'"), 'die Pruefung steht hinter dem Absenden');
+  const block = save.slice(pruefung, pruefung + 400);
+  assert.ok(block.includes("reportFieldError(overlay.querySelector('#event-rrule-until'), t('calendar.recurrenceEndBeforeStart'))"),
+    'der Fehler gehoert an das Feld, das ihn verursacht, mit einem uebersetzten Text');
+
+  const dir = new URL('../public/locales/', import.meta.url);
+  for (const datei of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const text = JSON.parse(readFileSync(new URL(datei, dir), 'utf8')).calendar?.recurrenceEndBeforeStart;
+    assert.ok(typeof text === 'string' && text.length > 5, `${datei} hat keinen Text fuer das Serienende vor dem Start`);
+  }
+});

@@ -4960,3 +4960,102 @@ test('Farb-Heilung: eine Farbwahl vor dem ersten Heil-Lauf kommt nicht in den Sc
     db.prepare("DELETE FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%'").run();
   }
 });
+
+// ════════════════════════════════════════════════════════════════════════════════
+// #1607 (9): ein Serienende VOR dem Start
+// ════════════════════════════════════════════════════════════════════════════════
+// `rrule()` prueft nur die Form der Regel, und die ist bei UNTIL=20910930 ab dem
+// 2. Oktober einwandfrei. Die Regel "Ende nicht vor dem Start" gehoert trotzdem
+// NICHT in den geteilten Validator: Aufgaben und Budget rufen ihn ebenfalls,
+// und er kennt gar kein Startdatum. Sie steht in den Schreibrouten des
+// Kalenders - und nur dort, wo die Anfrage die Serie anfasst, damit eine
+// eingelesene Fremdserie mit so einer Regel bearbeitbar bleibt.
+
+const ENDET_VORHER = 'FREQ=DAILY;UNTIL=20910930T235959Z';
+
+test('POST / - ein Serienende vor dem Start wird abgelehnt (#1607)', async () => {
+  const r = await call('POST', '/', {
+    body: { title: 'ENDE-VOR-START', start_datetime: '2091-10-02T09:00', recurrence_rule: ENDET_VORHER },
+  });
+  assert.equal(r.status, 400, `erwartet 400, bekommen ${r.status}`);
+  assert.match(String(r.body?.error ?? ''), /ends before the start date/);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM calendar_events WHERE title = 'ENDE-VOR-START'").get().n, 0);
+});
+
+test('POST / - ein Serienende AM Starttag bleibt erlaubt (#1607)', async () => {
+  // Die Grenze: derselbe Tag ist eine Serie mit genau einem Vorkommen.
+  const r = await call('POST', '/', {
+    body: { title: 'ENDE-AM-START', start_datetime: '2091-10-02T09:00', recurrence_rule: 'FREQ=DAILY;UNTIL=20911002T235959Z' },
+  });
+  assert.equal(r.status, 201, `erwartet 201, bekommen ${r.status}`);
+  db.prepare('DELETE FROM calendar_events WHERE id = ?').run(r.body.data.id);
+});
+
+test('PUT /:id - Regel oder Start so aendern, dass das Ende vor dem Start liegt, wird abgelehnt (#1607)', async () => {
+  const angelegt = await call('POST', '/', {
+    body: { title: 'ENDE-PUT', start_datetime: '2091-09-20T09:00', recurrence_rule: ENDET_VORHER },
+  });
+  assert.equal(angelegt.status, 201, 'vom 20. bis zum 30. September ist eine gueltige Serie');
+  const id = angelegt.body.data.id;
+  try {
+    const startDahinter = await call('PUT', `/${id}`, { body: { start_datetime: '2091-10-02T09:00' } });
+    assert.equal(startDahinter.status, 400, 'der Start wandert hinter das Ende');
+    assert.match(String(startDahinter.body?.error ?? ''), /ends before the start date/);
+
+    const endeDavor = await call('PUT', `/${id}`, { body: { recurrence_rule: 'FREQ=DAILY;UNTIL=20910915T235959Z' } });
+    assert.equal(endeDavor.status, 400, 'das Ende wandert vor den Start');
+
+    const zeile = db.prepare('SELECT start_datetime, recurrence_rule FROM calendar_events WHERE id = ?').get(id);
+    assert.match(zeile.start_datetime, /^2091-09-20/);
+    assert.equal(zeile.recurrence_rule, ENDET_VORHER);
+  } finally {
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
+  }
+});
+
+test('PUT /:id - eine Bestandsserie mit Ende vor dem Start bleibt bearbeitbar (#1607)', async () => {
+  // Am Guard vorbei in die Zeile, wie es ICS-Import und CalDAV-Sync tun. Das
+  // Formular schickt Start UND Regel bei jedem Speichern mit - geprueft werden
+  // deshalb die Werte, nicht die Anwesenheit der Felder.
+  const id = insertEvent({ title: 'FREMD-ENDE-VOR-START', start_datetime: '2091-10-02T09:00', recurrence_rule: ENDET_VORHER });
+  try {
+    const nurTitel = await call('PUT', `/${id}`, {
+      body: { title: 'Neuer Titel', start_datetime: '2091-10-02T09:00', recurrence_rule: ENDET_VORHER },
+    });
+    assert.equal(nurTitel.status, 200, `ein Titel-Edit darf nicht scheitern, bekommen ${nurTitel.status}`);
+    assert.equal(nurTitel.body.data.title, 'Neuer Titel');
+  } finally {
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
+  }
+});
+
+test('POST /import - eine eingelesene Serie mit Ende vor dem Start scheitert nicht (#1607)', async () => {
+  // Fremde Daten sind, wie sie sind. Der Import lehnt nicht ab, was ein anderer
+  // Kalender so geschrieben hat.
+  const ics = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:until-before-start@test',
+    'SUMMARY:FREMDSERIE-ENDE-VOR-START', 'DTSTART:20911002T090000Z', 'DTEND:20911002T100000Z',
+    'RRULE:FREQ=DAILY;UNTIL=20910930T235959Z', 'END:VEVENT', 'END:VCALENDAR',
+  ].join('\r\n');
+  const res = await call('POST', '/import', { actor: ADMIN, body: { ics } });
+  assert.equal(res.status, 201, `der Import darf nicht scheitern, bekommen ${res.status}: ${JSON.stringify(res.body)}`);
+  // Der Status allein reicht nicht: ein Import, der den Termin still
+  // ueberspringt, antwortet genauso mit 201.
+  assert.equal(res.body.data.imported, 1, `der Termin muss ankommen: ${JSON.stringify(res.body.data)}`);
+  const zeile = db.prepare("SELECT recurrence_rule FROM calendar_events WHERE title = 'FREMDSERIE-ENDE-VOR-START'").get();
+  assert.match(String(zeile?.recurrence_rule ?? ''), /UNTIL=20910930/, 'die Regel steht in der Zeile, wie sie kam');
+  db.prepare("DELETE FROM calendar_events WHERE title = 'FREMDSERIE-ENDE-VOR-START'").run();
+});
+
+test('following - ein Nachfolger, dessen Regel vor seinem Start endet, wird abgelehnt (#1607)', async () => {
+  const seriesId = insertEvent({ title: 'ENDE-FOLGESERIE', start_datetime: '2091-09-20T09:00:00', recurrence_rule: 'FREQ=DAILY' });
+  try {
+    const response = await call('PUT', `/${seriesId}/occurrences/2091-10-02/following`, {
+      body: { recurrence_rule: ENDET_VORHER },
+    });
+    assert.equal(response.status, 400, `erwartet 400, bekommen ${response.status}: ${JSON.stringify(response.body)}`);
+    assert.equal(db.prepare('SELECT recurrence_rule FROM calendar_events WHERE id = ?').get(seriesId).recurrence_rule, 'FREQ=DAILY');
+  } finally {
+    db.prepare("DELETE FROM calendar_events WHERE title = 'ENDE-FOLGESERIE'").run();
+  }
+});

@@ -27,6 +27,7 @@ import {
   requestCalendarOccurrenceMutation,
   requestCalendarOccurrenceDelete,
   requiresWholeSeriesConfirmation,
+  seriesEndsBeforeStart,
   shiftEndForStart,
   shiftSeriesStart,
 } from '/utils/recurrence-scope.js';
@@ -7966,6 +7967,21 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       ?? (overlay.querySelector('#modal-end-time')?.value ? overlay.querySelector('#modal-end-time') : null)
       ?? overlay.querySelector('#modal-end-date');
     reportFieldError(endField, t('calendar.endBeforeStart'));
+    return;
+  }
+
+  // EIN SERIENENDE VOR DEM START (#1607). Geprueft wurde am Ende-Feld bisher
+  // nur, ob das Datum gueltig ist - "taeglich, bis 30.09." an einem 2. Oktober
+  // ging durch, der Server speicherte es, und die Serie fand nie statt.
+  // Gefragt wird nur, wenn dieses Speichern Regel oder Starttag aendert: eine
+  // eingelesene Serie, die schon so dasteht, bleibt bearbeitbar (der Server
+  // zieht dieselbe Grenze, `serieBeruehrt` in routes/calendar/crud.js).
+  const ruleToSave = getRRuleValues(overlay, 'event').recurrence_rule;
+  const seriesTouched = mode !== 'edit'
+    || ruleToSave !== (event?.recurrence_rule ?? null)
+    || String(start_datetime).slice(0, 10) !== String(event?.start_datetime ?? '').slice(0, 10);
+  if (seriesTouched && seriesEndsBeforeStart(ruleToSave, start_datetime)) {
+    reportFieldError(overlay.querySelector('#event-rrule-until'), t('calendar.recurrenceEndBeforeStart'));
     return;
   }
 

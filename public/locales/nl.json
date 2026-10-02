@@ -990,6 +990,7 @@
         "iconWeather": "Weer",
         "invalidDate": "Gebruik een geldige datum in het geselecteerde datumformaat.",
         "endBeforeStart": "De einddatum mag niet vóór de startdatum liggen.",
+        "recurrenceEndBeforeStart": "Het einde van de herhaling mag niet vóór de begindatum liggen.",
         "caldavTargetLabel": "Synchroniseren met CalDAV",
         "caldavTargetLocal": "Alleen lokaal opslaan",
         "caldavTargetHint": "Kies een CalDAV-kalender om dit evenement mee te synchroniseren.",

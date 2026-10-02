@@ -8,7 +8,7 @@ import express from 'express';
 import * as db from '../../db.js';
 import { str, color, datetime, rrule, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../middleware/validate.js';
 import { normalizeVisibility, visibilityWhere } from '../../services/visibility.js';
-import { hasAnyOccurrence } from '../../services/recurrence.js';
+import { hasAnyOccurrence, endsBeforeStart } from '../../services/recurrence.js';
 import { resolveProjectedEventRows } from '../../services/calendar-event-reader.js';
 import { householdTimeZone, utcToWall } from '../../utils/timezone.js';
 import {
@@ -467,6 +467,8 @@ router.get('/:id', (req, res) => {
 });
 
 // --------------------------------------------------------
+const SERIES_ENDS_BEFORE_START = 'recurrence_rule: the series ends before the start date.';
+
 // POST /api/v1/calendar
 // Neuen Termin anlegen.
 // Body: { title, description?, start_datetime, end_datetime?,
@@ -533,6 +535,12 @@ router.post('/', async (req, res) => {
         error: 'recurrence_rule: the rule has no occurrence on or after the start date.',
         code: 400,
       });
+    }
+    // EIN ENDE VOR DEM START IST EIN WIDERSPRUCH, KEINE SERIE (#1607). Der
+    // Validator sieht nur die Form der Regel; gespeichert stand der Termin
+    // danach als "taeglich, bis 30.09." an einem 2. Oktober.
+    if (endsBeforeStart(vStart.value, vRrule.value)) {
+      return res.status(400).json({ error: SERIES_ENDS_BEFORE_START, code: 400 });
     }
 
     const { all_day = 0 } = req.body;
@@ -869,6 +877,13 @@ router.put('/:id', async (req, res) => {
         error: 'recurrence_rule: the rule has no occurrence on or after the start date.',
         code: 400,
       });
+    }
+    // Dasselbe Gatter fuer das Ende vor dem Start (#1607): nur wenn DIESE
+    // Anfrage Regel oder Starttag aendert. Eine eingelesene Serie, die schon so
+    // in der Zeile steht, bleibt bearbeitbar - und wo der gespeicherte UTC-Tag
+    // nicht der Ortstag ist (`zonenUnsicher`), wird nicht geraten.
+    if (serieBeruehrt && !zonenUnsicher && endsBeforeStart(startDanach, regelDanach)) {
+      return res.status(400).json({ error: SERIES_ENDS_BEFORE_START, code: 400 });
     }
 
     // JEDE ABWEISUNG GEHOERT VOR DAS STAGING. Ab hier laedt

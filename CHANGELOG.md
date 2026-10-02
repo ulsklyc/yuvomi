@@ -37,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A repeat end before the start date is no longer saved** (#1607). An event starting on 2 October
+  could be saved as "daily, until 30 September": the dialog only checked that the end was a valid
+  date, and the server only checked the form of the rule. The dialog now shows the error at the
+  repeat-end field, and `POST /api/v1/calendar`, `PUT /api/v1/calendar/{id}` and the "this and
+  following" edit answer 400. A repeat end on the start day stays valid. A series from an ICS
+  import or a synced calendar that already carries such a rule is still imported and stays
+  editable; tasks are unchanged, because a task is due on its own date and the rule only decides
+  about its successor.
 - **The weekday buttons of a weekly series no longer all look switched off** (#1607). A weekly
   event without chosen weekdays repeats on the weekday of its start, but the "repeat on" buttons
   showed none of the seven as active. The weekday of the start date is now shown as active, both
