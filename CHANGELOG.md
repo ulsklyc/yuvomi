@@ -114,6 +114,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   question when leaving the permissions sheet with unsaved changes in Korean, Italian and
   Russian.
 
+- **Saving a name dialog with an empty field says so instead of closing** (#1607). Creating a
+  shopping list with an empty name closed the dialog without a message and without a list. The
+  same dialog asks for the new name of a list, folder, category or subtask and for a custom
+  reminder time, and behaved the same there. It now stays open and marks the field as required;
+  Cancel and Escape still close it.
+
 ## [2.71.0] - 2026-09-30
 
 ### Added

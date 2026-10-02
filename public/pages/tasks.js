@@ -2519,7 +2519,8 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
 async function handleRenameSubtask(id, currentTitle, container) {
   const title = await promptModal(t('tasks.subtaskRenamePrompt'), currentTitle);
   // Abbruch (null) und "unverändert" gehen beide ohne Request weiter; ein
-  // leergeräumtes Feld ist kein gültiger Titel und wird wie Abbruch behandelt.
+  // leergeräumtes Feld ist kein gültiger Titel, das meldet promptModal selbst
+  // am Feld und bleibt offen (#1607).
   if (!title || title.trim() === currentTitle) return;
   try {
     await api.put(`/tasks/${id}`, { title: title.trim() });
