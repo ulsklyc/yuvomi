@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Editing a shared expense no longer rewrites its history** (#1607). The activity feed of a group
+  showed the amount an expense has now, so correcting 50 to 10 also changed the earlier "Expense
+  created" line to 10 - for expenses created by other members too. Each entry now records the
+  amount and currency at the moment it was written, and a deleted expense keeps its amount in the
+  feed. Entries written before this change show the title without an amount: what the expense
+  cost back then was never recorded.
 - **Opening one occurrence of a recurring event opens that occurrence** (#1607). In the month,
   week and day views, clicking or pressing Enter on an occurrence of a series opened the first
   occurrence the view had loaded instead - for a daily series the day before the visible range.
