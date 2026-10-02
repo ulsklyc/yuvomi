@@ -753,6 +753,38 @@ function hasAnyOccurrence(dateKey, rrule, { utcDiffersFromLocal = false } = {}) 
 }
 
 /**
+ * Endet die Regel vor dem Tag, an dem die Serie beginnt? (#1607)
+ *
+ * `FREQ=DAILY;UNTIL=20260930` ab dem 2. Oktober hat die richtige FORM, und
+ * mehr prueft `rrule()` in `middleware/validate.js` nicht - der Validator
+ * kennt kein Startdatum. Die Frage steht deshalb hier, als eigene Funktion,
+ * und NICHT in `hasAnyOccurrence`: das lesen auch Countdown-Kachel und
+ * Serien-Teilung, und eine eingelesene Fremdserie mit so einer Regel zeigt der
+ * Kalender weiter an ihrem Starttag. Wer sie dort als "leer" behandelte,
+ * liesse einen sichtbaren Termin verschwinden.
+ *
+ * NUR DIE SCHREIBROUTEN DES KALENDERS FRAGEN DANACH. Aufgaben nicht (eine
+ * Aufgabe ist an ihrem Faelligkeitstag faellig, die Regel betrifft erst den
+ * Nachfolger), ICS-Import und CalDAV-Sync nicht (fremde Daten sind, wie sie
+ * sind).
+ *
+ * Verglichen werden KALENDERTAGE, dieselbe Grenze, die `nextOccurrence` zieht:
+ * ein Ende am Starttag ist eine Serie mit einem Vorkommen und gueltig.
+ *
+ * @param {string} dateKey YYYY-MM-DD (oder ein ISO-Zeitstempel; der Tag zaehlt)
+ * @param {string} rrule
+ * @returns {boolean}
+ */
+function endsBeforeStart(dateKey, rrule) {
+  if (!dateKey || !rrule) return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateKey));
+  if (!match) return false;
+  const until = parseRRule(rrule)?.until;
+  if (!(until instanceof Date) || Number.isNaN(until.getTime())) return false;
+  return until.getTime() < Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+/**
  * Das erste Vorkommen der Regel am oder nach `dateKey`.
  *
  * NUR LESEND. Ein DTSTART, das die eigene Regel nicht erfuellt, wird damit
@@ -812,5 +844,5 @@ function seriesStartFor(dateKey, rrule, { utcDiffersFromLocal = false } = {}) {
 
 export {
   parseRRule, nextOccurrence, nextOccurrenceAfter, nextDueAfterCompletion, matchesRRuleByday,
-  seriesStartFor, hasAnyOccurrence, untilInstantMs,
+  seriesStartFor, hasAnyOccurrence, endsBeforeStart, untilInstantMs,
 };

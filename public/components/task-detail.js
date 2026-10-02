@@ -49,7 +49,7 @@ import { historyDayLabel } from '/utils/day-label.js';
 import {
   FALLBACK_CATEGORY, PRIORITY_LABELS, STATUS_LABELS, statusLabel,
   isArchived, canEditTaskDefinition, catLabel, normalizeTagList,
-  docMime, docHref, docIcon, formatDueDate,
+  docMime, docHref, docIcon, formatDueDate, seriesDoneText,
 } from '/utils/task-fields.js';
 
 // --------------------------------------------------------
@@ -345,8 +345,9 @@ function subtaskListNode(task, ctx) {
 /**
  * Die Eingabezeile „Teilaufgabe hinzufügen" an Ort und Stelle (A3 P1-1).
  *
- * Wie in Erinnerungen und Things: der Knopf wird zum Feld, Enter legt an und
- * lässt den Fokus für die nächste Zeile stehen, Escape schließt und gibt den
+ * Wie in Erinnerungen und Things: der Knopf wird zum Feld, Enter oder der
+ * Knopf „Hinzufügen" daneben legt an und lässt den Fokus für die nächste Zeile
+ * stehen, Escape schließt und gibt den
  * Fokus an den Knopf zurück. Enter auf leerem Feld schließt ebenfalls, ein
  * leeres Feld schließt auch, wenn der Fokus es verlässt. Escape bleibt hier:
  * das Blatt, in dem das Feld steht, schließt sonst mit (modal.js hört auf
@@ -379,7 +380,17 @@ function subtaskComposer(task, ctx, { onCreated }) {
   input.enterKeyHint = 'done';
   input.placeholder = t('tasks.subtaskAdd');
   input.setAttribute('aria-label', t('tasks.subtaskAddNamed', { title: task.title }));
-  form.appendChild(input);
+  // DER SICHTBARE WEG (#1598). Das Feld allein verliess sich auf Enter, und
+  // das Blatt verschluckte es: der Focus-Trap von modal.js klickte den ersten
+  // Absende-Knopf des Panels ("Kommentieren"). Auf dem Telefon, wo die Ansicht
+  // immer ein Blatt ist, blieb kein Weg, eine Teilaufgabe anzulegen. Der Knopf
+  // ist der Absender DIESES Formulars - der Trap findet ihn zuerst, und wer
+  // Enter nicht kennt oder keine Taste dafuer hat, tippt ihn an.
+  const submit = document.createElement('button');
+  submit.type = 'submit';
+  submit.className = 'btn btn--secondary detail-subtask-compose__submit';
+  submit.textContent = t('common.add');
+  form.append(input, submit);
 
   let pending = false;
   const open = () => {
@@ -402,6 +413,7 @@ function subtaskComposer(task, ctx, { onCreated }) {
     if (!title) { close(); return; }
     pending = true;
     form.setAttribute('aria-busy', 'true');
+    submit.disabled = true;
     try {
       const created = await addSubtask(task.id, title, ctx);
       if (!created) return;
@@ -411,6 +423,7 @@ function subtaskComposer(task, ctx, { onCreated }) {
     } finally {
       pending = false;
       form.removeAttribute('aria-busy');
+      submit.disabled = false;
       if (!form.hidden) input.focus();
     }
   });
@@ -1278,12 +1291,17 @@ function wireDetailDoerMenu(task, doers, ctx, close, pane = null) {
   if (window.lucide) window.lucide.createIcons({ el: panel });
 }
 
+// Ein Datum will gelesen werden: laenger als die drei Sekunden der Vorgabe,
+// dieselbe Frist wie die Quittungen der Liste.
+const SERIES_TOAST_MS = 5000;
+
 async function completeFor(task, person, button, ctx, close) {
   const stop = btnLoading(button);
   const siblings = statusActionButtons().filter((el) => el !== button);
   siblings.forEach((el) => { el.disabled = true; });
+  let response;
   try {
-    await api.patch(`/tasks/${task.id}/status`, { status: 'done', done_by_user_id: person.id });
+    response = await api.patch(`/tasks/${task.id}/status`, { status: 'done', done_by_user_id: person.id });
   } catch (err) {
     stop();
     siblings.forEach((el) => { el.disabled = false; });
@@ -1291,7 +1309,12 @@ async function completeFor(task, person, button, ctx, close) {
     return;
   }
   task.status = 'done';
-  window.yuvomi.showToast(t('tasks.doneByToast', { name: person.display_name ?? '' }));
+  // EIN Toast, nie zwei: bei einer Serie sagt derselbe Satz, wer es war UND
+  // wann es weitergeht (#1603).
+  const name = person.display_name ?? '';
+  const seriesText = seriesDoneText(response, { name });
+  if (seriesText) window.yuvomi.showToast(seriesText, 'default', SERIES_TOAST_MS);
+  else window.yuvomi.showToast(t('tasks.doneByToast', { name }));
   await afterConfirmedWrite(ctx, close);
 }
 
@@ -1336,8 +1359,9 @@ async function advanceTaskStatus(task, status, button, ctx, close = closeDetailV
   // Spinner gehoert an den Knopf, den jemand gedrueckt hat.
   const siblings = statusActionButtons().filter((el) => el !== button);
   siblings.forEach((el) => { el.disabled = true; });
+  let response;
   try {
-    await api.patch(`/tasks/${task.id}/status`, { status });
+    response = await api.patch(`/tasks/${task.id}/status`, { status });
   } catch (err) {
     task.status = previous;
     stop();
@@ -1348,6 +1372,12 @@ async function advanceTaskStatus(task, status, button, ctx, close = closeDetailV
     return;
   }
   task.status = status;
+  // Eine erledigte Serie sagt, wann es weitergeht (#1603): die Ansicht schliesst
+  // gleich, und die Umgebung zeigt danach eine offene Zeile, die aussieht wie
+  // diese. Ohne Serie bleibt es still wie bisher - der Knopf selbst und die
+  // verschwindende Zeile sind dort die Quittung.
+  const seriesText = status === 'done' ? seriesDoneText(response) : null;
+  if (seriesText) window.yuvomi.showToast(seriesText, 'default', SERIES_TOAST_MS);
   await afterConfirmedWrite(ctx, close);
 }
 
@@ -1475,4 +1505,4 @@ function seriesHistoryNode(task) {
  * der sich die Nur-lesen-Regel (#467) an dieser Ansicht MESSEN laesst - alles
  * andere hier haengt an `openDetailView` und damit am echten DOM.
  */
-export const __test = { subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, DOER_BUTTON_ID };
+export const __test = { subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, DOER_BUTTON_ID, completeFor };

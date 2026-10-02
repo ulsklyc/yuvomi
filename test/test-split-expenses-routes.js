@@ -1019,6 +1019,43 @@ test('member-candidates: Kontakt- und Geburtstagsfelder folgen dem Leserecht', a
   assert.equal(token.body.data.some((r) => r.source === 'contact'), false);
 });
 
+test('negative und Minus-Null-Betraege: 400 mit der Regel im Klartext, nichts wird gespeichert (#1607)', async () => {
+  // Das Schema haelt negative Betraege seit jeher ab (CHECK an expenses,
+  // expense_splits, settlements) - gespeichert wurde also nie einer. Die Antwort
+  // war aber der rohe SQLite-Text ("CHECK constraint failed: ..."), und "-0" kam
+  // an der Null-Pruefung vorbei: als Genau-Anteil wurde es als Anteil 0
+  // gespeichert, obwohl "0" abgelehnt wird.
+  const owner = { id: OWNER, role: 'member' };
+  const zaehle = () => db.prepare('SELECT (SELECT COUNT(*) FROM expenses) AS e, (SELECT COUNT(*) FROM settlements) AS s, (SELECT COUNT(*) FROM expense_ledger_entries) AS l').get();
+  const vorher = zaehle();
+  const ausgabe = (extra) => call('POST', `/groups/${GROUP}/expenses`, {
+    actor: owner, body: { title: 'Probe', amount: '10.00', payer_id: OWNER, participants: [OWNER, MEM], ...extra },
+  });
+  const genau = (a, b) => ausgabe({ split_method: 'exact', splits: [{ user_id: OWNER, amount: a }, { user_id: MEM, amount: b }] });
+  const zahlung = (amount) => call('POST', `/groups/${GROUP}/settlements`, { actor: owner, body: { payer_id: MEM, payee_id: OWNER, amount } });
+
+  for (const [name, antwort, regel] of [
+    ['Genau-Anteil -5 / 15', await genau('-5', '15'), /^split amount must be greater than zero\.$/],
+    ['Genau-Anteil -0 / 10', await genau('-0', '10'), /^split amount must be greater than zero\.$/],
+    ['Genau-Anteil 0 / 10', await genau('0', '10'), /^split amount must be greater than zero\.$/],
+    ['Gesamtbetrag -10', await ausgabe({ amount: '-10.00' }), /^amount must be greater than zero\.$/],
+    ['Gesamtbetrag -0', await ausgabe({ amount: '-0' }), /^amount must be greater than zero\.$/],
+    ['Zahlung -5', await zahlung('-5'), /^amount must be greater than zero\.$/],
+    ['Zahlung -0', await zahlung('-0'), /^amount must be greater than zero\.$/],
+    ['Prozent -50 / 150', await ausgabe({ split_method: 'percentage', splits: [{ user_id: OWNER, percentage: '-50' }, { user_id: MEM, percentage: '150' }] }), /^Percentages must be decimal strings/],
+    ['Anteile -1 / 3', await ausgabe({ split_method: 'shares', splits: [{ user_id: OWNER, shares: -1 }, { user_id: MEM, shares: 3 }] }), /^Shares must be positive integers\.$/],
+  ]) {
+    assert.equal(antwort.status, 400, name);
+    assert.match(antwort.body.error, regel, name);
+  }
+  assert.deepEqual(zaehle(), vorher, 'keine Ausgabe, keine Zahlung, keine Ledger-Zeile');
+
+  // Gegenprobe: derselbe Aufruf mit gueltigen Genau-Anteilen geht durch.
+  const gut = await genau('4', '6');
+  assert.equal(gut.status, 201);
+  assert.deepEqual(gut.body.data.splits.map((s) => s.amount_minor).sort((x, y) => x - y), [400, 600]);
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

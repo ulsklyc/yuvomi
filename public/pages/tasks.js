@@ -39,7 +39,7 @@ import { zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { historyDayLabel } from '/utils/day-label.js';
 import {
   PRIORITIES, PRIO_ORDER, STATUSES, FILTER_STATUSES, PRIORITY_LABELS, STATUS_LABELS, statusLabel,
-  FALLBACK_CATEGORY, isArchived, formatDueDate, normalizeTagList,
+  FALLBACK_CATEGORY, isArchived, formatDueDate, normalizeTagList, seriesDoneText,
   catLabel as catLabelOf, catSortIndex as catSortIndexOf,
   canEditTaskDefinition as canEditTaskDefinitionFor,
 } from '/utils/task-fields.js';
@@ -453,6 +453,17 @@ async function wireSyncTarget(panel, task) {
 }
 
 /**
+ * Das Schloss einer gesperrten Aufgabe - EINE Bauart fuer Liste und Brett
+ * (#1607: das Brett liess es weg, wer die Ansicht wechselte, erfuhr die Sperre
+ * erst am abgelehnten Zug). `role="img"`, damit das `aria-label` gilt.
+ */
+function renderLockedBadge(task) {
+  if (!task.locked) return '';
+  const label = esc(t('tasks.lockedBadge'));
+  return `<span class="due-date" role="img" aria-label="${label}" title="${label}"><i data-lucide="lock" class="icon-sm" aria-hidden="true"></i></span>`;
+}
+
+/**
  * EINE Metazeile, und sie bricht nicht um.
  *
  * Die Zeile trug bis zu acht Elemente mit `flex-wrap: wrap` und wurde damit je
@@ -617,7 +628,7 @@ function renderTaskCard(task, opts = {}) {
                 hier standen zwei Kopien ohne Rolle (PR-Review #754). */ ''}
             ${task.is_recurring ? `<span class="due-date" role="img" aria-label="${esc(t('tasks.recurring'))}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>` : ''}
             ${task.document_count > 0 ? `<span class="due-date task-card__docs" role="img" aria-label="${esc(t('tasks.documentsCount', { count: task.document_count }))}"><i data-lucide="paperclip" class="icon-sm" aria-hidden="true"></i></span>` : ''}
-            ${task.locked ? `<span class="due-date" role="img" aria-label="${esc(t('tasks.lockedBadge'))}" title="${esc(t('tasks.lockedBadge'))}"><i data-lucide="lock" class="icon-sm" aria-hidden="true"></i></span>` : ''}
+            ${renderLockedBadge(task)}
             ${renderVisibilityBadge(task.visibility)}
             ${showCategory && task.category !== FALLBACK_CATEGORY ? `<span class="due-date task-card__category">${esc(catLabel(task.category))}</span>` : ''}
             ${renderTagBadges(task.tags, ROW_TAG_BADGES_VISIBLE, task.priority)}
@@ -1610,12 +1621,53 @@ async function refreshTags() {
  *        Uebergang nach „erledigt" sinnvoll; der Server verwirft die Angabe an
  *        jedem anderen Wechsel still, damit eine Sammelaktion nicht an einem
  *        mitgeschickten Feld scheitert.
+ * @returns {Promise<object>} die Antwort des Servers. Sie traegt bei einer
+ *        erledigten Serie `next_due_date` (#1603) - wer abhakt, reicht sie an
+ *        die Quittung weiter (`seriesDoneText`).
  */
 async function toggleTaskStatus(id, currentStatus, doneByUserId = null) {
   const next = currentStatus === 'done' ? 'open' : 'done';
-  await api.patch(`/tasks/${id}/status`, doneByUserId == null
+  return api.patch(`/tasks/${id}/status`, doneByUserId == null
     ? { status: next }
     : { status: next, done_by_user_id: doneByUserId });
+}
+
+/**
+ * Die Quittung nach Haken oder Wisch in der Liste - EINE fuer beide Gesten.
+ *
+ * Derselbe Rueckweg an beiden: die Geste hatte zwei Endpunkte mit zwei
+ * Antworten, der Wisch bot Undo an, der Tipp - die haeufigere Bedienung - liess
+ * den Eintrag kommentarlos aus dem gefilterten Bild verschwinden.
+ *
+ * BEI EINER SERIE NENNT SIE DAS NAECHSTE MAL (#1603): dort verschwindet nichts,
+ * die Folgeinstanz steht nach dem Neuladen an derselben Stelle, und „Als
+ * erledigt markiert." neben einer offenen Zeile las sich wie ein Fehler.
+ *
+ * Die Schluessel heissen weiter `swiped*`: ihr TEXT ist gestenneutral ("Als
+ * erledigt markiert."), nur der Name nennt die Wischgeste. Ein Rename kostet
+ * jede Locale-Datei fuer eine Namensschuld, die kein Nutzer sieht - vermerkt
+ * statt bezahlt.
+ *
+ * @param {HTMLElement|null} container
+ * @param {number|string} taskId
+ * @param {string} nextStatus der Status NACH dem Wechsel
+ * @param {object} response die Antwort von `toggleTaskStatus`
+ */
+function acknowledgeStatusToggle(container, taskId, nextStatus, response) {
+  window.yuvomi.showToast(
+    seriesDoneText(response)
+      ?? t(nextStatus === 'done' ? 'tasks.swipedDoneToast' : 'tasks.swipedOpenToast'),
+    'default',
+    5000,
+    async () => {
+      try {
+        await toggleTaskStatus(taskId, nextStatus);
+        await reloadWithRowMotion(container, taskId);
+      } catch (err) {
+        window.yuvomi.showToast(err.message, 'danger');
+      }
+    },
+  );
 }
 
 async function loadTaskForEdit(id) {
@@ -2519,7 +2571,8 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
 async function handleRenameSubtask(id, currentTitle, container) {
   const title = await promptModal(t('tasks.subtaskRenamePrompt'), currentTitle);
   // Abbruch (null) und "unverändert" gehen beide ohne Request weiter; ein
-  // leergeräumtes Feld ist kein gültiger Titel und wird wie Abbruch behandelt.
+  // leergeräumtes Feld ist kein gültiger Titel, das meldet promptModal selbst
+  // am Feld und bleibt offen (#1607).
   if (!title || title.trim() === currentTitle) return;
   try {
     await api.put(`/tasks/${id}`, { title: title.trim() });
@@ -2587,10 +2640,13 @@ async function moveTaskToColumn(before, column) {
   // Statuswechsel nötig ist, muss sich auf den alten Stand beziehen.
   if (column === 'archived') {
     await setTaskArchived(before.id, true);
-    return;
+    return null;
   }
   if (before.archived_at) await setTaskArchived(before.id, false);
-  if (before.status !== column) await api.patch(`/tasks/${before.id}/status`, { status: column });
+  // Die Antwort des Statuswechsels geht zurueck: an ihr haengt die Quittung
+  // einer erledigten Serie (#1603). Ohne Statuswechsel gibt es keine.
+  if (before.status !== column) return api.patch(`/tasks/${before.id}/status`, { status: column });
+  return null;
 }
 
 /** Optimistisches Spiegelbild von moveTaskToColumn auf dem State-Objekt. */
@@ -2612,12 +2668,19 @@ async function runColumnMove(task, column, container) {
   const before = { id: task.id, status: task.status, archived_at: task.archived_at };
   applyColumnLocally(task, column);
   renderKanban(container);
+  let seriesText = null;
   try {
-    await moveTaskToColumn(before, column);
+    const response = await moveTaskToColumn(before, column);
+    if (column === 'done') seriesText = seriesDoneText(response);
   } catch (err) {
     window.yuvomi.showToast(err.message, 'danger');
   }
   await loadTasks(container);
+  // NACH dem Neuladen, wie in der Liste: die Karte liegt in „Erledigt", und in
+  // „Offen" ist im selben Moment eine gleich aussehende aufgetaucht. Der Satz
+  // sagt, dass das die naechste ist und nicht dieselbe (#1603). Ohne Serie
+  // bleibt das Brett still - die gewanderte Karte ist dort die Quittung.
+  if (seriesText) window.yuvomi.showToast(seriesText, 'default', 5000);
 }
 
 function renderKanbanCard(task) {
@@ -2651,6 +2714,7 @@ function renderKanbanCard(task) {
       <div class="kanban-card__meta">
         ${renderPriorityBadge(task.priority)}
         ${due ? `<span class="due-date ${due.cls}"><i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> ${due.label}</span>` : ''}
+        ${renderLockedBadge(task)}
         ${renderTagBadges(task.tags, TAG_BADGES_VISIBLE, task.priority)}
       </div>
       <div class="kanban-card__footer">
@@ -4079,21 +4143,9 @@ function wireSwipeGestures(container) {
         const card = row.querySelector('.task-card');
         if (card) card.style.visibility = 'hidden';
         try {
-          await toggleTaskStatus(taskId, capturedStatus);
+          const response = await toggleTaskStatus(taskId, capturedStatus);
           await reloadWithRowMotion(container, taskId);
-          window.yuvomi.showToast(
-            t(nextStatus === 'done' ? 'tasks.swipedDoneToast' : 'tasks.swipedOpenToast'),
-            'default',
-            5000,
-            async () => {
-              try {
-                await toggleTaskStatus(taskId, nextStatus);
-                await reloadWithRowMotion(container, taskId);
-              } catch (err) {
-                window.yuvomi.showToast(err.message, 'danger');
-              }
-            },
-          );
+          acknowledgeStatusToggle(container, taskId, nextStatus, response);
         } catch (err) {
           window.yuvomi.showToast(err.message, 'danger');
           await loadTasks(container);
@@ -4615,10 +4667,14 @@ async function completeTaskFor(container, taskId, userId) {
   const quelle = actingAsDisplay() ? (state.displayPeople ?? []) : (state.users ?? []);
   const person = quelle.find((u) => u.id === userId);
   try {
-    await toggleTaskStatus(taskId, 'open', userId);
+    const response = await toggleTaskStatus(taskId, 'open', userId);
     await reloadWithRowMotion(container, taskId);
+    // EIN Toast, nie zwei: bei einer Serie sagt derselbe Satz, wer es war UND
+    // wann es weitergeht (#1603) - auch am Wandtablett, wo die neue Zeile sonst
+    // wie ein Haken aussieht, der nicht gehalten hat.
+    const name = person?.display_name ?? '';
     window.yuvomi.showToast(
-      t('tasks.doneByToast', { name: person?.display_name ?? '' }),
+      seriesDoneText(response, { name }) ?? t('tasks.doneByToast', { name }),
       'default',
       5000,
       actingAsDisplay() ? null : async () => {
@@ -4796,31 +4852,11 @@ function wireTaskList(container) {
       // Netz verlaengert sie nicht noch einmal (EXIT_HOLD_MS).
       const holdUntil = performance.now() + EXIT_HOLD_MS;
       try {
-        await toggleTaskStatus(id, status);
+        const response = await toggleTaskStatus(id, status);
         await settled;
         await reloadWithRowMotion(container, id, { holdUntil });
-        // Derselbe Rückweg wie beim Wischen. Die Geste hatte hier zwei
-        // Endpunkte mit zwei Antworten: der Wisch bot Undo an, der Tipp - die
-        // häufigere Bedienung - liess den Eintrag kommentarlos aus dem
-        // gefilterten Bild verschwinden.
-        //
-        // Die Schlüssel heissen weiter `swiped*`: ihr TEXT ist gestenneutral
-        // ("Als erledigt markiert."), nur der Name nennt die Wischgeste. Ein
-        // Rename kostet 24 Locale-Dateien für eine Namensschuld, die kein
-        // Nutzer sieht - vermerkt statt bezahlt.
-        window.yuvomi.showToast(
-          t(nextStatus === 'done' ? 'tasks.swipedDoneToast' : 'tasks.swipedOpenToast'),
-          'default',
-          5000,
-          async () => {
-            try {
-              await toggleTaskStatus(id, nextStatus);
-              await reloadWithRowMotion(container, id);
-            } catch (err) {
-              window.yuvomi.showToast(err.message, 'danger');
-            }
-          },
-        );
+        // Derselbe Rückweg wie beim Wischen - und dieselbe Quittung.
+        acknowledgeStatusToggle(container, id, nextStatus, response);
       } catch (err) {
         window.yuvomi.showToast(err.message, 'danger');
         await loadTasks(container);
@@ -5621,6 +5657,9 @@ export async function render(container, { user, signal } = {}) {
 // Testfläche: nur reine Funktionen, deren Vertrag außerhalb dieser Datei zählt.
 export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
+  // Die Quittung nach dem Abhaken (#1603), je Weg am laufenden Aufruf: Haken
+  // und Wisch teilen sich eine, die Personenwahl und das Brett haben je ihre.
+  acknowledgeStatusToggle, completeTaskFor, runColumnMove,
   // Die Reihenfolge innerhalb einer Gruppe (ihr Aufrufer `renderTaskGroups`
   // steht weiter unten): Wanduhr des Haushalts, nicht die des Geraets.
   sortTasks, taskSortNow,

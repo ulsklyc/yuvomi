@@ -15,7 +15,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toDecimalString, amountInputToCents, centsToAmountInput, breaksOffAtSeparator, toStoredNumber } from '../public/utils/money.js';
+import { toDecimalString, amountInputToCents, centsToAmountInput, breaksOffAtSeparator, toStoredNumber, amountInputProblem, amountExample, currencyFractionDigits } from '../public/utils/money.js';
 import { parseQuantity } from '../server/services/shopping-import.js';
 
 /**
@@ -258,4 +258,94 @@ test('toStoredNumber: Ziffern UND Trenner der Region, von beiden Seiten lesbar',
   withFormatLocale('fa', () => { assert.equal(toStoredNumber(2000), '۲۰۰۰'); });
   // Ohne Gruppierung, sonst laese toDecimalString den Wert nicht wieder ein.
   withFormatLocale('de', () => { assert.equal(toStoredNumber(2000), '2000'); });
+});
+
+test('amountInputProblem: der Grund, warum ein Betrag nicht speicherbar ist (#1607)', () => {
+  const grund = (locale, eingabe, currency, optionen) => {
+    let ergebnis;
+    withFormatLocale(locale, () => { ergebnis = amountInputProblem(eingabe, currency, optionen); });
+    return ergebnis;
+  };
+  // Gueltig - und ein leeres Feld hat keinen Grund, das ist Sache des Pflichtfelds.
+  assert.equal(grund('de', '12,50', 'EUR'), null);
+  assert.equal(grund('ko-KR', '10000', 'KRW'), null);
+  assert.equal(grund('ar-EG', '١٢٫٥٠', 'EUR'), null);
+  assert.equal(grund('de', '', 'EUR'), null);
+  assert.equal(grund('de', '   ', 'EUR'), null);
+  // ... ausser der Speicherweg verlangt einen Betrag: `required` des Browsers
+  // nimmt ein Feld aus Leerzeichen an, der Server bekaeme einen leeren Text.
+  assert.equal(grund('de', '   ', 'EUR', { required: true }), 'notPositive');
+  assert.equal(grund('de', '', 'EUR', { required: true }), 'notPositive');
+  assert.equal(grund('de', '12,50', 'EUR', { required: true }), null);
+
+  // Gruppierung: die uebliche Schreibweise fuer zehntausend, je Region.
+  assert.equal(grund('ko-KR', '10,000', 'KRW'), 'grouped');
+  assert.equal(grund('en-US', '10,000', 'USD'), 'grouped');
+  assert.equal(grund('de-DE', '10.000', 'EUR'), 'grouped');
+  assert.equal(grund('de-DE', '1.000,50', 'EUR'), 'grouped');
+  assert.equal(grund('fr-FR', '10 000', 'EUR'), 'grouped');
+
+  assert.equal(grund('de', 'abc', 'EUR'), 'invalid');
+  assert.equal(grund('de', '12,', 'EUR'), 'invalid');
+  assert.equal(grund('de', '1e3', 'EUR'), 'invalid');
+  assert.equal(grund('de', '0', 'EUR'), 'notPositive');
+  assert.equal(grund('de', '0,00', 'EUR'), 'notPositive');
+  assert.equal(grund('de', '-5', 'EUR'), 'notPositive');
+
+  // Die Stellen zaehlen am TEXT: "10.000" ist unter ko-KR die Zahl 10 und passt
+  // als Zahl ins Raster von KRW - der Server liest aber den Text.
+  assert.equal(grund('ko-KR', '10.000', 'KRW'), 'precision');
+  assert.equal(grund('de-DE', '10,000', 'KRW'), 'precision');
+  assert.equal(grund('de-DE', '12,500', 'EUR'), 'precision');
+  assert.equal(grund('de-DE', '12,5', 'JPY'), 'precision');
+  assert.equal(grund('de-DE', '12,345', 'KWD'), null);
+
+  // Bestandsschutz wie amountIsSavable: unangetastet bleibt speicherbar, aber
+  // nicht mit MEHR Stellen als vorher.
+  assert.equal(grund('en-US', '12.50', 'JPY', { original: '12.50' }), null);
+  assert.equal(grund('en-US', '12.5', 'JPY', { original: '12.50' }), null);
+  assert.equal(grund('en-US', '12.51', 'JPY', { original: '12.50' }), 'precision');
+  assert.equal(grund('en-US', '10000.0', 'KRW', { original: '10000' }), 'precision');
+  // ... und nicht ueber einen Waehrungswechsel hinweg: wer von EUR auf JPY
+  // umstellt, hat das Raster gewechselt (wie bei amountIsSavable).
+  assert.equal(grund('en-US', '12.50', 'JPY', { original: '12.50', originalCurrency: 'JPY' }), null);
+  assert.equal(grund('en-US', '12.50', 'JPY', { original: '12.50', originalCurrency: 'EUR' }), 'precision');
+});
+
+test('jeder Speicherweg der Aufteilung verlangt einen Betrag', async () => {
+  const { readFileSync } = await import('node:fs');
+  const quelle = readFileSync(new URL('../public/pages/split-expenses.js', import.meta.url), 'utf8');
+  const aufrufe = quelle.match(/if \(rejectSplitAmount\([\s\S]*?\)\) return;/g) ?? [];
+  assert.equal(aufrufe.length >= 3, true, 'Aufrufe von rejectSplitAmount gefunden');
+  for (const aufruf of aufrufe) assert.match(aufruf, /required: true/, aufruf);
+});
+
+test('amountInputProblem ist nie nachsichtiger als der Server', async () => {
+  // Der Server zaehlt mit seiner ISO-Tabelle, das Frontend mit Intl (CLDR). Wo
+  // beide auseinandergehen, muss das Frontend das STRENGERE sein - sonst kaeme
+  // die englische Serverantwort zurueck, die diese Pruefung ersetzen soll.
+  const { parseMoneyToMinor } = await import('../server/services/split-expenses.js');
+  const { CURRENCY_CODES } = await import('../public/utils/currency-codes.js');
+  assert.ok(CURRENCY_CODES.length > 20);
+  for (const code of CURRENCY_CODES) {
+    const stellen = currencyFractionDigits(code);
+    const betrag = stellen ? `1.${'1'.repeat(stellen)}` : '1';
+    withFormatLocale('en-US', () => assert.equal(amountInputProblem(betrag, code), null, code));
+    assert.doesNotThrow(() => parseMoneyToMinor(betrag, code), `${code}: ${betrag}`);
+  }
+});
+
+test('amountExample: Schreibweise der Region, Stellen der Waehrung, keine Gruppierung', () => {
+  const beispiel = (locale, currency) => {
+    let text;
+    withFormatLocale(locale, () => { text = amountExample(currency); });
+    return text;
+  };
+  assert.equal(beispiel('de-DE', 'EUR'), '1250,00');
+  assert.equal(beispiel('en-US', 'USD'), '1250.00');
+  assert.equal(beispiel('ko-KR', 'KRW'), '1250');
+  // Was als Beispiel dasteht, muss die Pruefung auch annehmen.
+  for (const [locale, currency] of [['de-DE', 'EUR'], ['ko-KR', 'KRW'], ['fa', 'EUR'], ['ar-EG', 'KWD'], ['fr-FR', 'EUR']]) {
+    withFormatLocale(locale, () => assert.equal(amountInputProblem(amountExample(currency), currency), null, `${locale}/${currency}`));
+  }
 });

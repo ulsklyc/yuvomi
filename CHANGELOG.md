@@ -37,6 +37,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The month heading of Calendar and Budget follows the word order of the language** (#1607).
+  Both pages put the month name, a space and the year together themselves, which gave "10월 2026"
+  in Korean instead of "2026년 10월" (and the same for Japanese, Chinese and Hungarian). Month
+  and year now come from one formatter that asks the UI language for the order and always uses
+  the Gregorian calendar. German and English look the same as before; a few languages gain the
+  connecting words their grammar asks for ("Octubre de 2026", "Tháng 10 năm 2026").
+- **An event that ends at midnight is drawn at its full length in the week and day view**
+  (#1607). An event from 23:00 to 00:00 appeared as a 30-minute strip, and one from 22:00 to
+  00:00 as well: an end at exactly 00:00 was read as "ends at minute 0 of the same day". It now
+  runs to the end of the day, and it shares its column correctly with events that overlap it.
+  Events of 24 hours or more stay in the all-day row as before.
+- **A recurring event found in the global search opens at its next date, not in its first year**
+  (#1607). The search behind Cmd/Ctrl+K listed a series with the date of its very first
+  occurrence, and the link opened the calendar there: a birthday from 1990 opened October 1990.
+  The global search now resolves a series to its next occurrence from today, with the same
+  two-year window the calendar's own search uses, and the link carries that day. In
+  `GET /api/v1/search`, `events[].start_datetime` of a recurring event is therefore the next
+  occurrence instead of the series start; `id` is unchanged.
+- **A repeat end before the start date is no longer saved** (#1607). An event starting on 2 October
+  could be saved as "daily, until 30 September": the dialog only checked that the end was a valid
+  date, and the server only checked the form of the rule. The dialog now shows the error at the
+  repeat-end field, and `POST /api/v1/calendar`, `PUT /api/v1/calendar/{id}` and the "this and
+  following" edit answer 400. A repeat end on the start day stays valid. A series from an ICS
+  import or a synced calendar that already carries such a rule is still imported and stays
+  editable; tasks are unchanged, because a task is due on its own date and the rule only decides
+  about its successor.
+- **The weekday buttons of a weekly series no longer all look switched off** (#1607). A weekly
+  event without chosen weekdays repeats on the weekday of its start, but the "repeat on" buttons
+  showed none of the seven as active. The weekday of the start date is now shown as active, both
+  when you switch a new event to weekly and when you open an existing series, and it follows the
+  start date until you pick days yourself. The stored rule of an existing series is not rewritten.
 - **Editing a shared expense no longer rewrites its history** (#1607). The activity feed of a group
   showed the amount an expense has now, so correcting 50 to 10 also changed the earlier "Expense
   created" line to 10 - for expenses created by other members too. Each entry now records the
@@ -49,6 +80,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The detail view showed that day, the editor was filled with it, and "This event only" then
   changed or deleted it, not the occurrence you clicked. Each occurrence now opens itself; the
   agenda already did.
+- **Subtasks can be added from the task sheet again** (#1598). Since v2.70.0 "Add subtask" turns
+  into a text field inside the task. In the sheet - every phone and every narrow window - Enter
+  in that field triggered the comment button further down instead of saving the subtask, and
+  the field had no button of its own, so there was no way left to add one; only the detail
+  column on wide screens worked. The field now has an "Add" button next to it, and Enter saves
+  the subtask and keeps the field open for the next one. In any sheet with more than one form,
+  Enter now submits the form the field belongs to and ignores buttons of a view that is hidden
+  at that moment, so Enter in the edit form of a task saves the task.
+- **A new household starts in its own time zone** (#1607). The first-run page now sends the
+  browser's time zone along, and the server stores it as the household time zone. Until now a
+  fresh install had none, so the server counted "today" in the container's zone, usually UTC:
+  east of UTC the dashboard showed no meals for today and overdue tasks were not counted as
+  overdue during the first hours of the day, west of UTC the day turned over hours early in
+  the evening. A browser that reports no usable zone, or only UTC, sends nothing and the server
+  falls back to `TZ` as before. Households that already exist are not changed - an admin sets
+  the zone once in the settings under "Time zone".
 - **Reopening a completed task no longer erases its points from the history** (#1607). Reopening
   a task used to delete its earning. If the points were already in a reward request, the balance
   went below zero and the history showed only the request, neither the earning nor that it had
@@ -136,6 +183,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Filipino, which OpenWeatherMap does not offer, uses `OPENWEATHER_LANG` and otherwise English.
   `OPENWEATHER_LANG` is that fallback and takes an OpenWeatherMap code; a code OpenWeatherMap does
   not list is now ignored in favour of English, as the installation guide and `.env.example` say.
+- **Shared expenses say why an amount cannot be saved** (#1607). An amount of 0, a negative
+  amount or one written with thousands separators (`10,000` in Korea or the US, `10.000` in
+  Germany) only greyed out the Save button. The reason now appears under the amount once you
+  leave the field, with an example of the expected spelling. An amount with more decimals than
+  the currency has, such as `10.000` for won, was sent and came back as an English server
+  message; it is now caught at the field in your language, also for exact shares and when
+  recording a payment. An exact share that is empty, 0 or negative is caught there as well, even
+  when the shares add up. Over the API, a negative amount, share or payment was never stored,
+  but the answer was the database's raw constraint text; it is now "must be greater than
+  zero", and `-0` no longer slips through as a share of 0. The running total of a split follows
+  the household's number format and the expense's currency instead of always reading like
+  `33.00`.
+
+- **The "discard changes" question has two different buttons in every language** (#1607). In
+  Korean, Italian and Ukrainian both buttons said "Cancel", in Turkish and Russian the two words
+  were nearly the same, so it was unclear which one throws the input away. The discarding button
+  now says "discard" there, and the question above it uses the same verb. The same applied to the
+  question when leaving the permissions sheet with unsaved changes in Korean, Italian and
+  Russian.
+
+- **Saving a name dialog with an empty field says so instead of closing** (#1607). Creating a
+  shopping list with an empty name closed the dialog without a message and without a list. The
+  same dialog asks for the new name of a list, folder, category or subtask and for a custom
+  reminder time, and behaved the same there. It now stays open and marks the field as required;
+  Cancel and Escape still close it.
+
+- **A rejected default visibility in the Health settings jumps back** (#1607). When the server
+  refused a change to the default visibility of a health area, the error appeared but the field
+  kept showing the new value, so the sheet implied a sharing change that never happened. The
+  field now returns to the saved value, like the switches above it.
+
+- **Settings no longer show the sheet of a module you have no access to** (#1607). A member whose
+  permission for a module is "No access" still found that module's sheet under Settings, open and
+  operable, next to a "no access" error; the server refused every change. The sheet is now gone
+  from the list, from the settings search and from its direct address, as the module already was
+  from the navigation. With "Read only" the sheet stays.
+
+- **The board shows the lock of a locked task** (#1607). A task that only its assignees may
+  change carried its lock in the list but lost it on the board card. The card now shows the same
+  sign.
+- **Ticking off a recurring task now says when it comes back** (#1603). Completing a recurring
+  task creates its next occurrence at once, so the list, the board and the Overview tile showed
+  an open task that looked just like the one you had ticked off - with "repeat from completion"
+  even with the same date - and the tick seemed to have done nothing. Every way of completing
+  it now answers with "Done - next due <date>": the Complete button and the "who did it" choice
+  in the task view (also when opened from Overview or the calendar), the checkbox, the swipe and
+  the person choice in the list, moving a card to Done on the board, and the wall display. With
+  a named person it is one message that says both. The undo in the list stays. For API clients,
+  `PATCH /api/v1/tasks/{id}/status` additionally returns `next_due_date`, the due date of the
+  next occurrence that is not yet done, or `null`.
 
 ## [2.71.0] - 2026-09-30
 

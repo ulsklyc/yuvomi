@@ -13,7 +13,7 @@ import { installPopoverMenus } from '/utils/popover-menu.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { stagger } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
-import { formatMoney, amountPlaceholder, toDecimalString, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
+import { formatMoney, amountPlaceholder, toDecimalString, smallestUnitLabel, amountInputProblem, amountExample } from '/utils/money.js';
 import { todayKey } from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { wireTablist } from '/utils/tablist.js';
@@ -1147,25 +1147,76 @@ function updateSplitInputs(panel) {
 const decimalString = toDecimalString;
 
 /**
- * Weist einen Betrag zurück, der mehr Nachkommastellen hat als die Währung
- * kennt. Die Felder hier sind Textfelder, es gibt also kein `step`, das der
+ * Der Text zu einem Grund aus amountInputProblem() (utils/money.js).
+ */
+function amountProblemText(problem, currency) {
+  if (problem === 'grouped') return t('common.amountGrouped', { example: amountExample(currency) });
+  if (problem === 'invalid') return t('common.amountInvalid', { example: amountExample(currency) });
+  if (problem === 'notPositive') return t('common.amountNotPositive');
+  return t('common.amountPrecisionRequired', { currency, step: smallestUnitLabel(currency) });
+}
+
+/**
+ * Weist einen Betrag zurück, den der Server nicht annähme, und nennt den Grund
+ * am Feld. Die Felder hier sind Textfelder, es gibt also kein `step`, das der
  * Browser prüfen könnte - und der Platzhalter zeigt bei HUF, IDR oder IRR
  * bereits ganze Einheiten an.
  *
- * Ohne diese Prüfung landet die Ablehnung beim Server (parseMoneyToMinor wirft
- * bei zu vielen Stellen), und die Meldung erscheint als ortloser Fehler statt
- * am Feld, das sie meint.
+ * Ohne diese Prüfung landet die Ablehnung beim Server (parseMoneyToMinor wirft),
+ * und die Meldung erscheint englisch und ortlos statt am Feld, das sie meint.
+ *
+ * Gelesen wird der TEXT des Feldes, nicht eine Zahl daraus: "10.000" ist unter
+ * ko-KR die Zahl 10 und passte so ins Raster von KRW, gesendet wurde aber der
+ * Text mit seinen drei Stellen (#1607).
+ *
+ * `required` setzt jeder Speicherweg: ein leeres Feld zählt dann wie eine 0.
+ * Die Genau-Beträge einer Aufteilung haben kein Pflichtfeld des Browsers, und
+ * wo es eines gibt, nimmt es ein Feld aus Leerzeichen an - beides ginge als
+ * leerer Text an den Server.
+ *
+ * `original` und `originalCurrency` tragen den Bestandsschutz (siehe
+ * amountInputProblem): er endet, sobald die Währung gewechselt wurde.
  *
  * @returns {boolean} true, wenn abgewiesen wurde (der Aufrufer bricht dann ab)
  */
-function rejectOffGridSplitAmount(input, value, currency, original = null) {
-  if (input == null || value === '' || value == null) return false;
-  if (amountIsSavable(value, currency, { original })) return false;
-  reportFieldError(input, t('common.amountPrecisionRequired', {
-    currency,
-    step: smallestUnitLabel(currency),
-  }));
+function rejectSplitAmount(input, currency, { original = null, originalCurrency = null, required = false } = {}) {
+  if (input == null) return false;
+  const problem = amountInputProblem(input.value, currency, { original, originalCurrency, required });
+  if (!problem) return false;
+  reportFieldError(input, amountProblemText(problem, currency));
   return true;
+}
+
+/**
+ * Der Grund unter dem Betrag der Ausgabe, solange die Eingabe das Speichern
+ * sperrt (#1607): 0, negativ, gruppiert oder keine Zahl. Vorher ging nur der
+ * Speichern-Knopf aus.
+ *
+ * `reveal` kommt vom Verlassen des Feldes. Beim Tippen bleibt ein noch nicht
+ * gezeigter Grund still - "0" ist der Anfang von "0,50" und "12," der von
+ * "12,50". Steht er einmal da, folgt er der Eingabe und geht mit dem Fehler.
+ *
+ * Zu viele Nachkommastellen stehen NICHT hier: die meldet der Speicherweg am
+ * Feld, weil er den Bestandswert kennt (rejectSplitAmount).
+ *
+ * @returns {boolean} true, wenn der Betrag das Speichern sperrt
+ */
+function syncAmountReason(panel, currency, { reveal = false } = {}) {
+  const input = panel.querySelector('[name="amount"]');
+  const problem = amountInputProblem(input?.value, currency);
+  const blocking = Boolean(problem) && problem !== 'precision';
+  const reason = panel.querySelector('#split-amount-reason');
+  if (!input || !reason) return blocking;
+  if (!blocking) {
+    if (!reason.hidden) input.setAttribute('aria-invalid', 'false');
+    reason.hidden = true;
+    reason.textContent = '';
+  } else if (reveal || !reason.hidden) {
+    reason.textContent = amountProblemText(problem, currency);
+    reason.hidden = false;
+    input.setAttribute('aria-invalid', 'true');
+  }
+  return blocking;
 }
 
 function numberValue(value) {
@@ -1174,20 +1225,27 @@ function numberValue(value) {
   return Number(normalized);
 }
 
-function validateSplitForm(panel) {
+/** Eine laufende Prozentsumme im Zahlformat der Region: "33,5 %", "100%". */
+function percentTotal(total) {
+  return getNumberFormat({ style: 'percent', maximumFractionDigits: 2 }).format(total / 100);
+}
+
+function validateSplitForm(panel, { reveal = false } = {}) {
   const method = panel.querySelector('[name="split_method"]')?.value || 'equal';
+  const currency = panel.querySelector('[name="currency"]')?.value || state.meta?.default_currency || 'EUR';
   const amount = numberValue(panel.querySelector('[name="amount"]')?.value);
+  const amountBlocked = syncAmountReason(panel, currency, { reveal });
   const selected = [...panel.querySelectorAll('input[name="participants"]:checked')];
-  let valid = selected.length > 0 && Number.isFinite(amount) && amount > 0;
+  let valid = selected.length > 0 && Number.isFinite(amount) && amount > 0 && !amountBlocked;
   let message = t(`splitExpenses.splitHint.${method}`);
   if (valid && method === 'percentage') {
     const total = selected.reduce((sum, input) => sum + (numberValue(panel.querySelector(`[name="split_value_${input.value}"]`)?.value) || 0), 0);
     valid = Math.abs(total - 100) < 0.01;
-    message = `${message} ${t('splitExpenses.splitCurrentTotal', { total: total.toFixed(2) })}`;
+    message = `${message} ${t('splitExpenses.splitCurrentTotal', { total: percentTotal(total) })}`;
   } else if (valid && method === 'exact') {
     const total = selected.reduce((sum, input) => sum + (numberValue(panel.querySelector(`[name="split_value_${input.value}"]`)?.value) || 0), 0);
     valid = Math.abs(total - amount) < 0.01;
-    message = `${message} ${t('splitExpenses.splitCurrentTotal', { total: total.toFixed(2) })}`;
+    message = `${message} ${t('splitExpenses.splitCurrentTotal', { total: formatMoney(total, currency) })}`;
   } else if (valid && method === 'shares') {
     valid = selected.every((input) => {
       const value = numberValue(panel.querySelector(`[name="split_value_${input.value}"]`)?.value);
@@ -1257,7 +1315,7 @@ function updateGroupDefaults(panel) {
   if (method === 'percentage' && filled.length) {
     const total = rows.reduce((sum, input) => sum + (numberValue(input.value) || 0), 0);
     valid = Math.abs(total - 100) < 0.01;
-    message = t('splitExpenses.splitCurrentTotal', { total: total.toFixed(2) });
+    message = t('splitExpenses.splitCurrentTotal', { total: percentTotal(total) });
   } else if (method === 'shares' && filled.length) {
     valid = filled.every((input) => {
       const value = numberValue(input.value);
@@ -1493,9 +1551,10 @@ function openExpenseModal(expense = null, prefill = null) {
       <form id="split-expense-form" class="split-form">
         <label>${t('splitExpenses.titleLabel')}<input class="input" name="title" required maxlength="200" value="${esc(expense?.title || '')}"></label>
         <div class="split-form-row">
-          <label>${t('splitExpenses.amount')}<input class="input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(isEdit ? expense.currency : group.default_currency)}" required value="${esc(expense?.amount || '')}"></label>
+          <label>${t('splitExpenses.amount')}<input class="input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(isEdit ? expense.currency : group.default_currency)}" required aria-describedby="split-amount-reason" value="${esc(expense?.amount || '')}"></label>
           <label>${t('splitExpenses.paidBy')}<select class="input" name="payer_id">${memberOptions(isEdit ? expense.payer_id : state.user?.id)}</select></label>
         </div>
+        <p class="form-hint form-hint--danger" id="split-amount-reason" role="status" hidden></p>
         <div class="split-form-row">
           <label>${t('splitExpenses.currency')}<select class="input" name="currency">${state.meta.currencies.map((c) => `<option value="${c}" ${c === (expense?.currency || group.default_currency) ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
           <label>${t('splitExpenses.date')}<yuvomi-datepicker name="expense_date" type="date" value="${esc(expense?.expense_date || today)}"></yuvomi-datepicker></label>
@@ -1542,6 +1601,9 @@ function openExpenseModal(expense = null, prefill = null) {
       panel.querySelector('[name="split_method"]')?.addEventListener('change', () => updateSplitInputs(panel));
       panel.querySelector('[name="currency"]')?.addEventListener('change', () => updateSplitInputs(panel));
       panel.querySelector('#split-expense-form')?.addEventListener('input', () => validateSplitForm(panel));
+      // Der Grund fuer einen gesperrten Betrag erscheint beim Verlassen des
+      // Feldes, nicht bei jedem Tastendruck (syncAmountReason).
+      panel.querySelector('[name="amount"]')?.addEventListener('change', () => validateSplitForm(panel, { reveal: true }));
       panel.querySelectorAll('input[name="participants"]').forEach((input) => {
         const row = input.closest('.split-participant-row');
         const valueInput = row?.querySelector('.split-split-value');
@@ -1577,13 +1639,17 @@ function openExpenseModal(expense = null, prefill = null) {
         const data = Object.fromEntries(new FormData(form));
         data.amount = decimalString(data.amount);
         const expenseCurrency = form.querySelector('[name="currency"]')?.value || group.default_currency;
-        if (rejectOffGridSplitAmount(form.querySelector('[name="amount"]'), numberValue(data.amount),
-          expenseCurrency, isEdit ? expense.amount : null)) return;
-        // Auch die Genau-Beträge: sie sind Geld in derselben Währung.
+        if (rejectSplitAmount(form.querySelector('[name="amount"]'), expenseCurrency,
+          { original: isEdit ? expense.amount : null, originalCurrency: isEdit ? expense.currency : null, required: true })) return;
+        // Auch die Genau-Beträge: sie sind Geld in derselben Währung. Jeder
+        // Anteil eines angehakten Mitglieds muss groesser als 0 sein, auch wenn
+        // die Summe stimmt ("-5 und 15"): der Server lehnt 0 und negative
+        // Anteile ab (parseMoneyToMinor), und die Antwort kaeme englisch und
+        // ortlos zurueck. Wer nichts traegt, wird abgehakt.
         if (form.querySelector('[name="split_method"]')?.value === 'exact') {
           for (const field of form.querySelectorAll('.split-split-value')) {
-            if (field.hidden || !field.value) continue;
-            if (rejectOffGridSplitAmount(field, numberValue(field.value), expenseCurrency)) return;
+            if (field.hidden || field.disabled) continue;
+            if (rejectSplitAmount(field, expenseCurrency, { required: true })) return;
           }
         }
         const { participants, splits } = collectSplitPayload(form);
@@ -1683,9 +1749,9 @@ function openSettlementModal() {
         if (samePerson()) { syncSameHint(); payeeSel.focus(); return; }
         const data = Object.fromEntries(new FormData(form));
         data.amount = decimalString(data.amount);
-        if (rejectOffGridSplitAmount(form.querySelector('[name="amount"]'), numberValue(data.amount),
+        if (rejectSplitAmount(form.querySelector('[name="amount"]'),
           form.querySelector('[name="currency"]')?.value || group.default_currency,
-          debt?.amount ?? null)) return;
+          { original: debt?.amount ?? null, originalCurrency: debt?.currency ?? null, required: true })) return;
         const proofIds = proof ? await proof.commit() : [];
         if (proofIds.length) data.proof_document_id = proofIds[0];
         await api.post(`/split-expenses/groups/${state.activeGroupId}/settlements`, data);
@@ -1798,6 +1864,9 @@ function openGuestModal() {
 export const __test = {
   readOnly, canAddSplitExpense, groupToolsMenuHtml, renderExpenses, state, expenseReadSections, openExpenseModal, groupMetaHtml, openGroupModal,
   renderActivity, onActivityClick, loadGroupData, loadMoreActivity, groupFromQuery,
+  // Betragseingabe (#1607): Formularpruefung und die beiden Speicherwege
+  // (test-split-amount-input.js).
+  validateSplitForm, updateGroupDefaults, openSettlementModal,
   renderMainForTest(container) { _container = container; renderMain(); },
   renderGroupsForTest(container) { _container = container; renderGroups(); },
   // R10 L11: die Gruppenzahl steht am Kopf der Liste (test-split-activity-ui.js).

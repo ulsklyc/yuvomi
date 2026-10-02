@@ -1385,6 +1385,50 @@ function recurrenceFollowupOf(taskId) {
 }
 
 /**
+ * Das naechste Vorkommen hinter einer Aufgabe, das NOCH ANSTEHT, oder null
+ * (#1603).
+ *
+ * DIE SERIE IST EINE KETTE, KEIN STERN: `recurrence_origin_id` zeigt auf den
+ * direkten Vorgaenger (A <- B <- C), nicht auf eine Stammzeile. Das direkte
+ * Kind allein beantwortet die Frage deshalb nicht. Wer A wieder oeffnet,
+ * nachdem B schon erledigt wurde, behaelt B (discardRecurrenceFollowup wirft
+ * erledigte Arbeit nicht weg) - und beim erneuten Abhaken von A ist das
+ * naechste Mal C. Erledigte und abgelegte Glieder werden uebersprungen, das
+ * erste, das noch ansteht, zaehlt.
+ *
+ * „STEHT NOCH AN" HEISST NICHT ERLEDIGT UND NICHT ABGELEGT - nicht: Status
+ * genau 'open'. Gefragt wird ueber die eine Definition von erledigt, die auch
+ * Spawn, Punkte und Verlauf benutzen (`status === 'done'`), statt ueber eine
+ * zweite Liste der Status, die als offen gelten: eine begonnene Folgeinstanz
+ * ('in_progress') ist das naechste Mal, und ein Status, der spaeter zu
+ * REAL_STATUSES dazukommt, faellt hier nicht still durch.
+ *
+ * DIE SUCHE ENDET IMMER. Der Server baut keinen Kreis, eine wiederhergestellte
+ * oder von Hand bearbeitete Datenbank kann einen tragen, und der Treiber ist
+ * synchron: eine Schleife ohne Ende stuende fuer den ganzen Prozess. Dafuer
+ * reicht die besuchte Menge - jede Zeile wird hoechstens einmal gelesen, die
+ * Kette ist also so lang wie die Serie und nie laenger als die Tabelle. Eine
+ * feste Obergrenze stand hier frueher zusaetzlich und schnitt eine taegliche
+ * Serie nach 500 erledigten Gliedern ab, kurz vor dem offenen.
+ *
+ * `mayRead` IST DIE SICHTBARKEIT DES AUFRUFERS. Eine Folgeinstanz erbt ihre
+ * Sichtbarkeit, laesst sich danach aber einzeln umstellen. Wer das fruehere
+ * Vorkommen abhakt, darf das Datum eines spaeteren, das er nicht sieht, nicht
+ * ueber diese Antwort erfahren - dann gibt es fuer ihn kein „naechstes Mal".
+ */
+function nextPendingOccurrenceOf(taskId, mayRead = () => true) {
+  const seen = new Set([Number(taskId)]);
+  let current = recurrenceFollowupOf(taskId);
+  while (current) {
+    if (seen.has(current.id)) return null;
+    seen.add(current.id);
+    if (current.status !== 'done' && !current.archived_at) return mayRead(current) ? current : null;
+    current = recurrenceFollowupOf(current.id);
+  }
+  return null;
+}
+
+/**
  * Prüft, ob Unteraufgaben einer Folgeinstanz durch den Benutzer verändert wurden
  * (editiert, erledigt, hinzugefügt oder gelöscht).
  */
@@ -1608,8 +1652,15 @@ function spawnRecurrenceFollowup(task) {
 // Status einer Aufgabe schnell wechseln (z.B. Swipe-Geste / Checkbox).
 // Body: { status: 'open' | 'in_progress' | 'done' | 'archived',
 //         done_by_user_id?: number|null }
-// Response: { data: { id, status, archived_at } }
+// Response: { data: { id, status, archived_at, next_due_date } }
 // 'archived' legt die Aufgabe ab, ohne ihren Status anzufassen (#688).
+//
+// `next_due_date` (#1603) ist die Faelligkeit der Folgeinstanz, wenn dieser
+// Wechsel eine Serie erledigt hat und es danach ein naechstes Vorkommen gibt,
+// das noch ansteht (nicht erledigt, nicht abgelegt) - sonst null. Die
+// Oberflaeche kann nur daran sagen, WANN es weitergeht: die neue Zeile sieht
+// aus wie die eben abgehakte, und ohne den Hinweis wirkte der Haken wie
+// verschluckt.
 //
 // `done_by_user_id` benennt, WER die Aufgabe erledigt hat (#1205) - wer
 // abgehakt hat, steht ohnehin fest und kommt weiter aus der Sitzung. Ohne
@@ -1746,6 +1797,7 @@ router.patch('/:id/status', (req, res) => {
     let pending = false;
     let undone  = 0;
     let spawned = false;
+    let nextDueDate = null;
     db.get().transaction(() => {
       db.get().prepare('UPDATE tasks SET status = ? WHERE id = ?').run(status, req.params.id);
       pending = markTodoOutbound('tasks', prev, { ...prev, status });
@@ -1767,10 +1819,28 @@ router.patch('/:id/status', (req, res) => {
       // Wiederkehrende Aufgabe: nächste Instanz erstellen wenn erledigt
       if (status === 'done' && prev.status !== 'done') {
         spawned = spawnRecurrenceFollowup(db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id));
+        // NACHGELESEN, nicht aus dem Rueckgabewert: der sagt nur, ob ein
+        // Upload ansteht. Gefragt ist, was nach diesem Haken als Naechstes
+        // ansteht - das ist auch die Folgeinstanz, die ein frueheres
+        // Abhaken angelegt hat und die das Zuruecknehmen stehen liess, weil
+        // jemand an ihr gearbeitet hatte (discardRecurrenceFollowup), und es
+        // ist das Vorkommen HINTER ihr, wenn sie selbst schon erledigt ist.
+        // Ein Display sieht nur, was alle sehen (dieselbe Regel wie oben fuer
+        // die Aufgabe selbst), ein Mensch, was mayAccessTask ihm zeigt.
+        const viewer = req.authUserId || req.session.userId;
+        const mayRead = isDisplayRequest(req)
+          ? (task) => task.visibility === 'all'
+          : (task) => mayAccessTask(task, viewer);
+        nextDueDate = nextPendingOccurrenceOf(prev.id, mayRead)?.due_date ?? null;
       }
     })();
 
-    res.json({ data: { id: Number(req.params.id), status, archived_at: prev.archived_at } });
+    res.json({
+      data: {
+        id: Number(req.params.id), status, archived_at: prev.archived_at,
+        next_due_date: nextDueDate,
+      },
+    });
 
     if (pending || undone || spawned) pushToCalDAV('Statuswechsel');
   } catch (err) {
