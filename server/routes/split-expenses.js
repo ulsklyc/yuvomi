@@ -98,6 +98,17 @@ function activity(groupId, actorId, type, entityType, entityId, metadata = {}) {
   `).run(groupId, actorId, type, entityType, entityId, JSON.stringify(metadata));
 }
 
+/**
+ * Was ein Verlaufseintrag ueber eine Ausgabe festhaelt (#1607): Titel, Betrag
+ * und Waehrung im Augenblick des Schreibens. Der Verlauf ist Geschichte - las
+ * die Oberflaeche den Betrag aus der geladenen Ausgabe, schrieb jede spaetere
+ * Bearbeitung alle frueheren Eintraege um. Minor-Units wie bei
+ * ledger_restored; die Leseroute ergaenzt die Dezimalform.
+ */
+function expenseSnapshot(title, amountMinor, currency) {
+  return { title, amount_minor: amountMinor, currency };
+}
+
 function groupSelectWhere(where) {
   return `
     SELECT g.*,
@@ -1045,7 +1056,7 @@ router.post('/groups/:id/expenses', (req, res) => {
         viewer: documentViewer(req),
         extraValues: { kind: 'receipt' },
       });
-      activity(groupId, userId(req), 'expense_created', 'expense', expense.id, { title: parsed.title });
+      activity(groupId, userId(req), 'expense_created', 'expense', expense.id, expenseSnapshot(parsed.title, parsed.amountMinor, parsed.currency));
       return expense.id;
     });
     res.status(201).json({ data: serializeExpense(loadExpense(createdId, req), null, documentViewer(req)) });
@@ -1096,7 +1107,7 @@ router.put('/expenses/:id', (req, res) => {
           extraValues: { kind: 'receipt' },
         });
       }
-      activity(existing.group_id, userId(req), 'expense_edited', 'expense', existing.id, { title: parsed.title });
+      activity(existing.group_id, userId(req), 'expense_edited', 'expense', existing.id, expenseSnapshot(parsed.title, parsed.amountMinor, parsed.currency));
     });
     res.json({ data: serializeExpense(loadExpense(existing.id, req), null, documentViewer(req)) });
   } catch (err) {
@@ -1115,7 +1126,7 @@ router.delete('/expenses/:id', (req, res) => {
     db.transaction(() => {
       db.get().prepare("UPDATE expenses SET status = 'deleted', deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(existing.id);
       db.get().prepare('DELETE FROM expense_ledger_entries WHERE source_type = ? AND source_id = ?').run('expense', existing.id);
-      activity(existing.group_id, userId(req), 'expense_deleted', 'expense', existing.id, { title: existing.title });
+      activity(existing.group_id, userId(req), 'expense_deleted', 'expense', existing.id, expenseSnapshot(existing.title, existing.amount_minor, existing.currency));
     });
     res.json({ data: { ok: true } });
   } catch (err) {
@@ -1131,7 +1142,7 @@ router.post('/expenses/:id/comments', (req, res) => {
     const vComment = str(req.body.comment, 'Comment', { max: MAX_TEXT });
     if (vComment.error) return res.status(400).json({ error: vComment.error, code: 400 });
     const result = db.get().prepare('INSERT INTO expense_comments (expense_id, user_id, comment) VALUES (?, ?, ?)').run(expense.id, userId(req), vComment.value);
-    activity(expense.group_id, userId(req), 'comment_added', 'expense', expense.id);
+    activity(expense.group_id, userId(req), 'comment_added', 'expense', expense.id, { title: expense.title });
     res.status(201).json({ data: { id: result.lastInsertRowid, expense_id: expense.id, user_id: userId(req), comment: vComment.value } });
   } catch (err) {
     log.error('POST /expenses/:id/comments error:', err);
@@ -1290,7 +1301,8 @@ function activityCursor(query) {
   return { cursor: { beforeAt: query.before_at, beforeId } };
 }
 
-const LEDGER_REPAIR_ACTIVITY = new Set(['ledger_restored', 'ledger_removed']);
+// Typen, deren Metadaten einen Betrag in Minor-Units festhalten.
+const AMOUNT_SNAPSHOT_ACTIVITY = new Set(['ledger_restored', 'ledger_removed', 'expense_created', 'expense_edited', 'expense_deleted']);
 
 router.get('/groups/:id/activity', (req, res) => {
   try {
@@ -1316,8 +1328,10 @@ router.get('/groups/:id/activity', (req, res) => {
       // 'ledger_restored' (Migration v226) und 'ledger_removed' (v227)
       // speichern den Betrag in Minor-Units: eingefrorenes SQL kennt die
       // Nachkommastellen je Waehrung nicht. Hier bekommt er dieselbe
-      // Dezimalform wie payment_registered (`amount`).
-      if (LEDGER_REPAIR_ACTIVITY.has(row.type) && Number.isInteger(metadata?.amount_minor) && metadata.currency) {
+      // Dezimalform wie payment_registered (`amount`). Dasselbe gilt fuer den
+      // Betrag, den expense_created/_edited/_deleted festhalten (#1607);
+      // Eintraege von vor dem Snapshot tragen keinen und bleiben, wie sie sind.
+      if (AMOUNT_SNAPSHOT_ACTIVITY.has(row.type) && Number.isInteger(metadata?.amount_minor) && metadata.currency) {
         return { ...row, metadata: decorateMoney(metadata) };
       }
       return { ...row, metadata };
