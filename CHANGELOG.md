@@ -131,6 +131,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from the list, from the settings search and from its direct address, as the module already was
   from the navigation. With "Read only" the sheet stays.
 
+- **The board shows the lock of a locked task** (#1607). A task that only its assignees may
+  change carried its lock in the list but lost it on the board card. The card now shows the same
+  sign.
+
 ## [2.71.0] - 2026-09-30
 
 ### Added
