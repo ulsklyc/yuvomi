@@ -2516,8 +2516,8 @@
         "permLoadError": "Impossibile caricare i permessi.",
         "permNoMembers": "Ancora nessun membro.",
         "permReadOnlyBanner": "Hai accesso in sola lettura a questo modulo: non è possibile apportare modifiche.",
-        "permDiscardConfirm": "Annullare le modifiche non salvate?",
-        "permDiscard": "Annulla",
+        "permDiscardConfirm": "Scartare le modifiche non salvate?",
+        "permDiscard": "Scarta",
         "permUnsaved": "Modifiche non salvate",
         "leaveDiscardDetail": "Le modifiche apportate in questa pagina non sono ancora state salvate e andranno perse se esci ora.",
         "permSummaryFull": "Accesso completo a tutti i moduli e widget.",
@@ -3002,9 +3002,9 @@
     "modal": {
         "closeLabel": "Chiudi",
         "overlayLabel": "Sfondo del dialogo modale",
-        "unsavedChanges": "Annullare le modifiche?",
+        "unsavedChanges": "Scartare le modifiche?",
         "unsavedChangesDetail": "I dati inseriti in questo modulo andranno persi.",
-        "discardChanges": "Annulla",
+        "discardChanges": "Scarta",
         "moreSettings": "Altre impostazioni"
     },
     "rrule": {

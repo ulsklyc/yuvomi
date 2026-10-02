@@ -3196,9 +3196,9 @@
     "modal": {
         "closeLabel": "Закрити",
         "overlayLabel": "Фон модального вікна",
-        "unsavedChanges": "Скасувати зміни?",
+        "unsavedChanges": "Відхилити зміни?",
         "unsavedChangesDetail": "Введені у форму дані буде втрачено.",
-        "discardChanges": "Скасувати",
+        "discardChanges": "Відхилити",
         "moreSettings": "Додаткові налаштування"
     },
     "rrule": {

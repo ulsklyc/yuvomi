@@ -3002,9 +3002,9 @@
     "modal": {
         "closeLabel": "Kapat",
         "overlayLabel": "Modal iletişim kutusu arka planı",
-        "unsavedChanges": "Değişiklikler iptal edilsin mi?",
+        "unsavedChanges": "Değişiklikler atılsın mı?",
         "unsavedChangesDetail": "Bu formdaki girişlerin kaybolacak.",
-        "discardChanges": "İptal et",
+        "discardChanges": "At",
         "moreSettings": "Diğer ayarlar"
     },
     "rrule": {

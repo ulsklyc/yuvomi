@@ -2690,8 +2690,8 @@
         "permLoadError": "Не удалось загрузить права доступа.",
         "permNoMembers": "Пока нет участников.",
         "permReadOnlyBanner": "У вас доступ только для чтения к этому модулю - изменения невозможны.",
-        "permDiscardConfirm": "Отменить несохранённые изменения?",
-        "permDiscard": "Отменить",
+        "permDiscardConfirm": "Сбросить несохранённые изменения?",
+        "permDiscard": "Сбросить",
         "permUnsaved": "Несохранённые изменения",
         "leaveDiscardDetail": "Изменения на этой странице ещё не сохранены и будут потеряны, если вы уйдёте сейчас.",
         "permSummaryFull": "Полный доступ ко всем модулям и виджетам.",
@@ -3196,9 +3196,9 @@
     "modal": {
         "closeLabel": "Закрыть",
         "overlayLabel": "Фон модального диалога",
-        "unsavedChanges": "Отменить изменения?",
+        "unsavedChanges": "Сбросить изменения?",
         "unsavedChangesDetail": "Введённые в форму данные будут потеряны.",
-        "discardChanges": "Отменить",
+        "discardChanges": "Сбросить",
         "moreSettings": "Дополнительные настройки"
     },
     "rrule": {

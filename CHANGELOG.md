@@ -107,6 +107,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `OPENWEATHER_LANG` is that fallback and takes an OpenWeatherMap code; a code OpenWeatherMap does
   not list is now ignored in favour of English, as the installation guide and `.env.example` say.
 
+- **The "discard changes" question has two different buttons in every language** (#1607). In
+  Korean, Italian and Ukrainian both buttons said "Cancel", in Turkish and Russian the two words
+  were nearly the same, so it was unclear which one throws the input away. The discarding button
+  now says "discard" there, and the question above it uses the same verb. The same applied to the
+  question when leaving the permissions sheet with unsaved changes in Korean, Italian and
+  Russian.
+
 ## [2.71.0] - 2026-09-30
 
 ### Added
