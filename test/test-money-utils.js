@@ -301,6 +301,10 @@ test('amountInputProblem: der Grund, warum ein Betrag nicht speicherbar ist (#16
   assert.equal(grund('en-US', '12.5', 'JPY', { original: '12.50' }), null);
   assert.equal(grund('en-US', '12.51', 'JPY', { original: '12.50' }), 'precision');
   assert.equal(grund('en-US', '10000.0', 'KRW', { original: '10000' }), 'precision');
+  // ... und nicht ueber einen Waehrungswechsel hinweg: wer von EUR auf JPY
+  // umstellt, hat das Raster gewechselt (wie bei amountIsSavable).
+  assert.equal(grund('en-US', '12.50', 'JPY', { original: '12.50', originalCurrency: 'JPY' }), null);
+  assert.equal(grund('en-US', '12.50', 'JPY', { original: '12.50', originalCurrency: 'EUR' }), 'precision');
 });
 
 test('amountInputProblem ist nie nachsichtiger als der Server', async () => {

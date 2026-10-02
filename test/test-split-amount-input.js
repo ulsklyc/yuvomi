@@ -316,3 +316,51 @@ test('P2d: die Summe der Standard-Aufteilung einer Gruppe ebenfalls', () => {
     assert.equal(hint.textContent, 'splitExpenses.defaultSplitInvalid splitExpenses.splitCurrentTotal{"total":"33,5 %"}');
   });
 });
+
+test('Server-Fakten zu Genau-Anteilen: 0 lehnt er ab, einen negativen Anteil nimmt er an', async () => {
+  // Daran haengt die Client-Regel darunter: sie darf nie nachsichtiger sein als
+  // der Server (0) und muss den Fall fangen, den er durchlaesst (negativ).
+  const { buildSplits } = await import('../server/services/split-expenses.js');
+  const genau = (a, b) => buildSplits({
+    method: 'exact', amountMinor: 1000, currency: 'EUR', participants: [1, 3],
+    splits: [{ user_id: 1, amount: a }, { user_id: 3, amount: b }],
+  });
+  assert.throws(() => genau('0', '10'), /split amount must be greater than zero/);
+  assert.deepEqual(genau('-5', '15').map((r) => r.amount_minor), [-500, 1500],
+    'der Server speichert den negativen Anteil - die Summe stimmt ja');
+});
+
+test('Genau-Anteile: negativ, 0 und leer bleiben am Feld, auch wenn die Summe stimmt', async () => {
+  await unter('en-US', async () => {
+    const gut = formular({ amount: '10', method: 'exact', teilnehmer: { 1: '4', 3: '6' } });
+    const ok = await speichern(neueAusgabe, gut.panel);
+    assert.equal(ok.gesendet.length, 1, 'Positivfall');
+    assert.deepEqual(ok.gesendet[0].daten.splits, [{ user_id: 1, amount: '4' }, { user_id: 3, amount: '6' }]);
+
+    for (const [a, b] of [['-5', '15'], ['0', '10'], ['', '10']]) {
+      const { panel, felder } = formular({ amount: '10', method: 'exact', teilnehmer: { 1: a, 3: b } });
+      const { gesendet, gemeldet } = await speichern(neueAusgabe, panel);
+      assert.deepEqual(gesendet, [], `Anteil "${a}" geht nicht an den Server`);
+      assert.equal(gemeldet[0]?.input, felder['[name="split_value_1"]'], `Anteil "${a}" am Feld`);
+      assert.equal(gemeldet[0]?.text, 'common.amountNotPositive');
+    }
+  });
+});
+
+test('Bestandsschutz endet am Waehrungswechsel: 12.50 EUR, auf JPY umgestellt, bleibt am Feld', async () => {
+  const bestand = (currency) => ({
+    id: 5, title: 'Abendessen', amount: '12.50', currency, payer_id: 1, split_method: 'equal',
+    splits: [{ user_id: 1, amount_minor: 625 }, { user_id: 3, amount_minor: 625 }], attachments: [],
+  });
+  await unter('en-US', async () => {
+    // Unveraenderte Waehrung: der Altbetrag neben dem Raster bleibt speicherbar.
+    const alt = await speichern(() => split.openExpenseModal(bestand('JPY')), formular({ amount: '12.50', currency: 'JPY' }).panel, { currency: 'JPY' });
+    assert.equal(alt.gesendet[0]?.daten.amount, '12.50', 'Positivfall');
+
+    const { panel, felder } = formular({ amount: '12.50', currency: 'JPY' });
+    const { gesendet, gemeldet } = await speichern(() => split.openExpenseModal(bestand('EUR')), panel);
+    assert.deepEqual(gesendet, []);
+    assert.equal(gemeldet[0]?.input, felder['[name="amount"]']);
+    assert.match(gemeldet[0]?.text ?? '', /^common\.amountPrecisionRequired\{"currency":"JPY"/);
+  });
+});

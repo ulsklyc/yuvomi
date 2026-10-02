@@ -118,7 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   leave the field, with an example of the expected spelling. An amount with more decimals than
   the currency has, such as `10.000` for won, was sent and came back as an English server
   message; it is now caught at the field in your language, also for exact shares and when
-  recording a payment. The running total of a split follows the household's number format and
+  recording a payment. An exact share that is empty, 0 or negative is caught there as well, even
+  when the shares add up: a negative share used to be saved and skewed the balances. The running total of a split follows the household's number format and
   the expense's currency instead of always reading like `33.00`.
 
 ## [2.71.0] - 2026-09-30

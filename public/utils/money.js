@@ -440,9 +440,10 @@ export function amountInputToCents(text, currency) {
  *
  * `original` ist der Bestandswert des Feldes (wie bei `amountIsSavable`): ein
  * unangetasteter Betrag neben dem Raster bleibt speicherbar, solange er nicht
- * MEHR Stellen trägt als vorher.
+ * MEHR Stellen trägt als vorher. Ein Währungswechsel hebt den Schutz auf
+ * (`originalCurrency`): 12.50 EUR, auf JPY umgestellt, ist ein neuer Betrag.
  */
-export function amountInputProblem(text, currency, { original = null } = {}) {
+export function amountInputProblem(text, currency, { original = null, originalCurrency = null } = {}) {
   const raw = String(text ?? '').trim();
   if (!raw) return null;
   const decimal = toDecimalString(raw);
@@ -456,6 +457,7 @@ export function amountInputProblem(text, currency, { original = null } = {}) {
   const places = fractionLength(decimal);
   if (places <= currencyFractionDigits(currency)) return null;
   const untouched = original != null && Number(original) === value
+    && (originalCurrency == null || originalCurrency === currency)
     && places <= fractionLength(String(original));
   return untouched ? null : 'precision';
 }
