@@ -43,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   amount and currency at the moment it was written, and a deleted expense keeps its amount in the
   feed. Entries written before this change show the title without an amount: what the expense
   cost back then was never recorded.
+- **Opening one occurrence of a recurring event opens that occurrence** (#1607). In the month,
+  week and day views, clicking or pressing Enter on an occurrence of a series opened the first
+  occurrence the view had loaded instead - for a daily series the day before the visible range.
+  The detail view showed that day, the editor was filled with it, and "This event only" then
+  changed or deleted it, not the occurrence you clicked. Each occurrence now opens itself; the
+  agenda already did.
 - **Subtasks can be added from the task sheet again** (#1598). Since v2.70.0 "Add subtask" turns
   into a text field inside the task. In the sheet - every phone and every narrow window - Enter
   in that field triggered the comment button further down instead of saving the subtask, and
