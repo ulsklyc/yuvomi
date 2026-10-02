@@ -674,3 +674,154 @@ test('jeder Aufrufer des Wiederholungsformulars beantwortet die Expansionsfrage 
     'das geteilte Widget darf keine privaten Feld-IDs des Kalenders erraten'
   );
 });
+
+// --------------------------------------------------------
+// #1607 (5b): eine Wochenserie ohne BYDAY wiederholt sich am Wochentag ihres
+// Starts - die Knoepfe zeigten aber alle "aus", weil aria-pressed nur aus
+// parsed.byday kam. Die Anzeige folgt jetzt dem Startdatum, die REGEL bleibt,
+// wie sie ist: der vorgewaehlte Tag ist eine Aussage ueber die Serie, keine
+// Eingabe, solange niemand einen Knopf beruehrt hat.
+// --------------------------------------------------------
+
+/** eventRoot plus die Wochentagsknoepfe, abgeschrieben aus dem echten Markup. */
+function weekdayRoot(html) {
+  const base = eventRoot(html);
+  const buttons = [...html.matchAll(/<button[^>]*class="rrule-day[^"]*"[^>]*>/g)].map(([tag]) => {
+    const attrs = new Map();
+    for (const [, name, val] of tag.matchAll(/([a-z-]+)="([^"]*)"/g)) attrs.set(name, val);
+    const classes = new Set(attrs.get('class').split(/\s+/).filter(Boolean));
+    const listeners = [];
+    return {
+      dataset: { day: attrs.get('data-day') },
+      classList: {
+        contains: (c) => classes.has(c),
+        toggle: (c, force) => {
+          const on = force === undefined ? !classes.has(c) : !!force;
+          if (on) classes.add(c); else classes.delete(c);
+          return on;
+        },
+      },
+      getAttribute: (n) => (attrs.has(n) ? attrs.get(n) : null),
+      hasAttribute: (n) => attrs.has(n),
+      setAttribute: (n, v) => { attrs.set(n, String(v)); },
+      removeAttribute: (n) => { attrs.delete(n); },
+      addEventListener: (type, fn) => { if (type === 'click') listeners.push(fn); },
+      click: () => { for (const fn of listeners) fn(); },
+    };
+  });
+  assert.equal(buttons.length, 7, 'Reichweite: sieben Wochentagsknoepfe im Markup');
+  const isActive = (b) => b.classList.contains('rrule-day--active');
+  return {
+    ...base,
+    querySelectorAll(selector) {
+      if (!selector.includes('.rrule-day')) return [];
+      if (selector.includes(':not([data-implied])')) {
+        return buttons.filter((b) => isActive(b) && !b.hasAttribute('data-implied'));
+      }
+      if (selector.includes('rrule-day--active')) return buttons.filter(isActive);
+      return buttons;
+    },
+    pressed: () => buttons.filter((b) => b.getAttribute('aria-pressed') === 'true').map((b) => b.dataset.day),
+    day: (code) => buttons.find((b) => b.dataset.day === code),
+  };
+}
+
+// 2026-10-01 ist ein Donnerstag, 2026-10-03 ein Samstag (feste Kalendertage,
+// der Baustein rechnet den Wochentag aus dem Key und liest keine Uhr).
+const DONNERSTAG = '2026-10-01';
+const SAMSTAG = '2026-10-03';
+
+test('eine Wochenserie ohne BYDAY zeigt den Wochentag ihres Starts als aktiv (#1607)', () => {
+  const root = weekdayRoot(renderRRuleFields('event', 'FREQ=WEEKLY', {
+    allowCount: true, expandsFromStart: true, startDate: DONNERSTAG,
+  }));
+  bindRRuleEvents(root, 'event', { expandsFromStart: true, getStartDate: () => DONNERSTAG });
+  assert.deepEqual(root.pressed(), ['TH'],
+    'die Serie wiederholt sich donnerstags, also muss der Donnerstag gedrueckt aussehen');
+  assert.equal(root.day('TH').classList.contains('rrule-day--active'), true);
+});
+
+test('die Vorauswahl schreibt die gespeicherte Regel einer Bestandsserie nicht um (#1607)', () => {
+  for (const rule of ['FREQ=WEEKLY', 'RRULE:FREQ=WEEKLY;WKST=SU', 'FREQ=WEEKLY;INTERVAL=2']) {
+    const root = weekdayRoot(renderRRuleFields('event', rule, {
+      allowCount: true, expandsFromStart: true, startDate: DONNERSTAG,
+    }));
+    bindRRuleEvents(root, 'event', { expandsFromStart: true, getStartDate: () => DONNERSTAG });
+    assert.deepEqual(root.pressed(), ['TH']);
+    assert.equal(getRRuleValues(root, 'event').recurrence_rule, rule,
+      'der gezeigte Tag ist abgeleitet, nicht gewaehlt - er darf kein BYDAY erzeugen');
+  }
+});
+
+test('beim Wechsel auf woechentlich ist der Starttag vorgewaehlt und folgt dem Startdatum (#1607)', () => {
+  const root = weekdayRoot(renderRRuleFields('event', null, {
+    allowCount: true, expandsFromStart: true, startDate: DONNERSTAG,
+  }));
+  let startDate = DONNERSTAG;
+  const binding = bindRRuleEvents(root, 'event', { expandsFromStart: true, getStartDate: () => startDate });
+  root.get('#event-rrule-freq').value = 'WEEKLY';
+  root.get('#event-rrule-freq').fire('change');
+  assert.deepEqual(root.pressed(), ['TH'], 'nach dem Wechsel auf woechentlich wirkten alle Knoepfe aus');
+
+  startDate = SAMSTAG;
+  binding.refreshStartDate();
+  assert.deepEqual(root.pressed(), ['SA'], 'der vorgewaehlte Tag muss dem neuen Start folgen');
+  assert.equal(getRRuleValues(root, 'event').recurrence_rule, 'FREQ=WEEKLY');
+});
+
+test('nach der ersten Beruehrung gehoeren die Knoepfe dem Nutzer (#1607)', () => {
+  const root = weekdayRoot(renderRRuleFields('event', null, {
+    allowCount: true, expandsFromStart: true, startDate: DONNERSTAG,
+  }));
+  let startDate = DONNERSTAG;
+  const binding = bindRRuleEvents(root, 'event', { expandsFromStart: true, getStartDate: () => startDate });
+  root.get('#event-rrule-freq').value = 'WEEKLY';
+  root.get('#event-rrule-freq').fire('change');
+
+  root.day('MO').click();
+  assert.deepEqual(root.pressed(), ['MO', 'TH'],
+    'ein zweiter Tag kommt ZUM gezeigten Starttag dazu, er ersetzt ihn nicht');
+  assert.equal(getRRuleValues(root, 'event').recurrence_rule, 'FREQ=WEEKLY;BYDAY=MO,TH');
+
+  startDate = SAMSTAG;
+  binding.refreshStartDate();
+  assert.deepEqual(root.pressed(), ['MO', 'TH'], 'eine getroffene Wahl zieht nicht mehr mit dem Start um');
+
+  // Ohne einen einzigen Tag wiederholt sich die Serie wieder am Starttag -
+  // die Anzeige faellt deshalb auf ihn zurueck, statt "alle aus" zu behaupten.
+  root.day('MO').click();
+  root.day('TH').click();
+  assert.deepEqual(root.pressed(), ['SA']);
+  assert.equal(getRRuleValues(root, 'event').recurrence_rule, 'FREQ=WEEKLY');
+});
+
+test('ein gespeichertes BYDAY bleibt die Anzeige, auch wenn der Start woanders liegt (#1607)', () => {
+  const rule = 'FREQ=WEEKLY;BYDAY=MO,WE';
+  const root = weekdayRoot(renderRRuleFields('event', rule, {
+    allowCount: true, expandsFromStart: true, startDate: DONNERSTAG,
+  }));
+  const binding = bindRRuleEvents(root, 'event', { expandsFromStart: true, getStartDate: () => SAMSTAG });
+  binding.refreshStartDate();
+  assert.deepEqual(root.pressed(), ['MO', 'WE']);
+  assert.equal(getRRuleValues(root, 'event').recurrence_rule, rule);
+});
+
+test('ohne Startdatum wird kein Tag erfunden (#1607)', () => {
+  const root = weekdayRoot(renderRRuleFields('task', 'FREQ=WEEKLY', { expandsFromStart: false }));
+  bindRRuleEvents(root, 'task');
+  assert.deepEqual(root.pressed(), []);
+  assert.equal(getRRuleValues(root, 'task').recurrence_rule, 'FREQ=WEEKLY');
+});
+
+test('der Kalender meldet JEDE Startaenderung an die Wochentags-Vorauswahl (#1607)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const quelle = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  for (const feld of ['#modal-start-date', '#modal-allday-start']) {
+    // assert.ok statt assert.match: ein Fehlschlag druckte sonst die ganze Datei.
+    assert.ok(quelle.includes(`'${feld}')?.addEventListener('change', recurrenceBinding.refreshStartDate)`),
+      `${feld} aendert den Start, ohne dass die Vorauswahl nachzieht`);
+  }
+  const toggle = quelle.slice(quelle.indexOf("alldayCheck.addEventListener('change'"));
+  assert.ok(toggle.slice(0, toggle.indexOf('});')).includes('recurrenceBinding.refreshStartDate()'),
+    'der Ganztags-Schalter wechselt das aktive Startfeld');
+});

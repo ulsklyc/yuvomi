@@ -128,10 +128,11 @@ const STUBS = {
   `,
   '/rrule-ui.js': `
     export const renderRRuleFields = () => '';
-    // Dieselbe Form wie das Original, das immer { refreshMonthdayHint }
-    // zurueckgibt: der Kalender-Dialog haengt es an sein Startdatum, und ein
-    // leerer Rueckgabewert liess jede Suite sterben, die wireEventForm FAEHRT.
-    export const bindRRuleEvents = () => ({ refreshMonthdayHint: () => {} });
+    // Dieselbe Form wie das Original, das immer { refreshMonthdayHint,
+    // refreshStartDate } zurueckgibt: der Kalender-Dialog haengt es an sein
+    // Startdatum, und ein leerer Rueckgabewert liess jede Suite sterben, die
+    // wireEventForm FAEHRT.
+    export const bindRRuleEvents = () => ({ refreshMonthdayHint: () => {}, refreshStartDate: () => {} });
     // Das leere Objekt ist fuer jede Suite richtig, die nur das MARKUP prueft -
     // aber es hat kein 'valid_until', und jeder Formular-Handler, der die
     // Wiederholung mitliest, bricht damit sofort mit "invalidDate" ab. Suiten,

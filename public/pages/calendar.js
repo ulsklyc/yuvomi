@@ -7193,7 +7193,7 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
   alldayCheck.addEventListener('change', () => {
     if (alldayCheck.checked) { timeFields.style.display = 'none'; alldayFields.style.display = ''; }
     else                      { timeFields.style.display = '';     alldayFields.style.display = 'none'; }
-    recurrenceBinding.refreshMonthdayHint();
+    recurrenceBinding.refreshStartDate();
   });
   if (isEdit && event?.all_day) { timeFields.style.display = 'none'; alldayFields.style.display = ''; }
 
@@ -7412,8 +7412,8 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
   };
   wireDateFollow('#modal-start-date', '#modal-end-date');
   wireDateFollow('#modal-allday-start', '#modal-allday-end');
-  panel.querySelector('#modal-start-date')?.addEventListener('change', recurrenceBinding.refreshMonthdayHint);
-  panel.querySelector('#modal-allday-start')?.addEventListener('change', recurrenceBinding.refreshMonthdayHint);
+  panel.querySelector('#modal-start-date')?.addEventListener('change', recurrenceBinding.refreshStartDate);
+  panel.querySelector('#modal-allday-start')?.addEventListener('change', recurrenceBinding.refreshStartDate);
 
   // Dynamische Termindauer (#441): das Ende folgt dem Start um die gemerkte
   // Dauer. Ändert der Nutzer das Ende, wird die neue Dauer übernommen und bei

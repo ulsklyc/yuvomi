@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The weekday buttons of a weekly series no longer all look switched off** (#1607). A weekly
+  event without chosen weekdays repeats on the weekday of its start, but the "repeat on" buttons
+  showed none of the seven as active. The weekday of the start date is now shown as active, both
+  when you switch a new event to weekly and when you open an existing series, and it follows the
+  start date until you pick days yourself. The stored rule of an existing series is not rewritten.
 - **Editing a shared expense no longer rewrites its history** (#1607). The activity feed of a group
   showed the amount an expense has now, so correcting 50 to 10 also changed the earlier "Expense
   created" line to 10 - for expenses created by other members too. Each entry now records the
