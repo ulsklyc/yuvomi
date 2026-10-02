@@ -120,6 +120,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reminder time, and behaved the same there. It now stays open and marks the field as required;
   Cancel and Escape still close it.
 
+- **A rejected default visibility in the Health settings jumps back** (#1607). When the server
+  refused a change to the default visibility of a health area, the error appeared but the field
+  kept showing the new value, so the sheet implied a sharing change that never happened. The
+  field now returns to the saved value, like the switches above it.
+
 ## [2.71.0] - 2026-09-30
 
 ### Added
