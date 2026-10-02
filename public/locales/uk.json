@@ -53,6 +53,9 @@
         "all": "Усі",
         "unknownError": "Невідома помилка",
         "amountPrecisionRequired": "У валюті {{currency}} суми можливі лише з кроком {{step}}",
+        "amountGrouped": "Введіть суму без роздільників тисяч, наприклад {{example}}",
+        "amountInvalid": "Введіть лише цифри та один десятковий роздільник, наприклад {{example}}",
+        "amountNotPositive": "Сума має бути більшою за 0",
         "confirm": "Підтвердити",
         "undo": "Скасувати",
         "reset": "Скинути до оригіналу",
@@ -1124,6 +1127,7 @@
         "iconWeather": "Погода",
         "invalidDate": "Використовуйте дійсну дату у вибраному форматі дати.",
         "endBeforeStart": "Дата завершення не може бути раніше дати початку.",
+        "recurrenceEndBeforeStart": "Кінець повторення не може бути раніше дати початку.",
         "attachmentLabel": "Вкладення",
         "attachmentHint": "Зображення, PDF або документ. Зображення показуються в подробицях події.",
         "attachmentFallback": "Вкладення",
@@ -3198,9 +3202,9 @@
     "modal": {
         "closeLabel": "Закрити",
         "overlayLabel": "Фон модального вікна",
-        "unsavedChanges": "Скасувати зміни?",
+        "unsavedChanges": "Відхилити зміни?",
         "unsavedChangesDetail": "Введені у форму дані буде втрачено.",
-        "discardChanges": "Скасувати",
+        "discardChanges": "Відхилити",
         "moreSettings": "Додаткові налаштування"
     },
     "rrule": {

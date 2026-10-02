@@ -1,4 +1,9 @@
 import { sortNavigationItems } from './module-order.js';
+// Relativ und nicht '/permissions.js': diese Datei laden auch Node-Suiten ohne
+// den Browser-Loader (test:frontend-audit, test:settings-copy, test:typography),
+// und dort zeigte ein absoluter Pfad auf die Dateisystem-Wurzel. Im Browser
+// loest beides auf dieselbe Adresse auf, es bleibt also EIN Rechte-Speicher.
+import { canAccessNavModule } from '../permissions.js';
 
 export const SETTINGS_STORAGE_KEY = 'yuvomi:settings:path';
 export const LEGACY_SETTINGS_STORAGE_KEY = 'yuvomi:settings:tab';
@@ -763,8 +768,30 @@ export function settingsSheetSections(sheet, user = null, { all = false } = {}) 
   return SETTINGS_SCOPES.flatMap((scope) => sections.filter((section) => section.scope === scope));
 }
 
+/**
+ * Ein Modulblatt folgt dem Modulrecht (#1607). Bis dahin fragten die
+ * Einstellungen nur nach der Rolle: ein Mitglied mit `health: none` sah das
+ * Gesundheitsblatt offen und bedienbar, waehrend die Seitenleiste das Modul
+ * laengst nicht mehr zeigte und der Server jeden Aufruf mit 403 abwies.
+ *
+ * `none` blendet aus - dieselbe Auskunft, die der Router fuer die Navigation
+ * nimmt (`canAccessNavModule`), also auch dieselben Ausnahmen: Admins und die
+ * Uebersicht sind nie gesperrt, ohne geladene Rechte gilt Vollzugriff. `read`
+ * bleibt sichtbar; dass die Blaetter dort noch bedienbar sind, ist offen
+ * (#1265).
+ *
+ * Die Kueche hat kein eigenes Recht (sie fasst meals, shopping und pantry
+ * zusammen) und bleibt deshalb immer stehen. Das traegt, solange ihr Blatt nur
+ * Admin-Abschnitte fuehrt - Admins sind nie eingeschraenkt. Bekommt es einen
+ * Abschnitt fuer Mitglieder, braucht es hier die Regel "offen, solange eines
+ * der vier Module offen ist".
+ */
+function sheetModuleAccessible(sheet) {
+  return !sheet?.module || canAccessNavModule(sheet.module);
+}
+
 function sheetVisible(sheet, user) {
-  return settingsSheetSections(sheet, user).length > 0;
+  return sheetModuleAccessible(sheet) && settingsSheetSections(sheet, user).length > 0;
 }
 
 /* DIE MODULBLAETTER FOLGEN DER SEITENLEISTE (R14, A7 P3). Sie standen in

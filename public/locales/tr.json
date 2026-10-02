@@ -51,6 +51,9 @@
         "all": "Tümü",
         "unknownError": "Bilinmeyen hata",
         "amountPrecisionRequired": "{{currency}} para biriminde tutarlar yalnızca {{step}} adımlarıyla girilebilir",
+        "amountGrouped": "Tutarı binlik ayırıcı olmadan girin, örneğin {{example}}",
+        "amountInvalid": "Yalnızca rakam ve tek bir ondalık ayırıcı girin, örneğin {{example}}",
+        "amountNotPositive": "Tutar 0'dan büyük olmalıdır",
         "confirm": "Onayla",
         "undo": "Geri al",
         "reset": "Orijinale sıfırla",
@@ -992,6 +995,7 @@
         "iconWeather": "Hava durumu",
         "invalidDate": "Seçili biçimde geçerli bir tarih kullanın.",
         "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz.",
+        "recurrenceEndBeforeStart": "Tekrarın bitişi başlangıç tarihinden önce olamaz.",
         "attachmentLabel": "Ek",
         "attachmentHint": "Görsel, PDF veya belge. Görseller etkinlik ayrıntılarında gösterilir.",
         "attachmentFallback": "Attachment",
@@ -3004,9 +3008,9 @@
     "modal": {
         "closeLabel": "Kapat",
         "overlayLabel": "Modal iletişim kutusu arka planı",
-        "unsavedChanges": "Değişiklikler iptal edilsin mi?",
+        "unsavedChanges": "Değişiklikler atılsın mı?",
         "unsavedChangesDetail": "Bu formdaki girişlerin kaybolacak.",
-        "discardChanges": "İptal et",
+        "discardChanges": "At",
         "moreSettings": "Diğer ayarlar"
     },
     "rrule": {

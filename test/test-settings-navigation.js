@@ -2880,3 +2880,66 @@ test('R14: "Meine Einstellungen" des Schichtplans stehen im Modulblatt, auch fue
   const src = await readFile(new URL('../public/settings/pages/personal-schedule.js', import.meta.url), 'utf8');
   assert.match(src, /export async function render\(container, \{ user \}\)/, 'die Shell ruft render() des Moduls');
 });
+
+// #1607: ein Mitglied mit `health: none` sah das Gesundheitsblatt in den
+// Einstellungen offen und bedienbar, daneben "Kein Zugriff" - der Server wies
+// jeden Aufruf ab, die Seitenleiste zeigte das Modul laengst nicht mehr. Die
+// Einstellungen fragten nur nach der Rolle (adminOnly), nie nach dem
+// Modulrecht. Alle Wege in ein Blatt (Liste, Adresse, Suche) laufen durch
+// sheetVisible(), also wird dort gemessen - an den drei Ausgaengen, nicht am
+// Quelltext.
+test('#1607: ein Modulblatt folgt dem Modulrecht - none blendet aus, read bleibt', async () => {
+  const { settingsSheetsForDomain } = await import('../public/settings/registry.js');
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  const member = { role: 'member' };
+  const translate = (key) => key;
+  const sheetIds = () => settingsSheetsForDomain('modules', member).map((leaf) => leaf.id);
+  const healthPath = SETTINGS_LEAVES.find((leaf) => leaf.id === 'module-health').path;
+  const searchHits = () => {
+    const found = searchSettings('nav.health', { user: member, translate });
+    return [...found.leaves, ...found.sections.map((hit) => hit.leaf), ...found.options.map((hit) => hit.leaf)]
+      .filter((leaf) => leaf.id === 'module-health').length;
+  };
+
+  try {
+    // Gegenprobe zuerst: ohne Einschraenkung ist alles da. Faellt das schon
+    // hier, misst der Rest das Fehlen von etwas, das es nie gab.
+    clearPermissions();
+    assert.ok(sheetIds().includes('module-health'));
+    assert.equal(findSettingsLeaf(healthPath, member)?.id, 'module-health');
+    assert.ok(searchHits() > 0, 'die Suche findet das Gesundheitsblatt gar nicht - die Sonde ist blind');
+
+    setPermissions({ admin: false, modules: { health: 'none' } });
+    assert.ok(!sheetIds().includes('module-health'), 'die Blattliste fuehrt Gesundheit trotz none');
+    assert.equal(findSettingsLeaf(healthPath, member), null, 'die Adresse oeffnet das Blatt trotz none');
+    assert.equal(searchHits(), 0, 'die Suche fuehrt trotz none ins Gesundheitsblatt');
+    assert.ok(sheetIds().includes('module-tasks'), 'none fuer EIN Modul nimmt die anderen Blaetter nicht mit');
+
+    // Nur lesen: das Blatt bleibt (Zustand bleibt als Zeichen).
+    setPermissions({ admin: false, modules: { health: 'read' } });
+    assert.ok(sheetIds().includes('module-health'), 'read blendet das Blatt aus');
+
+    // Nicht nur Gesundheit: jedes Modulblatt, das ein Mitglied sieht, folgt
+    // seinem Recht. Die Liste kommt aus der Registry und nicht aus diesem Test,
+    // damit ein neues Blatt mitgeprueft wird.
+    clearPermissions();
+    const gated = settingsSheetsForDomain('modules', member)
+      .filter((leaf) => leaf.module && leaf.module !== 'dashboard');
+    assert.ok(gated.length >= 6, `nur ${gated.length} Modulblaetter fuer Mitglieder - die Schleife misst zu wenig`);
+    for (const leaf of gated) {
+      setPermissions({ admin: false, modules: { [leaf.module]: 'none' } });
+      assert.ok(!sheetIds().includes(leaf.id), `${leaf.id} bleibt trotz ${leaf.module}: none`);
+      assert.equal(findSettingsLeaf(leaf.path, member), null, `${leaf.path} oeffnet trotz none`);
+    }
+
+    // Ein Blatt ohne Modul (Navigation) haengt an keinem Recht.
+    setPermissions({ admin: false, modules: Object.fromEntries(gated.map((leaf) => [leaf.module, 'none'])) });
+    assert.deepEqual(sheetIds(), ['modules-navigation'], 'ohne jedes Modulrecht bleibt genau das modulfreie Blatt');
+
+    // Ein Admin ist nie eingeschraenkt, was auch immer in der Tabelle steht.
+    setPermissions({ admin: true, modules: { health: 'none' } });
+    assert.ok(settingsSheetsForDomain('modules', { role: 'admin' }).some((leaf) => leaf.id === 'module-health'));
+  } finally {
+    clearPermissions();
+  }
+});

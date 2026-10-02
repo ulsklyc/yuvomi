@@ -182,6 +182,11 @@ function bindVisibilityEvents(container) {
   };
 
   for (const select of container.querySelectorAll('[data-scope]')) {
+    // Der GESPEICHERTE Stand, nicht der angezeigte: beim `change` traegt das
+    // Feld schon den neuen Wert. Lehnt der Server ab, faellt es hierauf zurueck
+    // wie die Schalter darueber - sonst behauptet es eine Freigabe (oder ihr
+    // Ende), die es nie gab (#1607).
+    let saved = select.value;
     select.addEventListener('change', async () => {
       const scope = select.dataset.scope;
       const visibility = select.value;
@@ -189,11 +194,13 @@ function bindVisibilityEvents(container) {
       select.disabled = true;
       try {
         await api.put('/health/visibility-defaults', { defaults: { [scope]: visibility } });
+        saved = visibility;
         pending = { scope, visibility };
         applyText.textContent = t('settings.healthVisibilityApplyHint', { area: label });
         applyBtn.textContent = t('settings.healthVisibilityApply');
         applyBox.hidden = false;
       } catch (error) {
+        select.value = saved;
         hideApply();
         window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
       } finally {

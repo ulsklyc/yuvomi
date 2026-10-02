@@ -453,6 +453,17 @@ async function wireSyncTarget(panel, task) {
 }
 
 /**
+ * Das Schloss einer gesperrten Aufgabe - EINE Bauart fuer Liste und Brett
+ * (#1607: das Brett liess es weg, wer die Ansicht wechselte, erfuhr die Sperre
+ * erst am abgelehnten Zug). `role="img"`, damit das `aria-label` gilt.
+ */
+function renderLockedBadge(task) {
+  if (!task.locked) return '';
+  const label = esc(t('tasks.lockedBadge'));
+  return `<span class="due-date" role="img" aria-label="${label}" title="${label}"><i data-lucide="lock" class="icon-sm" aria-hidden="true"></i></span>`;
+}
+
+/**
  * EINE Metazeile, und sie bricht nicht um.
  *
  * Die Zeile trug bis zu acht Elemente mit `flex-wrap: wrap` und wurde damit je
@@ -617,7 +628,7 @@ function renderTaskCard(task, opts = {}) {
                 hier standen zwei Kopien ohne Rolle (PR-Review #754). */ ''}
             ${task.is_recurring ? `<span class="due-date" role="img" aria-label="${esc(t('tasks.recurring'))}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>` : ''}
             ${task.document_count > 0 ? `<span class="due-date task-card__docs" role="img" aria-label="${esc(t('tasks.documentsCount', { count: task.document_count }))}"><i data-lucide="paperclip" class="icon-sm" aria-hidden="true"></i></span>` : ''}
-            ${task.locked ? `<span class="due-date" role="img" aria-label="${esc(t('tasks.lockedBadge'))}" title="${esc(t('tasks.lockedBadge'))}"><i data-lucide="lock" class="icon-sm" aria-hidden="true"></i></span>` : ''}
+            ${renderLockedBadge(task)}
             ${renderVisibilityBadge(task.visibility)}
             ${showCategory && task.category !== FALLBACK_CATEGORY ? `<span class="due-date task-card__category">${esc(catLabel(task.category))}</span>` : ''}
             ${renderTagBadges(task.tags, ROW_TAG_BADGES_VISIBLE, task.priority)}
@@ -2560,7 +2571,8 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
 async function handleRenameSubtask(id, currentTitle, container) {
   const title = await promptModal(t('tasks.subtaskRenamePrompt'), currentTitle);
   // Abbruch (null) und "unverändert" gehen beide ohne Request weiter; ein
-  // leergeräumtes Feld ist kein gültiger Titel und wird wie Abbruch behandelt.
+  // leergeräumtes Feld ist kein gültiger Titel, das meldet promptModal selbst
+  // am Feld und bleibt offen (#1607).
   if (!title || title.trim() === currentTitle) return;
   try {
     await api.put(`/tasks/${id}`, { title: title.trim() });
@@ -2702,6 +2714,7 @@ function renderKanbanCard(task) {
       <div class="kanban-card__meta">
         ${renderPriorityBadge(task.priority)}
         ${due ? `<span class="due-date ${due.cls}"><i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> ${due.label}</span>` : ''}
+        ${renderLockedBadge(task)}
         ${renderTagBadges(task.tags, TAG_BADGES_VISIBLE, task.priority)}
       </div>
       <div class="kanban-card__footer">
