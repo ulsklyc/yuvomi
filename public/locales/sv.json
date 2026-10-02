@@ -73,7 +73,7 @@
             "private": "Endast jag",
             "hint": "Styr vem som kan se den här posten i Yuvomi.",
             "assigneesNobodyHint": "Utan tilldelning ser bara du den här posten.",
-            "privateAssignedHint": "De tilldelade personerna ser inte den här posten. Välj ”Endast tilldelade” om de ska se den."
+            "privateAssignedHint": "Bara den som skapade den här posten ser den - de andra tilldelade personerna gör det inte. Välj ”Endast tilldelade” om de ska se den."
         },
         "toShoppingListNamed": "Lägg till {{title}} i inköpslistan",
         "emailInUse": "Den här e-postadressen hör redan till ett annat konto."

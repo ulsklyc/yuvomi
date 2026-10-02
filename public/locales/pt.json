@@ -73,7 +73,7 @@
             "private": "Apenas eu",
             "hint": "Controla quem pode ver esta entrada no Yuvomi.",
             "assigneesNobodyHint": "Sem ninguém atribuído, só você vê esta entrada.",
-            "privateAssignedHint": "As pessoas atribuídas não veem esta entrada. Escolha «Apenas atribuídos» se a devem ver."
+            "privateAssignedHint": "Só quem criou esta entrada a vê - as outras pessoas atribuídas não. Escolha «Apenas atribuídos» se a devem ver."
         },
         "toShoppingListNamed": "Adicionar {{title}} à lista de compras",
         "emailInUse": "Este endereço de e-mail já pertence a outra conta."

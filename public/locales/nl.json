@@ -73,7 +73,7 @@
             "private": "Alleen ik",
             "hint": "Bepaalt wie dit item in Yuvomi kan zien.",
             "assigneesNobodyHint": "Zonder toewijzing zie alleen jij dit item.",
-            "privateAssignedHint": "De toegewezen personen zien dit item niet. Kies \"Alleen toegewezenen\" als ze het moeten zien."
+            "privateAssignedHint": "Alleen wie dit item heeft aangemaakt, ziet het - de andere toegewezen personen niet. Kies \"Alleen toegewezenen\" als ze het moeten zien."
         },
         "toShoppingListNamed": "{{title}} op de boodschappenlijst zetten",
         "emailInUse": "Dit e-mailadres hoort al bij een ander account."

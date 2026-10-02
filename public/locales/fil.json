@@ -73,7 +73,7 @@
             "private": "Ako lamang",
             "hint": "Kinokontrol kung sino ang makakakita ng entry na ito sa Yuvomi.",
             "assigneesNobodyHint": "Kung walang naatasan, ikaw lang ang makakakita ng entry na ito.",
-            "privateAssignedHint": "Hindi nakikita ng mga naatasan ang entry na ito. Piliin ang \"Mga naatasan lamang\" kung dapat nila itong makita."
+            "privateAssignedHint": "Ang gumawa lang ng entry na ito ang makakakita nito - hindi ang ibang mga naatasan. Piliin ang \"Mga naatasan lamang\" kung dapat nila itong makita."
         },
         "toShoppingListNamed": "Idagdag ang {{title}} sa listahan ng pamimili",
         "emailInUse": "Ang email address na ito ay pag-aari na ng ibang account."

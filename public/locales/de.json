@@ -73,7 +73,7 @@
             "private": "Nur ich",
             "hint": "Legt fest, wer diesen Eintrag in Yuvomi sieht.",
             "assigneesNobodyHint": "Ohne Zuweisung sieht diesen Eintrag nur du.",
-            "privateAssignedHint": "Die zugewiesenen Personen sehen diesen Eintrag nicht. Wähle „Nur Zugewiesene“, wenn sie ihn sehen sollen."
+            "privateAssignedHint": "Diesen Eintrag sieht nur, wer ihn angelegt hat - die anderen zugewiesenen Personen nicht. Wähle „Nur Zugewiesene“, wenn sie ihn sehen sollen."
         },
         "toShoppingListNamed": "{{title}} auf die Einkaufsliste setzen",
         "emailInUse": "Diese E-Mail-Adresse gehört bereits zu einem anderen Konto."

@@ -73,7 +73,7 @@
             "private": "Yalnızca ben",
             "hint": "Bu kaydı Yuvomi’de kimin görebileceğini belirler.",
             "assigneesNobodyHint": "Kimse atanmazsa bu kaydı yalnızca sen görürsün.",
-            "privateAssignedHint": "Atanan kişiler bu kaydı görmez. Görmeleri gerekiyorsa \"Yalnızca atananlar\" seçeneğini seç."
+            "privateAssignedHint": "Bu kaydı yalnızca oluşturan kişi görür - atanan diğer kişiler görmez. Görmeleri gerekiyorsa \"Yalnızca atananlar\" seçeneğini seç."
         },
         "toShoppingListNamed": "{{title}} yemeğini alışveriş listesine ekle",
         "emailInUse": "Bu e-posta adresi zaten başka bir hesaba ait."
