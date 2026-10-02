@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Organize events in several local calendars.** Create and rename household calendars, choose
+  the destination when importing an ICS file, and share a separate ICS subscription link for each
+  calendar. Calendar links include only events visible to everyone in the household.
 - **Norwegian Bokmål as the 26th language** (#1529, translated by @nilsanmy). The app, the web
   installer and the command-line installer speak Norwegian Bokmål. A Norwegian Bokmål browser or
   `LANG=nb_NO.UTF-8` picks it on its own, and the new region "Norwegian Bokmål (Norway)" sets

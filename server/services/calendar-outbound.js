@@ -37,6 +37,8 @@ export const OUTBOUND_SOURCES = ['google', 'caldav', 'apple'];
 
 // Felder, die zum Provider gespiegelt werden. Alles andere (Zuweisung, Sichtbarkeit,
 // Icon, Anhang) ist Yuvomi-intern und löst keinen Push aus.
+// local_calendar_id is intentionally absent: moving local calendars never pushes outward.
+// A sync target and a local calendar are mutually exclusive.
 export const MIRRORED_FIELDS = [
   'title', 'description', 'location', 'color',
   'all_day', 'start_datetime', 'end_datetime', 'recurrence_rule',

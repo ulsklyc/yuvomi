@@ -92,7 +92,12 @@ export function calendarPaths() {
       post: op({ summary: 'Sync ICS subscription', tag: 'Calendar', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/calendar/import': {
-      post: op({ summary: 'Import events from an ICS file or shared calendar feed as editable local events', tag: 'Calendar', stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({
+        summary: 'Import events from an ICS file or shared calendar feed as editable local events',
+        tag: 'Calendar',
+        stateChanging: true,
+requestBody: jsonBody('#/components/schemas/CalendarImportInput'),
+      }),
     },
     '/api/v1/calendar/feed': {
       get: op({ summary: 'Get personal ICS export feed status', tag: 'Calendar' }),
@@ -101,6 +106,66 @@ export function calendarPaths() {
     },
     '/api/v1/calendar/feed/regenerate': {
       post: op({ summary: 'Regenerate personal ICS export feed token', tag: 'Calendar', stateChanging: true }),
+    },
+    '/api/v1/calendar/calendars': {
+      get: op({
+        summary: 'List local calendars',
+        tag: 'Calendar',
+        description: 'Feed URLs and tokens are included only for administrators.',
+      }),
+      post: op({
+        summary: 'Create local calendar',
+        tag: 'Calendar',
+        description: 'Requires write access to the calendar module.',
+        stateChanging: true,
+        responses: {
+          201: { description: 'Local calendar created' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+requestBody: jsonBody('#/components/schemas/LocalCalendarCreateInput'),
+      }),
+    },
+    '/api/v1/calendar/calendars/{id}': {
+      put: op({
+        summary: 'Update local calendar',
+        tag: 'Calendar',
+        description: 'Requires write access to the calendar module.',
+        params: [idParam()],
+        stateChanging: true,
+        responses: {
+          200: { description: 'Local calendar updated' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: apiError('Local calendar not found.'),
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+requestBody: jsonBody('#/components/schemas/LocalCalendarUpdateInput'),
+      }),
+      delete: op({
+        summary: 'Delete local calendar and reassign events to the default calendar',
+        tag: 'Calendar',
+        description: 'Requires calendar write access. An active feed link also requires admin access.',
+        params: [idParam()],
+        stateChanging: true,
+        responses: {
+          204: { description: 'Local calendar deleted' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: apiError('Local calendar not found.'),
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/calendar/calendars/{id}/feed/regenerate': {
+      post: op({ summary: 'Regenerate local-calendar ICS export token', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true }),
+    },
+    '/api/v1/calendar/calendars/{id}/feed': {
+      delete: op({ summary: 'Disable local-calendar ICS export', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true }),
     },
     '/api/v1/calendar/sync-targets': {
       get: op({

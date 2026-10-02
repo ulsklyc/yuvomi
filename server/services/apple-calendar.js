@@ -555,7 +555,7 @@ async function runSync({ makeClient } = {}) {
       // exakten Wert durch den gerundeten (#899).
       db.get().prepare(`
         UPDATE calendar_events
-        SET external_calendar_id = ?, external_source = 'apple',
+        SET external_calendar_id = ?, external_source = 'apple', local_calendar_id = NULL,
             external_object_url = ?, calendar_ref_id = ?,
             color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END
         WHERE id = ?

@@ -1253,7 +1253,7 @@ async function runSync({ createClient } = {}) {
           // verteidigen müssten.
           db.get().prepare(`
             UPDATE calendar_events
-            SET external_source = 'caldav', external_calendar_id = ?,
+            SET external_source = 'caldav', local_calendar_id = NULL, external_calendar_id = ?,
                 external_object_url = ?, calendar_ref_id = ?,
                 color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END
             WHERE id = ?

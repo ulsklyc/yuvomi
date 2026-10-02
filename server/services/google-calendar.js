@@ -769,7 +769,7 @@ async function runSync(createCalendar) {
         // und ersetzte damit die gewählte (#899).
         db.get().prepare(`
           UPDATE calendar_events
-          SET external_calendar_id = ?, external_source = 'google', calendar_ref_id = ?,
+          SET external_calendar_id = ?, external_source = 'google', local_calendar_id = NULL, calendar_ref_id = ?,
               color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END
           WHERE id = ?
         `).run(created.data.id, calRefId, event.id);

@@ -59,7 +59,7 @@ import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { nowFields, todayKey, wallTimeToInstantMs, zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
-import { moduleAccess } from '/permissions.js';
+import { isPermAdmin, moduleAccess } from '/permissions.js';
 import { pathAccess } from '/utils/module-access.js';
 import {
   applyPendingCalendarDeleteOverlay,
@@ -646,6 +646,8 @@ let state = {
   today:         '',
   cursor:        null,     // aktuell angezeigte Referenz-Datum (YYYY-MM-DD)
   events:        [],
+  localCalendars: [],
+  localCalendarsError: null,
   tasks:         [],       // Aufgaben mit due_date für Kalender-Anzeige
   scheduleEntries: [],
   scheduleWarnings: [],
@@ -1324,6 +1326,7 @@ function eventSourceKey(ev) {
   if (ev?.subscription_id) return `sub:${ev.subscription_id}`;
   const ref = ev?.source_calendar_ref_id ?? ev?.calendar_ref_id;
   if (ref) return `cal:${ref}`;
+  if (ev?.local_calendar_id) return `local:${ev.local_calendar_id}`;
   return null;
 }
 
@@ -1338,12 +1341,18 @@ function passesSourceFilter(item) {
  *
  * Aus den geladenen Terminen, dazu jede ausgeblendete Quelle, auch ohne Termin
  * im Zeitraum - sonst liesse sich nur zurueckholen, was gerade zu sehen waere.
- * Keine eigene Route: Name und Farbe liefert der Server an jedem Termin
- * (`cal_name`, `cal_color`), und die Verwaltungsrouten der Quellen sind
- * `requireAdmin` - ein Mitglied kaeme dort nicht durch.
+ * Die lokale Kalenderquelle wird separat geladen, weil sie eigene Kalender
+ * verwaltet und nicht an eine externe Synchronisationsquelle gebunden ist.
  */
 function calendarSources() {
   const quellen = new Map();
+  for (const calendar of state.localCalendars ?? []) {
+    quellen.set(`local:${calendar.id}`, {
+      key: `local:${calendar.id}`,
+      name: localCalendarDisplayName(calendar),
+      color: calendar.color,
+    });
+  }
   for (const ev of state.events ?? []) {
     const key = eventSourceKey(ev);
     if (!key) continue;
@@ -1352,8 +1361,8 @@ function calendarSources() {
     // einen noch nicht hochgeladenen Termin ueber sein Ziel auf, `cal_name` und
     // `cal_color` folgen nur `calendar_ref_id` - und tragen bei Abos die Werte
     // des Abos. Fehlt beides, fuellt ein anderer Termin oder der Merker nach.
-    const name = ev.source_calendar_name || ev.cal_name || '';
-    const color = ev.source_calendar_color || ev.cal_color || null;
+    const name = ev.source_calendar_name || eventLocalCalendarDisplayName(ev);
+    const color = ev.source_calendar_color || ev.cal_color || ev.local_calendar_color || null;
     if (bekannt) {
       bekannt.name ||= name;
       bekannt.color ||= color;
@@ -1905,6 +1914,18 @@ async function loadRange(from, to) {
   await wastePromise;
 }
 
+async function loadLocalCalendars() {
+  try {
+    const res = await api.get('/calendar/calendars');
+    state.localCalendars = Array.isArray(res.data) ? res.data : [];
+    state.localCalendarsError = null;
+  } catch (err) {
+    console.warn('[Calendar] Local calendars fetch failed:', err);
+    state.localCalendars = [];
+    state.localCalendarsError = err;
+  }
+}
+
 /**
  * Eine Aufgabe aus dem Kalender öffnen (#918).
  *
@@ -2126,9 +2147,10 @@ export async function render(container, { user }) {
   }
 
   const { from, to } = getRangeForView(state.view, state.cursor);
-  const [,, prefsRes, documentOptionsRes] = await Promise.all([
+  const [,,, prefsRes, documentOptionsRes] = await Promise.all([
     loadRange(from, to),
     loadUsers(),
+    loadLocalCalendars(),
     api.get('/preferences').catch(() => ({ data: {} })),
     api.get('/documents/meta/options').catch(() => ({ data: {} })),
   ]);
@@ -2285,6 +2307,10 @@ function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '' } = {}) {
           FAB beim Neubau des Kopfs wieder ein. */ ''}
     <div class="page-toolbar__actions">
       ${scheduleWarningHtml}
+      ${moduleAccess('calendar') === 'write' ? `<button class="btn btn--icon cal-toolbar__calendars-btn" id="cal-calendars"
+        aria-label="${t('calendar.manageCalendars')}" title="${t('calendar.manageCalendars')}" aria-haspopup="dialog">
+        <i data-lucide="calendar-days" aria-hidden="true"></i>
+      </button>` : ''}
     </div>
     <!-- Bar-Zeile des Kopfs (Werkzeugzeilen-Regel, layout.css): das Ansichts-
          Segment hatte im Actions-Slot bei 1280px 212px fuer 245px Inhalt -
@@ -2425,6 +2451,7 @@ function renderToolbar() {
 
   bar.querySelector('#cal-prev').addEventListener('click', () => navigate(-1));
   bar.querySelector('#cal-next').addEventListener('click', () => navigate(1));
+  bar.querySelector('#cal-calendars')?.addEventListener('click', openLocalCalendarsModal);
   bar.querySelector('#cal-today').addEventListener('click', goToday);
   bar.querySelector('#cal-search').addEventListener('click', openCalendarSearch);
   bar.querySelector('#cal-filters').addEventListener('click', openCalendarFilters);
@@ -3621,7 +3648,7 @@ function monthBandsHtml({ bands }, inMonth = []) {
   const outside = (col) => inMonth[col] === false;
   return `<div class="month-bands" aria-hidden="true">${bands.map((band) => {
     const { ev, first, last, lane, continuesBefore, continuesAfter } = band;
-    const title = [ev.title, bandSpokenWhen(ev), ev.cal_name].filter(Boolean).map((part) => esc(part)).join(' · ')
+    const title = [ev.title, bandSpokenWhen(ev), eventLocalCalendarDisplayName(ev)].filter(Boolean).map((part) => esc(part)).join(' · ')
       + chipAssigneeTitleSuffix(ev);
     const span = last - first + 1;
     let outStart = 0;
@@ -3682,7 +3709,7 @@ function renderMonthDay(date, inMonth, { selected = false, selWeek = false, spli
     <div class="month-day__event"
          data-id="${ev.id}"
          style="${eventSurfaceStyle(ev)}"
-         title="${esc(ev.title)}${ev.cal_name ? ' · ' + esc(ev.cal_name) : ''}${chipAssigneeTitleSuffix(ev)}"
+         title="${esc(ev.title)}${eventLocalCalendarDisplayName(ev) ? ' · ' + esc(eventLocalCalendarDisplayName(ev)) : ''}${chipAssigneeTitleSuffix(ev)}"
     >${eventGlyphsHtml(ev)}<span>${esc(ev.title)}</span></div>
   `).join('');
 
@@ -4526,7 +4553,7 @@ function allDayChipTimeText(ev, dayStr, { suffix = false } = {}) {
  * zugaenglicher Name kommen aus diesem Attribut und dem Inhalt (#1350).
  */
 function allDayChipTitle(ev, timeText) {
-  return [ev.title, timeText, ev.cal_name].filter(Boolean).map((part) => esc(part)).join(' · ')
+  return [ev.title, timeText, eventLocalCalendarDisplayName(ev)].filter(Boolean).map((part) => esc(part)).join(' · ')
     + chipAssigneeTitleSuffix(ev);
 }
 
@@ -4599,7 +4626,7 @@ function renderWeekBand(band) {
   return `
     <div class="${bandClasses('allday-event', band)}" data-id="${ev.id}" data-start="${esc(startKey)}" data-end="${esc(endKey)}"
          style="grid-column:${first + 2} / span ${last - first + 1};grid-row:${lane + 1};${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, spoken)}
-         title="${[ev.title, bandSpokenWhen(ev), ev.cal_name].filter(Boolean).map((part) => esc(part)).join(' · ')}${chipAssigneeTitleSuffix(ev)}">${continuesBefore ? bandContinuationHtml('before') : ''}${eventGlyphsHtml(ev)}<span class="allday-event__line"><span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(from)}</span>${until ? `<small class="allday-event__time cal-band__until">${esc(until)}</small>` : ''}${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</span>${continuesAfter ? bandContinuationHtml('after') : ''}</div>`;
+         title="${[ev.title, bandSpokenWhen(ev), eventLocalCalendarDisplayName(ev)].filter(Boolean).map((part) => esc(part)).join(' · ')}${chipAssigneeTitleSuffix(ev)}">${continuesBefore ? bandContinuationHtml('before') : ''}${eventGlyphsHtml(ev)}<span class="allday-event__line"><span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(from)}</span>${until ? `<small class="allday-event__time cal-band__until">${esc(until)}</small>` : ''}${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</span>${continuesAfter ? bandContinuationHtml('after') : ''}</div>`;
 }
 
 function renderWeekEvent(ev, layout = null, dayStr = null) {
@@ -5270,6 +5297,155 @@ function buildLayerRowsHtml(layers) {
   }).join('');
 }
 
+function renderLocalCalendarsContent() {
+  if (state.localCalendarsError) {
+    return `<div class="cal-calendar-load-error" role="alert">
+      <p>${esc(t('common.errorGeneric'))} ${esc(t('common.loadErrorDescription'))}</p>
+      <button type="button" class="btn btn--secondary js-calendar-retry-load">${t('common.retry')}</button>
+    </div>`;
+  }
+  const rows = state.localCalendars.map((calendar) => `
+    <div class="cal-calendar-row" data-calendar-id="${calendar.id}">
+      <span class="cal-calendar-row__swatch" style="background-color:${esc(calendar.color)}" aria-hidden="true"></span>
+      ${moduleAccess('calendar') === 'write' ? `<input class="form-input cal-calendar-row__name" value="${esc(localCalendarDisplayName(calendar))}" aria-label="${esc(t('calendar.localCalendarName'))}">
+      <input class="form-input cal-calendar-row__color" type="color" value="${esc(calendar.color)}" aria-label="${esc(t('calendar.localCalendarColor'))}">` : ''}
+      <span class="cal-calendar-row__count">${t('calendar.localCalendarEventCount', { count: calendar.event_count ?? 0 })}</span>
+      ${moduleAccess('calendar') === 'write' ? `<button type="button" class="btn btn--icon js-calendar-save" title="${esc(t('common.save'))}" aria-label="${esc(t('common.save'))}">
+        <i data-lucide="save" aria-hidden="true"></i>
+      </button>` : ''}
+      ${isPermAdmin() && calendar.feed_url ? `
+        <button type="button" class="btn btn--icon js-calendar-copy-feed" title="${esc(t('calendar.localCalendarCopyExport'))}" aria-label="${esc(t('calendar.localCalendarCopyExport'))}">
+          <i data-lucide="copy" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="btn btn--icon js-calendar-disable-feed" title="${esc(t('calendar.localCalendarDisableExport'))}" aria-label="${esc(t('calendar.localCalendarDisableExport'))}">
+          <i data-lucide="link-2-off" aria-hidden="true"></i>
+        </button>
+      ` : isPermAdmin() ? `
+        <button type="button" class="btn btn--icon js-calendar-enable-feed" title="${esc(t('calendar.localCalendarEnableExport'))}" aria-label="${esc(t('calendar.localCalendarEnableExport'))}">
+          <i data-lucide="upload" aria-hidden="true"></i>
+        </button>
+      ` : ''}
+      ${moduleAccess('calendar') === 'write' && !calendar.is_default ? `
+        <button type="button" class="btn btn--icon btn--danger-outline js-calendar-delete" title="${esc(t('common.delete'))}" aria-label="${esc(t('common.delete'))}">
+          <i data-lucide="trash-2" aria-hidden="true"></i>
+        </button>
+      ` : ''}
+    </div>
+  `).join('');
+
+  return `
+    <div class="cal-calendar-manager">
+      ${moduleAccess('calendar') === 'write' ? `<form class="cal-calendar-create" id="local-calendar-create">
+        <input class="form-input" id="local-calendar-name" maxlength="80" placeholder="${esc(t('calendar.localCalendarName'))}" aria-label="${esc(t('calendar.localCalendarName'))}">
+        <input class="form-input" id="local-calendar-color" type="color" value="#007AFF" aria-label="${esc(t('calendar.localCalendarColor'))}">
+        <button class="btn btn--primary" type="submit">
+          <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>${t('calendar.localCalendarCreate')}
+        </button>
+      </form>` : ''}
+      <div class="cal-calendar-list">
+        ${rows || emptyStateHTML({
+          icon: 'calendar-days',
+          title: t('calendar.localCalendarEmpty'),
+          compact: true,
+        })}
+      </div>
+    </div>
+  `;
+}
+
+async function copyText(value, toastKey) {
+  await navigator.clipboard.writeText(value);
+  window.yuvomi?.showToast(t(toastKey), 'success');
+}
+
+async function refreshLocalCalendarsPanel(panel) {
+  await loadLocalCalendars();
+  const body = panel.querySelector('.modal-panel__body');
+  if (body) {
+    body.replaceChildren();
+    body.insertAdjacentHTML('beforeend', renderLocalCalendarsContent());
+    window.lucide?.createIcons({ el: body });
+  }
+  renderView();
+}
+
+async function openLocalCalendarsModal() {
+  if (moduleAccess('calendar') !== 'write') return;
+  await loadLocalCalendars();
+  openSharedModal({
+    title: t('calendar.manageCalendars'),
+    content: renderLocalCalendarsContent(),
+    size: 'md',
+    initialFocus: 'none',
+    dirtyGuard: false,
+  });
+  const panel = document.querySelector('#shared-modal-overlay .modal-panel');
+  if (!panel) return;
+  window.lucide?.createIcons({ el: panel });
+
+  panel.addEventListener('submit', async (e) => {
+    if (!e.target.closest('#local-calendar-create')) return;
+    e.preventDefault();
+    const name = panel.querySelector('#local-calendar-name')?.value.trim();
+    const color = panel.querySelector('#local-calendar-color')?.value || '#007AFF';
+    if (!name) return;
+    try {
+      await api.post('/calendar/calendars', { name, color });
+      window.yuvomi?.showToast(t('calendar.localCalendarCreated'), 'success');
+      await refreshLocalCalendarsPanel(panel);
+      refocusAfterRender();
+    } catch (err) {
+      window.yuvomi?.showToast(err.data?.error ?? t('calendar.saveError'), 'danger');
+    }
+  });
+
+  panel.addEventListener('click', async (e) => {
+    if (e.target.closest('.js-calendar-retry-load')) {
+      await refreshLocalCalendarsPanel(panel);
+      return;
+    }
+    const row = e.target.closest('.cal-calendar-row');
+    if (!row) return;
+    const id = Number(row.dataset.calendarId);
+    const calendar = state.localCalendars.find((item) => Number(item.id) === id);
+    if (!calendar) return;
+    try {
+      if (e.target.closest('.js-calendar-save')) {
+        const name = row.querySelector('.cal-calendar-row__name')?.value.trim();
+        const changes = { color: row.querySelector('.cal-calendar-row__color')?.value };
+        if (name !== localCalendarDisplayName(calendar)) changes.name = name;
+        await api.put(`/calendar/calendars/${id}`, changes);
+        window.yuvomi?.showToast(t('calendar.localCalendarSaved'), 'success');
+        await refreshLocalCalendarsPanel(panel);
+        refocusAfterRender();
+      } else if (e.target.closest('.js-calendar-enable-feed')) {
+        await api.post(`/calendar/calendars/${id}/feed/regenerate`);
+        await refreshLocalCalendarsPanel(panel);
+        refocusAfterRender();
+      } else if (e.target.closest('.js-calendar-copy-feed')) {
+        if (calendar.feed_url) await copyText(calendar.feed_url, 'calendar.localCalendarExportCopied');
+      } else if (e.target.closest('.js-calendar-disable-feed')) {
+        await api.delete(`/calendar/calendars/${id}/feed`);
+        await refreshLocalCalendarsPanel(panel);
+        refocusAfterRender();
+      } else if (e.target.closest('.js-calendar-delete')) {
+        const ok = await confirmOverModal(t('calendar.localCalendarDeleteConfirm', { name: calendar.name }), {
+          detail: t('calendar.localCalendarDeleteDetail'),
+          confirmLabel: t('common.delete'),
+          danger: true,
+        });
+        if (!ok) return;
+        await api.delete(`/calendar/calendars/${id}`);
+        window.yuvomi?.showToast(t('calendar.localCalendarDeleted'), 'success');
+        await refreshLocalCalendarsPanel(panel);
+        refocusAfterRender();
+      }
+    } catch (err) {
+      window.yuvomi?.showToast(err.data?.error ?? t('calendar.saveError'), 'danger');
+    }
+  });
+}
+
 function openCalendarFilters() {
   const layers = availableLayers();
   const people = state.users ?? [];
@@ -5634,12 +5810,23 @@ function restoreHiddenSources(userId) {
   try { stored = JSON.parse(localStorage.getItem(schluessel) ?? '[]'); } catch { stored = []; }
   if (!Array.isArray(stored)) return quellen;
   for (const eintrag of stored) {
-    if (!eintrag || !/^(?:cal|sub):\d+$/.test(String(eintrag.key))) continue;
+    if (!eintrag || !/^(?:cal|sub|local):\d+$/.test(String(eintrag.key))) continue;
     // Die Farbe landet als Scheibe im Blatt; aus dem Speicher nur, was eine Farbe ist.
     const color = /^#[0-9a-f]{3,8}$/i.test(String(eintrag.color ?? '')) ? eintrag.color : null;
     quellen.set(eintrag.key, { name: String(eintrag.name ?? ''), color });
   }
   return quellen;
+}
+
+function localCalendarDisplayName(calendar) {
+  return calendar?.name ?? '';
+}
+
+function eventLocalCalendarDisplayName(ev) {
+  const localCalendar = state.localCalendars.find((calendar) => Number(calendar.id) === Number(ev?.local_calendar_id));
+  return localCalendar
+    ? localCalendarDisplayName(localCalendar)
+    : (ev?.cal_name || ev?.local_calendar_name || '');
 }
 
 function persistHiddenSources() {
@@ -6036,7 +6223,7 @@ function renderAgendaEvent(ev, dayStr) {
         <div class="agenda-event__meta">
           <span class="calendar-meta-item calendar-meta-item--time">${calendarMetaIconHtml('clock')}<span>${esc(timeStr)}</span>${position ? `<span class="calendar-meta-item__day">${esc(position)}</span>` : ''}</span>
           ${ev.location ? `<span class="calendar-meta-item calendar-meta-item--place">${calendarMetaIconHtml('map-pin')}<span>${esc(fmtLocation(ev.location))}</span></span>` : ''}
-          ${ev.cal_name ? `<span class="calendar-meta-item calendar-meta-item--cal">${calendarMetaIconHtml('calendar-days')}<span>${esc(ev.cal_name)}</span></span>` : ''}
+          ${eventLocalCalendarDisplayName(ev) ? `<span class="calendar-meta-item calendar-meta-item--cal">${calendarMetaIconHtml('calendar-days')}<span>${esc(eventLocalCalendarDisplayName(ev))}</span></span>` : ''}
           ${eventVisibilityMeta(ev.visibility)}
           ${assignedUsers.length ? `<span class="agenda-event__assigned">${renderAvatarStack(assignedUsers, { size: 22, maxVisible: 3, minFont: 12 })}</span>` : ''}
         </div>
@@ -6052,7 +6239,7 @@ function agendaEventAriaLabel(ev, timeStr, dayText = '') {
     timeStr,
     dayText,
     ev.location ? fmtLocation(ev.location) : '',
-    ev.cal_name,
+    eventLocalCalendarDisplayName(ev),
     chipAssigneeLabel(ev),
   ].filter(Boolean).join(', ');
 }
@@ -6134,11 +6321,12 @@ function attachmentNode(ev) {
  * umbrach. Hier ist er die einzige Stelle, an der der Kalendername ausdrücklich
  * steht. */
 function calendarChipNode(ev) {
-  if (!ev.cal_name) return null;
+  const name = eventLocalCalendarDisplayName(ev);
+  if (!name) return null;
   const chip = document.createElement('span');
   chip.className = 'event-cal-label';
-  chip.style.setProperty('--cal-color', ev.cal_color || ev.color || resolveEventColor(ev));
-  chip.textContent = ev.cal_name;
+  chip.style.setProperty('--cal-color', ev.cal_color || ev.local_calendar_color || ev.color || resolveEventColor(ev));
+  chip.textContent = name;
   return chip;
 }
 
@@ -7059,6 +7247,29 @@ function applyDefaultSyncTarget(selectElement) {
   if (available) selectElement.value = target;
 }
 
+function defaultLocalCalendar() {
+  return state.localCalendars.find((calendar) => calendar.is_default)
+    ?? state.localCalendars[0]
+    ?? null;
+}
+
+function populateLocalCalendarSelect(selectElement, currentEvent = null) {
+  if (!selectElement) return;
+  const calendars = state.localCalendars.length
+    ? state.localCalendars
+    : [{ id: currentEvent?.local_calendar_id || defaultLocalCalendar()?.id || null,
+      name: t('calendar.defaultLocalCalendar'), color: '#007AFF', is_default: true }];
+  const selectedId = currentEvent?.local_calendar_id ?? defaultLocalCalendar()?.id ?? calendars[0]?.id;
+  selectElement.replaceChildren();
+  for (const calendar of calendars) {
+    const option = document.createElement('option');
+    option.value = String(calendar.id);
+    option.textContent = localCalendarDisplayName(calendar);
+    option.selected = Number(calendar.id) === Number(selectedId);
+    selectElement.appendChild(option);
+  }
+}
+
 // --------------------------------------------------------
 // Event-Modal (Erstellen / Bearbeiten)
 // --------------------------------------------------------
@@ -7312,6 +7523,9 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
   wireReminderRows(panel, { event });
 
   // Load unified sync targets (Google + CalDAV)
+  populateLocalCalendarSelect(panel.querySelector('#event-local-calendar'), event);
+
+  // Load unified sync targets (Google + CalDAV)
   const syncTargetSelect = panel.querySelector('#event-sync-target');
   if (syncTargetSelect) {
     // Outlook ist der einzige One-way-Push: Aenderungen in Outlook werden beim
@@ -7322,6 +7536,11 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
     const outlookHint = panel.querySelector('#event-sync-target-outlook-hint');
     const syncOutlookHint = () => {
       if (outlookHint) outlookHint.hidden = !syncTargetSelect.value.startsWith('outlook:');
+      const localSelect = panel.querySelector('#event-local-calendar');
+      if (localSelect) {
+        localSelect.disabled = /^(google|caldav):/.test(syncTargetSelect.value);
+        localSelect.closest('.form-group').hidden = localSelect.disabled;
+      }
     };
 
     // DAS ZIEL FOLGT DER ZUWEISUNG (#1060) - nur beim Anlegen, und nur bis jemand
@@ -7790,6 +8009,11 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
              placeholder="${t('calendar.titlePlaceholder')}" value="${esc(isEdit ? event.title : '')}">
     </div>
 
+    ${!isEdit || event.local_calendar_id ? `<div class="form-group">
+      <label class="form-label" for="event-local-calendar">${t('calendar.localCalendarLabel')}</label>
+      <select class="form-input" id="event-local-calendar"></select>
+    </div>` : ''}
+
     <div class="form-group">
       <label class="toggle">
         <input type="checkbox" id="modal-allday" ${isEdit && event.all_day ? 'checked' : ''}>
@@ -7988,7 +8212,10 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       closeModal({ force: true });
       return;
     }
-    const choice = await askOverModal(() => recurringScopeChoice({ action: 'save', event }));
+    const localSelect = overlay.querySelector('#event-local-calendar');
+    const calendarChanged = localSelect && !localSelect.disabled
+      && Number(localSelect.value) !== Number(event.local_calendar_id);
+    const choice = await askOverModal(() => recurringScopeChoice({ action: 'save', event, allowOccurrence: !calendarChanged }));
     if (!choice) return;
     occurrenceScope = choice;
   }
@@ -8044,6 +8271,8 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       title, description, start_datetime, end_datetime,
       all_day: !!allday,
       location, color, icon, assigned_to,
+      local_calendar_id: (target_google_calendar_id || target_caldav_account_id) ? undefined
+        : Number(overlay.querySelector('#event-local-calendar')?.value) || undefined,
       visibility: overlay.querySelector('#modal-visibility')?.value || 'all',
       countdown: !!overlay.querySelector('#modal-countdown')?.checked,
       recurrence_rule: rrule.recurrence_rule,
@@ -8099,6 +8328,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       const localRecurring = isLocalRecurringSeries(event);
       const canOverrideOccurrence = canOverrideCalendarOccurrence(event);
       let scope = occurrenceScope;
+      if (scope === 'this') delete body.local_calendar_id;
       if (!canOverrideOccurrence && scope === 'following' && followingMeansWholeSeries(event)) scope = 'series';
       if (localRecurring && canEditCalendarOccurrence(event) && (scope === 'this' || scope === 'following')) {
         const target = calendarOccurrenceMutationTarget(event, scope);
@@ -8280,9 +8510,9 @@ const RECURRING_SCOPES = [
  * Vorkommen als `recurrence_id`, und genau das tragen die Endpunkte der Wahl -
  * bei einer lokalen Serie (zonenlose Wanduhrzeit) sind beide derselbe Tag.
  */
-function renderRecurringScopeChoices(action, event) {
+function renderRecurringScopeChoices(action, event, allowOccurrence = true) {
   const tone = action === 'delete' ? 'btn--danger-outline' : 'btn--secondary';
-  const choices = RECURRING_SCOPES.map(([scope, key]) => `
+  const choices = RECURRING_SCOPES.filter(([scope]) => allowOccurrence || scope !== 'this').map(([scope, key]) => `
         <button type="button" class="btn ${tone}" data-scope="${scope}">${esc(t(key))}</button>`).join('');
   const occurrence = esc(t('calendar.recurringScopeOccurrence', {
     title: event?.title ?? '',
@@ -8320,7 +8550,7 @@ function renderRecurringScopeChoices(action, event) {
  *
  * Loest zu 'this' | 'following' | 'series' | null.
  */
-function recurringScopeChoice({ action, event }) {
+function recurringScopeChoice({ action, event, allowOccurrence = true }) {
   return new Promise((resolve) => {
     let resolved = false;
     const finish = (value) => {
@@ -8333,7 +8563,7 @@ function recurringScopeChoice({ action, event }) {
       pointerDeadTime: true,
       title: action === 'delete' ? t('calendar.deleteRecurringTitle') : t('calendar.saveRecurringTitle'),
       size: 'sm',
-      content: renderRecurringScopeChoices(action, event),
+      content: renderRecurringScopeChoices(action, event, allowOccurrence),
       onClose: () => finish(null),
       onSave(panel) {
         for (const button of panel.querySelectorAll('[data-scope]')) {

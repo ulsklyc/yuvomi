@@ -5,6 +5,9 @@
  * Abhängigkeiten: keine externen.
  */
 
+import { localCalendarIdSql } from './local-calendars.js';
+import { visibilityWhere } from './visibility.js';
+
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import {
   householdTimeZone, isValidTimeZone, localToUTC, shiftDateKey, utcToWall,
@@ -259,18 +262,23 @@ function buildVEvent(
   return lines.map(foldLine);
 }
 
-function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn)) {
+function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn), options = {}) {
   const windowStart = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
     .toISOString().slice(0, 10);
   const feedZone = resolveFeedZone(tz);
+  const calendarFilterSql = options.localCalendarId
+    ? `AND ${localCalendarIdSql()} = ? AND ${visibilityWhere('e', 'event_assignments', 'event_id', 'NULL')}`
+    : '';
+  const calendarFilterParams = options.localCalendarId ? [options.localCalendarId] : [];
+  const calendarName = options.calendarName || 'Yuvomi';
 
   // Identische Sichtbarkeitslogik wie GET /api/v1/calendar:
   // alle Events außer fremden, nicht-geteilten ICS-Abos.
-  const showAssignees = !!conn.prepare(
+  const showAssignees = options.showAssignees ?? !!conn.prepare(
     `SELECT calendar_feed_show_assignees AS v FROM users WHERE id = ?`
   ).get(userId)?.v;
 
-  // Namen nur laden, wenn der Feed-Eigentümer sie im Titel anzeigen will (#482);
+  // Namen nur laden, wenn die Feed-Option sie im Titel anzeigen will (#482);
   // im Default-Fall (aus) spart das die korrelierte Subquery je Event.
   const assigneeSelect = showAssignees ? `,
            (SELECT json_group_array(name) FROM (
@@ -293,8 +301,9 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn))
       e.recurrence_rule IS NOT NULL
       OR DATE(e.start_datetime) >= ?
     )
+    ${calendarFilterSql}
     ORDER BY e.start_datetime ASC
-  `).all(userId, windowStart);
+  `).all(userId, windowStart, ...calendarFilterParams);
   const referencedMasterIds = new Set(queriedRows
     .filter(isLinkedOccurrence)
     .map((event) => Number(event.recurrence_parent_id)));
@@ -370,7 +379,7 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn))
     'PRODID:-//Yuvomi//Calendar Feed//DE',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    'X-WR-CALNAME:Yuvomi',
+    `X-WR-CALNAME:${escapeICSText(calendarName)}`,
   ];
   // Kalenderzone für die Clients, die den Header auswerten (Google, Thunderbird).
   // Sie ersetzt die TZID-Parameter nicht, sondern deckt den Rest: Termine ohne
@@ -391,6 +400,18 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn))
   }
   out.push('END:VCALENDAR');
   return out.join('\r\n') + '\r\n';
+}
+
+function buildCalendarFeed(conn, calendarId, now = new Date(), tz = householdTimeZone(conn)) {
+  const calendar = conn.prepare('SELECT * FROM local_calendars WHERE id = ?').get(calendarId);
+  if (!calendar) return null;
+  // A household-wide calendar feed has no user identity. Do not inherit the
+  // creator's personal preference; local feeds consistently omit assignees.
+  return buildFeed(conn, 0, now, tz, {
+    localCalendarId: calendar.id,
+    calendarName: calendar.name,
+    showAssignees: false,
+  });
 }
 
 function getFeedToken(conn, userId) {
@@ -442,7 +463,7 @@ function setFeedShowAssignees(conn, userId, value) {
 }
 
 export {
-  escapeICSText, foldLine, buildFeed,
+  escapeICSText, foldLine, buildFeed, buildCalendarFeed,
   getFeedToken, regenerateFeedToken, clearFeedToken, findUserIdByFeedToken,
   getFeedShowAssignees, setFeedShowAssignees,
   resolveFeedZone, stampProp,

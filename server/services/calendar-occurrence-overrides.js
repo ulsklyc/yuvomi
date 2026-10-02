@@ -672,6 +672,7 @@ function loadSeriesForMutation(database, seriesId, actorId, isAdmin, authorizeAc
 function normalizeScalar(field, value) {
   if (field === 'all_day' || field === 'countdown') return value ? 1 : 0;
   if (['description', 'end_datetime', 'location', 'color'].includes(field)) return value || null;
+  if (field === 'local_calendar_id') return value == null ? null : Number(value);
   return value;
 }
 
@@ -1191,7 +1192,7 @@ export function upsertOccurrenceOverride(database, {
             visibility = ?, countdown = ?, attachment_name = ?,
             attachment_mime = ?, attachment_size = ?, attachment_data = ?,
             attachment_document_id = ?, recurrence_parent_id = ?, recurrence_id = ?,
-            overridden_fields = ?
+            overridden_fields = ?, local_calendar_id = ?
         WHERE id = ?
       `).run(
         materialized.title,
@@ -1213,6 +1214,7 @@ export function upsertOccurrenceOverride(database, {
         master.id,
         recurrenceId,
         overriddenFields,
+        master.local_calendar_id ?? null,
         existing.id,
       );
       childId = existing.id;
@@ -1223,8 +1225,8 @@ export function upsertOccurrenceOverride(database, {
           color, icon, assigned_to, created_by, external_source, recurrence_rule,
           visibility, countdown, attachment_name, attachment_mime, attachment_size,
           attachment_data, attachment_document_id, recurrence_parent_id,
-          recurrence_id, overridden_fields
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          recurrence_id, overridden_fields, local_calendar_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         materialized.title,
         materialized.description ?? null,
@@ -1246,6 +1248,7 @@ export function upsertOccurrenceOverride(database, {
         master.id,
         recurrenceId,
         overriddenFields,
+        master.local_calendar_id ?? null,
       ).lastInsertRowid;
     }
 
@@ -1469,8 +1472,8 @@ function insertSeriesRow(database, source) {
       visibility, countdown, attachment_name, attachment_mime, attachment_size,
       attachment_data, attachment_document_id, tzid, target_google_calendar_id,
       target_caldav_account_id, target_caldav_calendar_url,
-      target_outlook_account_id, target_outlook_calendar_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      target_outlook_account_id, target_outlook_calendar_id, local_calendar_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     source.title,
     source.description ?? null,
@@ -1496,6 +1499,7 @@ function insertSeriesRow(database, source) {
     source.target_caldav_calendar_url ?? null,
     source.target_outlook_account_id ?? null,
     source.target_outlook_calendar_id ?? null,
+    source.local_calendar_id ?? null,
   ).lastInsertRowid);
 }
 
@@ -1504,6 +1508,7 @@ function scalarDifferencesFromBase(values, base, limitedTo = SCALAR_OVERRIDE_FIE
 }
 
 function refreshReparentedChild(database, child, oldResolved, successor, successorAssignments, tz, mayWidenAttachment = () => false) {
+  database.prepare('UPDATE calendar_events SET local_calendar_id = ? WHERE id = ?').run(successor.local_calendar_id ?? null, child.id);
   let newBase;
   try {
     newBase = baseOccurrenceFor(successor, child.recurrence_id);
@@ -1658,6 +1663,7 @@ export function splitSeries(database, {
       if (Object.hasOwn(changes, field)) successorValues[field] = normalizeScalar(field, changes[field]);
     }
     for (const field of [
+      'local_calendar_id',
       'target_google_calendar_id',
       'target_caldav_account_id',
       'target_caldav_calendar_url',
@@ -1857,6 +1863,7 @@ export function splitSeries(database, {
 
 const SERIES_UPDATE_FIELDS = Object.freeze([
   ...SCALAR_OVERRIDE_FIELDS,
+  'local_calendar_id',
   'recurrence_rule',
   'target_google_calendar_id',
   'target_caldav_account_id',
@@ -2262,6 +2269,10 @@ export function updateSeriesWithOverrides(database, {
     }
     if (typeof applyUpdate === 'function') applyUpdate(database, current);
     else applySeriesChanges(database, master.id, changes);
+    if (Object.hasOwn(changes, 'local_calendar_id')) {
+      database.prepare('UPDATE calendar_events SET local_calendar_id = ? WHERE recurrence_parent_id = ?')
+        .run(changes.local_calendar_id ?? null, master.id);
+    }
     const updatedAnchor = database.prepare(
       'SELECT start_datetime FROM calendar_events WHERE id = ?'
     ).get(master.id).start_datetime;

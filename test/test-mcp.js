@@ -38,6 +38,8 @@ db.exec(`
   ALTER TABLE calendar_events ADD COLUMN calendar_ref_id INTEGER;
   ALTER TABLE calendar_events ADD COLUMN target_google_calendar_id TEXT;
   ALTER TABLE calendar_events ADD COLUMN target_caldav_calendar_url TEXT;
+  ALTER TABLE calendar_events ADD COLUMN target_caldav_account_id INTEGER;
+  CREATE TABLE housekeeping_work_sessions (id INTEGER PRIMARY KEY, calendar_event_id INTEGER);
   ALTER TABLE calendar_events ADD COLUMN outbound_move_to TEXT;
   CREATE TABLE external_calendars (
     id INTEGER PRIMARY KEY,
@@ -50,6 +52,7 @@ db.exec(`
 db.exec(MIGRATIONS_SQL[85]);  // calendar_event_exceptions
 db.exec(MIGRATIONS_SQL[174]); // generated birthday/name-day joins
 db.exec(MIGRATIONS_SQL[44]); // search index rebuilt by migration 194
+db.exec(MIGRATIONS_SQL[230]);
 db.exec(MIGRATIONS_SQL[194]); // linked occurrence overrides
 db.exec(MIGRATIONS_SQL[41]);  // tasks.start_date (geplante Aufgaben)
 db.exec(MIGRATIONS_SQL[74]);  // access_permissions (Modulrechte, #467)
