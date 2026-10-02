@@ -43,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   amount and currency at the moment it was written, and a deleted expense keeps its amount in the
   feed. Entries written before this change show the title without an amount: what the expense
   cost back then was never recorded.
+- **Opening one occurrence of a recurring event opens that occurrence** (#1607). In the month,
+  week and day views, clicking or pressing Enter on an occurrence of a series opened the first
+  occurrence the view had loaded instead - for a daily series the day before the visible range.
+  The detail view showed that day, the editor was filled with it, and "This event only" then
+  changed or deleted it, not the occurrence you clicked. Each occurrence now opens itself; the
+  agenda already did.
 - **Correcting the date of a series' first entry no longer moves the rest of the series** (#1545).
   Every later occurrence of a recurring payment is counted from its start day, and that was still
   the date of the first entry. Correcting it with "Only this occurrence" (the rent was debited on
