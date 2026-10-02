@@ -165,6 +165,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Filipino, which OpenWeatherMap does not offer, uses `OPENWEATHER_LANG` and otherwise English.
   `OPENWEATHER_LANG` is that fallback and takes an OpenWeatherMap code; a code OpenWeatherMap does
   not list is now ignored in favour of English, as the installation guide and `.env.example` say.
+- **Shared expenses say why an amount cannot be saved** (#1607). An amount of 0, a negative
+  amount or one written with thousands separators (`10,000` in Korea or the US, `10.000` in
+  Germany) only greyed out the Save button. The reason now appears under the amount once you
+  leave the field, with an example of the expected spelling. An amount with more decimals than
+  the currency has, such as `10.000` for won, was sent and came back as an English server
+  message; it is now caught at the field in your language, also for exact shares and when
+  recording a payment. An exact share that is empty, 0 or negative is caught there as well, even
+  when the shares add up. Over the API, a negative amount, share or payment was never stored,
+  but the answer was the database's raw constraint text; it is now "must be greater than
+  zero", and `-0` no longer slips through as a share of 0. The running total of a split follows
+  the household's number format and the expense's currency instead of always reading like
+  `33.00`.
 
 - **The "discard changes" question has two different buttons in every language** (#1607). In
   Korean, Italian and Ukrainian both buttons said "Cancel", in Turkish and Russian the two words
