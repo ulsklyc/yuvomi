@@ -17,6 +17,14 @@ import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-
 import { shiftDateKey, todayKey } from '../utils/timezone.js';
 
 export const SEARCH_LIMIT = 5;
+// Wie viele Termin-Treffer AUFGELOEST werden, bevor die fuenf fruehesten
+// uebrig bleiben (#1607). Eine Serie steht an ihrem naechsten Termin, ihre
+// Stammzeile aber am Tag ihres Beginns: wer schon in der Abfrage auf fuenf
+// deckelt, waehlt nach einem Datum aus, das er danach gar nicht anzeigt -
+// fuenf alte Jahrestage verdraengten den Termin von morgen. Die Schranke haelt
+// die Expansion klein; die Kalendersuche loest mit derselben Funktion hundert
+// Zeilen auf.
+const EVENT_SEARCH_CANDIDATES = 50;
 
 /**
  * Erzeugt die ß↔ss-Schreibvarianten eines Tokens. Der FTS-Tokenizer faltet
@@ -406,7 +414,9 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
         AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}
       ORDER BY e.start_datetime ASC
       LIMIT @limit
-    `).all({ match, userId, limit }), window.from, window.to, { lightweight: true });
+    `).all({ match, userId, limit: EVENT_SEARCH_CANDIDATES }), window.from, window.to, { lightweight: true })
+      // resolveEventSearchRows sortiert nach dem AUFGELOESTEN Start.
+      .slice(0, limit);
     // Preserve the compact global-search payload. The resolver-capable
     // projection supplies linked inheritance without loading attachment bodies
     // or unrelated sync metadata into this result bucket.

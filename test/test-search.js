@@ -302,6 +302,22 @@ test('globale Suche und Kalendersuche fragen dasselbe Fenster ab (#1607)', () =>
   assert(!/shiftDateKey\(today, 730\)/.test(route), 'in der Route steht noch eine eigene Fensterrechnung');
 });
 
+test('die fuenf Treffer sind die fuenf fruehesten ANGEZEIGTEN Tage, nicht die fuenf aeltesten Stammzeilen (#1607)', () => {
+  // Gedeckelt wurde nach dem Start der Stammzeile, angezeigt wird der naechste
+  // Termin. Fuenf alte Serien, deren naechster Termin Monate entfernt liegt,
+  // verdraengten so einen sechsten Treffer von morgen (Review an PR #1618).
+  const ins = db.prepare(`INSERT INTO calendar_events (title, start_datetime, all_day, recurrence_rule, created_by)
+                          VALUES (?, ?, 1, ?, ?)`);
+  for (let i = 0; i < 5; i++) ins.run(`Jahrestag Qzxcrowd ${i}`, `198${i}-03-0${i + 1}`, 'FREQ=YEARLY', uid);
+  ins.run('Morgen Qzxcrowd', '2026-10-03', null, uid);
+  const treffer = mitUhr('2026-10-02T10:00:00Z', 'UTC', () => runSearch(db, 'Qzxcrowd', uid).events);
+  assert(treffer.length === 5, `fuenf Treffer: ${treffer.length}`);
+  assert(treffer[0].title === 'Morgen Qzxcrowd',
+    `der Termin von morgen steht vorn: ${treffer.map((e) => `${e.title} ${e.start_datetime}`).join(' | ')}`);
+  const tage = treffer.map((e) => e.start_datetime.slice(0, 10));
+  assert(JSON.stringify(tage) === JSON.stringify([...tage].sort()), `aufsteigend: ${tage.join(', ')}`);
+});
+
 test('ohne kommenden Termin bleibt der Treffer die Stammzeile; ein Einzeltermin bleibt, wo er liegt (#1607)', () => {
   db.prepare(`
     INSERT INTO calendar_events (title, start_datetime, all_day, recurrence_rule, created_by)
