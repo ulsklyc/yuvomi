@@ -1169,9 +1169,10 @@ function amountProblemText(problem, currency) {
  * ko-KR die Zahl 10 und passte so ins Raster von KRW, gesendet wurde aber der
  * Text mit seinen drei Stellen (#1607).
  *
- * `required` ist für die Genau-Beträge einer Aufteilung: dort gibt es kein
- * Pflichtfeld des Browsers, und ein leerer Anteil eines angehakten Mitglieds
- * ginge als leerer Text an den Server. Er zählt deshalb wie eine 0.
+ * `required` setzt jeder Speicherweg: ein leeres Feld zählt dann wie eine 0.
+ * Die Genau-Beträge einer Aufteilung haben kein Pflichtfeld des Browsers, und
+ * wo es eines gibt, nimmt es ein Feld aus Leerzeichen an - beides ginge als
+ * leerer Text an den Server.
  *
  * `original` und `originalCurrency` tragen den Bestandsschutz (siehe
  * amountInputProblem): er endet, sobald die Währung gewechselt wurde.
@@ -1180,8 +1181,7 @@ function amountProblemText(problem, currency) {
  */
 function rejectSplitAmount(input, currency, { original = null, originalCurrency = null, required = false } = {}) {
   if (input == null) return false;
-  const problem = amountInputProblem(input.value, currency, { original, originalCurrency })
-    ?? (required && !String(input.value ?? '').trim() ? 'notPositive' : null);
+  const problem = amountInputProblem(input.value, currency, { original, originalCurrency, required });
   if (!problem) return false;
   reportFieldError(input, amountProblemText(problem, currency));
   return true;
@@ -1640,7 +1640,7 @@ function openExpenseModal(expense = null, prefill = null) {
         data.amount = decimalString(data.amount);
         const expenseCurrency = form.querySelector('[name="currency"]')?.value || group.default_currency;
         if (rejectSplitAmount(form.querySelector('[name="amount"]'), expenseCurrency,
-          { original: isEdit ? expense.amount : null, originalCurrency: isEdit ? expense.currency : null })) return;
+          { original: isEdit ? expense.amount : null, originalCurrency: isEdit ? expense.currency : null, required: true })) return;
         // Auch die Genau-Beträge: sie sind Geld in derselben Währung. Jeder
         // Anteil eines angehakten Mitglieds muss groesser als 0 sein, auch wenn
         // die Summe stimmt ("-5 und 15"): der Server lehnt 0 und negative
@@ -1751,7 +1751,7 @@ function openSettlementModal() {
         data.amount = decimalString(data.amount);
         if (rejectSplitAmount(form.querySelector('[name="amount"]'),
           form.querySelector('[name="currency"]')?.value || group.default_currency,
-          { original: debt?.amount ?? null, originalCurrency: debt?.currency ?? null })) return;
+          { original: debt?.amount ?? null, originalCurrency: debt?.currency ?? null, required: true })) return;
         const proofIds = proof ? await proof.commit() : [];
         if (proofIds.length) data.proof_document_id = proofIds[0];
         await api.post(`/split-expenses/groups/${state.activeGroupId}/settlements`, data);

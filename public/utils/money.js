@@ -443,9 +443,12 @@ export function amountInputToCents(text, currency) {
  * MEHR Stellen trägt als vorher. Ein Währungswechsel hebt den Schutz auf
  * (`originalCurrency`): 12.50 EUR, auf JPY umgestellt, ist ein neuer Betrag.
  */
-export function amountInputProblem(text, currency, { original = null, originalCurrency = null } = {}) {
+export function amountInputProblem(text, currency, { original = null, originalCurrency = null, required = false } = {}) {
   const raw = String(text ?? '').trim();
-  if (!raw) return null;
+  // Leer ist Sache des Pflichtfelds - ausser der Aufrufer sagt, dass ein Betrag
+  // da sein muss: `required` des Browsers nimmt ein Feld aus Leerzeichen an,
+  // und die Genau-Beträge einer Aufteilung haben gar kein Pflichtfeld.
+  if (!raw) return required ? 'notPositive' : null;
   const decimal = toDecimalString(raw);
   // Leer trotz Eingabe heisst: toDecimalString hat eine Gruppierung abgewiesen.
   // Ein Leerzeichen zwischen Ziffern ist dasselbe in der Schreibweise von fr

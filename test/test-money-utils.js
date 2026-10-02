@@ -272,6 +272,11 @@ test('amountInputProblem: der Grund, warum ein Betrag nicht speicherbar ist (#16
   assert.equal(grund('ar-EG', '١٢٫٥٠', 'EUR'), null);
   assert.equal(grund('de', '', 'EUR'), null);
   assert.equal(grund('de', '   ', 'EUR'), null);
+  // ... ausser der Speicherweg verlangt einen Betrag: `required` des Browsers
+  // nimmt ein Feld aus Leerzeichen an, der Server bekaeme einen leeren Text.
+  assert.equal(grund('de', '   ', 'EUR', { required: true }), 'notPositive');
+  assert.equal(grund('de', '', 'EUR', { required: true }), 'notPositive');
+  assert.equal(grund('de', '12,50', 'EUR', { required: true }), null);
 
   // Gruppierung: die uebliche Schreibweise fuer zehntausend, je Region.
   assert.equal(grund('ko-KR', '10,000', 'KRW'), 'grouped');
@@ -305,6 +310,14 @@ test('amountInputProblem: der Grund, warum ein Betrag nicht speicherbar ist (#16
   // umstellt, hat das Raster gewechselt (wie bei amountIsSavable).
   assert.equal(grund('en-US', '12.50', 'JPY', { original: '12.50', originalCurrency: 'JPY' }), null);
   assert.equal(grund('en-US', '12.50', 'JPY', { original: '12.50', originalCurrency: 'EUR' }), 'precision');
+});
+
+test('jeder Speicherweg der Aufteilung verlangt einen Betrag', async () => {
+  const { readFileSync } = await import('node:fs');
+  const quelle = readFileSync(new URL('../public/pages/split-expenses.js', import.meta.url), 'utf8');
+  const aufrufe = quelle.match(/if \(rejectSplitAmount\([\s\S]*?\)\) return;/g) ?? [];
+  assert.equal(aufrufe.length >= 3, true, 'Aufrufe von rejectSplitAmount gefunden');
+  for (const aufruf of aufrufe) assert.match(aufruf, /required: true/, aufruf);
 });
 
 test('amountInputProblem ist nie nachsichtiger als der Server', async () => {
