@@ -1405,20 +1405,24 @@ function recurrenceFollowupOf(taskId) {
  *
  * DIE SUCHE ENDET IMMER. Der Server baut keinen Kreis, eine wiederhergestellte
  * oder von Hand bearbeitete Datenbank kann einen tragen, und der Treiber ist
- * synchron: eine Schleife ohne Ende stuende fuer den ganzen Prozess. Deshalb
- * die besuchte Menge UND eine Obergrenze - hinter mehr als
- * MAX_FOLLOWUP_HOPS erledigten Gliedern gibt es kein „naechstes Mal" zu
- * nennen, nur eine Antwort, die auf sich warten liesse.
+ * synchron: eine Schleife ohne Ende stuende fuer den ganzen Prozess. Dafuer
+ * reicht die besuchte Menge - jede Zeile wird hoechstens einmal gelesen, die
+ * Kette ist also so lang wie die Serie und nie laenger als die Tabelle. Eine
+ * feste Obergrenze stand hier frueher zusaetzlich und schnitt eine taegliche
+ * Serie nach 500 erledigten Gliedern ab, kurz vor dem offenen.
+ *
+ * `mayRead` IST DIE SICHTBARKEIT DES AUFRUFERS. Eine Folgeinstanz erbt ihre
+ * Sichtbarkeit, laesst sich danach aber einzeln umstellen. Wer das fruehere
+ * Vorkommen abhakt, darf das Datum eines spaeteren, das er nicht sieht, nicht
+ * ueber diese Antwort erfahren - dann gibt es fuer ihn kein „naechstes Mal".
  */
-const MAX_FOLLOWUP_HOPS = 500;
-
-function nextPendingOccurrenceOf(taskId) {
+function nextPendingOccurrenceOf(taskId, mayRead = () => true) {
   const seen = new Set([Number(taskId)]);
   let current = recurrenceFollowupOf(taskId);
-  for (let hops = 0; current && hops < MAX_FOLLOWUP_HOPS; hops += 1) {
+  while (current) {
     if (seen.has(current.id)) return null;
     seen.add(current.id);
-    if (current.status !== 'done' && !current.archived_at) return current;
+    if (current.status !== 'done' && !current.archived_at) return mayRead(current) ? current : null;
     current = recurrenceFollowupOf(current.id);
   }
   return null;
@@ -1809,7 +1813,13 @@ router.patch('/:id/status', (req, res) => {
         // Abhaken angelegt hat und die das Zuruecknehmen stehen liess, weil
         // jemand an ihr gearbeitet hatte (discardRecurrenceFollowup), und es
         // ist das Vorkommen HINTER ihr, wenn sie selbst schon erledigt ist.
-        nextDueDate = nextPendingOccurrenceOf(prev.id)?.due_date ?? null;
+        // Ein Display sieht nur, was alle sehen (dieselbe Regel wie oben fuer
+        // die Aufgabe selbst), ein Mensch, was mayAccessTask ihm zeigt.
+        const viewer = req.authUserId || req.session.userId;
+        const mayRead = isDisplayRequest(req)
+          ? (task) => task.visibility === 'all'
+          : (task) => mayAccessTask(task, viewer);
+        nextDueDate = nextPendingOccurrenceOf(prev.id, mayRead)?.due_date ?? null;
       }
     })();
 

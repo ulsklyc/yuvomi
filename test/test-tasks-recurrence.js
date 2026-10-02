@@ -174,8 +174,10 @@ const uid = db.prepare(`INSERT INTO users (username, display_name, password_hash
 const app = express();
 app.use(express.json());
 app.use((req, _res, next) => {
-  req.authUserId = uid;
-  req.session = { userId: uid, role: 'admin' };
+  // `x-test-user` laesst einen Test als zweite Person fragen.
+  const other = Number(req.headers['x-test-user']) || null;
+  req.authUserId = other ?? uid;
+  req.session = { userId: other ?? uid, role: other ? 'member' : 'admin' };
   next();
 });
 app.use('/api/v1/tasks', tasksRouter);
@@ -185,10 +187,10 @@ const base = `http://127.0.0.1:${server.address().port}/api/v1/tasks`;
 
 test.after(() => server.close());
 
-async function call(method, path, body) {
+async function call(method, path, body, headers = {}) {
   const res = await fetch(`${base}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
@@ -908,6 +910,44 @@ test('PATCH done: die Suche nach dem naechsten Vorkommen endet auch an einer Ket
   const res = await call('PATCH', `/${a}/status`, { status: 'done' });
   assert.equal(res.status, 200);
   assert.equal(res.body.data.next_due_date, null);
+});
+
+test('PATCH done: das offene Vorkommen zaehlt auch hinter mehr als 500 erledigten', async () => {
+  // Eine taegliche Serie hat nach anderthalb Jahren so viele Glieder. Eine
+  // feste Obergrenze der Suche meldete dann null, obwohl das offene dasteht.
+  const a = await completeRecurring('Blumen giessen', 'FREQ=DAILY');
+  const b = openInstances('Blumen giessen')[0];
+  let prev = a;
+  for (let i = 0; i < 510; i += 1) {
+    prev = insertTask({ title: 'Blumen giessen', status: 'done', created_by: uid, recurrence_origin_id: prev });
+  }
+  db.prepare('UPDATE tasks SET recurrence_origin_id = ? WHERE id = ?').run(prev, b.id);
+  await call('PATCH', `/${a}/status`, { status: 'open' });
+  const res = await call('PATCH', `/${a}/status`, { status: 'done' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.next_due_date, b.due_date);
+});
+
+test('PATCH done: ein Vorkommen, das der Aufrufer nicht sieht, wird ihm nicht als naechstes Mal genannt', async () => {
+  // Die Folgeinstanz erbt ihre Sichtbarkeit, laesst sich aber einzeln auf
+  // privat stellen. Ihr Datum darf dann nicht ueber die Antwort auf das
+  // Abhaken des frueheren, sichtbaren Vorkommens hinausgehen.
+  const other = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
+    VALUES ('kind-sicht', 'Kind', '$2b$12$x', 'member')`).run().lastInsertRowid;
+  const a = await completeRecurring('Tagebuch', 'FREQ=WEEKLY');
+  const b = openInstances('Tagebuch')[0];
+  db.prepare(`UPDATE tasks SET visibility = 'private', created_by = ? WHERE id = ?`).run(uid, b.id);
+  // B traegt Arbeit, das Zuruecknehmen laesst sie deshalb stehen.
+  insertTask({ title: 'Seite 1', status: 'open', created_by: uid, parent_task_id: b.id });
+
+  await call('PATCH', `/${a}/status`, { status: 'open' });
+  const fremd = await call('PATCH', `/${a}/status`, { status: 'done' }, { 'x-test-user': String(other) });
+  assert.equal(fremd.status, 200);
+  assert.equal(fremd.body.data.next_due_date, null, 'wer B nicht sieht, erfaehrt ihr Datum nicht');
+
+  await call('PATCH', `/${a}/status`, { status: 'open' });
+  const eigen = await call('PATCH', `/${a}/status`, { status: 'done' });
+  assert.equal(eigen.body.data.next_due_date, b.due_date, 'die Erstellerin sieht es weiter');
 });
 
 test('PATCH done: eine begonnene Folgeinstanz ist das naechste Mal, nicht uebersprungen', async () => {
