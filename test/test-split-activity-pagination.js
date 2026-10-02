@@ -275,3 +275,38 @@ test('Eine Zahlung auf einer spaeteren Seite traegt ihren Stand und ist stornier
   const after = again.body.data.find((a) => a.type === 'payment_registered' && a.entity_id === sid);
   assert.match(after.settlement.reversed_at, /^\d{4}-\d{2}-\d{2}T/);
 });
+
+// ---------------------------------------------------------------------------
+// #1607 Punkt 3: der Verlauf ist Geschichte. Ein Eintrag haelt den Betrag fest,
+// der beim Schreiben galt - ein spaeter bearbeiteter Betrag aendert ihn nicht,
+// auch nicht, wenn ein anderes Mitglied bearbeitet.
+// ---------------------------------------------------------------------------
+
+test('Ein bearbeiteter Betrag aendert den Betrag im "erstellt"-Eintrag nicht', async () => {
+  const groupId = await newGroup('Snapshot');
+  const body = (amount, title) => ({
+    title, amount, currency: 'EUR', payer_id: CR.id, split_method: 'equal', participants: [OWN.id, CR.id],
+  });
+  const created = await CR.call('POST', `/split-expenses/groups/${groupId}/expenses`, body('50.00', 'Einkauf'));
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const expenseId = created.body.data.id;
+  // Die Gruppenverwalterin bearbeitet die Ausgabe eines ANDEREN Mitglieds.
+  const edited = await OWN.call('PUT', `/split-expenses/expenses/${expenseId}`, body('10.00', 'Einkauf'));
+  assert.equal(edited.status, 200, JSON.stringify(edited.body));
+  assert.equal((await CR.call('POST', `/split-expenses/expenses/${expenseId}/comments`, { comment: 'ok' })).status, 201);
+  assert.equal((await OWN.call('DELETE', `/split-expenses/expenses/${expenseId}`)).status, 200);
+
+  const r = await feed(CR, groupId, { limit: '50' });
+  assert.equal(r.status, 200);
+  const of = (type) => r.body.data.find((a) => a.type === type && a.entity_id === expenseId);
+  const money = (a) => a && { amount_minor: a.metadata?.amount_minor, amount: a.metadata?.amount, currency: a.metadata?.currency };
+  assert.deepEqual(money(of('expense_created')), { amount_minor: 5000, amount: '50.00', currency: 'EUR' },
+    'erstellt: der Betrag von damals, nicht der bearbeitete');
+  assert.deepEqual(money(of('expense_edited')), { amount_minor: 1000, amount: '10.00', currency: 'EUR' },
+    'bearbeitet: der Betrag, auf den geaendert wurde');
+  assert.deepEqual(money(of('expense_deleted')), { amount_minor: 1000, amount: '10.00', currency: 'EUR' },
+    'geloescht: der letzte Betrag');
+  const comment = of('comment_added');
+  assert.equal(comment.metadata?.title, 'Einkauf', 'Kommentar: Titel als Snapshot');
+  assert.equal(comment.metadata?.amount_minor, undefined, 'Kommentar: kein Betrag');
+});

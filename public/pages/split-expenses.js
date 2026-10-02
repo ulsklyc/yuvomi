@@ -824,23 +824,31 @@ function restoredDetail(item) {
 /**
  * WELCHE AUSGABE (Re-Critique 2026-09-27, A5 P2-8 / R10 L11). Der Verlauf las
  * fuenfmal „Ausgabe erstellt - Alex Johnson - 23.09.2026", ohne zu sagen,
- * welche - daneben nannte „Letzte Ausgaben" das Objekt. Den Titel legt der
- * Server beim Schreiben in die Metadaten (expense_*, recurring_created); den
- * Betrag kennt die geladene Ausgabenliste der Gruppe. Eine geloeschte Ausgabe
- * steht dort nicht mehr - dann bleibt der Titel allein, ein Betrag waere
- * geraten. Ein Kommentar traegt keinen Titel; er nennt die Ausgabe, an der er
- * haengt, sofern sie geladen ist.
+ * welche - daneben nannte „Letzte Ausgaben" das Objekt.
+ *
+ * Titel UND Betrag kommen aus den Metadaten, die der Server beim Schreiben
+ * festhaelt (#1607): der Verlauf ist Geschichte. Aus der geladenen Ausgabe
+ * gelesen, zeigte jeder fruehere Eintrag den HEUTIGEN Betrag - eine
+ * Bearbeitung schrieb „erstellt ueber 50" nachtraeglich auf 10 um. Ein Eintrag
+ * von vor dem Snapshot traegt keinen Betrag; dann bleibt der Titel allein, der
+ * heutige Betrag waere fuer damals geraten. Die Dezimalform `amount` rechnet
+ * der Server (ISO 4217 kennt er, der Browser nicht).
+ *
+ * Nur der Titel eines Kommentars darf noch aus der geladenen Ausgabe kommen:
+ * aeltere Kommentar-Eintraege tragen keine Metadaten, und der Titel benennt
+ * die Ausgabe, er behauptet keinen Stand von damals.
  */
 const EXPENSE_ACTIVITY = new Set(['expense_created', 'expense_edited', 'expense_deleted', 'comment_added', 'recurring_created']);
 
 function expenseDetail(item) {
   if (!EXPENSE_ACTIVITY.has(item.type)) return '';
-  const expense = item.entity_type === 'expense' && item.entity_id != null
+  const { title: snapshotTitle, amount, currency } = item.metadata || {};
+  const loaded = !snapshotTitle && item.type === 'comment_added' && item.entity_type === 'expense' && item.entity_id != null
     ? state.expenses.find((e) => e.id === Number(item.entity_id))
     : null;
-  const title = item.metadata?.title || expense?.title;
+  const title = snapshotTitle || loaded?.title;
   if (!title) return '';
-  const sum = expense ? ` · ${money(expense.amount, expense.currency)}` : '';
+  const sum = amount != null && currency ? ` · ${money(amount, currency)}` : '';
   return `<span class="split-activity-payment">${esc(`${title}${sum}`)}</span>`;
 }
 
