@@ -74,7 +74,8 @@
             "assignees": "Tylko przypisani",
             "private": "Tylko ja",
             "hint": "Określa, kto może zobaczyć ten wpis w Yuvomi.",
-            "assigneesNobodyHint": "Bez przypisania widzisz ten wpis tylko ty."
+            "assigneesNobodyHint": "Bez przypisania widzisz ten wpis tylko ty.",
+            "privateAssignedHint": "Przypisane osoby nie widzą tego wpisu i nie dostaną przypomnienia. Wybierz „Tylko przypisani”, jeśli mają go widzieć."
         },
         "toShoppingListNamed": "Dodaj {{title}} na listę zakupów",
         "emailInUse": "Ten adres e-mail należy już do innego konta."

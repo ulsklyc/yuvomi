@@ -72,7 +72,8 @@
             "assignees": "Csak a hozzárendeltek",
             "private": "Csak én",
             "hint": "Meghatározza, ki láthatja ezt a bejegyzést a Yuvomiban.",
-            "assigneesNobodyHint": "Hozzárendelés nélkül csak te látod ezt a bejegyzést."
+            "assigneesNobodyHint": "Hozzárendelés nélkül csak te látod ezt a bejegyzést.",
+            "privateAssignedHint": "A hozzárendelt személyek nem látják ezt a bejegyzést, és emlékeztetőt sem kapnak. Válaszd a „Csak a hozzárendeltek” lehetőséget, ha látniuk kell."
         },
         "toShoppingListNamed": "{{title}} hozzáadása a bevásárlólistához",
         "emailInUse": "Ez az e-mail-cím már egy másik fiókhoz tartozik."

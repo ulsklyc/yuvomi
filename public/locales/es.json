@@ -72,7 +72,8 @@
             "assignees": "Solo asignados",
             "private": "Solo yo",
             "hint": "Controla quién puede ver esta entrada en Yuvomi.",
-            "assigneesNobodyHint": "Si no asignas a nadie, solo tú verás esta entrada."
+            "assigneesNobodyHint": "Si no asignas a nadie, solo tú verás esta entrada.",
+            "privateAssignedHint": "Las personas asignadas no ven esta entrada y no reciben recordatorio. Elige «Solo asignados» si quieres que la vean."
         },
         "toShoppingListNamed": "Añadir {{title}} a la lista de la compra",
         "emailInUse": "Esta dirección de correo ya pertenece a otra cuenta."

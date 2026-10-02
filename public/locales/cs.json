@@ -73,7 +73,8 @@
             "assignees": "Pouze přiřazení",
             "private": "Pouze já",
             "hint": "Určuje, kdo vidí tuto položku v Yuvomi.",
-            "assigneesNobodyHint": "Bez přiřazení vidíš tuto položku jen ty."
+            "assigneesNobodyHint": "Bez přiřazení vidíš tuto položku jen ty.",
+            "privateAssignedHint": "Přiřazené osoby tuto položku nevidí a nedostanou připomenutí. Zvol „Pouze přiřazení“, pokud ji mají vidět."
         },
         "toShoppingListNamed": "Přidat {{title}} na nákupní seznam",
         "emailInUse": "Tato e-mailová adresa již patří jinému účtu."

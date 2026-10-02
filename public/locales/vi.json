@@ -72,7 +72,8 @@
             "assignees": "Chỉ người được giao",
             "private": "Chỉ mình tôi",
             "hint": "Kiểm soát ai có thể xem mục này trong Yuvomi.",
-            "assigneesNobodyHint": "Nếu không giao cho ai, chỉ bạn thấy mục này."
+            "assigneesNobodyHint": "Nếu không giao cho ai, chỉ bạn thấy mục này.",
+            "privateAssignedHint": "Những người được giao không thấy mục này và không được nhắc. Chọn \"Chỉ người được giao\" nếu muốn họ thấy."
         },
         "toShoppingListNamed": "Thêm {{title}} vào danh sách mua sắm",
         "emailInUse": "Địa chỉ email này đã thuộc về một tài khoản khác."

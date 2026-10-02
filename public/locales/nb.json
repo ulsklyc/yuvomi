@@ -72,7 +72,8 @@
             "assignees": "Kun tildelte",
             "private": "Bare meg",
             "hint": "Kontroller hvem som kan se dette oppføret i Yuvomi.",
-            "assigneesNobodyHint": "Siden ingen er tildelt, kan bare du se dette oppføret."
+            "assigneesNobodyHint": "Siden ingen er tildelt, kan bare du se dette oppføret.",
+            "privateAssignedHint": "De tildelte personene ser ikke denne oppføringen og får ingen påminnelse. Velg «Kun tildelte» hvis de skal se den."
         },
         "toShoppingListNamed": "Legg til {{title}} i handlelisten",
         "emailInUse": "Denne e-postadressen tilhører allerede en annen konto."
