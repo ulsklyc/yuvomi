@@ -115,47 +115,103 @@ export function rewardTargets(d, taskId, actingUserId, doneByUserId = null) {
   return [];
 }
 
+/*
+ * DER VERLAUF IST GESCHICHTE: WIEDERÖFFNEN BUCHT GEGEN, ES LÖSCHT NICHT (#1607).
+ *
+ * Bis v230 nahm das Zurücksetzen einer erledigten Aufgabe die earn-Zeile aus
+ * dem Ledger. Das hielt den Verlauf frei von Hin-und-her, aber es schrieb ihn
+ * um: wer mit den Punkten schon eine Prämie angefragt hatte, stand danach im
+ * Minus, und der Verlauf zeigte nur noch die Einlösung - weder die Gutschrift
+ * noch ihre Rücknahme. Ein Saldo, den seine eigene Geschichte nicht erklärt.
+ *
+ * Jetzt bleibt die earn-Zeile stehen, und die Rücknahme ist eine zweite Zeile:
+ * Typ `reversal`, negatives Delta, dieselbe `task_id`. Der Saldo darf dabei
+ * negativ werden und gleicht sich mit den nächsten Gutschriften aus; eine
+ * offene Anfrage bleibt offen, die Entscheidung darüber gehört den Eltern.
+ *
+ * OB EINE AUFGABE GERADE VERGÜTET IST, sagt der NETTO-Stand ihrer Buchungen je
+ * Person (earn plus reversal mit dieser task_id): größer 0 heißt vergütet, 0
+ * heißt offen. Das ersetzt den partiellen UNIQUE-Index `uniq_reward_earn`, der
+ * mit einer stehenbleibenden earn-Zeile die Neuvergabe nach dem Wiederöffnen
+ * verschluckt hätte (Migration 230). Die Idempotenz steht damit im Code - das
+ * trägt, weil der Treiber synchron ist und Lesen und Schreiben in EINER
+ * Transaktion liegen: zwischen "Netto ist 0" und der Buchung kommt kein
+ * anderer Request dazwischen. Ein `await` in diesem Pfad wäre genau die Lücke.
+ *
+ * Eine Einlöse-Rückbuchung ist ebenfalls `reversal`, trägt aber
+ * `redemption_id` statt `task_id` und ein positives Delta; die beiden kommen
+ * sich in dieser Summe nicht in die Quere.
+ */
+const TASK_NET = `
+  SELECT COALESCE(SUM(delta), 0) AS net FROM reward_ledger
+  WHERE task_id = ? AND user_id = ? AND type IN ('earn', 'reversal')
+`;
+
 /**
- * Punkte für eine erledigte Aufgabe gutschreiben. Idempotent: der partielle
- * UNIQUE-Index (task_id, user_id) WHERE type='earn' verhindert Doppelvergabe,
- * falls der Statuswechsel mehrfach eintrifft.
+ * Punkte für eine erledigte Aufgabe gutschreiben. Idempotent über den
+ * Netto-Stand: wer für diese Aufgabe schon vergütet ist, bekommt keine zweite
+ * Buchung, falls der Statuswechsel mehrfach eintrifft.
  */
 export function awardForCompletion(d, taskId, actingUserId, doneByUserId = null) {
   const task = d.prepare('SELECT id, points, title FROM tasks WHERE id = ?').get(taskId);
   if (!task || !Number.isInteger(task.points) || task.points <= 0) return;
   const targets = rewardTargets(d, taskId, actingUserId, doneByUserId);
   if (!targets.length) return;
-  const ins = d.prepare(`INSERT OR IGNORE INTO ${'reward_ledger'} (user_id, delta, type, reason, task_id, created_by)
-    VALUES (?, ?, 'earn', ?, ?, ?)`);
-  for (const uid of targets) {
-    ins.run(uid, task.points, task.title || null, taskId, actingUserId || null);
-  }
+  d.transaction(() => {
+    const net = d.prepare(TASK_NET);
+    const ins = d.prepare(`INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, created_by)
+      VALUES (?, ?, 'earn', ?, ?, ?)`);
+    for (const uid of new Set(targets)) {
+      if (net.get(taskId, uid).net > 0) continue;
+      ins.run(uid, task.points, task.title || null, taskId, actingUserId || null);
+    }
+  })();
 }
 
 /**
- * Vergabe zurücknehmen, wenn eine Aufgabe von 'done' zurückgesetzt wird. Die
- * earn-Buchungen werden entfernt (nicht per Gegenbuchung), damit ein erneutes
- * Erledigen sauber neu vergibt und der Ledger nicht mit Toggle-Rauschen wächst.
+ * Vergabe zurücknehmen, wenn eine Aufgabe von 'done' zurückgesetzt wird: je
+ * Person, die für die Aufgabe gerade vergütet ist, eine Gegenbuchung über
+ * genau den gebuchten Betrag. Gebucht wird der Netto-Stand, nicht der heutige
+ * Punktwert der Aufgabe - der kann seit dem Erledigen geändert worden sein.
+ * Idempotent: nach der Gegenbuchung ist das Netto 0, ein zweiter Aufruf findet
+ * nichts mehr.
  */
-export function reverseTaskEarnings(d, taskId) {
+export function reverseTaskEarnings(d, taskId, actingUserId = null) {
   // OHNE PERSONENFILTER, UND DAS BLEIBT SO (#1205). Seit eine benannte
   // erledigende Person die Punkte bekommen kann, ist der Empfänger einer
   // earn-Zeile nicht mehr aus der Zuweisung ableitbar - ein Filter auf
   // "Zuständige" oder "handelnde Person" ließe genau die Buchung stehen, die
-  // das Zurücknehmen auflösen soll. `task_id` + `type` trifft sie alle,
-  // unabhängig davon, wer sie erhalten hat.
-  d.prepare("DELETE FROM reward_ledger WHERE task_id = ? AND type = 'earn'").run(taskId);
+  // das Zurücknehmen auflösen soll. `task_id` trifft sie alle, unabhängig
+  // davon, wer sie erhalten hat.
+  d.transaction(() => {
+    const open = d.prepare(`
+      SELECT user_id, SUM(delta) AS net,
+             (SELECT e.reason FROM reward_ledger e
+               WHERE e.task_id = l.task_id AND e.user_id = l.user_id AND e.type = 'earn'
+               ORDER BY e.id DESC LIMIT 1) AS reason
+      FROM reward_ledger l
+      WHERE task_id = ? AND type IN ('earn', 'reversal')
+      GROUP BY user_id
+      HAVING SUM(delta) > 0
+    `).all(taskId);
+    for (const row of open) {
+      postLedger(d, {
+        userId: row.user_id, delta: -row.net, type: 'reversal',
+        reason: row.reason, taskId, createdBy: actingUserId || null,
+      });
+    }
+  })();
 }
 
 /**
  * Zentrale Kopplung an den Aufgaben-Statuswechsel. Vergibt beim Übergang nach
- * 'done' und storniert beim Verlassen von 'done'. Alles andere ist ein No-op.
+ * 'done' und bucht beim Verlassen von 'done' gegen. Alles andere ist ein No-op.
  */
 export function syncTaskRewards(d, taskId, oldStatus, newStatus, actingUserId, doneByUserId = null) {
   const wasDone = oldStatus === 'done';
   const isDone = newStatus === 'done';
   if (isDone && !wasDone) awardForCompletion(d, taskId, actingUserId, doneByUserId);
-  else if (wasDone && !isDone) reverseTaskEarnings(d, taskId);
+  else if (wasDone && !isDone) reverseTaskEarnings(d, taskId, actingUserId);
 }
 
 /** Freie Buchung (Bonus/Korrektur/Reversal) — vom Route-Handler genutzt. */

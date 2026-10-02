@@ -10020,6 +10020,40 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    version: 230,
+    description: 'Rewards: reopening a task books a reversal instead of deleting the earning (#1607)',
+    // DER LEDGER LÖSCHT NICHT MEHR (#1607). Bis hierher nahm das Wiederöffnen
+    // einer erledigten Aufgabe ihre earn-Zeile aus reward_ledger - entgegen dem
+    // Satz in v70, jede Zeile sei unveränderlich und nachvollziehbar. Ab jetzt
+    // bleibt die earn-Zeile stehen und die Rücknahme ist eine eigene Zeile
+    // (Typ 'reversal', negatives Delta, dieselbe task_id); der Satz aus v70
+    // stimmt damit erst seit dieser Migration.
+    //
+    // DAFÜR MUSS uniq_reward_earn FALLEN. Der partielle UNIQUE-Index
+    // (task_id, user_id) WHERE type = 'earn' ließ je Aufgabe und Person genau
+    // eine earn-Zeile zu. Bleibt die erste stehen, wäre das erneute Erledigen
+    // nach dem Wiederöffnen eine zweite - und der Index hätte sie abgewiesen:
+    // die Punkte wären nach einmal Hin und Her für immer weg. Die Idempotenz
+    // der Vergabe steht seitdem im Code, über den Netto-Stand der Aufgabe je
+    // Person (awardForCompletion in server/services/rewards.js).
+    //
+    // DER ERSATZINDEX IST NICHT EINDEUTIG und trägt genau diese Netto-Frage:
+    // sie liest je Statuswechsel die Buchungen einer Aufgabe, und ohne ihn
+    // wäre das ein Lauf über den ganzen Ledger. Ein künftiger Rebuild von
+    // reward_ledger muss ihn mit anlegen - und darf uniq_reward_earn NICHT
+    // wieder anlegen.
+    //
+    // KEIN BACKFILL: earn-Zeilen, die frühere Versionen beim Wiederöffnen
+    // gelöscht haben, sind weg, und aus dem Bestand lässt sich nicht ablesen,
+    // welche es gab. Die Salden bleiben, wie sie sind.
+    //
+    // Idempotent (IF EXISTS / IF NOT EXISTS).
+    up: `
+      DROP INDEX IF EXISTS uniq_reward_earn;
+      CREATE INDEX IF NOT EXISTS idx_reward_ledger_task ON reward_ledger(task_id, user_id);
+    `,
+  },
 ];
 
 /**

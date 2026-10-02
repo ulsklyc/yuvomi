@@ -37,6 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Reopening a completed task no longer erases its points from the history** (#1607). Reopening
+  a task used to delete its earning. If the points were already in a reward request, the balance
+  went below zero and the history showed only the request, neither the earning nor that it had
+  been taken back. The earning now stays in the history and reopening adds a second entry,
+  "Reopened: <task>", that takes the same points back. Completing the task again awards them
+  again. A balance can still go below zero this way; the page and the overview tile now say so
+  next to the number, the next points make up for it, and a pending request stays pending for
+  the parents to decide - with the current balance shown beside it when it is below zero.
+  Earnings that earlier versions deleted on reopening are not restored.
+
 - **Correcting the date of a series' first entry no longer moves the rest of the series** (#1545).
   Every later occurrence of a recurring payment is counted from its start day, and that was still
   the date of the first entry. Correcting it with "Only this occurrence" (the rent was debited on

@@ -92,6 +92,54 @@ test('syncTaskRewards: done→open storniert die Vergabe', () => {
   assert.equal(getBalance(db, child1), before, 'Storno stellt Saldo wieder her');
 });
 
+test('uniq_reward_earn ist gefallen, die Netto-Frage hat ihren Index (v230, #1607)', () => {
+  const names = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'reward_ledger'").all().map((r) => r.name);
+  assert.ok(!names.includes('uniq_reward_earn'), 'der eindeutige Index verschluckte die Neuvergabe nach dem Wiederöffnen');
+  assert.ok(names.includes('idx_reward_ledger_task'));
+});
+
+test('Wiederöffnen bucht gegen und lässt die earn-Zeile stehen (#1607)', () => {
+  const before = getBalance(db, child1);
+  const taskId = makeTask(40, [child1]);
+  syncTaskRewards(db, taskId, 'open', 'done', admin);
+  syncTaskRewards(db, taskId, 'done', 'open', child1);
+  const rows = db.prepare('SELECT delta, type, reason, created_by FROM reward_ledger WHERE task_id = ? ORDER BY id ASC').all(taskId);
+  assert.deepEqual(rows, [
+    { delta: 40, type: 'earn', reason: 'Chore', created_by: admin },
+    { delta: -40, type: 'reversal', reason: 'Chore', created_by: child1 },
+  ], 'die Gegenbuchung trägt den Aufgabentitel und wer zurückgenommen hat');
+  assert.equal(getBalance(db, child1), before);
+
+  // Ein zweites Zurücknehmen findet nichts Offenes mehr.
+  reverseTaskEarnings(db, taskId, admin);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM reward_ledger WHERE task_id = ?').get(taskId).n, 2);
+});
+
+test('Die Gegenbuchung nimmt den GEBUCHTEN Betrag, nicht den heutigen Punktwert (#1607)', () => {
+  const before = getBalance(db, child1);
+  const taskId = makeTask(40, [child1]);
+  syncTaskRewards(db, taskId, 'open', 'done', admin);
+  db.prepare('UPDATE tasks SET points = 5 WHERE id = ?').run(taskId);
+  syncTaskRewards(db, taskId, 'done', 'open', admin);
+  assert.equal(getBalance(db, child1), before, 'sonst blieben 35 Punkte für eine offene Aufgabe stehen');
+  // Die Neuvergabe nimmt dann den neuen Wert.
+  syncTaskRewards(db, taskId, 'open', 'done', admin);
+  assert.equal(getBalance(db, child1), before + 5);
+});
+
+test('Wechselt die Zuweisung zwischen Erledigen und Wiederöffnen, trifft die Gegenbuchung den Empfänger (#1607)', () => {
+  db.prepare('INSERT OR IGNORE INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(child2);
+  const b1 = getBalance(db, child1);
+  const b2 = getBalance(db, child2);
+  const taskId = makeTask(12, [child1]);
+  syncTaskRewards(db, taskId, 'open', 'done', admin);
+  db.prepare('UPDATE task_assignments SET user_id = ? WHERE task_id = ?').run(child2, taskId);
+  syncTaskRewards(db, taskId, 'done', 'open', admin);
+  assert.equal(getBalance(db, child1), b1, 'child1 hatte die Punkte und gibt sie zurück');
+  assert.equal(getBalance(db, child2), b2, 'child2 hatte nie welche');
+  db.prepare('DELETE FROM reward_participants WHERE user_id = ?').run(child2);
+});
+
 test('Ohne Zuweisung erhält die handelnde Person (Kiosk)', () => {
   const before = getBalance(db, child1);
   const taskId = makeTask(15, []);

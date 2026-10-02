@@ -823,10 +823,24 @@ router.get('/', (req, res) => {
         : 0;
     // Wer selbst sammelt, sieht seine letzten Gutschriften - verdient oder
     // geschenkt. Einloesungen und Rueckbuchungen sind kein "verdient".
+    //
+    // UND EINE ZURUECKGENOMMENE GUTSCHRIFT AUCH NICHT (#1607). Seit das
+    // Wiederoeffnen gegenbucht statt zu loeschen, bleibt die earn-Zeile im
+    // Ledger stehen. Hier stuende sie sonst weiter als "zuletzt verdient",
+    // obwohl die Aufgabe wieder offen ist - der vollstaendige Verlauf mit
+    // beiden Zeilen gehoert auf die Belohnungsseite, diese Liste zeigt nur,
+    // was gilt. Eine Gegenbuchung nimmt alles zurueck, was bis zu ihr fuer die
+    // Aufgabe gebucht war: jede earn-Zeile mit einer SPAETEREN Gegenbuchung
+    // derselben Aufgabe faellt deshalb heraus, eine danach neu vergebene bleibt.
     const ownRecent = own && (view === 'self' || members.length === 1)
       ? d.prepare(`
-          SELECT delta, type, reason, created_at FROM reward_ledger
+          SELECT delta, type, reason, created_at FROM reward_ledger l
           WHERE user_id = ? AND delta > 0 AND type IN ('earn', 'bonus')
+            AND NOT EXISTS (
+              SELECT 1 FROM reward_ledger r
+              WHERE r.type = 'reversal' AND r.task_id = l.task_id
+                AND r.user_id = l.user_id AND r.id > l.id
+            )
           ORDER BY created_at DESC, id DESC
           LIMIT 3
         `).all(userId)

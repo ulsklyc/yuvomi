@@ -415,3 +415,98 @@ test('Belohnungen mobil: Punktestand als Zeile mit Trailing-Kapsel, Anfrage mit 
   assert.match(mobil('.rw-pending'), /grid-template-columns:\s*auto\s+minmax\(0,\s*1fr\)/, 'Avatar und Titel in einer Zeile');
   assert.match(mobil('.rw-pending__actions'), /grid-column:\s*2/, 'die Knoepfe stehen unter dem Titel, nicht unter dem Avatar');
 });
+
+// --------------------------------------------------------
+// Negativer Punktestand (#1607)
+//
+// Seit das Wiederoeffnen einer Aufgabe gegenbucht statt die Gutschrift zu
+// loeschen, ist ein Saldo unter null ein gewoehnlicher Zustand: die Punkte der
+// wieder geoeffneten Aufgabe stecken schon in einer Praemie. Drei Dinge duerfen
+// dann nicht passieren - kein NaN, kein Balken unter null, kein Minus ohne
+// einen Satz, der es erklaert.
+// --------------------------------------------------------
+
+const lesbar = (html) => html.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+
+test('Server: eine zurueckgenommene Gutschrift steht nicht mehr unter "zuletzt verdient" (#1607)', async () => {
+  const kid = user('rw-mia', 'Mia', 'member');
+  d.prepare('INSERT INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(kid);
+  const task = d.prepare("INSERT INTO tasks (title, status, created_by, points) VALUES ('Muell', 'open', ?, 60)").run(PARENT).lastInsertRowid;
+  const book = d.prepare('INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, created_at) VALUES (?, ?, ?, ?, ?, ?)');
+  book.run(kid, 60, 'earn', 'Muell', task, '2026-09-22T08:00:00Z');
+  book.run(kid, -50, 'redeem', 'Eis', null, '2026-09-22T09:00:00Z');
+  book.run(kid, -60, 'reversal', 'Muell', task, '2026-09-22T10:00:00Z');
+
+  const zurueckgenommen = (await dashboardAs(kid, 'member')).rewards;
+  assert.equal(zurueckgenommen.standings[0].balance, -50, 'der Saldo geht unveraendert als Zahl hinaus');
+  assert.deepEqual(zurueckgenommen.recent, [], 'die Aufgabe ist wieder offen - verdient ist hier nichts');
+
+  // Erneut erledigt: die NEUE Gutschrift gilt, die alte bleibt zurueckgenommen.
+  book.run(kid, 60, 'earn', 'Muell', task, '2026-09-22T11:00:00Z');
+  const neu = (await dashboardAs(kid, 'member')).rewards;
+  assert.deepEqual(neu.recent.map((r) => r.created_at), ['2026-09-22T11:00:00Z']);
+
+  d.prepare('DELETE FROM reward_participants WHERE user_id = ?').run(kid);
+});
+
+test('Widget: ein Minus traegt seinen Satz, der Balken steht bei null (#1607)', () => {
+  for (const [view, size] of [['self', '1x2'], ['approver', '2x2'], ['family', '2x2']]) {
+    const html = renderRewardsWidget({
+      view, me: 7, standings: [emma(-50)], participantCount: 1, pending: 0, catalog: [KINO], recent: [],
+    }, size);
+    assert.doesNotMatch(html, /NaN|undefined/, `${view}: keine kaputte Zahl`);
+    assert.equal(progressValue(html), 0, `${view}: der Balken steht bei null`);
+    assert.match(html, /--rewards-progress:0[;"]/, `${view}: keine negative Breite`);
+    assert.match(html, /aria-valuetext="rewards\.balanceBelowZero"/, `${view}: die Ansage erklaert das Minus`);
+    assert.doesNotMatch(html, /remainingToReward/, `${view}: "noch 110 bis Kinoabend" erklaerte die Zahl nicht`);
+  }
+  // Auch ohne eine einzige Praemie: der Satz haengt nicht am Katalog.
+  const ohne = renderRewardsWidget({ view: 'self', me: 7, standings: [emma(-50)], catalog: [], recent: [] }, '1x2');
+  assert.match(ohne, /rewards\.balanceBelowZero/);
+  assert.doesNotMatch(ohne, /rewards\.noRewardsYet/);
+});
+
+test('Belohnungsseite: Punktestandzeile, Anfrage und Verlauf erklaeren das Minus (#1607)', () => {
+  const s = rewardsPage.state;
+  const vorher = { user: s.user, overview: s.overview, catalog: s.catalog, redemptions: s.redemptions, prevBalances: s.prevBalances };
+  const mia = { id: 3, display_name: 'Mia', avatar_color: '#34C759', balance: -50 };
+  const tom = { id: 4, display_name: 'Tom', avatar_color: '#FF9500', balance: 20 };
+  try {
+    s.user = { role: 'admin' };
+    s.overview = { me: 1, balances: [mia, tom] };
+    s.catalog = [{ id: 11, name: 'Kinoabend', cost: 60, is_active: 1, remaining: null }];
+    s.prevBalances = new Map();
+    s.redemptions = [
+      { id: 1, user_id: 3, user_name: 'Mia', reward_name: 'Eis', cost: 50 },
+      { id: 2, user_id: 4, user_name: 'Tom', reward_name: 'Eis', cost: 50 },
+    ];
+
+    const zeile = lesbar(rewardsPage.renderStandingRow(mia));
+    assert.doesNotMatch(zeile, /NaN|undefined/);
+    assert.match(zeile, /aria-valuenow="0"/);
+    assert.match(zeile, /--rw-progress:0"/, 'keine negative Balkenbreite');
+    assert.match(zeile, /rw-progress__label[^>]*>rewards\.balanceBelowZero</, 'der sichtbare Satz erklaert das Minus');
+    assert.match(lesbar(rewardsPage.renderStandingRow(tom)), /rewards\.remainingToReward/, 'ein Saldo ueber null bleibt unveraendert');
+
+    // Ohne Katalog stand dort "noch keine Praemien" - neben einer -50.
+    s.catalog = [];
+    assert.match(lesbar(rewardsPage.renderStandingRow(mia)), /rewards\.balanceBelowZero/);
+
+    // Der Hinweis neben der offenen Anfrage: nur fuer Entscheidende, nur bei wem er zutrifft.
+    const anfragen = lesbar(rewardsPage.renderPendingPanel());
+    const hinweise = anfragen.match(/rewards\.pendingBalanceBelowZero\{[^}]*\}/g) || [];
+    assert.equal(hinweise.length, 1, 'Mia ist im Minus, Tom nicht');
+    assert.match(hinweise[0], /"points":"-50"/);
+    assert.match(anfragen, /data-decide="fulfill" data-id="1"/, 'ein Hinweis, keine Sperre: freigeben bleibt moeglich');
+    s.user = { role: 'member' };
+    assert.doesNotMatch(lesbar(rewardsPage.renderPendingPanel()), /pendingBalanceBelowZero/, 'das Kind liest seinen Stand in der eigenen Zeile');
+
+    // Verlauf: die Gegenbuchung sagt, was geschah - die Einloese-Rueckbuchung bleibt, wie sie war.
+    assert.equal(lesbar(rewardsPage.ledgerReason({ type: 'reversal', delta: -60, reason: 'Muell' })), 'rewards.ledgerTaskReopenedNamed{"task":"Muell"}');
+    assert.equal(rewardsPage.ledgerReason({ type: 'reversal', delta: -60, reason: null }), 'rewards.ledgerTaskReopened');
+    assert.equal(rewardsPage.ledgerReason({ type: 'reversal', delta: 50, reason: 'Eis' }), 'Eis');
+    assert.equal(rewardsPage.ledgerReason({ type: 'earn', delta: 60, reason: 'Muell' }), 'Muell');
+  } finally {
+    Object.assign(s, vorher);
+  }
+});
