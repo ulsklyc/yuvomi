@@ -317,17 +317,17 @@ test('P2d: die Summe der Standard-Aufteilung einer Gruppe ebenfalls', () => {
   });
 });
 
-test('Server-Fakten zu Genau-Anteilen: 0 lehnt er ab, einen negativen Anteil nimmt er an', async () => {
+test('Server-Fakten zu Genau-Anteilen: 0 und negativ lehnt er ab', async () => {
   // Daran haengt die Client-Regel darunter: sie darf nie nachsichtiger sein als
-  // der Server (0) und muss den Fall fangen, den er durchlaesst (negativ).
+  // der Server. Ueber die Routen haelt das test:split-expenses-routes.
   const { buildSplits } = await import('../server/services/split-expenses.js');
   const genau = (a, b) => buildSplits({
     method: 'exact', amountMinor: 1000, currency: 'EUR', participants: [1, 3],
     splits: [{ user_id: 1, amount: a }, { user_id: 3, amount: b }],
   });
   assert.throws(() => genau('0', '10'), /split amount must be greater than zero/);
-  assert.deepEqual(genau('-5', '15').map((r) => r.amount_minor), [-500, 1500],
-    'der Server speichert den negativen Anteil - die Summe stimmt ja');
+  assert.throws(() => genau('-5', '15'), /split amount must be greater than zero/);
+  assert.deepEqual(genau('4', '6').map((r) => r.amount_minor), [400, 600]);
 });
 
 test('Genau-Anteile: negativ, 0 und leer bleiben am Feld, auch wenn die Summe stimmt', async () => {

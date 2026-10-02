@@ -16,6 +16,11 @@ function testMoneyParsing() {
   assert.equal(service.minorToDecimal(-505, 'EUR'), '-5.05');
   assert.throws(() => service.parseMoneyToMinor(12.34, 'EUR'), /decimal string/);
   assert.throws(() => service.parseMoneyToMinor('1.234', 'EUR'), /too many decimal/);
+  // Kein Aufrufer hat einen negativen Betrag: Ausgabe, Anteil und Zahlung liegen
+  // in Spalten mit CHECK(> 0) bzw. CHECK(>= 0). "-0" ist dieselbe Null wie "0".
+  for (const wert of ['0', '0.00', '-0', '-0.00', '-5', '-0.01']) {
+    assert.throws(() => service.parseMoneyToMinor(wert, 'EUR'), /amount must be greater than zero/, wert);
+  }
 }
 
 function testSplitAllocation() {

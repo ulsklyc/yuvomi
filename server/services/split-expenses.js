@@ -35,18 +35,19 @@ function parseMoneyToMinor(value, currency = 'EUR', field = 'amount') {
   const scale = minorUnit(currency);
   const re = /^-?\d+(\.\d+)?$/;
   if (!re.test(raw)) throw new Error(`${field} must be a valid decimal string.`);
-  const negative = raw.startsWith('-');
-  const unsigned = negative ? raw.slice(1) : raw;
-  const [whole, fraction = ''] = unsigned.split('.');
+  // Kein Aufrufer hat einen negativen Betrag: Ausgabe, Anteil und Zahlung liegen
+  // in Spalten mit CHECK(> 0) bzw. CHECK(>= 0), eine Erstattung ist ein Storno
+  // und keine negative Buchung. Bis #1607 liess diese Funktion ein Minus durch
+  // und ueberliess die Ablehnung dem Schema - die Antwort war dann der rohe
+  // SQLite-Text, und "-0" kam als Anteil 0 an der Null-Pruefung vorbei.
+  if (raw.startsWith('-')) throw new Error(`${field} must be greater than zero.`);
+  const [whole, fraction = ''] = raw.split('.');
   if (fraction.length > scale) throw new Error(`${field} has too many decimal places for ${currency}.`);
   const padded = fraction.padEnd(scale, '0');
   const minor = BigInt(whole) * (10n ** BigInt(scale)) + BigInt(padded || '0');
-  if (minor <= 0n && !negative) throw new Error(`${field} must be greater than zero.`);
-  const signed = negative ? -minor : minor;
-  if (signed > BigInt(Number.MAX_SAFE_INTEGER) || signed < BigInt(Number.MIN_SAFE_INTEGER)) {
-    throw new Error(`${field} is too large.`);
-  }
-  return Number(signed);
+  if (minor <= 0n) throw new Error(`${field} must be greater than zero.`);
+  if (minor > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error(`${field} is too large.`);
+  return Number(minor);
 }
 
 function minorToDecimal(value, currency = 'EUR') {

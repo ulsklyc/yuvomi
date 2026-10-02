@@ -1643,9 +1643,9 @@ function openExpenseModal(expense = null, prefill = null) {
           { original: isEdit ? expense.amount : null, originalCurrency: isEdit ? expense.currency : null })) return;
         // Auch die Genau-Beträge: sie sind Geld in derselben Währung. Jeder
         // Anteil eines angehakten Mitglieds muss groesser als 0 sein, auch wenn
-        // die Summe stimmt: der Server lehnt eine 0 ab (parseMoneyToMinor) und
-        // NIMMT einen negativen Anteil an - "-5 und 15" ergaebe eine gespeicherte
-        // Ausgabe mit falschen Salden. Wer nichts traegt, wird abgehakt.
+        // die Summe stimmt ("-5 und 15"): der Server lehnt 0 und negative
+        // Anteile ab (parseMoneyToMinor), und die Antwort kaeme englisch und
+        // ortlos zurueck. Wer nichts traegt, wird abgehakt.
         if (form.querySelector('[name="split_method"]')?.value === 'exact') {
           for (const field of form.querySelectorAll('.split-split-value')) {
             if (field.hidden || field.disabled) continue;
