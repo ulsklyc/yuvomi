@@ -581,6 +581,8 @@
         "checkConflict": "A tarefa foi alterada entretanto. Abra-a novamente.",
         "doneByPick": "Quem fez “{{title}}”?",
         "doneByToast": "Feito por {{name}}.",
+        "seriesDoneToast": "Feito - próxima vez: {{date}}",
+        "seriesDoneByToast": "Feito por {{name}} - próxima vez: {{date}}",
         "historyTickedBy": "assinalado por {{name}}",
         "reminderLockedNeedsDueDate": "Esta tarefa tem um lembrete que não pode alterar. Por isso precisa de uma data de vencimento.",
         "kanbanColCollapse": "Recolher coluna",

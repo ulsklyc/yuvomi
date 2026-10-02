@@ -595,6 +595,8 @@
         "checkConflict": "وظیفه در این میان تغییر کرده است. لطفاً دوباره آن را باز کنید.",
         "doneByPick": "چه کسی «{{title}}» را انجام داد؟",
         "doneByToast": "انجام‌شده توسط {{name}}.",
+        "seriesDoneToast": "انجام شد - دفعهٔ بعد: {{date}}",
+        "seriesDoneByToast": "انجام‌شده توسط {{name}} - دفعهٔ بعد: {{date}}",
         "historyTickedBy": "علامت‌زده توسط {{name}}",
         "reminderLockedNeedsDueDate": "این کار یادآوری دارد که اجازه تغییر آن را ندارید. بنابراین به تاریخ سرسید نیاز دارد.",
         "kanbanColCollapse": "جمع کردن ستون",

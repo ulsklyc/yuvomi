@@ -785,3 +785,90 @@ test('"ab Erledigung" behaelt sein Intervall, auch mit BYMONTHDAY=-1 (#960)', ()
     completedOn: '2026-02-02', fromCompletion: false,
   }), '2026-02-28');
 });
+
+// --------------------------------------------------------
+// Die Antwort nennt, wann es weitergeht (#1603)
+// --------------------------------------------------------
+// Wer eine Serie abhakt, sah danach eine gleich aussehende offene Zeile und
+// hielt den Haken fuer verschluckt. Die Oberflaeche kann nur sagen, wann es
+// weitergeht, wenn die Antwort es traegt - die Folgeinstanz entsteht ja erst
+// in dieser Anfrage.
+test('PATCH done: die Antwort traegt die Faelligkeit der Folgeinstanz', async () => {
+  const id = insertTask({
+    title: 'Blumen giessen', status: 'open', due_date: dayKey(0), created_by: uid,
+    is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY',
+  });
+  const res = await call('PATCH', `/${id}/status`, { status: 'done' });
+  assert.equal(res.status, 200);
+  const followup = openInstances('Blumen giessen')[0];
+  assert.ok(followup, 'Abhaken muss eine Folgeinstanz erzeugt haben');
+  assert.equal(res.body.data.next_due_date, followup.due_date);
+  assert.equal(res.body.data.next_due_date, dayKey(7));
+  // Additiv: die zugesagten Felder stehen unveraendert daneben.
+  assert.equal(res.body.data.id, Number(id));
+  assert.equal(res.body.data.status, 'done');
+  assert.ok('archived_at' in res.body.data);
+});
+
+test('PATCH done: "ab Erledigung" nennt den Tag ab heute, nicht die alte Faelligkeit', async () => {
+  // Der Fall aus dem Ticket: morgen faellig, heute abgehakt. Die Folgeinstanz
+  // rechnet ab heute - bei taeglicher Wiederholung also wieder morgen, und die
+  // neue Zeile sieht aus wie die alte.
+  const id = insertTask({
+    title: 'Zimmer aufraeumen', status: 'open', due_date: dayKey(1), created_by: uid,
+    is_recurring: 1, recurrence_rule: 'FREQ=DAILY', recurrence_from_completion: 1,
+  });
+  const res = await call('PATCH', `/${id}/status`, { status: 'done' });
+  assert.equal(res.body.data.next_due_date, dayKey(1));
+});
+
+test('PATCH: ohne Serie, ohne Uebergang und beim Zuruecknehmen steht next_due_date auf null', async () => {
+  const einmalig = insertTask({ title: 'Einmal', status: 'open', due_date: dayKey(0), created_by: uid });
+  const einmal = await call('PATCH', `/${einmalig}/status`, { status: 'done' });
+  assert.equal(einmal.body.data.next_due_date, null);
+
+  const serie = insertTask({
+    title: 'Altpapier', status: 'open', due_date: dayKey(0), created_by: uid,
+    is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY',
+  });
+  const gestartet = await call('PATCH', `/${serie}/status`, { status: 'in_progress' });
+  assert.equal(gestartet.body.data.next_due_date, null, 'Starten ist kein Erledigen');
+  const erledigt = await call('PATCH', `/${serie}/status`, { status: 'done' });
+  assert.equal(erledigt.body.data.next_due_date, dayKey(7));
+  // Kein Uebergang, also auch keine Quittung: sonst kaeme der Hinweis bei jedem
+  // doppelten Tipp noch einmal.
+  const doppelt = await call('PATCH', `/${serie}/status`, { status: 'done' });
+  assert.equal(doppelt.body.data.next_due_date, null);
+  const zurueck = await call('PATCH', `/${serie}/status`, { status: 'open' });
+  assert.equal(zurueck.body.data.next_due_date, null);
+});
+
+test('PATCH done: eine Serie, die zu Ende ist, nennt kein naechstes Mal', async () => {
+  const until = dayKey(1).replace(/-/g, '');
+  const id = insertTask({
+    title: 'Letzte Runde', status: 'open', due_date: dayKey(0), created_by: uid,
+    is_recurring: 1, recurrence_rule: `FREQ=WEEKLY;UNTIL=${until}`,
+  });
+  const res = await call('PATCH', `/${id}/status`, { status: 'done' });
+  assert.equal(res.status, 200);
+  assert.equal(openInstances('Letzte Runde').length, 0);
+  assert.equal(res.body.data.next_due_date, null);
+});
+
+test('PATCH done: bleibt eine bearbeitete Folgeinstanz stehen, nennt der zweite Haken sie', async () => {
+  // Das Zuruecknehmen laesst eine Folgeinstanz stehen, an der jemand
+  // gearbeitet hat. Der naechste Haken legt dann keine neue an - das naechste
+  // Mal gibt es trotzdem, und es ist diese.
+  const first = await completeRecurring('Regenrinne leeren', 'FREQ=WEEKLY');
+  const second = openInstances('Regenrinne leeren')[0];
+  insertTask({ title: 'Rahmen', status: 'open', created_by: uid, parent_task_id: second.id });
+  await call('PATCH', `/${first}/status`, { status: 'open' });
+  assert.ok(db.prepare('SELECT id FROM tasks WHERE id = ?').get(second.id), 'die Folgeinstanz blieb stehen');
+
+  const res = await call('PATCH', `/${first}/status`, { status: 'done' });
+  assert.equal(res.body.data.next_due_date, second.due_date);
+  assert.equal(
+    db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE title = 'Regenrinne leeren'`).get().n, 2,
+    'und es ist keine zweite entstanden',
+  );
+});

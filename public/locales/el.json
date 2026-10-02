@@ -581,6 +581,8 @@
         "checkConflict": "Η εργασία άλλαξε στο μεταξύ. Ανοίξτε την ξανά.",
         "doneByPick": "Ποιος έκανε το «{{title}}»;",
         "doneByToast": "Το έκανε ο/η {{name}}.",
+        "seriesDoneToast": "Έγινε - επόμενη φορά: {{date}}",
+        "seriesDoneByToast": "Το έκανε ο/η {{name}} - επόμενη φορά: {{date}}",
         "historyTickedBy": "τσεκαρίστηκε από {{name}}",
         "reminderLockedNeedsDueDate": "Αυτή η εργασία έχει μια υπενθύμιση που δεν επιτρέπεται να αλλάξετε. Χρειάζεται επομένως ημερομηνία λήξης.",
         "kanbanColCollapse": "Σύμπτυξη στήλης",

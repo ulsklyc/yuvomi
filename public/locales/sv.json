@@ -581,6 +581,8 @@
         "checkConflict": "Uppgiften har ändrats under tiden. Öppna den igen.",
         "doneByPick": "Vem gjorde ”{{title}}”?",
         "doneByToast": "Gjord av {{name}}.",
+        "seriesDoneToast": "Klar - nästa gång: {{date}}",
+        "seriesDoneByToast": "Gjord av {{name}} - nästa gång: {{date}}",
         "historyTickedBy": "bockad av {{name}}",
         "reminderLockedNeedsDueDate": "Den här uppgiften har en påminnelse som du inte får ändra. Därför behövs ett slutdatum.",
         "kanbanColCollapse": "Fäll ihop kolumnen",

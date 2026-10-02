@@ -255,3 +255,41 @@ export function formatDueDate(dateStr, timeStr, isDone = false) {
   }
   return { label: fullLabel, cls: '' };
 }
+
+// --------------------------------------------------------
+// Quittung nach dem Abhaken einer Serie (#1603)
+// --------------------------------------------------------
+
+/**
+ * Der Text, der nach einem bestaetigten Abhaken sagt, wann es weitergeht -
+ * oder null, wenn dieser Haken keine Serie fortgeschrieben hat.
+ *
+ * WARUM ES IHN GIBT: der Server legt beim Erledigen einer wiederkehrenden
+ * Aufgabe sofort die naechste an. Die Ansicht laedt neu und zeigt eine offene
+ * Zeile, die aussieht wie die eben abgehakte - bei „ab Erledigung wiederholen"
+ * sogar mit demselben Datum. Der Haken war gebucht, es sah nur aus wie ein
+ * verschluckter Tipp.
+ *
+ * EIN HELFER FUER ALLE WEGE (Detailansicht, Haken, Wisch, Personenwahl, Brett,
+ * Wandtablett): jeder reicht die Antwort von PATCH /tasks/:id/status herein
+ * und nimmt mit `?? t(...)` seinen bisherigen Text, wenn es keine Serie war.
+ * So bleibt es je Haken bei EINEM Toast - mit `name` sagt derselbe Satz auch,
+ * wer es erledigt hat, statt dass zwei Meldungen uebereinander stehen.
+ *
+ * DAS DATUM kommt aus `formatDueDate` und damit aus den Formatierern der
+ * Einstellung und der Uhr des Haushalts: Tag und Monat, das Jahr nur, wo es
+ * etwas unterscheidet. `isDone = true` waehlt die neutrale Form - „Ueberfaellig"
+ * oder „Heute faellig" gehoeren an die Zeile, nicht in diesen Satz.
+ *
+ * @param {{ data?: { next_due_date?: string|null } | null } | null | undefined} response
+ * @param {{ name?: string }} [who] die benannte Person (#1205), falls es eine gibt
+ * @returns {string|null}
+ */
+export function seriesDoneText(response, { name } = {}) {
+  const next = response?.data?.next_due_date;
+  const due = next ? formatDueDate(next, null, true) : null;
+  if (!due) return null;
+  return name
+    ? t('tasks.seriesDoneByToast', { name, date: due.label })
+    : t('tasks.seriesDoneToast', { date: due.label });
+}

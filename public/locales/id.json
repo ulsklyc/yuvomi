@@ -595,6 +595,8 @@
         "checkConflict": "Tugas telah berubah sementara itu. Silakan buka kembali.",
         "doneByPick": "Siapa yang mengerjakan “{{title}}”?",
         "doneByToast": "Dikerjakan oleh {{name}}.",
+        "seriesDoneToast": "Selesai - berikutnya: {{date}}",
+        "seriesDoneByToast": "Dikerjakan oleh {{name}} - berikutnya: {{date}}",
         "historyTickedBy": "dicentang oleh {{name}}",
         "reminderLockedNeedsDueDate": "Tugas ini memiliki pengingat yang tidak boleh Anda ubah. Karena itu tugas ini memerlukan tanggal jatuh tempo.",
         "kanbanColCollapse": "Ciutkan kolom",

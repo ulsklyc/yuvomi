@@ -581,6 +581,8 @@
         "checkConflict": "La tarea ha cambiado mientras tanto. Vuelve a abrirla.",
         "doneByPick": "¿Quién hizo «{{title}}»?",
         "doneByToast": "Hecho por {{name}}.",
+        "seriesDoneToast": "Hecho - próxima vez: {{date}}",
+        "seriesDoneByToast": "Hecho por {{name}} - próxima vez: {{date}}",
         "historyTickedBy": "marcado por {{name}}",
         "reminderLockedNeedsDueDate": "Esta tarea tiene un recordatorio que no puedes cambiar. Por eso necesita una fecha de vencimiento.",
         "kanbanColCollapse": "Contraer columna",

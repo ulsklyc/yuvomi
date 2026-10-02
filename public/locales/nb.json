@@ -581,6 +581,8 @@
         "checkConflict": "Oppgaven har endret seg i mellomtiden. Vennligst åpne den på nytt.",
         "doneByPick": "Hvem gjorde «{{title}}»?",
         "doneByToast": "Fullført av {{name}}.",
+        "seriesDoneToast": "Fullført - neste gang: {{date}}",
+        "seriesDoneByToast": "Fullført av {{name}} - neste gang: {{date}}",
         "historyTickedBy": "krysset av av {{name}}",
         "reminderLockedNeedsDueDate": "Denne oppgaven har en påminnelse du ikke har tillatelse til å endre. Den trenger derfor en frist.",
         "kanbanColCollapse": "Skjul kolonne",

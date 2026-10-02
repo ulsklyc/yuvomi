@@ -581,6 +581,8 @@
         "checkConflict": "The task has changed in the meantime. Please open it again.",
         "doneByPick": "Who did “{{title}}”?",
         "doneByToast": "Done by {{name}}.",
+        "seriesDoneToast": "Done - next due {{date}}",
+        "seriesDoneByToast": "Done by {{name}} - next due {{date}}",
         "historyTickedBy": "ticked off by {{name}}",
         "reminderLockedNeedsDueDate": "This task has a reminder you are not allowed to change. It therefore needs a due date.",
         "kanbanColCollapse": "Collapse column",

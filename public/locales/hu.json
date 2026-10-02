@@ -581,6 +581,8 @@
         "checkConflict": "A feladat időközben megváltozott. Nyissa meg újra.",
         "doneByPick": "Ki végezte el ezt: „{{title}}”?",
         "doneByToast": "Elvégezte: {{name}}.",
+        "seriesDoneToast": "Kész - legközelebb: {{date}}",
+        "seriesDoneByToast": "Elvégezte: {{name}} - legközelebb: {{date}}",
         "historyTickedBy": "kipipálta: {{name}}",
         "reminderLockedNeedsDueDate": "Ehhez a feladathoz emlékeztető tartozik, amelyet nem módosíthatsz. Ezért határidőre van szüksége.",
         "kanbanColCollapse": "Oszlop összecsukása",

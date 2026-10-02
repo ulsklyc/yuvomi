@@ -581,6 +581,8 @@
         "checkConflict": "Görev bu arada değişti. Lütfen yeniden açın.",
         "doneByPick": "“{{title}}” görevini kim yaptı?",
         "doneByToast": "{{name}} yaptı.",
+        "seriesDoneToast": "Tamamlandı - sıradaki: {{date}}",
+        "seriesDoneByToast": "{{name}} yaptı - sıradaki: {{date}}",
         "historyTickedBy": "işaretleyen: {{name}}",
         "reminderLockedNeedsDueDate": "Bu görevde değiştirmenize izin verilmeyen bir hatırlatıcı var. Bu nedenle bir bitiş tarihi gerekiyor.",
         "kanbanColCollapse": "Sütunu daralt",

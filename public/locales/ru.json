@@ -677,6 +677,8 @@
         "checkConflict": "Задача была изменена. Откройте её заново.",
         "doneByPick": "Кто выполнил «{{title}}»?",
         "doneByToast": "Выполнил(а) {{name}}.",
+        "seriesDoneToast": "Выполнено - следующий раз: {{date}}",
+        "seriesDoneByToast": "Выполнил(а) {{name}} - следующий раз: {{date}}",
         "historyTickedBy": "отметил(а) {{name}}",
         "reminderLockedNeedsDueDate": "У этой задачи есть напоминание, которое вы не можете изменить. Поэтому ей нужен срок выполнения.",
         "kanbanColCollapse": "Свернуть столбец",

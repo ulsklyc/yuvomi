@@ -581,6 +581,8 @@
         "checkConflict": "De taak is intussen gewijzigd. Open deze opnieuw.",
         "doneByPick": "Wie heeft “{{title}}” gedaan?",
         "doneByToast": "Gedaan door {{name}}.",
+        "seriesDoneToast": "Gedaan - volgende keer: {{date}}",
+        "seriesDoneByToast": "Gedaan door {{name}} - volgende keer: {{date}}",
         "historyTickedBy": "afgevinkt door {{name}}",
         "reminderLockedNeedsDueDate": "Deze taak heeft een herinnering die je niet mag wijzigen. Daarom is een einddatum nodig.",
         "kanbanColCollapse": "Kolom inklappen",

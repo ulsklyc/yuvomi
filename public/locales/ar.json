@@ -725,6 +725,8 @@
         "checkConflict": "تم تغيير المهمة في هذه الأثناء. يرجى فتحها من جديد.",
         "doneByPick": "مَن أنجز ”{{title}}“؟",
         "doneByToast": "أنجزها {{name}}.",
+        "seriesDoneToast": "تم الإنجاز - المرة القادمة: {{date}}",
+        "seriesDoneByToast": "أنجزها {{name}} - المرة القادمة: {{date}}",
         "historyTickedBy": "وضع العلامة {{name}}",
         "reminderLockedNeedsDueDate": "هذه المهمة لديها تذكير لا يمكنك تغييره. لذلك تحتاج إلى تاريخ استحقاق.",
         "kanbanColCollapse": "طيّ العمود",

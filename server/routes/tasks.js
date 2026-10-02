@@ -1596,8 +1596,14 @@ function spawnRecurrenceFollowup(task) {
 // Status einer Aufgabe schnell wechseln (z.B. Swipe-Geste / Checkbox).
 // Body: { status: 'open' | 'in_progress' | 'done' | 'archived',
 //         done_by_user_id?: number|null }
-// Response: { data: { id, status, archived_at } }
+// Response: { data: { id, status, archived_at, next_due_date } }
 // 'archived' legt die Aufgabe ab, ohne ihren Status anzufassen (#688).
+//
+// `next_due_date` (#1603) ist die Faelligkeit der Folgeinstanz, wenn dieser
+// Wechsel eine Serie erledigt hat und es danach ein offenes naechstes
+// Vorkommen gibt - sonst null. Die Oberflaeche kann nur daran sagen, WANN es
+// weitergeht: die neue Zeile sieht aus wie die eben abgehakte, und ohne den
+// Hinweis wirkte der Haken wie verschluckt.
 //
 // `done_by_user_id` benennt, WER die Aufgabe erledigt hat (#1205) - wer
 // abgehakt hat, steht ohnehin fest und kommt weiter aus der Sitzung. Ohne
@@ -1734,6 +1740,7 @@ router.patch('/:id/status', (req, res) => {
     let pending = false;
     let undone  = 0;
     let spawned = false;
+    let nextDueDate = null;
     db.get().transaction(() => {
       db.get().prepare('UPDATE tasks SET status = ? WHERE id = ?').run(status, req.params.id);
       pending = markTodoOutbound('tasks', prev, { ...prev, status });
@@ -1755,10 +1762,25 @@ router.patch('/:id/status', (req, res) => {
       // Wiederkehrende Aufgabe: nächste Instanz erstellen wenn erledigt
       if (status === 'done' && prev.status !== 'done') {
         spawned = spawnRecurrenceFollowup(db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id));
+        // NACHGELESEN, nicht aus dem Rueckgabewert: der sagt nur, ob ein
+        // Upload ansteht. Gefragt ist, was nach diesem Haken als Naechstes
+        // offen dasteht - das ist auch die Folgeinstanz, die ein frueheres
+        // Abhaken angelegt hat und die das Zuruecknehmen stehen liess, weil
+        // jemand an ihr gearbeitet hatte (discardRecurrenceFollowup). Eine
+        // erledigte oder abgelegte ist kein „naechstes Mal".
+        const followup = recurrenceFollowupOf(prev.id);
+        if (followup && followup.status === 'open' && !followup.archived_at) {
+          nextDueDate = followup.due_date ?? null;
+        }
       }
     })();
 
-    res.json({ data: { id: Number(req.params.id), status, archived_at: prev.archived_at } });
+    res.json({
+      data: {
+        id: Number(req.params.id), status, archived_at: prev.archived_at,
+        next_due_date: nextDueDate,
+      },
+    });
 
     if (pending || undone || spawned) pushToCalDAV('Statuswechsel');
   } catch (err) {

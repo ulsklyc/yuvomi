@@ -106,6 +106,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Filipino, which OpenWeatherMap does not offer, uses `OPENWEATHER_LANG` and otherwise English.
   `OPENWEATHER_LANG` is that fallback and takes an OpenWeatherMap code; a code OpenWeatherMap does
   not list is now ignored in favour of English, as the installation guide and `.env.example` say.
+- **Ticking off a recurring task now says when it comes back** (#1603). Completing a recurring
+  task creates its next occurrence at once, so the list, the board and the Overview tile showed
+  an open task that looked just like the one you had ticked off - with "repeat from completion"
+  even with the same date - and the tick seemed to have done nothing. Every way of completing
+  it now answers with "Done - next due <date>": the Complete button and the "who did it" choice
+  in the task view (also when opened from Overview or the calendar), the checkbox, the swipe and
+  the person choice in the list, moving a card to Done on the board, and the wall display. With
+  a named person it is one message that says both. The undo in the list stays. For API clients,
+  `PATCH /api/v1/tasks/{id}/status` additionally returns `next_due_date`, the due date of the
+  next open occurrence or `null`.
 
 ## [2.71.0] - 2026-09-30
 
