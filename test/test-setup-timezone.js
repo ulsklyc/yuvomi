@@ -182,11 +182,12 @@ test('Setup-Seite: ohne brauchbare Browser-Zone fehlt das Feld ganz', async () =
 
 test('Setup-Seite: lehnt der Server die Zone ab, laeuft die Einrichtung ohne sie durch', async () => {
   // Der Browser kann eine Zone kennen, die die ICU-Daten des Servers (noch)
-  // nicht fuehren. Die Route antwortet dann 400 - das darf kein Admin-Konto kosten.
+  // nicht fuehren. Die Route antwortet dann 400 mit `reason: invalid_timezone` -
+  // das darf kein Admin-Konto kosten.
   respond = (path, body) => {
     if (path.endsWith('/auth/setup')) {
       return body.timezone
-        ? { status: 400, body: { error: 'Invalid time zone.', code: 400 } }
+        ? { status: 400, body: { error: 'Invalid time zone.', code: 400, reason: 'invalid_timezone' } }
         : { status: 201, body: { user: { id: 1 } } };
     }
     return { status: 200, body: { user: { id: 1 } } };
@@ -201,15 +202,39 @@ test('Setup-Seite: lehnt der Server die Zone ab, laeuft die Einrichtung ohne sie
   assert.equal(errorEl.hidden, true);
 });
 
-test('Setup-Seite: ein 400 aus anderem Grund bleibt die Antwort', async () => {
+test('Setup-Seite: ein 400 aus anderem Grund loest genau EINE Anfrage aus', async () => {
+  // Setup haengt am Login-Limiter (fuenf Fehlversuche je Minute), und jedes 400
+  // zaehlt. Eine Wiederholung bei JEDEM 400 kostete je Fehleingabe zwei
+  // Versuche und machte aus der dritten Korrektur ein 429. Wiederholt wird
+  // deshalb nur am maschinenlesbaren Anker, nie am Status allein und nie am
+  // Wortlaut der Meldung.
+  const others = [
+    { error: 'Display name may be at most 128 characters long.', code: 400 },
+    // Derselbe Wortlaut wie die Zonen-Ablehnung, aber ohne Anker: kein Grund.
+    { error: 'Invalid time zone. Expected an IANA zone such as "Europe/Berlin".', code: 400 },
+    { error: 'Unsupported language.', code: 400, reason: 'something_else' },
+  ];
+  for (const payload of others) {
+    respond = (path) => (path.endsWith('/auth/setup')
+      ? { status: 400, body: payload }
+      : { status: 200, body: {} });
+    const { setupCalls, loginCalls, errorEl } = await withBrowserZone('Asia/Seoul', submitSetup);
+    assert.equal(setupCalls.length, 1, `keine Wiederholung bei ${JSON.stringify(payload)}`);
+    assert.equal(setupCalls[0].body.timezone, 'Asia/Seoul');
+    assert.equal(loginCalls.length, 0);
+    assert.equal(navigated.length, 0);
+    assert.equal(errorEl.hidden, false);
+    assert.equal(errorEl.textContent, 'setup.errorGeneric');
+  }
+});
+
+test('Setup-Seite: scheitert auch der Versuch ohne Zone, gibt es keinen dritten', async () => {
   respond = (path) => (path.endsWith('/auth/setup')
-    ? { status: 400, body: { error: 'Username must be 3-64 characters long.', code: 400 } }
+    ? { status: 400, body: { error: 'Invalid time zone.', code: 400, reason: 'invalid_timezone' } }
     : { status: 200, body: {} });
-  const { setupCalls, loginCalls, errorEl } = await withBrowserZone('Asia/Seoul', submitSetup);
-  assert.equal(setupCalls.length, 2, 'genau ein zweiter Versuch, kein dritter');
-  assert.equal(loginCalls.length, 0);
+  const { setupCalls, errorEl } = await withBrowserZone('Asia/Seoul', submitSetup);
+  assert.equal(setupCalls.length, 2);
   assert.equal(navigated.length, 0);
-  assert.equal(errorEl.hidden, false);
   assert.equal(errorEl.textContent, 'setup.errorGeneric');
 });
 

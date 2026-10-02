@@ -67,6 +67,7 @@ test('unsupported language: 400 with the usual error shape, nothing created', as
   const body = await res.json();
   assert.equal(body.code, 400);
   assert.match(body.error, /language/i);
+  assert.equal(Object.hasOwn(body, 'reason'), false, 'only the time zone rejection carries the anchor');
   assert.equal(userCount(), 0);
   assert.equal(cfg('language'), null);
 });
@@ -83,7 +84,12 @@ test('unknown time zone: 400, nothing created', async () => {
   for (const timezone of ['Mars/Olympus', 42, '   ']) {
     const res = await setup({ language: 'de', timezone });
     assert.equal(res.status, 400, `timezone ${JSON.stringify(timezone)} must be rejected`);
-    assert.equal((await res.json()).code, 400);
+    const body = await res.json();
+    assert.equal(body.code, 400);
+    assert.match(body.error, /time zone/i);
+    // Der Anker, an dem die Setup-Seite ihre eine Wiederholung ohne Zone
+    // festmacht - additiv, `error` und `code` bleiben wie sie waren.
+    assert.equal(body.reason, 'invalid_timezone');
   }
   assert.equal(userCount(), 0);
   assert.equal(cfg('language'), null);
