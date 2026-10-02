@@ -345,8 +345,9 @@ function subtaskListNode(task, ctx) {
 /**
  * Die Eingabezeile „Teilaufgabe hinzufügen" an Ort und Stelle (A3 P1-1).
  *
- * Wie in Erinnerungen und Things: der Knopf wird zum Feld, Enter legt an und
- * lässt den Fokus für die nächste Zeile stehen, Escape schließt und gibt den
+ * Wie in Erinnerungen und Things: der Knopf wird zum Feld, Enter oder der
+ * Knopf „Hinzufügen" daneben legt an und lässt den Fokus für die nächste Zeile
+ * stehen, Escape schließt und gibt den
  * Fokus an den Knopf zurück. Enter auf leerem Feld schließt ebenfalls, ein
  * leeres Feld schließt auch, wenn der Fokus es verlässt. Escape bleibt hier:
  * das Blatt, in dem das Feld steht, schließt sonst mit (modal.js hört auf
@@ -379,7 +380,17 @@ function subtaskComposer(task, ctx, { onCreated }) {
   input.enterKeyHint = 'done';
   input.placeholder = t('tasks.subtaskAdd');
   input.setAttribute('aria-label', t('tasks.subtaskAddNamed', { title: task.title }));
-  form.appendChild(input);
+  // DER SICHTBARE WEG (#1598). Das Feld allein verliess sich auf Enter, und
+  // das Blatt verschluckte es: der Focus-Trap von modal.js klickte den ersten
+  // Absende-Knopf des Panels ("Kommentieren"). Auf dem Telefon, wo die Ansicht
+  // immer ein Blatt ist, blieb kein Weg, eine Teilaufgabe anzulegen. Der Knopf
+  // ist der Absender DIESES Formulars - der Trap findet ihn zuerst, und wer
+  // Enter nicht kennt oder keine Taste dafuer hat, tippt ihn an.
+  const submit = document.createElement('button');
+  submit.type = 'submit';
+  submit.className = 'btn btn--secondary detail-subtask-compose__submit';
+  submit.textContent = t('common.add');
+  form.append(input, submit);
 
   let pending = false;
   const open = () => {
@@ -402,6 +413,7 @@ function subtaskComposer(task, ctx, { onCreated }) {
     if (!title) { close(); return; }
     pending = true;
     form.setAttribute('aria-busy', 'true');
+    submit.disabled = true;
     try {
       const created = await addSubtask(task.id, title, ctx);
       if (!created) return;
@@ -411,6 +423,7 @@ function subtaskComposer(task, ctx, { onCreated }) {
     } finally {
       pending = false;
       form.removeAttribute('aria-busy');
+      submit.disabled = false;
       if (!form.hidden) input.focus();
     }
   });

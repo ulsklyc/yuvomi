@@ -222,7 +222,9 @@ export function authPaths() {
         tag: 'Auth',
         auth: false,
         requestBody: jsonBody('#/components/schemas/SetupRequest'),
-        description: 'Unknown body fields are ignored. `language` and `timezone` are optional; servers before they were added ignore them as well.',
+        description: 'Unknown body fields are ignored. `language` and `timezone` are optional; servers before they were added ignore them as well. '
+          + 'A rejected `timezone` answers 400 with `reason: "invalid_timezone"`, so a client can retry without the field; other validation errors carry no `reason`. '
+          + 'Every failed request counts against the login rate limit.',
         responses: {
           201: { description: 'Admin user created' },
           400: { $ref: '#/components/responses/BadRequest' },

@@ -990,6 +990,7 @@
         "iconWeather": "Hava durumu",
         "invalidDate": "Seçili biçimde geçerli bir tarih kullanın.",
         "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz.",
+        "recurrenceEndBeforeStart": "Tekrarın bitişi başlangıç tarihinden önce olamaz.",
         "attachmentLabel": "Ek",
         "attachmentHint": "Görsel, PDF veya belge. Görseller etkinlik ayrıntılarında gösterilir.",
         "attachmentFallback": "Attachment",

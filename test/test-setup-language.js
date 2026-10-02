@@ -28,6 +28,7 @@ const { baseUrl: BASE } = await startTestServer({
   env: { SESSION_SECRET: 'test-setup-language-secret-32-chars-min', RATE_LIMIT_MAX_ATTEMPTS: '1000' },
 });
 const db = await import('../server/db.js');
+const { todayKey, configuredHouseholdTimeZone } = await import('../server/utils/timezone.js');
 
 const BASE_BODY = { username: 'admin', display_name: 'Admin', password: 'password123' };
 
@@ -66,6 +67,7 @@ test('unsupported language: 400 with the usual error shape, nothing created', as
   const body = await res.json();
   assert.equal(body.code, 400);
   assert.match(body.error, /language/i);
+  assert.equal(Object.hasOwn(body, 'reason'), false, 'only the time zone rejection carries the anchor');
   assert.equal(userCount(), 0);
   assert.equal(cfg('language'), null);
 });
@@ -82,7 +84,12 @@ test('unknown time zone: 400, nothing created', async () => {
   for (const timezone of ['Mars/Olympus', 42, '   ']) {
     const res = await setup({ language: 'de', timezone });
     assert.equal(res.status, 400, `timezone ${JSON.stringify(timezone)} must be rejected`);
-    assert.equal((await res.json()).code, 400);
+    const body = await res.json();
+    assert.equal(body.code, 400);
+    assert.match(body.error, /time zone/i);
+    // Der Anker, an dem die Setup-Seite ihre eine Wiederholung ohne Zone
+    // festmacht - additiv, `error` und `code` bleiben wie sie waren.
+    assert.equal(body.reason, 'invalid_timezone');
   }
   assert.equal(userCount(), 0);
   assert.equal(cfg('language'), null);
@@ -99,6 +106,29 @@ test('language + timezone: set the household data language and zone', async () =
   assert.equal(cfg('region'), null);
   assert.equal(cfg('currency'), null);
   assert.equal(cfg('date_format'), null);
+});
+
+test('timezone: the server day follows the zone the setup sent (#1607)', async () => {
+  // 18:30 UTC am 1. ist in Seoul 03:30 am 2. Ohne Haushaltszone liest der
+  // Server den Tag in der Zone des Containers, mit ihr in der des Haushalts -
+  // das ist der Unterschied zwischen "Essen heute" leer und gefuellt.
+  const at = new Date('2026-10-01T18:30:00Z');
+  resetUsers();
+  assert.equal((await setup()).status, 201);
+  assert.equal(configuredHouseholdTimeZone(db.get()), null);
+  const before = todayKey(db.get(), at);
+
+  resetUsers();
+  assert.equal((await setup({ timezone: 'Asia/Seoul' })).status, 201);
+  assert.equal(configuredHouseholdTimeZone(db.get()), 'Asia/Seoul');
+  assert.equal(todayKey(db.get(), at), '2026-10-02');
+
+  resetUsers();
+  assert.equal((await setup({ timezone: 'Pacific/Honolulu' })).status, 201);
+  assert.equal(todayKey(db.get(), at), '2026-10-01');
+  // Ohne Zone haengt die Antwort an der Maschine - nur festhalten, dass sie
+  // einer der beiden Tage ist, die es um diese Zeit auf der Erde gibt.
+  assert.ok(['2026-10-01', '2026-10-02'].includes(before));
 });
 
 test('a language with a subtag-free three-letter code is accepted (fil)', async () => {
