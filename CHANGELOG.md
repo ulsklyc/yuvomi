@@ -121,7 +121,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the person choice in the list, moving a card to Done on the board, and the wall display. With
   a named person it is one message that says both. The undo in the list stays. For API clients,
   `PATCH /api/v1/tasks/{id}/status` additionally returns `next_due_date`, the due date of the
-  next open occurrence or `null`.
+  next occurrence that is not yet done, or `null`.
 
 ## [2.71.0] - 2026-09-30
 

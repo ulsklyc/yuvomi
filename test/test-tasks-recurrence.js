@@ -909,3 +909,40 @@ test('PATCH done: die Suche nach dem naechsten Vorkommen endet auch an einer Ket
   assert.equal(res.status, 200);
   assert.equal(res.body.data.next_due_date, null);
 });
+
+test('PATCH done: eine begonnene Folgeinstanz ist das naechste Mal, nicht uebersprungen', async () => {
+  // „Steht noch an" heisst: nicht erledigt, nicht abgelegt - nicht: Status
+  // genau 'open'. Eine Folgeinstanz, die jemand gestartet hat, bleibt beim
+  // Zuruecknehmen stehen (verworfen wird nur eine unangetastete offene), der
+  // zweite Haken legt deshalb keine neue an, und hinter ihr steht nichts.
+  // Sie zu ueberspringen hiess null zu melden, obwohl sie dasteht (Review zu
+  // #1615).
+  const a = await completeRecurring('Aquarium reinigen', 'FREQ=WEEKLY');
+  const b = openInstances('Aquarium reinigen')[0];
+  await call('PATCH', `/${b.id}/status`, { status: 'in_progress' });
+  await call('PATCH', `/${a}/status`, { status: 'open' });
+  assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get(b.id).status, 'in_progress', 'B blieb stehen');
+
+  const res = await call('PATCH', `/${a}/status`, { status: 'done' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.next_due_date, b.due_date);
+  assert.equal(
+    db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE title = 'Aquarium reinigen'`).get().n, 2,
+    'und es ist keine zweite entstanden',
+  );
+});
+
+test('PATCH done: eine abgelegte Folgeinstanz zaehlt nicht, auch wenn ihr Status offen ist', async () => {
+  // Die Gegenrichtung derselben Regel: Ablegen laesst den Status stehen (#688),
+  // eine abgelegte offene Zeile sieht aber niemand - sie ist kein naechstes Mal.
+  const a = await completeRecurring('Dachboden lueften', 'FREQ=WEEKLY');
+  const b = openInstances('Dachboden lueften')[0];
+  await call('PATCH', `/${b.id}/archive`, { archived: true });
+  // B ist offen und unangetastet - das Zuruecknehmen verwuerfe sie. Der Fall,
+  // der bleibt: sie traegt Arbeit (eine Unteraufgabe) und ist abgelegt.
+  insertTask({ title: 'Leiter holen', status: 'open', created_by: uid, parent_task_id: b.id });
+  await call('PATCH', `/${a}/status`, { status: 'open' });
+  assert.ok(db.prepare('SELECT id FROM tasks WHERE id = ?').get(b.id), 'B blieb stehen');
+  const res = await call('PATCH', `/${a}/status`, { status: 'done' });
+  assert.equal(res.body.data.next_due_date, null);
+});

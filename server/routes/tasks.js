@@ -1385,7 +1385,8 @@ function recurrenceFollowupOf(taskId) {
 }
 
 /**
- * Das naechste OFFENE Vorkommen hinter einer Aufgabe, oder null (#1603).
+ * Das naechste Vorkommen hinter einer Aufgabe, das NOCH ANSTEHT, oder null
+ * (#1603).
  *
  * DIE SERIE IST EINE KETTE, KEIN STERN: `recurrence_origin_id` zeigt auf den
  * direkten Vorgaenger (A <- B <- C), nicht auf eine Stammzeile. Das direkte
@@ -1393,7 +1394,14 @@ function recurrenceFollowupOf(taskId) {
  * nachdem B schon erledigt wurde, behaelt B (discardRecurrenceFollowup wirft
  * erledigte Arbeit nicht weg) - und beim erneuten Abhaken von A ist das
  * naechste Mal C. Erledigte und abgelegte Glieder werden uebersprungen, das
- * erste offene, nicht abgelegte zaehlt.
+ * erste, das noch ansteht, zaehlt.
+ *
+ * „STEHT NOCH AN" HEISST NICHT ERLEDIGT UND NICHT ABGELEGT - nicht: Status
+ * genau 'open'. Gefragt wird ueber die eine Definition von erledigt, die auch
+ * Spawn, Punkte und Verlauf benutzen (`status === 'done'`), statt ueber eine
+ * zweite Liste der Status, die als offen gelten: eine begonnene Folgeinstanz
+ * ('in_progress') ist das naechste Mal, und ein Status, der spaeter zu
+ * REAL_STATUSES dazukommt, faellt hier nicht still durch.
  *
  * DIE SUCHE ENDET IMMER. Der Server baut keinen Kreis, eine wiederhergestellte
  * oder von Hand bearbeitete Datenbank kann einen tragen, und der Treiber ist
@@ -1404,13 +1412,13 @@ function recurrenceFollowupOf(taskId) {
  */
 const MAX_FOLLOWUP_HOPS = 500;
 
-function nextOpenOccurrenceOf(taskId) {
+function nextPendingOccurrenceOf(taskId) {
   const seen = new Set([Number(taskId)]);
   let current = recurrenceFollowupOf(taskId);
   for (let hops = 0; current && hops < MAX_FOLLOWUP_HOPS; hops += 1) {
     if (seen.has(current.id)) return null;
     seen.add(current.id);
-    if (current.status === 'open' && !current.archived_at) return current;
+    if (current.status !== 'done' && !current.archived_at) return current;
     current = recurrenceFollowupOf(current.id);
   }
   return null;
@@ -1632,10 +1640,11 @@ function spawnRecurrenceFollowup(task) {
 // 'archived' legt die Aufgabe ab, ohne ihren Status anzufassen (#688).
 //
 // `next_due_date` (#1603) ist die Faelligkeit der Folgeinstanz, wenn dieser
-// Wechsel eine Serie erledigt hat und es danach ein offenes naechstes
-// Vorkommen gibt - sonst null. Die Oberflaeche kann nur daran sagen, WANN es
-// weitergeht: die neue Zeile sieht aus wie die eben abgehakte, und ohne den
-// Hinweis wirkte der Haken wie verschluckt.
+// Wechsel eine Serie erledigt hat und es danach ein naechstes Vorkommen gibt,
+// das noch ansteht (nicht erledigt, nicht abgelegt) - sonst null. Die
+// Oberflaeche kann nur daran sagen, WANN es weitergeht: die neue Zeile sieht
+// aus wie die eben abgehakte, und ohne den Hinweis wirkte der Haken wie
+// verschluckt.
 //
 // `done_by_user_id` benennt, WER die Aufgabe erledigt hat (#1205) - wer
 // abgehakt hat, steht ohnehin fest und kommt weiter aus der Sitzung. Ohne
@@ -1796,11 +1805,11 @@ router.patch('/:id/status', (req, res) => {
         spawned = spawnRecurrenceFollowup(db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id));
         // NACHGELESEN, nicht aus dem Rueckgabewert: der sagt nur, ob ein
         // Upload ansteht. Gefragt ist, was nach diesem Haken als Naechstes
-        // offen dasteht - das ist auch die Folgeinstanz, die ein frueheres
+        // ansteht - das ist auch die Folgeinstanz, die ein frueheres
         // Abhaken angelegt hat und die das Zuruecknehmen stehen liess, weil
         // jemand an ihr gearbeitet hatte (discardRecurrenceFollowup), und es
         // ist das Vorkommen HINTER ihr, wenn sie selbst schon erledigt ist.
-        nextDueDate = nextOpenOccurrenceOf(prev.id)?.due_date ?? null;
+        nextDueDate = nextPendingOccurrenceOf(prev.id)?.due_date ?? null;
       }
     })();
 
