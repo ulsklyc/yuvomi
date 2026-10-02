@@ -125,6 +125,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   kept showing the new value, so the sheet implied a sharing change that never happened. The
   field now returns to the saved value, like the switches above it.
 
+- **Settings no longer show the sheet of a module you have no access to** (#1607). A member whose
+  permission for a module is "No access" still found that module's sheet under Settings, open and
+  operable, next to a "no access" error; the server refused every change. The sheet is now gone
+  from the list, from the settings search and from its direct address, as the module already was
+  from the navigation. With "Read only" the sheet stays.
+
 ## [2.71.0] - 2026-09-30
 
 ### Added
