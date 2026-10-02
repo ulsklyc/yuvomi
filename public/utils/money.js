@@ -419,6 +419,65 @@ export function amountInputToCents(text, currency) {
 }
 
 /**
+ * Warum ein eingetippter Betrag nicht gespeichert werden kann - oder `null`.
+ *
+ * Die Antwort ist ein GRUND, kein Ja/Nein: ein Formular, das nur den
+ * Speichern-Knopf sperrt, lässt die übliche Schreibweise für zehntausend Won
+ * ("10,000") kommentarlos liegen (#1607). Den Text dazu wählt der Aufrufer.
+ *
+ * - `'grouped'`: Tausendergruppierung. `toDecimalString` löst sie bewusst nicht
+ *   auf (siehe dort), hier bekommt die Ablehnung einen Namen.
+ * - `'invalid'`: keine Dezimalzahl in der Schreibweise, die der Server liest.
+ * - `'notPositive'`: null oder negativ.
+ * - `'precision'`: mehr Nachkommastellen, als die Währung kennt.
+ *
+ * Die Stellen werden am TEXT gezählt, nicht an der Zahl: "10.000" ist unter
+ * ko-KR die Zahl 10 und passt damit ins Raster von KRW, gesendet wird aber der
+ * Text, und parseMoneyToMinor() auf dem Server zählt die Stellen hinter dem
+ * Punkt. `fitsCurrencyGrid` sieht diese Nullen nicht.
+ *
+ * Ein leeres Feld hat keinen Grund - das ist Sache der Pflichtfeld-Prüfung.
+ *
+ * `original` ist der Bestandswert des Feldes (wie bei `amountIsSavable`): ein
+ * unangetasteter Betrag neben dem Raster bleibt speicherbar, solange er nicht
+ * MEHR Stellen trägt als vorher.
+ */
+export function amountInputProblem(text, currency, { original = null } = {}) {
+  const raw = String(text ?? '').trim();
+  if (!raw) return null;
+  const decimal = toDecimalString(raw);
+  // Leer trotz Eingabe heisst: toDecimalString hat eine Gruppierung abgewiesen.
+  // Ein Leerzeichen zwischen Ziffern ist dasselbe in der Schreibweise von fr
+  // oder sv ("10 000").
+  if (!decimal || /\d\s+\d/.test(decimal)) return 'grouped';
+  if (!/^-?\d+(\.\d+)?$/.test(decimal)) return 'invalid';
+  const value = Number(decimal);
+  if (!(value > 0)) return 'notPositive';
+  const places = fractionLength(decimal);
+  if (places <= currencyFractionDigits(currency)) return null;
+  const untouched = original != null && Number(original) === value
+    && places <= fractionLength(String(original));
+  return untouched ? null : 'precision';
+}
+
+/** Stellen hinter dem Punkt einer Dezimalangabe: "10.000" -> 3, "10" -> 0. */
+function fractionLength(decimal) {
+  return (String(decimal).split('.')[1] ?? '').length;
+}
+
+/**
+ * Ein Beispiel für die erwartete Schreibweise eines Betrags: ohne Gruppierung,
+ * mit Trenner und Ziffern der Region und den Stellen der Währung.
+ * EUR/de -> "1250,00", KRW -> "1250".
+ */
+export function amountExample(currency) {
+  const digits = currencyFractionDigits(currency);
+  return getNumberFormat({
+    useGrouping: false, minimumFractionDigits: digits, maximumFractionDigits: digits,
+  }).format(1250);
+}
+
+/**
  * Ein bestehendes Betragsfeld auf eine Währung nachziehen: Platzhalter,
  * Schrittweite und - bei Pflichtfeldern - Untergrenze in einem Zug.
  *
