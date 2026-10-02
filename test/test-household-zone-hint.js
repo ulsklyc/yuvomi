@@ -246,6 +246,65 @@ test('Uebernehmen: hat inzwischen ein anderer Admin entschieden, wird NICHT uebe
   assert.equal(hint.knownZonePrefs().timezone, 'Europe/Berlin');
 });
 
+test('Uebernehmen aus dem Band: hat ein anderer Admin "So lassen" gesagt, wird NICHT geschrieben', async () => {
+  // Review zu #1619: das Nachlesen liefert dann `timezone: null` MIT gesetztem
+  // Merker. Nur auf eine gesetzte Zone zu pruefen liess den alten Tab seine
+  // Browser-Zone trotzdem schreiben - gegen die Entscheidung des Haushalts.
+  reset();
+  const api = fakeApi({ current: { ...UNSET, timezone_hint_dismissed: true } });
+  const result = await hint.adoptZone('Asia/Seoul', { api, respectDismissed: true });
+
+  assert.deepEqual(api.calls, [['get', '/preferences']], 'kein PUT');
+  assert.equal(result.adopted, false);
+  assert.equal(result.timezone, null);
+  assert.equal(tz.displayTimeZone(), null, 'die Anzeige bleibt beim Browser');
+  assert.deepEqual(events, [], 'nichts hat sich geaendert, nichts zeichnet neu');
+  assert.equal(hint.zonePrompt(hint.knownZonePrefs(), ADMIN, { browserZone: 'Asia/Seoul' }), null,
+    'das Band kommt nicht wieder');
+});
+
+test('Uebernehmen in den Einstellungen gilt auch nach "So lassen"', async () => {
+  // Die Gegenrichtung, mit Absicht: die Zeile der Zeitzonen-Karte hat keinen
+  // Wegklick und ist der Ort, an dem die Handlung nach "So lassen" auffindbar
+  // bleibt. Wer dort klickt, entscheidet neu.
+  reset();
+  const api = fakeApi({ current: { ...UNSET, timezone_hint_dismissed: true } });
+  const result = await hint.adoptZone('Asia/Seoul', { api });
+
+  assert.deepEqual(api.calls, [
+    ['get', '/preferences'],
+    ['put', '/preferences', { timezone: 'Asia/Seoul' }],
+  ]);
+  assert.equal(result.adopted, true);
+  assert.equal(tz.displayTimeZone(), 'Asia/Seoul');
+});
+
+test('eine Zonen-Entscheidung von anderswo beendet das Band dieser Sitzung', () => {
+  // Review zu #1619: das Auswahlfeld der Einstellungen speichert und loest
+  // `timezone-changed` aus, aber der gemerkte Stand blieb bei `timezone: null`
+  // - die Uebersicht fragte danach weiter, obwohl der Server eine Zone hat.
+  const prompt = () => hint.zonePrompt(hint.knownZonePrefs(), ADMIN, { browserZone: 'Asia/Seoul' });
+  reset();
+  assert.ok(prompt(), 'Ausgangslage: das Band steht');
+  hint.noteZoneDecision('Europe/Berlin');
+  assert.equal(prompt(), null, 'eine gewaehlte Zone beendet das Band');
+  assert.equal(hint.knownZonePrefs().timezone, 'Europe/Berlin');
+  assert.equal(hint.knownZonePrefs().timezone_effective, 'Europe/Berlin');
+
+  // Bewusst "Automatisch": der Server merkt das als Entscheidung (jede
+  // angenommene timezone-Schreibung setzt den Merker), das Band also auch.
+  reset();
+  hint.noteZoneDecision(null);
+  assert.equal(prompt(), null, 'auch "Automatisch" ist eine Entscheidung');
+  assert.equal(hint.knownZonePrefs().timezone, null);
+  assert.equal(hint.knownZonePrefs().timezone_effective, 'UTC', 'der Rueckfall bleibt, wie er geladen wurde');
+
+  // Ohne geladenen Stand wird keiner erfunden.
+  hint.forgetZonePrefs();
+  hint.noteZoneDecision('Europe/Berlin');
+  assert.equal(hint.knownZonePrefs(), null);
+});
+
 test('Uebernehmen: ein Fehlschlag laesst alles, wie es war', async () => {
   reset();
   const boom = new Error('Ungültige Zeitzone.');
@@ -354,6 +413,27 @@ test('router.js fuettert den Stand aus /preferences und vergisst ihn mit der Sit
   const forget = router.slice(router.indexOf('function forgetSessionState()'));
   assert.match(forget.slice(0, forget.indexOf('\n}\n')), /forgetZonePrefs\(\)/,
     'der naechste Nutzer am selben Geraet erbte sonst den Stand des vorigen');
+});
+
+test('router.js zieht den Stand bei jedem timezone-changed nach - an EINER Stelle', () => {
+  // Das Ereignis feuert nur nach einem geglueckten Schreiben (Auswahlfeld der
+  // Einstellungen, Uebernehmen). Die /preferences-Antwort, die die Uebersicht
+  // bei jedem Aufbau holt, bleibt aussen vor: sie kann aelter sein als das
+  // Schreiben und stellte das Band wieder hin.
+  const router = code('public/router.js');
+  // assert.ok statt assert.match: ein Fehlschlag druckte sonst ganz router.js.
+  assert.ok(/addEventListener\('timezone-changed',\s*\(event\)\s*=>\s*noteZoneDecision\(event\.detail\?\.timezone\)\)/.test(router),
+    'router.js zieht den Stand nach einem Zonenwechsel nicht nach');
+  const dashboard = code('public/pages/dashboard.js');
+  assert.doesNotMatch(dashboard, /rememberZonePrefs|noteZoneDecision/,
+    'die Uebersicht darf den Stand nicht aus ihrer eigenen Antwort fuettern');
+  const render = dashboard.slice(dashboard.indexOf('export async function render(container'));
+  const mount = render.indexOf('mountZonePrompt(');
+  assert.doesNotMatch(render.slice(mount, mount + 300), /respectDismissed/, 'das Band entscheidet das selbst');
+  assert.match(read('public/utils/household-zone-hint.js'), /adoptZone\(mismatch\.browser, \{ api, respectDismissed: true \}\)/,
+    'das Band der Uebersicht achtet ein "So lassen" von anderswo nicht');
+  assert.doesNotMatch(code('public/settings/pages/personal-appearance.js'), /respectDismissed/,
+    'die Zeile der Einstellungen bleibt nach "So lassen" eine gueltige Handlung');
 });
 
 test('die Uebersicht setzt den Hinweis im synchronen Teil, nicht nach den Daten', () => {

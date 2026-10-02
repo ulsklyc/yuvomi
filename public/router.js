@@ -23,7 +23,7 @@ import { init as initReminders, stop as stopReminders } from '/reminders.js';
 import { initPush, stopPush } from '/push.js';
 import { numberLocaleFor } from '/settings/region-presets.js';
 import { setDisplayTimeZone } from '/utils/timezone.js';
-import { rememberZonePrefs, forgetZonePrefs } from '/utils/household-zone-hint.js';
+import { rememberZonePrefs, forgetZonePrefs, noteZoneDecision } from '/utils/household-zone-hint.js';
 import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
 import { swapPage } from '/utils/view-transition.js';
 import { moduleAccentToken, moduleAccentVar } from '/utils/module-accent.js';
@@ -4876,6 +4876,10 @@ window.addEventListener('date-format-changed', refreshCurrentRoute);
 // Die Anzeigezone wirkt auf jede Uhrzeit auf dem Schirm - dasselbe Neuzeichnen
 // wie beim Datums-/Zeitformat (#829 Teil 3).
 window.addEventListener('timezone-changed', refreshCurrentRoute);
+// Und der Zonen-Hinweis der Uebersicht erfaehrt hier, dass entschieden ist
+// (#1607): das Auswahlfeld der Einstellungen schreibt an ihm vorbei. Das
+// Neuzeichnen oben laeuft per setTimeout, liest also schon den neuen Stand.
+window.addEventListener('timezone-changed', (event) => noteZoneDecision(event.detail?.timezone));
 window.addEventListener('time-format-changed', refreshCurrentRoute);
 
 window.addEventListener('resize', () => {

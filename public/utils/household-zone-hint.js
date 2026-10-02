@@ -19,7 +19,9 @@
  * WOHER DER STAND KOMMT. `rememberZonePrefs()` bekommt die Antwort, die der
  * Router beim Anmelden ohnehin abwartet, BEVOR die erste Seite zeichnet. Der
  * Hinweis steht deshalb schon neben dem Skelett und schiebt nichts nach.
- * Danach aendern ihn nur noch die zwei Handlungen hier. Bewusst NICHT die
+ * Danach aendern ihn nur noch die zwei Handlungen hier und `noteZoneDecision()`,
+ * das der Router an `timezone-changed` haengt - das Ereignis feuert nur nach
+ * einem geglueckten Schreiben, auch dem des Auswahlfelds. Bewusst NICHT die
  * `/preferences`-Antwort, die die Uebersicht bei jedem Aufbau selbst holt: eine
  * Anfrage, die vor dem Schreiben losging und danach ankommt, stellte den
  * Hinweis wieder hin (die veraltete Antwort ueberholt den Schreibvorgang).
@@ -183,6 +185,29 @@ export function knownZonePrefs() {
 }
 
 /**
+ * Ein Admin hat die Zone geschrieben - irgendwo, nicht hier (das Auswahlfeld
+ * der Einstellungen). Der Router ruft das bei jedem `timezone-changed`.
+ *
+ * Ohne das blieb der Stand der Sitzung bei `timezone: null`, und die Uebersicht
+ * fragte weiter, obwohl der Server laengst eine Zone fuehrt. Auch `null` ist
+ * eine Entscheidung ("Automatisch"): der Server setzt bei jeder angenommenen
+ * timezone-Schreibung den Merker, dieser Stand also ebenfalls.
+ *
+ * Kein Stand geladen heisst: nichts erfinden - `timezone_effective` kennt nur
+ * der Server.
+ * @param {string|null|undefined} timezone  `detail.timezone` des Ereignisses
+ */
+export function noteZoneDecision(timezone) {
+  if (!_prefs) return;
+  const chosen = isValidTimeZone(timezone) ? timezone : null;
+  _prefs = {
+    timezone: chosen,
+    timezone_effective: chosen ?? _prefs.timezone_effective,
+    timezone_hint_dismissed: true,
+  };
+}
+
+/**
  * Die Anzeige auf die Zone des Haushalts stellen und offene Ansichten neu
  * zeichnen - dasselbe Paar, das das Auswahlfeld der Einstellungen nach seinem
  * Speichern ausloest (router.js haengt an `timezone-changed`).
@@ -200,16 +225,26 @@ function mirror(timezone) {
  * Browsers. Ein blindes PUT ueberschriebe dessen Wahl. Steht inzwischen eine
  * Zone, gilt sie, und die Anzeige folgt ihr.
  *
+ * `respectDismissed` ist das Band der Uebersicht: hat inzwischen jemand "So
+ * lassen" gesagt, ist die Frage fuer den Haushalt beantwortet, und ein alter
+ * Tab darf sie nicht umdrehen - das Band verschwindet, geschrieben wird nichts.
+ * Die Zeile der Zeitzonen-Karte setzt es NICHT: sie hat keinen Wegklick und ist
+ * der Ort, an dem die Handlung nach "So lassen" auffindbar bleibt.
+ *
  * @param {string} zone  IANA-Zone
- * @param {{api:{get:Function,put:Function}}} deps
+ * @param {{api:{get:Function,put:Function}, respectDismissed?:boolean}} deps
  * @returns {Promise<{adopted:boolean,timezone:string|null}>}
  */
-export async function adoptZone(zone, { api }) {
+export async function adoptZone(zone, { api, respectDismissed = false }) {
   const current = (await api.get('/preferences'))?.data;
   if (current && current.timezone) {
     _prefs = pick(current);
     mirror(current.timezone);
     return { adopted: false, timezone: current.timezone };
+  }
+  if (respectDismissed && current?.timezone_hint_dismissed === true) {
+    _prefs = pick(current);
+    return { adopted: false, timezone: null };
   }
   const saved = (await api.put('/preferences', { timezone: zone }))?.data ?? {};
   const timezone = saved.timezone ?? null;
@@ -312,7 +347,7 @@ export function mountZonePrompt(host, { user, t, api, wall = false, toast, befor
     mismatch,
     t,
     onAdopt: async () => {
-      const result = await adoptZone(mismatch.browser, { api });
+      const result = await adoptZone(mismatch.browser, { api, respectDismissed: true });
       el.remove();
       if (result.adopted) toast?.(t('settings.timezoneSaved'), 'success');
     },
