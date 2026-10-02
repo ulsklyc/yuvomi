@@ -829,18 +829,14 @@ router.get('/', (req, res) => {
     // Ledger stehen. Hier stuende sie sonst weiter als "zuletzt verdient",
     // obwohl die Aufgabe wieder offen ist - der vollstaendige Verlauf mit
     // beiden Zeilen gehoert auf die Belohnungsseite, diese Liste zeigt nur,
-    // was gilt. Eine Gegenbuchung nimmt alles zurueck, was bis zu ihr fuer die
-    // Aufgabe gebucht war: jede earn-Zeile mit einer SPAETEREN Gegenbuchung
-    // derselben Aufgabe faellt deshalb heraus, eine danach neu vergebene bleibt.
+    // was gilt. Die Gegenbuchung zeigt auf ihre Gutschrift (`reverses_id`) und
+    // nicht nur auf dieselbe Aufgabe: wird die Aufgabe geloescht, verlieren
+    // beide Zeilen ihre task_id, und ein Vergleich darueber traefe nie mehr.
     const ownRecent = own && (view === 'self' || members.length === 1)
       ? d.prepare(`
           SELECT delta, type, reason, created_at FROM reward_ledger l
           WHERE user_id = ? AND delta > 0 AND type IN ('earn', 'bonus')
-            AND NOT EXISTS (
-              SELECT 1 FROM reward_ledger r
-              WHERE r.type = 'reversal' AND r.task_id = l.task_id
-                AND r.user_id = l.user_id AND r.id > l.id
-            )
+            AND NOT EXISTS (SELECT 1 FROM reward_ledger r WHERE r.reverses_id = l.id)
           ORDER BY created_at DESC, id DESC
           LIMIT 3
         `).all(userId)

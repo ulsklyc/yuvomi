@@ -429,23 +429,49 @@ test('Belohnungen mobil: Punktestand als Zeile mit Trailing-Kapsel, Anfrage mit 
 const lesbar = (html) => html.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 
 test('Server: eine zurueckgenommene Gutschrift steht nicht mehr unter "zuletzt verdient" (#1607)', async () => {
+  // Gebucht wird ueber den Dienst: die Gegenbuchung zeigt auf ihre Gutschrift
+  // (`reverses_id`), und eine von Hand eingefuegte Zeile truege den Bezug nicht.
+  const { syncTaskRewards } = await import('../server/services/rewards.js');
   const kid = user('rw-mia', 'Mia', 'member');
   d.prepare('INSERT INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(kid);
   const task = d.prepare("INSERT INTO tasks (title, status, created_by, points) VALUES ('Muell', 'open', ?, 60)").run(PARENT).lastInsertRowid;
-  const book = d.prepare('INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, created_at) VALUES (?, ?, ?, ?, ?, ?)');
-  book.run(kid, 60, 'earn', 'Muell', task, '2026-09-22T08:00:00Z');
-  book.run(kid, -50, 'redeem', 'Eis', null, '2026-09-22T09:00:00Z');
-  book.run(kid, -60, 'reversal', 'Muell', task, '2026-09-22T10:00:00Z');
+  d.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(task, kid);
+  syncTaskRewards(d, task, 'open', 'done', PARENT, null, { now: new Date('2026-09-22T08:00:00Z') });
+  d.prepare("INSERT INTO reward_ledger (user_id, delta, type, reason, created_at) VALUES (?, -50, 'redeem', 'Eis', '2026-09-22T09:00:00Z')").run(kid);
+  syncTaskRewards(d, task, 'done', 'open', PARENT);
 
   const zurueckgenommen = (await dashboardAs(kid, 'member')).rewards;
   assert.equal(zurueckgenommen.standings[0].balance, -50, 'der Saldo geht unveraendert als Zahl hinaus');
   assert.deepEqual(zurueckgenommen.recent, [], 'die Aufgabe ist wieder offen - verdient ist hier nichts');
 
   // Erneut erledigt: die NEUE Gutschrift gilt, die alte bleibt zurueckgenommen.
-  book.run(kid, 60, 'earn', 'Muell', task, '2026-09-22T11:00:00Z');
+  syncTaskRewards(d, task, 'open', 'done', PARENT, null, { now: new Date('2026-09-22T11:00:00Z') });
   const neu = (await dashboardAs(kid, 'member')).rewards;
   assert.deepEqual(neu.recent.map((r) => r.created_at), ['2026-09-22T11:00:00Z']);
 
+  d.prepare('DELETE FROM reward_participants WHERE user_id = ?').run(kid);
+});
+
+test('Server: auch nach dem Loeschen der Aufgabe bleibt die zurueckgenommene Gutschrift draussen (#1607)', async () => {
+  // Das Loeschen setzt task_id an BEIDEN Zeilen auf NULL (ON DELETE SET NULL).
+  // Ein Bezug ueber die Aufgabe traefe danach nie mehr, und die zurueckgenommene
+  // Gutschrift stuende wieder unter "zuletzt verdient". Gebucht wird hier ueber
+  // den Dienst, damit die Zeilen so entstehen wie im Betrieb.
+  const { syncTaskRewards } = await import('../server/services/rewards.js');
+  const kid = user('rw-noa', 'Noa', 'member');
+  d.prepare('INSERT INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(kid);
+  const task = d.prepare("INSERT INTO tasks (title, status, created_by, points) VALUES ('Flur', 'open', ?, 15)").run(PARENT).lastInsertRowid;
+  d.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(task, kid);
+  syncTaskRewards(d, task, 'open', 'done', PARENT);
+  syncTaskRewards(d, task, 'done', 'open', PARENT);
+  d.prepare('DELETE FROM tasks WHERE id = ?').run(task);
+  assert.deepEqual(
+    d.prepare('SELECT delta, task_id FROM reward_ledger WHERE user_id = ? ORDER BY id').all(kid),
+    [{ delta: 15, task_id: null }, { delta: -15, task_id: null }],
+    'Vorbedingung: beide Zeilen haben die Aufgabe verloren',
+  );
+
+  assert.deepEqual((await dashboardAs(kid, 'member')).rewards.recent, []);
   d.prepare('DELETE FROM reward_participants WHERE user_id = ?').run(kid);
 });
 

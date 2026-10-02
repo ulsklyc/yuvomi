@@ -12,7 +12,7 @@ import { documentVisibleSql } from '../services/document-access.js';
 import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
 import { assertDocumentLinkTargetsAvailable, documentViewer, sendDocumentLinkRefusal } from '../services/document-links.js';
 import { nextDueAfterCompletion } from '../services/recurrence.js';
-import { syncTaskRewards } from '../services/rewards.js';
+import { syncTaskRewards, seriesOfTask } from '../services/rewards.js';
 import { completionFeed, seriesHistory, syncTaskCompletion } from '../services/task-completions.js';
 import { normalizeCategoryFilter, taskCategoryWhere, taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
 import { normalizeVisibility, visibilityWhere } from '../services/visibility.js';
@@ -1531,8 +1531,8 @@ function spawnRecurrenceFollowup(task) {
       INSERT INTO tasks (title, description, category, priority, status,
         start_date, due_date, due_time, assigned_to, created_by, is_recurring, recurrence_rule,
         points, visibility, recurrence_from_completion, countdown, locked, recurrence_origin_id,
-        target_caldav_account_id, target_caldav_list_url)
-      VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        target_caldav_account_id, target_caldav_list_url, recurrence_series_id)
+      VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       task.title, task.description, task.category, task.priority,
       shiftedStartDate(task.start_date, task.due_date, nextDate),
@@ -1556,7 +1556,13 @@ function spawnRecurrenceFollowup(task) {
       // und Admins auch an der Folgeinstanz berechtigt.
       task.locked ? 1 : 0,
       task.id,
-      syncTarget?.accountId ?? null, syncTarget?.listUrl ?? null
+      syncTarget?.accountId ?? null, syncTarget?.listUrl ?? null,
+      // Die Serie reist als WERT mit, nicht als Verweis (#1603).
+      // `recurrence_origin_id` daneben ist ON DELETE SET NULL: wird das eben
+      // erledigte Vorkommen geloescht, weiss die Folgeinstanz nicht mehr, woher
+      // sie kommt - und der Punkte-Deckel je Serie saehe in ihr eine neue
+      // Aufgabe. Die Kennung ist die ID des ersten Vorkommens und ueberlebt es.
+      seriesOfTask(db.get(), task)
     );
     setAssignments(db.get(), newTask.lastInsertRowid, existingAssignments);
     setTags(db.get(), newTask.lastInsertRowid, existingTags);
@@ -1572,8 +1578,9 @@ function spawnRecurrenceFollowup(task) {
       const newSub = db.get().prepare(`
         INSERT INTO tasks (title, description, category, priority, status,
           start_date, due_date, due_time, assigned_to, created_by, parent_task_id,
-          is_recurring, recurrence_rule, points, visibility, locked, recurrence_origin_id)
-        VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?)
+          is_recurring, recurrence_rule, points, visibility, locked, recurrence_origin_id,
+          recurrence_series_id)
+        VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?)
       `).run(
         sub.title, sub.description, sub.category, sub.priority,
         shiftedStartDate(sub.start_date, subAnchorDate, nextDate) ?? sub.start_date,
@@ -1582,7 +1589,12 @@ function spawnRecurrenceFollowup(task) {
         // Eine Unteraufgabe kann eine eigene Sperre tragen (POST nimmt `locked`
         // auch dort an) - die geerbte der Elternaufgabe kommt ueber
         // lockingTask(), die eigene muss mitkopiert werden (#1488).
-        sub.points, sub.visibility, sub.locked ? 1 : 0, sub.id
+        sub.points, sub.visibility, sub.locked ? 1 : 0, sub.id,
+        // Auch die Teilaufgabe traegt ihre eigene Serie (#1603): sie hat
+        // eigene Punkte, entsteht mit jeder Folgeinstanz neu und steht nicht im
+        // Verlauf - ohne Kennung zahlte dieselbe Checklistenzeile mit jeder
+        // Kopie am selben Tag noch einmal.
+        seriesOfTask(db.get(), sub)
       );
       setAssignments(db.get(), newSub.lastInsertRowid, subAssignments);
       setTags(db.get(), newSub.lastInsertRowid, subTags);

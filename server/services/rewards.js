@@ -8,7 +8,7 @@
  */
 
 import { householdMemberSql } from './household-members.js';
-import { seriesIdFor } from './task-completions.js';
+import { seriesRootOf } from './task-completions.js';
 import { householdTimeZone, todayKey, utcToWall } from '../utils/timezone.js';
 
 const REWARD_TX = `
@@ -170,21 +170,28 @@ const TASK_NET = `
  * Gutschrift darf das erneute Erledigen am selben Tag nicht sperren, und ihre
  * noch geltende fängt schon der Netto-Stand ab.
  *
- * DIE SERIE WIRD AUF ZWEI WEGEN GEFUNDEN, weil keiner allein reicht:
- *   1. task_completions.series_id - beim Schreiben eingefroren, deshalb auch
- *      nach einem Kettenriss dieselbe (seriesIdFor), und sie findet die Serie
- *      in BEIDE Richtungen (eine gestern erledigte, heute wieder geöffnete und
- *      neu abgehakte Vorgängerin sieht die heutige Gutschrift der Nachfolgerin).
- *      Aber TEILAUFGABEN stehen dort bewusst nicht - und sie tragen eigene
- *      Punkte und entstehen mit jeder Folgeinstanz neu.
- *   2. die Vorgängerkette über recurrence_origin_id, die Aufgaben und
- *      Teilaufgaben gleichermaßen tragen. Sie läuft nur so weit zurück, wie
- *      Glieder im Fenster ANGELEGT wurden: eine Folgeinstanz entsteht mit dem
- *      Abhaken ihrer Vorgängerin, ist sie also älter als das Fenster, ist es
- *      deren Gutschrift auch. Die Kosten wachsen damit nicht mit dem Alter der
- *      Serie, nur mit der Zahl der Haken der letzten zwei Tage.
- * Eine wieder geöffnete Vorgängerin hat eine Gegenbuchung im Ledger und fällt
- * auf beiden Wegen heraus.
+ * DIE SERIE STEHT AN DER GUTSCHRIFT SELBST (`reward_ledger.series_id`), und
+ * der Deckel fragt den Ledger direkt nach Serie, Person und Tag. Er
+ * rekonstruiert nichts: jede Kette über recurrence_origin_id reißt, sobald ein
+ * erledigtes Vorkommen gelöscht wird (ON DELETE SET NULL nimmt der
+ * Folgeinstanz den Verweis und der Gutschrift die task_id), und
+ * task_completions verliert die Zeile gleich mit. "Erledigen, löschen,
+ * erledigen" wäre derselbe Punktehahn gewesen, nur mit einem Klick mehr.
+ *
+ * WOHER DIE KENNUNG KOMMT: `tasks.recurrence_series_id`, beim ANLEGEN der
+ * Folgeinstanz von der Vorgängerin übernommen (spawnRecurrenceFollowup in
+ * routes/tasks.js) - für die Aufgabe und für jede kopierte Teilaufgabe, die
+ * eigene Punkte trägt und im Verlauf bewusst nicht steht. Der Wert ist die ID
+ * des ersten Vorkommens und bleibt es, auch wenn es dieses längst nicht mehr
+ * gibt. Eine Aufgabe ohne Kennung ist ihr eigenes erstes Vorkommen; trägt sie
+ * aus der Zeit vor v230 noch einen Vorgänger-Verweis, gilt die Wurzel ihrer
+ * Kette (seriesOfTask) - derselbe Wert, den ihre nächste Folgeinstanz erbt.
+ *
+ * BESTAND: Gutschriften von vor v230 tragen keine Kennung und zählen für den
+ * Deckel nicht. Es gibt ihn erst seit v230 - gesperrt hat davor nichts.
+ *
+ * Eine wieder geöffnete Aufgabe hat eine Gegenbuchung, die auf ihre
+ * Gutschrift zeigt (`reverses_id`); die fällt damit heraus.
  *
  * DER TAG ist der Haushaltstag (todayKey), nie der UTC-Tag: östlich von UTC
  * beginnt der Morgen sonst am Vortag, und die Gutschrift von gestern Abend
@@ -193,31 +200,27 @@ const TASK_NET = `
  * entscheidet den Tag je Zeile über die Wanduhr der Zone.
  */
 const SERIES_EARNS_SINCE = `
-  WITH RECURSIVE anc(id, origin, created_at, depth) AS (
-    SELECT id, recurrence_origin_id, created_at, 0 FROM tasks WHERE id = @task
-    UNION ALL
-    SELECT t.id, t.recurrence_origin_id, t.created_at, a.depth + 1
-      FROM tasks t JOIN anc a ON t.id = a.origin
-     WHERE a.created_at >= @since AND a.depth < 100000
-  )
   SELECT l.created_at FROM reward_ledger l
-  WHERE l.user_id = @user AND l.type = 'earn'
-    AND l.task_id != @task AND l.created_at >= @since
-    AND (
-      l.task_id IN (SELECT id FROM anc)
-      OR l.task_id IN (SELECT c.task_id FROM task_completions c WHERE c.series_id = @series)
-    )
-    AND NOT EXISTS (
-      SELECT 1 FROM reward_ledger r
-      WHERE r.type = 'reversal' AND r.task_id = l.task_id
-        AND r.user_id = l.user_id AND r.id > l.id
-    )
+  WHERE l.series_id = @series AND l.user_id = @user AND l.type = 'earn'
+    AND l.created_at >= @since
+    AND (l.task_id IS NULL OR l.task_id != @task)
+    AND NOT EXISTS (SELECT 1 FROM reward_ledger r WHERE r.reverses_id = l.id)
 `;
 const SERIES_LOOKBACK_MS = 50 * 60 * 60 * 1000;
 
 /** Zeitpunkt in der Form, die der Ledger schreibt: Sekunden, UTC, mit Z. */
 function ledgerTimestamp(date) {
   return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+/**
+ * Die Serie, unter der eine Gutschrift für diese Aufgabe gebucht wird.
+ * @param {object} d
+ * @param {{ id: number, recurrence_series_id: number|null }} task
+ * @returns {number}
+ */
+export function seriesOfTask(d, task) {
+  return task.recurrence_series_id ?? seriesRootOf(d, task.id);
 }
 
 /**
@@ -231,16 +234,16 @@ function ledgerTimestamp(date) {
  *                             der Tag, an dem der Serien-Deckel misst.
  */
 export function awardForCompletion(d, taskId, actingUserId, doneByUserId = null, { now = new Date() } = {}) {
-  const task = d.prepare('SELECT id, points, title FROM tasks WHERE id = ?').get(taskId);
+  const task = d.prepare('SELECT id, points, title, recurrence_series_id FROM tasks WHERE id = ?').get(taskId);
   if (!task || !Number.isInteger(task.points) || task.points <= 0) return;
   const targets = rewardTargets(d, taskId, actingUserId, doneByUserId);
   if (!targets.length) return;
   d.transaction(() => {
     const net = d.prepare(TASK_NET);
     const seriesEarns = d.prepare(SERIES_EARNS_SINCE);
-    const ins = d.prepare(`INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, created_by, created_at)
-      VALUES (?, ?, 'earn', ?, ?, ?, ?)`);
-    const series = seriesIdFor(d, taskId);
+    const ins = d.prepare(`INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, created_by, created_at, series_id)
+      VALUES (?, ?, 'earn', ?, ?, ?, ?, ?)`);
+    const series = seriesOfTask(d, task);
     const zone = householdTimeZone(d);
     const today = todayKey(d, now);
     const since = ledgerTimestamp(new Date(now.getTime() - SERIES_LOOKBACK_MS));
@@ -249,7 +252,7 @@ export function awardForCompletion(d, taskId, actingUserId, doneByUserId = null,
       const paidToday = seriesEarns.all({ series, user: uid, task: taskId, since })
         .some((row) => utcToWall(row.created_at, zone)?.date === today);
       if (paidToday) continue;
-      ins.run(uid, task.points, task.title || null, taskId, actingUserId || null, ledgerTimestamp(now));
+      ins.run(uid, task.points, task.title || null, taskId, actingUserId || null, ledgerTimestamp(now), series);
     }
   })();
 }
@@ -270,21 +273,24 @@ export function reverseTaskEarnings(d, taskId, actingUserId = null) {
   // das Zurücknehmen auflösen soll. `task_id` trifft sie alle, unabhängig
   // davon, wer sie erhalten hat.
   d.transaction(() => {
+    // Die Gegenbuchung ZEIGT AUF IHRE GUTSCHRIFT (`reverses_id`). Über die
+    // Aufgabe ließen sich die beiden nur finden, solange es sie gibt: wird sie
+    // gelöscht, verlieren beide Zeilen ihre task_id, und niemand wüsste mehr,
+    // dass diese Gutschrift zurückgenommen ist - weder die Liste "zuletzt
+    // verdient" noch der Serien-Deckel. Offen ist je Person höchstens eine
+    // Gutschrift (der Netto-Stand lässt keine zweite zu), also die jüngste.
     const open = d.prepare(`
-      SELECT user_id, SUM(delta) AS net,
-             (SELECT e.reason FROM reward_ledger e
-               WHERE e.task_id = l.task_id AND e.user_id = l.user_id AND e.type = 'earn'
-               ORDER BY e.id DESC LIMIT 1) AS reason
-      FROM reward_ledger l
+      SELECT user_id, SUM(delta) AS net, MAX(CASE WHEN type = 'earn' THEN id END) AS earn_id
+      FROM reward_ledger
       WHERE task_id = ? AND type IN ('earn', 'reversal')
       GROUP BY user_id
       HAVING SUM(delta) > 0
     `).all(taskId);
+    const reason = d.prepare('SELECT reason FROM reward_ledger WHERE id = ?');
+    const ins = d.prepare(`INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, created_by, reverses_id)
+      VALUES (?, ?, 'reversal', ?, ?, ?, ?)`);
     for (const row of open) {
-      postLedger(d, {
-        userId: row.user_id, delta: -row.net, type: 'reversal',
-        reason: row.reason, taskId, createdBy: actingUserId || null,
-      });
+      ins.run(row.user_id, -row.net, reason.get(row.earn_id)?.reason ?? null, taskId, actingUserId || null, row.earn_id);
     }
   })();
 }
