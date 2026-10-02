@@ -45,7 +45,20 @@ const activityPageResponse = {
   type: 'object',
   required: ['data', 'pagination'],
   properties: {
-    data: { type: 'array', items: { type: 'object', additionalProperties: true } },
+    data: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          metadata: {
+            type: ['object', 'null'],
+            additionalProperties: true,
+            description: 'What the entry recorded when it was written - it does not follow later edits. `expense_created`, `expense_edited` and `expense_deleted` carry `title`, `amount_minor`, `amount` (decimal) and `currency` as they were at that moment; entries written before this was recorded carry the `title` only. `comment_added` carries the `title` of its expense.',
+          },
+        },
+      },
+    },
     pagination: {
       type: 'object',
       required: ['limit', 'has_more', 'next_cursor'],

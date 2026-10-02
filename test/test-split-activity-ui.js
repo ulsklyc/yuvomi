@@ -398,30 +398,44 @@ test('Buchung entfernt: eigener Typtext, "System", Titel und Betrag maskiert, in
 // Objekt und Betrag, und die Gruppenzahl belegt mobil keine volle Zeile.
 // ---------------------------------------------------------------------------
 
-test('der Verlauf nennt die Ausgabe und ihren Betrag - nicht fuenfmal „Ausgabe erstellt"', () => {
+test('der Verlauf nennt die Ausgabe und den Betrag von damals - nicht fuenfmal „Ausgabe erstellt"', () => {
   const vorher = { ...split.state };
   Object.assign(split.state, {
     activeGroupId: 9, groupStatus: 'active', user: null,
-    expenses: [{ id: 5, title: 'Wocheneinkauf', amount: '142.30', currency: 'EUR' }],
+    // Die geladene Ausgabe traegt den HEUTIGEN Betrag (nach einer Bearbeitung).
+    expenses: [{ id: 5, title: 'Wocheneinkauf', amount: '10.00', currency: 'USD' }],
     activity: [
-      eintrag(5, { metadata: { title: 'Wocheneinkauf' } }),
-      eintrag(6, { type: 'expense_deleted', entity_id: 77, metadata: { title: 'Kino' } }),
-      eintrag(7, { type: 'comment_added', entity_id: 5 }),
+      eintrag(5, { metadata: { title: 'Wocheneinkauf', amount_minor: 14230, amount: '142.30', currency: 'EUR' } }),
+      eintrag(6, { type: 'expense_deleted', entity_id: 77, metadata: { title: 'Kino', amount_minor: 900, amount: '9.00', currency: 'EUR' } }),
+      eintrag(7, { type: 'comment_added', entity_id: 5, metadata: { title: 'Wocheneinkauf' } }),
       eintrag(8, { type: 'group_updated', entity_type: 'group', entity_id: 9 }),
+      // Bestand von vor dem Snapshot (#1607): nur der Titel. Der Betrag der
+      // geladenen Ausgabe waere der heutige, nicht der von damals.
+      eintrag(9, { entity_id: 5, metadata: { title: 'Wocheneinkauf' } }),
+      eintrag(10, { type: 'expense_edited', entity_id: 5, metadata: { title: 'Wocheneinkauf' } }),
+      // Bestands-Kommentar ohne Metadaten: nennt die Ausgabe weiter beim Namen.
+      eintrag(11, { type: 'comment_added', entity_id: 5 }),
     ],
     activityCursor: null,
   });
   try {
     const html = withAccess({ budget: 'write' }, () => split.renderActivity());
     const items = html.split('split-activity-item').slice(1);
-    assert.equal(items.length, 4);
+    assert.equal(items.length, 7);
     assert.match(items[0], /<span class="split-activity-payment">Wocheneinkauf · [^<]*142[.,]30[^<]*<\/span>/,
-      'erstellt: Titel aus den Metadaten, Betrag aus der geladenen Ausgabe');
-    assert.match(items[1], /<span class="split-activity-payment">Kino<\/span>/,
-      'geloescht: der Titel allein - die Ausgabe ist nicht mehr geladen, ein Betrag waere geraten');
-    assert.match(items[2], /<span class="split-activity-payment">Wocheneinkauf · /,
-      'Kommentar: nennt die Ausgabe, an der er haengt');
+      'erstellt: Titel und Betrag aus den Metadaten');
+    assert.doesNotMatch(items[0], /10[.,]00/, 'erstellt: nicht der heutige Betrag der Ausgabe');
+    assert.match(items[1], /<span class="split-activity-payment">Kino · [^<]*9[.,]00[^<]*<\/span>/,
+      'geloescht: der festgehaltene Betrag, auch wenn die Ausgabe nicht mehr geladen ist');
+    assert.match(items[2], /<span class="split-activity-payment">Wocheneinkauf<\/span>/,
+      'Kommentar: nennt die Ausgabe, an der er haengt - ohne Betrag');
     assert.doesNotMatch(items[3], /split-activity-payment/, 'eine Gruppenaenderung hat kein Ausgabenobjekt');
+    assert.match(items[4], /<span class="split-activity-payment">Wocheneinkauf<\/span>/,
+      'erstellt ohne Snapshot: der Titel allein, ein Betrag waere der heutige');
+    assert.match(items[5], /<span class="split-activity-payment">Wocheneinkauf<\/span>/,
+      'bearbeitet ohne Snapshot: der Titel allein');
+    assert.match(items[6], /<span class="split-activity-payment">Wocheneinkauf<\/span>/,
+      'Kommentar ohne Snapshot: Titel der geladenen Ausgabe, kein Betrag');
   } finally {
     Object.assign(split.state, vorher);
   }
