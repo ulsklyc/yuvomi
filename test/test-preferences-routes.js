@@ -268,6 +268,14 @@ test('timezone_hint_dismissed: haushaltsweit, nur Admin schreibt, nur ein Boolea
 
   assert.equal((await put({ timezone_hint_dismissed: true }, { role: 'member' })).status, 403);
   assert.equal((await get()).body.data.timezone_hint_dismissed, false, 'ein 403 darf nichts geschrieben haben');
+  // Auch nicht die ANDEREN Felder desselben Requests: der Check steht vor
+  // jedem Schreiben, ein gemischtes Payload wendet sich nicht teilweise an.
+  const before = (await get()).body.data.visible_meal_types;
+  const other = before.includes('snack') ? ['breakfast'] : ['snack'];
+  assert.equal((await put({ visible_meal_types: other, timezone_hint_dismissed: true }, { role: 'member' })).status, 403);
+  assert.deepEqual((await get()).body.data.visible_meal_types, before, 'ein 403 hat nichts teilweise angewendet');
+  assert.equal((await put({ visible_meal_types: other, timezone_hint_dismissed: 'ja' })).status, 400);
+  assert.deepEqual((await get()).body.data.visible_meal_types, before, 'ein 400 hat nichts teilweise angewendet');
   for (const bad of ['1', 1, 'true', null, {}]) {
     assert.equal((await put({ timezone_hint_dismissed: bad })).status, 400, `${JSON.stringify(bad)} ist kein Boolean`);
   }

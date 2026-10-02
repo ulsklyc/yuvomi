@@ -259,8 +259,15 @@ export async function adoptZone(zone, { api, respectDismissed = false }) {
  * @param {{api:{put:Function}}} deps
  */
 export async function keepZone({ api }) {
-  await api.put('/preferences', { timezone_hint_dismissed: true });
+  const saved = (await api.put('/preferences', { timezone_hint_dismissed: true }))?.data;
   _prefs = { ...(_prefs ?? {}), timezone_hint_dismissed: true };
+  // Hat inzwischen ein anderer Admin eine Zone gewaehlt, traegt die Antwort
+  // sie. Der Hinweis geht hier ohnehin - die Anzeige muss der Zone dann aber
+  // folgen, sonst rechnete diese Sitzung bis zum Neuladen in der des Browsers.
+  if (saved?.timezone) {
+    _prefs = pick(saved);
+    mirror(saved.timezone);
+  }
 }
 
 /**

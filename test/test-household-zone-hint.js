@@ -328,6 +328,17 @@ test('So lassen: merkt die Entscheidung am Haushalt und fasst die Zone nicht an'
   assert.deepEqual(hint.zoneMismatch(hint.knownZonePrefs(), 'Asia/Seoul'), { browser: 'Asia/Seoul', household: 'UTC' });
 });
 
+test('So lassen: hat inzwischen jemand eine Zone gewaehlt, folgt die Anzeige ihr', async () => {
+  reset();
+  // Der Tab ist alt: er kennt "nie gesetzt", der Server hat laengst Berlin.
+  const api = fakeApi({ current: { timezone: 'Europe/Berlin', timezone_effective: 'Europe/Berlin', timezone_hint_dismissed: true } });
+  await hint.keepZone({ api });
+
+  assert.equal(tz.displayTimeZone(), 'Europe/Berlin');
+  assert.equal(events.length, 1, 'offene Ansichten zeichnen neu');
+  assert.equal(hint.knownZonePrefs().timezone, 'Europe/Berlin');
+});
+
 test('So lassen: ein Fehlschlag merkt nichts', async () => {
   reset();
   const boom = new Error('offline');

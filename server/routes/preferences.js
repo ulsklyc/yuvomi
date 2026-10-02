@@ -709,6 +709,17 @@ router.put('/', (req, res) => {
       }
     }
 
+    // Der Merker zum Zonen-Hinweis ist aus demselben Grund hier oben geprueft
+    // und erst weiter unten geschrieben.
+    if (timezone_hint_dismissed !== undefined) {
+      if (!isAdminRequest(req)) {
+        return res.status(403).json({ error: 'Admin access required.', code: 403 });
+      }
+      if (typeof timezone_hint_dismissed !== 'boolean') {
+        return res.status(400).json({ error: 'timezone_hint_dismissed muss true oder false sein.', code: 400 });
+      }
+    }
+
     if (visible_meal_types !== undefined) {
       if (!Array.isArray(visible_meal_types)) {
         return res.status(400).json({ error: 'visible_meal_types muss ein Array sein', code: 400 });
@@ -836,13 +847,8 @@ router.put('/', (req, res) => {
     // Haushalt, also dasselbe Admin-Gate wie die Zone selbst. Ein eigener
     // sync_config-Schluessel und keine Spalte: die Einstellung, zu der er
     // gehoert, liegt ebenfalls dort.
+    // Admin-Gate und Typ sind am Anfang des Handlers geprueft.
     if (timezone_hint_dismissed !== undefined) {
-      if (!isAdminRequest(req)) {
-        return res.status(403).json({ error: 'Admin access required.', code: 403 });
-      }
-      if (typeof timezone_hint_dismissed !== 'boolean') {
-        return res.status(400).json({ error: 'timezone_hint_dismissed muss true oder false sein.', code: 400 });
-      }
       if (timezone_hint_dismissed) cfgSet('household_timezone_hint_dismissed', '1');
       else cfgDelete('household_timezone_hint_dismissed');
     }
