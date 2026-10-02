@@ -872,3 +872,40 @@ test('PATCH done: bleibt eine bearbeitete Folgeinstanz stehen, nennt der zweite 
     'und es ist keine zweite entstanden',
   );
 });
+
+test('PATCH done: ist die direkte Folgeinstanz schon erledigt, nennt die Antwort das offene Vorkommen dahinter', async () => {
+  // `recurrence_origin_id` zeigt auf den DIREKTEN Vorgaenger, die Serie ist
+  // eine Kette: A -> B -> C. Wer A wieder oeffnet, nachdem B erledigt wurde,
+  // behaelt B (dort steckt Arbeit) - und beim erneuten Abhaken von A ist das
+  // naechste Mal nicht B, sondern C. Nur das direkte Kind zu lesen hiess, hier
+  // null zu melden, obwohl ein offenes Vorkommen dasteht (Review zu #1615).
+  const a = await completeRecurring('Kompost leeren', 'FREQ=WEEKLY');
+  const b = openInstances('Kompost leeren')[0];
+  await call('PATCH', `/${b.id}/status`, { status: 'done' });
+  const c = openInstances('Kompost leeren')[0];
+  assert.equal(c.recurrence_origin_id, b.id, 'die Kette haengt am direkten Vorgaenger');
+  assert.equal(b.recurrence_origin_id, a);
+
+  await call('PATCH', `/${a}/status`, { status: 'open' });
+  assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get(b.id).status, 'done', 'B blieb stehen');
+
+  const res = await call('PATCH', `/${a}/status`, { status: 'done' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.next_due_date, c.due_date);
+  assert.equal(openInstances('Kompost leeren').length, 1, 'und es ist kein weiteres entstanden');
+});
+
+test('PATCH done: die Suche nach dem naechsten Vorkommen endet auch an einer Kette, die im Kreis laeuft', async () => {
+  // Der Server baut keinen Kreis. Eine wiederhergestellte oder von Hand
+  // bearbeitete Datenbank kann einen tragen, und ein Haken darf daran nicht
+  // haengen bleiben: die Route ist synchron, eine Endlosschleife stuende fuer
+  // den ganzen Prozess.
+  const a = await completeRecurring('Kreislauf', 'FREQ=WEEKLY');
+  const b = openInstances('Kreislauf')[0];
+  db.prepare(`UPDATE tasks SET status = 'done' WHERE id = ?`).run(b.id);
+  db.prepare('UPDATE tasks SET recurrence_origin_id = ? WHERE id = ?').run(b.id, a);
+  await call('PATCH', `/${a}/status`, { status: 'open' });
+  const res = await call('PATCH', `/${a}/status`, { status: 'done' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.next_due_date, null);
+});

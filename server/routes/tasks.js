@@ -1385,6 +1385,38 @@ function recurrenceFollowupOf(taskId) {
 }
 
 /**
+ * Das naechste OFFENE Vorkommen hinter einer Aufgabe, oder null (#1603).
+ *
+ * DIE SERIE IST EINE KETTE, KEIN STERN: `recurrence_origin_id` zeigt auf den
+ * direkten Vorgaenger (A <- B <- C), nicht auf eine Stammzeile. Das direkte
+ * Kind allein beantwortet die Frage deshalb nicht. Wer A wieder oeffnet,
+ * nachdem B schon erledigt wurde, behaelt B (discardRecurrenceFollowup wirft
+ * erledigte Arbeit nicht weg) - und beim erneuten Abhaken von A ist das
+ * naechste Mal C. Erledigte und abgelegte Glieder werden uebersprungen, das
+ * erste offene, nicht abgelegte zaehlt.
+ *
+ * DIE SUCHE ENDET IMMER. Der Server baut keinen Kreis, eine wiederhergestellte
+ * oder von Hand bearbeitete Datenbank kann einen tragen, und der Treiber ist
+ * synchron: eine Schleife ohne Ende stuende fuer den ganzen Prozess. Deshalb
+ * die besuchte Menge UND eine Obergrenze - hinter mehr als
+ * MAX_FOLLOWUP_HOPS erledigten Gliedern gibt es kein „naechstes Mal" zu
+ * nennen, nur eine Antwort, die auf sich warten liesse.
+ */
+const MAX_FOLLOWUP_HOPS = 500;
+
+function nextOpenOccurrenceOf(taskId) {
+  const seen = new Set([Number(taskId)]);
+  let current = recurrenceFollowupOf(taskId);
+  for (let hops = 0; current && hops < MAX_FOLLOWUP_HOPS; hops += 1) {
+    if (seen.has(current.id)) return null;
+    seen.add(current.id);
+    if (current.status === 'open' && !current.archived_at) return current;
+    current = recurrenceFollowupOf(current.id);
+  }
+  return null;
+}
+
+/**
  * Prüft, ob Unteraufgaben einer Folgeinstanz durch den Benutzer verändert wurden
  * (editiert, erledigt, hinzugefügt oder gelöscht).
  */
@@ -1766,12 +1798,9 @@ router.patch('/:id/status', (req, res) => {
         // Upload ansteht. Gefragt ist, was nach diesem Haken als Naechstes
         // offen dasteht - das ist auch die Folgeinstanz, die ein frueheres
         // Abhaken angelegt hat und die das Zuruecknehmen stehen liess, weil
-        // jemand an ihr gearbeitet hatte (discardRecurrenceFollowup). Eine
-        // erledigte oder abgelegte ist kein „naechstes Mal".
-        const followup = recurrenceFollowupOf(prev.id);
-        if (followup && followup.status === 'open' && !followup.archived_at) {
-          nextDueDate = followup.due_date ?? null;
-        }
+        // jemand an ihr gearbeitet hatte (discardRecurrenceFollowup), und es
+        // ist das Vorkommen HINTER ihr, wenn sie selbst schon erledigt ist.
+        nextDueDate = nextOpenOccurrenceOf(prev.id)?.due_date ?? null;
       }
     })();
 
