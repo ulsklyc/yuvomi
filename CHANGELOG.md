@@ -43,7 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the field had no button of its own, so there was no way left to add one; only the detail
   column on wide screens worked. The field now has an "Add" button next to it, and Enter saves
   the subtask and keeps the field open for the next one. In any sheet with more than one form,
-  Enter now submits the form the field belongs to.
+  Enter now submits the form the field belongs to and ignores buttons of a view that is hidden
+  at that moment, so Enter in the edit form of a task saves the task.
 - **Correcting the date of a series' first entry no longer moves the rest of the series** (#1545).
   Every later occurrence of a recurring payment is counted from its start day, and that was still
   the date of the first entry. Correcting it with "Only this occurrence" (the rent was debited on

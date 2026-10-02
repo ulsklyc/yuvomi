@@ -45,27 +45,46 @@ const { openTaskDetail } = await import('../public/components/task-detail.js');
 // Der Trap: Enter gehoert dem Formular des Feldes
 // --------------------------------------------------------
 
-/** Ein Knopf, der seine Klicks zaehlt. */
-function knopf(name) {
-  return { name, disabled: false, clicks: 0, click() { this.clicks += 1; } };
+/**
+ * Ein Knopf, der seine Klicks zaehlt. `form` ist sein Formular-BESITZER wie im
+ * Browser (`button.form`): das umgebende <form> oder das per `form="id"`
+ * zugeordnete - so haengt `mountFooter()` den Speichern-Knopf der Fusszeile an
+ * sein Formular (#543). `versteckt` heisst: er steht in einem `[hidden]`-Ast.
+ */
+function knopf(name, { form = null, imFormular = false, versteckt = false } = {}) {
+  const k = {
+    name, type: 'submit', disabled: false, clicks: 0, form,
+    click() { this.clicks += 1; },
+    closest(selector) { return versteckt && selector.includes('[hidden]') ? {} : null; },
+  };
+  if (form && imFormular) form.eigene.push(k);
+  return k;
 }
 
-/**
- * Ein Panel wie das der Aufgabe: `first` ist, was die panelweite Suche
- * `button[type="submit"], .btn--primary` zuerst findet.
- */
-function panelMit(first) {
+/** Ein Formular; `querySelector` sieht nur Knoepfe, die IN ihm stehen. */
+function formular() {
+  return {
+    eigene: [],
+    querySelector(selector) {
+      return selector.includes('button[type="submit"]') ? (this.eigene[0] ?? null) : null;
+    },
+  };
+}
+
+/** Ein Panel mit seinen Absende-Knoepfen in Dokumentreihenfolge. */
+function panelMit(...knoepfe) {
   const listeners = new Map();
+  const absender = (selector) => (selector.includes('button[type="submit"]') ? knoepfe : []);
   return {
     listeners,
     addEventListener(type, handler) { listeners.set(type, handler); },
     removeEventListener() {},
-    querySelector(selector) {
-      return selector.includes('button[type="submit"]') ? first : null;
-    },
-    querySelectorAll() { return []; },
+    querySelector(selector) { return absender(selector)[0] ?? null; },
+    querySelectorAll(selector) { return absender(selector); },
   };
 }
+
+const feld = (form) => ({ tagName: 'INPUT', type: 'text', form });
 
 /** Enter im gegebenen Feld druecken; liefert, ob der Trap es verschluckt hat. */
 function enterIn(panel, field) {
@@ -77,17 +96,16 @@ function enterIn(panel, field) {
 
 test('Enter in einem Feld mit eigenem Formular klickt DESSEN Absende-Knopf, nicht den ersten des Panels', () => {
   assert.equal(typeof modalTest.trapFocus, 'function', 'modal.js gibt den Trap nicht mehr fuer Tests heraus');
-  const kommentieren = knopf('Kommentieren');
-  const hinzufuegen = knopf('Hinzufuegen');
-  const panel = panelMit(kommentieren);
+  // Dokumentreihenfolge des Aufgabenblatts, hier bewusst UMGEKEHRT gestellt:
+  // "Kommentieren" steht vorn, damit die Reihenfolge den Fehler nicht verdeckt.
+  const kommentarForm = formular();
+  const zeile = formular();
+  const kommentieren = knopf('Kommentieren', { form: kommentarForm, imFormular: true });
+  const hinzufuegen = knopf('Hinzufuegen', { form: zeile, imFormular: true });
+  const panel = panelMit(kommentieren, hinzufuegen);
   modalTest.trapFocus(panel, 'none');
 
-  const field = {
-    tagName: 'INPUT',
-    type: 'text',
-    form: { querySelector: (s) => (s.includes('button[type="submit"]') ? hinzufuegen : null) },
-  };
-  enterIn(panel, field);
+  enterIn(panel, feld(zeile));
 
   assert.equal(kommentieren.clicks, 0,
     'Enter in der Teilaufgaben-Zeile hat "Kommentieren" ausgeloest - der Trap nimmt den ersten Absende-Knopf des Panels statt den des Formulars');
@@ -102,25 +120,66 @@ test('ein Formular OHNE eigenen Absende-Knopf faellt weiter auf den des Panels (
   const panel = panelMit(speichern);
   modalTest.trapFocus(panel, 'none');
 
-  assert.equal(enterIn(panel, { tagName: 'INPUT', type: 'text', form: { querySelector: () => null } }), true);
+  assert.equal(enterIn(panel, feld(formular())), true);
   assert.equal(speichern.clicks, 1, 'Feld in einem Formular ohne eigenen Knopf');
 
-  assert.equal(enterIn(panel, { tagName: 'INPUT', type: 'text', form: null }), true);
+  assert.equal(enterIn(panel, feld(null)), true);
   assert.equal(speichern.clicks, 2, 'Feld ganz ohne Formular');
 });
 
 test('ein gesperrter Absende-Knopf des eigenen Formulars loest nichts aus - auch nicht den des Panels', () => {
   // Gesperrt heisst "gerade unterwegs". Der Rueckfall auf das Panel waere hier
   // genau der Fehler aus #1598 durch die Hintertuer.
-  const kommentieren = knopf('Kommentieren');
-  const hinzufuegen = knopf('Hinzufuegen');
+  const zeile = formular();
+  const kommentieren = knopf('Kommentieren', { form: formular(), imFormular: true });
+  const hinzufuegen = knopf('Hinzufuegen', { form: zeile, imFormular: true });
   hinzufuegen.disabled = true;
-  const panel = panelMit(kommentieren);
+  const panel = panelMit(kommentieren, hinzufuegen);
   modalTest.trapFocus(panel, 'none');
 
-  enterIn(panel, { tagName: 'INPUT', type: 'text', form: { querySelector: () => hinzufuegen } });
+  enterIn(panel, feld(zeile));
   assert.equal(kommentieren.clicks, 0);
   assert.equal(hinzufuegen.clicks, 0);
+});
+
+test('im Bearbeiten-Formular trifft Enter Speichern, nicht einen Knopf der versteckten Leseansicht', () => {
+  // DAS BLATT NACH "BEARBEITEN" (Review zu PR #1611): die Leseansicht bleibt
+  // `hidden` im DOM stehen, samt Teilaufgaben-Zeile und Kommentarfeld - und sie
+  // steht VOR dem Formular. `mountFooter()` hebt die Fusszeile des Formulars
+  // ans Panel und bindet "Speichern" per `form="id"` an sein Formular: der
+  // Knopf steht also nicht mehr IN ihm, gehoert ihm aber. Der Rueckfall nahm
+  // den ersten Treffer im Dokument - den versteckten Knopf der Leseansicht.
+  const zeile = formular();
+  const bearbeiten = formular();
+  const hinzufuegen = knopf('Hinzufuegen', { form: zeile, imFormular: true, versteckt: true });
+  const kommentieren = knopf('Kommentieren', { form: formular(), imFormular: true, versteckt: true });
+  const speichern = knopf('Speichern', { form: bearbeiten });
+  const panel = panelMit(hinzufuegen, kommentieren, speichern);
+  modalTest.trapFocus(panel, 'none');
+
+  assert.equal(enterIn(panel, feld(bearbeiten)), true, 'Enter wurde nicht als Absenden behandelt');
+  assert.equal(hinzufuegen.clicks, 0, 'Enter im Titelfeld hat den versteckten "Hinzufuegen"-Knopf der Leseansicht ausgeloest');
+  assert.equal(kommentieren.clicks, 0, 'Enter im Titelfeld hat das versteckte "Kommentieren" ausgeloest');
+  assert.equal(speichern.clicks, 1, 'Enter im Titelfeld speichert die Aufgabe nicht');
+});
+
+test('der Rueckfall nimmt weder versteckte Knoepfe noch die eines FREMDEN Formulars', () => {
+  // Sichtbar, aber fremd: ein zweites Formular im selben Blatt. Sein Absender
+  // ist nicht die Antwort auf Enter in diesem Feld - lieber die formlose
+  // Hauptaktion des Panels dahinter.
+  const fremd = knopf('Kommentieren', { form: formular(), imFormular: true });
+  const versteckt = knopf('Alt', { versteckt: true });
+  const speichern = knopf('Speichern');
+  const panel = panelMit(versteckt, fremd, speichern);
+  modalTest.trapFocus(panel, 'none');
+
+  assert.equal(enterIn(panel, feld(formular())), true);
+  assert.deepEqual([versteckt.clicks, fremd.clicks, speichern.clicks], [0, 0, 1]);
+
+  // Und wenn NUR Verstecktes da ist, passiert nichts - Enter bleibt beim Browser.
+  const leer = panelMit(knopf('Alt', { versteckt: true }));
+  modalTest.trapFocus(leer, 'none');
+  assert.equal(enterIn(leer, feld(formular())), false, 'ein versteckter Knopf darf Enter nicht verschlucken');
 });
 
 // --------------------------------------------------------
