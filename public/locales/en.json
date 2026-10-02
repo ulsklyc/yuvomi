@@ -993,6 +993,7 @@
         "iconWeather": "Weather",
         "invalidDate": "Use a valid date in the selected date format.",
         "endBeforeStart": "The end date can't be before the start date.",
+        "recurrenceEndBeforeStart": "The repeat end can't be before the start date.",
         "caldavTargetLabel": "Sync to CalDAV",
         "caldavTargetLocal": "Store locally only",
         "caldavTargetHint": "Choose a CalDAV calendar to sync this event.",

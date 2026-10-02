@@ -1059,6 +1059,7 @@
         "iconWeather": "Počasí",
         "invalidDate": "Použijte platné datum ve zvoleném formátu.",
         "endBeforeStart": "Datum konce nesmí být před datem začátku.",
+        "recurrenceEndBeforeStart": "Konec opakování nesmí být před datem zahájení.",
         "caldavTargetLabel": "Synchronizovat s CalDAV",
         "caldavTargetLocal": "Ukládat pouze lokálně",
         "caldavTargetHint": "Vyberte CalDAV kalendář pro synchronizaci této události.",

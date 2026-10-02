@@ -1017,6 +1017,7 @@
         "iconWeather": "Panahon",
         "invalidDate": "Gumamit ng wastong petsa sa napiling format ng petsa.",
         "endBeforeStart": "Hindi maaaring mas maaga sa petsa ng simula ang petsa ng pagtatapos.",
+        "recurrenceEndBeforeStart": "Hindi maaaring mas maaga sa petsa ng simula ang pagtatapos ng pag-uulit.",
         "caldavTargetLabel": "I-sync sa CalDAV",
         "caldavTargetLocal": "Lokal na imbakan lamang",
         "caldavTargetHint": "Pumili ng kalendaryo sa CalDAV para i-sync ang kaganapang ito.",

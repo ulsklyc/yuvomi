@@ -6,6 +6,7 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
+import { readFileSync } from 'node:fs';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import {
   runSearch, buildMatchQuery, runTableSearch, escapeLike, INFIX_TERM_CAP, searchExcerpt,
@@ -232,6 +233,101 @@ test('globale Suche liefert den aufgelösten verschobenen Termin mit Originalide
   assert(result[0].series_id === Number(masterId), 'series_id fehlt');
   assert(result[0].recurrence_id === '2030-07-01', 'originale recurrence_id fehlt');
   assert(result[0].is_occurrence_override === true, 'Override-Kennzeichen fehlt');
+});
+
+// #1607 (M4a): die globale Suche lieferte fuer eine Serie den Start der
+// STAMMZEILE - ein Geburtstag von 1990 oeffnete den Kalender im Jahr 1990,
+// waehrend die Kalendersuche dieselbe Serie laengst an ihrem naechsten Termin
+// zeigte. Uhr und Zone stehen im Test: `todayKey` fragt beide.
+// Die Suite baut ihr Schema aus einzelnen Migrationen; `sync_config` (Traeger
+// der Haushaltszone) ist nicht dabei. Dieselbe Form wie in der Migration.
+db.exec(`CREATE TABLE IF NOT EXISTS sync_config (
+  key TEXT PRIMARY KEY, value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);`);
+const searchModule = await import('../server/services/search.js');
+
+function mitUhr(isoNow, zone, fn) {
+  const Echt = globalThis.Date;
+  const fest = new Echt(isoNow).getTime();
+  class FesteUhr extends Echt {
+    constructor(...args) { if (args.length) super(...args); else super(fest); }
+    static now() { return fest; }
+  }
+  db.prepare(`INSERT INTO sync_config (key, value) VALUES ('household_timezone', ?)
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(zone);
+  globalThis.Date = FesteUhr;
+  // KEIN await zwischen Setzen und Zuruecksetzen.
+  try { return fn(); } finally {
+    globalThis.Date = Echt;
+    db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run();
+  }
+}
+
+test('globale Suche zeigt eine alte Serie an ihrem naechsten Termin, nicht im Startjahr (#1607)', () => {
+  const id = db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, all_day, recurrence_rule, created_by)
+    VALUES ('Geburtstag Qzxbirthday', '1990-10-14', 1, 'FREQ=YEARLY', ?)
+  `).run(uid).lastInsertRowid;
+  const treffer = mitUhr('2026-10-02T10:00:00Z', 'UTC', () => runSearch(db, 'Qzxbirthday', uid).events);
+  assert(treffer.length === 1, `genau ein Treffer erwartet, bekommen ${treffer.length}`);
+  assert(treffer[0].id === Number(id), 'der Treffer bleibt die Serie selbst');
+  assert(treffer[0].start_datetime.slice(0, 10) === '2026-10-14',
+    `erwartet den naechsten Termin 2026-10-14, bekommen ${treffer[0].start_datetime}`);
+  assert(treffer[0].all_day === 1, 'ganztaegig bleibt ganztaegig');
+});
+
+test('"heute" der globalen Suche ist der Tag der Haushaltszone (#1607)', () => {
+  // 00:30 UTC am 15.: in Los Angeles ist noch der 14., der Geburtstag also
+  // heute; in UTC ist er vorbei und der naechste liegt ein Jahr spaeter. Die
+  // beiden Antworten MUESSEN sich unterscheiden.
+  const jetzt = '2026-10-15T00:30:00Z';
+  const la = mitUhr(jetzt, 'America/Los_Angeles', () => runSearch(db, 'Qzxbirthday', uid).events[0]);
+  const utc = mitUhr(jetzt, 'UTC', () => runSearch(db, 'Qzxbirthday', uid).events[0]);
+  assert(la.start_datetime.slice(0, 10) === '2026-10-14', `Los Angeles: ${la.start_datetime}`);
+  assert(utc.start_datetime.slice(0, 10) === '2027-10-14', `UTC: ${utc.start_datetime}`);
+});
+
+test('globale Suche und Kalendersuche fragen dasselbe Fenster ab (#1607)', () => {
+  // Synchron, wie jeder Test dieser Datei: der eigene Zaehler wartet nicht.
+  const { eventSearchWindow } = searchModule;
+  assert(typeof eventSearchWindow === 'function', 'das gemeinsame Fenster fehlt');
+  const fenster = mitUhr('2026-10-02T10:00:00Z', 'UTC', () => eventSearchWindow(db));
+  assert(fenster.from === '2026-10-02' && fenster.to === '2028-10-01',
+    `Fenster: ${JSON.stringify(fenster)}`);
+  // UND BEIDE AUFRUFER NEHMEN ES: eine zweite Rechnung in der Route liefe beim
+  // naechsten Umbau auseinander, und dieselbe Serie stuende wieder an zwei Tagen.
+  const route = readFileSync(new URL('../server/routes/calendar/read.js', import.meta.url), 'utf8');
+  assert(/eventSearchWindow\(/.test(route), 'die Kalendersuche rechnet ihr Fenster selbst');
+  assert(!/shiftDateKey\(today, 730\)/.test(route), 'in der Route steht noch eine eigene Fensterrechnung');
+});
+
+test('die fuenf Treffer sind die fuenf fruehesten ANGEZEIGTEN Tage, nicht die fuenf aeltesten Stammzeilen (#1607)', () => {
+  // Gedeckelt wurde nach dem Start der Stammzeile, angezeigt wird der naechste
+  // Termin. Fuenf alte Serien, deren naechster Termin Monate entfernt liegt,
+  // verdraengten so einen sechsten Treffer von morgen (Review an PR #1618).
+  const ins = db.prepare(`INSERT INTO calendar_events (title, start_datetime, all_day, recurrence_rule, created_by)
+                          VALUES (?, ?, 1, ?, ?)`);
+  for (let i = 0; i < 5; i++) ins.run(`Jahrestag Qzxcrowd ${i}`, `198${i}-03-0${i + 1}`, 'FREQ=YEARLY', uid);
+  ins.run('Morgen Qzxcrowd', '2026-10-03', null, uid);
+  const treffer = mitUhr('2026-10-02T10:00:00Z', 'UTC', () => runSearch(db, 'Qzxcrowd', uid).events);
+  assert(treffer.length === 5, `fuenf Treffer: ${treffer.length}`);
+  assert(treffer[0].title === 'Morgen Qzxcrowd',
+    `der Termin von morgen steht vorn: ${treffer.map((e) => `${e.title} ${e.start_datetime}`).join(' | ')}`);
+  const tage = treffer.map((e) => e.start_datetime.slice(0, 10));
+  assert(JSON.stringify(tage) === JSON.stringify([...tage].sort()), `aufsteigend: ${tage.join(', ')}`);
+});
+
+test('ohne kommenden Termin bleibt der Treffer die Stammzeile; ein Einzeltermin bleibt, wo er liegt (#1607)', () => {
+  db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, all_day, recurrence_rule, created_by)
+    VALUES ('Beendet Qzxended', '2001-03-05', 1, 'FREQ=YEARLY;UNTIL=20050305', ?),
+           ('Einmal Qzxsingle', '1999-06-01T09:00:00', 0, NULL, ?)
+  `).run(uid, uid);
+  const beendet = mitUhr('2026-10-02T10:00:00Z', 'UTC', () => runSearch(db, 'Qzxended', uid).events[0]);
+  assert(beendet.start_datetime.slice(0, 10) === '2001-03-05', `beendete Serie: ${beendet.start_datetime}`);
+  const einmal = mitUhr('2026-10-02T10:00:00Z', 'UTC', () => runSearch(db, 'Qzxsingle', uid).events[0]);
+  assert(einmal.start_datetime === '1999-06-01T09:00:00', `Einzeltermin: ${einmal.start_datetime}`);
 });
 
 test('globale Suche löst große Anhänge auf, ohne attachment_data zu lesen', () => {

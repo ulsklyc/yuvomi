@@ -1017,6 +1017,7 @@
         "iconWeather": "Cuaca",
         "invalidDate": "Gunakan tanggal yang valid dalam format yang dipilih.",
         "endBeforeStart": "Tanggal selesai tidak boleh sebelum tanggal mulai.",
+        "recurrenceEndBeforeStart": "Akhir pengulangan tidak boleh sebelum tanggal mulai.",
         "caldavTargetLabel": "Sinkronkan ke CalDAV",
         "caldavTargetLocal": "Simpan hanya secara lokal",
         "caldavTargetHint": "Pilih kalender CalDAV untuk menyinkronkan acara ini.",

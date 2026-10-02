@@ -1149,6 +1149,7 @@
         "iconWeather": "Pogoda",
         "invalidDate": "Proszę użyć prawidłowej daty w wybranym formacie.",
         "endBeforeStart": "Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.",
+        "recurrenceEndBeforeStart": "Koniec powtarzania nie może być wcześniejszy niż data rozpoczęcia.",
         "caldavTargetLabel": "Synchronizuj z CalDAV",
         "caldavTargetLocal": "Tylko lokalnie",
         "caldavTargetHint": "Wybierz kalendarz CalDAV, aby synchronizować to wydarzenie.",

@@ -372,6 +372,22 @@ test('auth.setup: schickt language mit, und laesst das Feld ohne Angabe weg', as
   assert.deepEqual(Object.keys(bodies[1].body).sort(), ['display_name', 'password', 'username']);
 });
 
+test('auth.setup: schickt timezone mit, und laesst das Feld ohne Angabe weg', async () => {
+  setup();
+  const bodies = [];
+  _mockFetch = (url, opts) => {
+    bodies.push(JSON.parse(opts.body));
+    return mockResponse(201, { user: { id: 1 } });
+  };
+
+  await auth.setup('admin', 'Admin', 'password123', 'de', 'Asia/Seoul');
+  await auth.setup('admin', 'Admin', 'password123', 'de');
+
+  assert.equal(bodies[0].timezone, 'Asia/Seoul');
+  assert.equal(bodies[0].language, 'de');
+  assert.equal(Object.hasOwn(bodies[1], 'timezone'), false);
+});
+
 test('OpenAPI beschreibt language und timezone als optionale Setup-Felder', () => {
   const schema = openApi.components.schemas.SetupRequest;
   assert.equal(schema.properties.language?.type, 'string');

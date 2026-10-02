@@ -1191,6 +1191,7 @@
         "iconWeather": "طقس",
         "invalidDate": "استخدم تاريخًا صالحًا بالتنسيق المحدد.",
         "endBeforeStart": "لا يمكن أن يسبق تاريخ الانتهاء تاريخ البدء.",
+        "recurrenceEndBeforeStart": "لا يمكن أن تكون نهاية التكرار قبل تاريخ البداية.",
         "attachmentLabel": "مرفق",
         "attachmentHint": "صورة أو PDF أو مستند. تظهر الصور في تفاصيل الحدث.",
         "attachmentFallback": "Attachment",

@@ -993,6 +993,7 @@
         "iconWeather": "Meteo",
         "invalidDate": "Usa una data valida nel formato selezionato.",
         "endBeforeStart": "La data di fine non può essere precedente alla data di inizio.",
+        "recurrenceEndBeforeStart": "La fine della ripetizione non può precedere la data di inizio.",
         "attachmentLabel": "Allegato",
         "attachmentHint": "Immagine, PDF o documento. Le immagini compaiono nei dettagli dell'evento.",
         "attachmentFallback": "Allegato",

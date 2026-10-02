@@ -993,6 +993,7 @@
         "iconWeather": "Thời tiết",
         "invalidDate": "Sử dụng ngày hợp lệ ở định dạng ngày đã chọn.",
         "endBeforeStart": "Ngày kết thúc không thể trước ngày bắt đầu.",
+        "recurrenceEndBeforeStart": "Ngày kết thúc lặp lại không thể trước ngày bắt đầu.",
         "caldavTargetLabel": "Đồng bộ với CalDAV",
         "caldavTargetLocal": "Chỉ lưu cục bộ",
         "caldavTargetHint": "Chọn lịch CalDAV để đồng bộ sự kiện này.",

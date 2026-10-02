@@ -1017,6 +1017,7 @@
         "iconWeather": "آب‌وهوا",
         "invalidDate": "لطفاً تاریخ معتبری در قالب انتخاب‌شده وارد کنید.",
         "endBeforeStart": "تاریخ پایان نباید پیش از تاریخ شروع باشد.",
+        "recurrenceEndBeforeStart": "پایان تکرار نمی‌تواند پیش از تاریخ شروع باشد.",
         "caldavTargetLabel": "همگام‌سازی با CalDAV",
         "caldavTargetLocal": "فقط ذخیره محلی",
         "caldavTargetHint": "برای همگام‌سازی این رویداد یک تقویم CalDAV انتخاب کنید.",
