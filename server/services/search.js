@@ -14,6 +14,7 @@ import {
   expandRecurringEvents, loadEventExceptions,
 } from './calendar-events.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
+import { shiftDateKey, todayKey } from '../utils/timezone.js';
 
 export const SEARCH_LIMIT = 5;
 
@@ -286,6 +287,28 @@ export function emptySearchResults() {
 }
 
 /**
+ * Das Fenster, in dem ein Serientreffer seinen naechsten Termin sucht: ab heute
+ * (Haushaltszone), zwei Jahre weit.
+ *
+ * EINE Rechnung fuer beide Suchen (#1607). Die Kalendersuche hatte sie in ihrer
+ * Route, die globale Suche hatte gar keine und lieferte den Start der
+ * Stammzeile - ein Geburtstag von 1990 stand in der Palette mit dem Datum von
+ * 1990 und oeffnete den Kalender in jenem Jahr, waehrend dieselbe Serie in der
+ * Kalendersuche an ihrem naechsten Termin stand.
+ *
+ * Zwei Jahre, damit auch eine Serie mit mehrjaehrigem Abstand ihren naechsten
+ * Termin findet. Findet sich keiner, bleibt der Treffer die Stammzeile
+ * (`resolveEventSearchRows`).
+ *
+ * @param {object} database
+ * @returns {{ from: string, to: string }} zwei Tagesschluessel
+ */
+export function eventSearchWindow(database) {
+  const from = todayKey(database);
+  return { from, to: shiftDateKey(from, 730) };
+}
+
+/**
  * Resolves event search hits through the same linked-occurrence contract as
  * calendar reads. When a display window is supplied, recurring master hits are
  * represented by their first occurrence in that window, preserving the
@@ -367,6 +390,8 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
   // Filter müssen vor ORDER/LIMIT greifen, damit verborgene Treffer sichtbare
   // nicht aus dem Ergebnisfenster verdrängen.
   if (allows('events')) {
+    // Serien stehen an ihrem naechsten Termin, wie in der Kalendersuche (#1607).
+    const window = eventSearchWindow(database);
     const eventRows = resolveEventSearchRows(database, database.prepare(`
       SELECT ${eventProjectionSql(database)}
       FROM search_index s
@@ -381,7 +406,7 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
         AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}
       ORDER BY e.start_datetime ASC
       LIMIT @limit
-    `).all({ match, userId, limit }), null, null, { lightweight: true });
+    `).all({ match, userId, limit }), window.from, window.to, { lightweight: true });
     // Preserve the compact global-search payload. The resolver-capable
     // projection supplies linked inheritance without loading attachment bodies
     // or unrelated sync metadata into this result bucket.

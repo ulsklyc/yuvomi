@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A recurring event found in the global search opens at its next date, not in its first year**
+  (#1607). The search behind Cmd/Ctrl+K listed a series with the date of its very first
+  occurrence, and the link opened the calendar there: a birthday from 1990 opened October 1990.
+  The global search now resolves a series to its next occurrence from today, with the same
+  two-year window the calendar's own search uses, and the link carries that day. In
+  `GET /api/v1/search`, `events[].start_datetime` of a recurring event is therefore the next
+  occurrence instead of the series start; `id` is unchanged.
 - **A repeat end before the start date is no longer saved** (#1607). An event starting on 2 October
   could be saved as "daily, until 30 September": the dialog only checked that the end was a valid
   date, and the server only checked the form of the rule. The dialog now shows the error at the
