@@ -269,7 +269,7 @@
     "test:reminder-offset": "node test/test-reminder-offset.js",
     "test:task-reminder-after-due": "node --loader ./test/test-browser-loader.mjs --test test/test-task-reminder-after-due.js",
     "test:calendar-reminder-after-start": "TZ=Europe/Berlin node --loader ./test/test-browser-loader.mjs --test test/test-calendar-reminder-after-start.js",
-    "test:calendar-occurrence-scope": "TZ=Europe/Berlin node --loader ./test/test-browser-loader.mjs --test test/test-calendar-occurrence-scope.js",
+    "test:calendar-occurrence-scope": "TZ=Europe/Berlin node --loader ./test/test-browser-loader.mjs --test test/test-calendar-occurrence-scope.js test/test-calendar-occurrence-click.js",
     "test:task-detail-finish": "node --loader ./test/test-browser-loader.mjs --test test/test-task-detail-finish.js",
     "test:api": "node --loader ./test/test-browser-loader.mjs test/test-api.js",
     "test:openapi-coverage": "node --test test/test-openapi-coverage.js",
