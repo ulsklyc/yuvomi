@@ -5,7 +5,7 @@
  * every occurrence mutation applies the same ownership and eligibility rules.
  */
 
-import { hasAnyOccurrence, parseRRule } from './recurrence.js';
+import { endsBeforeStart, hasAnyOccurrence, parseRRule } from './recurrence.js';
 import {
   ASSIGNED_USERS_SQL, expandRecurringEvents, MAX_EXPANSION_ITERATIONS,
 } from './calendar-events.js';
@@ -1348,7 +1348,11 @@ function recurrenceIsEmptyAtAnchor(source) {
   const wall = source.tzid ? utcToWall(start, source.tzid) : null;
   const utcDiffersFromLocal = Boolean(source.tzid)
     && !(wall && wall.date === start.slice(0, 10));
-  return !hasAnyOccurrence(start, source.recurrence_rule, { utcDiffersFromLocal });
+  if (!hasAnyOccurrence(start, source.recurrence_rule, { utcDiffersFromLocal })) return true;
+  // Ein Nachfolger, dessen Regel vor seinem eigenen Start endet (#1607). Nur
+  // hier, wo eine Folgeserie GESCHRIEBEN wird - nicht in `hasAnyOccurrence`,
+  // das auch Lesepfade fragen.
+  return !utcDiffersFromLocal && endsBeforeStart(start, source.recurrence_rule);
 }
 
 export function assertSuccessorHasOccurrence(source) {

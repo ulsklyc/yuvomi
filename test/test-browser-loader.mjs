@@ -111,6 +111,20 @@ const STUBS = {
     // WELCHES von beiden gerufen wurde (relativeDateLabel), setzt
     // globalThis.__formatDayMonth - dasselbe Muster wie __locale.
     export const formatDayMonth = (d) => (globalThis.__formatDayMonth ?? String)(d);
+    // Monat und Jahr in der Reihenfolge der Sprache (__locale), gregorianisch.
+    // Ein Nachbau wie formatUnit; test:region-presets fuehrt ihn gegen das
+    // Original.
+    export const formatMonthYear = (year, month) => {
+      const y = Number(year);
+      const m = Number(month);
+      if (!Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12) return '';
+      const locale = globalThis.__locale ?? 'de';
+      const text = new Intl.DateTimeFormat(locale, {
+        month: 'long', year: 'numeric', timeZone: 'UTC', calendar: 'gregory',
+      }).format(new Date(Date.UTC(y, m - 1, 1)));
+      const [first = ''] = text;
+      return first.toLocaleUpperCase(locale) + text.slice(first.length);
+    };
     export const formatTime = (d) => String(d);
     export const getTimeFormat = () => '24h';
     // Das Uhrzeit-Suffix der Locale („Uhr"): leer wie in den meisten Sprachen,
@@ -128,10 +142,11 @@ const STUBS = {
   `,
   '/rrule-ui.js': `
     export const renderRRuleFields = () => '';
-    // Dieselbe Form wie das Original, das immer { refreshMonthdayHint }
-    // zurueckgibt: der Kalender-Dialog haengt es an sein Startdatum, und ein
-    // leerer Rueckgabewert liess jede Suite sterben, die wireEventForm FAEHRT.
-    export const bindRRuleEvents = () => ({ refreshMonthdayHint: () => {} });
+    // Dieselbe Form wie das Original, das immer { refreshMonthdayHint,
+    // refreshStartDate } zurueckgibt: der Kalender-Dialog haengt es an sein
+    // Startdatum, und ein leerer Rueckgabewert liess jede Suite sterben, die
+    // wireEventForm FAEHRT.
+    export const bindRRuleEvents = () => ({ refreshMonthdayHint: () => {}, refreshStartDate: () => {} });
     // Das leere Objekt ist fuer jede Suite richtig, die nur das MARKUP prueft -
     // aber es hat kein 'valid_until', und jeder Formular-Handler, der die
     // Wiederholung mitliest, bricht damit sofort mit "invalidDate" ab. Suiten,

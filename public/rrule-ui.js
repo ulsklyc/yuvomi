@@ -24,6 +24,25 @@ const WEEKDAYS = () => [
   { value: 'SU', label: t('rrule.daySu') },
 ];
 
+const WEEKDAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+/**
+ * Wochentag eines Kalendertags als RRULE-Kuerzel, '' ohne gueltiges Datum.
+ *
+ * Gerechnet wird am KEY, ueber UTC-Felder: ein Date aus einem Key waere
+ * Mitternacht der Browser-Zone und koennte je nach Anzeigezone auf dem
+ * Nachbartag landen. Die Bestandteile werden zurueckgelesen, damit ein
+ * 31. Februar keinen Wochentag bekommt.
+ */
+function weekdayCodeOf(startDate) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(parseDateInput(startDate) || '');
+  if (!match) return '';
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return '';
+  return WEEKDAY_CODES[date.getUTCDay()];
+}
+
 /**
  * Parsed einen RRULE-String in ein Objekt für die UI.
  *
@@ -208,10 +227,20 @@ export function renderRRuleFields(prefix, existingRule, opts = {}) {
     `<option value="${o.value}" ${parsed.freq === o.value ? 'selected' : ''}>${o.label}</option>`
   ).join('');
 
-  const dayBtns = WEEKDAYS().map(d =>
-    `<button type="button" class="rrule-day ${parsed.byday.includes(d.value) ? 'rrule-day--active' : ''}"
-             data-day="${d.value}" aria-label="${d.label}" aria-pressed="${parsed.byday.includes(d.value)}">${d.label}</button>`
-  ).join('');
+  // OHNE BYDAY WIEDERHOLT SICH EINE WOCHENSERIE AM WOCHENTAG IHRES STARTS
+  // (#1607). Das ist keine Leere, sondern eine Angabe - nur stand sie nirgends:
+  // alle sieben Knoepfe wirkten "aus", waehrend die Serie donnerstags lief.
+  // Der Starttag wird deshalb als aktiv GEZEIGT und traegt `data-implied`:
+  // abgeleitet, nicht gewaehlt. getRRuleValues liest ihn nicht mit, die Regel
+  // einer Bestandsserie bleibt also im Wortlaut, und die Serie zieht weiter mit
+  // ihrem Start um, wenn jemand den Termin verschiebt.
+  const impliedDay = parsed.byday.length ? '' : weekdayCodeOf(opts.startDate);
+  const dayBtns = WEEKDAYS().map(d => {
+    const implied = d.value === impliedDay;
+    const active = implied || parsed.byday.includes(d.value);
+    return `<button type="button" class="rrule-day ${active ? 'rrule-day--active' : ''}"
+             data-day="${d.value}" aria-label="${d.label}" aria-pressed="${active}"${implied ? ' data-implied="true"' : ''}>${d.label}</button>`;
+  }).join('');
 
   // Endebedingung: Nie / Am Datum (UNTIL) / Nach N Terminen (COUNT). COUNT und
   // UNTIL schließen sich aus (RFC 5545) – der Selektor blendet je Wahl ein Feld ein.
@@ -426,7 +455,10 @@ export function recurrenceRow(rule, opts = {}) {
  * @param {{ expandsFromStart?: boolean, getStartDate?: () => string }} [opts]
  *        Das aufrufende Modul liefert bei Bedarf sein aktuelles Startdatum;
  *        der RRULE-Baustein kennt keine fremden Feldselektoren.
- * @returns {{ refreshMonthdayHint: () => void }}
+ * @returns {{ refreshMonthdayHint: () => void, refreshStartDate: () => void }}
+ *          `refreshStartDate` ruft der Aufrufer bei JEDER Aenderung seines
+ *          Startdatums: Monatsletzten-Vorschau und Wochentags-Vorauswahl
+ *          haengen beide daran.
  */
 export function bindRRuleEvents(root, prefix, opts = {}) {
   const freqSelect  = root.querySelector(`#${prefix}-rrule-freq`);
@@ -467,7 +499,34 @@ export function bindRRuleEvents(root, prefix, opts = {}) {
     }
   };
 
-  if (!freqSelect) return { refreshMonthdayHint };
+  // Die Wochentags-Vorauswahl (#1607). `impliedDays` heisst: kein Knopf traegt
+  // eine Wahl des Nutzers oder der gespeicherten Regel - dann zeigt genau der
+  // Wochentag des Starts "aktiv", und er zieht mit dem Startdatum um.
+  const dayButtons = [...root.querySelectorAll(`#${prefix}-rrule-weekdays .rrule-day`)];
+  const chosenDays = () => dayButtons.filter(
+    (btn) => btn.classList.contains('rrule-day--active') && !btn.hasAttribute('data-implied'),
+  );
+  let impliedDays = chosenDays().length === 0;
+
+  const setDay = (btn, active, implied) => {
+    btn.classList.toggle('rrule-day--active', active);
+    btn.setAttribute('aria-pressed', String(active));
+    if (implied) btn.setAttribute('data-implied', 'true');
+    else         btn.removeAttribute('data-implied');
+  };
+
+  const refreshImpliedDay = () => {
+    if (!impliedDays) return;
+    const code = typeof opts.getStartDate === 'function' ? weekdayCodeOf(opts.getStartDate()) : '';
+    for (const btn of dayButtons) setDay(btn, btn.dataset.day === code, btn.dataset.day === code);
+  };
+
+  const refreshStartDate = () => {
+    refreshMonthdayHint();
+    refreshImpliedDay();
+  };
+
+  if (!freqSelect) return { refreshMonthdayHint, refreshStartDate };
 
   freqSelect.addEventListener('change', () => {
     const freq = freqSelect.value;
@@ -486,7 +545,7 @@ export function bindRRuleEvents(root, prefix, opts = {}) {
       if (freq) freqSelect.removeAttribute('aria-describedby');
       else      freqSelect.setAttribute('aria-describedby', hint.id || `${prefix}-rrule-hint`);
     }
-    refreshMonthdayHint();
+    refreshStartDate();
     updateUnit();
   });
 
@@ -506,10 +565,22 @@ export function bindRRuleEvents(root, prefix, opts = {}) {
   });
 
   // Day-Toggle
-  root.querySelectorAll(`#${prefix}-rrule-weekdays .rrule-day`).forEach(btn => {
+  dayButtons.forEach(btn => {
     btn.addEventListener('click', () => {
-      btn.classList.toggle('rrule-day--active');
-      btn.setAttribute('aria-pressed', btn.classList.contains('rrule-day--active'));
+      // Die erste Beruehrung macht aus dem gezeigten Starttag eine Wahl: wer
+      // "Montag" dazunimmt, will Montag UND den Tag, der schon aktiv aussah.
+      if (impliedDays) {
+        impliedDays = false;
+        for (const other of dayButtons) other.removeAttribute('data-implied');
+      }
+      setDay(btn, !btn.classList.contains('rrule-day--active'), false);
+      // Kein Tag gewaehlt heisst wieder "am Wochentag des Starts" - die Anzeige
+      // faellt auf ihn zurueck, statt sieben Knoepfe "aus" zu zeigen, waehrend
+      // die Serie trotzdem laeuft.
+      if (chosenDays().length === 0) {
+        impliedDays = true;
+        refreshImpliedDay();
+      }
     });
   });
 
@@ -519,9 +590,9 @@ export function bindRRuleEvents(root, prefix, opts = {}) {
     unitEl.textContent = intervalUnitLabel(freqSelect.value, interval);
   }
 
-  refreshMonthdayHint();
+  refreshStartDate();
   syncMonthdayHintVisibility();
-  return { refreshMonthdayHint };
+  return { refreshMonthdayHint, refreshStartDate };
 }
 
 /**
@@ -543,7 +614,9 @@ export function getRRuleValues(root, prefix) {
     : null;
 
   const byday = [];
-  root.querySelectorAll(`#${prefix}-rrule-weekdays .rrule-day--active`).forEach(btn => {
+  // Der nur GEZEIGTE Starttag (`data-implied`, #1607) ist keine Wahl und
+  // erzeugt kein BYDAY: sonst schriebe jedes Speichern eine Bestandsserie um.
+  root.querySelectorAll(`#${prefix}-rrule-weekdays .rrule-day--active:not([data-implied])`).forEach(btn => {
     byday.push(btn.dataset.day);
   });
 

@@ -11,7 +11,7 @@ import { attachOverlay } from '/utils/overlay-history.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate } from '/utils/ux.js';
-import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
+import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation } from '/utils/html.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
          monthPeriodKeys, startOfLocalWeekKey, addLocalDays, defaultDateInPeriod,
@@ -27,6 +27,7 @@ import {
   requestCalendarOccurrenceMutation,
   requestCalendarOccurrenceDelete,
   requiresWholeSeriesConfirmation,
+  seriesEndsBeforeStart,
   shiftEndForStart,
   shiftSeriesStart,
 } from '/utils/recurrence-scope.js';
@@ -2474,7 +2475,9 @@ function updateLabel() {
   const year = d.getFullYear();
   const mon  = MONTH_NAMES()[d.getMonth()];
 
-  if (state.view === 'month')  lbl.textContent = `${mon} ${year}`;
+  // Die Reihenfolge von Monat und Jahr ist Sache der Sprache (#1607):
+  // "${mon} ${year}" ergab im Koreanischen "10월 2026" statt "2026년 10월".
+  if (state.view === 'month')  lbl.textContent = formatMonthYear(year, d.getMonth() + 1);
   if (state.view === 'week') {
     // Mobil zeigt die "Woche" ein 3-Tage-Fenster um den Cursor (renderWeekView);
     // ein "KW 30"-Label würde dann einen Bereich behaupten, der nicht zu sehen
@@ -4681,11 +4684,19 @@ function clickedTime(e, colEl) {
  * Ohne `dayStr` bleibt es beim ungeklammerten Fenster - der Aufrufer, der
  * keinen Tag nennt, fragt nach dem Termin, nicht nach seinem Anteil an einem
  * Tag.
+ *
+ * "ENDET SPAETER" FRAGT DEN ECHTEN ENDTAG, NICHT eventEndDate() (#1607).
+ * eventEndDate() zieht ein Ende um exakt 00:00 auf den Vortag - richtig fuer
+ * die Frage, auf welchen Tagen der Termin STEHT (#804), falsch fuer die Frage,
+ * wie lang er an diesem Tag ist: 23:00-00:00 galt damit als "endet heute um
+ * 00:00", also 0 Minuten, also vor dem Start, und stand als Strich von der
+ * Mindesthoehe im Raster. Mitternacht am Folgetag ist das Tagesende. Fuer
+ * jedes andere Ende sind beide Tage derselbe.
  */
 function timeRangeForEvent(ev, dayStr = null) {
   const beginntFrueher = !!dayStr && dayStr > localDate(ev.start_datetime);
   const start = beginntFrueher ? 0 : timeToMinutes(localTime(ev.start_datetime));
-  const endetSpaeter = !!dayStr && !!ev.end_datetime && dayStr < eventEndDate(ev);
+  const endetSpaeter = !!dayStr && !!ev.end_datetime && dayStr < localDate(ev.end_datetime);
   const end = ev.end_datetime
     ? (endetSpaeter ? 24 * 60 : timeToMinutes(localTime(ev.end_datetime)))
     : start + 60;
@@ -5971,6 +5982,7 @@ export const __test = {
   calendarRepeatIconHtml,
   monthDayAriaLabel,
   clickedTime,
+  seriesEndConflict,
   hourOffset,
   monthDayClasses,
   monthViewClasses,
@@ -7237,7 +7249,7 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
   alldayCheck.addEventListener('change', () => {
     if (alldayCheck.checked) { timeFields.style.display = 'none'; alldayFields.style.display = ''; }
     else                      { timeFields.style.display = '';     alldayFields.style.display = 'none'; }
-    recurrenceBinding.refreshMonthdayHint();
+    recurrenceBinding.refreshStartDate();
   });
   if (isEdit && event?.all_day) { timeFields.style.display = 'none'; alldayFields.style.display = ''; }
 
@@ -7456,8 +7468,8 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
   };
   wireDateFollow('#modal-start-date', '#modal-end-date');
   wireDateFollow('#modal-allday-start', '#modal-allday-end');
-  panel.querySelector('#modal-start-date')?.addEventListener('change', recurrenceBinding.refreshMonthdayHint);
-  panel.querySelector('#modal-allday-start')?.addEventListener('change', recurrenceBinding.refreshMonthdayHint);
+  panel.querySelector('#modal-start-date')?.addEventListener('change', recurrenceBinding.refreshStartDate);
+  panel.querySelector('#modal-allday-start')?.addEventListener('change', recurrenceBinding.refreshStartDate);
 
   // Dynamische Termindauer (#441): das Ende folgt dem Start um die gemerkte
   // Dauer. Ändert der Nutzer das Ende, wird die neue Dauer übernommen und bei
@@ -7940,6 +7952,27 @@ function calendarSaveErrorMessage(err) {
   return err?.data?.error ?? t('calendar.saveError');
 }
 
+/**
+ * Wuerde dieses Speichern eine Serie schreiben, die vor ihrem Start endet?
+ * (#1607)
+ *
+ * Gefragt wird nur, wenn das Speichern Regel oder Starttag AENDERT - siehe
+ * den Aufruf in saveEvent().
+ *
+ * DER STARTTAG WIRD IN EINER DARSTELLUNG VERGLICHEN. Das Formular liefert den
+ * Tag der Anzeigezone; die Zeile eines synchronisierten Termins traegt einen
+ * Instant, dessen UTC-Tag der Nachbartag sein kann. Am rohen Text verglichen
+ * galt ein reiner Titel-Edit dort als Startaenderung, und eine eingelesene
+ * Serie mit so einer Regel liess sich nicht mehr bearbeiten. `localDate()`
+ * ist dieselbe Umrechnung, mit der das Formular sein Startfeld fuellt.
+ */
+function seriesEndConflict(mode, event, ruleToSave, startDatetime) {
+  const seriesTouched = mode !== 'edit'
+    || ruleToSave !== (event?.recurrence_rule ?? null)
+    || String(startDatetime).slice(0, 10) !== localDate(event?.start_datetime);
+  return seriesTouched && seriesEndsBeforeStart(ruleToSave, startDatetime);
+}
+
 async function saveEvent(overlay, mode, event, existingReminder = null, attachmentState = null) {
   // Dasselbe wie in handleFormSubmit der Aufgabenseite: das Formular steht bei
   // `calendar: read` nicht offen, aber ein Dialog kann es gewesen sein, als die
@@ -8010,6 +8043,17 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       ?? (overlay.querySelector('#modal-end-time')?.value ? overlay.querySelector('#modal-end-time') : null)
       ?? overlay.querySelector('#modal-end-date');
     reportFieldError(endField, t('calendar.endBeforeStart'));
+    return;
+  }
+
+  // EIN SERIENENDE VOR DEM START (#1607). Geprueft wurde am Ende-Feld bisher
+  // nur, ob das Datum gueltig ist - "taeglich, bis 30.09." an einem 2. Oktober
+  // ging durch, der Server speicherte es, und die Serie fand nie statt.
+  // Gefragt wird nur, wenn dieses Speichern Regel oder Starttag aendert: eine
+  // eingelesene Serie, die schon so dasteht, bleibt bearbeitbar (der Server
+  // zieht dieselbe Grenze, `serieBeruehrt` in routes/calendar/crud.js).
+  if (seriesEndConflict(mode, event, getRRuleValues(overlay, 'event').recurrence_rule, start_datetime)) {
+    reportFieldError(overlay.querySelector('#event-rrule-until'), t('calendar.recurrenceEndBeforeStart'));
     return;
   }
 

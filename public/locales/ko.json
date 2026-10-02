@@ -1014,6 +1014,7 @@
         "iconWeather": "날씨",
         "invalidDate": "선택한 형식에 맞는 유효한 날짜를 입력하세요.",
         "endBeforeStart": "종료일은 시작일보다 앞설 수 없습니다.",
+        "recurrenceEndBeforeStart": "반복 종료일은 시작일보다 앞설 수 없습니다.",
         "caldavTargetLabel": "CalDAV로 동기화",
         "caldavTargetLocal": "로컬에만 저장",
         "caldavTargetHint": "이 일정을 동기화할 CalDAV 캘린더를 선택하세요.",
