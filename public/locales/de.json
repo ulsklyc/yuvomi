@@ -1014,6 +1014,7 @@
         "iconWeather": "Wetter",
         "invalidDate": "Bitte ein gültiges Datum im ausgewählten Format verwenden.",
         "endBeforeStart": "Das Enddatum darf nicht vor dem Startdatum liegen.",
+        "recurrenceEndBeforeStart": "Das Ende der Wiederholung darf nicht vor dem Startdatum liegen.",
         "caldavTargetLabel": "Zu CalDAV synchronisieren",
         "caldavTargetLocal": "Nur lokal speichern",
         "caldavTargetHint": "Wähle einen CalDAV-Kalender, um diesen Termin zu synchronisieren.",

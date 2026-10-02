@@ -990,6 +990,7 @@
         "iconWeather": "天気",
         "invalidDate": "選択した形式で有効な日付を入力してください。",
         "endBeforeStart": "終了日を開始日より前にはできません。",
+        "recurrenceEndBeforeStart": "繰り返しの終了日は開始日より前にはできません。",
         "attachmentLabel": "添付ファイル",
         "attachmentHint": "画像、PDF、書類を添付できます。画像は予定の詳細に表示されます。",
         "attachmentFallback": "Attachment",

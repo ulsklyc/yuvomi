@@ -236,6 +236,27 @@ const FIRST_FIELD = [
 // Focus-Trap (Spec §5.2)
 // --------------------------------------------------------
 
+/**
+ * Der Knopf, den Enter in einem einzeiligen Feld ausloest.
+ *
+ * 1. Der Absender des Formulars, dem das Feld gehoert. `button.form` ist der
+ *    Formular-BESITZER: das umgebende <form> oder das per `form="id"`
+ *    zugeordnete - so bindet `mountFooter()` das "Speichern" der Fusszeile an
+ *    sein Formular, obwohl es nicht mehr darin steht (#543).
+ * 2. Sonst die Hauptaktion des Panels, aber nie die eines FREMDEN Formulars.
+ *
+ * Versteckte Aeste (`[hidden]`, `[inert]`) zaehlen in beiden Stufen nicht. Ein
+ * GESPERRTER eigener Absender bleibt der Treffer und loest nichts aus: gesperrt
+ * heisst "unterwegs", nicht "nimm einen anderen".
+ */
+function enterSubmitTarget(active, container) {
+  const form = active.form ?? null;
+  const candidates = [...container.querySelectorAll('button[type="submit"], .btn--primary')]
+    .filter((btn) => !btn.closest?.('[hidden], [inert]'));
+  const own = form ? candidates.find((btn) => btn.type === 'submit' && btn.form === form) : null;
+  return own ?? candidates.find((btn) => !form || !btn.form || btn.form === form) ?? null;
+}
+
 function trapFocus(container, initialFocus = 'first-field') {
   focusTrapHandler = (e) => {
     // Tab-Trap: Fokus innerhalb des Modals halten
@@ -264,7 +285,13 @@ function trapFocus(container, initialFocus = 'first-field') {
       const isSelect = active.tagName === 'SELECT';
 
       if (isInput || isSelect) {
-        const submitBtn = container.querySelector('button[type="submit"], .btn--primary');
+        // WEM GEHOERT DIESES ENTER (#1598)? Ein Blatt kann mehr als ein
+        // Formular tragen - die Aufgabe hat die Teilaufgaben-Zeile UND das
+        // Kommentarfeld -, und nach "Bearbeiten" steht die Leseansicht samt
+        // beiden `hidden` VOR dem Formular im DOM. Der erste Treffer im
+        // Dokument war deshalb "Kommentieren" bzw. ein Knopf, den niemand
+        // sieht; `preventDefault()` nahm dem richtigen Formular die Absendung.
+        const submitBtn = enterSubmitTarget(active, container);
         if (submitBtn && !submitBtn.disabled) {
           e.preventDefault();
           submitBtn.click();
@@ -1935,6 +1962,7 @@ export const __test = {
   createAskOverModal,
   finishSuspendedConfirmation,
   applyInitialFocus,
+  trapFocus,
 };
 
 // --------------------------------------------------------

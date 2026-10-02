@@ -1122,6 +1122,7 @@
         "iconWeather": "Погода",
         "invalidDate": "Укажите корректную дату в выбранном формате.",
         "endBeforeStart": "Дата окончания не может быть раньше даты начала.",
+        "recurrenceEndBeforeStart": "Окончание повтора не может быть раньше даты начала.",
         "attachmentLabel": "Вложение",
         "attachmentHint": "Изображение, PDF или документ. Изображения показываются в подробностях события.",
         "attachmentFallback": "Attachment",

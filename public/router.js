@@ -22,7 +22,7 @@ import { COMPOSITION_MODES } from '/utils/page-layout.js';
 import { init as initReminders, stop as stopReminders } from '/reminders.js';
 import { initPush, stopPush } from '/push.js';
 import { numberLocaleFor } from '/settings/region-presets.js';
-import { setDisplayTimeZone } from '/utils/timezone.js';
+import { setDisplayTimeZone, zonedDateKey } from '/utils/timezone.js';
 import { rememberZonePrefs, forgetZonePrefs, noteZoneDecision } from '/utils/household-zone-hint.js';
 import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
 import { swapPage } from '/utils/view-transition.js';
@@ -3761,12 +3761,15 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
   // 3. DATEN - Reihenfolge, Ueberschrift, Ziel und Zweitzeile je Trefferart:
   // utils/search-sections.js (test:search-permissions prueft sie gegen die
   // Antwort des Servers).
-  const fmt = { formatDate, formatTime, activityLabel };
+  // `dateKey` ist der Kalendertag in der ANZEIGEZONE: der Termin-Treffer baut
+  // daraus den Tag seines Links (#1607), und ein synchronisierter Termin liegt
+  // als Instant in der Zeile - sein UTC-Tag waere der falsche.
+  const fmt = { formatDate, formatTime, activityLabel, dateKey: zonedDateKey };
   if (data) {
     SEARCH_SECTIONS.forEach((section) => {
       const hits = Array.isArray(data?.[section.bucket]) ? data[section.bucket] : [];
       makeSection(t(section.labelKey), section.module, hits, {
-        route: section.route,
+        route: (item) => section.route(item, fmt),
         title: (item) => (section.label ? section.label(item, fmt) : item.title),
         meta: section.meta ? (item) => section.meta(item, fmt) : null,
       });

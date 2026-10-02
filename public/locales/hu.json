@@ -990,6 +990,7 @@
         "iconWeather": "Időjárás",
         "invalidDate": "Használjon érvényes dátumot a kiválasztott dátumformátumban.",
         "endBeforeStart": "A befejezés dátuma nem lehet a kezdés dátuma előtt.",
+        "recurrenceEndBeforeStart": "Az ismétlés vége nem lehet korábbi a kezdő dátumnál.",
         "caldavTargetLabel": "Szinkronizálás CalDAV-hoz",
         "caldavTargetLocal": "Csak helyben tárolás",
         "caldavTargetHint": "Válasszon egy CalDAV naptárt az esemény szinkronizálásához.",

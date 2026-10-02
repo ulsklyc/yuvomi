@@ -256,12 +256,14 @@
 
 /* Die Eingabezeile, in die sich „Teilaufgabe hinzufuegen" verwandelt (A3
  * P1-1, task-detail.js `subtaskComposer`): ein kanonisches Feld ueber die
- * Breite der Liste, so hoch wie eine Teilaufgaben-Zeile. Enter legt an, der
- * Fokus bleibt fuer die naechste. `[hidden]` braucht fuer Feld UND Knopf die
+ * Breite der Liste, so hoch wie eine Teilaufgaben-Zeile. Enter oder der Knopf
+ * daneben legt an, der Fokus bleibt fuer die naechste. `[hidden]` braucht fuer Feld UND Knopf die
  * eigene Regel, weil `display: flex` das Browser-`hidden` sonst sticht
  * (gemessen: der Knopf stand ueber dem offenen Feld). */
 .detail-subtask-compose {
   display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .detail-subtask-compose[hidden],
@@ -272,6 +274,14 @@
 .detail-subtask-compose__input {
   flex: 1;
   min-width: 0;
+  min-height: var(--target-base);
+}
+
+/* Der sichtbare Absender (#1598): Enter allein reichte im Blatt nicht, und auf
+ * dem Telefon gab es sonst keinen Weg. Er behaelt seine Breite - das Feld gibt
+ * nach, nicht der Knopf. */
+.detail-subtask-compose__submit {
+  flex-shrink: 0;
   min-height: var(--target-base);
 }
 

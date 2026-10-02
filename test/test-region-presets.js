@@ -645,3 +645,123 @@ test('the demo seed writes backend-valid formats that resolve to a region preset
   assert.notEqual(detectRegion(triple), CUSTOM_REGION,
     `seed: ${JSON.stringify(triple)} matches no region preset, so the demo household has no region`);
 });
+
+// --------------------------------------------------------
+// #1607 (P1d): Monat und Jahr im Kopf von Kalender und Budget
+//
+// Beide Seiten klebten `${Monatsname} ${Jahr}` zusammen. Das ist die Reihenfolge
+// von Deutsch und Englisch, nicht die jeder Sprache: Koreanisch stand als
+// "10월 2026" da, richtig ist "2026년 10월". Die Reihenfolge ist Sache der
+// SPRACHE (der Monatsname ist ein Wort), also fragt die eine Funktion Intl mit
+// der UI-Sprache - und erzwingt den gregorianischen Kalender, weil `fa` sonst
+// den persischen nimmt und "Mehr 1405" zeigt, waehrend das Raster darunter
+// gregorianisch zaehlt.
+// --------------------------------------------------------
+
+test('formatMonthYear stellt Monat und Jahr in die Reihenfolge der Sprache (#1607)', async () => {
+  const i18n = await import('../public/i18n.js');
+  assert.equal(typeof i18n.formatMonthYear, 'function', 'formatMonthYear fehlt in public/i18n.js');
+  const erwartet = {
+    ko: '2026년 10월',
+    ja: '2026年10月',
+    zh: '2026年10月',
+    hu: '2026. október',
+    de: 'Oktober 2026',
+    en: 'October 2026',
+    // Eine Ueberschrift beginnt gross, auch wo die Sprache den Monat im Satz
+    // klein schreibt - so stand der Kalenderkopf bisher da ("Octubre 2026"),
+    // und Intl allein lieferte "octubre de 2026".
+    es: 'Octubre de 2026',
+    fr: 'Octobre 2026',
+    ru: 'Октябрь 2026 г.',
+    vi: 'Tháng 10 năm 2026',
+  };
+  for (const [language, text] of Object.entries(erwartet)) {
+    await withLocales({ language }, () => {
+      assert.equal(i18n.formatMonthYear(2026, 10), text, language);
+    });
+  }
+});
+
+test('formatMonthYear bleibt gregorianisch, auch wo die Sprache einen anderen Kalender vorgibt (#1607)', async () => {
+  const { formatMonthYear } = await import('../public/i18n.js');
+  await withLocales({ language: 'fa' }, () => {
+    const text = formatMonthYear(2026, 10);
+    assert.ok(/2026|۲۰۲۶/.test(text), `fa: das Jahr muss 2026 sein, nicht 1405: ${text}`);
+    assert.ok(!/1405|۱۴۰۵/.test(text), `fa: persischer Kalender: ${text}`);
+  });
+  // Die REGION redet nicht mit: sie waehlt Zahl- und Datumsformat, nicht die
+  // Woerter. Eine saudische Region unter englischer Sprache darf weder den
+  // islamischen Kalender noch arabische Monatsnamen hereinbringen.
+  await withLocales({ language: 'en', region: 'ar-SA' }, () => {
+    assert.equal(formatMonthYear(2026, 10), 'October 2026');
+  });
+});
+
+test('formatMonthYear laesst Deutsch und Englisch aussehen wie bisher, in allen zwoelf Monaten (#1607)', async () => {
+  const { formatMonthYear } = await import('../public/i18n.js');
+  const KEYS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+    'September', 'October', 'November', 'December'];
+  for (const language of ['de', 'en']) {
+    const locale = JSON.parse(await readFile(new URL(`../public/locales/${language}.json`, import.meta.url), 'utf8'));
+    await withLocales({ language }, () => {
+      KEYS.forEach((key, index) => {
+        // So stand es im Kalenderkopf: der Monatsname aus der Locale-Datei, ein
+        // Leerzeichen, das Jahr. Budget nahm Intl fuer den Namen - derselbe Text.
+        assert.equal(formatMonthYear(2026, index + 1), `${locale.calendar[`month${key}`]} 2026`,
+          `${language}: Monat ${index + 1}`);
+      });
+    });
+  }
+});
+
+test('formatMonthYear liest keine Zone und rollt nicht ueber die Monatsgrenze (#1607)', async () => {
+  // Der Prozess laeuft je nach Rechner und CI in einer anderen Zone; ein
+  // lokales Date am Monatsersten laege westlich von UTC im Vormonat. Deshalb
+  // jeder Monat, und dazu die Eingaben, mit denen die Aufrufer kommen.
+  const { formatMonthYear } = await import('../public/i18n.js');
+  await withLocales({ language: 'en' }, () => {
+    const names = Array.from({ length: 12 }, (_, i) => formatMonthYear(2026, i + 1));
+    assert.equal(new Set(names).size, 12, `zwoelf verschiedene Monate: ${names.join(', ')}`);
+    assert.equal(names[0], 'January 2026');
+    assert.equal(names[11], 'December 2026');
+    assert.equal(formatMonthYear('2026', '03'), 'March 2026', 'Budget reicht die Teile eines YYYY-MM als Text');
+    assert.equal(formatMonthYear(2026, 13), '', 'ein Monat ausserhalb 1-12 wird nicht in den Januar gerollt');
+    assert.equal(formatMonthYear(NaN, 3), '');
+  });
+});
+
+test('Kalender und Budget nehmen fuer Monat und Jahr die EINE Funktion (#1607)', async () => {
+  const calendar = withoutCommentsKeepingLines(await readFile(new URL('../public/pages/calendar.js', import.meta.url), 'utf8'));
+  const budget = withoutCommentsKeepingLines(await readFile(new URL('../public/pages/budget.js', import.meta.url), 'utf8'));
+  for (const [name, source] of [['calendar.js', calendar], ['budget.js', budget]]) {
+    assert.ok(/import \{[^}]*\bformatMonthYear\b[^}]*\} from '\/i18n\.js'/.test(source), `${name} importiert formatMonthYear nicht`);
+    assert.ok(/formatMonthYear\(/.test(source.replace(/import \{[^}]*\}/g, '')), `${name} ruft formatMonthYear nicht`);
+  }
+  assert.ok(!/\$\{mon\} \$\{year\}/.test(calendar), 'calendar.js klebt Monat und Jahr noch selbst zusammen');
+  assert.ok(!/\$\{getMonthName\([^)]*\)\} \$\{y\}/.test(budget), 'budget.js klebt Monat und Jahr noch selbst zusammen');
+  // Niemand darf das Ergebnis wieder am Leerzeichen zerlegen: "2026년 10월"
+  // beginnt mit dem Jahr.
+  assert.ok(!/formatMonthLabel\([^)]*\)\.split\(/.test(budget), 'budget.js zerlegt das Monatslabel am Leerzeichen');
+});
+
+test('der formatMonthYear-Stub des Browser-Loaders rechnet wie das Original (#1607)', async () => {
+  const { formatMonthYear } = await import('../public/i18n.js');
+  const { resolve } = await import('./test-browser-loader.mjs');
+  const { url } = await resolve('/i18n.js', {}, () => { throw new Error('/i18n.js ist kein Stub mehr'); });
+  const stub = await import(url);
+  assert.equal(typeof stub.formatMonthYear, 'function', 'der Stub kennt formatMonthYear nicht');
+  const vorher = globalThis.__locale;
+  try {
+    for (const language of ['de', 'en', 'ko', 'fa', 'ar', 'hu', 'es', 'tr', 'ru']) {
+      globalThis.__locale = language;
+      await withLocales({ language }, () => {
+        for (const month of [1, 2, 10, 12, 13]) {
+          assert.equal(stub.formatMonthYear(2026, month), formatMonthYear(2026, month), `${language}: Monat ${month}`);
+        }
+      });
+    }
+  } finally {
+    globalThis.__locale = vorher;
+  }
+});

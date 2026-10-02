@@ -990,6 +990,7 @@
         "iconWeather": "Tempo",
         "invalidDate": "Use uma data válida no formato selecionado.",
         "endBeforeStart": "A data de término não pode ser anterior à de início.",
+        "recurrenceEndBeforeStart": "O fim da repetição não pode ser anterior à data de início.",
         "attachmentLabel": "Anexo",
         "attachmentHint": "Imagem, PDF ou documento. As imagens aparecem nos detalhes do evento.",
         "attachmentFallback": "Anexo",

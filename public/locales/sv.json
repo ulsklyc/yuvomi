@@ -990,6 +990,7 @@
         "iconWeather": "Väder",
         "invalidDate": "Använd ett giltigt datum i det valda datumformatet.",
         "endBeforeStart": "Slutdatumet får inte vara före startdatumet.",
+        "recurrenceEndBeforeStart": "Slutet på upprepningen kan inte vara före startdatumet.",
         "attachmentLabel": "Bilaga",
         "attachmentHint": "Bild, PDF eller dokument. Bilder visas i händelsens detaljer.",
         "attachmentFallback": "Bilaga",

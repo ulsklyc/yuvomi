@@ -2453,7 +2453,10 @@ router.post('/setup', loginLimiter, async (req, res) => {
       return res.status(400).json({ error: `Unsupported language. Allowed: ${getSupportedLocales().join(', ')}`, code: 400 });
     }
     if (timezone !== null && timezone !== '' && !isValidTimeZone(timezone)) {
-      return res.status(400).json({ error: 'Invalid time zone. Expected an IANA zone such as "Europe/Berlin".', code: 400 });
+      // `reason` ist der Anker fuer Clients: die Setup-Seite wiederholt genau
+      // diese Ablehnung einmal ohne Zone. Am Status allein darf sie das nicht
+      // festmachen - jedes 400 zaehlt gegen den loginLimiter.
+      return res.status(400).json({ error: 'Invalid time zone. Expected an IANA zone such as "Europe/Berlin".', code: 400, reason: 'invalid_timezone' });
     }
 
     const avatarColor = avatarColors[Math.floor(Math.random() * avatarColors.length)];

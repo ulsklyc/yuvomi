@@ -11,7 +11,7 @@ import { attachOverlay } from '/utils/overlay-history.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate } from '/utils/ux.js';
-import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
+import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation } from '/utils/html.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
          monthPeriodKeys, startOfLocalWeekKey, addLocalDays, defaultDateInPeriod,
@@ -27,6 +27,7 @@ import {
   requestCalendarOccurrenceMutation,
   requestCalendarOccurrenceDelete,
   requiresWholeSeriesConfirmation,
+  seriesEndsBeforeStart,
   shiftEndForStart,
   shiftSeriesStart,
 } from '/utils/recurrence-scope.js';
@@ -2474,7 +2475,9 @@ function updateLabel() {
   const year = d.getFullYear();
   const mon  = MONTH_NAMES()[d.getMonth()];
 
-  if (state.view === 'month')  lbl.textContent = `${mon} ${year}`;
+  // Die Reihenfolge von Monat und Jahr ist Sache der Sprache (#1607):
+  // "${mon} ${year}" ergab im Koreanischen "10월 2026" statt "2026년 10월".
+  if (state.view === 'month')  lbl.textContent = formatMonthYear(year, d.getMonth() + 1);
   if (state.view === 'week') {
     // Mobil zeigt die "Woche" ein 3-Tage-Fenster um den Cursor (renderWeekView);
     // ein "KW 30"-Label würde dann einen Bereich behaupten, der nicht zu sehen
@@ -3085,7 +3088,7 @@ function renderMonthView(container) {
     // oeffnet seinen Termin, wie ein Chip in der Zelle.
     const bandEl = e.target.closest('.month-bands .cal-band');
     if (bandEl) {
-      const ev = state.events.find((x) => x.id === parseInt(bandEl.dataset.id, 10));
+      const ev = eventForChip(bandEl);
       if (ev) openEventDetail(ev, bandEl);
       return;
     }
@@ -3108,7 +3111,7 @@ function renderMonthView(container) {
       const evEl = e.target.closest('.month-day__event');
       if (evEl) {
         e.stopPropagation();
-        const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
+        const ev = eventForChip(evEl);
         if (ev) openEventDetail(ev, evEl);
         return;
       }
@@ -3631,7 +3634,7 @@ function monthBandsHtml({ bands }, inMonth = []) {
     const out = outStart > 0 || outEnd > 0;
     const classes = bandClasses('month-day__event', band) + (out ? ' cal-band--outside' : '');
     return `<div class="${classes}" data-id="${ev.id}" data-start="${esc(band.startKey)}" data-end="${esc(band.endKey)}"
-         data-lane="${lane}" data-first="${first}" data-last="${last}"
+         data-lane="${lane}" data-first="${first}" data-last="${last}"${occurrenceAttr(ev)}
          style="grid-column:${first + 1} / span ${span};grid-row:${lane + 1};${out ? `--band-span:${span};--band-out-start:${outStart};--band-out-end:${outEnd};` : ''}${eventSurfaceStyle(ev)}"
          title="${title}">${continuesBefore ? bandContinuationHtml('before') : ''}${eventGlyphsHtml(ev)}<span>${esc(ev.title)}</span>${continuesAfter ? bandContinuationHtml('after') : ''}</div>`;
   }).join('')}</div>`;
@@ -3681,7 +3684,7 @@ function renderMonthDay(date, inMonth, { selected = false, selWeek = false, spli
   const evHtml = evShown.map((ev) => `
     <div class="month-day__event"
          data-id="${ev.id}"
-         style="${eventSurfaceStyle(ev)}"
+         style="${eventSurfaceStyle(ev)}"${occurrenceAttr(ev)}
          title="${esc(ev.title)}${ev.cal_name ? ' · ' + esc(ev.cal_name) : ''}${chipAssigneeTitleSuffix(ev)}"
     >${eventGlyphsHtml(ev)}<span>${esc(ev.title)}</span></div>
   `).join('');
@@ -4192,7 +4195,7 @@ function renderWeekView(container) {
     }
     const evEl = e.target.closest('.week-event');
     if (evEl) {
-      const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
+      const ev = eventForChip(evEl);
       if (ev) openEventDetail(ev, evEl);
     }
   });
@@ -4226,7 +4229,7 @@ function renderWeekView(container) {
     }
     const evEl = e.target.closest('.allday-event');
     if (evEl) {
-      const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
+      const ev = eventForChip(evEl);
       if (ev) openEventDetail(ev, evEl);
     }
   });
@@ -4275,7 +4278,7 @@ function handleGridKeydown(e) {
     return;
   }
   if (target.matches('.week-event, .day-event, .allday-event')) {
-    const ev = state.events.find((x) => x.id === parseInt(target.dataset.id, 10));
+    const ev = eventForChip(target);
     if (ev) openEventDetail(ev, target);
   }
 }
@@ -4563,7 +4566,7 @@ function renderAllDayEvent(ev, dayStr) {
   // title-Attribut und im gesprochenen Namen bleibt.
   return `
     <div class="${segment ? bandClasses('allday-event', segment) : 'allday-event'}" data-id="${ev.id}"
-         style="${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, spoken || t('calendar.allDay'), dayStr)}
+         style="${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, spoken || t('calendar.allDay'), dayStr)}${occurrenceAttr(ev)}
          title="${allDayChipTitle(ev, allDayChipTimeText(ev, dayStr, { suffix: true }))}">${segment?.continuesBefore ? bandContinuationHtml('before') : ''}${eventGlyphsHtml(ev)}<span class="allday-event__line"><span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</span>${segment?.continuesAfter ? bandContinuationHtml('after') : ''}</div>`;
 }
 
@@ -4598,7 +4601,7 @@ function renderWeekBand(band) {
   const spoken = bandSpokenWhen(ev, { continued: continuesBefore });
   return `
     <div class="${bandClasses('allday-event', band)}" data-id="${ev.id}" data-start="${esc(startKey)}" data-end="${esc(endKey)}"
-         style="grid-column:${first + 2} / span ${last - first + 1};grid-row:${lane + 1};${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, spoken)}
+         style="grid-column:${first + 2} / span ${last - first + 1};grid-row:${lane + 1};${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, spoken)}${occurrenceAttr(ev)}
          title="${[ev.title, bandSpokenWhen(ev), ev.cal_name].filter(Boolean).map((part) => esc(part)).join(' · ')}${chipAssigneeTitleSuffix(ev)}">${continuesBefore ? bandContinuationHtml('before') : ''}${eventGlyphsHtml(ev)}<span class="allday-event__line"><span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(from)}</span>${until ? `<small class="allday-event__time cal-band__until">${esc(until)}</small>` : ''}${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</span>${continuesAfter ? bandContinuationHtml('after') : ''}</div>`;
 }
 
@@ -4616,7 +4619,7 @@ function renderWeekEvent(ev, layout = null, dayStr = null) {
   return `
     <div class="week-event" data-id="${ev.id}"
          style="top:${top};height:${height};left:${left};width:${width};${eventSurfaceStyle(ev)}"
-         title="${esc(ev.title)}${chipAssigneeTitleSuffix(ev)}"${eventBlockAttrs(ev, eventTimeText(ev, dayStr), dayStr)}>
+         title="${esc(ev.title)}${chipAssigneeTitleSuffix(ev)}"${eventBlockAttrs(ev, eventTimeText(ev, dayStr), dayStr)}${occurrenceAttr(ev)}>
       <div class="week-event__title">${eventGlyphsHtml(ev)}<span>${esc(ev.title)}</span></div>
       <div class="week-event__time"><span class="week-event__when">${gridTimeText(ev, dayStr)}</span>${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</div>
     </div>
@@ -4681,11 +4684,19 @@ function clickedTime(e, colEl) {
  * Ohne `dayStr` bleibt es beim ungeklammerten Fenster - der Aufrufer, der
  * keinen Tag nennt, fragt nach dem Termin, nicht nach seinem Anteil an einem
  * Tag.
+ *
+ * "ENDET SPAETER" FRAGT DEN ECHTEN ENDTAG, NICHT eventEndDate() (#1607).
+ * eventEndDate() zieht ein Ende um exakt 00:00 auf den Vortag - richtig fuer
+ * die Frage, auf welchen Tagen der Termin STEHT (#804), falsch fuer die Frage,
+ * wie lang er an diesem Tag ist: 23:00-00:00 galt damit als "endet heute um
+ * 00:00", also 0 Minuten, also vor dem Start, und stand als Strich von der
+ * Mindesthoehe im Raster. Mitternacht am Folgetag ist das Tagesende. Fuer
+ * jedes andere Ende sind beide Tage derselbe.
  */
 function timeRangeForEvent(ev, dayStr = null) {
   const beginntFrueher = !!dayStr && dayStr > localDate(ev.start_datetime);
   const start = beginntFrueher ? 0 : timeToMinutes(localTime(ev.start_datetime));
-  const endetSpaeter = !!dayStr && !!ev.end_datetime && dayStr < eventEndDate(ev);
+  const endetSpaeter = !!dayStr && !!ev.end_datetime && dayStr < localDate(ev.end_datetime);
   const end = ev.end_datetime
     ? (endetSpaeter ? 24 * 60 : timeToMinutes(localTime(ev.end_datetime)))
     : start + 60;
@@ -4865,7 +4876,7 @@ function renderDayView(container) {
     }
     const evEl = e.target.closest('.allday-event');
     if (evEl) {
-      const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
+      const ev = eventForChip(evEl);
       if (ev) openEventDetail(ev, evEl);
     }
   });
@@ -4882,7 +4893,7 @@ function renderDayView(container) {
     }
     const evEl = e.target.closest('.day-event');
     if (evEl) {
-      const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
+      const ev = eventForChip(evEl);
       if (ev) openEventDetail(ev, evEl);
     }
   });
@@ -4940,7 +4951,7 @@ function renderDayEvent(ev, layout = null, dayStr = null) {
   return `
     <div class="day-event${roomy ? '' : ' day-event--tight'}" data-id="${ev.id}"
          style="top:${top};height:${height};left:${left};width:${width};${eventSurfaceStyle(ev)}"
-         title="${esc(ev.title)}${ev.location ? ' · ' + esc(fmtLocation(ev.location)) : ''}${chipAssigneeTitleSuffix(ev)}"${eventBlockAttrs(ev, eventTimeText(ev, dayStr), dayStr)}>
+         title="${esc(ev.title)}${ev.location ? ' · ' + esc(fmtLocation(ev.location)) : ''}${chipAssigneeTitleSuffix(ev)}"${eventBlockAttrs(ev, eventTimeText(ev, dayStr), dayStr)}${occurrenceAttr(ev)}>
       <span class="day-event__text">
         <span class="day-event__title">${eventGlyphsHtml(ev)}<span class="day-event__name">${esc(ev.title)}</span></span>
         <span class="day-event__meta">${timeText}${place}</span>
@@ -5012,7 +5023,7 @@ function handleDayRowActivation(e, { keyboard = false } = {}) {
   // In der Agenda entscheidet der Baustein: ab der Schwelle waehlt die Zeile
   // aus (Detailspalte), darunter oeffnet sie wie bisher (openNarrow).
   if (_agendaMd && evEl.dataset.mdId) { _agendaMd.open(evEl.dataset.mdId, evEl); return; }
-  const ev = state.events.find((x) => x.id === parseInt(evEl.dataset.id, 10));
+  const ev = eventForChip(evEl);
   if (ev) openEventDetail(ev, evEl);
 }
 
@@ -5033,6 +5044,43 @@ function agendaMdId(ev, day) {
 function agendaMdIdAttr(ev, day) {
   const id = agendaMdId(ev, day);
   return id ? ` data-md-id="${esc(id)}"` : '';
+}
+
+/**
+ * WELCHES VORKOMMEN EIN CHIP MEINT, STEHT AM CHIP (#1607).
+ *
+ * Die Vorkommen einer Serie tragen alle die id ihrer Stammzeile - der Server
+ * expandiert per `{ ...event }`. Monat, Woche und Tag suchten den angetippten
+ * Termin trotzdem nur ueber `data-id` und bekamen das ERSTE geladene Vorkommen:
+ * bei einer taeglichen Serie den Randtag des Ladefensters (`fetchWindow`, ein
+ * Tag vor dem sichtbaren Bereich). Detailansicht, Editor und „nur dieser
+ * Termin" (Speichern wie Loeschen) arbeiteten dann an diesem Tag statt am
+ * angetippten.
+ *
+ * Der Beginn ist die Identitaet: zwei Vorkommen derselben Serie beginnen nie
+ * im selben Augenblick. Er steht unveraendert am Chip und wird unveraendert
+ * verglichen - keine Umrechnung in einen Tag, also auch keine Zone, die
+ * danebenliegen kann. Ein mehrtaegiges Vorkommen traegt auf jedem seiner
+ * Stuecke denselben Beginn.
+ */
+function occurrenceAttr(ev) {
+  return ` data-occurrence="${esc(ev?.start_datetime ?? '')}"`;
+}
+
+/**
+ * Der Termin zu einem Chip. Passt kein Beginn (ein Chip ohne das Attribut),
+ * gilt die id nur, wenn sie EINDEUTIG ist: lieber oeffnet ein Klick nichts,
+ * als dass er ein anderes Vorkommen zum Bearbeiten oder Loeschen anbietet.
+ */
+function eventForChip(el, events = state.events) {
+  const id = parseInt(el?.dataset?.id, 10);
+  const matches = events.filter((x) => x.id === id);
+  const start = el?.dataset?.occurrence;
+  if (start !== undefined) {
+    const hit = matches.find((x) => (x.start_datetime ?? '') === start);
+    if (hit) return hit;
+  }
+  return matches.length === 1 ? matches[0] : null;
 }
 
 /** Der Termin zu einer Auswahl-ID, bevorzugt das Vorkommen an diesem Tag. */
@@ -5868,8 +5916,13 @@ async function openFoundEvent(ev) {
   closeCalendarSearch({ restoreView: false });
   await switchToDayView(date);
 
-  const full = state.events.find((e) => e.id === ev.id) || ev;
-  const chip = _container.querySelector(`[data-id="${CSS.escape(String(ev.id))}"]`);
+  // Das Vorkommen AN DIESEM TAG, nicht das erste geladene der Serie (#1607):
+  // das Ladefenster beginnt einen Tag vor dem angezeigten.
+  const full = state.events.find((e) => e.id === ev.id && localDate(e.start_datetime) === date)
+    || state.events.find((e) => e.id === ev.id) || ev;
+  const idSel = `[data-id="${CSS.escape(String(ev.id))}"]`;
+  const chip = _container.querySelector(`${idSel}[data-occurrence="${CSS.escape(String(full.start_datetime ?? ''))}"]`)
+    ?? _container.querySelector(idSel);
   if (chip) {
     chip.scrollIntoView({ block: 'center', behavior: 'instant' });
     openEventDetail(full, chip);
@@ -5883,6 +5936,8 @@ export const __test = {
   eventBlockAttrs,
   // R10 L5: Liste + Detail der Agenda - Auswahl-ID und ihr Termin.
   agendaMdId, eventForAgendaMdId,
+  // #1607: welches Vorkommen ein Chip meint - das Attribut und sein Leser.
+  occurrenceAttr, eventForChip,
   // Die Nur-lesen-Weiche (#467) und der Anlegeweg, den sie als erstes schliesst.
   readOnly, openEventModal,
   periodStepOf, periodArrowLabels, openCalendarFilters,
@@ -5927,6 +5982,7 @@ export const __test = {
   calendarRepeatIconHtml,
   monthDayAriaLabel,
   clickedTime,
+  seriesEndConflict,
   hourOffset,
   monthDayClasses,
   monthViewClasses,
@@ -6029,7 +6085,7 @@ function renderAgendaEvent(ev, dayStr) {
   // `renderKeepingFocus()` nach dem Neuaufbau mehrere Kandidaten und weicht auf
   // die Seitenwurzel aus, statt auf der Zeile zu bleiben (#1083).
   return `
-    <div class="list-row agenda-event" data-id="${ev.id}" data-date="${esc(day)}"${agendaMdIdAttr(ev, day)} role="button" tabindex="0"
+    <div class="list-row agenda-event" data-id="${ev.id}" data-date="${esc(day)}"${agendaMdIdAttr(ev, day)}${occurrenceAttr(ev)} role="button" tabindex="0"
          style="${eventSurfaceStyle(ev)}" aria-label="${esc(agendaEventAriaLabel(ev, [timeStr, position].filter(Boolean).join(', ')))}">
       <div class="agenda-event__body">
         <div class="agenda-event__title">${eventGlyphsHtml(ev, { compact: false })}<span>${esc(ev.title)}</span></div>
@@ -7193,7 +7249,7 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
   alldayCheck.addEventListener('change', () => {
     if (alldayCheck.checked) { timeFields.style.display = 'none'; alldayFields.style.display = ''; }
     else                      { timeFields.style.display = '';     alldayFields.style.display = 'none'; }
-    recurrenceBinding.refreshMonthdayHint();
+    recurrenceBinding.refreshStartDate();
   });
   if (isEdit && event?.all_day) { timeFields.style.display = 'none'; alldayFields.style.display = ''; }
 
@@ -7412,8 +7468,8 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
   };
   wireDateFollow('#modal-start-date', '#modal-end-date');
   wireDateFollow('#modal-allday-start', '#modal-allday-end');
-  panel.querySelector('#modal-start-date')?.addEventListener('change', recurrenceBinding.refreshMonthdayHint);
-  panel.querySelector('#modal-allday-start')?.addEventListener('change', recurrenceBinding.refreshMonthdayHint);
+  panel.querySelector('#modal-start-date')?.addEventListener('change', recurrenceBinding.refreshStartDate);
+  panel.querySelector('#modal-allday-start')?.addEventListener('change', recurrenceBinding.refreshStartDate);
 
   // Dynamische Termindauer (#441): das Ende folgt dem Start um die gemerkte
   // Dauer. Ändert der Nutzer das Ende, wird die neue Dauer übernommen und bei
@@ -7896,6 +7952,27 @@ function calendarSaveErrorMessage(err) {
   return err?.data?.error ?? t('calendar.saveError');
 }
 
+/**
+ * Wuerde dieses Speichern eine Serie schreiben, die vor ihrem Start endet?
+ * (#1607)
+ *
+ * Gefragt wird nur, wenn das Speichern Regel oder Starttag AENDERT - siehe
+ * den Aufruf in saveEvent().
+ *
+ * DER STARTTAG WIRD IN EINER DARSTELLUNG VERGLICHEN. Das Formular liefert den
+ * Tag der Anzeigezone; die Zeile eines synchronisierten Termins traegt einen
+ * Instant, dessen UTC-Tag der Nachbartag sein kann. Am rohen Text verglichen
+ * galt ein reiner Titel-Edit dort als Startaenderung, und eine eingelesene
+ * Serie mit so einer Regel liess sich nicht mehr bearbeiten. `localDate()`
+ * ist dieselbe Umrechnung, mit der das Formular sein Startfeld fuellt.
+ */
+function seriesEndConflict(mode, event, ruleToSave, startDatetime) {
+  const seriesTouched = mode !== 'edit'
+    || ruleToSave !== (event?.recurrence_rule ?? null)
+    || String(startDatetime).slice(0, 10) !== localDate(event?.start_datetime);
+  return seriesTouched && seriesEndsBeforeStart(ruleToSave, startDatetime);
+}
+
 async function saveEvent(overlay, mode, event, existingReminder = null, attachmentState = null) {
   // Dasselbe wie in handleFormSubmit der Aufgabenseite: das Formular steht bei
   // `calendar: read` nicht offen, aber ein Dialog kann es gewesen sein, als die
@@ -7966,6 +8043,17 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       ?? (overlay.querySelector('#modal-end-time')?.value ? overlay.querySelector('#modal-end-time') : null)
       ?? overlay.querySelector('#modal-end-date');
     reportFieldError(endField, t('calendar.endBeforeStart'));
+    return;
+  }
+
+  // EIN SERIENENDE VOR DEM START (#1607). Geprueft wurde am Ende-Feld bisher
+  // nur, ob das Datum gueltig ist - "taeglich, bis 30.09." an einem 2. Oktober
+  // ging durch, der Server speicherte es, und die Serie fand nie statt.
+  // Gefragt wird nur, wenn dieses Speichern Regel oder Starttag aendert: eine
+  // eingelesene Serie, die schon so dasteht, bleibt bearbeitbar (der Server
+  // zieht dieselbe Grenze, `serieBeruehrt` in routes/calendar/crud.js).
+  if (seriesEndConflict(mode, event, getRRuleValues(overlay, 'event').recurrence_rule, start_datetime)) {
+    reportFieldError(overlay.querySelector('#event-rrule-until'), t('calendar.recurrenceEndBeforeStart'));
     return;
   }
 

@@ -12,7 +12,7 @@ import { openDetailView } from '/components/detail-view.js';
 import { stagger, vibrate, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
-import { t, formatDate, formatDayMonth, getLocale, getNumberFormat } from '/i18n.js';
+import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { render as renderSplitExpenses, prefillSplitExpense, canAddSplitExpense, openNewSplitExpense } from '/pages/split-expenses.js';
@@ -432,9 +432,11 @@ function loanBudgetEquivalent(n, loan) {
   return t('budget.loanConvertedAmount', { amount: formatAmount(Number(n || 0) * Number(loan.exchange_rate || 1)) });
 }
 
+// Reihenfolge und Fuegung von Monat und Jahr kommen aus der Sprache (#1607),
+// nicht aus einem Leerzeichen zwischen zwei Teilen.
 function formatMonthLabel(ym) {
   const [y, m] = ym.split('-');
-  return `${getMonthName(parseInt(m, 10) - 1)} ${y}`;
+  return formatMonthYear(y, m);
 }
 
 function addMonths(ym, n) {
@@ -1113,7 +1115,9 @@ function renderBody() {
     : s.balance >= 0
       ? 'metric-card--balance-positive'
       : 'metric-card--balance-negative';
-  const prevLabel = p ? formatMonthLabel(p.month).split(' ')[0].slice(0, 3) : '';
+  // Der Monatsname selbst, nicht das erste Wort des Labels: wo die Sprache das
+  // Jahr voranstellt ("2026년 10월"), waere das erste Wort das Jahr (#1607).
+  const prevLabel = p ? getMonthName(parseInt(p.month.split('-')[1], 10) - 1).slice(0, 3) : '';
 
   /* EIN MONAT, DER NOCH KOMMT, IST EINE PROGNOSE (Critique 2026-09-25). Seine
    * Buchungen sind Serien, die der Server beim Aufruf fuer den Monat anlegt -

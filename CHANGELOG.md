@@ -47,12 +47,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The month heading of Calendar and Budget follows the word order of the language** (#1607).
+  Both pages put the month name, a space and the year together themselves, which gave "10월 2026"
+  in Korean instead of "2026년 10월" (and the same for Japanese, Chinese and Hungarian). Month
+  and year now come from one formatter that asks the UI language for the order and always uses
+  the Gregorian calendar. German and English look the same as before; a few languages gain the
+  connecting words their grammar asks for ("Octubre de 2026", "Tháng 10 năm 2026").
+- **An event that ends at midnight is drawn at its full length in the week and day view**
+  (#1607). An event from 23:00 to 00:00 appeared as a 30-minute strip, and one from 22:00 to
+  00:00 as well: an end at exactly 00:00 was read as "ends at minute 0 of the same day". It now
+  runs to the end of the day, and it shares its column correctly with events that overlap it.
+  Events of 24 hours or more stay in the all-day row as before.
+- **A recurring event found in the global search opens at its next date, not in its first year**
+  (#1607). The search behind Cmd/Ctrl+K listed a series with the date of its very first
+  occurrence, and the link opened the calendar there: a birthday from 1990 opened October 1990.
+  The global search now resolves a series to its next occurrence from today, with the same
+  two-year window the calendar's own search uses, and the link carries that day. In
+  `GET /api/v1/search`, `events[].start_datetime` of a recurring event is therefore the next
+  occurrence instead of the series start; `id` is unchanged.
+- **A repeat end before the start date is no longer saved** (#1607). An event starting on 2 October
+  could be saved as "daily, until 30 September": the dialog only checked that the end was a valid
+  date, and the server only checked the form of the rule. The dialog now shows the error at the
+  repeat-end field, and `POST /api/v1/calendar`, `PUT /api/v1/calendar/{id}` and the "this and
+  following" edit answer 400. A repeat end on the start day stays valid. A series from an ICS
+  import or a synced calendar that already carries such a rule is still imported and stays
+  editable; tasks are unchanged, because a task is due on its own date and the rule only decides
+  about its successor.
+- **The weekday buttons of a weekly series no longer all look switched off** (#1607). A weekly
+  event without chosen weekdays repeats on the weekday of its start, but the "repeat on" buttons
+  showed none of the seven as active. The weekday of the start date is now shown as active, both
+  when you switch a new event to weekly and when you open an existing series, and it follows the
+  start date until you pick days yourself. The stored rule of an existing series is not rewritten.
 - **Editing a shared expense no longer rewrites its history** (#1607). The activity feed of a group
   showed the amount an expense has now, so correcting 50 to 10 also changed the earlier "Expense
   created" line to 10 - for expenses created by other members too. Each entry now records the
   amount and currency at the moment it was written, and a deleted expense keeps its amount in the
   feed. Entries written before this change show the title without an amount: what the expense
   cost back then was never recorded.
+- **Opening one occurrence of a recurring event opens that occurrence** (#1607). In the month,
+  week and day views, clicking or pressing Enter on an occurrence of a series opened the first
+  occurrence the view had loaded instead - for a daily series the day before the visible range.
+  The detail view showed that day, the editor was filled with it, and "This event only" then
+  changed or deleted it, not the occurrence you clicked. Each occurrence now opens itself; the
+  agenda already did.
+- **Subtasks can be added from the task sheet again** (#1598). Since v2.70.0 "Add subtask" turns
+  into a text field inside the task. In the sheet - every phone and every narrow window - Enter
+  in that field triggered the comment button further down instead of saving the subtask, and
+  the field had no button of its own, so there was no way left to add one; only the detail
+  column on wide screens worked. The field now has an "Add" button next to it, and Enter saves
+  the subtask and keeps the field open for the next one. In any sheet with more than one form,
+  Enter now submits the form the field belongs to and ignores buttons of a view that is hidden
+  at that moment, so Enter in the edit form of a task saves the task.
+- **A new household starts in its own time zone** (#1607). The first-run page now sends the
+  browser's time zone along, and the server stores it as the household time zone. Until now a
+  fresh install had none, so the server counted "today" in the container's zone, usually UTC:
+  east of UTC the dashboard showed no meals for today and overdue tasks were not counted as
+  overdue during the first hours of the day, west of UTC the day turned over hours early in
+  the evening. A browser that reports no usable zone, or only UTC, sends nothing and the server
+  falls back to `TZ` as before. Households that already exist are not changed - an admin sets
+  the zone once in the settings under "Time zone".
 - **Correcting the date of a series' first entry no longer moves the rest of the series** (#1545).
   Every later occurrence of a recurring payment is counted from its start day, and that was still
   the date of the first entry. Correcting it with "Only this occurrence" (the rent was debited on

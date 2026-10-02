@@ -11,13 +11,13 @@ import {
   expandAndResolveEventRows, getUpcomingEvents, hydrateEventAttachmentBodies,
 } from '../../services/calendar-event-reader.js';
 import { SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN } from '../../services/calendar-events.js';
-import { buildMatchQuery, resolveEventSearchRows } from '../../services/search.js';
+import { buildMatchQuery, eventSearchWindow, resolveEventSearchRows } from '../../services/search.js';
 import { visibilityWhere } from '../../services/visibility.js';
 import { documentViewer } from '../../services/document-links.js';
 import {
   VALID_SOURCES, ASSIGNED_USERS_SQL, getUserId, isAdminUser, serializeEvents,
 } from './helpers.js';
-import { shiftDateKey, todayKey } from '../../utils/timezone.js';
+import { todayKey } from '../../utils/timezone.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
@@ -227,14 +227,12 @@ router.get('/search', (req, res) => {
     `).all({ match, userId, limit: LIMIT });
 
     // Wiederkehrende Treffer auf die nächste Instanz ab heute auflösen (statt des
-    // Serienstarts, der Jahre zurückliegen kann). Findet die Serie im 1-Jahres-
-    // Fenster keine kommende Instanz, bleibt der Master-Termin unverändert (#471).
-    const today  = todayKey(db.get());
-    // 2-Jahres-Fenster: fängt auch Serien, deren nächste Instanz mehr als ein Jahr
-    // voraus liegt (z. B. mehrjährige Intervalle). Findet sich keine, bleibt der Master.
-    const future = shiftDateKey(today, 730);
+    // Serienstarts, der Jahre zurückliegen kann). Findet die Serie im Fenster
+    // keine kommende Instanz, bleibt der Master-Termin unverändert (#471). Das
+    // Fenster teilt sich diese Route mit der globalen Suche (#1607).
     const database = db.get();
-    const resolved = resolveEventSearchRows(database, rows, today, future);
+    const window = eventSearchWindow(database);
+    const resolved = resolveEventSearchRows(database, rows, window.from, window.to);
 
     res.json({
       data: serializeEvents(resolved, {

@@ -26,6 +26,28 @@ const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 const router = read('../public/router.js');
 const de = JSON.parse(read('../public/locales/de.json'));
 
+test('ein Termin-Treffer oeffnet den Kalender an SEINEM Tag (#1607)', async () => {
+  // Der Link trug nur die ID. Der Kalender fiel damit auf den Start der
+  // Stammzeile zurueck (deepLinkTargetDate), und ein Geburtstag von 1990
+  // oeffnete das Jahr 1990. Der Tag kommt aus dem Treffer, in der ANZEIGEZONE:
+  // ein synchronisierter Termin liegt als Instant in der Zeile.
+  const { SEARCH_SECTIONS } = await import('../public/utils/search-sections.js');
+  const events = SEARCH_SECTIONS.find((s) => s.bucket === 'events');
+  const fmt = { dateKey: (value) => `key(${value})` };
+  assert.equal(events.route({ id: 7, start_datetime: '2026-10-14' }, fmt), '/calendar?open=7&date=key(2026-10-14)');
+  assert.equal(events.route({ id: 7 }, fmt), '/calendar?open=7', 'ohne Start bleibt der Link, wie er war');
+  assert.equal(events.route({ id: 7, start_datetime: '2026-10-14' }), '/calendar?open=7',
+    'ohne Helfer wird kein Tag geraten');
+
+  // Der AUFRUFER muss den Helfer auch hereinreichen - sonst ist der Zweig oben
+  // tot, und der Test bliebe gruen.
+  assert.ok(/import \{[^}]*\bzonedDateKey\b[^}]*\} from '\/utils\/timezone\.js'/.test(router),
+    'router.js holt den Tagesschluessel der Anzeigezone nicht');
+  assert.ok(/const fmt = \{[^}]*\bdateKey: zonedDateKey\b[^}]*\}/.test(router), 'fmt traegt keinen dateKey');
+  assert.ok(router.includes('route: (item) => section.route(item, fmt)'),
+    'die Sektion bekommt die Helfer nicht, wenn ihr Ziel gebaut wird');
+});
+
 const marked = (segments) => segments.filter((s) => s.mark).map((s) => s.text);
 
 test('markSegments markiert den Wortteil im Original, gefaltet wie der Server', () => {
