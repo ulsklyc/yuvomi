@@ -49,6 +49,7 @@ import { widgetDisplayLabel, optionFieldLabel } from '/utils/extension-i18n.js';
 import { whoMark } from '/utils/seal-pair.js';
 import { MODULE_ICON, moduleIconHTML } from '/nav-icons.js';
 import { enterWallMode, exitWallMode, isWallActive, syncWallMode } from '/utils/wall-mode.js';
+import { mountZonePrompt } from '/utils/household-zone-hint.js';
 import { renderWallTimer, wireWallTimer } from '/components/wall-timer.js';
 import { rememberLayoutHint, layoutHintSizes, layoutHintQuery } from '/utils/dashboard-layout-hint.js';
 import { emptyHintHTML } from '/utils/empty-state.js';
@@ -6005,6 +6006,18 @@ export async function render(container, { user, signal: routeSignal = null } = {
     </div>
     ${wallMode ? '' : renderFab()}
   `);
+
+  // Der Zonen-Hinweis fuer Bestandshaushalte (#1607): ein Admin, dessen Browser
+  // in einer anderen Zone steht, als der Haushalt ohne eigene Einstellung
+  // rechnet, wird hier einmal gefragt. HIER und nicht nach den Daten: der Stand
+  // dazu liegt seit dem Anmelden vor (router.js), die Zeile steht also schon
+  // neben dem Skelett. Sie haengt neben `.dashboard-shell`, nicht darin - die
+  // Shell wird mit den Daten neu gefuellt.
+  mountZonePrompt(container.querySelector('.dashboard'), {
+    user, t, api, wall: wallMode,
+    before: container.querySelector('#dashboard-shell'),
+    toast: (message, type) => window.yuvomi?.showToast(message, type),
+  });
 
   // Ein Neuaufbau AUS DER SEITE HERAUS laeuft nicht durch renderPage() im
   // Router, und damit an dessen FAB-Wechsel vorbei (#634): den alten Knopf aus

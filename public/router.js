@@ -23,6 +23,7 @@ import { init as initReminders, stop as stopReminders } from '/reminders.js';
 import { initPush, stopPush } from '/push.js';
 import { numberLocaleFor } from '/settings/region-presets.js';
 import { setDisplayTimeZone } from '/utils/timezone.js';
+import { rememberZonePrefs, forgetZonePrefs } from '/utils/household-zone-hint.js';
 import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
 import { swapPage } from '/utils/view-transition.js';
 import { moduleAccentToken, moduleAccentVar } from '/utils/module-accent.js';
@@ -914,6 +915,10 @@ async function syncPreferencesOnce() {
     // der nichts darueber aussagt, wo dieser Haushalt lebt. Ohne getroffene
     // Wahl bleibt die Anzeige also beim Browser, so wie bisher.
     setDisplayTimeZone(res?.data?.timezone ?? null);
+    // Der Zonen-Hinweis der Uebersicht (#1607) liest genau diese Antwort: sie
+    // ist da, bevor die erste Seite zeichnet, also steht er schon neben dem
+    // Skelett und schiebt nichts nach.
+    rememberZonePrefs(res?.data);
     // Region als Formatier-Locale für Zahlen/Währung spiegeln (z. B. de-CH →
     // 123'456.78). getFormatLocale() in i18n.js liest diesen Wert.
     const numberLocale = numberLocaleFor({
@@ -4706,6 +4711,7 @@ window.addEventListener('popstate', (e) => {
 function forgetSessionState() {
   currentUser = null;
   _preferencesLoaded = false;
+  forgetZonePrefs();
   _hiddenModules = new Set();
   _moduleOrder = [];
   _mobileNavOrder = [];

@@ -251,6 +251,59 @@ test('GET timezone: gewählter Wert und geltender Wert sind zwei Felder', async 
     'ohne Einstellung nennt timezone_effective den Serverrueckfall (process.env.TZ am Dateikopf)');
 });
 
+/* Der Merker zum Zonen-Hinweis (#1607, Punkt 4).
+ *
+ * `timezone: null` hat zwei Bedeutungen, die gleich aussehen: "nie gesetzt"
+ * (Bestandshaushalt, der Server rechnet still in `TZ`) und "bewusst
+ * Automatisch". Die Oberflaeche fragt deshalb einmal nach, und die Antwort
+ * "So lassen" muss fuer ALLE Admins auf ALLEN Geraeten gelten - also liegt sie
+ * in sync_config und nicht im localStorage. Geprueft wird mit einem zweiten
+ * Admin (andere userId): ein Merker je Konto bestuende einen Test mit nur
+ * einem Akteur.
+ */
+test('timezone_hint_dismissed: haushaltsweit, nur Admin schreibt, nur ein Boolean gilt', async () => {
+  cfgDelete('household_timezone');
+  cfgDelete('household_timezone_hint_dismissed');
+  assert.equal((await get()).body.data.timezone_hint_dismissed, false, 'ohne Eintrag ist nichts gemerkt');
+
+  assert.equal((await put({ timezone_hint_dismissed: true }, { role: 'member' })).status, 403);
+  assert.equal((await get()).body.data.timezone_hint_dismissed, false, 'ein 403 darf nichts geschrieben haben');
+  for (const bad of ['1', 1, 'true', null, {}]) {
+    assert.equal((await put({ timezone_hint_dismissed: bad })).status, 400, `${JSON.stringify(bad)} ist kein Boolean`);
+  }
+  assert.equal((await get()).body.data.timezone_hint_dismissed, false, 'ein 400 darf nichts geschrieben haben');
+
+  const saved = await put({ timezone_hint_dismissed: true }, { userId: 1 });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.data.timezone_hint_dismissed, true, 'die PUT-Antwort traegt den Merker');
+  assert.equal(saved.body.data.timezone, null, '"So lassen" setzt keine Zone');
+  // Der ZWEITE Admin und ein Mitglied lesen denselben Merker.
+  assert.equal((await get({ userId: 2 })).body.data.timezone_hint_dismissed, true);
+  assert.equal((await get({ role: 'member', userId: 3 })).body.data.timezone_hint_dismissed, true);
+
+  assert.equal((await put({ timezone_hint_dismissed: false })).body.data.timezone_hint_dismissed, false);
+  assert.equal((await get({ userId: 2 })).body.data.timezone_hint_dismissed, false);
+});
+
+test('eine Zonen-Entscheidung des Admins beendet den Hinweis - auch "Automatisch"', async () => {
+  // Wer die Zone setzt, hat entschieden. Wer sie danach bewusst wieder auf
+  // Automatisch stellt, ebenfalls: ohne den Merker saehe das genauso aus wie
+  // "nie gesetzt", und der Hinweis kaeme fuer alle Admins zurueck.
+  cfgDelete('household_timezone');
+  cfgDelete('household_timezone_hint_dismissed');
+  assert.equal((await put({ timezone: 'Asia/Seoul' })).body.data.timezone_hint_dismissed, true);
+  cfgDelete('household_timezone_hint_dismissed');
+  const auto = (await put({ timezone: null })).body.data;
+  assert.equal(auto.timezone, null);
+  assert.equal(auto.timezone_hint_dismissed, true);
+
+  // Abgelehnte Schreibversuche entscheiden nichts.
+  cfgDelete('household_timezone_hint_dismissed');
+  await put({ timezone: 'Mars/Olympus_Mons' });
+  await put({ timezone: 'Asia/Seoul' }, { role: 'member' });
+  assert.equal((await get()).body.data.timezone_hint_dismissed, false);
+});
+
 // --------------------------------------------------------
 // app_name (str-Validator, empty->delete)
 // --------------------------------------------------------

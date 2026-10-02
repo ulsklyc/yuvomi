@@ -612,6 +612,11 @@ router.get('/', (req, res) => {
         // muss die Oberfläche als Automatik-Label zeigen können (#829).
         timezone: cfgGet('household_timezone') || null,
         timezone_effective: householdTimeZone(db.get()),
+        // Hat ein Admin die Frage "Zone des Browsers uebernehmen?" schon
+        // beantwortet (#1607)? `timezone: null` allein sagt es nicht: "nie
+        // gesetzt" und "bewusst Automatisch" sehen gleich aus. Haushaltsweit,
+        // damit die Antwort fuer jeden Admin auf jedem Geraet gilt.
+        timezone_hint_dismissed: cfgGet('household_timezone_hint_dismissed') === '1',
         // Drei Sichten auf dieselbe Einstellung, weil drei verschiedene Fragen
         // dahinterstecken: was ist gewählt (Select-Zustand), was gilt gerade
         // (API-Konsument), und was ergäbe die Automatik (Label der ersten Option).
@@ -686,7 +691,7 @@ router.get('/', (req, res) => {
 
 router.put('/', (req, res) => {
   try {
-    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
+    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, timezone_hint_dismissed, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
 
     // Welche Quickstart-Vorlagen der Schichtplan-Schnellstart zeigt - wie
     // disabled_modules haushaltweit und admin-only, nicht wie hidden_modules
@@ -821,6 +826,25 @@ router.put('/', (req, res) => {
       }
       if (timezone === null || timezone === '') cfgDelete('household_timezone');
       else cfgSet('household_timezone', timezone);
+      // Wer die Zone schreibt, hat entschieden - auch mit "Automatisch". Ohne
+      // den Merker saehe ein bewusstes Zurueckstellen aus wie "nie gesetzt",
+      // und der Hinweis kaeme fuer alle Admins wieder.
+      cfgSet('household_timezone_hint_dismissed', '1');
+    }
+
+    // Der Merker zum Zonen-Hinweis (#1607): "So lassen" gilt fuer den ganzen
+    // Haushalt, also dasselbe Admin-Gate wie die Zone selbst. Ein eigener
+    // sync_config-Schluessel und keine Spalte: die Einstellung, zu der er
+    // gehoert, liegt ebenfalls dort.
+    if (timezone_hint_dismissed !== undefined) {
+      if (!isAdminRequest(req)) {
+        return res.status(403).json({ error: 'Admin access required.', code: 403 });
+      }
+      if (typeof timezone_hint_dismissed !== 'boolean') {
+        return res.status(400).json({ error: 'timezone_hint_dismissed muss true oder false sein.', code: 400 });
+      }
+      if (timezone_hint_dismissed) cfgSet('household_timezone_hint_dismissed', '1');
+      else cfgDelete('household_timezone_hint_dismissed');
     }
 
     // Datensprache — haushaltweite Grundsatzentscheidung wie Region und Währung,
@@ -1367,6 +1391,7 @@ router.put('/', (req, res) => {
         region: cfgGet('region') || null,
         timezone: cfgGet('household_timezone') || null,
         timezone_effective: householdTimeZone(db.get()),
+        timezone_hint_dismissed: cfgGet('household_timezone_hint_dismissed') === '1',
         language: isSupportedLocale(cfgGet('language')) ? cfgGet('language') : null,
         language_effective: resolveHouseholdLocale(db.get()),
         language_auto: resolveHouseholdLocale(db.get(), { ignoreExplicit: true }),

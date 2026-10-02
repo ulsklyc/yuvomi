@@ -327,7 +327,7 @@
     "test:household-timezone": "node --experimental-sqlite --test test/test-household-timezone.js",
     "test:api-offset-conversion": "node --experimental-sqlite --test test/test-api-offset-conversion.js",
     "test:budget-month-zone": "node --experimental-sqlite --test test/test-budget-month-zone.js",
-    "test:display-timezone": "node --test test/test-display-timezone.js",
+    "test:display-timezone": "node --test test/test-display-timezone.js test/test-household-zone-hint.js",
     "test:calendar-mirrored-cleanup": "node --experimental-sqlite --test test/test-calendar-mirrored-cleanup.js",
     "test:sync-lock": "node --test test/test-sync-lock.js",
     "test:sync-outcome": "node --experimental-sqlite --test test/test-sync-outcome.js",

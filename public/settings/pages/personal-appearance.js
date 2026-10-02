@@ -4,14 +4,16 @@ import {
   setLocale,
   t,
 } from '/i18n.js';
+import { api } from '/api.js';
 import { esc } from '/utils/html.js';
 import { appendCurrencyOptions, persistCurrencySelection } from '/settings/currency.js';
-import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
+import { getPreferences, resetPreferencesCache, savePreferences } from '/settings/preferences-cache.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { isWallModeEnabled, setWallModeEnabled } from '/utils/wall-mode.js';
 import { setDisplayTimeZone } from '/utils/timezone.js';
+import { adoptZone, zoneHintEl, zoneMismatch } from '/utils/household-zone-hint.js';
 import {
   CUSTOM_REGION,
   REGION_CODES,
@@ -332,7 +334,7 @@ function renderPage(container, preferences, isAdmin) {
            keine Formatierung. Datum und Uhrzeit dort ändern nur, WIE ein Wert
            dasteht; die Zone ändert, WELCHER Tag "heute" ist, wann Erinnerungen
            auslösen und mit welcher Uhrzeit ein Termin bei Google ankommt. -->
-      <div class="settings-card">
+      <div class="settings-card" id="timezone-card">
         <h3 class="settings-card__title">${t('settings.timezoneTitle')}</h3>
         ${isAdmin ? `
         <p class="form-hint" id="timezone-hint">${t('settings.timezoneHint')}</p>
@@ -471,6 +473,40 @@ async function refreshDataLanguageOptions(container) {
     preferences.language || null,
     preferences.language_auto || 'en',
   ));
+}
+
+/**
+ * Die Zeile zum Zonen-Hinweis (#1607) in der Zeitzonen-Karte: solange der
+ * Haushalt keine Zone gewaehlt hat und der Browser in einer anderen steht, als
+ * der Server dann rechnet. Dieselbe Zeile wie auf der Uebersicht, hier ohne
+ * Wegklick - wer dort "So lassen" gesagt hat, findet die Handlung hier wieder.
+ * Ein Mitglied sieht den Zustand, aber keinen Knopf: der Server beantwortete
+ * ihn mit 403.
+ */
+function mountTimezoneMismatch(container, preferences, isAdmin) {
+  const card = container.querySelector('#timezone-card');
+  const mismatch = zoneMismatch(preferences);
+  if (!card || !mismatch) return;
+  const errorElement = container.querySelector('#timezone-error');
+  card.appendChild(zoneHintEl({
+    mismatch,
+    t,
+    onAdopt: isAdmin ? async () => {
+      clearError(errorElement);
+      // Schreiben ueber savePreferences(), damit der geteilte Cache der
+      // Settings-Blaetter faellt; gelesen wird am Cache vorbei, sonst saehe
+      // die Gegenprobe "hat inzwischen jemand entschieden?" nur den alten Stand.
+      const result = await adoptZone(mismatch.browser, {
+        api: { get: (path) => api.get(path), put: (_path, patch) => savePreferences(patch) },
+      });
+      resetPreferencesCache();
+      if (result.adopted) window.yuvomi?.showToast(t('settings.timezoneSaved'), 'success');
+    } : undefined,
+    onError: (error) => {
+      if (errorElement) showError(errorElement, error?.message);
+      else window.yuvomi?.showToast(error?.message || t('common.errorGeneric'), 'danger');
+    },
+  }));
 }
 
 function bindEvents(container, user) {
@@ -748,6 +784,7 @@ export async function render(container, { user }) {
       appendCurrencyOptions(container.querySelector('#currency-select'), preferences.currency);
     }
     bindEvents(container, user);
+    mountTimezoneMismatch(container, preferences, isAdmin);
     window.lucide?.createIcons({ el: container });
   } catch {
     renderLoadError(container);

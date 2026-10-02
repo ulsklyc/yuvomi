@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `LANG=nb_NO.UTF-8` picks it on its own, and the new region "Norwegian Bokmål (Norway)" sets
   kroner, day.month.year and the 24-hour clock in one step. A household on that region without
   its own data language also gets Norwegian for the entries Yuvomi writes itself.
+- **Admins are asked once whether the household should use the browser's time zone** (#1607).
+  A household that never chose a time zone counts "today" in the server's zone, usually UTC, so
+  east of UTC today's meals stayed empty and overdue tasks were not counted during the first
+  hours of the day. If your browser is in a different zone, the overview now shows one line
+  naming both zones with two choices: use the browser's zone, or keep things as they are. Either
+  answer ends the question for every admin on every device, and nothing changes until someone
+  answers. The same line with the first choice stays in Settings under "Time zone" for as long
+  as the zones differ; members see it without the button. A browser that reports only UTC or
+  no zone never triggers it, and two names for the same zone (Asia/Calcutta and Asia/Kolkata)
+  do not count as a difference.
 
 ### Changed
 
