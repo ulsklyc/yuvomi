@@ -5938,6 +5938,7 @@ export const __test = {
   calendarRepeatIconHtml,
   monthDayAriaLabel,
   clickedTime,
+  seriesEndConflict,
   hourOffset,
   monthDayClasses,
   monthViewClasses,
@@ -7907,6 +7908,27 @@ function calendarSaveErrorMessage(err) {
   return err?.data?.error ?? t('calendar.saveError');
 }
 
+/**
+ * Wuerde dieses Speichern eine Serie schreiben, die vor ihrem Start endet?
+ * (#1607)
+ *
+ * Gefragt wird nur, wenn das Speichern Regel oder Starttag AENDERT - siehe
+ * den Aufruf in saveEvent().
+ *
+ * DER STARTTAG WIRD IN EINER DARSTELLUNG VERGLICHEN. Das Formular liefert den
+ * Tag der Anzeigezone; die Zeile eines synchronisierten Termins traegt einen
+ * Instant, dessen UTC-Tag der Nachbartag sein kann. Am rohen Text verglichen
+ * galt ein reiner Titel-Edit dort als Startaenderung, und eine eingelesene
+ * Serie mit so einer Regel liess sich nicht mehr bearbeiten. `localDate()`
+ * ist dieselbe Umrechnung, mit der das Formular sein Startfeld fuellt.
+ */
+function seriesEndConflict(mode, event, ruleToSave, startDatetime) {
+  const seriesTouched = mode !== 'edit'
+    || ruleToSave !== (event?.recurrence_rule ?? null)
+    || String(startDatetime).slice(0, 10) !== localDate(event?.start_datetime);
+  return seriesTouched && seriesEndsBeforeStart(ruleToSave, startDatetime);
+}
+
 async function saveEvent(overlay, mode, event, existingReminder = null, attachmentState = null) {
   // Dasselbe wie in handleFormSubmit der Aufgabenseite: das Formular steht bei
   // `calendar: read` nicht offen, aber ein Dialog kann es gewesen sein, als die
@@ -7986,11 +8008,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
   // Gefragt wird nur, wenn dieses Speichern Regel oder Starttag aendert: eine
   // eingelesene Serie, die schon so dasteht, bleibt bearbeitbar (der Server
   // zieht dieselbe Grenze, `serieBeruehrt` in routes/calendar/crud.js).
-  const ruleToSave = getRRuleValues(overlay, 'event').recurrence_rule;
-  const seriesTouched = mode !== 'edit'
-    || ruleToSave !== (event?.recurrence_rule ?? null)
-    || String(start_datetime).slice(0, 10) !== String(event?.start_datetime ?? '').slice(0, 10);
-  if (seriesTouched && seriesEndsBeforeStart(ruleToSave, start_datetime)) {
+  if (seriesEndConflict(mode, event, getRRuleValues(overlay, 'event').recurrence_rule, start_datetime)) {
     reportFieldError(overlay.querySelector('#event-rrule-until'), t('calendar.recurrenceEndBeforeStart'));
     return;
   }

@@ -862,9 +862,11 @@ test('das Formular des Kalenders meldet ein Serienende vor dem Start am Ende-Fel
   const quelle = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   const von = quelle.indexOf('async function saveEvent(');
   const save = quelle.slice(von, quelle.indexOf('\nasync function ', von + 10));
-  const pruefung = save.indexOf('seriesEndsBeforeStart(');
+  const pruefung = save.indexOf('seriesEndConflict(');
   assert.ok(pruefung !== -1, 'saveEvent fragt nicht, ob die Serie vor ihrem Start endet');
   assert.ok(pruefung < save.indexOf("api.post('/calendar'"), 'die Pruefung steht hinter dem Absenden');
+  assert.ok(/function seriesEndConflict\([^)]*\) \{[^]*?seriesEndsBeforeStart\(/.test(quelle),
+    'die Pruefung des Kalenders ruft nicht die geteilte Regel');
   const block = save.slice(pruefung, pruefung + 400);
   assert.ok(block.includes("reportFieldError(overlay.querySelector('#event-rrule-until'), t('calendar.recurrenceEndBeforeStart'))"),
     'der Fehler gehoert an das Feld, das ihn verursacht, mit einem uebersetzten Text');

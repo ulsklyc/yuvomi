@@ -5029,6 +5029,59 @@ test('PUT /:id - eine Bestandsserie mit Ende vor dem Start bleibt bearbeitbar (#
   }
 });
 
+test('PUT /:id - ein Termin mit eigener Zone: geraten wird nicht, aber ein Ende klar vor dem Start faellt auf (#1607)', async () => {
+  // 31. Januar 20:00 in New York steht als 1. Februar 01:00 UTC in der Zeile.
+  // Welcher der beiden Tage "der Starttag" ist, haengt an der Lesart - dazwischen
+  // wird deshalb nicht geurteilt. Ein Ende vor BEIDEN ist in jeder Lesart ein
+  // Widerspruch (Review an PR #1618).
+  const id = insertEvent({ title: 'ZONE-ENDE', start_datetime: '2091-02-01T01:00:00Z', recurrence_rule: 'RRULE:FREQ=DAILY' });
+  db.prepare("UPDATE calendar_events SET tzid = 'America/New_York' WHERE id = ?").run(id);
+  try {
+    const klarDavor = await call('PUT', `/${id}`, { body: { recurrence_rule: 'FREQ=DAILY;UNTIL=20910115T235959Z' } });
+    assert.equal(klarDavor.status, 400, `ein Ende zwei Wochen vor dem Start: ${klarDavor.status}`);
+    assert.match(String(klarDavor.body?.error ?? ''), /ends before the start date/);
+
+    const dazwischen = await call('PUT', `/${id}`, { body: { recurrence_rule: 'FREQ=DAILY;UNTIL=20910131T235959Z' } });
+    assert.equal(dazwischen.status, 200, `zwischen Ortstag und UTC-Tag wird nicht geraten: ${dazwischen.status}`);
+
+    // Und der Bestand: dieselbe Zeile mit einer Regel, die klar vorher endet,
+    // am Guard vorbei geschrieben - ein Titel-Edit geht durch.
+    db.prepare('UPDATE calendar_events SET recurrence_rule = ? WHERE id = ?').run('RRULE:FREQ=DAILY;UNTIL=20910115T235959Z', id);
+    const nurTitel = await call('PUT', `/${id}`, {
+      body: { title: 'Neuer Titel', recurrence_rule: 'RRULE:FREQ=DAILY;UNTIL=20910115T235959Z' },
+    });
+    assert.equal(nurTitel.status, 200, `Titel-Edit am Bestand: ${nurTitel.status}`);
+  } finally {
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
+  }
+});
+
+test('PUT /:id - ein Instant ohne eigene Zone: der Tag des Formulars ist keine Startaenderung (#1607)', async () => {
+  // Ein synchronisierter Termin liegt als `...Z` in der Zeile, das Formular
+  // schickt denselben Zeitpunkt als Wanduhrzeit des Haushalts. In Tokio ist
+  // 20:00Z am 1. Oktober der 2. Oktober 05:00 - der rohe Textvergleich hielt
+  // das fuer einen verschobenen Start und wies den Titel-Edit ab.
+  const previousZone = db.prepare("SELECT value FROM sync_config WHERE key = 'household_timezone'").get()?.value;
+  db.prepare(`INSERT INTO sync_config (key, value) VALUES ('household_timezone', 'Asia/Tokyo')
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run();
+  const id = insertEvent({ title: 'INSTANT-ENDE', start_datetime: '2091-10-01T20:00:00Z', recurrence_rule: 'RRULE:FREQ=DAILY;UNTIL=20910930T235959Z' });
+  try {
+    const nurTitel = await call('PUT', `/${id}`, {
+      body: { title: 'Neuer Titel', start_datetime: '2091-10-02T05:00', recurrence_rule: 'RRULE:FREQ=DAILY;UNTIL=20910930T235959Z' },
+    });
+    assert.equal(nurTitel.status, 200, `Titel-Edit: ${nurTitel.status} ${JSON.stringify(nurTitel.body?.error ?? '')}`);
+
+    const verschoben = await call('PUT', `/${id}`, {
+      body: { start_datetime: '2091-10-05T05:00', recurrence_rule: 'RRULE:FREQ=DAILY;UNTIL=20910930T235959Z' },
+    });
+    assert.equal(verschoben.status, 400, `ein wirklich verschobener Start: ${verschoben.status}`);
+  } finally {
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
+    if (previousZone === undefined) db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run();
+    else db.prepare("UPDATE sync_config SET value = ? WHERE key = 'household_timezone'").run(previousZone);
+  }
+});
+
 test('POST /import - eine eingelesene Serie mit Ende vor dem Start scheitert nicht (#1607)', async () => {
   // Fremde Daten sind, wie sie sind. Der Import lehnt nicht ab, was ein anderer
   // Kalender so geschrieben hat.

@@ -26,7 +26,10 @@ const ATTACHMENT_RIGHTS = ' A new attachment creates a document in the Documents
 const SERIES_END_INPUT = ' A `recurrence_rule` whose `UNTIL` day lies before the start day is rejected with 400 '
   + '(`recurrence_rule: the series ends before the start date.`); an `UNTIL` on the start day is a series with one '
   + 'occurrence and is accepted. PUT checks this only when the request changes the rule or the start day, so an '
-  + 'imported series that already carries such a rule stays editable. ICS import and calendar sync do not reject it.';
+  + 'imported series that already carries such a rule stays editable; the start day is compared as the household calendar '
+  + 'day, so sending the wall-clock form of a stored instant is not a change. For an event with a time zone of its own, whose '
+  + 'stored UTC day differs from its local day, only a changed rule is checked, and only an `UNTIL` before both days is '
+  + 'rejected. ICS import and calendar sync do not reject it.';
 
 const DATETIME_INPUT = ' `start_datetime` and `end_datetime` take the forms of `CalendarDateOrDateTimeInput`: '
   + 'a value without offset is household wall-clock time, a value with `Z` or a numeric offset is read as an '

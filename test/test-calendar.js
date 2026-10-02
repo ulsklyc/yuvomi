@@ -5009,6 +5009,44 @@ test('Mehrtaegige ab 24 Stunden bleiben in der Ganztags-Zeile, auch mit Ende um 
 });
 
 // --------------------------------------------------------
+// #1607 (9): das Serienende vor dem Start im Dialog - WANN gefragt wird
+//
+// Der Dialog fragt nur, wenn das Speichern Regel oder Starttag aendert; eine
+// eingelesene Serie, die schon so dasteht, bleibt bearbeitbar. "Starttag
+// geaendert" muss dabei in EINER Darstellung verglichen werden: das Formular
+// liefert den Tag der Anzeigezone, die Zeile eines synchronisierten Termins
+// einen Instant. Am rohen Text verglichen galt ein reiner Titel-Edit als
+// Startaenderung, sobald UTC-Tag und Anzeigetag auseinanderfallen (Review an
+// PR #1618).
+// --------------------------------------------------------
+
+const ENDET_VORHER_REGEL = 'RRULE:FREQ=DAILY;UNTIL=20910930T235959Z';
+
+test('seriesEndConflict: ein Titel-Edit an einer eingelesenen Serie wird nicht blockiert, auch wenn ihr UTC-Tag ein anderer ist (#1607)', () => {
+  // 20:00Z am 1. Oktober ist in Tokio der 2. Oktober, 05:00.
+  const fremd = { id: 9, start_datetime: '2091-10-01T20:00:00Z', recurrence_rule: ENDET_VORHER_REGEL };
+  withDisplayTimeZone('Asia/Tokyo', () => {
+    assert(calendarHelpers.seriesEndConflict('edit', fremd, ENDET_VORHER_REGEL, '2091-10-02T05:00') === false,
+      'Start und Regel sind unveraendert - der Tag des Formulars ist nur der Anzeigetag desselben Zeitpunkts');
+    assert(calendarHelpers.seriesEndConflict('edit', fremd, ENDET_VORHER_REGEL, '2091-10-03T05:00') === true,
+      'ein wirklich verschobener Start wird gefragt');
+  });
+  withDisplayTimeZone('UTC', () => {
+    assert(calendarHelpers.seriesEndConflict('edit', fremd, ENDET_VORHER_REGEL, '2091-10-01T20:00') === false,
+      'in UTC ist der Anzeigetag der 1. - auch dort unveraendert');
+  });
+});
+
+test('seriesEndConflict: neue Serie, geaenderte Regel und unveraenderte Bestandsserie (#1607)', () => {
+  const lokal = { id: 10, start_datetime: '2091-10-02T09:00', recurrence_rule: 'FREQ=DAILY;UNTIL=20910930T235959Z' };
+  assert(calendarHelpers.seriesEndConflict('create', null, 'FREQ=DAILY;UNTIL=20910930T235959Z', '2091-10-02T09:00') === true, 'neu: wird gefragt');
+  assert(calendarHelpers.seriesEndConflict('create', null, 'FREQ=DAILY;UNTIL=20911002T235959Z', '2091-10-02T09:00') === false, 'Ende am Starttag ist gueltig');
+  assert(calendarHelpers.seriesEndConflict('edit', lokal, lokal.recurrence_rule, '2091-10-02T11:00') === false,
+    'gleicher Tag, gleiche Regel: der Bestand bleibt bearbeitbar');
+  assert(calendarHelpers.seriesEndConflict('edit', lokal, 'FREQ=DAILY;UNTIL=20910929T235959Z', '2091-10-02T09:00') === true, 'geaenderte Regel: wird gefragt');
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 console.log(`\n[Calendar-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

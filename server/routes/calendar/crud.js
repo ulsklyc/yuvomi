@@ -10,7 +10,7 @@ import { str, color, datetime, rrule, collectErrors, MAX_TITLE, MAX_TEXT, DATE_R
 import { normalizeVisibility, visibilityWhere } from '../../services/visibility.js';
 import { hasAnyOccurrence, endsBeforeStart } from '../../services/recurrence.js';
 import { resolveProjectedEventRows } from '../../services/calendar-event-reader.js';
-import { householdTimeZone, utcToWall } from '../../utils/timezone.js';
+import { hasExplicitZone, householdTimeZone, shiftDateKey, utcToWall } from '../../utils/timezone.js';
 import {
   StorageError,
   cleanupStagedUpload,
@@ -878,11 +878,36 @@ router.put('/:id', async (req, res) => {
         code: 400,
       });
     }
-    // Dasselbe Gatter fuer das Ende vor dem Start (#1607): nur wenn DIESE
-    // Anfrage Regel oder Starttag aendert. Eine eingelesene Serie, die schon so
-    // in der Zeile steht, bleibt bearbeitbar - und wo der gespeicherte UTC-Tag
-    // nicht der Ortstag ist (`zonenUnsicher`), wird nicht geraten.
-    if (serieBeruehrt && !zonenUnsicher && endsBeforeStart(startDanach, regelDanach)) {
+    // EIN ENDE VOR DEM START (#1607): nur wenn DIESE Anfrage Regel oder
+    // Starttag aendert. Eine eingelesene Serie, die schon so in der Zeile
+    // steht, bleibt bearbeitbar.
+    //
+    // "STARTTAG GEAENDERT" WIRD IN EINER DARSTELLUNG VERGLICHEN, anders als
+    // `serieBeruehrt` oben. Das Formular schickt die Wanduhrzeit des Haushalts;
+    // ein synchronisierter Termin liegt als Instant in der Zeile, und dessen
+    // UTC-Tag kann der Nachbartag sein. Am rohen Text verglichen waere ein
+    // reiner Titel-Edit dort eine Startaenderung. Fuer die Pruefung darueber
+    // ist das unschaedlich (sie wird dadurch nur OEFTER gefragt und nimmt sich
+    // im Zweifel selbst zurueck), hier wuerde es eine Bearbeitung abweisen.
+    const gespeicherterStart = String(event.start_datetime ?? '');
+    const gespeicherterTag = hasExplicitZone(gespeicherterStart)
+      ? (utcToWall(gespeicherterStart, zoneOpts.zone)?.date ?? gespeicherterStart.slice(0, 10))
+      : gespeicherterStart.slice(0, 10);
+    const startTag = String(startDanach ?? '').slice(0, 10);
+    const regelGeaendert = regelDanach !== event.recurrence_rule;
+    const startTagGeaendert = start_datetime !== undefined && start_datetime !== null
+      && startTag !== gespeicherterTag;
+    // WO DER STARTTAG VON DER LESART ABHAENGT, WIRD NICHT GERATEN - ABER AUCH
+    // NICHT WEGGESEHEN. Ein Termin mit eigener Zone hat zwei Kandidaten (der
+    // UTC-Tag der Zeile und der Ortstag); ohne aufloesbare Zone liegt der Ortstag
+    // hoechstens einen Tag daneben. Abgewiesen wird dort nur ein Ende, das vor
+    // JEDEM Kandidaten liegt, und nur bei geaenderter REGEL: die ist in jeder
+    // Darstellung dieselbe Zeichenkette.
+    const startKandidaten = zonenUnsicher
+      ? [startTag, wandUhr?.date ?? shiftDateKey(startTag, -1)]
+      : [startTag];
+    const endeGefragt = zonenUnsicher ? regelGeaendert : (regelGeaendert || startTagGeaendert);
+    if (endeGefragt && startKandidaten.every((tag) => endsBeforeStart(tag, regelDanach))) {
       return res.status(400).json({ error: SERIES_ENDS_BEFORE_START, code: 400 });
     }
 
