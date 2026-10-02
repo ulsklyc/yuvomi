@@ -490,3 +490,45 @@ test('ein bestehender privater Termin mit Zugewiesenen zeigt den Hinweis schon b
   assert.equal(panel.querySelector('#modal-visibility').value, 'private', 'die Auswahl kommt aus dem Markup');
   assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, false);
 });
+
+// Wer den Termin angelegt hat, sieht ihn auch als "Nur ich" - `created_by`
+// zaehlt deshalb nicht zu den Personen, vor denen der Hinweis warnt. Beim
+// Bearbeiten ist das die Erstellerin des Termins, nicht wer gerade bearbeitet;
+// bei einem neuen Termin das angemeldete Konto.
+
+async function asAccount(id, run) {
+  const vorher = calendar.state.currentUserId;
+  calendar.state.currentUserId = id;
+  try { return await run(); } finally { calendar.state.currentUserId = vorher; }
+}
+
+test('"Nur ich", zugewiesen ist nur, wer den Termin anlegt: kein Hinweis - erst eine weitere Person bringt ihn', async () => {
+  await asAccount(3, async () => {
+    const panel = await openForm();
+    await userClicksPerson(panel, 3);
+    userPicksVisibility(panel, 'private');
+    assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, true, 'die Erstellerin sieht ihren eigenen Termin');
+
+    await userClicksPerson(panel, 4);
+    assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, false, 'Leo sieht ihn nicht');
+    await userClicksPerson(panel, 4, false);
+    assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, true);
+  });
+});
+
+test('Bearbeiten eines fremden Termins: es zaehlt created_by, nicht wer bearbeitet', async () => {
+  const base = {
+    id: 14, title: 'Geschenk besorgen', start_datetime: '2026-10-02T19:00', end_datetime: '2026-10-02T20:30',
+    all_day: 0, recurrence_rule: null, visibility: 'private',
+  };
+  await asAccount(3, async () => {
+    // Papa hat den Termin angelegt, Emma bearbeitet ihn und ist allein zugewiesen.
+    const fremd = await openForm({ mode: 'edit', event: { ...base, created_by: 1, assigned_users: [{ id: 3 }] }, assigned: [3] });
+    assert.equal(hint(fremd, PRIVATE_ASSIGNED).hidden, false, 'die Bearbeitende ist nicht die Erstellerin - sie saehe den Termin nicht');
+  });
+  await asAccount(1, async () => {
+    // Emma hat ihn angelegt und ist allein zugewiesen, Papa bearbeitet.
+    const eigen = await openForm({ mode: 'edit', event: { ...base, created_by: 3, assigned_users: [{ id: 3 }] }, assigned: [3] });
+    assert.equal(hint(eigen, PRIVATE_ASSIGNED).hidden, true, 'die Erstellerin sieht ihren Termin, gleich wer ihn bearbeitet');
+  });
+});

@@ -7122,19 +7122,23 @@ function applyDefaultSyncTarget(selectElement) {
 // Zwei Hinweise an der Sichtbarkeit, beide warnen nur und aendern nichts:
 // - „Nur Zugewiesene" ohne Person: dann sieht faktisch nur der Ersteller den
 //   Termin (#474 Guard).
-// - „Nur ich" mit mindestens einer Person: die Zugewiesenen sehen den Termin
+// - „Nur ich" mit mindestens einer anderen Person als dem Ersteller: die Zugewiesenen sehen den Termin
 //   nicht. Die Kombination bleibt erlaubt und die
 //   Zuweisung stehen - Bestandsdaten und API-Clients fuehren sie.
-function wireVisibilityWarning(panel, selectSel, msName, warnSel, privateWarnSel) {
+function wireVisibilityWarning(panel, selectSel, msName, warnSel, privateWarnSel, creatorId = null) {
   const select = panel.querySelector(selectSel);
   const warn   = panel.querySelector(warnSel);
   if (!select || !warn) return;
   const privateWarn = privateWarnSel ? panel.querySelector(privateWarnSel) : null;
   const ms = panel.querySelector(`.user-ms[data-ms-name="${msName}"]`);
   const update = () => {
-    const count = getSelectedUserIds(panel, msName).length;
-    warn.hidden = !(select.value === 'assignees' && count === 0);
-    if (privateWarn) privateWarn.hidden = !(select.value === 'private' && count > 0);
+    const ids = getSelectedUserIds(panel, msName).map(Number);
+    warn.hidden = !(select.value === 'assignees' && ids.length === 0);
+    // Wer den Eintrag angelegt hat, sieht ihn auch als „Nur ich": gezaehlt
+    // werden nur die anderen. Massgeblich ist `created_by` des Eintrags, nicht
+    // wer ihn gerade bearbeitet; ein neuer gehoert dem angemeldeten Konto.
+    const others = creatorId == null ? ids : ids.filter((id) => id !== Number(creatorId));
+    if (privateWarn) privateWarn.hidden = !(select.value === 'private' && others.length > 0);
     // Die Sichtbarkeit steht unter „Weitere Einstellungen". Wer oben die
     // letzte Person abwaehlt oder die erste zuweist, bekommt die Warnung sonst
     // in einem geschlossenen <details> - aufklappen, nie zuklappen (wie die
@@ -7201,7 +7205,8 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
     ),
   });
   bindUserMultiSelect(panel, 'cal_assigned');
-  wireVisibilityWarning(panel, '#modal-visibility', 'cal_assigned', '#modal-visibility-warning', '#modal-visibility-private-warning');
+  wireVisibilityWarning(panel, '#modal-visibility', 'cal_assigned', '#modal-visibility-warning', '#modal-visibility-private-warning',
+    event?.created_by ?? state.currentUserId);
 
   // Der Farbwaehler war bis v2.35.0 ausgegraut, sobald jemand zugewiesen war,
   // mit dem Hinweis, die Farbe der Person schlage sie ohnehin. Seit #815 steht
