@@ -47,6 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the parents to decide - with the current balance shown beside it when it is below zero.
   Earnings that earlier versions deleted on reopening are not restored.
 
+- **A recurring task gives its points once a day, not once per tick** (#1603). Ticking off a
+  recurring task creates its next occurrence right away, and that one could be ticked off again
+  at once - each time for the full points. A recurring task now pays each person at most once
+  per day; the day is the household's, not UTC. Ticking off still works and still moves the
+  series on, and reopening a task and completing it again on the same day keeps its points. The
+  same holds for subtasks that carry points. If you catch up two missed occurrences of the same
+  task on one day, they count once.
+
 - **Correcting the date of a series' first entry no longer moves the rest of the series** (#1545).
   Every later occurrence of a recurring payment is counted from its start day, and that was still
   the date of the first entry. Correcting it with "Only this occurrence" (the rent was debited on

@@ -58,6 +58,34 @@ export function seriesRootOf(d, taskId) {
 }
 
 /**
+ * Die `series_id`, unter der eine Erledigung dieser Aufgabe steht oder stehen
+ * wird. EINE Funktion für beide, die danach fragen: `recordCompletion` schreibt
+ * den Wert, und der Punkte-Deckel je Serie (#1603, `awardForCompletion` in
+ * rewards.js) sucht mit ihm die Geschwister - rechneten die beiden getrennt,
+ * fände der Deckel nach einem Kettenriss eine andere Serie als die, unter der
+ * die Einträge stehen.
+ *
+ * Die Serie wird vom direkten Vorgänger GEERBT, wenn der schon einen Eintrag
+ * hat - ein Index-Zugriff statt eines Kettenlaufs. Das ist der Normalfall
+ * (eine laufende Serie hakt einen Nachfolger nach dem anderen ab), und er
+ * darf nicht mit der Länge der Serie teurer werden: die rekursive Abfrage
+ * deckelt bei 1000 Gliedern, und eine tägliche Aufgabe erreicht das nach gut
+ * zweieinhalb Jahren. Ohne das Erben bekäme sie ab da eine andere series_id
+ * und die Serie zerfiele still in zwei.
+ *
+ * @param {object} d       better-sqlite3-Connection
+ * @param {number} taskId
+ * @returns {number}
+ */
+export function seriesIdFor(d, taskId) {
+  const origin = d.prepare('SELECT recurrence_origin_id FROM tasks WHERE id = ?').get(taskId)?.recurrence_origin_id;
+  const inherited = origin
+    ? d.prepare('SELECT series_id FROM task_completions WHERE task_id = ?').get(origin)
+    : null;
+  return inherited?.series_id ?? seriesRootOf(d, taskId);
+}
+
+/**
  * Erledigung festhalten. Idempotent über den UNIQUE-Index auf `task_id`: trifft
  * derselbe Statuswechsel zweimal ein, bleibt es bei einem Eintrag mit dem
  * ersten Zeitpunkt.
@@ -79,26 +107,15 @@ export function seriesRootOf(d, taskId) {
  * @param {number|null} [doneByUserId] wer es getan hat, falls benannt
  */
 export function recordCompletion(d, taskId, actingUserId, doneByUserId = null) {
-  const task = d.prepare('SELECT id, parent_task_id, recurrence_origin_id FROM tasks WHERE id = ?').get(taskId);
+  const task = d.prepare('SELECT id, parent_task_id FROM tasks WHERE id = ?').get(taskId);
   if (!task || task.parent_task_id) return;
-
-  // Die Serie wird vom direkten Vorgänger GEERBT, wenn der schon einen Eintrag
-  // hat - ein Index-Zugriff statt eines Kettenlaufs. Das ist der Normalfall
-  // (eine laufende Serie hakt einen Nachfolger nach dem anderen ab), und er
-  // darf nicht mit der Länge der Serie teurer werden: die rekursive Abfrage
-  // deckelt bei 1000 Gliedern, und eine tägliche Aufgabe erreicht das nach gut
-  // zweieinhalb Jahren. Ohne das Erben bekäme sie ab da eine andere series_id
-  // und die Serie zerfiele still in zwei.
-  const inherited = task.recurrence_origin_id
-    ? d.prepare('SELECT series_id FROM task_completions WHERE task_id = ?').get(task.recurrence_origin_id)
-    : null;
 
   d.prepare(`
     INSERT OR IGNORE INTO task_completions (task_id, series_id, user_id, done_by_user_id)
     VALUES (?, ?, ?, ?)
   `).run(
     taskId,
-    inherited?.series_id ?? seriesRootOf(d, taskId),
+    seriesIdFor(d, taskId),
     actingUserId || null,
     doneByUserId || null,
   );

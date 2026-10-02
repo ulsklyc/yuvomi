@@ -1376,3 +1376,42 @@ test('Eine wiederkehrende Aufgabe bucht beim Weiterrollen keine Gegenbuchung (#1
   assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get(id).status, 'done');
   assert.deepEqual(ledgerOf(kid).map((r) => [r.type, r.delta, r.task_id]), [['earn', 10, id]]);
 });
+
+// --------------------------------------------------------
+// Eine Serie zahlt je Person einmal am Tag (#1603)
+// --------------------------------------------------------
+
+for (const fromCompletion of [true, false]) {
+  test(`Serie ${fromCompletion ? 'ab Erledigung' : 'ab Fälligkeit'}: mehrfaches Abhaken am selben Tag bringt eine Gutschrift (#1603)`, async (t) => {
+    const { todayKey, shiftDateKey } = await import('../server/utils/timezone.js');
+    const admin = { id: ALICE, role: 'admin' };
+    const kid = seedEarner(`kid-deckel-${fromCompletion ? 'e' : 'f'}`);
+    const dayBefore = todayKey(db);
+    const title = `deckel-${randomUUID().slice(0, 8)}`;
+    const created = await call('POST', '/', {
+      as: admin,
+      body: {
+        title, points: 10, assigned_to: [kid], is_recurring: true, recurrence_rule: 'FREQ=DAILY',
+        recurrence_from_completion: fromCompletion, due_date: shiftDateKey(dayBefore, 1),
+      },
+    });
+    assert.equal(created.status, 201);
+
+    // Dreimal hintereinander: jeder Haken legt eine NEUE Instanz an, die sich
+    // sofort wieder abhaken lässt.
+    let id = created.body.data.id;
+    for (let i = 0; i < 3; i++) {
+      const r = await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done' } });
+      assert.equal(r.status, 200, 'das Abhaken selbst bleibt erlaubt');
+      const next = db.prepare('SELECT id FROM tasks WHERE recurrence_origin_id = ? AND parent_task_id IS NULL').get(id);
+      assert.ok(next, 'und rollt die Serie weiter');
+      id = next.id;
+    }
+    // Die Uhr ist hier die echte: springt der Haushaltstag mitten im Test um,
+    // wären zwei Gutschriften richtig und der Test sagte nichts.
+    if (todayKey(db) !== dayBefore) return t.skip('Tageswechsel während des Tests');
+
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM tasks WHERE title = ? AND status = 'done'").get(title).n, 3);
+    assert.equal(balanceOf(kid), 10, 'drei Haken an einem Tag sind eine Gutschrift');
+  });
+}

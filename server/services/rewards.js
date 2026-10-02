@@ -8,6 +8,8 @@
  */
 
 import { householdMemberSql } from './household-members.js';
+import { seriesIdFor } from './task-completions.js';
+import { householdTimeZone, todayKey, utcToWall } from '../utils/timezone.js';
 
 const REWARD_TX = `
   INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, redemption_id, created_by)
@@ -147,23 +149,107 @@ const TASK_NET = `
   WHERE task_id = ? AND user_id = ? AND type IN ('earn', 'reversal')
 `;
 
+/*
+ * EINE SERIE ZAHLT JE PERSON EINMAL AM TAG (#1603).
+ *
+ * Eine wiederkehrende Aufgabe legt beim Abhaken sofort ihre nächste Instanz an
+ * (spawnRecurrenceFollowup in routes/tasks.js) - eine neue Zeile mit neuer
+ * task_id, die sich im selben Atemzug wieder abhaken lässt. Die Idempotenz
+ * oben gilt je task_id und sah darin jedes Mal eine neue Aufgabe: "Zähne
+ * putzen", fällig morgen, brachte mit zehn Klicks zehnmal Punkte.
+ *
+ * Das Abhaken bleibt erlaubt und rollt die Serie weiter - wer zwei Tage
+ * nachholt, soll das können. Nur die GUTSCHRIFT gibt es je Serie, Person und
+ * Haushaltstag höchstens einmal. Die Kehrseite ist benannt: wer an einem Tag
+ * zwei liegengebliebene Vorkommen derselben Serie nachholt, bekommt eine.
+ *
+ * WAS "HEUTE SCHON VERGÜTET" HEISST: es gibt eine earn-Zeile dieser Person für
+ * eine ANDERE Aufgabe derselben Serie, die noch gilt (keine spätere
+ * Gegenbuchung, #1607) und deren Zeitpunkt in der Haushaltszone auf den
+ * heutigen Tag fällt. Die eigene Aufgabe zählt nicht mit: ihre zurückgenommene
+ * Gutschrift darf das erneute Erledigen am selben Tag nicht sperren, und ihre
+ * noch geltende fängt schon der Netto-Stand ab.
+ *
+ * DIE SERIE WIRD AUF ZWEI WEGEN GEFUNDEN, weil keiner allein reicht:
+ *   1. task_completions.series_id - beim Schreiben eingefroren, deshalb auch
+ *      nach einem Kettenriss dieselbe (seriesIdFor), und sie findet die Serie
+ *      in BEIDE Richtungen (eine gestern erledigte, heute wieder geöffnete und
+ *      neu abgehakte Vorgängerin sieht die heutige Gutschrift der Nachfolgerin).
+ *      Aber TEILAUFGABEN stehen dort bewusst nicht - und sie tragen eigene
+ *      Punkte und entstehen mit jeder Folgeinstanz neu.
+ *   2. die Vorgängerkette über recurrence_origin_id, die Aufgaben und
+ *      Teilaufgaben gleichermaßen tragen. Sie läuft nur so weit zurück, wie
+ *      Glieder im Fenster ANGELEGT wurden: eine Folgeinstanz entsteht mit dem
+ *      Abhaken ihrer Vorgängerin, ist sie also älter als das Fenster, ist es
+ *      deren Gutschrift auch. Die Kosten wachsen damit nicht mit dem Alter der
+ *      Serie, nur mit der Zahl der Haken der letzten zwei Tage.
+ * Eine wieder geöffnete Vorgängerin hat eine Gegenbuchung im Ledger und fällt
+ * auf beiden Wegen heraus.
+ *
+ * DER TAG ist der Haushaltstag (todayKey), nie der UTC-Tag: östlich von UTC
+ * beginnt der Morgen sonst am Vortag, und die Gutschrift von gestern Abend
+ * sperrte die von heute früh. Die Abfrage holt deshalb großzügig die letzten
+ * 50 Stunden (weiter liegt kein "heute" einer Zone vom Jetzt entfernt) und
+ * entscheidet den Tag je Zeile über die Wanduhr der Zone.
+ */
+const SERIES_EARNS_SINCE = `
+  WITH RECURSIVE anc(id, origin, created_at, depth) AS (
+    SELECT id, recurrence_origin_id, created_at, 0 FROM tasks WHERE id = @task
+    UNION ALL
+    SELECT t.id, t.recurrence_origin_id, t.created_at, a.depth + 1
+      FROM tasks t JOIN anc a ON t.id = a.origin
+     WHERE a.created_at >= @since AND a.depth < 100000
+  )
+  SELECT l.created_at FROM reward_ledger l
+  WHERE l.user_id = @user AND l.type = 'earn'
+    AND l.task_id != @task AND l.created_at >= @since
+    AND (
+      l.task_id IN (SELECT id FROM anc)
+      OR l.task_id IN (SELECT c.task_id FROM task_completions c WHERE c.series_id = @series)
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM reward_ledger r
+      WHERE r.type = 'reversal' AND r.task_id = l.task_id
+        AND r.user_id = l.user_id AND r.id > l.id
+    )
+`;
+const SERIES_LOOKBACK_MS = 50 * 60 * 60 * 1000;
+
+/** Zeitpunkt in der Form, die der Ledger schreibt: Sekunden, UTC, mit Z. */
+function ledgerTimestamp(date) {
+  return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
 /**
  * Punkte für eine erledigte Aufgabe gutschreiben. Idempotent über den
  * Netto-Stand: wer für diese Aufgabe schon vergütet ist, bekommt keine zweite
- * Buchung, falls der Statuswechsel mehrfach eintrifft.
+ * Buchung, falls der Statuswechsel mehrfach eintrifft. Und je Serie, Person
+ * und Haushaltstag höchstens eine (#1603, siehe oben).
+ *
+ * @param {object} [opts]
+ * @param {Date}   [opts.now]  Ersetzbar für Tests - Zeitpunkt der Buchung UND
+ *                             der Tag, an dem der Serien-Deckel misst.
  */
-export function awardForCompletion(d, taskId, actingUserId, doneByUserId = null) {
+export function awardForCompletion(d, taskId, actingUserId, doneByUserId = null, { now = new Date() } = {}) {
   const task = d.prepare('SELECT id, points, title FROM tasks WHERE id = ?').get(taskId);
   if (!task || !Number.isInteger(task.points) || task.points <= 0) return;
   const targets = rewardTargets(d, taskId, actingUserId, doneByUserId);
   if (!targets.length) return;
   d.transaction(() => {
     const net = d.prepare(TASK_NET);
-    const ins = d.prepare(`INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, created_by)
-      VALUES (?, ?, 'earn', ?, ?, ?)`);
+    const seriesEarns = d.prepare(SERIES_EARNS_SINCE);
+    const ins = d.prepare(`INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, created_by, created_at)
+      VALUES (?, ?, 'earn', ?, ?, ?, ?)`);
+    const series = seriesIdFor(d, taskId);
+    const zone = householdTimeZone(d);
+    const today = todayKey(d, now);
+    const since = ledgerTimestamp(new Date(now.getTime() - SERIES_LOOKBACK_MS));
     for (const uid of new Set(targets)) {
       if (net.get(taskId, uid).net > 0) continue;
-      ins.run(uid, task.points, task.title || null, taskId, actingUserId || null);
+      const paidToday = seriesEarns.all({ series, user: uid, task: taskId, since })
+        .some((row) => utcToWall(row.created_at, zone)?.date === today);
+      if (paidToday) continue;
+      ins.run(uid, task.points, task.title || null, taskId, actingUserId || null, ledgerTimestamp(now));
     }
   })();
 }
@@ -207,10 +293,10 @@ export function reverseTaskEarnings(d, taskId, actingUserId = null) {
  * Zentrale Kopplung an den Aufgaben-Statuswechsel. Vergibt beim Übergang nach
  * 'done' und bucht beim Verlassen von 'done' gegen. Alles andere ist ein No-op.
  */
-export function syncTaskRewards(d, taskId, oldStatus, newStatus, actingUserId, doneByUserId = null) {
+export function syncTaskRewards(d, taskId, oldStatus, newStatus, actingUserId, doneByUserId = null, opts = {}) {
   const wasDone = oldStatus === 'done';
   const isDone = newStatus === 'done';
-  if (isDone && !wasDone) awardForCompletion(d, taskId, actingUserId, doneByUserId);
+  if (isDone && !wasDone) awardForCompletion(d, taskId, actingUserId, doneByUserId, opts);
   else if (wasDone && !isDone) reverseTaskEarnings(d, taskId, actingUserId);
 }
 
