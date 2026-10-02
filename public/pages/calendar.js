@@ -11,7 +11,7 @@ import { attachOverlay } from '/utils/overlay-history.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate } from '/utils/ux.js';
-import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
+import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation } from '/utils/html.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
          monthPeriodKeys, startOfLocalWeekKey, addLocalDays, defaultDateInPeriod,
@@ -2475,7 +2475,9 @@ function updateLabel() {
   const year = d.getFullYear();
   const mon  = MONTH_NAMES()[d.getMonth()];
 
-  if (state.view === 'month')  lbl.textContent = `${mon} ${year}`;
+  // Die Reihenfolge von Monat und Jahr ist Sache der Sprache (#1607):
+  // "${mon} ${year}" ergab im Koreanischen "10월 2026" statt "2026년 10월".
+  if (state.view === 'month')  lbl.textContent = formatMonthYear(year, d.getMonth() + 1);
   if (state.view === 'week') {
     // Mobil zeigt die "Woche" ein 3-Tage-Fenster um den Cursor (renderWeekView);
     // ein "KW 30"-Label würde dann einen Bereich behaupten, der nicht zu sehen

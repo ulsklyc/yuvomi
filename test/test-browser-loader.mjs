@@ -111,6 +111,20 @@ const STUBS = {
     // WELCHES von beiden gerufen wurde (relativeDateLabel), setzt
     // globalThis.__formatDayMonth - dasselbe Muster wie __locale.
     export const formatDayMonth = (d) => (globalThis.__formatDayMonth ?? String)(d);
+    // Monat und Jahr in der Reihenfolge der Sprache (__locale), gregorianisch.
+    // Ein Nachbau wie formatUnit; test:region-presets fuehrt ihn gegen das
+    // Original.
+    export const formatMonthYear = (year, month) => {
+      const y = Number(year);
+      const m = Number(month);
+      if (!Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12) return '';
+      const locale = globalThis.__locale ?? 'de';
+      const text = new Intl.DateTimeFormat(locale, {
+        month: 'long', year: 'numeric', timeZone: 'UTC', calendar: 'gregory',
+      }).format(new Date(Date.UTC(y, m - 1, 1)));
+      const [first = ''] = text;
+      return first.toLocaleUpperCase(locale) + text.slice(first.length);
+    };
     export const formatTime = (d) => String(d);
     export const getTimeFormat = () => '24h';
     // Das Uhrzeit-Suffix der Locale („Uhr"): leer wie in den meisten Sprachen,

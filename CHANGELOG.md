@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The month heading of Calendar and Budget follows the word order of the language** (#1607).
+  Both pages put the month name, a space and the year together themselves, which gave "10월 2026"
+  in Korean instead of "2026년 10월" (and the same for Japanese, Chinese and Hungarian). Month
+  and year now come from one formatter that asks the UI language for the order and always uses
+  the Gregorian calendar. German and English look the same as before; a few languages gain the
+  connecting words their grammar asks for ("Octubre de 2026", "Tháng 10 năm 2026").
 - **An event that ends at midnight is drawn at its full length in the week and day view**
   (#1607). An event from 23:00 to 00:00 appeared as a 30-minute strip, and one from 22:00 to
   00:00 as well: an end at exactly 00:00 was read as "ends at minute 0 of the same day". It now
