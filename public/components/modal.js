@@ -264,7 +264,17 @@ function trapFocus(container, initialFocus = 'first-field') {
       const isSelect = active.tagName === 'SELECT';
 
       if (isInput || isSelect) {
-        const submitBtn = container.querySelector('button[type="submit"], .btn--primary');
+        // DAS FORMULAR DES FELDES ZUERST (#1598). Ein Blatt kann mehr als ein
+        // Formular tragen - die Aufgabe hat die Teilaufgaben-Zeile UND das
+        // Kommentarfeld. Die panelweite Suche nimmt den ersten Treffer im
+        // Dokument, also "Kommentieren": Enter in der Teilaufgaben-Zeile
+        // schickte einen leeren Kommentar ab, und `preventDefault()` nahm dem
+        // eigenen Formular die Absendung. Der Rueckfall aufs Panel bleibt fuer
+        // Formulare, deren Speichern-Knopf in der Fusszeile steht (#543). Ein
+        // gesperrter eigener Knopf faellt NICHT zurueck - gesperrt heisst
+        // "unterwegs", nicht "nimm einen anderen".
+        const submitBtn = active.form?.querySelector?.('button[type="submit"]')
+          ?? container.querySelector('button[type="submit"], .btn--primary');
         if (submitBtn && !submitBtn.disabled) {
           e.preventDefault();
           submitBtn.click();
@@ -1935,6 +1945,7 @@ export const __test = {
   createAskOverModal,
   finishSuspendedConfirmation,
   applyInitialFocus,
+  trapFocus,
 };
 
 // --------------------------------------------------------

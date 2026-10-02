@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Subtasks can be added from the task sheet again** (#1598). Since v2.70.0 "Add subtask" turns
+  into a text field inside the task. In the sheet - every phone and every narrow window - Enter
+  in that field triggered the comment button further down instead of saving the subtask, and
+  the field had no button of its own, so there was no way left to add one; only the detail
+  column on wide screens worked. The field now has an "Add" button next to it, and Enter saves
+  the subtask and keeps the field open for the next one. In any sheet with more than one form,
+  Enter now submits the form the field belongs to.
 - **Correcting the date of a series' first entry no longer moves the rest of the series** (#1545).
   Every later occurrence of a recurring payment is counted from its start day, and that was still
   the date of the first entry. Correcting it with "Only this occurrence" (the rent was debited on
