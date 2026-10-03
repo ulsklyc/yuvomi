@@ -536,3 +536,57 @@ test('Belohnungsseite: Punktestandzeile, Anfrage und Verlauf erklaeren das Minus
     Object.assign(s, vorher);
   }
 });
+
+test('Kachel, eine Rasterzeile hoch: das Minus steht sichtbar da, nicht nur in der Ansage (#1623)', () => {
+  const kids = [emma(-50), leo(15)];
+  for (const size of ['1x1', '2x1']) {
+    for (const view of ['approver', 'family']) {
+      const html = renderRewardsWidget({ view, me: 1, standings: kids, participantCount: 2, pending: 0, catalog: [KINO] }, size);
+      const sichtbar = html.match(/<p class="rewards-goal__label[^"]*"[^>]*>([^<]*)<\/p>/g) || [];
+      assert.equal(sichtbar.length, 1, `${view} ${size}: genau eine sichtbare Zeile - Emmas, nicht Leos`);
+      assert.match(sichtbar[0], /rewards-goal__label--compact/, `${view} ${size}: einzeilig gekuerzt`);
+      assert.match(sichtbar[0], />rewards\.balanceBelowZeroShort</, `${view} ${size}: die Kurzform`);
+      assert.match(sichtbar[0], /aria-hidden="true"/, 'die Ansage traegt den ganzen Satz schon');
+      assert.match(html, /aria-valuetext="rewards\.balanceBelowZero"/, 'der ganze Satz bleibt in der Ansage');
+      assert.equal(progressValue(html), 0);
+    }
+  }
+  // Hoch bleibt, wie es war: der ganze Satz, keine Kurzform.
+  const tall = renderRewardsWidget({ view: 'approver', me: 1, standings: kids, participantCount: 2, pending: 0, catalog: [KINO] }, '1x2');
+  assert.match(tall, /class="rewards-goal__label"[^>]*>rewards\.balanceBelowZero</);
+  assert.doesNotMatch(tall, /balanceBelowZeroShort/);
+});
+
+test('Kachel: die Kurzform bleibt in ihrer Zeile (#1623)', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(css)].find((r) => r.selector.trim() === '.rewards-goal__label--compact');
+  assert.ok(rule, 'die Regel gibt es');
+  assert.match(rule.body, /white-space:\s*nowrap/);
+  assert.match(rule.body, /overflow:\s*hidden/);
+  assert.match(rule.body, /text-overflow:\s*ellipsis/);
+});
+
+test('Genehmigungsliste: der Saldo kommt mit der Anfrage, nicht aus der Teilnehmerliste (#1623)', () => {
+  const s = rewardsPage.state;
+  const vorher = { user: s.user, overview: s.overview, redemptions: s.redemptions };
+  try {
+    s.user = { role: 'admin' };
+    // Mia ist ausgetragen: `balances` fuehrt sie nicht mehr.
+    s.overview = { me: 1, balances: [{ id: 4, display_name: 'Tom', balance: 20 }] };
+    s.redemptions = [
+      { id: 1, user_id: 3, user_name: 'Mia', reward_name: 'Eis', cost: 50, user_balance: -50 },
+      { id: 2, user_id: 4, user_name: 'Tom', reward_name: 'Eis', cost: 50, user_balance: 20 },
+    ];
+    const hinweise = lesbar(rewardsPage.renderPendingPanel()).match(/rewards\.pendingBalanceBelowZero\{[^}]*\}/g) || [];
+    assert.equal(hinweise.length, 1, 'Mia ist im Minus, auch ohne Zeile in balances');
+    assert.match(hinweise[0], /"points":"-50"/);
+    // Die Anfrage gewinnt gegen die Teilnehmerliste, wenn beide etwas sagen.
+    s.redemptions = [{ id: 2, user_id: 4, user_name: 'Tom', reward_name: 'Eis', cost: 50, user_balance: -5 }];
+    assert.match(lesbar(rewardsPage.renderPendingPanel()), /pendingBalanceBelowZero\{"points":"-5"\}/);
+    s.user = { role: 'member' };
+    assert.doesNotMatch(lesbar(rewardsPage.renderPendingPanel()), /pendingBalanceBelowZero/);
+  } finally {
+    Object.assign(s, vorher);
+  }
+});

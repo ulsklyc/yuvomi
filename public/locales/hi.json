@@ -5372,6 +5372,7 @@
         "remainingToReward": "«{{reward}}» तक {{points}} और",
         "canRedeemNow": "भुनाने के लिए तैयार",
         "balanceBelowZero": "शेष ऋणात्मक है - अगले अंक इसे पूरा कर देंगे",
+        "balanceBelowZeroShort": "अगले अंक इसे पूरा कर देंगे",
         "pendingBalanceBelowZero": "वर्तमान शेष: {{points}}",
         "ledgerTaskReopened": "कार्य फिर से खोला गया",
         "ledgerTaskReopenedNamed": "फिर से खोला गया: {{task}}",

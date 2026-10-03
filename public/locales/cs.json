@@ -5503,6 +5503,7 @@
         "remainingToReward": "Ještě {{points}} do „{{reward}}“",
         "canRedeemNow": "Připraveno k vyzvednutí",
         "balanceBelowZero": "V minusu - další body to vyrovnají",
+        "balanceBelowZeroShort": "Další body to vyrovnají",
         "pendingBalanceBelowZero": "Aktuální stav bodů: {{points}}",
         "ledgerTaskReopened": "Úkol znovu otevřen",
         "ledgerTaskReopenedNamed": "Znovu otevřeno: {{task}}",

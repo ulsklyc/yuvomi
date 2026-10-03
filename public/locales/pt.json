@@ -5372,6 +5372,7 @@
         "remainingToReward": "Faltam {{points}} para “{{reward}}”",
         "canRedeemNow": "Pronto para resgatar",
         "balanceBelowZero": "Saldo negativo - os próximos pontos vão compensar",
+        "balanceBelowZeroShort": "Os próximos pontos compensam",
         "pendingBalanceBelowZero": "Saldo atual: {{points}}",
         "ledgerTaskReopened": "Tarefa reaberta",
         "ledgerTaskReopenedNamed": "Reaberta: {{task}}",

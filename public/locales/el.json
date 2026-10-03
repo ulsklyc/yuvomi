@@ -5372,6 +5372,7 @@
         "remainingToReward": "Ακόμη {{points}} για «{{reward}}»",
         "canRedeemNow": "Έτοιμο για εξαργύρωση",
         "balanceBelowZero": "Αρνητικό υπόλοιπο - οι επόμενοι πόντοι θα το καλύψουν",
+        "balanceBelowZeroShort": "Οι επόμενοι πόντοι το καλύπτουν",
         "pendingBalanceBelowZero": "Τρέχον υπόλοιπο πόντων: {{points}}",
         "ledgerTaskReopened": "Η εργασία άνοιξε ξανά",
         "ledgerTaskReopenedNamed": "Άνοιξε ξανά: {{task}}",

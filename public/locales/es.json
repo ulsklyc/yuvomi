@@ -5372,6 +5372,7 @@
         "remainingToReward": "{{points}} más para «{{reward}}»",
         "canRedeemNow": "Listo para canjear",
         "balanceBelowZero": "En negativo - los próximos puntos lo compensarán",
+        "balanceBelowZeroShort": "Los próximos puntos lo cubren",
         "pendingBalanceBelowZero": "Saldo actual: {{points}}",
         "ledgerTaskReopened": "Tarea reabierta",
         "ledgerTaskReopenedNamed": "Reabierta: {{task}}",

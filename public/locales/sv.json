@@ -5372,6 +5372,7 @@
         "remainingToReward": "{{points}} kvar till ”{{reward}}”",
         "canRedeemNow": "Redo att lösa in",
         "balanceBelowZero": "På minus - nästa poäng jämnar ut det",
+        "balanceBelowZeroShort": "Nästa poäng jämnar ut det",
         "pendingBalanceBelowZero": "Nuvarande saldo: {{points}}",
         "ledgerTaskReopened": "Uppgift öppnad igen",
         "ledgerTaskReopenedNamed": "Öppnad igen: {{task}}",

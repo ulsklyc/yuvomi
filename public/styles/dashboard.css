@@ -4378,6 +4378,17 @@ button.today-cockpit__more--link {
   color: var(--color-text-tertiary);
 }
 
+/* Die Kurzform auf der Kachel, die eine Rasterzeile hoch ist (#1623): genau
+ * eine Zeile, gekuerzt statt umbrochen - ein zweizeiliger Satz je Kind dehnte
+ * die Rasterzeile der Nachbarkacheln mit. */
+.rewards-goal__label--compact {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  hyphens: manual;
+  overflow-wrap: normal;
+}
+
 /* Die eigene Sicht: Stand, Balken, Satz - und daneben (breit) oder darunter
  * (hoch) die zuletzt verdienten Punkte. `auto-fit` entscheidet das an der
  * Breite der Karte, nicht an einer Groessenklasse. */

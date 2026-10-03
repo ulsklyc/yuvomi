@@ -5762,6 +5762,7 @@
         "remainingToReward": "يتبقى {{points}} للوصول إلى «{{reward}}»",
         "canRedeemNow": "جاهز للاستبدال",
         "balanceBelowZero": "الرصيد بالسالب - النقاط القادمة ستعوّضه",
+        "balanceBelowZeroShort": "النقاط القادمة ستعوّضه",
         "pendingBalanceBelowZero": "الرصيد الحالي: {{points}}",
         "ledgerTaskReopened": "أُعيد فتح المهمة",
         "ledgerTaskReopenedNamed": "أُعيد فتحها: {{task}}",

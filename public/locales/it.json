@@ -5372,6 +5372,7 @@
         "remainingToReward": "Ancora {{points}} per «{{reward}}»",
         "canRedeemNow": "Pronto per il riscatto",
         "balanceBelowZero": "In negativo - i prossimi punti lo compenseranno",
+        "balanceBelowZeroShort": "I prossimi punti lo compensano",
         "pendingBalanceBelowZero": "Saldo attuale: {{points}}",
         "ledgerTaskReopened": "Attività riaperta",
         "ledgerTaskReopenedNamed": "Riaperta: {{task}}",

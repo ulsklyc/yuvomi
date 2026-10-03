@@ -5632,6 +5632,7 @@
         "remainingToReward": "Jeszcze {{points}} do „{{reward}}”",
         "canRedeemNow": "Gotowe do wymiany",
         "balanceBelowZero": "Na minusie - kolejne punkty to wyrównają",
+        "balanceBelowZeroShort": "Kolejne punkty to wyrównają",
         "pendingBalanceBelowZero": "Aktualne saldo: {{points}}",
         "ledgerTaskReopened": "Zadanie otwarte ponownie",
         "ledgerTaskReopenedNamed": "Otwarte ponownie: {{task}}",

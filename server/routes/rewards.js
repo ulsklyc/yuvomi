@@ -344,13 +344,21 @@ router.get('/redemptions', (req, res) => {
     // also an jeden hinaus, der das Modul lesen darf. Aufgefallen ist es an
     // einem Wandtablett mit `rewards:read`, das gar keine eigenen Zeilen haben
     // kann - der Fehler ist aelter und traf jedes Mitglied ohne Adminrecht.
+    //
+    // `user_balance` ist der HEUTIGE Saldo des Anfragenden, aus dem Ledger
+    // gerechnet (#1623). `overview.balances` fuehrt nur, wer gerade teilnimmt;
+    // wer mit offener Anfrage ausgetragen wird, fiel dort heraus und die
+    // Genehmigungsliste rechnete mit 0. Der Wert folgt dem Subjektfilter
+    // darunter: wer entscheidet, sieht alle (wie in /participants), alle
+    // anderen nur den eigenen.
     const admin = isAdminRequest(req);
     const me = actingUser(req);
     const rows = db.get().prepare(`
       SELECT r.id, r.user_id, r.catalog_id, r.reward_name, r.reward_icon, r.cost, r.status,
              r.note, r.decided_at, r.created_at,
              u.display_name AS user_name, u.avatar_color AS user_color, u.avatar_data AS user_avatar,
-             dec.display_name AS decided_by_name
+             dec.display_name AS decided_by_name,
+             COALESCE((SELECT SUM(delta) FROM reward_ledger l WHERE l.user_id = r.user_id), 0) AS user_balance
       FROM reward_redemptions r
       JOIN users u ON u.id = r.user_id
       LEFT JOIN users dec ON dec.id = r.decided_by

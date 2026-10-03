@@ -461,8 +461,14 @@ function renderPendingPanel() {
    * sie nicht blind treffen. Der Satz steht nur bei wem er zutrifft und nur
    * fuer die, die entscheiden; das Kind liest denselben Stand in seiner
    * eigenen Zeile darunter. */
+  /* DER SALDO KOMMT MIT DER ANFRAGE (#1623). `overview.balances` fuehrt nur,
+   * wer gerade teilnimmt; wer mit offener Anfrage ausgetragen wurde, fiel dort
+   * heraus, `balanceOf()` sagte 0 und der Hinweis fehlte genau dann. Der
+   * Rueckgriff bleibt fuer eine Antwort ohne das Feld (aelterer Server hinter
+   * einer frischen Oberflaeche). */
   const belowZero = (r) => {
-    const bal = balanceOf(r.user_id);
+    const bal = r.user_balance != null && Number.isFinite(Number(r.user_balance))
+      ? Number(r.user_balance) : balanceOf(r.user_id);
     return isAdmin() && bal < 0
       ? `<p class="rw-pending__meta">${esc(t('rewards.pendingBalanceBelowZero', { points: fmtPoints(bal) }))}</p>`
       : '';

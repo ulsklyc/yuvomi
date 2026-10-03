@@ -5372,6 +5372,7 @@
         "remainingToReward": "Nog {{points}} tot “{{reward}}”",
         "canRedeemNow": "Klaar om in te wisselen",
         "balanceBelowZero": "In de min - de volgende punten maken dit goed",
+        "balanceBelowZeroShort": "Volgende punten maken dit goed",
         "pendingBalanceBelowZero": "Huidig saldo: {{points}}",
         "ledgerTaskReopened": "Taak heropend",
         "ledgerTaskReopenedNamed": "Heropend: {{task}}",

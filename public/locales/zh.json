@@ -5372,6 +5372,7 @@
         "remainingToReward": "距离“{{reward}}”还差 {{points}}",
         "canRedeemNow": "可以兑换",
         "balanceBelowZero": "积分为负 - 之后获得的积分会补上",
+        "balanceBelowZeroShort": "之后获得的积分会补上",
         "pendingBalanceBelowZero": "当前余额：{{points}}",
         "ledgerTaskReopened": "任务已重新打开",
         "ledgerTaskReopenedNamed": "已重新打开：{{task}}",
