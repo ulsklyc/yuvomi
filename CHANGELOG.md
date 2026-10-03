@@ -65,7 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   taken out of rewards while the request was still open - the page looked the balance up among
   the members taking part and found nothing. The balance now comes with each request. And on a
   family rewards tile that is one row high (1x1, 2x1), a negative balance was shown as a number
-  next to an empty bar; it now carries a short line saying that the next points make up for it.
+  next to an empty bar; a short line saying that the next points make up for it now stands
+  in place of that bar.
   API: `GET /api/v1/rewards/redemptions` adds `user_balance` to every row.
 - **The month heading of Calendar and Budget follows the word order of the language** (#1607).
   Both pages put the month name, a space and the year together themselves, which gave "10월 2026"
