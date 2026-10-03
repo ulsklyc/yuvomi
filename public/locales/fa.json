@@ -5376,6 +5376,7 @@
         "remainingToReward": "{{points}} تا «{{reward}}» باقی مانده",
         "canRedeemNow": "آماده برای دریافت",
         "balanceBelowZero": "موجودی منفی است - امتیازهای بعدی آن را جبران می‌کنند",
+        "balanceBelowZeroShort": "امتیازهای بعدی جبرانش می‌کنند",
         "pendingBalanceBelowZero": "موجودی فعلی: {{points}}",
         "ledgerTaskReopened": "کار دوباره باز شد",
         "ledgerTaskReopenedNamed": "دوباره باز شد: {{task}}",

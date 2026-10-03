@@ -5376,6 +5376,7 @@
         "remainingToReward": "Còn {{points}} nữa để đạt “{{reward}}”",
         "canRedeemNow": "Sẵn sàng đổi",
         "balanceBelowZero": "Đang âm điểm - những điểm tiếp theo sẽ bù lại",
+        "balanceBelowZeroShort": "Những điểm tiếp theo sẽ bù lại",
         "pendingBalanceBelowZero": "Số dư hiện tại: {{points}}",
         "ledgerTaskReopened": "Công việc đã được mở lại",
         "ledgerTaskReopenedNamed": "Đã mở lại: {{task}}",

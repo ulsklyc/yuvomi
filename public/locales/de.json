@@ -5376,6 +5376,7 @@
         "remainingToReward": "Noch {{points}} bis „{{reward}}“",
         "canRedeemNow": "Bereit zum Einlösen",
         "balanceBelowZero": "Im Minus - die nächsten Punkte gleichen das aus",
+        "balanceBelowZeroShort": "Nächste Punkte gleichen das aus",
         "pendingBalanceBelowZero": "Punktestand derzeit: {{points}}",
         "ledgerTaskReopened": "Aufgabe wieder geöffnet",
         "ledgerTaskReopenedNamed": "Wieder geöffnet: {{task}}",

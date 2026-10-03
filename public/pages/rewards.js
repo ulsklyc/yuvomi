@@ -461,8 +461,14 @@ function renderPendingPanel() {
    * sie nicht blind treffen. Der Satz steht nur bei wem er zutrifft und nur
    * fuer die, die entscheiden; das Kind liest denselben Stand in seiner
    * eigenen Zeile darunter. */
+  /* DER SALDO KOMMT MIT DER ANFRAGE (#1623). `overview.balances` fuehrt nur,
+   * wer gerade teilnimmt; wer mit offener Anfrage ausgetragen wurde, fiel dort
+   * heraus, `balanceOf()` sagte 0 und der Hinweis fehlte genau dann. Der
+   * Rueckgriff bleibt fuer eine Antwort ohne das Feld (aelterer Server hinter
+   * einer frischen Oberflaeche). */
   const belowZero = (r) => {
-    const bal = balanceOf(r.user_id);
+    const bal = r.user_balance != null && Number.isFinite(Number(r.user_balance))
+      ? Number(r.user_balance) : balanceOf(r.user_id);
     return isAdmin() && bal < 0
       ? `<p class="rw-pending__meta">${esc(t('rewards.pendingBalanceBelowZero', { points: fmtPoints(bal) }))}</p>`
       : '';
@@ -510,8 +516,14 @@ function renderOverview(el) {
     const action = isAdmin() && !readOnly()
       ? { label: t('rewards.manageParticipants'), icon: 'user-plus', className: 'rw-manage-participants' }
       : null;
+    /* DAS ANFRAGEN-PANEL HAENGT NICHT AN DEN PUNKTESTAENDEN (#1623). Wird die
+     * letzte Teilnehmende mit offener Anfrage ausgetragen, ist `balances` leer -
+     * und die Anfrage trotzdem da. Ohne das Panel hier konnte niemand sie
+     * sehen oder entscheiden. Es steht VOR dem Leerzustand: das Dringende
+     * zuerst, wie in der gefuellten Uebersicht. Nur-lesen regelt das Panel
+     * selbst (Liste bleibt, Knoepfe gehen). */
     el.insertAdjacentHTML('beforeend',
-      `<div class="rewards-content__inner">${emptyState('trophy', t('rewards.emptyOverviewTitle'), isAdmin() ? t('rewards.emptyOverviewAdmin') : t('rewards.emptyOverviewMember'), action)}</div>`);
+      `<div class="rewards-content__inner">${renderPendingPanel()}${emptyState('trophy', t('rewards.emptyOverviewTitle'), isAdmin() ? t('rewards.emptyOverviewAdmin') : t('rewards.emptyOverviewMember'), action)}</div>`);
     wireOverview(el);
     icons(el);
     return;
