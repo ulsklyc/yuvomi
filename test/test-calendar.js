@@ -939,10 +939,10 @@ test('Wochenraster: Kopf, Ganztagszeile und Stunden verwenden dieselbe Zeitspalt
  *
  * Die Prüfung darüber sichert die SPALTE. Was in ihr steht, hat sie nicht
  * gesehen: die Ganztags-Beschriftung stand auf --space-12 (48px) in der
- * 64px-Spur, ist rechtsbündig und endete deshalb 16px links von den
- * Stundenzahlen, die genau darunter anfangen - der Versatz überlebte den Fix
- * für die Spalten. Beide Texte enden nur dann auf derselben Kante, wenn sie
- * dieselbe Breite UND dasselbe padding-right haben. */
+ * 64px-Spur, ist endbündig und endete deshalb 16px vor den Stundenzahlen,
+ * die genau darunter anfangen - der Versatz überlebte den Fix für die
+ * Spalten. Beide Texte enden nur dann auf derselben Kante, wenn sie dieselbe
+ * Breite UND denselben Innenabstand am Zeilenende (padding-inline-end) haben. */
 test('Ganztags-Beschriftung endet auf derselben Kante wie die Stundenzahlen', () => {
   const rules = [...eachRule(calendarCss)];
   const label = rules.find((rule) => rule.selector.trim() === '.calendar-all-day-label');
@@ -952,10 +952,23 @@ test('Ganztags-Beschriftung endet auf derselben Kante wie die Stundenzahlen', ()
   assert(/width:\s*var\(--cal-gutter-width\)/.test(label.body),
     'die Ganztags-Beschriftung muss die volle Zeitspalte füllen, nicht --space-12');
 
-  const paddingRight = (body) => body.match(/padding(?:-right)?:\s*([^;]+)/)?.[1]?.trim() ?? '';
-  const labelPad = paddingRight(label.body).split(/\s+/)[1] ?? paddingRight(label.body);
-  assert(labelPad === paddingRight(slot.body),
-    `rechter Innenabstand läuft auseinander: Beschriftung ${labelPad}, Stunde ${paddingRight(slot.body)}`);
+  // Der Innenabstand am Zeilenende: padding-inline-end, sonst der zweite Wert
+  // von padding-inline (ein Wert gilt fuer beide Seiten). Findet keine der
+  // beiden Schreibweisen etwas, ist das ein Fehler - sonst waere '' === ''.
+  const inlineEnd = (body) => {
+    const end = body.match(/(?:^|[;\s])padding-inline-end\s*:\s*([^;]+)/);
+    if (end) return end[1].trim();
+    const inline = body.match(/(?:^|[;\s])padding-inline\s*:\s*([^;]+)/);
+    if (!inline) return '';
+    const [start, endValue = start] = inline[1].trim().split(/\s+/);
+    return endValue;
+  };
+  const labelPad = inlineEnd(label.body);
+  const slotPad = inlineEnd(slot.body);
+  assert(labelPad && slotPad,
+    `Innenabstand am Zeilenende nicht gefunden: Beschriftung "${labelPad}", Stunde "${slotPad}"`);
+  assert(labelPad === slotPad,
+    `Innenabstand am Zeilenende läuft auseinander: Beschriftung ${labelPad}, Stunde ${slotPad}`);
 });
 
 function zIndexOf(selector) {
@@ -4286,6 +4299,88 @@ test('Baender in RTL: offene Kante, Chevron und Nachbarmonat-Toenung kippen mit 
     'beide Stopps messen vom Anfang des Bands');
   const rtl = rule('[dir="rtl"] .month-bands > .cal-band--outside');
   assert(/--band-to:\s*left/.test(rtl.body), 'in RTL laeuft der Verlauf von rechts nach links');
+});
+test('Kalender in RTL: keine Regel in calendar.css haengt an einer physischen Seite', () => {
+  // Unter dir="rtl" steht die Zeitspalte rechts und Spalte 1 des Rasters
+  // ebenfalls. Eine Fuge per border-left, ein Einzug per margin-left oder
+  // eine Jetzt-Linie ab `left: <Zeitspalte>` bleibt dann auf der LTR-Seite:
+  // die Linien der Ganztags-Zeile laufen 1px neben denen des Zeitrasters, die
+  // Monatszelle zieht eine Linie an den Aussenrand, die Beschriftung klebt an
+  // der falschen Kante, und die Jetzt-Linie ueberdeckt die Zeitspalte.
+  // Geprueft wird jede Regel der Datei (auch in @media), nicht eine Liste -
+  // eine neue Regel mit border-right soll hier auffallen, nicht erst in RTL.
+  const all = [...eachRule(calendarCss)];
+  const where = (r) => `${r.selector.trim()}${r.at.length ? ` (in ${r.at.join(' ')})` : ''}`;
+  const physical = /(?:^|[;\s])(?:margin|padding|border)-(?:left|right)\b|(?:^|[;\s])(?:left|right)\s*:|text-align:\s*(?:left|right)\b|border-(?:top|bottom)-(?:left|right)-radius|(?:^|[;\s])float\s*:\s*(?:left|right)/;
+
+  // Ausnahmen nennen die Deklarationen, die sie erlauben - nicht die ganze
+  // Regel. Genau diese fallen aus dem Rumpf, und der Rest muss frei von
+  // physischen Seiten sein: eine neue border-left in einer gelisteten Regel
+  // faellt so genauso auf wie in jeder anderen.
+  const exceptions = {
+    // links und rechts 0: die Linie spannt die ganze Spalte, in beiden Richtungen gleich
+    '.week-view__hour-line': [/(?:^|[;\s])left:\s*0\s*;/, /(?:^|[;\s])right:\s*0\s*;/],
+    '.week-view__now-line': [/(?:^|[;\s])left:\s*0\s*;/, /(?:^|[;\s])right:\s*0\s*;/],
+    // left: 50% mit translateX(-50%) zentriert, die Richtung spielt keine Rolle
+    '.day-view__empty-hint': [/(?:^|[;\s])left:\s*50%\s*;/],
+    // Ueberlappung im Avatar-Stapel: gehoert zur Folgearbeit an .avatar-stack
+    // (user-multi-select.css, row-reverse mit margin-left) und kippt mit ihr
+    '.allday-event .avatar-stack__item, .week-event__time .avatar-stack__item': [
+      /(?:^|[;\s])margin-left:\s*calc\(-1 \* var\(--space-1\)\)\s*;/,
+    ],
+  };
+  for (const r of all) {
+    if (!physical.test(r.body)) continue;
+    const key = r.selector.trim().replace(/\s+/g, ' ');
+    let rest = r.body;
+    for (const allowed of exceptions[key] ?? []) {
+      assert(allowed.test(rest), `${where(r)} ist als Ausnahme gelistet, ihr Grund stimmt aber nicht mehr: ${r.body}`);
+      rest = rest.replace(allowed, ';');
+    }
+    assert(!physical.test(rest), `${where(r)} haengt an einer physischen Seite: ${rest}`);
+  }
+  // Die Zentrierung ist eine Bedingung, keine Seite: ohne translateX(-50%)
+  // stuende der Hinweis ab der Mitte nach rechts.
+  const hint = all.find((r) => r.at.length === 0 && r.selector.trim() === '.day-view__empty-hint');
+  assert(hint && /translateX\(-50%\)/.test(hint.body), '.day-view__empty-hint zentriert mit translateX(-50%)');
+
+  // Die umgestellten Regeln tragen ihre logische Eigenschaft.
+  const rule = (sel) => {
+    const found = all.filter((r) => r.at.length === 0 && r.selector.trim() === sel);
+    assert(found.length > 0, `Regel nicht gefunden: ${sel}`);
+    return found.map((r) => r.body).join(';');
+  };
+  const expect = {
+    '.month-day': /border-inline-end:/,
+    '.month-day:nth-child(7n)': /border-inline-end:\s*none/,
+    '.week-view__day-header': /border-inline-start:/,
+    '.week-view__col': /border-inline-start:/,
+    '.day-view__col': /border-inline-start:/,
+    '.allday-cell': /border-inline-start:/,
+    '.allday-row--week .allday-cell': /border-inline-start:\s*0/,
+    '.week-view__time-slot': /padding-inline-end:/,
+    '.calendar-all-day-label': /text-align:\s*end/,
+    '.week-view__now-line::before': /inset-inline-start:/,
+    '.day-view__now-line': /inset-inline:\s*var\(--cal-gutter-width\)\s+0/,
+    '.day-view__now-dot': /inset-inline-start:/,
+    '.cal-chip__assigned': /margin-inline-start:\s*auto/,
+    '.cal-band__until + .cal-chip__assigned': /margin-inline:\s*0/,
+    '.cal-filters__nested': /margin-inline-start:/,
+    '.event-icon-dialog__results': /padding-inline-end:/,
+  };
+  for (const [sel, logical] of Object.entries(expect)) {
+    assert(logical.test(rule(sel)), `${sel} traegt die logische Eigenschaft nicht: ${rule(sel)}`);
+  }
+
+  // Vier Werte in margin/padding mit verschiedenen Seiten sind genauso
+  // seitenfest wie margin-left/-right (die kompakten Monatspunkte hatten
+  // `margin: 0 X X 0`). Drei Werte (`a b c`) sind seitengleich.
+  for (const r of all) {
+    for (const [, prop, value] of r.body.matchAll(/(?:^|[;\s])(margin|padding)\s*:\s*([^;]+)/g)) {
+      const v = value.replace(/!important/, '').trim().split(/\s+(?![^(]*\))/);
+      assert(!(v.length === 4 && v[1] !== v[3]), `${where(r)} setzt ${prop} links und rechts verschieden: ${value.trim()}`);
+    }
+  }
 });
 test('Monatszelle: der Fokusring liegt ueber der Band-Schicht, die Zelle nicht', () => {
   // Ein Band liegt in `.month-bands` (z-index 1) ueber den Zellen. Hob sich die

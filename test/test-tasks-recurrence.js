@@ -986,3 +986,106 @@ test('PATCH done: eine abgelegte Folgeinstanz zaehlt nicht, auch wenn ihr Status
   const res = await call('PATCH', `/${a}/status`, { status: 'done' });
   assert.equal(res.body.data.next_due_date, null);
 });
+
+// --------------------------------------------------------
+// PUT /:id nennt das naechste Mal nach derselben Regel (#1620)
+// --------------------------------------------------------
+// Das Status-Feld im Bearbeiten-Formular speichert ueber PUT, hakt damit
+// genauso ab wie die Checkbox und legt genauso die Folgeinstanz an. Die
+// Antwort trug das Datum aber nicht, das Formular konnte also nur „gespeichert"
+// sagen. Die Regel ist dieselbe wie bei PATCH und steht nur einmal im Server
+// (`nextDueDateAfter`); hier wird gemessen, dass PUT sie auch wirklich fragt.
+test('PUT done: die Antwort traegt die Faelligkeit der Folgeinstanz, neben der ganzen Aufgabe', async () => {
+  const id = insertTask({
+    title: 'Hecke schneiden', status: 'open', due_date: dayKey(0), created_by: uid,
+    is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY',
+  });
+  const res = await call('PUT', `/${id}`, { title: 'Hecke schneiden', status: 'done' });
+  assert.equal(res.status, 200);
+  const followup = openInstances('Hecke schneiden')[0];
+  assert.ok(followup, 'das Speichern muss eine Folgeinstanz erzeugt haben');
+  assert.equal(res.body.data.next_due_date, followup.due_date);
+  assert.equal(res.body.data.next_due_date, dayKey(7));
+  // Additiv: die Antwort bleibt die ganze Aufgabe.
+  assert.equal(res.body.data.id, Number(id));
+  assert.equal(res.body.data.status, 'done');
+  assert.equal(res.body.data.title, 'Hecke schneiden');
+  assert.ok(Array.isArray(res.body.data.subtasks));
+});
+
+test('PUT: ohne Statuswechsel, ohne Serie und beim Zuruecknehmen steht next_due_date auf null', async () => {
+  const serie = insertTask({
+    title: 'Rasen maehen', status: 'open', due_date: dayKey(0), created_by: uid,
+    is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY',
+  });
+  // Das Feld ist IMMER da, auch wenn es nichts zu sagen gibt - `undefined`
+  // hiesse „aelterer Server", null heisst „kein naechstes Mal".
+  const titel = await call('PUT', `/${serie}`, { title: 'Rasen maehen' });
+  assert.equal(titel.status, 200);
+  assert.strictEqual(titel.body.data.next_due_date, null, 'eine Titelkorrektur ist kein Erledigen');
+  const gestartet = await call('PUT', `/${serie}`, { title: 'Rasen maehen', status: 'in_progress' });
+  assert.strictEqual(gestartet.body.data.next_due_date, null, 'Starten ist kein Erledigen');
+
+  const erledigt = await call('PUT', `/${serie}`, { title: 'Rasen maehen', status: 'done' });
+  assert.equal(erledigt.body.data.next_due_date, dayKey(7));
+  // Kein Uebergang: wer eine erledigte Serie noch einmal speichert (etwa den
+  // Titel korrigiert), bekommt den Hinweis nicht ein zweites Mal - obwohl die
+  // Folgeinstanz dasteht.
+  const nochmal = await call('PUT', `/${serie}`, { title: 'Rasen maehen (vorn)', status: 'done' });
+  assert.equal(openInstances('Rasen maehen').length, 1, 'die Folgeinstanz steht da');
+  assert.strictEqual(nochmal.body.data.next_due_date, null);
+  const zurueck = await call('PUT', `/${serie}`, { title: 'Rasen maehen', status: 'open' });
+  assert.strictEqual(zurueck.body.data.next_due_date, null);
+
+  const einmalig = insertTask({ title: 'Einmal per PUT', status: 'open', due_date: dayKey(0), created_by: uid });
+  const einmal = await call('PUT', `/${einmalig}`, { title: 'Einmal per PUT', status: 'done' });
+  assert.strictEqual(einmal.body.data.next_due_date, null, 'ohne Serie gibt es kein naechstes Mal');
+});
+
+test('PUT done: eine Serie, die zu Ende ist, nennt kein naechstes Mal', async () => {
+  const until = dayKey(1).replace(/-/g, '');
+  const id = insertTask({
+    title: 'Letzte Runde PUT', status: 'open', due_date: dayKey(0), created_by: uid,
+    is_recurring: 1, recurrence_rule: `FREQ=WEEKLY;UNTIL=${until}`,
+  });
+  const res = await call('PUT', `/${id}`, { title: 'Letzte Runde PUT', status: 'done' });
+  assert.equal(res.status, 200);
+  assert.equal(openInstances('Letzte Runde PUT').length, 0);
+  assert.strictEqual(res.body.data.next_due_date, null);
+});
+
+test('PUT done: ein Vorkommen, das der Aufrufer nicht sieht, wird ihm nicht als naechstes Mal genannt', async () => {
+  // Derselbe Fall wie bei PATCH, ueber den anderen Weg: B ist privat gestellt
+  // und traegt Arbeit, bleibt beim Zuruecknehmen also stehen.
+  const other = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
+    VALUES ('kind-sicht-put', 'Kind', '$2b$12$x', 'member')`).run().lastInsertRowid;
+  const a = await completeRecurring('Tagebuch PUT', 'FREQ=WEEKLY');
+  const b = openInstances('Tagebuch PUT')[0];
+  db.prepare(`UPDATE tasks SET visibility = 'private', created_by = ? WHERE id = ?`).run(uid, b.id);
+  insertTask({ title: 'Seite 1 PUT', status: 'open', created_by: uid, parent_task_id: b.id });
+
+  await call('PATCH', `/${a}/status`, { status: 'open' });
+  const fremd = await call('PUT', `/${a}`, { title: 'Tagebuch PUT', status: 'done' }, { 'x-test-user': String(other) });
+  assert.equal(fremd.status, 200);
+  assert.equal(fremd.body.data.status, 'done', 'der Wechsel selbst ging durch');
+  assert.strictEqual(fremd.body.data.next_due_date, null, 'wer B nicht sieht, erfaehrt ihr Datum nicht');
+
+  await call('PATCH', `/${a}/status`, { status: 'open' });
+  const eigen = await call('PUT', `/${a}`, { title: 'Tagebuch PUT', status: 'done' });
+  assert.equal(eigen.body.data.next_due_date, b.due_date, 'die Erstellerin sieht es weiter');
+});
+
+test('PUT und PATCH fragen dieselbe Regel: die Route formuliert sie nicht ein zweites Mal aus', async () => {
+  // Zwei Ausformulierungen laufen auseinander - #1615 hat die Regel in vier
+  // Runden nachgeschaerft (Kette, begonnen, abgelegt, Sichtbarkeit), und jede
+  // davon haette eine Kopie verfehlt. Gemessen am Quelltext: die Kettensuche
+  // hat genau EINEN Aufrufer, und beide Routen gehen durch ihn.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../server/routes/tasks.js', import.meta.url), 'utf8');
+  const walkers = [...src.matchAll(/(?<!function )nextPendingOccurrenceOf\(/g)];
+  assert.equal(walkers.length, 1, 'nur der geteilte Helfer liest die Kette');
+  const callers = [...src.matchAll(/(?<!function )nextDueDateAfter\(req, /g)];
+  assert.equal(callers.length, 2, 'PUT und PATCH rufen den geteilten Helfer');
+  const routeOf = (index) => [...src.slice(0, index).matchAll(/^router\.(\w+)\('([^']+)'/gm)].at(-1).slice(1, 3).join(' ');
+  assert.deepEqual(callers.map((m) => routeOf(m.index)).sort(), ['patch /:id/status', 'put /:id']);
+});

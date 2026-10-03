@@ -273,6 +273,8 @@ export function formatDueDate(dateStr, timeStr, isDone = false) {
  * EIN HELFER FUER ALLE WEGE (Detailansicht, Haken, Wisch, Personenwahl, Brett,
  * Wandtablett): jeder reicht die Antwort von PATCH /tasks/:id/status herein
  * und nimmt mit `?? t(...)` seinen bisherigen Text, wenn es keine Serie war.
+ * Das Bearbeiten-Formular reicht die Antwort von PUT /tasks/:id herein, die
+ * das Feld nach derselben Regel traegt (#1620).
  * So bleibt es je Haken bei EINEM Toast - mit `name` sagt derselbe Satz auch,
  * wer es erledigt hat, statt dass zwei Meldungen uebereinander stehen.
  *

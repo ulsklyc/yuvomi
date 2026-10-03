@@ -250,3 +250,91 @@ test('Brett: der Spaltenwechsel nach „Erledigt" sagt es bei einer Serie, sonst
     tasks.state.viewMode = 'list';
   }
 });
+
+// ── Bearbeiten-Formular (#1620) ───────────────────────────────────────────
+//
+// Das Status-Feld im Formular speichert ueber PUT /tasks/:id. Der Weg hakt
+// genauso ab und legt genauso die Folgeinstanz an, sagte aber nur
+// „gespeichert". Gefahren wird der echte Submit-Handler gegen ein
+// Attrappen-Formular (dasselbe Vorgehen wie in test:module-readonly-ui): ob
+// der Helfer GERUFEN wird, steht nur am Aufrufer.
+
+const feld = (value = '') => ({ value: String(value) });
+
+async function saveInEditForm({ status, response, taskId = '7' }) {
+  const calls = [];
+  globalThis.__apiStub = {
+    put: async (path, body) => { calls.push(['put', path, body]); return response; },
+    post: async (path, body) => { calls.push(['post', path, body]); return { data: { id: 7 } }; },
+    delete: async (path) => { calls.push(['delete', path]); return { data: null }; },
+    get: async () => ({ data: [] }),
+    getWithSource: async () => ({ data: { data: [] }, fromCache: false }),
+  };
+  globalThis.__rruleValues = {
+    is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY', recurrence_from_completion: 0, valid_until: true,
+  };
+  const nodes = {
+    'task-form-error': { hidden: true, textContent: '' },
+    'task-submit-btn': { disabled: false, textContent: '', classList: { add() {}, remove() {} } },
+    'task-id': feld(taskId),
+  };
+  const realDocument = globalThis.document;
+  globalThis.document = {
+    getElementById: (id) => nodes[id] ?? null,
+    documentElement: realDocument.documentElement,
+    addEventListener() {},
+  };
+  const form = { querySelector: () => null };
+  const fields = {
+    title: 'Blumen giessen', description: '', priority: 'none', category: 'household',
+    start_date: '', due_date: THIS_YEAR, due_time: '', points: '0',
+  };
+  for (const [name, value] of Object.entries(fields)) form[name] = feld(value);
+  // Unteraufgaben und neue Aufgaben haben kein Status-Feld.
+  if (status) form.status = feld(status);
+  try {
+    await tasks.handleFormSubmit(
+      { preventDefault() {}, target: form },
+      { container: null, onChanged: async () => {} },
+    );
+  } finally {
+    delete globalThis.__rruleValues;
+    globalThis.document = realDocument;
+  }
+  return { calls, error: nodes['task-form-error'].hidden ? null : nodes['task-form-error'].textContent };
+}
+
+const saved = (next, status = 'done') => ({ data: { id: 7, title: 'Blumen giessen', status, next_due_date: next } });
+
+test('Formular: wer eine Serie ueber das Status-Feld erledigt, liest, wann es weitergeht', async () => {
+  const { calls, error } = await saveInEditForm({ status: 'done', response: saved(THIS_YEAR) });
+  assert.equal(error, null);
+  const put = calls.find((c) => c[0] === 'put');
+  assert.equal(put[1], '/tasks/7');
+  assert.equal(put[2].status, 'done');
+  // EIN Toast, nicht „gespeichert" und darueber noch der Serienhinweis.
+  assert.deepEqual(toasts.map((x) => [x.message, x.type]), [[SERIES, 'success']]);
+});
+
+test('Formular: ohne naechstes Mal bleibt es beim schlichten „gespeichert"', async () => {
+  await saveInEditForm({ status: 'done', response: saved(null) });
+  await saveInEditForm({ status: 'open', response: saved(null, 'open') });
+  // Ein aelterer Server (oder eine zwischengespeicherte Antwort) ohne das Feld.
+  await saveInEditForm({ status: 'done', response: { data: { id: 7, status: 'done' } } });
+  assert.deepEqual(toasts.map((x) => x.message), ['tasks.savedToast', 'tasks.savedToast', 'tasks.savedToast']);
+});
+
+test('Formular: der Hinweis haengt am Erledigen, nicht an einem Datum in der Antwort', async () => {
+  // Der Server liefert das Feld nur beim Uebergang nach „erledigt". Selbst wenn
+  // nicht: wer nur den Titel aendert oder die Aufgabe startet, hat nichts
+  // erledigt - dieselbe Vorsicht wie in der Detailansicht.
+  await saveInEditForm({ status: 'in_progress', response: saved(THIS_YEAR, 'in_progress') });
+  await saveInEditForm({ status: null, response: saved(THIS_YEAR, 'open') });
+  assert.deepEqual(toasts.map((x) => x.message), ['tasks.savedToast', 'tasks.savedToast']);
+});
+
+test('Formular: das Anlegen einer Aufgabe sagt weiter „angelegt"', async () => {
+  const { calls } = await saveInEditForm({ status: null, response: saved(THIS_YEAR), taskId: '' });
+  assert.ok(calls.some((c) => c[0] === 'post' && c[1] === '/tasks'));
+  assert.deepEqual(toasts.map((x) => x.message), ['tasks.createdToast']);
+});

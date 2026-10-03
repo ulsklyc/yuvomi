@@ -52,6 +52,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The calendar mirrors fully in right-to-left languages.** In Arabic and Persian the week
+  view drew the column lines of the all-day row 1px beside those of the time grid, the month
+  grid drew a line along its outer right edge and only a thin one between its two leftmost days,
+  the hour labels and the "All day" label sat against the outer edge instead of the grid, the red
+  now line in the day view ran across the hour column with its dot on the wrong end, and nested
+  calendar filters were indented from the left. The avatars on all-day entries now sit at the end of
+  the line instead of right after the title, and the compact month dots start at the edge of the
+  day. Left-to-right layouts are unchanged.
 - **The month heading of Calendar and Budget follows the word order of the language** (#1607).
   Both pages put the month name, a space and the year together themselves, which gave "10월 2026"
   in Korean instead of "2026년 10월" (and the same for Japanese, Chinese and Hungarian). Month
@@ -248,6 +256,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a named person it is one message that says both. The undo in the list stays. For API clients,
   `PATCH /api/v1/tasks/{id}/status` additionally returns `next_due_date`, the due date of the
   next occurrence that is not yet done, or `null`.
+- **The edit form also says when a recurring task comes back** (#1620). Setting a recurring task
+  to "Done" through the status field of the edit form creates its next occurrence just like
+  ticking it off, but the form only answered "saved". It now shows the same "Done - next due
+  <date>" as every other way of completing a task; any other save still says "saved". For API
+  clients, `PUT /api/v1/tasks/{id}` additionally returns `next_due_date` under the same rule as
+  `PATCH /api/v1/tasks/{id}/status`: the due date of the next pending occurrence when this call
+  completed a recurring task, otherwise `null`.
 - **A rejected `PUT /api/v1/preferences` no longer applies part of the request** (#1622). The
   route checked and stored one field after the other, so a request with several fields that
   failed on a later one answered 400 or 403 while the fields before it were already saved: a
