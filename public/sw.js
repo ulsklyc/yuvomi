@@ -166,6 +166,7 @@ const APP_SHELL = [
   '/utils/inventory-warranty.js',
   '/utils/kitchen-tabs.js',
   '/utils/kitchen-transfer.js',
+  '/utils/korean-particles.js',
   '/utils/leave-guard.js',
   '/utils/live-feed.js',
   '/utils/markdown-checklist.js',
