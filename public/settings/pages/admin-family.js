@@ -6,6 +6,7 @@ import {
   t,
 } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { AVATAR_COLORS } from '/utils/color.js';
 import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
@@ -69,11 +70,6 @@ function appendCapabilityState(text, state) {
   return state ? `${text} · ${state}` : text;
 }
 
-function initials(name) {
-  if (!name) return '?';
-  return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-}
-
 function familyRoleLabel(role) {
   return t(`settings.familyRole${String(role || 'other').replace(/(^|_)([a-z])/g, (_, __, c) => c.toUpperCase())}`);
 }
@@ -98,7 +94,7 @@ function clearError(element) {
 
 function avatarHtml(user, className = 'settings-avatar') {
   const safeName = esc(user?.display_name || '');
-  const fallback = esc(initials(user?.display_name || ''));
+  const fallback = esc(initials(user?.display_name, '?'));
   const background = esc(user?.avatar_color) || 'var(--color-accent)';
   // Die Farbe waehlt das Mitglied selbst; auf hellen Toenen lagen die weissen
   // Initialen bei 3,5:1 und 2,8:1 (Critique 2026-07-27).
@@ -1065,3 +1061,7 @@ export async function render(container, { user } = {}) {
   await loadInvites(container);
   window.lucide?.createIcons({ el: container });
 }
+
+// Der Avatar als Programm (test:initials): welche Zeichen ohne Bild auf der
+// Scheibe stehen.
+export const __test = { avatarHtml };

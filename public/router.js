@@ -12,6 +12,7 @@ import { clearApiCache } from '/sw-register.js';
 import { forgetLayoutHint } from '/utils/dashboard-layout-hint.js';
 import { initI18n, getLocale, t, formatDate, formatTime } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
 import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
 import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight } from '/utils/ux.js';
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
@@ -1130,11 +1131,6 @@ function syncSidebarTools(root = document.querySelector('.nav-sidebar__logo-acti
   }
 }
 
-/** Initialen fuer die Avatar-Scheibe ohne Bild (wie in den Einstellungen). */
-function accountInitials(name) {
-  return String(name || '').trim().split(/\s+/).map((w) => w[0] ?? '').join('').toUpperCase().slice(0, 2);
-}
-
 /**
  * Die Kontozeile am Fuss der Seitenleiste: Avatar, Name, und dahinter das
  * Konto-Menue (Hilfe, Aenderungen, Abmelden).
@@ -1246,7 +1242,7 @@ function syncSidebarAccount(root = document.querySelector('.nav-sidebar__account
     img.alt = '';
     avatar.replaceChildren(img);
   } else {
-    avatar.textContent = accountInitials(displayName);
+    avatar.textContent = initials(displayName);
   }
   const label = displayName ? t('nav.accountMenu', { name: displayName }) : t('nav.accountMenuAnonymous');
   trigger.dataset.baseLabel = label;

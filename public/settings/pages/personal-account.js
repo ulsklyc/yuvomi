@@ -5,22 +5,13 @@ import {
   t,
 } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
 import { confirmModal } from '/components/modal.js';
 import { prefersInkText } from '/utils/contrast.js';
 
-function initials(name) {
-  if (!name) return '?';
-  return name
-    .split(' ')
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-}
-
 function avatarHtml(user, className = 'settings-avatar') {
   const safeName = esc(user?.display_name || '');
-  const fallback = esc(initials(user?.display_name || ''));
+  const fallback = esc(initials(user?.display_name, '?'));
   const background = esc(user?.avatar_color) || 'var(--color-accent)';
   const inkClass = prefersInkText(user?.avatar_color) ? ' settings-avatar--ink' : '';
   return `
@@ -826,3 +817,7 @@ export async function render(container, { user }) {
     throw error;
   }
 }
+
+// Der Avatar als Programm (test:initials): welche Zeichen ohne Bild auf der
+// Scheibe stehen.
+export const __test = { avatarHtml };

@@ -136,10 +136,6 @@ let taskDocuments = null;
 // Hilfsfunktionen
 // --------------------------------------------------------
 
-function initials(name = '') {
-  return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-}
-
 // Sichtbarkeits-Indikator (#474): nur für eingeschränkte Elemente ein dezentes
 // Icon — „Alle" bleibt icon-los (keine visuelle Flut, „Kraft ohne Lärm").
 function renderVisibilityBadge(visibility) {

@@ -7,6 +7,7 @@
 import { api, auth } from '/api.js';
 import { t, formatDate, formatDayMonth, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
@@ -165,10 +166,6 @@ function readOnlyLatch(event) {
 
 function money(value) {
   return getNumberFormat({ style: 'currency', currency: state.currency }).format(Number(value || 0));
-}
-
-function initials(name = '') {
-  return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 }
 
 function urgencyLabel(status) {

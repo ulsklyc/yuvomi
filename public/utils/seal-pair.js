@@ -25,6 +25,7 @@
  */
 
 import { esc } from '/utils/html.js';
+import { compactInitials } from '/utils/initials.js';
 import { isSoloHousehold } from '/utils/household.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 
@@ -68,11 +69,13 @@ export function whoMark(user) {
  */
 function whoMarkHtml(user) {
   const name = user.display_name ?? '';
+  // `compactInitials`, nicht `initials`: das Zeichen ist 20px breit, neben dem
+  // kleinen Siegel 16px, bei 10px Schrift. Zwei Hangul- oder Han-Zeichen
+  // brauchen 20px und stiessen an den Rand oder liefen darueber.
   const color = user.avatar_color ?? user.color ?? AVATAR_FALLBACK_COLOR;
-  const initials = name.split(/\s+/).map((w) => w[0] ?? '').join('').toUpperCase().slice(0, 2);
   const inner = user.avatar_data
     ? `<img src="${esc(user.avatar_data)}" alt="" loading="lazy">`
-    : esc(initials);
+    : esc(compactInitials(name));
   return `<span class="seal-pair__who"
     style="background-color:${esc(color)};color:${getReadableTextColor(color)}">
     <span class="sr-only">${esc(name)}</span><span aria-hidden="true">${inner}</span>

@@ -1,6 +1,7 @@
 import { api } from '/api.js';
 import { t, formatDate, formatDayMonth, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
 import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, advancedSection, refocusAfterRender, reportFieldError } from '/components/modal.js';
 import { makeSortable } from '/utils/sortable.js';
@@ -1534,8 +1535,7 @@ function overviewHolidaysOnDay(dateKey) {
 function overviewLaneHeader(userId) {
   const person = overview.people.find((p) => Number(p.id) === Number(userId));
   const name = person?.display_name ?? userName(userId);
-  const initials = (name ?? '').split(' ').map((w) => w[0] ?? '').join('').toUpperCase().slice(0, 2);
-  const inner = person?.avatar_data ? `<img src="${esc(person.avatar_data)}" alt="${esc(name)}" loading="lazy">` : esc(initials);
+  const inner = person?.avatar_data ? `<img src="${esc(person.avatar_data)}" alt="${esc(name)}" loading="lazy">` : esc(initials(name));
   return `<div class="schedule-overview__lane-head"><span class="schedule-overview__lane-avatar" style="background-color:${esc(person?.avatar_color ?? 'var(--color-border)')}">${inner}</span><span class="schedule-overview__lane-name">${esc(name)}</span></div>`;
 }
 
@@ -3031,4 +3031,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
