@@ -458,8 +458,12 @@ test('ein abgelehntes Feld hinterlässt keine Sprache ohne passende Titel', asyn
   const first = db.prepare(`SELECT id FROM birthdays ORDER BY id ASC`).get().id;
   assert.equal(storedEvent(first).title, 'Birthday: Lina Müller');
 
-  // Gültige Sprache zusammen mit einem Feld, das später scheitert: der Handler
-  // schreibt im Durchlauf und verlässt sich über ein early return.
+  // Gültige Sprache zusammen mit einem Feld, das später scheitert. Bis #1622
+  // schrieb der Handler im Durchlauf: die Sprache stand trotz 400 in der
+  // Datenbank, und diese Probe hielt fest, dass die Titel ihr dann wenigstens
+  // folgen. Seit #1622 gilt die ganze Patch oder nichts - die Sprache bleibt,
+  // und mit ihr die Titel. Die Aussage ist dieselbe geblieben: GET meldet
+  // keinen Zustand, den die Daten nicht haben.
   const rejected = await asAdmin(() => call('PUT', '/preferences', {
     language: 'de',
     app_name: 'x'.repeat(5000),
@@ -467,12 +471,17 @@ test('ein abgelehntes Feld hinterlässt keine Sprache ohne passende Titel', asyn
   assert.equal(rejected.status, 400);
 
   const after = await call('GET', '/preferences');
-  assert.equal(after.body.data.language, 'de', 'die Sprache ist geschrieben');
+  assert.equal(after.body.data.language, 'en', 'die abgelehnte Patch hat die Sprache nicht geschrieben');
   assert.equal(
     storedEvent(first).title,
-    'Geburtstag: Lina Müller',
-    'dann müssen die Titel ihr auch folgen, sonst meldet GET einen Zustand, den die Daten nicht haben',
+    'Birthday: Lina Müller',
+    'und die Titel bleiben bei der Sprache, die weiter gilt',
   );
+
+  // Dieselbe Sprache allein geht durch, und die Titel folgen ihr.
+  const accepted = await asAdmin(() => call('PUT', '/preferences', { language: 'de' }));
+  assert.equal(accepted.status, 200);
+  assert.equal(storedEvent(first).title, 'Geburtstag: Lina Müller');
 });
 
 // ---------------------------------------------------------------------------

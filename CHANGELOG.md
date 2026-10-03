@@ -248,6 +248,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a named person it is one message that says both. The undo in the list stays. For API clients,
   `PATCH /api/v1/tasks/{id}/status` additionally returns `next_due_date`, the due date of the
   next occurrence that is not yet done, or `null`.
+- **A rejected `PUT /api/v1/preferences` no longer applies part of the request** (#1622). The
+  route checked and stored one field after the other, so a request with several fields that
+  failed on a later one answered 400 or 403 while the fields before it were already saved: a
+  valid `timezone_hint_dismissed` followed by an invalid `language` dismissed the time zone
+  hint for the whole household although the request had failed. The whole request is now applied
+  or nothing is, for household, personal and admin-only fields alike; status and error text of
+  the answer are unchanged. The app sends these fields one at a time, so this only showed
+  through the API.
 
 ## [2.71.0] - 2026-09-30
 
