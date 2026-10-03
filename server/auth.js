@@ -529,7 +529,7 @@ router.use((req, res, next) => {
     // Liste aber `/api/v1`-relativ gefuehrt wird - eine Liste, zwei Verankerungen
     // waeren zwei Wahrheiten darueber, was ein Display lesen darf.
     if (device && !displayMayRead(req.method, `/auth${req.path}`)) {
-      return res.status(403).json({ error: 'A paired display cannot use the account routes.', code: 403 });
+      return res.status(403).json({ error: 'A paired display cannot use the account routes.', code: 403, reason: 'display_account' });
     }
     // Ein Cookie OHNE gueltiges Geraet dahinter kommt hier durch - ein Mensch
     // soll sich an einem zurueckgebauten Tablett anmelden koennen. Es wird dabei
@@ -1556,7 +1556,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 
     if (!canSignIn(db.get(), user.id)) {
       log.warn('Login blocked for housekeeping staff account', { ip: req.ip, username });
-      return res.status(403).json({ error: 'This account cannot sign in.', code: 403 });
+      return res.status(403).json({ error: 'This account cannot sign in.', code: 403, reason: 'account_cannot_sign_in' });
     }
 
     // Wer die eingebaute Anmeldung abgeschaltet hat, hat sie auch fuer alles
@@ -1575,7 +1575,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     // Ausschluss darueber: erst die Zugangsdaten, dann die Berechtigung.
     if (!isPasswordLoginEnabled() && !isSplitExpenseGuest(user.id)) {
       log.warn('Login rejected: password login is disabled', { ip: req.ip, username });
-      return res.status(403).json({ error: 'Password login is disabled.', code: 403 });
+      return res.status(403).json({ error: 'Password login is disabled.', code: 403, reason: 'password_login_disabled' });
     }
 
     // Zweiter Faktor (#672): das Passwort stimmt, die Sitzung entsteht aber
@@ -2107,7 +2107,7 @@ router.post('/logout', requireAuth, csrfMiddleware, (req, res) => {
  */
 router.post('/logout-others', requireAuth, csrfMiddleware, sessionRevokeLimiter, (req, res) => {
   if (req.authMethod !== 'session' || !req.sessionID) {
-    return res.status(403).json({ error: 'Only a signed-in browser session can sign out other sessions.', code: 403 });
+    return res.status(403).json({ error: 'Only a signed-in browser session can sign out other sessions.', code: 403, reason: 'browser_session_required' });
   }
   try {
     const ended = invalidateUserSessions(req.authUserId, req.sessionID);
@@ -2428,7 +2428,7 @@ router.post('/setup', loginLimiter, async (req, res) => {
       if (process.env.NODE_ENV === 'production') {
         return res.status(404).json({ error: 'Not found.', code: 404 });
       }
-      return res.status(403).json({ error: 'Setup has already been completed.', code: 403 });
+      return res.status(403).json({ error: 'Setup has already been completed.', code: 403, reason: 'setup_completed' });
     }
 
     const username = (req.body.username || '').trim();
@@ -2490,7 +2490,7 @@ router.post('/setup', loginLimiter, async (req, res) => {
       });
     } catch (txErr) {
       if (txErr === SETUP_DONE) {
-        return res.status(403).json({ error: 'Setup has already been completed.', code: 403 });
+        return res.status(403).json({ error: 'Setup has already been completed.', code: 403, reason: 'setup_completed' });
       }
       throw txErr;
     }

@@ -60,6 +60,7 @@
         "errorOffline": "Pas de connexion internet. Vérifiez votre réseau.",
         "errorForbidden": "Accès refusé. Veuillez vous reconnecter.",
         "errorModuleNoAccess": "Vous n'avez pas accès à ce module.",
+        "errorNoPermission": "Vous n'avez pas l'autorisation de faire cela.",
         "unknownAddress": "Cette adresse n'existe pas. La page la plus proche s'affiche à la place.",
         "errorNotFound": "L'entrée n'a pas été trouvée.",
         "errorServer": "Erreur serveur. Veuillez réessayer plus tard.",

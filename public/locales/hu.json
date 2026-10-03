@@ -60,6 +60,7 @@
         "errorOffline": "Nincs internetkapcsolat. Ellenőrizze a hálózati kapcsolatot.",
         "errorForbidden": "Hozzáférés megtagadva. Kérjük, jelentkezzen be újra.",
         "errorModuleNoAccess": "Nincs hozzáférésed ehhez a modulhoz.",
+        "errorNoPermission": "Ehhez nincs jogosultságod.",
         "unknownAddress": "Ez a cím nem létezik. Helyette a legközelebbi oldalt látod.",
         "errorNotFound": "A bejegyzés nem található.",
         "errorServer": "Szerverhiba. Kérjük, próbálja újra később.",

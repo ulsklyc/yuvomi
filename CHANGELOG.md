@@ -64,9 +64,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **"No access to this module" is shown in your language** (#1607). When a request was refused
   because your role has no access to a module, or only read access, the message came from the
   server in English, whatever language the app was set to. Both messages are now translated
-  into all 26 languages, on every page that shows them. Other refusals, for example "Admin
-  access required", are still English. API clients keep the English `error` text and get a new
-  `reason` field beside it: `module_access_denied` or `module_read_only`.
+  into all 26 languages, on every page that shows them. API clients keep the English `error`
+  text and get a new `reason` field beside it: `module_access_denied` or `module_read_only`.
+- **"You do not have permission to do that" is shown in your language** (#1607). Around 110
+  other refusals, such as "Not authorized." or "Admin access required.", reached the page as
+  the server wrote them: in English, a few in German. They all say no more than that the
+  permission is missing, so the app now shows one translated sentence for them, in all 26
+  languages. A refusal that says something more specific keeps its own text: a locked task, a
+  recipe managed by its provider, a missing right in a second module ("Write access to the
+  shopping list is required."), an expired form token, the sign-in page and the wall display.
+  Those are still English. For API clients nothing changes in the `error` text; the specific
+  refusals carry a new `reason` field, for example `task_locked`, `recipe_mirrored`,
+  `cross_module_access` or `csrf_invalid`.
 - **The status buttons on the task board name their task for screen readers** (#1607). The
   icon button on each board card that moves a task on was announced only as "Set to in
   progress", "Mark as done" or "Reopen", so every button in a column had the same name. It now

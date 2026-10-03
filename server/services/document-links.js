@@ -79,7 +79,7 @@ export class DocumentLinkRefusedError extends Error {
 /** Beantwortet eine Abweisung aus Regel 3; `false`, wenn `err` keine ist. */
 export function sendDocumentLinkRefusal(res, err) {
   if (!(err instanceof DocumentLinkRefusedError)) return false;
-  res.status(403).json({ error: err.message, code: 403 });
+  res.status(403).json({ error: err.message, code: 403, reason: 'cross_module_access' });
   return true;
 }
 

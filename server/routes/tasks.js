@@ -347,7 +347,7 @@ function mayEditTaskDefinition(task, req) {
   return lock.created_by === (req.authUserId || req.session?.userId);
 }
 
-const LOCKED_ERROR = { error: 'This task is locked; only its creator and administrators can change it.', code: 403 };
+const LOCKED_ERROR = { error: 'This task is locked; only its creator and administrators can change it.', code: 403, reason: 'task_locked' };
 
 /**
  * Aufgaben-IDs, deren Definition diese Person anfassen darf - fuer die
@@ -474,7 +474,7 @@ router.get('/sync-targets', (req, res) => {
     // Server-URLs" - `listUrl` ist eine. Wer nicht schreiben darf, sieht den
     // Dialog nie; ein Wandtablett mit `tasks:read` hatte die Liste trotzdem.
     if (!mayWriteModule(req, 'tasks')) {
-      return res.status(403).json({ error: 'Write access to tasks is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to tasks is required.', code: 403, reason: 'cross_module_access' });
     }
     const caldav = db.get().prepare(`
       SELECT s.account_id AS accountId, a.name AS accountName,
@@ -1781,11 +1781,12 @@ router.patch('/:id/status', (req, res) => {
         return res.status(403).json({
           error: 'A paired display can only tick a task off.',
           code: 403,
+          reason: 'display_action',
         });
       }
       const actor = displayActingPerson(req, req.body.done_by_user_id, 'tasks', { db: db.get() });
       if (!actor.ok) {
-        return res.status(actor.status).json({ error: actor.error, code: actor.status });
+        return res.status(actor.status).json({ error: actor.error, code: actor.status, ...(actor.reason ? { reason: actor.reason } : {}) });
       }
       displayDoneBy = actor.userId;
     }
@@ -2109,7 +2110,7 @@ router.get('/:id/documents', (req, res) => {
     // gefragt, damit eine unsichtbare Aufgabe weiter 404 bleibt.
     const viewer = documentViewer(req);
     if (!viewer.readsDocuments) {
-      return res.status(403).json({ error: 'Reading linked documents requires access to documents.', code: 403 });
+      return res.status(403).json({ error: 'Reading linked documents requires access to documents.', code: 403, reason: 'cross_module_access' });
     }
     res.json({ data: loadTaskDocuments(task.id, viewer) });
   } catch (err) {

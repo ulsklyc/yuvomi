@@ -60,6 +60,7 @@
         "errorOffline": "Geen internetverbinding. Controleer uw netwerk.",
         "errorForbidden": "Toegang geweigerd. Meld u opnieuw aan.",
         "errorModuleNoAccess": "Je hebt geen toegang tot deze module.",
+        "errorNoPermission": "Je hebt hiervoor geen toestemming.",
         "unknownAddress": "Dit adres bestaat niet. Je ziet in plaats daarvan de dichtstbijzijnde pagina.",
         "errorNotFound": "De vermelding is niet gevonden.",
         "errorServer": "Serverfout. Probeer het later opnieuw.",

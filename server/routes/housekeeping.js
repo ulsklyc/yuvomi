@@ -1456,7 +1456,7 @@ router.post('/supply-requests', (req, res) => {
     // Als Erstes, vor Validierung und Transaktion: eine Antwort darf einem
     // Gesperrten nichts ueber den Einkauf verraten, und angelegt wird nichts.
     if (!mayWriteModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
     }
 
     const vName = str(req.body.name, 'name', { max: MAX_TITLE });

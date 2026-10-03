@@ -396,7 +396,7 @@ router.post('/redemptions', (req, res) => {
     let targetId;
     if (isDisplayRequest(req)) {
       const actor = displayActingPerson(req, req.body?.user_id, 'rewards', { db: d });
-      if (!actor.ok) return res.status(actor.status).json({ error: actor.error, code: actor.status });
+      if (!actor.ok) return res.status(actor.status).json({ error: actor.error, code: actor.status, ...(actor.reason ? { reason: actor.reason } : {}) });
       targetId = actor.userId;
     } else {
       targetId = req.body?.user_id != null && isAdminRequest(req) ? toInt(req.body.user_id) : me;

@@ -660,7 +660,7 @@ router.post('/items/undo-transfer', (req, res) => {
     const findSource = db.get().prepare('SELECT added_from_meal FROM shopping_items WHERE id = ?');
     const touchesMealPlan = ids.some((id) => findSource.get(id)?.added_from_meal);
     if (touchesMealPlan && !mayWriteModule(req, 'meals')) {
-      return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403, reason: 'cross_module_access' });
     }
 
     const removed = db.get().transaction(() => {
@@ -1190,7 +1190,7 @@ router.post('/:listId/import-meal-plan', (req, res) => {
     // die rechnet, und ein Import, der danach mit 403 endet, waeren eine
     // Zusage, die nicht haelt.
     if (!mayWriteModule(req, 'meals')) {
-      return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403, reason: 'cross_module_access' });
     }
 
     const list = db.get()
@@ -1281,7 +1281,7 @@ router.post('/:listId/import-meal-plan', (req, res) => {
 router.post('/:listId/import-pantry', (req, res) => {
   try {
     if (!mayReadModule(req, 'pantry')) {
-      return res.status(403).json({ error: 'Read access to the pantry is required.', code: 403 });
+      return res.status(403).json({ error: 'Read access to the pantry is required.', code: 403, reason: 'cross_module_access' });
     }
 
     const list = db.get()

@@ -316,7 +316,7 @@ router.delete('/locations/:locId', (req, res) => {
 router.post('/import-shopping', (req, res) => {
   try {
     if (!mayReadModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Read access to the shopping list is required.', code: 403 });
+      return res.status(403).json({ error: 'Read access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
     }
 
     const vList = idParam(req.body.list_id, 'Listen-ID');

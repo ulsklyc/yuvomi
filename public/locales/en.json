@@ -60,6 +60,7 @@
         "errorOffline": "No internet connection. Please check your network.",
         "errorForbidden": "Access denied. Please sign in again.",
         "errorModuleNoAccess": "You do not have access to this module.",
+        "errorNoPermission": "You do not have permission to do that.",
         "unknownAddress": "That address does not exist. You are seeing the closest page instead.",
         "errorNotFound": "The entry was not found.",
         "errorServer": "Server error. Please try again later.",

@@ -855,7 +855,7 @@ router.post('/groups/:id/members', async (req, res) => {
         // ist ein Schreibvorgang in `contacts` und braucht dessen Schreibrecht
         // (beide Achsen) - vor dem Hash, damit nichts angefangen wird.
         if (!mayWriteModule(req, 'contacts')) {
-          return res.status(403).json({ error: 'Write access to contacts is required to add a contact without an account.', code: 403 });
+          return res.status(403).json({ error: 'Write access to contacts is required to add a contact without an account.', code: 403, reason: 'cross_module_access' });
         }
         passwordHash = await randomGuestPasswordHash();
       }

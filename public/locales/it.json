@@ -60,6 +60,7 @@
         "errorOffline": "Nessuna connessione internet. Controlla la tua rete.",
         "errorForbidden": "Accesso negato. Per favore accedi di nuovo.",
         "errorModuleNoAccess": "Non hai accesso a questo modulo.",
+        "errorNoPermission": "Non hai l'autorizzazione per farlo.",
         "unknownAddress": "Questo indirizzo non esiste. Al suo posto vedi la pagina più vicina.",
         "errorNotFound": "La voce non è stata trovata.",
         "errorServer": "Errore del server. Riprova più tardi.",
