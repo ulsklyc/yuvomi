@@ -325,7 +325,7 @@ router.get('/all', (req, res) => {
       return res.status(400).json({ error: 'entity_type und entity_id sind erforderlich.', code: 400 });
     }
     if (!mayTouchOrigin(req, entityType)) {
-      return res.status(403).json({ error: 'You do not have access to this module.', code: 403 });
+      return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
     }
 
     const rows = db.get().prepare(`
@@ -356,7 +356,7 @@ router.get('/', (req, res) => {
       return res.status(400).json({ error: 'entity_type und entity_id sind erforderlich.', code: 400 });
     }
     if (!mayTouchOrigin(req, entityType)) {
-      return res.status(403).json({ error: 'You do not have access to this module.', code: 403 });
+      return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
     }
 
     const row = db.get().prepare(`
@@ -407,7 +407,7 @@ router.post('/', (req, res) => {
       return res.status(400).json({ error: errors.join(' '), code: 400 });
     }
     if (!mayTouchOrigin(req, entity_type, 'write')) {
-      return res.status(403).json({ error: 'You do not have access to this module.', code: 403 });
+      return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
     }
 
     const entityId = parseInt(entity_id, 10);
@@ -458,7 +458,7 @@ router.put('/', (req, res) => {
       return res.status(400).json({ error: derivedTypeError(entityType), code: 400 });
     }
     if (!mayTouchOrigin(req, entityType, 'write')) {
-      return res.status(403).json({ error: 'You do not have access to this module.', code: 403 });
+      return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
     }
     if (!Array.isArray(remindAts)) {
       return res.status(400).json({ error: 'remind_ats muss ein Array sein.', code: 400 });
@@ -533,7 +533,7 @@ router.patch('/:id/dismiss', (req, res) => {
     // `calendar:write` durfte hier bis zur Review von #811 eine Vorrats- oder
     // Abo-Meldung wegwischen, ohne den Scope dieses Moduls zu besitzen.
     if (!mayTouchOrigin(req, reminder.entity_type, 'write')) {
-      return res.status(403).json({ error: 'You do not have access to this module.', code: 403 });
+      return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
     }
 
     db.get().prepare('UPDATE reminders SET dismissed = 1 WHERE id = ?').run(reminderId);
@@ -566,7 +566,7 @@ router.delete('/:id', (req, res) => {
       return res.status(404).json({ error: 'Erinnerung nicht gefunden.', code: 404 });
     }
     if (!mayTouchOrigin(req, reminder.entity_type, 'write')) {
-      return res.status(403).json({ error: 'You do not have access to this module.', code: 403 });
+      return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
     }
     // Dieselbe Sperre wie beim Filter-Weg daneben: ohne sie bliebe eine
     // Hintertuer mit exakt derselben folgenlosen Wirkung.
@@ -598,7 +598,7 @@ router.delete('/', (req, res) => {
       return res.status(400).json({ error: 'entity_type und entity_id sind erforderlich.', code: 400 });
     }
     if (!mayTouchOrigin(req, entityType, 'write')) {
-      return res.status(403).json({ error: 'You do not have access to this module.', code: 403 });
+      return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
     }
     // AUCH HIER, aus demselben Grund wie bei POST und PUT - und mit derselben
     // Wirkungslosigkeit: die geloeschte Zeile legt der naechste Modul-Sync

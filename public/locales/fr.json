@@ -59,6 +59,7 @@
         "reset": "Réinitialiser",
         "errorOffline": "Pas de connexion internet. Vérifiez votre réseau.",
         "errorForbidden": "Accès refusé. Veuillez vous reconnecter.",
+        "errorModuleNoAccess": "Vous n'avez pas accès à ce module.",
         "errorNotFound": "L'entrée n'a pas été trouvée.",
         "errorServer": "Erreur serveur. Veuillez réessayer plus tard.",
         "errorRestoreInProgress": "Une sauvegarde est en cours de restauration. Votre modification n'a pas été enregistrée, réessayez dans une minute.",

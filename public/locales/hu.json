@@ -59,6 +59,7 @@
         "reset": "Visszaállítás az eredetire",
         "errorOffline": "Nincs internetkapcsolat. Ellenőrizze a hálózati kapcsolatot.",
         "errorForbidden": "Hozzáférés megtagadva. Kérjük, jelentkezzen be újra.",
+        "errorModuleNoAccess": "Nincs hozzáférésed ehhez a modulhoz.",
         "errorNotFound": "A bejegyzés nem található.",
         "errorServer": "Szerverhiba. Kérjük, próbálja újra később.",
         "errorRestoreInProgress": "Éppen egy biztonsági mentés visszaállítása folyik. A módosításod nem lett mentve, próbáld újra egy perc múlva.",

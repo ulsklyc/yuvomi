@@ -52,6 +52,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **"No access to this module" is shown in your language** (#1607). When a request was refused
+  because your role has no access to a module, or only read access, the message came from the
+  server in English, whatever language the app was set to. Both messages are now translated
+  into all 26 languages, on every page that shows them. Other refusals, for example "Admin
+  access required", are still English. API clients keep the English `error` text and get a new
+  `reason` field beside it: `module_access_denied` or `module_read_only`.
 - **The status buttons on the task board name their task for screen readers** (#1607). The
   icon button on each board card that moves a task on was announced only as "Set to in
   progress", "Mark as done" or "Reopen", so every button in a column had the same name. It now

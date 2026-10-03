@@ -59,6 +59,7 @@
         "reset": "Orijinale sıfırla",
         "errorOffline": "İnternet bağlantısı yok. Lütfen ağınızı kontrol edin.",
         "errorForbidden": "Erişim reddedildi. Lütfen tekrar giriş yapın.",
+        "errorModuleNoAccess": "Bu modüle erişiminiz yok.",
         "errorNotFound": "Kayıt bulunamadı.",
         "errorServer": "Sunucu hatası. Lütfen daha sonra tekrar deneyin.",
         "errorRestoreInProgress": "Şu anda bir yedek geri yükleniyor. Değişikliğiniz kaydedilmedi, bir dakika sonra yeniden deneyin.",

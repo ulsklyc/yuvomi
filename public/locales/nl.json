@@ -59,6 +59,7 @@
         "reset": "Terugzetten naar origineel",
         "errorOffline": "Geen internetverbinding. Controleer uw netwerk.",
         "errorForbidden": "Toegang geweigerd. Meld u opnieuw aan.",
+        "errorModuleNoAccess": "Je hebt geen toegang tot deze module.",
         "errorNotFound": "De vermelding is niet gevonden.",
         "errorServer": "Serverfout. Probeer het later opnieuw.",
         "errorRestoreInProgress": "Er wordt nu een back-up hersteld. Je wijziging is niet opgeslagen, probeer het over een minuut opnieuw.",

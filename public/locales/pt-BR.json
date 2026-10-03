@@ -59,6 +59,7 @@
         "reset": "Redefinir",
         "errorOffline": "Sem conexão com a internet. Por favor, verifique a sua rede.",
         "errorForbidden": "Acesso negado. Por favor, faça login novamente.",
+        "errorModuleNoAccess": "Não tem acesso a este módulo.",
         "errorNotFound": "O registro não foi encontrado.",
         "errorServer": "Erro no servidor. Por favor, tente mais tarde.",
         "errorTimeout": "A conexão demorou demais. Por favor, tente novamente.",

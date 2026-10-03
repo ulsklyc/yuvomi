@@ -59,6 +59,7 @@
         "reset": "Restaurar original",
         "errorOffline": "Sin conexión a internet. Por favor, revisa tu red.",
         "errorForbidden": "Acceso denegado. Por favor, inicia sesión de nuevo.",
+        "errorModuleNoAccess": "No tienes acceso a este módulo.",
         "errorNotFound": "No se encontró el registro.",
         "errorServer": "Error del servidor. Por favor, inténtalo más tarde.",
         "errorRestoreInProgress": "Se está restaurando una copia de seguridad en este momento. Tu cambio no se ha guardado, inténtalo de nuevo en un minuto.",

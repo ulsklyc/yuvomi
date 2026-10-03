@@ -59,6 +59,7 @@
         "reset": "重置为原始",
         "errorOffline": "无网络连接。请检查您的网络。",
         "errorForbidden": "访问被拒绝。请重新登录。",
+        "errorModuleNoAccess": "您没有此模块的访问权限。",
         "errorNotFound": "未找到该条目。",
         "errorServer": "服务器错误。请稍后重试。",
         "errorRestoreInProgress": "正在恢复备份。你的更改未保存，请一分钟后再试。",

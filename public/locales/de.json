@@ -59,6 +59,7 @@
         "reset": "Auf Original zurücksetzen",
         "errorOffline": "Keine Internetverbindung. Bitte prüfe dein Netzwerk.",
         "errorForbidden": "Zugriff verweigert. Bitte erneut anmelden.",
+        "errorModuleNoAccess": "Du hast keinen Zugriff auf dieses Modul.",
         "errorNotFound": "Der Eintrag wurde nicht gefunden.",
         "errorServer": "Serverfehler. Bitte versuche es später erneut.",
         "errorRestoreInProgress": "Gerade wird ein Backup wiederhergestellt. Deine Änderung wurde nicht gespeichert, versuche es in einer Minute erneut.",

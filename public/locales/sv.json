@@ -59,6 +59,7 @@
         "reset": "Återställ till original",
         "errorOffline": "Ingen internetanslutning. Kontrollera ditt nätverk.",
         "errorForbidden": "Åtkomst nekad. Logga in igen.",
+        "errorModuleNoAccess": "Du har inte åtkomst till denna modul.",
         "errorNotFound": "Posten hittades inte.",
         "errorServer": "Serverfel. Försök igen senare.",
         "errorRestoreInProgress": "En säkerhetskopia återställs just nu. Din ändring sparades inte, försök igen om en minut.",
