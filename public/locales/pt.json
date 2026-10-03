@@ -60,6 +60,8 @@
         "errorOffline": "Sem ligação à internet. Por favor, verifique a sua rede.",
         "errorForbidden": "Acesso negado. Por favor, inicie sessão novamente.",
         "errorModuleNoAccess": "Não tem acesso a este módulo.",
+        "errorNoPermission": "Não tem permissão para fazer isso.",
+        "unknownAddress": "Este endereço não existe. Em vez dele, é apresentada a página mais próxima.",
         "errorNotFound": "O registo não foi encontrado.",
         "errorServer": "Erro no servidor. Por favor, tente mais tarde.",
         "errorRestoreInProgress": "Está a ser restaurado um backup neste momento. A sua alteração não foi guardada, tente novamente dentro de um minuto.",

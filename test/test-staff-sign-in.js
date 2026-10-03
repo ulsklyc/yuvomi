@@ -162,7 +162,8 @@ test('Passwort-Login: ein Personal-Konto bekommt weiterhin 403 und keine Sitzung
   });
 
   assert.equal(res.status, 403);
-  assert.deepEqual(await res.json(), { error: 'This account cannot sign in.', code: 403 });
+  // `reason` seit #1607: an ihm erkennt die App, dass dieser Satz eine eigene Auskunft ist.
+  assert.deepEqual(await res.json(), { error: 'This account cannot sign in.', code: 403, reason: 'account_cannot_sign_in' });
   assert.equal(sessionsOf(staff.id), 0);
 });
 

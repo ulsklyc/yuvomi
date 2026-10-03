@@ -604,6 +604,7 @@ router.put('/:id', (req, res) => {
         return res.status(403).json({
           error: 'Only this member or an admin, signed in or with a full-access token, can change the email addresses of a household member.',
           code: 403,
+          reason: 'contact_email_protected',
         });
       }
       // Gleiche Adressen (etwa nur anders geschrieben): die gespeicherten
@@ -748,7 +749,7 @@ router.delete('/:id', (req, res) => {
     if (!contact) return res.status(404).json({ error: 'Kontakt nicht gefunden', code: 404 });
     
     if (contact.family_user_id) {
-      return res.status(403).json({ error: 'Familienmitglieder können nicht aus der Kontaktliste gelöscht werden.', code: 403 });
+      return res.status(403).json({ error: 'Familienmitglieder können nicht aus der Kontaktliste gelöscht werden.', code: 403, reason: 'family_member_contact' });
     }
 
     const result = db.get().prepare('DELETE FROM contacts WHERE id = ?').run(id);

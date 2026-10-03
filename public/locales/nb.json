@@ -60,6 +60,8 @@
         "errorOffline": "Ingen internettforbindelse. Vennligst sjekk nettverket ditt.",
         "errorForbidden": "Tilgang nektet. Vennligst logg inn på nytt.",
         "errorModuleNoAccess": "Du har ikke tilgang til denne modulen.",
+        "errorNoPermission": "Du har ikke tillatelse til å gjøre dette.",
+        "unknownAddress": "Denne adressen finnes ikke. Du ser den nærmeste siden i stedet.",
         "errorNotFound": "Oppføringen ble ikke funnet.",
         "errorServer": "Serverfeil. Vennligst prøv igjen senere.",
         "errorRestoreInProgress": "En sikkerhetskopi blir gjenopprettet akkurat nå. Endringen din ble ikke lagret, prøv igjen om et minutt.",
