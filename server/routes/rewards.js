@@ -357,8 +357,7 @@ router.get('/redemptions', (req, res) => {
       SELECT r.id, r.user_id, r.catalog_id, r.reward_name, r.reward_icon, r.cost, r.status,
              r.note, r.decided_at, r.created_at,
              u.display_name AS user_name, u.avatar_color AS user_color, u.avatar_data AS user_avatar,
-             dec.display_name AS decided_by_name,
-             COALESCE((SELECT SUM(delta) FROM reward_ledger l WHERE l.user_id = r.user_id), 0) AS user_balance
+             dec.display_name AS decided_by_name
       FROM reward_redemptions r
       JOIN users u ON u.id = r.user_id
       LEFT JOIN users dec ON dec.id = r.decided_by
@@ -368,6 +367,16 @@ router.get('/redemptions', (req, res) => {
       ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END, r.created_at DESC, r.id DESC
       LIMIT 300
     `).all({ status, me });
+    // Je Person EINMAL summieren, nicht je Zeile: als Unterabfrage in der
+    // Liste lief die Ledger-Summe fuer jede der bis zu 300 Zeilen neu, bei
+    // einem Mitglied ohne Adminrecht 300-mal dieselbe. getBalance() ist die
+    // eine Stelle, die einen Saldo rechnet, und liefert 0 ohne Ledger-Zeile.
+    const d = db.get();
+    const balanceByUser = new Map();
+    for (const row of rows) {
+      if (!balanceByUser.has(row.user_id)) balanceByUser.set(row.user_id, getBalance(d, row.user_id));
+      row.user_balance = balanceByUser.get(row.user_id);
+    }
     res.json({ data: rows });
   } catch (err) {
     log.error('GET /redemptions error:', err);
