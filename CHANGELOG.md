@@ -52,6 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The status buttons on the task board name their task for screen readers** (#1607). The
+  icon button on each board card that moves a task on was announced only as "Set to in
+  progress", "Mark as done" or "Reopen", so every button in a column had the same name. It now
+  reads "Set Laundry to in progress". The tooltip stays the short form.
 - **Subscriptions without a monthly budget no longer show "Monthly budget 0" next to
   "Unlimited"** (#1607). With no budget set, the figures above the list carried a card
   "Monthly budget 0.00" with an empty bar, right beside the card saying there is no budget
