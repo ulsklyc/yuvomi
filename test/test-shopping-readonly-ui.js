@@ -367,6 +367,35 @@ test('Leerzustaende bei `read`: nur der Zustand, keine Einladung und kein Knopf'
   }
 });
 
+/* #1607: DER HINWEIS VERSPRICHT NUR, WAS DIE SEITE AUCH ANBIETET.
+ * „Abgehakte Artikel lassen sich in den Vorrat uebernehmen" nennt die Kapsel
+ * „In den Vorrat". Die steht nur, wenn der Vorrat eingeschaltet ist und der
+ * Betrachter dort schreiben darf (updateCheckedActions) - der Hinweis stand
+ * ohne diese Frage da und kuendigte einen Weg an, den es nicht gab. */
+test('Leere Liste: der Vorrats-Hinweis steht nur, wo „In den Vorrat" auch steht', async () => {
+  const leer = async (modules, vorratAus = false) => withAccess(modules, () => {
+    zustand({ items: [] });
+    const zuvor = globalThis.window.yuvomi;
+    globalThis.window.yuvomi = { ...zuvor, isModuleDisabled: (id) => vorratAus && id === 'pantry' };
+    try {
+      const ziel = new MiniElement('div');
+      shopping.mountItems(ziel, container());
+      return ziel.innerHTML;
+    } finally {
+      globalThis.window.yuvomi = zuvor;
+    }
+  });
+  assert.ok((await leer(SCHREIBEN)).includes('emptyHint.shopping'), 'Gegenfall: mit Vorrat und Schreibrecht steht der Hinweis');
+  for (const [name, html] of [
+    ['Vorrat abgeschaltet', await leer(SCHREIBEN, true)],
+    ['pantry: read', await leer({ shopping: 'write', pantry: 'read' })],
+    ['pantry: none', await leer({ shopping: 'write', pantry: 'none' })],
+  ]) {
+    assert.ok(!html.includes('emptyHint.shopping'), `${name}: der Hinweis nennt einen Weg, den es hier nicht gibt`);
+    assert.ok(html.includes('shopping.emptyAction'), `${name}: das Anlegen bleibt`);
+  }
+});
+
 // -------------------------------------------------------------------------
 // Verdrahtung und Riegel
 // -------------------------------------------------------------------------

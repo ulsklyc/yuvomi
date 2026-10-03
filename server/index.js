@@ -639,11 +639,14 @@ app.use('/api/v1', (req, res, next) => {
     scopedModuleKey,
     scopedAccess,
   );
+  // `reason` ist der maschinenlesbare Grund (#1607): der Satz in `error` ist
+  // englisch und stand so in jeder Oberflaechensprache im Toast. Die App
+  // uebersetzt ueber den Grund (public/api.js), API-Nutzer behalten den Satz.
   if (verdict === MODULE_ACCESS_DENIED) {
-    return res.status(403).json({ error: 'You do not have access to this module.', code: 403 });
+    return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
   }
   if (verdict === MODULE_ACCESS_READ_ONLY) {
-    return res.status(403).json({ error: 'You have read-only access to this module.', code: 403 });
+    return res.status(403).json({ error: 'You have read-only access to this module.', code: 403, reason: 'module_read_only' });
   }
   return next();
 });

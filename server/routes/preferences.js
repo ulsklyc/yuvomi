@@ -687,10 +687,30 @@ router.get('/', (req, res) => {
 // Haushalt-Praeferenzen aktualisieren.
 // Body: { visible_meal_types: string[] }
 // Response: { data: { visible_meal_types: string[] } }
+//
+// GANZE PATCH ODER NICHTS (#1622). Der Handler prueft und schreibt Feld fuer
+// Feld, und jedes abgelehnte Feld verlaesst ihn ueber ein
+// `return res.status(4xx)`. Damit die Felder davor dann nicht stehen bleiben,
+// laeuft die ganze Feldfolge in EINER Transaktion: COMMIT steht genau einmal,
+// hinter dem letzten Feld und der fertig gebauten Erfolgsantwort, unmittelbar
+// vor dem Senden; jeder andere Ausgang
+// (400, 401, 403, geworfener Fehler) findet im finally eine offene Transaktion
+// vor und rollt sie zurueck. Ein neues Feld mit neuem fruehem `return` ist
+// damit von selbst abgedeckt - es muss dafuer nichts nach oben gezogen werden.
+//
+// BEGIN/COMMIT von Hand statt `db.transaction(fn)`: der Helfer committet bei
+// jedem normalen Ruecksprung, ein `return res.status(400)` waere fuer ihn ein
+// Erfolg. Verschachtelte `db.transaction()`-Aufrufe weiter unten bleiben
+// richtig - der Treiber macht aus ihnen Savepoints, sobald eine Transaktion
+// offen ist. Der Treiber ist synchron und zwischen BEGIN und COMMIT steht kein
+// `await`; kaeme eines dazu, laege die offene Transaktion ueber fremden Requests.
 // --------------------------------------------------------
 
 router.put('/', (req, res) => {
+  let database = null;
   try {
+    database = db.get();
+    database.exec('BEGIN');
     const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, timezone_hint_dismissed, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
 
     // Welche Quickstart-Vorlagen der Schichtplan-Schnellstart zeigt - wie
@@ -700,6 +720,8 @@ router.put('/', (req, res) => {
     // erst mitten im Handler, nachdem laengst schon andere Haushaltsfelder
     // geschrieben waren - ein gemischtes Payload eines Nicht-Admins wandte sich
     // dann teilweise an, bevor der 403 kam.
+    // Seit #1622 nimmt die Transaktion um den Handler so eine Patch ohnehin ganz
+    // zurueck; der Check bleibt oben stehen, weil er nichts kostet.
     if (schedule_hidden_templates !== undefined) {
       if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
@@ -1369,6 +1391,13 @@ router.put('/', (req, res) => {
       }
     }
 
+    // DIE ANTWORT WIRD NOCH IN DER TRANSAKTION GEBAUT (#1622, Review zu #1627).
+    // Sie liest aus der Datenbank zurueck, und manche dieser Lesewege fragen
+    // weitere Tabellen ab (dashboardPersonalViews den Kategorien-Katalog). Wirft
+    // einer davon NACH dem COMMIT, sagt die Antwort 500 und die Patch steht
+    // trotzdem. Hier oben sieht das Lesen dieselben Werte - dieselbe Verbindung
+    // liest ihre eigenen, noch nicht committeten Schreibungen -, und ein Wurf
+    // findet die Transaktion noch offen.
     const rawMealTypes = cfgGet('visible_meal_types') ?? DEFAULT_MEAL_TYPES;
     const savedMealTypes = rawMealTypes.split(',').filter((t) => VALID_MEAL_TYPES.includes(t));
     const savedCurrency = cfgGet('currency') ?? DEFAULT_CURRENCY;
@@ -1386,7 +1415,7 @@ router.put('/', (req, res) => {
     // schon aussortiert - statt seiner eigenen Eingabe.
     const savedMealTypeNames = parseMealTypeNames(cfgGet('meal_type_names'));
 
-    res.json({
+    const payload = {
       data: {
         visible_meal_types: savedMealTypes,
         meal_type_names: savedMealTypeNames,
@@ -1443,11 +1472,31 @@ router.put('/', (req, res) => {
         holiday_school_color:  cfgGet('holiday_school_color')  ?? '#34C759',
         holiday_last_sync:     cfgGet('holiday_last_sync')     ?? null,
       },
-    });
+    };
+
+    // Alle Felder sind durch und die Antwort steht - erst jetzt wird die Patch
+    // wirksam. Hinter dem COMMIT kommt nur noch das Senden: kein Datenbankzugriff
+    // und keine Berechnung, die einen 500 ueber eine gespeicherte Patch legen
+    // koennte.
+    database.exec('COMMIT');
+    res.json(payload);
   } catch (err) {
     log.error('PUT /', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
   } finally {
+    // Noch offen heisst: der Handler ist NICHT ueber das COMMIT gegangen - ein
+    // Feld wurde abgelehnt oder etwas hat geworfen. Dann gilt nichts aus dieser
+    // Patch (#1622). Die Antwort ist zu diesem Zeitpunkt schon abgeschickt und
+    // bleibt, wie sie ist; dazwischen liegt kein Yield-Punkt, an dem ein anderer
+    // Request den halben Stand lesen koennte.
+    if (database?.inTransaction) {
+      try {
+        database.exec('ROLLBACK');
+      } catch (err) {
+        log.error('PUT / - Rollback fehlgeschlagen', err);
+      }
+    }
+
     // Gespeicherte Geburtstags-Termine an die geltende Datensprache angleichen.
     //
     // Unbedingt statt nur bei erkannter Verschiebung: retitleBirthdayEvents
@@ -1455,11 +1504,10 @@ router.put('/', (req, res) => {
     // vorher/nachher wäre ein zweiter Ort, an dem alle Wege zur Datensprache
     // (language, region, date_format) vollständig aufgezählt sein müssten.
     //
-    // Im finally, weil der Handler schreibt und validiert, während er durch die
-    // Felder läuft: ein Batch aus gültiger `language` und einem später
-    // abgelehnten Feld verlässt ihn über ein `return res.status(400)`, hat die
-    // Sprache aber schon geschrieben. Am Ende des try-Blocks bliebe der Haushalt
-    // dann auf einer neuen Sprache mit alten Titeln sitzen.
+    // Im finally und NACH dem Rollback, in einer eigenen Transaktion: der Lauf
+    // soll den Stand sehen, der wirklich gilt, und sein eigener Fehler darf die
+    // Patch nicht mitreissen. Nach einer abgelehnten Patch hat sich die
+    // Datensprache nicht bewegt, dann findet er nichts zu tun.
     //
     // Fehler beenden die Anfrage nicht: die Antwort ist zu diesem Zeitpunkt
     // längst gesendet, und die Präferenzen sind geschrieben. Der nächste PUT

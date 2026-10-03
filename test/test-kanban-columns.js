@@ -250,3 +250,39 @@ test('eine gesperrte Aufgabe traegt ihr Schloss auch auf der Brettkarte', () => 
   assert.equal(schloss(tasks.renderKanbanCard(offen)), null);
   assert.equal(schloss(tasks.renderTaskCard(offen)), null);
 });
+
+// #1607: der Weiterschalt-Knopf ist ein Icon ohne Text. Sein Name war nur das
+// Verb („In Bearbeitung setzen") - in einer Spalte mit zehn Karten zehnmal
+// derselbe Name, und ein Screenreader konnte die Knoepfe nicht auseinander-
+// halten. Der Name nennt jetzt die Aufgabe, der Tooltip bleibt beim Verb.
+test('der Weiterschalt-Knopf einer Brettkarte nennt seine Aufgabe', () => {
+  const knopf = (task) => /<button class="kanban-card__status-btn"[^>]*>/.exec(tasks.renderKanbanCard(task))?.[0] ?? '';
+  const name = (task) => /aria-label="([^"]*)"/.exec(knopf(task))?.[1] ?? null;
+  const tooltip = (task) => / title="([^"]*)"/.exec(knopf(task))?.[1] ?? null;
+
+  const a = { ...AUFGABE(1, 'open'), title: 'Waesche' };
+  const b = { ...AUFGABE(2, 'open'), title: 'Einkauf' };
+  assert.ok(name(a) && name(b), 'Reichweite: beide Karten tragen den Knopf');
+  assert.notEqual(name(a), name(b), 'zwei Karten derselben Spalte tragen denselben Knopfnamen');
+
+  for (const [status, key, verb] of [
+    ['open', 'tasks.kanbanMoveToInProgressNamed', 'tasks.kanbanMoveToInProgress'],
+    ['in_progress', 'tasks.kanbanMoveToDoneNamed', 'tasks.kanbanMoveToDone'],
+    ['done', 'tasks.kanbanMoveToOpenNamed', 'tasks.kanbanMoveToOpen'],
+  ]) {
+    const task = { ...AUFGABE(3, status), title: 'Waesche' };
+    assert.ok(name(task).startsWith(key), `${status}: ${name(task)}`);
+    assert.ok(name(task).includes('Waesche'), `${status}: der Name nennt die Aufgabe nicht`);
+    assert.equal(tooltip(task), verb, `${status}: der Tooltip bleibt das Verb`);
+  }
+
+  // Aus der Ablage fuehrt der Knopf zurueck - mit dem Namen, den die Liste
+  // dafuer schon hat.
+  const abgelegt = { ...AUFGABE(4, 'done'), title: 'Waesche', archived_at: '2026-10-01T10:00:00Z' };
+  assert.ok(name(abgelegt).startsWith('tasks.unarchiveNamed'), name(abgelegt));
+
+  // Der Titel ist Nutzereingabe und steht in einem Attribut.
+  const boese = { ...AUFGABE(5, 'open'), title: 'a"><img src=x onerror=1>' };
+  assert.doesNotMatch(tasks.renderKanbanCard(boese), /<img/, 'der Titel bricht aus dem Attribut aus');
+  assert.ok(name(boese).includes('&quot;'), 'der Name traegt den Titel maskiert');
+});

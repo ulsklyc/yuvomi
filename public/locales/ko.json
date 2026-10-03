@@ -59,6 +59,7 @@
         "reset": "원본으로 되돌리기",
         "errorOffline": "인터넷 연결이 없습니다. 네트워크를 확인해 주세요.",
         "errorForbidden": "접근이 거부되었습니다. 다시 로그인해 주세요.",
+        "errorModuleNoAccess": "이 모듈에 접근할 권한이 없습니다.",
         "errorNotFound": "항목을 찾을 수 없습니다.",
         "errorServer": "서버 오류입니다. 나중에 다시 시도해 주세요.",
         "errorRestoreInProgress": "지금 백업을 복원하는 중입니다. 변경 사항이 저장되지 않았습니다. 1분 후에 다시 시도하세요.",
@@ -467,6 +468,9 @@
         "kanbanMoveToInProgress": "진행 중으로 이동",
         "kanbanMoveToDone": "완료로 표시",
         "kanbanMoveToOpen": "다시 열기",
+        "kanbanMoveToInProgressNamed": "{{title}} 진행 중으로 이동",
+        "kanbanMoveToDoneNamed": "{{title}} 완료로 표시",
+        "kanbanMoveToOpenNamed": "{{title}} 다시 열기",
         "recurring": "반복",
         "listView": "목록 보기",
         "kanbanColEmpty": "작업 없음",
@@ -926,7 +930,7 @@
         "dayLongSaturday": "토요일",
         "spanFrom": "{{time}}부터",
         "spanUntil": "{{time}}까지",
-        "timeSuffix": "시",
+        "timeSuffix": "",
         "ics": {
             "reset": "원본으로 되돌리기",
             "resetToast": "변경 사항이 초기화되었습니다."
@@ -3263,7 +3267,7 @@
     "emptyHint": {
         "tasks": "+ 를 탭하여 첫 할 일을 만드세요. 카드를 왼쪽으로 밀면 완료, 오른쪽으로 밀면 보기가 열립니다.",
         "calendar": "자동 동기화를 위해 설정 → 통합에서 Google 캘린더를 연결하세요.",
-        "shopping": "장을 본 뒤 체크한 항목은 식료품 저장고로 옮겨집니다.",
+        "shopping": "장을 본 뒤 체크한 항목은 재고로 옮길 수 있습니다.",
         "notes": "+ 를 탭하여 새 메모를 만드세요. 메모는 전문 검색됩니다.",
         "contacts": "중요한 연락처 - 의사, 학교, 긴급 - 를 등록해 빠르게 접근하세요.",
         "meals": "계획이 정해지면 장보기 목록이 한 번에 채워집니다.",

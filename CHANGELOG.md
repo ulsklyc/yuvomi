@@ -52,6 +52,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **"No access to this module" is shown in your language** (#1607). When a request was refused
+  because your role has no access to a module, or only read access, the message came from the
+  server in English, whatever language the app was set to. Both messages are now translated
+  into all 26 languages, on every page that shows them. Other refusals, for example "Admin
+  access required", are still English. API clients keep the English `error` text and get a new
+  `reason` field beside it: `module_access_denied` or `module_read_only`.
+- **The status buttons on the task board name their task for screen readers** (#1607). The
+  icon button on each board card that moves a task on was announced only as "Set to in
+  progress", "Mark as done" or "Reopen", so every button in a column had the same name. It now
+  reads "Set Laundry to in progress". The tooltip stays the short form.
+- **Subscriptions without a monthly budget no longer show "Monthly budget 0" next to
+  "Unlimited"** (#1607). With no budget set, the figures above the list carried a card
+  "Monthly budget 0.00" with an empty bar, right beside the card saying there is no budget
+  limit. The zero card is gone in that case and three cards remain: monthly cost, no budget
+  limit, yearly projection. With a budget set, the four cards are unchanged.
+- **Korean no longer writes "18:00 시"** (#1607). With the 24-hour clock, Korean put the hour
+  counter 시 after a time that already has minutes, as in "내일, 18:00 시". The time now stands
+  on its own, as in Japanese and Chinese.
+- **The empty shopping list no longer promises that ticked items move to the pantry by
+  themselves** (#1607). The hint read "After the shop, ticked items move into the pantry", but
+  nothing moves until you choose "Into pantry" on the ticked items. It now says they can be
+  moved, in all 26 languages, and it is left out when the pantry is switched off or you may not
+  write there, because that action is not offered then either.
+- **The Budget tile on the overview opens the month, not the tab you last had open** (#1607).
+  Budget remembers its last tab. After a visit to Statistics, "Add entry" on the empty Budget
+  tile, the tile's header link and the "Monthly balance" figure all led to Statistics, where
+  nothing can be added. All three now open the Budget tab, which shows the month the tile is
+  about and carries the add button.
 - **Korean sentences pick the right particle for the name they contain** (#1607). Wherever a
   name, title or tag is inserted into a Korean sentence, the app showed both particle forms at
   once, for example "캘린더이(가)" or "「우유」을(를) 삭제할까요?". It now writes the form that fits the
@@ -270,6 +298,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   clients, `PUT /api/v1/tasks/{id}` additionally returns `next_due_date` under the same rule as
   `PATCH /api/v1/tasks/{id}/status`: the due date of the next pending occurrence when this call
   completed a recurring task, otherwise `null`.
+- **A rejected `PUT /api/v1/preferences` no longer applies part of the request** (#1622). The
+  route checked and stored one field after the other, so a request with several fields that
+  failed on a later one answered 400 or 403 while the fields before it were already saved: a
+  valid `timezone_hint_dismissed` followed by an invalid `language` dismissed the time zone
+  hint for the whole household although the request had failed. The whole request is now applied
+  or nothing is, for household, personal and admin-only fields alike; status and error text of
+  the answer are unchanged. The app sends these fields one at a time, so this only showed
+  through the API.
 
 ## [2.71.0] - 2026-09-30
 
