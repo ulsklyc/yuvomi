@@ -91,7 +91,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A balance below zero is explained in two more places** (#1623). In the list of requests
   waiting for approval the note with the current balance was missing when the member had been
   taken out of rewards while the request was still open - the page looked the balance up among
-  the members taking part and found nothing. The balance now comes with each request. And on a
+  the members taking part and found nothing. The balance now comes with each request. If that
+  member was the last one taking part, the overview showed only "nobody takes part yet" and
+  the request could not be seen or decided at all; the list of open requests now stands above
+  that message. And on a
   family rewards tile that is one row high (1x1, 2x1), a negative balance was shown as a number
   next to an empty bar; a short line saying that the next points make up for it now stands
   in place of that bar.

@@ -605,3 +605,54 @@ test('Genehmigungsliste: der Saldo kommt mit der Anfrage, nicht aus der Teilnehm
     Object.assign(s, vorher);
   }
 });
+
+test('Uebersicht ohne Teilnehmende: die offene Anfrage steht trotzdem da und ist entscheidbar (#1623)', async () => {
+  // Der haerteste Fall: die Anfragende war die LETZTE Teilnehmende und wurde
+  // ausgetragen. `balances` ist leer, die Uebersicht kehrte mit dem
+  // Leerzustand zurueck - vor dem Anfragen-Panel.
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  // Der Leerzustand BAUT Knoten (emptyStateHTML): dafuer das Mini-DOM, nur hier.
+  const { installMiniDom } = await import('./mini-dom.js');
+  const domZurueck = installMiniDom();
+  const s = rewardsPage.state;
+  const vorher = { user: s.user, overview: s.overview, catalog: s.catalog, redemptions: s.redemptions };
+  try {
+    s.user = { id: 1, role: 'admin' };
+    s.overview = { me: 1, balances: [], setup: { participantCount: 0, catalogCount: 1, pointedTaskCount: 1 } };
+    s.catalog = [];
+    s.redemptions = [{ id: 9, user_id: 3, user_name: 'Mia', reward_name: 'Eis', cost: 50, user_balance: -50 }];
+    const el = markupEl();
+    rewardsPage.renderOverview(el);
+    const html = lesbar(el.html);
+    assert.doesNotMatch(html, /NaN|undefined/);
+    assert.match(html, /rw-pending-panel/, 'das Panel steht ohne Punktestaende');
+    assert.match(html, /Mia/);
+    assert.match(html, /pendingBalanceBelowZero\{"points":"-50"\}/, 'samt Hinweis auf das Minus');
+    assert.match(html, /data-decide="fulfill" data-id="9"/, 'genehmigen ist erreichbar');
+    assert.match(html, /data-decide="reject" data-id="9"/, 'ablehnen auch');
+    assert.match(html, /rewards\.emptyOverviewTitle/, 'der Leerzustand bleibt daneben stehen');
+    assert.ok(html.indexOf('rw-pending-panel') < html.indexOf('rewards.emptyOverviewTitle'), 'das Dringende zuerst');
+
+    // Nur lesen: der Zustand bleibt als Zeichen, die Handlung geht.
+    setPermissions({ admin: false, modules: { rewards: 'read' }, widgets: {}, capabilities: {} });
+    try {
+      const ro = markupEl();
+      rewardsPage.renderOverview(ro);
+      assert.match(ro.html, /rw-pending-panel/);
+      assert.doesNotMatch(ro.html, /data-decide=/);
+      assert.doesNotMatch(ro.html, /rw-manage-participants/);
+    } finally {
+      clearPermissions();
+    }
+
+    // Ohne offene Anfrage bleibt es beim blossen Leerzustand.
+    s.redemptions = [];
+    const leer = markupEl();
+    rewardsPage.renderOverview(leer);
+    assert.doesNotMatch(leer.html, /rw-pending/);
+    assert.match(leer.html, /rewards\.emptyOverviewTitle/);
+  } finally {
+    Object.assign(s, vorher);
+    domZurueck();
+  }
+});
