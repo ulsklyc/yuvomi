@@ -248,6 +248,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a named person it is one message that says both. The undo in the list stays. For API clients,
   `PATCH /api/v1/tasks/{id}/status` additionally returns `next_due_date`, the due date of the
   next occurrence that is not yet done, or `null`.
+- **The edit form also says when a recurring task comes back** (#1620). Setting a recurring task
+  to "Done" through the status field of the edit form creates its next occurrence just like
+  ticking it off, but the form only answered "saved". It now shows the same "Done - next due
+  <date>" as every other way of completing a task; any other save still says "saved". For API
+  clients, `PUT /api/v1/tasks/{id}` additionally returns `next_due_date` under the same rule as
+  `PATCH /api/v1/tasks/{id}/status`: the due date of the next pending occurrence when this call
+  completed a recurring task, otherwise `null`.
 
 ## [2.71.0] - 2026-09-30
 

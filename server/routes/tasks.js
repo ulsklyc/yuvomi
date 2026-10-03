@@ -1156,8 +1156,11 @@ router.post('/', (req, res) => {
 // Aufgabe vollständig aktualisieren.
 // Body: { title, description?, category?, tags?, priority?, status?,
 //         due_date?, due_time?, assigned_to? }
-// Response: { data: Task }
+// Response: { data: Task & { next_due_date } }
 // tags fehlt → bleiben unangetastet; tags: [] → alle entfernt.
+// `next_due_date` (#1620) folgt derselben Regel wie in PATCH /:id/status
+// (nextDueDateAfter): gesetzt nur, wenn dieses Speichern eine Serie erledigt
+// hat und ein Vorkommen ansteht, das der Aufrufer sieht - sonst null.
 // --------------------------------------------------------
 router.put('/:id', (req, res) => {
   try {
@@ -1286,6 +1289,7 @@ router.put('/:id', (req, res) => {
     let pending = false;
     let undone  = 0;
     let spawned = false;
+    let nextDueDate = null;
     let updated;
     db.get().transaction(() => {
       db.get().prepare(`
@@ -1348,10 +1352,14 @@ router.put('/:id', (req, res) => {
       // also muss es die Serie genauso weiterschreiben. Grundlage ist die frisch
       // gelesene Zeile, damit im selben Zug geänderte Regel/Fälligkeit schon zählen.
       if (status === 'done' && task.status !== 'done') spawned = spawnRecurrenceFollowup(updated);
+      // Und es sagt genauso, wann es weitergeht (#1620): dieselbe Regel wie in
+      // PATCH /:id/status, ueber denselben Helfer.
+      nextDueDate = nextDueDateAfter(req, task.id, task.status, status);
     })();
 
     addAssignedUsers(updated);
     updated.subtasks = loadSubtasks(updated.id, req.authUserId || req.session.userId);
+    updated.next_due_date = nextDueDate;
 
     res.json({ data: updated });
 
@@ -1426,6 +1434,47 @@ function nextPendingOccurrenceOf(taskId, mayRead = () => true) {
     current = recurrenceFollowupOf(current.id);
   }
   return null;
+}
+
+/**
+ * `next_due_date` der Antwort auf einen Statuswechsel (#1603, #1620): die
+ * Faelligkeit des naechsten Vorkommens, das noch ansteht - oder null.
+ *
+ * DIE REGEL STEHT NUR HIER. Abgehakt wird ueber zwei Wege, die Checkbox
+ * (PATCH /:id/status) und das Status-Feld im Bearbeiten-Formular (PUT /:id),
+ * und beide legen dieselbe Folgeinstanz an. Die Regel wurde im Review zu
+ * #1615 viermal nachgeschaerft (Kette, begonnen, abgelegt, Sichtbarkeit) -
+ * eine zweite Ausformulierung in der anderen Route haette jede dieser Runden
+ * verfehlt. Wer sie aendert, aendert sie fuer beide.
+ *
+ * NUR BEIM UEBERGANG NACH 'done'. Ohne Uebergang gibt es keine Quittung: ein
+ * zweiter Tipp auf eine erledigte Aufgabe oder eine Titelkorrektur an ihr
+ * wiederholte den Hinweis sonst jedes Mal, obwohl nichts erledigt wurde.
+ *
+ * NACH DEM SPAWN RUFEN, in derselben Transaktion: die Folgeinstanz entsteht
+ * erst in dieser Anfrage. Gelesen wird die Kette und nicht der Rueckgabewert
+ * des Spawns - der sagt nur, ob ein Upload ansteht. Gefragt ist, was nach
+ * diesem Haken als Naechstes ansteht, und das ist auch die Folgeinstanz, die
+ * ein frueheres Abhaken angelegt hat und die das Zuruecknehmen stehen liess
+ * (discardRecurrenceFollowup), oder das Vorkommen HINTER ihr.
+ *
+ * SICHTBARKEIT DES AUFRUFERS: ein Display sieht nur, was alle sehen (dieselbe
+ * Regel wie fuer die Aufgabe selbst, #1209), ein Mensch, was mayAccessTask
+ * ihm zeigt.
+ *
+ * @param {import('express').Request} req
+ * @param {number|string} taskId
+ * @param {string} prevStatus Status vor dieser Anfrage
+ * @param {string} status     Status nach dieser Anfrage
+ * @returns {string|null} YYYY-MM-DD oder null
+ */
+function nextDueDateAfter(req, taskId, prevStatus, status) {
+  if (status !== 'done' || prevStatus === 'done') return null;
+  const viewer = req.authUserId || req.session.userId;
+  const mayRead = isDisplayRequest(req)
+    ? (task) => task.visibility === 'all'
+    : (task) => mayAccessTask(task, viewer);
+  return nextPendingOccurrenceOf(taskId, mayRead)?.due_date ?? null;
 }
 
 /**
@@ -1819,20 +1868,9 @@ router.patch('/:id/status', (req, res) => {
       // Wiederkehrende Aufgabe: nächste Instanz erstellen wenn erledigt
       if (status === 'done' && prev.status !== 'done') {
         spawned = spawnRecurrenceFollowup(db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id));
-        // NACHGELESEN, nicht aus dem Rueckgabewert: der sagt nur, ob ein
-        // Upload ansteht. Gefragt ist, was nach diesem Haken als Naechstes
-        // ansteht - das ist auch die Folgeinstanz, die ein frueheres
-        // Abhaken angelegt hat und die das Zuruecknehmen stehen liess, weil
-        // jemand an ihr gearbeitet hatte (discardRecurrenceFollowup), und es
-        // ist das Vorkommen HINTER ihr, wenn sie selbst schon erledigt ist.
-        // Ein Display sieht nur, was alle sehen (dieselbe Regel wie oben fuer
-        // die Aufgabe selbst), ein Mensch, was mayAccessTask ihm zeigt.
-        const viewer = req.authUserId || req.session.userId;
-        const mayRead = isDisplayRequest(req)
-          ? (task) => task.visibility === 'all'
-          : (task) => mayAccessTask(task, viewer);
-        nextDueDate = nextPendingOccurrenceOf(prev.id, mayRead)?.due_date ?? null;
       }
+      // Nach dem Spawn, in derselben Transaktion; die Regel steht im Helfer.
+      nextDueDate = nextDueDateAfter(req, prev.id, prev.status, status);
     })();
 
     res.json({

@@ -2517,8 +2517,15 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
   try {
     let savedTaskId = taskId;
     if (taskId) {
-      await api.put(`/tasks/${taskId}`, body);
-      window.yuvomi.showToast(t('tasks.savedToast'), 'success');
+      // Das Status-Feld hakt genauso ab wie die Checkbox, und der Server legt
+      // dabei genauso die Folgeinstanz an (#1620). Ohne den Hinweis schloss das
+      // Formular mit „gespeichert" ueber einer offenen Zeile, die aussieht wie
+      // die eben erledigte. Derselbe Helfer wie auf jedem anderen Abhak-Weg,
+      // und wie in der Detailansicht haengt der Hinweis am Erledigen selbst:
+      // PUT liefert `next_due_date` nur beim Uebergang nach „erledigt".
+      const response = await api.put(`/tasks/${taskId}`, body);
+      const seriesText = body.status === 'done' ? seriesDoneText(response) : null;
+      window.yuvomi.showToast(seriesText ?? t('tasks.savedToast'), 'success');
     } else {
       const res = await api.post('/tasks', body);
       savedTaskId = res.data?.id;
