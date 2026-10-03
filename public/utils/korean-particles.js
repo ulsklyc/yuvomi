@@ -31,12 +31,22 @@ export const KOREAN_PARTICLE_FORMS = [
 
 const BY_FORM = new Map(KOREAN_PARTICLE_FORMS.map((entry) => [entry.form, entry]));
 
-const FORM_PATTERN = new RegExp(
-  KOREAN_PARTICLE_FORMS
-    .map((entry) => entry.form.replace(/[()]/g, '\\$&'))
-    .join('|'),
-  'g',
-);
+/**
+ * Ein Muster, das genau die uebergebenen Schreibweisen woertlich trifft. Jedes
+ * Metazeichen wird maskiert, der Backslash eingeschlossen, in EINEM Durchgang -
+ * nacheinander maskiert, wuerde der zweite Durchgang die Backslashes des ersten
+ * erneut anfassen.
+ * Exportiert, damit der Test Formen hindurchschicken kann, die der Bestand
+ * nicht hat.
+ */
+export function buildFormPattern(forms) {
+  return new RegExp(
+    forms.map((form) => form.replace(/[\\^$.*+?()[\]{}|/-]/g, '\\$&')).join('|'),
+    'g',
+  );
+}
+
+const FORM_PATTERN = buildFormPattern(KOREAN_PARTICLE_FORMS.map((entry) => entry.form));
 
 // Hangul-Silbenblock: 19 Anlaute x 21 Vokale x 28 Auslaute, der Auslaut 0 ist
 // "keiner". Der Rest der Division durch 28 ist also der Batchim.

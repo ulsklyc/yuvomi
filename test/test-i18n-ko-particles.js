@@ -21,6 +21,7 @@ import { readFileSync } from 'node:fs';
 
 import {
   KOREAN_PARTICLE_FORMS,
+  buildFormPattern,
   resolveKoreanParticles,
 } from '../public/utils/korean-particles.js';
 
@@ -147,6 +148,34 @@ test('Text ohne Doppelform kommt unveraendert zurueck', () => {
   for (const text of ['', '저장', '기간(일)', '시간(왼쪽)과 목표(오른쪽)이며', 'Speichern (optional)']) {
     assert.equal(resolveKoreanParticles(text), text);
   }
+});
+
+// Das Muster entsteht aus den Formen. Nur die Klammern zu maskieren, reichte
+// fuer den Bestand - und liess jedes andere Metazeichen als Muster wirken: ein
+// Backslash maskierte das naechste Zeichen, ein Punkt traf alles (CodeQL
+// js/incomplete-sanitization). Jede Form muss sich selbst treffen und sonst
+// nichts.
+test('das Muster nimmt jede Form woertlich, auch Backslash und Metazeichen', () => {
+  const forms = ['a\\(b', 'x.y', '[z]', 'p|q', 'c^$d', 'e*+?f', 'g{2}', 'h\\d', '-/-', '을(를)'];
+  const wrong = [];
+  for (const form of forms) {
+    let pattern;
+    try {
+      pattern = buildFormPattern([form]);
+    } catch (err) {
+      wrong.push(`${form}: ${err.message}`);
+      continue;
+    }
+    const hits = `<${form}>`.match(pattern);
+    if (!hits || hits.length !== 1 || hits[0] !== form) wrong.push(`${form}: trifft sich nicht selbst (${hits})`);
+  }
+  // Was ein unmaskiertes Zeichen treffen wuerde, darf nicht treffen.
+  for (const [form, lookalike] of [['x.y', 'xay'], ['[z]', 'z'], ['p|q', 'p'], ['h\\d', 'h7'], ['e*+?f', 'ef'], ['g{2}', 'gg']]) {
+    try {
+      if (buildFormPattern([form]).test(lookalike)) wrong.push(`${form}: trifft auch ${lookalike}`);
+    } catch { /* oben schon gemeldet */ }
+  }
+  assert.deepEqual(wrong, []);
 });
 
 // ---------------------------------------------------------------------------
