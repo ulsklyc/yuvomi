@@ -52,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Korean no longer writes "18:00 시"** (#1607). With the 24-hour clock, Korean put the hour
+  counter 시 after a time that already has minutes, as in "내일, 18:00 시". The time now stands
+  on its own, as in Japanese and Chinese.
 - **The empty shopping list no longer promises that ticked items move to the pantry by
   themselves** (#1607). The hint read "After the shop, ticked items move into the pantry", but
   nothing moves until you choose "Into pantry" on the ticked items. It now says they can be

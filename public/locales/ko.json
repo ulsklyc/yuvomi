@@ -926,7 +926,7 @@
         "dayLongSaturday": "토요일",
         "spanFrom": "{{time}}부터",
         "spanUntil": "{{time}}까지",
-        "timeSuffix": "시",
+        "timeSuffix": "",
         "ics": {
             "reset": "원본으로 되돌리기",
             "resetToast": "변경 사항이 초기화되었습니다."
