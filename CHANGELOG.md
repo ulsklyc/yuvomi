@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The Budget tile on the overview opens the month, not the tab you last had open** (#1607).
+  Budget remembers its last tab. After a visit to Statistics, "Add entry" on the empty Budget
+  tile, the tile's header link and the "Monthly balance" figure all led to Statistics, where
+  nothing can be added. All three now open the Budget tab, which shows the month the tile is
+  about and carries the add button.
 - **The calendar mirrors fully in right-to-left languages.** In Arabic and Persian the week
   view drew the column lines of the all-day row 1px beside those of the time grid, the month
   grid drew a line along its outer right edge and only a thin one between its two leftmost days,
