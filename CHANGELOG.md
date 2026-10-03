@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Subscriptions without a monthly budget no longer show "Monthly budget 0" next to
+  "Unlimited"** (#1607). With no budget set, the figures above the list carried a card
+  "Monthly budget 0.00" with an empty bar, right beside the card saying there is no budget
+  limit. The zero card is gone in that case and three cards remain: monthly cost, no budget
+  limit, yearly projection. With a budget set, the four cards are unchanged.
 - **Korean no longer writes "18:00 시"** (#1607). With the 24-hour clock, Korean put the hour
   counter 시 after a time that already has minutes, as in "내일, 18:00 시". The time now stands
   on its own, as in Japanese and Chinese.

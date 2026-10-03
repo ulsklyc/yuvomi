@@ -619,6 +619,12 @@ function renderSummary() {
   // der ersten Abo-Zeile (y=478 bei 390x844). Unter 640px nennt eine Zeile die
   // Monatskosten und daneben Zahl und Budgetstand; ein Tipp klappt die Karten
   // auf (metric-glance.js, dieselbe Form wie die Budget-Uebersicht).
+  //
+  // OHNE MONATSBUDGET DREI KARTEN (#1607). Die Karte „Monatsbudget" zeigte
+  // dann „0,00 €" mit leerem Balken, direkt neben „Kein Budgetlimit -
+  // Unbegrenzt". Wo kein Budget gesetzt ist, gibt es keine Zahl dafuer; den
+  // Zustand nennt die Karte daneben. Drei Karten sind die Grundform der Reihe
+  // (panel.css), `--quad` traegt die Reihe nur mit vier.
   const budgetFlow = hasBudget
     ? { label: t(isOverBudget ? 'subscriptions.overBudget' : 'subscriptions.remainingBudget'),
       amount: money(Math.abs(summary.remaining_budget)), tone: isOverBudget ? 'negative' : '' }
@@ -632,13 +638,13 @@ function renderSummary() {
     value: money(used),
     flows: [{ label: t('subscriptions.activeCount', { count: summary.active_count }) }, budgetFlow],
   })}
-    <section class="metric-grid metric-grid--quad budget-glance-details${state.summaryExpanded ? ' is-expanded' : ''}" id="subscriptions-summary-details">
+    <section class="metric-grid${hasBudget ? ' metric-grid--quad' : ''} budget-glance-details${state.summaryExpanded ? ' is-expanded' : ''}" id="subscriptions-summary-details">
       <article class="metric-card">
         <div class="metric-card__label">${t('subscriptions.monthlyCost')}</div>
         <div class="metric-card__value">${money(used)}</div>
         <div class="metric-card__note">${t('subscriptions.activeCount', { count: summary.active_count })}</div>
       </article>
-      <article class="metric-card">
+      ${hasBudget ? `<article class="metric-card">
         <div class="metric-card__label">${t('subscriptions.monthlyBudget')}</div>
         <div class="metric-card__value">${money(budget)}</div>
         <div class="metric-card__progress${isOverBudget ? ' metric-card__progress--over' : isNearBudget ? ' metric-card__progress--near' : ''}"
@@ -646,7 +652,7 @@ function renderSummary() {
              aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage}" aria-valuetext="${realPercentage}%">
           <span style="--fill:${percentage / 100}"></span>
         </div>
-      </article>
+      </article>` : ''}
       <article class="metric-card${isOverBudget ? ' metric-card--over' : ''}">
         <div class="metric-card__label">${isOverBudget ? '<i data-lucide="triangle-alert" class="icon-sm" aria-hidden="true"></i>' : ''}${hasBudget ? (isOverBudget ? t('subscriptions.overBudget') : t('subscriptions.remainingBudget')) : t('subscriptions.noBudgetLimit')}</div>
         <div class="metric-card__value">${hasBudget ? money(Math.abs(summary.remaining_budget)) : t('subscriptions.unlimited')}</div>
