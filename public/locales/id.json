@@ -3263,7 +3263,7 @@
     "emptyHint": {
         "tasks": "Ketuk + untuk membuat tugas pertama Anda. Geser kartu ke kiri untuk menyelesaikan, ke kanan untuk melihat.",
         "calendar": "Sambungkan Google Calendar di Pengaturan → Integrasi untuk sinkronisasi otomatis.",
-        "shopping": "Setelah berbelanja, item yang dicentang pindah ke penyimpanan.",
+        "shopping": "Setelah berbelanja, item yang dicentang bisa dipindahkan ke persediaan.",
         "notes": "Ketuk + untuk catatan baru. Catatan dicari secara teks lengkap.",
         "contacts": "Buat kontak penting - dokter, sekolah, darurat - untuk akses cepat.",
         "meals": "Setelah rencana siap, daftar belanja terisi dalam satu langkah.",

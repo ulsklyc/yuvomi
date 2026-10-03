@@ -3323,7 +3323,7 @@
     "emptyHint": {
         "tasks": "Érintse meg a + gombot az első feladat létrehozásához. Húzza a kártyát balra a kész állapothoz, jobbra a megtekintéshez.",
         "calendar": "Csatlakoztassa a Google Naptárt a Beállítások → Integrációk alatt az automatikus szinkronizáláshoz.",
-        "shopping": "Vásárlás után a kipipált tételek a kamrába kerülnek.",
+        "shopping": "Vásárlás után a kipipált tételek átvihetők a készletbe.",
         "notes": "Érintse meg a + gombot egy új jegyzethez. A jegyzetek teljes szövege kereshető.",
         "contacts": "Adjon hozzá fontos kapcsolatokat - orvos, iskola, vészhelyzet - a gyors hozzáféréshez.",
         "meals": "A kész terv egy lépésben feltölti a bevásárlólistát.",

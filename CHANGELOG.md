@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The empty shopping list no longer promises that ticked items move to the pantry by
+  themselves** (#1607). The hint read "After the shop, ticked items move into the pantry", but
+  nothing moves until you choose "Into pantry" on the ticked items. It now says they can be
+  moved, in all 26 languages, and it is left out when the pantry is switched off or you may not
+  write there, because that action is not offered then either.
 - **The Budget tile on the overview opens the month, not the tab you last had open** (#1607).
   Budget remembers its last tab. After a visit to Statistics, "Add entry" on the empty Budget
   tile, the tile's header link and the "Monthly balance" figure all led to Statistics, where

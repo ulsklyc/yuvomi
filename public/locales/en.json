@@ -3323,7 +3323,7 @@
     "emptyHint": {
         "tasks": "Tap + to create your first task. Swipe a card left to check off, right to view.",
         "calendar": "Connect Google Calendar under Settings → Integrations for automatic sync.",
-        "shopping": "After the shop, ticked items move into the pantry.",
+        "shopping": "After the shop, ticked items can be moved into the pantry.",
         "notes": "Tap + for a new note. Notes are full-text searchable.",
         "contacts": "Add important contacts - doctor, school, emergency - for quick access.",
         "meals": "Once the plan is set, it fills your shopping list in one step.",

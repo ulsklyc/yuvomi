@@ -3191,7 +3191,7 @@
     "emptyHint": {
         "tasks": "Klepněte na + a vytvořte svůj první úkol. Přejetím karty doleva ji označíte za hotovou, doprava zobrazíte.",
         "calendar": "Propojte Kalendář Google v Nastavení → Integrace pro automatickou synchronizaci.",
-        "shopping": "Po nákupu se odškrtnuté položky přesunou do zásob.",
+        "shopping": "Po nákupu lze odškrtnuté položky přesunout do spíže.",
         "notes": "Klepněte na + pro novou poznámku. Poznámky jsou prohledávány v plném textu.",
         "contacts": "Přidejte důležité kontakty - lékař, škola, záchranné služby - pro rychlý přístup.",
         "meals": "Hotový plán naplní nákupní seznam jedním krokem.",

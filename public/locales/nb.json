@@ -3323,7 +3323,7 @@
     "emptyHint": {
         "tasks": "Trykk på + for å opprette din første oppgave. Sveip et kort til venstre for å krysse av, til høyre for å se.",
         "calendar": "Koble til Google Kalender under Innstillinger → Integrasjoner for automatisk synkronisering.",
-        "shopping": "Etter handling, flyttes kryssete elementer til kjøkkenskapet.",
+        "shopping": "Etter handling kan kryssete elementer flyttes til kjøkkenskapet.",
         "notes": "Trykk på + for en ny note. Notater kan søkes i med fulltekst.",
         "contacts": "Legg til viktige kontakter - lege, skole, nødstilfelle - for rask tilgang.",
         "meals": "Når planen er satt, fylles handlelisten din i ett trinn.",

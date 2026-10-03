@@ -3263,7 +3263,7 @@
     "emptyHint": {
         "tasks": "Tippe auf + um deine erste Aufgabe zu erstellen. Wische eine Karte nach links zum Abhaken, nach rechts zum Ansehen.",
         "calendar": "Verbinde Google Kalender unter Einstellungen → Integrationen für automatische Synchronisation.",
-        "shopping": "Nach dem Einkauf wandern abgehakte Artikel in den Vorrat.",
+        "shopping": "Nach dem Einkauf lassen sich abgehakte Artikel in den Vorrat übernehmen.",
         "notes": "Tippe auf + für eine neue Notiz. Notizen werden im Volltext durchsucht.",
         "contacts": "Lege wichtige Kontakte an - Arzt, Schule, Notfall - für Schnellzugriff.",
         "meals": "Aus dem fertigen Plan füllt sich die Einkaufsliste in einem Schritt.",

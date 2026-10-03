@@ -3264,7 +3264,7 @@
         "recipes": "Ett recept går direkt till måltidsplanen eller till inköpslistan.",
         "tasks": "Tryck på + för att skapa din första uppgift. Svep ett kort åt vänster för att bocka av, åt höger för att visa.",
         "calendar": "Koppla Google Kalender under Inställningar → Integrationer för automatisk synkronisering.",
-        "shopping": "Efter handlingen flyttas markerade varor till skafferiet.",
+        "shopping": "Efter handlingen kan markerade varor flyttas till skafferiet.",
         "notes": "Tryck på + för en ny anteckning. Anteckningar söks i fulltext.",
         "contacts": "Lägg till viktiga kontakter - läkare, skola, nödfall - för snabb åtkomst.",
         "meals": "När planen är klar fyller den inköpslistan i ett steg.",
