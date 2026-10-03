@@ -603,3 +603,18 @@ test('dateInputPlaceholder spricht die UI-Sprache, die Reihenfolge bleibt die de
     }
   }
 });
+
+/* #1607: `calendar.timeSuffix` HAENGT AN EINER ZEIT MIT DOPPELPUNKT.
+ * Die Aufrufer schreiben `${formatTime(...)} ${timeSuffix()}`, also „18:00" +
+ * Zeitwort. Deutsch hat dafuer „Uhr". Koreanisch (시), Japanisch (時) und
+ * Chinesisch (时/點) haben ein Zaehlwort fuer die STUNDE, das an der Zahl klebt
+ * („18시") - hinter „18:00" ergibt es „18:00 시", zwei Schreibweisen in einer.
+ * Der koreanische Wert war genau das. */
+test('timeSuffix: kein Stunden-Zaehlwort hinter einer Uhrzeit mit Doppelpunkt', () => {
+  const HOUR_COUNTERS = /^[시時时點点]$/u;
+  for (const locale of readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'))) {
+    const suffix = JSON.parse(readFileSync(new URL(locale, LOCALES_DIR), 'utf8')).calendar.timeSuffix;
+    assert.equal(typeof suffix, 'string', `${locale}: calendar.timeSuffix fehlt`);
+    assert.doesNotMatch(suffix.trim(), HOUR_COUNTERS, `${locale}: "18:00 ${suffix}" mischt zwei Schreibweisen`);
+  }
+});

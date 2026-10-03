@@ -77,17 +77,32 @@ function withBrowserZone(zone, fn) {
 // --------------------------------------------------------
 
 test('browserTimeZone: eine echte Zone kommt durch', () => {
-  assert.equal(hint.browserTimeZone(), 'Asia/Seoul', 'die Zone des Prozesses (TZ am Dateikopf)');
-  assert.equal(withBrowserZone('Europe/Berlin', () => hint.browserTimeZone()), 'Europe/Berlin');
+  assert.equal(tz.browserTimeZone(), 'Asia/Seoul', 'die Zone des Prozesses (TZ am Dateikopf)');
+  assert.equal(withBrowserZone('Europe/Berlin', () => tz.browserTimeZone()), 'Europe/Berlin');
 });
 
 test('browserTimeZone: ein Browser, der seine Zone verschweigt, nennt keine', () => {
   // Firefox mit resistFingerprinting und Headless melden UTC. Das ist keine
-  // Aussage ueber den Haushalt - dieselbe Liste wie in der Ersteinrichtung.
+  // Aussage ueber den Haushalt.
   for (const zone of ['UTC', 'Etc/UTC', 'GMT', 'Etc/GMT', 'Etc/Unknown', '', undefined, 'Mars/Olympus_Mons']) {
-    assert.equal(withBrowserZone(zone, () => hint.browserTimeZone()), null, `${zone} ist keine Auskunft`);
+    assert.equal(withBrowserZone(zone, () => tz.browserTimeZone()), null, `${zone} ist keine Auskunft`);
   }
-  assert.equal(withBrowserZone(new Error('kein Intl'), () => hint.browserTimeZone()), null);
+  assert.equal(withBrowserZone(new Error('kein Intl'), () => tz.browserTimeZone()), null);
+});
+
+/* EINE STELLE FUER DIE FRAGE. Ersteinrichtung (#1613) und Zonen-Hinweis (#1619)
+ * trugen je eine eigene Fassung samt eigener Liste der Zonen, die keine Auskunft
+ * sind. Zwei Listen driften: eine Zone, die nur in einer steht, wird in der
+ * Ersteinrichtung gespeichert und im Hinweis verschwiegen, oder umgekehrt. */
+test('browserTimeZone: beide Aufrufer fragen utils/timezone.js und fuehren keine eigene Liste', () => {
+  for (const file of ['public/pages/setup.js', 'public/utils/household-zone-hint.js']) {
+    const src = read(file);
+    assert.doesNotMatch(src, /function\s+browserTimeZone\b/, `${file} definiert die Frage selbst`);
+    assert.doesNotMatch(src, /Etc\/UTC|Etc\/Unknown/, `${file} fuehrt eine eigene Liste`);
+    assert.match(src, /import\s*\{[^}]*\bbrowserTimeZone\b[^}]*\}\s*from\s*'(?:\/utils|\.)\/timezone\.js'/,
+      `${file} importiert browserTimeZone nicht aus utils/timezone.js`);
+    assert.match(src.replace(/import\s*\{[^}]*\}\s*from[^;]*;/g, ''), /\bbrowserTimeZone\(/, `${file} ruft sie nicht`);
+  }
 });
 
 // --------------------------------------------------------

@@ -27,31 +27,12 @@
  * Hinweis wieder hin (die veraltete Antwort ueberholt den Schreibvorgang).
  */
 
-import { isValidTimeZone, setDisplayTimeZone, zonedFields } from './timezone.js';
-
-// Ein Browser, der seine Zone verschweigt (Firefox mit resistFingerprinting,
-// Headless), meldet UTC. Das ist keine Auskunft ueber den Haushalt - dieselbe
-// Liste wie in der Ersteinrichtung (public/pages/setup.js).
-const UNTELLING_ZONES = new Set(['UTC', 'Etc/UTC', 'Etc/GMT', 'GMT', 'Etc/Unknown']);
+import { browserTimeZone, isValidTimeZone, setDisplayTimeZone, zonedFields } from './timezone.js';
 
 const DAY_MS = 86_400_000;
 const QUARTER_MS = 900_000;
 /** Ein Jahr zurueck, ein Jahr voraus: beide Umstellungen jeder Zone, zweimal. */
 const WINDOW_DAYS = 366;
-
-/**
- * Die Zone, in der dieser Browser steht - oder `null`, wenn er keine
- * brauchbare nennt.
- * @returns {string|null} IANA-Zone
- */
-export function browserTimeZone() {
-  try {
-    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return isValidTimeZone(zone) && !UNTELLING_ZONES.has(zone) ? zone : null;
-  } catch {
-    return null;
-  }
-}
 
 /** UTC-Versatz der Zone zu einem Zeitpunkt, in Sekunden. */
 function offsetAt(zone, ms) {

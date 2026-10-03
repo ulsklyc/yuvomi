@@ -8,32 +8,12 @@
 import { auth, ApiError } from '/api.js';
 import { getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { isValidTimeZone } from '/utils/timezone.js';
+import { browserTimeZone } from '/utils/timezone.js';
 
 const VERSION_URL = '/api/v1/version';
 const DEFAULT_APP_NAME = 'Yuvomi';
 const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
 const USERNAME_RE = /^[a-zA-Z0-9._-]{3,64}$/;
-
-// Ein Browser, der seine Zone verschweigt (Firefox mit resistFingerprinting,
-// Headless), meldet UTC. Als Haushaltszone gespeichert waere das eine
-// ausdrueckliche Wahl und ueberstimmte ein gesetztes `TZ` des Containers.
-const UNTELLING_ZONES = new Set(['UTC', 'Etc/UTC', 'Etc/GMT', 'GMT', 'Etc/Unknown']);
-
-/**
- * Die Zone, in der dieser Browser steht - oder `undefined`, wenn er keine
- * brauchbare nennt. Ohne sie faellt der Server auf `TZ` zurueck (im Container
- * meist UTC), und "heute" liegt oestlich von UTC stundenlang auf gestern.
- * @returns {string|undefined} IANA-Zone
- */
-function browserTimeZone() {
-  try {
-    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return isValidTimeZone(zone) && !UNTELLING_ZONES.has(zone) ? zone : undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 function getStoredAppName() {
   return localStorage.getItem(APP_NAME_STORAGE_KEY) || DEFAULT_APP_NAME;
@@ -175,9 +155,12 @@ export async function render(container) {
       // Die Sprache, in der diese Seite gerade steht: der Server macht daraus
       // die Datensprache des Haushalts, statt still auf Englisch zu fallen.
       // Dazu die Zone dieses Browsers als Haushaltszone, sonst rechnet der
-      // Server "heute" in der Zone des Containers.
+      // Server "heute" in der Zone des Containers (im Container meist UTC, und
+      // "heute" liegt oestlich davon stundenlang auf gestern). Nennt der
+      // Browser keine brauchbare, fehlt das Feld ganz: `undefined` laesst
+      // JSON.stringify weg, ein `null` reiste als Wert mit.
       const language = getLocale();
-      const timezone = browserTimeZone();
+      const timezone = browserTimeZone() ?? undefined;
       try {
         await auth.setup(username, displayName, password, language, timezone);
       } catch (err) {

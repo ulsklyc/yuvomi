@@ -351,6 +351,39 @@ test('503 mit reason restore_in_progress: uebersetzte Meldung statt englischem S
   );
 });
 
+// ─── #1607: 403 des Modul-Gates ─────────────────────────────────────────────
+// Der Server antwortet englisch; die Seiten zeigen `err.message` oder
+// `err.data.error` (Gesundheit, Einstellungen) - beide tragen die Uebersetzung.
+
+test('403 mit reason module_access_denied / module_read_only: uebersetzt in message UND data.error', async () => {
+  for (const [reason, serverText, key] of [
+    ['module_access_denied', 'You do not have access to this module.', 'common.errorModuleNoAccess'],
+    ['module_read_only', 'You have read-only access to this module.', 'settings.permReadOnlyBanner'],
+  ]) {
+    setup();
+    _mockFetch = () => mockResponse(403, { error: serverText, code: 403, reason });
+    await assert.rejects(
+      () => api.get('/health/vitals'),
+      (err) => {
+        assert.equal(err.status, 403);
+        assert.equal(err.message, key, `${reason}: message`);
+        assert.equal(err.data.error, key, `${reason}: data.error`);
+        assert.equal(err.data.reason, reason, 'der Grund bleibt lesbar');
+        return true;
+      },
+    );
+  }
+});
+
+test('403 ohne bekannten Grund: der Servertext bleibt, wie er ist', async () => {
+  setup();
+  _mockFetch = () => mockResponse(403, { error: 'Admin access required.', code: 403 });
+  await assert.rejects(
+    () => api.get('/backup'),
+    (err) => err.message === 'Admin access required.' && err.data.error === 'Admin access required.',
+  );
+});
+
 // ─── Setup: die Sprache der Setup-Seite reist mit ───────────────────────────
 
 test('auth.setup: schickt language mit, und laesst das Feld ohne Angabe weg', async () => {

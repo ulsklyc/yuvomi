@@ -2722,6 +2722,17 @@ function renderKanbanCard(task) {
       : next === 'in_progress'
         ? t('tasks.kanbanMoveToInProgress')
         : t('tasks.kanbanMoveToOpen');
+  // DER NAME NENNT DIE AUFGABE (#1607). Der Knopf ist ein Icon ohne Text; mit
+  // dem Verb allein hiessen alle Knoepfe einer Spalte gleich, und ein
+  // Screenreader konnte sie nicht auseinanderhalten. Der Tooltip bleibt beim
+  // Verb - die Karte, ueber der er steht, zeigt ihren Titel selbst.
+  const nextName = archived
+    ? t('tasks.unarchiveNamed', { title: task.title })
+    : next === 'done'
+      ? t('tasks.kanbanMoveToDoneNamed', { title: task.title })
+      : next === 'in_progress'
+        ? t('tasks.kanbanMoveToInProgressNamed', { title: task.title })
+        : t('tasks.kanbanMoveToOpenNamed', { title: task.title });
   return `
     <!-- KEIN draggable-Attribut, obwohl die Karte ziehbar ist: SortableJS zieht
          ueber seine draggable-OPTION (einen Selektor), und ein echtes
@@ -2748,7 +2759,7 @@ function renderKanbanCard(task) {
               weg - zusammen mit dem Ziehen, das dieselbe Bewegung macht. */ ''}
         ${readOnly() ? '' : `
         <button class="kanban-card__status-btn" type="button"
-                data-next-status="${next}" title="${nextLabel}" aria-label="${nextLabel}">
+                data-next-status="${next}" title="${esc(nextLabel)}" aria-label="${esc(nextName)}">
           <i data-lucide="${icon}" aria-hidden="true"></i>
         </button>`}
       </div>

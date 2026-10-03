@@ -53,6 +53,28 @@ export function isValidTimeZone(zone) {
   } catch { return false; }
 }
 
+// Ein Browser, der seine Zone verschweigt (Firefox mit resistFingerprinting,
+// Headless), meldet UTC. Das ist keine Auskunft über den Haushalt: als
+// Haushaltszone gespeichert wäre es eine ausdrückliche Wahl und überstimmte ein
+// gesetztes `TZ` des Containers.
+const UNTELLING_ZONES = new Set(['UTC', 'Etc/UTC', 'Etc/GMT', 'GMT', 'Etc/Unknown']);
+
+/**
+ * Die Zone, in der dieser Browser steht - oder `null`, wenn er keine brauchbare
+ * nennt. Die eine Stelle für diese Frage: die Ersteinrichtung schickt die Zone
+ * mit (pages/setup.js), der Zonen-Hinweis vergleicht sie mit der des Haushalts
+ * (household-zone-hint.js).
+ * @returns {string|null} IANA-Zone
+ */
+export function browserTimeZone() {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return isValidTimeZone(zone) && !UNTELLING_ZONES.has(zone) ? zone : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Die Zone, in der diese Oberfläche Zeiten anzeigt - oder `null` für „die des
  * Browsers", was dem Verhalten vor #829 entspricht.

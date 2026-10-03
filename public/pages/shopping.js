@@ -1163,12 +1163,14 @@ function mountItems(listEl, container) {
   if (!state.items.length) {
     // Bei `read` nur der Zustand: Beschreibung („Der Name genuegt ...") und
     // Hinweis (abgehakte Artikel in den Vorrat) meinen beide eine Handlung.
+    // Der Hinweis nennt die Kapsel „In den Vorrat" und steht deshalb nur, wo
+    // sie auch steht (#1607) - dieselbe Frage wie in updateCheckedActions().
     const ro = readOnly();
     mountEmptyState(listEl, {
       icon: 'shopping-cart',
       title: t('shopping.emptyList'),
       description: ro ? undefined : t('shopping.emptyListDescription'),
-      hint: ro ? undefined : t('emptyHint.shopping'),
+      hint: ro || !pantryTransferOffered() ? undefined : t('emptyHint.shopping'),
       action: ro ? null : {
         label: t('shopping.emptyAction'),
         icon: 'plus',
@@ -2515,6 +2517,15 @@ async function openPantryTransfer(container) {
 }
 
 /**
+ * Steht der Weg „In den Vorrat" auf dieser Seite? Der Vorrat muss eingeschaltet
+ * sein und der Betrachter dort schreiben duerfen (#1265). Die Kapsel und der
+ * Hinweis im Leerzustand fragen beide hier.
+ */
+function pantryTransferOffered() {
+  return !window.yuvomi?.isModuleDisabled?.('pantry') && mayTransferShoppingToPantry();
+}
+
+/**
  * Baut die Sammelaktions-Leiste neu auf, die an abgehakten Artikeln hängt.
  * Reihenfolge: erst „In den Vorrat", dann „Erledigte löschen" — ein erledigter
  * Einkauf endet im Regal, nicht im Papierkorb, und die Übernahme räumt die Liste
@@ -2558,7 +2569,7 @@ function updateCheckedActions(container, { userChecked = false } = {}) {
   const actions = [];
   // „In den Vorrat" schreibt in den VORRAT: abgeschaltet ODER ohne
   // Schreibrecht dort endete die Kapsel im Leeren bzw. im 403 (#1265).
-  if (!window.yuvomi?.isModuleDisabled?.('pantry') && mayTransferShoppingToPantry()) {
+  if (pantryTransferOffered()) {
     actions.push({
       label: t('shopping.toPantry'),
       onClick: () => openPantryTransfer(container),

@@ -675,3 +675,46 @@ test('#1452: ob der Check-in von heute ist, entscheidet die Haushaltszone', () =
     assert.equal(row.sortKey, '00:01');
   });
 }));
+
+// --------------------------------------------------------
+// #1607: die Budget-Kachel fuehrt auf die Monatsuebersicht
+// --------------------------------------------------------
+// Das Budget merkt sich seinen zuletzt offenen Reiter (Modul-Singleton). Wer
+// zuletzt in der Statistik stand, landete ueber „Eintrag hinzufuegen" der
+// Kachel dort - auf einem Reiter ohne Anlegen. Die Kachel zeigt Einnahmen,
+// Ausgaben und Saldo des Monats, also nennt jeder ihrer Wege diesen Reiter.
+const routesOf = (html) => [...html.matchAll(/data-route="([^"]*)"/g)].map((m) => m[1]);
+
+test('#1607: jeder Weg aus der Budget-Kachel nennt den Reiter der Monatsuebersicht', () => {
+  const leer = routesOf(__test.renderBudgetWidget({ entryCount: 0 }, 'EUR'));
+  assert.equal(leer.length, 2, `Reichweite: Kopf-Link und „Eintrag hinzufuegen", bekam ${leer}`);
+  assert.deepEqual([...new Set(leer)], ['/budget?tab=budget']);
+
+  const gefuellt = routesOf(__test.renderBudgetWidget({ income: 100, expenses: 40, balance: 60, entryCount: 2 }, 'EUR'));
+  assert.ok(gefuellt.length >= 1, 'Reichweite: der Kopf-Link');
+  assert.deepEqual([...new Set(gefuellt)], ['/budget?tab=budget']);
+});
+
+test('#1607: die Kennzahl-Kachel „Monatssaldo" nennt denselben Reiter', () => {
+  const prevWindow = global.window;
+  global.window = { yuvomi: { isModuleDisabled: () => false } };
+  try {
+    // Zwei Kacheln, sonst ist es keine Reihe (selectMetricTiles).
+    const tile = __test.selectMetricTiles({
+      budget: { income: 100, expenses: 40, balance: 60, entryCount: 2 },
+      housekeeping: { configured: true, present: false, visitsThisMonth: 4 },
+    }, 'EUR').find((entry) => entry.id === 'budget');
+    assert.ok(tile, 'Reichweite: die Budget-Kachel steht in der Reihe');
+    assert.equal(tile.route, '/budget?tab=budget');
+  } finally {
+    global.window = prevWindow;
+  }
+});
+
+test('#1607: der Reiter aus der Kachel ist einer, den das Budget kennt', async () => {
+  globalThis.HTMLElement = globalThis.HTMLElement ?? class {};
+  globalThis.customElements = globalThis.customElements ?? { define() {}, get() {} };
+  globalThis.localStorage = globalThis.localStorage ?? { getItem: () => null, setItem() {}, removeItem() {} };
+  const { __test: budget } = await import('../public/pages/budget.js');
+  assert.equal(budget.tabFromQuery('?tab=budget'), 'budget');
+});

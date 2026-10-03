@@ -3094,7 +3094,11 @@ test('Abos, Darlehen, Aufteilung mobil: EINE Glance-Zeile, die Karten klappen au
     Object.assign(budgetUi.state, { loans: vorher.loans, loanStatusFilter: vorher.filter });
   }
 
-  const abos = abosGlance.renderSummary();
+  // Mit Monatsbudget: vier Karten. Ohne sind es drei (#1607, eigener Test unten).
+  const abosVorher = abosGlance.state.summary;
+  abosGlance.state.summary = { active_count: 2, monthly_total: 40, monthly_budget: 100, remaining_budget: 60, base_currency: 'EUR' };
+  let abos;
+  try { abos = abosGlance.renderSummary(); } finally { abosGlance.state.summary = abosVorher; }
   const abosRest = glanceVorDetails(abos, 'subscriptions-glance-more', 'subscriptions-summary-details');
   assert.match(abosRest, /class="metric-grid metric-grid--quad/, 'Abos: die vier Karten im aufklappbaren Bereich');
   assert.match(abos, /budget-glance__label">subscriptions\.monthlyCost</, 'Leitwert sind die Monatskosten');
@@ -3123,6 +3127,35 @@ test('Abos, Darlehen, Aufteilung mobil: EINE Glance-Zeile, die Karten klappen au
   assert(rules.some((r) => phone(r) && /display:\s*none/.test(r.body) && /\.budget-glance-details:not\(\.is-expanded\)/.test(r.selector)),
     'unter 640px ist der eingeklappte Bereich weg');
   assert(!rules.some((r) => !phone(r) && /budget-glance-details:not/.test(r.selector)), 'ab 640px bleiben die Karten');
+});
+
+/* #1607: OHNE MONATSBUDGET STEHT KEINE BUDGET-KARTE MIT „0".
+ * Die Reihe zeigte „Monatsbudget 0,00 €" samt leerem Balken und gleich daneben
+ * „Kein Budgetlimit - Unbegrenzt": zwei Karten, die einander widersprechen. Wo
+ * kein Budget gesetzt ist, gibt es keine Zahl dafuer; es bleibt die eine Karte,
+ * die den Zustand nennt. Drei Karten sind die Grundform der Reihe (panel.css,
+ * `--summary-cards` Standard 3), `--quad` gilt nur fuer vier. */
+test('Abo-Kennzahlen ohne Monatsbudget: keine Karte „Monatsbudget 0", drei Karten in der Dreier-Reihe', () => {
+  const vorher = abosGlance.state.summary;
+  const karten = (html) => (html.match(/<article class="metric-card/g) ?? []).length;
+  try {
+    abosGlance.state.summary = { active_count: 1, monthly_total: 12.99, monthly_budget: 0, remaining_budget: 0, base_currency: 'EUR' };
+    const ohne = abosGlance.renderSummary();
+    assert.doesNotMatch(ohne, /metric-card__label">subscriptions\.monthlyBudget</, 'die Karte „Monatsbudget" entfaellt');
+    assert.doesNotMatch(ohne, /role="progressbar"/, 'ohne Budget gibt es nichts, was ein Balken messen koennte');
+    assert.match(ohne, /subscriptions\.noBudgetLimit/, 'der Zustand bleibt benannt');
+    assert.match(ohne, /subscriptions\.unlimited/);
+    assert.equal(karten(ohne), 3);
+    assert.doesNotMatch(ohne, /metric-grid--quad/, 'drei Karten in einer Vierer-Reihe liessen eine Leerzelle');
+    assert.match(ohne, /class="metric-grid budget-glance-details/, 'der aufklappbare Bereich bleibt derselbe');
+
+    abosGlance.state.summary = { active_count: 1, monthly_total: 12.99, monthly_budget: 50, remaining_budget: 37.01, base_currency: 'EUR' };
+    const mit = abosGlance.renderSummary();
+    assert.match(mit, /metric-card__label">subscriptions\.monthlyBudget</, 'Gegenfall: mit Budget steht die Karte');
+    assert.match(mit, /role="progressbar"/);
+    assert.equal(karten(mit), 4);
+    assert.match(mit, /metric-grid--quad/);
+  } finally { abosGlance.state.summary = vorher; }
 });
 
 /* DER KOPF SPRINGT NICHT (Re-Critique 2026-09-28, A5 P2-9). Mobil 162 <-> 135px

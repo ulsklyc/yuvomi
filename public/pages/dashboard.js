@@ -2121,6 +2121,14 @@ function renderBudgetTopExpenses(budget, currency, size) {
     </div>`;
 }
 
+/* DIE BUDGET-KACHEL NENNT IHREN REITER (#1607). Das Budget merkt sich den
+ * zuletzt offenen Reiter und zeigt ihn ohne `?tab=` wieder - richtig fuer die
+ * Navigation, falsch fuer diese Kachel: wer zuletzt in der Statistik stand,
+ * landete ueber „Eintrag hinzufuegen" auf einem Reiter ohne Anlegen. Kachel und
+ * Kennzahl zeigen den Monat (Einnahmen, Ausgaben, Saldo), also fuehren ihre
+ * Wege auf die Monatsuebersicht. */
+const BUDGET_MONTH_ROUTE = '/budget?tab=budget';
+
 function renderBudgetWidget(budget, currency, size = '1x1') {
   const income = budget?.income || 0;
   const expenses = budget?.expenses || 0;
@@ -2131,17 +2139,17 @@ function renderBudgetWidget(budget, currency, size = '1x1') {
 
   if (!hasData) {
     return `<div class="widget widget--budget">
-      ${widgetHeader('budget', t('nav.budget'), null, '/budget')}
+      ${widgetHeader('budget', t('nav.budget'), null, BUDGET_MONTH_ROUTE)}
       <div class="widget__empty">
         <i data-lucide="wallet" class="empty-state__icon" aria-hidden="true"></i>
         <div>${t('dashboard.noBudgetData')}</div>
-        ${emptyStateCta('/budget', t('budget.addEntryLabel'))}
+        ${emptyStateCta(BUDGET_MONTH_ROUTE, t('budget.addEntryLabel'))}
       </div>
     </div>`;
   }
 
   return `<div class="widget widget--budget">
-    ${widgetHeader('budget', t('nav.budget'), null, '/budget')}
+    ${widgetHeader('budget', t('nav.budget'), null, BUDGET_MONTH_ROUTE)}
     <div class="budget-widget">
       <div class="budget-widget__headline">
         <span>${t('dashboard.monthlyBalance')}</span>
@@ -2216,7 +2224,7 @@ const METRIC_TILE_ORDER = ['tasks', 'shopping', 'budget', 'split-expenses', 'bir
 const METRIC_TILE_COUNT = 4;
 
 function metricTileFor(id, data, currency, sheetSpeaks = new Set()) {
-  const route = { tasks: '/tasks', shopping: '/shopping', budget: '/budget', birthdays: '/birthdays', meals: '/meals', notes: '/notes', rewards: '/rewards', health: '/health', housekeeping: '/housekeeping' }[id];
+  const route = { tasks: '/tasks', shopping: '/shopping', budget: BUDGET_MONTH_ROUTE, birthdays: '/birthdays', meals: '/meals', notes: '/notes', rewards: '/rewards', health: '/health', housekeeping: '/housekeeping' }[id];
   switch (id) {
     case 'tasks': {
       const open = data.openTaskCount;
