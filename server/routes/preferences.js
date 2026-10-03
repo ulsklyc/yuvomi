@@ -692,7 +692,8 @@ router.get('/', (req, res) => {
 // Feld, und jedes abgelehnte Feld verlaesst ihn ueber ein
 // `return res.status(4xx)`. Damit die Felder davor dann nicht stehen bleiben,
 // laeuft die ganze Feldfolge in EINER Transaktion: COMMIT steht genau einmal,
-// hinter dem letzten Feld und vor der Erfolgsantwort; jeder andere Ausgang
+// hinter dem letzten Feld und der fertig gebauten Erfolgsantwort, unmittelbar
+// vor dem Senden; jeder andere Ausgang
 // (400, 401, 403, geworfener Fehler) findet im finally eine offene Transaktion
 // vor und rollt sie zurueck. Ein neues Feld mit neuem fruehem `return` ist
 // damit von selbst abgedeckt - es muss dafuer nichts nach oben gezogen werden.
@@ -1390,9 +1391,13 @@ router.put('/', (req, res) => {
       }
     }
 
-    // Alle Felder sind durch - erst jetzt wird die Patch wirksam (#1622).
-    database.exec('COMMIT');
-
+    // DIE ANTWORT WIRD NOCH IN DER TRANSAKTION GEBAUT (#1622, Review zu #1627).
+    // Sie liest aus der Datenbank zurueck, und manche dieser Lesewege fragen
+    // weitere Tabellen ab (dashboardPersonalViews den Kategorien-Katalog). Wirft
+    // einer davon NACH dem COMMIT, sagt die Antwort 500 und die Patch steht
+    // trotzdem. Hier oben sieht das Lesen dieselben Werte - dieselbe Verbindung
+    // liest ihre eigenen, noch nicht committeten Schreibungen -, und ein Wurf
+    // findet die Transaktion noch offen.
     const rawMealTypes = cfgGet('visible_meal_types') ?? DEFAULT_MEAL_TYPES;
     const savedMealTypes = rawMealTypes.split(',').filter((t) => VALID_MEAL_TYPES.includes(t));
     const savedCurrency = cfgGet('currency') ?? DEFAULT_CURRENCY;
@@ -1410,7 +1415,7 @@ router.put('/', (req, res) => {
     // schon aussortiert - statt seiner eigenen Eingabe.
     const savedMealTypeNames = parseMealTypeNames(cfgGet('meal_type_names'));
 
-    res.json({
+    const payload = {
       data: {
         visible_meal_types: savedMealTypes,
         meal_type_names: savedMealTypeNames,
@@ -1467,7 +1472,14 @@ router.put('/', (req, res) => {
         holiday_school_color:  cfgGet('holiday_school_color')  ?? '#34C759',
         holiday_last_sync:     cfgGet('holiday_last_sync')     ?? null,
       },
-    });
+    };
+
+    // Alle Felder sind durch und die Antwort steht - erst jetzt wird die Patch
+    // wirksam. Hinter dem COMMIT kommt nur noch das Senden: kein Datenbankzugriff
+    // und keine Berechnung, die einen 500 ueber eine gespeicherte Patch legen
+    // koennte.
+    database.exec('COMMIT');
+    res.json(payload);
   } catch (err) {
     log.error('PUT /', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });

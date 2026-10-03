@@ -945,3 +945,32 @@ test('eine gueltige gemischte Patch wird weiterhin ganz geschrieben, und danach 
   assert.equal(db.inTransaction, false);
   cfgDelete('week_start'); cfgDelete('hidden_modules:user:1'); cfgDelete('budget_mode');
 });
+
+test('wirft die Berechnung der Erfolgsantwort, ist die Patch nicht geschrieben (#1622, Review zu #1627)', async () => {
+  // Die Antwort liest aus der Datenbank zurueck, und ein Notiz-Widget mit
+  // Kategorie-Filter fragt dafuer den Kategorien-Katalog ab. Eine TEMP-Tabelle
+  // gleichen Namens verdeckt ihn: die Feldfolge laeuft sauber durch, erst der
+  // Bau der Antwort wirft. Stand das COMMIT davor, sagte die Antwort 500 und
+  // die Patch war trotzdem gespeichert.
+  cfgSet('week_start', 'monday');
+  cfgDelete('dashboard_widgets:user:1');
+  const before = (await get()).body.data;
+  db.exec('CREATE TEMP TABLE note_categories (verdeckt INTEGER)');
+  let res;
+  try {
+    res = await put({
+      week_start: 'sunday',
+      dashboard_widgets: [{ id: 'notes', options: { categories: [1] } }],
+    });
+  } finally {
+    db.exec('DROP TABLE temp.note_categories');
+  }
+  assert.equal(res.status, 500);
+  assert.deepEqual(res.body, { error: 'Interner Fehler', code: 500 });
+  assert.equal(db.inTransaction, false);
+  const after = (await get()).body.data;
+  assert.equal(after.week_start, 'monday', 'week_start wurde trotz 500 geschrieben');
+  assert.deepEqual(after, before);
+  assert.equal(db.prepare("SELECT value FROM sync_config WHERE key = 'dashboard_widgets:user:1'").get(), undefined);
+  cfgDelete('week_start');
+});
