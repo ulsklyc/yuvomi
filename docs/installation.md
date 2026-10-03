@@ -886,16 +886,55 @@ the same kind, listed in the same table.
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `GOOGLE_CLIENT_ID` | OAuth 2.0 Client ID from Google Cloud Console | - | No |
-| `GOOGLE_CLIENT_SECRET` | OAuth 2.0 Client Secret | - | No |
-| `GOOGLE_REDIRECT_URI` | OAuth callback URL | `https://<YOUR-DOMAIN>/api/v1/calendar/google/callback` | No |
+| `GOOGLE_CLIENT_ID` | OAuth 2.0 Client ID from Google Cloud Console | - | Yes when Google sync is used |
+| `GOOGLE_CLIENT_SECRET` | OAuth 2.0 Client Secret | - | Yes when Google sync is used |
+| `GOOGLE_REDIRECT_URI` | OAuth callback URL, `https://<YOUR-DOMAIN>/api/v1/calendar/google/callback`. Yuvomi does not derive it, so it has to be set | - | Yes when Google sync is used |
 
-After connecting, enable the calendars to sync under **Settings → Modules → Calendar → Calendar sync**. The sync runs both ways:
+The three variables belong together. As long as one of them is empty, the settings page shows
+"Not configured (missing .env variables)" instead of the connect button.
+
+**Setting it up at Google.** Google renames the pages of its console from time to time, so the steps
+below say what has to exist rather than where to click; the current click path is in Google's own
+guide, [Using OAuth 2.0 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server).
+
+1. In the Google Cloud console, create a project (or pick an existing one) and enable the
+   **Google Calendar API** for it.
+2. Configure the OAuth consent screen of that project. Outside a Google Workspace organization the
+   user type is **External**. While the publishing status is **Testing**, only the Google accounts
+   listed as test users can connect, so add the account whose calendars you want to sync.
+3. Create an OAuth client of the type **Web application** and add
+   `https://<YOUR-DOMAIN>/api/v1/calendar/google/callback` as an authorized redirect URI. Google
+   compares scheme, case and trailing slash exactly, and accepts only HTTPS addresses with a host
+   name, not a raw IP address (`localhost` is exempt); see
+   [Google's rules for redirect URIs](https://support.google.com/cloud/answer/15549257).
+4. Put the client ID and the client secret into `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, set
+   `GOOGLE_REDIRECT_URI` to the same string as in step 3, and restart Yuvomi.
+
+**Connecting.** Sign in to Yuvomi as an admin, under the address that is in the redirect URI, and
+choose **Connect with Google** under **Settings → Modules → Calendar → Calendar sync**. Only an
+admin sees that button. Google's answer is matched against the session of the browser that started
+the request, so starting from another address (the LAN IP instead of the domain, for example) ends
+back on the settings page with an error. After connecting, tick the calendars to sync under
+"Synced calendars" on the same page. Nothing is imported before a calendar is ticked, and ticking
+one starts a sync right away.
+
+The sync runs both ways:
 events created, edited, deleted, or moved to another calendar in Yuvomi are applied in Google as
-well, and changes made in Google flow back. Outbound changes are attempted immediately and retried
+well, and changes made in Google flow back. A new event only goes to Google when a Google calendar
+is chosen as its **Sync target** in the event form; with "Store locally only" it stays in Yuvomi.
+Outbound changes are attempted immediately and retried
 by the next sync run (`SYNC_INTERVAL_MINUTES`) if Google is unreachable. A calendar is only written
-to when the connected account has write access to it, and the **read-only mode** checkbox stops
+to when the connected account has write access to it, and the **Read-only** switch stops
 Yuvomi from changing anything in Google while still importing normally.
+
+One Google account can be connected per installation; the calendars on offer are the ones in that
+account's Google calendar list. If Google returns no refresh token when connecting, the connection
+fails: remove Yuvomi's access in the settings of that Google account and connect again. And while
+the consent screen is in the publishing status Testing, Google lets the authorization, refresh
+token included, expire seven days after consent, so Yuvomi has to be connected again every week.
+Google documents this expiry for the Testing status only
+([Manage App Audience](https://support.google.com/cloud/answer/15549945)); a project switched to
+"In production" may show Google's unverified-app warning when connecting.
 
 Recurring appointments are imported as one series with its repeat rule, and cancelled or moved
 occurrences are carried over individually. Upgrading to v1.56.0 makes the first sync run read every
