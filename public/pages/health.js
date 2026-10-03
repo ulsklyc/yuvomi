@@ -8399,7 +8399,7 @@ function openDayLogModal(dateKey) {
       // robuster als ein zweiter, eigener "dirty"-Tracker neben dem des
       // Modal-Systems.
       panel.querySelector('[data-action="cycle-log-painkiller"]')?.addEventListener('click', async () => {
-        if (await closeModal()) window.yuvomi?.navigate('/health/medications');
+        if (await closeModal()) window.yuvomi?.navigate('/health/meds');
       });
       panel.querySelector('[data-action="cycle-log-weight"]')?.addEventListener('click', async () => {
         if (await closeModal()) window.yuvomi?.navigate('/health/vitals');

@@ -60,6 +60,7 @@
         "errorOffline": "Walang koneksyon sa internet. Pakisuri ang iyong network.",
         "errorForbidden": "Tinanggihan ang pag-access. Pakisign in muli.",
         "errorModuleNoAccess": "Wala kang access sa modyul na ito.",
+        "unknownAddress": "Walang ganitong address. Ang pinakamalapit na pahina ang ipinapakita sa halip.",
         "errorNotFound": "Hindi natagpuan ang entry.",
         "errorServer": "May error sa server. Pakisubukang muli mamaya.",
         "errorRestoreInProgress": "May nire-restore na backup ngayon. Hindi na-save ang iyong pagbabago, subukang muli pagkalipas ng isang minuto.",

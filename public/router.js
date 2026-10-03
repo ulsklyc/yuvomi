@@ -16,6 +16,7 @@ import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
 import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight } from '/utils/ux.js';
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
 import { showToast } from '/utils/toast-show.js';
+import { unknownPathDetour, followUnknownPathDetour } from '/utils/unknown-route.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
 import { watchToastPlacement } from '/utils/toast-placement.js';
 import { COMPOSITION_MODES } from '/utils/page-layout.js';
@@ -766,6 +767,33 @@ async function navigate(path, userOrPushState = true, pushState = true) {
     }
 
     route = allRoutes().find((r) => r.path === basePath) ?? route;
+
+    // Unbekannte Adresse (#1607): statt still die Uebersicht unter der toten
+    // Adresse zu zeichnen, auf den naechsten bekannten Vorfahren umleiten.
+    // ERST HIER und nicht am ersten Lookup oben: die Erweiterungsrouten kommen
+    // mit der Anmeldung (syncThirdPartyModules), davor waere jede "unbekannt".
+    // Ein abgeschaltetes oder gesperrtes Modul ist bekannt, aber kein
+    // Landeplatz - seine eigene Route bleibt den Modul-Guards (davor und
+    // danach), die hier nichts aendern. Regeln in utils/unknown-route.js.
+    const knownRoutes = allRoutes();
+    const detour = unknownPathDetour(basePath, {
+      known: knownRoutes.map((r) => r.path),
+      landable: knownRoutes
+        .filter((r) => r.requiresAuth && (r.path === '/' || !r.module
+          || !(_disabledModules.has(r.module) || !canAccessNavModule(r.module))))
+        .map((r) => r.path),
+    });
+    if (detour) {
+      currentPath = null;
+      isNavigating = false;
+      followUnknownPathDetour(detour, {
+        pushState,
+        history,
+        navigate,
+        notify: () => showToast(t('common.unknownAddress'), 'default', 5000),
+      });
+      return;
+    }
 
     // Split-Guest-Weiche: Gäste einer Ausgabenteilung sehen nur das Budget-Modul.
     // ABER: hat der Nutzer zusätzlich eine Familienrolle OHNE Budget-Recht, würde

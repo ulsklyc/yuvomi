@@ -410,7 +410,7 @@ test('Schnellzugriffs-Links schliessen ueber den regulaeren (Dirty-Check-)Pfad, 
   // eingebauten Dirty-Check umgehen (ungespeicherte Eingaben giengen
   // stillschweigend verloren) - deshalb explizit das NICHT erzwungene
   // closeModal(), das bei ungespeicherten Aenderungen selbst nachfragt.
-  assert.match(fn, /cycle-log-painkiller[\s\S]{0,200}await closeModal\(\)[\s\S]{0,80}navigate\('\/health\/medications'\)/,
+  assert.match(fn, /cycle-log-painkiller[\s\S]{0,200}await closeModal\(\)[\s\S]{0,80}navigate\('\/health\/meds'\)/,
     'painkiller-Link muss vor der Navigation ein nicht erzwungenes closeModal() abwarten');
   assert.match(fn, /cycle-log-weight[\s\S]{0,200}await closeModal\(\)[\s\S]{0,80}navigate\('\/health\/vitals'\)/,
     'weight-Link muss vor der Navigation ein nicht erzwungenes closeModal() abwarten');

@@ -52,6 +52,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An address that does not exist takes you to the closest page instead of a mislabeled
+  overview** (#1607). Opening something like `/settings/xyz` used to show the overview while the
+  address bar kept the wrong address and the tab title read the app name twice. The app now goes
+  to the closest page above it (`/settings` here, the overview when there is none), corrects the
+  address, and says so once in a short message. The wrong address is not kept in the history, so
+  the back button does not return to it. A trailing slash (`/settings/`) is corrected without a
+  message. Pages of modules that are switched off or not allowed for you behave as before.
+  One link inside the app pointed at such an address: the painkiller shortcut in the cycle day
+  log landed on the overview and now opens Medications.
 - **"No access to this module" is shown in your language** (#1607). When a request was refused
   because your role has no access to a module, or only read access, the message came from the
   server in English, whatever language the app was set to. Both messages are now translated

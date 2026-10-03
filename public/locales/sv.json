@@ -60,6 +60,7 @@
         "errorOffline": "Ingen internetanslutning. Kontrollera ditt nätverk.",
         "errorForbidden": "Åtkomst nekad. Logga in igen.",
         "errorModuleNoAccess": "Du har inte åtkomst till denna modul.",
+        "unknownAddress": "Den här adressen finns inte. Du ser den närmaste sidan i stället.",
         "errorNotFound": "Posten hittades inte.",
         "errorServer": "Serverfel. Försök igen senare.",
         "errorRestoreInProgress": "En säkerhetskopia återställs just nu. Din ändring sparades inte, försök igen om en minut.",
