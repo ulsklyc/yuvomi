@@ -2873,8 +2873,10 @@
 .perm-chip__avatar {
   display: inline-grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  /* 24px, nicht 22px (#1607): zwei Hangul- oder Han-Zeichen sind bei 12px
+   * Schrift zusammen 24px breit und liefen in der 22px-Scheibe ueber den Rand. */
+  width: var(--space-6);
+  height: var(--space-6);
   border-radius: var(--radius-full);
   overflow: hidden;
   color: var(--color-text-on-accent);

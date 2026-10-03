@@ -4,6 +4,7 @@ import { stagger, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, formatDate, parseDateInput, isDateInputValid, getLocale, formatUnit } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -62,15 +63,6 @@ function readOnly() {
 // Inline-SVG (Lucide-Stil) – das self-hostete Icon-Subset lässt sich nicht
 // grep-verifizieren, darum die Torte als eingebettetes SVG für den „Heute"-Höhepunkt.
 const CAKE_SVG = `<svg class="birthday-cake" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v3M12 8v3M17 8v3"/><path d="M7 4h.01M12 4h.01M17 4h.01"/></svg>`;
-
-function initials(name) {
-  return String(name || '')
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || '')
-    .join('') || '?';
-}
 
 // Die Werte sind Minuten vor 12:00 am Geburtstag, so wie `getOffsetMinutes()`
 // in server/services/birthdays.js sie liest. '' ist „Keine": der Server legt
@@ -343,9 +335,9 @@ function photoAvatar(birthday, extraClass = '') {
     const color = birthday.family_avatar_color || AVATAR_FALLBACK_COLOR;
     const name = birthday.family_display_name || birthday.name;
     return `<span class="birthday-avatar birthday-avatar--fallback ${extraClass}"
-      style="background-color:${esc(color)};color:${getReadableTextColor(color)}">${esc(initials(name))}</span>`;
+      style="background-color:${esc(color)};color:${getReadableTextColor(color)}">${esc(initials(name, '?'))}</span>`;
   }
-  return `<span class="birthday-avatar birthday-avatar--fallback ${extraClass}">${esc(initials(birthday.name))}</span>`;
+  return `<span class="birthday-avatar birthday-avatar--fallback ${extraClass}">${esc(initials(birthday.name, '?'))}</span>`;
 }
 
 function sortByProximity(list) {
@@ -734,7 +726,7 @@ async function onListClick(e) {
 function birthdayPreviewHtml(name, photoData) {
   if (photoData) return `<img class="birthday-preview__image" src="${photoData}" alt="${esc(name || '')}">`;
   if (!String(name || '').trim()) return '<i data-lucide="camera" class="birthday-preview__glyph" aria-hidden="true"></i>';
-  return `<span class="birthday-preview__fallback">${esc(initials(name))}</span>`;
+  return `<span class="birthday-preview__fallback">${esc(initials(name, '?'))}</span>`;
 }
 
 // --------------------------------------------------------

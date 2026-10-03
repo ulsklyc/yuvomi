@@ -7,6 +7,12 @@
 import { esc } from '/utils/html.js';
 import { t } from '/i18n.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
+import { initials, compactInitials } from '/utils/initials.js';
+
+// Der Rand von `.avatar-stack__item` (user-multi-select.css). Er steht hier
+// als Zahl, weil die Scheibe ihre Groesse und Schrift ohnehin inline in px
+// bekommt und die Passrechnung beides braucht.
+const STACK_BORDER_PX = 2;
 
 /**
  * Rendert einen Avatar-Stack für mehrere zugewiesene Benutzer.
@@ -35,16 +41,20 @@ export function renderAvatarStack(users, { size = 28, maxVisible = 3, minFont = 
   // <= 0.55 bleibt.
   const fs = Math.max(minFont, Math.round(size * 0.4));
   const showText = size >= 20;
+  // ZWEI GEVIERT-ZEICHEN BRAUCHEN BIS ZU 2em (#1607; gemessen: Noto Sans CJK
+  // 1em je Zeichen, die Apple-Systemschrift rund 0.9em). Der Rand der Scheibe (2px je
+  // Seite, user-multi-select.css) zaehlt bei `border-box` in ihre Breite, und
+  // `overflow: hidden` schneidet an seiner Innenkante. In eine 24px-Scheibe
+  // mit 11px Schrift passen deshalb 20px Text: zwei lateinische Buchstaben,
+  // aber keine zwei Hangul- oder Han-Zeichen (22px). Wo sie nicht passen,
+  // steht eines - die Schrift zu verkleinern hiesse unter die Untergrenze
+  // oben zu gehen.
+  const fitsTwoWide = size - 2 * STACK_BORDER_PX >= 2 * fs;
   const avatars = visible.map((u) => {
-    const initials = (u.display_name ?? '')
-      .split(' ')
-      .map((w) => w[0] ?? '')
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
+    const text = fitsTwoWide ? initials(u.display_name) : compactInitials(u.display_name);
     const inner = u.avatar_data
       ? `<img src="${esc(u.avatar_data)}" alt="${esc(u.display_name ?? '')}" loading="lazy">`
-      : (showText ? esc(initials) : '');
+      : (showText ? esc(text) : '');
     return `<span class="avatar-stack__item"
       style="width:${size}px;height:${size}px;font-size:${fs}px;background-color:${esc(u.color ?? AVATAR_FALLBACK_COLOR)};color:${getReadableTextColor(u.color ?? AVATAR_FALLBACK_COLOR)}"
       title="${esc(u.display_name ?? '')}">
@@ -75,15 +85,9 @@ export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey
   const selectedSet = new Set(selectedIds ?? []);
   const items = allUsers.map((u) => {
     const checked = selectedSet.has(u.id) ? 'checked' : '';
-    const initials = (u.display_name ?? '')
-      .split(' ')
-      .map((w) => w[0] ?? '')
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
     const inner = u.avatar_data
       ? `<img src="${esc(u.avatar_data)}" alt="${esc(u.display_name ?? '')}" loading="lazy">`
-      : esc(initials);
+      : esc(initials(u.display_name));
     return `
       <label class="user-ms__option">
         <input type="checkbox" class="user-ms__checkbox" value="${u.id}" ${checked}
