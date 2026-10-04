@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A loan created from "New entry" in the budget overview can say how many installments are
+  already paid** (#1648, reported by @ramonbresco). The field existed only in the "New loan" dialog
+  of the Loans tab; choosing the type "Loan" in the overview's dialog left it out, so a running loan
+  entered there started at zero. Both dialogs now build their loan fields from one list, so a field
+  can no longer land in one and miss the other. The same repair makes the suggestion work that
+  2.29.0 announced and never delivered: moving the first due month into the past fills in the number
+  of months since then, capped at the installment count for a loan without interest, and stops as
+  soon as you set the field yourself. It was wired to the dialog that did not have the field.
+
 ## [2.72.0] - 2026-10-04
 
 ### Added

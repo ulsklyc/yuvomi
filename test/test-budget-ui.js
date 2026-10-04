@@ -3320,3 +3320,95 @@ test('Darlehenskarte: ein fokussierbarer Knopf oeffnet den Bericht, die Karte bl
   const wire = code.slice(code.indexOf('function wireLoansPage('), code.indexOf('\n}\n', code.indexOf('function wireLoansPage(')));
   assert.match(wire, /wireLoanCards\(_container\)/, 'die Seite ruft die Verdrahtung wirklich auf');
 });
+
+// --------------------------------------------------------
+// Darlehen anlegen: EINE Feldliste fuer beide Einstiege (#1648)
+// --------------------------------------------------------
+//
+// Ein Darlehen entsteht an zwei Stellen: in der Uebersicht ueber "Neuer Eintrag"
+// mit dem Typ "Kredit" (openBudgetModal) und im Darlehen-Tab (openLoanModal).
+// Die Feldliste stand zweimal im Quelltext. "Bereits gezahlte Raten" (#813) kam
+// nur in die zweite, der Vorschlag dazu wurde nur an der ersten verdrahtet -
+// dort gab es das Feld nicht, die Verdrahtung kehrte sofort um, und ihr
+// ReferenceError (`todayMonth` aus einem fremden Geltungsbereich) lief nie.
+// Die Browser-Sonde test:budget-loan-dialogs-browser misst beide Dialoge am
+// gerenderten Dokument, laeuft aber nicht in der CI; diese drei Tests halten
+// dieselbe Regel in `npm test`.
+
+/** Rumpf einer Top-Level-Funktion aus budget.js, ohne Kommentare. */
+const budgetFunction = (name) => {
+  const code = withoutComments(budget);
+  const start = code.search(new RegExp(`\\n(?:async )?function ${name}\\(`));
+  assert.notEqual(start, -1, `${name} fehlt in budget.js`);
+  const end = code.slice(start + 1).search(/\n(?:async )?function |\nexport /);
+  return code.slice(start, end === -1 ? undefined : start + 1 + end);
+};
+
+test('#1648: jedes Darlehensfeld steht genau einmal im Quelltext, und beide Dialoge bauen aus derselben Liste', () => {
+  const code = withoutComments(budget);
+  const counts = new Map();
+  for (const [, id] of code.matchAll(/id="(lm-[a-z-]+)"/g)) counts.set(id, (counts.get(id) ?? 0) + 1);
+  assert.ok(counts.has('lm-paid') && counts.has('lm-start'), 'Vorbedingung: die Darlehensfelder werden gefunden');
+  const doppelt = [...counts].filter(([, n]) => n > 1).map(([id]) => id);
+  assert.deepEqual(doppelt, [], 'ein zweimal geschriebenes Feld ist eine zweite Feldliste');
+
+  for (const dialog of ['openBudgetModal', 'openLoanModal']) {
+    const body = budgetFunction(dialog);
+    assert.match(body, /\$\{loanFormFieldsHtml\(/, `${dialog} baut die Darlehensfelder aus loanFormFieldsHtml()`);
+    assert.match(body, /wireLoanFormFields\(panel\)/, `${dialog} verdrahtet sie ueber wireLoanFormFields()`);
+    assert.doesNotMatch(body, /wireLoan(?:Direction|Currency|Interest|PaidInstallments)Fields?\(/,
+      `${dialog} verdrahtet keinen Teil der Liste an wireLoanFormFields() vorbei`);
+  }
+});
+
+test('#1648: die Feldliste traegt "Bereits gezahlte Raten" bei der Neuanlage, nicht beim Bearbeiten', () => {
+  const neu = budgetUi.loanFormFieldsHtml(null, { startMonth: '2026-03' });
+  const ids = [...neu.matchAll(/<(?:input|select|textarea)[^>]*\sid="(lm-[a-z-]+)"/g)].map((m) => m[1]);
+  assert.equal(ids[ids.indexOf('lm-start') + 1], 'lm-paid', 'direkt unter dem ersten Faelligkeitsmonat');
+  assert.match(neu, /id="lm-start" value="2026-03"/, 'der Aufrufer bestimmt die Vorbelegung des Startmonats');
+
+  const bestehend = budgetUi.loanFormFieldsHtml(
+    { id: 1, title: 'Auto', borrower: 'Bank', total_amount: 1200, installment_count: 12, start_month: '2025-01' },
+    { startMonth: '2026-03' },
+  );
+  assert.doesNotMatch(bestehend, /id="lm-paid"/, 'ein bestehendes Darlehen traegt keine Raten nach');
+  assert.match(bestehend, /id="lm-start" value="2025-01"/, 'und behaelt seinen eigenen Startmonat');
+});
+
+test('#1648: die Verdrahtung schlaegt die gezahlten Raten wirklich vor', () => {
+  const feld = (value = '') => {
+    const el = { value, hidden: false, textContent: '', on: {}, style: {}, dataset: {},
+      setAttribute() {}, removeAttribute() {}, replaceChildren() {},
+      classList: { add() {}, remove() {}, toggle() {} } };
+    el.addEventListener = (type, fn) => { (el.on[type] ??= []).push(fn); };
+    el.fire = (type) => (el.on[type] ?? []).forEach((fn) => fn({ target: el }));
+    return el;
+  };
+  const [jahr, monat] = todayKey().slice(0, 7).split('-').map(Number);
+  const vorVierMonaten = (() => {
+    const total = jahr * 12 + (monat - 1) - 4;
+    return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
+  })();
+  const felder = {
+    '#lm-paid': feld('0'),
+    '#lm-start': feld(vorVierMonaten),
+    '#lm-installments': feld(''),
+  };
+  // Alles ausser den drei Feldern fehlt: die uebrigen Verdrahtungen kehren an
+  // einem fehlenden Feld um, gemessen wird nur der Vorschlag.
+  const panel = { querySelector: (sel) => felder[sel] ?? null, querySelectorAll: () => [] };
+
+  budgetUi.wireLoanFormFields(panel);
+  assert.equal(felder['#lm-paid'].value, '4', 'vier Monate zurueck: vier Raten vorgeschlagen, schon beim Oeffnen');
+
+  felder['#lm-installments'].value = '3';
+  felder['#lm-installments'].fire('input');
+  assert.equal(felder['#lm-paid'].value, '3', 'nie mehr als die Ratenanzahl');
+
+  felder['#lm-paid'].value = '1';
+  felder['#lm-paid'].fire('input');
+  felder['#lm-installments'].value = '24';
+  felder['#lm-installments'].fire('input');
+  felder['#lm-start'].fire('change');
+  assert.equal(felder['#lm-paid'].value, '1', 'eine selbst gesetzte Zahl bleibt stehen');
+});

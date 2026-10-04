@@ -3232,29 +3232,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
     </div>
 
     <div id="bm-loan-fields" hidden>
-      ${loanIdentityFieldsHtml(null)}
-      ${loanCurrencyFieldsHtml(null)}
-      <div class="form-grid-2" id="lm-manual-fields">
-        <div class="form-group">
-          <label class="form-label" for="lm-amount">${t('budget.loanAmountLabel')}</label>
-          <input type="number" class="form-input" id="lm-amount"
-                 step="${amountStep(state.currency, '')}" min="${amountMin(state.currency, '')}"
-                 placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="lm-installments">${t('budget.loanInstallmentsLabel')}</label>
-          <input type="number" class="form-input" id="lm-installments" step="1" min="1" max="360" inputmode="numeric">
-        </div>
-      </div>
-      ${loanInterestFieldsHtml(null)}
-      <div class="form-group">
-        <label class="form-label" for="lm-start">${t('budget.loanStartMonthLabel')}</label>
-        <input type="month" class="form-input" id="lm-start" value="${defaultDate.slice(0, 7)}">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="lm-notes">${t('budget.loanNotesLabel')}</label>
-        <textarea class="form-input" id="lm-notes" rows="3"></textarea>
-      </div>
+      ${loanFormFieldsHtml(null, { startMonth: defaultDate.slice(0, 7) })}
     </div>
 
     <div class="modal-panel__footer modal-panel__footer--plain">
@@ -3417,10 +3395,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
         onChange: (id) => setType(id),
       });
       attachSegmentIndicator(panel.querySelector('.budget-type-toggle'));
-      wireLoanDirectionField(panel);
-      wireLoanCurrencyFields(panel);
-      wireLoanInterestFields(panel);
-      wireLoanPaidInstallmentsField(panel);
+      wireLoanFormFields(panel);
       // Belege (#583): landen als Dokumente im Dokumente-Modul, deshalb die
       // Finanz-Kategorie und ein eigener Ordner - ein Kassenbon soll dort
       // auffindbar sein, nicht namenlos zwischen den Verträgen liegen.
@@ -3993,11 +3968,22 @@ function wireLoanInterestFields(panel) {
  * Die Differenz wird auf den Monats-Strings gerechnet, nicht über Date-Objekte:
  * ein "YYYY-MM" ist kein Zeitpunkt, und der Umweg über Date kippt westlich von
  * UTC auf den Vormonat.
+ *
+ * "Heute" holt sich die Funktion selbst (#1648): sie las `todayMonth` aus dem
+ * Geltungsbereich eines Aufrufers, den es dort nie gab, und wurde zugleich nur
+ * an dem Dialog verdrahtet, der das Feld nicht hatte - der Vorschlag lief also
+ * nie, und sein ReferenceError auch nicht.
+ *
+ * Ohne Zins kennt das Formular die Ratenanzahl; mehr als die schlägt es nicht
+ * vor, weil der Server eine größere Zahl ablehnt. Mit Zins leitet der Server die
+ * Anzahl ab - dort bleibt der Vorschlag ungedeckelt und die Route entscheidet.
  */
 function wireLoanPaidInstallmentsField(panel) {
   const paid = panel.querySelector('#lm-paid');
   if (!paid) return; // Bearbeiten-Modus: das Feld gibt es dort bewusst nicht.
   const start = panel.querySelector('#lm-start');
+  const installments = panel.querySelector('#lm-installments');
+  const modeSel = panel.querySelector('#lm-interest-mode');
   let touched = false;
   paid.addEventListener('input', () => { touched = true; });
 
@@ -4005,12 +3991,83 @@ function wireLoanPaidInstallmentsField(panel) {
     if (touched) return;
     const m = /^(\d{4})-(\d{2})$/.exec(start.value || '');
     if (!m) return;
-    const now = todayMonth.split('-');
-    const months = (Number(now[0]) - Number(m[1])) * 12 + (Number(now[1]) - Number(m[2]));
-    paid.value = String(Math.max(0, months));
+    const now = todayKey().slice(0, 7).split('-');
+    let months = Math.max(0, (Number(now[0]) - Number(m[1])) * 12 + (Number(now[1]) - Number(m[2])));
+    const count = parseInt(installments?.value, 10);
+    if ((modeSel?.value ?? 'none') === 'none' && Number.isInteger(count) && count >= 1) {
+      months = Math.min(months, count);
+    }
+    paid.value = String(months);
   };
   start.addEventListener('change', suggest);
+  installments?.addEventListener('input', suggest);
+  modeSel?.addEventListener('change', suggest);
   suggest();
+}
+
+/**
+ * DIE Feldliste eines Darlehens (#1648). Beide Einstiege - der Typ "Kredit" im
+ * Eintrags-Dialog der Übersicht und der eigene Dialog im Darlehen-Tab - bauen
+ * ihr Formular aus dieser einen Funktion und verdrahten es über
+ * wireLoanFormFields(). Bis dahin stand die Liste zweimal im Quelltext: "Bereits
+ * gezahlte Raten" (#813) kam nur in die eine, der Vorschlag dazu wurde nur an
+ * der anderen verdrahtet, und so fehlte dem einen Weg das Feld und dem anderen
+ * der Vorschlag. Ein neues Darlehensfeld gehört hierher und nirgends sonst.
+ *
+ * Richtung (#638) steht ganz oben: sie entscheidet, ob die Rate als Einnahme oder
+ * als Ausgabe gebucht wird, und benennt das Feld darunter um (Person vs. Kreditgeber).
+ *
+ * @param {object|null} loan        Bestehendes Darlehen (Bearbeiten) oder null (Neuanlage).
+ * @param {object} opts
+ * @param {string} opts.startMonth  Vorbelegung "YYYY-MM" des ersten Fälligkeitsmonats
+ *                                  bei der Neuanlage; der Aufrufer kennt seinen Kontext
+ *                                  (angezeigter Monat der Übersicht bzw. heute).
+ */
+function loanFormFieldsHtml(loan, { startMonth }) {
+  const isEdit = Boolean(loan);
+  const loanCurrency = loan?.currency || state.currency;
+  return `
+    ${loanIdentityFieldsHtml(loan)}
+    ${loanCurrencyFieldsHtml(loan)}
+    <div class="form-grid-2" id="lm-manual-fields">
+      <div class="form-group">
+        <label class="form-label" for="lm-amount">${t('budget.loanAmountLabel')}</label>
+        <input type="number" class="form-input" id="lm-amount"
+               step="${amountStep(loanCurrency, loan ? loan.total_amount : '')}"
+               min="${amountMin(loanCurrency, loan ? loan.total_amount : '')}"
+               placeholder="${amountPlaceholder(loanCurrency)}" inputmode="decimal"
+               value="${loan ? String(loan.total_amount) : ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="lm-installments">${t('budget.loanInstallmentsLabel')}</label>
+        <input type="number" class="form-input" id="lm-installments" step="1" min="1" max="360"
+               inputmode="numeric" value="${loan?.installment_count ?? ''}">
+      </div>
+    </div>
+    ${loanInterestFieldsHtml(loan)}
+    <div class="form-group">
+      <label class="form-label" for="lm-start">${t('budget.loanStartMonthLabel')}</label>
+      <input type="month" class="form-input" id="lm-start" value="${esc(loan?.start_month ?? startMonth)}">
+    </div>
+    ${isEdit ? '' : `
+    <div class="form-group">
+      <label class="form-label" for="lm-paid">${t('budget.loanPaidInstallmentsLabel')}</label>
+      <input type="number" class="form-input" id="lm-paid" step="1" min="0"
+             inputmode="numeric" value="0">
+      <p class="form-hint budget-loan-hint">${t('budget.loanPaidInstallmentsHint')}</p>
+    </div>`}
+    <div class="form-group">
+      <label class="form-label" for="lm-notes">${t('budget.loanNotesLabel')}</label>
+      <textarea class="form-input" id="lm-notes" rows="3">${esc(loan?.notes ?? '')}</textarea>
+    </div>`;
+}
+
+/** Verhalten zu loanFormFieldsHtml() - ebenfalls die eine Stelle für beide Dialoge. */
+function wireLoanFormFields(panel) {
+  wireLoanDirectionField(panel);
+  wireLoanCurrencyFields(panel);
+  wireLoanInterestFields(panel);
+  wireLoanPaidInstallmentsField(panel);
 }
 
 async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave = false } = {}) {
@@ -4137,44 +4194,8 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
 function openLoanModal(loan = null) {
   if (readOnly()) return;
   const isEdit = Boolean(loan);
-  const todayMonth = todayKey().slice(0, 7);
-  const loanCurrency = loan?.currency || state.currency;
-  // Richtung (#638) steht ganz oben: sie entscheidet, ob die Rate als Einnahme oder
-  // als Ausgabe gebucht wird, und benennt das Feld darunter um (Person vs. Kreditgeber).
   const content = `
-    ${loanIdentityFieldsHtml(loan)}
-    ${loanCurrencyFieldsHtml(loan)}
-    <div class="form-grid-2" id="lm-manual-fields">
-      <div class="form-group">
-        <label class="form-label" for="lm-amount">${t('budget.loanAmountLabel')}</label>
-        <input type="number" class="form-input" id="lm-amount"
-               step="${amountStep(loanCurrency, loan ? loan.total_amount : '')}"
-               min="${amountMin(loanCurrency, loan ? loan.total_amount : '')}"
-               placeholder="${amountPlaceholder(loanCurrency)}" inputmode="decimal"
-               value="${loan ? String(loan.total_amount) : ''}">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="lm-installments">${t('budget.loanInstallmentsLabel')}</label>
-        <input type="number" class="form-input" id="lm-installments" step="1" min="1" max="360"
-               inputmode="numeric" value="${loan?.installment_count ?? ''}">
-      </div>
-    </div>
-    ${loanInterestFieldsHtml(loan)}
-    <div class="form-group">
-      <label class="form-label" for="lm-start">${t('budget.loanStartMonthLabel')}</label>
-      <input type="month" class="form-input" id="lm-start" value="${esc(loan?.start_month ?? todayMonth)}">
-    </div>
-    ${isEdit ? '' : `
-    <div class="form-group">
-      <label class="form-label" for="lm-paid">${t('budget.loanPaidInstallmentsLabel')}</label>
-      <input type="number" class="form-input" id="lm-paid" step="1" min="0"
-             inputmode="numeric" value="0">
-      <p class="form-hint budget-loan-hint">${t('budget.loanPaidInstallmentsHint')}</p>
-    </div>`}
-    <div class="form-group">
-      <label class="form-label" for="lm-notes">${t('budget.loanNotesLabel')}</label>
-      <textarea class="form-input" id="lm-notes" rows="3">${esc(loan?.notes ?? '')}</textarea>
-    </div>
+    ${loanFormFieldsHtml(loan, { startMonth: todayKey().slice(0, 7) })}
     <div class="modal-panel__footer modal-panel__footer--plain">
       <div></div>
       <div style="display:flex;gap:var(--space-3)">
@@ -4188,9 +4209,7 @@ function openLoanModal(loan = null) {
     content,
     size: 'sm',
     onSave(panel) {
-      wireLoanDirectionField(panel);
-      wireLoanCurrencyFields(panel);
-      wireLoanInterestFields(panel);
+      wireLoanFormFields(panel);
       panel.querySelector('#lm-cancel').addEventListener('click', closeModal);
       panel.querySelector('#lm-save').addEventListener('click', async () => {
         const saveBtn = panel.querySelector('#lm-save');
@@ -4663,6 +4682,9 @@ async function deleteEntrySeries(id) {
 // statt Quelltext-Regex.
 export const __test = {
   monthNavHtml,
+  // #1648: die EINE Feldliste des Darlehens und ihre Verdrahtung, als Programm.
+  loanFormFieldsHtml,
+  wireLoanFormFields,
   // #1546: was "alle kuenftigen" aus einem Vorkommen an die Serie schickt.
   occurrenceSeriesBody,
   // #1035: dasselbe von der ersten Buchung aus - mit Rhythmus, Werte nur geaendert.
