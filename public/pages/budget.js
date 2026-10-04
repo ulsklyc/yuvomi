@@ -3892,7 +3892,13 @@ function loanInterestFieldsHtml(loan) {
 // Verdrahtet den Zinsmodus-Umschalter: blendet Betrag/Ratenanzahl vs. Zinsfelder
 // ein/aus und holt die Live-Vorschau (Monatsrate/Laufzeit/Gesamtzins) vom Server
 // (einzige Quelle der Zins-Mathematik). No-op, wenn der Block fehlt.
-function wireLoanInterestFields(panel) {
+//
+// `onTerm` bekommt die vom Server abgeleitete Laufzeit in Monaten, sobald die
+// Vorschau sie kennt, und `null`, solange sie unbekannt ist (kein Zins, Angaben
+// unvollständig oder ungültig, Antwort noch unterwegs). Daran deckelt der
+// Vorschlag der gezahlten Raten (#1648) - dieselbe Zahl, die POST /loans als
+// installment_count speichert, ohne eine zweite Zinsformel im Client.
+function wireLoanInterestFields(panel, { onTerm = () => {} } = {}) {
   const modeSel = panel.querySelector('#lm-interest-mode');
   if (!modeSel) return;
   const interestFields = panel.querySelector('#lm-interest-fields');
@@ -3902,9 +3908,17 @@ function wireLoanInterestFields(panel) {
   const rateLabel = panel.querySelector('#lm-fixed-rate-label');
   const variableHint = panel.querySelector('#lm-variable-hint');
   let timer = null;
+  // Zählt die Anfragen: eine Antwort, die von einer späteren Eingabe überholt
+  // wurde, darf weder Text noch Laufzeit setzen - sonst deckelte der Vorschlag
+  // an der Laufzeit der VORIGEN Angaben.
+  let request = 0;
 
   const requestPreview = () => {
     const mode = modeSel.value;
+    const seq = ++request;
+    clearTimeout(timer);
+    // Jede Änderung macht die bekannte Laufzeit ungültig, bis die neue da ist.
+    onTerm(null);
     if (mode === 'none') { preview.textContent = ''; return; }
     const body = {
       interest_mode: mode,
@@ -3919,11 +3933,12 @@ function wireLoanInterestFields(panel) {
     const incomplete = !(body.principal > 0) || !(body.fixed_rate >= 0) || !(body.initial_repayment_rate > 0)
       || (mode === 'fixed_then_variable' && !(body.fixed_period_months > 0 && body.followup_rate >= 0));
     if (incomplete) { preview.textContent = ''; return; }
-    clearTimeout(timer);
     timer = setTimeout(async () => {
       try {
         const { data } = await api.post('/budget/loans/preview', body);
+        if (seq !== request) return;
         if (!data?.ok) { preview.textContent = t('budget.loanPreviewInvalid'); return; }
+        onTerm(Number.isInteger(data.total_months) && data.total_months >= 1 ? data.total_months : null);
         // Die Vorschau rechnet in der im Dialog gewählten Darlehenswährung (#582) -
         // die Kreditsumme darüber wird ja ebenfalls in dieser Währung eingegeben.
         const currency = panel.querySelector('#lm-currency')?.value || state.currency;
@@ -3932,7 +3947,7 @@ function wireLoanInterestFields(panel) {
           term: t('budget.loanTermYearsMonths', { years: Math.floor(data.total_months / 12), months: data.total_months % 12 }),
           interest: formatAmount(data.total_interest, currency),
         });
-      } catch { preview.textContent = ''; }
+      } catch { if (seq === request) preview.textContent = ''; }
     }, 300);
   };
 
@@ -3974,17 +3989,24 @@ function wireLoanInterestFields(panel) {
  * an dem Dialog verdrahtet, der das Feld nicht hatte - der Vorschlag lief also
  * nie, und sein ReferenceError auch nicht.
  *
- * Ohne Zins kennt das Formular die Ratenanzahl; mehr als die schlägt es nicht
- * vor, weil der Server eine größere Zahl ablehnt. Mit Zins leitet der Server die
- * Anzahl ab - dort bleibt der Vorschlag ungedeckelt und die Route entscheidet.
+ * DER VORSCHLAG LÄUFT NIE IN EIN 400. POST /loans lehnt mehr gezahlte Raten ab,
+ * als das Darlehen hat, und eine Zahl, die das Formular selbst gesetzt hat, darf
+ * kein sonst gültiges Darlehen abweisen lassen. Ohne Zins steht die Ratenanzahl
+ * im Formular. Mit Zins leitet sie der Server ab; die Vorschau liefert genau
+ * diese Laufzeit (`setTerm`, aus wireLoanInterestFields). Solange sie unbekannt
+ * ist, schlägt das Feld 0 vor statt einer ungeprüften Zahl.
+ *
+ * @returns {{ setTerm: (months: number|null) => void }}
  */
 function wireLoanPaidInstallmentsField(panel) {
   const paid = panel.querySelector('#lm-paid');
-  if (!paid) return; // Bearbeiten-Modus: das Feld gibt es dort bewusst nicht.
+  // Bearbeiten-Modus: das Feld gibt es dort bewusst nicht.
+  if (!paid) return { setTerm() {} };
   const start = panel.querySelector('#lm-start');
   const installments = panel.querySelector('#lm-installments');
   const modeSel = panel.querySelector('#lm-interest-mode');
   let touched = false;
+  let derivedTerm = null;
   paid.addEventListener('input', () => { touched = true; });
 
   const suggest = () => {
@@ -3993,9 +4015,11 @@ function wireLoanPaidInstallmentsField(panel) {
     if (!m) return;
     const now = todayKey().slice(0, 7).split('-');
     let months = Math.max(0, (Number(now[0]) - Number(m[1])) * 12 + (Number(now[1]) - Number(m[2])));
-    const count = parseInt(installments?.value, 10);
-    if ((modeSel?.value ?? 'none') === 'none' && Number.isInteger(count) && count >= 1) {
-      months = Math.min(months, count);
+    if ((modeSel?.value ?? 'none') === 'none') {
+      const count = parseInt(installments?.value, 10);
+      if (Number.isInteger(count) && count >= 1) months = Math.min(months, count);
+    } else {
+      months = derivedTerm === null ? 0 : Math.min(months, derivedTerm);
     }
     paid.value = String(months);
   };
@@ -4003,6 +4027,12 @@ function wireLoanPaidInstallmentsField(panel) {
   installments?.addEventListener('input', suggest);
   modeSel?.addEventListener('change', suggest);
   suggest();
+  return {
+    setTerm(months) {
+      derivedTerm = months;
+      suggest();
+    },
+  };
 }
 
 /**
@@ -4066,8 +4096,10 @@ function loanFormFieldsHtml(loan, { startMonth }) {
 function wireLoanFormFields(panel) {
   wireLoanDirectionField(panel);
   wireLoanCurrencyFields(panel);
-  wireLoanInterestFields(panel);
-  wireLoanPaidInstallmentsField(panel);
+  // Erst das Feld der gezahlten Raten, dann die Zinsfelder: die Vorschau meldet
+  // ihre Laufzeit schon beim ersten Durchlauf.
+  const paid = wireLoanPaidInstallmentsField(panel);
+  wireLoanInterestFields(panel, { onTerm: paid.setTerm });
 }
 
 async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave = false } = {}) {
