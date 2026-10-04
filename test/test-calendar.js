@@ -4221,8 +4221,11 @@ function splitTopLevel(text, isSeparator) {
   for (let i = 0; i < text.length; i += 1) {
     const ch = text[i];
     if (ch === '\\' && i + 1 < text.length) {
-      cur += ch + text[i + 1];
-      i += 1;
+      // Ein Backslash vor dem Zeilenende setzt den String fort, und CRLF ist
+      // EIN Zeilenende: bliebe das \n stehen, beendete es den String.
+      const escaped = text.startsWith('\r\n', i + 1) ? '\r\n' : text[i + 1];
+      cur += ch + escaped;
+      i += escaped.length;
       continue;
     }
     if (rawUrl) {
@@ -4330,6 +4333,8 @@ test('RTL-Leser: eine Klammer in einem CSS-String oder hinter einem Backslash ve
     ['background-image: URL( a"(b.png ); margin-left: 1px', 'margin-left: 1px'],
     ['content: "("; margin: 0 1px 0 2px', 'margin: 0 1px 0 2px'],
     ['content: "(\n; margin-left: 1px', 'margin-left: 1px'],
+    ['content: "a\\\nb ( c"; margin-left: 1px', 'margin-left: 1px'],
+    ['content: "a\\\r\nb ( c"; margin-left: 1px', 'margin-left: 1px'],
     ['margin: 0 ); margin-left: 1px', 'margin-left: 1px'],
   ];
   for (const [body, want] of blind) {
@@ -4339,6 +4344,7 @@ test('RTL-Leser: eine Klammer in einem CSS-String oder hinter einem Backslash ve
   const quiet = [
     'content: "x; margin-left: 1px"; color: red',
     "content: 'a; float: right; b'; color: red",
+    'content: "a\\\r\nb; margin-left: 1px"; color: red',
     'content: "("; margin-inline-start: 1px',
     'quotes: "(" ")"; padding: 0 1px 0 1px',
     'background-image: url(a.png); margin-inline: 0 1px',
