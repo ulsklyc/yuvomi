@@ -15,16 +15,28 @@
  *     liefert der Service Worker fuer JEDE Navigation die Shell (`sw.js`,
  *     networkFirst), also auch fuer `/docs` oder einen Feed. Eine Umleitung
  *     ersetzte dort die Adresse, die nach dem naechsten Neuladen wieder stimmt.
+ *     Die Ausnahme reicht so weit wie der Server (server/index.js) und nicht
+ *     weiter: `/api` und `/mcp` sind ganze Unterbaeume, `/docs` gibt es nur
+ *     genau so, und alles andere (Feeds, Shell, Statisches) ist eine DATEI -
+ *     ein Punkt im letzten Segment, solange keine App-Route darueber steht.
+ *     `/settings/missing.js` liegt unter einer Route und ist ein Tippfehler.
  *   - Der Erweiterungsraum `/m/<id>` (server/services/modules.js), solange
  *     keine aktive Modulroute darueber steht. Die Modulliste kommt erst mit der
  *     Anmeldung, ein abgeschaltetes Modul steht nicht in `allRoutes()`, und ein
  *     gescheitertes `/modules` ist keine Aussage, dass es das Modul nicht gibt.
  */
 
-/** Erstes Pfadsegment der Routen, die `server/index.js` selbst bedient. */
-const SERVER_SEGMENTS = new Set(['api', 'docs', 'feed', 'mcp']);
+/** Erstes Pfadsegment der Unterbaeume, die `server/index.js` ganz bedient. */
+const SERVER_SUBTREES = new Set(['api', 'mcp']);
+/** Pfade, die der Server nur genau so bedient. */
+const SERVER_PATHS = new Set(['/docs']);
 /** Erstes Pfadsegment der Erweiterungsrouten. */
 const EXTENSION_SEGMENT = 'm';
+
+/** Der Pfad ohne Query und Hash. */
+function barePath(path) {
+  return path.split(/[?#]/)[0];
+}
 
 /**
  * @param {unknown} path - Pfad, wie `navigate()` ihn bekommt (Query/Hash erlaubt)
@@ -35,45 +47,60 @@ const EXTENSION_SEGMENT = 'm';
  */
 export function unknownPathDetour(path, { known, landable = known } = {}) {
   if (typeof path !== 'string' || !path.startsWith('/')) return null;
-  const clean = path.split(/[?#]/)[0];
+  const clean = barePath(path);
   const knownSet = new Set(known);
   if (knownSet.has(clean)) return null;
 
   const segments = clean.split('/').filter(Boolean);
   if (!segments.length) return null;
-  if (SERVER_SEGMENTS.has(segments[0])) return null;
-  // Eine Datei (`/sw.js`, `/index.html`, `/openapi.json`) ist keine Seite.
-  if (segments[segments.length - 1].includes('.')) return null;
+  if (SERVER_SUBTREES.has(segments[0])) return null;
+  const trimmed = `/${segments.join('/')}`;
+  if (SERVER_PATHS.has(trimmed)) return null;
 
   // Nur ein Schraegstrich zu viel: dieselbe Seite, also kein Hinweis.
-  const trimmed = `/${segments.join('/')}`;
   if (trimmed !== clean && knownSet.has(trimmed)) return { target: trimmed, notify: false };
 
-  const landableSet = new Set(landable);
+  const ancestors = [];
   for (let depth = segments.length - 1; depth > 0; depth -= 1) {
-    const ancestor = `/${segments.slice(0, depth).join('/')}`;
-    if (landableSet.has(ancestor)) return { target: ancestor, notify: true };
+    ancestors.push(`/${segments.slice(0, depth).join('/')}`);
   }
+  // Eine Datei (`/sw.js`, `/index.html`, `/feed/calendar/x.ics`) ist keine
+  // Seite - es sei denn, sie laege unter einer Route der App.
+  const underAppRoute = ancestors.some((ancestor) => knownSet.has(ancestor));
+  if (!underAppRoute && segments[segments.length - 1].includes('.')) return null;
+
+  const landableSet = new Set(landable);
+  const target = ancestors.find((ancestor) => landableSet.has(ancestor));
+  if (target) return { target, notify: true };
   if (segments[0] === EXTENSION_SEGMENT) return null;
   return { target: '/', notify: true };
 }
 
 /**
- * Folgt dem Umweg.
+ * Was aus dem Umweg in `navigate()` wird: der Pfad, mit dem die Navigation
+ * weiterlaeuft, und die Adresse fuer die History.
  *
- * `pushState === false` heisst Kaltstart oder Zurueck/Vor: die tote Adresse IST
- * der laufende History-Eintrag und wird ersetzt - Zurueck fuehrt danach nicht
- * wieder auf sie. Bei einem Wechsel innerhalb der App steht sie noch gar nicht
- * in der History; der laufende Eintrag gehoert der Seite davor und bleibt.
+ * Eine ECHT unbekannte Adresse verliert Query und Hash - sie gehoerten zu einer
+ * Seite, die es nicht gibt. Bei einem blossen Schraegstrich zu viel ist die
+ * Seite die gemeinte, und ihre Parameter bleiben: `/settings/?view=domain`
+ * waehlt eine Ansicht, `?sync_ok` traegt die Rueckmeldung eines OAuth-Rundwegs.
  *
- * Der Hinweis kommt NACH der Seite: beim Kaltstart gibt es die Toast-Flaeche
- * erst mit der Shell.
+ * Woher die Parameter kommen, haengt am Weg: Kaltstart und Zurueck/Vor reichen
+ * nur `location.pathname` herein, sie stehen in der Adresszeile; bei einem
+ * Wechsel innerhalb der App stehen sie im Pfad, und die Adresszeile gehoert
+ * noch der Seite davor.
  *
  * @param {{ target: string, notify: boolean }} detour
- * @param {{ pushState: boolean, history: History, navigate: Function, notify: Function }} deps
+ * @param {string} path - der Pfad, der zum Umweg fuehrte
+ * @param {{ pushState: boolean, location: { search: string, hash: string } }} context
+ * @returns {{ path: string, address: string }}
  */
-export async function followUnknownPathDetour(detour, { pushState, history, navigate, notify }) {
-  if (!pushState) history.replaceState({ path: detour.target }, '', detour.target);
-  await navigate(detour.target, pushState);
-  if (detour.notify) notify();
+export function detourPaths(detour, path, { pushState, location }) {
+  if (detour.notify) return { path: detour.target, address: detour.target };
+  const suffix = path.slice(barePath(path).length);
+  const query = suffix.split('#')[0];
+  return {
+    path: `${detour.target}${query}`,
+    address: pushState ? `${detour.target}${suffix}` : `${detour.target}${location.search}${location.hash}`,
+  };
 }

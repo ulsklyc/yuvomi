@@ -87,15 +87,33 @@ test('Erweiterungsrouten: eine nicht geladene oder abgeschaltete Modulroute gilt
 test('Pfade, die der Server beantwortet, werden nicht umgeleitet', async () => {
   const { unknownPathDetour } = await load();
   for (const path of [
-    '/api/v1/tasks', '/api', '/docs', '/docs/', '/feed/calendar/abc.ics', '/mcp', '/mcp/sse',
-    '/openapi.json', '/sw.js', '/index.html', '/manifest.webmanifest', '/styles/tokens.css',
-    '/locales/de.json', '/icons/icon-192.png', '/settings/registry.js',
+    // Unterbaeume, die server/index.js ganz bedient (`app.use`).
+    '/api/v1/tasks', '/api', '/api/typo', '/mcp', '/mcp/sse',
+    // `/docs` gibt es am Server nur genau so (mit und ohne Schraegstrich).
+    '/docs', '/docs/',
+    // Dateien ausserhalb jeder App-Route: Feeds, Shell, Statisches.
+    '/feed/calendar/abc.ics', '/openapi.json', '/sw.js', '/index.html', '/manifest.webmanifest',
+    '/styles/tokens.css', '/locales/de.json', '/icons/icon-192.png',
   ]) {
     assert.equal(unknownPathDetour(path, { known: KNOWN }), null, path);
   }
   // Nur das ERSTE Segment entscheidet: `/apiary` ist kein Serverpfad.
   assert.deepEqual(unknownPathDetour('/apiary', { known: KNOWN }), { target: '/', notify: true });
   assert.deepEqual(unknownPathDetour('/tasks/api', { known: KNOWN }), { target: '/tasks', notify: true });
+});
+
+test('die Ausnahmen reichen nicht weiter als der Server (Review #1638)', async () => {
+  const { unknownPathDetour } = await load();
+  // Unter `/docs` bedient der Server nichts: `/docs/typo` bekommt die Shell.
+  assert.deepEqual(unknownPathDetour('/docs/typo', { known: KNOWN }), { target: '/', notify: true });
+  // Ein Feed ohne Datei ist keiner.
+  assert.deepEqual(unknownPathDetour('/feed/calendar', { known: KNOWN }), { target: '/', notify: true });
+  // Ein Punkt macht einen Pfad UNTER einer App-Route nicht zur Datei.
+  assert.deepEqual(unknownPathDetour('/settings/missing.js', { known: KNOWN }), { target: '/settings', notify: true });
+  assert.deepEqual(unknownPathDetour('/tasks/v1.2', { known: KNOWN }), { target: '/tasks', notify: true });
+  // Auch unter einer Route, die gerade kein Landeplatz ist.
+  const landable = KNOWN.filter((path) => path !== '/budget');
+  assert.deepEqual(unknownPathDetour('/budget/report.pdf', { known: KNOWN, landable }), { target: '/', notify: true });
 });
 
 test('ein nicht erreichbarer Vorfahr wird uebersprungen', async () => {
@@ -115,105 +133,44 @@ test('kein Pfad, kein Urteil', async () => {
   }
 });
 
-// ─── Die Wirkung ────────────────────────────────────────────────────────────
+// ─── Adresse und Pfad nach dem Umweg ────────────────────────────────────────
 
-function fakeHistory(entries) {
-  const stack = [...entries];
-  const calls = [];
-  return {
-    stack,
-    calls,
-    replaceState(state, _title, url) { calls.push(['replace', url, state]); stack[stack.length - 1] = url; },
-    pushState(state, _title, url) { calls.push(['push', url, state]); stack.push(url); },
-  };
-}
-
-test('Kaltstart auf toter Adresse: Eintrag ersetzt, nicht ergaenzt; Hinweis genau einmal, nach der Seite', async () => {
-  const { unknownPathDetour, followUnknownPathDetour } = await load();
-  const history = fakeHistory(['/tasks', '/settings/xyz']);
-  const order = [];
-  const detour = unknownPathDetour('/settings/xyz', { known: KNOWN });
-  await followUnknownPathDetour(detour, {
-    pushState: false,
-    history,
-    navigate: async (path, push) => { order.push(['navigate', path, push]); },
-    notify: () => order.push(['notify']),
-  });
-  assert.deepEqual(history.calls, [['replace', '/settings', { path: '/settings' }]]);
-  assert.deepEqual(history.stack, ['/tasks', '/settings'], 'Zurueck fuehrt nicht wieder auf die tote Adresse');
-  assert.deepEqual(order, [['navigate', '/settings', false], ['notify']]);
-});
-
-test('Wechsel innerhalb der App auf eine tote Adresse: sie kommt nie in die History', async () => {
-  const { unknownPathDetour, followUnknownPathDetour } = await load();
-  const history = fakeHistory(['/tasks']);
-  const order = [];
-  await followUnknownPathDetour(unknownPathDetour('/xyz', { known: KNOWN }), {
-    pushState: true,
-    history,
-    navigate: async (path, push) => { order.push(['navigate', path, push]); },
-    notify: () => order.push(['notify']),
-  });
-  // Der laufende Eintrag gehoert der Seite davor - er wird nicht ueberschrieben.
-  assert.deepEqual(history.calls, []);
-  assert.deepEqual(order, [['navigate', '/', true], ['notify']]);
-});
-
-test('nur ein Schraegstrich zu viel: Adresse berichtigt, kein Hinweis', async () => {
-  const { unknownPathDetour, followUnknownPathDetour } = await load();
-  const history = fakeHistory(['/settings/']);
-  let notified = 0;
-  await followUnknownPathDetour(unknownPathDetour('/settings/', { known: KNOWN }), {
-    pushState: false,
-    history,
-    navigate: async () => {},
-    notify: () => { notified += 1; },
-  });
-  assert.deepEqual(history.stack, ['/settings']);
-  assert.equal(notified, 0);
-});
-
-test('keine Schleife: das Ziel ist selbst nie unbekannt, und der Start auf / bleibt still', async () => {
-  const { unknownPathDetour, followUnknownPathDetour } = await load();
-  // Ein Router im Kleinen, so verdrahtet wie navigate().
-  async function run(start) {
-    const history = fakeHistory([start]);
-    const rendered = [];
-    let notified = 0;
-    let hops = 0;
-    async function navigate(path, pushState) {
-      hops += 1;
-      assert.ok(hops < 5, 'Umleitungsschleife');
-      const detour = unknownPathDetour(path, { known: KNOWN });
-      if (detour) {
-        await followUnknownPathDetour(detour, { pushState, history, navigate, notify: () => { notified += 1; } });
-        return;
-      }
-      rendered.push(path);
-    }
-    await navigate(start, false);
-    return { history, rendered, notified, hops };
+test('echt unbekannt: Query und Hash fallen weg, in Pfad und Adresse', async () => {
+  const { unknownPathDetour, detourPaths } = await load();
+  const location = { search: '?view=domains', hash: '#frag' };
+  for (const pushState of [true, false]) {
+    const path = '/settings/xyz?view=domains#frag';
+    assert.deepEqual(
+      detourPaths(unknownPathDetour(path, { known: KNOWN }), path, { pushState, location }),
+      { path: '/settings', address: '/settings' },
+    );
   }
+});
 
-  for (const [start, target] of [['/settings/xyz', '/settings'], ['/xyz', '/'], ['/a/b/c/d', '/']]) {
-    const res = await run(start);
-    assert.deepEqual(res.rendered, [target], start);
-    assert.equal(res.notified, 1, `${start}: Hinweis genau einmal`);
-    assert.equal(res.hops, 2, `${start}: ein Umweg, kein zweiter`);
-    assert.deepEqual(res.history.stack, [target], start);
+test('nur ein Schraegstrich zu viel: Query und Hash bleiben (Review #1638)', async () => {
+  const { unknownPathDetour, detourPaths } = await load();
+  // Kaltstart und Zurueck/Vor: navigate() bekommt nur `location.pathname`,
+  // die Parameter stehen in der Adresszeile - und die Seite liest sie dort.
+  for (const [search, hash] of [['?view=domain&domain=calendar', ''], ['?sync_ok', ''], ['?sync_error=google', '#top'], ['', '']]) {
+    const path = '/settings/';
+    assert.deepEqual(
+      detourPaths(unknownPathDetour(path, { known: KNOWN }), path, { pushState: false, location: { search, hash } }),
+      { path: '/settings', address: `/settings${search}${hash}` },
+      search + hash,
+    );
   }
-
-  const home = await run('/');
-  assert.deepEqual(home.rendered, ['/']);
-  assert.equal(home.notified, 0, 'kein Hinweis beim Start auf /');
-  assert.deepEqual(home.history.calls, []);
-
-  const known = await run('/m/garden');
-  assert.deepEqual(known.rendered, ['/m/garden']);
-  assert.equal(known.notified, 0);
+  // Wechsel innerhalb der App: die Parameter stehen im uebergebenen Pfad, die
+  // Adresszeile gehoert noch der Seite davor.
+  const inApp = '/settings/?view=domain&domain=calendar#x';
+  assert.deepEqual(
+    detourPaths(unknownPathDetour(inApp, { known: KNOWN }), inApp, { pushState: true, location: { search: '?tab=budget', hash: '' } }),
+    { path: '/settings?view=domain&domain=calendar', address: '/settings?view=domain&domain=calendar#x' },
+  );
 });
 
 // ─── Die Verdrahtung in navigate() ──────────────────────────────────────────
+// navigate() haengt am Browser; geprueft wird am Quelltext die REIHENFOLGE, an
+// der die Befunde aus dem Review zu #1638 hingen.
 
 function navigateBody() {
   const start = routerSrc.indexOf('async function navigate(');
@@ -221,41 +178,94 @@ function navigateBody() {
   assert.ok(start > 0 && end > start, 'navigate() nicht gefunden');
   return routerSrc.slice(start, end);
 }
+const count = (haystack, needle) => haystack.split(needle).length - 1;
 
-test('navigate() fragt nach der unbekannten Adresse, und zwar erst nach dem zweiten Routen-Lookup', () => {
+test('navigate() loest den Umweg selbst auf: kein verschachteltes navigate, eine Sperre', () => {
+  const body = navigateBody();
+  // Ein un-awaitetes navigate(target) gab im finally die Sperre frei, waehrend
+  // das innere noch lud - ein zweiter Klick startete eine parallele Navigation.
+  assert.equal(count(routerSrc, 'followUnknownPathDetour'), 0, 'der Umweg laeuft wieder ueber ein zweites navigate()');
+  assert.equal(count(body, 'takeDetour('), 2, 'genau zwei Stellen: vor dem Verlassen-Schutz und nach dem zweiten Lookup');
+  const helper = body.indexOf('const takeDetour = ');
+  assert.ok(helper > 0, 'takeDetour nicht gefunden');
+  const helperBody = body.slice(helper, body.indexOf('};', helper));
+  assert.doesNotMatch(helperBody, /navigate\(/, 'takeDetour ruft navigate()');
+  assert.match(helperBody, /path = /, 'takeDetour berichtigt den Pfad dieser Navigation');
+});
+
+test('der Verlassen-Schutz fragt genau einmal, und zwar nach dem berichtigten Ziel', () => {
+  const body = navigateBody();
+  assert.equal(count(body, 'mayLeave('), 1);
+  const early = body.indexOf('takeDetour(userOrPushState)');
+  const guard = body.indexOf('mayLeave(path)');
+  assert.ok(early > 0, 'der fruehe Umweg fehlt');
+  assert.ok(early < guard, 'der Umweg wird erst nach dem Verlassen-Schutz aufgeloest - der fragte dann nach der toten Adresse');
+  // Frueh nur, wenn die Modulliste da ist: angemeldet und Praeferenzen geladen.
+  const condition = body.slice(body.lastIndexOf('if (', early), early);
+  assert.match(condition, /currentUser/);
+  assert.match(condition, /_preferencesLoaded/);
+});
+
+test('bricht der Verlassen-Schutz ab, aendert sich weder Adresse noch erscheint der Hinweis', () => {
+  const body = navigateBody();
+  const guard = body.indexOf('mayLeave(path)');
+  const lock = body.indexOf('isNavigating = true;');
+  assert.ok(guard > 0 && lock > guard);
+  // Alles, was der Umweg an der Welt aendert, steht hinter der Sperre.
+  const replace = body.indexOf('commitDetourAddress(');
+  assert.ok(replace > lock, 'die Adresse wird vor dem Verlassen-Schutz ersetzt');
+  // Vor der Sperre steht `history.replaceState` nur in der DEFINITION des Helfers.
+  const helper = body.indexOf('const commitDetourAddress = ');
+  const beforeLock = body.slice(0, helper) + body.slice(body.indexOf('};', helper), lock);
+  assert.equal(count(beforeLock, 'history.replaceState'), 0);
+  assert.equal(count(beforeLock, 'showToast('), 0);
+  const toast = body.indexOf("showToast(t('common.unknownAddress')");
+  assert.ok(toast > lock, 'der Hinweis steht vor dem Verlassen-Schutz');
+  assert.equal(count(routerSrc, "t('common.unknownAddress')"), 1, 'Hinweis genau einmal');
+  // Im finally: auch die Soft-Navigation (Settings-Blatt) kehrt frueh zurueck.
+  assert.ok(toast > body.lastIndexOf('} finally {'), 'der Hinweis steht nicht im finally - die Soft-Navigation bliebe stumm');
+});
+
+test('der zweite Umweg steht nach dem zweiten Routen-Lookup und vor dem History-Eintrag', () => {
   const body = navigateBody();
   const secondLookup = body.indexOf('route = allRoutes().find((r) => r.path === basePath) ?? route;');
-  const check = body.indexOf('unknownPathDetour(basePath');
+  const late = body.indexOf('takeDetour(pushState)');
   const push = body.indexOf('history.pushState({ path }');
   assert.ok(secondLookup > 0, 'zweiter Routen-Lookup nicht gefunden');
-  assert.ok(check > 0, 'navigate() ruft unknownPathDetour(basePath, ...) nicht');
-  // Erst nach dem Auth-Guard ist die Modulliste geladen: davor waere jede
-  // Erweiterungsroute "unbekannt".
-  assert.ok(check > secondLookup, 'die Pruefung steht vor dem zweiten Lookup - Modulrouten sind dort noch nicht geladen');
-  assert.ok(check < push, 'die Pruefung steht hinter dem History-Eintrag der toten Adresse');
+  // Erst nach dem Auth-Guard ist die Modulliste geladen: davor waere beim
+  // Kaltstart jede Erweiterungsroute "unbekannt".
+  assert.ok(late > secondLookup, 'die Pruefung steht vor dem zweiten Lookup');
+  assert.ok(late < push, 'die Pruefung steht hinter dem History-Eintrag der toten Adresse');
+  const block = body.slice(late, late + 700);
+  for (const needle of ['basePath = ', 'currentPath = basePath', 'scrollTarget = ', 'route = ', 'commitDetourAddress(']) {
+    assert.ok(block.includes(needle), `nach dem Umweg fehlt: ${needle}`);
+  }
 });
 
-test('navigate() gibt den Umweg frei, folgt ihm und rendert die tote Adresse nicht', () => {
+test('die Adresse des Umwegs: ersetzt bei Kaltstart/Zurueck, sonst als neuer Eintrag', () => {
   const body = navigateBody();
-  const check = body.indexOf('unknownPathDetour(basePath');
-  const block = body.slice(check, check + 1200);
-  assert.match(block, /isNavigating = false;/, 'ohne Freigabe bliebe navigate(target) am Riegel haengen');
-  assert.match(block, /followUnknownPathDetour\(/);
-  assert.match(block, /navigate,/, 'followUnknownPathDetour bekommt navigate');
-  assert.match(block, /showToast\(t\('common\.unknownAddress'\)/, 'der Hinweis kommt aus dem Locale-Key');
-  assert.match(block, /return;/);
-  // Nur genau ein Aufrufer: ein zweiter (etwa am ersten Lookup) liefe vor dem
-  // Laden der Modulliste.
-  assert.equal(routerSrc.split('unknownPathDetour(').length - 1, 1);
+  const helper = body.indexOf('const commitDetourAddress = ');
+  assert.ok(helper > 0, 'commitDetourAddress nicht gefunden');
+  const helperBody = body.slice(helper, body.indexOf('};', helper));
+  assert.match(helperBody, /!push && detourAddress/, 'ersetzt wird nur, wenn die tote Adresse der laufende Eintrag ist');
+  assert.match(helperBody, /history\.replaceState\(\{ path \}, '', detourAddress\)/);
+  // Der regulaere Eintrag traegt die berichtigte Adresse samt Hash.
+  assert.equal(count(body, "'', detourAddress ?? path)"), 2, 'pushState und Overlay-replaceState nehmen die berichtigte Adresse');
 });
 
-test('die bekannten Pfade sind die Routen des Routers, die erreichbaren folgen dem Modul-Guard', () => {
-  const body = navigateBody();
-  const check = body.indexOf('unknownPathDetour(basePath');
-  const block = body.slice(check - 900, check + 400);
-  assert.match(block, /allRoutes\(\)/, 'bekannt ist, was allRoutes() kennt - samt Erweiterungsrouten');
-  assert.match(block, /_disabledModules\.has\(/, 'ein abgeschaltetes Modul ist kein Landeplatz');
-  assert.match(block, /canAccessNavModule\(/, 'ein gesperrtes Modul ist kein Landeplatz');
+test('bekannt ist, was allRoutes() kennt; Landeplatz ist alles ausser Anmeldung, Einrichtung und gesperrten Modulen', () => {
+  const start = routerSrc.indexOf('function unknownDetourFor(');
+  assert.ok(start > 0, 'unknownDetourFor nicht gefunden');
+  const fn = routerSrc.slice(start, routerSrc.indexOf('\n}\n', start));
+  assert.match(fn, /allRoutes\(\)/, 'bekannt ist, was allRoutes() kennt - samt Erweiterungsrouten');
+  assert.match(fn, /_disabledModules\.has\(/, 'ein abgeschaltetes Modul ist kein Landeplatz');
+  assert.match(fn, /canAccessNavModule\(/, 'ein gesperrtes Modul ist kein Landeplatz');
+  // Oeffentliche Routen (`/pair`, `/join`) bleiben Landeplatz (Review #1638);
+  // nur die zwei, von denen eine angemeldete Sitzung sofort wieder wegfuehrt, nicht.
+  assert.doesNotMatch(fn, /requiresAuth/, 'oeffentliche Routen sind wieder ausgeschlossen');
+  assert.match(fn, /'\/login'/);
+  assert.match(fn, /'\/setup'/);
+  assert.equal(count(routerSrc, 'unknownPathDetour('), 1, 'genau ein Aufrufer');
 });
 
 // ─── Kein Weg der App fuehrt selbst auf eine unbekannte Adresse ─────────────
