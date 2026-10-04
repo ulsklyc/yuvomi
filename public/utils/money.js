@@ -413,17 +413,41 @@ export function centsToAmountInput(cents, currency) {
  * erfasst) erscheint so, wie er gespeichert ist. Ihn hier zu runden hiesse, beim
  * blossen Öffnen des Dialogs einen anderen Betrag ins Feld zu schreiben.
  *
+ * Gearbeitet wird auf dem TEXT, nicht auf der Zahl: Ganzzahl- und Bruchteil
+ * werden getrennt übernommen und nur Ziffern und Trenner der Region eingesetzt.
+ * Der Server rechnet Geld in ganzen Einheiten bis `Number.MAX_SAFE_INTEGER`, als
+ * Dezimalbetrag passt das nicht mehr in ein Gleitkomma: `90071992547409.91`
+ * stand über `Number()` als `90071992547409,90` im Feld, und wer den Dialog
+ * öffnete und unverändert speicherte, zog einen Cent ab.
+ *
  * Leer bleibt leer, und was keine Zahl ist, kommt unverändert zurück - ein
  * Feld soll nie "NaN" zeigen.
  */
 export function amountToInput(amount, currency) {
   if (amount === '' || amount == null) return '';
-  const value = Number(amount);
-  if (!Number.isFinite(value)) return String(amount);
+  // Eine Zahl (die Übergabe aus dem Budget reicht 12.5) hat als Text ihre
+  // kürzeste eindeutige Schreibweise; ein Dezimaltext des Servers bleibt, was
+  // er ist. Exponentenschreibweise trifft das Muster nicht und läuft unten
+  // über Intl.
+  const text = String(amount).trim();
   const digits = currencyFractionDigits(currency);
-  return getNumberFormat({
-    useGrouping: false, minimumFractionDigits: digits, maximumFractionDigits: Math.max(digits, 20),
-  }).format(value);
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(text);
+  if (!match) {
+    const value = Number(text);
+    if (text === '' || !Number.isFinite(value)) return String(amount);
+    return getNumberFormat({
+      useGrouping: false, minimumFractionDigits: digits, maximumFractionDigits: Math.max(digits, 20),
+    }).format(value);
+  }
+  const [, sign, whole, fraction = ''] = match;
+  // Ziffern und Trenner aus Intl abgeleitet, wie in toDecimalString - genau die
+  // Zeichen, die jene Funktion beim Speichern wieder liest.
+  const plain = getNumberFormat({ useGrouping: false, maximumFractionDigits: 0 });
+  const regional = (run) => [...run].map((char) => plain.format(Number(char))).join('');
+  const decimalSep = getNumberFormat({ useGrouping: false, minimumFractionDigits: 1 })
+    .formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.';
+  const padded = fraction.padEnd(digits, '0');
+  return sign + regional(whole) + (padded ? decimalSep + regional(padded) : '');
 }
 
 /**

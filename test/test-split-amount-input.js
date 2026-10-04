@@ -501,3 +501,17 @@ test('Eine Zahlung belegt die offene Schuld in der Schreibweise der Region vor u
     assert.equal(felder['[name="payee_id"]'].value, '1');
   });
 });
+
+test('Hin- und Rueckweg am Rand des Zahlenraums: unveraendert speichern zieht keinen Cent ab', async () => {
+  // 90071992547409.91 EUR sind 9007199254740991 Cent, der groesste Betrag, den der
+  // Server annimmt. Als Gleitkomma ist das 90071992547409.9.
+  const gross = bestandsAusgabe({ amount: '90071992547409.91', amount_minor: 9007199254740991 });
+  for (const locale of ['de', 'en-US', 'fa']) {
+    await unter(locale, async () => {
+      const feld = vorbelegt(await geoeffnet(() => split.openExpenseModal(gross)), 'amount');
+      const { gesendet, gemeldet } = await speichern(() => split.openExpenseModal(gross), formular({ amount: feld }).panel);
+      assert.deepEqual(gemeldet, [], `${locale}: "${feld}"`);
+      assert.equal(gesendet[0]?.daten.amount, '90071992547409.91', `${locale}: "${feld}"`);
+    });
+  }
+});

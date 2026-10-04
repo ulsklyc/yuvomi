@@ -396,3 +396,28 @@ test('amountToInput: der ausgegebene Wert kommt wieder herein, in jeder Region',
     assert.equal(toDecimalString('12.500'), '', 'Gegenprobe: der rohe Serverwert kaeme unter de nicht zurueck');
   });
 });
+
+test('amountToInput: der Dezimaltext des Servers geht nicht durch ein Gleitkomma', () => {
+  // Der Server rechnet in ganzen Einheiten bis Number.MAX_SAFE_INTEGER und gibt
+  // sie als Dezimaltext zurueck. Als Zahl passt so ein Betrag nicht mehr:
+  // Number('90071992547409.91') ist 90071992547409.9, im Feld stand ",90", und
+  // unveraendert speichern zog einen Cent ab.
+  withFormatLocale('de', () => {
+    assert.equal(amountToInput('90071992547409.91', 'EUR'), '90071992547409,91');
+    assert.equal(amountToInput('90071992547409.93', 'EUR'), '90071992547409,93');
+    assert.equal(amountToInput('9007199254740.991', 'KWD'), '9007199254740,991');
+    assert.equal(amountToInput('9007199254740991', 'JPY'), '9007199254740991');
+    assert.equal(amountToInput('12.5', 'EUR'), '12,50', 'aufgefuellt wird weiter');
+    assert.equal(amountToInput('12.500', 'EUR'), '12,500', 'und nichts abgeschnitten');
+    assert.equal(amountToInput('-3.50', 'EUR'), '-3,50');
+    assert.equal(amountToInput(1e21, 'EUR'), '1000000000000000000000,00', 'Exponentenschreibweise laeuft ueber Intl');
+  });
+  for (const locale of ['de', 'en-US', 'fr', 'fa', 'ar-EG', 'hi']) {
+    withFormatLocale(locale, () => {
+      for (const [betrag, currency] of [['90071992547409.91', 'EUR'], ['9007199254740.991', 'KWD'], ['9007199254740991', 'JPY']]) {
+        assert.equal(toDecimalString(amountToInput(betrag, currency)), betrag, `${locale}: ${betrag} ${currency}`);
+      }
+    });
+  }
+  withFormatLocale('fa', () => assert.equal(amountToInput('90071992547409.91', 'EUR'), '۹۰۰۷۱۹۹۲۵۴۷۴۰۹٫۹۱'));
+});
