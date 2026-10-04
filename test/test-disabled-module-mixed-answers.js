@@ -36,6 +36,8 @@ const { default: calendarRouter } = await import('../server/routes/calendar.js')
 const { default: birthdaysRouter } = await import('../server/routes/birthdays.js');
 const { buildFeed } = await import('../server/services/ics-export.js');
 const { getCountdowns } = await import('../server/services/countdowns.js');
+const { getUpcomingEvents } = await import('../server/services/calendar-event-reader.js');
+const { searchEverything } = await import('../server/services/search.js');
 const householdModules = await import('../server/services/household-modules.js');
 const { todayKey } = await import('../server/utils/timezone.js');
 
@@ -264,6 +266,13 @@ test('Die abgeloeste Einzelinstanz einer Geburtstagsserie laeuft bei abgeschalte
     assert.ok(!titles(off).includes('Zebrafink verschobene Feier'));
     assert.ok(!buildFeed(db, ADMIN).includes('Zebrafink verschobene Feier'));
     assert.ok(titles(off).includes(EVENT_TITLE));
+
+    // Dieselbe Zeile ueber den GETEILTEN Leser (Codex-Befund in #1664): er
+    // erkannte Geburtstage nur am Join der Stammzeile, die Instanz kam durch.
+    const s = await snapshot();
+    const everywhere = JSON.stringify([s.upcoming, s.search, s.dashboard]);
+    assert.ok(!everywhere.includes('Zebrafink verschobene Feier'),
+      'auch nicht in /calendar/upcoming, der Terminsuche und der Uebersicht');
   } finally {
     setDisabled([]);
     db.prepare('DELETE FROM calendar_events WHERE id = ?').run(childId);
@@ -289,4 +298,54 @@ test('modulesLeftOut(): beide Achsen in einem Set, und die Countdowns lesen gena
   }
   const countdowns = getCountdowns(db, { userId: ADMIN, todayKey: TODAY, hiddenModules: new Set() });
   assert.equal(countdowns.items.filter((c) => c.title === EVENT_TITLE).length, 1);
+});
+
+test('Der geteilte Leser kennt den Schalter selbst: ein Aufrufer, der nicht fragt, bekommt trotzdem keine Geburtstage', () => {
+  // Genau der Aufruf des MCP-Werkzeugs `list_upcoming_events` (server/mcp/tools.js):
+  // ohne `includeBirthdays`. Stuende der Schalter nur bei den Aufrufern, lieferte
+  // jeder weiter aus, der die Frage vergisst (Codex-Befund in #1664).
+  const asMcp = () => getUpcomingEvents(db, { userId: ADMIN, limit: 20, windowDays: null, fromToday: true });
+  assert.ok(asMcp().some(isBirthday), 'Vorbedingung: eingeschaltet liefert der Leser den Geburtstag');
+  try {
+    setDisabled(['birthdays']);
+    const events = asMcp();
+    assert.deepEqual(events.filter(isBirthday), []);
+    assert.ok(titles(events).includes(EVENT_TITLE), 'der Termin des Kalenders bleibt');
+  } finally {
+    setDisabled([]);
+  }
+});
+
+test('Globale Suche: Geburtstage abgeschaltet, Kalender an - der Geburtstagstermin steht nicht unter den Terminen', () => {
+  const search = () => searchEverything(db, 'Zebrafink', ADMIN, {
+    hiddenModules: new Set(), disabledNav: householdModules.householdDisabledModules(db),
+  });
+  const open = search();
+  assert.equal(open.events.length, 2, 'Vorbedingung: Termin und Geburtstagstermin');
+  assert.equal(open.birthdays.length, 1);
+  try {
+    setDisabled(['birthdays']);
+    const off = search();
+    assert.deepEqual(off.events.map((e) => e.title), [EVENT_TITLE], 'nur der Termin des Kalenders');
+    assert.deepEqual(off.birthdays, []);
+  } finally {
+    setDisabled([]);
+  }
+});
+
+test('Countdown: ein als Countdown markierter Geburtstagstermin folgt dem Schalter `birthdays`', async () => {
+  const eventId = db.prepare('SELECT calendar_event_id AS id FROM birthdays WHERE name = ?').get(BIRTHDAY_NAME).id;
+  db.prepare('UPDATE calendar_events SET countdown = 1 WHERE id = ?').run(eventId);
+  // Termin- und Aufgaben-Ids teilen sich keinen Nummernkreis: nur mit der Quelle eindeutig.
+  const carries = (body) => body.countdowns.some((c) => c.source === 'event' && c.id === eventId);
+  try {
+    assert.ok(carries((await call('GET', '/dashboard')).body), 'Vorbedingung: eingeschaltet zaehlt er herunter');
+    setDisabled(['birthdays']);
+    const body = (await call('GET', '/dashboard')).body;
+    assert.ok(!carries(body), 'abgeschaltet nicht mehr');
+    assert.equal(body.countdownTotal, 1, 'und die Gesamtzahl zaehlt ihn nicht mit - der Termin-Countdown bleibt');
+  } finally {
+    setDisabled([]);
+    db.prepare('UPDATE calendar_events SET countdown = 0 WHERE id = ?').run(eventId);
+  }
 });

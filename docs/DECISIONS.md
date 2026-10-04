@@ -783,8 +783,12 @@ each module's own ICS feed, and incoming calendar, reminder and contact sync.
   module), `getCountdowns()` in `server/services/countdowns.js`, the global search
   (`server/routes/search.js`), `GET /reminders/pending`
   (`withoutSwitchedOffModules()` in `server/services/reminder-origins.js`), and the birthday
-  events in `GET /calendar`, `/calendar/upcoming`, `/calendar/search`
-  (`server/routes/calendar/read.js`) and in `buildFeed()` (`server/services/ics-export.js`).
+  events wherever calendar rows are read for a list: `GET /calendar` and `/calendar/search`
+  (`server/routes/calendar/read.js`), the shared reader behind `/calendar/upcoming`, the overview
+  and the MCP tool `list_upcoming_events` (`birthdayFilter()` in
+  `server/services/calendar-event-reader.js`, in the reader so that a caller cannot forget to
+  ask), the event bucket of the global search, event countdowns, and `buildFeed()`
+  (`server/services/ics-export.js`).
 - Background work: delivery in `server/services/notifications.js`, the reminder syncs for pantry,
   schedule, waste, cycle, fasting, birthdays and prevention, the medication scheduler, the waste
   URL sources and the hourly recipe provider sync.

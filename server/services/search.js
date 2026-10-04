@@ -14,6 +14,7 @@ import {
   expandRecurringEvents, loadEventExceptions,
 } from './calendar-events.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
+import { notBirthdayEventSql } from './household-modules.js';
 import { shiftDateKey, todayKey } from '../utils/timezone.js';
 
 export const SEARCH_LIMIT = 5;
@@ -406,7 +407,10 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
       JOIN calendar_events e ON e.id = s.entity_id
       WHERE s.entity = 'event' AND s.search_index MATCH @match
         AND ${icsSubscriptionVisibleWhere('e', '@userId')}
-        AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}
+        AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}${
+          // Geburtstagstermine stehen in dieser Trefferart, gehoeren aber dem
+          // Schalter `birthdays` - wie in der Kalendersuche (#1660).
+          disabledNav?.has('birthdays') ? ` AND ${notBirthdayEventSql('e')}` : ''}
       ORDER BY e.start_datetime ASC
       LIMIT @limit
     `).all({ match, userId, limit: EVENT_SEARCH_CANDIDATES }), window.from, window.to, { lightweight: true })

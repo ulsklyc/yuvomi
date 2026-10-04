@@ -140,10 +140,8 @@ router.get('/upcoming', (req, res) => {
     const database = db.get();
     const expanded = serializeEvents(hydrateEventAttachmentBodies(
       database,
-      // Geburtstage abgeschaltet: wie in GET / laufen sie nicht mit (#1660).
-      getUpcomingEvents(database, {
-        userId: getUserId(req), limit, includeBirthdays: !birthdaysSwitchedOff(database),
-      }),
+      // Geburtstage abgeschaltet: der geteilte Leser laesst sie aus (#1660).
+      getUpcomingEvents(database, { userId: getUserId(req), limit }),
     ), {
       database,
       viewer: documentViewer(req),

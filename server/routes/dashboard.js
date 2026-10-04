@@ -286,10 +286,9 @@ router.get('/', (req, res) => {
    *
    * Der Standard bleibt „mit Geburtstagen": ein Filter wirkt nur, wo jemand ihn
    * gesetzt hat. Der Parameter reist deshalb nur in seiner einen Richtung. */
-  // Dazu der Haushaltsschalter (#1660): sind die Geburtstage abgeschaltet,
-  // laufen sie auch hier nicht mit, was immer der Parameter sagt.
-  const birthdaysOff = birthdaysSwitchedOff(d);
-  const includeBirthdays = !birthdaysOff && req.query.events_birthdays !== 'hide';
+  // Den Haushaltsschalter (#1660) kennt der geteilte Leser selbst: sind die
+  // Geburtstage abgeschaltet, laufen sie nicht mit, was immer hier steht.
+  const includeBirthdays = req.query.events_birthdays !== 'hide';
 
   const now = new Date();
 
@@ -348,7 +347,7 @@ router.get('/', (req, res) => {
   // abgeschalteter Kalender nimmt einem Haushalt mit eingeschalteten
   // Geburtstagen die Kachel deshalb nicht weg; die leere Fassung, die der
   // Kalender-Eintrag oben eben geschrieben hat, ueberschreibt der Block unten.
-  const birthdaysLeftOut = denied.has('calendar') || birthdaysOff;
+  const birthdaysLeftOut = denied.has('calendar') || birthdaysSwitchedOff(d);
   if (birthdaysLeftOut) Object.assign(result, emptyBirthdays());
 
   // Anstehende Termine (nächste 5, ab jetzt).
