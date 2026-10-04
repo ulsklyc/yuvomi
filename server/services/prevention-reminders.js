@@ -138,8 +138,15 @@ function syncRecordReminder(database, item, subjectId, subjectHasHealth, caregiv
  * ntfy-Kanal steht noch im Wiederholversuch, ist die Zeile "ausstehend" - und
  * mit ihr fiele ueber ON DELETE CASCADE auch der Zustellnachweis des Pushs.
  * Der Lauf nach dem Wiedereinschalten legte sie frisch an und der Push ginge
- * ein zweites Mal raus. Eine Zeile mit einem gesendeten Ziel bleibt deshalb;
- * die Zustellung haelt sie zurueck, solange das Modul aus ist.
+ * ein zweites Mal raus.
+ *
+ * DESHALB BLEIBT JEDE ZEILE, FUER DIE DIE ZUSTELLUNG SCHON BUCH FUEHRT, gleich
+ * in welchem Zustand: auch ein Ziel, das gerade UNTERWEGS ist, steht dort noch
+ * als `pending` (zweiter Codex-Befund in #1662). Wird Health in den Sekunden
+ * abgeschaltet, in denen der Zustelllauf auf den Anbieter wartet, faende sein
+ * `markSent()` sonst keine Zeile mehr. Abgeraeumt wird also nur, was noch nie
+ * angefasst wurde; den Rest haelt die Zustellung zurueck, solange das Modul aus
+ * ist.
  *
  * @param {object} database
  * @param {number|null} subjectId  eine Person, oder null fuer den ganzen Haushalt
@@ -149,7 +156,7 @@ function clearPendingWhileSwitchedOff(database, subjectId = null) {
     entity_type = ? AND dismissed = 0 AND pushed_at IS NULL
     AND NOT EXISTS (
       SELECT 1 FROM notification_deliveries nd
-      WHERE nd.reminder_id = reminders.id AND nd.status = 'sent'
+      WHERE nd.reminder_id = reminders.id
     )`;
   if (subjectId === null) {
     database.prepare(`DELETE FROM reminders WHERE ${untouched}`).run(ENTITY_TYPE);

@@ -434,6 +434,32 @@ test('Health abgeschaltet: eine zum Teil zugestellte Zeile bleibt samt Zustellna
   ]);
 });
 
+test('Health abgeschaltet: eine Zeile, deren Zustellung gerade unterwegs ist, bleibt - sonst findet markSent() sie nicht mehr', () => {
+  const u = makeUser();
+  const t = makeType({ default_interval_months: 12 });
+  const recordId = makeRecord(u, t, { given_on: '2026-01-01' });
+  syncAllPreventionReminders(db, NOW);
+  const reminderId = remindersFor(recordId)[0].id;
+  // Der Zustelllauf hat das Ziel angelegt und wartet auf den Anbieter.
+  const deliveryId = db.prepare(`
+    INSERT INTO notification_deliveries (reminder_id, provider, target_key, status)
+    VALUES (?, 'webpush', ?, 'pending')
+  `).run(reminderId, `user:${u}`).lastInsertRowid;
+
+  try {
+    setDisabledModules(['health']);
+    syncAllPreventionReminders(db, NOW);
+    syncPreventionRemindersForSubject(db, u, NOW);
+    assert.deepEqual(remindersFor(recordId).map((r) => r.id), [reminderId]);
+    assert.ok(
+      db.prepare('SELECT 1 FROM notification_deliveries WHERE id = ?').get(deliveryId),
+      'das laufende Ziel ist noch da, wenn die Antwort des Anbieters kommt',
+    );
+  } finally {
+    setDisabledModules([]);
+  }
+});
+
 test('teardown: keine Server-Ressourcen zu schliessen', () => {
   assert.ok(true);
 });
