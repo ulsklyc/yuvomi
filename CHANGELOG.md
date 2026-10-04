@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Editing a shared expense shows the amount in your household's number format.** The amount
+  field came pre-filled the way the server stores it, with a point: `12.50` in a field whose
+  placeholder says `0,00`, and `12.5` when the expense was handed over from a budget entry.
+  The same held for the exact shares and percentages of an existing split and for the open
+  debt in "Register payment". They now use the decimal separator and digits of the household
+  region, like the placeholder next to them, and are read back unchanged when you save.
+
 ## [2.72.0] - 2026-10-04
 
 ### Added

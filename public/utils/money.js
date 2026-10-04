@@ -397,10 +397,33 @@ export function toStoredNumber(value, { maximumFractionDigits = 2 } = {}) {
 }
 
 export function centsToAmountInput(cents, currency) {
+  return amountToInput(Number(cents) / 10 ** currencyFractionDigits(currency), currency);
+}
+
+/**
+ * Ein Dezimalbetrag (Zahl oder Punkt-Dezimaltext vom Server, "12.50") als Wert
+ * für ein Eingabefeld - das Gegenstück zu `toDecimalString`.
+ *
+ * Trenner und Ziffern der Region, ohne Gruppierung, aufgefüllt auf die Stellen
+ * der Währung: EUR/de "12,50", EUR/en-US "12.50", JPY "1300". Es ist dieselbe
+ * Schreibweise, die `amountPlaceholder` und `amountExample` zeigen, und
+ * `centsToAmountInput` rechnet nur vorher um.
+ *
+ * Nach oben NICHT gekappt: ein Bestandswert neben dem Raster (12,5 JPY, in EUR
+ * erfasst) erscheint so, wie er gespeichert ist. Ihn hier zu runden hiesse, beim
+ * blossen Öffnen des Dialogs einen anderen Betrag ins Feld zu schreiben.
+ *
+ * Leer bleibt leer, und was keine Zahl ist, kommt unverändert zurück - ein
+ * Feld soll nie "NaN" zeigen.
+ */
+export function amountToInput(amount, currency) {
+  if (amount === '' || amount == null) return '';
+  const value = Number(amount);
+  if (!Number.isFinite(value)) return String(amount);
   const digits = currencyFractionDigits(currency);
   return getNumberFormat({
-    useGrouping: false, minimumFractionDigits: digits, maximumFractionDigits: digits,
-  }).format(Number(cents) / 10 ** digits);
+    useGrouping: false, minimumFractionDigits: digits, maximumFractionDigits: Math.max(digits, 20),
+  }).format(value);
 }
 
 /**

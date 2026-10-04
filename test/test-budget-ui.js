@@ -1021,8 +1021,14 @@ test('keine Seite schreibt einen Dezimaltrenner von Hand um', () => {
   // Ohne useGrouping:false schriebe das Feld "1.234,56" - und genau das weist
   // toDecimalString beim naechsten Speichern ab. Der Wert kaeme also nicht
   // wieder herein, den das Feld selbst gezeigt hat.
+  // Die Schreibweise selbst steht in amountToInput (Dezimalbetrag -> Feld);
+  // centsToAmountInput rechnet nur vorher um und darf keine zweite Fassung der
+  // Formatoptionen daneben fuehren.
   const raus = clean.match(/export function centsToAmountInput[\s\S]*?\n\}/)[0];
-  assert.match(raus, /useGrouping:\s*false/, 'der Ausgabewert darf nicht gruppiert sein');
+  assert.match(raus, /amountToInput\(/, 'centsToAmountInput muss ueber amountToInput laufen');
+  assert.doesNotMatch(raus, /getNumberFormat\(/, 'centsToAmountInput formatiert wieder selbst');
+  const feld = clean.match(/export function amountToInput[\s\S]*?\n\}/)[0];
+  assert.match(feld, /useGrouping:\s*false/, 'der Ausgabewert darf nicht gruppiert sein');
 
   // Gemessen wird die GANZE Datei, nicht mehr nur der Preispfad. Die Einschraenkung
   // stand bis 09.09.2026 hier, weil shopping.js daneben Mengenangaben zerlegt
