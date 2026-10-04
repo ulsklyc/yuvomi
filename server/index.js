@@ -557,9 +557,9 @@ app.use('/api/v1', (req, res, next) => {
       || req.path === '/auth/logout'
       || req.path === '/version';
     if (allowed) return next();
-    return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403 });
+    return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403, reason: 'split_guest_scope' });
   } catch {
-    return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403 });
+    return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403, reason: 'split_guest_scope' });
   }
 });
 // Scopes: Ein gescoptes Zugangsmittel (scopes !== null) darf ein Modul nur in

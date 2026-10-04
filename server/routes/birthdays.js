@@ -255,7 +255,7 @@ function contactsHidden(req) {
 router.get('/import/candidates', (req, res) => {
   try {
     if (contactsHidden(req)) {
-      return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403 });
+      return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403, reason: 'cross_module_access' });
     }
     const data = listBirthdayImportCandidates(db.get());
     res.json({ data });
@@ -271,7 +271,7 @@ router.post('/import', (req, res) => {
     // Umweg offen, sich die abgewiesene Liste ueber die angelegten
     // Geburtstagseintraege doch noch zusammenzusetzen.
     if (contactsHidden(req)) {
-      return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403 });
+      return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403, reason: 'cross_module_access' });
     }
     const userId = req.authUserId || req.session.userId;
     const ids = Array.isArray(req.body.contact_ids) ? req.body.contact_ids : null;

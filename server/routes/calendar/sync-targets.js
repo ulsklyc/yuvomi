@@ -121,7 +121,7 @@ router.get('/sync-targets', refuseWhileRestoring, async (req, res) => {
     // Ziel-Feld des Termindialogs und nennt dabei die angebundenen Konten mit
     // ihren Kalender-URLs. Wer nicht schreiben darf, braucht sie nicht.
     if (!mayWriteModule(req, 'calendar')) {
-      return res.status(403).json({ error: 'Write access to the calendar is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to the calendar is required.', code: 403, reason: 'cross_module_access' });
     }
     const [google, caldav] = await Promise.all([
       listGoogleTargets().catch((err) => {

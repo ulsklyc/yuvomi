@@ -837,7 +837,7 @@ router.post('/:id/to-shopping-list', (req, res) => {
     // VOR DEN 404ern, nicht danach: sonst verriete die Antwort einem
     // Gesperrten noch, welche Mahlzeit und welche Liste es gibt.
     if (!mayWriteModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
     }
 
     const mealId = parseInt(req.params.id, 10);
@@ -924,7 +924,7 @@ router.post('/week-to-shopping-list', (req, res) => {
     // Derselbe Grund wie beim Einzel-Transfer darueber (#1290): der Pfad sagt
     // `meals`, geschrieben wird in den Einkauf.
     if (!mayWriteModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
     }
 
     const { listId, week } = req.body;

@@ -126,6 +126,20 @@ async function apiFetch(path, options = {}, _retried = false) {
       const text = t(gateKey);
       throw new ApiError(text, response.status, { ...data, error: text }, response.headers.get('Retry-After'));
     }
+    // Jede andere Absage OHNE Grund (#1607): "Not authorized.", "Admin access
+    // required." und rund hundert Geschwister sagen nur "das darfst du nicht",
+    // und zwar englisch - also ein uebersetzter Satz, an beiden Stellen wie
+    // beim Gate darueber. Der Server bleibt sprachfrei, sein Text unveraendert.
+    //
+    // NUR OHNE `reason`. Wer einen nennt, traegt eine Auskunft, die dieser Satz
+    // verschluckte (gesperrte Aufgabe, CSRF, Display-Konto), oder eine Seite
+    // liest ihn selbst (Anmeldung, Zwei-Faktor, Kalender-Anhang). Eine neue
+    // 403 mit eigener Auskunft bekommt am Server einen `reason` - die Liste
+    // haelt test:api. Ein Rumpf ohne `error` ist keine Absage der App (Proxy).
+    if (response.status === 403 && typeof data?.error === 'string' && !data.reason) {
+      const text = t('common.errorNoPermission');
+      throw new ApiError(text, response.status, { ...data, error: text }, response.headers.get('Retry-After'));
+    }
     const message = data?.error || `HTTP ${response.status}`;
     throw new ApiError(message, response.status, data, response.headers.get('Retry-After'));
   }

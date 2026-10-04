@@ -61,6 +61,8 @@
         "errorOffline": "Žádné připojení k internetu. Zkontrolujte prosím síť.",
         "errorForbidden": "Přístup odepřen. Přihlaste se prosím znovu.",
         "errorModuleNoAccess": "K tomuto modulu nemáte přístup.",
+        "errorNoPermission": "K tomu nemáte oprávnění.",
+        "unknownAddress": "Tato adresa neexistuje. Místo ní vidíte nejbližší stránku.",
         "errorNotFound": "Záznam nebyl nalezen.",
         "errorServer": "Chyba serveru. Zkuste to prosím později znovu.",
         "errorRestoreInProgress": "Právě se obnovuje záloha. Vaše změna nebyla uložena, zkuste to znovu za minutu.",

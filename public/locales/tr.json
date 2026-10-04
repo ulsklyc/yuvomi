@@ -60,6 +60,8 @@
         "errorOffline": "İnternet bağlantısı yok. Lütfen ağınızı kontrol edin.",
         "errorForbidden": "Erişim reddedildi. Lütfen tekrar giriş yapın.",
         "errorModuleNoAccess": "Bu modüle erişiminiz yok.",
+        "errorNoPermission": "Bunu yapmak için yetkiniz yok.",
+        "unknownAddress": "Bu adres mevcut değil. Bunun yerine en yakın sayfa gösteriliyor.",
         "errorNotFound": "Kayıt bulunamadı.",
         "errorServer": "Sunucu hatası. Lütfen daha sonra tekrar deneyin.",
         "errorRestoreInProgress": "Şu anda bir yedek geri yükleniyor. Değişikliğiniz kaydedilmedi, bir dakika sonra yeniden deneyin.",

@@ -100,6 +100,7 @@ export function displayActingPerson(req, rawId, moduleKey, { db } = {}) {
       ok: false,
       status: 403,
       error: 'The selected person does not have access to this module.',
+      reason: 'acting_person_no_access',
     };
   }
   return { ok: true, userId };

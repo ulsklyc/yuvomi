@@ -62,6 +62,8 @@
         "errorOffline": "Brak połączenia z internetem. Sprawdź sieć.",
         "errorForbidden": "Odmowa dostępu. Zaloguj się ponownie.",
         "errorModuleNoAccess": "Nie masz dostępu do tego modułu.",
+        "errorNoPermission": "Nie masz do tego uprawnień.",
+        "unknownAddress": "Ten adres nie istnieje. Zamiast niego widzisz najbliższą stronę.",
         "errorNotFound": "Wpis nie został znaleziony.",
         "errorServer": "Błąd serwera. Spróbuj ponownie później.",
         "errorRestoreInProgress": "Trwa właśnie przywracanie kopii zapasowej. Twoja zmiana nie została zapisana, spróbuj ponownie za minutę.",

@@ -243,7 +243,7 @@ router.put('/:id', (req, res) => {
     // Mirror-Rezepte sind read-only: der Quell-Provider bleibt Quelle der
     // Wahrheit für ihren Inhalt - fuer jeden, auch fuer den Nutzer, der den
     // Provider-Account angelegt hat (und damit als created_by dieser Rezepte gilt).
-    if (existing.provider_account_id) return res.status(403).json({ error: 'Mirrored recipes are managed by their source provider and cannot be edited here.', code: 403 });
+    if (existing.provider_account_id) return res.status(403).json({ error: 'Mirrored recipes are managed by their source provider and cannot be edited here.', code: 403, reason: 'recipe_mirrored' });
 
     const { ingredients = [] } = req.body;
 
@@ -383,7 +383,7 @@ router.delete('/:id', (req, res) => {
     // genuegt (#1577). Mirror-Rezepte lassen sich nur durch Löschen des
     // Provider-Accounts entfernen (DELETE /recipe-providers/accounts/:id), nicht
     // einzeln hier.
-    if (existing.provider_account_id) return res.status(403).json({ error: 'Mirrored recipes are managed by their source provider and cannot be deleted here.', code: 403 });
+    if (existing.provider_account_id) return res.status(403).json({ error: 'Mirrored recipes are managed by their source provider and cannot be deleted here.', code: 403, reason: 'recipe_mirrored' });
 
     const result = db.get().prepare('DELETE FROM recipes WHERE id = ?').run(id);
     if (result.changes === 0) return res.status(404).json({ error: 'Recipe not found', code: 404 });
@@ -468,7 +468,7 @@ router.post('/:id/to-shopping-list', (req, res) => {
     // Schreibrecht - als Mitglied wie als Token. Vor den 404ern, damit die
     // Antwort keine Rezept- und Listen-IDs bestaetigt.
     if (!mayWriteModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
     }
 
     const id = parseInt(req.params.id, 10);
@@ -553,7 +553,7 @@ router.post('/:id/to-shopping-list', (req, res) => {
 router.put('/:id/ingredient-match', (req, res) => {
   try {
     if (!mayWriteModule(req, 'pantry')) {
-      return res.status(403).json({ error: 'Write access to the pantry is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to the pantry is required.', code: 403, reason: 'cross_module_access' });
     }
 
     const id = parseInt(req.params.id, 10);
