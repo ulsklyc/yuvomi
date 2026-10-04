@@ -5376,6 +5376,7 @@
         "remainingToReward": "{{points}} pa para sa \"{{reward}}\"",
         "canRedeemNow": "Handa nang i-redeem",
         "balanceBelowZero": "Negatibo ang balanse - mababawi ito ng mga susunod na puntos",
+        "balanceBelowZeroShort": "Mababawi sa susunod na puntos",
         "pendingBalanceBelowZero": "Kasalukuyang balanse: {{points}}",
         "ledgerTaskReopened": "Muling binuksan ang gawain",
         "ledgerTaskReopenedNamed": "Muling binuksan: {{task}}",

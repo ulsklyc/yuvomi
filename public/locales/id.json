@@ -5376,6 +5376,7 @@
         "remainingToReward": "Kurang {{points}} untuk “{{reward}}”",
         "canRedeemNow": "Siap ditukar",
         "balanceBelowZero": "Saldo minus - poin berikutnya akan menutupinya",
+        "balanceBelowZeroShort": "Poin berikutnya menutupinya",
         "pendingBalanceBelowZero": "Saldo saat ini: {{points}}",
         "ledgerTaskReopened": "Tugas dibuka kembali",
         "ledgerTaskReopenedNamed": "Dibuka kembali: {{task}}",

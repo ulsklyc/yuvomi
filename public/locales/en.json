@@ -5376,6 +5376,7 @@
         "remainingToReward": "{{points}} more to “{{reward}}”",
         "canRedeemNow": "Ready to redeem",
         "balanceBelowZero": "Below zero - the next points will make up for it",
+        "balanceBelowZeroShort": "Next points make up for it",
         "pendingBalanceBelowZero": "Current balance: {{points}}",
         "ledgerTaskReopened": "Task reopened",
         "ledgerTaskReopenedNamed": "Reopened: {{task}}",

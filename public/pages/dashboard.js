@@ -2583,17 +2583,28 @@ function rewardGoalLabel(balance, catalog, goal = nextRewardGoal(balance, catalo
  * Kachel, die eine Rasterzeile hoch ist, trug die Eltern-Sicht mit Satz 259px
  * gegen 183px der Nachbarkachel und dehnte deren Zeile mit (gemessen 1440px).
  * Wer den Satz lesen will, zieht die Kachel auf 1x2 - dort steht er.
+ *
+ * AUSNAHME: DAS MINUS (#1623). Eine negative Zahl neben einem leeren Balken
+ * erklaert sich nicht, und der Satz stand nur in der Ansage. Kompakt steht
+ * deshalb eine Kurzform (`.rewards-goal__label--compact`, hoechstens zwei
+ * Zeilen), und sie steht AN STELLE des Balkens: der ist bei null leer und
+ * sagt sichtbar nichts, kostete mit der Zeile zusammen aber 23px je Mitglied
+ * (so 9px). Er bleibt per `.sr-only` im DOM - die Ansage behaelt Rolle, Wert
+ * und den ganzen Satz. Ueber null und auf der hohen Kachel aendert sich nichts.
  */
 function rewardGoalHTML(balance, catalog, who = '', { compact = false } = {}) {
   const goal = nextRewardGoal(balance, catalog);
   const label = rewardGoalLabel(balance, catalog, goal);
   if (!goal) return `<p class="rewards-goal__label rewards-goal__label--muted">${esc(label)}</p>`;
   const name = who ? `${t('rewards.progressLabel')}: ${who}` : t('rewards.progressLabel');
+  const compactHint = compact && Number(balance) < 0
+    ? `<p class="rewards-goal__label rewards-goal__label--compact" aria-hidden="true">${esc(t('rewards.balanceBelowZeroShort'))}</p>`
+    : '';
   return `
-    <div class="rewards-goal__track" role="progressbar" aria-label="${esc(name)}"
+    <div class="rewards-goal__track${compactHint ? ' sr-only' : ''}" role="progressbar" aria-label="${esc(name)}"
          aria-valuenow="${goal.pct}" aria-valuemin="0" aria-valuemax="100"
          aria-valuetext="${esc(label)}"><span class="rewards-goal__fill" style="--rewards-progress:${goal.pct / 100}"></span></div>
-    ${compact ? '' : `<p class="rewards-goal__label" aria-hidden="true">${esc(label)}</p>`}`;
+    ${compact ? compactHint : `<p class="rewards-goal__label" aria-hidden="true">${esc(label)}</p>`}`;
 }
 
 function rewardAvatarHTML(m) {

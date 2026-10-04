@@ -98,6 +98,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tile, the tile's header link and the "Monthly balance" figure all led to Statistics, where
   nothing can be added. All three now open the Budget tab, which shows the month the tile is
   about and carries the add button.
+- **Korean sentences pick the right particle for the name they contain** (#1607). Wherever a
+  name, title or tag is inserted into a Korean sentence, the app showed both particle forms at
+  once, for example "캘린더이(가)" or "「우유」을(를) 삭제할까요?". It now writes the form that fits the
+  inserted word: "캘린더가", "「우유」를", "서울로". After Latin letters, digits and emoji both forms
+  stay, because the right one depends on how the word is pronounced. Texts the server writes
+  itself (push notifications, calendar entries) and the installer are not affected; none of them
+  contains such a form today.
 - **The calendar mirrors fully in right-to-left languages.** In Arabic and Persian the week
   view drew the column lines of the all-day row 1px beside those of the time grid, the month
   grid drew a line along its outer right edge and only a thin one between its two leftmost days,
@@ -106,6 +113,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calendar filters were indented from the left. The avatars on all-day entries now sit at the end of
   the line instead of right after the title, and the compact month dots start at the edge of the
   day. Left-to-right layouts are unchanged.
+- **A balance below zero is explained in two more places** (#1623). In the list of requests
+  waiting for approval the note with the current balance was missing when the member had been
+  taken out of rewards while the request was still open - the page looked the balance up among
+  the members taking part and found nothing. The balance now comes with each request. If that
+  member was the last one taking part, the overview showed only "nobody takes part yet" and
+  the request could not be seen or decided at all; the list of open requests now stands above
+  that message. And on a
+  family rewards tile that is one row high (1x1, 2x1), a negative balance was shown as a number
+  next to an empty bar; a short line saying that the next points make up for it now stands
+  in place of that bar.
+  API: `GET /api/v1/rewards/redemptions` adds `user_balance` to every row.
 - **The month heading of Calendar and Budget follows the word order of the language** (#1607).
   Both pages put the month name, a space and the year together themselves, which gave "10월 2026"
   in Korean instead of "2026년 10월" (and the same for Japanese, Chinese and Hungarian). Month

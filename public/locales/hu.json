@@ -5376,6 +5376,7 @@
         "remainingToReward": "Még {{points}} a(z) „{{reward}}” eléréséig",
         "canRedeemNow": "Beváltásra kész",
         "balanceBelowZero": "Mínuszban - a következő pontok kiegyenlítik",
+        "balanceBelowZeroShort": "A következő pontok kiegyenlítik",
         "pendingBalanceBelowZero": "Jelenlegi egyenleg: {{points}}",
         "ledgerTaskReopened": "Feladat újranyitva",
         "ledgerTaskReopenedNamed": "Újranyitva: {{task}}",

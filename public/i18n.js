@@ -9,6 +9,7 @@
 // aus test-browser-loader.mjs, und '/utils/...' waere dort das Dateisystem-Root.
 // Im Browser loest './utils/timezone.js' von '/i18n.js' aus auf dasselbe auf.
 import { zonedFields } from './utils/timezone.js';
+import { resolveKoreanParticles } from './utils/korean-particles.js';
 
 const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt-BR', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi', 'hu', 'ko', 'id', 'fa', 'fil', 'nb'];
 const RTL_LOCALES = new Set(['ar', 'fa']);
@@ -229,9 +230,14 @@ export function t(key, params = {}) {
       ?? resolve(fallbackTranslations, key)
       ?? key;
   }
-  return str.replace(/\{\{(\w+)\}\}/g, (placeholder, name) => (
+  const fill = (text) => text.replace(/\{\{(\w+)\}\}/g, (placeholder, name) => (
     Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : placeholder
   ));
+  // Koreanisch schreibt hinter einen Platzhalter beide Formen der Partikel
+  // (`{{name}}이(가)`), weil die richtige am eingesetzten Wort haengt (#1607).
+  // Die Regel steht in utils/korean-particles.js; jede andere Sprache zahlt
+  // dafuer genau diesen einen Vergleich.
+  return currentLocale === 'ko' ? resolveKoreanParticles(str, fill) : fill(str);
 }
 
 const VALID_DATE_FORMATS = ['mdy', 'dmy', 'ymd', 'mdy_dot', 'dmy_dot', 'dmy_slash', 'ymd_dot', 'ymd_slash'];
