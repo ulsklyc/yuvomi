@@ -263,3 +263,41 @@ test('lang-init.js loest zh-TW auf zh-Hant auf, sobald es diese Locale gibt', ()
   assert.equal(runLangInit({ languages: ['zh-TW'], src: ohneHant }), 'zh');
   assert.equal(runLangInit({ languages: ['zh-CN'], src: ohneHant }), 'zh');
 });
+
+// --- Sprachcodes, die eine vorhandene Locale meinen -------------------------
+//
+// `nb` ist seit v2.72.0 eine Locale, aber ein norwegischer Browser meldet haeufig
+// die Makrosprache `no` (oder `no-NO`), und wer Nynorsk eingestellt hat, `nn`.
+// Beide bekamen Englisch, obwohl die norwegische Datei daneben lag.
+
+const NORWEGISCH = ['no', 'no-NO', 'NO-no', 'nn', 'nn-NO'];
+
+test('pickLocale: `no` und `nn` fallen auf `nb`, nicht auf Englisch', () => {
+  const alle = getSupportedLocales();
+  for (const tag of NORWEGISCH) {
+    assert.equal(pickLocale([tag], alle), 'nb', tag);
+  }
+  assert.equal(pickLocale(['nn-NO', 'de'], alle), 'nb',
+    'Die Reihenfolge von navigator.languages entscheidet: Nynorsk vor Deutsch heisst Bokmaal vor Deutsch.');
+  assert.equal(pickLocale(['th-TH', 'no'], alle), 'nb');
+});
+
+test('pickLocale: der Alias ist ein Rueckfall, kein Ersatz', () => {
+  // Eine eigene Locale gewinnt, sobald es sie gibt - mit einer Liste gemessen,
+  // die es im Repository nicht gibt, wie bei zh-Hant oben.
+  assert.equal(pickLocale(['nn-NO'], ['en', 'nb', 'nn']), 'nn');
+  assert.equal(pickLocale(['no'], ['en', 'nb', 'no']), 'no');
+  // Ohne das Ziel in der Liste bleibt es bei Englisch, statt eine Locale zu
+  // nennen, deren Datei nicht existiert.
+  assert.equal(pickLocale(['no-NO'], ['en', 'de']), 'en');
+  assert.equal(pickLocale(['nn'], ['en', 'de']), 'en');
+});
+
+test('lang-init.js loest `no` und `nn` wie i18n.js auf', () => {
+  for (const tag of NORWEGISCH) {
+    assert.equal(runLangInit({ languages: [tag] }), 'nb', tag);
+    assert.equal(runLangInit({ language: tag }), 'nb', `${tag} ueber navigator.language`);
+  }
+  assert.equal(runLangInit({ languages: ['nn-NO', 'de'] }), 'nb');
+  assert.equal(runLangInit({ stored: 'de', languages: ['no'] }), 'de', 'die gemerkte Wahl gewinnt weiter');
+});
