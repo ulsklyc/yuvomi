@@ -125,6 +125,15 @@ const SHARED_ISOMORPHIC = new Set([
   // anderen Tag nennt als der Ring zeigt. Rein, ohne DOM/Node - der einzige
   // Import (date.js) steht selbst schon in dieser Liste.
   'public/utils/health-cycle.js',
+  // #1607: Welche Form einer koreanischen Partikel hinter einem eingesetzten
+  // Wort gilt (`{{name}}이(가)` -> 이 oder 가). t() im Browser und translate()
+  // auf dem Server lesen dieselbe ko.json - der Server fuer Push-Texte,
+  // ICS-Feeds und gespeicherte Kalendertitel. Zwei Fassungen hiessen: derselbe
+  // Satz steht in der Oberflaeche richtig und in der Benachrichtigung mit
+  // beiden Formen, und eine neue Schreibweise in ko.json muesste an zwei
+  // Stellen nachgezogen werden. Rein: Zeichencodes und ein Muster, kein DOM,
+  // kein Node.
+  'public/utils/korean-particles.js',
 ]);
 
 const SOURCE_EXT = /\.(js|mjs)$/;

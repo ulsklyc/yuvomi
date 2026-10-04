@@ -85,8 +85,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   once, for example "캘린더이(가)" or "「우유」을(를) 삭제할까요?". It now writes the form that fits the
   inserted word: "캘린더가", "「우유」를", "서울로". After Latin letters, digits and emoji both forms
   stay, because the right one depends on how the word is pronounced. Texts the server writes
-  itself (push notifications, calendar entries) and the installer are not affected; none of them
-  contains such a form today.
+  itself (push notifications, calendar feeds, stored calendar titles) follow the same rule from
+  the same place; none of them contains such a form today, so nothing already stored changes.
+  The installer is not affected.
 - **The calendar mirrors fully in right-to-left languages.** In Arabic and Persian the week
   view drew the column lines of the all-day row 1px beside those of the time grid, the month
   grid drew a line along its outer right edge and only a thin one between its two leftmost days,

@@ -8,8 +8,10 @@
  *        dem Schirm: "캘린더이(가) 가정에서 켜져 있습니다."
  *
  *        Die Regel lebt hier und nur hier. ko.json behaelt die Doppelform, t()
- *        in public/i18n.js ruft diesen Helfer bei aktiver Sprache `ko`.
- * Dependencies: keine (reine Funktion, kein DOM)
+ *        in public/i18n.js ruft diesen Helfer bei aktiver Sprache `ko`, und
+ *        translate() in server/utils/i18n.js ruft ihn, wenn der gelieferte Text
+ *        aus ko.json stammt (geteiltes Modul, siehe test/test-layer-boundary.js).
+ * Dependencies: keine (reine Funktion, kein DOM, kein Node)
  */
 
 /**
