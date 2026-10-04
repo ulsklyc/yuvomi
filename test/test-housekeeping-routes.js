@@ -1823,6 +1823,23 @@ test('heute ohne eingestellte Haushaltszone: zonenlose Besuche liest dieselbe Uh
   }),
 ));
 
+test('Umstellnacht: zwei zonenlose Besuche bleiben zwei Zeitpunkte - der spaetere ist der spaetere (Review)', () => atHouseholdClock(
+  // 26.03.2034, Berlin stellt um 02:00 auf Sommerzeit. Die einfache Umrechnung
+  // (`localToUTC`) legt 00:30 und 01:30 beide auf 23:30Z; den Gleichstand
+  // entschied die hoehere id - hier bewusst der FRUEHERE Besuch.
+  { zone: 'Europe/Berlin', processTz: 'Asia/Tokyo', now: '2034-03-26T10:00:00.000Z' },
+  () => withSessions(async (insert) => {
+    const workerId = await freshWorker('Umstellnacht');
+    const later = insert(workerId, '2034-03-26T01:30:00');
+    const earlier = insert(workerId, '2034-03-26T00:30:00');
+    assert.equal(await todaySessionId('/workers', workerId), later, 'today_session: 01:30, nicht 00:30');
+    assert.equal((await call('GET', '/dashboard', { as: ADM })).body.data.last_visit.id, later, 'last_visit: ebenso');
+    const order = (list) => list.map((v) => v.id).filter((id) => id === earlier || id === later);
+    assert.deepEqual(order((await call('GET', '/visits?month=2034-03', { as: ADM })).body.data.visits), [later, earlier], '/visits');
+    assert.deepEqual(order((await call('GET', '/work-sessions?month=2034-03', { as: ADM })).body.data), [later, earlier], '/work-sessions');
+  }),
+));
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

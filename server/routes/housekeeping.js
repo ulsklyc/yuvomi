@@ -42,6 +42,7 @@ import {
   localToUTCPrecise,
   shiftDateKey,
   storedToInstantMs,
+  storedToInstantMsPrecise,
   todayKey,
   utcDateKey,
   utcToWall,
@@ -358,7 +359,7 @@ function loadTodaySession(workerId, context = localDayContext()) {
 // Ein gespeicherter `check_in` als Zeitpunkt, auf der Uhr eines Tageskontexts:
 // in dessen Zone, oder - aelterer Client ohne Zone - mit dessen Offset.
 function dayClockInstantMs(value, context) {
-  if (context.timeZone) return storedToInstantMs(value, context.timeZone);
+  if (context.timeZone) return storedToInstantMsPrecise(value, context.timeZone);
   const raw = String(value ?? '').trim();
   if (!raw) return null;
   if (hasExplicitZone(raw)) return storedToInstantMs(raw, 'UTC');

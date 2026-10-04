@@ -14,7 +14,7 @@
  * Zahlen fuer denselben Monat. Beide lesen jetzt hier.
  */
 
-import { localToUTCPrecise, storedToInstantMs, utcToWall } from '../utils/timezone.js';
+import { localToUTCPrecise, storedToInstantMs, storedToInstantMsPrecise, utcToWall } from '../utils/timezone.js';
 import { addMonthsClamped } from '../utils/interval-date.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -82,9 +82,14 @@ export function widenedWindow({ start, end }) {
  * '2026-07-15T10:00:00.000Z' (12:00 in Berlin), und '…T10:00:00Z' aus
  * scripts/seed-demo.js hinter '…T10:00:00.500Z' derselben Sekunde. Unlesbare
  * Werte ans Ende, Gleichstand nach der juengeren Zeile.
+ *
+ * Gelesen wird mit der DST-genauen Umrechnung: `storedToInstantMs()` bildet in
+ * der Umstellnacht zwei Wanduhrzeiten auf denselben Zeitpunkt ab (Berlin,
+ * 00:30 und 01:30 werden beide 23:30Z) - ein falscher Gleichstand, den dann die
+ * `id` entschiede.
  */
 export function byCheckInDesc(tz) {
-  const at = (row) => storedToInstantMs(row.check_in, tz) ?? -Infinity;
+  const at = (row) => storedToInstantMsPrecise(row.check_in, tz) ?? -Infinity;
   return (a, b) => {
     const [left, right] = [at(a), at(b)];
     if (left !== right) return left > right ? -1 : 1;
@@ -104,7 +109,7 @@ export function latestVisit(database, tz, where = '', params = []) {
   const from = `FROM housekeeping_work_sessions WHERE ${where || '1 = 1'}`;
   const top = database.prepare(`SELECT check_in ${from} ORDER BY check_in DESC LIMIT 1`).get(...params);
   if (!top) return undefined;
-  const topMs = storedToInstantMs(top.check_in, tz);
+  const topMs = storedToInstantMsPrecise(top.check_in, tz);
   const floor = topMs === null ? '' : widenedWindow({ start: new Date(topMs).toISOString(), end: '' }).start;
   return database.prepare(`SELECT * ${from} AND check_in >= ?`).all(...params, floor)
     .sort(byCheckInDesc(tz))[0];
