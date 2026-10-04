@@ -4203,13 +4203,50 @@ test('Baender: im Nachbarmonat toent das Band zurueck wie der Chip der Zelle, ni
 // Klammertiefe, statt mit einem Regex an der ersten `)` zu raten:
 // `calc(-1 * var(--space-1))` ist EIN Wert, auch mit Leerzeichen und
 // geschachtelten Klammern.
+// Was in einem CSS-String steht oder hinter einem Backslash, ist Text und
+// keine Syntax: `content: "("` oeffnet keine Klammer, `content: ")"` schliesst
+// keine, und ein `;` im String trennt keine Deklaration. Ohne das schluckte
+// eine einzige solche Klammer jede Deklaration dahinter, und der Guard sah
+// den Rest der Regel nicht mehr. Ein Zeilenende beendet einen offenen String
+// (so liest ihn auch der Browser), und eine ueberzaehlige `)` zaehlt nicht
+// ins Minus - sonst waere wieder alles dahinter "geschachtelt". In einem
+// `url(` ohne Anfuehrungszeichen ist bis zur `)` alles Adresse, auch ein
+// Anfuehrungszeichen: es oeffnet dort keinen String.
 function splitTopLevel(text, isSeparator) {
   const out = [];
   let depth = 0;
+  let quote = '';
+  let rawUrl = false;
   let cur = '';
-  for (const ch of text) {
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === '\\' && i + 1 < text.length) {
+      cur += ch + text[i + 1];
+      i += 1;
+      continue;
+    }
+    if (rawUrl) {
+      if (ch === ')') rawUrl = false;
+      cur += ch;
+      continue;
+    }
+    if (quote) {
+      if (ch === quote || ch === '\n') quote = '';
+      cur += ch;
+      continue;
+    }
+    if (ch === '(' && /(?:^|[^\w-])url$/i.test(cur) && !/^\s*["']/.test(text.slice(i + 1))) {
+      rawUrl = true;
+      cur += ch;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      cur += ch;
+      continue;
+    }
     if (ch === '(') depth += 1;
-    else if (ch === ')') depth -= 1;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
     if (depth === 0 && isSeparator(ch)) {
       out.push(cur);
       cur = '';
@@ -4272,6 +4309,47 @@ function physicalSideDeclarations(body) {
     return false;
   }).map(({ text }) => text);
 }
+
+test('RTL-Leser: eine Klammer in einem CSS-String oder hinter einem Backslash verdeckt keine Deklaration', () => {
+  // Der Leser selbst, ohne Stylesheet: was er hier verschluckt, prueft der
+  // Guard darunter gar nicht erst.
+  const seen = (body) => physicalSideDeclarations(body).join('; ');
+  const blind = [
+    ['content: "("; margin-left: 1px', 'margin-left: 1px'],
+    ["content: '('; margin-left: 1px", 'margin-left: 1px'],
+    ['content: ")"; margin-left: 1px', 'margin-left: 1px'],
+    ['content: "\\"("; margin-left: 1px', 'margin-left: 1px'],
+    ["content: '\\')'; margin-left: 1px", 'margin-left: 1px'],
+    ['content: "\'("; margin-left: 1px', 'margin-left: 1px'],
+    ['background-image: url("a)b"); margin-left: 1px', 'margin-left: 1px'],
+    ['background-image: url("a(b"); float: right', 'float: right'],
+    ['background-image: url(a\\)b.png); margin-left: 1px', 'margin-left: 1px'],
+    ['background-image: url(a\\(b.png); margin-left: 1px', 'margin-left: 1px'],
+    ['background-image: url(a.png); margin-left: 1px', 'margin-left: 1px'],
+    ["background-image: url(a'b.png); margin-left: 1px", 'margin-left: 1px'],
+    ['background-image: URL( a"(b.png ); margin-left: 1px', 'margin-left: 1px'],
+    ['content: "("; margin: 0 1px 0 2px', 'margin: 0 1px 0 2px'],
+    ['content: "(\n; margin-left: 1px', 'margin-left: 1px'],
+    ['margin: 0 ); margin-left: 1px', 'margin-left: 1px'],
+  ];
+  for (const [body, want] of blind) {
+    assert(seen(body) === want, `${JSON.stringify(body)}: gesehen "${seen(body)}", erwartet "${want}"`);
+  }
+  // Umgekehrt: Text IN einem String ist keine Deklaration.
+  const quiet = [
+    'content: "x; margin-left: 1px"; color: red',
+    "content: 'a; float: right; b'; color: red",
+    'content: "("; margin-inline-start: 1px',
+    'quotes: "(" ")"; padding: 0 1px 0 1px',
+    'background-image: url(a.png); margin-inline: 0 1px',
+  ];
+  for (const body of quiet) {
+    assert(seen(body) === '', `${JSON.stringify(body)}: faelschlich gemeldet "${seen(body)}"`);
+  }
+  // Der String bleibt EIN Wort, auch mit Leerraum darin.
+  assert(JSON.stringify(cssWords('0 "a b" 0 \'c ) d\'')) === JSON.stringify(['0', '"a b"', '0', "'c ) d'"]),
+    `Worte: ${JSON.stringify(cssWords('0 "a b" 0 \'c ) d\''))}`);
+});
 
 test('Baender in RTL: offene Kante, Chevron und Nachbarmonat-Toenung kippen mit der Schreibrichtung (#1467)', () => {
   // Das Raster kippt in RTL selbst: Spalte 1 steht rechts, `first` und
