@@ -322,6 +322,144 @@ test('D6: der Push-Text nennt die betreute Person nur auf der geerbten Zeile', a
   assert.equal(bodies[subject], 'Tetanus', 'die eigene Zeile bleibt ohne Namenszusatz');
 });
 
+// ── Health haushaltsweit abgeschaltet (#1660) ───────────────────────────────
+
+function setDisabledModules(modules) {
+  db.prepare(`
+    INSERT INTO sync_config (key, value) VALUES ('disabled_modules', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(JSON.stringify(modules));
+}
+
+test('Health abgeschaltet: der Voll-Sync legt nichts an und raeumt Ausstehendes ab, nach dem Einschalten kommt es wieder', () => {
+  const u = makeUser();
+  const t = makeType({ default_interval_months: 12 });
+  const recordId = makeRecord(u, t, { given_on: '2026-01-01' });
+  syncAllPreventionReminders(db, NOW);
+  assert.equal(remindersFor(recordId).length, 1, 'Ausgangslage: eine ausstehende Zeile');
+
+  try {
+    setDisabledModules(['health']);
+    syncAllPreventionReminders(db, NOW);
+    assert.equal(remindersFor(recordId).length, 0, 'abgeschaltet: die ausstehende Zeile ist weg');
+
+    // Ein Datensatz, der bei abgeschaltetem Modul dazukommt (die Routen bleiben
+    // offen), bekommt ebenfalls keine Zeile.
+    const lateRecord = makeRecord(u, makeType({ default_interval_months: 6 }), { given_on: '2026-02-01' });
+    syncAllPreventionReminders(db, NOW);
+    assert.equal(remindersFor(lateRecord).length, 0);
+
+    setDisabledModules([]);
+    syncAllPreventionReminders(db, NOW);
+    assert.equal(remindersFor(recordId).length, 1, 'wieder an: der Lauf legt sie neu an');
+    assert.equal(remindersFor(lateRecord).length, 1);
+  } finally {
+    setDisabledModules([]);
+  }
+});
+
+test('Health abgeschaltet: auch der Einzelweg der Schreibrouten legt nichts an', () => {
+  const u = makeUser();
+  const t = makeType({ default_interval_months: 12 });
+  const recordId = makeRecord(u, t, { given_on: '2026-01-01' });
+  try {
+    setDisabledModules(['health']);
+    syncPreventionRemindersForSubject(db, u, NOW);
+    assert.equal(remindersFor(recordId).length, 0);
+  } finally {
+    setDisabledModules([]);
+  }
+  syncPreventionRemindersForSubject(db, u, NOW);
+  assert.equal(remindersFor(recordId).length, 1);
+});
+
+test('Health abgeschaltet: eine zugestellte oder weggewischte Zeile bleibt, damit sie nach dem Einschalten nicht doppelt kommt', () => {
+  const u = makeUser();
+  const other = makeUser();
+  const t = makeType({ default_interval_months: 12 });
+  const pushedRecord = makeRecord(u, t, { given_on: '2026-01-01' });
+  const dismissedRecord = makeRecord(other, makeType({ default_interval_months: 12 }), { given_on: '2026-01-01' });
+  syncAllPreventionReminders(db, NOW);
+  const pushedId = remindersFor(pushedRecord)[0].id;
+  const dismissedId = remindersFor(dismissedRecord)[0].id;
+  db.prepare("UPDATE reminders SET pushed_at = '2026-06-01T09:00:00Z' WHERE id = ?").run(pushedId);
+  db.prepare('UPDATE reminders SET dismissed = 1 WHERE id = ?').run(dismissedId);
+
+  try {
+    setDisabledModules(['health']);
+    syncAllPreventionReminders(db, NOW);
+    syncPreventionRemindersForSubject(db, u, NOW);
+    assert.deepEqual(remindersFor(pushedRecord).map((r) => r.id), [pushedId]);
+    assert.deepEqual(remindersFor(dismissedRecord).map((r) => r.id), [dismissedId]);
+  } finally {
+    setDisabledModules([]);
+  }
+
+  syncAllPreventionReminders(db, NOW);
+  const after = remindersFor(pushedRecord);
+  assert.deepEqual(after.map((r) => r.id), [pushedId], 'dieselbe Zeile, keine zweite');
+  assert.equal(after[0].pushed_at, '2026-06-01T09:00:00Z');
+});
+
+test('Health abgeschaltet: eine zum Teil zugestellte Zeile bleibt samt Zustellnachweis (pushed_at noch leer)', () => {
+  const u = makeUser();
+  const t = makeType({ default_interval_months: 12 });
+  const recordId = makeRecord(u, t, { given_on: '2026-01-01' });
+  syncAllPreventionReminders(db, NOW);
+  const reminderId = remindersFor(recordId)[0].id;
+  // Web Push ist raus, der Kanal steht noch im Wiederholversuch: pushed_at bleibt leer.
+  const insertDelivery = db.prepare(`
+    INSERT INTO notification_deliveries (reminder_id, provider, target_key, status, attempt_count)
+    VALUES (?, ?, ?, ?, 1)
+  `);
+  insertDelivery.run(reminderId, 'webpush', `user:${u}`, 'sent');
+  insertDelivery.run(reminderId, 'ntfy', 'channel:1', 'failed');
+  const deliveries = () => db.prepare(
+    'SELECT provider, status FROM notification_deliveries WHERE reminder_id = ? ORDER BY provider'
+  ).all(reminderId);
+
+  try {
+    setDisabledModules(['health']);
+    syncAllPreventionReminders(db, NOW);
+    syncPreventionRemindersForSubject(db, u, NOW);
+    assert.deepEqual(remindersFor(recordId).map((r) => r.id), [reminderId]);
+  } finally {
+    setDisabledModules([]);
+  }
+  syncAllPreventionReminders(db, NOW);
+  assert.deepEqual(remindersFor(recordId).map((r) => r.id), [reminderId], 'dieselbe Zeile, keine frische');
+  assert.deepEqual(deliveries(), [
+    { provider: 'ntfy', status: 'failed' },
+    { provider: 'webpush', status: 'sent' },
+  ]);
+});
+
+test('Health abgeschaltet: eine Zeile, deren Zustellung gerade unterwegs ist, bleibt - sonst findet markSent() sie nicht mehr', () => {
+  const u = makeUser();
+  const t = makeType({ default_interval_months: 12 });
+  const recordId = makeRecord(u, t, { given_on: '2026-01-01' });
+  syncAllPreventionReminders(db, NOW);
+  const reminderId = remindersFor(recordId)[0].id;
+  // Der Zustelllauf hat das Ziel angelegt und wartet auf den Anbieter.
+  const deliveryId = db.prepare(`
+    INSERT INTO notification_deliveries (reminder_id, provider, target_key, status)
+    VALUES (?, 'webpush', ?, 'pending')
+  `).run(reminderId, `user:${u}`).lastInsertRowid;
+
+  try {
+    setDisabledModules(['health']);
+    syncAllPreventionReminders(db, NOW);
+    syncPreventionRemindersForSubject(db, u, NOW);
+    assert.deepEqual(remindersFor(recordId).map((r) => r.id), [reminderId]);
+    assert.ok(
+      db.prepare('SELECT 1 FROM notification_deliveries WHERE id = ?').get(deliveryId),
+      'das laufende Ziel ist noch da, wenn die Antwort des Anbieters kommt',
+    );
+  } finally {
+    setDisabledModules([]);
+  }
+});
+
 test('teardown: keine Server-Ressourcen zu schliessen', () => {
   assert.ok(true);
 });

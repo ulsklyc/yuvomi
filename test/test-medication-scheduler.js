@@ -325,3 +325,97 @@ test('#1539: Prozess und Haushalt in derselben Zone - unveraendert', inProcessZo
   assert.deepEqual((await runAt(db, '2026-06-15T05:30:00Z')).logs, []);
   assert.deepEqual((await runAt(db, '2026-06-15T06:30:00Z')).logs, ['2026-06-15T08:00']);
 }));
+
+// --------------------------------------------------------
+// Health haushaltsweit abgeschaltet (#1660)
+// --------------------------------------------------------
+function setDisabledModules(db, modules) {
+  db.prepare(`
+    INSERT INTO sync_config (key, value) VALUES ('disabled_modules', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(JSON.stringify(modules));
+}
+
+// Zone UND Zeitpunkt fest: der Lauf liest "heute" und "jetzt" auf der Uhr des
+// Haushalts. Mittags in UTC liegt weit genug von jeder Tagesgrenze, und die
+// gesetzte Zone nimmt der Maschine das Wort.
+function fixZone(db) {
+  db.prepare(`
+    INSERT INTO sync_config (key, value) VALUES ('household_timezone', 'UTC')
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run();
+}
+const NOON = new Date('2026-06-15T12:00:00Z');
+const NEXT_DAY_NOON = new Date('2026-06-16T12:00:00Z');
+
+test('Health abgeschaltet: der Lauf legt keine Dosis an und meldet nichts, auch nicht an Betreuende', async () => {
+  const db = buildTestDb();
+  fixZone(db);
+  const child = seedUser(db, 'kind');
+  const parent = seedUser(db, 'elternteil');
+  db.prepare('INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (?, ?)').run(child, parent);
+  const med = seedMed(db, child);
+  seedSchedule(db, med, { time: '08:00' });
+  setDisabledModules(db, ['health']);
+  const m = makeMocks();
+
+  const res = await processDueMedications({
+    database: db, now: NOON,
+    pushService: m.pushService, channelStore: m.channelStore, providers: m.providers,
+  });
+
+  assert.deepEqual(res, { due: 0, created: 0, notified: 0, sent: 0, failed: 0 });
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM medication_logs').get().n, 0, 'kein Log bei abgeschaltetem Modul');
+  assert.equal(m.pushed.length, 0, 'kein Web Push');
+  assert.equal(m.channelSent.length, 0, 'keine Kanal-Meldung');
+});
+
+test('Health abgeschaltet: ein anderes abgeschaltetes Modul haelt den Lauf nicht an', async () => {
+  const db = buildTestDb();
+  fixZone(db);
+  const user = seedUser(db, 'alice');
+  const med = seedMed(db, user);
+  seedSchedule(db, med, { time: '08:00' });
+  setDisabledModules(db, ['budget', 'inventory']);
+  const m = makeMocks();
+
+  const res = await processDueMedications({
+    database: db, now: NOON,
+    pushService: m.pushService, channelStore: m.channelStore, providers: m.providers,
+  });
+
+  assert.equal(res.created, 1);
+  assert.equal(m.pushed.length, 1);
+});
+
+test('Health wieder eingeschaltet: nur die Dosen von HEUTE kommen, die Tage dazwischen holt niemand nach', async () => {
+  const db = buildTestDb();
+  fixZone(db);
+  const user = seedUser(db, 'alice');
+  const med = seedMed(db, user);
+  seedSchedule(db, med, { time: '08:00' });
+  seedSchedule(db, med, { time: '11:00' });
+  seedSchedule(db, med, { time: '20:00' }); // heute noch nicht dran
+
+  // Tag 1: abgeschaltet, beide Zeitpunkte verstreichen ohne Spur.
+  setDisabledModules(db, ['health']);
+  const off = makeMocks();
+  await processDueMedications({
+    database: db, now: NOON,
+    pushService: off.pushService, channelStore: off.channelStore, providers: off.providers,
+  });
+  assert.equal(off.pushed.length, 0);
+
+  // Tag 2: wieder an. Faellig sind die zwei von heute, nicht die vier seit gestern.
+  setDisabledModules(db, []);
+  const on = makeMocks();
+  const res = await processDueMedications({
+    database: db, now: NEXT_DAY_NOON,
+    pushService: on.pushService, channelStore: on.channelStore, providers: on.providers,
+  });
+
+  assert.equal(res.created, 2);
+  const logs = db.prepare('SELECT scheduled_at FROM medication_logs ORDER BY scheduled_at').all();
+  assert.deepEqual(logs.map((l) => l.scheduled_at), ['2026-06-16T08:00', '2026-06-16T11:00']);
+  assert.equal(on.pushed.length, 2, 'eine Meldung je heutigem Zeitpunkt, keine Flut');
+});

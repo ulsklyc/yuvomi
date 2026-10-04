@@ -7,7 +7,7 @@
  *        Empfänger sind die betroffene Person UND jede Person, die ein Admin
  *        als Betreuer eingetragen hat (health_care_grants, #584, D#1041).
  * Abhängigkeiten: server/db.js, push.js, notification-channels.js, notifications.js,
- *                 utils/timezone.js.
+ *                 household-modules.js, utils/timezone.js.
  */
 import { runExternalJob } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
@@ -15,6 +15,7 @@ import * as dbModule from '../db.js';
 import { pushService as defaultPushService } from './push.js';
 import { createNotificationChannelStore } from './notification-channels.js';
 import { defaultProviders } from './notifications.js';
+import { householdDisabledModules } from './household-modules.js';
 import { resolveHouseholdLocale, translate } from '../utils/i18n.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 
@@ -95,6 +96,24 @@ async function processDueMedicationsUntracked({
   fetchImpl = fetch,
 } = {}) {
   const activeDb = database || dbModule.get();
+
+  // HEALTH HAUSHALTSWEIT ABGESCHALTET HEISST: DER LAUF TUT NICHTS (#1660).
+  // Gleiche Regel wie die Erinnerungs-Syncs seit #1279 - der Haushalt nutzt das
+  // Modul nicht, also legt der Server von sich aus keine Dosis an und meldet
+  // keine. Bis dahin schrieb dieser Lauf jede Minute weiter Logs und schickte
+  // Pushes, deren Tipp auf eine Seite fuehrte, die der Routen-Guard abweist.
+  //
+  // NACH DEM WIEDEREINSCHALTEN KOMMT NUR DER HEUTIGE TAG ZURUECK, und das folgt
+  // aus der Bauart weiter unten, nicht aus einer Sonderregel hier: faellig ist,
+  // was HEUTE schon dran war und noch keinen Log hat. Die Dosen der Tage
+  // dazwischen holt niemand nach - derselbe Verlauf wie nach einem
+  // Serverausfall, hoechstens eine Meldung je heutigem Einnahmezeitpunkt und
+  // keine Flut. Deshalb auch kein Abraeumen: was vor dem Abschalten angelegt
+  // wurde, ist Verlauf der Person und bleibt stehen.
+  if (householdDisabledModules(activeDb).has('health')) {
+    return { due: 0, created: 0, notified: 0, sent: 0, failed: 0 };
+  }
+
   const store = channelStore || createNotificationChannelStore({ db: activeDb });
   const { dateKey, time: nowTime } = householdWallClock(activeDb, now);
 

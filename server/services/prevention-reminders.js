@@ -54,6 +54,7 @@ import { todayKey } from '../utils/timezone.js';
 import { createLogger } from '../logger.js';
 import { computeDueForUser } from './prevention-due.js';
 import { lacksHealth } from './cycle-reminders.js';
+import { householdDisabledModules } from './household-modules.js';
 
 const log = createLogger('PreventionReminders');
 const ENTITY_TYPE = 'health_prevention_due';
@@ -120,6 +121,55 @@ function syncRecordReminder(database, item, subjectId, subjectHasHealth, caregiv
 }
 
 /**
+ * HEALTH HAUSHALTSWEIT ABGESCHALTET (#1660): die ausstehenden Vorsorge-Zeilen
+ * gehen weg, der erste Lauf nach dem Wiedereinschalten legt sie neu an -
+ * dieselbe Bauart wie Vorrat, Schichtplan, Muell, Zyklus und Geburtstage seit
+ * #1279. Die Zustellung hielt diese Zeilen schon zurueck (reminder-origins.js);
+ * der Sync selbst schrieb sie trotzdem jede Minute neu.
+ *
+ * NUR AUSSTEHENDES (wie clearPendingBirthdayReminders): eine zugestellte oder
+ * weggewischte Zeile ist die Erinnerung daran, DASS gemeldet wurde. Faellt sie
+ * mit, legt der Lauf nach dem Wiedereinschalten sie frisch an und dieselbe
+ * Vorsorge meldet sich ein zweites Mal - upsertRow() laesst eine bestehende
+ * Zeile mit gleichem Zeitpunkt genau deshalb stehen.
+ *
+ * UND AUCH NICHT, WAS SCHON ZUM TEIL RAUS IST (Codex-Befund in #1662):
+ * `pushed_at` faellt erst, wenn JEDES Ziel fertig ist. Kam der Push an und der
+ * ntfy-Kanal steht noch im Wiederholversuch, ist die Zeile "ausstehend" - und
+ * mit ihr fiele ueber ON DELETE CASCADE auch der Zustellnachweis des Pushs.
+ * Der Lauf nach dem Wiedereinschalten legte sie frisch an und der Push ginge
+ * ein zweites Mal raus.
+ *
+ * DESHALB BLEIBT JEDE ZEILE, FUER DIE DIE ZUSTELLUNG SCHON BUCH FUEHRT, gleich
+ * in welchem Zustand: auch ein Ziel, das gerade UNTERWEGS ist, steht dort noch
+ * als `pending` (zweiter Codex-Befund in #1662). Wird Health in den Sekunden
+ * abgeschaltet, in denen der Zustelllauf auf den Anbieter wartet, faende sein
+ * `markSent()` sonst keine Zeile mehr. Abgeraeumt wird also nur, was noch nie
+ * angefasst wurde; den Rest haelt die Zustellung zurueck, solange das Modul aus
+ * ist.
+ *
+ * @param {object} database
+ * @param {number|null} subjectId  eine Person, oder null fuer den ganzen Haushalt
+ */
+function clearPendingWhileSwitchedOff(database, subjectId = null) {
+  const untouched = `
+    entity_type = ? AND dismissed = 0 AND pushed_at IS NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM notification_deliveries nd
+      WHERE nd.reminder_id = reminders.id
+    )`;
+  if (subjectId === null) {
+    database.prepare(`DELETE FROM reminders WHERE ${untouched}`).run(ENTITY_TYPE);
+    return;
+  }
+  database.prepare(`
+    DELETE FROM reminders
+    WHERE ${untouched}
+      AND entity_id IN (SELECT id FROM health_prevention_records WHERE user_id = ?)
+  `).run(ENTITY_TYPE, subjectId);
+}
+
+/**
  * Soll-Zustand für EINE Person (Eigentümer aller betroffenen Datensätze)
  * herstellen. Aufgerufen vom periodischen Voll-Sync, sofort nach dem
  * Schreiben eines Vorsorge-Datensatzes und sofort nach
@@ -132,6 +182,14 @@ function syncRecordReminder(database, item, subjectId, subjectHasHealth, caregiv
  */
 export function syncPreventionRemindersForSubject(database, subjectId, now = new Date()) {
   database.transaction(() => {
+    // Haushaltsweit abgeschaltet: nichts anlegen, Ausstehendes abraeumen -
+    // siehe clearPendingWhileSwitchedOff(). Hier und nicht nur im Voll-Sync,
+    // weil die Schreibwege (Datensatz, Betreuung, Opt-in) diesen Einzelweg
+    // direkt rufen und die Modul-Routen bei abgeschaltetem Modul offen bleiben.
+    if (householdDisabledModules(database).has('health')) {
+      clearPendingWhileSwitchedOff(database, subjectId);
+      return;
+    }
     const today = todayKey(database, now);
     const items = computeDueForUser(database, subjectId, today);
     const wantedRecordIds = new Set(items.map((i) => i.record_id));
@@ -188,6 +246,13 @@ export function syncAllPreventionReminders(database, now = new Date()) {
     WHERE entity_type = ?
       AND entity_id NOT IN (SELECT id FROM health_prevention_records)
   `).run(ENTITY_TYPE);
+
+  // Ein Schnitt fuer den ganzen Haushalt statt eines Laufs je Person: bei
+  // abgeschaltetem Modul gibt es nichts aufzuloesen, nur abzuraeumen (#1660).
+  if (householdDisabledModules(database).has('health')) {
+    clearPendingWhileSwitchedOff(database);
+    return;
+  }
 
   const subjectIds = database.prepare(
     'SELECT DISTINCT user_id FROM health_prevention_records'
