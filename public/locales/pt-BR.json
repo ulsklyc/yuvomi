@@ -1297,7 +1297,7 @@
         "bulkDeleteConfirm": "Eliminar {{count}} contatos?",
         "bulkDeleteConfirm_one": "Eliminar {{count}} contato?",
         "bulkDeletedToast": "{{count}} contatos excluídos",
-        "emailLockedHint": "Este endereço de e-mail está vinculado à conta e só pode ser alterado por um administrador."
+        "emailLockedHint": "Estes endereços pertencem à conta deste membro. Apenas o próprio membro ou um administrador pode alterá-los."
     },
     "budget": {
         "title": "Orçamento",
