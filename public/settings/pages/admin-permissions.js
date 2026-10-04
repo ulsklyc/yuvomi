@@ -13,6 +13,7 @@
 import { api, auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { confirmModal } from '/components/modal.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
@@ -558,27 +559,24 @@ function renderSubjectSelector(container) {
       host.insertAdjacentHTML('beforeend', `<p class="form-hint">${esc(t('settings.permNoMembers'))}</p>`);
       return;
     }
-    const chips = members.map((m) => {
-      const badge = m.role === 'admin' ? `<span class="perm-chip__badge">${esc(t('settings.systemAdminBadge'))}</span>` : '';
-      const active = String(m.id) === String(state.subjectId);
-      return `
-        <button type="button" class="perm-chip${active ? ' is-active' : ''}" aria-pressed="${active ? 'true' : 'false'}"
-          data-user="${esc(m.id)}">
-          <span class="perm-chip__avatar${prefersInkText(m.avatar_color) ? ' perm-chip__avatar--ink' : ''}"
-            style="background:${esc(m.avatar_color) || 'var(--color-accent)'}">${
-            m.avatar_data ? `<img src="${esc(m.avatar_data)}" alt="">` : esc(initials(m.display_name))
-          }</span>
-          <span class="perm-chip__name">${esc(m.display_name)}</span>${badge}
-        </button>
-      `;
-    }).join('');
+    const chips = members.map((m) => memberChipHtml(m, String(m.id) === String(state.subjectId))).join('');
     host.insertAdjacentHTML('beforeend', chips);
   }
 }
 
-function initials(name) {
-  if (!name) return '?';
-  return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+/** Der Chip eines Mitglieds in der Subjekt-Auswahl. Exportiert fuer test:initials. */
+export function memberChipHtml(m, active = false) {
+  const badge = m.role === 'admin' ? `<span class="perm-chip__badge">${esc(t('settings.systemAdminBadge'))}</span>` : '';
+  return `
+        <button type="button" class="perm-chip${active ? ' is-active' : ''}" aria-pressed="${active ? 'true' : 'false'}"
+          data-user="${esc(m.id)}">
+          <span class="perm-chip__avatar${prefersInkText(m.avatar_color) ? ' perm-chip__avatar--ink' : ''}"
+            style="background:${esc(m.avatar_color) || 'var(--color-accent)'}">${
+            m.avatar_data ? `<img src="${esc(m.avatar_data)}" alt="">` : esc(initials(m.display_name, '?'))
+          }</span>
+          <span class="perm-chip__name">${esc(m.display_name)}</span>${badge}
+        </button>
+      `;
 }
 
 // ── Laden ────────────────────────────────────────────────────────────────────

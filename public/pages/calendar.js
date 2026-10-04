@@ -13,6 +13,7 @@ import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js'
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate } from '/utils/ux.js';
 import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
          monthPeriodKeys, startOfLocalWeekKey, addLocalDays, defaultDateInPeriod,
          isWeekendKey } from '/utils/date.js';
@@ -5281,14 +5282,24 @@ function availableLayers() {
   return rows;
 }
 
-/** Initialen einer Person - dieselbe Bildung wie im Avatar-Stack. */
-function personInitials(name) {
-  return String(name ?? '')
-    .split(' ')
-    .map((w) => w[0] ?? '')
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+/** Die Personenzeilen des Filterblatts: Name, Haekchen und die Scheibe mit Initialen. */
+function personFilterRowsHtml(people) {
+  return people.map((u) => toggleRowHtml({
+    label: u.display_name ?? '',
+    // Leeres Set heisst ALLE - die Haekchen stehen dann auf „an", weil genau
+    // das der sichtbare Zustand ist. Wer das erste abwaehlt, waehlt damit die
+    // uebrigen aus; das ist die Lesart, die Apple in derselben Liste hat.
+    checked: state.people.size === 0 || state.people.has(u.id),
+    // ZWEI NAMEN FUER DIESELBE FARBE, und das ist kein Tippfehler in einer
+    // der beiden Quellen: `/family/members` liefert die Spalte roh als
+    // `avatar_color`, waehrend `assigned_users` sie im JSON auf `color`
+    // umbenennt (services/calendar-events.js:17). Wer nur einen der beiden
+    // Namen liest, bekommt an einer der beiden Stellen `undefined` - hier
+    // stand zuerst `u.color` und die Scheiben blieben in jeder Zeile leer.
+    swatchColor: u.avatar_color ?? u.color ?? null,
+    swatchLabel: initials(u.display_name),
+    attrs: { 'data-filter-person': String(u.id) },
+  })).join('');
 }
 
 /**
@@ -5362,22 +5373,7 @@ function openCalendarFilters() {
     })
     : '';
 
-  const personRows = people.map((u) => toggleRowHtml({
-    label: u.display_name ?? '',
-    // Leeres Set heisst ALLE - die Haekchen stehen dann auf „an", weil genau
-    // das der sichtbare Zustand ist. Wer das erste abwaehlt, waehlt damit die
-    // uebrigen aus; das ist die Lesart, die Apple in derselben Liste hat.
-    checked: state.people.size === 0 || state.people.has(u.id),
-    // ZWEI NAMEN FUER DIESELBE FARBE, und das ist kein Tippfehler in einer
-    // der beiden Quellen: `/family/members` liefert die Spalte roh als
-    // `avatar_color`, waehrend `assigned_users` sie im JSON auf `color`
-    // umbenennt (services/calendar-events.js:17). Wer nur einen der beiden
-    // Namen liest, bekommt an einer der beiden Stellen `undefined` - hier
-    // stand zuerst `u.color` und die Scheiben blieben in jeder Zeile leer.
-    swatchColor: u.avatar_color ?? u.color ?? null,
-    swatchLabel: personInitials(u.display_name),
-    attrs: { 'data-filter-person': String(u.id) },
-  })).join('');
+  const personRows = personFilterRowsHtml(people);
 
   // „Nicht zugewiesen" als Eintrag der Personenachse (#1064): dieselbe Lesart
   // wie eine Person - leeres Set heisst alle, also steht er dann auf „an".
@@ -5932,6 +5928,8 @@ async function openFoundEvent(ev) {
 }
 
 export const __test = {
+  // test:initials: die Scheibe einer Person im Filterblatt.
+  personFilterRowsHtml,
   playViewSwap,
   eventBlockAttrs,
   // R10 L5: Liste + Detail der Agenda - Auswahl-ID und ihr Termin.

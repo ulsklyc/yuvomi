@@ -7,17 +7,20 @@
  *        nur an Stellen, die aus der Uebersetzung stammen, und nur, wenn das
  *        Zeichen davor eine Hangul-Silbe ist.
  *
- *        Drei Schichten:
+ *        Fuenf Schichten:
  *        (1) Tabelle ueber den Helfer, je Partikel und je Art von Vorgaenger.
  *        (2) Die ECHTE t() mit echten ko.json-Schluesseln, dazu die Gegenprobe
  *            in einer anderen Sprache.
  *        (3) Guards ueber ko.json: jede Doppelform dort ist dem Aufloeser
  *            bekannt, und jede Form, die er kennt, kommt dort vor.
+ *        (4) Die ECHTE translate() des Servers (server/utils/i18n.js): dieselbe
+ *            Regel, dazu der Rueckfall auf en/de, der nicht aufgeloest wird.
+ *        (5) Die Schluessel, die der Server ruft - auch die dynamisch gebauten.
  * Ausführen: node --test test/test-i18n-ko-particles.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 import {
   KOREAN_PARTICLE_FORMS,
@@ -421,4 +424,231 @@ test('Guard: die Installer-Locales fuer ko tragen keine Doppelform', () => {
     }
   }
   assert.deepEqual(hits, []);
+});
+
+// ---------------------------------------------------------------------------
+// (4) Die echte Server-translate()
+// ---------------------------------------------------------------------------
+//
+// server/utils/i18n.js liest dieselbe ko.json fuer Push-Texte, ICS-Feeds und
+// gespeicherte Kalendertitel und hat eine eigene Platzhalter-Ersetzung. Heute
+// traegt kein Schluessel, den der Server ruft, eine Doppelform - die Tests hier
+// rufen deshalb Schluessel der Oberflaeche ueber translate(): gemessen wird die
+// Verdrahtung, nicht der Bestand.
+
+const SERVER_I18N = '../server/utils/i18n.js';
+const { translate } = await import(SERVER_I18N);
+
+test('translate() in ko: echte Schluessel, je Partikel mit und ohne Batchim', () => {
+  const cases = [
+    ['settings.memberAddedToast', { name: '민준' }, '민준이 추가되었습니다.'],
+    ['settings.memberAddedToast', { name: '지우' }, '지우가 추가되었습니다.'],
+    ['changelog.updateAvailable', { version: '버전' }, '버전 버전을 사용할 수 있습니다.'],
+    ['rrule.lastDayOfMonthHintSame', { date: '오늘 하루' }, '오늘 하루는 이미 해당 월의 마지막 날이며 첫 일정이 됩니다.'],
+    ['budget.trendNeutral', { month: '지난달' }, '- 지난달과 동일'],
+    ['tasks.tagFilterBy', { tag: '집' }, '태그 집으로 필터'],
+    ['tasks.tagFilterBy', { tag: '서울' }, '태그 서울로 필터'],
+    ['tasks.subtaskDeleteConfirm', { title: '우유' }, '「우유」를 삭제할까요?'],
+  ];
+  const wrong = [];
+  for (const [key, params, want] of cases) {
+    const got = translate('ko', key, params);
+    if (got !== want) wrong.push(`${key} ${JSON.stringify(params)} -> ${got}`);
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('translate() in ko: Latein und fehlender Parameter lassen die Doppelform stehen', () => {
+  assert.equal(translate('ko', 'settings.memberAddedToast', { name: 'Anna' }), 'Anna이(가) 추가되었습니다.');
+  assert.equal(translate('ko', 'settings.memberAddedToast'), '{{name}}이(가) 추가되었습니다.');
+});
+
+test('translate() in ko: eine Doppelform im NUTZERWERT wird nicht angefasst', () => {
+  assert.equal(
+    translate('ko', 'tasks.subtaskDeleteConfirm', { title: '지우이(가) 할 일' }),
+    '「지우이(가) 할 일」을 삭제할까요?',
+  );
+  // Ein Geburtstagstitel wird GESPEICHERT: der Name bleibt, wie er eingegeben wurde.
+  assert.equal(translate('ko', 'birthdays.calendarEventTitle', { name: '지우(으)로' }), '생일: 지우(으)로');
+});
+
+/**
+ * Eine frische Instanz der ECHTEN server/utils/i18n.js, die statt der
+ * Locale-Dateien `patch(locale, daten)` zu lesen bekommt. Kein Nachbau und
+ * keine Pruefnaht im Produktivcode: gepatcht wird `readFileSync`, der
+ * Query-String gibt dem Modul einen eigenen, leeren Cache.
+ *
+ * Noetig, weil der Bestand die beiden Faelle nicht hergibt: keine andere
+ * Sprache traegt eine koreanische Doppelform, und `test:i18n` haelt die
+ * Schluessel aller Locales gleich, also faellt nie einer zurueck.
+ */
+async function serverTranslateWith(tag, patch, run) {
+  const fs = (await import('node:fs')).default;
+  const { syncBuiltinESMExports } = await import('node:module');
+  const original = fs.readFileSync;
+  fs.readFileSync = (file, ...rest) => {
+    const text = original(file, ...rest);
+    const locale = /[\\/]public[\\/]locales[\\/]([^\\/]+)\.json$/.exec(String(file))?.[1];
+    if (!locale) return text;
+    const data = JSON.parse(text);
+    patch(locale, data);
+    return JSON.stringify(data);
+  };
+  syncBuiltinESMExports();
+  try {
+    const fresh = await import(`${SERVER_I18N}?${tag}`);
+    return run(fresh.translate);
+  } finally {
+    fs.readFileSync = original;
+    syncBuiltinESMExports();
+  }
+}
+
+const PROBE = '{{name}}을(를) 삭제, {{name}}(으)로';
+
+test('translate() in anderen Sprachen: dieselbe Zeichenfolge bleibt woertlich stehen', async () => {
+  await serverTranslateWith('andere-sprache', (locale, data) => { data.probe = PROBE; }, (fresh) => {
+    for (const locale of ['de', 'en', 'ja', 'zh', 'xx']) {
+      assert.equal(fresh(locale, 'probe', { name: '지우' }), '지우을(를) 삭제, 지우(으)로', locale);
+    }
+    // Die Sonde selbst misst: in ko loest dieselbe Vorlage auf.
+    assert.equal(fresh('ko', 'probe', { name: '지우' }), '지우를 삭제, 지우로');
+  });
+});
+
+// Es entscheidet die Sprache des GELIEFERTEN Werts, nicht die angefragte: fehlt
+// ein Schluessel in ko.json, kommt der englische oder deutsche Text, und der
+// ist kein Koreanisch - auch wenn er zufaellig so aussieht.
+test('translate() im Rueckfall: ein ko-Schluessel, der auf en oder de faellt, wird nicht aufgeloest', async () => {
+  await serverTranslateWith('rueckfall', (locale, data) => {
+    if (locale === 'en') data.probeEn = PROBE;
+    if (locale === 'de') data.probeDe = PROBE;
+    if (locale === 'ko') data.probeKo = PROBE;
+  }, (fresh) => {
+    assert.equal(fresh('ko', 'probeEn', { name: '지우' }), '지우을(를) 삭제, 지우(으)로', 'ko -> en');
+    assert.equal(fresh('ko', 'probeDe', { name: '지우' }), '지우을(를) 삭제, 지우(으)로', 'ko -> de');
+    assert.equal(fresh('ko', 'probeKo', { name: '지우' }), '지우를 삭제, 지우로', 'ko selbst');
+    // Unbekannter Schluessel: der Key kommt zurueck, wie bisher.
+    assert.equal(fresh('ko', 'gibt.es(으)로.nicht'), 'gibt.es(으)로.nicht');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (5) Die Schluessel, die der Server tatsaechlich ruft
+// ---------------------------------------------------------------------------
+
+const SERVER_DIR = new URL('../server/', import.meta.url);
+const de = flattenLocale(localeFile('de'));
+
+/**
+ * Aufrufe, deren Schluessel nicht als Literal im Aufruf steht. Jeder Eintrag
+ * nennt, woher die Schluessel kommen; ein neuer dynamischer Aufruf ohne
+ * Eintrag macht den Test rot, statt still an der Pruefung vorbeizulaufen.
+ */
+const DYNAMIC_KEY_SITES = {
+  // reminderPayload(): `translate(locale, origin.titleKey)` - die Titel der
+  // Herkunftstabelle REMINDER_ORIGINS in derselben Datei.
+  'services/notifications.js|origin.titleKey': (code) => [...code.matchAll(/\btitleKey:\s*'([^']+)'/g)].map((m) => m[1]),
+};
+
+function serverSourceFiles(dir = SERVER_DIR, out = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const url = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+    if (entry.isDirectory()) serverSourceFiles(url, out);
+    else if (entry.name.endsWith('.js')) out.push(url);
+  }
+  return out;
+}
+
+/** Das zweite Argument jedes `translate(...)`-Aufrufs einer Quelldatei. */
+function translateKeyArgs(code) {
+  const bare = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
+  const args = [];
+  for (const m of bare.matchAll(/(?<![.\w])translate\(/g)) {
+    let depth = 1;
+    let quote = null;
+    const commaAt = [];
+    let i = m.index + m[0].length;
+    for (; i < bare.length && depth > 0; i += 1) {
+      const ch = bare[i];
+      if (quote) {
+        if (ch === '\\') i += 1;
+        else if (ch === quote) quote = null;
+      } else if (ch === '\'' || ch === '"' || ch === '`') quote = ch;
+      else if ('([{'.includes(ch)) depth += 1;
+      else if (')]}'.includes(ch)) depth -= 1;
+      else if (ch === ',' && depth === 1) commaAt.push(i);
+    }
+    const end = i - 1;
+    if (!commaAt.length) continue;
+    args.push(bare.slice(commaAt[0] + 1, commaAt[1] ?? end).trim());
+  }
+  return args;
+}
+
+function serverTranslateKeys() {
+  const keys = new Map(); // key -> Fundstelle
+  const problems = [];
+  const usedDynamic = new Set();
+  for (const url of serverSourceFiles()) {
+    const rel = url.pathname.slice(SERVER_DIR.pathname.length);
+    if (rel === 'utils/i18n.js') continue; // die Definition selbst
+    const code = readFileSync(url, 'utf8');
+    for (const arg of translateKeyArgs(code)) {
+      const literals = [...arg.matchAll(/'([^'\\]*)'/g)].map((m) => m[1]);
+      const plain = /^'[^'\\]*'$/.test(arg);
+      const found = literals.filter((literal) => typeof de.get(literal) === 'string');
+      if (plain && !found.length) { problems.push(`${rel}: ${arg} ist kein Schluessel in de.json`); continue; }
+      if (found.length) { for (const key of found) keys.set(key, rel); continue; }
+      const site = `${rel}|${arg}`;
+      const resolver = DYNAMIC_KEY_SITES[site];
+      if (!resolver) { problems.push(`${rel}: translate(…, ${arg}) baut den Schluessel dynamisch und steht nicht in DYNAMIC_KEY_SITES`); continue; }
+      usedDynamic.add(site);
+      const resolved = resolver(code);
+      if (!resolved.length) problems.push(`${site}: keine Schluessel aufgeloest`);
+      for (const key of resolved) {
+        if (typeof de.get(key) !== 'string') problems.push(`${site}: ${key} ist kein Schluessel in de.json`);
+        keys.set(key, rel);
+      }
+    }
+  }
+  for (const site of Object.keys(DYNAMIC_KEY_SITES)) {
+    if (!usedDynamic.has(site)) problems.push(`DYNAMIC_KEY_SITES: ${site} gibt es nicht mehr`);
+  }
+  return { keys, problems };
+}
+
+test('Server-Schluessel: jeder Aufruf von translate() ist aufgeloest, auch die dynamischen', () => {
+  const { keys, problems } = serverTranslateKeys();
+  assert.deepEqual(problems, []);
+  // Kein blinder Scanner: Literal, Ternary und Tabelle muessen gesehen werden.
+  for (const key of [
+    'birthdays.calendarEventTitle',                               // Literal
+    'health.fasting.goalReached', 'health.fasting.remindNext',    // Ternary im Aufruf
+    'nav.tasks', 'health.cycle.title', 'subscriptions.tabLabel',  // REMINDER_ORIGINS
+  ]) {
+    assert.ok(keys.has(key), `${key} nicht gefunden`);
+  }
+});
+
+test('Server-Schluessel: kein ko-Text, den der Server ruft, behaelt eine Doppelform hinter Hangul', () => {
+  const { keys } = serverTranslateKeys();
+  const wrong = [];
+  for (const key of keys.keys()) {
+    const template = ko.get(key);
+    if (typeof template !== 'string') { wrong.push(`${key}: fehlt in ko.json`); continue; }
+    for (const value of ['지우', '민준']) {
+      const params = Object.fromEntries([...template.matchAll(/\{\{(\w+)\}\}/g)].map((m) => [m[1], value]));
+      const got = translate('ko', key, params);
+      for (const form of KNOWN) {
+        // Eine Doppelform direkt hinter einem Platzhalter (samt Anfuehrungszeichen).
+        // Maskiert wird ueber den Helfer selbst - keine zweite Escape-Regel.
+        const behindPlaceholder = new RegExp(`\\}\\}${CLOSING_QUOTES}*(?:${buildFormPattern([form]).source})`);
+        if (behindPlaceholder.test(template) && got.includes(form)) {
+          wrong.push(`${key} (${value}) -> ${got}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(wrong, []);
 });

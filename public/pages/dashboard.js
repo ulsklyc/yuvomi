@@ -14,6 +14,7 @@ import { resolveEventColor } from '/utils/event-color.js';
 import { buildWeekStrip } from '/utils/week-strip.js';
 import { relativeDateLabel, housekeepingSinceLabel } from '/utils/day-label.js';
 import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
 // `todayKey` heisst hier schon ein Parameter (bzw. eine lokale Bindung), der den
 // Bezugstag traegt - der Import kommt deshalb unter eigenem Namen herein.
 import { parseLocalDateKey, addLocalDays, todayKey as householdToday } from '/utils/date.js';
@@ -834,10 +835,6 @@ const MEAL_ICONS = {
   dinner:    'moon',
   snack:     'apple',
 };
-
-function initials(name = '') {
-  return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-}
 
 function budgetCategoryLabel(category) {
   const key = BUDGET_CATEGORY_LABEL_KEYS[category];

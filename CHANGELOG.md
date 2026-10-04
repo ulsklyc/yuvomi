@@ -61,6 +61,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   message and keeps what follows the address (`?view=...`). Pages of modules that are switched off or not allowed for you behave as before.
   One link inside the app pointed at such an address: the painkiller shortcut in the cycle day
   log landed on the overview and now opens Medications.
+- **Avatars show the same initials for a person on every page, and a Korean, Chinese or
+  Japanese name shows the given name** (#1607, #1464). A name written in Hangul, Han characters
+  or kana showed only its first character, which is the family name, so two children with the
+  same family name had identical avatars. Such a name now shows the last two characters of the
+  given name (민수 for 김민수, 太郎 for 田中太郎), and the whole name if it has one or two. It makes
+  no difference whether the name was entered with a space: 김 민수 shows 민수 as well. Where the
+  circle is too small for two of these characters - the small avatars on task cards, calendar
+  entries and next to a module icon - it shows the last one.
+  For every other name with several words the initials are now the first letter of the first
+  and of the **last** word, everywhere: "AS" for Anna Maria Schmidt and "DM" for Dr. Hans
+  Müller. Until now each page had its own copy of the rule. Contacts already worked this way;
+  all other places took the first two words ("AM", "DH"), so the same person could carry two
+  different sets of initials, and a middle name or a title stood in for the family name. Names
+  with one or two words look as before. Two more differences between the pages are gone: a
+  name starting with an emoji showed a broken character and now shows the emoji, and two
+  spaces between the words of a name left the avatar in Settings with one letter or none.
+  The member chips under Settings > Permissions are 2px larger so that two Korean, Chinese or
+  Japanese characters fit.
 - **"No access to this module" is shown in your language** (#1607). When a request was refused
   because your role has no access to a module, or only read access, the message came from the
   server in English, whatever language the app was set to. Both messages are now translated
@@ -103,8 +121,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   once, for example "캘린더이(가)" or "「우유」을(를) 삭제할까요?". It now writes the form that fits the
   inserted word: "캘린더가", "「우유」를", "서울로". After Latin letters, digits and emoji both forms
   stay, because the right one depends on how the word is pronounced. Texts the server writes
-  itself (push notifications, calendar entries) and the installer are not affected; none of them
-  contains such a form today.
+  itself (push notifications, calendar feeds, stored calendar titles) follow the same rule from
+  the same place; none of them contains such a form today, so nothing already stored changes.
+  The installer is not affected.
 - **The calendar mirrors fully in right-to-left languages.** In Arabic and Persian the week
   view drew the column lines of the all-day row 1px beside those of the time grid, the month
   grid drew a line along its outer right edge and only a thin one between its two leftmost days,
@@ -335,6 +354,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or nothing is, for household, personal and admin-only fields alike; status and error text of
   the answer are unchanged. The app sends these fields one at a time, so this only showed
   through the API.
+- **Housekeeping: a visit stored without a time zone stays in its own month.** Yuvomi itself
+  stores a check-in as a point in time, but a row written into the database by hand can carry a
+  plain wall-clock time such as `2026-09-30T23:30:00`. The month lists of the module (visits,
+  work sessions, monthly summary, pending and paid amounts) compared such a row as text against
+  the month's UTC bounds: east of UTC a visit late on the last day of a month appeared in the
+  next month, west of UTC one early on the first day appeared in the previous month or dropped
+  out of the six-month chart, while the chart and the overview tile already counted it in the
+  household's month. All of them now read the month from the household's clock. Stored values
+  are not rewritten.
 - **A recurring shared expense is checked when it is created, not when it is booked.** Creating
   one through the API accepted any payer, any participants and any split values. A person who
   was never in the group could be named as payer or participant and was then booked a debt in

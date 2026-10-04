@@ -10,6 +10,7 @@ import { openDetailView } from '/components/detail-view.js';
 import { stagger, vibrate, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { pageToolsMenuHtml, popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
@@ -84,15 +85,6 @@ function catTintStyle(key) {
     : '';
 }
 
-// Initialen aus dem Namen (max. 2 Buchstaben): Vorname + letzter Namensteil.
-function initials(name) {
-  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '?';
-  const first = parts[0][0] || '';
-  const last  = parts.length > 1 ? parts[parts.length - 1][0] : '';
-  return (first + last).toUpperCase();
-}
-
 // Avatar einer Zeile. Zwei Faelle, zwei Sprecher:
 //
 // EIN VERKNUEPFTER KONTAKT IST EIN MENSCH DES HAUSHALTS, und der traegt ueberall
@@ -113,7 +105,7 @@ function contactAvatar(c) {
   const name  = c.family_display_name || c.name;
   const inner = c.family_avatar_data
     ? `<img src="${esc(c.family_avatar_data)}" alt="" loading="lazy">`
-    : esc(initials(name));
+    : esc(initials(name, '?'));
   return `<span class="contact-item__icon contact-item__icon--member"
     style="background-color:${esc(color)};color:${getReadableTextColor(color)}"
     aria-hidden="true">${inner}</span>`;
