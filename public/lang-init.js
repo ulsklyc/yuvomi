@@ -20,6 +20,10 @@
   // Regionen, die eine Schrift implizieren: ein Browser meldet `zh-TW`, nie
   // `zh-Hant-TW`. `CN` und `SG` fehlen bewusst - unser `zh` ist Vereinfacht.
   var REGION_SCRIPT = { TW: 'Hant', HK: 'Hant', MO: 'Hant' };
+  // Sprachcodes, die eine vorhandene Locale meinen: `no` (Makrosprache) und `nn`
+  // (Nynorsk, ohne eigene Datei) fallen auf `nb`, aber erst, wenn der Tag selbst
+  // nichts findet - siehe LANGUAGE_ALIAS in i18n.js.
+  var LANGUAGE_ALIAS = { no: 'nb', nn: 'nb' };
 
   /** Kanonische BCP-47-Schreibweise: Sprache klein, Schrift Titlecase, Region groß. */
   function canonicalTag(tag) {
@@ -33,24 +37,35 @@
     return teile.join('-');
   }
 
+  /** Ein Tag als Subtag-Liste gegen SUPPORTED: vom vollen Tag abwärts, oder null. */
+  function matchTag(teile) {
+    // Eine Schrift, die im Tag STEHT, schlaegt jede, die eine Region nahelegt
+    // (`zh-Hans-HK` meint Vereinfacht) - siehe i18n.js#matchTag.
+    var traegtSchrift = false;
+    for (var k = 1; k < teile.length; k++) if (teile[k].length === 4) traegtSchrift = true;
+    while (teile.length) {
+      var tag = teile.join('-');
+      if (SUPPORTED.indexOf(tag) !== -1) return tag;
+      if (!traegtSchrift) {
+        var letzter = teile[teile.length - 1];
+        var schrift = Object.prototype.hasOwnProperty.call(REGION_SCRIPT, letzter) ? REGION_SCRIPT[letzter] : null;
+        if (schrift && SUPPORTED.indexOf(teile[0] + '-' + schrift) !== -1) return teile[0] + '-' + schrift;
+      }
+      teile.pop();
+    }
+    return null;
+  }
+
   /** Die spezifischste unterstützte Locale: `zh-Hant-TW` > `zh-Hant` > `zh`. */
   function pickLocale(tags) {
     for (var i = 0; i < tags.length; i++) {
       if (!tags[i]) continue;
       var teile = canonicalTag(tags[i]).split('-');
-      // Eine Schrift, die im Tag STEHT, schlaegt jede, die eine Region nahelegt
-      // (`zh-Hans-HK` meint Vereinfacht) - siehe i18n.js#pickLocale.
-      var traegtSchrift = false;
-      for (var k = 1; k < teile.length; k++) if (teile[k].length === 4) traegtSchrift = true;
-      while (teile.length) {
-        var tag = teile.join('-');
-        if (SUPPORTED.indexOf(tag) !== -1) return tag;
-        if (!traegtSchrift) {
-          var letzter = teile[teile.length - 1];
-          var schrift = Object.prototype.hasOwnProperty.call(REGION_SCRIPT, letzter) ? REGION_SCRIPT[letzter] : null;
-          if (schrift && SUPPORTED.indexOf(teile[0] + '-' + schrift) !== -1) return teile[0] + '-' + schrift;
-        }
-        teile.pop();
+      var treffer = matchTag(teile.slice());
+      if (treffer) return treffer;
+      if (Object.prototype.hasOwnProperty.call(LANGUAGE_ALIAS, teile[0])) {
+        var alias = matchTag([LANGUAGE_ALIAS[teile[0]]].concat(teile.slice(1)));
+        if (alias) return alias;
       }
     }
     return 'en';

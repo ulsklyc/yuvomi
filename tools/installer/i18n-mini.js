@@ -23,6 +23,11 @@ function storedLocale() {
   } catch { return null; }
 }
 
+// Sprachcodes, die eine vorhandene Locale meinen: ein norwegischer Browser meldet
+// oft `no` (Makrosprache) statt `nb`, und `nn` (Nynorsk) hat keine eigene Datei.
+// Rueckfall, kein Ersatz - siehe LANGUAGE_ALIAS in public/i18n.js.
+const LANGUAGE_ALIAS = { no: 'nb', nn: 'nb' };
+
 /**
  * Gemerkte Wahl > Browsersprache > Englisch, wie resolveLocale() in
  * public/i18n.js. Je Tag erst Sprache mit Region (pt-BR), dann die
@@ -33,12 +38,23 @@ export function resolveLocale(languages = navigator.languages || [navigator.lang
   const stored = storedLocale();
   if (stored) return stored;
   for (const tag of languages) {
-    const [lang = '', region = ''] = (tag || '').split('-');
-    const full = `${lang.toLowerCase()}-${region.toUpperCase()}`;
-    if (region && SUPPORTED_LOCALES.includes(full)) return full;
-    if (SUPPORTED_LOCALES.includes(lang.toLowerCase())) return lang.toLowerCase();
+    const [rawLang = '', region = ''] = (tag || '').split('-');
+    const lang = rawLang.toLowerCase();
+    const hit = matchLanguage(lang, region);
+    if (hit) return hit;
+    if (Object.prototype.hasOwnProperty.call(LANGUAGE_ALIAS, lang)) {
+      const alias = matchLanguage(LANGUAGE_ALIAS[lang], region);
+      if (alias) return alias;
+    }
   }
   return FALLBACK_LOCALE;
+}
+
+/** Sprache mit Region, sonst die Basissprache, sonst null. */
+function matchLanguage(lang, region) {
+  const full = `${lang}-${region.toUpperCase()}`;
+  if (region && SUPPORTED_LOCALES.includes(full)) return full;
+  return SUPPORTED_LOCALES.includes(lang) ? lang : null;
 }
 
 async function loadLocale(locale) {

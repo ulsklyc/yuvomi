@@ -283,6 +283,16 @@ test('resolveLocale nimmt erst den vollen Tag, dann die Basissprache', () => {
   assert.equal(resolveLocale(['th-TH']), 'en');
 });
 
+// `no` ist die Makrosprache, die ein norwegischer Browser haeufig meldet, `nn`
+// (Nynorsk) hat keine eigene Datei. Beide bekamen den Installer auf Englisch.
+test('resolveLocale: `no` und `nn` fallen auf `nb`', () => {
+  for (const tag of ['no', 'no-NO', 'NO-no', 'nn', 'nn-NO']) {
+    assert.equal(resolveLocale([tag]), 'nb', tag);
+  }
+  assert.equal(resolveLocale(['nn-NO', 'de']), 'nb');
+  assert.equal(resolveLocale(['th-TH', 'no']), 'nb');
+});
+
 /* Die Sprache, die der Installer als `language` an /api/v1/auth/setup reicht,
  * muss die App kennen - in BEIDE Richtungen gemessen.
  *

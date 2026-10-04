@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A Norwegian browser or system that reports `no` or `nn` gets Norwegian instead of English.**
+  Norwegian Bokmål ships as `nb`, but many browsers and systems announce the general code `no`
+  (`no-NO`, `LANG=no_NO.UTF-8`), and that fell through to English. The same went for Nynorsk
+  (`nn`), which has no translation of its own: it now gets Bokmål, the closer language, rather
+  than English. This holds for the app, the web installer, the command-line installer and the
+  `lang` parameter of the API. An explicit language choice in the settings is not affected.
 - **A loan created from "New entry" in the budget overview can say how many installments are
   already paid** (#1648, reported by @ramonbresco). The field existed only in the "New loan" dialog
   of the Loans tab; choosing the type "Loan" in the overview's dialog left it out, so a running loan
