@@ -6,7 +6,7 @@
 import { isRestoreRunning } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
-import { buildSplits } from './split-expenses.js';
+import { buildSplits, insertExpenseLedger } from './split-expenses.js';
 import { todayKey } from '../utils/timezone.js';
 
 const log = createLogger('SplitExpenseScheduler');
@@ -60,15 +60,10 @@ function generateRecurringExpense(database, recurring) {
   const insertSplit = database.prepare('INSERT INTO expense_splits (expense_id, user_id, amount_minor, currency) VALUES (?, ?, ?, ?)');
   for (const split of splits) insertSplit.run(expenseId, split.user_id, split.amount_minor, split.currency);
 
-  const insertLedger = database.prepare(`
-    INSERT INTO expense_ledger_entries
-      (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
-    VALUES (?, 'expense', ?, ?, ?, ?, ?, ?, ?)
-  `);
-  insertLedger.run(recurring.group_id, expenseId, recurring.payer_id, null, recurring.amount_minor, recurring.currency, recurring.title, recurring.created_by);
-  for (const split of splits) {
-    insertLedger.run(recurring.group_id, expenseId, split.user_id, recurring.payer_id, -split.amount_minor, split.currency, recurring.title, recurring.created_by);
-  }
+  // Dieselbe Buchungsregel wie die Route (#1444), aus der gespeicherten Zeile
+  // gelesen statt aus der Serie: so bucht der Lauf, was in `expenses` steht.
+  const expense = database.prepare('SELECT * FROM expenses WHERE id = ?').get(expenseId);
+  insertExpenseLedger(database, expense, splits);
 
   insertActivity(database, recurring.group_id, recurring.created_by, 'recurring_generated', 'expense', expenseId, { recurring_expense_id: recurring.id, title: recurring.title });
   database.prepare('UPDATE recurring_expenses SET next_run_date = ? WHERE id = ?')

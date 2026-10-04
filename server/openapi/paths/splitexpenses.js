@@ -4,6 +4,7 @@ import { op, jsonBody, idParam, DOCUMENT_LINKS_READ_NOTE } from '../helpers.js';
 // durchgesetzt in parseMoneyToMinor().
 const AMOUNT_NOTE = 'Amounts are decimal strings with a dot (`"12.50"`, not a number), with at most the currency\'s decimal places, and must be greater than zero: `0`, `-0` and negative values are answered with `400`.';
 const EXACT_SPLIT_NOTE = 'With `split_method: "exact"`, every participant needs a `splits[].amount` under the same rule, and the shares must add up to the expense amount.';
+const RECURRING_SPLIT_NOTE = 'The split is checked when the recurring expense is created, by the same rule as a single expense: `payer_id` and every entry of `participants` must be members of the group, `exact` amounts must add up to the amount, `percentage` values to 100, and `shares` must be positive integers. Anything else is answered with `400` and nothing is stored.';
 
 const apiError = (description) => ({
   description,
@@ -171,7 +172,7 @@ export function splitexpensesPaths() {
     },
     '/api/v1/split-expenses/groups/{id}/recurring': {
       get: op({ summary: 'List recurring expenses in group', tag: 'SplitExpenses', params: [idParam()] }),
-      post: op({ summary: 'Create recurring expense in group', description: AMOUNT_NOTE, tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Create recurring expense in group', description: `${AMOUNT_NOTE} ${EXACT_SPLIT_NOTE} ${RECURRING_SPLIT_NOTE}`, tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/expenses/{id}': {
       put: op({ summary: 'Update expense (`attachment_document_ids` replaces the receipt links; omit the field to leave them untouched)', tag: 'SplitExpenses', params: [idParam()], description: `${AMOUNT_NOTE} ${EXACT_SPLIT_NOTE} ${DOCUMENT_LINKS_READ_NOTE}`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),

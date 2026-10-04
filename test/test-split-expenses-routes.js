@@ -1056,6 +1056,119 @@ test('negative und Minus-Null-Betraege: 400 mit der Regel im Klartext, nichts wi
   assert.deepEqual(gut.body.data.splits.map((s) => s.amount_minor).sort((x, y) => x - y), [400, 600]);
 });
 
+// --------------------------------------------------------------------------
+// Serien pruefen ihre Aufteilung beim Anlegen, mit derselben Regel wie eine
+// Ausgabe. Bis hierher nahm POST /groups/:id/recurring Zahler, Beteiligte und
+// `splits` ungeprueft und schrieb sie in `split_snapshot`; erst der Buchungslauf
+// rechnete sie durch `buildSplits`. Eine unerfuellbare Serie liess ihn werfen
+// (und mit ihr jede andere faellige Serie der Instanz, denn der Lauf ist EINE
+// Transaktion), eine Serie mit einer gruppenfremden Person buchte dieser eine
+// Schuld in eine Gruppe, die sie nie gesehen hat.
+// --------------------------------------------------------------------------
+const serie = (extra, groupId = GROUP) => call('POST', `/groups/${groupId}/recurring`, {
+  actor: { id: OWNER, role: 'member' },
+  body: { title: 'Strom', amount: '10.00', currency: 'EUR', frequency: 'monthly', next_run_date: '2026-01-15', payer_id: OWNER, participants: [OWNER, MEM], ...extra },
+});
+const serienZahl = () => db.prepare('SELECT COUNT(*) AS n FROM recurring_expenses').get().n;
+
+test('POST /groups/:id/recurring: ungueltige Aufteilung -> 400, nichts gespeichert', async () => {
+  const vorher = serienZahl();
+  for (const [name, antwort, regel] of [
+    ['Zahler ist kein Mitglied', await serie({ payer_id: OUTSIDER }), /^Payer must be a group member\.$/],
+    ['Beteiligter ist kein Mitglied', await serie({ participants: [OWNER, OUTSIDER] }), /^All participants must be group members\.$/],
+    ['Beteiligter existiert nicht', await serie({ participants: [OWNER, 999999] }), /^All participants must be group members\.$/],
+    ['Beteiligte leer', await serie({ participants: [] }), /^participants must contain at least one member\.$/],
+    ['Genau: Summe ungleich Betrag', await serie({ split_method: 'exact', splits: [{ user_id: OWNER, amount: '4.00' }, { user_id: MEM, amount: '5.00' }] }), /^Exact splits must add up to the expense amount\.$/],
+    ['Genau: Anteil fehlt', await serie({ split_method: 'exact', splits: [{ user_id: OWNER, amount: '10.00' }] }), /^Each participant needs an exact split amount\.$/],
+    ['Genau: Betrag als Zahl', await serie({ split_method: 'exact', splits: [{ user_id: OWNER, amount: 4 }, { user_id: MEM, amount: 6 }] }), /^split amount must be sent as a decimal string/],
+    ['Genau: splits ist kein Array', await serie({ split_method: 'exact', splits: 'alles ich' }), /^Each participant needs an exact split amount\.$/],
+    ['Prozent: Summe 90', await serie({ split_method: 'percentage', splits: [{ user_id: OWNER, percentage: '50' }, { user_id: MEM, percentage: '40' }] }), /^Percentages must add up to 100\.$/],
+    ['Prozent: ohne splits', await serie({ split_method: 'percentage' }), /^Percentages must be decimal strings/],
+    ['Anteile: 0', await serie({ split_method: 'shares', splits: [{ user_id: OWNER, shares: 0 }, { user_id: MEM, shares: 1 }] }), /^Shares must be positive integers\.$/],
+  ]) {
+    assert.equal(antwort.status, 400, name);
+    assert.match(antwort.body.error, regel, name);
+  }
+  assert.equal(serienZahl(), vorher, 'keine der abgelehnten Serien liegt in der Tabelle');
+});
+
+test('POST /groups/:id/recurring: gespeichert wird die gepruefte Aufteilung, nicht der Request', async () => {
+  const r = await serie({
+    split_method: 'percentage',
+    participants: [String(OWNER), MEM, MEM],
+    splits: [
+      { user_id: OUTSIDER, percentage: '100' },
+      { user_id: OWNER, percentage: '30', amount: '99.00', note: 'x' },
+      { user_id: String(MEM), percentage: '70' },
+    ],
+  });
+  assert.equal(r.status, 201);
+  const row = db.prepare('SELECT split_method, split_snapshot FROM recurring_expenses WHERE id = ?').get(r.body.data.id);
+  assert.equal(row.split_method, 'percentage');
+  assert.deepEqual(JSON.parse(row.split_snapshot), {
+    participants: [OWNER, MEM],
+    splits: [{ user_id: OWNER, percentage: '30' }, { user_id: MEM, percentage: '70' }],
+  });
+  // Gleichteilung traegt keine Einzelwerte: was mitkommt, wird nicht aufbewahrt.
+  const gleich = await serie({ splits: [{ user_id: OUTSIDER, amount: '10.00' }] });
+  assert.equal(gleich.status, 201);
+  assert.deepEqual(
+    JSON.parse(db.prepare('SELECT split_snapshot FROM recurring_expenses WHERE id = ?').get(gleich.body.data.id).split_snapshot),
+    { participants: [OWNER, MEM], splits: [] },
+  );
+});
+
+// #1444: der Buchungslauf schrieb die Ledger-Zeilen mit einem eigenen INSERT.
+// Gemessen wird der Lauf selbst gegen dieselbe Ausgabe ueber POST .../expenses -
+// aendert sich die Buchungsregel nur auf einer Seite, wird das hier rot.
+test('Buchungslauf: eine faellige Serie bucht dieselben Ledger-Zeilen wie POST /expenses', async () => {
+  const { processDueRecurringExpenses } = await import('../server/services/split-expenses-scheduler.js');
+  const owner = { id: OWNER, role: 'member' };
+  const g = await call('POST', '/groups', { actor: owner, body: { name: 'Serienlauf', type: 'household', default_currency: 'EUR' } });
+  const gid = g.body.data.id;
+  for (const uid of [MGR, MEM]) {
+    assert.equal((await call('POST', `/groups/${gid}/members`, { actor: owner, body: { user_id: uid, role: 'guest' } })).status, 201);
+  }
+  // Alles andere Faellige ruht, damit der Lauf nur diese Gruppe bucht.
+  db.prepare('UPDATE recurring_expenses SET paused_at = ? WHERE paused_at IS NULL').run('2026-01-01T00:00:00Z');
+
+  const faelle = [
+    { title: 'Gleich', amount: '10.00', split_method: 'equal' },
+    { title: 'Genau', amount: '10.00', split_method: 'exact', splits: [{ user_id: OWNER, amount: '1.00' }, { user_id: MGR, amount: '2.50' }, { user_id: MEM, amount: '6.50' }] },
+    { title: 'Prozent', amount: '10.01', split_method: 'percentage', splits: [{ user_id: OWNER, percentage: '33.33' }, { user_id: MGR, percentage: '33.33' }, { user_id: MEM, percentage: '33.34' }] },
+    { title: 'Anteile', amount: '0.10', split_method: 'shares', splits: [{ user_id: OWNER, shares: 1 }, { user_id: MGR, shares: 1 }, { user_id: MEM, shares: 1 }] },
+  ];
+  const gemeinsam = { currency: 'EUR', payer_id: MGR, participants: [OWNER, MGR, MEM] };
+  for (const fall of faelle) {
+    const r = await call('POST', `/groups/${gid}/recurring`, { actor: owner, body: { ...gemeinsam, ...fall, frequency: 'monthly', next_run_date: '2026-01-31' } });
+    assert.equal(r.status, 201, fall.title);
+    const e = await call('POST', `/groups/${gid}/expenses`, { actor: owner, body: { ...gemeinsam, ...fall, expense_date: '2026-01-31' } });
+    assert.equal(e.status, 201, fall.title);
+  }
+
+  assert.deepEqual(processDueRecurringExpenses('2026-01-31'), { generated: faelle.length });
+
+  const zeilen = (where) => db.prepare(`
+    SELECT e.title, l.group_id, l.source_type, l.user_id, l.counterparty_id, l.amount_minor, l.currency, l.memo, l.created_by
+    FROM expense_ledger_entries l JOIN expenses e ON e.id = l.source_id AND l.source_type IN ('expense', 'expense_reversal')
+    WHERE e.group_id = ? AND ${where}
+    ORDER BY e.title, l.id
+  `).all(gid);
+  const vomLauf = zeilen('e.recurring_rule_id IS NOT NULL');
+  const vonDerRoute = zeilen('e.recurring_rule_id IS NULL');
+  assert.equal(vomLauf.length, faelle.length * 4, 'je Serie eine Zahler-Zeile und drei Anteile');
+  assert.deepEqual(vomLauf, vonDerRoute);
+  const anteile = (where) => db.prepare(`
+    SELECT e.title, s.user_id, s.amount_minor, s.currency
+    FROM expense_splits s JOIN expenses e ON e.id = s.expense_id
+    WHERE e.group_id = ? AND ${where} ORDER BY e.title, s.id
+  `).all(gid);
+  assert.deepEqual(anteile('e.recurring_rule_id IS NOT NULL'), anteile('e.recurring_rule_id IS NULL'));
+
+  // Der Lauf hat den Termin weitergestellt und bucht denselben Tag nicht zweimal.
+  assert.deepEqual(processDueRecurringExpenses('2026-01-31'), { generated: 0 });
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

@@ -85,9 +85,13 @@ function withCurrency(rows, currency) {
   return rows.map((row) => ({ ...row, currency }));
 }
 
+function splitsByUser(splits) {
+  return new Map((Array.isArray(splits) ? splits : []).map((s) => [Number(s.user_id), s]));
+}
+
 function buildSplits({ method, amountMinor, currency, participants, splits = [] }) {
   const participantIds = assertIntegerIds(participants, 'participants');
-  const splitMap = new Map((Array.isArray(splits) ? splits : []).map((s) => [Number(s.user_id), s]));
+  const splitMap = splitsByUser(splits);
 
   if (method === 'equal') {
     const base = Math.trunc(amountMinor / participantIds.length);
@@ -136,6 +140,58 @@ function buildSplits({ method, amountMinor, currency, participants, splits = [] 
   }
 
   throw new Error('Unsupported split method.');
+}
+
+// Der Wert je Person, den eine Split-Art liest. `equal` liest keinen.
+const SPLIT_INPUT_FIELD = { exact: 'amount', percentage: 'percentage', shares: 'shares' };
+
+// Eine Serie bewahrt ihre Aufteilung als EINGABE auf (Beteiligte + Wert je
+// Person), der Buchungslauf rechnet sie an jedem Termin durch `buildSplits`.
+// Geprueft wird deshalb genau das, was gespeichert wird: die Eingabe wird erst
+// auf die Beteiligten und das eine Feld ihrer Split-Art gekuerzt, einmal durch
+// JSON geschickt wie beim Speichern, und DIESE Fassung laeuft durch
+// `buildSplits`. Wirft es hier nicht, wirft es mit denselben Werten auch im
+// Buchungslauf nicht. Die Mitgliedschaft der Personen kennt diese Datei nicht,
+// die prueft der Aufrufer.
+function splitSnapshot({ method, amountMinor, currency, participants, splits = [] }) {
+  const participantIds = assertIntegerIds(participants, 'participants');
+  const field = SPLIT_INPUT_FIELD[method];
+  const splitMap = splitsByUser(splits);
+  const snapshot = JSON.parse(JSON.stringify({
+    participants: participantIds,
+    splits: field
+      ? participantIds.filter((id) => splitMap.has(id)).map((id) => ({ user_id: id, [field]: splitMap.get(id)[field] }))
+      : [],
+  }));
+  buildSplits({ method, amountMinor, currency, participants: snapshot.participants, splits: snapshot.splits });
+  return snapshot;
+}
+
+// Die Buchungsregel einer Ausgabe: eine Zeile fuer den Zahler ueber den ganzen
+// Betrag, eine je Anteil mit umgekehrtem Vorzeichen. Route (Anlegen, Bearbeiten)
+// und Buchungslauf der Serien rufen diese eine Fassung (#1444).
+//
+// `created_by` jeder Ledger-Zeile ist `expense.created_by`, nie die Person, die
+// gerade anlegt oder bearbeitet: Ausgabe und Zeilen haengen per ON DELETE
+// CASCADE am selben Konto und fallen so nur gemeinsam. Trug ein PUT die
+// bearbeitende Person ein, nahm deren Kontoloeschung die Zeilen mit, und die
+// weiter aktive Ausgabe zaehlte nicht mehr im Saldo. Wer bearbeitet hat, steht
+// in `expense_edited` (expense_activity.actor_id).
+//
+// Migration v226 baut verlorene Zeilen mit einer EINGEFRORENEN SQL-Fassung
+// dieser Regel neu auf. Aendert sich die Regel, wird test:split-ledger-rebuild-
+// migration rot - dann gilt die neue Regel ab hier, v226 bleibt, wie sie ist.
+function insertExpenseLedger(database, expense, splits, sourceType = 'expense') {
+  const actorId = expense.created_by;
+  const insert = database.prepare(`
+    INSERT INTO expense_ledger_entries
+      (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  insert.run(expense.group_id, sourceType, expense.id, expense.payer_id, null, expense.converted_amount_minor, expense.converted_currency, expense.title, actorId);
+  for (const split of splits) {
+    insert.run(expense.group_id, sourceType, expense.id, split.user_id, expense.payer_id, -split.amount_minor, split.currency, expense.title, actorId);
+  }
 }
 
 function simplifyDebts(balanceRows) {
@@ -275,6 +331,8 @@ function decorateMoney(row, fields = ['amount_minor']) {
 
 export {
   buildSplits,
+  splitSnapshot,
+  insertExpenseLedger,
   decorateMoney,
   groupBalanceRows,
   minorToDecimal,

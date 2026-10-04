@@ -15,7 +15,9 @@ import {
   sendDocumentLinkRefusal, visibleDocumentRef,
 } from '../services/document-links.js';
 import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
-import { buildSplits, decorateMoney, groupBalanceRows, minorToDecimal, parseMoneyToMinor, simplifyDebts } from '../services/split-expenses.js';
+import {
+  buildSplits, decorateMoney, groupBalanceRows, insertExpenseLedger, minorToDecimal, parseMoneyToMinor, simplifyDebts, splitSnapshot,
+} from '../services/split-expenses.js';
 import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
 import { syncBirthdayArtifacts } from '../services/birthdays.js';
 import { householdMemberSql, newNonMembers, staffMessage } from '../services/household-members.js';
@@ -439,27 +441,15 @@ function settlementForViewer(row, req) {
   };
 }
 
-// `created_by` jeder Ledger-Zeile ist `expense.created_by`, nie die Person, die
-// gerade anlegt oder bearbeitet: Ausgabe und Zeilen haengen per ON DELETE
-// CASCADE am selben Konto und fallen so nur gemeinsam. Trug ein PUT die
-// bearbeitende Person ein, nahm deren Kontoloeschung die Zeilen mit, und die
-// weiter aktive Ausgabe zaehlte nicht mehr im Saldo. Wer bearbeitet hat, steht
-// in `expense_edited` (expense_activity.actor_id).
-//
-// Migration v226 baut verlorene Zeilen mit einer EINGEFRORENEN SQL-Fassung
-// dieser Regel neu auf. Aendert sich die Regel, wird test:split-ledger-rebuild-
-// migration rot - dann gilt die neue Regel ab hier, v226 bleibt, wie sie ist.
-function insertExpenseLedger(database, expense, splits, sourceType = 'expense') {
-  const actorId = expense.created_by;
-  const insert = database.prepare(`
-    INSERT INTO expense_ledger_entries
-      (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  insert.run(expense.group_id, sourceType, expense.id, expense.payer_id, null, expense.converted_amount_minor, expense.converted_currency, expense.title, actorId);
-  for (const split of splits) {
-    insert.run(expense.group_id, sourceType, expense.id, split.user_id, expense.payer_id, -split.amount_minor, split.currency, expense.title, actorId);
-  }
+// Zahler und Beteiligte muessen Mitglieder DIESER Gruppe sein
+// (GHSA-4p5w-5346-8598): sonst schreibt ein Mitglied einer Person, die nie in
+// der Gruppe war, eine Schuld zu, die diese nirgends sieht und nicht bestreiten
+// kann. Eine Regel fuer alle drei Wege, auf denen Personen an eine Ausgabe
+// kommen - Anlegen, Bearbeiten, Serie. Liefert den Ablehnungstext oder null.
+function membershipRefusal(groupId, payerId, participants) {
+  if (!memberRole(groupId, payerId)) return 'Payer must be a group member.';
+  if (participants.some((participantId) => !memberRole(groupId, Number(participantId)))) return 'All participants must be group members.';
+  return null;
 }
 
 function replaceExpenseSplits(database, expense, splits) {
@@ -1027,11 +1017,9 @@ router.post('/groups/:id/expenses', (req, res) => {
     if (!group) return res.status(404).json({ error: 'Group not found.', code: 404 });
     const parsed = parseExpenseBody(req.body, group.default_currency);
     const payerId = Number(req.body.payer_id || userId(req));
-    if (!memberRole(groupId, payerId)) return res.status(400).json({ error: 'Payer must be a group member.', code: 400 });
     const participants = Array.isArray(req.body.participants) ? req.body.participants : [payerId];
-    for (const participantId of participants) {
-      if (!memberRole(groupId, Number(participantId))) return res.status(400).json({ error: 'All participants must be group members.', code: 400 });
-    }
+    const refusal = membershipRefusal(groupId, payerId, participants);
+    if (refusal) return res.status(400).json({ error: refusal, code: 400 });
     const splits = buildSplits({
       method: parsed.method,
       amountMinor: parsed.convertedAmountMinor,
@@ -1077,15 +1065,8 @@ router.put('/expenses/:id', (req, res) => {
     const parsed = parseExpenseBody(req.body, existing.converted_currency);
     const payerId = Number(req.body.payer_id || existing.payer_id);
     const participants = Array.isArray(req.body.participants) ? req.body.participants : db.get().prepare('SELECT user_id FROM expense_splits WHERE expense_id = ?').all(existing.id).map((r) => r.user_id);
-    // Dieselbe Regel wie beim Anlegen (GHSA-4p5w-5346-8598): Zahler und
-    // Beteiligte muessen Mitglieder DIESER Gruppe sein. Der PUT nahm die IDs
-    // bisher ungeprueft - ein Mitglied konnte einer Person, die nie in der
-    // Gruppe war, eine Schuld zuschreiben, die diese nirgends sieht und nicht
-    // bestreiten kann.
-    if (!memberRole(existing.group_id, payerId)) return res.status(400).json({ error: 'Payer must be a group member.', code: 400 });
-    for (const participantId of participants) {
-      if (!memberRole(existing.group_id, Number(participantId))) return res.status(400).json({ error: 'All participants must be group members.', code: 400 });
-    }
+    const refusal = membershipRefusal(existing.group_id, payerId, participants);
+    if (refusal) return res.status(400).json({ error: refusal, code: 400 });
     const splits = buildSplits({ method: parsed.method, amountMinor: parsed.convertedAmountMinor, currency: parsed.convertedCurrency, participants, splits: req.body.splits });
     db.transaction(() => {
       db.get().prepare(`
@@ -1414,7 +1395,13 @@ router.post('/groups/:id/recurring', (req, res) => {
     if (!frequency) return res.status(400).json({ error: 'Invalid frequency.', code: 400 });
     const payerId = Number(req.body.payer_id || userId(req));
     const participants = Array.isArray(req.body.participants) ? req.body.participants : [payerId];
-    const snapshot = { participants, splits: req.body.splits || [] };
+    const refusal = membershipRefusal(groupId, payerId, participants);
+    if (refusal) return res.status(400).json({ error: refusal, code: 400 });
+    // Dieselbe Pruefung wie bei einer Ausgabe, hier VOR dem ersten Termin: der
+    // Buchungslauf rechnet den Snapshot spaeter ohne Nutzer vor dem Bildschirm
+    // durch, und eine Serie, die dort wirft, haelt den ganzen Lauf an.
+    // Gespeichert wird die gepruefte Fassung, nicht der Request.
+    const snapshot = splitSnapshot({ method: parsed.method, amountMinor: parsed.amountMinor, currency: parsed.currency, participants, splits: req.body.splits });
     const result = db.get().prepare(`
       INSERT INTO recurring_expenses
         (group_id, title, description, amount_minor, currency, payer_id, category, split_method, split_snapshot, frequency, next_run_date, created_by)
