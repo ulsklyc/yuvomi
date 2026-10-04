@@ -5378,6 +5378,7 @@
         "remainingToReward": "「{{reward}}」まであと{{points}}",
         "canRedeemNow": "交換できます",
         "balanceBelowZero": "マイナスです - 次に獲得するポイントで埋まります",
+        "balanceBelowZeroShort": "次のポイントで埋まります",
         "pendingBalanceBelowZero": "現在の残高: {{points}}",
         "ledgerTaskReopened": "タスクを再開",
         "ledgerTaskReopenedNamed": "再開: {{task}}",

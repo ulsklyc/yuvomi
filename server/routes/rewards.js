@@ -344,6 +344,13 @@ router.get('/redemptions', (req, res) => {
     // also an jeden hinaus, der das Modul lesen darf. Aufgefallen ist es an
     // einem Wandtablett mit `rewards:read`, das gar keine eigenen Zeilen haben
     // kann - der Fehler ist aelter und traf jedes Mitglied ohne Adminrecht.
+    //
+    // `user_balance` ist der HEUTIGE Saldo des Anfragenden, aus dem Ledger
+    // gerechnet (#1623). `overview.balances` fuehrt nur, wer gerade teilnimmt;
+    // wer mit offener Anfrage ausgetragen wird, fiel dort heraus und die
+    // Genehmigungsliste rechnete mit 0. Der Wert folgt dem Subjektfilter
+    // darunter: wer entscheidet, sieht alle (wie in /participants), alle
+    // anderen nur den eigenen.
     const admin = isAdminRequest(req);
     const me = actingUser(req);
     const rows = db.get().prepare(`
@@ -360,6 +367,16 @@ router.get('/redemptions', (req, res) => {
       ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END, r.created_at DESC, r.id DESC
       LIMIT 300
     `).all({ status, me });
+    // Je Person EINMAL summieren, nicht je Zeile: als Unterabfrage in der
+    // Liste lief die Ledger-Summe fuer jede der bis zu 300 Zeilen neu, bei
+    // einem Mitglied ohne Adminrecht 300-mal dieselbe. getBalance() ist die
+    // eine Stelle, die einen Saldo rechnet, und liefert 0 ohne Ledger-Zeile.
+    const d = db.get();
+    const balanceByUser = new Map();
+    for (const row of rows) {
+      if (!balanceByUser.has(row.user_id)) balanceByUser.set(row.user_id, getBalance(d, row.user_id));
+      row.user_balance = balanceByUser.get(row.user_id);
+    }
     res.json({ data: rows });
   } catch (err) {
     log.error('GET /redemptions error:', err);

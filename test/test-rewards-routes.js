@@ -415,6 +415,58 @@ test('GET /redemptions — wer nicht entscheidet, sieht nur seine eigenen', asyn
   assert.ok(nurOffen.body.data.every((r) => r.user_id === einer.id && r.status === 'pending'));
 });
 
+test('GET /redemptions - jede Anfrage traegt den Saldo des Anfragenden, auch nach dem Austragen (#1623)', async () => {
+  // Die Genehmigungsliste las den Saldo aus `overview.balances`, und die fuehrt
+  // nur, wer gerade teilnimmt. Wer mit offener Anfrage ausgetragen wird, faellt
+  // dort heraus - der Hinweis auf das Minus fehlte genau dann.
+  const { kid, id } = await pendingRedemption(100); // 90 nach der Reservierung
+  postLedger(db, { userId: kid.id, delta: -140, type: 'reversal', reason: 'Muell', createdBy: ADMIN.id });
+  assert.equal((await call('PUT', `/participants/${kid.id}`, { actor: ADMIN, body: { enabled: false } })).status, 200);
+  assert.equal(isEnrolled(db, kid.id), false);
+  const overview = await call('GET', '/overview', { actor: ADMIN });
+  assert.ok(!overview.body.data.balances.some((b) => b.id === kid.id), 'Vorbedingung: nicht mehr in balances');
+
+  const alsAdmin = await call('GET', '/redemptions?status=pending', { actor: ADMIN });
+  const zeile = alsAdmin.body.data.find((r) => r.id === id);
+  assert.equal(zeile.user_balance, -50, 'die Ledger-Summe kommt mit der Anfrage');
+  assert.equal(zeile.user_balance, getBalance(db, kid.id));
+  assert.ok(alsAdmin.body.data.every((r) => r.user_balance === getBalance(db, r.user_id)), 'fuer jeden Anfragenden');
+
+  // Wer nicht entscheidet, bekommt weiter nur eigene Zeilen - und damit nur den eigenen Saldo.
+  const fremd = await call('GET', '/redemptions', { actor: KID_B });
+  assert.ok(fremd.body.data.every((r) => r.user_id === KID_B.id));
+  const selbst = await call('GET', '/redemptions', { actor: kid });
+  assert.equal(selbst.body.data.find((r) => r.id === id).user_balance, -50);
+});
+
+test('GET /redemptions - der Saldo wird je Person einmal gerechnet und steht an jeder ihrer Zeilen (#1623)', async () => {
+  // Mehrere Zeilen derselben Person, mehrere Personen, und eine ohne jede
+  // Ledger-Zeile: ueberall dieselbe Zahl wie getBalance(), nie null.
+  const viel = freshKid(100);
+  for (let i = 0; i < 3; i += 1) {
+    assert.equal((await call('POST', '/redemptions', { actor: viel, body: { catalog_id: EIS } })).status, 201);
+  }
+  const andere = freshKid(40);
+  await call('POST', '/redemptions', { actor: andere, body: { catalog_id: EIS } });
+  // Eine Anfrage ohne Ledger: die Zeile direkt, wie eine Altlast sie hinterliesse.
+  const ohne = freshKid(0);
+  db.prepare("INSERT INTO reward_redemptions (user_id, catalog_id, reward_name, cost, requested_by) VALUES (?, ?, 'Eis', 10, ?)")
+    .run(ohne.id, EIS, ohne.id);
+
+  const alsAdmin = await call('GET', '/redemptions', { actor: ADMIN });
+  const von = (id) => alsAdmin.body.data.filter((r) => r.user_id === id);
+  assert.equal(von(viel.id).length, 3);
+  assert.deepEqual(von(viel.id).map((r) => r.user_balance), [70, 70, 70]);
+  assert.deepEqual(von(andere.id).map((r) => r.user_balance), [30]);
+  assert.deepEqual(von(ohne.id).map((r) => r.user_balance), [0], 'ohne Ledger-Zeile 0, nicht null');
+  for (const r of alsAdmin.body.data) {
+    assert.strictEqual(r.user_balance, getBalance(db, r.user_id), `Zeile ${r.id}`);
+  }
+  const selbst = await call('GET', '/redemptions', { actor: viel });
+  assert.deepEqual(selbst.body.data.map((r) => r.user_balance), [70, 70, 70]);
+  assert.strictEqual((await call('GET', '/redemptions', { actor: ohne })).body.data[0].user_balance, 0);
+});
+
 test('GET /overview — Ränge, Katalog und pendingCount nach Aktivität', async () => {
   const res = await call('GET', '/overview', { actor: ADMIN });
   assert.equal(res.status, 200);

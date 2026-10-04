@@ -5378,6 +5378,7 @@
         "remainingToReward": "“{{reward}}” için {{points}} kaldı",
         "canRedeemNow": "Kullanmaya hazır",
         "balanceBelowZero": "Ekside - sonraki puanlar bunu kapatır",
+        "balanceBelowZeroShort": "Sonraki puanlar bunu kapatır",
         "pendingBalanceBelowZero": "Güncel bakiye: {{points}}",
         "ledgerTaskReopened": "Görev yeniden açıldı",
         "ledgerTaskReopenedNamed": "Yeniden açıldı: {{task}}",

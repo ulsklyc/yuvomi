@@ -5378,6 +5378,7 @@
         "remainingToReward": "{{points}} til for å «{{reward}}»",
         "canRedeemNow": "Klar til innløsning",
         "balanceBelowZero": "I minus - de neste poengene jevner det ut",
+        "balanceBelowZeroShort": "De neste poengene jevner det ut",
         "pendingBalanceBelowZero": "Nåværende saldo: {{points}}",
         "ledgerTaskReopened": "Oppgave gjenåpnet",
         "ledgerTaskReopenedNamed": "Gjenåpnet: {{task}}",

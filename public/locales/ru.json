@@ -5638,6 +5638,7 @@
         "remainingToReward": "Ещё {{points}} до «{{reward}}»",
         "canRedeemNow": "Готово к обмену",
         "balanceBelowZero": "Баланс в минусе - следующие баллы его покроют",
+        "balanceBelowZeroShort": "Следующие баллы его покроют",
         "pendingBalanceBelowZero": "Текущий баланс: {{points}}",
         "ledgerTaskReopened": "Задача снова открыта",
         "ledgerTaskReopenedNamed": "Снова открыта: {{task}}",
