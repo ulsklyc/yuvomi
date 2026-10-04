@@ -1231,11 +1231,13 @@ test('Ausgabe: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Ha
     groupMembers: [{ id: 1, display_name: 'Alex' }, { id: 3, display_name: 'Emma' }],
   });
   const werte = {
-    'splitExpenses.amount': [[/name="amount"[^>]*value="600"/, /<option value="EUR" selected>/], /^600,00\s€$/],
+    // Der Editor belegt in der Schreibweise der Region vor (amountToInput), also
+    // mit den Stellen der Waehrung - nicht mit dem rohen Wert der Antwort.
+    'splitExpenses.amount': [[/name="amount"[^>]*value="600,00"/, /<option value="EUR" selected>/], /^600,00\s€$/],
     'splitExpenses.paidBy': [[/<option value="1" selected>Alex</], /^Alex$/],
     'splitExpenses.date': [[/name="expense_date"[^>]*value="2026-08-02"/], /^2026-08-02$/],
     'splitExpenses.splitMethod': [[/<option value="exact" selected>/], /^splitExpenses\.splitExact$/],
-    'splitExpenses.participants': [[/name="split_value_1"[^>]*value="400"/, /name="split_value_3"[^>]*value="200"/],
+    'splitExpenses.participants': [[/name="split_value_1"[^>]*value="400,00"/, /name="split_value_3"[^>]*value="200,00"/],
       /^Alex: 400,00\s€\nEmma: 200,00\s€$/],
     'splitExpenses.notes': [[/Anzahlung<\/textarea>/], /^Anzahlung$/],
     'splitExpenses.receiptsLabel': [[/Rechnung\.pdf/], belegLink(5, 'Rechnung.pdf')],

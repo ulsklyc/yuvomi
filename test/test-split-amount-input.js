@@ -364,3 +364,154 @@ test('Bestandsschutz endet am Waehrungswechsel: 12.50 EUR, auf JPY umgestellt, b
     assert.match(gemeldet[0]?.text ?? '', /^common\.amountPrecisionRequired\{"currency":"JPY"/);
   });
 });
+
+/**
+ * Oeffnet einen Dialog und liefert sein Markup. `dabei` laeuft, solange der
+ * Zustand der Seite steht - fuer Lauscher, die ihn beim Feuern lesen.
+ */
+async function geoeffnet(oeffnen, { currency = 'EUR', debts = [], panel = null, dabei = null } = {}) {
+  const vorherState = { ...split.state };
+  Object.assign(split.state, {
+    activeGroupId: 2, groups: [{ id: 2, name: 'Reise', default_currency: currency }],
+    groupMembers: [{ id: 1, display_name: 'Alex' }, { id: 3, display_name: 'Emma' }],
+    balances: { simplified_debts: debts }, user: { id: 1 },
+    meta: { currencies: ['EUR', 'KRW', 'JPY'], default_currency: currency },
+  });
+  let optionen = null;
+  globalThis.__openModal = (opts) => { optionen = opts; };
+  setPermissions({ admin: false, modules: { budget: 'write' }, widgets: {}, capabilities: {} });
+  try {
+    oeffnen();
+    assert.ok(optionen, 'der Dialog geht auf');
+    if (panel) optionen.onSave(panel);
+    if (dabei) await dabei();
+  } finally {
+    clearPermissions();
+    delete globalThis.__openModal;
+    Object.assign(split.state, vorherState);
+  }
+  return optionen.content;
+}
+
+/** Der vorbelegte Wert eines Feldes im Markup. */
+function vorbelegt(content, name) {
+  const treffer = content.match(new RegExp(`<input[^>]*name="${name}"[^>]*\\svalue="([^"]*)"`));
+  assert.ok(treffer, `Feld ${name} steht im Markup`);
+  return treffer[1];
+}
+
+const bestandsAusgabe = (extra = {}) => ({
+  id: 5, title: 'Abendessen', amount: '12.50', amount_minor: 1250, currency: 'EUR', payer_id: 1, split_method: 'equal',
+  splits: [
+    { user_id: 1, amount: '6.25', amount_minor: 625, currency: 'EUR' },
+    { user_id: 3, amount: '6.25', amount_minor: 625, currency: 'EUR' },
+  ],
+  attachments: [], ...extra,
+});
+
+test('Bearbeiten belegt den Betrag in der Schreibweise der Region vor, nicht in der des Servers', async () => {
+  // Der Server liefert "12.50". Das Feld daneben zeigt als Platzhalter "0,00" -
+  // und stand trotzdem mit Punkt da.
+  await unter('de', async () => {
+    const content = await geoeffnet(() => split.openExpenseModal(bestandsAusgabe()));
+    assert.match(content, /<input[^>]*name="amount"[^>]*placeholder="0,00"/, 'der Platzhalter macht die Schreibweise vor');
+    assert.equal(vorbelegt(content, 'amount'), '12,50');
+  });
+  await unter('en-US', async () => {
+    assert.equal(vorbelegt(await geoeffnet(() => split.openExpenseModal(bestandsAusgabe())), 'amount'), '12.50');
+  });
+  await unter('fa', async () => {
+    assert.equal(vorbelegt(await geoeffnet(() => split.openExpenseModal(bestandsAusgabe())), 'amount'), '۱۲٫۵۰',
+      'bis in die Ziffern, wie der Platzhalter');
+  });
+  await unter('de', async () => {
+    const yen = bestandsAusgabe({ amount: '1300', amount_minor: 1300, currency: 'JPY' });
+    assert.equal(vorbelegt(await geoeffnet(() => split.openExpenseModal(yen), { currency: 'JPY' }), 'amount'), '1300');
+  });
+});
+
+test('Hin- und Rueckweg: der vorbelegte Betrag geht unveraendert wieder an den Server', async () => {
+  for (const locale of ['de', 'en-US', 'fa', 'fr']) {
+    await unter(locale, async () => {
+      const ausgabe = bestandsAusgabe();
+      const feld = vorbelegt(await geoeffnet(() => split.openExpenseModal(ausgabe)), 'amount');
+      // Genau dieser Text steht im Feld, wenn nur der Titel geaendert wird.
+      const { gesendet, gemeldet } = await speichern(() => split.openExpenseModal(ausgabe), formular({ amount: feld }).panel);
+      assert.deepEqual(gemeldet, [], `${locale}: "${feld}" wird nicht abgewiesen`);
+      assert.equal(gesendet[0]?.pfad, '/split-expenses/expenses/5');
+      assert.equal(gesendet[0]?.daten.amount, '12.50', `${locale}: "${feld}"`);
+    });
+  }
+});
+
+test('Die Uebergabe aus dem Budget belegt den Betrag ebenfalls in der Schreibweise der Region vor', async () => {
+  // budget.js reicht eine ZAHL herueber (12.5), keinen Text. Sie stand als "12.5"
+  // im Feld - ohne die Stellen der Waehrung und mit dem falschen Trenner.
+  await unter('de', async () => {
+    const content = await geoeffnet(() => split.openExpenseModal(null, { title: 'Abendessen', amount: 12.5, currency: 'EUR' }));
+    assert.equal(vorbelegt(content, 'amount'), '12,50');
+  });
+  // Ohne Vorbelegung bleibt das Feld leer und zeigt keine formatierte Null.
+  await unter('de', async () => {
+    assert.equal(vorbelegt(await geoeffnet(() => split.openExpenseModal(null)), 'amount'), '');
+  });
+});
+
+test('Bearbeiten belegt auch die Genau-Betraege und Prozente in der Schreibweise der Region vor', async () => {
+  await unter('de', async () => {
+    const genau = await geoeffnet(() => split.openExpenseModal(bestandsAusgabe({ split_method: 'exact' })));
+    assert.equal(vorbelegt(genau, 'split_value_1'), '6,25');
+    assert.equal(vorbelegt(genau, 'split_value_3'), '6,25');
+
+    const drittel = bestandsAusgabe({
+      amount: '10.00', amount_minor: 1000, split_method: 'percentage',
+      splits: [
+        { user_id: 1, amount: '3.33', amount_minor: 333, currency: 'EUR' },
+        { user_id: 3, amount: '6.67', amount_minor: 667, currency: 'EUR' },
+      ],
+    });
+    const prozent = await geoeffnet(() => split.openExpenseModal(drittel));
+    assert.equal(vorbelegt(prozent, 'split_value_1'), '33,3');
+    assert.equal(vorbelegt(prozent, 'split_value_3'), '66,7');
+    // Und die Formularpruefung liest sie wieder: die Summe ist 100.
+    const { panel, felder } = formular({ amount: '10,00', method: 'percentage', teilnehmer: { 1: '33,3', 3: '66,7' } });
+    assert.equal(split.validateSplitForm(panel), true);
+    assert.equal(felder['#split-save-expense'].disabled, false);
+  });
+});
+
+test('Eine Zahlung belegt die offene Schuld in der Schreibweise der Region vor und zieht sie beim Zahlerwechsel nach', async () => {
+  const debts = [
+    { from_user_id: 1, to_user_id: 3, amount: '12.50', amount_minor: 1250, currency: 'EUR' },
+    { from_user_id: 3, to_user_id: 1, amount: '7.00', amount_minor: 700, currency: 'EUR' },
+  ];
+  await unter('de', async () => {
+    const { panel, felder } = formular({ amount: '12,50', formId: '#split-settlement-form' });
+    const content = await geoeffnet(split.openSettlementModal, {
+      debts, panel,
+      dabei: async () => {
+        // Der Betrag ist noch der vorbelegte, also unberuehrt: der Zahlerwechsel
+        // uebernimmt die Schuld des neuen Zahlers.
+        felder['[name="payer_id"]'].value = '3';
+        await felder['[name="payer_id"]'].feuere('change');
+      },
+    });
+    assert.equal(vorbelegt(content, 'amount'), '12,50');
+    assert.equal(felder['[name="amount"]'].value, '7,00');
+    assert.equal(felder['[name="payee_id"]'].value, '1');
+  });
+});
+
+test('Hin- und Rueckweg am Rand des Zahlenraums: unveraendert speichern zieht keinen Cent ab', async () => {
+  // 90071992547409.91 EUR sind 9007199254740991 Cent, der groesste Betrag, den der
+  // Server annimmt. Als Gleitkomma ist das 90071992547409.9.
+  const gross = bestandsAusgabe({ amount: '90071992547409.91', amount_minor: 9007199254740991 });
+  for (const locale of ['de', 'en-US', 'fa']) {
+    await unter(locale, async () => {
+      const feld = vorbelegt(await geoeffnet(() => split.openExpenseModal(gross)), 'amount');
+      const { gesendet, gemeldet } = await speichern(() => split.openExpenseModal(gross), formular({ amount: feld }).panel);
+      assert.deepEqual(gemeldet, [], `${locale}: "${feld}"`);
+      assert.equal(gesendet[0]?.daten.amount, '90071992547409.91', `${locale}: "${feld}"`);
+    });
+  }
+});

@@ -13,7 +13,7 @@ import { installPopoverMenus } from '/utils/popover-menu.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { stagger } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
-import { formatMoney, amountPlaceholder, toDecimalString, smallestUnitLabel, amountInputProblem, amountExample } from '/utils/money.js';
+import { formatMoney, amountPlaceholder, toDecimalString, smallestUnitLabel, amountInputProblem, amountExample, amountToInput, toStoredNumber } from '/utils/money.js';
 import { todayKey } from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { wireTablist } from '/utils/tablist.js';
@@ -1050,23 +1050,28 @@ function groupMemberCheckboxes(selectedIds = null, splitValues = {}) {
  * - percentage: Prozentanteile, Restbetrag auf letzten Teilnehmer (Summe = 100)
  * - shares: ganzzahlige Anteile über den ggT der Minor-Beträge
  * - equal: keine Werte nötig
+ *
+ * Die Werte landen in Eingabefeldern und stehen deshalb in der Schreibweise der
+ * Region (amountToInput / toStoredNumber aus utils/money.js): gelesen werden sie
+ * von toDecimalString, und ein Feld, das "12.50" vorbelegt und "0,00" als
+ * Platzhalter zeigt, widerspricht sich selbst.
  */
 function deriveSplitValues(expense) {
   const method = expense.split_method;
   const splits = expense.splits || [];
   const values = {};
   if (method === 'exact') {
-    for (const split of splits) values[split.user_id] = String(split.amount);
+    for (const split of splits) values[split.user_id] = amountToInput(split.amount, split.currency || expense.currency);
   } else if (method === 'percentage') {
     const totalMinor = splits.reduce((sum, split) => sum + Math.abs(Number(split.amount_minor || 0)), 0) || 1;
     let acc = 0;
     splits.forEach((split, index) => {
       if (index === splits.length - 1) {
-        values[split.user_id] = String(Number((100 - acc).toFixed(2)));
+        values[split.user_id] = toStoredNumber(Number((100 - acc).toFixed(2)));
       } else {
         const pct = Number(((Math.abs(Number(split.amount_minor || 0)) / totalMinor) * 100).toFixed(2));
         acc += pct;
-        values[split.user_id] = String(pct);
+        values[split.user_id] = toStoredNumber(pct);
       }
     });
   } else if (method === 'shares') {
@@ -1551,7 +1556,7 @@ function openExpenseModal(expense = null, prefill = null) {
       <form id="split-expense-form" class="split-form">
         <label>${t('splitExpenses.titleLabel')}<input class="input" name="title" required maxlength="200" value="${esc(expense?.title || '')}"></label>
         <div class="split-form-row">
-          <label>${t('splitExpenses.amount')}<input class="input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(isEdit ? expense.currency : group.default_currency)}" required aria-describedby="split-amount-reason" value="${esc(expense?.amount || '')}"></label>
+          <label>${t('splitExpenses.amount')}<input class="input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(isEdit ? expense.currency : group.default_currency)}" required aria-describedby="split-amount-reason" value="${esc(amountToInput(expense?.amount || '', expense?.currency || group.default_currency))}"></label>
           <label>${t('splitExpenses.paidBy')}<select class="input" name="payer_id">${memberOptions(isEdit ? expense.payer_id : state.user?.id)}</select></label>
         </div>
         <p class="form-hint form-hint--danger" id="split-amount-reason" role="status" hidden></p>
@@ -1686,7 +1691,7 @@ function openSettlementModal() {
         </div>
         <p class="form-hint field-hint--warn" id="split-settlement-same" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('splitExpenses.settlementSamePerson')}</span></p>
         <div class="split-form-row">
-          <label>${t('splitExpenses.amount')}<input class="input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(debt?.currency || group.default_currency)}" required value="${debt ? esc(String(debt.amount)) : ''}"></label>
+          <label>${t('splitExpenses.amount')}<input class="input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(debt?.currency || group.default_currency)}" required value="${debt ? esc(amountToInput(debt.amount, debt.currency)) : ''}"></label>
           <label>${t('splitExpenses.currency')}<select class="input" name="currency">${state.meta.currencies.map((c) => `<option value="${c}" ${c === (debt?.currency || group.default_currency) ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
         </div>
         <label>${t('splitExpenses.notes')}<textarea class="input" name="notes" rows="3" maxlength="5000"></textarea></label>
@@ -1728,8 +1733,8 @@ function openSettlementModal() {
         if (match) {
           payeeSel.value = String(match.to_user_id);
           const amountInput = form.querySelector('[name="amount"]');
-          if (!amountInput.value || (debt && amountInput.value === String(debt.amount))) {
-            amountInput.value = String(match.amount);
+          if (!amountInput.value || (debt && amountInput.value === amountToInput(debt.amount, debt.currency))) {
+            amountInput.value = amountToInput(match.amount, match.currency);
           }
         }
         syncSameHint();
