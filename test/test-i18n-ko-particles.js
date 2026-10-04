@@ -642,7 +642,9 @@ test('Server-Schluessel: kein ko-Text, den der Server ruft, behaelt eine Doppelf
       const got = translate('ko', key, params);
       for (const form of KNOWN) {
         // Eine Doppelform direkt hinter einem Platzhalter (samt Anfuehrungszeichen).
-        if (new RegExp(`\\}\\}${CLOSING_QUOTES}*${form.replace(/[()]/g, '\\$&')}`).test(template) && got.includes(form)) {
+        // Maskiert wird ueber den Helfer selbst - keine zweite Escape-Regel.
+        const behindPlaceholder = new RegExp(`\\}\\}${CLOSING_QUOTES}*(?:${buildFormPattern([form]).source})`);
+        if (behindPlaceholder.test(template) && got.includes(form)) {
           wrong.push(`${key} (${value}) -> ${got}`);
         }
       }
