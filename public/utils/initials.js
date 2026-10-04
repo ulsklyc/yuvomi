@@ -49,7 +49,9 @@ const CJK = /^[\p{scx=Hangul}\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}]/u;
 
 // Was auf der Scheibe ein ganzes Geviert breit ist: die Schriften oben und
 // Emoji. Zwei davon brauchen 2em, zwei lateinische Grossbuchstaben rund 1.4em.
-const FULL_WIDTH = /[\p{scx=Hangul}\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}\p{Extended_Pictographic}\p{Regional_Indicator}]/u;
+// Die Tastenkappe (U+20E3) steht eigens da: ihr Emoji beginnt mit einer Ziffer,
+// `#` oder `*`, und an denen ist die Breite nicht zu erkennen.
+const FULL_WIDTH = /[\p{scx=Hangul}\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}\p{Extended_Pictographic}\p{Regional_Indicator}\u20E3]/u;
 
 // Das Virama der Schriften, in denen es zwei Konsonanten zu EINER Ligatur
 // bindet (UAX #29, GB9c): Devanagari, Bengalisch, Gujarati, Oriya, Telugu,
@@ -57,6 +59,24 @@ const FULL_WIDTH = /[\p{scx=Hangul}\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}\p
 // bliebe auf der Scheibe ein Sha mit sichtbarem Halant. Tamil fehlt mit
 // Absicht: dort trennt auch der Segmenter.
 const CONJUNCT_VIRAMA = /[\u094D\u09CD\u0ACD\u0B4D\u0C4D\u0D4D]$/u;
+
+// Zerlegtes Hangul (UAX #29, GB6-GB8): Anlaut (L), Vokal (V) und Auslaut (T)
+// stehen als einzelne Jamo da und sind zusammen EINE Silbe. Namen werden ohne
+// NFC-Normalisierung gespeichert; ohne diese Regel bliebe von 김민수 in
+// zerlegter Form ein einzelner Vokal.
+const JAMO_L = /[\u1100-\u115F\uA960-\uA97C]$/u;
+const JAMO_V = /[\u1160-\u11A7\uD7B0-\uD7C6]$/u;
+const JAMO_T = /[\u11A8-\u11FF\uD7CB-\uD7FB]$/u;
+const SYLLABLE = /[\uAC00-\uD7A3]$/u;
+// Eine fertige Silbe ohne Auslaut (LV) - nur an sie passt noch ein Vokal.
+const isOpenSyllable = (text) => SYLLABLE.test(text) && (text.charCodeAt(text.length - 1) - 0xAC00) % 28 === 0;
+
+function joinsHangul(prev, cp) {
+  if (JAMO_L.test(prev)) return JAMO_L.test(cp) || JAMO_V.test(cp) || SYLLABLE.test(cp);
+  if (JAMO_V.test(prev) || isOpenSyllable(prev)) return JAMO_V.test(cp) || JAMO_T.test(cp);
+  if (JAMO_T.test(prev) || SYLLABLE.test(prev)) return JAMO_T.test(cp);
+  return false;
+}
 
 let segmenter = null;
 
@@ -66,7 +86,8 @@ let segmenter = null;
  * Ohne `Intl.Segmenter` (aeltere WebViews) setzt der Rueckfall die Cluster
  * selbst zusammen: Codepoints statt Code-Units, und was an seinem Vorgaenger
  * haengt (kombinierende Zeichen, Variantenselektoren, Hautton, ZWJ-Folgen,
- * das zweite Zeichen einer Flagge, der Konsonant hinter einem Virama),
+ * das zweite Zeichen einer Flagge, der Konsonant hinter einem Virama,
+ * die Jamo einer zerlegten Hangul-Silbe),
  * bleibt bei ihm. Das ist nicht ganz UAX #29, aber `test:initials` haelt es
  * fuer Namen in den Schriften der App-Sprachen gegen den Segmenter.
  *
@@ -87,6 +108,7 @@ export function graphemes(text) {
       || prev.endsWith('\u200D')
       || (CONJUNCT_VIRAMA.test(prev) && /^\p{L}$/u.test(cp))
       || (/^\p{Regional_Indicator}$/u.test(cp) && /^\p{Regional_Indicator}$/u.test(prev))
+      || joinsHangul(prev, cp)
     );
     if (joins) out[out.length - 1] = prev + cp;
     else out.push(cp);

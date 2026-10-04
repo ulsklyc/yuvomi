@@ -42,6 +42,14 @@ const read = (rel) => readFileSync(new URL(rel, PUBLIC), 'utf8');
 const E_ACUTE = 'e\u0301'; // e + kombinierender Akut: ein Graphem, zwei Codepoints
 const FAMILY = '\u{1F469}\u200D\u{1F467}'; // Frau + ZWJ + Maedchen: ein Graphem
 const FLAG = '\u{1F1F0}\u{1F1F7}'; // zwei Regional-Indikatoren: ein Graphem
+const KEYCAP_1 = '1\uFE0F\u20E3'; // Ziffer + Variantenselektor + Tastenkappe: ein Graphem
+const KEYCAP_2 = '2\uFE0F\u20E3';
+// Derselbe Name, kanonisch ZERLEGT: jede Silbe steht als zwei oder drei Jamo
+// da (Import, macOS-Dateinamen). Namen werden ohne NFC-Normalisierung
+// gespeichert, also kommt das auf der Scheibe an.
+const NFD_KIM_MINSU = '김민수'.normalize('NFD');
+const NFD_MINSU = '민수'.normalize('NFD');
+const NFD_SU = '수'.normalize('NFD');
 
 const TABLE = [
   // Name, erwartete Zeichen, was die Zeile haelt
@@ -79,6 +87,8 @@ const TABLE = [
   [`${FAMILY} Mama`, `${FAMILY}M`, 'eine ZWJ-Folge bleibt ganz'],
   [`${FLAG} Seoul`, `${FLAG}S`, 'eine Flagge bleibt ganz'],
   [`${E_ACUTE}lodie`, 'E\u0301', 'ein kombinierendes Zeichen bleibt bei seinem Buchstaben'],
+  [NFD_KIM_MINSU, NFD_MINSU, 'zerlegtes Hangul: drei Silben aus acht Jamo, der Rufname bleibt ganz'],
+  [`${KEYCAP_1} Eins`, `${KEYCAP_1}E`, 'eine Tastenkappe bleibt ganz'],
 ];
 
 // Namen in den Schriften, in denen die App spricht - fuer den Vergleich des
@@ -92,6 +102,10 @@ const NAMES_BY_SCRIPT = [
   'Ελένη', 'Дмитрий', 'Zoë', 'Łukasz', 'İpek', 'Nguyễn',
   '김민수', '田中太郎', 'やまだ', 'サトー',
   `${E_ACUTE}lodie`, `${FAMILY}${FLAG}\u{1F984}`, '\u{1F44D}\u{1F3FD}',
+  // Zerlegtes Hangul: Anlaut + Vokal (+ Auslaut) sind EINE Silbe (UAX #29,
+  // GB6-GB8), auch gemischt mit einer fertigen Silbe.
+  NFD_KIM_MINSU, '한글'.normalize('NFD'), '\u1100\uAC00\u11A8', '\uAC00\u1161', '\uAC01\u1161',
+  `${KEYCAP_1}${KEYCAP_2}`,
 ];
 
 test('die Regel: Name -> Zeichen auf der Scheibe', () => {
@@ -117,6 +131,7 @@ test('ohne Intl.Segmenter gilt dieselbe Tabelle', () => {
     for (const [name, expected, why] of TABLE) {
       assert.equal(initials(name), expected, `${JSON.stringify(name)}: ${why}`);
     }
+    assert.equal(compactInitials(NFD_KIM_MINSU), NFD_SU, 'die kleine Scheibe zeigt die Silbe, nicht ihren Vokal');
     // DER RUECKFALL IST EINE ABKUERZUNG, also misst er sich am Original: fuer
     // Namen in den Schriften der App-Sprachen muss er dieselben Grapheme
     // liefern wie der Segmenter (Review zu #1637: ohne die Virama-Regel wurde
@@ -142,6 +157,13 @@ test('die kleine Scheibe: zwei Geviert-Zeichen werden zu einem, lateinische blei
   assert.equal(compactInitials('Minsu 김'), 'M김');
   assert.equal(compactInitials('\u{1F984} Einhorn'), '\u{1F984}E');
   assert.equal(compactInitials('\u{1F984} \u{1F431}'), '\u{1F431}', 'zwei Emoji sind zwei Geviert-Zeichen');
+  // Eine Tastenkappe ist ein Emoji, ihr erstes Zeichen aber eine Ziffer - an
+  // ihr erkennt man die Breite nicht (Review zu #1637).
+  assert.equal(compactInitials(`${KEYCAP_1} ${KEYCAP_2}`), KEYCAP_2, 'zwei Tastenkappen sind zwei Geviert-Zeichen');
+  assert.equal(compactInitials(`${KEYCAP_1} Eins`), `${KEYCAP_1}E`);
+  assert.equal(compactInitials('1 2'), '12', 'zwei Ziffern ohne Tastenkappe bleiben');
+  // Zerlegtes Hangul: das letzte ZEICHEN ist die ganze Silbe, nicht ihr Vokal.
+  assert.equal(compactInitials(NFD_KIM_MINSU), NFD_SU);
   assert.equal(compactInitials('김'), '김');
   assert.equal(compactInitials('Anna Schmidt'), 'AS');
   assert.equal(compactInitials('Anna'), 'A');
