@@ -563,6 +563,37 @@ test('wallTimeToInstantMs rechnet wie localToUTCPrecise - auch in Luecke und Dop
   assert.ok(compared > 5000);
 });
 
+test('wallTimeToInstantMs traegt einen Sekundenbruchteil genau einmal - wie der Server (#1658)', async () => {
+  // Der Spiegel las den Offset wie der Server an einem Zeitpunkt MIT
+  // Millisekunden gegen eine Wanduhr in ganzen Sekunden: der Bruchteil kam
+  // doppelt bis dreifach an. Verglichen wird wieder gegen die Serverfunktion
+  // UND gegen einen ausgeschriebenen Wert - zwei gleich falsche Seiten waeren
+  // sich sonst einig.
+  const { localToUTCPrecise } = await import('../server/utils/timezone.js');
+  assert.equal(
+    new Date(tz.wallTimeToInstantMs('2031-07-15T11:00:00.250', 'Europe/Berlin')).toISOString(),
+    '2031-07-15T09:00:00.250Z',
+  );
+  assert.equal(
+    new Date(tz.wallTimeToInstantMs('2031-07-15T11:00:00.750', 'America/New_York')).toISOString(),
+    '2031-07-15T15:00:00.750Z',
+  );
+  const pad = (n) => String(n).padStart(2, '0');
+  const wrong = [];
+  for (const [zone, day] of [['Europe/Berlin', '2031-03-30'], ['Europe/Berlin', '2031-10-26'], ['America/New_York', '2031-03-09'], ['America/New_York', '2031-11-02']]) {
+    for (let minute = 0; minute < 24 * 60; minute += 15) {
+      const wall = `${day}T${pad(Math.floor(minute / 60))}:${pad(minute % 60)}:00`;
+      for (const [suffix, extra] of [['.250', 250], ['.999', 999]]) {
+        const actual = tz.wallTimeToInstantMs(`${wall}${suffix}`, zone);
+        const whole = tz.wallTimeToInstantMs(wall, zone) + extra;
+        const server = Date.parse(localToUTCPrecise(`${wall}${suffix}`, zone));
+        if (actual !== whole || actual !== server) wrong.push(`${zone} ${wall}${suffix}: ${actual} / ganze Sekunde ${whole} / Server ${server}`);
+      }
+    }
+  }
+  assert.deepEqual(wrong.slice(0, 10), [], `${wrong.length} Abweichungen`);
+});
+
 test('wallTimeToInstantMs: Formen, Rueckfall und unlesbare Werte', () => {
   // Minuten ohne Sekunden, ein reines Datum als Mitternacht - wie
   // `storedToInstantMsPrecise` auf dem Server.

@@ -1841,8 +1841,8 @@ test('Umstellnacht: zwei zonenlose Besuche bleiben zwei Zeitpunkte - der spaeter
 ));
 
 test('Sekundenbruchteile: eine zonenlose Zeile behaelt ihren Zeitpunkt auf die Millisekunde (Review)', () => atHouseholdClock(
-  // Die Umrechner in utils/timezone.js rechnen den Bruchteil einer zonenlosen
-  // Zeile doppelt: '…T23:59:59.900' kam im UTC-Haushalt als 00:00:00.800 des
+  // Die Umrechner in utils/timezone.js rechneten den Bruchteil einer zonenlosen
+  // Zeile doppelt (#1658): '…T23:59:59.900' kam im UTC-Haushalt als 00:00:00.800 des
   // Folgetags heraus - nicht mehr heute, nicht mehr in diesem Monat, und
   // '…T10:00:00.600' galt als spaeter als '…T10:00:01.000Z'.
   { zone: 'UTC', processTz: 'Asia/Tokyo', now: '2035-07-31T12:00:00.000Z' },
