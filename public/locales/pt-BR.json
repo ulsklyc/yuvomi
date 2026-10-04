@@ -60,6 +60,7 @@
         "errorOffline": "Sem conexão com a internet. Por favor, verifique a sua rede.",
         "errorModuleNoAccess": "Não tem acesso a este módulo.",
         "errorNoPermission": "Você não tem permissão para fazer isso.",
+        "errorFormExpired": "A página ficou aberta por tempo demais. Recarregue-a e tente novamente.",
         "unknownAddress": "Este endereço não existe. A página mais próxima é exibida no lugar.",
         "errorNotFound": "O registro não foi encontrado.",
         "errorServer": "Erro no servidor. Por favor, tente mais tarde.",
@@ -583,6 +584,7 @@
         "lockedBadge": "Bloqueada",
         "lockedLabel": "Edição",
         "lockedDetail": "Apenas o criador e os administradores",
+        "errorLocked": "Esta tarefa está bloqueada. Apenas a pessoa que a criou e os administradores podem alterá-la.",
         "tagsSkippedLocked": "{{count}} tarefas bloqueadas ignoradas.",
         "tagsSkippedLocked_one": "{{count}} tarefa bloqueada ignorada.",
         "listLoadError": "Não foi possível carregar as tarefas.",
@@ -1295,7 +1297,7 @@
         "bulkDeleteConfirm": "Eliminar {{count}} contatos?",
         "bulkDeleteConfirm_one": "Eliminar {{count}} contato?",
         "bulkDeletedToast": "{{count}} contatos excluídos",
-        "emailLockedHint": "Este endereço de e-mail está vinculado à conta e só pode ser alterado por um administrador."
+        "emailLockedHint": "Estes endereços pertencem à conta deste membro. Apenas o próprio membro ou um administrador pode alterá-los."
     },
     "budget": {
         "title": "Orçamento",
@@ -3108,6 +3110,7 @@
         "sourceNative": "Nativa",
         "sourceAll": "Todas",
         "sourceFilterLabel": "Filtrar por origem",
+        "errorMirrored": "Esta receita vem de uma origem de receitas conectada e é alterada lá.",
         "plannedThisWeek": "Planejado para esta semana",
         "imageLabel": "Imagem",
         "imageChoose": "Escolher imagem",

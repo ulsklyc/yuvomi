@@ -9,15 +9,9 @@ import { setPermissions, clearPermissions } from '/permissions.js';
 import { setHouseholdSize, setOtherReaders, clearHouseholdSize } from '/utils/household.js';
 import { forgetLayoutHint } from '/utils/dashboard-layout-hint.js';
 import { t } from '/i18n.js';
+import { REFUSAL_MESSAGES } from '/utils/friendly-error.js';
 
 const API_BASE = '/api/v1';
-
-// Grund des Modul-Gates -> Schluessel der Meldung. Eine Map, damit ein Grund
-// wie `__proto__` nichts findet.
-const MODULE_GATE_MESSAGES = new Map([
-  ['module_access_denied', 'common.errorModuleNoAccess'],
-  ['module_read_only', 'settings.permReadOnlyBanner'],
-]);
 
 /** In-Memory CSRF-Token (zuverlaessiger als document.cookie auf iOS Safari/PWA). */
 let _csrfToken = '';
@@ -118,12 +112,14 @@ async function apiFetch(path, options = {}, _retried = false) {
     if (response.status === 503 && data?.reason === 'restore_in_progress') {
       throw new ApiError(t('common.errorRestoreInProgress'), response.status, data, response.headers.get('Retry-After'));
     }
-    // Das Modul-Gate (server/index.js) nennt seinen Grund (#1607). Manche
-    // Seiten zeigen `err.data.error` statt `err.message` (Gesundheit, deren
-    // Einstellungen) - deshalb traegt beides die Uebersetzung.
-    const gateKey = response.status === 403 ? MODULE_GATE_MESSAGES.get(data?.reason) : undefined;
-    if (gateKey) {
-      const text = t(gateKey);
+    // Eine Absage, die ihren Grund nennt (#1607 das Modul-Gate, #1640 gesperrte
+    // Aufgabe, gespiegeltes Rezept, CSRF): der Satz zum Grund statt des
+    // englischen vom Server. Manche Seiten zeigen `err.data.error` statt
+    // `err.message` (Gesundheit, deren Einstellungen) - deshalb traegt beides
+    // die Uebersetzung. Die Liste steht bei friendlyError, das denselben Satz zeigt.
+    const refusalKey = response.status === 403 ? REFUSAL_MESSAGES.get(data?.reason) : undefined;
+    if (refusalKey) {
+      const text = t(refusalKey);
       throw new ApiError(text, response.status, { ...data, error: text }, response.headers.get('Retry-After'));
     }
     // Jede andere Absage OHNE Grund (#1607): "Not authorized.", "Admin access
@@ -132,9 +128,9 @@ async function apiFetch(path, options = {}, _retried = false) {
     // beim Gate darueber. Der Server bleibt sprachfrei, sein Text unveraendert.
     //
     // NUR OHNE `reason`. Wer einen nennt, traegt eine Auskunft, die dieser Satz
-    // verschluckte (gesperrte Aufgabe, CSRF, Display-Konto), oder eine Seite
-    // liest ihn selbst (Anmeldung, Zwei-Faktor, Kalender-Anhang). Eine neue
-    // 403 mit eigener Auskunft bekommt am Server einen `reason` - die Liste
+    // verschluckte (Display-Konto, fehlendes Recht in einem zweiten Modul), oder
+    // eine Seite liest ihn selbst (Anmeldung, Zwei-Faktor, Kalender-Anhang). Eine
+    // neue 403 mit eigener Auskunft bekommt am Server einen `reason` - die Liste
     // haelt test:api. Ein Rumpf ohne `error` ist keine Absage der App (Proxy).
     if (response.status === 403 && typeof data?.error === 'string' && !data.reason) {
       const text = t('common.errorNoPermission');

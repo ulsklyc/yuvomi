@@ -33,6 +33,39 @@ test('eine Absage (403) bekommt den einen Satz der App', async () => {
   assert.equal(friendlyError({ response: { status: 403 } }), 'common.errorNoPermission');
 });
 
+// #1640: api.js setzt anhand von `reason` den genaueren Satz - friendlyError hat
+// ihn bis dahin mit dem allgemeinen ueberschrieben.
+test('eine Absage mit bekanntem Grund behaelt ihren genaueren Satz', async () => {
+  const { friendlyError, REFUSAL_MESSAGES } = await load();
+  for (const [reason, key] of [
+    ['module_read_only', 'settings.permReadOnlyBanner'],
+    ['module_access_denied', 'common.errorModuleNoAccess'],
+    ['task_locked', 'tasks.errorLocked'],
+    ['recipe_mirrored', 'recipes.errorMirrored'],
+    ['csrf_invalid', 'common.errorFormExpired'],
+  ]) {
+    assert.equal(REFUSAL_MESSAGES.get(reason), key);
+    // So kommt der Fehler aus api.js: message und data.error tragen schon den Satz.
+    assert.equal(friendlyError({ status: 403, message: key, data: { error: key, code: 403, reason } }), key, reason);
+    // Und so von einem Aufrufer, der den Rumpf des Servers unveraendert weiterreicht.
+    assert.equal(friendlyError({ status: 403, message: 'Server sentence.', data: { error: 'Server sentence.', reason } }), key, reason);
+  }
+});
+
+test('ein unbekannter Grund reicht nie den Satz des Servers durch', async () => {
+  const { friendlyError } = await load();
+  for (const reason of ['some_future_reason', 'cross_module_access', '__proto__', 'constructor', 'toString', '', 7, null]) {
+    const text = 'A sentence this client has never seen.';
+    assert.equal(
+      friendlyError({ status: 403, message: text, data: { error: text, code: 403, reason } }),
+      'common.errorNoPermission', String(reason),
+    );
+  }
+  // Der Grund zaehlt nur an einer Absage: derselbe an einem anderen Status aendert nichts.
+  assert.equal(friendlyError({ status: 404, data: { reason: 'task_locked' } }), 'common.errorNotFound');
+  assert.equal(friendlyError({ status: 500, data: { reason: 'module_read_only' } }), 'common.errorServer');
+});
+
 test('den zweiten Wortlaut gibt es in keiner Sprache mehr, den einen in jeder', () => {
   const dir = new URL('../public/locales/', import.meta.url);
   const files = readdirSync(dir).filter((name) => name.endsWith('.json'));

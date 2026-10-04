@@ -73,6 +73,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Inside the running app the same link already led to the overview. It now does so on a fresh
   start as well, for members and for guests of a shared-expense group, and the module's address
   is not kept in the history.
+- **A refused request explains itself in your language** (#1640). Three refusals still reached
+  you as the server's English sentence: changing a locked task as someone who is neither its
+  creator nor an admin, editing or deleting a recipe that is mirrored from Mealie or Tandoor, and
+  saving from a page that had been open so long that its security token no longer matched. Each
+  now has its own sentence in all 26 languages; the last one asks you to reload the page, and you
+  only see it after the app has already fetched a fresh token and tried once more by itself. The
+  refusal for changing the email addresses of a household member's contact uses the hint the form
+  already shows. And where the app already knew the more precise reason, for example read-only
+  access to a module, the error screen no longer replaces it with the general "You do not have
+  permission to do that".
 - **A module switched off for the household no longer works in the background** (#1660). With
   Health switched off, the medication scheduler kept creating the due doses and sending their
   reminders - as a push and on notification channels, to the person and to their caregivers - and
