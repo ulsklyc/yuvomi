@@ -51,6 +51,13 @@ const CJK = /^[\p{scx=Hangul}\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}]/u;
 // Emoji. Zwei davon brauchen 2em, zwei lateinische Grossbuchstaben rund 1.4em.
 const FULL_WIDTH = /[\p{scx=Hangul}\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}\p{Extended_Pictographic}\p{Regional_Indicator}]/u;
 
+// Das Virama der Schriften, in denen es zwei Konsonanten zu EINER Ligatur
+// bindet (UAX #29, GB9c): Devanagari, Bengalisch, Gujarati, Oriya, Telugu,
+// Malayalam. Der Name Shruti beginnt mit Sha + Virama + Ra - ohne diese Regel
+// bliebe auf der Scheibe ein Sha mit sichtbarem Halant. Tamil fehlt mit
+// Absicht: dort trennt auch der Segmenter.
+const CONJUNCT_VIRAMA = /[\u094D\u09CD\u0ACD\u0B4D\u0C4D\u0D4D]$/u;
+
 let segmenter = null;
 
 /**
@@ -59,8 +66,9 @@ let segmenter = null;
  * Ohne `Intl.Segmenter` (aeltere WebViews) setzt der Rueckfall die Cluster
  * selbst zusammen: Codepoints statt Code-Units, und was an seinem Vorgaenger
  * haengt (kombinierende Zeichen, Variantenselektoren, Hautton, ZWJ-Folgen,
- * das zweite Zeichen einer Flagge), bleibt bei ihm. Das ist nicht ganz UAX
- * #29, aber es zerschneidet nichts, was in einem Namen vorkommt.
+ * das zweite Zeichen einer Flagge, der Konsonant hinter einem Virama),
+ * bleibt bei ihm. Das ist nicht ganz UAX #29, aber `test:initials` haelt es
+ * fuer Namen in den Schriften der App-Sprachen gegen den Segmenter.
  *
  * @param {string} text
  * @returns {string[]}
@@ -75,8 +83,9 @@ export function graphemes(text) {
   for (const cp of value) {
     const prev = out[out.length - 1];
     const joins = prev !== undefined && (
-      /^[\p{M}‍\p{Emoji_Modifier}]$/u.test(cp)
-      || prev.endsWith('‍')
+      /^[\p{M}\u200D\p{Emoji_Modifier}]$/u.test(cp)
+      || prev.endsWith('\u200D')
+      || (CONJUNCT_VIRAMA.test(prev) && /^\p{L}$/u.test(cp))
       || (/^\p{Regional_Indicator}$/u.test(cp) && /^\p{Regional_Indicator}$/u.test(prev))
     );
     if (joins) out[out.length - 1] = prev + cp;

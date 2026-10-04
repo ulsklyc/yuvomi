@@ -39,8 +39,8 @@ const read = (rel) => readFileSync(new URL(rel, PUBLIC), 'utf8');
 // 1. Die Regel
 // --------------------------------------------------------
 
-const E_ACUTE = 'é'; // e + kombinierender Akut: ein Graphem, zwei Codepoints
-const FAMILY = '\u{1F469}‍\u{1F467}'; // Frau + ZWJ + Maedchen: ein Graphem
+const E_ACUTE = 'e\u0301'; // e + kombinierender Akut: ein Graphem, zwei Codepoints
+const FAMILY = '\u{1F469}\u200D\u{1F467}'; // Frau + ZWJ + Maedchen: ein Graphem
 const FLAG = '\u{1F1F0}\u{1F1F7}'; // zwei Regional-Indikatoren: ein Graphem
 
 const TABLE = [
@@ -72,11 +72,26 @@ const TABLE = [
   ['Minsu 김', 'M김', 'ein lateinisches Wort vorn: Wortregel'],
   ['김 민 수', '김수', 'drei CJK-Woerter: Wortregel, erstes und letztes'],
   ['Kim민수', 'K', 'gemischte Schrift in einem Wort ist kein CJK-Name'],
+  ['श्रुति शर्मा', 'श्रुश', 'eine Devanagari-Ligatur (Konsonant + Virama + Konsonant) bleibt ganz'],
+  ['क्षमा', 'क्ष', 'eine Ligatur am Wortanfang'],
   ['\u{1F984} Einhorn', '\u{1F984}E', 'ein Emoji bleibt ganz (Surrogatpaar)'],
   ['\u{1F984}', '\u{1F984}', 'ein Emoji allein'],
   [`${FAMILY} Mama`, `${FAMILY}M`, 'eine ZWJ-Folge bleibt ganz'],
   [`${FLAG} Seoul`, `${FLAG}S`, 'eine Flagge bleibt ganz'],
-  [`${E_ACUTE}lodie`, 'É', 'ein kombinierendes Zeichen bleibt bei seinem Buchstaben'],
+  [`${E_ACUTE}lodie`, 'E\u0301', 'ein kombinierendes Zeichen bleibt bei seinem Buchstaben'],
+];
+
+// Namen in den Schriften, in denen die App spricht - fuer den Vergleich des
+// Rueckfalls mit `Intl.Segmenter`.
+const NAMES_BY_SCRIPT = [
+  'श्रुति', 'क्षमा', 'स्मिता', 'प्रिया', 'ज्ञानेश', // Devanagari, mit Ligaturen
+  'প্রিয়া', 'শ্রেয়া', // Bengalisch
+  'ప్రియ', 'ശ്രീ', 'પ્રિયા', // Telugu, Malayalam, Gujarati
+  'ப்ரியா', 'ஸ்ரீ', // Tamil: der Segmenter trennt dort nach dem Virama
+  'محمد', 'فاطمة', 'علی', // Arabisch, Persisch
+  'Ελένη', 'Дмитрий', 'Zoë', 'Łukasz', 'İpek', 'Nguyễn',
+  '김민수', '田中太郎', 'やまだ', 'サトー',
+  `${E_ACUTE}lodie`, `${FAMILY}${FLAG}\u{1F984}`, '\u{1F44D}\u{1F3FD}',
 ];
 
 test('die Regel: Name -> Zeichen auf der Scheibe', () => {
@@ -101,6 +116,14 @@ test('ohne Intl.Segmenter gilt dieselbe Tabelle', () => {
     assert.deepEqual(graphemes(`a${E_ACUTE}${FAMILY}${FLAG}\u{1F984}`), ['a', E_ACUTE, FAMILY, FLAG, '\u{1F984}']);
     for (const [name, expected, why] of TABLE) {
       assert.equal(initials(name), expected, `${JSON.stringify(name)}: ${why}`);
+    }
+    // DER RUECKFALL IST EINE ABKUERZUNG, also misst er sich am Original: fuer
+    // Namen in den Schriften der App-Sprachen muss er dieselben Grapheme
+    // liefern wie der Segmenter (Review zu #1637: ohne die Virama-Regel wurde
+    // aus श्रुति ein श mit sichtbarem Halant).
+    const real = new descriptor.value(undefined, { granularity: 'grapheme' });
+    for (const name of NAMES_BY_SCRIPT) {
+      assert.deepEqual(graphemes(name), Array.from(real.segment(name), (part) => part.segment), name);
     }
   } finally {
     Object.defineProperty(Intl, 'Segmenter', descriptor);
