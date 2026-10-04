@@ -542,14 +542,14 @@ function countingAdapter(calls) {
   };
 }
 
-test('sync(): Rezepte abgeschaltet → der Stundenlauf fragt den Anbieter nicht und schreibt nichts, nach dem Einschalten schon', async () => {
+test('Stundenlauf: Rezepte abgeschaltet → fragt den Anbieter nicht und schreibt nichts, nach dem Einschalten schon', async () => {
   const accountId = newAccount('Abgeschaltet');
   const calls = [];
   _setAdapterFactory(countingAdapter(calls));
 
   try {
     setDisabledModules(['recipes']);
-    const skipped = await sync.sync();
+    const skipped = await sync.scheduledSync();
     assert.deepEqual(calls, [], 'kein Abruf beim Anbieter');
     assert.equal(skipped.imported, 0);
     assert.equal(mirroredRecipes(accountId).length, 0);
@@ -559,18 +559,38 @@ test('sync(): Rezepte abgeschaltet → der Stundenlauf fragt den Anbieter nicht 
     setDisabledModules([]);
   }
 
-  const result = await sync.sync();
+  const result = await sync.scheduledSync();
   assert.equal(result.imported, 1);
   assert.equal(mirroredRecipes(accountId).length, 1);
 });
 
-test('syncOne(): "Sync now" bleibt bei abgeschaltetem Modul offen - die Handlung einer Person', async () => {
-  const accountId = newAccount('Handlung');
-  _setAdapterFactory(countingAdapter([]));
+// Der Zeitgeber ruft den Stundenlauf und nicht `sync()` direkt: sonst stuende
+// die Pruefung in einer Funktion, die niemand faehrt (Verdrahtung, am Text
+// gemessen, weil startScheduler() nur Timer stellt).
+test('startScheduler() faehrt scheduledSync(), nicht sync()', async () => {
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(new URL('../server/services/recipe-provider-sync.js', import.meta.url), 'utf8');
+  const body = source.slice(source.indexOf('export function startScheduler()'));
+  assert.match(body, /scheduledSync\(\)\.catch/);
+  assert.doesNotMatch(body, /[^d]sync\(\)\.catch/);
+});
+
+test('sync() und syncOne(): der Sync von Hand bleibt bei abgeschaltetem Modul offen - die Handlung einer Person', async () => {
+  const allId = newAccount('HandAlle');
+  const calls = [];
+  _setAdapterFactory(countingAdapter(calls));
   try {
     setDisabledModules(['recipes']);
-    const result = await sync.syncOne(accountId);
-    assert.equal(result.imported, 1);
+    // POST /recipe-providers/sync ruft sync() (alle Konten).
+    const all = await sync.sync();
+    assert.equal(all.imported, 1);
+    assert.ok(calls.includes('listRecipeSummaries'), 'der Anbieter wurde gefragt');
+    assert.equal(mirroredRecipes(allId).length, 1);
+
+    // POST /recipe-providers/accounts/:id/sync ruft syncOne().
+    const oneId = newAccount('HandEins');
+    const one = await sync.syncOne(oneId);
+    assert.equal(one.imported, 1);
   } finally {
     setDisabledModules([]);
   }

@@ -218,19 +218,35 @@ export function sync() {
   return runExternalJob(() => syncUntracked());
 }
 
-async function syncUntracked() {
-  // REZEPTE HAUSHALTSWEIT ABGESCHALTET: DER STUNDENLAUF HOLT NICHTS (#1660).
-  // Gleiche Regel wie die URL-Quellen der Entsorgung (waste-source-scheduler.js):
-  // ein Haushalt, der das Modul nicht nutzt, soll nicht im Hintergrund bei
-  // Mealie oder Tandoor abfragen und Rezepte anlegen, aendern und loeschen.
-  // Nur dieser Lauf - `syncOne()` ("Sync now" in den Einstellungen) ist die
-  // Handlung einer Person und bleibt offen wie die Modul-Routen. Der Spiegel
-  // bleibt stehen, der erste Lauf nach dem Wiedereinschalten zieht ihn nach.
-  if (householdDisabledModules(db.get()).has('recipes')) {
-    log.debug('Recipes are switched off for the household - scheduled provider sync skipped.');
-    return { success: true, syncedAccounts: 0, imported: 0, updated: 0, deleted: 0 };
-  }
+/**
+ * Der Stundenlauf - `sync()` mit der einen Frage davor, die nur er stellt.
+ *
+ * REZEPTE HAUSHALTSWEIT ABGESCHALTET: DER STUNDENLAUF HOLT NICHTS (#1660).
+ * Gleiche Regel wie die URL-Quellen der Entsorgung (waste-source-scheduler.js):
+ * ein Haushalt, der das Modul nicht nutzt, soll nicht im Hintergrund bei Mealie
+ * oder Tandoor abfragen und Rezepte anlegen, aendern und loeschen. Der Spiegel
+ * bleibt stehen, der erste Lauf nach dem Wiedereinschalten zieht ihn nach.
+ *
+ * EIGENE FUNKTION UND NICHT EINE ZEILE IN `sync()`: `sync()` ruft auch
+ * `POST /recipe-providers/sync` (alle Konten, von Hand), und das ist wie
+ * `syncOne()` die Handlung einer Person - sie bleibt offen wie die Modul-Routen.
+ * Die Pruefung in `sync()` haette diesen Aufruf still mit null Treffern
+ * beantwortet (Codex-Befund in #1662).
+ *
+ * Die Frage steht IM Job: sie liest die Datenbank, und waehrend eines Restores
+ * ist die Verbindung zu.
+ */
+export function scheduledSync() {
+  return runExternalJob(() => {
+    if (householdDisabledModules(db.get()).has('recipes')) {
+      log.debug('Recipes are switched off for the household - scheduled provider sync skipped.');
+      return { success: true, syncedAccounts: 0, imported: 0, updated: 0, deleted: 0 };
+    }
+    return syncUntracked();
+  });
+}
 
+async function syncUntracked() {
   const accounts = getEnabledAccounts();
   if (accounts.length === 0) {
     log.debug('No enabled recipe provider accounts configured.');
@@ -294,7 +310,7 @@ export function getStatus() {
 
 export function startScheduler() {
   const run = () => {
-    sync().catch((err) => log.error('Recipe provider sync scheduler run failed:', err?.message || err));
+    scheduledSync().catch((err) => log.error('Recipe provider sync scheduler run failed:', err?.message || err));
   };
   setTimeout(run, 10_000).unref();
   setInterval(run, SYNC_INTERVAL_MS).unref();
