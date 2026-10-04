@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Housekeeping: "today" and "last visit" read a visit's check-in as a point in time.** Visits
+  whose check-in is stored in another spelling than the app writes - a time without a zone, or
+  whole seconds as in the demo data, typically rows imported by hand - were compared and sorted
+  as text. Such a visit late in the evening (east of UTC) or shortly after midnight (west of UTC)
+  was missing from the helper's "today" while the month list showed it on that day, and with two
+  visits on one day the earlier one could be shown as the latest, in the module's last visit and
+  in the visit lists. All of them now compare the actual time on the household's clock. Stored
+  values are not changed.
+
 ## [2.72.0] - 2026-10-04
 
 ### Added

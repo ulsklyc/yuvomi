@@ -1,6 +1,7 @@
 /**
  * Modul: Haushaltshilfe - der Monat des Haushalts
- * Zweck: In welchen Monat ein Besuch faellt, fuer das Modul UND die Uebersicht.
+ * Zweck: In welchen Monat ein Besuch faellt, fuer das Modul UND die Uebersicht -
+ *        und welcher von mehreren Besuchen der spaetere ist.
  * Abhaengigkeiten: utils/timezone.js, utils/interval-date.js
  *
  * `check_in` ist ein UTC-Instant: der Check-in schreibt `toISOString()`, das
@@ -56,7 +57,15 @@ export function householdMonthRange(monthValue, tz) {
  * Monatsgrafik gruppiert.
  */
 export function householdMonthWindow(monthValue, tz) {
-  const { start, end } = householdMonthRange(monthValue, tz);
+  return widenedWindow(householdMonthRange(monthValue, tz));
+}
+
+/**
+ * Ein halboffenes Intervall in der Schreibweise von `check_in`, um einen Tag
+ * Rand je Seite geweitet. Der Rand reicht fuer jede Form: eine zonenlose
+ * Wanduhrzeit steht als Text hoechstens 14 Stunden neben ihrem Zeitpunkt.
+ */
+export function widenedWindow({ start, end }) {
   const widen = (iso, days) => {
     const ms = Date.parse(iso);
     const shifted = Number.isFinite(ms) ? new Date(ms + days * DAY_MS).toISOString() : '';
@@ -64,6 +73,41 @@ export function householdMonthWindow(monthValue, tz) {
     return /^\d{4}-/.test(shifted) ? shifted : iso;
   };
   return { start: widen(start, -1), end: widen(end, 1) };
+}
+
+/**
+ * Sortierfunktion "spaetester Besuch zuerst", nach dem ZEITPUNKT von
+ * `check_in`. `ORDER BY check_in` sortiert Text: die zonenlose
+ * '2026-07-15T11:00:00' (11:00 im Haushalt) steht dann hinter
+ * '2026-07-15T10:00:00.000Z' (12:00 in Berlin), und '…T10:00:00Z' aus
+ * scripts/seed-demo.js hinter '…T10:00:00.500Z' derselben Sekunde. Unlesbare
+ * Werte ans Ende, Gleichstand nach der juengeren Zeile.
+ */
+export function byCheckInDesc(tz) {
+  const at = (row) => storedToInstantMs(row.check_in, tz) ?? -Infinity;
+  return (a, b) => {
+    const [left, right] = [at(a), at(b)];
+    if (left !== right) return left > right ? -1 : 1;
+    return (b.id ?? 0) - (a.id ?? 0);
+  };
+}
+
+/**
+ * Der spaeteste Besuch - ersetzt `ORDER BY check_in DESC LIMIT 1`.
+ *
+ * Ohne die ganze Tabelle zu lesen: die als TEXT groesste Zeile gibt den
+ * Zeitpunkt vor, und nur was als Text hoechstens einen Tag darunter liegt, kann
+ * als Zeitpunkt spaeter sein. Unter diesen Zeilen entscheidet `byCheckInDesc`.
+ * `where` ist ein fester SQL-Ausdruck des Aufrufers, nie Eingabe.
+ */
+export function latestVisit(database, tz, where = '', params = []) {
+  const from = `FROM housekeeping_work_sessions WHERE ${where || '1 = 1'}`;
+  const top = database.prepare(`SELECT check_in ${from} ORDER BY check_in DESC LIMIT 1`).get(...params);
+  if (!top) return undefined;
+  const topMs = storedToInstantMs(top.check_in, tz);
+  const floor = topMs === null ? '' : widenedWindow({ start: new Date(topMs).toISOString(), end: '' }).start;
+  return database.prepare(`SELECT * ${from} AND check_in >= ?`).all(...params, floor)
+    .sort(byCheckInDesc(tz))[0];
 }
 
 /**

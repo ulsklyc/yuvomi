@@ -1705,6 +1705,103 @@ test('#1556 ohne eingestellte Haushaltszone: die Zone der Oberflaeche entscheide
   });
 });
 
+// --------------------------------------------------------------------------
+// "Heute" und "zuletzt" lesen `check_in` als ZEITPUNKT, nicht als Text
+// --------------------------------------------------------------------------
+// In der Spalte stehen Schreibweisen nebeneinander: `toISOString()` mit
+// Millisekunden (Check-in, Bearbeiten), '…SSZ' ohne (scripts/seed-demo.js) und
+// - von Hand eingespielt - zonenlose Wanduhrzeit, die die Monatslisten seit
+// #1643 nach der Uhr des Haushalts einordnen. `loadTodaySession()` verglich
+// weiter als Text gegen die Tagesgrenzen, und jedes "die letzte" sortierte per
+// `ORDER BY check_in`: dieselbe Seite gab fuer denselben Besuch zwei Antworten.
+// Die Jahre liegen bewusst hinter allen anderen Zeilen dieser Datei, weil
+// `last_visit` und `current_session` ueber die ganze Tabelle lesen.
+function insertSessionAt(workerId, checkIn, { open = false } = {}) {
+  return db.prepare(`
+    INSERT INTO housekeeping_work_sessions (worker_id, check_in, check_out, daily_rate, extras, created_by)
+    VALUES (?, ?, ?, 40, 0, ?)
+  `).run(workerId, checkIn, open ? null : checkIn, ADMIN).lastInsertRowid;
+}
+
+async function withSessions(fn) {
+  const ids = [];
+  try {
+    return await fn((...args) => { const id = insertSessionAt(...args); ids.push(id); return id; });
+  } finally {
+    for (const id of ids) db.prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(id);
+  }
+}
+
+test('heute: ein zonenloser Besuch zaehlt an SEINEM Haushaltstag (oestlich von UTC)', () => atHouseholdClock(
+  // 15.07.2031 23:45 in Berlin. Der Tag reicht von 14.07. 22:00Z bis 15.07. 22:00Z.
+  { zone: 'Europe/Berlin', processTz: 'Asia/Tokyo', now: '2031-07-15T21:45:00.000Z' },
+  () => withSessions(async (insert) => {
+    const lateToday = await freshWorker('HeuteSpaet');
+    const lateYesterday = await freshWorker('GesternSpaet');
+    // 23:30 in Berlin, heute: als Text hinter dem Tagesende '…T22:00:00.000Z'.
+    const todayId = insert(lateToday, '2031-07-15T23:30:00');
+    // 23:30 in Berlin, gestern: als Text hinter dem Tagesanfang '2031-07-14T22:00:00.000Z'.
+    insert(lateYesterday, '2031-07-14T23:30:00');
+    assert.equal(await todaySessionId('/workers', lateToday), todayId, 'der Besuch von heute 23:30 ist von heute');
+    assert.equal(await todaySessionId('/dashboard', lateToday), todayId, 'Uebersicht: dieselbe Frage');
+    assert.equal(await todaySessionId('/workers', lateYesterday), null, 'der von gestern 23:30 nicht');
+    const visits = (await call('GET', '/visits?month=2031-07', { as: ADM })).body.data.visits;
+    assert.equal(visits.some((v) => v.id === todayId), true, 'Vorbedingung: die Monatsliste fuehrt ihn laengst');
+  }),
+));
+
+test('heute: ein zonenloser Besuch zaehlt an SEINEM Haushaltstag (westlich von UTC)', () => atHouseholdClock(
+  // 15.07.2031 01:00 in Los Angeles. Der Tag beginnt dort um 07:00Z.
+  { zone: 'America/Los_Angeles', processTz: 'Asia/Tokyo', now: '2031-07-15T08:00:00.000Z' },
+  () => withSessions(async (insert) => {
+    const earlyToday = await freshWorker('HeuteFrueh');
+    const earlyTomorrow = await freshWorker('MorgenFrueh');
+    // 00:30 in Los Angeles, heute: als Text vor dem Tagesanfang '…T07:00:00.000Z'.
+    const todayId = insert(earlyToday, '2031-07-15T00:30:00');
+    // 00:30 in Los Angeles, morgen: als Text vor dem Tagesende '2031-07-16T07:00:00.000Z'.
+    insert(earlyTomorrow, '2031-07-16T00:30:00');
+    assert.equal(await todaySessionId('/workers', earlyToday), todayId, 'der Besuch von heute 00:30 ist von heute');
+    assert.equal(await todaySessionId('/workers', earlyTomorrow), null, 'der von morgen 00:30 nicht');
+  }),
+));
+
+test('heute und zuletzt: die spaeteste Sitzung ist der spaeteste Zeitpunkt, nicht der groesste Text', () => atHouseholdClock(
+  { zone: 'Europe/Berlin', processTz: 'Asia/Tokyo', now: '2032-07-15T12:00:00.000Z' },
+  () => withSessions(async (insert) => {
+    const mixed = await freshWorker('Gemischt');
+    const seeded = await freshWorker('Saatform');
+    // 11:00 in Berlin (zonenlos) gegen 12:00 in Berlin (Instant): als Text ist '…T11' groesser als '…T10'.
+    const earlier = insert(mixed, '2032-07-15T11:00:00');
+    const later = insert(mixed, '2032-07-15T10:00:00.000Z');
+    assert.equal(await todaySessionId('/workers', mixed), later, 'today_session: der Besuch von 12:00, nicht der von 11:00');
+    const dashboard = (await call('GET', '/dashboard', { as: ADM })).body.data;
+    assert.equal(dashboard.last_visit.id, later, 'last_visit: ebenso');
+    const order = (list) => list.map((v) => v.id).filter((id) => id === earlier || id === later);
+    assert.deepEqual(order((await call('GET', '/visits?month=2032-07', { as: ADM })).body.data.visits), [later, earlier],
+      '/visits: spaetester zuerst');
+    assert.deepEqual(order((await call('GET', '/work-sessions?month=2032-07', { as: ADM })).body.data), [later, earlier],
+      '/work-sessions: spaetester zuerst');
+
+    // Dieselbe Sekunde in zwei Schreibweisen, beide von echten Schreibwegen:
+    // scripts/seed-demo.js schreibt '…SSZ', der Check-in '…SS.mmmZ' - 'Z' sortiert hinter '.'.
+    insert(seeded, '2032-07-15T09:00:00Z');
+    const sameSecond = insert(seeded, '2032-07-15T09:00:00.500Z');
+    assert.equal(await todaySessionId('/workers', seeded), sameSecond, 'eine halbe Sekunde spaeter ist spaeter');
+  }),
+));
+
+test('offene Sitzung: ohne Arbeiter gilt die zuletzt begonnene, auch bei gemischten Schreibweisen', () => atHouseholdClock(
+  { zone: 'Europe/Berlin', processTz: 'Asia/Tokyo', now: '2033-07-15T12:00:00.000Z' },
+  () => withSessions(async (insert) => {
+    const first = await freshWorker('OffenFrueh');
+    const second = await freshWorker('OffenSpaet');
+    insert(first, '2033-07-15T11:00:00', { open: true });               // 11:00 in Berlin
+    const later = insert(second, '2033-07-15T10:00:00.000Z', { open: true }); // 12:00 in Berlin
+    const summary = (await call('GET', '/summary', { as: ADM })).body.data;
+    assert.equal(summary.current_session.id, later);
+  }),
+));
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });
