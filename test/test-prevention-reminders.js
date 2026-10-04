@@ -401,6 +401,39 @@ test('Health abgeschaltet: eine zugestellte oder weggewischte Zeile bleibt, dami
   assert.equal(after[0].pushed_at, '2026-06-01T09:00:00Z');
 });
 
+test('Health abgeschaltet: eine zum Teil zugestellte Zeile bleibt samt Zustellnachweis (pushed_at noch leer)', () => {
+  const u = makeUser();
+  const t = makeType({ default_interval_months: 12 });
+  const recordId = makeRecord(u, t, { given_on: '2026-01-01' });
+  syncAllPreventionReminders(db, NOW);
+  const reminderId = remindersFor(recordId)[0].id;
+  // Web Push ist raus, der Kanal steht noch im Wiederholversuch: pushed_at bleibt leer.
+  const insertDelivery = db.prepare(`
+    INSERT INTO notification_deliveries (reminder_id, provider, target_key, status, attempt_count)
+    VALUES (?, ?, ?, ?, 1)
+  `);
+  insertDelivery.run(reminderId, 'webpush', `user:${u}`, 'sent');
+  insertDelivery.run(reminderId, 'ntfy', 'channel:1', 'failed');
+  const deliveries = () => db.prepare(
+    'SELECT provider, status FROM notification_deliveries WHERE reminder_id = ? ORDER BY provider'
+  ).all(reminderId);
+
+  try {
+    setDisabledModules(['health']);
+    syncAllPreventionReminders(db, NOW);
+    syncPreventionRemindersForSubject(db, u, NOW);
+    assert.deepEqual(remindersFor(recordId).map((r) => r.id), [reminderId]);
+  } finally {
+    setDisabledModules([]);
+  }
+  syncAllPreventionReminders(db, NOW);
+  assert.deepEqual(remindersFor(recordId).map((r) => r.id), [reminderId], 'dieselbe Zeile, keine frische');
+  assert.deepEqual(deliveries(), [
+    { provider: 'ntfy', status: 'failed' },
+    { provider: 'webpush', status: 'sent' },
+  ]);
+});
+
 test('teardown: keine Server-Ressourcen zu schliessen', () => {
   assert.ok(true);
 });

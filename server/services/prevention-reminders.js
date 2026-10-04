@@ -133,20 +133,31 @@ function syncRecordReminder(database, item, subjectId, subjectHasHealth, caregiv
  * Vorsorge meldet sich ein zweites Mal - upsertRow() laesst eine bestehende
  * Zeile mit gleichem Zeitpunkt genau deshalb stehen.
  *
+ * UND AUCH NICHT, WAS SCHON ZUM TEIL RAUS IST (Codex-Befund in #1662):
+ * `pushed_at` faellt erst, wenn JEDES Ziel fertig ist. Kam der Push an und der
+ * ntfy-Kanal steht noch im Wiederholversuch, ist die Zeile "ausstehend" - und
+ * mit ihr fiele ueber ON DELETE CASCADE auch der Zustellnachweis des Pushs.
+ * Der Lauf nach dem Wiedereinschalten legte sie frisch an und der Push ginge
+ * ein zweites Mal raus. Eine Zeile mit einem gesendeten Ziel bleibt deshalb;
+ * die Zustellung haelt sie zurueck, solange das Modul aus ist.
+ *
  * @param {object} database
  * @param {number|null} subjectId  eine Person, oder null fuer den ganzen Haushalt
  */
 function clearPendingWhileSwitchedOff(database, subjectId = null) {
+  const untouched = `
+    entity_type = ? AND dismissed = 0 AND pushed_at IS NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM notification_deliveries nd
+      WHERE nd.reminder_id = reminders.id AND nd.status = 'sent'
+    )`;
   if (subjectId === null) {
-    database.prepare(`
-      DELETE FROM reminders
-      WHERE entity_type = ? AND dismissed = 0 AND pushed_at IS NULL
-    `).run(ENTITY_TYPE);
+    database.prepare(`DELETE FROM reminders WHERE ${untouched}`).run(ENTITY_TYPE);
     return;
   }
   database.prepare(`
     DELETE FROM reminders
-    WHERE entity_type = ? AND dismissed = 0 AND pushed_at IS NULL
+    WHERE ${untouched}
       AND entity_id IN (SELECT id FROM health_prevention_records WHERE user_id = ?)
   `).run(ENTITY_TYPE, subjectId);
 }
