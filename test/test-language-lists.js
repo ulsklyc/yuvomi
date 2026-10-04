@@ -59,6 +59,8 @@ test('Budget: Tags mit Region und fremder Schreibung finden ihre Sprache, Unbeka
     ['pt-BR', 'pt-BR'], ['pt_br', 'pt-BR'], ['PT-br', 'pt-BR'], ['pt-PT', 'pt'],
     ['de-AT', 'de'], ['DE', 'de'], [' nb ', 'nb'], ['zh-Hant-TW', 'zh'], ['es-419', 'es'],
     ['xx', 'en'], ['', 'en'], [undefined, 'en'], [['de'], 'en'], ['../de', 'en'], ['de/../en', 'en'],
+    // `no` (Makrosprache) und `nn` (Nynorsk) meinen die norwegische Datei.
+    ['no', 'nb'], ['no-NO', 'nb'], ['NO_no', 'nb'], ['nn', 'nb'], ['nn-NO', 'nb'],
   ];
   for (const [eingabe, erwartet] of faelle) {
     assert.equal(normalizeLang(eingabe), erwartet, `normalizeLang(${JSON.stringify(eingabe)})`);
@@ -115,6 +117,8 @@ test('OWM: owmLanguage() bildet ab, laesst OWM-Codes durch und sonst nichts in d
     ['fil', null],                       // OWM kennt kein Filipino
     ['zh_tw', 'zh_tw'], ['ZH_CN', 'zh_cn'], ['ua', 'ua'],   // OPENWEATHER_LANG traegt OWM-Codes
     ['de-AT', 'de'], ['pt_BR', 'pt_br'],
+    ['no', 'no'],                        // schon ein OWM-Code, geht wie geschrieben
+    ['nn', 'no'], ['nn-NO', 'no'], ['no-NO', 'no'],   // ueber den Alias auf nb, und nb heisst bei OWM `no`
     ['xx', null], ['', null], [undefined, null], [['de'], null], ['de&appid=x', null],
   ];
   for (const [eingabe, erwartet] of faelle) {
@@ -185,4 +189,60 @@ test('keine weitere Sprachliste in server/, public/ oder tools/', () => {
   assert.deepEqual(funde, [],
     'Eine eigene Liste der App-Sprachen bleibt zurueck, sobald eine Sprache dazukommt (#1523). '
     + 'Im Server getSupportedLocales()/supportedLocaleFor() aus server/utils/i18n.js nehmen.');
+});
+
+// ── Sprach-Aliase ───────────────────────────────────────────────────
+//
+// `no` (Makrosprache Norwegisch) und `nn` (Nynorsk) meinen die Datei `nb`. Fuenf
+// Stellen bilden einen Sprach-Tag von aussen auf eine Locale ab, und kein Import
+// verbindet sie: public/i18n.js ist ein Browser-Modul, lang-init.js laeuft vor
+// jedem Modul, i18n-mini.js gehoert dem Installer, install.sh ist Shell und
+// server/utils/i18n.js liegt hinter der Schichtgrenze. Was die einzelne Stelle
+// daraus MACHT, messen ihre eigenen Suiten (test:lang-init, test:installer-i18n,
+// test:installer-cli-i18n und oben normalizeLang/owmLanguage); hier steht nur,
+// dass alle fuenf dieselbe Zuordnung fuehren.
+
+/** `{ no: 'nb', nn: 'nb' }` aus einem JS-Quelltext, als Objekt. */
+function readJsAlias(rel) {
+  const src = readFileSync(path.join(ROOT, rel), 'utf8');
+  const match = src.match(/LANGUAGE_ALIAS = (?:Object\.freeze\()?\{([^}]*)\}/);
+  assert.ok(match, `LANGUAGE_ALIAS nicht in ${rel} gefunden`);
+  const paare = [...match[1].matchAll(/['"]?([A-Za-z-]+)['"]?\s*:\s*'([^']*)'/g)].map((m) => [m[1], m[2]]);
+  assert.ok(paare.length > 0, `LANGUAGE_ALIAS in ${rel} wurde leer gelesen`);
+  return Object.fromEntries(paare);
+}
+
+/** Dieselbe Zuordnung aus dem `case` von normalize_locale in install.sh. */
+function readShellAlias() {
+  const sh = readFileSync(path.join(ROOT, 'install.sh'), 'utf8');
+  const start = sh.indexOf('normalize_locale() {');
+  const fn = sh.slice(start, sh.indexOf('\n}\n', start));
+  const out = {};
+  for (const m of fn.matchAll(/^\s*([a-z|]+)\)\s*alias="([^"]+)"\s*;;/gm)) {
+    for (const lang of m[1].split('|')) out[lang] = m[2];
+  }
+  assert.ok(Object.keys(out).length > 0, 'kein Alias-Zweig in normalize_locale gefunden');
+  return out;
+}
+
+test('der Alias-Leser verschluckt keinen Eintrag', () => {
+  assert.deepEqual(readJsAlias('public/i18n.js'), { no: 'nb', nn: 'nb' },
+    'Die Quelle selbst, als Literal: liest der Leser weniger, waere der Gleichstand darunter gruen ueber nichts.');
+});
+
+test('alle fuenf Stellen fuehren dieselben Sprach-Aliase', () => {
+  const quelle = readJsAlias('public/i18n.js');
+  for (const rel of ['public/lang-init.js', 'tools/installer/i18n-mini.js', 'server/utils/i18n.js']) {
+    assert.deepEqual(readJsAlias(rel), quelle, `${rel} fuehrt andere Sprach-Aliase als public/i18n.js`);
+  }
+  assert.deepEqual(readShellAlias(), quelle, 'install.sh fuehrt andere Sprach-Aliase als public/i18n.js');
+});
+
+test('ein Alias zeigt auf eine App-Sprache und ueberdeckt keine', () => {
+  for (const [von, nach] of Object.entries(readJsAlias('public/i18n.js'))) {
+    assert.ok(APP_LOCALES.includes(nach), `${von} -> ${nach}: das Ziel ist keine App-Sprache`);
+    // Kein Fehler im Verhalten - der Alias ist ein Rueckfall und kaeme nie zum
+    // Zug -, aber toter Text, der beim Lesen wie eine geltende Regel aussieht.
+    assert.ok(!APP_LOCALES.includes(von), `${von} hat inzwischen eine eigene Locale, der Alias ist tot`);
+  }
 });
