@@ -4198,6 +4198,81 @@ test('Baender: im Nachbarmonat toent das Band zurueck wie der Chip der Zelle, ni
   assert(!/opacity|filter/.test(band.body), 'nie ueber Opacity auf Text');
 });
 
+// --- Physische Seiten in CSS-Deklarationen -------------------------------
+// Beide RTL-Guards unten lesen Werte ueber DIESE Helfer. Sie zaehlen die
+// Klammertiefe, statt mit einem Regex an der ersten `)` zu raten:
+// `calc(-1 * var(--space-1))` ist EIN Wert, auch mit Leerzeichen und
+// geschachtelten Klammern.
+function splitTopLevel(text, isSeparator) {
+  const out = [];
+  let depth = 0;
+  let cur = '';
+  for (const ch of text) {
+    if (ch === '(') depth += 1;
+    else if (ch === ')') depth -= 1;
+    if (depth === 0 && isSeparator(ch)) {
+      out.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  out.push(cur);
+  return out.map((part) => part.trim()).filter(Boolean);
+}
+/** Werte einer Deklaration, an Leerraum ausserhalb von Klammern getrennt. */
+const cssWords = (value) => splitTopLevel(value, (ch) => /\s/.test(ch));
+/** `[{ prop, value, text }]` eines Regelrumpfs aus eachRule(), ohne `!important`. */
+function cssDeclarations(body) {
+  return splitTopLevel(body, (ch) => ch === ';').flatMap((decl) => {
+    const colon = decl.indexOf(':');
+    if (colon < 1) return [];
+    const prop = decl.slice(0, colon).trim().toLowerCase();
+    const value = decl.slice(colon + 1).replace(/!\s*important/i, '').trim().replace(/\s+/g, ' ');
+    return [{ prop, value, text: `${prop}: ${value}` }];
+  });
+}
+// Vier Werte heissen oben/rechts/unten/links; ein, zwei und drei Werte sind
+// seitengleich, weil rechts und links denselben Wert bekommen.
+const BOX_SHORTHANDS = new Set([
+  'inset', 'margin', 'padding', 'border-width', 'border-style', 'border-color', 'scroll-margin', 'scroll-padding',
+]);
+// Eigenschaften, deren WERT eine Seite nennen kann. justify-* steht bewusst
+// nicht hier: dort gibt es start/end, und left/right bedeutet etwas anderes.
+const SIDE_KEYWORD_PROPS = new Set([
+  'text-align', 'float', 'clear', 'transform-origin', 'background-position', 'object-position',
+]);
+/**
+ * Die Deklarationen eines Regelrumpfs, die an einer physischen Seite haengen
+ * (als `prop: value`). Custom Properties zaehlen nicht - `--band-to: left`
+ * ist ein Wert, den erst die lesende Regel zu einer Seite macht.
+ */
+function physicalSideDeclarations(body) {
+  return cssDeclarations(body).filter(({ prop, value }) => {
+    if (prop.startsWith('--')) return false;
+    // Langformen: left, right, margin-left, border-right-color,
+    // scroll-padding-left, border-top-left-radius ...
+    if (/(?:^|-)(?:left|right)(?:-|$)/.test(prop)) return true;
+    if (BOX_SHORTHANDS.has(prop)) {
+      const v = cssWords(value);
+      return v.length === 4 && v[1] !== v[3];
+    }
+    if (prop === 'border-radius') {
+      // Ecken: oben-links, oben-rechts, unten-rechts, unten-links - je vor und
+      // hinter dem `/` (waagrechte und senkrechte Halbachse). Gespiegelt
+      // tauschen oben-links/oben-rechts und unten-links/unten-rechts.
+      return splitTopLevel(value, (ch) => ch === '/').some((half) => {
+        const [tl, tr = tl, br = tl, bl = tr] = cssWords(half);
+        return tl !== tr || br !== bl;
+      });
+    }
+    if (SIDE_KEYWORD_PROPS.has(prop)) {
+      return splitTopLevel(value, (ch) => /[\s,]/.test(ch)).some((word) => /^(?:left|right)$/i.test(word));
+    }
+    return false;
+  }).map(({ text }) => text);
+}
+
 test('Baender in RTL: offene Kante, Chevron und Nachbarmonat-Toenung kippen mit der Schreibrichtung (#1467)', () => {
   // Das Raster kippt in RTL selbst: Spalte 1 steht rechts, `first` und
   // --band-out-start zaehlen vom Zeilenanfang. Was an einer SEITE des Bands
@@ -4220,33 +4295,16 @@ test('Baender in RTL: offene Kante, Chevron und Nachbarmonat-Toenung kippen mit 
   // physisch: `margin: 0 var(--band-me) 0 var(--band-ms)` setzt den Einzug in
   // RTL auf die falsche Seite. Drei Werte (`a b c`) sind seitengleich, weil
   // der mittlere Wert fuer links UND rechts gilt.
-  const words = (value) => {
-    const out = [];
-    let depth = 0;
-    let cur = '';
-    for (const ch of value.trim()) {
-      if (ch === '(') depth += 1;
-      if (ch === ')') depth -= 1;
-      if (/\s/.test(ch) && depth === 0) {
-        if (cur) out.push(cur);
-        cur = '';
-      } else {
-        cur += ch;
-      }
-    }
-    if (cur) out.push(cur);
-    return out;
-  };
   const lopsided = (body) => [...body.matchAll(/(?:^|[;{\s])(margin|padding|inset|border-radius)\s*:\s*([^;]+)/g)]
     .filter(([, prop, raw]) => {
       const value = raw.replace(/!important/, '').trim();
       if (prop !== 'border-radius') {
-        const v = words(value);
+        const v = cssWords(value);
         return v.length === 4 && v[1] !== v[3];
       }
       // Radius: gespiegelt tauschen oben-links/oben-rechts und unten-links/unten-rechts.
       return value.split('/').some((half) => {
-        const [tl, tr = tl, br = tl, bl = tr] = words(half);
+        const [tl, tr = tl, br = tl, bl = tr] = cssWords(half);
         return tl !== tr || br !== bl;
       });
     })
@@ -4311,33 +4369,43 @@ test('Kalender in RTL: keine Regel in calendar.css haengt an einer physischen Se
   // eine neue Regel mit border-right soll hier auffallen, nicht erst in RTL.
   const all = [...eachRule(calendarCss)];
   const where = (r) => `${r.selector.trim()}${r.at.length ? ` (in ${r.at.join(' ')})` : ''}`;
-  const physical = /(?:^|[;\s])(?:margin|padding|border)-(?:left|right)\b|(?:^|[;\s])(?:left|right)\s*:|text-align:\s*(?:left|right)\b|border-(?:top|bottom)-(?:left|right)-radius|(?:^|[;\s])float\s*:\s*(?:left|right)/;
 
   // Ausnahmen nennen die Deklarationen, die sie erlauben - nicht die ganze
-  // Regel. Genau diese fallen aus dem Rumpf, und der Rest muss frei von
-  // physischen Seiten sein: eine neue border-left in einer gelisteten Regel
-  // faellt so genauso auf wie in jeder anderen.
+  // Regel - in der Schreibweise, die physicalSideDeclarations() liefert.
+  // Regel und Ausnahme gehen durch denselben Leser: was er als physisch
+  // meldet, muss hier woertlich stehen, und was hier steht, muss er in der
+  // Regel noch als physisch melden. Eine neue border-left in einer gelisteten
+  // Regel faellt so genauso auf wie in jeder anderen.
   const exceptions = {
     // links und rechts 0: die Linie spannt die ganze Spalte, in beiden Richtungen gleich
-    '.week-view__hour-line': [/(?:^|[;\s])left:\s*0\s*;/, /(?:^|[;\s])right:\s*0\s*;/],
-    '.week-view__now-line': [/(?:^|[;\s])left:\s*0\s*;/, /(?:^|[;\s])right:\s*0\s*;/],
+    '.week-view__hour-line': ['left: 0', 'right: 0'],
+    '.week-view__now-line': ['left: 0', 'right: 0'],
     // left: 50% mit translateX(-50%) zentriert, die Richtung spielt keine Rolle
-    '.day-view__empty-hint': [/(?:^|[;\s])left:\s*50%\s*;/],
+    '.day-view__empty-hint': ['left: 50%'],
     // Ueberlappung im Avatar-Stapel: gehoert zur Folgearbeit an .avatar-stack
     // (user-multi-select.css, row-reverse mit margin-left) und kippt mit ihr
     '.allday-event .avatar-stack__item, .week-event__time .avatar-stack__item': [
-      /(?:^|[;\s])margin-left:\s*calc\(-1 \* var\(--space-1\)\)\s*;/,
+      'margin-left: calc(-1 * var(--space-1))',
     ],
   };
+  const used = new Set();
   for (const r of all) {
-    if (!physical.test(r.body)) continue;
+    const found = physicalSideDeclarations(r.body);
+    if (found.length === 0) continue;
     const key = r.selector.trim().replace(/\s+/g, ' ');
-    let rest = r.body;
-    for (const allowed of exceptions[key] ?? []) {
-      assert(allowed.test(rest), `${where(r)} ist als Ausnahme gelistet, ihr Grund stimmt aber nicht mehr: ${r.body}`);
-      rest = rest.replace(allowed, ';');
+    const allowed = exceptions[key] ?? [];
+    if (key in exceptions) used.add(key);
+    for (const decl of allowed) {
+      assert(found.includes(decl), `${where(r)} ist als Ausnahme gelistet, ihr Grund stimmt aber nicht mehr (${decl} fehlt): ${r.body}`);
     }
-    assert(!physical.test(rest), `${where(r)} haengt an einer physischen Seite: ${rest}`);
+    const rest = found.filter((decl) => !allowed.includes(decl));
+    assert(rest.length === 0, `${where(r)} haengt an einer physischen Seite: ${rest.join('; ')}`);
+  }
+  // Eine Ausnahme, deren Regel keine physische Seite mehr hat (oder die es
+  // nicht mehr gibt), ist tot: sie wuerde die naechste physische Seite unter
+  // demselben Selektor still durchwinken.
+  for (const key of Object.keys(exceptions)) {
+    assert(used.has(key), `Ausnahme ohne Treffer - die Regel hat keine physische Seite mehr oder heisst anders: ${key}`);
   }
   // Die Zentrierung ist eine Bedingung, keine Seite: ohne translateX(-50%)
   // stuende der Hinweis ab der Mitte nach rechts.
@@ -4372,15 +4440,6 @@ test('Kalender in RTL: keine Regel in calendar.css haengt an einer physischen Se
     assert(logical.test(rule(sel)), `${sel} traegt die logische Eigenschaft nicht: ${rule(sel)}`);
   }
 
-  // Vier Werte in margin/padding mit verschiedenen Seiten sind genauso
-  // seitenfest wie margin-left/-right (die kompakten Monatspunkte hatten
-  // `margin: 0 X X 0`). Drei Werte (`a b c`) sind seitengleich.
-  for (const r of all) {
-    for (const [, prop, value] of r.body.matchAll(/(?:^|[;\s])(margin|padding)\s*:\s*([^;]+)/g)) {
-      const v = value.replace(/!important/, '').trim().split(/\s+(?![^(]*\))/);
-      assert(!(v.length === 4 && v[1] !== v[3]), `${where(r)} setzt ${prop} links und rechts verschieden: ${value.trim()}`);
-    }
-  }
 });
 test('Monatszelle: der Fokusring liegt ueber der Band-Schicht, die Zelle nicht', () => {
   // Ein Band liegt in `.month-bands` (z-index 1) ueber den Zellen. Hob sich die
