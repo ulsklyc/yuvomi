@@ -130,6 +130,23 @@ function syncMarker() {
   syncScheduled = true;
   queueMicrotask(() => {
     syncScheduled = false;
+    /* SOLANGE EIN EIGENER SCHRITT UNTERWEGS IST, BLEIBT DIE HISTORY IN RUHE.
+     *
+     * `back()` wirkt asynchron, und der Abgleich deckt nur EINEN Tick: geht ein
+     * Overlay zu und das naechste erst einen Tick spaeter auf (die Leseansicht
+     * am Desktop schliesst, ihr Formular wartet noch auf die Erinnerungen; das
+     * Loeschen wartet das Schliessen ab und fragt dann nach der Reichweite),
+     * liefe hier ein `pushState` in das noch ausstehende `back()` hinein. In
+     * Chrome gemessen: der Marker entsteht, und das `back()` traegt den Browser
+     * danach UNTER ihn, auf die Seite selbst. Das Register haelt den Marker fuer
+     * obenauf, steht aber darunter - und das Schliessen des Dialogs gibt mit
+     * seinem `back()` einen Eintrag zurueck, den es nie gab: die Adresse zeigt
+     * die Seite davor, waehrend der Kalender im Bild bleibt.
+     *
+     * Nachgeholt wird, sobald das eigene `popstate` da ist
+     * (`handleBackNavigation`): dann steht der Browser wieder auf einem Eintrag,
+     * den dieses Modul kennt. */
+    if (pendingSelfPops > 0) return;
     const wanted = stack.length > 0;
     if (wanted === markerActive) {
       flushSettled();
@@ -241,7 +258,9 @@ export function whenHistorySettled() {
 export async function handleBackNavigation() {
   if (pendingSelfPops > 0) {
     pendingSelfPops -= 1;
-    flushSettled();
+    // Ein Abgleich, der auf diesen Schritt gewartet hat, laeuft jetzt (siehe
+    // `syncMarker`); steht nichts an, gibt er die Wartenden frei.
+    syncMarker();
     return true;
   }
   /* Eine zweite Geste, waehrend die erste noch fragt - Begruendung an

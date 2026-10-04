@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 // History-Attrappe
 // --------------------------------------------------------
 
-function makeHistory() {
+function makeHistory({ lateTraversal = false } = {}) {
   /* Die Attrappe fuehrt eine ADRESSE je Eintrag, nicht nur einen Zustand.
    *
    * Eine fruehere Fassung hielt `location.href` konstant, und genau das machte
@@ -53,6 +53,22 @@ function makeHistory() {
       entries[index] = { state, href: href ?? entries[index].href };
     },
     back() {
+      /* `lateTraversal`: SO WIE CHROME ES TUT (gemessen am 04.10.2026 an der
+       * Leseansicht des Kalenders). Das Ziel eines `back()` steht beim AUFRUF
+       * fest, und `popstate` kommt erst Millisekunden spaeter - ein
+       * `pushState` dazwischen haengt seinen Eintrag an und aendert am Ziel
+       * nichts mehr. Die Microtask-Fassung darunter stellt zu, bevor
+       * irgendein spaeterer Tick etwas dazwischenlegen kann, und war damit
+       * blind fuer genau diese Verschraenkung. */
+      if (lateTraversal) {
+        const target = index - 1;
+        setTimeout(() => {
+          if (target < 0) return;
+          index = target;
+          emit();
+        }, 0);
+        return;
+      }
       // Der Browser feuert `popstate` NICHT synchron. Ein Test, der das
       // annimmt, verdeckt genau die Verschraenkung, die hier gefaehrlich ist.
       queueMicrotask(() => {
@@ -80,8 +96,8 @@ let observers = [];
  * Frische Modulinstanz je Test - das Register ist Modulzustand, und ein Test,
  * der den eines anderen erbt, misst nicht mehr, was er behauptet.
  */
-async function freshModule() {
-  const history = makeHistory();
+async function freshModule(historyOptions) {
+  const history = makeHistory(historyOptions);
   observers = [];
   globalThis.history = history;
   globalThis.location = { get href() { return history.href; } };
@@ -217,6 +233,85 @@ test('Blatt zu und Dialog auf im selben Tick fassen die History gar nicht an', a
   assert.equal(dialogClosed, 1, 'die Geste schliesst den Dialog');
   assert.deepEqual(history.navigations, [],
     'und nicht einen toten Marker, der die Geste verschluckt');
+});
+
+/* DER FALL DANEBEN: NICHT IM SELBEN TICK, SONDERN EINEN SPAETER.
+ *
+ * Die Leseansicht eines Termins ist am Desktop ein Popover mit eigenem
+ * Registereintrag. "Bearbeiten" schliesst es und oeffnet das Formular erst,
+ * wenn die Erinnerungen da sind; "Loeschen" wartet das Schliessen ab und fragt
+ * dann nach der Reichweite der Serie. Zwischen Abmelden und Anmelden liegt
+ * also mindestens ein Tick - der Abgleich hat sein `back()` schon abgeschickt,
+ * und es ist noch nicht angekommen.
+ *
+ * Im Browser gemessen (Chrome, Tagesansicht, 18 von 18 Wegen): der neue Marker
+ * entsteht, das ausstehende `back()` traegt den Browser unter ihn, und wer den
+ * Dialog danach schliesst - "Nur diesen Termin", Abbrechen, Escape -, landet
+ * mit der Adresse auf der Seite DAVOR, waehrend der Kalender im Bild bleibt. */
+const lateSettle = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+test('ein Overlay, das einen Tick nach dem vorigen aufgeht, legt seinen Marker nicht in das ausstehende back()', async () => {
+  const { pushOverlay, dropOverlay, history } = await freshModule({ lateTraversal: true });
+  history.pushState({ path: '/calendar' }, '', '/calendar');
+
+  const popover = pushOverlay(() => {});
+  await lateSettle();
+  assert.equal(history.depth, 2, 'Vorbedingung: der Marker liegt ueber /calendar');
+
+  dropOverlay(popover);
+  // Ein Tick: der Abgleich hat sein back() abgeschickt, angekommen ist es nicht.
+  await Promise.resolve();
+  await Promise.resolve();
+  let closed = 0;
+  const form = pushOverlay(() => { closed += 1; });
+  await lateSettle();
+
+  assert.equal(history.state?.overlay, true,
+    'der Browser steht AUF dem Marker - sonst gibt das Schliessen einen Eintrag zurueck, den es nie gab');
+  assert.equal(history.depth, 2, 'ein Marker ueber /calendar, nicht darunter und nicht zwei');
+
+  dropOverlay(form);
+  await lateSettle();
+  assert.equal(history.href, '/calendar', 'nach dem Schliessen steht die Adresse der Seite, nicht die der Seite davor');
+  assert.equal(history.depth, 1);
+  assert.equal(closed, 0);
+  assert.deepEqual(history.navigations, [], 'und der Router hat nichts davon als Geste gelesen');
+});
+
+test('die Zurueck-Geste ueber dem nachgerueckten Overlay schliesst es und bleibt auf der Seite', async () => {
+  const { pushOverlay, dropOverlay, history } = await freshModule({ lateTraversal: true });
+  history.pushState({ path: '/calendar' }, '', '/calendar');
+
+  const popover = pushOverlay(() => {});
+  await lateSettle();
+  dropOverlay(popover);
+  await Promise.resolve();
+  await Promise.resolve();
+  let closed = 0;
+  pushOverlay(() => { closed += 1; });
+  await lateSettle();
+
+  history.back();
+  await lateSettle();
+  assert.equal(closed, 1, 'die Geste gehoert dem Dialog');
+  assert.equal(history.href, '/calendar', 'und fuehrt nicht aus der Seite heraus');
+  assert.deepEqual(history.navigations, []);
+});
+
+test('ein ausstehendes back() haelt die Wartenden nicht fest, wenn nichts nachrueckt', async () => {
+  // Der Abgleich laesst die History in Ruhe, solange das eigene back()
+  // unterwegs ist. Rueckt nichts nach, muss `whenHistorySettled` trotzdem mit
+  // dessen Ankunft aufloesen - nicht erst an seiner Frist.
+  const { pushOverlay, dropOverlay, whenHistorySettled, history } = await freshModule({ lateTraversal: true });
+  history.pushState({ path: '/calendar' }, '', '/calendar');
+  const token = pushOverlay(() => {});
+  await lateSettle();
+  dropOverlay(token);
+  const started = Date.now();
+  await whenHistorySettled();
+  assert.ok(Date.now() - started < 500, 'aufgeloest mit dem popstate, nicht mit der Frist von einer Sekunde');
+  assert.equal(history.href, '/calendar');
+  assert.equal(history.depth, 1);
 });
 
 // --------------------------------------------------------
