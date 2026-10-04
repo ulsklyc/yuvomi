@@ -16,6 +16,7 @@ import { listQuickLinksFor } from './quick-links.js';
 import { visibilityWhere } from '../services/visibility.js';
 import { resolveBudgetMode } from '../services/budget-visibility.js';
 import { hiddenModulesFor } from '../permissions.js';
+import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
 import { documentViewer } from '../services/document-links.js';
 import { householdMemberSql } from '../services/household-members.js';
 import { FastingError, getFastingDashboardState } from '../services/fasting.js';
@@ -64,7 +65,7 @@ const log = createLogger('Dashboard');
 const DENIED_PAYLOAD = Object.freeze({
   // Geburtstage gehören zum Kalender-Modul, nicht zu einem eigenen — dieselbe
   // Zuordnung wie in PERMISSION_MODULES (navIds) und im Client (NAV_TO_MODULE).
-  calendar: () => ({ upcomingEvents: [], familyEvents: [], weekEvents: [], birthdays: [], birthdayCount: 0, birthdayTotal: 0, birthdaySoonCount: 0 }),
+  calendar: () => ({ upcomingEvents: [], familyEvents: [], weekEvents: [], ...emptyBirthdays() }),
   tasks: () => ({
     urgentTasks: [], openTaskCount: 0, overdueTaskCount: 0,
     memberTodayTasks: [], tasksDoneToday: 0,
@@ -101,6 +102,15 @@ const DENIED_PAYLOAD = Object.freeze({
   // Vorrat „läuft bald ab": Chargennamen sind Haushaltsdaten des Moduls pantry.
   pantry: () => ({ pantryExpiring: emptyPantryExpiring() }),
 });
+
+/**
+ * Die leere Fassung der Geburtstags-Kachel. Eigene Funktion, weil sie zwei
+ * Wege hat: das entzogene Kalender-RECHT nimmt sie mit (oben), der
+ * Haushaltsschalter `birthdays` nimmt sie allein (#1660, siehe die Route).
+ */
+function emptyBirthdays() {
+  return { birthdays: [], birthdayCount: 0, birthdayTotal: 0, birthdaySoonCount: 0 };
+}
 
 /** Wie viele beendete Termine von heute ausserhalb des Deckels mitkommen (#1449). */
 const ENDED_TODAY_POOL = 20;
@@ -276,7 +286,10 @@ router.get('/', (req, res) => {
    *
    * Der Standard bleibt „mit Geburtstagen": ein Filter wirkt nur, wo jemand ihn
    * gesetzt hat. Der Parameter reist deshalb nur in seiner einen Richtung. */
-  const includeBirthdays = req.query.events_birthdays !== 'hide';
+  // Dazu der Haushaltsschalter (#1660): sind die Geburtstage abgeschaltet,
+  // laufen sie auch hier nicht mit, was immer der Parameter sagt.
+  const birthdaysOff = birthdaysSwitchedOff(d);
+  const includeBirthdays = !birthdaysOff && req.query.events_birthdays !== 'hide';
 
   const now = new Date();
 
@@ -318,8 +331,25 @@ router.get('/', (req, res) => {
   // nicht die Module darin. Eine Kachel, deren Modul das Token nicht lesen darf,
   // kommt in derselben leeren Fassung wie bei einer Rollensperre.
   const denied = hiddenModulesFor(req, Object.keys(DENIED_PAYLOAD));
-  for (const key of denied) Object.assign(result, DENIED_PAYLOAD[key]?.({ month: currentMonth }));
-  const allows = (moduleKey) => !denied.has(moduleKey);
+  // UND DER HAUSHALTSSCHALTER (#1660, docs/DECISIONS.md 11). Bis dahin fragte
+  // diese Stelle nur nach Rechten und Scopes: ein haushaltsweit abgeschaltetes
+  // Modul lieferte seine Termine, Aufgaben, Buchungen und Medikamente weiter
+  // aus, und nur der Browser liess die Kachel weg. Abschalten ist keine Sperre -
+  // die eigenen Routen des Moduls bleiben offen -, aber was der Server
+  // ungefragt in eine gemischte Antwort legt, folgt dem Schalter. Beide Achsen
+  // in EINEM Set, damit jede Abfrage unten dieselbe Frage stellt; die leere
+  // Fassung ist dieselbe wie bei einer Sperre, die Form der Antwort bleibt.
+  const leftOut = modulesLeftOut(d, denied);
+  for (const key of leftOut) Object.assign(result, DENIED_PAYLOAD[key]?.({ month: currentMonth }));
+  const allows = (moduleKey) => !leftOut.has(moduleKey);
+  // GEBURTSTAGE HABEN ZWEI WEGE. Als RECHT gehoeren sie zum Kalender (siehe
+  // DENIED_PAYLOAD), als SCHALTER sind sie ein eigenes Modul - dieselbe
+  // Unterscheidung wie bei den Erinnerungen (reminder-origins.js). Ein
+  // abgeschalteter Kalender nimmt einem Haushalt mit eingeschalteten
+  // Geburtstagen die Kachel deshalb nicht weg; die leere Fassung, die der
+  // Kalender-Eintrag oben eben geschrieben hat, ueberschreibt der Block unten.
+  const birthdaysLeftOut = denied.has('calendar') || birthdaysOff;
+  if (birthdaysLeftOut) Object.assign(result, emptyBirthdays());
 
   // Anstehende Termine (nächste 5, ab jetzt).
   // Geteilte Logik mit /calendar/upcoming: expandiert wiederkehrende Serien,
@@ -602,7 +632,7 @@ router.get('/', (req, res) => {
     result.familyEvents = [];
   }
 
-  if (allows('calendar')) try {
+  if (!birthdaysLeftOut) try {
     // family_user_color: die Identitaetsfarbe des verknuepften Mitglieds. Das
     // Widget zeigt Familien-Geburtstage damit in derselben Farbsprache wie die
     // Familien-Kachel; Kontakte ohne Verknuepfung bleiben NULL und behalten im

@@ -13,6 +13,7 @@ import { formatWall, vtimezoneFor } from '../utils/vtimezone.js';
 import { outboundDateRange } from './outbound-dtstart.js';
 import { rruleLine } from './recurrence.js';
 import { icsSubscriptionVisibleWhere } from './visibility.js';
+import { birthdaysSwitchedOff, notBirthdayEventSql } from './household-modules.js';
 import {
   BODY_FREE_EVENT_COLUMNS, eventProjectionSql, resolveProjectedEventRows,
 } from './calendar-event-reader.js';
@@ -281,6 +282,15 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn))
               ORDER BY u.display_name
            )) AS assignee_names_json` : '';
 
+  // GEBURTSTAGE HAUSHALTSWEIT ABGESCHALTET (#1660): der Feed ist der Kalender
+  // des Haushalts in einem fremden Programm, und die Geburtstagstermine sind
+  // darin eine Einblendung aus einem anderen Modul. Wie in GET /calendar laufen
+  // sie nicht mit; nach dem Wiedereinschalten holt der naechste Abruf sie zurueck.
+  // Der Feed selbst bleibt auch bei abgeschaltetem Kalender erreichbar - er ist
+  // die eigene Ausgabe des Moduls, keine Mischstelle (docs/DECISIONS.md 11).
+  const withoutBirthdays = birthdaysSwitchedOff(conn) ? `
+    AND ${notBirthdayEventSql('e')}` : '';
+
   const queriedRows = conn.prepare(`
     SELECT ${eventProjectionSql(conn, 'e', BODY_FREE_EVENT_COLUMNS)}${assigneeSelect}
     FROM calendar_events e
@@ -288,7 +298,7 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn))
     AND (
       e.recurrence_rule IS NOT NULL
       OR DATE(e.start_datetime) >= ?
-    )
+    )${withoutBirthdays}
     ORDER BY e.start_datetime ASC
   `).all(userId, windowStart);
   const referencedMasterIds = new Set(queriedRows

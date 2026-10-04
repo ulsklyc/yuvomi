@@ -38,7 +38,7 @@
 
 import { hasAnyOccurrence, nextOccurrenceAfter, seriesStartFor } from './recurrence.js';
 import { loadEventExceptions } from './calendar-events.js';
-import { householdDisabledModules } from './household-modules.js';
+import { modulesLeftOut } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
@@ -248,7 +248,7 @@ export function getCountdowns(d, {
    * darf dieser Betrachter diese Zeile sehen? -, und deshalb landen sie in
    * einem Set und nicht in zwei nacheinander angewandten Filtern. Der
    * Unterschied wäre sonst wieder `total`: zwei Schnitte, zwei Wahrheiten. */
-  const hidden = new Set([...householdDisabledModules(d), ...(hiddenModules ?? [])]);
+  const hidden = modulesLeftOut(d, hiddenModules);
   const graceDays = overdueGraceDays(d);
   const items = [
     ...(hidden.has('calendar') ? [] : eventCountdowns(d, userId, todayKey, graceDays)),

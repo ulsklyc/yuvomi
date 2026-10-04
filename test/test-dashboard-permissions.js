@@ -57,6 +57,19 @@ function buildMigratedDatabase(migrations) {
   return database;
 }
 
+// DER HAUSHALT DIESER SUITE NUTZT JEDES MODUL. Die Migrationen schalten
+// Inventar, Schichtplan und Entsorgung ab Werk ab, und seit #1660 folgt die
+// Uebersicht dem Haushaltsschalter: ohne diese Zeile laege die Abfuhr von heute
+// gar nicht in der Antwort, und die Tests weiter unten haetten nichts, dessen
+// Verschwinden sie messen koennten. Der Schalter selbst hat unten eigene Tests.
+function setDisabledModules(modules) {
+  db.prepare(`
+    INSERT INTO sync_config (key, value) VALUES ('disabled_modules', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(JSON.stringify(modules));
+}
+setDisabledModules([]);
+
 // Lokaler Kalendertag wie in der Route (`todayLocalKey`), nicht der UTC-Tag:
 // westlich von UTC sind das zwei verschiedene Tage, und die Route vergleicht
 // Fälligkeiten gegen den lokalen.
@@ -617,5 +630,78 @@ test('Termin-Anhang auf dem Dashboard folgt dem Dokumentenrecht (#1358)', async 
     tokenScopes = null;
     clearModuleDenials(KID);
     db.prepare('UPDATE calendar_events SET attachment_document_id = NULL, attachment_name = NULL WHERE id = ?').run(eventId);
+  }
+});
+
+// --------------------------------------------------------------------------
+// Dritte Achse: der Haushaltsschalter (#1660, docs/DECISIONS.md 11).
+//
+// `disabled_modules` ist keine Sperre - die Routen eines Moduls bleiben offen -,
+// aber was die Uebersicht ungefragt mitliefert, folgt dem Schalter. Gemessen
+// wird ohne jede Rechte-Sperre (das Kind ohne Eintrag, der Admin mit Bypass):
+// was hier verschwindet, verschwindet allein wegen des Schalters.
+// --------------------------------------------------------------------------
+
+// Wie MODULE_PROBES, nur nach SCHALTERN geschnitten: `birthdays` ist dort ein
+// eigenes Modul und kein Teil des Kalenders.
+const SWITCH_PROBES = {
+  ...MODULE_PROBES,
+  calendar: (b) => b.upcomingEvents.length + b.familyEvents.length + b.weekEvents.length,
+  birthdays: (b) => b.birthdays.length + b.birthdayCount + b.birthdayTotal,
+};
+
+test('Schalter: jedes abgeschaltete Modul verschwindet aus der Uebersicht, und keins nimmt ein anderes mit', async () => {
+  // Als Mitglied OHNE jede Sperre: die Medikamente der Saat gehoeren dem Kind.
+  clearModuleDenials(KID);
+  try {
+    setDisabledModules([]);
+    const open = await dashboardAs(KID);
+    for (const [key, probe] of Object.entries(SWITCH_PROBES)) {
+      assert.ok(probe(open) > 0, `Vorbedingung: ${key} hat eingeschaltet etwas zu zeigen`);
+    }
+
+    for (const key of Object.keys(SWITCH_PROBES)) {
+      setDisabledModules([key]);
+      const body = await dashboardAs(KID);
+      assert.equal(SWITCH_PROBES[key](body), 0, `${key} abgeschaltet liefert nichts mehr`);
+      for (const other of Object.keys(SWITCH_PROBES)) {
+        if (other === key) continue;
+        assert.ok(SWITCH_PROBES[other](body) > 0, `${key} abzuschalten darf ${other} nicht mit leeren`);
+      }
+    }
+  } finally {
+    setDisabledModules([]);
+  }
+});
+
+test('Schalter: die Antwort behaelt ihre Form - jedes Feld bleibt, nur leer', async () => {
+  try {
+    setDisabledModules([]);
+    const open = await dashboardAs(PARENT);
+    setDisabledModules([...Object.keys(SWITCH_PROBES), 'recipes', 'inventory', 'contacts', 'documents']);
+    const off = await dashboardAs(PARENT);
+
+    assert.deepEqual(Object.keys(off).sort(), Object.keys(open).sort(), 'kein Schluessel faellt weg (/api/v1 ist zugesagt)');
+    const uebrig = belegtePfade(off).filter((p) => !NONEMPTY_ERLAUBT.has(p));
+    assert.deepEqual(uebrig, [], 'bei lauter abgeschalteten Modulen traegt kein modulgebundenes Feld mehr etwas');
+    assert.ok(off.users.length >= 2, 'die Mitgliederliste gehoert keinem Modul und bleibt');
+  } finally {
+    setDisabledModules([]);
+  }
+});
+
+test('Schalter und Rechte zusammen: der Countdown faellt ueber jede der beiden Achsen', async () => {
+  try {
+    clearModuleDenials(KID);
+    setDisabledModules(['calendar']);
+    denyModules(KID, ['tasks']);
+    const body = await dashboardAs(KID);
+    assert.equal(body.countdownTotal, 0, 'Termin-Countdown per Schalter weg, Aufgaben-Countdown per Recht');
+    assert.deepEqual(body.upcomingEvents, []);
+    assert.deepEqual(body.urgentTasks, []);
+    assert.equal(body.birthdays[0]?.name, 'Oma Erna', 'Geburtstage folgen ihrem eigenen Schalter, das Kalender-RECHT hat das Kind');
+  } finally {
+    clearModuleDenials(KID);
+    setDisabledModules([]);
   }
 });

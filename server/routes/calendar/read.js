@@ -18,6 +18,7 @@ import {
   VALID_SOURCES, ASSIGNED_USERS_SQL, getUserId, isAdminUser, serializeEvents,
 } from './helpers.js';
 import { todayKey } from '../../utils/timezone.js';
+import { birthdaysSwitchedOff, notBirthdayEventSql } from '../../services/household-modules.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
@@ -88,6 +89,14 @@ router.get('/', (req, res) => {
     sql += ` AND ${visibilityWhere('e', 'event_assignments', 'event_id')}`;
     params.push(getUserId(req), getUserId(req));
 
+    // GEBURTSTAGE HAUSHALTSWEIT ABGESCHALTET (#1660): ihre Termine sind eine
+    // Einblendung aus einem anderen Modul und laufen dann nicht mehr mit. Der
+    // Kalender selbst bleibt, wie er ist - abschalten ist keine Sperre, aber
+    // was eine Antwort ungefragt aus einem abgeschalteten Modul mitbringt,
+    // folgt dem Schalter (docs/DECISIONS.md 11). Der einzelne Termin bleibt
+    // ueber GET /:id erreichbar, und die Geburtstage ueber ihre eigenen Routen.
+    if (birthdaysSwitchedOff(db.get())) sql += ` AND ${notBirthdayEventSql('e')}`;
+
     if (req.query.assigned_to) {
       sql += ' AND EXISTS (SELECT 1 FROM event_assignments ea WHERE ea.event_id = e.id AND ea.user_id = ?)';
       params.push(parseInt(req.query.assigned_to, 10));
@@ -131,7 +140,10 @@ router.get('/upcoming', (req, res) => {
     const database = db.get();
     const expanded = serializeEvents(hydrateEventAttachmentBodies(
       database,
-      getUpcomingEvents(database, { userId: getUserId(req), limit }),
+      // Geburtstage abgeschaltet: wie in GET / laufen sie nicht mit (#1660).
+      getUpcomingEvents(database, {
+        userId: getUserId(req), limit, includeBirthdays: !birthdaysSwitchedOff(database),
+      }),
     ), {
       database,
       viewer: documentViewer(req),
@@ -170,7 +182,9 @@ router.get('/search', (req, res) => {
     const whereSql = `
       s.entity = 'event' AND s.search_index MATCH @match
       AND ${icsSubscriptionVisibleWhere('e', '@userId')}
-      AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}`;
+      AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}${
+        // Wie GET /: ohne Geburtstage, wenn der Haushalt sie abgeschaltet hat (#1660).
+        birthdaysSwitchedOff(db.get()) ? ` AND ${notBirthdayEventSql('e')}` : ''}`;
 
     const total = db.get().prepare(`
       SELECT COUNT(*) AS n

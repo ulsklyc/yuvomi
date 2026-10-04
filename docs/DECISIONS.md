@@ -715,3 +715,89 @@ A `mayWriteModule()` call for the module of a follow-on entry, which lets an act
 right its page never mentions. A transfer that asks only for its own path's right, which is #1290
 again. And a new route that writes into another module without deciding which of the two it is:
 the next reader of this entry should find the answer in the route's comment, not by guessing.
+
+---
+
+## 11. Switching a module off is not a lock
+
+**Switching a module off for the household (`disabled_modules`, Settings → Modules → Active
+modules) means the household does not use it. What the server does on its own, or hands over
+unasked, follows the switch. The module's own routes stay open, for sessions and API tokens
+alike.**
+
+Taking access away already has two instruments with their own gate and their own error wording:
+member permissions and token scopes (entry 2 names where they live). A second lock on the same
+path map would be that rule a third time, and the switch is the wrong carrier for it: it has
+neither a confirmation nor an undo, three modules ship switched off (`inventory`, `schedule`,
+`waste`), and `/api/v1` is a promised surface. A path gate would have turned a tidy-up click into
+a broken integration.
+
+The line was reached in three places before it was written down:
+
+- **Countdowns, #647 (review of #793).** The tile belongs to two modules, so its filter could not
+  sit in the browser like every other tile's: with the calendar off, the five nearest countdowns
+  were events, the browser dropped all five, and the flagged task behind them had never been
+  sent. `getCountdowns()` merged the household switch and the member's rights into one set.
+- **Reminders, #1279.** Only pantry, schedule and waste reminders respected the switch. Task,
+  calendar, subscription, inventory, document, cycle and birthday reminders kept arriving for a
+  module that was off, and tapping one opened a page that turned you away. Delivery and
+  `GET /reminders/pending` now skip them.
+- **Background jobs and mixed answers, #1660.** Measured against 2.72.0 with ten modules off:
+  every module route answered 200 and wrote, by session and by token, and that was left as it is.
+  What changed is the medication scheduler (it wrote doses and sent pushes with Health off), the
+  prevention sync, the hourly recipe provider sync, the overview, and the birthdays that travel in
+  the calendar, the overview and the calendar feed.
+
+### How to sort the next case
+
+1. **Did a person ask for exactly this module?** A request to the module's own path, a button
+   pressed on its page or in its settings ("Sync now"), its own export, its own ICS feed: open.
+   So is a follow-on entry of a person's action in another module (entry 10) - a completed task
+   still books its points with Rewards off.
+2. **Does the server start it by itself?** A timer, a periodic sync, a push, a notification on a
+   channel: it follows the switch. Sources a run recreates clear what is pending and bring it
+   back when the module is switched on again; anything a person set by hand is held back, never
+   deleted (#1279).
+3. **Does one answer carry several modules?** The overview, the global search, the reminder list,
+   another module's rows blended into the calendar: the part that belongs to a switched-off
+   module is left out. The field stays in the response with its empty value, so no `/api/v1`
+   consumer trips over a missing key.
+
+Two switches have no permission of their own: `birthdays` sits under the `calendar` right and
+`recipes` under `meals`. As rights they go with their parent, as switches they stand alone - a
+household with the calendar off and birthdays on keeps its birthday tile and its birthday
+reminders.
+
+Left open on purpose: the module routes, exports and the database backup, the OpenAPI document,
+each module's own ICS feed, and incoming calendar, reminder and contact sync.
+
+### Where the rule lives
+
+- `server/services/household-modules.js`: `householdDisabledModules()` is the one reading of the
+  stored value. `modulesLeftOut()` merges it with what `hiddenModulesFor()` in
+  `server/permissions.js` withholds from this caller, one set for a mixed answer.
+  `birthdaysSwitchedOff()` and `notBirthdayEventSql()` are for the birthday events that live in
+  `calendar_events`. Not in a middleware: the path of a mixed answer names none of the modules it
+  carries.
+- Mixed answers: `GET /dashboard` (`server/routes/dashboard.js`, the same empty forms as a denied
+  module), `getCountdowns()` in `server/services/countdowns.js`, the global search
+  (`server/routes/search.js`), `GET /reminders/pending`
+  (`withoutSwitchedOffModules()` in `server/services/reminder-origins.js`), and the birthday
+  events in `GET /calendar`, `/calendar/upcoming`, `/calendar/search`
+  (`server/routes/calendar/read.js`) and in `buildFeed()` (`server/services/ics-export.js`).
+- Background work: delivery in `server/services/notifications.js`, the reminder syncs for pantry,
+  schedule, waste, cycle, fasting, birthdays and prevention, the medication scheduler, the waste
+  URL sources and the hourly recipe provider sync.
+- The calendar's other layers (waste, schedule, cycle) are fetched by the page from each module's
+  own route and are left out there, in the browser; the server blends only the birthdays in.
+- `npm run test:disabled-module-reminders`, `npm run test:disabled-module-mixed-answers` and the
+  switch tests in `npm run test:dashboard-permissions` hold it, each with the other half: the
+  module's own route still answers.
+
+### What counts as undoing it
+
+A check of `disabled_modules` in the path guard of `server/index.js` or at the top of a module
+router, which makes the switch a lock and breaks tokens for a module that is merely off. A new
+timer, push or periodic sync that never asks the switch, which is #1279 again. A mixed answer
+that drops the key instead of emptying the value. And treating `hidden_modules` the same way:
+that one is a member tidying their own navigation and takes nothing away anywhere (#673).

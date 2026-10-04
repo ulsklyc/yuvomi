@@ -83,6 +83,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already shows. And where the app already knew the more precise reason, for example read-only
   access to a module, the error screen no longer replaces it with the general "You do not have
   permission to do that".
+- **A module switched off for the household is left out of the overview's data and of the
+  calendar** (#1660). The app already hid the tiles, but the server kept sending their content:
+  with tasks, budget or health switched off, the overview's answer still carried the tasks, the
+  month's figures and the medication - visible to anything that reads the API, a wall display or
+  a script included. It now sends those parts empty, in the same shape as before. With Birthdays
+  switched off, birthdays and name days no longer appear among the calendar's events, in the
+  event search, in the overview's event lists or in the calendar feed subscribed in another
+  app; they return when the module is switched back on. Switching the calendar off does not
+  take the birthday tile along. A module that is switched off is still not locked: its own
+  pages, API routes and exports answer as before, and what a member may not reach is decided by
+  permissions. The rule is written down in `docs/DECISIONS.md`, entry 11.
 
 ## [2.72.0] - 2026-10-04
 
