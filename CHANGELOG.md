@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A Norwegian browser or system that reports `no` or `nn` gets Norwegian instead of English.**
+  Norwegian Bokmål ships as `nb`, but many browsers and systems announce the general code `no`
+  (`no-NO`, `LANG=no_NO.UTF-8`), and that fell through to English. The same went for Nynorsk
+  (`nn`), which has no translation of its own: it now gets Bokmål, the closer language, rather
+  than English. This holds for the app, the web installer, the command-line installer and the
+  `lang` parameter of the API. An explicit language choice in the settings is not affected.
+
 - **Closing an event dialog on a wide screen no longer moves the address to the page you came
   from.** In the day, week and month views an event opens in a small card. Choosing "Edit" or
   "Delete" there closes the card and opens the next dialog a moment later - the form, or the

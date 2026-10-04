@@ -135,6 +135,14 @@ export function isSupportedLocale(locale) {
 }
 
 /**
+ * Sprachcodes, die eine vorhandene Locale meinen, aber anders heissen: `no` ist
+ * die Makrosprache Norwegisch, `nn` (Nynorsk) hat keine eigene Datei. Beide
+ * fallen auf `nb`. Das Gegenstueck heisst in public/i18n.js genauso; kein Import
+ * verbindet die beiden (Schichtgrenze), test:language-lists haelt sie gleich.
+ */
+const LANGUAGE_ALIAS = Object.freeze({ no: 'nb', nn: 'nb' });
+
+/**
  * Die spezifischste unterstuetzte Locale eines frei eingegebenen Sprach-Tags,
  * oder null. Fuer Werte, die von aussen kommen (`?lang=` der API): Gross- und
  * Kleinschreibung und `_` statt `-` werden in BCP-47-Form gebracht, dann faellt
@@ -158,10 +166,21 @@ export function supportedLocaleFor(tag) {
       ? teil[0].toUpperCase() + teil.slice(1).toLowerCase()
       : teil.toUpperCase();
   }
+  const sprache = teile[0];
+  const rest = teile.slice(1);
   while (teile.length) {
     const kandidat = teile.join('-');
     if (isSupportedLocale(kandidat)) return kandidat;
     teile.pop();
+  }
+  // Rueckfall ueber den Alias, erst nachdem der Tag selbst nichts fand.
+  if (Object.hasOwn(LANGUAGE_ALIAS, sprache)) {
+    const alias = [LANGUAGE_ALIAS[sprache], ...rest];
+    while (alias.length) {
+      const kandidat = alias.join('-');
+      if (isSupportedLocale(kandidat)) return kandidat;
+      alias.pop();
+    }
   }
   return null;
 }
