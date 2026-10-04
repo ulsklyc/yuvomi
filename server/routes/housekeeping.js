@@ -47,7 +47,10 @@ import {
 } from '../utils/timezone.js';
 import { addMonthsClamped } from '../utils/interval-date.js';
 import { recordLocalColorChoice } from '../services/legacy-color-snapshot.js';
-import { householdMonthOf as householdMonthOfIn, householdMonthRange as householdMonthRangeIn } from '../services/housekeeping-month.js';
+import {
+  householdMonthOf as householdMonthOfIn,
+  householdMonthWindow,
+} from '../services/housekeeping-month.js';
 
 const log = createLogger('Housekeeping');
 const router = express.Router();
@@ -95,7 +98,7 @@ function currentMonth() {
 }
 
 /**
- * Monat eines Besuchs und Monatsgrenzen in der Haushaltszone - die Regel steht
+ * Monat eines Besuchs in der Haushaltszone - die Regel steht
  * in services/housekeeping-month.js, weil die Uebersicht dieselbe Frage stellt
  * (#1451). Hier nur mit der Zone des Haushalts als Vorgabe.
  */
@@ -103,8 +106,18 @@ function householdMonthOf(value, tz = householdTimeZone(db.get())) {
   return householdMonthOfIn(value, tz);
 }
 
-function householdMonthRange(monthValue, tz = householdTimeZone(db.get())) {
-  return householdMonthRangeIn(monthValue, tz);
+/**
+ * Die Besuche EINES Haushaltsmonats lesen: `start`/`end` sind das SQL-Fenster
+ * mit Rand, `keep` siebt danach auf den Monat aus. Die genauen Grenzen als
+ * Textvergleich tragen nur die Instant-Form von `check_in` - eine zonenlose
+ * Zeile stand in den Monatslisten im Nachbarmonat, waehrend Monatsgrafik und
+ * Uebersicht sie richtig einordneten (services/housekeeping-month.js).
+ */
+function monthVisits(monthValue, tz = householdTimeZone(db.get())) {
+  return {
+    ...householdMonthWindow(monthValue, tz),
+    keep: (row) => householdMonthOfIn(row.check_in, tz) === monthValue,
+  };
 }
 
 /**
@@ -546,23 +559,21 @@ function loadWorkerById(workerId) {
 }
 
 function monthlySummary(monthValue = currentMonth()) {
-  const { start, end } = householdMonthRange(monthValue);
-  const row = db.get().prepare(`
-    SELECT
-      COUNT(*) AS session_count,
-      COALESCE(SUM(daily_rate), 0) AS daily_total,
-      COALESCE(SUM(extras), 0) AS extras_total,
-      COALESCE(SUM(daily_rate + extras), 0) AS total_amount
+  const { start, end, keep } = monthVisits(monthValue);
+  const rows = db.get().prepare(`
+    SELECT check_in, daily_rate, extras
     FROM housekeeping_work_sessions
     WHERE check_in >= ? AND check_in < ?
-  `).get(start, end);
+  `).all(start, end).filter(keep);
+  const dailyTotal = rows.reduce((sum, row) => sum + Number(row.daily_rate || 0), 0);
+  const extrasTotal = rows.reduce((sum, row) => sum + Number(row.extras || 0), 0);
 
   return {
     month: monthValue,
-    session_count: row.session_count,
-    daily_total: Number(row.daily_total || 0),
-    extras_total: Number(row.extras_total || 0),
-    total_amount: Number(row.total_amount || 0),
+    session_count: rows.length,
+    daily_total: dailyTotal,
+    extras_total: extrasTotal,
+    total_amount: dailyTotal + extrasTotal,
   };
 }
 
@@ -571,7 +582,7 @@ function housekeepingDashboard(receipts = MASKED_RECEIPTS, daySource = {}) {
   reconcilePaymentTasks();
   const tz = householdTimeZone(db.get());
   const monthValue = currentMonth();
-  const monthRange = householdMonthRange(monthValue, tz);
+  const monthWindow = monthVisits(monthValue, tz);
   const context = localDayContext(daySource);
   const workers = loadWorkers().map((row) => publicWorker(row, context, receipts));
   const worker = workers[0] ?? null;
@@ -582,17 +593,21 @@ function housekeepingDashboard(receipts = MASKED_RECEIPTS, daySource = {}) {
     LIMIT 1
   `).get();
   const payment = db.get().prepare(`
-    SELECT
-      COALESCE(SUM(CASE WHEN paid_at IS NULL THEN daily_rate + extras ELSE 0 END), 0) AS pending,
-      COALESCE(SUM(CASE WHEN paid_at IS NOT NULL THEN daily_rate + extras ELSE 0 END), 0) AS paid
+    SELECT check_in, daily_rate, extras, paid_at
     FROM housekeeping_work_sessions
     WHERE check_in >= ? AND check_in < ?
-  `).get(monthRange.start, monthRange.end);
+  `).all(monthWindow.start, monthWindow.end).filter(monthWindow.keep).reduce((acc, row) => {
+    acc[row.paid_at ? 'paid' : 'pending'] += Number(row.daily_rate || 0) + Number(row.extras || 0);
+    return acc;
+  }, { pending: 0, paid: 0 });
   const taskRows = db.get().prepare('SELECT * FROM housekeeping_decay_tasks').all();
   const tasks = taskRows.map((row) => publicDecayTask(row, tz));
   // Gruppiert wird in JS statt per `substr(check_in, 1, 7)`: der Monat eines
   // Besuchs ist der des Haushalts, und den kennt SQLite nicht.
-  const chartStart = householdMonthRange(addMonthsClamped(`${monthValue}-01`, -5).slice(0, 7), tz).start;
+  // Das Fenster hat einen Tag Rand (zonenlose Zeilen am Ersten), der Monat
+  // davor bleibt ueber `chartFirstMonth` draussen.
+  const chartFirstMonth = addMonthsClamped(`${monthValue}-01`, -5).slice(0, 7);
+  const chartStart = householdMonthWindow(chartFirstMonth, tz).start;
   const chartByMonth = new Map();
   for (const row of db.get().prepare(`
     SELECT check_in, daily_rate, extras, paid_at
@@ -600,7 +615,7 @@ function housekeepingDashboard(receipts = MASKED_RECEIPTS, daySource = {}) {
     WHERE check_in >= ?
   `).all(chartStart)) {
     const key = householdMonthOf(row.check_in, tz);
-    if (!key) continue;
+    if (!key || key < chartFirstMonth) continue;
     const bucket = chartByMonth.get(key) ?? { month: key, total: 0, pending: 0 };
     const amount = Number(row.daily_rate || 0) + Number(row.extras || 0);
     bucket.total += amount;
@@ -947,12 +962,12 @@ router.get('/work-sessions', (req, res) => {
     reconcilePaymentTasks();
     const vMonth = month(req.query.month, 'month');
     if (vMonth.error) return res.status(400).json({ error: vMonth.error, code: 400 });
-    const { start, end } = householdMonthRange(vMonth.value || currentMonth());
+    const { start, end, keep } = monthVisits(vMonth.value || currentMonth());
     const rows = db.get().prepare(`
       SELECT * FROM housekeeping_work_sessions
       WHERE check_in >= ? AND check_in < ?
       ORDER BY check_in DESC
-    `).all(start, end);
+    `).all(start, end).filter(keep);
     const receipts = receiptAccess(req).preload(rows);
     res.json({ data: rows.map((row) => publicSession(row, receipts)) });
   } catch (err) {
@@ -971,7 +986,7 @@ router.get('/visits', (req, res) => {
       : { value: null, error: null };
     if (vWorkerId.error) return res.status(400).json({ error: vWorkerId.error, code: 400 });
     const selectedMonth = vMonth.value || currentMonth();
-    const { start, end } = householdMonthRange(selectedMonth);
+    const { start, end, keep } = monthVisits(selectedMonth);
     const rows = db.get().prepare(`
       SELECT hws.*,
              hw.payment_schedule,
@@ -987,7 +1002,7 @@ router.get('/visits', (req, res) => {
       WHERE hws.check_in >= ? AND hws.check_in < ?
         AND (? IS NULL OR hws.worker_id = ?)
       ORDER BY hws.check_in DESC
-    `).all(start, end, vWorkerId.value, vWorkerId.value);
+    `).all(start, end, vWorkerId.value, vWorkerId.value).filter(keep);
     const receipts = receiptAccess(req).preload(rows);
     const visits = rows.map((row) => ({
       ...publicSession(row, receipts),

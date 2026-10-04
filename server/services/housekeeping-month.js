@@ -45,17 +45,17 @@ export function householdMonthRange(monthValue, tz) {
 }
 
 /**
- * Die ABGESCHLOSSENEN Besuche eines Haushaltsmonats: Anzahl und offener
- * Betrag (unbezahlt, Tagessatz plus Extras) - die Zahlen der Uebersicht.
+ * Das SQL-Fenster fuer einen Haushaltsmonat: seine Grenzen mit einem Tag Rand
+ * je Seite. Wer damit liest, MUSS danach mit `householdMonthOf` aussieben.
  *
- * Der Textvergleich allein traegt nur die Instant-Form: eine zonenlose Zeile
- * ('2026-09-30T23:30:00') sortiert als Text nach '2026-09-30T22:00:00.000Z'
- * und fiele in Berlin in den Oktober. SQL holt deshalb ein Fenster mit einem
- * Tag Rand je Seite, und entschieden wird Zeile fuer Zeile ueber
- * `householdMonthOf` - dieselbe Regel, nach der das Modul seinen Verlauf
- * gruppiert.
+ * Der Textvergleich gegen die genauen Grenzen traegt nur die Instant-Form:
+ * eine zonenlose Zeile ('2026-09-30T23:30:00') sortiert als Text nach
+ * '2026-09-30T22:00:00.000Z' und fiele in Berlin in den Oktober, westlich von
+ * UTC eine vom Ersten frueh in den Vormonat. Der Rand holt beide herein, und
+ * entschieden wird Zeile fuer Zeile - dieselbe Regel, nach der das Modul seine
+ * Monatsgrafik gruppiert.
  */
-export function finishedVisitsInMonth(database, monthValue, tz) {
+export function householdMonthWindow(monthValue, tz) {
   const { start, end } = householdMonthRange(monthValue, tz);
   const widen = (iso, days) => {
     const ms = Date.parse(iso);
@@ -63,11 +63,20 @@ export function finishedVisitsInMonth(database, monthValue, tz) {
     // Jenseits von 9999 schreibt toISOString '+010000-…' - als Text kleiner als jedes Datum.
     return /^\d{4}-/.test(shifted) ? shifted : iso;
   };
+  return { start: widen(start, -1), end: widen(end, 1) };
+}
+
+/**
+ * Die ABGESCHLOSSENEN Besuche eines Haushaltsmonats: Anzahl und offener
+ * Betrag (unbezahlt, Tagessatz plus Extras) - die Zahlen der Uebersicht.
+ */
+export function finishedVisitsInMonth(database, monthValue, tz) {
+  const window = householdMonthWindow(monthValue, tz);
   const rows = database.prepare(`
     SELECT check_in, daily_rate, extras, paid_at
     FROM housekeeping_work_sessions
     WHERE check_out IS NOT NULL AND check_in >= ? AND check_in < ?
-  `).all(widen(start, -1), widen(end, 1))
+  `).all(window.start, window.end)
     .filter((row) => householdMonthOf(row.check_in, tz) === monthValue);
   return {
     visits: rows.length,

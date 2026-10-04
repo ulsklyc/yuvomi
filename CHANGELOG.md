@@ -335,6 +335,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or nothing is, for household, personal and admin-only fields alike; status and error text of
   the answer are unchanged. The app sends these fields one at a time, so this only showed
   through the API.
+- **Housekeeping: a visit stored without a time zone stays in its own month.** Yuvomi itself
+  stores a check-in as a point in time, but a row written into the database by hand can carry a
+  plain wall-clock time such as `2026-09-30T23:30:00`. The month lists of the module (visits,
+  work sessions, monthly summary, pending and paid amounts) compared such a row as text against
+  the month's UTC bounds: east of UTC a visit late on the last day of a month appeared in the
+  next month, west of UTC one early on the first day appeared in the previous month or dropped
+  out of the six-month chart, while the chart and the overview tile already counted it in the
+  household's month. All of them now read the month from the household's clock. Stored values
+  are not rewritten.
 
 ## [2.71.0] - 2026-09-30
 

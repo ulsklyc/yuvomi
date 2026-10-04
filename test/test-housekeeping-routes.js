@@ -1090,6 +1090,99 @@ test('Monatsgrenze: eine am Monatsersten frueh erledigte Aufgabe zaehlt im neuen
   }
 });
 
+// Zonenlose Wanduhrzeit (`2024-09-30T23:30:00`) schreibt kein Codepfad, aber
+// `householdMonthOf` liest sie mit - Monatsgrafik und Uebersicht (#1451) ordnen
+// eine von Hand eingespielte Zeile deshalb nach der Uhr des Haushalts ein. Die
+// Monatslisten des Moduls verglichen dagegen nur als Text gegen die
+// UTC-Monatsgrenzen: '…T23:30:00' sortiert nach '…T22:00:00.000Z', der Besuch
+// vom 30.09. abends stand im Oktober - und in der Grafik derselben Seite im
+// September. Der Prozess laeuft bewusst in einer dritten Zone.
+async function withZonelessVisit({ zone, checkIn, now }, fn) {
+  const prevTz = process.env.TZ;
+  process.env.TZ = 'Asia/Tokyo';
+  setHouseholdZone(zone);
+  const visitId = insertVisitAt(checkIn);
+  try {
+    return await atClock(now, () => fn(visitId));
+  } finally {
+    db.prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(visitId);
+    setHouseholdZone(null);
+    if (prevTz === undefined) delete process.env.TZ;
+    else process.env.TZ = prevTz;
+  }
+}
+
+async function monthViews(monthValue) {
+  const visits = (await call('GET', `/visits?month=${monthValue}`, { as: ADM })).body.data;
+  const sessions = (await call('GET', `/work-sessions?month=${monthValue}`, { as: ADM })).body.data;
+  const summary = (await call('GET', `/summary?month=${monthValue}`, { as: ADM })).body.data.summary;
+  return {
+    visits: visits.visits.map((v) => v.id),
+    total: visits.totals.total,
+    sessions: sessions.map((v) => v.id),
+    count: summary.session_count,
+    amount: summary.total_amount,
+  };
+}
+
+test('Monatsgrenze: ein zonenloser Besuch am Letzten abends bleibt in seinem Monat (oestlich von UTC)', () => withZonelessVisit(
+  // 15.09.2024 12:00 in Berlin: der laufende Monat ist der September.
+  { zone: 'Europe/Berlin', checkIn: '2024-09-30T23:30:00', now: '2024-09-15T10:00:00.000Z' },
+  async (visitId) => {
+    assert.deepEqual(await monthViews('2024-09'),
+      { visits: [visitId], total: 55, sessions: [visitId], count: 1, amount: 55 },
+      'der Besuch vom 30.09. 23:30 steht im September');
+    assert.deepEqual(await monthViews('2024-10'),
+      { visits: [], total: 0, sessions: [], count: 0, amount: 0 },
+      'und nicht im Oktober');
+
+    const dashboard = (await call('GET', '/dashboard', { as: ADM })).body.data;
+    assert.equal(dashboard.visits_this_month, 1, 'die Kachel zaehlt ihn im laufenden September');
+    assert.equal(dashboard.pending_payments, 55, 'und fuehrt seinen Betrag als offen');
+    assert.equal(dashboard.monthly_payments.find((row) => row.month === '2024-09')?.total, 55,
+      'Vorbedingung: die Monatsgrafik bucht ihn laengst auf den September');
+  },
+));
+
+test('Monatsgrenze: ein zonenloser Besuch am Ersten frueh bleibt in seinem Monat (westlich von UTC)', () => withZonelessVisit(
+  // 15.10.2024 12:00 in Los Angeles. Der Oktober beginnt dort um 07:00 UTC -
+  // als Text liegt '2024-10-01T00:30:00' davor.
+  { zone: 'America/Los_Angeles', checkIn: '2024-10-01T00:30:00', now: '2024-10-15T19:00:00.000Z' },
+  async (visitId) => {
+    assert.deepEqual(await monthViews('2024-10'),
+      { visits: [visitId], total: 55, sessions: [visitId], count: 1, amount: 55 },
+      'der Besuch vom 01.10. 00:30 steht im Oktober');
+    assert.deepEqual(await monthViews('2024-09'),
+      { visits: [], total: 0, sessions: [], count: 0, amount: 0 },
+      'und nicht im September');
+
+    const dashboard = (await call('GET', '/dashboard', { as: ADM })).body.data;
+    assert.equal(dashboard.visits_this_month, 1);
+    assert.equal(dashboard.pending_payments, 55);
+    assert.equal(dashboard.monthly_payments.find((row) => row.month === '2024-10')?.total, 55,
+      'Vorbedingung: die Monatsgrafik bucht ihn laengst auf den Oktober');
+  },
+));
+
+test('Monatsgrenze: die Monatsgrafik behaelt einen zonenlosen Besuch am Ersten ihres aeltesten Monats', () => withZonelessVisit(
+  // Die Grafik reicht fuenf Monate zurueck: im Oktober bis zum Mai, und der
+  // beginnt in Los Angeles um 07:00 UTC.
+  { zone: 'America/Los_Angeles', checkIn: '2024-05-01T00:30:00', now: '2024-10-15T19:00:00.000Z' },
+  async () => {
+    // 30.04. 22:00 in Los Angeles: liegt im Rand des Fensters, gehoert aber
+    // in den April und damit nicht mehr in die Grafik.
+    const aprilId = insertVisitAt('2024-05-01T05:00:00.000Z');
+    try {
+      const dashboard = (await call('GET', '/dashboard', { as: ADM })).body.data;
+      assert.equal(dashboard.monthly_payments.find((row) => row.month === '2024-05')?.total, 55);
+      assert.equal(dashboard.monthly_payments.some((row) => row.month < '2024-05'), false,
+        'der Rand des Fensters bringt keinen aelteren Monat in die Grafik');
+    } finally {
+      db.prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(aprilId);
+    }
+  },
+));
+
 // --------------------------------------------------------------------------
 // Beleg eines Besuchs: Name UND Verknuepfung folgen dem Dokumentenrecht (#1358)
 // --------------------------------------------------------------------------
