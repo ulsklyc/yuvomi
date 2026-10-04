@@ -516,3 +516,62 @@ test('sync(): ein unveraenderter Lauf laesst eine bestaetigte Zuordnung in Ruhe'
     'die Zutat heisst noch so, also gilt die Bestaetigung weiter',
   );
 });
+
+// --------------------------------------------------------
+// Rezepte haushaltsweit abgeschaltet (#1660)
+// --------------------------------------------------------
+function setDisabledModules(modules) {
+  conn.prepare(`
+    INSERT INTO sync_config (key, value) VALUES ('disabled_modules', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(JSON.stringify(modules));
+}
+
+function countingAdapter(calls) {
+  const inner = fakeAdapter(
+    [{ id: 'uuid-stew', ref: 'stew', updatedAt: '2026-01-01T00:00:00Z' }],
+    { stew: { id: 'uuid-stew', updatedAt: '2026-01-01T00:00:00Z', slug: 'stew', title: 'Stew', notes: null, hasImage: false, ingredients: [] } },
+  );
+  return (account) => {
+    const adapter = inner(account);
+    return {
+      ...adapter,
+      testConnection: async (...args) => { calls.push('testConnection'); return adapter.testConnection(...args); },
+      listRecipeSummaries: async (...args) => { calls.push('listRecipeSummaries'); return adapter.listRecipeSummaries(...args); },
+    };
+  };
+}
+
+test('sync(): Rezepte abgeschaltet → der Stundenlauf fragt den Anbieter nicht und schreibt nichts, nach dem Einschalten schon', async () => {
+  const accountId = newAccount('Abgeschaltet');
+  const calls = [];
+  _setAdapterFactory(countingAdapter(calls));
+
+  try {
+    setDisabledModules(['recipes']);
+    const skipped = await sync.sync();
+    assert.deepEqual(calls, [], 'kein Abruf beim Anbieter');
+    assert.equal(skipped.imported, 0);
+    assert.equal(mirroredRecipes(accountId).length, 0);
+    const account = conn.prepare('SELECT last_sync FROM recipe_provider_accounts WHERE id = ?').get(accountId);
+    assert.equal(account.last_sync, null, 'ein uebersprungener Lauf gilt nicht als Sync');
+  } finally {
+    setDisabledModules([]);
+  }
+
+  const result = await sync.sync();
+  assert.equal(result.imported, 1);
+  assert.equal(mirroredRecipes(accountId).length, 1);
+});
+
+test('syncOne(): "Sync now" bleibt bei abgeschaltetem Modul offen - die Handlung einer Person', async () => {
+  const accountId = newAccount('Handlung');
+  _setAdapterFactory(countingAdapter([]));
+  try {
+    setDisabledModules(['recipes']);
+    const result = await sync.syncOne(accountId);
+    assert.equal(result.imported, 1);
+  } finally {
+    setDisabledModules([]);
+  }
+});

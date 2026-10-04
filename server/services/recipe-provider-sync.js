@@ -13,12 +13,13 @@
  *        abgelaufener Token oder eine leere Antwort dürfen den lokalen Spiegel nie
  *        leeren (gleicher Leer-Guard wie calendar-prune.js für CalDAV/Apple).
  *
- * Dependencies: server/db.js, ./recipe-providers/index.js
+ * Dependencies: server/db.js, ./recipe-providers/index.js, ./household-modules.js
  */
 import { runExternalJob } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { getAdapter } from './recipe-providers/index.js';
+import { householdDisabledModules } from './household-modules.js';
 import { withPrivateNetworkHint } from './recipe-providers/private-network.js';
 import { ingredientMatchKey } from '../../public/utils/ingredient-match-key.js';
 
@@ -218,6 +219,18 @@ export function sync() {
 }
 
 async function syncUntracked() {
+  // REZEPTE HAUSHALTSWEIT ABGESCHALTET: DER STUNDENLAUF HOLT NICHTS (#1660).
+  // Gleiche Regel wie die URL-Quellen der Entsorgung (waste-source-scheduler.js):
+  // ein Haushalt, der das Modul nicht nutzt, soll nicht im Hintergrund bei
+  // Mealie oder Tandoor abfragen und Rezepte anlegen, aendern und loeschen.
+  // Nur dieser Lauf - `syncOne()` ("Sync now" in den Einstellungen) ist die
+  // Handlung einer Person und bleibt offen wie die Modul-Routen. Der Spiegel
+  // bleibt stehen, der erste Lauf nach dem Wiedereinschalten zieht ihn nach.
+  if (householdDisabledModules(db.get()).has('recipes')) {
+    log.debug('Recipes are switched off for the household - scheduled provider sync skipped.');
+    return { success: true, syncedAccounts: 0, imported: 0, updated: 0, deleted: 0 };
+  }
+
   const accounts = getEnabledAccounts();
   if (accounts.length === 0) {
     log.debug('No enabled recipe provider accounts configured.');

@@ -73,6 +73,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Inside the running app the same link already led to the overview. It now does so on a fresh
   start as well, for members and for guests of a shared-expense group, and the module's address
   is not kept in the history.
+- **A module switched off for the household no longer works in the background** (#1660). With
+  Health switched off, the medication scheduler kept creating the due doses and sending their
+  reminders - as a push and on notification channels, to the person and to their caregivers - and
+  tapping one opened a page that turned you away. It now does nothing while Health is off. After
+  switching Health back on, only today's doses that are already due come up, at most one reminder
+  per time of day; the days in between are not caught up. Two quieter cases follow the same rule:
+  check-up and vaccination reminders are no longer prepared while Health is off (they were held
+  back from delivery already, and come back on the first run after switching it on), and the
+  hourly import from a recipe provider (Mealie, Tandoor) pauses while Recipes is off. "Sync now"
+  in the settings still works, and the module's own pages and API stay reachable as before.
 
 ## [2.72.0] - 2026-10-04
 
