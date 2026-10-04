@@ -58,7 +58,6 @@
         "undo": "元に戻す",
         "reset": "元に戻す",
         "errorOffline": "インターネット接続がありません。ネットワークを確認してください。",
-        "errorForbidden": "アクセスが拒否されました。再度サインインしてください。",
         "errorModuleNoAccess": "このモジュールへのアクセス権がありません。",
         "errorNoPermission": "この操作を行う権限がありません。",
         "unknownAddress": "このアドレスは存在しません。代わりに最も近いページを表示しています。",

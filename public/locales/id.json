@@ -58,7 +58,6 @@
         "undo": "Urungkan",
         "reset": "Kembalikan ke asli",
         "errorOffline": "Tidak ada koneksi internet. Harap periksa jaringan Anda.",
-        "errorForbidden": "Akses ditolak. Harap masuk kembali.",
         "errorModuleNoAccess": "Anda tidak memiliki akses ke modul ini.",
         "errorNoPermission": "Anda tidak memiliki izin untuk melakukan itu.",
         "unknownAddress": "Alamat ini tidak ada. Sebagai gantinya, halaman terdekat ditampilkan.",

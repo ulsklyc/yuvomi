@@ -58,7 +58,6 @@
         "undo": "Hoàn tác",
         "reset": "Đặt lại về ban đầu",
         "errorOffline": "Không có kết nối mạng. Vui lòng kiểm tra mạng của bạn.",
-        "errorForbidden": "Từ chối truy cập. Vui lòng đăng nhập lại.",
         "errorModuleNoAccess": "Bạn không có quyền truy cập mô-đun này.",
         "errorNoPermission": "Bạn không có quyền thực hiện thao tác này.",
         "unknownAddress": "Địa chỉ này không tồn tại. Thay vào đó, trang gần nhất được hiển thị.",

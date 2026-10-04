@@ -58,7 +58,6 @@
         "undo": "실행 취소",
         "reset": "원본으로 되돌리기",
         "errorOffline": "인터넷 연결이 없습니다. 네트워크를 확인해 주세요.",
-        "errorForbidden": "접근이 거부되었습니다. 다시 로그인해 주세요.",
         "errorModuleNoAccess": "이 모듈에 접근할 권한이 없습니다.",
         "errorNoPermission": "이 작업을 수행할 권한이 없습니다.",
         "unknownAddress": "존재하지 않는 주소입니다. 대신 가장 가까운 페이지를 표시합니다.",

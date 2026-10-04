@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A wrong address below the pairing or invitation page no longer ends on the sign-in page**
+  (#1640). Opening something like `/pair/extra` or `/join/extra` without being signed in led to
+  the sign-in page, because the app fell back to the overview, which needs a session. It now
+  goes to the page above it, `/pair` or `/join`, as it already did for someone who is signed in.
+  A wrong address below a page that needs a session still leads to the sign-in page first.
+- **Guests of a shared-expense group are no longer stuck behind the back button** (#1640). A
+  guest only sees the budget, so every other address sends them there. That hand-over kept the
+  address they came from in the history and put the budget on top of it, so the back button led
+  straight into the same hand-over again. The address is now replaced. While the budget was still
+  loading, a second tap could also start a second page change next to the first; it now waits.
+  And when a guest opened an address that does not exist, the short message about it was lost on
+  a fresh start, because it came before the page that shows it; it now appears.
+- **"Access denied. Please sign in again." is gone** (#1640). An error screen or message for a
+  refused request used this second sentence, which advised signing in again although the session
+  was fine. It now says "You do not have permission to do that", the same sentence as everywhere
+  else, in all 26 languages.
+
 ## [2.72.0] - 2026-10-04
 
 ### Added

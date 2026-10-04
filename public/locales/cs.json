@@ -59,7 +59,6 @@
         "undo": "Zpět",
         "reset": "Obnovit původní",
         "errorOffline": "Žádné připojení k internetu. Zkontrolujte prosím síť.",
-        "errorForbidden": "Přístup odepřen. Přihlaste se prosím znovu.",
         "errorModuleNoAccess": "K tomuto modulu nemáte přístup.",
         "errorNoPermission": "K tomu nemáte oprávnění.",
         "unknownAddress": "Tato adresa neexistuje. Místo ní vidíte nejbližší stránku.",

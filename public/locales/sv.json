@@ -58,7 +58,6 @@
         "undo": "Ångra",
         "reset": "Återställ till original",
         "errorOffline": "Ingen internetanslutning. Kontrollera ditt nätverk.",
-        "errorForbidden": "Åtkomst nekad. Logga in igen.",
         "errorModuleNoAccess": "Du har inte åtkomst till denna modul.",
         "errorNoPermission": "Du har inte behörighet att göra detta.",
         "unknownAddress": "Den här adressen finns inte. Du ser den närmaste sidan i stället.",

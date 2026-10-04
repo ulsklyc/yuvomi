@@ -8,14 +8,17 @@
  *
  * router.js ist browser-gekoppelt und nicht importierbar. Die Entscheidung und
  * ihre Wirkung stehen deshalb in `public/utils/unknown-route.js` und laufen
- * hier als Programm; dass `navigate()` sie an der richtigen Stelle ruft, haelt
- * der Verdrahtungsteil am Quelltext.
+ * hier als Programm. Seit #1640 laeuft auch `navigate()` selbst: der Helfer
+ * test/router-navigate-harness.js fuehrt den echten Text der Funktion aus, und
+ * der Teil "navigate() als Programm" misst, wo eine Navigation ENDET. Der
+ * aeltere Verdrahtungsteil am Quelltext bleibt daneben stehen.
  *
  * Ausfuehren: node --test test/test-unknown-route.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createNavigateHarness, HARNESS_ROUTES } from './router-navigate-harness.js';
 
 const load = () => import('../public/utils/unknown-route.js');
 const routerSrc = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
@@ -131,6 +134,43 @@ test('kein Pfad, kein Urteil', async () => {
   for (const path of [undefined, null, '', 'tasks', 42, {}]) {
     assert.equal(unknownPathDetour(path, { known: KNOWN }), null, String(path));
   }
+});
+
+// ─── Ohne Sitzung: nur oeffentliche Vorfahren (#1640) ───────────────────────
+
+const OPEN = ['/login', '/setup', '/pair'];
+const OPEN_LANDABLE = ['/pair'];
+
+test('ohne Sitzung fuehrt ein unbekannter Pfad unter einer oeffentlichen Seite auf sie', async () => {
+  const { publicPathDetour } = await load();
+  const routes = { known: KNOWN, open: OPEN, landable: OPEN_LANDABLE };
+  assert.deepEqual(publicPathDetour('/pair/extra', routes), { target: '/pair', notify: true });
+  assert.deepEqual(publicPathDetour('/pair/a/b?code=1#x', routes), { target: '/pair', notify: true });
+  // Nur ein Schraegstrich zu viel: dieselbe Seite, kein Hinweis - auch die Anmeldung.
+  assert.deepEqual(publicPathDetour('/pair/', routes), { target: '/pair', notify: false });
+  assert.deepEqual(publicPathDetour('/login/', routes), { target: '/login', notify: false });
+  // Eine bekannte Adresse braucht keinen Umweg.
+  assert.equal(publicPathDetour('/pair', routes), null);
+});
+
+test('ohne Sitzung bleibt alles andere unbeurteilt, bis die Anmeldung steht', async () => {
+  const { publicPathDetour } = await load();
+  const routes = { known: KNOWN, open: OPEN, landable: OPEN_LANDABLE };
+  // Der Vorfahr verlangt eine Sitzung: erst hinter dem Auth-Guard.
+  assert.equal(publicPathDetour('/settings/xyz', routes), null);
+  assert.equal(publicPathDetour('/settings/', routes), null);
+  // Kein bekannter Vorfahr: die Uebersicht verlangt eine Sitzung.
+  assert.equal(publicPathDetour('/xyz', routes), null);
+  // Anmeldung und Einrichtung sind kein Landeplatz - der Pfad bleibt offen.
+  assert.equal(publicPathDetour('/login/extra', routes), null);
+  assert.equal(publicPathDetour('/setup/extra', routes), null);
+  // Erweiterungsrouten kommen erst mit der Anmeldung.
+  const withoutModules = KNOWN.filter((path) => !path.startsWith('/m/'));
+  assert.equal(publicPathDetour('/m/garden/beds', { known: withoutModules, open: OPEN, landable: OPEN_LANDABLE }), null);
+  // Was der Server beantwortet, bleibt unberuehrt wie mit Sitzung.
+  assert.equal(publicPathDetour('/api/v1/tasks', routes), null);
+  // Ein Landeplatz, der nicht oeffentlich ist, zaehlt nicht.
+  assert.equal(publicPathDetour('/tasks/42', { known: KNOWN, open: OPEN, landable: KNOWN }), null);
 });
 
 // ─── Adresse und Pfad nach dem Umweg ────────────────────────────────────────
@@ -253,19 +293,133 @@ test('die Adresse des Umwegs: ersetzt bei Kaltstart/Zurueck, sonst als neuer Ein
   assert.equal(count(body, "'', detourAddress ?? path)"), 2, 'pushState und Overlay-replaceState nehmen die berichtigte Adresse');
 });
 
-test('bekannt ist, was allRoutes() kennt; Landeplatz ist alles ausser Anmeldung, Einrichtung und gesperrten Modulen', () => {
+test('unknownDetourFor() liest allRoutes() und hat genau einen Aufrufer je Entscheidung', () => {
   const start = routerSrc.indexOf('function unknownDetourFor(');
   assert.ok(start > 0, 'unknownDetourFor nicht gefunden');
   const fn = routerSrc.slice(start, routerSrc.indexOf('\n}\n', start));
   assert.match(fn, /allRoutes\(\)/, 'bekannt ist, was allRoutes() kennt - samt Erweiterungsrouten');
-  assert.match(fn, /_disabledModules\.has\(/, 'ein abgeschaltetes Modul ist kein Landeplatz');
-  assert.match(fn, /canAccessNavModule\(/, 'ein gesperrtes Modul ist kein Landeplatz');
-  // Oeffentliche Routen (`/pair`, `/join`) bleiben Landeplatz (Review #1638);
-  // nur die zwei, von denen eine angemeldete Sitzung sofort wieder wegfuehrt, nicht.
-  assert.doesNotMatch(fn, /requiresAuth/, 'oeffentliche Routen sind wieder ausgeschlossen');
-  assert.match(fn, /'\/login'/);
-  assert.match(fn, /'\/setup'/);
   assert.equal(count(routerSrc, 'unknownPathDetour('), 1, 'genau ein Aufrufer');
+  assert.equal(count(routerSrc, 'publicPathDetour('), 1, 'genau ein Aufrufer');
+});
+
+// ─── navigate() als Programm (#1640) ────────────────────────────────────────
+// Der echte Text von navigate() in der Umgebung aus router-navigate-harness.js.
+// Gemessen wird, was aussen ankommt: welche Seite gezeichnet wird, was in der
+// History steht, ob der Hinweis eine Flaeche fand.
+
+const MEMBER = { id: 1, access_scope: 'full' };
+const GUEST = { id: 2, access_scope: 'split_guest' };
+const settle = () => new Promise((resolve) => { setTimeout(resolve, 10); });
+
+test('die Routen des Helfers tragen dieselbe Anmeldepflicht wie die Tabelle des Routers', () => {
+  const tableStart = routerSrc.indexOf('const ROUTES = [');
+  const tableEnd = routerSrc.indexOf('ROUTES.push(...SETTINGS_ROUTES);');
+  assert.ok(tableStart > 0 && tableEnd > tableStart, 'Routentabelle nicht gefunden');
+  const real = new Map(
+    [...routerSrc.slice(tableStart, tableEnd).matchAll(/\{ path: '([^']+)',[^}]*?requiresAuth: (true|false)/g)]
+      .map((m) => [m[1], m[2] === 'true']),
+  );
+  for (const path of ['/login', '/setup', '/join', '/pair', '/', '/tasks', '/budget']) {
+    const fixture = HARNESS_ROUTES.find((route) => route.path === path);
+    assert.equal(real.get(path), fixture.requiresAuth, path);
+  }
+});
+
+test('ohne Sitzung: /pair/extra endet auf /pair, nicht auf der Anmeldung (#1640)', async () => {
+  for (const [dead, landing] of [['/pair/extra', '/pair'], ['/join/extra', '/join'], ['/pair/a/b', '/pair']]) {
+    const { navigate, log, env } = createNavigateHarness();
+    await navigate(dead, false);
+    await settle();
+    assert.deepEqual(log.rendered, [landing], dead);
+    // Kaltstart: die tote Adresse ist der laufende Eintrag und wird ersetzt.
+    assert.deepEqual(log.history, [['replace', landing]], dead);
+    assert.equal(log.authCalls, 0, 'eine oeffentliche Seite fragt nicht nach der Sitzung');
+    assert.equal(env.isNavigating, false);
+  }
+});
+
+test('ohne Sitzung: ein unbekannter Pfad unter einer geschuetzten Seite endet weiter auf der Anmeldung', async () => {
+  for (const dead of ['/settings/xyz', '/xyz', '/login/extra', '/m/garden/beds']) {
+    const { navigate, log } = createNavigateHarness();
+    await navigate(dead, false);
+    await settle();
+    assert.deepEqual(log.rendered, ['/login'], dead);
+    assert.equal(log.toasts.length, 0, dead);
+  }
+});
+
+test('Kaltstart mit Sitzung: der Umweg faellt erst hinter dem Auth-Guard', async () => {
+  const { navigate, log } = createNavigateHarness({ sessionUser: MEMBER });
+  await navigate('/settings/xyz', false);
+  assert.deepEqual(log.rendered, ['/settings']);
+  assert.deepEqual(log.history, [['replace', '/settings']]);
+  assert.deepEqual(log.toasts, [{ message: 'common.unknownAddress', shown: true }]);
+  // Auch hier fuehrt der oeffentliche Vorfahr direkt ans Ziel.
+  const open = createNavigateHarness({ sessionUser: MEMBER });
+  await open.navigate('/pair/extra', false);
+  assert.deepEqual(open.log.rendered, ['/pair']);
+});
+
+test('laufende Sitzung: oeffentliche Seiten bleiben Landeplatz, Anmeldung und gesperrte Module nicht', async () => {
+  const open = createNavigateHarness({ user: MEMBER });
+  await open.navigate('/pair/extra');
+  assert.deepEqual(open.log.rendered, ['/pair']);
+  assert.deepEqual(open.log.history, [['push', '/pair']]);
+
+  const login = createNavigateHarness({ user: MEMBER });
+  await login.navigate('/login/extra');
+  assert.deepEqual(login.log.rendered, ['/']);
+
+  const locked = createNavigateHarness({ user: MEMBER, canAccess: (module) => module !== 'budget' });
+  await locked.navigate('/budget/xyz');
+  assert.deepEqual(locked.log.rendered, ['/']);
+
+  const disabled = createNavigateHarness({ user: MEMBER, disabledModules: ['tasks'] });
+  await disabled.navigate('/tasks/42');
+  assert.deepEqual(disabled.log.rendered, ['/']);
+});
+
+test('laufende Sitzung: eine Sperre bis zum Ende, der Verlassen-Schutz fragt einmal nach dem Ziel', async () => {
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  const { navigate, log, env, setShell } = createNavigateHarness({
+    user: MEMBER,
+    leaveGuard: async () => true,
+    onRender: () => held,
+  });
+  setShell(true);
+  const running = navigate('/settings/xyz');
+  await settle();
+  assert.equal(env.isNavigating, true, 'die Sperre haelt, solange das Ziel laedt');
+  await navigate('/tasks');
+  assert.deepEqual(log.rendered, [], 'ein zweiter Klick startet keine zweite Navigation');
+  release();
+  await running;
+  assert.deepEqual(log.rendered, ['/settings']);
+  assert.deepEqual(log.leaveAsked, ['/settings']);
+  assert.deepEqual(log.history, [['push', '/settings']]);
+  assert.deepEqual(log.toasts, [{ message: 'common.unknownAddress', shown: true }]);
+});
+
+test('laufende Sitzung: bricht der Verlassen-Schutz ab, bleibt alles, wie es war', async () => {
+  const { navigate, log, env } = createNavigateHarness({ user: MEMBER, leaveGuard: async () => false });
+  await navigate('/settings/xyz');
+  assert.deepEqual(log.rendered, []);
+  assert.deepEqual(log.history, []);
+  assert.deepEqual(log.toasts, []);
+  assert.equal(env.isNavigating, false);
+});
+
+test('Kaltstart als Gast: der Hinweis erscheint erst, wenn die Flaeche steht (#1640)', async () => {
+  // `/settings/xyz` fuehrt auf `/settings`, die Gast-Weiche weiter auf `/budget`.
+  // Lief die Weiche ueber ein zweites navigate(), kam der Hinweis vor dessen
+  // Rendern - ohne Shell gibt es keine Toast-Flaeche, und er ging verloren.
+  const { navigate, log } = createNavigateHarness({ sessionUser: GUEST });
+  await navigate('/settings/xyz', false);
+  await settle();
+  assert.deepEqual(log.rendered, ['/budget']);
+  assert.deepEqual(log.toasts, [{ message: 'common.unknownAddress', shown: true }]);
+  assert.deepEqual(log.history.at(-1), ['replace', '/budget']);
 });
 
 // ─── Kein Weg der App fuehrt selbst auf eine unbekannte Adresse ─────────────
