@@ -42,7 +42,6 @@ import {
   localToUTCPrecise,
   shiftDateKey,
   storedToInstantMs,
-  storedToInstantMsPrecise,
   todayKey,
   utcDateKey,
   utcToWall,
@@ -51,6 +50,7 @@ import { addMonthsClamped } from '../utils/interval-date.js';
 import { recordLocalColorChoice } from '../services/legacy-color-snapshot.js';
 import {
   byCheckInDesc,
+  checkInInstantMs,
   householdMonthOf as householdMonthOfIn,
   householdMonthWindow,
   latestVisit,
@@ -359,12 +359,11 @@ function loadTodaySession(workerId, context = localDayContext()) {
 // Ein gespeicherter `check_in` als Zeitpunkt, auf der Uhr eines Tageskontexts:
 // in dessen Zone, oder - aelterer Client ohne Zone - mit dessen Offset.
 function dayClockInstantMs(value, context) {
-  if (context.timeZone) return storedToInstantMsPrecise(value, context.timeZone);
-  const raw = String(value ?? '').trim();
-  if (!raw) return null;
-  if (hasExplicitZone(raw)) return storedToInstantMs(raw, 'UTC');
-  const wallMs = storedToInstantMs(raw, 'UTC');
-  return wallMs === null ? null : wallMs + (context.timezoneOffsetMinutes * 60_000);
+  if (context.timeZone) return checkInInstantMs(value, context.timeZone);
+  // In UTC gelesen ist eine zonenlose Zeile ihre eigene Ziffernfolge.
+  const wallMs = checkInInstantMs(value, 'UTC');
+  if (wallMs === null || hasExplicitZone(String(value ?? '').trim())) return wallMs;
+  return wallMs + (context.timezoneOffsetMinutes * 60_000);
 }
 
 function housekeepingPaymentTasksEnabled(database = db.get()) {
@@ -465,7 +464,7 @@ function createPaymentTask(database, worker, checkIn, amount, actorId, title = n
  * UTC-Tag: ein Besuch um 00:30 in Berlin stand sonst am Vortag (#1540).
  */
 function householdWallOf(checkIn, tz) {
-  const ms = storedToInstantMs(checkIn, tz);
+  const ms = checkInInstantMs(checkIn, tz);
   return ms === null ? null : utcToWall(new Date(ms).toISOString(), tz);
 }
 

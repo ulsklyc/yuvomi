@@ -1840,6 +1840,28 @@ test('Umstellnacht: zwei zonenlose Besuche bleiben zwei Zeitpunkte - der spaeter
   }),
 ));
 
+test('Sekundenbruchteile: eine zonenlose Zeile behaelt ihren Zeitpunkt auf die Millisekunde (Review)', () => atHouseholdClock(
+  // Die Umrechner in utils/timezone.js rechnen den Bruchteil einer zonenlosen
+  // Zeile doppelt: '…T23:59:59.900' kam im UTC-Haushalt als 00:00:00.800 des
+  // Folgetags heraus - nicht mehr heute, nicht mehr in diesem Monat, und
+  // '…T10:00:00.600' galt als spaeter als '…T10:00:01.000Z'.
+  { zone: 'UTC', processTz: 'Asia/Tokyo', now: '2035-07-31T12:00:00.000Z' },
+  () => withSessions(async (insert) => {
+    const lastMoment = await freshWorker('LetzterMoment');
+    const fraction = await freshWorker('Bruchteil');
+    const edge = insert(lastMoment, '2035-07-31T23:59:59.900');
+    assert.equal(await todaySessionId('/workers', lastMoment), edge, 'today_session: 23:59:59.900 ist noch heute');
+    const inMonth = async (monthValue) => (await call('GET', `/visits?month=${monthValue}`, { as: ADM })).body.data.visits.some((v) => v.id === edge);
+    assert.equal(await inMonth('2035-07'), true, '/visits: und noch im Juli');
+    assert.equal(await inMonth('2035-08'), false, '/visits: nicht im August');
+
+    const earlier = insert(fraction, '2035-07-31T10:00:00.600');
+    const later = insert(fraction, '2035-07-31T10:00:01.000Z');
+    assert.notEqual(earlier, later);
+    assert.equal(await todaySessionId('/workers', fraction), later, 'today_session: 10:00:01.000 ist spaeter als 10:00:00.600');
+  }),
+));
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });
