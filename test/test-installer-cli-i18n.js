@@ -117,6 +117,13 @@ test('normalize_locale nimmt erst Sprache mit Region, dann die Basissprache', ()
   assert.equal(run('de_DE@euro'), 'de');
   assert.equal(run('fil_PH.UTF-8'), 'fil');
   assert.equal(run('nb_NO.UTF-8'), 'nb', 'Norwegisch bokmaal aus der Shell (#1529)');
+  // `no_NO` ist auf vielen Systemen der Name fuer Norwegisch, `nn_NO` ist
+  // Nynorsk ohne eigene Datei. Beide fallen auf nb statt auf Englisch.
+  assert.equal(run('no_NO.UTF-8'), 'nb');
+  assert.equal(run('no'), 'nb', 'so kommt es ueber --lang');
+  assert.equal(run('NO_no'), 'nb');
+  assert.equal(run('nn_NO.UTF-8'), 'nb');
+  assert.equal(run('nn'), 'nb');
   assert.equal(run('zh_TW.UTF-8'), 'zh');
   assert.equal(run('C.UTF-8'), 'en');
   assert.equal(run(''), 'en');

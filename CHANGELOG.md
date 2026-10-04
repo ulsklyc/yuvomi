@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A Norwegian browser or system that reports `no` or `nn` gets Norwegian instead of English.**
+  Norwegian Bokmål ships as `nb`, but many browsers and systems announce the general code `no`
+  (`no-NO`, `LANG=no_NO.UTF-8`), and that fell through to English. The same went for Nynorsk
+  (`nn`), which has no translation of its own: it now gets Bokmål, the closer language, rather
+  than English. This holds for the app, the web installer, the command-line installer and the
+  `lang` parameter of the API. An explicit language choice in the settings is not affected.
 - **A wrong address below the pairing or invitation page no longer ends on the sign-in page**
   (#1640). Opening something like `/pair/extra` or `/join/extra` without being signed in led to
   the sign-in page, because the app fell back to the overview, which needs a session. It now
@@ -20,7 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   straight into the same hand-over again. The address is now replaced. While the budget was still
   loading, a second tap could also start a second page change next to the first; it now waits.
   And when a guest opened an address that does not exist, the short message about it was lost on
-  a fresh start, because it came before the page that shows it; it now appears.
+  a fresh start, because it came before the page that shows it; it now appears. In a household
+  that has switched the budget module off, a guest is no longer sent to it: until now the app
+  kept sending them back and forth between the budget and the overview until the page gave up.
 - **"Access denied. Please sign in again." is gone** (#1640). An error screen or message for a
   refused request used this second sentence, which advised signing in again although the session
   was fine. It now says "You do not have permission to do that", the same sentence as everywhere
