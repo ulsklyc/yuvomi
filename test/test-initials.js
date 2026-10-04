@@ -47,7 +47,10 @@ const TABLE = [
   // Name, erwartete Zeichen, was die Zeile haelt
   ['Anna', 'A', 'ein Wort'],
   ['Anna Schmidt', 'AS', 'zwei Woerter'],
-  ['Anna Maria Schmidt', 'AM', 'drei Woerter: die ersten zwei, nicht das erste und das letzte'],
+  ['Anna Maria Schmidt', 'AS', 'drei Woerter: das erste und das letzte, nicht die ersten zwei'],
+  ['Dr. Hans Müller', 'DM', 'ein Titel vorn: das letzte Wort ist der Familienname'],
+  ['Jean-Luc Picard', 'JP', 'zwei Woerter, das erste mit Bindestrich'],
+  ['Maria del Carmen Ruiz Soto', 'MS', 'fuenf Woerter: weiterhin das erste und das letzte'],
   ['Anna-Lena Vogt', 'AV', 'ein Bindestrich trennt nicht'],
   ['Jean-Luc', 'J', 'ein Wort mit Bindestrich'],
   ['anna schmidt', 'AS', 'Kleinbuchstaben werden gross'],
@@ -60,9 +63,15 @@ const TABLE = [
   ['やまだ', 'まだ', 'Hiragana'],
   ['サトー', 'トー', 'Katakana mit Laengungszeichen'],
   ['佐々木', '々木', 'das Wiederholungszeichen zaehlt als Han'],
-  ['김 민수', '김민', 'mit Leerraum gilt die Wortregel, auch in Hangul'],
-  ['田中　太郎', '田太', 'das ideografische Leerzeichen ist Leerraum'],
-  ['Kim민수', 'K', 'gemischte Schrift ist kein CJK-Name'],
+  ['김 민수', '민수', 'zwei Hangul-Woerter: das zweite ist der Rufname - wie ohne Leerraum'],
+  ['田中 太郎', '太郎', 'zwei Han-Woerter: wie 田中太郎'],
+  ['田中\u3000太郎', '太郎', 'das ideografische Leerzeichen ist Leerraum'],
+  ['남궁 민', '민', 'ein Rufname aus einem Zeichen'],
+  ['김 민수아', '수아', 'ein laengerer Rufname: seine letzten zwei Zeichen'],
+  ['김 Minsu', '김M', 'ein lateinisches Wort: Wortregel'],
+  ['Minsu 김', 'M김', 'ein lateinisches Wort vorn: Wortregel'],
+  ['김 민 수', '김수', 'drei CJK-Woerter: Wortregel, erstes und letztes'],
+  ['Kim민수', 'K', 'gemischte Schrift in einem Wort ist kein CJK-Name'],
   ['\u{1F984} Einhorn', '\u{1F984}E', 'ein Emoji bleibt ganz (Surrogatpaar)'],
   ['\u{1F984}', '\u{1F984}', 'ein Emoji allein'],
   [`${FAMILY} Mama`, `${FAMILY}M`, 'eine ZWJ-Folge bleibt ganz'],
@@ -102,7 +111,14 @@ test('ohne Intl.Segmenter gilt dieselbe Tabelle', () => {
 test('die kleine Scheibe: zwei Geviert-Zeichen werden zu einem, lateinische bleiben', () => {
   assert.equal(compactInitials('김민수'), '수');
   assert.equal(compactInitials('田中太郎'), '郎');
-  assert.equal(compactInitials('김 민수'), '민');
+  assert.equal(compactInitials('김 민수'), '수', 'mit Leerraum dasselbe Zeichen wie ohne');
+  // Nur ZWEI Geviert-Zeichen werden zu einem. Ein gemischtes Paar ist nicht
+  // breiter als zwei breite lateinische Buchstaben, und das erste Zeichen zu
+  // streichen naehme ihm die Haelfte seiner Aussage (Review zu #1637).
+  assert.equal(compactInitials('김 Smith'), '김S');
+  assert.equal(compactInitials('Minsu 김'), 'M김');
+  assert.equal(compactInitials('\u{1F984} Einhorn'), '\u{1F984}E');
+  assert.equal(compactInitials('\u{1F984} \u{1F431}'), '\u{1F431}', 'zwei Emoji sind zwei Geviert-Zeichen');
   assert.equal(compactInitials('김'), '김');
   assert.equal(compactInitials('Anna Schmidt'), 'AS');
   assert.equal(compactInitials('Anna'), 'A');
@@ -236,7 +252,9 @@ test('Avatar-Stapel und Personenauswahl (components/user-multi-select.js)', asyn
 
   assertShows(ums.renderAvatarStack([user], { size: 28 }), '민수', 'Stapel 28px');
   assertShows(ums.renderUserMultiSelect([user], [], 'assignees', 'tasks.assignedTo'), '민수', 'Auswahl');
-  assertShows(ums.renderAvatarStack([{ ...user, display_name: 'Anna Maria Schmidt' }], { size: 22 }), 'AM', 'Stapel lateinisch');
+  assertShows(ums.renderAvatarStack([{ ...user, display_name: 'Anna Maria Schmidt' }], { size: 22 }), 'AS', 'Stapel lateinisch');
+  assert.ok(SHOWS(ums.renderAvatarStack([{ ...user, display_name: '김 Smith' }], { size: 22 }), '김S'), 'Stapel gemischt: beide Zeichen bleiben');
+  assertShows(ums.renderAvatarStack([{ ...user, display_name: '김 민수' }], { size: 28 }), '민수', 'Stapel: mit Leerraum wie ohne');
 
   // Die Passrechnung: der Rand (2px je Seite) zaehlt in die Scheibe.
   const css = read('styles/user-multi-select.css');
@@ -258,7 +276,7 @@ test('Ueberlappungszeichen (utils/seal-pair.js)', async () => {
   assert.equal(isSoloHousehold(), false, 'ohne gezaehlten Haushalt erscheint das Zeichen');
   // 20px breit, neben dem kleinen Siegel 16px, bei 10px Schrift: ein Zeichen.
   assertShows(whoMark({ display_name: MINSU, avatar_color: '#34C759' }), '수', 'Siegel-Avatar');
-  assert.ok(SHOWS(whoMark({ display_name: 'Anna Maria Schmidt' }), 'AM'), 'lateinisch: zwei Buchstaben');
+  assert.ok(SHOWS(whoMark({ display_name: 'Anna Maria Schmidt' }), 'AS'), 'lateinisch: zwei Buchstaben');
 });
 
 test('Kontozeile der Seitenleiste (router.js)', () => {
@@ -289,7 +307,7 @@ test('Kontozeile der Seitenleiste (router.js)', () => {
   run({ display_name: MINSU });
   assert.equal(avatar.textContent, '민수');
   run({ display_name: 'Anna Maria Schmidt' });
-  assert.equal(avatar.textContent, 'AM');
+  assert.equal(avatar.textContent, 'AS');
 });
 
 test('Einstellungen: Familie, Konto und Rechte', async () => {
@@ -330,11 +348,12 @@ test('Kontakte: ein verknuepftes Haushaltsmitglied', async () => {
     id: 1, name: MINSU, category: 'family', family_user_id: 5, family_display_name: MINSU, family_avatar_color: '#34C759',
   });
   assertShows(html, '민수', 'Kontaktzeile');
-  // Die alte Kontaktregel nahm das erste und das LETZTE Wort (AS).
+  // Erstes und letztes Wort - die Regel, die die Kontakte schon hatten und die
+  // jetzt ueberall gilt.
   const latin = contacts.renderContactItem({
     id: 2, name: 'Anna Maria Schmidt', category: 'family', family_user_id: 6, family_display_name: 'Anna Maria Schmidt',
   });
-  assert.ok(SHOWS(latin, 'AM'), 'drei Woerter: die ersten zwei, wie ueberall');
+  assert.ok(SHOWS(latin, 'AS'), 'drei Woerter: das erste und das letzte, wie ueberall');
 });
 
 test('Geburtstage: Zeile und Vorschau', async () => {

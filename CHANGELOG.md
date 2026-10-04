@@ -54,17 +54,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Avatars show the same initials for a person on every page, and a Korean, Chinese or
   Japanese name shows the given name** (#1607, #1464). A name written in Hangul, Han characters
-  or kana without a space showed only its first character, which is the family name, so two
-  children with the same family name had identical avatars. Such a name now shows its last two
-  characters (민수 for 김민수, 太郎 for 田中太郎), and the whole name if it has one or two. Where the
+  or kana showed only its first character, which is the family name, so two children with the
+  same family name had identical avatars. Such a name now shows the last two characters of the
+  given name (민수 for 김민수, 太郎 for 田中太郎), and the whole name if it has one or two. It makes
+  no difference whether the name was entered with a space: 김 민수 shows 민수 as well. Where the
   circle is too small for two of these characters - the small avatars on task cards, calendar
-  entries and next to a module icon - it shows the last one. Names with a space work as before:
-  the first letter of the first two words. Until now this rule existed separately on each page,
-  with three visible differences that are gone: a contact linked to a household member used the
-  first and the last word ("AS" for Anna Maria Schmidt) and now shows "AM" like everywhere
-  else; a name starting with an emoji showed a broken character and now shows the emoji; and
-  two spaces between the words of a name left the avatar in Settings with one letter or none.
-  The member chips under Settings > Permissions are 2px larger so that two such characters fit.
+  entries and next to a module icon - it shows the last one.
+  For every other name with several words the initials are now the first letter of the first
+  and of the **last** word, everywhere: "AS" for Anna Maria Schmidt and "DM" for Dr. Hans
+  Müller. Until now each page had its own copy of the rule. Contacts already worked this way;
+  all other places took the first two words ("AM", "DH"), so the same person could carry two
+  different sets of initials, and a middle name or a title stood in for the family name. Names
+  with one or two words look as before. Two more differences between the pages are gone: a
+  name starting with an emoji showed a broken character and now shows the emoji, and two
+  spaces between the words of a name left the avatar in Settings with one letter or none.
+  The member chips under Settings > Permissions are 2px larger so that two Korean, Chinese or
+  Japanese characters fit.
 - **"No access to this module" is shown in your language** (#1607). When a request was refused
   because your role has no access to a module, or only read access, the message came from the
   server in English, whatever language the app was set to. Both messages are now translated

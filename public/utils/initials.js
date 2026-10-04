@@ -13,16 +13,26 @@
  *
  * DIE REGEL
  *
- * 1. Name mit Leerraum: das erste Zeichen der ersten zwei Woerter, gross
- *    ("Anna Maria Schmidt" -> "AM"). Ein Bindestrich trennt nicht
- *    ("Anna-Lena Vogt" -> "AV"). Das ist die Regel, die dreizehn der vierzehn
- *    Kopien schon hatten.
+ * 1. Mehrere Woerter: das erste Zeichen des ERSTEN und des LETZTEN Worts,
+ *    gross ("Anna Maria Schmidt" -> "AS", "Dr. Hans Müller" -> "DM"). Ein
+ *    Bindestrich trennt nicht ("Anna-Lena Vogt" -> "AV"). Die ersten zwei
+ *    Woerter - die Regel von dreizehn der vierzehn Kopien - machten aus einem
+ *    Zweitnamen oder Titel den Familiennamen; das letzte Wort ist er.
  * 2. Name OHNE Leerraum, ganz in Hangul, Han oder Kana: die LETZTEN ZWEI
  *    Zeichen, also der Rufname (김민수 -> 민수, 田中太郎 -> 太郎); bei einem
  *    oder zwei Zeichen der ganze Name. Das erste Zeichen ist dort der
  *    Familienname - zwei Geschwister sahen damit gleich aus.
- * 3. Sonst ein Wort: sein erstes Zeichen ("Anna" -> "A").
- * 4. Leerer Name: der `fallback` des Aufrufers. Er ist ein Parameter und keine
+ * 3. Genau ZWEI Woerter, beide ganz in Hangul, Han oder Kana: das zweite
+ *    Wort ist der Rufname und wird behandelt wie in 2 ("김 민수" -> 민수,
+ *    "田中 太郎" -> 太郎). Dieselbe Person sieht damit gleich aus, ob sie mit
+ *    oder ohne Leerzeichen eingetragen ist.
+ *    DIE GRENZE: nur dieser eine Fall. Steht ein lateinisches Wort dabei
+ *    ("김 Minsu", "Minsu Kim 김"), sagt die Schrift nicht mehr, in welcher
+ *    Reihenfolge Familien- und Rufname stehen; bei drei und mehr Woertern
+ *    ist nicht zu erkennen, welche zusammen den Rufnamen bilden. Beides
+ *    faellt auf Regel 1 zurueck, statt zu raten.
+ * 4. Ein Wort sonst: sein erstes Zeichen ("Anna" -> "A").
+ * 5. Leerer Name: der `fallback` des Aufrufers. Er ist ein Parameter und keine
  *    Konstante, weil beide Antworten begruendet im Einsatz sind: eine Scheibe,
  *    die allein steht, zeigt "?", und eine, neben der der Name ohnehin steht,
  *    bleibt leer.
@@ -89,14 +99,19 @@ export function initials(name, fallback = '') {
   const words = String(name ?? '').trim().split(/\s+/u).filter(Boolean);
   if (!words.length) return fallback;
 
-  if (words.length === 1) {
-    const chars = graphemes(words[0]);
-    if (chars.every((char) => CJK.test(char))) return chars.slice(-2).join('');
-    return (chars[0] ?? '').toUpperCase() || fallback;
+  const letters = words.map(graphemes);
+  const isCjk = (chars) => chars.every((char) => CJK.test(char));
+
+  // Regel 2 und 3: der Rufname ist das einzige Wort oder das zweite von zweien.
+  if (words.length <= 2 && letters.every(isCjk)) {
+    return letters[letters.length - 1].slice(-2).join('');
   }
 
-  return words.slice(0, 2)
-    .map((word) => (graphemes(word)[0] ?? '').toUpperCase())
+  if (words.length === 1) return (letters[0][0] ?? '').toUpperCase() || fallback;
+
+  // Regel 1: erstes und letztes Wort.
+  return [letters[0], letters[letters.length - 1]]
+    .map((chars) => (chars[0] ?? '').toUpperCase())
     .join('') || fallback;
 }
 
@@ -104,7 +119,9 @@ export function initials(name, fallback = '') {
  * Dieselben Zeichen fuer eine Scheibe, in die keine zwei Geviert-Zeichen
  * passen (unter 2em Innenbreite): zwei Hangul-, Han-, Kana- oder Emoji-Zeichen
  * werden zu EINEM, und zwar dem letzten. Lateinische Initialen bleiben, wie
- * sie sind.
+ * sie sind - und ebenso ein GEMISCHTES Paar ("김 Smith" -> 김S): es ist nicht
+ * breiter als zwei breite lateinische Buchstaben, und wer sein erstes Zeichen
+ * striche, naehme ihm die Haelfte der Aussage.
  *
  * WARUM DAS LETZTE: der Zweck der Zwei-Zeichen-Regel ist, Geschwister zu
  * unterscheiden, und unter Geschwistern ist eher die erste Silbe des Rufnamens
@@ -118,6 +135,6 @@ export function initials(name, fallback = '') {
 export function compactInitials(name, fallback = '') {
   const full = initials(name, fallback);
   const chars = graphemes(full);
-  if (chars.length < 2 || !chars.some((char) => FULL_WIDTH.test(char))) return full;
+  if (chars.length < 2 || !chars.every((char) => FULL_WIDTH.test(char))) return full;
   return chars[chars.length - 1];
 }
