@@ -37,6 +37,7 @@ import {
   configuredHouseholdTimeZone,
   householdTimeZone,
   daysBetweenDateKeys,
+  hasExplicitZone,
   isValidTimeZone,
   localToUTCPrecise,
   shiftDateKey,
@@ -329,21 +330,40 @@ function loadOpenSession(workerId = null) {
  * die vom Vorabend stand dafuer drin. SQL holt deshalb den Tag mit einem Tag
  * Rand, und Grenzen wie Reihenfolge entscheidet der Zeitpunkt - dieselbe Bauart
  * wie bei den Monatslisten (`monthVisits`).
+ *
+ * Gelesen wird eine zonenlose Zeile auf DERSELBEN Uhr, die den Tag bestimmt
+ * (`localDayContext`): ohne eingestellte Haushaltszone ist das die Zone der
+ * Oberflaeche bzw. der Offset eines aelteren Clients, nicht `TZ` des Servers -
+ * sonst laege 00:30 in Los Angeles bei einem UTC-Server vor dem Tagesanfang.
  */
 function loadTodaySession(workerId, context = localDayContext()) {
-  const range = localDayRange(context);
+  const day = context && typeof context === 'object' && typeof context.localDate === 'string'
+    ? context
+    : localDayContext();
+  const range = localDayRange(day);
   const [startMs, endMs] = [Date.parse(range.start), Date.parse(range.end)];
   const window = widenedWindow(range);
-  const tz = householdTimeZone(db.get());
+  const at = (row) => dayClockInstantMs(row.check_in, day);
   return db.get().prepare(`
     SELECT * FROM housekeeping_work_sessions
     WHERE worker_id = ? AND check_in >= ? AND check_in < ?
   `).all(workerId, window.start, window.end)
     .filter((row) => {
-      const ms = storedToInstantMs(row.check_in, tz);
+      const ms = at(row);
       return ms !== null && ms >= startMs && ms < endMs;
     })
-    .sort(byCheckInDesc(tz))[0];
+    .sort((a, b) => (at(b) - at(a)) || (b.id - a.id))[0];
+}
+
+// Ein gespeicherter `check_in` als Zeitpunkt, auf der Uhr eines Tageskontexts:
+// in dessen Zone, oder - aelterer Client ohne Zone - mit dessen Offset.
+function dayClockInstantMs(value, context) {
+  if (context.timeZone) return storedToInstantMs(value, context.timeZone);
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  if (hasExplicitZone(raw)) return storedToInstantMs(raw, 'UTC');
+  const wallMs = storedToInstantMs(raw, 'UTC');
+  return wallMs === null ? null : wallMs + (context.timezoneOffsetMinutes * 60_000);
 }
 
 function housekeepingPaymentTasksEnabled(database = db.get()) {

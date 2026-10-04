@@ -1802,6 +1802,27 @@ test('offene Sitzung: ohne Arbeiter gilt die zuletzt begonnene, auch bei gemisch
   }),
 ));
 
+test('heute ohne eingestellte Haushaltszone: zonenlose Besuche liest dieselbe Uhr, die den Tag bestimmt (Review)', () => atHouseholdClock(
+  // Server in UTC, Oberflaeche in Los Angeles: es ist der 15.07.2031, 01:00.
+  // In der Zone des Servers gelesen waere 00:30 ein Zeitpunkt VOR dem
+  // Tagesanfang 07:00Z, und 00:30 von morgen laege noch vor dem Tagesende.
+  { zone: null, processTz: 'UTC', now: '2031-07-15T08:00:00.000Z' },
+  () => withSessions(async (insert) => {
+    const earlyToday = await freshWorker('OhnezoneHeuteFrueh');
+    const earlyTomorrow = await freshWorker('OhnezoneMorgenFrueh');
+    const todayId = insert(earlyToday, '2031-07-15T00:30:00');
+    insert(earlyTomorrow, '2031-07-16T00:30:00');
+    const zone = 'timezone=America%2FLos_Angeles';
+    assert.equal(await todaySessionId(`/workers?${zone}`, earlyToday), todayId, 'Zone der Oberflaeche: heute 00:30 ist von heute');
+    assert.equal(await todaySessionId(`/dashboard?${zone}`, earlyToday), todayId, 'Uebersicht des Moduls: dieselbe Frage');
+    assert.equal(await todaySessionId(`/workers?${zone}`, earlyTomorrow), null, 'morgen 00:30 nicht');
+    // Aelterer Client: nur Tag und Offset (Los Angeles im Sommer = +420 Minuten zu UTC).
+    const legacy = 'local_date=2031-07-15&timezone_offset_minutes=420';
+    assert.equal(await todaySessionId(`/workers?${legacy}`, earlyToday), todayId, 'Offset des Geraets: heute 00:30 ist von heute');
+    assert.equal(await todaySessionId(`/workers?${legacy}`, earlyTomorrow), null, 'Offset des Geraets: morgen 00:30 nicht');
+  }),
+));
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });
