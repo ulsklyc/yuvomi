@@ -171,6 +171,60 @@ test('#1451: Uebersicht und Modul zaehlen dieselben abgeschlossenen Besuche', wi
   assert.equal(housekeeping.visitsThisMonth, module.visits_this_month, 'Uebersicht und Modul sagen dieselbe Zahl');
 }));
 
+// `check_in` traegt mehrere Schreibweisen: `toISOString()` vom Check-in,
+// '…SSZ' aus scripts/seed-demo.js und - von Hand eingespielt - zonenlose
+// Wanduhrzeit. `ORDER BY check_in DESC LIMIT 1` sortierte sie als Text, und die
+// Kachel nannte einen anderen "letzten Besuch" als die Modulseite.
+function seedVisitFor(workerId, checkIn, checkOut) {
+  db.prepare(`
+    INSERT INTO housekeeping_work_sessions (check_in, check_out, daily_rate, extras, worker_id, created_by)
+    VALUES (?, ?, 40, 0, ?, ?)
+  `).run(checkIn, checkOut, workerId, ADMIN);
+}
+
+test('Haushaltshilfe: letzter Besuch und offene Sitzung sind der spaeteste Zeitpunkt, nicht der groesste Text',
+  withClock('2031-07-15T12:00:00Z', 'Europe/Berlin', async () => {
+    const prevTz = process.env.TZ;
+    process.env.TZ = 'Asia/Tokyo'; // der Prozess bewusst in einer dritten Zone
+    const otherUser = db.prepare(`
+      INSERT INTO users (username, display_name, password_hash, avatar_color, role)
+      VALUES (?, 'Jonas', 'hash', '#34C759', 'member')
+    `).run(`today-helper-${randomUUID()}`).lastInsertRowid;
+    const other = db.prepare('INSERT INTO housekeeping_workers (user_id, daily_rate) VALUES (?, 40)').run(otherUser).lastInsertRowid;
+    try {
+      clearVisits();
+      // Abgeschlossen: 11:00 in Berlin (zonenlos) gegen 12:00 in Berlin (Instant) -
+      // als Text ist '…T11' groesser als '…T10'.
+      seedVisitFor(WORKER, '2031-07-15T11:00:00', '2031-07-15T11:30:00');
+      seedVisitFor(WORKER, '2031-07-15T10:00:00.000Z', '2031-07-15T10:30:00.000Z');
+      // Offen: Jonas seit 09:00 in Berlin (zonenlos), Maria seit 09:30 in Berlin (Instant).
+      seedVisitFor(other, '2031-07-15T09:00:00', null);
+      seedVisitFor(WORKER, '2031-07-15T07:30:00.000Z', null);
+      const { housekeeping } = await getJson('/');
+      assert.equal(housekeeping.lastVisit, '2031-07-15T10:00:00.000Z', 'der Besuch von 12:00, nicht der von 11:00');
+      assert.equal(housekeeping.presentSince, '2031-07-15T07:30:00.000Z', 'die zuletzt begonnene offene Sitzung');
+      assert.equal(housekeeping.workerName, 'Maria', 'und ihr Name');
+      const module = (await getJson('/housekeeping/dashboard')).data;
+      // Das Modul fragt nach dem letzten Besuch ueberhaupt, die Kachel nach dem
+      // letzten ABGESCHLOSSENEN - ohne die offenen sagen beide denselben.
+      db.prepare('DELETE FROM housekeeping_work_sessions WHERE check_out IS NULL').run();
+      const moduleClosed = (await getJson('/housekeeping/dashboard')).data;
+      assert.equal(module.last_visit.check_in, '2031-07-15T10:00:00.000Z', 'Vorbedingung: das Modul nennt denselben Besuch');
+      assert.equal(moduleClosed.last_visit.check_in, housekeeping.lastVisit, 'Uebersicht und Modul sagen denselben letzten Besuch');
+
+      // Dieselbe Sekunde in den zwei Schreibweisen echter Schreibwege: 'Z' sortiert hinter '.'.
+      clearVisits();
+      seedVisitFor(WORKER, '2031-07-15T09:00:00Z', '2031-07-15T09:10:00Z');
+      seedVisitFor(WORKER, '2031-07-15T09:00:00.500Z', '2031-07-15T09:10:00.000Z');
+      assert.equal((await getJson('/')).housekeeping.lastVisit, '2031-07-15T09:00:00.500Z', 'eine halbe Sekunde spaeter ist spaeter');
+    } finally {
+      clearVisits();
+      db.prepare('DELETE FROM housekeeping_workers WHERE id = ?').run(other);
+      if (prevTz === undefined) delete process.env.TZ;
+      else process.env.TZ = prevTz;
+    }
+  }));
+
 // --------------------------------------------------------------------------
 // 2. Was gestern begann und heute laeuft (#1457)
 // --------------------------------------------------------------------------
