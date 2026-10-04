@@ -77,7 +77,9 @@ export function createNavigateHarness({
     _preferencesLoaded: preferencesLoaded,
     _setupRequired: setupRequired,
     _pendingLoginRedirect: false,
-    _disabledModules: new Set(disabledModules),
+    // Wie im Router: die abgeschalteten Module kommen mit den Praeferenzen.
+    // Beim Kaltstart ist die Menge leer, bis syncPreferencesOnce() gelaufen ist.
+    _disabledModules: new Set(preferencesLoaded ? disabledModules : []),
     _renderedModule: null,
     _renderedModuleName: null,
     // ── Tabelle und Entscheidungen: die echten ──
@@ -110,7 +112,11 @@ export function createNavigateHarness({
         return { user: sessionUser };
       },
     },
-    syncPreferencesOnce: async () => { env._preferencesLoaded = true; },
+    syncPreferencesOnce: async () => {
+      if (env._preferencesLoaded) return;
+      env._preferencesLoaded = true;
+      env._disabledModules = new Set(disabledModules);
+    },
     startThirdPartyModulePolling: () => {},
     loadReminderStyles: () => {},
     initReminders: () => {},

@@ -60,6 +60,43 @@ test('Gast OHNE Budget-Recht: keine Schleife, er landet auf einer erlaubten Seit
   assert.deepEqual(deep.log.rendered, ['/']);
 });
 
+test('Budget im Haushalt abgeschaltet: die Weiche schickt den Gast nicht dorthin (#1640)', async () => {
+  // Die Weiche pruefte das Recht, aber nicht die Abschaltung. In einer laufenden
+  // Sitzung warfen sich Weiche ('/budget') und Modul-Guard ('/') den Gast zu,
+  // bis der Stack ueberlief; beim Kaltstart stand die Weiche HINTER dem einzigen
+  // Guard, der die Abschaltung kennt, und zeichnete das abgeschaltete Modul.
+  // Die Weiche bleibt jetzt aus, wie beim Gast ohne Budget-Recht: von der
+  // Uebersicht geht es nirgends hin, und sie ist das Ziel, das der Modul-Guard
+  // fuer "nicht erreichbar" ohnehin kennt und selbst nie abweist.
+  for (const path of ['/', '/tasks', '/settings/xyz']) {
+    const cold = createNavigateHarness({ sessionUser: GUEST, disabledModules: ['budget'] });
+    await cold.navigate(path, false);
+    await settle();
+    assert.notEqual(cold.log.rendered.at(-1), '/budget', `Kaltstart ${path}: das abgeschaltete Budget wurde gezeichnet`);
+    assert.equal(cold.env.isNavigating, false, `Kaltstart ${path}`);
+  }
+  const coldRoot = createNavigateHarness({ sessionUser: GUEST, disabledModules: ['budget'] });
+  await coldRoot.navigate('/', false);
+  await settle();
+  assert.deepEqual(coldRoot.log.rendered, ['/']);
+
+  for (const path of ['/', '/tasks', '/budget']) {
+    const running = createNavigateHarness({ user: GUEST, disabledModules: ['budget'] });
+    await assert.doesNotReject(async () => running.navigate(path), `laufende Sitzung ${path}: navigate() laeuft in sich selbst`);
+    await settle();
+    assert.equal(running.log.rendered.includes('/budget'), false, `laufende Sitzung ${path}`);
+    assert.equal(running.env.isNavigating, false, `laufende Sitzung ${path}`);
+    // Nichts Neues: derselbe Ort wie fuer den Gast ohne Budget-Recht (#480).
+    // Die Uebersicht und das abgeschaltete Budget enden auf '/', jede andere
+    // Adresse bleibt den regulaeren Guards (und dem Server).
+    const noRight = createNavigateHarness({ user: GUEST, canAccess: (module) => module !== 'budget' });
+    await noRight.navigate(path);
+    await settle();
+    assert.deepEqual(running.log.rendered, noRight.log.rendered, `laufende Sitzung ${path}`);
+    if (path !== '/tasks') assert.deepEqual(running.log.rendered, ['/'], `laufende Sitzung ${path}`);
+  }
+});
+
 test('die Gast-Weiche haelt die Sperre, bis /budget gezeichnet ist (#1640)', async () => {
   // Ein zweites navigate('/budget') aus der laufenden Navigation heraus gab die
   // Sperre im finally der aeusseren frei, waehrend die innere noch lud: ein

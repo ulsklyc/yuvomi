@@ -801,9 +801,14 @@ async function navigate(path, userOrPushState = true, pushState = true) {
     // Endlosschleife bis Stack-Overflow (#480). Daher nur umleiten, wenn Budget
     // tatsächlich zugänglich ist; sonst greift der reguläre Rechte-Guard und der
     // Nutzer landet auf einer für ihn erlaubten Seite.
+    // Zugaenglich heisst auch: im Haushalt nicht abgeschaltet (#1640). Der
+    // Modul-Guard wirft von einem abgeschalteten '/budget' auf '/', die Weiche
+    // von '/' wieder zurueck - dieselbe Schleife - und hinter dem Auth-Guard
+    // prueft nach der Weiche niemand mehr die Abschaltung.
     if (currentUser?.access_scope === 'split_guest'
         && route.path !== '/budget'
-        && canAccessNavModule('budget')) {
+        && canAccessNavModule('budget')
+        && !_disabledModules.has('budget')) {
       continueOn('/budget');
     }
 
@@ -866,9 +871,14 @@ async function navigate(path, userOrPushState = true, pushState = true) {
     // Endlosschleife bis Stack-Overflow (#480). Daher nur umleiten, wenn Budget
     // tatsächlich zugänglich ist; sonst greift der reguläre Rechte-Guard und der
     // Nutzer landet auf einer für ihn erlaubten Seite.
+    // Zugaenglich heisst auch: im Haushalt nicht abgeschaltet (#1640). Der
+    // Modul-Guard wirft von einem abgeschalteten '/budget' auf '/', die Weiche
+    // von '/' wieder zurueck - dieselbe Schleife - und hinter dem Auth-Guard
+    // prueft nach der Weiche niemand mehr die Abschaltung.
     if (currentUser?.access_scope === 'split_guest'
         && route.path !== '/budget'
-        && canAccessNavModule('budget')) {
+        && canAccessNavModule('budget')
+        && !_disabledModules.has('budget')) {
       continueOn('/budget');
     }
 
