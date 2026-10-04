@@ -58,7 +58,6 @@
         "undo": "撤销",
         "reset": "重置为原始",
         "errorOffline": "无网络连接。请检查您的网络。",
-        "errorForbidden": "访问被拒绝。请重新登录。",
         "errorModuleNoAccess": "您没有此模块的访问权限。",
         "errorNoPermission": "您没有执行此操作的权限。",
         "unknownAddress": "该地址不存在。已为您显示最接近的页面。",

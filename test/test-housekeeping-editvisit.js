@@ -16,9 +16,9 @@
  *        Toast und Retry stilllegt.
  *
  *        Die 403-/404-Meldungstexte kommen aus dem lokalen `friendlyError`-
- *        Stub unten - die echte Zuordnung im Router (`common.errorForbidden`/
- *        `common.errorNotFound`/`common.errorServer`) wird hier NICHT
- *        mitgeprueft.
+ *        Stub unten - die echte Zuordnung (`utils/friendly-error.js`:
+ *        `common.errorNoPermission`/`common.errorNotFound`/`common.errorServer`)
+ *        prueft test:friendly-error, nicht diese Suite.
  *
  *        Der Erfolgsfall verzweigt seit #1170 nach `visit.can_edit` zwischen
  *        Bearbeiten- und Berichtsmodal (#1135: wer einen abgerechneten Besuch

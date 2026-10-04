@@ -2,7 +2,8 @@
  * Modul: Unbekannte Adresse
  * Zweck: Wohin ein Pfad ohne Route fuehrt (#1607), und wie die tote Adresse
  *        die History verlaesst. Aus router.js herausgehalten, damit beides ohne
- *        Browser pruefbar ist: test/test-unknown-route.js.
+ *        Browser pruefbar ist: test/test-unknown-route.js. Dort laeuft auch
+ *        `navigate()` selbst, in test/router-navigate-harness.js.
  * Abhaengigkeiten: keine
  *
  * VORHER fiel `/settings/xyz` in `navigate()` still auf die Uebersicht zurueck:
@@ -74,6 +75,32 @@ export function unknownPathDetour(path, { known, landable = known } = {}) {
   if (target) return { target, notify: true };
   if (segments[0] === EXTENSION_SEGMENT) return null;
   return { target: '/', notify: true };
+}
+
+/**
+ * Der Umweg, solange niemand angemeldet ist (#1640): nur auf einen
+ * OEFFENTLICHEN Vorfahren, sonst null.
+ *
+ * Ohne Sitzung kennt der Router nur seine feste Tabelle. `/pair/extra` laesst
+ * sich daraus schon beantworten - `/pair` braucht keine Anmeldung. Bis dahin
+ * fiel der Pfad auf die Uebersicht zurueck, die eine verlangt, und der Besuch
+ * endete auf `/login`. Alles, was nicht auf einer oeffentlichen Seite landet,
+ * bleibt hier unbeurteilt: Erweiterungsrouten und Rechte kommen erst mit der
+ * Anmeldung, und die Pruefung hinter dem Auth-Guard urteilt dann wie bisher.
+ *
+ * @param {unknown} path
+ * @param {{ known: Iterable<string>, open: Iterable<string>, landable?: Iterable<string> }} routes
+ *   `open`: die Routen ohne Anmeldung. `landable`: wie bei unknownPathDetour;
+ *   gezaehlt wird davon nur, was auch in `open` steht.
+ * @returns {{ target: string, notify: boolean } | null}
+ */
+export function publicPathDetour(path, { known, open = [], landable = open } = {}) {
+  const openSet = new Set(open);
+  const detour = unknownPathDetour(path, {
+    known,
+    landable: [...landable].filter((candidate) => openSet.has(candidate)),
+  });
+  return detour && openSet.has(detour.target) ? detour : null;
 }
 
 /**

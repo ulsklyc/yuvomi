@@ -1,11 +1,12 @@
 /**
  * Modul: Haushaltshilfe - der Monat des Haushalts
- * Zweck: In welchen Monat ein Besuch faellt, fuer das Modul UND die Uebersicht.
+ * Zweck: In welchen Monat ein Besuch faellt, fuer das Modul UND die Uebersicht -
+ *        und welcher von mehreren Besuchen der spaetere ist.
  * Abhaengigkeiten: utils/timezone.js, utils/interval-date.js
  *
  * `check_in` ist ein UTC-Instant: der Check-in schreibt `toISOString()`, das
  * Bearbeiten ebenso (#1540), und kein Codepfad hat je eine andere Form
- * geschrieben. Zonenlose Wanduhrzeit liest `storedToInstantMs()` trotzdem mit -
+ * geschrieben. Zonenlose Wanduhrzeit liest `checkInInstantMs()` trotzdem mit -
  * als Absicherung fuer von Hand eingespielte Zeilen, nicht als Bestandsform.
  * `substr(check_in, 1, 7)` ist der UTC-Monat: ein Besuch am Ersten um 00:30
  * Berliner Zeit stand im Vormonat, westlich von UTC einer am Letzten abends schon im naechsten. #1387
@@ -13,17 +14,38 @@
  * Zahlen fuer denselben Monat. Beide lesen jetzt hier.
  */
 
-import { localToUTCPrecise, storedToInstantMs, utcToWall } from '../utils/timezone.js';
+import { hasExplicitZone, localToUTCPrecise, storedToInstantMsPrecise, utcToWall } from '../utils/timezone.js';
 import { addMonthsClamped } from '../utils/interval-date.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * Ein gespeicherter `check_in` als Zeitpunkt (ms seit Epoch) - die EINE Lesart
+ * fuer Monat, Tag und Reihenfolge. Instants bleiben, was sie sind; zonenlose
+ * Wanduhrzeit wird in `tz` gelesen, DST-genau: die einfache Umrechnung bildet
+ * in der Umstellnacht zwei Wanduhrzeiten auf denselben Zeitpunkt ab (Berlin,
+ * 00:30 und 01:30 werden beide 23:30Z).
+ *
+ * Sekundenbruchteile einer zonenlosen Zeile gehen an der Umrechnung VORBEI:
+ * die Umrechner in utils/timezone.js bestimmen den Offset ueber `utcToWall()`,
+ * das Millisekunden abschneidet, und rechnen den Bruchteil dadurch ein zweites
+ * Mal dazu - '…T23:59:59.900' kam in einem UTC-Haushalt als '00:00:00.800' des
+ * Folgetags heraus. Der Offset einer Zone haengt nicht am Bruchteil, also wird
+ * die ganze Sekunde umgerechnet und der Bruchteil danach addiert.
+ */
+export function checkInInstantMs(value, tz) {
+  const raw = String(value ?? '').trim();
+  const fraction = hasExplicitZone(raw) ? null : /^(.+:\d{2})\.(\d+)$/.exec(raw);
+  if (!fraction) return storedToInstantMsPrecise(raw, tz);
+  const whole = storedToInstantMsPrecise(fraction[1], tz);
+  return whole === null ? null : whole + Number(fraction[2].padEnd(3, '0').slice(0, 3));
+}
+
+/**
  * Der Monat (YYYY-MM), in dem ein gespeicherter Zeitpunkt im Haushalt liegt.
- * `storedToInstantMs()` liest Instant und zonenlose Wanduhrzeit.
  */
 export function householdMonthOf(value, tz) {
-  const ms = storedToInstantMs(value, tz);
+  const ms = checkInInstantMs(value, tz);
   if (ms === null) return null;
   return utcToWall(new Date(ms).toISOString(), tz)?.date.slice(0, 7) ?? null;
 }
@@ -56,7 +78,15 @@ export function householdMonthRange(monthValue, tz) {
  * Monatsgrafik gruppiert.
  */
 export function householdMonthWindow(monthValue, tz) {
-  const { start, end } = householdMonthRange(monthValue, tz);
+  return widenedWindow(householdMonthRange(monthValue, tz));
+}
+
+/**
+ * Ein halboffenes Intervall in der Schreibweise von `check_in`, um einen Tag
+ * Rand je Seite geweitet. Der Rand reicht fuer jede Form: eine zonenlose
+ * Wanduhrzeit steht als Text hoechstens 14 Stunden neben ihrem Zeitpunkt.
+ */
+export function widenedWindow({ start, end }) {
   const widen = (iso, days) => {
     const ms = Date.parse(iso);
     const shifted = Number.isFinite(ms) ? new Date(ms + days * DAY_MS).toISOString() : '';
@@ -64,6 +94,43 @@ export function householdMonthWindow(monthValue, tz) {
     return /^\d{4}-/.test(shifted) ? shifted : iso;
   };
   return { start: widen(start, -1), end: widen(end, 1) };
+}
+
+/**
+ * Sortierfunktion "spaetester Besuch zuerst", nach dem ZEITPUNKT von
+ * `check_in`. `ORDER BY check_in` sortiert Text: die zonenlose
+ * '2026-07-15T11:00:00' (11:00 im Haushalt) steht dann hinter
+ * '2026-07-15T10:00:00.000Z' (12:00 in Berlin), und '…T10:00:00Z' aus
+ * scripts/seed-demo.js hinter '…T10:00:00.500Z' derselben Sekunde. Unlesbare
+ * Werte ans Ende, Gleichstand nach der juengeren Zeile.
+ * Gelesen wird ueber `checkInInstantMs()`: DST-genau, sonst entschiede in der
+ * Umstellnacht die `id` einen falschen Gleichstand.
+ */
+export function byCheckInDesc(tz) {
+  const at = (row) => checkInInstantMs(row.check_in, tz) ?? -Infinity;
+  return (a, b) => {
+    const [left, right] = [at(a), at(b)];
+    if (left !== right) return left > right ? -1 : 1;
+    return (b.id ?? 0) - (a.id ?? 0);
+  };
+}
+
+/**
+ * Der spaeteste Besuch - ersetzt `ORDER BY check_in DESC LIMIT 1`.
+ *
+ * Ohne die ganze Tabelle zu lesen: die als TEXT groesste Zeile gibt den
+ * Zeitpunkt vor, und nur was als Text hoechstens einen Tag darunter liegt, kann
+ * als Zeitpunkt spaeter sein. Unter diesen Zeilen entscheidet `byCheckInDesc`.
+ * `where` ist ein fester SQL-Ausdruck des Aufrufers, nie Eingabe.
+ */
+export function latestVisit(database, tz, where = '', params = []) {
+  const from = `FROM housekeeping_work_sessions WHERE ${where || '1 = 1'}`;
+  const top = database.prepare(`SELECT check_in ${from} ORDER BY check_in DESC LIMIT 1`).get(...params);
+  if (!top) return undefined;
+  const topMs = checkInInstantMs(top.check_in, tz);
+  const floor = topMs === null ? '' : widenedWindow({ start: new Date(topMs).toISOString(), end: '' }).start;
+  return database.prepare(`SELECT * ${from} AND check_in >= ?`).all(...params, floor)
+    .sort(byCheckInDesc(tz))[0];
 }
 
 /**

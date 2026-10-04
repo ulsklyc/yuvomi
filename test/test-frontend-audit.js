@@ -6547,6 +6547,9 @@ test('hardening uses logical alignment for RTL-sensitive adapted controls', () =
 test('route failures expose a localized recoverable alert instead of raw technical errors', () => {
   const router = read('../public/router.js');
   const notesPage = read('../public/pages/notes.js');
+  // Die Zuordnung Fehler -> Satz steht seit #1640 in utils/friendly-error.js
+  // und laeuft dort als Programm (test:friendly-error).
+  const friendly = read('../public/utils/friendly-error.js');
 
   // Die Rolle kommt seit der Vereinheitlichung aus der Variante des geteilten
   // Renderers (`error` -> `role="alert"`, utils/empty-state.js) statt aus einem
@@ -6555,9 +6558,9 @@ test('route failures expose a localized recoverable alert instead of raw technic
   assert.match(router, /function renderError\(container,\s*err\)[\s\S]*emptyStateEl\(\{[\s\S]{0,200}?variant:\s*'error'/);
   assert.match(router, /function renderError\(container,\s*err\)[\s\S]*description:\s*friendlyError\(err\)/);
   assert.match(router, /state\.focus\(\{\s*preventScroll:\s*true\s*\}\)/);
-  assert.match(router, /Failed to fetch\|NetworkError\|Load failed/i);
-  assert.match(router, /return t\(['"]common\.errorServer['"]\)/);
-  assert.match(router, /err\?\.name === ['"]TypeError['"][\s\S]*return t\(['"]common\.unexpectedError['"]\)/);
+  assert.match(friendly, /Failed to fetch\|NetworkError\|Load failed/i);
+  assert.match(friendly, /return t\(['"]common\.errorServer['"]\)/);
+  assert.match(friendly, /err\?\.name === ['"]TypeError['"][\s\S]*return t\(['"]common\.unexpectedError['"]\)/);
   assert.match(notesPage, /catch \(err\)\s*\{[\s\S]*console\.error\([\s\S]*throw err;/);
 });
 

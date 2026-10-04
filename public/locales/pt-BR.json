@@ -58,7 +58,6 @@
         "undo": "Desfazer",
         "reset": "Redefinir",
         "errorOffline": "Sem conexão com a internet. Por favor, verifique a sua rede.",
-        "errorForbidden": "Acesso negado. Por favor, faça login novamente.",
         "errorModuleNoAccess": "Não tem acesso a este módulo.",
         "errorNoPermission": "Você não tem permissão para fazer isso.",
         "unknownAddress": "Este endereço não existe. A página mais próxima é exibida no lugar.",

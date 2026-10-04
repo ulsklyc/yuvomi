@@ -22,7 +22,7 @@ import { FastingError, getFastingDashboardState } from '../services/fasting.js';
 import { openBalancesForUser } from '../services/split-expenses.js';
 import { NUTRIENT_KEYS, nutritionSummaryFor } from '../services/health-nutrition.js';
 import { emptyPantryExpiring, pantryExpiringSlice } from '../services/pantry-expiring.js';
-import { finishedVisitsInMonth } from '../services/housekeeping-month.js';
+import { finishedVisitsInMonth, latestVisit } from '../services/housekeeping-month.js';
 import { householdTimeZone, utcToWall, todayKey, shiftDateKey } from '../utils/timezone.js';
 import { isAdminUser, serializeEvents } from './calendar/helpers.js';
 import { getOccurrences as getWasteOccurrences } from '../services/waste-store.js';
@@ -938,29 +938,30 @@ router.get('/', (req, res) => {
   // Haushaltshilfe: Anwesenheitsstatus (offene Sitzung), Besuche im laufenden Monat,
   // offener Zahlbetrag und letzter Besuch — ein kompakter Status statt einer Liste.
   if (allows('housekeeping')) try {
-    const openSession = d.prepare(`
-      SELECT hws.check_in, u.display_name AS worker_name
-      FROM housekeeping_work_sessions hws
-      LEFT JOIN housekeeping_workers hw ON hw.id = hws.worker_id
+    // "Die zuletzt begonnene" und "der letzte Besuch" sind der spaeteste
+    // ZEITPUNKT, nicht der groesste Text von `check_in` - dieselbe Regel wie im
+    // Modul (`latestVisit`), sonst nennt die Kachel einen anderen Besuch als
+    // die Modulseite.
+    const hkZone = householdTimeZone(d);
+    const openSession = latestVisit(d, hkZone, 'check_out IS NULL');
+    const openWorker = openSession?.worker_id ? d.prepare(`
+      SELECT u.display_name AS worker_name
+      FROM housekeeping_workers hw
       LEFT JOIN users u ON u.id = hw.user_id
-      WHERE hws.check_out IS NULL
-      ORDER BY hws.check_in DESC LIMIT 1
-    `).get();
+      WHERE hw.id = ?
+    `).get(openSession.worker_id) : null;
     // Der Monat des HAUSHALTS, nicht der UTC-Monat von `check_in` (#1451):
     // `substr(check_in, 1, 7)` zaehlte einen Besuch am Ersten um 00:30 in
     // Berlin in den Vormonat - dieselbe Regel wie im Modul (#1387).
-    const month = finishedVisitsInMonth(d, currentMonth, householdTimeZone(d));
-    const lastRow = d.prepare(`
-      SELECT check_in FROM housekeeping_work_sessions
-      WHERE check_out IS NOT NULL ORDER BY check_in DESC LIMIT 1
-    `).get();
+    const month = finishedVisitsInMonth(d, currentMonth, hkZone);
+    const lastRow = latestVisit(d, hkZone, 'check_out IS NOT NULL');
     const anyRow = d.prepare('SELECT 1 FROM housekeeping_work_sessions LIMIT 1').get()
       || d.prepare('SELECT 1 FROM housekeeping_workers LIMIT 1').get();
     result.housekeeping = {
       configured: Boolean(anyRow),
       present: Boolean(openSession),
       presentSince: openSession?.check_in || null,
-      workerName: openSession?.worker_name || null,
+      workerName: openWorker?.worker_name || null,
       visitsThisMonth: month.visits,
       unpaidAmount: month.unpaid,
       lastVisit: lastRow?.check_in || null,

@@ -58,7 +58,6 @@
         "undo": "Geri al",
         "reset": "Orijinale sıfırla",
         "errorOffline": "İnternet bağlantısı yok. Lütfen ağınızı kontrol edin.",
-        "errorForbidden": "Erişim reddedildi. Lütfen tekrar giriş yapın.",
         "errorModuleNoAccess": "Bu modüle erişiminiz yok.",
         "errorNoPermission": "Bunu yapmak için yetkiniz yok.",
         "unknownAddress": "Bu adres mevcut değil. Bunun yerine en yakın sayfa gösteriliyor.",

@@ -15,6 +15,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`nn`), which has no translation of its own: it now gets Bokmål, the closer language, rather
   than English. This holds for the app, the web installer, the command-line installer and the
   `lang` parameter of the API. An explicit language choice in the settings is not affected.
+- **A loan created from "New entry" in the budget overview can say how many installments are
+  already paid** (#1648, reported by @ramonbresco). The field existed only in the "New loan" dialog
+  of the Loans tab; choosing the type "Loan" in the overview's dialog left it out, so a running loan
+  entered there started at zero. Both dialogs now build their loan fields from one list, so a field
+  can no longer land in one and miss the other. The same repair makes the suggestion work that
+  2.29.0 announced and never delivered: moving the first due month into the past fills in the number
+  of months since then, never more than the loan has installments, and stops as soon as you set the
+  field yourself. For a loan with interest that limit is the term shown in the preview; until the
+  preview has one, the field stays at 0. It was wired to the dialog that did not have the field.
+- **Housekeeping: "today" and "last visit" read a visit's check-in as a point in time.** Only
+  visits the app did not write itself are affected: rows imported by hand with a time that has
+  no zone, and the demo data. They were compared and sorted as text, so such a visit could be
+  missing from the helper's "today" or counted on the neighbouring day, and the earlier of two
+  visits could be shown as the latest - in the module, its visit lists and the overview tile.
+  All of them now compare the time on the household's clock. Stored values are not changed.
+- **Editing a shared expense shows the amount in your household's number format.** The amount
+  field came pre-filled the way the server stores it, with a point: `12.50` in a field whose
+  placeholder says `0,00`, and `12.5` when the expense was handed over from a budget entry.
+  The same held for the exact shares and percentages of an existing split and for the open
+  debt in "Register payment". They now use the decimal separator and digits of the household
+  region, like the placeholder next to them, and are read back unchanged when you save.
+- **A wrong address below the pairing or invitation page no longer ends on the sign-in page**
+  (#1640). Opening something like `/pair/extra` or `/join/extra` without being signed in led to
+  the sign-in page, because the app fell back to the overview, which needs a session. It now
+  goes to the page above it, `/pair` or `/join`, as it already did for someone who is signed in.
+  A wrong address below a page that needs a session still leads to the sign-in page first.
+- **Guests of a shared-expense group are no longer stuck behind the back button** (#1640). A
+  guest only sees the budget, so every other address sends them there. That hand-over kept the
+  address they came from in the history and put the budget on top of it, so the back button led
+  straight into the same hand-over again. The address is now replaced. While the budget was still
+  loading, a second tap could also start a second page change next to the first; it now waits.
+  And when a guest opened an address that does not exist, the short message about it was lost on
+  a fresh start, because it came before the page that shows it; it now appears. In a household
+  that has switched the budget module off, a guest is no longer sent to it: until now the app
+  kept sending them back and forth between the budget and the overview until the page gave up.
+- **"Access denied. Please sign in again." is gone** (#1640). An error screen or message for a
+  refused request used this second sentence, which advised signing in again although the session
+  was fine. It now says "You do not have permission to do that", the same sentence as everywhere
+  else, in all 26 languages.
 
 - **Closing an event dialog on a wide screen no longer moves the address to the page you came
   from.** In the day, week and month views an event opens in a small card. Choosing "Edit" or
