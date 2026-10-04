@@ -422,6 +422,59 @@ test('Kaltstart als Gast: der Hinweis erscheint erst, wenn die Flaeche steht (#1
   assert.deepEqual(log.history.at(-1), ['replace', '/budget']);
 });
 
+test('Kaltstart: der Direktlink auf ein abgeschaltetes Modul endet auf der Uebersicht', async () => {
+  // Der Modul-Guard vor dem Auth-Guard laeuft beim Kaltstart, bevor die
+  // Praeferenzen geladen sind: die Menge der abgeschalteten Module ist da noch
+  // leer. Der Guard dahinter pruefte nur das Recht - das Modul wurde gezeichnet,
+  // fuer Mitglieder wie fuer Gaeste.
+  for (const [who, sessionUser] of [['Mitglied', MEMBER], ['Gast', GUEST]]) {
+    for (const [path, module] of [['/budget', 'budget'], ['/tasks', 'tasks']]) {
+      // Der Gast wird von '/tasks' ohnehin auf sein Budget geschickt.
+      if (who === 'Gast' && path === '/tasks') continue;
+      const { navigate, log, env } = createNavigateHarness({ sessionUser, disabledModules: [module] });
+      await navigate(path, false);
+      await settle();
+      assert.deepEqual(log.rendered, ['/'], `${who} ${path}`);
+      // Dieselbe Navigation, eine Sperre; die Adresse des abgeschalteten Moduls
+      // bleibt nicht als Eintrag stehen, in den Zurueck wieder hineinfuehrte.
+      assert.deepEqual(log.history, [['replace', '/']], `${who} ${path}`);
+      assert.equal(env.isNavigating, false, `${who} ${path}`);
+    }
+  }
+  // Ein unbekannter Pfad unter dem abgeschalteten Modul: Uebersicht, mit Hinweis.
+  const below = createNavigateHarness({ sessionUser: MEMBER, disabledModules: ['tasks'] });
+  await below.navigate('/tasks/42', false);
+  await settle();
+  assert.deepEqual(below.log.rendered, ['/']);
+  assert.deepEqual(below.log.toasts, [{ message: 'common.unknownAddress', shown: true }]);
+});
+
+test('Kaltstart: der Direktlink auf ein gesperrtes Modul endet weiter auf der Uebersicht', async () => {
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  const { navigate, log, env } = createNavigateHarness({
+    sessionUser: MEMBER,
+    canAccess: (module) => module !== 'budget',
+    onRender: () => held,
+  });
+  const running = navigate('/budget', false);
+  await settle();
+  assert.equal(env.isNavigating, true, 'die Sperre ist frei, waehrend die Uebersicht noch laedt');
+  release();
+  await running;
+  await settle();
+  assert.deepEqual(log.rendered, ['/']);
+  assert.deepEqual(log.history, [['replace', '/']]);
+});
+
+test('ein eingeschaltetes Modul bleibt beim Kaltstart erreichbar', async () => {
+  const { navigate, log } = createNavigateHarness({ sessionUser: MEMBER, disabledModules: ['tasks'] });
+  await navigate('/budget', false);
+  await settle();
+  assert.deepEqual(log.rendered, ['/budget']);
+  assert.deepEqual(log.history, []);
+});
+
 // ─── Kein Weg der App fuehrt selbst auf eine unbekannte Adresse ─────────────
 // Seit der Umleitung faellt ein totes Ziel auf: vorher landete es still auf der
 // Uebersicht. `/health/medications` (Zyklus-Tagesprotokoll, "Schmerzmittel")

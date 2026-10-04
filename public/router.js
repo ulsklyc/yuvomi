@@ -882,13 +882,21 @@ async function navigate(path, userOrPushState = true, pushState = true) {
       continueOn('/budget');
     }
 
-    // Rechte-Guard nach frisch geladenen Rechten (Deep-Link auf ein für diese
-    // Rolle/dieses Mitglied gesperrtes Modul → Dashboard). #467
-    if (route.module && route.path !== '/' && !canAccessNavModule(route.module)) {
-      currentPath = null;
-      isNavigating = false;
-      navigate('/');
-      return;
+    // Modul-Guard, zweite Stelle: nach frisch geladenen Rechten UND Praeferenzen
+    // (Deep-Link auf ein gesperrtes oder abgeschaltetes Modul → Dashboard). #467
+    //
+    // Dieselbe Regel wie am Modul-Guard oben. Die Abschaltung fehlte hier: beim
+    // Kaltstart laeuft der Guard oben, bevor die Praeferenzen geladen sind -
+    // `_disabledModules` ist dann noch leer - und hier pruefte nur das Recht.
+    // Der Direktlink auf ein abgeschaltetes Modul wurde gezeichnet.
+    //
+    // Wie die Gast-Weiche darueber laeuft DIESE Navigation weiter, statt eine
+    // zweite zu starten (#1640). Das Ziel '/' nimmt die Bedingung selbst aus:
+    // es kann weder abgeschaltet noch gesperrt sein, eine Schleife gibt es nicht.
+    if (route.module
+        && route.path !== '/'
+        && (_disabledModules.has(route.module) || !canAccessNavModule(route.module))) {
+      continueOn('/');
     }
 
     if (!route.requiresAuth && currentUser && path === '/login') {

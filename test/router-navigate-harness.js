@@ -88,7 +88,9 @@ export function createNavigateHarness({
     unknownPathDetour,
     publicPathDetour,
     detourPaths,
-    canAccessNavModule: canAccess,
+    // Wie im Router: die Rechte kommen mit der Anmeldung (`auth.me()` setzt
+    // sie), davor ist alles offen - public/permissions.js gibt ohne Eintrag frei.
+    canAccessNavModule: (module) => (env.currentUser ? canAccess(module) : true),
     // ── Browser ──
     location: { search: '', hash: '', ...location },
     history: {
