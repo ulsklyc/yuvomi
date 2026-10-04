@@ -226,9 +226,11 @@ export function dropOverlay(token) {
  * WOZU. Der Verlassen-Schutz des Routers fragt per Dialog; lehnt der Nutzer
  * ein Zurueck ab, legt der Router die Adresse der stehengebliebenen Seite
  * wieder an. Der Dialog gibt beim Schliessen aber seinen Marker per `back()`
- * zurueck, und das wirkt asynchron - ein sofortiges `pushState` liefe davor,
- * und das `back()` truege die Adresse danach auf den Marker zurueck (im
- * Browser gemessen: "/calendar" in der Adresse, die Uebersicht im Bild).
+ * zurueck, und das wirkt asynchron. Sein Ziel steht beim Aufruf fest: der
+ * Eintrag UNTER dem Marker. Ein sofortiges `pushState` haengte die Adresse nur
+ * dahinter an, und das `back()` truege den Browser danach unter beide zurueck
+ * (im Browser gemessen: "/calendar" in der Adresse, die Uebersicht im Bild).
+ * Dieselbe Verschraenkung wie in `syncMarker`, dort mit dem eigenen Marker.
  *
  * Gewartet wird auf das LEERE Register, nicht nur auf den Abgleich: die
  * Antwort einer Rueckfrage steht fest, waehrend ihr Dialog noch ausblendet,

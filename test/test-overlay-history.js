@@ -628,8 +628,8 @@ test('whenHistorySettled: wer nach einer Rueckfrage die Adresse zuruecklegt, war
   // Der Verlassen-Schutz des Routers (A7 P2-1): Zurueck von "/" nach "/calendar"
   // fragt per Dialog, der Nutzer sagt "Abbrechen", und die Adresse soll wieder
   // "/" zeigen. Der Dialog gibt beim Schliessen seinen Marker per back() zurueck
-  // - asynchron. Legte der Router "/" SOFORT per pushState zurueck, liefe das
-  // back() danach gegen den neuen Eintrag und die Adresse stuende auf dem Marker.
+  // - asynchron. Legte der Router "/" SOFORT per pushState zurueck, kaeme das
+  // back() danach an und die Adresse stuende wieder auf "/calendar".
   const run = async (wait) => {
     const { pushOverlay, dropOverlay, whenHistorySettled, history } = await freshModule();
     history.pushState({ path: '/calendar' }, '', '/calendar');

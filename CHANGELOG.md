@@ -20,8 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   often: the calendar stayed on screen while the address bar already showed the previous page,
   a reload opened that page, and the next Back skipped one. Deleting a recurring event from
   the card did this every time; editing did it whenever the form opened quickly enough. The
-  app now waits for the browser to finish before it takes the new entry. The same card is used
-  for tasks and contacts.
+  app now waits for the browser to finish before it takes the new entry.
 
 ## [2.72.0] - 2026-10-04
 
