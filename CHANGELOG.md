@@ -30,6 +30,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   take the birthday tile along. A module that is switched off is still not locked: its own
   pages, API routes and exports answer as before, and what a member may not reach is decided by
   permissions. The rule is written down in `docs/DECISIONS.md`, entry 11.
+- **The loan dialog checks "Installments already paid" at the field and reports errors in your
+  language** (#1656). Typing more paid installments than the loan has, a negative number or a
+  fraction used to be sent off, refused by the server, and shown as a short English message at
+  the bottom of the screen, whatever language the app was set to. The field is now checked
+  before saving, in both places a loan can be created: it is marked, says what is wrong, and the
+  dialog stays open with everything you typed. For a loan with interest the number is compared
+  with the term the server works out, the same one the preview shows. When the server does
+  refuse a loan, the message appears at the field it belongs to and in the app's language. The
+  name, title and notes fields no longer accept more text than can be saved. For the API:
+  `POST /budget/loans` and `PUT /budget/loans/:id` now add a `reason` code to a 400 answer; the
+  `error` text is unchanged.
 
 ## [2.73.0] - 2026-10-04
 

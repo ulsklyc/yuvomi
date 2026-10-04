@@ -14,6 +14,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { friendlyError } from '/utils/friendly-error.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { render as renderSplitExpenses, prefillSplitExpense, canAddSplitExpense, openNewSplitExpense } from '/pages/split-expenses.js';
 import { openSubscriptionModal, render as renderSubscriptions } from '/pages/subscriptions.js';
@@ -3785,13 +3786,13 @@ function loanIdentityFieldsHtml(loan) {
       <label class="form-label" for="lm-borrower" id="lm-borrower-label">${
         t(borrowed ? 'budget.loanLenderLabel' : 'budget.loanBorrowerLabel')
       }</label>
-      <input type="text" class="form-input" id="lm-borrower"
+      <input type="text" class="form-input" id="lm-borrower" maxlength="100"
              placeholder="${t(borrowed ? 'budget.loanLenderPlaceholder' : 'budget.loanBorrowerPlaceholder')}"
              value="${esc(loan?.borrower ?? '')}">
     </div>
     <div class="form-group">
       <label class="form-label" for="lm-title">${t('budget.loanTitleLabel')}</label>
-      <input type="text" class="form-input" id="lm-title"
+      <input type="text" class="form-input" id="lm-title" maxlength="200"
              placeholder="${t('budget.loanTitlePlaceholder')}" value="${esc(loan?.title ?? '')}">
     </div>
     ${loanAccountFieldHtml(loan)}`;
@@ -4088,7 +4089,7 @@ function loanFormFieldsHtml(loan, { startMonth }) {
     </div>`}
     <div class="form-group">
       <label class="form-label" for="lm-notes">${t('budget.loanNotesLabel')}</label>
-      <textarea class="form-input" id="lm-notes" rows="3">${esc(loan?.notes ?? '')}</textarea>
+      <textarea class="form-input" id="lm-notes" rows="3" maxlength="1000">${esc(loan?.notes ?? '')}</textarea>
     </div>`;
 }
 
@@ -4102,18 +4103,125 @@ function wireLoanFormFields(panel) {
   wireLoanInterestFields(panel, { onTerm: paid.setTerm });
 }
 
+const LOAN_SAVE_FAILED = 'budget.loanSaveFailed';
+
+/**
+ * Absage von POST/PUT /budget/loans -> Feld und Satz (#1656).
+ *
+ * Der Server nennt zu jeder 400 des Formulars einen `reason`
+ * (server/routes/budget/loans.js). Hier steht, an welches Feld die Absage
+ * gehoert und welcher Satz der Oberflaeche sie sagt - bis dahin kam der
+ * englische Satz des Servers als Toast, in jeder Sprache. Dieselbe Mechanik wie
+ * in category-manager.js und shopping.js: die Seite liest ihren Grund selbst;
+ * REFUSAL_MESSAGES fuehrt nur, was fuer jede Seite dasselbe heisst.
+ *
+ * Mehrere Felder = das erste, das gerade sichtbar ist (ohne Zins die
+ * Ratenanzahl, mit Zins die Tilgung). `null` = kein Feld, der Satz kommt als
+ * Toast. Eine Map, damit ein Grund wie `__proto__` nichts findet.
+ * test:budget-ui haelt die Liste deckungsgleich mit den Gruenden des Servers.
+ */
+const LOAN_REFUSALS = new Map([
+  ['loan_title_invalid', ['#lm-title', LOAN_SAVE_FAILED]],
+  ['loan_borrower_invalid', ['#lm-borrower', 'budget.loanBorrowerRequired']],
+  ['loan_start_month_invalid', ['#lm-start', 'budget.loanStartMonthRequired']],
+  ['loan_notes_invalid', ['#lm-notes', LOAN_SAVE_FAILED]],
+  ['loan_amount_invalid', ['#lm-amount', 'budget.validAmountRequired']],
+  ['loan_installments_invalid', ['#lm-installments', 'budget.loanInstallmentsRequired']],
+  ['loan_principal_invalid', ['#lm-principal', 'budget.loanPrincipalRequired']],
+  ['loan_rate_invalid', ['#lm-fixed-rate', 'budget.loanRateRequired']],
+  ['loan_repayment_invalid', ['#lm-initial-repayment', 'budget.loanRepaymentRequired']],
+  ['loan_fixed_period_invalid', ['#lm-fixed-period', 'budget.loanFixedPeriodRequired']],
+  ['loan_followup_rate_invalid', ['#lm-followup-rate', 'budget.loanRateRequired']],
+  // Derselbe Satz, den die Vorschau unter den Zinsfeldern fuer beide Faelle zeigt.
+  ['loan_not_amortizing', ['#lm-initial-repayment', 'budget.loanPreviewInvalid']],
+  ['loan_term_too_long', ['#lm-initial-repayment', 'budget.loanPreviewInvalid']],
+  ['loan_currency_invalid', ['#lm-currency', LOAN_SAVE_FAILED]],
+  ['loan_exchange_rate_invalid', ['#lm-exchange-rate', 'budget.loanExchangeRateRequired']],
+  ['loan_account_invalid', ['#lm-account', LOAN_SAVE_FAILED]],
+  ['loan_paid_installments_invalid', ['#lm-paid', 'budget.loanPaidInstallmentsInvalid']],
+  ['loan_paid_installments_exceed', ['#lm-paid', 'budget.loanPaidInstallmentsTooMany']],
+  ['loan_term_below_paid', ['#lm-installments, #lm-initial-repayment', 'budget.loanTermBelowPaid']],
+  // Aus dem Dialog nicht erreichbar (er schickt nur gueltige Werte) - ohne Feld.
+  ['loan_direction_invalid', [null, LOAN_SAVE_FAILED]],
+  ['loan_interest_mode_invalid', [null, LOAN_SAVE_FAILED]],
+  ['loan_interest_fields_required', [null, LOAN_SAVE_FAILED]],
+]);
+
+/**
+ * Was der Darlehens-Dialog zu einem fehlgeschlagenen Speichern sagt (#1656).
+ * Nie der Satz des Servers: eine 400 bekommt den Satz ihres Grundes oder den
+ * allgemeinen des Dialogs, alles andere den Satz der App (friendlyError).
+ *
+ * @param {unknown} err
+ * @returns {{ fields: string|null, message: string }}
+ */
+function loanSaveError(err) {
+  const status = err?.status;
+  if (status === 400) {
+    const [fields, key] = LOAN_REFUSALS.get(err.data?.reason) ?? [null, LOAN_SAVE_FAILED];
+    return { fields, message: t(key) };
+  }
+  // friendlyError reicht bei einem Status ohne eigenen Satz den Text des Servers
+  // durch - hier nur dort fragen, wo es einen Satz hat.
+  const known = status === 0 || status === 403 || status === 404 || status >= 500 || !navigator.onLine;
+  return { fields: null, message: known ? friendlyError(err) : t(LOAN_SAVE_FAILED) };
+}
+
+/** Zeigt die Absage am Feld, wenn es eines gibt und es sichtbar ist - sonst als Toast. */
+function showLoanSaveError(panel, err) {
+  const { fields, message } = loanSaveError(err);
+  const input = fields
+    ? [...panel.querySelectorAll(fields)].find((el) => !el.closest('[hidden]'))
+    : null;
+  if (input) reportFieldError(input, message);
+  else window.yuvomi?.showToast(message, 'danger');
+}
+
+/**
+ * Prueft "Bereits gezahlte Raten" am Feld, bevor etwas gesendet wird (#1656).
+ * `null` = das Feld gibt es nicht (Bearbeiten) oder es ist leer - der Server
+ * behandelt beides als "nichts nachtragen".
+ *
+ * @returns {{ value: number|null }|{ invalid: true }}
+ */
+function readPaidInstallments(panel) {
+  const field = panel.querySelector('#lm-paid');
+  // Ein type=number-Feld liefert '' auch fuer Unlesbares ("abc", "1e"); das
+  // sagt validity.badInput - ein leeres Feld ist dagegen gueltig.
+  if (!field || (field.value.trim() === '' && !field.validity?.badInput)) return { value: null };
+  const value = Number(field.value);
+  if (field.value.trim() === '' || !Number.isInteger(value) || value < 0) {
+    reportFieldError(field, t('budget.loanPaidInstallmentsInvalid'));
+    return { invalid: true };
+  }
+  return { value };
+}
+
+/**
+ * Mit Zins leitet der Server die Laufzeit ab. Die Vorschau liefert genau diese
+ * Zahl - hier wird sie fuer den Koerper gefragt, der gleich gespeichert wird,
+ * statt eine zweite Zinsformel im Client zu fuehren oder sich auf eine Vorschau
+ * zu verlassen, die noch unterwegs sein kann. Kennt die Vorschau keine Laufzeit
+ * (Angaben tilgen nicht, Netz weg), entscheidet der Server - seine Absage
+ * landet ueber LOAN_REFUSALS am selben Feld.
+ *
+ * @returns {Promise<number|null>}
+ */
+async function loanTermFromPreview(body) {
+  try {
+    const { data } = await api.post('/budget/loans/preview', body);
+    return data?.ok && Number.isInteger(data.total_months) ? data.total_months : null;
+  } catch {
+    return null;
+  }
+}
+
 async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave = false } = {}) {
   if (readOnly()) return;
   const isEdit = Boolean(loan);
   const borrower = panel.querySelector('#lm-borrower').value.trim();
   const title = panel.querySelector('#lm-title').value.trim() || borrower;
   const start_month = panel.querySelector('#lm-start').value;
-  // null = das Feld gibt es nicht (Bearbeiten) oder es ist leer - der Server
-  // behandelt beides als "nichts nachtragen".
-  const paidField = panel.querySelector('#lm-paid');
-  const paidInstallments = paidField && paidField.value.trim() !== ''
-    ? parseInt(paidField.value, 10)
-    : null;
   const notes = panel.querySelector('#lm-notes').value.trim();
   const mode = panel.querySelector('#lm-interest-mode')?.value ?? 'none';
 
@@ -4156,8 +4264,14 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
       reportFieldError(panel.querySelector('#lm-installments'), t('budget.loanInstallmentsRequired'));
       return;
     }
+    const paid = readPaidInstallments(panel);
+    if (paid.invalid) return;
+    if (paid.value !== null && paid.value > installment_count) {
+      reportFieldError(panel.querySelector('#lm-paid'), t('budget.loanPaidInstallmentsTooMany'));
+      return;
+    }
     body = { borrower, title, start_month, notes, interest_mode: 'none', total_amount, installment_count };
-    if (paidInstallments !== null) body.paid_installments = paidInstallments;
+    if (paid.value !== null) body.paid_installments = paid.value;
   } else {
     const principal = parseFloat(panel.querySelector('#lm-principal').value);
     const fixed_rate = parseFloat(panel.querySelector('#lm-fixed-rate').value);
@@ -4179,7 +4293,6 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
       return;
     }
     body = { borrower, title, start_month, notes, interest_mode: mode, principal, fixed_rate, initial_repayment_rate };
-    if (paidInstallments !== null) body.paid_installments = paidInstallments;
     if (mode === 'fixed_then_variable') {
       const fixed_period_months = parseInt(panel.querySelector('#lm-fixed-period').value, 10);
       const followup_rate = parseFloat(panel.querySelector('#lm-followup-rate').value);
@@ -4194,6 +4307,9 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
       body.fixed_period_months = fixed_period_months;
       body.followup_rate = followup_rate;
     }
+    const paid = readPaidInstallments(panel);
+    if (paid.invalid) return;
+    if (paid.value !== null) body.paid_installments = paid.value;
   }
   body.currency = currency;
   body.exchange_rate = exchange_rate;
@@ -4204,8 +4320,20 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
   const accountSel = panel.querySelector('#lm-account');
   if (accountSel) body.account_id = accountSel.value === '' ? null : parseInt(accountSel.value, 10);
 
+  const saveLabel = isEdit ? t('common.save') : t('budget.createLoan');
   saveBtn.disabled = true;
   saveBtn.textContent = '…';
+  // Gezahlte Raten gegen die abgeleitete Laufzeit (#1656) - nur wo es etwas zu
+  // pruefen gibt, und erst bei gesperrtem Knopf: die Frage geht an den Server.
+  if (mode !== 'none' && body.paid_installments > 0) {
+    const term = await loanTermFromPreview(body);
+    if (term !== null && body.paid_installments > term) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = saveLabel;
+      reportFieldError(panel.querySelector('#lm-paid'), t('budget.loanPaidInstallmentsTooMany'));
+      return;
+    }
+  }
   try {
     if (isEdit) {
       await api.put(`/budget/loans/${loan.id}`, body);
@@ -4217,9 +4345,9 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
     renderBody();
     window.yuvomi?.showToast(isEdit ? t('budget.loanSavedToast') : t('budget.loanAddedToast'), 'success');
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     saveBtn.disabled = false;
-    saveBtn.textContent = isEdit ? t('common.save') : t('budget.createLoan');
+    saveBtn.textContent = saveLabel;
+    showLoanSaveError(panel, err);
   }
 }
 
@@ -4717,6 +4845,9 @@ export const __test = {
   // #1648: die EINE Feldliste des Darlehens und ihre Verdrahtung, als Programm.
   loanFormFieldsHtml,
   wireLoanFormFields,
+  // #1656: Absage des Servers -> Feld und Satz.
+  LOAN_REFUSALS,
+  loanSaveError,
   // #1546: was "alle kuenftigen" aus einem Vorkommen an die Serie schickt.
   occurrenceSeriesBody,
   // #1035: dasselbe von der ersten Buchung aus - mit Rhythmus, Werte nur geaendert.

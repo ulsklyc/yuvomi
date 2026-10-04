@@ -3505,3 +3505,115 @@ test('#1648: bei einem Zins-Darlehen deckelt der Vorschlag an der Laufzeit der S
     assert.equal(paid.value, '30', 'ohne Zins und ohne Ratenanzahl bleibt der Abstand');
   } finally { globalThis.__apiStub = vorher; }
 });
+
+// ─── #1656: Absage des Darlehens-Dialogs -> Feld und Satz ───────────────────
+// saveLoanFromPanel() zeigte `err.data.error` als Toast: den englischen Satz des
+// Servers, in jeder Sprache und an keinem Feld. Der Server nennt jetzt zu jeder
+// 400 des Formulars einen `reason`, LOAN_REFUSALS ordnet ihm Feld und Satz zu.
+// Den Klick selbst misst test-budget-loan-dialogs-browser.js.
+
+test('#1656: eine Absage des Darlehens-Dialogs wird nie zum Satz des Servers', () => {
+  const raw = 'A sentence this client has never seen.';
+  const online = globalThis.navigator;
+  Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
+  try {
+    // Der Test-Loader liefert fuer t(key) den Schluessel selbst.
+    assert.deepEqual(
+      budgetUi.loanSaveError({ status: 400, message: raw, data: { error: raw, code: 400, reason: 'loan_paid_installments_exceed' } }),
+      { fields: '#lm-paid', message: 'budget.loanPaidInstallmentsTooMany' },
+    );
+    assert.deepEqual(
+      budgetUi.loanSaveError({ status: 400, message: raw, data: { error: raw, code: 400, reason: 'loan_paid_installments_invalid' } }),
+      { fields: '#lm-paid', message: 'budget.loanPaidInstallmentsInvalid' },
+    );
+    // Bearbeiten: ohne Zins steht die Ratenanzahl da, mit Zins die Tilgung.
+    assert.deepEqual(
+      budgetUi.loanSaveError({ status: 400, data: { error: raw, reason: 'loan_term_below_paid' } }),
+      { fields: '#lm-installments, #lm-initial-repayment', message: 'budget.loanTermBelowPaid' },
+    );
+    // Kein, ein unbekannter oder ein boesartiger Grund: der allgemeine Satz des Dialogs.
+    for (const reason of [undefined, null, '', 'some_future_reason', '__proto__', 'constructor', 'toString', 7]) {
+      assert.deepEqual(
+        budgetUi.loanSaveError({ status: 400, message: raw, data: { error: raw, code: 400, reason } }),
+        { fields: null, message: 'budget.loanSaveFailed' }, String(reason),
+      );
+    }
+    // Andere Antworten: der Satz der App, wo sie einen hat - sonst der des Dialogs.
+    for (const [err, key] of [
+      [{ status: 403, message: raw, data: { error: raw } }, 'common.errorNoPermission'],
+      [{ status: 404, message: raw, data: { error: raw } }, 'common.errorNotFound'],
+      [{ status: 500, message: raw, data: { error: raw } }, 'common.errorServer'],
+      [{ status: 0, message: raw }, 'common.errorOfflineMutation'],
+      [{ status: 409, message: raw, data: { error: raw } }, 'budget.loanSaveFailed'],
+      [{ status: 429, message: raw, data: { error: raw } }, 'budget.loanSaveFailed'],
+      [{ message: raw }, 'budget.loanSaveFailed'],
+      [undefined, 'budget.loanSaveFailed'],
+    ]) {
+      assert.deepEqual(budgetUi.loanSaveError(err), { fields: null, message: key }, JSON.stringify(err));
+    }
+    // Ein Grund zaehlt nur an einer 400.
+    assert.deepEqual(
+      budgetUi.loanSaveError({ status: 500, data: { error: raw, reason: 'loan_paid_installments_exceed' } }),
+      { fields: null, message: 'common.errorServer' },
+    );
+  } finally {
+    Object.defineProperty(globalThis, 'navigator', { value: online, configurable: true, writable: true });
+  }
+});
+
+test('#1656: jeder Grund des Servers ist eingeordnet, jedes Feld gibt es, jeder Satz steht in jeder Sprache', () => {
+  const server = read('../server/routes/budget/loans.js');
+  const atServer = new Set([...server.matchAll(/\brefusals?\('(loan_[a-z_]+)'/g)].map((m) => m[1]));
+  assert.ok(atServer.size >= 20, `zu wenige Gruende gelesen (${atServer.size}) - das Muster greift nicht mehr`);
+  const known = new Set(budgetUi.LOAN_REFUSALS.keys());
+  assert.deepEqual([...atServer].filter((r) => !known.has(r)), [], 'ein Grund des Servers ohne Feld und Satz im Dialog');
+  assert.deepEqual([...known].filter((r) => !atServer.has(r)), [], 'der Dialog fuehrt einen Grund, den der Server nicht mehr schickt');
+  // Kein Formular-400 ohne Grund: jede Absage von POST/PUT /loans laeuft ueber refuse().
+  const form = server.slice(server.indexOf("router.post('/loans', "), server.indexOf("router.post('/loans/:id/payments'"));
+  assert.ok(form.length > 1000, 'Vorbedingung: der Abschnitt der beiden Formular-Routen wurde gefunden');
+  assert.doesNotMatch(form, /status\(400\)/, 'eine 400 des Formulars geht am Grund vorbei');
+
+  // Jedes genannte Feld steht im Formular - sonst landete die Absage still im Toast.
+  const html = budgetUi.loanFormFieldsHtml(null, { startMonth: '2026-01' })
+    + budgetUi.loanFormFieldsHtml({ id: 1, title: 'T', borrower: 'B', total_amount: 100, installment_count: 2, start_month: '2026-01' }, { startMonth: '2026-01' });
+  const dir = new URL('../public/locales/', import.meta.url);
+  const files = readdirSync(dir).filter((name) => name.endsWith('.json'));
+  assert.ok(files.length >= 26, `zu wenige Sprachdateien gelesen (${files.length})`);
+  const locales = files.map((name) => [name, JSON.parse(readFileSync(new URL(name, dir), 'utf8'))]);
+  const NEW = new Set(['budget.loanPaidInstallmentsInvalid', 'budget.loanPaidInstallmentsTooMany', 'budget.loanTermBelowPaid', 'budget.loanSaveFailed']);
+  const keys = new Set();
+  for (const [reason, [fields, key]] of budgetUi.LOAN_REFUSALS) {
+    keys.add(key);
+    for (const selector of (fields ?? '').split(',').map((s) => s.trim()).filter(Boolean)) {
+      assert.match(selector, /^#lm-[a-z-]+$/, `${reason}: ${selector}`);
+      // #lm-account gibt es nur, wenn ein Konto angelegt ist.
+      if (selector === '#lm-account') continue;
+      assert.ok(html.includes(`id="${selector.slice(1)}"`), `${reason}: das Feld ${selector} steht nicht im Formular`);
+    }
+  }
+  for (const key of new Set([...keys, ...NEW])) {
+    const seen = new Map();
+    for (const [name, data] of locales) {
+      const text = key.split('.').reduce((node, part) => node?.[part], data);
+      assert.ok(typeof text === 'string' && text.trim().length > 0, `${name}: ${key} fehlt`);
+      if (NEW.has(key)) {
+        assert.doesNotMatch(text, /[\u2013\u2014]/, `${name}: ${key} traegt einen Gedankenstrich`);
+        seen.set(name, text);
+      }
+    }
+    // Kein deutscher oder englischer Satz in einer dritten Sprache.
+    for (const [name, text] of seen) {
+      if (name === 'de.json' || name === 'en.json') continue;
+      assert.notEqual(text, seen.get('de.json'), `${name}: ${key} ist der deutsche Satz`);
+      assert.notEqual(text, seen.get('en.json'), `${name}: ${key} ist der englische Satz`);
+    }
+  }
+});
+
+test('#1656: die Textfelder des Darlehens lassen nicht mehr zu, als der Server annimmt', () => {
+  const html = budgetUi.loanFormFieldsHtml(null, { startMonth: '2026-01' });
+  for (const [id, max] of [['lm-borrower', 100], ['lm-title', 200], ['lm-notes', 1000]]) {
+    const tag = html.match(new RegExp(`<(?:input|textarea)[^>]*id="${id}"[^>]*>`))?.[0] ?? '';
+    assert.match(tag, new RegExp(`maxlength="${max}"`), `${id}: ${tag}`);
+  }
+});
