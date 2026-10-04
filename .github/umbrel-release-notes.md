@@ -1,12 +1,12 @@
-<!-- version: 2.72.0 -->
-This update closes several privacy gaps between members of a household, adds Norwegian Bokmål, and fixes a long list of things people reported after 2.71.0.
+<!-- version: 2.73.0 -->
+This update is a round of fixes on top of 2.72.0.
 
-On the security side, ticking off, reopening or archiving a task now respects its visibility, reminders can only be set on entries you can see, and the points history no longer names a task that is hidden from you. In personal budget mode, the entry list and the budget plan no longer reveal what another member keeps private. A recurring shared expense is now checked when it is created, and one that cannot be booked is paused on its own instead of holding back every other recurring expense. Updating is recommended for every household with more than one member.
+A browser or system that announces Norwegian as `no` or `nn` now gets the Norwegian translation instead of English. Refused requests explain themselves in your language: a locked task, a recipe mirrored from Mealie or Tandoor and an expired page each have their own sentence, and the misleading advice to sign in again is gone.
 
-Norwegian Bokmål is the 26th language. Admins are asked once whether the household should use the browser's time zone, and a new household starts in its own time zone. Korean sentences now pick the right particle for the name they contain, and avatars show the same initials for a person on every page.
+In the budget, a loan created from "New entry" can now say how many installments are already paid, and the suggestion for that number works when the first due month lies in the past. Editing a shared expense shows amounts in your household's number format. Guests of a shared-expense group are no longer stuck behind the back button.
 
-Recurring tasks say when they come back after you tick them off, and give their points once a day instead of once per tick; reopening a completed task no longer erases its points from the history. In the calendar, opening one occurrence of a recurring event opens that occurrence, an event that ends at midnight is drawn at its full length, and right-to-left languages are mirrored fully. An address that does not exist now takes you to the closest page.
+In the calendar, closing an event dialog on a wide screen no longer moves the address to the previous page. A direct link to a module that is switched off opens the overview, and a wrong address below the pairing or invitation page leads to that page instead of the sign-in page. Housekeeping reads the check-in of visits that were imported by hand correctly for "today" and "last visit".
 
-The update runs two database migrations on first start. One gives every recurring budget payment its own start date, the other changes how points are reversed when a task is reopened. No existing entry is lost and no action is needed; as always, a backup before updating is a good idea.
+There are no database migrations in this update and no action is needed.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.72.0
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.73.0

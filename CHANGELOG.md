@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A module switched off for the household no longer works in the background** (#1660). With
+  Health switched off, the medication scheduler kept creating the due doses and sending their
+  reminders - as a push and on notification channels, to the person and to their caregivers - and
+  tapping one opened a page that turned you away. It now does nothing while Health is off. After
+  switching Health back on, only today's doses that are already due come up, at most one reminder
+  per time of day; the days in between are not caught up. Two quieter cases follow the same rule:
+  check-up and vaccination reminders are no longer prepared while Health is off (they were held
+  back from delivery already, and come back on the first run after switching it on), and the
+  hourly import from a recipe provider (Mealie, Tandoor) pauses while Recipes is off. "Sync now"
+  in the settings still works, and the module's own pages and API stay reachable as before.
+
+## [2.73.0] - 2026-10-04
+
+### Fixed
+
 - **A Norwegian browser or system that reports `no` or `nn` gets Norwegian instead of English.**
   Norwegian Bokmål ships as `nb`, but many browsers and systems announce the general code `no`
   (`no-NO`, `LANG=no_NO.UTF-8`), and that fell through to English. The same went for Nynorsk
@@ -54,7 +69,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused request used this second sentence, which advised signing in again although the session
   was fine. It now says "You do not have permission to do that", the same sentence as everywhere
   else, in all 26 languages.
-
 - **Closing an event dialog on a wide screen no longer moves the address to the page you came
   from.** In the day, week and month views an event opens in a small card. Choosing "Edit" or
   "Delete" there closes the card and opens the next dialog a moment later - the form, or the
@@ -83,16 +97,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already shows. And where the app already knew the more precise reason, for example read-only
   access to a module, the error screen no longer replaces it with the general "You do not have
   permission to do that".
-- **A module switched off for the household no longer works in the background** (#1660). With
-  Health switched off, the medication scheduler kept creating the due doses and sending their
-  reminders - as a push and on notification channels, to the person and to their caregivers - and
-  tapping one opened a page that turned you away. It now does nothing while Health is off. After
-  switching Health back on, only today's doses that are already due come up, at most one reminder
-  per time of day; the days in between are not caught up. Two quieter cases follow the same rule:
-  check-up and vaccination reminders are no longer prepared while Health is off (they were held
-  back from delivery already, and come back on the first run after switching it on), and the
-  hourly import from a recipe provider (Mealie, Tandoor) pauses while Recipes is off. "Sync now"
-  in the settings still works, and the module's own pages and API stay reachable as before.
 
 ## [2.72.0] - 2026-10-04
 
