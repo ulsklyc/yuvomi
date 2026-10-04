@@ -3863,6 +3863,7 @@
             "payment_registered": "Paiement enregistré",
             "recurring_created": "Dépense récurrente créée",
             "recurring_paused": "Dépense récurrente suspendue",
+            "recurring_auto_paused": "Dépense récurrente suspendue automatiquement : elle n'a pas pu être enregistrée",
             "recurring_resumed": "Dépense récurrente reprise",
             "recurring_generated": "Dépense récurrente générée",
             "payment_reversed": "Paiement annulé",

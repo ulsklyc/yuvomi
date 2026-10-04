@@ -4083,6 +4083,7 @@
             "payment_registered": "Płatność zarejestrowana",
             "recurring_created": "Cykliczny wydatek utworzony",
             "recurring_paused": "Cykliczny wydatek wstrzymany",
+            "recurring_auto_paused": "Cykliczny wydatek wstrzymany automatycznie: nie udało się go zaksięgować",
             "recurring_resumed": "Cykliczny wydatek wznowiony",
             "recurring_generated": "Cykliczny wydatek wygenerowany",
             "payment_reversed": "Płatność stornowana",

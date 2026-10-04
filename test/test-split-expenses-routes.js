@@ -1146,7 +1146,7 @@ test('Buchungslauf: eine faellige Serie bucht dieselben Ledger-Zeilen wie POST /
     assert.equal(e.status, 201, fall.title);
   }
 
-  assert.deepEqual(processDueRecurringExpenses('2026-01-31'), { generated: faelle.length });
+  assert.deepEqual(processDueRecurringExpenses('2026-01-31'), { generated: faelle.length, paused: 0, failed: 0 });
 
   const zeilen = (where) => db.prepare(`
     SELECT e.title, l.group_id, l.source_type, l.user_id, l.counterparty_id, l.amount_minor, l.currency, l.memo, l.created_by
@@ -1166,7 +1166,134 @@ test('Buchungslauf: eine faellige Serie bucht dieselben Ledger-Zeilen wie POST /
   assert.deepEqual(anteile('e.recurring_rule_id IS NOT NULL'), anteile('e.recurring_rule_id IS NULL'));
 
   // Der Lauf hat den Termin weitergestellt und bucht denselben Tag nicht zweimal.
-  assert.deepEqual(processDueRecurringExpenses('2026-01-31'), { generated: 0 });
+  assert.deepEqual(processDueRecurringExpenses('2026-01-31'), { generated: 0, paused: 0, failed: 0 });
+});
+
+// --------------------------------------------------------------------------
+// Der Buchungslauf je Serie. Bis hierher buchte er alle faelligen Serien in
+// EINER Transaktion: warf eine, war der ganze Lauf zurueckgerollt, kein Termin
+// rueckte vor, und der naechste Lauf eine Stunde spaeter scheiterte an derselben
+// Serie. Sichtbar war das nur im Serverlog.
+// --------------------------------------------------------------------------
+async function serienGruppe(name) {
+  const owner = { id: OWNER, role: 'member' };
+  const g = await call('POST', '/groups', { actor: owner, body: { name, type: 'household', default_currency: 'EUR' } });
+  const gid = g.body.data.id;
+  for (const uid of [MGR, MEM]) {
+    assert.equal((await call('POST', `/groups/${gid}/members`, { actor: owner, body: { user_id: uid, role: 'guest' } })).status, 201);
+  }
+  // Alles andere Faellige ruht, damit jeder Fall nur seine eigenen Serien sieht.
+  db.prepare('UPDATE recurring_expenses SET paused_at = ? WHERE paused_at IS NULL').run('2026-01-01T00:00:00Z');
+  return gid;
+}
+const serieIn = async (gid, extra) => {
+  const r = await call('POST', `/groups/${gid}/recurring`, {
+    actor: { id: OWNER, role: 'member' },
+    body: { title: 'Strom', amount: '9.00', currency: 'EUR', frequency: 'monthly', next_run_date: '2026-03-10', payer_id: OWNER, participants: [OWNER, MGR, MEM], ...extra },
+  });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  return r.body.data.id;
+};
+const serienStand = (id) => db.prepare('SELECT next_run_date, paused_at FROM recurring_expenses WHERE id = ?').get(id);
+const gebucht = (id) => db.prepare('SELECT COUNT(*) AS n FROM expenses WHERE recurring_rule_id = ?').get(id).n;
+const autoPausen = (id) => db.prepare("SELECT actor_id, metadata FROM expense_activity WHERE type = 'recurring_auto_paused' AND entity_type = 'recurring_expense' AND entity_id = ?").all(id)
+  .map((row) => ({ actor_id: row.actor_id, ...JSON.parse(row.metadata) }));
+const { processDueRecurringExpenses: serienLauf } = await import('../server/services/split-expenses-scheduler.js');
+
+test('Buchungslauf: eine unbuchbare Bestandsserie pausiert sich, die gesunde daneben wird gebucht', async () => {
+  const gid = await serienGruppe('Lauf-Bestand');
+  // Bestand von vor der Pruefung beim Anlegen: die Route nimmt so etwas nicht
+  // mehr an, also liegt die Zeile so in der Tabelle, wie der alte POST sie schrieb.
+  const kaputt = await serieIn(gid, { title: 'Kaputt', next_run_date: '2026-03-01' });
+  db.prepare("UPDATE recurring_expenses SET split_method = 'exact', split_snapshot = ? WHERE id = ?")
+    .run(JSON.stringify({ participants: [OWNER, MGR], splits: [{ user_id: OWNER, amount: '1.00' }] }), kaputt);
+  const keinJson = await serieIn(gid, { title: 'Kein JSON', next_run_date: '2026-03-02' });
+  db.prepare("UPDATE recurring_expenses SET split_snapshot = '{participants' WHERE id = ?").run(keinJson);
+  const gesund = await serieIn(gid, { title: 'Gesund' });
+
+  let ergebnis;
+  assert.doesNotThrow(() => { ergebnis = serienLauf('2026-03-10'); });
+  assert.deepEqual(ergebnis, { generated: 1, paused: 2, failed: 0 });
+  assert.equal(gebucht(gesund), 1);
+  assert.equal(serienStand(gesund).next_run_date, '2026-04-10');
+  assert.equal(serienStand(gesund).paused_at, null);
+  for (const [id, title] of [[kaputt, 'Kaputt'], [keinJson, 'Kein JSON']]) {
+    assert.equal(gebucht(id), 0, title);
+    assert.ok(serienStand(id).paused_at, `${title} ist pausiert`);
+    assert.deepEqual(autoPausen(id), [{ actor_id: null, title, reason: 'split_invalid' }], title);
+  }
+  assert.equal(serienStand(kaputt).next_run_date, '2026-03-01', 'der Termin einer pausierten Serie bleibt stehen');
+
+  // Der Grund steht im Verlauf der Gruppe, den die App zeigt.
+  const verlauf = await call('GET', `/groups/${gid}/activity`, { actor: { id: OWNER, role: 'member' } });
+  assert.equal(verlauf.body.data.filter((a) => a.type === 'recurring_auto_paused').length, 2);
+
+  // Zweiter Lauf: nichts mehr faellig ausser nichts - er wirft nicht und schreibt keinen zweiten Eintrag.
+  assert.deepEqual(serienLauf('2026-03-10'), { generated: 0, paused: 0, failed: 0 });
+  assert.equal(autoPausen(kaputt).length, 1);
+});
+
+test('Buchungslauf: wer die Gruppe verlassen hat, wird nicht mehr gebucht - die Serie pausiert', async () => {
+  const gid = await serienGruppe('Lauf-Austritt');
+  const beteiligt = await serieIn(gid, { title: 'Beteiligter geht' });
+  const zahlt = await serieIn(gid, { title: 'Zahler geht', payer_id: MGR, participants: [OWNER, MEM] });
+  const bleibt = await serieIn(gid, { title: 'Bleibt', participants: [OWNER, MEM] });
+  assert.equal((await call('DELETE', `/groups/${gid}/members/${MGR}`, { actor: { id: OWNER, role: 'member' } })).status, 200);
+  const ledgerVorher = db.prepare('SELECT COUNT(*) AS n FROM expense_ledger_entries WHERE group_id = ?').get(gid).n;
+
+  assert.deepEqual(serienLauf('2026-03-10'), { generated: 1, paused: 2, failed: 0 });
+  assert.equal(gebucht(bleibt), 1);
+  for (const [id, title] of [[beteiligt, 'Beteiligter geht'], [zahlt, 'Zahler geht']]) {
+    assert.equal(gebucht(id), 0, title);
+    assert.ok(serienStand(id).paused_at, title);
+    assert.deepEqual(autoPausen(id), [{ actor_id: null, title, reason: 'not_a_member' }], title);
+  }
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM expense_ledger_entries WHERE group_id = ? AND user_id = ?').get(gid, MGR).n, 0, 'keine Ledger-Zeile fuer die ausgetretene Person');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM expense_ledger_entries WHERE group_id = ?').get(gid).n, ledgerVorher + 3, 'nur die gesunde Serie hat gebucht');
+
+  // Wieder aufgenommen und fortgesetzt, bucht die Serie wieder.
+  assert.equal((await call('POST', `/groups/${gid}/members`, { actor: { id: OWNER, role: 'member' }, body: { user_id: MGR, role: 'guest' } })).status, 201);
+  assert.equal((await call('POST', `/recurring/${beteiligt}/pause`, { actor: { id: OWNER, role: 'member' } })).body.data.paused_at, null);
+  assert.deepEqual(serienLauf('2026-03-10'), { generated: 1, paused: 0, failed: 0 });
+  assert.equal(gebucht(beteiligt), 1);
+});
+
+test('Buchungslauf: das Konto eines Beteiligten ist geloescht - die Serie pausiert, die andere bucht', async () => {
+  const gid = await serienGruppe('Lauf-Konto');
+  const weg = mkUser('gleichweg');
+  assert.equal((await call('POST', `/groups/${gid}/members`, { actor: { id: OWNER, role: 'member' }, body: { user_id: weg, role: 'guest' } })).status, 201);
+  const mitIhm = await serieIn(gid, { title: 'Mit geloeschtem Konto', participants: [OWNER, weg] });
+  const ohneIhn = await serieIn(gid, { title: 'Ohne', participants: [OWNER, MEM] });
+  db.prepare('DELETE FROM users WHERE id = ?').run(weg);
+
+  assert.deepEqual(serienLauf('2026-03-10'), { generated: 1, paused: 1, failed: 0 });
+  assert.equal(gebucht(ohneIhn), 1);
+  assert.equal(gebucht(mitIhm), 0);
+  assert.ok(serienStand(mitIhm).paused_at);
+  assert.deepEqual(autoPausen(mitIhm), [{ actor_id: null, title: 'Mit geloeschtem Konto', reason: 'not_a_member' }]);
+});
+
+// Die Gegenrichtung: pausiert wird nur, was die SERIE unbuchbar macht. Ein
+// Fehler im Code ist keiner davon - er darf nicht als "Serie kaputt" enden und
+// damit eine gesunde Serie still abschalten.
+test('Buchungslauf: ein Programmierfehler pausiert keine Serie und haelt die naechste nicht auf', async () => {
+  const gid = await serienGruppe('Lauf-Codefehler');
+  const trifft = await serieIn(gid, { title: 'Trifft den Fehler', next_run_date: '2026-03-01' });
+  const danach = await serieIn(gid, { title: 'Danach' });
+  const { generateRecurringExpense } = await import('../server/services/split-expenses-scheduler.js');
+  const mitFehler = (database, recurring) => {
+    if (recurring.id === trifft) return undefined.nichtDa;
+    return generateRecurringExpense(database, recurring);
+  };
+
+  assert.deepEqual(serienLauf('2026-03-10', mitFehler), { generated: 1, paused: 0, failed: 1 });
+  assert.equal(gebucht(danach), 1);
+  assert.equal(gebucht(trifft), 0);
+  assert.deepEqual(serienStand(trifft), { next_run_date: '2026-03-01', paused_at: null }, 'unpausiert, Termin unveraendert');
+  assert.deepEqual(autoPausen(trifft), []);
+  // Ohne den Fehler holt der naechste Lauf sie nach.
+  assert.deepEqual(serienLauf('2026-03-10'), { generated: 1, paused: 0, failed: 0 });
+  assert.equal(gebucht(trifft), 1);
 });
 
 test('teardown: Server schließen', async () => {

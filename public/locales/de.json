@@ -3863,6 +3863,7 @@
             "payment_registered": "Zahlung eingetragen",
             "recurring_created": "Wiederkehrende Ausgabe erstellt",
             "recurring_paused": "Wiederkehrende Ausgabe pausiert",
+            "recurring_auto_paused": "Wiederkehrende Ausgabe automatisch pausiert: nicht buchbar",
             "recurring_resumed": "Wiederkehrende Ausgabe fortgesetzt",
             "recurring_generated": "Wiederkehrende Ausgabe erzeugt",
             "payment_reversed": "Zahlung storniert",

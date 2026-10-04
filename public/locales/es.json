@@ -3863,6 +3863,7 @@
             "payment_registered": "Pago registrado",
             "recurring_created": "Gasto recurrente creado",
             "recurring_paused": "Gasto recurrente pausado",
+            "recurring_auto_paused": "Gasto recurrente pausado automáticamente: no se pudo registrar",
             "recurring_resumed": "Gasto recurrente reanudado",
             "recurring_generated": "Gasto recurrente generado",
             "payment_reversed": "Pago anulado",

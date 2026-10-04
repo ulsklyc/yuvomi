@@ -3863,6 +3863,7 @@
             "payment_registered": "Pagamento registrato",
             "recurring_created": "Spesa ricorrente creata",
             "recurring_paused": "Spesa ricorrente sospesa",
+            "recurring_auto_paused": "Spesa ricorrente sospesa automaticamente: non è stato possibile registrarla",
             "recurring_resumed": "Spesa ricorrente ripresa",
             "recurring_generated": "Spesa ricorrente generata",
             "payment_reversed": "Pagamento stornato",

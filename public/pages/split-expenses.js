@@ -838,7 +838,7 @@ function restoredDetail(item) {
  * aeltere Kommentar-Eintraege tragen keine Metadaten, und der Titel benennt
  * die Ausgabe, er behauptet keinen Stand von damals.
  */
-const EXPENSE_ACTIVITY = new Set(['expense_created', 'expense_edited', 'expense_deleted', 'comment_added', 'recurring_created']);
+const EXPENSE_ACTIVITY = new Set(['expense_created', 'expense_edited', 'expense_deleted', 'comment_added', 'recurring_created', 'recurring_auto_paused']);
 
 function expenseDetail(item) {
   if (!EXPENSE_ACTIVITY.has(item.type)) return '';

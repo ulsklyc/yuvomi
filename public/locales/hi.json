@@ -3863,6 +3863,7 @@
             "payment_registered": "भुगतान दर्ज हुआ",
             "recurring_created": "दोहराया खर्च बनाया गया",
             "recurring_paused": "दोहराया खर्च रोका गया",
+            "recurring_auto_paused": "दोहराया खर्च अपने आप रोका गया: इसे दर्ज नहीं किया जा सका",
             "recurring_resumed": "दोहराया खर्च फिर शुरू हुआ",
             "recurring_generated": "दोहराया खर्च बनाया गया",
             "payment_reversed": "भुगतान रद्द किया गया",

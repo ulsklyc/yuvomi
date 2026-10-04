@@ -3863,6 +3863,7 @@
             "payment_registered": "Betaling geregistreerd",
             "recurring_created": "Terugkerende uitgave aangemaakt",
             "recurring_paused": "Terugkerende uitgave gepauzeerd",
+            "recurring_auto_paused": "Terugkerende uitgave automatisch gepauzeerd: kon niet worden geboekt",
             "recurring_resumed": "Terugkerende uitgave hervat",
             "recurring_generated": "Terugkerende uitgave gegenereerd",
             "payment_reversed": "Betaling tegengeboekt",

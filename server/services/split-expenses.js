@@ -23,30 +23,42 @@ const CURRENCY_MINOR_UNITS = {
   CLP: 0, JPY: 0, KRW: 0, VND: 0,
 };
 
+// Eine Eingabe, die sich nicht aufteilen laesst: ungueltiger Betrag, fehlender
+// Anteil, Summe daneben. Ein eigener Typ, damit ein Aufrufer ohne Nutzer vor dem
+// Bildschirm (der Buchungslauf der Serien) "diese Eingabe ist unbuchbar" von
+// einem Fehler im Code unterscheiden kann, ohne Meldungstexte zu vergleichen.
+// Fuer die Routen aendert sich nichts: sie reichen `message` als 400 weiter.
+class SplitInputError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'SplitInputError';
+  }
+}
+
 function minorUnit(currency = 'EUR') {
   return CURRENCY_MINOR_UNITS[String(currency).toUpperCase()] ?? 2;
 }
 
 function parseMoneyToMinor(value, currency = 'EUR', field = 'amount') {
   if (typeof value === 'number') {
-    throw new Error(`${field} must be sent as a decimal string to avoid floating point loss.`);
+    throw new SplitInputError(`${field} must be sent as a decimal string to avoid floating point loss.`);
   }
   const raw = String(value ?? '').trim();
   const scale = minorUnit(currency);
   const re = /^-?\d+(\.\d+)?$/;
-  if (!re.test(raw)) throw new Error(`${field} must be a valid decimal string.`);
+  if (!re.test(raw)) throw new SplitInputError(`${field} must be a valid decimal string.`);
   // Kein Aufrufer hat einen negativen Betrag: Ausgabe, Anteil und Zahlung liegen
   // in Spalten mit CHECK(> 0) bzw. CHECK(>= 0), eine Erstattung ist ein Storno
   // und keine negative Buchung. Bis #1607 liess diese Funktion ein Minus durch
   // und ueberliess die Ablehnung dem Schema - die Antwort war dann der rohe
   // SQLite-Text, und "-0" kam als Anteil 0 an der Null-Pruefung vorbei.
-  if (raw.startsWith('-')) throw new Error(`${field} must be greater than zero.`);
+  if (raw.startsWith('-')) throw new SplitInputError(`${field} must be greater than zero.`);
   const [whole, fraction = ''] = raw.split('.');
-  if (fraction.length > scale) throw new Error(`${field} has too many decimal places for ${currency}.`);
+  if (fraction.length > scale) throw new SplitInputError(`${field} has too many decimal places for ${currency}.`);
   const padded = fraction.padEnd(scale, '0');
   const minor = BigInt(whole) * (10n ** BigInt(scale)) + BigInt(padded || '0');
-  if (minor <= 0n) throw new Error(`${field} must be greater than zero.`);
-  if (minor > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error(`${field} is too large.`);
+  if (minor <= 0n) throw new SplitInputError(`${field} must be greater than zero.`);
+  if (minor > BigInt(Number.MAX_SAFE_INTEGER)) throw new SplitInputError(`${field} is too large.`);
   return Number(minor);
 }
 
@@ -63,9 +75,9 @@ function minorToDecimal(value, currency = 'EUR') {
 }
 
 function assertIntegerIds(ids, field) {
-  if (!Array.isArray(ids) || ids.length === 0) throw new Error(`${field} must contain at least one member.`);
+  if (!Array.isArray(ids) || ids.length === 0) throw new SplitInputError(`${field} must contain at least one member.`);
   const normalized = [...new Set(ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
-  if (!normalized.length) throw new Error(`${field} must contain valid user ids.`);
+  if (!normalized.length) throw new SplitInputError(`${field} must contain valid user ids.`);
   return normalized;
 }
 
@@ -86,7 +98,10 @@ function withCurrency(rows, currency) {
 }
 
 function splitsByUser(splits) {
-  return new Map((Array.isArray(splits) ? splits : []).map((s) => [Number(s.user_id), s]));
+  // `s?.`: ein Eintrag, der kein Objekt ist, gehoert zu niemandem - der
+  // Beteiligte ohne Wert faellt dann an der Regel seiner Split-Art auf, statt
+  // dass hier ein TypeError wie ein Fehler im Code aussieht.
+  return new Map((Array.isArray(splits) ? splits : []).map((s) => [Number(s?.user_id), s]));
 }
 
 function buildSplits({ method, amountMinor, currency, participants, splits = [] }) {
@@ -101,11 +116,11 @@ function buildSplits({ method, amountMinor, currency, participants, splits = [] 
   if (method === 'exact') {
     const rows = participantIds.map((userId) => {
       const split = splitMap.get(userId);
-      if (!split) throw new Error('Each participant needs an exact split amount.');
+      if (!split) throw new SplitInputError('Each participant needs an exact split amount.');
       return { user_id: userId, amount_minor: parseMoneyToMinor(split.amount, currency, 'split amount') };
     });
     const sum = rows.reduce((acc, row) => acc + row.amount_minor, 0);
-    if (sum !== amountMinor) throw new Error('Exact splits must add up to the expense amount.');
+    if (sum !== amountMinor) throw new SplitInputError('Exact splits must add up to the expense amount.');
     return withCurrency(rows, currency);
   }
 
@@ -113,13 +128,13 @@ function buildSplits({ method, amountMinor, currency, participants, splits = [] 
     const rows = participantIds.map((userId) => {
       const split = splitMap.get(userId);
       const percent = String(split?.percentage ?? '').trim();
-      if (!/^\d+(\.\d{1,2})?$/.test(percent)) throw new Error('Percentages must be decimal strings with up to two decimals.');
+      if (!/^\d+(\.\d{1,2})?$/.test(percent)) throw new SplitInputError('Percentages must be decimal strings with up to two decimals.');
       const [whole, fraction = ''] = percent.split('.');
       const bps = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
       return { user_id: userId, bps };
     });
     const totalBps = rows.reduce((acc, row) => acc + row.bps, 0);
-    if (totalBps !== 10000) throw new Error('Percentages must add up to 100.');
+    if (totalBps !== 10000) throw new SplitInputError('Percentages must add up to 100.');
     return withCurrency(allocateRemainder(amountMinor, rows.map((row) => ({
       user_id: row.user_id,
       amount_minor: Math.trunc((amountMinor * row.bps) / 10000),
@@ -129,7 +144,7 @@ function buildSplits({ method, amountMinor, currency, participants, splits = [] 
   if (method === 'shares') {
     const rows = participantIds.map((userId) => {
       const shares = Number(splitMap.get(userId)?.shares);
-      if (!Number.isInteger(shares) || shares <= 0) throw new Error('Shares must be positive integers.');
+      if (!Number.isInteger(shares) || shares <= 0) throw new SplitInputError('Shares must be positive integers.');
       return { user_id: userId, shares };
     });
     const totalShares = rows.reduce((acc, row) => acc + row.shares, 0);
@@ -139,7 +154,7 @@ function buildSplits({ method, amountMinor, currency, participants, splits = [] 
     }))), currency);
   }
 
-  throw new Error('Unsupported split method.');
+  throw new SplitInputError('Unsupported split method.');
 }
 
 // Der Wert je Person, den eine Split-Art liest. `equal` liest keinen.
@@ -165,6 +180,20 @@ function splitSnapshot({ method, amountMinor, currency, participants, splits = [
   }));
   buildSplits({ method, amountMinor, currency, participants: snapshot.participants, splits: snapshot.splits });
   return snapshot;
+}
+
+// Zahler und Beteiligte muessen Mitglieder DIESER Gruppe sein
+// (GHSA-4p5w-5346-8598): sonst schreibt ein Mitglied einer Person, die nie in
+// der Gruppe war, eine Schuld zu, die diese nirgends sieht und nicht bestreiten
+// kann. Eine Regel fuer alle Wege, auf denen Personen an eine Ausgabe kommen -
+// Anlegen, Bearbeiten, Serie anlegen, und der Buchungslauf an jedem Termin
+// (wer inzwischen ausgetreten ist, wird nicht weiter gebucht). Liefert den
+// Ablehnungstext oder null.
+function membershipRefusal(database, groupId, payerId, participants) {
+  const isMember = database.prepare('SELECT 1 FROM expense_group_members WHERE group_id = ? AND user_id = ?');
+  if (!isMember.get(groupId, payerId)) return 'Payer must be a group member.';
+  if (participants.some((participantId) => !isMember.get(groupId, Number(participantId)))) return 'All participants must be group members.';
+  return null;
 }
 
 // Die Buchungsregel einer Ausgabe: eine Zeile fuer den Zahler ueber den ganzen
@@ -333,6 +362,8 @@ export {
   buildSplits,
   splitSnapshot,
   insertExpenseLedger,
+  membershipRefusal,
+  SplitInputError,
   decorateMoney,
   groupBalanceRows,
   minorToDecimal,

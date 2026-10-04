@@ -6,7 +6,7 @@
 import { isRestoreRunning } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
-import { buildSplits, insertExpenseLedger } from './split-expenses.js';
+import { buildSplits, insertExpenseLedger, membershipRefusal, SplitInputError } from './split-expenses.js';
 import { todayKey } from '../utils/timezone.js';
 
 const log = createLogger('SplitExpenseScheduler');
@@ -26,8 +26,31 @@ function insertActivity(database, groupId, actorId, type, entityType, entityId, 
   `).run(groupId, actorId, type, entityType, entityId, JSON.stringify(metadata));
 }
 
+// Warum eine Serie sich an diesem Termin nicht buchen laesst. `reason` geht in
+// den Verlaufseintrag der Gruppe.
+class RecurringNotBookable extends Error {
+  constructor(reason, message) {
+    super(message);
+    this.name = 'RecurringNotBookable';
+    this.reason = reason;
+  }
+}
+
+function readSnapshot(recurring) {
+  let snapshot;
+  try {
+    snapshot = JSON.parse(recurring.split_snapshot || '{}');
+  } catch {
+    throw new RecurringNotBookable('split_invalid', 'split_snapshot is not valid JSON.');
+  }
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+    throw new RecurringNotBookable('split_invalid', 'split_snapshot is not an object.');
+  }
+  return snapshot;
+}
+
 function generateRecurringExpense(database, recurring) {
-  const snapshot = JSON.parse(recurring.split_snapshot || '{}');
+  const snapshot = readSnapshot(recurring);
   const participants = Array.isArray(snapshot.participants) ? snapshot.participants : [recurring.payer_id];
   const splits = buildSplits({
     method: recurring.split_method,
@@ -36,6 +59,13 @@ function generateRecurringExpense(database, recurring) {
     participants,
     splits: snapshot.splits || [],
   });
+  // Mitgliedschaft an JEDEM Termin, mit der Regel der Routen: beim Anlegen war
+  // sie geprueft, aber wer seither die Gruppe verlassen hat (oder dessen Konto
+  // geloescht ist), bekaeme sonst weiter Schulden in eine Gruppe gebucht, die
+  // er nicht mehr sieht. Nach buildSplits, weil erst dort feststeht, dass die
+  // Beteiligten ueberhaupt IDs sind.
+  const refusal = membershipRefusal(database, recurring.group_id, recurring.payer_id, splits.map((split) => split.user_id));
+  if (refusal) throw new RecurringNotBookable('not_a_member', refusal);
   const expenseId = database.prepare(`
     INSERT INTO expenses
       (group_id, title, description, amount_minor, currency, converted_amount_minor, converted_currency,
@@ -71,11 +101,43 @@ function generateRecurringExpense(database, recurring) {
   return expenseId;
 }
 
+// Welche Fehler bedeuten "DIESE Serie ist unbuchbar" - nur die pausieren sie.
+// Erkannt am Typ, nie am Meldungstext. Ein SQLite-Code steht bewusst nicht
+// dabei: das geloeschte Konto eines Beteiligten faengt die Mitgliedspruefung
+// (die Mitgliedszeile faellt per CASCADE mit), bevor ein Fremdschluessel
+// verletzt wird. Alles andere (TypeError, ReferenceError, SQLite) ist ein Fehler im
+// Code oder in der Umgebung: er liefert null, die Serie bleibt unpausiert, und
+// der naechste Lauf versucht sie wieder. Schluckte der Lauf ihn als "Serie
+// kaputt", schaltete ein Bug still gesunde Serien ab.
+function pauseReason(err) {
+  if (err instanceof RecurringNotBookable) return err.reason;
+  if (err instanceof SplitInputError) return 'split_invalid';
+  return null;
+}
+
+// Pausiert die Serie und schreibt den Grund in den Verlauf der Gruppe - die App
+// zeigt Serien nirgends sonst, ohne den Eintrag stuende er nur im Serverlog.
+// `actor_id` NULL: das war niemand, die App zeigt dafuer "System".
+function pauseUnbookable(database, recurring, reason) {
+  database.transaction(() => {
+    const paused = database.prepare("UPDATE recurring_expenses SET paused_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ? AND paused_at IS NULL").run(recurring.id);
+    if (!paused.changes) return;
+    insertActivity(database, recurring.group_id, null, 'recurring_auto_paused', 'recurring_expense', recurring.id, { title: recurring.title, reason });
+  })();
+}
+
 // `today` in der Haushaltszone (#829): eine wiederkehrende Ausgabe mit
 // next_run_date = heute wurde westlich von UTC schon am Vorabend gebucht, weil
 // der UTC-Tag dort bereits der folgende ist - die Buchung trug dann das
 // Vortagsdatum ihres eigenen Laufs.
-function processDueRecurringExpenses(today = todayKey(db.get())) {
+//
+// Jede Serie bucht in ihrer EIGENEN Transaktion. Frueher war es eine fuer den
+// ganzen Lauf: eine einzige unbuchbare Serie rollte alle zurueck, kein Termin
+// rueckte vor, und jede Stunde scheiterte der Lauf an derselben Serie neu.
+//
+// `book` ist die Naht fuer den Test der Fehlerrichtung, sonst immer
+// generateRecurringExpense.
+function processDueRecurringExpenses(today = todayKey(db.get()), book = generateRecurringExpense) {
   const database = db.get();
   const due = database.prepare(`
     SELECT *
@@ -84,18 +146,30 @@ function processDueRecurringExpenses(today = todayKey(db.get())) {
     ORDER BY next_run_date ASC, id ASC
     LIMIT 100
   `).all(today);
-  if (!due.length) return { generated: 0 };
-  const run = database.transaction(() => {
-    let generated = 0;
-    for (const recurring of due) {
-      generateRecurringExpense(database, recurring);
-      generated += 1;
+  const result = { generated: 0, paused: 0, failed: 0 };
+  for (const recurring of due) {
+    try {
+      database.transaction(() => book(database, recurring))();
+      result.generated += 1;
+    } catch (err) {
+      const reason = pauseReason(err);
+      if (!reason) {
+        result.failed += 1;
+        log.error(`Recurring split expense ${recurring.id} failed, left unpaused:`, err);
+        continue;
+      }
+      try {
+        pauseUnbookable(database, recurring, reason);
+        result.paused += 1;
+        log.warn(`Recurring split expense ${recurring.id} paused (${reason}): ${err.message}`);
+      } catch (pauseErr) {
+        result.failed += 1;
+        log.error(`Recurring split expense ${recurring.id} could not be paused:`, pauseErr);
+      }
     }
-    return generated;
-  });
-  const generated = run();
-  log.info(`Generated ${generated} recurring split expense(s).`);
-  return { generated };
+  }
+  if (due.length) log.info(`Recurring split expenses: ${result.generated} generated, ${result.paused} paused, ${result.failed} failed.`);
+  return result;
 }
 
 function startScheduler() {
@@ -111,4 +185,4 @@ function startScheduler() {
   }, 60 * 60 * 1000).unref();
 }
 
-export { processDueRecurringExpenses, startScheduler };
+export { generateRecurringExpense, processDueRecurringExpenses, startScheduler };

@@ -3863,6 +3863,7 @@
             "payment_registered": "Betalning registrerad",
             "recurring_created": "Återkommande utgift skapad",
             "recurring_paused": "Återkommande utgift pausad",
+            "recurring_auto_paused": "Återkommande utgift pausad automatiskt: den kunde inte bokföras",
             "recurring_resumed": "Återkommande utgift återupptagen",
             "recurring_generated": "Återkommande utgift skapades",
             "payment_reversed": "Betalning återförd",

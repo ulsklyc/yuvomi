@@ -3863,6 +3863,7 @@
             "payment_registered": "Fizetés rögzítve",
             "recurring_created": "Ismétlődő költség létrehozva",
             "recurring_paused": "Ismétlődő költség szüneteltetve",
+            "recurring_auto_paused": "Ismétlődő költség automatikusan szüneteltetve: nem lehetett lekönyvelni",
             "recurring_resumed": "Ismétlődő költség folytatva",
             "recurring_generated": "Ismétlődő költség generálva",
             "payment_reversed": "Fizetés sztornózva",

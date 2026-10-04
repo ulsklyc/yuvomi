@@ -3863,6 +3863,7 @@
             "payment_registered": "Payment registered",
             "recurring_created": "Recurring expense created",
             "recurring_paused": "Recurring expense paused",
+            "recurring_auto_paused": "Recurring expense paused automatically: it could not be booked",
             "recurring_resumed": "Recurring expense resumed",
             "recurring_generated": "Recurring expense generated",
             "payment_reversed": "Payment reversed",

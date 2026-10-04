@@ -3863,6 +3863,7 @@
             "payment_registered": "결제 등록됨",
             "recurring_created": "반복 지출 생성됨",
             "recurring_paused": "반복 지출 일시중지됨",
+            "recurring_auto_paused": "반복 지출 자동 일시중지됨: 기록할 수 없음",
             "recurring_resumed": "반복 지출 재개됨",
             "recurring_generated": "반복 지출 생성됨",
             "payment_reversed": "결제 취소됨",

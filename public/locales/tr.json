@@ -3863,6 +3863,7 @@
             "payment_registered": "Ödeme kaydedildi",
             "recurring_created": "Tekrarlanan gider oluşturuldu",
             "recurring_paused": "Tekrarlanan gider duraklatıldı",
+            "recurring_auto_paused": "Tekrarlanan gider otomatik olarak duraklatıldı: kaydedilemedi",
             "recurring_resumed": "Tekrarlanan gider sürdürüldü",
             "recurring_generated": "Tekrarlanan gider üretildi",
             "payment_reversed": "Ödeme iptal edildi",

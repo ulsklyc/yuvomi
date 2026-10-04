@@ -3863,6 +3863,7 @@
             "payment_registered": "پرداخت ثبت شد",
             "recurring_created": "هزینه تکرارشونده ایجاد شد",
             "recurring_paused": "هزینه تکرارشونده متوقف شد",
+            "recurring_auto_paused": "هزینه تکرارشونده به‌طور خودکار متوقف شد: ثبت آن ممکن نبود",
             "recurring_resumed": "هزینه تکرارشونده از سر گرفته شد",
             "recurring_generated": "هزینه تکرارشونده تولید شد",
             "payment_reversed": "پرداخت برگشت خورد",

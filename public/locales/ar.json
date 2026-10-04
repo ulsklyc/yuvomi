@@ -4193,6 +4193,7 @@
             "payment_registered": "تم تسجيل الدفع",
             "recurring_created": "تم إنشاء مصروف متكرر",
             "recurring_paused": "تم إيقاف المصروف المتكرر مؤقتًا",
+            "recurring_auto_paused": "تم إيقاف المصروف المتكرر تلقائيًا: تعذّر تسجيله",
             "recurring_resumed": "تم استئناف المصروف المتكرر",
             "recurring_generated": "تم توليد مصروف متكرر",
             "payment_reversed": "تم عكس الدفع",

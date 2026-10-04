@@ -16,7 +16,7 @@ import {
 } from '../services/document-links.js';
 import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
 import {
-  buildSplits, decorateMoney, groupBalanceRows, insertExpenseLedger, minorToDecimal, parseMoneyToMinor, simplifyDebts, splitSnapshot,
+  buildSplits, decorateMoney, groupBalanceRows, insertExpenseLedger, membershipRefusal, minorToDecimal, parseMoneyToMinor, simplifyDebts, splitSnapshot,
 } from '../services/split-expenses.js';
 import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
 import { syncBirthdayArtifacts } from '../services/birthdays.js';
@@ -439,17 +439,6 @@ function settlementForViewer(row, req) {
     ...decorateMoney(row),
     proof_document_id: documentRefForViewer(db.get(), row.proof_document_id, documentViewer(req)),
   };
-}
-
-// Zahler und Beteiligte muessen Mitglieder DIESER Gruppe sein
-// (GHSA-4p5w-5346-8598): sonst schreibt ein Mitglied einer Person, die nie in
-// der Gruppe war, eine Schuld zu, die diese nirgends sieht und nicht bestreiten
-// kann. Eine Regel fuer alle drei Wege, auf denen Personen an eine Ausgabe
-// kommen - Anlegen, Bearbeiten, Serie. Liefert den Ablehnungstext oder null.
-function membershipRefusal(groupId, payerId, participants) {
-  if (!memberRole(groupId, payerId)) return 'Payer must be a group member.';
-  if (participants.some((participantId) => !memberRole(groupId, Number(participantId)))) return 'All participants must be group members.';
-  return null;
 }
 
 function replaceExpenseSplits(database, expense, splits) {
@@ -1018,7 +1007,7 @@ router.post('/groups/:id/expenses', (req, res) => {
     const parsed = parseExpenseBody(req.body, group.default_currency);
     const payerId = Number(req.body.payer_id || userId(req));
     const participants = Array.isArray(req.body.participants) ? req.body.participants : [payerId];
-    const refusal = membershipRefusal(groupId, payerId, participants);
+    const refusal = membershipRefusal(db.get(), groupId, payerId, participants);
     if (refusal) return res.status(400).json({ error: refusal, code: 400 });
     const splits = buildSplits({
       method: parsed.method,
@@ -1065,7 +1054,7 @@ router.put('/expenses/:id', (req, res) => {
     const parsed = parseExpenseBody(req.body, existing.converted_currency);
     const payerId = Number(req.body.payer_id || existing.payer_id);
     const participants = Array.isArray(req.body.participants) ? req.body.participants : db.get().prepare('SELECT user_id FROM expense_splits WHERE expense_id = ?').all(existing.id).map((r) => r.user_id);
-    const refusal = membershipRefusal(existing.group_id, payerId, participants);
+    const refusal = membershipRefusal(db.get(), existing.group_id, payerId, participants);
     if (refusal) return res.status(400).json({ error: refusal, code: 400 });
     const splits = buildSplits({ method: parsed.method, amountMinor: parsed.convertedAmountMinor, currency: parsed.convertedCurrency, participants, splits: req.body.splits });
     db.transaction(() => {
@@ -1395,7 +1384,7 @@ router.post('/groups/:id/recurring', (req, res) => {
     if (!frequency) return res.status(400).json({ error: 'Invalid frequency.', code: 400 });
     const payerId = Number(req.body.payer_id || userId(req));
     const participants = Array.isArray(req.body.participants) ? req.body.participants : [payerId];
-    const refusal = membershipRefusal(groupId, payerId, participants);
+    const refusal = membershipRefusal(db.get(), groupId, payerId, participants);
     if (refusal) return res.status(400).json({ error: refusal, code: 400 });
     // Dieselbe Pruefung wie bei einer Ausgabe, hier VOR dem ersten Termin: der
     // Buchungslauf rechnet den Snapshot spaeter ohne Nutzer vor dem Bildschirm

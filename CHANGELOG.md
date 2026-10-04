@@ -372,6 +372,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installation, each hour again. Such a request is now answered with `400` under the same rule
   as a single expense, and nothing is stored. Recurring expenses that already exist are not
   changed.
+- **One recurring shared expense that cannot be booked no longer holds back the others.** All
+  due recurring expenses were booked together, so a single one that failed stopped the booking
+  for every group, hour after hour, and only the server log said so. Each one is now booked on
+  its own. One that cannot be booked is paused, and the group's activity shows "Recurring
+  expense paused automatically: it could not be booked" with its title. That also applies when
+  the payer or a participant has left the group since it was created, or their account was
+  deleted: nothing more is booked for them. Once the person is back in the group, resuming the
+  recurring expense books it again.
 
 ## [2.71.0] - 2026-09-30
 

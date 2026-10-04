@@ -3863,6 +3863,7 @@
             "payment_registered": "Pembayaran dicatat",
             "recurring_created": "Pengeluaran berulang dibuat",
             "recurring_paused": "Pengeluaran berulang dijeda",
+            "recurring_auto_paused": "Pengeluaran berulang dijeda otomatis: tidak dapat dicatat",
             "recurring_resumed": "Pengeluaran berulang dilanjutkan",
             "recurring_generated": "Pengeluaran berulang dihasilkan",
             "payment_reversed": "Pembayaran dibatalkan",

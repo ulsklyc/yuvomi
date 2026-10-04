@@ -3863,6 +3863,7 @@
             "payment_registered": "付款已登记",
             "recurring_created": "定期支出已创建",
             "recurring_paused": "定期支出已暂停",
+            "recurring_auto_paused": "定期支出已自动暂停：无法记账",
             "recurring_resumed": "定期支出已恢复",
             "recurring_generated": "定期支出已生成",
             "payment_reversed": "付款已冲销",

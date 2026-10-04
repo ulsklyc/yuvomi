@@ -3863,6 +3863,7 @@
             "payment_registered": "Betaling registrert",
             "recurring_created": "Gjentakende utgift opprettet",
             "recurring_paused": "Gjentakende utgift satt på pause",
+            "recurring_auto_paused": "Gjentakende utgift satt på pause automatisk: den kunne ikke bokføres",
             "recurring_resumed": "Gjentakende utgift gjenopptatt",
             "recurring_generated": "Gjentakende utgift generert",
             "payment_reversed": "Betaling reversert",

@@ -3863,6 +3863,7 @@
             "payment_registered": "Thanh toán đã được ghi nhận",
             "recurring_created": "Chi phí định kỳ được tạo",
             "recurring_paused": "Chi phí định kỳ bị tạm dừng",
+            "recurring_auto_paused": "Chi phí định kỳ tự động tạm dừng: không thể ghi nhận",
             "recurring_resumed": "Chi phí định kỳ được tiếp tục",
             "recurring_generated": "Chi phí định kỳ được phát sinh",
             "payment_reversed": "Đã hoàn tác thanh toán",
