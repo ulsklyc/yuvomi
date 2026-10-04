@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A Norwegian browser or system that reports `no` or `nn` gets Norwegian instead of English.**
+  Norwegian Bokmål ships as `nb`, but many browsers and systems announce the general code `no`
+  (`no-NO`, `LANG=no_NO.UTF-8`), and that fell through to English. The same went for Nynorsk
+  (`nn`), which has no translation of its own: it now gets Bokmål, the closer language, rather
+  than English. This holds for the app, the web installer, the command-line installer and the
+  `lang` parameter of the API. An explicit language choice in the settings is not affected.
+- **A loan created from "New entry" in the budget overview can say how many installments are
+  already paid** (#1648, reported by @ramonbresco). The field existed only in the "New loan" dialog
+  of the Loans tab; choosing the type "Loan" in the overview's dialog left it out, so a running loan
+  entered there started at zero. Both dialogs now build their loan fields from one list, so a field
+  can no longer land in one and miss the other. The same repair makes the suggestion work that
+  2.29.0 announced and never delivered: moving the first due month into the past fills in the number
+  of months since then, never more than the loan has installments, and stops as soon as you set the
+  field yourself. For a loan with interest that limit is the term shown in the preview; until the
+  preview has one, the field stays at 0. It was wired to the dialog that did not have the field.
+- **Housekeeping: "today" and "last visit" read a visit's check-in as a point in time.** Only
+  visits the app did not write itself are affected: rows imported by hand with a time that has
+  no zone, and the demo data. They were compared and sorted as text, so such a visit could be
+  missing from the helper's "today" or counted on the neighbouring day, and the earlier of two
+  visits could be shown as the latest - in the module, its visit lists and the overview tile.
+  All of them now compare the time on the household's clock. Stored values are not changed.
 - **Editing a shared expense shows the amount in your household's number format.** The amount
   field came pre-filled the way the server stores it, with a point: `12.50` in a field whose
   placeholder says `0,00`, and `12.5` when the expense was handed over from a budget entry.

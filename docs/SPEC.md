@@ -5816,7 +5816,7 @@ Two independent resolutions, because they answer different questions:
 **Display language** (per user, what the UI renders):
 
 1. `localStorage` entry `yuvomi-locale` (manual selection)
-2. `navigator.languages`, each tag resolved to the most specific supported locale - the full tag, then without its last subtag (`pt-BR` → `pt-BR`, `pt-PT` → `pt`, `de-AT` → `de`)
+2. `navigator.languages`, each tag resolved to the most specific supported locale - the full tag, then without its last subtag (`pt-BR` → `pt-BR`, `pt-PT` → `pt`, `de-AT` → `de`). A tag that finds nothing is tried once more under its language alias: `no` and `nn` → `nb`
 3. Fallback: `en`
 
 **Data language** (per household, what the server stores - see Settings → Account → Appearance):

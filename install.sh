@@ -34,14 +34,21 @@ in_array() { local needle="$1"; shift; local e; for e in "$@"; do [ "$e" = "$nee
 # Basissprache (de). Gross/klein ueber tr statt ${x,,} - das kennt die bash 3.2
 # von macOS nicht und brach dort mit "bad substitution" ab.
 normalize_locale() {
-  local raw="${1:-}" lang region=""
+  local raw="${1:-}" lang region="" alias=""
   raw="${raw%%.*}"; raw="${raw%%@*}"; raw="${raw//_/-}"
   lang="$(printf '%s' "${raw%%-*}" | tr '[:upper:]' '[:lower:]')"
   case "$raw" in
     *-*) region="$(printf '%s' "${raw#*-}" | tr '[:lower:]' '[:upper:]')"; region="${region%%-*}" ;;
   esac
-  if [ -n "$region" ] && in_array "$lang-$region" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$lang-$region"
-  elif in_array "$lang" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$lang"
+  if [ -n "$region" ] && in_array "$lang-$region" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$lang-$region"; return; fi
+  if in_array "$lang" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$lang"; return; fi
+  # Sprachcodes, die eine vorhandene Locale meinen: `no_NO.UTF-8` ist auf vielen
+  # Systemen der Name fuer Norwegisch, `nn_NO` (Nynorsk) hat keine eigene Datei.
+  # Rueckfall, kein Ersatz - dieselbe Zuordnung wie LANGUAGE_ALIAS in public/i18n.js.
+  case "$lang" in
+    no|nn) alias="nb" ;;
+  esac
+  if [ -n "$alias" ] && in_array "$alias" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$alias"
   else printf '%s' "$FALLBACK_LOCALE"; fi
 }
 
