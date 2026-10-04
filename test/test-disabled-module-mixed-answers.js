@@ -349,3 +349,13 @@ test('Countdown: ein als Countdown markierter Geburtstagstermin folgt dem Schalt
     db.prepare('UPDATE calendar_events SET countdown = 0 WHERE id = ?').run(eventId);
   }
 });
+
+test('birthdaysSwitchedOff(): ohne Einstellungstabelle gibt es keinen Schalter, jeder andere Fehler bleibt laut', () => {
+  // Der geteilte Termin-Leser stellt die Frage bei jedem Aufruf. Suiten mit
+  // handgebautem Schema (test-dashboard.js, test-ics-export.js) haben die
+  // Tabelle nicht - genau daran fiel die CI in #1664.
+  const bare = new Database(':memory:');
+  assert.equal(householdModules.birthdaysSwitchedOff(bare), false);
+  bare.close();
+  assert.throws(() => householdModules.birthdaysSwitchedOff(bare), 'eine geschlossene Verbindung ist kein "nicht abgeschaltet"');
+});

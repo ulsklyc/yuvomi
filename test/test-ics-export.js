@@ -80,14 +80,6 @@ d2.exec(`CREATE TABLE IF NOT EXISTS event_assignments (
   user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   PRIMARY KEY (event_id, user_id)
 );`);
-// Seit #1660 fragt buildFeed() den Haushaltsschalter (`disabled_modules`), ob
-// die Geburtstage mitlaufen. Diese Suite baut ihr Schema von Hand, also braucht
-// sie die Tabelle, aus der er gelesen wird; leer heisst "nichts abgeschaltet".
-// Der Schalter selbst wird in test-disabled-module-mixed-answers.js gemessen,
-// gegen die volle Migrationskette.
-d2.exec(`CREATE TABLE IF NOT EXISTS sync_config (
-  key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT DEFAULT ''
-);`);
 const u1 = d2.prepare(`INSERT INTO users (username,display_name,password_hash,role) VALUES ('admin','Admin','x','admin')`).run().lastInsertRowid;
 const u2 = d2.prepare(`INSERT INTO users (username,display_name,password_hash) VALUES ('maria','Maria','x')`).run().lastInsertRowid;
 

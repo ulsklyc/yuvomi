@@ -84,9 +84,22 @@ export function modulesLeftOut(database, hiddenModules = null) {
  *
  * @param {object} database
  * @returns {boolean}
+ * @throws bei jedem Datenbankfehler ausser der fehlenden Tabelle `sync_config`
  */
 export function birthdaysSwitchedOff(database) {
-  return householdDisabledModules(database).has('birthdays');
+  try {
+    return householdDisabledModules(database).has('birthdays');
+  } catch (err) {
+    // EINE DATENBANK OHNE EINSTELLUNGSTABELLE HAT KEINEN SCHALTER. Diese Frage
+    // stellt der geteilte Termin-Leser bei JEDEM Aufruf, auch dort, wo es nie
+    // um Module ging - derselbe Rueckfall wie `configuredHouseholdTimeZone()`
+    // fuer die Zone, die derselbe Leser aus derselben Tabelle liest. Nur genau
+    // dieser Fall: jeder andere Fehler ist ein Programmierfehler und soll laut
+    // bleiben, sonst blendete ein Tippfehler in der Abfrage die Geburtstage
+    // still wieder ein.
+    if (/no such table: sync_config/.test(String(err?.message))) return false;
+    throw err;
+  }
 }
 
 /**
