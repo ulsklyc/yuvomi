@@ -279,6 +279,113 @@ test('storedToInstantMsPrecise erbt die Formregeln und tauscht nur die Umrechnun
 });
 
 // --------------------------------------------------------
+// Sekundenbruchteile einer zonenlosen Wanduhrzeit (#1658)
+//
+// Der Offset wurde als "Wanduhr minus Zeitpunkt" abgelesen, die Wanduhr aber
+// in ganzen Sekunden: der Bruchteil fehlte im Offset und kam beim Anwenden ein
+// zweites Mal dazu, ueber den Fixpunkt ein drittes. Kein Codepfad schreibt so
+// einen Wert, von Hand eingespielte Zeilen tragen ihn aber - und knapp vor
+// Mitternacht reicht das fuer den Nachbartag.
+// --------------------------------------------------------
+
+const FRACTION_READERS = [
+  ['storedToInstantMs', (value, zone) => storedToInstantMs(value, zone)],
+  ['storedToInstantMsPrecise', (value, zone) => storedToInstantMsPrecise(value, zone)],
+  ['localToUTC', (value, zone) => Date.parse(localToUTC(value, zone))],
+  ['localToUTCPrecise', (value, zone) => Date.parse(localToUTCPrecise(value, zone))],
+];
+const isoOf = (ms) => (Number.isFinite(ms) ? new Date(ms).toISOString() : String(ms));
+
+test('Sekundenbruchteil: die gemessenen Werte aus #1658, oestlich und westlich von UTC', () => {
+  const cases = [
+    ['Europe/Berlin', '2031-07-15T11:00:00.250', '2031-07-15T09:00:00.250Z'],
+    ['Europe/Berlin', '2031-07-15T11:00:00.750', '2031-07-15T09:00:00.750Z'],
+    ['America/New_York', '2031-07-15T11:00:00.250', '2031-07-15T15:00:00.250Z'],
+    ['America/New_York', '2031-07-15T11:00:00.750', '2031-07-15T15:00:00.750Z'],
+    // Krummer Offset (+05:45): ein Rechenweg, der in vollen Stunden denkt, faellt hier auf.
+    ['Asia/Kathmandu', '2031-07-15T11:00:00.250', '2031-07-15T05:15:00.250Z'],
+    // Vor 1970 ist der Zeitpunkt negativ - die ganze Sekunde ist dort die kleinere Zahl.
+    ['Europe/Berlin', '1965-07-15T11:00:00.250', '1965-07-15T10:00:00.250Z'],
+    ['America/New_York', '1965-07-15T11:00:00.750', '1965-07-15T15:00:00.750Z'],
+  ];
+  for (const [name, read] of FRACTION_READERS) {
+    for (const [zone, value, expected] of cases) {
+      assert.equal(isoOf(read(value, zone)), expected, `${name}: ${value} in ${zone}`);
+    }
+  }
+});
+
+test('Sekundenbruchteil: der letzte Moment eines Tages bleibt in seinem Tag', () => {
+  // Der Schaden, um den es geht: 23:59:59.900 wurde zu 00:00:00.800 des
+  // Folgetags - ein anderer Tag, am Monatsletzten ein anderer Monat.
+  const cases = [
+    ['UTC', '2035-07-31T23:59:59.900', '2035-07-31T23:59:59.900Z', '2035-07-31'],
+    ['Europe/Berlin', '2035-07-31T23:59:59.900', '2035-07-31T21:59:59.900Z', '2035-07-31'],
+    ['America/New_York', '2035-07-31T23:59:59.900', '2035-08-01T03:59:59.900Z', '2035-07-31'],
+  ];
+  for (const [name, read] of FRACTION_READERS) {
+    for (const [zone, value, expected, day] of cases) {
+      const ms = read(value, zone);
+      assert.equal(isoOf(ms), expected, `${name}: ${value} in ${zone}`);
+      assert.equal(utcToWall(new Date(ms).toISOString(), zone).date, day, `${name}: Tag in ${zone}`);
+    }
+  }
+});
+
+test('Sekundenbruchteil: ueber die Umstellnaechte ist der Wert die ganze Sekunde plus Bruchteil', () => {
+  // Nicht gegen abgeschriebene Erwartungen, sondern gegen die Umrechnung der
+  // ganzen Sekunde, die oben fuer Luecke, Doppelstunde und Band belegt ist: der
+  // Bruchteil darf an KEINER Stelle des Tages etwas anderes tun, als einmal
+  // dazuzukommen. Viertelstundenraster ueber beide Umstelltage je Zone.
+  const nights = [
+    ['Europe/Berlin', '2031-03-30'], ['Europe/Berlin', '2031-10-26'],
+    ['America/New_York', '2031-03-09'], ['America/New_York', '2031-11-02'],
+    ['Australia/Lord_Howe', '2031-04-06'], ['Australia/Lord_Howe', '2031-10-05'],
+  ];
+  const pad = (n) => String(n).padStart(2, '0');
+  const wrong = [];
+  let compared = 0;
+  let shifted = 0;
+  for (const [zone, day] of nights) {
+    const offsets = new Set();
+    for (let minute = 0; minute < 24 * 60; minute += 15) {
+      const wall = `${day}T${pad(Math.floor(minute / 60))}:${pad(minute % 60)}:00`;
+      offsets.add(Date.parse(`${wall}Z`) - storedToInstantMsPrecise(wall, zone));
+      for (const [name, read] of FRACTION_READERS) {
+        for (const [suffix, extra] of [['.001', 1], ['.250', 250], ['.5', 500], ['.999', 999]]) {
+          compared += 1;
+          const actual = read(`${wall}${suffix}`, zone);
+          const expected = read(wall, zone) + extra;
+          if (actual !== expected) wrong.push(`${name} ${zone} ${wall}${suffix}: ${isoOf(actual)} statt ${isoOf(expected)}`);
+        }
+      }
+    }
+    // Ohne diese Probe liefe das Raster auch dann gruen, wenn der Tag gar
+    // keine Umstellung haette.
+    if (offsets.size > 1) shifted += 1;
+  }
+  assert.deepEqual(wrong.slice(0, 10), [], `${wrong.length} von ${compared} Werten tragen den Bruchteil nicht genau einmal`);
+  assert.equal(shifted, nights.length, 'jeder der Tage ist ein Umstelltag');
+
+  // Und drei davon ausgeschrieben, damit die Aussage nicht nur relativ ist.
+  // Berlin, 30.03.2031: 01:30 ist noch CET, 03:30 schon CEST.
+  assert.equal(isoOf(storedToInstantMsPrecise('2031-03-30T01:30:00.250', 'Europe/Berlin')), '2031-03-30T00:30:00.250Z');
+  assert.equal(isoOf(storedToInstantMsPrecise('2031-03-30T03:30:00.250', 'Europe/Berlin')), '2031-03-30T01:30:00.250Z');
+  // New York, 09.03.2031: 03:30 ist schon EDT.
+  assert.equal(isoOf(storedToInstantMsPrecise('2031-03-09T03:30:00.750', 'America/New_York')), '2031-03-09T07:30:00.750Z');
+});
+
+test('Sekundenbruchteil: ganze Sekunden behalten ihre Schreibweise', () => {
+  // `localToUTC*` schreibt ganze Sekunden ohne '.000' - Aufrufer vergleichen
+  // und speichern den String (ICS-Parser, Expansion). Der Bruchteil kommt nur
+  // dort in die Ausgabe, wo er in der Eingabe stand.
+  assert.equal(localToUTC('2031-07-15T11:00:00', 'Europe/Berlin'), '2031-07-15T09:00:00Z');
+  assert.equal(localToUTCPrecise('2031-07-15T11:00:00', 'Europe/Berlin'), '2031-07-15T09:00:00Z');
+  assert.equal(localToUTC('2031-07-15T11:00:00.250', 'Europe/Berlin'), '2031-07-15T09:00:00.250Z');
+  assert.equal(localToUTCPrecise('2031-07-15T11:00:00.250', 'Europe/Berlin'), '2031-07-15T09:00:00.250Z');
+});
+
+// --------------------------------------------------------
 // Der Fehler, der das ausgeloest hat: Abendtermine im Uebersichts-Widget
 // --------------------------------------------------------
 

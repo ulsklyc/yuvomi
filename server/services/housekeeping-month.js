@@ -14,7 +14,7 @@
  * Zahlen fuer denselben Monat. Beide lesen jetzt hier.
  */
 
-import { hasExplicitZone, localToUTCPrecise, storedToInstantMsPrecise, utcToWall } from '../utils/timezone.js';
+import { localToUTCPrecise, storedToInstantMsPrecise, utcToWall } from '../utils/timezone.js';
 import { addMonthsClamped } from '../utils/interval-date.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -26,19 +26,13 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * in der Umstellnacht zwei Wanduhrzeiten auf denselben Zeitpunkt ab (Berlin,
  * 00:30 und 01:30 werden beide 23:30Z).
  *
- * Sekundenbruchteile einer zonenlosen Zeile gehen an der Umrechnung VORBEI:
- * die Umrechner in utils/timezone.js bestimmen den Offset ueber `utcToWall()`,
- * das Millisekunden abschneidet, und rechnen den Bruchteil dadurch ein zweites
- * Mal dazu - '…T23:59:59.900' kam in einem UTC-Haushalt als '00:00:00.800' des
- * Folgetags heraus. Der Offset einer Zone haengt nicht am Bruchteil, also wird
- * die ganze Sekunde umgerechnet und der Bruchteil danach addiert.
+ * Sekundenbruchteile einer zonenlosen Zeile traegt der geteilte Umrechner
+ * selbst durch (#1658). Bis dahin rechnete er sie doppelt - '…T23:59:59.900'
+ * kam in einem UTC-Haushalt als '00:00:00.800' des Folgetags heraus -, und
+ * diese Funktion nahm den Bruchteil deshalb an ihm vorbei.
  */
 export function checkInInstantMs(value, tz) {
-  const raw = String(value ?? '').trim();
-  const fraction = hasExplicitZone(raw) ? null : /^(.+:\d{2})\.(\d+)$/.exec(raw);
-  if (!fraction) return storedToInstantMsPrecise(raw, tz);
-  const whole = storedToInstantMsPrecise(fraction[1], tz);
-  return whole === null ? null : whole + Number(fraction[2].padEnd(3, '0').slice(0, 3));
+  return storedToInstantMsPrecise(value, tz);
 }
 
 /**

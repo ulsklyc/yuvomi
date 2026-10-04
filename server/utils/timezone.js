@@ -235,8 +235,29 @@ export function daysBetweenDateKeys(fromKey, toKey) {
 }
 
 /**
+ * Ein Zeitpunkt, auf seine ganze Sekunde abgerundet.
+ *
+ * Der Offset einer Zone wird hier ueberall als "Wanduhr minus Zeitpunkt"
+ * abgelesen, und die Wanduhr kommt aus `Intl` in ganzen Sekunden. Steht auf
+ * der anderen Seite der Differenz ein Zeitpunkt MIT Millisekunden, ist der
+ * Offset um genau diesen Bruchteil zu klein - und wer ihn anwendet, rechnet den
+ * Bruchteil ein zweites Mal dazu (#1658: '11:00:00.250' in Europe/Berlin kam
+ * als 09:00:00.500Z heraus, ueber den Fixpunkt als 09:00:00.750Z). Ein Offset
+ * haengt nie am Sekundenbruchteil, also wird er an der ganzen Sekunde gelesen;
+ * der Bruchteil bleibt beim Zeitpunkt und kommt genau einmal an.
+ *
+ * `Math.floor`, nicht `Math.trunc`: vor 1970 ist die ganze Sekunde, in der
+ * ein Zeitpunkt liegt, die KLEINERE Zahl.
+ * @param {number} ms
+ * @returns {number}
+ */
+function wholeSecondMs(ms) {
+  return Math.floor(ms / 1000) * 1000;
+}
+
+/**
  * Lokale Wanduhrzeit in einer IANA-Zone -> UTC-ISO (…Z).
- * @param {string} localStr  'YYYY-MM-DDTHH:mm:ss' ohne Offset
+ * @param {string} localStr  'YYYY-MM-DDTHH:mm:ss[.sss]' ohne Offset
  * @param {string} tzid      z.B. 'Europe/Berlin'
  * @returns {string}         UTC-ISO mit 'Z', oder localStr bei ungültiger Eingabe
  */
@@ -244,10 +265,12 @@ export function localToUTC(localStr, tzid) {
   try {
     const fakeUTC = new Date(localStr + 'Z');
     if (isNaN(fakeUTC.getTime())) return localStr;
+    // Der Offset wird an der ganzen Sekunde gelesen (siehe wholeSecondMs).
+    const wholeMs = wholeSecondMs(fakeUTC.getTime());
     const parts = new Intl.DateTimeFormat('en-US', {
       timeZone: tzid, year: 'numeric', month: 'numeric', day: 'numeric',
       hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
-    }).formatToParts(fakeUTC);
+    }).formatToParts(new Date(wholeMs));
     const get = (type) => {
       const part = parts.find((p) => p.type === type);
       const v = part ? part.value : '0';
@@ -260,7 +283,7 @@ export function localToUTC(localStr, tzid) {
     const asUTC = Date.UTC(
       get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second')
     );
-    const offsetMs = fakeUTC.getTime() - asUTC;
+    const offsetMs = wholeMs - asUTC;
     return new Date(fakeUTC.getTime() + offsetMs).toISOString().replace('.000Z', 'Z');
   } catch { return localStr; }
 }
@@ -269,11 +292,16 @@ export function localToUTC(localStr, tzid) {
  * Zonen-Offset (Minuten, Wanduhr minus UTC) an einem gegebenen UTC-Zeitpunkt,
  * ueber utcToWall gelesen - dieselbe Intl-Quelle wie ueberall sonst in diesem
  * Baum, nur zurueckgerechnet in eine Zahl statt Datumsteilen.
+ *
+ * Gelesen an der ganzen Sekunde (siehe wholeSecondMs): `utcToWall` liefert
+ * keine Millisekunden, und gegen einen Zeitpunkt mit Bruchteil abgezogen kaeme
+ * ein Offset heraus, der um diesen Bruchteil daneben liegt.
  */
 function offsetMinutesAt(utcMs, tzid) {
-  const wall = utcToWall(new Date(utcMs).toISOString(), tzid);
+  const wholeMs = wholeSecondMs(utcMs);
+  const wall = utcToWall(new Date(wholeMs).toISOString(), tzid);
   if (!wall) return null;
-  return (Date.parse(`${wall.date}T${wall.time}Z`) - utcMs) / 60000;
+  return (Date.parse(`${wall.date}T${wall.time}Z`) - wholeMs) / 60000;
 }
 
 /**
@@ -319,7 +347,7 @@ function offsetMinutesAt(utcMs, tzid) {
  * ueberein - der Unterschied zeigt sich erst innerhalb der Sprung-/Fold-Stunde
  * selbst.
  *
- * @param {string} localStr  'YYYY-MM-DDTHH:mm:ss' ohne Offset
+ * @param {string} localStr  'YYYY-MM-DDTHH:mm:ss[.sss]' ohne Offset
  * @param {string} tzid      IANA-Zone
  * @returns {string} UTC-ISO mit 'Z'
  */

@@ -247,9 +247,17 @@ export function wallTimeInstant(value, zone, original = null, offsetMinutes = nu
   return (candidates.find((candidate) => candidate.offsetMinutes === preferred) || candidates[0]).instant;
 }
 
-/** Zonen-Offset (ms, Wanduhr minus UTC) an einem Zeitpunkt. */
+/**
+ * Zonen-Offset (ms, Wanduhr minus UTC) an einem Zeitpunkt.
+ *
+ * Gelesen an der ganzen Sekunde: `wallTimeValue` liefert keine Millisekunden,
+ * und gegen einen Zeitpunkt mit Bruchteil abgezogen laege der Offset um diesen
+ * Bruchteil daneben - der Aufrufer rechnete ihn dann ein zweites Mal dazu
+ * (#1658, dieselbe Regel wie `wholeSecondMs` in server/utils/timezone.js).
+ */
 function offsetMsAt(ms, zone) {
-  return wallEpoch(wallTimeValue(ms, zone)) - ms;
+  const whole = Math.floor(ms / 1000) * 1000;
+  return wallEpoch(wallTimeValue(whole, zone)) - whole;
 }
 
 /**
