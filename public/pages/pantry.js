@@ -20,6 +20,7 @@ import {
 } from '/components/modal.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, mayTransferPantryToShopping } from '/utils/kitchen-transfer.js';
+import { mayWritePath } from '/utils/module-access.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
@@ -580,6 +581,14 @@ function renderBulkBar() {
   });
 }
 
+/**
+ * Darf dieses Konto in den Vorrat schreiben? Regel 1 in utils/module-access.js.
+ * Als Funktion, damit jedes Neuzeichnen neu fragt.
+ */
+function readOnly() {
+  return !mayWritePath('/pantry');
+}
+
 const PANTRY_ROW = '.pantry-swipe[data-swipe-id]';
 
 /* `motion: true` setzt, wer die DATEN geaendert hat (Artikel angelegt,
@@ -821,11 +830,16 @@ function rowEl(item) {
   const wrap = document.createElement('li');
   wrap.className = 'swipe-row pantry-swipe';
   wrap.dataset.swipeId = String(item.id);
-  wrap.insertAdjacentHTML('beforeend', `
+  // Nur-lesen: die Buehne bleibt (Zeilenschluessel fuer Neuzeichnen und
+  // Auffrischung), das Loeschen-Panel entfaellt - es verspraeche ein DELETE,
+  // das im 403 endet (Regel 3 in utils/module-access.js).
+  if (!readOnly()) {
+    wrap.insertAdjacentHTML('beforeend', `
     <div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">
       <i data-lucide="trash-2" class="icon-md"></i>
       <span>${esc(t('common.delete'))}</span>
     </div>`);
+  }
 
   const li = document.createElement('div');
   // Geteilte Zeilen-Grammatik (styles/list-row.css). Ohne --reserve-end: der
@@ -1027,6 +1041,10 @@ function rowEl(item) {
  * blendet die Zeile selbst aus und holt sie bei "Rueckgaengig" wieder.
  */
 function wirePantrySwipe(list) {
+  // Regel 3 in utils/module-access.js: bei Nur-lesen bleibt die VERDRAHTUNG
+  // aus, samt Wisch-Hinweis. Ein Riegel in `run` kaeme zu spaet - die Zeile
+  // waere schon weggewischt, bevor jemand fragt.
+  if (readOnly()) return null;
   const optionen = {
     card: '.pantry-row',
     ignore: '.pantry-stepper, .pantry-row__cart',

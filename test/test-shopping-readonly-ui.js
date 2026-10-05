@@ -618,6 +618,48 @@ test('Vorrat: der Handler schickt ohne Einkaufsrecht nichts - nicht einmal die L
   }
 });
 
+/* PR #1673 Review: der Loesch-Wisch der Vorratszeile (R16 2b) kam ohne Frage
+ * nach dem Recht. Mit `pantry: read` verschwand die Zeile optimistisch, das
+ * DELETE endete im 403, und sie kam mit Fehler zurueck. Regel 3 in
+ * utils/module-access.js: kein Panel, keine Verdrahtung. Gegen den Stand davor
+ * rot gelaufen. */
+test('Vorrat: ohne Schreibrecht kein Loeschen-Panel und kein verdrahteter Wisch', async () => {
+  const VORRAT_LESEN = { pantry: 'read', shopping: 'write' };
+  const VORRAT_SCHREIBEN = { pantry: 'write', shopping: 'write' };
+  const zeile = (modules) => withAccess(modules, () => pantry.rowEl(knapp()));
+
+  const lesend = await zeile(VORRAT_LESEN);
+  assert.doesNotMatch(lesend.outerHTML, /swipe-reveal/, 'das Panel verspraeche ein DELETE, das im 403 endet');
+  assert.equal(lesend.dataset.swipeId, '3', 'die Buehne bleibt: Neuzeichnen und Auffrischung suchen die Zeile dort');
+  assert.match(lesend.outerHTML, /pantry-row__main/, 'die Zeile selbst bleibt als Zeichen');
+  assert.match((await zeile(VORRAT_SCHREIBEN)).outerHTML, /swipe-reveal--delete/, 'Gegenfall: mit Schreibrecht traegt die Buehne das Panel');
+
+  // Die Verdrahtung als Programm: eine Liste mit einer Buehne, die mitzaehlt,
+  // welche Beruehrungs-Listener an ihr landen.
+  const verdrahtet = (modules) => withAccess(modules, () => {
+    const gehoert = [];
+    const karte = { style: {} };
+    const buehne = {
+      classList: { add() {}, remove() {} },
+      querySelector: (sel) => (sel === '.pantry-row' ? karte : null),
+      addEventListener: (typ) => { gehoert.push(typ); },
+    };
+    const liste = {
+      querySelectorAll: (sel) => (sel === '.swipe-row' ? [buehne] : []),
+      querySelector: (sel) => (sel === '.swipe-row' ? buehne : null),
+    };
+    const optionen = pantry.wirePantrySwipe(liste);
+    return { optionen, gehoert: gehoert.filter((typ) => typ.startsWith('touch')) };
+  });
+
+  const ohne = await verdrahtet(VORRAT_LESEN);
+  assert.deepEqual(ohne.gehoert, [], 'ohne Schreibrecht haengt an der Zeile keine Geste');
+  assert.equal(ohne.optionen, null);
+  const mit = await verdrahtet(VORRAT_SCHREIBEN);
+  assert.ok(mit.gehoert.includes('touchstart') && mit.gehoert.includes('touchend'),
+    'Gegenfall: mit Schreibrecht ist die Geste verdrahtet');
+});
+
 test('Vorrat: die Sammel-Pille fragt denselben Riegel wie der Warenkorb', () => {
   // renderBulkBar() zeichnet in die Shell-Schicht und liest den Seitenzustand;
   // als Fallback die kommentarfreie Quelle (siehe den Kopf von
