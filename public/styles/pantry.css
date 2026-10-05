@@ -506,3 +506,12 @@
     transition: none;
   }
 }
+
+/* DER LOESCH-WISCH DER VORRATSZEILE (R16 Schritt 2b, pantry.js rowEl()).
+ * Buehne und Reveal-Panel kommen aus layout.css (`.swipe-row`). Den Chevron
+ * am Zeilenende zeigt der Vorrat nicht: dort steht der "+"-Knopf des Steppers,
+ * und der Pfeil laege auf seinem Ring (gemessen 390px). Die Geste lernt man am
+ * einmaligen Nudge (maybeShowSwipeHint); der feste Ort bleibt der Dialogfuss. */
+.pantry-swipe::after {
+  display: none;
+}

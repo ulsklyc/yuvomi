@@ -27,6 +27,7 @@ import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 // Renderer mit den Vorrats-Texten füllt.
 import { emptyStateEl as emptyStateComponentEl, mountLoadError } from '/utils/empty-state.js';
 import { scheduleUndoableDelete, vibrate, wireScrollFade } from '/utils/ux.js';
+import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { todayKey } from '/utils/date.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { locationLabel } from '/utils/pantry-locations.js';
@@ -319,9 +320,11 @@ export async function render(container) {
         id: 'pantry-tools-menu',
         label: t('common.moreActions'),
         // KUECHENKOPF (Kopfregel mobil, 2026-09-26): die Verwaltung steht im
-        // EINEN Werkzeugmenue, nicht als loses Icon im Kopf. Das Zeichen ist
+        // EINEN Werkzeugmenue. Mit einem einzigen Eintrag wird daraus der
+        // direkte Knopf (pageToolsMenuHtml, R16): "Lagerorte verwalten" mit
         // map-pin wie im Inventar - "archive" war dasselbe Zeichen wie der
-        // Vorrat-Tab darueber (A4, P3).
+        // Vorrat-Tab darueber (A4, P3). Kommt ein zweiter Eintrag dazu, ist es
+        // von selbst wieder das Menue.
         items: [{ action: 'manage-locations', label: t('pantry.manageLocations'), icon: 'map-pin' }],
       })}
     </div>`);
@@ -639,6 +642,7 @@ function renderList() {
     list.appendChild(section);
   }
 
+  wirePantrySwipe(list);
   if (window.lucide) window.lucide.createIcons({ el: list });
 }
 
@@ -793,7 +797,24 @@ function emptyStateEl() {
 function rowEl(item) {
   const status = pantryItemStatus(item, state.todayKey);
 
-  const li = document.createElement('li');
+  // DIE ZEILE LAESST SICH WEGWISCHEN (R16 Schritt 2b, Kuechenregel in
+  // DESIGN.md: Loeschen = Wisch mobil + ein fester Ort am Desktop). Der Vorrat
+  // war der letzte Kuechen-Reiter ohne die Geste; Loeschen stand nur im
+  // Dialogfuss. Das `li` ist die Buehne (`.swipe-row`) mit dem Reveal-Panel am
+  // Zeilenende, die Zeile selbst liegt als `div` darin. Nur EINE Seite: am
+  // Zeilenanfang gibt es im Vorrat nichts Positives zu erledigen. Stepper und
+  // Warenkorb sind Ausnahmezone (wirePantrySwipe, `ignore`) - wer dort tippt
+  // und dabei rutscht, loescht nichts.
+  const wrap = document.createElement('li');
+  wrap.className = 'swipe-row pantry-swipe';
+  wrap.dataset.swipeId = String(item.id);
+  wrap.insertAdjacentHTML('beforeend', `
+    <div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">
+      <i data-lucide="trash-2" class="icon-md"></i>
+      <span>${esc(t('common.delete'))}</span>
+    </div>`);
+
+  const li = document.createElement('div');
   // Geteilte Zeilen-Grammatik (styles/list-row.css). Ohne --reserve-end: der
   // Warenkorb sitzt nicht mehr an der Zeilenkante, sondern in einem festen Slot
   // am Anfang der Bedienzone (siehe unten).
@@ -983,7 +1004,30 @@ function rowEl(item) {
   // ausnahmslos mit dem Namen führen. Nebeneffekt: die Namenskante steht jetzt
   // von selbst, statt mit der Stepper-Breite zu wandern (Critique 2026-07-29).
   li.append(main, actions);
-  return li;
+  wrap.appendChild(li);
+  return wrap;
+}
+
+/**
+ * Wisch zum Zeilenende loescht - mit dem Rueckweg, den removeItem() schon hat
+ * (Undo-Toast). Die Karte federt zurueck statt hinauszufliegen: removeItem()
+ * blendet die Zeile selbst aus und holt sie bei "Rueckgaengig" wieder.
+ */
+function wirePantrySwipe(list) {
+  const optionen = {
+    card: '.pantry-row',
+    ignore: '.pantry-stepper, .pantry-row__cart',
+    trailing: {
+      reveal: '.swipe-reveal--delete',
+      run: (row) => {
+        const item = state.items.find((i) => String(i.id) === row.dataset.swipeId);
+        if (item) removeItem(item);
+      },
+    },
+  };
+  wireSwipeRows(list, optionen);
+  maybeShowSwipeHint(list);
+  return optionen;
 }
 
 /** Kontextuelle Einkaufs-Aktion einer Zeile; nur bei leeren/knappen Artikeln. */
@@ -1399,7 +1443,10 @@ async function saveItem(panel, mode, item) {
 }
 
 async function removeItem(item) {
-  const rowEl_ = _container?.querySelector(`.pantry-row[data-id="${item.id}"]`);
+  // Die Buehne (`li.swipe-row`), nicht nur die Zeile darin: sonst bliebe ein
+  // leeres Listenelement samt Trennlinie stehen.
+  const inner = _container?.querySelector(`.pantry-row[data-id="${item.id}"]`);
+  const rowEl_ = inner?.closest('.swipe-row') ?? inner;
   if (rowEl_) rowEl_.style.display = 'none';
 
   scheduleUndoableDelete({
@@ -1506,4 +1553,7 @@ export const __test = {
   // Beide Wege in den Bearbeiten-Dialog (test-pantry-ux.js).
   onListClick,
   onWatchClick,
+  // R16 2b: der Lösch-Wisch der Vorratszeile (test-pantry-ux.js).
+  wirePantrySwipe,
+  removeItem,
 };

@@ -42,6 +42,9 @@ function makeNode() {
 }
 
 global.window = { matchMedia: () => ({ matches: false }), addEventListener() {}, yuvomi: {} };
+// maybeShowSwipeHint() (utils/swipe-row.js) liest den Pfad: seit R16 2b traegt
+// auch die Vorratsliste den Wisch, also braucht das Mini-DOM eine Adresse.
+global.location = { pathname: '/pantry' };
 global.document = {
   createElement: () => makeNode(),
   getElementById: () => null,
@@ -595,4 +598,45 @@ test('Vorrats-Sheet: Menge und Einheit stehen mobil nebeneinander', async () => 
   assert.ok(min, 'die Zeile bleibt ein auto-fit-Raster mit rem-Untergrenze');
   // Sheet 364px, Innenabstand 2x16, Luecke 12: zwei Spalten brauchen 2*min*16 + 12 <= 332.
   assert.ok(2 * Number(min[1]) * 16 + 12 <= 332, `minmax(${min[1]}rem) passt im 364px-Sheet nicht zweispaltig`);
+});
+
+
+/* R16 Schritt 2b (Critique 2026-10-05, Kuechenregel in DESIGN.md): der Vorrat
+ * war der letzte Kuechen-Reiter ohne Loesch-Wisch. Gegen den Stand davor rot
+ * gelaufen (rowEl lieferte die nackte Zeile, wirePantrySwipe fehlte). */
+test('R16: die Vorratszeile liegt auf einer Wisch-Buehne - Zeilenende loescht, Stepper und Warenkorb sind Ausnahmezone', () => {
+  resetPantry();
+  const wrap = __test.rowEl({ id: 7, name: 'Reis', quantity: 2, unit: 'kg' });
+  assert.match(wrap.className, /\bswipe-row\b/, 'das Listenelement ist die Buehne');
+  assert.equal(wrap.dataset.swipeId, '7');
+  const row = wrap.children.at(-1);
+  assert.match(row.className, /\blist-row pantry-row\b/, 'die Zeile liegt als letztes Kind in der Buehne');
+  assert.equal(row.dataset.id, '7', 'die Zeile behaelt ihre id - Klick, Stepper und Auffrischung suchen sie dort');
+
+  assert.equal(typeof __test.wirePantrySwipe, 'function');
+  const optionen = __test.wirePantrySwipe(makeNode());
+  assert.equal(optionen.card, '.pantry-row');
+  assert.equal(optionen.leading, undefined, 'nur eine Seite: am Zeilenanfang gibt es nichts zu erledigen');
+  assert.equal(optionen.trailing.reveal, '.swipe-reveal--delete');
+  assert.notEqual(optionen.trailing.flyOut, true, 'die Karte federt zurueck - removeItem() blendet aus und holt sie beim Undo wieder');
+  for (const zone of ['.pantry-stepper', '.pantry-row__cart']) {
+    assert.ok(optionen.ignore.split(',').map((s) => s.trim()).includes(zone), `${zone} ist Ausnahmezone`);
+  }
+  const src = readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8');
+  assert.match(src, /wrap\.insertAdjacentHTML\('beforeend', `\s*<div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">/);
+  assert.match(src, /wirePantrySwipe\(list\);/, 'renderList verdrahtet die Geste nach jedem Aufbau');
+  assert.match(src, /inner\?\.closest\('\.swipe-row'\) \?\? inner/, 'ausgeblendet wird die Buehne, nicht nur die Zeile darin');
+});
+
+test('R16: ein Werkzeugmenue mit einem einzigen Eintrag ist ein direkter Knopf', async () => {
+  const { pageToolsMenuHtml } = await import('../public/utils/popover-menu.js');
+  const einer = pageToolsMenuHtml({ id: 'x-menu', label: 'Mehr', items: [{ action: 'manage-locations', label: 'Lagerorte verwalten', icon: 'map-pin' }] });
+  assert.match(einer, /<button type="button" class="btn btn--secondary btn--icon page-tools-btn page-tools-btn--direct"\s+data-action="manage-locations"\s+aria-label="Lagerorte verwalten" title="Lagerorte verwalten">/);
+  assert.match(einer, /data-lucide="map-pin"/, 'das Icon der Handlung, kein Auslassungszeichen');
+  assert.doesNotMatch(einer, /popovertarget|role="menu"|ellipsis/, 'kein Menue, kein Popover');
+  const zwei = pageToolsMenuHtml({ id: 'x-menu', label: 'Mehr', items: [
+    { action: 'a', label: 'A', icon: 'tag' }, { separator: true }, { action: 'b', label: 'B', icon: 'tag' }] });
+  assert.match(zwei, /popovertarget="x-menu"[\s\S]*role="menu"/, 'ab zwei Eintraegen das Menue');
+  const schalter = pageToolsMenuHtml({ id: 'x-menu', label: 'Mehr', items: [{ action: 'a', label: 'A', icon: 'tag', checked: true }] });
+  assert.match(schalter, /role="menuitemcheckbox"/, 'ein Schalter bleibt im Menue - sein Zustand braucht den Haken');
 });

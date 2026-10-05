@@ -104,6 +104,23 @@ export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn
  * @returns {string}
  */
 export function pageToolsMenuHtml({ id, label, items = [] }) {
+  // EIN EINTRAG IST EIN KNOPF, KEIN MENUE (Critique 2026-10-05, R16; DESIGN.md
+  // Kopfregel). Der Vorrat fuehrte "..." mit genau einem Eintrag ("Lagerorte
+  // verwalten"): zwei Tipps und ein Auslassungszeichen fuer eine Handlung.
+  // Ein Menue beginnt bei zwei Eintraegen; darunter steht die Handlung selbst
+  // im Kopf - mit ihrem Icon, ihrem Namen als aria-label/title und demselben
+  // `data-action`, auf das der delegierte Handler der Seite schon hoert. Ein
+  // Schalter (`checked`) bleibt im Menue: sein Zustand braucht den Haken.
+  const real = items.filter((item) => item && !item.separator);
+  if (real.length === 1 && typeof real[0].checked !== 'boolean') {
+    const [item] = real;
+    return `
+    <button type="button" class="btn btn--secondary btn--icon page-tools-btn page-tools-btn--direct"
+            data-action="${esc(item.action)}"${item.id == null ? '' : ` data-id="${esc(String(item.id))}"`}${item.disabled ? ' disabled' : ''}
+            aria-label="${esc(item.label)}" title="${esc(item.label)}">
+      <i data-lucide="${esc(item.icon)}" class="icon-md" aria-hidden="true"></i>
+    </button>`;
+  }
   return popoverMenuHtml({
     id,
     label,
