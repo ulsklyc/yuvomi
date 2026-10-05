@@ -31,7 +31,7 @@
     <img src="docs/screenshots/dashboard-light-web.webp" alt="The Yuvomi overview: today's events, tasks and shopping for the whole family, with the family, budget and birthdays below" width="820">
   </picture>
 
-  <sub><b>20</b> modules&nbsp;&nbsp;·&nbsp; <b>26</b> languages&nbsp;&nbsp;·&nbsp; <b>0</b> trackers&nbsp;&nbsp;·&nbsp; optional&nbsp;<b>AES&#8209;256</b>&nbsp;database&nbsp;encryption</sub>
+  <sub><b>20</b> modules&nbsp;&nbsp;·&nbsp; <b>27</b> languages&nbsp;&nbsp;·&nbsp; <b>0</b> trackers&nbsp;&nbsp;·&nbsp; optional&nbsp;<b>AES&#8209;256</b>&nbsp;database&nbsp;encryption</sub>
 </div>
 
 Most households glue their life together from a dozen paid apps, each with its own account, its
@@ -194,7 +194,7 @@ On **Proxmox**, the same steps run inside a small Debian LXC: see the
 
 ### Guided setup
 
-A setup wizard in your browser, in 26 languages. It detects Docker or Podman, sets up single sign-on
+A setup wizard in your browser, in 27 languages. It detects Docker or Podman, sets up single sign-on
 and scheduled backups, prepares Yuvomi for an HTTPS reverse proxy (the certificate stays with your
 proxy), then starts the container and creates your admin account.
 
@@ -248,7 +248,7 @@ Yuvomi was renamed from **Oikos** to avoid a trademark conflict with an unrelate
 - **Apple HIG in the Liquid Glass language** - the system font stack and Apple's type scale, capsule controls, inset-grouped lists and spring motion, verified for WCAG AA in light and dark.
 - **Privacy first** - fully self-hosted, optional SQLCipher AES-256 database encryption, zero telemetry.
 - **Sign-in for a whole household** - two-factor authentication, invite links, optional password reset by email and single sign-on with any OIDC provider; see [how safe access from outside is](#before-you-commit).
-- **26 languages** with automatic detection. A separate household setting decides the language of entries Yuvomi creates itself, so an exported calendar speaks your household's language instead of English.
+- **27 languages** with automatic detection. A separate household setting decides the language of entries Yuvomi creates itself, so an exported calendar speaks your household's language instead of English.
 
 <p align="center">
   <img src="https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white" alt="Express">

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Traditional Chinese as the 27th language** (#1320, translated by @TW199501). The app, the web
+  installer and the command-line installer speak Traditional Chinese (`zh-Hant`), next to the
+  existing Simplified `zh`. A browser or shell from Taiwan, Hong Kong or Macau (`zh-TW`,
+  `LANG=zh_TW.UTF-8`) picks it on its own; mainland China and Singapore keep `zh`. The new region
+  "Chinese (Traditional, Taiwan)" sets New Taiwan dollars, YYYY/MM/DD and the 12-hour clock in one
+  step, and TWD can now be picked anywhere a currency is chosen.
+
 ### Fixed
 
 - **A module switched off for the household no longer works in the background** (#1660). With
