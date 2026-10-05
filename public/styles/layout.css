@@ -5474,7 +5474,22 @@ p.field-hint--warn[hidden] {
   color: var(--color-text-primary);
 }
 
+/* DER INHALT EINES DIALOGS SPRICHT DEN TON SEINES MODULS (Critique 2026-10-05,
+ * R16). Das Modal haengt an <body>, also AUSSERHALB der Modulwurzel, die
+ * `--module-accent` setzt: was im Dialog `var(--module-accent,
+ * var(--color-accent))` las, fiel auf den Markenton zurueck. Gemessen am
+ * Aufgaben-Filterblatt: der aktive Chip stand violett, derselbe Chip in der
+ * Liste dahinter gruen.
+ *
+ * AM KOERPER, NICHT AM OVERLAY: Rahmen, Kopf und Fuss des Dialogs sind Shell
+ * und tragen die Stimme (`--color-accent`, Eine-Stimme-Regel in DESIGN.md -
+ * der Guard "die Shell traegt die Stimme" fuehrt `.modal-overlay` als
+ * Shell-Wurzel). Der Koerper ist INHALT, und dort gehoert der Modulton hin:
+ * Chips, Abhakkreis, modul-eigene Segmente. Der Router fuehrt den Ton des
+ * offenen Moduls theme-fest als `--active-module-accent` an der Wurzel; ohne
+ * Modul greift der Markenton. Guard: test-frontend-audit.js. */
 .modal-panel__body {
+  --module-accent: var(--active-module-accent, var(--color-accent));
   padding: var(--space-4);
   display: flex;
   flex-direction: column;

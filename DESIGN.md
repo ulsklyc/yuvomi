@@ -1441,6 +1441,26 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 | Betrag in Zeile oder Karte | semibold, `tabular-nums`; Ton nur mit Aussage (Zuwachs gruen, Schuld rot, **null neutral**). Fett bleibt der Kennzahl (`.metric-card__value`, Title 1) | `--font-weight-semibold`; `test:budget-ui` | 600 / 700 / 900 je Reiter, Gewicht als Literal oder mit `!important`, "0,00 €" in Erfolgsgruen |
 | Icon stylen | auf `svg` (oder eine Klasse) zielen - Lucide ersetzt `<i data-lucide>` durch `<svg>` | - | Regeln auf `... i`: sie trafen nie (38 entfernt) |
 
+**Die Zeilenregel in der Kueche (R16, Critique 2026-10-05).** Die vier Reiter sprachen vier
+Grammatiken, und derselbe Tipp bedeutete dreierlei (Einkauf: abhaken; Vorrat: bearbeiten;
+Rezepte: oeffnen). Jetzt gilt in allen die Regel "Was eine Zeile tut":
+- **Einkauf:** der Zeilenkoerper oeffnet den Artikel (`.list-row__main--interactive`,
+  `item-details`), das Kaestchen hakt ab, auf Touch der Wisch vom Zeilenanfang. Der Stift ist
+  weg, weil der Koerper ihn ersetzt; der Zeilenklick, der abhakte, ebenso. Loeschen: Wisch zum
+  Zeilenende (Touch), Papierkorb in der Zeile (Zeiger), Dialogfuss (immer).
+- **Vorrat:** Koerper oeffnet, Loeschen im Dialogfuss. Ein Wisch fehlt noch (die Zeile traegt
+  Stepper, die Geste braucht dort eine Ausnahmezone) - offen.
+- **Mahlzeiten:** die Karte oeffnet den Dialog, Loeschen im Dialogfuss (auch mobil, wo der
+  Papierkorb der Karte nicht steht) und am Zeiger auf der Karte.
+- **Rezepte:** die Zeile oeffnet das Rezept; Bearbeiten und Loeschen stehen im Mehr-Menue der
+  Zeile und im Leseblatt.
+
+**Der INHALT eines Dialogs spricht den Ton seines Moduls.** `.modal-panel__body` setzt
+`--module-accent: var(--active-module-accent, var(--color-accent))`: das Modal haengt an
+`<body>`, ausserhalb der Modulwurzel, und der aktive Chip im Aufgaben-Filterblatt stand
+deshalb violett neben demselben Chip in Gruen. Am Koerper, nicht am Overlay: Rahmen, Kopf
+und Fuss sind Shell und tragen die Stimme (Eine-Stimme-Regel).
+
 **Benannte Ausnahmen, je mit Grund an der Stelle:** die Essenskarte (`.meal-card__action-btn`,
 bis zu drei Aktionen in einem 148px-Slot, Trefferflaeche per `::before`, meals.css);
 Foto- und Avatar-Overlays (`*-photo-action`, `settings-avatar-action`: die Aktion liegt auf

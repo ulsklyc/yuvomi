@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   semibold in Tasks, 16px regular in Budget entries and subscriptions, 16px medium in most
   modules, 17px semibold in the agenda, contacts and birthdays. It is 16px medium everywhere
   now; card titles keep their heading size.
+- **Shopping: tapping an item opens it, the checkbox ticks it off.** A tap anywhere on a
+  shopping row used to tick the item off, and a pencil next to it opened the item - while the
+  same tap opened the item in Pantry and the recipe in Recipes. The row body now opens the
+  item everywhere in the kitchen, the pencil is gone, and the name gets its width (228 instead
+  of 158px on a phone). Ticking off stays on the checkbox and on the swipe from the start of
+  the row.
+- **Dialogs carry their module's colour.** The active chip in the Tasks filter sheet was violet
+  next to the same chip in green on the page behind it.
 - **Budget: amounts have one weight, and zero is not a gain.** The amount of a split expense
   stood heavier than an account balance, which stood heavier than a booking; all of them are
   semibold now. "You are owed 0.00" in Split no longer shows in green, "You owe 0.00" no longer

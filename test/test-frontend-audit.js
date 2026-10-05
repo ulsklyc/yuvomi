@@ -19460,3 +19460,15 @@ test('R16: die Buchungszeile der Belohnungen ist eine `.list-row` im `.row-carri
   // Abschnittstitel tragen kein Icon - in keinem anderen Modul tun sie es.
   assert.doesNotMatch(page, /class="rw-section__title u-section-title"[^>]*><i data-lucide/);
 });
+
+test('R16: ein Dialog traegt den Ton des offenen Moduls (aktiver Chip im Filterblatt)', () => {
+  // Am KOERPER (Inhalt), nicht am Overlay: Rahmen, Kopf und Fuss sind Shell und
+  // tragen die Stimme - das haelt "die Shell traegt die Stimme, nicht den Modulton".
+  const body = rulesOf(read('../public/styles/layout.css'))
+    .filter((rule) => rule.at.length === 0 && rule.selector.trim() === '.modal-panel__body')
+    .map((rule) => rule.body).join(';');
+  assert.match(body, /--module-accent:\s*var\(--active-module-accent,\s*var\(--color-accent\)\)/,
+    'der Dialogkoerper haengt ausserhalb der Modulwurzel und bekommt den Ton von der Wurzel');
+  assert.match(read('../public/router.js'), /style\.setProperty\('--active-module-accent', accent\)/,
+    'der Router fuehrt den Ton des offenen Moduls an der Wurzel');
+});
