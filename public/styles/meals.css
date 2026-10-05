@@ -1255,7 +1255,17 @@
    * 1280px bleibt ein Scroll-Fenster wie zuvor.
    *
    *   Bedarf   116 Gutter + 7 × 140 Spalte + 7 × 8 Gap = 1152px
-   *   1440px   1156 verfügbar → passt, 7/7 sichtbar (Rezept-Spalte eingeklappt) */
+   *   1440px   1156 verfügbar → passt, 7/7 sichtbar (Rezept-Spalte eingeklappt)
+   *
+   * NACHGEMESSEN 2026-10-05 (Critique R16, „bei 1280 liegt der Sonntag
+   * ausserhalb"), am Demo-Haushalt mit 27 Karten: sieben Spalten in 996px
+   * sind 117,7px je Tag und 83px Titelbreite (heute 105). Abgeschnitten
+   * („…" nach zwei Zeilen) waeren 12 von 27 Titeln statt 2, getrennt 13 von
+   * 49 Woertern statt 3; mit 12px statt 16px Kartenpolster (91px Titel) immer
+   * noch 10 von 27. Sieben Tage ohne Querscroll kosten bei 1280 also fast
+   * jede zweite Karte ihren Namen - das Scroll-Fenster bleibt. Wer es
+   * aufloesen will, baut die Ansicht um (5 + 2 Tage oder eine Tagesliste),
+   * nicht die Spaltenbreite. */
   .week-grid {
     display: grid;
     /* Breit genug für das längste deutsche Typ-Label („Mittagessen" ≈ 84px
