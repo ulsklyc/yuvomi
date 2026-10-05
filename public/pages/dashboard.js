@@ -40,6 +40,7 @@ import {
   nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans,
   dashboardQuery,
 } from '/utils/dashboard-widgets.js';
+import { EVENT_LIMIT_STEPS, EVENT_LIMIT_DEFAULT, clampEventLimit } from '/utils/dashboard-event-limit.js';
 import {
   allWidgetIds,
   buildDefaultWidgetConfig,
@@ -1237,15 +1238,19 @@ function renderUrgentTasks(tasks, openTotal = null) {
  * Zurueckgetreten heisst: Farbe statt Deckung (#1230) und ein Wort im Etikett
  * statt „Heute" - der Zustand haengt nicht an der Farbe allein. */
 const ENDED_EVENTS_SHOWN = 2;
-const UPCOMING_EVENTS_SHOWN = 5;
 
-function renderUpcomingEvents(allEvents, { now = new Date() } = {}) {
+/* Wie viele Kommende, steht in den Optionen der Kachel (#1680) und geht durch
+ * dieselbe Klemme wie der Parameter der Route (`clampEventLimit`). Die Kachel
+ * schneidet trotzdem selbst: im Anpassen-Modus steht bis zum Speichern die
+ * alte Antwort da, und wer von zwoelf auf fuenf zurueckstellt, soll fuenf
+ * sehen und nicht zwoelf bis zum naechsten Abruf. */
+function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT_DEFAULT } = {}) {
   const todayKey = zonedDateKey(now);
   const nowStamp = householdNowStamp(now);
   const endedToday = allEvents.filter((e) => overviewEventSpan(e, todayKey).day === todayKey && eventHasEnded(e, nowStamp));
   const ended = endedToday.slice(-ENDED_EVENTS_SHOWN);
   const folded = endedToday.length - ended.length;
-  const ahead = allEvents.filter((e) => !endedToday.includes(e)).slice(0, UPCOMING_EVENTS_SHOWN);
+  const ahead = allEvents.filter((e) => !endedToday.includes(e)).slice(0, clampEventLimit(limit));
   const events = [...ended, ...ahead];
   if (!events.length) {
     return `<div class="widget widget--calendar">
@@ -1297,10 +1302,10 @@ function renderUpcomingEvents(allEvents, { now = new Date() } = {}) {
   const earlier = folded > 0
     ? `<p class="event-list__earlier">${esc(t('dashboard.eventsEndedMore', { count: folded }))}</p>`
     : '';
-  // KEINE BADGE: die Liste ist nach vorn offen und bei fuenf Kommenden
-  // geschnitten, eine Gesamtzahl gibt es nicht. „5" stuende genau so lange da,
-  // wie mindestens fuenf Termine kommen - eine Zahl, die nur ihre eigene
-  // Obergrenze nennt. Beendete zaehlen ohnehin nie mit (#1449).
+  // KEINE BADGE: die Liste ist nach vorn offen und bei der gewaehlten Stufe
+  // (5, 8 oder 12) geschnitten, eine Gesamtzahl gibt es nicht. „5" stuende
+  // genau so lange da, wie mindestens fuenf Termine kommen - eine Zahl, die
+  // nur ihre eigene Obergrenze nennt. Beendete zaehlen ohnehin nie mit (#1449).
   return `<div class="widget widget--calendar">
     ${widgetHeader('calendar', t('nav.calendar'), null, '/calendar')}
     <div class="widget__body">${earlier}${items}</div>
@@ -1364,11 +1369,13 @@ function renderWeekStrip(weekEvents) {
   </div>`;
 }
 
-/** Das Kalender-Widget in seiner Groesse: 2x1 ist die Woche, alles andere die Liste. */
-function renderCalendarWidget(data, size) {
+/** Das Kalender-Widget in seiner Groesse: 2x1 ist die Woche, alles andere die Liste.
+ *  Die Stufe aus den Optionen (#1680) gilt nur der Liste - die Woche zeigt
+ *  sieben Tage, keine Zeilen. */
+function renderCalendarWidget(data, size, options = {}) {
   return nearestPreset(size ?? '1x2') === '2x1'
     ? renderWeekStrip(data?.weekEvents)
-    : renderUpcomingEvents(data?.upcomingEvents ?? []);
+    : renderUpcomingEvents(data?.upcomingEvents ?? [], { limit: options?.limit });
 }
 
 /**
@@ -4329,6 +4336,15 @@ async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategor
           <input type="checkbox" name="cal-birthdays" ${options.birthdays === 'hide' ? '' : 'checked'}>
           <span>${t('calendar.toggleBirthdays')}</span>
         </label>
+      </fieldset>
+      <fieldset class="form-group widget-options__group">
+        <legend class="form-label">${t('dashboard.optionCalendarLimit')}</legend>
+        <p class="widget-options__hint">${esc(t('dashboard.optionCalendarLimitHint', { size: t('dashboard.widgetSizeWide') }))}</p>
+        ${EVENT_LIMIT_STEPS.map((step) => `
+        <label class="widget-options__choice">
+          <input type="radio" name="cal-limit" value="${step}" ${clampEventLimit(options.limit) === step ? 'checked' : ''}>
+          <span>${esc(getNumberFormat().format(step))}</span>
+        </label>`).join('')}
       </fieldset>`
     : id === 'waste'
     ? `
@@ -4398,6 +4414,11 @@ async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategor
             // Dasselbe eine Zeile tiefer, nur andersherum notiert: gespeichert
             // wird das ABWAEHLEN, nicht das Haekchen (#927).
             if (!panel.querySelector('input[name="cal-birthdays"]')?.checked) next.birthdays = 'hide';
+            // Und die Stufe (#1680): gespeichert wird nur, was von der Vorgabe
+            // abweicht, als Zahl und durch die Klemme - ein Wert, den es im
+            // Dialog nicht gibt, kommt so auch nicht ins Layout.
+            const limit = clampEventLimit(panel.querySelector('input[name="cal-limit"]:checked')?.value);
+            if (limit !== EVENT_LIMIT_DEFAULT) next.limit = limit;
           } else if (id === 'waste') {
             const picked = [...panel.querySelectorAll('input[name="waste-type"]:checked')].map((el) => Number(el.value));
             // Dieselbe Regel wie bei den Aufgaben-Kategorien: keine Auswahl
@@ -4564,7 +4585,7 @@ function renderHiddenWidgetsTray(cfg, glanceHidden = false) {
 function renderDashboardLayout(cfg, data, weather, currency, { editing = false, visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null } = {}) {
   const widgetById = {
     tasks: () => renderUrgentTasks(data.urgentTasks ?? [], data.openTaskCount),
-    calendar: (size) => renderCalendarWidget(data, size),
+    calendar: (size, options) => renderCalendarWidget(data, size, options),
     birthdays: (size) => renderUpcomingBirthdays(data.birthdays ?? [], size, data.birthdayTotal),
     countdown: (size) => renderCountdowns(data.countdowns ?? [], size, data.countdownTotal),
     budget: (size) => renderBudgetWidget(data.budget ?? {}, currency, size),
@@ -4609,7 +4630,7 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
             <div class="widget__empty">${esc(t('common.loading'))}</div>
           </div>`;
         } else {
-          html = widgetById[w.id](w.size);
+          html = widgetById[w.id](w.size, w.options);
         }
       } catch (err) {
         console.error(`[dashboard] Widget "${w.id}" konnte nicht gerendert werden`, err);

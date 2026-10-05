@@ -384,6 +384,8 @@
         "optionsFor": "Параметри: {{widget}}",
         "optionCalendarScope": "Які події?",
         "optionCalendarAll": "Усі події",
+        "optionCalendarLimit": "Скільки подій?",
+        "optionCalendarLimitHint": "Діє для списку. У розмірі «{{size}}» картка натомість показує тиждень.",
         "optionTaskCategories": "Які категорії?",
         "optionTaskCategoriesHint": "Без вибору огляд показує всі категорії.",
         "optionTaskCategoriesEmpty": "Категорій поки немає.",

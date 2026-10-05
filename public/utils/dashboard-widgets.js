@@ -3,7 +3,7 @@
  * Zweck: Der Standard-Satz der Dashboard-Widgets und die reine Logik darauf -
  *        Normalisieren eines gespeicherten Layouts, Vergleich zweier
  *        Konfigurationen, Nachrechnen des dicht gepackten Rasters.
- * Abhängigkeiten: keine
+ * Abhängigkeiten: nur utils/dashboard-event-limit.js (rein, ohne eigene Importe)
  *
  * WARUM ALS UTIL UND NICHT IN dashboard.js: `normalizeDashboardConfig` traegt
  * eine Zusicherung (siehe unten an WIDGET_IDS) und war bis 2026-08-13 durch
@@ -14,12 +14,16 @@
  * Tür, die für Ansichts-Renderer gebaut ist und deren Inhalt sich nach dem
  * Bedarf der Tests richtet. Eine Regel, an der ein Bestandslayout hängt, gehört
  * hinter eine echte Modulgrenze.
- * Diese Datei hat deshalb bewusst keine Importe: sie ist die Teilmenge, die
- * ohne DOM, ohne `window.yuvomi` und ohne Haushaltskontext entscheidbar ist.
+ * Diese Datei hat deshalb bewusst keine Importe ausser einer reinen Schwester
+ * (die Stufen der Kalender-Kachel, #1680, die auch die Route liest): sie ist
+ * die Teilmenge, die ohne DOM, ohne `window.yuvomi` und ohne Haushaltskontext
+ * entscheidbar ist.
  * Was an `isSoloHousehold()` oder den Modul-Schaltern hängt
  * (`isWidgetModuleEnabled`), bleibt drüben in der Seite.
  * Guards: test/test-dashboard.js, Abschnitt „Widget-Konfiguration".
  */
+
+import { EVENT_LIMIT_DEFAULT, clampEventLimit } from './dashboard-event-limit.js';
 
 // Reihenfolge = Standard-Layout. Die primären Inhalte (tasks, calendar) führen,
 // damit sie beim Wieder-Einblenden oben stehen; das einzige passive Widget
@@ -433,6 +437,10 @@ export function dashboardQuery(config) {
   // zustand der Route, und ein Parameter, der ihn wiederholt, stuende in jeder
   // Anfrage - dieselbe Regel, nach der `scope: 'all'` nicht gespeichert wird.
   if (optionsOf('calendar').birthdays === 'hide') params.set('events_birthdays', 'hide');
+  // Die Stufe reist geklemmt und nur, wenn sie nicht die Vorgabe ist (#1680):
+  // ein gespeicherter Fremdwert ergibt hier dieselbe Anfrage wie gar keiner.
+  const eventLimit = clampEventLimit(optionsOf('calendar').limit);
+  if (eventLimit !== EVENT_LIMIT_DEFAULT) params.set('events_limit', String(eventLimit));
   for (const key of optionsOf('tasks').categories ?? []) params.append('tasks_category', key);
   for (const id of optionsOf('notes').categories ?? []) params.append('notes_category', String(id));
   const query = params.toString();

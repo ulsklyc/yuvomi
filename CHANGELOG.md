@@ -20,6 +20,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `POST /api/v1/displays/{id}/devices/{deviceId}/remove`; both answer 409 for a credential
   that is still active, and `DELETE /api/v1/auth/api-tokens/{id}` keeps meaning "revoke".
 
+- **The Calendar tile on the overview can list 8 or 12 appointments instead of 5** (D#1676, #1680).
+  The tile always showed the next five, and a household with a full week had to open the
+  calendar for the rest. Its options in Customize mode - where "Which appointments?" and the
+  birthdays switch already live - now ask "How many appointments?" with three steps: 5, 8 and
+  12. Five stays the default, so a tile nobody touched looks as before. The choice belongs to
+  the person who made it, travels with a household default like the other tile options, and
+  applies on a phone as well. Appointments of today that are already over still stand above
+  the list and do not use up the number. The tile grows with its list instead of scrolling,
+  in every list size, and the tiles next to it in the grid grow with it: with 12 it is
+  roughly twice as tall as with 5. At "Wide (2x1)" the tile remains the week strip, and the
+  Today sheet and wall mode keep their own number of rows. For API clients:
+  `GET /api/v1/dashboard` takes `events_limit` with exactly `5`, `8` or `12`; any other value
+  means 5.
+
 ### Changed
 
 - **Housekeeping chores work like every other list.** A chore row carried a pencil and a bin

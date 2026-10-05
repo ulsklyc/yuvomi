@@ -338,6 +338,8 @@
         "optionsFor": "Opsi untuk {{widget}}",
         "optionCalendarScope": "Acara yang mana?",
         "optionCalendarAll": "Semua acara",
+        "optionCalendarLimit": "Berapa acara?",
+        "optionCalendarLimitHint": "Berlaku untuk daftar. Pada ukuran “{{size}}”, kartu menampilkan minggu sebagai gantinya.",
         "optionTaskCategories": "Kategori yang mana?",
         "optionTaskCategoriesHint": "Tanpa pilihan, ikhtisar menampilkan semua kategori.",
         "optionTaskCategoriesEmpty": "Belum ada kategori.",

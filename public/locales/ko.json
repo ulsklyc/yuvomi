@@ -338,6 +338,8 @@
         "optionsFor": "{{widget}} 옵션",
         "optionCalendarScope": "어떤 일정을 볼까요?",
         "optionCalendarAll": "모든 일정",
+        "optionCalendarLimit": "일정을 몇 개 표시할까요?",
+        "optionCalendarLimitHint": "목록에 적용됩니다. ‘{{size}}’ 크기에서는 타일이 대신 한 주를 보여 줍니다.",
         "optionTaskCategories": "어떤 분류를 볼까요?",
         "optionTaskCategoriesHint": "선택하지 않으면 개요에 모든 분류가 표시됩니다.",
         "optionTaskCategoriesEmpty": "아직 분류가 없습니다.",

@@ -324,6 +324,8 @@
         "optionsFor": "{{widget}}のオプション",
         "optionCalendarScope": "どの予定を表示しますか？",
         "optionCalendarAll": "すべての予定",
+        "optionCalendarLimit": "予定を何件表示しますか？",
+        "optionCalendarLimitHint": "リストに適用されます。サイズ「{{size}}」では、タイルは代わりに週を表示します。",
         "optionTaskCategories": "どのカテゴリを表示しますか？",
         "optionTaskCategoriesHint": "選択しない場合、ダッシュボードはすべてのカテゴリを表示します。",
         "optionTaskCategoriesEmpty": "カテゴリはまだありません。",

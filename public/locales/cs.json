@@ -354,6 +354,8 @@
         "optionsFor": "Možnosti: {{widget}}",
         "optionCalendarScope": "Které události?",
         "optionCalendarAll": "Všechny události",
+        "optionCalendarLimit": "Kolik událostí?",
+        "optionCalendarLimitHint": "Platí pro seznam. Ve velikosti „{{size}}“ dlaždice místo toho zobrazuje týden.",
         "optionTaskCategories": "Které kategorie?",
         "optionTaskCategoriesHint": "Bez výběru zobrazí přehled všechny kategorie.",
         "optionTaskCategoriesEmpty": "Zatím tu nejsou žádné kategorie.",

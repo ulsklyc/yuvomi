@@ -324,6 +324,8 @@
         "optionsFor": "{{widget}} beállításai",
         "optionCalendarScope": "Mely események?",
         "optionCalendarAll": "Minden esemény",
+        "optionCalendarLimit": "Hány esemény?",
+        "optionCalendarLimitHint": "A listára vonatkozik. „{{size}}” méretben a csempe ehelyett a hetet mutatja.",
         "optionTaskCategories": "Mely kategóriák?",
         "optionTaskCategoriesHint": "Választás nélkül az áttekintés minden kategóriát mutat.",
         "optionTaskCategoriesEmpty": "Még nincsenek kategóriák.",

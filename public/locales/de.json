@@ -338,6 +338,8 @@
         "optionsFor": "Optionen für {{widget}}",
         "optionCalendarScope": "Welche Termine?",
         "optionCalendarAll": "Alle Termine",
+        "optionCalendarLimit": "Wie viele Termine?",
+        "optionCalendarLimitHint": "Gilt für die Liste. In der Größe „{{size}}“ zeigt die Kachel stattdessen die Woche.",
         "optionTaskCategories": "Welche Kategorien?",
         "optionTaskCategoriesHint": "Ohne Auswahl zeigt die Übersicht alle Kategorien.",
         "optionTaskCategoriesEmpty": "Es gibt noch keine Kategorien.",

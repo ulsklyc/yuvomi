@@ -324,6 +324,8 @@
         "optionsFor": "Opções de {{widget}}",
         "optionCalendarScope": "Que compromissos?",
         "optionCalendarAll": "Todos os compromissos",
+        "optionCalendarLimit": "Quantos compromissos?",
+        "optionCalendarLimitHint": "Aplica-se à lista. No tamanho «{{size}}», o cartão mostra a semana em vez dela.",
         "optionTaskCategories": "Que categorias?",
         "optionTaskCategoriesHint": "Sem seleção, a vista geral mostra todas as categorias.",
         "optionTaskCategoriesEmpty": "Ainda não há categorias.",
