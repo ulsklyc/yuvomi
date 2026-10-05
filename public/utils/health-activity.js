@@ -13,6 +13,7 @@
  */
 
 import { addLocalDays, parseLocalDateKey, startOfLocalWeekKey, todayKey } from '/utils/date.js';
+import { isRollingAnchor, stepVitalAnchor } from '/utils/health-vitals.js';
 
 // --------------------------------------------------------
 // Preset-Definitionen (Trainingsarten)
@@ -71,10 +72,12 @@ function toFiniteOrNull(value) {
  */
 export function weekSummary(activities, opts = {}) {
   const { anchor, weekStartsOn = 1, today = todayKey() } = opts;
-  const weekStart = startOfLocalWeekKey(anchor || today, weekStartsOn);
-  const start = weekStart === startOfLocalWeekKey(today, weekStartsOn)
+  // Ein Anker hinter heute in der laufenden Woche meint die Kalenderwoche
+  // (isRollingAnchor): dorthin springt die Seite nach dem Speichern einer
+  // Einheit mit Datum in der Zukunft, und dorthin fuehrt "Weiter".
+  const start = isRollingAnchor('week', anchor, weekStartsOn, { today })
     ? addLocalDays(today, -6)
-    : weekStart;
+    : startOfLocalWeekKey(anchor || today, weekStartsOn);
 
   const buckets = [];
   const index = new Map();
@@ -99,6 +102,15 @@ export function weekSummary(activities, opts = {}) {
   }
 
   return { buckets, from, to };
+}
+
+/**
+ * Blaettert die Aktivitaetswoche: dieselbe lueckenlose Folge wie die
+ * Vitalwerte (stepVitalAnchor) - vorige Kalenderwoche, gleitend bis heute,
+ * laufende Kalenderwoche, naechste Kalenderwoche.
+ */
+export function stepActivityAnchor(anchorKey, dir, weekStartsOn = 1, opts = {}) {
+  return stepVitalAnchor('week', anchorKey, dir, weekStartsOn, opts);
 }
 
 /**

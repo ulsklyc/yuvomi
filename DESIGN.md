@@ -1516,8 +1516,9 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
   160 -> 400px). Metafelder stehen darunter bzw. hinter "Weitere Einstellungen".
 - **Der laufende Zeitraum ist gleitend, der vergangene kalendarisch.** Gesundheit: "Monat" =
   letzte 30 Tage, "Woche" = letzte 7, endend am Tag des Haushalts (`todayKey()`); wer
-  zurueckblaettert, bekommt Kalendermonat und -woche. Die Beschriftung nennt das Fenster, das
-  gilt. Eine Kennzahl hat EINEN Zeitraum auf jeder Flaeche und nennt ihn (Einnahmetreue: 7
+  zurueckblaettert, bekommt Kalendermonat und -woche. "Weiter" haelt zuerst am laufenden
+  Kalenderzeitraum (der Rest der Woche, des Monats), dann am naechsten: kein Tag liegt in
+  keinem Fenster (`stepVitalAnchor`). Die Beschriftung nennt das Fenster, das gilt. Eine Kennzahl hat EINEN Zeitraum auf jeder Flaeche und nennt ihn (Einnahmetreue: 7
   Tage in Uebersicht und Medikamente). Eine Monatsachse traegt Monatsnamen.
 - **Der Filterknopf zaehlt Abweichungen vom Standard.** Aufgaben: Status "Offen" ist der
   Ruhezustand und zaehlt nicht; "Filter zuruecksetzen" stellt ihn her. Im Filterblatt

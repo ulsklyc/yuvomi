@@ -29,7 +29,7 @@ import { installPopoverMenus, pageToolsMenuHtml } from '/utils/popover-menu.js';
 import { personSwitcherMarkup } from '/utils/health-person-switcher.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import {
-  computeVitalSeries, VITAL_METRICS, vitalMetric,
+  computeVitalSeries, stepVitalAnchor, VITAL_METRICS, vitalMetric,
   MOOD_SCALE, moodStep, splitDuration, durationToHours,
 } from '/utils/health-vitals.js';
 import {
@@ -41,7 +41,7 @@ import {
   deriveFlag, summarizeReport, analyteNames, analyteTrend, LAB_FLAGS,
 } from '/utils/health-labs.js';
 import {
-  ACTIVITY_TYPES, activityType, weekSummary, activityTotals,
+  ACTIVITY_TYPES, activityType, weekSummary, activityTotals, stepActivityAnchor,
 } from '/utils/health-activity.js';
 import { upcomingDoses, computeAdherenceStreak } from '/utils/health-overview.js';
 import { withChosenPeople } from '/utils/people-picker.js';
@@ -1815,14 +1815,7 @@ function renderVitalSheet(host) {
 }
 
 function stepAnchor(dir) {
-  if (vitals.range === 'week') {
-    vitals.anchor = addLocalDays(vitals.anchor, 7 * dir);
-    return;
-  }
-  const d = parseLocalDateKey(vitals.anchor);
-  if (vitals.range === 'month') d.setMonth(d.getMonth() + dir);
-  else d.setFullYear(d.getFullYear() + dir);
-  vitals.anchor = toLocalDateKey(d);
+  vitals.anchor = stepVitalAnchor(vitals.range, vitals.anchor, dir);
 }
 
 function chartMarkup(metric, series, geo = CHART) {
@@ -4390,7 +4383,7 @@ async function reloadActivity() {
 }
 
 function stepActivityWeek(dir) {
-  activity.anchor = addLocalDays(activity.anchor, 7 * dir);
+  activity.anchor = stepActivityAnchor(activity.anchor, dir);
 }
 
 // Einheiten der gewählten Woche, absteigend chronologisch (neueste zuerst).

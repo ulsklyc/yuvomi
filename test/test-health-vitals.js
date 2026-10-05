@@ -621,6 +621,93 @@ test('R16: wer zurueckblaettert, bekommt den Kalendermonat und die Kalenderwoche
   assert.deepEqual([next.from, next.to], ['2026-11-01', '2026-11-30']);
 });
 
+// Review PR #1673: das gleitende Fenster endet heute, "Weiter" begann erst mit
+// dem naechsten Kalenderzeitraum. Der Rest der laufenden Woche / des laufenden
+// Monats lag damit in KEINEM erreichbaren Fenster - und Messwerte duerfen ein
+// Datum in der Zukunft tragen. Ein Anker hinter heute meint jetzt das
+// Kalenderfenster, und das Blaettern haelt dort an.
+
+const vitalsModule = await import('../public/utils/health-vitals.js');
+
+test('R16: ein Anker hinter heute im laufenden Zeitraum zeigt das Kalenderfenster', () => {
+  const week = buildVitalBuckets('week', '2026-10-08', 1, { today: R16_TODAY });
+  assert.deepEqual([week.from, week.to], ['2026-10-05', '2026-10-11']);
+  const month = buildVitalBuckets('month', '2026-10-31', 1, { today: R16_TODAY });
+  assert.deepEqual([month.from, month.to], ['2026-10-01', '2026-10-31']);
+  // Ein Messwert von uebermorgen steht damit in einem erreichbaren Fenster.
+  const rows = [{ id: 1, type: 'weight', value_num: 70, unit: 'kg', measured_at: '2026-10-07T07:00' }];
+  const series = computeVitalSeries(rows, { type: 'weight', range: 'week', anchor: '2026-10-11', today: R16_TODAY });
+  assert.equal(series.hasData, true);
+});
+
+/** Laeuft `steps` Schritte und sammelt die Fenster [from, to] in Leserichtung. */
+function walkWindows(range, start, dir, steps, today) {
+  const out = [];
+  let anchor = start;
+  for (let i = 0; i <= steps; i++) {
+    const { from, to } = buildVitalBuckets(range, anchor, 1, { today });
+    out.push([from, to]);
+    anchor = vitalsModule.stepVitalAnchor(range, anchor, dir, 1, { today });
+  }
+  return out;
+}
+
+function nextDay(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + 1);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
+test('R16: Blaettern laesst keinen Tag aus - jedes Fenster beginnt spaetestens am Tag nach dem vorigen', () => {
+  // Montag, Mittwoch, Sonntag (letzter Tag der Woche), Monatsletzter, 31. Januar.
+  for (const today of ['2026-10-05', '2026-10-07', '2026-10-11', '2026-10-31', '2027-01-31']) {
+    for (const range of ['week', 'month']) {
+      let start = today;
+      for (let i = 0; i < 4; i++) start = vitalsModule.stepVitalAnchor(range, start, -1, 1, { today });
+      const forward = walkWindows(range, start, 1, 9, today);
+      for (let i = 1; i < forward.length; i++) {
+        assert.ok(forward[i][0] <= nextDay(forward[i - 1][1]),
+          `${range} am ${today}: Luecke zwischen ${forward[i - 1]} und ${forward[i]}`);
+        assert.ok(forward[i][1] > forward[i - 1][1], `${range} am ${today}: ${forward[i]} fuehrt nicht weiter`);
+      }
+      // Zurueck ueber dieselben Fenster, in umgekehrter Reihenfolge.
+      let end = start;
+      for (let i = 0; i < 9; i++) end = vitalsModule.stepVitalAnchor(range, end, 1, 1, { today });
+      assert.deepEqual(walkWindows(range, end, -1, 9, today), [...forward].reverse(), `${range} am ${today}: Rueckweg`);
+    }
+  }
+});
+
+test('R16: die Folge am Montag, 05.10. - vorige Woche, gleitend, laufende Woche, naechste Woche', () => {
+  const start = vitalsModule.stepVitalAnchor('week', R16_TODAY, -1, 1, { today: R16_TODAY });
+  assert.deepEqual(walkWindows('week', start, 1, 3, R16_TODAY), [
+    ['2026-09-28', '2026-10-04'],
+    ['2026-09-29', '2026-10-05'],
+    ['2026-10-05', '2026-10-11'],
+    ['2026-10-12', '2026-10-18'],
+  ]);
+  const monthStart = vitalsModule.stepVitalAnchor('month', R16_TODAY, -1, 1, { today: R16_TODAY });
+  assert.deepEqual(walkWindows('month', monthStart, 1, 3, R16_TODAY), [
+    ['2026-09-01', '2026-09-30'],
+    ['2026-09-06', '2026-10-05'],
+    ['2026-10-01', '2026-10-31'],
+    ['2026-11-01', '2026-11-30'],
+  ]);
+  // Am 31. reichen 30 Tage nur bis zum 2. - der Monatserste gehoert dazu.
+  const last = buildVitalBuckets('month', '2026-10-31', 1, { today: '2026-10-31' });
+  assert.deepEqual([last.from, last.to, last.buckets.length], ['2026-10-01', '2026-10-31', 31]);
+  // Am letzten Tag des Zeitraums liegt nichts mehr dahinter: kein Zwischenhalt.
+  assert.equal(vitalsModule.stepVitalAnchor('week', '2026-10-11', 1, 1, { today: '2026-10-11' }), '2026-10-18');
+  // Das Jahr blaettert wie bisher.
+  assert.equal(vitalsModule.stepVitalAnchor('year', R16_TODAY, -1, 1, { today: R16_TODAY }), '2025-10-05');
+});
+
+test('R16: die Seite blaettert ueber die Bausteine, nicht ueber eigene Kalenderrechnung', () => {
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.match(src, /function stepAnchor\(dir\) \{\s*vitals\.anchor = stepVitalAnchor\(vitals\.range, vitals\.anchor, dir\);\s*\}/);
+  assert.match(src, /function stepActivityWeek\(dir\) \{\s*activity\.anchor = stepActivityAnchor\(activity\.anchor, dir\);\s*\}/);
+});
+
 test('R16: vier Messungen der Vorwoche ergeben am Monatsanfang einen Trend', () => {
   const rows = ['2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02'].map((day, i) => (
     { id: i + 1, type: 'weight', value_num: 70 + i / 10, unit: 'kg', measured_at: `${day}T07:00` }));
