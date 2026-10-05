@@ -75,6 +75,9 @@ export const REGION_PRESETS = {
   'be-BY': { currency: 'BYN', date_format: 'dmy', time_format: '24h' },
   'tr-TR': { currency: 'TRY', date_format: 'dmy', time_format: '24h' },
   'zh-CN': { currency: 'CNY', date_format: 'ymd', time_format: '24h' },
+  // Taiwan schreibt 2026/11/05 und rechnet in 12h (上午/下午) - beides CLDR
+  // zh-Hant-TW. Mit Schrift-Subtag, damit regionLocale() auf zh-Hant faellt.
+  'zh-Hant-TW': { currency: 'TWD', date_format: 'ymd_slash', time_format: '12h' },
   'ja-JP': { currency: 'JPY', date_format: 'ymd', time_format: '24h' },
   'hi-IN': { currency: 'INR', date_format: 'dmy_slash', time_format: '12h' },
   'pt-PT': { currency: 'EUR', date_format: 'dmy_slash', time_format: '24h' },
