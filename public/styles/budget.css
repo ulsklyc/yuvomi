@@ -145,6 +145,55 @@
   align-items: center;
 }
 
+/* MOBIL TEILEN SICH TITEL UND ZEITRAUM EINE ZEILE (R16, layout.css
+ * `.page-toolbar--period-inline`). Hier steht nur, was das Label und die Notiz
+ * dafuer hergeben:
+ *
+ * DAS LABEL HAT EINE FESTE BREITE, damit die Pfeile beim Blaettern stehen
+ * („Mai 2026" 71px, „Sept. 2026" 84px), und zeigt die Kurzform des Monats
+ * (`data-short`, budget.js updateLabel): neben „Budget" im Large Title
+ * bleiben ihm 96px, „September 2026" braucht 128. Der volle Text bleibt der
+ * Text des Elements - Schriftgroesse 0, die Kurzform ist reine Malerei
+ * (`/ ""`: kein zweiter Name fuer Screenreader). Ein Wochenbereich der
+ * Statistik bricht in zwei Zeilen; die Zeile haelt 48px.
+ *
+ * DIE NOTIZ der Reiter ohne Zeitraum steht am Zeilenende, wo sonst der
+ * Stepper steht, hoechstens zweizeilig - der Kopf bleibt auf allen sieben
+ * Reitern gleich hoch (A5 P2-9 gilt weiter, jetzt ohne eigene Zeile). */
+@media (max-width: 767px) {
+  .page-toolbar--period-inline .budget-nav__label {
+    flex: 0 0 auto;
+    inline-size: calc(var(--space-12) * 2);
+    font-size: 0;
+  }
+
+  .page-toolbar--period-inline .budget-nav__label::after {
+    content: attr(data-short);
+    content: attr(data-short) / "";
+    display: block;
+    font-size: var(--text-base);
+    line-height: var(--line-height-tight);
+    text-wrap: balance;
+  }
+
+  .page-toolbar.page-toolbar--period-inline.page-toolbar--wrap:not(.page-toolbar--in-group) > .budget-nav__month:has(.budget-nav__note:not([hidden])) {
+    flex: 1 1 0;
+  }
+
+  .page-toolbar--period-inline .budget-nav__note {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-align: end;
+    line-height: var(--line-height-tight);
+  }
+
+  .page-toolbar.page-toolbar--period-inline:not(.page-toolbar--in-group):has(.budget-nav__note:not([hidden])) > .page-toolbar__title {
+    flex: 0 1 auto;
+  }
+}
+
 /* Die Tab-Leiste ist die Bar-Zeile des Kopfs (.page-toolbar__bar, layout.css,
  * Werkzeugzeilen-Regel 2026-08-27): volle Zeile unter Titel/Monat/Aktionen.
  * Layout, Scrollen, Snap und Scroll-Affordanz kommen komplett aus der Shell

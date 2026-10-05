@@ -574,11 +574,11 @@ export function formatDayMonth(date) {
  * @param {number|string} month  1-12
  * @returns {string} '' bei einer Eingabe, die kein Monat ist
  */
-export function formatMonthYear(year, month) {
+export function formatMonthYear(year, month, { month: monthStyle = 'long' } = {}) {
   const y = Number(year);
   const m = Number(month);
   if (!Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12) return '';
-  const options = { month: 'long', year: 'numeric', timeZone: 'UTC', calendar: 'gregory' };
+  const options = { month: monthStyle === 'short' ? 'short' : 'long', year: 'numeric', timeZone: 'UTC', calendar: 'gregory' };
   let formatter;
   try { formatter = new Intl.DateTimeFormat(currentLocale, options); }
   catch { formatter = new Intl.DateTimeFormat(DEFAULT_LOCALE, options); }

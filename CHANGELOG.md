@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single 932px column, the phone layout stretched. From a window of about 1280px the next seven
   days stand beside the hour timeline as agenda rows; a row opens the event, the heading leads
   to the agenda. The phone's day view is unchanged.
+- **The Budget header is one row shorter on a phone.** Title, month stepper and tabs stood in
+  three rows (162px), and on the four tabs without a month the middle row only carried a
+  caption. The month now sits at the end of the title row with a short label ("Oct 2026"), the
+  caption of the other tabs stands in the same place, and the header is 117px on every tab, so
+  nothing moves when you switch. "Current" appears to the left of the arrows while you look at
+  another month; the arrows stay where they are.
 
 ### Fixed
 

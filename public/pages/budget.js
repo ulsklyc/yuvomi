@@ -757,7 +757,7 @@ export async function render(container, { user }) {
 
   setHtml(container, `
     <div class="budget-page app-page app-page--reading page-measure--narrow" data-composition="reading">
-      <div class="page-toolbar page-toolbar--wrap page-toolbar--narrow page-toolbar--period budget-nav">
+      <div class="page-toolbar page-toolbar--wrap page-toolbar--narrow page-toolbar--period page-toolbar--period-inline budget-nav">
         <h1 class="page-toolbar__title">${t('budget.title')}</h1>
         <!-- Der Kopf-Slot bleibt auf jedem Tab besetzt: entweder Stepper oder
              ein ruhiger Kontexttext. Eine Lücke machte jeden Tabwechsel zur
@@ -948,7 +948,15 @@ function refocusSegmented(barSelector) {
 
 function updateLabel() {
   const lbl = _container.querySelector('#budget-label');
-  if (lbl) lbl.textContent = state.activeTab === 'reports' ? reportPeriodLabel() : formatMonthLabel(state.month);
+  if (!lbl) return;
+  const reports = state.activeTab === 'reports';
+  lbl.textContent = reports ? reportPeriodLabel() : formatMonthLabel(state.month);
+  // Die Kurzform fuer die Titelzeile mobil (layout.css, `--period-inline`):
+  // neben dem Large Title bleiben dem Label rund 96px, „September 2026"
+  // braucht 128. Nur der Monat hat eine; Jahr und Woche stehen wie sie sind.
+  const ym = reports ? (state.range === 'month' ? state.reportAnchor.slice(0, 7) : null) : state.month;
+  const [y, m] = ym ? ym.split('-') : [];
+  lbl.setAttribute('data-short', ym ? formatMonthYear(y, m, { month: 'short' }) : lbl.textContent);
 }
 
 // --------------------------------------------------------

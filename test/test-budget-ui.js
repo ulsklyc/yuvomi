@@ -3661,3 +3661,40 @@ test('#1656: die Textfelder des Darlehens lassen nicht mehr zu, als der Server a
     assert.match(tag, new RegExp(`maxlength="${max}"`), `${id}: ${tag}`);
   }
 });
+
+/* R16 (Critique 2026-10-05, P1 mobil): TITEL UND ZEITRAUM TEILEN SICH ZEILE 1.
+ * Der Budgetkopf stand mobil auf allen sieben Reitern bei 162px - drei Zeilen,
+ * und auf vier Reitern trug die mittlere nur eine Bildunterschrift. Mit
+ * `page-toolbar--period-inline` gibt der Titel nach, der Stepper steht am
+ * Zeilenende; gemessen 117px auf jedem Reiter. Der Guard haelt die drei
+ * Stuecke, ohne die die Zeile wieder aufgeht: die Klasse im Markup, die
+ * nachgebende Titelbasis und den Center-Slot ohne volle Zeile. */
+test('R16: der Budgetkopf fuehrt den Zeitraum mobil in der Titelzeile', () => {
+  assert.match(budget, /<div class="page-toolbar[^"]*\bpage-toolbar--period-inline\b[^"]*\bbudget-nav\b[^"]*">/,
+    'der Budgetkopf traegt `page-toolbar--period-inline`');
+  const mobile = [...eachRule(layoutCss)].filter((r) => r.at.some((a) => /max-width:\s*767px/.test(a))
+    && r.selector.includes('.page-toolbar--period-inline'));
+  const of = (tail) => mobile.filter((r) => r.selector.trim().endsWith(tail)).map((r) => r.body).join(';');
+  assert.match(of(':not(.page-toolbar--in-group) > .page-toolbar__title'), /flex:\s*1 1 0/,
+    'der Titel gibt nach (Basis 0) - mit der Basis der Large-Title-Regel nimmt er die ganze Zeile');
+  assert.match(of('> .page-toolbar__center'), /flex:\s*0 0 auto/,
+    'der Center-Slot beansprucht keine eigene Zeile und gibt selbst nicht nach');
+  // Der Ruecksprung haelt hier keinen Platz frei: er steht per `order` VOR dem
+  // Stepper, und der ist am Zeilenende verankert - kein Pfeil bewegt sich (#1200).
+  assert.match(of('> .page-toolbar__center > .btn.is-current'), /display:\s*none/);
+  assert.match(of('> .page-toolbar__center > .btn--secondary'), /order:\s*-1/);
+  // Das Label traegt die Kurzform des Monats und eine feste Breite.
+  assert.match(budget, /lbl\.setAttribute\('data-short', ym \? formatMonthYear\(y, m, \{ month: 'short' \}\)/);
+  const label = [...eachRule(budgetCss)].filter((r) => r.at.some((a) => /max-width:\s*767px/.test(a))
+    && r.selector.trim() === '.page-toolbar--period-inline .budget-nav__label');
+  assert.ok(label.some((r) => /inline-size:/.test(r.body)), 'feste Labelbreite - sonst wandern die Pfeile beim Blaettern');
+});
+
+test('R16: formatMonthYear kennt die Kurzform des Monats', async () => {
+  const i18n = await import('../public/i18n.js');
+  const long = i18n.formatMonthYear(2026, 9);
+  const short = i18n.formatMonthYear(2026, 9, { month: 'short' });
+  assert.ok(long.length > 0 && short.length > 0);
+  assert.ok(short.length <= long.length, `${short} ist nicht laenger als ${long}`);
+  assert.match(short, /2026/);
+});

@@ -3746,6 +3746,73 @@ html.fab-anim-done .page-fab {
   }
 }
 
+/* DER ZEITRAUM STEHT IN DER TITELZEILE (R16, Critique 2026-10-05 P1 mobil).
+ *
+ * `--period-inline` traegt ein Kopf, dessen Zeile 2 schon die Sub-Tabs fuehrt
+ * und der dazu einen Zeitraum blaettert (Budget). Bis R16 war das die benannte
+ * Ausnahme mit DREI Kopfzeilen (162px bei 390px): Titel, Stepper, Tab-Leiste -
+ * und auf vier von sieben Reitern trug die Stepperzeile nur eine
+ * Bildunterschrift. Jetzt teilen sich Titel und Zeitraum Zeile 1: der Titel
+ * gibt nach (Basis 0, Ellipse), der Stepper steht am Zeilenende und gibt nie
+ * nach. Der Kopf misst damit auf JEDEM Reiter dasselbe, ob der Slot einen
+ * Stepper oder die Notiz traegt (Budget 162 -> 117px).
+ *
+ * DER RUECKSPRUNG RESERVIERT HIER KEINEN PLATZ. `.btn.is-current` haelt seine
+ * Box sonst per `visibility` (siehe dort, #1200): der Stepper stand links, und
+ * ein auftauchender Knopf schob den Weiter-Pfeil unter dem Finger weg. Hier ist
+ * der Stepper am Zeilenende verankert und der Ruecksprung steht per `order`
+ * VOR ihm - er erscheint links vom Zurueck-Pfeil, und kein Pfeil bewegt sich.
+ * Den Platz dafuer gibt der Titel: solange der Ruecksprung steht, verlaesst er
+ * das Bild (nicht den Baum), genau wie der eingeklappte Titel eines
+ * Zeitraum-Kopfs oben. Siegel, Tab-Leiste und Navigation sagen weiter, wo man
+ * ist.
+ *
+ * EINGEKLAPPT BLEIBT DER TITEL STEHEN: er teilt die Zeile mit dem Stepper,
+ * sein Verschwinden sparte keine Hoehe mehr. Er faellt nur auf den
+ * Inline-Schnitt (typography.css). */
+@media (max-width: 767px) {
+  .page-toolbar.page-toolbar--period-inline:not(.page-toolbar--in-group) > .page-toolbar__title {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .page-toolbar.page-toolbar--period-inline.page-toolbar--wrap:not(.page-toolbar--in-group) > .page-toolbar__center {
+    flex: 0 0 auto;
+    min-width: 0;
+    margin-inline: auto 0;
+    gap: 0;
+  }
+
+  .page-toolbar--period-inline > .page-toolbar__center > .btn.is-current {
+    display: none;
+  }
+
+  .page-toolbar--period-inline > .page-toolbar__center > .btn--secondary {
+    order: -1;
+    margin-inline-end: var(--space-1);
+  }
+
+  .page-toolbar.page-toolbar--period-inline.page-toolbar--capped.is-collapsed > .page-toolbar__title {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+  }
+
+  .page-toolbar.page-toolbar--period-inline.page-toolbar--capped.is-collapsed > .module-seal--head {
+    display: inline-flex;
+  }
+
+  .page-toolbar.page-toolbar--period-inline:has(> .page-toolbar__center > .btn--secondary:not(.is-current):not([hidden])) > .page-toolbar__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 /* --------------------------------------------------------
  * KOMPAKTE HÖHENKLASSE: der Kopf trägt EINE Zeile.
  *

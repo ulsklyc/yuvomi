@@ -2169,7 +2169,7 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    Belohnungen). Die Primaeraktion bleibt mobil der FAB in der Kapsel, am Desktop die
    angedockte Kopf-Pille. Ziel ausgeklappt <= 114px, mit Stepper <= 122px. Gemessen
    2026-09-27 (R11, 390px): Aufgaben, Notizen, Kontakte, Dokumente, Inventar, Geburtstage,
-   Entsorgung, Einstellungen 114-120px, Kalender 117px, Budget 162px (benannte Ausnahme unten).
+   Entsorgung, Einstellungen 114-120px, Kalender 117px, Budget 162px (seit R16 117px, siehe unten).
    Bis R11 stand hier, Such-Icon und Menue sassen in Zeile 1 neben dem Titel - gebaut war
    immer Zeile 2 (Re-Critique 2026-09-27, A8 P3-1). Neben dem Large Title haetten sie ihn
    bei 390px auf rund 220px gekuerzt, und angedockt waeren sie mit ihm aus dem Bild gewandert.
@@ -2237,15 +2237,25 @@ ueber den Rueckweg nach oben, wie die Suche der gedeckelten Koepfe (Kontakte); i
 selbst ist fuer sie kein Platz (390px, de: 65-87px frei, zwei 48px-Ziele passen nicht, ohne
 die Zaehler wieder zu Punkten zu machen).
 
-**Benannte Ausnahme: Sub-Tabs + Zeitraum (Budget, Haushaltshilfe-Berichte).** Ein Modul, dessen
-Zeile 2 schon die Sub-Tabs traegt und dessen Tab einen Zeitraum blaettert, bekommt den
-Zeitraum-Stepper als dritte Kopfzeile (Budget 162px, Haushaltshilfe-Berichte 170px). Neben
-den Large Title passt der Stepper nicht (min-content rund 220px), und ein Stepper im Port
-scrollte mit dem Zeitraum weg, den er benennt. Beim Scrollen klappt der Titel als Lead weg,
-es kleben zwei Zeilen. Die Ausnahme gilt nur fuer genau diese Kombination - ein drittes
-Element (Werkzeugzeile, Chipreihe) macht daraus keinen vierten Fall, sondern wandert ins
-Menue oder in den Port. `test:mobile-chrome` zaehlt keine Kopfzeilen (das ist Messarbeit),
-die Ausnahme steht deshalb hier und in der Messmatrix, nicht in einer Ausnahmekarte.
+**Sub-Tabs + Zeitraum: der Zeitraum steht in der Titelzeile (Budget, R16 2026-10-05).** Ein
+Modul, dessen Zeile 2 schon die Sub-Tabs traegt und dessen Tab einen Zeitraum blaettert, fuehrt
+den Stepper am ENDE von Zeile 1 (`page-toolbar--period-inline`, layout.css): der Titel gibt nach
+(Basis 0, Ellipse), der Stepper nie. Bis R16 war das die benannte Ausnahme mit drei Kopfzeilen
+(Budget 162px), und auf vier von sieben Reitern trug die mittlere nur eine Bildunterschrift.
+Gemessen 390px: Budget 162 -> 117px auf JEDEM Reiter (die Notiz der Reiter ohne Zeitraum steht
+am selben Zeilenende, hoechstens zweizeilig), erste Buchung y 342 -> 297. Drei Dinge machen den
+Platz: das Monatslabel zeigt mobil die Kurzform („Okt. 2026", `data-short`) in fester Breite
+(96px - die Pfeile stehen beim Blaettern still); der Ruecksprung „Aktuell" reserviert keinen
+Platz mehr, sondern erscheint per `order` LINKS vom Stepper, der am Zeilenende verankert ist
+(kein Pfeil bewegt sich, #1200 gilt weiter); und solange er steht, verlaesst der Titel das Bild
+(nicht den Baum) - Siegel, Tab-Leiste und Navigation sagen weiter, wo man ist. Eingeklappt bleibt
+der Titel stehen und faellt nur auf den Inline-Schnitt: er teilt die Zeile, sein Verschwinden
+sparte keine Hoehe. Der Kopf aendert seine Hoehe damit in keinem Zustand.
+Die Haushaltshilfe-Berichte (170px) stehen noch in der alten Dreizeilen-Form - dort ist der
+Zeitraum Sache EINES Reiters; der Umzug gehoert zur Baustein-Vereinheitlichung des
+Zeitraum-Kopfs. Ein drittes Element (Werkzeugzeile, Chipreihe) wandert weiter ins Menue oder
+in den Port. `test:budget-ui` haelt Klasse, nachgebende Titelbasis und den Center-Slot ohne
+eigene Zeile.
 
 **Variante: Zeitraum-Kopf (Kalender).** (R17 Z1, 2026-09-28, A1 P2-3/P3-7.) Wo der Titel
 ein navigierbarer Zeitraum ist - heute nur im Kalender -, stehen mobil die Werkzeuge in
