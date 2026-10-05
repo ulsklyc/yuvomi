@@ -237,7 +237,7 @@ export async function render(container, { user, signal }) {
   // Spalten stutzen. Kopf und Koerper enden deshalb beide an der Nutzbreite.
   container.insertAdjacentHTML('beforeend', `
     <div class="notes-page app-page app-page--full" data-composition="full">
-      <div class="page-toolbar notes-toolbar">
+      <div class="page-toolbar page-toolbar--title-tools notes-toolbar">
         <h1 class="page-toolbar__title">${t('notes.title')}</h1>
         ${renderPageSearch({ id: 'notes-search', label: t('notes.searchPlaceholder'), placeholder: t('notes.searchPlaceholder'), value: state.filterQuery, clearLabel: t('common.searchClear'), className: 'notes-toolbar__search page-toolbar__center' })}
         ${/* KATEGORIEN VERWALTEN STEHT IM WERKZEUGMENUE (Kopfregel mobil,

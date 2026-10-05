@@ -2185,7 +2185,7 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    Stepper noch Tab-Leiste, ist sie keine Zeile wert: die Knoepfe stehen am Ende der
    Titelzeile, Zeile 2 entfaellt (`page-toolbar--title-tools`, layout.css; in
    `renderPageHeader` die Option `titleTools`). Traeger: Kontakte, Geburtstage, Entsorgung,
-   Einstellungen-Wurzel. Gemessen 390px: Kopf 114 -> 65px; erste Zeile Kontakte y 218 -> 169,
+   Einstellungen-Wurzel, Notizen, Dokumente. Gemessen 390px: Kopf 114 -> 65px; erste Zeile Kontakte y 218 -> 169,
    Geburtstage 179 -> 77 (dazu entfiel der Dauerhinweis, der wortgleich im Dialog steht),
    Entsorgung 164 -> 115. Der Titel gibt nach (Basis 0, Ellipse - „Recogida de basura"
    kuerzt), die Knoepfe nie. Der Kopf ist damit EINZEILIG: keine Lead-Zone, nichts dockt an
@@ -2196,8 +2196,12 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    dafuer das Bild (nicht den Baum), das Siegel bleibt. Ein beschrifteter Kopfknopf zaehlt
    nicht als Icon: er wird unter 768px nach der Label-Verlust-Regel zum Eintrag im „..."
    (Entsorgung, „Abfallart hinzufuegen"), ab 768px steht er wieder - je Breite ein Weg.
+   Dasselbe gilt fuer ein Ansichts-Segment mit zwei Optionen: in den Dokumenten steht die
+   Ansicht unter 768px als Einfachauswahl im Kopf-Menue (wie im Kalender), der Umschalter ab
+   768px. Damit entfaellt in Notizen und Dokumenten die Zeile ueber der Chipreihe: Notizen
+   erste Karte y 232 -> 183, Dokumente 249 -> 200 (vier Baender -> drei).
    NICHT Traeger sind Koepfe mit Segment, Filter, Stepper oder Tab-Leiste in Zeile 2
-   (Aufgaben, Notizen, Dokumente, Inventar, Budget, Kalender als eigene Variante) und die
+   (Aufgaben, Inventar, Budget, Kalender als eigene Variante) und die
    Kuechen-Koepfe: dort IST die Tab-Leiste die Titelzeile und laeuft bei 390px ohne Werkzeug
    schon bis 65px vor die Kante (R14 P7 bleibt, die Zeile faltet beim Scrollen, R17 K1).
    `test:mobile-chrome` haelt Traegerliste, Geltung nur unter 768px und „nie neben einer

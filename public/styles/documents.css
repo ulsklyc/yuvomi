@@ -68,6 +68,22 @@
   color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
 }
 
+/* EIN WEG ZUR ANSICHT JE BREITE (R16, Kopfregel mobil 1a). Unter 768px stehen
+ * die Werkzeuge in der Titelzeile, und die traegt kein Segment: die Ansicht
+ * steht dort als Einfachauswahl im Kopf-Menue (documentsToolsMenuHtml), der
+ * Umschalter ist ausgeblendet. Ab 768px umgekehrt. */
+@media (max-width: 767px) {
+  .documents-view-toggle {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .documents-tools-menu__view {
+    display: none;
+  }
+}
+
 /* Kopf-Menue fuer Sortierung und Auswahl (documentsToolsMenuHtml). Die
  * Groesse des Icon-Knopfs gehoert der Shell (.btn--icon); hier steht nur,
  * dass er in der Aktionszeile nicht schrumpft. */

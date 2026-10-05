@@ -222,7 +222,7 @@ export async function render(container, context = {}) {
            "Zum Inhalt springen" der Shell (router.js): `.sr-only`, sichtbar
            nur bei Tastaturfokus (layout.css, .sr-only:focus-visible). */ ''}
       <a class="sr-only documents-skip" href="#documents-list" data-documents-skip>${t('documents.skipToDocuments')}</a>
-      <div class="page-toolbar page-toolbar--wrap documents-toolbar">
+      <div class="page-toolbar page-toolbar--wrap page-toolbar--title-tools documents-toolbar">
         <h1 class="page-toolbar__title">${t('documents.title')}</h1>
         ${renderPageSearch({ id: 'documents-search', label: t('documents.searchPlaceholder'), placeholder: t('documents.searchPlaceholder'), value: state.query, clearLabel: t('common.searchClear'), className: 'documents-toolbar__search page-toolbar__center' })}
         <div class="page-toolbar__actions">
@@ -525,6 +525,23 @@ function documentsToolsMenuHtml() {
       <i data-lucide="arrow-up-down" class="icon-md" aria-hidden="true"></i>
     </button>
     <div class="popover-menu documents-tools-menu" id="documents-tools-menu" popover role="menu" aria-label="${esc(label)}">
+      ${/* ANSICHT IM MENUE, NUR UNTER 768px (R16, Kopfregel mobil 1a). Der
+           Ansichts-Umschalter ist ein Segment und hielt damit eine eigene
+           Werkzeugzeile; als Einfachauswahl im Menue (wie die Ansichtswahl
+           des Kalenders) bleiben Lupe und Menue uebrig, und die stehen in
+           der Titelzeile. documents.css blendet je Breite EINEN der beiden
+           Wege aus. */ ''}
+      <div class="popover-menu__group documents-tools-menu__view" role="group" aria-labelledby="documents-tools-view-label">
+        <div class="popover-menu__label" id="documents-tools-view-label">${esc(t('documents.viewToggle'))}</div>
+        ${[['grid', t('documents.gridView'), 'layout-grid'], ['list', t('documents.listView'), 'list']].map(([view, text, icon]) => {
+          const on = state.view === view;
+          return `
+        <button type="button" role="menuitemradio" aria-checked="${on}" class="popover-menu__item" data-view-choice="${view}">
+          ${check(on)}<span>${esc(text)}</span><i data-lucide="${icon}" class="icon-md popover-menu__item-trail" aria-hidden="true"></i>
+        </button>`;
+        }).join('')}
+      </div>
+      <div class="popover-menu__separator documents-tools-menu__view" role="separator"></div>
       <div class="popover-menu__group" role="group" aria-labelledby="documents-tools-sort-label">
         <div class="popover-menu__label" id="documents-tools-sort-label">${esc(t('documents.sortLabel'))}</div>
         ${SORTS.map((sort) => {
@@ -569,6 +586,7 @@ function syncToolsMenu() {
     item.setAttribute('aria-checked', String(on));
     item.querySelector('.popover-menu__item-check')?.classList.toggle('popover-menu__item-check--hidden', !on);
   };
+  menu.querySelectorAll('[data-view-choice]').forEach((item) => paint(item, item.dataset.viewChoice === state.view));
   menu.querySelectorAll('[data-sort]').forEach((item) => paint(item, item.dataset.sort === state.sort));
   menu.querySelectorAll('[data-sort-direction]').forEach((item) => paint(item, item.dataset.sortDirection === state.sortDirection));
   const select = menu.querySelector('[data-action="enter-select"]');
@@ -608,7 +626,14 @@ function bindToolsMenu() {
   menu?.addEventListener('click', (e) => {
     const item = e.target.closest('.popover-menu__item');
     if (!item || item.disabled) return;
-    if (item.dataset.sort) {
+    if (item.dataset.viewChoice) {
+      // Derselbe Weg wie der Umschalter im Kopf: sein Klick-Handler haelt
+      // Zustand, Speicher und Zeichnung an EINER Stelle.
+      if (item.dataset.viewChoice !== state.view) {
+        _container.querySelector(`.documents-view-toggle [data-view="${item.dataset.viewChoice}"]`)?.click();
+      }
+      syncToolsMenu();
+    } else if (item.dataset.sort) {
       // Ein neuer Schluessel beginnt in seiner natuerlichen Richtung.
       if (item.dataset.sort !== state.sort) setSort(item.dataset.sort);
     } else if (item.dataset.sortDirection) {
@@ -706,6 +731,7 @@ function bindPageEvents() {
       el.classList.toggle('documents-view-toggle__btn--active', active);
       el.setAttribute('aria-pressed', String(active));
     });
+    syncToolsMenu();
     renderDocuments();
   });
   _container.querySelector('#documents-list')?.addEventListener('click', handleDocumentAction);

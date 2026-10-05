@@ -289,7 +289,9 @@ test('R17 Z1: die Variante steht nur im Markup der Module, die DESIGN.md nennt',
 // R14 zurueckgenommen hat. Wie viele Knoepfe ein Kopf zur Laufzeit zeigt, ist
 // Messarbeit (Handoff/Messmatrix), nicht dieser Guard.
 const TITLE_TOOLS = 'page-toolbar--title-tools';
-const TITLE_TOOLS_MODULES = ['pages/birthdays.js', 'pages/contacts.js', 'pages/waste.js', 'settings/shell.js'];
+const TITLE_TOOLS_MODULES = [
+  'pages/birthdays.js', 'pages/contacts.js', 'pages/documents.js', 'pages/notes.js', 'pages/waste.js', 'settings/shell.js',
+];
 
 test('R16: Werkzeuge in der Titelzeile - nur markiert, nur mobil, nie neben einer Bar-Zeile', () => {
   const pub = new URL('../public/', import.meta.url);

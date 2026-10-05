@@ -6383,7 +6383,7 @@ test('responsive adaptation uses tablet space without crowding module toolbars',
   // (Titel + Suche + Aktionen brechen bei Bedarf um), die Filter leben in einer
   // eigenen Zeile darunter — kein in die Kopfzeile gequetschter Filter-Block (#506).
   const documentsPageSrc = read('../public/pages/documents.js');
-  assert.match(documentsPageSrc, /class="page-toolbar page-toolbar--wrap documents-toolbar"/);
+  assert.match(documentsPageSrc, /class="page-toolbar page-toolbar--wrap(?: page-toolbar--title-tools)? documents-toolbar"/);
   assert.match(documentsPageSrc, /<div class="documents-filters">/);
   assert.match(
     documents,
