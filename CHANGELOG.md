@@ -120,7 +120,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text side by side. The heading "Rewards" under the tab "Rewards" no longer takes a row, and
   the overview ends with the three latest bookings instead of six.
 
+- **Shopping: checked items keep their way into the pantry.** "To pantry" and "Remove checked"
+  lived only in the pill that appears for five seconds after the first tick and then stays
+  away until nothing is checked. Both now also stand in the list menu, in a group of their own
+  while something is checked; the menu is grouped into checked items, the list, master data
+  and delete. The pill stays as the shortcut.
+- **Tasks: the dialog asks when, who and how important first.** Due date and time, assignee,
+  priority and category follow the title; the note comes after them. Recurrence and reminder
+  wait behind "More settings" while they are empty and stay open once set. On a phone the due
+  date is on the first screen (it stood at 700 of 844px) and the dialog is a quarter shorter.
+- **The formatting toolbar appears with the focus.** Above a note it took three rows on a phone
+  (162px) and twelve tab stops. It now shows when you enter the text field, runs as one row you
+  can scroll, and is a single tab stop: Shift+Tab from the field enters it, the arrow keys move.
+- **Notes: the editor is a workspace.** The text field was six lines high and started below the
+  keyboard line on a phone. Title and text no longer carry label rows, and the text field fills
+  the sheet (about 320px on a phone, 400px on a desktop) and grows with what you write.
+- **Tasks: the filter sheet is shorter.** Category and tag fold while nothing in them is
+  chosen, and grouping and "Show scheduled" form a separate "View" section at the end.
+- **Recipes: the uploaded picture opens the detail** as a 3:2 header; without a picture
+  nothing takes its place.
+- **Health on a phone: the start page is half as long.** Below "Due today" and the area list it
+  shows the two most recent vitals - the card title leads to all of them - and one row "Show
+  all values" for the rest. The CSV export is a button in the head that opens a dialog, on
+  every screen size.
+- **Settings: long sheets start with jump marks.** A sheet with more than three sections opens
+  with a row of links to them; on a phone the sheet description is two lines.
+- **Subscriptions on a phone: the billing cycle stands under the amount**, so the line with the
+  due date no longer wraps. **Budget accounts:** a long account name wraps to a second line
+  instead of being cut after "Gemeinsames Gi...".
+
 ### Fixed
+
+- **Health: "month" and "week" no longer start empty.** The default month was the calendar
+  month and the activity week the calendar week, so on the 5th the trend said "too few
+  readings" over four measurements from the week before, and on a Monday the week was empty
+  although yesterday's run was listed. The current period is now the last 30 or 7 days up to
+  today and says so in its label; paging back still shows the calendar month or week.
+- **Health: adherence shows one figure.** The overview counted 30 days and the medication page
+  7, so the same figure read 21 % here and 86 % there. Both use the last 7 days and name them.
+- **Health: the year chart labels months** instead of the first day of each month.
+- **Tasks: "Filter 1" is no longer the resting state.** The default status "open" counted as an
+  active filter, so the button always carried a number and its active colour, and "Clear all
+  filters" led to a third state that also showed finished tasks. The button now marks only
+  what differs from the default, and "Reset filters" restores it.
+- **Meal plan: a dragged meal lands at once**, and a move the server refuses says so instead of
+  silently snapping back. Saving a meal confirms with "Meal saved." instead of the dialog
+  title "Add meal".
+- **Recipes: your own recipes show their picture in the list.** The thumbnail appeared only for
+  recipes mirrored from Mealie or Tandoor.
+- **Shopping: the tick is felt when you tap**, not after the server has answered.
+- **Housekeeping staff: the row's button is as high as the row** (it was 25px) for keyboard and
+  assistive technology.
 
 - **Required fields: the star is no longer part of the label text.** In thirteen labels the
   " *" was written into the translated text, so screen readers read it out, it lacked the

@@ -1448,6 +1448,50 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 | Antippbarer Wert in einem Leseblatt | Wert in Textfarbe, das Zeichen der Zeile im Modulton, Unterstreichung unter dem Zeiger | `.contact-detail__link`, `.detail-row:has(...) > .detail-row__icon` (contacts.css) | Link im Modul-Rot neben "Loeschen" in Warnrot |
 | Icon stylen | auf `svg` (oder eine Klasse) zielen - Lucide ersetzt `<i data-lucide>` durch `<svg>` | - | Regeln auf `... i`: sie trafen nie (38 entfernt) |
 
+**Wege und Eingaben (R16 Schritt 3, Critique 2026-10-05).** Neun Regeln, je mit ihrem Ort:
+- **Eine Abkuerzung hat einen dauerhaften Ort.** Die Sammel-Pille des Einkaufs steht fuenf
+  Sekunden und bleibt dann unterdrueckt; "In den Vorrat" und "Abgehakt loeschen" stehen deshalb
+  AUCH im Werkzeugmenue der Liste, in einer benannten Gruppe, solange etwas abgehakt ist
+  (`listToolsItems()`, dieselben Handler und Rechtefragen). **Ein Menue mit mehr als einer
+  Frage hat Gruppen:** `popoverMenuHtml` nimmt `{ group, items }` (Ueberschrift als Name der
+  Gruppe, kein Eintrag) und `{ separator: true }`; im Einkauf Abgehakt | Liste | Stammdaten |
+  Loeschen.
+- **Ein Dialog fragt erst, was den Gegenstand ausmacht, dann den Freitext.** Aufgabe: Titel,
+  Faelligkeit/Uhrzeit, Zugewiesen an, Prioritaet/Kategorie, dann die Notiz. Ein LEERER
+  Abschnitt (Wiederholung, Erinnerung) liegt hinter "Weitere Einstellungen" und wird im
+  Hinweis genannt; ein gesetzter steht offen an seinem Platz. Gemessen 390x844: Faelligkeit
+  y 699 -> 304, Koerper 1455 -> 1076px, Fokusziele 33 -> 17.
+- **Die Formatierleiste ist ein Werkzeug des Felds** (`renderMarkdownToolbar` /
+  `wireMarkdownToolbar`, geteilt von Notizen und Aufgaben): `hidden`, bis das Feld den Fokus
+  hat, danach bleibt sie (ein Ausblenden verschoebe das Feld unter dem Finger); EINE scrollende
+  Zeile mit Rand-Fade (162 -> 58px mobil); EIN Tab-Stopp (`role="toolbar"`, wandernder
+  `tabindex`, Pfeile/Pos1/Ende; Umschalt+Tab aus dem Feld fuehrt hinein).
+- **Ein Editor ist eine Arbeitsflaeche, kein Formular.** Notiz: Titel und Text ohne
+  Labelzeile (Label `.sr-only`), das Textfeld traegt die Mindesthoehe der Flaeche
+  (`.note-editor__text`: mobil 160 -> 321px ab y=295 statt 430, mit Leiste ab 357; Desktop
+  160 -> 400px). Metafelder stehen darunter bzw. hinter "Weitere Einstellungen".
+- **Der laufende Zeitraum ist gleitend, der vergangene kalendarisch.** Gesundheit: "Monat" =
+  letzte 30 Tage, "Woche" = letzte 7, endend am Tag des Haushalts (`todayKey()`); wer
+  zurueckblaettert, bekommt Kalendermonat und -woche. Die Beschriftung nennt das Fenster, das
+  gilt. Eine Kennzahl hat EINEN Zeitraum auf jeder Flaeche und nennt ihn (Einnahmetreue: 7
+  Tage in Uebersicht und Medikamente). Eine Monatsachse traegt Monatsnamen.
+- **Der Filterknopf zaehlt Abweichungen vom Standard.** Aufgaben: Status "Offen" ist der
+  Ruhezustand und zaehlt nicht; "Filter zuruecksetzen" stellt ihn her. Im Filterblatt
+  (`openFilterSheet`) klappt eine lange, seltene Achse ein, solange nichts darin gewaehlt ist
+  (`fold`), und Ansichtsoptionen stehen als abgesetzter Abschnitt am Ende (`variant: 'view'`).
+  35 -> 22 Bedienelemente, 1084 -> 908px.
+- **Eine Geste, deren Ergebnis feststeht, wartet nicht auf den Server.** Verschieben im
+  Essensplan ist optimistisch (Ruecksprung + Fehler-Toast bei Ablehnung), die Haptik beim
+  Abhaken kommt mit dem Tipp. Eine Erfolgsmeldung nennt das Ergebnis, nie den Dialogtitel.
+- **Ein Bild zeigt sich, wo es eines gibt** - die Frage ist nicht, woher der Datensatz kommt.
+  Rezeptzeile: Vorschaubild bei eigenem Bild; Detail: Kopfbild 3:2 im RAHMEN, das Bild
+  `object-fit: cover` (beschneiden, nie stauchen), ohne Bild kein Platzhalterblock.
+- **Ein langes Blatt beginnt mit dem Weg zu seinen Teilen.** Einstellungen: ab vier
+  Abschnitten Sprungmarken als eine scrollende Zeile von Links auf `?section=`
+  (`settingsSheetJumpTargets`), mobil zwei Zeilen Blattbeschreibung. Gesundheit mobil: nach
+  der Bereichsliste zwei Vitalkennzahlen (Titel = Weg zu allen) und EINE Zeile "Alle Werte
+  anzeigen"; der CSV-Export ist ein Knopf im Kopf. Startseite 2711 -> 1394px.
+
 **Die Zeilenregel in der Kueche (R16, Critique 2026-10-05).** In Abhak-Listen des Einkaufs
 hakt der Zeilen-Tipp ab; sonst oeffnet er. Loeschen = Wisch mobil + ein fester Ort am Desktop.
 - **Einkauf:** der Tipp auf die Zeile hakt ab (die ganze Zeile ist das Ziel, nicht nur das
@@ -2230,7 +2274,8 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    Stepper noch Tab-Leiste, ist sie keine Zeile wert: die Knoepfe stehen am Ende der
    Titelzeile, Zeile 2 entfaellt (`page-toolbar--title-tools`, layout.css; in
    `renderPageHeader` die Option `titleTools`). Traeger: Kontakte, Geburtstage, Entsorgung,
-   Einstellungen-Wurzel, Notizen, Dokumente. Gemessen 390px: Kopf 114 -> 65px; erste Zeile Kontakte y 218 -> 169,
+   Einstellungen-Wurzel, Notizen, Dokumente, Gesundheit (seit R16 Schritt 3: das Werkzeug
+   des Kopfs ist dort der CSV-Export, Kopf 65px; im Bereich weicht es Rueckweg und Person). Gemessen 390px: Kopf 114 -> 65px; erste Zeile Kontakte y 218 -> 169,
    Geburtstage 179 -> 77 (dazu entfiel der Dauerhinweis, der wortgleich im Dialog steht),
    Entsorgung 164 -> 115. Der Titel gibt nach (Basis 0, Ellipse - „Recogida de basura"
    kuerzt), die Knoepfe nie. Der Kopf ist damit EINZEILIG: keine Lead-Zone, nichts dockt an
