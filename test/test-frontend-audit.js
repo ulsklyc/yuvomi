@@ -19567,3 +19567,20 @@ test('R16: die einzeilige Kopfzeile ist am Desktop in jedem Modul ein volles Zie
     assert.deepStrictEqual(eigen.map((rule) => `${file}: ${rule.selector.trim()}`), [], 'die Kopfhoehe gehoert der Shell');
   }
 });
+
+/* R16 Schritt 2b (A-Rest; DESIGN.md "Ueberschrift ueber Inhalt"): die vier
+ * Abschnittskoepfe der Haushaltshilfe standen IN der Karte. Gegen den Stand
+ * davor rot gelaufen. */
+test('R16: die Abschnittstitel der Haushaltshilfe stehen auf der Buehne, ueber der Karte', () => {
+  const page = withoutHtmlComments(read('../public/pages/housekeeping.js'));
+  assert.doesNotMatch(page, /<section class="housekeeping-card/, 'kein Abschnitt ist selbst die Karte');
+  const koepfe = page.match(/<section class="housekeeping-section[^"]*">\s*<div class="housekeeping-section-heading">[\s\S]*?<h2 class="u-section-title">[\s\S]*?<div class="housekeeping-card">/g) ?? [];
+  assert.equal(koepfe.length, 4, 'Letzte Besuche, Zahlungen, Haushaltshilfen, Protokoll: Titel VOR der Flaeche');
+  for (const kopf of koepfe) {
+    assert.ok(kopf.indexOf('u-section-title') < kopf.indexOf('class="housekeeping-card"'));
+  }
+  const css = rulesOf(read('../public/styles/housekeeping.css'));
+  const flaeche = css.filter((rule) => selectorsOf(rule).some((sel) => /^\.housekeeping-section(?:-heading)?$/.test(sel)) && /background(?:-color)?:|box-shadow:/.test(rule.body));
+  assert.deepStrictEqual(flaeche.map((rule) => rule.selector.trim()), [], 'Abschnitt und Kopf tragen keine Flaeche');
+  assert.doesNotMatch(read('../public/styles/typography.css'), /\.housekeeping-card h2/, 'die Rolle kommt von `.u-section-title`, nicht vom Ort in der Karte');
+});

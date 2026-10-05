@@ -149,8 +149,11 @@
   padding: var(--space-4);
 }
 
-.housekeeping-card h2 {
-  margin: 0 0 var(--space-3);
+/* Der Abschnitt um eine Karte: Titel auf der Buehne, Flaeche darunter (R16
+ * Schritt 2b). Er traegt selbst keine Flaeche - sonst stuende der Titel wieder
+ * in der Karte. */
+.housekeeping-section {
+  min-width: 0;
 }
 
 .housekeeping-worker-strip {
@@ -230,7 +233,9 @@
   justify-content: space-between;
   align-items: baseline;
   gap: var(--space-3);
-  margin-bottom: var(--space-3);
+  /* Auf der Buehne: der Abstand zur Flaeche ist der eines Abschnittskopfs
+   * (wie `.section-toolbar` im Budget), nicht mehr das Innenpolster der Karte. */
+  margin-bottom: var(--space-2);
 }
 
 .housekeeping-section-heading h2 {

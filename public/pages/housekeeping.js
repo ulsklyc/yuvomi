@@ -625,22 +625,30 @@ function renderDashboard(content) {
          (housekeeping.css, [data-tab="dashboard"]) - im Lesemass einer
          Textseite blieben bei 1440 rund 470px leer. Darunter bleibt die
          Reihenfolge Liste vor Diagramm. -->
+    <!-- ABSCHNITTSTITEL AUF DER BUEHNE (R16 Schritt 2b; DESIGN.md
+         "Ueberschrift ueber Inhalt"): der Titel stand IN der Karte, als
+         einziges Modul neben dem Budget. Der Abschnitt (.housekeeping-section)
+         traegt keine Flaeche, die Karte darunter nur noch den Inhalt. -->
     <div class="housekeeping-dashboard-columns">
-    <section class="housekeeping-card">
+    <section class="housekeeping-section">
       <div class="housekeeping-section-heading">
-        <h2>${esc(t('housekeeping.recentVisits'))}</h2>
+        <h2 class="u-section-title">${esc(t('housekeeping.recentVisits'))}</h2>
       </div>
+      <div class="housekeeping-card">
       <div class="housekeeping-staff-log-list">
         ${recentRows || `<p class="housekeeping-muted">${esc(t('housekeeping.noVisits'))}</p>`}
       </div>
+      </div>
     </section>
-    <section class="housekeeping-card">
+    <section class="housekeeping-section">
       <div class="housekeeping-section-heading">
-        <h2>${esc(t('housekeeping.payments'))}</h2>
+        <h2 class="u-section-title">${esc(t('housekeeping.payments'))}</h2>
         <span>${esc(t('housekeeping.pendingPayments'))}: ${esc(money(data.pending_payments || 0))}</span>
       </div>
+      <div class="housekeeping-card">
       <div class="housekeeping-chart" aria-label="${esc(t('housekeeping.monthlyPayments'))}">
         ${bars || `<p class="housekeeping-muted">${esc(t('housekeeping.noPaymentData'))}</p>`}
+      </div>
       </div>
     </section>
     </div>
@@ -1552,12 +1560,14 @@ function renderStaff(content) {
   // daneben (mobil darunter, wie bisher).
   content.insertAdjacentHTML('beforeend', renderPageColumns({
     main: `
-    <section class="housekeeping-card">
+    <section class="housekeeping-section">
       <div class="housekeeping-section-heading">
-        <h2>${esc(t('housekeeping.staffTitle'))}</h2>
+        <h2 class="u-section-title">${esc(t('housekeeping.staffTitle'))}</h2>
       </div>
+      <div class="housekeeping-card">
       <div class="housekeeping-staff-list">
         ${workerRows || `<p class="housekeeping-muted">${esc(t('housekeeping.noWorkers'))}</p>`}
+      </div>
       </div>
     </section>`,
     rail: state.selectedStaffId ? renderStaffVisitLog() : '',
@@ -1702,10 +1712,10 @@ function renderStaffVisitLog() {
     });
   }).join('');
   return `
-    <section class="housekeeping-card housekeeping-staff-log">
+    <section class="housekeeping-section housekeeping-staff-log">
       <div class="housekeeping-section-heading">
         <div>
-          <h2>${esc(t('housekeeping.staffLogTitle', { name: worker.display_name }))}</h2>
+          <h2 class="u-section-title">${esc(t('housekeeping.staffLogTitle', { name: worker.display_name }))}</h2>
           <span>${esc(t('housekeeping.staffLogHint'))}</span>
         </div>
         <label class="housekeeping-field housekeeping-field--inline">
@@ -1713,8 +1723,10 @@ function renderStaffVisitLog() {
           <input id="housekeeping-staff-month" type="month" value="${esc(state.staffLogMonth)}">
         </label>
       </div>
+      <div class="housekeeping-card">
       <div class="housekeeping-staff-log-list">
         ${rows || `<p class="housekeeping-muted">${esc(t('housekeeping.noVisitReports'))}</p>`}
+      </div>
       </div>
     </section>
   `;
