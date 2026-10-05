@@ -240,13 +240,19 @@ test('Teilaufgaben der Detailansicht sind abhakbar, nicht nur lesbar', () => {
 // liefe beim ersten .includes/.forEach in einen TypeError.
 test('Filter-Achsen halten Listen, nicht einzelne Werte', () => {
   const source = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
-  assert(/filters:\s*\{ status: \['open'\], priority: \[\], assigned_to: \[\], category: \[\], tags: \[\] \}/.test(source),
+  // Seit R16 kommen Anfangszustand UND Zuruecksetzen aus EINER Quelle
+  // (`defaultFilters()`), damit der Zaehler am Filterknopf denselben Standard
+  // kennt wie die beiden.
+  assert(/const DEFAULT_STATUS_FILTER = Object\.freeze\(\['open'\]\);/.test(source),
+    'der Standard-Status ist eine Liste');
+  assert(/const defaultFilters = \(\) => \(\{ status: \[\.\.\.DEFAULT_STATUS_FILTER\], priority: \[\], assigned_to: \[\], category: \[\], tags: \[\] \}\);/.test(source),
     'der Anfangszustand muss je Achse eine Liste sein');
+  assert(/filters:\s*defaultFilters\(\),/.test(source), 'der Zustand beginnt mit dem Standard');
   for (const axis of ['status', 'priority', 'assigned_to', 'category']) {
     assert(new RegExp(`state\\.filters\\.${axis}\\.forEach\\(\\(v\\) => params\\.append\\('${axis}', v\\)\\)`).test(source),
       `${axis} muss jeden Wert einzeln an die Query hängen`);
   }
-  assert(/state\.filters = \{ status: \[\], priority: \[\], assigned_to: \[\], category: \[\], tags: \[\] \}/.test(source),
+  assert(/state\.filters = defaultFilters\(\);/.test(source),
     '"Alle Filter löschen" muss Listen hinterlassen, keine leeren Strings');
 });
 
