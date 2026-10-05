@@ -147,3 +147,44 @@ test('activityTotals: leere/ungültige Eingaben → Nullsummen (null-Einträge z
     assert.deepEqual(activityTotals(input), zero);
   }
 });
+
+// --------------------------------------------------------
+// Gleitende Woche (Critique 2026-10-05, R16)
+// --------------------------------------------------------
+//
+// Die Aktivitaet rechnete in der Kalenderwoche: am Montag, 05.10., war die
+// Woche leer, waehrend die Bereichsliste "Laufen · 04.10." meldete. Die
+// laufende Woche sind jetzt die letzten 7 Tage, endend heute; zurueckgeblaettert
+// bleibt es die Kalenderwoche Mo-So.
+
+test('R16: die laufende Woche sind die letzten 7 Tage, der Lauf von gestern zaehlt', () => {
+  const today = '2026-10-05'; // Montag
+  const s = weekSummary([{ performed_at: '2026-10-04T18:00', duration_min: 40 }], { anchor: today, today });
+  assert.deepEqual([s.from, s.to], ['2026-09-29', today]);
+  assert.equal(s.buckets.at(-2).durationMin, 40, 'der Sonntag steht im Fenster');
+  // Die Spalten nennen ihren WOCHENTAG - sie beginnen nicht mehr immer am Montag.
+  assert.deepEqual(s.buckets.map((b) => b.weekday), [1, 2, 3, 4, 5, 6, 0], 'Di ... So, Mo');
+});
+
+test('R16: zurueckgeblaettert bleibt es die Kalenderwoche Mo-So', () => {
+  const s = weekSummary([], { anchor: '2026-09-28', today: '2026-10-05' });
+  assert.deepEqual([s.from, s.to], ['2026-09-28', '2026-10-04']);
+  assert.deepEqual(s.buckets.map((b) => b.weekday), [0, 1, 2, 3, 4, 5, 6]);
+});
+
+test('R16: ohne Anker und ohne "today" rechnet die Woche am Tag des Haushalts', async () => {
+  const { mock } = await import('node:test');
+  const tz = await import('/utils/timezone.js');
+  const prevTz = process.env.TZ;
+  process.env.TZ = 'America/Los_Angeles';
+  mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-04T23:30:00Z') });
+  tz.setDisplayTimeZone('Europe/Berlin');
+  try {
+    const s = weekSummary([]);
+    assert.deepEqual([s.from, s.to], ['2026-09-29', '2026-10-05']);
+  } finally {
+    tz.setDisplayTimeZone(null);
+    mock.timers.reset();
+    if (prevTz === undefined) delete process.env.TZ; else process.env.TZ = prevTz;
+  }
+});

@@ -579,3 +579,91 @@ test('Schlaf auf der Karte: kurze Form „7:30" plus Einheit, der lange Satz ble
     assert.match(health.cardMarkup(sleep, kurz), /<span class="metric-card__value">6:05<\/span>/, 'Minuten zweistellig');
   });
 });
+
+// --------------------------------------------------------
+// Gleitendes Standardfenster (Critique 2026-10-05, R16)
+// --------------------------------------------------------
+//
+// Der Standard "Monat" war der KALENDERMONAT. Am 05.10. zeigte er fuenf Tage,
+// und ueber vier Messungen der Vorwoche stand "Zu wenige Messwerte fuer einen
+// Trend". Der laufende Zeitraum ist jetzt gleitend - die letzten 30 bzw. 7
+// Tage, endend HEUTE -, und wer in die Vergangenheit blaettert, bekommt wie
+// bisher den Kalendermonat bzw. die Kalenderwoche. `today` ist ein Parameter,
+// damit die Regel ohne Uhr pruefbar ist; der letzte Test nagelt Uhr UND Zone
+// fest und laesst den Standard selbst rechnen.
+
+const R16_TODAY = '2026-10-05'; // Montag
+
+test('R16: der laufende Monat sind die letzten 30 Tage, endend heute', () => {
+  const { buckets, from, to, gran } = buildVitalBuckets('month', R16_TODAY, 1, { today: R16_TODAY });
+  assert.equal(from, '2026-09-06');
+  assert.equal(to, R16_TODAY);
+  assert.equal(buckets.length, 30);
+  assert.equal(gran, 'day');
+  // Jeder Tag des Monats landet im gleitenden Fenster, nicht nur der Monatserste.
+  assert.equal(buildVitalBuckets('month', '2026-10-01', 1, { today: R16_TODAY }).to, R16_TODAY);
+});
+
+test('R16: die laufende Woche sind die letzten 7 Tage, endend heute', () => {
+  const { buckets, from, to } = buildVitalBuckets('week', R16_TODAY, 1, { today: R16_TODAY });
+  assert.equal(from, '2026-09-29');
+  assert.equal(to, R16_TODAY);
+  assert.equal(buckets.length, 7);
+});
+
+test('R16: wer zurueckblaettert, bekommt den Kalendermonat und die Kalenderwoche', () => {
+  const month = buildVitalBuckets('month', '2026-09-05', 1, { today: R16_TODAY });
+  assert.deepEqual([month.from, month.to], ['2026-09-01', '2026-09-30']);
+  const week = buildVitalBuckets('week', '2026-09-28', 1, { today: R16_TODAY });
+  assert.deepEqual([week.from, week.to], ['2026-09-28', '2026-10-04']);
+  // Auch nach vorn: ein Zeitraum, der heute nicht enthaelt, ist ein Kalenderfenster.
+  const next = buildVitalBuckets('month', '2026-11-05', 1, { today: R16_TODAY });
+  assert.deepEqual([next.from, next.to], ['2026-11-01', '2026-11-30']);
+});
+
+test('R16: vier Messungen der Vorwoche ergeben am Monatsanfang einen Trend', () => {
+  const rows = ['2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02'].map((day, i) => (
+    { id: i + 1, type: 'weight', value_num: 70 + i / 10, unit: 'kg', measured_at: `${day}T07:00` }));
+  const series = computeVitalSeries(rows, { type: 'weight', range: 'month', anchor: R16_TODAY, today: R16_TODAY });
+  assert.equal(series.points.filter((p) => p.count > 0).length, 4, 'alle vier liegen im Fenster');
+  assert.deepEqual([series.from, series.to], ['2026-09-06', R16_TODAY], 'die Beschriftung nennt den gleitenden Bereich');
+  const svg = health.chartMarkup(vitalMetric('weight'), series);
+  assert.match(svg, /<polyline/, 'eine Kurve, kein "zu wenige Messwerte"');
+  assert.doesNotMatch(svg, /health\.vitals\.sparse/);
+});
+
+test('R16: "heute" ist der Tag des HAUSHALTS, auch wenn das Geraet noch im Vortag steht', async () => {
+  const { mock } = await import('node:test');
+  const tz = await import('/utils/timezone.js');
+  const prevTz = process.env.TZ;
+  // 23:30 UTC am 04.10.: in Berlin 01:30 am 05.10., in Los Angeles 16:30 am 04.10.
+  process.env.TZ = 'America/Los_Angeles';
+  mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-04T23:30:00Z') });
+  tz.setDisplayTimeZone('Europe/Berlin');
+  try {
+    assert.equal(new Date().getDate(), 4, 'das Geraet steht im Vortag');
+    const month = buildVitalBuckets('month');
+    assert.deepEqual([month.from, month.to], ['2026-09-06', '2026-10-05']);
+    const week = buildVitalBuckets('week');
+    assert.deepEqual([week.from, week.to], ['2026-09-29', '2026-10-05']);
+  } finally {
+    tz.setDisplayTimeZone(null);
+    mock.timers.reset();
+    if (prevTz === undefined) delete process.env.TZ; else process.env.TZ = prevTz;
+  }
+});
+
+test('R16: die Jahresachse nennt Monate, keine Monatsersten', () => {
+  const rows = [
+    { id: 1, type: 'weight', value_num: 70, unit: 'kg', measured_at: '2026-02-10T07:00' },
+    { id: 2, type: 'weight', value_num: 71, unit: 'kg', measured_at: '2026-08-10T07:00' },
+  ];
+  const series = computeVitalSeries(rows, { type: 'weight', range: 'year', anchor: R16_TODAY, today: R16_TODAY });
+  const svg = health.chartMarkup(vitalMetric('weight'), series);
+  const axis = [...svg.matchAll(/class="chart__axis" text-anchor="[a-z]+">([^<]*)</g)].map((m) => m[1]);
+  assert.equal(axis.length, 3);
+  for (const label of axis) {
+    assert.doesNotMatch(label, /^\d{4}-\d{2}-01$/, `"${label}" ist ein Tagesdatum fuer einen Monatspunkt`);
+  }
+  assert.doesNotMatch(svg, /<title>[^<]*2026-0[28]-01/, 'auch der Punkt nennt seinen Monat, nicht dessen ersten Tag');
+});

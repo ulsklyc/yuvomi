@@ -201,15 +201,42 @@ function toFiniteOrNull(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Laenge des gleitenden Standardfensters je Zeitraum (Tage, endend heute). */
+export const ROLLING_WINDOW_DAYS = { week: 7, month: 30 };
+
 /**
  * Baut die Bucket-Achse für einen Zeitraum.
- * - week:  7 Tages-Buckets ab Wochenanfang (weekStartsOn, Default Montag=1)
- * - month: ein Tages-Bucket je Kalendertag des Anker-Monats
+ * - week:  7 Tages-Buckets
+ * - month: ein Tages-Bucket je Tag
  * - year:  12 Monats-Buckets (Jan–Dez) des Anker-Jahres
+ *
+ * DER LAUFENDE ZEITRAUM IST GLEITEND (Critique 2026-10-05, R16). Woche und
+ * Monat waren Kalenderfenster: am 05.10. zeigte "Monat" fuenf Tage, und ueber
+ * vier Messungen der Vorwoche stand "Zu wenige Messwerte fuer einen Trend".
+ * Liegt HEUTE im Kalenderzeitraum des Ankers, ist das Fenster deshalb die
+ * letzten 7 bzw. 30 Tage, endend heute. Wer zurueckblaettert (der Anker liegt
+ * in einer anderen Woche, einem anderen Monat), bekommt wie bisher die
+ * Kalenderwoche ab `weekStartsOn` bzw. den Kalendermonat - "September" ist
+ * dort die Frage, nicht "die 30 Tage vor dem 5. September". `from`/`to` nennen
+ * das Fenster, das wirklich gilt; die Beschriftung liest sie.
+ *
+ * @param {'week'|'month'|'year'} range
+ * @param {string} [anchorKey]   YYYY-MM-DD im Zeitraum, Standard heute
+ * @param {number} [weekStartsOn=1]
+ * @param {{ today?: string }} [opts]  `today` nur fuer Tests; sonst `todayKey()`
+ *        (Tag des Haushalts, utils/date.js).
  * @returns {{ buckets: Array<{key,date,gran}>, from: string, to: string, gran: string }}
  */
-export function buildVitalBuckets(range, anchorKey, weekStartsOn = 1) {
-  const anchor = anchorKey || todayKey();
+export function buildVitalBuckets(range, anchorKey, weekStartsOn = 1, { today = todayKey() } = {}) {
+  const anchor = anchorKey || today;
+  const rolling = (days) => {
+    const buckets = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = addLocalDays(today, -i);
+      buckets.push({ key: d, date: d, gran: 'day' });
+    }
+    return { buckets, from: buckets[0].date, to: today, gran: 'day' };
+  };
 
   if (range === 'year') {
     const year = parseLocalDateKey(anchor).getFullYear();
@@ -223,6 +250,7 @@ export function buildVitalBuckets(range, anchorKey, weekStartsOn = 1) {
 
   if (range === 'week') {
     const start = startOfLocalWeekKey(anchor, weekStartsOn);
+    if (start === startOfLocalWeekKey(today, weekStartsOn)) return rolling(ROLLING_WINDOW_DAYS.week);
     const buckets = [];
     for (let i = 0; i < 7; i++) {
       const d = addLocalDays(start, i);
@@ -232,6 +260,7 @@ export function buildVitalBuckets(range, anchorKey, weekStartsOn = 1) {
   }
 
   // month (Default)
+  if (anchor.slice(0, 7) === today.slice(0, 7)) return rolling(ROLLING_WINDOW_DAYS.month);
   const d = parseLocalDateKey(anchor);
   const year = d.getFullYear();
   const month = d.getMonth();
@@ -267,7 +296,7 @@ export function buildVitalBuckets(range, anchorKey, weekStartsOn = 1) {
  * }}
  */
 export function computeVitalSeries(rows, opts = {}) {
-  const { type, range = 'month', anchor, weekStartsOn = 1 } = opts;
+  const { type, range = 'month', anchor, weekStartsOn = 1, today } = opts;
   const metric = vitalMetric(type);
   const channels = metric ? metric.channels : ['value_num'];
 
@@ -294,7 +323,7 @@ export function computeVitalSeries(rows, opts = {}) {
   }
 
   // Zeitraum-Serie: Buckets aufbauen und Messungen einsortieren.
-  const { buckets, from, to, gran } = buildVitalBuckets(range, anchor, weekStartsOn);
+  const { buckets, from, to, gran } = buildVitalBuckets(range, anchor, weekStartsOn, today ? { today } : undefined);
   const index = new Map(buckets.map((b, i) => [b.key, i]));
   const acc = buckets.map(() => ({
     count: 0,

@@ -470,3 +470,45 @@ test('#1539: Einnahmeprotokoll mit Geraet in der Haushaltszone - Wanduhrzeit unv
     ['2026-06-15', '08:10'], ['2026-06-14', '20:00'], ['2026-06-13', '01:30'],
   ]);
 }));
+
+// --------------------------------------------------------
+// Einnahmetreue: EIN Zeitraum auf beiden Flaechen (Critique 2026-10-05, R16)
+// --------------------------------------------------------
+//
+// Die Uebersicht rechnete ueber 30 Tage, die Medikamenten-Seite ueber 7 -
+// dieselbe Kennzahl mit demselben Namen zeigte 21 % hier und 86 % dort. Beide
+// rechnen jetzt ueber dasselbe Fenster und nennen es im Label.
+
+test('R16: Uebersicht und Medikamenten-Seite zeigen dieselbe Einnahmetreue ueber denselben Zeitraum', async () => {
+  const { mock } = await import('node:test');
+  const prevTz = process.env.TZ;
+  process.env.TZ = 'Europe/Berlin';
+  tzModule.setDisplayTimeZone('Europe/Berlin');
+  mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-05T10:00:00Z') });
+  // Taeglich 08:00; genommen an den sechs Tagen VOR heute, davor nichts.
+  const schedule = { id: 3, medication_id: 1, time_of_day: '08:00', days_mask: null, active: 1, dose_qty: 1 };
+  const logs = ['09-29', '09-30', '10-01', '10-02', '10-03', '10-04'].map((day, i) => (
+    { id: i + 1, status: 'taken', schedule_id: 3, scheduled_at: `2026-${day}T08:00`, taken_at: `2026-${day}T08:05` }));
+  const shared = { schedulesByMed: { 1: [schedule] }, logsByMed: { 1: logs } };
+  healthHelpers.setViewStateForTest('meds', { list: [{ id: 1, name: 'Ramipril', active: 1 }], personId: 5, meId: 5, ...shared });
+  healthHelpers.setViewStateForTest('overview', { meds: [{ id: 1, name: 'Ramipril', active: 1 }], ...shared });
+  try {
+    const page = healthHelpers.adherenceMarkup();
+    const overview = healthHelpers.overviewAdherenceMarkup();
+    const pagePct = page.match(/metric-card__value">(\d+)%/)?.[1];
+    const overviewPct = overview.match(/health-overview__stat-value">(\d+)%/)?.[1];
+    assert.equal(pagePct, '86', 'sechs von sieben');
+    assert.equal(overviewPct, pagePct, 'dieselbe Kennzahl, dieselbe Zahl');
+    // Der t()-Stub haengt die Werte als JSON an; esc() macht daraus &quot;.
+    const days = (html, key) => html.replaceAll('&quot;', '"')
+      .match(new RegExp(`${key.replaceAll('.', '\\.')}\\{"days":(\\d+)\\}`))?.[1];
+    assert.equal(days(page, 'health.meds.adherence.period'), '7');
+    assert.equal(days(overview, 'health.overview.adherence.period'), '7', 'das Label nennt den Zeitraum, der gilt');
+  } finally {
+    mock.timers.reset();
+    tzModule.setDisplayTimeZone(null);
+    healthHelpers.setViewStateForTest('meds', { list: [], logsByMed: {}, schedulesByMed: {} });
+    healthHelpers.setViewStateForTest('overview', { meds: [], logsByMed: {}, schedulesByMed: {} });
+    if (prevTz === undefined) delete process.env.TZ; else process.env.TZ = prevTz;
+  }
+});
