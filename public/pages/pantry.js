@@ -26,7 +26,8 @@ import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 // Alias, weil dieses Modul selbst eine `emptyStateEl()`-Funktion hat, die den
 // Renderer mit den Vorrats-Texten füllt.
 import { emptyStateEl as emptyStateComponentEl, mountLoadError } from '/utils/empty-state.js';
-import { scheduleUndoableDelete, vibrate, wireScrollFade } from '/utils/ux.js';
+import { scheduleUndoableDelete, vibrate, wireScrollFade, collapseOut, expandIn } from '/utils/ux.js';
+import { redrawList } from '/utils/list-motion.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { todayKey } from '/utils/date.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
@@ -579,9 +580,21 @@ function renderBulkBar() {
   });
 }
 
-function renderList() {
+const PANTRY_ROW = '.pantry-swipe[data-swipe-id]';
+
+/* `motion: true` setzt, wer die DATEN geaendert hat (Artikel angelegt,
+ * gespeichert, geloescht): dann zieht die neue Zeile auf, und was dadurch die
+ * Stelle wechselt, gleitet (utils/list-motion.js). Filter und Suche zeichnen
+ * ohne Bewegung neu - dort wechselt die Frage, nicht die Liste, und jede
+ * hinzukommende Zeile einzeln aufzuziehen waere Unruhe. */
+function renderList({ motion = false } = {}) {
   const list = _container?.querySelector('#pantry-list');
   if (!list) return;
+  if (motion) redrawList(list, () => drawList(list), { selector: PANTRY_ROW, keyAttr: 'data-swipe-id' });
+  else drawList(list);
+}
+
+function drawList(list) {
   list.removeAttribute('aria-busy');
   // Die Chipreihe ist das erste Kind des Ports und ueberlebt den Neuaufbau.
   const chipRow = list.querySelector(':scope > #pantry-filters');
@@ -1434,7 +1447,7 @@ async function saveItem(panel, mode, item) {
     await loadPantry();
     closeSharedModal({ force: true });
     renderFilters();
-    renderList();
+    renderList({ motion: true });
     window.yuvomi?.showToast(mode === 'create' ? t('pantry.created') : t('pantry.updated'), 'success');
   } catch (err) {
     saveBtn.disabled = false;
@@ -1447,7 +1460,12 @@ async function removeItem(item) {
   // leeres Listenelement samt Trennlinie stehen.
   const inner = _container?.querySelector(`.pantry-row[data-id="${item.id}"]`);
   const rowEl_ = inner?.closest('.swipe-row') ?? inner;
-  if (rowEl_) rowEl_.style.display = 'none';
+  // Die Zeile klappt aus, die Nachbarn ruecken nach (vorher `display: none`:
+  // sie war weg, der Rest sprang). `display: none` folgt erst DANACH und bleibt
+  // das Netz fuer alles, was nicht animiert (reduzierte Bewegung, kein
+  // `animate`): der Zustand "weg" haengt an keiner Animation.
+  let restored = false;
+  if (rowEl_) collapseOut(rowEl_).then(() => { if (!restored) rowEl_.style.display = 'none'; });
 
   scheduleUndoableDelete({
     message: t('pantry.deleted'),
@@ -1459,7 +1477,14 @@ async function removeItem(item) {
       renderList();
     },
     restore: (err) => {
-      if (rowEl_) rowEl_.style.display = '';
+      restored = true;
+      if (rowEl_) {
+        rowEl_.style.display = '';
+        // collapseOut haelt die Hoehe 0 (fill: forwards) - verwerfen, dann aufziehen.
+        rowEl_.getAnimations?.().forEach((anim) => anim.cancel());
+        rowEl_.style.overflow = '';
+        expandIn(rowEl_);
+      }
       if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     },
   });

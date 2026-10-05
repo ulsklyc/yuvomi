@@ -123,3 +123,24 @@ test('without manualActivation (default, every other wireTablist caller), ArrowR
 
   assert.deepEqual(changed, ['patterns'], 'automatic activation (the default, unchanged for budget/calendar/rewards/housekeeping/kitchen/health) must still fire onChange on every arrow press');
 });
+
+// R16 (Bewegung): der Reiterwechsel nennt seine Richtung in der Reihenfolge der
+// Leiste, damit der neue Inhalt von der Seite kommt, zu der man gewechselt hat
+// (utils/content-swap.js). Vorwaerts +1, rueckwaerts -1 - auch ueber den Umbruch
+// der Pfeiltasten hinweg zaehlt die Lage in der Leiste, nicht die Taste.
+test('onChange carries the direction of the switch in tab order', () => {
+  const { container, buttons } = makeTablist();
+  global.document = { activeElement: buttons[0] };
+  const seen = [];
+  const handle = wireTablist(container, { activeId: buttons[0].dataset.tabId, onChange: (id, meta) => seen.push([id, meta?.direction]) });
+
+  handle.setActive(buttons[2].dataset.tabId);
+  handle.setActive(buttons[1].dataset.tabId);
+  handle.setActive('not-in-the-bar');
+
+  assert.deepEqual(seen, [
+    [buttons[2].dataset.tabId, 1],
+    [buttons[1].dataset.tabId, -1],
+    ['not-in-the-bar', 0],
+  ]);
+});

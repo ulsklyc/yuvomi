@@ -820,3 +820,257 @@ test('swapPage: die Chrome-Namen stehen nur waehrend des Wechsels (html.page-swa
     delete globalThis.matchMedia;
   }
 });
+
+/*
+ * 11. DIE ZWEI GETEILTEN HELFER (Critique R16, P2 Bewegung): `swapContent`
+ *     (utils/content-swap.js) fuer "derselbe Traeger, neuer Inhalt" und
+ *     `redrawList`/`collapseRow` (utils/list-motion.js) fuer neu gezeichnete
+ *     Listen. Gefahren werden die ECHTEN Module samt echtem ux.js und flip.js -
+ *     gestubbt sind nur DOM und Uhr. Drei Zusagen je Helfer:
+ *       a) der Tausch laeuft immer, genau einmal und synchron;
+ *       b) unter reduzierter Bewegung bewegt sich nichts;
+ *       c) der Endzustand braucht weder rAF noch ein `finish`-Ereignis.
+ */
+function motionEnv({ reduced = false, visibility = 'visible', dir = '' } = {}) {
+  const saved = {
+    window: globalThis.window,
+    document: globalThis.document,
+    getComputedStyle: globalThis.getComputedStyle,
+    requestAnimationFrame: globalThis.requestAnimationFrame,
+  };
+  globalThis.window = { matchMedia: (q) => ({ matches: reduced && /prefers-reduced-motion/.test(q) }) };
+  globalThis.document = { visibilityState: visibility, documentElement: { dir } };
+  globalThis.getComputedStyle = () => ({
+    getPropertyValue: () => '',
+    opacity: '1', paddingTop: '4px', paddingBottom: '4px', marginTop: '0px', marginBottom: '0px', borderTopWidth: '0px', borderBottomWidth: '0px',
+  });
+  // (c): kein Helfer darf auf einen Frame warten - im verdeckten Tab kommt keiner.
+  globalThis.requestAnimationFrame = () => { throw new Error('rAF darf fuer den Endzustand nicht noetig sein'); };
+  return () => {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete globalThis[key]; else globalThis[key] = value;
+    }
+  };
+}
+
+function motionEl(key, top = 0) {
+  const el = {
+    key,
+    style: {},
+    calls: [],
+    cancelled: 0,
+    top,
+    getAttribute: (name) => (name === 'data-key' ? key : null),
+    getBoundingClientRect: () => ({ left: 0, top: el.top, width: 300, height: 48 }),
+    // `finished` loest NIE auf: wer darauf wartet, haengt (Zusage c).
+    animate(keyframes, timing) {
+      const anim = { keyframes, timing, finished: new Promise(() => {}), cancel: () => { el.cancelled += 1; } };
+      el.calls.push(anim);
+      return anim;
+    },
+  };
+  return el;
+}
+
+const motionHost = (rows) => {
+  const host = motionEl('host');
+  host.rows = rows;
+  host.querySelectorAll = () => host.rows;
+  host.closest = () => null;
+  return host;
+};
+
+test('swapContent: der Tausch laeuft einmal und VOR der Blende, die Blende beginnt bei 0,4 ohne Versatz', async () => {
+  const restore = motionEnv();
+  try {
+    const { swapContent, SWAP_FROM_OPACITY } = await import('../public/utils/content-swap.js');
+    const host = motionHost([]);
+    const log = [];
+    const origAnimate = host.animate;
+    host.animate = (...args) => { log.push('animate'); return origAnimate.apply(host, args); };
+    const anim = swapContent(host, () => log.push('update'));
+    assert.deepEqual(log, ['update', 'animate']);
+    assert.ok(anim, 'die Blende ist gestartet');
+    assert.deepEqual(anim.keyframes, [{ opacity: SWAP_FROM_OPACITY }, { opacity: 1 }], 'nur Deckkraft, kein leerer Frame');
+    assert.equal(anim.timing.duration, 200, '--duration-md (Rueckfall ohne Stylesheet)');
+    assert.equal(anim.timing.fill, undefined, 'kein fill: am Ende gilt das Stylesheet');
+    assert.deepEqual(host.style, {}, 'kein Inline-Stil am Traeger');
+  } finally { restore(); }
+});
+
+test('swapContent: gerichtet kommt der Inhalt von der Seite, zu der man blaettert - in RTL gespiegelt', async () => {
+  const { swapContent, SWAP_SHIFT_PX } = await import('../public/utils/content-swap.js');
+  for (const [dir, direction, expected] of [['', 1, SWAP_SHIFT_PX], ['', -1, -SWAP_SHIFT_PX], ['', 7, SWAP_SHIFT_PX], ['rtl', 1, -SWAP_SHIFT_PX], ['rtl', -1, SWAP_SHIFT_PX]]) {
+    const restore = motionEnv({ dir });
+    try {
+      const anim = swapContent(motionHost([]), () => {}, { direction });
+      assert.equal(anim.keyframes[0].transform, `translateX(${expected}px)`, `dir=${dir || 'ltr'} direction=${direction}`);
+      assert.equal(anim.keyframes[1].transform, 'none');
+    } finally { restore(); }
+  }
+});
+
+test('swapContent: reduzierte Bewegung nimmt den Versatz, die kurze Blende bleibt', async () => {
+  const restore = motionEnv({ reduced: true });
+  try {
+    const { swapContent } = await import('../public/utils/content-swap.js');
+    let ran = 0;
+    const anim = swapContent(motionHost([]), () => { ran += 1; }, { direction: 1 });
+    assert.equal(ran, 1);
+    assert.equal(anim.keyframes[0].transform, undefined, 'kein translate');
+    assert.equal(anim.keyframes[1].transform, undefined);
+    assert.equal(anim.timing.duration, 150, '--duration-sm');
+  } finally { restore(); }
+});
+
+test('swapContent: ohne Blende (verdeckt, kein animate, animate:false, kein Traeger) steht der Inhalt trotzdem', async () => {
+  const { swapContent } = await import('../public/utils/content-swap.js');
+  const cases = [
+    ['verdeckter Tab', { visibility: 'hidden' }, () => motionHost([]), {}],
+    ['kein animate', {}, () => ({ style: {} }), {}],
+    ['animate: false', {}, () => motionHost([]), { animate: false }],
+    ['kein Traeger', {}, () => null, {}],
+  ];
+  for (const [name, env, makeHost, opts] of cases) {
+    const restore = motionEnv(env);
+    try {
+      const host = makeHost();
+      let ran = 0;
+      const anim = swapContent(host, () => { ran += 1; }, opts);
+      assert.equal(ran, 1, `${name}: der Tausch laeuft`);
+      assert.equal(anim, null, `${name}: keine Blende`);
+      assert.equal(host?.calls?.length ?? 0, 0, `${name}: animate nicht gerufen`);
+    } finally { restore(); }
+  }
+});
+
+test('swapContent: ein neuer Aufruf bricht die laufende Blende ab; ein werfender Tausch startet keine', async () => {
+  const restore = motionEnv();
+  try {
+    const { swapContent } = await import('../public/utils/content-swap.js');
+    const host = motionHost([]);
+    swapContent(host, () => {});
+    assert.equal(host.cancelled, 0);
+    swapContent(host, () => {}, { direction: -1 });
+    assert.equal(host.cancelled, 1, 'die erste Blende ist abgebrochen');
+    assert.equal(host.calls.length, 2);
+    // Ein anderer Traeger bleibt unberuehrt.
+    const other = motionHost([]);
+    swapContent(other, () => {});
+    assert.equal(host.cancelled, 1);
+
+    const broken = motionHost([]);
+    assert.throws(() => swapContent(broken, () => { throw new Error('render kaputt'); }), /render kaputt/);
+    assert.equal(broken.calls.length, 0, 'kein Einblenden eines halben Inhalts');
+  } finally { restore(); }
+});
+
+test('redrawList: ein Aufbau aus dem Leeren staffelt - einmal je Traeger - und klappt nichts auf', async () => {
+  const restore = motionEnv();
+  try {
+    const { redrawList } = await import('../public/utils/list-motion.js');
+    const host = motionHost([]);
+    let renders = 0;
+    const opts = { selector: '.row', keyAttr: 'data-key' };
+    assert.deepEqual(redrawList(host, () => { renders += 1; }, opts), { first: false, entered: 0, moved: 0 }, 'leer: nichts zu bewegen');
+    const a = motionEl('a', 0);
+    const b = motionEl('b', 48);
+    const drawn = redrawList(host, () => { renders += 1; host.rows = [a, b]; }, opts);
+    assert.equal(renders, 2, 'render laeuft je Aufruf genau einmal');
+    assert.equal(drawn.first, true);
+    assert.equal(a.style.opacity, '0', 'stagger hat die Zeilen angesetzt');
+    assert.equal(a.calls.length, 0, 'der Aufbau klappt nichts auf');
+
+    // Derselbe Traeger zeigt zwischendurch etwas anderes (anderer Reiter) und
+    // baut die Liste dann wieder auf: keine Zeile gilt als "neu", und das
+    // gestaffelte Einblenden wiederholt sich nicht.
+    host.rows = [];
+    const a2 = motionEl('a', 0);
+    const b2 = motionEl('b', 48);
+    const again = redrawList(host, () => { host.rows = [a2, b2]; }, opts);
+    assert.equal(again.entered, 0);
+    assert.equal(a2.calls.length + b2.calls.length, 0, 'kein Aufklappen jeder Zeile beim Zurueckkehren');
+    assert.equal(a2.style.opacity, undefined, 'und kein zweites Staffeln');
+  } finally { restore(); }
+  // stagger raeumt seine Inline-Werte per Timer ab - abwarten, damit kein Test daran haengt.
+  await new Promise((r) => setTimeout(r, 500));
+});
+
+test('redrawList: eine neue Zeile klappt ein (ohne FLIP darueber), eine reine Umsortierung gleitet', async () => {
+  const restore = motionEnv();
+  try {
+    const { redrawList } = await import('../public/utils/list-motion.js');
+    const opts = { selector: '.row', keyAttr: 'data-key' };
+    const host = motionHost([motionEl('a', 0), motionEl('b', 48)]);
+    redrawList(host, () => {}, opts); // erster Aufbau
+
+    // Neue Zeile "c" zwischen a und b: b rutscht im Layout nach unten.
+    const a2 = motionEl('a', 0); const c2 = motionEl('c', 48); const b2 = motionEl('b', 96);
+    const entered = redrawList(host, () => { host.rows = [a2, c2, b2]; }, opts);
+    assert.deepEqual(entered, { first: false, entered: 1, moved: 0 });
+    assert.equal(c2.calls.length, 1, 'die neue Zeile zieht ihre Hoehe auf');
+    assert.equal(c2.calls[0].keyframes[0].height, '0px');
+    assert.equal(c2.calls[0].keyframes[1].height, '48px');
+    assert.equal(b2.calls.length, 0, 'der Nachbar folgt dem Layout - kein zweiter Versatz per FLIP');
+
+    // Reine Umsortierung: b vor a.
+    const b3 = motionEl('b', 0); const a3 = motionEl('a', 48); const c3 = motionEl('c', 96);
+    host.rows = [a2, c2, b2];
+    a2.top = 0; c2.top = 48; b2.top = 96;
+    const moved = redrawList(host, () => { host.rows = [b3, a3, c3]; }, opts);
+    assert.deepEqual(moved, { first: false, entered: 0, moved: 3 });
+    assert.deepEqual(b3.calls[0].keyframes, [{ transform: 'translate(0px, 96px)' }, { transform: 'none' }]);
+    assert.equal(b3.calls[0].timing.duration, 200, '--duration-md');
+  } finally { restore(); }
+  await new Promise((r) => setTimeout(r, 500));
+});
+
+test('redrawList/collapseRow: unter reduzierter Bewegung laeuft nur das Neuzeichnen', async () => {
+  const restore = motionEnv({ reduced: true });
+  try {
+    const { redrawList, collapseRow } = await import('../public/utils/list-motion.js');
+    const opts = { selector: '.row', keyAttr: 'data-key' };
+    const a = motionEl('a', 0);
+    const host = motionHost([a]);
+    redrawList(host, () => {}, opts);
+    assert.equal(a.style.opacity, undefined, 'kein gestaffeltes Einblenden');
+    const a2 = motionEl('a', 48); const n = motionEl('n', 0);
+    let ran = 0;
+    redrawList(host, () => { ran += 1; host.rows = [n, a2]; }, opts);
+    assert.equal(ran, 1);
+    assert.equal(n.calls.length + a2.calls.length, 0, 'weder Aufklappen noch FLIP');
+    await collapseRow(a2);
+    assert.equal(a2.calls.length, 0, 'kein Ausklappen');
+  } finally { restore(); }
+});
+
+test('collapseRow: klappt die Zeile aus, mit der letzten Zeile die Gruppe - und loest auch ohne finish auf', async () => {
+  const restore = motionEnv();
+  try {
+    const { collapseRow } = await import('../public/utils/list-motion.js');
+    await collapseRow(null); // nichts zu tun
+
+    const row = motionEl('a');
+    const started = Date.now();
+    await collapseRow(row); // `finished` loest in motionEl NIE auf
+    assert.ok(Date.now() - started < 1000, 'der Timer loest auf, nicht das Ereignis');
+    assert.equal(row.calls.length, 1);
+    assert.equal(row.calls[0].keyframes[1].height, '0px');
+    assert.equal(row.calls[0].timing.fill, 'forwards', 'bleibt zu, bis die Liste neu gezeichnet ist');
+    assert.equal(row.calls[0].timing.duration, 250, '--duration-lg');
+
+    const group = motionEl('group');
+    const only = motionEl('x');
+    group.querySelectorAll = () => [only];
+    await collapseRow(only, { group, selector: '.row' });
+    assert.equal(only.calls.length, 0);
+    assert.equal(group.calls.length, 1, 'die Gruppe geht mit ihrer letzten Zeile');
+
+    const group2 = motionEl('group2');
+    const one = motionEl('y');
+    group2.querySelectorAll = () => [one, motionEl('z')];
+    await collapseRow(one, { group: group2, selector: '.row' });
+    assert.equal(one.calls.length, 1);
+    assert.equal(group2.calls.length, 0);
+  } finally { restore(); }
+});

@@ -17,6 +17,8 @@ import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { wireScrollFade, vibrate, animationSettled, scheduleUndoableDelete } from '/utils/ux.js';
+import { swapContent } from '/utils/content-swap.js';
+import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
@@ -373,7 +375,7 @@ function renderShell(container) {
 
   wireTablist(container.querySelector('.housekeeping-tabs'), {
     activeId: state.tab,
-    onChange: (id) => { state.tab = id; renderCurrentTab(container); },
+    onChange: (id, { direction = 0 } = {}) => { state.tab = id; renderCurrentTab(container, { direction }); },
   });
   // Geteilte gleitende Kapsel (Re-Critique 2026-09-27, D8); `key`, weil die
   // Seite den Kopf bei jedem Aufruf neu baut.
@@ -385,18 +387,24 @@ function renderShell(container) {
   renderCurrentTab(container);
 }
 
-function renderCurrentTab(container) {
+/* `direction` kommt nur vom Reiterwechsel (wireTablist): dann blendet der neue
+ * Reiter in Schrittrichtung ein (utils/content-swap.js). Jeder andere Aufruf -
+ * erster Aufbau, Auffrischen nach einer Handlung - tauscht ohne Blende; dort
+ * traegt die betroffene Zeile die Bewegung (redrawList/collapseRow). */
+function renderCurrentTab(container, { direction = null } = {}) {
   const content = container.querySelector('#housekeeping-content');
   if (!content) return;
   // Der Reiter steht an der Seite (Stil-Haken je Reiter). Das Mass folgt ihm
   // NICHT mehr: die Seite hat eine Kante fuer alle Reiter (housekeeping.css).
   const page = container.querySelector('.housekeeping-page');
   if (page) page.dataset.tab = state.tab;
-  content.replaceChildren();
-  if (state.tab === 'tasks') renderTasks(content);
-  else if (state.tab === 'reports') renderReports(content);
-  else if (state.tab === 'staff') renderStaff(content);
-  else renderDashboard(content);
+  swapContent(content, () => {
+    content.replaceChildren();
+    if (state.tab === 'tasks') renderTasks(content);
+    else if (state.tab === 'reports') renderReports(content);
+    else if (state.tab === 'staff') renderStaff(content);
+    else renderDashboard(content);
+  }, { direction: direction ?? 0, animate: direction !== null });
   // Der Zeitraum gehoert nur dem Berichte-Tab; renderReports() setzt ihn selbst.
   if (state.tab !== 'reports') syncReportPeriod(content);
   updateHousekeepingFab();
@@ -923,7 +931,18 @@ async function undoCompleteTask(taskId, previous, content) {
  * Der Aufgaben-Tab ist die LISTE, sonst nichts: Anlegen sitzt hinter dem FAB
  * (openTaskCreateModal()). Der Leerzustand bietet denselben Weg an.
  */
+const TASK_ROW = '.swipe-row[data-swipe-id]';
+
+/* Die Liste baut ihre Zeilen bei jeder Aenderung neu. redrawList() haelt die
+ * Lage davor fest und bewegt danach, was sich geaendert hat: eine erledigte
+ * Aufgabe gleitet an ihre neue Stelle (die Frist setzt zurueck, die Zeile
+ * bleibt), eine per "Rueckgaengig" zurueckgekehrte zieht auf, der erste Aufbau
+ * blendet gestaffelt ein (utils/list-motion.js). */
 function renderTasks(content) {
+  redrawList(content, () => drawTasks(content), { selector: TASK_ROW, keyAttr: 'data-swipe-id' });
+}
+
+function drawTasks(content) {
   content.replaceChildren();
   const taskRows = state.tasks.map(taskRowHtml).join('');
   const empty = emptyStateHTML({
@@ -1019,7 +1038,12 @@ function deleteTask(task, content) {
   pendingTaskDeletes.add(String(task.id));
   const index = state.tasks.findIndex((it) => String(it.id) === String(task.id));
   state.tasks = state.tasks.filter((it) => String(it.id) !== String(task.id));
-  repaint();
+  // Die Zeile klappt aus, die Nachbarn ruecken nach - erst dann steht die
+  // Liste ohne sie neu. Der Zustand ist schon geaendert: ein Neuzeichnen, das
+  // dazwischenkommt, zeigt dasselbe Ergebnis nur ohne die Bewegung.
+  const row = [...(content?.querySelectorAll?.(TASK_ROW) ?? [])]
+    .find((el) => el.dataset?.swipeId === String(task.id)) ?? null;
+  collapseRow(row).then(repaint);
   scheduleUndoableDelete({
     message: t('housekeeping.taskDeletedToast'),
     commit: async ({ keepalive }) => {

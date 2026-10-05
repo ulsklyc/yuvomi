@@ -27,6 +27,7 @@ import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import { USER_COLORS } from '/utils/color.js';
+import { redrawList } from '/utils/list-motion.js';
 
 const UPCOMING_WINDOW_DAYS = 90;
 const WEEKDAY_CODES = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
@@ -330,9 +331,19 @@ function deepLinkNeedsExpand(occurrences, { typeId, date }) {
   return splitUpcomingByType(occurrences).rest.some((occ) => occ.type_id === typeId && occ.date_key === date);
 }
 
+/* DIE DREI LISTEN DER SEITE BAUEN SICH BEI JEDER AENDERUNG NEU (R16, Bewegung).
+ * Jede hat ihren eigenen Traeger, der das Neuzeichnen ueberlebt - redrawList()
+ * (utils/list-motion.js) haelt davor die Lage fest und bewegt danach, was sich
+ * geaendert hat: der erste Aufbau nach dem Skelett blendet gestaffelt ein, eine
+ * neue Abholung, Abfallart oder Quelle zieht auf, und was nachrueckt oder die
+ * Reihenfolge wechselt (Abfallart hoch/runter), gleitet an seine Stelle. */
 function renderUpcoming() {
   const host = _container.querySelector('#waste-upcoming-list');
   if (!host) return;
+  redrawList(host, () => drawUpcoming(host), { selector: '.waste-occurrence-row[data-key]', keyAttr: 'data-key' });
+}
+
+function drawUpcoming(host) {
   if (state.loading) {
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 4, lines: 2 }));
@@ -601,6 +612,10 @@ function applyPageMode() {
 function renderTypes() {
   const host = _container.querySelector('#waste-types-list');
   if (!host) return;
+  redrawList(host, () => drawTypes(host), { selector: '.waste-type-card[data-type-id]', keyAttr: 'data-type-id' });
+}
+
+function drawTypes(host) {
   if (state.loading) {
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 3, lines: 2 }));
@@ -682,6 +697,10 @@ function sourceRowHtml(source) {
 function renderSources() {
   const host = _container.querySelector('#waste-sources-list');
   if (!host) return;
+  redrawList(host, () => drawSources(host), { selector: '.waste-source-row[data-source-id]', keyAttr: 'data-source-id' });
+}
+
+function drawSources(host) {
   if (state.loading) {
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 2, lines: 2 }));

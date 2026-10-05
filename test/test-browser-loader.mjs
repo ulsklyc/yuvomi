@@ -264,6 +264,32 @@ const STUBS = {
     export const durationToken = (name, fallback) => fallback;
     export const easingToken = (name, fallback = 'ease-out') => fallback;
   `,
+  // Inhaltswechsel und Listenbewegung (R16): ohne Layout gibt es nichts zu
+  // bewegen - der Tausch selbst muss trotzdem laufen, genau einmal und
+  // synchron. Die Originale importieren ux.js RELATIV und bekaemen hier das
+  // echte statt des Stubs darueber; test:motion faehrt sie ungestubbt.
+  // Suiten, die pruefen wollen, OB und WIE eine Seite den Uebergang anfragt,
+  // setzen globalThis.__motionStub = (name, ...args) => {}.
+  '/utils/content-swap.js': `
+    export const SWAP_SHIFT_PX = 8;
+    export const SWAP_FROM_OPACITY = 0.4;
+    export function swapContent(host, update, opts = {}) {
+      globalThis.__motionStub?.('swapContent', host, opts);
+      if (typeof update === 'function') update();
+      return null;
+    }
+  `,
+  '/utils/list-motion.js': `
+    export function redrawList(host, render, opts = {}) {
+      globalThis.__motionStub?.('redrawList', host, opts);
+      render();
+      return { first: false, entered: 0, moved: 0 };
+    }
+    export function collapseRow(row, opts = {}) {
+      globalThis.__motionStub?.('collapseRow', row, opts);
+      return Promise.resolve();
+    }
+  `,
   '/utils/html.js': `
     export const esc = (value) => String(value ?? '')
       .replaceAll('&', '&amp;')

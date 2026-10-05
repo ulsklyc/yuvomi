@@ -846,6 +846,14 @@
  * gegen 176px Bedarf, lesbar blieben vier Zeichen („Broc…", „Cherr…"), und das
  * in genau der Situation, für die diese Liste gebaut ist. Der geteilte Name
  * bricht stattdessen um, wie es das MHD im Vorrat schon tat. */
+/* Der Wechsel auf die gedaempfte Farbe blendet (R16, Bewegung): Name und
+ * Metazeile sprangen beim Abhaken ohne Uebergang um, waehrend der Kreis
+ * daneben poppt. Nur `color` - der Durchstrich selbst ist nicht animierbar. */
+.shopping-item .list-row__name,
+.shopping-item .item-meta {
+  transition: color var(--transition-fast);
+}
+
 .shopping-item--checked .list-row__name {
   text-decoration: line-through;
   color: var(--color-text-secondary);

@@ -703,7 +703,8 @@ test('Listenreiter am Desktop: Liste im Spaltenraster, Kennzahlen bzw. Protokoll
     const end = HK_SRC.indexOf('\nfunction ', start + 1);
     return HK_SRC.slice(start, end < 0 ? undefined : end);
   };
-  const tasks = fn('renderTasks');
+  // renderTasks() reicht seit R16 an redrawList() weiter; das Markup baut drawTasks().
+  const tasks = fn('drawTasks');
   assert.match(tasks, /renderPageColumns\(\{\s*main:[\s\S]*housekeeping-task-list/, 'Aufgaben: die Liste steht in der Listenspalte');
   assert.doesNotMatch(tasks, /\brail:/, 'Aufgaben: kein zweiter Inhalt, also keine erfundene Seitenspalte');
   const reports = fn('renderReports');

@@ -16,7 +16,8 @@
  * Nur `transform`, Dauer und Kurve aus den Tokens (`--duration-md`,
  * `--ease-out`); unter `prefers-reduced-motion` springt die Liste wie bisher.
  */
-import { durationToken, easingToken } from '/utils/ux.js';
+// Relativ (wie utils/sortable.js): dieselbe Modul-URL im Browser, ladbar ohne Loader.
+import { durationToken, easingToken } from './ux.js';
 
 /**
  * Erste Messung: die Lage jeder Zeile vor dem Neubau.

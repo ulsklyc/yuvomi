@@ -138,6 +138,8 @@ const APP_SHELL = [
   '/utils/extension-widgets.js',
   '/utils/fab.js',
   '/utils/flip.js',
+  '/utils/list-motion.js',
+  '/utils/content-swap.js',
   '/utils/filter-sheet.js',
   '/utils/folder-upload.js',
   '/utils/folder-tree.js',

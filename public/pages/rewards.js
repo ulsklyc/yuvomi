@@ -16,7 +16,9 @@ import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
-import { wireScrollFade } from '/utils/ux.js';
+import { wireScrollFade, stagger } from '/utils/ux.js';
+import { swapContent } from '/utils/content-swap.js';
+import { collapseRow } from '/utils/list-motion.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { renderPageColumns } from '/utils/page-layout.js';
@@ -289,7 +291,7 @@ function renderShell(container) {
 
   wireTablist(container.querySelector('.rewards-tabs'), {
     activeId: state.tab,
-    onChange: (id) => { state.tab = id; renderCurrentTab(container); },
+    onChange: (id, { direction = 0 } = {}) => { state.tab = id; renderCurrentTab(container, { direction }); },
   });
   // Geteilte gleitende Kapsel (Re-Critique 2026-09-27, D8); `key`, weil die
   // Seite den Kopf bei jedem Aufruf neu baut.
@@ -314,16 +316,46 @@ function content() {
  * fuellen die Flaeche mit einer Seitenspalte (`.page-columns`, layout.css)
  * statt den Kopf zu sich zu ziehen. */
 
-async function renderCurrentTab(container) {
+/* DAS SKELETT GEHOERT ZUM ERSTEN LADEN, NICHT ZU JEDEM WECHSEL (Critique R16,
+ * P2 Bewegung). Hier wurde der Traeger bei JEDEM Aufruf geleert und ein
+ * Skelett gezeigt - beim Reiterwechsel und nach jeder Buchung, Freigabe oder
+ * Ablehnung. Die Seite blitzte dreimal je Handlung: Inhalt, Skelett, Inhalt.
+ * Jetzt bleibt stehen, was da ist, bis die Antwort kommt:
+ *   - erster Aufbau der Seite: Skelett, dann gestaffelt einblenden;
+ *   - Reiterwechsel (`direction`): der neue Reiter blendet in Schrittrichtung
+ *     ein (utils/content-swap.js);
+ *   - Auffrischen nach einer Handlung: Tausch ohne Blende - die Bewegung traegt
+ *     dort die betroffene Zeile selbst (`collapseRow` in decideRedemption).
+ * `renderSeq` verwirft eine Antwort, die ein spaeterer Wechsel ueberholt hat. */
+let renderSeq = 0;
+/** Traeger, die schon einmal Inhalt gezeigt haben (ueberlebt keinen Seitenneubau). */
+const filledHosts = new WeakSet();
+
+async function renderCurrentTab(container, { direction = null } = {}) {
   const el = content();
   if (!el) return;
-  el.replaceChildren();
-  el.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 3 }));
+  const seq = ++renderSeq;
+  const first = !filledHosts.has(el);
+  if (first) {
+    el.replaceChildren();
+    el.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 3 }));
+  }
+  const tab = state.tab;
   try {
-    if (state.tab === 'overview') { await Promise.all([loadOverview(), loadRecentLedger()]); renderOverview(el); }
-    else if (state.tab === 'catalog') { await Promise.all([loadCatalog(), loadOverview()]); renderCatalog(el); }
-    else { await Promise.all([loadLedger(), loadOverview()]); renderLedger(el); }
+    if (tab === 'overview') await Promise.all([loadOverview(), loadRecentLedger()]);
+    else if (tab === 'catalog') await Promise.all([loadCatalog(), loadOverview()]);
+    else await Promise.all([loadLedger(), loadOverview()]);
+    if (seq !== renderSeq) return;
+    const draw = () => {
+      if (tab === 'overview') renderOverview(el);
+      else if (tab === 'catalog') renderCatalog(el);
+      else renderLedger(el);
+    };
+    swapContent(el, draw, { direction: direction ?? 0, animate: !first && direction !== null });
+    filledHosts.add(el);
+    if (first) stagger(el.querySelectorAll('.rw-pending, .rw-standing, .rw-reward-card, .rw-ledger-row'), { host: el });
   } catch (err) {
+    if (seq !== renderSeq) return;
     // War ein Leerzustand ohne Rolle und ohne Ausweg - der gefangene Fehler
     // wurde nicht einmal gelesen. Jetzt traegt er den Statuscode und einen
     // Wiederholen-CTA auf denselben Tab.
@@ -941,6 +973,10 @@ async function decideRedemption(id, action, btn) {
     const msg = action === 'fulfill' ? t('rewards.toastApproved')
       : action === 'reject' ? t('rewards.toastRejected') : t('rewards.toastCancelled');
     toast(msg, action === 'fulfill' ? 'success' : 'default');
+    // Die entschiedene Anfrage klappt aus, bevor die Liste ohne sie neu steht;
+    // mit der letzten geht der ganze Abschnitt (Titel + Traeger).
+    const row = btn?.closest?.('.rw-pending');
+    await collapseRow(row, { group: row?.closest?.('.rw-section'), selector: '.rw-pending' });
     await refreshActiveTab();
     // Nur nach der Rueckfrage: "Einloesen" fragt nicht, schliesst also keinen
     // Dialog, und das Nachfassen griffe auf den Merker eines frueheren zurueck (#1083).
