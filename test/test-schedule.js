@@ -2644,7 +2644,13 @@ test('R16: Vergleich und Auswertung tragen mobil zwei Bedienzeilen', async () =>
   const body = (list, sel) => list.filter((r) => r.selector === sel).map((r) => r.body).join(';');
 
   // Der Stepper ist EIN Rasterkind: ohne den Kasten fielen Pfeile und Label einzeln ins Raster.
-  assert.match(src, /<div class="schedule-overview__stepper">[\s\S]*data-direction="prev"[\s\S]*data-direction="next"[\s\S]*schedule-overview__week-label/);
+  // Seit R16 Schritt 2 in der Reihenfolge des Zeitraum-Kopfs: zurueck, Wert,
+  // vor, dahinter der Reset - im Markup, nicht per `order` (Tab-Folge).
+  assert.match(src, /<div class="schedule-overview__stepper">[\s\S]*?data-direction="prev"[\s\S]*?schedule-overview__week-label[\s\S]*?data-direction="next"[\s\S]*?data-direction="today"[\s\S]*?<\/div>/);
+  const stepper = src.match(/<div class="schedule-overview__stepper">[\s\S]*?<\/div>/)[0];
+  assert.doesNotMatch(stepper, /calendar\.back|calendar\.forward/, 'die Pfeile nennen ihr Objekt (Woche/Tag), nicht nur die Richtung');
+  assert.match(stepper, /calendar\.prevWeek[\s\S]*calendar\.nextWeek/);
+  assert.doesNotMatch(body(phone, '.schedule-overview__stepper > [data-direction="today"]'), /order:/, 'keine zweite Reihenfolge im Stylesheet');
   assert.match(body(phone, '.schedule-overview__toolbar'), /grid-template-areas:\s*"view people"\s*"step step"/);
   assert.match(body(phone, '.schedule-overview__week-nav'), /display:\s*contents/);
   assert.match(body(phone, '.schedule-overview__toolbar > .user-ms > .user-ms__options'), /flex-wrap:\s*nowrap/,

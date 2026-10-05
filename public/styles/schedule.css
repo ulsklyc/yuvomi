@@ -818,7 +818,11 @@
   min-width: 0;
 }
 
+/* Der Wert steht ZWISCHEN den Pfeilen (Zeitraum-Kopf, DESIGN.md) und haelt
+ * eine Mindestbreite, damit der rechte Pfeil beim Blaettern nicht wandert. */
 .schedule-overview__week-label {
+  min-inline-size: 9rem;
+  text-align: center;
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-secondary);
@@ -1264,20 +1268,12 @@
     flex-wrap: nowrap;
   }
 
+  /* Die Reihenfolge Pfeil, Wert, Pfeil, Heute steht seit R16 Schritt 2 im
+     Markup; hier bleibt nur, dass der Wert die Zeile fuellt und kuerzt. */
   .schedule-overview__stepper > .schedule-overview__week-label {
-    order: 1;
     flex: 1 1 0;
-    min-width: 0;
-    text-align: center;
+    min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  .schedule-overview__stepper > [data-direction="next"] {
-    order: 2;
-  }
-
-  .schedule-overview__stepper > [data-direction="today"] {
-    order: 3;
   }
 }

@@ -1664,11 +1664,17 @@ function renderOverview() {
       ${/* Der Stepper ist ein eigener Kasten (R16): schmal loest sich die
            Gruppe auf (schedule.css), Ansicht und Personen teilen sich Zeile 1,
            der Stepper bekommt Zeile 2 - dafuer muss er EIN Rasterkind sein. */ ''}
+      ${/* DER ZEITRAUM-KOPF DER APP (DESIGN.md, R16): zurueck, Wert, vor - und
+           DAHINTER der Reset, wie Kalender, Wochenplan, Budget und die
+           Berichte der Haushaltshilfe. Hier stand `< Heute > Wert` mit den
+           Namen "Zurueck"/"Weiter": die eine Stelle, an der "Heute" zwischen
+           den Pfeilen sass und die Pfeile ihr Objekt nicht nannten. Die
+           Reihenfolge steht im MARKUP (= Tab-Folge), nicht per `order`. */ ''}
       <div class="schedule-overview__stepper">
-        <button type="button" class="btn btn--icon" data-action="overview-week" data-direction="prev" aria-label="${esc(t('calendar.back'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+        <button type="button" class="btn btn--icon" data-action="overview-week" data-direction="prev" aria-label="${esc(t(overview.viewMode === 'day' ? 'calendar.prevDay' : 'calendar.prevWeek'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+        <span class="schedule-overview__week-label" aria-live="polite">${esc(weekLabel)}</span>
+        <button type="button" class="btn btn--icon" data-action="overview-week" data-direction="next" aria-label="${esc(t(overview.viewMode === 'day' ? 'calendar.nextDay' : 'calendar.nextWeek'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
         <button type="button" class="btn btn--secondary" data-action="overview-week" data-direction="today">${esc(t('calendar.today'))}</button>
-        <button type="button" class="btn btn--icon" data-action="overview-week" data-direction="next" aria-label="${esc(t('calendar.forward'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
-        <span class="schedule-overview__week-label">${esc(weekLabel)}</span>
       </div>
     </div>
   </div>`;

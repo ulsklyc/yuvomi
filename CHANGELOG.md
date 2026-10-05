@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   item everywhere in the kitchen, the pencil is gone, and the name gets its width (228 instead
   of 158px on a phone). Ticking off stays on the checkbox and on the swipe from the start of
   the row.
+- **The shift plan steps through weeks like every other period.** The compare view read
+  "back, Today, forward, week"; it now reads back, week, forward and then "Today", as in the
+  calendar and the budget, and the arrows say what they move ("Previous week").
 - **Dialogs carry their module's colour.** The active chip in the Tasks filter sheet was violet
   next to the same chip in green on the page behind it.
 - **Budget: amounts have one weight, and zero is not a gain.** The amount of a split expense
