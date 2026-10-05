@@ -1141,6 +1141,49 @@ das Verhaeltnis haelt.
   samt Gruppenwinkel) laufen auf der symmetrischen `--ease-in-out` cubic-bezier(0.42,0,0.58,1):
   `--ease-out` nahm dort 80 % der Hoehe in 60ms, die Nachbarn sprangen hinterher.
   prefers-reduced-motion schaltet Signature-Animationen ab.
+- **Eine Kurvenfamilie (R16):** Interaktions-Motion nimmt Dauer UND Kurve aus Tokens. Die drei
+  Shorthands `--transition-fast/base/slow` bestehen aus `var(--duration-*) var(--ease-out)` -
+  sie fuehrten bis R16 das Keyword `ease` (306 Nutzungen gegen 70 mit `--ease-out`), Hover und
+  Press liefen damit auf einer anderen Kurve als Seiten, Dialoge und Listen. Ein Shorthand ist
+  Dauer + Kurve: dahinter steht nie eine zweite Kurve (die Deklaration waere ungueltig). Kein
+  `transition: all`, keine Literal-Dauer, kein nacktes Keyword - weder im Stylesheet noch in
+  Skripten (Inline-Transitions zeigen auf `var(--duration-*) var(--ease-*)`, die Web Animations
+  API liest `durationToken()`/`easingToken()` aus `utils/ux.js`). Ausgenommen sind nur
+  Endlos-Schleifen (`infinite`: Wetter, Spinner, Shimmer, Blob) und die acht benannten Stellen
+  in `test:motion` (`MOTION_EXCEPTIONS`, jede mit Grund). Eintritt darf federn, Austritt ist
+  kuerzer und ohne Ueberschwinger; im Arbeitsfluss laeuft nichts laenger als 300ms. Unter
+  reduzierter Bewegung gilt EINE "aus"-Konvention: `0s` aus `reset.css`, kein `0.01ms` daneben.
+- **Blatt von unten - ein Paar:** Dialog-Sheet, Mehr-Blatt und die mobile Suche fahren aus
+  `--sheet-in` (`--duration-xl` + `--ease-glass`) und `--sheet-out` (`--duration-md` +
+  `--ease-out`), mit dem kurzen Hub `--sheet-lift` (24px) und einer Blende. Vorher drei
+  Bewegungen fuer dieselbe Geste (Dialog 24px/Feder/300ms, Mehr-Blatt Vollhub 250ms, Suche
+  Vollhub). Der Vollhub ist entfallen, weil die Feder ihn nicht traegt: ueber die volle Hoehe
+  wirft sie das Blatt sichtbar ueber seine Ruhelage. Geschlossen sind Mehr-Blatt und Suche
+  durchsichtig, nehmen keinen Zeiger und sind `inert`.
+- **Menue-Ausgang:** Popover-Menues (`.popover-menu`, Dokument-Kontextmenue) blenden aus und
+  nehmen die 4 % Wachstum zurueck (`overlay`/`display` diskret, `--duration-xs` gegen
+  `--duration-md` der Einfahrt). Zwei `transition`-Deklarationen, die erste ohne
+  `allow-discrete`: wo der Browser es nicht kennt, schliesst das Menue hart wie zuvor.
+- **Listenbewegung - der Standard (`utils/list-motion.js`):** eine Liste, die ihre Zeilen neu
+  baut, zeichnet ueber `redrawList(host, render, { selector, keyAttr })`: der Aufbau aus dem
+  Leeren blendet einmal gestaffelt ein, eine neue Zeile zieht auf (`expandIn`), eine reine
+  Umsortierung gleitet (FLIP) - nie zwei Bewegungen uebereinander. Eine Zeile, die geht, klappt
+  VOR dem Neuzeichnen aus (`collapseRow`). Nutzer: Aufgaben und Einkauf (Bestand),
+  Haushaltshilfe, Entsorgung (drei Listen), Vorrat, Belohnungen. Filter und Suche zeichnen ohne
+  Bewegung neu - dort wechselt die Frage, nicht die Liste. Ein Skelett gehoert zum ERSTEN
+  Laden; danach bleibt der Inhalt stehen, bis der neue da ist.
+- **Inhaltswechsel - der Standard (`utils/content-swap.js`):** derselbe Traeger, neuer Inhalt
+  (Reiterwechsel im Modul, Monats-/Wochen-Blaettern, Bereichswechsel) tauscht ueber
+  `swapContent(host, update, { direction })`: Blende ab 0,4 Deckkraft (kein leerer Frame),
+  auf Wunsch 8px Versatz in Schrittrichtung (in RTL gespiegelt, derselbe Richtungssinn wie das
+  Wischen), `--duration-md` + `--ease-out`. `update()` laeuft immer zuerst und synchron - der
+  Endzustand haengt an keiner Animation. Reduzierte Bewegung: nur eine kurze Blende. Ein neuer
+  Aufruf bricht den laufenden ab, nichts sperrt Eingaben. Die Richtung kommt aus
+  `wireTablist` (`onChange(id, { direction })`) bzw. vom Stepper (`swapPeriod` in
+  `utils/period-stepper.js`). Die Seite selbst wechselt weiter ueber `swapPage` (naechster
+  Punkt). Zwei kleine Geschwister in `utils/ux.js`: `toggleRegion(region, open)` fuer per
+  `hidden` geschaltete Aufklapper, `growBars(root, { selector, memo })` fuer Balken ueber
+  `--bar-scale` (der Endwert steht im Markup, der Helfer setzt nur den Startwert).
 - **Seitenwechsel:** Kontinuitaet vor Effekt - Navigation, Kopf und Tab-Leisten STEHEN, nur
   der Inhalt wechselt. Der Router tauscht per View Transition (`utils/view-transition.js`):
   Wurzel-Blende 200ms `--ease-out`, Seitenleiste und Kapsel zeigen nur ihr lebendes Bild,
@@ -1430,7 +1473,7 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 | Boolean in den Einstellungen | Schalter (`.toggle`-Bahn, `role="switch"`), Label links, Zustand rechts; Bahn aus = `--color-switch-off` (3:1, siehe Kanten), der Knopf startet per `inset-inline-start` und laeuft in RTL nach links wie bei Apple (#1572) | `toggleRowHtml({ ..., control: 'switch' })` (settings/components.js) | native 18px-Checkbox, "Aktiviert"-Badge neben dem Haken |
 | Auswahl aus 2-4 Werten (Theme) | `.segmented` im Well (Abschnitt "Segmented Controls") | panel.css | drei getrennte Rahmenknoepfe |
 | Auswahl in einer Segment-/Tab-Leiste zeigen | EINE Bewegung: eine Kapsel hinter den Labels gleitet (`--duration-lg` + `--ease-out`, nur `transform`, Breite nur wenn sie sich aendert; reduzierte Bewegung springt); die Sidebar-Pille behaelt ihre Feder, hoechstens `--duration-xl` | `attachSegmentIndicator(bar)` (utils/segment-indicator.js; folgt jedem Wechsel des aktiven Eintrags selbst), `renderSubTabs({ indicator })`, `{ key }` fuer Leisten, die neu gebaut werden | springende Flaeche am aktiven Tab; eigene WAAPI-Kapseln; Literal-Dauern (450ms) |
-| Mobiles Blatt (Dialog, Mehr) | EINE Grammatik: Griff 36x5 in der Kopfzone (`--sheet-grabber`: hell `--color-border-strong`, dunkel Glas-Weiss), Griff-Oberkante bis Titel 16px; 1:1 mitgehen, schliessen ab 80px Weg ODER Flick > 0.5px/ms, sonst zurueckfedern (`--duration-lg` + `--ease-out`), nach oben Gummiband; der Zug liegt auf `translate` | `wireSheetDrag(sheet, { scroller, onDismiss })` (utils/sheet-drag.js) | leerer Griff-Streifen, Glas-Weiss auf weisser Tafel, Faktor 0.6, Schliessen erst bei `touchend`, Zurueckspringen ohne Transition |
+| Mobiles Blatt (Dialog, Mehr) | EINE Grammatik: Griff 36x5 in der Kopfzone (`--sheet-grabber`: hell `--color-border-strong`, dunkel Glas-Weiss), Griff-Oberkante bis Titel 16px; 1:1 mitgehen, schliessen ab 80px Weg ODER Flick > 0.5px/ms, sonst zurueckfedern (`--duration-lg` + `--ease-out`), nach oben Gummiband; der Zug liegt auf `translate`. Ein- und Ausfahrt aus EINEM Paar (`--sheet-in`/`--sheet-out`, Hub `--sheet-lift`), auch die mobile Suche | `wireSheetDrag(sheet, { scroller, onDismiss })` (utils/sheet-drag.js) | leerer Griff-Streifen, Glas-Weiss auf weisser Tafel, Faktor 0.6, Schliessen erst bei `touchend`, Zurueckspringen ohne Transition |
 | Mehrfachauswahl in einer Liste | Auswahlkreis ERSETZT Statuskreis und Zeilen-Picker (Apple Erinnerungen); Leiste = Bulk-Pille mit "Fertig"; Name je Zeile mit Objekt ("<Titel> auswaehlen"); Loeschen im Pillen-Stil, Rueckfrage in der Pille, eine Folge, die die Frage nicht traegt, als Detailzeile darunter (Dokumente: kein Papierkorb) | `.select-circle` (layout.css) + `setBulkPill({ label, actions })` / `clearBulkPill()` (utils/bulk-pill.js), `confirm: { question, detail? }` | native blaue Checkbox neben dem Statuskreis, eigene Aktionsleiste, gefuellte rote Loeschen-Kapsel |
 | Aktionen an Karte oder Zeile | dauerhaft sichtbar, ruhig per Tertiaerfarbe (ignore.md) | `.row-action` | Einblenden erst per `:hover`/`:focus-within` |
 | Erledigen an einer Zeile | EIN Abhakkreis: 20px, 2px, in Ruhe `--color-text-tertiary`; unter dem Zeiger laedt der Modulton ein, erledigt ist `--color-success` (Gruen bestaetigt, es steht nie in Ruhe da); `--static` = Zeichen ohne Einladung. Das Kaestchen des Einkaufs (`.item-check`) ist ein Kaestchen und bleibt eigen | `.check-ring` (list-row.css) an `.task-status-btn` und `.housekeeping-task__check`; Trefferflaeche und Zustand beim Modul | zweiter Ring je Modul (24px, in Ruhe gruen) |
@@ -3085,7 +3128,7 @@ plus Bottom-Inset) und `--glass-sheen` auf der oberen Kapselhaelfte als Material
 am Scroll-Ende liegt per `--fab-safe-zone` leerer Nachlauf unter dem FAB, der Sheen ist dort
 der einzige Beweis, dass die Flaeche Glas ist. Die 78 % sind eine Untergrenze: darunter faellt das
 Plus-Glyph auf hellen Modul-Tints unter 3:1 (gemessen 78 % Tasks-Gruen auf Weiss = 3.4:1).
-Hover geht auf Vollton, der Fallback ist opak. Einblendung als Feder (420ms `--ease-out`),
+Hover geht auf Vollton, der Fallback ist opak. Einblendung als Feder (`--duration-xl` + `--ease-out`),
 reduced-motion-sicher. (Der hier bis 2026-09-26 zugesagte Ring-Pulse hing an der toten
 Klasse `.fab` und lief nie; er ist mit ihr entfallen.)
 

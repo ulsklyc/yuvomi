@@ -148,6 +148,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Subscriptions on a phone: the billing cycle stands under the amount**, so the line with the
   due date no longer wraps. **Budget accounts:** a long account name wraps to a second line
   instead of being cut after "Gemeinsames Gi...".
+- **Movement follows one curve.** Hover and press feedback ran on a different easing curve than
+  pages, dialogs and lists; buttons, rows, chips and toggles now share the curve of the rest of
+  the app. Nothing in the working flow moves for longer than 300ms.
+- **Sheets from below move the same way.** The dialog sheet, the "More" sheet and the search on
+  a phone were three different movements; all three now rise by a short lift with a fade and
+  leave faster than they arrive. Menus fade out instead of vanishing.
+- **Switching a tab or a period no longer cuts.** Tabs inside Rewards, Housekeeping and the
+  shift schedule fade to the new content as Budget's already did, in the direction of the tab
+  you switch to, and paging by month or week (Budget, calendar,
+  meal plan, housekeeping reports, shift overview) brings the new period in from the side you
+  page to - with the arrows and shortcuts too, not only with a swipe. Health fades between
+  areas on a desktop as it did on a phone. With "reduce motion" switched on only a short fade
+  remains.
+- **Lists show what changed.** In Housekeeping, Waste collection, Pantry and Rewards a deleted
+  or decided row folds away, a new one unfolds and a reordered one glides to its place, instead
+  of the whole list being rebuilt in one step. Checked shopping items fade to their muted
+  colour.
+- **Rewards and the shift schedule no longer flash a loading state.** Rewards emptied the page
+  into a placeholder on every tab change and after every action; the shift overview did the
+  same on every week step. Both keep what is shown until the new content is there. Where
+  something does load for the first time, the shift schedule and the budget statistics show a
+  placeholder in the shape of what follows instead of a "Loading..." card or a list.
+- **Overview: customising no longer jumps.** Entering and leaving the customise mode slides
+  the tiles to their new position, and "+N more today" unfolds in place.
+- **Shopping on a phone: the add field unfolds** instead of pushing the list down in one step.
 
 ### Fixed
 
@@ -216,6 +241,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   name, title and notes fields no longer accept more text than can be saved. For the API:
   `POST /budget/loans` and `PUT /budget/loans/:id` now add a `reason` code to a 400 answer; the
   `error` text is unchanged.
+- **Budget: the category bars grow to their value.** They were built to animate and never did;
+  they now grow from the previous month's value when you page, and from zero the first time.
+- **Meal plan: a dragged meal lifts off** with a short movement, and its slot fades instead of
+  switching to pale in one step.
+- **The page title in Budget, calendar, notes and contacts no longer stutters while the header
+  collapses** on a phone; it changed its size across several layout steps during scrolling.
 
 ## [2.73.0] - 2026-10-04
 
