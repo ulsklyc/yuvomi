@@ -97,6 +97,69 @@ test('tasks: a solo household keeps hiding the assignee picker when only one per
   assert.equal(assigneeGroup(tasks.renderModalContent({ task: null, users: [ANNA] })).hidden, true);
 });
 
+// Feldfolge des Aufgaben-Dialogs (Critique 2026-10-05, R16). Unter dem Titel
+// stand die Notiz samt Formatierleiste, die Faelligkeit mobil erst bei y=700
+// von 844; Wiederholung und Erinnerung standen offen unter dem Aufklapper,
+// 1455px Formular in 591px. Was eine Aufgabe ausmacht - wann, wer, wie
+// wichtig -, steht jetzt vor dem Freitext, und die beiden seltenen Abschnitte
+// liegen hinter "Weitere Einstellungen", SOLANGE sie leer sind.
+// Der Loader stubt Aufklapper und Wiederholung auf nichts; hier zaehlt gerade,
+// WO sie stehen, also bekommen beide ein erkennbares Markup.
+function withFormLandmarks(run) {
+  globalThis.__advancedSection = (inner, { hint = '' } = {}) => (
+    `<details class="form-advanced"><span class="form-advanced__hint">${hint}</span>${inner}</details>`);
+  globalThis.__renderRRuleFields = (prefix) => `<select id="${prefix}-rrule-freq"></select>`;
+  try { return run(); } finally {
+    delete globalThis.__advancedSection;
+    delete globalThis.__renderRRuleFields;
+  }
+}
+const taskDialog = (opts) => withFormLandmarks(() => tasks.renderModalContent(opts));
+
+function advancedRange(html) {
+  const start = html.indexOf('<details class="form-advanced"');
+  return [start, html.indexOf('</details>', start)];
+}
+const inAdvanced = (html, needle) => {
+  const [start, end] = advancedRange(html);
+  const at = html.indexOf(needle);
+  assert.ok(at > 0, `${needle} fehlt im Dialog`);
+  return at > start && at < end;
+};
+
+test('tasks: the dialog asks when, who and how important before the free-text note', () => {
+  setHouseholdSize(2);
+  const html = taskDialog({ task: null, users: [ANNA, CLARA] });
+  const order = ['id="task-title"', 'id="task-due-date"', 'id="task-due-time"', 'task_assigned', 'id="task-priority"', 'id="task-description"', '<details class="form-advanced"']
+    .map((needle) => html.indexOf(needle));
+  assert.ok(order.every((at) => at > 0), 'every field is in the dialog');
+  assert.deepEqual(order, [...order].sort((a, b) => a - b), 'title, due, assignee, priority, note, more settings');
+});
+
+test('tasks: an empty recurrence and an empty reminder wait behind "more settings"', () => {
+  setHouseholdSize(2);
+  const html = taskDialog({ task: null, users: [ANNA, CLARA] });
+  assert.equal(inAdvanced(html, 'id="task-rrule-freq"'), true);
+  assert.equal(inAdvanced(html, 'id="reminder-toggle"'), true);
+  assert.match(html, /form-advanced__hint">[^<]*rrule\.labelRepeat[^<]*reminders\.sectionTitle/,
+    'the hint names what moved behind the disclosure');
+});
+
+test('tasks: a set recurrence or reminder is never hidden behind the disclosure', () => {
+  setHouseholdSize(2);
+  const task = { id: 9, title: 'Muell', status: 'open', priority: 'none', visibility: 'all', due_date: '2026-10-09', recurrence_rule: 'FREQ=WEEKLY' };
+  const series = taskDialog({ task, users: [ANNA, CLARA] });
+  assert.equal(inAdvanced(series, 'id="task-rrule-freq"'), false, 'a series shows its rule');
+  assert.equal(inAdvanced(series, 'id="reminder-toggle"'), true, 'its empty reminder still waits');
+  const reminded = taskDialog({
+    task: { ...task, recurrence_rule: null }, users: [ANNA, CLARA],
+    reminder: { id: 1, remind_at: '2026-10-08T09:00:00.000Z' },
+  });
+  assert.equal(inAdvanced(reminded, 'id="reminder-toggle"'), false, 'a set reminder shows');
+  assert.equal(inAdvanced(reminded, 'id="task-rrule-freq"'), true);
+  assert.doesNotMatch(reminded, /form-advanced__hint">[^<]*reminders\.sectionTitle/, 'the hint only names what is behind it');
+});
+
 // Die Auswahl "wer hat es getan" beim Abhaken (#1205). Sie hat keinen eigenen
 // Dialog: sie ist ein zweites Ziel in der Zeile, und die ganze Entscheidung
 // liegt darin, WANN es ueberhaupt dasteht.

@@ -999,7 +999,7 @@ function wireTagBadgeFilter(container) {
  * unter dem Aufklapper (DESIGN.md: „Weitere Einstellungen nennt, was dahinter
  * liegt"; A3 P1-2). Dieselbe Bauart wie eventAdvancedTopics() im Kalender.
  */
-function taskAdvancedTopics({ privacy = true } = {}) {
+function taskAdvancedTopics({ privacy = true, recurrence = false, reminder = false } = {}) {
   const topics = [
     t('tasks.startDateLabel'),
     t('tasks.pointsLabel'),
@@ -1007,6 +1007,10 @@ function taskAdvancedTopics({ privacy = true } = {}) {
     t('tasks.statusLabel'),
     privacy ? t('common.visibility.label') : null,
     t('tasks.documentsLabel'),
+    // Nur solange sie leer hinter dem Aufklapper liegen (R16) - der Hinweis
+    // nennt, was dahinter IST, nicht was dort sein koennte.
+    recurrence ? t('rrule.labelRepeat') : null,
+    reminder ? t('reminders.sectionTitle') : null,
   ].filter(Boolean);
   try {
     return new Intl.ListFormat(getLocale(), { style: 'long', type: 'conjunction' }).format(topics);
@@ -1093,7 +1097,32 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   const advancedLabel = advancedSummary.length
     ? `${t('modal.moreSettings')} · ${advancedSummary.join(' · ')}`
     : undefined;
-  const advancedHint = taskAdvancedTopics({ privacy: !hidesPrivacyControls('tasks') });
+  /* WIEDERHOLUNG UND ERINNERUNG LIEGEN HINTER DEM AUFKLAPPER, SOLANGE SIE LEER
+   * SIND (Critique 2026-10-05, R16). Beide standen offen unter ihm - eine
+   * Auswahl "Keine" samt Hinweis und ein ausgeschalteter Schalter, zusammen
+   * rund 200px fuer zwei Angaben, die die meisten Aufgaben nicht tragen. Ein
+   * GESETZTER Wert bleibt offen an seinem alten Platz: beim Bearbeiten darf
+   * nichts Gesetztes versteckt sein, und eine Serie in eine Zusammenfassung zu
+   * kuerzen hiesse, ihre Regel zu verschweigen. Der Abschnitt selbst entfaellt
+   * ohne Recht (`renderReminderSection` liefert dann nichts). */
+  const recurrenceHtml = renderRRuleFields('task', task?.recurrence_rule, {
+    allowFromCompletion: true,
+    fromCompletion: !!task?.recurrence_from_completion,
+    // AUSDRUECKLICH FALSE, nicht weggelassen (#960). Eine Aufgabe ist eine
+    // Zeile mit einem Faelligkeitsdatum, das Liste, Ueberfaelligkeit und
+    // Countdown direkt lesen - sie wird nicht wie eine Kalenderserie vom
+    // Startdatum aus expandiert. Der Monatsletzten-Hinweis muss das sagen,
+    // sonst verspricht er einen Termin, den es hier nicht gibt.
+    expandsFromStart: false,
+  });
+  const reminderHtml = renderReminderSection(task, reminder);
+  const recurrenceTucked = !task?.recurrence_rule;
+  const reminderTucked = !reminder && reminderHtml !== '';
+  const advancedHint = taskAdvancedTopics({
+    privacy: !hidesPrivacyControls('tasks'),
+    recurrence: recurrenceTucked,
+    reminder: reminderTucked,
+  });
 
   const advancedFieldsHtml = `
       <div class="modal-grid modal-grid--2">
@@ -1187,7 +1216,9 @@ ${syncTargetFieldHtml(task)}
       ${renderDocumentAttachField({
         attachments: (task?.documents ?? []).map((doc) => ({ document_id: doc.id, name: doc.name, mime_type: doc.mime_type })),
         label: t('tasks.documentsLabel'),
-      })}`;
+      })}
+${recurrenceTucked ? `<div class="task-form__tucked">${recurrenceHtml}</div>` : ''}
+${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`;
 
   return `
     <form id="task-form" novalidate>
@@ -1207,20 +1238,6 @@ ${syncTargetFieldHtml(task)}
             ${t('common.required')}
           </div>
         </div>
-      </div>
-
-      <!-- Notiz steht beim Titel, nicht hinter dem Aufklapper: sie ist sein
-           Gegenstueck, und eine Zusammenfassung kann Freitext nicht tragen.
-           Genau deshalb sind zwei Zeilen zu wenig gewesen (#731): das Feld war
-           auf die Groesse einer Zusammenfassung gebaut, obwohl der Kommentar
-           darueber das Gegenteil begruendet. -->
-      <div class="form-group">
-        <label class="label" for="task-description">${t('tasks.descriptionLabel')}</label>
-        ${renderMarkdownToolbar()}
-        <textarea class="input" id="task-description" name="description"
-                  rows="6" placeholder="${t('tasks.descriptionPlaceholder')}"
-                 >${esc(task?.description)}</textarea>
-        <small class="form-hint">${t('tasks.descriptionMarkdownHint')}</small>
       </div>
 
       <div class="modal-grid modal-grid--2">
@@ -1286,20 +1303,27 @@ ${syncTargetFieldHtml(task)}
         </div>
       </div>
 
+      <!-- DIE NOTIZ STEHT NACH DEM, WAS EINE AUFGABE AUSMACHT (Critique
+           2026-10-05, R16). Sie stand direkt unter dem Titel, und mit ihrer
+           Formatierleiste lag die Faelligkeit mobil bei y=700 von 844 - wann,
+           wer und wie wichtig kamen erst nach dem Freitext. Im Hauptteil
+           bleibt sie trotzdem: eine Zusammenfassung kann Freitext nicht
+           tragen (#731), hinter den Aufklapper gehoert sie nicht. Die Leiste
+           erscheint erst mit dem Fokus im Feld (utils/markdown-toolbar.js). -->
+      <div class="form-group" style="margin-top:var(--space-4)">
+        <label class="label" for="task-description">${t('tasks.descriptionLabel')}</label>
+        ${renderMarkdownToolbar()}
+        <textarea class="input" id="task-description" name="description"
+                  rows="6" placeholder="${t('tasks.descriptionPlaceholder')}"
+                 >${esc(task?.description)}</textarea>
+        <small class="form-hint">${t('tasks.descriptionMarkdownHint')}</small>
+      </div>
+
       ${advancedSection(advancedFieldsHtml, { label: advancedLabel, hint: advancedHint })}
 
-      ${renderRRuleFields('task', task?.recurrence_rule, {
-        allowFromCompletion: true,
-        fromCompletion: !!task?.recurrence_from_completion,
-        // AUSDRUECKLICH FALSE, nicht weggelassen (#960). Eine Aufgabe ist eine
-        // Zeile mit einem Faelligkeitsdatum, das Liste, Ueberfaelligkeit und
-        // Countdown direkt lesen - sie wird nicht wie eine Kalenderserie vom
-        // Startdatum aus expandiert. Der Monatsletzten-Hinweis muss das sagen,
-        // sonst verspricht er einen Termin, den es hier nicht gibt.
-        expandsFromStart: false,
-      })}
+      ${recurrenceTucked ? '' : recurrenceHtml}
 
-      ${renderReminderSection(task, reminder)}
+      ${reminderTucked ? '' : reminderHtml}
 
       <div id="task-form-error" class="form-error" role="alert" hidden></div>
 

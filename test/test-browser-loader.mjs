@@ -141,7 +141,9 @@ const STUBS = {
     export const timeInputPlaceholder = () => 'HH:MM';
   `,
   '/rrule-ui.js': `
-    export const renderRRuleFields = () => '';
+    // Suiten, die pruefen wollen, WO ein Dialog die Wiederholung hinstellt,
+    // setzen globalThis.__renderRRuleFields - dasselbe Muster wie __apiStub.
+    export const renderRRuleFields = (...args) => globalThis.__renderRRuleFields?.(...args) ?? '';
     // Dieselbe Form wie das Original, das immer { refreshMonthdayHint,
     // refreshStartDate } zurueckgibt: der Kalender-Dialog haengt es an sein
     // Startdatum, und ein leerer Rueckgabewert liess jede Suite sterben, die

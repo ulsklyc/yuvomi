@@ -168,8 +168,9 @@ test('die Leiste ist eine geteilte Komponente mit eigenem, global geladenem CSS'
   assert.match(css, /\.md-toolbar__btn\s*\{/);
   assert.match(css, /\.md-toolbar__sep\s*\{/);
   // Beide Textfeld-Klassen: Notizen tragen .form-input, Aufgaben .input.
-  assert.match(css, /\.md-toolbar \+ \.form-input/);
-  assert.match(css, /\.md-toolbar \+ \.input/);
+  // Nur solange die Leiste steht: verborgen (R16) behaelt das Feld seine Ecken.
+  assert.match(css, /\.md-toolbar:not\(\[hidden\]\) \+ \.form-input/);
+  assert.match(css, /\.md-toolbar:not\(\[hidden\]\) \+ \.input/);
 
   const html = await read('public/index.html');
   assert.match(html, /href="\/styles\/markdown-toolbar\.css"/, 'sie gehoert nicht zu einer Seite');
@@ -210,4 +211,103 @@ test('die markdown-Sektion steht in allen Locales und traegt jeden Schluessel', 
       assert.ok(!/^format/.test(old), `${f}: notes.${old} muss nach markdown.* umgezogen sein`);
     }
   }
+});
+
+// --------------------------------------------------------------------------
+// Die Leiste als Werkzeug des FELDS (Critique 2026-10-05, R16)
+//
+// Sie stand dauerhaft ueber jeder Notiz: zwoelf Knoepfe, mobil dreireihig
+// (162px), zwoelf Tab-Stopps - im Aufgaben-Dialog schob sie die Faelligkeit
+// auf y=700 von 844. Sie erscheint jetzt mit dem Fokus im Feld, bleibt dann
+// stehen (ein Ausblenden beim Verlassen verschoebe das Feld, auf das der
+// Finger gerade zielt), laeuft einzeilig und ist EIN Tab-Stopp.
+// --------------------------------------------------------------------------
+
+const { renderMarkdownToolbar, wireMarkdownToolbar } = await import('/utils/markdown-toolbar.js');
+
+function fakeToolbarDom() {
+  const listeners = (target) => {
+    target.handlers = {};
+    target.addEventListener = (type, fn) => { (target.handlers[type] ??= []).push(fn); };
+    target.fire = (type, evt = {}) => (target.handlers[type] ?? []).forEach((fn) => fn(evt));
+    return target;
+  };
+  const buttons = ['bold', 'italic', 'list'].map((format) => listeners({
+    dataset: { format },
+    tabIndex: -1,
+    focused: false,
+    focus() { buttons.forEach((b) => { b.focused = false; }); this.focused = true; },
+    scrollIntoView() {},
+    matches: (sel) => sel.includes('md-toolbar__btn'),
+  }));
+  buttons[0].tabIndex = 0;
+  const bar = listeners({
+    hidden: true,
+    classList: { add() {}, remove() {}, toggle() {} },
+    querySelectorAll: (sel) => (sel.includes('md-toolbar__btn') ? buttons : []),
+    animate: undefined,
+  });
+  const textarea = listeners({ focusCalls: 0, focus() { this.focusCalls += 1; } });
+  const root = {
+    querySelector: (sel) => (sel === '.md-toolbar' ? bar : null),
+    querySelectorAll: (sel) => (sel.includes('md-toolbar__btn') ? buttons : []),
+  };
+  return { root, bar, textarea, buttons };
+}
+
+test('R16: die Leiste kommt verborgen und als EIN Tab-Stopp aus dem Renderer', () => {
+  const html = renderMarkdownToolbar();
+  assert.match(html, /<div class="md-toolbar" role="toolbar"[^>]*\shidden>/, 'verborgen, bis das Feld den Fokus hat');
+  assert.equal((html.match(/tabindex="0"/g) ?? []).length, 1, 'genau ein Knopf steht in der Tab-Folge');
+  assert.equal((html.match(/tabindex="-1"/g) ?? []).length, 11, 'die anderen elf erreicht man mit den Pfeiltasten');
+});
+
+test('R16: der Fokus im Feld zeigt die Leiste, und sie bleibt stehen', () => {
+  const { root, bar, textarea } = fakeToolbarDom();
+  wireMarkdownToolbar(root, textarea);
+  assert.equal(bar.hidden, true, 'ohne Fokus bleibt sie verborgen');
+  textarea.fire('focus');
+  assert.equal(bar.hidden, false, 'der Fokus im Feld zeigt sie');
+  textarea.fire('blur');
+  assert.equal(bar.hidden, false, 'sie verschwindet nicht wieder - das naechste Feld spraenge sonst unter dem Finger weg');
+});
+
+test('R16: ein Feld, das beim Verdrahten schon den Fokus hat, zeigt die Leiste sofort', () => {
+  const { root, bar, textarea } = fakeToolbarDom();
+  const before = globalThis.document;
+  globalThis.document = { activeElement: textarea };
+  try { wireMarkdownToolbar(root, textarea); } finally { globalThis.document = before; }
+  assert.equal(bar.hidden, false);
+});
+
+test('R16: Pfeiltasten wandern durch die Leiste, der Tab-Stopp wandert mit', () => {
+  const { root, bar, textarea, buttons } = fakeToolbarDom();
+  wireMarkdownToolbar(root, textarea);
+  const key = (k, target) => {
+    const evt = { key: k, target, prevented: false, preventDefault() { this.prevented = true; } };
+    bar.fire('keydown', evt);
+    return evt;
+  };
+  assert.equal(key('ArrowRight', buttons[0]).prevented, true);
+  assert.equal(buttons[1].focused, true);
+  assert.deepEqual(buttons.map((b) => b.tabIndex), [-1, 0, -1]);
+  key('End', buttons[1]);
+  assert.equal(buttons[2].focused, true);
+  key('ArrowRight', buttons[2]);
+  assert.equal(buttons[0].focused, true, 'am Ende laeuft die Auswahl um');
+  key('ArrowLeft', buttons[0]);
+  assert.equal(buttons[2].focused, true);
+  key('Home', buttons[2]);
+  assert.deepEqual(buttons.map((b) => b.tabIndex), [0, -1, -1]);
+  assert.equal(key('a', buttons[0]).prevented, false, 'fremde Tasten bleiben unangetastet');
+});
+
+test('R16: die Leiste laeuft einzeilig und scrollt, statt umzubrechen', async () => {
+  const css = (await read('public/styles/markdown-toolbar.css')).replace(/\/\*[\s\S]*?\*\//g, '');
+  const rule = css.match(/\.md-toolbar\s*\{([^}]*)\}/)?.[1] ?? '';
+  assert.match(rule, /flex-wrap:\s*nowrap/);
+  assert.match(rule, /overflow-x:\s*auto/);
+  assert.doesNotMatch(css, /flex-wrap:\s*wrap/, 'kein Umbruch: dreireihig waren es 162px vor dem Textfeld');
+  // `display` an einem per `hidden` geschalteten Element schluege das UA-[hidden].
+  assert.match(css, /\.md-toolbar\[hidden\]\s*\{\s*display:\s*none/, 'verborgen heisst verborgen, trotz display: flex');
 });

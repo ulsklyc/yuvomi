@@ -6,9 +6,19 @@
  * gehoert; Verhalten und Beschriftungen in /utils/markdown-toolbar.js.
  */
 
+/* EINE ZEILE, DIE SCROLLT (Critique 2026-10-05, R16). Die Leiste brach um:
+ * zwoelf 48px-Knoepfe in 332px waren drei Reihen und 162px vor dem Textfeld,
+ * dem sie dient. Sie laeuft jetzt einzeilig; was nicht passt, liegt hinter dem
+ * Rand-Fade (`wireScrollFade`, filter-chip.css `.has-fade-end`) und kommt per
+ * Wisch oder Pfeiltaste. Sichtbar wird sie erst mit dem Fokus im Feld
+ * (utils/markdown-toolbar.js) - deshalb die [hidden]-Regel darunter: eine
+ * Autorenregel mit `display` schluege sonst das UA-`[hidden]`. */
 .md-toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
   gap: var(--space-1);
   padding: var(--space-1) var(--space-2);
   border: 1.5px solid var(--color-border);
@@ -17,8 +27,17 @@
   background-color: var(--color-surface-2);
 }
 
-.md-toolbar + .form-input,
-.md-toolbar + .input {
+.md-toolbar[hidden] {
+  display: none;
+}
+
+.md-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Das Feld behaelt seine oberen Ecken, solange die Leiste nicht darueber steht. */
+.md-toolbar:not([hidden]) + .form-input,
+.md-toolbar:not([hidden]) + .input {
   border-top-left-radius: 0;
   border-top-right-radius: 0;
 }
@@ -27,8 +46,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* Nicht schrumpfen: bei 12 Buttons in einem ~340px-Modal bricht die Leiste
-   * jetzt um (flex-wrap), statt die Buttons unter die Fingergröße zu quetschen. */
+  /* Nicht schrumpfen: bei 12 Buttons in einem ~340px-Modal scrollt die Leiste,
+   * statt die Buttons unter die Fingergröße zu quetschen. */
   flex: 0 0 auto;
   width: 32px;
   height: 32px;
@@ -56,6 +75,7 @@
 }
 
 .md-toolbar__sep {
+  flex: 0 0 auto;
   width: 1px;
   background-color: var(--color-border);
   margin: var(--space-1) var(--space-1);
