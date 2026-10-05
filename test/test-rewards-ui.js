@@ -58,3 +58,21 @@ test('das Anfrage-Panel der Belohnungen behaelt sein Innenpolster', () => {
     assert.doesNotMatch(horizontal, /^0(px)?$/, 'das Panel braucht seitliches Polster, sonst klebt der Avatar an der Kante');
   }
 });
+
+/* R16 (Critique 2026-10-05, P1 mobil): die Praemie stand als gestapelte Kachel
+ * 358x218 (zweieinhalb je Bildschirm), darueber „Praemien" unter dem Reiter
+ * „Praemien", und die Uebersicht endete mobil mit sechs Buchungen unter den
+ * Punktestaenden. Mobil: kompakte Karte (rund 130px), Titel nur im Baum, drei
+ * Buchungen. */
+test('R16: Praemien mobil - kompakte Karte, kein doppelter Titel, drei letzte Buchungen', () => {
+  const phone = [...eachRule(read('public/styles/rewards.css'))]
+    .filter((r) => r.at.some((a) => /max-width:\s*639px/.test(a)))
+    .map((r) => ({ ...r, selector: r.selector.trim() }));
+  const body = (sel) => phone.filter((r) => r.selector === sel).map((r) => r.body).join(';');
+  assert.match(body('.rw-reward-card'), /display:\s*grid/);
+  assert.match(body('.rw-reward-card'), /grid-template-columns:\s*auto minmax\(0, 1fr\)/, 'Zeichen und Text stehen nebeneinander');
+  assert.match(body('.rw-reward-card__foot'), /grid-column:\s*1 \/ -1/, 'Preis und Aktion ueber die ganze Breite');
+  assert.match(body('.rw-section--wide > .rw-section__head'), /clip-path:\s*inset\(50%\)/);
+  assert.doesNotMatch(body('.rw-section--wide > .rw-section__head'), /display:\s*none/, 'die Ueberschrift bleibt in der Gliederung');
+  assert.match(body('.rw-recent .rw-ledger > :nth-child(n + 4)'), /display:\s*none/);
+});

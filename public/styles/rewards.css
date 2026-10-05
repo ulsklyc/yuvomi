@@ -624,7 +624,41 @@
 
 @media (max-width: 639px) {
   .rewards-content__inner { gap: var(--space-6); padding-top: var(--space-4); }
-  .rw-reward-grid { grid-template-columns: 1fr; }
+  .rw-reward-grid { grid-template-columns: 1fr; gap: var(--space-2); }
+  /* DIE PRAEMIE IST MOBIL EINE KOMPAKTE KARTE (R16, Critique 2026-10-05 P1).
+   * Als gestapelte Kachel mass sie 358x218 - zweieinhalb je Bildschirm, mit
+   * dem Zeichen allein auf einer eigenen Zeile. Jetzt stehen Zeichen und Text
+   * nebeneinander, Preis und Aktion darunter ueber die ganze Breite: rund
+   * 130px, fuenf je Bildschirm. Ab 640px bleibt die Kachel. */
+  .rw-reward-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--space-3);
+    row-gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+  }
+  .rw-reward-card__foot {
+    grid-column: 1 / -1;
+    margin-top: 0;
+    padding-top: 0;
+  }
+  /* „Praemien" unter dem Reiter „Praemien": 42px ohne Auskunft. Die
+   * Ueberschrift bleibt im Baum (Gliederung), sie steht nur nicht da. */
+  .rw-section--wide > .rw-section__head {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  /* Die Uebersicht endet seit R16 mit den letzten Buchungen (am Desktop die
+   * Seitenspalte, sechs Zeilen). Mobil stehen sie UNTER den Punktestaenden:
+   * drei reichen als Blick, der Titel fuehrt in den Reiter Verlauf. */
+  .rw-recent .rw-ledger > :nth-child(n + 4) {
+    display: none;
+  }
   /* Schmaler Viewport ⇒ mit hoher Wahrscheinlichkeit Touch: 44-pt-Ziele. */
   .rw-setup-step__go { min-height: var(--target-base); }
   /* EINE ZEILE JE PERSON (Re-Critique 2026-09-28, P5 / A3 P2-5). Hier fiel

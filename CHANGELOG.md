@@ -60,6 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and four tiles stood in front of the list, one of them for "0". Now one row names the main
   figure and up to two others, and a tap opens the tiles; a figure that is zero is left out.
   The first category in Inventory starts 106px higher, the first visit in Housekeeping 57px.
+- **Rewards fit about five to a phone screen instead of two and a half.** A reward was a tall
+  tile with its emoji on a line of its own; on a phone it is now a compact card with emoji and
+  text side by side. The heading "Rewards" under the tab "Rewards" no longer takes a row, and
+  the overview ends with the three latest bookings instead of six.
 
 ### Fixed
 
