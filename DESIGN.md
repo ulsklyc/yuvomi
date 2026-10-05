@@ -1440,6 +1440,12 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 | Ueberschrift ueber Inhalt | **Gruppentitel IN einer Liste** = `.list-group__title` (12px Versalien). **Abschnittstitel einer Flaeche** = `h2.u-section-title` (20px semibold) AUF DER BUEHNE, ueber der Karte oder dem Traeger, Werkzeuge rechts daneben; ohne Icon. Wiederholt er den Namen des offenen Reiters, steht er nur in der Gliederung (`.sr-only`) | list-row.css, typography.css | Titel in der Karte, `div` ohne Ueberschriftenrolle, Icon vor dem Titel |
 | Betrag in Zeile oder Karte | semibold, `tabular-nums`; Ton nur mit Aussage (Zuwachs gruen, Schuld rot, **null neutral**). Fett bleibt der Kennzahl (`.metric-card__value`, Title 1) | `--font-weight-semibold`; `test:budget-ui` | 600 / 700 / 900 je Reiter, Gewicht als Literal oder mit `!important`, "0,00 €" in Erfolgsgruen |
 | Zeitraum blaettern | EINE Reihenfolge im Markup (= Tab-Folge): Pfeil zurueck, Wert, Pfeil vor, DAHINTER der Reset ("Heute"/"Aktuell" - ein Reset, kein Schritt). Die Pfeile nennen ihr OBJEKT ("Vorherige Woche", "Naechster Monat"), der Wert haelt eine feste Breite, damit kein Pfeil wandert. Kalender, Wochenplan, Budget, Berichte der Haushaltshilfe und seit R16 der Schichtplan (dort im Koerper: "Schichtplan" + Stepper passen mobil nicht in eine Kopfzeile). Gleiches gilt fuer die Berichte der Haushaltshilfe: "Haushaltshilfe" (ca. 236px) + Stepper (192px) > 358px, der Zeitraum behaelt mobil seine eigene Kopfzeile (170px) | `periodStepperHtml()` + `syncPeriodReset()` (utils/period-stepper.js) in Kalender, Essensplan, Budget, Haushaltshilfe/Berichte und Schichtplan/Vergleich; Module behalten ids und Klassen, die Shell haengt an `period-stepper__*`. Der Reset zeigt sich nur neben dem laufenden Zeitraum (`.is-current` + `inert`, Fokus vorher zum Zurueck-Pfeil). **Mobil in der Titelzeile (`--period-inline`, Budget) liegt der Reset durchsichtig UEBER dem Wert:** Tipp aufs Monatslabel springt zurueck, der Wert steht im Modulton, solange man daneben steht; Name und Tab-Stopp bleiben | `< Heute > Wert`, Pfeile namens "Zurueck"/"Weiter", Reihenfolge per CSS-`order` |
+| Kennzahl einer Flaeche | EINE Karte, EIN Wert-Grad: am Desktop `.metric-grid` mit Title 1 (28px) - auch in einer Seitenspalte, die EINE Karte je Zeile stapelt (die Spalte sagt es der Zeile mit `--summary-cards: 1` + `--metric-value-size`); mobil die Kurzzeile, bei einer einzigen Zahl ohne Aufklapper (`metricGlanceHtml()` ohne `controls`) | `.metric-grid`, `.metric-grid--rail`, `.budget-glance*` (panel.css), utils/metric-glance.js | 20px in der Seitenleiste neben 28px in der Zeile, Zweier-Reihe mit 144px-Karten, Karte statt Kurzzeile unter 640px |
+| Reiter-Skelett im Budget (R16) | Kennzahlen (s. o.), dann je Abschnitt `.u-section-title` AUF DER BUEHNE mit den Werkzeugen rechts (`.section-toolbar`), darunter der Zeilentraeger (`.row-carrier`). Karten nur, wo ein OBJEKT eine Karte ist (Darlehen, Gruppe, Konto). Statistik: Verlauf und Anteilsring teilen Zeile 1, die Balken nehmen darunter die Bahn; mobil steht der Ring als Kopf der Kategorieliste | budget.js, subscriptions.js, split-expenses.js, budget-stats.js | Titel in der Karte (`.subscriptions-list-section`, `.split-card`), Kartentitel 17px als Abschnittstitel, Ring in einer Leiste, die unter ihm leer bleibt |
+| Pflichtfeld | der Stern ist EIN Element hinter dem Label: `${REQUIRED_MARK}` (`.required-marker`, aus dem Baum genommen); die Pflicht sagt das Feld (`required`) | utils/html.js | " *" im Locale-Text, handgebauter Span je Seite |
+| Vor der Anmeldung | EIN Kopf mit Marke (`authHeroHtml()`; ueber einer Karte mit eigener h1 als Absatz, `heading: false`), EIN Auge an JEDEM Passwortfeld (`wirePasswordToggle()`), EIN Fehlerfeld (`authErrorHtml()`: `role="alert"` + `tabindex="-1"`, kein `aria-live` daneben) | utils/auth-ui.js; `test:auth-pages-ui` | Marke nur auf der Anmeldung, Auge nur auf zwei von vier Seiten, drei Fehlerfeld-Fassungen |
+| Ueberschriften im Einstellungsblatt | EINE Stufenleiter, die Groesse folgt der Tiefe: Blatt 22/700, Reichweite ("Fuer mich"/"Fuer den Haushalt") 20/600, Abschnitt 17/600, Karte 16/500; ohne Reichweite eine Stufe kuerzer (22/20/17). Die Ebene im Baum zieht `levelScopedHeadings()` per `aria-level` nach | typography.css, settings/shell.js | Reichweite als kleinste Stufe (16px sekundaer), "Termine" zweimal auf der Ebene der Reichweite |
+| Antippbarer Wert in einem Leseblatt | Wert in Textfarbe, das Zeichen der Zeile im Modulton, Unterstreichung unter dem Zeiger | `.contact-detail__link`, `.detail-row:has(...) > .detail-row__icon` (contacts.css) | Link im Modul-Rot neben "Loeschen" in Warnrot |
 | Icon stylen | auf `svg` (oder eine Klasse) zielen - Lucide ersetzt `<i data-lucide>` durch `<svg>` | - | Regeln auf `... i`: sie trafen nie (38 entfernt) |
 
 **Die Zeilenregel in der Kueche (R16, Critique 2026-10-05).** In Abhak-Listen des Einkaufs
@@ -2319,14 +2325,17 @@ Gemessen 390px: Budget 162 -> 117px auf JEDEM Reiter (die Notiz der Reiter ohne 
 am selben Zeilenende, hoechstens zweizeilig), erste Buchung y 342 -> 297. Drei Dinge machen den
 Platz: das Monatslabel zeigt mobil die Kurzform („Okt. 2026", `data-short`) in fester Breite
 (96px - die Pfeile stehen beim Blaettern still); der Ruecksprung „Aktuell" reserviert keinen
-Platz mehr, sondern erscheint per `order` LINKS vom Stepper, der am Zeilenende verankert ist
-(kein Pfeil bewegt sich, #1200 gilt weiter); und solange er steht, verlaesst der Titel das Bild
-(nicht den Baum) - Siegel, Tab-Leiste und Navigation sagen weiter, wo man ist. Eingeklappt bleibt
+Platz und nimmt ihn auch nicht vom Titel: er liegt durchsichtig UEBER dem Monatslabel, zwischen
+den Pfeilen (R16 Schritt 2b - zuerst stand er per `order` links vom Stepper, und der Titel
+verliess solange das Bild). Ein Tipp aufs Label springt zum laufenden Monat, der Knopf behaelt
+Namen und Platz in der Tab-Folge, und das Label steht im Modulton, solange ein anderer Monat
+offen ist (kein Pfeil bewegt sich, #1200 gilt weiter). Eingeklappt bleibt
 der Titel stehen und faellt nur auf den Inline-Schnitt: er teilt die Zeile, sein Verschwinden
 sparte keine Hoehe. Der Kopf aendert seine Hoehe damit in keinem Zustand.
-Die Haushaltshilfe-Berichte (170px) stehen noch in der alten Dreizeilen-Form - dort ist der
-Zeitraum Sache EINES Reiters; der Umzug gehoert zur Baustein-Vereinheitlichung des
-Zeitraum-Kopfs. Ein drittes Element (Werkzeugzeile, Chipreihe) wandert weiter ins Menue oder
+Die Haushaltshilfe-Berichte (170px) bleiben in der Dreizeilen-Form, gemessen und begruendet
+(R16 Schritt 2b): „Haushaltshilfe" braucht im Large Title rund 236px, der Stepper 192px - in
+358px passt beides nicht, und ein auf „Haush…" gekuerzter Titel waere der teurere Tausch. Der
+Stepper selbst ist der geteilte Baustein (utils/period-stepper.js). Ein drittes Element (Werkzeugzeile, Chipreihe) wandert weiter ins Menue oder
 in den Port. `test:budget-ui` haelt Klasse, nachgebende Titelbasis und den Center-Slot ohne
 eigene Zeile.
 

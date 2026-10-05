@@ -20,6 +20,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   semibold in Tasks, 16px regular in Budget entries and subscriptions, 16px medium in most
   modules, 17px semibold in the agenda, contacts and birthdays. It is 16px medium everywhere
   now; card titles keep their heading size.
+- **Budget: the seven tabs share one skeleton.** Figures use one size everywhere (28px; the
+  side columns of the overview and the loans tab showed the same card at 20px), and on a phone
+  every tab with figures shows them as one row, accounts included. On subscriptions and split
+  expenses the section titles now stand above their lists, with search and tools to the right,
+  as on the overview; the lists themselves are plain row lists instead of rows inside a padded
+  card.
+- **Budget statistics: the share ring sits with the categories it explains.** On a phone it
+  stood 874px below the category bars next to an empty area; on a desktop it sat in a side
+  column that was empty beneath it. It now shares the first row with the trend chart, the bars
+  use the full width below, and a line next to the ring names the number of segments, the
+  largest one and the total. The marker line no longer stands at the last data point before you
+  touch the chart.
+- **One period stepper in calendar, meal plan, budget, housekeeping reports and shift plan.**
+  The five modules now share the same control. The shift plan's "Today" disappears while today
+  is on screen, like everywhere else. In the budget on a phone, the title no longer vanishes
+  while another month is open: tap the month to jump back to the current one - it is shown in
+  the module colour as long as you are somewhere else.
+- **Pantry: swipe a row to delete, and "Manage locations" is a button.** A swipe to the end of
+  a pantry row deletes it, with "Undo"; the stepper and the cart button are excluded from the
+  gesture. The header's "..." menu had a single entry and is now that action itself.
+- **Housekeeping: section titles stand above their cards**, as in the other modules.
+- **Headers have one height on a desktop.** Single-row headers measured 65 or 69px depending on
+  the module, and the "New" button moved by 2px when switching; all are 69px now.
+- **Settings: headings follow one scale.** On a sheet with "For me" and "For the household",
+  that scope title was the smallest heading on the page. It now ranks above the sections it
+  groups (sheet 22px, scope 20, section 17, card 16), also for screen readers.
+- **Sign-in, setup, invitation and password reset look like one family.** All of them show the
+  app mark and name, every password field has the eye to show what you typed (new on the
+  invitation and reset pages and on the repeat field of setup), and errors are announced the
+  same way on each page.
+- **Contacts: phone numbers, mail addresses and map links are no longer pink.** They stood in
+  the contacts colour right above a red "Delete"; the value is plain text now and the icon of
+  its row carries the colour.
 - **The shift plan steps through weeks like every other period.** The compare view read
   "back, Today, forward, week"; it now reads back, week, forward and then "Today", as in the
   calendar and the budget, and the arrows say what they move ("Previous week").
@@ -61,8 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   three rows (162px), and on the four tabs without a month the middle row only carried a
   caption. The month now sits at the end of the title row with a short label ("Oct 2026"), the
   caption of the other tabs stands in the same place, and the header is 117px on every tab, so
-  nothing moves when you switch. "Current" appears to the left of the arrows while you look at
-  another month; the arrows stay where they are.
+  nothing moves when you switch. While you look at another month, a tap on the month label
+  returns to the current one; the arrows stay where they are.
 - **Contacts, Birthdays, Waste, Notes, Documents and Settings lose their second header row on a
   phone.** That row only carried one or two icons (search, "more"). They now sit at the end of
   the title row, and the list starts about 50px higher; an open search takes the row. In Waste,
@@ -89,6 +122,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Required fields: the star is no longer part of the label text.** In thirteen labels the
+  " *" was written into the translated text, so screen readers read it out, it lacked the
+  warning colour of the other stars, and a loan's read-only view showed "Total amount *".
+- **Charts: the lowest axis value no longer runs into the first date** on a phone ("0 EUR" stood
+  3px next to "01.10.2026" in the budget trend; the health charts share the fix).
 - **A module switched off for the household no longer works in the background** (#1660). With
   Health switched off, the medication scheduler kept creating the due doses and sending their
   reminders - as a push and on notification channels, to the person and to their caregivers - and
