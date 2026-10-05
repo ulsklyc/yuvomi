@@ -24,6 +24,7 @@
         "filtersActive": "{{count}} filter aktif",
         "filtersActive_one": "1 filter aktif",
         "filtersReset": "Hapus semua filter",
+        "filtersResetDefault": "Atur ulang filter",
         "close": "Tutup",
         "create": "Buat",
         "add": "Tambah",

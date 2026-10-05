@@ -24,6 +24,7 @@
         "filtersActive": "フィルター {{count}} 件が有効",
         "filtersActive_one": "フィルター 1 件が有効",
         "filtersReset": "すべてのフィルターを解除",
+        "filtersResetDefault": "フィルターをリセット",
         "close": "閉じる",
         "create": "作成",
         "add": "追加",

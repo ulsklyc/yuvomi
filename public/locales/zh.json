@@ -24,6 +24,7 @@
         "filtersActive": "{{count}} 个筛选条件生效",
         "filtersActive_one": "1 个筛选条件生效",
         "filtersReset": "清除所有筛选",
+        "filtersResetDefault": "重置筛选",
         "close": "关闭",
         "create": "创建",
         "add": "添加",

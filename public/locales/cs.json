@@ -25,6 +25,7 @@
         "filtersActive_one": "1 aktivní filtr",
         "filtersActive_few": "{{count}} aktivní filtry",
         "filtersReset": "Zrušit všechny filtry",
+        "filtersResetDefault": "Zrušit filtry",
         "close": "Zavřít",
         "create": "Vytvořit",
         "add": "Přidat",

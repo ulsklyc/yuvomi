@@ -24,6 +24,7 @@
         "filtersActive": "{{count}} aktibong filter",
         "filtersActive_one": "{{count}} aktibong filter",
         "filtersReset": "Alisin ang lahat ng filter",
+        "filtersResetDefault": "I-reset ang mga filter",
         "close": "Isara",
         "create": "Gumawa",
         "add": "Idagdag",

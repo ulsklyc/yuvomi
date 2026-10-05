@@ -24,6 +24,7 @@
         "filtersActive": "{{count}} filter aktiva",
         "filtersActive_one": "1 filter aktivt",
         "filtersReset": "Rensa alla filter",
+        "filtersResetDefault": "Återställ filter",
         "close": "Stäng",
         "create": "Skapa",
         "add": "Lägg till",

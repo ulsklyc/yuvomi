@@ -24,6 +24,7 @@
         "filtersActive": "{{count}} filtros ativos",
         "filtersActive_one": "{{count}} filtro ativo",
         "filtersReset": "Limpar todos os filtros",
+        "filtersResetDefault": "Repor filtros",
         "close": "Fechar",
         "create": "Criar",
         "add": "Adicionar",

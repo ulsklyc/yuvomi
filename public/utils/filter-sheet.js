@@ -138,13 +138,32 @@ export function syncFilterButton(button, count, labels = defaultFilterLabels()) 
 export function openFilterSheet({
   title = t('common.filters'), groups = [], resetLabel = t('common.filtersReset'), onChange, onReset,
 }) {
+  // ZWEI ANGABEN JE GRUPPE (Critique 2026-10-05, R16):
+  // - `fold: 'closed' | 'open'` macht die Gruppe zum Aufklapper (<details>),
+  //   fuer lange, seltene Achsen. Der Aufrufer oeffnet sie, sobald darin etwas
+  //   gewaehlt ist - eine wirkende Wahl steht nie hinter einem Aufklapper.
+  // - `variant: 'view'` setzt die Gruppe ab: Ansichtsoptionen (Gruppierung,
+  //   „Geplante anzeigen") engen nichts ein und stehen hinter den Filtern.
   const body = groups
     .filter((g) => g && g.html)
-    .map((g) => `
-      <section class="filter-sheet__group">
+    .map((g) => {
+      const cls = `filter-sheet__group${g.variant ? ` filter-sheet__group--${esc(g.variant)}` : ''}`;
+      if (g.fold) {
+        return `
+      <details class="${cls} filter-sheet__fold"${g.fold === 'open' ? ' open' : ''}>
+        <summary class="filter-sheet__summary">
+          <h3 class="filter-sheet__heading">${esc(g.heading)}</h3>
+          <i data-lucide="chevron-down" class="icon-md filter-sheet__chevron" aria-hidden="true"></i>
+        </summary>
+        ${g.html}
+      </details>`;
+      }
+      return `
+      <section class="${cls}">
         <h3 class="filter-sheet__heading">${esc(g.heading)}</h3>
         ${g.html}
-      </section>`)
+      </section>`;
+    })
     .join('');
   const footer = resetLabel ? `
     <div class="modal-panel__footer">

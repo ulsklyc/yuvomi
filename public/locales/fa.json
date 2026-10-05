@@ -24,6 +24,7 @@
         "filtersActive": "{{count}} فیلتر فعال",
         "filtersActive_one": "{{count}} فیلتر فعال",
         "filtersReset": "برداشتن همه فیلترها",
+        "filtersResetDefault": "بازنشانی فیلترها",
         "close": "بستن",
         "create": "ایجاد",
         "add": "افزودن",

@@ -4521,6 +4521,52 @@ a.popover-menu__item {
   margin: 0 0 var(--space-2);
 }
 
+/* Eingeklappte Achse (R16): lange, seltene Gruppen - Kategorie, Tag - stehen
+ * als Aufklapper da, bis darin etwas gewaehlt ist. Die Zeile ist das Ziel
+ * (--target-base), die Ueberschrift behaelt ihre Rolle und ihr Aussehen. */
+.filter-sheet__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--target-base);
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--radius-sm);
+}
+
+.filter-sheet__summary::-webkit-details-marker {
+  display: none;
+}
+
+.filter-sheet__summary .filter-sheet__heading {
+  margin: 0;
+}
+
+.filter-sheet__chevron {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+}
+
+.filter-sheet__fold[open] > .filter-sheet__summary .filter-sheet__chevron {
+  transform: rotate(180deg);
+}
+
+.filter-sheet__fold[open] > .filter-sheet__summary {
+  margin-bottom: var(--space-1);
+}
+
+/* Ansichtsoptionen, abgesetzt: sie filtern nicht, sie ordnen und weiten. Eine
+ * Haarlinie und mehr Luft trennen sie von den Achsen darueber. */
+.filter-sheet__group--view {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.filter-sheet__group--view > * + * {
+  margin-top: var(--space-3);
+}
+
 /* DIE CHIPREIHE IM SCROLLPORT.
  *
  * Sie ist das ERSTE Kind des `.page-scrollport` (oder, wo die Seite selbst

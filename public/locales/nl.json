@@ -24,6 +24,7 @@
         "filtersActive": "{{count}} filters actief",
         "filtersActive_one": "1 filter actief",
         "filtersReset": "Alle filters wissen",
+        "filtersResetDefault": "Filters wissen",
         "close": "Sluiten",
         "create": "Aanmaken",
         "add": "Toevoegen",

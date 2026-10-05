@@ -24,6 +24,7 @@
         "filtersActive": "{{count}} bộ lọc đang bật",
         "filtersActive_one": "1 bộ lọc đang bật",
         "filtersReset": "Xóa tất cả bộ lọc",
+        "filtersResetDefault": "Đặt lại bộ lọc",
         "close": "Đóng",
         "create": "Tạo",
         "add": "Thêm",

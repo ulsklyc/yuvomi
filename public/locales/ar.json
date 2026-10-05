@@ -27,6 +27,7 @@
         "filtersActive_two": "عاملا تصفية نشطان",
         "filtersActive_many": "{{count}} عامل تصفية نشطًا",
         "filtersReset": "إزالة كل عوامل التصفية",
+        "filtersResetDefault": "إعادة ضبط عوامل التصفية",
         "close": "إغلاق",
         "create": "إنشاء",
         "add": "إضافة",

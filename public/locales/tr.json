@@ -24,6 +24,7 @@
         "filtersActive": "{{count}} filtre etkin",
         "filtersActive_one": "1 filtre etkin",
         "filtersReset": "Tüm filtreleri kaldır",
+        "filtersResetDefault": "Filtreleri sıfırla",
         "close": "Kapat",
         "create": "Oluştur",
         "add": "Ekle",

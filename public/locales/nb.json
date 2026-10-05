@@ -24,6 +24,7 @@
         "filtersActive": "{{count}} aktive filtre",
         "filtersActive_one": "1 aktivt filter",
         "filtersReset": "Tøm alle filtre",
+        "filtersResetDefault": "Nullstill filtre",
         "close": "Lukk",
         "create": "Opprett",
         "add": "Legg til",

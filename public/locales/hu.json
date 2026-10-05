@@ -24,6 +24,7 @@
         "filtersActive": "{{count}} aktív szűrő",
         "filtersActive_one": "1 aktív szűrő",
         "filtersReset": "Összes szűrő törlése",
+        "filtersResetDefault": "Szűrők törlése",
         "close": "Bezárás",
         "create": "Létrehozás",
         "add": "Hozzáad",

@@ -24,6 +24,7 @@
         "filtersActive": "{{count}} ενεργά φίλτρα",
         "filtersActive_one": "1 ενεργό φίλτρο",
         "filtersReset": "Κατάργηση όλων των φίλτρων",
+        "filtersResetDefault": "Επαναφορά φίλτρων",
         "close": "Κλείσιμο",
         "create": "Δημιουργία",
         "add": "Προσθήκη",

@@ -24,6 +24,7 @@
         "filtersActive": "{{count}} फ़िल्टर सक्रिय",
         "filtersActive_one": "{{count}} फ़िल्टर सक्रिय",
         "filtersReset": "सभी फ़िल्टर हटाएँ",
+        "filtersResetDefault": "फ़िल्टर रीसेट करें",
         "close": "बंद करें",
         "create": "बनाएं",
         "add": "जोड़ें",

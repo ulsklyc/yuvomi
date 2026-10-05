@@ -286,49 +286,85 @@ function baseState(overrides = {}) {
   });
 }
 
-test('Filter (n): die Zahl nennt jeden wirkenden Filter, im Kanban ohne den Status', () => {
+test('Filter (n): die Zahl nennt nur ABWEICHUNGEN vom Standard (R16)', () => {
+  // „Filter 1" brannte im Ruhezustand: der Startwert „Offen" zaehlte mit, der
+  // Knopf trug also immer eine Zahl und die Aktiv-Farbe - und sagte damit
+  // nichts mehr (Critique 2026-10-05, R16).
   baseState();
-  assert.equal(tasks.activeFilterCount(), 1, 'der Standardfilter „Offen" ist ein Filter - vorher stand er als Chip da');
+  assert.equal(tasks.activeFilterCount(), 0, 'der Standard ist kein Filter');
   tasks.state.filters.priority = ['high', 'urgent'];
   tasks.state.filters.tags = ['garten'];
-  assert.equal(tasks.activeFilterCount(), 4, 'jeder Wert jeder Achse zaehlt (#671)');
+  assert.equal(tasks.activeFilterCount(), 3, 'jeder Wert jeder Achse zaehlt (#671)');
   tasks.state.showFuture = true;
-  assert.equal(tasks.activeFilterCount(), 5,
+  assert.equal(tasks.activeFilterCount(), 4,
     '„Geplante anzeigen" hatte einen eigenen Chip - ohne ihn traegt allein die Zahl, dass er an ist');
   tasks.state.viewMode = 'kanban';
   assert.equal(tasks.activeFilterCount(), 4,
     'im Brett wirkt der Status nicht (die Spalten SIND er) - mitgezaehlt behauptete die Zahl einen unsichtbaren Filter');
 });
 
-test('das Blatt bietet an, was vorher in der Chipzeile stand - je nach Ansicht', () => {
+test('Filter (n): ein Status abseits von „Offen" ist eine Abweichung - auch der leere (R16)', () => {
   baseState();
-  const headingsOf = () => tasks.filterSheetGroups().map((g) => g.heading);
-  const htmlOf = (heading) => tasks.filterSheetGroups().find((g) => g.heading === heading)?.html ?? '';
+  tasks.state.filters.status = [];
+  assert.equal(tasks.activeFilterCount(), 1, '„alle Status" zeigt mehr als der Standard und ist damit ein Filterzustand');
+  tasks.state.filters.status = ['done'];
+  assert.equal(tasks.activeFilterCount(), 1);
+  tasks.state.filters.status = ['open', 'in_progress'];
+  assert.equal(tasks.activeFilterCount(), 2, 'jeder gewaehlte Wert zaehlt');
+  // „Bis heute faellig" weitet den Status selbst: das ist EIN Filter, nicht drei.
+  baseState();
+  tasks.setDueToday(true);
+  assert.deepEqual(tasks.state.filters.status, ['open', 'in_progress']);
+  assert.equal(tasks.activeFilterCount(), 1);
+  tasks.setDueToday(false);
+  assert.equal(tasks.activeFilterCount(), 0);
+});
+
+test('das Blatt: Filter zuerst, Kategorie und Tag eingeklappt, „Ansicht" abgesetzt am Ende (R16)', () => {
+  baseState();
+  const groups = () => tasks.filterSheetGroups();
+  const headingsOf = () => groups().map((g) => g.heading);
+  const groupOf = (heading) => groups().find((g) => g.heading === heading) ?? {};
+  const htmlOf = (heading) => groupOf(heading).html ?? '';
 
   assert.deepEqual(headingsOf(), [
-    'tasks.filterGroupShow', 'tasks.groupToggleLabel', 'tasks.filterGroupStatus', 'tasks.filterGroupPriority',
-    'tasks.filterGroupPerson', 'tasks.categoryLabel', 'tasks.filterGroupTag',
+    'tasks.filterGroupShow', 'tasks.filterGroupStatus', 'tasks.filterGroupPriority',
+    'tasks.filterGroupPerson', 'tasks.categoryLabel', 'tasks.filterGroupTag', 'tasks.viewToggleLabel',
   ]);
   const show = htmlOf('tasks.filterGroupShow');
   assert.match(show, /type="checkbox"[^>]*data-filter-mine/, '„Mir zugewiesen" ist ein Schalter im Blatt');
-  assert.match(show, /type="checkbox"[^>]*data-filter-future/, '„Geplante anzeigen" ist ein Schalter im Blatt');
-  const group = htmlOf('tasks.groupToggleLabel');
-  assert.match(group, /role="radiogroup"/, 'die Gruppierung ist EINE Wahl aus zwei, kein Paar von Schaltern');
-  assert.match(group, /data-tab-id="category"[^>]*aria-checked="true"|aria-checked="true"[^>]*data-tab-id="category"/);
+  assert.doesNotMatch(show, /data-filter-future/, '„Geplante anzeigen" ist eine Ansichtsoption, kein Filter der ersten Gruppe');
+
+  // „Ansicht": Gruppierung und „Geplante anzeigen", abgesetzt.
+  const view = groupOf('tasks.viewToggleLabel');
+  assert.equal(view.variant, 'view');
+  assert.match(view.html, /role="radiogroup"/, 'die Gruppierung ist EINE Wahl aus zwei, kein Paar von Schaltern');
+  assert.match(view.html, /data-tab-id="category"[^>]*aria-checked="true"|aria-checked="true"[^>]*data-tab-id="category"/);
+  assert.match(view.html, /type="checkbox"[^>]*data-filter-future/);
   assert.match(htmlOf('tasks.filterGroupStatus'), /data-filter="status" data-value="open" aria-pressed="true"/,
     'der gewaehlte Status traegt seinen Zustand als aria-pressed');
 
-  // Das Brett: kein Status (die Spalten sind er), keine Gruppierung.
+  // Kategorie und Tag: eingeklappt, solange nichts gewaehlt ist - offen, sobald etwas wirkt.
+  assert.deepEqual([groupOf('tasks.categoryLabel').fold, groupOf('tasks.filterGroupTag').fold], ['closed', 'closed']);
+  assert.equal(groupOf('tasks.filterGroupStatus').fold, undefined, 'die haeufigen Achsen bleiben offen');
+  tasks.state.filters.category = ['haushalt'];
+  tasks.state.filters.tags = ['garten'];
+  assert.deepEqual([groupOf('tasks.categoryLabel').fold, groupOf('tasks.filterGroupTag').fold], ['open', 'open'],
+    'eine gesetzte Wahl ist nie hinter einem Aufklapper versteckt');
+
+  // Das Brett: kein Status (die Spalten sind er), keine Gruppierung - „Geplante" bleibt.
+  baseState();
   tasks.state.viewMode = 'kanban';
   assert.ok(!headingsOf().includes('tasks.filterGroupStatus'));
-  assert.ok(!headingsOf().includes('tasks.groupToggleLabel'));
+  assert.doesNotMatch(htmlOf('tasks.viewToggleLabel'), /radiogroup/);
+  assert.match(htmlOf('tasks.viewToggleLabel'), /data-filter-future/);
 
   // Allein im Haushalt: keine Personenachse und kein „Mir zugewiesen".
   baseState();
   tasks.state.users = [{ id: 1, display_name: 'U1' }];
   assert.ok(!headingsOf().includes('tasks.filterGroupPerson'));
   assert.doesNotMatch(htmlOf('tasks.filterGroupShow'), /data-filter-mine/);
-  assert.match(htmlOf('tasks.filterGroupShow'), /data-filter-future/, '„Geplante" bleibt - es haengt an niemandem');
+  assert.match(htmlOf('tasks.viewToggleLabel'), /data-filter-future/, '„Geplante" bleibt - es haengt an niemandem');
 });
 
 test('gemerkte Sets stehen zuerst im Blatt, als Aktion ohne Ein/Aus-Zustand', () => {
@@ -417,11 +453,16 @@ test('die Schalter im Blatt: „Mir zugewiesen" ist die eigene ID in der Persone
   assert.equal(store.get('yuvomi:taskShowFuture'), '1', 'pro Geraet gemerkt wie vorher der Chip');
 });
 
-test('„Alle Filter aufheben" laesst keine Zahl am Knopf stehen', async () => {
+test('„Filter zuruecksetzen" stellt den Standard her, keinen dritten Zustand (R16)', async () => {
+  // „Alle Filter aufheben" leerte auch den Status: das zeigte Erledigtes mit,
+  // war also weder der Ruhezustand noch das, was vorher eingestellt war.
   baseState({ showFuture: true });
   tasks.state.filters.priority = ['high'];
+  tasks.state.filters.status = ['done'];
   const { container } = mountSheet();
   await tasks.resetTaskFilters(container);
+  assert.deepEqual(tasks.state.filters, { status: ['open'], priority: [], assigned_to: [], category: [], tags: [] });
+  assert.equal(tasks.state.showFuture, false);
   assert.equal(tasks.activeFilterCount(), 0);
 });
 
@@ -489,7 +530,7 @@ test('„Bis heute faellig" zeigt Offenes von heute UND Ueberfaelliges, sonst ni
   assert.equal(tasks.filteredTasks().length, 5, 'ohne den Filter alles');
   tasks.state.dueToday = true;
   assert.deepEqual(tasks.filteredTasks().map((task) => task.id), [1, 2]);
-  assert.equal(tasks.activeFilterCount(), 2, 'Standard „Offen" plus dieser - die Zahl am Knopf sagt, dass er wirkt');
+  assert.equal(tasks.activeFilterCount(), 1, 'nur dieser zaehlt - der Standard „Offen" ist seit R16 kein Filter mehr');
   tasks.state.searchQuery = 'gest';
   assert.deepEqual(tasks.filteredTasks().map((task) => task.id), [1], 'die Suche engt weiter ein');
   tasks.state.searchQuery = '';

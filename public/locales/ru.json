@@ -26,6 +26,7 @@
         "filtersActive_few": "{{count}} активных фильтра",
         "filtersActive_many": "Активных фильтров: {{count}}",
         "filtersReset": "Снять все фильтры",
+        "filtersResetDefault": "Сбросить фильтры",
         "close": "Закрыть",
         "create": "Создать",
         "add": "Добавить",

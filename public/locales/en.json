@@ -24,6 +24,7 @@
         "filtersActive": "{{count}} filters active",
         "filtersActive_one": "1 filter active",
         "filtersReset": "Clear all filters",
+        "filtersResetDefault": "Reset filters",
         "close": "Close",
         "create": "Create",
         "add": "Add",

@@ -1345,6 +1345,18 @@ ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`
 // Seiten-State
 // --------------------------------------------------------
 
+/**
+ * Der Ruhezustand des Statusfilters: die Liste zeigt, was zu tun ist.
+ *
+ * EINE QUELLE fuer drei Stellen (Critique 2026-10-05, R16): den Startwert des
+ * Zustands, den Zaehler am Filterknopf und das Zuruecksetzen im Blatt. Sie
+ * liefen auseinander - der Startwert war „Offen", der Zaehler zaehlte ihn als
+ * Filter („Filter 1" im Ruhezustand), und „Alle Filter aufheben" fuehrte in
+ * einen dritten Zustand mit leerem Status, der auch Erledigtes zeigt.
+ */
+const DEFAULT_STATUS_FILTER = Object.freeze(['open']);
+const defaultFilters = () => ({ status: [...DEFAULT_STATUS_FILTER], priority: [], assigned_to: [], category: [], tags: [] });
+
 let state = {
   tasks:           [],
   // Das Fehlerobjekt des letzten Ladeversuchs, oder null. Nicht `true`:
@@ -1387,7 +1399,7 @@ let state = {
   // wie jeder andere Filter in dieser Leiste auch (#586).
   // Status, Priorität und Person halten mehrere Werte (#671); innerhalb einer
   // Achse wirken sie ODER, zwischen den Achsen UND. Tags bleiben UND-verknüpft.
-  filters:         { status: ['open'], priority: [], assigned_to: [], category: [], tags: [] },
+  filters:         defaultFilters(),
   groupMode:       'category',   // 'category' | 'due'
   viewMode:        'list',       // 'list' | 'kanban' | 'history' (resolved at render time)
   // Der Verlauf (#791) hat einen eigenen Bestand, weil er etwas anderes zeigt
@@ -3624,13 +3636,36 @@ function renderTaskList(container, { paneQuiet = false } = {}) {
  * eigener Chip, jetzt nur noch diese Zahl.
  */
 function activeFilterCount() {
-  return (state.viewMode === 'kanban' ? 0 : state.filters.status.length)
+  return statusDeviationCount()
     + state.filters.priority.length
     + state.filters.assigned_to.length
     + state.filters.category.length
     + state.filters.tags.length
     + (state.showFuture ? 1 : 0)
     + (state.dueToday ? 1 : 0);
+}
+
+/**
+ * Wie viele Filter der Statusachse zaehlen: nur eine ABWEICHUNG vom Standard.
+ *
+ * - Der Standard „Offen" zaehlt nicht - er ist der Ruhezustand, und ein Knopf,
+ *   der im Ruhezustand „Filter 1" in Aktiv-Farbe traegt, sagt nichts mehr.
+ * - Im Brett wirkt die Achse nicht (die Spalten SIND der Status).
+ * - Die Weitung, die „Bis heute faellig" selbst gesetzt hat, ist Teil DIESES
+ *   Filters und zaehlt nicht doppelt.
+ * - Sonst jeder gewaehlte Wert; der leere Status („alle") ist eine Abweichung
+ *   und zaehlt als einer.
+ */
+function statusDeviationCount() {
+  if (state.viewMode === 'kanban') return 0;
+  const status = state.filters.status;
+  const isDefault = status.length === DEFAULT_STATUS_FILTER.length
+    && DEFAULT_STATUS_FILTER.every((value) => status.includes(value));
+  if (isDefault) return 0;
+  const widenedByDueToday = state.dueToday && state.dueTodayWidened
+    && status.length === 2 && status.includes('open') && status.includes('in_progress');
+  if (widenedByDueToday) return 0;
+  return Math.max(1, status.length);
 }
 
 /**
@@ -3732,27 +3767,9 @@ function filterSheetGroups() {
     showRows.push(toggleRowHtml({ label: t('tasks.assignedToMe'), icon: 'user', checked: isAssignedToMe(),
       attrs: { 'data-filter-mine': 'true' } }));
   }
-  showRows.push(toggleRowHtml({ label: t('tasks.showFuture'), icon: 'calendar-clock', checked: state.showFuture,
-    attrs: { 'data-filter-future': 'true' } }));
   showRows.push(toggleRowHtml({ label: t('tasks.filterDueToday'), icon: 'calendar-check', checked: state.dueToday,
     attrs: { 'data-filter-due-today': 'true' } }));
   groups.push({ heading: t('tasks.filterGroupShow'), html: showRows.join('') });
-
-  if (state.viewMode === 'list') {
-    const modes = [['category', 'tasks.categoryLabel', 'folder'], ['due', 'tasks.dueDateLabel', 'calendar-clock']];
-    groups.push({
-      heading: t('tasks.groupToggleLabel'),
-      html: `
-        <div class="segmented tasks-group-mode" id="group-mode-toggle" role="radiogroup" aria-label="${esc(t('tasks.groupToggleLabel'))}">
-          ${modes.map(([mode, key, icon]) => {
-            const on = state.groupMode === mode;
-            return `<button type="button" class="segmented__item${on ? ' is-active' : ''}" role="radio"
-                    data-tab-id="${mode}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}">
-              <i data-lucide="${icon}" aria-hidden="true"></i>${esc(t(key))}</button>`;
-          }).join('')}
-        </div>`,
-    });
-  }
 
   if (state.viewMode !== 'kanban') {
     groups.push({ heading: t('tasks.filterGroupStatus'),
@@ -3764,15 +3781,43 @@ function filterSheetGroups() {
     groups.push({ heading: t('tasks.filterGroupPerson'),
       html: chipsHtml('assigned_to', t('tasks.filterGroupPerson'), state.users.map((u) => ({ value: String(u.id), label: u.display_name }))) });
   }
+  // KATEGORIE UND TAG SIND EINGEKLAPPT, SOLANGE NICHTS GEWAEHLT IST (Critique
+  // 2026-10-05, R16). Das Blatt mass 35 Bedienelemente und 1084px in 591px;
+  // die beiden langen Achsen - je Haushalt ein Dutzend Chips und mehr - sind
+  // die seltenen. Eine gesetzte Wahl steht offen: was wirkt, ist nie hinter
+  // einem Aufklapper versteckt (dieselbe Regel wie im Aufgaben-Dialog).
   if (state.categories.length) {
     groups.push({ heading: t('tasks.categoryLabel'),
+      fold: state.filters.category.length ? 'open' : 'closed',
       html: chipsHtml('category', t('tasks.categoryLabel'), state.categories.map((c) => ({ value: c.key, label: catLabel(c.key) }))) });
   }
   // Tags nur, wenn welche vergeben sind - sonst stuende eine leere Gruppe da (#586).
   if (state.allTags.length) {
     groups.push({ heading: t('tasks.filterGroupTag'),
+      fold: state.filters.tags.length ? 'open' : 'closed',
       html: chipsHtml('tag', t('tasks.filterGroupTag'), state.allTags.map((entry) => ({ value: entry.tag, label: entry.tag }))) });
   }
+
+  // ANSICHT, ABGESETZT AM ENDE (R16). „Gruppieren nach" und „Geplante anzeigen"
+  // standen zwischen den Filtern, engen aber nichts ein: das eine ordnet die
+  // Liste, das andere weitet sie um das, was noch nicht dran ist. Sie stehen
+  // jetzt als eigener Abschnitt hinter allen Achsen.
+  const viewRows = [];
+  if (state.viewMode === 'list') {
+    const modes = [['category', 'tasks.categoryLabel', 'folder'], ['due', 'tasks.dueDateLabel', 'calendar-clock']];
+    viewRows.push(`
+        <div class="segmented tasks-group-mode" id="group-mode-toggle" role="radiogroup" aria-label="${esc(t('tasks.groupToggleLabel'))}">
+          ${modes.map(([mode, key, icon]) => {
+            const on = state.groupMode === mode;
+            return `<button type="button" class="segmented__item${on ? ' is-active' : ''}" role="radio"
+                    data-tab-id="${mode}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}">
+              <i data-lucide="${icon}" aria-hidden="true"></i>${esc(t(key))}</button>`;
+          }).join('')}
+        </div>`);
+  }
+  viewRows.push(toggleRowHtml({ label: t('tasks.showFuture'), icon: 'calendar-clock', checked: state.showFuture,
+    attrs: { 'data-filter-future': 'true' } }));
+  groups.push({ heading: t('tasks.viewToggleLabel'), variant: 'view', html: viewRows.join('') });
   return groups;
 }
 
@@ -3826,6 +3871,9 @@ function renderFilters(container) {
 function openTaskFilters(container) {
   const panel = openFilterSheet({
     groups: filterSheetGroups(),
+    // Nicht „Alle Filter aufheben": der Knopf stellt den Standard her (Status
+    // „Offen"), und so heisst er auch.
+    resetLabel: t('common.filtersResetDefault'),
     onChange: (input) => onFilterSheetChange(input, container),
     onReset: () => { resetTaskFilters(container); },
   });
@@ -3896,12 +3944,14 @@ async function onFilterSheetClick(e, container) {
 }
 
 /**
- * „Alle Filter aufheben": alle Achsen leer, und auch „Geplante anzeigen" aus -
- * sonst bliebe nach dem Aufheben eine Zahl am Knopf stehen, die das Blatt
- * gerade weggenommen haben will.
+ * „Filter zuruecksetzen": zurueck auf den STANDARD (Status „Offen", sonst
+ * nichts), und auch „Geplante anzeigen" aus - sonst bliebe nach dem
+ * Zuruecksetzen eine Zahl am Knopf stehen, die das Blatt gerade weggenommen
+ * haben will. Bis R16 leerte der Knopf auch den Status: ein dritter Zustand,
+ * der Erledigtes mitzeigt und weder Ruhezustand noch gewaehlt war.
  */
 async function resetTaskFilters(container) {
-  state.filters = { status: [], priority: [], assigned_to: [], category: [], tags: [] };
+  state.filters = defaultFilters();
   state.showFuture = false;
   state.dueToday = false;
   state.dueTodayWidened = false;
@@ -5720,7 +5770,7 @@ export const __test = {
   sortTasks, taskSortNow,
   // `?due=today` (Re-Critique 2026-09-27): was die Adresse setzt, was die
   // Liste daraus zeigt, und dass das Blatt es wieder nimmt - samt Adresse.
-  dueTodayFromSearch, isDueByToday, applyDueTodayFromAddress,
+  dueTodayFromSearch, isDueByToday, applyDueTodayFromAddress, setDueToday,
   // Das Brett als Markup plus seine Spaltenliste (#1250). Beides steht hier,
   // weil die Spaltenzahl eine Zusicherung GEGEN das Stylesheet ist: das Raster
   // muss so viele Spalten legen, wie diese Liste fuehrt, und genau dort ist es
