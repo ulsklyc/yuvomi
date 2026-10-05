@@ -1277,7 +1277,8 @@ Kopf endet an der Bahn statt am Lesemass (Knopf 972 -> 1248 / 1376), und jeder R
 sie: Plan mit Kategorien links und Sparziel in der Seitenleiste, Darlehen mit Filter, Karten
 und Transaktionen links und den drei Kennzahlen rechts (vorher vier Kanten), Konten mit dem
 Nettovermoegen als Zeile ueber dem Raster, Aufteilung mit den Ausgaben in der breiten Spalte,
-Statistik mit angeheftetem Anteilsring neben den Kategoriezeilen (`test:budget-ui`).
+Statistik mit dem Anteilsring in Zeile 1 neben dem Verlauf, die Kategoriezeilen darunter ueber
+die ganze Bahn (`test:budget-ui`).
 
 **Das vierte Mass ist abgeschafft.** 960px (`data`) war ein Zwischenstand, keine Entscheidung:
 es liess 228px leer, ohne dass die Flaeche etwas trug. Zugeordnet am 2026-09-26:
