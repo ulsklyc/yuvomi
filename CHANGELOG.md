@@ -34,9 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   touch the chart.
 - **One period stepper in calendar, meal plan, budget, housekeeping reports and shift plan.**
   The five modules now share the same control. The shift plan's "Today" disappears while today
-  is on screen, like everywhere else. In the budget on a phone, the title no longer vanishes
-  while another month is open: tap the month to jump back to the current one - it is shown in
-  the module colour as long as you are somewhere else.
+  is on screen, like everywhere else. In the budget on a phone, the month is shown in the
+  module colour while you are somewhere else, and a tap on it jumps back to the current one.
 - **Pantry: swipe a row to delete, and "Manage locations" is a button.** A swipe to the end of
   a pantry row deletes it, with "Undo"; the stepper and the cart button are excluded from the
   gesture. The header's "..." menu had a single entry and is now that action itself.
@@ -81,8 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   category budgets with the savings goal beside them, loans show the filter, the loans and their
   transactions in one column with the three figures beside it, and the net worth runs across the
   row above the accounts. In "Split" the recent expenses take the wider column, balances and
-  activity the narrower one; in the statistics the share ring stays in view while you scroll the
-  categories. Phones are unchanged.
+  activity the narrower one. Phones are unchanged.
 - **"Latest vitals" in the Health overview uses the width instead of one long column.** On a
   desktop the nine tiles stood one below the other, 930px tall, next to 640px of empty space.
   The card now runs across the overview with four or five tiles per row, about a third as tall.
@@ -119,7 +117,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tile with its emoji on a line of its own; on a phone it is now a compact card with emoji and
   text side by side. The heading "Rewards" under the tab "Rewards" no longer takes a row, and
   the overview ends with the three latest bookings instead of six.
-
 - **Shopping: checked items keep their way into the pantry.** "To pantry" and "Remove checked"
   lived only in the pill that appears for five seconds after the first tick and then stays
   away until nothing is checked. Both now also stand in the list menu, in a group of their own
@@ -196,7 +193,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shopping: the tick is felt when you tap**, not after the server has answered.
 - **Housekeeping staff: the row's button is as high as the row** (it was 25px) for keyboard and
   assistive technology.
-
 - **Required fields: the star is no longer part of the label text.** In thirteen labels the
   " *" was written into the translated text, so screen readers read it out, it lacked the
   warning colour of the other stars, and a loan's read-only view showed "Total amount *".
