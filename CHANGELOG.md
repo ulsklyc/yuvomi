@@ -187,6 +187,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A failed single sign-on says why in the log.** When the identity provider turned the token
+  request down, the server log showed only "server responded with an error in the response
+  body" and a stack trace - the same line for a wrong client secret, a mismatched redirect URI
+  and an expired code. The entry now carries the provider's `error`, `error_description` and
+  HTTP status, the challenge of a 401 answer, and the network error underneath a failed
+  discovery (certificate, DNS, connection). Secret, authorization code and tokens are not
+  logged (#1675).
 - **Health: "month" and "week" no longer start empty.** The default month was the calendar
   month and the activity week the calendar week, so on the 5th the trend said "too few
   readings" over four measurements from the week before, and on a Monday the week was empty
