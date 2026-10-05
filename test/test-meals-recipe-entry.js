@@ -359,6 +359,67 @@ test('Verschieben: scheitert der Server, kehrt die Karte zurueck UND es gibt ein
   assert.deepEqual(toasts, [['Nicht erlaubt', 'danger']], 'der Fehler wird gemeldet, nicht verschluckt');
 });
 
+// Zweimal ziehen, bevor der Server geantwortet hat (Review #1673). Jeder Zug
+// merkte sich als Ursprung den Platz, an dem die Karte GERADE stand - beim
+// zweiten also das optimistische Ziel des ersten. Scheiterten beide, kehrte
+// die Karte auf einen Tag zurueck, den der Server nie gespeichert hat.
+function gatedPut() {
+  const calls = [];
+  const put = (path, body) => new Promise((resolve, reject) => { calls.push({ path, body, resolve, reject }); });
+  return { calls, put };
+}
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+test('Verschieben: scheitern zwei Zuege derselben Karte, steht sie am letzten BESTAETIGTEN Platz', async () => {
+  const meal = { id: 5, date: '2026-10-05', meal_type: 'lunch', title: 'Lachs' };
+  meals.state.meals = [meal];
+  const { calls, put } = gatedPut();
+  globalThis.__apiStub = { put };
+  const prevYuvomi = globalThis.window.yuvomi;
+  globalThis.window.yuvomi = { ...prevYuvomi, showToast: () => {}, friendlyError: () => 'x' };
+  try {
+    const first = meals.moveMeal(5, '2026-10-06', 'lunch', { rerender: () => {} });
+    const second = meals.moveMeal(5, '2026-10-07', 'dinner', { rerender: () => {} });
+    assert.deepEqual([meal.date, meal.meal_type], ['2026-10-07', 'dinner'], 'optimistisch am Ziel des zweiten Zugs');
+    await tick();
+    assert.equal(calls.length, 1, 'der zweite Aufruf wartet, bis der erste entschieden ist');
+    calls[0].reject(new Error('boom'));
+    await first;
+    assert.deepEqual([meal.date, meal.meal_type], ['2026-10-07', 'dinner'], 'der Platz gehoert noch dem spaeteren Zug');
+    await tick();
+    assert.equal(calls.length, 2);
+    calls[1].reject(new Error('boom'));
+    await second;
+    assert.deepEqual([meal.date, meal.meal_type], ['2026-10-05', 'lunch'], 'nicht das gescheiterte Ziel des ersten Zugs');
+  } finally {
+    globalThis.window.yuvomi = prevYuvomi;
+    delete globalThis.__apiStub;
+  }
+});
+
+test('Verschieben: gelingt der erste Zug und scheitert der zweite, bleibt das Ziel des ersten', async () => {
+  const meal = { id: 5, date: '2026-10-05', meal_type: 'lunch', title: 'Lachs' };
+  meals.state.meals = [meal];
+  const { calls, put } = gatedPut();
+  globalThis.__apiStub = { put };
+  const prevYuvomi = globalThis.window.yuvomi;
+  globalThis.window.yuvomi = { ...prevYuvomi, showToast: () => {}, friendlyError: () => 'x' };
+  try {
+    const first = meals.moveMeal(5, '2026-10-06', 'lunch', { rerender: () => {} });
+    const second = meals.moveMeal(5, '2026-10-07', 'dinner', { rerender: () => {} });
+    await tick();
+    calls[0].resolve({ data: null });
+    await first;
+    await tick();
+    calls[1].reject(new Error('boom'));
+    await second;
+    assert.deepEqual([meal.date, meal.meal_type], ['2026-10-06', 'lunch'], 'dort steht sie auch auf dem Server');
+  } finally {
+    globalThis.window.yuvomi = prevYuvomi;
+    delete globalThis.__apiStub;
+  }
+});
+
 test('Speichern: die Quittung nennt das Ergebnis, nicht den Dialogtitel', async () => {
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../public/pages/meals.js', import.meta.url), 'utf8');

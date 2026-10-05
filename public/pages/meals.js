@@ -1562,33 +1562,57 @@ function wireDragDrop(grid) {
  * zurueck, und der Fehler wird gemeldet (dasselbe Muster wie beim Einplanen
  * weiter oben).
  *
- * Zurueckgesetzt wird nur, was noch DIESER Zug gesetzt hat: liegt die Karte
- * inzwischen woanders (ein zweites Ziehen vor der Antwort), gehoert ihr Platz
- * dem spaeteren Zug.
+ * ZWEI ZUEGE DERSELBEN KARTE vor der ersten Antwort (Review #1673): die
+ * Aufrufe laufen je Karte NACHEINANDER, und zurueckgekehrt wird an den letzten
+ * Platz, den der Server bestaetigt hat - nicht an den, an dem die Karte beim
+ * Ziehen gerade stand (das war das unbestaetigte Ziel des ersten Zugs).
+ * Zurueck setzt nur der JUENGSTE Zug: scheitert ein aelterer, gehoert der Platz
+ * dem spaeteren.
  *
  * @param {number} mealId
  * @param {string} targetDate  YYYY-MM-DD
  * @param {string} targetType
  * @param {{ rerender?: () => void }} [opts]  nur fuer Tests
  */
+const _mealMoves = new Map(); // mealId -> { confirmed, tail, latest, pending }
+
 async function moveMeal(mealId, targetDate, targetType, { rerender = renderWeekGrid } = {}) {
   const meal = state.meals.find((m) => m.id === mealId);
-  const origin = meal ? { date: meal.date, meal_type: meal.meal_type } : null;
+  let moves = _mealMoves.get(mealId);
+  if (!moves) {
+    moves = {
+      confirmed: meal ? { date: meal.date, meal_type: meal.meal_type } : null,
+      tail: Promise.resolve(),
+      latest: 0,
+      pending: 0,
+    };
+    _mealMoves.set(mealId, moves);
+  }
+  const turn = ++moves.latest;
+  moves.pending += 1;
   if (meal) {
     meal.date = targetDate;
     meal.meal_type = targetType;
     rerender();
   }
+  const send = () => api.put(`/meals/${mealId}`, { date: targetDate, meal_type: targetType });
+  // Der Normalfall (kein Zug dieser Karte unterwegs) geht sofort raus.
+  const request = moves.pending > 1 ? moves.tail.then(send) : send();
+  moves.tail = request.catch(() => {});
   try {
-    await api.put(`/meals/${mealId}`, { date: targetDate, meal_type: targetType });
+    await request;
+    moves.confirmed = { date: targetDate, meal_type: targetType };
     if (!meal) rerender();
   } catch (err) {
-    if (meal && origin && meal.date === targetDate && meal.meal_type === targetType) {
-      meal.date = origin.date;
-      meal.meal_type = origin.meal_type;
+    if (meal && moves.confirmed && moves.latest === turn) {
+      meal.date = moves.confirmed.date;
+      meal.meal_type = moves.confirmed.meal_type;
     }
     rerender();
     window.yuvomi?.showToast(window.yuvomi?.friendlyError?.(err) ?? t('common.errorGeneric'), 'danger');
+  } finally {
+    moves.pending -= 1;
+    if (moves.pending === 0) _mealMoves.delete(mealId);
   }
 }
 
