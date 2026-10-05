@@ -1450,8 +1450,9 @@ hakt der Zeilen-Tipp ab; sonst oeffnet er. Loeschen = Wisch mobil + ein fester O
   Zeilenkoerper zum Oeffnen-Knopf gemacht und den Stift entfernt; das ist zurueckgenommen
   (`test:shopping` haelt Stift und Zeilen-Toggle). Loeschen: Wisch zum Zeilenende (Touch),
   Papierkorb in der Zeile (Zeiger), Dialogfuss (immer).
-- **Vorrat:** Koerper oeffnet, Loeschen im Dialogfuss. Ein Wisch fehlt noch (die Zeile traegt
-  Stepper, die Geste braucht dort eine Ausnahmezone) - offen.
+- **Vorrat:** Koerper oeffnet. Loeschen: Wisch zum Zeilenende (Touch; Stepper und Warenkorb
+  sind Ausnahmezone, `wirePantrySwipe()`), Dialogfuss (immer), jeweils mit Rueckgaengig. Der
+  Chevron am Zeilenende entfaellt hier - dort steht der "+"-Knopf.
 - **Mahlzeiten:** die Karte oeffnet den Dialog, Loeschen im Dialogfuss (auch mobil, wo der
   Papierkorb der Karte nicht steht) und am Zeiger auf der Karte.
 - **Rezepte:** die Zeile oeffnet das Rezept; Bearbeiten und Loeschen stehen im Mehr-Menue der
@@ -2272,6 +2273,14 @@ Leiste, Zeile 2 = EINE Kopfzeile je Tab mit [Kontext] ... [Such-Icon] [EIN „..
 dazu die angedockte Primaer-Pille). Such-Icon und Menue wandern in Zeile 2, weil die Leiste
 bei 390px schon ohne sie ueberlaeuft (gemessen scrollWidth 403/390). Die Zwei-Zeilen-Regel
 gilt unveraendert. Ein Tab ohne Werkzeuge traegt kein leeres „..." (Rezepte).
+**Ein Werkzeugmenue beginnt bei zwei Eintraegen (R16).** Mit einem einzigen Eintrag gibt
+`pageToolsMenuHtml()` den direkten Knopf aus - Icon der Handlung, ihr Name als
+`aria-label`/`title`, dasselbe `data-action` (Vorrat: „Lagerorte verwalten" statt „..." mit
+einem Eintrag). Ein Schalter (`checked`) bleibt im Menue.
+**Die einzeilige Kopfzeile ist am Desktop ein volles Ziel hoch (R16):** 69px in jedem Modul
+(`.page-toolbar { min-block-size }` ab 1024px), gleich ob sie einen Segment-Umschalter (44px)
+oder nur 40px-Knoepfe traegt - vorher 65 gegen 69px, der angedockte Primaerknopf bei y 12
+gegen 14. Mehrzeilige Koepfe (Budget 121, Kalender 125, Schichtplan 117) sind unberuehrt.
 EINE Regel fuer alle vier Tabs (R14, Re-Critique 2026-09-28 P7): die Leiste traegt nur Tabs
 mit ihren Zahlen, jedes Werkzeug steht in Zeile 2 seines Tabs. Die R9-Verdichtung (Werkzeuge
 am Ende der Leiste, Zaehler als Punkt an der Ecke) ist zurueckgenommen - sie gab vier Tabs

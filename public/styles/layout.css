@@ -2359,6 +2359,21 @@ html.fab-anim-done .page-fab {
   flex-shrink: 0;
 }
 
+/* DIE KOPFZEILE IST EIN VOLLES ZIEL HOCH, GLEICH WAS SIE TRAEGT (Critique
+ * 2026-10-05, R16 "Desktop-Kopf 65 gegen 69px"). Gemessen bei 1280: Aufgaben,
+ * Dokumente, Gesundheit und Einkauf 69px, die zehn anderen einzeiligen Koepfe
+ * 65px - der Unterschied war, ob in der Zeile ein Segment-Umschalter (44px)
+ * oder nur 40px-Knoepfe standen, und mit ihm sprang der angedockte
+ * Primaerknopf beim Modulwechsel um 2px (y 12 gegen 14, in der Kueche 68 gegen
+ * 70). Die Zeile haelt jetzt die Hoehe ihres hoechsten moeglichen Inhalts
+ * (`--target-base`), also 69px in jedem Modul. Mehrzeilige Koepfe sind hoeher
+ * und bleiben unberuehrt; unter 1024px gelten die Large-Title-Regeln. */
+@media (min-width: 1024px) {
+  .page-toolbar {
+    min-block-size: calc(var(--target-base) + 2 * var(--space-3) + 1px);
+  }
+}
+
 .page-toolbar:has(> .module-seal--head) {
   --seal-head-lead: calc(var(--seal-head-size) + var(--page-toolbar-gap));
 }

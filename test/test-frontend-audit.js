@@ -19547,3 +19547,23 @@ test('R16: im Budget steht jeder Abschnittstitel auf der Buehne, die Zeilen lieg
   const typo = read('../public/styles/typography.css');
   assert.doesNotMatch(typo, /\.split-card-title|\.subscriptions-chart h2/);
 });
+
+/* R16 Schritt 2b (Critique 2026-10-05, "Desktop-Kopf 65 gegen 69px"): gemessen
+ * bei 1280 standen Aufgaben, Dokumente, Gesundheit und Einkauf auf 69px, zehn
+ * andere einzeilige Koepfe auf 65px, der angedockte Primaerknopf entsprechend
+ * bei y 14 bzw. 12 (Kueche 70 bzw. 68). Gegen den Stand davor rot gelaufen. */
+test('R16: die einzeilige Kopfzeile ist am Desktop in jedem Modul ein volles Ziel hoch', () => {
+  const regeln = rulesOf(read('../public/styles/layout.css'))
+    .filter((rule) => rule.selector.trim() === '.page-toolbar' && /min-block-size:/.test(rule.body));
+  assert.equal(regeln.length, 1, 'genau eine Stelle setzt die Mindesthoehe');
+  assert.ok(regeln[0].at.some((at) => /min-width:\s*1024px/.test(at)), 'nur am Desktop - darunter gelten die Large-Title-Regeln');
+  assert.match(regeln[0].body, /min-block-size:\s*calc\(var\(--target-base\) \+ 2 \* var\(--space-3\) \+ 1px\)/,
+    'Ziel + Polster der Leiste + ihre Linie: 69px, gleich was die Zeile traegt');
+  // Kein Modul setzt dem Kopf am Desktop eine eigene Hoehe entgegen.
+  for (const file of readdirSync(new URL('../public/styles/', import.meta.url)).filter((name) => name.endsWith('.css') && name !== 'layout.css')) {
+    const eigen = rulesOf(read(`../public/styles/${file}`))
+      .filter((rule) => selectorsOf(rule).some((sel) => /\.page-toolbar$|-toolbar$/.test(sel)) && /(?:^|;|\s)(?:min-)?(?:block-size|height):/.test(rule.body)
+        && !rule.at.some((at) => /max-width/.test(at)));
+    assert.deepStrictEqual(eigen.map((rule) => `${file}: ${rule.selector.trim()}`), [], 'die Kopfhoehe gehoert der Shell');
+  }
+});
