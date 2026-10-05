@@ -2957,7 +2957,19 @@
         "otherSessionsEnded_one": "他のセッションを {{count}} 件終了しました。",
         "otherSessionsNone": "他のデバイスではサインインしていませんでした。",
         "otherSessionsError": "他のデバイスからのサインアウトに失敗しました。",
-        "otherSessionsTooManyAttempts": "リクエストが多すぎます。少し待ってから、もう一度お試しください。"
+        "otherSessionsTooManyAttempts": "リクエストが多すぎます。少し待ってから、もう一度お試しください。",
+        "apiTokensInactiveTitle": "失効済みまたは期限切れ",
+        "apiTokensInactiveHint": "これらのトークンではもうアクセスできません。削除した項目は元に戻せません。",
+        "apiTokensNoneActive": "有効な API トークンはありません。",
+        "apiTokenRemove": "トークンを削除",
+        "apiTokenRemoveConfirm": "API トークン「{{name}}」を削除しますか?",
+        "apiTokenRemoveDetail": "この項目は一覧から完全に消えます。この操作は取り消せません。",
+        "apiTokenRemovedToast": "API トークンを削除しました。",
+        "apiTokenRemoveActive": "このトークンはまだ有効です。先に失効させてください。",
+        "displayRemoveDevice": "削除",
+        "displayRemoveDeviceConfirm": "この端末の項目を削除しますか？",
+        "displayRemoveDeviceDetail": "この項目は一覧から完全に消えます。この操作は取り消せません。",
+        "displayRemoveDeviceActive": "この端末はまだペアリングされています。先に失効させてください。"
     },
     "login": {
         "tagline": "家族のプランナーへおかえりなさい。",

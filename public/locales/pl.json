@@ -3165,7 +3165,19 @@
         "otherSessionsEnded_many": "Zakończono {{count}} innych sesji.",
         "otherSessionsNone": "Twoje konto nie było zalogowane na żadnym innym urządzeniu.",
         "otherSessionsError": "Nie udało się wylogować na innych urządzeniach.",
-        "otherSessionsTooManyAttempts": "Zbyt wiele żądań. Poczekaj chwilę i spróbuj ponownie."
+        "otherSessionsTooManyAttempts": "Zbyt wiele żądań. Poczekaj chwilę i spróbuj ponownie.",
+        "apiTokensInactiveTitle": "Unieważnione lub wygasłe",
+        "apiTokensInactiveHint": "Te tokeny nie dają już dostępu. Usuniętego wpisu nie można przywrócić.",
+        "apiTokensNoneActive": "Brak aktywnego tokenu API.",
+        "apiTokenRemove": "Usuń token",
+        "apiTokenRemoveConfirm": "Usunąć token API \"{{name}}\"?",
+        "apiTokenRemoveDetail": "Wpis zniknie z listy na stałe. Tego nie można cofnąć.",
+        "apiTokenRemovedToast": "Token API usunięty.",
+        "apiTokenRemoveActive": "Ten token jest nadal aktywny. Najpierw go unieważnij.",
+        "displayRemoveDevice": "Usuń",
+        "displayRemoveDeviceConfirm": "Usunąć wpis tego urządzenia?",
+        "displayRemoveDeviceDetail": "Wpis zniknie z listy na stałe. Tego nie można cofnąć.",
+        "displayRemoveDeviceActive": "To urządzenie jest nadal sparowane. Najpierw je unieważnij."
     },
     "login": {
         "tagline": "Witaj ponownie w swoim planerze rodzinnym.",

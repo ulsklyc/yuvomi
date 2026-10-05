@@ -2957,7 +2957,19 @@
         "otherSessionsEnded_one": "{{count}} annan session avslutad.",
         "otherSessionsNone": "Ditt konto var inte inloggat på någon annan enhet.",
         "otherSessionsError": "Det gick inte att logga ut på andra enheter.",
-        "otherSessionsTooManyAttempts": "För många förfrågningar. Vänta en stund och försök sedan igen."
+        "otherSessionsTooManyAttempts": "För många förfrågningar. Vänta en stund och försök sedan igen.",
+        "apiTokensInactiveTitle": "Återkallade eller utgångna",
+        "apiTokensInactiveHint": "De här tokens ger inte längre någon åtkomst. En borttagen post kan inte återställas.",
+        "apiTokensNoneActive": "Ingen aktiv API-token.",
+        "apiTokenRemove": "Ta bort token",
+        "apiTokenRemoveConfirm": "Ta bort API-token \"{{name}}\"?",
+        "apiTokenRemoveDetail": "Posten försvinner från listan för gott. Det går inte att ångra.",
+        "apiTokenRemovedToast": "API-token har tagits bort.",
+        "apiTokenRemoveActive": "Den här token är fortfarande aktiv. Återkalla den först.",
+        "displayRemoveDevice": "Ta bort",
+        "displayRemoveDeviceConfirm": "Ta bort posten för den här enheten?",
+        "displayRemoveDeviceDetail": "Posten försvinner från listan för gott. Det går inte att ångra.",
+        "displayRemoveDeviceActive": "Den här enheten är fortfarande parkopplad. Återkalla den först."
     },
     "login": {
         "tagline": "Välkommen tillbaka till din familjeplanerare.",

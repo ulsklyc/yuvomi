@@ -2957,7 +2957,19 @@
         "otherSessionsEnded_one": "{{count}} outra sessão terminada.",
         "otherSessionsNone": "A tua conta não tinha sessão iniciada em nenhum outro dispositivo.",
         "otherSessionsError": "Não foi possível terminar a sessão noutros dispositivos.",
-        "otherSessionsTooManyAttempts": "Demasiados pedidos. Aguarda um momento e tenta novamente."
+        "otherSessionsTooManyAttempts": "Demasiados pedidos. Aguarda um momento e tenta novamente.",
+        "apiTokensInactiveTitle": "Revogados ou expirados",
+        "apiTokensInactiveHint": "Estes tokens já não dão acesso. Uma entrada removida não pode ser recuperada.",
+        "apiTokensNoneActive": "Nenhum token de API ativo.",
+        "apiTokenRemove": "Remover token",
+        "apiTokenRemoveConfirm": "Remover o token de API \"{{name}}\"?",
+        "apiTokenRemoveDetail": "A entrada desaparece da lista de forma definitiva. Isto não pode ser anulado.",
+        "apiTokenRemovedToast": "Token de API removido.",
+        "apiTokenRemoveActive": "Este token ainda está ativo. Revogue-o primeiro.",
+        "displayRemoveDevice": "Remover",
+        "displayRemoveDeviceConfirm": "Remover a entrada deste dispositivo?",
+        "displayRemoveDeviceDetail": "A entrada desaparece da lista de forma definitiva. Isto não pode ser anulado.",
+        "displayRemoveDeviceActive": "Este dispositivo ainda está emparelhado. Revogue-o primeiro."
     },
     "login": {
         "tagline": "Bem-vindo de volta ao teu planeador familiar.",

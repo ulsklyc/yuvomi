@@ -2957,7 +2957,19 @@
         "otherSessionsEnded_one": "Đã kết thúc {{count}} phiên khác.",
         "otherSessionsNone": "Tài khoản của bạn không đăng nhập trên thiết bị nào khác.",
         "otherSessionsError": "Không thể đăng xuất trên các thiết bị khác.",
-        "otherSessionsTooManyAttempts": "Quá nhiều yêu cầu. Vui lòng đợi một chút rồi thử lại."
+        "otherSessionsTooManyAttempts": "Quá nhiều yêu cầu. Vui lòng đợi một chút rồi thử lại.",
+        "apiTokensInactiveTitle": "Đã thu hồi hoặc hết hạn",
+        "apiTokensInactiveHint": "Các mã này không còn cấp quyền truy cập. Mục đã gỡ không thể khôi phục.",
+        "apiTokensNoneActive": "Không có mã API nào đang hoạt động.",
+        "apiTokenRemove": "Gỡ mã",
+        "apiTokenRemoveConfirm": "Gỡ mã API \"{{name}}\"?",
+        "apiTokenRemoveDetail": "Mục này sẽ biến mất vĩnh viễn khỏi danh sách. Không thể hoàn tác.",
+        "apiTokenRemovedToast": "Đã gỡ mã API.",
+        "apiTokenRemoveActive": "Mã này vẫn đang hoạt động. Hãy thu hồi trước.",
+        "displayRemoveDevice": "Gỡ",
+        "displayRemoveDeviceConfirm": "Gỡ mục của thiết bị này?",
+        "displayRemoveDeviceDetail": "Mục này sẽ biến mất vĩnh viễn khỏi danh sách. Không thể hoàn tác.",
+        "displayRemoveDeviceActive": "Thiết bị này vẫn đang ghép nối. Hãy thu hồi trước."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại trình lập kế hoạch gia đình.",

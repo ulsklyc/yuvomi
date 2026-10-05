@@ -2957,7 +2957,19 @@
         "otherSessionsEnded_one": "{{count}} sesión más cerrada.",
         "otherSessionsNone": "Tu cuenta no tenía la sesión iniciada en ningún otro dispositivo.",
         "otherSessionsError": "No se pudo cerrar la sesión en otros dispositivos.",
-        "otherSessionsTooManyAttempts": "Demasiadas solicitudes. Espera un momento y vuelve a intentarlo."
+        "otherSessionsTooManyAttempts": "Demasiadas solicitudes. Espera un momento y vuelve a intentarlo.",
+        "apiTokensInactiveTitle": "Revocados o caducados",
+        "apiTokensInactiveHint": "Estos tokens ya no dan acceso. Una entrada eliminada no se puede recuperar.",
+        "apiTokensNoneActive": "Ningún token de API activo.",
+        "apiTokenRemove": "Eliminar token",
+        "apiTokenRemoveConfirm": "¿Eliminar el token de API \"{{name}}\"?",
+        "apiTokenRemoveDetail": "La entrada desaparece de la lista de forma definitiva. Esto no se puede deshacer.",
+        "apiTokenRemovedToast": "Token de API eliminado.",
+        "apiTokenRemoveActive": "Este token sigue activo. Revócalo primero.",
+        "displayRemoveDevice": "Eliminar",
+        "displayRemoveDeviceConfirm": "¿Eliminar la entrada de este dispositivo?",
+        "displayRemoveDeviceDetail": "La entrada desaparece de la lista de forma definitiva. Esto no se puede deshacer.",
+        "displayRemoveDeviceActive": "Este dispositivo sigue vinculado. Revócalo primero."
     },
     "login": {
         "tagline": "Bienvenido de nuevo a tu planificador familiar.",

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Revoked and expired API tokens can be removed from the list** (D#1672, asked by @torbenvanassche). Under
+  Settings, API access, a revoked token stayed in the list for good, with a greyed-out button
+  next to it. The list now has two parts: the tokens that work, each with "Revoke", and below
+  them the ones that are revoked or expired, each with "Remove". Removing asks first and cannot
+  be undone. A token that still works cannot be removed, only revoked, so ending someone's
+  access always leaves a trace until you decide to clear it. The same goes for wall tablets:
+  every new pairing revokes the device before it, and those old entries can now be removed as
+  well. For API clients: `POST /api/v1/auth/api-tokens/{id}/remove` and
+  `POST /api/v1/displays/{id}/devices/{deviceId}/remove`; both answer 409 for a credential
+  that is still active, and `DELETE /api/v1/auth/api-tokens/{id}` keeps meaning "revoke".
+
 ### Changed
 
 - **Housekeeping chores work like every other list.** A chore row carried a pencil and a bin

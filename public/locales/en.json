@@ -2957,7 +2957,19 @@
         "otherSessionsEnded_one": "{{count}} other session ended.",
         "otherSessionsNone": "Your account was not signed in on any other device.",
         "otherSessionsError": "Signing out on other devices failed.",
-        "otherSessionsTooManyAttempts": "Too many requests. Please wait a moment, then try again."
+        "otherSessionsTooManyAttempts": "Too many requests. Please wait a moment, then try again.",
+        "apiTokensInactiveTitle": "Revoked or expired",
+        "apiTokensInactiveHint": "These tokens no longer grant access. A removed entry cannot be restored.",
+        "apiTokensNoneActive": "No active API token.",
+        "apiTokenRemove": "Remove token",
+        "apiTokenRemoveConfirm": "Remove API token \"{{name}}\"?",
+        "apiTokenRemoveDetail": "The entry disappears from the list for good. This cannot be undone.",
+        "apiTokenRemovedToast": "API token removed.",
+        "apiTokenRemoveActive": "This token is still active. Revoke it first.",
+        "displayRemoveDevice": "Remove",
+        "displayRemoveDeviceConfirm": "Remove the entry for this device?",
+        "displayRemoveDeviceDetail": "The entry disappears from the list for good. This cannot be undone.",
+        "displayRemoveDeviceActive": "This device is still paired. Revoke it first."
     },
     "login": {
         "tagline": "Welcome back to your family planner.",

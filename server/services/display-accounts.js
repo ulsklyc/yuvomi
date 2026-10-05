@@ -399,6 +399,24 @@ export function revokeDisplayDevice(deviceId, { db } = {}) {
   ).run(nowIso(), deviceId).changes > 0;
 }
 
+/**
+ * Die Zeile eines WIDERRUFENEN Geraets entfernen (D#1672).
+ *
+ * Jede neue Kopplung widerruft das Geraet davor, und die Zeile blieb fuer
+ * immer in der Liste - nach dem dritten Tablettwechsel standen drei tote
+ * Eintraege ueber dem einen, das an der Wand haengt. Entfernt wird nur, was
+ * widerrufen ist: ein gekoppeltes Geraet verliert seinen Zugang ueber den
+ * Widerruf, der den Zeitpunkt hinterlaesst, nicht ueber eine Luecke. Pruefen
+ * und Loeschen sind eine Anweisung.
+ * @returns {boolean} ob eine Zeile ging
+ */
+export function removeRevokedDisplayDevice(deviceId, { db } = {}) {
+  const database = db || dbModule.get();
+  return database.prepare(
+    'DELETE FROM display_devices WHERE id = ? AND revoked_at IS NOT NULL',
+  ).run(deviceId).changes > 0;
+}
+
 /** Die Geraete eines Displays, neueste zuerst - ohne jedes Geheimnis. */
 export function listDisplayDevices(userId, { db } = {}) {
   const database = db || dbModule.get();

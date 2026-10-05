@@ -2957,7 +2957,19 @@
         "otherSessionsEnded_one": "{{count}} diğer oturum sonlandırıldı.",
         "otherSessionsNone": "Hesabın başka hiçbir cihazda oturum açmış değildi.",
         "otherSessionsError": "Diğer cihazlarda oturum kapatılamadı.",
-        "otherSessionsTooManyAttempts": "Çok fazla istek. Lütfen biraz bekle, sonra tekrar dene."
+        "otherSessionsTooManyAttempts": "Çok fazla istek. Lütfen biraz bekle, sonra tekrar dene.",
+        "apiTokensInactiveTitle": "İptal edilmiş veya süresi dolmuş",
+        "apiTokensInactiveHint": "Bu belirteçler artık erişim sağlamıyor. Kaldırılan kayıt geri getirilemez.",
+        "apiTokensNoneActive": "Etkin API belirteci yok.",
+        "apiTokenRemove": "Belirteci kaldır",
+        "apiTokenRemoveConfirm": "\"{{name}}\" API belirteci kaldırılsın mı?",
+        "apiTokenRemoveDetail": "Kayıt listeden kalıcı olarak silinir. Bu geri alınamaz.",
+        "apiTokenRemovedToast": "API belirteci kaldırıldı.",
+        "apiTokenRemoveActive": "Bu belirteç hâlâ etkin. Önce iptal edin.",
+        "displayRemoveDevice": "Kaldır",
+        "displayRemoveDeviceConfirm": "Bu cihazın kaydı kaldırılsın mı?",
+        "displayRemoveDeviceDetail": "Kayıt listeden kalıcı olarak silinir. Bu geri alınamaz.",
+        "displayRemoveDeviceActive": "Bu cihaz hâlâ eşleştirilmiş. Önce iptal edin."
     },
     "login": {
         "tagline": "Aile planlayıcına tekrar hoş geldin.",

@@ -2957,7 +2957,19 @@
         "otherSessionsEnded_one": "{{count}} altra sessione terminata.",
         "otherSessionsNone": "Il tuo account non era connesso su nessun altro dispositivo.",
         "otherSessionsError": "Uscita dagli altri dispositivi non riuscita.",
-        "otherSessionsTooManyAttempts": "Troppe richieste. Attendi un momento, poi riprova."
+        "otherSessionsTooManyAttempts": "Troppe richieste. Attendi un momento, poi riprova.",
+        "apiTokensInactiveTitle": "Revocati o scaduti",
+        "apiTokensInactiveHint": "Questi token non danno più alcun accesso. Una voce rimossa non può essere ripristinata.",
+        "apiTokensNoneActive": "Nessun token API attivo.",
+        "apiTokenRemove": "Rimuovi token",
+        "apiTokenRemoveConfirm": "Rimuovere il token API \"{{name}}\"?",
+        "apiTokenRemoveDetail": "La voce scompare dall'elenco in modo definitivo. L'operazione non può essere annullata.",
+        "apiTokenRemovedToast": "Token API rimosso.",
+        "apiTokenRemoveActive": "Questo token è ancora attivo. Revocalo prima.",
+        "displayRemoveDevice": "Rimuovi",
+        "displayRemoveDeviceConfirm": "Rimuovere la voce di questo dispositivo?",
+        "displayRemoveDeviceDetail": "La voce scompare dall'elenco in modo definitivo. L'operazione non può essere annullata.",
+        "displayRemoveDeviceActive": "Questo dispositivo è ancora associato. Revocalo prima."
     },
     "login": {
         "tagline": "Bentornato nel tuo pianificatore familiare.",

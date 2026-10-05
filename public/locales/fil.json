@@ -2971,7 +2971,19 @@
         "otherSessionsEnded_one": "{{count}} ibang session ang tinapos.",
         "otherSessionsNone": "Hindi naka-sign in ang account mo sa anumang ibang device.",
         "otherSessionsError": "Hindi nagawang mag-sign out sa ibang device.",
-        "otherSessionsTooManyAttempts": "Masyadong maraming kahilingan. Maghintay sandali, saka subukang muli."
+        "otherSessionsTooManyAttempts": "Masyadong maraming kahilingan. Maghintay sandali, saka subukang muli.",
+        "apiTokensInactiveTitle": "Nabawi o nag-expire",
+        "apiTokensInactiveHint": "Hindi na nagbibigay ng access ang mga token na ito. Hindi na maibabalik ang inalis na entry.",
+        "apiTokensNoneActive": "Walang aktibong API token.",
+        "apiTokenRemove": "Alisin ang token",
+        "apiTokenRemoveConfirm": "Alisin ang API token na \"{{name}}\"?",
+        "apiTokenRemoveDetail": "Tuluyang mawawala ang entry sa listahan. Hindi ito maibabalik.",
+        "apiTokenRemovedToast": "Naalis ang API token.",
+        "apiTokenRemoveActive": "Aktibo pa ang token na ito. Bawiin muna ito.",
+        "displayRemoveDevice": "Alisin",
+        "displayRemoveDeviceConfirm": "Alisin ang entry ng device na ito?",
+        "displayRemoveDeviceDetail": "Tuluyang mawawala ang entry sa listahan. Hindi ito maibabalik.",
+        "displayRemoveDeviceActive": "Nakapares pa ang device na ito. Bawiin muna ito."
     },
     "login": {
         "tagline": "Maligayang pagbabalik sa iyong family planner.",

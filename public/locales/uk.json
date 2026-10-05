@@ -3151,7 +3151,19 @@
         "otherSessionsEnded_many": "Завершено інших сеансів: {{count}}.",
         "otherSessionsNone": "Ваш обліковий запис не був відкритий на жодному іншому пристрої.",
         "otherSessionsError": "Не вдалося вийти на інших пристроях.",
-        "otherSessionsTooManyAttempts": "Забагато запитів. Зачекайте трохи й спробуйте знову."
+        "otherSessionsTooManyAttempts": "Забагато запитів. Зачекайте трохи й спробуйте знову.",
+        "apiTokensInactiveTitle": "Відкликані або прострочені",
+        "apiTokensInactiveHint": "Ці токени більше не дають доступу. Видалений запис неможливо відновити.",
+        "apiTokensNoneActive": "Немає активних токенів API.",
+        "apiTokenRemove": "Видалити токен",
+        "apiTokenRemoveConfirm": "Видалити токен API \"{{name}}\"?",
+        "apiTokenRemoveDetail": "Запис назавжди зникне зі списку. Це неможливо скасувати.",
+        "apiTokenRemovedToast": "Токен API видалено.",
+        "apiTokenRemoveActive": "Цей токен ще активний. Спершу відкличте його.",
+        "displayRemoveDevice": "Видалити",
+        "displayRemoveDeviceConfirm": "Видалити запис цього пристрою?",
+        "displayRemoveDeviceDetail": "Запис назавжди зникне зі списку. Це неможливо скасувати.",
+        "displayRemoveDeviceActive": "Цей пристрій ще підключено. Спершу відкличте його."
     },
     "login": {
         "tagline": "З поверненням до вашого сімейного планувальника.",
