@@ -1985,7 +1985,15 @@ function renderAccountsPage() {
       ${title}
       <div class="panel-head__actions">${archiveToggle}</div>
     </div>` : title}
-    <div class="metric-grid">
+    ${/* Mobil die Kurzzeile wie in jedem Reiter mit Kennzahlen (R16): hier stand
+       * unter 640px als einzige Stelle des Moduls noch die Karte. EINE Zahl,
+       * also ohne Aufklapper (metric-glance.js) - die Karte bleibt dort aus. */ ''}
+    ${metricGlanceHtml({
+      label: t('budget.netWorth'),
+      value: netWorth.text,
+      tone: Number(state.netWorth) > 0 ? 'positive' : Number(state.netWorth) < 0 ? 'negative' : 'neutral',
+    })}
+    <div class="metric-grid budget-glance-details">
       <div class="metric-card ${netWorth.className}">
         <div class="metric-card__label">${t('budget.netWorth')}</div>
         <div class="metric-card__value">${netWorth.text}</div>

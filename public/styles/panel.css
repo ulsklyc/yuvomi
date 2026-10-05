@@ -317,7 +317,9 @@
  * sich über die Container-Query weiter unten auf Title 2 herunter statt in
  * zwei Zeilen zu fallen. Ein Betrag über zwei Zeilen ist keine Kennzahl mehr. */
 .metric-card__value {
-  font-size: var(--text-3xl);
+  /* `--metric-value-size` ist die Zusage einer SEITENSPALTE (siehe unten,
+   * "Eine Karte je Zeile traegt Title 1"); ohne sie gilt die Stufenleiter. */
+  font-size: var(--metric-value-size, var(--text-3xl));
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-tight);
   letter-spacing: var(--tracking-tight);
@@ -337,7 +339,7 @@
  * ihre 28px. */
 @container metric-grid (max-width: 600px) {
   .metric-card__value {
-    font-size: var(--text-2xl);
+    font-size: var(--metric-value-size, var(--text-2xl));
   }
 }
 
@@ -349,8 +351,27 @@
  * bekommen, deren Wert Datum UND Uhrzeit trug. */
 @container metric-grid (max-width: 400px) {
   .metric-card__value {
-    font-size: var(--text-xl);
+    font-size: var(--metric-value-size, var(--text-xl));
   }
+}
+
+/* EINE KARTE JE ZEILE TRAEGT TITLE 1 (Critique 2026-10-05, R16 P1 Bausteine).
+ *
+ * Die Stufen oben fragen die ZEILE, weil sie von mehreren Karten je Zeile
+ * ausgehen: 300px Zeile heisst dort 144px Karte. In einer Seitenspalte steht
+ * aber EINE Karte je Zeile, und dieselbe 300px-Zeile ist eine 300px-Karte -
+ * "24.503,00 EUR" braucht in Title 1 190px und passt. Gemessen stand der Wert
+ * in den Seitenspalten von Budget-Uebersicht und Darlehen in 20px, in den
+ * Kennzahl-Zeilen der Nachbarreiter in 28px: dieselbe Karte, zwei Grade.
+ *
+ * Wer `.metric-grid` in eine Seitenspalte stellt, setzt deshalb
+ * `--summary-cards: 1` UND diese Zusage - `.metric-grid--rail` ist beides in
+ * einem Wort fuer Spalten, die immer Spalte sind; die drei bedingten Spalten
+ * (budget.css Uebersicht und Darlehen, layout.css `.page-columns__rail`)
+ * setzen dasselbe Paar in ihrer Container-Query. Guard: test-frontend-audit. */
+.metric-grid--rail {
+  --summary-cards: 1;
+  --metric-value-size: var(--text-3xl);
 }
 
 /* UND DIE REIHE BRICHT, STATT IHRE KARTEN ZU ZERQUETSCHEN.
@@ -793,7 +814,12 @@ svg.chart {
   transition: background-color var(--transition-fast);
 }
 
-.budget-glance__row:hover {
+/* Die Zeile ohne Aufklapper (metric-glance.js): ein Zeichen, kein Ziel. */
+.budget-glance__row--static {
+  cursor: default;
+}
+
+.budget-glance__row:not(.budget-glance__row--static):hover {
   background-color: var(--color-surface-hover);
 }
 

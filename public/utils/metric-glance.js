@@ -17,9 +17,15 @@
 import { esc } from '/utils/html.js';
 
 /**
+ * OHNE `controls` IST DIE ZEILE EIN ZEICHEN, KEIN KNOPF (R16 Schritt 2b):
+ * ein Reiter mit EINER Kennzahl (Konten: Nettovermoegen) hat nichts
+ * aufzuklappen - die Karte darunter nennte dieselbe Zahl noch einmal. Die
+ * Zeile steht dann als `div` ohne Pfeil, in derselben Form wie die der
+ * Nachbarreiter; die Karte bleibt unter 640px ausgeblendet.
+ *
  * @param {object} o
  * @param {string} o.id        id des Aufklappers
- * @param {string} o.controls  id des Bereichs, den er auf- und zuklappt
+ * @param {string} [o.controls]  id des Bereichs, den er auf- und zuklappt; ohne ihn steht die Zeile statisch
  * @param {boolean} o.expanded
  * @param {string} o.label     Leitwert-Beschriftung (Klartext, wird escaped)
  * @param {string} o.value     Leitwert, schon formatiert (Klartext, wird escaped)
@@ -33,14 +39,22 @@ export function metricGlanceHtml({ id, controls, expanded, label, value, tone = 
         <span class="budget-glance__flows">${side.map((f) => `
           <span class="budget-glance__flow${f.tone ? ` budget-glance__flow--${esc(f.tone)}` : ''}">${esc(f.label)}${f.amount != null ? ` <span class="budget-glance__amount">${esc(f.amount)}</span>` : ''}</span>`).join('')}
         </span>` : '';
-  return `
-    <div class="row-carrier budget-glance">
-      <button type="button" class="budget-glance__row budget-glance__balance" id="${esc(id)}"
-              aria-expanded="${expanded ? 'true' : 'false'}" aria-controls="${esc(controls)}">
+  const lead = `
         <span class="budget-glance__lead">
           <span class="budget-glance__label">${esc(label)}</span>
           <span class="budget-glance__value budget-glance__value--${esc(tone)}">${esc(value)}</span>
-        </span>${flowsHtml}
+        </span>${flowsHtml}`;
+  if (!controls) {
+    return `
+    <div class="row-carrier budget-glance">
+      <div class="budget-glance__row budget-glance__row--static"${id ? ` id="${esc(id)}"` : ''}>${lead}
+      </div>
+    </div>`;
+  }
+  return `
+    <div class="row-carrier budget-glance">
+      <button type="button" class="budget-glance__row budget-glance__balance" id="${esc(id)}"
+              aria-expanded="${expanded ? 'true' : 'false'}" aria-controls="${esc(controls)}">${lead}
         <i data-lucide="chevron-down" class="icon-sm budget-glance__chevron" aria-hidden="true"></i>
       </button>
     </div>`;

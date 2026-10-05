@@ -19472,3 +19472,48 @@ test('R16: ein Dialog traegt den Ton des offenen Moduls (aktiver Chip im Filterb
   assert.match(read('../public/router.js'), /style\.setProperty\('--active-module-accent', accent\)/,
     'der Router fuehrt den Ton des offenen Moduls an der Wurzel');
 });
+
+/* R16 Schritt 2b - EIN REITER-SKELETT IM BUDGET (Critique 2026-10-05, P1
+ * Bausteine). Gemessen bei 1280: Kennzahl-Wert 20px in den Seitenspalten von
+ * Uebersicht und Darlehen, 28px in Konten, Abos und Aufteilung - dieselbe
+ * Karte, zwei Grade; Konten zeigte unter 640px als einziger Reiter die Karte
+ * statt der Kurzzeile. Gegen den Stand davor rot gelaufen. */
+test('R16: eine Kennzahlkarte je Zeile traegt Title 1 - die Seitenspalte sagt es der Zeile zu', () => {
+  const panel = rulesOf(read('../public/styles/panel.css'));
+  const stufen = panel.filter((rule) => rule.selector.trim() === '.metric-card__value' && /font-size:/.test(rule.body));
+  assert.equal(stufen.length, 3, 'Basis und zwei Container-Stufen');
+  for (const rule of stufen) {
+    assert.match(rule.body, /font-size:\s*var\(--metric-value-size,\s*var\(--text-(?:3xl|2xl|xl)\)\)/,
+      `Stufe ${rule.at.join(' ') || 'Basis'} fragt zuerst die Zusage der Spalte`);
+  }
+  // Jede BEDINGTE Einspalten-Zeile (Seitenspalte in einer Container-Query) gibt
+  // die Zusage mit; sonst klemmt die 300px-Zeile den Wert auf Title 3.
+  let spalten = 0;
+  for (const file of readdirSync(new URL('../public/styles/', import.meta.url)).filter((name) => name.endsWith('.css'))) {
+    for (const rule of rulesOf(read(`../public/styles/${file}`))) {
+      if (!/\.metric-grid/.test(rule.selector) || !/--summary-cards:\s*1\b/.test(rule.body)) continue;
+      if (rule.at.length === 0 && !/\.metric-grid--rail/.test(rule.selector)) continue;
+      spalten += 1;
+      assert.match(rule.body, /--metric-value-size:\s*var\(--text-3xl\)/, `${file}: ${rule.selector.trim()}`);
+    }
+  }
+  assert.ok(spalten >= 4, `Uebersicht, Darlehen, .page-columns__rail und .metric-grid--rail (gefunden: ${spalten})`);
+  // Kein Modul unterbietet den Grad lokal.
+  for (const file of ['budget.css', 'subscriptions.css', 'split-expenses.css']) {
+    const lokal = rulesOf(read(`../public/styles/${file}`))
+      .filter((rule) => /\.metric-card__value/.test(rule.selector) && /font-size:/.test(rule.body));
+    assert.deepStrictEqual(lokal.map((rule) => rule.selector.trim()), [], `${file} setzt keinen eigenen Wert-Grad`);
+  }
+  // Die Zweier-Reihe mit 144px-Karten in der Seitenleiste der Uebersicht ist weg.
+  assert.doesNotMatch(read('../public/styles/budget.css'), /\.budget-overview__aside \.metric-grid[^{]*\{[^}]*--summary-cards:\s*2/);
+});
+
+test('R16: Konten zeigt mobil die Kurzzeile wie jeder Budget-Reiter mit Kennzahlen', () => {
+  const glance = read('../public/utils/metric-glance.js');
+  assert.match(glance, /if \(!controls\) \{[\s\S]*?budget-glance__row budget-glance__row--static/,
+    'ohne Aufklapp-Ziel ist die Zeile ein Zeichen, kein Knopf');
+  const accounts = read('../public/pages/budget.js').match(/const header = `[\s\S]*?<\/div>`;/)?.[0] ?? '';
+  assert.match(accounts, /metricGlanceHtml\(\{\s*label: t\('budget\.netWorth'\)/, 'Konten fuehrt die Kurzzeile');
+  assert.doesNotMatch(accounts, /controls:/, 'eine Zahl hat nichts aufzuklappen');
+  assert.match(accounts, /<div class="metric-grid budget-glance-details">/, 'die Karte bleibt unter 640px aus');
+});

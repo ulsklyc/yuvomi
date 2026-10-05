@@ -426,16 +426,33 @@
     top: 0;
   }
 
-  /* In der Seitenleiste zwei Karten je Zeile, der Saldo als Summe darunter
-   * ueber die volle Breite - drei Karten in ~380px liessen keinem Betrag
-   * genug Platz. „Nur Ausgaben" bleibt bei seiner einen Karte. */
-  .budget-overview__aside .metric-grid:not(.metric-grid--expenses-only) {
-    --summary-cards: 2;
+  /* In der Seitenleiste EINE Karte je Zeile, im Grad der Kennzahl-Zeilen der
+   * Nachbarreiter (panel.css, "Eine Karte je Zeile traegt Title 1"). Bis R16
+   * standen hier zwei 144px-Karten nebeneinander und der Saldo darunter: in
+   * 144px passt kein Betrag in Title 1, also stand die Leitzahl des Moduls in
+   * 20px, waehrend Konten, Abos und Aufteilung 28px zeigten. Der Trend steht
+   * in der Labelzeile statt unter dem Wert: der Betrag behaelt die volle
+   * Kartenbreite (auch "24.503,00 EUR" in 190px), und drei Karten bleiben bei
+   * 76px statt 104px (gemessen 1280: Kennzahl-Zeile 216 -> 287px samt Bandpolster). */
+  .budget-overview__aside .metric-grid {
+    --summary-cards: 1;
+    --metric-value-size: var(--text-3xl);
+    grid-auto-rows: auto;
   }
 
-  .budget-overview__aside .metric-grid:not(.metric-grid--expenses-only) > .metric-card:last-child {
-    grid-column: 1 / -1;
+  .budget-overview__aside .metric-grid > .metric-card:has(> .metric-card__trend) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label trend"
+      "value value";
+    align-items: baseline;
+    column-gap: var(--space-3);
   }
+
+  .budget-overview__aside .metric-grid > .metric-card > .metric-card__label { grid-area: label; }
+  .budget-overview__aside .metric-grid > .metric-card > .metric-card__value { grid-area: value; }
+  .budget-overview__aside .metric-grid > .metric-card > .metric-card__trend { grid-area: trend; }
 
   /* Die Kategoriezeilen stapeln in der Seitenleiste wieder (Name und Betrag
    * oben, Bahn darunter ueber die volle Breite). Die Dreispalten-Stufe fragt
@@ -1313,6 +1330,7 @@
 
   .budget-loans > .metric-grid {
     --summary-cards: 1;
+    --metric-value-size: var(--text-3xl);
     grid-column: 2;
     grid-row: 1 / -1;
     grid-auto-rows: auto;

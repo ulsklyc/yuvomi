@@ -2841,6 +2841,8 @@ html.fab-anim-done .page-fab {
    * ohne das Bandpolster, damit die erste Karte mit der Liste beginnt. */
   .page-columns__rail > .metric-grid {
     --summary-cards: 1;
+    /* Eine Karte je Zeile traegt Title 1 (panel.css). */
+    --metric-value-size: var(--text-3xl);
     grid-auto-rows: auto;
     padding-block: 0;
   }
