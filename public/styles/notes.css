@@ -720,6 +720,7 @@
 }
 
 .note-editor__text {
+  min-height: max(18.75rem, 38vh);
   min-height: max(18.75rem, 38dvh);
   field-sizing: content;
   resize: vertical;
@@ -729,6 +730,7 @@
 /* Breiter Dialog (lg, 680px): das Modal hat die Hoehe, das Feld nimmt sie. */
 @container modal-body (min-width: 600px) {
   .note-editor__text {
+    min-height: max(25rem, 45vh);
     min-height: max(25rem, 45dvh);
   }
 }
