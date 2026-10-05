@@ -264,6 +264,15 @@
   white-space: nowrap;
 }
 
+/* Wie Budget (budget.css, `.budget-nav__label`): ab der regulaeren Breite
+ * bleibt der Stepper eine Gruppe, statt die Pfeile ueber den Slot zu spreizen. */
+@media (min-width: 768px) {
+  .housekeeping-month-nav__label {
+    flex: 0 0 auto;
+    min-inline-size: calc(var(--space-12) * 3);
+  }
+}
+
 .housekeeping-month-nav__current {
   padding: var(--space-1) var(--space-3);
 }

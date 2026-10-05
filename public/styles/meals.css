@@ -70,6 +70,9 @@
   text-align: center;
   /* Der Datumsbereich darf nicht zwischen den beiden Chevrons zerbrechen. */
   white-space: nowrap;
+  /* Gleich breite Ziffern: der Weiter-Pfeil wandert beim Wochenwechsel nicht
+   * mehr um die Breite einer anderen Ziffer (R16: x=483/485/491). */
+  font-variant-numeric: tabular-nums;
   /* KEINE Mindestbreite. Naheliegend wäre eine, damit die Chevrons beim
    * Wochenwechsel nicht um die Breite eines Monatsübergangs wandern. Als feste
    * 14rem sprengte sie bei 320px die Zeile, und als `min(14rem, 100%)` erzeugte

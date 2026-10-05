@@ -96,6 +96,19 @@
   text-align: center;
 }
 
+/* AB DER REGULAEREN BREITE WAECHST DAS LABEL NICHT MEHR MIT (R16,
+ * Gesamtpruefung). Seit das Modul die breite Bahn belegt, spreizte `flex: 1`
+ * die Pfeile ueber den ganzen Slot (1280: "<" bei x=365, ">" bei 1008, in der
+ * Statistik bei 1119) - der Weiter-Pfeil stand je Reiter woanders. Eine
+ * Mindestbreite haelt die Pfeile beim Blaettern durch die Monate an ihrem
+ * Platz; ein laengerer Wochenbereich darf sie ueberschreiten. */
+@media (min-width: 768px) {
+  .budget-nav__label {
+    flex: 0 0 auto;
+    min-inline-size: calc(var(--space-12) * 3);
+  }
+}
+
 /* Aktion, keine Selektion: bewusst Outline-Grammatik statt getönter Pille, damit
  * „Aktuell" neben der aktiven Tab-Pille nicht wie eine zweite Auswahl aussieht.
  * Das IST .btn--secondary - die Regel stand hier einmal handkopiert, mit dem
