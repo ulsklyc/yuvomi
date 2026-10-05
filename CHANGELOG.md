@@ -147,7 +147,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of being cut after "Gemeinsames Gi...".
 - **Movement follows one curve.** Hover and press feedback ran on a different easing curve than
   pages, dialogs and lists; buttons, rows, chips and toggles now share the curve of the rest of
-  the app. Nothing in the working flow moves for longer than 300ms.
+  the app.
 - **Sheets from below move the same way.** The dialog sheet, the "More" sheet and the search on
   a phone were three different movements; all three now rise by a short lift with a fade and
   leave faster than they arrive. Menus fade out instead of vanishing.
