@@ -34,12 +34,20 @@ const uid = u1.lastInsertRowid;
 
 console.log('\n[Shopping-Test] Listen, Artikel, Sortierung\n');
 
-test('Einkaufslisten-Zeilen toggeln nur außerhalb interaktiver Controls', () => {
+// R16 (Critique 2026-10-05, P1 Bausteine; DESIGN.md "Was eine Zeile tut"): der
+// Zeilenklick hakte ab, der Stift daneben oeffnete den Dialog - im Vorrat
+// nebenan oeffnete derselbe Tipp den Dialog. Jetzt oeffnet der Zeilenkoerper
+// (ein echter Knopf), Abhaken bleibt Kaestchen und Wisch. Gegen den Stand davor
+// rot gelaufen.
+test('Einkaufszeile: der Koerper oeffnet den Artikel, das Kaestchen hakt ab - kein Zeilenklick, kein Stift', () => {
   const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
-  assert(/function shouldIgnoreShoppingRowToggle/.test(source), 'Row-Toggle-Guard muss als Helper existieren');
-  assert(/button, a, input, select, textarea, \[data-no-row-toggle\]/.test(source), 'Interaktive Controls müssen ignoriert werden');
-  assert(/closest\('\.shopping-item'\)/.test(source), 'Klicks müssen auf Einkaufszeilen begrenzt sein');
-  assert(/data-item-id/.test(source), 'Zeilen-Toggle muss die Artikel-ID aus data-item-id lesen');
+  assert(/<button type="button" class="list-row__main list-row__main--interactive" data-action="item-details" data-id="\$\{item\.id\}">/.test(source),
+    'der Zeilenkoerper ist ein Knopf mit dem Ziel item-details');
+  assert(!/data-lucide="pencil"/.test(source.match(/function renderItem\(item\)[\s\S]*?\n\}/)?.[0] ?? 'data-lucide="pencil"'),
+    'der Stift doppelte den Koerper und entfaellt');
+  assert(!/shouldIgnoreShoppingRowToggle/.test(source), 'der Zeilenklick-Zweig ist weg, nicht nur stillgelegt');
+  assert(/if \(!target\) return;/.test(source), 'ein Tipp in die Polsterung raet kein Ziel');
+  assert(/data-action="toggle-item"/.test(source), 'das Kaestchen bleibt das Abhak-Ziel');
 });
 
 test('Shopping-Löschaktionen importieren den gemeinsamen Undo-Helper', () => {

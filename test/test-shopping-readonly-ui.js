@@ -464,8 +464,10 @@ test('Delegierter Handler bei `read`: nur die Positivliste kommt durch', async (
       zustand();
       await handler(klick({ aktion: 'delete-item' }));
     }));
-    assert.deepEqual(schreibend, ['PATCH /shopping/items/1', 'PATCH /shopping/items/1'],
-      'Gegenprobe: Knopf und Zeilenklick haken mit Schreibrecht ab');
+    // Seit R16 hakt nur noch das Kaestchen ab: der Zeilenkoerper oeffnet den
+    // Artikel, ein Klick ohne Ziel (Polsterung) tut nichts.
+    assert.deepEqual(schreibend, ['PATCH /shopping/items/1'],
+      'Gegenprobe: das Kaestchen hakt mit Schreibrecht ab, der Zeilenklick nicht mehr');
     assert.equal(undo.length, 1, 'Gegenprobe: das Loeschen landet im Undo-Fenster');
   } finally {
     delete globalThis.__undoStub;
