@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Sign-in pages no longer stack inside each other.** Going from one page without sign-in to
+  the next inside the app - "Back to sign in" on the forgotten-password page, or the back button
+  between them - put the new page inside the old one. The card then shrank to the width of its
+  content (338px on the sign-in page, 307px on the reset page, instead of 380px), and a screen
+  reader met two nested main regions. Each of these pages now replaces the one before it.
 - **A module switched off for the household no longer works in the background** (#1660). With
   Health switched off, the medication scheduler kept creating the due doses and sending their
   reminders - as a push and on notification channels, to the person and to their caregivers - and

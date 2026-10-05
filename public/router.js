@@ -18,6 +18,7 @@ import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight } from '/ut
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
 import { showToast } from '/utils/toast-show.js';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
+import { pageMountTarget } from '/utils/page-mount.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
 import { watchToastPlacement } from '/utils/toast-placement.js';
@@ -1815,7 +1816,9 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
       refreshModuleCountsUnlessPageProvides(route.path);
     }
 
-    const content = document.getElementById('main-content') || app;
+    // Eine Seite ohne Anmeldung haengt an der App-Wurzel, nie im `main` ihrer
+    // Vorgaengerin (utils/page-mount.js).
+    const content = pageMountTarget(route, app);
 
     // Seitenwechsel (Critique 2026-09-26, P2-1): der Tausch laeuft als View
     // Transition, wo der Browser sie kann - alter Inhalt blendet in den neuen,

@@ -229,6 +229,7 @@ const APP_SHELL = [
   '/utils/toast-surface.js',
   '/utils/today-sheet.js',
   '/utils/unknown-route.js',
+  '/utils/page-mount.js',
   '/utils/ux.js',
   '/utils/vcard.js',
   '/utils/view-transition.js',
