@@ -2809,6 +2809,7 @@ positive Aktion, das Zeilenende das Destruktive oder Sekundaere:
 | Geburtstage | bearbeiten (`--edit`), federt zurueck | loeschen (`--delete`), federt zurueck, widerrufbar |
 | Haushaltshilfe (Aufgaben) | erledigen (`--done`), federt zurueck - die Zeile bleibt, nur ihre Frist setzt zurueck | loeschen (`--delete`), federt zurueck, widerrufbar |
 | Abonnements | Zahlung buchen (`--done`), federt zurueck, fragt nach | loeschen (`--delete`), federt zurueck, fragt nach |
+| Vorrat | - (keine Geste: am Zeilenanfang gibt es nichts Positives zu erledigen, Bearbeiten ist der Zeilenkoerper) | loeschen (`--delete`), federt zurueck, widerrufbar |
 
 Die Abo-Zeile ist die einzige, deren `--done` nicht abhakt, sondern BUCHT: sie schiebt das
 Faelligkeitsdatum und legt einen Budget-Eintrag an. Ein zweiter Wisch nimmt das nicht
@@ -2822,7 +2823,8 @@ Tastaturweg an seine Stelle zu setzen.
 Widerspruch: die Regel ordnet einen RANG zu, keine Rolle. Wo eine positive Aktion in der
 Liste steht, ist Bearbeiten die sekundaere; wo keine steht, ist es die primaere. Fest
 liegen die beiden Enden der Skala - `--delete` steht nie am Zeilenanfang, `--done` nie am
-Ende. Genau das misst der Guard.
+Ende. Genau das misst der Guard - je Kante, die eine Zeile belegt: eine einseitige Zeile
+(Vorrat) deckt an der leeren Kante nichts auf, und auch das misst Sonde 5.
 
 **Eine Geste, die loescht, hat einen Rueckweg**, nie ein direktes `api.delete`. Der Einkauf
 war die eine Stelle, die sofort und endgueltig loeschte - wer die Geste in zwei Listen als
