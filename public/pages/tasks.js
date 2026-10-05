@@ -3836,6 +3836,15 @@ function syncFilterSheet(panel) {
       : hasFilter(chip.dataset.filter, chip.dataset.value);
     chip.classList.toggle('filter-chip--active', on);
     chip.setAttribute('aria-pressed', String(on));
+    // WAS WIRKT, STEHT OFFEN - auch wenn es NACH dem Oeffnen des Blatts gesetzt
+    // wurde. Ein gemerktes Set ("Zuletzt benutzt") kann Kategorie oder Tag
+    // setzen, waehrend deren Aufklapper zu ist: der Chip wurde aktiv, blieb
+    // aber verborgen. Nur aufklappen, nie zuklappen und nichts neu bauen - der
+    // Fokus steht vielleicht gerade in der Falte.
+    if (on) {
+      const fold = chip.closest('details.filter-sheet__fold');
+      if (fold && !fold.open) fold.open = true;
+    }
   });
   const mine = panel.querySelector('[data-filter-mine]');
   if (mine) mine.checked = isAssignedToMe();

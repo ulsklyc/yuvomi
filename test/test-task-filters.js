@@ -439,6 +439,41 @@ test('ein Chip im Blatt schaltet seinen Wert und bleibt DERSELBE Knoten (Lehre a
   assert.equal(high.getAttribute('aria-pressed'), 'false');
 });
 
+// Review PR #1673: Kategorie und Tag stehen im Blatt eingeklappt, solange
+// nichts gewaehlt ist. Ein gemerktes Set setzt sie bei OFFENEM Blatt - der Chip
+// wurde aktiv, seine Falte blieb zu, und ein wirkender Filter war verborgen.
+test('ein gemerktes Set klappt die Falte seiner Achse auf - derselbe Knoten, nichts klappt zu', async () => {
+  baseState();
+  const { chips, panel, container } = mountSheet();
+  const fold = (open) => ({ open });
+  const withFold = (dataset, f) => {
+    const chip = new SheetEl({ dataset });
+    chip.closest = (sel) => (sel === 'details.filter-sheet__fold' ? f : SheetEl.prototype.closest.call(chip, sel));
+    return chip;
+  };
+  const tagFold = fold(false);
+  const catFold = fold(false);
+  const tagChip = withFold({ filter: 'tag', value: 'Garten' }, tagFold);
+  const catChip = withFold({ filter: 'category', value: 'household' }, catFold);
+  chips.push(tagChip, catChip);
+  tasks.state.filterSheet = panel;
+
+  const recent = new SheetEl({ dataset: {
+    recentFilter: JSON.stringify({ status: ['open'], priority: [], assigned_to: [], category: [], tags: ['garten'] }),
+  } });
+  await tasks.onFilterSheetClick({ target: recent }, container);
+  assert.deepEqual(tasks.state.filters.tags, ['garten']);
+  assert.equal(tagChip.getAttribute('aria-pressed'), 'true');
+  assert.equal(tagFold.open, true, 'die Falte mit dem wirkenden Tag steht offen');
+  assert.equal(catFold.open, false, 'eine Achse ohne Wahl bleibt zu');
+
+  // Faellt die Wahl wieder weg, bleibt die Falte offen: zuklappen naehme dem
+  // Chip, auf dem der Fokus steht, den Boden.
+  await tasks.onFilterSheetClick({ target: tagChip }, container);
+  assert.deepEqual(tasks.state.filters.tags, []);
+  assert.equal(tagFold.open, true);
+});
+
 test('die Schalter im Blatt: „Mir zugewiesen" ist die eigene ID in der Personenachse', async () => {
   baseState({ filters: { status: ['open'], priority: [], assigned_to: ['2'], category: [], tags: [] } });
   const { mine, future, container } = mountSheet();
