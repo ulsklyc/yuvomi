@@ -730,6 +730,8 @@
         "addMealOnDay": "{{day}}に食事を追加",
         "addMealTypeOnDay": "{{day}}に{{type}}を追加",
         "editMeal": "食事を編集",
+        "mealSaved": "食事が保存されました。",
+        "mealUpdated": "食事が更新されました。",
         "addMealTitle": "食事を追加",
         "planRecipeNamed": "「{{name}}」を献立に追加",
         "suggestionsLabel": "候補",

@@ -793,6 +793,8 @@
         "addMealOnDay": "Přidat jídlo ({{day}})",
         "addMealTypeOnDay": "Přidat {{type}} ({{day}})",
         "editMeal": "Upravit jídlo",
+        "mealSaved": "Jídlo uloženo.",
+        "mealUpdated": "Jídlo aktualizováno.",
         "addMealTitle": "Přidat jídlo",
         "planRecipeNamed": "Naplánovat „{{name}}“",
         "suggestionsLabel": "Návrhy",

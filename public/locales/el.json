@@ -730,6 +730,8 @@
         "addMealOnDay": "Προσθήκη γεύματος ({{day}})",
         "addMealTypeOnDay": "Προσθήκη {{type}} ({{day}})",
         "editMeal": "Επεξεργασία γεύματος",
+        "mealSaved": "Το γεύμα αποθηκεύτηκε.",
+        "mealUpdated": "Το γεύμα ενημερώθηκε.",
         "addMealTitle": "Προσθήκη γεύματος",
         "planRecipeNamed": "Προγραμματισμός «{{name}}»",
         "suggestionsLabel": "Προτάσεις",

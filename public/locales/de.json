@@ -744,6 +744,8 @@
         "addMealOnDay": "Mahlzeit am {{day}} hinzufügen",
         "addMealTypeOnDay": "{{type}} am {{day}} hinzufügen",
         "editMeal": "Mahlzeit bearbeiten",
+        "mealSaved": "Mahlzeit gespeichert.",
+        "mealUpdated": "Mahlzeit aktualisiert.",
         "addMealTitle": "Mahlzeit hinzufügen",
         "planRecipeNamed": "„{{name}}“ einplanen",
         "suggestionsLabel": "Vorschläge",

@@ -744,6 +744,8 @@
         "addMealOnDay": "Tambah makanan pada {{day}}",
         "addMealTypeOnDay": "Tambah {{type}} pada {{day}}",
         "editMeal": "Ubah makanan",
+        "mealSaved": "Makanan disimpan.",
+        "mealUpdated": "Makanan diperbarui.",
         "addMealTitle": "Tambah makanan",
         "planRecipeNamed": "Rencanakan \"{{name}}\"",
         "suggestionsLabel": "Saran",

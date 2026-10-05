@@ -730,6 +730,8 @@
         "addMealOnDay": "Yemek ekle ({{day}})",
         "addMealTypeOnDay": "{{type}} ekle ({{day}})",
         "editMeal": "Yemeği düzenle",
+        "mealSaved": "Yemek kaydedildi.",
+        "mealUpdated": "Yemek güncellendi.",
         "addMealTitle": "Yemek ekle",
         "planRecipeNamed": "„{{name}}” planla",
         "suggestionsLabel": "Öneriler",

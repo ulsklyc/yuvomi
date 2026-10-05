@@ -744,6 +744,8 @@
         "addMealOnDay": "افزودن وعده برای {{day}}",
         "addMealTypeOnDay": "افزودن {{type}} برای {{day}}",
         "editMeal": "ویرایش وعده",
+        "mealSaved": "وعده ذخیره شد.",
+        "mealUpdated": "وعده به‌روزرسانی شد.",
         "addMealTitle": "افزودن وعده",
         "planRecipeNamed": "برنامه‌ریزی «{{name}}»",
         "suggestionsLabel": "پیشنهادها",

@@ -730,6 +730,8 @@
         "addMealOnDay": "Adicionar refeição ({{day}})",
         "addMealTypeOnDay": "Adicionar {{type}} ({{day}})",
         "editMeal": "Editar refeição",
+        "mealSaved": "Refeição salva.",
+        "mealUpdated": "Refeição atualizada.",
         "addMealTitle": "Adicionar refeição",
         "planRecipeNamed": "Planear «{{name}}»",
         "suggestionsLabel": "Sugestões",

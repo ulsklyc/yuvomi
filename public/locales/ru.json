@@ -851,6 +851,8 @@
         "addMealOnDay": "Добавить приём пищи ({{day}})",
         "addMealTypeOnDay": "Добавить {{type}} ({{day}})",
         "editMeal": "Редактировать приём пищи",
+        "mealSaved": "Приём пищи сохранен.",
+        "mealUpdated": "Приём пищи обновлен.",
         "addMealTitle": "Добавить приём пищи",
         "planRecipeNamed": "Запланировать «{{name}}»",
         "suggestionsLabel": "Предложения",

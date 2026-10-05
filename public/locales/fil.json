@@ -744,6 +744,8 @@
         "addMealOnDay": "Magdagdag ng pagkain sa {{day}}",
         "addMealTypeOnDay": "Magdagdag ng {{type}} sa {{day}}",
         "editMeal": "I-edit ang pagkain",
+        "mealSaved": "Na-save ang pagkain.",
+        "mealUpdated": "Na-update ang pagkain.",
         "addMealTitle": "Magdagdag ng pagkain",
         "planRecipeNamed": "Iplano ang \"{{name}}\"",
         "suggestionsLabel": "Mga mungkahi",

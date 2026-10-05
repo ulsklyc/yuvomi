@@ -909,6 +909,8 @@
         "addMealOnDay": "إضافة وجبة يوم {{day}}",
         "addMealTypeOnDay": "إضافة {{type}} يوم {{day}}",
         "editMeal": "تعديل الوجبة",
+        "mealSaved": "تم حفظ الوجبة.",
+        "mealUpdated": "تم تحديث الوجبة.",
         "addMealTitle": "إضافة وجبة",
         "planRecipeNamed": "تخطيط «{{name}}»",
         "suggestionsLabel": "اقتراحات",

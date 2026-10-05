@@ -730,6 +730,8 @@
         "addMealOnDay": "在{{day}}添加餐食",
         "addMealTypeOnDay": "在{{day}}添加{{type}}",
         "editMeal": "编辑餐食",
+        "mealSaved": "餐食已保存。",
+        "mealUpdated": "餐食已更新。",
         "addMealTitle": "添加餐食",
         "planRecipeNamed": "安排“{{name}}”",
         "suggestionsLabel": "建议",

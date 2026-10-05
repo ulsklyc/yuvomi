@@ -730,6 +730,8 @@
         "addMealOnDay": "Maaltijd toevoegen ({{day}})",
         "addMealTypeOnDay": "{{type}} toevoegen ({{day}})",
         "editMeal": "Maaltijd bewerken",
+        "mealSaved": "Maaltijd opgeslagen.",
+        "mealUpdated": "Maaltijd bijgewerkt.",
         "addMealTitle": "Maaltijd toevoegen",
         "planRecipeNamed": "„{{name}}” inplannen",
         "suggestionsLabel": "Suggesties",

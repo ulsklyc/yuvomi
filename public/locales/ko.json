@@ -744,6 +744,8 @@
         "addMealOnDay": "{{day}}에 식사 추가",
         "addMealTypeOnDay": "{{day}}에 {{type}} 추가",
         "editMeal": "식사 편집",
+        "mealSaved": "식사가 저장되었습니다.",
+        "mealUpdated": "식사가 업데이트되었습니다.",
         "addMealTitle": "식사 추가",
         "planRecipeNamed": "“{{name}}” 계획하기",
         "suggestionsLabel": "추천",

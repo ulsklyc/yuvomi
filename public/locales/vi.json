@@ -730,6 +730,8 @@
         "addMealOnDay": "Thêm bữa ăn vào {{day}}",
         "addMealTypeOnDay": "Thêm {{type}} vào {{day}}",
         "editMeal": "Sửa bữa ăn",
+        "mealSaved": "Bữa ăn đã lưu.",
+        "mealUpdated": "Bữa ăn đã cập nhật.",
         "addMealTitle": "Thêm bữa ăn",
         "planRecipeNamed": "Lên kế hoạch “{{name}}”",
         "suggestionsLabel": "Gợi ý",

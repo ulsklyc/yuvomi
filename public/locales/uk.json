@@ -851,6 +851,8 @@
         "addMealOnDay": "Додати страву ({{day}})",
         "addMealTypeOnDay": "Додати {{type}} ({{day}})",
         "editMeal": "Редагувати страву",
+        "mealSaved": "Страву збережено.",
+        "mealUpdated": "Страву оновлено.",
         "addMealTitle": "Додати страву",
         "planRecipeNamed": "Запланувати «{{name}}»",
         "suggestionsLabel": "Пропозиції",

@@ -1543,14 +1543,44 @@ function wireDragDrop(grid) {
   }, true);
 }
 
-async function moveMeal(mealId, targetDate, targetType) {
+/**
+ * Eine Mahlzeit auf einen anderen Tag oder eine andere Mahlzeit ziehen.
+ *
+ * OPTIMISTISCH (Critique 2026-10-05, R16). Die Funktion wartete auf den Server
+ * und baute erst danach neu: die Karte stand solange am alten Platz, das
+ * Ablegen sah also aus, als haette es nicht geklappt. Und scheiterte der
+ * Aufruf, baute die Woche still neu - die Karte war ohne ein Wort wieder da,
+ * wo sie herkam. Jetzt zieht der Zustand sofort um; im Fehlerfall kehrt er
+ * zurueck, und der Fehler wird gemeldet (dasselbe Muster wie beim Einplanen
+ * weiter oben).
+ *
+ * Zurueckgesetzt wird nur, was noch DIESER Zug gesetzt hat: liegt die Karte
+ * inzwischen woanders (ein zweites Ziehen vor der Antwort), gehoert ihr Platz
+ * dem spaeteren Zug.
+ *
+ * @param {number} mealId
+ * @param {string} targetDate  YYYY-MM-DD
+ * @param {string} targetType
+ * @param {{ rerender?: () => void }} [opts]  nur fuer Tests
+ */
+async function moveMeal(mealId, targetDate, targetType, { rerender = renderWeekGrid } = {}) {
+  const meal = state.meals.find((m) => m.id === mealId);
+  const origin = meal ? { date: meal.date, meal_type: meal.meal_type } : null;
+  if (meal) {
+    meal.date = targetDate;
+    meal.meal_type = targetType;
+    rerender();
+  }
   try {
     await api.put(`/meals/${mealId}`, { date: targetDate, meal_type: targetType });
-    const m = state.meals.find((m) => m.id === mealId);
-    if (m) { m.date = targetDate; m.meal_type = targetType; }
-    renderWeekGrid();
-  } catch {
-    renderWeekGrid();
+    if (!meal) rerender();
+  } catch (err) {
+    if (meal && origin && meal.date === targetDate && meal.meal_type === targetType) {
+      meal.date = origin.date;
+      meal.meal_type = origin.meal_type;
+    }
+    rerender();
+    window.yuvomi?.showToast(window.yuvomi?.friendlyError?.(err) ?? t('common.errorGeneric'), 'danger');
   }
 }
 
@@ -2162,7 +2192,9 @@ async function saveModal(overlay) {
 
     closeModal({ force: true });
     renderWeekGrid();
-    window.yuvomi?.showToast(mode === 'create' ? t('meals.addMealTitle') : t('meals.editMeal'), 'success');
+    // Das Ergebnis, nicht der Dialogtitel: „Mahlzeit hinzufügen" als
+    // Erfolgsmeldung liest sich wie eine Aufforderung (R16).
+    window.yuvomi?.showToast(mode === 'create' ? t('meals.mealSaved') : t('meals.mealUpdated'), 'success');
   } catch (err) {
     window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
     saveBtn.disabled    = false;
@@ -2300,6 +2332,8 @@ async function transferMeal(mealId, btn) {
 
 export const __test = {
   buildRandomMealAssignments,
+  // Verschieben per Ziehen (R16): optimistisch, mit Ruecksprung und Meldung.
+  moveMeal,
   // Kuechenkopf (Kopfregel mobil): das EINE Werkzeugmenue (test-meals.js).
   mealsToolsMenuHtml,
   mealPayloadFromRecipe,

@@ -730,6 +730,8 @@
         "addMealOnDay": "{{day}} को भोजन जोड़ें",
         "addMealTypeOnDay": "{{day}} को {{type}} जोड़ें",
         "editMeal": "भोजन संपादित करें",
+        "mealSaved": "भोजन सहेजा गया।",
+        "mealUpdated": "भोजन अपडेट किया गया।",
         "addMealTitle": "भोजन जोड़ें",
         "planRecipeNamed": "“{{name}}” की योजना बनाएं",
         "suggestionsLabel": "सुझाव",

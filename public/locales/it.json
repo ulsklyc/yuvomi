@@ -730,6 +730,8 @@
         "addMealOnDay": "Aggiungi pasto ({{day}})",
         "addMealTypeOnDay": "Aggiungi {{type}} ({{day}})",
         "editMeal": "Modifica pasto",
+        "mealSaved": "Pasto salvato.",
+        "mealUpdated": "Pasto aggiornato.",
         "addMealTitle": "Aggiungi pasto",
         "planRecipeNamed": "Pianifica «{{name}}»",
         "suggestionsLabel": "Suggerimenti",

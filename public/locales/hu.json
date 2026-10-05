@@ -730,6 +730,8 @@
         "addMealOnDay": "Étkezés hozzáadása: {{day}}",
         "addMealTypeOnDay": "Étkezés hozzáadása: {{type}}, {{day}}",
         "editMeal": "Étkezés szerkesztése",
+        "mealSaved": "Étkezés mentve.",
+        "mealUpdated": "Étkezés frissítve.",
         "addMealTitle": "Étkezés hozzáadása",
         "planRecipeNamed": "„{{name}}” betervezése",
         "suggestionsLabel": "Javaslatok",

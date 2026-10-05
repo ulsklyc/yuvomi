@@ -865,6 +865,8 @@
         "addMealOnDay": "Dodaj posiłek ({{day}})",
         "addMealTypeOnDay": "Dodaj {{type}} ({{day}})",
         "editMeal": "Edytuj posiłek",
+        "mealSaved": "Posiłek zapisany.",
+        "mealUpdated": "Posiłek zaktualizowany.",
         "addMealTitle": "Dodaj posiłek",
         "planRecipeNamed": "Zaplanuj „{{name}}”",
         "suggestionsLabel": "Sugestie",

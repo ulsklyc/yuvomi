@@ -730,6 +730,8 @@
         "addMealOnDay": "Lägg till måltid ({{day}})",
         "addMealTypeOnDay": "Lägg till {{type}} ({{day}})",
         "editMeal": "Redigera måltid",
+        "mealSaved": "Måltid sparad.",
+        "mealUpdated": "Måltid uppdaterad.",
         "addMealTitle": "Lägg till måltid",
         "planRecipeNamed": "Planera ”{{name}}”",
         "suggestionsLabel": "Förslag",
