@@ -739,11 +739,20 @@
   display: block;
   position: relative;
   width: 100%;
-  padding: 0;
+  padding-inline: 0;
   text-align: start;
   color: var(--color-text-primary);
   line-height: var(--line-height-snug);
-  margin-bottom: var(--space-0h);
+  /* DIE BOX TRAEGT DIE TREFFERFLAECHE, IN JEDER BREITE (R16, Sonde 4 der
+   * Dokument-Guards). Das ::before unten wird von `overflow: hidden` (der
+   * Ellipse) auf die Textzeile beschnitten; mobil hob schon das Polster die
+   * Box, am Desktop blieb sie 22px hoch, seit der Zeilentitel 16px misst.
+   * Polster nach oben bis an die Zeilenkante, nach unten bis an die Metazeile,
+   * und der Rand nimmt es zurueck - der Text bleibt, wo er steht. */
+  padding-block-start: var(--list-row-pad, var(--space-3));
+  padding-block-end: var(--space-0h);
+  margin-block-start: calc(-1 * var(--list-row-pad, var(--space-3)));
+  margin-block-end: 0;
   cursor: pointer;
   /* EINZEILIG MIT ELLIPSE, und das ist die Ausnahme von der Regel nebenan
    * (list-row.css: „UMBRECHEN, NICHT ABSCHNEITEN"). Die Regel gilt dem
