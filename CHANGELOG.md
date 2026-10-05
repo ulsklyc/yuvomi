@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Add waste type" moves into the "more" menu on a phone, and in Documents the grid/list choice
   moves into the sort menu. The note "Birthdays also appear in the calendar" no
   longer stands above the list - it is still in the dialog where you add one.
+- **"Split" shows the first expense on the first screen of a phone.** The group list, the group
+  header and the balances stood as three cards in front of it, and the first expense came after
+  more than a full screen. The group choice is now one row that names the active group and
+  opens the list with search, "new group" and Active/Archived; the group header is just its
+  actions, and the balances are tighter. On a wide window nothing changes.
 
 ### Fixed
 
