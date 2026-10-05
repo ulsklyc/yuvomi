@@ -450,7 +450,7 @@ function renderSetupHints() {
     </li>`).join('');
   return `
     <section class="rw-section rw-setup" aria-labelledby="rw-setup-title">
-      <h2 class="rw-section__title u-section-title" id="rw-setup-title"><i data-lucide="sparkles" aria-hidden="true"></i>${esc(t('rewards.setupTitle'))}</h2>
+      <h2 class="rw-section__title u-section-title" id="rw-setup-title">${esc(t('rewards.setupTitle'))}</h2>
       <ol class="rw-setup-list">${items}</ol>
     </section>`;
 }
@@ -507,7 +507,7 @@ function renderPendingPanel() {
    * dasselbe Vokabular, das die Zeilengruppen schon fuehren. */
   return `
     <section class="rw-section">
-      <h2 class="rw-section__title u-section-title"><i data-lucide="hourglass" aria-hidden="true"></i>${esc(heading)}<span class="list-group__count">${state.redemptions.length}</span></h2>
+      <h2 class="rw-section__title u-section-title">${esc(heading)}<span class="list-group__count">${state.redemptions.length}</span></h2>
       <ul class="rw-pending-list rw-pending-panel">${rows}</ul>
     </section>`;
 }
@@ -641,10 +641,12 @@ function renderRewardCard(item) {
 function renderCatalog(el) {
   el.replaceChildren();
   const items = state.catalog || [];
+  // „Praemien" unter dem Reiter „Praemien" nennt die Ebene ein zweites Mal:
+  // die Ueberschrift haelt die Gliederung, sie steht nicht da (`.sr-only`,
+  // test-typography.js). Bis R16 trug sie ein Icon vor dem Wort - genau das
+  // machte den Guard blind, und am Desktop stand der Titel sichtbar da.
   const header = isAdmin() ? `
-    <div class="rw-section__head">
-      <h2 class="rw-section__title u-section-title"><i data-lucide="gift" aria-hidden="true"></i>${esc(t('rewards.tabCatalog'))}</h2>
-    </div>` : '';
+      <h2 class="sr-only">${esc(t('rewards.tabCatalog'))}</h2>` : '';
   if (!items.length) {
     const action = isAdmin() && !readOnly()
       ? { label: t('rewards.addReward'), icon: 'plus', className: 'rw-add-reward' }
@@ -699,15 +701,18 @@ function ledgerReason(row) {
   return t(`rewards.ledgerType.${row.type}`);
 }
 
-/** Eine Buchungszeile - der Verlauf und die Seitenspalte der Uebersicht teilen sie. */
+/** Eine Buchungszeile - der Verlauf und die Seitenspalte der Uebersicht teilen sie.
+ * Sie ist eine `.list-row` im `.row-carrier` (list-row.css): Zeichen | Grund +
+ * Meta | Punkte. Bis R16 baute rewards.css Traeger, Zeile, Trennlinie und
+ * Schnitt als `.rw-ledger*` ein zweites Mal nach. */
 function ledgerRowHtml(row) {
   const positive = row.delta > 0;
   return `
-      <li class="rw-ledger-row">
+      <li class="list-row rw-ledger-row">
         <span class="rw-ledger-row__icon rw-ledger-row__icon--${esc(row.type)}"><i data-lucide="${LEDGER_ICON[row.type] || 'circle'}" aria-hidden="true"></i></span>
-        <div class="rw-ledger-row__text">
-          <p class="rw-ledger-row__reason">${esc(ledgerReason(row))}</p>
-          <p class="rw-ledger-row__meta">${esc(row.user_name)} · ${esc(formatDate(row.created_at))}</p>
+        <div class="list-row__main">
+          <p class="list-row__name rw-ledger-row__reason">${esc(ledgerReason(row))}</p>
+          <p class="list-row__meta rw-ledger-row__meta">${esc(row.user_name)} · ${esc(formatDate(row.created_at))}</p>
         </div>
         <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>
       </li>`;
@@ -723,9 +728,9 @@ function renderRecentLedger() {
   return `
       <section class="rw-section rw-recent">
         <h2 class="rw-section__title u-section-title">
-          <button class="rw-section__more" type="button">${esc(t('rewards.tabLedger'))}<i data-lucide="chevron-right" aria-hidden="true"></i></button>
+          <button class="section-title-link rw-section__more" type="button">${esc(t('rewards.tabLedger'))}<i data-lucide="chevron-right" aria-hidden="true"></i></button>
         </h2>
-        <ul class="rw-ledger">${rows.map(ledgerRowHtml).join('')}</ul>
+        <ul class="rw-ledger row-carrier">${rows.map(ledgerRowHtml).join('')}</ul>
       </section>`;
 }
 
@@ -781,7 +786,7 @@ function renderLedger(el) {
           ${adminBar}
         </div>
         ${state.ledger.length
-          ? `<ul class="rw-ledger">${rows}</ul>`
+          ? `<ul class="rw-ledger row-carrier">${rows}</ul>`
           : emptyState('history', t('rewards.emptyLedgerTitle'), t('rewards.emptyLedgerBody'))}
       </section>`,
         rail: renderBalancesRail(),
@@ -1170,12 +1175,12 @@ async function openMemberDetail(memberId) {
   const hint = nextRewardHint(member.balance);
   const rows = ledger.length ? ledger.map((row) => {
     const positive = row.delta > 0;
-    return `<li class="rw-ledger-row rw-ledger-row--compact">
+    return `<li class="list-row rw-ledger-row rw-ledger-row--compact">
       <span class="rw-ledger-row__icon rw-ledger-row__icon--${esc(row.type)}"><i data-lucide="${LEDGER_ICON[row.type] || 'circle'}" aria-hidden="true"></i></span>
-      <div class="rw-ledger-row__text"><p class="rw-ledger-row__reason">${esc(ledgerReason(row))}</p><p class="rw-ledger-row__meta">${esc(formatDate(row.created_at))}</p></div>
+      <div class="list-row__main"><p class="list-row__name rw-ledger-row__reason">${esc(ledgerReason(row))}</p><p class="list-row__meta rw-ledger-row__meta">${esc(formatDate(row.created_at))}</p></div>
       <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>
     </li>`;
-  }).join('') : `<li class="rw-ledger-row rw-ledger-row--compact"><p class="rw-ledger-row__meta">${esc(t('rewards.emptyLedgerBody'))}</p></li>`;
+  }).join('') : `<li class="list-row rw-ledger-row rw-ledger-row--compact"><p class="list-row__meta rw-ledger-row__meta">${esc(t('rewards.emptyLedgerBody'))}</p></li>`;
   const canRedeem = actingAsDisplay()
     ? displayMayRedeemFor(member.id)
     : (!readOnly() && (isAdmin() || member.id === state.overview?.me));
@@ -1189,7 +1194,7 @@ async function openMemberDetail(memberId) {
           ${hint ? `<p class="rw-detail-hint">${esc(hint.label)}</p>` : ''}
         </div>
       </div>
-      <ul class="rw-ledger rw-ledger--compact">${rows}</ul>
+      <ul class="rw-ledger rw-ledger--compact row-divided">${rows}</ul>
       ${canRedeem ? `<div class="modal-panel__footer modal-panel__footer--plain">
         <button type="button" class="btn btn--primary" id="rw-detail-redeem"><i data-lucide="gift" aria-hidden="true"></i>${esc(redeemVerb())}</button>
       </div>` : ''}`,

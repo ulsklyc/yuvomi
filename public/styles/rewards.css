@@ -66,38 +66,9 @@
   --page-columns-gap: var(--space-8);
 }
 
-/* Der Abschnittstitel als Weg in den Reiter (Seitenspalte der Uebersicht):
- * Schrift und Farbe kommen vom Titel, der Knopf traegt nur Ziel und Pfeil. */
-.rw-section__more {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  /* Volle Zielhoehe, ohne die Zeile hoeher zu machen als die anderen
-   * Abschnittstitel: der Ueberstand wird nach oben und unten zurueckgenommen. */
-  min-height: var(--target-base);
-  margin-block: calc((var(--target-base) - 1lh) / -2);
-  margin-inline: 0;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.rw-section__more:hover { color: var(--module-accent); }
-
-.rw-section__more:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
-}
-
-.rw-section__more svg {
-  inline-size: var(--icon-md);
-  block-size: var(--icon-md);
-  color: var(--color-text-tertiary);
-}
+/* Der Abschnittstitel als Weg in den Reiter (Seitenspalte der Uebersicht) ist
+ * `.section-title-link` (layout.css) - derselbe Knopf wie „Agenda >" in der
+ * Tagesansicht des Kalenders. */
 
 /* Punktestand in Kurzform (Seitenspalte des Verlaufs): nur Person und Punkte. */
 .rw-standing--compact {
@@ -210,7 +181,7 @@
  * schon in derselben Zeile und ist handlungsfaehig. */
 .rw-standing__idtext { min-width: 0; display: flex; flex-direction: column; }
 .rw-standing__name {
-  font-weight: 600;
+  /* Schnitt aus der Rolle Zeilentitel (typography.css). */
   color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -469,36 +440,20 @@
  * hier stand bis zur Re-Critique 2026-09-28 ein eigener `.rw-chip` mit 31px
  * Hoehe und ohne Zustand fuer den Screenreader. */
 
-/* Verlaufsliste: EIN Träger (Zeilenlisten-Regel, tokens.css). Der Träger endet
- * mit der Liste, deshalb trennt der +-Kombinator statt border-bottom je Zeile. */
+/* Verlaufsliste: Traeger und Zeile kommen aus list-row.css (`.row-carrier` +
+ * `.list-row`) - Flaeche, Radius, Trennlinie, Polster und der Schnitt des
+ * Grundes (`.list-row__name`) standen hier ein zweites Mal (Critique
+ * 2026-10-05, R16). Hier bleibt nur der Listen-Reset. */
 .rw-ledger {
   list-style: none;
   margin: 0;
   padding: 0;
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-}
-.rw-ledger-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-}
-.rw-ledger-row + .rw-ledger-row {
-  border-top: 1px solid var(--color-border-subtle);
 }
 /* Der Träger entscheidet (tokens.css): im Modal ist der Grund schon
  * --color-surface, eine zweite weisse Karte darauf wäre unsichtbar. Die
- * Kurzfassung der Liste bleibt deshalb trägerlos, nur mit Haarlinien. */
-.rw-ledger--compact {
-  background: none;
-  border-radius: 0;
-  box-shadow: none;
-  overflow: visible;
-}
-.rw-ledger-row--compact { padding: var(--space-2) 0; }
+ * Kurzfassung der Liste bleibt deshalb trägerlos, nur mit Haarlinien
+ * (`.row-divided`), und ohne seitliches Polster - der Dialog polstert. */
+.rw-ledger-row--compact { padding-inline: 0; }
 .rw-ledger-row__icon {
   flex: 0 0 auto;
   display: inline-flex;
@@ -532,10 +487,9 @@
  * zwei stumm neutral. Die Scheibe bleibt deshalb bei der neutralen Basis oben;
  * ein Vollton-Siegel je Zeile wäre die Gegenrichtung desselben Fehlers und
  * streute die Modulmarke durch die Liste ihres eigenen Moduls. */
-.rw-ledger-row__text { flex: 1 1 auto; min-width: 0; }
-.rw-ledger-row__reason { margin: 0; font-weight: 500; color: var(--color-text-primary); }
-.rw-ledger-row__meta { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--color-text-secondary); }
-.rw-delta { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rw-ledger-row__reason,
+.rw-ledger-row__meta { margin: 0; }
+.rw-delta { flex: 0 0 auto; font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; }
 /* Die Richtung der Buchung ist eine WERT-Aussage, keine Modul-Aussage: sie
  * nimmt den Zuwachs-Ton der App (Geld-Vokabular des Budgets), nicht den Ton des
  * Aufgabenmoduls, aus dem der Punkt zufällig stammte. */
@@ -642,16 +596,6 @@
     grid-column: 1 / -1;
     margin-top: 0;
     padding-top: 0;
-  }
-  /* „Praemien" unter dem Reiter „Praemien": 42px ohne Auskunft. Die
-   * Ueberschrift bleibt im Baum (Gliederung), sie steht nur nicht da. */
-  .rw-section--wide > .rw-section__head {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
   }
   /* Die Uebersicht endet seit R16 mit den letzten Buchungen (am Desktop die
    * Seitenspalte, sechs Zeilen). Mobil stehen sie UNTER den Punktestaenden:

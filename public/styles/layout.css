@@ -2755,6 +2755,49 @@ html.fab-anim-done .page-fab {
   container: module-surface / inline-size;
 }
 
+/* DER ABSCHNITTSTITEL ALS WEG (Critique 2026-10-05, R16). Steht ein Abschnitt
+ * als Auszug eines Reiters oder einer Ansicht da (die letzten Buchungen neben
+ * den Punktestaenden, die Folgetage neben dem Tag), ist sein Titel der Weg
+ * dorthin: Schrift und Farbe kommen vom Titel (`h2.u-section-title`), der
+ * Knopf darin traegt Ziel und Pfeil. Kein zweiter „Alle anzeigen"-Knopf, kein
+ * neuer Text.
+ *
+ * Volle Zielhoehe, ohne die Zeile hoeher zu machen als die anderen
+ * Abschnittstitel: der Ueberstand wird nach oben und unten zurueckgenommen.
+ * Stand bis R16 wortgleich als `.rw-section__more` (rewards.css) und
+ * `.day-rail__more` (calendar.css); die Modulklassen bleiben als Haken fuer
+ * die Verdrahtung. Guard: test-frontend-audit.js. */
+.section-title-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--target-base);
+  margin-block: calc((var(--target-base) - 1lh) / -2);
+  margin-inline: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.section-title-link:hover {
+  color: var(--module-accent, var(--color-accent));
+}
+
+.section-title-link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.section-title-link svg {
+  inline-size: var(--icon-md);
+  block-size: var(--icon-md);
+  color: var(--color-text-tertiary);
+}
+
 .page-columns {
   display: grid;
   grid-template-columns: minmax(0, var(--layout-reading));

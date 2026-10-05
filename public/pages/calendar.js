@@ -4954,7 +4954,7 @@ function renderDayRail() {
   return `
     <aside class="day-rail" aria-label="${esc(label)}">
       <h2 class="day-rail__title u-section-title">
-        <button type="button" class="day-rail__more">${esc(label)}<i data-lucide="chevron-right" aria-hidden="true"></i></button>
+        <button type="button" class="section-title-link day-rail__more">${esc(label)}<i data-lucide="chevron-right" aria-hidden="true"></i></button>
       </h2>
       ${groups.length ? groups.map((group) => `
         <div class="agenda-day">

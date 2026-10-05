@@ -357,8 +357,8 @@ test('Belohnungen: Uebersicht und Verlauf stehen im Spaltenraster, die Seitenspa
     const [main, rail] = el.html.split('<div class="page-columns__rail">');
     assert.match(main, /<div class="page-columns__main">[\s\S]*rw-standings/, 'die Punktestaende stehen in der Listenspalte');
     assert.ok(rail, 'mit Buchungen gibt es eine Seitenspalte');
-    assert.match(rail, /class="rw-section__more"[^>]*>rewards\.tabLedger/, 'der Abschnittstitel ist der Weg in den Verlauf');
-    assert.match(rail, /<ul class="rw-ledger">[\s\S]*rw-ledger-row/, 'derselbe Zeilenbaustein wie im Verlauf');
+    assert.match(rail, /class="section-title-link rw-section__more"[^>]*>rewards\.tabLedger/, 'der Abschnittstitel ist der Weg in den Verlauf');
+    assert.match(rail, /<ul class="rw-ledger row-carrier">[\s\S]*list-row rw-ledger-row/, 'derselbe Zeilenbaustein wie im Verlauf');
 
     // Ohne Antwort (null) und ohne Buchung ([]) entfaellt die Spalte - kein
     // Leerzustand, der "keine Buchungen" behauptet, wenn die Abfrage scheiterte.
@@ -374,7 +374,7 @@ test('Belohnungen: Uebersicht und Verlauf stehen im Spaltenraster, die Seitenspa
     el = markupEl();
     rewardsPage.renderLedger(el);
     const [lMain, lRail] = el.html.split('<div class="page-columns__rail">');
-    assert.match(lMain, /<ul class="rw-ledger">/, 'die Buchungen stehen in der Listenspalte');
+    assert.match(lMain, /<ul class="rw-ledger row-carrier">/, 'die Buchungen stehen in der Listenspalte');
     assert.match(lRail ?? '', /rw-standing--compact[\s\S]*Emma/, 'die Punktestaende stehen in der Seitenspalte');
     assert.doesNotMatch(lRail ?? '', /rw-redeem-open|rw-progress__track/, 'Kurzform: kein Fortschritt, kein Einloesen');
   } finally {
@@ -413,7 +413,7 @@ test('Belohnungen: eine Buchung ohne Grund zeigt den Namen ihres Typs, keine lee
       s.ledger = [{ id: 1, delta: 5, user_name: 'Emma', created_at: '2026-09-20', ...row }];
       const el = markupEl();
       rewardsPage.renderLedger(el);
-      return el.html.match(/<p class="rw-ledger-row__reason">([^<]*)<\/p>/)?.[1];
+      return el.html.match(/<p class="list-row__name rw-ledger-row__reason">([^<]*)<\/p>/)?.[1];
     };
     const named = reasonOf({ type: 'earn', reason: 'Zimmer', task_id: 7 });
     assert.equal(named, 'Zimmer');

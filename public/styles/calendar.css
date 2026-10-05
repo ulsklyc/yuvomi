@@ -1137,37 +1137,7 @@
   margin: 0 0 var(--space-2);
 }
 
-/* Der Titel ist der Weg in die Agenda: Schrift und Farbe vom Titel, der Knopf
- * traegt Ziel und Pfeil. Volle Zielhoehe, ohne die Zeile hoeher zu machen. */
-.day-rail__more {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: var(--target-base);
-  margin-block: calc((var(--target-base) - 1lh) / -2);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.day-rail__more:hover {
-  color: var(--color-accent);
-}
-
-.day-rail__more:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
-}
-
-.day-rail__more svg {
-  inline-size: var(--icon-md);
-  block-size: var(--icon-md);
-  color: var(--color-text-tertiary);
-}
+/* Der Titel ist der Weg in die Agenda: `.section-title-link` (layout.css). */
 
 /* #cal-body ist mobil randbündig (das Monatsraster ist ein Vollbreiten-Canvas);
  * eine Karte braucht dort ihren eigenen Rand. Ab 1024px stellt ihn

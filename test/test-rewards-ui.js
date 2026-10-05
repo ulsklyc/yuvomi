@@ -72,7 +72,9 @@ test('R16: Praemien mobil - kompakte Karte, kein doppelter Titel, drei letzte Bu
   assert.match(body('.rw-reward-card'), /display:\s*grid/);
   assert.match(body('.rw-reward-card'), /grid-template-columns:\s*auto minmax\(0, 1fr\)/, 'Zeichen und Text stehen nebeneinander');
   assert.match(body('.rw-reward-card__foot'), /grid-column:\s*1 \/ -1/, 'Preis und Aktion ueber die ganze Breite');
-  assert.match(body('.rw-section--wide > .rw-section__head'), /clip-path:\s*inset\(50%\)/);
-  assert.doesNotMatch(body('.rw-section--wide > .rw-section__head'), /display:\s*none/, 'die Ueberschrift bleibt in der Gliederung');
+  // Seit R16 Schritt 2 auf JEDER Breite: die Ueberschrift ist `.sr-only` im
+  // Markup (sie wiederholt den Reiter), keine Mobil-Regel im Stylesheet mehr.
+  assert.match(readFileSync(new URL('../public/pages/rewards.js', import.meta.url), 'utf8'),
+    /<h2 class="sr-only">\$\{esc\(t\('rewards\.tabCatalog'\)\)\}<\/h2>/, 'die Ueberschrift bleibt in der Gliederung');
   assert.match(body('.rw-recent .rw-ledger > :nth-child(n + 4)'), /display:\s*none/);
 });

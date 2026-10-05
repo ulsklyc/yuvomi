@@ -2382,7 +2382,7 @@ test('renderDayView: die Seitenspalte zeigt Folgetage mit Eintrag als Agenda-Zei
     const [grid, rail] = container.html.split('<aside class="day-rail"');
     assert(rail, 'die Tagesansicht traegt eine Seitenspalte (.day-rail)');
     assert(/<div class="day-layout">\s*<div class="day-view">/.test(grid), 'Raster und Spalte stehen in EINER Huelle (.day-layout)');
-    assert(/class="day-rail__more"/.test(rail), 'der Titel ist der Weg in die Agenda');
+    assert(/class="section-title-link day-rail__more"/.test(rail), 'der Titel ist der Weg in die Agenda');
     assert((rail.match(/class="agenda-day"/g) || []).length === 1, 'nur Tage mit Eintrag bekommen einen Kopf');
     assert(rail.includes('Uebermorgen'), 'ein Eintrag in zwei Tagen steht in der Spalte');
     assert(!rail.includes('Heute'), 'der gezeigte Tag steht im Raster, nicht noch einmal daneben');
