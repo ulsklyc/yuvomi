@@ -317,7 +317,7 @@ export function growBars(root, { selector, memo }) {
   for (const [el, from] of moving) el.style.setProperty('--bar-scale', from);
   // Den Startwert EINMAL berechnen lassen - sonst faellt er mit dem Endwert in
   // denselben Frame, und es gibt wieder keinen Uebergang.
-  const [firstBar] = moving.at(0);
+  const [firstBar] = moving[0];
   void firstBar.offsetWidth;
   let done = false;
   const settle = () => {
