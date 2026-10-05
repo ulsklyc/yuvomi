@@ -822,7 +822,9 @@ function createSheetJump(leaf, user, leafContainer, headingId) {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button > 0) return;
       event.preventDefault();
       revealSheetSection(leafContainer, target.id);
-      window.history?.replaceState?.(window.history.state, '', target.url);
+      // `path` zieht mit: Zurueck liest den Eintrag vor der Adresse (router.js,
+      // popstate) und kaeme sonst am alten Abschnitt an.
+      window.history?.replaceState?.({ ...window.history.state, path: target.url }, '', target.url);
     });
     item.appendChild(link);
     list.appendChild(item);

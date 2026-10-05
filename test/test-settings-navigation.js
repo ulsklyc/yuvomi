@@ -2974,6 +2974,11 @@ test('R16: ein Blatt mit mehr als drei Abschnitten fuehrt Sprungmarken auf seine
 test('R16: die Sprungmarken sind Links im Blatt, eine scrollende Zeile, und springen ohne Neuaufbau', async () => {
   const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
   assert.match(shell, /settingsSheetJumpTargets\(leaf, user\)/, 'die Shell fragt die Registry, sie zaehlt nicht selbst');
+  // Zurueck liest `state.path` VOR der Adresse (router.js, popstate): zieht nur
+  // die Adresse um, landet die Rueckkehr am alten Abschnitt (Review #1673).
+  const jump = shell.slice(shell.indexOf('function createSheetJump('), shell.indexOf('function createSheetJump(') + 1600);
+  assert.match(jump, /replaceState\?\.\(\{ \.\.\.window\.history\.state, path: target\.url \}, '', target\.url\)/,
+    'der History-Eintrag traegt den Abschnitt, nicht nur die Adresszeile');
   assert.match(shell, /link\.href = target\.url/, 'ein echter Link: Mittelklick und "Adresse kopieren" fuehren an den Abschnitt');
   assert.match(shell, /event\.preventDefault\(\);\s*\n\s*revealSheetSection\(leafContainer, target\.id\)/,
     'der Klick springt im stehenden Blatt (Fokus auf die Abschnittsueberschrift), statt es neu zu laden');
