@@ -180,7 +180,7 @@
     flex: 1 1 0;
   }
 
-  .page-toolbar--period-inline .budget-nav__note {
+  .page-toolbar--period-inline .budget-nav__note:not([hidden]) {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
