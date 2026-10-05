@@ -279,6 +279,14 @@ test('resolveLocale nimmt erst den vollen Tag, dann die Basissprache', () => {
   assert.equal(resolveLocale(['de-AT']), 'de');
   assert.equal(resolveLocale(['fil-PH']), 'fil');
   assert.equal(resolveLocale(['nb-NO']), 'nb');
+  // Ein Browser meldet zh-TW, nie zh-Hant-TW (#1320).
+  assert.equal(resolveLocale(['zh-TW']), 'zh-Hant');
+  assert.equal(resolveLocale(['zh-HK']), 'zh-Hant');
+  assert.equal(resolveLocale(['zh-Hant']), 'zh-Hant');
+  assert.equal(resolveLocale(['zh-Hant-TW']), 'zh-Hant');
+  assert.equal(resolveLocale(['zh-Hans-HK']), 'zh');
+  assert.equal(resolveLocale(['zh-CN']), 'zh');
+  assert.equal(resolveLocale(['zh']), 'zh');
   assert.equal(resolveLocale(['th-TH', 'nl-BE']), 'nl');
   assert.equal(resolveLocale(['th-TH']), 'en');
 });

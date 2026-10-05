@@ -6,7 +6,7 @@
  * de ist die Referenzlocale, en der Fallback für fehlende Schlüssel.
  */
 
-export const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt-BR', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi', 'hu', 'ko', 'id', 'fa', 'fil', 'nb'];
+export const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'zh-Hant', 'ja', 'ar', 'hi', 'pt-BR', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi', 'hu', 'ko', 'id', 'fa', 'fil', 'nb'];
 const FALLBACK_LOCALE = 'en';
 const RTL_LOCALES = ['ar', 'fa'];
 const STORAGE_KEY = 'yuvomi-installer-locale';
@@ -38,22 +38,36 @@ export function resolveLocale(languages = navigator.languages || [navigator.lang
   const stored = storedLocale();
   if (stored) return stored;
   for (const tag of languages) {
-    const [rawLang = '', region = ''] = (tag || '').split('-');
+    const [rawLang = '', ...rest] = (tag || '').split('-');
     const lang = rawLang.toLowerCase();
-    const hit = matchLanguage(lang, region);
+    const region = rest.find((teil) => teil.length === 2) || '';
+    const script = rest.find((teil) => teil.length === 4) || '';
+    const hit = matchLanguage(lang, region, script);
     if (hit) return hit;
     if (Object.prototype.hasOwnProperty.call(LANGUAGE_ALIAS, lang)) {
-      const alias = matchLanguage(LANGUAGE_ALIAS[lang], region);
+      const alias = matchLanguage(LANGUAGE_ALIAS[lang], region, script);
       if (alias) return alias;
     }
   }
   return FALLBACK_LOCALE;
 }
 
-/** Sprache mit Region, sonst die Basissprache, sonst null. */
-function matchLanguage(lang, region) {
+// Regionen, die eine Schrift implizieren - siehe REGION_SCRIPT in public/i18n.js.
+const REGION_SCRIPT = { TW: 'Hant', HK: 'Hant', MO: 'Hant' };
+
+/**
+ * Sprache mit Region, sonst Sprache mit Schrift, sonst die Basissprache, sonst
+ * null. Eine ausdrueckliche Schrift (`zh-Hans-HK`) schlaegt die, die eine
+ * Region nur nahelegt.
+ */
+function matchLanguage(lang, region, script) {
   const full = `${lang}-${region.toUpperCase()}`;
   if (region && SUPPORTED_LOCALES.includes(full)) return full;
+  const upper = region.toUpperCase();
+  const schrift = script
+    ? script[0].toUpperCase() + script.slice(1).toLowerCase()
+    : (Object.prototype.hasOwnProperty.call(REGION_SCRIPT, upper) ? REGION_SCRIPT[upper] : '');
+  if (schrift && SUPPORTED_LOCALES.includes(`${lang}-${schrift}`)) return `${lang}-${schrift}`;
   return SUPPORTED_LOCALES.includes(lang) ? lang : null;
 }
 
