@@ -163,3 +163,70 @@ export async function getConfig() {
 export function resetClient() {
   _config = null;
 }
+
+const ERROR_TEXT_MAX = 300;
+
+function errorText(value) {
+  return typeof value === 'string' && value ? value.slice(0, ERROR_TEXT_MAX) : undefined;
+}
+
+/**
+ * Macht aus einem Fehler des OIDC-Wegs das, was ins Log gehoert (#1675).
+ *
+ * Der Logger schreibt von einem Error nur `name`, `message` und `stack`. Bei
+ * einem Fehler vom Anbieter steht die eigentliche Auskunft aber in den Feldern
+ * daneben: `oauth4webapi` meldet eine abgelehnte Token-Anfrage als
+ * `ResponseBodyError` mit der immer gleichen Meldung "server responded with an
+ * error in the response body", und ob dahinter `invalid_client` (Client-ID oder
+ * Secret) oder `invalid_grant` (Code, Redirect-URI, PKCE) steckt, sagen nur
+ * `error` und `error_description`. Ohne sie kann niemand seine eigene
+ * Konfiguration einordnen.
+ *
+ * Uebernommen wird eine feste Liste, nie das Fehlerobjekt als Ganzes: an
+ * `response` haengt die Anfrage samt Authorization-Header, und der Antwortkoerper
+ * (`cause`) gehoert dem Anbieter. Code, Tokens und Secret kommen in keinem der
+ * gelisteten Felder vor. Texte sind gekappt, weil sie von aussen kommen.
+ *
+ * - `error`, `error_description`, `status`: Antwort des Token-Endpunkts, oder
+ *   die Fehlerparameter, mit denen der Anbieter zum Callback zurueckleitet.
+ * - `challenges`: ein 401 mit `WWW-Authenticate` statt eines JSON-Koerpers.
+ * - `cause`: der Netzwerkfehler unter einem "fetch failed" (DNS, Zertifikat,
+ *   Verbindung) - der haeufigste Grund, warum schon die Discovery scheitert.
+ *
+ * @param {unknown} err
+ * @returns {object}
+ */
+export function describeOidcError(err) {
+  if (!(err instanceof Error)) return { message: errorText(String(err)) };
+
+  const detail = { name: err.name, message: err.message };
+  const code = errorText(err.code);
+  if (code) detail.code = code;
+  const error = errorText(err.error);
+  if (error) detail.error = error;
+  const description = errorText(err.error_description);
+  if (description) detail.error_description = description;
+  if (Number.isInteger(err.status)) detail.status = err.status;
+
+  const { cause } = err;
+  if (Array.isArray(cause)) {
+    const challenges = cause
+      .filter((entry) => entry && typeof entry === 'object')
+      .map((entry) => {
+        const challenge = { scheme: errorText(entry.scheme) };
+        const challengeError = errorText(entry.parameters?.error);
+        if (challengeError) challenge.error = challengeError;
+        const challengeDescription = errorText(entry.parameters?.error_description);
+        if (challengeDescription) challenge.error_description = challengeDescription;
+        return challenge;
+      });
+    if (challenges.length) detail.challenges = challenges;
+  } else if (cause instanceof Error) {
+    detail.cause = { name: cause.name, message: errorText(cause.message) };
+    const causeCode = errorText(cause.code);
+    if (causeCode) detail.cause.code = causeCode;
+  }
+
+  detail.stack = err.stack;
+  return detail;
+}

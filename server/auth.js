@@ -33,6 +33,7 @@ import {
   isSsoOnlyAccount,
   OIDC_PASSWORD_SENTINEL,
   getConfig as getOidcConfig,
+  describeOidcError,
 } from './services/oidc.js';
 import { emailService as defaultEmailService } from './services/email.js';
 import { passwordResetService as defaultResetService } from './services/password-reset.js';
@@ -2189,7 +2190,7 @@ router.get('/oidc/start', refuseWhileRestoring, async (req, res) => {
     }
     res.redirect(await beginOidcFlow(req, config));
   } catch (err) {
-    log.error('OIDC start error:', err);
+    log.error('OIDC start error:', describeOidcError(err));
     res.status(500).json({ error: 'OIDC initialization failed.', code: 500 });
   }
 });
@@ -2238,7 +2239,7 @@ router.post('/oidc/link/start', requireAuth, csrfMiddleware, async (req, res) =>
 
     res.json({ url: await beginOidcFlow(req, config, { linkUserId: req.authUserId }) });
   } catch (err) {
-    log.error('OIDC link start error:', err);
+    log.error('OIDC link start error:', describeOidcError(err));
     res.status(500).json({ error: 'OIDC initialization failed.', code: 500 });
   }
 });
@@ -2389,7 +2390,7 @@ router.get('/oidc/callback', refuseWhileRestoring, async (req, res) => {
 
     res.redirect('/');
   } catch (err) {
-    log.error('OIDC callback error:', err);
+    log.error('OIDC callback error:', describeOidcError(err));
     res.redirect('/login?error=oidc_failed');
   }
 });
