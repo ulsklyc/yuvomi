@@ -577,6 +577,10 @@ async function toggleShoppingItem(id, checked, container) {
 
   const seq = ++_checkSeq;
   intents.set(id, { value: newVal, seq, listId, delta });
+  // HAPTIK IM MOMENT DES TIPPS (Critique 2026-10-05, R16). Sie stand nach der
+  // Serverantwort: die Zeile wechselte sofort, das Vibrieren kam mit der
+  // Leitung hinterher. Die Zeile ist optimistisch, also ist es ihre Quittung auch.
+  vibrate(10);
   if (item) {
     // Nur die betroffene Zeile aktualisieren — kein Komplett-Re-Render,
     // damit die Scroll-Position der Liste erhalten bleibt (Issue #276).
@@ -613,7 +617,6 @@ async function toggleShoppingItem(id, checked, container) {
       current.is_checked = newVal;
     }
     settledAt.set(id, _loadSeq);
-    vibrate(10);
   } catch (err) {
     // ZWEI GRUENDE, WARUM DIE EIGENE ABSICHT NICHT MEHR DA IST, und sie fuehren
     // auseinander. Ueberstimmt: ein neueres Antippen steht an, dessen Ausgang
@@ -745,6 +748,51 @@ function deleteItemUndoable(id, container) {
 // Render-Bausteine
 // --------------------------------------------------------
 
+/**
+ * Die Eintraege des Werkzeugmenues der gewaehlten Liste, in vier Gruppen:
+ * Abgehakt | Liste | Stammdaten | Loeschen.
+ *
+ * DIE ABGEHAKT-GRUPPE (Critique 2026-10-05, R16). "In den Vorrat" und
+ * "Abgehakt loeschen" lebten nur in der Sammel-Pille: fuenf Sekunden nach dem
+ * ersten Abhaken eines Batches, danach unterdrueckt, bis die Zahl auf 0 faellt
+ * (#1039). Wer im Laden zwanzig Artikel abhakt und zu Hause einraeumt, fand
+ * den Weg in den Vorrat nicht wieder. Die Pille bleibt die Abkuerzung im
+ * Moment des Abhakens; der DAUERHAFTE Ort ist dieses Menue - mit denselben
+ * Handlern und denselben Rechtefragen (`pantryTransferOffered`, #1265).
+ * Bei `read` entfaellt das ganze Menue (renderTabs), also auch die Gruppe.
+ */
+function listToolsItems() {
+  const list = state.activeList;
+  if (!list) return [];
+  const checkedCount = state.items.filter((i) => checkedOf(i)).length;
+  const checkedGroup = checkedCount ? [{
+    group: t('shopping.checkedHint', { count: checkedCount }),
+    items: [
+      ...(pantryTransferOffered()
+        ? [{ action: 'checked-to-pantry', label: t('shopping.toPantry'), icon: 'archive' }]
+        : []),
+      { action: 'clear-checked', label: t('shopping.clearChecked', { count: checkedCount }), icon: 'list-x', danger: true },
+    ],
+  }, { separator: true }] : [];
+  return [
+    ...checkedGroup,
+    { action: 'rename-list', label: t('shopping.renameListLabel'), icon: 'pencil', id: list.id },
+    { action: 'duplicate-list', label: t('shopping.duplicateListLabel'), icon: 'copy' },
+    // Die Uebernahme schreibt auch in den Essensplan (`on_shopping_list`),
+    // und die Route verlangt dafuer `meals: write` - schon fuer die
+    // Vorschau (#1290). Ohne das endete der Eintrag im 403.
+    ...(mayImportMealPlan(list.id)
+      ? [{ action: 'import-meals', label: t('shopping.importMeals'), icon: 'utensils' }]
+      : []),
+    { action: 'send-list', label: t('shopping.sendList'), icon: 'mail' },
+    { separator: true },
+    { action: 'manage-categories', label: t('shopping.manageCategories'), icon: 'tags' },
+    { action: 'manage-stores', label: t('shopping.manageStores'), icon: 'store' },
+    { separator: true },
+    { action: 'delete-list', label: t('shopping.deleteListLabel'), icon: 'trash', id: list.id, danger: true },
+  ];
+}
+
 function renderTabs(container) {
   const bar = container.querySelector('#list-tabs-bar');
   if (!bar) return;
@@ -796,20 +844,7 @@ function renderTabs(container) {
         // einer Überschrift, die den Bezug herstellt. „Mehr" allein ließe offen,
         // worauf sich „Löschen" bezieht - und das löscht die Liste des Haushalts.
         label: t('shopping.listActionsLabel', { name: state.activeList.name }),
-        items: [
-          { action: 'rename-list', label: t('shopping.renameListLabel'), icon: 'pencil', id: state.activeList.id },
-          { action: 'duplicate-list', label: t('shopping.duplicateListLabel'), icon: 'copy' },
-          // Die Uebernahme schreibt auch in den Essensplan (`on_shopping_list`),
-          // und die Route verlangt dafuer `meals: write` - schon fuer die
-          // Vorschau (#1290). Ohne das endete der Eintrag im 403.
-          ...(mayImportMealPlan(state.activeList.id)
-            ? [{ action: 'import-meals', label: t('shopping.importMeals'), icon: 'utensils' }]
-            : []),
-          { action: 'send-list', label: t('shopping.sendList'), icon: 'mail' },
-          { action: 'manage-categories', label: t('shopping.manageCategories'), icon: 'tags' },
-          { action: 'manage-stores', label: t('shopping.manageStores'), icon: 'store' },
-          { action: 'delete-list', label: t('shopping.deleteListLabel'), icon: 'trash', id: state.activeList.id, danger: true },
-        ],
+        items: listToolsItems(),
       })}` : '';
 
   bar.insertAdjacentHTML('beforeend', `
@@ -3286,6 +3321,26 @@ function wireListContentEvents(container) {
       openMealPlanImport(container);
     }
 
+    // ---- Abgehakt-Gruppe des Werkzeugmenues (R16): dieselben Handler wie
+    // die Sammel-Pille. Die Rueckfrage vor dem Sammel-Loeschen bleibt
+    // (Critique 2026-08-13, P0) - hier als Dialog, weil ein Menue keine
+    // zweite Stufe in sich traegt.
+    if (action === 'checked-to-pantry') {
+      if (pantryTransferOffered()) await openPantryTransfer(container);
+    }
+
+    if (action === 'clear-checked') {
+      const count = state.items.filter((i) => checkedOf(i)).length;
+      if (!count) return;
+      // Ohne `danger`: das Loeschen ist fuenf Sekunden lang ruecknehmbar,
+      // der Dialog droht also mit nichts Unwiederbringlichem.
+      const confirmed = await confirmModal(
+        t('shopping.clearCheckedConfirm', { count }),
+        { confirmLabel: t('common.delete') },
+      );
+      if (confirmed) clearCheckedUndoable(container);
+    }
+
     if (action === 'send-list') {
       await openSendListDialog(container);
     }
@@ -3745,6 +3800,7 @@ export const __test = {
   // Vorhandensein einer Wache. Beide Wege gehoeren dazu - der Merker wird beim
   // Abhaken gesetzt und beim Laden gelesen.
   toggleShoppingItem,
+  listToolsItems,
   loadItems,
   deleteItemUndoable,
   clearCheckedUndoable,

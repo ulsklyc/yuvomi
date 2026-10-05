@@ -40,7 +40,7 @@ import { esc } from '/utils/html.js';
  * @param {string}   opts.id             Eindeutige Panel-ID (popovertarget).
  * @param {string}   opts.label          Zugänglicher Name des Triggers.
  * @param {Array<{action: string, label: string, icon: string, id?: string|number, danger?: boolean,
- *   checked?: boolean, disabled?: boolean} | {separator: true}>} opts.items
+ *   checked?: boolean, disabled?: boolean} | {separator: true} | {group: string, items: Array}>} opts.items
  *        `checked` macht aus dem Eintrag einen Schalter (`menuitemcheckbox`,
  *        Haken am Ende) - fuer Ansichts-Schalter wie „Verlauf zeigen", die im
  *        Werkzeugmenue stehen statt als loses Icon im Kopf. `{ separator: true }`
@@ -54,8 +54,20 @@ import { esc } from '/utils/html.js';
  * @returns {string}
  */
 export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn--ghost btn--icon', icon = 'ellipsis' }) {
-  const entries = items.map((item) => {
+  const entry = (item, index) => {
     if (item.separator) return '\n    <div class="popover-menu__separator" role="separator"></div>';
+    // EINE GRUPPE MIT NAMEN (Critique 2026-10-05, R16): `{ group, items }`.
+    // Die Ueberschrift ist kein Eintrag - sie traegt die Eintragsklasse nicht
+    // und faellt damit aus Pfeiltasten und Fokus -, die Gruppe verweist per
+    // `aria-labelledby` auf sie (dasselbe Vokabular wie das Sortier-Menue der
+    // Dokumente, layout.css `.popover-menu__group`).
+    if (item.group) {
+      const labelId = `${id}-group-${index}`;
+      return `
+    <div class="popover-menu__group" role="group" aria-labelledby="${esc(labelId)}">
+      <div class="popover-menu__label" id="${esc(labelId)}">${esc(item.group)}</div>${(item.items ?? []).map(entry).join('')}
+    </div>`;
+    }
     const checkable = typeof item.checked === 'boolean';
     const role = checkable ? 'menuitemcheckbox' : 'menuitem';
     const checkedAttr = checkable ? ` aria-checked="${item.checked}"` : '';
@@ -69,7 +81,8 @@ export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn
       <i data-lucide="${esc(item.icon)}" class="icon-md" aria-hidden="true"></i>
       <span>${esc(item.label)}</span>${trail}
     </button>`;
-  }).join('');
+  };
+  const entries = items.map(entry).join('');
 
   return `
     <button type="button" class="${triggerClass} popover-menu__trigger"
@@ -111,7 +124,7 @@ export function pageToolsMenuHtml({ id, label, items = [] }) {
   // im Kopf - mit ihrem Icon, ihrem Namen als aria-label/title und demselben
   // `data-action`, auf das der delegierte Handler der Seite schon hoert. Ein
   // Schalter (`checked`) bleibt im Menue: sein Zustand braucht den Haken.
-  const real = items.filter((item) => item && !item.separator);
+  const real = items.flatMap((item) => (item?.group ? item.items ?? [] : [item])).filter((item) => item && !item.separator);
   if (real.length === 1 && typeof real[0].checked !== 'boolean') {
     const [item] = real;
     return `

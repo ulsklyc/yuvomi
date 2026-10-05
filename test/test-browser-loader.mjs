@@ -243,7 +243,9 @@ const STUBS = {
   `,
   '/utils/ux.js': `
     export const stagger = () => {};
-    export const vibrate = () => {};
+    // Suiten, die pruefen wollen, WANN eine Seite vibriert (im Moment des
+    // Tipps, nicht nach der Serverantwort), setzen globalThis.__vibrateStub.
+    export const vibrate = (pattern) => { globalThis.__vibrateStub?.(pattern); };
     export const wireScrollFade = () => ({ update: () => {}, destroy: () => {} });
     // Tests, die das Undo-Fenster selbst schliessen oder zuruecknehmen wollen,
     // setzen globalThis.__undoStub = (opts) => {} und bekommen commit/restore

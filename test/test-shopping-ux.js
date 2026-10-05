@@ -261,6 +261,56 @@ test('updateCheckedActions: vorbelegte (geladene) Artikel zeigen KEINE Pille', (
   assert.equal(__test.getPillPhaseForTest(), 'idle');
 });
 
+// --------------------------------------------------------
+// Werkzeugmenue: die Abgehakt-Gruppe (Critique 2026-10-05, R16)
+// --------------------------------------------------------
+// "In den Vorrat" und "Abgehakt loeschen" lebten NUR in der Pille - fuenf
+// Sekunden nach dem ersten Abhaken, danach unterdrueckt, bis die Zahl auf 0
+// faellt. Wer zwanzig Artikel im Laden abhakt und zu Hause einraeumt, fand den
+// Weg nicht wieder. Das Menue traegt ihn dauerhaft.
+
+function toolActions(items) {
+  return items.flatMap((item) => (item.group ? item.items : [item])).filter((i) => i.action).map((i) => i.action);
+}
+
+test('Werkzeugmenue: mit abgehakten Artikeln steht die Gruppe "Abgehakt" mit beiden Wegen vorn', () => {
+  resetShoppingState();
+  global.window.yuvomi = { isModuleDisabled: () => false, canWriteModule: () => true };
+  __test.state.activeList = { id: 1, name: 'Wocheneinkauf' };
+  __test.state.items = [{ id: 1, is_checked: 1 }, { id: 2, is_checked: 1 }, { id: 3, is_checked: 0 }];
+  const items = __test.listToolsItems();
+  assert.ok(items[0].group, 'die erste Position ist die Gruppe');
+  assert.match(items[0].group, /2/, 'die Gruppe nennt die Zahl');
+  assert.deepEqual(items[0].items.map((i) => i.action), ['checked-to-pantry', 'clear-checked']);
+  assert.equal(items[0].items[1].danger, true);
+  assert.equal(items[1].separator, true);
+  // Liste | Stammdaten | Destruktiv: drei weitere Gruppen, durch Trenner geschieden.
+  assert.equal(items.filter((i) => i.separator).length, 3);
+  const actions = toolActions(items);
+  assert.ok(actions.indexOf('send-list') < actions.indexOf('manage-categories'));
+  assert.equal(actions.at(-1), 'delete-list');
+  global.window.yuvomi = {};
+});
+
+test('Werkzeugmenue: ohne abgehakte Artikel gibt es keine Abgehakt-Gruppe', () => {
+  resetShoppingState();
+  __test.state.activeList = { id: 1, name: 'Wocheneinkauf' };
+  __test.state.items = [{ id: 1, is_checked: 0 }];
+  const items = __test.listToolsItems();
+  assert.equal(items.some((i) => i.group), false);
+  assert.equal(items[0].action, 'rename-list');
+});
+
+test('Werkzeugmenue: ohne Schreibrecht im Vorrat bleibt nur das Loeschen in der Gruppe', () => {
+  resetShoppingState();
+  global.window.yuvomi = { isModuleDisabled: (m) => m === 'pantry' };
+  __test.state.activeList = { id: 1, name: 'Wocheneinkauf' };
+  __test.state.items = [{ id: 1, is_checked: 1 }];
+  const items = __test.listToolsItems();
+  assert.deepEqual(items[0].items.map((i) => i.action), ['clear-checked']);
+  global.window.yuvomi = {};
+});
+
 test('updateCheckedActions: ein echter Abhak-Treffer aus dem Ruhezustand oeffnet die Pille', () => {
   resetShoppingState();
   __test.state.items = [{ id: 1, is_checked: 1 }];
@@ -645,6 +695,27 @@ test('Abhaken ueberlebt eine Auffrischung, deren GET aelter ist als der PATCH', 
   assert.equal(__test.checkedOf(__test.state.items[0]), 1,
     'die alte Antwort darf die Bearbeitung nicht zurueckdrehen');
   delete globalThis.__apiStub;
+});
+
+test('die Haptik kommt im Moment des Tipps, nicht erst mit der Serverantwort (R16)', async () => {
+  // Die Zeile wechselt sofort (optimistisch), das Vibrieren kam erst nach dem
+  // PATCH - auf einer langsamen Leitung im Laden also spuerbar nach dem Bild.
+  // Zwei Rueckmeldungen fuer EINEN Tipp gehoeren in denselben Moment.
+  resetShoppingState();
+  __test.state.lists = [{ id: 1, name: 'Einkauf', item_total: 1, item_checked: 0 }];
+  __test.state.items = [milk(0)];
+  const pulses = [];
+  globalThis.__vibrateStub = (pattern) => pulses.push(pattern);
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  globalThis.__apiStub = { patch: () => gate.then(() => ({ data: null })) };
+  const pending = __test.toggleShoppingItem(10, 0, makeNullContainer());
+  assert.deepEqual(pulses, [10], 'vibriert, waehrend der PATCH noch laeuft');
+  release();
+  await pending;
+  assert.deepEqual(pulses, [10], 'genau einmal - die Antwort vibriert nicht noch einmal');
+  delete globalThis.__apiStub;
+  delete globalThis.__vibrateStub;
 });
 
 test('ein spaeter begonnenes Laden raeumt den Merker - fremde Aenderungen kommen durch', async () => {

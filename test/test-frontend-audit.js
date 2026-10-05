@@ -4870,13 +4870,23 @@ test('der Einkaufs-Kopf trägt mobil keine unbeschrifteten Aktionen', () => {
     'jeder Menü-Eintrag muss ein sichtbares Textlabel tragen');
   const menuStart = page.indexOf("id: 'list-actions-menu'");
   assert.ok(menuStart > 0, 'das Überlaufmenü der Einkaufsliste ist nicht auffindbar - der Guard misst dann nichts');
-  const items = page.slice(menuStart, page.indexOf('})}', menuStart));
+  // Die Eintraege baut seit R16 `listToolsItems()` (vier Gruppen); das Menue
+  // muss sie auch wirklich von dort beziehen, sonst misst der Guard eine
+  // Funktion, die niemand ruft.
+  assert.match(page.slice(menuStart, page.indexOf('})}', menuStart)), /items:\s*listToolsItems\(\)/,
+    'das Überlaufmenü bezieht seine Einträge aus listToolsItems()');
+  const builderStart = page.indexOf('function listToolsItems()');
+  assert.ok(builderStart > 0, 'listToolsItems() ist nicht auffindbar - der Guard misst dann nichts');
+  const items = page.slice(builderStart, page.indexOf('\n}\n', builderStart));
   // Umbenennen kam 2026-08-11 dazu: es hing bis dahin als einzige Affordanz am
   // Listen-Titel im Kopf, und der Kopf ist entfallen (Titelwiederholung).
-  for (const key of ['shopping.renameListLabel', 'shopping.importMeals', 'shopping.manageCategories', 'shopping.deleteListLabel']) {
+  // "In den Vorrat" und "Abgehakt löschen" kamen mit R16 dazu: sie lebten nur
+  // in der Fuenf-Sekunden-Pille.
+  for (const key of ['shopping.renameListLabel', 'shopping.importMeals', 'shopping.manageCategories', 'shopping.deleteListLabel', 'shopping.toPantry']) {
     assert.ok(items.includes(`t('${key}')`), `das Überlaufmenü muss ${key} als Label führen`);
   }
   assert.match(items, /danger:\s*true/, '„Liste löschen" muss im Menü als destruktiv gekennzeichnet sein');
+  assert.match(items, /t\('shopping\.clearChecked',/, 'das Überlaufmenü muss „Abgehakt löschen" führen');
 
   // Der Trigger muss die Liste NENNEN. Er stand früher neben einer Überschrift,
   // die den Bezug herstellte; in der Chip-Leiste steht er allein, und ein bloßes

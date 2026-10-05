@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 // `panel instanceof HTMLElement` steht als Typwaechter in onToggle.
 global.HTMLElement = class HTMLElement {};
 
-const { installPopoverMenus, pageToolsMenuHtml } = await import('../public/utils/popover-menu.js');
+const { installPopoverMenus, pageToolsMenuHtml, popoverMenuHtml } = await import('../public/utils/popover-menu.js');
 
 /** Kleinstes Element, das die Selektorwege des Moduls bedient. */
 function el(selector, attrs = {}) {
@@ -259,6 +259,28 @@ test('das Werkzeugmenue eines Modulkopfs: ein „..."-Knopf, Eintraege mit Text,
   assert.match(html, /<span>Tags &lt;b&gt;<\/span>/, 'Labels laufen durch esc()');
 });
 
+
+test('eine Gruppe traegt ihre Ueberschrift als Namen, die Ueberschrift ist kein Eintrag (R16)', () => {
+  const html = popoverMenuHtml({
+    id: 'g-menu',
+    label: 'Mehr',
+    items: [
+      { group: 'Abgehakt (3)', items: [
+        { action: 'a', label: 'In den Vorrat', icon: 'archive' },
+        { action: 'b', label: 'Abgehakt löschen (3)', icon: 'trash-2', danger: true },
+      ] },
+      { separator: true },
+      { action: 'c', label: 'Umbenennen', icon: 'pencil' },
+    ],
+  });
+  const group = html.match(/<div class="popover-menu__group" role="group" aria-labelledby="([^"]+)">/);
+  assert.ok(group, 'die Gruppe ist role="group" und verweist auf ihre Ueberschrift');
+  assert.match(html, new RegExp(`<div class="popover-menu__label" id="${group[1]}">Abgehakt \\(3\\)</div>`));
+  // Die Ueberschrift traegt die Eintragsklasse nicht: sie faellt aus Pfeiltasten und Fokus.
+  assert.equal((html.match(/class="popover-menu__item[ "]/g) ?? []).length, 3);
+  assert.ok(html.indexOf('data-action="a"') < html.indexOf('popover-menu__separator'));
+  assert.ok(html.indexOf('popover-menu__separator') < html.indexOf('data-action="c"'));
+});
 
 test('top-start: ein Menue am Fuss einer linken Leiste oeffnet ueber dem Ausloeser, an seiner linken Kante', () => {
   // Konto-Menue der Seitenleiste (Critique 2026-09-26, P1-2). Rechtsbuendig
