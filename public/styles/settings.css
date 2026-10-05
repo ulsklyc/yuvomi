@@ -604,6 +604,28 @@
   text-decoration: none;
 }
 
+/* MOBIL STEHEN DIE MARKEN FUER DIE BESCHREIBUNG (R16, Gesamtpruefung). Beides
+ * zaehlt auf, was im Blatt steht; zusammen schoben sie den ersten Schalter des
+ * Kalender-Blatts von y=517 auf 580 - der eine Messwert der Critique, der
+ * schlechter wurde. Im Blatt mit Marken ist die Beschreibung mobil nur noch
+ * im Baum (geclippt wie `.sr-only`, reset.css), und der Kopf haelt den
+ * kleineren Abstand. Ein Blatt ohne Marken behaelt seine zwei Zeilen. */
+@media (max-width: 767px) {
+  .settings-leaf-header--jump { margin-bottom: var(--space-4); }
+
+  .settings-leaf-header--jump .settings-leaf-header__description {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
 /* --------------------------------------------------------
    Ein Blatt je Modul (Re-Critique 2026-09-27, S1)
 

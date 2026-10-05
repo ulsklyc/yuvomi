@@ -2990,3 +2990,17 @@ test('R16: mobil ist die Blattbeschreibung zwei Zeilen lang', async () => {
     && r.selector.split(',').some((s) => s.trim() === '.settings-leaf-header__description'));
   assert.match(phone?.body ?? '', /-webkit-line-clamp:\s*2/, 'vier Zeilen Vorspann standen vor dem ersten Schalter');
 });
+
+test('R16: im Blatt mit Sprungmarken steht die Beschreibung mobil nur im Baum', async () => {
+  // Marken und Beschreibung zaehlen beide auf, was im Blatt steht; zusammen
+  // schoben sie den ersten Schalter des Kalender-Blatts von y=517 auf 580.
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  assert.match(shell, /if \(jump\) \{[^}]*header\.classList\.add\('settings-leaf-header--jump'\)/,
+    'der Kopf weiss, dass Marken folgen - nur dann weicht die Beschreibung');
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const phone = [...eachRule(css)].find((r) => r.at.some((a) => /\(max-width:\s*767px\)/.test(a))
+    && r.selector.trim() === '.settings-leaf-header--jump .settings-leaf-header__description');
+  assert.match(phone?.body ?? '', /clip:\s*rect\(0, 0, 0, 0\)/, 'geclippt, nicht entfernt: der Text bleibt fuer Screenreader');
+  assert.doesNotMatch(phone?.body ?? '', /display:\s*none/);
+});
+

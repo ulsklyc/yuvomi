@@ -907,7 +907,12 @@ async function renderLeafContent(content, leaf, domain, user, query) {
   // Sprungmarken (R16): nur in Blaettern mit mehr als drei Abschnitten.
   if (!heading.id) heading.id = `settings-sheet-title-${leaf.id}`;
   const jump = createSheetJump(leaf, user, leafContainer, heading.id);
-  if (jump) leafContainer.appendChild(jump);
+  if (jump) {
+    leafContainer.appendChild(jump);
+    // Die Marken nennen, was im Blatt steht - mobil ersetzen sie die
+    // Beschreibung im Bild (settings.css, `.settings-leaf-header--jump`).
+    header.classList.add('settings-leaf-header--jump');
+  }
 
   const hosts = [];
   for (const scope of ['mine', 'household']) {

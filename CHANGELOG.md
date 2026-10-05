@@ -141,7 +141,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   all values" for the rest. The CSV export is a button in the head that opens a dialog, on
   every screen size.
 - **Settings: long sheets start with jump marks.** A sheet with more than three sections opens
-  with a row of links to them; on a phone the sheet description is two lines.
+  with a row of links to them. On a phone that row stands in place of the sheet description, and
+  a sheet without it shows the description in two lines.
 - **Subscriptions on a phone: the billing cycle stands under the amount**, so the line with the
   due date no longer wraps. **Budget accounts:** a long account name wraps to a second line
   instead of being cut after "Gemeinsames Gi...".
