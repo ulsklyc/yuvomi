@@ -3864,3 +3864,17 @@ test('R16: Kalender, Essensplan, Budget, Haushaltshilfe und Schichtplan bauen ih
     assert.doesNotMatch(src, /\.inert = isCurrent/, `${name}.js setzt inert nicht selbst`);
   }
 });
+
+// Critique 2026-10-05 (R16): bei 390px waren vier von sechs Kontonamen gekappt
+// ("Gemeinsames Gi..."): 118px Namensspalte, einzeilig mit Ellipse. Der Name
+// ist die Identitaet der Zeile; er darf auf zwei Zeilen umbrechen. Der Saldo
+// daneben bleibt unzerbrechlich (Re-Critique 2026-09-28 P1-2).
+test('R16: ein Kontoname bricht auf zwei Zeilen um, statt gekappt zu werden', () => {
+  const rule = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-account__name-text' && !r.at.length);
+  assert.ok(rule, 'die Regel ist nicht auffindbar - der Guard misst dann nichts');
+  assert.match(rule.body, /-webkit-line-clamp:\s*2/);
+  assert.doesNotMatch(rule.body, /white-space:\s*nowrap/, 'einzeilig mit Ellipse war der Befund');
+  assert.match(rule.body, /overflow-wrap:\s*anywhere/, 'ein langes Wort ohne Leerzeichen laeuft sonst unter den Saldo');
+  const figures = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-account__figures' && !r.at.length);
+  assert.match(figures?.body ?? '', /flex:\s*0 0 auto/, 'die Saldo-Spalte schrumpft weiter nie');
+});

@@ -523,6 +523,26 @@
   }
 }
 
+/* DER TURNUS STEHT SCHMAL UNTER DEM BETRAG (Critique 2026-10-05, R16). In 204px
+ * Textspalte passt die Faelligkeit (184px), der Turnus daneben nicht - die
+ * Metazeile brach um, die Zeile mass 77 bis 94px. "Monatlich" gehoert zum
+ * Betrag ("12,99 EUR / Monatlich") und steht dort, wo die Zeile schmal ist;
+ * breit bleibt er in der Metazeile. Immer genau eine der beiden Fassungen
+ * (`display: none` nimmt die andere auch aus dem Baum der assistiven Technik). */
+.subscription-card__cost-cycle {
+  display: none;
+}
+
+@container subscriptions-list (max-width: 559px) {
+  .subscription-card__meta .subscription-card__meta-cycle {
+    display: none;
+  }
+
+  .subscription-card__cost .subscription-card__cost-cycle {
+    display: block;
+  }
+}
+
 /* Ueberfaellig: Warnton UND Symbol (Dreieck statt Kalender) - die Bedeutung
  * haengt nicht an der Farbe allein, und der Text sagt es ohnehin. */
 .subscription-card__due--overdue {

@@ -909,7 +909,7 @@ function renderCard(subscription) {
           </span>
           <span class="subscription-card__meta">
             <span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i><span>${formatDate(subscription.next_payment_date)} ·</span> <span>${dueLabel(subscription)}</span></span>
-            <span>${cycleLabel(subscription)}</span>
+            <span class="subscription-card__meta-cycle">${cycleLabel(subscription)}</span>
             <span class="subscription-card__meta-extra">${esc(rowPaymentMethodLabel(subscription))}</span>
             <span class="subscription-card__meta-extra"><i data-lucide="bell" aria-hidden="true"></i>${t('subscriptions.reminderMeta', { count: subscription.reminder_days })}</span>
             ${endInfo ? `<span><i data-lucide="${endInfo.icon}" aria-hidden="true"></i>${esc(endInfo.text)}</span>` : ''}
@@ -918,6 +918,7 @@ function renderCard(subscription) {
         <span class="subscription-card__cost">
           <strong>${money(subscription.amount, subscription.currency)}</strong>
           ${converted ? `<span>${converted}</span>` : ''}
+          <span class="subscription-card__cost-cycle">${cycleLabel(subscription)}</span>
         </span>
         ${ro ? '' : `<span class="sr-only">${t('common.edit')}</span>`}
       </button>

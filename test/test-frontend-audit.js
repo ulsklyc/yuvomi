@@ -19699,3 +19699,23 @@ test('R16: das Textfeld der Notiz ist die Flaeche des Editors, nicht eine Zeile 
   assert.ok(Math.min(...all) >= 18.75, `mobil mindestens 300px, gefunden ${JSON.stringify(minHeights)}`);
   assert.ok(Math.max(...all) >= 25, `am Desktop mindestens 400px, gefunden ${JSON.stringify(minHeights)}`);
 });
+
+// Critique 2026-10-05 (R16): die Abo-Zeile brach ihre Metazeile mobil auf zwei
+// bis drei Zeilen (77-94px statt einer Zeilenhoehe um 62). In 204px Textspalte
+// passt die Faelligkeit ("08.10.2026 · Faellig in 3 Tagen", 184px) - der Turnus
+// daneben nicht mehr. Schmal steht er deshalb unter dem Betrag, zu dem er
+// gehoert ("12,99 EUR / Monatlich"), und weicht aus der Metazeile.
+test('R16: in der schmalen Abo-Liste steht der Turnus unter dem Betrag, nicht in der Metazeile', () => {
+  const page = read('../public/pages/subscriptions.js');
+  assert.match(page, /<span class="subscription-card__meta-cycle">\$\{cycleLabel\(subscription\)\}<\/span>/);
+  assert.match(page, /<span class="subscription-card__cost-cycle">\$\{cycleLabel\(subscription\)\}<\/span>/);
+
+  const rules = [...eachRule(read('../public/styles/subscriptions.css'))];
+  const narrow = (r) => r.at.some((a) => /subscriptions-list\s*\(max-width:\s*559px\)/.test(a));
+  const base = rules.find((r) => r.selector.trim() === '.subscription-card__cost-cycle' && !r.at.length);
+  assert.match(base?.body ?? '', /display:\s*none/, 'breit steht der Turnus nur in der Metazeile');
+  const show = rules.find((r) => narrow(r) && /\.subscription-card__cost-cycle\b/.test(r.selector));
+  assert.match(show?.body ?? '', /display:\s*block/, 'schmal steht er unter dem Betrag');
+  const hide = rules.find((r) => narrow(r) && /\.subscription-card__meta-cycle\b/.test(r.selector));
+  assert.match(hide?.body ?? '', /display:\s*none/, 'und weicht dort aus der Metazeile - nie beides zugleich');
+});

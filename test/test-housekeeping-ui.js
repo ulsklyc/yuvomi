@@ -790,3 +790,16 @@ test('#1556 Tagesabfrage und Check-in lesen den Tag des Haushalts, nicht Tag und
   }
   assert.match(checkIn.payment_description, /"date":"2026-10-01"/, 'die Zahlungsaufgabe nennt den Tag des Haushalts');
 });
+
+// Critique 2026-10-05 (R16): der Namens-Knopf der Personalzeile mass 178x25,5px.
+// Die Maus trifft die ganze Zeile (data-select-worker), Tastatur und assistive
+// Technik aber nur diesen Knopf - und der war so hoch wie eine Textzeile. Er
+// reicht jetzt ueber die Polsterung der Zeile (Polster + Gegenmarge), ohne die
+// Zeile hoeher zu machen.
+test('R16: der Auswahlknopf der Personalzeile hat die Hoehe der Zeile, nicht die des Namens', () => {
+  const rule = [...eachRule(HK_STYLES)].find((r) => r.selector.trim() === '.housekeeping-staff-row__select' && !r.at.length);
+  assert.ok(rule, 'die Regel ist nicht auffindbar - der Guard misst dann nichts');
+  assert.match(rule.body, /padding-block:\s*var\(--space-3\)/, 'der Knopf traegt die Polsterung der Zeile selbst');
+  assert.match(rule.body, /margin-block:\s*calc\(var\(--space-3\)\s*\*\s*-1\)/, 'und nimmt sie nach aussen zurueck: die Zeile bleibt so hoch wie vorher');
+  assert.doesNotMatch(rule.body, /(^|[\s;])padding:\s*0/, 'ein pauschales padding: 0 hoebe das wieder auf');
+});

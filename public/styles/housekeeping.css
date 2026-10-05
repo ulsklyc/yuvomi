@@ -781,13 +781,22 @@
   background-color: color-mix(in srgb, var(--module-accent) var(--tint-state), var(--color-surface-hover));
 }
 
+/* DIE ZIELHOEHE DES KNOPFS IST DIE DER ZEILE (Critique 2026-10-05, R16). Er
+ * mass 178x25,5px - so hoch wie der Name. Die Maus trifft die ganze Zeile
+ * (data-select-worker), Tastatur, Schaltersteuerung und assistive Technik aber
+ * nur ihn. Er traegt deshalb die Polsterung der Zeile selbst und nimmt sie per
+ * Gegenmarge zurueck: gleiche Zeilenhoehe, Knopf >= 48px. */
 .housekeeping-staff-row__select {
   display: grid;
+  align-content: center;
   gap: var(--space-0h);
   min-width: 0;
   background: none;
   border: 0;
-  padding: 0;
+  padding-block: var(--space-3);
+  padding-inline: 0;
+  margin-block: calc(var(--space-3) * -1);
+  border-radius: var(--radius-sm);
   font: inherit;
   color: inherit;
   text-align: start;

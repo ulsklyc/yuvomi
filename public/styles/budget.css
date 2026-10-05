@@ -630,10 +630,23 @@
   min-width: 0;
 }
 
+/* ZWEI ZEILEN STATT ELLIPSE (Critique 2026-10-05, R16). Bei 390px blieben dem
+ * Namen 118px, und vier von sechs Konten hiessen "Gemeinsames Gi...". Der Name
+ * ist die Identitaet der Zeile; er bricht jetzt einmal um und kuerzt erst
+ * danach. `overflow-wrap: anywhere`, damit ein langes Wort ohne Leerzeichen
+ * nicht unter den (unzerbrechlichen) Saldo laeuft. */
 .budget-account__name-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
+  /* Nach der zweiten Zeile kuerzt weiter der NAME, nie der Saldo. */
   text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  /* Ein Wort, das allein breiter ist als die Spalte ("Wertpapierdepot"),
+   * trennt an der Silbe statt vor dem letzten Buchstaben. */
+  hyphens: auto;
   min-width: 0;
 }
 
