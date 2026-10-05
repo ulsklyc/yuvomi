@@ -691,7 +691,46 @@
 .note-mode-switch {
   display: inline-flex;
   gap: var(--space-1);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+/* --------------------------------------------------------
+ * Der Editor als Arbeitsflaeche (Critique 2026-10-05, R16).
+ *
+ * Gemessen bei 390x844: Formatierleiste 332x162 (dreireihig), Textfeld 332x160
+ * ab y=534 - unter der Tastaturlinie. Am Desktop ein 680x752-Modal mit einem
+ * Textfeld von 646x160. Das Feld, fuer das der Dialog da ist, war sein
+ * kleinstes Stueck.
+ *
+ * Jetzt: Titel und Text ohne Labelzeile (die Labels bleiben als Name, .sr-only),
+ * 8px statt 16px zwischen den Stuecken, und das Textfeld traegt eine
+ * Mindesthoehe, die das Blatt fuellt. Was dahinter kommt (Kategorien, "Weitere
+ * Einstellungen" mit Farbe und Anheften), liegt unter der Flaeche und scrollt.
+ * `field-sizing: content` laesst das Feld mit dem Text wachsen, wo der Browser
+ * es kann; sonst scrollt es in sich.
+ * -------------------------------------------------------- */
+.note-edit-view > .note-editor__title,
+.note-edit-view > .note-editor {
+  margin-bottom: var(--space-2);
+}
+
+.note-editor__title-input {
+  font-size: var(--type-card-title);
+  font-weight: var(--font-weight-semibold);
+}
+
+.note-editor__text {
+  min-height: max(18.75rem, 38dvh);
+  field-sizing: content;
+  resize: vertical;
+  line-height: var(--line-height-relaxed);
+}
+
+/* Breiter Dialog (lg, 680px): das Modal hat die Hoehe, das Feld nimmt sie. */
+@container modal-body (min-width: 600px) {
+  .note-editor__text {
+    min-height: max(25rem, 45dvh);
+  }
 }
 
 /* Leseansicht: gerendertes Markdown (.note-md-* aus typography.css) auf einer

@@ -19668,3 +19668,33 @@ test('R16: das Einstellungsblatt hat eine Stufenleiter - die Reichweite steht ue
   assert.match(shell, /'\.settings-scope \.settings-card__title:not\(\[aria-level\]\)'\)\) \{\s*el\.setAttribute\('aria-level', '4'\);/);
   assert.match(shell, /scopedHeadingObserver\.observe\(leafContainer, \{ childList: true, subtree: true \}\)/, 'ein neu gebauter Abschnitt behaelt seine Ebene');
 });
+
+// DER NOTIZ-EDITOR IST EINE ARBEITSFLAECHE, KEIN FORMULAR (Critique 2026-10-05,
+// R16). Gemessen bei 390x844: Leiste 162px, Textfeld 160px ab y=534 - unter der
+// Tastaturlinie; am Desktop 646x160 in einem 680x752-Modal. Das Feld, fuer das
+// der Dialog da ist, war sein kleinstes. Es traegt jetzt eine Mindesthoehe, die
+// den Dialog fuellt, und die beiden sichtbaren Labels sind ihm gewichen (sie
+// bleiben als Name fuer assistive Technik).
+test('R16: das Textfeld der Notiz ist die Flaeche des Editors, nicht eine Zeile darin', () => {
+  const page = read('../public/pages/notes.js');
+  const css = withoutBlockComments(read('../public/styles/notes.css'));
+
+  assert.match(page, /<textarea class="form-input note-editor__text" id="note-content"/,
+    'das Textfeld traegt die Editor-Klasse');
+  assert.doesNotMatch(page, /id="note-content" rows="6"/, 'sechs Zeilen waren 160px');
+  // Die Labels bleiben Namen, stehen aber nicht mehr als Zeile vor dem Feld.
+  assert.match(page, /<label class="form-label sr-only" for="note-title">/);
+  assert.match(page, /<label class="form-label sr-only" for="note-content">/);
+
+  const minHeights = [];
+  for (const rule of eachRule(css)) {
+    if (!/\.note-editor__text\b/.test(rule.selector)) continue;
+    const value = rule.body.match(/min-height:\s*([^;]+);/)?.[1];
+    if (value) minHeights.push({ media: rule.media ?? rule.context ?? '', value });
+  }
+  const rems = (value) => Number(value.match(/max\(\s*([\d.]+)rem/)?.[1] ?? 0);
+  assert.ok(minHeights.length >= 2, 'eine Mindesthoehe mobil und eine fuer breite Dialoge');
+  const all = minHeights.map((entry) => rems(entry.value));
+  assert.ok(Math.min(...all) >= 18.75, `mobil mindestens 300px, gefunden ${JSON.stringify(minHeights)}`);
+  assert.ok(Math.max(...all) >= 25, `am Desktop mindestens 400px, gefunden ${JSON.stringify(minHeights)}`);
+});

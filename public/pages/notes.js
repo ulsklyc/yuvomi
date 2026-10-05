@@ -807,17 +807,23 @@ function openNoteModal({ mode, note = null }) {
 
       <div class="note-edit-view" id="note-pane-edit" data-pane="edit" role="tabpanel"
            aria-labelledby="note-tab-edit"${initialView === 'edit' ? '' : ' hidden'}>
-    <div class="form-group">
-      <label class="form-label" for="note-title">${t('notes.titleLabel')}</label>
-      <input type="text" class="form-input" id="note-title"
-             placeholder="${t('notes.titlePlaceholder')}" value="${esc(isEdit && note.title ? note.title : '')}">
+    <!-- DER EDITOR IST EINE ARBEITSFLAECHE (Critique 2026-10-05, R16). Titel
+         und Text standen als zwei Formularfelder mit Label untereinander, das
+         Textfeld sechs Zeilen hoch (160px) und mobil ab y=534 - unter der
+         Tastaturlinie. Der Dialog ist fuer genau dieses Feld da. Die Labels
+         bleiben als Namen (sr-only), der Platzhalter sagt Sehenden dasselbe;
+         das Textfeld traegt die Mindesthoehe der Flaeche (notes.css,
+         .note-editor__text). -->
+    <div class="form-group note-editor__title">
+      <label class="form-label sr-only" for="note-title">${t('notes.titleLabel')}</label>
+      <input type="text" class="form-input note-editor__title-input" id="note-title"
+             placeholder="${t('notes.titleLabel')}" value="${esc(isEdit && note.title ? note.title : '')}">
     </div>
-    <div class="form-group">
-      <label class="form-label" for="note-content">${t('notes.contentLabel')} <span class="form-label__hint">${t('notes.contentMarkdownHint')}</span></label>
+    <div class="form-group note-editor">
+      <label class="form-label sr-only" for="note-content">${t('notes.contentLabel')} <span class="form-label__hint">${t('notes.contentMarkdownHint')}</span></label>
       ${renderMarkdownToolbar()}
-      <textarea class="form-input" id="note-content" rows="6"
-                placeholder="${t('notes.contentPlaceholder')}"
-                style="resize:vertical;">${esc(isEdit ? note.content : '')}</textarea>
+      <textarea class="form-input note-editor__text" id="note-content" rows="12"
+                placeholder="${t('notes.contentPlaceholder')}">${esc(isEdit ? note.content : '')}</textarea>
     </div>
     ${renderCategoryEditor(isEdit ? (note.categories || []).map((category) => category.id) : [])}
     ${advancedSection(`
