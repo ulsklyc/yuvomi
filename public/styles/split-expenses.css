@@ -116,6 +116,15 @@
   min-width: 0;
 }
 
+/* DIE EINE ZEILE DER GRUPPENWAHL (R16). Breit ausgeblendet: dort steht die
+ * Liste als eigene Spalte. Schmal (Regeln unten bei max-width: 639px) ist sie
+ * der Kopf des Panels und klappt die Liste auf. Sie traegt die Bauart der
+ * Gruppenzeile (.split-group), damit zu- und aufgeklappt dieselbe Zeile an
+ * derselben Stelle steht. */
+.split-group-switch {
+  display: none;
+}
+
 .split-panel-head {
   justify-content: space-between;
   flex-wrap: wrap;
@@ -573,6 +582,109 @@ button.split-expense:hover {
   .split-topbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  /* VERWALTUNG VOR INHALT (R16, Critique 2026-10-05 P1 mobil). Gemessen bei
+     390x844: Gruppen-Panel 284px, Gruppenkopf 197px, Salden 145px - die erste
+     Ausgabe stand bei y=975, unter dem Falz. Jetzt:
+     - die Gruppenwahl ist EINE Zeile (aktive Gruppe, Aufklapp-Pfeil); Suche,
+       „+", Aktiv/Archiviert und die Liste klappen darunter auf;
+     - der Gruppenkopf wiederholt Namen und Typ nicht (sie stehen in der Zeile
+       darueber) und ist nur noch die Aktionszeile; Name, Typ und Beschreibung
+       bleiben im Baum, Archiv-Marke und die Angaben bei `budget: read`
+       bleiben sichtbar;
+     - Salden und Karten ruecken zusammen. */
+  .split-layout,
+  .split-main {
+    gap: var(--space-3);
+  }
+
+  .split-groups-panel {
+    padding-block: 0;
+  }
+
+  .split-group-switch {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: calc(100% + 2 * var(--space-3));
+    min-height: 64px;
+    margin-inline: calc(var(--space-3) * -1);
+    padding: var(--space-2) var(--space-3);
+    border: none;
+    background: transparent;
+    color: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .split-group-switch__chevron {
+    flex-shrink: 0;
+    margin-inline-start: auto;
+    color: var(--color-text-secondary);
+    transition: rotate var(--duration-sm) var(--ease-out);
+  }
+
+  .split-groups-panel--open .split-group-switch__chevron {
+    rotate: 180deg;
+  }
+
+  .split-groups-panel:not(.split-groups-panel--open) > .split-groups-body {
+    display: none;
+  }
+
+  .split-groups-panel--open > .split-groups-body {
+    padding-block: var(--space-2) 0;
+    border-block-start: 1px solid var(--color-border-subtle);
+  }
+
+  .split-group-header {
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+    gap: var(--space-2);
+  }
+
+  .split-group-header .split-group-name,
+  .split-group-header .split-group-type,
+  .split-group-header .split-group-desc {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .split-group-header__text:not(:has(.split-archived-badge, .split-group-meta)) {
+    display: contents;
+  }
+
+  .split-header-actions .btn.split-group-tools {
+    flex: 0 0 auto;
+  }
+
+  .split-card {
+    padding: var(--space-3);
+  }
+
+  .split-content-grid {
+    gap: var(--space-3);
+  }
+
+  .split-card-head {
+    margin-bottom: 0;
+  }
+
+  /* Salden kompakt: die Zeile traegt einen Satz und eine Zahl, kein Icon -
+     sie braucht nicht das Polster der Ausgabenzeile mit ihrer 42px-Marke. */
+  .split-debt {
+    padding-block: var(--space-2);
+  }
+
+  .split-debt:last-child {
+    padding-block-end: 0;
   }
 
   .split-header-actions {

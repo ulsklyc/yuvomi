@@ -77,6 +77,12 @@ let _statusTablist = null;   // wireTablist-Handle des Statusfilters (sync ohne 
 // Ausgabe gerade moeglich ist (Archiv an/aus) - der Kopfknopf gehoert budget.js.
 let _onAddableChange = null;
 
+// Die Gruppenwahl ist schmal EINE Zeile (R16): die aktive Gruppe als Kopf,
+// die Liste samt Suche, „+" und Aktiv/Archiviert klappt darunter auf. Der
+// Merker gilt nur fuer die schmale Bauart (split-expenses.css); breit steht
+// die Liste immer.
+let _groupPickerOpen = false;
+
 /**
  * Darf dieser Nutzer hier schreiben? (#467, #1265 P7)
  *
@@ -169,6 +175,14 @@ export async function render(container, { user, embedded = false, onAddableChang
       <section class="metric-grid budget-glance-details" id="split-summary"></section>
       <div class="split-layout">
         <aside class="split-groups-panel">
+          <!-- SCHMAL IST DIE GRUPPENWAHL EINE ZEILE (R16, Critique 2026-10-05):
+               Kopf der Liste, Segment und alle Gruppen standen mobil als 284px
+               Verwaltung vor der ersten Ausgabe (y=975). Der Knopf nennt die
+               aktive Gruppe und klappt die Liste auf; breit ist er
+               ausgeblendet und die Liste steht immer (split-expenses.css). -->
+          <button type="button" class="split-group-switch" id="split-group-switch"
+                  aria-expanded="false" aria-controls="split-groups-body"></button>
+          <div class="split-groups-body" id="split-groups-body">
           <!-- Das geteilte Suchfeld (gefuellte Kapsel) statt eines eigenen mit
                sichtbarem Label darueber, das nur den Platzhalter wiederholte
                (Komponenten-Kanon, Critique 2026-09-26 P1). Es steht IM Kopf
@@ -202,6 +216,7 @@ export async function render(container, { user, embedded = false, onAddableChang
             }).join('')}
           </div>
           <div class="split-groups" id="split-groups"></div>
+          </div>
         </aside>
         <main class="split-main" id="split-main" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 2 })}</main>
       </div>${fab}
@@ -420,10 +435,16 @@ function bindShell() {
   // Gleitende Auswahl-Kapsel wie jede Segmentleiste (Kanon, Runde 7 D8).
   const statusBar = _container.querySelector('#split-status-filter');
   if (statusBar) attachSegmentIndicator(statusBar);
+  _container.querySelector('#split-group-switch')?.addEventListener('click', () => {
+    _groupPickerOpen = !_groupPickerOpen;
+    syncGroupSwitch();
+  });
   _container.querySelector('#split-groups')?.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-group-id]');
     if (!btn) return;
     state.activeGroupId = Number(btn.dataset.groupId);
+    // Gewaehlt ist gewaehlt: die Zeile klappt wieder zu, die Ausgaben stehen.
+    _groupPickerOpen = false;
     await loadGroupData();
     renderAll();
   });
@@ -517,7 +538,33 @@ function renderSummary() {
   `);
 }
 
+/**
+ * Die eine Zeile der Gruppenwahl (schmal): aktive Gruppe mit Typ und
+ * Mitgliederzahl, dahinter der Aufklapp-Pfeil. Ohne aktive Gruppe (leere
+ * Liste, leeres Archiv, Suche ohne Treffer) steht die Liste offen - sonst
+ * laegen Leerzustand, Suche und „+" hinter einem Knopf ohne Namen.
+ */
+function syncGroupSwitch() {
+  const panel = _container.querySelector('.split-groups-panel');
+  const btn = _container.querySelector('#split-group-switch');
+  if (!panel || !btn) return;
+  const group = state.groups.find((g) => g.id === state.activeGroupId);
+  const open = _groupPickerOpen || !group;
+  panel.classList.toggle('split-groups-panel--open', open);
+  btn.setAttribute('aria-expanded', String(open));
+  setHtml(btn, `
+    <span class="split-group__avatar"><i data-lucide="${group ? groupIcon(group.type) : 'users-round'}" aria-hidden="true"></i></span>
+    <span class="split-group__body">
+      <span class="sr-only">${t('splitExpenses.groups')}: </span>
+      <span class="split-group__name">${group ? esc(group.name) : t('splitExpenses.groups')}</span>
+      ${group ? `<span class="split-group__meta">${t(`splitExpenses.groupType.${group.type}`)} · ${group.member_count} ${t('splitExpenses.members')}${isArchivedView() ? ` · ${t('splitExpenses.statusArchived')}` : ''}</span>` : ''}
+    </span>
+    <i data-lucide="chevron-down" class="icon-md split-group-switch__chevron" aria-hidden="true"></i>`);
+  if (window.lucide) lucide.createIcons({ el: btn });
+}
+
 function renderGroups() {
+  syncGroupSwitch();
   const el = _container.querySelector('#split-groups');
   if (!state.groups.length) {
     setHtml(el, isArchivedView()
@@ -607,11 +654,11 @@ function renderMain() {
   const SectionTag = _embedded ? 'h4' : 'h3';
   setHtml(main, `
     <section class="split-group-header">
-      <div>
+      <div class="split-group-header__text">
         <${GroupTag} class="split-group-name">${esc(group.name)}</${GroupTag}>
         <p class="split-group-type">${t(`splitExpenses.groupType.${group.type}`)}</p>
         ${archived ? `<p class="split-archived-badge"><i data-lucide="archive" class="icon-md" aria-hidden="true"></i>${t('splitExpenses.statusArchived')}</p>` : ''}
-        <p>${esc(group.description || t('splitExpenses.groupDefaultDescription'))}</p>
+        <p class="split-group-desc">${esc(group.description || t('splitExpenses.groupDefaultDescription'))}</p>
         ${ro ? groupMetaHtml(group) : ''}
       </div>
       ${/* Bei `budget: read` faellt die ganze Leiste: Bearbeiten, Archivieren,

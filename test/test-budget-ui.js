@@ -3698,3 +3698,29 @@ test('R16: formatMonthYear kennt die Kurzform des Monats', async () => {
   assert.ok(short.length <= long.length, `${short} ist nicht laenger als ${long}`);
   assert.match(short, /2026/);
 });
+
+/* R16 (Critique 2026-10-05, P1 mobil): VERWALTUNG VOR INHALT IN DER AUFTEILUNG.
+ * Gemessen 390x844: Gruppen-Panel 284px + Gruppenkopf 197px + Salden 145px,
+ * erste Ausgabe y=975. Schmal ist die Gruppenwahl jetzt EINE Zeile, die die
+ * Liste aufklappt, und der Gruppenkopf nur noch die Aktionszeile (y=499). */
+test('R16 Aufteilung: schmal ist die Gruppenwahl eine Zeile, die die Liste aufklappt', () => {
+  const src = read('../public/pages/split-expenses.js');
+  const css = read('../public/styles/split-expenses.css');
+  assert.match(src, /<button type="button" class="split-group-switch" id="split-group-switch"\s+aria-expanded="false" aria-controls="split-groups-body">/);
+  assert.match(src, /<div class="split-groups-body" id="split-groups-body">[\s\S]*id="split-status-filter"[\s\S]*id="split-groups"/,
+    'Suche, Aktiv/Archiviert und die Liste stehen IM aufklappbaren Teil');
+  // Ohne aktive Gruppe steht die Liste offen - sonst laegen Leerzustand und „+" hinter einem namenlosen Knopf.
+  assert.match(src, /const open = _groupPickerOpen \|\| !group;/);
+  assert.match(src, /btn\.setAttribute\('aria-expanded', String\(open\)\)/);
+  const all = [...eachRule(css)].map((r) => ({ ...r, selector: r.selector.trim() }));
+  const narrow = all.filter((r) => r.at.some((a) => /@container split-page \(max-width:\s*639px\)/.test(a)));
+  const base = all.find((r) => r.at.length === 0 && r.selector === '.split-group-switch');
+  assert.match(base?.body ?? '', /display:\s*none/, 'breit steht die Liste als Spalte - die Zeile ist dort ausgeblendet');
+  assert.ok(narrow.some((r) => r.selector === '.split-group-switch' && /display:\s*flex/.test(r.body)));
+  assert.ok(narrow.some((r) => r.selector === '.split-groups-panel:not(.split-groups-panel--open) > .split-groups-body'
+    && /display:\s*none/.test(r.body)), 'zugeklappt ist die Liste aus dem Fluss');
+  // Der Gruppenkopf wiederholt den Namen nicht: geclippt, nicht entfernt.
+  const clipped = narrow.find((r) => r.selector.includes('.split-group-header .split-group-name'));
+  assert.match(clipped?.body ?? '', /clip-path:\s*inset\(50%\)/);
+  assert.doesNotMatch(clipped?.body ?? '', /display:\s*none/, 'die Ueberschrift der Gruppe bleibt im Baum');
+});
