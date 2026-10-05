@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   row above the accounts. In "Split" the recent expenses take the wider column, balances and
   activity the narrower one; in the statistics the share ring stays in view while you scroll the
   categories. Phones are unchanged.
+- **"Latest vitals" in the Health overview uses the width instead of one long column.** On a
+  desktop the nine tiles stood one below the other, 930px tall, next to 640px of empty space.
+  The card now runs across the overview with four or five tiles per row, about a third as tall.
 
 ### Fixed
 

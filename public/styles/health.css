@@ -2004,6 +2004,18 @@ button.health-med-card:hover {
   color: var(--color-warning);
 }
 
+/* DIE VITALWERTE NEHMEN DIE GANZE BREITE (Critique R16, 2026-10-05). Als eine
+ * Karte unter vielen stand sie in EINER Spalte der Masonry: 300px innen, das
+ * Kachelraster braucht fuer zwei Spalten 308 - neun Kacheln untereinander,
+ * 930px hoch, und die Nachbarspalte endete 640px frueher. Als Band ueber alle
+ * Spalten traegt dieselbe Karte ihr Raster in der Breite (1280: vier Kacheln
+ * je Zeile, 1440: fuenf) und ist rund 300px hoch. Die Karten davor und danach
+ * verteilen sich weiter auf die Spalten. Einspaltig (Telefon) aendert sich
+ * nichts: dort gibt es nichts zu ueberspannen. */
+.health-overview__card--vitals {
+  column-span: all;
+}
+
 /* Letzte Vitalwerte */
 /* Eine Kachelhöhe je Rasterzeile (Finish-Review Runde 2, Fix 6). Die Ursache
  * der ungleichen Höhen war NICHT das Raster, sondern das umbrechende Label:

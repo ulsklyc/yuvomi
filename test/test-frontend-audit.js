@@ -17560,6 +17560,22 @@ test('PAGE-020: eine Aussenkante je Modul - kein Reiter schaltet das Mass oder d
   assert.ok(users >= 3, `PAGE-020: nur ${users} Seiten mit Spaltenraster gefunden - Belohnungen, Entsorgung und Haushaltshilfe sollten es sein`);
 });
 
+test('Gesundheit: die letzten Vitalwerte ueberspannen die Spalten der Uebersicht', () => {
+  // Critique R16 (2026-10-05): als eine Karte der Multicolumn-Masonry stand sie
+  // in EINER Spalte - 300px innen, das Kachelraster braucht fuer zwei Spalten
+  // 308 (2 x 150 + Abstand). Neun Kacheln untereinander, 930px hoch, daneben
+  // 640px leer. Als Band ueber alle Spalten traegt sie vier bis fuenf Kacheln
+  // je Zeile.
+  const health = read('../public/pages/health.js');
+  assert.match(health, /overviewCard\('activity', 'health\.overview\.vitals\.title', overviewVitalsMarkup\(\), 'vitals'\)/,
+    'die Vitalwerte-Karte traegt ihren Teilnamen - an ihm haengt die Spannweite');
+  const css = read('../public/styles/health.css');
+  const span = [...eachRule(css)].find(({ selector, at }) => selector.trim() === '.health-overview__card--vitals' && !at.length);
+  assert.match(span?.body ?? '', /column-span:\s*all/, 'die Karte ueberspannt alle Spalten der Masonry');
+  const masonry = [...eachRule(css)].find(({ selector, at }) => selector.trim() === '.health-overview__grid' && !at.length);
+  assert.match(masonry?.body ?? '', /column-width:/, 'die Uebersicht ist weiter eine Multicolumn-Masonry - nur dort wirkt column-span');
+});
+
 test('PAGE-010: full-bleed is an explicit --bleed declaration', () => {
   const layout = read('../public/styles/layout.css');
   assert.match(layout, /\.page-section--bleed\s*\{[\s\S]*?padding-inline:\s*var\(--page-inline-pad\)/,

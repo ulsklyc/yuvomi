@@ -5808,7 +5808,7 @@ function renderOverviewShell() {
       ${overviewCard('calendar-check', 'health.overview.dueToday.title', overviewDueMarkup(), 'due')}
       ${prnMeds('overview').length ? overviewCard('pill', 'health.meds.prn.title', prnListMarkup('overview')) : ''}
       ${overviewCard('trending-up', 'health.overview.adherence.title', overviewAdherenceMarkup())}
-      ${overviewCard('activity', 'health.overview.vitals.title', overviewVitalsMarkup())}
+      ${overviewCard('activity', 'health.overview.vitals.title', overviewVitalsMarkup(), 'vitals')}
       ${overviewCycleTileMarkup()}
       ${canEditFor(overview.personId, overview.meId) ? overviewCard('plus-circle', 'health.overview.quick.title', quickCaptureMarkup(), 'quick') : ''}
       ${overviewCard('bell', 'health.overview.reminders.title', overviewUpcomingMarkup())}
