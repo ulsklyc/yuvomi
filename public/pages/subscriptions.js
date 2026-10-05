@@ -13,7 +13,7 @@ import {
   parseDateInput,
   t,
 } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { todayKey } from '/utils/date.js';
@@ -1050,11 +1050,11 @@ function currencyItems() {
 // anderen Feldern, traegt ein sichtbares Label und zeigt den GEWAEHLTEN Wert
 // („EUR · Euro"). Deshalb `type="text"` (die Rolle kommt aus role="combobox")
 // und die Feldform des Formulars, nicht die Suchkapsel (Komponenten-Kanon).
-function comboboxMarkup({ id, label, items, value = '', placeholder }) {
+function comboboxMarkup({ id, label, items, value = '', placeholder, required = false }) {
   const selected = items.find((item) => String(item.value) === String(value));
   return `
     <div class="form-group subscriptions-combobox" data-combobox="${id}">
-      <label class="form-label" for="${id}-search">${label}</label>
+      <label class="form-label" for="${id}-search">${label}${required ? REQUIRED_MARK : ''}</label>
       <div class="subscriptions-combobox__control">
         <i data-lucide="search" aria-hidden="true"></i>
         <input class="form-input" id="${id}-search" type="text" role="combobox"
@@ -1309,7 +1309,7 @@ export function openSubscriptionModal(subscription = null) {
         </div>
         <div class="subscription-form__identity-fields">
           <div class="form-group">
-            <label class="form-label" for="subscription-name">${t('subscriptions.nameLabel')}</label>
+            <label class="form-label" for="subscription-name">${t('subscriptions.nameLabel')}${REQUIRED_MARK}</label>
             <input class="form-input" id="subscription-name" maxlength="200" required value="${esc(initialName)}">
           </div>
           <div class="form-group">
@@ -1323,7 +1323,7 @@ export function openSubscriptionModal(subscription = null) {
         <h3><i data-lucide="receipt-text" aria-hidden="true"></i>${t('subscriptions.billingDetails')}</h3>
         <div class="subscription-form__billing-grid">
           <div class="form-group">
-            <label class="form-label" for="subscription-amount">${t('subscriptions.amountLabel')}</label>
+            <label class="form-label" for="subscription-amount">${t('subscriptions.amountLabel')}${REQUIRED_MARK}</label>
             <input class="form-input" id="subscription-amount" type="number"
                    min="0"
                    step="${amountStep(formCurrency, subscription?.amount ?? '')}"
@@ -1333,6 +1333,7 @@ export function openSubscriptionModal(subscription = null) {
           ${comboboxMarkup({
             id: 'subscription-currency',
             label: t('subscriptions.currencyLabel'),
+            required: true,
             items: currencyItems(),
             value: subscription?.currency || state.settings.base_currency,
             placeholder: t('subscriptions.currencySearchPlaceholder'),
@@ -1355,7 +1356,7 @@ export function openSubscriptionModal(subscription = null) {
         <h3><i data-lucide="calendar-clock" aria-hidden="true"></i>${t('subscriptions.renewalDetails')}</h3>
         <div class="form-grid-2">
           <div class="form-group">
-            <label class="form-label" for="subscription-next-date">${t('subscriptions.nextPaymentLabel')}</label>
+            <label class="form-label" for="subscription-next-date">${t('subscriptions.nextPaymentLabel')}${REQUIRED_MARK}</label>
             <yuvomi-datepicker id="subscription-next-date" type="date"
                    value="${esc(subscription?.next_payment_date || todayKey())}"></yuvomi-datepicker>
           </div>

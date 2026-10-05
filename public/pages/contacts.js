@@ -9,7 +9,7 @@ import { openModal as openSharedModal, closeModal, advancedSection, refocusAfter
 import { openDetailView } from '/components/detail-view.js';
 import { stagger, vibrate, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { t, formatDate } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
@@ -1466,7 +1466,7 @@ function buildContactForm({ mode, contact = null }) {
 
   const content = `
     <fieldset class="contact-modal__name-group">
-      <legend class="form-label">${t('contacts.nameGroupLabel')}</legend>
+      <legend class="form-label">${t('contacts.nameGroupLabel')}${REQUIRED_MARK}</legend>
       <div class="modal-grid modal-grid--2 contact-modal__name-grid">
         <div class="form-group">
           <label class="form-label" for="cm-first-name">${t('contacts.firstNameLabel')}</label>

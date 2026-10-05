@@ -19584,3 +19584,45 @@ test('R16: die Abschnittstitel der Haushaltshilfe stehen auf der Buehne, ueber d
   assert.deepStrictEqual(flaeche.map((rule) => rule.selector.trim()), [], 'Abschnitt und Kopf tragen keine Flaeche');
   assert.doesNotMatch(read('../public/styles/typography.css'), /\.housekeeping-card h2/, 'die Rolle kommt von `.u-section-title`, nicht vom Ort in der Karte');
 });
+
+/* R16 Schritt 2b (Critique 2026-10-05, Persona Sam: "Pflichtstern mal Element,
+ * mal Label-Text"): 13 Schluessel trugen " *" im Locale-Text, in jeder der 26
+ * Sprachen. Gegen den Stand davor rot gelaufen. */
+test('R16: der Pflichtstern ist ein Element (`REQUIRED_MARK`), nie Teil eines Locale-Texts', () => {
+  const dir = new URL('../public/locales/', import.meta.url);
+  for (const file of readdirSync(dir).filter((name) => name.endsWith('.json'))) {
+    const sterne = [];
+    const walk = (node, path) => {
+      for (const [key, value] of Object.entries(node)) {
+        if (value && typeof value === 'object') walk(value, `${path}${key}.`);
+        else if (typeof value === 'string' && /[*＊][\s‎‏]*$/.test(value)) sterne.push(`${path}${key}`);
+      }
+    };
+    walk(JSON.parse(read(`../public/locales/${file}`)), '');
+    assert.deepStrictEqual(sterne, [], `${file}: der Text nennt das Feld, der Stern ist Markup`);
+  }
+  assert.match(read('../public/utils/html.js'),
+    /export const REQUIRED_MARK = '<span class="required-marker" aria-hidden="true"> \*<\/span>';/);
+  // Keine Seite baut den Stern von Hand nach (eine Ausnahme: der schaltbare
+  // Stern der Unterkategorie im Budget traegt zusaetzlich `hidden`).
+  for (const file of readdirSync(new URL('../public/pages/', import.meta.url)).filter((name) => name.endsWith('.js'))) {
+    const hand = (read(`../public/pages/${file}`).match(/<span class="required-marker" aria-hidden="true">/g) ?? []).length;
+    assert.equal(hand, 0, `${file}: \${REQUIRED_MARK} statt eines eigenen Spans`);
+  }
+  // Die 13 Felder, deren Text den Stern verloren hat, tragen ihn als Element.
+  const mit = (file, re) => assert.match(read(`../public/pages/${file}`), re, `${file}: ${re}`);
+  mit('inventory.js', /t\('common\.nameLabel'\)\)\}\$\{REQUIRED_MARK\}/);
+  mit('meals.js', /t\('common\.nameLabel'\)\}\$\{REQUIRED_MARK\}/);
+  mit('pantry.js', /t\('common\.nameLabel'\)\)\}\$\{REQUIRED_MARK\}/);
+  mit('recipes.js', /t\('common\.nameLabel'\)\}\$\{REQUIRED_MARK\}/);
+  mit('contacts.js', /t\('contacts\.nameGroupLabel'\)\}\$\{REQUIRED_MARK\}/);
+  for (const key of ['loanPrincipalLabel', 'loanAmountLabel', 'loanInstallmentsLabel', 'loanStartMonthLabel']) {
+    mit('budget.js', new RegExp(`t\\('budget\\.${key}'\\)\\}\\$\\{REQUIRED_MARK\\}`));
+  }
+  assert.equal((read('../public/pages/budget.js').match(/t\('budget\.dateLabel'\)\}\$\{REQUIRED_MARK\}/g) ?? []).length, 2);
+  mit('budget.js', /<span id="lm-borrower-label">[\s\S]{0,120}<\/span>\$\{REQUIRED_MARK\}<\/label>/);
+  for (const key of ['nameLabel', 'amountLabel', 'nextPaymentLabel']) {
+    mit('subscriptions.js', new RegExp(`t\\('subscriptions\\.${key}'\\)\\}\\$\\{REQUIRED_MARK\\}`));
+  }
+  mit('subscriptions.js', /label: t\('subscriptions\.currencyLabel'\),\s*required: true,/);
+});

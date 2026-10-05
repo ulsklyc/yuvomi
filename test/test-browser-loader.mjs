@@ -268,6 +268,9 @@ const STUBS = {
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#039;');
     export const fmtLocation = (value) => String(value ?? '');
+    // Der Pflichtstern (R16): dieselbe Zeichenkette wie in public/utils/html.js;
+    // test-frontend-audit.js haelt das Original fest.
+    export const REQUIRED_MARK = '<span class="required-marker" aria-hidden="true"> *</span>';
     // Wie __renderUserMultiSelect weiter unten: Suiten, die pruefen wollen, WAS
     // ein Aufrufer dem Markdown-Renderer uebergibt (die Checklisten-Optionen
     // etwa), setzen globalThis.__renderMarkdownLight. Ohne das bleibt es beim

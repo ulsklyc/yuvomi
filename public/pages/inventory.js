@@ -9,7 +9,7 @@
 
 import { api } from '/api.js';
 import { t } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import {
   openModal as openSharedModal,
@@ -1864,7 +1864,7 @@ function buildItemForm({ mode, item = null }) {
 
   const content = `
       <div class="form-group">
-        <label class="form-label" for="inv-name">${esc(t('common.nameLabel'))}</label>
+        <label class="form-label" for="inv-name">${esc(t('common.nameLabel'))}${REQUIRED_MARK}</label>
         <input id="inv-name" class="form-input" type="text" required placeholder="${esc(t('inventory.namePlaceholder'))}">
       </div>
       <div class="inventory-form-row">

@@ -13,7 +13,7 @@ import { stagger, vibrate, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset } from '/utils/period-stepper.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -2107,7 +2107,7 @@ function openAccountModal(account = null) {
 
   const content = `
     <div class="form-group">
-      <label class="form-label" for="am-name">${t('budget.accountNameLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+      <label class="form-label" for="am-name">${t('budget.accountNameLabel')}${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="am-name" maxlength="100"
              placeholder="${t('budget.accountNamePlaceholder')}" value="${esc(isEdit ? account.name : '')}">
     </div>
@@ -3119,7 +3119,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
         * Belege), steht hinter „Weitere Angaben" - beim Bearbeiten offen,
         * sobald eines davon einen Wert traegt. */ ''}
     <div class="form-group js-entry-field">
-      <label class="form-label" for="bm-amount">${t('budget.amountLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+      <label class="form-label" for="bm-amount">${t('budget.amountLabel')}${REQUIRED_MARK}</label>
       <input type="number" class="form-input budget-amount-input" id="bm-amount"
              placeholder="${amountPlaceholder(state.currency)}"
              step="${amountStep(state.currency, absAmount)}" min="${amountMin(state.currency, absAmount)}"
@@ -3127,14 +3127,14 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
     </div>
 
     <div class="form-group js-entry-field">
-      <label class="form-label" for="bm-title">${t('budget.titleLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+      <label class="form-label" for="bm-title">${t('budget.titleLabel')}${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="bm-title"
              placeholder="${t('budget.titlePlaceholder')}" value="${esc(isEdit ? entry.title : '')}">
     </div>
 
     <div class="form-group js-entry-field">
       <div class="budget-field-header">
-        <label class="form-label" for="bm-category">${t('budget.categoryLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+        <label class="form-label" for="bm-category">${t('budget.categoryLabel')}${REQUIRED_MARK}</label>
         <button class="btn btn--secondary budget-inline-add" type="button" id="bm-add-category">${t('budget.addCategory')}</button>
       </div>
       <select class="form-input" id="bm-category" required aria-required="true">${catOpts}</select>
@@ -3149,7 +3149,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
     </div>
 
     <div class="form-group js-entry-field">
-      <label class="form-label" for="bm-date">${t('budget.dateLabel')}</label>
+      <label class="form-label" for="bm-date">${t('budget.dateLabel')}${REQUIRED_MARK}</label>
       <yuvomi-datepicker type="date" id="bm-date"
              value="${isEdit ? entry.date : defaultDate}"></yuvomi-datepicker>
     </div>
@@ -3791,9 +3791,9 @@ function loanIdentityFieldsHtml(loan) {
       </select>
     </div>
     <div class="form-group">
-      <label class="form-label" for="lm-borrower" id="lm-borrower-label">${
+      <label class="form-label" for="lm-borrower"><span id="lm-borrower-label">${
         t(borrowed ? 'budget.loanLenderLabel' : 'budget.loanBorrowerLabel')
-      }</label>
+      }</span>${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="lm-borrower" maxlength="100"
              placeholder="${t(borrowed ? 'budget.loanLenderPlaceholder' : 'budget.loanBorrowerPlaceholder')}"
              value="${esc(loan?.borrower ?? '')}">
@@ -3860,7 +3860,7 @@ function loanInterestFieldsHtml(loan) {
     </div>
     <div id="lm-interest-fields" ${mode === 'none' ? 'hidden' : ''}>
       <div class="form-group">
-        <label class="form-label" for="lm-principal">${t('budget.loanPrincipalLabel')}</label>
+        <label class="form-label" for="lm-principal">${t('budget.loanPrincipalLabel')}${REQUIRED_MARK}</label>
         <input type="number" class="form-input" id="lm-principal"
                step="${amountStep(currency, it?.principal ?? '')}" min="${amountMin(currency, it?.principal ?? '')}"
                placeholder="${amountPlaceholder(currency)}" inputmode="decimal" value="${v(it?.principal)}">
@@ -4070,7 +4070,7 @@ function loanFormFieldsHtml(loan, { startMonth }) {
     ${loanCurrencyFieldsHtml(loan)}
     <div class="form-grid-2" id="lm-manual-fields">
       <div class="form-group">
-        <label class="form-label" for="lm-amount">${t('budget.loanAmountLabel')}</label>
+        <label class="form-label" for="lm-amount">${t('budget.loanAmountLabel')}${REQUIRED_MARK}</label>
         <input type="number" class="form-input" id="lm-amount"
                step="${amountStep(loanCurrency, loan ? loan.total_amount : '')}"
                min="${amountMin(loanCurrency, loan ? loan.total_amount : '')}"
@@ -4078,14 +4078,14 @@ function loanFormFieldsHtml(loan, { startMonth }) {
                value="${loan ? String(loan.total_amount) : ''}">
       </div>
       <div class="form-group">
-        <label class="form-label" for="lm-installments">${t('budget.loanInstallmentsLabel')}</label>
+        <label class="form-label" for="lm-installments">${t('budget.loanInstallmentsLabel')}${REQUIRED_MARK}</label>
         <input type="number" class="form-input" id="lm-installments" step="1" min="1" max="360"
                inputmode="numeric" value="${loan?.installment_count ?? ''}">
       </div>
     </div>
     ${loanInterestFieldsHtml(loan)}
     <div class="form-group">
-      <label class="form-label" for="lm-start">${t('budget.loanStartMonthLabel')}</label>
+      <label class="form-label" for="lm-start">${t('budget.loanStartMonthLabel')}${REQUIRED_MARK}</label>
       <input type="month" class="form-input" id="lm-start" value="${esc(loan?.start_month ?? startMonth)}">
     </div>
     ${isEdit ? '' : `
@@ -4505,7 +4505,7 @@ async function openConfirmBookingModal(id) {
              min="${amountMin(state.currency)}" value="${absAmount}">
     </div>
     <div class="form-group">
-      <label class="form-label" for="cb-date">${t('budget.dateLabel')}</label>
+      <label class="form-label" for="cb-date">${t('budget.dateLabel')}${REQUIRED_MARK}</label>
       <yuvomi-datepicker type="date" id="cb-date" value="${esc(entry.date)}"></yuvomi-datepicker>
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">

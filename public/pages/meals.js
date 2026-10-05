@@ -8,7 +8,7 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { stagger, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
 import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset } from '/utils/period-stepper.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { DEFAULT_CATEGORY_NAME } from '/utils/shopping-categories.js';
@@ -2015,7 +2015,7 @@ function buildModalContent({ mode, date, mealType, meal, fromSlot = false, recip
 `;
   const nameHtml = `
     <div class="form-group" style="position:relative;">
-      <label class="form-label" for="modal-title">${t('common.nameLabel')}</label>
+      <label class="form-label" for="modal-title">${t('common.nameLabel')}${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="modal-title" required
              placeholder="${t('meals.titlePlaceholder')}"
              value="${esc(isEdit ? meal.title : '')}"

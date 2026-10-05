@@ -5,7 +5,7 @@
 
 import { api } from '/api.js';
 import { t, formatDate, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
@@ -1378,7 +1378,7 @@ function openRecipeModal(mode, recipe = null) {
     size: 'md',
     content: `
       <div class="form-group">
-        <label class="form-label" for="recipe-title">${t('common.nameLabel')}</label>
+        <label class="form-label" for="recipe-title">${t('common.nameLabel')}${REQUIRED_MARK}</label>
         <input id="recipe-title" class="form-input" type="text" required placeholder="${t('recipes.titlePlaceholder')}">
       </div>
       <div class="form-group">

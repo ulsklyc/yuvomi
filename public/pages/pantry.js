@@ -9,7 +9,7 @@
 
 import { api } from '/api.js';
 import { t, getNumberFormat, formatDate } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import {
   openModal as openSharedModal,
   closeModal as closeSharedModal,
@@ -1325,7 +1325,7 @@ function openItemModal(mode, item = null) {
     size: 'md',
     content: `
       <div class="form-group">
-        <label class="form-label" for="pantry-name">${esc(t('common.nameLabel'))}</label>
+        <label class="form-label" for="pantry-name">${esc(t('common.nameLabel'))}${REQUIRED_MARK}</label>
         <input id="pantry-name" class="form-input" type="text" required
                placeholder="${esc(t('pantry.namePlaceholder'))}">
       </div>

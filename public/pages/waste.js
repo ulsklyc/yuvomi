@@ -13,7 +13,7 @@
 
 import { api } from '/api.js';
 import { t, formatDate } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { todayKey, addLocalDays, parseLocalDateKey, toLocalDateKey } from '/utils/date.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, btnLoading, refocusAfterRender } from '/components/modal.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -878,7 +878,7 @@ function openTypeModal(type = null) {
       </select>
     </div>`}
     <div class="form-group">
-      <label class="form-label" for="wtm-name">${t('waste.typeNameLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+      <label class="form-label" for="wtm-name">${t('waste.typeNameLabel')}${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="wtm-name" maxlength="100" value="${esc(isEdit ? type.name : '')}">
     </div>
     <div class="form-group">

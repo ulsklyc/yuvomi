@@ -14,6 +14,18 @@ import { esc } from './html-escape.js';
 export { esc };
 
 /**
+ * DER PFLICHTSTERN, EIN MUSTER (Critique 2026-10-05, R16). Er stand auf zwei
+ * Arten da: als Element hinter dem Label (elf Stellen) und als " *" im
+ * Locale-Text selbst (13 Schluessel in jeder Sprache) - dort las ihn der
+ * Screenreader als "Name Stern" mit, er trug kein Warnrot, und derselbe
+ * Schluessel stand in einer Leseansicht als "Gesamtbetrag *" da. Jetzt: der
+ * Locale-Text nennt nur das Feld, der Stern ist dieses Element
+ * (`.required-marker`, layout.css), aus dem Baum genommen - die Pflicht selbst
+ * sagt das Feld (`required`/`aria-required`). Guard: test-frontend-audit.
+ */
+export const REQUIRED_MARK = '<span class="required-marker" aria-hidden="true"> *</span>';
+
+/**
  * Normalisiert einen iCalendar LOCATION-String fuer die Anzeige.
  * Entfernt ICS-Backslash-Escapes (RFC 5545 §3.3.11) und fasst
  * mehrzeilige Adressen zu einem einzeiligen String zusammen.
