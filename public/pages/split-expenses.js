@@ -522,12 +522,16 @@ function renderSummary() {
     }));
     wireMetricGlance(glance, 'split-glance-more');
   }
+  // DER TON GILT DEM BETRAG, NICHT DER KARTE (Critique 2026-10-05, R16): „Du
+  // bekommst 0,00 €" stand in Erfolgsgruen, „Du schuldest 0,00 €" in Rot. Null
+  // ist weder Gewinn noch Schuld - die Kurzzeile darueber hielt das schon so
+  // (`tone` nur mit Betrag), die Karten jetzt auch.
   setHtml(summary, `
-    <div class="metric-card metric-card--positive">
+    <div class="metric-card${owed.length ? ' metric-card--positive' : ''}">
       <div class="metric-card__label">${t('splitExpenses.youAreOwed')}</div>
       <div class="metric-card__value">${owedText}</div>
     </div>
-    <div class="metric-card metric-card--negative">
+    <div class="metric-card${owing.length ? ' metric-card--negative' : ''}">
       <div class="metric-card__label">${t('splitExpenses.youOwe')}</div>
       <div class="metric-card__value">${owingText}</div>
     </div>

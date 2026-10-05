@@ -3728,3 +3728,41 @@ test('R16 Aufteilung: schmal ist die Gruppenwahl eine Zeile, die die Liste aufkl
   assert.match(clipped?.body ?? '', /clip-path:\s*inset\(50%\)/);
   assert.doesNotMatch(clipped?.body ?? '', /display:\s*none/, 'die Ueberschrift der Gruppe bleibt im Baum');
 });
+
+/* R16 Schritt 2 (Critique 2026-10-05, P1 Bausteine): das Budget sprach in
+ * seinen Reitern Dialekt. Drei Regeln, je gegen den Stand davor rot gelaufen. */
+test('R16 Budget: Gewichte kommen aus den Tokens, ohne !important - und der Betrag hat EIN Gewicht', () => {
+  const funde = [];
+  for (const file of ['budget.css', 'split-expenses.css', 'subscriptions.css']) {
+    for (const rule of eachRule(read(`../public/styles/${file}`))) {
+      const w = rule.body.match(/font-weight:\s*([^;]+)/);
+      if (!w) continue;
+      if (/^\d+/.test(w[1].trim()) || /!important/.test(w[1])) funde.push(`${file}: ${rule.selector.trim()} { font-weight: ${w[1].trim()} }`);
+    }
+  }
+  assert.deepStrictEqual(funde, [], 'Gewicht als Literal oder mit !important');
+
+  const body = (file, sel) => [...eachRule(read(`../public/styles/${file}`))]
+    .filter((r) => r.selector.split(',').map((s) => s.trim()).includes(sel)).map((r) => r.body).join(';');
+  for (const [file, sel] of [
+    ['budget.css', '.budget-entry__amount'],
+    ['budget.css', '.budget-account__balance'],
+    ['budget.css', '.budget-plan-row__amounts strong'],
+    ['split-expenses.css', '.split-expense__amount'],
+  ]) {
+    assert.match(body(file, sel), /font-weight:\s*var\(--font-weight-semibold\)/, `${sel}: ein Betrag steht semibold`);
+  }
+});
+
+test('R16 Budget: "Darlehenstransaktionen" ist eine Ueberschrift auf der Buehne, kein div', () => {
+  const src = read('../public/pages/budget.js');
+  assert.match(src, /<h2 class="budget-loan-transactions__title u-section-title">\$\{t\('budget\.loanTransactions'\)\}<\/h2>/);
+  assert.doesNotMatch(src, /<div class="budget-loan-transactions__title"/);
+});
+
+test('R16 Aufteilung: null ist weder Gewinn noch Schuld - der Ton haengt am Betrag', () => {
+  const src = read('../public/pages/split-expenses.js');
+  assert.match(src, /class="metric-card\$\{owed\.length \? ' metric-card--positive' : ''\}"/);
+  assert.match(src, /class="metric-card\$\{owing\.length \? ' metric-card--negative' : ''\}"/);
+  assert.doesNotMatch(src, /class="metric-card metric-card--(?:positive|negative)">\s*<div class="metric-card__label">\$\{t\('splitExpenses\.you/);
+});

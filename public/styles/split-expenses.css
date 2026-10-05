@@ -145,8 +145,13 @@
   }
 }
 
+/* GEWICHTE AUS DEN TOKENS (Critique 2026-10-05, R16). Hier standen 800, 800,
+ * 900, 700 und `600 !important` als Literale - fuenf Gewichte, von denen die
+ * Skala drei gar nicht kennt, und der Betrag einer geteilten Ausgabe stand
+ * fetter da als der Kontosaldo. Jetzt: Titel semibold, Zeilenname medium
+ * (Rolle Zeilentitel), Betrag semibold (die Betragsregel in budget.css). */
 .split-panel-title {
-  font-weight: 800;
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Der Zaehler der Gruppenliste in der geteilten Zaehler-Tinte
@@ -258,7 +263,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 800;
+  font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
 }
 
@@ -396,7 +401,8 @@
 .split-debt strong,
 .split-expense__amount {
   flex: 0 0 auto;
-  font-weight: 900;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
   color: var(--color-text-primary);
 }
 
@@ -478,7 +484,7 @@ button.split-expense:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  font-weight: 700;
+  font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
 }
 
@@ -505,10 +511,12 @@ button.split-expense:hover {
   background: var(--color-fill-well);
 }
 
-.split-check {
-  flex-direction: row !important;
+/* Zwei Klassen statt `!important`: (0,2,0) schlaegt `.split-form label`
+ * (0,1,1) auch ohne den Hammer. */
+.split-form .split-check {
+  flex-direction: row;
   align-items: center;
-  font-weight: 600 !important;
+  font-weight: var(--font-weight-medium);
 }
 
 .split-participant-row {

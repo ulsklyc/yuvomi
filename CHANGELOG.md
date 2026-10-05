@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   semibold in Tasks, 16px regular in Budget entries and subscriptions, 16px medium in most
   modules, 17px semibold in the agenda, contacts and birthdays. It is 16px medium everywhere
   now; card titles keep their heading size.
+- **Budget: amounts have one weight, and zero is not a gain.** The amount of a split expense
+  stood heavier than an account balance, which stood heavier than a booking; all of them are
+  semibold now. "You are owed 0.00" in Split no longer shows in green, "You owe 0.00" no longer
+  in red. "Loan transactions" is a real heading, so a screen reader finds the list.
 - **Rewards: the history rows are the shared list rows, and section headings carry no icon.**
   The heading "Rewards" under the tab "Rewards" is no longer shown on a desktop either.
 - **Rewards, Waste and Housekeeping use the width of a desktop window.** These three stood as a

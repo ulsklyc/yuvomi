@@ -2378,7 +2378,7 @@ function renderLoanTransactions(loans) {
   if (!payments.length) return '';
 
   return `<div class="budget-loan-transactions">
-    <div class="budget-loan-transactions__title">${t('budget.loanTransactions')}</div>
+    <h2 class="budget-loan-transactions__title u-section-title">${t('budget.loanTransactions')}</h2>
     ${/* Traeger wie das Hauptbuch (Re-Critique 2026-09-28 P1-1): vorher lagen
         * die Raten nackt auf der Buehne, der einzige Tab ohne Flaeche. */ ''}
     <div class="row-carrier budget-loan-transactions__list">
