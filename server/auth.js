@@ -462,6 +462,13 @@ function publicApiToken(row) {
     scopes: parseScopes(row.scopes),
     expires_at: row.expires_at,
     revoked_at: row.revoked_at,
+    // Das Urteil des SERVERS, ob das Token noch gilt (D#1672, Codex zu #1681).
+    // Die Oberflaeche teilt ihre Liste danach - entschiede sie mit der Uhr des
+    // Browsers, hielte ein vorgehendes Geraet ein Token fuer abgelaufen, boete
+    // nur "Entfernen" an, bekaeme 409 und koennte es auch nicht widerrufen.
+    // `usable` kommt aus `apiTokenUsableSql()`; wo eine Abfrage es nicht
+    // mitliefert, fehlt das Feld, statt etwas zu behaupten.
+    ...(row.usable === undefined ? {} : { active: row.usable === 1 }),
     last_used_at: row.last_used_at,
     created_at: row.created_at,
   };
@@ -2940,7 +2947,8 @@ router.get('/users', requireAuth, (req, res) => {
 router.get('/api-tokens', requireAuth, requireAdmin, (req, res) => {
   try {
     const rows = db.get().prepare(`
-      SELECT t.*, creator.display_name AS creator_name,
+      SELECT t.*, ${apiTokenUsableSql('t')} AS usable,
+        creator.display_name AS creator_name,
         subject.id AS effective_subject_user_id,
         subject.display_name AS subject_name
       FROM api_tokens t
@@ -3037,7 +3045,8 @@ router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, (req, res)
     `).run(name, tokenHash, tokenPrefix, req.authUserId, subjectUserId, normalizedExpiresAt, serializedScopes);
 
     const row = db.get().prepare(`
-      SELECT t.*, creator.display_name AS creator_name,
+      SELECT t.*, ${apiTokenUsableSql('t')} AS usable,
+        creator.display_name AS creator_name,
         subject.id AS effective_subject_user_id,
         subject.display_name AS subject_name
       FROM api_tokens t

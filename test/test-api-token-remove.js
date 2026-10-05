@@ -104,6 +104,27 @@ test('ein AKTIVES Token wird nicht entfernt: 409 mit Grund, die Zeile bleibt, da
   assert.equal((await withToken(token)('GET', '/auth/api-tokens')).status, 200, 'das Credential gilt weiter');
 });
 
+test('die Liste nennt je Token das Urteil des Servers, und genau die mit active:false lassen sich entfernen', async () => {
+  const live = await mint('Urteil lebt');
+  const revoked = await mint('Urteil widerrufen');
+  const expired = await mint('Urteil abgelaufen', { expires_at: '2999-01-01T00:00:00.000Z' });
+  assert.equal((await admin('POST', '/auth/api-tokens', { name: 'Urteil neu' })).body.data.active, true, 'schon die Antwort des Anlegens traegt es');
+  await admin('DELETE', `/auth/api-tokens/${revoked.id}`);
+  expire(expired.id);
+
+  const { data } = (await admin('GET', '/auth/api-tokens')).body;
+  const verdict = (id) => data.find((row) => row.id === id).active;
+  assert.equal(verdict(live.id), true);
+  assert.equal(verdict(revoked.id), false);
+  assert.equal(verdict(expired.id), false);
+  for (const row of data) assert.equal(typeof row.active, 'boolean', `Token ${row.id}`);
+
+  // Feld und Route urteilen gleich: active:true -> 409, active:false -> weg.
+  assert.equal((await admin('POST', `/auth/api-tokens/${live.id}/remove`, {})).status, 409);
+  assert.equal((await admin('POST', `/auth/api-tokens/${revoked.id}/remove`, {})).status, 200);
+  assert.equal((await admin('POST', `/auth/api-tokens/${expired.id}/remove`, {})).status, 200);
+});
+
 test('ein Token mit KUENFTIGEM Ablauf gilt als aktiv', async () => {
   const { id } = await mint('Laeuft erst ab', { expires_at: '2999-01-01T00:00:00.000Z' });
   const res = await admin('POST', `/auth/api-tokens/${id}/remove`, {});
@@ -276,6 +297,7 @@ test('der Katalog nennt beide Routen mit ihrer Absage, und DELETE bleibt der Wid
   assert.deepEqual(device.parameters.filter((p) => p.in === 'path').map((p) => p.name), ['id', 'deviceId']);
 
   assert.equal(paths['/api/v1/auth/api-tokens/{id}'].delete.summary, 'Revoke API token');
+  assert.equal(buildOpenApiSpec({}, 'test').components.schemas.ApiToken.properties.active.type, 'boolean');
 });
 
 // --------------------------------------------------------
@@ -341,6 +363,32 @@ test('die Liste teilt sich: aktive oben mit Widerrufen, tote im zweiten Abschnit
     assert.match(inactive, /settings\.apiTokenRevoked/);
     assert.match(inactive, /settings\.apiTokenExpired/);
     assert.doesNotMatch(inactive, /settings\.apiTokenActive/);
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test('das Urteil des Servers schlaegt die Uhr des Geraets - in beide Richtungen', () => {
+  // Die Uhr des Browsers geht vor: fuer sie ist das Token abgelaufen, der Server
+  // meldet es noch an. Es muss unter "Widerrufen" stehen, sonst kaeme niemand
+  // mehr heran - Entfernen antwortet 409, und Widerrufen stuende nirgends.
+  const stillValid = { ...TOKENS[3], id: 7, active: true };
+  // Und umgekehrt: fuer die nachgehende Uhr laeuft es noch, am Server ist es vorbei.
+  const alreadyOver = { ...TOKENS[1], id: 8, active: false };
+  assert.equal(page.isApiTokenActive(stillValid, NOW), true);
+  assert.equal(page.isApiTokenActive(alreadyOver, NOW), false);
+  // Ein Widerruf, den die Seite selbst gerade eingetragen hat, schlaegt ein altes `active`.
+  assert.equal(page.isApiTokenActive({ ...TOKENS[0], active: true, revoked_at: '2026-10-06T11:00:00Z' }, NOW), false);
+
+  const realNow = Date.now;
+  Date.now = () => NOW;
+  try {
+    const container = fakeContainer();
+    page.renderApiTokenList(container, [stillValid, alreadyOver]);
+    assert.deepEqual(ids(container.nodes['#api-token-list'].innerHTML, 'data-revoke-api-token'), [7]);
+    assert.deepEqual(ids(container.nodes['#api-token-inactive-list'].innerHTML, 'data-remove-api-token'), [8]);
+    assert.match(container.nodes['#api-token-list'].innerHTML, /settings\.apiTokenActive/);
+    assert.match(container.nodes['#api-token-inactive-list'].innerHTML, /settings\.apiTokenExpired/);
   } finally {
     Date.now = realNow;
   }

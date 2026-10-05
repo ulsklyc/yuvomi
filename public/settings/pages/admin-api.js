@@ -40,13 +40,16 @@ function datetimeLocalToIso(value) {
 }
 
 /**
- * Gilt dieses Token noch? Dieselbe Frage, die der Server bei der Anmeldung
- * stellt (nicht widerrufen, nicht abgelaufen) - hier nur, um die Liste zu
- * teilen. Das Urteil faellt am Server: haelt er ein Token noch fuer aktiv,
- * lehnt er das Entfernen mit `api_token_active` ab.
+ * Gilt dieses Token noch? DAS SAGT DER SERVER (`active`), nicht die Uhr dieses
+ * Geraets: geht sie vor, hielte die Seite ein Token fuer abgelaufen, das noch
+ * anmeldet, boete nur "Entfernen" an, bekaeme dafuer 409 - und "Widerrufen"
+ * stuende nirgends (Codex zu #1681). Die eigene Rechnung bleibt nur fuer eine
+ * Antwort ohne das Feld und fuer den Widerruf, den diese Seite selbst gerade
+ * eingetragen hat (`revoked_at` schlaegt alles).
  */
 export function isApiTokenActive(token, now = Date.now()) {
   if (token.revoked_at) return false;
+  if (typeof token.active === 'boolean') return token.active;
   if (!token.expires_at) return true;
   const expires = new Date(token.expires_at).getTime();
   return Number.isNaN(expires) || expires > now;
