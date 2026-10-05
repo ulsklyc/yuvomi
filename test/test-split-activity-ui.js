@@ -307,7 +307,7 @@ test('Datum: der Tag in der Haushaltszone, nicht der UTC-Tag', () => {
 
 test('geloeschte Ausgabe (#1382): Zeichen am Anlege-Eintrag, Loesch-Eintrag nennt sie ohne Zeichen', () => {
   const vorher = { ...split.state };
-  const ausgabe = (extra = {}) => ({ id: 9, title: 'Einkauf', amount_minor: 3000, amount: '30.00', currency: 'EUR', deleted_at: null, ...extra });
+  const ausgabe = (extra = {}) => ({ id: 9, deleted_at: null, ...extra });
   // Titel und Betrag stehen seit #1607 in den Metadaten des Eintrags.
   const metadata = { title: 'Einkauf', amount_minor: 3000, amount: '30.00', currency: 'EUR' };
   const zeichne = (activity, modus = 'write') => {
@@ -336,6 +336,13 @@ test('geloeschte Ausgabe (#1382): Zeichen am Anlege-Eintrag, Loesch-Eintrag nenn
       assert.doesNotMatch(loeschung, /split-activity-reversed/, modus);
       assert.doesNotMatch(html, /data-reverse-settlement/, `${modus}: keine Handlung`);
     }
+
+    // Eine Serienbuchung legt ihre Ausgabe ohne `expense_created` an: ihr
+    // Eintrag traegt das Zeichen und muss deshalb sagen, welche Ausgabe.
+    const serie = zeichne([eintrag(3, { type: 'recurring_generated', entity_id: 9, metadata: { recurring_expense_id: 4, title: 'Miete' }, expense: weg })]);
+    assert.match(serie, /<span class="split-activity-payment">Miete<\/span>/);
+    assert.match(serie, /split-activity-item--reversed"/);
+    assert.match(serie, /<span class="split-activity-reversed">splitExpenses\.expenseDeleted<\/span>/);
   } finally {
     Object.assign(split.state, vorher);
   }

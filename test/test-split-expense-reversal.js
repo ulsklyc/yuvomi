@@ -154,7 +154,7 @@ test('Ersteller loescht eine ausgeglichene Ausgabe: Gegenbuchung statt Loeschen,
   assert.deepEqual(shape(ledger(E1, 'expense')), shape(booked), 'die urspruengliche Buchung bleibt');
   const reversed = ledger(E1, 'expense_reversal');
   assert.deepEqual(shape(reversed), mirror(booked));
-  assert.ok(reversed.every((row) => row.created_by === CR.id), 'gebucht von der loeschenden Person');
+  assert.ok(reversed.every((row) => row.created_by === CR.id));
 
   // Saldo = ohne E1: nur der Ausgleich (Clara +10, Olivia -10) und E2.
   assert.deepEqual(await balances(), {
@@ -186,7 +186,8 @@ test('Verwalter loescht eine Fremdwaehrungs-Ausgabe: Gegenbuchung in der gebucht
   const r = await del(MGR, E2);
   assert.equal(r.status, 200);
   assert.deepEqual(shape(ledger(E2, 'expense_reversal')), mirror(booked));
-  assert.ok(ledger(E2, 'expense_reversal').every((row) => row.currency === 'EUR' && row.created_by === MGR.id));
+  // Max loescht, Olivia hat angelegt: die Gegenbuchung traegt Olivia.
+  assert.ok(ledger(E2, 'expense_reversal').every((row) => row.currency === 'EUR' && row.created_by === OWN.id));
   // Uebrig bleibt allein der Ausgleich.
   assert.deepEqual(await balances(), { [`${OWN.id}:EUR`]: -1000, [`${CR.id}:EUR`]: 1000 });
 });
@@ -207,12 +208,64 @@ test('Verlauf: expense_deleted nennt Titel und Betrag, die angelegte Ausgabe tra
   assert.deepEqual(deletedFx.metadata, { title: 'Mietwagen', amount_minor: 2000, currency: 'USD', amount: '20.00' });
 
   const created = items.find((a) => a.type === 'expense_created' && a.entity_id === E1);
+  assert.deepEqual(Object.keys(created.expense), ['id', 'deleted_at']);
   assert.equal(created.expense.id, E1);
-  assert.equal(created.expense.title, 'Einkauf');
-  assert.equal(created.expense.amount, '30.00');
-  assert.equal(created.expense.currency, 'EUR');
   assert.match(created.expense.deleted_at, /^\d{4}-\d{2}-\d{2}T/);
+  assert.deepEqual(created.metadata, { title: 'Einkauf', amount_minor: 3000, currency: 'EUR', amount: '30.00' });
 
   const active = items.find((a) => a.type === 'expense_created' && a.entity_id === E3);
-  assert.deepEqual({ ...active.expense }, { id: E3, title: 'Brot', amount_minor: 400, amount: '4.00', currency: 'EUR', deleted_at: null });
+  assert.deepEqual({ ...active.expense }, { id: E3, deleted_at: null });
+});
+
+// Buchung und Gegenbuchung haengen per `created_by ON DELETE CASCADE` an einem
+// Konto. Trug die Gegenbuchung die LOESCHENDE Person, riss das Loeschen eines
+// Kontos das Paar auseinander - in beide Richtungen: mit dem Konto der
+// loeschenden Person verschwand nur die Gegenbuchung, und die geloeschte
+// Ausgabe zaehlte still wieder im Saldo; mit dem Konto der anlegenden Person
+// verschwanden Ausgabe und Buchung, und die Gegenbuchung blieb als Waise ohne
+// Ausgabe stehen (die Klasse, die Migration v227 einmal entfernt hat). Die
+// Gegenbuchung traegt deshalb den `created_by` ihrer Originalzeile, wie das
+// Storno einer Zahlung; wer geloescht hat, steht in `expense_activity.actor_id`
+// (expense_deleted). Die Konten in beiden Tests nehmen an keiner Buchung teil -
+// sonst hielte `user_id ON DELETE RESTRICT` das Loeschen auf.
+test('Konto der LOESCHENDEN Person geloescht: die Ausgabe bleibt aufgehoben, Salden bleiben', async () => {
+  const A2 = await member('author2', 'Anna');
+  const M2 = await member('manager2', 'Mara');
+  assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: A2.id, role: 'guest' })).status, 201);
+  assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: M2.id, role: 'admin' })).status, 201);
+  const base = await balances();
+  const eid = await addExpense(A2, { title: 'Getraenke', amount: '8.00', currency: 'EUR', payer_id: OWN.id, participants: [OWN.id, OTH.id] });
+  assert.notDeepEqual(await balances(), base, 'die Ausgabe zaehlt, solange sie aktiv ist');
+  assert.equal((await del(M2, eid)).status, 200);
+  assert.deepEqual(await balances(), base);
+
+  const eintrag = db.prepare("SELECT actor_id FROM expense_activity WHERE type = 'expense_deleted' AND entity_type = 'expense' AND entity_id = ?").get(eid);
+  assert.equal(eintrag.actor_id, M2.id, 'wer geloescht hat, steht im Verlauf');
+
+  const gone = await adminCall('DELETE', `/auth/users/${M2.id}`);
+  assert.equal(gone.status, 200);
+  assert.deepEqual(await balances(), base, 'die geloeschte Ausgabe zaehlt nicht wieder');
+  const booked = ledger(eid, 'expense');
+  const reversed = ledger(eid, 'expense_reversal');
+  assert.equal(booked.length, 3);
+  assert.deepEqual(shape(reversed), mirror(booked), 'die Gegenbuchung steht noch');
+  assert.ok(booked.every((row) => row.created_by === A2.id));
+  assert.deepEqual(reversed.map((row) => row.created_by), booked.map((row) => row.created_by), 'Gegenbuchung traegt den Autor der Originalzeile');
+});
+
+test('Konto der ANLEGENDEN Person geloescht: Buchung und Gegenbuchung fallen gemeinsam', async () => {
+  const A3 = await member('author3', 'Arne');
+  assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: A3.id, role: 'guest' })).status, 201);
+  const base = await balances();
+  const eid = await addExpense(A3, { title: 'Pizza', amount: '6.00', currency: 'EUR', payer_id: OWN.id, participants: [OWN.id, OTH.id] });
+  assert.equal((await del(MGR, eid)).status, 200);
+  assert.deepEqual(await balances(), base);
+
+  // Die Ausgabe haengt per `expenses.created_by` CASCADE an Arne.
+  const gone = await adminCall('DELETE', `/auth/users/${A3.id}`);
+  assert.equal(gone.status, 200);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM expenses WHERE id = ?').get(eid).n, 0);
+  assert.equal(ledger(eid, 'expense').length, 0);
+  assert.equal(ledger(eid, 'expense_reversal').length, 0, 'keine Gegenbuchung ohne ihre Buchung');
+  assert.deepEqual(await balances(), base, 'Salden wie vor der Ausgabe');
 });

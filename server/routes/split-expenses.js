@@ -1117,7 +1117,7 @@ router.delete('/expenses/:id', (req, res) => {
     db.transaction(() => {
       db.get().prepare("UPDATE expenses SET status = 'deleted', deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(existing.id);
       const booked = db.get().prepare(`
-        SELECT group_id, user_id, counterparty_id, amount_minor, currency, memo
+        SELECT group_id, user_id, counterparty_id, amount_minor, currency, memo, created_by
         FROM expense_ledger_entries
         WHERE source_type = 'expense' AND source_id = ?
         ORDER BY id ASC
@@ -1126,8 +1126,16 @@ router.delete('/expenses/:id', (req, res) => {
         INSERT INTO expense_ledger_entries (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
         VALUES (?, 'expense_reversal', ?, ?, ?, ?, ?, ?, ?)
       `);
+      // `created_by` kommt aus der Originalzeile, nicht von der loeschenden
+      // Person: beide Zeilen haengen per ON DELETE CASCADE an diesem Konto und
+      // fallen so nur gemeinsam. Mit dem Konto der loeschenden Person
+      // verschwaende sonst nur die Gegenbuchung, und die geloeschte Ausgabe
+      // zaehlte still wieder im Saldo; mit dem Konto der anlegenden Person
+      // fielen Ausgabe und Buchung, und die Gegenbuchung bliebe als Waise
+      // stehen. Wer geloescht hat, steht in `expense_deleted`
+      // (expense_activity.actor_id).
       for (const row of booked) {
-        insert.run(row.group_id, existing.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, row.memo, userId(req));
+        insert.run(row.group_id, existing.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, row.memo, row.created_by);
       }
       // Der Betrag, unter dem die Ausgabe in der Liste stand (eingegeben, in
       // seiner Waehrung); das Ledger fuehrt den umgerechneten.
@@ -1398,15 +1406,14 @@ function attachSettlementState(rows, groupId, req) {
 }
 
 /**
- * Haengt an jede Aktivitaet, die eine Ausgabe anlegt oder loescht, deren
- * Stand (#1382): Titel, Betrag, und ob sie inzwischen geloescht ist. Die
- * Oberflaeche zeigt eine geloeschte Ausgabe damit weiter im Verlauf - als
- * Zeichen, in derselben Form wie eine stornierte Zahlung.
+ * Haengt an jede Aktivitaet, die eine Ausgabe anlegt oder loescht, ob es die
+ * Ausgabe noch gibt (#1382): `expense.deleted_at`. Die Oberflaeche zeigt eine
+ * geloeschte Ausgabe damit weiter im Verlauf - als Zeichen, in derselben Form
+ * wie eine stornierte Zahlung.
  *
- * Der Betrag ist der eingegebene in seiner Waehrung, wie ihn die Ausgabenliste
- * zeigte; das Ledger fuehrt den umgerechneten. `expense_edited` bekommt nichts:
- * der Datensatz traegt nur den letzten Stand, und der alte Eintrag nennte einen
- * Betrag, den es zu seiner Zeit nicht gab.
+ * Nur der Stand, kein Titel und kein Betrag: die stehen seit #1607 in den
+ * Metadaten des Eintrags, wie sie beim Schreiben galten. Aus dem Datensatz
+ * gelesen, nennte ein alter Eintrag den heutigen Betrag.
  */
 const EXPENSE_STATE_TYPES = new Set(['expense_created', 'recurring_generated', 'expense_deleted']);
 function attachExpenseState(rows, groupId) {
@@ -1414,7 +1421,7 @@ function attachExpenseState(rows, groupId) {
   const ids = [...new Set(rows.filter(wanted).map((row) => row.entity_id))];
   if (!ids.length) return;
   const expenses = db.get().prepare(`
-    SELECT id, title, amount_minor, currency, status, deleted_at
+    SELECT id, status, deleted_at
     FROM expenses
     WHERE group_id = ? AND id IN (${ids.map(() => '?').join(', ')})
   `).all(groupId, ...ids);
@@ -1425,10 +1432,6 @@ function attachExpenseState(rows, groupId) {
     if (!e) continue;
     row.expense = {
       id: e.id,
-      title: e.title,
-      amount_minor: e.amount_minor,
-      amount: minorToDecimal(e.amount_minor, e.currency),
-      currency: e.currency,
       deleted_at: e.status === 'deleted' ? (e.deleted_at ?? null) : null,
     };
   }
