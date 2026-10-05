@@ -1030,10 +1030,46 @@ const pendingTaskDeletes = new Set();
  * den haelt `scheduleUndoableDelete` jetzt fest: der Server loescht erst nach
  * dem Fenster, „Rueckgaengig" stellt die Zeile samt Verlauf wieder her.
  */
-function deleteTask(task, content) {
+/**
+ * Fokus nach dem Loeschen aus dem Bearbeiten-Dialog: die Zeile, die an die
+ * Stelle der geloeschten gerueckt ist (die letzte, wenn es die letzte war) -
+ * und die Zeile selbst, wenn "Rueckgaengig" sie zurueckgeholt hat.
+ *
+ * `refocusAfterRender()` allein kennt keinen Nachbarn: es sucht DENSELBEN
+ * Knopf wieder, findet ihn nach dem Loeschen nicht und setzt die Seitenwurzel.
+ * Es bleibt der Rueckfall fuer die leere Liste.
+ *
+ * Hat der Nutzer inzwischen selbst etwas fokussiert, gilt seine Wahl. Frei ist
+ * der Fokus auf <body> (die Zeile ist weg), auf der Seitenwurzel (der
+ * Rueckfall der Modal-Schicht) und IM NOCH SCHLIESSENDEN DIALOG: der geht erst
+ * mit dem Ende seiner Ausgangsanimation aus dem Dokument, das Neuzeichnen kann
+ * ihn ueberholen. `_doClose()` laesst einen Fokus ausserhalb des Dialogs dann
+ * stehen, statt ihn auf den verschwundenen Ausloeser zurueckzusetzen.
+ */
+function focusTaskRowAfterDelete(content, taskId, index) {
+  const active = document.activeElement;
+  const free = !active || active === document.body || active.id === 'main-content'
+    || Boolean(active.closest?.('.modal-overlay--closing'));
+  if (!free) return;
+  const edits = [...(content?.querySelectorAll?.('[data-edit-task]') ?? [])];
+  const target = edits.find((el) => el.dataset.editTask === String(taskId))
+    ?? edits[Math.min(index, edits.length - 1)];
+  if (target) target.focus();
+  else refocusAfterRender();
+}
+
+/**
+ * `afterRepaint` laeuft nach JEDEM Neuzeichnen, das dieses Loeschen ausloest
+ * (Liste ohne die Zeile; Liste mit ihr, wenn der Toast sie zurueckholt). Die
+ * Liste steht erst neu, wenn die Zeile ausgeklappt ist - wer dem Fokus danach
+ * ein Ziel geben will, kann das nicht im selben Atemzug wie den Aufruf tun.
+ */
+function deleteTask(task, content, afterRepaint = null) {
   if (readOnly()) return;
   const repaint = () => {
-    if (content?.isConnected && state.tab === 'tasks') renderTasks(content);
+    if (!(content?.isConnected && state.tab === 'tasks')) return;
+    renderTasks(content);
+    afterRepaint?.();
   };
   pendingTaskDeletes.add(String(task.id));
   const index = state.tasks.findIndex((it) => String(it.id) === String(task.id));
@@ -1795,11 +1831,15 @@ function openTaskEditModal(task, content) {
       // dann laeuft das widerrufbare Loeschen - der Toast traegt den Rueckweg.
       panel.querySelector('[data-delete-task]')?.addEventListener('click', () => {
         if (readOnly()) return;
+        const edits = [...(content?.querySelectorAll?.('[data-edit-task]') ?? [])];
+        const index = Math.max(0, edits.findIndex((el) => el.dataset.editTask === String(task.id)));
         closeModal({ force: true });
-        deleteTask(task, content);
         // Die Zeile, von der der Dialog kam, gibt es nicht mehr: der Fokus
-        // faellt auf den Nachbarn statt auf <body>.
-        refocusAfterRender();
+        // faellt auf den Nachbarn statt auf <body>. ERST NACH DEM NEUZEICHNEN:
+        // deleteTask() klappt die Zeile aus und zeichnet danach. Ein Aufruf
+        // gleich hier fand die alte Zeile noch vor, hielt den Fokus fuer heil
+        // und tat nichts - und das Neuzeichnen liess ihn dann fallen.
+        deleteTask(task, content, () => focusTaskRowAfterDelete(content, task.id, index));
       });
       panel.querySelector('#housekeeping-task-edit-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -2438,6 +2478,8 @@ export const __test = {
   openVisitEditModal,
   openVisitReportModal,
   openTaskEditModal,
+  deleteTask,
+  focusTaskRowAfterDelete,
   openStaffModal,
   openStaffReadModal,
   toggleSession,

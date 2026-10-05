@@ -3630,6 +3630,87 @@ test('H6: die Aufgabenzeile der Haushaltshilfe oeffnet mit Schreibrecht das Bear
   assert.match(lesen.html, /<h2 class="list-row__name">Fenster putzen<\/h2>/, 'die Zeile bleibt Auskunft mit Ueberschrift');
 });
 
+// Review PR #1673: wohin der Fokus nach dem Loeschen geht. Die Modal-Schicht
+// sucht denselben Knopf wieder und kennt keinen Nachbarn - nach dem Loeschen
+// blieb ihr nur die Seitenwurzel.
+test('nach dem Loeschen aus dem Dialog bekommt die nachgerueckte Zeile den Fokus', () => {
+  const echtesDocument = globalThis.document;
+  const knopf = (id) => ({ dataset: { editTask: String(id) }, focus() { doc.activeElement = this; } });
+  const liste = (ids) => { const k = ids.map(knopf); return { k, querySelectorAll: (sel) => (sel === '[data-edit-task]' ? k : []) }; };
+  const body = { tagName: 'BODY' };
+  const doc = { body, activeElement: body };
+  globalThis.document = doc;
+  try {
+    // Die mittlere von drei Zeilen (Index 1) ist weg: die dritte rueckt nach.
+    let content = liste([1, 3]);
+    hk.focusTaskRowAfterDelete(content, 2, 1);
+    assert.equal(doc.activeElement, content.k[1], 'die Zeile an der alten Stelle');
+
+    // Es war die letzte: die neue letzte.
+    doc.activeElement = body;
+    content = liste([1, 2]);
+    hk.focusTaskRowAfterDelete(content, 3, 2);
+    assert.equal(doc.activeElement, content.k[1]);
+
+    // Die Seitenwurzel (Rueckfall der Modal-Schicht) gilt als frei.
+    doc.activeElement = { id: 'main-content' };
+    hk.focusTaskRowAfterDelete(content, 3, 0);
+    assert.equal(doc.activeElement, content.k[0]);
+
+    // Der Dialog schliesst noch (Ausgangsanimation), das Neuzeichnen war
+    // schneller: der Fokus in ihm ist keine Wahl des Nutzers.
+    doc.activeElement = { id: '', closest: (sel) => (sel === '.modal-overlay--closing' ? {} : null) };
+    hk.focusTaskRowAfterDelete(content, 3, 1);
+    assert.equal(doc.activeElement, content.k[1]);
+
+    // "Rueckgaengig" hat die Zeile zurueckgeholt: sie selbst.
+    doc.activeElement = body;
+    content = liste([1, 2, 3]);
+    hk.focusTaskRowAfterDelete(content, 2, 1);
+    assert.equal(doc.activeElement, content.k[1]);
+    hk.focusTaskRowAfterDelete(content, 3, 0);
+    assert.equal(doc.activeElement, content.k[1], 'ein gewaehlter Fokus bleibt, wo er ist');
+  } finally {
+    globalThis.document = echtesDocument;
+  }
+});
+
+// Review PR #1673: `deleteTask()` klappt die Zeile aus und zeichnet die Liste
+// ERST DANACH neu. Der Bearbeiten-Dialog rief `refocusAfterRender()` im selben
+// Atemzug wie das Loeschen - die alte Zeile stand noch, der Fokus galt als
+// heil, und das Neuzeichnen liess ihn fallen. `afterRepaint` laeuft nach dem
+// Neuzeichnen und sieht die Liste ohne die Zeile.
+test('deleteTask ruft afterRepaint erst nach dem Neuzeichnen der Liste', async () => {
+  const { mock } = await import('node:test');
+  const vorher = globalThis.__apiStub;
+  mock.timers.enable({ apis: ['setTimeout'] });
+  globalThis.__apiStub = { delete: async () => ({}) };
+  try {
+    const task = { id: 901, name: 'ZZ Fenster', area: 'Bad', frequency_days: 7, urgency_status: 'today', last_completed: '2026-07-01' };
+    hkState({ tab: 'tasks', tasks: [task, { ...task, id: 902, name: 'ZZ Boden' }] });
+    const content = hkContainer();
+    const seen = [];
+    withAccess({ housekeeping: 'write' }, () => {
+      hk.renderTasks(content);
+      assert.match(content.html, /ZZ Fenster/);
+      hk.deleteTask(task, content, () => seen.push(content.html));
+    });
+    assert.equal(seen.length, 0, 'im selben Atemzug steht die alte Liste noch - kein Rueckruf');
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(seen.length, 1, 'nach dem Ausklappen und Neuzeichnen genau einmal');
+    assert.doesNotMatch(seen[0], /ZZ Fenster/, 'der Rueckruf sieht die Liste OHNE die Zeile');
+    assert.match(seen[0], /ZZ Boden/);
+    // Das Undo-Fenster laeuft ab: der Server loescht, die Liste bleibt.
+    mock.timers.runAll();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(seen.length, 1);
+  } finally {
+    mock.timers.reset();
+    if (vorher === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = vorher;
+    hkState({});
+  }
+});
+
 test('Aufgaben-Tab mit `housekeeping: read`: kein Anlegen, kein Abhaken, keine Zeilenaktion - die Dringlichkeit bleibt', () => {
   hkState({
     templates: [{ key: 'kitchen', name: 'Kueche', area: 'Kueche', frequency_days: 7 }],

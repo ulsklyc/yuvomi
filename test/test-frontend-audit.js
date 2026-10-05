@@ -19437,7 +19437,8 @@ test('R16: die Aufgabenzeile der Haushaltshilfe fuehrt keine Zeilenaktion - Loes
 
   const dialog = functionBody(page, 'openTaskEditModal');
   assert.match(dialog, /data-delete-task=/, 'der Dialogfuss ist der feste Ort (und der Tastaturweg)');
-  assert.match(dialog, /deleteTask\(task, content\)/);
+  // Mit Rueckruf: der Fokus wandert NACH dem Neuzeichnen (Review PR #1673).
+  assert.match(dialog, /deleteTask\(task, content, \(\) => focusTaskRowAfterDelete\(content, task\.id, index\)\)/);
 
   const del = functionBody(page, 'deleteTask');
   assert.match(del, /scheduleUndoableDelete\(/, 'in einem Satz zuruecknehmbar - Undo-Toast statt Rueckfrage');

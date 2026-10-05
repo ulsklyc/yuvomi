@@ -804,3 +804,25 @@ test('R16: der Auswahlknopf der Personalzeile hat die Hoehe der Zeile, nicht die
   assert.match(rule.body, /margin-block:\s*calc\(var\(--space-3\)\s*\*\s*-1\)/, 'und nimmt sie nach aussen zurueck: die Zeile bleibt so hoch wie vorher');
   assert.doesNotMatch(rule.body, /(^|[\s;])padding:\s*0/, 'ein pauschales padding: 0 hoebe das wieder auf');
 });
+
+// ---------------------------------------------------------------------------
+// Review PR #1673: Fokus nach dem Loeschen aus dem Bearbeiten-Dialog
+// ---------------------------------------------------------------------------
+//
+// `deleteTask()` klappt die Zeile aus und zeichnet die Liste ERST DANACH neu.
+// Der Dialog rief `refocusAfterRender()` im selben Atemzug: die alte Zeile stand
+// noch, der Fokus galt als heil, und das spaetere Neuzeichnen liess ihn fallen.
+// Der Rueckruf laeuft jetzt nach dem Neuzeichnen - und noch einmal, wenn der
+// Toast die Zeile zurueckholt. Den Ablauf selbst faehrt
+// test-module-readonly-ui.js (dort steht das Mini-DOM fuer die Aufgabenliste).
+
+test('der Bearbeiten-Dialog gibt den Fokus NACH dem Neuzeichnen weiter, nicht davor', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
+  const from = src.indexOf("panel.querySelector('[data-delete-task]')?.addEventListener('click'");
+  assert.ok(from > 0, 'der Loeschen-Knopf des Dialogs ist verdrahtet');
+  const handler = src.slice(from, src.indexOf("#housekeeping-task-edit-form')?.addEventListener", from));
+  assert.match(handler, /deleteTask\(task, content, \(\) => focusTaskRowAfterDelete\(content, task\.id, index\)\);/);
+  assert.doesNotMatch(handler, /^\s*refocusAfterRender\(\);\s*$/m,
+    'ein Aufruf als eigene Anweisung laeuft vor dem Neuzeichnen und tut nichts');
+});
