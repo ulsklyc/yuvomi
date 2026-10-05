@@ -7,6 +7,7 @@ import { t, formatDate, getLocale } from '/i18n.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { renderSkeletonChart } from '/utils/skeleton.js';
+import { growBars } from '/utils/ux.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup, niceDomain } from '/utils/chart.js';
 import { formatMoneyAxis, formatSignedAmount } from '/utils/money.js';
@@ -307,7 +308,7 @@ function renderCatBars() {
         <div class="budget-bar-row budget-bar-row--compare">
           <div class="budget-bar-row__label" title="${catLabel}">${catLabel}</div>
           <div class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}">
-            <div class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}${fillColor}"></div>
+            <div class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}${fillColor}" data-bar-key="${kind}:${view.ctx.esc(String(r.category))}"></div>
             ${targetMarker}
           </div>
           <div class="budget-bar-row__amount">${view.ctx.esc(signed(r.amount))}${share}</div>
@@ -335,6 +336,7 @@ function renderCatBars() {
       <div class="budget-chart">${html}</div>
     </div>`);
   if (window.lucide) lucide.createIcons({ el: host });
+  growBars(host, { selector: '.budget-bar-row__fill', memo: 'budget-stats-categories' });
 }
 
 // Segmente auf die Palettengröße begrenzen: alles jenseits davon fließt in eine

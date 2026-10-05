@@ -319,7 +319,11 @@
 .recipe-row__chevron {
   flex-shrink: 0;
   color: var(--color-text-tertiary);
-  transition: transform var(--transition-fast);
+  /* EIN Tempo fuer jeden Aufklapp-Winkel: wie `.list-group__chevron`
+   * (list-row.css) dreht er im Takt des Panels, das darunter aufzieht
+   * (expandIn/collapseOut: --duration-lg, --ease-in-out). Vorher 150ms
+   * gegen 250ms - der Winkel war fertig, bevor das Panel halb offen war. */
+  transition: transform var(--duration-lg) var(--ease-in-out);
 }
 
 /* Gespiegelte Zeile ganz ohne Detail (recipes.js, isMirrored && !hasDetail):

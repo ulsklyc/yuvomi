@@ -771,3 +771,11 @@
     background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), var(--color-surface));
   }
 }
+
+/* Hover-Feedback blendet (R16, Bewegung): diese Datei fuehrte keine einzige
+ * Transition - die zwei Flaechen, die unter dem Zeiger ihren Grund wechseln,
+ * sprangen. Nur die Farbe, aus dem Shorthand der Shell. */
+.inventory-photo-action,
+.inventory-booking-picker__item {
+  transition: background-color var(--transition-fast);
+}

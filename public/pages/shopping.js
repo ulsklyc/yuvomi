@@ -1574,13 +1574,42 @@ function _flashAddBtn(btn) {
  * @param {Element} container
  * @param {boolean} open
  */
+/** Letzte Absicht des Quick-Add (offen/zu) - ein Zuklappen, das ein Oeffnen ueberholt hat, raeumt nicht mehr ab. */
+let quickAddOpenIntent = false;
+
 function syncQuickAddDisclosure(container, open) {
   const page = container.querySelector('.shopping-page');
   const fab = findPageFab('fab-new-item');
   if (!page || !fab) return;
 
   const collapsible = window.matchMedia('(hover: none)').matches && Boolean(state.activeList);
-  page.classList.toggle('shopping-page--adding', collapsible && open);
+  const wasOpen = page.classList.contains('shopping-page--adding');
+  const nowOpen = collapsible && open;
+  quickAddOpenIntent = nowOpen;
+  // DAS FELD ZIEHT AUF UND KLAPPT ZU (R16, Bewegung). Vorher schaltete nur
+  // `display` um: die Liste darunter sprang um die Hoehe des Formulars (127px
+  // bei 390). Der ZUSTAND bleibt die Klasse; die Bewegung liegt davor bzw.
+  // dahinter, und wo nichts animiert (kein `animate`, reduzierte Bewegung -
+  // dann loest collapseOut sofort auf), faellt sie im selben Takt wie bisher.
+  const quick = page.querySelector?.('.quick-add') ?? null;
+  const canAnimate = typeof quick?.animate === 'function';
+  if (wasOpen && !nowOpen && canAnimate) {
+    collapseOut(quick).then(() => {
+      // Inzwischen wieder geoeffnet: das Oeffnen hat schon aufgeraeumt.
+      if (quickAddOpenIntent) return;
+      page.classList.remove('shopping-page--adding');
+      // collapseOut haelt die Hoehe 0 (fill: forwards) - nach `display: none` verwerfen.
+      quick.getAnimations?.().forEach((anim) => anim.cancel());
+      quick.style.overflow = '';
+    });
+  } else {
+    page.classList.toggle('shopping-page--adding', nowOpen);
+    if (nowOpen && canAnimate) {
+      quick.getAnimations?.().forEach((anim) => anim.cancel());
+      quick.style.overflow = '';
+      if (!wasOpen) expandIn(quick);
+    }
+  }
 
   // `aria-expanded` NUR wo der Knopf tatsächlich etwas aufklappt. Auf Desktop
   // fokussiert er ein sichtbares Feld; ein „eingeklappt" zu melden, was gar nicht

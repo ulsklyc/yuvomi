@@ -1406,3 +1406,160 @@ test('K1: die gefaltete Zeile misst die Reserve ausgeklappt - sonst pendelt sie 
     assert.equal(s.toolbar.classList.contains('is-collapsed'), true, 'die Zeile bleibt gefaltet');
   } finally { s.restore(); }
 });
+
+/*
+ * growBars (Critique R16, P2 Bewegung): die Budget-Balken tragen eine
+ * Transition, die nie lief, weil `--bar-scale` schon am Endwert im Markup
+ * steht. Der Helfer setzt kurz den Startwert und sofort wieder den Endwert.
+ * Drei Zusagen: (a) der Endwert wird IMMER erreicht - per rAF oder per Timer,
+ * wer zuerst kommt; (b) reduzierte Bewegung und verdeckter Tab fassen nichts
+ * an; (c) ein unveraenderter Balken ruehrt sich beim Neuzeichnen nicht.
+ */
+function barEl(key, value) {
+  const props = new Map([['--bar-scale', value]]);
+  const el = {
+    dataset: { barKey: key },
+    writes: [],
+    offsetWidth: 100,
+    style: {
+      getPropertyValue: (name) => props.get(name) ?? '',
+      setProperty: (name, v) => { props.set(name, String(v)); el.writes.push(String(v)); },
+    },
+    value: () => props.get('--bar-scale'),
+  };
+  return el;
+}
+
+async function withBarEnv({ reduced = false, visibility = 'visible', raf = 'never' }, fn) {
+  const { growBars } = await import('../public/utils/ux.js');
+  const saved = { matchMedia: global.window.matchMedia, document: global.document, raf: global.requestAnimationFrame };
+  const frames = [];
+  global.window.matchMedia = (q) => ({ matches: reduced && /prefers-reduced-motion/.test(q) });
+  global.document = { visibilityState: visibility };
+  if (raf === 'missing') delete global.requestAnimationFrame;
+  else global.requestAnimationFrame = (cb) => { frames.push(cb); return frames.length; };
+  try { return await fn(growBars, frames); } finally {
+    global.window.matchMedia = saved.matchMedia;
+    if (saved.document === undefined) delete global.document; else global.document = saved.document;
+    if (saved.raf === undefined) delete global.requestAnimationFrame; else global.requestAnimationFrame = saved.raf;
+  }
+}
+
+test('growBars: startet bei 0, und der Endwert kommt auch OHNE rAF (Timer-Rueckfall)', async () => {
+  await withBarEnv({ raf: 'never' }, async (growBars, frames) => {
+    const a = barEl('a', '0.4000');
+    const b = barEl('b', '1.0000');
+    const root = { querySelectorAll: () => [a, b] };
+    assert.equal(growBars(root, { selector: '.bar', memo: 'test-timer' }), 2);
+    assert.equal(a.value(), '0', 'der Balken steht fuer einen Frame am Startwert');
+    assert.equal(frames.length, 1, 'ein Frame ist angefragt');
+    // rAF feuert NIE (verdeckter Tab nach dem Start): der Timer muss es richten.
+    await new Promise((r) => setTimeout(r, 200));
+    assert.equal(a.value(), '0.4000');
+    assert.equal(b.value(), '1.0000');
+    // Ein spaet doch noch feuernder Frame schreibt nichts Falsches mehr.
+    frames[0]();
+    assert.deepEqual(a.writes, ['0', '0.4000']);
+  });
+});
+
+test('growBars: mit rAF setzt der Frame den Endwert, der Timer danach nichts mehr', async () => {
+  await withBarEnv({ raf: 'never' }, async (growBars, frames) => {
+    const a = barEl('a', '0.2500');
+    growBars({ querySelectorAll: () => [a] }, { selector: '.bar', memo: 'test-raf' });
+    frames[0]();
+    assert.equal(a.value(), '0.2500');
+    await new Promise((r) => setTimeout(r, 200));
+    assert.deepEqual(a.writes, ['0', '0.2500'], 'genau ein Zuruecksetzen, genau ein Endwert');
+  });
+});
+
+test('growBars: reduzierte Bewegung, verdeckter Tab und fehlendes rAF fassen den Endwert nicht an', async () => {
+  for (const env of [{ reduced: true }, { visibility: 'hidden' }, { raf: 'missing' }]) {
+    await withBarEnv(env, async (growBars) => {
+      const a = barEl('a', '0.7000');
+      const moved = growBars({ querySelectorAll: () => [a] }, { selector: '.bar', memo: `test-still-${JSON.stringify(env)}` });
+      assert.equal(moved, 0, JSON.stringify(env));
+      assert.deepEqual(a.writes, [], `${JSON.stringify(env)}: der Balken bleibt am Wert aus dem Markup`);
+    });
+  }
+  // Nichts zu tun, nichts kaputt.
+  const { growBars } = await import('../public/utils/ux.js');
+  assert.equal(growBars(null, { selector: '.bar', memo: 'x' }), 0);
+});
+
+test('growBars: ein unveraenderter Balken ruehrt sich beim Neuzeichnen nicht, ein geaenderter waechst vom alten Wert', async () => {
+  await withBarEnv({ raf: 'never' }, async (growBars, frames) => {
+    const memo = 'test-memo';
+    growBars({ querySelectorAll: () => [barEl('a', '0.4000'), barEl('b', '0.6000')] }, { selector: '.bar', memo });
+    frames.splice(0).forEach((cb) => cb());
+    // Neuzeichnen: neue Knoten, a gleich, b geaendert, c neu.
+    const a = barEl('a', '0.4000');
+    const b = barEl('b', '0.9000');
+    const c = barEl('c', '0.1000');
+    assert.equal(growBars({ querySelectorAll: () => [a, b, c] }, { selector: '.bar', memo }), 2);
+    assert.deepEqual(a.writes, [], 'gleich geblieben: keine Bewegung');
+    assert.equal(b.value(), '0.6000', 'geaendert: startet am zuletzt gezeigten Wert');
+    assert.equal(c.value(), '0', 'neu: startet bei 0');
+    frames.splice(0).forEach((cb) => cb());
+    assert.equal(b.value(), '0.9000');
+    assert.equal(c.value(), '0.1000');
+  });
+});
+
+/*
+ * toggleRegion (R16, Bewegung): der Zustand ist `hidden`, nicht die Animation.
+ * Auf faellt `hidden` sofort; zu setzt es NACH dem Einklappen - und auch dann,
+ * wenn `finish` nie kommt. Ein Oeffnen, das ein Zuklappen ueberholt, gewinnt.
+ */
+function regionEl({ hidden = true, animates = true } = {}) {
+  const el = {
+    hidden,
+    style: {},
+    calls: [],
+    cancelled: 0,
+    getBoundingClientRect: () => ({ height: 120 }),
+    getAnimations: () => el.calls.map(() => ({ cancel: () => { el.cancelled += 1; } })),
+  };
+  if (animates) el.animate = (keyframes, timing) => { el.calls.push({ keyframes, timing }); return { finished: new Promise(() => {}) }; };
+  return el;
+}
+
+test('toggleRegion: auf faellt hidden sofort, zu erst nach dem Einklappen - auch ohne finish', async () => {
+  const { toggleRegion } = await import('../public/utils/ux.js');
+  const savedGcs = global.getComputedStyle;
+  const savedDoc = global.document;
+  global.getComputedStyle = () => ({ getPropertyValue: () => '', opacity: '1', paddingTop: '0px', paddingBottom: '0px', marginTop: '0px', marginBottom: '0px', borderTopWidth: '0px', borderBottomWidth: '0px' });
+  global.document = { documentElement: {} };
+  try {
+    const region = regionEl({ hidden: true });
+    const opening = toggleRegion(region, true);
+    assert.equal(region.hidden, false, 'der Inhalt ist im selben Moment erreichbar');
+    assert.equal(region.calls.length, 1, 'die Hoehe zieht auf');
+    await opening;
+
+    const closing = toggleRegion(region, false);
+    assert.equal(region.hidden, false, 'solange es einklappt, steht die Region noch');
+    await closing; // `finished` loest nie auf - der Timer muss es tun
+    assert.equal(region.hidden, true, 'der Zustand kommt an');
+    assert.ok(region.cancelled > 0, 'die gehaltene Hoehe 0 ist verworfen');
+
+    // Zuklappen, sofort wieder oeffnen: das Oeffnen gewinnt.
+    region.hidden = false;
+    const late = toggleRegion(region, false);
+    toggleRegion(region, true);
+    await late;
+    assert.equal(region.hidden, false, 'ein ueberholtes Zuklappen raeumt nicht ab');
+
+    // Ohne animate (und damit auch unter reduzierter Bewegung): im selben Takt.
+    const plain = regionEl({ hidden: false, animates: false });
+    await toggleRegion(plain, false);
+    assert.equal(plain.hidden, true);
+    await toggleRegion(plain, true);
+    assert.equal(plain.hidden, false);
+    await toggleRegion(null, true);
+  } finally {
+    if (savedGcs === undefined) delete global.getComputedStyle; else global.getComputedStyle = savedGcs;
+    if (savedDoc === undefined) delete global.document; else global.document = savedDoc;
+  }
+});

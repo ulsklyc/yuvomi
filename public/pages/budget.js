@@ -9,7 +9,7 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
-import { stagger, vibrate, scheduleUndoableDelete } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, growBars } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
@@ -1059,6 +1059,7 @@ function renderBody() {
     setHtml(body, renderLoansPage());
     wireLoansPage();
     if (window.lucide) lucide.createIcons({ el: body });
+    growBars(body, { selector: '.budget-loan-card__progress span', memo: 'budget-loans' });
     return;
   }
   if (state.activeTab === 'accounts') {
@@ -1279,6 +1280,9 @@ function renderBody() {
   `);
 
   if (window.lucide) lucide.createIcons({ el: body });
+  // Die Kategorie-Balken wachsen an ihren Wert (vom letzten gezeigten aus) -
+  // ihre Transition lief nie, weil der Endwert schon im Markup steht (ux.js).
+  growBars(body, { selector: '.budget-bar-row__fill', memo: 'budget-categories' });
   watchAsideFit(body.querySelector('.budget-tab-panel--budget'));
   wirePageSearch(body, { id: 'budget-ledger-search', delay: 250, onQuery: runLedgerSearch });
   _container.querySelector('#empty-cta-budget')?.addEventListener('click', () => {
@@ -1673,7 +1677,7 @@ function renderCategoryBars(byCategory) {
             <div class="budget-bar-row${lead && i < CHART_LEAD ? ' budget-bar-row--lead' : ''}">
               <div class="budget-bar-row__label" title="${label}">${label}</div>
               <div class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}">
-                <div class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}"></div>
+                <div class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}" data-bar-key="${kind}:${esc(String(r.category))}"></div>
               </div>
               <div class="budget-bar-row__amount">${amountByRole(r.amount, 'flow').text}</div>
             </div>`;
@@ -2787,7 +2791,7 @@ function renderLoanCard(loan) {
       <div class="budget-loan-card__progress" role="progressbar"
            aria-valuenow="${paidPct}" aria-valuemin="0" aria-valuemax="100"
            aria-label="${t('budget.loanProgressLabel')}">
-        <span style="--bar-scale:${paidPct / 100}"></span>
+        <span data-bar-key="loan:${loan.id}" style="--bar-scale:${paidPct / 100}"></span>
       </div>
       <div class="budget-loan-card__footer">
         <span>${t('budget.loanNextDue', { month: nextDue })}</span>

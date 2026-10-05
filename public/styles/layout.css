@@ -3724,15 +3724,12 @@ html.fab-anim-done .page-fab {
     display: none;
   }
 
-  .page-toolbar--capped > .page-toolbar__title {
-    transition: font-size var(--duration-sm) var(--ease-out);
-  }
-}
-
-@media (max-width: 1023px) and (prefers-reduced-motion: reduce) {
-  .page-toolbar--capped > .page-toolbar__title {
-    transition: none;
-  }
+  /* KEINE `font-size`-TRANSITION AM TITEL (R16, Bewegung). Hier stand eine:
+   * sie animierte Layout - jeder Frame brach die Titelzeile neu um und schob
+   * den Port darunter, im klebenden Kopf, waehrend gescrollt wird. Ein
+   * `transform: scale()` an ihrer Stelle traegt nicht: der Platz der Zeile
+   * wechselt mit (`flex-basis` oben), der Titel liefe waehrend der Skalierung
+   * ueber seine Nachbarn. Der Groessenwechsel faellt deshalb in EINEN Frame. */
 }
 
 /* EIN KOPF MIT ZEITRAUM KLAPPT DIE TITELZEILE GANZ EIN (Kalender-Critique
@@ -4602,6 +4599,8 @@ a.popover-menu__item {
 .filter-sheet__chevron {
   flex: 0 0 auto;
   color: var(--color-text-tertiary);
+  /* Dasselbe Tempo wie jeder Aufklapp-Winkel (list-row.css); er sprang hier. */
+  transition: transform var(--duration-lg) var(--ease-in-out);
 }
 
 .filter-sheet__fold[open] > .filter-sheet__summary .filter-sheet__chevron {

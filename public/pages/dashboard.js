@@ -32,6 +32,7 @@ import { setLeaveGuard } from '/utils/leave-guard.js';
 import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
 import { renderAvatarStack } from '/components/user-multi-select.js';
 import { isSoloHousehold } from '/utils/household.js';
+import { toggleRegion, durationToken, easingToken } from '/utils/ux.js';
 import { findSettingsLeaf } from '/settings/registry.js';
 import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
@@ -3713,7 +3714,7 @@ function wireTodayOverdue(root) {
     btn.addEventListener('click', () => {
       const open = btn.getAttribute('aria-expanded') !== 'true';
       const region = root.querySelector(`#${btn.getAttribute('aria-controls')}`);
-      if (region) region.hidden = !open;
+      toggleRegion(region, open);
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
       todayOverdueOpen = open;
     });
@@ -3730,7 +3731,7 @@ function wireTodayMore(root) {
     btn.addEventListener('click', () => {
       const open = btn.getAttribute('aria-expanded') !== 'true';
       const region = root.querySelector(`#${btn.getAttribute('aria-controls')}`);
-      if (region) region.hidden = !open;
+      toggleRegion(region, open);
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
       const label = btn.querySelector('span');
       if (label) label.textContent = open ? btn.dataset.lessLabel : btn.dataset.moreLabel;
@@ -4080,6 +4081,26 @@ function motionTiming() {
     duration: Number.isFinite(ms) ? ms : 250,
     easing: styles?.getPropertyValue('--ease-glass').trim() || 'ease-out',
   };
+}
+
+/**
+ * Das Raster gleitet von seiner alten Oberkante an die neue - beim Betreten und
+ * Verlassen des Anpassen-Modus. Nur `transform`, Dauer und Kurve aus den Tokens,
+ * ohne Feder (ein Versatz ueber hunderte Pixel wuerfe sie sichtbar ueber das
+ * Ziel); unter reduzierter Bewegung und ohne messbaren Versatz geschieht nichts.
+ * Der Endzustand steht vor dem Aufruf: die Animation hat kein `fill`.
+ */
+function playGridShift(root, topBefore, options = {}) {
+  const reduced = options.reduced ?? prefersReducedMotion();
+  if (topBefore == null || reduced) return null;
+  const grid = root.querySelector('#dashboard-widget-grid');
+  if (!grid || typeof grid.animate !== 'function') return null;
+  const dy = topBefore - grid.getBoundingClientRect().top;
+  if (Math.abs(dy) < 1) return null;
+  return grid.animate([
+    { transform: `translateY(${dy}px)` },
+    { transform: 'none' },
+  ], { duration: durationToken('--duration-lg', 250), easing: easingToken('--ease-out', 'ease-out') });
 }
 
 function playTileFlip(root, before, options = {}) {
@@ -6819,6 +6840,14 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // und Verlassen wachsen und schwinden die Bearbeiten-Leisten aller Kacheln,
     // da waere jede Bewegung nur Unruhe.
     const tileRectsBefore = isCustomizing && renderedCustomizing === true ? captureTileRects(shell) : null;
+    // BETRETEN UND VERLASSEN: das Raster gleitet ALS GANZES an seine neue Lage
+    // (R16, Bewegung). Der Gruss bricht um, die Ablage schiebt sich davor - das
+    // Raster sprang beim Betreten um mehrere hundert Pixel (gemessen 486 ->
+    // 868). Die Kacheln selbst bleiben ruhig (Satz oben): EIN Versatz fuer das
+    // Raster, keine zweiundzwanzig einzelnen.
+    const gridTopBefore = modeChanged
+      ? shell.querySelector('#dashboard-widget-grid')?.getBoundingClientRect?.().top ?? null
+      : null;
     renderedCustomizing = isCustomizing;
     syncLeaveGuard();
     // Im Anpassen-Modus ist die Seite ein Editor: der Speed-Dial ("Neue
@@ -6905,6 +6934,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       }
     }
     playTileFlip(shell, tileRectsBefore);
+    playGridShift(shell, gridTopBefore);
   }
 
   rebuildDashboard(widgetConfig);
@@ -7137,7 +7167,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
+export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

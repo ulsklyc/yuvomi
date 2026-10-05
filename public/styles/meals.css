@@ -1146,11 +1146,31 @@
   opacity: 0.85;
   box-shadow: var(--glass-shadow-lg);
   transform: rotate(2deg) scale(1.03);
+  /* `transition: none` bleibt: der Geist folgt dem Zeiger ueber `left`/`top`,
+   * jede Transition darauf liesse ihn nachziehen. Das ABHEBEN laeuft deshalb
+   * als Keyframe-Animation auf `transform`/`opacity` - sie beruehrt die Lage
+   * nicht (R16, Bewegung: der Geist stand vorher im ersten Frame gedreht da). */
   transition: none;
+  animation: meal-ghost-lift var(--duration-xs) var(--ease-out);
+}
+
+@keyframes meal-ghost-lift {
+  from { transform: none; opacity: 1; }
+}
+
+/* Die Quelle blendet beim Abheben ab und beim Ablegen wieder auf, statt
+ * zwischen 1 und 0.35 zu springen. Eigene Regel NACH `.meal-slot`, damit die
+ * Liste dort (border-color) erhalten bleibt. */
+.meal-slot {
+  transition: border-color var(--transition-fast), opacity var(--transition-fast);
 }
 
 .meal-slot--dragging {
   opacity: 0.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meal-card--ghost { animation: none; }
 }
 
 .meal-slot--drop-target {

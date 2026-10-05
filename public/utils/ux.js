@@ -223,6 +223,113 @@ export function expandIn(el, { duration = durationToken('--duration-lg', 250) } 
   return settleAnimation(anim, duration).then(() => { el.style.overflow = prevOverflow; });
 }
 
+/** Letzte Absicht je Region (offen/zu): ein Zuklappen, das ein Oeffnen ueberholt hat, raeumt nicht ab. */
+const regionIntent = new WeakMap();
+
+/**
+ * Klappt eine per `hidden` geschaltete Region auf oder zu - mit Bewegung, wo
+ * es eine gibt (Critique R16, P2 Bewegung: "+N weitere" und die Sammelzeile
+ * der Uebersicht schalteten nur `hidden`, der Rest der Kachel sprang).
+ *
+ * DER ZUSTAND IST `hidden`, NICHT DIE ANIMATION. Auf: `hidden` faellt sofort
+ * (Tastatur und Screenreader erreichen den Inhalt im selben Moment), danach
+ * zieht die Hoehe auf. Zu: erst klappt die Hoehe ein, dann setzt `hidden` -
+ * und `collapseOut` loest auch ohne `finish` auf, der Zustand kommt also
+ * immer an. Wo nichts animiert (kein `animate`, reduzierte Bewegung), schaltet
+ * es im selben Takt wie vorher.
+ *
+ * @param {HTMLElement|null} region
+ * @param {boolean} open
+ * @returns {Promise<void>} aufgeloest, wenn der Zustand steht
+ */
+export function toggleRegion(region, open) {
+  if (!region) return Promise.resolve();
+  regionIntent.set(region, Boolean(open));
+  const settle = () => {
+    // collapseOut haelt die Hoehe 0 (fill: forwards) - verwerfen.
+    region.getAnimations?.().forEach((anim) => anim.cancel());
+    if (region.style) region.style.overflow = '';
+  };
+  if (open) {
+    settle();
+    const wasHidden = region.hidden;
+    region.hidden = false;
+    return wasHidden ? expandIn(region) : Promise.resolve();
+  }
+  if (region.hidden) return Promise.resolve();
+  return collapseOut(region).then(() => {
+    if (regionIntent.get(region)) return; // inzwischen wieder geoeffnet
+    region.hidden = true;
+    settle();
+  });
+}
+
+/** Letzter gezeigter Wert je Balken, je Diagramm (`memo`) - ueberlebt das Neuzeichnen. */
+const barMemo = new Map();
+
+/**
+ * Laesst Balken an ihren Wert WACHSEN - vom zuletzt gezeigten Wert aus, beim
+ * ersten Zeichnen von 0 (Critique R16, P2 Bewegung).
+ *
+ * DER ANLASS: die Budget-Balken tragen `transition: transform`, und sie lief
+ * nie. Die Breite kommt aus `--bar-scale`, und der stand inline schon am
+ * Endwert im Markup - ein Element, das mit seinem Endwert entsteht, hat keinen
+ * Uebergang. Eine gebaute Bewegung, die nie zu sehen ist.
+ *
+ * DER ENDWERT STEHT IM MARKUP UND BLEIBT DORT DIE WAHRHEIT. Dieser Helfer
+ * setzt den Balken nur kurz zurueck und sofort wieder vor; faellt er aus
+ * (kein Skript, Fehler davor), steht der Balken richtig. Deshalb auch:
+ *   - reduzierte Bewegung, verdeckter Tab: nichts anfassen - verdeckt feuert
+ *     rAF nicht, der Balken bliebe auf dem Startwert stehen;
+ *   - sonst rAF UND ein Timer: wer zuerst kommt, setzt den Endwert, der
+ *     Zustand haengt an keinem Frame.
+ * Ein Balken, dessen Wert sich gegenueber dem letzten Zeichnen NICHT geaendert
+ * hat, ruehrt sich nicht: ein Neuzeichnen (Filter, Speichern) ist kein Anlass,
+ * alle Balken neu wachsen zu lassen. Wiedererkannt wird er an `data-bar-key`.
+ *
+ * @param {ParentNode|null} root
+ * @param {Object} opts
+ * @param {string} opts.selector  die Balken (tragen `--bar-scale` inline)
+ * @param {string} opts.memo      Name des Diagramms; Balken desselben Diagramms teilen ein Gedaechtnis
+ * @returns {number} wie viele Balken wachsen
+ */
+export function growBars(root, { selector, memo }) {
+  if (!root?.querySelectorAll) return 0;
+  const seen = barMemo.get(memo) ?? new Map();
+  const next = new Map();
+  const moving = [];
+  let index = 0;
+  for (const el of root.querySelectorAll(selector)) {
+    const value = el.style?.getPropertyValue?.('--bar-scale')?.trim() ?? '';
+    const key = el.dataset?.barKey ?? `#${index}`;
+    index += 1;
+    if (value === '') continue;
+    next.set(key, value);
+    const from = seen.get(key) ?? '0';
+    if (Number(from) !== Number(value)) moving.push([el, from, value]);
+  }
+  barMemo.set(memo, next);
+  if (!moving.length) return 0;
+  if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return 0;
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return 0;
+  if (typeof requestAnimationFrame !== 'function') return 0;
+
+  for (const [el, from] of moving) el.style.setProperty('--bar-scale', from);
+  // Den Startwert EINMAL berechnen lassen - sonst faellt er mit dem Endwert in
+  // denselben Frame, und es gibt wieder keinen Uebergang.
+  const [firstBar] = moving.at(0);
+  void firstBar.offsetWidth;
+  let done = false;
+  const settle = () => {
+    if (done) return;
+    done = true;
+    for (const [el, , value] of moving) el.style.setProperty('--bar-scale', value);
+  };
+  requestAnimationFrame(settle);
+  setTimeout(settle, 120);
+  return moving.length;
+}
+
 function settleAnimation(anim, duration) {
   return new Promise((resolve) => {
     let done = false;

@@ -1169,3 +1169,9 @@
     padding-inline-end: calc(var(--space-2) + var(--space-3) + var(--space-2));
   }
 }
+
+/* Hover-/Fokus-Feedback der Logo-Auswahl blendet (R16, Bewegung): Rahmen und
+ * Hof sprangen - die Datei fuehrte keine einzige Transition. */
+.subscriptions-logo-option {
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}

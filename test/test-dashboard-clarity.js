@@ -436,6 +436,39 @@ test('FLIP haengt am Neuaufbau: vorher messen, nach dem setHtml abspielen - nur 
     'gemessen wird, bevor der Modus des letzten Aufbaus ueberschrieben ist - sonst gleitet auch das Betreten des Modus');
 });
 
+// R16 (Bewegung): beim Betreten/Verlassen des Anpassen-Modus sprang das Raster
+// (Gruss bricht um, Ablage schiebt sich davor - gemessen y 486 -> 868). Die
+// Kacheln bleiben ruhig (Test darueber), aber das Raster gleitet ALS GANZES.
+test('Anpassen-Modus betreten/verlassen: das Raster gleitet als Ganzes, ohne Feder, nicht unter reduzierter Bewegung', async () => {
+  const calls = [];
+  const grid = {
+    top: 868,
+    getBoundingClientRect: () => ({ top: grid.top }),
+    animate: (keyframes, timing) => { calls.push({ keyframes, timing }); return {}; },
+  };
+  const root = { querySelector: (sel) => (sel === '#dashboard-widget-grid' ? grid : null) };
+  __test.playGridShift(root, 486, { reduced: false });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].keyframes, [{ transform: 'translateY(-382px)' }, { transform: 'none' }], 'von der alten Oberkante an die neue');
+  assert.equal(calls[0].timing.duration, 250, '--duration-lg');
+  assert.equal(calls[0].timing.easing, 'ease-out', 'Rueckfall der --ease-out; keine Feder ueber hunderte Pixel');
+  assert.equal(calls[0].timing.fill, undefined, 'kein fill: der Endzustand steht vor der Animation');
+
+  __test.playGridShift(root, 486, { reduced: true });
+  __test.playGridShift(root, null, { reduced: false });
+  __test.playGridShift(root, 868.4, { reduced: false });
+  __test.playGridShift({ querySelector: () => ({ getBoundingClientRect: () => ({ top: 0 }) }) }, 100, { reduced: false });
+  assert.equal(calls.length, 1, 'reduzierte Bewegung, kein Vorher-Wert, kein Versatz, kein animate: nichts');
+
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const body = src.match(/function rebuildDashboard\(cfg\) \{[\s\S]*?\n {2}\}\n/)?.[0] ?? '';
+  const capture = body.search(/const gridTopBefore = modeChanged\s*\?/);
+  const rebuild = body.search(/setHtml\(shell, `\s*<section class="dashboard-masthead/);
+  const play = body.search(/playGridShift\(shell, gridTopBefore\)/);
+  assert.ok(capture > -1 && capture < rebuild && rebuild < play, 'nur beim Moduswechsel: vorher messen, neu bauen, gleiten');
+});
+
 test('Anpassen-Modus: das Raster traegt eine Kante, keine Toenung ueber allen Kacheln', async () => {
   const { readFileSync } = await import('node:fs');
   const { eachRule } = await import('./css-rules.js');

@@ -1236,7 +1236,10 @@
   border-radius: var(--radius-full);
   transform: scaleX(var(--bar-scale, 0));
   transform-origin: left center;
-  transition: transform var(--transition-slow);
+  /* 300ms, nicht 400: die Obergrenze im Arbeitsfluss. Den Startwert setzt
+   * growBars() (utils/ux.js) - ohne ihn entsteht der Balken am Endwert und
+   * diese Transition liefe nie. */
+  transition: transform var(--duration-xl) var(--ease-out);
 }
 
 /* AUSGABEN TRAGEN DEN MODULTON, NICHT DAS ROT (Re-Critique 2026-09-27, C1).
@@ -1526,7 +1529,10 @@
   background: var(--color-success);
   transform: scaleX(var(--bar-scale, 0));
   transform-origin: left center;
-  transition: transform var(--transition-slow);
+  /* 300ms, nicht 400: die Obergrenze im Arbeitsfluss. Den Startwert setzt
+   * growBars() (utils/ux.js) - ohne ihn entsteht der Balken am Endwert und
+   * diese Transition liefe nie. */
+  transition: transform var(--duration-xl) var(--ease-out);
 }
 
 [dir='rtl'] .budget-bar-row__fill,
