@@ -2971,7 +2971,19 @@
         "otherSessionsEnded_one": "{{count}} نشست دیگر پایان یافت.",
         "otherSessionsNone": "حساب تو در هیچ دستگاه دیگری وارد نشده بود.",
         "otherSessionsError": "خروج از دستگاه‌های دیگر ناموفق بود.",
-        "otherSessionsTooManyAttempts": "درخواست‌های بیش از حد. کمی صبر کنید و دوباره تلاش کنید."
+        "otherSessionsTooManyAttempts": "درخواست‌های بیش از حد. کمی صبر کنید و دوباره تلاش کنید.",
+        "apiTokensInactiveTitle": "باطل‌شده یا منقضی‌شده",
+        "apiTokensInactiveHint": "این توکن‌ها دیگر دسترسی نمی‌دهند. مورد حذف‌شده قابل بازیابی نیست.",
+        "apiTokensNoneActive": "هیچ توکن API فعالی وجود ندارد.",
+        "apiTokenRemove": "حذف توکن",
+        "apiTokenRemoveConfirm": "توکن API «{{name}}» حذف شود؟",
+        "apiTokenRemoveDetail": "این مورد برای همیشه از فهرست حذف می‌شود. این کار برگشت‌پذیر نیست.",
+        "apiTokenRemovedToast": "توکن API حذف شد.",
+        "apiTokenRemoveActive": "این توکن هنوز فعال است. ابتدا آن را باطل کنید.",
+        "displayRemoveDevice": "حذف",
+        "displayRemoveDeviceConfirm": "مورد مربوط به این دستگاه حذف شود؟",
+        "displayRemoveDeviceDetail": "این مورد برای همیشه از فهرست حذف می‌شود. این کار برگشت‌پذیر نیست.",
+        "displayRemoveDeviceActive": "این دستگاه هنوز جفت است. ابتدا آن را باطل کنید."
     },
     "login": {
         "tagline": "دوباره به برنامه‌ریز خانوادگی‌تان خوش آمدید.",

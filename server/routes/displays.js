@@ -35,6 +35,7 @@ import {
   issuePairingCode,
   listDisplayDevices,
   redeemPairingCode,
+  removeRevokedDisplayDevice,
   revokeDisplayDevice,
 } from '../services/display-accounts.js';
 
@@ -360,6 +361,38 @@ router.post('/:id/devices/:deviceId/revoke', (req, res) => {
     return res.json({ data: { id: deviceId, revoked: true } });
   } catch (err) {
     log.error('POST /:id/devices/:deviceId/revoke error:', err);
+    return res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * Die Zeile eines widerrufenen Geraets entfernen (D#1672).
+ *
+ * Dieselbe Regel wie `POST /auth/api-tokens/:id/remove`: nur was nicht mehr
+ * gilt, geht. Ein gekoppeltes Geraet antwortet 409 mit `reason` - sein Weg
+ * hinaus ist der Widerruf eine Route darueber.
+ */
+router.post('/:id/devices/:deviceId/remove', (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const deviceId = Number(req.params.deviceId);
+    if (!Number.isInteger(id) || !Number.isInteger(deviceId)) {
+      return res.status(400).json({ error: 'Invalid id.', code: 400 });
+    }
+    // Wie beim Widerruf: das Geraet muss zu DIESEM Display gehoeren.
+    const device = db.get().prepare('SELECT id FROM display_devices WHERE id = ? AND user_id = ?').get(deviceId, id);
+    if (!device) return res.status(404).json({ error: 'Device not found.', code: 404 });
+
+    if (!removeRevokedDisplayDevice(deviceId)) {
+      return res.status(409).json({
+        error: 'A paired device cannot be removed. Revoke it first.',
+        code: 409,
+        reason: 'display_device_active',
+      });
+    }
+    return res.json({ data: { id: deviceId, removed: true } });
+  } catch (err) {
+    log.error('POST /:id/devices/:deviceId/remove error:', err);
     return res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

@@ -2957,7 +2957,19 @@
         "otherSessionsEnded_one": "已结束 {{count}} 个其他会话。",
         "otherSessionsNone": "你的账户没有在其他任何设备上登录。",
         "otherSessionsError": "在其他设备上退出失败。",
-        "otherSessionsTooManyAttempts": "请求过多，请稍候再试。"
+        "otherSessionsTooManyAttempts": "请求过多，请稍候再试。",
+        "apiTokensInactiveTitle": "已吊销或已过期",
+        "apiTokensInactiveHint": "这些令牌不再提供访问权限。移除的条目无法恢复。",
+        "apiTokensNoneActive": "没有有效的 API 令牌。",
+        "apiTokenRemove": "移除令牌",
+        "apiTokenRemoveConfirm": "要移除 API 令牌“{{name}}”吗？",
+        "apiTokenRemoveDetail": "该条目将从列表中永久消失。此操作无法撤销。",
+        "apiTokenRemovedToast": "API 令牌已移除。",
+        "apiTokenRemoveActive": "此令牌仍然有效。请先吊销它。",
+        "displayRemoveDevice": "移除",
+        "displayRemoveDeviceConfirm": "要移除这台设备的条目吗？",
+        "displayRemoveDeviceDetail": "该条目将从列表中永久消失。此操作无法撤销。",
+        "displayRemoveDeviceActive": "这台设备仍处于配对状态。请先撤销它。"
     },
     "login": {
         "tagline": "欢迎回到您的家庭计划工具。",

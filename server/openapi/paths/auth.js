@@ -500,7 +500,26 @@ export function authPaths() {
         tag: 'Auth',
         admin: true,
         stateChanging: true,
+        description: 'Sets `revoked_at` and keeps the row, so the revocation stays on record. To drop the row of a token that no longer works, use `POST /api/v1/auth/api-tokens/{id}/remove`.',
         params: [idParam('id', 'API token ID')],
+      }),
+    },
+    '/api/v1/auth/api-tokens/{id}/remove': {
+      post: op({
+        summary: 'Remove a revoked or expired API token',
+        tag: 'Auth',
+        admin: true,
+        stateChanging: true,
+        description: 'Deletes the row of a token that is revoked or past its expiry. This cannot be undone. A token that still works is refused with 409 and `reason: "api_token_active"`: revoke it first (`DELETE /api/v1/auth/api-tokens/{id}`), which ends the access and keeps the moment on record.',
+        params: [idParam('id', 'API token ID')],
+        responses: {
+          200: { description: 'The token row was removed' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { description: 'No API token with this ID' },
+          409: { description: 'The token is still active. The response body reason is `api_token_active`.' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
   };

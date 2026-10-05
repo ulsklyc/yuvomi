@@ -2957,7 +2957,19 @@
         "otherSessionsEnded_one": "Τερματίστηκε {{count}} άλλη συνεδρία.",
         "otherSessionsNone": "Ο λογαριασμός σου δεν ήταν συνδεδεμένος σε καμία άλλη συσκευή.",
         "otherSessionsError": "Η αποσύνδεση από άλλες συσκευές απέτυχε.",
-        "otherSessionsTooManyAttempts": "Πάρα πολλά αιτήματα. Περίμενε λίγο και δοκίμασε ξανά."
+        "otherSessionsTooManyAttempts": "Πάρα πολλά αιτήματα. Περίμενε λίγο και δοκίμασε ξανά.",
+        "apiTokensInactiveTitle": "Ανακληθέντα ή ληγμένα",
+        "apiTokensInactiveHint": "Αυτά τα διακριτικά δεν παρέχουν πλέον πρόσβαση. Μια καταχώριση που αφαιρέθηκε δεν επαναφέρεται.",
+        "apiTokensNoneActive": "Κανένα ενεργό διακριτικό API.",
+        "apiTokenRemove": "Αφαίρεση διακριτικού",
+        "apiTokenRemoveConfirm": "Αφαίρεση του διακριτικού API \"{{name}}\";",
+        "apiTokenRemoveDetail": "Η καταχώριση φεύγει οριστικά από τη λίστα. Αυτό δεν αναιρείται.",
+        "apiTokenRemovedToast": "Το διακριτικό API αφαιρέθηκε.",
+        "apiTokenRemoveActive": "Αυτό το διακριτικό είναι ακόμη ενεργό. Ανακαλέστε το πρώτα.",
+        "displayRemoveDevice": "Αφαίρεση",
+        "displayRemoveDeviceConfirm": "Να αφαιρεθεί η καταχώριση αυτής της συσκευής;",
+        "displayRemoveDeviceDetail": "Η καταχώριση φεύγει οριστικά από τη λίστα. Αυτό δεν αναιρείται.",
+        "displayRemoveDeviceActive": "Αυτή η συσκευή είναι ακόμη συζευγμένη. Ανακαλέστε την πρώτα."
     },
     "login": {
         "tagline": "Καλώς ήρθατε ξανά στον οικογενειακό σας οργανωτή.",

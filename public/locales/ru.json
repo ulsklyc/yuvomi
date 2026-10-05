@@ -3151,7 +3151,19 @@
         "otherSessionsEnded_many": "Завершено других сеансов: {{count}}.",
         "otherSessionsNone": "Ваша учётная запись не была открыта ни на одном другом устройстве.",
         "otherSessionsError": "Не удалось выйти на других устройствах.",
-        "otherSessionsTooManyAttempts": "Слишком много запросов. Подождите немного и попробуйте снова."
+        "otherSessionsTooManyAttempts": "Слишком много запросов. Подождите немного и попробуйте снова.",
+        "apiTokensInactiveTitle": "Отозванные или истёкшие",
+        "apiTokensInactiveHint": "Эти токены больше не дают доступа. Удалённую запись нельзя восстановить.",
+        "apiTokensNoneActive": "Нет активных токенов API.",
+        "apiTokenRemove": "Удалить токен",
+        "apiTokenRemoveConfirm": "Удалить токен API «{{name}}»?",
+        "apiTokenRemoveDetail": "Запись исчезнет из списка навсегда. Это нельзя отменить.",
+        "apiTokenRemovedToast": "Токен API удалён.",
+        "apiTokenRemoveActive": "Этот токен ещё активен. Сначала отзовите его.",
+        "displayRemoveDevice": "Удалить",
+        "displayRemoveDeviceConfirm": "Удалить запись этого устройства?",
+        "displayRemoveDeviceDetail": "Запись исчезнет из списка навсегда. Это нельзя отменить.",
+        "displayRemoveDeviceActive": "Это устройство ещё подключено. Сначала отзовите его."
     },
     "login": {
         "tagline": "С возвращением в ваш семейный планировщик.",

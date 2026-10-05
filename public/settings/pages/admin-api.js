@@ -1,6 +1,7 @@
 import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { rowActionHtml } from '/utils/row-action.js';
 import { confirmModal, refocusAfterRender } from '/components/modal.js';
 import { createRetryState, toggleRowHtml } from '/settings/components.js';
 import { getExtensionModules } from '/utils/extension-widgets.js';
@@ -38,12 +39,26 @@ function datetimeLocalToIso(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function apiTokenHtml(token) {
+/**
+ * Gilt dieses Token noch? DAS SAGT DER SERVER (`active`), nicht die Uhr dieses
+ * Geraets: geht sie vor, hielte die Seite ein Token fuer abgelaufen, das noch
+ * anmeldet, boete nur "Entfernen" an, bekaeme dafuer 409 - und "Widerrufen"
+ * stuende nirgends (Codex zu #1681). Die eigene Rechnung bleibt nur fuer eine
+ * Antwort ohne das Feld und fuer den Widerruf, den diese Seite selbst gerade
+ * eingetragen hat (`revoked_at` schlaegt alles).
+ */
+export function isApiTokenActive(token, now = Date.now()) {
+  if (token.revoked_at) return false;
+  if (typeof token.active === 'boolean') return token.active;
+  if (!token.expires_at) return true;
+  const expires = new Date(token.expires_at).getTime();
+  return Number.isNaN(expires) || expires > now;
+}
+
+function apiTokenHtml(token, active) {
   const status = token.revoked_at
     ? t('settings.apiTokenRevoked')
-    : token.expires_at && new Date(token.expires_at).getTime() <= Date.now()
-      ? t('settings.apiTokenExpired')
-      : t('settings.apiTokenActive');
+    : active ? t('settings.apiTokenActive') : t('settings.apiTokenExpired');
   const scopeSummary = Array.isArray(token.scopes)
     ? t('settings.apiTokenScopeSummary', { count: token.scopes.length })
     : t('settings.apiTokenScopeFull');
@@ -60,34 +75,63 @@ function apiTokenHtml(token) {
     status,
   ].join(' · ');
 
+  // EIN KNOPF JE ZEILE, UND WELCHER, SAGT DER ZUSTAND (D#1672). Ein aktives
+  // Token wird widerrufen - das beendet den Zugang und laesst den Zeitpunkt
+  // stehen. Erst was nicht mehr gilt, laesst sich entfernen. Vorher trug die
+  // tote Zeile einen gesperrten Widerruf-Knopf und blieb fuer immer.
+  const action = active
+    ? `<button class="btn btn--icon btn--danger-outline" data-revoke-api-token="${token.id}" data-name="${esc(token.name)}" aria-label="${esc(t('settings.apiTokenRevoke'))}">
+        <i data-lucide="ban" aria-hidden="true"></i>
+      </button>`
+    : rowActionHtml({
+      icon: 'trash-2',
+      tone: 'danger',
+      label: t('common.removeNamed', { name: token.name }),
+      attrs: { 'data-remove-api-token': token.id, 'data-name': token.name },
+    });
+
   return `
     <li class="settings-member" data-api-token-id="${token.id}">
       <div class="settings-member__info">
         <span class="settings-member__name">${esc(token.name)}</span>
         <span class="settings-member__meta">${esc(meta)}</span>
       </div>
-      <button class="btn btn--icon btn--danger-outline" data-revoke-api-token="${token.id}" data-name="${esc(token.name)}" ${token.revoked_at ? 'disabled' : ''} aria-label="${t('settings.apiTokenRevoke')}">
-        <i data-lucide="ban" aria-hidden="true"></i>
-      </button>
+      ${action}
     </li>
   `;
 }
 
-function renderApiTokenList(container, tokens) {
+function fillTokenList(list, tokens, active) {
+  list.replaceChildren();
+  list.insertAdjacentHTML('beforeend', tokens.map((token) => apiTokenHtml(token, active)).join(''));
+}
+
+/**
+ * Zwei Listen: was gilt, und was nicht mehr gilt. Der zweite Abschnitt steht
+ * nur da, wenn er etwas zeigt - eine Ueberschrift ueber nichts waere eine
+ * Frage ohne Gegenstand.
+ */
+export function renderApiTokenList(container, tokens) {
   const list = container.querySelector('#api-token-list');
   if (!list) return;
-  list.replaceChildren();
-  if (!tokens.length) {
-    const empty = document.createElement('p');
+  const now = Date.now();
+  const active = tokens.filter((token) => isApiTokenActive(token, now));
+  const inactive = tokens.filter((token) => !isApiTokenActive(token, now));
+
+  fillTokenList(list, active, true);
+  if (!active.length) {
+    const empty = document.createElement('li');
     empty.className = 'form-hint';
-    empty.textContent = t('settings.apiTokensEmpty');
+    empty.textContent = t(tokens.length ? 'settings.apiTokensNoneActive' : 'settings.apiTokensEmpty');
     list.appendChild(empty);
-  } else {
-    tokens.forEach((token) => {
-      const tmp = document.createElement('div');
-      tmp.insertAdjacentHTML('beforeend', apiTokenHtml(token));
-      list.appendChild(tmp.firstElementChild);
-    });
+  }
+
+  const inactiveSection = container.querySelector('#api-token-inactive-section');
+  const inactiveList = container.querySelector('#api-token-inactive-list');
+  if (inactiveSection && inactiveList) {
+    fillTokenList(inactiveList, inactive, false);
+    inactiveSection.hidden = inactive.length === 0;
+    window.lucide?.createIcons({ el: inactiveList });
   }
   window.lucide?.createIcons({ el: list });
 }
@@ -122,7 +166,7 @@ function renderPage(container, scopeKeys = CORE_SCOPE_MODULE_KEYS) {
         <h3 class="settings-card__title">${t('settings.apiTokensCardTitle')}</h3>
         <p class="form-hint" style="margin-bottom:var(--space-3)">${t('settings.apiTokensHint')}</p>
         <p class="form-hint" style="margin-bottom:var(--space-3)">${t('settings.apiTokensMcpHint')}</p>
-        <ul class="settings-members" id="api-token-list"></ul>
+        <ul class="settings-members row-divided" id="api-token-list"></ul>
         <form id="api-token-form" class="settings-form" autocomplete="off">
           <div class="form-group">
             <label class="form-label" for="api-token-name">${t('settings.apiTokenNameLabel')}</label>
@@ -168,6 +212,13 @@ function renderPage(container, scopeKeys = CORE_SCOPE_MODULE_KEYS) {
           <div id="api-token-error" class="form-error" role="alert" hidden></div>
           <button type="submit" class="btn btn--primary">${t('settings.apiTokenCreate')}</button>
         </form>
+      </div>
+    </section>
+    <section class="settings-section" id="api-token-inactive-section" hidden>
+      <h2 class="settings-section__title">${t('settings.apiTokensInactiveTitle')}</h2>
+      <div class="settings-card">
+        <p class="form-hint">${t('settings.apiTokensInactiveHint')}</p>
+        <ul class="settings-members row-divided" id="api-token-inactive-list"></ul>
       </div>
     </section>
   `);
@@ -293,6 +344,48 @@ function bindEvents(container, initialTokens, users, currentUserId) {
     } catch (err) {
       window.yuvomi?.showToast(err.message, 'danger');
     }
+  });
+
+  // ENTFERNEN HAT KEIN RUECKGAENGIG: die Zeile samt Token-Hash ist danach weg,
+  // es gibt nichts, was sich zurueckholen liesse. Deshalb die Rueckfrage vorab
+  // statt eines Toasts mit Undo, und sie nennt die Folge.
+  const inactiveList = container.querySelector('#api-token-inactive-list');
+  inactiveList?.addEventListener('click', async (event) => {
+    const btn = event.target.closest('[data-remove-api-token]');
+    if (!btn) return;
+    const id = Number(btn.dataset.removeApiToken);
+    const name = btn.dataset.name;
+    if (!await confirmModal(t('settings.apiTokenRemoveConfirm', { name }), {
+      danger: true,
+      confirmLabel: t('settings.apiTokenRemove'),
+      detail: t('settings.apiTokenRemoveDetail'),
+    })) return;
+    try {
+      await api.post(`/auth/api-tokens/${id}/remove`, {});
+    } catch (err) {
+      // 404: jemand war schneller, die Zeile ist schon weg - das Ziel ist erreicht.
+      if (err?.status !== 404) {
+        // Der Server haelt das Token noch fuer aktiv (die Uhr dieses Geraets
+        // geht vor, oder die Liste ist alt): sein Satz statt des englischen,
+        // und die Liste neu vom Server, damit die Zeile wieder richtig steht.
+        const active = err?.status === 409 && err.data?.reason === 'api_token_active';
+        window.yuvomi?.showToast(active ? t('settings.apiTokenRemoveActive') : err.message, 'danger');
+        if (active) {
+          try {
+            tokens = (await api.get('/auth/api-tokens')).data ?? tokens;
+            renderApiTokenList(container, tokens);
+            refocusAfterRender();
+          } catch (reloadErr) {
+            window.yuvomi?.showToast(reloadErr.message, 'danger');
+          }
+        }
+        return;
+      }
+    }
+    tokens = tokens.filter((token) => token.id !== id);
+    renderApiTokenList(container, tokens);
+    refocusAfterRender();
+    window.yuvomi?.showToast(t('settings.apiTokenRemovedToast'), 'default');
   });
 }
 

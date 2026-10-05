@@ -2971,7 +2971,19 @@
         "otherSessionsEnded_one": "{{count}} sesi lain diakhiri.",
         "otherSessionsNone": "Akunmu tidak masuk di perangkat lain mana pun.",
         "otherSessionsError": "Gagal keluar dari perangkat lain.",
-        "otherSessionsTooManyAttempts": "Terlalu banyak permintaan. Tunggu sebentar, lalu coba lagi."
+        "otherSessionsTooManyAttempts": "Terlalu banyak permintaan. Tunggu sebentar, lalu coba lagi.",
+        "apiTokensInactiveTitle": "Dicabut atau kedaluwarsa",
+        "apiTokensInactiveHint": "Token ini tidak lagi memberi akses. Entri yang dihapus tidak bisa dipulihkan.",
+        "apiTokensNoneActive": "Tidak ada token API aktif.",
+        "apiTokenRemove": "Hapus token",
+        "apiTokenRemoveConfirm": "Hapus token API \"{{name}}\"?",
+        "apiTokenRemoveDetail": "Entri hilang dari daftar untuk selamanya. Ini tidak bisa dibatalkan.",
+        "apiTokenRemovedToast": "Token API dihapus.",
+        "apiTokenRemoveActive": "Token ini masih aktif. Cabut dulu.",
+        "displayRemoveDevice": "Hapus",
+        "displayRemoveDeviceConfirm": "Hapus entri perangkat ini?",
+        "displayRemoveDeviceDetail": "Entri hilang dari daftar untuk selamanya. Ini tidak bisa dibatalkan.",
+        "displayRemoveDeviceActive": "Perangkat ini masih dipasangkan. Cabut dulu."
     },
     "login": {
         "tagline": "Selamat datang kembali di perencana keluarga Anda.",

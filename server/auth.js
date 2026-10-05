@@ -462,6 +462,13 @@ function publicApiToken(row) {
     scopes: parseScopes(row.scopes),
     expires_at: row.expires_at,
     revoked_at: row.revoked_at,
+    // Das Urteil des SERVERS, ob das Token noch gilt (D#1672, Codex zu #1681).
+    // Die Oberflaeche teilt ihre Liste danach - entschiede sie mit der Uhr des
+    // Browsers, hielte ein vorgehendes Geraet ein Token fuer abgelaufen, boete
+    // nur "Entfernen" an, bekaeme 409 und koennte es auch nicht widerrufen.
+    // `usable` kommt aus `apiTokenUsableSql()`; wo eine Abfrage es nicht
+    // mitliefert, fehlt das Feld, statt etwas zu behaupten.
+    ...(row.usable === undefined ? {} : { active: row.usable === 1 }),
     last_used_at: row.last_used_at,
     created_at: row.created_at,
   };
@@ -798,6 +805,21 @@ function invalidateUserSessions(userId, exceptSid, database = db.get()) {
   return ended;
 }
 
+/**
+ * Wann ein API-Token noch gilt: nicht widerrufen und nicht abgelaufen.
+ *
+ * EINE Schreibweise fuer zwei Stellen (D#1672): die Anmeldung laesst genau
+ * diese Tokens durch, und `POST /api-tokens/:id/remove` loescht genau die
+ * anderen. Stuenden dort zwei Fassungen, koennte eine davon ein Token fuer
+ * tot halten, mit dem sich noch jemand anmeldet - und die Zeile samt
+ * Widerrufszeitpunkt waere weg, waehrend das Credential noch gilt.
+ * @param {string} alias - Tabellenalias von `api_tokens` in der Abfrage
+ */
+function apiTokenUsableSql(alias) {
+  return `(${alias}.revoked_at IS NULL
+      AND (${alias}.expires_at IS NULL OR ${alias}.expires_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now')))`;
+}
+
 function authenticateApiToken(req) {
   const token = extractApiToken(req);
   if (!token) return null;
@@ -814,8 +836,7 @@ function authenticateApiToken(req) {
     JOIN users subject ON subject.id = COALESCE(t.subject_user_id, t.created_by)
     JOIN users creator ON creator.id = t.created_by
     WHERE t.token_hash = ?
-      AND t.revoked_at IS NULL
-      AND (t.expires_at IS NULL OR t.expires_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      AND ${apiTokenUsableSql('t')}
   `).get(tokenHash);
   if (!row) return null;
 
@@ -2926,7 +2947,8 @@ router.get('/users', requireAuth, (req, res) => {
 router.get('/api-tokens', requireAuth, requireAdmin, (req, res) => {
   try {
     const rows = db.get().prepare(`
-      SELECT t.*, creator.display_name AS creator_name,
+      SELECT t.*, ${apiTokenUsableSql('t')} AS usable,
+        creator.display_name AS creator_name,
         subject.id AS effective_subject_user_id,
         subject.display_name AS subject_name
       FROM api_tokens t
@@ -3023,7 +3045,8 @@ router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, (req, res)
     `).run(name, tokenHash, tokenPrefix, req.authUserId, subjectUserId, normalizedExpiresAt, serializedScopes);
 
     const row = db.get().prepare(`
-      SELECT t.*, creator.display_name AS creator_name,
+      SELECT t.*, ${apiTokenUsableSql('t')} AS usable,
+        creator.display_name AS creator_name,
         subject.id AS effective_subject_user_id,
         subject.display_name AS subject_name
       FROM api_tokens t
@@ -3054,6 +3077,47 @@ router.delete('/api-tokens/:id', requireAuth, requireAdmin, csrfMiddleware, (req
     res.json({ ok: true });
   } catch (err) {
     log.error('API token revocation error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * POST /api/v1/auth/api-tokens/:id/remove
+ * Entfernt die Zeile eines Tokens, das nicht mehr gilt (D#1672).
+ *
+ * EIGENE ROUTE, WEIL `DELETE /api-tokens/:id` SCHON "WIDERRUFEN" HEISST und in
+ * der zugesagten /api/v1-Oberflaeche so bleibt: ein Client, der dort loescht,
+ * erwartet eine Zeile mit `revoked_at`, keine Luecke. Die Form folgt
+ * `POST /displays/:id/devices/:deviceId/revoke` - das Verb als letztes Segment.
+ *
+ * NUR WAS NICHT MEHR GILT. Ein aktives Token zu entfernen hiesse, einen
+ * Zugang zu beenden, ohne dass davon etwas stehen bleibt: der Widerruf ist der
+ * Weg, und er hinterlaesst den Zeitpunkt. Erst die tote Zeile darf gehen - sie
+ * blieb bis hierhin fuer immer in der Liste. Loeschen und Pruefen sind EINE
+ * Anweisung, damit zwischen beiden nichts liegt.
+ * Response: { ok: true }
+ */
+router.post('/api-tokens/:id/remove', requireAuth, requireAdmin, csrfMiddleware, (req, res) => {
+  try {
+    // Strenger als `parseInt` beim Widerruf darueber: `12abc` ist keine Id.
+    // Eine Route, die endgueltig loescht, raet nicht, welche Zeile gemeint war.
+    const id = /^\d+$/.test(req.params.id) ? Number(req.params.id) : NaN;
+    if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid token ID.', code: 400 });
+
+    const result = db.get().prepare(`
+      DELETE FROM api_tokens WHERE id = ? AND NOT ${apiTokenUsableSql('api_tokens')}
+    `).run(id);
+    if (result.changes > 0) return res.json({ ok: true });
+
+    const exists = db.get().prepare('SELECT 1 FROM api_tokens WHERE id = ?').get(id);
+    if (!exists) return res.status(404).json({ error: 'API token not found.', code: 404 });
+    return res.status(409).json({
+      error: 'An active API token cannot be removed. Revoke it first.',
+      code: 409,
+      reason: 'api_token_active',
+    });
+  } catch (err) {
+    log.error('API token removal error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

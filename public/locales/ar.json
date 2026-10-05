@@ -3248,7 +3248,19 @@
         "otherSessionsEnded_many": "تم إنهاء {{count}} جلسة أخرى.",
         "otherSessionsNone": "لم يكن حسابك مسجّل الدخول على أي جهاز آخر.",
         "otherSessionsError": "فشل تسجيل الخروج من الأجهزة الأخرى.",
-        "otherSessionsTooManyAttempts": "طلبات كثيرة. انتظر قليلًا ثم حاول مرة أخرى."
+        "otherSessionsTooManyAttempts": "طلبات كثيرة. انتظر قليلًا ثم حاول مرة أخرى.",
+        "apiTokensInactiveTitle": "مُبطَلة أو منتهية الصلاحية",
+        "apiTokensInactiveHint": "لم تعد هذه الرموز تمنح أي وصول. لا يمكن استعادة الإدخال بعد إزالته.",
+        "apiTokensNoneActive": "لا يوجد رمز API نشط.",
+        "apiTokenRemove": "إزالة الرمز",
+        "apiTokenRemoveConfirm": "إزالة رمز API \"{{name}}\"؟",
+        "apiTokenRemoveDetail": "يختفي الإدخال من القائمة نهائيًا. ولا يمكن التراجع عن ذلك.",
+        "apiTokenRemovedToast": "تمت إزالة رمز API.",
+        "apiTokenRemoveActive": "هذا الرمز ما زال نشطًا. أبطِله أولًا.",
+        "displayRemoveDevice": "إزالة",
+        "displayRemoveDeviceConfirm": "هل تريد إزالة إدخال هذا الجهاز؟",
+        "displayRemoveDeviceDetail": "يختفي الإدخال من القائمة نهائيًا. ولا يمكن التراجع عن ذلك.",
+        "displayRemoveDeviceActive": "هذا الجهاز ما زال مقترنًا. أبطِله أولًا."
     },
     "login": {
         "tagline": "مرحبًا بعودتك إلى منظّم عائلتك.",

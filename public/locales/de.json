@@ -2971,7 +2971,19 @@
         "otherSessionsEnded_one": "{{count}} andere Sitzung beendet.",
         "otherSessionsNone": "Auf keinem anderen Gerät war dein Konto angemeldet.",
         "otherSessionsError": "Abmelden auf anderen Geräten fehlgeschlagen.",
-        "otherSessionsTooManyAttempts": "Zu viele Anfragen. Bitte warte kurz und versuche es dann erneut."
+        "otherSessionsTooManyAttempts": "Zu viele Anfragen. Bitte warte kurz und versuche es dann erneut.",
+        "apiTokensInactiveTitle": "Widerrufen oder abgelaufen",
+        "apiTokensInactiveHint": "Diese Tokens gewähren keinen Zugriff mehr. Ein entfernter Eintrag lässt sich nicht wiederherstellen.",
+        "apiTokensNoneActive": "Kein aktiver API-Token.",
+        "apiTokenRemove": "Token entfernen",
+        "apiTokenRemoveConfirm": "API-Token \"{{name}}\" entfernen?",
+        "apiTokenRemoveDetail": "Der Eintrag verschwindet endgültig aus der Liste. Das lässt sich nicht rückgängig machen.",
+        "apiTokenRemovedToast": "API-Token entfernt.",
+        "apiTokenRemoveActive": "Dieser Token ist noch aktiv. Widerrufe ihn zuerst.",
+        "displayRemoveDevice": "Entfernen",
+        "displayRemoveDeviceConfirm": "Eintrag dieses Geräts entfernen?",
+        "displayRemoveDeviceDetail": "Der Eintrag verschwindet endgültig aus der Liste. Das lässt sich nicht rückgängig machen.",
+        "displayRemoveDeviceActive": "Dieses Gerät ist noch gekoppelt. Widerrufe es zuerst."
     },
     "login": {
         "tagline": "Willkommen zurück bei deinem Familienplaner.",

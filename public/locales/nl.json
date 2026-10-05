@@ -2957,7 +2957,19 @@
         "otherSessionsEnded_one": "{{count}} andere sessie beëindigd.",
         "otherSessionsNone": "Je account was op geen enkel ander apparaat aangemeld.",
         "otherSessionsError": "Afmelden op andere apparaten is mislukt.",
-        "otherSessionsTooManyAttempts": "Te veel verzoeken. Wacht even en probeer het dan opnieuw."
+        "otherSessionsTooManyAttempts": "Te veel verzoeken. Wacht even en probeer het dan opnieuw.",
+        "apiTokensInactiveTitle": "Ingetrokken of verlopen",
+        "apiTokensInactiveHint": "Deze tokens geven geen toegang meer. Een verwijderde vermelding kan niet worden hersteld.",
+        "apiTokensNoneActive": "Geen actief API-token.",
+        "apiTokenRemove": "Token verwijderen",
+        "apiTokenRemoveConfirm": "API-token \"{{name}}\" verwijderen?",
+        "apiTokenRemoveDetail": "De vermelding verdwijnt definitief uit de lijst. Dit kan niet ongedaan worden gemaakt.",
+        "apiTokenRemovedToast": "API-token verwijderd.",
+        "apiTokenRemoveActive": "Dit token is nog actief. Trek het eerst in.",
+        "displayRemoveDevice": "Verwijderen",
+        "displayRemoveDeviceConfirm": "Vermelding van dit apparaat verwijderen?",
+        "displayRemoveDeviceDetail": "De vermelding verdwijnt definitief uit de lijst. Dit kan niet ongedaan worden gemaakt.",
+        "displayRemoveDeviceActive": "Dit apparaat is nog gekoppeld. Trek het eerst in."
     },
     "login": {
         "tagline": "Welkom terug bij je gezinsplanner.",

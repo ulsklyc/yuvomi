@@ -2971,7 +2971,19 @@
         "otherSessionsEnded_one": "다른 세션 {{count}}개를 종료했습니다.",
         "otherSessionsNone": "다른 기기에 로그인된 계정이 없었습니다.",
         "otherSessionsError": "다른 기기에서 로그아웃하지 못했습니다.",
-        "otherSessionsTooManyAttempts": "요청이 너무 많습니다. 잠시 기다린 후 다시 시도하세요."
+        "otherSessionsTooManyAttempts": "요청이 너무 많습니다. 잠시 기다린 후 다시 시도하세요.",
+        "apiTokensInactiveTitle": "취소되었거나 만료됨",
+        "apiTokensInactiveHint": "이 토큰으로는 더 이상 접근할 수 없습니다. 제거한 항목은 복구할 수 없습니다.",
+        "apiTokensNoneActive": "활성 API 토큰이 없습니다.",
+        "apiTokenRemove": "토큰 제거",
+        "apiTokenRemoveConfirm": "\"{{name}}\" API 토큰을 제거할까요?",
+        "apiTokenRemoveDetail": "항목이 목록에서 완전히 사라집니다. 이 작업은 되돌릴 수 없습니다.",
+        "apiTokenRemovedToast": "API 토큰이 제거되었습니다.",
+        "apiTokenRemoveActive": "이 토큰은 아직 활성 상태입니다. 먼저 취소하세요.",
+        "displayRemoveDevice": "제거",
+        "displayRemoveDeviceConfirm": "이 기기의 항목을 제거할까요?",
+        "displayRemoveDeviceDetail": "항목이 목록에서 완전히 사라집니다. 이 작업은 되돌릴 수 없습니다.",
+        "displayRemoveDeviceActive": "이 기기는 아직 페어링되어 있습니다. 먼저 해지하세요."
     },
     "login": {
         "tagline": "가족 플래너에 다시 오신 것을 환영합니다.",

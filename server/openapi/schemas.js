@@ -1023,6 +1023,7 @@ export const schemas = {
             },
             expires_at: { type: ['string', 'null'], format: 'date-time' },
             revoked_at: { type: ['string', 'null'], format: 'date-time' },
+            active: { type: 'boolean', description: 'Whether the token still signs in: not revoked and not past `expires_at`, judged by the server clock. Only a token with `active: false` can be removed.' },
             last_used_at: { type: ['string', 'null'], format: 'date-time' },
             created_at: { type: 'string', format: 'date-time' },
           },

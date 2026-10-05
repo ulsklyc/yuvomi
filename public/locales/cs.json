@@ -3054,7 +3054,19 @@
         "otherSessionsEnded_few": "Ukončeny {{count}} další relace.",
         "otherSessionsNone": "Tvůj účet nebyl přihlášen na žádném jiném zařízení.",
         "otherSessionsError": "Odhlášení na ostatních zařízeních se nezdařilo.",
-        "otherSessionsTooManyAttempts": "Příliš mnoho požadavků. Chvíli počkej a zkus to znovu."
+        "otherSessionsTooManyAttempts": "Příliš mnoho požadavků. Chvíli počkej a zkus to znovu.",
+        "apiTokensInactiveTitle": "Odvolané nebo vypršelé",
+        "apiTokensInactiveHint": "Tyto tokeny už neposkytují žádný přístup. Odstraněný záznam nelze obnovit.",
+        "apiTokensNoneActive": "Žádný aktivní API token.",
+        "apiTokenRemove": "Odstranit token",
+        "apiTokenRemoveConfirm": "Odstranit API token \"{{name}}\"?",
+        "apiTokenRemoveDetail": "Záznam ze seznamu nadobro zmizí. Tuto akci nelze vzít zpět.",
+        "apiTokenRemovedToast": "API token odstraněn.",
+        "apiTokenRemoveActive": "Tento token je stále aktivní. Nejprve ho odvolejte.",
+        "displayRemoveDevice": "Odstranit",
+        "displayRemoveDeviceConfirm": "Odstranit záznam tohoto zařízení?",
+        "displayRemoveDeviceDetail": "Záznam ze seznamu nadobro zmizí. Tuto akci nelze vzít zpět.",
+        "displayRemoveDeviceActive": "Toto zařízení je stále spárované. Nejprve ho odvolejte."
     },
     "login": {
         "tagline": "Vítejte zpět ve svém rodinném plánovači.",
