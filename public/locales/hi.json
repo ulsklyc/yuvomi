@@ -3624,8 +3624,6 @@
         "taskUpdatedToast": "कार्य अपडेट किया गया",
         "taskDeletedToast": "कार्य हटाया गया",
         "taskUndoneToast": "पूर्णता रीसेट की गई",
-        "deleteTaskConfirm": "क्या आप वाकई कार्य \"{{name}}\" हटाना चाहते हैं?",
-        "deleteTaskConfirmDetail": "कार्य के साथ अंतिम बार पूरा करने का समय भी चला जाता है। नई प्रविष्टि बिना इतिहास के शुरू होती है और तुरंत फिर से पूरी तरह बकाया दिखती है।",
         "reportTitle": "समस्या दर्ज करें",
         "problemDescription": "समस्या का विवरण",
         "problemPlaceholder": "उदाहरण: बल्ब खराब है",

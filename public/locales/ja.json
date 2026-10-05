@@ -3624,8 +3624,6 @@
         "taskUpdatedToast": "タスクを更新しました",
         "taskDeletedToast": "タスクを削除しました",
         "taskUndoneToast": "完了をリセットしました",
-        "deleteTaskConfirm": "タスク「{{name}}」を削除しますか？",
-        "deleteTaskConfirmDetail": "タスクと一緒に、最後に実施した日時も失われます。新しく作り直すと履歴がないため、すぐにまた完全に未実施の状態として表示されます。",
         "reportTitle": "問題を報告",
         "problemDescription": "問題の説明",
         "problemPlaceholder": "例: 電球が切れている",

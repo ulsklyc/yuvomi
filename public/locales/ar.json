@@ -3954,8 +3954,6 @@
         "taskUpdatedToast": "تم تحديث المهمة",
         "taskDeletedToast": "تم حذف المهمة",
         "taskUndoneToast": "تمت إعادة تعيين الإنجاز",
-        "deleteTaskConfirm": "هل تريد حقاً حذف المهمة \"{{name}}\"؟",
-        "deleteTaskConfirmDetail": "يضيع مع المهمة موعد آخر إنجاز لها. أي إدخال جديد يبدأ بلا سجل ويظهر فورًا كأنه مستحق بالكامل من جديد.",
         "reportTitle": "الإبلاغ عن مشكلة",
         "problemDescription": "وصف المشكلة",
         "problemPlaceholder": "مثال: مصباح محترق",

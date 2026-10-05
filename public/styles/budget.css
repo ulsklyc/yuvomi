@@ -1906,7 +1906,10 @@ button.budget-entry__title {
   z-index: 1;
   padding: calc((var(--target-base) - 1lh) / 2) 0;
   margin-block: calc((var(--target-base) - 1lh) / -2);
-  font: inherit;
+  /* KEIN `font: inherit` HIER: reset.css nimmt dem Knopf die UA-Schrift schon,
+   * und die Kurzschrift haette mit (0,1,1) das Gewicht des Zeilentitels
+   * (`.list-row__name`, typography.css) mit zurueckgesetzt - die Buchung stand
+   * als einzige Zeile der App auf 16/400 (Critique 2026-10-05, R16). */
   color: inherit;
   text-align: start;
   cursor: pointer;

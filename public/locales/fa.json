@@ -3628,8 +3628,6 @@
         "taskUpdatedToast": "کار به‌روزرسانی شد",
         "taskDeletedToast": "کار حذف شد",
         "taskUndoneToast": "انجام لغو شد",
-        "deleteTaskConfirm": "آیا واقعاً کار «{{name}}» حذف شود؟",
-        "deleteTaskConfirmDetail": "با این وظیفه زمان آخرین انجام آن نیز از بین می‌رود. ورودی جدید بدون سابقه آغاز می‌شود و بی‌درنگ دوباره کاملاً سررسیده نشان داده می‌شود.",
         "reportTitle": "گزارش مشکل",
         "problemDescription": "شرح مشکل",
         "problemPlaceholder": "مثال: لامپ سوخته است",

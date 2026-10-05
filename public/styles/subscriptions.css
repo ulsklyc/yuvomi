@@ -424,7 +424,7 @@
  * dahinter und kuerzt sich zuerst. Vorher war sie eine eigene Zeile. */
 .subscription-card__name {
   flex: 0 1 auto;
-  font-weight: var(--font-weight-semibold);
+  /* Schnitt aus der Rolle Zeilentitel (typography.css). */
 }
 
 .subscription-card__desc {

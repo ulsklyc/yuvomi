@@ -3624,8 +3624,6 @@
         "taskUpdatedToast": "Attività aggiornata",
         "taskDeletedToast": "Attività eliminata",
         "taskUndoneToast": "Completamento annullato",
-        "deleteTaskConfirm": "Eliminare l'attività \"{{name}}\"?",
-        "deleteTaskConfirmDetail": "Con l'attività si perde la data dell'ultimo svolgimento. Una voce nuova parte senza storico e torna subito a mostrarsi come completamente da fare.",
         "reportTitle": "Segnala problema",
         "problemDescription": "Descrizione del problema",
         "problemPlaceholder": "Esempio: lampadina bruciata",

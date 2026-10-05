@@ -3624,8 +3624,6 @@
         "taskUpdatedToast": "Feladat frissítve",
         "taskDeletedToast": "Feladat törölve",
         "taskUndoneToast": "Feladat visszaállítva",
-        "deleteTaskConfirm": "Biztosan törölni szeretné a(z) \"{{name}}\" feladatot?",
-        "deleteTaskConfirmDetail": "A feladattal együtt elvész az utolsó elvégzés időpontja is. Egy új bejegyzés előzmények nélkül indul, és azonnal újra teljesen esedékesnek látszik.",
         "reportTitle": "Probléma jelentése",
         "problemDescription": "Probléma leírása",
         "problemPlaceholder": "Példa: kiégett villanykörte",

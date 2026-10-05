@@ -579,7 +579,7 @@ function renderTaskCard(task, opts = {}) {
         </button>
         ` : `
         ${darfAbhaken ? `
-        <button class="task-status-btn task-status-btn--${task.status}"
+        <button class="task-status-btn task-status-btn--${task.status} check-ring"
                 data-action="toggle-status" data-id="${task.id}" data-status="${task.status}"
                 aria-label="${isDone ? t('tasks.markOpen', { title: esc(task.title) }) : t('tasks.markDone', { title: esc(task.title) })}">
           <i data-lucide="check" class="task-status-btn__check" aria-hidden="true"></i>
@@ -591,7 +591,7 @@ function renderTaskCard(task, opts = {}) {
              Mensch mit Leserecht bekommt keinen Picker, und ohne dieses
              Zeichen verschwaende die Zeile die Auskunft, die der Haken traegt:
              ob die Aufgabe erledigt ist. */''}
-        <span class="task-status-btn task-status-btn--${task.status} task-status-btn--static"
+        <span class="task-status-btn task-status-btn--${task.status} task-status-btn--static check-ring check-ring--static"
               role="img" aria-label="${esc(`${task.title}: ${statusLabel(task.status)}`)}">
           <i data-lucide="check" class="task-status-btn__check" aria-hidden="true"></i>
         </span>
@@ -608,7 +608,7 @@ function renderTaskCard(task, opts = {}) {
         `}
 
         <div class="task-card__body">
-          <button type="button" class="task-card__title u-card-title u-compact" data-action="open-task" data-id="${task.id}" data-md-focus>
+          <button type="button" class="task-card__title u-row-title" data-action="open-task" data-id="${task.id}" data-md-focus>
             ${esc(task.title)}
           </button>
           <div class="task-card__meta">
@@ -3256,7 +3256,7 @@ function renderDoerPicker(task, isDone, archived) {
     // Handlung, und eines davon fuehrte in eine 403.
     icon: tablett ? 'check' : 'user-round-check',
     triggerClass: tablett
-      ? 'task-status-btn task-status-btn--open task-status-btn--pick'
+      ? 'task-status-btn task-status-btn--open task-status-btn--pick check-ring'
       : 'btn btn--ghost btn--icon btn--icon-sm task-doer-btn',
     items: members.map((u) => ({
       action: 'pick-doer', id: u.id, label: u.display_name, icon: 'user-round',

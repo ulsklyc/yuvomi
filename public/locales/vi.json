@@ -3624,8 +3624,6 @@
         "taskUpdatedToast": "Nhiệm vụ đã cập nhật",
         "taskDeletedToast": "Nhiệm vụ đã bị xóa",
         "taskUndoneToast": "Đã đặt lại trạng thái hoàn thành",
-        "deleteTaskConfirm": "Thực sự xóa nhiệm vụ \"{{name}}\"?",
-        "deleteTaskConfirmDetail": "Cùng với công việc, thời điểm hoàn thành gần nhất cũng mất. Mục mới bắt đầu không có lịch sử và lập tức hiện lại là đã đến hạn hoàn toàn.",
         "reportTitle": "Báo cáo sự cố",
         "problemDescription": "Mô tả sự cố",
         "problemPlaceholder": "Ví dụ: bóng đèn bị cháy",

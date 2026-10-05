@@ -3628,8 +3628,6 @@
         "taskUpdatedToast": "Na-update ang gawain",
         "taskDeletedToast": "Natanggal ang gawain",
         "taskUndoneToast": "Na-reset ang pagkakatapos",
-        "deleteTaskConfirm": "Talagang tanggalin ang gawaing \"{{name}}\"?",
-        "deleteTaskConfirmDetail": "Kasama ng gawain ang petsa ng huling pagkakatapos. Nagsisimula ang bagong gawang entry nang walang kasaysayan at agad na lumalabas na muling lubos na kailangan.",
         "reportTitle": "Mag-ulat ng problema",
         "problemDescription": "Paglalarawan ng problema",
         "problemPlaceholder": "Halimbawa: sirang bombilya",

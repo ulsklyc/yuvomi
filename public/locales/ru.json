@@ -3844,8 +3844,6 @@
         "taskUpdatedToast": "Задача обновлена",
         "taskDeletedToast": "Задача удалена",
         "taskUndoneToast": "Выполнение сброшено",
-        "deleteTaskConfirm": "Удалить задачу \"{{name}}\"?",
-        "deleteTaskConfirmDetail": "Вместе с задачей пропадёт дата последнего выполнения. Новая запись начнётся без истории и сразу снова покажется полностью просроченной.",
         "reportTitle": "Сообщить о проблеме",
         "problemDescription": "Описание проблемы",
         "problemPlaceholder": "Например: перегорела лампочка",

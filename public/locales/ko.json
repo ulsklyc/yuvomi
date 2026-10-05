@@ -3628,8 +3628,6 @@
         "taskUpdatedToast": "작업이 업데이트되었습니다",
         "taskDeletedToast": "작업이 삭제되었습니다",
         "taskUndoneToast": "완료가 취소되었습니다",
-        "deleteTaskConfirm": "\"{{name}}\" 작업을 정말 삭제할까요?",
-        "deleteTaskConfirmDetail": "작업과 함께 마지막으로 완료한 시점도 사라집니다. 새로 만든 항목은 이력이 없어 곧바로 다시 완전히 밀린 상태로 표시됩니다.",
         "reportTitle": "문제 신고",
         "problemDescription": "문제 설명",
         "problemPlaceholder": "예: 전구 고장",

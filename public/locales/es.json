@@ -3624,8 +3624,6 @@
         "taskUpdatedToast": "Tarea actualizada",
         "taskDeletedToast": "Tarea eliminada",
         "taskUndoneToast": "Completado deshecho",
-        "deleteTaskConfirm": "¿Eliminar la tarea \"{{name}}\"?",
-        "deleteTaskConfirmDetail": "Con la tarea se pierde la fecha de la última vez que se hizo. Una entrada nueva empieza sin historial y vuelve a aparecer enseguida como totalmente pendiente.",
         "reportTitle": "Reportar problema",
         "problemDescription": "Descripción del problema",
         "problemPlaceholder": "Ejemplo: bombilla fundida",

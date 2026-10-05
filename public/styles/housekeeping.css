@@ -512,9 +512,19 @@
   gap: var(--space-1);
 }
 
-.housekeeping-task > .list-row__actions,
 .housekeeping-report-item > .list-row__actions {
   margin-inline-end: calc(-1 * var(--space-2));
+}
+
+/* DIE ZEILE FUEHRT KEINE AKTIONEN MEHR (Critique 2026-10-05, R16): der Tipp
+ * oeffnet, Loeschen steht im Dialogfuss und auf dem Wisch (taskRowHtml()).
+ * Auf Touch bleibt am Zeilenende die Gasse fuer den Wisch-Chevron
+ * (`.swipe-row::after`, layout.css) - dieselbe Rechnung wie `.task-card__main`
+ * in tasks.css: 8px Kantenabstand + 12px Glyphe + 8px Luft. */
+@media (hover: none) {
+  .housekeeping-task:not(.housekeeping-task--readonly) {
+    padding-inline-end: calc(var(--space-2) + var(--space-3) + var(--space-2));
+  }
 }
 
 /* KEINE ZEILENWAESCHE FUER „FAELLIG" (Re-Critique 2026-09-27, A3 P2-3 /
@@ -524,14 +534,22 @@
  * `.due-date--overdue/--today` ist Tinte am Wort, die Zeile bleibt ruhig. Die
  * Klassen `--today/--overdue` bleiben am Markup - sie faerben das Wort. */
 
-/* DER KREIS: ein LEERER Ring in 48px Trefferflaeche (Bauart `.item-check`,
- * shopping.css). Der gefuellte Kreis mit Haken las sich an jeder Zeile wie
- * „schon erledigt" (A3, Persona Oma Ingrid) - er heisst aber „jetzt erledigen".
- * Der Haken erscheint erst als Einladung unter Zeiger und Fokus. */
+/* DER KREIS: ein LEERER Ring in 48px Trefferflaeche. Der gefuellte Kreis mit
+ * Haken las sich an jeder Zeile wie „schon erledigt" (A3, Persona Oma Ingrid) -
+ * er heisst aber „jetzt erledigen". Der Haken erscheint erst als Einladung
+ * unter Zeiger und Fokus.
+ *
+ * DER RING IST DER DER AUFGABEN (`.check-ring`, list-row.css): 20px in
+ * `--color-text-tertiary`, unter dem Zeiger im Modulton. Hier stand er als
+ * eigene Fassung - 24px und in Ruhe schon gruen, also mit der Farbe, die
+ * app-weit „erledigt" heisst (Critique 2026-10-05, R16). Hier bleibt, was die
+ * Zeile betrifft: Trefferflaeche, Stellung und der Haken als Einladung. */
 .housekeeping-task__check {
   position: relative;
   flex-shrink: 0;
-  margin-inline-start: calc(-1 * var(--space-3));
+  /* Der 20px-Ring steht auf der Inhaltskante der Zeile: die halbe Differenz
+   * zur Trefferflaeche reicht in die Zeilenpolsterung. */
+  margin-inline-start: calc((var(--target-lg) - var(--space-5)) / -2);
   width: var(--target-lg);
   height: var(--target-lg);
   border: 0;
@@ -544,21 +562,17 @@
   transition: color var(--transition-fast);
 }
 
-.housekeeping-task__check::before {
-  content: '';
-  position: absolute;
-  width: var(--space-6);
-  height: var(--space-6);
-  border: 2px solid var(--module-accent);
-  border-radius: var(--radius-full);
-  background: var(--color-surface);
-  transition: background-color var(--transition-fast);
+/* Ring und Haken liegen uebereinander in derselben Zelle: der Ring ist das
+ * `::after` aus `.check-ring`, der Haken das Kind. */
+.housekeeping-task__check::after,
+.housekeeping-task__check svg {
+  grid-area: 1 / 1;
 }
 
 .housekeeping-task__check svg {
   position: relative;
-  width: var(--space-4);
-  height: var(--space-4);
+  width: var(--space-3);
+  height: var(--space-3);
 }
 
 .housekeeping-task__check:hover,
@@ -566,11 +580,7 @@
   color: var(--module-accent);
 }
 
-.housekeeping-task__check:hover::before {
-  background: color-mix(in srgb, var(--module-accent) var(--tint-surface), var(--color-surface));
-}
-
-.housekeeping-task__check:active::before {
+.housekeeping-task__check:active::after {
   transform: scale(0.92);
 }
 
@@ -587,11 +597,11 @@
   animation: check-pop var(--duration-md) var(--ease-out);
 }
 
-.housekeeping-task__check.housekeeping-task__check--done::before {
+.housekeeping-task__check.housekeeping-task__check--done::after {
   border-color: var(--color-success);
 }
 
-/* Die Fuellung traegt der Haken selbst (16px + 2 x 4px = der 24px-Ring), damit
+/* Die Fuellung traegt der Haken selbst (12px + 2 x 4px = der 20px-Ring), damit
  * Tinte und Untergrund in EINER Regel stehen - so prueft der Kontrast-Guard
  * genau dieses Paar (Tinte auf Gruen) und nicht Tinte auf der Seitenflaeche. */
 .housekeeping-task__check.housekeeping-task__check--done svg {

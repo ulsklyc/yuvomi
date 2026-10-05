@@ -3624,8 +3624,6 @@
         "taskUpdatedToast": "Oppgave oppdatert",
         "taskDeletedToast": "Oppgave slettet",
         "taskUndoneToast": "Fullføring tilbakestilt",
-        "deleteTaskConfirm": "Vil du virkelig slette oppgaven \"{{name}}\"?",
-        "deleteTaskConfirmDetail": "Datoen for forrige fullføring følger oppgaven. En ny opprettet post starter uten historikk og vises umiddelbart som forfalt igjen.",
         "reportTitle": "Rapporter et problem",
         "problemDescription": "Beskrivelse av problem",
         "problemPlaceholder": "Eksempel: brent lyspære",

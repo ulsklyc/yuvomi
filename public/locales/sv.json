@@ -3624,8 +3624,6 @@
         "taskUpdatedToast": "Uppgift uppdaterad",
         "taskDeletedToast": "Uppgift borttagen",
         "taskUndoneToast": "Slutförande återställt",
-        "deleteTaskConfirm": "Ta bort uppgiften \"{{name}}\"?",
-        "deleteTaskConfirmDetail": "Med uppgiften försvinner tidpunkten för senaste utförandet. En ny post börjar utan historik och visas genast som helt förfallen igen.",
         "reportTitle": "Rapportera problem",
         "problemDescription": "Problembeskrivning",
         "problemPlaceholder": "Exempel: trasig lampa",

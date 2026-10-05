@@ -3848,8 +3848,6 @@
         "taskUpdatedToast": "Zadanie zaktualizowane",
         "taskDeletedToast": "Zadanie usunięte",
         "taskUndoneToast": "Ukończenie cofnięte",
-        "deleteTaskConfirm": "Usunąć zadanie \"{{name}}\"?",
-        "deleteTaskConfirmDetail": "Razem z zadaniem przepada data ostatniego wykonania. Nowy wpis startuje bez historii i od razu znów pokazuje pełną zaległość.",
         "reportTitle": "Zgłoś problem",
         "problemDescription": "Opis problemu",
         "problemPlaceholder": "Przykład: Przepalona żarówka",

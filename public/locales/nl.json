@@ -3624,8 +3624,6 @@
         "taskUpdatedToast": "Taak bijgewerkt",
         "taskDeletedToast": "Taak verwijderd",
         "taskUndoneToast": "Voltooiing gereset",
-        "deleteTaskConfirm": "Taak \"{{name}}\" echt verwijderen?",
-        "deleteTaskConfirmDetail": "Met de taak verdwijnt het moment van de laatste keer. Een nieuw item begint zonder geschiedenis en staat meteen weer volledig op achterstand.",
         "reportTitle": "Probleem melden",
         "problemDescription": "Probleembeschrijving",
         "problemPlaceholder": "Voorbeeld: doorgebrande gloeilamp",

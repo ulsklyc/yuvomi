@@ -3628,8 +3628,6 @@
         "taskUpdatedToast": "Aufgabe aktualisiert",
         "taskDeletedToast": "Aufgabe gelöscht",
         "taskUndoneToast": "Erledigung zurückgesetzt",
-        "deleteTaskConfirm": "Aufgabe \"{{name}}\" wirklich löschen?",
-        "deleteTaskConfirmDetail": "Mit der Aufgabe geht der Zeitpunkt der letzten Erledigung verloren. Ein neuer Eintrag startet ohne Verlauf und zeigt sofort wieder vollen Handlungsbedarf.",
         "reportTitle": "Problem melden",
         "problemDescription": "Problembeschreibung",
         "problemPlaceholder": "Beispiel: Glühbirne defekt",

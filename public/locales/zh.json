@@ -3624,8 +3624,6 @@
         "taskUpdatedToast": "任务已更新",
         "taskDeletedToast": "任务已删除",
         "taskUndoneToast": "完成已重置",
-        "deleteTaskConfirm": "确实要删除任务\"{{name}}\"吗？",
-        "deleteTaskConfirmDetail": "任务连同上次完成的时间一起消失。重新建立的条目没有历史记录，会立刻再次显示为完全到期。",
         "reportTitle": "报告问题",
         "problemDescription": "问题描述",
         "problemPlaceholder": "例如：灯泡坏了",

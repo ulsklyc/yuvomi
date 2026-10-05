@@ -3264,8 +3264,6 @@
         "taskUpdatedToast": "Úkol aktualizován",
         "taskDeletedToast": "Úkol smazán",
         "taskUndoneToast": "Splnění zrušeno",
-        "deleteTaskConfirm": "Opravdu smazat úkol \"{{name}}\"?",
-        "deleteTaskConfirmDetail": "S úkolem zmizí i datum posledního splnění. Nový záznam začíná bez historie a hned se zase ukáže jako zcela po termínu.",
         "reportTitle": "Nahlásit problém",
         "problemDescription": "Popis problému",
         "problemPlaceholder": "Příklad: Vadná žárovka",

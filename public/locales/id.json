@@ -3628,8 +3628,6 @@
         "taskUpdatedToast": "Tugas diperbarui",
         "taskDeletedToast": "Tugas dihapus",
         "taskUndoneToast": "Penyelesaian dibatalkan",
-        "deleteTaskConfirm": "Benar-benar hapus tugas \"{{name}}\"?",
-        "deleteTaskConfirmDetail": "Bersama tugasnya, waktu terakhir dikerjakan ikut hilang. Entri baru dimulai tanpa riwayat dan langsung tampil sepenuhnya jatuh tempo lagi.",
         "reportTitle": "Laporkan masalah",
         "problemDescription": "Deskripsi masalah",
         "problemPlaceholder": "Contoh: Bola lampu rusak",

@@ -19378,3 +19378,85 @@ test('Seiten geben keinen Em- oder En-Dash als UI-Text aus', () => {
   assert.deepStrictEqual(funde, [], `"-" statt Em-/En-Dash (CLAUDE.md):\n  ${funde.join('\n  ')}`);
   assert.deepStrictEqual(verwaist, [], 'diese Ausnahmen sind erledigt - Eintrag aus DASH_PENDING streichen');
 });
+
+/* --------------------------------------------------------------------------
+ * R16 Schritt 2 (Critique 2026-10-05, P1 "Bausteine werden nicht vererbt"):
+ * je vereinheitlichtem Baustein ein Guard. Jeder ist gegen den Stand davor rot
+ * gelaufen (Dateikopie zurueck, laufen lassen, wieder vor).
+ * ------------------------------------------------------------------------ */
+const rulesOf = (css) => [...eachRule(css)];
+const selectorsOf = (rule) => rule.selector.split(',').map((s) => s.trim());
+
+test('R16: der Abhakkreis steht einmal - eine Groesse, eine Tonregel', () => {
+  const listRow = rulesOf(read('../public/styles/list-row.css'));
+  const ring = listRow.find((rule) => rule.selector.trim() === '.check-ring::after');
+  assert.ok(ring, 'list-row.css fuehrt den Ring als `.check-ring::after`');
+  assert.match(ring.body, /width:\s*var\(--space-5\)/);
+  assert.match(ring.body, /height:\s*var\(--space-5\)/);
+  assert.match(ring.body, /border:\s*2px solid var\(--color-text-tertiary\)/, 'in Ruhe neutral, nicht im Modulton');
+  assert.ok(listRow.some((rule) => rule.selector.trim() === '.check-ring:not(.check-ring--static):hover::after'
+    && /--module-accent/.test(rule.body)), 'der Modulton laedt ein, das Zeichen ist ausgenommen');
+
+  // Kein Modul baut den Ring nach: wer am Kreis-Pseudo eine Groesse oder einen
+  // ganzen Rahmen setzt, hat eine zweite Fassung.
+  for (const [file, pseudo] of [
+    ['tasks.css', /^\.task-status-btn::after$/],
+    ['housekeeping.css', /^\.housekeeping-task__check::(?:before|after)$/],
+  ]) {
+    const nachbau = rulesOf(read(`../public/styles/${file}`))
+      .filter((rule) => rule.at.length === 0 && selectorsOf(rule).some((sel) => pseudo.test(sel)))
+      .filter((rule) => /(?:^|[;\s])(?:width|height|border):/.test(rule.body));
+    assert.deepStrictEqual(nachbau.map((rule) => rule.selector.trim()), [], `${file} baut den Ring nicht nach`);
+  }
+
+  const tasksPage = read('../public/pages/tasks.js');
+  assert.match(tasksPage, /class="task-status-btn task-status-btn--\$\{task\.status\} check-ring"/);
+  assert.match(tasksPage, /task-status-btn--static check-ring check-ring--static"/, 'das Zeichen nimmt die Einladung aus');
+  assert.match(read('../public/pages/housekeeping.js'), /class="housekeeping-task__check check-ring"/);
+});
+
+test('R16: die Aufgabenzeile der Haushaltshilfe fuehrt keine Zeilenaktion - Loeschen steht im Dialog, mit Rueckweg', () => {
+  const page = read('../public/pages/housekeeping.js');
+  const row = functionBody(page, 'taskRowHtml');
+  assert.ok(row, 'taskRowHtml() gefunden');
+  assert.doesNotMatch(row, /row-action|list-row__actions/, 'Stift und Papierkorb stehen nicht mehr in der Zeile');
+  assert.equal((row.match(/data-edit-task=/g) || []).length, 1, 'ein Ziel oeffnet den Dialog, nicht zwei');
+  assert.match(row, /swipe-reveal--done swipe-reveal--leading[\s\S]*swipe-reveal--delete swipe-reveal--trailing/,
+    'Wisch: erledigen am Zeilenanfang, loeschen am Zeilenende (DESIGN.md, Wischbedienung)');
+
+  const dialog = functionBody(page, 'openTaskEditModal');
+  assert.match(dialog, /data-delete-task=/, 'der Dialogfuss ist der feste Ort (und der Tastaturweg)');
+  assert.match(dialog, /deleteTask\(task, content\)/);
+
+  const del = functionBody(page, 'deleteTask');
+  assert.match(del, /scheduleUndoableDelete\(/, 'in einem Satz zuruecknehmbar - Undo-Toast statt Rueckfrage');
+  assert.doesNotMatch(del, /confirmModal/);
+  assert.match(del, /pendingTaskDeletes\.add/, 'ein Neuladen im Rueckgaengig-Fenster bringt die Zeile nicht zurueck');
+  assert.match(page, /filter\(\(it\) => !pendingTaskDeletes\.has\(String\(it\.id\)\)\)/);
+});
+
+test('R16: der Abschnittstitel als Weg ist ein Baustein, kein Nachbau je Modul', () => {
+  const layout = rulesOf(read('../public/styles/layout.css'));
+  const link = layout.find((rule) => rule.selector.trim() === '.section-title-link');
+  assert.ok(link, 'layout.css fuehrt `.section-title-link`');
+  assert.match(link.body, /min-height:\s*var\(--target-base\)/);
+  for (const [file, cls] of [['rewards.css', '.rw-section__more'], ['calendar.css', '.day-rail__more']]) {
+    const nachbau = rulesOf(read(`../public/styles/${file}`)).filter((rule) => selectorsOf(rule).some((sel) => sel.startsWith(cls)));
+    assert.deepStrictEqual(nachbau.map((rule) => rule.selector.trim()), [], `${file} traegt keine eigene Fassung mehr`);
+  }
+  assert.match(read('../public/pages/rewards.js'), /class="section-title-link rw-section__more"/);
+  assert.match(read('../public/pages/calendar.js'), /class="section-title-link day-rail__more"/);
+});
+
+test('R16: die Buchungszeile der Belohnungen ist eine `.list-row` im `.row-carrier`', () => {
+  const page = read('../public/pages/rewards.js');
+  assert.doesNotMatch(page, /<li class="rw-ledger-row/, 'keine Zeile ohne `.list-row`');
+  assert.match(page, /<li class="list-row rw-ledger-row">[\s\S]*?class="list-row__main"[\s\S]*?class="list-row__name rw-ledger-row__reason"/);
+  assert.match(page, /<ul class="rw-ledger row-carrier">/);
+  const css = rulesOf(read('../public/styles/rewards.css'));
+  const eigen = css.filter((rule) => selectorsOf(rule).some((sel) => /^\.rw-ledger(?:-row)?$/.test(sel)))
+    .filter((rule) => /background|box-shadow|border-radius|padding:\s*var|display:\s*flex/.test(rule.body));
+  assert.deepStrictEqual(eigen.map((rule) => rule.selector.trim()), [], 'Flaeche, Radius und Polster kommen vom Traeger und von der Zeile');
+  // Abschnittstitel tragen kein Icon - in keinem anderen Modul tun sie es.
+  assert.doesNotMatch(page, /class="rw-section__title u-section-title"[^>]*><i data-lucide/);
+});

@@ -3624,8 +3624,6 @@
         "taskUpdatedToast": "Görev güncellendi",
         "taskDeletedToast": "Görev silindi",
         "taskUndoneToast": "Tamamlama sıfırlandı",
-        "deleteTaskConfirm": "\"{{name}}\" görevi silinsin mi?",
-        "deleteTaskConfirmDetail": "Görevle birlikte son yapılma tarihi de kaybolur. Yeni bir kayıt geçmişsiz başlar ve hemen yeniden tümüyle gecikmiş görünür.",
         "reportTitle": "Sorun bildir",
         "problemDescription": "Sorun açıklaması",
         "problemPlaceholder": "Örnek: ampul yanmış",

@@ -3844,8 +3844,6 @@
         "taskUpdatedToast": "Завдання оновлено",
         "taskDeletedToast": "Завдання видалено",
         "taskUndoneToast": "Виконання скасовано",
-        "deleteTaskConfirm": "Видалити завдання \"{{name}}\"?",
-        "deleteTaskConfirmDetail": "Разом із завданням зникне дата останнього виконання. Новий запис почнеться без історії й одразу знову виглядатиме як цілком прострочений.",
         "reportTitle": "Повідомте про проблему",
         "problemDescription": "Опис проблеми",
         "problemPlaceholder": "Приклад: перегоріла лампочка",

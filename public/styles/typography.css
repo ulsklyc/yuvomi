@@ -241,17 +241,12 @@
  * Card-/Item-Titel
  * ------------------------------------------------------------------------ */
 .u-card-title,
-.agenda-event__title,
 .detail-popover__title,
 .budget-loan-card__title,
-.budget-entry__title,
-.contact-item__name,
-.birthday-item__name,
 .document-card__title,
 .document-row__title,
 .document-viewer__unsupported-title,
 .recipe-card__title,
-.housekeeping-task__body h2,
 .split-card-title,
 .settings-card__title,
 .settings-member__name,
@@ -282,7 +277,6 @@
 .dms-result__title,
 .meal-card__title,
 .housekeeping-section-heading span,
-.subscription-card__name,
 .reminder-section__title,
 .cat-row__name,
 .cat-subrow__name,
@@ -294,6 +288,44 @@
   font-size: var(--type-secondary);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-snug);
+}
+
+/* --------------------------------------------------------------------------
+ * Zeilentitel: der Name einer Listenzeile (`.list-row`)
+ *
+ * EINE ROLLE (Critique 2026-10-05, R16 P1 "Bausteine werden nicht vererbt").
+ * Gemessen standen vier Schnitte fuer dieselbe Stelle: 15/600 (Aufgaben),
+ * 16/400 (Buchung, Abo - der Knopf-Reset `font: inherit` hatte das Gewicht
+ * mitgenommen), 16/500 (`.list-row__name` in vierzehn Modulen) und 17/600
+ * (Agenda, Kontakte, Geburtstage, Dokumente - sie standen in der Headline-
+ * Registrierung darueber, obwohl sie Zeilen sind). Kanon ist der haeufigste:
+ * 16px, medium.
+ *
+ * DIE GRENZE ZUR HEADLINE: ein KARTEN-Titel (Rezeptkarte, Darlehen, Widget,
+ * Kanban-Karte, Notizkarte) bleibt Headline bzw. ihre Dichte-Variante - eine
+ * Karte ist ein Objekt mit eigener Flaeche und fuehrt ihren Titel als
+ * Ueberschrift. Eine ZEILE steht in einem Traeger neben ihresgleichen; ihr
+ * Name ist Lesetext mit Betonung, keine Ueberschrift. Wer `.list-row` traegt,
+ * nimmt diese Rolle - ueber `.list-row__name` am Namen oder, wo der Name ein
+ * eigenes Element mit eigener Geometrie ist, ueber die Registrierung hier.
+ *
+ * BENANNTE AUSNAHME: die Dokumentzeile (`.document-row__title`) bleibt
+ * Headline. Raster und Liste zeigen dort DASSELBE Objekt in zwei Ansichten,
+ * und der Umschalter darf den Titel nicht umsetzen (test-typography.js,
+ * "Raster und Liste der Dokumente verwenden dieselbe Titelrolle").
+ *
+ * Die Zeilenhoehe erbt die Zeile (Body, 1.47): ein Name darf umbrechen
+ * (list-row.css), und zwei Zeilen Lesetext stehen im Body-Abstand.
+ * Guard: test-typography.js, "der Zeilentitel ist eine Rolle".
+ * ------------------------------------------------------------------------ */
+.u-row-title,
+.list-row__name,
+.agenda-event__title,
+.contact-item__name,
+.subscription-card__name,
+.rw-standing__name {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
 }
 
 /* --------------------------------------------------------------------------

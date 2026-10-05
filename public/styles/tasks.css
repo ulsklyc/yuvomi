@@ -548,32 +548,10 @@
   height: var(--target-base);
 }
 
-.task-status-btn::after {
-  content: '';
-  width: var(--space-5);
-  height: var(--space-5);
-  border-radius: var(--radius-full);
-  /* Kräftigerer Ring: das meistgenutzte Steuerelement der Zeile darf nicht
-   * das blasseste sein (vorher --color-border, im Dark Mode kaum sichtbar). */
-  border: 2px solid var(--color-text-tertiary);
-  transition: border-color var(--transition-fast), background-color var(--transition-fast);
-}
-
-/* DAS ZEICHEN IST AUSGENOMMEN, statt seine Farbe zurueckzuschreiben.
- *
- * Hier stand die Ausnahme zuerst als Gegenregel (`--static:hover::after` mit
- * `border-color: var(--color-text-tertiary)`), und die war eine FARBAUSSAGE mit
- * Spezifitaet (0,2,1): sie schlug `--done::after` und `--in_progress::after`
- * (beide (0,1,1)) und faerbte beim Ueberfahren den gruenen Ring einer
- * erledigten Aufgabe grau. Das Zeichen bekam damit genau die Hover-Reaktion,
- * die es nicht haben soll - nur in einer anderen Farbe (Review zu PR #1252).
- *
- * `:not()` sagt stattdessen, was gemeint ist: der KNOPF reagiert, das ZEICHEN
- * nicht. Keine zweite Farbaussage, also auch nichts, was den Zustandsring
- * ueberstimmen koennte. */
-.task-status-btn:not(.task-status-btn--static):hover::after {
-  border-color: var(--module-accent, var(--color-accent));
-}
+/* DER RING SELBST steht in list-row.css (`.check-ring`): eine Groesse, eine
+ * Tonregel fuer jede Zeile, die sich erledigen laesst - samt der Einladung
+ * unter dem Zeiger und der Ausnahme fuer das Zeichen (`.check-ring--static`).
+ * Hier bleiben Trefferflaeche und Zustand. */
 
 /* DAS ZEICHEN STATT DES KNOPFS (#467), dieselbe Bauart wie
  * `.subtask-item__checkbox--static` aus #1209: der Ring bleibt, weil er die
@@ -750,7 +728,11 @@
 }
 
 .task-card__title {
-  /* Typografie via .u-card-title.
+  /* Typografie: die Rolle Zeilentitel (`.u-row-title`, typography.css) - bis
+   * R16 stand hier die Dichte-Variante der Headline (15/600), als einzige
+   * Zeile der App. Die Zeilenhoehe bleibt die enge: der Titel ist einzeilig
+   * (siehe unten), der Body-Abstand der Rolle gilt umbrechenden Namen und
+   * kostete hier 4px je Zeile ohne eine zweite Zeile, die ihn braucht.
    * Ist ein <button>: der Titel öffnet die Aufgabe und muss fokussierbar sein.
    * Die Reset-Regeln (font/border/background) kommen aus reset.css, hier nur
    * die Block-Geometrie, damit der Button wie der frühere Div fließt. */
@@ -760,6 +742,7 @@
   padding: 0;
   text-align: start;
   color: var(--color-text-primary);
+  line-height: var(--line-height-snug);
   margin-bottom: var(--space-0h);
   cursor: pointer;
   /* EINZEILIG MIT ELLIPSE, und das ist die Ausnahme von der Regel nebenan

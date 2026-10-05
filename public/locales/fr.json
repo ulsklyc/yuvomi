@@ -3624,8 +3624,6 @@
         "taskUpdatedToast": "Tâche mise à jour",
         "taskDeletedToast": "Tâche supprimée",
         "taskUndoneToast": "Complétion annulée",
-        "deleteTaskConfirm": "Supprimer la tâche \"{{name}}\"?",
-        "deleteTaskConfirmDetail": "La date de la dernière réalisation disparaît avec la tâche. Une nouvelle entrée démarre sans historique et se réaffiche aussitôt comme entièrement due.",
         "reportTitle": "Signaler un problème",
         "problemDescription": "Description du problème",
         "problemPlaceholder": "Exemple : ampoule grillée",

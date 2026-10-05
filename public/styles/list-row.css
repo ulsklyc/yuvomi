@@ -709,6 +709,41 @@
 }
 
 /* --------------------------------------------------------
+ * Abhakkreis: EIN Ring fuer jede Zeile, die sich erledigen laesst
+ * -------------------------------------------------------- */
+/* EINE GROESSE, EINE TONREGEL (Critique 2026-10-05, R16 P1 "Bausteine werden
+ * nicht vererbt"). Der Ring stand zweimal da: 20px in `--color-text-tertiary`
+ * an der Aufgabe (tasks.css), 24px im Modulton an der Haushaltshilfe
+ * (housekeeping.css) - dieselbe Geste, zwei Zeichen. Die Aufgaben-Fassung ist
+ * die Referenz und steht jetzt hier; beide Knoepfe tragen `.check-ring`.
+ *
+ * - RUHE: 20px, 2px, `--color-text-tertiary`. Das meistgenutzte Steuerelement
+ *   der Zeile darf nicht das blasseste sein (`--color-border` war im Dark kaum
+ *   zu sehen), aber es traegt auch nicht den Modulton: der Modulton LAEDT EIN,
+ *   Gruen BESTAETIGT, Ruhe ist neutral.
+ * - EINLADUNG: unter dem Zeiger nimmt der Ring den Modulton an.
+ * - ZEICHEN STATT KNOPF (`--static`): keine Einladung - der Ring ist dann eine
+ *   Auskunft. Per `:not()` ausgenommen statt per Gegenregel, die eine
+ *   Zustandsfarbe ueberstimmen koennte (Review zu PR #1252).
+ *
+ * Trefferflaeche, Zustand (`--done`, `--in_progress`) und die Stellung in der
+ * Zeile bleiben beim Modul: sie haengen an dessen Markup. Das eckige
+ * `.item-check` des Einkaufs ist ein Kaestchen, kein Kreis, und bleibt eigen.
+ * Guard: test-frontend-audit.js, "der Abhakkreis steht einmal". */
+.check-ring::after {
+  content: '';
+  width: var(--space-5);
+  height: var(--space-5);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-text-tertiary);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.check-ring:not(.check-ring--static):hover::after {
+  border-color: var(--module-accent, var(--color-accent));
+}
+
+/* --------------------------------------------------------
  * Rangmarke: der Prioritätspunkt
  * -------------------------------------------------------- */
 /* EINE Fassung für alle Listen, die einen Rang zeigen.

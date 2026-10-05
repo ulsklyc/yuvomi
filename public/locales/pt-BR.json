@@ -3624,8 +3624,6 @@
         "taskUpdatedToast": "Tarefa atualizada",
         "taskDeletedToast": "Tarefa excluída",
         "taskUndoneToast": "Conclusão desfeita",
-        "deleteTaskConfirm": "Excluir a tarefa \"{{name}}\"?",
-        "deleteTaskConfirmDetail": "Com a tarefa perde-se a data da última realização. Um registro novo começa sem histórico e volta logo a aparecer como totalmente pendente.",
         "reportTitle": "Reportar problema",
         "problemDescription": "Descrição do problema",
         "problemPlaceholder": "Ex: lâmpada queimada",

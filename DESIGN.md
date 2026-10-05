@@ -935,6 +935,16 @@ Subheadline 15, Footnote 13, Caption 2 11.
 - **Headline** (semibold, 17px, lh 1.3): Karten-/Item-Titel. Die Dichte-Variante
   (`.u-compact`, 15px) macht hohe Informationsdichte zur bewussten Entscheidung statt zum
   Groessen-Override pro Selektor.
+- **Zeilentitel** (medium, 16px, Zeilenhoehe des Body): der Name einer Listenzeile
+  (`.list-row__name`, `.u-row-title`). Eine ZEILE steht in einem Traeger neben
+  ihresgleichen, ihr Name ist Lesetext mit Betonung; eine KARTE ist ein Objekt mit eigener
+  Flaeche und fuehrt ihren Titel als Headline. Bis R16 (Critique 2026-10-05) standen an
+  dieser Stelle vier Schnitte: 15/600 (Aufgaben), 16/400 (Buchung, Abo - ein
+  `font: inherit` am Knopf hatte das Gewicht mitgenommen), 16/500 (vierzehn Module) und
+  17/600 (Agenda, Kontakte, Geburtstage). Benannte Ausnahmen: die Dokumentzeile bleibt
+  Headline, weil Raster und Liste dasselbe Objekt in zwei Ansichten zeigen; der einzeilige
+  Aufgabentitel behaelt die enge Zeilenhoehe (kein Umbruch, also kein Body-Abstand).
+  Guard: `test:typography`, "der Zeilentitel ist eine Rolle".
 - **Body** (regular, 17px, lh 1.47 = Apples 17/25): Fliesstext, Listenzellen.
 - **Subheadline** (regular, 15px): Sekundaerzeilen.
 - **Footnote** (medium, 13px, lh 1.21): Metazeilen, Label ueber Feldern, das Versal-Datum
@@ -1423,6 +1433,11 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 | Mobiles Blatt (Dialog, Mehr) | EINE Grammatik: Griff 36x5 in der Kopfzone (`--sheet-grabber`: hell `--color-border-strong`, dunkel Glas-Weiss), Griff-Oberkante bis Titel 16px; 1:1 mitgehen, schliessen ab 80px Weg ODER Flick > 0.5px/ms, sonst zurueckfedern (`--duration-lg` + `--ease-out`), nach oben Gummiband; der Zug liegt auf `translate` | `wireSheetDrag(sheet, { scroller, onDismiss })` (utils/sheet-drag.js) | leerer Griff-Streifen, Glas-Weiss auf weisser Tafel, Faktor 0.6, Schliessen erst bei `touchend`, Zurueckspringen ohne Transition |
 | Mehrfachauswahl in einer Liste | Auswahlkreis ERSETZT Statuskreis und Zeilen-Picker (Apple Erinnerungen); Leiste = Bulk-Pille mit "Fertig"; Name je Zeile mit Objekt ("<Titel> auswaehlen"); Loeschen im Pillen-Stil, Rueckfrage in der Pille, eine Folge, die die Frage nicht traegt, als Detailzeile darunter (Dokumente: kein Papierkorb) | `.select-circle` (layout.css) + `setBulkPill({ label, actions })` / `clearBulkPill()` (utils/bulk-pill.js), `confirm: { question, detail? }` | native blaue Checkbox neben dem Statuskreis, eigene Aktionsleiste, gefuellte rote Loeschen-Kapsel |
 | Aktionen an Karte oder Zeile | dauerhaft sichtbar, ruhig per Tertiaerfarbe (ignore.md) | `.row-action` | Einblenden erst per `:hover`/`:focus-within` |
+| Erledigen an einer Zeile | EIN Abhakkreis: 20px, 2px, in Ruhe `--color-text-tertiary`; unter dem Zeiger laedt der Modulton ein, erledigt ist `--color-success` (Gruen bestaetigt, es steht nie in Ruhe da); `--static` = Zeichen ohne Einladung. Das Kaestchen des Einkaufs (`.item-check`) ist ein Kaestchen und bleibt eigen | `.check-ring` (list-row.css) an `.task-status-btn` und `.housekeeping-task__check`; Trefferflaeche und Zustand beim Modul | zweiter Ring je Modul (24px, in Ruhe gruen) |
+| Was eine Zeile tut (R16) | **Der Tipp auf den Zeilenkoerper oeffnet** (Bearbeiten, mit Leserecht die Leseansicht) - als echter Knopf (`.list-row__main--interactive`). **Loeschen hat zwei feste Orte:** den Dialogfuss (Desktop, Tastatur) und auf Touch den Wisch zum Zeilenende. Eine Zeilenaktion, die nur den Zeilenkoerper doppelt (Stift), entfaellt; sichtbare Zeilenaktionen bleiben sichtbar (ignore.md), reduziert wird ihre ZAHL | `wireSwipeRows()` (utils/swipe-row.js), `scheduleUndoableDelete()` (utils/ux.js), `decorateFooterDelete()` (modal.js) | Stift + Papierkorb als 2 x 48px am Zeilenende, vier Grammatiken je Modulgruppe |
+| Name einer Zeile | Rolle **Zeilentitel**: 16px medium (Abschnitt Typography) | `.list-row__name` / `.u-row-title` (typography.css) | 15/600, 16/400, 17/600 je Modul |
+| Abschnitt als Auszug eines Reiters | der Abschnittstitel IST der Weg: Knopf im `h2.u-section-title` mit Pfeil | `.section-title-link` (layout.css) | "Alle anzeigen"-Knopf daneben, Nachbau je Modul |
+| Ueberschrift ueber Inhalt | **Gruppentitel IN einer Liste** = `.list-group__title` (12px Versalien). **Abschnittstitel einer Flaeche** = `h2.u-section-title` (20px semibold) AUF DER BUEHNE, ueber der Karte oder dem Traeger, Werkzeuge rechts daneben; ohne Icon. Wiederholt er den Namen des offenen Reiters, steht er nur in der Gliederung (`.sr-only`) | list-row.css, typography.css | Titel in der Karte, `div` ohne Ueberschriftenrolle, Icon vor dem Titel |
 | Icon stylen | auf `svg` (oder eine Klasse) zielen - Lucide ersetzt `<i data-lucide>` durch `<svg>` | - | Regeln auf `... i`: sie trafen nie (38 entfernt) |
 
 **Benannte Ausnahmen, je mit Grund an der Stelle:** die Essenskarte (`.meal-card__action-btn`,
@@ -2662,6 +2677,7 @@ positive Aktion, das Zeilenende das Destruktive oder Sekundaere:
 | Aufgaben | erledigt umschalten (`--done`), fliegt hinaus | Detailansicht (`--edit`), federt zurueck |
 | Einkauf | abhaken (`--done`), fliegt hinaus | loeschen (`--delete`), federt zurueck, widerrufbar |
 | Geburtstage | bearbeiten (`--edit`), federt zurueck | loeschen (`--delete`), federt zurueck, widerrufbar |
+| Haushaltshilfe (Aufgaben) | erledigen (`--done`), federt zurueck - die Zeile bleibt, nur ihre Frist setzt zurueck | loeschen (`--delete`), federt zurueck, widerrufbar |
 | Abonnements | Zahlung buchen (`--done`), federt zurueck, fragt nach | loeschen (`--delete`), federt zurueck, fragt nach |
 
 Die Abo-Zeile ist die einzige, deren `--done` nicht abhakt, sondern BUCHT: sie schiebt das

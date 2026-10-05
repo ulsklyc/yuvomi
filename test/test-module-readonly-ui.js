@@ -164,7 +164,7 @@ test('Aufgabenzeile mit `tasks: read`: der Haken wird zum Zustandszeichen', () =
     const html = tasks.renderTaskCard(aufgabe({ subtasks: [{ id: 8, title: 'Tonne', status: 'done' }] }));
 
     // Zustand ANZEIGEN: bleibt stehen - als span, nicht als gesperrter Knopf.
-    assert.match(html, /<span class="task-status-btn task-status-btn--open task-status-btn--static"[\s\S]*?role="img"/,
+    assert.match(html, /<span class="task-status-btn task-status-btn--open task-status-btn--static check-ring check-ring--static"[\s\S]*?role="img"/,
       'der Erledigt-Haken zeigt den Zustand der Aufgabe und darf nicht verschwinden');
     assert.doesNotMatch(html, /data-action="toggle-status"/,
       'aber er ist kein Knopf mehr: ein disabled-Knopf verspricht eine Berührung, die nichts tut');
@@ -206,7 +206,7 @@ test('Zustandszeichen bei `tasks: read`: eine begonnene Aufgabe heisst "In Bearb
   withAccess({ tasks: 'read' }, () => {
     for (const [status, key] of zustaende) {
       const html = tasks.renderTaskCard(aufgabe({ status }));
-      const zeichen = html.match(/<span class="task-status-btn [^"]*task-status-btn--static"[^>]*aria-label="([^"]*)"/);
+      const zeichen = html.match(/<span class="task-status-btn [^"]*task-status-btn--static check-ring check-ring--static"[^>]*aria-label="([^"]*)"/);
       assert.ok(zeichen, `Zeichen fuer ${status} vorhanden`);
       assert.equal(zeichen[1], `Müll rausbringen: ${key}`, `Aufgabe im Zustand ${status}`);
 
@@ -450,18 +450,22 @@ test('dieselbe Zusicherung fuer die Teilaufgabe (#1209 und #467 teilen sich das 
 // -------------------------------------------------------------------------
 
 test('das Zustandszeichen reagiert nicht auf Ueberfahren, und der Ring behaelt seine Farbe', () => {
+  // Der Ring samt Einladung steht seit R16 geteilt in list-row.css
+  // (`.check-ring`), der Zustand weiter in tasks.css - gemessen wird die
+  // Kaskade in Ladereihenfolge (index.html: list-row.css vor dem Seiten-CSS).
+  const KASKADE = `${readFileSync(new URL('../public/styles/list-row.css', import.meta.url), 'utf8')}\n${TASKS_CSS}`;
   for (const [name, klassen, ruhend] of [
-    ['erledigt', ['task-status-btn', 'task-status-btn--done', 'task-status-btn--static'], 'var(--color-success)'],
-    ['in Arbeit', ['task-status-btn', 'task-status-btn--in_progress', 'task-status-btn--static'], 'var(--color-warning)'],
+    ['erledigt', ['task-status-btn', 'task-status-btn--done', 'task-status-btn--static', 'check-ring', 'check-ring--static'], 'var(--color-success)'],
+    ['in Arbeit', ['task-status-btn', 'task-status-btn--in_progress', 'task-status-btn--static', 'check-ring', 'check-ring--static'], 'var(--color-warning)'],
   ]) {
-    assert.equal(effektiverWert(TASKS_CSS, klassen, 'border-color', ':hover::after'), null,
+    assert.equal(effektiverWert(KASKADE, klassen, 'border-color', ':hover::after'), null,
       `${name}: keine Hover-Regel darf das Zeichen treffen`);
-    assert.equal(effektiverWert(TASKS_CSS, klassen, 'border-color', '::after'), ruhend,
+    assert.equal(effektiverWert(KASKADE, klassen, 'border-color', '::after'), ruhend,
       `${name}: der Ring behaelt die Farbe, die den Zustand traegt`);
   }
   // Der bedienbare Knopf behaelt seine Hover-Reaktion.
   assert.match(
-    effektiverWert(TASKS_CSS, ['task-status-btn', 'task-status-btn--done'], 'border-color', ':hover::after') ?? '',
+    effektiverWert(KASKADE, ['task-status-btn', 'task-status-btn--done', 'check-ring'], 'border-color', ':hover::after') ?? '',
     /module-accent/,
   );
 });
@@ -3417,6 +3421,10 @@ const LAYOUT_CSS = readFileSync(new URL('../public/styles/layout.css', import.me
  * WELCHE Knoepfe ein Renderer verdrahten will. Die Verdrahtung hat kein Markup;
  * ohne diese Spur liefe „bei read haengt nichts" ins Leere.
  */
+// Die Aufgabenliste verdrahtet seit R16 den Wisch; dessen einmaliger Hinweis
+// (`maybeShowSwipeHint`, utils/swipe-row.js) liest den Pfad der Seite.
+globalThis.location = globalThis.location ?? { pathname: '/housekeeping' };
+
 function hkContainer() {
   return {
     html: '',
@@ -3585,8 +3593,12 @@ test('Besuchszeile mit `housekeeping: read`: Bearbeiten und Loeschen weg, der Za
 
 // Re-Critique 2026-09-27 (R11 H6): ein Tipp auf die Aufgabenzeile tat nichts,
 // mobil war der Stift das einzige Ziel. Wie die Geburtstagszeile (R8) ist die
-// Hauptspalte mit Schreibrecht jetzt der Knopf zum Bearbeiten; die Aktions-Icons
-// bleiben sichtbar. Bei `read` verspricht die Spalte kein Bearbeiten.
+// Hauptspalte mit Schreibrecht jetzt der Knopf zum Bearbeiten. Bei `read`
+// verspricht die Spalte kein Bearbeiten.
+//
+// R16 (Critique 2026-10-05, P1 Bausteine): der Stift doppelte genau diesen
+// Knopf und ist weg, der Papierkorb steht im Dialogfuss und auf dem Wisch.
+// Die Zeile fuehrt KEINE Aktionszone mehr.
 test('H6: die Aufgabenzeile der Haushaltshilfe oeffnet mit Schreibrecht das Bearbeiten - lesend verspricht sie nichts', () => {
   hkState({
     tasks: [{ id: 3, name: 'Fenster putzen', area: 'Wohnzimmer', frequency_days: 14, urgency_status: 'today', last_completed: '2026-07-01' }],
@@ -3598,12 +3610,20 @@ test('H6: die Aufgabenzeile der Haushaltshilfe oeffnet mit Schreibrecht das Bear
   assert.match(haupt[1], /Fenster putzen/, 'er traegt den Namen');
   assert.match(haupt[1], /housekeeping\.dueToday/, 'und die Metazeile samt Dringlichkeit');
   assert.doesNotMatch(haupt[1], /<(?:h\d|p|div)\b/, 'in einem Knopf steht nur Phrasing-Inhalt');
-  assert.match(schreiben.html, /class="row-action" type="button" data-edit-task="3"/, 'der Stift bleibt sichtbar (ignore.md)');
-  assert.ok(schreiben.gefragt.includes('[data-edit-task]'), 'beide Ziele laufen ueber dieselbe Verdrahtung');
+  assert.equal(schreiben.html.match(/data-edit-task="3"/g).length, 1, 'ein Bearbeiten-Ziel je Zeile, nicht zwei mit derselben Wirkung');
+  assert.doesNotMatch(schreiben.html, /row-action|list-row__actions|data-delete-task/, 'keine Zeilenaktion: Loeschen steht im Dialog und auf dem Wisch');
+  assert.match(schreiben.html, /<div class="swipe-row" data-swipe-id="3">[\s\S]*?swipe-reveal--done swipe-reveal--leading[\s\S]*?swipe-reveal--delete swipe-reveal--trailing/,
+    'die Wischflaechen: erledigen am Zeilenanfang, loeschen am Zeilenende');
+  assert.match(schreiben.html, /class="housekeeping-task__check check-ring"/, 'der Kreis ist der geteilte Abhakkreis');
+  assert.ok(schreiben.gefragt.includes('[data-edit-task]'), 'die Zeile ist verdrahtet');
+  assert.ok(schreiben.gefragt.includes('.swipe-row'), 'und der Wisch auch');
 
   const lesen = hkContainer();
   withAccess({ housekeeping: 'read' }, () => hk.renderTasks(lesen));
   assert.doesNotMatch(lesen.html, /list-row__main--interactive|data-edit-task/, 'lesend kein Bearbeiten-Versprechen');
+  assert.match(lesen.html, /class="swipe-row swipe-row--static"/, 'lesend ohne Wisch-Chevron');
+  assert.doesNotMatch(lesen.html, /swipe-reveal/, 'und ohne Wischflaechen');
+  assert.ok(!lesen.gefragt.includes('.swipe-row'), 'die Geste ist lesend nicht verdrahtet');
   assert.match(lesen.html, /<h2 class="list-row__name">Fenster putzen<\/h2>/, 'die Zeile bleibt Auskunft mit Ueberschrift');
 });
 
@@ -3625,7 +3645,7 @@ test('Aufgaben-Tab mit `housekeeping: read`: kein Anlegen, kein Abhaken, keine Z
 
   const schreiben = hkContainer();
   withAccess({ housekeeping: 'write' }, () => hk.renderTasks(schreiben));
-  for (const da of ['data-complete-task="3"', 'data-edit-task="3"', 'data-delete-task="3"']) {
+  for (const da of ['data-complete-task="3"', 'data-edit-task="3"', 'data-swipe-id="3"']) {
     assert.ok(schreiben.html.includes(da), `mit Schreibrecht steht ${da} da`);
   }
   // Die Liste ZUERST (Critique 2026-09-26): Vorlagen und Formular sitzen im
@@ -4407,8 +4427,11 @@ test('Kanon R5: Haushaltshilfe nennt Aufgabe und Person an ihren Zeilenaktionen'
     });
     const aufgaben = hkContainer();
     withAccess({ housekeeping: 'write' }, () => hk.renderTasks(aufgaben));
-    assert.match(aufgaben.html, /data-edit-task="3"\s+aria-label="common\.editNamed\{&quot;name&quot;:&quot;Fenster putzen&quot;\}"/);
-    assert.match(aufgaben.html, /data-delete-task="3"\s+aria-label="common\.deleteNamed\{&quot;name&quot;:&quot;Fenster putzen&quot;\}"/);
+    // Die Aufgabenzeile fuehrt seit R16 keine Zeilenaktion mehr: der Kreis
+    // nennt die Aufgabe, der Zeilenkoerper traegt ihren Namen als Inhalt, und
+    // das Loeschen im Dialogfuss nennt sie wieder (openTaskEditModal()).
+    assert.match(aufgaben.html, /data-complete-task="3"\s+aria-label="housekeeping\.completeTask\{&quot;name&quot;:&quot;Fenster putzen&quot;\}"/);
+    assert.match(HK_CODE, /data-delete-task="\$\{esc\(task\.id\)\}"\s+aria-label="\$\{esc\(t\('common\.deleteNamed', \{ name: task\.name \}\)\)\}"/);
 
     hkState({ tab: 'staff', workers: [{ id: 7, display_name: 'Ana', phone: '0151 000' }] });
     const personal = hkContainer();

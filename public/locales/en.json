@@ -3624,8 +3624,6 @@
         "taskUpdatedToast": "Task updated",
         "taskDeletedToast": "Task deleted",
         "taskUndoneToast": "Completion reset",
-        "deleteTaskConfirm": "Really delete task \"{{name}}\"?",
-        "deleteTaskConfirmDetail": "The date of the last completion goes with the task. A newly created entry starts without any history and immediately shows as fully due again.",
         "reportTitle": "Report a problem",
         "problemDescription": "Problem description",
         "problemPlaceholder": "Example: burnt-out light bulb",

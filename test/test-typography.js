@@ -857,3 +857,48 @@ test('die Messwoerter der Re-Critique trennen an der Basis ihres Subjekts (W1)',
       `${subject}: hyphens: auto fehlt an der Basisregel`);
   }
 });
+
+/* R16 (Critique 2026-10-05, P1 Bausteine): der Name einer Listenzeile stand in
+ * vier Schnitten da (15/600, 16/400, 16/500, 17/600). Kanon ist 16px medium,
+ * registriert als Rolle Zeilentitel. Gegen den Stand davor rot gelaufen. */
+test('der Zeilentitel ist eine Rolle (R16)', () => {
+  const typo = [...eachRule(readFileSync(new URL('typography.css', STYLES_DIR), 'utf8'))];
+  const sels = (rule) => rule.selector.split(',').map((s) => s.trim());
+  const rolle = typo.find((rule) => sels(rule).includes('.list-row__name'));
+  assert.ok(rolle, 'typography.css registriert `.list-row__name`');
+  assert.match(rolle.body, /font-size:\s*var\(--text-base\)/);
+  assert.match(rolle.body, /font-weight:\s*var\(--font-weight-medium\)/);
+  for (const sel of ['.u-row-title', '.agenda-event__title', '.contact-item__name', '.subscription-card__name', '.rw-standing__name']) {
+    assert.ok(sels(rolle).includes(sel), `${sel} nimmt die Rolle`);
+  }
+
+  // Eine Zeile steht nicht in der Headline-Registrierung (17/600) und nicht in
+  // ihrer Dichte-Variante (15/600): das sind Karten-Titel.
+  const ZEILEN = ['.agenda-event__title', '.budget-entry__title', '.contact-item__name', '.birthday-item__name',
+    '.housekeeping-task__body h2', '.subscription-card__name', '.task-card__title'];
+  const headline = typo.filter((rule) => /--type-card-title|--type-secondary/.test(rule.body) && /font-weight-semibold/.test(rule.body));
+  assert.ok(headline.length >= 2, 'Headline und Dichte-Variante gefunden');
+  const doppelt = headline.flatMap(sels).filter((sel) => ZEILEN.includes(sel));
+  assert.deepStrictEqual(doppelt, [], 'Zeilen stehen nicht in der Karten-Titel-Rolle');
+
+  // Der Knopf-Reset der Buchungszeile nahm das Gewicht mit (16/400).
+  const budget = [...eachRule(readFileSync(new URL('budget.css', STYLES_DIR), 'utf8'))];
+  const knopf = budget.find((rule) => rule.selector.trim() === 'button.budget-entry__title');
+  assert.ok(knopf);
+  assert.doesNotMatch(knopf.body, /(?:^|[;\s])font:\s*inherit/, '`font: inherit` setzt das Gewicht der Rolle zurueck');
+
+  // Die Aufgabenzeile traegt die Rolle, nicht mehr die Dichte-Variante der Headline.
+  const tasks = readFileSync(new URL('../pages/tasks.js', STYLES_DIR), 'utf8');
+  assert.match(tasks, /class="task-card__title u-row-title"/);
+
+  // Und kein Modul setzt am Zeilennamen ein eigenes Gewicht als Literal.
+  const funde = [];
+  for (const name of cssFiles.filter((n) => n !== 'typography.css' && n !== 'list-row.css')) {
+    for (const rule of eachRule(readFileSync(new URL(name, STYLES_DIR), 'utf8'))) {
+      if (!sels(rule).some((sel) => /\.(?:list-row__name|rw-standing__name|subscription-card__name|contact-item__name)$/.test(sel))) continue;
+      const w = rule.body.match(/font-weight:\s*([^;]+)/);
+      if (w && !/font-weight-medium/.test(w[1])) funde.push(`${name}: ${rule.selector.trim()} { font-weight: ${w[1].trim()} }`);
+    }
+  }
+  assert.deepStrictEqual(funde, [], 'ein eigenes Gewicht am Zeilentitel ist ein Dialekt');
+});

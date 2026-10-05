@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Housekeeping chores work like every other list.** A chore row carried a pencil and a bin
+  side by side, 4px apart; the pencil opened the same dialog as a tap on the row, and on a
+  phone the name was left with 198 of 358px. The row now opens the dialog when tapped, "Delete"
+  sits in the dialog footer, and on a touch screen a swipe to the end of the row deletes and a
+  swipe from the start marks the chore done. Deleting no longer asks first: it shows "Undo" for
+  five seconds, and undoing brings the chore back with its last completion. The circle is the
+  same one as in Tasks - 20px and neutral until you tick it, instead of 24px and green at rest.
+- **Row titles share one type size.** The name of a list row was set in four ways - 15px
+  semibold in Tasks, 16px regular in Budget entries and subscriptions, 16px medium in most
+  modules, 17px semibold in the agenda, contacts and birthdays. It is 16px medium everywhere
+  now; card titles keep their heading size.
+- **Rewards: the history rows are the shared list rows, and section headings carry no icon.**
+  The heading "Rewards" under the tab "Rewards" is no longer shown on a desktop either.
 - **Rewards, Waste and Housekeeping use the width of a desktop window.** These three stood as a
   720px column next to an empty right half, and where one tab was wider than the others, the
   header and its primary button jumped when you switched tabs - in Rewards by up to 431px. Each
