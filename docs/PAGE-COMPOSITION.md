@@ -71,6 +71,11 @@ module, so the docked primary action does not move when the tab changes. A tab w
 piece of existing content leaves the side column empty rather than stretching its list or
 inventing content. No tab switches `--page-measure` or a header modifier (PAGE-020).
 
+Decided on 2026-10-05: the housekeeping **staff** tab is such a tab. It is a short list of
+master data with the character of a form, and a readable column (about 612px) is the right
+width for it; it gets a side column only when the module has a second piece of content that
+belongs there.
+
 Arbitrary values such as `max-width: 843px` are prohibited.
 
 ### Primary alignment edge
