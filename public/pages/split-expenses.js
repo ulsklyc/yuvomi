@@ -52,7 +52,7 @@ let _container = null;
 // Eingebettet (siehe render) sinkt die ganze Gliederung um eine Stufe: der Tab-Titel
 // ist <h2>, also Gruppenname <h3> und Karten <h4> - Budget > Split-Ausgaben > Gruppe
 // > Abschnitt (Nachtrag aus dem Review von #1148). Die Optik haengt an Klassen
-// (.split-group-name, .split-card-title), nicht am Tag.
+// (.split-group-name, .u-section-title), nicht am Tag.
 let _embedded = false;
 
 /* UEBERGABE AUS DEM BUDGET (#1057).
@@ -190,7 +190,7 @@ export async function render(container, { user, embedded = false, onAddableChang
                R14 P1): mobil in seiner Icon-Form statt einer eigenen 48px-Zeile
                vor der ersten Gruppe. -->
           <div class="split-panel-head section-toolbar">
-            <div class="split-panel-title">${t('splitExpenses.groups')}<span class="list-group__count split-panel-count" id="split-group-count"></span></div>
+            <${embedded ? 'h3' : 'h2'} class="split-panel-title u-section-title">${t('splitExpenses.groups')}<span class="list-group__count split-panel-count" id="split-group-count"></span></${embedded ? 'h3' : 'h2'}>
             ${renderPageSearch({
     id: 'split-group-search',
     label: t('splitExpenses.searchGroups'),
@@ -683,23 +683,31 @@ function renderMain() {
         ${groupToolsMenuHtml()}`}
       </div>`}
     </section>
+    ${/* ABSCHNITTSTITEL AUF DER BUEHNE, ZEILEN IM TRAEGER (R16 Schritt 2b,
+        * Reiter-Skelett des Budgets). Hier standen drei Karten mit dem Titel
+        * als 17px-Kartentitel IN der Flaeche und den Zeilen in deren Polster -
+        * die vierte Titel- und fuenfte Listenform des Moduls. Jetzt wie
+        * "Transaktionen" in der Uebersicht: `.u-section-title` ueber einem
+        * `.row-carrier`. Die Stufe (h4 eingebettet) bleibt die der Gliederung
+        * Budget > Aufteilung > Gruppe > Abschnitt; die Rolle kommt von der
+        * Klasse. Ein leerer Abschnitt traegt keine Flaeche. */ ''}
     <div class="split-content-grid">
-      <section class="split-card split-card--balances">
-        <div class="split-card-head">
-          <${SectionTag} class="split-card-title">${t('splitExpenses.balances')}</${SectionTag}>
+      <section class="split-section split-section--balances">
+        <div class="split-section-head">
+          <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.balances')}</${SectionTag}>
           <span>${t('splitExpenses.simplified')}</span>
         </div>
         <div id="split-balances">${renderBalances()}</div>
       </section>
-      <section class="split-card">
-        <div class="split-card-head">
-          <${SectionTag} class="split-card-title">${t('splitExpenses.recentExpenses')}</${SectionTag}>
+      <section class="split-section">
+        <div class="split-section-head">
+          <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.recentExpenses')}</${SectionTag}>
         </div>
         <div id="split-expense-list">${renderExpenses(archived || ro)}</div>
       </section>
-      <section class="split-card">
-        <div class="split-card-head">
-          <${SectionTag} class="split-card-title">${t('splitExpenses.activity')}</${SectionTag}>
+      <section class="split-section">
+        <div class="split-section-head">
+          <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.activity')}</${SectionTag}>
         </div>
         <div class="split-activity">${renderActivity()}</div>
       </section>
@@ -778,12 +786,12 @@ function groupMetaHtml(group) {
 function renderBalances() {
   const debts = state.balances.simplified_debts || [];
   if (!debts.length) return `<div class="split-muted">${t('splitExpenses.noBalances')}</div>`;
-  return debts.map((debt) => `
+  return `<div class="row-carrier">${debts.map((debt) => `
     <div class="split-debt">
       <span>${esc(debt.from_name)} ${t('splitExpenses.owes')} ${esc(debt.to_name)}</span>
       <strong>${money(debt.amount, debt.currency)}</strong>
     </div>
-  `).join('');
+  `).join('')}</div>`;
 }
 
 // Regel 6 aus utils/module-access.js: der Parameter hiess `readOnly` und meinte
@@ -791,7 +799,7 @@ function renderBalances() {
 // Aufrufer odert Archiv und Modulrecht hinein (renderMain).
 function renderExpenses(asList = false) {
   if (!state.expenses.length) return `<div class="split-muted">${t('splitExpenses.noExpenses')}</div>`;
-  return state.expenses.map((expense) => {
+  return `<div class="row-carrier">${state.expenses.map((expense) => {
     // Beleg-Marke (#583): dass ein Nachweis vorliegt, ist die Information -
     // wie viele es sind, beantwortet keine Frage vor dem Öffnen.
     const receiptCount = expense.attachments?.length ?? 0;
@@ -821,7 +829,7 @@ function renderExpenses(asList = false) {
         ${body}
       </button>
     `;
-  }).join('');
+  }).join('')}</div>`;
 }
 
 /** Die Werte, die Zeile, Knopf und Rueckfrage einer Zahlung nennen (#1309). */
@@ -854,7 +862,7 @@ function renderActivity() {
   const more = state.activityCursor
     ? `<button type="button" class="btn btn--secondary split-activity-more" data-activity-more${busy ? ' aria-disabled="true" aria-busy="true"' : ''}>${esc(t('splitExpenses.loadMoreActivity'))}</button>`
     : '';
-  return `<div class="split-activity-list" tabindex="-1">${items}</div>${more}`;
+  return `<div class="split-activity-list row-carrier" tabindex="-1">${items}</div>${more}`;
 }
 
 /**

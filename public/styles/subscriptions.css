@@ -89,8 +89,13 @@
  * vorbehalten (Begründung an .metric-card in budget.css). Diese Datei
  * setzte auf denselben Rollen --glass-bg-card und widersprach damit der Regel
  * innerhalb des eigenen Moduls. */
-.subscriptions-chart,
-.subscriptions-list-section {
+/* DIE FLAECHE GEHOERT DEM INHALT, DER TITEL STEHT DARUEBER (R16 Schritt 2b).
+ * Bis hierhin trugen `.subscriptions-chart` und `.subscriptions-list-section`
+ * die Flaeche samt ihrer Ueberschrift - die zweite Titelgrammatik des Budgets
+ * neben "Transaktionen" und "Nach Kategorie", die auf der Buehne stehen. Die
+ * Liste ist jetzt ein `.row-carrier` (list-row.css), das Diagramm liegt in
+ * `.subscriptions-chart__card`. Guard: test-frontend-audit. */
+.subscriptions-chart__card {
   border: 1px solid transparent;
   border-radius: var(--radius-lg);
   background-color: var(--color-surface);
@@ -135,16 +140,24 @@
 }
 
 .subscriptions-chart {
-  padding: var(--space-3);
+  /* Titel, darunter die Flaeche: in einer Rasterzeile enden alle Flaechen auf
+   * derselben Hoehe, auch wenn ein Titel in der schmalen Spalte umbricht. */
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
 }
 
-.subscriptions-chart__head {
+.subscriptions-chart__title {
+  /* Dieselbe Kopfhoehe wie der Listenkopf darueber (ein volles Ziel), damit
+   * die drei Titel und "Abonnements" denselben Abstand zu ihrer Flaeche haben. */
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--space-2);
-  align-items: baseline;
-  margin-bottom: var(--space-2);
+  align-items: center;
+  min-height: var(--target-base);
+}
+
+.subscriptions-chart__card {
+  padding: var(--space-3);
+  min-width: 0;
 }
 
 /* Die Zahl im Kopf traegt ihr Label sichtbar davor („Hoechster Monat: Nov"). */
@@ -152,6 +165,7 @@
   display: flex;
   gap: var(--space-1);
   align-items: baseline;
+  justify-content: flex-end;
   margin: 0;
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
@@ -163,7 +177,7 @@
   font-size: var(--text-sm);
 }
 
-.subscriptions-chart h2,
+.subscriptions-chart__title,
 .subscriptions-section-head h2 {
   margin: 0;
 }
@@ -260,7 +274,6 @@
 }
 
 .subscriptions-list-section {
-  padding: var(--space-3);
   margin-bottom: var(--space-3);
 }
 
@@ -274,6 +287,7 @@
   display: flex;
   gap: var(--space-2);
   align-items: center;
+  min-height: var(--target-base);
   margin-bottom: var(--space-2);
 }
 

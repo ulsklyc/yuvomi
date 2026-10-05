@@ -356,8 +356,11 @@ test('sichtbare Split-Expense-Überschriften besitzen explizite Rollen', () => {
   // Klassen statt Tags: eingebettet rendert die Seite <h3>/<h4>, sonst <h2>/<h3> (#1148).
   assertTypeRole(typography, 'typography.css', '.split-group-name', '--type-section-title',
     'Gruppenüberschriften dürfen nicht auf die Browser-Standardgröße zurückfallen');
-  assertTypeRole(typography, 'typography.css', '.split-card-title', '--type-card-title',
-    'Kartenüberschriften dürfen nicht auf die Browser-Standardgröße zurückfallen');
+  // Seit R16 Schritt 2b stehen Salden, Ausgaben und Verlauf als Abschnittstitel
+  // auf der Buehne (`.u-section-title`), nicht mehr als Kartentitel in der Flaeche.
+  assertTypeRole(typography, 'typography.css', '.u-section-title', '--type-section-title',
+    'Abschnittsüberschriften dürfen nicht auf die Browser-Standardgröße zurückfallen');
+  assert.doesNotMatch(typography, /\.split-card-title/, 'die Kartentitel-Rolle der Aufteilung ist entfallen');
 });
 
 test('Settings zeigen auf Leaf-Seiten nur den Leaf-Titel als sichtbare Hauptüberschrift', () => {

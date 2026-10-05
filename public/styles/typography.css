@@ -150,7 +150,6 @@
 .settings-navigation-panel__title,
 .split-group-name,
 .housekeeping-card h2,
-.subscriptions-chart h2,
 .subscriptions-section-head h2,
 .subscriptions-logo-picker-head h3 {
   font-size: var(--type-section-title);
@@ -247,7 +246,6 @@
 .document-row__title,
 .document-viewer__unsupported-title,
 .recipe-card__title,
-.split-card-title,
 .settings-card__title,
 .settings-member__name,
 .settings-provider__name,

@@ -463,5 +463,5 @@ test('die Gruppenzahl steht am Kopf der Liste, mobil entfaellt ihre Kennzahlkart
   assert.ok(regel?.at.includes('@container split-page (max-width: 639px)'), 'nur schmal - am Desktop bleibt die Dreierreihe');
   assert.match(regel.body, /display:\s*none/, 'keine volle Zeile fuer eine Ziffer (59px fuer „2", 390x844)');
   const src = readFileSync(new URL('../public/pages/split-expenses.js', import.meta.url), 'utf8');
-  assert.match(src, /class="split-panel-title">\$\{t\('splitExpenses\.groups'\)\}<span class="list-group__count split-panel-count" id="split-group-count">/);
+  assert.match(src, /class="split-panel-title u-section-title">\$\{t\('splitExpenses\.groups'\)\}<span class="list-group__count split-panel-count" id="split-group-count">/);
 });

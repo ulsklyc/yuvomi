@@ -10532,7 +10532,7 @@ test('split expenses reflows from container width, not viewport width', () => {
     'Grid-Items haben min-width: auto — ohne 0 schiebt die Gruppen-Leiste die Seite über ihren Rand',
   );
   assert.match(
-    cssRuleBody(split, '.split-card-head'),
+    cssRuleBody(split, '.split-section-head'),
     /flex-wrap:\s*wrap/,
     'Titel und Zusatz der Kartenköpfe brechen um, statt in die Nachbarkarte zu laufen',
   );
@@ -19516,4 +19516,34 @@ test('R16: Konten zeigt mobil die Kurzzeile wie jeder Budget-Reiter mit Kennzahl
   assert.match(accounts, /metricGlanceHtml\(\{\s*label: t\('budget\.netWorth'\)/, 'Konten fuehrt die Kurzzeile');
   assert.doesNotMatch(accounts, /controls:/, 'eine Zahl hat nichts aufzuklappen');
   assert.match(accounts, /<div class="metric-grid budget-glance-details">/, 'die Karte bleibt unter 640px aus');
+});
+
+test('R16: im Budget steht jeder Abschnittstitel auf der Buehne, die Zeilen liegen im Traeger', () => {
+  const subs = read('../public/pages/subscriptions.js');
+  const split = read('../public/pages/split-expenses.js');
+  // Abos: Listenkopf und die drei Diagrammtitel.
+  assert.match(subs, /<h2 class="u-section-title" id="subscriptions-list-title"/);
+  assert.equal((subs.match(/<h2 class="u-section-title subscriptions-chart__title">\$\{title\}<\/h2>\s*<div class="subscriptions-chart__card">/g) ?? []).length, 2,
+    'Flaechen- und Balkendiagramm: Titel VOR der Flaeche, nicht darin');
+  assert.match(subs, /<div class="subscriptions-list row-carrier" id="subscriptions-list">/, 'die Abo-Liste ist ein Zeilentraeger');
+  const subsCss = rulesOf(read('../public/styles/subscriptions.css'));
+  for (const sel of ['.subscriptions-list-section', '.subscriptions-chart']) {
+    const flaeche = subsCss.filter((rule) => selectorsOf(rule).includes(sel) && /background(?:-color)?:|box-shadow:|padding:/.test(rule.body));
+    assert.deepStrictEqual(flaeche.map((rule) => rule.selector.trim()), [], `${sel} traegt keine Flaeche mehr - der Titel stuende sonst wieder darin`);
+  }
+  // Aufteilung: drei Abschnitte, Titel ueber dem Traeger.
+  assert.doesNotMatch(split, /split-card\b/, 'die Karte mit Titel darin ist entfallen');
+  assert.equal((split.match(/class="split-section-title u-section-title"/g) ?? []).length, 3);
+  assert.match(split, /return `<div class="row-carrier">\$\{debts\.map/, 'Salden im Traeger');
+  assert.match(split, /return `<div class="row-carrier">\$\{state\.expenses\.map/, 'Ausgaben im Traeger');
+  assert.match(split, /class="split-activity-list row-carrier"/, 'Verlauf im Traeger');
+  const splitCss = rulesOf(read('../public/styles/split-expenses.css'));
+  const sektion = splitCss.filter((rule) => selectorsOf(rule).some((sel) => /^\.split-section(?:-head)?$/.test(sel)) && /background(?:-color)?:|box-shadow:/.test(rule.body));
+  assert.deepStrictEqual(sektion.map((rule) => rule.selector.trim()), [], 'der Abschnitt traegt keine Flaeche');
+  // Zweispaltig steht auch "Gruppen" ueber seiner Flaeche.
+  const breit = splitCss.find((rule) => rule.selector.trim() === '.split-groups-panel' && rule.at.some((at) => /split-page \(min-width: 976px\)/.test(at)));
+  assert.match(breit?.body ?? '', /background-color:\s*transparent/, 'das Gruppen-Panel gibt zweispaltig seine Flaeche an die Liste ab');
+  // Kein Budget-Reiter fuehrt eine sichtbare Ueberschrift ohne Rolle.
+  const typo = read('../public/styles/typography.css');
+  assert.doesNotMatch(typo, /\.split-card-title|\.subscriptions-chart h2/);
 });

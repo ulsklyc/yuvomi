@@ -22,7 +22,7 @@
 
 .split-topbar,
 .split-panel-head,
-.split-card-head,
+.split-section-head,
 .split-group-header,
 .split-header-actions,
 .split-form-row {
@@ -37,7 +37,7 @@
 
 .split-title,
 .split-group-name,
-.split-card-title {
+.split-section-title {
   margin: 0;
   letter-spacing: var(--tracking-normal);
   color: var(--color-text-primary);
@@ -64,7 +64,7 @@
 .split-subtitle,
 .split-group-header p,
 .split-muted,
-.split-card-head span {
+.split-section-head span {
   margin: var(--space-1) 0 0;
   color: var(--color-text-secondary);
 }
@@ -85,7 +85,6 @@
  * (Begründung an .metric-card in budget.css). Diese Datei setzte auf
  * denselben Rollen --glass-bg-card und widersprach damit der Regel innerhalb
  * des eigenen Moduls. */
-.split-card,
 .split-groups-panel {
   background-color: var(--color-surface);
   border: 1px solid transparent;
@@ -137,6 +136,37 @@
  * Container, unten), bliebe ihr neben Titel und „+" nur ~80px - dort nimmt
  * sie die eigene Zeile darunter. */
 @container split-page (min-width: 976px) {
+  /* ZWEISPALTIG STEHT AUCH "GRUPPEN" AUF DER BUEHNE (R16 Schritt 2b): Titel,
+   * Suche und Aktiv/Archiviert sind der Kopf der Spalte, die Flaeche traegt
+   * nur noch die Gruppenzeilen - dieselbe Grammatik wie rechts daneben und in
+   * den anderen Reitern. Einspaltig bleibt das Panel die aufklappbare Zeile
+   * der Gruppenwahl (R16 1b) und damit selbst die Flaeche. */
+  .split-groups-panel {
+    padding: 0;
+    overflow: visible;
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  .split-groups-panel .split-panel-head {
+    min-height: var(--target-base);
+    padding: 0 0 var(--space-1);
+  }
+
+  .split-groups-panel .split-groups {
+    margin-inline: 0;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background-color: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .split-groups-panel .split-groups:has(> .empty-state),
+  .split-groups-panel .split-groups:empty {
+    background-color: transparent;
+    box-shadow: none;
+  }
+
   .split-panel-head.section-toolbar > label.split-search {
     order: 3;
     flex: 1 0 100%;
@@ -301,7 +331,7 @@
 .split-group-header {
   justify-content: space-between;
   padding: var(--space-4);
-  /* Arbeitsfläche, also opak - dieselbe Regel wie .split-card darüber. */
+  /* Arbeitsfläche, also opak - dieselbe Regel wie das Gruppen-Panel darüber. */
   background-color: var(--color-surface);
   border: 1px solid transparent;
   border-radius: var(--radius-lg);
@@ -350,32 +380,42 @@
   align-items: start;
 }
 
-.split-card {
-  padding: var(--space-4);
+/* EIN ABSCHNITT = TITEL AUF DER BUEHNE + ZEILENTRAEGER (R16 Schritt 2b). Der
+ * Abschnitt selbst traegt keine Flaeche mehr (vorher `.split-card`: Flaeche,
+ * 16px Polster, Titel darin); die Zeilen liegen in einem `.row-carrier` und
+ * bringen ihr Polster selbst mit. */
+.split-section {
   min-width: 0;
 }
 
-.split-content-grid > .split-card {
+.split-content-grid > .split-section {
   grid-column: 2;
 }
 
-.split-content-grid > .split-card:nth-child(2) {
+.split-content-grid > .split-section:nth-child(2) {
   grid-column: 1;
   grid-row: 1 / span 2;
 }
 
-.split-card-head {
+.split-section-head {
   justify-content: space-between;
-  margin-bottom: var(--space-3);
+  /* Ein volles Ziel hoch, wie der Listenkopf der Uebersicht - der Titel steht
+   * damit in jedem Reiter gleich weit ueber seiner Flaeche. */
+  min-height: var(--target-base);
+  margin-bottom: var(--space-1);
   /* Titel und Zusatz („vereinfachte Schulden") sind zwei eigenständige Zeilen,
    * sobald sie nebeneinander nicht mehr passen - ohne Umbruch schiebt der
    * Zusatz über den Kartenrand in die Nachbarkarte. */
   flex-wrap: wrap;
 }
 
-.split-card-head > * {
+.split-section-head > * {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.split-section-head > span {
+  margin-block-start: 0;
 }
 
 .split-debt,
@@ -384,7 +424,9 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) 0;
+  /* Das Zeilenpolster des Traegers (`.list-row`: --space-3 inline) - die
+   * Flaeche um die Zeile ist weg, also bringt die Zeile ihren Rand mit. */
+  padding: var(--space-3);
   border-top: 1px solid var(--color-border-subtle);
 }
 
@@ -673,16 +715,13 @@ button.split-expense:hover {
     flex: 0 0 auto;
   }
 
-  .split-card {
-    padding: var(--space-3);
-  }
-
   .split-content-grid {
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
-  .split-card-head {
-    margin-bottom: 0;
+  /* Der Abschnittskopf traegt mobil kein Werkzeug, also kein volles Ziel. */
+  .split-section-head {
+    min-height: var(--target-md);
   }
 
   /* Salden kompakt: die Zeile traegt einen Satz und eine Zahl, kein Icon -
@@ -691,9 +730,6 @@ button.split-expense:hover {
     padding-block: var(--space-2);
   }
 
-  .split-debt:last-child {
-    padding-block-end: 0;
-  }
 
   .split-header-actions {
     justify-content: stretch;
@@ -711,8 +747,8 @@ button.split-expense:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .split-content-grid > .split-card,
-  .split-content-grid > .split-card:nth-child(2) {
+  .split-content-grid > .split-section,
+  .split-content-grid > .split-section:nth-child(2) {
     grid-column: auto;
     grid-row: auto;
   }

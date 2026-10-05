@@ -633,10 +633,11 @@
  * und genau das ist beim Bau einmal passiert. */
 /* ZWEI Klassen, weil „wer trägt" und „wer trennt" nicht dieselbe Frage sind.
  * Meist ist es dieselbe Box - dann steht `.row-carrier` allein. Liegt die Liste
- * aber schon IN einer Karte (die Abo-Liste steckt in `.subscriptions-list-section`,
- * gemessen: weiß, 16px Radius, Schatten), dann ist DIE der Träger, und eine
+ * aber schon IN einer Karte (die Vitalwert-Liste der Gesundheit, die
+ * Mitgliederliste der Einstellungen), dann ist DIE der Träger, und eine
  * zweite Fläche darin wäre genau der Kasten-in-Kasten, den §2 verbietet. Dort
- * trägt die Liste nur `.row-divided`.
+ * trägt die Liste nur `.row-divided`. (Die Abo-Liste war bis R16 so ein Fall;
+ * ihr Kopf steht jetzt auf der Bühne und sie ist selbst `.row-carrier`.)
  *
  * Dieselbe Grammatik wie beim Well und beim Lesemaß: der Träger entscheidet. */
 /* Der Träger nimmt seinen Zeilen die Kante, statt dass jedes Modul sie sich

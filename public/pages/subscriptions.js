@@ -233,12 +233,18 @@ export async function render(target, { user } = {}) {
            Hauptbuch (.section-toolbar): Titel links, Suche mit
            --page-search-width, mobil in der Icon-Form. Kennzahlen stehen
            davor, damit Kopf und Liste zusammen bleiben; der Kopf wird nie neu
-           gebaut, sonst verloere die Suche beim Tippen ihren Fokus. -->
+           gebaut, sonst verloere die Suche beim Tippen ihren Fokus.
+
+           AUF DER BUEHNE, NICHT IN DER KARTE (R16 Schritt 2b, Reiter-Skelett
+           des Budgets): der Kopf stand samt Titel IN der weissen Flaeche der
+           Liste, waehrend "Transaktionen" und "Kategorie-Budgets" nebenan
+           ueber ihrem Traeger stehen. Jetzt h2.u-section-title mit den
+           Werkzeugen rechts, darunter der Zeilentraeger (.row-carrier). -->
       <div class="subscriptions-summary" id="subscriptions-summary"></div>
       <section class="subscriptions-list-section" aria-labelledby="subscriptions-list-title">
         <div class="subscriptions-section-head section-toolbar">
           <div class="subscriptions-section-head__lead">
-            <h2 id="subscriptions-list-title" tabindex="-1">${t('subscriptions.listTitle')}</h2>
+            <h2 class="u-section-title" id="subscriptions-list-title" tabindex="-1">${t('subscriptions.listTitle')}</h2>
             <span class="list-group__count" id="subscriptions-list-count"></span>
           </div>
           <span class="subscriptions-rates-slot" id="subscriptions-rates-slot"></span>
@@ -573,7 +579,7 @@ function renderContent() {
         </button>`);
   }
   setHtml(content, `
-      <div class="subscriptions-list row-divided" id="subscriptions-list">
+      <div class="subscriptions-list row-carrier" id="subscriptions-list">
         ${rows.length ? rows.map(renderCard).join('') : renderEmpty()}
       </div>
   `);
@@ -760,13 +766,12 @@ function renderAreaChart(title, rows) {
   const peak = rows.reduce((best, row) => (row.amount > (best?.amount ?? 0) ? row : best), null);
   return `
     <article class="subscriptions-chart subscriptions-chart--area">
-      <div class="subscriptions-chart__head">
-        <h2>${title}</h2>
-        ${peak ? `<p class="subscriptions-chart__figure">
+      <h2 class="u-section-title subscriptions-chart__title">${title}</h2>
+      <div class="subscriptions-chart__card">
+      ${peak ? `<p class="subscriptions-chart__figure">
           <span>${esc(t('subscriptions.forecastPeak', { month: peak.label }))}</span>
           <strong>${money(peak.amount)}</strong>
         </p>` : ''}
-      </div>
       <svg class="subscriptions-area-chart" viewBox="0 0 100 52" preserveAspectRatio="none" aria-hidden="true">
         <polygon points="${areaPoints}"></polygon>
         <polyline points="${points}" vector-effect="non-scaling-stroke"></polyline>
@@ -777,6 +782,7 @@ function renderAreaChart(title, rows) {
       <ul class="sr-only">
         ${rows.map((row) => `<li>${esc(row.label)}: ${money(row.amount)}</li>`).join('')}
       </ul>
+      </div>
     </article>
   `;
 }
@@ -794,9 +800,8 @@ function renderBreakdown(title, rows) {
   const percent = getNumberFormat({ style: 'percent', maximumFractionDigits: 0 });
   return `
     <article class="subscriptions-chart">
-      <div class="subscriptions-chart__head">
-        <h2>${title}</h2>
-      </div>
+      <h2 class="u-section-title subscriptions-chart__title">${title}</h2>
+      <div class="subscriptions-chart__card">
       ${rows.length ? `<ul class="subscriptions-chart-rows">${rows.map((row) => `
         <li class="subscriptions-chart-row">
           <span class="subscriptions-chart-row__label" title="${esc(row.label)}">${esc(row.label)}</span>
@@ -805,6 +810,7 @@ function renderBreakdown(title, rows) {
           <span class="subscriptions-chart-row__share">${percent.format(row.amount / total)}</span>
         </li>
       `).join('')}</ul>` : `<p>${t('subscriptions.noAnalytics')}</p>`}
+      </div>
     </article>
   `;
 }
