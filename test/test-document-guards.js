@@ -5431,9 +5431,17 @@ test('Sonde 24 - spaeter Umbenennungskonflikt ersetzt keinen neuen Notizeditor',
     }, { firstName: renamedCategory, secondName: conflictingCategory });
     await gotoRoute(page, '/notes');
 
-    // Seit der Kopfregel mobil (2026-09-26) ein Eintrag im Werkzeugmenue.
-    await page.click('.notes-toolbar .page-tools-btn');
-    await page.click('#notes-tools-menu [data-action="manage-categories"]');
+    // Seit der Kopfregel mobil (2026-09-26) ein Werkzeug des Kopfs - und seit
+    // R16 ein direkter Knopf, solange es das einzige ist (`pageToolsMenuHtml`:
+    // ein Eintrag ist ein Knopf, kein Menue). Die Sonde nimmt die Bauart, die
+    // im Dokument steht; kommt ein zweiter Eintrag dazu, geht sie durchs Menue.
+    const directTool = await page.$('.notes-toolbar .page-tools-btn--direct[data-action="manage-categories"]');
+    if (directTool) {
+      await directTool.click();
+    } else {
+      await page.click('.notes-toolbar .page-tools-btn');
+      await page.click('#notes-tools-menu [data-action="manage-categories"]');
+    }
     await page.waitForSelector(`yuvomi-category-manager .cat-row[data-key="${categoryIds[0]}"]`);
     await page.click(`yuvomi-category-manager .cat-row[data-key="${categoryIds[0]}"] .cat-row__name`);
     await page.waitForSelector('#prompt-modal-input');
