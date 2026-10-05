@@ -1976,6 +1976,34 @@ async function metricRowHeights(page) {
   });
 }
 
+/**
+ * Klappt jede eingeklappte Kennzahlreihe der Ansicht auf und meldet, wie viele.
+ *
+ * SEIT R16 STEHEN DIE KENNZAHLEN MOBIL HINTER EINER KURZZEILE (metric-glance.js):
+ * ein Knopf mit `aria-expanded="false"` und `aria-controls` auf die Reihe, die
+ * solange `display: none` traegt. Die Sonde sah von dort an mobil vier Reihen
+ * statt sieben und haette die uebrigen nie wieder gemessen - eine Reihe, die
+ * erst nach einem Tipp im Bild steht, ist trotzdem eine Reihe. Gelesen wird die
+ * BEZIEHUNG im Dokument (ein Aufklapper, dessen Bereich Kennzahlkarten traegt),
+ * kein Klassenname: ein neuer Traeger der Kurzzeile ist damit schon gemessen.
+ */
+async function openMetricDisclosures(page) {
+  const opened = await page.evaluate(() => {
+    let n = 0;
+    for (const btn of document.querySelectorAll('[aria-expanded="false"][aria-controls]')) {
+      if (!btn.getClientRects().length) continue;
+      const region = document.getElementById(btn.getAttribute('aria-controls'));
+      if (!region || !region.querySelector('.metric-card')) continue;
+      btn.click();
+      n += 1;
+    }
+    return n;
+  });
+  // Das Aufklappen laeuft als Hoehen-Uebergang; gemessen wird der Endzustand.
+  if (opened) await new Promise((resolve) => { setTimeout(resolve, 700); });
+  return opened;
+}
+
 describe('Sonde 6 - die Kacheln einer Kennzahlreihe sind gleich hoch', () => {
   for (const device of ['mobile', 'desktop']) {
     test(`Geraet ${device}`, async () => {
@@ -1998,7 +2026,10 @@ describe('Sonde 6 - die Kacheln einer Kennzahlreihe sind gleich hoch', () => {
       // Ohne sie saehe die Sonde von sieben Kennzahlreihen genau eine.
       for (const name of sweep('Sonde 6')) {
         await gotoRoute(page, ALL_ROUTES[name]);
-        await visitViews(page, name, async (where) => check(where, await metricRowHeights(page)));
+        await visitViews(page, name, async (where) => {
+          await openMetricDisclosures(page);
+          check(where, await metricRowHeights(page));
+        });
       }
       await page.close();
 
