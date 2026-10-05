@@ -551,6 +551,27 @@
   display: none;
 }
 
+/* EIN WEG ZUR ABFALLART JE BREITE (R16, Kopfregel mobil 1a). Unter 768px
+   stehen die Werkzeuge in der Titelzeile, und die traegt nur Icon-Knoepfe:
+   der beschriftete Kopfknopf (193px) wird dort zum Eintrag im "..."-Menue.
+   Ab 768px steht der Knopf und der Eintrag ist ausgeblendet. Im Onboarding
+   heisst der FAB "Abfallart" - dort entfaellt auch der Eintrag. */
+@media (max-width: 767px) {
+  #waste-add-type-btn {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) {
+  #waste-page-menu [data-action="add-type"] {
+    display: none;
+  }
+}
+
+.waste-page--onboarding #waste-page-menu [data-action="add-type"] {
+  display: none;
+}
+
 .waste-onboarding {
   display: flex;
   flex-direction: column;

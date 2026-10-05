@@ -17651,7 +17651,8 @@ test('PAGE composition: birthdays stays free of page geometry in module CSS', ()
     'renderPageTitle',
     'renderPageActions',
     'renderPageBody',
-    'renderPageSection',
+    // `renderPageSection` trug nur den Dauerhinweis ueber der Liste; der ist
+    // mit R16 entfallen (er steht im Dialog). Die Liste ist die eine Sektion.
     'renderListSection',
   ]) {
     assert.match(src, new RegExp(name), `birthdays.js must call ${name}`);

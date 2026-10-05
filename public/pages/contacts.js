@@ -253,7 +253,7 @@ export async function render(container, { user, signal } = {}) {
   // Spalten fuer sich scrollen.
   container.insertAdjacentHTML('beforeend', `
     <div class="contacts-page app-page app-page--reading app-page--list-detail page-measure--narrow" data-composition="reading">
-      <div class="page-toolbar page-toolbar--wrap page-toolbar--narrow contacts-toolbar">
+      <div class="page-toolbar page-toolbar--wrap page-toolbar--narrow page-toolbar--title-tools contacts-toolbar">
         <h1 class="page-toolbar__title">${t('contacts.title')}</h1>
         ${renderPageSearch({ id: 'contacts-search', label: t('contacts.searchPlaceholder'), placeholder: t('contacts.searchPlaceholder'), value: state.searchQuery, clearLabel: t('common.searchClear'), className: 'contacts-toolbar__search page-toolbar__center' })}
         <div class="page-toolbar__actions">${toolbarActionsHtml()}</div>

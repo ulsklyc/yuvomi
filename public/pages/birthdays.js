@@ -26,7 +26,6 @@ import {
   renderPageTitle,
   renderPageBody,
   renderPageActions,
-  renderPageSection,
   renderListSection,
 } from '/utils/page-layout.js';
 
@@ -601,6 +600,7 @@ function renderPage() {
     header: renderPageHeader({
       wrap: true,
       narrow: true,
+      titleTools: true,
       className: 'birthdays-toolbar',
       title: renderPageTitle(t('birthdays.title')),
       center: renderPageSearch({
@@ -618,10 +618,9 @@ function renderPage() {
     }),
     body: renderPageBody({
       content: [
-        renderPageSection({
-          className: 'birthdays-hint-section',
-          content: `<p class="birthdays-hint">${t('birthdays.calendarHint')}</p>`,
-        }),
+        // Der Dauerhinweis „erscheint auch im Kalender" stand hier als 41px
+        // ueber jeder Liste (R16). Er steht wortgleich im Dialog, an der
+        // Stelle, an der die Entscheidung faellt.
         renderListSection({
           className: 'birthdays-list-section',
           content: `

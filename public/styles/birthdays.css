@@ -13,13 +13,6 @@
   padding-bottom: var(--space-6);
 }
 
-/* Hint copy only — measure/gutter live on .page-section.page-measure. */
-.birthdays-hint {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-}
-
 /* --------------------------------------------------------
  * Liste (nach Nähe sortiert) — EIN Träger, Zeilen per Haarlinie
  * (Zeilenlisten-Regel, tokens.css). Vorher trug jede Zeile ihre eigene Karte:

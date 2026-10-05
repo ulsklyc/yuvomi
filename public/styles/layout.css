@@ -3774,6 +3774,12 @@ html.fab-anim-done .page-fab {
   .page-toolbar.page-toolbar--period-inline:not(.page-toolbar--in-group) > .page-toolbar__title {
     flex: 1 1 0;
     min-width: 0;
+    /* Die Zeile ist eine Zeile: ein langer Titel (es „Recogida de basura")
+     * kuerzt mit Ellipse, er bricht nicht um - sonst wuechse der Kopf mit der
+     * Sprache. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .page-toolbar.page-toolbar--period-inline.page-toolbar--wrap:not(.page-toolbar--in-group) > .page-toolbar__center {
@@ -3810,6 +3816,67 @@ html.fab-anim-done .page-fab {
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+}
+
+/* WERKZEUGE IN DER TITELZEILE (R16, Critique 2026-10-05 P1 mobil; DESIGN.md,
+ * Kopfregel mobil 1a).
+ *
+ * Traegt die Werkzeugzeile eines Kopfs hoechstens ZWEI Icon-Knoepfe (Such-Icon,
+ * „...") und weder Segment noch Stepper noch Tab-Leiste, ist sie keine Zeile
+ * wert: Kontakte, Geburtstage, Entsorgung und die Einstellungen zahlten 48 bis
+ * 57px fuer ein bis zwei Icons am linken Rand. `--title-tools` stellt sie ans
+ * Ende der Titelzeile (114 -> 65px). Der Titel gibt nach (Basis 0, Ellipse),
+ * die Knoepfe nie - sie haben kein Label zum Anschneiden.
+ *
+ * DER KOPF IST DAMIT EINZEILIG: keine Lead-Zone, nichts dockt an oder klappt
+ * ein, Hoehe und Klebekante sind in jedem Scrollstand dieselben, und die
+ * Linie steht durchgehend (wie in den Kuechen-Koepfen). R11 hatte die
+ * Werkzeuge aus genau dieser Zeile genommen, weil sie angedockt „mit dem
+ * Titel aus dem Bild gewandert" waeren - das galt fuer einen Kopf, dessen
+ * Titelzeile wegscrollt. Dieser hier hat nur die eine und behaelt sie.
+ *
+ * DIE OFFENE SUCHE NIMMT DIE ZEILE: mit Fokus oder Begriff ist sie das, was
+ * der Nutzer gerade tut. Der Titel verlaesst dafuer das Bild (nicht den
+ * Baum); das Siegel bleibt als Ortsangabe.
+ *
+ * Die Klasse ist markiert, nicht geraten, und `test:mobile-chrome` laesst sie
+ * nur in einem Kopf durch, der keine Bar-Zeile, keine Tab-Leiste und kein
+ * Segment traegt. */
+@media (max-width: 767px) {
+  .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group) > .page-toolbar__title {
+    flex: 1 1 0;
+    min-width: 0;
+    /* Die Zeile ist eine Zeile: ein langer Titel (es „Recogida de basura")
+     * kuerzt mit Ellipse, er bricht nicht um - sonst wuechse der Kopf mit der
+     * Sprache. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group) > .page-toolbar__center {
+    order: 0;
+  }
+
+  .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group) > .page-search:is(:focus-within, :has(input:not(:placeholder-shown))) {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group):has(> .page-search:focus-within) > .page-toolbar__title,
+  .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group):has(> .page-search input:not(:placeholder-shown)) > .page-toolbar__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group) > .page-toolbar__actions {
+    flex: 0 0 auto;
   }
 }
 

@@ -121,10 +121,15 @@ export function renderPageHeader({
   inGroup = false,
   capped = false,
   stacked = false,
+  titleTools = false,
 } = {}) {
   const classes = [
     'page-toolbar',
     wrap && 'page-toolbar--wrap',
+    // Werkzeuge in der Titelzeile (mobil): nur fuer einen Kopf, dessen
+    // Werkzeugzeile hoechstens zwei Icon-Knoepfe traegt (DESIGN.md, Kopfregel
+    // mobil 1a; layout.css `.page-toolbar--title-tools`).
+    titleTools && 'page-toolbar--title-tools',
     narrow && 'page-toolbar--narrow',
     inGroup && 'page-toolbar--in-group',
     capped && 'page-toolbar--capped',

@@ -523,6 +523,7 @@ function renderToolbar(toolbar, content, { activeLeaf, domain }) {
     label.textContent = t('settings.title');
     back.append(createIcon('chevron-left', 'settings-toolbar__back-icon'), label);
     toolbar.dataset.mode = 'leaf';
+    toolbar.classList.remove('page-toolbar--title-tools');
     toolbar.replaceChildren(back);
     hydrateIcons(toolbar);
     return;
@@ -537,6 +538,9 @@ function renderToolbar(toolbar, content, { activeLeaf, domain }) {
   title.className = 'page-toolbar__title';
   title.textContent = t('settings.title');
   toolbar.dataset.mode = 'root';
+  // Die Wurzel traegt nur das Such-Icon: es steht mobil am Ende der
+  // Titelzeile statt auf einer eigenen (Kopfregel mobil 1a, layout.css).
+  toolbar.classList.add('page-toolbar--title-tools');
   toolbar.replaceChildren(title);
   toolbar.insertAdjacentHTML('beforeend', renderPageSearch({
     id: 'settings-search',

@@ -595,9 +595,18 @@ test('die Seite hat einen sichtbaren, beschrifteten Weg zur ersten Abfallart, un
   // die Variante hier ausdruecklich im Test und nicht nur im Kommentar.
   assert.match(WASTE_SRC, /class="btn btn--secondary" id="waste-add-type-btn" data-action="add-type"/);
   assert.doesNotMatch(WASTE_CODE, /class="btn btn--primary" id="waste-add-type-btn"/);
-  // Und genau einmal: der Menueeintrag ist beim Befoerdern entfallen.
+  // Und genau einmal als Knopf. Seit R16 (Kopfregel mobil 1a) gibt es den
+  // Menueeintrag wieder, aber nie NEBEN dem Knopf: unter 768px traegt die
+  // Titelzeile nur Icon-Knoepfe, der beschriftete Knopf ist dort ausgeblendet
+  // und der Eintrag steht; ab 768px umgekehrt. Je Breite EIN Weg.
   assert.equal((WASTE_SRC.match(/data-action="add-type"/g) ?? []).length, 1);
-  assert.doesNotMatch(WASTE_SRC, /action: 'add-type'/, 'add-type darf nicht mehr im Ueberlaufmenue stehen');
+  assert.equal((WASTE_CODE.match(/action: 'add-type'/g) ?? []).length, 1);
+  const wasteCss = readFileSync(new URL('../public/styles/waste.css', import.meta.url), 'utf8');
+  const hides = (sel, media) => [...eachRule(wasteCss)].some((r) => r.selector.trim() === sel
+    && /display:\s*none/.test(r.body) && (media ? r.at.some((a) => media.test(a)) : r.at.length === 0));
+  assert.ok(hides('#waste-add-type-btn', /max-width:\s*767px/), 'unter 768px weicht der Kopfknopf dem Menueeintrag');
+  assert.ok(hides('#waste-page-menu [data-action="add-type"]', /min-width:\s*768px/), 'ab 768px weicht der Eintrag dem Knopf');
+  assert.ok(hides('.waste-page--onboarding #waste-page-menu [data-action="add-type"]'), 'im Onboarding traegt der FAB den Weg');
   // Die drei uebrigen Kopf-Aktionen bleiben im Menue.
   for (const a of ['open-import', 'open-url-source', 'open-reminder-settings']) {
     assert.match(WASTE_SRC, new RegExp(`action: '${a}'`), `${a} gehoert weiter ins Ueberlaufmenue`);

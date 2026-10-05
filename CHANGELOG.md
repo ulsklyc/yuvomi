@@ -41,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   caption of the other tabs stands in the same place, and the header is 117px on every tab, so
   nothing moves when you switch. "Current" appears to the left of the arrows while you look at
   another month; the arrows stay where they are.
+- **Contacts, Birthdays, Waste and Settings lose their second header row on a phone.** That row
+  only carried one or two icons (search, "more"). They now sit at the end of the title row, and
+  the list starts about 50px higher; an open search takes the row. In Waste, "Add waste type"
+  moves into the "more" menu on a phone. The note "Birthdays also appear in the calendar" no
+  longer stands above the list - it is still in the dialog where you add one.
 
 ### Fixed
 

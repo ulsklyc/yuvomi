@@ -2180,6 +2180,28 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    nichts falten kann, weil die Bar-Zeile eine Tab-Leiste ist, klebt der Kopf um die Hoehe
    des Inline-Titels tiefer und zeigt ihn in diesem Streifen ueber der Leiste (Band, R11
    H1). Kopfhoehe und Klebekante haengen in keinem der drei Wege am Andock-Zustand.
+   **1a. Werkzeuge in der Titelzeile.** (R16, Critique 2026-10-05 P1 mobil.) Traegt die
+   Werkzeugzeile hoechstens ZWEI Icon-Knoepfe (Such-Icon, „...") und weder Segment noch
+   Stepper noch Tab-Leiste, ist sie keine Zeile wert: die Knoepfe stehen am Ende der
+   Titelzeile, Zeile 2 entfaellt (`page-toolbar--title-tools`, layout.css; in
+   `renderPageHeader` die Option `titleTools`). Traeger: Kontakte, Geburtstage, Entsorgung,
+   Einstellungen-Wurzel. Gemessen 390px: Kopf 114 -> 65px; erste Zeile Kontakte y 218 -> 169,
+   Geburtstage 179 -> 77 (dazu entfiel der Dauerhinweis, der wortgleich im Dialog steht),
+   Entsorgung 164 -> 115. Der Titel gibt nach (Basis 0, Ellipse - „Recogida de basura"
+   kuerzt), die Knoepfe nie. Der Kopf ist damit EINZEILIG: keine Lead-Zone, nichts dockt an
+   oder klappt ein, Hoehe und Klebekante sind in jedem Scrollstand gleich, die Linie steht
+   durchgehend. Das ist der Unterschied zu R11 (Absatz oben): dort waeren die Werkzeuge mit
+   einer wegscrollenden Titelzeile aus dem Bild gewandert; dieser Kopf hat nur die eine und
+   behaelt sie. Die offene Suche (Fokus oder Begriff) nimmt die Zeile, der Titel verlaesst
+   dafuer das Bild (nicht den Baum), das Siegel bleibt. Ein beschrifteter Kopfknopf zaehlt
+   nicht als Icon: er wird unter 768px nach der Label-Verlust-Regel zum Eintrag im „..."
+   (Entsorgung, „Abfallart hinzufuegen"), ab 768px steht er wieder - je Breite ein Weg.
+   NICHT Traeger sind Koepfe mit Segment, Filter, Stepper oder Tab-Leiste in Zeile 2
+   (Aufgaben, Notizen, Dokumente, Inventar, Budget, Kalender als eigene Variante) und die
+   Kuechen-Koepfe: dort IST die Tab-Leiste die Titelzeile und laeuft bei 390px ohne Werkzeug
+   schon bis 65px vor die Kante (R14 P7 bleibt, die Zeile faltet beim Scrollen, R17 K1).
+   `test:mobile-chrome` haelt Traegerliste, Geltung nur unter 768px und „nie neben einer
+   Bar-Zeile".
 2. **Keine losen Verwaltungs-Icons oder Textknoepfe im Kopf.** Kategorien, Tags, Lagerorte,
    Mehrfachauswahl, Import, Verlauf stehen im Werkzeugmenue - mit Icon UND Text; ein
    Ansichts-Schalter dort ist ein `menuitemcheckbox` mit Haken.

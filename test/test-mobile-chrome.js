@@ -278,3 +278,52 @@ test('R17 Z1: die Variante steht nur im Markup der Module, die DESIGN.md nennt',
   assert.match(design, /\*\*Variante: Zeitraum-Kopf \(Kalender\)\.\*\*/, 'DESIGN.md benennt die Variante');
   assert.ok(design.includes(PERIOD_TITLE), 'und nennt ihre Kennklasse');
 });
+
+// R16 (Critique 2026-10-05, P1 mobil): „Werkzeuge in der Titelzeile" (DESIGN.md,
+// Kopfregel mobil 1a). Traegt die Werkzeugzeile eines Kopfs hoechstens zwei
+// Icon-Knoepfe und weder Segment noch Stepper noch Tab-Leiste, stehen sie am
+// Ende der Titelzeile; die zweite Zeile entfaellt (114 -> 65px). Wie beim
+// Zeitraum-Kopf ist die Variante MARKIERT: die Klasse steht nur in den Modulen,
+// die DESIGN.md nennt, sie wirkt nur unter 768px, und kein Traeger fuehrt eine
+// Bar-Zeile - mit Tab-Leiste daneben waere es wieder die R9-Verdichtung, die
+// R14 zurueckgenommen hat. Wie viele Knoepfe ein Kopf zur Laufzeit zeigt, ist
+// Messarbeit (Handoff/Messmatrix), nicht dieser Guard.
+const TITLE_TOOLS = 'page-toolbar--title-tools';
+const TITLE_TOOLS_MODULES = ['pages/birthdays.js', 'pages/contacts.js', 'pages/waste.js', 'settings/shell.js'];
+
+test('R16: Werkzeuge in der Titelzeile - nur markiert, nur mobil, nie neben einer Bar-Zeile', () => {
+  const pub = new URL('../public/', import.meta.url);
+  const carriers = [];
+  for (const dir of ['pages', 'utils', 'components', 'settings']) {
+    for (const f of readdirSync(new URL(`${dir}/`, pub)).filter((n) => n.endsWith('.js'))) {
+      if (`${dir}/${f}` === 'utils/page-layout.js') continue;
+      const src = readFileSync(new URL(`${dir}/${f}`, pub), 'utf8');
+      if (!src.includes(TITLE_TOOLS) && !/\btitleTools:\s*true\b/.test(src)) continue;
+      carriers.push(`${dir}/${f}`);
+      assert.doesNotMatch(src, /page-toolbar__bar|\bbar:\s/,
+        `${dir}/${f}: ein Kopf mit Bar-Zeile (Tab-Leiste, Segment) traegt seine Werkzeuge dort, nicht in der Titelzeile`);
+    }
+  }
+  assert.deepEqual(carriers.sort(), [...TITLE_TOOLS_MODULES].sort(),
+    'wer die Werkzeuge in die Titelzeile stellt, steht in DESIGN.md und in TITLE_TOOLS_MODULES');
+  assert.match(read('../public/utils/page-layout.js'), /titleTools && 'page-toolbar--title-tools'/,
+    'renderPageHeader reicht die Variante als Option durch');
+
+  const own = sheets.flatMap(({ file, css }) => rules(css).filter((r) => r.selector.includes(`.${TITLE_TOOLS}`))
+    .map((r) => ({ file, ...r })));
+  assert.ok(own.length >= 1, 'die Regel fehlt in layout.css');
+  for (const r of own) {
+    assert.equal(r.file, 'layout.css', `${r.file}: die Variante gehoert der Shell (${r.selector})`);
+    assert.ok(r.at.some((a) => /max-width:\s*767px/.test(a)),
+      `${r.selector}: nur unter 768px - ab dort hat die Titelzeile Feld und angedockte Pille`);
+  }
+  const title = own.find((r) => r.selector.endsWith(':not(.page-toolbar--in-group) > .page-toolbar__title')
+    && /flex:\s*1 1 0/.test(r.body));
+  assert.ok(title, 'der Titel gibt nach (Basis 0) - die Knoepfe haben kein Label zum Anschneiden');
+  assert.match(title.body, /white-space:\s*nowrap/, 'ein langer Titel kuerzt, er bricht nicht um (Kopfhoehe je Sprache gleich)');
+  assert.match(title.body, /text-overflow:\s*ellipsis/);
+
+  const design = read('../DESIGN.md');
+  assert.match(design, /\*\*1a\. Werkzeuge in der Titelzeile\.\*\*/, 'DESIGN.md benennt die Regel');
+  assert.ok(design.includes(TITLE_TOOLS), 'und nennt ihre Kennklasse');
+});

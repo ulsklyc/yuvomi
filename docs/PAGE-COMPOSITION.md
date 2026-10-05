@@ -296,7 +296,6 @@ Open **`/birthdays`** on a wide desktop (1440 / 1920) to see the structure:
 |  |- .page-toolbar__actions                 large title select `> .page-toolbar__title`
 |  `- ::after                             <- holds the row end at --page-measure
 `- .app-page__body
-   |- .page-section.page-measure          <- hint
    `- .page-section--list.page-measure    <- .row-carrier list
 ```
 

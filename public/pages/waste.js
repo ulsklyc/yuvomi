@@ -1968,6 +1968,9 @@ function renderPage() {
     legacyAlias: false,
     header: renderPageHeader({
       narrow: true,
+      // Mobil stehen die Werkzeuge am Ende der Titelzeile (Kopfregel mobil 1a):
+      // dort traegt der Kopf nur das „..." - siehe den Menue-Eintrag unten.
+      titleTools: true,
       title: renderPageTitle(t('waste.title')),
       // ALLE VIER schreiben, auch die Erinnerungen: das zentrale Gate an
       // /api/v1 entscheidet nach METHODE, und `PUT /waste/reminder-settings/:id`
@@ -2029,6 +2032,11 @@ function renderPage() {
           id: 'waste-page-menu',
           label: t('waste.moreActions'),
           items: [
+            // NUR UNTER 768px SICHTBAR (waste.css): dort hat der beschriftete
+            // Kopfknopf keine Zeile mehr und wird nach der Label-Verlust-Regel
+            // zum Eintrag seines Menues. Ab 768px steht der Knopf, und der
+            // Eintrag ist ausgeblendet - es bleibt je Breite EIN Weg.
+            { action: 'add-type', label: t('waste.addType'), icon: 'plus' },
             { action: 'open-import', label: t('waste.importFileAction'), icon: 'upload' },
             { action: 'open-url-source', label: t('waste.addUrlSourceAction'), icon: 'link' },
             { action: 'open-reminder-settings', label: t('waste.reminderSettingsAction'), icon: 'bell' },
