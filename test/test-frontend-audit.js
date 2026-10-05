@@ -19637,3 +19637,24 @@ test('R16: Werte im Kontakt-Leseblatt stehen in Textfarbe, das Zeilenzeichen tra
   const icon = css.find((rule) => rule.selector.trim() === '.detail-row:has(.contact-detail__link) > .detail-row__icon');
   assert.match(icon?.body ?? '', /color:\s*var\(--module-contacts, var\(--color-accent\)\)/, 'das Zeichen sagt, dass der Wert eine Handlung ist');
 });
+
+/* R16 Schritt 2b (Critique 2026-10-05: "Ueberschriften im Einstellungsblatt
+ * 22/16/20/17px", "'Termine' zweimal als H2"). Gegen den Stand davor rot
+ * gelaufen. */
+test('R16: das Einstellungsblatt hat eine Stufenleiter - die Reichweite steht ueber ihren Abschnitten', () => {
+  const typo = rulesOf(read('../public/styles/typography.css')).filter((rule) => rule.at.length === 0);
+  const rolle = (sel) => typo.filter((rule) => selectorsOf(rule).includes(sel)).map((rule) => rule.body).join(';');
+  assert.match(rolle('.settings-scope__title'), /font-size:\s*var\(--type-section-title\)/, 'Reichweite = Abschnittstitel (20px)');
+  assert.match(rolle('.settings-scope .settings-section__title'), /font-size:\s*var\(--type-card-title\)/, 'Abschnitt in einer Reichweite = eine Stufe darunter (17px)');
+  assert.ok(selectorsOf(typo.find((rule) => selectorsOf(rule).includes('.u-row-title')) ?? { selector: '' }).includes('.settings-scope .settings-card__title'),
+    'Karte in einer Reichweite = Zeilentitel (16px)');
+  const scope = rulesOf(read('../public/styles/settings.css')).filter((rule) => rule.selector.trim() === '.settings-scope__title').map((rule) => rule.body).join(';');
+  assert.doesNotMatch(scope, /font-size:|font-weight:/, 'settings.css setzt der Reichweite keine eigene Groesse entgegen');
+  assert.doesNotMatch(scope, /--color-text-secondary/, 'und nimmt sie nicht in den Sekundaerton zurueck');
+  // Die Ebene im Baum: Abschnitte und Karten in einer Reichweite stehen eine Ebene tiefer.
+  const shell = read('../public/settings/shell.js');
+  assert.match(shell, /levelScopedHeadings\(leafContainer\);/);
+  assert.match(shell, /'\.settings-scope \.settings-section__title:not\(\[aria-level\]\)'\)\) \{\s*el\.setAttribute\('aria-level', '3'\);/);
+  assert.match(shell, /'\.settings-scope \.settings-card__title:not\(\[aria-level\]\)'\)\) \{\s*el\.setAttribute\('aria-level', '4'\);/);
+  assert.match(shell, /scopedHeadingObserver\.observe\(leafContainer, \{ childList: true, subtree: true \}\)/, 'ein neu gebauter Abschnitt behaelt seine Ebene');
+});

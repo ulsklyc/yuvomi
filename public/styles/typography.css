@@ -147,6 +147,10 @@
 .day-view__date-label,
 .today-cockpit__header h2,
 .settings-section__title,
+/* Die Reichweite eines Einstellungsblatts ("Fuer mich" / "Fuer den Haushalt")
+ * gliedert Abschnitte, also traegt sie deren Stufe - siehe die Stufenleiter
+ * weiter unten (R16). */
+.settings-scope__title,
 .settings-navigation-panel__title,
 .split-group-name,
 .subscriptions-section-head h2,
@@ -246,6 +250,13 @@
 .document-viewer__unsupported-title,
 .recipe-card__title,
 .settings-card__title,
+/* EINE STUFENLEITER IM EINSTELLUNGSBLATT (Critique 2026-10-05, R16). Gemessen
+ * im Kalender-Blatt: Blatt 22px, Reichweite 16px, Abschnitt 20px, Karte 17px -
+ * die Reichweite, die alles darunter gliedert, war die KLEINSTE Stufe. Jetzt
+ * folgt die Groesse der Tiefe: Blatt 22, Reichweite 20, Abschnitt 17, Karte 16.
+ * Ein Blatt ohne Reichweite hat eine Stufe weniger (22 / 20 / 17) - dieselbe
+ * Leiter, nur kuerzer. Die Ebene im Baum zieht shell.js nach (`aria-level`). */
+.settings-scope .settings-section__title,
 .settings-member__name,
 .settings-provider__name,
 .settings-sync-info__name,
@@ -316,6 +327,7 @@
  * Guard: test-typography.js, "der Zeilentitel ist eine Rolle".
  * ------------------------------------------------------------------------ */
 .u-row-title,
+.settings-scope .settings-card__title,
 .list-row__name,
 .agenda-event__title,
 .contact-item__name,

@@ -908,6 +908,7 @@ async function renderLeafContent(content, leaf, domain, user, query) {
     // dann weder Fokus noch Formularwache fuer ein abgehaengtes Blatt.
     if (!leafContainer.isConnected) return;
     leafContainer.removeAttribute('aria-busy');
+    levelScopedHeadings(leafContainer);
     watchLeafForms(leafContainer);
     hydrateIcons(content);
 
@@ -928,6 +929,38 @@ async function renderLeafContent(content, leaf, domain, user, query) {
     hosts.map(([host, section]) => renderSheetSection(host, section, user, query)),
     finishLeaf,
   );
+}
+
+/**
+ * DIE EBENE FOLGT DER TIEFE (R16, Stufenleiter des Einstellungsblatts).
+ *
+ * Die Abschnitte eines Blatts bringen ihre Titel als <h2>/<h3> mit - richtig,
+ * solange sie direkt unter dem Blatt stehen. In einem Blatt MIT Reichweiten
+ * ("Fuer mich" / "Fuer den Haushalt", je eine <h2>) stehen sie eine Ebene
+ * tiefer: im Kalender-Blatt gab es "Termine" zweimal als <h2>, auf derselben
+ * Ebene wie die Reichweite, die sie unterscheidet. `aria-level` setzt die
+ * Ebene im Baum, ohne dass 65 Abschnitts-Vorlagen ihren Tag kennen muessen;
+ * die Groesse dazu steht in typography.css. Abschnitte bauen sich nach dem
+ * Speichern neu - der Beobachter zieht nach.
+ */
+let scopedHeadingObserver = null;
+
+function levelScopedHeadings(leafContainer) {
+  scopedHeadingObserver?.disconnect();
+  scopedHeadingObserver = null;
+  if (!leafContainer?.querySelector?.('.settings-scope')) return;
+  const apply = () => {
+    for (const el of leafContainer.querySelectorAll('.settings-scope .settings-section__title:not([aria-level])')) {
+      el.setAttribute('aria-level', '3');
+    }
+    for (const el of leafContainer.querySelectorAll('.settings-scope .settings-card__title:not([aria-level])')) {
+      el.setAttribute('aria-level', '4');
+    }
+  };
+  apply();
+  if (typeof MutationObserver !== 'function') return;
+  scopedHeadingObserver = new MutationObserver(apply);
+  scopedHeadingObserver.observe(leafContainer, { childList: true, subtree: true });
 }
 
 /**
