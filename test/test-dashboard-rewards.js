@@ -320,36 +320,66 @@ test('Belohnungen: nur der Katalog ist ein breiter Abschnitt, Uebersicht und Ver
   }
 });
 
-test('Belohnungen: der Kopf gibt im Katalog der Pille die volle Kante zurueck, sonst nicht', () => {
-  assert.equal(typeof rewardsPage.syncToolbarMeasure, 'function', 'syncToolbarMeasure fehlt im __test-Export');
-  const classes = new Set(['page-toolbar', 'page-toolbar--narrow', 'rewards-toolbar']);
-  const toolbar = { classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) } };
-  const container = { querySelector: (sel) => (sel === '.rewards-toolbar' ? toolbar : null) };
-  const s = rewardsPage.state;
-  const tabVorher = s.tab;
-  try {
-    for (const [tab, breit] of [['catalog', true], ['ledger', false], ['overview', false], ['catalog', true]]) {
-      s.tab = tab;
-      rewardsPage.syncToolbarMeasure(container);
-      assert.equal(classes.has('rewards-toolbar--wide'), breit, `${tab}: --wide ${breit ? 'gesetzt' : 'weg'}`);
-      assert.ok(classes.has('page-toolbar--narrow'),
-        `${tab}: --narrow bleibt - ohne passte die gekappte Reiterleiste in die Titelzeile (52px Sprung, gemessen)`);
-    }
-  } finally {
-    s.tab = tabVorher;
-  }
+// Critique R16 (2026-10-05): der Kopf folgte dem Reiter (`--wide` nur im
+// Katalog), die angedockte Pille sprang zwischen Katalog (1408) und Verlauf
+// (972) um 431px. Jetzt fuehrt die SEITE das breite Mass, und Uebersicht und
+// Verlauf fuellen es mit einer Seitenspalte.
+test('Belohnungen: eine Kante fuer alle Reiter - die Seite fuehrt das breite Mass, der Kopf schaltet nicht um', () => {
+  const page = readFileSync(new URL('../public/pages/rewards.js', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../public/styles/rewards.css', import.meta.url), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '');
-  assert.match(css, /\.rewards-page \.rw-section:not\(\.rw-section--wide\)\s*\{[^}]*max-width:\s*var\(--page-measure/,
-    'jeder Abschnitt ausser dem Raster endet am Lesemass - samt Kopf');
-  assert.match(css, /\.rewards-toolbar--wide\s*\{[^}]*padding-inline-end:\s*var\(--page-inline-pad\)/);
-  assert.match(css, /\.rewards-toolbar--wide\s*\{[^}]*--page-measure:\s*100%/,
-    'der breite Kopf erklaert sein Mass als Spalte - sonst behauptet er das Lesemass der Seite, an dem er nicht endet (Sonde 19)');
-  assert.match(css, /\.rewards-toolbar--wide::after\s*\{[^}]*content:\s*none/, 'kein Rest-Slot, der die Pille zurueckschoebe');
-  assert.match(css, /\.rewards-toolbar--wide > \.rewards-tabs\s*\{[^}]*max-width:\s*none/, 'die Reiterleiste bricht weiter um');
-  const page = readFileSync(new URL('../public/pages/rewards.js', import.meta.url), 'utf8');
-  assert.match(page, /async function renderCurrentTab\(container\) \{[\s\S]{0,120}syncToolbarMeasure\(container\);/,
-    'jeder Reiterwechsel fuehrt den Kopf mit');
+  assert.match(page, /class="rewards-page app-page app-page--dashboard app-page--columns" data-composition="dashboard"/,
+    'die Seitenwurzel fuehrt das breite Mass und ist der Container der Spalten');
+  assert.match(page, /<header class="page-toolbar page-toolbar--narrow rewards-toolbar">/,
+    '--narrow bleibt: der Kopf endet am Mass der Seite, in jedem Reiter am selben');
+  assert.equal(rewardsPage.syncToolbarMeasure, undefined, 'kein Umschalter am Kopf mehr');
+  assert.doesNotMatch(page, /rewards-toolbar--wide/, 'der Kopf-Modifier je Reiter ist weg');
+  assert.doesNotMatch(css, /rewards-toolbar--wide/, 'und seine Regeln auch');
+  assert.match(css, /\.rewards-page \.rw-section\s*\{[^}]*max-width:\s*var\(--page-measure/,
+    'jeder Abschnitt endet am Mass der Seite - auch das Katalograster');
+});
+
+test('Belohnungen: Uebersicht und Verlauf stehen im Spaltenraster, die Seitenspalte nimmt nur vorhandene Daten', () => {
+  const s = rewardsPage.state;
+  const vorher = { user: s.user, overview: s.overview, catalog: s.catalog, ledger: s.ledger, redemptions: s.redemptions, recentLedger: s.recentLedger };
+  const buchung = { id: 1, type: 'earn', delta: 5, reason: 'Zimmer', user_name: 'Emma', created_at: '2026-09-20' };
+  try {
+    s.user = { id: 1, role: 'admin' };
+    s.overview = { me: 1, balances: [{ id: 2, display_name: 'Emma', balance: 30 }] };
+    s.catalog = [{ id: 7, name: 'Kinoabend', cost: 100, is_active: 1 }];
+    s.ledger = [buchung];
+    s.redemptions = [];
+
+    // Uebersicht mit Buchungen: Punktestaende links, die letzten Buchungen rechts.
+    s.recentLedger = [buchung];
+    let el = markupEl();
+    rewardsPage.renderOverview(el);
+    const [main, rail] = el.html.split('<div class="page-columns__rail">');
+    assert.match(main, /<div class="page-columns__main">[\s\S]*rw-standings/, 'die Punktestaende stehen in der Listenspalte');
+    assert.ok(rail, 'mit Buchungen gibt es eine Seitenspalte');
+    assert.match(rail, /class="rw-section__more"[^>]*>rewards\.tabLedger/, 'der Abschnittstitel ist der Weg in den Verlauf');
+    assert.match(rail, /<ul class="rw-ledger">[\s\S]*rw-ledger-row/, 'derselbe Zeilenbaustein wie im Verlauf');
+
+    // Ohne Antwort (null) und ohne Buchung ([]) entfaellt die Spalte - kein
+    // Leerzustand, der "keine Buchungen" behauptet, wenn die Abfrage scheiterte.
+    for (const leer of [null, []]) {
+      s.recentLedger = leer;
+      el = markupEl();
+      rewardsPage.renderOverview(el);
+      assert.match(el.html, /page-columns__main/);
+      assert.doesNotMatch(el.html, /page-columns__rail/, `recentLedger=${JSON.stringify(leer)}: keine Seitenspalte`);
+    }
+
+    // Verlauf: Buchungen links, Punktestaende in Kurzform rechts.
+    el = markupEl();
+    rewardsPage.renderLedger(el);
+    const [lMain, lRail] = el.html.split('<div class="page-columns__rail">');
+    assert.match(lMain, /<ul class="rw-ledger">/, 'die Buchungen stehen in der Listenspalte');
+    assert.match(lRail ?? '', /rw-standing--compact[\s\S]*Emma/, 'die Punktestaende stehen in der Seitenspalte');
+    assert.doesNotMatch(lRail ?? '', /rw-redeem-open|rw-progress__track/, 'Kurzform: kein Fortschritt, kein Einloesen');
+  } finally {
+    Object.assign(s, vorher);
+  }
 });
 
 test('Belohnungen: der Einrichtungsschritt „Praemien" wechselt wirklich in den Katalog', () => {

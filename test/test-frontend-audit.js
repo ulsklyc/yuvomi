@@ -17511,6 +17511,55 @@ test('PAGE-019: der Liste-+-Detail-Baustein misst die Modulflaeche an der Schwel
     'PAGE-019: der gedeckelte Baustein steht mittig wie die Content-Spalte des Kopfs');
 });
 
+test('PAGE-020: eine Aussenkante je Modul - kein Reiter schaltet das Mass oder den Kopf um', () => {
+  // Critique R16 (2026-10-05): Haushaltshilfe gab NUR der Uebersicht das breite
+  // Mass (`[data-tab="dashboard"] { --page-measure }`), Belohnungen gab NUR im
+  // Katalog dem Kopf die volle Kante (`.rewards-toolbar--wide`). Kopf und
+  // angedockter Primaerknopf sprangen beim Reiterwechsel um bis zu 431px. Das
+  // Mass steht an der Seite und gilt fuer alle ihre Reiter (DESIGN.md,
+  // Breitenregel); die Liste haelt ihr Lesemass im Spaltenraster.
+  let declarations = 0;
+  for (const file of readdirSync(new URL('../public/styles/', import.meta.url)).filter((name) => name.endsWith('.css'))) {
+    for (const { selector, body } of eachRule(read(`../public/styles/${file}`))) {
+      if (!/--page-measure\s*:/.test(body)) continue;
+      declarations += 1;
+      assert.ok(!/\[data-tab\b/.test(selector),
+        `PAGE-020 ${file}: "${selector.trim()}" setzt --page-measure je Reiter - die Kante des Moduls springt`);
+      assert.ok(!/toolbar--[\w-]+/.test(selector),
+        `PAGE-020 ${file}: "${selector.trim()}" setzt --page-measure an einem Kopf-Modifier - der Kopf folgt der Seite, nicht dem Reiter`);
+    }
+  }
+  assert.ok(declarations >= 8, `PAGE-020: nur ${declarations} --page-measure-Deklarationen gelesen - der Scan ist blind`);
+
+  // Wer das Spaltenraster benutzt, macht die Seitenwurzel zum Container und
+  // fuehrt ein Mass, an dem der Kopf enden kann.
+  const layout = read('../public/styles/layout.css');
+  let root = null;
+  let twoTracks = null;
+  for (const { selector, body, at } of eachRule(layout)) {
+    const sel = selector.trim();
+    if (sel === '.app-page--columns' && !at.length) root = body;
+    if (sel === '.page-columns' && at.some((a) => /@container\s+module-surface/.test(a))) twoTracks = body;
+  }
+  assert.ok(root && /container\s*:\s*module-surface\s*\/\s*inline-size/.test(root),
+    'PAGE-020: .app-page--columns muss der Container module-surface sein - die Spalten messen die Modulflaeche');
+  assert.ok(twoTracks && /var\(--layout-reading\)/.test(twoTracks) && /var\(--layout-rail-min\)/.test(twoTracks),
+    'PAGE-020: ab der Schwelle fuehrt .page-columns die Liste auf --layout-reading und die Seitenspalte ab --layout-rail-min');
+  let users = 0;
+  for (const name of pagesBehindAppShell()) {
+    const src = withoutBlockComments(withoutHtmlComments(read(`../public/pages/${name}`)));
+    if (!/renderPageColumns\(/.test(src)) continue;
+    users += 1;
+    assert.match(src, /app-page--columns/,
+      `PAGE-020 ${name}: nutzt renderPageColumns() ohne app-page--columns an der Wurzel - die Spalten haben keinen Container`);
+    assert.ok(declaredCompositionModes(src).includes('dashboard'),
+      `PAGE-020 ${name}: das Spaltenraster verlangt das breite Mass (dashboard) - im Lesemass endete der Kopf an der Liste`);
+    assert.doesNotMatch(src, /classList\.toggle\('[\w-]*toolbar--[\w-]+'/,
+      `PAGE-020 ${name}: schaltet einen Kopf-Modifier um - der Kopf steht in jedem Reiter an derselben Kante`);
+  }
+  assert.ok(users >= 3, `PAGE-020: nur ${users} Seiten mit Spaltenraster gefunden - Belohnungen, Entsorgung und Haushaltshilfe sollten es sein`);
+});
+
 test('PAGE-010: full-bleed is an explicit --bleed declaration', () => {
   const layout = read('../public/styles/layout.css');
   assert.match(layout, /\.page-section--bleed\s*\{[\s\S]*?padding-inline:\s*var\(--page-inline-pad\)/,

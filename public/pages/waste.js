@@ -20,7 +20,7 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import {
   renderAppPage, renderPageHeader, renderPageTitle, renderPageBody,
-  renderPageActions, renderListSection,
+  renderPageActions, renderListSection, renderPageColumns,
 } from '/utils/page-layout.js';
 import { findPageFab, setPageFabAction } from '/utils/fab.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
@@ -1960,8 +1960,11 @@ async function restoreOccurrence(occurrenceKey) {
 function renderPage() {
   _container.replaceChildren();
   _container.insertAdjacentHTML('beforeend', renderAppPage({
-    mode: 'reading',
-    className: 'waste-page',
+    // Flaeche mit Spalten (DESIGN.md, Breitenregel, R16): der Kopf endet an
+    // der Modulkante, die Abholungen stehen links auf dem Lesemass, Abfallarten
+    // und Quellen ab der Split-Schwelle rechts daneben.
+    mode: 'dashboard',
+    className: 'waste-page app-page--columns',
     legacyAlias: false,
     header: renderPageHeader({
       narrow: true,
@@ -2038,20 +2041,22 @@ function renderPage() {
       ].join('\n')),
     }),
     body: renderPageBody({
-      content: [
-        renderListSection({
+      content: renderPageColumns({
+        main: renderListSection({
           className: 'waste-upcoming-section',
           content: `<h2 class="waste-section-title u-section-title">${t('waste.upcomingSectionTitle')}</h2><div class="row-carrier" id="waste-upcoming-list"></div>`,
         }),
-        renderListSection({
-          className: 'waste-types-section',
-          content: `<h2 class="waste-section-title u-section-title">${t('waste.typesSectionTitle')}</h2><div id="waste-types-list"></div>`,
-        }),
-        renderListSection({
-          className: 'waste-sources-section',
-          content: `<h2 class="waste-section-title u-section-title">${t('waste.sourcesSectionTitle')}</h2><div class="row-carrier" id="waste-sources-list"></div>`,
-        }),
-      ].join('\n'),
+        rail: [
+          renderListSection({
+            className: 'waste-types-section',
+            content: `<h2 class="waste-section-title u-section-title">${t('waste.typesSectionTitle')}</h2><div id="waste-types-list"></div>`,
+          }),
+          renderListSection({
+            className: 'waste-sources-section',
+            content: `<h2 class="waste-section-title u-section-title">${t('waste.sourcesSectionTitle')}</h2><div class="row-carrier" id="waste-sources-list"></div>`,
+          }),
+        ].join('\n'),
+      }),
     }),
     trailing: `
       <button class="page-fab" id="waste-fab-new-pickup" aria-label="${esc(t('waste.addPickup'))}" data-dock-label="${t('newLabel.waste')}">

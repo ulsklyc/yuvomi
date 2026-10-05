@@ -2727,6 +2727,82 @@ html.fab-anim-done .page-fab {
    * .row-carrier / historical page-measure--narrow behaviour. */
 }
 
+/* FLAECHE MIT SPALTEN (DESIGN.md, Breitenregel; Critique R16, 2026-10-05).
+ *
+ * Belohnungen, Entsorgung und Haushaltshilfe standen als reine Lesemass-Seiten
+ * linksbuendig auf 720px: bei 1280 blieben rechts 308px leer, bei 1440 468px.
+ * Wo ein Reiter breit war (Katalograster, Uebersicht der Haushaltshilfe),
+ * wechselte die Aussenkante je Reiter, und der angedockte Primaerknopf sprang
+ * mit (Belohnungen 271/431px).
+ *
+ * EINE KANTE JE MODUL: die Seite fuehrt das breite Mass (`dashboard`,
+ * `--layout-wide`), ihr Kopf endet in JEDEM Reiter dort. Der Inhalt steht in
+ * diesem Raster: die Liste links auf dem Lesemass - eine Zeilenliste wird
+ * nicht auf 1000px gestreckt -, daneben ab `--layout-split-threshold` eine
+ * Seitenspalte bis zur Modulkante. Die Listenspalte ist in jedem Reiter gleich
+ * breit, ob eine Seitenspalte daneben steht oder nicht.
+ *
+ * Unter der Schwelle steht alles einspaltig auf dem Lesemass, in
+ * Quelltextreihenfolge. `--rail-first` ist fuer Reiter, deren Zusammenfassung
+ * mobil UEBER der Liste steht (Kennzahlen vor Zeilen): die Reihenfolge im DOM
+ * bleibt, am Desktop rueckt sie in die Seitenspalte.
+ *
+ * Der Container ist die Seitenwurzel, derselbe Name wie bei Liste + Detail:
+ * beide messen die Modulflaeche neben der Seitenleiste, nicht den Viewport,
+ * und PAGE-019 haelt jede Abfrage dieses Namens an der Schwelle aus
+ * tokens.css. Baustein im Markup: `renderPageColumns()` (page-layout.js). */
+.app-page--columns {
+  container: module-surface / inline-size;
+}
+
+.page-columns {
+  display: grid;
+  grid-template-columns: minmax(0, var(--layout-reading));
+  /* Zwischen den Spalten steht ein fester Abstand, damit die Listenspalte in
+   * jedem Modul gleich breit ist; den Abstand der gestapelten Abschnitte
+   * bestimmt das Modul (`--page-columns-gap`), wie vor dem Raster. */
+  gap: var(--page-columns-gap, var(--space-6)) var(--space-6);
+  align-items: start;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--page-measure, none);
+}
+
+.page-columns__main,
+.page-columns__rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-columns-gap, var(--space-6));
+  min-width: 0;
+}
+
+@container module-surface (min-width: 65rem) {
+  .page-columns {
+    grid-template-columns:
+      minmax(0, var(--layout-reading))
+      minmax(var(--layout-rail-min), 1fr);
+  }
+
+  .page-columns--rail-first > .page-columns__main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .page-columns--rail-first > .page-columns__rail {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  /* Kennzahlen in der Seitenspalte sind eine Zusammenfassung neben der Liste:
+   * untereinander statt als Zeile, die in der Spalte zu schmal wuerde, und
+   * ohne das Bandpolster, damit die erste Karte mit der Liste beginnt. */
+  .page-columns__rail > .metric-grid {
+    --summary-cards: 1;
+    grid-auto-rows: auto;
+    padding-block: 0;
+  }
+}
+
 /* Der Kopf hat KEIN Rail-Element (docs/PAGE-COMPOSITION.md). Titel, Mitte und
  * Aktionen sind direkte Kinder von .page-toolbar - die Large-Title-Regeln
  * (typography.css) und Siegel/Dock-Titel (`:scope > .page-toolbar__title` in

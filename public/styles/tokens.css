@@ -1395,6 +1395,15 @@
    * Seitenleiste (320px, Apples Systemeinstellungen), nicht die Listenbahn
    * oben. EIN Wert fuer beide, damit sie nicht auseinanderlaufen (R10). */
   --layout-nav-list: 20rem;
+  /* Seitenspalte der Flaechen mit Spalten (`.page-columns`, layout.css;
+   * DESIGN.md, Breitenregel, R16 2026-10-05): links die Liste auf dem
+   * Lesemass, rechts eine Spalte, die den Rest bis zur Modulkante nimmt und
+   * nie schmaler wird als dieser Wert. 22.5rem = 360px, die Inhaltsbreite eines
+   * 390er-Telefons - was mobil in die Spalte passt, passt auch hier. Bei 1280
+   * (Flaeche 1060,
+   * Inhalt 996) bleiben der Liste 612px, bei 1440 steht sie voll auf 720px
+   * und die Seitenspalte nimmt 412px. */
+  --layout-rail-min: 22.5rem;
   /* Kanonisches horizontales Seiten-Padding. Ein Wert für den Gutter aller
    * Modul-Roots. Ab 1024px auf --space-8 angehoben (siehe Media-Query unter
    * :root), damit Kopf und Inhalt dieselbe Fluchtlinie haben (Issue #577). */

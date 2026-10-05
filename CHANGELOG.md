@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Rewards, Waste and Housekeeping use the width of a desktop window.** These three stood as a
+  720px column next to an empty right half, and where one tab was wider than the others, the
+  header and its primary button jumped when you switched tabs - in Rewards by up to 431px. Each
+  module now has one outer edge for all of its tabs, and the button stays where it is. From a
+  window of about 1280px the lists get a second column with what was already there: the latest
+  bookings next to the point balances in Rewards (the heading leads to the full history) and
+  the balances next to the history, waste types and import sources next to the next pickups,
+  the month's figures next to the visit reports and a person's visit log next to the staff list
+  in Housekeeping. The lists themselves keep their reading width. Nothing changes on a phone
+  except that the Rewards overview ends with the latest bookings.
+
 ### Fixed
 
 - **A module switched off for the household no longer works in the background** (#1660). With

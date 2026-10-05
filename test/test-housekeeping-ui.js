@@ -676,14 +676,47 @@ test('Uebersicht am Desktop: Besuche | Zahlungen nebeneinander, sobald die Spalt
   assert.ok(cols, 'die beiden Karten stehen in EINEM Spaltentraeger');
   assert.match(cols[1], /housekeeping\.recentVisits[\s\S]*housekeeping\.payments/, 'Besuche links, Zahlungen rechts');
   const rules = [...eachRule(HK_STYLES)];
-  const wide = rules.find((r) => r.selector.trim() === '.housekeeping-page[data-tab="dashboard"]' && !r.at.length);
-  assert.match(wide?.body ?? '', /--page-measure:\s*var\(--layout-wide\)/, 'die Uebersicht bekommt das breite Mass');
+  // Das breite Mass fuehrt die SEITE (Critique R16, 2026-10-05), nicht mehr
+  // nur dieser Reiter: mit `[data-tab="dashboard"] { --page-measure }` endeten
+  // Kopf und Knopf in der Uebersicht bei 996px und in den anderen Reitern bei
+  // 720 - die Kante wechselte je Reiter.
+  assert.equal(rules.filter((r) => /\[data-tab/.test(r.selector) && /--page-measure/.test(r.body)).length, 0,
+    'kein Reiter schaltet das Mass um');
   // Zwei Spalten am Container der Seite, nicht am Viewport (PAGE-005).
   const grid = rules.find((r) => r.selector.trim() === '.housekeeping-dashboard-columns'
     && r.at.some((a) => /@container housekeeping-page \(min-width:\s*60rem\)/.test(a)));
   assert.match(grid?.body ?? '', /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
   const HK_SRC = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
-  assert.match(HK_SRC, /page\.dataset\.tab = state\.tab/, 'der Reiter steht an der Seite, damit das Mass ihm folgt');
+  assert.equal((HK_SRC.match(/class="housekeeping-page app-page app-page--dashboard app-page--columns[ "]/g) || []).length, 3,
+    'Seite, Ladezustand und Fehlerzustand fuehren dasselbe breite Mass');
+  assert.doesNotMatch(HK_SRC, /app-page--reading/, 'kein Lesemass-Rest an einer der drei Wurzeln');
+});
+
+// Critique R16 (2026-10-05): Aufgaben, Berichte und Personal standen auf 720px
+// neben 308/468px leerer Flaeche. Die Listen bleiben auf dem Lesemass, aber im
+// Spaltenraster der Shell - mit dem, was es als zweiten Inhalt schon gibt.
+test('Listenreiter am Desktop: Liste im Spaltenraster, Kennzahlen bzw. Protokoll in der Seitenspalte', () => {
+  const HK_SRC = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
+  const fn = (name) => {
+    const start = HK_SRC.indexOf(`function ${name}(`);
+    assert.ok(start >= 0, `${name} fehlt`);
+    const end = HK_SRC.indexOf('\nfunction ', start + 1);
+    return HK_SRC.slice(start, end < 0 ? undefined : end);
+  };
+  const tasks = fn('renderTasks');
+  assert.match(tasks, /renderPageColumns\(\{\s*main:[\s\S]*housekeeping-task-list/, 'Aufgaben: die Liste steht in der Listenspalte');
+  assert.doesNotMatch(tasks, /\brail:/, 'Aufgaben: kein zweiter Inhalt, also keine erfundene Seitenspalte');
+  const reports = fn('renderReports');
+  assert.match(reports, /renderPageColumns\(\{\s*railFirst: true,\s*rail:[\s\S]*metric-grid[\s\S]*main:[\s\S]*housekeeping-reports/,
+    'Berichte: Kennzahlen im DOM vor der Liste (mobil darueber), am Desktop in der Seitenspalte');
+  const staff = fn('renderStaff');
+  assert.match(staff, /rail: state\.selectedStaffId \? renderStaffVisitLog\(\) : ''/,
+    'Personal: das Protokoll der gewaehlten Person steht in der Seitenspalte');
+  const rules = [...eachRule(HK_STYLES)];
+  const heading = rules.find((r) => r.selector.trim() === '.page-columns__rail .housekeeping-section-heading'
+    && r.at.some((a) => /@container module-surface \(min-width:\s*65rem\)/.test(a)));
+  assert.match(heading?.body ?? '', /flex-direction:\s*column/,
+    'in der 360px-Spalte stehen Titel und Monatswahl untereinander wie am Telefon');
 });
 
 test('Haushaltshilfe spricht EINEN Namen: Reiter "Uebersicht", Kennzahlen mit Zeitbezug, Geldschein statt Dollar', () => {

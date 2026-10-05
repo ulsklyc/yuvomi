@@ -575,3 +575,16 @@
   block-size: var(--icon-md);
   flex-shrink: 0;
 }
+
+/* Die Abschnitte stehen im Spaltenraster der Seite (`.page-columns`,
+   layout.css): Abholungen links, Abfallarten und Quellen in der Seitenspalte.
+   Im Onboarding ist die Listenspalte leer - ohne sie rueckt der Leerzustand in
+   die erste Spur und steht auf dem Lesemass statt in der schmalen Spalte. */
+.waste-page--onboarding .page-columns__main {
+  display: none;
+}
+
+/* Der Abstand der Abschnitte bleibt der des Seitenkoerpers vor dem Raster. */
+.waste-page {
+  --page-columns-gap: var(--space-3);
+}

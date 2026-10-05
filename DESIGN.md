@@ -1171,7 +1171,9 @@ Seitdem steht jede Seite hinter der Shell in **genau einem von drei Regimen**:
 - **Flaeche** - die volle Hauptspalte fuer Seiten, deren Inhalt selbst zweidimensional ist:
   Raster, Board, Masonry, Kacheln, Diagramme. Umsetzung: `full` oder `dashboard`; das Budget
   fuehrt als `reading` seine eigene Bahn (Lesemass-Liste plus Seitenleiste, `--budget-lane`),
-  die die Hauptspalte fuellt.
+  die die Hauptspalte fuellt. Dazu gehoert die **Flaeche mit Spalten** (R16, 2026-10-05) fuer
+  Module aus kurzen Listen: `dashboard` plus `app-page--columns` an der Wurzel, der Inhalt im
+  Raster `.page-columns` (`renderPageColumns()`), siehe unten.
 
 **Die Schwelle misst die Modulflaeche, nicht den Viewport.** Neben der ausgeklappten
 Seitenleiste hat ein 1440er-Fenster 1220px Hauptspalte (Detailspalte da), ein 1280er 1060px
@@ -1191,25 +1193,49 @@ eines z-index-Wettlaufs bekommt alles hinter `.split-view__detail-head` einen ei
 Stapelkontext (`isolation: isolate`, layout.css) - fuer jede Split-Detailspalte
 (`test:master-detail`).
 
+**Eine Aussenkante je Modul, kurze Listen zweispaltig** (R16, 2026-10-05). Die Messmatrix
+vom 05.10. fand die 720px-Spalte weiter in leerer Flaeche: Haushaltshilfe (Aufgaben, Berichte,
+Personal), Entsorgung und Belohnungen (Uebersicht, Verlauf) nutzten 67,9 % der Flaeche bei
+1280 und 59,0 % bei 1440. Wo ein Reiter breit war, wechselte die Kante je Reiter, und der
+angedockte Primaerknopf sprang mit (Belohnungen 271/431px). Seitdem gilt:
+
+- **Der Kopf endet in jedem Reiter eines Moduls an derselben Kante**, der breiten. Kein
+  Reiter schaltet `--page-measure` oder den Kopf um (kein `[data-tab]`-Mass, kein
+  `--wide`-Modifier am Kopf); der Primaerknopf steht fest.
+- **Die Liste bleibt auf dem Lesemass** - eine Zeilenliste wird nicht auf 1000px gestreckt.
+  `.page-columns` fuehrt sie in der ersten Spur (hoechstens `--layout-reading`), in jedem
+  Reiter gleich breit.
+- **Ab `--layout-split-threshold` steht rechts eine Seitenspalte** bis zur Modulkante,
+  mindestens `--layout-rail-min` (360px, die Inhaltsbreite eines Telefons) breit. Sie bekommt
+  nur, was es als Daten und Baustein schon gibt: Belohnungen/Uebersicht die letzten Buchungen
+  (der Abschnittstitel fuehrt in den Reiter Verlauf), Belohnungen/Verlauf die Punktestaende,
+  Entsorgung Abfallarten und Quellen neben den Abholungen, Haushaltshilfe/Berichte die
+  Kennzahlen (`railFirst`: mobil ueber der Liste, am Desktop daneben), Haushaltshilfe/Personal
+  das Protokoll der gewaehlten Person. Ein Reiter ohne zweiten Inhalt (Haushaltshilfe/Aufgaben)
+  laesst die Spur leer, statt Inhalt zu erfinden.
+- Unter der Schwelle steht alles einspaltig in Quelltextreihenfolge auf dem Lesemass.
+
+Gemessen 1280 / 1440: Liste 612 / 720px, Seitenspalte 360 / 412px, Kopfkante 1248 / 1408 in
+allen Reitern. Guard: `test:frontend-audit` ("eine Aussenkante je Modul").
+
 **Das vierte Mass ist abgeschafft.** 960px (`data`) war ein Zwischenstand, keine Entscheidung:
 es liess 228px leer, ohne dass die Flaeche etwas trug. Zugeordnet am 2026-09-26:
 
 - **Inventar -> Liste + Detail**, weil es ein Detail-Markup hat (`openDetailView`, dieselbe
   Leseansicht wie Kontakte); eingehaengt mit #1477 (`reading` + `list-detail`,
   `test:inventory-list-detail`).
-- **Haushaltshilfe -> Lesemass.** Ihre vier Reiter sind Listen und Karten, die auf 720px
-  zweispaltig bleiben. Die Berichte waeren als Flaeche besser gelesen, aber ein Regime je
-  Reiter hiesse den geteilten Kopf je Reiter umzuschalten - dieselbe offene Frage wie beim
-  Budget (PAGE-COMPOSITION.md, Welle C). Bis sie entschieden ist, gilt das Lesemass.
+- **Haushaltshilfe -> Lesemass**, am 2026-10-05 (R16) weiter zur **Flaeche mit Spalten**:
+  die Frage "ein Regime je Reiter oder ein geteilter Kopf" ist entschieden - eine Kante je
+  Modul, die breite, und die Listenreiter fuellen sie mit einer Seitenspalte (oben).
 
 `.app-page--data` bleibt nur fuer Erweiterungs-Manifeste, die `data` erklaeren; keine
 Kernseite fuehrt es. Die Zuordnung aller Seiten:
 
 | Seite | Regime | Umsetzung |
 |---|---|---|
-| `rewards.js` Belohnungen | Lesemass | `reading`; der Katalog darf als Raster breit (`rw-section--wide`) |
-| `waste.js` Entsorgung | Lesemass | `reading` |
-| `housekeeping.js` Haushaltshilfe | Lesemass | `reading` (vorher `data`) |
+| `rewards.js` Belohnungen | Flaeche | `dashboard` + Spalten (`.page-columns`); der Katalog ist ein Raster ueber das Mass |
+| `waste.js` Entsorgung | Flaeche | `dashboard` + Spalten (`.page-columns`) |
+| `housekeeping.js` Haushaltshilfe | Flaeche | `dashboard` + Spalten (`.page-columns`); die Uebersicht fuehrt zwei gleiche Karten |
 | `birthdays.js` Geburtstage | Liste + Detail | `reading` + `list-detail` |
 | `contacts.js` Kontakte | Liste + Detail | `reading` + `list-detail` |
 | `tasks.js` Aufgaben | Liste + Detail | `full` + `list-detail` in Liste und Verlauf (#1550: neben dem Eintrag seine Aufgabe); Kanban ist Flaeche |

@@ -926,17 +926,31 @@
   }
 }
 
-/* BESUCHE | ZAHLUNGEN (Re-Critique 2026-09-28, P5 / A8 P2-3). Die Uebersicht
- * ist ein Kennzahlen-Reiter, keine Textseite: im Lesemass (720px) standen
- * Besuche und Zahlungen untereinander und bei 1440 blieben rechts rund 470px
- * leer. NUR dieser Reiter bekommt das breite Mass (Kopf, Kennzahlen und Karten
- * fluchten weiter miteinander; die Listenreiter bleiben im Lesemass), und die
- * zwei Karten stehen nebeneinander, sobald die Inhaltsspalte fuer zwei
- * lesbare Karten reicht - gemessen am Container der Seite, nicht am Viewport
- * (PAGE-005: eine Seite besitzt keine eigenen Viewport-Schwellen). 60rem
- * erreicht die Spalte ab etwa 1280px Fensterbreite neben der Seitenleiste. */
-.housekeeping-page[data-tab="dashboard"] {
-  --page-measure: var(--layout-wide);
+/* EINE KANTE FUER ALLE VIER REITER (Critique R16, 2026-10-05). Bis hierhin
+ * bekam NUR die Uebersicht das breite Mass (`[data-tab="dashboard"]`): Kopf
+ * und angedockter Knopf endeten dort bei 996/1156px, in Aufgaben, Berichten
+ * und Personal bei 720 - die Kante wechselte je Reiter. Die Seite fuehrt das
+ * breite Mass jetzt selbst (`dashboard`), und die Listenreiter stehen im
+ * Spaltenraster der Shell (`.page-columns`, layout.css): Liste auf dem
+ * Lesemass, daneben Kennzahlen (Berichte) bzw. das Protokoll (Personal).
+ *
+ * BESUCHE | ZAHLUNGEN (Re-Critique 2026-09-28, P5 / A8 P2-3): die Uebersicht
+ * ist ein Kennzahlen-Reiter, ihre zwei Karten stehen nebeneinander, sobald die
+ * Inhaltsspalte fuer zwei lesbare Karten reicht - gemessen am Container der
+ * Seite, nicht am Viewport (PAGE-005). 60rem erreicht die Spalte ab etwa
+ * 1280px Fensterbreite neben der Seitenleiste. */
+.housekeeping-content {
+  --page-columns-gap: var(--space-4);
+}
+
+/* Das Protokoll in der Seitenspalte ist so schmal wie am Telefon (360px):
+ * Titel und Monatswahl stehen deshalb untereinander wie dort, statt sich die
+ * Zeile zu teilen. Schwelle = `--layout-split-threshold` (PAGE-019). */
+@container module-surface (min-width: 65rem) {
+  .page-columns__rail .housekeeping-section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 .housekeeping-dashboard-columns {

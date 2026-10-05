@@ -35,33 +35,6 @@
   gap: var(--space-1);
 }
 
-/* DER KATALOG-KOPF ENDET AM RASTER (R10 L7, rewards.js syncToolbarMeasure).
- * Der Kopf bleibt `--narrow` - sonst passte die gekappte Reiterleiste neben
- * Titel und Pille in die erste Zeile -, gibt aber im Katalog der Aktionszeile
- * die regulaere Kante zurueck: Polster wie jeder Kopf, kein Rest-Slot
- * (`::after`, layout.css), und die Reiterleiste darf ihre volle Zeile nehmen,
- * damit sie weiter umbricht. Gemessen 1440: Pille endet 1408 wie das Raster.
- *
- * DAS MASS DIESES KOPFS IST DIE SPALTE, UND DAS SAGT ER AUCH. Ohne die
- * Angabe erbte er `--page-measure` der Seite (720px) und behauptete damit ein
- * Lesemass, an dem er bewusst nicht endet - die Kanten-Pruefung der
- * gedeckelten Koepfe (Sonde 19 der Dokument-Guards) las 996px statt 720px bei
- * 1280. `100%` ist der Wert der Kompositionen ohne Mass (`full`/`split`):
- * die Deckel-Formeln in layout.css fallen damit von selbst auf den
- * regulaeren Abstand, den die beiden Regeln hier ausdruecklich setzen. */
-.rewards-page > .rewards-toolbar.page-toolbar--narrow.rewards-toolbar--wide {
-  --page-measure: 100%;
-  padding-inline-end: var(--page-inline-pad);
-}
-
-.rewards-page > .rewards-toolbar.page-toolbar--narrow.rewards-toolbar--wide::after {
-  content: none;
-}
-
-.rewards-page > .rewards-toolbar--wide > .rewards-tabs {
-  max-width: none;
-}
-
 .rewards-content__inner {
   display: flex;
   flex-direction: column;
@@ -78,14 +51,57 @@
    -------------------------------------------------------- */
 .rw-section { display: flex; flex-direction: column; gap: var(--space-4); }
 
-/* ZEILENLISTEN AUF DEM LESEMASS, DAS RASTER DARF BREIT (Re-Critique
- * 2026-09-27, A3 P2-5 / R10 L7). Gemessen bei 1440x900: der Punktestand endete
- * bei 972, sein Kopfknopf „Teilnehmer verwalten" bei 1408; das Verlaufs-Ledger
- * lief 1156px breit, und der Punktwert stand 1100px von seinem Grund entfernt.
- * Jeder Abschnitt ausser dem Katalograster (`--wide`) endet jetzt mit dem
- * Lesemass der Seite - samt seines Kopfs, der sonst die Kante verliesse. */
-.rewards-page .rw-section:not(.rw-section--wide) {
+/* JEDER ABSCHNITT ENDET AN DER MODULKANTE (Critique R16, 2026-10-05). Die
+ * Seite fuehrt das breite Mass; Uebersicht und Verlauf stehen im Spaltenraster
+ * (`.page-columns`, layout.css), das die Zeilenlisten auf dem Lesemass haelt
+ * und die Seitenspalte bis zur Kante fuehrt. Das Katalograster nimmt die volle
+ * Breite des Masses. Vorher endeten Zeilenlisten samt Kopf bei 720px und das
+ * Raster an der Spalte - zwei Kanten in einem Modul. */
+.rewards-page .rw-section {
   max-width: var(--page-measure, none);
+}
+
+/* Die Spalten und ihre Abschnitte teilen den Abstand der Seite. */
+.rewards-content__inner {
+  --page-columns-gap: var(--space-8);
+}
+
+/* Der Abschnittstitel als Weg in den Reiter (Seitenspalte der Uebersicht):
+ * Schrift und Farbe kommen vom Titel, der Knopf traegt nur Ziel und Pfeil. */
+.rw-section__more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  /* Volle Zielhoehe, ohne die Zeile hoeher zu machen als die anderen
+   * Abschnittstitel: der Ueberstand wird nach oben und unten zurueckgenommen. */
+  min-height: var(--target-base);
+  margin-block: calc((var(--target-base) - 1lh) / -2);
+  margin-inline: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rw-section__more:hover { color: var(--module-accent); }
+
+.rw-section__more:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.rw-section__more svg {
+  inline-size: var(--icon-md);
+  block-size: var(--icon-md);
+  color: var(--color-text-tertiary);
+}
+
+/* Punktestand in Kurzform (Seitenspalte des Verlaufs): nur Person und Punkte. */
+.rw-standing--compact {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .rw-section__head {

@@ -61,6 +61,16 @@ detail column appears once the page itself is at least `--layout-split-threshold
 in the table in DESIGN.md; PAGE-017 to PAGE-019 hold table and code together.
 | `full` | calendar month, kanban, notes masonry, schedule, documents browser, immersive | usable width |
 
+**Columns inside the wide measure** (2026-10-05). A module made of short lists - rewards,
+waste, housekeeping - is not a reading page with an empty right half: it declares `dashboard`
+plus `app-page--columns` on the root and puts its content into `.page-columns`
+(`renderPageColumns()`). The list sits in the first track, capped at `--layout-reading`; from
+`--layout-split-threshold` of module surface a side column runs to the module edge
+(`--layout-rail-min` or wider). The header ends at the wide measure in **every** tab of the
+module, so the docked primary action does not move when the tab changes. A tab without a second
+piece of existing content leaves the side column empty rather than stretching its list or
+inventing content. No tab switches `--page-measure` or a header modifier (PAGE-020).
+
 Arbitrary values such as `max-width: 843px` are prohibited.
 
 ### Primary alignment edge
@@ -141,6 +151,8 @@ Defined in [`public/styles/tokens.css`](../public/styles/tokens.css):
 | `--layout-reading` | 720px | reading / form columns |
 | `--layout-content` | 960px | data tables and wide lists |
 | `--layout-wide` | 1200px | dashboard / KPI grids |
+| `--layout-split-threshold` | 65rem | module surface from which list + detail and `.page-columns` show their second column |
+| `--layout-rail-min` | 22.5rem | minimum width of the side column in `.page-columns` (the content width of a phone) |
 
 Legacy aliases remain for one release cycle:
 
@@ -160,6 +172,8 @@ Defined in [`public/styles/layout.css`](../public/styles/layout.css):
 | `.page-section` | semantic section; no page geometry |
 | `.page-section--bleed` | explicit full-bleed band |
 | `.page-toolbar--narrow` | header row ends at `--page-measure` via `::after`; the slots stay direct children (no rail element) |
+| `.app-page--columns` | makes the page root the `module-surface` container for `.page-columns` |
+| `.page-columns` | list track on the reading measure plus, from the split threshold, a side column to the module edge; `__main` and `__rail` are its two children, `--rail-first` keeps a summary above the list in the DOM (mobile) and beside it on desktop |
 
 Mode modifiers set `--page-measure`:
 
@@ -199,6 +213,7 @@ module CSS sizing the page.
 | `renderPageSection` | `.page-section` (+ measure by default) |
 | `renderListSection` | list section with measure cap |
 | `renderMetricBand` | KPI band on the page measure |
+| `renderPageColumns` | `.page-columns` with `main`, optional `rail` and `railFirst` |
 
 Modules must not set page width, gutters, or breakpoints. They pass content into these helpers.
 
@@ -239,6 +254,7 @@ Enforced in [`test/test-frontend-audit.js`](../test/test-frontend-audit.js):
 | PAGE-017 | Every page stands in exactly one of the three width regimes of DESIGN.md, and its code matches the regime |
 | PAGE-018 | No core page declares the retired 960px measure (`data`) |
 | PAGE-019 | The list + detail block queries the module surface at the threshold from tokens.css |
+| PAGE-020 | One outer edge per module: no tab switches `--page-measure` or a header modifier, and a page using `.page-columns` declares `dashboard` and the container |
 
 **Scope: every page behind the app shell.** The audit derives that set from
 `public/router.js` rather than from a list somebody has to remember: a route with
@@ -320,12 +336,12 @@ overflow checks. Not wired into CI yet.
 | Wave | Mode | Modules | Status in this PR |
 |------|------|---------|-------------------|
 | Reference | `reading` | **birthdays** | **Done (helpers + CSS)** |
-| A | `reading` | contacts, rewards, pantry, recipes | Mode declared |
-| B | `data` -> `reading` | inventory, housekeeping | Moved to `reading` on 2026-09-26 when the width rule retired the 960px measure for core pages (DESIGN.md, "Die Breitenregel"); inventory joins `list-detail` once the master/detail block is wired (PAGE-017) |
+| A | `reading` | contacts, pantry, recipes | Mode declared |
+| A' | `reading` -> `dashboard` + columns | rewards, waste, housekeeping | Moved on 2026-10-05: one outer edge per module, lists on the reading measure inside `.page-columns`, a side column from the split threshold (DESIGN.md, "Die Breitenregel") |
+| B | `data` -> `reading` | inventory | Moved to `reading` on 2026-09-26 when the width rule retired the 960px measure for core pages (DESIGN.md, "Die Breitenregel"); wired to `list-detail` since (PAGE-017) |
 | B' | `full` | schedule, documents | Mode declared. Both were `data` until the seventh review round: their headers run full width (no `--narrow`), so the 960px measure was visible only on the primitives that happen to consume it - the KPI band of the schedule statistics ended at 960 while the filter card and the result cards beside it did not. `full` sets the measure to 100% and caps nothing, which is what these pages looked like before this PR. PAGE-016 keeps it that way: a measured mode needs a narrow header, or nothing on the page may consume the measure |
 | C | budget family | budget + stats/plans | Mode declared (`reading`); stats and plans are tab panels inside the Budget page and inherit its measure. A per-tab mode (reports as `dashboard`) also means switching the shared header per tab - an open design decision, not done here |
 | C' | `full` / `split` | subscriptions (`full`), split-expenses (`split`) | Mode declared; content not on a measure yet (analytics grid / two-column layout own their width) |
 | D | `dashboard` / `full` | calendar, tasks, notes, health, dashboard | Mode declared |
-| Later | `reading` | waste | Built with the mode declared from the start |
 
 After v1, every layout question becomes: *which composition mode, and which contract clause is violated?*
