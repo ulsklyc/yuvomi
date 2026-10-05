@@ -2283,6 +2283,30 @@ Zeitraum-Kopfs. Ein drittes Element (Werkzeugzeile, Chipreihe) wandert weiter in
 in den Port. `test:budget-ui` haelt Klasse, nachgebende Titelbasis und den Center-Slot ohne
 eigene Zeile.
 
+**Verwaltung steht mobil nicht vor dem Inhalt (R16, 2026-10-05).** Der Kopf war nur die
+halbe Rechnung: in vier Flaechen stand unter ihm eine eigene Bedienflaeche, die den Inhalt
+unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
+- **Wahl, die man selten aendert, ist EINE aufklappbare Zeile.** Aufteilung: die Gruppenwahl
+  nennt die aktive Gruppe und klappt Suche, „+", Aktiv/Archiviert und die Liste auf; der
+  Gruppenkopf darunter wiederholt den Namen nicht und ist nur noch seine Aktionszeile.
+  Erste Ausgabe y 975 -> 499. Ohne aktive Gruppe steht die Liste offen.
+- **Kennzahlen sind mobil die Kurzzeile** (`metricGlanceHtml`, `.budget-glance*`, seit R16
+  in panel.css statt budget.css - der Baustein laedt jetzt in jedem Modul). Inventar erste
+  Kategorie y 292 -> 186, Haushaltshilfe erste Besuchszeile y 475 -> 418. Eine Kennzahl mit
+  dem Wert 0 entfaellt in der Zeile und mobil auch aufgeklappt (`metric-card--empty`); ein
+  aktiver Kachel-Filter (Inventar „Braucht Aufmerksamkeit") haelt die Zeile aufgeklappt.
+- **Filter und Zeitraum eines Reiters sind hoechstens zwei Zeilen.** Schichtplan/Vergleich:
+  Ansicht und Personen in Zeile 1 (die Personen als EINE waagerecht scrollende Chipreihe),
+  der Stepper in Zeile 2 (263 -> 110px). Auswertung: Person und Zeitraum nebeneinander ohne
+  Kartenflaeche, die Aktionen darunter (257 -> 104px). Feld-Labels, die dabei weichen,
+  bleiben im Baum (geclippt), nie `display: none`.
+- **Kacheln werden mobil kompakte Karten.** Praemien: 358x218 -> rund 130px (Zeichen und Text
+  nebeneinander, Preis und Aktion darunter). Ein Abschnittstitel, der den Reiter wiederholt,
+  steht mobil nur im Baum.
+Was hier NICHT umgezogen ist und warum, steht in der Messmatrix der Umsetzung: Vorrat (die
+Kuechen-Leiste hat keine Titelzeile, die Werkzeugzeile faltet beim Scrollen), Rezepte
+(ebenso), Gesundheit-Startseite, Einstellungsblaetter, Budget/Statistik.
+
 **Variante: Zeitraum-Kopf (Kalender).** (R17 Z1, 2026-09-28, A1 P2-3/P3-7.) Wo der Titel
 ein navigierbarer Zeitraum ist - heute nur im Kalender -, stehen mobil die Werkzeuge in
 Zeile 1: Large Title, dahinter trailing Filter, Lupe und EIN „..." (dort die Ansichtswahl
