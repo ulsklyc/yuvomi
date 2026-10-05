@@ -1216,7 +1216,15 @@ angedockte Primaerknopf sprang mit (Belohnungen 271/431px). Seitdem gilt:
 - Unter der Schwelle steht alles einspaltig in Quelltextreihenfolge auf dem Lesemass.
 
 Gemessen 1280 / 1440: Liste 612 / 720px, Seitenspalte 360 / 412px, Kopfkante 1248 / 1408 in
-allen Reitern. Guard: `test:frontend-audit` ("eine Aussenkante je Modul").
+allen Reitern. Guard: PAGE-020 in `test:frontend-audit`.
+
+**Das Budget folgt derselben Regel mit seiner eigenen Bahn** (`--budget-lane`, Lesemass +
+Abstand + Seitenleiste; die Variable steht an `.budget-page`, damit der Kopf sie liest). Der
+Kopf endet an der Bahn statt am Lesemass (Knopf 972 -> 1248 / 1376), und jeder Reiter fuellt
+sie: Plan mit Kategorien links und Sparziel in der Seitenleiste, Darlehen mit Filter, Karten
+und Transaktionen links und den drei Kennzahlen rechts (vorher vier Kanten), Konten mit dem
+Nettovermoegen als Zeile ueber dem Raster, Aufteilung mit den Ausgaben in der breiten Spalte,
+Statistik mit angeheftetem Anteilsring neben den Kategoriezeilen (`test:budget-ui`).
 
 **Das vierte Mass ist abgeschafft.** 960px (`data`) war ein Zwischenstand, keine Entscheidung:
 es liess 228px leer, ohne dass die Flaeche etwas trug. Zugeordnet am 2026-09-26:

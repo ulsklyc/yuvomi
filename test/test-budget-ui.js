@@ -1408,6 +1408,50 @@ test('die Übersicht wird ab 960px Container zweispaltig: Buchungen links, Bilan
   assert.ok(aside > 0 && list > aside, 'Seitenleiste muss im Markup vor der Liste stehen');
 });
 
+// Critique R16 (2026-10-05): der Kopf endete am Lesemass (Knopf bei x=972),
+// waehrend sechs von sieben Reitern bis zur Bahn liefen (1248 bei 1280, 1376
+// bei 1440); der Plan stand als einziger auf 720px, die Darlehen fuehrten vier
+// Kanten, und das Nettovermoegen stand als 232px-Kachel allein in seiner Zeile.
+test('Kopf und alle Reiter enden an der Bahn: Kopfmass, Plan, Darlehen und Konten', () => {
+  const rules = [...eachRule(budgetCss)];
+  const rule = (sel, pred = () => true) => rules.find(({ selector, at }) => selector.trim() === sel && pred(at));
+  const wide = (at) => at.some((a) => /@container\s+budget-page\s*\(\s*min-width:\s*960px\s*\)/.test(a));
+  const flat = (at) => at.length === 0;
+
+  // Die Bahn steht an der Seite, damit Kopf UND Koerper sie lesen.
+  const page = rule('.budget-page', (at) => flat(at) && true);
+  const lanes = rules.filter(({ selector, body }) => selector.trim() === '.budget-page' && /--budget-lane:/.test(body));
+  assert.equal(lanes.length, 1, 'die Bahn (--budget-lane) steht genau einmal, an .budget-page');
+  assert.ok(page);
+  assert.doesNotMatch(rule('#budget-body', flat)?.body ?? '', /--budget-lane:/, 'nicht mehr am Koerper - dort las sie der Kopf nicht');
+  assert.match(rule('.budget-page > .page-toolbar', flat)?.body ?? '', /--page-measure:\s*var\(--budget-lane\)/,
+    'der Kopf endet an der Bahn, in jedem Reiter an derselben Stelle');
+
+  // Plan: Kategorien links, Sparziel in der Seitenleiste.
+  const columns = /grid-template-columns:[^;]*var\(--page-measure[^;]*var\(--budget-rail-max\)/;
+  assert.match(rule('.budget-tab-panel--plan > .budget-plan', wide)?.body ?? '', /max-width:\s*var\(--budget-lane\)/,
+    'der Plan nimmt ab 960px die Bahn statt des Lesemasses');
+  const plan = rule('#budget-plan-body', wide);
+  assert.match(plan?.body ?? '', columns, 'dieselben Spaltenmasse wie die Uebersicht');
+  assert.match(plan?.body ?? '', /grid-auto-flow:\s*row dense/, 'die Liste rueckt NEBEN das Sparziel, das im Markup vor ihr steht');
+  assert.match(rule('#budget-plan-body > .budget-plan-savings', wide)?.body ?? '', /grid-column:\s*2/);
+  assert.match(rule('#budget-plan-body > .budget-plan__section', wide)?.body ?? '', /grid-column:\s*1/);
+
+  // Darlehen: Filter, Karten und Transaktionen links, Kennzahlen rechts.
+  const loans = rule('.budget-loans', wide);
+  assert.match(loans?.body ?? '', columns, 'die Darlehen stehen auf derselben Zweispalte');
+  assert.match(loans?.body ?? '', /grid-template-rows:[^;]*minmax\(0,\s*1fr\)/,
+    'die letzte Zeile ist flexibel - eine hoehere Seitenleiste zieht die linke Spalte nicht auseinander');
+  const loanMetrics = rule('.budget-loans > .metric-grid', wide);
+  assert.match(loanMetrics?.body ?? '', /grid-column:\s*2/);
+  assert.match(loanMetrics?.body ?? '', /--summary-cards:\s*1/, 'in der Seitenleiste stehen die Kennzahlen untereinander');
+
+  // Konten: die eine Kennzahl traegt die Zeile bis zur Bahn.
+  const net = rule('#budget-body .budget-tab-panel--accounts > .metric-grid', flat);
+  assert.match(net?.body ?? '', /--summary-cards:\s*1/);
+  assert.match(net?.body ?? '', /max-width:\s*var\(--budget-lane\)/);
+});
+
 test('alle Tabs teilen EINE Bahn: gleiche linke Kante, gleiches Mass, der Plan nicht zentriert', () => {
   // Drei Bahnen vorher: Übersicht 720 links, Plan 640 ZENTRIERT, Rest 1156.
   const lane = [...eachRule(budgetCss)].find(({ selector, at }) => selector.trim() === '.budget-tab-panel > *' && at.length === 0);

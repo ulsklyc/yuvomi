@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the month's figures next to the visit reports and a person's visit log next to the staff list
   in Housekeeping. The lists themselves keep their reading width. Nothing changes on a phone
   except that the Rewards overview ends with the latest bookings.
+- **Every Budget tab ends at the same edge on a desktop, and so does the header.** The "new"
+  button stood 276px (at 1280) or 404px (at 1440) short of the content it belongs to. The plan
+  was a single 720px column, loans changed their right edge four times on the way down, and the
+  net worth of the accounts sat in a 232px tile next to an empty row. Now the plan shows the
+  category budgets with the savings goal beside them, loans show the filter, the loans and their
+  transactions in one column with the three figures beside it, and the net worth runs across the
+  row above the accounts. In "Split" the recent expenses take the wider column, balances and
+  activity the narrower one; in the statistics the share ring stays in view while you scroll the
+  categories. Phones are unchanged.
 
 ### Fixed
 

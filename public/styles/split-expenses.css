@@ -323,10 +323,17 @@
   justify-content: flex-end;
 }
 
+/* DIE AUSGABEN TRAGEN DIE BREITE SPALTE (Critique R16, 2026-10-05). Bis hierhin
+ * standen Salden und Aktivitaetsprotokoll links in der breiten Spalte und die
+ * „Letzten Ausgaben" - das, wofuer man den Reiter oeffnet - rechts in der
+ * schmalen (305px bei 1280). Die Reihenfolge im Markup bleibt Salden, Ausgaben,
+ * Aktivitaet (einspaltig unveraendert); zweispaltig stehen die Ausgaben links
+ * ueber beide Zeilen, Salden und Aktivitaet rechts untereinander. */
 .split-content-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.9fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(300px, 1fr);
   gap: var(--space-4);
+  align-items: start;
 }
 
 .split-card {
@@ -334,8 +341,13 @@
   min-width: 0;
 }
 
-.split-card:nth-child(2) {
-  grid-row: span 2;
+.split-content-grid > .split-card {
+  grid-column: 2;
+}
+
+.split-content-grid > .split-card:nth-child(2) {
+  grid-column: 1;
+  grid-row: 1 / span 2;
 }
 
 .split-card-head {
@@ -579,7 +591,9 @@ button.split-expense:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .split-card:nth-child(2) {
+  .split-content-grid > .split-card,
+  .split-content-grid > .split-card:nth-child(2) {
+    grid-column: auto;
     grid-row: auto;
   }
 }

@@ -285,11 +285,20 @@
  * Das Mass steht an den KINDERN des Panels, nicht am Panel: das Panel ist der
  * Scrollport, und ein gekappter Scroller liesse das Mausrad rechts von seiner
  * Kante ins Leere greifen (dieselbe Begruendung wie bei `.list-scroller`). */
-#budget-body {
+/* DIE BAHN STEHT AN DER SEITE, NICHT AM KOERPER (Critique R16, 2026-10-05):
+ * der Kopf muss sie auch lesen. Er endete am Lesemass (720px), waehrend jeder
+ * Reiter ausser dem Plan bis zur Bahn lief - der angedockte Knopf stand bei
+ * 1280 um 276px und bei 1440 um 404px vor der Kante seines Inhalts. Jetzt
+ * endet der Kopf an der Bahn, in jedem Reiter an derselben Stelle. */
+.budget-page {
   --budget-rail-min: 18.75rem;
   --budget-rail-max: 23.75rem;
   --budget-column-gap: var(--space-6);
   --budget-lane: calc(var(--page-measure, var(--layout-reading)) + var(--budget-column-gap) + var(--budget-rail-max));
+}
+
+.budget-page > .page-toolbar {
+  --page-measure: var(--budget-lane);
 }
 
 .budget-tab-panel > * {
@@ -439,6 +448,17 @@
 
 /* .budget-networth ist entfallen: das Nettovermögen ist jetzt eine
  * .metric-card wie jede andere Kennzahl im Modul. */
+
+/* DIE EINE KENNZAHL TRAEGT DIE ZEILE (Critique R16, 2026-10-05). Am Desktop
+ * stand das Nettovermoegen als 232px-Kachel in der ersten von drei Spalten,
+ * daneben 764px leer, und endete am Lesemass ueber einem Kontenraster, das bis
+ * zur Bahn laeuft. Wie die Einzelkarte „Nur Ausgaben" (#504) nimmt sie die
+ * volle Zeile - mobil tat sie das ueber `auto-fit` schon - und endet an
+ * derselben Kante wie die Konten darunter. */
+#budget-body .budget-tab-panel--accounts > .metric-grid {
+  --summary-cards: 1;
+  max-width: var(--budget-lane);
+}
 
 .budget-accounts__list {
   display: grid;
@@ -1322,6 +1342,43 @@
 .budget-loans {
   margin-bottom: var(--space-3);
   flex-shrink: 0;
+}
+
+/* DARLEHEN AUF DER BAHN DER UEBERSICHT (Critique R16, 2026-10-05). Vier
+ * Bloecke, vier Kanten: Filterzeile bis zur Bahn, Kennzahlen am Lesemass,
+ * Karten bis zur Bahn, Transaktionen am Lesemass. Ab 960px Container dieselbe
+ * Zweispalte wie Uebersicht, Statistik und Plan: links Filter, Darlehen und
+ * Transaktionen auf dem Lesemass, rechts die drei Kennzahlen als
+ * Zusammenfassung in der Seitenleiste. Das Markup bleibt in seiner Reihenfolge
+ * (mobil unveraendert). Die Kennzahlen spannen alle Zeilen; die letzte Zeile
+ * ist flexibel, damit eine kurze linke Spalte nicht auseinandergezogen wird,
+ * wenn die Seitenleiste hoeher ist als sie. */
+@container budget-page (min-width: 960px) {
+  .budget-loans {
+    display: grid;
+    grid-template-columns:
+      minmax(0, var(--page-measure, var(--layout-reading)))
+      clamp(
+        var(--budget-rail-min),
+        calc(100% - var(--page-measure, var(--layout-reading)) - var(--budget-column-gap)),
+        var(--budget-rail-max)
+      );
+    grid-template-rows: repeat(5, auto) minmax(0, 1fr);
+    column-gap: var(--budget-column-gap);
+    align-items: start;
+  }
+
+  .budget-loans > * {
+    grid-column: 1;
+  }
+
+  .budget-loans > .metric-grid {
+    --summary-cards: 1;
+    grid-column: 2;
+    grid-row: 1 / -1;
+    grid-auto-rows: auto;
+    padding-block: 0;
+  }
 }
 
 /* .budget-loans__header trägt jetzt .panel-head (geteilte Panel-
@@ -2244,6 +2301,14 @@ button.budget-entry__title {
   .budget-stats__aside {
     grid-column: 2;
     grid-row: 1 / span 2;
+    /* DIE ANTEILE BEGLEITEN DIE LISTE (Critique R16, 2026-10-05). Der Ring
+     * stand oben in der Seitenleiste, und ab y=397 war sie leer, waehrend
+     * links 700px Kategoriezeilen liefen - deren Farben nur der Ring erklaert.
+     * Angeheftet bleibt er beim Scrollen neben den Balken stehen; er ist
+     * 198px hoch und passt in jeden Scrollport, der zwei Spalten traegt. Der
+     * Abstand ist der, mit dem das Panel beginnt. */
+    position: sticky;
+    top: var(--space-3);
   }
 }
 
@@ -2281,6 +2346,45 @@ button.budget-entry__title {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+}
+
+/* KATEGORIEN | SPARZIEL (Critique R16, 2026-10-05). Der Plan stand als einziger
+ * Reiter auf dem Lesemass (720px) neben 276px (1280) bzw. 404px (1440) leerer
+ * Bahn. Ab 960px Container dieselbe Zweispalte wie Uebersicht und Statistik:
+ * links die Kategorie-Budgets auf dem Lesemass, rechts das Sparziel in der
+ * Breite der Seitenleiste. Im Markup bleibt das Sparziel vorn (mobil ueber der
+ * Liste); `dense` setzt die Liste neben es statt darunter, und der Hinweis
+ * eines vergangenen Monats laeuft ueber beide Spalten. */
+@container budget-page (min-width: 960px) {
+  .budget-tab-panel--plan > .budget-plan {
+    max-width: var(--budget-lane);
+  }
+
+  #budget-plan-body {
+    display: grid;
+    grid-auto-flow: row dense;
+    grid-template-columns:
+      minmax(0, var(--page-measure, var(--layout-reading)))
+      clamp(
+        var(--budget-rail-min),
+        calc(100% - var(--page-measure, var(--layout-reading)) - var(--budget-column-gap)),
+        var(--budget-rail-max)
+      );
+    column-gap: var(--budget-column-gap);
+    align-items: start;
+  }
+
+  #budget-plan-body > .budget-plan__historic-note {
+    grid-column: 1 / -1;
+  }
+
+  #budget-plan-body > .budget-plan-savings {
+    grid-column: 2;
+  }
+
+  #budget-plan-body > .budget-plan__section {
+    grid-column: 1;
+  }
 }
 
 /* Sparziel-Karte */
