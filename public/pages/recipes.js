@@ -21,7 +21,7 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { mealTypeList, ensureMealTypeNames } from '/utils/meal-types.js';
-import { recipeThumbEl } from '/utils/recipe-thumb.js';
+import { recipeThumbEl, recipeHeroEl } from '/utils/recipe-thumb.js';
 import { navModuleAccess } from '/permissions.js';
 import { mountMasterDetail, splitViewDetailHtml, detailPaneHeaderEl } from '/utils/master-detail.js';
 
@@ -86,6 +86,19 @@ function recipeThumb(recipe) {
     hasOwnImage: recipe.has_own_image,
     className: 'recipe-row__thumb',
   });
+}
+
+/**
+ * Traegt die Zeile ein Vorschaubild?
+ *
+ * DIE FRAGE IST "HAT ES EIN BILD", NICHT "WOHER KOMMT ES" (Critique 2026-10-05,
+ * R16). Die Bedingung war `isMirrored`: ein eigenes Rezept bekam im Editor ein
+ * Bild, der Wochenplan zeigte es, die Rezeptliste nicht. Gespiegelte Rezepte
+ * behalten ihre Regel aus #1059 (Bild oder Platzhalter - die Herkunft ist Teil
+ * der Zeile); ein eigenes Rezept ohne Bild bleibt eine Textzeile.
+ */
+function rowShowsThumb(recipe) {
+  return recipe.source !== 'native' || Boolean(recipe.has_own_image);
 }
 
 function mealTypeOptions() {
@@ -772,7 +785,7 @@ function buildRecipeList() {
     // durch eine gemischte Liste scrollt, muss vor dem Aufklappen sehen können,
     // welche Rezepte gespiegelt (und schreibgeschützt) sind, nicht erst
     // danach.
-    if (isMirrored) toggle.appendChild(recipeThumb(recipe));
+    if (rowShowsThumb(recipe)) toggle.appendChild(recipeThumb(recipe));
 
     const name = document.createElement('span');
     name.className = 'list-row__name';
@@ -940,6 +953,11 @@ function buildRecipeList() {
  * Detailspalte (Liste + Detail), damit beide nie auseinanderlaufen.
  */
 function fillRecipeDetail(detail, recipe) {
+  // Das eigene Bild als Kopf des Details (R16) - ohne Bild kein Element, also
+  // auch kein Platzhalterblock (utils/recipe-thumb.js).
+  const hero = recipeHeroEl({ recipeId: recipe.id, hasOwnImage: recipe.has_own_image });
+  if (hero) detail.appendChild(hero);
+
   const ingredients = recipe.ingredients ?? [];
   const mealTypes = normalizeRecipeMealTypes(recipe.meal_types);
   // Chips nur, wenn sie unterscheiden: gilt ein Rezept für alle Mahlzeiten,
@@ -1842,4 +1860,6 @@ export const __test = {
   transferRecipe,
   // R8 H10: Loeschen links im Dialogfuss.
   recipeModalFooterHtml,
+  // R16: eigene Rezepte zeigen ihr Bild in Liste und Detail.
+  rowShowsThumb, fillRecipeDetail,
 };

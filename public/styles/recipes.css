@@ -356,6 +356,28 @@
   padding: var(--space-1) var(--space-3) var(--space-4);
 }
 
+/* Kopfbild des Details (R16): das selbst hochgeladene Bild, 3:2. Der RAHMEN
+ * traegt das Verhaeltnis, das Bild fuellt ihn per `object-fit: cover` - es wird
+ * beschnitten, nie gestaucht (ein Hochformat-Foto verliert oben und unten,
+ * statt breitgezogen zu werden). Ohne Bild gibt es den Rahmen nicht
+ * (utils/recipe-thumb.js), also auch keinen grauen Block. Auf breiter Flaeche
+ * begrenzt, damit das Bild die Zutaten nicht aus dem ersten Bildschirm schiebt. */
+.recipe-detail__hero {
+  aspect-ratio: 3 / 2;
+  width: 100%;
+  max-width: 30rem;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: var(--color-surface-2);
+}
+
+.recipe-detail__hero-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .recipe-detail__ingredients {
   margin: 0;
   padding: 0;

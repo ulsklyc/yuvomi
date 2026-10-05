@@ -419,3 +419,52 @@ test('Serien-Mahlzeit: Loeschen im Fuss fragt den Umfang UEBER dem Editor - ein 
     globalThis.__apiStub = zuvor.api;
   }
 });
+
+// ---------------------------------------------------------------------------
+// Eigene Rezepte zeigen ihr Bild (Critique 2026-10-05, R16)
+// ---------------------------------------------------------------------------
+// Das Vorschaubild hing an `isMirrored`: ein eigenes Rezept bekam im Editor ein
+// Bild, der Wochenplan zeigte es - die Rezeptliste nicht, und das Detail hatte
+// gar keins. Die Frage ist "hat es ein Bild", nicht "woher kommt das Rezept".
+
+const NATIVE_MIT_BILD = { id: 11, title: 'Lachs', source: 'native', has_own_image: true, provider_has_image: false, ingredients: [], meal_types: ['dinner'] };
+const NATIVE_OHNE_BILD = { ...NATIVE_MIT_BILD, id: 12, has_own_image: false };
+
+test('R16: ein eigenes Rezept mit Bild traegt das Vorschaubild in der Liste, eines ohne Bild keinen Platzhalter', () => {
+  assert.equal(recipes.rowShowsThumb(NATIVE_MIT_BILD), true);
+  assert.equal(recipes.rowShowsThumb(NATIVE_OHNE_BILD), false, 'ein eigenes Rezept ohne Bild bleibt eine Textzeile');
+  // Gespiegelte Rezepte behalten ihre Regel (#1059): Bild oder Platzhalter.
+  assert.equal(recipes.rowShowsThumb({ id: 13, source: 'mealie', provider_has_image: false }), true);
+});
+
+test('R16: das Detail traegt ein Kopfbild, wenn es ein eigenes Bild gibt - und nur dann', () => {
+  // Das Mini-DOM kennt keine Selektoren: gelesen werden die Kinder selbst.
+  const isHero = (node) => node?.className === 'recipe-detail__hero';
+  const mit = document.createElement('div');
+  recipes.fillRecipeDetail(mit, NATIVE_MIT_BILD);
+  const [hero] = mit.childNodes;
+  assert.ok(isHero(hero), 'das Kopfbild steht im Detail, und zwar zuerst');
+  const [img] = hero.childNodes;
+  assert.equal(img.tagName, 'img');
+  assert.equal(img.src, '/api/v1/recipes/11/image');
+  assert.equal(img.alt, '', 'dekorativ: der Name steht in der Zeile');
+  assert.equal(img.loading, 'lazy');
+  assert.equal(img.listener, 'error', 'ein Bild, das nicht laedt, nimmt seinen Rahmen mit');
+
+  const ohne = document.createElement('div');
+  recipes.fillRecipeDetail(ohne, NATIVE_OHNE_BILD);
+  assert.equal(ohne.childNodes.some(isHero), false, 'ohne Bild kein Platzhalterblock');
+  assert.ok(ohne.childNodes.length > 0, 'das Detail selbst ist da');
+});
+
+test('R16: das Kopfbild beschneidet (3:2, cover) und verzerrt nicht', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/recipes.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const frame = rules.find((r) => r.selector.trim() === '.recipe-detail__hero');
+  const image = rules.find((r) => r.selector.trim() === '.recipe-detail__hero-img');
+  assert.match(frame?.body ?? '', /aspect-ratio:\s*3\s*\/\s*2/);
+  assert.match(frame?.body ?? '', /overflow:\s*hidden/);
+  assert.match(image?.body ?? '', /object-fit:\s*cover/, 'das Bild wird beschnitten, nicht gestaucht');
+});
