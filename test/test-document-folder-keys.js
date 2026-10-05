@@ -132,6 +132,7 @@ test('der Schluessel ist eindeutig - ein zweiter Ordner kann ihn nicht bekommen'
 const LOCALES_AFTER_V157 = {
   'pt-BR.json': 'pt-BR kam mit #1437 dazu; sein "Comprovantes" gab es als Bestandsordner nie',
   'nb.json': 'nb kam mit #1529 dazu; seine Modulordner ("Kvitteringer", "Oppgaver" ...) gab es als Bestandsordner nie',
+  'zh-Hant.json': 'zh-Hant kam mit #1320 dazu; seine Modulordner in traditioneller Schrift ("收據", "任務" ...) gab es als Bestandsordner nie',
 };
 
 test('die Namensliste der Migration deckt jede ausgelieferte Uebersetzung ab', () => {
