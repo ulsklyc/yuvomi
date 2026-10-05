@@ -23,7 +23,7 @@ import {
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateEl } from '/utils/empty-state.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
-import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
+import { pageToolsMenuHtml, pageToolsActionEl, installPopoverMenus } from '/utils/popover-menu.js';
 import { formatMoney } from '/utils/money.js';
 import { todayKey } from '/utils/date.js';
 import { formatDate, getLocale, getNumberFormat } from '/i18n.js';
@@ -2375,7 +2375,7 @@ export async function render(container, { signal } = {}) {
     else _md.clear({ history: 'none' });
   }, { signal });
   toolbar.addEventListener('click', (e) => {
-    const item = e.target.closest('.popover-menu__item[data-action]');
+    const item = pageToolsActionEl(e.target);
     if (!item || item.disabled) return;
     if (item.dataset.action === 'manage-locations') openLocationManager();
     else if (item.dataset.action === 'manage-categories') openCategoryManager();

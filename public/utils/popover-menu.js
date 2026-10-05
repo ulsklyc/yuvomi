@@ -144,6 +144,27 @@ export function pageToolsMenuHtml({ id, label, items = [] }) {
 }
 
 /**
+ * Das Werkzeug des Kopfs, auf das geklickt wurde - in BEIDEN Bauarten.
+ *
+ * `pageToolsMenuHtml` baut einen einzelnen Eintrag als direkten Knopf
+ * (`.page-tools-btn--direct`) und erst ab zweien ein Menue
+ * (`.popover-menu__item`). Ein Handler, der nur den Eintrag fragt, laesst den
+ * Knopf stumm: so standen "Kategorien verwalten" (Notizen) und "Aus Kontakten
+ * importieren" (Geburtstage) im Kopf und taten nichts. Wie viele Eintraege ein
+ * Menue hat, weiss der Handler nicht - Rechte koennen es kuerzen -, also fragt
+ * er immer beide.
+ *
+ * @param {EventTarget|null} target  `event.target` des delegierten Klicks.
+ * @param {string} [action]          `data-action`; ohne ihn jedes Werkzeug.
+ * @returns {HTMLElement|null}
+ */
+export function pageToolsActionEl(target, action) {
+  if (typeof target?.closest !== 'function') return null;
+  const attr = action ? `[data-action="${action}"]` : '[data-action]';
+  return target.closest(`.popover-menu__item${attr}, .page-tools-btn--direct${attr}`) ?? null;
+}
+
+/**
  * Zieht Haken und `aria-checked` eines Schalter-Eintrags nach.
  *
  * @param {ParentNode} root

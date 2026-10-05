@@ -27,7 +27,7 @@ import { findPageFab } from '/utils/fab.js';
 import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { isSoloHousehold, hidesPrivacyControls } from '/utils/household.js';
-import { popoverMenuHtml, installPopoverMenus, pageToolsMenuHtml, syncPopoverMenuItem } from '/utils/popover-menu.js';
+import { popoverMenuHtml, installPopoverMenus, pageToolsMenuHtml, pageToolsActionEl, syncPopoverMenuItem } from '/utils/popover-menu.js';
 import { filterButtonHtml, syncFilterButton, openFilterSheet } from '/utils/filter-sheet.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
@@ -4454,7 +4454,7 @@ function wireToolbar(container) {
       openTaskFilters(container);
       return;
     }
-    const item = e.target.closest('.popover-menu__item[data-action]');
+    const item = pageToolsActionEl(e.target);
     if (!item || item.disabled) return;
     // Der Fokus steht auf einem Eintrag, den das Menue gerade versteckt hat.
     // Ein Dialog (Kategorien, Tags) gaebe ihn beim Schliessen dorthin zurueck,

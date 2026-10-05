@@ -15,7 +15,7 @@ import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
-import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
+import { pageToolsMenuHtml, pageToolsActionEl, installPopoverMenus } from '/utils/popover-menu.js';
 import { findPageFab } from '/utils/fab.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
@@ -337,7 +337,7 @@ export async function render(container, { user, signal }) {
   // geteilten Popover-Mechanik, der Klick ueber `data-action` am Kopf.
   installPopoverMenus(_container);
   _container.querySelector('.notes-toolbar')?.addEventListener('click', (e) => {
-    if (e.target.closest('.popover-menu__item[data-action="manage-categories"]') && !readOnly()) {
+    if (pageToolsActionEl(e.target, 'manage-categories') && !readOnly()) {
       // Der Fokus steht auf einem Eintrag, den das Menue gerade versteckt hat;
       // der Dialog gaebe ihn beim Schliessen dorthin zurueck und er fiele aufs
       // Dokument. Also vorher auf den Knopf, der das Menue geoeffnet hat.

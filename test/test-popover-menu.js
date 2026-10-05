@@ -371,3 +371,49 @@ test('R14: Wachsen mit Token-Kurve, bei reduzierter Bewegung nur die Blende', as
   assert.match(still, /transform:\s*none/, 'reduzierte Bewegung: kein Wachsen');
   assert.match(still, /transition:\s*opacity/, 'aber die Blende bleibt');
 });
+
+/* R16-Gesamtpruefung (2026-10-05): seit `pageToolsMenuHtml` EINEN Eintrag als
+ * direkten Knopf baut, gibt es zwei Bauarten desselben Werkzeugs - den
+ * Menue-Eintrag (`.popover-menu__item`) und den Knopf im Kopf
+ * (`.page-tools-btn--direct`). Notizen und Geburtstage hoerten nur auf den
+ * Eintrag: "Kategorien verwalten" und "Aus Kontakten importieren" standen als
+ * Knopf im Kopf und taten nichts. Gefunden von Sonde 24 der Dokument-Guards,
+ * die den Eintrag nicht mehr fand. Gegen den Stand davor rot gelaufen (Helfer
+ * fehlte, fuenf Seiten fragten den Eintrag direkt). */
+test('R16: ein Werkzeug des Kopfs antwortet als Menue-Eintrag UND als direkter Knopf', async () => {
+  const { pageToolsActionEl } = await import('../public/utils/popover-menu.js');
+  assert.equal(typeof pageToolsActionEl, 'function');
+  const asked = [];
+  const hit = { dataset: { action: 'manage-categories' } };
+  const target = { closest: (selector) => { asked.push(selector); return hit; } };
+  assert.equal(pageToolsActionEl(target, 'manage-categories'), hit);
+  assert.equal(asked[0],
+    '.popover-menu__item[data-action="manage-categories"], .page-tools-btn--direct[data-action="manage-categories"]');
+  pageToolsActionEl(target);
+  assert.equal(asked[1], '.popover-menu__item[data-action], .page-tools-btn--direct[data-action]',
+    'ohne Namen: jedes Werkzeug, in beiden Bauarten');
+  assert.equal(pageToolsActionEl({ closest: () => null }, 'x'), null);
+  assert.equal(pageToolsActionEl({}, 'x'), null, 'ein Ziel ohne closest (Textknoten) ist kein Werkzeug');
+
+  // Die Regel statt der fuenf Fundstellen: wer ein Werkzeugmenue baut, fragt den
+  // Klick ueber den Helfer. Ein `closest('.popover-menu__item[data-action...')`
+  // mit vollem Namen oder ganz ohne trifft den direkten Knopf nie; ein
+  // Praefix-Selektor (`^=`) gehoert einem Zeilenmenue und bleibt erlaubt.
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const dir = new URL('../public/pages/', import.meta.url);
+  const offenders = [];
+  let carriers = 0;
+  for (const file of readdirSync(dir).filter((name) => name.endsWith('.js'))) {
+    const src = readFileSync(new URL(file, dir), 'utf8');
+    if (!/pageToolsMenuHtml\(/.test(src)) continue;
+    carriers += 1;
+    for (const match of src.matchAll(/closest\(\s*['"`]\.popover-menu__item\[data-action(?:="[^"]*")?\]['"`]\s*\)/g)) {
+      offenders.push(`${file}: ${match[0]}`);
+    }
+  }
+  assert.ok(carriers >= 8, `nur ${carriers} Seiten mit Werkzeugmenue gelesen - der Scan hat nichts gesehen`);
+  assert.deepEqual(offenders, [],
+    'Diese Klick-Handler treffen nur den Menue-Eintrag. Baut das Menue einen einzigen Eintrag '
+    + '(von Haus aus oder weil Rechte es kuerzen), steht dort ein Knopf, der nichts tut - '
+    + '`pageToolsActionEl(e.target, name)` aus utils/popover-menu.js nehmen.');
+});
