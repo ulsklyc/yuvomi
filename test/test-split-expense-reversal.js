@@ -269,3 +269,37 @@ test('Konto der ANLEGENDEN Person geloescht: Buchung und Gegenbuchung fallen gem
   assert.equal(ledger(eid, 'expense_reversal').length, 0, 'keine Gegenbuchung ohne ihre Buchung');
   assert.deepEqual(await balances(), base, 'Salden wie vor der Ausgabe');
 });
+
+// 10.00 durch drei laesst einen Rest-Cent bei einer Person. Die Gegenbuchung
+// spiegelt die gebuchten Zeilen und rechnet nicht neu - der Cent kommt bei
+// genau der Person wieder heraus, bei der er gelandet ist.
+test('Rest-Cent: die Gegenbuchung hebt jede Zeile genau auf', async () => {
+  const base = await balances();
+  const eid = await addExpense(OWN, { title: 'Taxi', amount: '10.00', currency: 'EUR', payer_id: OWN.id, participants: [OWN.id, MGR.id, OTH.id] });
+  const booked = ledger(eid, 'expense');
+  assert.deepEqual(booked.filter((row) => row.counterparty_id != null).map((row) => -row.amount_minor).sort(), [333, 333, 334], 'Fixture: ein Anteil traegt den Rest-Cent');
+  assert.equal((await del(OWN, eid)).status, 200);
+  assert.deepEqual(shape(ledger(eid, 'expense_reversal')), mirror(booked));
+  assert.deepEqual(await balances(), base);
+});
+
+// Bearbeiten schreibt die Zeilen einer Ausgabe neu. Die Gegenbuchung spiegelt
+// den Stand NACH der Bearbeitung, und sie traegt weiter die anlegende Person -
+// nicht die, die bearbeitet, und nicht die, die loescht.
+test('erst bearbeitet, dann geloescht: aufgehoben wird der bearbeitete Stand', async () => {
+  const base = await balances();
+  const eid = await addExpense(CR, { title: 'Kino', amount: '8.00', currency: 'EUR', payer_id: OWN.id, participants: [OWN.id, OTH.id] });
+  const edited = await MGR.call('PUT', `/split-expenses/expenses/${eid}`, {
+    title: 'Kino', amount: '12.00', currency: 'EUR', split_method: 'equal', payer_id: OWN.id,
+    participants: [OWN.id, OTH.id, MGR.id], expense_date: '2026-09-01',
+  });
+  assert.equal(edited.status, 200, JSON.stringify(edited.body));
+  const booked = ledger(eid, 'expense');
+  assert.equal(booked.length, 4, 'Zahler + drei Anteile nach der Bearbeitung');
+  assert.equal(booked[0].amount_minor, 1200);
+  assert.equal((await del(OWN, eid)).status, 200);
+  const reversed = ledger(eid, 'expense_reversal');
+  assert.deepEqual(shape(reversed), mirror(booked));
+  assert.ok(reversed.every((row) => row.created_by === CR.id), 'Autor ist die anlegende Person');
+  assert.deepEqual(await balances(), base);
+});
