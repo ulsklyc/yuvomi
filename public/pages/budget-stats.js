@@ -174,10 +174,17 @@ function renderBodyContent(body) {
    * in der Hoehe und in der Schrift waechst. */
   body.replaceChildren();
   body.insertAdjacentHTML('beforeend', `
+    ${/* DER RING IST DER KOPF DER KATEGORIELISTE (R16 Schritt 2b). Er stand im
+        * Markup HINTER den Balken: mobil 874px von ihnen entfernt, am Desktop in
+        * einer Seitenleiste, die unter ihm leer blieb, waehrend links 700px
+        * Balken liefen. Jetzt: Verlauf und Ring teilen die erste Zeile (Ring
+        * rechts), die Balken nehmen darunter die ganze Bahn; einspaltig steht
+        * der Ring zwischen Verlauf und Balken. Keine leere Leiste, kein
+        * Anheften. */ ''}
     <div class="budget-stats__grid">
       <div id="budget-stats-trend" class="budget-stats__main"></div>
-      <div id="budget-stats-cat" class="budget-stats__main"></div>
       <div id="budget-stats-donut" class="budget-stats__aside"></div>
+      <div id="budget-stats-cat" class="budget-stats__main budget-stats__main--wide"></div>
     </div>
     <div class="budget-stats__export"></div>
   `);
@@ -362,9 +369,11 @@ function renderDonut() {
     return seg;
   }).join('');
   // KEINE ZWEITE LEGENDE (R14 P8): Betrag und Anteil je Kategorie stehen an
-  // den Balken daneben, die dieselbe Farbe tragen (categoryColorIndex). Die
-  // Donut-Legende zaehlte alles ein zweites Mal auf. Fuer Screenreader bleibt
-  // die Zusammenfassung unten.
+  // den Balken, die dieselbe Farbe tragen (categoryColorIndex). Die
+  // Donut-Legende zaehlte alles ein zweites Mal auf. Die Zusammenfassung
+  // (Zahl der Segmente, groesstes, Summe) steht seit R16 SICHTBAR neben dem
+  // Ring: sie war nur fuer Screenreader da, und der Ring stand ohne ein Wort
+  // neben 198px Leere.
   const summary = t('budget.statsDonutSummary', {
     count: exp.length,
     top: exp[0].label,
@@ -376,9 +385,9 @@ function renderDonut() {
   host.insertAdjacentHTML('beforeend', `
     <div class="budget-chart-section">
       <h2 class="budget-chart-section__title">${t('budget.statsDonutTitle')}</h2>
-      <p class="sr-only">${view.ctx.esc(summary)}</p>
       <div class="budget-stats__donut-wrap">
         <svg viewBox="0 0 160 160" class="budget-stats__donut" aria-hidden="true">${segs}</svg>
+        <p class="budget-stats__donut-note">${view.ctx.esc(summary)}</p>
       </div>
     </div>`);
 }
@@ -517,11 +526,15 @@ function wireTrendPoints(host, series, labelKey, raw = series) {
   const buttons = [...group.querySelectorAll('.budget-stats__point')];
   if (!buttons.length) return;
 
-  const show = (index, { focus = false } = {}) => {
+  // `mark: false` fuer den Ausgangswert: die Ableselinie nennt ihn mit Datum,
+  // aber die senkrechte Marke erscheint erst, wenn jemand zeigt, tippt oder
+  // per Tastatur wandert. Ungefragt am letzten Datenpunkt stehend las sie sich
+  // als "heute" (Critique 2026-10-05, R16).
+  const show = (index, { focus = false, mark = true } = {}) => {
     const point = series[index];
     if (!point) return;
     buttons.forEach((b, i) => {
-      b.classList.toggle('is-active', i === index);
+      b.classList.toggle('is-active', mark && i === index);
       b.tabIndex = i === index ? 0 : -1;
     });
     readout.textContent = t(labelKey, {
@@ -573,7 +586,7 @@ function wireTrendPoints(host, series, labelKey, raw = series) {
   // Aufsummiert ist kein Wert mehr null - gesucht wird am ROHEN Abschnitt.
   let initial = raw.length - 1;
   while (initial > 0 && !raw[initial].income && !raw[initial].expenses) initial--;
-  show(initial);
+  show(initial, { mark: false });
 }
 
 // Der Zeitraum steht im geteilten Kopf, nicht mehr im Panel. Gemeldet wird er

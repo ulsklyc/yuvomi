@@ -2234,8 +2234,17 @@ button.budget-entry__title {
   }
 }
 
-.budget-stats__donut-wrap { display:flex; gap:var(--space-4); align-items:center; flex-wrap:wrap; }
-.budget-stats__donut { width:160px; height:160px; }
+/* Ring und sein Satz. Einspaltig nebeneinander (Ring klein, der Satz fuellt die
+ * Zeile - vorher 160px Ring neben 198px Leere), in der Seitenspalte
+ * untereinander (Regel in der Container-Query unten). */
+.budget-stats__donut-wrap { display:flex; gap:var(--space-4); align-items:center; }
+.budget-stats__donut { width:96px; height:96px; flex:0 0 auto; }
+.budget-stats__donut-note {
+  margin:0;
+  min-width:0;
+  font-size:var(--text-sm);
+  color:var(--color-text-secondary);
+}
 .budget-stats__export { margin-top:var(--space-4); }
 
 /* Statistik auf der Budget-Bahn (Critique 2026-09-26, A5 P2-5): ab 960px
@@ -2262,19 +2271,34 @@ button.budget-entry__title {
     grid-column: 1;
   }
 
-  /* Neben Verlauf UND Vergleich: die Anteile sind die zweite Sicht auf
-   * dieselben Kategorien, die links als Balken stehen. */
+  /* NEBEN DEM VERLAUF, UEBER DEN BALKEN (R16 Schritt 2b). Der Ring stand in
+   * einer Leiste ueber beide Zeilen: ab y=397 war sie leer, und das Anheften
+   * (R16 1a) hielt ihn zwar im Bild, liess die Leiste aber leer. Jetzt endet
+   * die Spalte mit der ersten Zeile; die Balken darunter nehmen die ganze
+   * Bahn und stehen direkt unter dem Ring, der ihre Farben erklaert. */
   .budget-stats__aside {
     grid-column: 2;
-    grid-row: 1 / span 2;
-    /* DIE ANTEILE BEGLEITEN DIE LISTE (Critique R16, 2026-10-05). Der Ring
-     * stand oben in der Seitenleiste, und ab y=397 war sie leer, waehrend
-     * links 700px Kategoriezeilen liefen - deren Farben nur der Ring erklaert.
-     * Angeheftet bleibt er beim Scrollen neben den Balken stehen; er ist
-     * 198px hoch und passt in jeden Scrollport, der zwei Spalten traegt. Der
-     * Abstand ist der, mit dem das Panel beginnt. */
-    position: sticky;
-    top: var(--space-3);
+    grid-row: 1;
+  }
+
+  .budget-stats__main--wide {
+    grid-column: 1 / -1;
+  }
+
+  /* Bis zur Bahn, nicht bis zum Lesemass: sonst stuende unter dem Ring wieder
+   * eine leere Spalte neben den Balken. */
+  .budget-stats__main--wide .budget-chart-section {
+    max-width: none;
+  }
+
+  .budget-stats__aside .budget-stats__donut-wrap {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .budget-stats__aside .budget-stats__donut {
+    width: 160px;
+    height: 160px;
   }
 }
 

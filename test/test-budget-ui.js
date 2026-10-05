@@ -2609,7 +2609,7 @@ test('die Statistik steht ab 960px Container auf der Budget-Bahn: Verlauf und Ve
     assert.ok(stats.indexOf(`id="${id}"`) > gridAt, `#${id} steht nicht im Raster`);
   }
   assert.equal(cellOf('budget-stats-trend'), 'budget-stats__main');
-  assert.equal(cellOf('budget-stats-cat'), 'budget-stats__main');
+  assert.equal(cellOf('budget-stats-cat'), 'budget-stats__main budget-stats__main--wide');
   assert.equal(cellOf('budget-stats-donut'), 'budget-stats__aside');
 
   const rules = [...eachRule(budgetCss)];
@@ -2626,6 +2626,36 @@ test('die Statistik steht ab 960px Container auf der Budget-Bahn: Verlauf und Ve
   assert.ok(aside, 'die Ausgaben-Anteile stehen ab 960px nicht in der zweiten Spalte');
   const main = inQuery('.budget-stats__main', /grid-column:\s*1/);
   assert.ok(main, 'Verlauf und Vergleich stehen ab 960px nicht in der ersten Spalte');
+});
+
+/* R16 Schritt 2b (Critique 2026-10-05): der Ring stand im Markup hinter den
+ * Balken (mobil 874px entfernt, daneben 198px leer) und am Desktop in einer
+ * Leiste ueber beide Zeilen, die unter ihm leer blieb. Dazu "0 EUR" 3px neben
+ * dem ersten Datum und eine unbeschriftete Marke am letzten Datenpunkt.
+ * Gegen den Stand davor rot gelaufen. */
+test('R16: der Anteilsring ist der Kopf der Kategorieliste - keine leere Leiste, kein Anheften', () => {
+  const order = ['budget-stats-trend', 'budget-stats-donut', 'budget-stats-cat'].map((id) => stats.indexOf(`id="${id}"`));
+  assert.ok(order[0] > 0 && order[0] < order[1] && order[1] < order[2], 'Markup: Verlauf, Ring, Balken');
+  const rules = [...eachRule(budgetCss)];
+  const wide = (sel) => rules.filter(({ selector, at }) => selector.trim() === sel
+    && at.some((a) => /@container\s+budget-page\s*\(\s*min-width:\s*960px\s*\)/.test(a))).map((r) => r.body).join(';');
+  assert.match(wide('.budget-stats__aside'), /grid-row:\s*1\s*;/, 'der Ring endet mit der ersten Zeile');
+  assert.doesNotMatch(wide('.budget-stats__aside'), /position:\s*sticky|span 2/, 'keine Leiste ueber beide Zeilen');
+  assert.match(wide('.budget-stats__main--wide'), /grid-column:\s*1\s*\/\s*-1/, 'die Balken nehmen die ganze Bahn');
+  assert.match(wide('.budget-stats__main--wide .budget-chart-section'), /max-width:\s*none/);
+  // Der Satz zum Ring steht sichtbar daneben, nicht nur im Baum.
+  assert.match(stats, /<p class="budget-stats__donut-note">\$\{view\.ctx\.esc\(summary\)\}<\/p>/);
+  // Die Marke erscheint erst auf Zeigen, Tippen oder Tastatur.
+  assert.match(stats, /show\(initial, \{ mark: false \}\);/);
+  assert.match(stats, /classList\.toggle\('is-active', mark && i === index\)/);
+});
+
+test('R16: der unterste Achsenwert sitzt auf seiner Linie statt in der Zeile der X-Beschriftung', async () => {
+  const { chartGridMarkup, CHART } = await import('../public/utils/chart.js');
+  const ticks = [...chartGridMarkup(0, 6000, (v) => String(v), CHART, 3).matchAll(/<text[^>]*class="chart__axis chart__axis--y"[^>]*>/g)].map((m) => m[0]);
+  assert.equal(ticks.length, 4);
+  assert.match(ticks.at(-1), /dy="-0\.6em"/, 'der Grundwert ist um eine halbe Schrifthoehe gehoben');
+  for (const tick of ticks.slice(0, -1)) assert.doesNotMatch(tick, /dy=/, 'die uebrigen Werte bleiben mittig auf ihrer Linie');
 });
 
 // --------------------------------------------------------

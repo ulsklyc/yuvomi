@@ -84,7 +84,16 @@ export function chartGridMarkup(min, max, formatTick, geo = CHART, steps = 4) {
     // y = die Gitterlinie selbst: `.chart__axis--y` zentriert per
     // dominant-baseline. Der fruehere Versatz (+3.5 Einheiten) passte nur zu
     // einer Schrift, die mit dem Diagramm skaliert (panel.css, `.chart`).
-    out.push(`<text x="${PAD_L - 6}" y="${gy.toFixed(1)}" class="chart__axis chart__axis--y" text-anchor="end">${esc(formatTick(val, wholeTicks))}</text>`);
+    // DER UNTERSTE WERT SITZT AUF SEINER LINIE, NICHT MITTIG DARAUF (Critique
+    // 2026-10-05, R16). Die Achsenschrift ist fest 12px, die Geometrie skaliert:
+    // bei 358px Breite ist PAD_B nur noch 14px hoch, und "0 €" stand mittig auf
+    // der Grundlinie halb in der Zeile der X-Beschriftung - 3px neben
+    // "01.10.2026", gelesen als ein Wort. Um eine halbe Schrifthoehe gehoben
+    // (`dy` in em, also in Bildschirmpixeln) steht er ueber der Linie, das
+    // Datum darunter. Gilt fuer jedes Diagramm dieser Geometrie (Budget-Verlauf
+    // und die Kurven der Gesundheit).
+    const base = k === steps ? ' dy="-0.6em"' : '';
+    out.push(`<text x="${PAD_L - 6}" y="${gy.toFixed(1)}" class="chart__axis chart__axis--y" text-anchor="end"${base}>${esc(formatTick(val, wholeTicks))}</text>`);
   }
   return out.join('');
 }
