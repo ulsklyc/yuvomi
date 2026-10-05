@@ -13,7 +13,7 @@ import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js'
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate } from '/utils/ux.js';
 import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation, REQUIRED_MARK } from '/utils/html.js';
-import { periodStepperHtml, syncPeriodReset } from '/utils/period-stepper.js';
+import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
 import { initials } from '/utils/initials.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
          monthPeriodKeys, startOfLocalWeekKey, addLocalDays, defaultDateInPeriod,
@@ -2180,7 +2180,8 @@ export async function render(container, { user }) {
   // Pfeilknoepfe bleiben der Weg fuer Tastatur und Maus.
   wirePeriodSwipe(bodyEl, {
     enabled: () => !searchActive && PERIOD_SWIPE_VIEWS.has(state.view),
-    onStep: (step) => navigate(step),
+    // Der Wisch gleitet selbst herein (period-swipe.js) - kein zweiter Uebergang.
+    onStep: (step) => navigate(step, { swap: false }),
   });
 
   if (initialEvent) {
@@ -2591,7 +2592,12 @@ function getWeekNumber(dateStr) {
   return 1 + Math.round((target - firstThursday) / (7 * 86400000));
 }
 
-async function navigate(dir) {
+/* PFEILE UND KUERZEL BLAETTERN WIE DER WISCH (R16, Bewegung): der neue
+ * Zeitraum kommt von der Seite, zu der man blaettert (swapPeriod,
+ * utils/period-stepper.js). Bisher glitt nur der Touch-Pfad; Maus und Tastatur
+ * schnitten hart. `swap: false` setzt der Wisch, der sein eigenes Hereingleiten
+ * mitbringt. */
+async function navigate(dir, { swap = true } = {}) {
   if (searchActive) closeCalendarSearch({ restoreView: false });
   const gridFocus = monthGridHasFocus();
   _monthFocusDate = null;
@@ -2601,7 +2607,8 @@ async function navigate(dir) {
     : addDays(state.cursor, dir * step.days);
   await reloadForView();
   updateLabel();
-  renderView();
+  if (swap) swapPeriod(_container?.querySelector('#cal-body'), dir, renderView);
+  else renderView();
   if (gridFocus) focusMonthCell(state.cursor);
   // Eingeklappt waehlt der Schritt einen anderen Tag - die Liste darunter
   // wechselt, und das sagt die Ansage wie beim Tipp (announceMonthDay).
@@ -2612,10 +2619,13 @@ async function goToday() {
   if (searchActive) closeCalendarSearch({ restoreView: false });
   const gridFocus = monthGridHasFocus();
   _monthFocusDate = null;
+  // Aus welcher Richtung "Heute" kommt: vor oder hinter dem gezeigten Zeitraum.
+  // Tagesschluessel (YYYY-MM-DD) vergleichen sich als Text.
+  const towardsToday = state.today === state.cursor ? 0 : (state.today < state.cursor ? -1 : 1);
   state.cursor = state.today;
   await reloadForView();
   updateLabel();
-  renderView();
+  swapPeriod(_container?.querySelector('#cal-body'), towardsToday, renderView);
   if (gridFocus) focusMonthCell(state.cursor);
   else if (state.view === 'month') announceMonthDay(state.cursor);
 }

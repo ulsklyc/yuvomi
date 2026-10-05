@@ -16,6 +16,7 @@ import { t, formatDate, formatMonthYear, formatTime, getLocale, getNumberFormat 
 import { esc } from '/utils/html.js';
 import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
 import { scheduleUndoableDelete, expandIn } from '/utils/ux.js';
+import { swapContent } from '/utils/content-swap.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays, todayKey} from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { DATE_STATUS_ALERT_DAYS } from '/utils/date-status.js';
@@ -687,15 +688,16 @@ function syncDetailHead() {
   }
 }
 
-/* DER NEUE BEREICH BLENDET EIN (R14 P11, A6 P2-9). Schmal schaltete der
- * Wechsel nur `hidden` um - die einzige Tiefennavigation im Modul sprang. Nur
- * Deckkraft, kein Versatz (wie der Seitenwechsel); die Klasse faellt nach der
- * Blende, unter reduzierter Bewegung schneidet die globale Sperre sie ab. */
+/* DER NEUE BEREICH BLENDET EIN - IN JEDER BREITE (R14 P11, R16 Bewegung).
+ * Schmal schaltete der Wechsel nur `hidden` um; seit R14 blendete er dort,
+ * am Desktop schnitt die Detailspalte weiter hart. Jetzt ueber den geteilten
+ * Helfer (utils/content-swap.js): nur Deckkraft, kein Versatz - die Bereiche
+ * stehen untereinander in einer Liste, eine Seitwaertsrichtung gibt es nicht.
+ * Der Tausch selbst ist das Umschalten von `hidden` davor; hier laeuft nur
+ * die Blende, und ein zweiter Wechsel bricht sie ab. */
 function markAreaEntering(route) {
   const panel = [..._container.querySelectorAll('[data-health-panel]')].find((p) => p.dataset.healthPanel === route);
-  if (!panel) return;
-  panel.classList.add('health-panel--entering');
-  panel.addEventListener('animationend', () => panel.classList.remove('health-panel--entering'), { once: true });
+  if (panel) swapContent(panel, null);
 }
 
 /* Personenwahl und „Heute" an ihren Ort je Darstellung (health-hoist.js). */
@@ -755,7 +757,7 @@ function activateArea(id) {
   for (const panel of _container.querySelectorAll('[data-health-panel]')) {
     panel.hidden = panel.dataset.healthPanel !== route;
   }
-  if (narrow && previous && previous !== id) markAreaEntering(route);
+  if (previous && previous !== id) markAreaEntering(route);
   rememberHealthRoute(route);
   syncHealthHeader();
   updateHealthFab(route);

@@ -7069,6 +7069,13 @@ textarea::placeholder {
 .skeleton-line--medium { width: 60%; }
 .skeleton-line--full   { width: 100%; }
 
+/* Diagramm-Block (renderSkeletonChart): die Hoehe einer Diagrammflaeche, damit
+ * die Seite beim Eintreffen der Daten nicht in eine andere Gliederung springt. */
+.skeleton-chart {
+  height: calc(var(--space-12) * 3);
+  border-radius: var(--radius-sm);
+}
+
 /* --------------------------------------------------------
  * Leer-Zustände (Empty States)
  * -------------------------------------------------------- */

@@ -1074,3 +1074,68 @@ test('collapseRow: klappt die Zeile aus, mit der letzten Zeile die Gruppe - und 
     assert.equal(group2.calls.length, 0);
   } finally { restore(); }
 });
+
+/*
+ * 12. DER STANDARD HAELT NUR, WENN DIE MODULE IHN AUFRUFEN. Die Helfer oben
+ *     sind getestet; ob eine Seite sie benutzt, sieht man ihnen nicht an. Die
+ *     Listen unten sind das Inventar: jede Zeile ist ein Traeger, dessen
+ *     Inhaltswechsel bzw. Listenaenderung vor R16 ein harter Schnitt war (oder
+ *     eine eigene Einzelloesung trug). Wer einen davon wieder direkt neu
+ *     zeichnet, macht den Guard rot.
+ */
+const pageSource = (name) => readFileSync(new URL(`../public/pages/${name}.js`, import.meta.url), 'utf8');
+
+test('Inhaltswechsel: Reiter, Zeitraeume und Bereiche tauschen ueber swapContent/swapPeriod', () => {
+  const carriers = [
+    ['rewards', /swapContent\(el, draw, \{ direction/, 'Reiterwechsel'],
+    ['housekeeping', /swapContent\(content, \(\) => \{/, 'Reiterwechsel'],
+    ['housekeeping', /swapPeriod\(content, towards, \(\) => renderReports\(content\)\)/, 'Berichtsmonat'],
+    ['budget', /swapContent\(_container\.querySelector\('#budget-body'\), renderBody, \{ direction \}\)/, 'Reiterwechsel'],
+    ['budget', /swapPeriod\(bodyEl\(\), dir,/, 'Monat/Berichtszeitraum'],
+    ['budget', /swapContent\(body, renderBody\)/, 'Aufloesung der Statistik'],
+    ['calendar', /swapPeriod\(_container\?\.querySelector\('#cal-body'\), dir, renderView\)/, 'Blaettern per Pfeil und Kuerzel'],
+    ['calendar', /swapPeriod\(_container\?\.querySelector\('#cal-body'\), towardsToday, renderView\)/, 'Heute'],
+    ['meals', /swapPeriod\(_container\?\.querySelector\('#week-grid'\) \?\? null, step, renderWeekGrid\)/, 'Woche'],
+    ['schedule', /swapContent\(bodyEl\(\), renderPage, \{ direction \}\)/, 'Reiterwechsel'],
+    ['schedule', /swapPeriod\(bodyEl\(\), step, renderPage\)/, 'Woche/Tag der Uebersicht'],
+    ['health', /swapContent\(panel, null\)/, 'Bereichswechsel in jeder Breite'],
+  ];
+  const missing = carriers.filter(([name, pattern]) => !pattern.test(pageSource(name))).map(([name, , what]) => `${name}.js: ${what}`);
+  assert.deepEqual(missing, [], `Traeger ohne den geteilten Uebergang:\n  ${missing.join('\n  ')}`);
+  // Der Wisch im Kalender bringt sein eigenes Hereingleiten mit - kein zweiter Uebergang darueber.
+  assert.match(pageSource('calendar'), /onStep: \(step\) => navigate\(step, \{ swap: false \}\)/);
+  // Die zwei Einzelloesungen sind im Helfer aufgegangen.
+  for (const file of ['budget.css', 'health.css']) {
+    assert.ok(![...eachRule(css(file))].some((r) => /--entering\b/.test(r.selector)), `${file}: eigene Einblend-Klasse`);
+  }
+});
+
+test('Listenbewegung: Module, die ihre Zeilen neu bauen, nutzen list-motion bzw. die Bausteine dahinter', () => {
+  const modules = [
+    ['housekeeping', /redrawList\(content, \(\) => drawTasks\(content\)/, 'Aufgabenliste'],
+    ['housekeeping', /collapseRow\(row\)\.then\(repaint\)/, 'geloeschte Aufgabe klappt aus'],
+    ['rewards', /await collapseRow\(row, \{ group:/, 'entschiedene Anfrage klappt aus'],
+    ['waste', /redrawList\(host, \(\) => drawUpcoming\(host\)/, 'Abholungen'],
+    ['waste', /redrawList\(host, \(\) => drawTypes\(host\)/, 'Abfallarten'],
+    ['waste', /redrawList\(host, \(\) => drawSources\(host\)/, 'Quellen'],
+    ['pantry', /redrawList\(list, \(\) => drawList\(list\)/, 'Vorrat nach Datenaenderung'],
+    ['pantry', /collapseOut\(rowEl_\)/, 'geloeschter Artikel klappt aus'],
+    ['shopping', /flipPlay\(listEl,/, 'Einkauf (Bestand)'],
+    ['tasks', /await collapseOut\(lastInGroup \? group : row\)/, 'Aufgaben (Bestand)'],
+  ];
+  const missing = modules.filter(([name, pattern]) => !pattern.test(pageSource(name))).map(([name, , what]) => `${name}.js: ${what}`);
+  assert.deepEqual(missing, [], `Liste ohne Bewegung:\n  ${missing.join('\n  ')}`);
+  // Belohnungen: das Skelett steht nur beim ersten Aufbau, nicht bei jedem Wechsel.
+  const rewards = pageSource('rewards');
+  const fn = rewards.slice(rewards.indexOf('async function renderCurrentTab('), rewards.indexOf('async function renderCurrentTab(') + 900);
+  assert.match(fn, /if \(first\) \{\s*el\.replaceChildren\(\);\s*el\.insertAdjacentHTML\('beforeend', renderSkeletonList/, 'Skelett nur unter `first`');
+});
+
+test('Schichtplan: Laden zeigt das geteilte Skelett, Blaettern haelt den Inhalt bis zur Antwort', () => {
+  const schedule = pageSource('schedule');
+  assert.doesNotMatch(schedule, /card card--padded schedule-stat-loading/, 'keine Textkarte "Laedt..." mehr');
+  assert.match(schedule, /function scheduleLoadingHtml\([^)]*\) \{[\s\S]{0,200}renderSkeletonList\(/);
+  const fn = schedule.slice(schedule.indexOf('async function activateView('), schedule.indexOf('async function activateView(') + 1500);
+  assert.match(fn, /const hold = step !== null && !overview\.loading && !overview\.error;/);
+  assert.match(fn, /if \(hold\) swapPeriod\(bodyEl\(\), step, renderPage\);/);
+});

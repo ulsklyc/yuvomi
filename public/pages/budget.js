@@ -14,7 +14,8 @@ import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { periodStepperHtml, syncPeriodReset } from '/utils/period-stepper.js';
+import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
+import { swapContent } from '/utils/content-swap.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { render as renderSplitExpenses, prefillSplitExpense, canAddSplitExpense, openNewSplitExpense } from '/pages/split-expenses.js';
@@ -833,15 +834,17 @@ function wireNav() {
   // EIN Stepper für alle Tabs mit Zeitbezug. Welche Achse er bewegt, sagt der
   // Tab: Budget und Plan rechnen in Monaten, die Berichte in ihrer gewählten
   // Auflösung. Vorher trugen die Berichte einen zweiten Stepper im Panel.
+  // Der neue Zeitraum kommt von der Seite, zu der man blaettert (swapPeriod,
+  // utils/period-stepper.js) - vorher ein harter Schnitt.
+  const bodyEl = () => _container.querySelector('#budget-body');
   const stepPeriod = async (dir) => {
     if (state.activeTab === 'reports') {
       state.reportAnchor = stepAnchor(state.reportAnchor, state.range, dir);
-      renderBody();
+      swapPeriod(bodyEl(), dir, renderBody);
       return;
     }
     await loadMonth(addMonths(state.month, dir));
-    renderBody();
-    updateLabel();
+    swapPeriod(bodyEl(), dir, () => { renderBody(); updateLabel(); });
   };
   _container.querySelector('#budget-prev').addEventListener('click', () => stepPeriod(-1));
   _container.querySelector('#budget-next').addEventListener('click', () => stepPeriod(1));
@@ -851,15 +854,17 @@ function wireNav() {
       // ein Klick, waehrend der Anker schon im heutigen Bereich liegt, waere
       // sonst ein sichtbares No-Op, obwohl der Knopf `inert` sein sollte.
       if (reportShowsToday()) return;
+      const back = todayKey() < state.reportAnchor ? -1 : 1;
       state.reportAnchor = todayKey();
-      renderBody();
+      swapPeriod(bodyEl(), back, renderBody);
       return;
     }
     const m = currentMonth();
     if (m === state.month) return;
+    // 'YYYY-MM' vergleicht sich als Text: zurueck zum laufenden Monat oder vor.
+    const back = m < state.month ? -1 : 1;
     await loadMonth(m);
-    renderBody();
-    updateLabel();
+    swapPeriod(bodyEl(), back, () => { renderBody(); updateLabel(); });
   });
   // Ansichts-Scope (Mein Budget / Haushalt) — nur im personal-Modus vorhanden.
   // Dieselbe Verhaltensschicht wie die Haupt-Tabs: Roving-Tabindex ohne
@@ -903,7 +908,7 @@ function wireNav() {
   // Tab (sub-tab--active/aria/tabindex); renderBody übernimmt nur noch den Inhalt.
   _tablist = wireTablist(_container.querySelector('.budget-tabs'), {
     activeId: state.activeTab,
-    onChange: async (id) => {
+    onChange: async (id, { direction = 0 } = {}) => {
       const prev = state.activeTab;
       state.activeTab = id;
       writeTabToUrl(id);
@@ -914,8 +919,9 @@ function wireNav() {
       if (id === 'reports' && prev !== 'reports') {
         state.reportAnchor = anchorForMonth(state.month);
       }
-      renderBody();
-      markTabEntering();
+      // Nur der Reiterwechsel blendet (in Schrittrichtung der Leiste) - ein
+      // Neuaufbau desselben Reiters (Filter, Speichern) nicht.
+      swapContent(_container.querySelector('#budget-body'), renderBody, { direction });
       if (prev === 'reports' && id !== 'reports') {
         const ym = state.reportAnchor.slice(0, 7);
         if (ym !== state.month) {
@@ -982,18 +988,6 @@ function watchAsideFit(panel) {
 // Body
 // --------------------------------------------------------
 
-/* DER NEUE REITER BLENDET EIN (R14 P11, A5 P3). Die Untertabs wechselten per
- * hartem Schnitt, waehrend jeder Seitenwechsel blendet. Nur der Wechsel selbst
- * blendet - ein Neuaufbau desselben Reiters (Filter, Monat, Speichern) nicht;
- * die Klasse faellt nach der Blende. Unter reduzierter Bewegung schneidet die
- * globale Sperre (reset.css) die Animation ab. */
-function markTabEntering() {
-  const panel = _container?.querySelector('#budget-body > .budget-tab-panel');
-  if (!panel) return;
-  panel.classList.add('budget-tab-panel--entering');
-  panel.addEventListener('animationend', () => panel.classList.remove('budget-tab-panel--entering'), { once: true });
-}
-
 function renderBody() {
   const body = _container.querySelector('#budget-body');
   if (!body) return;
@@ -1031,7 +1025,8 @@ function renderBody() {
       anchor: state.reportAnchor,
       onRangeChange: (r) => {
         state.range = r;
-        renderBody();
+        // Woche/Monat/Jahr wechselt die Aufloesung: Blende ohne Richtung.
+        swapContent(body, renderBody);
         refocusSegmented('.budget-stats__ranges');
       },
       // Die Wochengrenzen kennt der Server; das Kopf-Label holt sie sich von dort
@@ -4939,9 +4934,5 @@ export const __test = {
   toggleBalanceDetailsForTest(container) {
     _container = container;
     toggleBalanceDetails();
-  },
-  markTabEnteringForTest(container) {
-    _container = container;
-    markTabEntering();
   },
 };

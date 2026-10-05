@@ -52,3 +52,27 @@ export function renderSkeletonList({ rows = 5, lines = 2 } = {}) {
   for (let i = 0; i < count; i++) cards += renderSkeletonCard({ lines });
   return `<div class="skeleton-list" aria-hidden="true">${cards}</div>`;
 }
+
+/**
+ * Skelett fuer eine DIAGRAMM-Flaeche (R16, Bewegung): Titelzeile, darunter ein
+ * Block in Diagrammhoehe, darunter eine kurze Legendenzeile. Die Statistik
+ * zeigte beim Laden ein Listen-Skelett (vier Karten mit zwei Zeilen) - die
+ * falsche Form: was danach kommt, sind Diagramme, und die Flaeche sprang beim
+ * Eintreffen der Daten in eine andere Gliederung.
+ *
+ * @param {object} [opts]
+ * @param {number} [opts.charts=2] - Anzahl der Diagramm-Karten
+ * @returns {string} HTML-String
+ */
+export function renderSkeletonChart({ charts = 2 } = {}) {
+  const count = Math.max(1, Math.floor(charts));
+  let cards = '';
+  for (let i = 0; i < count; i++) {
+    cards += '<div class="skeleton-card">'
+      + '<div class="skeleton skeleton-line skeleton-line--title"></div>'
+      + '<div class="skeleton skeleton-chart"></div>'
+      + '<div class="skeleton skeleton-line skeleton-line--short"></div>'
+      + '</div>';
+  }
+  return `<div class="skeleton-list" aria-hidden="true">${cards}</div>`;
+}

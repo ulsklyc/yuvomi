@@ -7,7 +7,7 @@
 import { api, auth } from '/api.js';
 import { t, formatDate, formatDayMonth, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { periodStepperHtml, syncPeriodReset } from '/utils/period-stepper.js';
+import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
 import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -1300,6 +1300,10 @@ let reportStepInFlight = 0;
  * zwei Monate weit gehen; eine Antwort, die ein spaeterer Klick schon
  * ueberholt hat, wird verworfen, und ein Fehler stellt den Monat zurueck. */
 async function showReportMonth(content, monthValue, focusId = null) {
+  // Richtung gegen den Monat, den der Bericht gerade ZEIGT ('YYYY-MM' als Text):
+  // der neue Monat kommt von der Seite, zu der man blaettert (swapPeriod).
+  const shownBefore = state.visitReport?.month || currentMonthKey();
+  const towards = monthValue === shownBefore ? 0 : (monthValue < shownBefore ? -1 : 1);
   state.reportMonth = monthValue === currentMonthKey() ? null : monthValue;
   const request = ++reportMonthRequest;
   const seq = ++reportFetchSeq;
@@ -1315,7 +1319,7 @@ async function showReportMonth(content, monthValue, focusId = null) {
       appliedReportSeq = seq;
     }
     if (!content?.isConnected || state.tab !== 'reports') return;
-    renderReports(content);
+    swapPeriod(content, towards, () => renderReports(content));
     // Der Reset verschwindet im laufenden Monat - dann bleibt der Fokus am
     // vorherigen Pfeil statt auf <body> zu fallen. Der Stepper steht im Kopf.
     const head = reportPeriodSlot(content) ?? content;

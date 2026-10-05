@@ -1641,7 +1641,9 @@ test('das Inline-Kategorie-Overlay ist ein vollwertiger Dialog', () => {
 });
 
 test('Berichte und Plan zeigen beim Laden ein Skelett', () => {
-  assert.match(stats, /renderSkeletonList/);
+  // Berichte laden in Diagrammform (R16): renderSkeletonChart statt der Liste.
+  assert.match(stats, /renderSkeletonChart\(/);
+  assert.doesNotMatch(stats, /renderSkeletonList/, 'kein Listen-Skelett vor Diagrammen');
   assert.match(plans, /renderSkeletonList/);
 });
 
@@ -2846,7 +2848,7 @@ test('der Budget-Tab steht in der Adresse, ohne neuen Verlaufseintrag (R8 H5, A5
   // Verdrahtung: der Wechsel der Hauptleiste schreibt die Adresse.
   const wire = budgetCode.slice(budgetCode.indexOf("_tablist = wireTablist(_container.querySelector('.budget-tabs')"));
   const onChange = wire.slice(0, wire.indexOf('attachSegmentIndicator'));
-  assert.match(onChange, /onChange:\s*async \(id\) => \{[^}]*writeTabToUrl\(id\)/, 'der Tabwechsel schreibt nicht in die Adresse');
+  assert.match(onChange, /onChange:\s*async \(id[^\n]*\) => \{[^}]*writeTabToUrl\(id\)/, 'der Tabwechsel schreibt nicht in die Adresse');
 });
 
 test('die Bilanz rechnet eine geloeschte Buchung sofort heraus und beim Undo wieder hinein (R8 H6, A5 P3)', () => {
@@ -3274,22 +3276,21 @@ test('Abos- und Gruppensuche stehen im Listenkopf (.section-toolbar), ohne eigen
   assert.match(gruppen[1].split('class="segmented')[0], /renderPageSearch\(\{\s*id: 'split-group-search'/, 'Aufteilung: die Suche steht im Gruppenkopf, vor dem Statusfilter');
 });
 
-/* R14 P11 (A5 P3): die Budget-Untertabs wechselten per hartem Schnitt, die
- * Seiten per View Transition. Der neue Reiter blendet jetzt ein - nur beim
- * Reiterwechsel, nicht bei jedem Neuaufbau (Filter, Monat). */
-test('Budget-Untertabs blenden beim Wechsel ein, mit Tokens (R14 P11)', () => {
-  const klassen = new Set();
-  let ende = null;
-  const panel = { classList: { add: (c) => klassen.add(c), remove: (c) => klassen.delete(c) }, addEventListener: (typ, fn) => { if (typ === 'animationend') ende = fn; } };
-  budgetUi.markTabEnteringForTest({ querySelector: (sel) => (sel === '#budget-body > .budget-tab-panel' ? panel : null) });
-  assert.ok(klassen.has('budget-tab-panel--entering'), 'der neue Reiter traegt die Einblendung');
-  ende?.();
-  assert.ok(!klassen.has('budget-tab-panel--entering'), 'nach der Blende faellt die Klasse, ein Neuaufbau blendet nicht erneut');
+/* R14 P11 (A5 P3) / R16 (Bewegung): die Budget-Untertabs wechselten per
+ * hartem Schnitt, dann mit einer eigenen CSS-Klasse. Jetzt laeuft der Wechsel
+ * ueber den geteilten Helfer swapContent() - nur beim Reiterwechsel, nicht bei
+ * jedem Neuaufbau - und das Blaettern ueber swapPeriod(), gerichtet. Die
+ * Regeln des Helfers (Tokens, reduzierte Bewegung, Abbruch) haelt test:motion. */
+test('Budget: Reiterwechsel und Blaettern tauschen ueber die geteilten Helfer (R16)', () => {
   const onChange = budget.slice(budget.indexOf('_tablist = wireTablist('), budget.indexOf('_tablist = wireTablist(') + 1500);
-  assert.match(onChange, /renderBody\(\);\s*markTabEntering\(\);/, 'nur der Reiterwechsel blendet');
-  const regel = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-tab-panel--entering' && !r.at.length);
-  assert.ok(regel, '.budget-tab-panel--entering fehlt');
-  assert.match(regel.body, /animation:\s*fade-in var\(--duration-[a-z0-9]+\) var\(--ease-[a-z-]+\)/, 'Blende aus Tokens');
+  assert.match(onChange, /onChange: async \(id, \{ direction = 0 \} = \{\}\)/, 'die Leiste reicht die Richtung durch');
+  assert.match(onChange, /swapContent\(_container\.querySelector\('#budget-body'\), renderBody, \{ direction \}\)/, 'der Reiterwechsel blendet in Schrittrichtung');
+  const nav = budget.slice(budget.indexOf('function wireNav()'), budget.indexOf('function wireNav()') + 2600);
+  assert.match(nav, /swapPeriod\(bodyEl\(\), dir, renderBody\)/, 'Berichte: Blaettern ist gerichtet');
+  assert.match(nav, /swapPeriod\(bodyEl\(\), dir, \(\) => \{ renderBody\(\); updateLabel\(\); \}\)/, 'Monat: Blaettern ist gerichtet');
+  assert.match(nav, /swapPeriod\(bodyEl\(\), back,/, '"Aktuell" kommt aus der Richtung des laufenden Zeitraums');
+  assert.doesNotMatch(budget, /markTabEntering/, 'die eigene Einblendung ist weg');
+  assert.ok(![...eachRule(budgetCss)].some((r) => /budget-tab-panel--entering/.test(r.selector)), 'und ihre Klasse auch');
 });
 
 /* STATISTIK OHNE DOPPELUNG (R14 P8, A5 P2-8). „Nach Kategorie" (Balken, alle
@@ -3858,7 +3859,7 @@ test('R16: Kalender, Essensplan, Budget, Haushaltshilfe und Schichtplan bauen ih
   const seiten = { calendar: 4, meals: 4, budget: 4, housekeeping: 4, schedule: 4 };
   for (const name of Object.keys(seiten)) {
     const src = withoutHtmlComments(withoutComments(read(`../public/pages/${name}.js`)));
-    assert.match(src, /import \{ periodStepperHtml(?:, syncPeriodReset)? \} from '\/utils\/period-stepper\.js';/, `${name}.js nimmt den Baustein`);
+    assert.match(src, /import \{ periodStepperHtml(?:, syncPeriodReset)?(?:, swapPeriod)? \} from '\/utils\/period-stepper\.js';/, `${name}.js nimmt den Baustein`);
     assert.match(src, /periodStepperHtml\(\{\s*prev: \{[^}]*label:[\s\S]*?value: \{[\s\S]*?next: \{[^}]*label:[\s\S]*?reset: \{/, `${name}.js: prev, value, next, reset`);
     assert.doesNotMatch(src, /classList\.toggle\('is-current'/, `${name}.js fuehrt keine eigene Fassung der Reset-Regel`);
     assert.doesNotMatch(src, /\.inert = isCurrent/, `${name}.js setzt inert nicht selbst`);

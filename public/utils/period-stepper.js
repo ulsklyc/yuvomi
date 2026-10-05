@@ -25,11 +25,17 @@
  *   ein Modul ueber `keys` an (`aria-keyshortcuts`), ausgeloest werden sie im
  *   Dispatcher der Shell (router.js).
  *
+ * - Blaettern TAUSCHT DEN INHALT GERICHTET (`swapPeriod`, R16 Bewegung): der
+ *   neue Zeitraum kommt von der Seite, zu der man blaettert - 8px + Blende,
+ *   derselbe Richtungssinn wie das Wischen (utils/period-swipe.js). Vorher
+ *   schnitt jedes Modul hart; nur der Kalender glitt, und nur per Touch.
+ *
  * Die Module behalten ihre ids und Klassen (Layout, Tests, Kuerzel haengen
  * daran); dazu kommen die geteilten Klassen `period-stepper__*`, an denen die
  * Shell-Regeln haengen (layout.css).
  */
 import { esc } from '/utils/html.js';
+import { swapContent } from '/utils/content-swap.js';
 
 function attrsHtml(attrs = {}) {
   return Object.entries(attrs)
@@ -107,4 +113,21 @@ export function syncPeriodReset(root, { reset, isCurrent, prev = '.period-steppe
   // faerbt ihn dort, wo der Reset auf dem Wert liegt statt daneben).
   btn.parentElement?.querySelector?.('.period-stepper__value')?.classList.toggle('period-stepper__value--away', !isCurrent);
   return btn;
+}
+
+/**
+ * Der Zeitraum hat gewechselt: tauscht den Inhalt des Traegers und blendet ihn
+ * in Schrittrichtung ein. Die EINE Stelle, an der die Stepper-Module ihren
+ * Inhaltswechsel einhaengen - die Regeln (kein Endzustand an einer Animation,
+ * reduzierte Bewegung, Abbruch durch den naechsten Schritt) stehen in
+ * utils/content-swap.js.
+ *
+ * @param {Element|null} host   Traeger des Zeitraum-Inhalts (ueberlebt den Tausch)
+ * @param {number} step         > 0 weiter, < 0 zurueck; beim Reset die Richtung
+ *                              zum laufenden Zeitraum, 0 = nur Blende
+ * @param {() => void} update   zeichnet den neuen Zeitraum (synchron)
+ * @returns {Animation|null}
+ */
+export function swapPeriod(host, step, update) {
+  return swapContent(host, update, { direction: step });
 }

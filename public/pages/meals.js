@@ -9,7 +9,7 @@ import { openModal as openSharedModal, closeModal as closeSharedModal, selectMod
 import { stagger, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
 import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { periodStepperHtml, syncPeriodReset } from '/utils/period-stepper.js';
+import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { DEFAULT_CATEGORY_NAME } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
@@ -1165,25 +1165,33 @@ function setWeekBusy() {
   _container.querySelector('#week-grid')?.setAttribute('aria-busy', 'true');
 }
 
+/* Die neue Woche kommt von der Seite, zu der man blaettert (swapPeriod,
+ * utils/period-stepper.js) - vorher ein harter Schnitt nach dem Laden. */
+function swapWeek(step) {
+  swapPeriod(_container?.querySelector('#week-grid') ?? null, step, renderWeekGrid);
+}
+
 function wireNav() {
   _container.querySelector('#week-prev')?.addEventListener('click', async () => {
     setWeekBusy();
     await loadWeek(addDays(state.currentWeek, -7));
-    renderWeekGrid();
+    swapWeek(-1);
   });
 
   _container.querySelector('#week-next')?.addEventListener('click', async () => {
     setWeekBusy();
     await loadWeek(addDays(state.currentWeek, 7));
-    renderWeekGrid();
+    swapWeek(1);
   });
 
   _container.querySelector('#week-today')?.addEventListener('click', async () => {
     const monday = getMondayOf(todayKey());
     if (monday === state.currentWeek) return;
+    // "Heute" kommt von dort, wo die laufende Woche liegt (Schluessel als Text).
+    const towards = monday < state.currentWeek ? -1 : 1;
     setWeekBusy();
     await loadWeek(monday);
-    renderWeekGrid();
+    swapWeek(towards);
   });
 
   _container.querySelector('[data-action="randomize-plan"]')?.addEventListener('click', openRandomizeModal);

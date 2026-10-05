@@ -130,11 +130,9 @@
   flex: 1 1 0;
 }
 
-/* Der neue Reiter blendet ein (R14 P11, budget.js `markTabEntering`): nur
- * Deckkraft, kein Versatz - wie der Seitenwechsel. */
-.budget-tab-panel--entering {
-  animation: fade-in var(--duration-md) var(--ease-out);
-}
+/* Der neue Reiter blendet ein: seit R16 ueber swapContent()
+ * (utils/content-swap.js) am Traeger `#budget-body`, wie in jedem Modul - die
+ * eigene Klasse `.budget-tab-panel--entering` ist entfallen. */
 
 /* DER KOPF SPRINGT NICHT (Re-Critique 2026-09-28, A5 P2-9). Die Notiz ist 21px
  * hoch, der Stepper 48px: mobil sprang die Tab-Leiste darunter beim Wechsel

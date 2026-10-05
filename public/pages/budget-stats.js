@@ -6,7 +6,7 @@ import { api } from '/api.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
-import { renderSkeletonList } from '/utils/skeleton.js';
+import { renderSkeletonChart } from '/utils/skeleton.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup, niceDomain } from '/utils/chart.js';
 import { formatMoneyAxis, formatSignedAmount } from '/utils/money.js';
@@ -47,7 +47,8 @@ async function loadStats() {
   // ebenfalls ein Skelett; hier blieb das Panel bis zur Antwort einfach leer.
   if (body) {
     body.replaceChildren();
-    body.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 4, lines: 2 }));
+    // Diagrammfoermig, nicht als Liste: danach stehen hier Verlauf und Anteile.
+    body.insertAdjacentHTML('beforeend', renderSkeletonChart({ charts: 2 }));
   }
   try {
     const res = await api.get(`/budget/stats?range=${view.range}&anchor=${view.anchor}${scopeQuery()}`);

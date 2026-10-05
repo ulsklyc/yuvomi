@@ -1846,7 +1846,7 @@ test('switching the statistics range outdates any request in flight, matching th
     schedulePage.indexOf("if (button.dataset.action === 'overview-week')"),
     schedulePage.indexOf("if (button.dataset.action === 'overview-view-mode')"),
   );
-  assert.match(overviewBranch, /await activateView\('overview'\)/, 'overview-week must route back through activateView(), which itself owns ++overviewRequestId - unlike statistics-range it does not need its own bump here');
+  assert.match(overviewBranch, /await activateView\('overview'(?:, \{[^}]*\})?\)/, 'overview-week must route back through activateView(), which itself owns ++overviewRequestId - unlike statistics-range it does not need its own bump here');
 });
 
 test('switching Planning sub-tabs while a pattern editor is dirty asks before discarding, and clears on save (S-03)', () => {
@@ -1861,7 +1861,7 @@ test('switching Planning sub-tabs while a pattern editor is dirty asks before di
   assert.match(schedulePage, /await api\.put\(`\/schedule\/patterns\/\$\{button\.dataset\.id\}\/days`, \{ days \}\);\s*\n\s*dirtyPatternIds\.delete\(String\(button\.dataset\.id\)\)/);
   assert.match(schedulePage, /await api\.put\(`\/schedule\/patterns\/\$\{form\.dataset\.id\}`, data\);\s*\n\s*dirtyPatternIds\.delete\(String\(form\.dataset\.id\)\)/);
 
-  assert.match(schedulePage, /onChange: \(id\) => \{ guardedActivateView\(id\); \}/, 'the tablist must route through the guard, not call activateView() directly');
+  assert.match(schedulePage, /onChange: \(id[^\n]*guardedActivateView\(id\); \}/, 'the tablist must route through the guard, not call activateView() directly');
 });
 
 // UX audit batch 3 (comprehension): S-04 cycle positions get real dates,
