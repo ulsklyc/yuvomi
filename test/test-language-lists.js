@@ -57,7 +57,7 @@ test('Budget: Tags mit Region und fremder Schreibung finden ihre Sprache, Unbeka
   const { normalizeLang } = await import('../server/routes/budget/helpers.js');
   const faelle = [
     ['pt-BR', 'pt-BR'], ['pt_br', 'pt-BR'], ['PT-br', 'pt-BR'], ['pt-PT', 'pt'],
-    ['de-AT', 'de'], ['DE', 'de'], [' nb ', 'nb'], ['zh-Hant-TW', 'zh'], ['es-419', 'es'],
+    ['de-AT', 'de'], ['DE', 'de'], [' nb ', 'nb'], ['zh-Hant-TW', 'zh-Hant'], ['zh-CN', 'zh'], ['es-419', 'es'],
     ['xx', 'en'], ['', 'en'], [undefined, 'en'], [['de'], 'en'], ['../de', 'en'], ['de/../en', 'en'],
     // `no` (Makrosprache) und `nn` (Nynorsk) meinen die norwegische Datei.
     ['no', 'nb'], ['no-NO', 'nb'], ['NO_no', 'nb'], ['nn', 'nb'], ['nn-NO', 'nb'],

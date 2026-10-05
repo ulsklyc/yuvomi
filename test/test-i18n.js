@@ -501,11 +501,13 @@ test('die Serverliste traegt jede Locale-Datei des Ordners', async () => {
 //  - zh: "——" ist der chinesische Gedankenstrich (破折号), ein eigenes
 //    Satzzeichen; ein Bindestrich ist im chinesischen Fliesstext kein Ersatz.
 //    Erlaubt ist nur die Doppelform, ein einzelner Strich bleibt ein Befund.
+//    Dasselbe gilt fuer zh-Hant (破折號, Taiwans Interpunktionsnorm fuehrt ihn).
 //  - ru/uk tasks.subtaskDeleteDetail: der Strich steht fuer das ausgelassene
 //    Praedikat ("это — нет" = "das hier [laesst sich] nicht"); die Grammatik
 //    verlangt ihn dort, ein Bindestrich waere ein Fehler.
 const DASH_EXCEPTIONS = {
   zh: { allLocale: /——/g },
+  'zh-Hant': { allLocale: /——/g },
   ru: { keys: new Set(['tasks.subtaskDeleteDetail']) },
   uk: { keys: new Set(['tasks.subtaskDeleteDetail']) },
 };

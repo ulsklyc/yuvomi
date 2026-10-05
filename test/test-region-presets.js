@@ -577,17 +577,17 @@ test('every region preset passes both shape checks', () => {
 });
 
 // regionLocale() macht aus einer Region eine Datensprache
-// (resolveHouseholdLocale). Solange es keine `zh-Hant.json` gibt, muss aus
-// `zh-Hant-TW` `zh` werden, sonst fiele ein chinesischer Haushalt auf
-// Englisch zurück; eine Sprache ohne Datei liefert null statt eines Codes,
-// den niemand laden kann.
+// (resolveHouseholdLocale): `zh-Hant-TW` findet seit #1320 `zh-Hant.json`,
+// `zh-CN` bleibt beim vereinfachten `zh`; eine Sprache ohne Datei liefert null
+// statt eines Codes, den niemand laden kann.
 test('a region yields its most specific supported locale', () => {
   assert.equal(regionLocale('fil-PH'), 'fil');
   assert.equal(regionLocale('de-DE'), 'de');
   assert.equal(regionLocale('pt-BR'), 'pt-BR');
   assert.equal(regionLocale('pt-PT'), 'pt');
   assert.equal(regionLocale('nb-NO'), 'nb');
-  assert.equal(regionLocale('zh-Hant-TW'), 'zh');
+  assert.equal(regionLocale('zh-Hant-TW'), 'zh-Hant');
+  assert.equal(regionLocale('zh-CN'), 'zh');
   assert.equal(regionLocale('sr-Latn-RS'), null);
   assert.equal(regionLocale('custom'), null);
   assert.equal(regionLocale(null), null);
@@ -606,7 +606,8 @@ test('a region resolves to the most specific supported data language', () => {
   assert.equal(resolveHouseholdLocale(household({ region: 'pt-PT' })), 'pt');
   assert.equal(resolveHouseholdLocale(household({ region: 'de-AT' })), 'de');
   assert.equal(resolveHouseholdLocale(household({ region: 'fil-PH' })), 'fil');
-  assert.equal(resolveHouseholdLocale(household({ region: 'zh-Hant-TW' })), 'zh');
+  assert.equal(resolveHouseholdLocale(household({ region: 'zh-Hant-TW' })), 'zh-Hant');
+  assert.equal(resolveHouseholdLocale(household({ region: 'zh-CN' })), 'zh');
   assert.equal(resolveHouseholdLocale(household({ region: 'sr-Latn-RS' })), 'en');
   assert.equal(resolveHouseholdLocale(household({ region: 'custom' })), 'en');
   assert.equal(resolveHouseholdLocale(household({ language: 'pt', region: 'pt-BR' })), 'pt',

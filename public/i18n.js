@@ -11,7 +11,7 @@
 import { zonedFields } from './utils/timezone.js';
 import { resolveKoreanParticles } from './utils/korean-particles.js';
 
-const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt-BR', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi', 'hu', 'ko', 'id', 'fa', 'fil', 'nb'];
+const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'zh-Hant', 'ja', 'ar', 'hi', 'pt-BR', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi', 'hu', 'ko', 'id', 'fa', 'fil', 'nb'];
 const RTL_LOCALES = new Set(['ar', 'fa']);
 // Form eines Regions-Tags: Sprache, optional Schrift, dann die Region -
 // `de-DE`, `fil-PH`, `zh-Hant-TW`. Eigene Konstante und kein Import aus

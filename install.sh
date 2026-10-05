@@ -23,24 +23,40 @@ ask()     { printf "%s%s%s " "$BOLD" "$*" "$RESET"; }
 # der Umgebung (OIKOS_INSTALLER_LANG > LC_ALL > LC_MESSAGES > LANG), analog der App.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLI_LOCALES_DIR="$SCRIPT_DIR/tools/installer/locales/cli"
-SUPPORTED_LOCALES=(de en es fr it sv el ru tr zh ja ar hi pt-BR pt uk pl nl cs vi hu ko id fa fil nb)
+SUPPORTED_LOCALES=(de en es fr it sv el ru tr zh zh-Hant ja ar hi pt-BR pt uk pl nl cs vi hu ko id fa fil nb)
 FALLBACK_LOCALE=en
 ACTIVE_LOCALE=$FALLBACK_LOCALE
 
 in_array() { local needle="$1"; shift; local e; for e in "$@"; do [ "$e" = "$needle" ] && return 0; done; return 1; }
 
 # Rohen Locale-Tag (z. B. de_DE.UTF-8, pt_BR.UTF-8, --lang pt-BR) auf eine
-# unterstützte Locale abbilden: erst Sprache mit Region (pt-BR), dann die
-# Basissprache (de). Gross/klein ueber tr statt ${x,,} - das kennt die bash 3.2
-# von macOS nicht und brach dort mit "bad substitution" ab.
+# unterstützte Locale abbilden: erst Sprache mit Region (pt-BR), dann Sprache
+# mit Schrift (zh-Hant), dann die Basissprache (de). Gross/klein ueber tr statt
+# ${x,,} - das kennt die bash 3.2 von macOS nicht und brach dort mit "bad
+# substitution" ab.
 normalize_locale() {
-  local raw="${1:-}" lang region="" alias=""
+  local raw="${1:-}" lang region="" script="" part alias=""
   raw="${raw%%.*}"; raw="${raw%%@*}"; raw="${raw//_/-}"
   lang="$(printf '%s' "${raw%%-*}" | tr '[:upper:]' '[:lower:]')"
+  # Subtags nach der Sprache: vier Zeichen sind eine Schrift (Hant), zwei eine Region (TW).
   case "$raw" in
-    *-*) region="$(printf '%s' "${raw#*-}" | tr '[:lower:]' '[:upper:]')"; region="${region%%-*}" ;;
+    *-*)
+      for part in $(printf '%s' "${raw#*-}" | tr '-' ' '); do
+        case "${#part}" in
+          4) script="$(printf '%s' "${part:0:1}" | tr '[:lower:]' '[:upper:]')$(printf '%s' "${part:1}" | tr '[:upper:]' '[:lower:]')" ;;
+          2) [ -n "$region" ] || region="$(printf '%s' "$part" | tr '[:lower:]' '[:upper:]')" ;;
+        esac
+      done ;;
   esac
   if [ -n "$region" ] && in_array "$lang-$region" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$lang-$region"; return; fi
+  # Eine Region, die eine Schrift impliziert: die Shell meldet zh_TW, nie zh_Hant_TW.
+  # Eine ausdrueckliche Schrift (zh-Hans-HK) gewinnt - wie REGION_SCRIPT in public/i18n.js.
+  if [ -z "$script" ]; then
+    case "$region" in
+      TW|HK|MO) script="Hant" ;;
+    esac
+  fi
+  if [ -n "$script" ] && in_array "$lang-$script" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$lang-$script"; return; fi
   if in_array "$lang" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$lang"; return; fi
   # Sprachcodes, die eine vorhandene Locale meinen: `no_NO.UTF-8` ist auf vielen
   # Systemen der Name fuer Norwegisch, `nn_NO` (Nynorsk) hat keine eigene Datei.

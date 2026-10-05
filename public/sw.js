@@ -281,6 +281,7 @@ const APP_LOCALES = [
   '/locales/uk.json',
   '/locales/vi.json',
   '/locales/zh.json',
+  '/locales/zh-Hant.json',
 ];
 
 // Seiten-Module: lazy geladen, aber vorab gecacht für Offline.
