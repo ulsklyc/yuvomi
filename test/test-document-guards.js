@@ -1848,12 +1848,35 @@ describe('Sonde 5 - eine Wischzeile antwortet, und jede Rolle liegt an ihrer Kan
         if (!hasRows) return;
         listsSeen += 1;
 
+        // WELCHE KANTEN DIE ZEILE TRAEGT, STEHT IM DOKUMENT (R16). Bis dahin
+        // setzte die Sonde voraus, dass jede Wischzeile BEIDE Kanten belegt, und
+        // meldete die Vorratszeile - nur Loeschen am Zeilenende, am Anfang gibt
+        // es dort nichts Positives zu erledigen - als "nicht verdrahtet". Das
+        // war die falsche Diagnose fuer eine richtig verdrahtete Zeile. Gemessen
+        // wird jetzt je Kante, was die Zeile dort zusagt: ein Panel antwortet,
+        // eine Kante ohne Panel deckt nichts auf. Eine Zeile ganz ohne Panel
+        // bleibt ein Befund - sonst waere "keine Geste" wieder gruen.
+        const sides = await page.evaluate(() => {
+          const row = document.querySelector('.swipe-row');
+          return ['leading', 'trailing'].filter((side) => row?.querySelector(`.swipe-reveal--${side}`));
+        });
+        if (!sides.length) {
+          findings.push(`${name}: die erste Wischzeile traegt an keiner Kante ein Panel.`);
+          return;
+        }
+
         // In RTL deckt derselbe Finger die andere Kante auf - die Erwartung
         // spiegelt mit, die Kante bleibt dieselbe.
         for (const [sign, side] of [[1, rtl ? 'trailing' : 'leading'], [-1, rtl ? 'leading' : 'trailing']]) {
           const classes = await uncoveredPanel(page, sign);
           const move = sign > 0 ? 'nach rechts' : 'nach links';
 
+          if (!sides.includes(side)) {
+            if (classes?.length) {
+              findings.push(`${name}: der Wisch ${move} deckt ${classes.join('.')} auf, obwohl die Zeile an der ${side}-Kante kein Panel traegt.`);
+            }
+            continue;
+          }
           if (!classes?.length) {
             findings.push(`${name}: der Wisch ${move} deckt nichts auf - die Zeilen sind nicht verdrahtet.`);
             continue;
