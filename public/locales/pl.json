@@ -4599,6 +4599,7 @@
             "loadErrorDesc": "Spróbuj ponownie.",
             "retry": "Spróbuj ponownie",
             "areasTitle": "Wszystkie kategorie",
+            "moreTitle": "Pokaż wszystkie wartości",
             "areasPick": "Wybierz kategorię",
             "dueToday": {
                 "title": "Na dziś"

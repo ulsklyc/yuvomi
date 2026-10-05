@@ -4363,6 +4363,7 @@
             "loadErrorDesc": "Vennligst prøv igjen.",
             "retry": "Prøv igjen",
             "areasTitle": "Alle kategorier",
+            "moreTitle": "Vis alle verdier",
             "areasPick": "Velg en kategori",
             "dueToday": {
                 "title": "Forfaller i dag"

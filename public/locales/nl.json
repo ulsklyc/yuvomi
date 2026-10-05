@@ -4363,6 +4363,7 @@
             "loadErrorDesc": "Probeer het opnieuw.",
             "retry": "Opnieuw proberen",
             "areasTitle": "Alle categorieën",
+            "moreTitle": "Alle waarden tonen",
             "areasPick": "Kies een categorie",
             "dueToday": {
                 "title": "Vandaag te doen"

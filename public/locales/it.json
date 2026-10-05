@@ -4363,6 +4363,7 @@
             "loadErrorDesc": "Riprova.",
             "retry": "Riprova",
             "areasTitle": "Tutte le categorie",
+            "moreTitle": "Mostra tutti i valori",
             "areasPick": "Scegli una categoria",
             "dueToday": {
                 "title": "In scadenza oggi"

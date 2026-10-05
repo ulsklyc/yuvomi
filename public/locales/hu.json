@@ -4363,6 +4363,7 @@
             "loadErrorDesc": "Kérjük, próbáld újra.",
             "retry": "Újrapróbálkozás",
             "areasTitle": "Minden kategória",
+            "moreTitle": "Összes érték megjelenítése",
             "areasPick": "Válassz egy kategóriát",
             "dueToday": {
                 "title": "Mai teendők"

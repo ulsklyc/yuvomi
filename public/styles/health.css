@@ -2040,6 +2040,38 @@ button.health-med-card:hover {
   container: metric-grid / inline-size;
 }
 
+/* TELEFON: ZWEI KERNWERTE (R16). Neun Kacheln waren 575px auf einer Seite,
+ * deren Wurzel die Uebersicht ist; die zwei zuletzt gemessenen bleiben, der
+ * Kartentitel fuehrt zu allen (health.js `overviewVitalsMarkup`). Dieselbe
+ * Grenze wie `PHONE_QUERY`. */
+@media (max-width: 639px) {
+  .health-overview__vitals-grid > .health-overview__vital--extra {
+    display: none;
+  }
+}
+
+/* "Alle Werte anzeigen" (Telefon): die Zeile ist ein Glied der Kartenfolge
+ * und haelt deren Abstand; die Karten dahinter bringen ihren eigenen mit. */
+.health-overview__more-list {
+  margin-bottom: var(--space-4);
+}
+
+.health-overview__more-toggle[aria-expanded="true"] .health-vitals__more-chevron {
+  transform: rotate(180deg);
+}
+
+/* Das Werkzeug im Kopf (CSV-Export). In einem Bereich traegt der schmale Kopf
+ * Rueckweg, Person und Bereichsnamen - das Werkzeug gehoert zur Uebersicht und
+ * weicht dort. */
+.health-toolbar__tools {
+  display: inline-flex;
+  align-items: center;
+}
+
+.health-page[data-health-pushed] .health-toolbar__tools {
+  display: none;
+}
+
 /* Nächste Erinnerungen */
 /* Haarlinien-Liste: der Trenner ersetzt den Abstand (siehe tokens.css). */
 .health-overview__reminders-list {

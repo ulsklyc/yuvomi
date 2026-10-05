@@ -3238,8 +3238,11 @@ test('renderCycleShell() reicht beide Antworten getrennt weiter', () => {
 
 test('READ_SAFE_ACTIONS ist eine Positivliste und enthaelt nur lesende Aktionen', () => {
   const erlaubt = [...health.READ_SAFE_ACTIONS].sort();
-  assert.deepEqual(erlaubt, ['cancel', 'ov-go-cycle', 'ov-go-meds'],
-    'Dialog schliessen und zwei Tabwechsel - alles andere dieser Seite schreibt');
+  // R16: dazu der dritte Tabwechsel (Kartentitel "Letzte Vitalwerte") und der
+  // CSV-Export im Kopf - ein Download, der schon als Karte ohne Schreibrecht
+  // offenstand (dort als blosse Links, deshalb ohne `data-action`).
+  assert.deepEqual(erlaubt, ['cancel', 'health-export', 'ov-go-cycle', 'ov-go-meds', 'ov-go-vitals'],
+    'Dialog schliessen, drei Tabwechsel und der Export-Dialog - alles andere dieser Seite schreibt');
 
   // Und die Gegenprobe gegen den Quelltext: JEDE andere `data-action` der Seite
   // ist damit gesperrt. Kaeme morgen eine dazu, waere sie es auch - das ist der

@@ -4363,6 +4363,7 @@
             "loadErrorDesc": "Vui lòng thử lại.",
             "retry": "Thử lại",
             "areasTitle": "Tất cả danh mục",
+            "moreTitle": "Hiển thị tất cả giá trị",
             "areasPick": "Chọn một danh mục",
             "dueToday": {
                 "title": "Cần làm hôm nay"

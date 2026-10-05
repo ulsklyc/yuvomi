@@ -4363,6 +4363,7 @@
             "loadErrorDesc": "Bitte versuche es erneut.",
             "retry": "Erneut versuchen",
             "areasTitle": "Alle Bereiche",
+            "moreTitle": "Alle Werte anzeigen",
             "areasPick": "Wähle einen Bereich",
             "dueToday": {
                 "title": "Heute fällig"

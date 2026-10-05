@@ -15,7 +15,7 @@ import { api } from '/api.js';
 import { t, formatDate, formatMonthYear, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
-import { scheduleUndoableDelete } from '/utils/ux.js';
+import { scheduleUndoableDelete, expandIn } from '/utils/ux.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays, todayKey} from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { DATE_STATUS_ALERT_DAYS } from '/utils/date-status.js';
@@ -24,7 +24,7 @@ import { trendMarkup } from '/utils/metric-card.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, reportFieldError, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
-import { installPopoverMenus } from '/utils/popover-menu.js';
+import { installPopoverMenus, pageToolsMenuHtml } from '/utils/popover-menu.js';
 import { personSwitcherMarkup } from '/utils/health-person-switcher.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import {
@@ -242,7 +242,7 @@ function cycleCanEdit() {
  * `cancel` schliesst nur einen Dialog; `ov-go-meds`/`ov-go-cycle` wechseln nur
  * den Tab. Alles andere schreibt.
  */
-const READ_SAFE_ACTIONS = new Set(['cancel', 'ov-go-meds', 'ov-go-cycle']);
+const READ_SAFE_ACTIONS = new Set(['cancel', 'ov-go-meds', 'ov-go-cycle', 'ov-go-vitals', 'health-export']);
 
 /**
  * Die schreibenden Bedienhaken OHNE `data-action`.
@@ -1010,7 +1010,7 @@ export async function render(container, ctx = {}) {
       <!-- Kanonischer Modulkopf. Am Desktop und auf der Übersicht trägt er den
            Modulnamen; mobil in einem Bereich den Rückweg und den Bereichsnamen
            (syncHealthHeader). Die Tab-Leiste darunter ist entfallen (R10 G1). -->
-      <header class="page-toolbar health-toolbar">
+      <header class="page-toolbar page-toolbar--title-tools health-toolbar">
         <a class="health-toolbar__back" href="/health" hidden>
           <i data-lucide="chevron-left" class="health-toolbar__back-icon" aria-hidden="true"></i><span>${esc(t('nav.health'))}</span>
         </a>
@@ -1020,7 +1020,9 @@ export async function render(container, ctx = {}) {
         <div class="health-toolbar__person" data-health-person-slot></div>
         <span class="health-toolbar__break" aria-hidden="true"></span>
         <h1 class="page-toolbar__title">${esc(t('nav.health'))}</h1>
-        <div class="page-toolbar__actions"></div>
+        <!-- Eigener Traeger im Slot: am Desktop dockt der Router den
+             Primaerknopf in denselben Slot (dieselbe Lehre wie shopping-tools). -->
+        <div class="page-toolbar__actions"><span class="health-toolbar__tools" id="health-tools">${healthToolsHtml()}</span></div>
       </header>
       <div class="split-view health-split">
         <div class="split-view__list page-scrollport health-browse">
@@ -1058,6 +1060,9 @@ export async function render(container, ctx = {}) {
     container.querySelector('[data-health-priority]'),
     _detailHead.querySelector('[data-health-person-detail]'),
   ]) installPopoverMenus(slot);
+  container.querySelector('#health-tools')?.addEventListener('click', (event) => {
+    if (event.target.closest('[data-action="health-export"]')) openHealthExport();
+  });
   watchHoists();
   watchPhoneQuery();
 
@@ -1496,6 +1501,8 @@ function watchPhoneQuery() {
   _phoneQuery = window.matchMedia(PHONE_QUERY);
   _phoneQuery.addEventListener?.('change', () => {
     if (vitals.root?.isConnected && vitals.loaded && !vitals.error) renderCards();
+    // Die Uebersicht ordnet ihre Karten je Breite anders (overviewGridMarkup).
+    if (overview.root?.isConnected && overview.loaded && !overview.error) renderOverviewShell();
     syncHoists();
   });
 }
@@ -5674,6 +5681,9 @@ const overview = {
   cycleLogs: [],
   cycleSettings: null,
   exportRange: { from: null, to: null },
+  // Telefon: die Zeile "Alle Werte anzeigen" aufgeklappt (ueberlebt das
+  // Neuzeichnen nach einer Einnahme).
+  moreExpanded: false,
   loaded: false,
   error: false,
   root: null,
@@ -5827,16 +5837,7 @@ function renderOverviewShell() {
     ${personSwitcherMarkup(overview.members, overview.personId, overview.meId,
       { menuId: 'health-person-menu-overview', label: t('health.overview.personsLabel') })}
     ${readOnlyBannerMarkup(overview.members, overview.personId, canEditFor(overview.personId, overview.meId), overview.meId)}
-    <div class="health-overview__grid">
-      ${overviewCard('calendar-check', 'health.overview.dueToday.title', overviewDueMarkup(), 'due')}
-      ${prnMeds('overview').length ? overviewCard('pill', 'health.meds.prn.title', prnListMarkup('overview')) : ''}
-      ${overviewCard('trending-up', 'health.overview.adherence.title', overviewAdherenceMarkup())}
-      ${overviewCard('activity', 'health.overview.vitals.title', overviewVitalsMarkup(), 'vitals')}
-      ${overviewCycleTileMarkup()}
-      ${canEditFor(overview.personId, overview.meId) ? overviewCard('plus-circle', 'health.overview.quick.title', quickCaptureMarkup(), 'quick') : ''}
-      ${overviewCard('bell', 'health.overview.reminders.title', overviewUpcomingMarkup())}
-      ${overviewCard('download', 'health.export.title', overviewExportMarkup())}
-    </div>
+    ${overviewGridMarkup()}
     ${disclaimerMarkup()}
   `);
   if (window.lucide) window.lucide.createIcons({ el: overview.root });
@@ -5845,15 +5846,129 @@ function renderOverviewShell() {
   syncHoists();
 }
 
-function overviewCard(icon, titleKey, body, part = '') {
+/**
+ * Die Karten der Uebersicht.
+ *
+ * OHNE EXPORT-KARTE (Critique 2026-10-05, R16). Der CSV-Export stand als
+ * 374px hohe Karte am Ende der Uebersicht - mobil also am Ende einer 2711px
+ * langen Startseite, vor der Bereichsliste eines jeden, der nie exportiert.
+ * Er ist ein Werkzeug des Moduls, kein Wert des Tages, und steht deshalb im
+ * Kopf (`healthToolsHtml`, `openHealthExport`) - auf jeder Breite.
+ */
+function overviewGridMarkup({ phone = isPhone() } = {}) {
+  const due = overviewCard('calendar-check', 'health.overview.dueToday.title', overviewDueMarkup(), 'due');
+  const quick = canEditFor(overview.personId, overview.meId)
+    ? overviewCard('plus-circle', 'health.overview.quick.title', quickCaptureMarkup(), 'quick') : '';
+  const vitalsCard = overviewCard('activity', 'health.overview.vitals.title', overviewVitalsMarkup(), 'vitals', { action: 'ov-go-vitals' });
+  const prn = prnMeds('overview').length
+    ? { title: t('health.meds.prn.title'), html: overviewCard('pill', 'health.meds.prn.title', prnListMarkup('overview')) } : null;
+  const adherence = { title: t('health.overview.adherence.title'), html: overviewCard('trending-up', 'health.overview.adherence.title', overviewAdherenceMarkup()) };
+  const cycleHtml = overviewCycleTileMarkup();
+  const cycleTile = cycleHtml ? { title: t('health.cycle.status.nextPeriod'), html: cycleHtml } : null;
+  const reminders = { title: t('health.overview.reminders.title'), html: overviewCard('bell', 'health.overview.reminders.title', overviewUpcomingMarkup()) };
+
+  if (!phone) {
+    // Breit: alle Karten, in der bisherigen Reihenfolge.
+    return `
+    <div class="health-overview__grid">
+      ${due}
+      ${prn?.html ?? ''}
+      ${adherence.html}
+      ${vitalsCard}
+      ${cycleTile?.html ?? ''}
+      ${quick}
+      ${reminders.html}
+    </div>`;
+  }
+
+  // Titel und Markup zusammen: die Zeile nennt, was hinter ihr liegt.
+  const rest = [prn, adherence, cycleTile, reminders].filter(Boolean);
+
+  /* TELEFON: KERNWERTE ZUERST, DER REST HINTER EINER ZEILE (R16). Die Wurzel
+   * des Moduls IST dort die Uebersicht - "Heute faellig" und "Schnell
+   * erfassen" stehen vor der Bereichsliste (health-hoist.js), alles andere
+   * hing als 1627px lange Kartenfolge darunter. Jetzt folgen der Bereichsliste
+   * die Vitalwerte (zwei Kennzahlen, der Titel fuehrt zu allen) und EINE
+   * Zeile, die den Rest aufklappt und nennt, was sie haelt. Die Reihenfolge im
+   * Baum ist die im Bild, damit der Fokus dem Auge folgt. */
+  const open = overview.moreExpanded;
+  return `
+    <div class="health-overview__grid">
+      ${due}
+      ${quick}
+      ${vitalsCard}
+      <div class="row-divided health-vitals__more-list health-overview__more-list">
+        <button type="button" class="health-vitals__more-row health-overview__more-toggle"
+                aria-expanded="${open ? 'true' : 'false'}" aria-controls="health-overview-more">
+          <span class="health-vitals__more-text">
+            <span class="health-vitals__more-title">${esc(t('health.overview.moreTitle'))}</span>
+            <span class="health-vitals__more-names">${esc(rest.map((card) => card.title).join(', '))}</span>
+          </span>
+          <i data-lucide="chevron-down" class="icon-sm health-vitals__more-chevron" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="health-overview__more" id="health-overview-more"${open ? '' : ' hidden'}>
+        ${rest.map((card) => card.html).join('')}
+      </div>
+    </div>`;
+}
+
+/**
+ * @param {string} icon
+ * @param {string} titleKey
+ * @param {string} body
+ * @param {string} [part]
+ * @param {{ action?: string }} [link]  Mit `action` ist der Titel der Weg in
+ *        den Bereich hinter der Karte (`.section-title-link`, layout.css) -
+ *        kein zweiter "Alle anzeigen"-Knopf, kein neuer Text.
+ */
+function overviewCard(icon, titleKey, body, part = '', { action = '' } = {}) {
+  const title = action
+    ? `<button type="button" class="section-title-link" data-action="${esc(action)}">${esc(t(titleKey))}<i data-lucide="chevron-right" aria-hidden="true"></i></button>`
+    : esc(t(titleKey));
   return `
     <section class="health-overview__card${part ? ` health-overview__card--${part}` : ''}">
       <header class="health-overview__card-head">
         <i data-lucide="${esc(icon)}" class="health-overview__card-icon" aria-hidden="true"></i>
-        <h3 class="health-overview__card-title u-section-title">${esc(t(titleKey))}</h3>
+        <h3 class="health-overview__card-title u-section-title">${title}</h3>
       </header>
       <div class="health-overview__card-body">${body}</div>
     </section>`;
+}
+
+/**
+ * Das Werkzeug im Modulkopf: der CSV-Export. Ein Eintrag ist ein Knopf, kein
+ * Menue (Kopfregel, `pageToolsMenuHtml`); kommt ein zweiter dazu, wird daraus
+ * von selbst das "..."-Menue.
+ */
+function healthToolsHtml() {
+  return pageToolsMenuHtml({
+    id: 'health-tools-menu',
+    label: t('common.moreActions'),
+    items: [{ action: 'health-export', label: t('health.export.title'), icon: 'download' }],
+  });
+}
+
+/** Der Export als Dialog: Zeitraum und je Bereich ein Download. */
+function openHealthExport() {
+  if (!overview.exportRange.from && !overview.exportRange.to) {
+    const today = todayKey();
+    overview.exportRange = { from: addLocalDays(today, -(OVERVIEW_EXPORT_DAYS - 1)), to: today };
+  }
+  openModal({
+    title: t('health.export.title'),
+    content: overviewExportMarkup(),
+    size: 'sm',
+    dirtyGuard: false,
+    onSave(panel) {
+      if (window.lucide) window.lucide.createIcons({ el: panel });
+      const fromEl = panel.querySelector('#ov-export-from');
+      const toEl = panel.querySelector('#ov-export-to');
+      const rerender = () => rerenderExportButtons(panel);
+      fromEl?.addEventListener('change', () => { overview.exportRange.from = fromEl.value || null; rerender(); });
+      toEl?.addEventListener('change', () => { overview.exportRange.to = toEl.value || null; rerender(); });
+    },
+  });
 }
 
 // --- Zyklus-Kachel ("Nächste Periode") ---
@@ -6037,16 +6152,39 @@ function overviewAdherenceMarkup() {
 
 // --- Letzte Vitalwerte (Karten, Klick navigiert zum Vitalwerte-Tab) ---
 
+/** Wie viele Vitalkennzahlen die Uebersicht auf dem Telefon zeigt. */
+const OVERVIEW_PHONE_VITALS = 2;
+
+/**
+ * ZWEI KERNWERTE AUF DEM TELEFON (Critique 2026-10-05, R16). Neun Kacheln
+ * waren dort 575px - unter "Heute faellig" und der Bereichsliste, auf einer
+ * Seite, deren Wurzel die Uebersicht IST. Die zwei zuletzt gemessenen bleiben
+ * (EINE Reihe im zweispaltigen Raster; mit vieren mass die Seite 1521px, das
+ * Ziel sind unter 1500);
+ * die uebrigen tragen `--extra` und sind unter der Telefon-Grenze per CSS
+ * verborgen (health.css). Sie bleiben im Baum, damit die Breite allein
+ * entscheidet - kein Neuzeichnen beim Drehen. Der Kartentitel fuehrt zu allen.
+ */
 function overviewVitalsMarkup() {
   const today = todayKey();
-  const cards = VITAL_METRICS.map((metric) => {
-    const series = computeVitalSeries(overview.vitals, { type: metric.type, range: 'month', anchor: today });
-    return overviewVitalCardMarkup(metric, series);
-  }).join('');
+  const entries = VITAL_METRICS.map((metric) => ({
+    metric,
+    series: computeVitalSeries(overview.vitals, { type: metric.type, range: 'month', anchor: today }),
+  }));
+  const core = new Set(entries
+    .filter((entry) => entry.series.latest)
+    .sort((a, b) => (String(a.series.latest.measured_at) < String(b.series.latest.measured_at) ? 1 : -1))
+    .slice(0, OVERVIEW_PHONE_VITALS)
+    .map((entry) => entry.metric.type));
+  // Ohne jede Messung: die ersten der Liste, damit die Karte nicht leer ist.
+  if (!core.size) entries.slice(0, OVERVIEW_PHONE_VITALS).forEach((entry) => core.add(entry.metric.type));
+  const cards = entries
+    .map(({ metric, series }) => overviewVitalCardMarkup(metric, series, { extra: !core.has(metric.type) }))
+    .join('');
   return `<div class="health-overview__vitals-grid">${cards}</div>`;
 }
 
-function overviewVitalCardMarkup(metric, series) {
+function overviewVitalCardMarkup(metric, series, { extra = false } = {}) {
   const latest = series.latest;
   const label = t(metric.labelKey);
 
@@ -6068,7 +6206,7 @@ function overviewVitalCardMarkup(metric, series) {
   // --inset: die Kachel liegt IN der Übersichtskarte (Kasten-in-Kasten,
   // Muster vorher .health-overview__card .health-metric-card).
   return `
-    <button type="button" class="metric-card metric-card--select metric-card--inset" data-vital-nav="${esc(metric.type)}">
+    <button type="button" class="metric-card metric-card--select metric-card--inset${extra ? ' health-overview__vital--extra' : ''}" data-vital-nav="${esc(metric.type)}">
       <span class="metric-card__head">
         <i data-lucide="${esc(metric.icon)}" class="metric-card__icon" aria-hidden="true"></i>
         <span class="metric-card__label">${esc(label)}</span>
@@ -6163,8 +6301,8 @@ function overviewExportMarkup() {
     </div>`;
 }
 
-function rerenderExportButtons() {
-  const host = overview.root?.querySelector('#ov-export-buttons');
+function rerenderExportButtons(root = overview.root) {
+  const host = root?.querySelector('#ov-export-buttons');
   if (!host) return;
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', exportButtonsMarkup());
@@ -6207,11 +6345,20 @@ function wireOverview() {
     ?.addEventListener('click', () => window.yuvomi?.navigate('/health/meds'));
   overview.root.querySelector('[data-action="ov-go-cycle"]')
     ?.addEventListener('click', () => window.yuvomi?.navigate('/health/cycle'));
+  overview.root.querySelector('[data-action="ov-go-vitals"]')
+    ?.addEventListener('click', () => window.yuvomi?.navigate('/health/vitals'));
 
-  const fromEl = overview.root.querySelector('#ov-export-from');
-  const toEl = overview.root.querySelector('#ov-export-to');
-  fromEl?.addEventListener('change', () => { overview.exportRange.from = fromEl.value || null; rerenderExportButtons(); });
-  toEl?.addEventListener('change', () => { overview.exportRange.to = toEl.value || null; rerenderExportButtons(); });
+  // Telefon: "Alle Werte anzeigen" - derselbe Schalter wie "Weitere Messwerte".
+  const moreToggle = overview.root.querySelector('.health-overview__more-toggle');
+  const more = overview.root.querySelector('#health-overview-more');
+  moreToggle?.addEventListener('click', () => {
+    overview.moreExpanded = !overview.moreExpanded;
+    moreToggle.setAttribute('aria-expanded', String(overview.moreExpanded));
+    if (more) {
+      more.hidden = !overview.moreExpanded;
+      if (overview.moreExpanded) expandIn(more);
+    }
+  });
 }
 
 // ========================================================
@@ -8779,6 +8926,8 @@ export const __test = {
   overviewDueRowMarkup,
   // Einnahmetreue auf beiden Flaechen (R16): dieselbe Zahl, derselbe Zeitraum.
   adherenceMarkup, overviewAdherenceMarkup,
+  // Uebersicht mobil (R16): Export im Kopf, drei Kernwerte.
+  overviewGridMarkup, healthToolsHtml, overviewExportMarkup, overviewVitalsMarkup,
   overviewVitalCardMarkup,
   quickCaptureMarkup,
   cycleBubbleMarkup,

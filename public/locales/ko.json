@@ -4363,6 +4363,7 @@
             "loadErrorDesc": "다시 시도해 주세요.",
             "retry": "다시 시도",
             "areasTitle": "모든 카테고리",
+            "moreTitle": "모든 값 보기",
             "areasPick": "카테고리 선택",
             "dueToday": {
                 "title": "오늘 예정"

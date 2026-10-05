@@ -4363,6 +4363,7 @@
             "loadErrorDesc": "Veuillez réessayer.",
             "retry": "Réessayer",
             "areasTitle": "Toutes les catégories",
+            "moreTitle": "Afficher toutes les valeurs",
             "areasPick": "Choisissez une catégorie",
             "dueToday": {
                 "title": "À faire aujourd'hui"

@@ -4717,6 +4717,7 @@
             "loadErrorDesc": "يرجى المحاولة مرة أخرى.",
             "retry": "إعادة المحاولة",
             "areasTitle": "كل الأقسام",
+            "moreTitle": "عرض كل القيم",
             "areasPick": "اختر قسمًا",
             "dueToday": {
                 "title": "مستحق اليوم"

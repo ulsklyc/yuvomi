@@ -4363,6 +4363,7 @@
             "loadErrorDesc": "Försök igen.",
             "retry": "Försök igen",
             "areasTitle": "Alla kategorier",
+            "moreTitle": "Visa alla värden",
             "areasPick": "Välj en kategori",
             "dueToday": {
                 "title": "Att göra idag"

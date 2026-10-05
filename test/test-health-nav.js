@@ -470,7 +470,9 @@ test('Kanon: der Kontext-FAB dockt am Desktop an - Aktions-Slot im Kopf, Nomen j
   // stumm nicht an, und das Nomen waere nur ein Attribut, das niemand zeigt.
   const render = HEALTH_JS.match(/export async function render\(container[\s\S]*?\n}\n/)?.[0];
   assert.ok(render, 'render() nicht gefunden');
-  assert.match(render, /<header class="page-toolbar health-toolbar">[\s\S]*?<div class="page-toolbar__actions"><\/div>[\s\S]*?<\/header>/,
+  // Seit R16 traegt der Slot einen eigenen Traeger fuer das Werkzeug des Kopfs
+  // (CSV-Export); der Router dockt die Pille daneben in denselben Slot.
+  assert.match(render, /<header class="page-toolbar page-toolbar--title-tools health-toolbar">[\s\S]*?<div class="page-toolbar__actions"><span class="health-toolbar__tools" id="health-tools">[^\n]*<\/span><\/div>[\s\S]*?<\/header>/,
     'der Gesundheitskopf braucht den Aktions-Slot, in den der Router die Kopf-Pille legt');
   assert.match(render, /createPageFab\(\{[^}]*dockLabel: t\('newLabel\.\w+'\)/, 'createPageFab ohne Nomen dockt nie an');
 

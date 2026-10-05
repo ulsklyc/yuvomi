@@ -4363,6 +4363,7 @@
             "loadErrorDesc": "Lütfen tekrar deneyin.",
             "retry": "Tekrar dene",
             "areasTitle": "Tüm kategoriler",
+            "moreTitle": "Tüm değerleri göster",
             "areasPick": "Bir kategori seçin",
             "dueToday": {
                 "title": "Bugün yapılacak"

@@ -512,3 +512,81 @@ test('R16: Uebersicht und Medikamenten-Seite zeigen dieselbe Einnahmetreue ueber
     if (prevTz === undefined) delete process.env.TZ; else process.env.TZ = prevTz;
   }
 });
+
+// --------------------------------------------------------
+// Uebersicht mobil: Kernwerte statt Wand (Critique 2026-10-05, R16)
+// --------------------------------------------------------
+//
+// Bei 390x844 war die Gesundheit-Startseite 2711px lang: unter "Heute faellig"
+// und der Bereichsliste hing die ganze Uebersicht, samt neun Vitalkacheln
+// (575px) und dem CSV-Export (374px). Der Export steht jetzt im Kopf (ein
+// Knopf, der den Dialog oeffnet - auch am Desktop), und mobil zeigt die
+// Vitalkarte die drei juengsten Kennzahlen; ihr Titel fuehrt zu allen.
+
+test('R16: der CSV-Export steht im Kopf, nicht mehr als Karte in der Uebersicht', async () => {
+  const { installMiniDom } = await import('./mini-dom.js');
+  const abraeumen = installMiniDom();
+  healthHelpers.setViewStateForTest('overview', { meds: [], vitals: [], members: [], personId: 5, meId: 5, exportRange: { from: '2026-07-08', to: '2026-10-05' } });
+  try {
+    const grid = healthHelpers.overviewGridMarkup();
+    assert.doesNotMatch(grid, /health-overview__export|health\.export\.title/, 'keine Export-Karte im Raster');
+    const tools = healthHelpers.healthToolsHtml();
+    assert.match(tools, /data-action="health-export"/);
+    assert.match(tools, /aria-label="health\.export\.title"/, 'der Knopf nennt, was er tut');
+    // Der Dialog traegt, was die Karte trug: Zeitraum und je Bereich ein Download.
+    const dialog = healthHelpers.overviewExportMarkup();
+    assert.match(dialog, /id="ov-export-from"[\s\S]*id="ov-export-to"/);
+    assert.match(dialog, /href="\/api\/v1\/health\/export\/vitals\?user_id=5&amp;from=2026-07-08&amp;to=2026-10-05"/);
+  } finally {
+    healthHelpers.setViewStateForTest('overview', { meds: [], vitals: [], exportRange: { from: null, to: null } });
+    abraeumen();
+  }
+});
+
+test('R16: mobil bleiben zwei Vitalkennzahlen, der Titel fuehrt zu allen', async () => {
+  const at = (type, value, day) => ({ id: day, type, value_num: value, value_num2: type === 'bp' ? 80 : null, value_num3: type === 'bp' ? 60 : null, unit: '', measured_at: `2026-10-0${day}T07:00` });
+  const { installMiniDom } = await import('./mini-dom.js');
+  const abraeumen = installMiniDom();
+  healthHelpers.setViewStateForTest('overview', {
+    vitals: [at('bp', 120, 1), at('weight', 70, 2), at('glucose', 95, 3), at('spo2', 98, 4), at('temp', 36.6, 5)],
+  });
+  try {
+    const html = healthHelpers.overviewVitalsMarkup();
+    const cards = [...html.matchAll(/<button type="button" class="([^"]*)" data-vital-nav="([^"]+)"/g)].map((m) => ({ cls: m[1], type: m[2] }));
+    const core = cards.filter((c) => !/health-overview__vital--extra/.test(c.cls));
+    assert.equal(core.length, 2, 'zwei Kernwerte: eine Reihe im zweispaltigen Raster');
+    // Die zwei JUENGSTEN Messungen, nicht die ersten zwei der Metrikliste.
+    assert.deepEqual(core.map((c) => c.type).sort(), ['spo2', 'temp']);
+    assert.ok(cards.length > 2, 'die uebrigen stehen weiter im Baum - breit sind sie sichtbar');
+
+    const grid = healthHelpers.overviewGridMarkup();
+    assert.match(grid, /<h3 class="health-overview__card-title u-section-title"><button type="button" class="section-title-link" data-action="ov-go-vitals">/,
+      'der Titel der Karte ist der Weg zu allen Werten');
+  } finally {
+    healthHelpers.setViewStateForTest('overview', { vitals: [] });
+    abraeumen();
+  }
+  // Telefon: Vitalwerte, dann EINE Zeile, dahinter der Rest - im Baum in der Reihenfolge des Bilds.
+  {
+    const { installMiniDom } = await import('./mini-dom.js');
+    const raeumen = installMiniDom();
+    try {
+      const phone = healthHelpers.overviewGridMarkup({ phone: true });
+      const at = (needle) => { const i = phone.indexOf(needle); assert.ok(i > 0, `${needle} fehlt`); return i; };
+      assert.ok(at('health.overview.vitals.title') < at('health-overview__more-toggle'), 'die Vitalwerte stehen vor der Zeile');
+      assert.ok(at('health-overview__more-toggle') < at('health.overview.adherence.title</h3>'), 'die Einnahmetreue liegt dahinter');
+      assert.match(phone, /health-overview__more-toggle"\s+aria-expanded="false" aria-controls="health-overview-more"/);
+      assert.match(phone, /id="health-overview-more" hidden>/, 'eingeklappt beim ersten Blick');
+      assert.match(phone, /health-vitals__more-names">health\.overview\.adherence\.title, health\.overview\.reminders\.title</,
+        'die Zeile nennt, was hinter ihr liegt');
+      const wide = healthHelpers.overviewGridMarkup({ phone: false });
+      assert.doesNotMatch(wide, /health-overview__more/, 'breit gibt es keine Zeile - dort stehen alle Karten');
+      assert.ok(wide.indexOf('health.overview.adherence.title') < wide.indexOf('health.overview.vitals.title'), 'und in der bisherigen Reihenfolge');
+    } finally { raeumen(); }
+  }
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
+  const hide = [...eachRule(css)].find((r) => /\.health-overview__vital--extra\b/.test(r.selector) && /display:\s*none/.test(r.body));
+  assert.ok(hide, 'die Extras werden per CSS verborgen');
+  assert.ok(hide.at.some((a) => /max-width:\s*639px/.test(a)), `nur unter der Telefon-Grenze, gefunden: ${JSON.stringify(hide.at)}`);
+});

@@ -4482,6 +4482,7 @@
             "loadErrorDesc": "Zkuste to prosím znovu.",
             "retry": "Zkusit znovu",
             "areasTitle": "Všechny oblasti",
+            "moreTitle": "Zobrazit všechny hodnoty",
             "areasPick": "Vyberte oblast",
             "dueToday": {
                 "title": "Dnes k vyřízení"

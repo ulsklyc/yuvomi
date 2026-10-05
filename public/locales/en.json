@@ -4363,6 +4363,7 @@
             "loadErrorDesc": "Please try again.",
             "retry": "Try again",
             "areasTitle": "All categories",
+            "moreTitle": "Show all values",
             "areasPick": "Choose a category",
             "dueToday": {
                 "title": "Due today"

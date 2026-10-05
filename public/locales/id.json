@@ -4363,6 +4363,7 @@
             "loadErrorDesc": "Silakan coba lagi.",
             "retry": "Coba lagi",
             "areasTitle": "Semua kategori",
+            "moreTitle": "Tampilkan semua nilai",
             "areasPick": "Pilih kategori",
             "dueToday": {
                 "title": "Jatuh tempo hari ini"

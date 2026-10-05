@@ -4363,6 +4363,7 @@
             "loadErrorDesc": "もう一度お試しください。",
             "retry": "再試行",
             "areasTitle": "すべてのカテゴリ",
+            "moreTitle": "すべての値を表示",
             "areasPick": "カテゴリを選択",
             "dueToday": {
                 "title": "今日の予定"

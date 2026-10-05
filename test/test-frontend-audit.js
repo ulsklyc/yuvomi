@@ -17577,7 +17577,8 @@ test('Gesundheit: die letzten Vitalwerte ueberspannen die Spalten der Uebersicht
   // 640px leer. Als Band ueber alle Spalten traegt sie vier bis fuenf Kacheln
   // je Zeile.
   const health = read('../public/pages/health.js');
-  assert.match(health, /overviewCard\('activity', 'health\.overview\.vitals\.title', overviewVitalsMarkup\(\), 'vitals'\)/,
+  // Seit R16 ist ihr Titel zugleich der Weg zu allen Werten (fuenfter Parameter).
+  assert.match(health, /overviewCard\('activity', 'health\.overview\.vitals\.title', overviewVitalsMarkup\(\), 'vitals', \{ action: 'ov-go-vitals' \}\)/,
     'die Vitalwerte-Karte traegt ihren Teilnamen - an ihm haengt die Spannweite');
   const css = read('../public/styles/health.css');
   const span = [...eachRule(css)].find(({ selector, at }) => selector.trim() === '.health-overview__card--vitals' && !at.length);

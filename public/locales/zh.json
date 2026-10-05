@@ -4363,6 +4363,7 @@
             "loadErrorDesc": "请重试。",
             "retry": "重试",
             "areasTitle": "所有类别",
+            "moreTitle": "显示所有数值",
             "areasPick": "选择一个类别",
             "dueToday": {
                 "title": "今日待办"
