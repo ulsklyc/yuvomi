@@ -765,7 +765,7 @@
 }
 
 .note-pane--enter {
-  animation: notePaneEnter 160ms var(--ease-out);
+  animation: notePaneEnter var(--duration-sm) var(--ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {

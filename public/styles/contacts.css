@@ -524,7 +524,7 @@ html:has(.contacts-page.is-selecting) {
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: background-color var(--duration-sm) ease;
+  transition: background-color var(--transition-fast);
 }
 
 .vcard-import-row:hover,
@@ -631,7 +631,7 @@ html:has(.contacts-page.is-selecting) {
   padding-inline: var(--space-1);
   margin-inline: calc(var(--space-1) * -1);
   border-radius: var(--radius-sm);
-  transition: background-color 150ms ease;
+  transition: background-color var(--transition-fast);
 }
 
 /* Aktive Telefonzeile: dezenter Ton verankert den (geteilten) Hint an der Zeile,

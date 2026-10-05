@@ -1535,10 +1535,16 @@
   /* --------------------------------------------------------
    * 14. Übergänge
    *     fast=150ms, base=250ms, slow=400ms
+   *     EINE Kurvenfamilie: die Shorthands tragen dieselbe `--ease-out` wie
+   *     Seiten, Dialoge und Listen. Sie fuehrten bis R16 das Keyword `ease`,
+   *     also eine zweite Kurve fuer Hover und Press (307 Nutzungen gegen 69) -
+   *     dieselbe Oberflaeche fuehlte sich je nach Deklaration anders an.
+   *     Ein Shorthand ist Dauer + Kurve: dahinter steht NIE eine zweite Kurve
+   *     (macht die Deklaration ungueltig, `test:motion` haelt das).
    * -------------------------------------------------------- */
-  --transition-fast: 150ms ease;
-  --transition-base: 250ms ease;
-  --transition-slow: 400ms ease;
+  --transition-fast: var(--duration-sm) var(--ease-out);
+  --transition-base: var(--duration-lg) var(--ease-out);
+  --transition-slow: var(--duration-2xl) var(--ease-out);
 
   /* Motion-Dauern: kanonische Stufen für nackte Dauern in transition-/
    * animation-Werten, wo die --transition-*-Shorthands nicht passen.
@@ -1749,7 +1755,18 @@
    * --ease-glass), damit die gleitende Aktiv-Pille nicht über das Ziel-Item
    * hinausschießt. */
   --ease-sidebar-glide: cubic-bezier(0.28, 1.25, 0.36, 1);
-  --transition-glass: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Aus Bestandteilen, nicht als Literal: 0.35s brach die ms-Konvention und
+   * wiederholte die Federkurve; 300ms ist die Obergrenze im Arbeitsfluss. */
+  --transition-glass: var(--duration-xl) var(--ease-glass);
+  /* BLATT VON UNTEN: EIN PAAR fuer Dialog-Sheet, Mehr-Blatt und mobile Suche
+   * (R16). Es gab drei Bewegungen fuer dieselbe Geste: Dialog 24px + Feder in
+   * 300ms, Mehr-Blatt Vollhub in 250ms, Suche Vollhub. Der Eintritt federt,
+   * der Austritt ist kuerzer und ohne Ueberschwinger. Die Feder vertraegt nur
+   * den kurzen Hub (`--sheet-lift`): ueber einen Vollhub wirft sie das Blatt
+   * sichtbar ueber seine Ruhelage (gemessen 28,5px bei 40 %, test:motion). */
+  --sheet-in:   var(--duration-xl) var(--ease-glass);
+  --sheet-out:  var(--duration-md) var(--ease-out);
+  --sheet-lift: 24px;
 
   /* h) Liquid-Glass-Backdrop (Section 17) — driftende Blobs + Specular.
    *    --lg-blob-opacity bleibt bewusst niedrig, damit Inhalte dominieren.

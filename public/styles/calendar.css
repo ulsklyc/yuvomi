@@ -206,7 +206,9 @@
   background: none;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  /* Was wirklich wechselt (Hover, Aktiv-Pille) - `all` nahm jede kuenftige
+   * Eigenschaft mit, auch Layout. */
+  transition: color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
   min-height: var(--target-lg);
   white-space: nowrap;
 }

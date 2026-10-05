@@ -557,10 +557,47 @@
   border-radius: var(--radius-md);
   background: var(--color-surface);
   box-shadow: var(--shadow-lg);
+  /* Ein- und Ausgang wie `.popover-menu` (layout.css), hier rein in CSS: das
+   * Menue erschien und verschwand hart. `@starting-style` traegt die Einfahrt,
+   * `overlay`/`display` diskret den kuerzeren Ausgang. Rueckfall: ohne
+   * `allow-discrete` faellt die zweite Deklaration weg (harter Ausgang), ohne
+   * `@starting-style` steht es sofort - beides der Stand von vorher. */
+  opacity: 0;
+  transform: scale(0.96);
+  pointer-events: none;
+  transition:
+    opacity var(--duration-xs) var(--ease-out),
+    transform var(--duration-xs) var(--ease-out);
+  transition:
+    opacity var(--duration-xs) var(--ease-out),
+    transform var(--duration-xs) var(--ease-out),
+    overlay var(--duration-xs) allow-discrete,
+    display var(--duration-xs) allow-discrete;
 }
 
 .documents-context-menu:popover-open {
   display: flex;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition:
+    opacity var(--duration-md) var(--ease-out),
+    transform var(--duration-md) var(--ease-out);
+}
+
+@starting-style {
+  .documents-context-menu:popover-open {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .documents-context-menu,
+  .documents-context-menu:popover-open {
+    transform: none;
+    transition: none;
+  }
 }
 
 .documents-context-menu__item {
@@ -838,7 +875,7 @@
  * gerade angekommen ist (data-thumb-fresh), nicht das aus dem Seitenspeicher. */
 @media (prefers-reduced-motion: no-preference) {
   .document-thumb__img[data-thumb-fresh] {
-    animation: document-thumb-in var(--duration-md) ease-out;
+    animation: document-thumb-in var(--duration-md) var(--ease-out);
   }
 }
 

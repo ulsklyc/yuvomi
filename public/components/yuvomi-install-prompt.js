@@ -211,7 +211,9 @@ class YuvomiInstallPrompt extends HTMLElement {
         box-shadow: var(--shadow-md);
         pointer-events: auto;
         transform: translateY(calc(100% + 20px));
-        transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        /* Custom Properties erben in den Shadow Tree: Dauer und Kurve aus
+           tokens.css, kein zweiter Satz Literale. */
+        transition: transform var(--duration-xl) var(--ease-out);
       }
 
       .banner--visible {
@@ -259,7 +261,7 @@ class YuvomiInstallPrompt extends HTMLElement {
         cursor: pointer;
         min-height: 36px;
         min-width: 36px;
-        transition: background 0.15s ease;
+        transition: background var(--transition-fast);
       }
 
       .btn-install:hover {
@@ -281,7 +283,7 @@ class YuvomiInstallPrompt extends HTMLElement {
         padding: 0;
         min-height: 32px;
         min-width: 32px;
-        transition: background 0.15s ease;
+        transition: background var(--transition-fast);
       }
 
       .btn-dismiss:hover {

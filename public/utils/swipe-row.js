@@ -15,7 +15,7 @@
  * seit jeher geteilt in layout.css - nur der JS-Teil fehlte.
  */
 
-import { vibrate } from '/utils/ux.js';
+import { vibrate, durationToken } from '/utils/ux.js';
 import { t } from '/i18n.js';
 
 export const SWIPE_THRESHOLD = 80;   // px - Mindestweg für Aktion
@@ -24,7 +24,11 @@ export const SWIPE_LOCK_VERT = 30;   // px - ab diesem Weg gilt es als Scroll
 
 // Dauer der Rückfeder-Animation in resetCard(); die Konstante hält sie mit dem
 // Zeitpunkt zusammen, an dem die Compositor-Ebene wieder freigegeben wird.
-const SWIPE_RESET_MS = 250;
+// Aus dem Token (--duration-lg), nicht als Zahl: die Inline-Transition unten
+// zeigt auf dieselbe Custom Property, der Timer muss dieselbe Dauer kennen.
+const SWIPE_RESET_MS = durationToken('--duration-lg', 250);
+// Dauer des Hinausfliegens nach einer ausgeloesten Aktion (--duration-md).
+const SWIPE_FLY_MS = durationToken('--duration-md', 200);
 
 const SWIPE_HINT_KEY = 'yuvomi:swipeHintSeen';
 const SWIPE_HINT_MAX = 3;
@@ -151,7 +155,7 @@ export function wireSwipeRows(listEl, {
     }
 
     function resetCard(animate = true) {
-      cardEl.style.transition = animate ? `transform ${SWIPE_RESET_MS}ms ease` : '';
+      cardEl.style.transition = animate ? 'transform var(--duration-lg) var(--ease-out)' : '';
       cardEl.style.transform = '';
       row.classList.remove('swipe-row--swiping');
       disarm(animate ? SWIPE_RESET_MS : 0);
@@ -234,13 +238,13 @@ export function wireSwipeRows(listEl, {
       if (dir.flyOut) {
         // Die Karte verlässt das Bild, die Aktion läuft danach - so sieht man
         // das Ergebnis der Geste, bevor die Liste sich neu aufbaut.
-        cardEl.style.transition = 'transform 0.2s ease';
+        cardEl.style.transition = 'transform var(--duration-md) var(--ease-out)';
         cardEl.style.transform = `translateX(${dx < 0 ? '-' : ''}110%)`;
         vibrate(40);
         setTimeout(async () => {
           resetCard(false);
           await dir.run(row);
-        }, 200);
+        }, SWIPE_FLY_MS);
         return;
       }
 

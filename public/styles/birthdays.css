@@ -556,7 +556,7 @@
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: background-color var(--duration-sm) ease;
+  transition: background-color var(--transition-fast);
 }
 
 .bd-import-row:hover,

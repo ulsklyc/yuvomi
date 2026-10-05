@@ -4420,7 +4420,7 @@ function setViewMode(container, mode) {
   if (listEl) listEl.style.opacity = '0.4';
   const restore = () => {
     const el = container.querySelector('#task-list');
-    if (el) { el.style.transition = 'opacity 0.15s'; el.style.opacity = ''; }
+    if (el) { el.style.transition = 'opacity var(--transition-fast)'; el.style.opacity = ''; }
   };
   requestAnimationFrame(() => {
     // Der Verlauf holt Vorgaenge, die beiden anderen Ansichten Aufgaben -

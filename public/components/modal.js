@@ -1313,7 +1313,7 @@ export function updateHeaderAction(panel, { label, onClick, hidden = false } = {
  * Wie lange eine frisch geöffnete RÜCKFRAGE keine Zeiger-Betätigung annimmt.
  *
  * DER DIALOG FÄHRT IN DIE HAND, DIE GERADE GETIPPT HAT. Auf Handybreite ist
- * das Modal ein Sheet, und `modal-sheet-in` (layout.css) schiebt es 280 ms
+ * das Modal ein Sheet, und `glass-sheet-in` (glass.css) schiebt es 300 ms
  * lang von unten nach oben - quer durch die Stelle, an der eben noch
  * „Speichern" stand. Gemessen in headless Chrome: ein zweiter Tipp 40-70 ms
  * nach dem Öffnen der Serien-Rückfrage wählte eine Reichweite aus, ohne dass

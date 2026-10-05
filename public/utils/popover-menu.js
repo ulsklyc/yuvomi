@@ -162,7 +162,14 @@ export function syncPopoverMenuItem(root, action, checked) {
 function onBeforeToggle(event) {
   const panel = event.target;
   if (!(panel instanceof HTMLElement) || !panel.matches('.popover-menu')) return;
-  if (event.newState === 'open') panel.style.opacity = '0';
+  if (event.newState === 'open') { panel.style.opacity = '0'; return; }
+  // SCHLIESSEN: die Inline-Werte gehen JETZT, nicht erst im `toggle` danach.
+  // Der Ausgang (layout.css: `overlay`/`display` diskret, Blende, Schrumpfen)
+  // beginnt mit dem Schliessen; blieben Deckkraft und Groesse bis zum spaeter
+  // zugestellten `toggle` inline stehen, liefe die Uhr des Ausgangs schon,
+  // waehrend das Panel noch in voller Deckung stuende.
+  panel.style.opacity = '';
+  panel.style.transform = '';
 }
 
 function onToggle(event) {

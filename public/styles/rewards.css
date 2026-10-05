@@ -186,7 +186,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: color 140ms ease;
+  transition: color var(--transition-fast);
 }
 .rw-standing__points { font-size: var(--text-sm); color: var(--color-text-secondary); }
 /* Der Punktestand ist die Hauptaussage seiner Zeile und trägt Label-Farbe: der

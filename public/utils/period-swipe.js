@@ -31,14 +31,14 @@
  * (sie ist Bedienung, keine Animation), der Wechsel ist ein harter Schnitt.
  */
 
-import { vibrate } from '/utils/ux.js';
+import { vibrate, durationToken } from '/utils/ux.js';
 import { SWIPE_THRESHOLD, SWIPE_MAX_VERT } from '/utils/swipe-row.js';
 
 /** Abstand zur Bildschirmkante, in dem ein Kontakt der Systemgeste gehoert. */
 export const PERIOD_SWIPE_EDGE = 20;
 
 /** Dauer des Hereingleitens = --duration-md der Keyframe-Regel in calendar.css. */
-const SLIDE_IN_MS = 200;
+const SLIDE_IN_MS = durationToken('--duration-md', 200);
 
 /**
  * Gehoert ein Kontakt, der bei `x` beginnt, der Randgeste des Systems?
@@ -119,7 +119,7 @@ export function wirePeriodSwipe(surface, { enabled, onStep, ignore } = {}) {
     moving = null;
     if (!el) return;
     if (animate && !prefersReducedMotion()) {
-      el.style.transition = `transform ${SLIDE_IN_MS}ms var(--ease-out)`;
+      el.style.transition = 'transform var(--duration-md) var(--ease-out)';
       el.style.transform = '';
       setTimeout(() => { el.style.transition = ''; el.style.willChange = ''; }, SLIDE_IN_MS);
     } else {

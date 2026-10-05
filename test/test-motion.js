@@ -162,39 +162,226 @@ test('die Tafel und ihr Overlay haben auf JEDER Breite einen Ausgang', () => {
   }
 });
 
-test('kein Shorthand-Token mit einer zweiten Kurve in einer Transition', () => {
-  // Welche --transition-*-Token Shorthands sind (Dauer UND Kurve), steht in
-  // tokens.css - nicht in diesem Test.
-  const tokens = css('tokens.css');
-  const shorthandTokens = [...tokens.matchAll(/(--transition-[\w-]+)\s*:\s*([^;]+);/g)]
-    .filter(([, , value]) => /\d(?:ms|s)\b/.test(value) && /(ease|linear|cubic-bezier|steps)/.test(value))
-    .map(([, name]) => name);
-  assert.ok(shorthandTokens.includes('--transition-fast'), 'Vorbedingung: --transition-fast ist ein Shorthand');
+/** Ein Wert auf oberster Ebene an Kommas trennen - `cubic-bezier(a, b, c, d)` nicht zerteilen. */
+function splitCommas(value) {
+  const items = [];
+  let depth = 0;
+  let cur = '';
+  for (const ch of value) {
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth -= 1;
+    if (ch === ',' && depth === 0) { items.push(cur); cur = ''; } else cur += ch;
+  }
+  items.push(cur);
+  return items.map((item) => item.trim()).filter(Boolean);
+}
 
-  const curve = /\b(?:ease|ease-in|ease-out|ease-in-out|linear)\b|cubic-bezier\(|steps\(|var\(--ease-[\w-]+\)|var\(--transition-[\w-]+\)/g;
-  const failures = [];
+/**
+ * Jede `transition`-/`animation`-Deklaration aller Stylesheets, je Listeneintrag:
+ * `{ file, selector, prop, item, reduced }`. EIN Leser fuer alle Motion-Guards.
+ */
+function motionItems() {
+  const out = [];
   for (const file of allSheets) {
     for (const rule of eachRule(css(file))) {
-      for (const decl of rule.body.matchAll(/(?:^|;)\s*(transition(?:-[\w-]+)?)\s*:\s*([^;]+)/g)) {
-        // Auf oberster Ebene an Kommas trennen - `cubic-bezier(a, b, c, d)` nicht zerteilen.
-        const items = [];
-        let depth = 0;
-        let cur = '';
-        for (const ch of decl[2]) {
-          if (ch === '(') depth += 1;
-          if (ch === ')') depth -= 1;
-          if (ch === ',' && depth === 0) { items.push(cur); cur = ''; } else cur += ch;
-        }
-        items.push(cur);
-        for (const item of items) {
-          if (!shorthandTokens.some((tok) => item.includes(`var(${tok})`))) continue;
-          const curves = item.match(curve) ?? [];
-          if (curves.length > 1) failures.push(`${file}: ${rule.selector} { ${decl[1]}: ${item.trim()} }`);
+      const reduced = rule.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a));
+      for (const decl of rule.body.matchAll(/(?:^|;)\s*((transition|animation)(?:-[\w-]+)?)\s*:\s*([^;]+)/g)) {
+        for (const item of splitCommas(decl[3])) {
+          out.push({ file, selector: rule.selector, prop: decl[1], kind: decl[2], item, reduced });
         }
       }
     }
   }
-  assert.deepEqual(failures, [], `Ungueltige Transitions (zwei Kurven - die ganze Deklaration faellt weg):\n  ${failures.join('\n  ')}`);
+  return out;
+}
+
+/** Shorthand-Token aus tokens.css: Dauer UND Kurve in einem Wert. */
+function shorthandTokens() {
+  const tokens = css('tokens.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  return [...tokens.matchAll(/(--(?:transition|sheet)-[\w-]+)\s*:\s*([^;]+);/g)]
+    .filter(([, , value]) => /\d(?:ms|s)\b|var\(--duration-[\w-]+\)/.test(value)
+      && /(?<![\w-])(?:ease|linear|ease-in|ease-out|ease-in-out)(?![\w-])|cubic-bezier|steps\(|var\(--ease-[\w-]+\)/.test(value))
+    .map(([, name, value]) => ({ name, value: value.trim() }));
+}
+
+test('kein Shorthand-Token mit einer zweiten Kurve in einer Transition oder Animation', () => {
+  // Welche Token Shorthands sind (Dauer UND Kurve), steht in tokens.css - nicht
+  // in diesem Test.
+  const names = shorthandTokens().map((tok) => tok.name);
+  for (const expected of ['--transition-fast', '--transition-base', '--transition-slow', '--transition-glass', '--sheet-in', '--sheet-out']) {
+    assert.ok(names.includes(expected), `Vorbedingung: ${expected} ist als Shorthand erkannt (gefunden: ${names})`);
+  }
+
+  const curve = /(?<![\w-])(?:ease|ease-in|ease-out|ease-in-out|linear)(?![\w-])|cubic-bezier\(|steps\(|var\(--ease-[\w-]+\)|var\(--(?:transition|sheet)-[\w-]+\)/g;
+  const failures = [];
+  let seen = 0;
+  for (const { file, selector, prop, item } of motionItems()) {
+    const used = names.filter((tok) => item.includes(`var(${tok})`));
+    if (!used.length) continue;
+    seen += 1;
+    const curves = (item.match(curve) ?? []).filter((c) => !/^var\(--sheet-lift\)$/.test(c));
+    if (curves.length > 1) failures.push(`${file}: ${selector} { ${prop}: ${item} }`);
+  }
+  assert.ok(seen > 200, `der Scanner sieht die Shorthand-Nutzungen nicht (${seen}) - der Guard waere blind`);
+  assert.deepEqual(failures, [], `Ungueltige Deklarationen (zwei Kurven - die ganze Deklaration faellt weg):\n  ${failures.join('\n  ')}`);
+});
+
+/*
+ * 9. EINE KURVENFAMILIE (Critique R16, P2 Bewegung). Die drei Shorthands
+ *    fuehrten `ease` (307 Nutzungen) neben `--ease-out` (69): Hover und Press
+ *    liefen auf einer anderen Kurve als Seiten, Dialoge und Listen. Dazu rund
+ *    vierzig Deklarationen mit nacktem Keyword, 3x `transition: all` und
+ *    Literal-Dauern (140ms, 0.15s, 420ms, 0.35s ...).
+ *
+ *    Die Regel: Interaktions-Motion nimmt Dauer und Kurve aus tokens.css.
+ *    AUSGENOMMEN sind nur
+ *      - Endlos-Schleifen (`infinite`): Wetter, Spinner, Shimmer, Blob - dort
+ *        ist `linear`/`ease-in-out` die Aussage und die Periode kein UI-Tempo;
+ *      - die benannten Stellen unten, jede mit ihrem Grund;
+ *      - Nullwerte (`0s`, `none`) - kein Tempo, sondern "aus".
+ *    Eine Ausnahme, die nichts mehr trifft, macht den Guard rot: eine Liste
+ *    mit toten Eintraegen deckt die naechste echte Stelle.
+ */
+const KEYWORD_CURVE = /(?<![\w-])(ease|ease-in|ease-out|ease-in-out|linear)(?![\w(-])/;
+const LITERAL_TIME = /(?<![\w.-])(\d*\.?\d+)(ms|s)\b/g;
+
+/** `datei: selektor` -> Grund. Gilt fuer Keyword-Kurve UND Literal-Dauer der Stelle. */
+const MOTION_EXCEPTIONS = new Map([
+  ['calendar.css: .cal-press-ghost', 'Fortschritt des Langdrucks: laeuft linear mit der Haltezeit (--cal-press-ms), keine Bewegungskurve'],
+  ['layout.css: .app-content', 'sanktionierte Layout-Transition des Offline-Banners (ignore.md) - nicht angefasst'],
+  ['layout.css: .search-overlay', '`visibility 0s linear <Verzoegerung>`: diskreter Schalter nach der Blende, keine Bewegung'],
+  ['layout.css: .swipe-reveal', 'folgt dem Finger: die Deckkraft wird je Frame gesetzt, linear glaettet nur'],
+  ['layout.css: .swipe-row--hint > :first-child', 'einmaliger Wisch-Hinweis (Onboarding), nicht im Arbeitsfluss'],
+  ['dashboard.css: .dashboard-icon-btn--hint', 'einmaliger Hinweis-Puls (3 Wiederholungen), nicht im Arbeitsfluss'],
+  ['health.css: .cycle-ring__now', 'Hinweis-Puls am heutigen Tag (3 Wiederholungen), nicht im Arbeitsfluss'],
+  ['screensaver.css: .photo-screensaver img', 'Bildschirmschoner: langsame Ueberblendung zwischen Fotos, kein Bedienmoment'],
+]);
+
+function motionViolations() {
+  const used = new Set();
+  const keyword = [];
+  const literal = [];
+  const all = [];
+  let loops = 0;
+  for (const { file, selector, prop, kind, item, reduced } of motionItems()) {
+    const where = `${file}: ${selector}`;
+    if (kind === 'transition' && /^(?:transition|transition-property)$/.test(prop) && /^all\b/.test(item)) {
+      all.push(`${where} { ${prop}: ${item} }`);
+    }
+    const kw = KEYWORD_CURVE.test(item);
+    const lits = [...item.replace(/cubic-bezier\([^)]*\)/g, '').matchAll(LITERAL_TIME)]
+      .filter((m) => parseFloat(m[1]) !== 0);
+    if (!kw && !lits.length) continue;
+    if (/(?<![\w-])infinite(?![\w-])/.test(item)) { loops += 1; continue; }
+    if (MOTION_EXCEPTIONS.has(where)) { used.add(where); continue; }
+    // Unter reduzierter Bewegung steht kein Tempo, nur "aus" - ein Keyword
+    // dort ist trotzdem eins, eine Literal-Dauer auch.
+    if (kw) keyword.push(`${where} { ${prop}: ${item} }${reduced ? ' [reduced-motion]' : ''}`);
+    if (lits.length) literal.push(`${where} { ${prop}: ${item} }${reduced ? ' [reduced-motion]' : ''}`);
+  }
+  return { keyword, literal, all, used, loops };
+}
+
+test('eine Kurvenfamilie: die Shorthands und das Sheet-Paar bestehen aus Tokens', () => {
+  const byName = new Map(shorthandTokens().map((tok) => [tok.name, tok.value]));
+  for (const name of ['--transition-fast', '--transition-base', '--transition-slow']) {
+    assert.match(byName.get(name) ?? '', /^var\(--duration-[\w-]+\) var\(--ease-out\)$/, `${name}: Dauer-Token + --ease-out, kein Keyword und kein Literal`);
+  }
+  assert.match(byName.get('--transition-glass') ?? '', /^var\(--duration-[\w-]+\) var\(--ease-glass\)$/);
+  assert.match(byName.get('--sheet-in') ?? '', /^var\(--duration-[\w-]+\) var\(--ease-glass\)$/, 'der Eintritt des Blatts federt');
+  assert.match(byName.get('--sheet-out') ?? '', /^var\(--duration-[\w-]+\) var\(--ease-out\)$/, 'der Austritt hat keinen Ueberschwinger');
+  const ms = (name) => parseFloat(css('tokens.css').match(new RegExp(`${name}:\\s*(\\d+)ms`))?.[1] ?? 'NaN');
+  const dur = (name) => ms(byName.get(name).match(/var\((--duration-[\w-]+)\)/)[1]);
+  assert.ok(dur('--sheet-out') < dur('--sheet-in'), 'der Austritt ist kuerzer als der Eintritt');
+  assert.ok(dur('--sheet-in') <= 300, 'keine Bewegung ueber 300ms im Arbeitsfluss');
+});
+
+test('ein Blatt von unten: Dialog-Sheet, Mehr-Blatt und mobile Suche fahren aus EINEM Token-Paar', () => {
+  const items = motionItems().filter((m) => !m.reduced);
+  const uses = (selector, token) => items.some((m) => m.selector === selector && m.item.includes(`var(${token})`));
+  // Eintritt
+  assert.ok(items.some((m) => m.file === 'glass.css' && /^\.modal-panel:not\(\.modal-panel--closing\)$/.test(m.selector) && /glass-sheet-in var\(--sheet-in\)/.test(m.item)), 'Dialog-Sheet: Einfahrt aus --sheet-in');
+  assert.ok(uses('.more-sheet[aria-hidden="false"]', '--sheet-in'), 'Mehr-Blatt: Einfahrt aus --sheet-in');
+  assert.ok(uses('.search-overlay--visible', '--sheet-in'), 'Suche: Einfahrt aus --sheet-in');
+  // Austritt
+  assert.ok(items.some((m) => m.selector === '.modal-panel.modal-panel--closing' && /sheet-out var\(--sheet-out\)/.test(m.item)), 'Dialog-Sheet: Ausgang aus --sheet-out');
+  assert.ok(uses('.more-sheet', '--sheet-out'), 'Mehr-Blatt: Ausgang aus --sheet-out');
+  assert.ok(uses('.search-overlay', '--sheet-out'), 'Suche: Ausgang aus --sheet-out');
+  // Der Hub: kein Vollhub mehr - die Feder wuerfe ihn ueber die Ruhelage.
+  const layout = [...eachRule(css('layout.css'))];
+  for (const sel of ['.more-sheet', '.search-overlay']) {
+    const body = layout.find((r) => r.selector === sel && !r.at.length)?.body ?? '';
+    assert.match(body, /transform:\s*translateY\(var\(--sheet-lift\)\)/, `${sel}: kurzer Hub`);
+    assert.doesNotMatch(body, /translateY\((?:calc\()?100%/, `${sel}: kein Vollhub`);
+  }
+  // Die tote zweite Einfahrt in layout.css bleibt weg.
+  assert.doesNotMatch(css('layout.css').replace(/\/\*[\s\S]*?\*\//g, ''), /modal-sheet-in|modal-slide-up|modal-scale-in/);
+});
+
+test('eine Kurvenfamilie: keine nackte Keyword-Kurve in Interaktions-Motion', () => {
+  const { keyword, loops } = motionViolations();
+  assert.ok(loops >= 8, `der Scanner sieht die Endlos-Schleifen nicht (${loops}) - der Guard waere blind`);
+  assert.deepEqual(keyword, [], `Keyword-Kurve statt var(--ease-out)/var(--ease-in-out):\n  ${keyword.join('\n  ')}`);
+});
+
+test('keine Literal-Dauer und kein `transition: all` in Interaktions-Motion', () => {
+  const { literal, all } = motionViolations();
+  assert.deepEqual(all, [], `transition: all - die wechselnden Eigenschaften nennen:\n  ${all.join('\n  ')}`);
+  assert.deepEqual(literal, [], `Literal-Dauer statt var(--duration-*):\n  ${literal.join('\n  ')}`);
+});
+
+test('die Ausnahmeliste der Motion-Guards hat keinen toten Eintrag', () => {
+  const { used } = motionViolations();
+  const dead = [...MOTION_EXCEPTIONS.keys()].filter((key) => !used.has(key));
+  assert.deepEqual(dead, [], `Ausnahme trifft nichts mehr - streichen:\n  ${dead.join('\n  ')}`);
+});
+
+test('reduzierte Bewegung hat EINE "aus"-Konvention: 0s aus reset.css, kein 0.01ms daneben', () => {
+  const offenders = [];
+  for (const file of allSheets) {
+    for (const rule of eachRule(css(file))) {
+      if (/(?<![\w.-])0?\.\d+ms\b/.test(rule.body)) offenders.push(`${file}: ${rule.selector}`);
+    }
+  }
+  assert.deepEqual(offenders, [], `Bruchteil-Millisekunden als "aus":\n  ${offenders.join('\n  ')}`);
+});
+
+/*
+ * 10. BEWEGUNG AUS SKRIPTEN NIMMT DIESELBEN TOKENS. Eine Inline-Transition
+ *     darf auf Custom Properties zeigen (`transform var(--duration-md)
+ *     var(--ease-out)`), die Web Animations API bekommt ihre Zahl aus
+ *     `durationToken()`/`easingToken()` (utils/ux.js). Literale standen in
+ *     swipe-row.js (`0.2s ease`), sortable.js (die Federkurve als zweite
+ *     Quelle) und im Shadow Tree des Installationsbanners (0.35s, 0.15s).
+ */
+function frontendScripts(dir = new URL('../public/', import.meta.url)) {
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'vendor' || entry.name === 'locales') continue;
+    const url = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+    if (entry.isDirectory()) out.push(...frontendScripts(url));
+    else if (entry.name.endsWith('.js')) out.push(url);
+  }
+  return out;
+}
+
+test('Skripte: keine Literal-Dauer, kein Keyword und keine Literal-Kurve in Transition-Texten', () => {
+  const scripts = frontendScripts();
+  assert.ok(scripts.length > 100, 'Vorbedingung: der Scanner findet die Frontend-Skripte');
+  const offenders = [];
+  // Eine Eigenschaft, dann eine Literal-Dauer: `transform 0.2s ease`,
+  // `transition: background 0.15s ease` (auch in CSS-Texten eines Shadow Trees).
+  const timed = /(?:transform|opacity|background(?:-color)?|color|translate|box-shadow|border-color|filter|height|width)\s+\d*\.?\d+(?:ms|s)\b/;
+  const bezier = /cubic-bezier\(\s*[\d.]/;
+  for (const url of scripts) {
+    const lines = readFileSync(url, 'utf8').split('\n');
+    lines.forEach((line, i) => {
+      const code = line.replace(/\/\/.*$/, '');
+      if (/^\s*(?:\*|\/\*)/.test(code)) return;
+      if (timed.test(code) || bezier.test(code)) offenders.push(`${url.pathname.split('/public/')[1]}:${i + 1}: ${line.trim()}`);
+    });
+  }
+  assert.deepEqual(offenders, [], `Literal-Motion im Skript - var(--duration-*)/var(--ease-*) oder durationToken()/easingToken():\n  ${offenders.join('\n  ')}`);
 });
 
 test('der Seiteninhalt blendet nur - keine Feder, kein Versatz', () => {

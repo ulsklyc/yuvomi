@@ -58,7 +58,7 @@ test('sortable.js: respektiert prefers-reduced-motion', () => {
 });
 
 test('sortable.js: nutzt vibrate() aus ux.js als Drop-Feedback', () => {
-  assert.match(wrapperSource, /import \{ vibrate \} from '\.\/ux\.js'/);
+  assert.match(wrapperSource, /import \{[^}]*\bvibrate\b[^}]*\} from '\.\/ux\.js'/);
   assert.match(wrapperSource, /vibrate\(/);
 });
 

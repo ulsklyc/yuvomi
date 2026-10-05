@@ -299,14 +299,9 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .nav-item,
-  .nav-sidebar .nav-item,
-  .btn,
-  .card--interactive {
-    transition-duration: 0.01ms !important;
-  }
-}
+/* Hier stand ein eigener reduced-motion-Block mit `0.01ms !important` - eine
+ * zweite "aus"-Konvention neben reset.css, das in diesem Medienzustand jede
+ * Transition auf 0s nimmt. Es gilt die eine dort. */
 
 /* ================================================================
  * PHASE 2 — Modul-Komponenten
@@ -485,10 +480,6 @@ textarea.form-input {
   .toggle__track::after {
     transition: none;
   }
-
-  .toast {
-    animation-duration: 0.01ms !important;
-  }
 }
 
 /* ================================================================
@@ -521,10 +512,10 @@ textarea.form-input {
 @keyframes glass-sheet-in {
   from {
     opacity: 0.6;
-    /* 24px wie `modal-sheet-in` in layout.css, NICHT 40 %. Mit 40 % Hub warf die
+    /* 24px (= `--sheet-lift`, tokens.css), NICHT 40 %. Mit 40 % Hub warf die
      * Feder die Tafel gemessen 28,5px ueber ihre Ruhelage (Bodenluft 12 -> 41px),
-     * und genau dieser Block schlug die dort als "dezent, 24px" begruendete
-     * Einfahrt. Die Kurve bleibt die Feder (Glas-Element, ignore.md), der Hub
+     * und die Einfahrt war nicht mehr "dezent". Die Kurve bleibt die Feder
+     * (Glas-Element, ignore.md; `--sheet-in`), der Hub
      * nicht: 24px mal Ueberschwinger sind knapp 3px. */
     transform: translateY(24px);
   }
@@ -550,7 +541,7 @@ textarea.form-input {
 
 @media (max-width: 767px) {
   .modal-panel:not(.modal-panel--closing) {
-    animation: glass-sheet-in var(--duration-xl) var(--ease-glass) forwards;
+    animation: glass-sheet-in var(--sheet-in) forwards;
   }
 }
 
@@ -1032,7 +1023,7 @@ textarea.form-input {
   filter: blur(90px);
   /* Blob 1 wechselt seine Farbe mit der Stimme - der Übergang gehört an die
    * Farbe, also hierher zum Gradienten und nicht an die bewegte Hülle. */
-  transition: background 600ms var(--ease-out);
+  transition: background var(--duration-2xl) var(--ease-out);
 }
 
 /* Blob-Positionen meiden die Chrome-Zonen (Sidebar links, schwebende Tab-Bar

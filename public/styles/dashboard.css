@@ -2293,7 +2293,7 @@ svg.weather-forecast__icon {
 }
 
 .onboarding-overlay--out {
-  animation: onboarding-out var(--duration-lg) ease forwards;
+  animation: onboarding-out var(--duration-lg) var(--ease-out) forwards;
 }
 
 @keyframes onboarding-in {

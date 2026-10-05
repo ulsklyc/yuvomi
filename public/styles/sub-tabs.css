@@ -118,8 +118,8 @@
    * (Critique 2026-09-26, P3). Hinein kurz (--duration-2xs, Rueckmeldung
    * unter dem Finger), heraus mit der normalen Dauer. */
   transition:
-    background-color var(--duration-sm) ease,
-    color var(--duration-sm) ease,
+    background-color var(--transition-fast),
+    color var(--transition-fast),
     transform var(--duration-sm) var(--ease-out);
   -webkit-tap-highlight-color: transparent;
 }

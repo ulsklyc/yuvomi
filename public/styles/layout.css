@@ -763,7 +763,7 @@ html.page-swapping .nav-bottom {
 
 .more-backdrop--visible {
   display: block;
-  animation: fade-in var(--duration-sm) ease;
+  animation: fade-in var(--duration-sm) var(--ease-out);
 }
 
 /* DIE KAPSEL BLEIBT HELL, SOLANGE IHR EIGENES BLATT OFFEN IST (A1, Kleinkram
@@ -876,16 +876,25 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * Adressleiste die Hoehe waehrend der Sitzung aendert - ueber den Token, weil
    * die Rechnung var() traegt und ein vh-Zwilling dann nichts rettet (#1276). */
   max-block-size: calc(var(--viewport-height) - var(--nav-bottom-height) - var(--space-8));
-  /* Die Ausfahr-Distanz rechnet die Leiste MIT. `translateY(100%)` schob das
-   * Blatt frueher exakt aus dem Bild, weil seine Unterkante der Bildschirmrand
-   * war; seit sie ueber der Tab-Leiste liegt, blieben genau deren 76px oben
-   * sichtbar - ein Streifen fremdes Blatt unter jeder Seite. Gefunden hat das
-   * der Screenshot, nicht die Sonde: die Sonde mass das OFFENE Blatt. */
-  transform: translateY(calc(100% + var(--nav-bottom-height)));
-  /* `translate` traegt den Zug des Fingers (utils/sheet-drag.js) und federt
-   * mit derselben Kurve zurueck; `transform` bleibt dem Ein-/Ausfahren. */
+  /* EIN BLATT, EINE BEWEGUNG (R16): das Mehr-Blatt kommt wie das Dialog-Sheet
+   * - `--sheet-lift` Hub + Blende, `--sheet-in`/`--sheet-out` (tokens.css).
+   * Vorher fuhr es den vollen Weg (`translateY(100% + Leiste)`, 250ms) und
+   * war damit die zweite von drei Bewegungen fuer "Blatt von unten". Der
+   * Vollhub vertraegt die Feder nicht (sie wirft ihn ueber die Ruhelage).
+   *
+   * Geschlossen ist es durchsichtig UND nimmt keinen Zeiger; `inert` setzt
+   * router.js (`setOverlayInteractive`). Hier steht der AUSGANG (die Regel
+   * gilt, sobald `aria-hidden="false"` faellt), die Einfahrt an der offenen
+   * Regel unten.
+   * `translate` traegt den Zug des Fingers (utils/sheet-drag.js) und federt
+   * mit eigener Kurve zurueck; nach einer Wischgeste bleibt es stehen, und
+   * das Blatt blendet von dort aus, wohin der Finger es zog. */
+  transform: translateY(var(--sheet-lift));
+  opacity: 0;
+  pointer-events: none;
   transition:
-    transform var(--duration-lg) var(--ease-out),
+    transform var(--sheet-out),
+    opacity var(--sheet-out),
     translate var(--duration-lg) var(--ease-out);
 }
 
@@ -938,6 +947,12 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 
 .more-sheet[aria-hidden="false"] {
   transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    transform var(--sheet-in),
+    opacity var(--sheet-in),
+    translate var(--duration-lg) var(--ease-out);
 }
 
 /* ── More-Sheet Drag-Handle ── */
@@ -977,7 +992,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   text-align: left;
   margin-bottom: var(--space-1);
   -webkit-tap-highlight-color: transparent;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast), transform 100ms ease;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--duration-xs) var(--ease-out);
   user-select: none;
 }
 
@@ -1472,12 +1487,21 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   z-index: calc(var(--z-nav) + 3);
   display: flex;
   flex-direction: column;
-  transform: translateY(100%);
-  transition: transform var(--duration-lg) var(--ease-out);
+  /* Dieselbe Bewegung wie Dialog-Sheet und Mehr-Blatt (`--sheet-in`/`--sheet-out`,
+   * tokens.css) statt eines dritten Vollhubs. Das Overlay deckt den ganzen
+   * Schirm: geschlossen nimmt es keinen Zeiger, den Fokus sperrt `inert`
+   * (router.js, `setOverlayInteractive`). */
+  transform: translateY(var(--sheet-lift));
+  opacity: 0;
+  pointer-events: none;
+  transition: transform var(--sheet-out), opacity var(--sheet-out);
 }
 
 .search-overlay--visible {
   transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+  transition: transform var(--sheet-in), opacity var(--sheet-in);
 }
 
 /* Gruppiert Kopf + Treffer + Schließen. Auf Mobile transparent und
@@ -1753,7 +1777,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
     overflow: hidden;
-    /* Auftakt gespiegelt aus @keyframes modal-scale-in: Fade + scale(0.95→1)
+    /* Auftakt wie der Desktop-Dialog (glass-modal-scale-in): Fade + scale(0.95→1)
      * mit ease-out-expo, statt eines vom Bildschirmrand hochfahrenden Sheets.
      * Als Transition (nicht Keyframe), weil das Overlay persistent ist und nur
      * per --visible getoggelt wird. */
@@ -2239,7 +2263,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   border: none;
   transition: transform var(--transition-base), background-color var(--transition-fast);
   -webkit-tap-highlight-color: transparent;
-  animation: fab-in 420ms var(--ease-out) backwards;
+  animation: fab-in var(--duration-xl) var(--ease-out) backwards;
 }
 
 .page-fab:hover {
@@ -4322,15 +4346,42 @@ html.fab-anim-done .page-fab {
    * Ausloeser (utils/popover-menu.js setzt `transform-origin` mit der
    * Position und `transform: none` beim Oeffnen). Kein @starting-style: das
    * Oeffnen laeuft ohnehin ueber die zwei Werte, die JS nach der Rechnung
-   * setzt, und so wirkt es auch dort, wo @starting-style fehlt. */
+   * setzt, und so wirkt es auch dort, wo @starting-style fehlt.
+   *
+   * DER AUSGANG STEHT HIER, DIE EINFAHRT AN `:popover-open` (R16). Das Menue
+   * hatte keinen: mit dem Schliessen setzt das UA-Blatt `display: none`, und
+   * es war weg. `overlay` und `display` gehen jetzt diskret mit
+   * (`allow-discrete`, das Muster des Datepickers): das Panel bleibt fuer die
+   * Dauer des Ausgangs im Top-Layer, blendet aus und nimmt die 4 % zurueck.
+   * Der Ausgang ist kuerzer als die Einfahrt (--duration-xs gegen
+   * --duration-md) und nimmt keinen Zeiger mehr.
+   *
+   * ZWEI DEKLARATIONEN, UND DIE REIHENFOLGE IST DER RUECKFALL: ein Browser
+   * ohne `allow-discrete` verwirft die zweite als Ganzes und behaelt die
+   * erste - dort schliesst das Menue hart wie bisher, die Einfahrt bleibt. */
   transform: scale(0.96);
   transition:
-    opacity var(--duration-md) var(--ease-out),
-    transform var(--duration-md) var(--ease-out);
+    opacity var(--duration-xs) var(--ease-out),
+    transform var(--duration-xs) var(--ease-out);
+  transition:
+    opacity var(--duration-xs) var(--ease-out),
+    transform var(--duration-xs) var(--ease-out),
+    overlay var(--duration-xs) allow-discrete,
+    display var(--duration-xs) allow-discrete;
+}
+
+/* Ziel des Ausgangs. Offen setzt utils/popover-menu.js die Deckkraft inline
+ * (0 vor der Positionsrechnung, 1 danach) und raeumt sie beim Schliessen. */
+.popover-menu:not(:popover-open) {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .popover-menu:popover-open {
   display: flex;
+  transition:
+    opacity var(--duration-md) var(--ease-out),
+    transform var(--duration-md) var(--ease-out);
 }
 
 /* Icon UND Textlabel, immer. Das ist der ganze Zweck des Menüs: die drei
@@ -4436,11 +4487,16 @@ a.popover-menu__item {
   margin-inline-start: auto;
 }
 
-/* Reduzierte Bewegung: kein Wachsen, nur die Blende - sie bewegt nichts. */
+/* Reduzierte Bewegung: kein Wachsen, nur die Blende - sie bewegt nichts. Der
+ * Ausgang entfaellt (ohne `display` in der Liste schliesst das Menue sofort). */
 @media (prefers-reduced-motion: reduce) {
   .popover-menu {
     transform: none;
     transition: opacity var(--duration-md) var(--ease-out);
+  }
+
+  .popover-menu:popover-open {
+    transition-property: opacity;
   }
 
   .popover-menu__item {
@@ -5183,13 +5239,13 @@ p.field-hint--warn[hidden] {
    * und der Accessible Name des Items bleibt erhalten (besser für Screenreader). */
   html.sidebar-collapsed .nav-sidebar .nav-item__label {
     opacity: 0;
-    transition: opacity var(--duration-xs) ease;
+    transition: opacity var(--duration-xs) var(--ease-out);
   }
 
   html.sidebar-collapsed .nav-sidebar .nav-sidebar__account-chevron {
     opacity: 0;
     pointer-events: none;
-    transition: opacity var(--duration-xs) ease;
+    transition: opacity var(--duration-xs) var(--ease-out);
   }
 
   /* Eingeklappt: anders als die Nav-Item-Labels (die neben ihrem Icon in
@@ -5202,7 +5258,7 @@ p.field-hint--warn[hidden] {
     height: 0;
     padding-block: 0;
     overflow: hidden;
-    transition: opacity var(--duration-xs) ease;
+    transition: opacity var(--duration-xs) var(--ease-out);
   }
 
   /* ── Eingeklappt: Rail expandiert bei Hover/Fokus und zeigt Labels ──
@@ -5419,7 +5475,7 @@ p.field-hint--warn[hidden] {
            max(var(--space-3), env(safe-area-inset-right))
            max(var(--space-3), env(safe-area-inset-bottom))
            max(var(--space-3), env(safe-area-inset-left));
-  animation: modal-overlay-in var(--duration-md) ease forwards;
+  animation: modal-overlay-in var(--duration-md) var(--ease-out) forwards;
   /* iOS Safari: click-Events auf non-interactive divs erfordern cursor:pointer */
   cursor: pointer;
 }
@@ -5460,9 +5516,10 @@ p.field-hint--warn[hidden] {
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border-subtle);
   box-shadow: var(--shadow-lg);
-  /* Dezentes Einfahren: kurzer Hub + leichte Skalierung statt vollem
-   * translateY(100%)-Vollhub. Wirkt leichter und weniger einnehmend. */
-  animation: modal-sheet-in 280ms var(--ease-out) forwards;
+  /* DIE EINFAHRT STEHT IN glass.css (Abschnitt 18), NICHT HIER. Hier stand
+   * `modal-sheet-in 280ms` und ab 768px `modal-scale-in`: beide verloren immer
+   * gegen `.modal-panel:not(.modal-panel--closing)` dort (hoehere
+   * Spezifitaet, spaetere Datei) - eine zweite Einfahrt, die nie lief. */
   /* Cursor vom Overlay zurücksetzen */
   cursor: default;
 }
@@ -5472,7 +5529,6 @@ p.field-hint--warn[hidden] {
     max-width: 520px;
     max-height: calc(var(--viewport-height) - (2 * var(--space-6)));
     border-radius: var(--radius-lg);
-    animation: modal-scale-in var(--duration-md) var(--ease-out) forwards;
   }
   .modal-panel--sm { max-width: 400px; }
   .modal-panel--lg { max-width: 680px; }
@@ -6148,22 +6204,6 @@ p.field-hint--warn[hidden] {
   to   { opacity: 1; }
 }
 
-@keyframes modal-slide-up {
-  from { transform: translateY(100%); }
-  to   { transform: translateY(0); }
-}
-
-@keyframes modal-scale-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
-/* Mobile-Sheet: sanfter kurzer Hub + leichte Skalierung (kein Vollhub). */
-@keyframes modal-sheet-in {
-  from { opacity: 0; transform: translateY(24px) scale(0.985); }
-  to   { opacity: 1; transform: translateY(0)    scale(1); }
-}
-
 /* ── Bottom Sheet: Handle + Closing Animation (Mobile < 768px) ── */
 @media (max-width: 767px) {
   /* Sheet am unteren Rand verankern: oben bleibt ein Streifen des geblurten
@@ -6255,7 +6295,7 @@ p.field-hint--warn[hidden] {
 
 @media (max-width: 767px) {
   .modal-panel.modal-panel--closing {
-    animation: sheet-out var(--duration-md) var(--ease-out) forwards;
+    animation: sheet-out var(--sheet-out) forwards;
   }
 
   .modal-overlay.modal-overlay--closing {
@@ -6265,7 +6305,7 @@ p.field-hint--warn[hidden] {
 
 @keyframes sheet-out {
   from { transform: translateY(0); }
-  to   { transform: translateY(24px); opacity: 0; }
+  to   { transform: translateY(var(--sheet-lift)); opacity: 0; }
 }
 
 @keyframes modal-scale-out {
@@ -6801,7 +6841,7 @@ textarea::placeholder {
 
 .form-field--error-repeat .input,
 .form-field--error-repeat .form-input {
-  animation: field-error-pulse 500ms var(--ease-out);
+  animation: field-error-pulse var(--duration-2xl) var(--ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -7523,7 +7563,7 @@ textarea::placeholder {
   cursor: pointer;
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
-  transition: opacity var(--transition-fast), transform var(--duration-2xs) ease;
+  transition: opacity var(--transition-fast), transform var(--duration-2xs) var(--ease-out);
 }
 
 /* DIE MARKE AN DER KAPSEL steht standardmäßig nicht da: solange das Subjekt
@@ -7816,7 +7856,7 @@ textarea::placeholder {
 }
 
 .toast--out {
-  animation: toast-out var(--duration-md) ease forwards;
+  animation: toast-out var(--duration-md) var(--ease-out) forwards;
 }
 
 @keyframes toast-out {
@@ -7925,7 +7965,7 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
   position: relative;
 }
 
@@ -7982,7 +8022,7 @@ textarea::placeholder {
 }
 
 .btn--shaking {
-  animation: btn-shake var(--duration-xl) ease;
+  animation: btn-shake var(--duration-xl) var(--ease-out);
 }
 
 /* prefers-reduced-motion: kein Schütteln, nur Farb-Feedback */
@@ -8112,7 +8152,7 @@ textarea::placeholder {
   opacity: 0;
   pointer-events: none;
   z-index: 0;
-  transition: opacity 50ms linear;
+  transition: opacity var(--duration-2xs) linear;
 }
 
 /* --------------------------------------------------------
@@ -8533,7 +8573,7 @@ textarea.input { resize: vertical; }
 }
 
 .quick-add__input--flash {
-  animation: input-add-flash 550ms var(--ease-out) forwards;
+  animation: input-add-flash var(--duration-2xl) var(--ease-out) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -8700,7 +8740,7 @@ textarea.input { resize: vertical; }
   .nav-sidebar__indicator,
   .nav-sidebar__hover,
   .nav-bottom__indicator {
-    transition: opacity 0.01ms;
+    transition: none;
   }
 
   /* Die Flyout-Labels standen hier mit `transition: opacity 0.01ms` und dem
@@ -8723,10 +8763,16 @@ textarea.input { resize: vertical; }
   .more-sheet {
     transition: opacity var(--transition-fast);
     opacity: 0;
+    transform: none;
   }
 
+  /* `transition-property`, nicht der Shorthand: die offene Regel oben fuehrt
+   * `transform` in ihrer Transition und schluege diese hier (zwei Klassen
+   * gegen eine) - der Hub kaeme unter reduzierter Bewegung zurueck. */
   .more-sheet[aria-hidden="false"] {
     opacity: 1;
+    transform: none;
+    transition-property: opacity;
   }
 
   .more-sheet__search:active,
@@ -8743,10 +8789,12 @@ textarea.input { resize: vertical; }
   .search-overlay {
     transition: opacity var(--transition-fast);
     opacity: 0;
+    transform: none;
   }
 
   .search-overlay--visible {
     opacity: 1;
+    transform: none;
   }
 
   /* Desktop-Palette: kein Scale-Auftakt — das Panel erscheint ohne Bewegung,

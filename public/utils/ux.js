@@ -45,10 +45,10 @@ function commonHost(els) {
  * @param {Object} [opts]
  * @param {Element} [opts.host]        - Traeger der Liste, der das Neuzeichnen ueberlebt
  * @param {number} [opts.delay=30]     - ms zwischen jedem Element
- * @param {number} [opts.duration=200] - ms pro Element (--duration-md)
+ * @param {number} [opts.duration]     - ms pro Element, Standard `--duration-md`
  * @param {number} [opts.max=5]        - Maximale Anzahl gestaffelter Elemente
  */
-export function stagger(elements, { host = null, delay = 30, duration = 200, max = 5 } = {}) {
+export function stagger(elements, { host = null, delay = 30, duration = durationToken('--duration-md', 200), max = 5 } = {}) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const els = Array.from(elements ?? []);
   if (!els.length) return;
@@ -61,7 +61,7 @@ export function stagger(elements, { host = null, delay = 30, duration = 200, max
     const itemDelay = i < max ? i * delay : max * delay;
     el.style.opacity = '0';
     el.style.transform = 'translateY(8px)';
-    // 200ms = --duration-md, die Kurve aus den Token: der Inline-Wert darf auf
+    // Dauer (--duration-md) und Kurve aus den Token: der Inline-Wert darf auf
     // eine Custom Property zeigen, der Rueckleser unten vergleicht, was der
     // Browser daraus serialisiert.
     el.style.transition = `opacity ${duration}ms var(--ease-out), transform ${duration}ms var(--ease-out)`;

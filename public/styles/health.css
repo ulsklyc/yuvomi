@@ -1950,7 +1950,7 @@ button.health-med-card:hover {
   text-align: left;
   cursor: pointer;
   width: 100%;
-  transition: box-shadow 0.15s ease;
+  transition: box-shadow var(--transition-fast);
 }
 
 .health-overview__card--link:hover,
@@ -2469,7 +2469,7 @@ button.health-med-card:hover {
    * der Füllstand kommt als --cycle-fill (0..1) aus dem Markup. */
   transform-origin: left center;
   transform: scaleX(var(--cycle-fill, 0));
-  transition: transform var(--duration-md) ease;
+  transition: transform var(--duration-md) var(--ease-out);
 }
 
 /* Derselbe Fall wie beim Sparziel-Balken in dashboard.css: der Ursprung steht
@@ -2742,7 +2742,7 @@ button.health-med-card:hover {
   font-size: var(--text-sm);
   color: var(--color-text-primary);
   cursor: pointer;
-  transition: background var(--duration-xs) ease;
+  transition: background var(--duration-xs) var(--ease-out);
 }
 
 .cycle-cal__day:disabled { cursor: default; }
@@ -3383,7 +3383,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   font-size: var(--text-sm);
   cursor: pointer;
   min-height: var(--target-base);
-  transition: background var(--duration-xs) ease, border-color var(--duration-xs) ease;
+  transition: background var(--duration-xs) var(--ease-out), border-color var(--duration-xs) var(--ease-out);
 }
 
 .health-choice svg { width: 15px; height: 15px; }
