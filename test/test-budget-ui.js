@@ -2267,8 +2267,9 @@ test('Uebersicht mobil: EINE Kopfzeile, Karten und Diagramm eingeklappt, das Hau
   assert.match(zukunft, /budget-glance__label">budget\.summaryTitleForecast<\/span>\s*<span class="budget-glance__value budget-glance__value--forecast">/);
 
   // CSS: den Traeger gibt es nur unter 640px; dort ist eingeklappt nichts
-  // davon zu sehen, der zweite Diagramm-Knopf entfaellt.
-  const rules = [...eachRule(budgetCss)];
+  // davon zu sehen, der zweite Diagramm-Knopf entfaellt. Der Traeger selbst
+  // steht seit R16 in panel.css (Inventar und Haushaltshilfe nutzen ihn auch).
+  const rules = [...eachRule(budgetCss), ...eachRule(read('../public/styles/panel.css'))];
   const phone = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
   const base = rules.find((r) => r.at.length === 0 && r.selector.trim() === '.budget-glance');
   assert(base && /display:\s*none/.test(base.body), 'ab 640px gibt es keinen Traeger');
@@ -3171,8 +3172,11 @@ test('Abos, Darlehen, Aufteilung mobil: EINE Glance-Zeile, die Karten klappen au
   assert.match(slot.html, /budget-glance__label">splitExpenses\.youAreOwed</);
   assert.match(splitExpenses, /<section class="metric-grid budget-glance-details" id="split-summary">/, 'Aufteilung: die Kennzahl-Zeile ist der aufklappbare Bereich');
 
-  // CSS: eingeklappt ist der Bereich unter 640px weg, ab 640px bleibt er.
-  const rules = [...eachRule(budgetCss)];
+  // CSS: eingeklappt ist der Bereich unter 640px weg, ab 640px bleibt er
+  // (panel.css, seit R16 geteilt).
+  const rules = [...eachRule(read('../public/styles/panel.css'))];
+  assert.equal([...eachRule(budgetCss)].filter((r) => /\.budget-glance(?:__|-details|\b)/.test(r.selector)).length, 0,
+    'budget.css fuehrt keine zweite Fassung der Kurzzeile - sie laedt nur im Budget');
   const phone = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
   assert(rules.some((r) => phone(r) && /display:\s*none/.test(r.body) && /\.budget-glance-details:not\(\.is-expanded\)/.test(r.selector)),
     'unter 640px ist der eingeklappte Bereich weg');

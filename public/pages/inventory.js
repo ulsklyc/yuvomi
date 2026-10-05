@@ -10,6 +10,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import {
   openModal as openSharedModal,
   closeModal as closeSharedModal,
@@ -432,10 +433,32 @@ function updateAttentionBadge() {
     'warning');
 }
 
+// Mobil ist die Kennzahl-Zeile EINE Kurzzeile (utils/metric-glance.js), die
+// die Karten aufklappt (R16): drei Kacheln standen als 136px vor der ersten
+// Kategorie, eine davon fuer „0". Der Merker haelt den Zustand ueber den
+// Neuaufbau der Liste.
+let _metricsExpanded = false;
+
 function renderMetrics() {
   const { count, totalValue, needsAttention } = computeMetrics(state.items);
+  // Ein aktiver Filter bleibt sichtbar: seine Kachel ist der Schalter, also
+  // steht die Zeile dann aufgeklappt.
+  const expanded = _metricsExpanded || state.filterAttention;
+  const attentionEmpty = needsAttention === 0 && !state.filterAttention;
   return `
-    <div class="metric-grid">
+    ${metricGlanceHtml({
+    id: 'inventory-glance-more',
+    controls: 'inventory-metrics',
+    expanded,
+    label: t('inventory.metricItemsLabel'),
+    value: String(count),
+    flows: [
+      { label: t('inventory.metricValueLabel'), amount: formatMoney(totalValue, _householdCurrency) },
+      // Eine leere Kennzahl entfaellt in der Kurzzeile.
+      needsAttention > 0 ? { label: t('inventory.metricAttentionLabel'), amount: String(needsAttention) } : null,
+    ],
+  })}
+    <div class="metric-grid budget-glance-details${expanded ? ' is-expanded' : ''}" id="inventory-metrics">
       <div class="metric-card">
         <div class="metric-card__label">${esc(t('inventory.metricItemsLabel'))}</div>
         <div class="metric-card__value">${count}</div>
@@ -444,7 +467,7 @@ function renderMetrics() {
         <div class="metric-card__label">${esc(t('inventory.metricValueLabel'))}</div>
         <div class="metric-card__value">${esc(formatMoney(totalValue, _householdCurrency))}</div>
       </div>
-      <button type="button" class="metric-card metric-card--select${state.filterAttention ? ' is-active' : ''}"
+      <button type="button" class="metric-card metric-card--select${state.filterAttention ? ' is-active' : ''}${attentionEmpty ? ' metric-card--empty' : ''}"
               data-action="toggle-attention-filter" aria-pressed="${state.filterAttention}">
         <div class="metric-card__label">${esc(t('inventory.metricAttentionLabel'))}</div>
         <div class="metric-card__value">${needsAttention}</div>
@@ -760,6 +783,7 @@ function renderBrowse(list) {
 
   list.replaceChildren();
   list.insertAdjacentHTML('beforeend', renderMetrics());
+  wireMetricGlance(list, 'inventory-glance-more', (expanded) => { _metricsExpanded = expanded; });
   list.querySelector('[data-action="toggle-attention-filter"]')?.addEventListener('click', () => {
     state.filterAttention = !state.filterAttention;
     renderList();

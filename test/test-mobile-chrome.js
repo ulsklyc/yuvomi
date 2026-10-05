@@ -329,3 +329,32 @@ test('R16: Werkzeuge in der Titelzeile - nur markiert, nur mobil, nie neben eine
   assert.match(design, /\*\*1a\. Werkzeuge in der Titelzeile\.\*\*/, 'DESIGN.md benennt die Regel');
   assert.ok(design.includes(TITLE_TOOLS), 'und nennt ihre Kennklasse');
 });
+
+// R16 (Critique 2026-10-05, P1 mobil): KENNZAHLEN ALS KURZZEILE. Inventar trug
+// 136px Kacheln vor der Liste (eine fuer „0"), die Haushaltshilfe ein 2x2-
+// Raster vor den Besuchen. Beide nutzen mobil die Kurzzeile des Budgets
+// (utils/metric-glance.js). Die steht dafuer in panel.css: budget.css laedt
+// nur im Budget, und die Zeile waere in jedem anderen Modul unsichtbar
+// (`display: none` als Basis) oder ungestylt gewesen.
+test('R16: die Kennzahl-Kurzzeile ist ein geteilter Baustein, und Inventar und Haushaltshilfe nutzen ihn', () => {
+  const panel = rules(read('../public/styles/panel.css'));
+  const phone = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
+  assert.ok(panel.some((r) => r.at.length === 0 && r.selector === '.budget-glance' && decl(r.body, 'display') === 'none'),
+    'ab 640px gibt es den Traeger nicht');
+  assert.ok(panel.some((r) => phone(r) && r.selector === '.budget-glance' && decl(r.body, 'display') === 'block'));
+  assert.ok(panel.some((r) => phone(r) && r.selector === '.budget-glance-details:not(.is-expanded)' && decl(r.body, 'display') === 'none'),
+    'eingeklappt stehen die Karten nicht');
+  assert.ok(panel.some((r) => phone(r) && r.selector === '.budget-glance-details > .metric-card--empty' && decl(r.body, 'display') === 'none'),
+    'eine leere Kennzahl entfaellt mobil');
+  assert.ok(panel.some((r) => r.selector === '.budget-glance__row'), 'die Zeile selbst steht in panel.css');
+  for (const [file, id, controls] of [
+    ['../public/pages/inventory.js', 'inventory-glance-more', 'inventory-metrics'],
+    ['../public/pages/housekeeping.js', 'housekeeping-glance-more', 'housekeeping-metrics'],
+  ]) {
+    const src = read(file);
+    assert.match(src, /import \{ metricGlanceHtml, wireMetricGlance \} from '\/utils\/metric-glance\.js';/, file);
+    assert.match(src, new RegExp(`id: '${id}',\\s*controls: '${controls}'`), `${file}: Zeile und Bereich gehoeren zusammen`);
+    assert.match(src, new RegExp(`class="metric-grid[^"]*budget-glance-details[^"]*" id="${controls}"`), `${file}: die Karten sind der aufklappbare Bereich`);
+    assert.match(src, new RegExp(`wireMetricGlance\\(\\w+, '${id}'`), `${file}: der Aufklapper ist verdrahtet`);
+  }
+});

@@ -1110,139 +1110,24 @@
  * Kopfwert oben, der aufgeklappt hier weiter gilt - unter 640px gibt es keine
  * Seitenleiste, die den Container schmaler machte als das Fenster.
  * -------------------------------------------------------- */
-.budget-glance {
-  display: none;
-}
-
+/* Der Traeger selbst (`.budget-glance*`) und der aufklappbare Bereich
+ * (`.budget-glance-details`) stehen seit R16 in panel.css: Inventar und
+ * Haushaltshilfe nutzen dieselbe Zeile, und budget.css laedt nur im Budget.
+ * Hier bleibt, was nur die Budget-Uebersicht betrifft. */
 @media (max-width: 639px) {
-  .budget-glance {
-    display: block;
-    margin-block-end: var(--space-2);
-  }
-
   /* Eingeklappt: weder Karten noch Diagramm. Aufgeklappt stehen sie in
    * ihrer bisherigen Form unter dem Traeger, die Karten mit Trend und
    * „Nur Ausgaben", das Diagramm voll (is-expanded hebt die Top-3-Kuerzung
    * ohnehin auf). Den Knopf im Diagrammkopf braucht es dann nicht - die
    * Zeile im Traeger steuert denselben Zustand. */
   .budget-balance-details:not(.is-expanded),
-  .budget-glance-details:not(.is-expanded),
   .budget-overview .budget-chart-section:not(.is-expanded),
   .budget-overview .budget-chart-more {
     display: none;
   }
 
-  .budget-balance-details.is-expanded,
-  .budget-glance-details.is-expanded {
+  .budget-balance-details.is-expanded {
     margin-block-end: var(--space-2);
-  }
-}
-
-.budget-glance__row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  min-height: var(--target-base);
-  padding: var(--space-2) var(--space-4);
-  background: none;
-  font: inherit;
-  color: var(--color-text-primary);
-  text-align: start;
-  cursor: pointer;
-  transition: background-color var(--transition-fast);
-}
-
-.budget-glance__row:hover {
-  background-color: var(--color-surface-hover);
-}
-
-/* Der Traeger clippt seine Ecken (overflow: hidden) - ein Ring aussen waere
- * abgeschnitten, deshalb nach innen. */
-.budget-glance__row:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset-inset);
-}
-
-.budget-glance__lead {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.budget-glance__label {
-  font-size: var(--text-xs);
-  line-height: var(--line-height-tight);
-  color: var(--color-text-secondary);
-}
-
-/* Der Saldo traegt die Aussage der Zeile, aber als Zeilenwert, nicht als
- * Kennzahl-Karte: Title 3 waere groesser als der Titel „Transaktionen"
- * darunter. Die Toene sind die der Saldo-Karte (panel.css). */
-.budget-glance__value {
-  font-size: var(--text-lg);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-tight);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.budget-glance__value--positive { color: var(--color-success); }
-.budget-glance__value--negative { color: var(--color-danger); }
-.budget-glance__value--neutral  { color: var(--color-text-primary); }
-.budget-glance__value--forecast { color: var(--color-text-secondary); }
-
-.budget-glance__flows {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--space-0h);
-  min-width: 0;
-  margin-inline-start: auto;
-  font-size: var(--text-sm);
-  line-height: var(--line-height-tight);
-  color: var(--color-text-secondary);
-}
-
-.budget-glance__flow {
-  white-space: nowrap;
-}
-
-.budget-glance__amount {
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-primary);
-}
-
-/* Ein Nebenwert, der eine Tatsache meldet (Abos ueber Budget, Aufteilung
- * „Du schuldest"), traegt den Ton der Karte, die er vertritt. */
-.budget-glance__flow--negative .budget-glance__amount {
-  color: var(--color-danger);
-}
-
-.budget-glance__title {
-  font-weight: var(--font-weight-medium);
-}
-
-.budget-glance__chevron {
-  flex-shrink: 0;
-  margin-inline-start: auto;
-  color: var(--color-text-tertiary);
-  transition: transform var(--transition-fast);
-}
-
-.budget-glance__flows + .budget-glance__chevron {
-  margin-inline-start: 0;
-}
-
-.budget-glance__row[aria-expanded="true"] .budget-glance__chevron {
-  transform: rotate(180deg);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .budget-glance__row,
-  .budget-glance__chevron {
-    transition: none;
   }
 }
 

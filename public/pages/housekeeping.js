@@ -7,6 +7,7 @@
 import { api, auth } from '/api.js';
 import { t, formatDate, formatDayMonth, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
@@ -48,6 +49,10 @@ function dayTimeZone() {
 function localDayParams() {
   return new URLSearchParams({ timezone: dayTimeZone() });
 }
+
+// Aufklapp-Zustand der Kennzahl-Kurzzeile der Uebersicht (mobil, R16): haelt
+// ueber den Neuaufbau der Uebersicht nach einem Check-in.
+let _metricsExpanded = false;
 
 let state = {
   tab: 'dashboard',
@@ -574,7 +579,23 @@ function renderDashboard(content) {
 
   content.insertAdjacentHTML('beforeend', `
     ${renderWorkerSummary()}
-    <section class="metric-grid metric-grid--quad">
+    ${/* MOBIL EINE KURZZEILE (R16, utils/metric-glance.js): die vier Kacheln
+          standen als 2x2 vor den Besuchen (erste Besuchszeile y=475 von 844).
+          Die Zeile nennt die Besuche im Monat, daneben den letzten Besuch und
+          - nur wenn es welche gibt - die faelligen Aufgaben; ein Tipp klappt
+          die Kacheln auf. Ab 640px stehen die Kacheln wie bisher. */ ''}
+    ${metricGlanceHtml({
+    id: 'housekeeping-glance-more',
+    controls: 'housekeeping-metrics',
+    expanded: _metricsExpanded,
+    label: t('housekeeping.visitsThisMonth'),
+    value: String(data.visits_this_month ?? 0),
+    flows: [
+      hasLastVisit ? { label: t('housekeeping.lastVisit'), amount: lastVisit } : null,
+      (data.pending_tasks ?? 0) > 0 ? { label: t('housekeeping.pendingChores'), amount: String(data.pending_tasks) } : null,
+    ],
+  })}
+    <section class="metric-grid metric-grid--quad budget-glance-details${_metricsExpanded ? ' is-expanded' : ''}" id="housekeeping-metrics">
       <article class="metric-card">
         <div class="metric-card__label">${esc(t('housekeeping.visitsThisMonth'))}</div>
         <div class="metric-card__value">${esc(data.visits_this_month ?? 0)}</div>
@@ -584,11 +605,11 @@ function renderDashboard(content) {
         <div class="metric-card__value">${esc(lastVisit)}</div>
         ${lastVisitTime ? `<div class="metric-card__note">${esc(lastVisitTime)}</div>` : ''}
       </article>
-      <article class="metric-card">
+      <article class="metric-card${(data.pending_tasks ?? 0) > 0 ? '' : ' metric-card--empty'}">
         <div class="metric-card__label">${esc(t('housekeeping.pendingChores'))}</div>
         <div class="metric-card__value">${esc(data.pending_tasks ?? 0)}</div>
       </article>
-      <article class="metric-card">
+      <article class="metric-card${(data.finished_tasks_this_month ?? 0) > 0 ? '' : ' metric-card--empty'}">
         <div class="metric-card__label">${esc(t('housekeeping.finishedChores'))}</div>
         <div class="metric-card__value">${esc(data.finished_tasks_this_month ?? 0)}</div>
       </article>
@@ -623,6 +644,7 @@ function renderDashboard(content) {
     </div>
   `);
   if (window.lucide) window.lucide.createIcons({ el: content });
+  wireMetricGlance(content, 'housekeeping-glance-more', (expanded) => { _metricsExpanded = expanded; });
   // `if (!readOnly())` statt `return`: die lesende Verdrahtung (Bericht
   // oeffnen) steht dahinter und muss bleiben - dieselbe Form wie in health.js.
   if (!readOnly()) {

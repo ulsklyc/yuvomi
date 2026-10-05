@@ -56,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of a third of the screen.** In "Compare" the people are one row you swipe through,
   next to Week/Day, with the week stepper below; in "Statistics" person and period stand side
   by side above the two buttons. The comparison or the figures begin about 170px higher.
+- **Inventory and the Housekeeping overview show their figures as one row on a phone.** Three
+  and four tiles stood in front of the list, one of them for "0". Now one row names the main
+  figure and up to two others, and a tap opens the tiles; a figure that is zero is left out.
+  The first category in Inventory starts 106px higher, the first visit in Housekeeping 57px.
 
 ### Fixed
 
