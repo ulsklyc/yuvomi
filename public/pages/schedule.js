@@ -1661,10 +1661,15 @@ function renderOverview() {
     ${picker}
     <div class="schedule-overview__week-nav" role="group" aria-label="${esc(weekLabel)}">
       ${viewToggle}
-      <button type="button" class="btn btn--icon" data-action="overview-week" data-direction="prev" aria-label="${esc(t('calendar.back'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-      <button type="button" class="btn btn--secondary" data-action="overview-week" data-direction="today">${esc(t('calendar.today'))}</button>
-      <button type="button" class="btn btn--icon" data-action="overview-week" data-direction="next" aria-label="${esc(t('calendar.forward'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
-      <span class="schedule-overview__week-label">${esc(weekLabel)}</span>
+      ${/* Der Stepper ist ein eigener Kasten (R16): schmal loest sich die
+           Gruppe auf (schedule.css), Ansicht und Personen teilen sich Zeile 1,
+           der Stepper bekommt Zeile 2 - dafuer muss er EIN Rasterkind sein. */ ''}
+      <div class="schedule-overview__stepper">
+        <button type="button" class="btn btn--icon" data-action="overview-week" data-direction="prev" aria-label="${esc(t('calendar.back'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+        <button type="button" class="btn btn--secondary" data-action="overview-week" data-direction="today">${esc(t('calendar.today'))}</button>
+        <button type="button" class="btn btn--icon" data-action="overview-week" data-direction="next" aria-label="${esc(t('calendar.forward'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+        <span class="schedule-overview__week-label">${esc(weekLabel)}</span>
+      </div>
     </div>
   </div>`;
 

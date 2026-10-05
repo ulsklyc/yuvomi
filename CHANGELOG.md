@@ -52,6 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   more than a full screen. The group choice is now one row that names the active group and
   opens the list with search, "new group" and Active/Archived; the group header is just its
   actions, and the balances are tighter. On a wide window nothing changes.
+- **Shift schedule: "Compare" and "Statistics" start with two rows of controls on a phone
+  instead of a third of the screen.** In "Compare" the people are one row you swipe through,
+  next to Week/Day, with the week stepper below; in "Statistics" person and period stand side
+  by side above the two buttons. The comparison or the figures begin about 170px higher.
 
 ### Fixed
 

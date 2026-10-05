@@ -670,8 +670,36 @@
 
 :root[data-theme="dark"] .schedule-page input[type="month"] { color-scheme: dark; }
 
+/* Auswertung mobil: zwei Zeilen statt einer 257px-Formularkarte (R16) - die
+ * Begruendung steht am Dateiende bei der Bedienflaeche des Vergleichs. */
 @media (max-width: 639px) {
-  .schedule-stat-filters { grid-template-columns: minmax(0, 1fr); }
+  .schedule-stat-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+  }
+
+  .schedule-stat-filters > :first-child,
+  .schedule-stat-range {
+    grid-column: auto;
+  }
+
+  .schedule-stat-filters > :first-child > .label,
+  .schedule-stat-range > .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .schedule-stat-filter-actions > .btn {
+    flex: 1 1 0;
+  }
 }
 
 /* Desktop follows the shared full-width module shell.  The Schedule page
@@ -775,6 +803,14 @@
 }
 
 .schedule-overview__week-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.schedule-overview__stepper {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1149,4 +1185,99 @@
   margin: 0;
   min-width: 0;
   text-align: end;
+}
+
+/* MOBIL: DIE BEDIENFLAECHE VOR DEM INHALT (R16, Critique 2026-10-05 P1).
+ * Gemessen 390x844: Vergleich 263px (Personenwahl 165px in drei Chipreihen,
+ * darunter Ansicht + Stepper + Label auf zwei Zeilen), Auswertung 257px (eine
+ * Formularkarte, je Feld eine Zeile mit Label) - der Inhalt begann bei y=417
+ * bzw. 441. Beide sind jetzt zwei Zeilen.
+ *
+ * VERGLEICH: Zeile 1 = Ansicht (Woche/Tag) und die Personen als EINE
+ * waagerecht scrollende Chipreihe; Zeile 2 = der Stepper, Label mittig
+ * zwischen den Pfeilen, „Heute" am Zeilenende. Die Gruppe `week-nav` loest
+ * sich dafuer auf (`display: contents`), ihre Kinder sind Rasterkinder der
+ * Bedienflaeche. Die Beschriftung der Personenwahl bleibt der Name der
+ * Gruppe, sie steht nur nicht mehr als eigene Zeile da.
+ *
+ * AUSWERTUNG: Person und Zeitraum nebeneinander, die Aktionen darunter, ohne
+ * Kartenflaeche. Die Feld-Labels bleiben die Namen der Felder (geclippt); ein
+ * Auswahlfeld, das „Linda" bzw. „Dieser Monat" zeigt, sagt, was es ist. Die
+ * Datumsfelder eines eigenen Zeitraums behalten ihre Labels - dort stehen zwei
+ * gleichartige Felder nebeneinander. */
+@media (max-width: 767px) {
+  .schedule-overview__toolbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "view people"
+      "step step";
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+
+  .schedule-overview__week-nav {
+    display: contents;
+  }
+
+  .schedule-overview__week-nav > .segmented {
+    grid-area: view;
+  }
+
+  .schedule-overview__toolbar > .user-ms {
+    grid-area: people;
+    min-width: 0;
+  }
+
+  .schedule-overview__toolbar > .user-ms > .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .schedule-overview__toolbar > .user-ms > .user-ms__options {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    /* Der Fokusring der Chips liegt ausserhalb ihrer Box; ohne Polster
+       schneidet der Scroller ihn ab. */
+    padding: var(--space-1);
+    margin: calc(var(--space-1) * -1);
+  }
+
+  .schedule-overview__toolbar > .user-ms .user-ms__option {
+    flex: 0 0 auto;
+  }
+
+  /* In der einen Zeile stehen die Personen vorn; „Auswahl leeren" (124px)
+     schob sonst die erste Person halb aus dem Bild. */
+  .schedule-overview__toolbar > .user-ms .user-ms__option--none {
+    order: 1;
+  }
+
+  .schedule-overview__stepper {
+    grid-area: step;
+    flex-wrap: nowrap;
+  }
+
+  .schedule-overview__stepper > .schedule-overview__week-label {
+    order: 1;
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .schedule-overview__stepper > [data-direction="next"] {
+    order: 2;
+  }
+
+  .schedule-overview__stepper > [data-direction="today"] {
+    order: 3;
+  }
 }

@@ -2629,3 +2629,36 @@ test('P12: the comparison fits seven days of one person into the desktop width',
   assert.ok(rules.some((r) => sel(r, '.schedule-overview__day:not(.schedule-overview__gutter)') && /flex\s*:\s*1 1 0/.test(r.body)),
     'die Tage teilen sich die Breite statt auf ihrer Mindestbreite zu stehen');
 });
+
+/* R16 (Critique 2026-10-05, P1 mobil): BEDIENFLAECHE VOR DEM INHALT. Vergleich
+ * 263px (Personenwahl in drei Chipreihen, Ansicht + Stepper + Label auf zwei
+ * Zeilen), Auswertung 257px (Formularkarte, je Feld eine Zeile). Beide sind
+ * mobil zwei Zeilen: gemessen 110 bzw. 104px, Inhalt ab y=248 bzw. 242. */
+test('R16: Vergleich und Auswertung tragen mobil zwei Bedienzeilen', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const all = [...eachRule(css)].map((r) => ({ ...r, selector: r.selector.trim() }));
+  const at = (re) => all.filter((r) => r.at.some((a) => re.test(a)));
+  const phone = at(/max-width:\s*767px/);
+  const body = (list, sel) => list.filter((r) => r.selector === sel).map((r) => r.body).join(';');
+
+  // Der Stepper ist EIN Rasterkind: ohne den Kasten fielen Pfeile und Label einzeln ins Raster.
+  assert.match(src, /<div class="schedule-overview__stepper">[\s\S]*data-direction="prev"[\s\S]*data-direction="next"[\s\S]*schedule-overview__week-label/);
+  assert.match(body(phone, '.schedule-overview__toolbar'), /grid-template-areas:\s*"view people"\s*"step step"/);
+  assert.match(body(phone, '.schedule-overview__week-nav'), /display:\s*contents/);
+  assert.match(body(phone, '.schedule-overview__toolbar > .user-ms > .user-ms__options'), /flex-wrap:\s*nowrap/,
+    'die Personen sind EINE scrollende Reihe');
+  assert.match(body(phone, '.schedule-overview__toolbar > .user-ms > .user-ms__options'), /overflow-x:\s*auto/);
+  // Die mobile Regel muss NACH der Basisregel stehen (gleiche Spezifitaet): davor verlor sie still.
+  const order = all.map((r, i) => [r, i]).filter(([r]) => r.selector === '.schedule-overview__toolbar');
+  const baseAt = order.find(([r]) => r.at.length === 0)?.[1];
+  const phoneAt = order.find(([r]) => r.at.some((a) => /max-width:\s*767px/.test(a)))?.[1];
+  assert.ok(baseAt >= 0 && phoneAt > baseAt, 'die mobile Bedienflaeche steht hinter ihrer Basisregel');
+
+  const narrow = at(/max-width:\s*639px/);
+  assert.match(body(narrow, '.schedule-stat-filters'), /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
+    'Person und Zeitraum stehen nebeneinander');
+  const labels = narrow.find((r) => r.selector.includes('.schedule-stat-range > .label'));
+  assert.match(labels?.body ?? '', /clip-path:\s*inset\(50%\)/, 'die Feld-Labels bleiben im Baum');
+});
