@@ -320,6 +320,7 @@ const PAGE_MODULES = [
   // Der Bildzuschnitt kommt per dynamischem import() aus mehreren Modulen
   // (Avatare, Geburtstage, Vorrat, Rezepte, Haushaltshilfe, Schnellzugriff).
   // Der Precache-Guard las dynamische Importe bis dahin nicht.
+  '/utils/auth-ui.js',
   '/utils/avatar-crop.js',
   '/utils/lucide-icons.js',
   '/utils/sortable.js',

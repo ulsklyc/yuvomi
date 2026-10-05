@@ -7,6 +7,7 @@
 import { auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { authHeroHtml, authErrorHtml, wirePasswordToggle } from '/utils/auth-ui.js';
 
 const VERSION_URL = '/api/v1/version';
 const DEFAULT_APP_NAME = 'Yuvomi';
@@ -51,19 +52,7 @@ export async function render(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <main class="auth-page" id="main-content">
-      <div class="auth-hero">
-        <span class="auth-hero__mark" aria-hidden="true">
-          <svg viewBox="0 0 160 160" fill="currentColor">
-            <g fill-opacity="0.82">
-              <circle cx="64" cy="72" r="27" />
-              <circle cx="100" cy="78" r="25" />
-              <circle cx="80" cy="106" r="24" />
-            </g>
-          </svg>
-        </span>
-        <h1 class="auth-hero__title">${esc(storedAppName)}</h1>
-        <p class="auth-hero__tagline">${esc(t('login.tagline'))}</p>
-      </div>
+      ${authHeroHtml({ appName: storedAppName, tagline: t('login.tagline') })}
       <div class="auth-card card card--padded">
         ${!passwordLoginEnabled ? `
         <div class="auth-form" id="sso-only-block">
@@ -107,7 +96,7 @@ export async function render(container) {
             </p>
           </div>
 
-          <div class="form-error" id="form-error" role="alert" tabindex="-1" hidden></div>
+          ${authErrorHtml('form-error')}
 
           <button type="submit" class="btn btn--primary auth-form__submit" id="auth-btn">
             <span class="auth-btn__label">${esc(t('login.loginButton'))}</span>
@@ -178,31 +167,9 @@ export async function render(container) {
     form?.querySelector('#username')?.focus();
   });
 
-  // K3: Passwort-Sichtbarkeits-Toggle
+  // K3: Passwort-Sichtbarkeits-Toggle - der geteilte Baustein (utils/auth-ui.js).
   const passwordInput = form.querySelector('#password');
-  const passwordWrapper = document.createElement('div');
-  passwordWrapper.className = 'input-password-wrapper';
-  passwordInput.parentNode.insertBefore(passwordWrapper, passwordInput);
-  passwordWrapper.appendChild(passwordInput);
-
-  const toggleBtn = document.createElement('button');
-  toggleBtn.type = 'button';
-  toggleBtn.className = 'password-toggle';
-  toggleBtn.setAttribute('aria-label', t('login.showPassword'));
-  const toggleIcon = document.createElement('i');
-  toggleIcon.setAttribute('data-lucide', 'eye');
-  toggleIcon.setAttribute('aria-hidden', 'true');
-  toggleBtn.appendChild(toggleIcon);
-  passwordWrapper.appendChild(toggleBtn);
-  if (window.lucide) lucide.createIcons({ el: toggleBtn });
-
-  toggleBtn.addEventListener('click', () => {
-    const isPassword = passwordInput.type === 'password';
-    passwordInput.type = isPassword ? 'text' : 'password';
-    toggleIcon.setAttribute('data-lucide', isPassword ? 'eye-off' : 'eye');
-    toggleBtn.setAttribute('aria-label', t(isPassword ? 'login.hidePassword' : 'login.showPassword'));
-    if (window.lucide) lucide.createIcons({ el: toggleBtn });
-  });
+  wirePasswordToggle(passwordInput, { show: t('login.showPassword'), hide: t('login.hidePassword') });
 
   // Caps-Lock-Hinweis: eine aktive Feststelltaste ist die häufigste Ursache für
   // vermeintlich falsche Passwörter. Nur am Passwortfeld, nur solange aktiv.
@@ -374,7 +341,7 @@ function renderSecondFactor(container, { recoveryAvailable }) {
         >
         <p class="form-hint" id="two-factor-hint">${esc(t(recoveryAvailable ? 'login.twoFactorHintRecovery' : 'login.twoFactorHint'))}</p>
       </div>
-      <div class="form-error" id="two-factor-error" role="alert" tabindex="-1" hidden></div>
+      ${authErrorHtml('two-factor-error')}
       <button type="submit" class="btn btn--primary auth-form__submit" id="two-factor-btn">
         <span class="auth-btn__label">${esc(t('login.twoFactorSubmit'))}</span>
       </button>

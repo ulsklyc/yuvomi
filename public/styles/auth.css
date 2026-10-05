@@ -76,6 +76,26 @@
   height: 55%;
 }
 
+/* DER KOPF UEBER EINER KARTE MIT EIGENEM TITEL (R16, utils/auth-ui.js):
+ * Einladung und Passwort-Reset tragen dieselbe Marke wie die Anmeldung, aber
+ * eine Stufe leiser - die Seite hat ihre <h1> in der Karte ("Einladung
+ * annehmen"), der App-Name ist dort Absender, nicht Titel. */
+.auth-hero--compact {
+  margin-bottom: var(--space-6);
+}
+
+.auth-hero--compact .auth-hero__mark {
+  width: var(--space-12);
+  height: var(--space-12);
+  margin-bottom: var(--space-2);
+}
+
+.auth-hero--compact .auth-hero__title {
+  margin: 0;
+  font-size: var(--type-section-title);
+  font-weight: var(--font-weight-semibold);
+}
+
 /* Large Title wie jeder Seitentitel, in Label-Farbe. Der Titel stand bis Runde 3
  * auf einer eigenen 48px-Stufe und in --color-accent - beides verbietet
  * DESIGN.md ausdruecklich (Ueberschriften enden bei 34px; Large Titles tragen

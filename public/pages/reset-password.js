@@ -6,6 +6,7 @@
 import { auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { authHeroHtml, authErrorHtml, wirePasswordToggle } from '/utils/auth-ui.js';
 
 function wireLinks(container) {
   container.querySelectorAll('a[data-link]').forEach((a) =>
@@ -21,6 +22,7 @@ function renderUnavailable(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <main class="auth-page" id="main-content">
+      ${authHeroHtml({ heading: false })}
       <div class="auth-card card card--padded">
         <h1 class="auth-card__title">${esc(t('forgotPassword.title'))}</h1>
         <p class="auth-card__intro">${esc(t('forgotPassword.unavailable'))}</p>
@@ -51,11 +53,12 @@ export async function render(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <main class="auth-page" id="main-content">
+      ${authHeroHtml({ heading: false })}
       <div class="auth-card card card--padded">
         <h1 class="auth-card__title">${esc(t('resetPassword.title'))}</h1>
         <!-- Beide Meldungen stehen außerhalb des Formulars: der Erfolgsfall
              blendet das Formular aus, und ein Kind davon wäre mit ihm weg. -->
-        <div class="form-error" id="reset-error" role="alert" aria-live="polite" hidden></div>
+        ${authErrorHtml('reset-error')}
         <div class="form-success" id="reset-success" role="status" aria-live="polite" hidden></div>
         <form class="auth-form" id="reset-form" novalidate>
           <div class="form-group">
@@ -81,6 +84,10 @@ export async function render(container) {
   const errorEl = container.querySelector('#reset-error');
   const successEl = container.querySelector('#reset-success');
   const btn = container.querySelector('#reset-btn');
+  // Das Auge an beiden Passwortfeldern (utils/auth-ui.js).
+  const eye = { show: t('login.showPassword'), hide: t('login.hidePassword') };
+  wirePasswordToggle(form.querySelector('#password'), eye);
+  wirePasswordToggle(form.querySelector('#confirm'), eye);
   wireLinks(container);
 
   const show = (el, msg) => { el.textContent = msg; el.hidden = false; };
