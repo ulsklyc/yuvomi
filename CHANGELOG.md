@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **"Latest vitals" in the Health overview uses the width instead of one long column.** On a
   desktop the nine tiles stood one below the other, 930px tall, next to 640px of empty space.
   The card now runs across the overview with four or five tiles per row, about a third as tall.
+- **The calendar's day view shows what comes next beside the day.** On a desktop the day was a
+  single 932px column, the phone layout stretched. From a window of about 1280px the next seven
+  days stand beside the hour timeline as agenda rows; a row opens the event, the heading leads
+  to the agenda. The phone's day view is unchanged.
 
 ### Fixed
 

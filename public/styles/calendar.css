@@ -1096,6 +1096,79 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* TAG | FOLGETAGE (Critique R16, 2026-10-05). Die Tagesansicht war am Desktop
+ * eine einzelne 932px breite Spalte. Ab der Split-Schwelle der Modulflaeche
+ * (`--layout-split-threshold`, PAGE-019; Container ist die Seitenwurzel mit
+ * `app-page--columns`, die calendar.js nur in dieser Ansicht setzt) steht
+ * rechts eine Seitenspalte in `--layout-rail-min` mit den Folgetagen als
+ * Agenda-Zeilen. Darunter gibt es sie nicht: die Huelle ist dann nur die
+ * Flex-Spalte, die `.day-view` schon war. Die Spalte scrollt fuer sich, damit
+ * das Stundenraster seine Position behaelt. */
+.day-layout {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.day-rail {
+  display: none;
+}
+
+@container module-surface (min-width: 65rem) {
+  .day-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--layout-rail-min);
+    grid-template-rows: minmax(0, 1fr);
+    column-gap: var(--space-6);
+  }
+
+  .day-rail {
+    display: block;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    /* Luft fuer den Fokusring der Zeilen an der Scrollkante. */
+    padding-inline: var(--space-1);
+  }
+}
+
+.day-rail__title {
+  margin: 0 0 var(--space-2);
+}
+
+/* Der Titel ist der Weg in die Agenda: Schrift und Farbe vom Titel, der Knopf
+ * traegt Ziel und Pfeil. Volle Zielhoehe, ohne die Zeile hoeher zu machen. */
+.day-rail__more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--target-base);
+  margin-block: calc((var(--target-base) - 1lh) / -2);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.day-rail__more:hover {
+  color: var(--color-accent);
+}
+
+.day-rail__more:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.day-rail__more svg {
+  inline-size: var(--icon-md);
+  block-size: var(--icon-md);
+  color: var(--color-text-tertiary);
+}
+
 /* #cal-body ist mobil randbündig (das Monatsraster ist ein Vollbreiten-Canvas);
  * eine Karte braucht dort ihren eigenen Rand. Ab 1024px stellt ihn
  * --page-inline-pad am #cal-body, ein Margin hier addierte sich dazu. */

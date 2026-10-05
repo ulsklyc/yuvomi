@@ -74,6 +74,8 @@ import {
 // --------------------------------------------------------
 
 const VIEWS      = ['month', 'week', 'day', 'agenda'];
+/** So viele Folgetage zeigt die Seitenspalte der Tagesansicht (und laedt sie mit). */
+const DAY_RAIL_DAYS = 7;
 let viewTabs = null; // wireTablist-Controller der View-Umschaltung (Sync aus switchToDayView)
 const VIEW_LABELS = () => ({
   month: t('calendar.viewMonth'),
@@ -760,7 +762,9 @@ function getRangeForView(view, cursor) {
     const mobile = window.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false;
     return getWeekRange(cursor, { mobile });
   }
-  if (view === 'day') return { from: cursor, to: cursor };
+  // Der Tag laedt die Folgetage mit: am Desktop stehen sie als Seitenspalte
+  // neben dem Stundenraster (renderDayRail).
+  if (view === 'day') return { from: cursor, to: addDays(cursor, DAY_RAIL_DAYS) };
   if (view === 'agenda') return getAgendaRange(cursor);
   return getMonthRange(cursor);
 }
@@ -2945,6 +2949,9 @@ function renderView() {
   // 436px leer. Der Container der Schwelle (`module-surface`) steht nur in der
   // Agenda an der Seitenwurzel; die drei Raster bleiben Flaeche.
   page?.classList.toggle('app-page--list-detail', state.view === 'agenda');
+  // Die Tagesansicht fuehrt ab der Split-Schwelle eine Seitenspalte mit den
+  // Folgetagen; dafuer ist die Seitenwurzel derselbe Container (layout.css).
+  page?.classList.toggle('app-page--columns', state.view === 'day');
   if (state.view !== 'agenda') dropAgendaSelection();
   // Monats-Resize-Observer lösen, bevor das alte #month-grid detached wird;
   // nur die Monatsansicht setzt ihn danach wieder auf.
@@ -4812,6 +4819,7 @@ function renderDayView(container) {
   // Kein eigener Datums-Header mehr: die Toolbar zeigt exakt dasselbe Datum
   // bereits als Ansichts-Label (Audit A1-18).
   container.insertAdjacentHTML('beforeend', `
+    <div class="day-layout">
     <div class="day-view">
       ${(allday.length || scheduleChips.length || dayWaste.length || tasksOnDay(state.cursor).length || holidaysOnDay(state.cursor).length) ? `
       <div class="allday-row" style="display:grid;grid-template-columns:var(--cal-gutter-width) 1fr;">
@@ -4854,7 +4862,24 @@ function renderDayView(container) {
         </div>
       </div>
     </div>
+    ${renderDayRail()}
+    </div>
   `);
+
+  // Die Seitenspalte traegt Agenda-Zeilen: dieselbe Aktivierung wie dort.
+  const rail = container.querySelector('.day-rail');
+  rail?.addEventListener('click', (e) => {
+    if (e.target.closest('.day-rail__more')) {
+      _container.querySelector('#cal-view-tab-agenda')?.click();
+      return;
+    }
+    handleDayRowActivation(e);
+  });
+  rail?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (e.target.closest('.day-rail__more')) return;
+    handleDayRowActivation(e, { keyboard: true });
+  });
 
   container.querySelector('.allday-row')?.addEventListener('click', (e) => {
     const taskChip = e.target.closest('.cal-task-chip');
@@ -4910,6 +4935,36 @@ function renderDayView(container) {
   container.querySelector('.day-view').addEventListener('keydown', handleGridKeydown);
 
   scrollToHour(container.querySelector('#day-scroll'), container.querySelector('.day-view__body'));
+}
+
+/**
+ * DIE FOLGETAGE NEBEN DEM TAG (Critique R16, 2026-10-05). Am Desktop war die
+ * Tagesansicht eine einzelne 932px breite Spalte - die Telefonansicht, nur
+ * breiter. Ab der Split-Schwelle steht rechts neben dem Stundenraster, was als
+ * Naechstes kommt: die Tage nach dem gezeigten, in denselben Zeilen wie die
+ * Agenda (dayGroup/dayGroupHtml), mit dem Namen der Agenda als Weg dorthin.
+ * Tage ohne Eintrag fehlen wie in der Agenda; ist die ganze Spanne leer, sagt
+ * die Spalte das. Unter der Schwelle ist sie ausgeblendet (calendar.css) -
+ * mobil bleibt der Tag, wie er war.
+ */
+function renderDayRail() {
+  const days = Array.from({ length: DAY_RAIL_DAYS }, (_, i) => addDays(state.cursor, i + 1));
+  const groups = days.map(dayGroup).filter((g) => !dayGroupIsEmpty(g));
+  const label = VIEW_LABELS().agenda;
+  return `
+    <aside class="day-rail" aria-label="${esc(label)}">
+      <h2 class="day-rail__title u-section-title">
+        <button type="button" class="day-rail__more">${esc(label)}<i data-lucide="chevron-right" aria-hidden="true"></i></button>
+      </h2>
+      ${groups.length ? groups.map((group) => `
+        <div class="agenda-day">
+          <h3 class="agenda-day__header ${group.date === state.today ? 'agenda-day__header--today' : ''}">
+            <span class="agenda-day__date">${formatDate(group.date)}</span>
+            <span class="agenda-day__weekday">${DAY_NAMES_LONG()[new Date(group.date + 'T00:00:00').getDay()]}</span>
+          </h3>
+          ${dayGroupHtml(group)}
+        </div>`).join('') : `<p class="agenda-day__empty">${t('calendar.agendaEmpty')}</p>`}
+    </aside>`;
 }
 
 /**

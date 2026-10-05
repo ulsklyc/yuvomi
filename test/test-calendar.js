@@ -2361,6 +2361,58 @@ test('renderDayView: zwei ueberlappende Schichten am selben Tag bekommen untersc
 });
 
 // --------------------------------------------------------
+// Tagesansicht am Desktop: die Folgetage als Seitenspalte (Critique R16,
+// 2026-10-05). Der Tag war eine einzelne 932px breite Spalte; ab der
+// Split-Schwelle stehen rechts die naechsten sieben Tage als Agenda-Zeilen.
+// --------------------------------------------------------
+
+test('Tagesansicht: laedt die sieben Folgetage mit, die die Seitenspalte zeigt', () => {
+  const { from, to } = calendarHelpers.getRangeForView('day', '2026-03-28');
+  assert(from === '2026-03-28', `der Tag selbst bleibt der Anfang: ${from}`);
+  assert(to === '2026-04-04', `sieben Folgetage, auch ueber die Monatsgrenze: ${to}`);
+});
+
+test('renderDayView: die Seitenspalte zeigt Folgetage mit Eintrag als Agenda-Zeilen, nie den Tag selbst', () => {
+  const schicht = (tag, name) => ({ ...scheduleEntry({ start: '08:00', end: '12:00', name }), date_key: tag });
+  withOverlappingScheduleState({
+    scheduleEntries: [schicht('2026-09-07', 'Heute'), schicht('2026-09-09', 'Uebermorgen'), schicht('2026-09-15', 'Zu weit')],
+  }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderDayView(container);
+    const [grid, rail] = container.html.split('<aside class="day-rail"');
+    assert(rail, 'die Tagesansicht traegt eine Seitenspalte (.day-rail)');
+    assert(/<div class="day-layout">\s*<div class="day-view">/.test(grid), 'Raster und Spalte stehen in EINER Huelle (.day-layout)');
+    assert(/class="day-rail__more"/.test(rail), 'der Titel ist der Weg in die Agenda');
+    assert((rail.match(/class="agenda-day"/g) || []).length === 1, 'nur Tage mit Eintrag bekommen einen Kopf');
+    assert(rail.includes('Uebermorgen'), 'ein Eintrag in zwei Tagen steht in der Spalte');
+    assert(!rail.includes('Heute'), 'der gezeigte Tag steht im Raster, nicht noch einmal daneben');
+    assert(!rail.includes('Zu weit'), 'nach sieben Tagen ist Schluss');
+  });
+  withOverlappingScheduleState({ scheduleEntries: [] }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderDayView(container);
+    const rail = container.html.split('<aside class="day-rail"')[1] ?? '';
+    assert(/agenda-day__empty/.test(rail), 'eine leere Spanne sagt, dass sie leer ist');
+    assert(!/class="agenda-day"/.test(rail));
+  });
+});
+
+test('Tagesansicht: die Seitenspalte gibt es erst ab der Split-Schwelle der Modulflaeche', () => {
+  const rules = [...eachRule(calendarCss)];
+  const base = rules.find((r) => r.selector.trim() === '.day-rail' && !r.at.length);
+  assert(/display:\s*none/.test(base?.body ?? ''), 'unter der Schwelle (mobil) ist die Spalte ausgeblendet');
+  const wide = (r) => r.at.some((a) => /@container module-surface \(min-width:\s*65rem\)/.test(a));
+  const shown = rules.find((r) => r.selector.trim() === '.day-rail' && wide(r));
+  assert(/display:\s*block/.test(shown?.body ?? ''), 'ab 65rem Modulflaeche steht sie');
+  const layout = rules.find((r) => r.selector.trim() === '.day-layout' && wide(r));
+  assert(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*var\(--layout-rail-min\)/.test(layout?.body ?? ''),
+    'Stundenraster flexibel, Spalte auf --layout-rail-min');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/classList\.toggle\('app-page--columns', state\.view === 'day'\)/.test(src),
+    'nur die Tagesansicht macht die Seitenwurzel zum Container der Spalte');
+});
+
+// --------------------------------------------------------
 // Kurze Termine ueber Mitternacht (#1313, aus Diskussion #1081)
 //
 // isAllDayLike() fragte ueber isMultiDayEvent() nur nach VERSCHIEDENEN
