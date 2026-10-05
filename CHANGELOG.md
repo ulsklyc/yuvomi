@@ -66,6 +66,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wall display are unchanged. The API gets `PATCH /api/v1/tasks/reorder` and
   `POST /api/v1/tasks/reorder/reset`, and `sort_order` on each task (migration 242).
 
+- **Custom modules can be installed from Settings, from GitHub or as a ZIP file.** Until now a
+  third-party module reached Yuvomi only as a folder copied into `modules/` on the server, which on
+  most installations means a shell, a file share or `docker cp`. The new page Settings → Modules →
+  Add custom module (admin only, the last entry of the Modules group) takes either the address of a
+  public GitHub repository or an uploaded `.zip` of up to 20 MB. It accepts
+  `https://github.com/owner/repo`, the same without `https://`, the short form `owner/repo`, a
+  folder in a branch or tag (`https://github.com/owner/repo/tree/main/modules/example`), a release
+  (`.../releases/tag/v1.2.0`) and `.../releases/latest`. An address that names no tag or branch
+  installs the latest release, or the default branch when the repository has no release.
+
+  Yuvomi finds the module by its `module.json`, at most six folders below the repository root and
+  never inside `node_modules` or a hidden folder. One manifest is installed directly; several, as in a
+  repository that carries more than one module, are listed with name, id, version and folder to
+  pick from, and a `tree/<branch>/<folder>` address picks one itself. Only that module's folder is
+  copied, never the rest of the repository, and only the file types a browser module consists of:
+  JavaScript, CSS, JSON, images, fonts, source maps, Markdown and text, plus LICENSE, NOTICE and
+  README. Anything else (build scripts, CI files, dotfiles) is skipped and listed after the install
+  rather than refused, because a repository rarely holds nothing but the module. A subfolder with a
+  `module.json` of its own is another module and stays out of the copy. The folder on the server is
+  named after the manifest `id`, not after the folder in the archive.
+
+  A new module starts **disabled**: it reaches members only once an admin has looked at it in
+  Active modules and switched it on. Every third-party module there now has a Details disclosure
+  (id, version, description, source, install date, folder) and a delete button. Installing an id
+  that already exists asks before it replaces the module, names both versions and says whether the
+  replacement will be switched off for review. Only an update from GitHub out of the same repository
+  and folder keeps the module's on/off state. Every replacement from a ZIP file is disabled for
+  review, since two uploads share no origin anyone could check, and so is one whose source changed,
+  including a module that was copied by hand: trusting a module from one repository is no reason to
+  trust whatever arrives under the same id from another. Deleting removes the folder and leaves the
+  module's `ext:<id>` rows in Roles and permissions and its dashboard widget settings in place, so a
+  reinstall of the same id comes back as it was.
+
+  A module is JavaScript that runs with the session of every member who opens it, so installing one
+  is the same act as copying files onto the server, and the page is built around that. Install and
+  delete need an admin signed in **in the browser**: API tokens and the MCP endpoint are refused with
+  `403 module_session_required`, an admin's token included, so a leaked token cannot place code in front of
+  the household. The install routes allow 10 requests per 10 minutes per user; the answers that
+  only ask back (already installed, several modules found) do not count. An archive is checked
+  before anything is written: at most 20 MB packed, 50 MB unpacked, 2000 entries and 10 MB per file,
+  with a ceiling on the compression ratio. Symbolic links, paths that climb out of the folder (zip
+  slip), absolute and Windows-reserved names, duplicate names, ZIP64, multi-part and encrypted
+  archives are refused, and every file's checksum is verified. Nothing from the archive runs on the
+  server: the files are staged next to `modules/`, validated by the same code that loads modules at
+  startup, and moved into place with one rename; a replace that fails puts the old folder back.
+  GitHub downloads talk only to `github.com`, `api.github.com` and `codeload.github.com`, redirects
+  included, through the same private-network guard as every other outbound request, within 30
+  seconds. Where the modules folder is read-only (a `:ro` mount, a volume the app user cannot
+  write), the page says so and points to the manual way instead of showing install controls. Where
+  the folder is writable but not kept, the page warns instead: on Umbrel, whose package mounts no
+  modules folder, and in any container without a volume on `/app/modules`, a module installed this
+  way lives in the container layer and is gone after the next app update, exactly like one copied
+  in by hand. The server tells the two apart by reading its own mount table. That is a best-effort
+  guess: an LXC container can look like a plain host, and a Kubernetes `emptyDir` looks like a
+  volume although it ends with the pod, so neither gets the warning.
+
+  No dependency was added: the ZIP reader (`server/services/zip-reader.js`) is written on
+  `node:zlib` and reads only what a module archive needs. Not included on purpose: private
+  repositories and GitHub tokens, hosts other than GitHub, automatic updates or update checks, and
+  any review of what a module does. The installer checks the form of an archive, not its code;
+  install only modules whose author you trust. Copying a folder into `modules/` works as before.
+  API: `GET /api/v1/modules/install/info`, `POST /api/v1/modules/install/zip`,
+  `POST /api/v1/modules/install/github`, `DELETE /api/v1/modules/:id`.
+
 ### Changed
 
 - **Recipes mirrored from a Norwegian Mealie or Tandoor sort into shopping categories.** The

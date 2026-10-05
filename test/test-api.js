@@ -806,6 +806,9 @@ const REASONS_READ_BY_A_PAGE = new Map([
   // Gast erreicht der Knopf gar nicht (gravatarAvailable), der Satz steht fuer
   // einen Aufruf, der an der Oberflaeche vorbei kommt.
   ['not_a_household_member', 'settings/pages/personal-account.js'],
+  // Installieren und Loeschen eines Moduls mit einem API-Token: beide Blaetter
+  // (Eigenes Modul hinzufuegen, Aktive Module) nehmen den Satz aus dieser Datei.
+  ['module_session_required', 'settings/module-install-errors.js'],
 ]);
 
 const REASONS_WITHOUT_SENTENCE = new Set([

@@ -1,8 +1,17 @@
 import { api } from '/api.js';
-import { t } from '/i18n.js';
+import { formatDate, formatTime, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { confirmModal, refocusAfterRender } from '/components/modal.js';
+import { rowActionHtml } from '/utils/row-action.js';
+import { emptyStateEl } from '/utils/empty-state.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
-import { bindDisclosure, thirdPartyStatusLabel, toggleRowHtml } from '/settings/components.js';
+import {
+  bindDisclosure,
+  createDisclosure,
+  createInfoList,
+  thirdPartyStatusLabel,
+  toggleRowHtml,
+} from '/settings/components.js';
 import {
   BUILT_IN_MODULES,
   DEFAULT_MODULE_ACCENT,
@@ -16,6 +25,7 @@ import {
 import { MODULE_ICON, moduleIconHTML } from '/nav-icons.js';
 import { moduleAccentVar } from '/utils/module-accent.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
+import { installErrorText } from '/settings/module-install-errors.js';
 
 /**
  * Blatt: Einstellungen -> Module -> Aktive Module (adminOnly)
@@ -36,7 +46,25 @@ import { moduleDisplayLabel } from '/utils/extension-i18n.js';
  * Die Trennung loest das an der Wurzel statt mit Beschriftung: ein Blatt, eine
  * Reichweite. Hier entscheidet der Haushalt, was es gibt; drueben entscheidet
  * jede Person, was sie sehen will.
+ *
+ * EIN DRITTMODUL WIRD HIER GEPRUEFT, BEVOR ES ANGEHT. Seit Module aus den
+ * Einstellungen installiert werden (modules-install.js), kommen sie
+ * ausgeschaltet an; ihre Zeile traegt deshalb Details (Kennung, Version,
+ * Quelle, Installationszeitpunkt, Ordner) und einen Loeschen-Knopf.
  */
+
+const INSTALL_MODULE_PATH = '/settings/modules/install';
+
+// Dieselbe Regel wie MODULE_ID_RE in server/services/module-capabilities.js.
+// Ein Ordner, dessen Name keine gueltige Kennung ist, erscheint als Fehlerzeile
+// unter seinem Ordnernamen - und den lehnt DELETE als `bad_id` ab. Ein Knopf,
+// der nur scheitern kann, wird gar nicht erst angeboten.
+const DELETABLE_MODULE_ID_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
+
+/** Ob die Zeile eines Drittmoduls einen Loeschen-Knopf bekommt. */
+export function isDeletableModuleId(id) {
+  return typeof id === 'string' && DELETABLE_MODULE_ID_RE.test(id);
+}
 
 /** Zeilen in derselben Reihenfolge und Gruppierung wie die Navigation - nur ohne Sortierung. */
 function buildRows(preferences, thirdPartyModules) {
@@ -143,8 +171,19 @@ function rowHtml(row) {
   })).join('')}
     </div>` : '';
 
+  // Loeschen gibt es nur fuer Drittmodule: eingebaute sind Teil der App.
+  const deletable = row.type === 'third-party' && isDeletableModuleId(row.id);
+  const deleteAction = deletable ? rowActionHtml({
+    icon: 'trash-2',
+    label: t('common.deleteNamed', { name: row.label }),
+    tone: 'danger',
+    className: 'settings-module-row__delete',
+    attrs: { 'data-module-delete': row.id, 'data-module-name': row.label },
+  }) : '';
+  const removableClass = deletable ? ' settings-module-row--removable' : '';
+
   return `
-    <div class="settings-module-row settings-module-row--fixed ${stateClass}${row.hasError ? ' settings-module-row--error' : ''}" data-module-row-id="${esc(row.id)}">
+    <div class="settings-module-row settings-module-row--fixed${removableClass} ${stateClass}${row.hasError ? ' settings-module-row--error' : ''}" data-module-row-id="${esc(row.id)}">
       <div class="settings-module-row__icon vivid-mark"${accentStyle}>
         ${moduleIconHTML(row.icon)}
       </div>
@@ -166,8 +205,88 @@ function rowHtml(row) {
     labelVisible: false,
     attrs: toggleAttr,
   })}
+      ${deleteAction}
     </div>
   `;
+}
+
+function installedAtText(install) {
+  const date = install?.installedAt ? new Date(install.installedAt) : null;
+  if (!date || Number.isNaN(date.getTime())) return t('settings.moduleDetailUnknown');
+  return `${formatDate(date)} ${formatTime(date)}`.trim();
+}
+
+/** Woher ein Drittmodul kommt: GitHub-Adresse, ZIP-Upload oder von Hand kopiert. */
+export function moduleSourceText(install) {
+  if (!install || typeof install !== 'object') return t('settings.moduleSourceManual');
+  if (install.source === 'github') {
+    const url = String(install.url || '').trim();
+    const ref = String(install.ref || '').trim();
+    if (!url) return 'GitHub';
+    return t('settings.moduleSourceGithub', { url: ref ? `${url} @ ${ref}` : url });
+  }
+  if (install.source === 'zip') return t('settings.moduleSourceZip');
+  return t('settings.moduleSourceManual');
+}
+
+/**
+ * Die Details einer Drittmodul-Zeile, aufklappbar unter ihrer Titelzeile.
+ *
+ * Ein eigenes Kind der Zeile, nicht Teil des Textblocks: im Textblock bekam das
+ * Feld auf dem Telefon nur dessen Spalte (gemessen 127px bei 375px Breite),
+ * Werte wurden abgeschnitten, und die Zeile wuchs um rund 700px, waehrend
+ * Schalter und Loeschen-Knopf auf halber Hoehe schwebten. Als eigene Rasterzeile
+ * (settings.css, `.settings-module-row__details`) nimmt es die Breite unter dem
+ * Titel, und die Bedienelemente bleiben neben dem Titel. In der DOM-Reihenfolge
+ * steht es damit auch hinter Schalter und Knopf - wie auf dem Bildschirm.
+ */
+function moduleDetailsElement(module) {
+  const install = module.install && typeof module.install === 'object' ? module.install : null;
+  const content = createInfoList([
+    { label: t('settings.moduleDetailId'), value: module.id, code: true },
+    { label: t('settings.moduleDetailVersion'), value: module.version || t('settings.moduleDetailUnknown') },
+    module.description ? { label: t('settings.moduleDetailDescription'), value: module.description } : null,
+    { label: t('settings.moduleDetailSource'), value: moduleSourceText(install) },
+    install ? { label: t('settings.moduleDetailInstalledAt'), value: installedAtText(install) } : null,
+    { label: t('settings.moduleDetailFolder'), value: `modules/${module.id}`, code: true },
+    // Kein Fehler-Eintrag hier: die Zeile selbst zeigt ihn schon als Alert, und
+    // ein zweites Mal im aufgeklappten Detail las ein Screenreader ihn doppelt.
+  ]);
+  const disclosure = createDisclosure({
+    id: `module-details-${String(module.id).replace(/[^\w-]/g, '_')}`,
+    summary: t('settings.moduleDetailsToggle'),
+    content,
+  });
+  disclosure.classList.add('settings-module-row__details');
+  return disclosure;
+}
+
+/**
+ * Noch kein Drittmodul: statt einer fehlenden Gruppe ein Hinweis mit dem Weg
+ * zum Installieren. Kompakt und ohne eigene Ueberschrift - die Gruppe nennt den
+ * Zusammenhang schon ("Eigene Module").
+ */
+function emptyCustomModulesElement() {
+  const section = document.createElement('section');
+  section.className = 'settings-navigation-group';
+  section.dataset.moduleSection = String(NAV_SECTION.customModules);
+  const title = document.createElement('h3');
+  title.className = 'settings-navigation-group__title';
+  title.textContent = t(NAV_SECTION_LABEL_KEYS[NAV_SECTION.customModules]);
+  section.append(title, emptyStateEl({
+    compact: true,
+    description: t('settings.installModuleEmptyHint'),
+    action: {
+      label: t('settings.pageInstallModule'),
+      icon: 'package-plus',
+      tone: 'secondary',
+      onClick: () => {
+        if (window.yuvomi?.navigate) window.yuvomi.navigate(INSTALL_MODULE_PATH);
+        else window.location.assign(INSTALL_MODULE_PATH);
+      },
+    },
+  }));
+  return section;
 }
 
 function sectionHtml(section, rows) {
@@ -259,20 +378,120 @@ function bindEvents(container, user) {
       window.yuvomi?.showToast(error.message ?? t('common.errorGeneric'), 'danger');
     }
   });
+
+  list.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-module-delete]');
+    if (!button) return;
+    deleteThirdPartyModule(container, user, button);
+  });
+}
+
+/**
+ * Wohin der Fokus nach dem Loeschen geht. Die Zeile samt Knopf ist weg, und der
+ * allgemeine Rueckfall (`refocusAfterRender()`) kennt nur die Seitenwurzel - von
+ * dort muesste man sich durch das ganze Blatt zurueckarbeiten. Also explizit:
+ * der Loeschen-Knopf der naechsten Drittmodul-Zeile (sonst der vorigen), und
+ * war es das letzte, die Ueberschrift der Gruppe "Eigene Module".
+ */
+export function focusAfterModuleDelete(container, neighbourIds) {
+  const rows = [...container.querySelectorAll('[data-module-delete]')];
+  for (const id of neighbourIds) {
+    const target = rows.find((el) => el.dataset.moduleDelete === id);
+    if (target) {
+      target.focus();
+      return target;
+    }
+  }
+  const heading = container.querySelector(`[data-module-section="${NAV_SECTION.customModules}"] h3`);
+  if (heading) {
+    heading.setAttribute('tabindex', '-1');
+    heading.focus();
+  }
+  return heading;
+}
+
+/** Die Drittmodule neben `id`, in der Reihenfolge, in der der Fokus sie versucht. */
+function deleteNeighbours(container, id) {
+  const ids = [...container.querySelectorAll('[data-module-delete]')].map((el) => el.dataset.moduleDelete);
+  const at = ids.indexOf(id);
+  if (at < 0) return [];
+  return [...ids.slice(at + 1, at + 2), ...ids.slice(Math.max(0, at - 1), at)];
+}
+
+/**
+ * Ein Drittmodul loeschen: Rueckfrage, DELETE, Katalog neu laden, Blatt neu bauen.
+ *
+ * `data-busy` haelt einen zweiten Klick auf denselben Knopf fern, solange der
+ * erste laeuft (Doppelklick, Enter-Wiederholung): sonst stuenden zwei
+ * Rueckfragen uebereinander, und die zweite schickte ein DELETE fuer ein
+ * Modul, das es nicht mehr gibt. Kein `disabled`: ein deaktivierter Knopf nimmt
+ * den Fokus nicht an, den die Rueckfrage beim Abbrechen zurueckgibt.
+ */
+async function deleteThirdPartyModule(container, user, button) {
+  if (button.dataset.busy === 'true') return;
+  button.dataset.busy = 'true';
+  button.setAttribute('aria-disabled', 'true');
+  const release = () => {
+    delete button.dataset.busy;
+    button.removeAttribute('aria-disabled');
+  };
+  const id = button.dataset.moduleDelete;
+  const name = button.dataset.moduleName || id;
+  const neighbours = deleteNeighbours(container, id);
+  const ok = await confirmModal(t('settings.moduleDeleteConfirm', { name }), {
+    danger: true,
+    confirmLabel: t('common.delete'),
+    detail: t('settings.moduleDeleteDetail', { id }),
+  });
+  if (!ok) {
+    release();
+    return;
+  }
+  try {
+    await api.delete(`/modules/${encodeURIComponent(id)}`);
+  } catch (error) {
+    release();
+    // Dieselbe Abbildung wie beim Installieren: not_found, not_a_module und
+    // module_session_required sagen dem Admin etwas, der Servertext nur auf Englisch.
+    window.yuvomi?.showToast(error?.data?.reason ? installErrorText(error) : (error?.message || t('common.errorGeneric')), 'danger');
+    return;
+  }
+  try {
+    await window.yuvomi?.refreshThirdPartyModules?.();
+  } catch (error) {
+    console.warn('[Settings] Module catalog refresh failed:', error);
+  }
+  // Der Neuaufbau ersetzt den Knopf; seine Sperre geht mit ihm.
+  await renderActiveModules(container, user);
+  // Erst das eigene Ziel: der Nachbar ist naeher als alles, was der allgemeine
+  // Rueckfall kennt. Danach refocusAfterRender() als Netz - es tut nichts,
+  // solange der Fokus sitzt, und faengt nur den Fall, dass er doch auf <body>
+  // gelandet ist (keine Ueberschrift, weil das Laden scheiterte).
+  focusAfterModuleDelete(container, neighbours);
+  refocusAfterRender();
+  window.yuvomi?.showToast(t('settings.moduleDeleted', { name }), 'success');
 }
 
 export async function render(container, { user }) {
+  await renderActiveModules(container, user);
+}
+
+async function renderActiveModules(container, user) {
   container.replaceChildren();
 
   let preferences = {};
   let thirdPartyModules = [];
+  // Der Leerzustand "noch kein eigenes Modul" nur nach einer ERFOLGREICHEN,
+  // leeren Antwort - ein Ladefehler ist kein leerer Bestand (utils/empty-state.js).
+  let modulesLoaded = false;
   try {
     const [prefs, modules] = await Promise.all([
       getPreferences(),
-      api.get('/modules?admin=1').then((res) => res?.data ?? []).catch(() => []),
+      api.get('/modules?admin=1').then((res) => res?.data ?? []).catch(() => null),
     ]);
     preferences = prefs ?? {};
-    thirdPartyModules = Array.isArray(modules) ? modules : [];
+    modulesLoaded = Array.isArray(modules);
+    thirdPartyModules = modulesLoaded ? modules : [];
   } catch (error) {
     container.insertAdjacentHTML('beforeend',
       `<p class="form-error" role="alert">${esc(error.message ?? t('common.errorGeneric'))}</p>`);
@@ -292,6 +511,14 @@ export async function render(container, { user }) {
       </section>
     </section>
   `);
+
+  const groups = container.querySelector('#module-toggles');
+  for (const module of thirdPartyModules) {
+    const row = [...(groups?.querySelectorAll('[data-module-row-id]') ?? [])]
+      .find((el) => el.dataset.moduleRowId === module.id);
+    row?.appendChild(moduleDetailsElement(module));
+  }
+  if (modulesLoaded && !thirdPartyModules.length) groups?.appendChild(emptyCustomModulesElement());
 
   bindDisclosure(container, { triggerSelector: '[data-kitchen-expand]', panelSelector: '[data-kitchen-children]', id: 'kitchen-children-active' });
   bindEvents(container, user);

@@ -132,7 +132,10 @@ test('die Blaetter verteilen sich wie beschlossen auf drei Bereiche, je Modul ei
   const perDomain = {};
   for (const leaf of SETTINGS_LEAVES) perDomain[leaf.domainId] = (perDomain[leaf.domainId] ?? 0) + 1;
   // R14 (A7 P2-3): Inventar und Entsorgung bekommen ein Blatt fuer ihren Feed.
-  assert.deepEqual(perDomain, { personal: 5, admin: 8, modules: 15 });
+  // Dazu "Eigenes Modul hinzufuegen" (modules-install): Drittmodule zu
+  // installieren ist eine Handlung im Modul-Bereich, kein Modul - deshalb ein
+  // Blatt ohne `module`, aber in derselben Domaene.
+  assert.deepEqual(perDomain, { personal: 5, admin: 8, modules: 16 });
   assert.deepEqual(SETTINGS_DOMAINS.map((domain) => domain.id), ['personal', 'admin', 'modules']);
   // Jedes Blatt haengt an einem existierenden Bereich, jeder Abschnitt an
   // einem existierenden Blatt, und kein Blatt ist leer.
@@ -3047,7 +3050,14 @@ test('R14: Modulblaetter stehen in der Reihenfolge der Seitenleiste', async () =
   const ids = (order) => settingsSheetsForDomain('modules', admin, { moduleOrder: order }).map((s) => s.module ?? s.id);
   const plain = ids([]);
   assert.deepEqual(plain.slice(0, 2), ['modules-active', 'modules-navigation'], 'die zwei allgemeinen Blaetter zuerst');
-  const mods = plain.slice(2);
+  // "Eigenes Modul hinzufuegen" (`placement: 'end'`) schliesst die Liste ab -
+  // hinter den sortierten Modulblaettern, egal welche Reihenfolge der Haushalt
+  // gewaehlt hat. Die Aussage dieses Tests (Modulblaetter folgen der
+  // Seitenleiste) bleibt: sie wird zwischen den allgemeinen Blaettern und dem
+  // Abschluss gemessen.
+  assert.equal(plain.at(-1), 'modules-install', 'Hinzufuegen steht am Ende');
+  assert.equal(ids(['budget', 'tasks']).at(-1), 'modules-install', 'auch bei eigener Anordnung');
+  const mods = plain.slice(2, -1);
   assert.deepEqual(mods, ['dashboard', 'calendar', 'schedule', 'tasks', 'kitchen', 'housekeeping', 'waste', 'documents',
     'inventory', 'rewards', 'contacts', 'health', 'budget'], 'ohne eigene Anordnung genau wie die Seitenleiste (gemessen 1440)');
   const pos = (id) => mods.indexOf(id);
@@ -3055,7 +3065,7 @@ test('R14: Modulblaetter stehen in der Reihenfolge der Seitenleiste', async () =
   assert.ok(pos('tasks') < pos('kitchen') && pos('kitchen') < pos('contacts') && pos('contacts') < pos('budget'),
     `Planen, Haushalt, Menschen, Finanzen: ${mods}`);
   assert.ok(pos('health') < pos('budget'), 'Gesundheit (Menschen) vor Budget (Finanzen)');
-  const custom = ids(['tasks', 'schedule', 'calendar', 'rewards', 'kitchen']).slice(2);
+  const custom = ids(['tasks', 'schedule', 'calendar', 'rewards', 'kitchen']).slice(2, -1);
   assert.ok(custom.indexOf('tasks') < custom.indexOf('calendar'), 'die eigene Reihenfolge des Haushalts zaehlt');
   assert.ok(custom.indexOf('rewards') < custom.indexOf('kitchen'));
   const router = await readFile(new URL('../public/router.js', import.meta.url), 'utf8');
@@ -3776,4 +3786,144 @@ test('R17: die Standard-Erinnerungen sind Chips des Kanons mit aria-pressed, kei
   assert.match(src, /chip\.setAttribute\('aria-pressed', String\(on\)\);\s*chip\.classList\.toggle\('filter-chip--active', on\)/,
     'Zustand und Aktiv-Form wechseln zusammen');
   assert.match(src, /querySelectorAll\('\.js-default-reminder\[aria-pressed="true"\]'\)/, 'gelesen wird der Zustand, den der Chip ansagt');
+});
+
+// Eigenes Modul hinzufuegen (modules-install): ein adminOnly-Blatt am Ende des
+// Modul-Bereichs, die Fehler des Servers in der UI-Sprache, die Groessen-
+// pruefung vor dem Hochladen und die Herkunft eines Drittmoduls in Aktive Module.
+test('Eigenes Modul hinzufuegen: adminOnly, am Ende, Fehler je reason lokalisiert', async () => {
+  const leaf = SETTINGS_LEAVES.find((entry) => entry.id === 'modules-install');
+  assert.ok(leaf, 'das Blatt existiert');
+  assert.equal(leaf.domainId, 'modules');
+  assert.equal(leaf.placement, 'end');
+  assert.deepEqual(settingsSheetSections(leaf, admin).map((section) => section.adminOnly), [true]);
+  assert.equal(findSettingsLeaf('/settings/modules/install', member), null, 'Mitglieder sehen es nicht');
+
+  const { installErrorText, zipFileProblem, installQuery } = await import('/settings/pages/modules-install.js');
+  assert.equal(installErrorText({ status: 400, data: { reason: 'bad_url', error: 'x' } }), 'settings.installModuleErrorBadUrl');
+  assert.equal(installErrorText({ status: 503, data: { reason: 'not_writable' } }), 'settings.installModuleErrorNotWritable');
+  assert.equal(installErrorText({ status: 429, data: { reason: 'install_rate_limited', error: 'Too many' } }),
+    'settings.installModuleErrorTooManyAttempts', 'das eigene Ratenlimit hat seinen eigenen reason');
+  assert.equal(installErrorText({ status: 429, data: { error: 'Too many' } }), 'settings.installModuleErrorTooManyAttempts',
+    'ein 429 ohne reason (Proxy davor) liest sich trotzdem als "zu oft"');
+  // GitHubs Limit: ohne resetAt der allgemeine Satz, mit resetAt die Uhrzeit.
+  assert.equal(installErrorText({ status: 429, data: { reason: 'rate_limited' } }), 'settings.installModuleErrorRateLimited');
+  assert.match(installErrorText({ status: 429, data: { reason: 'rate_limited', resetAt: '2030-01-01T12:34:00.000Z' } }),
+    /^settings\.installModuleErrorRateLimitedUntil\{"time":/);
+  assert.equal(installErrorText({ status: 429, data: { reason: 'rate_limited', resetAt: 'kaputt' } }), 'settings.installModuleErrorRateLimited');
+  for (const [reason, key] of [
+    ['ref_not_found', 'installModuleErrorRefNotFound'],
+    ['not_a_module', 'installModuleErrorNotAModule'],
+    ['module_session_required', 'installModuleErrorSessionRequired'],
+    ['unsupported_encoding', 'installModuleErrorUnsupportedEncoding'],
+    ['not_found', 'moduleDeleteErrorNotFound'],
+    ['bad_id', 'moduleDeleteErrorBadId'],
+  ]) {
+    assert.equal(installErrorText({ status: 400, data: { reason, error: 'English' } }), `settings.${key}`, reason);
+  }
+  // Der Loeschen-Toast in Aktive Module nutzt dieselbe Abbildung.
+  const activeSrc = await readFile(new URL('../public/settings/pages/modules-active.js', import.meta.url), 'utf8');
+  assert.match(activeSrc, /import \{ installErrorText \} from '\/settings\/module-install-errors\.js'/);
+  assert.match(activeSrc, /showToast\(error\?\.data\?\.reason \? installErrorText\(error\)/);
+  assert.equal(installErrorText({ status: 400, data: { reason: 'new_thing', error: 'Server says' } }), 'Server says',
+    'ein unbekannter reason faellt auf den Servertext zurueck');
+  assert.equal(installErrorText({}), 'settings.installModuleErrorGeneric');
+
+  assert.equal(zipFileProblem({ name: 'm.ZIP', size: 1024 }, 20), null);
+  assert.equal(zipFileProblem({ name: 'm.tar.gz', size: 1024 }, 20), 'settings.installModuleFileNotZip');
+  assert.match(zipFileProblem({ name: 'm.zip', size: 21 * 1024 * 1024 }, 20), /^settings\.installModuleFileTooLarge/);
+
+  assert.equal(installQuery({}), '');
+  assert.equal(installQuery({ overwrite: true, path: 'plugins/a b' }), '?overwrite=1&path=plugins%2Fa+b');
+  // Die Wurzel als Kandidat ist path='' - und der muss ankommen, nicht wegfallen.
+  assert.equal(installQuery({ path: '' }), '?path=');
+  assert.equal(installQuery({ overwrite: true, path: '' }), '?overwrite=1&path=');
+
+  const { moduleSourceText } = await import('/settings/pages/modules-active.js');
+  assert.equal(moduleSourceText(null), 'settings.moduleSourceManual', 'ohne Metadaten: von Hand kopiert');
+  assert.equal(moduleSourceText({ source: 'zip' }), 'settings.moduleSourceZip');
+  assert.match(moduleSourceText({ source: 'github', url: 'https://github.com/o/r', ref: 'v1' }), /^settings\.moduleSourceGithub.*github\.com\/o\/r @ v1/);
+});
+
+// Review Runde 1: Fokus nach Loeschen und nach "Ausgewaehltes installieren",
+// Kandidaten veralten mit der Adresse, der Fehler steht einmal, und ein
+// nicht dauerhafter Modulordner wird angesagt.
+test('Eigenes Modul: Fokus, veraltete Kandidaten, ein Fehler, Persistenz-Hinweis', async () => {
+  const { focusAfterModuleDelete } = await import('/settings/pages/modules-active.js');
+  let focused = null;
+  const el = (attrs = {}) => ({
+    ...attrs,
+    attributes: {},
+    setAttribute(name, value) { this.attributes[name] = value; },
+    focus() { focused = this; },
+  });
+  const rows = ['a-mod', 'c-mod'].map((id) => el({ dataset: { moduleDelete: id } }));
+  const heading = el({ tag: 'h3' });
+  const container = {
+    querySelectorAll: (sel) => (sel === '[data-module-delete]' ? rows : []),
+    querySelector: (sel) => (/data-module-section/.test(sel) ? heading : null),
+  };
+  // b-mod wurde geloescht; Nachbarn in Reihenfolge: naechster c-mod, dann a-mod.
+  assert.equal(focusAfterModuleDelete(container, ['c-mod', 'a-mod']), rows[1]);
+  assert.equal(focused, rows[1], 'der Loeschen-Knopf der naechsten Zeile');
+  assert.equal(focusAfterModuleDelete(container, ['gone', 'a-mod']), rows[0], 'sonst der vorigen');
+  const empty = { querySelectorAll: () => [], querySelector: container.querySelector };
+  assert.equal(focusAfterModuleDelete(empty, ['x']), heading, 'das letzte Modul: die Gruppenueberschrift');
+  assert.equal(heading.attributes.tabindex, '-1', 'fokussierbar, ohne in die Tab-Folge zu geraten');
+
+  const installSrc = await readFile(new URL('../public/settings/pages/modules-install.js', import.meta.url), 'utf8');
+  const flat = installSrc.replace(/\s+/g, ' ');
+  assert.ok(flat.includes("addEventListener('input', () => { clearError(card); clearCandidates(card); });"),
+    'eine neue Adresse verwirft die Kandidaten der alten');
+  assert.ok(flat.includes("if (button !== card.button) { card.resultEl.querySelector('[data-install-open-active]')?.focus(); }"),
+    'nach "Ausgewaehltes installieren" landet der Fokus auf "Aktive Module oeffnen"');
+
+  // Verhalten statt Quelltext: die reinen Helfer der Seite (Review Runde 2).
+  const {
+    successStatus, replaceConfirmText, candidateInstallOptions, warnsNotPersistent,
+  } = await import('/settings/pages/modules-install.js');
+  assert.equal(warnsNotPersistent({ persistent: false }), true);
+  assert.equal(warnsNotPersistent({ persistent: null }), false, 'unbekannt bleibt still');
+  assert.equal(warnsNotPersistent({ persistent: true }), false);
+  assert.equal(warnsNotPersistent(undefined), false);
+
+  // Erfolg: ob und warum das Modul zur Pruefung aus ist.
+  assert.equal(successStatus({ replaced: false, disabledForReview: false, disabledReason: null }), 'settings.installModuleSuccessDisabled');
+  assert.equal(successStatus({ replaced: true, disabledForReview: false, disabledReason: null }), 'settings.installModuleSuccessReplaced');
+  assert.equal(successStatus({ replaced: true, disabledForReview: true, disabledReason: 'zip_replace' }), 'settings.installModuleSuccessZipReplace');
+  assert.equal(successStatus({ replaced: true, disabledForReview: true, disabledReason: 'source_changed' }), 'settings.installModuleSuccessSourceChanged');
+
+  // Rueckfrage bei 409 exists: das Detail sagt vorher, was das Ersetzen tut.
+  const ask = replaceConfirmText({
+    existing: { id: 'demo', name: 'Demo', version: '1.0.0' },
+    incoming: { id: 'demo', version: '2.0.0' },
+    sourceChanged: false,
+    replaceDisabledReason: 'zip_replace',
+  });
+  assert.match(ask.question, /^settings\.installModuleReplaceConfirm\{"name":"Demo","from":"1\.0\.0","to":"2\.0\.0"\}$/);
+  assert.equal(ask.detail, 'settings.installModuleReplaceDetailZip');
+  assert.equal(replaceConfirmText({ existing: { id: 'demo' }, replaceDisabledReason: 'source_changed' }).detail,
+    'settings.installModuleReplaceDetailSourceChanged');
+  assert.equal(replaceConfirmText({ existing: { id: 'demo' }, replaceDisabledReason: null }).detail,
+    'settings.installModuleReplaceDetail', 'GitHub-Update aus derselben Quelle: der Schalter bleibt');
+  assert.equal(replaceConfirmText({ existing: { id: 'demo' }, sourceChanged: true }).detail,
+    'settings.installModuleReplaceDetailSourceChanged', 'ein Server ohne replaceDisabledReason: sourceChanged reicht');
+  assert.match(replaceConfirmText({ existing: { id: 'demo' } }).question, /"name":"demo".*"from":"settings\.installModuleVersionUnknown".*"to":"settings\.installModuleVersionNew"/);
+
+  // Kandidat waehlen: der Pfad kommt an, '' (Wurzel) eingeschlossen, die
+  // uebrigen Optionen (overwrite) bleiben.
+  assert.deepEqual(candidateInstallOptions({ overwrite: true }, { path: 'mods/a' }), { overwrite: true, path: 'mods/a' });
+  assert.deepEqual(candidateInstallOptions({}, { path: '' }), { path: '' });
+  assert.deepEqual(candidateInstallOptions({}, undefined), { path: '' });
+
+  const activeSrc = await readFile(new URL('../public/settings/pages/modules-active.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(activeSrc, /moduleDetailError/, 'der Fehler steht in der Zeile, nicht noch einmal in den Details');
+
+  // Loeschen nur fuer Kennungen, die DELETE auch annimmt (sonst 400 bad_id).
+  const { isDeletableModuleId } = await import('/settings/pages/modules-active.js');
+  assert.equal(isDeletableModuleId('solar-panel'), true);
+  for (const bad of ['Bad_ID', 'ab', '-lead', 'trail-', 'a'.repeat(65), '', null, undefined]) {
+    assert.equal(isDeletableModuleId(bad), false, String(bad));
+  }
+  assert.equal(isDeletableModuleId('a'.repeat(64)), true);
 });

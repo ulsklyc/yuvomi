@@ -265,39 +265,93 @@ async function pathExists(filePath) {
   }
 }
 
+// Wer ein Modul ueber die Einstellungen installiert hat, legt diese Datei in den
+// Modulordner (server/services/module-install.js). Sie ist Information fuer den
+// Admin (Quelle, Zeitpunkt), keine Konfiguration: fehlt sie oder ist sie kaputt,
+// laedt das Modul trotzdem - es wurde dann eben von Hand kopiert.
+export const INSTALL_META_FILE = '.yuvomi-install.json';
+const INSTALL_META_MAX_BYTES = 4096;
+const INSTALL_SOURCES = new Set(['zip', 'github']);
+
+export async function readInstallMeta(basePath) {
+  try {
+    const file = path.join(basePath, INSTALL_META_FILE);
+    const stat = await fs.lstat(file);
+    if (!stat.isFile() || stat.size > INSTALL_META_MAX_BYTES) return null;
+    const raw = JSON.parse(await fs.readFile(file, 'utf8'));
+    if (!raw || typeof raw !== 'object' || !INSTALL_SOURCES.has(raw.source)) return null;
+    const str = (v, max) => (typeof v === 'string' && v ? v.slice(0, max) : null);
+    // installedBy bleibt draussen: wer installiert hat, steht im Log, keine
+    // Antwort braucht es. Der Rest geht nur an Admins - listModules() nimmt
+    // `install` aus der Liste fuer alle anderen heraus (Quelle und Commit
+    // sagen einem Mitglied nichts, einem Angreifer aber, woher der Code kommt).
+    return {
+      source: raw.source,
+      url: str(raw.url, 500),
+      ref: str(raw.ref, 200),
+      commit: str(raw.commit, 64),
+      path: str(raw.path, 500),
+      installedAt: str(raw.installedAt, 40),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Laedt und prueft einen Modulordner - DERSELBE Weg fuer den Loader und fuer die
+ * Installation aus den Einstellungen. Die Installation prueft den Staging-Ordner
+ * hiermit, bevor er an seinen Platz rueckt: was hier durchgeht, laedt auch der
+ * Loader, und was der Loader ablehnt, wird gar nicht erst installiert.
+ * Wirft mit der Meldung, die der Loader als `error` zeigen wuerde.
+ */
+export async function loadModuleDir(basePath, folderName) {
+  const stat = await fs.stat(basePath);
+  if (!stat.isDirectory()) throw new Error('module path is not a directory.');
+  const manifestPath = path.join(basePath, 'module.json');
+  const raw = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+  const manifest = normalizeManifest(raw, folderName);
+  const entryPath = path.resolve(basePath, manifest.entry);
+  if (!entryPath.startsWith(`${basePath}${path.sep}`) || !(await pathExists(entryPath))) {
+    throw new Error('entry file does not exist.');
+  }
+  if (manifest.style) {
+    const stylePath = path.resolve(basePath, manifest.style);
+    if (!stylePath.startsWith(`${basePath}${path.sep}`) || !(await pathExists(stylePath))) {
+      throw new Error('style file does not exist.');
+    }
+  }
+  const capabilities = await normalizeCapabilities(
+    raw,
+    manifest.id,
+    basePath,
+    modulePublicUrl,
+    pathExists,
+    isSafeRelativeFile,
+  );
+  const availableLocales = await scanModuleLocales(basePath);
+  const i18n = normalizeModuleI18n(raw.i18n, availableLocales);
+  return { manifest, capabilities, i18n };
+}
+
 async function readModule(folderName, disabledSet) {
   const basePath = path.join(MODULES_DIR, folderName);
+  let install = null;
   try {
     const stat = await fs.stat(basePath);
     if (!stat.isDirectory()) return null;
-    const manifestPath = path.join(basePath, 'module.json');
-    const raw = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
-    const manifest = normalizeManifest(raw, folderName);
-    const entryPath = path.resolve(basePath, manifest.entry);
-    if (!entryPath.startsWith(`${basePath}${path.sep}`) || !(await pathExists(entryPath))) {
-      throw new Error('entry file does not exist.');
-    }
-    if (manifest.style) {
-      const stylePath = path.resolve(basePath, manifest.style);
-      if (!stylePath.startsWith(`${basePath}${path.sep}`) || !(await pathExists(stylePath))) {
-        throw new Error('style file does not exist.');
-      }
-    }
-    const capabilities = await normalizeCapabilities(
-      raw,
-      manifest.id,
-      basePath,
-      modulePublicUrl,
-      pathExists,
-      isSafeRelativeFile,
-    );
-    const availableLocales = await scanModuleLocales(basePath);
-    const i18n = normalizeModuleI18n(raw.i18n, availableLocales);
+    // Kosten je Modul und Listenaufruf: ein lstat und hoechstens 4 KiB lesen -
+    // neben module.json, Entry und Locales, die listModules() ohnehin jedes Mal
+    // neu liest. Ein Cache lohnte die Frage nach seiner Gueltigkeit nicht (jede
+    // Installation schreibt die Datei neu, ein Betreiber kann sie loeschen).
+    install = await readInstallMeta(basePath);
+    const { manifest, capabilities, i18n } = await loadModuleDir(basePath, folderName);
     const enabled = !disabledSet.has(manifest.id);
     return {
       ...manifest,
       i18n,
       capabilities: clientCapabilities(capabilities),
+      install,
       enabled,
       status: enabled ? 'enabled' : 'disabled',
       error: null,
@@ -313,6 +367,7 @@ async function readModule(folderName, disabledSet) {
       route: null,
       menu: { show: false, label: folderName, icon: 'triangle-alert', order: 1000 },
       capabilities: null,
+      install,
       enabled: false,
       status: 'error',
       error: err?.message || 'Module could not be loaded.',
@@ -346,13 +401,22 @@ async function listModules({ admin = false } = {}) {
     return [];
   });
 
-  const modules = (await Promise.all(entries.map((entry) => readModule(entry, disabledSet))))
+  // Eintraege mit fuehrendem Punkt sind keine Module: die Installation legt dort
+  // ihre Staging- und Sicherungsordner ab (`.install-*`, `.backup-*`), und ein
+  // `.git` oder `.DS_Store` eines Betreibers gehoert ebenso wenig in die Liste.
+  const modules = (await Promise.all(entries
+    .filter((entry) => !entry.startsWith('.'))
+    .map((entry) => readModule(entry, disabledSet))))
     .filter(Boolean)
     .sort((a, b) => (a.menu?.order ?? 1000) - (b.menu?.order ?? 1000) || a.name.localeCompare(b.name));
 
   refreshExtensionCatalog(modules);
 
-  return admin ? modules : modules.filter((module) => module.enabled && module.status === 'enabled');
+  if (admin) return modules;
+  return modules
+    .filter((module) => module.enabled && module.status === 'enabled')
+    // eslint-disable-next-line no-unused-vars
+    .map(({ install, ...rest }) => rest);
 }
 
 async function setModuleEnabled(id, enabled) {
@@ -382,11 +446,39 @@ async function setModuleEnabled(id, enabled) {
   return (await listModules({ admin: true })).find((module) => module.id === id);
 }
 
+/**
+ * Setzt nur den gespeicherten Schalter, ohne das Modul zu laden. Fuer die
+ * Installation: ein neues Modul landet AUSGESCHALTET, bevor sein Ordner an
+ * seinen Platz rueckt - es gibt keinen Moment, in dem fremder Code schon
+ * ausgeliefert wuerde. setModuleEnabled() taugt dafuer nicht, es verlangt ein
+ * bereits ladbares Modul.
+ */
+function setModuleDisabledFlag(id, disabled) {
+  if (!ID_RE.test(String(id || ''))) return;
+  const set = new Set(parseDisabledModules());
+  if (disabled) set.add(id);
+  else set.delete(id);
+  setDisabledModules([...set]);
+}
+
+function isModuleDisabled(id) {
+  return parseDisabledModules().includes(id);
+}
+
 async function resolveAssetPath(id, relPath) {
   const modules = await listModules({ admin: false });
   const module = modules.find((item) => item.id === id);
   if (!module) {
     const err = new Error('Module not found or disabled.');
+    err.status = 404;
+    throw err;
+  }
+  // Punktdateien werden nie ausgeliefert - allen voran `.yuvomi-install.json`,
+  // die der Installer in jeden Modulordner legt (sie nennt den installierenden
+  // Admin). 404 statt 400: von aussen sieht so eine Datei aus wie keine. `.`
+  // und `..` bleiben der Traversal-Pruefung darunter (400) ueberlassen.
+  if (String(relPath).split('/').some((seg) => seg.startsWith('.') && seg !== '.' && seg !== '..')) {
+    const err = new Error('Module asset not found.');
     err.status = 404;
     throw err;
   }
@@ -418,6 +510,8 @@ export {
   MODULES_DIR,
   listModules,
   setModuleEnabled,
+  setModuleDisabledFlag,
+  isModuleDisabled,
   resolveAssetPath,
   getExtensionPermissionCatalog,
 };
