@@ -685,13 +685,23 @@ html:has(.contacts-page.is-selecting) {
    häufigste Handlung der ganzen Seite, und Telefonnummern liegen dicht
    untereinander. --target-base ist dasselbe Maß, das die Detailansicht für
    Kopf- und Fußzeilen-Aktionen nutzt. */
+/* DER WERT STEHT IN TEXTFARBE, DAS ZEICHEN DAVOR IM MODULTON (Critique
+ * 2026-10-05, R16). Die Links standen im Kontakt-Rosa (gemessen
+ * rgb(206,42,99)) - im selben Blatt wie "Loeschen" in rgb(215,0,21): zwei
+ * Rottoene, von denen einer "anrufen" und einer "weg damit" hiess. Dass der
+ * Wert eine Handlung ist, sagt jetzt das Zeichen der Zeile (Telefon, Brief,
+ * Stecknadel, Globus) im Modulton und die Unterstreichung unter dem Zeiger. */
 .contact-detail__link {
   display: inline-flex;
   align-items: center;
   min-height: var(--target-base);
-  color: var(--module-contacts, var(--color-accent));
+  color: var(--color-text-primary);
   text-decoration: none;
   overflow-wrap: anywhere;
+}
+
+.detail-row:has(.contact-detail__link) > .detail-row__icon {
+  color: var(--module-contacts, var(--color-accent));
 }
 
 .contact-detail__link:hover,

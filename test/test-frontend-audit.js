@@ -19626,3 +19626,14 @@ test('R16: der Pflichtstern ist ein Element (`REQUIRED_MARK`), nie Teil eines Lo
   }
   mit('subscriptions.js', /label: t\('subscriptions\.currencyLabel'\),\s*required: true,/);
 });
+
+/* R16 Schritt 2b (Critique 2026-10-05, "Kontakte: Links rgb(206,42,99) neben
+ * Loeschen rgb(215,0,21)"). Gegen den Stand davor rot gelaufen. */
+test('R16: Werte im Kontakt-Leseblatt stehen in Textfarbe, das Zeilenzeichen traegt den Modulton', () => {
+  const css = rulesOf(read('../public/styles/contacts.css'));
+  const link = css.find((rule) => rule.at.length === 0 && rule.selector.trim() === '.contact-detail__link');
+  assert.match(link?.body ?? '', /(?:^|;|\s)color:\s*var\(--color-text-primary\)/, 'kein zweiter Rotton neben "Loeschen"');
+  assert.doesNotMatch(link?.body ?? '', /--module-contacts|--color-accent/);
+  const icon = css.find((rule) => rule.selector.trim() === '.detail-row:has(.contact-detail__link) > .detail-row__icon');
+  assert.match(icon?.body ?? '', /color:\s*var\(--module-contacts, var\(--color-accent\)\)/, 'das Zeichen sagt, dass der Wert eine Handlung ist');
+});
