@@ -547,7 +547,9 @@ function renderSummary() {
 function syncGroupSwitch() {
   const panel = _container.querySelector('.split-groups-panel');
   const btn = _container.querySelector('#split-group-switch');
-  if (!panel || !btn) return;
+  // `classList` mitgeprueft, wie beim Aufklapper der Kennzahlen: ein Aufrufer
+  // ohne gebaute Seite (Storno aus dem Verlauf im Test) hat hier nichts zu tun.
+  if (!panel?.classList || !btn) return;
   const group = state.groups.find((g) => g.id === state.activeGroupId);
   const open = _groupPickerOpen || !group;
   panel.classList.toggle('split-groups-panel--open', open);
