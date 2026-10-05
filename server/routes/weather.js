@@ -110,6 +110,7 @@ export const OWM_LANG_BY_LOCALE = Object.freeze({
   uk: 'uk',
   vi: 'vi',
   zh: 'zh_cn',
+  'zh-Hant': 'zh_tw',
 });
 
 /**
