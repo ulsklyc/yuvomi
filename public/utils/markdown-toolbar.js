@@ -2,7 +2,7 @@
  * Modul: Markdown-Formatierungsleiste
  * Zweck: Die eine Leiste ueber jedem Textfeld, dessen Inhalt als Markdown
  *        gelesen wird - damit niemand Syntax auswendig koennen muss.
- * Abhaengigkeiten: /i18n.js, /utils/html.js
+ * Abhaengigkeiten: /i18n.js, /utils/html.js, /utils/ux.js
  *
  * Sie stand bis zuletzt in notes.js, und die Aufgaben rendern ihre Notiz seit
  * v2.7.0 durch denselben Renderer, hatten aber kein Werkzeug, sie zu schreiben
@@ -13,6 +13,7 @@
 
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { expandIn, wireScrollFade } from '/utils/ux.js';
 
 // Reihenfolge = Anzeige-Reihenfolge; null trennt zwei Gruppen.
 const FORMAT_ACTIONS = () => [
@@ -39,29 +40,49 @@ const FORMAT_ACTIONS = () => [
  * Trenner sind `role="separator"` und nicht bedeutungslose Spans, und jeder
  * Button traegt einen echten Namen statt nur ein `title`.
  *
+ * EIN WERKZEUG DES FELDS, KEIN DAUERGAST (Critique 2026-10-05, R16). Die Leiste
+ * stand ueber jeder Notiz, auch ueber der leeren: zwoelf Knoepfe, mobil in drei
+ * Reihen (162px), zwoelf Tab-Stopps zwischen Titel und Text. Im Aufgaben-Dialog
+ * schob sie die Faelligkeit auf y=700 von 844. Drei Regeln seitdem:
+ *
+ *  1. Sie kommt `hidden` und erscheint mit dem Fokus im Feld
+ *     (`wireMarkdownToolbar`). Danach BLEIBT sie: ein Ausblenden beim Verlassen
+ *     verschoebe genau das Feld, auf das der Finger gerade zielt.
+ *  2. Sie laeuft einzeilig und scrollt (markdown-toolbar.css).
+ *  3. Sie ist EIN Tab-Stopp (`role="toolbar"` mit wanderndem `tabindex`):
+ *     Umschalt+Tab aus dem Feld fuehrt hinein - sie steht davor, im Bild wie
+ *     im Baum -, die Pfeiltasten wandern, Tab fuehrt zurueck ins Feld.
+ *
  * @returns {string} HTML fuer insertAdjacentHTML
  */
 export function renderMarkdownToolbar() {
-  const items = FORMAT_ACTIONS().map((a) => a === null
-    ? '<span class="md-toolbar__sep" role="separator" aria-orientation="vertical"></span>'
-    : `<button type="button" class="md-toolbar__btn" data-format="${a.format}"
+  let first = true;
+  const items = FORMAT_ACTIONS().map((a) => {
+    if (a === null) return '<span class="md-toolbar__sep" role="separator" aria-orientation="vertical"></span>';
+    const tabindex = first ? 0 : -1;
+    first = false;
+    return `<button type="button" class="md-toolbar__btn" data-format="${a.format}" tabindex="${tabindex}"
                title="${esc(a.label)}" aria-label="${esc(a.label)}">
          <i data-lucide="${a.icon}" class="icon-md" aria-hidden="true"></i>
-       </button>`
-  ).join('');
+       </button>`;
+  }).join('');
 
-  return `<div class="md-toolbar" role="toolbar" aria-label="${t('markdown.toolbarLabel')}">${items}</div>`;
+  return `<div class="md-toolbar" role="toolbar" aria-label="${t('markdown.toolbarLabel')}" hidden>${items}</div>`;
 }
 
 /**
- * Haengt die Leiste an ein Textfeld: Klicks auf die Buttons und die drei
- * Tastenkuerzel, die jeder aus einem Textverarbeitungsprogramm mitbringt.
+ * Haengt die Leiste an ein Textfeld: Klicks auf die Buttons, die drei
+ * Tastenkuerzel, die jeder aus einem Textverarbeitungsprogramm mitbringt, das
+ * Erscheinen mit dem Fokus und die Pfeiltasten innerhalb der Leiste.
  *
  * @param {ParentNode} root Container, der Leiste UND Textfeld enthaelt
  * @param {HTMLTextAreaElement} textarea
  */
 export function wireMarkdownToolbar(root, textarea) {
-  root.querySelectorAll('.md-toolbar__btn[data-format]').forEach((btn) => {
+  const bar = root.querySelector('.md-toolbar');
+  const buttons = [...root.querySelectorAll('.md-toolbar__btn[data-format]')];
+
+  buttons.forEach((btn) => {
     btn.addEventListener('click', () => {
       applyFormat(textarea, btn.dataset.format);
       textarea.focus();
@@ -73,6 +94,38 @@ export function wireMarkdownToolbar(root, textarea) {
     if (e.key === 'b') { e.preventDefault(); applyFormat(textarea, 'bold'); }
     if (e.key === 'i') { e.preventDefault(); applyFormat(textarea, 'italic'); }
     if (e.key === 'u') { e.preventDefault(); applyFormat(textarea, 'underline'); }
+  });
+
+  if (!bar) return;
+
+  // Erscheinen: einmal, und dann stehenbleiben. Das Aufziehen nimmt dem Feld
+  // den Sprung - es rueckt um die Hoehe der Leiste nach unten, waehrend der
+  // Cursor schon darin steht (`expandIn` schweigt unter reduzierter Bewegung).
+  const reveal = ({ animate = true } = {}) => {
+    if (!bar.hidden) return;
+    bar.hidden = false;
+    wireScrollFade(bar);
+    if (animate) expandIn(bar);
+  };
+  textarea.addEventListener('focus', () => reveal());
+  if (typeof document !== 'undefined' && document.activeElement === textarea) reveal({ animate: false });
+
+  // Wandernder Tab-Stopp (WAI-ARIA Toolbar): genau ein Knopf traegt
+  // tabindex="0" - der zuletzt besuchte, damit die Rueckkehr dort ansetzt.
+  const moveTo = (index) => {
+    const next = buttons[(index + buttons.length) % buttons.length];
+    buttons.forEach((b) => { b.tabIndex = b === next ? 0 : -1; });
+    next.focus();
+    next.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  };
+  bar.addEventListener('keydown', (e) => {
+    const at = buttons.indexOf(e.target);
+    if (at < 0) return;
+    const rtl = typeof document !== 'undefined' && document.documentElement?.dir === 'rtl';
+    const step = { ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1 }[e.key];
+    if (step) { e.preventDefault(); moveTo(at + step); }
+    else if (e.key === 'Home') { e.preventDefault(); moveTo(0); }
+    else if (e.key === 'End') { e.preventDefault(); moveTo(buttons.length - 1); }
   });
 }
 

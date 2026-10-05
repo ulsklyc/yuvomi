@@ -7,22 +7,85 @@ const call = (page, method, path, body) => page.evaluate(async ({ method, path, 
   const { api } = await import('/api.js');
   return api[method](path, body);
 }, { method, path, body });
+// Eine Rueckkehr auf die Seite ist `pageshow` mit `persisted: true` (bfcache).
+// startFastingClock() ignoriert seit 05e6ef250 das `pageshow` des ersten
+// Ladens (persisted: false), damit der Timer nicht direkt nach dem Aufbau
+// doppelt nachlaedt. Ein blosses `new Event('pageshow')` ist dieses erste Laden
+// und loest keine Aktualisierung mehr aus.
 const fill = (page, selector, value) => page.$eval(selector, (el, next) => {
   el.value = next; el.dispatchEvent(new Event('change', { bubbles: true }));
 }, value);
+// Die Person waehlt seit Runde 7 die Personen-Pille der Gesundheit (Kanon D6)
+// statt eines nativen Selects: der aktive Menuepunkt traegt aria-checked, die
+// Wahl ist ein Klick. Ein Menuepunkt fuer eine Person, die es im Haushalt nicht
+// gibt (die Proben unten), wird vorher eingehaengt - die Wahl haengt am
+// Umschalter und nimmt ihn wie jeden anderen. Seit R14 (A6 P2-2) zieht die
+// Gesundheit die Pille aus dem Fasten-Kopf in ihren Seiten- bzw. Detailkopf
+// (health-hoist.js) - gesucht wird sie deshalb im Dokument, nicht im Kopf.
+const PERSON = '.health-person-switcher:has(#health-person-menu-fasting)';
+const currentPerson = (page) => page.$eval(`${PERSON} [role="menuitemradio"][aria-checked="true"]`, (el) => el.dataset.personId);
+const choosePerson = (page, id) => page.evaluate((next, person) => {
+  const menu = document.querySelector(`${person} .popover-menu`);
+  let item = menu.querySelector(`[data-person-id="${next}"]`);
+  if (!item) {
+    menu.insertAdjacentHTML('beforeend', `<button type="button" role="menuitemradio" aria-checked="false" class="popover-menu__item" data-person-id="${next}">${next}</button>`);
+    item = menu.lastElementChild;
+  }
+  item.click();
+}, String(id), PERSON);
+// Filter und Verlauf erscheinen seit R14 (A6 P2-1) erst, wenn es etwas zu
+// filtern gibt - ohne ein Fasten steht EIN Leerzustand. Die Proben, die den
+// Filter brauchen, legen deshalb vorher ein abgeschlossenes Fasten an.
+const seedCompletedFast = (page) => call(page, 'post', '/health/fasting', {
+  start_at: '2025-01-01T00:00Z', end_at: '2025-01-01T01:00Z', start_tzid: 'UTC', acknowledge_safety: true,
+});
+// Der Zeitraum wirkt seit R14 beim Aendern (kein "Zeitraum anwenden" mehr):
+// eine "gewoehnliche Aktualisierung" ist ein neuer Zeitraum.
+let filterDay = 0;
+const changeFilter = (page) => fill(page, '[data-fasting-from]', `2020-01-${String(++filterDay).padStart(2, '0')}`);
+const openFastingSettings = async (page) => {
+  if (await page.$('.modal-panel [data-fasting-preferences]')) return;
+  // Abfrage und Klick in EINEM Schritt im Dokument: ein Neubau des Inhalts
+  // (Filter, Rueckkehr) zwischen beiden liesse den Knoten sonst losgeloest.
+  await page.waitForFunction(() => {
+    const el = document.querySelector('[data-fasting-settings]');
+    if (!el) return false;
+    el.scrollIntoView({ block: 'center', behavior: 'instant' });
+    el.click();
+    return true;
+  });
+  await page.waitForSelector('.modal-panel [data-fasting-preferences] [data-fasting-preset]');
+  await settle(page);
+};
+const closeFastingSettings = async (page) => {
+  await page.click('.modal-panel [data-action="close-modal"]');
+  await page.waitForFunction(() => !document.querySelector('.modal-panel'));
+};
 
-test('history filters name the household calendar used for completion dates', async () => {
+// Bis R14 nannte der Filter die Zeitzone des Haushalts ("Casove pasmo
+// domacnosti - Europe/Prague"). Die Re-Critique 2026-09-28 (A6 P2-1/P2-5)
+// strich den Satz: die Tage sind die des Haushalts wie ueberall in der App.
+// Geprueft wird jetzt die Form, die an seine Stelle trat - zwei Kanon-
+// Datumsfelder, die beim Aendern wirken, und leer kein Filter.
+test('history filters use the app date picker, apply on change and wait for a first fast', async () => {
   const harness = await startHarness();
   try {
     await harness.reset();
     const page = await openPage(harness, { locale: 'cs' });
     await gotoRoute(page, '/health/fasting');
-    await page.waitForSelector('[data-fasting-filter-zone]');
-    const state = (await call(page, 'get', '/health/fasting/state')).data;
-    const hint = await page.$eval('[data-fasting-filter-zone]', (el) => el.textContent.trim());
-    assert.match(hint, /Dokončeno od.*Dokončeno do/);
-    assert.match(hint, /Časové pásmo domácnosti/);
-    assert.match(hint, new RegExp(state.display_tzid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    await page.waitForSelector('[data-fasting-action]');
+    assert.equal(await page.$('[data-fasting-filters]'), null, 'ohne Fasten gibt es nichts zu filtern');
+    assert.equal(await page.$$eval('[data-fasting-body] .empty-state', (els) => els.length), 1, 'EIN Leerzustand');
+    await seedCompletedFast(page);
+    await gotoRoute(page, '/health/fasting');
+    await page.waitForSelector('[data-fasting-filters]');
+    assert.equal(await page.$$eval('[data-fasting-filters] yuvomi-datepicker', (els) => els.length), 2);
+    // Der Picker fuehrt sein natives Feld intern - gezaehlt wird, was der Filter selbst baut.
+    assert.equal(await page.$$eval('[data-fasting-filters] input[type="date"], [data-fasting-filters] [type="submit"], [data-fasting-filter-zone]', (els) => els.filter((el) => !el.closest('yuvomi-datepicker')).length), 0);
+    const refreshed = page.waitForRequest((request) => request.url().includes('/health/fasting/history') && request.url().includes('from=2020-01-01'), { timeout: 10000 });
+    await fill(page, '[data-fasting-from]', '2020-01-01');
+    await refreshed;
+    await page.waitForFunction(() => document.querySelector('a[download]')?.href.includes('from=2020-01-01'));
   } finally { await harness.close(); }
 });
 
@@ -31,6 +94,7 @@ test('filter and preference refreshes reuse insights while page resume refreshes
   try {
     await harness.reset();
     const page = await openPage(harness, { locale: 'cs' });
+    await seedCompletedFast(page);
     await gotoRoute(page, '/health/fasting');
     await page.waitForSelector('[data-fasting-filters]');
     await page.evaluate(async () => {
@@ -45,13 +109,15 @@ test('filter and preference refreshes reuse insights while page resume refreshes
         return get(path, ...args);
       };
     });
-    await page.click('[data-fasting-filters] [type="submit"]');
+    await changeFilter(page);
     await page.waitForFunction(() => window.fastingStateRequests >= 1);
     assert.equal(await page.evaluate(() => window.fastingStatsRequests), 0);
+    await openFastingSettings(page);
     await page.select('[data-fasting-clock-default]', 'elapsed');
     await page.waitForFunction(() => window.fastingStateRequests >= 2);
     assert.equal(await page.evaluate(() => window.fastingStatsRequests), 0);
-    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await closeFastingSettings(page);
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
     await page.waitForFunction(() => window.fastingStateRequests >= 3 && window.fastingStatsRequests >= 1);
     assert.equal(await page.evaluate(() => window.fastingStatsRequests), 1);
     await page.evaluate(() => window.fastingRestoreStatsGet());
@@ -63,6 +129,7 @@ test('a failed insights refresh remains retryable on the next ordinary refresh',
   try {
     await harness.reset();
     const page = await openPage(harness, { locale: 'cs' });
+    await seedCompletedFast(page);
     await gotoRoute(page, '/health/fasting');
     await page.waitForSelector('[data-fasting-filters]');
     await page.evaluate(async () => {
@@ -77,10 +144,10 @@ test('a failed insights refresh remains retryable on the next ordinary refresh',
         return get(path, ...args);
       };
     });
-    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
     await page.waitForFunction(() => window.fastingStatsRequests === 1);
     await page.waitForSelector('.fasting-stats [role="status"]');
-    await page.click('[data-fasting-filters] [type="submit"]');
+    await changeFilter(page);
     await page.waitForFunction(() => window.fastingStatsRequests === 2);
   } finally { await harness.close(); }
 });
@@ -90,6 +157,7 @@ test('an ordinary refresh cannot cancel record-driven insights invalidation', as
   try {
     await harness.reset();
     const page = await openPage(harness, { locale: 'cs' });
+    await seedCompletedFast(page);
     await gotoRoute(page, '/health/fasting');
     await page.waitForSelector('[data-fasting-filters]');
     await page.evaluate(async () => {
@@ -105,9 +173,9 @@ test('an ordinary refresh cannot cancel record-driven insights invalidation', as
         });
       };
     });
-    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
     await page.waitForFunction(() => window.fastingStatsRequests === 1);
-    await page.click('[data-fasting-filters] [type="submit"]');
+    await changeFilter(page);
     await page.waitForFunction(() => window.fastingStatsRequests === 2);
     await page.evaluate(() => window.releaseFastingStats());
   } finally { await harness.close(); }
@@ -179,15 +247,17 @@ test('journal earlier start, active edit, recorded target, end undo and manual h
     const edited = (await call(page, 'get', '/health/fasting/state')).data.active;
     assert.equal(Date.parse(edited.start_at) - Date.parse(active.start_at), 300000);
     assert.equal(edited.end_at, null);
+    await openFastingSettings(page);
     await page.click('[data-fasting-preset="16"]');
-    await page.waitForFunction(() => document.querySelector('[data-fasting-preset="16"]')?.getAttribute('aria-pressed') === 'true');
-    assert.ok(await page.$('[data-fasting-target]'));
+    await page.waitForFunction(() => (() => { const el = document.querySelector('[data-fasting-preset="16"]'); return el?.getAttribute('aria-checked') === 'true' && !el.disabled; })());
+    await page.waitForSelector('[data-fasting-target]');
     const target16 = await page.$eval('[data-fasting-target]', (el) => el.textContent);
     await page.click('[data-fasting-preset="20"]');
     await page.waitForFunction((value) => document.querySelector('[data-fasting-target]')?.textContent !== value, {}, target16);
     assert.equal((await call(page, 'get', '/health/fasting/state')).data.active.start_at, edited.start_at);
-    await page.click('[data-fasting-preset=""]');
+    await page.click('[data-fasting-preset="none"]');
     await page.waitForFunction(() => !document.querySelector('[data-fasting-target]'));
+    await closeFastingSettings(page);
     await page.click('[data-fasting-action]');
     await page.waitForSelector('[data-fasting-edit-form]');
     await settle(page);
@@ -199,7 +269,7 @@ test('journal earlier start, active edit, recorded target, end undo and manual h
     active = (await call(page, 'get', '/health/fasting/state')).data.active;
     assert.equal(active.id, edited.id);
     assert.ok(await page.$('[data-fasting-backfill]'));
-    assert.ok(await page.$('[data-fasting-from]'));
+    assert.equal(await page.$('[data-fasting-from]'), null, 'ohne abgeschlossenes Fasten kein Filter');
     await page.click('[data-fasting-backfill]');
     await page.waitForSelector('#fast-start'); await settle(page);
     await fill(page, '#fast-start', '2025-01-01T06:00:00');
@@ -207,12 +277,12 @@ test('journal earlier start, active edit, recorded target, end undo and manual h
     await page.click('.modal-panel [type="submit"]');
     await page.waitForFunction(() => !document.querySelector('.modal-panel'));
     assert.equal((await call(page, 'get', '/health/fasting/state')).data.active.id, active.id, 'Backfill does not replace active record');
+    await page.waitForSelector('[data-fasting-from]');
     await fill(page, '[data-fasting-from]', '2025-01-02');
+    await page.waitForFunction(() => document.querySelector('a[download]')?.href.includes('from=2025-01-02'));
     await fill(page, '[data-fasting-to]', '2025-01-01');
-    await page.click('[data-fasting-filters] [type="submit"]');
     assert.ok(await page.$eval('[data-fasting-filter-error]', (el) => el.textContent));
     await fill(page, '[data-fasting-from]', '2025-01-01');
-    await page.click('[data-fasting-filters] [type="submit"]');
     await page.waitForFunction(() => document.querySelector('a[download]')?.href.includes('from=2025-01-01'));
     assert.equal(await page.$$eval('[data-fast-edit]', (els) => els.length), 1);
     assert.match(await page.$eval('a[download]', (el) => el.href), /from=2025-01-01&to=2025-01-01/);
@@ -292,11 +362,22 @@ test('delete expiry and failed pagehide flush settle pending identity; stale Und
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
     await page.waitForSelector('[data-fast-delete]');
     assert.equal(await page.evaluate(() => window.fastingKeepalive), true);
-    await page.evaluate(() => { window.fastingRestoreDelete(); window.dispatchEvent(new Event('pageshow')); });
-    await page.waitForSelector('[data-fast-delete]'); await settle(page);
+    // Die Rueckkehr muss neu laden: die Zeile steht schon im DOM, ein Warten auf
+    // sie allein waere auch ohne Aktualisierung sofort erfuellt.
+    const resumed = page.waitForRequest((request) => request.url().includes('/health/fasting/state'), { timeout: 10000 });
+    // Seit R14 steht die Statistik nur, wenn sie Daten hat: die Rueckkehr
+    // zeichnet den Verlauf zuerst ohne sie und setzt sie ueber ihn, sobald die
+    // Antwort kommt. Erst danach steht die Zeile dort, wo geklickt wird.
+    const statsBack = page.waitForResponse((response) => response.url().includes('/health/fasting/stats'), { timeout: 10000 });
+    await page.evaluate(() => { window.fastingRestoreDelete(); window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); });
+    await resumed; await statsBack;
+    await page.waitForSelector('.fasting-stats'); await page.waitForSelector('[data-fast-delete]'); await settle(page);
     // The failure toast temporarily covers the mobile history button.
     await page.waitForFunction(() => !document.querySelector('.toast'));
     const deleted = page.waitForResponse((response) => response.request().method() === 'DELETE' && response.url().includes('/health/fasting/')).catch(() => null);
+    // Ohne die Einstellungen im Inhalt (R14) steht die Zeile mobil so weit
+    // oben, dass Puppeteer nicht scrollt - und die Tab-Leiste liegt ueber ihr.
+    await page.$eval('[data-fast-delete]', (el) => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
     await page.click('[data-fast-delete]');
     assert.equal(await page.$('[data-fast-delete]'), null, 'Expiry deletion was actually scheduled by the rendered control');
     assert.equal((await deleted).status(), 204);
@@ -323,7 +404,7 @@ test('denied family views clear private data, retain filters, and discard late s
     await call(page, 'post', '/health/fasting', { start_at: '2025-01-01T00:00Z', end_at: '2025-01-01T01:00Z', start_tzid: 'UTC', note: 'SELF PRIVATE', acknowledge_safety: true });
     await gotoRoute(page, '/health/fasting');
     await page.waitForSelector('[data-fast-edit]');
-    const self = await page.$eval('[data-fasting-person]', (el) => el.value);
+    const self = await currentPerson(page);
     await page.evaluate(async () => {
       const { api } = await import('/api.js');
       const get = api.get;
@@ -337,26 +418,23 @@ test('denied family views clear private data, retain filters, and discard late s
         }
         return get(path, ...args);
       };
-      const select = document.querySelector('[data-fasting-person]');
-      select.add(new Option('Denied', '9999')); select.add(new Option('Delayed', '9998'));
     });
-    await page.select('[data-fasting-person]', '9999');
+    await choosePerson(page, '9999');
     await page.waitForSelector('[data-fasting-retry]');
     assert.equal(await page.$('[data-fast-edit]'), null);
     assert.equal(await page.$('[data-fasting-action]'), null);
     assert.equal(await page.$('a[download]'), null);
     assert.ok(await page.$('[data-fasting-filters]'));
     assert.equal(await page.$eval('[data-fasting-body]', (el) => el.textContent.includes('SELF PRIVATE')), false);
-    await page.select('[data-fasting-person]', self);
+    await choosePerson(page, self);
     await page.waitForSelector('[data-fast-edit]');
-    await page.evaluate(() => document.querySelector('[data-fasting-person]').add(new Option('Delayed', '9998')));
-    await page.select('[data-fasting-person]', '9998');
+    await choosePerson(page, '9998');
     await page.waitForFunction(() => typeof window.fastingReleaseA === 'function');
-    await page.select('[data-fasting-person]', self);
+    await choosePerson(page, self);
     await page.waitForSelector('[data-fast-edit]');
     await page.evaluate(() => { window.fastingReleaseA(); window.fastingRestoreGet(); });
     await settle(page);
-    assert.equal(await page.$eval('[data-fasting-person]', (el) => el.value), self);
+    assert.equal(await currentPerson(page), self);
     assert.ok(await page.$('[data-fasting-action]'));
     await page.evaluate(async () => {
       const { setPermissions } = await import('/permissions.js');
@@ -376,7 +454,7 @@ test('family reading renders API-redacted state and remains read-only even with 
     await harness.reset();
     const page = await openPage(harness, { locale: 'cs' });
     await gotoRoute(page, '/health/fasting'); await page.waitForSelector('[data-fasting-action]');
-    const self = Number(await page.$eval('[data-fasting-person]', (el) => el.value));
+    const self = Number(await currentPerson(page));
     const members = (await call(page, 'get', '/auth/users')).data;
     const member = members.find((entry) => entry.id !== self);
     const login = await fetch(`${harness.baseUrl}/api/v1/auth/login`, {
@@ -392,18 +470,26 @@ test('family reading renders API-redacted state and remains read-only even with 
     assert.equal(acknowledgement.status, 200);
     await call(page, 'put', `/health/caregivers/${member.id}`, { caregiver_ids: [self] });
     await call(page, 'post', '/health/fasting', { user_id: member.id, start_at: '2025-01-01T00:00Z', end_at: '2025-01-01T01:00Z', start_tzid: 'UTC', visibility: 'family', note: 'FAMILY SHARED', acknowledge_safety: false });
-    await page.select('[data-fasting-person]', String(member.id));
+    await choosePerson(page, member.id);
     await page.waitForFunction(() => document.querySelector('[data-fasting-history]')?.textContent.includes('FAMILY SHARED'));
     assert.equal((await call(page, 'get', `/health/fasting/state?user_id=${member.id}`)).data.canWrite, true);
     assert.equal(await page.$('[data-fasting-action]'), null);
     assert.equal(await page.$('[data-fast-edit]'), null);
     assert.equal(await page.$('[data-fasting-preferences]'), null);
     await call(page, 'put', `/health/caregivers/${member.id}`, { caregiver_ids: [] });
-    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    // "FAMILY SHARED" steht schon vor dem Entzug im DOM (Review an #1438): die
+    // Probe wartet deshalb auf die Antwort der Aktualisierung selbst, bevor sie
+    // die eigene Anfrage stellt.
+    const resumed = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === '/api/v1/health/fasting/state' && url.searchParams.get('user_id') === String(member.id);
+    }, { timeout: 10000 });
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+    assert.equal((await resumed).status(), 200, 'die Rueckkehr laedt die Familienansicht neu');
     await page.waitForFunction(() => document.querySelector('[data-fasting-history]')?.textContent.includes('FAMILY SHARED'));
     assert.equal((await call(page, 'get', `/health/fasting/state?user_id=${member.id}`)).data.settings, null);
     assert.match(await page.$eval('a[download]', (el) => el.href), new RegExp(`user_id=${member.id}`));
-    await page.select('[data-fasting-person]', String(self)); await page.waitForSelector('[data-fasting-action]');
+    await choosePerson(page, self); await page.waitForSelector('[data-fasting-action]');
   } finally { await harness.close(); }
 });
 
@@ -474,7 +560,7 @@ test('family selector, offline resume and undo deletion survive route remount', 
     const page = await openPage(harness, { device: 'mobile', theme: 'dark', locale: 'cs' });
     await gotoRoute(page, '/health/fasting');
     await page.waitForSelector('[data-fasting-action]');
-    assert.ok(await page.$('[data-fasting-person]'), 'family selector remains available');
+    assert.ok(await page.$(PERSON), 'family selector remains available');
     await call(page, 'post', '/health/fasting', { start_at: '2025-01-01T00:00Z', end_at: '2025-01-01T01:00Z', start_tzid: 'UTC', acknowledge_safety: true });
     await gotoRoute(page, '/health/fasting');
     await page.waitForSelector('[data-fast-delete]');
@@ -500,7 +586,7 @@ test('family selector, offline resume and undo deletion survive route remount', 
     await page.setOfflineMode(false);
     const active = (await call(page, 'get', '/health/fasting/state')).data.active;
     await call(page, 'post', `/health/fasting/${active.id}/finish`, { expected_revision: active.revision });
-    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
     await page.waitForFunction(() => !document.querySelector('[data-fasting-edit-start]'));
     assert.ok(await page.$('[data-fasting-earlier]'), 'Successful resume replaces stale active state');
   } finally { await harness.close(); }
@@ -519,7 +605,9 @@ test('journal educational dial and controls meet rendered AA, RTL and reduced-mo
       await page.waitForSelector('[data-fasting-education]');
       assert.equal(await page.$$eval('.fasting-dial__zone', (els) => els.length), 3);
       const announcement = await page.$eval('[data-fasting-announcement]', (el) => el.textContent);
-      const help = 'yuvomi-fasting-help button';
+      // Die Ziel-Erklaerung steht mit der Zielwahl im Einstellungsblatt (R14).
+      await openFastingSettings(page);
+      const help = '.modal-panel yuvomi-fasting-help button';
       await page.waitForSelector(help);
       assert.equal(await page.$$eval('yuvomi-fasting-help [role="tooltip"]', (els) => els.every((el) => !el.matches(':popover-open'))), true);
       await page.$eval(help, (el) => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
@@ -543,6 +631,7 @@ test('journal educational dial and controls meet rendered AA, RTL and reduced-mo
       await page.waitForSelector('yuvomi-fasting-help [role="tooltip"]:popover-open');
       await page.keyboard.press('Escape');
       assert.equal(await page.$$eval('yuvomi-fasting-help [role="tooltip"]', (els) => new Set(els.map((el) => el.id)).size === els.length), true);
+      await closeFastingSettings(page);
       assert.equal(await page.evaluate(async () => {
         const { fastingHelpHtml } = await import('/components/fasting-help.js');
         const container = document.createElement('div');

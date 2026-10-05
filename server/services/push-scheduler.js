@@ -3,6 +3,7 @@
  * Zweck: Kompatibilitaets-Scheduler fuer faellige Reminder-Notifications.
  * Abhängigkeiten: server/services/notifications.js
  */
+import { runExternalJob } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 import { processDueNotifications } from './notifications.js';
 
@@ -14,8 +15,11 @@ export async function processDuePushes(options = {}) {
 }
 
 export function startScheduler() {
+  // Versendet nach aussen und vermerkt es danach: waehrend eines Restores
+  // beginnt kein Lauf, ein laufender wird abgewartet (Codex-Befund in #1431).
   const run = () => {
-    processDuePushes().catch((err) => log.error('Push scheduler run failed:', err?.message || err));
+    runExternalJob(() => processDuePushes())
+      .catch((err) => log.error('Push scheduler run failed:', err?.message || err));
   };
   setTimeout(run, 10_000).unref();
   setInterval(run, 60_000).unref();

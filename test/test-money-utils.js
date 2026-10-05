@@ -15,7 +15,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toDecimalString, amountInputToCents, centsToAmountInput, breaksOffAtSeparator, toStoredNumber } from '../public/utils/money.js';
+import { toDecimalString, amountInputToCents, centsToAmountInput, amountToInput, breaksOffAtSeparator, toStoredNumber, amountInputProblem, amountExample, currencyFractionDigits } from '../public/utils/money.js';
 import { parseQuantity } from '../server/services/shopping-import.js';
 
 /**
@@ -258,4 +258,166 @@ test('toStoredNumber: Ziffern UND Trenner der Region, von beiden Seiten lesbar',
   withFormatLocale('fa', () => { assert.equal(toStoredNumber(2000), '۲۰۰۰'); });
   // Ohne Gruppierung, sonst laese toDecimalString den Wert nicht wieder ein.
   withFormatLocale('de', () => { assert.equal(toStoredNumber(2000), '2000'); });
+});
+
+test('amountInputProblem: der Grund, warum ein Betrag nicht speicherbar ist (#1607)', () => {
+  const grund = (locale, eingabe, currency, optionen) => {
+    let ergebnis;
+    withFormatLocale(locale, () => { ergebnis = amountInputProblem(eingabe, currency, optionen); });
+    return ergebnis;
+  };
+  // Gueltig - und ein leeres Feld hat keinen Grund, das ist Sache des Pflichtfelds.
+  assert.equal(grund('de', '12,50', 'EUR'), null);
+  assert.equal(grund('ko-KR', '10000', 'KRW'), null);
+  assert.equal(grund('ar-EG', '١٢٫٥٠', 'EUR'), null);
+  assert.equal(grund('de', '', 'EUR'), null);
+  assert.equal(grund('de', '   ', 'EUR'), null);
+  // ... ausser der Speicherweg verlangt einen Betrag: `required` des Browsers
+  // nimmt ein Feld aus Leerzeichen an, der Server bekaeme einen leeren Text.
+  assert.equal(grund('de', '   ', 'EUR', { required: true }), 'notPositive');
+  assert.equal(grund('de', '', 'EUR', { required: true }), 'notPositive');
+  assert.equal(grund('de', '12,50', 'EUR', { required: true }), null);
+
+  // Gruppierung: die uebliche Schreibweise fuer zehntausend, je Region.
+  assert.equal(grund('ko-KR', '10,000', 'KRW'), 'grouped');
+  assert.equal(grund('en-US', '10,000', 'USD'), 'grouped');
+  assert.equal(grund('de-DE', '10.000', 'EUR'), 'grouped');
+  assert.equal(grund('de-DE', '1.000,50', 'EUR'), 'grouped');
+  assert.equal(grund('fr-FR', '10 000', 'EUR'), 'grouped');
+
+  assert.equal(grund('de', 'abc', 'EUR'), 'invalid');
+  assert.equal(grund('de', '12,', 'EUR'), 'invalid');
+  assert.equal(grund('de', '1e3', 'EUR'), 'invalid');
+  assert.equal(grund('de', '0', 'EUR'), 'notPositive');
+  assert.equal(grund('de', '0,00', 'EUR'), 'notPositive');
+  assert.equal(grund('de', '-5', 'EUR'), 'notPositive');
+
+  // Die Stellen zaehlen am TEXT: "10.000" ist unter ko-KR die Zahl 10 und passt
+  // als Zahl ins Raster von KRW - der Server liest aber den Text.
+  assert.equal(grund('ko-KR', '10.000', 'KRW'), 'precision');
+  assert.equal(grund('de-DE', '10,000', 'KRW'), 'precision');
+  assert.equal(grund('de-DE', '12,500', 'EUR'), 'precision');
+  assert.equal(grund('de-DE', '12,5', 'JPY'), 'precision');
+  assert.equal(grund('de-DE', '12,345', 'KWD'), null);
+
+  // Bestandsschutz wie amountIsSavable: unangetastet bleibt speicherbar, aber
+  // nicht mit MEHR Stellen als vorher.
+  assert.equal(grund('en-US', '12.50', 'JPY', { original: '12.50' }), null);
+  assert.equal(grund('en-US', '12.5', 'JPY', { original: '12.50' }), null);
+  assert.equal(grund('en-US', '12.51', 'JPY', { original: '12.50' }), 'precision');
+  assert.equal(grund('en-US', '10000.0', 'KRW', { original: '10000' }), 'precision');
+  // ... und nicht ueber einen Waehrungswechsel hinweg: wer von EUR auf JPY
+  // umstellt, hat das Raster gewechselt (wie bei amountIsSavable).
+  assert.equal(grund('en-US', '12.50', 'JPY', { original: '12.50', originalCurrency: 'JPY' }), null);
+  assert.equal(grund('en-US', '12.50', 'JPY', { original: '12.50', originalCurrency: 'EUR' }), 'precision');
+});
+
+test('jeder Speicherweg der Aufteilung verlangt einen Betrag', async () => {
+  const { readFileSync } = await import('node:fs');
+  const quelle = readFileSync(new URL('../public/pages/split-expenses.js', import.meta.url), 'utf8');
+  const aufrufe = quelle.match(/if \(rejectSplitAmount\([\s\S]*?\)\) return;/g) ?? [];
+  assert.equal(aufrufe.length >= 3, true, 'Aufrufe von rejectSplitAmount gefunden');
+  for (const aufruf of aufrufe) assert.match(aufruf, /required: true/, aufruf);
+});
+
+test('amountInputProblem ist nie nachsichtiger als der Server', async () => {
+  // Der Server zaehlt mit seiner ISO-Tabelle, das Frontend mit Intl (CLDR). Wo
+  // beide auseinandergehen, muss das Frontend das STRENGERE sein - sonst kaeme
+  // die englische Serverantwort zurueck, die diese Pruefung ersetzen soll.
+  const { parseMoneyToMinor } = await import('../server/services/split-expenses.js');
+  const { CURRENCY_CODES } = await import('../public/utils/currency-codes.js');
+  assert.ok(CURRENCY_CODES.length > 20);
+  for (const code of CURRENCY_CODES) {
+    const stellen = currencyFractionDigits(code);
+    const betrag = stellen ? `1.${'1'.repeat(stellen)}` : '1';
+    withFormatLocale('en-US', () => assert.equal(amountInputProblem(betrag, code), null, code));
+    assert.doesNotThrow(() => parseMoneyToMinor(betrag, code), `${code}: ${betrag}`);
+  }
+});
+
+test('amountExample: Schreibweise der Region, Stellen der Waehrung, keine Gruppierung', () => {
+  const beispiel = (locale, currency) => {
+    let text;
+    withFormatLocale(locale, () => { text = amountExample(currency); });
+    return text;
+  };
+  assert.equal(beispiel('de-DE', 'EUR'), '1250,00');
+  assert.equal(beispiel('en-US', 'USD'), '1250.00');
+  assert.equal(beispiel('ko-KR', 'KRW'), '1250');
+  // Was als Beispiel dasteht, muss die Pruefung auch annehmen.
+  for (const [locale, currency] of [['de-DE', 'EUR'], ['ko-KR', 'KRW'], ['fa', 'EUR'], ['ar-EG', 'KWD'], ['fr-FR', 'EUR']]) {
+    withFormatLocale(locale, () => assert.equal(amountInputProblem(amountExample(currency), currency), null, `${locale}/${currency}`));
+  }
+});
+
+test('amountToInput: ein Dezimalbetrag des Servers steht im Feld in der Schreibweise der Region', () => {
+  // Der Server liefert Geld als Punkt-Dezimaltext ("12.50"). Im Feld muss er so
+  // stehen, wie der Platzhalter daneben es vormacht - und so, dass
+  // toDecimalString ihn wieder liest.
+  withFormatLocale('de', () => {
+    assert.equal(amountToInput('12.50', 'EUR'), '12,50');
+    assert.equal(amountToInput(12.5, 'EUR'), '12,50', 'eine Zahl wird auf die Stellen der Waehrung aufgefuellt');
+    assert.equal(amountToInput('1234.50', 'EUR'), '1234,50', 'ohne Gruppierung');
+    assert.equal(amountToInput('1300', 'JPY'), '1300');
+    assert.equal(amountToInput('12.500', 'KWD'), '12,500');
+  });
+  withFormatLocale('en-US', () => assert.equal(amountToInput('12.50', 'EUR'), '12.50'));
+  withFormatLocale('de-CH', () => assert.equal(amountToInput('12.50', 'CHF'), '12.50'));
+  withFormatLocale('fa', () => assert.equal(amountToInput('12.50', 'EUR'), '۱۲٫۵۰'));
+});
+
+test('amountToInput: leer bleibt leer, Unsinn bleibt stehen, nichts wird gerundet', () => {
+  withFormatLocale('de', () => {
+    assert.equal(amountToInput('', 'EUR'), '');
+    assert.equal(amountToInput(null, 'EUR'), '');
+    assert.equal(amountToInput(undefined, 'EUR'), '');
+    assert.equal(amountToInput('abc', 'EUR'), 'abc', 'ein Feld zeigt nie NaN');
+    // Bestandswert neben dem Raster: er erscheint, wie er gespeichert ist.
+    assert.equal(amountToInput('12.5', 'JPY'), '12,5');
+    assert.equal(amountToInput(12.345, 'EUR'), '12,345');
+    assert.equal(amountToInput('131072.02', 'EUR'), '131072,02');
+  });
+});
+
+test('amountToInput: der ausgegebene Wert kommt wieder herein, in jeder Region', () => {
+  // Der Hin- und Rueckweg ist der ganze Zweck. KWD unter de ist der Fall, in dem
+  // der unformatierte Serverwert NICHT zurueckkam: "12.500" liest de als
+  // Tausendergruppierung, toDecimalString weist ihn ab.
+  for (const locale of ['de', 'de-CH', 'en-US', 'fr', 'sv', 'fa', 'ar-EG', 'ko-KR', 'hi']) {
+    withFormatLocale(locale, () => {
+      for (const [betrag, currency] of [['12.50', 'EUR'], ['0.05', 'EUR'], ['1234567.89', 'EUR'], ['1300', 'JPY'], ['12.500', 'KWD'], ['1.000', 'KWD']]) {
+        const feld = amountToInput(betrag, currency);
+        assert.equal(toDecimalString(feld), betrag, `${locale}: ${betrag} ${currency} -> "${feld}"`);
+        assert.equal(amountInputProblem(feld, currency), null, `${locale}: "${feld}" ist speicherbar`);
+      }
+    });
+  }
+  withFormatLocale('de', () => {
+    assert.equal(toDecimalString('12.500'), '', 'Gegenprobe: der rohe Serverwert kaeme unter de nicht zurueck');
+  });
+});
+
+test('amountToInput: der Dezimaltext des Servers geht nicht durch ein Gleitkomma', () => {
+  // Der Server rechnet in ganzen Einheiten bis Number.MAX_SAFE_INTEGER und gibt
+  // sie als Dezimaltext zurueck. Als Zahl passt so ein Betrag nicht mehr:
+  // Number('90071992547409.91') ist 90071992547409.9, im Feld stand ",90", und
+  // unveraendert speichern zog einen Cent ab.
+  withFormatLocale('de', () => {
+    assert.equal(amountToInput('90071992547409.91', 'EUR'), '90071992547409,91');
+    assert.equal(amountToInput('90071992547409.93', 'EUR'), '90071992547409,93');
+    assert.equal(amountToInput('9007199254740.991', 'KWD'), '9007199254740,991');
+    assert.equal(amountToInput('9007199254740991', 'JPY'), '9007199254740991');
+    assert.equal(amountToInput('12.5', 'EUR'), '12,50', 'aufgefuellt wird weiter');
+    assert.equal(amountToInput('12.500', 'EUR'), '12,500', 'und nichts abgeschnitten');
+    assert.equal(amountToInput('-3.50', 'EUR'), '-3,50');
+    assert.equal(amountToInput(1e21, 'EUR'), '1000000000000000000000,00', 'Exponentenschreibweise laeuft ueber Intl');
+  });
+  for (const locale of ['de', 'en-US', 'fr', 'fa', 'ar-EG', 'hi']) {
+    withFormatLocale(locale, () => {
+      for (const [betrag, currency] of [['90071992547409.91', 'EUR'], ['9007199254740.991', 'KWD'], ['9007199254740991', 'JPY']]) {
+        assert.equal(toDecimalString(amountToInput(betrag, currency)), betrag, `${locale}: ${betrag} ${currency}`);
+      }
+    });
+  }
+  withFormatLocale('fa', () => assert.equal(amountToInput('90071992547409.91', 'EUR'), '۹۰۰۷۱۹۹۲۵۴۷۴۰۹٫۹۱'));
 });

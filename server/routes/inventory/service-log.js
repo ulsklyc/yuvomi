@@ -432,8 +432,11 @@ function completeTrackedDate({ item, dateId, values, userId }) {
  * sortierten Zeitleiste zusammengefuehrt. Reine Aggregation, kein neuer
  * Speicher (DECISIONS.md #6) - beide Sichtbarkeitsregeln laufen ueber ihre
  * bestehenden, einzigen Stellen (DECISIONS.md #2).
+ *
+ * `viewer` ist `documentViewer(req)`. Ohne Leserecht auf die Dokumente gibt es
+ * keine Belege (#1358), die Zeitleiste zeigt dann keine Dokumentzeile.
  */
-function loadHistory(itemId, userId) {
+function loadHistory(itemId, budget, viewer) {
   const logRows = loadServiceLog(itemId).map((row) => ({
     type: 'service_log',
     id: row.id,
@@ -444,7 +447,7 @@ function loadHistory(itemId, userId) {
     note: row.note,
   }));
 
-  const bookingLinks = loadLinkedEntries(itemId, userId)
+  const bookingLinks = loadLinkedEntries(itemId, budget)
     .filter((link) => HISTORY_ENTRY_ROLES.includes(link.role));
   const bookingRows = bookingLinks.map((link) => ({
     type: 'budget_entry',
@@ -456,7 +459,8 @@ function loadHistory(itemId, userId) {
   }));
 
   const householdTz = householdTimeZone(db.get());
-  const documentRows = documentLinksFor(db.get(), { ...DOCS, ownerId: itemId, userId }).map((doc) => ({
+  const documents = documentLinksFor(db.get(), { ...DOCS, ownerId: itemId, viewer }) ?? [];
+  const documentRows = documents.map((doc) => ({
     type: 'document',
     id: doc.document_id,
     // doc.created_at ist ein UTC-Instant (%Y-%m-%dT%H:%M:%SZ) - der Link-

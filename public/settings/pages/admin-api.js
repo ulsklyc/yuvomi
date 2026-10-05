@@ -141,6 +141,7 @@ function renderPage(container, scopeKeys = CORE_SCOPE_MODULE_KEYS) {
             <label class="form-label">${t('settings.apiTokenScopes')}</label>
             <p class="form-hint" style="margin-bottom:var(--space-2)">${t('settings.apiTokenScopeHint')}</p>
             ${toggleRowHtml({
+              control: 'switch',
               label: t('settings.apiTokenScopeLimit'),
               attrs: { id: 'api-token-scope-limit' },
             })}

@@ -4,12 +4,16 @@ import {
   setLocale,
   t,
 } from '/i18n.js';
+import { api } from '/api.js';
 import { esc } from '/utils/html.js';
 import { appendCurrencyOptions, persistCurrencySelection } from '/settings/currency.js';
-import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
+import { getPreferences, resetPreferencesCache, savePreferences } from '/settings/preferences-cache.js';
 import { toggleRowHtml } from '/settings/components.js';
+import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { isWallModeEnabled, setWallModeEnabled } from '/utils/wall-mode.js';
 import { setDisplayTimeZone } from '/utils/timezone.js';
+import { adoptZone, zoneHintEl, zoneMismatch } from '/utils/household-zone-hint.js';
 import {
   CUSTOM_REGION,
   REGION_CODES,
@@ -19,6 +23,15 @@ import {
   regionLabel,
   numberLocaleFor,
 } from '/settings/region-presets.js';
+
+// Der Name jedes Segments ist sein sichtbares Wort - vorher trug es ein
+// abweichendes aria-label („Dunkles Design" zu „Dunkel"), und die Gruppe
+// selbst heisst schon „Design" (WCAG 2.5.3, Label im Namen).
+const THEME_OPTIONS = [
+  { value: 'system', icon: 'monitor', labelKey: 'settings.themeSystem' },
+  { value: 'light', icon: 'sun', labelKey: 'settings.themeLight' },
+  { value: 'dark', icon: 'moon', labelKey: 'settings.themeDark' },
+];
 
 const DATE_FORMATS = [
   ['mdy', 'MM/DD/YYYY'],
@@ -220,19 +233,19 @@ function renderPage(container, preferences, isAdmin) {
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.sectionDesign')}</h2>
       <div class="settings-card">
-        <div class="theme-toggle" id="theme-toggle">
-          <button class="theme-toggle__btn ${theme === 'system' ? 'theme-toggle__btn--active' : ''}" type="button" data-theme-value="system" aria-label="${t('settings.themeSysLabel')}" aria-pressed="${theme === 'system'}">
-            <i data-lucide="monitor" class="icon-md" aria-hidden="true"></i>
-            ${t('settings.themeSystem')}
-          </button>
-          <button class="theme-toggle__btn ${theme === 'light' ? 'theme-toggle__btn--active' : ''}" type="button" data-theme-value="light" aria-label="${t('settings.themeLightLabel')}" aria-pressed="${theme === 'light'}">
-            <i data-lucide="sun" class="icon-md" aria-hidden="true"></i>
-            ${t('settings.themeLight')}
-          </button>
-          <button class="theme-toggle__btn ${theme === 'dark' ? 'theme-toggle__btn--active' : ''}" type="button" data-theme-value="dark" aria-label="${t('settings.themeDarkLabel')}" aria-pressed="${theme === 'dark'}">
-            <i data-lucide="moon" class="icon-md" aria-hidden="true"></i>
-            ${t('settings.themeDark')}
-          </button>
+        <!-- Hell / Dunkel / System ist EIN Wert aus drei - das Segment der
+             Shell im Well (.segmented, panel.css; DESIGN.md "Segmented
+             Controls"). Bis 2026-09-26 standen hier drei getrennte
+             Rahmenknoepfe ohne Traeger (Critique A7). radiogroup statt
+             aria-pressed: genau einer gilt, und Pfeiltasten gehoeren dazu. -->
+        <div class="segmented settings-segmented" id="theme-toggle" role="radiogroup" aria-label="${esc(t('settings.sectionDesign'))}">
+          ${THEME_OPTIONS.map(({ value, icon, labelKey }) => {
+            const on = theme === value;
+            return `<button type="button" class="segmented__item${on ? ' is-active' : ''}" role="radio"
+              data-tab-id="${value}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}">
+              <i data-lucide="${icon}" class="icon-md" aria-hidden="true"></i>${esc(t(labelKey))}
+            </button>`;
+          }).join('')}
         </div>
       </div>
       <!-- DER WAND-MODUS WOHNT HIER UND NICHT IM ANPASSEN-PANEL.
@@ -243,6 +256,7 @@ function renderPage(container, preferences, isAdmin) {
            das Raster, während dieser Schalter eine Betriebsart wählt. -->
       <div class="settings-card">
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.wallModeLabel'),
           checked: isWallModeEnabled(),
           icon: 'tablet',
@@ -320,7 +334,7 @@ function renderPage(container, preferences, isAdmin) {
            keine Formatierung. Datum und Uhrzeit dort ändern nur, WIE ein Wert
            dasteht; die Zone ändert, WELCHER Tag "heute" ist, wann Erinnerungen
            auslösen und mit welcher Uhrzeit ein Termin bei Google ankommt. -->
-      <div class="settings-card">
+      <div class="settings-card" id="timezone-card">
         <h3 class="settings-card__title">${t('settings.timezoneTitle')}</h3>
         ${isAdmin ? `
         <p class="form-hint" id="timezone-hint">${t('settings.timezoneHint')}</p>
@@ -461,17 +475,49 @@ async function refreshDataLanguageOptions(container) {
   ));
 }
 
+/**
+ * Die Zeile zum Zonen-Hinweis (#1607) in der Zeitzonen-Karte: solange der
+ * Haushalt keine Zone gewaehlt hat und der Browser in einer anderen steht, als
+ * der Server dann rechnet. Dieselbe Zeile wie auf der Uebersicht, hier ohne
+ * Wegklick - wer dort "So lassen" gesagt hat, findet die Handlung hier wieder.
+ * Ein Mitglied sieht den Zustand, aber keinen Knopf: der Server beantwortete
+ * ihn mit 403.
+ */
+function mountTimezoneMismatch(container, preferences, isAdmin) {
+  const card = container.querySelector('#timezone-card');
+  const mismatch = zoneMismatch(preferences);
+  if (!card || !mismatch) return;
+  const errorElement = container.querySelector('#timezone-error');
+  card.appendChild(zoneHintEl({
+    mismatch,
+    t,
+    onAdopt: isAdmin ? async () => {
+      clearError(errorElement);
+      // Schreiben ueber savePreferences(), damit der geteilte Cache der
+      // Settings-Blaetter faellt; gelesen wird am Cache vorbei, sonst saehe
+      // die Gegenprobe "hat inzwischen jemand entschieden?" nur den alten Stand.
+      const result = await adoptZone(mismatch.browser, {
+        api: { get: (path) => api.get(path), put: (_path, patch) => savePreferences(patch) },
+      });
+      resetPreferencesCache();
+      if (result.adopted) window.yuvomi?.showToast(t('settings.timezoneSaved'), 'success');
+    } : undefined,
+    onError: (error) => {
+      if (errorElement) showError(errorElement, error?.message);
+      else window.yuvomi?.showToast(error?.message || t('common.errorGeneric'), 'danger');
+    },
+  }));
+}
+
 function bindEvents(container, user) {
+  // Geteilte gleitende Kapsel (Re-Critique 2026-09-27, D8).
   const themeToggle = container.querySelector('#theme-toggle');
-  themeToggle?.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-theme-value]');
-    if (!button) return;
-    applyTheme(button.dataset.themeValue);
-    themeToggle.querySelectorAll('.theme-toggle__btn').forEach((candidate) => {
-      const active = candidate === button;
-      candidate.classList.toggle('theme-toggle__btn--active', active);
-      candidate.setAttribute('aria-pressed', String(active));
-    });
+  if (themeToggle) attachSegmentIndicator(themeToggle);
+  wireTablist(themeToggle, {
+    activeId: currentTheme(),
+    activeClass: 'is-active',
+    mode: 'select',
+    onChange: (value) => applyTheme(value),
   });
 
   // Gerätelokal wie das Theme darüber: kein Server-Request, keine Preference.
@@ -738,6 +784,7 @@ export async function render(container, { user }) {
       appendCurrencyOptions(container.querySelector('#currency-select'), preferences.currency);
     }
     bindEvents(container, user);
+    mountTimezoneMismatch(container, preferences, isAdmin);
     window.lucide?.createIcons({ el: container });
   } catch {
     renderLoadError(container);

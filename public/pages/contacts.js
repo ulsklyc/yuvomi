@@ -9,15 +9,18 @@ import { openModal as openSharedModal, closeModal, advancedSection, refocusAfter
 import { openDetailView } from '/components/detail-view.js';
 import { stagger, vibrate, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { t, formatDate } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
+import { pageToolsMenuHtml, pageToolsActionEl, popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { parseVCards } from '/utils/vcard.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { composeDisplayName, contactSortKey, splitDisplayName } from '/utils/contact-name.js';
 import { getPhoneFormatter, createAsYouType, countryFromRegion } from '/utils/phone.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
+import { splitViewDetailHtml, mountMasterDetail } from '/utils/master-detail.js';
 import '/components/category-manager.js';
 import { findPageFab } from '/utils/fab.js';
 import { isNavModuleReadOnly } from '/permissions.js';
@@ -82,15 +85,6 @@ function catTintStyle(key) {
     : '';
 }
 
-// Initialen aus dem Namen (max. 2 Buchstaben): Vorname + letzter Namensteil.
-function initials(name) {
-  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '?';
-  const first = parts[0][0] || '';
-  const last  = parts.length > 1 ? parts[parts.length - 1][0] : '';
-  return (first + last).toUpperCase();
-}
-
 // Avatar einer Zeile. Zwei Faelle, zwei Sprecher:
 //
 // EIN VERKNUEPFTER KONTAKT IST EIN MENSCH DES HAUSHALTS, und der traegt ueberall
@@ -111,7 +105,7 @@ function contactAvatar(c) {
   const name  = c.family_display_name || c.name;
   const inner = c.family_avatar_data
     ? `<img src="${esc(c.family_avatar_data)}" alt="" loading="lazy">`
-    : esc(initials(name));
+    : esc(initials(name, '?'));
   return `<span class="contact-item__icon contact-item__icon--member"
     style="background-color:${esc(color)};color:${getReadableTextColor(color)}"
     aria-hidden="true">${inner}</span>`;
@@ -139,34 +133,58 @@ function readOnly() {
 }
 
 /**
+ * Sind die E-Mail-Adressen dieses Kontakts fuer die bedienende Person gesperrt?
+ *
+ * Die Adressen eines verknuepften Kontakts fuehren zu seinem Konto
+ * (Passwort-Reset, SSO-Verknuepfung). Aendern duerfen sie nur die Person
+ * selbst und ein Admin; der Server weist alle anderen mit 403 ab
+ * (server/services/contact-identity.js). Das Formular zeigt die Adressen
+ * deshalb nur-lesen und schickt sie beim Speichern gar nicht erst mit.
+ */
+function emailsLockedFor(contact) {
+  if (!contact?.family_user_id) return false;
+  if (state.user?.role === 'admin') return false;
+  return Number(state.user?.id) !== Number(contact.family_user_id);
+}
+
+/**
  * Die Kopf-Aktionen der Seite - als eigene Funktion, damit sich messen laesst,
  * WAS bei `contacts: read` uebrig bleibt.
  *
  * DREI VON VIER SCHREIBEN NUR, UND KEINE DAVON HING AN EINER CSS-REGEL. Der
  * Kategorie-Verwalter legt an und loescht, der Auswahlmodus hat als einzige
  * Aktion „Loeschen" (seine Pille zeigt sonst nur „Alle auswaehlen"), und der
- * Import legt Kontakte an. Nur der Primaerknopf traegt `.toolbar-new-btn`, und
- * genau der ist der einzige, den `html[data-module-readonly]` schon erfasst hat
- * (layout.css) - er bleibt deshalb im Markup stehen.
+ * Import legt Kontakte an. Die Primaeraktion steht hier NICHT: sie ist der FAB
+ * (#fab-new-contact), den die Shell am Zeigergeraet in diesen Slot dockt
+ * (Re-Critique 2026-09-27, D3), und `html[data-module-readonly]` blendet ihn
+ * aus (layout.css).
+ *
+ * DIE DREI STEHEN IM EINEN WERKZEUGMENUE (Kopfregel mobil, DESIGN.md,
+ * 2026-09-26). Als Kategorien-Icon, „Auswaehlen" (130px) und „Import" (103px)
+ * fuellten sie mobil eine eigene Kopfzeile (A5 P2-4); im Menue tragen sie Icon
+ * UND Text. Bei `contacts: read` bliebe das Menue leer - dann gibt es gar
+ * keinen Knopf, nicht einen, der ins Leere oeffnet.
+ *
+ * Der AUSSTIEG aus dem Auswahlmodus bleibt sichtbar: „Abbrechen" steht,
+ * solange ausgewaehlt wird, im Kopf (wie in den Dokumenten und in Apples
+ * Fotos) - ein Modus, den man nur ueber ein Menue verlassen kann, waere eine
+ * Falle. Die Datei-Auswahl des Imports bleibt ein verstecktes `<input>`; der
+ * Menue-Eintrag loest es aus.
  */
 function toolbarActionsHtml() {
   return `${readOnly() ? '' : `
-          <button class="btn btn--icon btn--ghost" id="contacts-manage-cats" aria-label="${t('contacts.manageCategories')}" title="${t('contacts.manageCategories')}">
-            <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--secondary" id="contacts-select-btn" aria-pressed="false">
-            <i data-lucide="list-checks" class="icon-md" aria-hidden="true"></i>
-            ${t('contacts.selectButton')}
-          </button>
-          <label class="btn btn--secondary" title="${t('contacts.importTooltip')}" aria-label="${t('contacts.importLabel')}">
-            <i data-lucide="upload" class="icon-md" aria-hidden="true"></i>
-            ${t('contacts.importButton')}
-            <input type="file" id="contacts-import-input" accept=".vcf,text/vcard" style="display:none">
-          </label>`}
-          <button class="btn btn--primary toolbar-new-btn" id="contacts-add-btn" aria-label="${t('contacts.newContactLabel')}">
-            <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
-            <span class="toolbar-new-btn__label">${t('newLabel.contacts')}</span>
-          </button>`;
+          <button type="button" class="btn btn--secondary" id="contacts-select-cancel" hidden>${esc(t('common.cancel'))}</button>
+          ${pageToolsMenuHtml({
+            id: 'contacts-tools-menu',
+            label: t('common.moreActions'),
+            items: [
+              { action: 'select-mode', label: t('contacts.selectButton'), icon: 'list-checks' },
+              { action: 'import-vcard', label: t('contacts.importTooltip'), icon: 'upload' },
+              { separator: true },
+              { action: 'manage-categories', label: t('contacts.manageCategories'), icon: 'tags' },
+            ],
+          })}
+          <input type="file" id="contacts-import-input" accept=".vcf,text/vcard" hidden>`}`;
 }
 
 // --------------------------------------------------------
@@ -186,27 +204,72 @@ let state = {
   // haushaltweiten Region abgeleitet; null → libphonenumber-js nutzt nur
   // explizite Ländervorwahlen (führendes +). Rein Anzeige, nie Speicher-Logik.
   defaultCountry: null,
+  // Wer die Seite bedient - fuer die Frage, wer die E-Mail-Adressen eines
+  // verknuepften Kontakts aendern darf (siehe emailsLockedFor()).
+  user:           null,
 };
 let _container = null;
 let contactsSearch = null;
+// Liste + Detail (utils/master-detail.js). Ab der Schwelle steht der Kontakt
+// der ausgewaehlten Zeile rechts neben der Liste, wie in Apples Kontakten;
+// darunter oeffnet die Zeile ihre Leseansicht wie bisher. `null`, solange die
+// Seite nicht steht - jede Stelle fragt deshalb mit `md?.`.
+let md = null;
 
 // --------------------------------------------------------
 // Entry Point
 // --------------------------------------------------------
 
-export async function render(container, { user }) {
+/**
+ * EIN BENANNTES ZIEL SCHLAEGT EINEN ALTEN FILTER - dieselbe Regel wie in den
+ * Rezepten (#936). `state` ueberlebt den Seitenwechsel: wer vorhin nach
+ * "Weber" gesucht oder auf "Aerzte" gefiltert hat und jetzt aus der globalen
+ * Suche per `?open=<id>` kommt, saehe links eine Liste ohne den Kontakt
+ * (oder "keine Treffer") und rechts dessen Detail ohne Zeile - und der
+ * naechste Listenaufbau raeumte die Auswahl samt Adresse ab. Der alte Filter
+ * ist kein Zusammenhang, den jemand fuer diesen Sprung gewaehlt hat.
+ *
+ * Bedingungslos und VOR dem Bau des Suchfelds, wie in den Rezepten: ob der
+ * Kontakt den Filter besteht, steht erst nach dem Laden fest, und bis dahin
+ * zeigte das Feld einen Begriff, nach dem die Liste gleich nicht mehr
+ * filtert. Die Adresse selbst loest weiter nur der Baustein ein.
+ */
+function dropFiltersForDeepLink() {
+  if (!new URLSearchParams(location.search).has('open')) return;
+  state.searchQuery = '';
+  state.activeCategory = null;
+}
+
+export async function render(container, { user, signal } = {}) {
   _container = container;
+  state.user = user ?? null;
+  md = null;
+  dropFiltersForDeepLink();
   container.replaceChildren();
+  // LISTE + DETAIL (Breitenregel, DESIGN.md): die Seite bleibt im Lesemass,
+  // bis die Modulflaeche die Schwelle erreicht; dann steht rechts der Kontakt.
+  // Der bisherige Scrollport ist die linke Spalte und behaelt seine Klassen -
+  // `.split-view` nimmt seinen Platz in der Flex-Spalte ein, damit beide
+  // Spalten fuer sich scrollen.
   container.insertAdjacentHTML('beforeend', `
-    <div class="contacts-page app-page app-page--reading page-measure--narrow" data-composition="reading">
-      <div class="page-toolbar page-toolbar--wrap page-toolbar--narrow contacts-toolbar">
+    <div class="contacts-page app-page app-page--reading app-page--list-detail page-measure--narrow" data-composition="reading">
+      <div class="page-toolbar page-toolbar--wrap page-toolbar--narrow page-toolbar--title-tools contacts-toolbar">
         <h1 class="page-toolbar__title">${t('contacts.title')}</h1>
         ${renderPageSearch({ id: 'contacts-search', label: t('contacts.searchPlaceholder'), placeholder: t('contacts.searchPlaceholder'), value: state.searchQuery, clearLabel: t('common.searchClear'), className: 'contacts-toolbar__search page-toolbar__center' })}
         <div class="page-toolbar__actions">${toolbarActionsHtml()}</div>
       </div>
-      <div class="contacts-filters" id="contacts-filters" role="group" aria-label="${t('contacts.filterAll')}"></div>
       <div id="contacts-status" class="sr-only" role="status" aria-live="polite"></div>
-      <div id="contacts-list" class="contacts-list page-scrollport" aria-busy="true">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
+      <div class="split-view contacts-split">
+        <div id="contacts-list" class="contacts-list page-scrollport split-view__list" aria-busy="true">
+          <div class="contacts-filters page-chip-row" id="contacts-filters" role="group" aria-label="${t('contacts.categoryLabel')}"></div>
+          <div id="contacts-rows" class="contacts-rows">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
+        </div>
+        ${splitViewDetailHtml({
+          id: 'contacts',
+          label: t('contacts.detailPaneLabel'),
+          empty: { icon: 'contact-round', title: t('contacts.pickOne'), hint: t('contacts.pickOneHint') },
+        })}
+      </div>
       <button class="page-fab" id="fab-new-contact" aria-label="${t('contacts.newContactLabel')}" data-dock-label="${t('newLabel.contacts')}">
         <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
       </button>
@@ -223,6 +286,9 @@ export async function render(container, { user }) {
     // hier nimmt auch dem uebrig gebliebenen Knoten die Wirkung - ein Menue aus
     // einem aelteren Render findet denselben Riegel.
     if (readOnly() && e.target.closest('[data-action="delete"], [data-action="empty-cta"]')) return;
+
+    const menuItem = e.target.closest('.popover-menu__item[data-action^="contact-"]');
+    if (menuItem) { runContactMenuAction(menuItem.dataset.action, contactById(menuItem.dataset.id)); return; }
 
     const del = e.target.closest('[data-action="delete"]');
     if (del) { await deleteContact(parseInt(del.dataset.id, 10)); return; }
@@ -243,23 +309,22 @@ export async function render(container, { user }) {
       renderList();
       return;
     }
+    // Ein Weg fuer beide Formen: in der Spalte waehlt der Klick aus, darunter
+    // oeffnet er die Leseansicht (openNarrow unten).
     const open = e.target.closest('[data-open]');
     if (open) {
-      const c = state.contacts.find((x) => x.id === parseInt(open.dataset.open, 10));
-      if (c) openContactDetail(c);
+      if (md) md.open(open.dataset.open, open);
+      else openContactById(open.dataset.open);
     }
   });
-  listEl.addEventListener('beforetoggle', onPanelBeforeToggle, true);
-  listEl.addEventListener('toggle', onPanelToggle, true);
+  // Positionierung, aria-expanded, Fokus und Pfeiltasten der Zeilenmenues
+  // kommen aus installPopoverMenus(_container) weiter unten (Kanon-Baustein).
 
-  // Auswahl-Modus: Checkbox-Änderungen sammeln.
-  listEl.addEventListener('change', (e) => {
-    const cb = e.target.closest('[data-select]');
-    if (!cb) return;
-    const id = parseInt(cb.dataset.select, 10);
-    if (cb.checked) state.selected.add(id); else state.selected.delete(id);
-    cb.closest('.contact-item')?.classList.toggle('contact-item--selected', cb.checked);
-    updateSelectUI();
+  // Auswahl-Modus: ein Tipp auf die Zeile waehlt oder waehlt ab - immer ueber
+  // ihren Kreis, damit Zeile und Knopf nicht zweimal umschalten.
+  listEl.addEventListener('click', (e) => {
+    const row = e.target.closest('.contact-item--select');
+    if (row) toggleContactSelection(row.querySelector('[data-select]'));
   });
 
   const [res, catRes, metaRes, prefsRes] = await Promise.all([
@@ -285,17 +350,51 @@ export async function render(container, { user }) {
   renderCategoryFilters();
   renderList({ animate: true });
 
-  _container.querySelector('#contacts-manage-cats')
-    ?.addEventListener('click', () => { if (!readOnly()) openContactCategoryManager(); });
-
-  // Deep-Link: ?open=<id> öffnet die Detailansicht. Aus der globalen Suche
-  // kommend will man den Treffer zuerst sehen, nicht bearbeiten - derselbe
-  // Grund wie beim Antippen in der Liste.
-  const openId = new URLSearchParams(window.location.search).get('open');
-  if (openId) {
-    const contact = state.contacts.find((c) => c.id === parseInt(openId, 10));
-    if (contact) openContactDetail(contact);
+  // Liste + Detail einhaengen, sobald die Zeilen stehen: ein `?open=` in der
+  // Adresse (Deep-Link, Zurueck-Taste) findet seine Zeile nur dann. Eine
+  // Seite, die waehrend der Abrufe schon verlassen wurde, haengt nichts mehr an.
+  //
+  // Deep-Link `?open=<id>` (globale Suche): EIN Parameter fuer beide Regime
+  // und fuer alle Liste-+-Detail-Seiten (Standard des Bausteins). In der
+  // Spalte waehlt er den Kontakt aus, darunter oeffnet er die Leseansicht
+  // (`deepLinkNarrow`) - aus der Suche kommend will man den Treffer zuerst
+  // sehen, nicht bearbeiten, derselbe Grund wie beim Antippen in der Liste.
+  if (!signal?.aborted) {
+    md = mountMasterDetail({
+      root: _container.querySelector('.contacts-split'),
+      signal,
+      deepLinkNarrow: true,
+      renderDetail: (id, body) => {
+        const contact = contactById(id);
+        if (!contact) return false;
+        openContactDetail(contact, { inPane: body });
+        return undefined;
+      },
+      openNarrow: (id) => openContactById(id),
+      // Enter auf der schon gewaehlten Zeile: bearbeiten, wie „Bearbeiten" im
+      // Kopf der Spalte. Ohne Schreibrecht gibt es das nicht - dann geht der
+      // Fokus ins Detail, der Standard des Bausteins.
+      onEnter: (id) => {
+        const contact = contactById(id);
+        if (contact && !readOnly()) openContactModal({ mode: 'edit', contact });
+        else _container?.querySelector('#contacts-detail')?.focus();
+      },
+    });
   }
+
+  // Werkzeugmenue: die Eintraege laufen ueber data-action (popover-menu.js
+  // schliesst das Panel in der Capture-Phase, bevor ein Dialog aufgeht).
+  installPopoverMenus(_container);
+  const toolbar = _container.querySelector('.contacts-toolbar');
+  toolbar.addEventListener('click', (e) => {
+    const item = pageToolsActionEl(e.target);
+    if (!item || item.disabled || readOnly()) return;
+    const action = item.dataset.action;
+    if (action === 'manage-categories') openContactCategoryManager();
+    else if (action === 'select-mode') enterSelectMode();
+    // Der Klick auf den Eintrag ist die Nutzergeste, die der Datei-Dialog braucht.
+    else if (action === 'import-vcard') _container.querySelector('#contacts-import-input')?.click();
+  });
 
   // Suche
   contactsSearch = wirePageSearch(_container, {
@@ -323,17 +422,14 @@ export async function render(container, { user }) {
   });
 
   // Neu
-  // Beide Anlegewege blendet CSS aus (html[data-module-readonly]); der Handler
+  // Den Anlegeweg blendet CSS aus (html[data-module-readonly]); der Handler
   // bleibt trotzdem gesperrt - ausgeblendet ist nicht unerreichbar.
   const addHandler = () => { if (!readOnly()) openContactModal({ mode: 'create' }); };
-  _container.querySelector('#contacts-add-btn').addEventListener('click', addHandler);
   findPageFab('fab-new-contact').addEventListener('click', addHandler);
 
-  // Auswahl-Modus (opt-in): Toggle in der Toolbar + Aktionen in der Auswahl-Leiste.
-  _container.querySelector('#contacts-select-btn')?.addEventListener('click', () => {
-    if (readOnly()) return;
-    if (state.selectMode) exitSelectMode(); else enterSelectMode();
-  });
+  // Auswahl-Modus (opt-in): Einstieg im Werkzeugmenue, Ausstieg per
+  // „Abbrechen" im Kopf oder Escape; die Aktionen stehen in der Pille.
+  _container.querySelector('#contacts-select-cancel')?.addEventListener('click', () => exitSelectMode());
 
   // vCard-Import: parsen, dann eine Auswahl-Vorstufe zeigen (nichts wird
   // ungefragt angelegt). Die eigentliche Anlage passiert in openImportSelectionModal.
@@ -359,7 +455,10 @@ export async function render(container, { user }) {
     openImportSelectionModal(named, skipped);
   });
 
-  // Tastatur-Shortcuts (Power-User): „/" fokussiert die Suche, „n" legt neu an.
+  // Tastatur-Shortcuts (Power-User): „/" fokussiert die Suche, Escape verlaesst
+  // die Auswahl. „n" legt NICHT hier an: das tut der Kurzbefehl der Shell ueber
+  // den FAB (triggerPageFab, router.js), der Nur-lesen schon abfaengt - ein
+  // zweiter Handler hier oeffnete den Dialog ein zweites Mal.
   // document-Level, weil sie auch ohne Fokus in der Liste greifen sollen. Der
   // Router bietet keinen Page-Teardown — daher meldet sich der Listener selbst ab,
   // sobald sein Seiten-Container (Closure) aus dem DOM entfernt wurde.
@@ -376,12 +475,6 @@ export async function render(container, { user }) {
     if (e.key === '/') {
       e.preventDefault();
       pageRoot.querySelector('#contacts-search')?.focus();
-    } else if (e.key === 'n' || e.key === 'N') {
-      // EIN WEG OHNE MARKUP, und deshalb der, den jede CSS-Regel auslaesst:
-      // „n" legte auch dann an, wenn Kopfknopf und FAB schon weg waren.
-      if (readOnly()) return;
-      e.preventDefault();
-      openContactModal({ mode: 'create' });
     }
   };
   document.addEventListener('keydown', onKey);
@@ -391,18 +484,53 @@ export async function render(container, { user }) {
 // Kategorie-Filterleiste (aus state.categories aufgebaut) + Verwaltung (#357)
 // --------------------------------------------------------
 
+/**
+ * Die Kategorien, die einen Chip bekommen: nur BELEGTE (R10 L8, A5 P2-6).
+ * Zehn Chips fuer drei belegte Kategorien liessen am Desktop 65 % der Reihe
+ * hinter einem Querscroller verschwinden, den eine Maus nicht bedienen kann -
+ * und ein Chip, der eine leere Liste liefert, ist eine Sackgasse. Die aktive
+ * Kategorie bleibt stehen, auch wenn sie leer geworden ist: sonst gaebe es
+ * keinen Weg zurueck aus dem Filter. Mit hoechstens einer belegten Kategorie
+ * gibt es nichts zu filtern - die Reihe bleibt leer (CSS blendet sie aus).
+ */
+function filterCategoryKeys() {
+  const used = new Set(state.contacts.map((c) => c.category));
+  const keys = state.categories.map((c) => c.key).filter((k) => used.has(k) || k === state.activeCategory);
+  return keys.length < 2 && !state.activeCategory ? [] : keys;
+}
+
 function renderCategoryFilters() {
   const bar = _container?.querySelector('#contacts-filters');
   if (!bar) return;
   const active = state.activeCategory;
+  const keys = filterCategoryKeys();
+  // Nur neu bauen, wenn sich die Menge der Chips geaendert hat: renderList()
+  // ruft hier bei jedem Tastendruck der Suche, und ein Neubau naehme einem
+  // gerade fokussierten Chip den Fokus.
+  const signature = keys.join(',');
+  const chips = () => bar.querySelectorAll('[data-cat]');
+  if (bar.dataset.chips === signature && (chips().length > 0) === (keys.length > 0)) {
+    for (const chip of chips()) {
+      const on = (chip.dataset.cat || null) === (active || null);
+      chip.classList.toggle('filter-chip--active', on);
+      chip.classList.toggle('contact-filter-chip--active', on);
+      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    return;
+  }
+  bar.dataset.chips = signature;
+  // Stand der Fokus auf einem Chip, bekommt ihn derselbe Chip im Neubau.
+  const focusedCat = bar.contains(document.activeElement) ? document.activeElement?.dataset?.cat : undefined;
+  if (!keys.length) { bar.replaceChildren(); return; }
   const allChip = `<button class="filter-chip contact-filter-chip${active ? '' : ' filter-chip--active contact-filter-chip--active'}" data-cat="" aria-pressed="${active ? 'false' : 'true'}">${esc(t('contacts.filterAll'))}</button>`;
-  const catChips = state.categories.map((c) => {
+  const catChips = state.categories.filter((c) => keys.includes(c.key)).map((c) => {
     const on = active === c.key;
     return `<button class="filter-chip contact-filter-chip${on ? ' filter-chip--active contact-filter-chip--active' : ''}" data-cat="${esc(c.key)}" aria-pressed="${on ? 'true' : 'false'}">${categoryIcon(c.key)} ${esc(catLabel(c.key))}</button>`;
   }).join('');
   bar.replaceChildren();
   bar.insertAdjacentHTML('beforeend', allChip + catChips);
   if (window.lucide) lucide.createIcons({ el: bar });
+  if (focusedCat !== undefined) bar.querySelector(`[data-cat="${CSS.escape(focusedCat)}"]`)?.focus();
 }
 
 function openContactCategoryManager() {
@@ -458,6 +586,18 @@ function openContactCategoryManager() {
 // --------------------------------------------------------
 // Liste rendern
 // --------------------------------------------------------
+
+/** Kontakt zu einer ID aus Adresse oder Markup (dort ist sie ein String). */
+function contactById(id) {
+  const n = parseInt(id, 10);
+  return state.contacts.find((c) => c.id === n) ?? null;
+}
+
+/** Der bisherige Weg unter der Schwelle: die Leseansicht als Sheet/Modal. */
+function openContactById(id) {
+  const c = contactById(id);
+  if (c) openContactDetail(c);
+}
 
 function filterContacts() {
   let list = state.contacts;
@@ -524,9 +664,14 @@ function contactsEmptyStateHtml(filtered) {
 }
 
 function renderList({ animate = false } = {}) {
-  const container = _container.querySelector('#contacts-list');
+  // Die Zeilen stehen in `#contacts-rows`, damit die Chipreihe davor im Port
+  // (`#contacts-list`) bei jedem Render stehen bleibt und mit wegscrollt.
+  const container = _container.querySelector('#contacts-rows');
   if (!container) return;
-  container.removeAttribute('aria-busy');
+  // Die Chipreihe folgt den BELEGTEN Kategorien: ein neuer Kontakt in einer
+  // bisher leeren Kategorie bringt ihren Chip mit, der letzte nimmt ihn mit.
+  renderCategoryFilters();
+  _container.querySelector('#contacts-list')?.removeAttribute('aria-busy');
 
   const contacts = filterContacts();
 
@@ -545,6 +690,7 @@ function renderList({ animate = false } = {}) {
     container.replaceChildren();
     container.insertAdjacentHTML('beforeend', contactsEmptyStateHtml(filtered));
     if (window.lucide) lucide.createIcons({ el: container });
+    md?.refresh();
     return;
   }
 
@@ -568,8 +714,12 @@ function renderList({ animate = false } = {}) {
   if (window.lucide) lucide.createIcons({ el: container });
   // Entrance-Stagger nur beim echten Erst-Load — nicht bei jedem Such-/Filter-
   // Render (sonst flackert die Liste bei jeder Tastatureingabe).
-  if (animate) stagger(container.querySelectorAll('.contact-item'));
+  if (animate) stagger(container.querySelectorAll('.contact-item'), { host: container });
   enhancePhones(container);
+  // Die Markierung der ausgewaehlten Zeile neu setzen. Ist ihr Kontakt weg
+  // (geloescht) oder weggefiltert, faellt die Spalte auf den Leerzustand -
+  // rechts stuende sonst ein Kontakt, den die Liste nicht mehr zeigt.
+  md?.refresh();
 }
 
 // Progressive Enhancement der Telefon-Anzeige: formatiert sichtbare Nummern und
@@ -684,56 +834,72 @@ function renderMeta(c) {
 function renderContactItem(c) {
   const menuId  = `contact-more-${c.id}`;
 
-  // Auswahl-Modus: Zeile wird zur Checkbox (Familien-Kontakte deaktiviert,
-  // da einzeln nicht löschbar). Aktionen/Öffnen entfallen.
+  // Auswahl-Modus: die Zeile wird zum Umschalter (Familien-Kontakte
+  // deaktiviert, da einzeln nicht löschbar). Aktionen/Öffnen entfallen.
+  //
+  // DER KREIS DER AUFGABEN STATT EINER NATIVEN CHECKBOX (R8 H14, Muster
+  // der Aufgaben seit R7, `.select-circle` in layout.css): EIN Knopf mit `aria-pressed` und einem Label,
+  // das Person und Handlung nennt (vorher sagte die Checkbox nur den Namen).
+  // Die Zeile drumherum bleibt Trefflaeche wie das Label vorher - ein Tipp
+  // irgendwo darauf laeuft ueber denselben Knopf (Verdrahtung in `render`).
+  // Sie selbst ist KEIN Knopf: ein Zeilenkoerper mit aria-label verschluckte
+  // Name und Telefonnummer fuer Hilfsmittel.
   if (state.selectMode) {
     const selected = state.selected.has(c.id);
     return `
-      <div class="list-row list-row--tight contact-item contact-item--select${selected ? ' contact-item--selected' : ''}" data-id="${c.id}">
-        <label class="contact-item__open list-row__main--interactive contact-item__select">
-          <input type="checkbox" class="contact-item__checkbox" data-select="${c.id}"${selected ? ' checked' : ''}${c.family_user_id ? ' disabled' : ''} aria-label="${esc(c.name)}">
+      <div class="list-row list-row--tight contact-item contact-item--select${selected ? ' contact-item--selected' : ''}" data-id="${c.id}" data-md-id="${c.id}">
+        <div class="contact-item__open list-row__main--interactive contact-item__select">
+          <button type="button" class="select-circle${selected ? ' select-circle--on' : ''}" data-select="${c.id}"
+                  aria-pressed="${selected}" aria-label="${esc(t('contacts.selectNamed', { name: c.name }))}"${c.family_user_id ? ' disabled' : ''}>
+            <i data-lucide="check" class="select-circle__check" aria-hidden="true"></i>
+          </button>
           ${contactAvatar(c)}
           <span class="contact-item__body">
             <span class="contact-item__name">${esc(c.name)}</span>
             ${renderMeta(c)}
           </span>
-        </label>
+        </div>
       </div>
     `;
   }
 
   // Primäre, stets sichtbare Zeilenaktion: Anrufen (falls Telefon vorhanden).
+  // Der Name nennt die Person: zwoelf Zeilen, die alle "Anrufen" heissen, sind
+  // fuer einen Screenreader eine Zeile.
   const callBtn = c.phone
-    ? `<a href="tel:${esc(c.phone)}" data-phone-raw="${esc(c.phone)}" class="row-action row-action--success" aria-label="${t('contacts.callLabel')}">
+    ? `<a href="tel:${esc(c.phone)}" data-phone-raw="${esc(c.phone)}" class="row-action row-action--success" aria-label="${esc(t('contacts.callNamed', { name: c.name }))}">
          <i data-lucide="phone" aria-hidden="true"></i>
        </a>`
     : '';
 
   // Sekundäre Aktionen als beschriftetes Menü (Icon + Textlabel), identisch auf
   // Desktop und Mobile. Export ist immer verfügbar → das Menü ist nie leer.
-  const mapsUrl = c.address ? `https://www.openstreetmap.org/search?query=${encodeURIComponent(c.address)}` : '';
+  //
+  // DER KANON-BAUSTEIN STATT DES EIGENBAUS (Re-Kritik 2026-09-28, A5 P2-5).
+  // Hier stand ein eigenes Popover mit `role="menu"`, aber ohne
+  // `aria-haspopup`/`aria-expanded` am Ausloeser und ohne Pfeiltasten: der
+  // Screenreader kuendigte ein Menue an, das sich nicht wie eines bedienen
+  // liess. popover-menu.js bringt beides mit (und den Fokus ins Menue). Seine
+  // Eintraege sind Knoepfe mit `data-action` - Mail, Karte und Export laufen
+  // deshalb ueber runContactMenuAction() im delegierten Klick der Liste, mit
+  // denselben Zielen wie die Detailansicht (dort oeffnet auch der Export per
+  // window.open).
   const menuItems = [
-    c.email ? `<a href="mailto:${esc(c.email)}" class="contact-menu-item" role="menuitem">
-        <i data-lucide="mail" class="contact-menu-item__icon" aria-hidden="true"></i><span>${t('contacts.emailActionLabel')}</span>
-      </a>` : '',
-    c.address ? `<a href="${mapsUrl}" target="_blank" rel="noopener" class="contact-menu-item" role="menuitem">
-        <i data-lucide="map-pin" class="contact-menu-item__icon" aria-hidden="true"></i><span>${t('contacts.mapsLabel')}</span>
-      </a>` : '',
-    `<a href="/api/v1/contacts/${c.id}/vcard" download="${esc(c.name)}.vcf" class="contact-menu-item" role="menuitem">
-        <i data-lucide="download" class="contact-menu-item__icon" aria-hidden="true"></i><span>${t('contacts.exportLabel')}</span>
-      </a>`,
+    c.email ? { action: 'contact-email', id: c.id, icon: 'mail', label: t('contacts.emailActionLabel') } : null,
+    c.address ? { action: 'contact-maps', id: c.id, icon: 'map-pin', label: t('contacts.mapsLabel') } : null,
+    { action: 'contact-export', id: c.id, icon: 'download', label: t('contacts.exportLabel') },
     // Der EINE schreibende Eintrag dieses Menues. Die vier anderen - anrufen,
     // mailen, Karte, Export - sind reines Lesen und bleiben; das Menue ist
     // deshalb auch bei `contacts: read` nie leer, und ein Knopf ohne Inhalt
     // entsteht hier nicht (anders als an der Abholzeile in waste.js).
-    (!c.family_user_id && !readOnly()) ? `<button type="button" class="contact-menu-item contact-menu-item--danger" data-action="delete" data-id="${c.id}" role="menuitem">
-        <i data-lucide="trash-2" class="contact-menu-item__icon" aria-hidden="true"></i><span>${t('common.delete')}</span>
-      </button>` : '',
-  ].join('');
+    ...((!c.family_user_id && !readOnly())
+      ? [{ separator: true }, { action: 'delete', id: c.id, icon: 'trash-2', label: t('common.delete'), danger: true }]
+      : []),
+  ].filter(Boolean);
 
   return `
-    <div class="list-row list-row--tight contact-item" data-id="${c.id}">
-      <button type="button" class="contact-item__open list-row__main--interactive" data-open="${c.id}">
+    <div class="list-row list-row--tight contact-item" data-id="${c.id}" data-md-id="${c.id}">
+      <button type="button" class="contact-item__open list-row__main--interactive" data-open="${c.id}" data-md-focus>
         ${contactAvatar(c)}
         <span class="contact-item__body">
           <span class="contact-item__name">${esc(c.name)}</span>
@@ -742,45 +908,44 @@ function renderContactItem(c) {
       </button>
       <div class="row-actions contact-item__actions">
         ${callBtn}
-        <button type="button" class="row-action contact-more-menu__trigger"
-                popovertarget="${menuId}" aria-label="${t('contacts.moreActions')}">
-          <i data-lucide="more-horizontal" aria-hidden="true"></i>
-        </button>
-        <div class="contact-more-menu__panel" id="${menuId}" popover role="menu">
-          ${menuItems}
-        </div>
+        ${popoverMenuHtml({
+          id: menuId,
+          label: t('common.moreActionsNamed', { name: c.name }),
+          items: menuItems,
+          triggerClass: 'row-action contact-more-menu__trigger',
+        })}
       </div>
     </div>
   `;
 }
 
-// Popover (mobiles „Mehr"-Menü) im Top-Layer positionieren — nahe dem Trigger,
-// nach oben gekippt, wenn unten kein Platz ist. beforetoggle/toggle bubbeln nicht,
-// daher werden die Listener in render() mit { capture:true } am Listen-Container
-// registriert (Capture-Phase erreicht auch nicht-bubbelnde Events).
-function onPanelBeforeToggle(e) {
-  const panel = e.target;
-  if (!(panel instanceof HTMLElement) || !panel.matches('.contact-more-menu__panel')) return;
-  if (e.newState === 'open') panel.style.opacity = '0'; // Flash vor Positionierung vermeiden
-}
-
-function onPanelToggle(e) {
-  const panel = e.target;
-  if (!(panel instanceof HTMLElement) || !panel.matches('.contact-more-menu__panel')) return;
-  if (e.newState !== 'open') { panel.style.opacity = ''; return; }
-  const trigger = _container?.querySelector(`[popovertarget="${panel.id}"]`);
-  if (trigger) {
-    const r    = trigger.getBoundingClientRect();
-    const pw   = panel.offsetWidth  || 200;
-    const ph   = panel.offsetHeight || 48;
-    const gap  = 4;
-    let left = Math.min(Math.max(8, r.right - pw), window.innerWidth  - pw - 8);
-    let top  = r.bottom + gap;
-    if (top + ph > window.innerHeight - 8) top = r.top - ph - gap; // nach oben kippen
-    panel.style.left = `${Math.round(left)}px`;
-    panel.style.top  = `${Math.round(Math.max(8, top))}px`;
+/**
+ * Die lesenden Eintraege des Zeilenmenues (Mail, Karte, Export).
+ *
+ * Kanon-Eintraege sind Knoepfe, keine Links (utils/popover-menu.js); die Ziele
+ * sind dieselben wie in der Detailansicht. Liefert `false` fuer alles, was
+ * nicht hierher gehoert - Loeschen bleibt im Schreib-Zweig der Liste, hinter
+ * dem Riegel fuer `contacts: read`.
+ *
+ * @param {string} action
+ * @param {object|null} c
+ * @returns {boolean} ob die Aktion hier behandelt wurde
+ */
+function runContactMenuAction(action, c) {
+  if (!c) return false;
+  if (action === 'contact-email' && c.email) {
+    window.location.href = `mailto:${c.email}`;
+    return true;
   }
-  panel.style.opacity = '1';
+  if (action === 'contact-maps' && c.address) {
+    window.open(`https://www.openstreetmap.org/search?query=${encodeURIComponent(c.address)}`, '_blank', 'noopener');
+    return true;
+  }
+  if (action === 'contact-export') {
+    window.open(`/api/v1/contacts/${c.id}/vcard`, '_blank', 'noopener');
+    return true;
+  }
+  return false;
 }
 
 // --------------------------------------------------------
@@ -900,6 +1065,9 @@ function renderContactDetail(contact) {
       icon: 'building-2',
       label: t('contacts.organizationLabel'),
       value: [contact.organization, contact.job_title].filter(Boolean).join(' · '),
+      // Sie steht in der Karte (contactCardEl) - seit R9 M12 in der Spalte UND
+      // im Blatt, also in keinem Weg ein zweites Mal als Zeile.
+      hidden: true,
     },
     {
       icon: 'cake',
@@ -932,16 +1100,36 @@ function renderContactDetail(contact) {
  * und fällt ohne sie auf den Legacy-Einzelwert zurück. Ein Formular, das vor
  * der Antwort entsteht, schriebe beim Speichern genau eine Nummer zurück und
  * verlöre alle weiteren.
+ *
+ * MIT `inPane` STEHT DIESELBE ANSICHT IN DER DETAILSPALTE (Liste + Detail).
+ * Dieselben Zeilen und dieselbe Fusszeile; dazu kommt oben die Karte mit
+ * Monogramm und Schnellaktionen (A5 P1-1: Apples Kontakte fuehren sie, und
+ * wer durch mehrere Kontakte blaettert, will anrufen, ohne zu suchen, wo die
+ * Nummer steht). „Bearbeiten" fuehrt dort ins regulaere Formular-Modal
+ * (`edit.standalone`) - die Spalte ist ein Leseort.
  */
-function openContactDetail(contact) {
+function openContactDetail(contact, { inPane = null } = {}) {
   let full = contact;
   // `view` wird weiter unten synchron zugewiesen, dieser Callback läuft
   // frühestens im nächsten Microtask - der Optional-Chain ist trotzdem da,
   // damit die Reihenfolge nicht stillschweigend zur Voraussetzung wird.
   let view = null;
+  let card = null;
   const ready = fetchFullContact(contact).then((loaded) => {
     full = loaded;
-    if (view?.update(renderContactDetail(full))) enhanceDetailPhones();
+    if (!view?.update(renderContactDetail(full))) return;
+    // Organisation und Zweitnummern kennt erst der Einzelabruf. In der Spalte
+    // steht die Karte ausserhalb der Zeilen und wird getauscht; im Blatt lag
+    // sie in dem Bereich, den update() gerade neu gefuellt hat, und kommt neu.
+    if (card?.isConnected) {
+      const next = contactCardEl(full);
+      card.replaceWith(next);
+      card = next;
+      if (window.lucide) window.lucide.createIcons({ el: next });
+    } else if (!inPane) {
+      card = mountContactCard(full, null);
+    }
+    enhanceDetailPhones(inPane);
   });
 
   const actions = [{
@@ -969,7 +1157,15 @@ function openContactDetail(contact) {
       // im DOM stehen, zählt also weiter in den Dirty-Check.
       onClick: async ({ close }) => {
         await close({ force: true });
+        // In der Spalte rueckt die Auswahl auf den Nachbarn, wie in Mail und
+        // in Apples Kontakten - sonst fiele der Fokus mit dem Knopf auf <body>.
+        const neighbour = inPane ? neighbourRowId(contact.id) : null;
         await deleteContact(contact.id);
+        if (inPane) {
+          if (neighbour) md?.select(neighbour, { history: 'replace', focus: 'row' });
+          else _container?.querySelector('#contacts-search')?.focus();
+          return;
+        }
         // Mit dem Kontakt ist seine Zeile weg, von der aus die Ansicht aufging.
         // Hier und nicht in deleteContact(): das laeuft auch ohne Dialog, und
         // dort griffe der Aufruf auf den Merker eines frueheren zurueck (#1083).
@@ -980,7 +1176,9 @@ function openContactDetail(contact) {
 
   view = openDetailView({
     title: contact.name,
+    key: `contact:${contact.id}`,
     size: 'md',
+    pane: inPane ?? undefined,
     sections: renderContactDetail(full),
     actions,
     // OHNE SCHREIBRECHT KEIN „BEARBEITEN" IM KOPF. `openDetailView` setzt die
@@ -996,11 +1194,116 @@ function openContactDetail(contact) {
         pane.insertAdjacentHTML('beforeend', form.content);
         form.wire(panel);
       },
+      // Nur die Spalte ruft ihn. openContactModal holt den vollen Kontakt
+      // selbst, bevor das Formular entsteht - dieselbe Sperre wie `ready`.
+      standalone: inPane ? () => openContactModal({ mode: 'edit', contact }) : undefined,
     },
   });
 
-  enhanceDetailPhones();
+  card = mountContactCard(full, inPane);
+  enhanceDetailPhones(inPane);
   return view;
+}
+
+/**
+ * DIE KARTE STEHT IN BEIDEN WEGEN (R9 M12, A5 P2-7).
+ *
+ * Bis R9 bekam nur die Detailspalte Monogramm und Schnellaktionen - gemessen
+ * im mobilen Blatt `hasTiles: false`. Die Begruendung der Karte („will
+ * anrufen, ohne zu suchen, wo die Nummer steht") trifft aber gerade am
+ * Telefon am staerksten: dort liegt die Nummer im Blatt unter dem Daumen,
+ * nicht als Kachel. In der Spalte steht die Karte unter dem Kopf, im Blatt
+ * zuoberst in den Zeilen (`.detail-view__pane`) - dort, wo das Formular sie
+ * beim Wechsel ins Bearbeiten mit den Zeilen zusammen ausblendet.
+ */
+function mountContactCard(contact, inPane, root = document) {
+  const card = contactCardEl(contact);
+  if (inPane) {
+    const head = inPane.querySelector('.split-view__detail-head');
+    if (!head) return null;
+    head.after(card);
+  } else {
+    const pane = root.getElementById?.('shared-modal-overlay')
+      ?.querySelector('.modal-panel__body > .detail-view__pane');
+    if (!pane) return null;
+    card.className = `${card.className} contact-card--sheet`;
+    pane.prepend(card);
+  }
+  if (window.lucide) window.lucide.createIcons({ el: card });
+  return card;
+}
+
+/**
+ * Die Karte oben in der Detailspalte: Monogramm bzw. Bild, Organisation und
+ * die drei Schnellaktionen Anrufen, E-Mail, Karte - je nur, wenn der Kontakt
+ * den Wert hat. Das Bild ist dasselbe wie in der Zeile (`contactAvatar`,
+ * Identitaetsfarbe fuer Mitglieder, Kategorie-Ton sonst).
+ *
+ * Nutzerdaten gehen ueber textContent und Attribute der DOM-API; das Bild
+ * kommt aus `contactAvatar`, das jeden Wert durch esc() schickt.
+ */
+function contactCardEl(c) {
+  const card = document.createElement('div');
+  card.className = 'contact-card';
+  // Der Kategorie-Ton wie an der Gruppe der Liste (catTintStyle): die Karte
+  // steht ausserhalb jeder Gruppe und setzt ihn deshalb selbst.
+  const color = catByKey(c.category)?.color;
+  if (color) {
+    card.style.setProperty('--cat', color);
+    card.style.setProperty('--cat-ink', 'var(--color-ink-on-vivid)');
+  }
+  card.insertAdjacentHTML('beforeend', contactAvatar(c));
+
+  // Nur die Organisation - die Kategorie steht als eigene Zeile darunter.
+  const sub = [c.organization, c.job_title].filter(Boolean).join(' · ');
+  if (sub) {
+    const line = document.createElement('p');
+    line.className = 'contact-card__sub';
+    line.textContent = sub;
+    card.appendChild(line);
+  }
+
+  const phone = c.phones?.[0]?.value || c.phone;
+  const email = c.emails?.[0]?.value || c.email;
+  const address = c.addresses?.length ? formatAddress(c.addresses[0]) : c.address;
+  const actions = [
+    phone && { href: `tel:${phone}`, icon: 'phone', label: t('contacts.callLabel'), phoneRaw: phone },
+    email && { href: `mailto:${email}`, icon: 'mail', label: t('contacts.emailActionLabel') },
+    address && {
+      href: `https://www.openstreetmap.org/search?query=${encodeURIComponent(address)}`,
+      icon: 'map-pin', label: t('contacts.mapsLabel'), external: true,
+    },
+  ].filter(Boolean);
+  if (actions.length) {
+    const bar = document.createElement('div');
+    bar.className = 'contact-card__actions';
+    for (const action of actions) {
+      const a = document.createElement('a');
+      a.className = 'contact-card__action';
+      a.href = action.href;
+      // enhancePhones() hebt den tel:-Link auf E.164, wie in der Zeile.
+      if (action.phoneRaw) a.dataset.phoneRaw = action.phoneRaw;
+      if (action.external) { a.target = '_blank'; a.rel = 'noopener'; }
+      const i = document.createElement('i');
+      i.dataset.lucide = action.icon;
+      i.className = 'contact-card__action-icon';
+      i.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span');
+      label.textContent = action.label;
+      a.append(i, label);
+      bar.appendChild(a);
+    }
+    card.appendChild(bar);
+  }
+  return card;
+}
+
+/** Die sichtbare Nachbarzeile (erst die folgende, sonst die vorige). */
+function neighbourRowId(id) {
+  const rows = [...(_container?.querySelectorAll('#contacts-rows [data-md-id]') ?? [])];
+  const index = rows.findIndex((row) => row.dataset.mdId === String(id));
+  if (index === -1) return null;
+  return (rows[index + 1] ?? rows[index - 1])?.dataset.mdId ?? null;
 }
 
 /**
@@ -1008,11 +1311,12 @@ function openContactDetail(contact) {
  * AsYouType-Aufbereitung, die die Liste nutzt. Der gespeicherte Wert bleibt
  * unberührt, ersetzt wird nur der Anzeigetext.
  *
- * Die Ansicht liegt ohne Anker immer im geteilten Modal-Overlay; ein Popover
- * gäbe es nur mit `anchor`, den diese Seite bewusst nicht übergibt.
+ * Die Ansicht liegt ohne Anker im geteilten Modal-Overlay (ein Popover gäbe es
+ * nur mit `anchor`, den diese Seite bewusst nicht übergibt) - oder, mit
+ * `pane`, in der Detailspalte von Liste + Detail.
  */
-function enhanceDetailPhones() {
-  enhancePhones(document.getElementById('shared-modal-overlay'));
+function enhanceDetailPhones(pane = null) {
+  enhancePhones(pane ?? document.getElementById('shared-modal-overlay'));
 }
 
 // --------------------------------------------------------
@@ -1054,6 +1358,7 @@ async function openContactModal({ mode, contact = null }) {
 function buildContactForm({ mode, contact = null }) {
   const isEdit = mode === 'edit';
   const v      = (field) => esc(isEdit && contact[field] ? contact[field] : '');
+  const emailsLocked = isEdit && emailsLockedFor(contact);
 
   // Mehrwert-Zeilen: bestehende Arrays; sonst speist das Legacy-Einzelfeld die
   // erste Zeile. Mindestens eine (ggf. leere) Zeile pro Gruppe.
@@ -1066,42 +1371,52 @@ function buildContactForm({ mode, contact = null }) {
   const phoneRows = mvRows(isEdit ? contact.phones : null, isEdit ? contact.phone : '');
   const emailRows = mvRows(isEdit ? contact.emails : null, isEdit ? contact.email : '');
 
+  const mvLocked = (kind) => kind === 'email' && emailsLocked;
   const mvRow = (kind, row, isFirst) => `
     <div class="contact-mv-row" data-mv-row>
       <input type="${kind === 'phone' ? 'tel' : 'email'}" class="form-input" data-mv-value
              ${isFirst ? `id="cm-${kind}"` : ''} value="${esc(row.value)}"
              placeholder="${t(kind === 'phone' ? 'contacts.phonePlaceholder' : 'contacts.emailPlaceholder')}"
-             autocomplete="${kind === 'phone' ? 'tel' : 'email'}">
+             autocomplete="${kind === 'phone' ? 'tel' : 'email'}"${mvLocked(kind) ? ' readonly aria-describedby="cm-email-locked"' : ''}>
       <input type="text" class="form-input contact-mv-row__label" data-mv-label maxlength="50"
              value="${esc(row.label)}" placeholder="${t('contacts.mvLabelPlaceholder')}"
-             aria-label="${t('contacts.mvLabel')}">
-      <button type="button" class="row-action row-action--danger" data-mv-remove ${isFirst ? 'hidden' : ''}
-              aria-label="${t('contacts.mvRemove')}">
+             aria-label="${t('contacts.mvLabel')}"${mvLocked(kind) ? ' readonly' : ''}>
+      ${mvLocked(kind) ? '' : `<button type="button" class="row-action row-action--danger" data-mv-remove ${isFirst ? 'hidden' : ''}
+              aria-label="${esc(t('common.removeNamed', { name: t(kind === 'phone' ? 'contacts.phoneLabel' : 'contacts.emailLabel') }))}">
         <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
-      </button>
+      </button>`}
     </div>`;
 
   const mvSection = (kind, rows, labelKey, addKey) => `
     <div class="form-group" data-mv-group="${kind}">
       <label class="form-label" for="cm-${kind}">${t(labelKey)}</label>
       <div class="contact-mv-list" data-mv-list>${rows.map((r, i) => mvRow(kind, r, i === 0)).join('')}</div>
-      <button type="button" class="btn btn--ghost contact-mv-add" data-mv-add>
+      ${mvLocked(kind)
+        ? `<p class="form-hint" id="cm-email-locked">${t('contacts.emailLockedHint')}</p>`
+        : `<button type="button" class="btn btn--ghost contact-mv-add" data-mv-add>
         <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i>${t(addKey)}
-      </button>
+      </button>`}
       ${kind === 'phone'
         // Unverbindliche Tipphilfe (AsYouType-Vorschau) + Plausibilitäts-Hinweis.
         // Rein visuell: die Eingabefelder werden NIE programmatisch umgeschrieben,
         // gespeichert wird ausschließlich der rohe Feldinhalt.
         // Zwei Zonen: Vorschau ist STILL (keine Live-Region, sonst würde jeder
         // Tastendruck vorgelesen); nur die Warnung wird per aria-live angesagt.
-        ? `<p class="contact-phone-hint" id="cm-phone-hint" data-mv-hint>
+        ? `<p class="form-hint contact-phone-hint" id="cm-phone-hint" data-mv-hint>
              <span class="contact-phone-hint__preview" data-mv-preview></span>
              <span class="contact-phone-hint__warn" data-mv-warn aria-live="polite"></span>
            </p>`
         : ''}
     </div>`;
 
-  const defaultCat = state.categories[0]?.key ?? FALLBACK_CATEGORY;
+  // Vorbelegung eines NEUEN Kontakts (Re-Critique 2026-09-28 P2-5): die aktive
+  // Filterkategorie, sonst „Sonstiges" (misc). Vorher `state.categories[0]` -
+  // das Formular oeffnete auch unter „Alle" als „Arzt", und der Nachbar wurde
+  // still zum Arzt. Nur wenn misc nicht (mehr) verwaltet wird, bleibt die erste.
+  const known = (key) => key && state.categories.some((c) => c.key === key);
+  const defaultCat = known(state.activeCategory) ? state.activeCategory
+    : known(FALLBACK_CATEGORY) ? FALLBACK_CATEGORY
+      : (state.categories[0]?.key ?? FALLBACK_CATEGORY);
 
   // Ein Kontakt kann eine Kategorie tragen, die nicht (mehr) in der verwalteten
   // Liste steht - z. B. aus einem Fremd-Import direkt in die DB. Ohne passende
@@ -1115,7 +1430,7 @@ function buildContactForm({ mode, contact = null }) {
   const catOpts = [
     ...(orphanCat ? [`<option value="${esc(orphanCat)}" selected>${esc(orphanCat)}</option>`] : []),
     ...state.categories.map((c) =>
-      `<option value="${esc(c.key)}" ${isEdit && contact.category === c.key ? 'selected' : ''}>${esc(catLabel(c.key))}</option>`
+      `<option value="${esc(c.key)}" ${(isEdit ? contact.category : defaultCat) === c.key ? 'selected' : ''}>${esc(catLabel(c.key))}</option>`
     ),
   ].join('');
 
@@ -1151,7 +1466,7 @@ function buildContactForm({ mode, contact = null }) {
 
   const content = `
     <fieldset class="contact-modal__name-group">
-      <legend class="form-label">${t('contacts.nameGroupLabel')}</legend>
+      <legend class="form-label">${t('contacts.nameGroupLabel')}${REQUIRED_MARK}</legend>
       <div class="modal-grid modal-grid--2 contact-modal__name-grid">
         <div class="form-group">
           <label class="form-label" for="cm-first-name">${t('contacts.firstNameLabel')}</label>
@@ -1176,8 +1491,8 @@ function buildContactForm({ mode, contact = null }) {
     ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
 
     <div class="modal-panel__footer contact-modal__footer">
-      ${isEdit && !contact.family_user_id ? `<button class="btn btn--danger btn--icon" id="cm-delete" aria-label="${t('contacts.deleteLabel')}">
-        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
+      ${isEdit && !contact.family_user_id ? `<button type="button" class="btn btn--danger-outline" id="cm-delete" style="margin-inline-end:auto">
+        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>` : '<div></div>'}
       <div class="contact-modal__footer-actions">
         <button class="btn btn--secondary" id="cm-cancel">${t('common.cancel')}</button>
@@ -1280,13 +1595,17 @@ function buildContactForm({ mode, contact = null }) {
           // deckt 'other' als neutrales Default ab.
           body.phones = phoneEntries.map((r, i) => ({ label: r.label || 'other', value: r.value, isPrimary: i === 0 }));
           body.emails = emailEntries.map((r, i) => ({ label: r.label || 'other', value: r.value, isPrimary: i === 0 }));
+          // Gesperrte Adressen gehen gar nicht erst mit: der Server behaelt sie.
+          if (emailsLocked) { delete body.email; delete body.emails; }
           if (structured) { body.firstName = firstName; body.lastName = lastName; }
           // Eine unverändert gebliebene Fremd-Kategorie würde der Server (zu Recht)
           // mit 400 ablehnen; sie wird deshalb weggelassen und bleibt serverseitig
           // per COALESCE erhalten.
           if (orphanCat && category === orphanCat) delete body.category;
+          let savedId = contact?.id ?? null;
           if (mode === 'create') {
             const res = await api.post('/contacts', body);
+            savedId = res.data.id;
             state.contacts.push(res.data);
             state.contacts.sort((a, b) =>
               catSortIndex(a.category) - catSortIndex(b.category) || byName(a, b)
@@ -1298,9 +1617,19 @@ function buildContactForm({ mode, contact = null }) {
           }
           closeModal({ force: true });
           renderList();
+          // In der Spalte: das Gespeicherte steht rechts - das Bearbeitete neu
+          // gezeichnet, das Neue ausgewaehlt (wie in Apples Kontakten), sofern
+          // Suche und Filter seine Zeile zeigen. Den Fokus gibt das Schliessen
+          // des Modals an den Ausloeser zurueck; hier wird nur ausgewaehlt.
+          const newRow = mode === 'create' && md?.isSplit()
+            && _container?.querySelector(`#contacts-rows [data-md-id="${savedId}"]`);
+          if (newRow) md.select(savedId, { history: 'push' });
+          else md?.refresh({ repaint: true });
           window.yuvomi?.showToast(mode === 'create' ? t('contacts.savedToast') : t('contacts.updatedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          window.yuvomi?.showToast(err.data?.reason === 'email_in_use'
+            ? t('common.emailInUse')
+            : (err.data?.error ?? t('common.unknownError')), 'danger');
           saveBtn.disabled    = false;
           saveBtn.textContent = isEdit ? t('common.save') : t('common.create');
         }
@@ -1340,7 +1669,7 @@ function buildContactForm({ mode, contact = null }) {
 function enterSelectMode() {
   state.selectMode = true;
   state.selected.clear();
-  _container.querySelector('#contacts-select-btn')?.setAttribute('aria-pressed', 'true');
+  syncSelectChrome();
   _container.querySelector('.contacts-page')?.classList.add('is-selecting');
   renderList();
   updateSelectUI();
@@ -1349,10 +1678,25 @@ function enterSelectMode() {
 function exitSelectMode() {
   state.selectMode = false;
   state.selected.clear();
-  _container.querySelector('#contacts-select-btn')?.setAttribute('aria-pressed', 'false');
+  // Der Fokus stand auf „Abbrechen", das gleich verschwindet: zurueck an den
+  // Menue-Knopf, ueber den man hineingekommen ist - sonst faellt er auf <body>.
+  const refocus = _container.querySelector('#contacts-select-cancel')?.contains(document.activeElement);
+  syncSelectChrome();
+  if (refocus) _container.querySelector('.contacts-toolbar .page-tools-btn')?.focus();
   _container.querySelector('.contacts-page')?.classList.remove('is-selecting');
   clearBulkPill();
   renderList();
+}
+
+/**
+ * Kopf im Auswahlmodus: „Abbrechen" sichtbar, der Menue-Eintrag „Auswaehlen"
+ * gesperrt (man ist schon drin) - dieselbe Paarung wie in den Dokumenten.
+ */
+function syncSelectChrome() {
+  const cancel = _container?.querySelector('#contacts-select-cancel');
+  if (cancel) cancel.hidden = !state.selectMode;
+  const item = _container?.querySelector('#contacts-tools-menu [data-action="select-mode"]');
+  if (item) item.disabled = state.selectMode;
 }
 
 function updateSelectUI() {
@@ -1377,6 +1721,18 @@ function updateSelectUI() {
     });
   }
   setBulkPill({ label: t('contacts.selectCount', { count: n }), actions });
+}
+
+/** Ein Tipp im Auswahlmodus: den Kontakt in die Auswahl oder heraus. */
+function toggleContactSelection(btn) {
+  if (!btn || btn.disabled) return;
+  const id = parseInt(btn.dataset.select, 10);
+  const on = !state.selected.has(id);
+  if (on) state.selected.add(id); else state.selected.delete(id);
+  btn.setAttribute('aria-pressed', String(on));
+  btn.classList.toggle('select-circle--on', on);
+  btn.closest('.contact-item')?.classList.toggle('contact-item--selected', on);
+  updateSelectUI();
 }
 
 // Nur nicht-verknüpfte Kontakte sind wählbar (Familien-Kontakte lassen sich
@@ -1513,7 +1869,7 @@ function openImportSelectionModal(named, skipped) {
         </div>
         <div class="vcard-import__list">${named.map(importSelectionRowHtml).join('')}</div>
         ${skippedHtml}
-        <div class="vcard-import__footer">
+        <div class="modal-panel__footer modal-panel__footer--plain">
           <button class="btn btn--secondary" type="button" id="vcard-import-cancel">${t('common.cancel')}</button>
           <button class="btn btn--primary" type="button" id="vcard-import-submit">${t('contacts.importSubmit', { count: 0 })}</button>
         </div>
@@ -1685,8 +2041,20 @@ function showImportResult({ imported, withBirthday, failedList, lastName, lastEr
  */
 export const __test = {
   renderContactItem, contactsEmptyStateHtml, toolbarActionsHtml,
-  openContactDetail, readOnly, state,
+  // Re-Kritik 2026-09-28: die lesenden Eintraege des Kanon-Zeilenmenues.
+  runContactMenuAction,
+  // R8 H14: der Auswahlkreis als Programm.
+  toggleContactSelection,
+  openContactDetail, readOnly, state, buildContactForm,
   // Der Import-Toast und sein Sprung (#1348): die Aussage ist ein Aufruf von
   // `showToast` und ein Flag in der sessionStorage, kein Markup.
   showImportResult, openBirthdayImport,
+  // Liste + Detail: Karte und Zeilen der Detailspalte.
+  contactCardEl, renderContactDetail,
+  // R9 M12: die Karte auch im mobilen Blatt.
+  mountContactCard,
+  // Deep-Link gegen gemerkten Filter.
+  dropFiltersForDeepLink,
+  // R10 L8: nur belegte Kategorien bekommen einen Chip.
+  filterCategoryKeys,
 };

@@ -9,7 +9,8 @@
 
 import { api } from '/api.js';
 import { t } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import {
   openModal as openSharedModal,
   closeModal as closeSharedModal,
@@ -22,20 +23,25 @@ import {
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateEl } from '/utils/empty-state.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
+import { pageToolsMenuHtml, pageToolsActionEl, installPopoverMenus } from '/utils/popover-menu.js';
 import { formatMoney } from '/utils/money.js';
 import { todayKey } from '/utils/date.js';
 import { formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
-import { warrantyStatus, hasUpcomingDeadline, dateStatus, countUpcomingDeadlines } from '/utils/inventory-warranty.js';
+import { pathAccess } from '/utils/module-access.js';
+import { warrantyStatus, hasUpcomingDeadline, dateStatus, countUpcomingDeadlines, deadlineChipSpec } from '/utils/inventory-warranty.js';
 import { openDetailView, closeDetailView } from '/components/detail-view.js';
+import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { wireScrollFade } from '/utils/ux.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { setNavBadge } from '/utils/nav-badges.js';
-import { CHART, chartScales, chartX, chartY, chartGridMarkup, chartXLabelsMarkup } from '/utils/chart.js';
+import { CHART, chartScales, chartY, chartGridMarkup, niceDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
 
 let _container = null;
 let _search = null;
 let _householdCurrency = 'EUR';
+/** Liste + Detail (utils/master-detail.js); null vor dem ersten Laden. */
+let _md = null;
 
 const state = {
   items: [],
@@ -81,7 +87,7 @@ async function openLocationManager() {
       // server-seitig - die Liste muss neu geladen werden, sonst zeigt sie
       // veraltete location_path-Werte bis zum naechsten vollen Reload.
       await loadItems();
-      renderList();
+      renderList({ repaint: true });
       updateAttentionBadge();
       refocusAfterRender();
     } catch (err) {
@@ -133,7 +139,7 @@ async function openCategoryManager() {
       // 'other' zu - die Liste muss neu geladen werden, sonst zeigt sie
       // veraltete category_name-Werte bis zum naechsten vollen Reload.
       await loadItems();
-      renderList();
+      renderList({ repaint: true });
       updateAttentionBadge();
       refocusAfterRender();
     } catch (err) {
@@ -206,31 +212,161 @@ function matchesAttentionFilter(item) {
   return !state.filterAttention || hasUpcomingDeadline(item);
 }
 
-function openCategory(key) {
+// --------------------------------------------------------
+// DIE EBENE HAT EINE ADRESSE (Re-Critique 2026-09-28, A6 P1-1 / A8 P2-1)
+//
+// `/inventory` ist die Kategorienliste, `/inventory?category=<key>` eine
+// Kategorie. Vorher setzte `openCategory()` nur `state.view`, die URL blieb
+// `/inventory` - wer zurueckwischte, landete im vorigen Modul statt in der
+// Kategorienliste. Jetzt legt das Oeffnen einen History-Eintrag an, und
+// Zurueck/Vor stellt die Ebene aus der Adresse wieder her
+// (`syncLevelFromAddress`, am popstate der Seite).
+//
+// Die Auswahl eines Gegenstands (`?open=`) bleibt Sache des Bausteins
+// (utils/master-detail.js). Er bekommt ueber `mdAddress` gesagt, dass jede
+// Ebene dieselbe Seite ist - sonst hielte er eine andere Kategorie fuer eine
+// fremde Adresse, und der Router zeichnete bei jedem Zurueck die ganze Seite
+// neu (Skelett, Seitenuebergang).
+// --------------------------------------------------------
+
+const INVENTORY_PATH = '/inventory';
+
+/** Die Kategorie, die die Adresse nennt (`null` = Kategorienliste). */
+function categoryFromAddress(loc = globalThis.location) {
+  return new URLSearchParams(loc?.search ?? '').get('category');
+}
+
+function inventoryHref({ category = null, open = null } = {}) {
+  const params = new URLSearchParams();
+  if (category) params.set('category', category);
+  if (open != null && open !== '') params.set('open', String(open));
+  const query = params.toString();
+  return query ? `${INVENTORY_PATH}?${query}` : INVENTORY_PATH;
+}
+
+/** Die Kategorie, die gerade steht - `null` auf der Kategorienliste und in Treffern. */
+function shownCategory() {
+  return state.view === 'category' ? state.activeCategory : null;
+}
+
+/**
+ * Die Ebene in die Adresse schreiben. `path` im State, weil der Router ihn bei
+ * popstate liest; `inventoryFromBrowse` merkt, dass dieser Eintrag direkt aus
+ * der Kategorienliste kam - dann ist „‹ Inventar" ein Schritt zurueck.
+ */
+function writeLevelAddress(mode, { category = shownCategory(), open = null, fromBrowse = false } = {}) {
+  const hist = globalThis.history;
+  if (typeof hist?.pushState !== 'function') return;
+  const path = inventoryHref({ category, open });
+  if (mode === 'push') hist.pushState(fromBrowse ? { path, inventoryFromBrowse: true } : { path }, '', path);
+  else hist.replaceState({ ...(hist.state ?? {}), path }, '', path);
+}
+
+/** Adresse der Auswahl fuer den Baustein: `?open=` neben der Ebene. */
+const mdAddress = {
+  read: (loc) => (loc?.pathname === INVENTORY_PATH ? new URLSearchParams(loc.search ?? '').get('open') : undefined),
+  href: (id) => inventoryHref({ category: shownCategory(), open: id }),
+};
+
+function setCategoryState(key) {
   state.view = 'category';
   state.activeCategory = key;
   state.query = '';
   state.filterAttention = false;
   _search?.clear();
-  renderList();
-  scrollListToTop();
 }
 
-function backToBrowse() {
+function setBrowseState() {
   state.view = 'browse';
   state.activeCategory = null;
   state.query = '';
   state.filterAttention = false;
   _search?.clear();
+}
+
+function isKnownCategory(key) {
+  return Boolean(key) && state.categories.some((c) => c.key === key);
+}
+
+function openCategory(key) {
+  setCategoryState(key);
+  // ERST der Eintrag, dann die Liste: der Neuaufbau waehlt in der Spalte die
+  // erste Zeile vor (`replaceState`) - das gehoert auf den NEUEN Eintrag.
+  writeLevelAddress('push', { category: key, fromBrowse: true });
   renderList();
   scrollListToTop();
+}
+
+/**
+ * Zur Kategorienliste. Als Geste des Nutzers („‹ Inventar"): kam die Kategorie
+ * direkt aus der Liste, ist das ein Schritt zurueck wie Apples Zurueck-Knopf
+ * (popstate stellt die Ebene her), sonst ein neuer Eintrag. Als Folge
+ * (Kategorie verschwunden, Inventar leer) ersetzt sie die Adresse.
+ */
+function backToBrowse({ history: mode = 'push' } = {}) {
+  const hist = globalThis.history;
+  if (mode === 'push' && hist?.state?.inventoryFromBrowse
+    && categoryFromAddress() === state.activeCategory && typeof hist.back === 'function') {
+    hist.back();
+    return;
+  }
+  setBrowseState();
+  writeLevelAddress(mode, { category: null });
+  renderList();
+  scrollListToTop();
+}
+
+/**
+ * Zurueck/Vor: die Ebene folgt der Adresse. Laeuft am popstate der Seite,
+ * VOR dem Baustein (der Router fragt ihn erst nach den Dialogen) - die Liste
+ * muss stehen, bevor er die Auswahl aus `?open=` markiert. Deshalb ohne
+ * `_md.refresh()`: der raeumte eine Auswahl ab, die die Adresse gleich nennt.
+ * @returns {boolean} ob sich die Ebene geaendert hat
+ */
+function syncLevelFromAddress() {
+  const key = categoryFromAddress();
+  if (isKnownCategory(key)) {
+    if (state.view === 'category' && state.activeCategory === key) return false;
+    setCategoryState(key);
+    return true;
+  }
+  if (state.view !== 'category') return false;
+  setBrowseState();
+  return true;
+}
+
+/** Welche Ebene steht: Kategorienliste, Treffer (Suche/Fristen) oder eine Kategorie. */
+function inventoryLevel() {
+  if (state.view === 'category') return 'category';
+  return state.query || state.filterAttention ? 'search' : 'categories';
+}
+
+/**
+ * Kopf der Ebene: in einer Kategorie „‹ Inventar" oben und ihr Name als Titel
+ * (Muster Gesundheit), sonst der Modulname. Die Ebene steht als
+ * `data-inventory-level` an der Seite - auf der Kategorienliste gibt es am
+ * Desktop keine Detailspalte (inventory.css): sie forderte „Waehle einen
+ * Gegenstand" neben einer Liste ohne Gegenstaende.
+ */
+function syncInventoryHeader(container = _container) {
+  if (!container) return;
+  const level = inventoryLevel();
+  const category = level === 'category' ? state.categories.find((c) => c.key === state.activeCategory) : null;
+  const title = category ? categoryLabel(category) : t('nav.inventory');
+  // Nur schreiben, wenn sich etwas aendert: der Kopf-Beobachter der Shell
+  // (ux.js) misst bei jeder Mutation in diesem Teilbaum neu.
+  const heading = container.querySelector('.inventory-toolbar .page-toolbar__title');
+  if (heading && heading.textContent !== title) heading.textContent = title;
+  const back = container.querySelector('.inventory-toolbar__back');
+  if (back && back.hidden !== !category) back.hidden = !category;
+  container.querySelector('.inventory-page')?.setAttribute('data-inventory-level', level);
 }
 
 /** Gleicher Scroll-Container wie router.js bei echten Routenwechseln
  *  (#main-content) - ein Ebenenwechsel hier fuehlt sich sonst wie eine neue
  *  Seite an, springt aber nicht wie eine. */
 function scrollListToTop() {
-  const main = document.getElementById('main-content');
+  const main = globalThis.document?.getElementById('main-content');
   if (main) main.scrollTop = 0;
 }
 
@@ -297,10 +433,32 @@ function updateAttentionBadge() {
     'warning');
 }
 
+// Mobil ist die Kennzahl-Zeile EINE Kurzzeile (utils/metric-glance.js), die
+// die Karten aufklappt (R16): drei Kacheln standen als 136px vor der ersten
+// Kategorie, eine davon fuer „0". Der Merker haelt den Zustand ueber den
+// Neuaufbau der Liste.
+let _metricsExpanded = false;
+
 function renderMetrics() {
   const { count, totalValue, needsAttention } = computeMetrics(state.items);
+  // Ein aktiver Filter bleibt sichtbar: seine Kachel ist der Schalter, also
+  // steht die Zeile dann aufgeklappt.
+  const expanded = _metricsExpanded || state.filterAttention;
+  const attentionEmpty = needsAttention === 0 && !state.filterAttention;
   return `
-    <div class="metric-grid">
+    ${metricGlanceHtml({
+    id: 'inventory-glance-more',
+    controls: 'inventory-metrics',
+    expanded,
+    label: t('inventory.metricItemsLabel'),
+    value: String(count),
+    flows: [
+      { label: t('inventory.metricValueLabel'), amount: formatMoney(totalValue, _householdCurrency) },
+      // Eine leere Kennzahl entfaellt in der Kurzzeile.
+      needsAttention > 0 ? { label: t('inventory.metricAttentionLabel'), amount: String(needsAttention) } : null,
+    ],
+  })}
+    <div class="metric-grid budget-glance-details${expanded ? ' is-expanded' : ''}" id="inventory-metrics">
       <div class="metric-card">
         <div class="metric-card__label">${esc(t('inventory.metricItemsLabel'))}</div>
         <div class="metric-card__value">${count}</div>
@@ -309,7 +467,7 @@ function renderMetrics() {
         <div class="metric-card__label">${esc(t('inventory.metricValueLabel'))}</div>
         <div class="metric-card__value">${esc(formatMoney(totalValue, _householdCurrency))}</div>
       </div>
-      <button type="button" class="metric-card metric-card--select${state.filterAttention ? ' is-active' : ''}"
+      <button type="button" class="metric-card metric-card--select${state.filterAttention ? ' is-active' : ''}${attentionEmpty ? ' metric-card--empty' : ''}"
               data-action="toggle-attention-filter" aria-pressed="${state.filterAttention}">
         <div class="metric-card__label">${esc(t('inventory.metricAttentionLabel'))}</div>
         <div class="metric-card__value">${needsAttention}</div>
@@ -394,10 +552,37 @@ function renderGroupedItems(groups) {
         ${esc(g.name)}
         <span class="list-group__count">${g.items.length}</span>
       </div>
-      <div class="list-rows">
+      <div class="row-carrier">
         ${g.items.map(renderItemRow).join('')}
       </div>
     </div>`).join('');
+}
+
+/**
+ * Fristen-Chip der Zeile - derselbe Baustein wie der Ablauf-Chip in Dokumente
+ * (`.doc-badge`, list-row.css), damit eine Frist app-weit gleich aussieht.
+ * Vorher stand hier ein 12px-`shield-alert` mit einem sr-only-Satz, der weder
+ * Frist noch Datum nannte (Critique 2026-09-26). Welche Frist er zeigt und in
+ * welchem Ton, entscheidet deadlineChipSpec() - dieselbe Regel, aus der Filter,
+ * Kennzahl und Nav-Badge zaehlen. Die Garantie nennt ihr Enddatum ("bis"),
+ * eine getrackte Frist den Abstand ("TUeV in 12 Tagen"); das Datum steht
+ * zusaetzlich im title.
+ */
+function deadlineChipHtml(item) {
+  const spec = deadlineChipSpec(item);
+  if (!spec) return '';
+  const date = formatDate(spec.endDateKey);
+  let text;
+  if (spec.kind === 'warranty') {
+    text = spec.state === 'expired' ? t('inventory.warrantyChipExpired') : t('inventory.warrantyChipUntil', { date });
+  } else if (spec.state === 'expired') {
+    text = t('inventory.deadlineChipOverdue', { label: spec.label });
+  } else {
+    text = spec.days === 0
+      ? t('inventory.deadlineChipToday', { label: spec.label })
+      : t('inventory.deadlineChipInDays', { label: spec.label, count: spec.days });
+  }
+  return `<span class="doc-badge doc-badge--${spec.tone}" title="${esc(date)}"><i data-lucide="calendar-clock" aria-hidden="true"></i>${esc(text)}</span>`;
 }
 
 /**
@@ -408,20 +593,23 @@ function renderGroupedItems(groups) {
  * abweicht (Groesse, Abstand, Trennlinie sind app-weit EIN Wert, nicht
  * modulweise nachgebaut). Nur Statusbadge und Kaufpreis sind Inventar-eigen
  * (Vorrat hat kein Aequivalent zu beidem).
+ *
+ * Der Status steht nur, wenn er vom Normalfall abweicht: „Vorhanden" in jeder
+ * Zeile war Rauschen, das die Ausnahmen (Verkauft, Verloren) verdeckte (R10 L3,
+ * A6 P3-3). Die Detailansicht nennt ihn weiter immer.
  */
 function renderItemRow(item) {
   const hasAttachments = (item.attachments?.length ?? 0) > 0;
   const hasBookings = (item.linked_entries?.length ?? 0) > 0;
-  const deadlineAlert = hasUpcomingDeadline(item);
   return `
-    <div class="list-row" data-id="${item.id}">
-      <button type="button" class="list-row__main list-row__main--interactive" data-action="open-detail">
+    <div class="list-row" data-id="${item.id}" data-md-id="${item.id}">
+      <button type="button" class="list-row__main list-row__main--interactive" data-action="open-detail" data-md-focus>
         <span class="inventory-row__headline">
           <span class="list-row__name">${esc(item.name)}</span>
           ${hasAttachments ? `<i data-lucide="paperclip" class="icon-sm" aria-hidden="true"></i><span class="sr-only">${esc(t('inventory.hasAttachmentsLabel'))}</span>` : ''}
           ${hasBookings ? `<i data-lucide="receipt" class="icon-sm" aria-hidden="true"></i><span class="sr-only">${esc(t('inventory.hasBookingsLabel'))}</span>` : ''}
-          ${deadlineAlert ? `<i data-lucide="shield-alert" class="icon-sm" aria-hidden="true"></i><span class="sr-only">${esc(t('inventory.warrantyAlertLabel'))}</span>` : ''}
-          <span class="inventory-status-badge inventory-status-badge--${esc(item.status)}">${esc(statusLabel(item.status))}</span>
+          ${item.status !== 'active' ? `<span class="inventory-status-badge inventory-status-badge--${esc(item.status)}">${esc(statusLabel(item.status))}</span>` : ''}
+          ${deadlineChipHtml(item)}
         </span>
         ${item.location_path ? `<span class="list-row__meta">${esc(item.location_path)}</span>` : ''}
       </button>
@@ -479,7 +667,7 @@ function renderCategoryList() {
     }),
   ];
   return `
-    <div class="list-rows">
+    <div class="row-carrier">
       ${rows.join('')}
     </div>`;
 }
@@ -506,20 +694,64 @@ function wireItemRows(list) {
     button.addEventListener('click', () => {
       const id = Number(button.closest('.list-row')?.dataset.id);
       const item = state.items.find((i) => i.id === id);
-      if (item) openItemDetail(item);
+      if (!item) return;
+      // Ab der Schwelle waehlt der Klick aus (Detailspalte), darunter oeffnet
+      // er das Sheet wie bisher - das entscheidet der Baustein, nicht wir.
+      if (_md) _md.open(String(item.id), button);
+      else openItemDetail(item);
     });
   });
 }
 
-function renderList() {
+/**
+ * @param {{repaint?: boolean}} [opts] `repaint` nach einer Datenaenderung
+ *   (Speichern, Loeschen, Frist erledigt): die Detailspalte zeichnet den
+ *   ausgewaehlten Gegenstand neu. Ohne (Suche, Filter, Ebenenwechsel) bleibt
+ *   sie stehen - jeder Tastendruck in der Suche holte sonst den Verlauf neu.
+ */
+function renderList({ repaint = false } = {}) {
+  renderListBody();
+  // Wie in Mail: verschwindet die ausgewaehlte Zeile aus der Liste (anderer
+  // Ordner, Suche, geloescht), faellt die Spalte auf den Leerzustand zurueck.
+  _md?.refresh({ repaint });
+  // Die Filterzeile kommt und geht mit der Ebene - die Spalte darunter misst neu.
+  const page = _container?.querySelector('.inventory-page');
+  syncDetailTop(page, page?.querySelector('.split-view__detail'));
+}
+
+/**
+ * DIE DETAILSPALTE MISST, WO SIE STEHT (Runde 5, 2026-09-26).
+ *
+ * Ihre Hoehe rechnete nur den Kopf (`--inventory-head-block`). In Ruhe steht
+ * unter dem Kopf aber noch die Filterzeile der Kategorie-Ebene, und die Spalte
+ * ragte um deren Hoehe unter den Falz - gemessen bei 1440x900: Oberkante 133,
+ * Hoehe 803, Unterkante 936. Beim Kleben ist die Filterzeile weggescrollt und
+ * die alte Rechnung stimmt; dazwischen liegt jeder Zwischenstand. Statt die
+ * Zustaende zu raten, setzt die Seite die gemessene Oberkante der Spalte als
+ * `--inventory-detail-top`, und inventory.css rechnet die Hoehe von dort bis
+ * zur Luft ueber dem Fensterrand. Eine ausgeblendete Spalte (unter der
+ * Schwelle) misst nichts und laesst den Wert stehen.
+ *
+ * @param {HTMLElement|null|undefined} page    `.inventory-page`
+ * @param {HTMLElement|null|undefined} detail  `.split-view__detail`
+ */
+function syncDetailTop(page, detail) {
+  if (!page || !detail || !detail.getClientRects().length) return;
+  page.style.setProperty('--inventory-detail-top', `${Math.round(detail.getBoundingClientRect().top)}px`);
+}
+
+function renderListBody() {
   const list = _container?.querySelector('#inventory-list');
   if (!list) return;
 
   if (!state.items.length) {
     // Sonst wuerde ein spaeter neu angelegtes Item (in JEDER Kategorie) diese
     // Detailansicht wiederbeleben, statt auf der Startseite zu landen.
+    const hadCategory = state.view === 'category' || categoryFromAddress();
     state.view = 'browse';
     state.activeCategory = null;
+    if (hadCategory) writeLevelAddress('replace', { category: null });
+    syncInventoryHeader();
     const filtersHost = _container?.querySelector('#inventory-filters');
     if (filtersHost) filtersHost.hidden = true;
     list.replaceChildren(emptyStateEl({
@@ -535,6 +767,7 @@ function renderList() {
   } else {
     renderBrowse(list);
   }
+  syncInventoryHeader();
 }
 
 /**
@@ -550,6 +783,7 @@ function renderBrowse(list) {
 
   list.replaceChildren();
   list.insertAdjacentHTML('beforeend', renderMetrics());
+  wireMetricGlance(list, 'inventory-glance-more', (expanded) => { _metricsExpanded = expanded; });
   list.querySelector('[data-action="toggle-attention-filter"]')?.addEventListener('click', () => {
     state.filterAttention = !state.filterAttention;
     renderList();
@@ -607,20 +841,16 @@ function renderCategoryDetail(list) {
   // war (ueber manage-categories geloescht - der Server haengt ihre Items auf
   // 'other' um). Kein Geister-Detail fuer eine Kategorie, die es nicht mehr
   // gibt: zurueck zur Startseite statt den rohen Key als Titel zu zeigen.
-  if (!category) { backToBrowse(); return; }
+  if (!category) { backToBrowse({ history: 'replace' }); return; }
   const categoryItems = state.items.filter((item) => item.category === state.activeCategory);
 
   updateFilterChips(categoryItems);
   updateSearchScope(t('inventory.searchInCategoryPlaceholder', { category: categoryLabel(category) }));
 
+  // Rueckweg und Kategoriename stehen im Kopf (syncInventoryHeader) - hier
+  // stand bis zur Re-Critique 2026-09-28 ein Textlink „Zurueck zum Inventar"
+  // unter den Chips und ein zweiter Titel.
   list.replaceChildren();
-  list.insertAdjacentHTML('beforeend', `
-    <button type="button" class="inventory-back-link" id="inventory-back-link">
-      <i data-lucide="arrow-left" class="inventory-back-link__icon" aria-hidden="true"></i>
-      ${esc(t('inventory.backToInventory'))}
-    </button>
-    <h2 class="inventory-category-title u-section-title">${esc(category ? categoryLabel(category) : state.activeCategory)}</h2>`);
-  list.querySelector('#inventory-back-link').addEventListener('click', backToBrowse);
 
   const filtered = categoryItems.filter((item) => matchesQuery(item) && matchesAttentionFilter(item));
   if (!filtered.length) {
@@ -845,22 +1075,24 @@ function odometerChartMarkup(points, unit) {
   const { W, H } = CHART;
   const { top, bottom } = chartScales();
 
+  // Runde Achse und Zeitachse nach Datum (C4, utils/chart.js): Wartungen
+  // liegen in ungleichen Abstaenden, der Zaehlerstand je Tag ist die Aussage.
   const values = points.map((p) => p.value);
-  let min = Math.min(...values);
-  let max = Math.max(...values);
-  if (min === max) { min -= 1; max += 1; }
-  const pad = (max - min) * 0.1;
-  min -= pad; max += pad;
-
-  const x = (i) => chartX(i, points.length);
+  const { min, max, steps } = niceDomain(Math.min(...values), Math.max(...values));
+  const from = points[0].date;
+  const to = points[points.length - 1].date;
+  // Zwei Wartungen am selben Tag: chartTimePositions verteilt sie, statt sie
+  // auf die linke Kante zu legen.
+  const xs = chartTimePositions(points.map((p) => p.date));
+  const x = (i) => xs[i];
   const y = (v) => chartY(v, min, max);
 
   const spine = points.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
   const area = `<polygon class="inventory-chart__area" points="${x(0).toFixed(1)},${bottom.toFixed(1)} ${spine} ${x(points.length - 1).toFixed(1)},${bottom.toFixed(1)}" />`;
   const dots = points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="var(--module-inventory)"><title>${esc(`${formatDate(p.date)}: ${formatOdometer(p.value)} ${unit}`)}</title></circle>`).join('');
 
-  const grid = chartGridMarkup(min, max, (val) => formatOdometer(Math.round(val)));
-  const xLabels = chartXLabelsMarkup(points.map((p) => formatDate(p.date)));
+  const grid = chartGridMarkup(min, max, (val) => formatOdometer(Math.round(val)), CHART, steps);
+  const xLabels = chartTimeLabelsMarkup(from, to, formatDate);
   const titleText = t('inventory.odometerChartTitle');
   const table = chartTableMarkup(titleText, [t('inventory.completePerformedOnLabel'), t('inventory.odometerLabel')],
     points.map((p) => [formatDate(p.date), `${formatOdometer(p.value)} ${unit}`]));
@@ -868,7 +1100,7 @@ function odometerChartMarkup(points, unit) {
   return `
     <div class="inventory-chart-section">
       <div class="inventory-chart-section__title">${esc(titleText)}</div>
-      <svg class="inventory-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
+      <svg class="chart inventory-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
         ${grid}
         ${area}
         <polyline fill="none" stroke="var(--module-inventory)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${spine}" />
@@ -949,6 +1181,21 @@ function photoDetailNode(photoData) {
 }
 
 /**
+ * Die Belege fuer die Detailansicht. Sie gehoeren dem Dokumente-Modul: bei
+ * `documents: none` gibt es keine Zeile, jeder Link ginge ins 403 (dieselbe
+ * Antwort wie attachmentLinksNode in components/document-attach.js). Ohne
+ * Leserecht kommt vom Server `attachments: null` (#1358) - dann gibt es keine
+ * Zeile und keinen Hinweis; eine Zeile ohne ID wird nie zum Link.
+ */
+function attachmentDetailEntries(attachments) {
+  if (pathAccess('/documents') === 'none') return [];
+  return (attachments || []).filter((doc) => doc?.document_id).map((doc) => ({
+    text: doc.name || doc.original_name || '',
+    href: `/api/v1/documents/${Number(doc.document_id)}/preview`,
+  }));
+}
+
+/**
  * Lese-Zeilen fuer die Detailansicht. Zeilen ohne Inhalt fallen selbst weg
  * (detailRowEl), also keine Fallunterscheidung hier noetig.
  * @returns {Array} Sections fuer openDetailView
@@ -958,35 +1205,56 @@ function renderItemDetail(item, history, onDoneTrackedDate, historyLoadFailed) {
     text: `${link.title} · ${formatMoney(link.amount, _householdCurrency)}`,
     sub: `${roleLabel(link.role)} · ${formatDate(link.date)}`,
   }));
-  const attachmentEntries = (item.attachments || []).map((doc) => ({
-    text: doc.name || doc.original_name || '',
-    href: `/api/v1/documents/${doc.document_id}/preview`,
-  }));
+  const attachmentEntries = attachmentDetailEntries(item.attachments);
 
+  // GEGLIEDERT STATT DREIZEHN LOSER ZEILEN (R10 L3, A6 P3-3). Oben, was das
+  // Ding ist und wo es steht; darunter benannte Gruppen wie die Abschnitte
+  // einer Kontaktkarte - Kauf, Garantie und Fristen, Zustand, Belege. Eine
+  // Gruppe ohne Inhalt faellt samt Titel weg (detail-view.js, detailGroupEl).
   return [
     { icon: 'image', label: t('inventory.photoLabel'), node: photoDetailNode(item.photo_data) },
     { icon: item.category_icon, label: t('inventory.categoryLabel'), value: itemCategoryLabel(item) },
     { icon: 'map-pin', label: t('inventory.locationLabel'), value: item.location_path || '' },
-    { icon: 'building-2', label: t('inventory.brandLabel'), value: item.brand || '' },
-    { icon: 'package', label: t('inventory.modelLabel'), value: item.model || '' },
-    { icon: 'hash', label: t('inventory.serialNumberLabel'), value: item.serial_number || '' },
-    { icon: 'calendar', label: t('inventory.purchaseDateLabel'), value: item.purchase_date ? formatDate(item.purchase_date) : '' },
-    { icon: 'banknote', label: t('inventory.purchasePriceLabel'), value: item.purchase_price != null ? formatMoney(item.purchase_price, item.currency) : '' },
-    { icon: 'store', label: t('inventory.vendorLabel'), value: item.vendor || '' },
-    // Konto, unter dem das Geraet registriert ist (#1004) - eine Adresse oder ein
-    // Benutzername, nie ein Passwort. Steht bei den uebrigen Herkunftsangaben,
-    // weil es dieselbe Art Frage beantwortet: woher kommt das Ding, und unter
-    // wessen Namen laeuft es.
-    { icon: 'at-sign', label: t('inventory.accountUsernameLabel'), value: item.account_username || '' },
-    { icon: 'shield', label: t('inventory.warrantyMonthsLabel'), value: warrantyDetailValue(item) },
-    { icon: 'gauge', label: t('inventory.odometerLabel'), value: odometerDetailValue(item) },
-    { icon: 'sparkles', label: t('inventory.conditionLabel'), value: t(`inventory.condition${item.condition.charAt(0).toUpperCase()}${item.condition.slice(1)}`) },
-    { icon: 'info', label: t('inventory.statusLabel'), value: statusLabel(item.status) },
-    { icon: 'align-left', label: t('inventory.notesLabel'), value: item.notes || '', multiline: true },
-    { icon: 'calendar-clock', label: t('inventory.trackedDatesLabel'), node: trackedDatesDetailNode(item, onDoneTrackedDate) },
-    { icon: 'receipt', label: t('inventory.linkedBookingsLabel'), node: inventoryDetailListNode(bookingEntries) },
-    { icon: 'paperclip', label: t('inventory.attachmentsLabel'), node: inventoryDetailListNode(attachmentEntries) },
-    { icon: 'history', label: t('inventory.historyLabel'), node: historyDetailNode(history, item, historyLoadFailed) },
+    {
+      group: t('inventory.detailGroupPurchase'),
+      rows: [
+        { icon: 'building-2', label: t('inventory.brandLabel'), value: item.brand || '' },
+        { icon: 'package', label: t('inventory.modelLabel'), value: item.model || '' },
+        { icon: 'hash', label: t('inventory.serialNumberLabel'), value: item.serial_number || '' },
+        { icon: 'calendar', label: t('inventory.purchaseDateLabel'), value: item.purchase_date ? formatDate(item.purchase_date) : '' },
+        { icon: 'banknote', label: t('inventory.purchasePriceLabel'), value: item.purchase_price != null ? formatMoney(item.purchase_price, item.currency) : '' },
+        { icon: 'store', label: t('inventory.vendorLabel'), value: item.vendor || '' },
+        // Konto, unter dem das Geraet registriert ist (#1004) - eine Adresse oder ein
+        // Benutzername, nie ein Passwort. Steht bei den uebrigen Herkunftsangaben,
+        // weil es dieselbe Art Frage beantwortet: woher kommt das Ding, und unter
+        // wessen Namen laeuft es.
+        { icon: 'at-sign', label: t('inventory.accountUsernameLabel'), value: item.account_username || '' },
+      ],
+    },
+    {
+      group: t('inventory.detailGroupWarranty'),
+      rows: [
+        { icon: 'shield', label: t('inventory.warrantyMonthsLabel'), value: warrantyDetailValue(item) },
+        { icon: 'calendar-clock', label: t('inventory.trackedDatesLabel'), node: trackedDatesDetailNode(item, onDoneTrackedDate) },
+      ],
+    },
+    {
+      group: t('inventory.detailGroupCondition'),
+      rows: [
+        { icon: 'sparkles', label: t('inventory.conditionLabel'), value: t(`inventory.condition${item.condition.charAt(0).toUpperCase()}${item.condition.slice(1)}`) },
+        { icon: 'info', label: t('inventory.statusLabel'), value: statusLabel(item.status) },
+        { icon: 'gauge', label: t('inventory.odometerLabel'), value: odometerDetailValue(item) },
+        { icon: 'align-left', label: t('inventory.notesLabel'), value: item.notes || '', multiline: true },
+      ],
+    },
+    {
+      group: t('inventory.detailGroupRecords'),
+      rows: [
+        { icon: 'receipt', label: t('inventory.linkedBookingsLabel'), node: inventoryDetailListNode(bookingEntries) },
+        { icon: 'paperclip', label: t('inventory.attachmentsLabel'), node: inventoryDetailListNode(attachmentEntries) },
+        { icon: 'history', label: t('inventory.historyLabel'), node: historyDetailNode(history, item, historyLoadFailed) },
+      ],
+    },
   ];
 }
 
@@ -1023,7 +1291,7 @@ function odometerDetailValue(item) {
  * reine Aggregation, kein Teil des Item-Datensatzes) und wird deshalb separat
  * nachgeladen, bevor die Ansicht aufgeht.
  */
-async function openItemDetail(item) {
+async function openItemDetail(item, { pane = null, signal = null } = {}) {
   let history = null;
   let historyLoadFailed = false;
   try {
@@ -1033,8 +1301,23 @@ async function openItemDetail(item) {
     console.error('[Inventory] Verlauf konnte nicht geladen werden:', err);
     historyLoadFailed = true;
   }
+  // In der Detailspalte kann waehrend des Ladens schon eine andere Zeile
+  // gewaehlt sein - dann gehoert die Spalte ihr, nicht diesem Gegenstand.
+  if (signal?.aborted) return;
 
   const onDoneTrackedDate = async (trackedDate) => {
+    if (pane) {
+      // In der Spalte liegt kein Overlay offen: die Abschluss-Karte geht direkt
+      // auf, und ein closeDetailView() schloesse hier ein fremdes Modal. Nach
+      // dem Abschluss zeichnet der Baustein die Spalte neu (repaint).
+      const completed = await openCompletionSheet(item, trackedDate);
+      if (completed) {
+        await loadItems();
+        renderList({ repaint: true });
+        updateAttentionBadge();
+      }
+      return;
+    }
     // Die Detailansicht MUSS zu sein, BEVOR die Abschluss-Karte aufgeht: beide
     // sind openModal()-Overlays, und ein zweiter Overlay ueber einem noch
     // offenen zwingt dessen erzwungenes Schliessen (modal.js#openModal) - das
@@ -1045,7 +1328,7 @@ async function openItemDetail(item) {
     const completed = await openCompletionSheet(item, trackedDate);
     if (completed) {
       await loadItems();
-      renderList();
+      renderList({ repaint: true });
       updateAttentionBadge();
     }
     // Ein voller Neu-Öffnen ist einfacher und robuster als ein In-Place-Update
@@ -1066,8 +1349,10 @@ async function openItemDetail(item) {
 
   openDetailView({
     title: item.name,
+    key: `inventory:${item.id}`,
     accentColor: 'var(--module-inventory)',
     size: 'md',
+    pane,
     sections: renderItemDetail(item, history, onDoneTrackedDate, historyLoadFailed),
     actions: [{
       id: 'inventory-detail-delete',
@@ -1083,11 +1368,14 @@ async function openItemDetail(item) {
     edit: {
       label: t('common.edit'),
       title: t('common.editItem'),
-      mount: (panel, pane) => {
+      mount: (panel, editPane) => {
         const form = buildItemForm({ mode: 'edit', item });
-        pane.insertAdjacentHTML('beforeend', form.content);
+        editPane.insertAdjacentHTML('beforeend', form.content);
         form.wire(panel);
       },
+      // Aus der Detailspalte: das regulaere Formular-Modal (detail-view.js,
+      // openInPane) - dasselbe Formular, das „Neu" oeffnet.
+      standalone: () => openItemModal('edit', item),
     },
   });
 }
@@ -1244,14 +1532,14 @@ function openBookingPicker(panel, { initialMonth, includeRole = false } = {}) {
     overlay.insertAdjacentHTML('afterbegin', `
       <div class="inventory-booking-picker__panel" role="dialog" aria-modal="true"
            aria-label="${esc(t('inventory.bookingPickerTitle'))}">
-        <div class="inventory-booking-picker__header">
+        <div class="inventory-booking-picker__header" data-dialog-actions>
           <strong>${esc(t('inventory.bookingPickerTitle'))}</strong>
           <button class="btn btn--icon" type="button" data-picker-close
                   aria-label="${esc(t('common.cancel'))}">
             <i data-lucide="x" aria-hidden="true"></i>
           </button>
         </div>
-        <div class="inventory-booking-picker__nav">
+        <div class="inventory-booking-picker__nav" data-dialog-actions>
           <button class="btn btn--icon" type="button" data-picker-prev
                   aria-label="${esc(t('inventory.bookingPickerPrevMonth'))}">
             <i data-lucide="chevron-left" aria-hidden="true"></i>
@@ -1272,7 +1560,7 @@ function openBookingPicker(panel, { initialMonth, includeRole = false } = {}) {
               ${ROLES.map((r) => `<option value="${r}">${esc(roleLabel(r))}</option>`).join('')}
             </select>
           </div>
-          <div class="inventory-booking-picker__role-footer">
+          <div class="inventory-booking-picker__role-footer" data-dialog-actions>
             <button class="btn btn--secondary" type="button" data-picker-role-back>${esc(t('common.back'))}</button>
             <button class="btn btn--primary" type="button" data-picker-role-confirm>${esc(t('inventory.addBooking'))}</button>
           </div>
@@ -1552,6 +1840,12 @@ function photoPreviewHtml(photoData) {
  */
 function buildItemForm({ mode, item = null }) {
   const isEdit = mode === 'edit';
+  // Verknuepfte Buchungen kommen aus dem Budget: ohne dessen Leserecht liefert
+  // der Server keine und antwortet auf jedes Nachschlagen mit 404. Abschnitt
+  // und Knoepfe fallen dann weg - "keine verknuepften Buchungen" waere falsch,
+  // und "Buchung hinzufuegen" endete im Fehler (Regel 1 in
+  // utils/module-access.js, Muster wie attachmentDetailEntries()).
+  const showsBookings = pathAccess('/budget') !== 'none';
   let pickedBooking = null; // nur im Anlegen-Fluss: {entry, role:'purchase'} vor dem Speichern
   let photoData = isEdit && item.photo_data ? item.photo_data : null;
 
@@ -1570,7 +1864,7 @@ function buildItemForm({ mode, item = null }) {
 
   const content = `
       <div class="form-group">
-        <label class="form-label" for="inv-name">${esc(t('common.nameLabel'))}</label>
+        <label class="form-label" for="inv-name">${esc(t('common.nameLabel'))}${REQUIRED_MARK}</label>
         <input id="inv-name" class="form-input" type="text" required placeholder="${esc(t('inventory.namePlaceholder'))}">
       </div>
       <div class="inventory-form-row">
@@ -1594,7 +1888,7 @@ function buildItemForm({ mode, item = null }) {
           <input id="inv-purchase-price" class="form-input" type="number" min="0" step="0.01" inputmode="decimal">
         </div>
       </div>
-      ${!isEdit ? `
+      ${!isEdit && showsBookings ? `
       <div class="form-group">
         <button class="btn btn--secondary btn--sm" type="button" data-action="link-booking">
           <i data-lucide="link" aria-hidden="true"></i> ${esc(t('inventory.linkBooking'))}
@@ -1605,7 +1899,7 @@ function buildItemForm({ mode, item = null }) {
         <label class="form-label" for="inv-status">${esc(t('inventory.statusLabel'))}</label>
         <select id="inv-status" class="form-input">${statusOptions}</select>
       </div>
-      ${isEdit ? `
+      ${isEdit && showsBookings ? `
       <div class="form-group">
         <span class="form-label">${esc(t('inventory.linkedBookingsLabel'))}</span>
         <div class="inventory-linked-entries" data-linked-entries></div>
@@ -1620,7 +1914,8 @@ function buildItemForm({ mode, item = null }) {
             <button type="button" class="inventory-photo-editor" id="inv-photo-preview" aria-label="${esc(t('inventory.photoLabel'))}">
               ${photoPreviewHtml(photoData)}
             </button>
-            <input class="sr-only" id="inv-photo" type="file" accept="image/png,image/jpeg,image/webp">
+            <input class="sr-only" id="inv-photo" type="file" accept="image/png,image/jpeg,image/webp"
+                   aria-label="${esc(t('inventory.photoLabel'))}" tabindex="-1">
             <div class="inventory-photo-actions">
               <button type="button" class="inventory-photo-action" id="inv-photo-edit"
                       aria-label="${esc(t('inventory.photoLabel'))}" title="${esc(t('inventory.photoLabel'))}">
@@ -1802,7 +2097,7 @@ function buildItemForm({ mode, item = null }) {
         name: panel.querySelector('#inv-name').value.trim() || file.name,
       }),
     });
-    if (isEdit) {
+    if (showsBookings && isEdit) {
       renderLinkedEntries(panel, item);
       panel.querySelector('[data-action="add-booking"]').addEventListener('click', async () => {
         const picked = await openBookingPicker(panel, {
@@ -1817,7 +2112,7 @@ function buildItemForm({ mode, item = null }) {
           item = res.data;
           renderLinkedEntries(panel, item);
           await loadItems();
-          renderList();
+          renderList({ repaint: true });
         } catch (err) {
           window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
         }
@@ -1830,12 +2125,12 @@ function buildItemForm({ mode, item = null }) {
           item = res.data;
           renderLinkedEntries(panel, item);
           await loadItems();
-          renderList();
+          renderList({ repaint: true });
         } catch (err) {
           window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
         }
       });
-    } else {
+    } else if (showsBookings) {
       panel.querySelector('[data-action="link-booking"]').addEventListener('click', async () => {
         const picked = await openBookingPicker(panel, { includeRole: false });
         if (!picked) return;
@@ -1931,7 +2226,7 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
     else await api.put(`/inventory/items/${item.id}`, payload);
     await loadItems();
     closeSharedModal({ force: true });
-    renderList();
+    renderList({ repaint: true });
     updateAttentionBadge();
     window.yuvomi?.showToast(mode === 'create' ? t('inventory.created') : t('inventory.updated'), 'success');
   } catch (err) {
@@ -1949,7 +2244,7 @@ async function removeItem(item) {
   try {
     await api.delete(`/inventory/items/${item.id}`);
     await loadItems();
-    renderList();
+    renderList({ repaint: true });
     refocusAfterRender();
     updateAttentionBadge();
     window.yuvomi?.showToast(t('inventory.deleted'), 'success');
@@ -1958,46 +2253,58 @@ async function removeItem(item) {
   }
 }
 
-export async function render(container) {
+export async function render(container, { signal } = {}) {
   _container = container;
+  _md = null;
 
   const page = document.createElement('div');
-  // app-page--data: die Seite setzt --layout-content; die Zeilentraeger lesen
-  // es (Guard in test-frontend-audit.js). Ohne die Rolle enden Kopf und
-  // Bedienzeilen neben ihrem eigenen Koerper. Die Regel kam mit v2.8.0, also
-  // nach der Basis, auf der dieser Zweig gebaut wurde.
-  page.className = 'inventory-page app-page app-page--data';
-  page.dataset.composition = 'data';
+  // Breitenregel (DESIGN.md, 2026-09-26): Inventar gehoert zu Liste + Detail,
+  // weil es eine Leseansicht hat (openDetailView). Unter der Schwelle steht es
+  // auf dem Lesemass (`reading` bleibt die Modusrolle), ab der Schwelle stehen
+  // Liste und Detailspalte nebeneinander (utils/master-detail.js). Das
+  // fruehere 960er-Mass (`data`) ist abgeschafft. Die Zeilentraeger lesen das
+  // Mass der Seite (Guard in test-frontend-audit.js); ohne die Rolle enden Kopf
+  // und Bedienzeilen neben ihrem eigenen Koerper.
+  page.className = 'inventory-page app-page app-page--reading app-page--list-detail';
+  page.dataset.composition = 'reading';
 
   // Sichtbarer Seitentitel statt sr-only: nur ein echtes .page-toolbar__title
   // loest das Absender-Siegel der Shell aus (router.js#wireToolbar,
   // headSealIcon), das jedes andere Modul schon automatisch zeigt - Icon +
   // Name, direkt vor dem Titel, aus derselben Quelle wie der Sidebar-Eintrag.
   const toolbar = document.createElement('div');
-  toolbar.className = 'page-toolbar page-toolbar--narrow page-toolbar--wrap';
+  toolbar.className = 'page-toolbar page-toolbar--narrow page-toolbar--wrap inventory-toolbar';
+  // Kopfregel mobil (DESIGN.md, 2026-09-26): Lagerorte und Kategorien sind
+  // Verwaltung, nicht Ansicht - sie stehen im EINEN Werkzeugmenue mit Icon UND
+  // Text statt als zwei unbeschriftete Icons in einer eigenen Kopfzeile. Die
+  // Suche ist selbst der Slot (`page-toolbar__center`), nicht in einen Wrapper
+  // geschachtelt: so greift ihre Icon-Form mobil wie in den Dokumenten (A6 P1-1).
   toolbar.insertAdjacentHTML('beforeend', `
+    ${renderPageSearch({
+      id: 'inventory-search',
+      label: t('inventory.searchPlaceholder'),
+      placeholder: t('inventory.searchPlaceholder'),
+      value: state.query,
+      clearLabel: t('common.searchClear'),
+      className: 'inventory-search page-toolbar__center',
+    })}
     <div class="page-toolbar__actions">
-      <button class="btn btn--ghost btn--icon" data-action="manage-locations"
-              aria-label="${esc(t('inventory.manageLocations'))}" title="${esc(t('inventory.manageLocations'))}">
-        <i data-lucide="map-pin" class="icon-md" aria-hidden="true"></i>
-      </button>
-      <button class="btn btn--ghost btn--icon" data-action="manage-categories"
-              aria-label="${esc(t('inventory.manageCategories'))}" title="${esc(t('inventory.manageCategories'))}">
-        <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
-      </button>
-    </div>`);
-  toolbar.insertAdjacentHTML('afterbegin', `
-    <div class="page-toolbar__center">
-      ${renderPageSearch({
-        id: 'inventory-search',
-        label: t('inventory.searchPlaceholder'),
-        placeholder: t('inventory.searchPlaceholder'),
-        value: state.query,
-        clearLabel: t('common.searchClear'),
-        className: 'inventory-search',
+      ${pageToolsMenuHtml({
+        id: 'inventory-tools-menu',
+        label: t('common.moreActions'),
+        items: [
+          { action: 'manage-locations', label: t('inventory.manageLocations'), icon: 'map-pin' },
+          { action: 'manage-categories', label: t('inventory.manageCategories'), icon: 'tags' },
+        ],
       })}
     </div>`);
   toolbar.insertAdjacentHTML('afterbegin', `<h1 class="page-toolbar__title">${esc(t('nav.inventory'))}</h1>`);
+  // Rueckweg aus einer Kategorie, oben wie Apples Navigationsleiste und wie
+  // „‹ Gesundheit" (syncInventoryHeader blendet ihn ein).
+  toolbar.insertAdjacentHTML('afterbegin', `
+    <a class="inventory-toolbar__back" href="/inventory" hidden>
+      <i data-lucide="chevron-left" class="inventory-toolbar__back-icon" aria-hidden="true"></i><span>${esc(t('nav.inventory'))}</span>
+    </a>`);
 
   const filters = document.createElement('div');
   filters.className = 'inventory-filters';
@@ -2007,9 +2314,21 @@ export async function render(container) {
   filters.hidden = true;
 
   const list = document.createElement('div');
-  list.className = 'inventory-list';
+  list.className = 'inventory-list split-view__list';
   list.id = 'inventory-list';
   list.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 4, lines: 2 }));
+
+  // Liste + Detail: die Liste bleibt, wie sie war, und bekommt rechts die
+  // Detailspalte. Unter der Schwelle ist die Spalte `display: none` und die
+  // Huelle ein unsichtbarer Block (layout.css, `.split-view`).
+  const split = document.createElement('div');
+  split.className = 'split-view';
+  split.append(list);
+  split.insertAdjacentHTML('beforeend', splitViewDetailHtml({
+    id: 'inventory',
+    label: t('inventory.detailPaneLabel'),
+    empty: { icon: 'package', title: t('inventory.pickOne'), hint: t('inventory.pickOneHint') },
+  }));
 
   const fab = document.createElement('button');
   fab.className = 'page-fab';
@@ -2023,13 +2342,44 @@ export async function render(container) {
   fab.dataset.dockLabel = t('newLabel.inventory');
   fab.insertAdjacentHTML('beforeend', '<i data-lucide="plus" aria-hidden="true"></i>');
 
-  page.append(toolbar, filters, list, fab);
+  page.append(toolbar, filters, split, fab);
   container.replaceChildren(page);
 
   if (window.lucide) window.lucide.createIcons({ el: container });
 
-  toolbar.querySelector('[data-action="manage-locations"]').addEventListener('click', openLocationManager);
-  toolbar.querySelector('[data-action="manage-categories"]').addEventListener('click', openCategoryManager);
+  installPopoverMenus(container);
+  toolbar.querySelector('.inventory-toolbar__back')?.addEventListener('click', (event) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault();
+    backToBrowse();
+  }, { signal });
+  // Zurueck/Vor zwischen den Ebenen. Der Router fragt danach den Baustein
+  // (`handleMasterDetailPopstate`), der dank `mdAddress` jede Ebene als
+  // dieselbe Seite erkennt und nur die Auswahl aus `?open=` nachzieht.
+  //
+  // DIE REIHENFOLGE ZWISCHEN DIESEM HOERER UND DEM BAUSTEIN IST NICHT FEST:
+  // der Router fragt den Baustein in einem `.then`, und der Browser leert die
+  // Microtasks nach JEDEM Hoerer - gemessen lief der Baustein ZUERST, noch auf
+  // der alten Ebene (Detailspalte verborgen), merkte sich `?open=` und malte
+  // nichts. Deshalb zieht die Seite die Auswahl nach dem Neuaufbau selbst aus
+  // der Adresse nach - dasselbe Ziel, in welcher Reihenfolge auch immer.
+  window.addEventListener('popstate', () => {
+    if (location.pathname !== INVENTORY_PATH || !state.categories.length) return;
+    if (!syncLevelFromAddress()) return;
+    renderListBody();
+    syncDetailTop(page, split.querySelector('.split-view__detail'));
+    scrollListToTop();
+    if (!_md?.isSplit()) return;
+    const open = mdAddress.read(location);
+    if (open) _md.select(open, { history: 'none' });
+    else _md.clear({ history: 'none' });
+  }, { signal });
+  toolbar.addEventListener('click', (e) => {
+    const item = pageToolsActionEl(e.target);
+    if (!item || item.disabled) return;
+    if (item.dataset.action === 'manage-locations') openLocationManager();
+    else if (item.dataset.action === 'manage-categories') openCategoryManager();
+  });
 
   _search = wirePageSearch(toolbar, {
     id: 'inventory-search',
@@ -2048,6 +2398,31 @@ export async function render(container) {
 
   fab.addEventListener('click', () => openItemModal('create'));
 
+  // Die Detailspalte klebt unter dem Kopf, waehrend die Liste mit der Seite
+  // scrollt (inventory.css). Inventar hat keinen eigenen Scrollport - der Kopf
+  // klebt in #main-content -, also braucht die Spalte seine Hoehe als Versatz.
+  // Gemessen statt als Token, weil der Kopf in langen Locales umbricht.
+  const syncHeadBlock = () => {
+    page.style.setProperty('--inventory-head-block', `${toolbar.offsetHeight}px`);
+    syncDetailTop(page, split.querySelector('.split-view__detail'));
+  };
+  syncHeadBlock();
+  // Beim Scrollen wandert die Oberkante der Spalte vom Ruhe- zum Klebestand
+  // (syncDetailTop); ein Messwert je Frame reicht.
+  let detailTopFrame = 0;
+  document.getElementById('main-content')?.addEventListener('scroll', () => {
+    if (detailTopFrame) return;
+    detailTopFrame = requestAnimationFrame(() => {
+      detailTopFrame = 0;
+      syncDetailTop(page, split.querySelector('.split-view__detail'));
+    });
+  }, { passive: true, signal });
+  if (typeof ResizeObserver === 'function') {
+    const headRo = new ResizeObserver(syncHeadBlock);
+    headRo.observe(toolbar);
+    signal?.addEventListener('abort', () => headRo.disconnect(), { once: true });
+  }
+
   try {
     await Promise.all([
       loadLocations(),
@@ -2055,7 +2430,35 @@ export async function render(container) {
       loadItems(),
       api.get('/preferences').then((res) => { _householdCurrency = res.data?.currency ?? 'EUR'; }).catch(() => {}),
     ]);
+    if (signal?.aborted) return;
+    // Die Ebene steht in der Adresse, nicht im Modulzustand vom letzten Besuch.
+    if (isKnownCategory(categoryFromAddress())) {
+      state.view = 'category';
+      state.activeCategory = categoryFromAddress();
+    } else {
+      if (categoryFromAddress()) writeLevelAddress('replace', { category: null, open: new URLSearchParams(location.search).get('open') });
+      state.view = 'browse';
+      state.activeCategory = null;
+    }
+    openDeepLinkedCategory(split);
     renderList();
+    _md = mountMasterDetail({
+      root: split,
+      signal,
+      address: mdAddress,
+      renderDetail: (id, body, ctx) => {
+        const item = state.items.find((i) => String(i.id) === id);
+        if (!item) return false;
+        return openItemDetail(item, { pane: body, signal: ctx.signal });
+      },
+      openNarrow: openItemNarrow,
+      onEnter: (id) => {
+        const item = state.items.find((i) => String(i.id) === id);
+        if (item) openItemModal('edit', item);
+      },
+      onModeChange: onInventoryModeChange,
+    });
+    signal?.addEventListener('abort', () => { _md = null; }, { once: true });
     updateAttentionBadge();
   } catch (err) {
     window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
@@ -2063,8 +2466,86 @@ export async function render(container) {
   }
 }
 
+/**
+ * Deep-Link `?open=` in der Spaltenform: die Zeile des Gegenstands muss in der
+ * Liste stehen, sonst waere die Auswahl ohne Markierung und fiele beim
+ * naechsten Neuaufbau weg (master-detail.js#refresh). Die Startseite zeigt nur
+ * Kategorien - also die Kategorie des Gegenstands oeffnen, wie ein Klick es
+ * getan haette. Unter der Schwelle loest niemand den Link ein (kein Sheet, das
+ * beim Laden aufspringt), und die Seite bleibt auf der Startseite.
+ */
+function openDeepLinkedCategory(split) {
+  const id = new URLSearchParams(location.search).get('open');
+  if (!id) return;
+  const detail = split.querySelector('.split-view__detail');
+  if (!detail || getComputedStyle(detail).display === 'none') return;
+  showItemCategory(id);
+}
+
+/**
+ * Die Kategorie eines Gegenstands zeigen, damit seine Zeile in der Liste steht.
+ * Wie ein Klick (openCategory): auch Suche und Fristen-Filter fallen weg.
+ * Beide ueberleben den Seitenwechsel; stuende ein alter davon noch, fehlte
+ * die Zeile in der geoeffneten Kategorie, und rechts stuende ein Detail, das
+ * der naechste Listenaufbau samt Adresse abraeumt.
+ * @returns {boolean} ob es den Gegenstand gibt
+ */
+function showItemCategory(id) {
+  const item = state.items.find((i) => String(i.id) === String(id));
+  if (!item) return false;
+  setCategoryState(item.category);
+  // Die Adresse nennt die Ebene mit (ersetzt: ein Deep-Link oder ein breiter
+  // gezogenes Fenster ist kein Schritt fuer die Zurueck-Taste).
+  writeLevelAddress('replace', { category: item.category, open: id });
+  return true;
+}
+
+/**
+ * Unter der Schwelle: das Blatt eines Gegenstands (utils/master-detail.js,
+ * `openNarrow`). openItemDetail() laedt erst den Verlauf - das Signal des
+ * Bausteins bricht ab, wenn in der Zeit Zurueck gedrueckt, das Fenster breit
+ * oder die Seite verlassen wurde; dann geht kein altes Blatt mehr auf.
+ */
+function openItemNarrow(id, _trigger, { signal } = {}) {
+  const item = state.items.find((i) => String(i.id) === String(id));
+  if (item) return openItemDetail(item, { signal });
+  return undefined;
+}
+
+/**
+ * Die Darstellung hat gewechselt (utils/master-detail.js, `onModeChange`).
+ *
+ * Ein `?open=` vom Telefon laesst die Startseite stehen (kein Blatt beim
+ * Laden), der Baustein merkt sich die ID. Wird das Fenster breiter, zeichnet
+ * er das Detail - vorher muss links die Zeile stehen, also die Kategorie des
+ * Gegenstands, wie beim Deep-Link in der Spaltenform.
+ */
+function onInventoryModeChange({ split, selectedId }) {
+  if (!split || selectedId == null) return;
+  const list = _container?.querySelector('#inventory-list');
+  if (list?.querySelector(`[data-md-id="${CSS.escape(String(selectedId))}"]`)) return;
+  if (showItemCategory(selectedId)) renderList();
+}
+
 export const __test = {
+  state,
+  // Re-Critique 2026-09-28 (W1): die Ebene hat eine Adresse.
+  openCategory,
+  backToBrowse,
+  syncLevelFromAddress,
+  syncInventoryHeader,
+  mdAddress,
+  renderItemRow,
+  renderItemDetail,
+  openDeepLinkedCategory,
+  syncDetailTop,
+  onInventoryModeChange,
+  openItemNarrow,
   categoryLabel,
   itemCategoryLabel,
   categoryOptionsHtml,
+  attachmentDetailEntries,
+  buildItemForm,
+  // Review R11: Kilometerstand-Trend auf der Zeitachse, auch am selben Tag.
+  odometerChartMarkup,
 };

@@ -92,6 +92,17 @@ test('preview CSP: Nicht-PDFs behalten strikte default-src none Policy', async (
   assert.ok(csp.includes("default-src 'none'"), 'Bilder müssen strikt bleiben');
 });
 
+// Der Viewer zeigt Arztbriefe, Ausweise und Steuerbescheide. Eine Vorschau darf
+// deshalb nicht im HTTP-Cache des Geraets liegen bleiben - auch nicht fuer fuenf
+// Minuten, und auch nicht nach dem Abmelden, das den Browser-Cache nicht leert.
+test('preview: Dokumente landen nicht im HTTP-Cache des Geraets', async () => {
+  for (const id of [pdfId, pngId]) {
+    const res = await fetchPreview(id);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('cache-control'), 'no-store', `Dokument ${id}`);
+  }
+});
+
 test.after(async () => {
   await new Promise((resolve, reject) => {
     server.close((err) => {

@@ -116,6 +116,23 @@
   --color-border-subtle:  var(--neutral-150);
   --color-border-strong:  var(--neutral-300);  /* kräftigere Trennlinie (Hover, betonte Rahmen) */
   --color-border-control: var(--neutral-500);  /* Ruhekante von Eingabefeldern, 3:1 (WCAG 1.4.11) */
+  /* DIE BAHN EINES AUSGESCHALTETEN SCHALTERS (#1572). Die `.toggle`-Bahn stand
+   * auf --neutral-300 und lag gerendert bei 1,65:1 auf Weiss und 1,46:1 auf
+   * dem dunklen -raised - ein Schalter, der aus war, verschwand in seiner
+   * Zeile. WCAG 1.4.11 verlangt fuer die Grenze eines Bedienelements 3:1.
+   *
+   * Die Bahn selbst traegt die Grenze, keine zusaetzliche Kante: die Form
+   * bleibt Apples randlose Kapsel, und der Knopf (--color-surface) steht auf
+   * der dunkleren Bahn mit demselben Abstand, der Zustand bleibt also auch am
+   * Knopf ablesbar. Light liegt eine Spur unter --neutral-500, weil die
+   * Schalterzeile im Hover auf --color-surface-hover wechselt und die
+   * Rampenstufe dort 2,94 truege; #88847C haelt 3,72 auf Weiss, 3,36 auf der
+   * Buehne, 3,10 auf dem Hover. Dark ist die Rampenstufe --_neutral-500:
+   * 4,51 auf -surface, 3,86 auf -raised und dem Hover, 3,25 auf dem Hover
+   * der erhoehten Flaeche. Guard: test-frontend-audit.js, "die ausgeschaltete
+   * Schalterbahn haelt 3:1". Der Installer traegt dieselben Werte inline. */
+  --_color-switch-off:    #88847C;
+  --color-switch-off:     var(--_color-switch-off);
   /* ZURUECKGENOMMEN IST EIN MUSTER, KEINE DECKUNG (#1230, Entscheidung Ulas
    * 2026-09-15). Erledigte und abgelegte Aufgaben, archivierte Konten,
    * pausierte und abgeschlossene Abos, inaktive Medikamente und Praemien,
@@ -221,6 +238,16 @@
    * LEERZUSTAENDE bekommen gar keine Flaeche: zentrierter Sekundaertext, kein
    * Rahmen, kein Well - sonst muesste jeder Leerzustand seinen Traeger kennen. */
   --color-fill-well:          var(--color-surface-3);
+
+  /* DAS GEFUELLTE FELD (Komponenten-Kanon, 2026-09-26): die Flaeche des EINEN
+   * Suchfelds (`.page-search__input`, gefuellte Kapsel wie Apples Suchfeld).
+   * Nicht der Well: der liegt fuer Kacheln IN einer Karte und haelt auf dem
+   * Grouped-Grund nur 1.06:1 (#EDEAE3 auf #F5F3ED) - ein Suchfeld im Kopf steht
+   * aber auf dem Grund. neutral-200 haelt dort 1.19:1 hell / 1.42:1 dunkel
+   * (Apples tertiaere Fuellung liegt bei rund 1.13:1), und die Kennung als Feld
+   * tragen Lupe und Platzhalter. Der Platzhalter steht darauf in
+   * --color-text-secondary (tertiaer faellt hell auf 4.27:1). */
+  --color-fill-field:         var(--neutral-200);
 
   /* DIE ZEILENLISTEN-REGEL (HIG-Rollout Runde 3, 2026-08-06).
    * Die Kasten-in-Kasten-Regel sagt, wie eine Zeile INNEN aussieht. Diese hier
@@ -409,43 +436,82 @@
   --color-info-ink:       var(--_color-info-ink);
 
   /* Toast-Textfarben: weiß auf dunklen semantischen Bg (light mode).
-   * Dark mode überschreibt auf dunkel, weil --color-success/warning/danger
-   * dort vivid/hell sind und weißen Text unleserlich machen würden. */
-  --_toast-success-text: var(--color-text-on-accent);
-  --toast-success-text:  var(--_toast-success-text);
+   * Dark mode überschreibt auf dunkel, weil --color-warning/danger dort
+   * vivid/hell sind und weißen Text unleserlich machen würden. Erfolg steht
+   * seit R11 auf dem Shell-Glas (glass.css, --shell-success-ink). */
   --_toast-warning-text: var(--color-text-on-accent);
   --toast-warning-text:  var(--_toast-warning-text);
   --_toast-danger-text:  var(--color-text-on-accent);
   --toast-danger-text:   var(--_toast-danger-text);
 
-  /* DIE GEFAHR AUF SHELL-MATERIAL - und sie läuft der Themenlage ENTGEGEN.
+  /* DAS SHELL-MATERIAL: Toast und Sammelaktions-Pille (eine Schicht, ein
+   * Material - Entscheidung vom 2026-08-12, glass.css Abschnitt 9).
    *
-   * Der Toast und die Sammelaktions-Pille stehen auf --neutral-800 mit
-   * --neutral-50 als Schrift, und dieses Paar dreht sich mit dem Thema: im
-   * hellen Modus ist --neutral-800 dunkelbraun (#2D2A25), im dunklen ist es
-   * hell (#E7E2DA). Ein `var(--color-danger)` als Tinte wäre deshalb genau
-   * falschherum - gerechnet #D70015 auf #2D2A25 = 2,69:1.
+   * ES IST IN BEIDEN THEMES DUNKEL (Re-Critique 2026-09-28, A1 P2-2). Bis
+   * dahin stand es auf --neutral-800 mit --neutral-50 als Schrift, und dieses
+   * Paar dreht sich mit dem Thema: im Dunkelmodus wurde --neutral-800 hell
+   * (#E7E2DA). Der leiseste Hinweis der App ("Gespeichert") war dort die
+   * hellste Flaeche im Bild, gemessen rgba(231,226,218,.9) auf rgb(25,24,22).
+   * Apple fuehrt Toasts und HUDs im Dunkeln als gehobenes dunkles Material mit
+   * heller Schrift. Dunkel steht es deshalb auf --color-surface-raised (#37332E,
+   * die hoechste Flaechenstufe - nie heller, test:toast-placement), hell
+   * bleibt es, was es war.
    *
-   * UND DER GRUND IST NICHT --neutral-800, SONDERN DAS, WAS DARAUS WIRD.
+   * Gerechnet mit der 90-%-Deckung aus glass.css, also gegen den ECHTEN Grund
+   * (Buehne / Karte / reines Weiss darunter) und gegen den opaken Token:
+   *   hell   #FBFAF7 auf #413E39 = 10,2:1  |  auf #2D2A25 = 13,7:1
+   *   dunkel #F5F3ED auf #34302C = 11,8:1  |  auf #36322D = 11,5:1
+   *          auf #4B4743 (Weiss darunter) = 8,3:1  |  opak #37332E = 11,3:1
+   * Die Zweitschrift der Pille (`.list-bulkbar__detail`) dunkel #CBC5BC:
+   *   7,6 / 7,4 / 5,4 / 7,3:1. */
+  --_toast-bg:             var(--_neutral-800);
+  --toast-bg:              var(--_toast-bg);
+  --_toast-text:           var(--_neutral-50);
+  --toast-text:            var(--_toast-text);
+  --_toast-text-secondary: var(--_neutral-300);
+  --toast-text-secondary:  var(--_toast-text-secondary);
+
+  /* DIE GEFAHR AUF SHELL-MATERIAL.
+   *
+   * Das Material ist in beiden Themes dunkel (oben), die semantischen Farben
+   * drehen sich aber mit dem Thema: `var(--color-danger)` waere als Tinte hier
+   * falsch - gerechnet #D70015 auf #2D2A25 = 2,69:1. Die Gefahr bekommt
+   * deshalb eine eigene, helle Tinte, die in BEIDEN Themes gilt. Bis R16 lief
+   * sie der Themenlage entgegen (dunkel #9B000F auf dem damals hellen Grund);
+   * mit dem dunklen Material ist diese Gegendrehung entfallen.
+   *
+   * UND DER GRUND IST NICHT DER TOKEN, SONDERN DAS, WAS DARAUS WIRD.
    * glass.css mischt die Fläche mit 90 % Deckung (`color-mix(… 90%,
    * transparent)` plus backdrop-filter), also scheint ein Zehntel der Seite
-   * durch: komponiert steht dort #413E39 hell und #D2CEC6 dunkel. Gegen den
-   * puren Token gerechnet hielt #FF6961 mit 5,13:1 - gegen den echten Grund
-   * sind es 3,78:1. Genau diese Differenz ist der Grund, aus dem die
-   * Pro-Hintergrund-Regel den ECHTEN Hintergrund meint und nicht den
+   * durch. Gegen den puren Token gerechnet hielt #FF6961 mit 5,13:1 - gegen
+   * den echten Grund sind es 3,78:1. Genau diese Differenz ist der Grund, aus
+   * dem die Pro-Hintergrund-Regel den ECHTEN Hintergrund meint und nicht den
    * deklarierten.
    *
    * Gerechnet gegen beide Fassungen, weil beide vorkommen (ohne
    * backdrop-filter-Unterstützung bleibt der opake Token stehen):
-   *   hell   #FF8A80 auf #413E39 = 4,67:1  |  auf #2D2A25 = 6,35:1
-   *   dunkel #9B000F auf #D2CEC6 = 5,58:1  |  auf #E7E2DA = 6,79:1
+   *   hell   #FF9A91 auf #413E39 = 4,67:1  |  auf #2D2A25 = 6,35:1
+   *   dunkel #FF9A91 auf #34302C = 6,41:1  |  auf #4B4743 = 4,51:1
+   *          opak #37332E = 6,14:1
    *
    * WARUM NICHT ÜBER --color-danger-ink: das ist die Tinte auf der eigenen
-   * hellen Füllung (--color-danger-light) und dreht in dieselbe Richtung wie
-   * der Rest. Zwei Tokens, die im hellen Modus verwandt aussehen, sind hier
-   * kein Duplikat, sondern zwei Aussagen, die im dunklen auseinanderlaufen. */
+   * hellen Füllung (--color-danger-light) und dreht mit dem Thema. Zwei
+   * Tokens, die im hellen Modus verwandt aussehen, sind hier kein Duplikat,
+   * sondern zwei Aussagen, die im dunklen auseinanderlaufen. */
   --_shell-danger-ink:   #FF9A91;
   --shell-danger-ink:    var(--_shell-danger-ink);
+
+  /* DER ERFOLG AUF SHELL-MATERIAL (Re-Critique 2026-09-27, C2). Der
+   * Erfolgs-Toast war eine gruene Vollflaeche - 118 Aufrufe, jeder ein kleiner
+   * Alarm. Er steht jetzt auf demselben Glas wie jeder Toast; das Gruen
+   * wandert ins Haekchen. Es ist ein Icon, also 3:1 (WCAG 1.4.11), und es
+   * gilt wie die Gefahr in beiden Themes, weil das Material in beiden dunkel
+   * ist. Gegen den komponierten Glasgrund und den opaken Token:
+   *   hell   #6ADE87 auf #413E39 = 6,29:1  |  auf #2D2A25 = 8,45:1
+   *   dunkel #6ADE87 auf #34302C = 7,73:1  |  auf #4B4743 = 5,44:1
+   *          opak #37332E = 7,41:1 */
+  --_shell-success-ink:  #6ADE87;
+  --shell-success-ink:   var(--_shell-success-ink);
 
   /* Datenreihen-Palette für Diagramme (Donut, Kategorie-Segmente).
    * Bewusst eigene Tokens statt geborgter Modul-Akzente: Modulfarben tragen
@@ -1278,8 +1344,13 @@
    * 12. Layout
    * -------------------------------------------------------- */
   --nav-height-mobile: 60px;
-  /* Schwebende Kapsel (Liquid Glass): Zone = Kapsel + 8px Luft oben und unten. */
-  --nav-bottom-height: calc(var(--nav-height-mobile) + var(--space-4) + var(--safe-area-inset-bottom));
+  /* Schwebende Kapsel (Liquid Glass): Zone = Kapsel + 8px Luft oben und unten.
+   * Die Kapsel ist MINDESTENS --nav-height-mobile hoch und waechst mit
+   * umbrechenden Labels (lange Sprachen, enge Geraete). Ihre echte Hoehe misst
+   * die Shell und setzt sie als --nav-capsule-height an die Wurzel
+   * (watchNavCapsuleHeight() in utils/ux.js, Review zu #1475); ohne Messung
+   * gilt die Token-Hoehe. Guard: test:mobile-chrome. */
+  --nav-bottom-height: calc(var(--nav-capsule-height, var(--nav-height-mobile)) + var(--space-4) + var(--safe-area-inset-bottom));
   /* Sichtbare Fensterhoehe (#1276). `dvh` kennt Chrome erst ab 108 und Safari
    * ab 15.4; aeltere Browser verwerfen jede Deklaration damit. Ein vh-Zwilling
    * davor (`height: 100vh; height: 100dvh`) rettet nur eine Deklaration OHNE
@@ -1292,12 +1363,47 @@
   --viewport-height: 100vh;
   --sidebar-width: 56px;             /* Fallback (mobile: sidebar hidden) */
   --sidebar-width-expanded: 220px;   /* full sidebar (≥1024px), max 240px laut Spec */
+  /* Zeilenhoehe der Seitenleiste (Critique 2026-09-26, P1-2): 15 Module,
+   * vier Sektionslabels, Einstellungen und das Konto muessen auf 1280x800
+   * ohne Scrollen stehen - mit 40px-Zeilen fehlten dort ~270px. Die Zeilen
+   * sind ein REIHEN-Bauteil (gleichartige Ziele im 2px-Abstand), fuer das die
+   * Zielgroessen-Regel (DESIGN.md) WCAG 2.5.8 ansetzt, nicht --target-md;
+   * Apples Mac-Seitenleiste fuehrt dieselbe Dichte. */
+  --sidebar-row-height: 32px;
   --content-max-width: 1280px;
   --content-max-width-narrow: 720px;
   /* Page Composition System width tokens (PAGE-COMPOSITION.md) */
   --layout-reading: var(--content-max-width-narrow);
   --layout-content: 60rem;
   --layout-wide: 75rem;
+  /* Regime „Liste + Detail" (DESIGN.md, Breitenregel): die Liste steht auf
+   * einer schmaleren Bahn als das Lesemass, weil rechts das Detail liest. Die
+   * Bahn waechst zwischen den beiden Grenzen mit der Flaeche mit. Die Schwelle,
+   * ab der die Detailspalte erscheint, steht als Wert hier, damit sie einen
+   * Namen hat - `@container` kann keine Variable lesen, die Regel in
+   * layout.css schreibt sie deshalb aus, und test:frontend-audit (PAGE-019)
+   * haelt beide gleich.
+   * 65rem = 1040px Modulflaeche: ein 1280er-Laptop (1060px neben der
+   * Seitenleiste) bekommt Liste + Detail (420 + 24 + ~560), auch mit einer
+   * klassischen 15-17px-Bildlaufleiste an #main-content. Bis R10 stand hier
+   * 75rem, und 1280 fiel auf den Einspalter mit Modal zurueck (A3 P2-2). */
+  --layout-list-min: 26.25rem;
+  --layout-list-max: 32.5rem;
+  --layout-split-threshold: 65rem;
+  /* Navigationsliste im Split (Einstellungen, Gesundheit): ihre Zeilen sind
+   * Ziele, keine zweizeiligen Datensaetze - sie nimmt die Breite einer
+   * Seitenleiste (320px, Apples Systemeinstellungen), nicht die Listenbahn
+   * oben. EIN Wert fuer beide, damit sie nicht auseinanderlaufen (R10). */
+  --layout-nav-list: 20rem;
+  /* Seitenspalte der Flaechen mit Spalten (`.page-columns`, layout.css;
+   * DESIGN.md, Breitenregel, R16 2026-10-05): links die Liste auf dem
+   * Lesemass, rechts eine Spalte, die den Rest bis zur Modulkante nimmt und
+   * nie schmaler wird als dieser Wert. 22.5rem = 360px, die Inhaltsbreite eines
+   * 390er-Telefons - was mobil in die Spalte passt, passt auch hier. Bei 1280
+   * (Flaeche 1060,
+   * Inhalt 996) bleiben der Liste 612px, bei 1440 steht sie voll auf 720px
+   * und die Seitenspalte nimmt 412px. */
+  --layout-rail-min: 22.5rem;
   /* Kanonisches horizontales Seiten-Padding. Ein Wert für den Gutter aller
    * Modul-Roots. Ab 1024px auf --space-8 angehoben (siehe Media-Query unter
    * :root), damit Kopf und Inhalt dieselbe Fluchtlinie haben (Issue #577). */
@@ -1324,10 +1430,19 @@
    * stapeln muss. `.day-view` überschreibt damit --cal-hour-height für alles in
    * seinem Träger; die Zahl steht deshalb genau hier und nirgends sonst. */
   --cal-hour-height-day: 40px;
-  /* Breite der Zeitspalte in Wochen-/Tagesansicht. Muss 12-Stunden-Labels
-   * („12:00 PM") aufnehmen. Header-Gutter + Body-Zeitspalte teilen diesen
-   * Wert, damit die Spalten fluchten. */
+  /* Breite der Zeitspalte in Wochen-/Tagesansicht. Header-Gutter +
+   * Body-Zeitspalte teilen diesen Wert, damit die Spalten fluchten. Die
+   * Stundenleiste beschriftet volle Stunden („08:00", im 12-Stunden-Format
+   * „12 PM", siehe hourGutterLabel in pages/calendar.js); 64px sind die
+   * Breite mit Luft, die schmale Stufe darunter ist das Mass fuer 375px. */
   --cal-gutter-width: 64px;
+  /* Mobil (<640px) 44px (Critique 2026-09-24): 64px von 375 waren ein
+   * Sechstel der Breite fuer eine Beschriftung, bei nur drei Tagesspalten. */
+  --cal-gutter-width-compact: 44px;
+  /* Die Vollton-Kante eines Termins (DESIGN.md „Event-Bloecke"): Monat, Woche,
+   * Tag, Ganztag und Listenzeile tragen sie gleich breit. Die Titelfassung des
+   * Telefon-Monats nimmt 2px (--space-0h), eine Geometrie, keine zweite Kante. */
+  --cal-event-edge: 3px;
   --sub-tabs-height: 52px;
   --kitchen-tabs-height: 56px;
 
@@ -1420,10 +1535,16 @@
   /* --------------------------------------------------------
    * 14. Übergänge
    *     fast=150ms, base=250ms, slow=400ms
+   *     EINE Kurvenfamilie: die Shorthands tragen dieselbe `--ease-out` wie
+   *     Seiten, Dialoge und Listen. Sie fuehrten bis R16 das Keyword `ease`,
+   *     also eine zweite Kurve fuer Hover und Press (307 Nutzungen gegen 69) -
+   *     dieselbe Oberflaeche fuehlte sich je nach Deklaration anders an.
+   *     Ein Shorthand ist Dauer + Kurve: dahinter steht NIE eine zweite Kurve
+   *     (macht die Deklaration ungueltig, `test:motion` haelt das).
    * -------------------------------------------------------- */
-  --transition-fast: 150ms ease;
-  --transition-base: 250ms ease;
-  --transition-slow: 400ms ease;
+  --transition-fast: var(--duration-sm) var(--ease-out);
+  --transition-base: var(--duration-lg) var(--ease-out);
+  --transition-slow: var(--duration-2xl) var(--ease-out);
 
   /* Motion-Dauern: kanonische Stufen für nackte Dauern in transition-/
    * animation-Werten, wo die --transition-*-Shorthands nicht passen.
@@ -1435,8 +1556,17 @@
   --duration-lg:  250ms;   /* = base (Sheets, Overlays) */
   --duration-xl:  300ms;   /* betonte Einblendungen */
   --duration-2xl: 400ms;   /* = slow (Layout-Umbauten, Sidebar) */
+  /* Hover-Absicht der eingeklappten Seitenleiste: so lange muss der Zeiger
+   * auf ihr ruhen, bevor sie ausklappt (150-250ms, A1 P3-1 der Re-Critique
+   * 2026-09-27). Eine Wartezeit, keine Bewegungsdauer. */
+  --sidebar-hover-intent: 200ms;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Symmetrische Kurve fuer Hoehenwechsel (Einklappen/Aufziehen von Zeilen und
+   * Gruppen): `--ease-out` nimmt 80 % der Hoehe in den ersten 60ms und wirkt
+   * dort wie ein Ruck; eine Hoehe, der die Nachbarn folgen, braucht Anlauf
+   * UND Auslauf (Critique 2026-09-26, Runde 3). */
+  --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
 
   /* --------------------------------------------------------
    * 15. Z-Indizes
@@ -1467,11 +1597,45 @@
   /* a) Glass-Hintergründe */
   --_glass-bg-elevated: rgba(250, 250, 252, 0.86);
   --glass-bg-elevated:  var(--_glass-bg-elevated);
+  /* a1) Die schwebende Tab-Bar-Kapsel: duenneres Glas als die uebrigen
+   * Chrome-Flaechen (Entscheid von Ulas 2026-10-01: "mehr Glas im Hintergrund,
+   * transparenter"). Vier Werte gehoeren zusammen und sind gemeinsam gemessen:
+   *   --glass-bg-capsule    die Toenung: 0.86 -> 0.66 hell, 0.88 -> 0.50 dunkel.
+   *   --glass-capsule-tone  ein Ton-Filter auf dem Hintergrund, NACH Blur und
+   *                         Saettigung. Hell ist er neutral; dunkel staucht er
+   *                         helle Inhalte unter der Kapsel zum Glas hin, damit
+   *                         Farbe durchscheint, ohne die hellen Zeichen zu
+   *                         ueberstrahlen (Apples dunkles Material macht das
+   *                         ebenso).
+   *   --lg-capsule-saturate die Saettigung, eine Stufe ueber dem uebrigen Glas.
+   *   Labelfarbe            die inaktiven Labels stehen in --color-text-primary
+   *                         (layout.css, `.nav-bottom .nav-item__label`) - mit
+   *                         Tertiaertext war die alte Deckung schon die Grenze.
+   * Gemessen am gerenderten Pixel (390x844, Chromium, dunkelster bzw. hellster
+   * Punkt der Flaeche) gegen den unguenstigsten REALISTISCHEN Grund unter der
+   * Kapsel - Buehne, Karte, Textzeilen, ein mittelgraues Foto, dunkel dazu eine
+   * Akzentflaeche: Label hell >= 11.1:1, dunkel >= 11.2:1; aktives Label auf
+   * der Pille hell >= 4.58:1, dunkel >= 4.6:1 (diese beiden binden); Modul-
+   * Zeichen hell >= 3.3:1, dunkel >= 4.6:1. Wer einen der vier Werte anfasst,
+   * misst alle neu. Ohne backdrop-filter bleibt --glass-bg-elevated (glass.css,
+   * Abschnitt 1); prefers-reduced-transparency und prefers-contrast: more
+   * kippen die Toenung auf --color-surface (Bloecke unten). */
+  --_glass-bg-capsule:   rgba(250, 250, 252, 0.66);
+  --glass-bg-capsule:    var(--_glass-bg-capsule);
+  --_glass-capsule-tone: brightness(1);
+  --glass-capsule-tone:  var(--_glass-capsule-tone);
   --_glass-border:      rgba(255, 255, 255, 0.65);
   --glass-border:       var(--_glass-border);
   --_glass-border-subtle: rgba(255, 255, 255, 0.38);
   --glass-border-subtle:  var(--_glass-border-subtle);
   --glass-border-overlay: rgba(255, 255, 255, 0.10);  /* immer-dunkle Surfaces (Toasts, Overlays) */
+  /* Griff jedes mobilen Blatts (Dialog-Sheet, Mehr-Blatt; Re-Critique
+   * 2026-09-27 P1 #1). Hell: die kraeftigere Kante, neutral und leise wie
+   * Apples Grabber (gemessen 1,6:1 gegen die Kopfflaeche des Blatts) - vorher
+   * Glas-Weiss 65 % auf weisser Tafel, also unsichtbar. Dunkel bleibt das
+   * Glas-Weiss (Dark-Bloecke unten). */
+  --_sheet-grabber:     var(--color-border-strong);
+  --sheet-grabber:      var(--_sheet-grabber);
 
   /* a2) Glass-Hintergründe: Vibrancy-Stufe (transparenter, mehr Durchschein) */
   --_glass-bg-card:       var(--_color-surface-glass);
@@ -1507,6 +1671,12 @@
    * dort der einzige Materialbeweis. */
   --_glass-sheen: rgba(255, 255, 255, 0.35);
   --glass-sheen:  var(--_glass-sheen);
+  /* Lichtfang der Tab-Bar-Kapsel: laeuft von der Oberkante bis knapp unter
+   * die Mitte aus (glass.css, Abschnitt 1). Im Dunkeln bewusst leise - die
+   * Zeichen dort sind hell, und ein kraeftiger Sheen hinter ihnen kostete
+   * genau den Kontrast, den der Ton-Filter oben erkauft. */
+  --_glass-sheen-capsule: rgba(255, 255, 255, 0.40);
+  --glass-sheen-capsule:  var(--_glass-sheen-capsule);
 
   /* d2) Inset-Specular: Oberrand-Sheen für Glass-Elemente (volle inset-Kurzform)
    *
@@ -1538,6 +1708,13 @@
    * 2026-08-09 an beiden Stellen als rohes rgba, eine Zeile unter dem oberen
    * Specular, der den Schalter korrekt las. */
   --glass-inset-bottom-lift:  inset 0 -1px 0 rgba(255, 255, 255, calc(0.04 * var(--glass-inset-strength)));
+  /* Glanzrand der Tab-Bar-Kapsel: Oberkanten-Licht plus eine feine Kante rund
+   * um die Scheibe, die das duennere Glas als Koerper fasst. Am selben Schalter
+   * wie alle Insets; die Staerke je Theme steht in --_glass-capsule-rim-*. */
+  --_glass-capsule-rim-top:  0.60;
+  --_glass-capsule-rim-edge: 0.45;
+  --glass-inset-capsule:      inset 0 1px 0 rgba(255, 255, 255, calc(var(--_glass-capsule-rim-top) * var(--glass-inset-strength))),
+                              inset 0 0 0 0.5px rgba(255, 255, 255, calc(var(--_glass-capsule-rim-edge) * var(--glass-inset-strength)));
   --glass-inset-thumb:        inset 0  1px 0 rgba(255, 255, 255, calc(0.90 * var(--glass-inset-strength))),
                               inset 0 -1px 0 rgba(0, 0, 0, calc(0.08 * var(--glass-inset-strength)));
   --glass-inset-input:        inset 0  1px 2px rgba(0, 0, 0, calc(0.04 * var(--glass-inset-strength)));
@@ -1578,7 +1755,18 @@
    * --ease-glass), damit die gleitende Aktiv-Pille nicht über das Ziel-Item
    * hinausschießt. */
   --ease-sidebar-glide: cubic-bezier(0.28, 1.25, 0.36, 1);
-  --transition-glass: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Aus Bestandteilen, nicht als Literal: 0.35s brach die ms-Konvention und
+   * wiederholte die Federkurve; 300ms ist die Obergrenze im Arbeitsfluss. */
+  --transition-glass: var(--duration-xl) var(--ease-glass);
+  /* BLATT VON UNTEN: EIN PAAR fuer Dialog-Sheet, Mehr-Blatt und mobile Suche
+   * (R16). Es gab drei Bewegungen fuer dieselbe Geste: Dialog 24px + Feder in
+   * 300ms, Mehr-Blatt Vollhub in 250ms, Suche Vollhub. Der Eintritt federt,
+   * der Austritt ist kuerzer und ohne Ueberschwinger. Die Feder vertraegt nur
+   * den kurzen Hub (`--sheet-lift`): ueber einen Vollhub wirft sie das Blatt
+   * sichtbar ueber seine Ruhelage (gemessen 28,5px bei 40 %, test:motion). */
+  --sheet-in:   var(--duration-xl) var(--ease-glass);
+  --sheet-out:  var(--duration-md) var(--ease-out);
+  --sheet-lift: 24px;
 
   /* h) Liquid-Glass-Backdrop (Section 17) — driftende Blobs + Specular.
    *    --lg-blob-opacity bleibt bewusst niedrig, damit Inhalte dominieren.
@@ -1590,6 +1778,7 @@
   --app-backdrop-secondary-strength: var(--_app-backdrop-secondary-strength);
   --lg-blob-opacity:   0.16;
   --lg-glass-saturate: 200%;    /* Backdrop-Sättigung erhöhter Glass-Flächen */
+  --lg-capsule-saturate: 220%;  /* Tab-Bar-Kapsel: duenneres Glas, sattere Durchsicht (a1) */
   --lg-specular:       0.22;    /* Stärke des Inset-Top-Highlights */
 
   /* i) Maskenstopp — voll deckend. KEIN FARBWERT.
@@ -1657,6 +1846,12 @@
  * `.contact-more-menu` unerreichbar (gemessen 2026-08-10). Der Unterschied
  * ist nicht die Zone, sondern wo der Knopf steht.
  * ================================================================ */
+@media (max-width: 639px) {
+  :root {
+    --cal-gutter-width: var(--cal-gutter-width-compact);
+  }
+}
+
 @media (max-width: 1023px) {
   :root {
     --fab-safe-zone: 0px;
@@ -1795,13 +1990,17 @@
      * (Critique 2026-07-29). Mit der Flaechen-Kur eine knappe Stufe
      * mitgerueckt, damit die Sichtbarkeit auf der helleren Surface haelt
      * (subtle 1.28:1, border 1.47:1 gegen #2B2825 - vorher 1.23 / 1.51).
-     * Die Standardkante bleibt dabei unter #48423C: zwei Bestandsstellen
-     * fuellen mit --color-border eine Flaeche UNTER Sekundaertext
-     * (.md-toolbar__sep:hover, .user-ms__avatar--none), und der Guard
-     * verlangt dort zu Recht 4.5 - #47423B traegt 4.52. */
+     * Die Standardkante bleibt dabei unter #48423C: eine Bestandsstelle
+     * fuellt mit --color-border eine Flaeche UNTER Sekundaertext
+     * (.md-toolbar__sep:hover; der zweite Fall, der Avatar von „Niemand",
+     * ist 2026-09-24 entfallen), und der Guard verlangt dort zu Recht 4.5 -
+     * #47423B traegt 4.52. */
     --color-border-subtle: #3E3933;  /* Trenner, ruhige Kartenkante */
     --color-border:        #47423B;  /* Standardkante (Karten, Gruppen); Feldkanten: --color-border-control */
     --color-border-strong: #6F6A61;  /* Hover, betonte Rahmen (~2.7:1) */
+    /* Bahn des ausgeschalteten Schalters (#1572, Werte im :root-Block). Als Hex,
+     * nicht als var(): die Naht zum Installer-Fallback vergleicht Wert fuer Wert. */
+    --_color-switch-off:   #948E85;  /* = --_neutral-500 */
 
     --_sidebar-bg:           #221F1D;
     --_sidebar-shadow-light: rgba(255, 255, 255, 0.04);
@@ -1882,15 +2081,15 @@
     --_color-info-ink:      #60ACFF;
 
     /* Toast: dunkler Text auf vividen Farben */
-    --_toast-success-text: #04200D;   /* auf #30D158 */
     --_toast-warning-text: #2B1A00;   /* auf #FF9F0A */
     --_toast-danger-text:  #330606;   /* auf #FF6961 */
 
-    /* Gegendrehung: --neutral-800 ist hier HELL (#E7E2DA), also braucht die
-     * Gefahr darauf das tiefe Rot statt des vividen. Gegen den komponierten
-     * Glasgrund #D2CEC6: 5,58:1. --color-danger-hover (#B80012) hielt dort nur
-     * 4,39:1 und ist deshalb NICHT der Wert. */
-    --_shell-danger-ink:   #9B000F;
+    /* Shell-Material: gehobenes dunkles Glas statt des hellen --neutral-800
+     * (Begruendung und Messwerte im :root-Block). Die Shell-Tinten brauchen
+     * hier keinen eigenen Wert mehr - das Material dreht sich nicht mit. */
+    --_toast-bg:             var(--_color-surface-raised);
+    --_toast-text:           var(--_neutral-900);
+    --_toast-text-secondary: var(--_neutral-700);
 
     /* Dunkle Tinte auf den vividen Hell-Füllungen des Dark Mode (FAB, Badges, aktive Chips) */
     --_color-ink-on-vivid: #0A0A0C;
@@ -1999,7 +2198,15 @@
      * die Tab-Bar stand als kuehle Scheibe auf der warmen Buehne. Jetzt die
      * Glas-Fassung der eigenen Surface (#2D2A27-Basis), gleiche Deckung. */
     --_glass-bg-elevated:      rgba(45, 42, 39, 0.88);
+    /* Kapsel (a1 im Light-Block): gleiche Toenung wie oben, duenner; der
+     * Ton-Filter dunkelt statt aufzuhellen, weil die Zeichen hier hell sind. */
+    --_glass-bg-capsule:       rgba(45, 42, 39, 0.50);
+    --_glass-capsule-tone:     contrast(0.65) brightness(0.4);
+    --_glass-sheen-capsule:    rgba(255, 255, 255, 0.07);
+    --_glass-capsule-rim-top:  0.18;
+    --_glass-capsule-rim-edge: 0.10;
     --_glass-border:           rgba(255, 255, 255, 0.12);
+    --_sheet-grabber:         var(--glass-border);
     --_glass-border-subtle:    rgba(255, 255, 255, 0.14);
     --_glass-highlight:        rgba(255, 255, 255, 0.09);
     --_glass-highlight-subtle: rgba(255, 255, 255, 0.05);
@@ -2063,6 +2270,7 @@
     --color-border-subtle: #3E3933;
     --color-border:        #47423B;
     --color-border-strong: #6F6A61;
+    --_color-switch-off:   #948E85;  /* = --_neutral-500 */
 
     /* Sidebar */
     --_sidebar-bg:           #221F1D;
@@ -2123,12 +2331,13 @@
     --_color-info-ink:      #60ACFF;
 
     /* Toast: dunkler Text auf vividen Farben */
-    --_toast-success-text: #04200D;
     --_toast-warning-text: #2B1A00;
     --_toast-danger-text:  #330606;
 
-    /* Gegendrehung, siehe den Zwilling im prefers-color-scheme-Block. */
-    --_shell-danger-ink:   #9B000F;
+    /* Shell-Material, siehe den Zwilling im prefers-color-scheme-Block. */
+    --_toast-bg:             var(--_color-surface-raised);
+    --_toast-text:           var(--_neutral-900);
+    --_toast-text-secondary: var(--_neutral-700);
 
     /* Dunkle Tinte auf den vividen Hell-Füllungen des Dark Mode (FAB, Badges, aktive Chips) */
     --_color-ink-on-vivid: #0A0A0C;
@@ -2214,7 +2423,14 @@
 
     /* Glass — warm statt iOS-Neutralgrau (Media-Block oben) */
     --_glass-bg-elevated:     rgba(45, 42, 39, 0.88);
+    /* Kapsel - Zwilling des prefers-color-scheme-Blocks. */
+    --_glass-bg-capsule:      rgba(45, 42, 39, 0.50);
+    --_glass-capsule-tone:    contrast(0.65) brightness(0.4);
+    --_glass-sheen-capsule:   rgba(255, 255, 255, 0.07);
+    --_glass-capsule-rim-top:  0.18;
+    --_glass-capsule-rim-edge: 0.10;
     --_glass-border:          rgba(255, 255, 255, 0.12);
+    --_sheet-grabber:         var(--glass-border);
     --_glass-border-subtle:   rgba(255, 255, 255, 0.14);
     --_glass-highlight:       rgba(255, 255, 255, 0.09);
     --_glass-highlight-subtle: rgba(255, 255, 255, 0.05);
@@ -2238,6 +2454,7 @@
 @media (prefers-reduced-transparency: reduce) {
   :root {
     --glass-bg-elevated: var(--color-surface);
+    --glass-bg-capsule:  var(--color-surface);
     --glass-bg-card:     var(--color-surface);
     --glass-bg-card-hover: var(--color-surface-2);
     --glass-border:      var(--color-border);
@@ -2245,6 +2462,7 @@
     --glass-highlight:        transparent;
     --glass-highlight-subtle: transparent;
     --glass-sheen:            transparent;
+    --glass-sheen-capsule:    transparent;
     --glass-tint-strength: 0%;
     --blur-2xs: blur(0px);
     --blur-xs:  blur(0px);
@@ -2275,11 +2493,13 @@
      * #F2F2F7 ist 1,12:1 - unlesbar, ausgerechnet im Modus fuer Menschen, die
      * mehr Kontrast brauchen. */
     --glass-bg-elevated: var(--color-surface);
+    --glass-bg-capsule:  var(--color-surface);
     --glass-border:      var(--color-text-primary);
     --glass-border-subtle: var(--color-text-secondary);
     --glass-highlight:        transparent;
     --glass-highlight-subtle: transparent;
     --glass-sheen:            transparent;
+    --glass-sheen-capsule:    transparent;
     --blur-2xs: blur(0px);
     --blur-xs:  blur(0px);
     --blur-sm:  blur(0px);

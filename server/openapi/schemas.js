@@ -644,12 +644,19 @@ export const schemas = {
               type: ['string', 'null'],
               description: 'Inherited colour of the source calendar or ICS subscription, read-only. Applies to every event of that source and therefore says nothing about this one; it is the fallback below color and the assignee.',
             },
-            attachment_name: { type: ['string', 'null'] },
-            attachment_mime: { type: ['string', 'null'] },
-            attachment_size: { type: ['integer', 'null'] },
-            attachment_document_id: { type: ['integer', 'null'] },
-            attachment_preview_url: { type: ['string', 'null'] },
-            attachment_download_url: { type: ['string', 'null'] },
+            attachment_name: { type: ['string', 'null'], description: 'Null when the event has no attachment or the caller may not read its document (see attachment_document_id).' },
+            attachment_mime: { type: ['string', 'null'], description: 'Null when the event has no attachment or the caller may not read its document (see attachment_document_id).' },
+            attachment_size: { type: ['integer', 'null'], description: 'Null when the event has no attachment or the caller may not read its document (see attachment_document_id).' },
+            attachment_document_id: {
+              type: ['integer', 'null'],
+              description: 'The attachment\'s document in the Documents module. Null unless the caller may read that document: access to the Documents module (for API tokens a `documents:read` scope) and the document\'s own visibility. Without it the event carries no attachment at all - id, URLs, name, MIME type and size are null.',
+            },
+            attachment_locked: {
+              type: ['boolean', 'null'],
+              description: 'True when the event has an attachment whose document the caller may not see (for example a private document of another member); it names nothing about that document, and such an attachment cannot be replaced or removed by this caller. False otherwise. Null without read access to the Documents module (for API tokens a `documents:read` scope).',
+            },
+            attachment_preview_url: { type: ['string', 'null'], description: 'Null whenever attachment_document_id is null.' },
+            attachment_download_url: { type: ['string', 'null'], description: 'Null whenever attachment_document_id is null.' },
             attachment_data: {
               type: ['string', 'null'],
               description: 'Legacy attachment data URL. Null for attachments linked through attachment_document_id.',
@@ -834,6 +841,20 @@ export const schemas = {
             username: { type: 'string' },
             display_name: { type: 'string' },
             password: { type: 'string' },
+            language: {
+              type: 'string',
+              nullable: true,
+              description: 'Optional. Language code of a supported app locale (e.g. `de`, `pt`, `fil`). '
+                + 'Sets the household data language (the language of server-generated titles such as birthday events), '
+                + 'unless the automatic choice already yields it. Region, currency and date format are not derived from it. '
+                + 'Unsupported values are rejected with 400; omitted, null or empty keeps the previous behaviour.',
+            },
+            timezone: {
+              type: 'string',
+              nullable: true,
+              description: 'Optional. IANA time zone of the household (e.g. `Europe/Berlin`). '
+                + 'Unknown zones are rejected with 400; omitted, null or empty keeps the fallback to TZ, the system zone and UTC.',
+            },
           },
           required: ['username', 'display_name', 'password'],
         },

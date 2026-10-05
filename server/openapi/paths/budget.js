@@ -1,10 +1,10 @@
-import { op, jsonBody, idParam, stringPathParam, langParam } from '../helpers.js';
+import { op, jsonBody, idParam, stringPathParam, langParam, DOCUMENT_LINKS_READ_NOTE } from '../helpers.js';
 
 export function budgetPaths() {
   return {
     '/api/v1/budget/summary': { get: op({ summary: 'Get budget summary', tag: 'Budget' }) },
     '/api/v1/budget/plans': {
-      get: op({ summary: 'Get planned budget vs. actual for a month (category caps + savings goal)', tag: 'Budget' }),
+      get: op({ summary: 'Get planned budget vs. actual for a month (category caps + savings goal)', tag: 'Budget', description: 'In personal budget mode the actual figures count what you can see, like the summary: `scope` (`mine`|`household`, default `mine`) picks the view, private entries of others do not count, and the amount of an entry of someone else whose details are hidden (`shared_amount`) counts only toward income and balance of the savings goal, never toward a category. Shared mode counts every entry.' }),
     },
     '/api/v1/budget/plans/{category}': {
       put: op({ summary: 'Set planned monthly amount for a category or the savings goal (__savings__)', tag: 'Budget', params: [stringPathParam('category', 'Expense category key or __savings__')], stateChanging: true, requestBody: jsonBody(null) }),
@@ -63,25 +63,38 @@ export function budgetPaths() {
       get: op({
         summary: 'List budget entries',
         tag: 'Budget',
+        description: `Each entry carries \`attachments\`. ${DOCUMENT_LINKS_READ_NOTE}`,
         params: [{
           name: 'scope',
           in: 'query',
           required: false,
-          description: "View filter when the household runs in personal budget mode (preference `budget_mode=personal`): `mine` shows entries you own, `household` shows the shared pot. Ignored in shared mode. Entries also carry `owner_id` and `visibility` (`private`|`shared`); private entries are only visible to their owner (no admin bypass). Each entry carries `attachments`: linked documents from the documents module, filtered by document visibility.",
+          description: "View filter when the household runs in personal budget mode (preference `budget_mode=personal`): `mine` shows entries you own, `household` shows the shared pot. Ignored in shared mode. Entries also carry `owner_id` and `visibility` (`private`|`shared`|`shared_amount`); private entries are only visible to their owner (no admin bypass), and on a `shared_amount` entry of someone else only amount, date and account remain (`details_hidden: true`). Each entry carries `attachments`: linked documents from the documents module, filtered by document visibility.",
           schema: { type: 'string', enum: ['mine', 'household'], default: 'mine' },
+        }, {
+          name: 'category',
+          in: 'query',
+          required: false,
+          description: 'Only entries of this category key; an unknown key is ignored. The filter sees the same view as the response: in personal budget mode an entry of someone else whose details are hidden from you (`shared_amount`) carries the category `__private__` and matches only that key, like the catch-all bucket in the summary and statistics.',
+          schema: { type: 'string' },
+        }, {
+          name: 'q',
+          in: 'query',
+          required: false,
+          description: 'Search the ledger instead of listing one month: matches the entry title across all months, inside words, ignoring case and accents (`muller` finds `Müller`). `month` and `category` are ignored; `account_id` and `scope` still apply. Newest first, at most 200 hits; `meta.truncated` says whether more matched. An entry whose details are hidden from you (`shared_amount` of someone else) is never a hit. 1-100 characters, otherwise 400.',
+          schema: { type: 'string', minLength: 1, maxLength: 100 },
         }],
       }),
-      post: op({ summary: 'Create budget entry (optional `visibility`: private|shared; owner is the creator; optional `attachment_document_ids`: receipts from the documents module)', tag: 'Budget', stateChanging: true, documentDeleteConflict: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Create budget entry (optional `visibility`: private|shared; owner is the creator; optional `attachment_document_ids`: receipts from the documents module)', tag: 'Budget', description: DOCUMENT_LINKS_READ_NOTE, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/budget/{id}': {
-      put: op({ summary: 'Update budget entry (`attachment_document_ids` replaces the receipt links; omit the field to leave them untouched)', tag: 'Budget', params: [idParam()], stateChanging: true, documentDeleteConflict: true, requestBody: jsonBody(null) }),
+      put: op({ summary: 'Update budget entry (`attachment_document_ids` replaces the receipt links; omit the field to leave them untouched)', tag: 'Budget', params: [idParam()], description: `${DOCUMENT_LINKS_READ_NOTE} On the first entry of a running series, a changed rhythm (\`recurrence_interval\`, \`recurrence_interval_count\`, \`recurrence_virtual\`, \`recurrence_rule\`) applies to the whole series: missing past occurrences are created on the old grid, occurrences from today on are rebuilt, and none is generated before today on the new grid. The entry's \`date\` is that booking's date only; the series keeps its start day.`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete budget entry', tag: 'Budget', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/budget/{id}/confirm': {
       patch: op({ summary: 'Confirm a booked entry, correcting amount and date', tag: 'Budget', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { amount?, date? }, both optional. Amount and date are editable here precisely because their deviation is the occasion: services rarely debit on the day and to the cent a series predicts. A plain "confirmed" tick would have left the very discrepancy against the bank statement that this is about.' }),
     },
     '/api/v1/budget/{id}/series': {
-      put: op({ summary: 'Update recurring budget entry series (receipts stay with the single entry and are not part of the series)', tag: 'Budget', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      put: op({ summary: 'Update recurring budget entry series (receipts stay with the single entry and are not part of the series)', tag: 'Budget', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Changes a series "for all future occurrences": its own definition and every entry of the series dated today or later (household time zone). Entries already booked keep their values, the first entry included - it is an ordinary entry that anchors the series. Visibility is the deliberate exception and applies to every entry of the series. The response is the anchor entry with the resulting definition as `series` (null once the series has ended). A series edit never ends the series: `is_recurring: false` is answered with 400. End a series with PUT /api/v1/budget/{id} and `is_recurring: false` on its first entry, or with DELETE. Addressed through a generated occurrence of a virtual series, `amount` is that occurrence\'s amount (the monthly share), and the period amount is derived from it. The start day belongs to the definition: `start_date` (YYYY-MM-DD) moves it and rebuilds the occurrences from today on like a rhythm change; the first entry moves along only while it lies ahead. Once it is booked, a start day in an earlier month than the first entry is answered with 400. Before a start day or rhythm change, every missing past occurrence is created on the old grid; afterwards no occurrence is generated before the day of that change. `date` is ignored here, it is the date of a single entry, and correcting the first entry\'s date with PUT /api/v1/budget/{id} leaves the start day as it is.' }),
       delete: op({ summary: 'Delete recurring budget entry series', tag: 'Budget', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/budget/stats': {

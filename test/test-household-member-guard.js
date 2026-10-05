@@ -116,8 +116,8 @@ const ALLOWLIST = [
     reason: 'Two-factor overview for admins: the second factor protects accounts, not membership, so the overview lists every account.',
   },
   {
-    file: 'server/auth.js', site: 'findOrCreateOidcUser', lists: 1,
-    reason: 'Sign-in: SSO links the one account that carries the verified address, whichever kind it is.',
+    file: 'server/utils/email-match.js', site: 'accountIdsByEmail', lists: 1,
+    reason: 'Sign-in and password reset: finds the one account that carries an address, whichever kind it is (SSO linking, the SSO-only clash check, forgot-password). Shows no one; returns account ids only.',
   },
   {
     file: 'server/routes/permissions.js', site: 'GET /catalog', lists: 1,

@@ -61,3 +61,31 @@ export function normalizePantryQuantity(value, { fallback = 1 } = {}) {
   if (!Number.isFinite(n)) return fallback;
   return Math.min(MAX_PANTRY_QUANTITY, Math.max(0, Math.round(n * 100) / 100));
 }
+
+/**
+ * Menge mit Einheit fuer die Anzeige: „6 Dosen", „1 Dose", „1,5 kg".
+ *
+ * DIE EINHEIT FLEKTIERT MIT DER MENGE (Re-Critique 2026-09-27, W2). Hier gab
+ * es keinen geteilten Helfer; Vorrat und Uebersicht setzten je den Einheitennamen
+ * hinter die Zahl, und das ist der Singular - „6 Dose", „3 Packung". Die Locale
+ * traegt dafuer `pantry.units.<unit>_one|_two|_few|_many|_other`; t() waehlt die
+ * Kategorie ueber Intl.PluralRules, also auch Bruchzahlen richtig („1,5 Dosen",
+ * im Polnischen „1,5 puszki"). Der Basisschluessel bleibt der Name der Einheit,
+ * den das Auswahlfeld ohne Menge zeigt.
+ *
+ * `t` und `formatNumber` kommen vom Aufrufer, damit diese Datei importfrei und
+ * damit fuer den Server ladbar bleibt (siehe Dateikopf).
+ *
+ * @param {number|string} quantity
+ * @param {string} unit
+ * @param {{ t: (key: string, params?: object) => string, formatNumber: (n: number) => string }} deps
+ * @returns {string}
+ */
+export function pantryQuantityLabel(quantity, unit, { t, formatNumber }) {
+  const amount = Number(quantity) || 0;
+  const key = `pantry.units.${unit}`;
+  const label = t(key, { count: amount });
+  // Rueckfall auf den Rohwert: eine Einheit ohne Locale-Key (Fremdimport,
+  // direkter DB-Zugriff) stuende sonst als nackter Schluessel in der Zeile.
+  return `${formatNumber(amount)} ${label === key ? String(unit ?? '') : label}`;
+}

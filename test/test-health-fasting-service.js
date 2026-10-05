@@ -1,7 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
 import { applyMigration, buildMigratedDatabase } from './helpers/migrated-database.js';
@@ -9,12 +7,13 @@ import {
   createFast, finishFast, updateFast, deleteFast, getFastingState,
   acknowledgeSafety, updateFastingSettings, FastingError,
 } from '../server/services/fasting.js';
+import { tempDir } from './tmp-dir.js';
 
 process.env.DB_PATH = ':memory:';
 const { MIGRATIONS } = await import('../server/db.js');
 const REMINDER_MIGRATION_VERSION = 220;
 
-function setup(path = join(mkdtempSync(join(tmpdir(), 'yuvomi-fasting-service-')), 'db.sqlite')) {
+function setup(path = join(tempDir('yuvomi-fasting-service-'), 'db.sqlite')) {
   const database = buildMigratedDatabase(
     Database,
     MIGRATIONS.filter((migration) => migration.version < REMINDER_MIGRATION_VERSION),
@@ -246,7 +245,7 @@ test('lifecycle and active-goal settings enter an immediate transaction before r
 });
 
 test('createFast acquires the writer lock before overlap validation on two real connections', () => {
-  const path = join(mkdtempSync(join(tmpdir(), 'yuvomi-fasting-lock-')), 'db.sqlite');
+  const path = join(tempDir('yuvomi-fasting-lock-'), 'db.sqlite');
   const first = setup(path);
   acknowledgeSafety(first, actor(1), 1);
   const second = new Database(path);

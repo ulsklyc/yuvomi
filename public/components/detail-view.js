@@ -8,12 +8,14 @@
  *                 i18n.js (t), detail-view.css
  *
  * API:
- *   openDetailView({ title, accentColor, anchor, sections, actions, edit, size, onClose })
+ *   openDetailView({ title, accentColor, anchor, pane, sections, actions, edit, size, onClose })
  *   closeDetailView({ force, fokus }) → Promise<void>
  *
- * Zwei Präsentationen, eine Aufrufer-API: ab 768px UND mit Anker erscheint die
- * Ansicht als verankertes Popover am Auslöser, sonst als Bottom-Sheet über
- * openModal(). Der Inhalt kommt in beiden Fällen aus demselben Renderer.
+ * Drei Präsentationen, eine Aufrufer-API: mit `pane` (die Detailspalte aus
+ * Liste + Detail, utils/master-detail.js) steht die Ansicht in der Spalte;
+ * sonst ab 768px UND mit Anker als verankertes Popover am Auslöser, sonst als
+ * Bottom-Sheet über openModal(). Der Inhalt kommt in allen drei Fällen aus
+ * demselben Renderer.
  */
 
 import { t } from '/i18n.js';
@@ -22,6 +24,7 @@ import {
   focusFirstField, updateHeaderAction, rememberFocus, restoreFocusAfterClose,
 } from '/components/modal.js';
 import { pushOverlay, dropOverlay } from '/utils/overlay-history.js';
+import { detailPaneHeaderEl } from '/utils/master-detail.js';
 
 // Ab dieser Breite ist ein Popover am Auslöser die bessere Präsentation: Der
 // Auslöser bleibt sichtbar, der Weg ist kurz. Darunter deckt ein 320px-Kärtchen
@@ -40,6 +43,14 @@ let activePopover = null;
 // Ansicht, die der Nutzer inzwischen geöffnet hat.
 let viewSeq = 0;
 let activeViewToken = 0;
+
+// Das offene Blatt und WESSEN Leseansicht es zeigt (`opts.key`, z.B.
+// `contact:42`). Wird dieselbe Auswahl in die Detailspalte befoerdert
+// (Fenster breiter, utils/master-detail.js), geht genau dieses Blatt zu -
+// sonst stuende das Detail doppelt da, und das Overlay blockierte die Spalte.
+// Der Schluessel ist die Grenze: ein Blatt eines anderen Eintrags oder eines
+// fremden Moduls bleibt stehen.
+let activeSheet = null;
 
 function reduceMotion() {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -62,10 +73,18 @@ function renderIcons(el) {
  * ungeprüft ein, die Garantie gilt dort also nur so weit, wie der Aufrufer ihn
  * selbst über createElement/textContent gebaut hat.
  *
- * @param {{icon?: string, label: string, value?: string, node?: HTMLElement, multiline?: boolean}} row
+ * FOLGEAKTION (`action`): ein leiser Knopf am Ende der Zeile, der mit genau
+ * diesem Wert weiterarbeitet - „In Maps oeffnen" an der Ort-Zeile, wie Apple
+ * Kalender ihn fuehrt. Er gehoert zur Zeile, nicht in die Fusszeile: dort
+ * stand er als dritte Aktion und brach den Fuss auf drei Reihen (A2 P3). Der
+ * Wert bleibt reiner Text - die Aktion ist ausdruecklich, kein Link auf
+ * Freitext wie „Zoom" (#1110).
+ *
+ * @param {{icon?: string, label: string, value?: string, node?: HTMLElement, multiline?: boolean,
+ *   action?: {id?: string, label: string, icon?: string, onClick: Function}}} row
  * @returns {HTMLElement|null}
  */
-export function detailRowEl({ icon, label, value, node, multiline = false } = {}) {
+export function detailRowEl({ icon, label, value, node, multiline = false, action = null } = {}) {
   const hasContent = node instanceof HTMLElement || (typeof value === 'string' && value.trim().length > 0);
   if (!hasContent) return null;
 
@@ -101,6 +120,23 @@ export function detailRowEl({ icon, label, value, node, multiline = false } = {}
   }
 
   row.appendChild(text);
+
+  if (action && typeof action.onClick === 'function') {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn--ghost btn--sm detail-row__action';
+    if (action.id) btn.id = action.id;
+    if (action.icon) {
+      const i = document.createElement('i');
+      i.className = 'icon-sm';
+      i.dataset.lucide = action.icon;
+      i.setAttribute('aria-hidden', 'true');
+      btn.appendChild(i);
+    }
+    btn.append(document.createTextNode(action.label ?? ''));
+    btn.addEventListener('click', () => action.onClick({ button: btn }));
+    row.appendChild(btn);
+  }
   return row;
 }
 
@@ -168,7 +204,7 @@ function detailBodyEl({ accentColor, sections = [] }) {
   rows.className = 'detail-view__rows';
   sections
     .filter((s) => s && !s.hidden)
-    .map(detailRowEl)
+    .map((s) => (Array.isArray(s.rows) ? detailGroupEl(s) : detailRowEl(s)))
     .filter(Boolean)
     .forEach((row) => rows.appendChild(row));
   view.appendChild(rows);
@@ -177,11 +213,40 @@ function detailBodyEl({ accentColor, sections = [] }) {
 }
 
 /**
+ * Eine benannte Gruppe von Metazeilen (`{ group, rows }`) - wie die
+ * Abschnitte einer Kontaktkarte bei Apple. Dreizehn lose Zeilen lesen sich wie
+ * ein Formular; nach Kauf, Garantie und Zustand gegliedert, findet das Auge
+ * die Frage, die es hat (A6 P3-3). Ohne eine Zeile mit Inhalt faellt die
+ * Gruppe ganz weg, samt Titel.
+ *
+ * @param {{group: string, rows: Array}} section
+ * @returns {HTMLElement|null}
+ */
+function detailGroupEl({ group, rows = [] }) {
+  const built = rows.filter((r) => r && !r.hidden).map(detailRowEl).filter(Boolean);
+  if (!built.length) return null;
+  const box = document.createElement('section');
+  box.className = 'detail-group';
+  if (group) {
+    const title = document.createElement('h3');
+    title.className = 'detail-group__title';
+    title.textContent = group;
+    box.appendChild(title);
+    box.setAttribute('aria-label', group);
+  }
+  const list = document.createElement('div');
+  list.className = 'detail-group__rows';
+  built.forEach((row) => list.appendChild(row));
+  box.appendChild(list);
+  return box;
+}
+
+/**
  * Fußzeile mit den Objektaktionen. Bewusst `.modal-panel__footer`, damit sie im
  * Sheet-Modus vom Fußzeilen-Umzug in modal.js erfasst wird und unter der Falz
  * stehen bleibt statt mitzuscrollen.
  */
-function detailFooterEl(actions = []) {
+function detailFooterEl(actions = [], close = closeDetailView) {
   const visible = actions.filter((a) => a && !a.hidden);
   if (!visible.length) return null;
 
@@ -201,9 +266,19 @@ function detailFooterEl(actions = []) {
       i.setAttribute('aria-hidden', 'true');
       btn.appendChild(i);
     }
-    btn.append(document.createTextNode(action.label ?? ''));
+    // Die Beschriftung in einem eigenen Knoten: in einer schmalen Detailspalte
+    // (1280er-Laptop, 552px) tritt sie bei leisen Knoepfen mit Icon hinter das
+    // Icon zurueck, damit der Fuss EINE Reihe bleibt (layout.css); der Name
+    // bleibt fuer Screenreader und als Tooltip.
+    if (action.label) {
+      const label = document.createElement('span');
+      label.className = 'btn__label';
+      label.textContent = action.label;
+      btn.appendChild(label);
+      if (action.icon) btn.title = action.label;
+    }
     if (typeof action.onClick === 'function') {
-      btn.addEventListener('click', () => action.onClick({ close: closeDetailView, button: btn }));
+      btn.addEventListener('click', () => action.onClick({ close, button: btn }));
     }
     footer.appendChild(btn);
   });
@@ -422,10 +497,11 @@ function switchToDetail(panel, opts, state) {
 
   setPanelTitle(panel, opts.title ?? '');
   const btn = updateHeaderAction(panel, {
-    label: opts.edit.label ?? t('common.edit'),
+    label: state.primaryEdit ? t('common.back') : (opts.edit.label ?? t('common.edit')),
     onClick: () => switchToForm(panel, opts, state),
+    hidden: state.primaryEdit,
   });
-  btn?.focus();
+  (state.primaryEdit ? state.detailFooter?.querySelector('#detail-view-edit') : btn)?.focus();
   state.mode = 'detail';
 }
 
@@ -438,8 +514,18 @@ function openAsSheet(opts, token) {
     mode: 'detail',
     detailPane: null, formPane: null,
     detailFooter: null, formFooter: null,
+    primaryEdit: Boolean(opts.edit?.primary),
   };
   let panelRef = null;
+  // BEARBEITEN ALS HAUPTAKTION UNTEN (Critique 2026-09-24, Persona Casey).
+  // Im Sheet stand „Bearbeiten" oben im Kopf, ausser Reichweite des Daumens,
+  // und „Löschen" unten in der Fusszeile - die riskanteste Aktion war die
+  // erreichbarste. Mit `edit.primary` wandert Bearbeiten als Primaerknopf an
+  // das Ende der Fusszeile (Daumenzone), Löschen bleibt zurueckgenommen am
+  // Anfang, und der Kopfknopf erscheint erst im Formular - als „Zurück".
+  // Opt-in, weil nicht jedes Blatt Bearbeiten als Hauptabsicht hat: in der
+  // Aufgabe ist es das Erledigen.
+  const { primaryEdit } = state;
 
   openModal({
     title: opts.title,
@@ -452,9 +538,14 @@ function openAsSheet(opts, token) {
       // Auch das X, Escape, der Backdrop und die Wischgeste enden hier - nur so
       // weiß ein nachgereichtes update(), dass seine Ansicht fort ist.
       if (activeViewToken === token) activeViewToken = 0;
+      if (activeSheet?.token === token) activeSheet = null;
       opts.onClose?.();
     },
-    headerAction: opts.edit ? { label: opts.edit.label ?? t('common.edit'), id: 'detail-view-edit' } : null,
+    headerAction: opts.edit
+      ? (primaryEdit
+        ? { label: t('common.back'), id: 'detail-view-back' }
+        : { label: opts.edit.label ?? t('common.edit'), id: 'detail-view-edit' })
+      : null,
     onSave(panel) {
       panelRef = panel;
       const body = panel.querySelector('.modal-panel__body');
@@ -465,7 +556,15 @@ function openAsSheet(opts, token) {
       body.replaceChildren(pane);
       state.detailPane = pane;
 
-      const footer = detailFooterEl(opts.actions);
+      const footer = detailFooterEl(primaryEdit
+        ? [...(opts.actions ?? []), {
+          id: 'detail-view-edit',
+          label: opts.edit.label ?? t('common.edit'),
+          variant: 'primary',
+          icon: 'pencil',
+          onClick: () => switchToForm(panel, opts, state),
+        }]
+        : opts.actions);
       if (footer) {
         body.appendChild(footer);
         // Die Fußzeile entstand erst jetzt, nach dem Umzug in openModal - also
@@ -476,8 +575,8 @@ function openAsSheet(opts, token) {
       renderIcons(panel);
 
       if (opts.edit) {
-        updateHeaderAction(panel, { onClick: () => switchToForm(panel, opts, state) });
-        panel.querySelector('.modal-panel__action')?.focus();
+        updateHeaderAction(panel, { onClick: () => switchToForm(panel, opts, state), hidden: primaryEdit });
+        (primaryEdit ? panel.querySelector('#detail-view-edit') : panel.querySelector('.modal-panel__action'))?.focus();
       } else {
         panel.querySelector('.modal-panel__close')?.focus();
       }
@@ -544,16 +643,25 @@ function openAsPopover(opts) {
   // Im Popover führt „Bearbeiten" ins reguläre Formular-Modal statt in einen
   // Pane-Wechsel: ein 320px-Kärtchen ist kein Ort für sieben Selects, und der
   // Weg ist derselbe, den der Desktop schon immer ging.
-  const actions = [];
-  if (opts.edit?.standalone) {
-    actions.push({
-      label: opts.edit.label ?? t('common.edit'),
-      variant: 'secondary',
-      id: 'detail-popover-edit',
-      onClick: () => { closeDetailView(); opts.edit.standalone(); },
-    });
-  }
-  (opts.actions ?? []).forEach((a) => actions.push(a));
+  //
+  // DIESELBE ORDNUNG WIE IM SHEET (Re-Kritik 2026-09-25, P2). Mit
+  // `edit.primary` steht Bearbeiten dort als Primaerknopf am Ende und Löschen
+  // zurueckgenommen am Anfang. Das Popover setzte Bearbeiten weiter VOR alle
+  // Aktionen: Löschen stand 8px daneben, sein `--start` schob nichts mehr
+  // auseinander (es war nicht mehr das erste), und „In Maps öffnen" rutschte
+  // allein in eine zweite Zeile. Jetzt folgt es derselben Reihenfolge - in
+  // 286px Innenbreite teilen sich Löschen und Maps die erste Zeile, Bearbeiten
+  // steht als Hauptaktion unten am Ende, so weit von Löschen weg wie im Sheet.
+  // Ohne `edit.primary` bleibt Bearbeiten der Sekundaerknopf vorne.
+  const edit = opts.edit?.standalone ? {
+    label: opts.edit.label ?? t('common.edit'),
+    id: 'detail-popover-edit',
+    onClick: () => { closeDetailView(); opts.edit.standalone(); },
+    ...(opts.edit.primary ? { variant: 'primary', icon: 'pencil' } : { variant: 'secondary' }),
+  } : null;
+  const actions = opts.edit?.primary
+    ? [...(opts.actions ?? []), edit]
+    : [edit, ...(opts.actions ?? [])];
 
   const footer = detailFooterEl(actions);
   if (footer) {
@@ -589,9 +697,29 @@ function openAsPopover(opts) {
   };
 
   const onOutsideClick = (e) => {
+    if (popover.isConnected && popover.contains(e.target)) return;
+    // DER KLICK DANEBEN SCHLIESST NUR (Re-Kritik 2026-09-28, P1). Er lief
+    // weiter zu dem, was darunter lag: im Kalender war das die leere
+    // Wochenspalte, und wer die Leseansicht wegklickte, bekam das Formular
+    // "Neuer Termin". Der Listener sitzt deshalb in der CAPTURE-Phase am
+    // Dokument, also vor jedem Handler der Seite, und schluckt den Klick -
+    // samt Standardaktion, sonst folgte ein Link darunter trotzdem. Angelegt
+    // wird im Kalender seit R17 (Z2) ohnehin nur per Doppelklick oder langem
+    // Druck, wie bei Apple Kalender (wireTimeGridCreate) - der Riegel hier
+    // bleibt fuer jede andere Flaeche unter dem Popover. Ausgenommen sind nur
+    // Klicks in einer ANDEREN Ebene (Dialog, Rueckfrage, Toast): sie liegen
+    // ueber dem Popover, und ihr Knopf muss tun, was er sagt. Ebenso
+    // Klicks aus Code (`el.click()`), die niemand "daneben" gesetzt hat.
+    const inOtherLayer = typeof e.target?.closest === 'function' && Boolean(e.target.closest(
+      '.modal-overlay, .toast-container, [role="dialog"], [role="alertdialog"]',
+    ));
+    if (popover.isConnected && e.isTrusted && !inOtherLayer) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
     // Ohne Fokus-Rueckgabe: wer daneben klickt, wollte woanders hin, und ein
     // Sprung zurueck zum Ausloeser naehme ihm das Ziel weg.
-    if (!popover.isConnected || !popover.contains(e.target)) closeDetailView({ fokus: false });
+    closeDetailView({ fokus: false });
   };
 
   activePopover = {
@@ -608,14 +736,15 @@ function openAsPopover(opts) {
     overlayToken: pushOverlay(() => { closeDetailView(); }),
     teardown() {
       document.removeEventListener('keydown', onKeydown);
-      document.removeEventListener('click', onOutsideClick);
+      document.removeEventListener('click', onOutsideClick, true);
     },
   };
 
   document.addEventListener('keydown', onKeydown);
   // Erst im nächsten Tick binden, sonst schließt der Klick, der das Popover
   // geöffnet hat, es sofort wieder.
-  setTimeout(() => document.addEventListener('click', onOutsideClick), 0);
+  // Capture: siehe onOutsideClick - nur so kommt er VOR den Handlern der Seite.
+  setTimeout(() => document.addEventListener('click', onOutsideClick, true), 0);
   popover.focus();
 
   return (sections) => {
@@ -631,6 +760,62 @@ function openAsPopover(opts) {
 }
 
 // --------------------------------------------------------
+// Präsentation: Detailspalte (Liste + Detail)
+// --------------------------------------------------------
+
+/**
+ * Die Ansicht in der rechten Spalte von Liste + Detail.
+ *
+ * Kein Overlay: sie liegt in der Seite, hat keinen Marker in der History und
+ * schliesst nicht - die Auswahl in der Liste entscheidet, was hier steht
+ * (utils/master-detail.js). Deshalb ist `close` fuer die Aktionen hier ein
+ * reines Abmelden der Ansicht, KEIN `closeModal()`: das schloesse sonst ein
+ * fremdes, gerade offenes Modal.
+ *
+ * Kopf wie in Mail: Titel links, „Bearbeiten" rechts. „Bearbeiten" fuehrt ins
+ * regulaere Formular-Modal (`edit.standalone`), wie aus dem Popover - eine
+ * Spalte neben der Liste ist ein Leseort, und das Formular hat im Modal seine
+ * Fusszeile, seinen Dirty-Check und seine Fokusfuehrung.
+ */
+function openInPane(opts, token) {
+  const pane = opts.pane;
+  const close = () => {
+    if (activeViewToken === token) activeViewToken = 0;
+    opts.onClose?.();
+    return Promise.resolve();
+  };
+  const edit = opts.edit?.standalone ? {
+    label: opts.edit.label ?? t('common.edit'),
+    id: 'detail-pane-edit',
+    icon: 'pencil',
+    onClick: () => opts.edit.standalone(),
+  } : null;
+
+  const view = document.createElement('div');
+  view.className = 'detail-view__pane detail-view--in-pane';
+  view.appendChild(detailPaneHeaderEl({ title: opts.title ?? '', actions: edit ? [edit] : [] }));
+  let bodyEl = detailBodyEl(opts);
+  view.appendChild(bodyEl);
+  const footer = detailFooterEl(opts.actions, close);
+  if (footer) {
+    // In der Spalte ist die Fusszeile Teil des Inhalts, kein Modal-Fuss: die
+    // Klassen des Modal-Fusses holte sonst dessen Umzug- und Sticky-Logik an.
+    footer.className = 'detail-view__footer split-view__detail-footer';
+    view.appendChild(footer);
+  }
+  pane.replaceChildren(view);
+  renderIcons(pane);
+
+  return (sections) => {
+    if (!view.isConnected) return;
+    const next = detailBodyEl({ ...opts, sections });
+    view.replaceChild(next, bodyEl);
+    bodyEl = next;
+    renderIcons(next);
+  };
+}
+
+// --------------------------------------------------------
 // Öffentliche API
 // --------------------------------------------------------
 
@@ -641,19 +826,25 @@ function openAsPopover(opts) {
  * @param {string} opts.title            - Kopfzeile (Titel der Entität)
  * @param {string} [opts.accentColor]    - Farbstreifen oben (Kalenderfarbe o. Ä.)
  * @param {HTMLElement} [opts.anchor]    - Auslöser; ab 768px wird daran verankert
+ * @param {HTMLElement} [opts.pane]      - Koerper der Detailspalte (Liste + Detail); hat Vorrang
  * @param {Array}  [opts.sections]       - Metazeilen, siehe detailRowEl
  * @param {Array}  [opts.actions]        - Objektaktionen in der Fußzeile
- * @param {Object} [opts.edit]           - { label?, title?, ready?, mount(panel, pane), standalone() }
+ * @param {Object} [opts.edit]           - { label?, title?, ready?, primary?, mount(panel, pane), standalone() }
+ *                                         `primary`: im Sheet als Primaerknopf am Ende der Fusszeile statt im Kopf,
+ *                                         im Popover ebenso am Ende statt als Sekundaerknopf vorne
  *                                         `ready` ist ein Promise, auf das der
  *                                         Wechsel ins Formular wartet
  * @param {string} [opts.size]           - Panel-Breite wie bei openModal
  * @param {Function} [opts.onClose]
+ * @param {string} [opts.key]            - Wessen Leseansicht (z.B. `contact:42`). Oeffnet
+ *                                         dieselbe in der Detailspalte, geht ihr offenes Blatt zu.
  * @returns {{update: (sections: Array) => boolean, isOpen: () => boolean}}
  *          Handle zum Nachreichen von Zeilen, die beim Öffnen noch nicht da
  *          waren. Siehe `update`.
  */
 export function openDetailView(opts = {}) {
-  const usePopover = window.innerWidth >= POPOVER_MIN_WIDTH && !!opts.anchor;
+  const usePane = Boolean(opts.pane);
+  const usePopover = !usePane && window.innerWidth >= POPOVER_MIN_WIDTH && !!opts.anchor;
 
   // Ein offenes Popover weicht zuerst - auch wenn die neue Ansicht ein Sheet
   // wird, denn openModal räumt nur Modals weg, kein Popover. Das muss VOR der
@@ -663,11 +854,29 @@ export function openDetailView(opts = {}) {
   // rufen und ein fremdes, offenes Modal schließen.
   // Ohne Fokus-Rueckgabe: die neue Ansicht nimmt den Fokus selbst.
   if (activePopover) closeDetailView({ fokus: false });
+  // In die Spalte befoerdert: das Blatt DIESES Eintrags weicht. `activeSheet`
+  // steht nur, solange das Blatt offen ist - X, Escape und ein Modal, das es
+  // ersetzt, raeumen es im onClose ab; ein fremdes Modal wird so nie getroffen.
+  //
+  // DAS ERGEBNIS ZAEHLT. closeDetailView() fragt bei ungespeicherten
+  // Aenderungen nach; wer „nicht verwerfen" sagt, behaelt das Blatt (`false`).
+  // Dann bleibt es verfolgt, und die naechste Befoerderung fragt erneut -
+  // vergessen stuende es ungefuehrt ueber der Spalte. Die Spalte darunter wird
+  // trotzdem gefuellt: sie ist, was nach dem Schliessen stehen soll.
+  if (usePane && opts.key && activeSheet?.key === opts.key) {
+    const sheet = activeSheet;
+    Promise.resolve(closeDetailView({ fokus: false })).then((closed) => {
+      if (closed !== false && activeSheet === sheet) activeSheet = null;
+    });
+  }
 
   const token = ++viewSeq;
   activeViewToken = token;
+  if (!usePane && !usePopover) activeSheet = { token, key: opts.key ?? null };
 
-  const applySections = usePopover ? openAsPopover(opts, token) : openAsSheet(opts, token);
+  const applySections = usePane
+    ? openInPane(opts, token)
+    : (usePopover ? openAsPopover(opts, token) : openAsSheet(opts, token));
 
   return {
     isOpen: () => activeViewToken === token,

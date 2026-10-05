@@ -158,7 +158,9 @@ router.get('/photos/:id', async (req, res) => {
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.startsWith('image/')) throw new Error('Immich returned a non-image response');
     res.set('Content-Type', contentType);
-    res.set('Cache-Control', 'private, max-age=3600');
+    // Familienfotos bleiben nicht als Kopie im Browser-Cache des Geraets
+    // liegen; der Schoner holt jedes Foto bei Bedarf neu.
+    res.set('Cache-Control', 'no-store');
     const bytes = await response.arrayBuffer();
     res.send(Buffer.from(bytes));
   } catch (error) {

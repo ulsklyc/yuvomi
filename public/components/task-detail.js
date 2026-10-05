@@ -10,9 +10,9 @@
  *
  * API:
  *   openTaskDetail({ task, reminder, users, currentUserId, isAdmin,
- *                    categories, container, onChanged, edit })
+ *                    categories, container, onChanged, edit, pane, onClose })
  *   deleteTaskWithUndo(id, { container, onChanged })
- *   addSubtask(parentId, { onChanged })
+ *   addSubtask(parentId, title, { onChanged })
  *
  * WARUM DIESE DATEI EXISTIERT (#918). Die Ansicht lag in `pages/tasks.js` und
  * war damit nur von dort zu öffnen. Jede andere Stelle, die eine Aufgabe zeigt -
@@ -32,21 +32,24 @@
 import { api } from '/api.js';
 import { t, formatDate, formatTime } from '/i18n.js';
 import { openDetailView, closeDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
-import { closeModal, promptModal, btnLoading, refocusAfterRender } from '/components/modal.js';
+import { closeModal, btnLoading, refocusAfterRender } from '/components/modal.js';
 import { recurrenceRow } from '/rrule-ui.js';
 import { scheduleUndoableDelete } from '/utils/ux.js';
+import { rowActionEl } from '/utils/row-action.js';
 import { renderMarkdownLight } from '/utils/html.js';
 import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
 import { splitMentions, applyMention } from '/utils/mentions.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
 import { isNavModuleReadOnly } from '/permissions.js';
+import { pathAccess } from '/utils/module-access.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { historyDayLabel } from '/utils/day-label.js';
 import {
   FALLBACK_CATEGORY, PRIORITY_LABELS, STATUS_LABELS, statusLabel,
   isArchived, canEditTaskDefinition, catLabel, normalizeTagList,
-  docMime, docHref, docIcon, formatDueDate,
+  docMime, docHref, docIcon, formatDueDate, seriesDoneText,
 } from '/utils/task-fields.js';
 
 // --------------------------------------------------------
@@ -122,21 +125,23 @@ export async function deleteTaskWithUndo(id, { container = null, onChanged = () 
 }
 
 /**
- * Teilaufgabe anlegen - der eine Weg für Liste und Leseansicht.
+ * Teilaufgabe anlegen - der eine Schreibweg für die Eingabezeile der
+ * Leseansicht (`subtaskComposer`).
  *
- * Gibt die angelegte Teilaufgabe zurück (oder null bei Abbruch und Fehler):
- * die Leseansicht hängt sie sich damit selbst an, statt sich zum Nachladen
- * schließen zu müssen (#925).
+ * Gibt die angelegte Teilaufgabe zurück (oder null bei leerem Titel und
+ * Fehler): die Leseansicht hängt sie sich damit selbst an, statt sich zum
+ * Nachladen schließen zu müssen (#925). Bis zur Re-Critique 2026-09-28 fragte
+ * diese Funktion den Titel selbst per `promptModal` ab - ein Dialog je
+ * Teilschritt, fünf Punkte kosteten fünfzehn Gesten (A3 P1-1).
  */
-export async function addSubtask(parentId, { onChanged = () => {} } = {}) {
-  const title = await promptModal(t('tasks.subtaskPrompt'));
-  if (!title) return null;
+export async function addSubtask(parentId, title, { onChanged = () => {} } = {}) {
+  const clean = String(title ?? '').trim();
+  if (!clean) return null;
   try {
-    const res = await api.post('/tasks', { title, parent_task_id: parentId });
+    const res = await api.post('/tasks', { title: clean, parent_task_id: parentId });
     // Wie beim Abhaken daneben: die Umgebung trägt den Fortschrittsbalken der
     // Elternkarte, aber sie muss nichts davon zeigen.
     await onChanged();
-    refocusAfterRender();
     return res.data ?? null;
   } catch (err) {
     window.yuvomi.showToast(err.message, 'danger');
@@ -311,37 +316,129 @@ function subtaskListNode(task, ctx) {
   (task.subtasks ?? []).forEach(appendRow);
 
   if (mayAdd) {
-    const add = document.createElement('button');
-    add.type = 'button';
-    add.className = 'detail-subtask detail-subtask--add';
-    const icon = document.createElement('i');
-    icon.dataset.lucide = 'plus';
-    icon.className = 'icon-sm';
-    icon.setAttribute('aria-hidden', 'true');
-    const label = document.createElement('span');
-    label.textContent = t('tasks.subtaskAdd');
-    add.replaceChildren(icon, label);
-    if (window.lucide) window.lucide.createIcons({ el: add });
-
-    add.addEventListener('click', async () => {
-      add.disabled = true;
-      try {
-        // Derselbe Weg wie in der Liste, nicht ein zweiter: addSubtask stellt
-        // die Frage, legt an und meldet die Änderung an die Umgebung. Sie gibt
-        // die angelegte Teilaufgabe zurück - ohne die müsste diese Ansicht sich
-        // schließen, um den neuen Schritt zu zeigen.
-        const created = await addSubtask(task.id, ctx);
-        if (!created) return;
+    // Derselbe Weg wie in der Liste, nicht ein zweiter: addSubtask legt an und
+    // meldet die Änderung an die Umgebung, die Zeile hängt sich die neue
+    // Teilaufgabe selbst an - ohne das müsste diese Ansicht sich schließen, um
+    // den neuen Schritt zu zeigen.
+    const composer = subtaskComposer(task, ctx, {
+      onCreated: (created) => {
         task.subtasks = [...(task.subtasks ?? []), created];
-        wrap.insertBefore(appendRow(created), add);
-      } finally {
-        add.disabled = false;
-      }
+        wrap.insertBefore(appendRow(created), composer.add);
+      },
     });
-
-    wrap.appendChild(add);
+    wrap.append(composer.add, composer.form);
+    // Aus der Liste gekommen („Teilaufgabe hinzufügen" an der Karte): das Feld
+    // steht offen, sobald die Ansicht im Dokument haengt.
+    // Nach dem Einhaengen und NACH dem Anfangsfokus des Blatts (detail-view.js
+    // setzt ihn synchron auf "Bearbeiten"), sonst naehme der ihn wieder weg.
+    if (ctx.composeSubtask) {
+      const tryOpen = (left) => {
+        if (composer.form.isConnected) composer.open();
+        else if (left > 0) setTimeout(() => tryOpen(left - 1), 50);
+      };
+      setTimeout(() => tryOpen(10), 0);
+    }
   }
   return wrap;
+}
+
+/**
+ * Die Eingabezeile „Teilaufgabe hinzufügen" an Ort und Stelle (A3 P1-1).
+ *
+ * Wie in Erinnerungen und Things: der Knopf wird zum Feld, Enter oder der
+ * Knopf „Hinzufügen" daneben legt an und lässt den Fokus für die nächste Zeile
+ * stehen, Escape schließt und gibt den
+ * Fokus an den Knopf zurück. Enter auf leerem Feld schließt ebenfalls, ein
+ * leeres Feld schließt auch, wenn der Fokus es verlässt. Escape bleibt hier:
+ * das Blatt, in dem das Feld steht, schließt sonst mit (modal.js hört auf
+ * `document`).
+ *
+ * `onCreated(sub)` hängt die neue Zeile an; der Anlegeweg ist `addSubtask`.
+ */
+function subtaskComposer(task, ctx, { onCreated }) {
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'detail-subtask detail-subtask--add';
+  const icon = document.createElement('i');
+  icon.dataset.lucide = 'plus';
+  icon.className = 'icon-sm';
+  icon.setAttribute('aria-hidden', 'true');
+  const label = document.createElement('span');
+  label.textContent = t('tasks.subtaskAdd');
+  add.replaceChildren(icon, label);
+  if (window.lucide) window.lucide.createIcons({ el: add });
+
+  const form = document.createElement('form');
+  form.className = 'detail-subtask-compose';
+  form.hidden = true;
+  form.noValidate = true;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'form-input detail-subtask-compose__input';
+  input.maxLength = 500;
+  input.autocomplete = 'off';
+  input.enterKeyHint = 'done';
+  input.placeholder = t('tasks.subtaskAdd');
+  input.setAttribute('aria-label', t('tasks.subtaskAddNamed', { title: task.title }));
+  // DER SICHTBARE WEG (#1598). Das Feld allein verliess sich auf Enter, und
+  // das Blatt verschluckte es: der Focus-Trap von modal.js klickte den ersten
+  // Absende-Knopf des Panels ("Kommentieren"). Auf dem Telefon, wo die Ansicht
+  // immer ein Blatt ist, blieb kein Weg, eine Teilaufgabe anzulegen. Der Knopf
+  // ist der Absender DIESES Formulars - der Trap findet ihn zuerst, und wer
+  // Enter nicht kennt oder keine Taste dafuer hat, tippt ihn an.
+  const submit = document.createElement('button');
+  submit.type = 'submit';
+  submit.className = 'btn btn--secondary detail-subtask-compose__submit';
+  submit.textContent = t('common.add');
+  form.append(input, submit);
+
+  let pending = false;
+  const open = () => {
+    add.hidden = true;
+    form.hidden = false;
+    input.focus();
+  };
+  const close = ({ refocus = true } = {}) => {
+    input.value = '';
+    form.hidden = true;
+    add.hidden = false;
+    if (refocus) add.focus();
+  };
+
+  add.addEventListener('click', open);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (pending) return;
+    const title = input.value.trim();
+    if (!title) { close(); return; }
+    pending = true;
+    form.setAttribute('aria-busy', 'true');
+    submit.disabled = true;
+    try {
+      const created = await addSubtask(task.id, title, ctx);
+      if (!created) return;
+      onCreated(created);
+      // Nur leeren, was angelegt ist: ein Fehler laesst den Titel stehen.
+      if (input.value.trim() === title) input.value = '';
+    } finally {
+      pending = false;
+      form.removeAttribute('aria-busy');
+      submit.disabled = false;
+      if (!form.hidden) input.focus();
+    }
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    e.stopPropagation();
+    close();
+  });
+  form.addEventListener('focusout', (e) => {
+    if (pending || form.contains(e.relatedTarget)) return;
+    if (!input.value.trim()) close({ refocus: false });
+  });
+
+  return { add, form, open };
 }
 
 /**
@@ -355,9 +452,15 @@ function subtaskListNode(task, ctx) {
  * Bilder stehen als Vorschau statt als Wort: an einer Aufgabe hängt meist ein
  * abfotografierter Zettel, und ein Dateiname beantwortet die Frage nicht, wegen
  * der man das Foto angehängt hat. Alles andere bleibt ein Chip mit Link.
+ *
+ * Ohne Leserecht auf die Dokumente liefert der Server `documents: null` (#1358)
+ * und die Zeile faellt weg; bei `documents: none` fragt sie das Recht selbst,
+ * wie attachmentLinksNode, denn jeder Link ginge dort ins 403. Ein Eintrag ohne
+ * ID wird nie zu einem Link auf `/documents/null`.
  */
 function documentListNode(docs) {
-  const list = Array.isArray(docs) ? docs : [];
+  if (pathAccess('/documents') === 'none') return null;
+  const list = (Array.isArray(docs) ? docs : []).filter((doc) => doc?.id);
   if (!list.length) return null;
 
   const images = list.filter((doc) => docMime(doc).startsWith('image/'));
@@ -464,31 +567,25 @@ function commentRowNode(comment, { onChanged, ctx }) {
     actions.className = 'task-comment__actions';
 
     // Ändern darf nur der Autor - ein Admin moderiert, er schreibt nicht um.
+    // Die geteilte Zeilenaktion (utils/row-action.js, DESIGN.md
+    // "Komponenten-Kanon"): hier standen 28px-Eigenbauten, die kleinste
+    // Handlung der ganzen Detailansicht.
     if (mine) {
-      const edit = document.createElement('button');
-      edit.type = 'button';
-      edit.className = 'task-comment__action';
-      edit.setAttribute('aria-label', t('tasks.commentEdit'));
-      edit.title = t('tasks.commentEdit');
-      const editIcon = document.createElement('i');
-      editIcon.dataset.lucide = 'pencil';
-      editIcon.className = 'icon-sm';
-      editIcon.setAttribute('aria-hidden', 'true');
-      edit.appendChild(editIcon);
-      edit.addEventListener('click', () => startCommentEdit(row, comment, { onChanged, ctx }));
+      const edit = rowActionEl({
+        icon: 'pencil',
+        label: t('tasks.commentEdit'),
+        attrs: { title: t('tasks.commentEdit') },
+        onClick: () => startCommentEdit(row, comment, { onChanged, ctx }),
+      });
       actions.appendChild(edit);
     }
 
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.className = 'task-comment__action task-comment__action--danger';
-    del.setAttribute('aria-label', t('tasks.commentDelete'));
-    del.title = t('tasks.commentDelete');
-    const delIcon = document.createElement('i');
-    delIcon.dataset.lucide = 'trash-2';
-    delIcon.className = 'icon-sm';
-    delIcon.setAttribute('aria-hidden', 'true');
-    del.appendChild(delIcon);
+    const del = rowActionEl({
+      icon: 'trash-2',
+      tone: 'danger',
+      label: t('tasks.commentDelete'),
+      attrs: { title: t('tasks.commentDelete') },
+    });
     // Kein Bestätigungsdialog, sondern der Rückgängig-Toast, den diese Seite
     // schon fürs Löschen einer Aufgabe benutzt. Zwei Gründe: Eine Rückfrage
     // wäre hier ein Modal über einem Modal - `confirmModal` verdrängt die
@@ -534,7 +631,7 @@ function startCommentEdit(row, comment, { onChanged, ctx }) {
   actions.className = 'task-comment__edit-actions';
   const cancel = document.createElement('button');
   cancel.type = 'button';
-  cancel.className = 'btn btn--ghost btn--sm';
+  cancel.className = 'btn btn--secondary btn--sm';
   cancel.textContent = t('common.cancel');
   const save = document.createElement('button');
   save.type = 'submit';
@@ -945,8 +1042,23 @@ async function toggleDescriptionCheck(task, box) {
  *   categories?: object[],
  *   container?: HTMLElement|null,
  *   onChanged?: () => (void|Promise<void>),
- *   edit?: {mount: (panel: HTMLElement, pane: HTMLElement) => void}|null,
+ *   edit?: {mount?: (panel: HTMLElement, pane: HTMLElement) => void,
+ *           standalone?: () => void}|null,
+ *   pane?: HTMLElement|null,
+ *   onClose?: () => void,
+ *   onStale?: () => void,
+ *   composeSubtask?: boolean,
  * }} options
+ *
+ * `pane` ist der Koerper der Detailspalte (Liste + Detail). Dort schliesst die
+ * Ansicht nicht - die Auswahl in der Liste entscheidet, was dasteht -, und
+ * `onClose` meldet nur, dass eine Aktion der Ansicht (Status, Ablage, Loeschen)
+ * sie abgemeldet hat: die Umgebung zeichnet dann neu oder waehlt weiter.
+ *
+ * `onStale` ruft die Ansicht, wenn ein Schreibvorgang BESTAETIGT ist, aber das
+ * Nachladen danach scheiterte: was dasteht, ist veraltet. Die Umgebung zeichnet
+ * neu (in der Spalte: frisch vom Server oder der Fehlerzustand mit „Erneut
+ * versuchen", utils/master-detail.js) - die alten Aktionen kommen nie zurueck.
  */
 export function openTaskDetail({
   task,
@@ -958,8 +1070,12 @@ export function openTaskDetail({
   container = null,
   onChanged = () => {},
   edit = null,
+  pane = null,
+  onClose = null,
+  onStale = null,
+  composeSubtask = false,
 }) {
-  const ctx = { users, currentUserId, isAdmin, categories, container, onChanged };
+  const ctx = { users, currentUserId, isAdmin, categories, container, onChanged, onStale, inPane: Boolean(pane), composeSubtask };
   const archived = isArchived(task);
   const statusActions = archived ? [] : (STATUS_ACTIONS[task.status] ?? []);
   // Gesperrte Aufgabe (#830): der Weiterschalt-Knopf bleibt, Loeschen, Ablegen
@@ -989,6 +1105,11 @@ export function openTaskDetail({
   // Zustand, den er anzeigen koennte - was die Aufgabe IST, steht zwei Zeilen
   // darueber als "Status: offen". Ein grauer Knopf "Als erledigt markieren"
   // waere nur ein Versprechen, das der Server mit 403 einloest.
+  // Die Schliessfunktion DIESER Ansicht (Sheet oder Spalte). Die Fusszeile
+  // reicht sie nur an `onClick`; das Personenmenue daneben ist ein Popover,
+  // dessen Eintraege spaeter kommen - der Ausloeser merkt sie sich deshalb.
+  let viewClose = closeDetailView;
+  const doers = doerChoices(task, ctx, archived);
   if (!isNavModuleReadOnly('tasks')) {
     statusActions.forEach((step) => {
       actions.push({
@@ -996,8 +1117,17 @@ export function openTaskDetail({
         label: t(step.labelKey),
         variant: step.variant,
         icon: step.icon,
-        onClick: ({ button }) => advanceTaskStatus(task, step.status, button, ctx),
+        onClick: ({ button, close }) => advanceTaskStatus(task, step.status, button, ctx, close),
       });
+      if (step.id === 'task-detail-finish' && doers.length) {
+        actions.push({
+          id: DOER_BUTTON_ID,
+          label: '',
+          variant: 'ghost',
+          icon: 'user-round-check',
+          onClick: ({ close }) => { viewClose = close; },
+        });
+      }
     });
   }
 
@@ -1009,21 +1139,183 @@ export function openTaskDetail({
       label: archived ? t('tasks.unarchiveButton') : t('tasks.archiveButton'),
       variant: 'ghost',
       icon: archived ? 'archive-restore' : 'archive',
-      onClick: ({ button }) => toggleTaskArchive(task, button, ctx),
+      onClick: ({ button, close }) => toggleTaskArchive(task, button, ctx, close),
     });
+  }
+
+  // MOBIL EINE REIHE (Re-Critique 2026-09-28, P8 / A3 P3-2): Starten und
+  // Archivieren treten auf dem Telefon in EIN Mehr-Menue (detail-view.css);
+  // am Desktop stehen sie weiter im Fuss, und dort gibt es den Knopf nicht.
+  const overflowIds = ['task-detail-start', 'task-detail-archive'];
+  if (actions.some((a) => overflowIds.includes(a.id))) {
+    actions.push({ id: MORE_BUTTON_ID, label: '', variant: 'ghost', icon: 'more-horizontal' });
   }
 
   openDetailView({
     title: task.title,
+    key: `task:${task.id}`,
     size: 'lg',
+    // DIE DETAILSPALTE (Liste + Detail, utils/master-detail.js): dieselbe
+    // Ansicht, nur in der rechten Spalte statt im Sheet. Bearbeiten fuehrt dort
+    // ins eigene Formular-Modal (`edit.standalone`), weil die Spalte ein
+    // Leseort ist; ohne `standalone` bleibt der Knopf weg.
+    pane: pane ?? undefined,
+    onClose: onClose ?? undefined,
     sections: renderTaskDetail(task, reminder, ctx),
     actions,
     edit: canEdit && edit ? {
       label: t('common.edit'),
       title: t('tasks.editTask'),
-      mount: (panel, pane) => edit.mount(panel, pane),
+      mount: (panel, formPane) => edit.mount?.(panel, formPane),
+      standalone: edit.standalone,
     } : undefined,
   });
+
+  if (doers.length) {
+    wireDetailDoerMenu(task, doers, ctx, (...args) => viewClose(...args), pane);
+  }
+  wireDetailMoreMenu(task, overflowIds, pane);
+}
+
+const MORE_BUTTON_ID = 'task-detail-more';
+
+/**
+ * Das Mehr-Menue des Detail-Fusses (mobil). Seine Eintraege LOESEN DIE ECHTEN
+ * KNOEPFE AUS, statt eigene Handler zu tragen: Starten und Archivieren bleiben
+ * (verborgen) im Fuss, damit statusActionButtons() sie weiter mitsperrt und
+ * btnLoading() seinen Knopf findet - ein Handler, eine Sperrlogik.
+ */
+function wireDetailMoreMenu(task, overflowIds, pane = null) {
+  const root = pane ?? document;
+  const button = root.querySelector?.(`#${MORE_BUTTON_ID}`);
+  if (!button) return;
+  const targets = overflowIds.map((id) => root.querySelector?.(`#${id}`)).filter(Boolean);
+  if (!targets.length) { button.remove(); return; }
+  const label = t('common.moreActionsNamed', { name: task.title });
+  const panelId = `task-detail-more-${task.id}`;
+  button.classList.add('btn--icon', 'popover-menu__trigger', 'task-detail__more');
+  button.setAttribute('aria-label', label);
+  button.setAttribute('title', label);
+  button.setAttribute('aria-haspopup', 'menu');
+  button.setAttribute('aria-expanded', 'false');
+  button.setAttribute('popovertarget', panelId);
+
+  const panel = document.createElement('div');
+  panel.className = 'popover-menu';
+  panel.id = panelId;
+  panel.setAttribute('popover', '');
+  panel.setAttribute('role', 'menu');
+  for (const target of targets) {
+    target.classList.add('task-detail__overflow');
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'popover-menu__item';
+    item.setAttribute('role', 'menuitem');
+    const icon = document.createElement('i');
+    icon.dataset.lucide = target.querySelector('[data-lucide]')?.dataset.lucide
+      ?? target.querySelector('svg[data-lucide]')?.getAttribute('data-lucide') ?? 'circle';
+    icon.className = 'icon-md';
+    icon.setAttribute('aria-hidden', 'true');
+    const name = document.createElement('span');
+    name.textContent = target.querySelector('.btn__label')?.textContent ?? target.textContent.trim();
+    item.append(icon, name);
+    item.addEventListener('click', () => {
+      panel.hidePopover?.();
+      if (!target.disabled) target.click();
+    });
+    panel.appendChild(item);
+  }
+  button.after(panel);
+  installPopoverMenus(button.parentElement);
+  if (window.lucide) window.lucide.createIcons({ el: panel });
+}
+
+/**
+ * „WER HAT ES ERLEDIGT?" IN DER DETAILANSICHT (R9 M1, #1205).
+ *
+ * Mobil hat die Frage ihren Platz in der Zeile abgegeben (tasks.css, Raster
+ * unter 640px): dort nahm sie dem Titel die Breite und stand 0px neben dem
+ * Haken. Das Detail ist der Tastatur- und Vorleseweg zu ihr, der Long-Press
+ * auf die Zeile der schnelle (tasks.js, wireDoerContextMenu).
+ *
+ * DIESELBE SCHWELLE WIE IN DER ZEILE (renderDoerPicker): offen, nicht
+ * abgelegt, und mindestens zwei Menschen zur Auswahl - ein Menue mit einem
+ * Eintrag fragt nichts.
+ */
+const DOER_BUTTON_ID = 'task-detail-done-by';
+
+function doerChoices(task, ctx, archived) {
+  if (archived || task.status === 'done') return [];
+  if (isNavModuleReadOnly('tasks')) return [];
+  const members = (ctx.users ?? []).filter((u) => u && u.id != null);
+  return members.length >= 2 ? members : [];
+}
+
+function wireDetailDoerMenu(task, doers, ctx, close, pane = null) {
+  const root = pane ?? document;
+  const button = root.querySelector?.(`#${DOER_BUTTON_ID}`);
+  if (!button) return;
+  const label = t('tasks.doneByPick', { title: task.title });
+  const panelId = `task-detail-doer-${task.id}`;
+  button.classList.add('btn--icon', 'popover-menu__trigger', 'task-detail__doer');
+  button.setAttribute('aria-label', label);
+  button.setAttribute('title', label);
+  button.setAttribute('aria-haspopup', 'menu');
+  button.setAttribute('aria-expanded', 'false');
+  button.setAttribute('popovertarget', panelId);
+
+  const panel = document.createElement('div');
+  panel.className = 'popover-menu';
+  panel.id = panelId;
+  panel.setAttribute('popover', '');
+  panel.setAttribute('role', 'menu');
+  for (const person of doers) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'popover-menu__item';
+    item.setAttribute('role', 'menuitem');
+    item.dataset.action = 'pick-doer';
+    item.dataset.id = String(person.id);
+    const icon = document.createElement('i');
+    icon.dataset.lucide = 'user-round';
+    icon.className = 'icon-md';
+    icon.setAttribute('aria-hidden', 'true');
+    const name = document.createElement('span');
+    name.textContent = person.display_name ?? '';
+    item.append(icon, name);
+    item.addEventListener('click', () => completeFor(task, person, button, ctx, close));
+    panel.appendChild(item);
+  }
+  button.after(panel);
+  installPopoverMenus(button.parentElement);
+  if (window.lucide) window.lucide.createIcons({ el: panel });
+}
+
+// Ein Datum will gelesen werden: laenger als die drei Sekunden der Vorgabe,
+// dieselbe Frist wie die Quittungen der Liste.
+const SERIES_TOAST_MS = 5000;
+
+async function completeFor(task, person, button, ctx, close) {
+  const stop = btnLoading(button);
+  const siblings = statusActionButtons().filter((el) => el !== button);
+  siblings.forEach((el) => { el.disabled = true; });
+  let response;
+  try {
+    response = await api.patch(`/tasks/${task.id}/status`, { status: 'done', done_by_user_id: person.id });
+  } catch (err) {
+    stop();
+    siblings.forEach((el) => { el.disabled = false; });
+    window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+    return;
+  }
+  task.status = 'done';
+  // EIN Toast, nie zwei: bei einer Serie sagt derselbe Satz, wer es war UND
+  // wann es weitergeht (#1603).
+  const name = person.display_name ?? '';
+  const seriesText = seriesDoneText(response, { name });
+  if (seriesText) window.yuvomi.showToast(seriesText, 'default', SERIES_TOAST_MS);
+  else window.yuvomi.showToast(t('tasks.doneByToast', { name }));
+  await afterConfirmedWrite(ctx, close);
 }
 
 /**
@@ -1053,26 +1345,23 @@ export function openTaskDetail({
 const STATUS_ACTION_IDS = Object.values(STATUS_ACTIONS).flat().map((step) => step.id);
 
 function statusActionButtons() {
-  return [...new Set(STATUS_ACTION_IDS)]
+  // Die Personenwahl (R9 M1) ist ein dritter Weg nach „erledigt" und wird
+  // mitgesperrt, solange ein anderer laeuft.
+  return [...new Set([...STATUS_ACTION_IDS, DOER_BUTTON_ID])]
     .map((id) => document.getElementById(id))
     .filter(Boolean);
 }
 
-async function advanceTaskStatus(task, status, button, ctx) {
+async function advanceTaskStatus(task, status, button, ctx, close = closeDetailView) {
   const previous = task.status;
   const stop = btnLoading(button);
   // Die Geschwister werden nur gesperrt, nicht in den Ladezustand versetzt: der
   // Spinner gehoert an den Knopf, den jemand gedrueckt hat.
   const siblings = statusActionButtons().filter((el) => el !== button);
   siblings.forEach((el) => { el.disabled = true; });
+  let response;
   try {
-    await api.patch(`/tasks/${task.id}/status`, { status });
-    task.status = status;
-    // Der Status steht bereits beim Server - eine Verwerfen-Frage danach böte
-    // an, etwas rückgängig zu machen, was gar nicht mehr aussteht (#625).
-    await closeDetailView({ force: true });
-    await ctx.onChanged();
-    refocusAfterRender();
+    response = await api.patch(`/tasks/${task.id}/status`, { status });
   } catch (err) {
     task.status = previous;
     stop();
@@ -1080,6 +1369,46 @@ async function advanceTaskStatus(task, status, button, ctx) {
     // Gescheitert ist ein Schreibvorgang, kein Laden - tasks.loadError („Aufgabe
     // konnte nicht geladen werden") beschriebe den falschen Vorgang.
     window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+    return;
+  }
+  task.status = status;
+  // Eine erledigte Serie sagt, wann es weitergeht (#1603): die Ansicht schliesst
+  // gleich, und die Umgebung zeigt danach eine offene Zeile, die aussieht wie
+  // diese. Ohne Serie bleibt es still wie bisher - der Knopf selbst und die
+  // verschwindende Zeile sind dort die Quittung.
+  const seriesText = status === 'done' ? seriesDoneText(response) : null;
+  if (seriesText) window.yuvomi.showToast(seriesText, 'default', SERIES_TOAST_MS);
+  await afterConfirmedWrite(ctx, close);
+}
+
+/**
+ * Nach einem BESTAETIGTEN Schreibvorgang: Ansicht abmelden, Umgebung nachladen.
+ *
+ * GETRENNT VOM SCHREIBEN, weil ein Fehler hier etwas anderes heisst. Stand
+ * beides in einem catch, stellte ein gescheitertes Nachladen den alten Status
+ * wieder her und gab die alten Knoepfe frei - in der Spalte, wo `close()` das
+ * DOM nicht entfernt, stand dann nach einem erledigten Serientermin „Starten"
+ * bedienbar da, und der Server haette die Erledigung umgekehrt und die
+ * Folgeinstanz verworfen. Hier bleibt der neue Stand, die alten Aktionen
+ * bleiben gesperrt, und die Umgebung zeichnet neu (`onStale`).
+ */
+async function afterConfirmedWrite(ctx, close) {
+  try {
+    // Der Stand steht bereits beim Server - eine Verwerfen-Frage danach böte
+    // an, etwas rückgängig zu machen, was gar nicht mehr aussteht (#625).
+    //
+    // `close` ist das Schliessen DIESER Ansicht, nicht das globale der
+    // Detailansicht: in der Detailspalte meldet es die Ansicht nur ab - das
+    // globale ginge blind an das Modal und schloesse dort ein fremdes.
+    await close({ force: true });
+    await ctx.onChanged();
+    // Der Fokus-Merker gehoert zu einem geschlossenen Dialog. In der Spalte hat
+    // es keinen gegeben - ein Nachfassen setzte den Fokus in einen fremden
+    // Zusammenhang; dort fuehrt die Umgebung ihn selbst.
+    if (!ctx.inPane) refocusAfterRender();
+  } catch {
+    window.yuvomi.showToast(t('tasks.listLoadError'), 'danger');
+    ctx.onStale?.();
   }
 }
 
@@ -1088,20 +1417,21 @@ async function advanceTaskStatus(task, status, button, ctx) {
  * die Ansicht danach: die Aufgabe wechselt die Liste, und ein Panel, das über
  * einem verschwundenen Eintrag stehen bleibt, hat nichts mehr zu zeigen.
  */
-async function toggleTaskArchive(task, button, ctx) {
+async function toggleTaskArchive(task, button, ctx, close = closeDetailView) {
   const stop = btnLoading(button);
   const archived = isArchived(task);
   try {
     await setTaskArchived(task.id, !archived);
-    task.archived_at = archived ? null : new Date().toISOString();
-    await closeDetailView({ force: true });
-    window.yuvomi.showToast(archived ? t('tasks.unarchivedToast') : t('tasks.archivedToast'), 'success');
-    await ctx.onChanged();
-    refocusAfterRender();
   } catch (err) {
     stop();
     window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+    return;
   }
+  task.archived_at = archived ? null : new Date().toISOString();
+  window.yuvomi.showToast(archived ? t('tasks.unarchivedToast') : t('tasks.archivedToast'), 'success');
+  // Derselbe Grund wie beim Status: ein gescheitertes Nachladen gibt den
+  // Ablage-Knopf nicht frei - er zeigte den alten Stand und schaltete zurueck.
+  await afterConfirmedWrite(ctx, close);
 }
 
 /**
@@ -1175,4 +1505,4 @@ function seriesHistoryNode(task) {
  * der sich die Nur-lesen-Regel (#467) an dieser Ansicht MESSEN laesst - alles
  * andere hier haengt an `openDetailView` und damit am echten DOM.
  */
-export const __test = { subtaskListNode, descriptionNode };
+export const __test = { subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, DOER_BUTTON_ID, completeFor };

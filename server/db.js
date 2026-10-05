@@ -19,9 +19,13 @@
 
 import Database from 'better-sqlite3-multiple-ciphers';
 import path from 'path';
+import os from 'node:os';
 import fs from 'node:fs/promises';
-import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync } from 'node:fs';
+import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync, readdirSync, constants as fsConstants } from 'node:fs';
 import { createLogger } from './logger.js';
+import { acquireInstanceLock } from './utils/instance-lock.js';
+import { RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON } from './utils/restore-messages.js';
+import { setRestoreRunning, activeWriters, restoreWaitTimeoutMs, waitUntilIdle } from './utils/restore-state.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
 
@@ -383,6 +387,14 @@ const EMPTY_DATABASE_FILE = 'YUVOMI_EMPTY_DATABASE_FILE';
 const RESTORE_TARGET_HANDSHAKE = Symbol.for('yuvomi.db.restoreTarget');
 
 /**
+ * Handschlag fuer die Instanzsperre (#1530), gesetzt VOR dem Import dieser
+ * Datei: `'wait'` vom Server (server/utils/claim-instance-lock.js), `'refuse'`
+ * vom CLI-Restore. Wie beim Restore-Handschlag ein Symbol und keine
+ * Env-Variable - ein Kindprozess soll ihn nicht erben.
+ */
+const INSTANCE_LOCK_HANDSHAKE = Symbol.for('yuvomi.db.instanceLock');
+
+/**
  * Bricht den Start ab, wenn die Datei, die gleich geöffnet wird, existiert und
  * leer ist. Läuft VOR allem, was die Datei anfasst - auch vor
  * `migrateLegacyDbFile()`, die eine leere `oikos.db` samt Journal sonst schon
@@ -415,11 +427,32 @@ function init({ plaintextBackup = true } = {}) {
       `Data will be lost on container restart. Use an absolute path, e.g. DB_PATH=/data/yuvomi.db`
     );
   }
+  // Instanzsperre (#1530) als ERSTES, vor allem, was neben DB_PATH etwas
+  // anfasst: ein Server, der waehrend eines CLI-Restores startet, wartet hier,
+  // statt Reste wegzuraeumen oder die Datei mitten im Tausch zu oeffnen. Nur
+  // Server und Restore-CLI setzen den Handschlag; andere Importeure (das
+  // Backup per `node -e` aus docs/installation.md, Skripte) bleiben frei.
+  // Der Restore aus der Einstellungsseite laeuft erneut hier durch und haelt
+  // die Sperre schon.
+  const instanceLockMode = globalThis[INSTANCE_LOCK_HANDSHAKE];
+  if ((instanceLockMode === 'wait' || instanceLockMode === 'refuse') && DB_PATH !== ':memory:') {
+    mkdirSync(path.dirname(DB_PATH), { recursive: true });
+    acquireInstanceLock(DB_PATH, { onBusy: instanceLockMode, log });
+  }
+  // Reste eines abgebrochenen Restores zuerst: auch vor der Leer-Pruefung,
+  // denn ein CLI-Restore auf eine leere Datei (#1282), der mittendrin stirbt,
+  // laesst sie neben genau so einer Datei liegen - und die Pruefung bricht ab,
+  // bevor sie sonst drankaemen (Codex-Befund in #1431). Gefahrlos: angefasst
+  // werden nur Arbeitsdateien toter Prozesse, nie die Datenbank oder ihr Journal.
+  removeRestoreStaging();
   // Vor allem anderen: eine leere Datei würde ab hier still zur frischen
   // Instanz, und ein Journal daneben ginge dabei verloren (#1282).
   assertDatabaseFileNotEmpty();
   mkdirSync(path.dirname(DB_PATH), { recursive: true });
   migrateLegacyDbFile();
+  // Scheitert die Umbenennung einer Legacy-oikos.db, faellt DB_PATH auf sie
+  // zurueck - und Reste eines Restores tragen dann ihren Namen.
+  removeRestoreStaging();
 
   // Beide Prüfungen laufen VOR dem Öffnen: fehlt der Cipher-Support, darf gar
   // nicht erst eine unverschlüsselte Datei entstehen.
@@ -532,10 +565,20 @@ function assertKeyIsNotPlaceholder() {
 
 function applyEncryptionKey(database) {
   if (!DB_KEY) return;
+  applyKeyBytes(database, Buffer.from(DB_KEY, 'utf8'));
+}
+
+/**
+ * Schluessel als Bytes setzen. Hex statt Text: der Wert landet in einem
+ * PRAGMA, und Hex kann dort weder quoten noch etwas anderes ausdruecken.
+ * @param {import('better-sqlite3-multiple-ciphers').Database} database
+ * @param {Buffer} bytes
+ */
+function applyKeyBytes(database, bytes) {
   // `cipher` muss vor `key` gesetzt werden. `sqlcipher` = AES-256 im
   // SQLCipher-Format (statt des Default-Ciphers ChaCha20).
   database.pragma("cipher = 'sqlcipher'");
-  database.pragma(`key="x'${Buffer.from(DB_KEY, 'utf8').toString('hex')}'"`);
+  database.pragma(`key="x'${bytes.toString('hex')}'"`);
 }
 
 function assertReadable(database) {
@@ -9561,6 +9604,491 @@ const MIGRATIONS = [
         UPDATE inventory_item_service_log SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
     `,
   },
+  {
+    version: 225,
+    description: 'Split: ledger rows carry the author of the record they book',
+    up: `
+      -- Ledger-Zeilen und der Datensatz, den sie buchen, haengen per
+      -- created_by ON DELETE CASCADE an einem Konto. Stand dort eine andere
+      -- Person als am Datensatz, riss eine Kontoloeschung das Paar
+      -- auseinander (#1309): ein PUT /expenses/:id stempelte die neu
+      -- geschriebenen Zeilen mit der BEARBEITENDEN Person, das Loeschen ihres
+      -- Kontos nahm sie mit, und die weiter aktive Ausgabe fiel still aus
+      -- allen Salden. Die Route schreibt seit dieser Version
+      -- expenses.created_by; hier werden die schon geschriebenen Zeilen
+      -- nachgezogen. Nur UPDATE, und nur wo sich etwas unterscheidet - ein
+      -- zweiter Lauf findet nichts mehr.
+      --
+      -- expense_reversal gehoert dazu: eine Gegenbuchung einer Ausgabe teilt
+      -- source_id und damit expenses.created_by mit ihrer Buchung - blieben
+      -- nur die 'expense'-Zeilen im Blick, risse diese Migration genau so ein
+      -- Paar auseinander.
+      --
+      -- Nicht angefasst: Zeilen ohne ihre Ausgabe (source_id ist kein echter
+      -- Fremdschluessel, es gibt also keinen Ersteller, den man eintragen
+      -- koennte) und eine Ausgabe ohne created_by (die Spalte ist NOT NULL,
+      -- der Filter haelt das nur fest, statt eine NULL in eine NOT-NULL-Spalte
+      -- zu schreiben), und ein Autor, den es in users nicht gibt (der
+      -- Fremdschluessel wuerde beim Serverstart werfen). Ledger-Zeilen, deren Bearbeiter schon geloescht ist,
+      -- gibt es nicht mehr - die hat die Kaskade genommen, und ein UPDATE kann
+      -- sie nicht zurueckholen.
+      UPDATE expense_ledger_entries
+      SET created_by = (SELECT e.created_by FROM expenses e WHERE e.id = expense_ledger_entries.source_id)
+      WHERE source_type IN ('expense', 'expense_reversal')
+        AND EXISTS (
+          SELECT 1 FROM expenses e
+          WHERE e.id = expense_ledger_entries.source_id
+            AND e.created_by IS NOT NULL
+            AND e.created_by <> expense_ledger_entries.created_by
+            AND EXISTS (SELECT 1 FROM users u WHERE u.id = e.created_by)
+        );
+
+      -- Dasselbe fuer das Storno einer Zahlung: die Gegenbuchung
+      -- (settlement_reversal) trug die STORNIERENDE Person, die Buchung
+      -- (settlement) die erfassende. Beide Zeilen einer Buchung tragen
+      -- dieselbe Person (sie entstehen in einem Request); die Gegenbuchung
+      -- bekommt deren created_by. Eine Gegenbuchung ohne Buchung bleibt, wie
+      -- sie ist - es gibt keinen Partner, dessen Autor sie uebernehmen koennte.
+      UPDATE expense_ledger_entries
+      SET created_by = (
+        SELECT s.created_by FROM expense_ledger_entries s
+        WHERE s.source_type = 'settlement' AND s.source_id = expense_ledger_entries.source_id
+        ORDER BY s.id ASC LIMIT 1
+      )
+      WHERE source_type = 'settlement_reversal'
+        AND EXISTS (
+          SELECT 1 FROM expense_ledger_entries s
+          WHERE s.source_type = 'settlement' AND s.source_id = expense_ledger_entries.source_id
+            AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.created_by)
+        )
+        AND created_by <> (
+          SELECT s.created_by FROM expense_ledger_entries s
+          WHERE s.source_type = 'settlement' AND s.source_id = expense_ledger_entries.source_id
+          ORDER BY s.id ASC LIMIT 1
+        );
+    `,
+  },
+  {
+    version: 226,
+    description: 'Split: rebuild ledger rows of active expenses lost to an account deletion',
+    // v225 hat den Autor der noch vorhandenen Ledger-Zeilen korrigiert; die
+    // Zeilen, die ein Kontoloeschen vorher schon per created_by ON DELETE
+    // CASCADE genommen hatte, konnte ein UPDATE nicht zurueckholen (#1382).
+    // Eine aktive Ausgabe ohne eine einzige 'expense'-Zeile zaehlte seitdem in
+    // keinem Saldo. Alle Zeilen einer Ausgabe entstehen gemeinsam mit einem
+    // created_by und fallen deshalb nur gemeinsam - "keine Zeile" ist die Suche.
+    //
+    // Neu aufgebaut aus expenses + expense_splits nach der Regel von
+    // insertExpenseLedger (server/routes/split-expenses.js), hier als SQL
+    // EINGEFROREN: eine Migration laeuft auf dem Schema ihrer Version, ein
+    // Aufruf der lebenden Funktion braeche sie, sobald die Regel eine spaetere
+    // Spalte schreibt. test:split-ledger-rebuild-migration vergleicht beide
+    // Fassungen; wird er rot, hat sich die Buchungsregel geaendert - diese
+    // Migration dann NICHT anfassen.
+    //
+    // Nur aktive Ausgaben (geloeschte sind ohne Zeilen richtig), nur fehlende
+    // Zeilen; ein zweiter Lauf findet nichts mehr. Das Log nennt Ausgabe und
+    // Gruppe, damit ein Admin eine veraenderte Bilanz erklaeren kann.
+    //
+    // Die Gruppe sieht es selbst im Verlauf: je wiederhergestellter Ausgabe
+    // genau ein Eintrag 'ledger_restored' (entity 'expense', actor_id NULL -
+    // niemand hat gehandelt, die Oberflaeche zeigt "System"). metadata traegt
+    // Titel und den gebuchten (umgerechneten) Betrag - als
+    // {title, amount_minor, currency} und nicht wie payment_* als
+    // {amount: Dezimal, currency}, weil eingefrorenes SQL die Nachkommastellen
+    // je Waehrung (ISO 4217, server/services/split-expenses.js) nicht anwenden
+    // kann; die Dezimalform ergaenzt GET /groups/:id/activity. Das Schema von
+    // expense_activity ist hier dasselbe wie bei seiner Anlage in v39: keine
+    // Spalte ist seitdem dazugekommen, und type hat keinen CHECK. Die Spalten
+    // stehen ausdruecklich im INSERT, created_at kommt aus dem Default - eine
+    // spaetere Spalte bricht das nur, wenn sie NOT NULL ohne Default ist, und
+    // die verbietet .claude/rules/db-migrations.md ohnehin.
+    up(db) {
+      db.exec(`
+        DROP TABLE IF EXISTS temp._v226_missing;
+        CREATE TEMP TABLE _v226_missing AS
+          SELECT e.id FROM expenses e
+          WHERE e.status = 'active'
+            AND NOT EXISTS (SELECT 1 FROM expense_ledger_entries l
+                            WHERE l.source_type = 'expense' AND l.source_id = e.id);
+      `);
+      const rebuilt = db.prepare(`
+        SELECT e.id, e.group_id FROM expenses e JOIN _v226_missing m ON m.id = e.id ORDER BY e.id
+      `).all();
+      db.exec(`
+        INSERT INTO expense_ledger_entries
+          (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
+        SELECT x.group_id, 'expense', x.id, x.user_id, x.counterparty_id, x.amount_minor, x.currency, x.title, x.created_by
+        FROM (
+          SELECT e.id, 0 AS ord, e.group_id, e.payer_id AS user_id, NULL AS counterparty_id,
+                 e.converted_amount_minor AS amount_minor, e.converted_currency AS currency, e.title, e.created_by
+          FROM expenses e JOIN _v226_missing m ON m.id = e.id
+          UNION ALL
+          SELECT e.id, s.id, e.group_id, s.user_id, e.payer_id, -s.amount_minor, s.currency, e.title, e.created_by
+          FROM expenses e JOIN _v226_missing m ON m.id = e.id JOIN expense_splits s ON s.expense_id = e.id
+        ) x
+        ORDER BY x.id, x.ord;
+        INSERT INTO expense_activity (group_id, actor_id, type, entity_type, entity_id, metadata)
+        SELECT e.group_id, NULL, 'ledger_restored', 'expense', e.id,
+               json_object('title', e.title, 'amount_minor', e.converted_amount_minor, 'currency', e.converted_currency)
+        FROM expenses e JOIN _v226_missing m ON m.id = e.id
+        ORDER BY e.id;
+        DROP TABLE _v226_missing;
+      `);
+      for (const row of rebuilt) {
+        log.info(`Rebuilt the ledger rows of shared expense ${row.id} in group ${row.group_id}; its balances change accordingly.`);
+      }
+    },
+  },
+  {
+    version: 227,
+    description: 'Split: remove ledger rows of expenses that no longer exist',
+    // Das Gegenstueck zu v226 (#1445): bis v225 stempelte PUT /expenses/:id
+    // die Ledger-Zeilen mit der BEARBEITENDEN Person. Wurde danach das Konto
+    // geloescht, das die Ausgabe angelegt hatte, nahm expenses.created_by
+    // ON DELETE CASCADE Ausgabe und Anteile, die Zeilen (am Bearbeiter)
+    // blieben. Die Salden summieren das Ledger ohne Blick auf expenses - die
+    // Zeilen verschoben sie weiter, und keine Liste zeigte eine Ausgabe, die
+    // das erklaert. v225 hat sie bewusst liegen lassen (kein Autor, den man
+    // eintragen koennte), v226 baut nur fuer existierende Ausgaben auf.
+    //
+    // Seit v225 tragen die Zeilen expenses.created_by und fallen mit der
+    // Ausgabe; neue Waisen entstehen nicht mehr, es ist ein endlicher
+    // Altbestand. Darum hier einmal entfernt statt dauerhaft in jeder
+    // Saldenabfrage herausgefiltert. Nebenbei haelt eine Waise ueber
+    // user_id ON DELETE RESTRICT kein Konto mehr fest.
+    //
+    // Massstab ist "die expenses-Zeile EXISTIERT", nicht "sie ist aktiv": eine
+    // geloeschte Ausgabe behaelt ihre Zeile in expenses, und wer ihre
+    // Buchung samt Gegenbuchung (expense_reversal, #1382) haelt, verliert sie
+    // hier nicht. source_type gehoert in jede Abfrage - Zahlungen zaehlen ihre
+    // source_id in einem anderen Namensraum.
+    //
+    // Die Spur bleibt: je entfernter Ausgabe ein Log (Ausgabe, Gruppe) und
+    // genau ein Verlaufseintrag 'ledger_removed' in ihrer Gruppe, gleiche Form
+    // wie 'ledger_restored' in v226 (actor_id NULL, metadata {title,
+    // amount_minor, currency}; die Dezimalform ergaenzt GET
+    // /groups/:id/activity). Titel und Betrag kommen aus der Zahler-Zeile
+    // (counterparty_id NULL): memo ist der Titel, amount_minor der gebuchte
+    // (umgerechnete) Gesamtbetrag. Fehlt sie, nennt der Eintrag nur den Titel
+    // irgendeiner Zeile. Ein zweiter Lauf findet nichts mehr.
+    up(db) {
+      db.exec(`
+        DROP TABLE IF EXISTS temp._v227_orphans;
+        CREATE TEMP TABLE _v227_orphans AS
+          SELECT DISTINCT l.group_id, l.source_id AS id
+          FROM expense_ledger_entries l
+          WHERE l.source_type IN ('expense', 'expense_reversal')
+            AND NOT EXISTS (SELECT 1 FROM expenses e WHERE e.id = l.source_id);
+      `);
+      const removed = db.prepare('SELECT id, group_id FROM _v227_orphans ORDER BY id, group_id').all();
+      db.exec(`
+        INSERT INTO expense_activity (group_id, actor_id, type, entity_type, entity_id, metadata)
+        SELECT o.group_id, NULL, 'ledger_removed', 'expense', o.id,
+               CASE WHEN p.id IS NULL
+                 THEN json_object('title', (
+                   SELECT x.memo FROM expense_ledger_entries x
+                   WHERE x.source_type IN ('expense', 'expense_reversal')
+                     AND x.source_id = o.id AND x.group_id = o.group_id
+                   ORDER BY x.id LIMIT 1))
+                 ELSE json_object('title', p.memo, 'amount_minor', p.amount_minor, 'currency', p.currency)
+               END
+        FROM _v227_orphans o
+        LEFT JOIN expense_ledger_entries p ON p.id = (
+          SELECT MIN(y.id) FROM expense_ledger_entries y
+          WHERE y.source_type = 'expense' AND y.source_id = o.id AND y.group_id = o.group_id
+            AND y.counterparty_id IS NULL)
+        ORDER BY o.id, o.group_id;
+        DELETE FROM expense_ledger_entries
+        WHERE source_type IN ('expense', 'expense_reversal')
+          AND NOT EXISTS (SELECT 1 FROM expenses e WHERE e.id = expense_ledger_entries.source_id);
+        DROP TABLE _v227_orphans;
+      `);
+      for (const row of removed) {
+        log.info(`Removed the ledger rows of shared expense ${row.id} in group ${row.group_id}: the expense no longer exists, and the group's balances change accordingly.`);
+      }
+    },
+  },
+  {
+    version: 228,
+    description: 'Budget: a series keeps its own definition, the first booking is an ordinary entry (#1035)',
+    // DIE ERSTE ZEILE EINER SERIE WAR ZWEIERLEI (#1035): die Vorlage, aus der
+    // generateRecurringInstances() jedes kuenftige Vorkommen baut, UND die
+    // erste, von Hand erfasste Buchung. "Alle kuenftigen aendern" schrieb
+    // deshalb Titel, Betrag, Kategorie, Unterkategorie, Konto und Zustaendige
+    // auf eine Buchung, die Jahre zurueckliegen konnte - gemessen: die Miete
+    // vom Januar 2020 zog beim Kontowechsel auf das neue Konto um, beide Salden
+    // waren danach falsch. Umgekehrt schrieb eine Korrektur NUR der ersten
+    // Buchung in jedes kuenftige Vorkommen weiter.
+    //
+    // Entschieden in #1035 (Option 1): die Serie bekommt eine Definition fuer
+    // sich, das Original wird eine gewoehnliche Buchung, die Anker ihrer Serie
+    // ist. Hier liegen die WERTE der Vorlage - genau die Felder, die zugleich
+    // Tatsachen ueber eine Buchung sind. Der Rhythmus (recurrence_interval,
+    // _interval_count, _virtual, _confirm, recurrence_rule) und der Starttag
+    // (date) bleiben am Anker: sie haben nur eine Bedeutung, und das Frontend
+    // liest sie dort.
+    //
+    // WAS `recurrence_parent_id IS NULL` DANACH HEISST: nur noch "diese Zeile
+    // wurde nicht von einer Serie erzeugt" - eine von Hand erfasste Buchung.
+    // Ob sie eine Serie traegt, sagt allein diese Tabelle (eine Zeile je
+    // laufender Serie, Schluessel = id des Ankers); ihre Werte sind die der
+    // Buchung, nie die der Vorlage. Der einzige Leser, der die Spalte als "das
+    // ist die Serie" las, war generateRecurringInstances(); er liest jetzt hier.
+    //
+    // Schluessel ist die id des Ankers, keine eigene: an ihr haengen schon die
+    // Instanzen (recurrence_parent_id), die Ausnahmen
+    // (budget_recurrence_skipped.parent_id) und jede API-Adresse einer Serie
+    // (/budget/:id/series). Eine zweite id haette all das umziehen muessen,
+    // ohne dass eine Frage anders beantwortet waere. Der Preis: die Definition
+    // lebt nicht laenger als ihr Anker (ON DELETE CASCADE) - wie bisher.
+    //
+    // Sichtbarkeit steht mit darin, obwohl eine Serien-Aenderung sie bewusst
+    // RUECKWIRKEND auf alle Buchungen der Serie legt: sonst machte eine Einzel-
+    // Aenderung der ersten Buchung ("nur dieser Eintrag") jedes kuenftige
+    // Vorkommen mit oeffentlich oder privat.
+    //
+    // DIE TRIGGER halten die Definition fuer JEDEN Schreiber vollstaendig, auch
+    // fuer die, die am Router vorbei einfuegen (Demo-Seed, Tests): wird eine
+    // Buchung zur Serie, entsteht ihre Definition aus ihren Werten; wird die
+    // Serie beendet, faellt sie weg. Ohne Trigger haette eine Serie ohne
+    // Definition still keine Vorkommen mehr erzeugt. Nur UPDATE OF
+    // is_recurring - der updated_at-Trigger schreibt eine andere Spalte und
+    // loest sie nicht aus. EIN KUENFTIGER REBUILD von budget_entries (wie v156)
+    // verliert Trigger mit der Tabelle und muss diese drei neu anlegen.
+    //
+    // Zeitstempel wie jede Entitaetstabelle (CONTRIBUTING.md); updated_at
+    // fuehrt PUT /budget/:id/series nach, der einzige Schreiber danach.
+    //
+    // Die Zustaendigen des Ankers wandern als Vorlage mit; ihre Zeilen am Anker
+    // bleiben, sie beschreiben die erste Buchung. Idempotent: IF NOT EXISTS,
+    // und gefuellt wird nur fuer Anker ohne Definition - ein zweiter Lauf
+    // ueberschreibt keine Definition, die inzwischen von der Buchung abweicht.
+    up: `
+      CREATE TABLE IF NOT EXISTS budget_series (
+        anchor_id   INTEGER PRIMARY KEY REFERENCES budget_entries(id) ON DELETE CASCADE,
+        title       TEXT    NOT NULL,
+        amount      REAL    NOT NULL,
+        full_amount REAL,
+        category    TEXT    NOT NULL,
+        subcategory TEXT    NOT NULL DEFAULT '',
+        account_id  INTEGER REFERENCES budget_accounts(id) ON DELETE SET NULL,
+        visibility  TEXT    NOT NULL DEFAULT 'shared'
+                            CHECK (visibility IN ('private', 'shared', 'shared_amount')),
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_budget_series_account ON budget_series(account_id);
+
+      CREATE TABLE IF NOT EXISTS budget_series_responsibles (
+        anchor_id INTEGER NOT NULL REFERENCES budget_series(anchor_id) ON DELETE CASCADE,
+        user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        PRIMARY KEY (anchor_id, user_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_budget_series_responsibles_user
+        ON budget_series_responsibles(user_id);
+
+      -- Nur Anker, die noch KEINE Definition haben: ein zweiter Lauf fasst
+      -- weder eine inzwischen abweichende Definition noch ihre (vielleicht
+      -- bewusst geleerte) Zustaendigkeit an.
+      DROP TABLE IF EXISTS temp._v228_anchors;
+      CREATE TEMP TABLE _v228_anchors AS
+        SELECT id FROM budget_entries
+         WHERE is_recurring = 1 AND recurrence_parent_id IS NULL
+           AND id NOT IN (SELECT anchor_id FROM budget_series);
+
+      INSERT INTO budget_series
+        (anchor_id, title, amount, full_amount, category, subcategory, account_id, visibility)
+      SELECT e.id, e.title, e.amount, e.recurrence_full_amount, e.category, e.subcategory,
+             e.account_id, e.visibility
+        FROM budget_entries e JOIN _v228_anchors n ON n.id = e.id;
+
+      INSERT OR IGNORE INTO budget_series_responsibles (anchor_id, user_id)
+      SELECT r.entry_id, r.user_id
+        FROM budget_entry_responsibles r JOIN _v228_anchors n ON n.id = r.entry_id;
+
+      DROP TABLE _v228_anchors;
+
+      CREATE TRIGGER IF NOT EXISTS trg_budget_series_on_insert
+        AFTER INSERT ON budget_entries
+        WHEN NEW.is_recurring = 1 AND NEW.recurrence_parent_id IS NULL
+      BEGIN
+        INSERT OR IGNORE INTO budget_series
+          (anchor_id, title, amount, full_amount, category, subcategory, account_id, visibility)
+        VALUES (NEW.id, NEW.title, NEW.amount, NEW.recurrence_full_amount, NEW.category,
+                NEW.subcategory, NEW.account_id, NEW.visibility);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_budget_series_on_start
+        AFTER UPDATE OF is_recurring ON budget_entries
+        WHEN OLD.is_recurring = 0 AND NEW.is_recurring = 1 AND NEW.recurrence_parent_id IS NULL
+      BEGIN
+        INSERT OR IGNORE INTO budget_series
+          (anchor_id, title, amount, full_amount, category, subcategory, account_id, visibility)
+        VALUES (NEW.id, NEW.title, NEW.amount, NEW.recurrence_full_amount, NEW.category,
+                NEW.subcategory, NEW.account_id, NEW.visibility);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_budget_series_on_stop
+        AFTER UPDATE OF is_recurring ON budget_entries
+        WHEN OLD.is_recurring = 1 AND NEW.is_recurring = 0
+      BEGIN
+        DELETE FROM budget_series WHERE anchor_id = NEW.id;
+      END;
+    `,
+  },
+  {
+    version: 229,
+    description: 'Budget: a series keeps its own start date (#1545)',
+    // DER STARTTAG WAR NOCH DAS DATUM DER ERSTEN BUCHUNG (#1545). v228 hat die
+    // Werte der Vorlage vom Anker getrennt, den Starttag aber dort gelassen:
+    // occurrenceDatesInMonth() leitet jedes spaetere Vorkommen (Tag im Monat,
+    // Wochentag, das "alle N"-Raster) aus ihm ab. Eine Korrektur NUR der ersten
+    // Buchung ("abgebucht wurde am 6., nicht am 5.") verschob deshalb das
+    // Raster jedes Vorkommens, das noch nicht angelegt war, und bei Wochen-
+    // oder "alle N"-Serien sogar, welche Tage es ueberhaupt gibt.
+    //
+    // Die Definition bekommt ihren eigenen Starttag. Gefuellt aus dem Datum des
+    // Ankers - das war bis hierher der Starttag, jede Serie behaelt also genau
+    // ihr Raster. Die Trigger aus v228 legen neue Definitionen an; sie werden
+    // hier mit derselben Bedingung neu angelegt und nehmen den Starttag aus
+    // der Buchung mit (DROP + CREATE, weil ein Trigger sich nicht aendern
+    // laesst). Ein kuenftiger Rebuild von budget_entries verliert sie weiter
+    // mit der Tabelle, siehe v228.
+    //
+    // NULL-faehig, weil ADD COLUMN ein NOT NULL nur mit Vorgabewert nimmt, und
+    // jeder Vorgabewert waere ein erfundener Starttag. Geschrieben wird die
+    // Spalte von dieser Migration, den Triggern und PUT /budget/:id/series;
+    // generateRecurringInstances() liest bei NULL das Datum des Ankers, also
+    // genau das Verhalten bis v228.
+    //
+    // GRID_FROM: ab welchem Tag das heutige Raster gilt. Eine Serien-Aenderung,
+    // die das Raster verschiebt (Starttag oder Rhythmus), raeumt nur ab heute
+    // ab; was davor liegt, ist gebucht und steht auf dem alten Raster. Der
+    // Monatsaufruf kennt das alte Raster nicht mehr und legte in einem schon
+    // gefuellten vergangenen Monat ein zweites Vorkommen daneben (Review-Befund
+    // in #1585). Vor grid_from erzeugt generateRecurringInstances() deshalb
+    // nichts. NULL = das Raster galt schon immer, keine Grenze - der Bestand
+    // bleibt, wie er ist.
+    //
+    // Idempotent: jede Spalte kommt nur dazu, wenn sie fehlt, und gefuellt
+    // wird nur, was noch keinen Starttag hat - ein zweiter Lauf ueberschreibt
+    // keinen inzwischen geaenderten.
+    up(db) {
+      const columns = db.prepare('PRAGMA table_info(budget_series)').all().map((c) => c.name);
+      if (!columns.includes('start_date')) {
+        db.exec('ALTER TABLE budget_series ADD COLUMN start_date TEXT');
+      }
+      if (!columns.includes('grid_from')) {
+        db.exec('ALTER TABLE budget_series ADD COLUMN grid_from TEXT');
+      }
+      // "Gibt es das Vorkommen an diesem Tag schon?" fragt occurrenceWriter()
+      // fuer jedes Vorkommen. Mit dem Index nur auf recurrence_parent_id las
+      // die Frage jede Buchung der Serie - beim Einfrieren der Vergangenheit
+      // vor einer Rasteraenderung (#1585) quadratisch: gemessen 290 s fuer
+      // eine Wochenserie ueber 100.000 Vorkommen. Ein kuenftiger Rebuild von
+      // budget_entries (wie v156) muss ihn mit anlegen.
+      db.exec('CREATE INDEX IF NOT EXISTS idx_budget_parent_date ON budget_entries(recurrence_parent_id, date)');
+      db.exec(`
+        UPDATE budget_series
+           SET start_date = (SELECT e.date FROM budget_entries e WHERE e.id = budget_series.anchor_id)
+         WHERE start_date IS NULL;
+
+        DROP TRIGGER IF EXISTS trg_budget_series_on_insert;
+        CREATE TRIGGER trg_budget_series_on_insert
+          AFTER INSERT ON budget_entries
+          WHEN NEW.is_recurring = 1 AND NEW.recurrence_parent_id IS NULL
+        BEGIN
+          INSERT OR IGNORE INTO budget_series
+            (anchor_id, title, amount, full_amount, category, subcategory, account_id, visibility,
+             start_date)
+          VALUES (NEW.id, NEW.title, NEW.amount, NEW.recurrence_full_amount, NEW.category,
+                  NEW.subcategory, NEW.account_id, NEW.visibility, NEW.date);
+        END;
+
+        DROP TRIGGER IF EXISTS trg_budget_series_on_start;
+        CREATE TRIGGER trg_budget_series_on_start
+          AFTER UPDATE OF is_recurring ON budget_entries
+          WHEN OLD.is_recurring = 0 AND NEW.is_recurring = 1 AND NEW.recurrence_parent_id IS NULL
+        BEGIN
+          INSERT OR IGNORE INTO budget_series
+            (anchor_id, title, amount, full_amount, category, subcategory, account_id, visibility,
+             start_date)
+          VALUES (NEW.id, NEW.title, NEW.amount, NEW.recurrence_full_amount, NEW.category,
+                  NEW.subcategory, NEW.account_id, NEW.visibility, NEW.date);
+        END;
+      `);
+    },
+  },
+  {
+    version: 230,
+    description: 'Rewards: reversal instead of deletion on reopen, series id on tasks and earnings (#1607, #1603)',
+    // DER LEDGER LÖSCHT NICHT MEHR (#1607). Bis hierher nahm das Wiederöffnen
+    // einer erledigten Aufgabe ihre earn-Zeile aus reward_ledger - entgegen dem
+    // Satz in v70, jede Zeile sei unveränderlich und nachvollziehbar. Ab jetzt
+    // bleibt die earn-Zeile stehen und die Rücknahme ist eine eigene Zeile
+    // (Typ 'reversal', negatives Delta, dieselbe task_id); der Satz aus v70
+    // stimmt damit erst seit dieser Migration.
+    //
+    // DAFÜR MUSS uniq_reward_earn FALLEN. Der partielle UNIQUE-Index
+    // (task_id, user_id) WHERE type = 'earn' ließ je Aufgabe und Person genau
+    // eine earn-Zeile zu. Bleibt die erste stehen, wäre das erneute Erledigen
+    // nach dem Wiederöffnen eine zweite - und der Index hätte sie abgewiesen:
+    // die Punkte wären nach einmal Hin und Her für immer weg. Die Idempotenz
+    // der Vergabe steht seitdem im Code, über den Netto-Stand der Aufgabe je
+    // Person (awardForCompletion in server/services/rewards.js).
+    //
+    // DER ERSATZINDEX IST NICHT EINDEUTIG und trägt genau diese Netto-Frage:
+    // sie liest je Statuswechsel die Buchungen einer Aufgabe, und ohne ihn
+    // wäre das ein Lauf über den ganzen Ledger. Ein künftiger Rebuild von
+    // reward_ledger muss ihn mit anlegen - und darf uniq_reward_earn NICHT
+    // wieder anlegen.
+    //
+    // KEIN BACKFILL: earn-Zeilen, die frühere Versionen beim Wiederöffnen
+    // gelöscht haben, sind weg, und aus dem Bestand lässt sich nicht ablesen,
+    // welche es gab. Die Salden bleiben, wie sie sind.
+    //
+    // DREI SPALTEN, DIE DAS LOESCHEN EINER AUFGABE UEBERLEBEN (#1603, #1607).
+    // reward_ledger.task_id und tasks.recurrence_origin_id sind beide ON DELETE
+    // SET NULL: wird eine erledigte Aufgabe geloescht, weiss die Gutschrift
+    // nicht mehr, wofuer sie war, und die Folgeinstanz nicht mehr, woher sie
+    // kommt. Alles, was ueber diese Verweise fragt, wird dann blind.
+    //   - tasks.recurrence_series_id: die ID des ERSTEN Vorkommens einer Serie,
+    //     beim Anlegen jeder Folgeinstanz (und jeder kopierten Teilaufgabe) als
+    //     Wert uebernommen. NULL = die Aufgabe ist selbst ein erstes Vorkommen,
+    //     oder sie stammt von vor dieser Migration (dann gilt die Wurzel der
+    //     Kette, seriesOfTask in server/services/rewards.js).
+    //   - reward_ledger.series_id: dieselbe Kennung an der Gutschrift. Der
+    //     Deckel "eine Gutschrift je Serie, Person und Haushaltstag" fragt den
+    //     Ledger direkt danach. NULL an Zeilen von vor dieser Migration und an
+    //     allem, was keine Gutschrift fuer eine Aufgabe ist.
+    //   - reward_ledger.reverses_id: an einer Gegenbuchung die ID der
+    //     Gutschrift, die sie zuruecknimmt.
+    // Keine Fremdschluessel: die Werte sollen gerade dann stehen bleiben, wenn
+    // das, worauf sie zeigen, verschwindet. Ein kuenftiger Rebuild von tasks
+    // oder reward_ledger muss die Spalten und ihre Indizes mitnehmen.
+    //
+    // KEIN BACKFILL DER KENNUNGEN: der Deckel ist neu, vor dieser Migration hat
+    // nichts gesperrt, also fehlt auch nichts. Offene Folgeinstanzen aus dem
+    // Bestand finden ihre Serie ueber die Kette und geben sie beim naechsten
+    // Abhaken als Wert weiter.
+    //
+    // Idempotent: Indizes ueber IF (NOT) EXISTS, Spalten nur, wenn sie fehlen.
+    up(db) {
+      db.exec(`
+        DROP INDEX IF EXISTS uniq_reward_earn;
+        CREATE INDEX IF NOT EXISTS idx_reward_ledger_task ON reward_ledger(task_id, user_id);
+      `);
+      const has = (table, column) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column);
+      if (!has('tasks', 'recurrence_series_id')) db.exec('ALTER TABLE tasks ADD COLUMN recurrence_series_id INTEGER');
+      if (!has('reward_ledger', 'series_id')) db.exec('ALTER TABLE reward_ledger ADD COLUMN series_id INTEGER');
+      if (!has('reward_ledger', 'reverses_id')) db.exec('ALTER TABLE reward_ledger ADD COLUMN reverses_id INTEGER');
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_reward_ledger_series ON reward_ledger(series_id, user_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_reward_ledger_reverses ON reward_ledger(reverses_id);
+      `);
+    },
+  },
 ];
 
 /**
@@ -9834,7 +10362,24 @@ function getPath() {
   return DB_PATH;
 }
 
-async function backupToFile(destinationPath) {
+/**
+ * Laufende `backupToFile()`-Aufrufe. Der Restore wartet vor dem Schliessen der
+ * Verbindung, bis keiner mehr laeuft (Codex-Befund in #1431): seit die
+ * Arbeitsdatei VOR dem Schliessen kopiert wird, kann waehrend dieses Kopierens
+ * ein Backup (Download-Route, Zeitplan) auf der noch offenen Verbindung
+ * beginnen - und `db.close()` zoege ihm die Verbindung unter den Haenden weg.
+ * @type {Set<Promise<unknown>>}
+ */
+const activeBackups = new Set();
+
+function backupToFile(destinationPath) {
+  const running = backupToFileUntracked(destinationPath);
+  const tracked = running.finally(() => activeBackups.delete(tracked));
+  activeBackups.add(tracked);
+  return tracked;
+}
+
+async function backupToFileUntracked(destinationPath) {
   const database = get();
   await fs.mkdir(path.dirname(destinationPath), { recursive: true });
 
@@ -9846,14 +10391,30 @@ async function backupToFile(destinationPath) {
     // der Quelle, das Backup ist also ebenfalls verschlüsselt. Es verlangt
     // allerdings ein noch nicht existierendes Ziel.
     await unlinkIfExists(destinationPath);
-    database.prepare('VACUUM INTO ?').run(destinationPath);
+    vacuumInto(database, destinationPath);
   } else if (typeof database.backup === 'function') {
     await database.backup(destinationPath);
   } else {
-    database.prepare('VACUUM INTO ?').run(destinationPath);
+    vacuumInto(database, destinationPath);
   }
 
   return destinationPath;
+}
+
+/**
+ * `VACUUM INTO` auch waehrend eines Restores: `query_only` (siehe
+ * `restoreFromFile()`) sperrt es sonst, obwohl es nur in eine andere Datei
+ * schreibt. Das Loesen und Wiedersetzen ist synchron - dazwischen kann kein
+ * anderer Request schreiben.
+ */
+function vacuumInto(database, destinationPath) {
+  const locked = database.pragma('query_only', { simple: true }) === 1;
+  if (locked) database.pragma('query_only = OFF');
+  try {
+    database.prepare('VACUUM INTO ?').run(destinationPath);
+  } finally {
+    if (locked) database.pragma('query_only = ON');
+  }
 }
 
 /**
@@ -9891,26 +10452,46 @@ async function backupToFile(destinationPath) {
  */
 function undecryptableBackupError(cause) {
   if (!DB_KEY) {
-    return new Error(
+    return restoreError(
       'Backup file could not be read: it has no plain SQLite header, so it is likely encrypted - '
       + 'and DB_ENCRYPTION_KEY is not set on this instance, so there is nothing to decrypt it with. '
       + 'A backup carries the encryption of the instance that wrote it: set DB_ENCRYPTION_KEY to '
       + "that instance's key and restart Yuvomi, then restore again. If the file was never "
       + 'encrypted, it is not a valid Yuvomi database.',
-      { cause }
+      'own_key_missing',
+      cause
     );
   }
-  return new Error(
+  return restoreError(
     "Backup file could not be decrypted with this instance's DB_ENCRYPTION_KEY. A backup carries "
-    + 'the encryption of the instance that wrote it, so a backup from another installation cannot '
-    + 'be read here. Do NOT just set DB_ENCRYPTION_KEY to that installation\'s key and restart: '
+    + 'the encryption of the instance that wrote it, so a backup from another installation needs '
+    + "that installation's key: enter it as the backup key and restore again (on the command "
+    + 'line: `scripts/restore-backup.js <file> --backup-key-stdin`, with the key on stdin). It is used only for '
+    + "this restore - the backup is re-encrypted with this instance's own key and the entered key "
+    + 'is not stored. Do NOT just set DB_ENCRYPTION_KEY to that installation\'s key and restart: '
     + "this instance's own database is encrypted with the key it has now, so after the swap Yuvomi "
-    + 'would not start at all and this dialog would be out of reach. Taking over a backup from '
-    + 'another installation replaces the database file and sets the key together, with Yuvomi '
-    + 'stopped - see "CLI / Docker Compose restore" on this page. If both installations really do '
-    + 'have the same key, the file is not a Yuvomi database.',
-    { cause }
+    + 'would not start at all and this dialog would be out of reach. The manual route, which '
+    + 'replaces the database file and sets the key together with Yuvomi stopped, is under '
+    + '"CLI / Docker Compose restore" on this page. If both installations really do have the same '
+    + 'key, the file is not a Yuvomi database.',
+    'backup_key_required',
+    cause
   );
+}
+
+/**
+ * Fehler mit maschinenlesbarem Grund fuer den Restore-Dialog (#1267): er
+ * entscheidet daran, ob er das Feld fuer den Backup-Schluessel zeigt. Die
+ * Meldung selbst nennt nie einen Schluessel, weder den eigenen noch den des
+ * Backups.
+ * @param {string} message
+ * @param {string} reason
+ * @param {unknown} [cause]
+ */
+function restoreError(message, reason, cause) {
+  const err = cause === undefined ? new Error(message) : new Error(message, { cause });
+  err.reason = reason;
+  return err;
 }
 
 /**
@@ -9953,22 +10534,36 @@ function undecryptableBackupError(cause) {
  * @returns {Error}
  */
 function unreadableBackupError(encrypted, cause) {
+  const code = typeof cause?.code === 'string' ? cause.code : '';
   if (!encrypted) {
+    // Kopf da, aber schon die Schemaseite kaputt: ein beschaedigtes Backup,
+    // keine fremde Datei - derselbe Grund wie aus `assertBackupIntact()`
+    // (Codex-Befund in #1431).
+    if (code.startsWith('SQLITE_CORRUPT')) {
+      return restoreError(
+        `Backup file is damaged (${code}: ${cause?.message ?? String(cause)}). Its SQLite header is `
+        + 'intact, but its schema page is not. Nothing on this instance was changed. Get the backup '
+        + 'again from where it is stored and check that its size and sha256sum match the stored '
+        + 'original, then restore that copy - or restore an older backup.',
+        'backup_corrupt',
+        cause
+      );
+    }
     return new Error('Backup file is not a valid Yuvomi database.', { cause });
   }
-  const code = typeof cause?.code === 'string' ? cause.code : '';
   if (code === 'SQLITE_NOTADB') return undecryptableBackupError(cause);
 
   const detail = `${code || 'no SQLite error code'}: ${cause?.message ?? String(cause)}`;
   if (DB_KEY && code.startsWith('SQLITE_CORRUPT')) {
-    return new Error(
+    return restoreError(
       `Backup file is damaged or incomplete (${detail}). DB_ENCRYPTION_KEY is not the problem: it `
       + 'does open this file - its first page decrypted and passed the integrity check, which a '
       + 'wrong key never does. Most likely the file was cut short before it got here, by a download '
       + 'or copy that stopped early. Nothing on this instance was changed. Get the backup again from '
       + 'where it is stored - download or copy it once more - and check that its size and sha256sum '
       + 'match the stored original, then restore that copy.',
-      { cause }
+      'backup_corrupt',
+      cause
     );
   }
 
@@ -9977,6 +10572,78 @@ function unreadableBackupError(encrypted, cause) {
     lines.push('Check that the file is there and that the user this restore runs as may read it.');
   }
   return new Error(lines.join(' '), { cause });
+}
+
+/** Erste Zeile eines Befunds ohne die Kopfzeile `*** in database main ***`. */
+function firstFinding(result) {
+  const text = String(result);
+  return text.split('\n').find((line) => line.trim() && !line.startsWith('***')) ?? text;
+}
+
+/**
+ * Jede Seite des Backups lesen, bevor es eingespielt wird (#1422).
+ *
+ * `assertReadable()` liest nur `sqlite_master`. Ein EIGENES Backup mit einer
+ * kaputten Seite dahinter (gemessen: ein gekipptes Byte in Seite 5, mit und
+ * ohne Schluessel) ging damit ohne Fehler durch, wurde eingespielt, und die
+ * Instanz lief danach auf einer Datenbank, deren `quick_check` Hunderte
+ * unerreichbare Seiten meldet. Der Weg mit Backup-Schluessel lehnte dieselbe
+ * Datei schon ab - nur weil das Umschluesseln jede Seite anfasst.
+ *
+ * `quick_check` statt `integrity_check`: es liest jede Seite (mit Schluessel
+ * also auch deren HMAC) und prueft den Aufbau jedes B-Baums, laeuft aber
+ * linear. Was `integrity_check` zusaetzlich prueft - ob jeder Index genau zu
+ * seiner Tabelle passt -, kann in einem Backup aus `VACUUM INTO` nur durch
+ * eine kaputte Seite auseinanderlaufen, und die findet schon `quick_check`.
+ * Gemessen mit Schluessel: 2 MB samt ganzem Restore unter 200 ms, 91 MB (300 000 Zeilen, zwei
+ * Indizes) rund 0,9 s gegen 1,9 s fuer `integrity_check` - der Restore
+ * blockiert solange den Server, deshalb die schnellere Pruefung.
+ * `quick_check(1)` hoert nach dem ersten Befund auf; einer reicht. Es meldet
+ * nicht nur kaputte Seiten, sondern auch Zeilen, die eine NOT-NULL-Regel
+ * ihrer Tabelle verletzen (gemessen: „NULL value in a.x"; CHECK-Regeln prueft
+ * es nicht) - deshalb sagt die Meldung „haelt nicht zusammen" und nicht
+ * „Seite unlesbar".
+ * @param {import('better-sqlite3-multiple-ciphers').Database} candidate
+ * @param {boolean} encrypted
+ */
+function assertBackupIntact(candidate, encrypted) {
+  let result;
+  try {
+    // Klartext: integrity_check. quick_check prueft nicht, ob jeder Index zu
+    // seiner Tabelle passt, und ohne Seiten-HMAC kann ein gekipptes Byte in
+    // einem indizierten Wert genau das auseinanderlaufen lassen - gemessen:
+    // quick_check „ok", integrity_check „row missing from index" (Codex-Befund
+    // in #1431). Verschluesselt: quick_check. Jede Seite traegt dort ein HMAC,
+    // eine veraenderte Seite scheitert schon beim Lesen, und integrity_check
+    // kostete fuer diesen Fall nur die doppelte Zeit.
+    result = candidate.pragma(encrypted ? 'quick_check(1)' : 'integrity_check(1)', { simple: true });
+  } catch (err) {
+    const code = typeof err?.code === 'string' ? err.code : '';
+    if (!code.startsWith('SQLITE_CORRUPT')) throw unreadableBackupError(encrypted, err);
+    result = `${code}: ${err.message}`;
+  }
+  if (result === 'ok') return;
+  throw restoreError(
+    `Backup file is damaged: the integrity check found an error in it (${firstFinding(result)}). `
+    + 'Its first page opens, but the file does not hold together - a damaged page or a row that '
+    + 'breaks a NOT NULL rule of its table - and restoring it would put a broken database in place. Nothing on '
+    + 'this instance was changed. Get the backup again from '
+    + 'where it is stored and check that its size and sha256sum match the stored original, then '
+    + 'restore that copy - or restore an older backup.',
+    'backup_corrupt'
+  );
+}
+
+/**
+ * Ein Backup pruefen, ohne es einzuspielen: dieselbe Validierung wie vor jedem
+ * Restore (lesbar mit dem eigenen Schluessel, Integritaet, Yuvomi-Schema, keine
+ * neuere Version). Liefert die Schema-Version; wirft mit derselben Meldung wie
+ * der Restore.
+ * @param {string} sourcePath
+ * @returns {number}
+ */
+function checkBackupFile(sourcePath) {
+  return validateBackupFile(sourcePath);
 }
 
 function validateBackupFile(sourcePath) {
@@ -10000,6 +10667,7 @@ function validateBackupFile(sourcePath) {
     } catch (err) {
       throw unreadableBackupError(encrypted, err);
     }
+    assertBackupIntact(candidate, encrypted);
     const row = candidate.prepare(`
       SELECT name
       FROM sqlite_master
@@ -10052,10 +10720,548 @@ function keptJournalName(rollbackPath, kind) {
   return `${rollbackPath}.${kind}-kept`;
 }
 
-async function restoreFromFile(sourcePath) {
+/** `true`, wenn DB_ENCRYPTION_KEY dieser Instanz die Datei oeffnet und liest. */
+function opensWithOwnKey(filePath) {
+  if (!DB_KEY) return false;
+  let candidate;
+  try {
+    candidate = new Database(filePath, { readonly: true, fileMustExist: true });
+    applyEncryptionKey(candidate);
+    assertReadable(candidate);
+    return true;
+  } catch {
+    // Jeder Fehler heisst nur „nicht mit diesem Schluessel" - die Diagnose
+    // uebernimmt der Weg mit dem Backup-Schluessel.
+    return false;
+  } finally {
+    candidate?.close();
+  }
+}
+
+/** Backup-Schluessel als Bytes; `null`, wenn keiner (oder ein leerer) gegeben ist. */
+function backupKeyBytes(backupKey) {
+  if (backupKey == null) return null;
+  const bytes = Buffer.isBuffer(backupKey) ? backupKey : Buffer.from(String(backupKey), 'utf8');
+  return bytes.length > 0 ? bytes : null;
+}
+
+/**
+ * Warum der Backup-Schluessel die Datei nicht oeffnet - getrennt wie in
+ * `unreadableBackupError()`: nur `SQLITE_NOTADB` heisst „falscher Schluessel",
+ * `SQLITE_CORRUPT` gibt es nur mit dem richtigen (Seite 1 hat die HMAC-Pruefung
+ * bestanden).
+ */
+function foreignKeyReadError(cause, { keyProven = false } = {}) {
+  const code = typeof cause?.code === 'string' ? cause.code : '';
+  if (code === 'SQLITE_NOTADB' && !keyProven) {
+    return restoreError(
+      'Backup file could not be decrypted with the backup key you entered. It has to be exactly '
+      + 'the DB_ENCRYPTION_KEY of the installation that wrote this backup - every character counts, '
+      + 'including spaces at either end. Nothing on this instance was changed. If the key is right, '
+      + 'the file is not a Yuvomi database or was cut short before it got here.',
+      'backup_key_wrong',
+      cause
+    );
+  }
+  // Node-Fehler (etwa EACCES aus copyFile) tragen den Code schon am Anfang
+  // ihrer Meldung - dann nicht ein zweites Mal davorsetzen.
+  const text = cause?.message ?? String(cause);
+  const detail = code && text.startsWith(`${code}:`) ? text : `${code || 'no SQLite error code'}: ${text}`;
+  // Gemessen scheitert eine spaetere Seite beim Umschluesseln immer mit
+  // SQLITE_CORRUPT. Der NOTADB-Zweig mit `keyProven` ist in keiner Messung
+  // aufgetreten; er ist defensiv und sichert ab, dass ein nach bewiesenem
+  // Schluessel doch gemeldetes NOTADB nie als „falscher Schluessel" ankommt.
+  if (code.startsWith('SQLITE_CORRUPT') || (keyProven && code === 'SQLITE_NOTADB')) {
+    return restoreError(
+      `Backup file is damaged or incomplete (${detail}). The backup key is right: it opens the `
+      + 'first page, which a wrong key never does. Nothing on this instance was changed. Get the '
+      + 'backup again from where it is stored and check that its size and sha256sum match the '
+      + 'stored original, then restore that copy.',
+      'backup_damaged',
+      cause
+    );
+  }
+  return restoreError(
+    `Backup file could not be read (${detail}). Nothing on this instance was changed.`,
+    'backup_unreadable',
+    cause
+  );
+}
+
+/**
+ * Backup einer ANDEREN Installation auf den eigenen Schluessel umschluesseln (#1267).
+ *
+ * Entschieden in #1267: der Schluessel des Backups lebt nur fuer diesen
+ * Restore, die Datenbank wird auf DB_ENCRYPTION_KEY dieser Instanz
+ * umgeschluesselt. Der eigene Schluessel bleibt die eine Quelle der Wahrheit -
+ * jede Alternative (alten Key in die Env schreiben, nur im Speicher halten,
+ * Key-Datei auf dem Volume) endete am naechsten Neustart oder neben den Daten.
+ *
+ * Gearbeitet wird an einer Kopie in einem eigenen Temp-Verzeichnis, nie an
+ * DB_PATH: erst wenn die Kopie mit dem alten Schluessel lesbar war und auf den
+ * neuen umgestellt ist, laeuft sie in den bestehenden Restore - der sie mit dem
+ * EIGENEN Schluessel validiert und dann erst die Datenbank tauscht. Ein
+ * falscher Schluessel endet also vor jeder Aenderung an dieser Instanz.
+ * `PRAGMA rekey` schreibt die Seiten verschluesselt um; die Datei liegt zu
+ * keinem Zeitpunkt entschluesselt auf der Platte.
+ *
+ * Ohne eigenen Schluessel wird abgelehnt: umschluesseln ginge hier nur auf
+ * Klartext, und ein still entschluesseltes Backup unterliefe die
+ * Verschluesselung der Quellinstanz.
+ *
+ * @param {string} sourcePath
+ * @param {Buffer} oldKey
+ * @returns {Promise<{ dir: string, path: string }>}
+ */
+async function rekeyForeignBackup(sourcePath, oldKey) {
+  if (!DB_KEY) {
+    throw restoreError(
+      'A backup key was given, but DB_ENCRYPTION_KEY is not set on this instance. A restore with a '
+      + "backup key re-encrypts the backup with this instance's own key; without one it would have "
+      + 'to be stored decrypted, and this restore refuses that. Set DB_ENCRYPTION_KEY on this '
+      + 'instance (for example to a value from `openssl rand -hex 32`) and restart Yuvomi - its '
+      + 'current database is encrypted with it on that start - then restore again with the backup '
+      + 'key. Nothing on this instance was changed.',
+      'own_key_missing'
+    );
+  }
+  assertCipherSupport();
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-rekey-'));
+  const workingPath = path.join(dir, 'rekeyed.db');
+  try {
+    try {
+      await fs.copyFile(sourcePath, workingPath);
+    } catch (err) {
+      throw foreignKeyReadError(err);
+    }
+    let working;
+    try {
+      working = new Database(workingPath, { fileMustExist: true });
+    } catch (err) {
+      throw foreignKeyReadError(err);
+    }
+    try {
+      working.pragma('temp_store = MEMORY');
+      applyKeyBytes(working, oldKey);
+      try {
+        assertReadable(working);
+      } catch (err) {
+        throw foreignKeyReadError(err);
+      }
+      // Ein Backup aus `VACUUM INTO` einer WAL-Datenbank traegt das WAL-Flag
+      // im Kopf. DELETE haelt das Umschluesseln in EINER Datei: ohne entstuende
+      // ein `-wal` neben der Arbeitskopie im Temp-Verzeichnis. init() stellt
+      // nach dem Restore ohnehin wieder auf WAL.
+      try {
+        working.pragma('journal_mode = DELETE');
+        working.pragma(`rekey="x'${Buffer.from(DB_KEY, 'utf8').toString('hex')}'"`);
+      } catch (err) {
+        // Seite 1 ist oben mit diesem Schluessel entschluesselt worden - ein
+        // Fehler hier liegt nicht am Schluessel: an einer spaeteren Seite
+        // (SQLITE_CORRUPT) oder am Temp-Verzeichnis (SQLITE_FULL, SQLITE_IOERR,
+        // voller Datentraeger), das dann als backup_unreadable ankommt.
+        throw foreignKeyReadError(err, { keyProven: true });
+      }
+    } finally {
+      working.close();
+    }
+  } catch (err) {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    throw err;
+  }
+  return { dir, path: workingPath };
+}
+
+/**
+ * Laeuft in diesem Prozess gerade ein Restore? Ein zweiter (zweiter Tab,
+ * zweiter Admin) wird sofort abgelehnt, statt mit dem ersten um dieselben
+ * Dateien zu ringen: im Review von #1431 nachgestellt, ueberschrieb der zweite die
+ * halbe Arbeitsdatei bzw. die Rollback-Kopie des ersten, und der erste hing
+ * danach eine Mischung an DB_PATH (`database disk image is malformed`).
+ * Gesetzt wird der Riegel vor dem ersten `await`, geloest im `finally`.
+ * Gegen einen Restore aus einem ANDEREN Prozess (CLI neben dem Server) wirkt
+ * er nicht. Dafuer tragen Arbeitsdatei und halbe Rollback-Kopie die
+ * Prozessnummer im Namen: kein Prozess ueberschreibt die des anderen, und
+ * `removeRestoreStaging()` raeumt nur Dateien toter Prozesse weg. Den Tausch
+ * selbst serialisiert das nicht - beide haengten nacheinander eine
+ * vollstaendige Datenbank an DB_PATH.
+ */
+let restoreRunning = false;
+
+/**
+ * Backup einspielen.
+ * @param {string} sourcePath
+ * @param {{ backupKey?: string | Buffer | null }} [options] `backupKey`: der
+ *   DB_ENCRYPTION_KEY der Installation, die das Backup geschrieben hat - nur
+ *   fuer ein verschluesseltes Backup einer ANDEREN Installation (#1267). Er
+ *   wird nicht gespeichert und steht in keiner Meldung.
+ */
+async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
+  if (restoreRunning) {
+    throw restoreError(RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON);
+  }
+  restoreRunning = true;
+  setRestoreRunning(true);
+  try {
+    // Erst die Jobs zu Ende kommen lassen, die schon nach aussen schreiben
+    // (Kalender-Sync, Push, ...): sie muessen ihr Ergebnis noch zurueckschreiben
+    // koennen, sonst bleibt der entfernte Stand ohne Link (Codex-Befund in
+    // #1431). Neue beginnen ab `setRestoreRunning(true)` nicht mehr, und
+    // schreibende Requests weist `restoreWriteGate` ab derselben Zeile ab.
+    // Schon zugelassene schreibende Requests laufen zu Ende und landen in der
+    // alten Datenbank, nie in der eingespielten (Codex-Befund in #1431).
+    // Hoechstens `restoreWaitTimeoutMs()` lang, dann Abbruch vor jeder
+    // Aenderung (Review #1431).
+    await waitForQuietOrGiveUp();
+    // Ab jetzt nimmt die laufende Verbindung keine Schreibzugriffe mehr an
+    // (Codex-Befund in #1431): seit die Arbeitsdatei VOR dem Schliessen kopiert
+    // wird, bleibt sie waehrenddessen offen, und ein Schreibzugriff meldete
+    // Erfolg, den Checkpoint, Schliessen und rename danach verwarfen. Die neue
+    // Verbindung nach dem Tausch beginnt ohne den Riegel, nach einem
+    // Fehlschlag wird er unten geloest.
+    try { db?.pragma('query_only = ON'); } catch { /* ohne Verbindung nichts zu sperren */ }
+    return await restoreFromFileUnlocked(sourcePath, { backupKey });
+  } finally {
+    restoreRunning = false;
+    setRestoreRunning(false);
+    try { db?.pragma('query_only = OFF'); } catch { /* best effort */ }
+  }
+}
+
+/**
+ * Auf laufende Backups, Jobs und zugelassene Anfragen warten - hoechstens
+ * `restoreWaitTimeoutMs()`. Laeuft die Frist ab, bricht der Restore ab, bevor er
+ * die Verbindung sperrt oder etwas aendert, mit einem Grund, den der Dialog
+ * uebersetzt (Review #1431).
+ */
+async function waitForQuietOrGiveUp() {
+  const quiet = await waitUntilIdle(
+    () => [...activeBackups, ...activeWriters()],
+    Date.now() + restoreWaitTimeoutMs()
+  );
+  if (quiet) return;
+  const seconds = Math.round(restoreWaitTimeoutMs() / 1000);
+  throw restoreError(
+    `Yuvomi is still busy: a sync, a backup or a request had not finished after ${seconds} seconds, `
+    + 'so the restore did not start. Nothing on this instance was changed. Try again in a moment.',
+    'restore_busy'
+  );
+}
+
+/** Laeuft gerade ein Restore? Fuer `restoreWriteGate`. */
+function isRestoreRunning() {
+  return restoreRunning;
+}
+
+/**
+ * Ist die Verbindung offen? Waehrend eines Restores ist sie es vom Schliessen
+ * bis zum Wiederoeffnen nicht - dann beantwortet `restoreWriteGate` auch
+ * lesende API-Anfragen mit 503 (Review #1431).
+ */
+function isDatabaseOpen() {
+  return Boolean(db);
+}
+
+/**
+ * `true`, wenn `sourcePath` dieselbe Datei ist wie DB_PATH (auch per Symlink
+ * oder hartem Link). Ein Restore der laufenden Datenbank auf sich selbst
+ * kopierte die Hauptdatei VOR dem Checkpoint: was nur im `-wal` stand, fehlte
+ * der Arbeitsdatei, und das rename haengte diesen alten Stand als „Erfolg" ein
+ * (Codex-Befund in #1431).
+ */
+function isActiveDatabaseFile(sourcePath) {
+  try {
+    // bigint: grosse Inode-Nummern (manche Netz- und Overlay-Dateisysteme)
+    // passen nicht verlustfrei in eine Zahl.
+    const source = statSync(sourcePath, { bigint: true });
+    const active = statSync(DB_PATH, { bigint: true });
+    return source.dev === active.dev && source.ino === active.ino;
+  } catch {
+    return false;
+  }
+}
+
+async function restoreFromFileUnlocked(sourcePath, { backupKey }) {
+  if (isActiveDatabaseFile(sourcePath)) {
+    throw new Error(
+      `Backup file ${sourcePath} is the active database itself (DB_PATH). Restoring it onto itself `
+      + 'would drop the changes that are still only in its write-ahead log. Nothing on this instance '
+      + 'was changed. Restore a backup file instead - download one under Settings, Backup, or copy '
+      + 'the database file while Yuvomi is stopped.'
+    );
+  }
+  const oldKey = backupKeyBytes(backupKey);
+  // Ein Klartext-Backup braucht keinen Schluessel - es laeuft wie bisher und
+  // wird von init() mit dem eigenen verschluesselt.
+  // Oeffnet der EIGENE Schluessel das Backup, ist es eines dieser Installation
+  // und der Backup-Schluessel gar nicht gefragt - etwa bei einem API-Client,
+  // der den Header immer mitschickt.
+  const rekeyed = oldKey && !isPlaintextDatabase(sourcePath) && !opensWithOwnKey(sourcePath)
+    ? await rekeyForeignBackup(sourcePath, oldKey)
+    : null;
+  try {
+    return await restoreValidatedFile(rekeyed?.path ?? sourcePath);
+  } finally {
+    if (rekeyed) await fs.rm(rekeyed.dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+const RESTORE_STAGING_SUFFIX = '.restore-tmp';
+
+/**
+ * Arbeitsname, unter dem `restoreFromFile()` die neue Datenbank ablegt, bevor
+ * sie an `DB_PATH` gehaengt wird (#1422). Neben `DB_PATH`, nicht im
+ * Temp-Verzeichnis: nur im selben Verzeichnis ist das Umhaengen ein `rename()`
+ * innerhalb eines Dateisystems und damit unteilbar - wie `.creating` (#1287).
+ */
+function restoreStagingPath() {
+  // Eigener Name je Restore: ein Restore aus einem zweiten Prozess (CLI neben
+  // dem laufenden Server) ueberschreibt so nie die Arbeitsdatei des ersten.
+  return `${DB_PATH}${RESTORE_STAGING_SUFFIX}-${process.pid}-${Date.now().toString(36)}`;
+}
+
+/**
+ * Codes, mit denen ein Dateisystem sagt, dass es fsync auf ein Verzeichnis
+ * nicht kann - nicht, dass es gescheitert ist. EISDIR/EACCES/EPERM kommen beim
+ * Oeffnen eines Verzeichnisses (Windows, manche Netzfreigaben), EINVAL,
+ * ENOTSUP/EOPNOTSUPP und EBADF vom fsync selbst (FUSE, SMB, NFS-Varianten).
+ */
+const DIRECTORY_SYNC_UNSUPPORTED = new Set(['EINVAL', 'ENOTSUP', 'EOPNOTSUPP', 'EISDIR', 'EPERM', 'EACCES', 'EBADF']);
+
+/**
+ * Verzeichnis-Eintrag auf die Platte bringen. Kann das Dateisystem das nicht,
+ * bleibt es beim unteilbaren rename (nur nicht sofort dauerhaft). Ein echter
+ * Fehler (EIO, ENOSPC, ...) geht weiter: der Aufrufer bricht ab bzw. meldet,
+ * statt einen nicht bestaetigten Tausch als Erfolg auszugeben (Codex-Befund in #1431).
+ */
+async function syncDirectory(dirPath) {
+  let handle;
+  try {
+    handle = await fs.open(dirPath, 'r');
+    await handle.sync();
+  } catch (err) {
+    if (!DIRECTORY_SYNC_UNSUPPORTED.has(err?.code)) throw err;
+  } finally {
+    await handle?.close().catch(() => {});
+  }
+}
+
+/**
+ * Die fertige Arbeitsdatei unteilbar an `DB_PATH` haengen (#1422). Sie ist
+ * vorher vollstaendig neben `DB_PATH` kopiert und auf die Platte gebracht
+ * (`stageDatabaseCopy()`); hier wird nur noch umbenannt.
+ *
+ * Vorher wurde das Backup direkt ueber `DB_PATH` kopiert. Ein Kopieren ist
+ * nicht unteilbar: starb der Prozess mittendrin oder lief die Platte voll,
+ * lag an `DB_PATH` eine halb geschriebene Datei - halb Backup, halb nichts -,
+ * und der naechste Start fand eine kaputte Datenbank. Der Rueckweg ueber
+ * `.pre-restore-*` stand zwar da, aber nichts sagte dem Admin, dass er ihn
+ * braucht. Jetzt ist `DB_PATH` zu jedem Zeitpunkt entweder die alte oder die
+ * neue Datenbank: bis zum `rename()` ist nur die Arbeitsdatei betroffen, und
+ * die raeumt der naechste Start weg (`removeRestoreStaging()`).
+ *
+ * Die Verbindung muss dafuer zu sein, und `-wal`/`-shm` der alten Datenbank
+ * muessen VOR dem Umhaengen weg sein: SQLite wendete ein liegengebliebenes
+ * `-wal` sonst auf die neue Datei an. Beides erledigt der Aufrufer.
+ * DB_PATH muss eine echte Datei sein, kein Symlink: `rename()` ersetzt den
+ * Verzeichniseintrag, einen Symlink also durch die Datei, statt ihm zu folgen.
+ * Dasselbe gilt schon fuer die Verschluesselungs-Migration und `.creating`;
+ * docs/installation.md sagt es beim Restore.
+ * @param {string} stagingPath  fertig geschriebene Arbeitsdatei oder, beim
+ *   Rollback, die Rollback-Kopie
+ */
+async function swapIntoDbPath(stagingPath, onRenamed = () => {}) {
+  await fs.rename(stagingPath, DB_PATH);
+  // Sofort vermerken: scheitert der fsync danach, liegt die Datei trotzdem
+  // schon an DB_PATH, und der Aufrufer muss das wissen.
+  onRenamed();
+  await syncDirectory(path.dirname(DB_PATH));
+}
+
+/** `from` nach `stagingPath` kopieren und die Datei auf die Platte bringen. */
+async function stageDatabaseCopy(from, stagingPath) {
+  await unlinkIfExists(stagingPath);
+  await fs.copyFile(from, stagingPath);
+  await adoptDatabaseAttributes(stagingPath);
+  // Schreibend oeffnen, wo es geht: Windows (FlushFileBuffers) verlangt fuer
+  // fsync einen Handle mit Schreibrecht und antwortet sonst mit EPERM - ein
+  // Restore unter Node nativ auf Windows blieb daran stehen (#1441). Traegt
+  // die Datei keine Schreibrechte, genuegt ausserhalb von Windows ein lesender
+  // Handle wie bisher.
+  let handle;
+  try {
+    handle = await fs.open(stagingPath, 'r+');
+  } catch (err) {
+    if (err?.code !== 'EACCES' && err?.code !== 'EPERM') throw err;
+    handle = await fs.open(stagingPath, 'r');
+  }
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
+ * Rechte und, soweit erlaubt, Besitzer der bisherigen Datenbank auf die
+ * Arbeitsdatei uebertragen (Codex-Befunde in #1431).
+ *
+ * `copyFile` gibt der neuen Datei die Rechte der QUELLE und den Nutzer, der
+ * kopiert, als Besitzer - und das rename macht beides zu denen von DB_PATH.
+ * Das fruehere Kopieren UEBER DB_PATH behielt die Datei und damit beides.
+ * Gemessen wurde: ein Backup von schreibgeschuetztem Medium (0444) machte die
+ * Arbeitsdatei 0444, und ein CLI-Restore als root hinterliesse eine Datenbank,
+ * die der Dienst nach dem Neustart nicht schreiben darf. Der Besitzerwechsel
+ * gelingt nur als root oder wenn er ohnehin stimmt; sonst bleibt er, wie er
+ * ist. Ohne bisherige Datenbank: 0600, lesbar nur fuer den Dienst.
+ * @param {string} filePath
+ */
+/**
+ * Kann, wer die bisherige Datenbank schreiben durfte, auch die neue Datei
+ * schreiben? Besitzer gleich: Besitzerbit; sonst Gruppe gleich: Gruppenbit.
+ * Wer nur ueber die Gruppe schrieb, schreibt so weiter; wer Besitzer war und
+ * es nicht mehr ist, verliert das Recht (ausser die Datei ist fuer alle
+ * schreibbar).
+ * @param {import('node:fs').Stats} staged
+ * @param {import('node:fs').Stats} previous
+ */
+function stillWritableForPreviousWriters(staged, previous, { processMayWritePrevious = false } = {}) {
+  const mode = staged.mode;
+  if (mode & 0o002) return true;
+  // Die Arbeitsdatei gehoert immer dem laufenden Prozess. Durfte er die
+  // bisherige Datenbank schreiben, ist er der Dienst oder hat dessen Rechte -
+  // dann genuegt sein Besitzer-Schreibbit, auch bei anderer uid und gid als die
+  // alte Datei (Review #1431).
+  if (processMayWritePrevious && staged.uid === process.geteuid?.() && (mode & 0o200) !== 0) return true;
+  if (staged.uid === previous.uid) return (mode & 0o200) !== 0;
+  if (staged.gid === previous.gid) return (mode & 0o020) !== 0;
+  return false;
+}
+
+async function adoptDatabaseAttributes(filePath) {
+  let previous = null;
+  try { previous = await fs.stat(DB_PATH); } catch { /* keine bisherige Datenbank */ }
+  try {
+    await fs.chmod(filePath, previous ? previous.mode & 0o7777 : 0o600);
+  } catch (err) {
+    // FUSE- und SMB-Mounts eines NAS lehnen chmod oft ab - dann gelten ihre
+    // eigenen Rechte. Abbrechen nur, wenn der Besitzer die Datei so nicht
+    // schreiben kann: sie wird gleich DB_PATH.
+    const mode = (await fs.stat(filePath)).mode;
+    if ((mode & 0o200) === 0) throw err;
+    log.warn(`Could not set the mode of ${filePath} (${err?.code ?? err}); keeping the one the file system gave it.`);
+  }
+  if (previous) {
+    try {
+      await fs.chown(filePath, previous.uid, previous.gid);
+    } catch (err) {
+      // Nur als root oder ohne Wechsel erlaubt. Abbrechen, vor dem Tausch, nur
+      // wenn die Datei so fuer die bisherigen Schreiber der Datenbank NICHT
+      // schreibbar waere (Codex-Befund in #1431) - verglichen wird mit Besitzer
+      // UND Gruppe der bisherigen Datei, wie im chmod-Zweig ueber die
+      // Modusbits. Eine Datenbank root:node 0660 mit dem Dienst als node
+      // (TrueNAS, Entrypoint ohne chown) besteht so ueber die Gruppe; eine
+      // gleichbleibende uid (SMB-Mounts melden jeder Datei dieselbe) ohnehin.
+      const staged = await fs.stat(filePath);
+      // Nur im Dienst selbst (Restore aus der App) ist die eigene euid die des
+      // Dienstes. Das Restore-CLI (Handschlag gesetzt) kann root oder ein
+      // Gruppenmitglied sein, das die alte Datei schreiben darf, der Dienst
+      // die neue aber nicht - dort gelten nur Besitzer und Gruppe (Review #1431).
+      let processMayWritePrevious = false;
+      if (globalThis[RESTORE_TARGET_HANDSHAKE] !== true) {
+        try {
+          await fs.access(DB_PATH, fsConstants.W_OK);
+          processMayWritePrevious = true;
+        } catch { /* der laufende Prozess darf die bisherige Datenbank nicht schreiben */ }
+      }
+      if (!stillWritableForPreviousWriters(staged, previous, { processMayWritePrevious })) {
+        throw new Error(
+          `Could not give ${filePath} the owner of the current database (uid ${previous.uid}, gid `
+          + `${previous.gid}; it belongs to uid ${staged.uid}, gid ${staged.gid}): ${err?.code ?? err}. `
+          + 'Yuvomi would not be able to write the restored database. Nothing on this instance was '
+          + 'changed. Run the restore as the user Yuvomi runs as, or as root.',
+          { cause: err }
+        );
+      }
+    }
+  }
+}
+
+const ROLLBACK_PARTIAL_SUFFIX = '.partial';
+
+/**
+ * Lebt der Prozess, der eine liegengebliebene Datei angelegt hat, noch - und
+ * ist es nicht dieser? `process.kill(pid, 0)` prueft nur, sendet nichts;
+ * `EPERM` heisst „gibt es, gehoert einem anderen Benutzer".
+ *
+ * Grenze: die Nummer gilt nur im selben PID-Namensraum. Ein CLI-Restore per
+ * `docker compose run` laeuft in einem eigenen Container; seine Nummer kann
+ * hier einen fremden Prozess treffen (dann bleibt die Datei bis zum naechsten
+ * Start liegen) oder keinen (dann wird sie geloescht). Trifft das seine
+ * Arbeitsdatei, scheitert sein rename auf DB_PATH; trifft es seine halbe
+ * Rollback-Kopie, scheitert deren rename, und `restoreValidatedFile()` bricht
+ * deshalb ab (ENOENT zaehlt dort nur, wenn DB_PATH vorher fehlte). In beiden
+ * Faellen vor dem Tausch: DB_PATH bleibt die alte Datenbank.
+ * @param {number} pid
+ */
+function otherProcessAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err?.code === 'EPERM';
+  }
+}
+
+/**
+ * Reste eines abgebrochenen Restores wegraeumen: die Arbeitsdatei
+ * (`<DB_PATH>.restore-tmp-<pid>-<zeit>`) und eine halbe Rollback-Kopie
+ * (`<DB_PATH>.pre-restore-<zeit>.<pid>.partial`). Die Arbeitsdatei ist nie an
+ * `DB_PATH` gehaengt worden - die Datenbank ist die alte, und das Backup liegt
+ * dort, woher es kam. Ohne Aufraeumen laege eine vollstaendige Kopie des
+ * Backups im Datenverzeichnis, bei einem Klartext-Backup sogar unverschluesselt.
+ *
+ * Jeder Prozess, der db.js laedt, laeuft hier durch (`init()`). Eine Datei,
+ * deren Prozess noch lebt, gehoert zu einem laufenden Restore und bleibt
+ * liegen (Review #1431) - siehe `otherProcessAlive()` fuer die Grenze.
+ * Der Compose-Restore aus docs/installation.md schreibt die Nummer 0: er laeuft
+ * bei gestopptem Server in einem eigenen Container, dessen Nummern hier nichts
+ * bedeuten - 0 heisst „kein Eigentuemer", sein Rest wird immer weggeraeumt.
+ */
+function removeRestoreStaging() {
+  if (DB_PATH === ':memory:') return;
+  const dir = path.dirname(DB_PATH);
+  const base = path.basename(DB_PATH);
+  const stagingPrefix = `${base}${RESTORE_STAGING_SUFFIX}-`;
+  const rollbackPrefix = `${base}.pre-restore-`;
+  let names;
+  try { names = readdirSync(dir); } catch { return; }
+  for (const name of names) {
+    let pid;
+    if (name.startsWith(stagingPrefix)) {
+      pid = Number(name.slice(stagingPrefix.length).split('-')[0]);
+    } else if (name.startsWith(rollbackPrefix) && name.endsWith(ROLLBACK_PARTIAL_SUFFIX)) {
+      const parts = name.slice(0, -ROLLBACK_PARTIAL_SUFFIX.length).split('.');
+      pid = Number(parts[parts.length - 1]);
+    } else {
+      continue;
+    }
+    if (otherProcessAlive(pid)) continue;
+    const leftover = path.join(dir, name);
+    log.info(`${leftover} is left over from a restore that was interrupted before the swap - removing it. The database is the one from before that restore.`);
+    try { rmSync(leftover, { force: true }); } catch { /* best effort */ }
+  }
+}
+
+async function restoreValidatedFile(sourcePath) {
   const backupVersion = validateBackupFile(sourcePath);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const rollbackPath = `${DB_PATH}.pre-restore-${timestamp}`;
+  // Mit Prozessnummer wie die Arbeitsdatei: `removeRestoreStaging()` laesst
+  // die Datei eines noch laufenden fremden Prozesses liegen.
+  const rollbackPartialPath = `${rollbackPath}.${process.pid}${ROLLBACK_PARTIAL_SUFFIX}`;
+  const stagingPath = restoreStagingPath();
   let rollbackCreated = false;
   // Offen ist die Verbindung, außer im Leer-Fall des Restore-CLI (#1282, siehe
   // Auto-Init am Dateiende). Nur eine offene Verbindung wird unten per
@@ -10063,20 +11269,58 @@ async function restoreFromFile(sourcePath) {
   // Rest-Journal zu löschen verliert nichts.
   const wasOpen = Boolean(db);
   let keptJournalPath = null;
+  // Ab hier liegt an DB_PATH die Datenbank aus dem Backup (#1422).
+  let swapped = false;
+  // Die Rollback-Kopie ist per rename zurueck an DB_PATH.
+  let rolledBack = false;
 
   try {
+    await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
+    // Zuerst die Arbeitsdatei: scheitert schon das Kopieren (volle Platte),
+    // ist die laufende Verbindung noch gar nicht angefasst.
+    await stageDatabaseCopy(sourcePath, stagingPath);
+
+    // Laufende Backups zu Ende kommen lassen. Zwischen dem letzten Blick auf
+    // `activeBackups` und `db.close()` steht kein await: ein neues Backup kann
+    // dort nicht mehr beginnen, und danach findet es keine Verbindung.
+    // Waehrend des Kopierens kann ein Download ein Backup begonnen haben.
+    // Scheitert das Warten, raeumt der catch unten die Arbeitsdatei weg - die
+    // Datenbank ist noch nicht angefasst. Die Schleife prueft nach dem letzten
+    // await noch einmal synchron - erst dann ist die Luecke zu.
+    do {
+      await waitForQuietOrGiveUp();
+    } while (activeBackups.size > 0 || activeWriters().length > 0);
     if (db) {
       try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
       db.close();
       db = null;
     }
 
-    await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
+    // Die Rollback-Kopie entsteht wie die Arbeitsdatei: unter einem
+    // Zwischennamen vollstaendig geschrieben, auf die Platte gebracht, dann
+    // umbenannt. Ein direktes Kopieren hinterliess bei einem Abbruch eine
+    // abgeschnittene Datei unter dem Namen, den die Anleitung als Rueckweg
+    // nennt. Kein harter Link statt der Kopie: er spart das Kopieren, aber
+    // bis zum Tausch waeren Rollback und DB_PATH dieselbe Datei - ein
+    // gescheiterter Restore, der die alte Datenbank wieder oeffnet, schriebe
+    // dann in die Rollback-Kopie mit.
+    // ENOENT heisst hier nur dann „keine bisherige Datenbank", wenn DB_PATH
+    // schon vor dem Kopieren fehlte. Sonst kam es von unterwegs - etwa weil
+    // ein zweiter Prozess die `.partial` als Rest weggeraeumt hat (Review
+    // #1431) -, und ohne Rollback-Kopie darf nicht getauscht werden: die alte
+    // Datenbank waere danach weg.
+    const hadDatabase = existsSync(DB_PATH);
     try {
-      await fs.copyFile(DB_PATH, rollbackPath);
+      await stageDatabaseCopy(DB_PATH, rollbackPartialPath);
+      await fs.rename(rollbackPartialPath, rollbackPath);
+      // Den Namen dauerhaft machen, BEVOR DB_PATH ersetzt wird: sonst kann nach
+      // einem Stromausfall das Backup an DB_PATH stehen, die Rollback-Kopie aber
+      // noch unter `.partial` - und die raeumt der naechste Start weg
+      // (Codex-Befund in #1431).
+      await syncDirectory(path.dirname(DB_PATH));
       rollbackCreated = true;
     } catch (err) {
-      if (err?.code !== 'ENOENT') throw err;
+      if (err?.code !== 'ENOENT' || hadDatabase) throw err;
     }
 
     // Ohne offene Verbindung hat niemand das Journal gecheckpointet. Ein `-wal`
@@ -10096,7 +11340,12 @@ async function restoreFromFile(sourcePath) {
     }
     await unlinkIfExists(`${DB_PATH}-wal`);
     await unlinkIfExists(`${DB_PATH}-shm`);
-    await fs.copyFile(sourcePath, DB_PATH);
+    // Das Entfernen der alten Nebendateien dauerhaft machen, BEVOR DB_PATH
+    // ersetzt wird: sonst kann nach einem Stromausfall das neue DB_PATH stehen
+    // und das alte -wal wieder daneben - und SQLite wendete es auf die falsche
+    // Datei an (Codex-Befund in #1431).
+    await syncDirectory(path.dirname(DB_PATH));
+    await swapIntoDbPath(stagingPath, () => { swapped = true; });
 
     // Ohne Klartext-Sicherheitskopie: stammt das Backup aus der Zeit vor der
     // Verschlüsselung, verschlüsselt init() es jetzt — die Sicherung dafür ist
@@ -10113,21 +11362,51 @@ async function restoreFromFile(sourcePath) {
       keptJournalPath,
     };
   } catch (err) {
-    if (rollbackCreated) {
-      try {
+    try {
+      // Best effort: ein Rest, der nicht weggeht (EACCES), darf das
+      // Wiederoeffnen unten nicht verhindern - der naechste Start raeumt ihn weg.
+      for (const leftover of [stagingPath, rollbackPartialPath]) {
+        try {
+          await unlinkIfExists(leftover);
+        } catch (cleanupErr) {
+          log.warn(`Could not remove ${leftover} after a failed restore: ${cleanupErr?.message ?? cleanupErr}`);
+        }
+      }
+      if (swapped) {
+        // init() kann die neue Datenbank schon geoeffnet haben.
         if (db) {
           db.close();
           db = null;
         }
-        await unlinkIfExists(`${DB_PATH}-wal`);
-        await unlinkIfExists(`${DB_PATH}-shm`);
-        await fs.copyFile(rollbackPath, DB_PATH);
-        if (keptJournalPath) {
-          // Der Rollback stellt den Stand vor dem Restore her: das Journal
-          // gehört wieder neben die (leere) Datei, an der die Meldung es nennt.
-          await renameIfExists(keptJournalName(rollbackPath, 'wal'), `${DB_PATH}-wal`);
-          await renameIfExists(keptJournalName(rollbackPath, 'shm'), `${DB_PATH}-shm`);
+        if (rollbackCreated) {
+          // Die neue Datenbank liegt schon an DB_PATH: die alte per rename
+          // zurueck, nicht per Kopie. Eine Kopie braucht noch einmal so viel
+          // Platz wie die alte Datenbank, waehrend die neue noch an DB_PATH
+          // liegt - bei vollem Datentraeger (der Fall aus #1422) scheiterte der
+          // Rollback, und die Instanz blieb auf dem gescheiterten Backup ohne
+          // Verbindung stehen (Review #1431). Das rename ist unteilbar und
+          // braucht keinen Platz; die Rollback-Kopie ist danach DB_PATH selbst.
+          await unlinkIfExists(`${DB_PATH}-wal`);
+          await unlinkIfExists(`${DB_PATH}-shm`);
+          await syncDirectory(path.dirname(DB_PATH));
+          await swapIntoDbPath(rollbackPath, () => { rolledBack = true; });
         }
+      }
+      // Vor dem Tausch ist DB_PATH die alte Datei geblieben, nach dem Rollback
+      // ist sie es wieder: ein beiseite gelegtes Journal gehoert zurueck neben
+      // die (leere) Datei, an der die Meldung es nennt.
+      if (keptJournalPath) {
+        await renameIfExists(keptJournalName(rollbackPath, 'wal'), `${DB_PATH}-wal`);
+        await renameIfExists(keptJournalName(rollbackPath, 'shm'), `${DB_PATH}-shm`);
+        // Das zurueckgelegte Journal dauerhaft machen: sonst kann es nach einem
+        // Stromausfall wieder unter `.wal-kept` liegen, wo die Meldung zur
+        // leeren Datei es nicht nennt (Codex-Befund in #1431).
+        await syncDirectory(path.dirname(DB_PATH));
+      }
+      if (!db && swapped && !rollbackCreated) {
+        // Vorher gab es keine Datenbank: nichts zurueckzuholen.
+        try { init({ plaintextBackup: false }); } catch { /* preserve original restore error */ }
+      } else if (!db) {
         try {
           init({ plaintextBackup: false });
         } catch (reopenErr) {
@@ -10135,14 +11414,57 @@ async function restoreFromFile(sourcePath) {
           // alte Stand, kein gescheiterter Rollback.
           if (reopenErr?.code !== EMPTY_DATABASE_FILE) throw reopenErr;
         }
-      } catch (rollbackErr) {
-        log.error('Rollback after failed restore also failed:', rollbackErr);
       }
-    } else if (!db) {
-      try { init({ plaintextBackup: false }); } catch { /* preserve original restore error */ }
+    } catch (rollbackErr) {
+      log.error('Rollback after failed restore also failed:', rollbackErr);
+      // Nur wenn die Instanz wirklich nicht mehr wie vorher dasteht: getauscht,
+      // oder ohne Verbindung. Scheitert bloss das Aufraeumen der Arbeitsdatei
+      // (etwa EACCES), laeuft die alte Datenbank weiter - dann gilt der
+      // urspruengliche Fehler, samt seinem Grund (Review #1431).
+      if (swapped || !db) {
+        throw rollbackFailedError(err, rollbackErr, {
+          swapped, rolledBack, rollbackPath: rollbackCreated ? rollbackPath : null,
+        });
+      }
     }
     throw err;
   }
+}
+
+/**
+ * Meldung, wenn nach einem gescheiterten Restore auch der Rueckweg scheitert
+ * (Review #1431). Die Instanz steht dann NICHT mehr wie vorher da - der
+ * urspruengliche Fehler (oft mit einem Grund, dessen Dialogtext „hier wurde
+ * nichts geaendert" sagt) waere eine falsche Auskunft. Deshalb ohne `reason`:
+ * der Dialog zeigt diese Meldung selbst, und sie nennt den Weg von Hand.
+ * @param {Error} restoreErr
+ * @param {Error} rollbackErr
+ * @param {{ swapped: boolean, rolledBack: boolean, rollbackPath: string | null }} state
+ *   `swapped`: das Backup lag schon an DB_PATH; `rolledBack`: die Rollback-Kopie
+ *   ist per rename zurueck; `rollbackPath`: die Rollback-Kopie, falls eine
+ *   angelegt wurde (vorher gab es sonst keine Datenbank)
+ */
+function rollbackFailedError(restoreErr, rollbackErr, { swapped, rolledBack, rollbackPath }) {
+  const lines = [
+    `Restore failed: ${restoreErr?.message ?? String(restoreErr)}`,
+    `Putting the previous database back failed as well: ${rollbackErr?.message ?? String(rollbackErr)}.`,
+  ];
+  if (swapped && !rolledBack && rollbackPath) {
+    lines.push(
+      `The database from before the restore is kept at ${rollbackPath}. Stop Yuvomi, move that file `
+      + `to ${DB_PATH} (and delete ${DB_PATH}-wal and ${DB_PATH}-shm if they exist), then start Yuvomi again.`
+    );
+  } else if (swapped && !rolledBack) {
+    lines.push(
+      `There was no database at ${DB_PATH} before this restore, and the restored one does not start. `
+      + `Delete ${DB_PATH} (with ${DB_PATH}-wal and ${DB_PATH}-shm) to start as a fresh instance, or restore another backup.`
+    );
+  } else if (rolledBack) {
+    lines.push(`The database from before the restore is back at ${DB_PATH}, but it could not be opened again. Restart Yuvomi.`);
+  } else {
+    lines.push(`The restore never replaced ${DB_PATH}; the database there is the one from before, but it could not be opened again. Restart Yuvomi.`);
+  }
+  return new Error(lines.join(' '), { cause: restoreErr });
 }
 
 // --------------------------------------------------------
@@ -10199,10 +11521,19 @@ function _resetTestDatabase() {
 // pauschal aufgeschobenes init() kürzte die Kopie um nicht gecheckpointete
 // Transaktionen und löschte danach das `-wal`. Ohne Handschlag (Server, Tests,
 // andere Skripte) bricht der Leer-Fall ab wie zuvor.
-try {
-  init();
-} catch (err) {
-  if (!(err?.code === EMPTY_DATABASE_FILE && globalThis[RESTORE_TARGET_HANDSHAKE] === true)) throw err;
+// Nur pruefen, nichts oeffnen: `server/check-backup.js` (der Pruefschritt im
+// dokumentierten Compose-Restore, #1431) setzt diesen Handschlag VOR dem
+// Import. Er braucht nur `checkBackupFile()` - und die laufende Datenbank darf
+// dabei nicht angefasst werden, sie kann leer sein oder einen anderen
+// Schluessel tragen, genau die Faelle, fuer die es den manuellen Weg gibt.
+const CHECK_ONLY_HANDSHAKE = Symbol.for('yuvomi.db.checkOnly');
+
+if (globalThis[CHECK_ONLY_HANDSHAKE] !== true) {
+  try {
+    init();
+  } catch (err) {
+    if (!(err?.code === EMPTY_DATABASE_FILE && globalThis[RESTORE_TARGET_HANDSHAKE] === true)) throw err;
+  }
 }
 
-export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };
+export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, checkBackupFile, isRestoreRunning, isDatabaseOpen, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };

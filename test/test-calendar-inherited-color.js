@@ -25,13 +25,12 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
-process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), 'yuvomi-colmig-')), 'unused.db');
+process.env.DB_PATH = join(tempDir('yuvomi-colmig-'), 'unused.db');
 const { MIGRATIONS } = await import('../server/db.js');
 
 const NULLABLE_COLOR_VERSION  = 166;
@@ -65,7 +64,7 @@ function applyWithMigrateSemantics(db, migration) {
  * Bestandsnutzer mitbringt, wenn genau diese Migration ansteht.
  */
 function buildDatabaseBefore(version = NULLABLE_COLOR_VERSION) {
-  const db = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-colmig-')), 'db.sqlite'));
+  const db = new Database(join(tempDir('yuvomi-colmig-'), 'db.sqlite'));
   db.pragma('foreign_keys = ON');
   for (const migration of MIGRATIONS.filter((m) => m.version < version)) {
     applyMigration(db, migration);
@@ -251,7 +250,7 @@ test('der Test-Schema-Auszug haelt die Spalte ebenfalls nullable', async () => {
   for (const key of [1, 11]) {
     const sql = MIGRATIONS_SQL[key];
     if (!sql || !/CREATE TABLE[^;]*calendar_events/.test(sql)) continue;
-    const db = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-auszug-')), 'db.sqlite'));
+    const db = new Database(join(tempDir('yuvomi-auszug-'), 'db.sqlite'));
     // Jeder Eintrag ist fuer sich lesbar, seine Nachbartabellen fehlen aber - die
     // Suiten fahren jeweils die, die sie brauchen. Geprueft wird hier die
     // Spalte, nicht die Verweisintegritaet, deshalb ohne Fremdschluessel.
@@ -320,7 +319,7 @@ test('der Test-Schema-Auszug kennt den Zustand ebenfalls', async () => {
   // hat. Der Beleg ist deshalb ein INSERT, keine Spaltendefinition.
   const { MIGRATIONS_SQL } = await import('../server/db-schema-test.js');
   const sql = MIGRATIONS_SQL[11];
-  const db = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-auszug-')), 'db.sqlite'));
+  const db = new Database(join(tempDir('yuvomi-auszug-'), 'db.sqlite'));
   db.pragma('foreign_keys = OFF');
   db.exec(sql);
   db.prepare(`INSERT INTO calendar_events (title, start_datetime, created_by)

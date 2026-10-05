@@ -11,7 +11,8 @@ import {
   SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN,
 } from './calendar-events.js';
 import { resolveEventRows } from './calendar-occurrence-overrides.js';
-import { visibilityWhere } from './visibility.js';
+import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
+import { birthdaysSwitchedOff, notBirthdayEventSql } from './household-modules.js';
 import {
   householdTimeZone, localToUTC, shiftDateKey, storedToInstantMs, todayKey,
 } from '../utils/timezone.js';
@@ -125,14 +126,53 @@ export function expandAndResolveEventRows(database, rows, from, to, options = {}
 }
 
 /**
+ * „Nur meine" auf einer Rohzeile: zugewiesen, nicht „unzugewiesen zaehlt mit"
+ * (#814, Begruendung an `matchesAssignment` in getUpcomingEvents). Eine
+ * Funktion fuer beide Leser, damit Liste und Wochenstreifen der Uebersicht
+ * denselben Satz gleich auslegen. Ohne Filter ist jede Zeile gemeint.
+ */
+function isAssignedTo(event, assignedTo) {
+  if (!assignedTo) return true;
+  const assigned = event.assigned_users_json
+    ? JSON.parse(event.assigned_users_json)
+    : [];
+  return assigned.some((user) => Number(user.id) === Number(assignedTo));
+}
+
+/**
+ * Laufen die Geburtstage in dieser Liste mit? Zwei Gruende fuer NEIN, eine
+ * Antwort: der Aufrufer hat sie abgewaehlt (#927), oder der Haushalt hat das
+ * Modul abgeschaltet (#1660, docs/DECISIONS.md 11).
+ *
+ * DER SCHALTER STEHT HIER UND NICHT BEI DEN AUFRUFERN: die Uebersicht, die
+ * Kalender-Route und das MCP-Werkzeug lesen alle ueber diese Datei, und ein
+ * Aufrufer, der die Frage vergisst, lieferte die Geburtstage weiter aus - so
+ * geschehen mit `list_upcoming_events` (Codex-Befund in #1664).
+ *
+ * UND ALS SQL, NICHT NUR AM `birthday_name`: der Join erkennt die Stammzeile.
+ * Eine abgeloeste Einzelinstanz der Serie ist eine eigene Zeile, auf die
+ * `birthdays` nicht zeigt; sie traegt keinen `birthday_name` und kam durch den
+ * JS-Filter weiter unten. Das galt auch schon fuer das Abwaehlen aus #927.
+ */
+function birthdayFilter(d, wantsBirthdays) {
+  const includeBirthdays = Boolean(wantsBirthdays) && !birthdaysSwitchedOff(d);
+  return {
+    includeBirthdays,
+    birthdaySql: includeBirthdays ? '' : `
+    AND ${notBirthdayEventSql('e')}`,
+  };
+}
+
+/**
  * Loads upcoming calendar rows for the dashboard, calendar route, and MCP.
  * windowDays defaults to the dashboard's 90 days; null keeps the future open.
  * Each series contributes at most limit eligible occurrences before merging.
  */
 export function getUpcomingEvents(d, {
   userId = null, limit = 5, windowDays = 90, fromToday = false, assignedTo = null,
-  includeBirthdays = true, now = new Date(),
+  includeBirthdays: wantsBirthdays = true, now = new Date(), keepEndedToday = 0,
 } = {}) {
+  const { includeBirthdays, birthdaySql } = birthdayFilter(d, wantsBirthdays);
   const tz      = householdTimeZone(d);
   const nowDate = todayKey(d, now);
   // fromToday: ganztägige Sichtbarkeit heutiger Termine (Dashboard-Widget) -
@@ -148,6 +188,19 @@ export function getUpcomingEvents(d, {
   // heraus, die exakt auf `nowDate` sitzt. Geklammert wird danach exakt, über
   // den Instant-Vergleich unten, deshalb blendet der Rand nichts Zusätzliches ein.
   const sqlFrom = shiftDateKey(nowDate, -1);
+  /* WAS GESTERN BEGANN UND HEUTE NOCH LAEUFT (#1457). Mit `fromToday` fragt die
+   * Uebersicht „was ist heute", nicht „was beginnt ab heute": eine Reise von
+   * gestern 18:00 bis morgen 12:00 laeuft heute, fiel aber durch, weil nur der
+   * Beginn mit Mitternacht verglichen wurde. Einzeltermine kommen deshalb ueber
+   * ihr ENDE herein (dieselbe Ueberlappung wie `getEventsOverlappingDays`),
+   * und Serien werden eine Woche frueher expandiert, damit ein mehrtaegiges
+   * Vorkommen, das vorher begann, noch hineinreicht. Ohne `fromToday`
+   * (/calendar/upcoming, MCP) bleibt es bei „ab jetzt". */
+  const singleWhere = fromToday
+    ? 'DATE(e.start_datetime) <= ? AND DATE(COALESCE(e.end_datetime, e.start_datetime)) >= ?'
+    : 'DATE(e.start_datetime) BETWEEN ? AND ?';
+  const singleParams = fromToday ? [future, sqlFrom] : [sqlFrom, future];
+  const expandFrom = fromToday ? shiftDateKey(nowDate, -7) : sqlFrom;
 
   const rawEvents = d.prepare(`
     SELECT ${eventProjectionSql(d, 'e', BODY_FREE_EVENT_COLUMNS)},
@@ -174,24 +227,31 @@ export function getUpcomingEvents(d, {
     LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
     LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
     WHERE (
-      (e.recurrence_rule IS NULL AND DATE(e.start_datetime) BETWEEN ? AND ?)
+      (e.recurrence_rule IS NULL AND ${singleWhere})
       OR
       (e.recurrence_rule IS NOT NULL AND DATE(e.start_datetime) <= ?)
     )
-    AND (
-      e.external_source <> 'ics'
-      OR e.subscription_id IN (
-        SELECT id FROM ics_subscriptions WHERE shared = 1 OR created_by = ?
-      )
-    )
-    AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
+    AND ${icsSubscriptionVisibleWhere('e')}
+    AND ${visibilityWhere('e', 'event_assignments', 'event_id')}${birthdaySql}
     ORDER BY e.start_datetime ASC
-  `).all(sqlFrom, future, future, userId, userId, userId);
+  `).all(...singleParams, future, userId, userId, userId);
 
   const startInstant = (event) => storedToInstantMs(
     event.all_day ? event.start_datetime.slice(0, 10) : event.start_datetime,
     tz,
   );
+  // Bis wann ein Termin reicht, als Zeitpunkt: ganztaegig bis zur Mitternacht
+  // NACH seinem letzten Tag (inklusives Ende, wie `getEventsOverlappingDays`),
+  // sonst sein Ende - ohne Ende sein Beginn.
+  const reachMs = (event) => {
+    const start = String(event.start_datetime || '');
+    if (event.all_day || !start.includes('T')) {
+      const startKey = start.slice(0, 10);
+      const endKey = event.end_datetime ? String(event.end_datetime).slice(0, 10) : startKey;
+      return storedToInstantMs(shiftDateKey(endKey > startKey ? endKey : startKey, 1), tz);
+    }
+    return storedToInstantMs(event.end_datetime || start, tz);
+  };
   const isUpcoming = (event) => {
     // Verglichen werden ZEITPUNKTE, nicht Strings. In start_datetime liegen
     // zwei Formen nebeneinander - zonenlose Wanduhrzeit (lokal angelegt) und
@@ -201,7 +261,13 @@ export function getUpcomingEvents(d, {
     // von UTC die Abendtermine aus dem Übersichts-Widget (#829).
     // Ganztägige Termine beginnen um Mitternacht der Haushaltszone.
     const startMs = startInstant(event);
-    return startMs !== null && startMs >= filterFromMs;
+    if (startMs === null) return false;
+    if (startMs >= filterFromMs) return true;
+    // Begann vorher: zaehlt mit `fromToday`, solange es ueber die Mitternacht
+    // von heute hinausreicht (#1457). Ganztaegig endet inklusiv, wie im Kalender.
+    if (!fromToday) return false;
+    const endMs = reachMs(event);
+    return endMs !== null && endMs > filterFromMs;
   };
   const matchesAssignment = (event) => {
     // „NUR MEINE" HEISST HIER DASSELBE WIE IM KALENDERMODUL (#814): zugewiesen,
@@ -213,11 +279,7 @@ export function getUpcomingEvents(d, {
     // VOR der Deckelung, nicht danach: gefiltert würde sonst innerhalb der
     // fünf, die ohnehin schon feststehen, und ein Widget mit „nur meine" zeigte
     // je nach Fremdterminen mal fünf und mal keinen (dieselbe Lehre wie #647).
-    if (!assignedTo) return true;
-    const assigned = event.assigned_users_json
-      ? JSON.parse(event.assigned_users_json)
-      : [];
-    return assigned.some((user) => Number(user.id) === Number(assignedTo));
+    return isAssignedTo(event, assignedTo);
   };
   /* GEBURTSTAGE ABWAEHLEN (#927) - und zwar hier, VOR der Deckelung, aus
    * demselben Grund wie „nur meine" eine Zeile darueber: gefiltert wuerde
@@ -235,10 +297,28 @@ export function getUpcomingEvents(d, {
   // slots. Linked children still need effective inheritance before filtering.
   const candidates = rawEvents.filter((event) => !event.recurrence_rule
     || (matchesAssignment(event) && matchesBirthday(event)));
-  return expandAndResolveEventRows(d, candidates, sqlFrom, future, {
+  /* BEENDETES VON HEUTE ZAEHLT NICHT IN DEN DECKEL (#1449). Mit `fromToday`
+   * beginnt die Liste um Mitternacht, damit der Morgentermin sichtbar bleibt
+   * (#230) - aber gezaehlt wurde er mit: um 19:28 fuellten fuenf vorbeie
+   * Termine das Limit, und der um 21:00 fiel heraus. Mit `keepEndedToday`
+   * kommen die beendeten Termine von heute AUSSERHALB des Limits mit (die
+   * juengsten, hoechstens so viele), und `limit` gilt nur dem, was noch kommt.
+   *
+   * „Beendet" heisst: das ENDE liegt hinter uns, als Zeitpunkt verglichen wie
+   * der Start oben. Ein laufender Termin zaehlt also als kommend, und ein
+   * ganztaegiger endet nie an seinem eigenen Tag. Ohne Ende gilt der Start als
+   * Ende - ein Termin ohne Dauer ist vorbei, sobald er begonnen hat. */
+  const keepEnded = fromToday ? Math.max(0, Number(keepEndedToday) || 0) : 0;
+  const nowMs = now.getTime();
+  const hasEnded = (event) => {
+    if (!keepEnded || event.all_day) return false;
+    const endMs = storedToInstantMs(event.end_datetime || event.start_datetime, tz);
+    return endMs !== null && endMs <= nowMs;
+  };
+  const sorted = expandAndResolveEventRows(d, candidates, expandFrom, future, {
     lightweight: true,
     expansion: {
-      maxOccurrencesPerSeries: limit,
+      maxOccurrencesPerSeries: limit + keepEnded,
       occurrenceFilter: isUpcoming,
       maxIterations: MAX_EXPANSION_ITERATIONS,
     },
@@ -248,6 +328,122 @@ export function getUpcomingEvents(d, {
     .filter(matchesBirthday)
     // Offset-bearing and local timestamps must compete by effective instant,
     // including linked replacements moved before their original series slot.
-    .sort((a, b) => startInstant(a) - startInstant(b))
+    .sort((a, b) => startInstant(a) - startInstant(b));
+  if (!keepEnded) return sorted.slice(0, limit);
+  const ended = sorted.filter(hasEnded).slice(-keepEnded);
+  const ahead = sorted.filter((event) => !hasEnded(event)).slice(0, limit);
+  return [...ended, ...ahead].sort((a, b) => startInstant(a) - startInstant(b));
+}
+
+/**
+ * Die Termine, die eine Reihe von Haushaltstagen BERUEHREN - der Wochenstreifen
+ * des Kalender-Widgets auf der Uebersicht.
+ *
+ * NICHT getUpcomingEvents mit groesserem Limit: jene Frage lautet „was beginnt
+ * ab heute", diese „was findet an diesen Tagen statt". Eine Reise, die
+ * vorgestern begann und morgen endet, fehlt in der ersten und gehoert in die
+ * zweite - sie ist das Band ueber den ersten zwei Tagen des Streifens.
+ *
+ * Verglichen werden ZEITPUNKTE in der Haushaltszone, wie in getUpcomingEvents:
+ * in start_datetime liegen zonenlose Wanduhrzeit und Instants nebeneinander.
+ * Welcher TAG ein Termin im Streifen ist, entscheidet der Browser in seiner
+ * Anzeigezone (public/utils/week-strip.js); der Aufrufer gibt deshalb ein
+ * Fenster mit einem Tag Rand je Seite an, damit ein Geraet ohne gesetzte
+ * Haushaltszone an den Raendern nichts verliert. Geklammert wird dort.
+ *
+ * Filter wie in der Terminliste: Sichtbarkeit in SQL, „nur meine" und die
+ * abgewaehlten Geburtstage vor dem Deckel.
+ *
+ * @param {object} d  better-sqlite3-Connection
+ * @param {object} opts
+ * @param {number} opts.userId
+ * @param {string} opts.fromKey  erster Tag, 'YYYY-MM-DD' (Haushaltszone)
+ * @param {number} opts.days     Anzahl Tage ab fromKey
+ * @param {number|null} [opts.assignedTo]
+ * @param {boolean} [opts.includeBirthdays=true]
+ * @param {number} [opts.limit=300]  Sicherung gegen einen entgleisten Import
+ * @returns {object[]} aufgeloeste Zeilen, nach Beginn sortiert
+ */
+export function getEventsOverlappingDays(d, {
+  userId = null, fromKey, days, assignedTo = null, includeBirthdays: wantsBirthdays = true, limit = 300,
+} = {}) {
+  const { includeBirthdays, birthdaySql } = birthdayFilter(d, wantsBirthdays);
+  const tz = householdTimeZone(d);
+  const toKey = shiftDateKey(fromKey, days);          // exklusiv
+  const windowStartMs = new Date(localToUTC(`${fromKey}T00:00:00`, tz)).getTime();
+  const windowEndMs = new Date(localToUTC(`${toKey}T00:00:00`, tz)).getTime();
+  // Ein Tag Rand gegen den UTC-Tag von `DATE()` (#824); die Serien werden eine
+  // Woche frueher expandiert, damit ein mehrtaegiges Vorkommen, das vor dem
+  // Fenster beginnt, noch hineinreicht.
+  const sqlFrom = shiftDateKey(fromKey, -1);
+  const sqlTo = toKey;
+  const expandFrom = shiftDateKey(fromKey, -7);
+
+  const rawEvents = d.prepare(`
+    SELECT ${eventProjectionSql(d, 'e', BODY_FREE_EVENT_COLUMNS)},
+           u_assigned.display_name AS assigned_name,
+           u_assigned.avatar_color AS assigned_color,
+           COALESCE(ec.name, isub.name)   AS cal_name,
+           COALESCE(ec.color, isub.color) AS cal_color,
+           ${SOURCE_CALENDAR_COLUMNS},
+           COALESCE(bd.name, nd.name) AS birthday_name,
+           bd.birth_date AS birthday_date,
+           nd.name_day   AS name_day,
+           CASE WHEN nd.id IS NOT NULL THEN 'name_day'
+                WHEN bd.id IS NOT NULL THEN 'birthday' END AS birthday_event_kind,
+           ${ASSIGNED_USERS_SQL}
+    FROM calendar_events e
+    LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
+    LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
+    ${SOURCE_CALENDAR_JOIN}
+    LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
+    LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
+    LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
+    WHERE (
+      (e.recurrence_rule IS NULL
+        AND DATE(e.start_datetime) <= ?
+        AND DATE(COALESCE(e.end_datetime, e.start_datetime)) >= ?)
+      OR
+      (e.recurrence_rule IS NOT NULL AND DATE(e.start_datetime) <= ?)
+    )
+    AND ${icsSubscriptionVisibleWhere('e')}
+    AND ${visibilityWhere('e', 'event_assignments', 'event_id')}${birthdaySql}
+    ORDER BY e.start_datetime ASC
+  `).all(sqlTo, sqlFrom, sqlTo, userId, userId, userId);
+
+  const isAllDay = (event) => Boolean(event.all_day) || !String(event.start_datetime).includes('T');
+  const overlaps = (event) => {
+    const allDay = isAllDay(event);
+    const startKey = String(event.start_datetime).slice(0, 10);
+    const startMs = storedToInstantMs(allDay ? startKey : event.start_datetime, tz);
+    if (startMs === null) return false;
+    let endMs;
+    if (allDay) {
+      // Ganztaegig endet INKLUSIV (wie im Kalender): der Termin reicht bis zur
+      // Mitternacht NACH seinem letzten Tag.
+      const endKey = event.end_datetime ? String(event.end_datetime).slice(0, 10) : startKey;
+      endMs = storedToInstantMs(shiftDateKey(endKey > startKey ? endKey : startKey, 1), tz);
+    } else {
+      endMs = event.end_datetime ? storedToInstantMs(event.end_datetime, tz) : null;
+      if (endMs === null || endMs < startMs) endMs = startMs;
+    }
+    if (startMs >= windowEndMs) return false;
+    // Ein Punkt-Termin ohne Dauer zaehlt, wenn er im Fenster beginnt; einer
+    // mit Dauer, wenn er nach Fensterbeginn noch laeuft.
+    return endMs === startMs ? startMs >= windowStartMs : endMs > windowStartMs;
+  };
+  const matchesBirthday = (event) => includeBirthdays || !event.birthday_name;
+
+  const candidates = rawEvents.filter((event) => !event.recurrence_rule
+    || (isAssignedTo(event, assignedTo) && matchesBirthday(event)));
+  return expandAndResolveEventRows(d, candidates, expandFrom, sqlTo, {
+    lightweight: true,
+    expansion: { maxIterations: MAX_EXPANSION_ITERATIONS },
+  })
+    .filter(overlaps)
+    .filter((event) => isAssignedTo(event, assignedTo))
+    .filter(matchesBirthday)
+    .sort((a, b) => (storedToInstantMs(isAllDay(a) ? String(a.start_datetime).slice(0, 10) : a.start_datetime, tz) ?? 0)
+      - (storedToInstantMs(isAllDay(b) ? String(b.start_datetime).slice(0, 10) : b.start_datetime, tz) ?? 0))
     .slice(0, limit);
 }

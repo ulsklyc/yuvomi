@@ -1,9 +1,11 @@
 import { t } from '/i18n.js';
 import { api } from '/api.js';
-import { renderSubTabs, setSubTabBadge, scrollActiveSubTabIntoView } from '/utils/sub-tabs.js';
+import { renderSubTabs, selectSubTab, setSubTabBadge, scrollActiveSubTabIntoView } from '/utils/sub-tabs.js';
+import { navigationFrom } from '/utils/view-transition.js';
 import { MODULE_ICON, moduleIconEl } from '/nav-icons.js';
 import { todayKey } from '/utils/date.js';
 import { KITCHEN_MODULES as KITCHEN_MODULES_SOURCE } from '/utils/module-accent.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 
 // Reihenfolge = Küchen-Kreislauf: planen → kochen → einkaufen → lagern.
 //
@@ -108,21 +110,42 @@ const BADGES = [
 
 /** Aktuelle Leiste; der Zustand wird nachgeladen, nachdem sie schon steht. */
 let _bar = null;
+/** Die gleitende Kapsel der stehenden Leiste - eine, nie mehr. */
+let _indicator = null;
 let _activeRoute = null;
 let _refreshTimer = null;
+/**
+ * Die letzte Antwort von /kitchen/summary. Sie haelt den PLATZ der Zahlen
+ * (Critique 2026-09-26, A4): die Leiste zeichnet ihre Badges beim Tabwechsel
+ * sofort aus dem letzten Stand, statt 22px breiter zu werden, sobald die
+ * Antwort kommt - sonst verschoebe sich das Ziel der gleitenden Kapsel mitten
+ * in der Bewegung. Der Abruf danach zieht nur nach, was sich geaendert hat.
+ */
+let _lastSummary = null;
+
+function applyBadges(data) {
+  if (!_bar || !data) return;
+  for (const { route, pick, label, tone } of BADGES) {
+    const count = route === _activeRoute ? 0 : Number(pick(data)) || 0;
+    setSubTabBadge(_bar, route, count > 0 ? { count, tone, label: label(count) } : null);
+  }
+}
 
 async function loadBadges() {
-  if (!_bar?.isConnected) return;
+  // Die Antwort gehoert der Leiste, die sie angefragt hat. Wer die Kueche
+  // verlaesst und wieder betritt (auch ueber Ab- und Anmelden), bekommt eine
+  // neue - eine Antwort, die ueber diesen Tausch hinweg ankommt, schriebe
+  // sonst fremde Zahlen in Cache und Leiste (Codex an #1476).
+  const bar = _bar;
+  if (!bar?.isConnected) return;
   try {
     // `today` kommt vom Client: „abgelaufen" hängt am lokalen Kalendertag, und der
     // Server rechnet in UTC (siehe server/routes/kitchen.js).
     const res = await api.get(`/kitchen/summary?today=${encodeURIComponent(todayKey())}`);
     const data = res.data ?? {};
-    if (!_bar?.isConnected) return;
-    for (const { route, pick, label, tone } of BADGES) {
-      const count = route === _activeRoute ? 0 : Number(pick(data)) || 0;
-      setSubTabBadge(_bar, route, count > 0 ? { count, tone, label: label(count) } : null);
-    }
+    if (bar !== _bar || !bar.isConnected) return;
+    _lastSummary = data;
+    applyBadges(data);
     // Die Zahlen machen die Leiste breiter (je 22px gemessen). Bei 320px läuft sie
     // damit über, und der aktive Tab - beim Rendern korrekt eingescrollt - konnte
     // danach teilweise außerhalb liegen.
@@ -146,17 +169,114 @@ export function refreshKitchenBadges() {
   _refreshTimer = setTimeout(loadBadges, 200);
 }
 
+// --------------------------------------------------------
+// Die gleitende Kapsel
+// --------------------------------------------------------
+
+/**
+ * DIE LEISTE STEHT, DIE KAPSEL GLEITET (Critique 2026-09-26, A4 P2).
+ *
+ * Ein Kuechen-Tab ist ein Routenwechsel, und bis hierher baute jede der vier
+ * Seiten ihre eigene Leiste: die angetippte Leiste glitt mit der Seite herein
+ * (20px + Blende), die aktive Pille sprang. "Ein Ort mit vier Tabs" fuehlte
+ * sich an wie vier Seiten. Apples Segmented Control steht still, nur die
+ * Auswahl gleitet.
+ *
+ * Deshalb zwei Dinge:
+ *   1. Die Leiste ist ueber einen Wechsel INNERHALB der Kueche derselbe Knoten.
+ *      Die naechste Seite haengt ihn wieder ein, statt einen neuen zu bauen,
+ *      und die View Transition zeigt von ihm nur das lebende Bild
+ *      (`kitchen-tabs` in layout.css) - er steht.
+ *   2. Die Auswahl ist eine eigene Kapsel unter den Labels, keine Flaeche am
+ *      Tab. Sie gleitet per Web Animations vom alten zum neuen Tab. Web
+ *      Animations und nicht `transition`: das Wiedereinhaengen beim
+ *      Seitentausch bricht eine CSS-Transition ab, eine Script-Animation laeuft
+ *      weiter.
+ *
+ * Die Bewegung beginnt schon beim Tipp (onChange), nicht erst, wenn die neue
+ * Seite steht - wie die Pille der unteren Kapsel (updateNav in router.js).
+ *
+ * Die Kapsel selbst ist seit der Re-Critique 2026-09-27 der geteilte Baustein
+ * aller Segment-Leisten (utils/segment-indicator.js): Messen, Gleiten,
+ * Nachziehen bei Groessenwechseln (auch dem Ein-/Ausklappen der Seitenleiste,
+ * A1 P2-1) stehen dort. Hier bleibt, WANN sie gleitet.
+ */
+function placeIndicator({ glide = false } = {}) {
+  _indicator?.place({ glide });
+}
+
+/**
+ * Passt die stehende Leiste noch? Ziele UND Beschriftungen: nach einem
+ * Sprachwechsel zeichnet der Router dieselbe Route neu, und eine nur nach
+ * Zielen verglichene Leiste bliebe in der alten Sprache stehen.
+ */
+function sameTabs(bar, tabs) {
+  if (bar.getAttribute('aria-label') !== t('nav.kitchen')) return false;
+  const els = [...bar.querySelectorAll('[data-tab-id]')];
+  return els.length === tabs.length && tabs.every(({ route, labelKey }, i) =>
+    els[i].dataset.tabId === route
+    && els[i].querySelector('.sub-tab__label')?.textContent === t(labelKey));
+}
+
+/**
+ * Die stehende Leiste auf die Route ziehen, auf der die App wirklich steht.
+ * Der Router nimmt waehrend einer laufenden Navigation keine zweite an; die
+ * Leiste hat den zweiten Tipp dann schon markiert, und niemand zeichnete sie
+ * danach neu - Einkauf offen, Vorrat aktiv und als letzte Kuechen-Route gemerkt.
+ */
+function syncToLocation() {
+  const path = location.pathname;
+  if (!_bar?.isConnected || !isKitchenRoute(path) || path === _activeRoute) return;
+  _activeRoute = path;
+  selectSubTab(_bar, path);
+  applyBadges(_lastSummary);
+  placeIndicator({ glide: true });
+}
+
+/** Tipp auf einen Tab: Zahlen und Kapsel ziehen sofort, die Seite folgt. */
+function onTabChosen(route) {
+  _activeRoute = route;
+  applyBadges(_lastSummary);
+  placeIndicator({ glide: true });
+  // Abgelehnt loest das Promise sofort auf, angenommen nach dem Render - beide
+  // Male steht danach fest, wo die App ist.
+  Promise.resolve(window.yuvomi?.navigate(route)).finally(syncToLocation);
+}
+
 export function renderKitchenTabsBar(container, activeRoute) {
   container.classList.add('has-kitchen-tabs');
   _activeRoute = activeRoute;
 
+  const tabs = TABS();
+  // Nur innerhalb der Kueche bleibt die Leiste stehen. Wer von aussen kommt,
+  // bekommt eine frische - dort gibt es nichts, von wo die Kapsel gleiten
+  // koennte, und die Leiste blendet mit der Seite ein.
+  if (_bar && isKitchenRoute(navigationFrom()) && sameTabs(_bar, tabs)) {
+    container.insertAdjacentElement('afterbegin', _bar);
+    selectSubTab(_bar, activeRoute);
+    applyBadges(_lastSummary);
+    // Das Wiedereinhaengen setzt den waagrechten Scrollstand zurueck.
+    scrollActiveSubTabIntoView(_bar);
+    placeIndicator({ glide: true });
+    refreshKitchenBadges();
+    return _bar;
+  }
+
+  // Eine frische Leiste zeichnet ihre Zahlen nur aus einem frischen Abruf. Der
+  // letzte Stand dient allein dem Gleiten innerhalb der Kueche; von aussen
+  // koennte er einem anderen Konto gehoeren (Abmelden, Anmelden ohne Neuladen)
+  // und bliebe bei einem gescheiterten Abruf fuer immer stehen.
+  _lastSummary = null;
+  // Die Kapsel der vorigen Leiste geht mit ihr - ihre Beobachter auch.
+  _indicator?.destroy();
+  _indicator = null;
   _bar = renderSubTabs(container, {
     // Zielorte, keine Sichten: die vier Küchen-Routen sind vier eigenständige
     // Module (eigener `module:`-Wert in router.js, eigene Seitendatei, einzeln
     // abschaltbar). Die Leiste wird damit zur Navigation aus echten Links -
     // cmd-Klick öffnet den Vorrat im neuen Tab, wie überall sonst in der Shell.
     semantics: 'nav',
-    tabs: TABS().map(({ route, labelKey, icon }) => ({ id: route, label: t(labelKey), icon })),
+    tabs: tabs.map(({ route, labelKey, icon }) => ({ id: route, label: t(labelKey), icon })),
     activeId: activeRoute,
     storageKey: KITCHEN_STORAGE_KEY,
     extraClass: 'kitchen-tabs-bar',
@@ -170,8 +290,12 @@ export function renderKitchenTabsBar(container, activeRoute) {
     // Bottom-Nav für „Küche" führt (kitchenNavButtonEl in router.js).
     sealIcon: () => moduleIconEl(MODULE_ICON.kitchen),
     insertPosition: 'afterbegin',
-    onChange: (route) => window.yuvomi?.navigate(route),
+    onChange: onTabChosen,
   });
+  _indicator = attachSegmentIndicator(_bar, { itemSelector: '.sub-tab' });
+  applyBadges(_lastSummary);
+  scrollActiveSubTabIntoView(_bar);
+  placeIndicator();
 
   refreshKitchenBadges();
   return _bar;

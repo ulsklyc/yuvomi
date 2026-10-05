@@ -9,6 +9,28 @@ const apiError = (description) => ({
  * Gilt fuer POST und PUT gleich (#1364), deshalb einmal: ein Offset wird
  * umgerechnet statt abgeschnitten, und PUT speichert den geprueften Wert.
  */
+/**
+ * Ein Anhang ist ein Dokument im Dokumente-Modul (#1358, DECISIONS.md Eintrag 10).
+ */
+const ATTACHMENT_RIGHTS = ' A new attachment creates a document in the Documents module and therefore needs write access '
+  + 'there (member right, for API tokens a `documents:write` scope); without it any non-empty `attachment_data` is refused with 403 '
+  + 'before the event is looked up. Replacing or removing an attachment needs read access to the Documents module and sight of the '
+  + 'stored document; otherwise the same 403, and the attachment stays. The 403 bodies carry `reason` `ATTACHMENT_UPLOAD_REFUSED` or '
+  + '`ATTACHMENT_CHANGE_REFUSED`. Saving an event carries its visibility and assignees over to the attachment\'s document only when the save changes who sees the event (its visibility, or the assignees of an event for assignees); a save of the title, time or other fields leaves the document\'s visibility and shares alone. It opens the '
+  + 'document further only for a caller with write access to documents who can see it and may manage it (its creator - for an attachment the event creator - or an admin); otherwise the document keeps the visibility and shares its owner set, so the save neither opens nor narrows it and removes no share. A new attachment uploaded in the same save to an event the caller did not create is only narrowed to the event, never opened further. The default-assignee sync of connected calendars never changes document rights, with one exception: when the event is visible to its assignees and the document is already shared with selected members, the new assignee is added to those shares. Otherwise nothing changes - no document becomes visible to the family, none is opened, narrowed or made private, and no share is removed. A copy made on split or detach belongs to the owner of its source document. A split or a '
+  + 'detach copies the attachment for the new series or event only for such a caller; otherwise the new one has no attachment and '
+  + 'the original stays on the original series.';
+
+// Ein Serienende vor dem Start (#1607). Steht an POST und PUT, weil beide es
+// abweisen - und PUT nur dann, wenn die Anfrage die Serie anfasst.
+const SERIES_END_INPUT = ' A `recurrence_rule` whose `UNTIL` day lies before the start day is rejected with 400 '
+  + '(`recurrence_rule: the series ends before the start date.`); an `UNTIL` on the start day is a series with one '
+  + 'occurrence and is accepted. PUT checks this only when the request changes the rule or the start day, so an '
+  + 'imported series that already carries such a rule stays editable; the start day is compared as the household calendar '
+  + 'day, so sending the wall-clock form of a stored instant is not a change. For an event with a time zone of its own, whose '
+  + 'stored UTC day differs from its local day, only a changed rule is checked, and only an `UNTIL` before both days is '
+  + 'rejected. ICS import and calendar sync do not reject it.';
+
 const DATETIME_INPUT = ' `start_datetime` and `end_datetime` take the forms of `CalendarDateOrDateTimeInput`: '
   + 'a value without offset is household wall-clock time, a value with `Z` or a numeric offset is read as an '
   + 'instant and converted into the household time zone (`2026-09-21T16:00:00Z` in a Europe/Berlin household is '
@@ -21,7 +43,7 @@ export function calendarPaths() {
       get: op({
         summary: 'List calendar events',
         tag: 'Calendar',
-        description: 'Events generated from the birthdays module carry `birthday_name` and `birthday_date`. Their `title` is stored in the household data language (see `language` in `/preferences`), so API consumers, the ICS feed and calendar sync all read the same wording; clients that display in a different language can re-render the title from `birthday_name`.',
+        description: 'Events generated from the birthdays module carry `birthday_name` and `birthday_date`. Their `title` is stored in the household data language (see `language` in `/preferences`), so API consumers, the ICS feed and calendar sync all read the same wording; clients that display in a different language can re-render the title from `birthday_name`. While the household has the birthdays module switched off (`disabled_modules` in `/preferences`), these events are left out of this list, of `/calendar/upcoming`, of `/calendar/search` and of the ICS feed; a single one stays reachable by id, and the birthdays routes keep answering.',
         responses: {
           200: {
             description: 'Calendar events',
@@ -35,7 +57,7 @@ export function calendarPaths() {
         summary: 'Create calendar event',
         tag: 'Calendar',
         stateChanging: true,
-        description: 'Supports optional document-storage attachments via `attachment_name`, `attachment_mime`, `attachment_size`, and `attachment_data` (base64 data URL). New attachments are linked through `attachment_document_id`; legacy events may still return `attachment_data`. Set `target_caldav_account_id` and `target_caldav_calendar_url` to push the event to a CalDAV calendar (omit or null for a local-only event).' + DATETIME_INPUT,
+        description: 'Supports optional document-storage attachments via `attachment_name`, `attachment_mime`, `attachment_size`, and `attachment_data` (base64 data URL). New attachments are linked through `attachment_document_id`; legacy events may still return `attachment_data`. Set `target_caldav_account_id` and `target_caldav_calendar_url` to push the event to a CalDAV calendar (omit or null for a local-only event).' + ATTACHMENT_RIGHTS + DATETIME_INPUT + SERIES_END_INPUT,
         requestBody: jsonBody(null),
         responses: {
           201: {
@@ -44,6 +66,7 @@ export function calendarPaths() {
           },
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
+          403: apiError('A new attachment without write access to the Documents module.'),
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -101,7 +124,15 @@ export function calendarPaths() {
       post: op({ summary: 'Create CalDAV account', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/calendar/caldav/accounts/{id}': {
-      put: op({ summary: 'Update CalDAV account', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      put: op({
+        summary: 'Update CalDAV account',
+        tag: 'Calendar',
+        admin: true,
+        description: 'An omitted or empty `password` keeps the stored one, but only while the server (scheme, host and port) and the `username` stay the same. A different server or username without a new password is refused with 400 and `errorCode: password_required` before any connection is made, and nothing is saved. A different path on the same server needs no password.',
+        params: [idParam()],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
       delete: op({ summary: 'Delete CalDAV account', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true }),
     },
     '/api/v1/calendar/caldav/accounts/{id}/calendars': {
@@ -168,7 +199,7 @@ export function calendarPaths() {
           stringPathParam('recurrenceId', 'Original occurrence date in YYYY-MM-DD format'),
         ],
         stateChanging: true,
-        description: 'Creates or updates a linked replacement for one original slot of an eligible local-only series. Scalar fields, assignments, attachments, and `reminder_offsets` are compared with the expanded series defaults. Saving no actual difference restores the normal series occurrence only when a linked replacement existed for that slot; a slot excluded by a deletion or detached replacement remains excluded.',
+        description: 'Creates or updates a linked replacement for one original slot of an eligible local-only series. Scalar fields, assignments, attachments, and `reminder_offsets` are compared with the expanded series defaults. Saving no actual difference restores the normal series occurrence only when a linked replacement existed for that slot; a slot excluded by a deletion or detached replacement remains excluded.' + ATTACHMENT_RIGHTS,
         requestBody: jsonBody('#/components/schemas/CalendarOccurrenceOnlyMutation'),
         responses: {
           200: {
@@ -210,7 +241,7 @@ export function calendarPaths() {
           stringPathParam('recurrenceId', 'Original occurrence date in YYYY-MM-DD format'),
         ],
         stateChanging: true,
-        description: 'Truncates the original series before the selected original slot, creates a successor series, transfers every later exclusion except the selected slot, and reparents later linked replacements atomically.',
+        description: 'Truncates the original series before the selected original slot, creates a successor series, transfers every later exclusion except the selected slot, and reparents later linked replacements atomically.' + ATTACHMENT_RIGHTS,
         requestBody: jsonBody('#/components/schemas/CalendarOccurrenceFollowingMutation'),
         responses: {
           200: {
@@ -271,7 +302,7 @@ export function calendarPaths() {
         tag: 'Calendar',
         params: [idParam()],
         stateChanging: true,
-        description: 'Supports document-storage attachments. Omit attachment fields to preserve the current attachment, send new `attachment_data` to create and link a document, or set `remove_attachment` to true to unlink it without deleting the library document. Legacy events may still return `attachment_data`. A recurrence-rule or anchor change that would orphan linked replacements returns 409 with `calendar_override_orphans` and the exact `orphaned_override_count`; retry with the same value in `confirmed_orphan_count` to preserve those replacements as standalone events. The same confirmation is required before assigning an outbound target to a series with linked replacements. Changing a mirrored field (title, description, location, color, all-day, start/end, recurrence) of an event synced to Google pushes the change there, and switching `target_google_calendar_id` moves it to the other Google calendar. The remote call runs after the response and is retried by the next sync run if it fails. PUT stores the validated start and end, exactly as POST does; up to v2.68.0 it wrote the raw request value. `start_datetime` may be omitted to keep it, but an empty or null start is rejected with 400; an empty or null `end_datetime` clears the end.' + DATETIME_INPUT,
+        description: 'Supports document-storage attachments. Omit attachment fields to preserve the current attachment, send new `attachment_data` to create and link a document, or set `remove_attachment` to true to unlink it without deleting the library document. Legacy events may still return `attachment_data`. A recurrence-rule or anchor change that would orphan linked replacements returns 409 with `calendar_override_orphans` and the exact `orphaned_override_count`; retry with the same value in `confirmed_orphan_count` to preserve those replacements as standalone events. The same confirmation is required before assigning an outbound target to a series with linked replacements. Changing a mirrored field (title, description, location, color, all-day, start/end, recurrence) of an event synced to Google pushes the change there, and switching `target_google_calendar_id` moves it to the other Google calendar. The remote call runs after the response and is retried by the next sync run if it fails. PUT stores the validated start and end, exactly as POST does; up to v2.68.0 it wrote the raw request value. `start_datetime` may be omitted to keep it, but an empty or null start is rejected with 400; an empty or null `end_datetime` clears the end.' + ATTACHMENT_RIGHTS + DATETIME_INPUT + SERIES_END_INPUT,
         requestBody: jsonBody(null),
         responses: {
           200: {
@@ -280,6 +311,7 @@ export function calendarPaths() {
           },
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
+          403: apiError('A new attachment without write access to the Documents module, or a change to an attachment whose document the caller cannot read.'),
           404: { description: 'Calendar event not found' },
           409: {
             description: 'Linked occurrence replacements require exact-count orphan confirmation',
@@ -306,8 +338,8 @@ export function calendarPaths() {
       patch: op({ summary: 'Set the default assignee of an external calendar', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody(null), description: 'Body: { source, external_id, default_assignee_user_id }. Events arriving from that calendar are assigned to this member. Without it the first batch of a newly enabled calendar came in unassigned and had to be filled in by hand (#730). The sync only refreshes name and colour on conflict, so the assignment set here stays.' }),
     },
     '/api/v1/calendar/external-calendars/default-assignee-backfill': {
-      get: op({ summary: 'Count imported events a default-assignee backfill would fill', tag: 'Calendar', admin: true, description: 'Response: { data: { count, token } }. Counts already imported events from calendars of every account that carry a default assignee and are not assigned to anyone yet (#1154). `token` fingerprints exactly that candidate set - which events, and which person each would get - and is meant to be sent back as `expected_token` (#1171).' }),
-      post: op({ summary: 'Apply default assignees to already imported events', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody(null), description: 'Body: { expected_count, expected_token? } - the count and the token the confirmation was based on; when the candidate set changed since, the call answers 409 with { data: { count, token } } and changes nothing. With `expected_token` a change of the same size is caught as well (an event assigned by hand while a new import takes its place, or a calendar switched to another person); without it only the count is compared (#1171). Only the confirmed candidate list is processed, each event re-checked when written, so `assigned` can be lower than `expected_count` if events were assigned in the meantime. Response: { data: { assigned } }. Runs in batches so a long history does not block other requests; inherited reminders whose time has passed are marked dismissed. A default assignee only reaches events imported after it was set. This one-off action assigns it to the events already imported from that calendar, across all accounts, but only where an event is not assigned to anyone yet: an assignment made by hand is left alone (#1154). It cannot tell a never-assigned event from one whose assignment was removed by hand. ICS subscriptions are not included.' }),
+      get: op({ summary: 'Count imported events a default-assignee backfill would fill', tag: 'Calendar', admin: true, description: 'Query: `moved_after` (optional) - the `moved_next` of the previous page. Response: { data: { count, token, moved, moved_total, moved_offset, moved_next } }. `count` counts already imported events from calendars of every account that carry a default assignee and are not assigned to anyone yet (#1154). `token` fingerprints exactly that set - which events, and which person each would get - and is meant to be sent back as `expected_token` (#1171). `moved` lists, one entry per event, events whose only assignee is still the untouched default assignee of another calendar of the same account (same provider; for CalDAV the same account), in a calendar with a different default assignee, never edited in Yuvomi and not pushed out (#1307): { event_id, title, start_datetime, all_day, calendar_name, from_user_id, from_name, to_user_id, to_name }. Only events the requesting admin may see under the calendar visibility rule are listed, counted or changed (no admin bypass, as everywhere in the calendar); `count` and `token` only count and name no event, as before. The list comes in pages of at most 5000 entries, oldest start first: `moved_total` counts all, `moved_offset` those before this page, and `moved_next` is the cursor for the next page (null on the last), so a page left entirely unticked does not hide the ones after it. Such an event may have been moved between calendars before the move started carrying the assignment along, or it may sit in a calendar whose default assignee was changed later; the data cannot tell the two apart, so these events are not part of `count` and change only when picked one by one.' }),
+      post: op({ summary: 'Apply default assignees to already imported events', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody(null), description: 'Body: { expected_count, expected_token?, moves? } - the count and the token the confirmation was based on; when the candidate set changed since, the call answers 409 with { data: { count, token, moved, moved_total, moved_offset, moved_next } } (the first page) and changes nothing. With `expected_token` a change of the same size is caught as well (an event assigned by hand while a new import takes its place, or a calendar switched to another person); without it only the count is compared (#1171). `moves` is the list of `moved` entries the admin picked, each as { event_id, from_user_id, to_user_id } exactly as listed, each event at most once and at most 5000 entries, as many as the preview lists; a longer list answers 400 with a message naming the limit (#1307); each entry is checked on its own against the same rule and visibility as the preview, without loading the list and without needing a page, and an entry that does not match that way also answers 409. Without `moves` no existing assignment is changed. Only the confirmed candidate list and the picked moves are processed, each event re-checked when written, so `assigned` can be lower than expected if events changed in the meantime. Response: { data: { assigned } }. Runs in batches so a long history does not block other requests; inherited reminders whose time has passed are marked dismissed. A default assignee only reaches events imported after it was set. This one-off action assigns it to the events already imported from that calendar, across all accounts, but only where an event is not assigned to anyone yet: an assignment made by hand is left alone (#1154). It cannot tell a never-assigned event from one whose assignment was removed by hand. ICS subscriptions are not included.' }),
     },
   };
 }

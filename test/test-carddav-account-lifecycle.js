@@ -113,8 +113,9 @@ try {
   // PUT /accounts/:id - Bearbeiten statt Löschen-und-neu-Anlegen
   // ------------------------------------------------------------------
   await asyncTest('PUT /accounts/:id ändert Name, URL und Benutzer', async () => {
+    // Ein neuer Benutzername verlangt das Passwort neu (test-carddav-admin-gate.js).
     const { status, body } = await jsend(`${base}/accounts/${accountId}`, 'PUT', {
-      name: 'SOGo Haushalt', cardavUrl: 'https://dav.example.com/Contacts2/', username: 'demo-neu',
+      name: 'SOGo Haushalt', cardavUrl: 'https://dav.example.com/Contacts2/', username: 'demo-neu', password: 'geheim-neu',
     });
     assert(status === 200, `Status ${status}`);
     assert(body.data.name === 'SOGo Haushalt', 'Name nicht übernommen');
@@ -133,7 +134,7 @@ try {
       name: 'SOGo Haushalt', cardavUrl: 'https://dav.example.com/Contacts2/', username: 'demo-neu', password: '   ',
     });
     assert(status === 200, `Status ${status}`);
-    assert(row(accountId).password === 'geheim', 'Passwort wurde überschrieben');
+    assert(row(accountId).password === 'geheim-neu', 'Passwort wurde überschrieben');
   });
 
   await asyncTest('Neues Passwort wird gesetzt und macht den alten Fehler gegenstandslos', async () => {

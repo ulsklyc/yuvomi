@@ -18,6 +18,7 @@
 
 import express from 'express';
 import { mayWriteModule } from '../../permissions.js';
+import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 
 import { createLogger } from '../../logger.js';
 import * as googleCalendar from '../../services/google-calendar.js';
@@ -110,14 +111,17 @@ function listOutlookTargets() {
  *
  * Jede Quelle faellt einzeln auf eine leere Liste zurueck: ein abgelaufenes
  * Google-Token darf die CalDAV-Ziele nicht verschlucken (und umgekehrt).
+ *
+ * Die Google-Liste kann das Token erneuern, und der `tokens`-Listener speichert
+ * es nach dem Warten auf Google - deshalb `refuseWhileRestoring` (#1551).
  */
-router.get('/sync-targets', async (req, res) => {
+router.get('/sync-targets', refuseWhileRestoring, async (req, res) => {
   try {
     // Dieselbe Erwaegung wie bei /tasks/sync-targets: die Liste fuellt das
     // Ziel-Feld des Termindialogs und nennt dabei die angebundenen Konten mit
     // ihren Kalender-URLs. Wer nicht schreiben darf, braucht sie nicht.
     if (!mayWriteModule(req, 'calendar')) {
-      return res.status(403).json({ error: 'Write access to the calendar is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to the calendar is required.', code: 403, reason: 'cross_module_access' });
     }
     const [google, caldav] = await Promise.all([
       listGoogleTargets().catch((err) => {

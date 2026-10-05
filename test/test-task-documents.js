@@ -57,13 +57,16 @@ function seedUser(prefix, role) {
   `).run(`${prefix}-${randomUUID()}`, prefix, role).lastInsertRowid;
 }
 
-function createHarness({ userId = ALICE, role = 'admin' } = {}) {
+function createHarness({ userId = ALICE, role = 'admin', moduleAccess = null, authMethod, authScopes = null } = {}) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     req.authUserId = userId;
     req.authRole = role;
     req.session = { userId, role };
+    req.sessionModuleAccess = moduleAccess;
+    req.authMethod = authMethod;
+    req.authScopes = authScopes;
     next();
   });
   app.use('/api/v1/tasks', tasksRouter);
@@ -232,6 +235,116 @@ test('deleting a document cascades and removes the link', async () => {
   } finally {
     await h.close();
   }
+});
+
+// ── Dokumentenrecht (#1358) ─────────────────────────────────────────────────────
+// Die verknuepften Dokumente gehoeren dem Dokumente-Modul. Wer es nicht lesen
+// darf (Mitgliedsrecht `documents: none` oder ein Token ohne documents:read),
+// bekommt weder Namen noch IDs noch die ANZAHL: `document_count` und
+// `documents` sind `null` ("nicht gesagt"), nicht 0 oder [] ("keine").
+// Verknuepfen ist fuer jede ID dieselbe 403 - sonst waere die Antwort ein Orakel.
+
+const NO_DOCS = [
+  ['documents: none', { userId: BOB, role: 'member', moduleAccess: { documents: 'none' } }],
+  ['Token ohne documents-Scope', { userId: BOB, role: 'member', authMethod: 'api_token', authScopes: ['tasks:write'] }],
+  // Der Admin sieht jedes Familien-Dokument - sein Token ohne documents-Scope
+  // trotzdem nicht: der Scope schneidet, die Rolle erweitert nicht.
+  ['Admin-Token ohne documents-Scope', { userId: ALICE, role: 'admin', authMethod: 'api_token', authScopes: ['tasks:write'] }],
+];
+
+function linkedIds(taskId) {
+  return get().prepare('SELECT document_id FROM task_documents WHERE task_id = ? ORDER BY document_id')
+    .all(taskId).map((r) => r.document_id);
+}
+
+test('Dokumentenrecht: ohne documents-Lesen nennen Liste, Detail und GET /documents nichts (#1358)', async () => {
+  const taskId = seedTask();
+  const docId = seedDocument({ visibility: 'family' });
+  get().prepare('INSERT INTO task_documents (task_id, document_id, created_by) VALUES (?, ?, ?)').run(taskId, docId, ALICE);
+
+  const readable = [
+    ['Mitglied', { userId: BOB, role: 'member' }],
+    ['Admin-Sitzung', { userId: ALICE, role: 'admin' }],
+    ['documents: read', { userId: BOB, role: 'member', moduleAccess: { documents: 'read' } }],
+    ['Token mit documents:read', { userId: BOB, role: 'member', authMethod: 'api_token', authScopes: ['tasks:read', 'documents:read'] }],
+  ];
+  for (const [label, as] of readable) {
+    const h = createHarness(as);
+    try {
+      const detail = await h.call('GET', `/${taskId}`);
+      assert.equal(detail.body.data.document_count, 1, `${label}: Zahl`);
+      assert.deepEqual(detail.body.data.documents.map((d) => d.id), [docId], `${label}: Detail`);
+      const list = await h.call('GET', '?include_future=1');
+      assert.equal(list.body.data.find((t) => t.id === taskId).document_count, 1, `${label}: Liste`);
+      const docs = await h.call('GET', `/${taskId}/documents`);
+      assert.equal(docs.status, 200);
+      assert.deepEqual(docs.body.data.map((d) => d.id), [docId]);
+    } finally { await h.close(); }
+  }
+
+  for (const [label, as] of NO_DOCS) {
+    const h = createHarness(as);
+    try {
+      const detail = await h.call('GET', `/${taskId}`);
+      assert.equal(detail.status, 200, `${label}: die Aufgabe selbst bleibt lesbar`);
+      assert.equal(detail.body.data.document_count, null, `${label}: keine Zahl im Detail`);
+      assert.equal(detail.body.data.documents, null, `${label}: keine Liste im Detail`);
+      const list = await h.call('GET', '?include_future=1');
+      assert.equal(list.status, 200);
+      assert.equal(list.body.data.find((t) => t.id === taskId).document_count, null, `${label}: keine Zahl in der Liste`);
+      const docs = await h.call('GET', `/${taskId}/documents`);
+      assert.equal(docs.status, 403, `${label}: GET /documents ist 403`);
+      assert.equal(docs.body.code, 403);
+      // Nur Felder, die ein DOKUMENT benennen: eine blanke `"id":N`-Suche
+      // traefe auch eine Aufgabe mit derselben Nummer.
+      assert.doesNotMatch(JSON.stringify([detail.body, list.body, docs.body]),
+        /Doc-|file\.pdf|application\/pdf|"document_id"|"documents":\[/,
+        `${label}: weder Name, Datei, Typ noch Dokumentliste in den Antworten`);
+    } finally { await h.close(); }
+  }
+});
+
+test('Dokumentenrecht: ohne documents-Lesen verknuepft PUT nichts, jede ID antwortet gleich (#1358)', async () => {
+  const taskId = seedTask();
+  const stored = seedDocument({ visibility: 'family' });
+  const other = seedDocument({ visibility: 'family' });
+  get().prepare('INSERT INTO task_documents (task_id, document_id, created_by) VALUES (?, ?, ?)').run(taskId, stored, ALICE);
+  const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
+
+  for (const [label, as] of NO_DOCS) {
+    const h = createHarness(as);
+    try {
+      const valid = await h.call('PUT', `/${taskId}/documents`, { document_ids: [other] });
+      assert.equal(valid.status, 403, `${label}: PUT mit Dokument ist 403`);
+      assert.equal(valid.body.code, 403);
+      for (const ids of [[stored], [987654]]) {
+        const res = await h.call('PUT', `/${taskId}/documents`, { document_ids: ids });
+        assert.deepEqual(res, { status: 403, body: valid.body }, `${label}: ${ids} antwortet wie jede andere ID`);
+      }
+      lockDocumentDeletes([stored]);
+      try {
+        const locked = await h.call('PUT', `/${taskId}/documents`, { document_ids: [stored] });
+        assert.deepEqual(locked, { status: 403, body: valid.body }, `${label}: im Loeschfenster weiter 403, nicht 409`);
+      } finally { unlockDocumentDeletes([stored]); }
+      assert.deepEqual(linkedIds(taskId), [stored], `${label}: nichts verknuepft`);
+
+      // Leer, `null` oder gar kein Feld: kein Verknuepfen - und mit Recht hiesse
+      // jede der drei "alle sichtbaren loesen", ohne Recht loest keine etwas.
+      for (const [form, body] of [['[]', { document_ids: [] }], ['null', { document_ids: null }], ['ohne Feld', {}]]) {
+        const kept = await h.call('PUT', `/${taskId}/documents`, body);
+        assert.equal(kept.status, 200, `${label}, ${form}: kein Verknuepfen`);
+        assert.equal(kept.body.data, null, `${label}, ${form}: und die Antwort nennt nichts`);
+        assert.deepEqual(linkedIds(taskId), [stored], `${label}, ${form}: und loest nichts, was er nicht sieht`);
+      }
+    } finally { await h.close(); }
+  }
+
+  const h = createHarness({ userId: BOB, role: 'member', authMethod: 'api_token', authScopes: ['tasks:write', 'documents:read'] });
+  try {
+    const res = await h.call('PUT', `/${taskId}/documents`, { document_ids: [other] });
+    assert.equal(res.status, 200, 'mit documents:read verknuepft das Token');
+    assert.deepEqual(linkedIds(taskId), [other]);
+  } finally { await h.close(); }
 });
 
 test('deleting a task cascades and removes its links', async () => {

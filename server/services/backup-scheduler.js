@@ -4,6 +4,7 @@
  * Dependencies: node-cron, fs/promises, path, server/db.js
  */
 
+import { runExternalJob } from '../utils/restore-state.js';
 import cron from 'node-cron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -199,7 +200,9 @@ export function startScheduler() {
     return;
   }
 
-  scheduledTask = cron.schedule(BACKUP_SCHEDULE, performBackup, {
+  // Laedt nach WebDAV hoch: waehrend eines Restores beginnt kein Lauf, ein
+  // laufender wird abgewartet (Codex-Befund in #1431).
+  scheduledTask = cron.schedule(BACKUP_SCHEDULE, () => runExternalJob(performBackup), {
     timezone: process.env.TZ || 'UTC',
   });
 

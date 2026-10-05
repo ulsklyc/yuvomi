@@ -69,7 +69,7 @@
 }
 
 /* --------------------------------------------------------
- * Seiten-Übergangs-Animation (direktional)
+ * Seiten-Übergang (Rückfall-Blende und View Transition)
  * -------------------------------------------------------- */
 /* Basis: unsichtbar vor Animation */
 .page-transition {
@@ -92,40 +92,114 @@
   height: 100%;
 }
 
-/* Nach der In-Animation soll es sichtbar bleiben → direkt auf der Klasse */
-.page-transition--in-right,
-.page-transition--in-left {
+/* RUECKFALL ohne View Transitions: eine reine Blende, kein Versatz, keine
+ * Feder (Critique 2026-09-26, P2-1). Hier stand ein 20px-Slide nach
+ * Nav-Reihenfolge, den glass.css zusaetzlich mit der Glas-Feder ueberschwingen
+ * liess - Feder gehoert dem Glas, nicht dem Inhalt. Wo der Browser View
+ * Transitions kann, sieht man diese Klasse nie; der Wechsel steht unten. */
+.page-transition--in {
   opacity: 1;
-  transform: none;
+  animation: page-fade-in var(--duration-md) var(--ease-out);
 }
 
-/* Keyframes OHNE forwards */
-@keyframes page-slide-in-right {
-  from { opacity: 0; transform: translateX(20px); }
-  to   { opacity: 1; transform: none; }
+@keyframes page-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-@keyframes page-slide-in-left {
-  from { opacity: 0; transform: translateX(-20px); }
-  to   { opacity: 1; transform: none; }
+
+/* --------------------------------------------------------
+ * Seitenwechsel als View Transition (utils/view-transition.js)
+ *
+ * Grundsatz: Kontinuitaet vor Effekt. Navigation, Kopf und Tab-Leisten
+ * STEHEN, nur der Inhalt wechselt - wie Apples Tab-Wechsel, der gar nicht
+ * gleitet. Das Wurzelbild blendet 200ms mit `--ease-out` ueber; der Browser
+ * haelt dabei das alte Bild, bis das neue steht - der leere Frame zwischen
+ * altem und neuem Inhalt ist damit weg.
+ *
+ * Was steht, traegt einen Namen und faellt aus dem Wurzelbild heraus:
+ *   - `nav-sidebar`, `nav-bottom`: nur das LEBENDE neue Bild, ohne Blende.
+ *     Die Pille der Kapsel gleitet seit dem Tipp (updateNav) - ein
+ *     eingefrorenes altes Bild darueber waere ihr Geist.
+ *   - `kitchen-tabs` (kitchen-tabs.css): derselbe Knoten vorher und nachher,
+ *     ebenso nur lebend - seine Kapsel gleitet dort zum Ziel.
+ *   - `page-toolbar` (per Inline-Stil am ersten Kopf): Kopf steht, sein
+ *     Inhalt blendet mit der Wurzel ueber. Die Gruppe selbst bewegt sich
+ *     nicht (`animation: none`) - kein Kopf gleitet.
+ * Kommt ein Name nur auf EINER Seite vor (Kueche betreten/verlassen), blendet
+ * er wie die Wurzel (`:only-child` laesst die Standard-Blende stehen).
+ * -------------------------------------------------------- */
+/* Die Namen `nav-sidebar` und `nav-bottom` stehen NUR waehrend des Wechsels:
+ * swapPage setzt `html.page-swapping` vor startViewTransition und nimmt es nach
+ * dem letzten Wechsel wieder ab. Dauerhaft gesetzt macht ein Name die Leiste
+ * zur Backdrop Root - der `backdrop-filter` der Kapsel `.nav-bottom__items` und
+ * des Seitenleisten-Indikators sah dann nur den transparenten Elternknoten, und
+ * Schrift lief scharf durchs Glas (Re-Critique 2026-09-28, A1 P1-1). Waehrend
+ * des Wechsels ist das egal: dort steht die Leiste als eigenes Bild still.
+ * Guard: test-motion.js (8). */
+html.page-swapping .nav-sidebar {
+  view-transition-name: nav-sidebar;
 }
-.page-transition--in-right {
-  animation: page-slide-in-right var(--duration-md) var(--ease-out);
+
+html.page-swapping .nav-bottom {
+  view-transition-name: nav-bottom;
 }
-.page-transition--in-left {
-  animation: page-slide-in-left var(--duration-md) var(--ease-out);
+
+/* Gedacht war: Tipps gehen waehrend der Blende an das echte Dokument darunter.
+ * Chromium trifft waehrend einer Wurzel-Transition aber nur <html>, trotz
+ * dieser Regel (gemessen 2026-09-27). Deshalb bricht swapPage
+ * (utils/view-transition.js) die Blende beim ersten Tipp ab - der naechste
+ * Tipp erreicht die Seite. Die Regel bleibt fuer Engines, die sie ehren. */
+::view-transition {
+  pointer-events: none;
 }
-/* Die out-/crossfade-Varianten (--out-left, --out-right, --crossfade) sind mit
- * dem Toter-Selektoren-Aufraeumen 2026-08-31 entfallen: router.js vergibt seit
- * je nur --in-right/--in-left, die Gegenrichtung entstand nie. */
+
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-old(page-toolbar),
+::view-transition-new(page-toolbar) {
+  animation-duration: var(--duration-md);
+  animation-timing-function: var(--ease-out);
+}
+
+::view-transition-group(page-toolbar),
+::view-transition-group(nav-sidebar),
+::view-transition-group(nav-bottom),
+::view-transition-group(kitchen-tabs) {
+  animation: none;
+}
+
+::view-transition-old(nav-sidebar):not(:only-child),
+::view-transition-old(nav-bottom):not(:only-child),
+::view-transition-old(kitchen-tabs):not(:only-child) {
+  display: none;
+}
+
+::view-transition-new(nav-sidebar):not(:only-child),
+::view-transition-new(nav-bottom):not(:only-child),
+::view-transition-new(kitchen-tabs):not(:only-child) {
+  animation: none;
+}
+
+::view-transition-old(kitchen-tabs):only-child,
+::view-transition-new(kitchen-tabs):only-child {
+  animation-duration: var(--duration-md);
+  animation-timing-function: var(--ease-out);
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .page-transition--in-right,
-  .page-transition--in-left {
+  .page-transition--in {
     animation: none;
     opacity: 1;
   }
   #main-content {
     transition: none;
+  }
+  /* utils/view-transition.js startet unter reduzierter Bewegung gar keine
+   * Transition; das hier haelt auch den Fall still, in dem doch eine laeuft. */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }
 
@@ -259,6 +333,7 @@
   --install-prompt-tail: 0px;
   --fab-tail: 0px;
   --bulk-pill-tail: 0px;
+  --nav-tail: 0px;
 }
 
 /* AM ZUSTAND, NICHT AN DER ANWESENHEIT - und das ist gemessen, nicht
@@ -289,11 +364,41 @@
   --bulk-pill-tail: var(--bulk-pill-safe-zone);
 }
 
-/* Die Summe. AN .app-content UND NICHT AN :root - sie liest die drei Summanden
- * an der Stelle, an der sie deklariert wird (siehe :root oben), und alle drei
+/* DER VIERTE SUMMAND IST DIE TAB-LEISTE SELBST (Kopfregel mobil, 2026-09-26).
+ *
+ * Bis hierher war die Leiste ein Flex-Kind der Shell und nahm dem Scrollport
+ * ihre Zone ab: unter dem Glas lief nie Inhalt, 76px (plus Safe-Area) waren
+ * tote Buehne unter einer Kapsel, deren Material genau das zeigen soll, was
+ * darunter liegt (Critique 2026-09-26, A1 P1-3 / A8). Jetzt liegt sie ueber
+ * dem Inhalt (siehe `.nav-bottom`), der Scrollport reicht bis zur Unterkante,
+ * und damit die letzte Zeile trotzdem UEBER der Kapsel endet, ist ihre Zone
+ * ein Nachlauf wie FAB, Pille und Banner - dieselbe Invariante: nichts ist
+ * unerreichbar, und mitten im Scrollen darf Inhalt unter dem Glas laufen.
+ *
+ * NUR, WO DIE LEISTE STEHT: unter 1024px und nicht im Wand-Modus, der sie
+ * ausblendet (dashboard.css). Die Summanden von Pille und Banner rechnen
+ * weiter ab der Oberkante der Leiste - sie haengen ueber ihr, und der
+ * Nachlauf addiert jetzt, was darunter liegt, statt es wegzuschneiden.
+ *
+ * `--nav-bottom-height` ist die GEMESSENE Zone, nicht die Token-Hoehe (Review
+ * zu #1475): die Kapsel waechst mit umbrechenden Labels ueber 60px (320px,
+ * lange Sprachen), und eine feste Reserve liess die letzte Zeile 4px unter dem
+ * Glas enden. Die Messung steht in tokens.css an der Variable. */
+@media (max-width: 1023px) {
+  .app-shell {
+    --nav-tail: var(--nav-bottom-height);
+  }
+
+  [data-wall-mode] .app-shell {
+    --nav-tail: 0px;
+  }
+}
+
+/* Die Summe. AN .app-content UND NICHT AN :root - sie liest die Summanden
+ * an der Stelle, an der sie deklariert wird (siehe :root oben), und alle
  * sind erst hier fertig. */
 .app-content {
-  --shell-tail: calc(var(--fab-tail) + var(--bulk-pill-tail) + var(--install-prompt-tail));
+  --shell-tail: calc(var(--nav-tail) + var(--fab-tail) + var(--bulk-pill-tail) + var(--install-prompt-tail));
 }
 
 /* --------------------------------------------------------
@@ -346,6 +451,63 @@
 .app-content:not(:has(.page-scrollport)),
 .app-shell .page-scrollport:not(:has(.page-scrollport)) {
   padding-block-end: calc(var(--scrollport-pad, 0px) + var(--shell-tail));
+  /* Fokus und scrollIntoView landen nie unter der Kapsel (WCAG 2.4.11): wer
+   * per Tastatur ans Seitenende tabbt, bekommt das Ziel ueber dem Glas statt
+   * dahinter. Nur die Leiste, nicht der ganze Nachlauf - der Desktop-FAB
+   * schwebt seitlich und verdeckt keine volle Zeile. */
+  scroll-padding-block-end: var(--nav-tail);
+}
+
+/* DER SCROLLPORT IST AUCH CONTAINING BLOCK (Critique 2026-09-26).
+ *
+ * Ein Scrollport clippt nur die absolut positionierten Nachfahren, deren
+ * Containing Block er ist. `.sr-only` steht ohne Versatz an seiner statischen
+ * Stelle, gehoert aber dem naechsten POSITIONIERTEN Vorfahren - im Vorrat war
+ * das `#main-content`: 21 "Bearbeiten"-Spans unten in der Liste entkamen dem
+ * Clipping und machten den Hauptbereich zu einem zweiten Scroller (1766px bei
+ * 768px Hoehe); eine Wischgeste neben der Liste schob Kopf und Liste weg. Die
+ * Rolle bringt die Positionierung deshalb selbst mit, statt sie jedem Modul
+ * einzeln abzuverlangen. Gemessen auf allen Seiten mit eigenem Scrollport
+ * (Kalender in allen vier Ansichten, 390 und 1440): kein Element verschiebt
+ * sich. Guard: test-frontend-audit.js. */
+.page-scrollport {
+  position: relative;
+}
+
+/* UND AM DEFAULT-PORT REITET ER AUF EINEM PLATZHALTER, NICHT AUF DEM POLSTER
+ * (Critique 2026-09-23).
+ *
+ * Das Polster oben greift an `.app-content` nur zur Haelfte. Ein Scrollport
+ * haengt sein Endpolster an das Ende seines FLUSS-Kindes, und das ist
+ * `.page-transition` - mit `height: 100%` (siehe dort), also genau so hoch wie
+ * die Inhaltsbox. Eine Seite, die laenger ist, laeuft ueber diese Box hinaus,
+ * und ihr Ueberlauf bekommt kein Polster mehr. Gemessen bei 1440x900 auf der
+ * Uebersicht: 24px statt 96px unter dem letzten Widget, der FAB lag am
+ * Seitenende auf der rechten Spalte; dasselbe auf Einstellungen (32px) und
+ * Haushaltshilfe (64px), sobald eine fixierte Flaeche einen Nachlauf verlangt.
+ * Die Regel galt nur dort, wo eine Seite zufaellig selbst genug Bodenpolster
+ * mitbrachte.
+ *
+ * Der Platzhalter steht IM Fluss der Seite, hinter ihrem Root - und der waechst
+ * in dieser Architektur mit dem Inhalt. Er reitet damit am echten Inhaltsende.
+ *
+ * DAS POLSTER BLEIBT TROTZDEM, und die beiden rechnen sich nicht doppelt. Es
+ * haelt `.page-transition` um den Nachlauf kuerzer als das Fenster; eine Seite,
+ * die nur ihren Platz fuellt (`min-height: 100%` wie Belohnungen und Entsorgung),
+ * endet deshalb mit dem Platzhalter genau an der Fensterkante statt um den
+ * Nachlauf darueber hinaus. Die Scrollhoehe ist in jedem Fall
+ * max(Fensterhoehe, Inhaltsende + Nachlauf) - das Polster zaehlt nur bis zur
+ * Kante der Box, der Platzhalter nur ab dem Inhalt.
+ *
+ * Die Hoehe des Fluss-Kindes selbst anzufassen (`min-height` statt `height`),
+ * hiesse die Bezugshoehe fuer jedes `min-height: 100%` darunter aufzugeben:
+ * eine Prozenthoehe loest sich nur gegen eine DEFINITE Hoehe auf. Seiten mit
+ * eigenem Scrollport sind ausgenommen wie oben - dort reitet der Nachlauf an
+ * ihrem Port. Gemessen: `test:dashboard-surface-browser`. */
+.app-content:not(:has(.page-scrollport)) > .page-transition::after {
+  content: "";
+  display: block;
+  block-size: var(--shell-tail);
 }
 
 /* #main-content wird nach jeder Navigation programmatisch fokussiert, damit
@@ -407,6 +569,39 @@
   color: var(--color-text-primary);
 }
 
+/* DIE SCHALTERZEILE (Komponenten-Kanon, 2026-09-26): eine Boolean-Einstellung
+ * ist ein Schalter wie in Apples Einstellungen - Label links und fuellend, die
+ * geteilte `.toggle`-Bahn rechts (toggleRowHtml({ control: 'switch' })). Die
+ * ganze Zeile bleibt das Label und damit die Trefferflaeche. Der Fokusring
+ * steht an der Zeile und nur bei Tastaturfokus: `:focus-within` allein zeigte
+ * ihn auch nach jedem Mausklick, und die Bahn truege sonst einen zweiten. */
+.toggle-row--switch .toggle-row__label {
+  flex: 1;
+  min-width: 0;
+}
+
+.toggle-row--switch .toggle {
+  margin-inline-start: auto;
+}
+
+.toggle-row--switch .toggle input[type="checkbox"] {
+  width: 1px;
+  height: 1px;
+}
+
+.toggle-row--switch:focus-within {
+  outline: none;
+}
+
+.toggle-row--switch:has(input:focus-visible) {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.toggle-row--switch .toggle input:focus-visible + .toggle__track {
+  outline: none;
+}
+
 /* DIE FARBSCHEIBE EINER ZEILE, DEREN GEGENSTAND EINE EIGENE FARBE HAT
    (eine Person, eine Kalenderebene).
 
@@ -456,27 +651,46 @@
  * Leichter Blur-Effekt für Glassmorphismus.
  * -------------------------------------------------------- */
 .nav-bottom {
-  /* Flex-Kind von .app-shell statt position: fixed - zuverlässiger auf iOS PWA.
-   * position: fixed kann durch will-change: transform in iOS-Compositor-Layern
-   * falsch referenziert werden. Als Flex-Kind am Ende der 100dvh-App-Shell ist
-   * die Position garantiert am Viewport-Bottom.
+  /* Absolut an der Unterkante von .app-shell statt position: fixed -
+   * zuverlässiger auf iOS PWA. position: fixed kann durch will-change:
+   * transform in iOS-Compositor-Layern falsch referenziert werden. Die Shell
+   * ist 100dvh hoch und `position: relative`, ihre Unterkante IST der
+   * Viewport-Bottom - dieselbe Garantie wie als Flex-Kind.
+   *
+   * UEBER DEM INHALT, NICHT DARUNTER (Kopfregel mobil, 2026-09-26). Bis dahin
+   * stand hier ein Flex-Kind (`position: relative; flex-shrink: 0`): es nahm
+   * dem Scrollport seine Zone ab, unter dem Glas lief nie Inhalt, und die
+   * Kapsel war Glas ueber leerem Grund (A1 P1-3, A8). Aus dem Fluss genommen
+   * reicht `.app-content` bis zur Unterkante, die Kapsel schwebt ueber dem,
+   * was darunter scrollt, und `--nav-tail` (oben bei den Summanden) haelt das
+   * Seitenende ueber ihr. FAB, Toasts und Mehr-Blatt rechnen weiter mit
+   * `--nav-bottom-height` ab dem Viewport-Bottom und stehen unveraendert.
+   * Guard: test:mobile-chrome.
    *
    * Liquid Glass: die Bar selbst ist eine transparente Zone; das
    * Glas-Material trägt die schwebende Kapsel .nav-bottom__items. Der
    * gleitende Indikator bleibt Kind von .nav-bottom und misst echte Rects
    * (positionTabIndicator) — die Kapsel-Margins rechnen sich automatisch ein. */
-  position: relative;
-  flex-shrink: 0;
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
   width: 100%;
   background: transparent;
   display: flex;
   flex-direction: column;
+  /* Kein `view-transition-name` hier: der Name steht nur waehrend des
+   * Seitenwechsels (`html.page-swapping`, Abschnitt Seiten-Uebergang). Dauerhaft
+   * machte er die Zone zur Backdrop Root, und die Kapsel darin blurrte nichts. */
   /* Der seitliche Rand der ZONE ist auf --space-2 gefallen, als der FAB in die
    * Kapsel zog: sechs Ziele teilen sich jetzt eine Breite, die vorher fuenf
    * trugen, und 8px Rand sehen auf einem 375er-Telefon genauso freistehend aus
    * wie 12 - sie sind nur nicht mehr da, wo die Labels sie brauchen. */
   padding: var(--space-2) var(--nav-bar-gutter) calc(var(--safe-area-inset-bottom) + var(--space-2));
   z-index: var(--z-nav);
+  /* Die Zone ist Luft, keine Flaeche: seit Inhalt unter ihr laeuft, gehoert
+   * ein Tipp auf den Streifen neben oder ueber der Kapsel der Zeile darunter.
+   * Treffer nimmt nur die Kapsel an (`.nav-bottom__items`). */
+  pointer-events: none;
 }
 
 /* ── Items-Reihe: die schwebende Glas-Kapsel ── */
@@ -505,6 +719,7 @@
    * --space-2 (8px) raeumt genau diese Sehne frei. Hinten braucht es nichts:
    * dort deckt die FAB-Reserve die Kurve laengst ab. */
   padding-inline-start: var(--space-2);
+  pointer-events: auto;
 }
 
 /* NUR WO ES EINEN FAB GIBT. Die Frage stellt dieselbe `:has()`-Bedingung, die
@@ -524,8 +739,7 @@
 
 /* ── More-Button (Button-Basis, ansonsten wie nav-item) ── */
 .nav-item--more,
-.nav-item--kitchen,
-.nav-item--search {
+.nav-item--kitchen {
   background: none;
   border: none;
   cursor: pointer;
@@ -549,7 +763,23 @@
 
 .more-backdrop--visible {
   display: block;
-  animation: fade-in var(--duration-sm) ease;
+  animation: fade-in var(--duration-sm) var(--ease-out);
+}
+
+/* DIE KAPSEL BLEIBT HELL, SOLANGE IHR EIGENES BLATT OFFEN IST (A1, Kleinkram
+ * der Re-Critique 2026-09-27). Der Backdrop lag ueber der Leiste und dimmte
+ * den Mehr-Knopf mit, der das Blatt gerade traegt. Leiste und FAB heben sich
+ * ueber ihn; ein Tipp daneben trifft weiter den Backdrop (die Zone ist
+ * `pointer-events: none`, nur die Kapsel nimmt Treffer), ein Tipp auf einen
+ * anderen Tab navigiert, und `navigate()` schliesst das Blatt. */
+html:has(.more-sheet[aria-hidden="false"]) .nav-bottom {
+  z-index: calc(var(--z-nav) + 2);
+}
+
+/* Der FAB liegt IN der Kapsel und darum eine Stufe ueber ihr - dieselbe
+ * Ordnung wie sonst (--z-nav + 1 ueber --z-nav), nur beide gehoben. */
+html:has(.more-sheet[aria-hidden="false"]) :is(.page-fab, .page-fab-group) {
+  z-index: calc(var(--z-nav) + 3);
 }
 
 @keyframes fade-in {
@@ -615,18 +845,23 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * eigene Leiste. Ein Sicherheitsabstand als padding-bottom haette dieselben
    * 76px gekostet und den Fehler nur eine Zeile weiter geschoben. */
   bottom: var(--nav-bottom-height);
-  left: 0;
-  right: 0;
+  /* EIN BLATT, EINE FORM (Re-Critique 2026-09-27, A1 P2-3): Einrueckung,
+   * Material und Radius wie das Dialog-Sheet (`.modal-overlay`-Polster,
+   * `.modal-panel` + glass.css) - vorher randlos, oben 26px, nur eine
+   * Oberkante. Die Unterkante bleibt ueber der Leiste (Absatz darueber). */
+  left: max(var(--space-3), env(safe-area-inset-left));
+  right: max(var(--space-3), env(safe-area-inset-right));
   background-color: var(--color-surface);
-  border-top: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow-lg);
   /* DER SEITENRAND IST HIER SPALTENBREITE, KEIN LUXUS. Seit das Raster vier
    * statt drei Spalten fuehrt, entscheidet jeder Pixel Innenabstand darueber,
    * ob ein deutscher Modulname einzeilig steht: die 4px, die von --space-4 auf
    * --space-3 fallen, gehen zur Haelfte in jede Zelle. Unten bleibt der volle
    * Wert - dort schliesst das Blatt gegen die Tab-Leiste ab, und die Fuge
    * zwischen zwei schwebenden Flaechen ist der einzige Rand, den man sieht. */
-  padding: var(--space-3) var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3) var(--space-4);
   z-index: calc(var(--z-nav) + 2);
   display: flex;
   flex-direction: column;
@@ -641,13 +876,26 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * Adressleiste die Hoehe waehrend der Sitzung aendert - ueber den Token, weil
    * die Rechnung var() traegt und ein vh-Zwilling dann nichts rettet (#1276). */
   max-block-size: calc(var(--viewport-height) - var(--nav-bottom-height) - var(--space-8));
-  /* Die Ausfahr-Distanz rechnet die Leiste MIT. `translateY(100%)` schob das
-   * Blatt frueher exakt aus dem Bild, weil seine Unterkante der Bildschirmrand
-   * war; seit sie ueber der Tab-Leiste liegt, blieben genau deren 76px oben
-   * sichtbar - ein Streifen fremdes Blatt unter jeder Seite. Gefunden hat das
-   * der Screenshot, nicht die Sonde: die Sonde mass das OFFENE Blatt. */
-  transform: translateY(calc(100% + var(--nav-bottom-height)));
-  transition: transform var(--duration-lg) var(--ease-out);
+  /* EIN BLATT, EINE BEWEGUNG (R16): das Mehr-Blatt kommt wie das Dialog-Sheet
+   * - `--sheet-lift` Hub + Blende, `--sheet-in`/`--sheet-out` (tokens.css).
+   * Vorher fuhr es den vollen Weg (`translateY(100% + Leiste)`, 250ms) und
+   * war damit die zweite von drei Bewegungen fuer "Blatt von unten". Der
+   * Vollhub vertraegt die Feder nicht (sie wirft ihn ueber die Ruhelage).
+   *
+   * Geschlossen ist es durchsichtig UND nimmt keinen Zeiger; `inert` setzt
+   * router.js (`setOverlayInteractive`). Hier steht der AUSGANG (die Regel
+   * gilt, sobald `aria-hidden="false"` faellt), die Einfahrt an der offenen
+   * Regel unten.
+   * `translate` traegt den Zug des Fingers (utils/sheet-drag.js) und federt
+   * mit eigener Kurve zurueck; nach einer Wischgeste bleibt es stehen, und
+   * das Blatt blendet von dort aus, wohin der Finger es zog. */
+  transform: translateY(var(--sheet-lift));
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform var(--sheet-out),
+    opacity var(--sheet-out),
+    translate var(--duration-lg) var(--ease-out);
 }
 
 /* Der Deckel gehoert dem Blatt, das Scrollen dem Koerper: Griff und Suche
@@ -699,6 +947,12 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 
 .more-sheet[aria-hidden="false"] {
   transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    transform var(--sheet-in),
+    opacity var(--sheet-in),
+    translate var(--duration-lg) var(--ease-out);
 }
 
 /* ── More-Sheet Drag-Handle ── */
@@ -707,10 +961,12 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   /* flex-shrink: 0, weil das Blatt seit der Obergrenze ein schrumpfender
    * Flex-Container ist: bei 320px war der Griff auf 2,3px zusammengedrueckt. */
   flex-shrink: 0;
+  /* Derselbe Griff wie am Dialog-Sheet (layout.css, Mobile-Block der
+   * `.modal-panel`): 36x5, 8px unter der Oberkante, Farbe `--sheet-grabber`. */
   width: 36px;
-  height: 4px;
+  height: 5px;
   border-radius: var(--radius-full);
-  background-color: var(--color-border);
+  background-color: var(--sheet-grabber);
   margin: 0 auto var(--space-2);
 }
 
@@ -724,36 +980,34 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   gap: var(--space-2);
   width: 100%;
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-lg);
-  background-color: var(--color-surface-elevated);
-  border: 1.5px solid var(--color-border);
-  color: var(--color-text-tertiary);
+  /* Sieht aus wie das EINE Suchfeld (page-search.css), weil es sich wie eins
+   * anfuehlt: gefuellte Kapsel statt 16px-Ecke mit Kante (Komponenten-Kanon,
+   * 2026-09-26). Es ist ein Knopf, der die globale Suche oeffnet. */
+  border-radius: var(--radius-full);
+  background-color: var(--color-fill-field);
+  border: 1.5px solid transparent;
+  color: var(--color-text-secondary);
   cursor: text;
   font-family: inherit;
   text-align: left;
   margin-bottom: var(--space-1);
   -webkit-tap-highlight-color: transparent;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast), transform 100ms ease;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--duration-xs) var(--ease-out);
   user-select: none;
 }
 
 /* Der Hover eines FELDES lebt an seiner Kante, nicht an seiner Flaeche
- * (Dark-Kur 2026-08-17). Hier stand zusaetzlich der Flaechenschritt auf
- * --color-surface-elevated-hover, und der drueckte den Placeholder
- * (Tertiaerfarbe) im Dark unter AA - gemessen 3.82:1, mit der gestiegenen
- * Rampe 4.32:1, beides unter 4.5. Ein Eingabefeld ist nach dem
- * Kasten-in-Kasten-Vokabular ein GRIFF und traegt seine Kante; border-strong
- * gegen border ist in beiden Themes ein klarer Zustand (1.55x dunkel), die
- * Flaeche muss nichts dazutun. Die uebrigen Traeger der Hover-Stufe
- * (.more-item, .metric-card--tile, Chips) fuehren keinen Tertiaertext und
- * behalten ihren Flaechenschritt. */
+ * (Dark-Kur 2026-08-17): ein Flaechenschritt drueckte den Platzhalter im Dark
+ * unter AA (gemessen 3.82:1). Seit dem Komponenten-Kanon (2026-09-26) ist die
+ * Kante in Ruhe transparent und der Hover faerbt sie ein - dieselbe Regel wie
+ * am EINEN Suchfeld (page-search.css); der Platzhalter steht in
+ * Sekundaertext auf --color-fill-field. */
 .more-sheet__search:hover {
-  border-color: var(--color-border-strong, var(--color-border));
+  border-color: var(--color-border-control);
 }
 
 .more-sheet__search:active {
   border-color: var(--color-accent);
-  background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), var(--color-surface-elevated));
   transform: scale(0.985);
 }
 
@@ -778,7 +1032,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 
 .more-sheet__search-placeholder {
   font-size: var(--text-sm);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   flex: 1;
 }
 
@@ -1233,12 +1487,21 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   z-index: calc(var(--z-nav) + 3);
   display: flex;
   flex-direction: column;
-  transform: translateY(100%);
-  transition: transform var(--duration-lg) var(--ease-out);
+  /* Dieselbe Bewegung wie Dialog-Sheet und Mehr-Blatt (`--sheet-in`/`--sheet-out`,
+   * tokens.css) statt eines dritten Vollhubs. Das Overlay deckt den ganzen
+   * Schirm: geschlossen nimmt es keinen Zeiger, den Fokus sperrt `inert`
+   * (router.js, `setOverlayInteractive`). */
+  transform: translateY(var(--sheet-lift));
+  opacity: 0;
+  pointer-events: none;
+  transition: transform var(--sheet-out), opacity var(--sheet-out);
 }
 
 .search-overlay--visible {
   transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+  transition: transform var(--sheet-in), opacity var(--sheet-in);
 }
 
 /* Gruppiert Kopf + Treffer + Schließen. Auf Mobile transparent und
@@ -1263,20 +1526,23 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
+/* Flaeche, Kante, Form und Fokus teilt die globale Suche mit dem EINEN
+ * Suchfeld (page-search.css, Komponenten-Kanon 2026-09-26); hier steht nur,
+ * was ihr eigen ist: sie fuellt die Kopfzeile und hat keine Lupe davor. */
 .search-overlay__input {
   flex: 1;
   height: var(--target-lg);
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-lg);
-  border: 1.5px solid var(--color-border-control);
-  background-color: var(--color-surface-elevated);
-  color: var(--color-text-primary);
+  padding: 0 var(--space-4);
   font-size: var(--text-base);
 }
 
-.search-overlay__input:focus {
-  outline: none;
-  border-color: var(--color-accent);
+/* EIN X IM PALETTENKOPF (R14, A1 P3-3): das native Leeren des Suchfelds stand
+ * direkt neben dem Schliessen-Knopf, zwei gleiche Zeichen fuer zwei Folgen.
+ * Geleert wird per Escape im Feld (Browser-Standard) oder Auswahl. */
+.search-overlay__input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
 }
 
 .search-overlay__close {
@@ -1326,6 +1592,16 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   margin-top: var(--space-0h);
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
+}
+
+/* Der getroffene Wortteil (Re-Critique 2026-09-28, A1 P2-2): wie Spotlight
+ * fett in der Primaertinte statt als gelber Marker - er zeigt den Grund des
+ * Treffers, ohne die Liste zu einer Textmarker-Seite zu machen. In der
+ * Zweitzeile hebt die Primaertinte ihn zusaetzlich vom Sekundaertext ab. */
+.search-result__hit {
+  background: transparent;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Sektionskopf einer Mischstelle (Herkunfts-Regel, Block 2): das Siegel
@@ -1379,6 +1655,29 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
  * statt unter overflow:hidden zu verschwinden. */
 .search-result:focus-visible {
   outline-offset: var(--focus-ring-offset-inset);
+}
+
+/* DIE MARKIERTE ZEILE DER COMBOBOX (Re-Critique 2026-09-28, A1 P1-1). Der
+ * Fokus bleibt im Suchfeld; welche Zeile Enter oeffnet, zeigt
+ * `aria-selected` (utils/palette-combobox.js). Dieselbe Flaeche wie die
+ * ausgewaehlte Zeile von Liste+Detail und die Aktiv-Pille der Seitenleiste -
+ * "das ist gemeint". Im Kontrastmodus traegt ein Rahmen die Markierung, weil
+ * dort keine Hintergrundfarbe durchkommt. */
+.search-result[aria-selected="true"],
+.search-scope[aria-selected="true"] {
+  background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), var(--color-surface));
+}
+
+.search-scope[aria-selected="true"] {
+  border-color: var(--color-accent);
+}
+
+@media (forced-colors: active) {
+  .search-result[aria-selected="true"],
+  .search-scope[aria-selected="true"] {
+    outline: var(--focus-ring-width) solid Highlight;
+    outline-offset: var(--focus-ring-offset-inset);
+  }
 }
 
 /* Scope-Launcher im Leerzustand: „Direkt öffnen"-Kacheln, die zugleich zeigen,
@@ -1478,7 +1777,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
     overflow: hidden;
-    /* Auftakt gespiegelt aus @keyframes modal-scale-in: Fade + scale(0.95→1)
+    /* Auftakt wie der Desktop-Dialog (glass-modal-scale-in): Fade + scale(0.95→1)
      * mit ease-out-expo, statt eines vom Bildschirmrand hochfahrenden Sheets.
      * Als Transition (nicht Keyframe), weil das Overlay persistent ist und nur
      * per --visible getoggelt wird. */
@@ -1592,6 +1891,14 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   pointer-events: none;
 }
 
+/* Eintrag „Aenderungen" im Konto-Menue der Seitenleiste: der Punkt steht am
+ * Zeilenende, wie ein Hinweis in einem macOS-Menue - im Fluss, nicht schwebend. */
+.popover-menu__item > .nav-dot {
+  position: static;
+  flex-shrink: 0;
+  margin-inline-start: auto;
+}
+
 /* Listenzeile im „Mehr"-Sheet: kein Icon-Well, der Punkt hängt an der Zeile. */
 .more-action > .nav-dot {
   top: var(--space-1);
@@ -1645,11 +1952,12 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * Text und muesste 4.5:1 halten - was sieben der neun Familientoene reissen.
    *
    * GEMESSEN GEGEN DIE KAPSEL, NICHT GEGEN DIE SEITE: die Leiste ist Glas
-   * (rgba .86 plus backdrop-filter), der echte Grund des Zeichens also die
-   * Mischung aus Kapsel und Seite - im Light #F9F9FA, im Dark #2B2825. Ueber
-   * alle neun Familientoene: Light 4,79-6,81:1, Dark 4,57-8,41:1. Beide Bereiche
-   * liegen nicht nur ueber der 3:1-Grafikschwelle, sondern ueber der
-   * 4.5:1-Textschwelle - der Ton ist hier also nicht die Grenze.
+   * (--glass-bg-capsule plus backdrop-filter), der echte Grund des Zeichens
+   * also die Mischung aus Kapsel und dem, was darunter scrollt. Seit dem
+   * duenneren Kapselglas (2026-10-01) ist der Ton eine der Grenzen: ueber
+   * einem mittelgrauen Foto haelt der schwaechste Familienton hell 3,3:1,
+   * dunkel 4,6:1 - ueber der 3:1-Grafikschwelle, nicht mehr ueber 4.5:1. Die
+   * Rechnung steht in tokens.css (a1).
    *
    * Die Eine-Stimme-Regel bleibt heil: Kapsel, gleitender Indikator, Label,
    * Fokusring und FAB tragen weiter --color-accent. Gewechselt hat das
@@ -1703,8 +2011,6 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 .segmented__item.is-active svg,
 .cal-toolbar__view-btn--active svg,
 .cal-toolbar__search-btn--active svg,
-.theme-toggle__btn--active svg,
-.perm-modeswitch__btn.is-active svg,
 .perm-seg__opt.is-active svg {
   /* 30 % statt 16 %: auf Tab-Bar-Größe (20px) las die schwächere Füllung
    * weiter als Outline (Finish-Verdict Fundament-Phase, Fix 8). */
@@ -1753,6 +2059,15 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
  * und nicht in einer zweiten mit gleichem Selektor. */
 .nav-bottom .nav-item__label {
   font-size: var(--type-micro);
+  /* PRIMAER- STATT TERTIAERTEXT (2026-10-01, duenneres Kapselglas). Das Label
+   * ist der einzige TEXT auf dem Glas und damit die Groesse, die bestimmt, wie
+   * duenn es sein darf: gegen ein mittelgraues Foto unter der Kapsel hielt
+   * Tertiaertext schon bei der alten Deckung (0.86) nur 4.6:1 - jede weitere
+   * Durchsicht haette AA gerissen, Sekundaertext haette kaum etwas gewonnen.
+   * Die Rechnung steht in tokens.css (a1). Aktiv bleibt erkennbar, weil der
+   * aktive Tab Akzentfarbe, Halbfett, gefuelltes Zeichen UND die Pille traegt
+   * (Regel unten) - drei Kanaele neben der Farbe. */
+  color: var(--color-text-primary);
   white-space: normal;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -1948,7 +2263,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   border: none;
   transition: transform var(--transition-base), background-color var(--transition-fast);
   -webkit-tap-highlight-color: transparent;
-  animation: fab-in 420ms var(--ease-out) backwards;
+  animation: fab-in var(--duration-xl) var(--ease-out) backwards;
 }
 
 .page-fab:hover {
@@ -2068,6 +2383,21 @@ html.fab-anim-done .page-fab {
   flex-shrink: 0;
 }
 
+/* DIE KOPFZEILE IST EIN VOLLES ZIEL HOCH, GLEICH WAS SIE TRAEGT (Critique
+ * 2026-10-05, R16 "Desktop-Kopf 65 gegen 69px"). Gemessen bei 1280: Aufgaben,
+ * Dokumente, Gesundheit und Einkauf 69px, die zehn anderen einzeiligen Koepfe
+ * 65px - der Unterschied war, ob in der Zeile ein Segment-Umschalter (44px)
+ * oder nur 40px-Knoepfe standen, und mit ihm sprang der angedockte
+ * Primaerknopf beim Modulwechsel um 2px (y 12 gegen 14, in der Kueche 68 gegen
+ * 70). Die Zeile haelt jetzt die Hoehe ihres hoechsten moeglichen Inhalts
+ * (`--target-base`), also 69px in jedem Modul. Mehrzeilige Koepfe sind hoeher
+ * und bleiben unberuehrt; unter 1024px gelten die Large-Title-Regeln. */
+@media (min-width: 1024px) {
+  .page-toolbar {
+    min-block-size: calc(var(--target-base) + 2 * var(--space-3) + 1px);
+  }
+}
+
 .page-toolbar:has(> .module-seal--head) {
   --seal-head-lead: calc(var(--seal-head-size) + var(--page-toolbar-gap));
 }
@@ -2105,6 +2435,19 @@ html.fab-anim-done .page-fab {
    * 431px breit, 72px hinaus). Das Clipping von `main.app-content` macht den
    * Bruch unsichtbar, nicht harmlos. */
   min-width: 0;
+}
+
+/* Unter 1024px dockt nichts in den Slot (dockFabIntoToolbar), er bleibt in
+ * Modulen mit Tab-Zeile leer - bricht im umbrechenden Kopf aber auf eine
+ * eigene Null-Zeile und bringt deren row-gap mit: +8px Kopf in Gesundheit und
+ * Belohnungen, gemessen 375px. Das schob "Fasten beenden" unter die
+ * Glas-Tab-Leiste (test:fasting-browser, der Tipp traf den Kalender-Tab).
+ * `:empty` statt `[hidden]`: ein gefuellter Slot bleibt immer sichtbar
+ * (test:hidden-cascade). */
+@media (max-width: 1023px) {
+  .page-toolbar__actions:empty {
+    display: none;
+  }
 }
 
 /* --------------------------------------------------------
@@ -2423,6 +2766,126 @@ html.fab-anim-done .page-fab {
    * .row-carrier / historical page-measure--narrow behaviour. */
 }
 
+/* FLAECHE MIT SPALTEN (DESIGN.md, Breitenregel; Critique R16, 2026-10-05).
+ *
+ * Belohnungen, Entsorgung und Haushaltshilfe standen als reine Lesemass-Seiten
+ * linksbuendig auf 720px: bei 1280 blieben rechts 308px leer, bei 1440 468px.
+ * Wo ein Reiter breit war (Katalograster, Uebersicht der Haushaltshilfe),
+ * wechselte die Aussenkante je Reiter, und der angedockte Primaerknopf sprang
+ * mit (Belohnungen 271/431px).
+ *
+ * EINE KANTE JE MODUL: die Seite fuehrt das breite Mass (`dashboard`,
+ * `--layout-wide`), ihr Kopf endet in JEDEM Reiter dort. Der Inhalt steht in
+ * diesem Raster: die Liste links auf dem Lesemass - eine Zeilenliste wird
+ * nicht auf 1000px gestreckt -, daneben ab `--layout-split-threshold` eine
+ * Seitenspalte bis zur Modulkante. Die Listenspalte ist in jedem Reiter gleich
+ * breit, ob eine Seitenspalte daneben steht oder nicht.
+ *
+ * Unter der Schwelle steht alles einspaltig auf dem Lesemass, in
+ * Quelltextreihenfolge. `--rail-first` ist fuer Reiter, deren Zusammenfassung
+ * mobil UEBER der Liste steht (Kennzahlen vor Zeilen): die Reihenfolge im DOM
+ * bleibt, am Desktop rueckt sie in die Seitenspalte.
+ *
+ * Der Container ist die Seitenwurzel, derselbe Name wie bei Liste + Detail:
+ * beide messen die Modulflaeche neben der Seitenleiste, nicht den Viewport,
+ * und PAGE-019 haelt jede Abfrage dieses Namens an der Schwelle aus
+ * tokens.css. Baustein im Markup: `renderPageColumns()` (page-layout.js). */
+.app-page--columns {
+  container: module-surface / inline-size;
+}
+
+/* DER ABSCHNITTSTITEL ALS WEG (Critique 2026-10-05, R16). Steht ein Abschnitt
+ * als Auszug eines Reiters oder einer Ansicht da (die letzten Buchungen neben
+ * den Punktestaenden, die Folgetage neben dem Tag), ist sein Titel der Weg
+ * dorthin: Schrift und Farbe kommen vom Titel (`h2.u-section-title`), der
+ * Knopf darin traegt Ziel und Pfeil. Kein zweiter „Alle anzeigen"-Knopf, kein
+ * neuer Text.
+ *
+ * Volle Zielhoehe, ohne die Zeile hoeher zu machen als die anderen
+ * Abschnittstitel: der Ueberstand wird nach oben und unten zurueckgenommen.
+ * Stand bis R16 wortgleich als `.rw-section__more` (rewards.css) und
+ * `.day-rail__more` (calendar.css); die Modulklassen bleiben als Haken fuer
+ * die Verdrahtung. Guard: test-frontend-audit.js. */
+.section-title-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--target-base);
+  margin-block: calc((var(--target-base) - 1lh) / -2);
+  margin-inline: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.section-title-link:hover {
+  color: var(--module-accent, var(--color-accent));
+}
+
+.section-title-link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.section-title-link svg {
+  inline-size: var(--icon-md);
+  block-size: var(--icon-md);
+  color: var(--color-text-tertiary);
+}
+
+.page-columns {
+  display: grid;
+  grid-template-columns: minmax(0, var(--layout-reading));
+  /* Zwischen den Spalten steht ein fester Abstand, damit die Listenspalte in
+   * jedem Modul gleich breit ist; den Abstand der gestapelten Abschnitte
+   * bestimmt das Modul (`--page-columns-gap`), wie vor dem Raster. */
+  gap: var(--page-columns-gap, var(--space-6)) var(--space-6);
+  align-items: start;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--page-measure, none);
+}
+
+.page-columns__main,
+.page-columns__rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-columns-gap, var(--space-6));
+  min-width: 0;
+}
+
+@container module-surface (min-width: 65rem) {
+  .page-columns {
+    grid-template-columns:
+      minmax(0, var(--layout-reading))
+      minmax(var(--layout-rail-min), 1fr);
+  }
+
+  .page-columns--rail-first > .page-columns__main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .page-columns--rail-first > .page-columns__rail {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  /* Kennzahlen in der Seitenspalte sind eine Zusammenfassung neben der Liste:
+   * untereinander statt als Zeile, die in der Spalte zu schmal wuerde, und
+   * ohne das Bandpolster, damit die erste Karte mit der Liste beginnt. */
+  .page-columns__rail > .metric-grid {
+    --summary-cards: 1;
+    /* Eine Karte je Zeile traegt Title 1 (panel.css). */
+    --metric-value-size: var(--text-3xl);
+    grid-auto-rows: auto;
+    padding-block: 0;
+  }
+}
+
 /* Der Kopf hat KEIN Rail-Element (docs/PAGE-COMPOSITION.md). Titel, Mitte und
  * Aktionen sind direkte Kinder von .page-toolbar - die Large-Title-Regeln
  * (typography.css) und Siegel/Dock-Titel (`:scope > .page-toolbar__title` in
@@ -2512,6 +2975,256 @@ html.fab-anim-done .page-fab {
 }
 
 /* --------------------------------------------------------
+ * DIE BREITENREGEL: DREI REGIME (DESIGN.md „Breitenregel", 2026-09-26)
+ *
+ * Jede Seite hinter der Shell steht in genau EINEM von drei Regimen:
+ *
+ *   Lesemass       `reading` / `form`      eine Spalte, 720px (--layout-reading)
+ *   Liste + Detail `.app-page--list-detail` unter der Schwelle wie Lesemass,
+ *                  (bzw. `split`)           ab 65rem Modulflaeche Liste links,
+ *                                           Detail der Auswahl rechts
+ *   Flaeche        `full` / `dashboard`    die volle Hauptspalte
+ *
+ * Das fruehere vierte Mass (`data`, 960px - Haushaltshilfe, Inventar) war
+ * keine Entscheidung, sondern ein Zwischenstand: es liess bei 1440px 228px
+ * leer, ohne dass die Flaeche etwas trug. Keine Kernseite fuehrt es mehr;
+ * `.app-page--data` bleibt nur fuer Erweiterungs-Manifeste, die es erklaeren
+ * (PAGE-COMPOSITION.md). Guard: PAGE-017 bis PAGE-019 in test-frontend-audit.
+ * -------------------------------------------------------- */
+
+/* LISTE + DETAIL (Regime 2) - der geteilte Baustein, utils/master-detail.js.
+ *
+ * DIE ABFRAGE MISST DIE MODULFLAECHE, NICHT DEN VIEWPORT UND NICHT DIE LISTE.
+ * Die Seitenwurzel ist der Container: sie ist so breit wie die Hauptspalte
+ * neben der Seitenleiste (1220px bei 1440, 1060px bei 1280, eingeklappt
+ * 1224px). Eine Viewport-Abfrage wuesste nichts von der Seitenleiste, und ein
+ * Container auf der Liste selbst zoege das Seitenpolster ab. Benannt, damit
+ * die unbenannten Abfragen der Module nicht an ihm haengen bleiben.
+ *
+ * DIE SCHWELLE IST `--layout-split-threshold` (tokens.css). `@container` kann
+ * keine Variable lesen; PAGE-019 haelt Literal und Token gleich. */
+.app-page--list-detail {
+  container: module-surface / inline-size;
+}
+
+/* Unter der Schwelle ist der Baustein unsichtbar: die Liste steht, wie sie
+ * stand, und die Zeile oeffnet ihr Modal, Sheet oder ihren Aufklapper. Die
+ * Huelle ist eine Flex-Spalte, die den Platz des bisherigen Scrollports
+ * uebernimmt (`flex: 1; min-height: 0`) - der Port selbst wird zu
+ * `.split-view__list` und behaelt seine Klassen. */
+.split-view {
+  /* Rechte Kante der Detailspalte (siehe dort); ein Baustein in einem schon
+   * gepolsterten Koerper setzt sie auf 0. */
+  --split-view-end-pad: var(--page-inline-pad);
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.split-view__list {
+  min-width: 0;
+}
+
+.split-view__detail {
+  display: none;
+}
+
+@container module-surface (min-width: 65rem) {
+  /* Ab der Schwelle ist die Seite eine zweispaltige Flaeche: ihr Kopf laeuft
+   * ueber beide Spalten (wie die Werkzeugleiste in Mail), und alles, was sonst
+   * am Lesemass endet, endet jetzt an seiner Spalte. `100%` statt `none` aus
+   * dem Grund an `.app-page--full` (calc im Kopf). */
+  .app-page--list-detail > * {
+    --page-measure: 100%;
+  }
+
+  /* DIE SPALTEN FLUCHTEN MIT DEM KOPF. Der Kopf zieht seinen Inhalt ueber
+   * `--page-inline-pad` auf die zentrierte Content-Spalte (1280px); ab einer
+   * Modulflaeche ueber 1280 + 2 x Gutter liefe der Baustein sonst voll, und bei
+   * 1920 begann die Liste 178px links vom Siegel und das Detail endete 178px
+   * rechts der Aktionen. Gedeckelt auf Content-Spalte plus die beiden Gutter,
+   * die Liste und Detail selbst als Polster tragen: dann loest
+   * `--page-inline-pad` darin zum Gutter auf, und beide Kanten stehen unter dem
+   * Kopf. Darunter (1440: 1220px Flaeche) greift die Deckelung nicht. Seiten,
+   * deren Koerper schon polstert (Aufgaben), sind schmaler als der Deckel. */
+  .split-view {
+    display: grid;
+    grid-template-columns:
+      clamp(var(--layout-list-min), 40%, var(--layout-list-max))
+      minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    column-gap: var(--space-6);
+    inline-size: 100%;
+    max-inline-size: calc(var(--content-max-width) + 2 * var(--page-gutter));
+    margin-inline: auto;
+  }
+
+  /* Beide Spalten scrollen fuer sich - das Detail bleibt stehen, waehrend man
+   * durch die Liste geht. Voraussetzung: `.split-view` steht in einer
+   * Flex-Spalte mit fester Hoehe (Seiten mit eigenem Scrollport; Rezeptkarte
+   * in master-detail.js). */
+  .split-view__list {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .split-view__detail {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background-color: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    margin-block-end: var(--space-4);
+    /* Die Spalte endet am Seitenpolster wie der Kopf darueber. Der Baustein
+     * steht an der Stelle des Scrollports, und der ist full-bleed und polstert
+     * innen; wer ihn in einen schon gepolsterten Koerper setzt, stellt
+     * `--split-view-end-pad: 0` (gesetzt an `.split-view`). */
+    margin-inline-end: var(--split-view-end-pad);
+  }
+
+  .split-view__detail:focus-visible {
+    outline-offset: var(--focus-ring-offset-inset);
+  }
+
+  /* Die ausgewaehlte Zeile: dieselbe Flaeche wie die Aktiv-Pille der
+   * Seitenleiste - „das steht rechts". Nur in der Spaltenform; darunter gibt
+   * es keine Auswahl, nur ein Oeffnen. */
+  .split-view [data-md-id].is-selected {
+    background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), var(--color-surface));
+  }
+}
+
+/* Leerzustand: ruhig, mittig, ohne Aktion - er erklaert nur die Spalte. */
+.split-view__empty {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-6);
+}
+
+.split-view__empty[hidden],
+.split-view__detail-body[hidden] {
+  display: none;
+}
+
+.split-view__detail-body {
+  display: flex;
+  flex-direction: column;
+  /* Fuellt die Spalte, damit ein kurzes Detail seinen Fuss unten traegt. */
+  flex: 1 0 auto;
+  min-height: 0;
+}
+
+/* Der eigene Kopf der Detailspalte: Titel links, Aktionen rechts. Klebt oben,
+ * waehrend das Detail darunter scrollt. */
+.split-view__detail-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: calc(var(--target-md) + (2 * var(--space-3)));
+  padding: var(--space-3) var(--space-5);
+  background-color: var(--color-surface);
+  border-block-end: 1px solid var(--color-border-subtle);
+}
+
+/* DER INHALT UNTER DEM KOPF IST EINE EIGENE EBENE (Re-Critique 2026-09-28,
+ * A6 P1-1). Der Kopf klebt mit `z-index: 1`, und Kennzahlkarten
+ * (`.metric-card__value`, panel.css) oder die Ziffern des Zykluskalenders
+ * (`.cycle-cal__num`, health.css) heben sich mit demselben `z-index: 1` ueber
+ * ihre eigene Flaeche. Weil sie spaeter im DOM stehen, gewannen sie: beim
+ * Scrollen standen "ST" und "Gut" im Kopf "Vitalwerte", die Ziffern 14-20
+ * ueber "Zyklus". Ein hoeherer Wert am Kopf verschoebe den Streit nur zur
+ * naechsten Zahl. `isolation: isolate` an jedem Geschwister NACH dem Kopf
+ * schliesst jede Ebene darin in ihre eigene Stapelung ein - die ganze
+ * Stapelung liegt dann auf Ebene 0 unter dem Kopf, gleich welche Zahl ein
+ * Modul darin setzt. Fuer jede Split-Detailspalte, nicht nur die Gesundheit:
+ * Aufgaben, Kontakte und Rezepte setzen denselben Kopf vor ihren Inhalt. */
+.split-view__detail-head ~ * {
+  isolation: isolate;
+}
+
+.split-view__detail-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.split-view__detail-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* DER FUSS DER SPALTE KLEBT UNTEN, EINREIHIG (R10 L6, A3 P2-1). Er scrollte
+ * mit dem Inhalt: bei 1440x900 stand „Erledigen" einer einfachen Aufgabe
+ * unter der Falz. Jetzt gilt dieselbe Regel wie am Blattrand: der Kopf klebt
+ * oben, der Fuss unten, dazwischen scrollt das Detail. `margin-block-start:
+ * auto` setzt ihn bei kurzem Inhalt an die Unterkante der Spalte (die Ansicht
+ * fuellt sie, detail-view.css). Einreihig: Loeschen am Anfang, der Rest am
+ * Ende - eine Folgeaktion wie „In Maps oeffnen" gehoert in ihre Zeile, nicht
+ * hierher. */
+.split-view__detail-footer {
+  position: sticky;
+  /* Die Spalte steht nur am Desktop, wo `--nav-tail` 0 ist - der Wert haelt
+   * trotzdem die Regel der Kapsel (test:mobile-chrome, Fall 3). */
+  bottom: var(--nav-tail);
+  z-index: 1;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-start: auto;
+  padding: var(--space-3) var(--space-5);
+  background-color: var(--color-surface);
+  border-block-start: 1px solid var(--color-border-subtle);
+}
+
+.split-view__detail-footer > .btn {
+  flex-shrink: 0;
+}
+
+/* Die Spalte ist ihr eigener Container: ihre Breite, nicht das Fenster,
+ * entscheidet, ob die Fussbeschriftungen passen. */
+.split-view__detail {
+  container: detail-pane / inline-size;
+}
+
+/* Schmale Spalte (1280: 552px; Aufgaben tragen fuenf Aktionen): leise Knoepfe
+ * mit Icon zeigen nur das Icon, die Beschriftung bleibt als zugaenglicher Name
+ * (geclippt wie `.sr-only`) und als Tooltip. Der Fuss bleibt EINE Reihe; die
+ * Hauptaktion (Erledigen) und Loeschen behalten ihr Wort. */
+@container detail-pane (max-width: 40rem) {
+  .split-view__detail-footer > .btn--ghost:has(> svg, > i) > .btn__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .split-view__detail-footer > .btn--ghost:has(> svg, > i):has(> .btn__label) {
+    min-width: var(--target-md);
+    padding-inline: var(--space-2);
+  }
+}
+
+/* --------------------------------------------------------
  * DAS LESEMASS IST EINE EIGENSCHAFT DER SEITE, NICHT DES TRAEGERS
  * (Critique 2026-08-13, zweite Runde)
  *
@@ -2564,19 +3277,20 @@ html.fab-anim-done .page-fab {
  * gemacht. Was er braucht, ist ein Begriff von "Seitenblock", der Zeileninterna
  * strukturell ausschliesst - das ist eigene Arbeit, kein Anhang an einen Fix.
  * Bis dahin bleibt diese Liste eine Liste, die man von Hand pflegt. */
-/* NICHT in dieser Liste: `.list-tabs-bar` (shopping.css) und
- * `.contacts-filters` (contacts.css). Beide polstern sich selbst mit
- * `--page-inline-pad`, und bei `box-sizing: border-box` zieht dieses Polster
- * von der Kappung ab statt zu ihr zu addieren: gemessen bei 1907px blieben von
- * 720px genau 313px fuer die Chips uebrig, waehrend der Koerper darunter die
- * vollen 720px fuehrte - die Reiter brachen also mitten im Namen ab (#758).
- * Ihre Kappung steht deshalb in ihrer eigenen Datei und rechnet das Polster
- * ein. Wer hier ein Element eintraegt, das anderswo horizontal polstert, macht
- * es genauso. Guard: `die Lesemass-Liste kappt kein selbstpolsterndes Element`
- * in test/test-frontend-audit.js - er liest beide Seiten aus dem Stylesheet und
- * findet die Ueberschneidung von allein. */
+/* NICHT in diese Liste gehoert ein Element, das sich selbst horizontal mit
+ * `--page-inline-pad` polstert: bei `box-sizing: border-box` zieht dieses
+ * Polster von der Kappung ab statt zu ihr zu addieren. Gemessen bei 1907px
+ * blieben von 720px genau 313px fuer die Chips uebrig, waehrend der Koerper
+ * darunter die vollen 720px fuehrte - die Reiter brachen mitten im Namen ab
+ * (#758). Die beiden Faelle von damals (`.list-tabs-bar`, `.contacts-filters`)
+ * polstern seit der Kopfregel mobil (2026-09-26) nicht mehr selbst: die
+ * Listenleiste steht im __center-Slot des Einkaufskopfs, die Kontakt-Chips im
+ * Port, und Kontakte kappt seine Reihe in contacts.css. Wer hier ein Element
+ * eintraegt, das anderswo horizontal polstert, kappt es stattdessen in seiner
+ * eigenen Datei und rechnet das Polster ein. Guard: `die Lesemass-Liste kappt
+ * kein selbstpolsterndes Element` in test/test-frontend-audit.js - er liest
+ * beide Seiten aus dem Stylesheet und findet die Ueberschneidung von allein. */
 .page-measure--narrow :is(
-  .tasks-filters-row,
   .rewards-tabs,
   /* Die Karten der Hauswirtschaft, deren Zeilen per Bleed an ihrer Kante
    * fluchten: die Liste selbst hat keine eigene Flaeche, die Karte hat sie,
@@ -2596,7 +3310,6 @@ html.fab-anim-done .page-fab {
   .housekeeping-worker-strip
 ),
 .app-page :is(
-  .tasks-filters-row,
   .rewards-tabs,
   .housekeeping-card,
   .contact-group__header,
@@ -2638,7 +3351,7 @@ html.fab-anim-done .page-fab {
  * (gemessen 2026-07-29). Innerhalb eines nicht scrollenden Roots ist `top: 0`
  * korrekt, und die Leiste darüber kann den Kopf ohnehin nicht überlaufen.
  *
- * Nutzer: die vier Küchen-Tabs. Für health-tabs.js ebenso verwendbar. */
+ * Nutzer: die vier Küchen-Tabs. */
 .page-toolbar--in-group {
   border-top: none;
 }
@@ -2926,6 +3639,56 @@ html.fab-anim-done .page-fab {
     white-space: nowrap;
   }
 
+  /* NIE EIN KOPF OHNE ORTSANGABE (R9 M9): laesst die Bar-Zeile dem Titel
+   * keine 88px, falten angedockt ihre Kontrollen ins Werkzeugmenue
+   * (`wireCollapsingHeader` markiert sie mit `data-dock-fold` und baut die
+   * Menue-Eintraege). Die Suche und das „..." bleiben stehen. Die Zeile
+   * behaelt ihre ausgeklappte Hoehe - eine niedrigere Bar-Zeile waere die
+   * Hoehenaenderung, gegen die das negative `top` oben gewaehlt ist. */
+  .page-toolbar--stacked.page-toolbar--dock-fold.is-docked > .page-toolbar__actions > [data-dock-fold] {
+    display: none;
+  }
+
+  .page-toolbar--stacked.page-toolbar--dock-fold.is-docked > .page-toolbar__actions {
+    min-block-size: var(--dock-fold-bar-h, auto);
+  }
+
+  /* DAS BAND (R11 H1): wo auch nichts falten kann - die Bar-Zeile ist eine
+   * Tab-Leiste ueber die ganze Breite (Schichtplan, Haushaltshilfe,
+   * Belohnungen) -, klebt der Kopf um die Hoehe des angedockten Titels tiefer
+   * (`--dock-band-h`, gemessen von `wireCollapsingHeader`). Im so sichtbaren
+   * untersten Streifen der Lead-Zone steht angedockt der Titel, absolut und
+   * damit ohne eigene Zeile; die Lead-Zone selbst blendet aus. Hoehe und
+   * Klebekante haengen nicht am Andock-Zustand - nichts kann pendeln.
+   * Ausgeklappt ist der Titel gerendert, aber unsichtbar: nur so ist er
+   * messbar, bevor er gebraucht wird. */
+  .page-toolbar--stacked.page-toolbar--dock-band {
+    top: calc(-1 * (var(--page-toolbar-lead, 0px) - var(--dock-band-h, 0px)));
+  }
+
+  .page-toolbar--stacked.page-toolbar--dock-band > .page-toolbar__dock-title {
+    display: block;
+    position: absolute;
+    inset-block-start: calc(var(--page-toolbar-lead, 0px) - var(--dock-band-h, 0px) + var(--dock-band-pad, 0px));
+    inset-inline: var(--page-inline-pad);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .page-toolbar--stacked.page-toolbar--dock-band.is-docked > .page-toolbar__dock-title {
+    visibility: visible;
+  }
+
+  /* Opazitaet statt `visibility`: der Large Title bleibt die Ueberschrift der
+   * Seite im Baum; er ist angedockt nur nicht zu sehen. */
+  .page-toolbar--stacked.page-toolbar--dock-band.is-docked > [data-dock-lead] {
+    opacity: 0;
+    pointer-events: none;
+  }
+
   /* Die Trennlinie erscheint erst, wenn die Leiste angedockt ist - am
    * Scroll-Anfang steht der Large Title nahtlos auf dem Seitengrund.
    * `--stacked` setzt der Helfer nur, wenn es überhaupt eine Lead-Zone gibt;
@@ -2960,14 +3723,251 @@ html.fab-anim-done .page-fab {
     display: none;
   }
 
-  .page-toolbar--capped > .page-toolbar__title {
-    transition: font-size var(--duration-sm) var(--ease-out);
+  /* KEINE `font-size`-TRANSITION AM TITEL (R16, Bewegung). Hier stand eine:
+   * sie animierte Layout - jeder Frame brach die Titelzeile neu um und schob
+   * den Port darunter, im klebenden Kopf, waehrend gescrollt wird. Ein
+   * `transform: scale()` an ihrer Stelle traegt nicht: der Platz der Zeile
+   * wechselt mit (`flex-basis` oben), der Titel liefe waehrend der Skalierung
+   * ueber seine Nachbarn. Der Groessenwechsel faellt deshalb in EINEN Frame. */
+}
+
+/* EIN KOPF MIT ZEITRAUM KLAPPT DIE TITELZEILE GANZ EIN (Kalender-Critique
+ * 2026-09-24, P1; Budget-Critique 2026-09-25; DESIGN.md, Die Chrome-Regel).
+ *
+ * `--period` traegt ein Kopf, dessen Center-Slot den Zeitraum der Seite fuehrt
+ * (Kalender: Tag/Woche/Monat, Budget: Monat). Dort beantwortet der Zeitraum
+ * mit Vor/Zurueck beim Scrollen weiter „wo bin ich", die Tab-Leiste darunter
+ * den Modulnamen - der Large Title hat eingeklappt nichts mehr zu sagen, was
+ * nicht schon dasteht. Fiel er nur auf den Inline-Schnitt, blieb er auf seiner
+ * eigenen Zeile, weil der Zeitraum mobil die ganze Zeile fuellt: der Kollaps
+ * sparte im Kalender 5-14px, im Budget 14px (170 -> 156px).
+ *
+ * Eingeklappt verlaesst der Titel deshalb das Bild, nicht den Baum: das <h1>
+ * bleibt die Seitenueberschrift fuer Screenreader, geclippt wie `.sr-only`.
+ * Das Siegel geht mit. Koepfe ohne Zeitraum (Notizen, Kontakte) behalten den
+ * Inline-Schnitt - bei ihnen verankert nichts anderes die Seite. */
+@media (max-width: 1023px) {
+  .page-toolbar--period.page-toolbar--capped.is-collapsed > .page-toolbar__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .page-toolbar--period.page-toolbar--capped.is-collapsed > .module-seal--head {
+    display: none;
+  }
+}
+
+/* DIE FALTZEILE (R17 K1, Re-Critique 2026-09-28 A4 P2-4 / A8 P3-2).
+ *
+ * Unter der Kuechen-Leiste traegt der Kopf von Rezepte und Vorrat mobil nur
+ * Werkzeuge - Lupe, "..." -, und kostete dafuer 65px ueber der Liste.
+ * `wireCollapsingHeader` (utils/ux.js) erkennt eine solche Zeile
+ * (`--fold-row`: Gruppen-Variante, einzeilig, ohne Titel, im Center-Slot
+ * nur die Suche) und haengt sie an dieselbe Schwelle und Klasse wie den Kopf
+ * der gedeckelten Module: angedockt (`is-collapsed`) gibt sie ihre Hoehe
+ * frei, zurueck oben kommt sie wieder. Mahlzeiten und Einkauf benennen in
+ * ihrer Zeile etwas (Woche, Liste) und falten nicht.
+ *
+ * WIE SIE FALTET: nicht ueber ihre Hoehe. Eine Hoehe, die nach `auto`
+ * zurueckgleiten soll, braucht `interpolate-size`, und das kann Safari nicht -
+ * auf dem iPhone waere es ein Sprung. Stattdessen bleibt die Box gleich
+ * gross: der negative Rand unten zieht die Liste um die gemessene Hoehe
+ * (`--fold-row-h`, ohne die Linie) nach oben, und dieselbe Strecke schiebt
+ * die Zeile hinter die Leiste, wo die Seite (overflow hidden) sie abschneidet.
+ * Beides sind Laengen und gleiten ueberall. Uebrig bleibt ihre Linie, genau
+ * unter der Leiste - die Kante des angedockten Kopfes. Der ResizeObserver des
+ * Kopfes sieht keinen Groessenwechsel, also auch keine neue Messung.
+ *
+ * WANN SIE STEHEN BLEIBT: mit Fokus darin (wer per Tab hineinkommt, bekommt
+ * die Zeile zurueck), mit einem Suchbegriff und mit offenem Werkzeugmenue -
+ * dieselben Ausnahmen wie die Suche der gedeckelten Koepfe oben. */
+@media (max-width: 1023px) {
+  .page-toolbar--fold-row {
+    transition:
+      margin-block-end var(--duration-lg) var(--ease-in-out),
+      translate var(--duration-lg) var(--ease-in-out);
+  }
+
+  .page-toolbar--fold-row > * {
+    transition: opacity var(--duration-md) var(--ease-out);
+  }
+
+  .page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(:popover-open)) {
+    margin-block-end: calc(-1 * var(--fold-row-h, 0px));
+    translate: 0 calc(-1 * var(--fold-row-h, 0px));
+    pointer-events: none;
+  }
+
+  /* Die Blende gehoert dem Inhalt, nicht der Zeile: deren Linie bleibt. */
+  .page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(:popover-open)) > * {
+    opacity: 0;
   }
 }
 
 @media (max-width: 1023px) and (prefers-reduced-motion: reduce) {
-  .page-toolbar--capped > .page-toolbar__title {
+  .page-toolbar--fold-row,
+  .page-toolbar--fold-row > * {
     transition: none;
+  }
+}
+
+/* Mobil liegen Titel, Zeitraum und Bar-Zeile mit halbem Zeilenabstand
+ * uebereinander: Zeitraum und Tab-Leiste bringen ihre Luft in 48px-
+ * Trefferflaechen mit, der Large Title in seiner Zeilenhoehe. Selektorform der
+ * Large-Title-Regel oben plus die Modifier-Klasse - mit blossem
+ * `.page-toolbar--period` verlor der Wert still gegen 0,3,0. */
+@media (max-width: 767px) {
+  .page-toolbar.page-toolbar--period:not(.page-toolbar--in-group):has(> .page-toolbar__title) {
+    row-gap: var(--space-1);
+  }
+}
+
+/* DER ZEITRAUM STEHT IN DER TITELZEILE (R16, Critique 2026-10-05 P1 mobil).
+ *
+ * `--period-inline` traegt ein Kopf, dessen Zeile 2 schon die Sub-Tabs fuehrt
+ * und der dazu einen Zeitraum blaettert (Budget). Bis R16 war das die benannte
+ * Ausnahme mit DREI Kopfzeilen (162px bei 390px): Titel, Stepper, Tab-Leiste -
+ * und auf vier von sieben Reitern trug die Stepperzeile nur eine
+ * Bildunterschrift. Jetzt teilen sich Titel und Zeitraum Zeile 1: der Titel
+ * gibt nach (Basis 0, Ellipse), der Stepper steht am Zeilenende und gibt nie
+ * nach. Der Kopf misst damit auf JEDEM Reiter dasselbe, ob der Slot einen
+ * Stepper oder die Notiz traegt (Budget 162 -> 117px).
+ *
+ * DER RUECKSPRUNG LIEGT HIER AUF DEM WERT (R16 Schritt 2b). Zuerst stand er per
+ * `order` links vom Stepper und nahm sich den Platz vom Titel: solange
+ * "Aktuell" stand, war "Budget" aus dem Bild. Jetzt ist der Wert selbst das
+ * Ziel: der Reset-Knopf (utils/period-stepper.js, `.period-stepper__reset`)
+ * liegt durchsichtig ueber dem Monatslabel, ein Tipp darauf springt zum
+ * laufenden Zeitraum. Er bleibt ein Knopf mit seinem Namen ("Aktuell") an
+ * seiner Stelle in der Tab-Folge - hinter dem Weiter-Pfeil -, und sein
+ * Fokusring umschliesst das Label. Dass man NEBEN dem laufenden Zeitraum
+ * steht, sagt der Wert im Modulton (`.period-stepper__value--away`). Kein
+ * Pfeil bewegt sich, und der Titel bleibt stehen.
+ *
+ * EINGEKLAPPT BLEIBT DER TITEL STEHEN: er teilt die Zeile mit dem Stepper,
+ * sein Verschwinden sparte keine Hoehe mehr. Er faellt nur auf den
+ * Inline-Schnitt (typography.css). */
+@media (max-width: 767px) {
+  .page-toolbar.page-toolbar--period-inline:not(.page-toolbar--in-group) > .page-toolbar__title {
+    flex: 1 1 0;
+    min-width: 0;
+    /* Die Zeile ist eine Zeile: ein langer Titel (es „Recogida de basura")
+     * kuerzt mit Ellipse, er bricht nicht um - sonst wuechse der Kopf mit der
+     * Sprache. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .page-toolbar.page-toolbar--period-inline.page-toolbar--wrap:not(.page-toolbar--in-group) > .page-toolbar__center {
+    flex: 0 0 auto;
+    min-width: 0;
+    margin-inline: auto 0;
+    gap: 0;
+  }
+
+  .page-toolbar--period-inline > .page-toolbar__center {
+    position: relative;
+  }
+
+  .page-toolbar--period-inline > .page-toolbar__center > .period-stepper__reset.is-current {
+    display: none;
+  }
+
+  /* Zwischen den beiden Pfeilen (je ein volles Ziel breit), ueber dem Wert. */
+  .page-toolbar--period-inline > .page-toolbar__center > .period-stepper__reset {
+    position: absolute;
+    inset-block: 0;
+    inset-inline: var(--target-base);
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    color: transparent;
+  }
+
+  .page-toolbar--period-inline > .page-toolbar__center > .period-stepper__value--away {
+    color: var(--module-accent);
+  }
+
+  .page-toolbar.page-toolbar--period-inline.page-toolbar--capped.is-collapsed > .page-toolbar__title {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+  }
+
+  .page-toolbar.page-toolbar--period-inline.page-toolbar--capped.is-collapsed > .module-seal--head {
+    display: inline-flex;
+  }
+
+}
+
+/* WERKZEUGE IN DER TITELZEILE (R16, Critique 2026-10-05 P1 mobil; DESIGN.md,
+ * Kopfregel mobil 1a).
+ *
+ * Traegt die Werkzeugzeile eines Kopfs hoechstens ZWEI Icon-Knoepfe (Such-Icon,
+ * „...") und weder Segment noch Stepper noch Tab-Leiste, ist sie keine Zeile
+ * wert: Kontakte, Geburtstage, Entsorgung und die Einstellungen zahlten 48 bis
+ * 57px fuer ein bis zwei Icons am linken Rand. `--title-tools` stellt sie ans
+ * Ende der Titelzeile (114 -> 65px). Der Titel gibt nach (Basis 0, Ellipse),
+ * die Knoepfe nie - sie haben kein Label zum Anschneiden.
+ *
+ * DER KOPF IST DAMIT EINZEILIG: keine Lead-Zone, nichts dockt an oder klappt
+ * ein, Hoehe und Klebekante sind in jedem Scrollstand dieselben, und die
+ * Linie steht durchgehend (wie in den Kuechen-Koepfen). R11 hatte die
+ * Werkzeuge aus genau dieser Zeile genommen, weil sie angedockt „mit dem
+ * Titel aus dem Bild gewandert" waeren - das galt fuer einen Kopf, dessen
+ * Titelzeile wegscrollt. Dieser hier hat nur die eine und behaelt sie.
+ *
+ * DIE OFFENE SUCHE NIMMT DIE ZEILE: mit Fokus oder Begriff ist sie das, was
+ * der Nutzer gerade tut. Der Titel verlaesst dafuer das Bild (nicht den
+ * Baum); das Siegel bleibt als Ortsangabe.
+ *
+ * Die Klasse ist markiert, nicht geraten, und `test:mobile-chrome` laesst sie
+ * nur in einem Kopf durch, der keine Bar-Zeile, keine Tab-Leiste und kein
+ * Segment traegt. */
+@media (max-width: 767px) {
+  .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group) > .page-toolbar__title {
+    flex: 1 1 0;
+    min-width: 0;
+    /* Die Zeile ist eine Zeile: ein langer Titel (es „Recogida de basura")
+     * kuerzt mit Ellipse, er bricht nicht um - sonst wuechse der Kopf mit der
+     * Sprache. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group) > .page-toolbar__center {
+    order: 0;
+  }
+
+  .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group) > .page-search:is(:focus-within, :has(input:not(:placeholder-shown))) {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group):has(> .page-search:focus-within) > .page-toolbar__title,
+  .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group):has(> .page-search input:not(:placeholder-shown)) > .page-toolbar__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group) > .page-toolbar__actions {
+    flex: 0 0 auto;
   }
 }
 
@@ -3076,8 +4076,26 @@ html.fab-anim-done .page-fab {
  *
  * Die Media-Liste nennt beide Faelle EINMAL, statt den Block zu verdoppeln:
  * eine zweite Kopie waere die zweite Handschrift derselben Regel.
+ *
+ * DIE GRENZE IST 768, NICHT 640 (Kopfregel mobil, 2026-09-26): die Regel
+ * gilt fuer jeden Modulkopf der kompakten Klasse unter --bp-tablet, und
+ * zwischen 640 und 767px stand das volle Feld neben Titel und Aktionen und
+ * brach den Kopf in eine dritte Zeile.
+ *
+ * UND SIE FRAGT NACH DEM KOPF, NICHT NACH DEM ELTERNTEIL. Hier stand
+ * `.page-toolbar > .page-search`: eine Suche in einem Wrapper-Slot
+ * (`div.page-toolbar__center` im Inventar) blieb damit ein 248px-Feld und
+ * baute die dritte Zeile (A6 P1-1). Der bevorzugte Weg bleibt, die Suche
+ * SELBST zum Slot zu machen (`renderPageSearch({ className: '...
+ * page-toolbar__center' })`); ein Wrapper, der nur die Suche traegt,
+ * schrumpft unten mit ihr.
+ *
+ * `.section-toolbar` ist derselbe Fall eine Ebene tiefer: der Kopf eines
+ * Abschnitts, der eine Suche NUR fuer diesen Abschnitt traegt (das Hauptbuch
+ * im Budget, R11 C6). Er ist kein Seitenkopf (kein Kleben, kein Large
+ * Title), aber sein Feld kostet mobil dieselbe Zeile - also dieselbe Form.
  * -------------------------------------------------------- */
-@media (max-width: 639px), (max-width: 1023px) and (max-height: 499px) {
+@media (max-width: 767px), (max-width: 1023px) and (max-height: 499px) {
   /* Die Bauart ist die Label-Verlust-Regel: ein Bedienelement, dem der Platz
    * ausgeht, wird zum Einstieg seiner Familie und behaelt --target-base. Kein
    * neues Markup und kein JS - `.page-search` IST ein `<label for>`, ein Klick
@@ -3088,7 +4106,8 @@ html.fab-anim-done .page-fab {
    * die einem beim Scrollen der eigenen Treffer unter den Haenden
    * verschwindet, waere der falsche Gehorsam gegenueber der Regel. Also nur
    * ohne Fokus UND ohne Wert. */
-  .page-toolbar > .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) {
+  .page-toolbar .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))),
+  .section-toolbar .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) {
     flex: 0 0 auto;
     width: var(--target-base);
     max-width: var(--target-base);
@@ -3102,7 +4121,10 @@ html.fab-anim-done .page-fab {
   }
 
   .page-toolbar
-    > .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search__input,
+  .section-toolbar
+    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
     .page-search__input {
     padding-inline: 0;
     /* Der Text ist leer (kein Wert, sonst griffe die Regel nicht), unsichtbar
@@ -3119,7 +4141,10 @@ html.fab-anim-done .page-fab {
   }
 
   .page-toolbar
-    > .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search__input::placeholder,
+  .section-toolbar
+    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
     .page-search__input::placeholder {
     color: transparent;
   }
@@ -3134,16 +4159,32 @@ html.fab-anim-done .page-fab {
    * `inset-inline: 0` plus `margin-inline: auto` zentriert in beiden
    * Richtungen und braucht die X-Achse des Translates gar nicht. */
   .page-toolbar
-    > .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search__icon,
+  .section-toolbar
+    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
     .page-search__icon {
     inset-inline: 0;
     margin-inline: auto;
     transform: translateY(-50%);
   }
 
+  /* Ein Slot, der NUR die Suche traegt, gibt ihre Breite mit ab - sonst
+   * stuende das Icon in einem leeren, flex-wachsenden Kasten. Dieselbe
+   * Bedingung wie oben (ohne Fokus, ohne Wert), aber ohne `:has()` im
+   * `:has()`: verschachtelt ist der Selektor ungueltig, und der Browser
+   * verwirft die ganze Regel lautlos. */
+  .page-toolbar > :not(.page-search):not(:focus-within):has(> .page-search:only-child input:placeholder-shown) {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+  }
+
   /* Im aufgeklappten Zustand nimmt die Suche die Zeile, die sie braucht - sie
    * ist dann das, was der Nutzer gerade tut. */
-  .page-toolbar > .page-search:focus-within {
+  .page-toolbar .page-search:focus-within,
+  .section-toolbar .page-search:focus-within {
     flex: 1 1 auto;
   }
 }
@@ -3268,12 +4309,11 @@ html.fab-anim-done .page-fab {
  * darunter „Liste löschen" für die Liste des ganzen Haushalts (Critique
  * 2026-07-30).
  *
- * Diese Grammatik existiert im Repo bereits zweimal privat:
- * `.contact-more-menu__panel` + `.contact-menu-item` (contacts.css) und
- * `.documents-context-menu` + `__item` (documents.css). Beide sind bis auf die
- * Klassennamen deckungsgleich mit dem hier. Sie sind bewusst nicht mitmigriert -
- * der Auftrag war die Küche, und zwei fremde Module umzustellen ist ein eigener
- * Schritt. Wer ihn geht, löscht dort rund 60 Zeilen und ändert hier nichts.
+ * Diese Grammatik existierte im Repo zweimal privat. Das Zeilenmenü der
+ * Kontakte ist seit R16 (Re-Critique 2026-09-28) hierher umgezogen; übrig ist
+ * `.documents-context-menu` + `__item` (documents.css), bis auf die
+ * Klassennamen deckungsgleich mit dem hier. Wer es nachzieht, löscht dort die
+ * private Kopie und ändert hier nichts.
  * -------------------------------------------------------- */
 
 /* `display: none` als Grundzustand, `flex` erst bei :popover-open: das UA-Blatt
@@ -3295,13 +4335,49 @@ html.fab-anim-done .page-fab {
   background-color: var(--color-surface);
   box-shadow: var(--shadow-md);
   /* Die Position rechnet JS erst im `toggle`-Ereignis; ohne die Startopazität
-   * blitzt das Panel eine Frame lang oben links auf. */
+   * blitzt das Panel eine Frame lang oben links auf.
+   *
+   * DAS MENUE WAECHST VOM AUSLOESER AUS (R14, A1 P3-4), statt nur
+   * einzublenden: Startgroesse 96 % und Blende, der Ursprung ist die Ecke am
+   * Ausloeser (utils/popover-menu.js setzt `transform-origin` mit der
+   * Position und `transform: none` beim Oeffnen). Kein @starting-style: das
+   * Oeffnen laeuft ohnehin ueber die zwei Werte, die JS nach der Rechnung
+   * setzt, und so wirkt es auch dort, wo @starting-style fehlt.
+   *
+   * DER AUSGANG STEHT HIER, DIE EINFAHRT AN `:popover-open` (R16). Das Menue
+   * hatte keinen: mit dem Schliessen setzt das UA-Blatt `display: none`, und
+   * es war weg. `overlay` und `display` gehen jetzt diskret mit
+   * (`allow-discrete`, das Muster des Datepickers): das Panel bleibt fuer die
+   * Dauer des Ausgangs im Top-Layer, blendet aus und nimmt die 4 % zurueck.
+   * Der Ausgang ist kuerzer als die Einfahrt (--duration-xs gegen
+   * --duration-md) und nimmt keinen Zeiger mehr.
+   *
+   * ZWEI DEKLARATIONEN, UND DIE REIHENFOLGE IST DER RUECKFALL: ein Browser
+   * ohne `allow-discrete` verwirft die zweite als Ganzes und behaelt die
+   * erste - dort schliesst das Menue hart wie bisher, die Einfahrt bleibt. */
+  transform: scale(0.96);
+  transition:
+    opacity var(--duration-xs) var(--ease-out),
+    transform var(--duration-xs) var(--ease-out);
+  transition:
+    opacity var(--duration-xs) var(--ease-out),
+    transform var(--duration-xs) var(--ease-out),
+    overlay var(--duration-xs) allow-discrete,
+    display var(--duration-xs) allow-discrete;
+}
+
+/* Ziel des Ausgangs. Offen setzt utils/popover-menu.js die Deckkraft inline
+ * (0 vor der Positionsrechnung, 1 danach) und raeumt sie beim Schliessen. */
+.popover-menu:not(:popover-open) {
   opacity: 0;
-  transition: opacity var(--transition-fast);
+  pointer-events: none;
 }
 
 .popover-menu:popover-open {
   display: flex;
+  transition:
+    opacity var(--duration-md) var(--ease-out),
+    transform var(--duration-md) var(--ease-out);
 }
 
 /* Icon UND Textlabel, immer. Das ist der ganze Zweck des Menüs: die drei
@@ -3326,10 +4402,24 @@ html.fab-anim-done .page-fab {
   transition: background-color var(--transition-fast);
 }
 
+/* `display: flex` oben schlaegt das UA-`[hidden]`. Menues blenden Eintraege
+ * nach Zustand aus (Aufgaben: Ablegen und Tags nur waehrend der Auswahl;
+ * Dokumente: „Alle auswaehlen" und Archivieren, R11 H4) - ohne diese Regel
+ * standen sie immer da. */
+.popover-menu__item[hidden] {
+  display: none;
+}
+
 @media (hover: none) {
   .popover-menu__item {
     min-height: var(--target-lg);
   }
+}
+
+/* Ein Eintrag darf ein Link sein (Budget: CSV-Export) - dann ohne Unterstrich,
+ * sonst sieht er anders aus als seine Knopf-Nachbarn. */
+a.popover-menu__item {
+  text-decoration: none;
 }
 
 .popover-menu__item:hover,
@@ -3364,54 +4454,241 @@ html.fab-anim-done .page-fab {
   visibility: hidden;
 }
 
+/* Gruppen mit Ueberschrift und Trenner - fuer ein Menue, das mehr als eine
+ * Frage stellt (Dokumente: Sortierung, Richtung, Auswahl; Critique
+ * 2026-09-25). Die Ueberschrift ist kein Eintrag: sie traegt keine
+ * `.popover-menu__item`-Klasse und faellt damit aus Pfeiltasten und Fokus
+ * heraus; die Gruppe verweist per `aria-labelledby` auf sie. */
+.popover-menu__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0h);
+}
+
+.popover-menu__label {
+  padding: var(--space-1) var(--space-3) 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.popover-menu__separator {
+  height: 1px;
+  margin: var(--space-1) var(--space-2);
+  background: var(--color-border);
+}
+
+/* Ein Zeichen am Zeilenende (etwa die Richtungspfeile), rechtsbuendig. */
+.popover-menu__item-trail {
+  margin-inline-start: auto;
+}
+
+/* Reduzierte Bewegung: kein Wachsen, nur die Blende - sie bewegt nichts. Der
+ * Ausgang entfaellt (ohne `display` in der Liste schliesst das Menue sofort). */
 @media (prefers-reduced-motion: reduce) {
-  .popover-menu,
+  .popover-menu {
+    transform: none;
+    transition: opacity var(--duration-md) var(--ease-out);
+  }
+
+  .popover-menu:popover-open {
+    transition-property: opacity;
+  }
+
   .popover-menu__item {
     transition: none;
   }
 }
 
-/* Toolbar-"Neu"-Buttons: auf dem Handy übernimmt der FAB, auf dem Desktop der
- * Knopf in der Werkzeugleiste.
+/* --------------------------------------------------------
+ * KOPFREGEL MOBIL - DIE GETEILTEN BAUSTEINE (2026-09-26)
  *
- * DIE MECHANIK WAR GEBAUT UND ABGESCHALTET. Fünf Module (Aufgaben, Notizen,
- * Kontakte, Budget, Kalender) tragen ihren Toolbar-Knopf seit jeher im Markup;
- * hier stand nur `display: none` für alle. Auf einem Zeigergerät ist ein
- * beschrifteter Knopf im Kopf der bessere Ort als ein schwebender Kreis über
- * dem Inhalt - Platz ist da, und der Kreis verdeckt die letzte Zeile.
+ * Die Regel steht in DESIGN.md („Kopfregel mobil"): hoechstens zwei
+ * Kopfzeilen, keine losen Verwaltungs-Icons, Filter nicht fest ueber dem
+ * Port, Suche als Icon, Inhalt unter der Kapsel. Was die Module dafuer
+ * brauchen, steht hier und nicht im Modul-Stylesheet - der Router laedt je
+ * Seite genau eines, und eine Form, deren Regeln dort wohnen, gilt nur in
+ * diesem einen Modul (Lehre von `.toggle-row`, oben).
  *
- * Gemeinsame Klasse statt ID-Liste (Audit 1.9): neue Module ergänzen nur die
- * Klasse an ihrem Toolbar-Button, statt diesen Selektor erweitern zu müssen. */
-.toolbar-new-btn {
-  display: none !important;
+ *   `.page-tools-btn`  das EINE Werkzeugmenue („..."), utils/popover-menu.js
+ *                      `pageToolsMenuHtml()`. Braucht keine eigene Geometrie:
+ *                      `.btn--secondary.btn--icon` wie `documents-tools-btn`.
+ *   `.page-filter-btn` „Filter (n)", utils/filter-sheet.js. Vorbild ist der
+ *                      Filterknopf des Kalenders (calendar.css).
+ *   `.filter-sheet`    das Blatt dazu: benannte Gruppen.
+ *   `.page-chip-row`   eine Chipreihe IM Scrollport - sie scrollt mit weg.
+ * -------------------------------------------------------- */
+
+/* Der aktive Knopf traegt den Modulton als Tinte; die Zahl ist der Zustand
+ * (Begruendung am Kalender-Vorbild). */
+.page-filter-btn {
+  position: relative;
 }
 
+.page-filter-btn--active {
+  color: var(--module-accent, var(--color-accent));
+}
+
+.page-filter-btn--labeled {
+  gap: var(--space-1);
+}
+
+.page-filter-btn__count {
+  position: absolute;
+  top: var(--space-1);
+  inset-inline-end: var(--space-1);
+  min-width: var(--space-4);
+  height: var(--space-4);
+  padding-inline: var(--space-0h);
+  border-radius: var(--radius-full);
+  background: var(--module-accent, var(--color-accent));
+  color: var(--color-ink-on-vivid);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--space-4);
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Mit Wort steht die Zahl IN der Zeile statt als Ecke - eine Ecke ueber
+ * Text liest sich als Fussnote, nicht als Zustand. */
+.page-filter-btn--labeled .page-filter-btn__count {
+  position: static;
+}
+
+.page-filter-btn__count[hidden] {
+  display: none;
+}
+
+.filter-sheet__group + .filter-sheet__group {
+  margin-top: var(--space-5);
+}
+
+.filter-sheet__heading {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  margin: 0 0 var(--space-2);
+}
+
+/* Eingeklappte Achse (R16): lange, seltene Gruppen - Kategorie, Tag - stehen
+ * als Aufklapper da, bis darin etwas gewaehlt ist. Die Zeile ist das Ziel
+ * (--target-base), die Ueberschrift behaelt ihre Rolle und ihr Aussehen. */
+.filter-sheet__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--target-base);
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--radius-sm);
+}
+
+.filter-sheet__summary::-webkit-details-marker {
+  display: none;
+}
+
+.filter-sheet__summary .filter-sheet__heading {
+  margin: 0;
+}
+
+.filter-sheet__chevron {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+  /* Dasselbe Tempo wie jeder Aufklapp-Winkel (list-row.css); er sprang hier. */
+  transition: transform var(--duration-lg) var(--ease-in-out);
+}
+
+.filter-sheet__fold[open] > .filter-sheet__summary .filter-sheet__chevron {
+  transform: rotate(180deg);
+}
+
+.filter-sheet__fold[open] > .filter-sheet__summary {
+  margin-bottom: var(--space-1);
+}
+
+/* Ansichtsoptionen, abgesetzt: sie filtern nicht, sie ordnen und weiten. Eine
+ * Haarlinie und mehr Luft trennen sie von den Achsen darueber. */
+.filter-sheet__group--view {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.filter-sheet__group--view > * + * {
+  margin-top: var(--space-3);
+}
+
+/* DIE CHIPREIHE IM SCROLLPORT.
+ *
+ * Sie ist das ERSTE Kind des `.page-scrollport` (oder, wo die Seite selbst
+ * scrollt, das erste Kind nach dem Kopf) und scrollt senkrecht mit dem
+ * Inhalt weg - Apples Suchleiste in einer Liste. Fest ueber dem Port kostete
+ * sie in Notizen, Kontakten und Vorrat dauerhaft 60-65px, die kein
+ * Kopf-Kollaps zurueckholte (A8). Deshalb hier bewusst KEIN `position:
+ * sticky`: eine klebende Reihe waere dieselbe feste Zeile mit einem Umweg,
+ * und der Guard (test:mobile-chrome) sagt nein dazu.
+ *
+ * Waagerecht scrollt sie selbst; `wireScrollFade(row)` (utils/ux.js) setzt
+ * die Fade-Klassen aus filter-chip.css. Der Kopf-Kollaps ignoriert ihren
+ * waagerechten Scroll (ux.js `onInnerScroll`: kein senkrechter Ueberlauf,
+ * also nicht der Port der Seite). Seitenrand: keiner - sie steht in der
+ * Inhaltsspalte ihres Ports, die das Polster schon traegt (#577, genau
+ * einmal pro Ahnenkette). */
+.page-chip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  /* Luft fuer den Fokusring: ein waagerechter Scroller clippt senkrecht mit. */
+  padding-block: var(--space-2);
+  /* DIE HOEHE STEHT ALS ZAHL, weil ein Port auch ein Grid sein kann, das hoeher
+   * waechst als er selbst (`.list-scroller`, Vorrat): eine Spur ohne Groesse
+   * bekommt dort nur den Mindestbeitrag ihres Elements, und der ist bei einem
+   * Scroll-Container (die Reihe scrollt waagerecht) NULL. Gemessen stand die
+   * Reihe 16px hoch - nur ihr Polster -, die Chips ragten in die erste Gruppe;
+   * `min-content`/`fit-content` aendern daran in Chrome nichts. Chiphoehe
+   * (`.filter-chip`, filter-chip.css) plus Polster schon. `flex-shrink: 0`
+   * gilt fuer Ports, die Flex-Spalten sind. */
+  flex-shrink: 0;
+  min-height: calc(var(--target-lg) + 2 * var(--space-2));
+}
+
+/* Dieselben Stufen wie `.filter-chip` im Querformat (filter-chip.css): die
+ * Reihe folgt ihrer Chiphoehe, sonst stuende im flachen Fenster ein leerer
+ * Streifen unter den Chips. */
+@media (max-height: 499px) {
+  .page-chip-row {
+    min-height: calc(var(--target-md) + 2 * var(--space-2));
+  }
+}
+
+@media (max-height: 499px) and (hover: none) {
+  .page-chip-row {
+    min-height: calc(var(--target-base) + 2 * var(--space-2));
+  }
+}
+
+.page-chip-row::-webkit-scrollbar {
+  display: none;
+}
+
+.page-chip-row > * {
+  flex-shrink: 0;
+}
+
+/* Anlegen im Kopf: auf dem Handy schwebt der FAB, auf dem Zeigergerät dockt
+ * die Shell DENSELBEN Knopf in `.page-toolbar__actions` (dockFabIntoToolbar in
+ * router.js). Einen eigenen Kopfknopf je Modul gibt es seit Runde 7 nicht mehr
+ * (D3, `toolbar-new-btn` im Ratchet von test-control-dialect.js steht auf 0):
+ * zwei Wege zur selben Aktion brauchten eine Weiche, die entscheidet, wer
+ * gewinnt, und eine Nur-lesen-Regel für jeden der beiden. */
 @media (min-width: 1024px) {
-  /* `:not([hidden])` ist Pflicht: mehrere Module blenden ihren Kopf samt
-   * Aktionen aus (die Einkaufsliste ohne aktive Liste), und ein
-   * `display !important` schlüge das UA-`[hidden]`. */
-  .toolbar-new-btn:not([hidden]) {
-    display: inline-flex !important;
-  }
-
-  /* Wo ein beschrifteter Knopf steht, schwebt keiner mehr. `:has()` fragt das
-   * am Dokument, weil beide in verschiedenen Teilbäumen leben: der Knopf im
-   * Modulkopf, der FAB seit #634 in der Shell-Layer. */
-  body:has(.toolbar-new-btn:not([hidden])) #fab-layer .page-fab {
-    display: none;
-  }
-
-  /* UND WER IHN VERSTECKT, NIMMT IHM SEINEN NACHLAUF (Etappe 6, 2026-08-13).
-   * Gemessen bei 1440x900: /tasks, /calendar, /contacts, /budget und /notes
-   * reservierten 96px am Scroll-Ende für einen Knopf mit 0x0 Fläche, /shopping
-   * 156 statt 60. Die Nachlauf-Regel oben fragt `.page-fab:not([hidden])` - das
-   * ist ein STELLVERTRETER für „hier schwebt ein Knopf über dem Scrollport",
-   * und er wird falsch, sobald CSS statt der Seite versteckt.
-   * `[hidden]` braucht diese Paarung nicht: das steht schon im Selektor. */
-  body:has(.toolbar-new-btn:not([hidden])) {
-    --fab-safe-zone: 0px;
-  }
-
   /* Der angedockte FAB IST der Toolbar-Knopf (siehe dockFabIntoToolbar in
    * router.js): dieselbe Node, dieselbe Verdrahtung, nur ohne die schwebende
    * Geometrie. Die Kapsel und die Stimme kommen von `.btn--primary`. */
@@ -3535,7 +4812,10 @@ p.field-hint--warn[hidden] {
     border-right: 1px solid var(--color-border-subtle);
     flex-direction: column;
     z-index: var(--z-nav);
-    padding: var(--space-4) 0 var(--space-4);
+    /* 12px statt 16px oben und unten: die Leiste muss auf 1280x800 alle Module
+     * ohne Scrollen zeigen (Critique 2026-09-26, P1-2, Rechnung an
+     * --sidebar-row-height in tokens.css). */
+    padding: var(--space-3) 0;
     /* Bewusste Layout-Transition (Detector layout-transition, geprüft):
      * der Collapse ändert echte Inhaltsbreite - transform kann Breite nicht
      * animieren, ein Overlay-Umbau stünde in keinem Verhältnis. Läuft nur
@@ -3546,8 +4826,7 @@ p.field-hint--warn[hidden] {
 
   @media (prefers-reduced-motion: reduce) {
     .nav-sidebar,
-    .app-content,
-    .nav-sidebar__toggle {
+    .app-content {
       transition: none;
     }
   }
@@ -3560,11 +4839,49 @@ p.field-hint--warn[hidden] {
      * padding-left 14px zentriert den 28px-Logomark auf X=28 — fluchtet mit
      * den Nav-Item-Icon-Wells (siehe .nav-sidebar .nav-item). Krumme px-Werte,
      * weil exakte Pixel-Zentrierung nicht auf die 4px-Token-Skala fällt. */
-    height: 56px;
-    padding: 0 var(--space-5) 0 14px;
+    height: var(--target-base);
+    padding: 0 var(--space-2) 0 14px;
     margin-bottom: var(--space-1);
     flex-shrink: 0;
     gap: var(--space-3);
+  }
+
+  /* Suche und Einklappen stehen als Werkzeuge rechts in der Logo-Zeile
+   * (Critique 2026-09-26, P1-2) - vorher je eine eigene 40px-Zeile. Zwei
+   * gleichartige Ziele nebeneinander: ein Reihen-Bauteil, WCAG 2.5.8 genuegt,
+   * 32px halten es trotzdem gut treffbar. */
+  .nav-sidebar__logo-actions {
+    display: flex;
+    align-items: center;
+    margin-inline-start: auto;
+    flex-shrink: 0;
+  }
+
+  .nav-sidebar__tool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--target-sm);
+    height: var(--target-sm);
+    padding: 0;
+    border: none;
+    /* Ein quadratischer Icon-Knopf ist ein Kreis (Kapsel-Regel der Shell). */
+    border-radius: var(--radius-full);
+    background: none;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    transition: color var(--transition-fast), background-color var(--transition-fast);
+  }
+
+  .nav-sidebar__tool:hover {
+    color: var(--color-text-secondary);
+    background-color: var(--color-surface-3);
+  }
+
+  .nav-sidebar__tool svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
   }
 
   /* SVG-Logomark (via DOM API in router.js injiziert, Gradient im SVG selbst) */
@@ -3595,14 +4912,6 @@ p.field-hint--warn[hidden] {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  .nav-sidebar__version {
-    margin-top: var(--space-0h);
-    font-size: var(--text-xs);
-    font-weight: var(--font-weight-medium);
-    letter-spacing: var(--tracking-label);
-    color: var(--color-text-tertiary);
   }
 
   /* ── Nav-Items Container ── */
@@ -3683,31 +4992,90 @@ p.field-hint--warn[hidden] {
     -webkit-mask-image: linear-gradient(to bottom, transparent, var(--mask-opaque) var(--space-8), var(--mask-opaque) calc(100% - var(--space-8)), transparent);
   }
 
-  /* Footer ist eine eigene, nicht-scrollende Region (flex-shrink:0) und setzt
-   * sich mit einer Haarlinie vom scrollenden Nav-Bereich ab — so verschmilzt das
-   * gepinnte Settings-Item nie mit Hilfe/Änderungen/Abmelden. */
-  .nav-sidebar__footer-actions {
+  /* DIE KONTOZEILE (Critique 2026-09-26, P1-2). Sie ersetzt die Fussleiste mit
+   * Hilfe, Aenderungen und Abmelden (104px): die drei stehen jetzt im
+   * Konto-Menue hinter dem Avatar (router.js, sidebarAccountEl). Eine
+   * nicht-scrollende Region mit Haarlinie, wie vorher der Fuss. */
+  .nav-sidebar__account {
+    flex-shrink: 0;
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-start;
-    gap: var(--space-0h);
-    padding: var(--space-2) var(--space-1) 0;
+    flex-direction: column;
+    padding-top: var(--space-1);
     margin-top: var(--space-1);
     border-top: 1px solid var(--color-border-subtle);
+  }
+
+  /* Doppelte Klasse: die spaetere `.nav-sidebar .nav-item`-Regel setzte die
+   * Hoehe sonst auf die Listenzeile zurueck. Die Kontozeile steht allein am
+   * Fuss und haelt deshalb die Zielgroesse des Zeigers. */
+  .nav-sidebar .nav-item.nav-sidebar__account-trigger {
+    min-height: var(--target-md);
+    width: 100%;
+    border: none;
+    background: none;
+    font-family: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .nav-sidebar .nav-sidebar__account-trigger:hover,
+  .nav-sidebar .nav-sidebar__account-trigger[aria-expanded="true"] {
+    color: var(--color-text-primary);
+    background-color: var(--color-surface-3);
+  }
+
+  /* Die Scheibe hat die Groesse des Icon-Wells (26px) und steht damit auf
+   * derselben Flucht wie die Modul-Icons darueber, auch eingeklappt. */
+  .nav-sidebar__avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    /* Ohne eigene Farbe steht die Scheibe auf dem Akzent, und dessen Tinte
+     * kippt mit dem Theme (hell: Weiss, dunkel: das helle Violett traegt
+     * dunkle Schrift). Eine Nutzerfarbe setzt syncSidebarAccount() inline und
+     * waehlt die Schrift per Kontrastrechnung (--on-color / --ink). */
+    background-color: var(--color-accent);
+    color: var(--color-ink-on-vivid);
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-semibold);
+    line-height: 1;
     flex-shrink: 0;
   }
 
-  /* Abmelden bricht in eine eigene, volle Zeile unter Hilfe/Änderungen und
-   * setzt sich mit einer Haarlinie als terminale Aktion ab. Doppelte
-   * Klassen-Spezifität (.nav-item.nav-item--logout) + volle flex-Shorthand
-   * schlagen die spätere `.nav-item { flex: 0 1 auto }`-Regel, die sonst
-   * flex-basis auf auto zurücksetzte → Zeile blieb schmal statt vollbreit. */
-  .nav-sidebar__footer-actions .nav-item.nav-item--logout {
-    flex: 1 1 100%;
-    margin-top: var(--space-1);
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--color-border-subtle);
+  .nav-sidebar__avatar--on-color {
+    color: var(--color-text-on-accent);
+  }
+
+  .nav-sidebar__avatar--ink {
+    color: var(--color-ink-on-bright);
+  }
+
+  .nav-sidebar__avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .nav-sidebar__account-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--color-text-primary);
+  }
+
+  .nav-sidebar__account-chevron {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    color: var(--color-text-tertiary);
+  }
+
+  .nav-sidebar__account-menu {
+    min-width: calc(var(--sidebar-width-expanded) - (2 * var(--space-2)));
   }
 
   /* ── Nav-Item: Sidebar ── */
@@ -3719,12 +5087,13 @@ p.field-hint--warn[hidden] {
     border-radius: var(--radius-sm);
     /* padding-left 15px zentriert das 26px-Icon-Well auf X=28 — fluchtet mit
      * dem Logomark. Krumm, weil exakte Zentrierung neben der 4px-Token-Skala liegt. */
-    padding: var(--space-1) var(--space-3) var(--space-1) 15px;
+    padding: var(--space-0h) var(--space-3) var(--space-0h) 15px;
     gap: var(--space-3);
-    /* Desktop-Pointer-Target (40px) statt Touch-Target (48px): mit 13 Items +
-     * 4 Sektionslabels passt die Liste so bis ~800px Fensterhöhe ohne Scroll
-     * (Audit F-01). Die Bottom-Nav für Touch behält 48px. */
-    min-height: var(--target-md);
+    /* Zeilenhoehe der Seitenleiste statt --target-md (Critique 2026-09-26,
+     * P1-2): mit 40px lagen auf 1440x900 drei Module unter der Falz, auf
+     * 1280x800 rund 270px. Die Zeilen sind ein Reihen-Bauteil - Begruendung
+     * und Rechnung am Token in tokens.css. Die Bottom-Nav behaelt 48px. */
+    min-height: var(--sidebar-row-height);
     font-size: var(--text-sm);
     color: var(--color-text-secondary);
     background: transparent;
@@ -3768,14 +5137,6 @@ p.field-hint--warn[hidden] {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  .nav-sidebar__footer-actions .nav-item {
-    flex: 0 1 auto;
-    min-width: 0;
-    justify-content: flex-start;
-    padding: var(--space-2) var(--space-1);
-    gap: var(--space-1);
   }
 
   /* ── Hover: dezente Hintergrundfarbe ── */
@@ -3840,40 +5201,6 @@ p.field-hint--warn[hidden] {
     border-top: 1px solid var(--color-border-subtle);
   }
 
-  /* ── Sidebar Toggle ── */
-  .nav-sidebar__toggle {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    align-self: stretch;
-    /* NIMMT DEN PLATZ, DEN SEIN TRAEGER IHM LAESST (Zielgroessen-Regel,
-     * DESIGN.md). Er mass 219x23 und kam allein ueber die Spacing-Ausnahme
-     * durch - freistehend am Fuss der Sidebar, mit Platz nach oben und unten.
-     * Das war kein Dichte-Fall, sondern ein vergessener: 23px ist die Hoehe
-     * seines 15px-Icons plus Zeilenrest, nicht eine Entscheidung. */
-    min-height: var(--target-md);
-    padding: 0 var(--space-4) var(--space-2);
-    margin-top: calc(-1 * var(--space-2));
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--color-text-tertiary);
-    flex-shrink: 0;
-    /* padding begleitet den Sidebar-Collapse (Detector layout-transition, geprüft);
-     * reduced-motion schaltet sie im Block unten ab. */
-    transition: color var(--transition-fast), padding var(--transition-slow);
-  }
-
-  .nav-sidebar__toggle:hover {
-    color: var(--color-text-secondary);
-  }
-
-  .nav-sidebar__toggle svg {
-    width: 15px;
-    height: 15px;
-    flex-shrink: 0;
-  }
-
   /* ── Sidebar eingeklappt (icon-only) ── */
   html.sidebar-collapsed {
     --sidebar-width: 56px;
@@ -3887,9 +5214,21 @@ p.field-hint--warn[hidden] {
     display: none;
   }
 
-  html.sidebar-collapsed .nav-sidebar .nav-sidebar__toggle {
-    padding-right: var(--space-5);
-    padding-left: 0;
+  /* Eingeklappt hat die Logo-Zeile 56px Breite - zu wenig fuer Logo UND zwei
+   * Werkzeuge. Sie stapelt dann: Logo, darunter Einklappen und Suche auf der
+   * Icon-Flucht der Module (X=28). Der Platz dafuer ist da, weil die vier
+   * Sektionslabels eingeklappt auf null Hoehe fallen. */
+  html.sidebar-collapsed .nav-sidebar .nav-sidebar__logo {
+    flex-direction: column;
+    align-items: flex-start;
+    height: auto;
+    gap: var(--space-1);
+    padding-block: var(--space-1h) 0;
+  }
+
+  html.sidebar-collapsed .nav-sidebar .nav-sidebar__logo-actions {
+    flex-direction: column-reverse;
+    margin-inline-start: calc(-1 * var(--space-0h));
   }
 
   /* Eingeklappt: Labels bleiben im Layout (Sidebar-Breite ist fix, overflow:hidden
@@ -3898,30 +5237,13 @@ p.field-hint--warn[hidden] {
    * und der Accessible Name des Items bleibt erhalten (besser für Screenreader). */
   html.sidebar-collapsed .nav-sidebar .nav-item__label {
     opacity: 0;
-    transition: opacity var(--duration-xs) ease;
+    transition: opacity var(--duration-xs) var(--ease-out);
   }
 
-  /* Eingeklappt stapelt der Footer vertikal. align-items:stretch dehnt die
-   * drei Items auf volle Rail-Breite (statt sie zentriert je nach verstecktem
-   * Label-Rest unterschiedlich breit zu lassen — sonst landeten ihre Icons an
-   * verschiedenen X-Positionen, #501). padding-inline:0 + padding-left:15px an
-   * den Items setzt die Icon-Flucht deckungsgleich mit den Body-Items. */
-  html.sidebar-collapsed .nav-sidebar .nav-sidebar__footer-actions {
-    flex-direction: column;
-    align-items: stretch;
-    padding-inline: 0;
-  }
-
-  html.sidebar-collapsed .nav-sidebar__footer-actions .nav-item {
-    padding-left: 15px;
-  }
-
-  /* Eingeklappt stapelt der Footer bereits vertikal (icon-only) — der
-   * Vollzeilen-Umbruch entfällt (flex komplett zurücksetzen, sonst streckt
-   * flex-grow das Icon in der Spalte), die Haarlinie bleibt als Trenner. */
-  html.sidebar-collapsed .nav-sidebar__footer-actions .nav-item.nav-item--logout {
-    flex: 0 0 auto;
-    margin-top: var(--space-0h);
+  html.sidebar-collapsed .nav-sidebar .nav-sidebar__account-chevron {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--duration-xs) var(--ease-out);
   }
 
   /* Eingeklappt: anders als die Nav-Item-Labels (die neben ihrem Icon in
@@ -3934,7 +5256,7 @@ p.field-hint--warn[hidden] {
     height: 0;
     padding-block: 0;
     overflow: hidden;
-    transition: opacity var(--duration-xs) ease;
+    transition: opacity var(--duration-xs) var(--ease-out);
   }
 
   /* ── Eingeklappt: Rail expandiert bei Hover/Fokus und zeigt Labels ──
@@ -3951,9 +5273,40 @@ p.field-hint--warn[hidden] {
     box-shadow: var(--shadow-lg);
   }
 
+  /* HOVER-ABSICHT (Re-Critique 2026-09-27, A1 P3-1): der Zeiger, der nur auf
+   * dem Weg zum Inhalt ueber die Leiste streicht, klappte sie jedes Mal aus -
+   * 400ms `ease`, ohne Verzoegerung. Jetzt wartet das Aufklappen
+   * `--sidebar-hover-intent` (200ms); verlaesst der Zeiger die Leiste vorher,
+   * beginnt die Transition nie. Die Kurve ist die der Shell (`--ease-out`).
+   * Nur fuer den Zeiger: der Tastaturfokus (`:focus-within`) klappt sofort
+   * auf, dort gibt es keine Durchfahrt. Das Einklappen (Basisregel) wartet
+   * nicht. */
+  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover:not(:focus-within) {
+    transition:
+      width var(--duration-xl) var(--ease-out) var(--sidebar-hover-intent),
+      box-shadow var(--duration-xl) var(--ease-out) var(--sidebar-hover-intent);
+  }
+
   html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__brand-text,
   html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__brand-text {
     display: flex;
+  }
+
+  /* Flyout: die Logo-Zeile nimmt wieder ihre Zeilenform an - Logo, Name und
+   * die zwei Werkzeuge nebeneinander, wie ausgeklappt. */
+  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__logo,
+  html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__logo {
+    flex-direction: row;
+    align-items: center;
+    height: var(--target-base);
+    gap: var(--space-3);
+    padding-block: 0;
+  }
+
+  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__logo-actions,
+  html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__logo-actions {
+    flex-direction: row;
+    margin-inline-start: auto;
   }
 
   /* Beim Aufklappen die Labels erst einblenden, NACHDEM die Breite gewachsen ist
@@ -3962,10 +5315,13 @@ p.field-hint--warn[hidden] {
    * über die Basis-Regel oben. */
   html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-item__label,
   html.sidebar-collapsed .nav-sidebar:focus-within .nav-item__label,
+  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__account-chevron,
+  html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__account-chevron,
   html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-section-label,
   html.sidebar-collapsed .nav-sidebar:focus-within .nav-section-label {
     opacity: 1;
-    transition: opacity 180ms ease 220ms;
+    /* Nach Absicht UND Breite: erst wenn die Leiste steht, kommt der Text. */
+    transition: opacity var(--duration-sm) var(--ease-out) calc(var(--sidebar-hover-intent) + var(--duration-md));
   }
 
   /* Flyout: die eingeklappt auf null Höhe kollabierten Sektionslabels wieder
@@ -3973,31 +5329,7 @@ p.field-hint--warn[hidden] {
   html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-section-label,
   html.sidebar-collapsed .nav-sidebar:focus-within .nav-section-label {
     height: auto;
-    padding-block: var(--space-2) var(--space-1);
-  }
-
-  /* Beim Aufklappen (Hover/Fokus) muss der Footer das Expanded-Layout annehmen:
-   * Zeile statt Spalte, Abmelden bricht als volle Zeile um. Ohne dies blieben
-   * Hilfe/Änderungen/Abmelden in der eingeklappten, zentrierten Spalte stehen
-   * und flüchteten nicht linksbündig wie im gepinnten Zustand (#488). */
-  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__footer-actions,
-  html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__footer-actions {
-    flex-direction: row;
-    align-items: center;
-    padding-inline: var(--space-1);
-  }
-
-  /* Flyout: den 15px-Icon-Einzug der eingeklappten Spalte zurücknehmen, damit
-   * Hilfe/Änderungen wie im gepinnten Expanded-Zustand bündig stehen. */
-  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__footer-actions .nav-item,
-  html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__footer-actions .nav-item {
-    padding-left: var(--space-1);
-  }
-
-  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__footer-actions .nav-item.nav-item--logout,
-  html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__footer-actions .nav-item.nav-item--logout {
-    flex: 1 1 100%;
-    margin-top: var(--space-1);
+    padding-block: var(--space-1h) var(--space-0h);
   }
 
   /* ── Fokus-Ring der Nav-Items/Toggle nach innen versetzt ──
@@ -4007,53 +5339,11 @@ p.field-hint--warn[hidden] {
    * der linken Kante abschneiden; der Inset-Wert bleibt vollständig sichtbar -
    * genau der Fall, für den tokens.css §7b das zweite Offset-Token führt. */
   .nav-sidebar .nav-item:focus-visible,
-  .nav-sidebar__toggle:focus-visible {
+  .nav-sidebar__tool:focus-visible {
     outline-offset: var(--focus-ring-offset-inset);
   }
 }
 
-
-/* --------------------------------------------------------
- * Seiten-Container
- * -------------------------------------------------------- */
-.page {
-  padding: var(--space-4);
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-}
-
-.page__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-6);
-  padding-bottom: var(--space-4);
-  gap: var(--space-4);
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.page__title {
-  /* HIER STEHT KEINE GROESSE, UND DER KOMMENTAR, DER HIER STAND, NANNTE ZWEI.
-   *
-   * Er sagte „Mobil --text-2xl (24px), Desktop --text-3xl (30px)" - drei Fehler
-   * in einem Satz: die Tokens messen 22 und 28px, die Regel setzt seit dem
-   * HIG-Rollout gar keine Schriftgroesse mehr, und der Seitentitel ist dort
-   * Large Title (34px, mobil wie Desktop). Der Schnitt gehoert der
-   * Seitentitel-Rolle in typography.css; hier bleibt der Umbruch. */
-  text-wrap: balance;
-}
-
-@media (min-width: 1024px) {
-  .page {
-    padding: var(--space-8) var(--space-8);
-  }
-}
-
-@media (min-width: 1440px) {
-  .page {
-    padding: var(--space-8) var(--space-10);
-  }
-}
 
 /* --------------------------------------------------------
  * Cards
@@ -4183,7 +5473,7 @@ p.field-hint--warn[hidden] {
            max(var(--space-3), env(safe-area-inset-right))
            max(var(--space-3), env(safe-area-inset-bottom))
            max(var(--space-3), env(safe-area-inset-left));
-  animation: modal-overlay-in var(--duration-md) ease forwards;
+  animation: modal-overlay-in var(--duration-md) var(--ease-out) forwards;
   /* iOS Safari: click-Events auf non-interactive divs erfordern cursor:pointer */
   cursor: pointer;
 }
@@ -4224,9 +5514,10 @@ p.field-hint--warn[hidden] {
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border-subtle);
   box-shadow: var(--shadow-lg);
-  /* Dezentes Einfahren: kurzer Hub + leichte Skalierung statt vollem
-   * translateY(100%)-Vollhub. Wirkt leichter und weniger einnehmend. */
-  animation: modal-sheet-in 280ms var(--ease-out) forwards;
+  /* DIE EINFAHRT STEHT IN glass.css (Abschnitt 18), NICHT HIER. Hier stand
+   * `modal-sheet-in 280ms` und ab 768px `modal-scale-in`: beide verloren immer
+   * gegen `.modal-panel:not(.modal-panel--closing)` dort (hoehere
+   * Spezifitaet, spaetere Datei) - eine zweite Einfahrt, die nie lief. */
   /* Cursor vom Overlay zurücksetzen */
   cursor: default;
 }
@@ -4236,7 +5527,6 @@ p.field-hint--warn[hidden] {
     max-width: 520px;
     max-height: calc(var(--viewport-height) - (2 * var(--space-6)));
     border-radius: var(--radius-lg);
-    animation: modal-scale-in var(--duration-md) var(--ease-out) forwards;
   }
   .modal-panel--sm { max-width: 400px; }
   .modal-panel--lg { max-width: 680px; }
@@ -4312,7 +5602,22 @@ p.field-hint--warn[hidden] {
   color: var(--color-text-primary);
 }
 
+/* DER INHALT EINES DIALOGS SPRICHT DEN TON SEINES MODULS (Critique 2026-10-05,
+ * R16). Das Modal haengt an <body>, also AUSSERHALB der Modulwurzel, die
+ * `--module-accent` setzt: was im Dialog `var(--module-accent,
+ * var(--color-accent))` las, fiel auf den Markenton zurueck. Gemessen am
+ * Aufgaben-Filterblatt: der aktive Chip stand violett, derselbe Chip in der
+ * Liste dahinter gruen.
+ *
+ * AM KOERPER, NICHT AM OVERLAY: Rahmen, Kopf und Fuss des Dialogs sind Shell
+ * und tragen die Stimme (`--color-accent`, Eine-Stimme-Regel in DESIGN.md -
+ * der Guard "die Shell traegt die Stimme" fuehrt `.modal-overlay` als
+ * Shell-Wurzel). Der Koerper ist INHALT, und dort gehoert der Modulton hin:
+ * Chips, Abhakkreis, modul-eigene Segmente. Der Router fuehrt den Ton des
+ * offenen Moduls theme-fest als `--active-module-accent` an der Wurzel; ohne
+ * Modul greift der Markenton. Guard: test-frontend-audit.js. */
 .modal-panel__body {
+  --module-accent: var(--active-module-accent, var(--color-accent));
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
@@ -4655,6 +5960,22 @@ p.field-hint--warn[hidden] {
 }
 
 /* Default-Disclosure-Dreieck entfernen (Cross-Browser) */
+/* Mit `hint`: die Beschriftung und darunter, was hinter ihr liegt. Die zweite
+ * Zeile ist eine Stufe leiser (Caption-Groesse, tertiaer) und bricht um, statt
+ * den Chevron aus der Zeile zu schieben. */
+.form-advanced__label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0h);
+  min-width: 0;
+}
+
+.form-advanced__hint {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-tertiary);
+}
+
 .form-advanced__summary::-webkit-details-marker { display: none; }
 .form-advanced__summary::marker { content: ''; }
 
@@ -4770,6 +6091,20 @@ p.field-hint--warn[hidden] {
   flex-wrap: wrap;
 }
 
+/* LOESCHEN STEHT AM ANFANG, ABBRECHEN UND PRIMAER AM ENDE (Re-Critique
+ * 2026-09-28, A2 P1-2). Der Fuss ist rechtsbuendig; wer Loeschen nicht selbst
+ * wegschob, stand mit ihm neben Abbrechen - im Termindialog, dem Vorbild des
+ * Kanons ("[Loeschen links] ... [Abbrechen] [Primaer]", DESIGN.md), 12px
+ * daneben (1440: x=157 und 284). Zwanzig Module schrieben dafuer je ein
+ * `style="margin-inline-end:auto"` an ihren Knopf, drei vergassen es. Jetzt
+ * EINE Regel am Knopf, den modal.js ohnehin erkennt (`decorateFooterDelete`
+ * setzt `.modal-panel__delete`), und an der Gruppe, in der er steht (Konto:
+ * Loeschen plus Archivieren). `inline-end` spiegelt sich in RTL von selbst. */
+.modal-panel__footer > .modal-panel__delete,
+.modal-panel__footer > :has(> .modal-panel__delete) {
+  margin-inline-end: auto;
+}
+
 /* Fußzeile INNERHALB des scrollenden Bodys (kein direktes Panel-Kind): dort
  * trägt der Modal-Rahmen die Trennlinie schon, eine zweite säße mitten im
  * Inhalt. Ersetzt 20 gleichlautende Inline-Styles, die diese Neutralisierung
@@ -4793,25 +6128,78 @@ p.field-hint--warn[hidden] {
   flex-shrink: 0;
 }
 
+/* DER FUSS MIT LÖSCHEN AUF DEM TELEFON (Re-Critique 2026-09-27, R9 M8).
+ *
+ * Gemessen bei 390px: Löschen · Abbrechen · Speichern brauchten 345px, der Fuß
+ * hat 332 - der Umbruch oben hielt alles im Bild, stellte aber „Speichern"
+ * allein in eine zweite Zeile, unter die Nebenaktion. Apples Antwort: Löschen
+ * wird ein Papierkorb links, die beiden beschrifteten Knöpfe bleiben rechts.
+ *
+ * Erkannt wird der Knopf EINMAL in modal.js (`decorateFooterDelete`): es setzt
+ * `.modal-panel__delete` an den Knopf, packt sein Wort in
+ * `.modal-panel__delete-label` und `--has-delete`/`--one-row` an den Fuß.
+ * Kein Modul baut das nach.
+ *
+ * Das Wort verlässt nur das BILD (Schreibweise von `.sr-only`), nicht den
+ * Baum; wo modal.js den Objektnamen fand, spricht das `aria-label`
+ * („Einkauf löschen"). Die Optik ist die der Zeilenaktion (`.row-action`):
+ * nackt, rund, Zielgröße der Geräteklasse - nur die Tinte bleibt die Gefahr,
+ * weil der Papierkorb hier allein steht und nicht in einer Reihe von Icons.
+ *
+ * `--one-row` trägt nur die kanonische Dreiheit. Dort bricht die Zeile nicht
+ * mehr; eine lange Beschriftung bricht INNEN (die `white-space`-Rücknahme von
+ * #872 bleibt), und `min-width: 0` plus `overflow-wrap: anywhere` halten auch
+ * das längste Wort im Fuß statt ihn nach links hinauszuschieben.
+ *
+ * Die Grenze ist die kanonische Mobil-Grenze (tokens.css §11c, `--bp-mobile`),
+ * nicht die „~430px" der Critique: jedes Telefon im Hochformat liegt darunter,
+ * und eine eigene Zahl wäre der sechste Breakpoint der App. */
+@media (max-width: 639px) {
+  .modal-panel__footer .btn.modal-panel__delete {
+    flex: none;
+    width: var(--target-base);
+    min-width: var(--target-base);
+    height: var(--target-base);
+    min-height: var(--target-base);
+    padding: 0;
+    gap: 0;
+    border: none;
+    background: transparent;
+    color: var(--color-danger);
+  }
+
+  .modal-panel__footer .btn.modal-panel__delete:hover {
+    background: var(--color-danger-light);
+    color: var(--color-danger-ink);
+  }
+
+  .modal-panel__footer .modal-panel__delete .modal-panel__delete-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .modal-panel__footer.modal-panel__footer--one-row,
+  .modal-panel__footer.modal-panel__footer--one-row > div {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .modal-panel__footer.modal-panel__footer--one-row .btn:not(.modal-panel__delete):not(.btn--icon) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
 @keyframes modal-overlay-in {
   from { opacity: 0; }
   to   { opacity: 1; }
-}
-
-@keyframes modal-slide-up {
-  from { transform: translateY(100%); }
-  to   { transform: translateY(0); }
-}
-
-@keyframes modal-scale-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
-/* Mobile-Sheet: sanfter kurzer Hub + leichte Skalierung (kein Vollhub). */
-@keyframes modal-sheet-in {
-  from { opacity: 0; transform: translateY(24px) scale(0.985); }
-  to   { opacity: 1; transform: translateY(0)    scale(1); }
 }
 
 /* ── Bottom Sheet: Handle + Closing Animation (Mobile < 768px) ── */
@@ -4822,52 +6210,121 @@ p.field-hint--warn[hidden] {
     align-items: flex-end;
   }
 
+  /* DER GRIFF SITZT IN DER KOPFZONE, NICHT DARUEBER (Re-Critique 2026-09-27,
+   * P1 #1). Hier stand ein 36px-Polster (`--space-4 + 20px`) fuer einen 44px
+   * hohen Griff-Streifen, und der Griff darin war im hellen Theme Glas-Weiss
+   * auf weisser Tafel: uebrig blieb ein leerer Streifen ueber jedem Dialog,
+   * der wie ein Renderfehler wirkte. Jetzt liegt der Griff (36x5, Apples
+   * Grabber) im oberen Polster des Kopfes: Griff-Oberkante bis Titel-
+   * Oberkante 16px (8px Luft, 5px Griff, der Rest ist die Zentrierung des
+   * Titels neben dem 48px-Schliessen-X). Ein Blatt ohne Kopf behaelt ein
+   * kleines Polster, damit der Griff nicht auf dem Inhalt liegt.
+   * Die Farbe ist ein Token (`--sheet-grabber`): hell die kraeftigere Kante,
+   * dunkel das Glas-Weiss. Die Zugflaeche ist keine Frage der Zeichnung - sie
+   * steht als Griffzone (48px) in utils/sheet-drag.js. */
   .modal-panel {
-    /* Extra top padding for the drag handle. position:relative steht seit #805
-     * in der Basisregel und gilt auf jeder Breite - hier stand es frueher. */
-    padding-top: calc(var(--space-4) + 20px);
+    padding-top: 0;
+    /* Rueckfedern nach einem Zug (utils/sheet-drag.js schreibt `translate`,
+     * nicht `transform` - die Einfahrt haelt `transform` per `forwards`). */
+    transition: translate var(--duration-lg) var(--ease-out);
+  }
+
+  .modal-panel:not(:has(> .modal-panel__header)) {
+    padding-top: var(--space-5);
+  }
+
+  .modal-panel > .modal-panel__header {
+    padding-top: var(--space-3);
   }
 
   .modal-panel::before {
     content: '';
     position: absolute;
-    top: 0;
+    top: var(--space-2);
     left: 50%;
     transform: translateX(-50%);
-    /* Visuelle Linie bleibt klein, Hit-Area ist 44px hoch */
     width: 36px;
-    height: 44px;
-    background-color: transparent;
-    /* Nur die dünne Griff-Linie ist sichtbar; oben/unten transparent. Die
-       Linienfarbe läuft über --modal-handle-color, damit der Glass-Modus sie
-       (in glass.css) umfärben kann, OHNE das background-Shorthand zu benutzen —
-       das hatte das Gradient gelöscht und den Griff zum vollen 36×44-Block
-       gemacht (#569). */
-    background-image: linear-gradient(
-      to bottom,
-      transparent calc(50% - 2px),
-      var(--modal-handle-color, var(--color-border)) calc(50% - 2px),
-      var(--modal-handle-color, var(--color-border)) calc(50% + 2px),
-      transparent calc(50% + 2px)
-    );
+    height: 5px;
     border-radius: var(--radius-full);
+    background-color: var(--sheet-grabber);
+    pointer-events: none;
+    z-index: 1;
   }
 
-  .modal-panel--closing {
-    animation: sheet-out var(--duration-md) ease forwards;
+}
+
+/* Waehrend der Finger zieht, fuehrt er - keine Transition. Ohne die Marke
+ * federt `translate` zurueck (Dialog-Sheet oben, Mehr-Blatt an `.more-sheet`).
+ * Geteilte Grammatik: utils/sheet-drag.js. */
+.modal-panel[data-sheet-drag="drag"],
+.more-sheet[data-sheet-drag="drag"] {
+  transition: none;
+}
+
+/* ── Ausgang: Tafel UND Overlay, auf jeder Breite (Critique 2026-09-26, P1-1) ──
+ *
+ * ZWEI KLASSEN IM SELEKTOR, NICHT EINE. Die Einfahrt steht auch in glass.css,
+ * das NACH dieser Datei laedt; mit gleicher Spezifitaet gewann dort
+ * `.modal-panel { animation: glass-sheet-in }`, die Tafel stand 400ms still
+ * und verschwand dann hart. glass.css nimmt seine Einfahrt inzwischen selbst
+ * zurueck (`:not(.modal-panel--closing)`), und diese Regel gewinnt zusaetzlich
+ * aus eigener Kraft - ein Ausgang, der an der Ladereihenfolge haengt, ist
+ * keiner. Guard: test-motion.js rechnet die Kaskade fuer beide Breiten nach.
+ *
+ * Mobil faellt das Blatt 24px (derselbe Hub wie die Einfahrt) und blendet aus.
+ * Nach einer Wischgeste startet es dort, wohin der Finger es gezogen hat: der
+ * Zug liegt als `translate` auf der Tafel (utils/sheet-drag.js) und setzt sich
+ * mit dem `transform` der Keyframes zusammen - sonst spraenge die Tafel beim
+ * Loslassen erst nach oben zurueck.
+ *
+ * Desktop hatte gar keinen Ausgang (modal.js raeumte sofort ab): jetzt ein
+ * kurzes Zuruecknehmen, Scale 0.98 + Blende, 150ms.
+ *
+ * Das Overlay blendet mit aus und laesst waehrenddessen Tipps durch - ein
+ * zweiter Tipp traf vorher das noch stehende Overlay und verpuffte. */
+.modal-panel.modal-panel--closing {
+  animation: modal-scale-out var(--duration-sm) var(--ease-out) forwards;
+}
+
+.modal-overlay.modal-overlay--closing {
+  animation: modal-overlay-out var(--duration-sm) var(--ease-out) forwards;
+  pointer-events: none;
+}
+
+@media (max-width: 767px) {
+  .modal-panel.modal-panel--closing {
+    animation: sheet-out var(--sheet-out) forwards;
+  }
+
+  .modal-overlay.modal-overlay--closing {
+    animation-duration: var(--duration-md);
   }
 }
 
 @keyframes sheet-out {
   from { transform: translateY(0); }
-  to   { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(var(--sheet-lift)); opacity: 0; }
 }
 
+@keyframes modal-scale-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.98); }
+}
+
+@keyframes modal-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* Unter reduzierter Bewegung schliesst modal.js ohne Ausgang (sofort); die
+ * Regeln hier halten auch den Fall still, in dem die Klassen doch gesetzt
+ * werden. */
 @media (prefers-reduced-motion: reduce) {
   .modal-panel {
     animation: none;
   }
-  .modal-panel--closing {
+  .modal-panel.modal-panel--closing,
+  .modal-overlay.modal-overlay--closing {
     animation: none;
   }
 }
@@ -5022,6 +6479,39 @@ p.field-hint--warn[hidden] {
   border-color: transparent;
 }
 
+/* DER KLEINE KNOPF fuer dichte Aktionsreihen (Kartenfuss, Zeilenaktion,
+ * Hinzufuegen unter einer Liste). Er stand bis 2026-09-24 in rewards.css,
+ * und das laedt der Router nur auf /rewards: an rund hundert Stellen in
+ * Einstellungen, Aufgaben, Gesundheit, Inventar, Dokumenten und Kalender
+ * trug `btn--sm` nichts, und der Knopf war ein normaler - derselbe Fehler wie
+ * `.form-hint` in settings.css (test-frontend-audit: „global geladen").
+ *
+ * KLEIN HEISST SCHMALER, NICHT UNTER DIE ZIELGROESSE. In rewards.css stand
+ * `min-height: var(--target-sm)` (32px) - ein Token, das tokens.css selbst
+ * „kein Touch-Target" nennt. Solange die Regel nur auf /rewards galt, fiel
+ * das nicht auf; global haette sie die Einnehmen-Knoepfe der Gesundheit, die
+ * in schmalen Karten nur ihr Symbol zeigen, auf 36x32px gedrueckt - ein
+ * freistehendes Ziel unter den 40px am Zeiger (Zielgroessen-Regel). Der
+ * kleine Knopf spart deshalb Polsterung, Luecke und die 48px, die `.btn`
+ * unter 1024px nach der BREITE traegt; die Hoehe haelt die Zielgroesse der
+ * Geraetewelt (`--target-md` am Zeiger, `--target-base` am Finger).
+ *
+ * VOR `.btn--icon`, nicht dahinter: `btn--icon btn--sm` steht an einem
+ * Dutzend Stellen, und der Icon-Knopf behaelt dort seine quadratische
+ * 44px-Flaeche - der kleine Knopf verdichtet Text, kein Symbol. */
+.btn--sm {
+  min-height: var(--target-md);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  gap: var(--space-1);
+}
+
+@media (pointer: coarse), (max-width: 639px) {
+  .btn--sm {
+    min-height: var(--target-base);
+  }
+}
+
 .btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -5112,6 +6602,31 @@ p.field-hint--warn[hidden] {
   height: 18px;
 }
 
+/* Gesperrte Zeilenaktion - dieselben zwei Zustaende wie beim `.btn`, weil
+ * seit dem Komponenten-Kanon (2026-09-26) die Verwalter (Kategorien, Abo-
+ * Kategorien, Zahlungsarten) ihre Pfeile am Listenrand hier sperren und jede
+ * Stelle die Regel sonst selbst mitbrachte (category-manager.css,
+ * subscriptions.css). `disabled` = nicht erreichbar, blass wie `.btn:disabled`;
+ * `aria-disabled` = fokussierbar, der Klick wird im Handler verworfen, also eine
+ * echte gedeckte Farbe statt Opazitaet und kein Hover-Grund, der eine Wirkung
+ * verspricht. */
+.row-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.row-action[aria-disabled='true'],
+.row-action[aria-disabled='true']:hover {
+  color: var(--color-text-disabled);
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.row-action[aria-disabled='true']:active {
+  transform: none;
+}
+
 /* Auch der Icon-Button ist eine Kapsel, hier also ein Kreis - Apples eigene
  * Icon-Buttons sind rund. Die frühere --radius-sm-Ecke war der letzte Rest der
  * zwei Buttonformen: sie überschrieb die Basisregel und stand damit neben der
@@ -5129,6 +6644,24 @@ p.field-hint--warn[hidden] {
   padding: var(--space-2);
   min-height: var(--target-base);
   min-width: var(--target-base);
+}
+
+/* EINE STEUERHOEHE IM DESKTOP-KOPF (R14, A1 P3-2). Suche und Werkzeugmenue
+ * standen mit --target-base (44px) neben Segment, Filter und angedockter
+ * Pille mit --target-md (40px, die `.btn`-Regel oben) - zwei Kanten in einer
+ * Zeile, gemessen in 12 Modulen bei 1440. Am Zeiger ist 40px die Regel
+ * (Hit-Test, ignore.md); dieselbe Grenze wie `.btn`. */
+@media (min-width: 1024px) {
+  .page-toolbar .btn--icon {
+    min-height: var(--target-md);
+    min-width: var(--target-md);
+  }
+
+  /* `height` dazu: Polster plus Zeilenhoehe ergaben 43px ueber der Untergrenze. */
+  .page-toolbar .page-search__input {
+    min-height: var(--target-md);
+    height: var(--target-md);
+  }
 }
 
 
@@ -5231,6 +6764,29 @@ textarea::placeholder {
   color: var(--color-text-tertiary);
 }
 
+/* DIE HINWEISZEILE UNTER EINEM FELD - global, weil sie global benutzt wird.
+ *
+ * Die Regel lebte bis 2026-09-24 in settings.css. Der Router laedt aber genau
+ * EIN Seiten-Blatt pro Route, und `.form-hint` steht in fast jedem Modul:
+ * ueberall ausser in den Einstellungen fiel sie auf den geerbten Koerpertext
+ * zurueck (16px, volle Primaertinte) - lauter als das Label und das Feld, zu
+ * denen sie gehoert (Critique 2026-09-24, P2, gemessen im Termin-Dialog).
+ * Kalender, Budget, Kontakte, Dokumente, Inventar und die Fasten-Bausteine
+ * trugen dafuer eine eigene Kopie oder eine Ersatzklasse. Die Regel
+ * steht deshalb hier; `test:frontend-audit` haelt sie in einem Blatt, das
+ * index.html fuer jede Route verlinkt. Nur die Zeilenlaenge der
+ * Einstellungen (`.settings-page .form-hint`) bleibt in settings.css. */
+.form-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Tonlagen für Hinweistexte. Vorher setzte `admin-backup.js` die Farbe des
+   Verbindungstests inline (`style.color = 'var(--color-success)'`), was den
+   Wert am Token vorbei ins Markup schrieb. */
+.form-hint--success { color: var(--color-success); }
+.form-hint--danger { color: var(--color-danger); }
+
 .required-marker {
   color: var(--color-danger);
   margin-left: var(--space-0h);
@@ -5283,7 +6839,7 @@ textarea::placeholder {
 
 .form-field--error-repeat .input,
 .form-field--error-repeat .form-input {
-  animation: field-error-pulse 500ms var(--ease-out);
+  animation: field-error-pulse var(--duration-2xl) var(--ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -5296,55 +6852,37 @@ textarea::placeholder {
  * Global statt modul-scoped, weil Modals im geteilten Overlay rendern und der
  * Router immer nur EIN Modul-Stylesheet aktiv hält. Markup: ingredient-row.js.
  * -------------------------------------------------------- */
+/* ZWEI ZEILEN STATT DREI GEKAPPTER FELDER (Re-Critique 2026-09-28, A4 P2-7):
+ * im 520px-Dialog zeigte die Kategorie "Fleisch &...", "Milchpro...", mobil
+ * blieben ihr 100px. Der Name bekommt die volle Zeile (mit dem Entfernen-Knopf),
+ * Menge und Kategorie teilen sich die zweite. */
 .ingredient-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
+  grid-template-areas: "name name remove" "qty cat .";
   align-items: center;
   gap: var(--space-2);
   border-radius: var(--radius-glass-inner);
 }
 
 .ingredient-row__name {
-  flex: 2;
+  grid-area: name;
+  min-width: 0;
 }
 
 .ingredient-row__qty {
-  flex: 1;
+  grid-area: qty;
   min-width: 0;
 }
 
 .ingredient-row__cat {
-  flex: 1.5;
+  grid-area: cat;
   min-width: 0;
   font-size: var(--type-body);
 }
 
-.ingredient-row__remove {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  background: none;
-  border: none;
-  cursor: pointer;
-  /* NICHT --color-text-disabled: der Knopf ist bedienbar, er tritt nur zurueck.
-   * Die Ruhefarbe eines erreichbaren Bedienelements traegt 3:1 (dieselbe Regel
-   * wie bei .meal-slot__add-btn in meals.css). */
-  color: var(--color-text-tertiary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  position: relative;
-  transition: color var(--transition-fast);
-}
-
-.ingredient-row__remove::before {
-  content: '';
-  position: absolute;
-  inset: -8px;
-}
-
-.ingredient-row__remove:hover {
-  color: var(--color-danger);
+.ingredient-row > .row-action {
+  grid-area: remove;
 }
 
 .meal-type-badge {
@@ -5402,7 +6940,8 @@ textarea::placeholder {
   position: relative;
   width: 44px;
   height: 26px;
-  background-color: var(--neutral-300);
+  /* 3:1 gegen jede Flaeche, auf der ein Schalter steht (#1572, Werte in tokens.css). */
+  background-color: var(--color-switch-off);
   border-radius: var(--radius-full);
   transition: background-color var(--transition-fast);
   flex-shrink: 0;
@@ -5412,13 +6951,17 @@ textarea::placeholder {
   content: '';
   position: absolute;
   top: 3px;
-  left: 3px;
+  inset-inline-start: 3px;
   width: 20px;
   height: 20px;
   background: var(--color-surface);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-sm);
-  transition: transform var(--transition-fast) var(--ease-out);
+  /* Dauer UND Kurve einzeln, nicht `var(--transition-fast) var(--ease-out)`:
+   * das Token ist schon „150ms ease", dahinter eine zweite Kurve macht die
+   * ganze Deklaration ungueltig - der Knopf sprang beim Ausschalten zurueck,
+   * waehrend er beim Einschalten federte (Critique 2026-09-26, P2-2). */
+  transition: transform var(--duration-sm) var(--ease-out);
 }
 
 .toggle input:checked + .toggle__track {
@@ -5431,6 +6974,14 @@ textarea::placeholder {
 
 .toggle input:checked + .toggle__track::after {
   transform: translateX(18px);
+}
+
+/* In RTL steht "an" auf der fuehrenden Seite, also links - wie bei Apple und
+ * im Installer (#1571). Der Knopf startet per inset-inline-start schon auf der
+ * richtigen Seite; nur sein Weg braucht das Vorzeichen, translateX kennt keine
+ * Schreibrichtung (#1572). */
+[dir="rtl"] .toggle input:checked + .toggle__track::after {
+  transform: translateX(-18px);
 }
 
 .toggle input:focus-visible + .toggle__track {
@@ -5515,6 +7066,13 @@ textarea::placeholder {
 .skeleton-line--short  { width: 35%; }
 .skeleton-line--medium { width: 60%; }
 .skeleton-line--full   { width: 100%; }
+
+/* Diagramm-Block (renderSkeletonChart): die Hoehe einer Diagrammflaeche, damit
+ * die Seite beim Eintreffen der Daten nicht in eine andere Gliederung springt. */
+.skeleton-chart {
+  height: calc(var(--space-12) * 3);
+  border-radius: var(--radius-sm);
+}
 
 /* --------------------------------------------------------
  * Leer-Zustände (Empty States)
@@ -5924,12 +7482,55 @@ textarea::placeholder {
   }
 }
 
+/* DER STAPEL WEICHT DEN KNOEPFEN EINES OFFENEN DIALOGS AUS (#1160).
+ *
+ * Er steht ueber Dialogen (`--z-toast` ueber `--z-modal`), damit eine Meldung
+ * waehrend eines Dialogs sichtbar bleibt - positioniert ist er aber fuer die
+ * Seite. Bei 1280x900 lag der Erinnerungs-Toast genau auf "Speichern" des
+ * Kalenderdialogs und nahm den Klick: die Erinnerung war verworfen, der Termin
+ * nicht gespeichert. Welche Lage frei ist (ueber dem Dialog, unter ihm, ueber
+ * seiner Aktionsleiste), steht erst gemessen fest; das entscheidet
+ * utils/toast-placement.js und schreibt es als Variablen hierher, immer als
+ * Oberkante im Bild. `measure` ist der Zwischenstand, in dem es die Hoehe in
+ * der Dialogbreite abliest.
+ * Attribut plus Klasse schlaegt die Media-Queries oben ohne `!important`. */
+.shell-bottom-stack {
+  --toast-dock-gap: var(--space-3);
+}
+
+.shell-bottom-stack[data-dock] {
+  left: var(--toast-dock-center);
+  width: var(--toast-dock-width);
+}
+
+.shell-bottom-stack[data-dock="placed"] {
+  top: var(--toast-dock-top);
+  bottom: auto;
+}
+
+/* Kein freier Platz neben dem Dialog: nur der juengste Toast bleibt sichtbar.
+ * Die uebrigen bleiben im Dokument, in der Schreibweise von `.sr-only`
+ * (reset.css) und `inert` (utils/toast-placement.js), damit ihre Knoepfe nicht
+ * unsichtbar per Tab erreichbar sind. Sie kommen zurueck, sobald Platz ist. */
+.shell-bottom-stack .toast.toast--tucked {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  pointer-events: none;
+}
+
 .toast {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  background-color: var(--neutral-800);
-  color: var(--neutral-50);
+  background-color: var(--toast-bg);
+  color: var(--toast-text);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
@@ -5967,7 +7568,7 @@ textarea::placeholder {
   cursor: pointer;
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
-  transition: opacity var(--transition-fast), transform var(--duration-2xs) ease;
+  transition: opacity var(--transition-fast), transform var(--duration-2xs) var(--ease-out);
 }
 
 /* DIE MARKE AN DER KAPSEL steht standardmäßig nicht da: solange das Subjekt
@@ -5979,10 +7580,11 @@ textarea::placeholder {
  * dem dunklen Shell-Material mit heller. Genau die Verwechslung, die den Toast
  * im Reduced-Transparency-Fallback des Filter-Chips auf 1,08:1 gebracht hat -
  * zwei Selektoren in einer Regel behaupten denselben Grund darunter.
- * `currentColor 15%` rechnet hier deshalb gegen die Schrift der Kapsel, und die
- * dreht sich mit dem Thema: --neutral-800 ist dunkel im hellen Modus und hell
- * im dunklen, --neutral-50 umgekehrt. Am gerenderten Pixel gemessen (320px,
- * die einzige Breite, auf der die Marke steht): 10,04:1 hell, 12,54:1 dunkel. */
+ * `currentColor 15%` rechnet hier deshalb gegen die Schrift der Kapsel
+ * (--toast-text, hell auf dem in beiden Themes dunklen --toast-bg). Am
+ * gerenderten Pixel gemessen (320px, die einzige Breite, auf der die Marke
+ * steht): 10,04:1 hell; dunkel gemessen vor R16, als das Material dort noch
+ * hell war (12,54:1). */
 .list-bulkbar__action-count {
   display: none;
   margin-inline-start: var(--space-1);
@@ -6004,9 +7606,8 @@ textarea::placeholder {
  * die Tinte, und mit `currentColor` an der Kante wechselt die Kante mit.
  *
  * --shell-danger-ink und nicht --color-danger: der Grund unter dieser Kapsel
- * dreht sich mit dem Thema (--neutral-800 ist hell im Dunkelmodus), die
- * semantischen Farben drehen in dieselbe Richtung. Begründung und Messwerte am
- * Token in tokens.css.
+ * (--toast-bg) ist in beiden Themes dunkel, die semantischen Farben drehen
+ * sich aber mit dem Thema. Begründung und Messwerte am Token in tokens.css.
  *
  * SIE IST DER ZWEITE KANAL, NICHT DER ERSTE. Der erste ist das Wort auf der
  * Kapsel, der dritte die Rückfrage dahinter - Farbe allein trägt hier keine
@@ -6055,9 +7656,41 @@ textarea::placeholder {
   transform: none;
 }
 
-.toast--success { background-color: var(--color-success); color: var(--toast-success-text); }
 .toast--danger  { background-color: var(--color-danger);  color: var(--toast-danger-text); }
 .toast--warning { background-color: var(--color-warning); color: var(--toast-warning-text); }
+
+/* DER DAUERHAFTE TOAST IST AUF DEM TELEFON EINE ZEILE (Re-Critique
+ * 2026-09-27, Casey; R9 M14). Die Erinnerung stand 66px hoch und dreissig
+ * Sekunden lang ueber Raster und Liste - Versal-Kicker „ERINNERUNG" ueber dem
+ * Titel, beides in 12px-Polsterung. Mobil traegt das Siegel die Herkunft und
+ * der Titel die Sache; der Kicker verlaesst das Bild (nicht den Baum, er
+ * bleibt vorgelesen), und die Hoehe ist die Zielgroesse des Textknopfs selbst:
+ * 44/48px statt 66, und der Knopf, der die Erinnerung oeffnet, fuellt sie
+ * ganz. Kompakt passt er bei einem Blatt auch in den Streifen darueber, statt
+ * im Formular zu liegen; wo nicht, weicht er (utils/toast-placement.js). */
+@media (max-width: 767px) {
+  .toast.toast--reminder {
+    padding-block: 0;
+  }
+
+  .toast--reminder .toast__reminder-text {
+    align-self: stretch;
+    justify-content: center;
+    min-height: var(--target-base);
+  }
+
+  .toast--reminder .toast__reminder-text strong {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
 
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(6px) scale(0.98); }
@@ -6095,8 +7728,8 @@ textarea::placeholder {
    * Scroll-Ende rechnet mit diesem Wert, also muss die Pille ihn halten. */
   min-height: var(--bulk-pill-height);
   box-sizing: border-box;
-  background-color: var(--neutral-800);
-  color: var(--neutral-50);
+  background-color: var(--toast-bg);
+  color: var(--toast-text);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-lg);
   pointer-events: auto;
@@ -6144,6 +7777,20 @@ textarea::placeholder {
   /* Bleibt die Wahl neben der Frage, sitzt sie am Ende der Zeile; rutscht sie
    * darunter, steht sie am Ende ihrer eigenen. Eine Schreibweise für beides. */
   margin-inline-start: auto;
+}
+
+/* Die Folge, die die Frage nicht trägt (optional, `confirm.detail` in
+ * utils/bulk-pill.js; Dokumente: kein Papierkorb). Sie steht NACH dem Paar im
+ * DOM und nimmt eine ganze Zeile - so bleiben Frage und Wahl oben beieinander,
+ * und der Satz liegt darunter. Anders als die Frage bricht sie innen um: sie
+ * ist in manchen Sprachen länger als die Pille breit ist (gemessen bei 390px),
+ * und eine gekappte Warnung wäre keine. Auch hier keine Container-Schwelle. */
+.list-bulkbar__detail {
+  flex: 1 0 100%;
+  font-size: var(--text-xs);
+  line-height: var(--line-height-snug);
+  color: var(--toast-text-secondary);
+  white-space: normal;
 }
 
 /* Das einzige Element der Pille, das nachgibt. `min-width: 0` ist die
@@ -6214,7 +7861,7 @@ textarea::placeholder {
 }
 
 .toast--out {
-  animation: toast-out var(--duration-md) ease forwards;
+  animation: toast-out var(--duration-md) var(--ease-out) forwards;
 }
 
 @keyframes toast-out {
@@ -6323,7 +7970,7 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
   position: relative;
 }
 
@@ -6380,7 +8027,7 @@ textarea::placeholder {
 }
 
 .btn--shaking {
-  animation: btn-shake var(--duration-xl) ease;
+  animation: btn-shake var(--duration-xl) var(--ease-out);
 }
 
 /* prefers-reduced-motion: kein Schütteln, nur Farb-Feedback */
@@ -6510,7 +8157,7 @@ textarea::placeholder {
   opacity: 0;
   pointer-events: none;
   z-index: 0;
-  transition: opacity 50ms linear;
+  transition: opacity var(--duration-2xs) linear;
 }
 
 /* --------------------------------------------------------
@@ -6578,6 +8225,14 @@ textarea::placeholder {
  * Zeilenende, und das liegt in RTL links. */
 [dir='rtl'] .swipe-row::after {
   transform: translateY(-50%) scaleX(-1);
+}
+
+/* Eine Zeile OHNE Geste (Nur-lesen, #1265): der Chevron versprache einen Wisch,
+ * den keine Verdrahtung beantwortet. Die Zeile behaelt `.swipe-row` fuer ihre
+ * Form und ihre Nachschlage-Selektoren; nur die Richtungsangabe faellt weg.
+ * Steht NACH der Basisregel: gleiche Spezifitaet, die Reihenfolge entscheidet. */
+.swipe-row--static::after {
+  content: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6711,7 +8366,11 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
+  /* Die Oberkante liegt unter der Statusleiste (viewport-fit=cover): ohne den
+   * Inset stand der Text als installierte App hinter Uhr und Notch (Critique
+   * 2026-09-26, Minor). Dieselbe Formel wie der Kopf des Such-Overlays; die
+   * gemessene Hoehe (router.js, --offline-banner-height) schliesst ihn ein. */
+  padding: calc(var(--space-2) + var(--safe-area-inset-top)) var(--space-4) var(--space-2);
   background-color: var(--color-warning-light);
   color: var(--color-warning-ink);
   font-size: var(--text-sm);
@@ -6919,7 +8578,7 @@ textarea.input { resize: vertical; }
 }
 
 .quick-add__input--flash {
-  animation: input-add-flash 550ms var(--ease-out) forwards;
+  animation: input-add-flash var(--duration-2xl) var(--ease-out) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6965,12 +8624,16 @@ textarea.input { resize: vertical; }
   left: var(--space-1);
   right: var(--space-1);
   top: 0;
-  height: var(--target-md); /* füllt das 40px-Sidebar-Item (Audit F-01) */
+  height: var(--sidebar-row-height); /* füllt die Sidebar-Zeile (tokens.css) */
   border-radius: var(--radius-sm);
   pointer-events: none;
+  /* Die Feder bleibt (Glas-Element, ignore.md), aber in der Dauer der
+   * anderen Auswahl-Bewegungen: hier standen 450ms als Literal, und die Pille
+   * lief noch ~250ms, als der Inhalt laengst stand (Re-Critique 2026-09-27,
+   * A1 P2-2). --duration-xl ist die Obergrenze (300ms). */
   transition:
-    transform 450ms var(--ease-sidebar-glide),
-    opacity var(--duration-lg) ease;
+    transform var(--duration-xl) var(--ease-sidebar-glide),
+    opacity var(--duration-lg) var(--ease-out);
   will-change: transform;
   z-index: 0;
 }
@@ -6983,14 +8646,14 @@ textarea.input { resize: vertical; }
   left: var(--space-1);
   right: var(--space-1);
   top: 0;
-  height: var(--target-md); /* füllt das 40px-Sidebar-Item (Audit F-01) */
+  height: var(--sidebar-row-height); /* füllt die Sidebar-Zeile (tokens.css) */
   border-radius: var(--radius-sm);
   background: var(--color-surface-3);
   opacity: 0;
   pointer-events: none;
   transition:
-    transform 280ms var(--ease-sidebar-glide),
-    opacity 180ms ease;
+    transform var(--duration-lg) var(--ease-sidebar-glide),
+    opacity var(--duration-sm) var(--ease-out);
   will-change: transform, opacity;
   z-index: 0;
 }
@@ -7034,7 +8697,9 @@ textarea.input { resize: vertical; }
  * --sidebar-bg ≈ 5:1 (AA ✓). */
 .nav-section-label {
   color: var(--color-text-tertiary);
-  padding: var(--space-2) var(--space-3) var(--space-1);
+  /* 22px Zeile statt 27 (Critique 2026-09-26, P1-2): 6px Luft ueber dem
+   * Label trennt die Gruppe, 2px darunter binden es an seine Zeilen. */
+  padding: var(--space-1h) var(--space-3) var(--space-0h);
   user-select: none;
   pointer-events: none;
   position: relative;
@@ -7080,7 +8745,7 @@ textarea.input { resize: vertical; }
   .nav-sidebar__indicator,
   .nav-sidebar__hover,
   .nav-bottom__indicator {
-    transition: opacity 0.01ms;
+    transition: none;
   }
 
   /* Die Flyout-Labels standen hier mit `transition: opacity 0.01ms` und dem
@@ -7103,10 +8768,16 @@ textarea.input { resize: vertical; }
   .more-sheet {
     transition: opacity var(--transition-fast);
     opacity: 0;
+    transform: none;
   }
 
+  /* `transition-property`, nicht der Shorthand: die offene Regel oben fuehrt
+   * `transform` in ihrer Transition und schluege diese hier (zwei Klassen
+   * gegen eine) - der Hub kaeme unter reduzierter Bewegung zurueck. */
   .more-sheet[aria-hidden="false"] {
     opacity: 1;
+    transform: none;
+    transition-property: opacity;
   }
 
   .more-sheet__search:active,
@@ -7123,10 +8794,12 @@ textarea.input { resize: vertical; }
   .search-overlay {
     transition: opacity var(--transition-fast);
     opacity: 0;
+    transform: none;
   }
 
   .search-overlay--visible {
     opacity: 1;
+    transform: none;
   }
 
   /* Desktop-Palette: kein Scale-Auftakt — das Panel erscheint ohne Bewegung,
@@ -7141,27 +8814,27 @@ textarea.input { resize: vertical; }
 /* Read-only-Modul-Modus (#467): Bei „Nur lesen"-Rechten die Anlege-Affordance
    ausblenden und einen erklärenden Hinweis oben in der Seite zeigen. Die
    verbindliche Sperre liegt am Server; dies ist die ehrliche UI-Entsprechung. */
-/* BEIDE ANLEGE-WEGE, nicht nur der schwebende. Der angedockte FAB behaelt
- * `.page-fab` und war damit immer erfasst - der HANDGESCHRIEBENE Kopfknopf der
- * fuenf Module, die ihre Primaeraktion selbst mitbringen (Aufgaben, Kalender,
- * Kontakte, Budget, Notizen), war es nie. Ein Nur-lesen-Nutzer sah dort einen
- * aktiven Knopf, dessen Formular am Server im 403 endet. Die Regel stand seit
- * #467 auf einem Weg, und dieser Branch hat den zweiten von einem Modul auf
- * fuenf verbreitert (Codex-Review zu PR #754). */
+/* EIN ANLEGE-WEG, schwebend wie angedockt: der angedockte FAB behaelt
+ * `.page-fab`, also erfasst ihn dieselbe Regel. Bis Runde 7 stand hier ein
+ * zweiter Selektor fuer den handgeschriebenen Kopfknopf der fuenf Module
+ * (#467, Codex-Review zu PR #754) - der Knopf ist weg, der Selektor mit ihm. */
 html[data-module-readonly] .page-fab,
-html[data-module-readonly] .toolbar-new-btn,
 html[data-module-readonly] .notes-manage-categories {
   display: none !important;
 }
 
-/* Und ohne Knopf kein Nachlauf - dieselbe Paarung wie beim angedockten FAB
-   (Etappe 6). Ein „Nur lesen"-Modul reservierte sonst 96px für eine
+/* Und ohne Knopf kein Nachlauf - die Paarung aus Etappe 6 (jede
+   CSS-Ausblendung des FAB nullt --fab-safe-zone). Ein „Nur lesen"-Modul reservierte sonst 96px für eine
    Anlege-Affordance, die es gerade ausdrücklich nicht anbietet. */
 html[data-module-readonly] {
   --fab-safe-zone: 0px;
 }
 
-.module-readonly-banner {
+/* `.page-notice` ist dasselbe Band unter einem Namen, der nichts ueber den
+   Anlass sagt: der Zonen-Hinweis (#1607) ist keine Nur-lesen-Auskunft, soll
+   aber genauso aussehen. Eine Regel, zwei Namen - kein zweites Muster. */
+.module-readonly-banner,
+.page-notice {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -7175,11 +8848,30 @@ html[data-module-readonly] {
   font-weight: var(--font-weight-medium);
 }
 
-.module-readonly-banner i {
-  width: 16px;
-  height: 16px;
-  color: var(--color-text-tertiary);
-  flex-shrink: 0;
+/* Der Zonen-Hinweis: ein Satz und seine Handlungen als zweite Haelfte.
+   Reicht die Zeile nicht fuer beide, brechen die Knoepfe als Gruppe um, statt
+   den Satz auf wenige Zeichen zusammenzudruecken. */
+.zone-hint {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.zone-hint__text {
+  min-width: 0;
+  margin: 0;
+}
+
+.zone-hint__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* In einer Karte steht das Band am Ende und haelt Abstand nach oben statt
+   nach unten. */
+.settings-card > .zone-hint {
+  margin: var(--space-3) 0 0;
 }
 
 /* Warn-Variante für Formular-Hinweise (#474 Sichtbarkeits-Guard): hebt einen
@@ -7267,4 +8959,68 @@ p.field-hint--warn svg {
   width: var(--space-4);
   height: var(--space-4);
   margin-inline-start: calc(-1 * var(--space-1) - 2px);
+}
+
+/* ================================================================
+   DER AUSWAHLKREIS - Mehrfachauswahl in einer Liste (Aufgaben seit R7,
+   Kontakte und Dokumente seit R8 H14). Ein Knopf mit `aria-pressed` und
+   einem Namen mit Objekt ("<Titel> auswaehlen"); er ERSETZT Statuskreis und
+   Zeilen-Picker, die Leiste dazu ist die Bulk-Pille (utils/bulk-pill.js).
+   20px-Ring in der Tertiaerfarbe, gewaehlt gefuellt im App-Akzent mit Haken
+   (NICHT im Modulton: bei den Aufgaben ist der Gruen und vom erledigten Haken
+   nicht zu unterscheiden), Trefflaeche --target-base. Er steht in der Shell,
+   weil Modul-CSS nur auf seiner Route laedt - vorher trugen documents.css und
+   contacts.css je eine gleichlautende Kopie. Wie er in einer Zeile sitzt
+   (Ausgleich, disabled), bleibt Sache des Moduls.
+   ================================================================ */
+.select-circle {
+  width: var(--target-base);
+  height: var(--target-base);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-ink-on-vivid);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.select-circle::after {
+  content: '';
+  width: var(--space-5);
+  height: var(--space-5);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-text-tertiary);
+  box-sizing: border-box;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.select-circle:hover::after {
+  border-color: var(--color-accent);
+}
+
+.select-circle:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: calc(var(--focus-ring-offset) * -1);
+}
+
+.select-circle--on::after {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent);
+}
+
+.select-circle__check {
+  position: absolute;
+  z-index: 1;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  display: none;
+}
+
+.select-circle--on .select-circle__check {
+  display: block;
 }

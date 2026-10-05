@@ -1,19 +1,28 @@
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
+import { eachRule } from './css-rules.js';
 
 import {
   LEGACY_SETTINGS_STORAGE_KEY,
   SETTINGS_DOMAINS,
   SETTINGS_LEAVES,
+  SETTINGS_SCOPES,
+  SETTINGS_SECTIONS,
   SETTINGS_STORAGE_KEY,
   filterSettingsDomains,
   currentSettingsPath,
   RENAMED_SETTINGS_SOURCE_PATHS,
   findSettingsLeaf,
+  firstSettingsSheet,
+  movedSettingsUrl,
+  settingsSectionUrl,
+  settingsSheetSections,
   migrateLegacySettingsTab,
   readStoredSettingsDestination,
   resolveSettingsDestination,
+  searchSettings,
+  settingsOptionUrl,
   settingsOverviewUrl,
 } from '../public/settings/registry.js';
 import {
@@ -69,13 +78,15 @@ const admin = { role: 'admin' };
 const registryTranslationKeys = [
   ...SETTINGS_DOMAINS.map((domain) => domain.labelKey),
   ...SETTINGS_LEAVES.flatMap((leaf) => [leaf.labelKey, leaf.descriptionKey]),
+  ...SETTINGS_SECTIONS.flatMap((section) => [section.labelKey, section.descriptionKey]),
 ];
 const sharedTranslationKeys = [
   'settings.navigationLabel',
-  'settings.mobileOverviewTitle',
-  'settings.mobileOverviewDescription',
-  'settings.mobileDomainTitle',
   'settings.breadcrumbLabel',
+  'settings.scopeMine',
+  'settings.scopeHousehold',
+  'settings.moduleStatusOn',
+  'settings.moduleStatusOff',
   'settings.backToSettings',
   'settings.retry',
   'settings.loadError',
@@ -114,49 +125,33 @@ test('settings leaves have unique IDs and paths', () => {
   assert.equal(new Set(SETTINGS_LEAVES.map((leaf) => leaf.path)).size, SETTINGS_LEAVES.length);
 });
 
-test('die Blätter verteilen sich wie beschlossen auf die vier Domänen', () => {
-  // Statt einer nackten Gesamtzahl: die Verteilung ist die IA-Aussage. Der
-  // Critique 2026-07-27 fand sie unbalanciert (personal 5 / modules 8 / sync 3 /
-  // documents 2 / admin 6) - `documents` ist aufgelöst, `modules` von acht auf
-  // vier geschrumpft, und was per-user schreibt, liegt bei `personal`.
-  // Immich (#693) liegt bei `admin` wie das Wetter: eine serverweite
-  // Dienstanbindung, deren Zugangsdaten der Browser nie sieht.
-  // Die Aufgaben-Vorgaben (#695) liegen bei `personal` und NICHT bei
-  // `sync-reminders`: welche Erinnerungslisten der Haushalt abgleicht, ist eine
-  // Admin-Entscheidung, in welche davon meine neuen Aufgaben laufen, ist meine.
-  // Nach demselben Schnitt liegt das Zyklus-Opt-out (#760) bei `personal`: ob der
-  // Haushalt den Zyklus führt, steht im adminOnly-`modules-options`, ob ich ihn
-  // sehen will, entscheide ich.
-  // Und ebenso `personal-feeds`: beide Feed-Tokens hängen an der eigenen
-  // users-Zeile und beide Routen tragen keinen Admin-Check, das Blatt lag
-  // trotzdem im adminOnly-`sync-calendar`.
-  // `personal-calendar-subscriptions` ist die Gegenrichtung und derselbe Fall:
-  // `GET /calendar/subscriptions` liefert `shared = 1 OR created_by = ich`, und
-  // PATCH/DELETE/sync antworten 403 für fremde Abos - `isAdmin` ist dort ein
-  // ZUSATZrecht, keine Voraussetzung. Bei `sync` bleiben nur die Blätter, deren
-  // Routen wirklich `requireAdmin` tragen: CalDAV und Google/Apple hängen an
-  // Zugangsdaten des Haushalts.
-  // `modules-countdowns` (#969) liegt bei `modules`, nicht bei `personal`: die
-  // Nachfrist ist haushaltweit und admin-only, kein persoenlicher Wert wie das
-  // Zyklus-Opt-out oben - deshalb ein eigenes Blatt statt eines Platzes in
-  // `modules-options`, dessen eigener Guard (test:frontend-audit) nur Schalter
-  // aus dem geteilten Toggle-Primitiv zulaesst, kein Zahlenfeld.
-  // `admin-displays` (#1208) liegt bei `admin` und nirgends sonst: ein Wandtablett
-  // anzulegen heisst, einem Geraet dauerhaft Zugang zum Haushalt zu geben, und
-  // jede Route des Blatts traegt `requireAdmin`. Es ist kein Modulschalter (es
-  // schaltet nichts an oder aus) und keine Synchronisation (es haengt an keinen
-  // fremden Zugangsdaten) - damit steigt `admin` von 8 auf 9.
-  // `modules-health` gibt `/settings/modules/health` eigenen Inhalt (das
-  // Vorsorge-Typregister) statt eines Alias auf `modules-options` - damit
-  // steigt `modules` von 6 auf 7.
+test('die Blaetter verteilen sich wie beschlossen auf drei Bereiche, je Modul ein Blatt (R10)', () => {
+  // Re-Critique 2026-09-27 (A7 P1-3): vier Bereiche mit 32 Blaettern, ein Modul
+  // an bis zu fuenf Orten. Jetzt Konto / Haushalt / Module, und je Modul EIN
+  // Blatt - die Verteilung ist die IA-Aussage, keine nackte Gesamtzahl.
   const perDomain = {};
   for (const leaf of SETTINGS_LEAVES) perDomain[leaf.domainId] = (perDomain[leaf.domainId] ?? 0) + 1;
-  assert.deepEqual(perDomain, { personal: 11, modules: 7, sync: 5, admin: 9 });
-  // Jedes Blatt hängt an einer existierenden Domäne.
+  // R14 (A7 P2-3): Inventar und Entsorgung bekommen ein Blatt fuer ihren Feed.
+  assert.deepEqual(perDomain, { personal: 5, admin: 8, modules: 15 });
+  assert.deepEqual(SETTINGS_DOMAINS.map((domain) => domain.id), ['personal', 'admin', 'modules']);
+  // Jedes Blatt haengt an einem existierenden Bereich, jeder Abschnitt an
+  // einem existierenden Blatt, und kein Blatt ist leer.
   const domainIds = new Set(SETTINGS_DOMAINS.map((domain) => domain.id));
+  const sheetIds = new Set(SETTINGS_LEAVES.map((leaf) => leaf.id));
   for (const leaf of SETTINGS_LEAVES) {
-    assert.ok(domainIds.has(leaf.domainId), `${leaf.id}: unbekannte Domäne "${leaf.domainId}"`);
+    assert.ok(domainIds.has(leaf.domainId), `${leaf.id}: unbekannter Bereich "${leaf.domainId}"`);
+    assert.ok(settingsSheetSections(leaf, admin).length > 0, `${leaf.id}: Blatt ohne Abschnitt`);
   }
+  for (const section of SETTINGS_SECTIONS) {
+    assert.ok(sheetIds.has(section.sheetId), `${section.id}: unbekanntes Blatt "${section.sheetId}"`);
+    assert.ok(SETTINGS_SCOPES.includes(section.scope), `${section.id}: unbekannte Reichweite "${section.scope}"`);
+  }
+  assert.equal(new Set(SETTINGS_SECTIONS.map((section) => section.id)).size, SETTINGS_SECTIONS.length);
+  // Je Modul hoechstens EIN Blatt.
+  const modules = SETTINGS_LEAVES.filter((leaf) => leaf.module).map((leaf) => leaf.module);
+  assert.equal(new Set(modules).size, modules.length, 'ein Modul hat zwei Blaetter');
+  // Die Sammelschublade ist aufgeloest: kein Blatt heisst mehr Modul-Optionen.
+  assert.equal(SETTINGS_LEAVES.some((leaf) => leaf.labelKey === 'settings.pageModuleOptions'), false);
 });
 
 test('settings registry is immutable', () => {
@@ -180,6 +175,99 @@ test('personal settings leaf modules import without browser globals', async () =
   }
 });
 
+test('sign out other devices names the rate limit instead of a generic failure (#1354)', async () => {
+  // Review zu #1423: ein 429 las sich wie "fehlgeschlagen", obwohl nur zu
+  // schnell geklickt wurde - die Seite muss sagen, dass Warten hilft.
+  const { logoutOthersErrorText } = await import('/settings/pages/personal-account.js');
+  assert.equal(typeof logoutOthersErrorText, 'function');
+  assert.equal(logoutOthersErrorText({ status: 429 }), 'settings.otherSessionsTooManyAttempts');
+  assert.equal(logoutOthersErrorText({ status: 500 }), 'settings.otherSessionsError');
+  assert.equal(logoutOthersErrorText(new Error('offline')), 'settings.otherSessionsError');
+
+  // Der Klick-Handler nimmt genau diese Funktion - sonst misst der Fall oben
+  // eine Funktion, die niemand aufruft.
+  const source = await readFile(new URL('../public/settings/pages/personal-account.js', import.meta.url), 'utf8');
+  assert.match(source, /catch \(error\) \{\s*showError\(errorBox, logoutOthersErrorText\(error\)\);/);
+});
+
+test('sign out other devices: hint, status and buttons keep a token gap, an empty status none (#1423)', async () => {
+  // a11y-Audit zu #1423: zwischen Hinweis, Statuszeile und Knopfreihe standen
+  // 0 px. Der Status las sich als vierte Zeile des Hinweises, und der Fokusring
+  // des Knopfes lag auf dem Statustext.
+  const { otherSessionsCardHtml } = await import('/settings/pages/personal-account.js');
+  assert.equal(typeof otherSessionsCardHtml, 'function', 'die Karte hat einen eigenen Baustein');
+  const html = otherSessionsCardHtml();
+  const classesOf = (id) => html.match(new RegExp(`<[^>]*id="${id}"[^>]*>`))?.[0]?.match(/class="([^"]*)"/)?.[1]?.split(/\s+/) ?? [];
+  assert.ok(classesOf('logout-others-status').includes('settings-sessions__status'), 'Statuszeile traegt ihre Klasse');
+  // Leer im Markup, damit `:not(:empty)` greift - schon ein Zeilenumbruch darin
+  // gaebe der leeren Zeile ihren Abstand.
+  assert.match(html, /id="logout-others-status"[^>]*><\/p>/);
+  const actions = html.match(/<div class="([^"]*)">\s*<button[^>]*id="logout-others-btn"/)?.[1]?.split(/\s+/) ?? [];
+  assert.ok(actions.includes('settings-sessions__actions'), 'Knopfreihe traegt ihre Klasse');
+
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const marginTopOf = (selector) => {
+    const rule = rules.find((r) => r.selector.split(',').map((s) => s.trim()).includes(selector));
+    return rule?.body.match(/(?:^|;)\s*margin-top\s*:\s*([^;]+)/)?.[1]?.trim() ?? null;
+  };
+  assert.match(marginTopOf('.settings-sessions__status:not(:empty)') ?? '', /^var\(--space-\d+\)$/, 'Status: Abstand aus tokens.css');
+  assert.match(marginTopOf('.settings-sessions__actions') ?? '', /^var\(--space-\d+\)$/, 'Knopfreihe: Abstand aus tokens.css');
+  // Die LEERE Statuszeile bekommt keinen: keine Regel auf die blosse Klasse,
+  // die Hoehe oder Abstand setzt.
+  const bare = rules.filter((r) => r.selector.split(',').map((s) => s.trim()).includes('.settings-sessions__status'));
+  for (const rule of bare) assert.doesNotMatch(rule.body, /margin|padding|min-height|height/, rule.body);
+});
+
+test('two-factor card: every line and the button row keep a token gap, in every state (a11y leftovers)', async () => {
+  // a11y-Runde: in der 2FA-Karte standen Hinweis und Knopf mit 0 px
+  // untereinander, der Fokusring des Knopfes lag auf dem Hinweis. Dieselbe
+  // Loesung wie "Andere Geraete" (#1427): jede Zeile nach der ersten und die
+  // Knopfreihe tragen eine Klasse, deren Abstand aus tokens.css kommt.
+  const { twoFactorCardHtml } = await import('/settings/pages/personal-account.js');
+  const states = [
+    { enabled: false, pending: false, recovery_remaining: 0, required: false },
+    { enabled: false, pending: false, recovery_remaining: 0, required: true },
+    { enabled: true, pending: false, recovery_remaining: 8, required: false },
+    { enabled: true, pending: false, recovery_remaining: 0, required: true },
+  ];
+  for (const state of states) {
+    const html = twoFactorCardHtml(state);
+    // Die Karte selbst, dann ihre Zeilen in Dokumentreihenfolge (p und div).
+    const [, ...lines] = [...html.matchAll(/<(p|div)\b[^>]*>/g)]
+      .map(([tag]) => ({ tag, classes: tag.match(/class="([^"]*)"/)?.[1]?.split(/\s+/) ?? [] }));
+    assert.ok(lines.length >= 3, `zu wenige Zeilen gelesen (${JSON.stringify(state)})`);
+    const [lead, ...rest] = lines;
+    assert.ok(lead.classes.includes('form-hint'), `die erste Zeile ist der Hinweis: ${lead.tag}`);
+    for (const { tag, classes } of rest) {
+      const expected = classes.includes('settings-form-actions') ? 'settings-2fa__actions' : 'settings-2fa__note';
+      assert.ok(classes.includes(expected), `${tag} ohne ${expected} (${JSON.stringify(state)})`);
+    }
+  }
+
+  // Die Codes-Ansicht: die Statuszeile steht NACH der Knopfreihe und ist leer,
+  // bis kopiert wurde; die Rueckfrage: Hinweis und Formular.
+  const source = await readFile(new URL('../public/settings/pages/personal-account.js', import.meta.url), 'utf8');
+  const recovery = source.slice(source.indexOf('function renderRecoveryCodes'), source.indexOf('function askForCode'));
+  assert.match(recovery, /class="settings-form-actions settings-2fa__actions"/);
+  assert.match(recovery, /class="form-hint settings-2fa__note" id="two-factor-copy-status" role="status"><\/p>/,
+    'Statuszeile traegt ihre Klasse und bleibt leer im Markup');
+  const ask = source.slice(source.indexOf('function askForCode'));
+  assert.match(ask, /<form id="two-factor-confirm-form" class="settings-form settings-2fa__form">/);
+
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const marginTopOf = (selector) => {
+    const rule = rules.find((r) => !r.at?.length && r.selector.split(',').map((s) => s.trim()).includes(selector));
+    return rule?.body.match(/(?:^|;)\s*margin-top\s*:\s*([^;]+)/)?.[1]?.trim() ?? null;
+  };
+  for (const selector of ['.settings-2fa__note:not(:empty)', '.settings-2fa__actions', '.settings-2fa__form']) {
+    assert.match(marginTopOf(selector) ?? '', /^var\(--space-\d+\)$/, `${selector}: Abstand aus tokens.css`);
+  }
+  const bare = rules.filter((r) => r.selector.split(',').map((s) => s.trim()).includes('.settings-2fa__note'));
+  for (const rule of bare) assert.doesNotMatch(rule.body, /margin|padding|min-height|height/, rule.body);
+});
+
 test('settings reuse the authenticated router user instead of blocking on auth.me', async () => {
   const source = await readFile(
     new URL('../public/pages/settings.js', import.meta.url),
@@ -201,15 +289,14 @@ test('navigation settings leaf imports without browser globals and exports rende
 test('Mitglieder können ihre eigene Navigation erreichen', () => {
   // module_order und mobile_nav_order sind per-user (cfgUserSet, kein Admin-Check),
   // das Blatt lag aber hinter adminOnly - 5 von 6 Mitgliedern kamen nie hin
-  // (Critique 2026-07-27).
-  assert.equal(findSettingsLeaf('/settings/personal/navigation', member)?.id, 'modules-navigation');
-  assert.equal(findSettingsLeaf('/settings/personal/navigation', admin)?.id, 'modules-navigation');
-  // Alter Pfad bleibt erreichbar und landet am neuen Ort.
-  assert.equal(findSettingsLeaf('/settings/modules/navigation', member)?.path, '/settings/personal/navigation');
-  // Und es liegt in der einzigen Domäne, die ein Mitglied sieht.
-  const leaf = SETTINGS_LEAVES.find((entry) => entry.id === 'modules-navigation');
-  assert.equal(leaf.domainId, 'personal');
-  assert.equal(leaf.adminOnly, false);
+  // (Critique 2026-07-27). Seit R10 steht es bei den Modulen, fuer alle.
+  assert.equal(findSettingsLeaf('/settings/modules/navigation', member)?.id, 'modules-navigation');
+  assert.equal(findSettingsLeaf('/settings/modules/navigation', admin)?.id, 'modules-navigation');
+  // Der Pfad von vor R10 bleibt erreichbar und landet am neuen Ort.
+  assert.equal(findSettingsLeaf('/settings/personal/navigation', member)?.path, '/settings/modules/navigation');
+  const section = SETTINGS_SECTIONS.find((entry) => entry.id === 'modules-navigation');
+  assert.equal(section.adminOnly, false);
+  assert.equal(section.scope, 'mine');
 });
 
 test('das persoenliche Blatt traegt keinen haushaltweiten Schalter mehr', async () => {
@@ -267,7 +354,7 @@ test('das Blatt der aktiven Module liegt adminOnly in der Modul-Domaene', () => 
   const leaf = SETTINGS_LEAVES.find((entry) => entry.id === 'modules-active');
   assert.ok(leaf, 'Blatt modules-active fehlt in der Registry');
   assert.equal(leaf.domainId, 'modules');
-  assert.equal(leaf.adminOnly, true);
+  assert.deepEqual(settingsSheetSections(leaf, admin).map((section) => section.adminOnly), [true]);
   assert.equal(findSettingsLeaf('/settings/modules/active', admin)?.id, 'modules-active');
   assert.equal(findSettingsLeaf('/settings/modules/active', member), null);
 });
@@ -295,98 +382,120 @@ test('navigation settings expose separate mobile slots and grouped desktop lists
   assert.match(source, /window\.yuvomi\?\.setMobileNavOrder/);
 });
 
-test('members only see the personal settings domain', () => {
-  assert.deepEqual(filterSettingsDomains(member).map((domain) => domain.id), ['personal']);
+test('members only see the account and module settings domains', () => {
+  // Haushalt bleibt Admin-Sache; bei den Modulen sieht ein Mitglied nur die
+  // Blaetter mit einem "Fuer mich"-Abschnitt.
+  assert.deepEqual(filterSettingsDomains(member).map((domain) => domain.id), ['personal', 'modules']);
 });
 
 test('admins see all settings domains', () => {
   assert.deepEqual(
     filterSettingsDomains(admin).map((domain) => domain.id),
-    ['personal', 'modules', 'sync', 'admin'],
+    ['personal', 'admin', 'modules'],
   );
 });
 
 test('verschobene Blatt-Pfade landen am neuen Ort statt beim Fallback', () => {
-  // Die Domäne `documents` trug zwei Admin-Blätter, während `calendar` mit 729
-  // Zeilen Konfiguration keine eigene hatte (Critique 2026-07-27). Beide binden
-  // externe Dienste an und liegen jetzt unter `sync`. Alte Bookmarks und
-  // gespeicherte Ziele dürfen dabei nicht stumm auf `personal/account` fallen.
-  assert.equal(findSettingsLeaf('/settings/documents/storage', admin)?.path, '/settings/sync/storage');
-  assert.equal(findSettingsLeaf('/settings/documents/dms', admin)?.path, '/settings/sync/dms');
-  assert.equal(currentSettingsPath('/settings/documents/storage'), '/settings/sync/storage');
-  assert.equal(currentSettingsPath('/settings/sync/storage'), '/settings/sync/storage');
+  // Alte Bookmarks und gespeicherte Ziele duerfen nicht stumm auf
+  // `personal/account` fallen - auch die aus aelteren Umbauten nicht.
+  assert.equal(findSettingsLeaf('/settings/documents/storage', admin)?.path, '/settings/modules/documents');
+  assert.equal(findSettingsLeaf('/settings/sync/dms', admin)?.path, '/settings/modules/documents');
+  assert.equal(currentSettingsPath('/settings/sync/storage'), '/settings/modules/documents');
+  assert.equal(currentSettingsPath('/settings/modules/documents'), '/settings/modules/documents');
   assert.equal(currentSettingsPath('/settings/unbekannt'), '/settings/unbekannt');
-  // Rollen-Gate greift auch über den alten Pfad.
+  assert.equal(movedSettingsUrl('/settings/documents/dms'), '/settings/modules/documents?section=documents-dms');
+  // Rollen-Gate greift auch ueber den alten Pfad.
   assert.equal(findSettingsLeaf('/settings/documents/storage', member), null);
 });
 
 test('das aufgelöste Übersicht-Blatt landet beim Haushalts-Wetter', () => {
-  // "Übersicht" trug Haushalts-Wetter und App-Name, aber keinen einzigen
-  // Widget-Schalter (Critique 2026-07-27). Der App-Name sitzt jetzt bei den
-  // Systemangaben, das Wetter in einem eigenen Blatt; der Alt-Pfad zeigt dorthin.
-  assert.equal(currentSettingsPath('/settings/modules/dashboard'), '/settings/admin/weather');
-  assert.equal(findSettingsLeaf('/settings/modules/dashboard', admin)?.id, 'admin-weather');
+  // "Übersicht" trug Haushalts-Wetter und App-Name (Critique 2026-07-27); der
+  // Alt-Pfad zeigt seit R10 auf die Wetter-Quelle unter Haushalt > Integrationen.
+  assert.equal(currentSettingsPath('/settings/modules/dashboard'), '/settings/admin/integrations');
+  assert.equal(movedSettingsUrl('/settings/modules/dashboard'), '/settings/admin/integrations?section=admin-weather');
   assert.equal(findSettingsLeaf('/settings/modules/dashboard', member), null);
   assert.equal(SETTINGS_LEAVES.some((leaf) => leaf.id === 'modules-dashboard'), false);
 });
 
 test('Mitglieder erreichen ihre eigenen Termin-Vorgaben', () => {
   // calendar_default_reminders und calendar_default_assign_me schreiben per
-  // cfgUserSet pro Nutzer, lagen aber hinter dem adminOnly-Kalenderblatt
-  // (Critique 2026-07-27).
-  const leaf = SETTINGS_LEAVES.find((entry) => entry.id === 'personal-calendar');
-  assert.equal(leaf.domainId, 'personal');
-  assert.equal(leaf.adminOnly, false);
-  assert.equal(findSettingsLeaf('/settings/personal/calendar', member)?.id, 'personal-calendar');
-  // Das haushaltweite Kalenderblatt bleibt adminOnly.
-  assert.equal(findSettingsLeaf('/settings/modules/calendar', member), null);
+  // cfgUserSet pro Nutzer (Critique 2026-07-27). Seit R10 "Fuer mich" im Blatt
+  // Kalender - das Mitglied sieht das Blatt, aber nur seine Abschnitte.
+  const section = SETTINGS_SECTIONS.find((entry) => entry.id === 'personal-calendar');
+  assert.equal(section.adminOnly, false);
+  assert.equal(section.scope, 'mine');
+  const sheet = findSettingsLeaf('/settings/personal/calendar', member);
+  assert.equal(sheet?.id, 'module-calendar');
+  assert.deepEqual(settingsSheetSections(sheet, member).map((entry) => entry.id),
+    ['personal-calendar', 'personal-calendar-subscriptions', 'personal-feeds']);
+  // Der haushaltweite Teil bleibt adminOnly.
+  assert.deepEqual(settingsSheetSections(sheet, admin).filter((entry) => entry.adminOnly).map((entry) => entry.id),
+    ['modules-calendar', 'sync-calendar']);
 });
 
 test('Mitglieder erreichen ihr eigenes Zyklus-Opt-out (#760)', () => {
-  // health_cycle_enabled_user schreibt per cfgUserSet pro Nutzer. Läge der
-  // Schalter im adminOnly-`modules-options`, könnte ihn genau die Mehrheit nicht
-  // bedienen, für die er gedacht ist - derselbe Schnitt wie bei personal-calendar.
-  const leaf = SETTINGS_LEAVES.find((entry) => entry.id === 'personal-health');
-  assert.equal(leaf.domainId, 'personal');
-  assert.equal(leaf.adminOnly, false);
-  assert.equal(findSettingsLeaf('/settings/personal/health', member)?.id, 'personal-health');
+  // health_cycle_enabled_user schreibt per cfgUserSet pro Nutzer - derselbe
+  // Schnitt wie bei personal-calendar.
+  const sheet = findSettingsLeaf('/settings/personal/health', member);
+  assert.equal(sheet?.id, 'module-health');
+  // R14: dazu der eigene Zyklus-Export, der vorher im Kalender-Blatt stand.
+  assert.deepEqual(settingsSheetSections(sheet, member).map((entry) => entry.id), ['personal-health', 'feed-cycle']);
   // Der haushaltweite Schalter bleibt daneben adminOnly.
-  assert.equal(findSettingsLeaf('/settings/modules/options', member), null);
+  assert.deepEqual(settingsSheetSections(sheet, admin).map((entry) => entry.id),
+    ['personal-health', 'feed-cycle', 'options-health', 'modules-health']);
 });
 
-test('zwei Ein-Schalter-Blätter teilen sich jetzt eines', () => {
-  // Budget, Gesundheit und Haushaltshilfe trugen zusammen drei Checkboxen und
-  // kosteten drei Sidebar-Einträge und drei Requests (Critique 2026-07-27).
-  // Gesundheit ist seither wieder raus (siehe Test direkt darunter): die
-  // Vorsorge-Funktion gab `/settings/modules/health` eigenen Inhalt zurück
-  // (das Vorsorge-Typregister) - der Haushalts-Schalter selbst bleibt
-  // trotzdem in `modules-options`.
-  for (const legacyPath of [
-    '/settings/modules/budget',
-    '/settings/modules/housekeeping',
-  ]) {
-    assert.equal(currentSettingsPath(legacyPath), '/settings/modules/options');
-    assert.equal(findSettingsLeaf(legacyPath, admin)?.id, 'modules-options');
-    assert.equal(findSettingsLeaf(legacyPath, member), null);
+test('die Modul-Optionen sind aufgeloest: jeder Teil steht im Blatt seines Moduls', async () => {
+  // Re-Critique 2026-09-27 (A7 P1-3): "Modul-Optionen" war eine Sammelschublade
+  // fuer Budget, Gesundheit, Haushaltshilfe, Aufgaben und Schichtplan.
+  const parts = SETTINGS_SECTIONS.filter((section) => String(section.loader).includes('modules-options.js'));
+  assert.deepEqual(
+    Object.fromEntries(parts.map((section) => [section.props?.part, section.sheetId])),
+    {
+      budget: 'module-budget',
+      health: 'module-health',
+      housekeeping: 'module-housekeeping',
+      tasks: 'module-tasks',
+      schedule: 'module-schedule',
+    },
+  );
+  for (const section of parts) assert.equal(section.adminOnly, true, `${section.id} ist haushaltweit`);
+  // Das Blatt rendert nur den Teil, den sein Traeger nennt - sonst stuende auf
+  // jedem Modulblatt die ganze Schublade.
+  const source = await readFile(new URL('../public/settings/pages/modules-options.js', import.meta.url), 'utf8');
+  assert.match(source, /renderPage\(container, preferences, container\.dataset\.part\)/);
+  assert.match(source, /PARTS\.includes\(part\) \? \[part\] : PARTS/);
+  const shell = await settingsShellSource();
+  assert.match(shell, /if \(section\.props\?\.part\) host\.dataset\.part = section\.props\.part;/);
+  // Die frueheren Alias-Pfade sind wieder eigene Blaetter.
+  for (const path of ['/settings/modules/budget', '/settings/modules/housekeeping']) {
+    assert.equal(currentSettingsPath(path), path);
+    assert.equal(findSettingsLeaf(path, member), null);
   }
+  // Ein Suchtreffer von gestern (`/settings/modules/options?option=...`) landet
+  // am Abschnitt, der die Option heute fuehrt.
+  assert.equal(movedSettingsUrl('/settings/modules/options', 'option=settings.healthCycleEnableLabel'),
+    '/settings/modules/health?section=options-health&option=settings.healthCycleEnableLabel');
+  assert.equal(movedSettingsUrl('/settings/modules/options'), '/settings/modules/budget?section=options-budget');
 });
 
-test('/settings/modules/health führt zum Vorsorge-Typregister, nicht mehr zu modules-options', () => {
+test('/settings/modules/health ist das Blatt Gesundheit samt Vorsorge-Typregister', () => {
   assert.equal(currentSettingsPath('/settings/modules/health'), '/settings/modules/health');
   const leaf = findSettingsLeaf('/settings/modules/health', admin);
-  assert.equal(leaf?.id, 'modules-health');
+  assert.equal(leaf?.id, 'module-health');
   assert.equal(leaf?.module, 'health');
-  assert.equal(findSettingsLeaf('/settings/modules/health', member), null, 'bleibt adminOnly');
+  assert.ok(settingsSheetSections(leaf, admin).some((section) => section.id === 'modules-health'));
+  assert.equal(settingsSheetSections(leaf, member).some((section) => section.id === 'modules-health'), false,
+    'das Typregister bleibt adminOnly');
 });
 
 test('legacy settings tabs migrate to their new destinations', () => {
   assert.equal(migrateLegacySettingsTab('general'), '/settings/personal/appearance');
   assert.equal(migrateLegacySettingsTab('shopping'), '/shopping?manage=categories');
-  assert.equal(migrateLegacySettingsTab('sync'), '/settings/sync/calendar');
+  assert.equal(migrateLegacySettingsTab('sync'), '/settings/modules/calendar');
   assert.equal(migrateLegacySettingsTab('backup'), '/settings/admin/backup');
-  // Ein Alt-Tab muss am heutigen Blatt ankommen, nicht am Zwischenstand von
-  // 2026-06: der Budget-Tab zeigte auf ein Blatt, das seither aufgegangen ist.
-  assert.equal(migrateLegacySettingsTab('budget'), '/settings/modules/options');
+  // Ein Alt-Tab muss am heutigen Blatt ankommen, nicht an einem Zwischenstand.
+  assert.equal(migrateLegacySettingsTab('budget'), '/settings/modules/budget');
 });
 
 test('legacy settings migration covers every previous tab', () => {
@@ -398,10 +507,10 @@ test('legacy settings migration covers every previous tab', () => {
     {
       general: '/settings/personal/appearance',
       meals: '/settings/modules/kitchen',
-      budget: '/settings/modules/options',
+      budget: '/settings/modules/budget',
       shopping: '/shopping?manage=categories',
       calendar: '/settings/modules/calendar',
-      sync: '/settings/sync/calendar',
+      sync: '/settings/modules/calendar',
       account: '/settings/personal/account',
       family: '/settings/admin/family',
       'api-tokens': '/settings/admin/api',
@@ -429,7 +538,7 @@ test('settingsOverviewUrl builds an encoded domain overview URL', () => {
 test('resolveSettingsDestination restores an allowed stored leaf at the settings root', () => {
   assert.equal(
     resolveSettingsDestination('/settings', admin, '/settings/sync/storage'),
-    '/settings/sync/storage',
+    '/settings/modules/documents',
   );
 });
 
@@ -472,13 +581,13 @@ function createMemoryStorage(initial = {}) {
 }
 
 test('readStoredSettingsDestination restores a valid stored leaf', () => {
-  const storage = createMemoryStorage({ [SETTINGS_STORAGE_KEY]: '/settings/sync/storage' });
-  assert.equal(readStoredSettingsDestination(admin, storage), '/settings/sync/storage');
+  const storage = createMemoryStorage({ [SETTINGS_STORAGE_KEY]: '/settings/modules/documents' });
+  assert.equal(readStoredSettingsDestination(admin, storage), '/settings/modules/documents');
 });
 
 test('readStoredSettingsDestination hebt ein vor dem IA-Umbau gespeichertes Ziel an', () => {
   const storage = createMemoryStorage({ [SETTINGS_STORAGE_KEY]: '/settings/documents/dms' });
-  assert.equal(readStoredSettingsDestination(admin, storage), '/settings/sync/dms');
+  assert.equal(readStoredSettingsDestination(admin, storage), '/settings/modules/documents');
 });
 
 // Ohne gueltiges gespeichertes Ziel gibt es kein "zuletzt besuchtes Blatt".
@@ -603,38 +712,326 @@ test('ungespeicherte Eingaben gehen beim Blattwechsel nicht still verloren', asy
   // Wiederverwendete Texte statt eigener Keys - der Modal-Dirty-Schutz sagt dasselbe.
   assert.match(guard, /modal\.unsavedChanges/);
 
-  assert.match(shell, /import\s*\{[^}]*confirmLeafExit[^}]*\}\s*from\s*'\.\/dirty-guard\.js'/);
-  assert.match(shell, /await confirmLeafExit\(\)/, 'jede Navigation aus einem Blatt muss durch den Guard');
+  // Seit R15 A7 P1-1 fragt nicht mehr jeder Link selbst, sondern der Router
+  // fuer JEDEN Weg: der Guard meldet sich beim Verlassen-Schutz an (Programm-
+  // Test unten). Ein zweites Fragen im Link waere eine zweite Buchfuehrung.
+  assert.match(guard, /import \{ setLeaveGuard \} from '\/utils\/leave-guard\.js';/);
+  assert.doesNotMatch(shell, /confirmLeafExit/, 'der Link fragt nicht selbst - navigate() fragt fuer alle Wege');
   assert.match(shell, /watchLeafForms\(leafContainer\)/, 'das Tracking haengt am fertig gerenderten Blatt');
+});
+
+/* EINSTELLUNGEN VERLIEREN NICHTS STILL (Re-Critique 2026-09-28 R15, A7 P1-1).
+ * Der Blatt-Guard fragte nur in den Links der Shell; Browser-Zurueck, die
+ * Befehlspalette, Tab-Leiste und Mehr-Blatt liefen an ihm vorbei in
+ * navigate() und warfen den offenen Stand weg. Die Rechte-Matrix (kein
+ * <form>) sah er gar nicht. Gemessen als Programm: Formular-Stubs, echte
+ * Listener des Guards, der echte Verlassen-Schutz, den der Router fragt. */
+function guardFakes() {
+  const container = {
+    isConnected: true,
+    on: {},
+    addEventListener(type, fn) { (this.on[type] ??= []).push(fn); },
+  };
+  const form = {
+    isConnected: true,
+    querySelector: (sel) => (/type="submit"/.test(sel) ? {} : null),
+  };
+  const field = (instant = false) => ({
+    closest: (sel) => (sel === 'form' ? form : (sel === '[data-instant-save]' && instant ? {} : null)),
+  });
+  const fire = (type, target, isTrusted = true) => {
+    for (const fn of container.on[type] ?? []) fn({ type, target, isTrusted });
+  };
+  return { container, form, field, fire };
+}
+
+async function withGuardEnv(fn) {
+  const prev = { window: globalThis.window, confirm: globalThis.__confirmModal };
+  globalThis.window = { ...(prev.window ?? {}), addEventListener() {}, removeEventListener() {} };
+  const gefragt = [];
+  let antwort = false;
+  globalThis.__confirmModal = async (title, options) => { gefragt.push({ title, options }); return antwort; };
+  const guard = await import('/settings/dirty-guard.js');
+  const leave = await import('/utils/leave-guard.js');
+  try {
+    await fn({ guard, leave, gefragt, antworte: (a) => { antwort = a; } });
+  } finally {
+    guard.clearLeafEdits?.();
+    globalThis.window = prev.window;
+    globalThis.__confirmModal = prev.confirm;
+  }
+}
+
+test('Einstellungen: ein offenes Formular fragt vor JEDEM Wechsel ueber den Router - nur solange etwas offen ist (R15 A7 P1-1)', async () => {
+  await withGuardEnv(async ({ guard, leave, gefragt, antworte }) => {
+    const { container, form, field, fire } = guardFakes();
+    guard.watchLeafForms(container);
+    assert.equal(leave.hasLeaveGuard(), false, 'sauberes Blatt: kein Waechter, die Navigation bleibt ohne await');
+
+    fire('change', field(), false);
+    assert.equal(leave.hasLeaveGuard(), false, 'programmatische Werte sind keine Nutzerarbeit');
+
+    fire('input', field());
+    assert.equal(leave.hasLeaveGuard(), true, 'eine echte Eingabe meldet den Schutz beim Router an');
+    antworte(false);
+    assert.equal(await leave.mayLeave('/tasks'), false, 'Palette, Zurueck, Tab-Leiste: ein Nein haelt das Blatt');
+    assert.equal(gefragt.length, 1);
+    assert.equal(gefragt[0].title, 'modal.unsavedChanges', 'dieselbe Rueckfrage wie Dialog und Anpassen-Modus');
+    assert.equal(gefragt[0].options.danger, true, 'Verwerfen ist rot wie im Dialog-Schutz');
+    assert.equal(gefragt[0].options.confirmLabel, 'modal.discardChanges');
+    assert.equal(gefragt[0].options.detail, 'settings.leaveDiscardDetail', 'der rote Dialog nennt seine Folgen');
+
+    antworte(true);
+    assert.equal(await leave.mayLeave('/tasks'), true, 'Verwerfen laesst gehen');
+    assert.equal(leave.hasLeaveGuard(), false, 'danach ist nichts mehr offen');
+
+    fire('change', field());
+    assert.equal(leave.hasLeaveGuard(), true);
+    fire('submit', field());
+    assert.equal(leave.hasLeaveGuard(), false, 'gespeichert = sauber, der Waechter geht');
+
+    fire('change', field());
+    form.isConnected = false;
+    const vorher = gefragt.length;
+    assert.equal(await leave.mayLeave('/tasks'), true, 'ein abgehaengtes Formular haelt niemanden');
+    assert.equal(gefragt.length, vorher, 'und fragt auch nicht');
+  });
+});
+
+test('Einstellungen: ein Sofort-Schalter im Formular hinterlaesst keinen offenen Stand (R15 A7 P1-1)', async () => {
+  await withGuardEnv(async ({ guard, leave }) => {
+    const { container, field, fire } = guardFakes();
+    guard.watchLeafForms(container);
+    fire('change', field(true));
+    assert.equal(leave.hasLeaveGuard(), false, 'data-instant-save: gespeichert beim Umlegen, nichts zu verlieren');
+    fire('change', field(false));
+    assert.equal(leave.hasLeaveGuard(), true, 'Gegenprobe: ein Feld ohne die Marke zaehlt');
+  });
+});
+
+test('Einstellungen: ein Blatt ohne Formular (Rechte-Matrix) meldet seinen Entwurf selbst an (R15 A7 P1-1)', async () => {
+  await withGuardEnv(async ({ guard, leave, gefragt }) => {
+    const { container } = guardFakes();
+    guard.watchLeafForms(container);
+    let dirty = false;
+    const knoten = { isConnected: true };
+    const abmelden = guard.trackLeafEdits(knoten, () => dirty);
+    assert.equal(leave.hasLeaveGuard(), false, 'sauberer Entwurf: kein Waechter');
+    dirty = true;
+    guard.syncLeafEdits();
+    assert.equal(leave.hasLeaveGuard(), true, 'offener Entwurf: angemeldet');
+    assert.equal(await leave.mayLeave('/calendar'), false, 'und gefragt');
+    assert.equal(gefragt.length, 1);
+    guard.watchLeafForms(container);
+    assert.equal(leave.hasLeaveGuard(), true, 'ein Neuaufbau der Formularwache wirft die Quelle des Blatts nicht weg');
+    dirty = false;
+    guard.syncLeafEdits();
+    assert.equal(leave.hasLeaveGuard(), false, 'gespeichert: abgemeldet');
+    abmelden();
+  });
+  const src = await readFile(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
+  assert.match(src, /trackLeafEdits\(container, \(\) => state\.dirty\)/, 'die Matrix meldet ihren Entwurf an');
+  const update = src.slice(src.indexOf('function updateSaveState('), src.indexOf('\n}\n', src.indexOf('function updateSaveState(')));
+  assert.match(update, /syncLeafEdits\(\)/, 'jede Aenderung des Entwurfs gleicht die Anmeldung ab');
+});
+
+test('Feiertage: die Ebenen-Schalter speichern sofort, ein Fehler legt zurueck (R15 A7 P1-1)', async () => {
+  const cal = await import('../public/settings/pages/modules-calendar.js');
+  assert.equal(typeof cal.bindHolidayLayerSwitches, 'function');
+  const prevWindow = globalThis.window;
+  const toasts = [];
+  globalThis.window = { ...(prevWindow ?? {}), yuvomi: { showToast: (...a) => toasts.push(a) } };
+  const schalter = (checked) => ({
+    checked, disabled: false, isConnected: true, on: {},
+    addEventListener(type, fn) { (this.on[type] ??= []).push(fn); },
+    async fire() { for (const fn of this.on.change ?? []) await fn(); },
+  });
+  try {
+    const showPublic = schalter(false);
+    const showSchool = schalter(true);
+    const publicColorGroup = { hidden: true };
+    const schoolColorGroup = { hidden: false };
+    const gespeichert = [];
+    let fehler = null;
+    cal.bindHolidayLayerSwitches({
+      showPublic, showSchool, publicColorGroup, schoolColorGroup,
+      save: async (patch) => { if (fehler) throw fehler; gespeichert.push(patch); },
+    });
+    showPublic.checked = true;
+    await showPublic.fire();
+    assert.deepEqual(gespeichert, [{ holiday_show_public: true }], 'nur der eigene Wert, ohne Land und Farben');
+    assert.equal(toasts.at(-1)?.[1], 'success');
+    assert.equal(showPublic.disabled, false, 'nach dem Speichern wieder bedienbar');
+
+    fehler = new Error('offline');
+    showSchool.checked = false;
+    schoolColorGroup.hidden = true;
+    await showSchool.fire();
+    assert.equal(showSchool.checked, true, 'Fehler: der Schalter legt sich zurueck');
+    assert.equal(schoolColorGroup.hidden, false, 'und die Farbe folgt ihm');
+    assert.equal(toasts.at(-1)?.[1], 'danger');
+  } finally {
+    globalThis.window = prevWindow;
+  }
+});
+
+/* KEIN SCHALTER IM FORMULAR OHNE ANTWORT (R15 A7 P1-1). Ein `role=switch` in
+ * einem Formular mit Speichern-Knopf ist entweder ein Sofort-Schalter
+ * (`data-instant-save`, eigener Speicherweg) oder steht in einem Formular,
+ * dessen Felder aneinander haengen - dann haelt ihn der Blatt-Guard (oben
+ * als Programm gemessen), und das Formular steht hier mit Grund. Ein neues
+ * Formular mit Schalter muss sich fuer eine der beiden Antworten entscheiden. */
+const GUARDED_SWITCH_FORMS = new Map([
+  ['admin-api.js#api-token-form', 'Anlegen: der Schalter ist ein Merkmal des neuen Tokens'],
+  ['admin-backup.js#backup-webdav-form', 'Aktivieren ohne Adresse und Zugang waere ein Sicherungsauftrag ins Leere'],
+  ['admin-family.js#add-member-form', 'Anlegen eines Mitglieds'],
+  ['admin-family.js#edit-member-form', 'Dialog mit eigenem Dirty-Schutz (components/modal.js)'],
+  ['admin-weather.js#weather-form', 'Automatisch orten fuellt die Koordinaten desselben Formulars'],
+  ['personal-weather.js#pweather-form', 'Automatisch orten fuellt die Koordinaten desselben Formulars'],
+  ['notifications.js#${esc(channel.id ?? \'\')}', 'Kanal: Aktiv haengt an Adresse und Zugang des Kanals'],
+  ['personal-calendar-subscriptions.js#ics-add-form', 'Anlegen eines Abos'],
+  ['personal-calendar-subscriptions.js#ics-edit-form', 'Dialog mit eigenem Dirty-Schutz (components/modal.js)'],
+]);
+
+test('Einstellungen: jeder Schalter in einem Formular mit Speichern speichert sofort oder steht im Guard mit Grund (R15 A7 P1-1)', async () => {
+  const dir = new URL('../public/settings/', import.meta.url);
+  const files = [
+    ...(await readdir(new URL('pages/', dir))).map((f) => `pages/${f}`),
+    'weather-location.js',
+  ];
+  const sources = Object.fromEntries(await Promise.all(files.map(async (f) => [f, await readFile(new URL(f, dir), 'utf8')])));
+  const gefunden = [];
+  for (const [file, src] of Object.entries(sources)) {
+    for (const m of src.matchAll(/<form\b[\s\S]*?<\/form>/g)) {
+      const body = m[0];
+      if (!/type="submit"/.test(body)) continue;
+      const id = body.match(/id="([^"]+)"/)?.[1] ?? '?';
+      const key = `${file.replace(/^pages\//, '')}#${id}`;
+      // Der Standort-Baustein bringt seinen Schalter von aussen mit.
+      const calls = [...body.matchAll(/toggleRowHtml\(\{[\s\S]*?\}\)\}/g)].map((c) => c[0])
+        .concat(/weatherLocationFieldsHtml\(/.test(body) ? [sources['weather-location.js']] : []);
+      for (const call of calls) {
+        if (!/control: 'switch'/.test(call)) continue;
+        gefunden.push(key);
+        if (/'data-instant-save': true/.test(call)) continue;
+        assert.ok(GUARDED_SWITCH_FORMS.has(key),
+          `${key}: Schalter ohne data-instant-save in einem Formular mit Speichern - sofort speichern oder mit Grund in GUARDED_SWITCH_FORMS`);
+      }
+    }
+  }
+  assert.ok(gefunden.includes('modules-calendar.js#holidays-form'), 'der Leser findet die Feiertags-Schalter');
+  for (const key of GUARDED_SWITCH_FORMS.keys()) {
+    assert.ok(gefunden.includes(key), `${key}: steht in der Ausnahmeliste, hat aber keinen Schalter (mehr) - Eintrag streichen`);
+  }
+  const cal = sources['pages/modules-calendar.js'];
+  for (const id of ['holiday-show-public', 'holiday-show-school']) {
+    assert.match(cal, new RegExp(`attrs: \\{ id: '${id}', 'data-instant-save': true \\}`), `${id} ist ein Sofort-Schalter`);
+  }
+  assert.match(cal, /bindHolidayLayerSwitches\(\{ showPublic, showSchool, publicColorGroup, schoolColorGroup \}\);/,
+    'die Seite verdrahtet die Sofort-Speicherung wirklich');
 });
 
 test('die Navigation laesst sich ueber alle Blaetter durchsuchen', async () => {
   const source = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  const registry = await readFile(new URL('../public/settings/registry.js', import.meta.url), 'utf8');
   // Bei 23 Blaettern in vier Domaenen war die Taxonomie der einzige Weg zu
   // einer Einstellung, deren Domaene man nicht kennt (Critique 2026-07-27).
-  assert.match(source, /type\s*=\s*'search'/, 'die Suche braucht ein echtes Suchfeld');
-  assert.match(source, /descriptionKey/, 'gefiltert wird ueber Label UND Beschreibung');
-  assert.match(source, /searchNormalize/, 'die Suche muss Gross-/Kleinschreibung und Diakritika ignorieren');
-  assert.match(source, /normalize\('NFD'\)/);
-  assert.match(source, /setAttribute\('role',\s*'status'\)/, 'die Trefferzahl gehoert in eine Live-Region');
+  // Seit 2026-09-26 ist es das geteilte Suchfeld der Shell (gefuellte Kapsel)
+  // und dieselbe Suche wie in der Wurzel - searchSettings() aus der Registry,
+  // die Label, Beschreibung, Bereich UND die einzelnen Optionen durchsucht
+  // (Verhalten: der Test "die Suche findet einzelne Optionen" weiter unten).
+  const navSearch = source.slice(source.indexOf('function createNavigationSearch'), source.indexOf('function createNavigation('));
+  assert.match(navSearch, /renderPageSearch\(\{\s*id: 'settings-navigation-search'/, 'die Seitenleiste nimmt das geteilte Suchfeld');
+  assert.doesNotMatch(navSearch, /form-input/, 'kein eigenes Suchfeld neben der Kapsel');
+  assert.match(navSearch, /searchSettings\(query, \{ user, translate: t \}\)/);
+  assert.match(registry, /descriptionKey/, 'gefiltert wird ueber Label UND Beschreibung');
+  assert.match(registry, /normalize\('NFD'\)/, 'die Suche muss Gross-/Kleinschreibung und Diakritika ignorieren');
+  assert.match(navSearch, /setAttribute\('role',\s*'status'\)/, 'die Trefferzahl gehoert in eine Live-Region');
   // Ohne Treffer greift der bestehende Leerzustand, statt stumm zu bleiben.
-  assert.match(source, /t\('search\.noResults'\)/);
+  assert.match(navSearch, /t\('search\.noResults'\)/);
+});
+
+/**
+ * DIE SUCHE FINDET EINZELNE OPTIONEN (Critique 2026-09-26, A7 P1). Gemessen
+ * lieferten "Zeitzone", "Dunkel", "Einladung", "Mealie" und "Zwei-Faktor"
+ * null Treffer, "Wand" nur die Wandtabletts statt des Wand-Modus: die Suche
+ * kannte nur Blatt-Titel und -Beschreibung. Gefahren wird die echte Suche mit
+ * dem deutschen Locale - dieselbe Funktion, die Wurzel und Seitenleiste rufen.
+ */
+test('die Suche findet einzelne Optionen, nicht nur Blaetter', async () => {
+  const de = JSON.parse(await readFile(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  const translate = (key) => key.split('.').reduce((value, segment) => value?.[segment], de) ?? key;
+  const admin = { role: 'admin' };
+  // Seit R10 steht eine Option in einem Abschnitt eines Blatts: gefragt wird
+  // der Abschnitt (das fruehere Blatt), das Sprungziel ist das Blatt.
+  const optionOn = (query, sectionId, user = admin) => searchSettings(query, { user, translate })
+    .options.some((hit) => hit.section.id === sectionId);
+
+  assert.ok(optionOn('Zeitzone', 'personal-appearance'), 'Zeitzone -> Darstellung');
+  assert.ok(optionOn('dunkel', 'personal-appearance'), 'ein Theme-Wert findet das Design-Segment');
+  assert.ok(optionOn('Einladung', 'admin-family'));
+  assert.ok(optionOn('mealie', 'modules-kitchen'), 'Produktnamen stehen als terms im Index');
+  assert.ok(optionOn('Zwei-Faktor', 'personal-account'));
+  assert.ok(optionOn('Wand', 'personal-appearance'), 'Wand findet den Wand-Modus, nicht nur die Wandtabletts');
+  // Diakritika und Gross-/Kleinschreibung zaehlen nicht.
+  assert.ok(optionOn('wahrung', 'personal-appearance'), 'waehrung ohne Umlaut findet Waehrung');
+
+  // Die Rechte gelten auch fuer Treffer: ein Mitglied findet keine Option
+  // eines adminOnly-Abschnitts, wohl aber seine eigenen.
+  const member = { role: 'member' };
+  assert.equal(optionOn('Einladung', 'admin-family', member), false);
+  assert.ok(optionOn('Wand', 'personal-appearance', member));
+
+  // Blatt-Treffer bleiben, und eine leere Eingabe findet nichts.
+  assert.ok(searchSettings('Wetter', { user: admin, translate }).leaves.some((leaf) => leaf.id === 'personal-weather'));
+  assert.deepEqual(searchSettings('  ', { user: admin, translate }), { leaves: [], sections: [], options: [] });
+
+  // Der Sprung traegt die Option als Anker, die Shell zeigt sie im Blatt.
+  const [hit] = searchSettings('Zeitzone', { user: admin, translate }).options;
+  assert.equal(settingsOptionUrl(hit.leaf, hit.key), '/settings/personal/appearance?option=settings.timezoneLabel');
+  const shell = await settingsShellSource();
+  assert.match(shell, /revealSettingsOption\(leafContainer, query\?\.get\?\.\('option'\)\)/);
+});
+
+/**
+ * FAST JEDER BLATTAUFRUF KOMMT OHNE `?option=`. Die erste Fassung von
+ * revealSettingsOption() rief `t(key)` vor der Pruefung, und das echte t()
+ * wirft bei `null` (i18n.js, resolveExtensionTranslation) - gemessen fiel
+ * dadurch JEDES Blatt ohne Suchtreffer in den Fehlerzustand "Einstellungen
+ * konnten nicht geladen werden". Der Stub des Test-Loaders wirft nicht, ein
+ * Aufruf hier waere also gruen gegen den Fehler; deshalb die Reihenfolge im
+ * Quelltext: die Schluesselpruefung steht vor dem ersten t().
+ */
+test('ein Blatt ohne Suchtreffer ruft t() nicht mit einem leeren Schluessel', async () => {
+  const shell = await settingsShellSource();
+  const body = shell.slice(shell.indexOf('function revealSettingsOption('), shell.indexOf('async function renderLeafContent'));
+  const guard = body.search(/if \(typeof key !== 'string' \|\| !key\) return false;/);
+  const firstT = body.search(/\bt\(key\)/);
+  assert.ok(guard > 0, 'revealSettingsOption() prueft den Schluessel nicht');
+  assert.ok(firstT > guard, 't(key) laeuft vor der Schluesselpruefung');
 });
 
 test('der Blattwechsel zeigt einen Ladezustand statt eines leeren Kastens', async () => {
   const source = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
-  // Zwischen `leafContainer.replaceChildren()` und dem fertigen Blatt lagen der
-  // dynamische Import und der erste Datenabruf (Critique 2026-07-27).
+  // Zwischen dem leeren Blatt und dem fertigen lagen der dynamische Import und
+  // der erste Datenabruf (Critique 2026-07-27).
   assert.match(source, /import\s*\{\s*renderSkeletonList\s*\}\s*from\s*'\/utils\/skeleton\.js'/);
   assert.match(source, /setAttribute\('aria-busy',\s*'true'\)/, 'aria-busy muss den Ladezustand ansagen');
   assert.match(source, /renderSkeletonList\(/, 'das Skelett muss aus dem geteilten Helfer kommen');
-  // Erfolg und Fehlschlag muessen aria-busy wieder abraeumen, sonst bleibt das
-  // Blatt fuer Screenreader dauerhaft "beschaeftigt".
-  assert.equal(
-    source.match(/removeAttribute\('aria-busy'\)/g)?.length,
-    2,
-    'aria-busy muss im Erfolgs- UND im Fehlerpfad entfernt werden',
-  );
+  // Seit R10 rendert ein Blatt mehrere Abschnitte, und ein Fehler bleibt im
+  // Abschnitt (renderSheetSection faengt ihn). aria-busy faellt deshalb genau
+  // einmal - NACH allen Abschnitten, egal ob einer scheiterte.
+  const body = source.slice(source.indexOf('async function renderLeafContent'), source.indexOf('function isSplit('));
+  // Seit 2026-09-28 wartet die Shell hoechstens SECTION_WAIT_MS (A7 P1-2); das
+  // Fertig-Stueck `finishLeaf` laeuft trotzdem genau einmal nach ALLEN.
+  assert.match(body, /await awaitSections\(\s*hosts\.map\(\(\[host, section\]\) => renderSheetSection\([^)]*\)\),\s*finishLeaf,\s*\)/,
+    'die Abschnitte laufen durch awaitSections, das Fertig-Stueck haengt daran');
+  assert.match(body, /const finishLeaf = \(\) => \{\s*clearTimeout\(skeletonTimer\);[\s\S]*?leafContainer\.removeAttribute\('aria-busy'\);/,
+    'aria-busy muss nach allen Abschnitten entfernt werden, auch wenn einer scheitert');
+  assert.match(source, /Promise\.allSettled\(pending\)\.then\(\(\) => onSettled\(\)\)/,
+    'auch ein scheiternder Abschnitt zaehlt als fertig');
+  const section = source.slice(source.indexOf('async function renderSheetSection'), source.indexOf('async function renderLeafContent'));
+  assert.match(section, /catch \(error\)[\s\S]*createRetryState\(/, 'ein scheiternder Abschnitt zeigt seinen eigenen Wiederholen-Zustand');
   assert.match(source, /clearTimeout\(skeletonTimer\)/, 'der verzoegerte Einsatz muss abbrechbar sein');
 });
 
@@ -1256,6 +1653,53 @@ test('weather geolocation callbacks only update the active leaf', () => {
   );
 });
 
+// Die Admin-Seite las nur die Datenbank: Wetter aus der `.env` (Web-Installer)
+// lief auf dem Dashboard, die Seite sagte "Nicht konfiguriert" und bot nichts
+// an. Die Quelle meldet jetzt der Server (`weather_source`), die Seite zeigt sie.
+test('admin weather page shows weather configured by the server', async () => {
+  const { weatherSourceOf, weatherSourceHtml, canRemoveStoredWeather } = await import('/settings/pages/admin-weather.js');
+
+  const env = weatherSourceOf({
+    weather_provider: null,
+    weather_source: { source: 'env', provider: 'open-meteo', lat: '52.52', lon: '13.4', city: 'Berlin', units: 'metric' },
+  });
+  const envHtml = weatherSourceHtml(env);
+  assert.match(envHtml, /settings\.weatherProviderOpenMeteoEnv/);
+  assert.doesNotMatch(envHtml, /settings\.weatherProviderNone/);
+  assert.match(envHtml, /Berlin \(52\.52, 13\.4\)/, 'Stadt und Koordinaten stehen schreibgeschuetzt da');
+  assert.match(envHtml, /settings\.weatherEnvHint\{"vars":"WEATHER_\*"\}/, 'der Weg zum Abschalten steht dabei');
+  assert.equal(canRemoveStoredWeather(env), false, 'die .env laesst sich hier nicht entfernen');
+
+  const owm = weatherSourceOf({
+    weather_source: { source: 'env', provider: 'openweathermap', lat: null, lon: null, city: 'Hamburg', units: 'metric' },
+  });
+  const owmHtml = weatherSourceHtml(owm);
+  assert.match(owmHtml, /settings\.weatherProviderOwm/);
+  assert.match(owmHtml, /settings\.weatherEnvHint\{"vars":"OPENWEATHER_\*"\}/);
+
+  // Koordinaten ohne Anbieter nimmt der Proxy auch - die Seite darf sie nicht
+  // "Nicht konfiguriert" nennen und muss sie entfernen lassen.
+  const stored = weatherSourceOf({
+    weather_provider: null,
+    weather_source: { source: 'db', provider: 'open-meteo', lat: '48.14', lon: '11.58', city: '', units: 'metric' },
+  });
+  assert.match(weatherSourceHtml(stored), /settings\.weatherProviderOpenMeteo\b(?!Env)/);
+  assert.doesNotMatch(weatherSourceHtml(stored), /weatherEnvHint/);
+  assert.equal(canRemoveStoredWeather(stored), true);
+
+  const none = weatherSourceOf({ weather_source: { source: 'none', provider: null } });
+  assert.match(weatherSourceHtml(none), /settings\.weatherProviderNone/);
+  assert.equal(canRemoveStoredWeather(none), false);
+
+  // Die Seite entscheidet den Vorrang nicht selbst: sie liest `weather_source`
+  // und nicht `weather_provider`, und das Entfernen loescht die Koordinaten
+  // mit - sonst kaeme die `.env` danach nie wieder zum Zug.
+  const source = await readFile(new URL('../public/settings/pages/admin-weather.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /preferences\.weather_provider\s*===/);
+  assert.match(source, /savePreferences\(\{ weather_provider: null, weather_lat: null, weather_lon: null, weather_city: '' \}\)/);
+  assert.match(source, /next\.source === 'env' \? t\('settings\.weatherRemovedEnv'\)/);
+});
+
 // Die Koordinatenvalidierung lag doppelt in admin-weather und personal-weather
 // (Critique 2026-07-27) und liegt jetzt einmal in weather-location.js.
 test('hasValidWeatherCoords rejects empty, non-numeric and out-of-range input', () => {
@@ -1443,3 +1887,1125 @@ test('all locales contain the settings IA translation foundation', async () => {
     }
   }
 });
+
+/*
+ * KOPFREGEL MOBIL (2026-09-26, Critique A7 P1 + A8). Die Einstellungen hatten
+ * mobil drei Ebenen (vier Bereichszeilen, eine Bereichsseite mit 88px-Zeilen,
+ * das Blatt), keinen geteilten Kopf, keine Suche und einen Rueckweg, der als
+ * Textlink im Inhalt mit wegscrollte. Die drei Tests halten die drei Zusagen.
+ */
+const settingsShellSource = () => readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+const settingsCssRules = async () => [...eachRule(await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8'))];
+const ruleBody = (rules, selector, atPattern = null) => rules
+  .filter((r) => r.selector.split(',').map((s) => s.trim()).includes(selector))
+  .filter((r) => (atPattern ? r.at.some((a) => atPattern.test(a)) : r.at.length === 0))
+  .map((r) => r.body)
+  .join(';');
+
+test('die Wurzel ist in jeder Breite EINE gruppierte Liste, die Bereichsebene gibt es nicht mehr', async () => {
+  const shell = await settingsShellSource();
+  // Keine zweite, mobile Uebersicht und keine Bereichsseite mehr.
+  assert.doesNotMatch(shell, /function renderDomainOverview\b|settings-mobile-overview/,
+    'mobil darf es keine eigene Bereichsebene geben - die Wurzel ist die Liste aller Blaetter');
+  assert.match(shell, /function renderOverview\(content, domains, user\)/);
+  // Jeder Bereich ist ein Abschnitt mit Sprungziel; der Deep-Link landet dort.
+  assert.match(shell, /section\.id = overviewSectionId\(domain\.id\)/);
+  assert.match(shell, /revealOverviewSection\(content, focusDomain\?\.id\)/,
+    '?view=domain&domain=x muss auf den Abschnitt springen, statt eine Zwischenseite zu rendern');
+  // Der Sprung wartet auf den Router, der den Port nach update() zuruecksetzt.
+  assert.match(shell, /function revealOverviewSection[\s\S]*?setTimeout\(/);
+
+  // Mobil: Zeile 44/48px, 32px-Marke, keine Beschreibung.
+  const rules = await settingsCssRules();
+  const mobile = /max-width:\s*767px/;
+  assert.match(ruleBody(rules, '.settings-overview__row', mobile), /min-height:\s*var\(--target-base\)/);
+  assert.match(ruleBody(rules, '.settings-overview__row-mark', mobile), /width:\s*var\(--target-sm\)/);
+  assert.match(ruleBody(rules, '.settings-overview__row-description', mobile), /display:\s*none/);
+  // Der Abschnitt landet unter dem klebenden Kopf, nicht dahinter.
+  assert.match(ruleBody(rules, '.settings-overview__section'), /scroll-margin-block-start:/);
+});
+
+test('der Rueckweg im Blatt steht im klebenden Kopf, nicht im Inhalt', async () => {
+  const shell = await settingsShellSource();
+  assert.doesNotMatch(shell, /settings-leaf-back-link/,
+    'der Textlink im Inhalt scrollte auf langen Blaettern mit weg (A7, Casey)');
+  // Der Kopf ist der geteilte Modulkopf - klebend, verdrahtet vom Router.
+  assert.match(shell, /toolbar\.className = 'page-toolbar settings-shell-header'/);
+  assert.match(shell, /createLink\(settingsOverviewUrl\(domain\.id\), 'settings-toolbar__back'\)/);
+  assert.match(shell, /back\.setAttribute\('aria-label', t\('settings\.backToSettings'\)\)/);
+  // Der Kopf zeigt den Rueckweg, BEVOR das Blatt geladen ist.
+  assert.match(shell, /renderToolbar\(toolbar, content, \{ activeLeaf, domain: leafDomain \}\);\s*await renderLeafContent/);
+
+  // Ausgeblendet wird der Kopf auf Blaettern nur dort, wo der Breadcrumb
+  // zurueckfuehrt (ab 768px) - nie bedingungslos, sonst fehlt mobil jeder Weg.
+  const rules = await settingsCssRules();
+  assert.equal(ruleBody(rules, '.settings-page--leaf .settings-shell-header'), '',
+    'ein bedingungsloses display:none nimmt mobil den einzigen Rueckweg');
+  assert.match(ruleBody(rules, '.settings-page--leaf .settings-shell-header', /min-width:\s*768px/), /display:\s*none/);
+});
+
+test('die Wurzel sucht ueber das Such-Icon im geteilten Kopf, in jeder Breite', async () => {
+  const shell = await settingsShellSource();
+  assert.match(shell, /import \{ renderPageSearch, wirePageSearch \} from '\/utils\/page-search\.js'/);
+  // Als Slot des Kopfes, damit die Shell sie mobil zum Icon macht (Regel 4).
+  assert.match(shell, /className: 'settings-toolbar__search page-toolbar__center'/);
+  // Die Suche filtert die Liste der Wurzel, nicht nur die Desktop-Seitenleiste.
+  assert.match(shell, /onQuery: \(value\) => filterOverview\(content, value\)/);
+  // Dieselbe Suche wie in der Seitenleiste (searchSettings); ein Abschnitt ohne
+  // Treffer faellt weg, und fruehere Blaetter und Optionen bekommen einen
+  // eigenen Abschnitt.
+  assert.match(shell, /function filterOverview[\s\S]*?searchSettings\(query[\s\S]*?section\.hidden = visible === 0[\s\S]*?hits\.sections\.map[\s\S]*?hits\.options\.map[\s\S]*?extra\.map\(createOptionRow\)/);
+});
+
+/**
+ * KEIN GRUENES „AKTIVIERT" NEBEN EINEM SCHALTER (Critique 2026-09-26, A7 P2).
+ * Auf `Aktive Module` standen vierzehn gruene Badges neben vierzehn gehakten
+ * Kaestchen - dieselbe Aussage zweimal, und die eine abweichende Zeile ging
+ * darin unter. Das Statuswort steht nur noch fuer die Abweichung (aus,
+ * Fehler, nicht im Menue). Geprueft an beiden Blaettern, die das Wort bauen,
+ * und am Stylesheet: eine Regel fuer den Normalzustand waere die Einladung,
+ * ihn wieder zu beschriften.
+ */
+test('Modulzeilen beschriften nur die Abweichung, nicht den Normalzustand', async () => {
+  const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
+  for (const path of ['../public/settings/pages/modules-active.js', '../public/settings/pages/modules-navigation.js']) {
+    assert.doesNotMatch(await read(path), /settings-module-status--enabled/, `${path} baut wieder ein Aktiviert-Badge`);
+  }
+  const rules = await settingsCssRules();
+  assert.deepEqual(rules.filter((rule) => rule.selector.includes('settings-module-status--enabled')).map((rule) => rule.selector), []);
+  // Die Abweichung behaelt ihr Wort.
+  assert.match(await read('../public/settings/pages/modules-active.js'), /settings-module-status--disabled[\s\S]*thirdPartyModulesStatusDisabled/);
+});
+
+/**
+ * EIN WERT AUS DREI IST DAS SEGMENT DER SHELL (Komponenten-Kanon 2026-09-26,
+ * DESIGN.md "Segmented Controls"). Theme und Wochenstart waren drei getrennte
+ * Rahmenknoepfe (`.theme-toggle`) ohne Well, mit aria-pressed statt einer
+ * Auswahl - die Pille war kein Zustand in einer Leiste. Beide nehmen jetzt
+ * `.segmented` (panel.css) als radiogroup mit der geteilten Verhaltensschicht
+ * (Pfeiltasten, Roving-Tabindex, aria-checked), und die eigene Optik ist weg.
+ */
+test('Theme und Wochenstart sind das Segment der Shell, kein eigener Umschalter', async () => {
+  const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
+  for (const [path, id] of [
+    ['../public/settings/pages/personal-appearance.js', 'theme-toggle'],
+    ['../public/settings/pages/modules-calendar.js', 'week-start-toggle'],
+  ]) {
+    const source = await read(path);
+    assert.match(source, new RegExp(`class="segmented settings-segmented" id="${id}" role="radiogroup"`), `${path}: #${id} ist kein .segmented`);
+    assert.match(source, /wireTablist\([\s\S]{0,120}?\{\s*activeId:[\s\S]{0,80}?activeClass: 'is-active',\s*mode: 'select'/, `${path}: ohne geteilte Verhaltensschicht`);
+    assert.doesNotMatch(source, /theme-toggle__btn/, `${path}: die alte Knopfreihe ist zurueck`);
+  }
+  const rules = await settingsCssRules();
+  assert.deepEqual(rules.filter((rule) => /\.theme-toggle/.test(rule.selector)).map((rule) => rule.selector), []);
+});
+
+// ── Re-Critique 2026-09-27 (R8, H12): ein Speichermodell auf der Belohnungs-Seite ──
+
+/** Das Blatt mit Fake-Flaechen: jedes per Id gefragte Element merkt sich seine Listener. */
+function rewardsSheet() {
+  const els = new Map();
+  const el = (id) => {
+    if (!els.has(id)) {
+      const listeners = {};
+      const attrs = new Map();
+      els.set(id, {
+        id, value: '', checked: false, disabled: false, readOnly: false, hidden: true, textContent: '', isConnected: true,
+        addEventListener(type, fn) { (listeners[type] ??= []).push(fn); },
+        setAttribute(name, value) { attrs.set(name, String(value)); },
+        removeAttribute(name) { attrs.delete(name); },
+        getAttribute(name) { return attrs.get(name) ?? null; },
+        querySelector: () => null,
+        async fire(type, extra = {}) {
+          for (const fn of listeners[type] ?? []) await fn({ type, preventDefault() {}, ...extra });
+        },
+      });
+    }
+    return els.get(id);
+  };
+  let html = '';
+  return {
+    el,
+    get html() { return html; },
+    replaceChildren() { html = ''; },
+    insertAdjacentHTML(_pos, markup) { html += markup; },
+    querySelector: (sel) => (sel.startsWith('#') ? el(sel.slice(1)) : null),
+  };
+}
+
+test('Belohnungen: das Punktefeld speichert wie die Schalter - ohne eigenen Knopf, beim Verlassen (H12)', async () => {
+  const { render } = await import('/settings/pages/modules-rewards.js');
+  const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
+  const puts = [];
+  const toasts = [];
+  const prevWindow = globalThis.window;
+  globalThis.window = { yuvomi: { showToast: (...args) => toasts.push(args) } };
+  globalThis.__apiStub = {
+    get: async (url) => (url === '/preferences' ? { data: { tasks_default_points: 0, disabled_modules: [] } } : { data: { count: 0 } }),
+    put: async (url, body) => { puts.push([url, body]); return { data: body }; },
+  };
+  resetPreferencesCache();
+  try {
+    const sheet = rewardsSheet();
+    await render(sheet, { user: { role: 'admin' } });
+    const form = sheet.html.match(/<form\b[^>]*id="rewards-default-points-form"[\s\S]*?<\/form>/)?.[0] ?? '';
+    assert.match(form, /id="rewards-default-points"/, 'Reichweite: das Punktefeld steht im Formular');
+    assert.doesNotMatch(form, /type="submit"/, 'kein Speichern-Knopf nur fuer dieses Feld');
+
+    const input = sheet.el('rewards-default-points');
+    const error = sheet.el('rewards-default-points-error');
+    input.value = '-3';
+    await input.fire('blur');
+    assert.deepEqual(puts, [], 'ein ungueltiger Wert wird nicht geschrieben');
+    assert.equal(error.hidden, false, 'sondern benannt');
+    assert.equal(input.getAttribute('aria-invalid'), 'true');
+
+    input.value = '5';
+    await input.fire('blur');
+    assert.deepEqual(puts, [['/preferences', { tasks_default_points: 5 }]], 'beim Verlassen gespeichert');
+    assert.equal(error.hidden, true, 'und der Fehler ist weg');
+    assert.equal(input.getAttribute('aria-invalid'), null);
+    assert.ok(toasts.some(([key]) => key === 'settings.rewardsDefaultPointsSaved'), `mit Rueckmeldung: ${JSON.stringify(toasts)}`);
+
+    await input.fire('blur');
+    assert.equal(puts.length, 1, 'derselbe Wert ein zweites Mal ist kein neuer Schreibzugriff');
+
+    input.value = '7';
+    await sheet.el('rewards-default-points-form').fire('submit');
+    assert.deepEqual(puts.at(-1), ['/preferences', { tasks_default_points: 7 }], 'Enter speichert ebenso');
+
+    input.value = '9';
+    await input.fire('keydown', { key: 'Escape' });
+    assert.equal(input.value, '7', 'Escape nimmt die ungespeicherte Eingabe zurueck');
+  } finally {
+    delete globalThis.__apiStub;
+    globalThis.window = prevWindow;
+    resetPreferencesCache();
+  }
+});
+
+// ── #1516: Die Standard-Erinnerungsliste ohne freigegebene Liste und bei gescheiterter Abfrage ──
+
+/**
+ * Der Abschnitt `personal-tasks` mit Fake-Flaechen: das Markup kommt als Text
+ * an, was `createRetryState` als Knoten in die Karte haengt, landet in
+ * `appended`, und jedes per Id gefragte Element merkt sich seine Listener.
+ */
+function tasksDefaultsSheet() {
+  let html = '';
+  const appended = [];
+  const els = new Map();
+  const card = { appendChild(node) { appended.push(node); return node; } };
+  const el = (id) => {
+    if (!els.has(id)) {
+      const listeners = {};
+      els.set(id, {
+        id,
+        addEventListener(type, fn) { (listeners[type] ??= []).push(fn); },
+        async fire(type) {
+          const event = { type, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+          for (const fn of listeners[type] ?? []) await fn(event);
+          return event;
+        },
+      });
+    }
+    return els.get(id);
+  };
+  return {
+    appended,
+    get html() { return html; },
+    replaceChildren() { html = ''; appended.length = 0; els.clear(); },
+    insertAdjacentHTML(_pos, markup) { html += markup; },
+    querySelector(sel) {
+      if (sel === '.settings-card') return html.includes('class="settings-card"') ? card : null;
+      const id = sel.match(/^#([\w-]+)$/)?.[1];
+      return id && html.includes(`id="${id}"`) ? el(id) : null;
+    },
+  };
+}
+
+/** Gerade genug `document` fuer createRetryState (settings/components.js). */
+function fakeDocument() {
+  const createElement = (tag) => {
+    const listeners = {};
+    const attrs = new Map();
+    return {
+      tagName: tag.toUpperCase(), className: '', textContent: '', type: '', disabled: false, children: [],
+      appendChild(child) { this.children.push(child); return child; },
+      setAttribute(name, value) { attrs.set(name, String(value)); },
+      getAttribute(name) { return attrs.get(name) ?? null; },
+      addEventListener(type, fn) { (listeners[type] ??= []).push(fn); },
+      async click() { for (const fn of listeners.click ?? []) await fn({ type: 'click' }); },
+      focus() {},
+    };
+  };
+  return { createElement };
+}
+
+const walkNodes = (nodes) => nodes.flatMap((node) => [node, ...walkNodes(node.children ?? [])]);
+
+async function withTasksDefaults({ preferences = {}, syncTargets }, run) {
+  const { render } = await import('/settings/pages/personal-tasks.js');
+  const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
+  const prev = { window: globalThis.window, document: globalThis.document, error: console.error };
+  const navigations = [];
+  globalThis.window = { yuvomi: { showToast() {}, navigate: (href) => navigations.push(href) } };
+  globalThis.document = fakeDocument();
+  console.error = () => {};
+  const state = { syncTargets };
+  globalThis.__apiStub = {
+    get: async (url) => {
+      if (url === '/preferences') return { data: preferences };
+      if (url === '/tasks/sync-targets') {
+        if (state.syncTargets instanceof Error) throw state.syncTargets;
+        return { data: { caldav: state.syncTargets } };
+      }
+      return { data: null };
+    },
+  };
+  resetPreferencesCache();
+  try {
+    await run({ render, state, navigations });
+  } finally {
+    delete globalThis.__apiStub;
+    globalThis.window = prev.window;
+    globalThis.document = prev.document;
+    console.error = prev.error;
+    resetPreferencesCache();
+  }
+}
+
+const LIST = { accountId: 1, accountName: 'Nextcloud', listUrl: 'https://dav.example/tasks/', listName: 'Familie' };
+
+test('Standard-Erinnerungsliste: ohne freigegebene Liste sagt der Abschnitt, warum - und der Admin bekommt den Weg zur Freigabe (#1516)', async () => {
+  const admin = { role: 'admin' };
+  const member = { role: 'member' };
+  const sheet = findSettingsLeaf('/settings/modules/tasks', admin);
+  const releaseHref = settingsSectionUrl(sheet, 'sync-reminders');
+  assert.ok(settingsSheetSections(sheet, admin).some((section) => section.id === 'sync-reminders'),
+    'die Freigabestelle ist ein sichtbarer Abschnitt im Aufgabenblatt des Admins');
+  assert.ok(!settingsSheetSections(sheet, member).some((section) => section.id === 'sync-reminders'),
+    'fuer Mitglieder gibt es sie nicht - ein Link dorthin liefe ins Leere');
+
+  await withTasksDefaults({ syncTargets: [] }, async ({ render, navigations }) => {
+    const asAdmin = tasksDefaultsSheet();
+    await render(asAdmin, { user: admin });
+    assert.doesNotMatch(asAdmin.html, /id="tasks-default-target"/, 'kein Dropdown mit der einzigen Option "nur lokal"');
+    assert.match(asAdmin.html, /settings\.tasksDefaultTargetEmpty\b/, 'der Leerzustand steht da');
+    assert.ok(asAdmin.html.includes(`href="${releaseHref}"`), `der Admin bekommt den Weg zur Freigabe: ${asAdmin.html}`);
+    const event = await asAdmin.querySelector('#tasks-sync-reminders-link').fire('click');
+    assert.equal(event.defaultPrevented, true, 'der Link bleibt in der App');
+    assert.deepEqual(navigations, [releaseHref]);
+
+    const asMember = tasksDefaultsSheet();
+    await render(asMember, { user: member });
+    assert.match(asMember.html, /settings\.tasksDefaultTargetEmpty\b/);
+    assert.ok(!asMember.html.includes('section=sync-reminders'), 'kein Link auf einen Abschnitt, den das Mitglied nicht sieht');
+  });
+
+  // Der Leerzustand erklaert sich selbst: was eine Erinnerungsliste ist
+  // (CalDAV) und wer sie freigibt (ein Admin). Gemessen am Wortlaut der
+  // Referenz und der englischen Fassung - der Rest folgt ihnen per Uebersetzung.
+  for (const code of ['de', 'en']) {
+    const locale = JSON.parse(await readFile(new URL(`../public/locales/${code}.json`, import.meta.url), 'utf8'));
+    const rendered = `${locale.settings.tasksDefaultsDescription} ${locale.settings.tasksDefaultTargetEmpty}`;
+    assert.match(rendered, /CalDAV/, `${code}: sagt nicht, was eine Erinnerungsliste ist: ${rendered}`);
+    assert.match(rendered, /\badmin/i, `${code}: sagt nicht, wer sie freigibt: ${rendered}`);
+  }
+});
+
+test('Standard-Erinnerungsliste: eine gescheiterte Abfrage ist ein Fehler mit Ausweg, kein Leerzustand (#1516)', async () => {
+  const failure = Object.assign(new Error('Internal server error.'), { status: 500 });
+  // Mit gespeichertem Ziel: gerade dann waere "nichts freigegeben" eine falsche Behauptung.
+  await withTasksDefaults({
+    preferences: { tasks_default_target: 'caldav:1|https://dav.example/tasks/' },
+    syncTargets: failure,
+  }, async ({ render, state }) => {
+    const host = tasksDefaultsSheet();
+    await render(host, { user: { role: 'member' } });
+    assert.doesNotMatch(host.html, /settings\.tasksDefaultTargetEmpty\b/, 'der Leerzustand behauptet, es sei nichts freigegeben');
+    assert.doesNotMatch(host.html, /id="tasks-default-target"/, 'ohne Liste ist unbekannt, was zur Wahl stuende');
+    const nodes = walkNodes(host.appended);
+    const alert = nodes.find((node) => node.getAttribute?.('role') === 'alert');
+    assert.ok(alert, `kein Fehler zu sehen: ${host.html}`);
+    assert.equal(alert.textContent, 'settings.tasksDefaultTargetLoadError');
+    const retry = nodes.find((node) => node.tagName === 'BUTTON');
+    assert.ok(retry, 'und kein Ausweg');
+
+    state.syncTargets = [LIST];
+    await retry.click();
+    assert.match(host.html, /id="tasks-default-target"/, 'Erneut versuchen laedt die Listen und zeigt das Feld');
+    assert.equal(walkNodes(host.appended).some((node) => node.getAttribute?.('role') === 'alert'), false, 'der Fehler ist weg');
+  });
+});
+
+/* ==========================================================================
+ * R10 (Re-Critique 2026-09-27): JE MODUL EIN BLATT, ALTE ADRESSEN LEBEN WEITER,
+ * LISTE + DETAIL AM DESKTOP.
+ *
+ * Der Stand VOR dem Umbau steht hier als Ledger, nicht als Import: die alte
+ * Registry gibt es nicht mehr, und ihre Pfade und Optionen sind genau das, was
+ * Lesezeichen, gespeicherte Ziele, App-Links und die Suche von gestern kennen.
+ * Das Ledger schrumpft nie - eine Adresse, die einmal galt, gilt weiter.
+ * ======================================================================== */
+
+const PRE_R10_LEAVES = Object.freeze({
+  '/settings/personal/account': { id: 'personal-account', adminOnly: false, labelKey: 'settings.pageAccount', options: ['settings.displayNameLabel', 'settings.colorLabel', 'settings.contactDetailsLegend', 'settings.changePassword', 'settings.twoFactorTitle', 'settings.otherSessionsTitle', 'settings.oidcLinkTitle'] },
+  '/settings/personal/appearance': { id: 'personal-appearance', adminOnly: false, labelKey: 'settings.pageAppearance', options: ['settings.sectionDesign', 'settings.wallModeLabel', 'settings.localeLabel', 'settings.dataLanguageLabel', 'settings.regionLabel', 'settings.currencyLabel', 'settings.timezoneLabel', 'settings.dateFormatLabel', 'settings.timeFormatLabel'] },
+  '/settings/personal/device': { id: 'personal-device', adminOnly: false, labelKey: 'settings.pageDevice', options: ['settings.pwaInstallTitle'] },
+  '/settings/personal/notifications': { id: 'personal-notifications', adminOnly: false, labelKey: 'settings.pageNotifications', options: ['settings.pushToggleTitle', 'settings.notificationChannelsTitle'] },
+  '/settings/personal/calendar': { id: 'personal-calendar', adminOnly: false, labelKey: 'settings.pageCalendarDefaults', options: ['settings.calendarAssignMeLabel', 'settings.calendarDefaultTargetLabel', 'settings.calendarDefaultRemindersLabel'] },
+  '/settings/personal/tasks': { id: 'personal-tasks', adminOnly: false, labelKey: 'settings.pageTaskDefaults', options: ['settings.tasksDefaultTargetLabel'] },
+  '/settings/personal/health': { id: 'personal-health', adminOnly: false, labelKey: 'settings.pageHealthPersonal', options: ['settings.healthCyclePersonalLabel', 'settings.healthPreventionNotifyCaregiversLabel', 'settings.healthVisibilityTitle'] },
+  '/settings/personal/weather': { id: 'personal-weather', adminOnly: false, labelKey: 'settings.pageWeather', options: ['settings.personalWeatherTitle', 'settings.weatherAutoLocateLabel'] },
+  '/settings/personal/navigation': { id: 'modules-navigation', adminOnly: false, labelKey: 'settings.pageNavigation', options: ['settings.desktopNavigationTitle', 'settings.mobileNavigationTitle'] },
+  '/settings/personal/feeds': { id: 'personal-feeds', adminOnly: false, labelKey: 'settings.pageFeeds', options: ['settings.feedExportTitle', 'settings.feedExportShowAssignees', 'settings.inventoryFeedTitle', 'settings.cycleFeedTitle', 'settings.scheduleFeedTitle', 'settings.wasteFeedTitle'] },
+  '/settings/personal/calendar-subscriptions': { id: 'personal-calendar-subscriptions', adminOnly: false, labelKey: 'settings.pageCalendarSubscriptions', options: ['settings.ics.title', 'settings.calendarImport.title'] },
+  '/settings/modules/active': { id: 'modules-active', adminOnly: true, labelKey: 'settings.pageActiveModules', options: ['settings.activeModulesTitle'] },
+  '/settings/modules/kitchen': { id: 'modules-kitchen', adminOnly: true, labelKey: 'settings.pageKitchen', options: ['settings.mealTypesLabel', 'settings.mealTypeNamesLabel', 'settings.recipeProvidersTitle'] },
+  '/settings/modules/calendar': { id: 'modules-calendar', adminOnly: true, labelKey: 'settings.pageCalendarModule', options: ['settings.calendarDurationTitle', 'settings.weekStartTitle', 'settings.holidayPublicLabel', 'settings.holidaySchoolLabel'] },
+  '/settings/modules/options': { id: 'modules-options', adminOnly: true, labelKey: 'settings.pageModuleOptions', options: ['settings.budgetModePersonalLabel', 'settings.healthCycleEnableLabel', 'settings.housekeepingPaymentTasksLabel', 'settings.tasksSubtasksExpandedLabel', 'settings.scheduleTemplatesTitle'] },
+  '/settings/modules/rewards': { id: 'modules-rewards', adminOnly: true, labelKey: 'settings.pageRewardsModule', options: ['settings.rewardsEnableLabel', 'settings.rewardsApprovalLabel', 'settings.rewardsDefaultPointsLabel'] },
+  '/settings/modules/health': { id: 'modules-health', adminOnly: true, labelKey: 'settings.pageHealthModule', options: ['settings.healthPreventionTypesTitle'] },
+  '/settings/modules/countdowns': { id: 'modules-countdowns', adminOnly: true, labelKey: 'settings.pageCountdownsModule', options: ['settings.countdownGraceDaysTitle'] },
+  '/settings/sync/calendar': { id: 'sync-calendar', adminOnly: true, labelKey: 'settings.pageSyncCalendar', options: ['settings.caldavTitle', 'settings.moreProviders', 'settings.sync.backfillTitle'] },
+  '/settings/sync/contacts': { id: 'sync-contacts', adminOnly: true, labelKey: 'settings.pageSyncContacts', options: ['settings.cardavTitle'] },
+  '/settings/sync/reminders': { id: 'sync-reminders', adminOnly: true, labelKey: 'settings.pageSyncReminders', options: ['settings.caldavSyncReminders'] },
+  '/settings/sync/storage': { id: 'documents-storage', adminOnly: true, labelKey: 'settings.pageDocumentStorage', options: ['settings.documentStorageWebdavTitle', 'settings.documentStorageGoogleDriveTitle'] },
+  '/settings/sync/dms': { id: 'documents-dms', adminOnly: true, labelKey: 'settings.pageDocumentDms', options: ['settings.dmsTitle'] },
+  '/settings/admin/family': { id: 'admin-family', adminOnly: true, labelKey: 'settings.pageFamilyRoles', options: ['settings.sectionFamily', 'settings.invites.title', 'settings.twoFactorTitle'] },
+  '/settings/admin/permissions': { id: 'admin-permissions', adminOnly: true, labelKey: 'settings.pagePermissions', options: ['settings.permCapabilitiesHeading'] },
+  '/settings/admin/weather': { id: 'admin-weather', adminOnly: true, labelKey: 'settings.pageHouseholdWeather', options: ['settings.weatherTitle'] },
+  '/settings/admin/displays': { id: 'admin-displays', adminOnly: true, labelKey: 'settings.pageDisplays', options: ['settings.displayPairingCodeLabel'] },
+  '/settings/admin/api': { id: 'admin-api', adminOnly: true, labelKey: 'settings.pageApiAccess', options: ['settings.apiTokensTitle'] },
+  '/settings/admin/backup': { id: 'admin-backup', adminOnly: true, labelKey: 'settings.pageBackupRestore', options: ['settings.backupDownloadTitle', 'settings.backupRestoreTitle', 'settings.backupSchedulerTitle', 'settings.backupWebdavEnabled'] },
+  '/settings/admin/email': { id: 'admin-email', adminOnly: true, labelKey: 'settings.pageEmail', options: ['email.host'] },
+  '/settings/admin/immich': { id: 'admin-immich', adminOnly: true, labelKey: 'settings.pageImmich', options: ['settings.immichServerUrl'] },
+  '/settings/admin/system': { id: 'admin-system', adminOnly: true, labelKey: 'settings.pageSystem', options: ['settings.appNameLabel', 'settings.systemVersionLabel'] },
+});
+
+/** Alias-Pfade aelterer Umbauten, die vor R10 schon umleiteten -> Abschnitt heute. */
+const PRE_R10_ALIASES = Object.freeze({
+  '/settings/documents/storage': 'documents-storage',
+  '/settings/documents/dms': 'documents-dms',
+  '/settings/modules/navigation': 'modules-navigation',
+  '/settings/modules/dashboard': 'admin-weather',
+  '/settings/modules/budget': 'options-budget',
+  '/settings/modules/housekeeping': 'options-housekeeping',
+});
+
+/**
+ * Optionen, die es bewusst nicht mehr gibt - mit dem Ort, der sie heute
+ * traegt. Nur ein Eintrag: der zweite An/Aus-Schalter fuer Belohnungen (A7
+ * P1-3). An und aus geht ein Modul nur in Aktive Module.
+ */
+const RETIRED_OPTIONS = Object.freeze({
+  'settings.rewardsEnableLabel': 'modules-active',
+});
+
+/** Der Abschnitt, in dem ein altes Blatt heute steht (modules-options: einer je Teil). */
+function sectionsOfOldLeaf(oldId) {
+  if (oldId === 'modules-options') return SETTINGS_SECTIONS.filter((s) => String(s.loader).includes('modules-options.js'));
+  // Feed-Abos: seit R14 ein Feed je Modulblatt, dieselbe Datei (A7 P2-3).
+  if (oldId === 'personal-feeds') return SETTINGS_SECTIONS.filter((s) => String(s.loader).includes('personal-feeds.js'));
+  return SETTINGS_SECTIONS.filter((s) => s.id === oldId);
+}
+
+/** Zerlegt die Umleitung eines Alt-Pfads in Blatt und Abschnitt. */
+function landing(path, search = '') {
+  const url = new URL(movedSettingsUrl(path, search) ?? path, 'http://x');
+  const sheet = SETTINGS_LEAVES.find((leaf) => leaf.path === url.pathname) ?? null;
+  return { sheet, section: url.searchParams.get('section'), params: url.searchParams };
+}
+
+test('S2: jede Adresse von vor R10 landet auf einem existierenden Blatt samt Abschnitt', () => {
+  const paths = [...Object.keys(PRE_R10_LEAVES), ...Object.keys(PRE_R10_ALIASES)];
+  assert.ok(paths.length >= 38, `nur ${paths.length} Alt-Adressen - liest der Test das Ledger noch?`);
+  const routed = new Set([...SETTINGS_LEAVES.map((leaf) => leaf.path), ...RENAMED_SETTINGS_SOURCE_PATHS]);
+  for (const path of paths) {
+    // Der Router kennt die Adresse, sonst matcht ein Lesezeichen gar nichts.
+    assert.ok(routed.has(path), `${path}: keine Route - ein Lesezeichen laeuft ins Leere`);
+    const { sheet, section } = landing(path);
+    assert.ok(sheet, `${path}: landet auf keinem Blatt`);
+    assert.equal(findSettingsLeaf(path, admin)?.id, sheet.id, `${path}: findSettingsLeaf und Umleitung sind sich uneins`);
+    const expected = PRE_R10_LEAVES[path]
+      ? sectionsOfOldLeaf(PRE_R10_LEAVES[path].id).map((entry) => entry.id)
+      : [PRE_R10_ALIASES[path]];
+    const sheetSections = settingsSheetSections(sheet, admin).map((entry) => entry.id);
+    if (section) {
+      assert.ok(sheetSections.includes(section), `${path}: Abschnitt ${section} steht nicht im Blatt ${sheet.id}`);
+      assert.ok(expected.includes(section), `${path}: springt an ${section}, erwartet ${expected.join('|')}`);
+    } else {
+      // Unverschoben: das Blatt traegt den Abschnitt des alten Blatts selbst.
+      assert.ok(expected.some((id) => sheetSections.includes(id)), `${path}: ${sheet.id} traegt ${expected.join('|')} nicht`);
+    }
+  }
+});
+
+test('S2: Mitglieder landen an ihren Abschnitten, Admin-Adressen bleiben zu', () => {
+  for (const [path, old] of Object.entries(PRE_R10_LEAVES)) {
+    const sheet = findSettingsLeaf(path, member);
+    if (old.adminOnly) {
+      // Ein Blatt darf es fuer das Mitglied geben (Kalender), der alte
+      // Admin-Abschnitt darin aber nicht.
+      const visible = sheet ? settingsSheetSections(sheet, member).map((entry) => entry.id) : [];
+      for (const section of sectionsOfOldLeaf(old.id)) {
+        assert.equal(visible.includes(section.id), false, `${path}: ${section.id} ist fuer Mitglieder sichtbar`);
+      }
+    } else {
+      assert.ok(sheet, `${path}: fuer Mitglieder verschwunden`);
+      assert.ok(settingsSheetSections(sheet, member).some((entry) => entry.id === old.id), `${path}: ${old.id} fehlt im Blatt`);
+    }
+  }
+});
+
+test('S2: der Controller leitet Alt-Adressen samt Abschnitt und Parametern um', async () => {
+  const source = await readFile(new URL('../public/pages/settings.js', import.meta.url), 'utf8');
+  // Am Programm statt an der Schreibweise: der Controller fuehrt die Adresse
+  // samt Parametern ueber movedSettingsUrl weiter.
+  assert.deepEqual((await runSettingsController('/settings/sync/calendar', '?sync_ok=google')).replaced,
+    ['/settings/modules/calendar?section=sync-calendar&sync_ok=google']);
+  // Das OAuth-Ergebnis (?sync_ok) gehoert an den Abschnitt Kalender-Synchronisation.
+  assert.match(source, /const SYNC_CALENDAR_LEAF = '\/settings\/modules\/calendar';/);
+  assert.match(source, /`\$\{SYNC_CALENDAR_LEAF\}\?section=\$\{SYNC_CALENDAR_SECTION\}&\$\{query\.toString\(\)\}`/);
+  // Parameter reisen mit, ein alter `?section=` nicht doppelt.
+  const { sheet, section, params } = landing('/settings/sync/calendar', 'sync_ok=google&section=alt');
+  assert.equal(sheet.id, 'module-calendar');
+  assert.equal(section, 'sync-calendar');
+  assert.equal(params.get('sync_ok'), 'google');
+  assert.equal(params.getAll('section').length, 1);
+  // Die Blaetter selbst verlinken intern auf die neuen Orte, nicht ueber die Umleitung.
+  const pages = await readdir(new URL('../public/settings/pages/', import.meta.url));
+  const stale = [];
+  for (const file of pages.filter((name) => name.endsWith('.js'))) {
+    const text = await readFile(new URL(`../public/settings/pages/${file}`, import.meta.url), 'utf8');
+    for (const path of RENAMED_SETTINGS_SOURCE_PATHS) {
+      if (text.includes(`'${path}'`) || text.includes(`"${path}"`)) stale.push(`${file}: ${path}`);
+    }
+  }
+  assert.deepEqual(stale, []);
+});
+
+test('S2: kein Link in App, Server oder Uebersetzung zeigt auf eine Adresse von vor R10', async () => {
+  // Die Umleitung ist das Netz fuer Lesezeichen - eigene Links (Dokumente ->
+  // Speicher, Drive-OAuth-Ruecksprung, Hinweis im Zyklus) fuehren direkt ans
+  // neue Blatt, sonst landet jeder Klick ueber einen replaceState-Umweg und
+  // ein spaeteres Aufraeumen der Umleitung braeche sie still.
+  const moved = new Set(RENAMED_SETTINGS_SOURCE_PATHS);
+  const current = new Set(SETTINGS_LEAVES.map((leaf) => leaf.path));
+  const roots = ['../public/', '../server/'];
+  const skip = /\/(vendor|node_modules)\/|\/public\/settings\/registry\.js$|\/public\/sw\.js$/;
+  const withoutComments = (text) => text
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+  const stale = [];
+  const unknown = [];
+  let scanned = 0;
+  async function walk(url) {
+    for (const entry of await readdir(url, { withFileTypes: true })) {
+      const child = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, url);
+      if (skip.test(child.pathname)) continue;
+      if (entry.isDirectory()) { await walk(child); continue; }
+      if (!/\.(js|json|html)$/.test(entry.name)) continue;
+      let text = await readFile(child, 'utf8');
+      if (entry.name.endsWith('.js')) text = withoutComments(text);
+      scanned += 1;
+      for (const [path] of text.matchAll(/\/settings\/[a-z]+\/[a-z-]+/g)) {
+        const where = child.pathname.replace(/^.*\/(public|server)\//, '$1/');
+        if (moved.has(path)) stale.push(`${where}: ${path}`);
+        else if (!current.has(path)) unknown.push(`${where}: ${path}`);
+      }
+    }
+  }
+  for (const root of roots) await walk(new URL(root, import.meta.url));
+  assert.ok(scanned > 300, `nur ${scanned} Dateien gelesen - der Scan ist blind`);
+  assert.deepEqual(stale, [], 'direkt auf das neue Blatt verlinken (movedSettingsUrl nennt das Ziel)');
+  assert.deepEqual(unknown, [], 'Link auf ein Blatt, das es nicht gibt');
+});
+
+test('S2: die Suche findet jede Option und jedes Blatt von vor R10', async () => {
+  const de = JSON.parse(await readFile(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  const translate = (key) => key.split('.').reduce((value, segment) => value?.[segment], de) ?? key;
+  let seen = 0;
+  for (const old of Object.values(PRE_R10_LEAVES)) {
+    const homes = sectionsOfOldLeaf(old.id).map((entry) => entry.id);
+    for (const key of old.options) {
+      if (RETIRED_OPTIONS[key]) continue;
+      seen += 1;
+      const hits = searchSettings(translate(key), { user: admin, translate }).options;
+      assert.ok(hits.some((hit) => hit.key === key && homes.includes(hit.section.id)),
+        `"${translate(key)}" (${key}) findet ${old.id} nicht mehr`);
+    }
+    // Der NAME des frueheren Blatts findet seinen Ort: als Blatt oder als
+    // Abschnitt ("Feed-Abos" -> Kalender, Abschnitt Feed-Abos).
+    const name = translate(old.labelKey);
+    const result = searchSettings(name, { user: admin, translate });
+    const sheets = new Set(homes.map((id) => SETTINGS_SECTIONS.find((entry) => entry.id === id).sheetId));
+    const found = result.leaves.some((leaf) => sheets.has(leaf.id))
+      || result.sections.some((hit) => homes.includes(hit.section.id))
+      || (old.id === 'modules-options' && result.options.length > 0);
+    assert.ok(found || old.id === 'modules-options', `Blattname "${name}" (${old.id}) findet nichts mehr`);
+  }
+  assert.ok(seen >= 70, `nur ${seen} Optionen geprueft - liest der Test das Ledger noch?`);
+  // Die ausgemusterte Option ist wirklich weg - und ihr Ort ist findbar.
+  for (const [key, home] of Object.entries(RETIRED_OPTIONS)) {
+    assert.equal(SETTINGS_SECTIONS.some((section) => (section.options ?? [])
+      .some((entry) => (typeof entry === 'string' ? entry : entry.key) === key)), false, `${key} steht wieder im Index`);
+    assert.ok(searchSettings(translate('settings.pageActiveModules'), { user: admin, translate })
+      .leaves.some((leaf) => leaf.id === home));
+  }
+  // Ein Abschnitt-Treffer springt an seinen Abschnitt.
+  const feeds = searchSettings(translate('settings.pageFeeds'), { user: admin, translate }).sections
+    .find((hit) => hit.section.id === 'personal-feeds');
+  assert.equal(settingsSectionUrl(feeds.leaf, feeds.section.id), '/settings/modules/calendar?section=personal-feeds');
+});
+
+// Codex P2 zu R10: ein Suchtreffer von vor R10
+// (`/settings/modules/rewards?option=settings.rewardsEnableLabel`) landete auf
+// dem Belohnungen-Blatt ohne die Option - das Blatt lebt weiter, nur der
+// Schalter nicht. Die Adresse fuehrt an den Ort, der ihn heute traegt.
+test('S2: eine ausgemusterte Option fuehrt von jedem alten Blatt an ihren heutigen Ort', () => {
+  const oldHomes = Object.entries(PRE_R10_LEAVES).filter(([, old]) => old.options.some((key) => RETIRED_OPTIONS[key]));
+  assert.ok(oldHomes.length > 0, 'das Ledger kennt das Blatt der ausgemusterten Option nicht mehr');
+  for (const [key, home] of Object.entries(RETIRED_OPTIONS)) {
+    for (const path of [...oldHomes.map(([oldPath]) => oldPath), '/settings/modules/options']) {
+      const { sheet, section, params } = landing(path, `option=${key}`);
+      assert.equal(sheet?.id, home, `${path}?option=${key}: landet auf ${sheet?.id}, erwartet ${home}`);
+      assert.ok(settingsSheetSections(sheet, admin).some((entry) => entry.id === section), `${path}: Abschnitt ${section} fehlt im Blatt`);
+      assert.equal(params.get('option'), null, 'die Option, die es nicht mehr gibt, faellt aus der Adresse');
+    }
+  }
+  // Gegenprobe: eine lebende Option auf ihrem lebenden Blatt bleibt, wo sie ist.
+  assert.equal(movedSettingsUrl('/settings/modules/rewards', 'option=settings.rewardsApprovalLabel'), null);
+  assert.equal(movedSettingsUrl('/settings/modules/rewards'), null);
+});
+
+/**
+ * Faehrt den Settings-Controller (pages/settings.js) als Programm fuer eine
+ * Adresse, die umleitet: was landet per replaceState in der Adresse, was
+ * bekommt der Router. Die Globals gehen danach zurueck; `update` misst die
+ * Soft-Navigation auf dieselbe Adresse.
+ */
+async function runSettingsController(pathname, search, { soft = false } = {}) {
+  const { render, update } = await import('/pages/settings.js');
+  const prev = { window: globalThis.window, history: globalThis.history, sessionStorage: globalThis.sessionStorage };
+  const replaced = [];
+  const navigated = [];
+  globalThis.window = {
+    location: { pathname, search },
+    yuvomi: { navigate: (...args) => navigated.push(args) },
+  };
+  globalThis.history = { replaceState: (_state, _title, url) => replaced.push(url) };
+  globalThis.sessionStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+  const container = { isConnected: true, replaceChildren() {}, insertAdjacentHTML() {}, querySelector: () => null };
+  try {
+    await render(container, { user: admin });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const softResult = soft ? await update({ user: admin, path: pathname, query: new URLSearchParams(search) }) : undefined;
+    return { replaced, navigated, softResult };
+  } finally {
+    globalThis.window = prev.window;
+    globalThis.history = prev.history;
+    globalThis.sessionStorage = prev.sessionStorage;
+  }
+}
+
+test('S2: der Controller leitet ein lebendes Blatt mit ausgemusterter Option per replaceState um', async () => {
+  const { replaced, navigated, softResult } = await runSettingsController(
+    '/settings/modules/rewards', '?option=settings.rewardsEnableLabel', { soft: true });
+  assert.deepEqual(replaced, ['/settings/modules/active?section=modules-active'], 'die Adresse zeigt aufs heutige Blatt');
+  assert.deepEqual(navigated, [['/settings/modules/active?section=modules-active', false]], 'und der Router zeichnet es');
+  // Soft-Navigation auf dieselbe Adresse rendert nicht inkrementell, sondern
+  // ueberlaesst sie dem regulaeren Pfad, der umleitet.
+  assert.equal(softResult, false);
+});
+
+test('S1: Admin-Abschnitte bleiben fuer Nicht-Admins verborgen - im Blatt, in der Liste und in der Suche', async () => {
+  const de = JSON.parse(await readFile(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  const translate = (key) => key.split('.').reduce((value, segment) => value?.[segment], de) ?? key;
+  for (const sheet of SETTINGS_LEAVES) {
+    const visible = settingsSheetSections(sheet, member);
+    assert.deepEqual(visible.filter((section) => section.adminOnly).map((section) => section.id), [], sheet.id);
+    // Ein Blatt ohne sichtbaren Abschnitt gibt es fuer das Mitglied nicht.
+    assert.equal(Boolean(findSettingsLeaf(sheet.path, member)), visible.length > 0, sheet.id);
+  }
+  // Die Suche: kein Treffer eines Admin-Abschnitts, egal wonach gesucht wird.
+  const queries = SETTINGS_SECTIONS.flatMap((section) => [section.labelKey, ...(section.options ?? [])
+    .map((entry) => (typeof entry === 'string' ? entry : entry.key))]).map(translate);
+  for (const query of queries) {
+    const hits = searchSettings(query, { user: member, translate });
+    const leaked = [...hits.sections, ...hits.options].filter((hit) => hit.section.adminOnly);
+    assert.deepEqual(leaked.map((hit) => `${query} -> ${hit.section.id}`), []);
+    assert.ok(hits.leaves.every((leaf) => findSettingsLeaf(leaf.path, member)), query);
+  }
+  // Die Shell rendert nur, was die Rolle sieht - Liste, Blatt und Vorwahl.
+  const shell = await settingsShellSource();
+  assert.match(shell, /const sections = settingsSheetSections\(leaf, user\);/);
+  assert.match(shell, /for \(const entry of settingsSheetsForDomain\(domain\.id, user\)\)/);
+  assert.match(shell, /const leaves = settingsSheetsForDomain\(domain\.id, user\);/);
+  assert.equal(firstSettingsSheet(member, 'admin')?.domainId, 'personal', 'ein Mitglied bekommt kein Haushaltsblatt vorgewaehlt');
+});
+
+test('S1: ein Modul geht nur in Aktive Module an und aus - die Modulblaetter zeigen den Zustand', async () => {
+  // Bis nichts mehr faellt: ein einmaliger Durchlauf laesst aus `<!<!---->--` wieder ein `<!--` entstehen.
+  const strip = (src) => {
+    let text = src;
+    for (let prev = null; prev !== text;) {
+      prev = text;
+      text = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, '');
+    }
+    return text;
+  };
+  const pages = (await readdir(new URL('../public/settings/pages/', import.meta.url))).filter((name) => name.endsWith('.js'));
+  const writers = [];
+  for (const file of pages) {
+    const text = strip(await readFile(new URL(`../public/settings/pages/${file}`, import.meta.url), 'utf8'));
+    // Schreiben heisst: der Schluessel als Payload-Feld (Lesen bleibt erlaubt).
+    if (/(^|[{,])\s*disabled_modules\s*:/m.test(text)) writers.push(file);
+  }
+  assert.deepEqual(writers, ['modules-active.js'], 'ein zweites Blatt schaltet Module fuer den Haushalt');
+  const rewards = await readFile(new URL('../public/settings/pages/modules-rewards.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(strip(rewards), /rewards-enabled|rewardsEnableLabel/, 'der Belohnungen-Schalter ist zurueck');
+
+  // Die Statuszeile: Zustand fuer alle, der Weg zum Schalter nur fuer Admins.
+  const shell = await settingsShellSource();
+  const status = shell.slice(shell.indexOf('function createModuleStatus('), shell.indexOf('// Wie lange die angesprungene Option'));
+  assert.match(status, /settings\.moduleStatusOn/);
+  assert.match(status, /settings\.moduleStatusOff/);
+  assert.match(status, /if \(user\?\.role === 'admin'\) \{\s*const link = createLink\(ACTIVE_MODULES_PATH/);
+  assert.match(shell, /const ACTIVE_MODULES_PATH = '\/settings\/modules\/active';/);
+  assert.equal(findSettingsLeaf('/settings/modules/active', admin)?.id, 'modules-active');
+  // Reichweiten-Ueberschriften stehen auf Modulblaettern.
+  assert.match(shell, /const scoped = Boolean\(leaf\.module\);/);
+  assert.match(shell, /t\(scope === 'mine' \? 'settings\.scopeMine' : 'settings\.scopeHousehold'\)/);
+});
+
+test('S3: Liste + Detail ab der Split-Schwelle aus tokens.css, erstes Blatt per replaceState, mobil nie', async () => {
+  const tokens = await readFile(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const threshold = Number(tokens.match(/--layout-split-threshold:\s*([0-9.]+)rem/)?.[1]);
+  assert.ok(threshold > 0, 'tokens.css: --layout-split-threshold fehlt');
+  const rules = await settingsCssRules();
+  // Die Seite ist der Container, gemessen wird die Modulflaeche.
+  assert.match(ruleBody(rules, '.settings-page'), /container:\s*settings-surface\s*\/\s*inline-size/);
+  const inside = rules.filter((rule) => rule.at.some((at) => /@container\s+settings-surface/.test(at)));
+  assert.ok(inside.length >= 2, 'keine Regel ab der Split-Schwelle');
+  for (const rule of inside) {
+    const at = rule.at.find((entry) => /@container\s+settings-surface/.test(entry));
+    assert.equal(Number(at.match(/min-width:\s*([0-9.]+)rem/)?.[1]), threshold,
+      `settings.css misst ${at}, tokens.css sagt ${threshold}rem - @container kann keine Variable lesen`);
+  }
+  const containerQuery = new RegExp(`@container\\s+settings-surface\\s*\\(min-width:\\s*${threshold}rem\\)`);
+  // Darunter keine Seitenleiste; darueber steht sie, klebt und scrollt fuer sich.
+  assert.match(ruleBody(rules, '.settings-shell__navigation'), /display:\s*none/);
+  const nav = ruleBody(rules, '.settings-shell__navigation', containerQuery);
+  assert.match(nav, /display:\s*block/);
+  assert.match(nav, /position:\s*sticky/);
+  assert.match(nav, /overflow-y:\s*auto/);
+  // Die klebende Liste endet ueber dem Nachlauf der Shell (Installationsbanner):
+  // bis an den Fensterrand gerechnet laegen ihre letzten Zeilen darunter und
+  // waeren auch mit dem eigenen Bildlauf nicht zu erreichen.
+  assert.match(nav, /max-height:\s*calc\([^;]*var\(--shell-tail/, 'die Liste zieht --shell-tail ab');
+  assert.match(ruleBody(rules, '.settings-shell', containerQuery), /grid-template-columns:\s*var\(--settings-list-width\)\s+minmax\(0,\s*1fr\)/);
+  // Das Blatt liest im Lesemass.
+  assert.match(ruleBody(rules, '.settings-shell__content'), /max-inline-size:\s*var\(--layout-reading\)/);
+
+  const shell = await settingsShellSource();
+  // Ob die Spalte steht, sagt das CSS: keine zweite Schwelle im Skript.
+  assert.doesNotMatch(shell, /matchMedia\([^)]*min-width/);
+  assert.match(shell, /getComputedStyle\(navigation\)\.display !== 'none'/);
+  // Vorwahl: replaceState, kein neuer History-Eintrag, kein Fokuswechsel - der
+  // Fokus wandert nur, wenn er schon in den Einstellungen lag.
+  const preselect = shell.slice(shell.indexOf('function preselectSheet('), shell.indexOf('function watchSplit('));
+  assert.match(preselect, /history\.replaceState\(/);
+  assert.doesNotMatch(preselect, /pushState|navigate\(|focus\(/);
+  assert.match(shell, /const quiet = !page\?\.contains\(document\.activeElement\);[\s\S]*?if \(quiet\) return;\s*requestAnimationFrame\(\(\) => \{\s*if \(!leafContainer\.contains\(document\.activeElement\)\) heading\.focus/);
+  // Nur im Split, und nur auf der Wurzel - ein Blatt in der Adresse hat Vorrang.
+  assert.match(shell, /if \(!activeLeaf && page && isSplit\(shell\) && preselectSheet\(/);
+  assert.match(shell, /if \(page\.classList\.contains\('settings-page--leaf'\)\) return;\s*if \(isSplit\(/);
+  // Die Suche steht an der Listenkante (Seitenleiste), dieselbe wie in der Wurzel.
+  assert.match(shell, /createNavigationSearch\(navigation, domains, user, activeLeaf\)/);
+});
+
+/*
+ * OHNE SERVICE WORKER HAENGT NICHTS (Re-Critique 2026-09-28, A7 P1-2).
+ * `navigator.serviceWorker.ready` loest nie auf, solange keine Registrierung
+ * aktiv ist (No-SW-Proxy, blockierte Registrierung). pushStatus() wartete
+ * darauf ohne Frist, das Blatt Benachrichtigungen damit auch, die Shell per
+ * Promise.all auf alle Abschnitte - und der Router haelt waehrend eines
+ * Soft-Updates seine Navigationssperre: danach wechselte KEIN Klick mehr das
+ * Blatt. Zwei Riegel: push.js gibt nach einer Frist "nicht verfuegbar" zurueck,
+ * und die Shell wartet hoechstens eine Frist auf ihre Abschnitte.
+ */
+function stubPushGlobals(ready) {
+  const saved = {};
+  for (const key of ['navigator', 'window', 'Notification']) {
+    saved[key] = Object.getOwnPropertyDescriptor(globalThis, key);
+  }
+  const define = (key, value) => Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
+  const Notification = { permission: 'default' };
+  define('navigator', { serviceWorker: { ready } });
+  define('window', { PushManager: function PushManager() {}, Notification });
+  define('Notification', Notification);
+  return () => {
+    for (const [key, desc] of Object.entries(saved)) {
+      if (desc) Object.defineProperty(globalThis, key, desc);
+      else delete globalThis[key];
+    }
+  };
+}
+
+/** Loest das Versprechen auf, oder 'haengt', wenn es nach allen Mikro-Schritten noch offen ist. */
+const settledOrHang = (promise) => Promise.race([promise, new Promise((r) => setImmediate(() => r('haengt')))]);
+
+test('pushStatus: ein nie bereiter Service Worker meldet "nicht verfuegbar" statt zu haengen', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const restore = stubPushGlobals(new Promise(() => {}));
+  try {
+    const { pushStatus, SW_READY_TIMEOUT_MS } = await import('/push.js');
+    const pending = pushStatus();
+    // 5s sind die Obergrenze, die sich noch nicht wie ein Haenger anfuehlt.
+    t.mock.timers.tick(5000);
+    const status = await settledOrHang(pending);
+    assert.notEqual(status, 'haengt', 'pushStatus wartet ohne Frist auf serviceWorker.ready');
+    assert.ok(SW_READY_TIMEOUT_MS > 0 && SW_READY_TIMEOUT_MS <= 5000);
+    assert.deepEqual(
+      { supported: status.supported, available: status.available, subscribed: status.subscribed },
+      { supported: true, available: false, subscribed: false },
+    );
+  } finally {
+    restore();
+  }
+});
+
+test('pushStatus: ein bereiter Service Worker bleibt verfuegbar', async () => {
+  const restore = stubPushGlobals(Promise.resolve({ pushManager: { getSubscription: async () => ({ endpoint: 'x' }) } }));
+  try {
+    const { pushStatus } = await import('/push.js');
+    const status = await pushStatus();
+    assert.equal(status.available, true);
+    assert.equal(status.subscribed, true);
+  } finally {
+    restore();
+  }
+});
+
+test('das Blatt Benachrichtigungen nennt "nicht verfuegbar" und sperrt Schalter und Test', async () => {
+  const source = await readFile(new URL('../public/settings/pages/notifications.js', import.meta.url), 'utf8');
+  assert.match(source, /st\.available !== false[\s\S]{0,300}toggle\.disabled = true;\s*testBtn\.disabled = true;\s*status\.textContent = t\('settings\.pushUnavailable'\)/,
+    'ohne Service Worker stuende "Status wird geprueft ..." fuer immer da');
+});
+
+test('die Shell wartet hoechstens eine Frist auf ihre Abschnitte', async (t) => {
+  const { __test } = await import('/settings/shell.js');
+  assert.equal(typeof __test?.awaitSections, 'function', 'settings/shell.js exportiert awaitSections nicht');
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let finished = false;
+  const pending = __test.awaitSections([Promise.resolve(), new Promise(() => {})], () => { finished = true; });
+  t.mock.timers.tick(__test.SECTION_WAIT_MS);
+  assert.notEqual(await settledOrHang(pending), 'haengt', 'ein haengender Abschnitt haelt die Shell - und mit ihr die Navigationssperre des Routers');
+  assert.equal(finished, false, 'das Blatt ist erst fertig, wenn alle Abschnitte stehen');
+
+  // Alle da: das Fertig-Stueck laeuft, bevor die Shell zurueckkehrt.
+  let done = false;
+  await __test.awaitSections([Promise.resolve(), Promise.resolve()], () => { done = true; });
+  assert.equal(done, true, 'ohne Haenger bleibt alles wie bisher: erst fertig, dann zurueck');
+
+  // Die Shell nutzt genau diesen Weg, nicht mehr das nackte Promise.all.
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  const leaf = shell.slice(shell.indexOf('async function renderLeafContent('), shell.indexOf('function isSplit('));
+  assert.match(leaf, /await awaitSections\(/);
+  assert.doesNotMatch(leaf, /await Promise\.all\(hosts/, 'renderLeafContent wartet wieder ohne Frist auf alle Abschnitte');
+});
+
+// R14 P12 (Re-Critique 2026-09-28, A1 P3-7): "v2.69.1" stand dauerhaft unter
+// der Wortmarke - Chrome-Rauschen. Die Version steht, wo man sie sucht: im
+// Blatt "Neuigkeiten" (aktuelle Version) und im Blatt "System".
+test('R14: die Versionsnummer steht nicht mehr unter der Wortmarke', async () => {
+  const router = await readFile(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(router, /className = 'nav-sidebar__version'/, 'keine Versionszeile in der Seitenleiste');
+  assert.match(router, /changelog\.currentVersion/, 'die Neuigkeiten nennen die installierte Version');
+  const system = await readFile(new URL('../public/settings/pages/admin-system.js', import.meta.url), 'utf8');
+  assert.match(system, /settings\.systemVersionValue/, 'das Blatt System nennt sie ebenfalls');
+});
+
+// R14 P10 (Re-Critique 2026-09-28, A7 P3): die Modulblaetter standen in einer
+// anderen Reihenfolge als die Seitenleiste - Budget vor Gesundheit, Kontakte
+// vor Dokumenten. Jetzt folgen sie ihr: Gruppen der Seitenleiste, darin die
+// Reihenfolge, die der Haushalt gewaehlt hat.
+test('R14: Modulblaetter stehen in der Reihenfolge der Seitenleiste', async () => {
+  const { settingsSheetsForDomain } = await import('../public/settings/registry.js');
+  const admin = { role: 'admin' };
+  const ids = (order) => settingsSheetsForDomain('modules', admin, { moduleOrder: order }).map((s) => s.module ?? s.id);
+  const plain = ids([]);
+  assert.deepEqual(plain.slice(0, 2), ['modules-active', 'modules-navigation'], 'die zwei allgemeinen Blaetter zuerst');
+  const mods = plain.slice(2);
+  assert.deepEqual(mods, ['dashboard', 'calendar', 'schedule', 'tasks', 'kitchen', 'housekeeping', 'waste', 'documents',
+    'inventory', 'rewards', 'contacts', 'health', 'budget'], 'ohne eigene Anordnung genau wie die Seitenleiste (gemessen 1440)');
+  const pos = (id) => mods.indexOf(id);
+  assert.equal(mods[0], 'dashboard', 'die Uebersicht fuehrt wie in der Seitenleiste');
+  assert.ok(pos('tasks') < pos('kitchen') && pos('kitchen') < pos('contacts') && pos('contacts') < pos('budget'),
+    `Planen, Haushalt, Menschen, Finanzen: ${mods}`);
+  assert.ok(pos('health') < pos('budget'), 'Gesundheit (Menschen) vor Budget (Finanzen)');
+  const custom = ids(['tasks', 'schedule', 'calendar', 'rewards', 'kitchen']).slice(2);
+  assert.ok(custom.indexOf('tasks') < custom.indexOf('calendar'), 'die eigene Reihenfolge des Haushalts zaehlt');
+  assert.ok(custom.indexOf('rewards') < custom.indexOf('kitchen'));
+  const router = await readFile(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(router, /moduleOrder: \(\) => _moduleOrder\.slice\(\)/, 'die Einstellungen lesen dieselbe Reihenfolge wie die Seitenleiste');
+});
+
+// R14 P10 (Re-Critique 2026-09-28, A8 P2-4): zwei mobile Unterseiten-
+// Grammatiken - Gesundheit-Bereich mit Large Title (34px), Einstellungs-Blatt
+// mit 22px-Titel direkt ueber einem 20px-Abschnitt. EINE Regel: eine Ebene
+// tiefer heisst mobil Zurueck-Leiste plus Large Title.
+test('R14: mobil traegt das Einstellungs-Blatt den Large Title wie jede Unterseite', async () => {
+  const css = await readFile(new URL('../public/styles/typography.css', import.meta.url), 'utf8');
+  const phone = [...eachRule(css)].filter((r) => r.at.some((a) => /\(max-width:\s*767px\)/.test(a))
+    && r.selector.split(',').some((s) => s.trim() === '.settings-leaf-header__title'));
+  assert.equal(phone.length, 1, 'eine Regel fuer den mobilen Blatt-Titel');
+  assert.match(phone[0].body, /font-size:\s*var\(--type-page-title-mobile\)/, 'Large Title (34px), dieselbe Stufe wie der Modulkopf');
+});
+
+// R14 P10 (Re-Critique 2026-09-28, A7 P2-3): das Kalender-Blatt war die
+// Sammelschublade - 4703px, fuenfmal "Feed aktivieren" als Primaerknopf, die
+// Exporte von Inventar, Gesundheit, Schichtplan und Entsorgung darin.
+test('R14: jeder Export steht im Blatt seines Moduls', async () => {
+  const { settingsSheetsForDomain } = await import('../public/settings/registry.js');
+  const member = { role: 'member' };
+  const home = (id) => SETTINGS_SECTIONS.find((section) => section.id === id);
+  assert.equal(home('personal-feeds').sheetId, 'module-calendar', 'der Kalender-Feed bleibt im Kalender');
+  assert.equal(home('personal-feeds').props?.part, 'calendar');
+  for (const [id, sheet, part] of [
+    ['feed-schedule', 'module-schedule', 'schedule'],
+    ['feed-cycle', 'module-health', 'cycle'],
+    ['feed-inventory', 'module-inventory', 'inventory'],
+    ['feed-waste', 'module-waste', 'waste'],
+  ]) {
+    const section = home(id);
+    assert.equal(section?.sheetId, sheet, `${id} steht im Blatt ${sheet}`);
+    assert.equal(section.props?.part, part);
+    assert.equal(section.scope, 'mine', 'der Token haengt an der eigenen Zeile');
+    assert.equal(section.adminOnly, false, 'jedes Mitglied richtet sein eigenes Abo ein (#770)');
+    assert.ok(SETTINGS_LEAVES.some((leaf) => leaf.id === sheet), `${sheet} ist ein Blatt`);
+  }
+  const calendarOptions = home('personal-feeds').options.map((o) => (typeof o === 'string' ? o : o.key));
+  assert.ok(!calendarOptions.some((key) => /inventoryFeed|cycleFeed|scheduleFeed|wasteFeed/.test(key)),
+    'die Suche fuehrt fremde Exporte nicht mehr ins Kalender-Blatt');
+  assert.ok(settingsSheetsForDomain('modules', member).some((leaf) => leaf.id === 'module-inventory'),
+    'Mitglieder sehen das Inventar-Blatt (ihr eigener Feed)');
+});
+
+test('R14: ein Feed ist ein Schalter, kein Primaerknopf', async () => {
+  const src = await readFile(new URL('../public/settings/pages/personal-feeds.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /btn--primary/, 'kein "Feed aktivieren" als Primaerknopf');
+  assert.match(src, /control: 'switch',\s*label: feed\.text\.title\(\)/, 'An/Aus ist ein Schalter mit dem Namen des Feeds');
+  assert.match(src, /container\.dataset\?\.part/, 'der Abschnitt sagt, welcher Feed');
+  assert.match(src, /!next && !await feed\.confirmDisable\(\)/, 'Ausschalten fragt nach wie der fruehere Knopf');
+});
+
+// R14 P11 (Re-Critique 2026-09-28, A7 P3/A1): der Blattwechsel schnitt hart,
+// waehrend der Rest der App mit Blenden wechselt. Das neue Blatt blendet ein -
+// nur beim WECHSEL (nicht beim ersten Aufbau), nur Deckkraft, Dauer und
+// Kurve aus den Tokens.
+test('R14: ein Blattwechsel blendet das neue Blatt ein', async () => {
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  const leaf = shell.slice(shell.indexOf('async function renderLeafContent('), shell.indexOf('function isSplit('));
+  assert.match(leaf, /const swapping = Boolean\(content\.querySelector\(':scope > \.settings-leaf'\)\);[\s\S]*content\.replaceChildren\(breadcrumb, header, leafContainer\);/,
+    'gefragt wird VOR dem Tausch, ob schon ein Blatt stand');
+  assert.match(leaf, /if \(swapping\) \{[^}]*classList\.add\('settings-sheet-enter'\)/, 'nur ein Wechsel blendet');
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const enter = rules.find((r) => r.selector.trim() === '.settings-sheet-enter');
+  assert.ok(enter, 'die Regel fuer das einblendende Blatt fehlt');
+  assert.match(enter.body, /animation:\s*settings-sheet-enter var\(--duration-md\) var\(--ease-out\)/);
+  assert.match(css, /@keyframes settings-sheet-enter\s*\{\s*from\s*\{\s*opacity:\s*0;?\s*\}\s*\}/, 'nur Deckkraft - nichts bewegt sich');
+});
+
+// R14 P8 (Re-Critique 2026-09-28, A7 P2-4): Familie brach den Kanon - violetter
+// Balken "+ Mitglied hinzufuegen" ueber 720px, 850px Inline-Formular mit
+// [Erstellen][Abbrechen], Zeilen ohne Haarlinien, Namen per Verkettung
+// ("Alex Johnson Loeschen"). Jetzt: Blatt-Dialog mit Kanon-Fuss, geteilte Liste,
+// Objektnamen aus common.*Named.
+test('R14: Familie legt im Blatt-Dialog an, Fuss [Abbrechen][Primaer], Zeilen mit Haarlinien', async () => {
+  const src = await readFile(new URL('../public/settings/pages/admin-family.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /settings-card--hidden/, 'kein Inline-Formular, das auf- und zugeklappt wird');
+  for (const [fn, cancel, submit] of [
+    ['addMemberFormHtml', 'cancel-add-member', "t('settings.createMember')"],
+    ['addInviteFormHtml', 'cancel-add-invite', "t('settings.invites.submit')"],
+  ]) {
+    const body = src.slice(src.indexOf(`function ${fn}(`), src.indexOf('\n}\n', src.indexOf(`function ${fn}(`)));
+    const foot = body.slice(body.indexOf('modal-panel__footer'));
+    assert.ok(body.includes('modal-panel__footer'), `${fn}: der Fuss ist .modal-panel__footer`);
+    assert.ok(foot.indexOf(cancel) >= 0 && foot.indexOf(cancel) < foot.indexOf(submit), `${fn}: [Abbrechen] vor [Primaer]`);
+  }
+  assert.match(src, /addMemberBtn\.addEventListener\('click', \(\) => openAddMemberModal\(/, 'der Knopf oeffnet den Dialog');
+  assert.match(src, /addBtn\.addEventListener\('click', \(\) => openInviteModal\(\)\)/);
+  assert.match(src, /content: addMemberFormHtml\(\)/);
+  assert.match(src, /content: addInviteFormHtml\(\)/);
+  assert.match(src, /<ul class="settings-members row-divided" id="members-list">/, 'Haarlinien zwischen den Mitgliedern');
+  assert.doesNotMatch(src, /btn--primary settings-add-btn/, 'kein violetter Balken ueber die volle Breite');
+  assert.match(src, /t\('common\.deleteNamed', \{ name: u\.display_name \}\)/, 'der Loeschknopf nennt sein Objekt');
+  assert.match(src, /t\('common\.editNamed', \{ name: u\.display_name \}\)/);
+  const editFoot = src.slice(src.indexOf('id="edit-member-error"'), src.indexOf("settings.saveMember')}</button>"));
+  assert.match(editFoot, /modal-panel__footer/, 'auch Bearbeiten traegt den Kanon-Fuss');
+});
+
+// R14 P8 (Re-Critique 2026-09-28, A7 Konsistenz): die Rechte trugen einen
+// eigenen Modus-Umschalter (.perm-modeswitch) neben dem Kanon-Umschalter, den
+// Design und Wochenstart zeigen.
+test('R14: der Modus der Rechte ist der Kanon-Umschalter .segmented', async () => {
+  const src = await readFile(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
+  assert.match(src, /<div class="segmented settings-segmented perm-mode" role="tablist"/);
+  assert.match(src, /class="segmented__item is-active" role="tab" aria-selected="true" data-mode="role"/);
+  assert.match(src, /attachSegmentIndicator\(modeSwitch\)/, 'die gleitende Kapsel bleibt');
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css, /perm-modeswitch/, 'kein zweiter Dialekt im Stylesheet');
+});
+
+// R14 P12 (Re-Critique 2026-09-28, A2 P2-3): die eigenen Schichtplan-
+// Einstellungen (Vorlauf, Ueberstunden, Wochenstunden) standen als Karte im
+// Tab "Auswertung". Sie gehoeren ins Modulblatt - und ein Mitglied muss sie
+// dort finden: die Route traegt keinen Admin-Check, das Blatt darf keinen
+// erfinden. Ohne den Registry-Eintrag war personal-schedule.js unerreichbar.
+test('R14: "Meine Einstellungen" des Schichtplans stehen im Modulblatt, auch fuer Mitglieder', async () => {
+  const member = { role: 'member' };
+  const sheet = SETTINGS_LEAVES.find((leaf) => leaf.id === 'module-schedule');
+  assert.ok(sheet, 'das Modulblatt Schichtplan existiert');
+  const sections = settingsSheetSections(sheet, member);
+  const mine = sections.find((section) => section.id === 'personal-schedule');
+  assert.ok(mine, 'der Abschnitt steht im Blatt und ist fuer ein Mitglied sichtbar');
+  assert.equal(mine.scope, 'mine');
+  assert.equal(mine.adminOnly, false);
+  assert.match(String(mine.loader), /import\('\/settings\/pages\/personal-schedule\.js'\)/,
+    'der Abschnitt laedt die Seite, die z14 aus der Auswertung geholt hat');
+  const src = await readFile(new URL('../public/settings/pages/personal-schedule.js', import.meta.url), 'utf8');
+  assert.match(src, /export async function render\(container, \{ user \}\)/, 'die Shell ruft render() des Moduls');
+});
+
+// #1607: ein Mitglied mit `health: none` sah das Gesundheitsblatt in den
+// Einstellungen offen und bedienbar, daneben "Kein Zugriff" - der Server wies
+// jeden Aufruf ab, die Seitenleiste zeigte das Modul laengst nicht mehr. Die
+// Einstellungen fragten nur nach der Rolle (adminOnly), nie nach dem
+// Modulrecht. Alle Wege in ein Blatt (Liste, Adresse, Suche) laufen durch
+// sheetVisible(), also wird dort gemessen - an den drei Ausgaengen, nicht am
+// Quelltext.
+test('#1607: ein Modulblatt folgt dem Modulrecht - none blendet aus, read bleibt', async () => {
+  const { settingsSheetsForDomain } = await import('../public/settings/registry.js');
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  const member = { role: 'member' };
+  const translate = (key) => key;
+  const sheetIds = () => settingsSheetsForDomain('modules', member).map((leaf) => leaf.id);
+  const healthPath = SETTINGS_LEAVES.find((leaf) => leaf.id === 'module-health').path;
+  const searchHits = () => {
+    const found = searchSettings('nav.health', { user: member, translate });
+    return [...found.leaves, ...found.sections.map((hit) => hit.leaf), ...found.options.map((hit) => hit.leaf)]
+      .filter((leaf) => leaf.id === 'module-health').length;
+  };
+
+  try {
+    // Gegenprobe zuerst: ohne Einschraenkung ist alles da. Faellt das schon
+    // hier, misst der Rest das Fehlen von etwas, das es nie gab.
+    clearPermissions();
+    assert.ok(sheetIds().includes('module-health'));
+    assert.equal(findSettingsLeaf(healthPath, member)?.id, 'module-health');
+    assert.ok(searchHits() > 0, 'die Suche findet das Gesundheitsblatt gar nicht - die Sonde ist blind');
+
+    setPermissions({ admin: false, modules: { health: 'none' } });
+    assert.ok(!sheetIds().includes('module-health'), 'die Blattliste fuehrt Gesundheit trotz none');
+    assert.equal(findSettingsLeaf(healthPath, member), null, 'die Adresse oeffnet das Blatt trotz none');
+    assert.equal(searchHits(), 0, 'die Suche fuehrt trotz none ins Gesundheitsblatt');
+    assert.ok(sheetIds().includes('module-tasks'), 'none fuer EIN Modul nimmt die anderen Blaetter nicht mit');
+
+    // Nur lesen: das Blatt bleibt (Zustand bleibt als Zeichen).
+    setPermissions({ admin: false, modules: { health: 'read' } });
+    assert.ok(sheetIds().includes('module-health'), 'read blendet das Blatt aus');
+
+    // Nicht nur Gesundheit: jedes Modulblatt, das ein Mitglied sieht, folgt
+    // seinem Recht. Die Liste kommt aus der Registry und nicht aus diesem Test,
+    // damit ein neues Blatt mitgeprueft wird.
+    clearPermissions();
+    const gated = settingsSheetsForDomain('modules', member)
+      .filter((leaf) => leaf.module && leaf.module !== 'dashboard');
+    assert.ok(gated.length >= 6, `nur ${gated.length} Modulblaetter fuer Mitglieder - die Schleife misst zu wenig`);
+    for (const leaf of gated) {
+      setPermissions({ admin: false, modules: { [leaf.module]: 'none' } });
+      assert.ok(!sheetIds().includes(leaf.id), `${leaf.id} bleibt trotz ${leaf.module}: none`);
+      assert.equal(findSettingsLeaf(leaf.path, member), null, `${leaf.path} oeffnet trotz none`);
+    }
+
+    // Ein Blatt ohne Modul (Navigation) haengt an keinem Recht.
+    setPermissions({ admin: false, modules: Object.fromEntries(gated.map((leaf) => [leaf.module, 'none'])) });
+    assert.deepEqual(sheetIds(), ['modules-navigation'], 'ohne jedes Modulrecht bleibt genau das modulfreie Blatt');
+
+    // Ein Admin ist nie eingeschraenkt, was auch immer in der Tabelle steht.
+    setPermissions({ admin: true, modules: { health: 'none' } });
+    assert.ok(settingsSheetsForDomain('modules', { role: 'admin' }).some((leaf) => leaf.id === 'module-health'));
+  } finally {
+    clearPermissions();
+  }
+});
+
+// Critique 2026-10-05 (R16): das Kalender-Blatt mass mobil 4319px, fuenf
+// Abschnitte untereinander, der erste Schalter bei y=517. Das Sprungziel gab
+// es laengst (`?section=`, Ziel der Umleitungen) - nur keinen Weg dorthin, der
+// im Blatt selbst steht. Blaetter mit mehr als drei Abschnitten fuehren jetzt
+// Sprungmarken am Blattanfang; kurze Blaetter bleiben ohne.
+test('R16: ein Blatt mit mehr als drei Abschnitten fuehrt Sprungmarken auf seine Abschnitte', async () => {
+  const { SETTINGS_LEAVES, settingsSheetJumpTargets, settingsSheetSections } = await import('../public/settings/registry.js');
+  const admin = { id: 1, role: 'admin', is_admin: true };
+  const sheet = (id) => SETTINGS_LEAVES.find((entry) => entry.id === id);
+
+  const calendar = settingsSheetJumpTargets(sheet('module-calendar'), admin);
+  assert.deepEqual(calendar.map((target) => target.id),
+    ['personal-calendar', 'personal-calendar-subscriptions', 'personal-feeds', 'modules-calendar', 'sync-calendar'],
+    'in der Reihenfolge des Blatts: erst "Fuer mich", dann der Haushalt');
+  assert.equal(calendar[4].url, '/settings/modules/calendar?section=sync-calendar', 'dasselbe Ziel wie die Umleitungen');
+  assert.equal(calendar[0].labelKey, 'settings.pageCalendarDefaults', 'die Marke heisst wie der Abschnitt in der Registry');
+
+  // Drei Abschnitte sind ein Blick, keine Navigation.
+  const tasks = sheet('module-tasks');
+  assert.equal(settingsSheetSections(tasks, admin).length, 3);
+  assert.deepEqual(settingsSheetJumpTargets(tasks, admin), []);
+  // Was ein Mitglied nicht sieht, zaehlt nicht mit und steht nicht in den Marken.
+  const member = { id: 2, role: 'member', is_admin: false };
+  const memberTargets = settingsSheetJumpTargets(sheet('module-calendar'), member);
+  assert.ok(memberTargets.every((target) => settingsSheetSections(sheet('module-calendar'), member).some((s) => s.id === target.id)));
+});
+
+test('R16: die Sprungmarken sind Links im Blatt, eine scrollende Zeile, und springen ohne Neuaufbau', async () => {
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  assert.match(shell, /settingsSheetJumpTargets\(leaf, user\)/, 'die Shell fragt die Registry, sie zaehlt nicht selbst');
+  // Zurueck liest `state.path` VOR der Adresse (router.js, popstate): zieht nur
+  // die Adresse um, landet die Rueckkehr am alten Abschnitt (Review #1673).
+  const jump = shell.slice(shell.indexOf('function createSheetJump('), shell.indexOf('function createSheetJump(') + 1600);
+  assert.match(jump, /replaceState\?\.\(\{ \.\.\.window\.history\.state, path: target\.url \}, '', target\.url\)/,
+    'der History-Eintrag traegt den Abschnitt, nicht nur die Adresszeile');
+  assert.match(shell, /link\.href = target\.url/, 'ein echter Link: Mittelklick und "Adresse kopieren" fuehren an den Abschnitt');
+  assert.match(shell, /event\.preventDefault\(\);\s*\n\s*revealSheetSection\(leafContainer, target\.id\)/,
+    'der Klick springt im stehenden Blatt (Fokus auf die Abschnittsueberschrift), statt es neu zu laden');
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const row = rules.find((r) => r.selector.trim() === '.settings-sheet-jump__list' && !r.at.length);
+  assert.match(row?.body ?? '', /overflow-x:\s*auto/);
+  assert.match(row?.body ?? '', /flex-wrap:\s*nowrap/, 'eine Zeile: umgebrochen kosteten fuenf Marken mobil drei Reihen vor dem ersten Schalter');
+});
+
+test('R16: mobil ist die Blattbeschreibung zwei Zeilen lang', async () => {
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const phone = [...eachRule(css)].find((r) => r.at.some((a) => /\(max-width:\s*767px\)/.test(a))
+    && r.selector.split(',').some((s) => s.trim() === '.settings-leaf-header__description'));
+  assert.match(phone?.body ?? '', /-webkit-line-clamp:\s*2/, 'vier Zeilen Vorspann standen vor dem ersten Schalter');
+});
+
+test('R16: im Blatt mit Sprungmarken steht die Beschreibung mobil nur im Baum', async () => {
+  // Marken und Beschreibung zaehlen beide auf, was im Blatt steht; zusammen
+  // schoben sie den ersten Schalter des Kalender-Blatts von y=517 auf 580.
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  assert.match(shell, /if \(jump\) \{[^}]*header\.classList\.add\('settings-leaf-header--jump'\)/,
+    'der Kopf weiss, dass Marken folgen - nur dann weicht die Beschreibung');
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const phone = [...eachRule(css)].find((r) => r.at.some((a) => /\(max-width:\s*767px\)/.test(a))
+    && r.selector.trim() === '.settings-leaf-header--jump .settings-leaf-header__description');
+  assert.match(phone?.body ?? '', /clip:\s*rect\(0, 0, 0, 0\)/, 'geclippt, nicht entfernt: der Text bleibt fuer Screenreader');
+  assert.doesNotMatch(phone?.body ?? '', /display:\s*none/);
+});
+

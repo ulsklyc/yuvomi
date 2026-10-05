@@ -58,16 +58,24 @@ function checkedState(preferences) {
   return new Map(TOGGLES.map((toggle) => [toggle.id, toggle.read(preferences)]));
 }
 
-function renderPage(container, preferences) {
-  const checked = checkedState(preferences);
-  container.replaceChildren();
-  container.insertAdjacentHTML('beforeend', `
-    <section class="settings-section">
-      <h2 class="settings-section__title">${t('settings.sectionBudget')}</h2>
+/**
+ * SEIT R10 KEIN EIGENES BLATT MEHR (Re-Critique 2026-09-27, A7 P1-3): die
+ * "Modul-Optionen" waren eine Sammelschublade fuer fuenf Module. Jeder Teil
+ * steht jetzt als Abschnitt "Fuer den Haushalt" im Blatt SEINES Moduls
+ * (registry.js, `part`). Die Ueberschrift mit dem Modulnamen entfaellt deshalb:
+ * das Blatt heisst schon so, und darueber steht die Reichweite.
+ */
+const PARTS = ['budget', 'health', 'housekeeping', 'tasks', 'schedule'];
+
+function partHtml(part, preferences, checked) {
+  switch (part) {
+    case 'budget':
+      return `
       <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.budgetModeTitle')}</h3>
         <p class="form-hint">${t('settings.budgetModeHint')}</p>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.budgetModePersonalLabel'),
           checked: checked.get('budget-mode-personal'),
           attrs: { id: 'budget-mode-personal' },
@@ -76,61 +84,67 @@ function renderPage(container, preferences) {
           ${t('settings.currencyMovedHint')}
           <a href="${APPEARANCE_PATH}" id="budget-region-link">${t('settings.regionTitle')}</a>
         </p>
-      </div>
-    </section>
-
-    <section class="settings-section">
-      <h2 class="settings-section__title">${t('nav.health')}</h2>
+      </div>`;
+    case 'health':
+      return `
       <div class="settings-card">
         <h3 class="settings-card__title">${t('health.tabs.cycle')}</h3>
         <p class="form-hint">${t('settings.healthCycleHint')}</p>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.healthCycleEnableLabel'),
           checked: checked.get('health-cycle-enabled'),
           attrs: { id: 'health-cycle-enabled' },
         })}
-      </div>
-    </section>
-
-    <section class="settings-section">
-      <h2 class="settings-section__title">${t('settings.sectionHousekeeping')}</h2>
+      </div>`;
+    case 'housekeeping':
+      return `
       <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.housekeepingPaymentsTitle')}</h3>
         <p class="form-hint">${t('settings.housekeepingPaymentTasksHint')}</p>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.housekeepingPaymentTasksLabel'),
           checked: checked.get('housekeeping-payment-tasks'),
           attrs: { id: 'housekeeping-payment-tasks' },
         })}
-      </div>
-    </section>
-
-    <section class="settings-section">
-      <h2 class="settings-section__title">${t('nav.tasks')}</h2>
+      </div>`;
+    case 'tasks':
+      return `
       <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.tasksSubtasksExpandedTitle')}</h3>
         <p class="form-hint">${t('settings.tasksSubtasksExpandedHint')}</p>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.tasksSubtasksExpandedLabel'),
           checked: checked.get('tasks-subtasks-expanded'),
           attrs: { id: 'tasks-subtasks-expanded' },
         })}
-      </div>
-    </section>
-
-    <section class="settings-section">
-      <h2 class="settings-section__title">${t('nav.schedule')}</h2>
+      </div>`;
+    case 'schedule':
+      return `
       <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.scheduleTemplatesTitle')}</h3>
         <p class="form-hint">${t('settings.scheduleTemplatesHint')}</p>
         ${SCHEDULE_TEMPLATES.map(([key, labelKey]) => toggleRowHtml({
+          control: 'switch',
           label: t(labelKey),
           checked: !(preferences.schedule_hidden_templates ?? []).includes(key),
           attrs: { id: `schedule-template-${key}`, 'data-template': key },
         })).join('')}
-      </div>
-    </section>
-  `);
+      </div>`;
+    default:
+      return '';
+  }
+}
+
+function renderPage(container, preferences, part) {
+  const checked = checkedState(preferences);
+  const parts = PARTS.includes(part) ? [part] : PARTS;
+  container.replaceChildren();
+  container.insertAdjacentHTML('beforeend', parts
+    .map((entry) => `<section class="settings-section">${partHtml(entry, preferences, checked)}</section>`)
+    .join(''));
 }
 
 function bindEvents(container) {
@@ -178,9 +192,11 @@ function bindEvents(container) {
   }
 }
 
+// Welcher Teil, sagt der Abschnitt (registry.js `props.part`): die Shell
+// schreibt ihn an den Traeger, die Signatur bleibt die aller Blaetter.
 export async function render(container, { user }) {
   void user;
   const preferences = await getPreferences();
-  renderPage(container, preferences);
+  renderPage(container, preferences, container.dataset.part);
   bindEvents(container);
 }

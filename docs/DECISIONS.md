@@ -50,7 +50,9 @@ The same rule was reached three times, each time from a different module:
   the ownership check for admins, so an admin could permanently delete a member's private
   document that the single-document path would not even show them. Decided in review: the
   visibility rule stands and admins do not override it. The subtree is selected through the
-  one visibility rule and refused as soon as one row in it is invisible to the caller;
+  one visibility rule, and a row in it that is invisible to the caller is never deleted - at
+  first by refusing the whole subtree, later by leaving that row in place with only its folder
+  cleared, because a refusal that depends on a hidden row tells the caller it is there;
   sharing a single document deliberately is the owner's act, and that path already exists.
 
 The task lock in v2.30.0 rests on the same reasoning from the other side: a family role says
@@ -680,9 +682,25 @@ forgot to ask about.
   `to-shopping-list` routes in `server/routes/meals.js` and `server/routes/recipes.js` for
   `shopping`, `import-meal-plan` and the undo of a meal transfer in `server/routes/shopping.js` for
   `meals`, `PUT /recipes/:id/ingredient-match` for `pantry`, because it hooks a row of the pantry
-  into a recipe, and the housekeeping supply request with #1353.
+  into a recipe, the housekeeping supply request with #1353, and a calendar attachment upload for
+  `documents` (#1358, `attachmentUploadRefused()` in `server/routes/calendar/helpers.js`): the
+  attachment lands in the Documents module as a document of its own, named on the dialog's upload
+  area.
+- `mayReadModule()` beside it for the other half: a route that reads another module's rows asks
+  for read access to that module, built on `hiddenModulesFor()` so there is one rule. A transfer
+  that copies rows out of a module refuses without it: `POST /pantry/import-shopping` asks for
+  `shopping`, `POST /shopping/:listId/import-pantry` for `pantry`, both before the list lookup,
+  and the controls need no second check because each stands on its source's own page. A response
+  that merely carries fields from another module leaves them out instead: the member candidates of
+  a shared-expense group (contacts, and birthdays under `calendar`), the budget bookings linked to
+  an inventory item (`budgetViewer()` in `server/routes/inventory/entry-links.js`). Adding a
+  contact to a shared-expense group reads the contact, so it needs `contacts`, and a contact without
+  an account is linked to the new guest, which writes it and needs `contacts` write; the birthday the
+  new guest gets is a follow-on entry of the guest and asks nothing of `calendar`.
 - `npm run test:cross-module-write` (`test/test-cross-module-write-rights.js`) holds those routes on
   both axes and checks the effect after each refusal, not only the status.
+  `npm run test:split-expenses-routes` holds the member candidates and adding a contact,
+  `npm run test:inventory-item-entries` the budget bookings of an inventory item.
 - The follow-on entries of a visit in `server/routes/housekeeping.js`: `createVisitCalendarEvent()`
   and `createPaymentTask()` at check-in, the completed task at payment, `updateVisitLinks()` and
   `deleteVisitLinks()` on edit and delete. None of them asks for more than `housekeeping`.
@@ -697,3 +715,93 @@ A `mayWriteModule()` call for the module of a follow-on entry, which lets an act
 right its page never mentions. A transfer that asks only for its own path's right, which is #1290
 again. And a new route that writes into another module without deciding which of the two it is:
 the next reader of this entry should find the answer in the route's comment, not by guessing.
+
+---
+
+## 11. Switching a module off is not a lock
+
+**Switching a module off for the household (`disabled_modules`, Settings → Modules → Active
+modules) means the household does not use it. What the server does on its own, or hands over
+unasked, follows the switch. The module's own routes stay open, for sessions and API tokens
+alike.**
+
+Taking access away already has two instruments with their own gate and their own error wording:
+member permissions and token scopes (entry 2 names where they live). A second lock on the same
+path map would be that rule a third time, and the switch is the wrong carrier for it: it has
+neither a confirmation nor an undo, three modules ship switched off (`inventory`, `schedule`,
+`waste`), and `/api/v1` is a promised surface. A path gate would have turned a tidy-up click into
+a broken integration.
+
+The line was reached in three places before it was written down:
+
+- **Countdowns, #647 (review of #793).** The tile belongs to two modules, so its filter could not
+  sit in the browser like every other tile's: with the calendar off, the five nearest countdowns
+  were events, the browser dropped all five, and the flagged task behind them had never been
+  sent. `getCountdowns()` merged the household switch and the member's rights into one set.
+- **Reminders, #1279.** Only pantry, schedule and waste reminders respected the switch. Task,
+  calendar, subscription, inventory, document, cycle and birthday reminders kept arriving for a
+  module that was off, and tapping one opened a page that turned you away. Delivery and
+  `GET /reminders/pending` now skip them.
+- **Background jobs and mixed answers, #1660.** Measured against 2.72.0 with ten modules off:
+  every module route answered 200 and wrote, by session and by token, and that was left as it is.
+  What changed is the medication scheduler (it wrote doses and sent pushes with Health off), the
+  prevention sync, the hourly recipe provider sync, the overview, and the birthdays that travel in
+  the calendar, the overview and the calendar feed.
+
+### How to sort the next case
+
+1. **Did a person ask for exactly this module?** A request to the module's own path, a button
+   pressed on its page or in its settings ("Sync now"), its own export, its own ICS feed: open.
+   So is a follow-on entry of a person's action in another module (entry 10) - a completed task
+   still books its points with Rewards off.
+2. **Does the server start it by itself?** A timer, a periodic sync, a push, a notification on a
+   channel: it follows the switch. Sources a run recreates clear what is pending and bring it
+   back when the module is switched on again; anything a person set by hand is held back, never
+   deleted (#1279).
+3. **Does one answer carry several modules?** The overview, the global search, the reminder list,
+   another module's rows blended into the calendar: the part that belongs to a switched-off
+   module is left out. The field stays in the response with its empty value, so no `/api/v1`
+   consumer trips over a missing key.
+
+Two switches have no permission of their own: `birthdays` sits under the `calendar` right and
+`recipes` under `meals`. As rights they go with their parent, as switches they stand alone - a
+household with the calendar off and birthdays on keeps its birthday tile and its birthday
+reminders.
+
+Left open on purpose: the module routes, exports and the database backup, the OpenAPI document,
+each module's own ICS feed, and incoming calendar, reminder and contact sync.
+
+### Where the rule lives
+
+- `server/services/household-modules.js`: `householdDisabledModules()` is the one reading of the
+  stored value. `modulesLeftOut()` merges it with what `hiddenModulesFor()` in
+  `server/permissions.js` withholds from this caller, one set for a mixed answer.
+  `birthdaysSwitchedOff()` and `notBirthdayEventSql()` are for the birthday events that live in
+  `calendar_events`. Not in a middleware: the path of a mixed answer names none of the modules it
+  carries.
+- Mixed answers: `GET /dashboard` (`server/routes/dashboard.js`, the same empty forms as a denied
+  module), `getCountdowns()` in `server/services/countdowns.js`, the global search
+  (`server/routes/search.js`), `GET /reminders/pending`
+  (`withoutSwitchedOffModules()` in `server/services/reminder-origins.js`), and the birthday
+  events wherever calendar rows are read for a list: `GET /calendar` and `/calendar/search`
+  (`server/routes/calendar/read.js`), the shared reader behind `/calendar/upcoming`, the overview
+  and the MCP tool `list_upcoming_events` (`birthdayFilter()` in
+  `server/services/calendar-event-reader.js`, in the reader so that a caller cannot forget to
+  ask), the event bucket of the global search, event countdowns, and `buildFeed()`
+  (`server/services/ics-export.js`).
+- Background work: delivery in `server/services/notifications.js`, the reminder syncs for pantry,
+  schedule, waste, cycle, fasting, birthdays and prevention, the medication scheduler, the waste
+  URL sources and the hourly recipe provider sync.
+- The calendar's other layers (waste, schedule, cycle) are fetched by the page from each module's
+  own route and are left out there, in the browser; the server blends only the birthdays in.
+- `npm run test:disabled-module-reminders`, `npm run test:disabled-module-mixed-answers` and the
+  switch tests in `npm run test:dashboard-permissions` hold it, each with the other half: the
+  module's own route still answers.
+
+### What counts as undoing it
+
+A check of `disabled_modules` in the path guard of `server/index.js` or at the top of a module
+router, which makes the switch a lock and breaks tokens for a module that is merely off. A new
+timer, push or periodic sync that never asks the switch, which is #1279 again. A mixed answer
+that drops the key instead of emptying the value. And treating `hidden_modules` the same way:
+that one is a member tidying their own navigation and takes nothing away anywhere (#673).

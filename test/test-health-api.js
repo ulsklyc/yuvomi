@@ -258,6 +258,21 @@ test('Logs: POST erstellt Dosis-Eintrag (default pending)', async () => {
   logId = res.body.data.id;
 });
 
+test('Logs: POST mit pending oder skipped verwirft eine mitgeschickte Einnahmezeit', async () => {
+  // Dieselbe Regel wie PATCH und skip: die Zeit gehoert zum Status. Ein
+  // "steht aus" oder "nicht genommen" mit Einnahmezeit stuende sonst so im Export.
+  asA();
+  for (const status of ['pending', 'skipped']) {
+    const res = await call('POST', `/medications/${medId}/logs`, {
+      status, scheduled_at: '2026-06-03T08:00', taken_at: '2026-06-03T08:05',
+    });
+    assert.equal(res.status, 201);
+    assert.equal(res.body.data.status, status);
+    assert.equal(res.body.data.taken_at, null, `${status} darf keine Einnahmezeit tragen`);
+    db.prepare('DELETE FROM medication_logs WHERE id = ?').run(res.body.data.id);
+  }
+});
+
 test('Logs: take markiert genommen und setzt taken_at', async () => {
   asA();
   const res = await call('POST', `/logs/${logId}/take`, { taken_at: '2026-06-04T08:05' });
@@ -497,6 +512,74 @@ test('Labs: POST /results fügt Analyt hinzu, DELETE entfernt ihn', async () => 
   assert.equal(add.body.data.flag, 'low');
   const del = await call('DELETE', `/results/${add.body.data.id}`);
   assert.equal(del.status, 204);
+});
+
+test('Labs: PATCH /results korrigiert einen Analyt und leitet das Flag neu ab (R8 H9)', async () => {
+  asA();
+  const add = await call('POST', `/labs/${reportId}/results`, {
+    analyte: 'Vitamin B12', value_num: 90, unit: 'pg/mL', ref_low: 200, ref_high: 900,
+  });
+  assert.equal(add.status, 201);
+  assert.equal(add.body.data.flag, 'low');
+  const patch = await call('PATCH', `/results/${add.body.data.id}`, { value_num: 390 });
+  assert.equal(patch.status, 200, 'ein Tippfehler laesst sich korrigieren, statt die Zeile zu loeschen');
+  assert.equal(patch.body.data.value_num, 390);
+  assert.equal(patch.body.data.analyte, 'Vitamin B12', 'nicht genannte Felder bleiben');
+  assert.equal(patch.body.data.unit, 'pg/mL');
+  assert.equal(patch.body.data.flag, 'normal', 'das Urteil folgt dem neuen Wert, nicht dem alten Flag');
+
+  const leer = await call('PATCH', `/results/${add.body.data.id}`, { analyte: '' });
+  assert.equal(leer.status, 400, 'die zusammengefuehrte Zeile wird wie beim Anlegen geprueft');
+
+  asB();
+  const fremd = await call('PATCH', `/results/${add.body.data.id}`, { value_num: 1 });
+  assert.equal(fremd.status, 404, 'fremde Befunde bleiben unbeschreibbar');
+  asA();
+  await call('DELETE', `/results/${add.body.data.id}`);
+});
+
+test('Labs: PATCH /results behaelt ein gesetztes Flag, solange Wert und Referenz bleiben', async () => {
+  // Ein per POST ausdruecklich markierter Analyt ohne Referenzbereich: ein
+  // Teil-Update, das Wert und Bereich nicht anfasst, darf das Urteil nicht
+  // loeschen - der Bearbeiten-Dialog hat kein Flag-Feld, es waere verloren.
+  asA();
+  const add = await call('POST', `/labs/${reportId}/results`, {
+    analyte: 'TSH', value_num: 7.1, flag: 'high',
+  });
+  assert.equal(add.status, 201);
+  assert.equal(add.body.data.flag, 'high');
+  const unit = await call('PATCH', `/results/${add.body.data.id}`, { unit: 'mU/L' });
+  assert.equal(unit.status, 200);
+  assert.equal(unit.body.data.flag, 'high', 'eine Einheitenkorrektur loescht das Flag nicht');
+  // Der App-Dialog schickt leere Felder als null mit: dieselbe Zeile, nichts geaendert.
+  const dialog = await call('PATCH', `/results/${add.body.data.id}`, {
+    unit: 'mU/L', ref_low: null, ref_high: null, analyte: 'TSH', value_num: 7.1,
+  });
+  assert.equal(dialog.body.data.flag, 'high', 'Speichern ohne Wert- oder Bereichsaenderung behaelt das Flag');
+  // Aendert sich der Wert, gilt das Urteil ueber den alten Wert nicht mehr.
+  const neu = await call('PATCH', `/results/${add.body.data.id}`, { value_num: 2.0, ref_low: 0.4, ref_high: 4 });
+  assert.equal(neu.body.data.flag, 'normal');
+  await call('DELETE', `/results/${add.body.data.id}`);
+});
+
+test('Labs: PATCH /results leert keinen gespeicherten Messwert', async () => {
+  asA();
+  const add = await call('POST', `/labs/${reportId}/results`, { analyte: 'Ferritin', value_num: 45, unit: 'ng/mL' });
+  assert.equal(add.status, 201);
+  for (const leer of [null, '']) {
+    const res = await call('PATCH', `/results/${add.body.data.id}`, { value_num: leer });
+    assert.equal(res.status, 400, `value_num ${JSON.stringify(leer)} ueberschreibt keinen vorhandenen Wert`);
+  }
+  const bleibt = await call('PATCH', `/results/${add.body.data.id}`, { unit: 'ug/L' });
+  assert.equal(bleibt.body.data.value_num, 45);
+  // Ein Analyt, der nie einen Wert hatte, darf ohne Wert bleiben.
+  const ohne = await call('POST', `/labs/${reportId}/results`, { analyte: 'Befund folgt' });
+  assert.equal(ohne.status, 201);
+  const korr = await call('PATCH', `/results/${ohne.body.data.id}`, { analyte: 'Befund ausstehend', value_num: null });
+  assert.equal(korr.status, 200);
+  assert.equal(korr.body.data.value_num, null);
+  await call('DELETE', `/results/${add.body.data.id}`);
+  await call('DELETE', `/results/${ohne.body.data.id}`);
 });
 
 test('Labs: Bob kann Analyt nicht hinzufügen → 404', async () => {

@@ -19,5 +19,6 @@ export function buildHelpRows({ coarsePointer, shortcuts, t }) {
       { icon: 'settings',    desc: t('help.mobileSettings') },
     ];
   }
-  return shortcuts.map((s) => ({ key: s.key, desc: s.description() }));
+  // `label` nennt Zweitbelegungen mit („k / ←"); ohne sie steht die Taste selbst.
+  return shortcuts.map((s) => ({ key: s.label?.() ?? s.key, desc: s.description() }));
 }

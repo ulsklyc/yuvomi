@@ -386,9 +386,11 @@ router.post('/medications/:id/logs', (req, res) => {
     // Wie /take und PATCH: eine genommene Dosis ohne Zeit bekommt "jetzt" als
     // Wanduhrzeit des Haushalts. NULL neben `taken` waere eine Einnahme ohne
     // Einnahmezeit - im CSV-Export stuende die Spalte leer, und die Anzeige
-    // muesste auf `created_at` ausweichen, einen UTC-Instant.
+    // muesste auf `created_at` ausweichen, einen UTC-Instant. Umgekehrt traegt
+    // nur `taken` eine Einnahmezeit: ein mitgeschicktes `taken_at` neben
+    // pending/skipped faellt weg, wie bei PATCH und skip.
     const nextStatus  = status.value || 'pending';
-    const nextTakenAt = nextStatus === 'taken' ? (takenAt.value || wallClockNow()) : takenAt.value;
+    const nextTakenAt = nextStatus === 'taken' ? (takenAt.value || wallClockNow()) : null;
 
     const result = db.get().prepare(`
       INSERT INTO medication_logs (medication_id, schedule_id, scheduled_at, status, taken_at, dose_qty, note)

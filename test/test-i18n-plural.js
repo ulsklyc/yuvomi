@@ -53,6 +53,15 @@ test('Deutsch: Singular und Plural je nach count', async () => {
   assert.equal(t('settings.enabledReminderListCount', { count: 0 }), '0 Erinnerungslisten aktiviert');
 });
 
+test('Abos: „1 Tag überfällig", nicht „1 Tage" (Critique 2026-09-25)', async () => {
+  await setLocale('de');
+  assert.equal(t('subscriptions.overdueDays', { count: 1 }), '1 Tag überfällig');
+  assert.equal(t('subscriptions.overdueDays', { count: 3 }), '3 Tage überfällig');
+  assert.equal(t('subscriptions.reminderMeta', { count: 1 }), '1 Tag vorher');
+  await setLocale('en');
+  assert.equal(t('subscriptions.overdueDays', { count: 1 }), '1 day overdue');
+});
+
 test('Englisch: Singular und Plural je nach count', async () => {
   await setLocale('en');
   assert.equal(t('settings.enabledReminderListCount', { count: 1 }), '1 reminder list enabled');
@@ -101,10 +110,10 @@ test('Sprachen ohne Zahlflexion liefern für jede Anzahl denselben Satz', async 
   assert.equal(one.replace('1', 'N'), many.replace('5', 'N'));
 });
 
-test('Polnisch: fehlende few/many-Variante fällt auf den Basisschlüssel zurück', async () => {
+test('Polnisch: das zaehlunabhaengige „Label: N"-Muster bleibt in jeder Kategorie korrekt', async () => {
   await setLocale('pl');
-  // pl kennt one/few/many/other; hinterlegt sind Basis + _one. Kein Absturz,
-  // und das zählunabhängige „Label: N"-Muster bleibt korrekt.
+  // pl kennt one/few/many/other; hier tragen alle Varianten dasselbe neutrale
+  // Muster, das fuer jede Zahl stimmt (1 one, 2 und 22 few, 5 many).
   for (const count of [1, 2, 5, 22]) {
     assert.match(t('settings.enabledReminderListCount', { count }), /Włączone listy przypomnień: \d+/);
   }
@@ -265,7 +274,6 @@ const PLURAL_EXCEPTIONS = {
   'dashboard.healthRefill': 'NO_NOUN',
   'health.labs.abnormalBadge': 'NO_NOUN',
   'subscriptions.activeCount': 'NO_NOUN',
-  'budget.loansSummary': 'NO_NOUN',
 
   // --- Zahl in Klammern / hinter Doppelpunkt ------------------------------
   'category.errorInUse': 'PARENTHETICAL',
@@ -308,7 +316,6 @@ const PLURAL_EXCEPTIONS = {
 
   // --- echte Luecken, eingefroren statt behoben ---------------------------
   // Alle unten sind bei n=1 grammatisch falsch und n=1 ist erreichbar.
-  'dashboard.housekeepingVisitsMonth': 'TODO_ONE',  // dashboard.js:2138, `visits` ungefiltert
   // Diese drei standen faelschlich unter PARENTHETICAL: die Klammer ist neutral, das
   // Substantiv davor nicht. renderFolderUploadPreview zeigt sie ab EINEM Konflikt.
   'documents.folderUpload.fileConflictsTitle': 'TODO_ONE',
@@ -330,15 +337,13 @@ const PLURAL_EXCEPTIONS = {
   'documents.bulkUploadedToast': 'TODO_ONE',
   'documents.selectedFilesLabel': 'TODO_ONE',
   'budget.chartSummary': 'TODO_ONE',
+  'budget.showAllCategories': 'TODO_ONE',        // Knopf erst ab 4 Kategorien (CHART_LEAD), Zahl in Klammern
   'budget.statsDonutSummary': 'TODO_ONE',
   'health.labs.analyteCount': 'TODO_ONE',
   'health.cycle.status.inDays': 'TODO_ONE',
   'health.cycle.status.overdue': 'TODO_ONE',
   'inventory.navLabelAttention': 'TODO_ONE',        // router-Badge, Guard ist `> 0`
   'tasks.navLabelOverdue': 'TODO_ONE',              // router.js:1151, Guard ist `> 0`
-  'subscriptions.listCount': 'TODO_ONE',
-  'subscriptions.overdueDays': 'TODO_ONE',
-  'subscriptions.reminderMeta': 'TODO_ONE',
   'subscriptions.metaInUseWarning': 'TODO_ONE',     // umgeht den Plural im String: „Abonnement(s)"
   'settings.recipeProviderDeleteAccountConfirm': 'TODO_ONE',
 
@@ -408,6 +413,79 @@ test('jede _one-Variante traegt in JEDER Locale einen brauchbaren Wert (#1010)',
 });
 
 // ---------------------------------------------------------------------------
+// `_one` ist nicht „genau eins" (#1549)
+//
+// CLDR `one` deckt in vielen Sprachen mehr als die 1: in ru/uk auch 21, 31,
+// 101 ..., in fr/pt/hi/fa auch die 0, im Filipino sogar 2, 3, 5, 7, 8, 10 ...
+// Ein `_one` mit fest geschriebener Eins ("1 событие", "Каждый месяц", "1 kaganapan")
+// stand deshalb bei 21 Terminen als "1 событие" und bei 5 Terminen im Filipino
+// als "1 kaganapan" in der Oberflaeche. In solchen Sprachen muss `_one` den
+// `{{count}}` tragen.
+//
+// Ausnahme nur, wenn der AUFRUFER die Zahl so begrenzt, dass `one` dort nur noch
+// die 1 trifft. Die Karte nennt den Bereich (`min`/`max` oder feste `counts`) und
+// die Belegstelle; welche Sprachen er deckt, rechnet der Test selbst aus
+// Intl.PluralRules nach - "fr ja, ru nein" steht nirgends von Hand.
+// ---------------------------------------------------------------------------
+const ONE_WITHOUT_COUNT = {
+  // calendar.js periodArrowLabels/periodStepOf: 'days' ist 3 (Telefon-Woche) oder
+  // 30 (Agenda); die Eins geht an calendar.prevDay/nextDay.
+  'calendar.prevDays': { counts: [3, 30], where: 'public/pages/calendar.js periodStepOf' },
+  'calendar.nextDays': { counts: [3, 30], where: 'public/pages/calendar.js periodStepOf' },
+  // dashboard.js: count ist die Konstante EXPIRY_SOON_DAYS = 7 (utils/pantry-status.js).
+  'dashboard.pantryExpiringEmpty': { counts: [7], where: 'public/utils/pantry-status.js EXPIRY_SOON_DAYS' },
+  // cron-label.js formatCronSchedule: `count < 1 || count > 23` -> null.
+  'settings.backupSchedulerCronHourly': { min: 1, max: 23, where: 'public/settings/cron-label.js formatCronSchedule' },
+  // modules-health.js typeIntervalLabel: 0/leer -> healthPreventionOneOff, sonst >= 1.
+  'settings.healthPreventionIntervalMonths': { min: 1, where: 'public/settings/pages/modules-health.js typeIntervalLabel' },
+  'settings.healthPreventionIntervalYears': { min: 1, where: 'public/settings/pages/modules-health.js typeIntervalLabel' },
+  // health-cycle.js: source 'history' erst ab MIN_HISTORY_GAPS Luecken, count = Perioden >= 2.
+  'health.cycle.stats.source.history': { min: 2, where: 'public/utils/health-cycle.js source/count' },
+  'health.cycle.stats.source.historyOther': { min: 2, where: 'public/utils/health-cycle.js source/count' },
+  // server/db.js: cycle_length INTEGER NOT NULL CHECK (cycle_length BETWEEN 1 AND 366).
+  'schedule.cycleDaysHint': { min: 1, max: 366, where: 'server/db.js shift_patterns.cycle_length CHECK' },
+};
+
+/** Zahlen ausser der 1, fuer die `locale` im Bereich der Ausnahme `one` waehlt. */
+const oneBeyondOne = (locale, range) => {
+  const rules = new Intl.PluralRules(locale);
+  const counts = range?.counts
+    ?? Array.from({ length: Math.min(range?.max ?? 1000, 1000) - (range?.min ?? 0) + 1 }, (_, i) => (range?.min ?? 0) + i);
+  return counts.filter((n) => n !== 1 && rules.select(n) === 'one');
+};
+
+test('in Sprachen, deren one mehr als die 1 deckt, traegt _one den {{count}} (#1549)', () => {
+  const de = flattenLocale(localeFile('de'));
+  const counting = [...de.keys()]
+    .filter((k) => k.endsWith('_one'))
+    .map((k) => k.slice(0, -4))
+    .filter((b) => typeof de.get(b) === 'string' && de.get(b).includes('{{count}}'));
+  const betroffen = readdirSync(LOCALE_DIR).filter((f) => f.endsWith('.json'))
+    .map((f) => f.replace(/\.json$/, ''))
+    .filter((l) => oneBeyondOne(l).length > 0);
+  // Ohne diese Probe liefe der Test gruen, wenn oneBeyondOne() nie etwas findet.
+  for (const l of ['ru', 'uk', 'fr', 'pt', 'fil']) assert.ok(betroffen.includes(l), `${l} muss als betroffen erkannt werden`);
+  assert.ok(!betroffen.includes('de') && !betroffen.includes('pl'), 'de und pl waehlen one nur fuer die 1');
+
+  const falsch = [];
+  const genutzt = new Set();
+  for (const locale of betroffen) {
+    const entries = flattenLocale(localeFile(locale));
+    for (const base of counting) {
+      const wert = entries.get(`${base}_one`);
+      if (typeof wert !== 'string' || wert.includes('{{count}}')) continue;
+      const ausnahme = ONE_WITHOUT_COUNT[base];
+      const treffer = oneBeyondOne(locale, ausnahme ?? {});
+      if (ausnahme && treffer.length === 0) { genutzt.add(base); continue; }
+      falsch.push(`${locale}: ${base}_one = ${JSON.stringify(wert)} (one auch bei ${treffer.slice(0, 3).join(', ')})`);
+    }
+  }
+  assert.deepEqual(falsch, [], `${falsch.length} _one-Werte ohne {{count}} in Sprachen, deren one mehr als die 1 deckt`);
+  const veraltet = Object.keys(ONE_WITHOUT_COUNT).filter((k) => !genutzt.has(k));
+  assert.deepEqual(veraltet, [], 'ONE_WITHOUT_COUNT: diese Ausnahmen braucht keine Sprache mehr - streichen');
+});
+
+// ---------------------------------------------------------------------------
 // Platzhalter-Ersetzung
 //
 // Die Werte kommen aus Nutzereingaben (Namen, Titel, Notizen). Sie werden
@@ -470,4 +548,164 @@ test('tschechische Fastenanzeige dekliniert zusaetzliche Tage', async () => {
   assert.equal(t('health.fasting.extraDays', { count: 1 }), '+1 den');
   assert.equal(t('health.fasting.extraDays', { count: 2 }), '+2 dny');
   assert.equal(t('health.fasting.extraDays', { count: 5 }), '+5 dní');
+});
+
+// ---------------------------------------------------------------------------
+// Jede ganzzahlige Pluralkategorie hat ihre Variante (#1472, #1473)
+//
+// cs, pl, ru und uk waehlen fuer 2-4 (pl/ru/uk auch 22-24 ...) die CLDR-Kategorie
+// `few`, pl/ru/uk fuer 5-20 `many`; Arabisch hat fuer 2 den Dual (`two`), fuer
+// 3-10 `few` und fuer 11-99 `many`. Fehlt `key_<kategorie>`, faellt
+// resolvePluralKey auf `_other` und dann auf den Basisschluessel zurueck - und
+// der traegt in diesen Sprachen die Form fuer einen ANDEREN Zahlenbereich:
+// "za 2 dní" statt "za 2 dny" (cs), "через 2 дн." statt "через 2 дня" (ru),
+// "خلال 2 أيام" statt des Duals "خلال يومين" (ar).
+//
+// Gemessen wird jeder zaehlende Schluessel, der in de.json eine `_one`-Variante
+// hat. Welche Kategorien eine Sprache braucht, sagt Intl.PluralRules selbst: jede
+// Kategorie, die sie fuer eine ganze Zahl 0..1000 waehlt, ausser `one` (eigener
+// Guard oben), `other` (das IST der Rueckfall) und `zero` (nur ar, fuer die 0;
+// der Rueckfall liefert dort die Pluralform "0 أيام", die im Arabischen fuer die
+// Null gebraeuchlich ist). Die Kategorien kommen aus der Laufzeit, nicht aus einer
+// Liste - eine neue Sprache mit `few` ist ab ihrer ersten Datei geprueft.
+//
+// Die Varianten stehen NUR in den Sprachen, die sie waehlen: de.json ist die
+// Rueckfall-Locale von t() und traegt nur one/other, sonst zoege eine Sprache ohne
+// die Variante den deutschen Text (Paritaetsregel: test/i18n-plural-keys.js).
+//
+// Bis #1473 fror FEW_GAPS_LEGACY 110 Luecken ein; die Karte ist leer und
+// entfernt, der Guard ist strikt.
+// ---------------------------------------------------------------------------
+const integerCategories = (locale) => {
+  const rules = new Intl.PluralRules(locale);
+  const seen = new Set();
+  for (let n = 0; n <= 1000; n += 1) seen.add(rules.select(n));
+  return [...seen].filter((c) => !['one', 'other', 'zero'].includes(c)).sort();
+};
+
+test('der Kategorienleser kennt die Sprachen, um die es geht', () => {
+  // Ohne diese Probe liefe der Guard unten auch dann gruen, wenn integerCategories()
+  // fuer jede Sprache [] liefert - er pruefte dann gar nichts.
+  assert.deepEqual(integerCategories('cs'), ['few']);
+  for (const locale of ['pl', 'ru', 'uk']) assert.deepEqual(integerCategories(locale), ['few', 'many'], locale);
+  assert.deepEqual(integerCategories('ar'), ['few', 'many', 'two']);
+  assert.deepEqual(integerCategories('de'), []);
+});
+
+test('zaehlende Schluessel tragen in jeder Sprache jede ganzzahlige Pluralkategorie (#1473)', () => {
+  const files = readdirSync(LOCALE_DIR).filter((f) => f.endsWith('.json'));
+  const load = (f) => flattenLocale(JSON.parse(readFileSync(new URL(f, LOCALE_DIR), 'utf8')));
+  const de = load('de.json');
+  const counting = [...de.keys()]
+    .filter((k) => k.endsWith('_one'))
+    .map((k) => k.slice(0, -4))
+    .filter((b) => typeof de.get(b) === 'string' && de.get(b).includes('{{count}}'));
+  assert.ok(counting.length > 100, `nur ${counting.length} zaehlende Schluessel - misst der Filter noch?`);
+  const gepruefte = files.filter((f) => integerCategories(f.replace(/\.json$/, '')).length > 0);
+  assert.ok(gepruefte.length >= 5, `nur ${gepruefte.join(', ')} - cs, pl, ru, uk und ar muessen dabei sein`);
+  const fehlt = [];
+  for (const file of gepruefte) {
+    const entries = load(file);
+    for (const category of integerCategories(file.replace(/\.json$/, ''))) {
+      for (const base of counting) {
+        const wert = entries.get(`${base}_${category}`);
+        // Nicht nur `has()`: ein leerer oder nicht-String-Wert faellt zur Laufzeit
+        // genauso auf den Basisschluessel zurueck wie ein fehlender.
+        if (typeof wert !== 'string' || wert.trim() === '') fehlt.push(`${file}: ${base}_${category}`);
+      }
+    }
+  }
+  assert.deepEqual(fehlt, [], `${fehlt.length} Pluralvarianten fehlen oder sind leer - echte Form je Sprache anlegen`
+    + ' (nur in dieser Sprache - de und die uebrigen Locales tragen sie nicht, siehe test/i18n-plural-keys.js)');
+});
+
+test('t() waehlt in cs, pl, ru, uk und ar die Form fuer 2, 5 und 11 (#1473)', async () => {
+  // Stichproben durch die echte t(): der Guard oben prueft, DASS die Variante da
+  // ist, diese Faelle, dass die Auswahl sie auch trifft.
+  const faelle = [
+    ['cs', 'dashboard.daysLeft', 2, 'Za 2 dny'],
+    ['cs', 'dashboard.daysLeft', 5, 'Za 5 dní'],
+    ['pl', 'dashboard.metricPoints', 2, '2 punkty'],
+    ['pl', 'dashboard.metricPoints', 5, '5 punktów'],
+    ['pl', 'dashboard.metricPoints', 22, '22 punkty'],
+    ['ru', 'dashboard.daysLeft', 2, '2 дня'],
+    ['ru', 'dashboard.daysLeft', 11, '11 дн.'],
+    ['uk', 'tasks.pointsSummary', 3, '3 бали'],
+    ['uk', 'tasks.pointsSummary', 12, '12 балів'],
+    ['ar', 'dashboard.daysLeft', 2, 'يومان'],
+    ['ar', 'dashboard.daysLeft', 5, '5 أيام'],
+    ['ar', 'dashboard.daysLeft', 11, '11 يومًا'],
+  ];
+  for (const [locale, key, count, erwartet] of faelle) {
+    await setLocale(locale);
+    assert.equal(t(key, { count }), erwartet, `${locale} ${key} bei ${count}`);
+  }
+  await setLocale('de');
+});
+
+// Arabisch hat fuer ganze Zahlen die Kategorien zero, one, two, few, many, other:
+// der Basisschluessel traegt dort die few-Form (3-10, "أيام"), die fuer 2 (Dual)
+// und 11-99 ("يومًا") falsch ist. Die zwei Tageszaehler aus #1472 waren das Muster
+// fuer die Nachpflege in #1473.
+test('Arabisch: die Tageszaehler waehlen Dual und many statt der few-Form', async () => {
+  await setLocale('ar');
+  for (const key of ['birthdays.inDays', 'inventory.deadlineChipInDays']) {
+    const few = t(key, { count: 5, label: 'X' });
+    assert.notEqual(t(key, { count: 2, label: 'X' }).replace('2', '5'), few, `${key}: 2 braucht den Dual`);
+    assert.notEqual(t(key, { count: 11, label: 'X' }).replace('11', '5'), few, `${key}: 11 braucht die many-Form`);
+  }
+  await setLocale('de');
+});
+
+// Vorrats-Einheiten flektieren mit der Menge (Re-Critique 2026-09-27, W2):
+// „6 Dose", „3 Packung" standen im Vorrat und in der Uebersicht, weil beide
+// `t('pantry.units.X')` ohne count hinter die Zahl setzten. Geprueft wird der
+// geteilte Helfer MIT der echten t() UND dass beide Aufrufer ihn nehmen - ein
+// Helfer, den niemand ruft, misst nichts.
+test('Vorrat: die Einheit flektiert mit der Menge, auch in Bruchzahlen', async () => {
+  const { pantryQuantityLabel, PANTRY_UNITS } = await import('../public/utils/pantry-units.js');
+  const fmt = (locale) => (n) => new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n);
+  await setLocale('de');
+  assert.equal(pantryQuantityLabel(6, 'can', { t, formatNumber: fmt('de') }), '6 Dosen');
+  assert.equal(pantryQuantityLabel(1, 'can', { t, formatNumber: fmt('de') }), '1 Dose');
+  assert.equal(pantryQuantityLabel(3, 'jar', { t, formatNumber: fmt('de') }), '3 Gläser');
+  assert.equal(pantryQuantityLabel(1.5, 'pkg', { t, formatNumber: fmt('de') }), '1,5 Packungen');
+  assert.equal(pantryQuantityLabel(250, 'g', { t, formatNumber: fmt('de') }), '250 g');
+  // Der Basisschluessel bleibt der Name der Einheit (Auswahlfeld ohne Menge).
+  assert.equal(t('pantry.units.can'), 'Dose');
+  // Unbekannte Einheit: Rohwert statt Schluessel.
+  assert.equal(pantryQuantityLabel(2, 'Kiste', { t, formatNumber: fmt('de') }), '2 Kiste');
+  await setLocale('en');
+  assert.equal(pantryQuantityLabel(2, 'bottle', { t, formatNumber: fmt('en') }), '2 bottles');
+  await setLocale('pl');
+  assert.equal(pantryQuantityLabel(2, 'can', { t, formatNumber: fmt('pl') }), '2 puszki');
+  assert.equal(pantryQuantityLabel(5, 'can', { t, formatNumber: fmt('pl') }), '5 puszek');
+  await setLocale('de');
+  // Jede Zaehleinheit traegt in de _one und _other (Paritaet ueber test:i18n).
+  // Die metrischen Symbole flektieren nicht („5 g") und brauchen keine Variante.
+  const units = localeFile('de').pantry.units;
+  for (const unit of PANTRY_UNITS.filter((u) => !['g', 'kg', 'ml', 'l'].includes(u))) {
+    assert.ok(units[`${unit}_one`] && units[`${unit}_other`], `pantry.units.${unit}_one/_other fehlt`);
+  }
+});
+
+test('Vorrat und Uebersicht setzen die Menge ueber den flektierenden Helfer', () => {
+  const strip = (src) => {
+    let out = src;
+    for (let prev = ''; prev !== out;) { prev = out; out = out.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''); }
+    return out;
+  };
+  const body = (src, name) => {
+    const at = src.indexOf(`function ${name}(`);
+    assert.ok(at >= 0, `${name} fehlt`);
+    return src.slice(at, src.indexOf('\n}\n', at));
+  };
+  const pantry = strip(readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8'));
+  const dashboard = strip(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  for (const [src, fn, file] of [[pantry, 'quantityText', 'pantry.js'], [pantry, 'shortfallText', 'pantry.js'],
+    [dashboard, 'pantryQuantityText', 'dashboard.js']]) {
+    const own = body(src, fn);
+    assert.match(own, /pantryQuantityLabel\(/, `${file} ${fn}: Menge ohne flektierende Einheit („6 Dose")`);
+    assert.doesNotMatch(own, /pantry\.units\.\$\{|unitLabel\(/, `${file} ${fn}: setzt den Singular selbst hinter die Zahl`);
+  }
 });

@@ -442,6 +442,57 @@ export function pendingCreations(accountId, module = 'tasks') {
   `).all(accountId);
 }
 
+/** Zwei Schreibweisen derselben Collection-URL: mit und ohne Schlussstrich. */
+function sameCollection(a, b) {
+  return String(a).replace(/\/+$/, '') === String(b).replace(/\/+$/, '');
+}
+
+/**
+ * Das Ziel, das die Folgeinstanz einer Serie von ihrer Vorgängerin erbt (#1515),
+ * oder null.
+ *
+ * Eine hier angelegte Aufgabe trägt ihr Ziel nur bis zum Upload in den
+ * Zielspalten - processPendingCreations räumt sie danach ab, und ab da steht die
+ * Liste nur noch in der Objekt-URL des Spiegels. Das ist der Regelfall, denn der
+ * Sofortversuch läuft direkt nach dem Anlegen. Wer nur die Zielspalten
+ * weitergäbe, deckte also bloß den Fall ab, dass die Serie abgehakt wird, bevor
+ * sie oben ist; die Folgeinstanz einer hochgeladenen Serie bliebe lokal.
+ *
+ * Einen Spiegel zählt nur mit, wer hier entstanden ist: seine UID ist die aus
+ * todoUidFor. Ein vom Server geholter Eintrag bleibt, wie er war - seine Liste
+ * gehört einem anderen Programm, und Yuvomi hat nie zugesagt, dort Einträge
+ * anzulegen.
+ *
+ * Geprüft wird gegen die Auswahltabelle wie beim Anlegen (resolveTaskSyncTarget):
+ * ist die Liste inzwischen abgewählt oder das Konto weg, bleibt die
+ * Folgeinstanz lokal - derselbe Ausgang, den processPendingCreations einer
+ * wartenden Aufgabe mit verschwundener Liste gibt.
+ *
+ * @returns {{accountId: number, listUrl: string}|null}
+ */
+export function recurrenceFollowupTarget(task) {
+  if (!task || task.parent_task_id) return null;
+  let accountId = null;
+  let listUrl   = null;
+  if (task.external_source === 'local') {
+    accountId = task.target_caldav_account_id;
+    listUrl   = task.target_caldav_list_url;
+  } else if (isMirrored(task) && task.external_uid === todoUidFor('tasks', task.id)) {
+    accountId = task.external_account_id;
+    listUrl   = collectionUrlOf(task.external_object_url);
+  }
+  if (!accountId || !listUrl) return null;
+
+  // Die Schreibweise der Auswahltabelle zurückgeben, nicht die abgeleitete:
+  // taskListsOf schlägt die Liste später genau unter diesem Schlüssel nach.
+  const selected = db.get().prepare(`
+    SELECT list_url FROM caldav_reminder_selection
+     WHERE account_id = ? AND enabled = 1 AND target_module = 'tasks'
+  `).all(accountId).map((r) => r.list_url);
+  const match = selected.find((url) => sameCollection(url, listUrl));
+  return match ? { accountId, listUrl: match } : null;
+}
+
 /**
  * Einkaufsartikel einer gespiegelten Liste, die es auf dem Server noch nicht gibt.
  *

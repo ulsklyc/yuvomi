@@ -6,6 +6,7 @@
 import { auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { authHeroHtml } from '/utils/auth-ui.js';
 
 function wireLinks(container) {
   container.querySelectorAll('a[data-link]').forEach((a) =>
@@ -21,6 +22,7 @@ function renderUnavailable(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <main class="auth-page" id="main-content">
+      ${authHeroHtml({ heading: false })}
       <div class="auth-card card card--padded">
         <h1 class="auth-card__title">${esc(t('forgotPassword.title'))}</h1>
         <p class="auth-card__intro">${esc(t('forgotPassword.unavailable'))}</p>
@@ -51,6 +53,7 @@ export async function render(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <main class="auth-page" id="main-content">
+      ${authHeroHtml({ heading: false })}
       <div class="auth-card card card--padded">
         <h1 class="auth-card__title">${esc(t('forgotPassword.title'))}</h1>
         <p class="auth-card__intro">${esc(t('forgotPassword.intro'))}</p>

@@ -6,8 +6,11 @@ import { openModal, closeModal, confirmModal, refocusAfterRender, captureModalCo
 import { FASTING_PRESETS, normalizeGoalHours, fastingDisplayModel, fastingNotificationAvailability, fastingServerDate, fastingServerClock, formatFastingClock } from '/utils/health-fasting.js';
 import { wallTimeValue, wallTimeInstant, wallTimeCandidates } from '/utils/timezone.js';
 import { moduleAccess } from '/permissions.js';
-import { fastingDialMarkup } from '/components/fasting-dial.js';
+import { updateFastingDial } from '/components/fasting-dial.js';
 import { fastingHelpHtml } from '/components/fasting-help.js';
+import { toggleRowHtml } from '/settings/components.js';
+import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 
 export function fastingError(error) {
   if (error?.message === 'FASTING_OFFLINE') return t('health.fasting.offline');
@@ -29,15 +32,20 @@ export function requireFastingWrite() {
   if (moduleAccess('health') !== 'write') throw new Error('FASTING_READ_ONLY');
 }
 
+let preferencesSequence = 0;
 export function fastingPreferencesHtml(settings = {}) {
   const hours = settings.default_goal_minutes ? settings.default_goal_minutes / 60 : null;
   const custom = hours !== null && !FASTING_PRESETS.includes(hours);
   const available = fastingNotificationAvailability(settings.default_goal_minutes);
-  const choice = (value, label, selected) => `<button type="button" class="btn ${selected ? 'btn--primary' : 'btn--secondary'} btn--sm" data-fasting-preset="${value}" aria-pressed="${selected}">${esc(label)}</button>`;
+  const goalTitleId = `fasting-goal-title-${++preferencesSequence}`;
+  // DIE ZIEL-WAHL IST EINE SEGMENTLEISTE (R14 P3, A6 P2-1): eine Einfachauswahl
+  // wie jede andere der App (.segmented, role=radio, gleitende Kapsel), nicht
+  // Knoepfe, die sich zwischen Primaer und Sekundaer umfaerben.
+  const choice = (value, label, selected) => `<button type="button" class="segmented__item${selected ? ' is-active' : ''}" role="radio" aria-checked="${selected}" tabindex="${selected ? '0' : '-1'}" data-tab-id="${value}" data-fasting-preset="${value}">${esc(label)}</button>`;
   return `<div class="fasting-preferences">
-    <section><h3 class="u-section-title fasting-help-heading">${esc(t('health.fasting.goalTitle'))}${fastingHelpHtml(t('health.fasting.goalTitle'), [t('health.fasting.goalHint'), t('health.fasting.goalNextHint')])}</h3>
-      <div class="fasting-presets" role="group" aria-label="${esc(t('health.fasting.goalTitle'))}">
-        ${choice('', t('health.fasting.noGoal'), hours === null)}
+    <section><div class="fasting-help-heading"><h3 class="u-section-title" id="${goalTitleId}">${esc(t('health.fasting.goalTitle'))}</h3>${fastingHelpHtml(t('health.fasting.goalTitle'), [t('health.fasting.goalHint'), t('health.fasting.goalNextHint')])}</div>
+      <div class="segmented fasting-presets" role="radiogroup" aria-labelledby="${goalTitleId}">
+        ${choice('none', t('health.fasting.noGoal'), hours === null)}
         ${FASTING_PRESETS.map((h) => choice(String(h), `${h}:${24 - h}`, hours === h)).join('')}
         ${choice('custom', t('health.fasting.custom'), custom)}
       </div>
@@ -46,9 +54,9 @@ export function fastingPreferencesHtml(settings = {}) {
         <input class="form-input" id="fasting-goal-hours" type="number" min="1" max="336" step="1" value="${custom ? hours : ''}" data-fasting-goal>
       </div>
     </section>
-    <section class="fasting-notifications"><h3 class="u-section-title fasting-help-heading">${esc(t('health.fasting.notifications'))}${fastingHelpHtml(t('health.fasting.notifications'), [t('health.fasting.reminderHint')])}</h3>
-      <label class="form-check"><input type="checkbox" data-fasting-remind-goal ${settings.remind_goal ? 'checked' : ''} ${available.goal ? '' : 'disabled'}>${esc(t('health.fasting.remindGoalToggle'))}</label>
-      <label class="form-check"><input type="checkbox" data-fasting-remind-next ${settings.remind_next_start ? 'checked' : ''} ${available.next ? '' : 'disabled'}>${esc(t('health.fasting.remindNextToggle'))}</label>
+    <section class="fasting-notifications"><div class="fasting-help-heading"><h3 class="u-section-title">${esc(t('health.fasting.notifications'))}</h3>${fastingHelpHtml(t('health.fasting.notifications'), [t('health.fasting.reminderHint')])}</div>
+      ${toggleRowHtml({ label: t('health.fasting.remindGoalToggle'), control: 'switch', checked: !!settings.remind_goal, disabled: !available.goal, attrs: { 'data-fasting-remind-goal': true } })}
+      ${toggleRowHtml({ label: t('health.fasting.remindNextToggle'), control: 'switch', checked: !!settings.remind_next_start, disabled: !available.next, attrs: { 'data-fasting-remind-next': true } })}
     </section>
     <section class="form-group"><label class="form-label" for="fasting-clock-default">${esc(t('health.fasting.clockDefault'))}</label>
       <select class="form-input" id="fasting-clock-default" data-fasting-clock-default>${['auto', 'elapsed', 'remaining'].map((mode) => `<option value="${mode}" ${(settings.clock_mode || 'auto') === mode ? 'selected' : ''}>${esc(t(`health.fasting.clock${mode[0].toUpperCase() + mode.slice(1)}`))}</option>`).join('')}</select>
@@ -66,17 +74,27 @@ export function wireFastingPreferences(root, initial, onSaved = () => {}, active
     const context = captureModalContext();
     const focusSelector = focused?.id ? `#${CSS.escape(focused.id)}` : focused?.hasAttribute('data-fasting-preset') ? `[data-fasting-preset="${CSS.escape(focused.dataset.fastingPreset)}"]` : focused?.hasAttribute('data-fasting-remind-goal') ? '[data-fasting-remind-goal]' : focused?.hasAttribute('data-fasting-remind-next') ? '[data-fasting-remind-next]' : null;
     pending = true;
+    // Den Fokus erst NACH dem Freigeben zurueckgeben: ein gesperrter Knopf
+    // nimmt keinen Fokus an. Seit die Einstellungen im Blatt stehen (R14),
+    // ist savedRoot derselbe Knoten wie root und bis `finally` gesperrt - der
+    // Fokus fiel nach jeder Zielwahl auf <body>.
+    let refocus = null;
     root.querySelectorAll('input, button, select').forEach((el) => { el.disabled = true; });
     try {
       requireFastingWrite();
-      if (Object.hasOwn(patch, 'default_goal_minutes')) Object.assign(patch, { active_id: active?.id ?? null, expected_revision: active?.revision });
+      // `active` darf ein Getter sein: das Blatt (R14) bleibt ueber mehrere
+      // Wahlen offen, und jede Zielwahl hebt die Revision des laufenden
+      // Fastens - mit der beim Oeffnen gemerkten scheiterte die zweite Wahl
+      // am Revisionsvergleich.
+      const running = typeof active === 'function' ? active() : active;
+      if (Object.hasOwn(patch, 'default_goal_minutes')) Object.assign(patch, { active_id: running?.id ?? null, expected_revision: running?.revision });
       settings = (await api.put('/health/fasting/settings', patch)).data;
       const restoreFocus = document.activeElement === focused || document.activeElement === document.body;
       const savedRoot = await onSaved(settings) || root;
       if (savedRoot.isConnected) {
         savedRoot.querySelector('[data-fasting-preferences-status]').textContent = t('settings.feedExportSaved');
         const focusUnchanged = document.activeElement === focused || document.activeElement === document.body;
-        if (restoreFocus && focusUnchanged && focusSelector && isModalContextCurrent(context)) savedRoot.querySelector(focusSelector)?.focus({ preventScroll: true });
+        if (restoreFocus && focusUnchanged && focusSelector && isModalContextCurrent(context)) refocus = savedRoot.querySelector(focusSelector);
       }
     } catch (error) {
       status.textContent = fastingError(error);
@@ -90,31 +108,33 @@ export function wireFastingPreferences(root, initial, onSaved = () => {}, active
       root.querySelector('[data-fasting-remind-goal]').checked = !!settings.remind_goal;
       root.querySelector('[data-fasting-remind-next]').checked = !!settings.remind_next_start;
       const hours = settings.default_goal_minutes ? settings.default_goal_minutes / 60 : null;
-      const selected = hours === null ? '' : FASTING_PRESETS.includes(hours) ? String(hours) : 'custom';
-      root.querySelectorAll('[data-fasting-preset]').forEach((button) => {
-        const active = button.dataset.fastingPreset === selected;
-        button.setAttribute('aria-pressed', String(active));
-        button.classList.toggle('btn--primary', active);
-        button.classList.toggle('btn--secondary', !active);
-      });
+      const selected = hours === null ? 'none' : FASTING_PRESETS.includes(hours) ? String(hours) : 'custom';
+      presets.sync(selected);
       root.querySelector('[data-fasting-custom]').hidden = selected !== 'custom';
       root.querySelector('[data-fasting-goal]').value = selected === 'custom' ? hours : '';
+      if (refocus?.isConnected && (document.activeElement === document.body || document.activeElement === focused)) refocus.focus({ preventScroll: true });
     }
   }
-  root.querySelectorAll('[data-fasting-preset]').forEach((button) => button.addEventListener('click', () => {
-    if (button.dataset.fastingPreset === 'custom') {
-      root.querySelectorAll('[data-fasting-preset]').forEach((choice) => {
-        const active = choice === button;
-        choice.setAttribute('aria-pressed', String(active));
-        choice.classList.toggle('btn--primary', active);
-        choice.classList.toggle('btn--secondary', !active);
-      });
-      root.querySelector('[data-fasting-custom]').hidden = false;
-      root.querySelector('[data-fasting-goal]').focus();
-      return;
-    }
-    void save({ default_goal_minutes: normalizeGoalHours(button.dataset.fastingPreset) });
-  }));
+  // Die geteilte Verhaltensschicht (Pfeiltasten, rovierendes tabindex) im
+  // select-Modus; Pfeiltasten waehlen erst mit Enter/Leertaste - jeder
+  // Wechsel speichert.
+  const bar = root.querySelector('.fasting-presets');
+  const presets = wireTablist(bar, {
+    activeId: bar?.querySelector('[aria-checked="true"]')?.dataset.tabId ?? '',
+    activeClass: 'is-active',
+    mode: 'select',
+    manualActivation: true,
+    onChange: (id) => {
+      if (id === 'custom') {
+        root.querySelector('[data-fasting-custom]').hidden = false;
+        root.querySelector('[data-fasting-goal]').focus();
+        return;
+      }
+      // „Ohne Ziel" traegt die Kennung `none` - die Leiste kennt keine leere.
+      void save({ default_goal_minutes: normalizeGoalHours(id === 'none' ? '' : id) });
+    },
+  });
+  if (bar) attachSegmentIndicator(bar, { key: 'fasting-goal' });
   root.querySelector('[data-fasting-goal]').addEventListener('change', (event) => {
     if (!event.target.value || !event.target.reportValidity()) return;
     void save({ default_goal_minutes: normalizeGoalHours(event.target.value) });
@@ -308,12 +328,26 @@ export function fastingClockSwitchHtml() {
 
 export function updateFastingClock(root, active, last, settings = {}) {
   const model = fastingDisplayModel(active, last, settings.clock_mode);
+  // RUHE OHNE NULLEN (A6 P2-3): ohne laufendes Fasten gibt es keinen
+  // Fastentag und nichts umzuschalten, und ohne jedes Fasten auch keine Zeit -
+  // "00:00:00", "Tag 0" und ein Umschalter Verstrichen/Verbleibend behaupteten
+  // einen Zustand, den es nicht gibt. Bleibt: der Satz, dass man starten kann.
   const timer = root.querySelector('[data-fasting-timer]');
-  if (timer) timer.textContent = model.hasAnchor ? formatFastingClock(model.displaySeconds) : '00:00:00';
+  if (timer) {
+    timer.hidden = !model.hasAnchor;
+    timer.textContent = model.hasAnchor ? formatFastingClock(model.displaySeconds) : '';
+  }
   const label = root.querySelector('[data-fasting-clock-label]');
   if (label) label.textContent = t(active ? model.mode === 'remaining' ? 'health.fasting.remaining' : 'health.fasting.elapsed' : last ? 'health.fasting.sinceLast' : 'health.fasting.ready');
   const days = root.querySelector('[data-fasting-days]');
-  if (days) days.textContent = t('health.fasting.elapsedDays', { days: model.days });
+  if (days) {
+    days.hidden = !active;
+    // `model.days` zaehlt VOLLE Tage (0 am ersten Tag); der Satz nennt den
+    // laufenden Tag - die erste Stunde eines Fastens ist "Tag 1", nicht "Tag 0".
+    days.textContent = active ? t('health.fasting.elapsedDays', { days: model.days + 1 }) : '';
+  }
+  const clockSwitch = root.querySelector('.fasting-clock-switch');
+  if (clockSwitch) clockSwitch.hidden = !active;
   const remaining = root.querySelector('[data-fasting-remaining]');
   if (remaining) remaining.textContent = model.reached ? `${t('health.fasting.goalReached')} · +${formatFastingClock(model.overtime)}` : model.remaining !== null ? `${t(model.mode === 'remaining' ? 'health.fasting.elapsed' : 'health.fasting.remaining')}: ${formatFastingClock(model.mode === 'remaining' ? model.seconds : model.remaining)}` : t('health.fasting.noGoal');
   root.querySelectorAll('[data-fasting-clock-mode]').forEach((button) => {
@@ -323,15 +357,13 @@ export function updateFastingClock(root, active, last, settings = {}) {
   root.querySelector('[data-fasting-progress]')?.style.setProperty('--fasting-progress', `${model.progress}%`);
   const dial = root.querySelector('[data-fasting-segments]');
   const minute = Math.floor(model.seconds / 60);
-  if (dial && dial.dataset.minute !== String(minute)) {
-    dial.dataset.minute = String(minute);
-    dial.replaceChildren();
-    dial.insertAdjacentHTML('beforeend', fastingDialMarkup(active ? minute : 0, active?.goal_minutes, settings.zone_mode));
-  }
+  if (dial) updateFastingDial(dial, active ? minute : 0, active?.goal_minutes, settings.zone_mode);
   const announcement = root.querySelector('[data-fasting-announcement]');
   if (announcement && announcement.dataset.minute !== String(minute)) {
     announcement.dataset.minute = String(minute);
-    announcement.textContent = `${t(active ? 'health.fasting.elapsed' : 'health.fasting.sinceLast')}: ${formatFastingClock(minute * 60)}`;
+    announcement.textContent = model.hasAnchor
+      ? `${t(active ? 'health.fasting.elapsed' : 'health.fasting.sinceLast')}: ${formatFastingClock(minute * 60)}`
+      : '';
   }
 }
 

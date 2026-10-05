@@ -1,13 +1,13 @@
 /**
  * Modul: Dashboard-Widget-Konfiguration
  * Zweck: Der Standard-Satz der Dashboard-Widgets und die reine Logik darauf -
- *        Normalisieren eines gespeicherten Layouts, Erkennen einer echten
- *        Nutzer-Umsortierung, Vergleich zweier Konfigurationen.
+ *        Normalisieren eines gespeicherten Layouts, Vergleich zweier
+ *        Konfigurationen, Nachrechnen des dicht gepackten Rasters.
  * Abhängigkeiten: keine
  *
- * WARUM ALS UTIL UND NICHT IN dashboard.js: `normalizeDashboardConfig` und
- * `isUserOrderedConfig` tragen zusammen eine Zusicherung (siehe unten an
- * WIDGET_IDS) und waren bis 2026-08-13 durch keinen einzigen Test gedeckt.
+ * WARUM ALS UTIL UND NICHT IN dashboard.js: `normalizeDashboardConfig` traegt
+ * eine Zusicherung (siehe unten an WIDGET_IDS) und war bis 2026-08-13 durch
+ * keinen einzigen Test gedeckt.
  * NICHT der Grund ist Unerreichbarkeit - `dashboard.js` ist über den
  * Browser-Loader importierbar, `test-dashboard.js` tut das für den Wand-Modus.
  * Der Grund ist, dass diese Zusicherung dann am `__test`-Export hinge: einer
@@ -26,20 +26,18 @@
 // (weather) steht bewusst am Ende, statt die sichtbare Grid-Spitze zu belegen.
 /* DIE REIHENFOLGE DIESER LISTE IST SEIT 2026-08-13 FREI - sie war es vorher
  * nicht. Bis dahin hängte `normalizeDashboardConfig` eine neu bekannte Id an
- * bestehende Layouts HINTEN an, während `isUserOrderedConfig` die Reihenfolge
- * gegen genau diese Liste vergleicht. Beide Reihenfolgen stimmten nur überein,
- * solange neue Ids auch hier hinten standen; wer eine neue Id vor eine
- * bestehende setzte, liess JEDES Bestandslayout als „umsortiert" lesen, und das
- * Raster schaltete stillschweigend von der dichten Packung auf preserve-order
- * um (der Regress aus Audit A1-03). `metrics` steht deshalb bis heute am Ende,
- * obwohl die Kachelreihe oben am meisten taugt.
- * Der Merge sortiert eine fehlende Id jetzt an ihrer Default-Position ein statt
- * sie anzuhängen, damit hält der Vergleich unabhängig von der Position. Die
- * Zusicherung ist damit nicht mehr eine Regel im Kopf, sondern ein Guard:
- * „Bestandslayout ohne genau eine Id liest sich nicht als umsortiert", über
- * JEDE Id dieser Liste. Wer hier umsortiert, prüft ihn - er ist der Ort, an dem
- * ein Fehler auffällt. */
-export const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'countdown', 'budget', 'rewards', 'health', 'cycle', 'fasting', 'nutrition', 'housekeeping', 'schedule', 'waste', 'family', 'notes', 'weather', 'clock', 'metrics', 'quicklinks'];
+ * bestehende Layouts HINTEN an, und ein Vergleich gegen genau diese Liste
+ * (`isUserOrderedConfig`) las jedes Bestandslayout als „umsortiert", sobald
+ * eine neue Id vor einer bestehenden stand - das Raster schaltete dann
+ * stillschweigend von der dichten Packung auf die Quellordnung um (Audit A1-03).
+ * Der Merge sortiert eine fehlende Id seitdem an ihrer Default-Position ein.
+ *
+ * SEIT 2026-09-23 GIBT ES DEN VERGLEICH NICHT MEHR, und die Einsortierung
+ * bleibt trotzdem richtig. Das Raster packt jetzt IMMER dicht (siehe `packGrid`
+ * unten), eine Umsortierung schaltet nichts mehr um. Die Default-Position ist
+ * aber weiter der Ort, an dem ein Neuzugang erscheint, und der Guard
+ * „eine fehlende Id landet an ihrer Default-Position" haelt das fest. */
+export const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'pantry', 'birthdays', 'countdown', 'budget', 'rewards', 'health', 'cycle', 'fasting', 'nutrition', 'housekeeping', 'schedule', 'waste', 'family', 'notes', 'weather', 'clock', 'metrics', 'quicklinks'];
 
 // Vier kuratierte Formen statt sechs: über vier Auswahlmöglichkeiten pro Widget
 // (× bis zu 12 Widgets) kippt der Anpassen-Modus in Mikro-Entscheidungs-Overhead
@@ -48,7 +46,10 @@ export const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'birthdays'
 // nicht zurückgesetzt, nur die Neu-Auswahl steuert auf diese vier zu.
 export const WIDGET_SIZE_PRESETS = [
   { value: '1x1', labelKey: 'dashboard.widgetSizeTiny'     },
-  { value: '2x1', labelKey: 'dashboard.widgetSizeNarrow'   },
+  // 2 Spalten x 1 Zeile ist BREIT. Der Schluessel hiess `widgetSizeNarrow`
+  // („Schmal (2×1)"), und wer das woertlich nahm, bekam das Gegenteil
+  // (Re-Critique 2026-09-27, W2).
+  { value: '2x1', labelKey: 'dashboard.widgetSizeWide'     },
   { value: '1x2', labelKey: 'dashboard.widgetSizeTall'     },
   { value: '2x2', labelKey: 'dashboard.widgetSizeStandard' },
 ];
@@ -99,7 +100,9 @@ export function defaultWidgetSize(id) {
   // avatar, name, shift - and left at the 1x1 default it rendered 318px against
   // the 218px the size class promised, stretching whatever shared its grid row
   // (PR #930 review).
-  if (['tasks', 'calendar', 'rewards', 'budget', 'family', 'notes', 'birthdays', 'countdown', 'schedule', 'waste'].includes(id)) return '1x2';
+  // `pantry` („Laeuft bald ab") ist dieselbe Kachel wie die Geburtstage: eine
+  // nach Naehe sortierte Liste aus Name und „noch so lange".
+  if (['tasks', 'calendar', 'rewards', 'budget', 'family', 'notes', 'birthdays', 'countdown', 'schedule', 'waste', 'pantry'].includes(id)) return '1x2';
   // Die Uhr startet breit statt quadratisch: Uhrzeit und darunter der ausgeschriebene
   // Wochentag brauchen Zeile, nicht Höhe - auf 1x1 bräche das Datum um (#651).
   // `quicklinks` steht bei der Uhr und nicht bei den Listen: es ist eine ZEILE
@@ -153,7 +156,11 @@ export const COCKPIT_COVERED_WIDGETS = new Set(['tasks', 'calendar', 'shopping',
 // Kosmetik - eine Id, die in dieser Menge FEHLT, ist nach dem Update in JEDEM
 // bestehenden Haushalt eingeblendet, weil `normalizeDashboardConfig` eine neu
 // bekannte Id mit `defaultWidgetVisible(id)` einsortiert.
-export const DEFAULT_HIDDEN_WIDGETS = new Set([...COCKPIT_COVERED_WIDGETS, 'rewards', 'health', 'cycle', 'fasting', 'nutrition', 'housekeeping', 'schedule', 'waste', 'clock', 'weather', 'quicklinks']);
+// `pantry` („Laeuft bald ab", Critique 2026-09-23) aus demselben Grund: nicht
+// jeder Haushalt fuehrt Mindesthaltbarkeiten, und ein frisches Dashboard mit
+// einer Kachel „nichts laeuft ab" waere die Ueberladung, die diese Menge
+// verhindern soll.
+export const DEFAULT_HIDDEN_WIDGETS = new Set([...COCKPIT_COVERED_WIDGETS, 'rewards', 'health', 'cycle', 'fasting', 'nutrition', 'housekeeping', 'schedule', 'waste', 'pantry', 'clock', 'weather', 'quicklinks']);
 
 export function defaultWidgetVisible(id) {
   return !DEFAULT_HIDDEN_WIDGETS.has(id);
@@ -167,10 +174,9 @@ export const DEFAULT_WIDGET_CONFIG = WIDGET_IDS.map((id, i) => ({ id, visible: d
  *
  * ANHÄNGEN WAR DIE BEQUEMERE ANTWORT UND DIE TEURERE. Eine ans Ende gehängte
  * Id ist nur dann an ihrer Default-Position, wenn sie auch in WIDGET_IDS ganz
- * hinten steht - und `isUserOrderedConfig` vergleicht gegen WIDGET_IDS. Aus
- * einer Datenoperation wurde so eine Reihenfolgen-Vorschrift für eine Liste
- * zwei Bildschirme weiter oben. Hier kostet die richtige Antwort eine
- * Rückwärtssuche.
+ * hinten steht. Aus einer Datenoperation wurde so eine Reihenfolgen-Vorschrift
+ * für eine Liste zwei Bildschirme weiter oben. Hier kostet die richtige
+ * Antwort eine Rückwärtssuche.
  *
  * SIE FOLGT IHREM VORGÄNGER, AUCH WENN DER UMGEZOGEN IST, und das ist eine
  * Entscheidung, keine Nebenwirkung. In einem Layout, das der Nutzer selbst
@@ -229,32 +235,165 @@ export function normalizeDashboardConfig(input) {
   return ordered.map((w, i) => ({ ...w, order: i }));
 }
 
-// Hat der Nutzer die Widget-Reihenfolge bewusst geändert (vs. dem Autor-Default)?
-// Nur dann darf das Grid auf `grid-auto-flow: row` umschalten, um die gesetzte
-// Ordnung zu bewahren. Beim unveränderten Default packt `dense` die Kacheln dicht
-// (kein toter Weißraum auf breitem Desktop) — die Löcher entstünden sonst nicht aus
-// „Nutzerabsicht", sondern nur, weil der Default-Satz nicht sauber tesselliert (Critique P2).
-export function isUserOrderedConfig(cfg) {
-  if (!Array.isArray(cfg)) return false;
-  // Nur sichtbare, beidseitig bekannte Widgets vergleichen: eine Id, die im
-  // gespeicherten Layout steht und in WIDGET_IDS nicht mehr (abgeschaffte
-  // Widgets alter Stände), und reine Sichtbarkeits-Toggles sind KEINE
-  // Nutzer-Umsortierung. Der strikte Voll-Vergleich schaltete sonst dauerhaft
-  // auf preserve-order und der dense-Bento füllte nie wieder Lücken
-  // (Audit A1-03).
-  //
-  // DER UMGEKEHRTE FALL - eine Id, die normalizeDashboardConfig gerade selbst
-  // ERGÄNZT hat, weil sie in WIDGET_IDS neu ist - fällt hier nicht auf, und
-  // zwar seit 2026-08-13 aus dem richtigen Grund: der Merge setzt sie an ihre
-  // Default-Position, nicht ans Ende. Vorher hing das an der Vereinbarung, neue
-  // Ids auch in WIDGET_IDS hinten anzuhängen. Siehe die Notiz dort.
-  const defaultIds = DEFAULT_WIDGET_CONFIG.map((w) => w.id);
-  const currentOrder = [...cfg]
-    .filter((w) => w.visible !== false && defaultIds.includes(w.id))
-    .sort((a, b) => a.order - b.order)
-    .map((w) => w.id);
-  const defaultOrder = defaultIds.filter((id) => currentOrder.includes(id));
-  return currentOrder.join(',') !== defaultOrder.join(',');
+/* DAS DICHTE RASTER, NACHGERECHNET (Critique 2026-09-23).
+ *
+ * Das Raster packt seit dieser Runde IMMER dicht (`grid-auto-flow: row dense`),
+ * auch bei eigener Reihenfolge und im Bearbeiten-Modus. Was danach noch an
+ * Loechern bleibt, liegt nicht an der Reihenfolge, sondern an den GROESSEN:
+ * drei Breitkacheln in drei Spalten lassen rechts je eine Zelle frei, weil keine
+ * spaetere Kachel hineinpasst. Das kann nur eine andere Groesse loesen, und die
+ * schlaegt der Bearbeiten-Modus vor.
+ *
+ * Dafuer braucht es die Belegung, BEVOR sie gerendert ist - fuer jede
+ * Kandidaten-Groesse ein Raster, das es nie gibt. `packGrid` rechnet den
+ * Auto-Placement-Algorithmus fuer den einzigen Fall nach, den das Raster kennt:
+ * jede Kachel hat nur Spans und keine feste Position, und `dense` setzt den
+ * Suchcursor fuer JEDE Kachel zurueck an den Anfang (CSS Grid 2, §8.5, Schritt
+ * 4). Erste passende Zelle von oben links gewinnt. Die Spans kommen vom
+ * Aufrufer, gelesen aus dem gerenderten Stylesheet - die Zuordnung Groesse →
+ * Span steht damit weiter nur in dashboard.css. */
+
+/**
+ * Belegung eines dicht gepackten Rasters.
+ * @param {{ id: string, cols: number, rows: number }[]} items in Rangfolge
+ * @param {number} columns Spaltenzahl des Rasters
+ * @returns {(string|null)[][]} Zeilen x Spalten, belegt mit der Widget-Id
+ */
+export function packGrid(items, columns) {
+  const cols = Math.max(1, Math.floor(columns) || 1);
+  const cells = [];
+  const row = (r) => (cells[r] ??= Array(cols).fill(null));
+  const free = (r, c, w, h) => {
+    for (let a = r; a < r + h; a += 1) {
+      for (let b = c; b < c + w; b += 1) if (row(a)[b]) return false;
+    }
+    return true;
+  };
+  for (const item of items) {
+    // Breiter als das Raster geht nicht: CSS legte dafuer eine implizite
+    // Spalte an, die das Raster nie zeigen soll - gerechnet wird mit der Kante.
+    const w = Math.min(Math.max(1, item.cols | 0), cols);
+    const h = Math.max(1, item.rows | 0);
+    let placed = false;
+    for (let r = 0; !placed; r += 1) {
+      for (let c = 0; c + w <= cols && !placed; c += 1) {
+        if (!free(r, c, w, h)) continue;
+        for (let a = r; a < r + h; a += 1) for (let b = c; b < c + w; b += 1) row(a)[b] = item.id;
+        placed = true;
+      }
+    }
+  }
+  return cells;
+}
+
+/**
+ * Leere Zellen VOR der letzten Zeile. Die letzte Zeile darf auslaufen - dort
+ * endet das Raster ruhig, statt ein Loch mitten in die Flaeche zu setzen.
+ */
+export function gridHoleCount(cells) {
+  let holes = 0;
+  for (let r = 0; r < cells.length - 1; r += 1) holes += cells[r].filter((v) => !v).length;
+  return holes;
+}
+
+/**
+ * Die billigste Groessenaenderung EINER Kachel, nach der kein Loch mehr bleibt
+ * und das Raster nicht hoeher wird. `null`, wenn es nichts zu schliessen gibt
+ * oder keine einzelne Aenderung es schafft - dann schweigt der Hinweis lieber,
+ * als einen Umbau in mehreren Schritten anzuregen.
+ *
+ * @param {{ id: string, size: string, cols: number, rows: number }[]} items
+ * @param {number} columns
+ * @param {(item: object) => { size: string, cols: number, rows: number }[]} candidatesFor
+ */
+export function suggestGridHoleFill(items, columns, candidatesFor) {
+  const base = packGrid(items, columns);
+  if (!gridHoleCount(base)) return null;
+  // Zuerst die NACHBARN des Lochs - die Kachel darueber kann nach unten, die
+  // links daneben nach rechts wachsen -, dann der Rest. Ein Vorschlag, der eine
+  // Kachel am anderen Ende des Rasters umbaut, schliesst das Loch zwar auch,
+  // aber niemand sieht, warum.
+  const neighbours = new Set();
+  for (let r = 0; r < base.length - 1; r += 1) {
+    for (let c = 0; c < base[r].length; c += 1) {
+      if (base[r][c]) continue;
+      if (r > 0 && base[r - 1][c]) neighbours.add(base[r - 1][c]);
+      if (c > 0 && base[r][c - 1]) neighbours.add(base[r][c - 1]);
+    }
+  }
+  // Danach die Kosten der Aenderung: gleiche Flaeche (aus breit wird hoch) vor
+  // groesser vor kleiner - ein Vorschlag, der Inhalt wegnimmt, ist der teuerste.
+  // Erst zuletzt die Rangfolge.
+  const area = (x) => x.cols * x.rows;
+  const cost = (item, cand) => {
+    const delta = area(cand) - area(item);
+    return delta === 0 ? 0 : delta > 0 ? delta : 100 - delta;
+  };
+  const tries = items.flatMap((item, i) => candidatesFor(item)
+    .filter((cand) => cand.size !== item.size)
+    .map((cand) => ({ i, cand, near: neighbours.has(item.id) ? 0 : 1, cost: cost(item, cand) })))
+    .sort((x, y) => x.near - y.near || x.cost - y.cost || x.i - y.i);
+  for (const { i, cand } of tries) {
+    const next = items.map((it, j) => (j === i ? { ...it, ...cand } : it));
+    const cells = packGrid(next, columns);
+    if (gridHoleCount(cells) === 0 && cells.length <= base.length) {
+      return { id: items[i].id, size: cand.size };
+    }
+  }
+  return null;
+}
+
+/**
+ * Welche Kachel im NORMALMODUS in den Rest ihrer Zeile waechst (Re-Critique
+ * 2026-09-27, A7 P2-12 / R10 L9). Gemessen bei 1440x900: neben der
+ * Kennzahlreihe (2x1) und neben den Notizen (2x1) blieb je eine Spalte leer,
+ * 367x110 und 367x201px - der Loch-Hinweis steht nur im Anpassen-Modus, und
+ * wer nie anpasst, sieht die Loecher fuer immer.
+ *
+ * Die Regel: nach der dichten Packung waechst jede Kachel nach rechts ueber
+ * die freien Zellen, die in ALLEN ihren Zeilen frei sind, bis zur naechsten
+ * belegten Zelle oder zum Rand. Gespeichert wird nichts - die gewaehlte Groesse
+ * bleibt die des Nutzers, gewachsen wird nur in der Darstellung.
+ *
+ * WARUM DAS DIE PACKUNG NICHT UMWIRFT (Aequivalenz, getestet): gewachsen wird
+ * nur in Zellen, die nach der VOLLEN Packung leer sind. Keine Kachel stand je
+ * dort, also findet bei der Neupackung mit den breiteren Spans jede Kachel
+ * dieselbe erste passende Stelle - die davor passten schon mit der schmaleren
+ * Breite nicht, und die eigene ist weiterhin frei. Der Test packt beide
+ * Fassungen und vergleicht die Positionen.
+ *
+ * @param {{ id: string, cols: number, rows: number }[]} items in Rangfolge
+ * @param {number} columns Spaltenzahl des Rasters
+ * @returns {Map<string, number>} Id -> neue Spaltenbreite, nur fuer Kacheln, die wachsen
+ */
+export function rowFillSpans(items, columns) {
+  const cols = Math.max(1, Math.floor(columns) || 1);
+  const grown = new Map();
+  if (cols < 2) return grown;
+  const cells = packGrid(items, cols);
+  for (const item of items) {
+    // Die Stelle der Kachel: ihre erste Zelle in Lesereihenfolge.
+    let top = -1;
+    let left = -1;
+    for (let r = 0; r < cells.length && top < 0; r += 1) {
+      const c = cells[r].indexOf(item.id);
+      if (c >= 0) { top = r; left = c; }
+    }
+    if (top < 0) continue;
+    const w = Math.min(Math.max(1, item.cols | 0), cols);
+    const h = Math.max(1, item.rows | 0);
+    let end = left + w;
+    const columnFree = (c) => {
+      for (let r = top; r < top + h; r += 1) if (!cells[r] || cells[r][c]) return false;
+      return true;
+    };
+    while (end < cols && columnFree(end)) {
+      for (let r = top; r < top + h; r += 1) cells[r][end] = item.id;
+      end += 1;
+    }
+    if (end > left + w) grown.set(item.id, end - left);
+  }
+  return grown;
 }
 
 export function sameWidgetConfig(a, b) {

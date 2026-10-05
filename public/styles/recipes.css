@@ -35,7 +35,8 @@
   padding-block-start: var(--space-4);
 }
 
-/* Der Stretch-und-Clip-Fix für lange, ungruppierte .list-rows-Listen sitzt
+/* Der Stretch-und-Clip-Fix für lange, ungruppierte Zeilenlisten (.row-carrier,
+ * bis Runde 5 .list-rows) sitzt
  * jetzt in list-row.css selbst (align-self: start) - er galt hier zuerst
  * nur für Rezepte, betrifft aber jede Küchenliste, deren Filter sie auf eine
  * einzige flache Gruppe reduziert (z. B. Vorrat unter "fast leer"). Siehe
@@ -116,6 +117,16 @@
  * selbst ist dann das Flex-Item wie zuvor. Die Container-Query unten
  * reaktiviert ihn als echtes Flex-Item mit eigener Zeile. */
 .recipe-row__badge-slot {
+  display: contents;
+}
+
+/* Derselbe Kniff fuer Zutatenzahl und „Diese Woche geplant": breit sind beide
+ * Flex-Items der Zeile wie zuvor, schmal (Query unten) ist der Slot die zweite
+ * Zeile und haelt beide Angaben zusammen. Ohne ihn rueckte nur die Zahl unter
+ * den Namen, und „· Diese Woche geplant" blieb mit fuehrendem Mittelpunkt
+ * allein neben dem Namen stehen - gemessen in der Listenbahn der Detailspalte
+ * (Zeile 424px, 26,5rem, 2026-09-26), vorher jede Zeile zwischen 26 und 30rem. */
+.recipe-row__sub {
   display: contents;
 }
 
@@ -243,6 +254,19 @@
     order: 1;
   }
 
+  /* Der Slot ist die zweite Zeile; darin laufen Zahl und Planungsangabe als
+   * Text hintereinander (Block, kein Flex - die beiden Angaben sind ein Satz). */
+  .recipe-row__sub {
+    display: block;
+    flex: 1 0 100%;
+    order: 2;
+    min-width: 0;
+    /* Die Schrift der beiden Angaben auch am Block: sonst setzt die Zeile den
+     * Strut der groesseren Namensschrift an und wird 1-2px hoeher als die
+     * Meta allein (gemessen 390px: 65/66 statt 64px). */
+    font-size: var(--text-sm);
+  }
+
   .recipe-row__toggle .list-row__meta {
     flex: 1 0 100%;
     order: 2;
@@ -295,7 +319,11 @@
 .recipe-row__chevron {
   flex-shrink: 0;
   color: var(--color-text-tertiary);
-  transition: transform var(--transition-fast);
+  /* EIN Tempo fuer jeden Aufklapp-Winkel: wie `.list-group__chevron`
+   * (list-row.css) dreht er im Takt des Panels, das darunter aufzieht
+   * (expandIn/collapseOut: --duration-lg, --ease-in-out). Vorher 150ms
+   * gegen 250ms - der Winkel war fertig, bevor das Panel halb offen war. */
+  transition: transform var(--duration-lg) var(--ease-in-out);
 }
 
 /* Gespiegelte Zeile ganz ohne Detail (recipes.js, isMirrored && !hasDetail):
@@ -332,6 +360,28 @@
   padding: var(--space-1) var(--space-3) var(--space-4);
 }
 
+/* Kopfbild des Details (R16): das selbst hochgeladene Bild, 3:2. Der RAHMEN
+ * traegt das Verhaeltnis, das Bild fuellt ihn per `object-fit: cover` - es wird
+ * beschnitten, nie gestaucht (ein Hochformat-Foto verliert oben und unten,
+ * statt breitgezogen zu werden). Ohne Bild gibt es den Rahmen nicht
+ * (utils/recipe-thumb.js), also auch keinen grauen Block. Auf breiter Flaeche
+ * begrenzt, damit das Bild die Zutaten nicht aus dem ersten Bildschirm schiebt. */
+.recipe-detail__hero {
+  aspect-ratio: 3 / 2;
+  width: 100%;
+  max-width: 30rem;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: var(--color-surface-2);
+}
+
+.recipe-detail__hero-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .recipe-detail__ingredients {
   margin: 0;
   padding: 0;
@@ -340,9 +390,25 @@
   gap: var(--space-1);
 }
 
+/* Ein Abschnitt des Details: Kopf + Inhalt (Zutaten, Notizen). Die Koepfe
+ * tragen die Bereichsrolle aus typography.css; hier stehen nur Abstand und
+ * Rand, damit der erste Kopf nicht auf dem Detailrand klebt. */
+.recipe-detail__section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.recipe-detail__section-title {
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+/* ZUTATEN IN PRIMAERTEXT: sie sind der Inhalt des Rezepts, nicht seine
+ * Fussnote. Grau standen sie gleichrangig mit den Notizen und leiser als die
+ * Zuordnungs-Knoepfe daneben (Re-Critique 2026-09-27, A4). */
 .recipe-detail__ingredient {
   font-size: var(--type-body);
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
   font-variant-numeric: tabular-nums;
   /* Zutat links, Vorrats-Zuordnung rechts, und bei 320px untereinander statt
    * abgeschnitten: ein Vorratsname ist so lang, wie der Haushalt ihn getippt
@@ -377,11 +443,12 @@ button.recipe-detail__ingredient-match:hover {
   color: var(--color-text-secondary);
 }
 
-/* Nicht zugeordnet ist ein ZUSTAND, kein Mangel: dieselbe stille Farbe wie eine
- * gesetzte Zuordnung, nur kursiv. Ein Warnton haette aus „unbekannt" ein
- * „fehlt" gemacht, und genau diesen Unterschied haelt #1314 fest. */
-.recipe-detail__ingredient-match--unset {
-  font-style: italic;
+/* (Hier stand `.recipe-detail__ingredient-match--unset` fuer das kursive „Nicht
+ * zugeordnet" an jeder offenen Zutat. Das Wort steht nicht mehr an der Zeile -
+ * recipes.js `pantryMatchEl` -, der Weg zu den offenen Zuordnungen ist EIN
+ * Knopf unter der Liste.) */
+.recipe-detail__match-open {
+  justify-self: start;
 }
 
 .recipe-detail__notes {
@@ -405,14 +472,9 @@ button.recipe-detail__ingredient-match:hover {
  * .page-toolbar--in-group (layout.css); die frühere eigene .recipes-toolbar
  * entfällt samt Padding-Regeln, die der Kopf schon mitbringt. */
 
-/* Nur Positionierung, wie .pantry-search: das Bedienelement liegt in
- * page-search.css. Der frühere Nachbau hier trug kein `min-width: 0` und konnte
- * damit nicht unter die Mindestbreite des Inputs schrumpfen; der geteilte
- * Baustein bringt es mit. */
-.recipes-search {
-  flex: 1;
-  max-width: 420px;
-}
+/* .recipes-search traegt keine eigene Breite mehr (Re-Critique 2026-09-27,
+ * D4): sie ist der Center-Slot, Breite und Stelle kommen aus page-search.css
+ * (`--page-search-width`). */
 
 /* Herkunfts-Filter (Alle/Nativ/Mealie): Trigger im __actions-Slot des Kopfs
  * (nur sichtbar, wenn Mirror-Rezepte existieren, siehe renderSourceFilter()),
@@ -508,14 +570,8 @@ button.recipe-detail__ingredient-match:hover {
   gap: var(--space-2);
 }
 
-/* Geometrie, Zielgröße und das eingekleidete Control kommen aus dem geteilten
- * .form-check (layout.css) - vorher war das eine nackte System-Checkbox in
- * System-Größe, während sechs andere Module ihre schon einkleiden (Critique
- * 2026-07-30, P2). Der engere Abstand bleibt: hier stehen vier Optionen in einer
- * Zeile, nicht eine Zeile mit einem Satz. */
-.recipe-meal-types__option {
-  gap: var(--space-1);
-}
+/* Die Optionen sind Umschalt-Chips (`.filter-chip`, Re-Critique 2026-09-28,
+ * A4 P2-7) - Form, Zielgroesse und Aktivton kommen aus filter-chip.css. */
 
 /* Eigenes Rezeptbild im Formular (#1059, Schritt 2) - dieselbe Bauart wie der
    Foto-Editor im Inventar: eine quadratische Vorschau, die selbst der Ausloeser
@@ -554,3 +610,30 @@ button.recipe-detail__ingredient-match:hover {
   object-fit: cover;
 }
 
+/* --------------------------------------------------------
+ * Liste + Detail (Breitenregel, Regime 2 - DESIGN.md)
+ *
+ * Ab der Schwelle steht das ausgewaehlte Rezept rechts in der Detailspalte
+ * (utils/master-detail.js, Geometrie in layout.css `.split-view`). Die Zeile
+ * waehlt dort aus, statt aufzuklappen - also fallen Aufklapper und Chevron in
+ * der Liste weg.
+ *
+ * KEINE EIGENE `@container`-ABFRAGE. Die Schwelle steht einmal in layout.css
+ * (PAGE-019 haelt sie am Token); ein zweites `65rem` hier liefe ihr bei der
+ * naechsten Aenderung still davon. `.recipes-list--split` setzt recipes.js
+ * nach der gerechneten Darstellung der Spalte (syncRowMode).
+ * -------------------------------------------------------- */
+
+.recipes-list--split .recipe-detail,
+.recipes-list--split .recipe-row__chevron {
+  display: none;
+}
+
+/* Derselbe Inhalt wie der Aufklapper, aber mit dem Polster der Spalte: der
+ * Aufklapper haengt unter einer Zeile und rueckt nur um die Zeilenkante ein,
+ * die Spalte ist eine eigene Flaeche mit dem Polster ihres Kopfs
+ * (`.split-view__detail-head`, --space-5). */
+.recipe-detail--pane {
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}

@@ -76,6 +76,26 @@
   height: 55%;
 }
 
+/* DER KOPF UEBER EINER KARTE MIT EIGENEM TITEL (R16, utils/auth-ui.js):
+ * Einladung und Passwort-Reset tragen dieselbe Marke wie die Anmeldung, aber
+ * eine Stufe leiser - die Seite hat ihre <h1> in der Karte ("Einladung
+ * annehmen"), der App-Name ist dort Absender, nicht Titel. */
+.auth-hero--compact {
+  margin-bottom: var(--space-6);
+}
+
+.auth-hero--compact .auth-hero__mark {
+  width: var(--space-12);
+  height: var(--space-12);
+  margin-bottom: var(--space-2);
+}
+
+.auth-hero--compact .auth-hero__title {
+  margin: 0;
+  font-size: var(--type-section-title);
+  font-weight: var(--font-weight-semibold);
+}
+
 /* Large Title wie jeder Seitentitel, in Label-Farbe. Der Titel stand bis Runde 3
  * auf einer eigenen 48px-Stufe und in --color-accent - beides verbietet
  * DESIGN.md ausdruecklich (Ueberschriften enden bei 34px; Large Titles tragen
@@ -109,6 +129,22 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+}
+
+/* Der Kartentitel der Seiten ohne Hero (/join, /forgot-password,
+ * /reset-password, /pair). Er hatte KEINE Regel (Critique 2026-09-26, Minor
+ * Observations): das <h1> fiel auf die Reset-Basis zurueck, 17px halbfett -
+ * so gross wie der Fliesstext darunter, und die Seite hatte keinen Titel, der
+ * als Titel las. Title 2 wie der Modul-Kopf (--type-toolbar-title, 22px, fett),
+ * nicht der Large Title des /login-Heros: der steht ueber der Karte, dieser
+ * Titel in ihr. */
+.auth-card__title {
+  font-size: var(--type-toolbar-title);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  color: var(--color-text-primary);
+  text-wrap: balance;
+  margin-bottom: var(--space-2);
 }
 
 /* Einleitungstext unter dem Kartentitel (/join). */
@@ -151,12 +187,6 @@
  * hidden-Attributs – Hinweis würde permanent sichtbar sein. */
 .auth-capslock[hidden] {
   display: none;
-}
-
-.auth-capslock i {
-  width: var(--text-base, 1rem);
-  height: var(--text-base, 1rem);
-  flex-shrink: 0;
 }
 
 /* Nach falschen Zugangsdaten wird der Recovery-Link betont, damit der Nutzer
@@ -262,12 +292,6 @@
 .password-toggle:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset-inset);
-}
-
-.password-toggle i {
-  width: var(--text-lg, 1.125rem);
-  height: var(--text-lg, 1.125rem);
-  pointer-events: none;
 }
 
 /* Feld-Fehler-Zustand */

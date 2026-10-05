@@ -325,7 +325,8 @@ function showReminderToast(reminder) {
 
   const toast = document.createElement('div');
   toast.className = 'toast toast--reminder';
-  toast.setAttribute('role', 'alert');
+  // Keine eigene Live-Rolle: die hoefliche Region sagt an. `role="alert"`
+  // machte die Erinnerung bestimmt und liess sie doppelt ansagen.
   toast.dataset.reminderId = reminder.id;
 
   const seal = createOriginSeal(reminder.entity_type);

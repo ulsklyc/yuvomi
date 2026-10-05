@@ -7,6 +7,7 @@
  *                  server/utils/http.js (node-nativer Safe-HTTP-Client)
  */
 
+import { runExternalJob } from '../utils/restore-state.js';
 import dns from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { createLogger } from '../logger.js';
@@ -276,7 +277,17 @@ async function syncOne(sub) {
   } finally { syncingNow.delete(sub.id); }
 }
 
-async function sync(subscriptionId) {
+/**
+ * Als Job, der liest, auf einen Anbieter wartet und dann schreibt: waehrend
+ * eines Restores beginnt er nicht, ein laufender wird abgewartet - sonst
+ * schriebe er sein Ergebnis in die gerade eingespielte Datenbank (Codex-Befund
+ * in #1431, siehe server/utils/restore-state.js).
+ */
+function sync(subscriptionId) {
+  return runExternalJob(() => syncUntracked(subscriptionId));
+}
+
+async function syncUntracked(subscriptionId) {
   const subs = subscriptionId
     ? db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').all(subscriptionId)
     : db.get().prepare('SELECT * FROM ics_subscriptions').all();

@@ -6,15 +6,11 @@
    * PAGE-COMPOSITION.md / .app-page--reading — not from this file. */
   display: flex;
   flex-direction: column;
-  /* Full-bleed root; bottom clearance for nav + FAB. */
-  padding-bottom: calc(var(--nav-bottom-height) + var(--space-6));
-}
-
-/* Hint copy only — measure/gutter live on .page-section.page-measure. */
-.birthdays-hint {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
+  /* Full-bleed root. Die Luft fuer Tab-Leiste und FAB rechnet die Shell als
+   * Nachlauf (`--shell-tail`, layout.css); hier steht nur der eigene Abstand -
+   * die Leiste zusaetzlich einzurechnen, zahlte sie doppelt, seit die Kapsel
+   * ueber dem Inhalt liegt (Kopfregel mobil, 2026-09-26). */
+  padding-bottom: var(--space-6);
 }
 
 /* --------------------------------------------------------
@@ -357,6 +353,17 @@
 /* --------------------------------------------------------
  * Modal
  * -------------------------------------------------------- */
+/* DIE DIALOGE HAENGEN UNTER document.body, NICHT UNTER .birthdays-page
+ * (components/modal.js). --module-accent stand nur an der Seitenwurzel; im
+ * Dialog war es leer, jedes color-mix() darauf ungueltig - die Bildflaeche
+ * des Editors stand ohne Hintergrund da (Critique 2026-09-26, Beifang), die
+ * Initialen in reinem Primaertext, die Haken des Imports im Systemblau.
+ * Dasselbe Muster wie `.document-form` in documents.css. */
+.birthday-modal,
+.bd-import {
+  --module-accent: var(--module-birthdays);
+}
+
 .birthday-avatar-editor {
   width: 84px;
   height: 84px;
@@ -388,6 +395,12 @@
   object-fit: cover;
 }
 
+.birthday-preview__glyph {
+  width: var(--icon-xl);
+  height: var(--icon-xl);
+  color: var(--color-text-secondary);
+}
+
 .birthday-preview__fallback {
   color: color-mix(in srgb, var(--module-accent) var(--tint-ink), var(--color-text-primary));
   font-size: var(--text-xl);
@@ -411,6 +424,12 @@
   background: var(--color-surface);
   color: var(--color-text-secondary);
   cursor: pointer;
+}
+
+/* `display: inline-flex` schlaegt das UA-`[hidden]` - ohne diese Regel stand
+ * "Bild entfernen" auch ohne Bild da. */
+.birthday-modal__photo-action[hidden] {
+  display: none;
 }
 
 .birthday-modal__photo-action:hover {
@@ -476,14 +495,6 @@
   font-size: var(--text-sm);
 }
 
-.birthday-modal__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-}
-
 .birthday-modal__footer-actions {
   display: flex;
   gap: var(--space-3);
@@ -521,18 +532,6 @@
 /* --------------------------------------------------------
  * Import aus Kontakten (#518)
  * -------------------------------------------------------- */
-.birthdays-toolbar__import {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  white-space: nowrap;
-}
-
-.birthdays-toolbar__import i {
-  width: 16px;
-  height: 16px;
-}
-
 .bd-import__intro {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
@@ -557,7 +556,7 @@
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: background-color var(--duration-sm) ease;
+  transition: background-color var(--transition-fast);
 }
 
 .bd-import-row:hover,
@@ -615,9 +614,11 @@
   color: var(--module-accent, var(--module-birthdays));
 }
 
-.bd-import-row__check i {
-  width: 16px;
-  height: 16px;
+/* Wie `.vcard-import-row__bday svg` in contacts.css: das `<svg>` bringt 24px
+ * mit, die fruehere `i`-Regel griff nie. */
+.bd-import-row__check svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
 }
 
 /* DER IMPORT-DIALOG HAENGT UNTER document.body, NICHT UNTER .birthdays-page
@@ -667,32 +668,42 @@
   font-size: var(--text-sm);
 }
 
-.bd-import__footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  /* Umbruch statt Quetschen - Begruendung an `.modal-panel__footer`
-   * (layout.css, #872). */
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
+
+/* --------------------------------------------------------
+ * Liste + Detail (R10 L5, A2; Baustein utils/master-detail.js)
+ *
+ * Die Geometrie der Spalten gehoert der Shell (layout.css `.split-view`).
+ * Geburtstage haben keinen eigenen Scrollport - die Liste scrollt mit
+ * #main-content wie unter der Schwelle -, deshalb klebt die Detailspalte unter
+ * dem Kopf (dieselbe Bauart wie Inventar). Den Versatz misst birthdays.js
+ * (`--birthdays-head-block`). Schwelle = `--layout-split-threshold` (65rem).
+ * -------------------------------------------------------- */
+@container module-surface (min-width: 65rem) {
+  .birthdays-page .split-view {
+    align-items: start;
+    /* Der Koerper polstert schon (`.app-page__body`); die Spalte endet dort. */
+    --split-view-end-pad: 0;
+  }
+
+  .birthdays-page .split-view__list {
+    overflow: visible;
+  }
+
+  .birthdays-page .split-view__detail {
+    position: sticky;
+    top: calc(var(--birthdays-head-block, 0px) + var(--space-3));
+    /* Von der gemessenen Oberkante bis zur Luft ueber dem Fensterrand
+     * (birthdays.js, syncBirthdaysDetailTop); ohne Messwert der Klebestand.
+     * Minus `--shell-tail`: was unten fest steht (Installationsbanner, FAB),
+     * verlangt seinen Nachlauf auch von einer klebenden Spalte - sonst endet
+     * ihr Fuss darunter (test:dashboard-surface-browser, Nachlauf). */
+    height: calc(var(--viewport-height) - var(--birthdays-detail-top, calc(var(--birthdays-head-block, 0px) + var(--space-3))) - var(--space-4) - var(--shell-tail, 0px));
+  }
 }
 
-@media (max-width: 639px) {
-  /* Icon-only: der Button trägt sein Label via aria-label weiter.
-   * DIE LABEL-VERLUST-REGEL (Runde 6, Phase 3b): er wechselt dabei in die
-   * Icon-Form seiner Familie - quadratisch auf `--target-base`, die Kapsel wird
-   * damit zum Kreis. Das bloße Zusammenziehen des Innenabstands ließ ihn als
-   * 50x48-Oval zurück, also in einer Form, die es sonst nirgends gibt. */
-  .birthdays-toolbar__import span {
-    display: none;
-  }
-
-  .birthdays-toolbar__import {
-    width: var(--target-base);
-    height: var(--target-base);
-    padding: 0;
-    flex-shrink: 0;
-    justify-content: center;
-  }
+/* Das Bild in der Detailspalte: gross genug, um die Person zu erkennen. */
+.birthday-pane__photo .birthday-avatar--pane {
+  inline-size: var(--space-16);
+  block-size: var(--space-16);
+  font-size: var(--text-xl);
 }

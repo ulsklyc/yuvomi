@@ -655,7 +655,7 @@ function displayRules(css, file) {
 const RUNTIME_ANCESTORS = new Map([
   ['.settings-page', {
     files: /^settings\//,
-    reason: "settings/shell.js setzt `page.className = 'page settings-page'` auf den "
+    reason: "settings/shell.js setzt `page.className = 'settings-page'` auf den "
       + 'Seitencontainer, und jedes Blatt unter settings/ rendert in diese Shell.',
   }],
 ]);

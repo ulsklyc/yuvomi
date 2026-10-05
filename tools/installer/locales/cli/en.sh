@@ -108,3 +108,10 @@ MSG_document_google_drive_client_secret="  Override client secret (empty reuses 
 MSG_document_google_drive_err_pair="Google Drive client ID and secret must both be set or both be empty."
 MSG_document_google_drive_err_credentials="Google Drive needs its own OAuth pair or configured Google Calendar credentials."
 MSG_review_document_google_drive="Google Drive docs"
+# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst, durch Leerzeichen
+# getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein Prompt in [x/N],
+# [X/n] oder [M] zeigt, muss hier stehen. Gross/klein faltet install.sh nur fuer A-Z: ein Wort
+# mit anderen Zeichen steht auch in Grossbuchstaben und gross geschrieben da (test:installer-cli-i18n).
+MSG_yes_chars="y yes"
+MSG_no_chars="n no"
+MSG_manual_chars="m"

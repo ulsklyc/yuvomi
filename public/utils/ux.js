@@ -5,23 +5,66 @@
  */
 
 /**
- * Gestaffeltes Einblenden einer NodeList oder eines Arrays von Elementen.
+ * Listen, deren erster Aufbau schon eingeblendet hat (Critique 2026-09-26, A3 P1-4).
+ *
+ * DAS EINBLENDEN GEHOERT ZUM ERSTEN AUFBAU, NICHT ZU JEDEM NEUZEICHNEN. Die
+ * Aufgabenliste rief stagger() bei jedem renderTaskList() - nach dem Abhaken,
+ * jedem Filterwechsel, jedem Tastendruck in der Suche. Die abgehakte Zeile
+ * verschwand ohne Austritt, und der ganze Rest fuhr von 8px unten neu ein: die
+ * Liste behauptete, neu geladen zu sein, obwohl sich eine Zeile geaendert hatte.
+ *
+ * Der Merker haengt am TRAEGER der Liste (`host`), nicht an den Zeilen: die
+ * sind nach jedem Neuzeichnen neue Knoten, der Traeger ueberlebt es. Baut der
+ * Router die Seite neu, ist auch der Traeger neu - und die Liste blendet beim
+ * naechsten Besuch wieder ein. Eine WeakSet haelt keinen abgehaengten Traeger am
+ * Leben.
+ */
+const staggeredHosts = new WeakSet();
+
+/** Der tiefste gemeinsame Vorfahr - nur der Rueckfall, wenn kein `host` kommt. */
+function commonHost(els) {
+  let host = els[0]?.parentElement ?? null;
+  while (host && !els.every((el) => host.contains?.(el))) host = host.parentElement;
+  return host;
+}
+
+/**
+ * Gestaffeltes Einblenden einer NodeList oder eines Arrays von Elementen -
+ * EINMAL je Listentraeger (siehe `staggeredHosts`).
  * Maximal MAX_STAGGER Elemente werden verzögert, der Rest sofort eingeblendet.
+ *
+ * `host` ist der Traeger, der das Neuzeichnen ueberlebt (`#task-list`, nicht
+ * die Gruppen darin). Ohne ihn gilt der gemeinsame Vorfahr der Zeilen - der ist
+ * bei gruppierten Listen aber oft selbst neu, deshalb uebergibt jeder Aufrufer
+ * ihn ausdruecklich (test:ux-utils prueft das).
+ *
+ * Ein Aufruf ohne Zeilen verbraucht den Merker nicht: das Skelett oder der
+ * Leerzustand ist nicht der erste Aufbau der Liste.
  *
  * @param {NodeList|Element[]} elements
  * @param {Object} [opts]
+ * @param {Element} [opts.host]        - Traeger der Liste, der das Neuzeichnen ueberlebt
  * @param {number} [opts.delay=30]     - ms zwischen jedem Element
- * @param {number} [opts.duration=180] - ms pro Element
+ * @param {number} [opts.duration]     - ms pro Element, Standard `--duration-md`
  * @param {number} [opts.max=5]        - Maximale Anzahl gestaffelter Elemente
  */
-export function stagger(elements, { delay = 30, duration = 180, max = 5 } = {}) {
+export function stagger(elements, { host = null, delay = 30, duration = durationToken('--duration-md', 200), max = 5 } = {}) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const els = Array.from(elements);
+  const els = Array.from(elements ?? []);
+  if (!els.length) return;
+  const root = host ?? commonHost(els);
+  if (root) {
+    if (staggeredHosts.has(root)) return;
+    staggeredHosts.add(root);
+  }
   els.forEach((el, i) => {
     const itemDelay = i < max ? i * delay : max * delay;
     el.style.opacity = '0';
     el.style.transform = 'translateY(8px)';
-    el.style.transition = `opacity ${duration}ms ease, transform ${duration}ms ease`;
+    // Dauer (--duration-md) und Kurve aus den Token: der Inline-Wert darf auf
+    // eine Custom Property zeigen, der Rueckleser unten vergleicht, was der
+    // Browser daraus serialisiert.
+    el.style.transition = `opacity ${duration}ms var(--ease-out), transform ${duration}ms var(--ease-out)`;
     // Zurückgelesen statt als Literal verglichen: der Browser serialisiert
     // Inline-Werte selbst, und nur so erkennt das Aufräumen seine eigenen.
     const own = { opacity: el.style.opacity, transform: el.style.transform, transition: el.style.transition };
@@ -94,6 +137,205 @@ export function animationSettled(el, { fallback = 260 } = {}) {
     };
     el.addEventListener('animationend', finish, { once: true });
     setTimeout(finish, fallback);
+  });
+}
+
+/**
+ * Wert eines Dauer-Tokens (`--duration-*`) in ms, fuer die Web Animations API.
+ * Die kennt keine Custom Properties in `duration` - die Skala bleibt trotzdem
+ * die in tokens.css, der Rueckfall greift nur ohne Stylesheet (Node-Tests).
+ */
+export function durationToken(name, fallback) {
+  const raw = typeof getComputedStyle === 'function' && typeof document !== 'undefined'
+    ? getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+    : '';
+  const ms = raw.endsWith('ms') ? parseFloat(raw) : raw.endsWith('s') ? parseFloat(raw) * 1000 : NaN;
+  return Number.isFinite(ms) ? ms : fallback;
+}
+
+/** Wert eines Kurven-Tokens (`--ease-*`); WAAPI nimmt `cubic-bezier(...)` direkt. */
+export function easingToken(name, fallback = 'ease-out') {
+  const raw = typeof getComputedStyle === 'function' && typeof document !== 'undefined'
+    ? getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+    : '';
+  return raw || fallback;
+}
+
+/** Die Blockmasse, die beim Einklappen mit auf null gehen: Hoehe, Innen- und Aussenabstand, Rahmen. */
+const BLOCK_PROPS = ['height', 'paddingTop', 'paddingBottom', 'marginTop', 'marginBottom', 'borderTopWidth', 'borderBottomWidth'];
+
+function blockFrame(el) {
+  const cs = getComputedStyle(el);
+  const frame = { height: `${el.getBoundingClientRect().height}px`, opacity: cs.opacity };
+  for (const p of BLOCK_PROPS.slice(1)) frame[p] = cs[p];
+  return frame;
+}
+
+function closedFrame() {
+  const frame = { opacity: '0' };
+  for (const p of BLOCK_PROPS) frame[p] = '0px';
+  return frame;
+}
+
+/**
+ * Hoehe einer Zeile oder Gruppe weich auf null nehmen - der Austritt, nach dem
+ * die Nachbarn nachruecken statt zu springen (Critique 2026-09-26, A3 P1-4).
+ *
+ * WARUM WEB ANIMATIONS UND NICHT `interpolate-size` ODER `grid-template-rows`:
+ * `height: auto -> 0` per `interpolate-size` kann Safari nicht (dort spraenge
+ * die Zeile), und der `1fr -> 0fr`-Trick braucht einen Wrapper um jede Zeile -
+ * in Listen, deren Markup drei Module teilen. Gemessen wird die echte Hoehe in
+ * px, von dort geht es auf 0; das kann jede Engine.
+ *
+ * Das Element bleibt danach auf null stehen (`fill: 'forwards'`) - der Aufrufer
+ * zeichnet die Liste neu oder entfernt es. Unter `prefers-reduced-motion`
+ * springt es wie bisher. Das Promise loest auch ohne `finish` auf: im verdeckten
+ * Tab und an einem abgehaengten Element kommt das Ereignis nicht zuverlaessig.
+ *
+ * @param {Element} el
+ * @param {Object} [opts]
+ * @param {number} [opts.duration] - ms, Standard `--duration-lg`
+ * @returns {Promise<void>}
+ */
+export function collapseOut(el, { duration = durationToken('--duration-lg', 250) } = {}) {
+  if (!el || typeof el.animate !== 'function') return Promise.resolve();
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
+  el.style.overflow = 'hidden';
+  const anim = el.animate([blockFrame(el), closedFrame()], {
+    duration, easing: easingToken('--ease-in-out', 'ease-in-out'), fill: 'forwards',
+  });
+  return settleAnimation(anim, duration);
+}
+
+/**
+ * Das Gegenstueck: ein gerade eingesetztes Element von null auf seine Hoehe
+ * aufziehen (aufgeklappte Gruppe, eine per „Rueckgaengig" zurueckgekehrte
+ * Zeile). Ohne `fill` - am Ende gilt wieder das Stylesheet.
+ */
+export function expandIn(el, { duration = durationToken('--duration-lg', 250) } = {}) {
+  if (!el || typeof el.animate !== 'function') return Promise.resolve();
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
+  const prevOverflow = el.style.overflow;
+  el.style.overflow = 'hidden';
+  const anim = el.animate([closedFrame(), blockFrame(el)], {
+    duration, easing: easingToken('--ease-in-out', 'ease-in-out'),
+  });
+  return settleAnimation(anim, duration).then(() => { el.style.overflow = prevOverflow; });
+}
+
+/** Letzte Absicht je Region (offen/zu): ein Zuklappen, das ein Oeffnen ueberholt hat, raeumt nicht ab. */
+const regionIntent = new WeakMap();
+
+/**
+ * Klappt eine per `hidden` geschaltete Region auf oder zu - mit Bewegung, wo
+ * es eine gibt (Critique R16, P2 Bewegung: "+N weitere" und die Sammelzeile
+ * der Uebersicht schalteten nur `hidden`, der Rest der Kachel sprang).
+ *
+ * DER ZUSTAND IST `hidden`, NICHT DIE ANIMATION. Auf: `hidden` faellt sofort
+ * (Tastatur und Screenreader erreichen den Inhalt im selben Moment), danach
+ * zieht die Hoehe auf. Zu: erst klappt die Hoehe ein, dann setzt `hidden` -
+ * und `collapseOut` loest auch ohne `finish` auf, der Zustand kommt also
+ * immer an. Wo nichts animiert (kein `animate`, reduzierte Bewegung), schaltet
+ * es im selben Takt wie vorher.
+ *
+ * @param {HTMLElement|null} region
+ * @param {boolean} open
+ * @returns {Promise<void>} aufgeloest, wenn der Zustand steht
+ */
+export function toggleRegion(region, open) {
+  if (!region) return Promise.resolve();
+  regionIntent.set(region, Boolean(open));
+  const settle = () => {
+    // collapseOut haelt die Hoehe 0 (fill: forwards) - verwerfen.
+    region.getAnimations?.().forEach((anim) => anim.cancel());
+    if (region.style) region.style.overflow = '';
+  };
+  if (open) {
+    settle();
+    const wasHidden = region.hidden;
+    region.hidden = false;
+    return wasHidden ? expandIn(region) : Promise.resolve();
+  }
+  if (region.hidden) return Promise.resolve();
+  return collapseOut(region).then(() => {
+    if (regionIntent.get(region)) return; // inzwischen wieder geoeffnet
+    region.hidden = true;
+    settle();
+  });
+}
+
+/** Letzter gezeigter Wert je Balken, je Diagramm (`memo`) - ueberlebt das Neuzeichnen. */
+const barMemo = new Map();
+
+/**
+ * Laesst Balken an ihren Wert WACHSEN - vom zuletzt gezeigten Wert aus, beim
+ * ersten Zeichnen von 0 (Critique R16, P2 Bewegung).
+ *
+ * DER ANLASS: die Budget-Balken tragen `transition: transform`, und sie lief
+ * nie. Die Breite kommt aus `--bar-scale`, und der stand inline schon am
+ * Endwert im Markup - ein Element, das mit seinem Endwert entsteht, hat keinen
+ * Uebergang. Eine gebaute Bewegung, die nie zu sehen ist.
+ *
+ * DER ENDWERT STEHT IM MARKUP UND BLEIBT DORT DIE WAHRHEIT. Dieser Helfer
+ * setzt den Balken nur kurz zurueck und sofort wieder vor; faellt er aus
+ * (kein Skript, Fehler davor), steht der Balken richtig. Deshalb auch:
+ *   - reduzierte Bewegung, verdeckter Tab: nichts anfassen - verdeckt feuert
+ *     rAF nicht, der Balken bliebe auf dem Startwert stehen;
+ *   - sonst rAF UND ein Timer: wer zuerst kommt, setzt den Endwert, der
+ *     Zustand haengt an keinem Frame.
+ * Ein Balken, dessen Wert sich gegenueber dem letzten Zeichnen NICHT geaendert
+ * hat, ruehrt sich nicht: ein Neuzeichnen (Filter, Speichern) ist kein Anlass,
+ * alle Balken neu wachsen zu lassen. Wiedererkannt wird er an `data-bar-key`.
+ *
+ * @param {ParentNode|null} root
+ * @param {Object} opts
+ * @param {string} opts.selector  die Balken (tragen `--bar-scale` inline)
+ * @param {string} opts.memo      Name des Diagramms; Balken desselben Diagramms teilen ein Gedaechtnis
+ * @returns {number} wie viele Balken wachsen
+ */
+export function growBars(root, { selector, memo }) {
+  if (!root?.querySelectorAll) return 0;
+  const seen = barMemo.get(memo) ?? new Map();
+  const next = new Map();
+  const moving = [];
+  let index = 0;
+  for (const el of root.querySelectorAll(selector)) {
+    const value = el.style?.getPropertyValue?.('--bar-scale')?.trim() ?? '';
+    const key = el.dataset?.barKey ?? `#${index}`;
+    index += 1;
+    if (value === '') continue;
+    next.set(key, value);
+    const from = seen.get(key) ?? '0';
+    if (Number(from) !== Number(value)) moving.push([el, from, value]);
+  }
+  barMemo.set(memo, next);
+  if (!moving.length) return 0;
+  if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return 0;
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return 0;
+  if (typeof requestAnimationFrame !== 'function') return 0;
+
+  for (const [el, from] of moving) el.style.setProperty('--bar-scale', from);
+  // Den Startwert EINMAL berechnen lassen - sonst faellt er mit dem Endwert in
+  // denselben Frame, und es gibt wieder keinen Uebergang.
+  const [firstBar] = moving[0];
+  void firstBar.offsetWidth;
+  let done = false;
+  const settle = () => {
+    if (done) return;
+    done = true;
+    for (const [el, , value] of moving) el.style.setProperty('--bar-scale', value);
+  };
+  requestAnimationFrame(settle);
+  setTimeout(settle, 120);
+  return moving.length;
+}
+
+function settleAnimation(anim, duration) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    anim.finished.then(finish, finish);
+    setTimeout(finish, duration + 60);
   });
 }
 
@@ -203,7 +445,32 @@ export function wireScrollFade(el, { axis = 'x' } = {}) {
   // Sub-Pixel-Schwelle fuer die POSITION. Sie ist bewusst kleiner als `eps`:
   // siehe die Trennung der beiden Fragen im `update` darunter.
   const posEps = 0.5;
+  let destroyed = false;
+  let wasConnected = false;
+  const destroy = () => {
+    if (destroyed) return;
+    destroyed = true;
+    el.removeEventListener('scroll', update);
+    ro.disconnect();
+    mo.disconnect();
+  };
   const update = () => {
+    // DIE LEISTE RAEUMT SICH SELBST AB, sobald sie aus dem Dokument ist
+    // (Critique 2026-09-26, Beifang R5). Fast kein Aufrufer haelt `destroy`
+    // fest - sub-tabs.js baut bei jedem Eintritt eine neue Leiste, und jede
+    // liess ihren ResizeObserver am abgehaengten Knoten haengen (Sonde: vier
+    // Kuechen-Eintritte, vier lebende Observer). Ein Observer meldet sich, wenn
+    // sein Element das Dokument verlaesst (die Box faellt auf 0x0) - genau dort
+    // haengt er sich ab. Eine Leiste, die schon ausgeblendet (0x0) abgehaengt
+    // wird, meldet sich nicht mehr; dafuer bleibt `destroy` im Rueckgabewert.
+    // NUR NACH DEM ERSTEN EINHAENGEN: wer die Leiste verdrahtet, bevor er sie
+    // einfuegt, bekaeme sonst gar keinen Fade - der erste Aufruf unten laeuft
+    // dann auf einem noch losen Knoten.
+    if (!el.isConnected) {
+      if (wasConnected) destroy();
+      return;
+    }
+    wasConnected = true;
     // `Math.abs` wegen RTL: in `ar` und `fa` setzt die App `dir=rtl`, und dort
     // steht `scrollLeft` nach CSSOM am Anfang auf 0 und laeuft beim Scrollen ins
     // NEGATIVE. Ohne den Betrag waere `pos > eps` nie wahr und `pos < max - eps`
@@ -246,14 +513,7 @@ export function wireScrollFade(el, { axis = 'x' } = {}) {
   const mo = new MutationObserver(update);
   mo.observe(el, { childList: true, subtree: true });
   update();
-  return {
-    update,
-    destroy: () => {
-      el.removeEventListener('scroll', update);
-      ro.disconnect();
-      mo.disconnect();
-    },
-  };
+  return { update, destroy };
 }
 
 /**
@@ -340,8 +600,12 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
 
   let io = null;
   let lead = 0;
+  // Hoehe einer Faltzeile (siehe `foldRow` in update), ohne ihre Linie.
+  let foldH = 0;
   let dockTitle = null;
   let headSeal = null;
+  // Die Kinder der Lead-Zone, die im Band-Modus angedockt ausblenden.
+  let leadMarked = [];
 
   // DAS ABSENDER-SIEGEL: genau eines, unmittelbar vor dem Seitentitel.
   //
@@ -379,6 +643,27 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     }
   };
 
+  // NUR EIN SCROLL, DEN DER NUTZER FUEHRT, KLAPPT DEN KOPF EIN (Re-Kritik
+  // 2026-09-25, P2). Der Kalender stellt Woche und Tag beim Rendern auf
+  // „jetzt" und laesst die Shell nach jedem Ansichtswechsel per
+  // synthetischem `scroll` am neuen Port neu urteilen - beides kommt hier als
+  // ganz gewoehnliches Scroll-Ereignis an. Gewertet wie ein Nutzer-Scroll,
+  // klappte ein Tipp auf „Tag" den Titel ein und zog die Ansichts-Tabs mobil
+  // um 45px nach oben; der Finger lag danach auf dem ersten Termin. Ein
+  // Scroll-Ereignis sagt nicht, wer es ausgeloest hat - die Geste davor schon.
+  // Gemerkt wird deshalb das Ziel der letzten Geste im Modul; als Nutzer-
+  // Scroll zaehlt nur, was einen Port bewegt, in dem diese Geste lag. Der Tipp
+  // auf einen Tab liegt im Kopf, nicht im Port, und ein neu gerenderter Port
+  // enthaelt das alte Ziel nicht mehr. Nachlaufender Schwung (iOS) kommt nach
+  // dem Loslassen, aber vom selben Port, und zaehlt weiter mit.
+  // Ein Scroll OHNE Geste darf genau eines: die Reserve-Regel unten. Kann der
+  // neue Port den eingeklappten Kopf nicht tragen (der Monat scrollt gar
+  // nicht), klappt er auf - sonst bliebe er dort eingeklappt, ohne dass ein
+  // Scroll ihn je zurueckholt. Alles andere haelt der Kopf ueber den Wechsel.
+  let gestureTarget = null;
+  const onGesture = (e) => { gestureTarget = e.target; };
+  const GESTURES = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
+
   // Hysterese, damit der Kopf nicht um seine eigene Schwelle flattert.
   const onInnerScroll = (e) => {
     const port = e.target;
@@ -392,13 +677,40 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // blieb es bis zum naechsten senkrechten Scroll. Wer waagerecht Reserve
     // hat und senkrecht keine, ist nicht gemeint.
     if (reserve <= 0 && port.scrollWidth > port.clientWidth) return;
+    // EINKLAPPEN KANN NUR EIN VERMESSENER KOPF. `--capped` setzt `update()`,
+    // sobald es eine Lead-Zone gemessen hat; davor ist `lead` 0. Kam ein
+    // Scroll-Ereignis vor der ersten Messung an (der Kalender stellt seine
+    // Woche beim ersten Render auf „jetzt"), setzte es `is-collapsed` auf einen
+    // unvermessenen Kopf - und `update()` misst einen eingeklappten Kopf nie
+    // (siehe dort). Der Kopf blieb dann ausgeklappt sichtbar, aber als
+    // eingeklappt markiert, ohne Lead-Zone, bis zum Neuladen.
+    // Eine Faltzeile (siehe `foldRow` in update) hat keine Lead-Zone, aber
+    // eine vermessene Hoehe - sie ist ihre ganze Lead-Zone. Ihre Linie bleibt
+    // in beiden Zustaenden: sie ist die Kante des angedockten Kopfes.
+    const fold = toolbar.classList.contains('page-toolbar--fold-row') && foldH > 0;
+    if (!fold && !toolbar.classList.contains('page-toolbar--capped')) return;
+    const states = fold ? ['is-collapsed'] : ['is-collapsed', 'is-docked'];
     // Nur kollabieren, wenn der Port das Ausklappen danach auch verkraftet -
     // sonst schiebt die zurückkehrende Kopfhöhe den Scroll auf 0, der Kopf
     // klappt wieder aus und beides pendelt gegeneinander.
-    if (reserve < lead + 48) { toolbar.classList.remove('is-collapsed', 'is-docked'); return; }
+    // Die Faltzeile misst die Reserve AUSGEKLAPPT: gefaltet ist der Port um
+    // ihren negativen Rand laenger und die Reserve um genau so viel kuerzer.
+    // Gegen die gefaltete Reserve gemessen, klappte eine knappe Liste (Rezepte
+    // mit einem aufgeklappten Rezept: 166px ausgeklappt, 102px gefaltet) beim
+    // naechsten Scroll-Ereignis wieder aus - und dann wieder ein. Der
+    // berechnete Rand gilt auch mitten in der Bewegung.
+    const unfolded = fold
+      ? reserve - Math.min(0, parseFloat(getComputedStyle(toolbar).marginBlockEnd) || 0)
+      : reserve;
+    if (unfolded < (fold ? foldH : lead) + 48) {
+      toolbar.classList.remove(...states);
+      return;
+    }
+    // Ab hier nur noch der Nutzer (siehe `gestureTarget` oben).
+    if (!gestureTarget || !port.contains(gestureTarget)) return;
     const top = port.scrollTop;
-    if (top > 24) toolbar.classList.add('is-collapsed', 'is-docked');
-    else if (top < 8) toolbar.classList.remove('is-collapsed', 'is-docked');
+    if (top > 24) toolbar.classList.add(...states);
+    else if (top < 8) toolbar.classList.remove(...states);
   };
   const update = () => {
     // VOR der Messung: das Siegel steht in der Titelzeile und zählt zu ihr.
@@ -460,7 +772,13 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     const firstEl = lines.length
       ? lines[0].els.reduce((a, b) => (b.getBoundingClientRect().height > a.getBoundingClientRect().height ? b : a))
       : null;
-    lead = Math.max(0, Math.round(lastTop - padTop));
+    // EINE ZEILE HAT KEINE LEAD-ZONE, auch wenn sie nicht auf dem Polster
+    // beginnt. Die Kuechen-Koepfe von Rezepten und Vorrat stehen mobil seit
+    // R9 M10 IN der Zeile der Kuechen-Leiste: 56px hoch, ohne Polster, die
+    // 48px-Lupe mittig darin - ihre Oberkante liegt 4px tief. `lastTop -
+    // padTop` machte daraus 4px Lead-Zone und ein `--stacked`, das die
+    // Trennlinie dauerhaft verbarg (Sonde 8 der Dokument-Guards).
+    lead = lines.length > 1 ? Math.max(0, Math.round(lastTop - padTop)) : 0;
     toolbar.style.setProperty('--page-toolbar-lead', `${lead}px`);
     toolbar.classList.toggle('page-toolbar--stacked', lead > 0);
     toolbar.classList.toggle('page-toolbar--capped', Boolean(capped) && lead > 0);
@@ -486,9 +804,9 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // sie ganz: der Titel begann dort eine SECHSTE Zeile, und mit ihr sprangen
     // Kopfhöhe und Lead-Zone beim Andocken (Belohnungen 110→145px,
     // Haushaltshilfe 122→157px). Das ist exakt die Oszillation, gegen die das
-    // negative `top` gewählt wurde - also lieber keinen Titel als einen, der
-    // den Kopf um seine eigene Schwelle pendeln lässt. Gemessen statt
-    // aufgezählt, damit die Regel auch beim sechsten Modul noch gilt.
+    // negative `top` gewählt wurde. Gemessen statt aufgezählt, damit die Regel
+    // auch beim sechsten Modul noch gilt. Was dann geschieht, steht unten bei
+    // der Faltung und beim Band.
     const lastLine = lines.length ? lines[lines.length - 1] : null;
     const tbCS = getComputedStyle(toolbar);
     const innerWidth = toolbar.clientWidth
@@ -500,10 +818,103 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
         + colGap * lastLine.els.length
       : 0;
     // Unter dieser Breite bliebe von jedem Modulnamen nur die Ellipse.
-    const roomForDockTitle = innerWidth - usedWidth >= 88;
+    const roomForDockTitle = innerWidth - usedWidth >= DOCK_TITLE_MIN_WIDTH;
 
     const heading = toolbar.querySelector(':scope > .page-toolbar__title');
-    if (lead > 0 && !capped && heading && roomForDockTitle) {
+
+    // DIE FALTZEILE (R17 K1, Re-Critique 2026-09-28 A4 P2-4 / A8 P3-2). Unter
+    // einer Gruppen-Leiste (Kueche) steht der Kopf der Seite als EINE Zeile
+    // ohne Titel - in Rezepte und Vorrat traegt sie mobil nur Werkzeuge (Lupe,
+    // "...") und kostet 65px fuer ein bis zwei Icons. Angedockt gibt sie diese
+    // Hoehe frei, an derselben Schwelle und mit derselben Klasse wie der Kopf
+    // der gedeckelten Module (`is-collapsed`, onInnerScroll); zurueck oben
+    // kommt sie wieder. Das ist Apples `hidesSearchBarWhenScrolling` fuer eine
+    // Zeile, deren Inhalt die Suche IST.
+    //
+    // NUR EINE ZEILE, DIE NICHTS BENENNT: steht im Center-Slot etwas anderes
+    // als die Suche (Wochenstepper im Essensplan, Listen-Kapseln im Einkauf),
+    // beantwortet die Zeile beim Scrollen weiter „wo bin ich" und bleibt -
+    // dieselbe Abgrenzung wie der Zeitraum im Kalender. Gezaehlt wird ueber
+    // `classList`, nicht per Selektor: die Regel ist eine Aussage ueber den
+    // Inhalt des Slots.
+    //
+    // KEINE LEAD-ZONE: die Zeile ist einzeilig, und eine Lead-Zone auf einem
+    // einzeiligen Kopf verbirgt seine Linie (Sonde 8). Die Hoehe steht deshalb
+    // in einer eigenen Variablen, gemessen OHNE die Linie - die bleibt
+    // gefaltet als Kante unter der Leiste stehen.
+    const center = [...toolbar.children].find((c) => c.classList.contains('page-toolbar__center'));
+    const foldRow = Boolean(capped) && lines.length === 1 && !heading
+      && toolbar.classList.contains('page-toolbar--in-group')
+      && (!center || center.classList.contains('page-search'));
+    toolbar.classList.toggle('page-toolbar--fold-row', foldRow);
+    foldH = foldRow ? Math.round(tb.height - (parseFloat(getComputedStyle(toolbar).borderBottomWidth) || 0)) : 0;
+    if (foldH > 0) toolbar.style.setProperty('--fold-row-h', `${foldH}px`);
+    else toolbar.style.removeProperty('--fold-row-h');
+
+    // NIE EIN KOPF OHNE ORTSANGABE (Re-Critique 2026-09-27, R9 M9). Die Regel
+    // darueber liess den Titel lieber weg, als den Kopf pendeln zu lassen - in
+    // den Aufgaben hiess das: angedockt standen Lupe, Ansicht, Filter und
+    // „..." da, und kein Wort, wo man ist (A1 P2-4). Wo die Bar-Zeile die
+    // Kontrollen eines Moduls traegt und es ein Werkzeugmenue hat, weichen
+    // angedockt die Kontrollen: sie falten ins „..." (als Eintraege mit
+    // demselben Namen, Ansichten als Einfachauswahl), die Suche bleibt, und
+    // der Titel bekommt den Platz. Die Zeile aendert dabei nur ihre Breite,
+    // nie ihre Hoehe (`--dock-fold-bar-h`) - das negative `top` bleibt gueltig.
+    //
+    // GEFALTET GEMESSEN WIRD NICHT NEU ENTSCHIEDEN: angedockt sind die
+    // Kontrollen weg, die Zeile hat Platz, und eine neue Rechnung hiesse
+    // „nicht mehr falten" - die Kontrollen kaemen zurueck, der Platz ginge,
+    // und das Ganze pendelte. Entschieden wird im ausgeklappten Zustand.
+    const actions = toolbar.querySelector(':scope > .page-toolbar__actions');
+    const docked = toolbar.classList.contains('is-docked');
+    const wasFolded = toolbar.classList.contains('page-toolbar--dock-fold');
+    let fold = false;
+    if (lead > 0 && !capped && heading && actions) {
+      if (wasFolded && docked) {
+        fold = true;
+        // Rendert das Modul seine Aktionen angedockt neu (Ansicht gewechselt,
+        // Filterzahl geaendert), kaemen die neuen Knoepfe ungefaltet dazu und
+        // braechen die Zeile um. Nur ergaenzen: die schon gefalteten sind
+        // unsichtbar und fielen aus `dockFoldables` heraus.
+        for (const el of dockFoldables(actions)) el.setAttribute('data-dock-fold', '');
+      } else if (!roomForDockTitle && lastLine?.els.includes(actions) && dockFoldMenu(actions)) {
+        const foldable = dockFoldables(actions);
+        const actionsGap = parseFloat(getComputedStyle(actions).columnGap) || 0;
+        const freed = foldable.reduce((sum, el) => sum + el.getBoundingClientRect().width + actionsGap, 0);
+        fold = foldable.length > 0 && innerWidth - (usedWidth - freed) >= DOCK_TITLE_MIN_WIDTH;
+        if (fold) {
+          for (const el of actions.children) el.toggleAttribute('data-dock-fold', foldable.includes(el));
+          toolbar.style.setProperty('--dock-fold-bar-h', `${Math.round(actions.getBoundingClientRect().height)}px`);
+        }
+      }
+    }
+    if (!fold && wasFolded) {
+      for (const el of actions?.children ?? []) el.removeAttribute('data-dock-fold');
+      toolbar.style.removeProperty('--dock-fold-bar-h');
+    }
+    toolbar.classList.toggle('page-toolbar--dock-fold', fold);
+
+    // DAS BAND: WO NICHTS FALTEN KANN, BLEIBT EIN STREIFEN DES TITELS STEHEN
+    // (Re-Critique 2026-09-27, R11 H1). Schichtplan, Haushaltshilfe und
+    // Belohnungen tragen als Bar-Zeile eine Tab-Leiste ueber die ganze Breite
+    // und kein „..." - dort half die Faltung nicht, und angedockt stand nur
+    // die Leiste da, ohne ein Wort, in welchem Modul sie liegt. Statt einer
+    // eigenen Zeile (die waere die Hoehenaenderung, gegen die das negative
+    // `top` gewaehlt ist) klebt der Kopf um genau die Hoehe des angedockten
+    // Titels TIEFER: der unterste Streifen der Lead-Zone bleibt sichtbar, der
+    // Titel steht absolut darin, und die Lead-Zone blendet angedockt aus.
+    // Die Geometrie haengt damit nicht am Andock-Zustand - der Kopf hat im
+    // Band-Modus immer dieselbe Hoehe und dieselbe Klebekante, angedockt
+    // wechselt nur, was in dem Streifen zu sehen ist. Die Schwelle der
+    // Trennlinie (unten, IntersectionObserver) rueckt um denselben Streifen.
+    const band = lead > 0 && !capped && Boolean(heading) && !roomForDockTitle && !fold;
+    toolbar.classList.toggle('page-toolbar--dock-band', band);
+    const leadEls = band ? lines.slice(0, -1).flatMap((l) => l.els) : [];
+    for (const el of leadMarked) if (!leadEls.includes(el)) el.removeAttribute('data-dock-lead');
+    for (const el of leadEls) if (!leadMarked.includes(el)) el.setAttribute('data-dock-lead', '');
+    leadMarked = leadEls;
+
+    if (lead > 0 && !capped && heading && (roomForDockTitle || fold || band)) {
       if (!dockTitle) {
         dockTitle = document.createElement('span');
         dockTitle.className = 'page-toolbar__dock-title';
@@ -521,6 +932,21 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       }
     } else if (dockTitle?.parentElement) {
       dockTitle.remove();
+    }
+
+    // Die Hoehe des Streifens ist die des angedockten Titels, gemessen - das
+    // CSS stellt ihn im Band-Modus unsichtbar, aber gerendert hin. Dazu das
+    // obere Polster des Kopfes: mit ihm steht der Titel angedockt so weit
+    // unter der Kante wie der Large Title ausgeklappt.
+    const bandH = band && dockTitle?.parentElement === toolbar
+      ? Math.min(lead, Math.ceil(dockTitle.getBoundingClientRect().height))
+      : 0;
+    if (bandH > 0) {
+      toolbar.style.setProperty('--dock-band-h', `${bandH}px`);
+      toolbar.style.setProperty('--dock-band-pad', `${Math.round(padTop)}px`);
+    } else {
+      toolbar.style.removeProperty('--dock-band-h');
+      toolbar.style.removeProperty('--dock-band-pad');
     }
 
     // Die Trennlinie erscheint, sobald die erste Zeile aus dem Scrollport
@@ -544,12 +970,46 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // Belohnungen, Haushaltshilfe): der Kopf trug mobil NIE eine Trennlinie.
     // Bei drei Zeilen fiel es nicht auf - dort ist `lead` die Höhe von zwei
     // Zeilen und schiebt die erste weit über die Kante hinaus.
+    // Im Band-Modus klebt der Kopf um `bandH` tiefer, und genau so viel der
+    // ersten Zeile bleibt geklebt im Bild - der Rahmen schrumpft um dasselbe
+    // Mass, sonst dockte der Kopf nie an.
+    //
+    // UND UM DAS, WAS DIE ERSTE ZEILE UNTER DIE LEAD-ZONE REICHT. `lead` ist
+    // die Oberkante der letzten Zeile minus dem oberen Polster; die erste
+    // Zeile endet aber `row-gap` vor der letzten, und ist das Polster groesser
+    // als die Luecke, ragt sie geklebt um die Differenz ins Bild. Die
+    // Haushaltshilfe (8px Polster, 4px Luecke, R11-Band) liess ihren 41px-Titel
+    // so 31px tief stehen - 3px unter dem 28px-Rahmen, und der Kopf dockte nie
+    // an (Sonde 8). Gemessen statt aus Polster und Luecke gerechnet, damit auch
+    // ein hoeherer Nachbar in der ersten Zeile mitzaehlt - und an der Kante
+    // von JETZT: `tb` stammt von vor dem Schreiben von Lead-Zone und Streifen,
+    // und der klebende Kopf rueckt mit beiden.
+    const firstBottom = firstEl.getBoundingClientRect().bottom - toolbar.getBoundingClientRect().top;
+    const overhang = Math.max(0, Math.ceil(firstBottom - lead));
     io = new IntersectionObserver(
       ([entry]) => toolbar.classList.toggle('is-docked', !entry.isIntersecting),
-      { root: scrollport, threshold: 0, rootMargin: '-1px 0px 0px 0px' },
+      { root: scrollport, threshold: 0, rootMargin: `-${bandH + overhang + 1}px 0px 0px 0px` },
     );
     io.observe(firstEl);
   };
+
+  // Die gefalteten Kontrollen erscheinen im Werkzeugmenue, solange es offen
+  // ist - gebaut beim Oeffnen aus dem Ist-Zustand (welche Ansicht gewaehlt
+  // ist, wie viele Filter stehen), abgebaut beim Schliessen. `beforetoggle`
+  // steigt nicht auf; am Kopf kommt es nur in der Capture-Phase an.
+  const onMenuToggle = (e) => {
+    const panel = e.target;
+    if (!(panel instanceof Element) || !panel.matches('.popover-menu')) return;
+    const actions = toolbar.querySelector(':scope > .page-toolbar__actions');
+    if (!actions || dockFoldMenu(actions)?.panel !== panel) return;
+    clearDockFoldItems(panel);
+    if (e.newState === 'open'
+      && toolbar.classList.contains('page-toolbar--dock-fold')
+      && toolbar.classList.contains('is-docked')) {
+      fillDockFoldItems(panel, [...actions.querySelectorAll(':scope > [data-dock-fold]')]);
+    }
+  };
+  toolbar.addEventListener('beforetoggle', onMenuToggle, { capture: true });
 
   const ro = new ResizeObserver(update);
   ro.observe(toolbar);
@@ -559,6 +1019,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
   // Capture-Phase am Modul-Root gelauscht. Damit ist jede innere Liste erfasst,
   // auch die eines Tabs, den es beim Verdrahten noch nicht gab.
   capped?.addEventListener('scroll', onInnerScroll, { capture: true, passive: true });
+  for (const type of GESTURES) capped?.addEventListener(type, onGesture, { capture: true, passive: true });
   update();
 
   return {
@@ -568,15 +1029,124 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       ro.disconnect();
       mo.disconnect();
       capped?.removeEventListener('scroll', onInnerScroll, { capture: true });
+      for (const type of GESTURES) capped?.removeEventListener(type, onGesture, { capture: true });
+      gestureTarget = null;
+      toolbar.removeEventListener('beforetoggle', onMenuToggle, { capture: true });
+      toolbar.querySelectorAll('[data-dock-fold]').forEach((el) => el.removeAttribute('data-dock-fold'));
+      toolbar.style.removeProperty('--dock-fold-bar-h');
+      for (const el of leadMarked) el.removeAttribute('data-dock-lead');
+      leadMarked = [];
+      toolbar.style.removeProperty('--dock-band-h');
+      toolbar.style.removeProperty('--dock-band-pad');
       dockTitle?.remove();
       dockTitle = null;
       headSeal?.remove();
       headSeal = null;
       delete toolbar.dataset.collapsingHeader;
       toolbar.style.removeProperty('--page-toolbar-lead');
-      toolbar.classList.remove('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked');
+      toolbar.style.removeProperty('--fold-row-h');
+      foldH = 0;
+      toolbar.classList.remove('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked', 'page-toolbar--dock-fold', 'page-toolbar--dock-band', 'page-toolbar--fold-row');
     },
   };
+}
+
+/** Unter dieser Breite bliebe vom angedockten Titel nur die Ellipse. */
+export const DOCK_TITLE_MIN_WIDTH = 88;
+
+/**
+ * Das Werkzeugmenue der Bar-Zeile (`pageToolsMenuHtml`, Kennklasse
+ * `page-tools-btn`) - das „..." , in das angedockt gefaltet wird. Ohne es
+ * faltet nichts: eine Kontrolle, die verschwindet, ohne irgendwo
+ * wiederzukommen, waere eine gestrichene Funktion.
+ *
+ * @param {Element} actions
+ * @returns {{trigger: Element, panel: Element}|null}
+ */
+export function dockFoldMenu(actions) {
+  const trigger = actions?.querySelector?.(':scope > .page-tools-btn[popovertarget]');
+  if (!trigger) return null;
+  const id = trigger.getAttribute('popovertarget');
+  const panel = [...actions.children].find((el) => el.id === id) ?? document.getElementById(id);
+  return panel ? { trigger, panel } : null;
+}
+
+/**
+ * Was angedockt falten darf: jedes sichtbare Kind der Aktionen, das ein Knopf
+ * ist oder Knoepfe traegt (Segment, Filter), ausser dem Menue selbst und der
+ * Suche. `data-dock-keep` nimmt eine Kontrolle heraus, die stehen bleiben muss.
+ *
+ * @param {Element} actions
+ * @returns {Element[]}
+ */
+export function dockFoldables(actions) {
+  const menu = dockFoldMenu(actions);
+  return [...(actions?.children ?? [])].filter((el) => el !== menu?.trigger
+    && el !== menu?.panel
+    && !el.matches('.popover-menu, .page-search, [data-dock-keep]')
+    && el.getClientRects().length > 0
+    && (el.matches('button') || Boolean(el.querySelector('button'))));
+}
+
+function dockFoldLabel(btn) {
+  return (btn.getAttribute('aria-label') || btn.getAttribute('title') || btn.textContent || '')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function clearDockFoldItems(panel) {
+  panel.querySelectorAll(':scope > .page-toolbar__fold-item').forEach((el) => el.remove());
+}
+
+/**
+ * Baut die Stellvertreter der gefalteten Kontrollen oben ins Menue. Ein
+ * Eintrag KLICKT das Original - kein zweiter Weg zur selben Aktion, der
+ * auseinanderlaufen koennte. Ein Segment (Knoepfe mit `aria-pressed`, Radio,
+ * Tab) wird eine Einfachauswahl (`menuitemradio`), wie die Ansichtswahl im
+ * Kalender-Werkzeugmenue.
+ *
+ * @param {Element} panel
+ * @param {Element[]} controls
+ */
+function fillDockFoldItems(panel, controls) {
+  const items = [];
+  for (const control of controls) {
+    const single = control.matches('button');
+    const buttons = single ? [control] : [...control.querySelectorAll('button')];
+    const choice = !single && buttons.some((b) => b.hasAttribute('aria-pressed')
+      || ['radio', 'tab', 'menuitemradio'].includes(b.getAttribute('role')));
+    for (const btn of buttons) {
+      if (btn.disabled || !dockFoldLabel(btn)) continue;
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'popover-menu__item page-toolbar__fold-item';
+      const on = ['aria-pressed', 'aria-checked', 'aria-selected'].some((a) => btn.getAttribute(a) === 'true');
+      item.setAttribute('role', choice ? 'menuitemradio' : 'menuitem');
+      if (choice) item.setAttribute('aria-checked', String(on));
+      const glyph = btn.querySelector('svg')?.cloneNode(true);
+      if (glyph) {
+        glyph.setAttribute('class', 'icon-md');
+        glyph.setAttribute('aria-hidden', 'true');
+        item.append(glyph);
+      }
+      const label = document.createElement('span');
+      label.textContent = dockFoldLabel(btn);
+      item.append(label);
+      const check = choice && on && window.lucide?.icons?.Check
+        ? window.lucide.createElement(window.lucide.icons.Check) : null;
+      if (check) {
+        check.setAttribute('class', 'icon-md popover-menu__item-trail popover-menu__item-check');
+        check.setAttribute('aria-hidden', 'true');
+        item.append(check);
+      }
+      item.addEventListener('click', () => btn.click());
+      items.push(item);
+    }
+  }
+  if (!items.length) return;
+  const sep = document.createElement('div');
+  sep.className = 'popover-menu__separator page-toolbar__fold-item';
+  sep.setAttribute('role', 'separator');
+  panel.prepend(...items, sep);
 }
 
 /**
@@ -684,4 +1254,45 @@ export function wireSwipeToDismiss(el, { onDismiss, threshold = 40, slop = 10, f
   });
 
   el.addEventListener('pointercancel', settle);
+}
+
+/**
+ * DIE ECHTE HOEHE DER TAB-KAPSEL, NICHT DIE TOKEN-HOEHE (Review zu #1475).
+ *
+ * `.nav-bottom__items` traegt `min-height: var(--nav-height-mobile)` und darf
+ * wachsen: lange Labels brechen auf engen Geraeten und in langen Sprachen auf
+ * zwei Zeilen um, statt zu clippen (layout.css). Die Zone darunter - der
+ * Nachlauf `--nav-tail`, und alles, was ueber der Leiste steht (Mehr-Blatt,
+ * Toast- und Pillenstapel, Installationsbanner) - rechnete fest mit 60px. Die Kapsel wurde
+ * hoeher als ihre Reserve, und die letzte Zeile jeder Seite lag teilweise
+ * unter dem Glas.
+ *
+ * Gemessen, nicht gerechnet, aus demselben Grund wie beim Installationsbanner
+ * (`--install-prompt-height`): ob ein Label umbricht, haengt an Text, Sprache
+ * und Breite. `--nav-bottom-height` (tokens.css) liest den Wert mit der
+ * Token-Hoehe als Rueckfall - ohne Messung (kein ResizeObserver, Kapsel nicht
+ * gerendert) gilt wieder genau die alte Rechnung.
+ *
+ * @param {Element} items              - die Kapsel `.nav-bottom__items`
+ * @param {Element} [root]             - Traeger der Variable
+ * @returns {ResizeObserver|null}
+ */
+export function watchNavCapsuleHeight(items, root = document.documentElement) {
+  if (!items || typeof ResizeObserver !== 'function') return null;
+  const observer = new ResizeObserver(([entry]) => {
+    // Eine ersetzte Kapsel (Neuaufbau der Navigation) meldet beim Abhaengen 0 -
+    // sie darf den Wert ihrer Nachfolgerin nicht raeumen.
+    if (!items.isConnected) {
+      observer.disconnect();
+      return;
+    }
+    const height = entry?.borderBoxSize?.[0]?.blockSize ?? entry?.target?.offsetHeight ?? 0;
+    // 0 heisst: nicht gerendert (Desktop mit Sidebar, Wand-Modus).
+    // Ungerundet: aufgerundet reservierte die Zone bei 60,09px schon 61, und
+    // jede Flaeche ueber der Leiste rueckte auf allen Telefonen 1px hoch.
+    if (height > 0) root.style.setProperty('--nav-capsule-height', `${height}px`);
+    else root.style.removeProperty('--nav-capsule-height');
+  });
+  observer.observe(items);
+  return observer;
 }

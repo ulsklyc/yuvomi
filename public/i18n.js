@@ -9,8 +9,9 @@
 // aus test-browser-loader.mjs, und '/utils/...' waere dort das Dateisystem-Root.
 // Im Browser loest './utils/timezone.js' von '/i18n.js' aus auf dasselbe auf.
 import { zonedFields } from './utils/timezone.js';
+import { resolveKoreanParticles } from './utils/korean-particles.js';
 
-const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi', 'hu', 'ko', 'id', 'fa', 'fil'];
+const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt-BR', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi', 'hu', 'ko', 'id', 'fa', 'fil', 'nb'];
 const RTL_LOCALES = new Set(['ar', 'fa']);
 // Form eines Regions-Tags: Sprache, optional Schrift, dann die Region -
 // `de-DE`, `fil-PH`, `zh-Hant-TW`. Eigene Konstante und kein Import aus
@@ -52,6 +53,19 @@ function applyDocumentLocale(locale) {
 // Vereinfacht, und genau darauf soll `zh-CN` fallen.
 const REGION_SCRIPT = { TW: 'Hant', HK: 'Hant', MO: 'Hant' };
 
+// Sprachcodes, die eine vorhandene Locale meinen, aber anders heissen. `no` ist
+// die Makrosprache Norwegisch, und Browser melden sie weiterhin (`no`, `no-NO`),
+// obwohl die Locale-Datei `nb` heisst. `nn` (Nynorsk) hat keine eigene Datei;
+// wer Nynorsk liest, liest Bokmaal eher als Englisch.
+//
+// Der Alias ist ein RUECKFALL, kein Ersatz: er greift erst, wenn der Tag selbst
+// nichts findet. Kommt eine `nn.json` dazu, gewinnt sie von allein.
+//
+// Dieselbe Zuordnung fuehren lang-init.js, tools/installer/i18n-mini.js,
+// install.sh und server/utils/i18n.js - kein Import verbindet die fuenf
+// (Schichtgrenze, <head>-Skript, Shell), test:language-lists haelt sie gleich.
+const LANGUAGE_ALIAS = { no: 'nb', nn: 'nb' };
+
 /**
  * Kanonische BCP-47-Schreibweise: Sprache klein, Schrift (vier Zeichen)
  * Titlecase, Region (zwei Zeichen) groß. Ein Browser darf `ZH-hant-tw` melden,
@@ -82,25 +96,40 @@ export function pickLocale(tags, supported) {
   for (const roh of tags || []) {
     if (!roh) continue;
     const teile = canonicalTag(roh).split('-');
-    // Eine Schrift, die im Tag STEHT, schlaegt jede, die eine Region nur nahelegt.
-    // `zh-Hans-HK` meint Vereinfacht in Hongkong, und macOS, iOS und Android melden
-    // genau das. Ohne diese Sperre antwortet die Regionszuordnung darauf mit
-    // Traditionell - also mit dem Gegenteil dessen, was ausdruecklich dasteht.
-    const traegtSchrift = teile.slice(1).some((teil) => teil.length === 4);
-    while (teile.length) {
-      const tag = teile.join('-');
-      if (supported.includes(tag)) return tag;
-      if (!traegtSchrift) {
-        const letzter = teile[teile.length - 1];
-        // hasOwnProperty.call statt Object.hasOwn: das kennt Chrome erst ab 93, und
-        // diese Zeile laeuft beim Start vor dem ersten Bild (#1276).
-        const schrift = Object.prototype.hasOwnProperty.call(REGION_SCRIPT, letzter) ? REGION_SCRIPT[letzter] : null;
-        if (schrift && supported.includes(`${teile[0]}-${schrift}`)) return `${teile[0]}-${schrift}`;
-      }
-      teile.pop();
+    const treffer = matchTag(teile.slice(), supported);
+    if (treffer) return treffer;
+    // hasOwnProperty.call statt Object.hasOwn, wie in matchTag (#1276).
+    if (Object.prototype.hasOwnProperty.call(LANGUAGE_ALIAS, teile[0])) {
+      const alias = matchTag([LANGUAGE_ALIAS[teile[0]]].concat(teile.slice(1)), supported);
+      if (alias) return alias;
     }
   }
   return 'en';
+}
+
+/**
+ * Ein Tag als Subtag-Liste gegen die Liste: vom vollen Tag abwaerts, oder null.
+ * Verbraucht `teile`.
+ */
+function matchTag(teile, supported) {
+  // Eine Schrift, die im Tag STEHT, schlaegt jede, die eine Region nur nahelegt.
+  // `zh-Hans-HK` meint Vereinfacht in Hongkong, und macOS, iOS und Android melden
+  // genau das. Ohne diese Sperre antwortet die Regionszuordnung darauf mit
+  // Traditionell - also mit dem Gegenteil dessen, was ausdruecklich dasteht.
+  const traegtSchrift = teile.slice(1).some((teil) => teil.length === 4);
+  while (teile.length) {
+    const tag = teile.join('-');
+    if (supported.includes(tag)) return tag;
+    if (!traegtSchrift) {
+      const letzter = teile[teile.length - 1];
+      // hasOwnProperty.call statt Object.hasOwn: das kennt Chrome erst ab 93, und
+      // diese Zeile laeuft beim Start vor dem ersten Bild (#1276).
+      const schrift = Object.prototype.hasOwnProperty.call(REGION_SCRIPT, letzter) ? REGION_SCRIPT[letzter] : null;
+      if (schrift && supported.includes(`${teile[0]}-${schrift}`)) return `${teile[0]}-${schrift}`;
+    }
+    teile.pop();
+  }
+  return null;
 }
 
 /** Resolve locale: manual override > navigator.languages > English */
@@ -229,9 +258,14 @@ export function t(key, params = {}) {
       ?? resolve(fallbackTranslations, key)
       ?? key;
   }
-  return str.replace(/\{\{(\w+)\}\}/g, (placeholder, name) => (
+  const fill = (text) => text.replace(/\{\{(\w+)\}\}/g, (placeholder, name) => (
     Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : placeholder
   ));
+  // Koreanisch schreibt hinter einen Platzhalter beide Formen der Partikel
+  // (`{{name}}이(가)`), weil die richtige am eingesetzten Wort haengt (#1607).
+  // Die Regel steht in utils/korean-particles.js; jede andere Sprache zahlt
+  // dafuer genau diesen einen Vergleich.
+  return currentLocale === 'ko' ? resolveKoreanParticles(str, fill) : fill(str);
 }
 
 const VALID_DATE_FORMATS = ['mdy', 'dmy', 'ymd', 'mdy_dot', 'dmy_dot', 'dmy_slash', 'ymd_dot', 'ymd_slash'];
@@ -514,16 +548,65 @@ export function formatDayMonth(date) {
   }
 }
 
+/**
+ * Monat und Jahr als Ueberschrift, in der Reihenfolge der SPRACHE: "Oktober
+ * 2026", "October 2026", "2026년 10월", "2026. október" (#1607).
+ *
+ * Kalender und Budget klebten Monatsname und Jahr selbst zusammen, mit einem
+ * Leerzeichen und in dieser Reihenfolge - richtig fuer Deutsch und Englisch,
+ * falsch fuer jede Sprache, die das Jahr voranstellt oder eine Partikel
+ * braucht. Der Monatsname ist ein Wort, also entscheidet die UI-Sprache
+ * (`getLocale()`), nicht die Region: eine US-Region unter deutscher Sprache
+ * soll nicht "October" schreiben.
+ *
+ * GREGORIANISCH ERZWUNGEN. `fa` nimmt sonst den persischen Kalender und
+ * schriebe "Mehr 1405" ueber ein Raster, das gregorianisch zaehlt.
+ *
+ * Gerechnet wird in UTC, auf beiden Seiten (`Date.UTC` und `timeZone`): ein
+ * lokales Date am Monatsersten laege westlich von UTC im Vormonat.
+ *
+ * DER ERSTE BUCHSTABE WIRD GROSS. Das Ergebnis ist eine Ueberschrift, und Intl
+ * liefert die Form fuer den laufenden Satz ("octubre de 2026"); der
+ * Kalenderkopf stand bisher gross da, weil sein Monatsname aus der
+ * Locale-Datei kam ("Octubre").
+ *
+ * @param {number|string} year   vierstellig
+ * @param {number|string} month  1-12
+ * @returns {string} '' bei einer Eingabe, die kein Monat ist
+ */
+export function formatMonthYear(year, month, { month: monthStyle = 'long' } = {}) {
+  const y = Number(year);
+  const m = Number(month);
+  if (!Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12) return '';
+  const options = { month: monthStyle === 'short' ? 'short' : 'long', year: 'numeric', timeZone: 'UTC', calendar: 'gregory' };
+  let formatter;
+  try { formatter = new Intl.DateTimeFormat(currentLocale, options); }
+  catch { formatter = new Intl.DateTimeFormat(DEFAULT_LOCALE, options); }
+  const text = formatter.format(new Date(Date.UTC(y, m - 1, 1)));
+  const [first = ''] = text;
+  return first.toLocaleUpperCase(formatter.resolvedOptions().locale) + text.slice(first.length);
+}
+
+/**
+ * Platzhalter eines getippten Datumsfelds. REIHENFOLGE und Trenner folgen der
+ * Datumsformat-Einstellung (Region), die BUCHSTABEN der UI-Sprache - im
+ * deutschen UI stand vorher "DD.MM.YYYY" (Re-Critique 2026-09-28, A2 P3);
+ * Apples Systemfelder sagen "TT.MM.JJJJ". Fehlt ein Wort in einer Locale,
+ * greift wie ueberall die Referenz-Locale.
+ */
 export function dateInputPlaceholder() {
+  const d = t('common.datePlaceholderDay');
+  const m = t('common.datePlaceholderMonth');
+  const y = t('common.datePlaceholderYear');
   switch (getDateFormatPreference()) {
-    case 'dmy': return 'DD.MM.YYYY';
-    case 'mdy_dot': return 'MM.DD.YYYY';
-    case 'dmy_dot': return 'DD.MM.YYYY';
-    case 'dmy_slash': return 'DD/MM/YYYY';
-    case 'ymd': return 'YYYY-MM-DD';
-    case 'ymd_dot': return 'YYYY.MM.DD';
-    case 'ymd_slash': return 'YYYY/MM/DD';
-    default: return 'MM/DD/YYYY';
+    case 'dmy': return `${d}.${m}.${y}`;
+    case 'mdy_dot': return `${m}.${d}.${y}`;
+    case 'dmy_dot': return `${d}.${m}.${y}`;
+    case 'dmy_slash': return `${d}/${m}/${y}`;
+    case 'ymd': return `${y}-${m}-${d}`;
+    case 'ymd_dot': return `${y}.${m}.${d}`;
+    case 'ymd_slash': return `${y}/${m}/${d}`;
+    default: return `${m}/${d}/${y}`;
   }
 }
 

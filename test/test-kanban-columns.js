@@ -209,3 +209,80 @@ test('beide Beschriftungen liegen in allen Locales und sind nicht leer', async (
       `${datei}: Zu- und Aufklappen tragen denselben Text`);
   }
 });
+
+test('alle Spaltenkoepfe gleich hoch: die Archiv-Aktion ist eine kompakte Zeilenaktion (A3 P2-1)', () => {
+  // Gemessen 50/50/70/50px: der 44px-Knopf "Alles Erledigte archivieren"
+  // hob nur den Erledigt-Kopf. Jetzt Kanon-Zeilenaktion, sichtbar so hoch wie
+  // --target-sm, und JEDER Kopf haelt diese Hoehe als Mindesthoehe.
+  const html = brett();
+  const knopf = /<button[^>]*data-kanban-archive-done[^>]*>/.exec(html)?.[0] ?? '';
+  assert.match(knopf, /class="row-action kanban-col__action"/, `Kanon row-action statt btn: ${knopf}`);
+  assert.match(knopf, /aria-label="[^"]+"/, 'die Aktion hat einen Namen');
+
+  const regeln = [...eachRule(tasksCss)];
+  const kopf = regeln.find((r) => r.selector.trim() === '.kanban-col__header' && !r.at.length);
+  assert.match(kopf?.body ?? '', /min-height:\s*calc\(var\(--target-sm\)/, `jeder Kopf haelt die Aktionshoehe: ${kopf?.body}`);
+  const aktion = regeln.find((r) => r.selector.trim() === '.row-action.kanban-col__action' && !r.at.length);
+  assert.match(aktion?.body ?? '', /(?:^|[\s;])height:\s*var\(--target-sm\)/, `die Aktion ist sichtbar kompakt: ${aktion?.body}`);
+  const treffer = regeln.find((r) => r.selector.trim() === '.row-action.kanban-col__action::before');
+  assert.match(treffer?.body ?? '', /--target-base/, 'die Treffflaeche waechst auf die Zielgroesse');
+});
+
+// #1607: eine gesperrte Aufgabe (`task.locked`, "nur die Zugewiesenen duerfen
+// aendern") trug ihr Schloss in der Liste, im Brett nicht - wer die Ansicht
+// wechselte, verlor die Auskunft und erfuhr sie erst am abgelehnten Zug.
+test('eine gesperrte Aufgabe traegt ihr Schloss auch auf der Brettkarte', () => {
+  const gesperrt = { ...AUFGABE(7, 'open'), locked: 1 };
+  const schloss = (html) => /<span[^>]*>\s*<i data-lucide="lock"[^>]*><\/i>\s*<\/span>/.exec(html)?.[0] ?? null;
+
+  const inListe = schloss(tasks.renderTaskCard(gesperrt));
+  assert.ok(inListe, 'die Listenzeile zeigt kein Schloss - die Sonde findet das Vorbild nicht');
+  assert.match(inListe, /role="img"/);
+  assert.match(inListe, /aria-label="tasks\.lockedBadge"/, 'das Zeichen nennt seinen Zustand');
+
+  const karte = tasks.renderKanbanCard(gesperrt);
+  assert.equal(schloss(karte), inListe, 'die Brettkarte zeigt nicht dasselbe Zeichen wie die Liste');
+  const meta = /<div class="kanban-card__meta">([\s\S]*?)<\/div>/.exec(karte)?.[1] ?? '';
+  assert.ok(schloss(meta), 'das Schloss steht nicht in der Metazeile der Karte');
+
+  // Und die andere Richtung: ohne Sperre kein Schloss, in keiner Ansicht.
+  const offen = AUFGABE(8, 'open');
+  assert.equal(schloss(tasks.renderKanbanCard(offen)), null);
+  assert.equal(schloss(tasks.renderTaskCard(offen)), null);
+});
+
+// #1607: der Weiterschalt-Knopf ist ein Icon ohne Text. Sein Name war nur das
+// Verb („In Bearbeitung setzen") - in einer Spalte mit zehn Karten zehnmal
+// derselbe Name, und ein Screenreader konnte die Knoepfe nicht auseinander-
+// halten. Der Name nennt jetzt die Aufgabe, der Tooltip bleibt beim Verb.
+test('der Weiterschalt-Knopf einer Brettkarte nennt seine Aufgabe', () => {
+  const knopf = (task) => /<button class="kanban-card__status-btn"[^>]*>/.exec(tasks.renderKanbanCard(task))?.[0] ?? '';
+  const name = (task) => /aria-label="([^"]*)"/.exec(knopf(task))?.[1] ?? null;
+  const tooltip = (task) => / title="([^"]*)"/.exec(knopf(task))?.[1] ?? null;
+
+  const a = { ...AUFGABE(1, 'open'), title: 'Waesche' };
+  const b = { ...AUFGABE(2, 'open'), title: 'Einkauf' };
+  assert.ok(name(a) && name(b), 'Reichweite: beide Karten tragen den Knopf');
+  assert.notEqual(name(a), name(b), 'zwei Karten derselben Spalte tragen denselben Knopfnamen');
+
+  for (const [status, key, verb] of [
+    ['open', 'tasks.kanbanMoveToInProgressNamed', 'tasks.kanbanMoveToInProgress'],
+    ['in_progress', 'tasks.kanbanMoveToDoneNamed', 'tasks.kanbanMoveToDone'],
+    ['done', 'tasks.kanbanMoveToOpenNamed', 'tasks.kanbanMoveToOpen'],
+  ]) {
+    const task = { ...AUFGABE(3, status), title: 'Waesche' };
+    assert.ok(name(task).startsWith(key), `${status}: ${name(task)}`);
+    assert.ok(name(task).includes('Waesche'), `${status}: der Name nennt die Aufgabe nicht`);
+    assert.equal(tooltip(task), verb, `${status}: der Tooltip bleibt das Verb`);
+  }
+
+  // Aus der Ablage fuehrt der Knopf zurueck - mit dem Namen, den die Liste
+  // dafuer schon hat.
+  const abgelegt = { ...AUFGABE(4, 'done'), title: 'Waesche', archived_at: '2026-10-01T10:00:00Z' };
+  assert.ok(name(abgelegt).startsWith('tasks.unarchiveNamed'), name(abgelegt));
+
+  // Der Titel ist Nutzereingabe und steht in einem Attribut.
+  const boese = { ...AUFGABE(5, 'open'), title: 'a"><img src=x onerror=1>' };
+  assert.doesNotMatch(tasks.renderKanbanCard(boese), /<img/, 'der Titel bricht aus dem Attribut aus');
+  assert.ok(name(boese).includes('&quot;'), 'der Name traegt den Titel maskiert');
+});

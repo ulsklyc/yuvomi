@@ -20,6 +20,7 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { installMiniDom } from './mini-dom.js';
 const { __test: calendarHelpers } = await import('../public/pages/calendar.js');
 const permissions = await import('../public/permissions.js');
 
@@ -404,10 +405,23 @@ test('renderDayView: die Ganztagszeile zeigt den Waste-Chip, und ein Klick darau
   });
 });
 
+/** Seit R10 (L5) steht die Agenda in Liste + Detail; die Detailspalte baut
+ * ihren Leerzustand per DOM-API. Fuer die Dauer des Aufrufs ein Mini-DOM
+ * (dieselbe Form wie test-calendar.js), statt eines globalen Rests. */
+function renderAgendaWithDom(container) {
+  // `.calendar-agenda-split` gibt es im Textstub nicht - der Baustein haengt
+  // sich dann nicht ein (wie fakeAgendaContainer in test-calendar.js); diese
+  // Tests pruefen die Zeilen und ihre Verdrahtung, nicht die Detailspalte.
+  const query = container.querySelector?.bind(container);
+  container.querySelector = (sel) => (sel === '.calendar-agenda-split' ? null : query?.(sel) ?? null);
+  const restore = installMiniDom();
+  try { calendarHelpers.renderAgendaView(container); } finally { restore(); container.querySelector = query; }
+}
+
 test('renderAgendaView: ein Tag MIT NUR einer Waste-Abholung (keine Termine/Aufgaben/Feiertage/Schichtplan) bekommt trotzdem seine eigene Gruppe', () => {
   withWasteViewState({ wasteOccurrences: [occurrence()] }, {}, () => {
     const container = listenerContainer();
-    calendarHelpers.renderAgendaView(container);
+    renderAgendaWithDom(container);
     assert(container.html.includes('waste-occurrence-chip'),
       'ohne diesen Fall in groups.filter() wuerde ein reiner Waste-Tag als "kein Eintrag" stillschweigend uebersprungen');
   });
@@ -416,7 +430,7 @@ test('renderAgendaView: ein Tag MIT NUR einer Waste-Abholung (keine Termine/Aufg
 test('renderAgendaView: Klick auf den Waste-Chip navigiert direkt (nie openEventDetail)', () => {
   withWasteViewState({ wasteOccurrences: [occurrence()] }, {}, (navigated) => {
     const container = listenerContainer();
-    calendarHelpers.renderAgendaView(container);
+    renderAgendaWithDom(container);
     const target = fakeClickTarget(['.waste-occurrence-chip'], { deepLink: '?type=1&date=2026-09-10' });
     container.fire('#agenda-view', 'click', { target });
     assert(navigated.length === 1 && navigated[0] === '/waste?type=1&date=2026-09-10');
@@ -426,7 +440,7 @@ test('renderAgendaView: Klick auf den Waste-Chip navigiert direkt (nie openEvent
 test('renderAgendaView: Enter auf dem fokussierten Waste-Chip (Tastatur) navigiert ebenfalls', () => {
   withWasteViewState({ wasteOccurrences: [occurrence()] }, {}, (navigated) => {
     const container = listenerContainer();
-    calendarHelpers.renderAgendaView(container);
+    renderAgendaWithDom(container);
     const target = fakeClickTarget(['.waste-occurrence-chip'], { deepLink: '?type=1&date=2026-09-10' });
     container.fire('#agenda-view', 'keydown', { key: 'Enter', target, preventDefault() {} });
     assert(navigated.length === 1 && navigated[0] === '/waste?type=1&date=2026-09-10',

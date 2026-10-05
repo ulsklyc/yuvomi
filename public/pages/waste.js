@@ -13,19 +13,21 @@
 
 import { api } from '/api.js';
 import { t, formatDate } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { todayKey, addLocalDays, parseLocalDateKey, toLocalDateKey } from '/utils/date.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, btnLoading, refocusAfterRender } from '/components/modal.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import {
   renderAppPage, renderPageHeader, renderPageTitle, renderPageBody,
-  renderPageActions, renderListSection,
+  renderPageActions, renderListSection, renderPageColumns,
 } from '/utils/page-layout.js';
-import { findPageFab } from '/utils/fab.js';
+import { findPageFab, setPageFabAction } from '/utils/fab.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { createPageController } from '/utils/page-lifecycle.js';
+import { USER_COLORS } from '/utils/color.js';
+import { redrawList } from '/utils/list-motion.js';
 
 const UPCOMING_WINDOW_DAYS = 90;
 const WEEKDAY_CODES = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
@@ -79,13 +81,18 @@ function nearestOrdinalAnchorDateKey(ordinal, weekdayCode, todayKeyValue = today
     : nthWeekdayOfMonthLocal(today.getFullYear(), today.getMonth() + 1, weekday, ordinal);
   return toLocalDateKey(target);
 }
+// Die Vorlagen ziehen ihre Farbe aus der geteilten Startpalette
+// (utils/color.js, Re-Critique 2026-09-28): Sperrmuell trug vorher #7C3AED -
+// im Dark exakt die Flaeche des Primaerknopfs -, Restmuell und Wertstoff
+// lagen auf der gehobenen Dark-Karte unter 3:1. Bestehende Abfallarten
+// behalten ihre Farbe; das Raster zeigt sie dann als „Aktuelle Farbe".
 const TYPE_PRESETS = [
-  { key: 'general', icon: 'trash-2', color: '#64748B' },
-  { key: 'recycling', icon: 'recycle', color: '#2563EB' },
+  { key: 'general', icon: 'trash-2', color: '#78808C' },
+  { key: 'recycling', icon: 'recycle', color: '#3B82F6' },
   { key: 'organic', icon: 'leaf', color: '#16A34A' },
   { key: 'paper', icon: 'newspaper', color: '#D97706' },
   { key: 'glass', icon: 'wine', color: '#059669' },
-  { key: 'bulky', icon: 'armchair', color: '#7C3AED' },
+  { key: 'bulky', icon: 'armchair', color: '#D946EF' },
 ];
 
 /**
@@ -98,15 +105,15 @@ const TYPE_PRESETS = [
  *
  * Dieselbe Antwort, die Notizen, Kalender, Budget und der
  * Kategorie-Verwalter auf dieselbe Frage schon geben: eine kleine feste
- * Auswahl statt eines Regenbogens. Die Werte sind bewusst die Tailwind-600er
- * -Familie - also exakt das Helligkeitsband, in dem die sechs
- * `TYPE_PRESETS`-Farben oben ohnehin schon liegen. Dadurch traegt jede Farbe
- * auf `--color-surface-*` UND auf dem dunklen Kartengrund genug Eigenhelligkeit,
- * ohne in einem der beiden Themen auszubrennen.
+ * Auswahl statt eines Regenbogens. Seit der Re-Critique 2026-09-28 ist es die
+ * geteilte Startpalette `USER_COLORS` (utils/color.js): jede Farbe dort haelt
+ * >= 3:1 auf `--color-surface` und `--color-surface-raised` in BEIDEN Themes
+ * - der fruehere Kommentar versprach das, #7C3AED (2.57) und #2563EB (2.84)
+ * hielten es auf dem dunklen Kartengrund nicht.
  *
- * Die ersten sechs Eintraege SIND die Preset-Farben, in Preset-Reihenfolge:
- * nur so kann die Preset-Auswahl im Dialog ihre Farbe als aktiven Swatch
- * zeigen, statt einen Wert zu setzen, den das Raster gar nicht kennt.
+ * Jede Preset-Farbe steht im Raster: nur so kann die Preset-Auswahl im
+ * Dialog ihre Farbe als aktiven Swatch zeigen, statt einen Wert zu setzen,
+ * den das Raster gar nicht kennt.
  *
  * KEIN `getReadableTextColor()`. Diese Farbe wird nirgends als TEXTfarbe auf
  * einem freien Grund gesetzt - waste.js faerbt damit ausschliesslich das
@@ -115,22 +122,19 @@ const TYPE_PRESETS = [
  * braucht keine gerechnete Tinte - wohl aber die Untergrenze, die diese
  * Palette ist.
  */
-const WASTE_TYPE_COLORS = [
-  '#64748B', '#2563EB', '#16A34A', '#D97706', '#059669',
-  '#7C3AED', '#DC2626', '#0891B2', '#EA580C', '#DB2777',
-];
+const WASTE_TYPE_COLORS = USER_COLORS;
 
 const WASTE_TYPE_COLOR_NAMES = () => ({
-  '#64748B': t('waste.colorGray'),
-  '#2563EB': t('waste.colorBlue'),
+  '#78808C': t('waste.colorGray'),
+  '#3B82F6': t('waste.colorBlue'),
   '#16A34A': t('waste.colorGreen'),
   '#D97706': t('waste.colorOcher'),
   '#059669': t('waste.colorTeal'),
-  '#7C3AED': t('waste.colorViolet'),
-  '#DC2626': t('waste.colorRed'),
+  '#D946EF': t('waste.colorViolet'),
+  '#EF4444': t('waste.colorRed'),
   '#0891B2': t('waste.colorCyan'),
   '#EA580C': t('waste.colorOrange'),
-  '#DB2777': t('waste.colorMagenta'),
+  '#EC4899': t('waste.colorMagenta'),
 });
 
 let _container = null;
@@ -250,9 +254,12 @@ function occurrenceRowHtml(occurrence) {
   // URL-Quelle. Die Zeile versprach damit Aktionen, die es fuer sie nicht gibt,
   // und der Nutzer suchte den Fehler bei sich („ich kann die Optionen nicht
   // sehen"). Dieselbe Bedingung traegt deshalb jetzt beides: Knopf und Menue.
+  // Der Name des Menueknopfs nennt Art UND Tag: dieselbe Abfallart steht in
+  // der aufgeklappten Liste mehrfach.
+  const occurrenceName = `${occurrence.type_name ?? ''}, ${formatDate(occurrence.date_key)}`;
   const actions = (readOnly() || !menuItems) ? '' : `
       <div class="row-actions">
-        <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('waste.moreActions'))}">
+        <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('common.moreActionsNamed', { name: occurrenceName }))}">
           <i data-lucide="more-horizontal" aria-hidden="true"></i>
         </button>
         <!-- Das geteilte .popover-menu (utils/popover-menu.js + layout.css), nicht
@@ -324,9 +331,19 @@ function deepLinkNeedsExpand(occurrences, { typeId, date }) {
   return splitUpcomingByType(occurrences).rest.some((occ) => occ.type_id === typeId && occ.date_key === date);
 }
 
+/* DIE DREI LISTEN DER SEITE BAUEN SICH BEI JEDER AENDERUNG NEU (R16, Bewegung).
+ * Jede hat ihren eigenen Traeger, der das Neuzeichnen ueberlebt - redrawList()
+ * (utils/list-motion.js) haelt davor die Lage fest und bewegt danach, was sich
+ * geaendert hat: der erste Aufbau nach dem Skelett blendet gestaffelt ein, eine
+ * neue Abholung, Abfallart oder Quelle zieht auf, und was nachrueckt oder die
+ * Reihenfolge wechselt (Abfallart hoch/runter), gleitet an seine Stelle. */
 function renderUpcoming() {
   const host = _container.querySelector('#waste-upcoming-list');
   if (!host) return;
+  redrawList(host, () => drawUpcoming(host), { selector: '.waste-occurrence-row[data-key]', keyAttr: 'data-key' });
+}
+
+function drawUpcoming(host) {
   if (state.loading) {
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 4, lines: 2 }));
@@ -352,7 +369,7 @@ function renderUpcoming() {
         <i data-lucide="chevron-down" class="waste-upcoming-toggle__icon" aria-hidden="true"></i>
         <span>${esc(expanded ? t('waste.upcomingShowLess') : t('waste.upcomingShowMore', { count: rest.length }))}</span>
       </button>
-      <div class="list-rows" id="waste-upcoming-rest"${expanded ? '' : ' hidden'}>
+      <div class="row-divided" id="waste-upcoming-rest"${expanded ? '' : ' hidden'}>
         ${rest.map(occurrenceRowHtml).join('')}
       </div>
     `);
@@ -363,6 +380,15 @@ function renderUpcoming() {
 // -------------------------------------------------------------------------
 // Types & schedules
 // -------------------------------------------------------------------------
+
+// Der Screenreader-Name der Serienzeile: Abfallart UND Rhythmus. Der Rhythmus
+// allein („Jeden Montag") steht unter jeder Abfallart gleich da; erst die Art
+// macht die Zeile unterscheidbar.
+function scheduleRowName(schedule) {
+  const summary = recurrenceSummary(schedule);
+  const typeName = typeById(schedule.type_id)?.name;
+  return typeName ? `${typeName}, ${summary}` : summary;
+}
 
 function recurrenceSummary(schedule) {
   if (schedule.recurrence_kind === 'weekly') {
@@ -417,7 +443,7 @@ function scheduleRowHtml(schedule) {
       </div>
       ${ro ? '' : `
         <div class="row-actions">
-          <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('waste.moreActions'))}">
+          <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('common.moreActionsNamed', { name: scheduleRowName(schedule) }))}">
             <i data-lucide="more-horizontal" aria-hidden="true"></i>
           </button>
           <div class="popover-menu" id="${menuId}" popover role="menu">
@@ -458,7 +484,7 @@ function typeCardHtml(type, index, total) {
         </div>
         ${ro ? '' : `
           <div class="row-actions">
-            <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('waste.moreActions'))}">
+            <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('common.moreActionsNamed', { name: type.name }))}">
               <i data-lucide="more-horizontal" aria-hidden="true"></i>
             </button>
             <div class="popover-menu" id="${menuId}" popover role="menu">
@@ -472,24 +498,134 @@ function typeCardHtml(type, index, total) {
     </div>`;
 }
 
+// -------------------------------------------------------------------------
+// EIN Leerzustand statt drei (Re-Critique 2026-09-28, P4)
+// -------------------------------------------------------------------------
+
+/**
+ * Pure: steht die Seite im Onboarding? Nur ohne JEDE Abfallart - eine nur
+ * archivierte muss wiederherstellbar bleiben, und das geht nur in der vollen
+ * Ansicht mit ihrer Karte. Beim Laden steht das Skelett, bei einem Ladefehler
+ * der Fehler; beides ist kein "noch nichts".
+ */
+function isOnboarding(s) {
+  return !s.loading && !s.error && s.types.length === 0;
+}
+
+/**
+ * Pure: was die Seite im jeweiligen Zustand zeigt. Ohne Abfallart standen
+ * drei "Noch nichts"-Bloecke untereinander (Abholungen, Abfallarten,
+ * Quellen), der erste Weg lag mobil bei y683 unter dem Erinnerungs-Toast.
+ * Abholungen und Quellen haben ohne Abfallart nichts zu sagen - sie kommen
+ * mit den Daten. Der Kopfknopf "Abfallart hinzufuegen" faellt dann ebenfalls
+ * weg: der FAB traegt in diesem Zustand genau diese Aktion (fabIntent).
+ */
+function sectionVisibility(s) {
+  const onboarding = isOnboarding(s);
+  return { upcoming: !onboarding, sources: !onboarding, addTypeButton: !onboarding };
+}
+
+/**
+ * Pure: was der FAB anlegt. Ohne aktive Abfallart laesst sich keine Abholung
+ * eintragen - der FAB hiess trotzdem "Abholung" und leitete per Toast in den
+ * Abfallart-Dialog um (der Toast legte sich dabei ueber dessen Namensfeld).
+ * Jetzt nennt er, was er tut.
+ */
+function fabIntent(s) {
+  const hasActiveType = s.types.some((type) => !type.archived);
+  return hasActiveType
+    ? { creates: 'pickup', labelKey: 'waste.addPickup', dockLabelKey: 'newLabel.waste' }
+    : { creates: 'type', labelKey: 'waste.addType', dockLabelKey: 'newLabel.wasteType' };
+}
+
+function presetLabel(preset) {
+  return t(`waste.preset${preset.key.charAt(0).toUpperCase()}${preset.key.slice(1)}`);
+}
+
+/**
+ * Pure: der EINE Onboarding-Block. Die Vorlagen stehen als Chips da und legen
+ * mit einem Tipp an (Name, Symbol und Farbe der Vorlage) - vorher lagen sie
+ * zwei Schritte tief im Dialog hinter "Mit einer Vorlage starten". Darunter
+ * der zweite Weg, den viele Kommunen anbieten: der ICS-Import, der Arten
+ * gleich mitbringt. Nur-lesen bekommt denselben Leerzustand ohne Schreibweg.
+ */
+function onboardingHtml({ readOnly: ro, emptyHtml = null }) {
+  // `emptyHtml` nur fuer den Test (die DOM-Attrappe dort baut keinen
+  // Leerzustand); die Seite laesst ihn weg.
+  const empty = emptyHtml ?? emptyStateHTML({
+    icon: 'trash-2',
+    title: t('waste.emptyTypesTitle'),
+    description: t('waste.emptyTypesDescription'),
+  });
+  if (ro) return `<div class="waste-onboarding">${empty}</div>`;
+  const chips = TYPE_PRESETS.map((preset) => `
+      <button type="button" class="filter-chip waste-onboarding__preset" data-action="create-preset-type" data-preset="${preset.key}">
+        <i data-lucide="${esc(preset.icon)}" style="color:${esc(preset.color)}" aria-hidden="true"></i>
+        <span>${esc(presetLabel(preset))}</span>
+      </button>`).join('');
+  return `
+    <div class="waste-onboarding">
+      ${empty}
+      <div class="waste-onboarding__presets" role="group" aria-label="${esc(t('waste.typePresetLabel'))}">${chips}
+      </div>
+      <button type="button" class="btn btn--ghost waste-onboarding__import" data-action="open-import">
+        <i data-lucide="upload" class="icon-md" aria-hidden="true"></i>
+        <span>${esc(t('waste.importFileAction'))}</span>
+      </button>
+    </div>`;
+}
+
+/** Legt eine Abfallart aus einer Vorlage an - derselbe POST wie der Dialog. */
+async function createPresetType(key, button) {
+  const preset = TYPE_PRESETS.find((p) => p.key === key);
+  if (!preset) return;
+  if (button) button.disabled = true;
+  try {
+    await api.post('/waste/types', { name: presetLabel(preset), icon: preset.icon, color: preset.color });
+    await reloadAndRender();
+    window.yuvomi?.showToast(t('waste.typeSavedToast'), 'success');
+  } catch (err) {
+    if (button) button.disabled = false;
+    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+  }
+}
+
+/** Zieht Abschnitte, Kopfknopf und FAB auf den Zustand nach. */
+function applyPageMode() {
+  const page = _container.querySelector('.waste-page');
+  page?.classList.toggle('waste-page--onboarding', isOnboarding(state));
+  const intent = fabIntent(state);
+  const fab = findPageFab('waste-fab-new-pickup');
+  if (fab) {
+    setPageFabAction(fab, {
+      label: t(intent.labelKey),
+      dockLabel: t(intent.dockLabelKey),
+      onClick: () => {
+        if (readOnly()) return;
+        if (fabIntent(state).creates === 'type') openTypeModal();
+        else openPickupModal();
+      },
+    });
+  }
+}
+
 function renderTypes() {
   const host = _container.querySelector('#waste-types-list');
   if (!host) return;
+  redrawList(host, () => drawTypes(host), { selector: '.waste-type-card[data-type-id]', keyAttr: 'data-type-id' });
+}
+
+function drawTypes(host) {
   if (state.loading) {
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 3, lines: 2 }));
     return;
   }
   if (!state.types.length) {
+    // Der EINE Onboarding-Block (onboardingHtml) - auch der Leerzustand
+    // bietet einem Nur-lesen-Nutzer keinen Anlegeweg an.
     host.replaceChildren();
-    host.insertAdjacentHTML('beforeend', emptyStateHTML({
-      title: t('waste.emptyTypesTitle'),
-      description: t('waste.emptyTypesDescription'),
-      // Auch der Leerzustand darf einem Nur-lesen-Nutzer keinen Anlege-Knopf
-      // anbieten - er ist derselbe Weg wie der Kopfknopf, nur an anderer Stelle.
-      action: readOnly() ? null : { label: t('waste.addType'), icon: 'plus', attrs: { id: 'waste-empty-add-type' } },
-    }));
-    host.querySelector('#waste-empty-add-type')?.addEventListener('click', () => openTypeModal());
+    host.insertAdjacentHTML('beforeend', onboardingHtml({ readOnly: readOnly() }));
     if (window.lucide) window.lucide.createIcons({ el: host });
     return;
   }
@@ -519,7 +655,7 @@ function sourceRowHtml(source) {
   const badge = sourceHealthBadgeInfo(source);
   const isUrl = source.kind === 'url';
   const coverage = source.coverage_start
-    ? `${esc(formatDate(source.coverage_start))} – ${esc(formatDate(source.coverage_end))}`
+    ? `${esc(formatDate(source.coverage_start))} - ${esc(formatDate(source.coverage_end))}`
     : esc(t('waste.sourceNoCoverage'));
   // A URL source's own row action is a manual refresh (fetch now) or, once
   // needs_mapping is set, a review action that opens the same mapping wizard
@@ -548,7 +684,7 @@ function sourceRowHtml(source) {
       </div>
       ${readOnly() ? '' : `
         <div class="row-actions">
-          <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('waste.moreActions'))}">
+          <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('common.moreActionsNamed', { name: source.name }))}">
             <i data-lucide="more-horizontal" aria-hidden="true"></i>
           </button>
           <div class="popover-menu" id="${menuId}" popover role="menu">
@@ -561,6 +697,10 @@ function sourceRowHtml(source) {
 function renderSources() {
   const host = _container.querySelector('#waste-sources-list');
   if (!host) return;
+  redrawList(host, () => drawSources(host), { selector: '.waste-source-row[data-source-id]', keyAttr: 'data-source-id' });
+}
+
+function drawSources(host) {
   if (state.loading) {
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 2, lines: 2 }));
@@ -598,6 +738,7 @@ async function reloadAndRender() {
   renderUpcoming();
   renderTypes();
   renderSources();
+  applyPageMode();
 }
 
 /**
@@ -756,7 +897,7 @@ function openTypeModal(type = null) {
       </select>
     </div>`}
     <div class="form-group">
-      <label class="form-label" for="wtm-name">${t('waste.typeNameLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+      <label class="form-label" for="wtm-name">${t('waste.typeNameLabel')}${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="wtm-name" maxlength="100" value="${esc(isEdit ? type.name : '')}">
     </div>
     <div class="form-group">
@@ -788,15 +929,14 @@ function openTypeModal(type = null) {
       </div>
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
-      <div style="display:flex;gap:var(--space-2)">
-        ${isEdit ? `
-          <button class="btn btn--danger btn--icon" id="wtm-delete" aria-label="${esc(t('common.delete'))}"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i></button>
-          <button class="btn btn--secondary btn--icon" id="wtm-archive" aria-label="${esc(type.archived ? t('waste.restoreAction') : t('waste.archiveAction'))}"><i data-lucide="${type.archived ? 'archive-restore' : 'archive'}" class="icon-md" aria-hidden="true"></i></button>
-        ` : '<div></div>'}
-      </div>
+      ${isEdit ? `
+      <div style="display:flex;gap:var(--space-2);margin-inline-end:auto">
+          <button type="button" class="btn btn--danger-outline" id="wtm-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>
+          <button type="button" class="btn btn--secondary btn--icon" id="wtm-archive" aria-label="${esc(type.archived ? t('waste.restoreAction') : t('waste.archiveAction'))}"><i data-lucide="${type.archived ? 'archive-restore' : 'archive'}" class="icon-md" aria-hidden="true"></i></button>
+      </div>` : ''}
       <div style="display:flex;gap:var(--space-3)">
-        <button class="btn btn--secondary" id="wtm-cancel">${t('common.cancel')}</button>
-        <button class="btn btn--primary" id="wtm-save">${isEdit ? t('common.save') : t('common.add')}</button>
+        <button type="button" class="btn btn--secondary" id="wtm-cancel">${t('common.cancel')}</button>
+        <button type="button" class="btn btn--primary" id="wtm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
     </div>`;
 
@@ -976,10 +1116,10 @@ function openScheduleModal(type, schedule = null) {
       </label>
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
-      <div>${isEdit ? `<button class="btn btn--danger btn--icon" id="wsm-delete" aria-label="${esc(t('common.delete'))}"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i></button>` : ''}</div>
+      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="wsm-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>` : ''}
       <div style="display:flex;gap:var(--space-3)">
-        <button class="btn btn--secondary" id="wsm-cancel">${t('common.cancel')}</button>
-        <button class="btn btn--primary" id="wsm-save">${isEdit ? t('common.save') : t('common.add')}</button>
+        <button type="button" class="btn btn--secondary" id="wsm-cancel">${t('common.cancel')}</button>
+        <button type="button" class="btn btn--primary" id="wsm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
     </div>`;
 
@@ -1086,10 +1226,10 @@ function openPickupModal(pickup = null) {
       <textarea class="form-input" id="wpm-note" maxlength="500">${esc(pickup?.note ?? '')}</textarea>
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
-      <div>${isEdit ? `<button class="btn btn--danger btn--icon" id="wpm-delete" aria-label="${esc(t('common.delete'))}"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i></button>` : ''}</div>
+      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="wpm-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>` : ''}
       <div style="display:flex;gap:var(--space-3)">
-        <button class="btn btn--secondary" id="wpm-cancel">${t('common.cancel')}</button>
-        <button class="btn btn--primary" id="wpm-save">${isEdit ? t('common.save') : t('common.add')}</button>
+        <button type="button" class="btn btn--secondary" id="wpm-cancel">${t('common.cancel')}</button>
+        <button type="button" class="btn btn--primary" id="wpm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
     </div>`;
 
@@ -1495,7 +1635,7 @@ function openSourceModal(source) {
     </div>
     <div class="waste-source-detail__meta">
       ${isUrl && source.url ? `<p>${esc(t('waste.sourceUrlLabel'))}: ${esc(source.url)}</p>` : ''}
-      ${source.coverage_start ? `<p>${esc(t('waste.sourceCoverageLabel'))}: ${esc(formatDate(source.coverage_start))} – ${esc(formatDate(source.coverage_end))}</p>` : ''}
+      ${source.coverage_start ? `<p>${esc(t('waste.sourceCoverageLabel'))}: ${esc(formatDate(source.coverage_start))} - ${esc(formatDate(source.coverage_end))}</p>` : ''}
       ${source.last_success_at ? `<p>${esc(t('waste.sourceLastImportedLabel'))}: ${esc(formatDate(source.last_success_at.slice(0, 10)))}</p>` : ''}
       ${source.last_error ? `<p class="waste-source-detail__error">${esc(source.last_error)}</p>` : ''}
       ${badge ? `<span class="waste-badge waste-badge--${badge.code}">${esc(t(badge.labelKey))}</span>` : ''}
@@ -1509,11 +1649,11 @@ function openSourceModal(source) {
     </h3>
     <div id="wsrc-mappings">${source.mappings.map(sourceMappingRowHtml).join('')}</div>
     <div class="modal-panel__footer modal-panel__footer--plain">
-      <div><button class="btn btn--danger btn--icon" id="wsrc-delete" aria-label="${esc(t('common.delete'))}"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i></button></div>
+      <button type="button" class="btn btn--danger-outline" id="wsrc-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>
       <div style="display:flex;gap:var(--space-3)">
-        <button class="btn btn--secondary" id="wsrc-reimport">${t(primaryActionKey)}</button>
-        <button class="btn btn--secondary" id="wsrc-cancel">${t('common.cancel')}</button>
-        <button class="btn btn--primary" id="wsrc-save">${t('common.save')}</button>
+        <button type="button" class="btn btn--secondary" id="wsrc-reimport">${t(primaryActionKey)}</button>
+        <button type="button" class="btn btn--secondary" id="wsrc-cancel">${t('common.cancel')}</button>
+        <button type="button" class="btn btn--primary" id="wsrc-save">${t('common.save')}</button>
       </div>
     </div>`;
 
@@ -1839,11 +1979,17 @@ async function restoreOccurrence(occurrenceKey) {
 function renderPage() {
   _container.replaceChildren();
   _container.insertAdjacentHTML('beforeend', renderAppPage({
-    mode: 'reading',
-    className: 'waste-page',
+    // Flaeche mit Spalten (DESIGN.md, Breitenregel, R16): der Kopf endet an
+    // der Modulkante, die Abholungen stehen links auf dem Lesemass, Abfallarten
+    // und Quellen ab der Split-Schwelle rechts daneben.
+    mode: 'dashboard',
+    className: 'waste-page app-page--columns',
     legacyAlias: false,
     header: renderPageHeader({
       narrow: true,
+      // Mobil stehen die Werkzeuge am Ende der Titelzeile (Kopfregel mobil 1a):
+      // dort traegt der Kopf nur das „..." - siehe den Menue-Eintrag unten.
+      titleTools: true,
       title: renderPageTitle(t('waste.title')),
       // ALLE VIER schreiben, auch die Erinnerungen: das zentrale Gate an
       // /api/v1 entscheidet nach METHODE, und `PUT /waste/reminder-settings/:id`
@@ -1905,6 +2051,11 @@ function renderPage() {
           id: 'waste-page-menu',
           label: t('waste.moreActions'),
           items: [
+            // NUR UNTER 768px SICHTBAR (waste.css): dort hat der beschriftete
+            // Kopfknopf keine Zeile mehr und wird nach der Label-Verlust-Regel
+            // zum Eintrag seines Menues. Ab 768px steht der Knopf, und der
+            // Eintrag ist ausgeblendet - es bleibt je Breite EIN Weg.
+            { action: 'add-type', label: t('waste.addType'), icon: 'plus' },
             { action: 'open-import', label: t('waste.importFileAction'), icon: 'upload' },
             { action: 'open-url-source', label: t('waste.addUrlSourceAction'), icon: 'link' },
             { action: 'open-reminder-settings', label: t('waste.reminderSettingsAction'), icon: 'bell' },
@@ -1917,20 +2068,22 @@ function renderPage() {
       ].join('\n')),
     }),
     body: renderPageBody({
-      content: [
-        renderListSection({
+      content: renderPageColumns({
+        main: renderListSection({
           className: 'waste-upcoming-section',
-          content: `<h2 class="waste-section-title u-section-title">${t('waste.upcomingSectionTitle')}</h2><div class="list-rows" id="waste-upcoming-list"></div>`,
+          content: `<h2 class="waste-section-title u-section-title">${t('waste.upcomingSectionTitle')}</h2><div class="row-carrier" id="waste-upcoming-list"></div>`,
         }),
-        renderListSection({
-          className: 'waste-types-section',
-          content: `<h2 class="waste-section-title u-section-title">${t('waste.typesSectionTitle')}</h2><div id="waste-types-list"></div>`,
-        }),
-        renderListSection({
-          className: 'waste-sources-section',
-          content: `<h2 class="waste-section-title u-section-title">${t('waste.sourcesSectionTitle')}</h2><div class="list-rows" id="waste-sources-list"></div>`,
-        }),
-      ].join('\n'),
+        rail: [
+          renderListSection({
+            className: 'waste-types-section',
+            content: `<h2 class="waste-section-title u-section-title">${t('waste.typesSectionTitle')}</h2><div id="waste-types-list"></div>`,
+          }),
+          renderListSection({
+            className: 'waste-sources-section',
+            content: `<h2 class="waste-section-title u-section-title">${t('waste.sourcesSectionTitle')}</h2><div class="row-carrier" id="waste-sources-list"></div>`,
+          }),
+        ].join('\n'),
+      }),
     }),
     trailing: `
       <button class="page-fab" id="waste-fab-new-pickup" aria-label="${esc(t('waste.addPickup'))}" data-dock-label="${t('newLabel.waste')}">
@@ -1957,26 +2110,15 @@ function bindEvents() {
   // Der FAB liegt in der Shell-Layer, nicht in `_container`; CSS blendet ihn
   // ueber html[data-module-readonly] aus (layout.css). Der Handler bleibt
   // trotzdem gesperrt - ausgeblendet ist nicht dasselbe wie unerreichbar.
-  findPageFab('waste-fab-new-pickup').addEventListener('click', () => {
-    if (readOnly()) return;
-    // SACKGASSE BEHOBEN (Audit UX, 2026-09-12). Ohne Abfallart liess sich keine
-    // Abholung anlegen - der FAB sagte das auch, tat dann aber NICHTS weiter.
-    // Auf einer frischen Installation war er damit der prominenteste Knopf der
-    // Seite und zugleich der einzige, der garantiert nirgendwohin fuehrte: der
-    // Nutzer musste selbst erraten, dass „Abfallart" hinter dem „..." im Kopf
-    // liegt. Jetzt fuehrt er dorthin, wo er hinweist.
-    // Der Hinweis bleibt BESTEHEN und wird nicht durch das stille Oeffnen
-    // ersetzt: der FAB ist mit „Abholung" beschriftet, und ein Dialog, der
-    // unangekuendigt nach einer ABFALLART fragt, ist ein Themenwechsel, den der
-    // Satz erklaeren muss. Toast und Dialog zusammen sind der vollstaendige
-    // Weg - der Satz sagt warum, der Dialog macht es moeglich.
-    if (!state.types.filter((t2) => !t2.archived).length) {
-      window.yuvomi?.showToast(t('waste.addTypeFirstHint'), 'default');
-      openTypeModal();
-      return;
-    }
-    openPickupModal();
-  });
+  // Die Aktion des FAB haengt am Zustand (fabIntent) und wird deshalb nach
+  // jedem Laden in applyPageMode() gesetzt - ueber setPageFabAction(), damit
+  // der am Desktop angedockte Knopf sein Nomen mitzieht. Bis dahin (Skelett)
+  // legt er an, was der Stand hergibt. SACKGASSE BEHOBEN (Audit UX,
+  // 2026-09-12), jetzt ohne Umleitungs-Toast (Re-Critique 2026-09-28): ohne
+  // Abfallart heisst der FAB "Abfallart" und oeffnet genau diesen Dialog;
+  // vorher hiess er "Abholung", und der erklaerende Toast legte sich ueber das
+  // Namensfeld des Dialogs.
+  applyPageMode();
 
   // The three `role="button" tabindex="0"` rows (edit-type, edit-schedule,
   // open-source) are a div, not a real <button> - unlike the app's own
@@ -2059,6 +2201,8 @@ function bindEvents() {
       openReminderSettingsModal();
     } else if (kind === 'add-type') {
       openTypeModal();
+    } else if (kind === 'create-preset-type') {
+      createPresetType(action.dataset.preset, action);
     }
   });
 }
@@ -2165,6 +2309,7 @@ export async function render(container, { signal: routeSignal = null } = {}) {
   renderUpcoming();
   renderTypes();
   renderSources();
+  applyPageMode();
   applyDeepLink();
 }
 
@@ -2178,4 +2323,5 @@ export const __test = {
   // im Menue steht, und dass die Preset-Farben allesamt im Raster liegen.
   typeCardHtml, scheduleRowHtml, sourceRowHtml, TYPE_PRESETS, WASTE_TYPE_COLORS,
   activeSwatchColor, resolveSwatchColors,
+  isOnboarding, onboardingHtml, sectionVisibility, fabIntent,
 };

@@ -307,12 +307,29 @@ test('der Guard sieht ueberhaupt Dateien - sonst waere er gruen und blind', () =
   assert.ok(SOURCES.some((s) => s.rel === path.join('pages', 'calendar.js')));
 });
 
+/** `const x = new Date(`${key}T00:00:00`)` - ein Datums-Key, zur Browser-Mitternacht gemacht. */
+const KEY_DATE_BINDING = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new Date\(\s*`\$\{[^`]*\}T00:00(?::00)?`\s*\)/;
+
 test('formatDate/formatTime bekommen keinen Date-Umweg um einen Datums-Key', () => {
   // `formatDate(new Date(key + 'T00:00:00'))` ist Mitternacht der BROWSER-Zone.
   // In einer Haushaltszone westlich davon zeigt das den Vortag. Der Key gehoert
   // direkt hinein - formatDate() kennt die reine Datumsform.
   const pattern = /format(?:Date|DayMonth|Time)\(\s*new Date\(\s*`\$\{[^`]*\}T00:00:00`/;
   const offenders = SOURCES.filter((s) => pattern.test(s.code)).map((s) => s.rel);
+  // Derselbe Umweg mit einem Namen dazwischen: `const d = new Date(`${key}T00:00:00`)`
+  // und ein paar Zeilen spaeter `formatDate(d)`. Das Muster darueber sah nur
+  // den Ausdruck IM Aufruf, und so stand der Start-Badge der Aufgaben daneben.
+  for (const s of SOURCES) {
+    const lines = s.code.split('\n');
+    lines.forEach((line, i) => {
+      const bound = KEY_DATE_BINDING.exec(line);
+      if (!bound) return;
+      const window = lines.slice(i, i + 12).join('\n');
+      if (new RegExp(`format(?:Date|DayMonth|Time)\\(\\s*${bound[1]}\\s*[,)]`).test(window)) {
+        offenders.push(`${s.rel}:${i + 1} (${bound[1]})`);
+      }
+    });
+  }
   assert.deepEqual(offenders, [], 'Datums-Key direkt an formatDate() uebergeben');
 });
 
@@ -377,11 +394,14 @@ test('kein Frontend-Modul baut sich sein eigenes "jetzt" aus der Browser-Uhr', (
       const bound = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new Date\(\s*\)/.exec(line);
       if (bound) {
         const window = lines.slice(i, i + 12).join('\n');
-        const getter = new RegExp(`\\b${bound[1]}\\.get(?:Hours|Minutes|Date|Day|FullYear|Month)\\(`);
+        // Auch die SETTER: `today.setHours(0, 0, 0, 0)` macht aus "jetzt" die
+        // Mitternacht des Geraets, also "heute" nach der Browser-Uhr - so stand
+        // der Start-Badge der Aufgaben neben dem Guard.
+        const getter = new RegExp(`\\b${bound[1]}\\.[gs]et(?:Hours|Minutes|Date|Day|FullYear|Month)\\(`);
         if (getter.test(window)) offenders.push(`${s.rel}:${i + 1} (${bound[1]})`);
         return;
       }
-      if (/new Date\(\s*\)\s*\.\s*get(?:Hours|Minutes|Date|Day|FullYear|Month)\(/.test(line)) {
+      if (/new Date\(\s*\)\s*\.\s*[gs]et(?:Hours|Minutes|Date|Day|FullYear|Month)\(/.test(line)) {
         offenders.push(`${s.rel}:${i + 1}`);
       }
     });
@@ -425,6 +445,10 @@ test('der Guard erkennt die Schreibweise, an der er vorbeigesehen hat', () => {
   // Ein Wert im Konstruktor ist kein "jetzt".
   assert.equal(bound.test('const d = new Date(iso);'), false);
   assert.equal(bound.test('const d = new Date(y, m, 1);'), false);
+  // Der Umweg eines Datums-Keys ueber einen Namen (Start-Badge der Aufgaben).
+  assert.equal(KEY_DATE_BINDING.exec('  const startDay = new Date(`${startDateStr}T00:00:00`);')?.[1], 'startDay');
+  assert.equal(KEY_DATE_BINDING.test('const d = new Date(`${day}T${time}`);'), false,
+    'eine Wanduhrzeit mit Uhrzeit ist kein Datums-Key');
 });
 
 test('utils/timezone.js ist die einzige Stelle mit einem zonenbehafteten Formatter', () => {
@@ -490,4 +514,102 @@ test('die Haushaltszone wird beim Laden und beim Umstellen gespiegelt', () => {
     'render() reicht die gewaehlte Zone nicht an das Formular durch');
   assert.match(settings, /timezone_effective:\s*loaded\.timezone_effective/,
     'render() reicht die geltende Zone nicht an das Automatik-Label durch');
+});
+
+// --------------------------------------------------------------------------
+// Wanduhrzeit der Haushaltszone -> Zeitpunkt (#1522)
+//
+// Der Erinnerungsvorlauf in Kalender und Aufgaben rechnet von einer
+// Wanduhrzeit der Haushaltszone auf `remind_at`, einen Zeitpunkt. Der Server
+// tut dasselbe mit `localToUTCPrecise()` (#1300, #1341) - Dialog und Server
+// muessen denselben Anker haben, sonst wandert ein gespeicherter Vorlauf beim
+// naechsten Verschieben. Deshalb der Vergleich gegen die Serverfunktion selbst,
+// nicht gegen abgeschriebene Erwartungswerte: ueber Zonen mit beiden
+// Vorzeichen, halben und Dreiviertelstunden (Chatham, Lord Howe mit einer
+// 30-Minuten-Umstellung), und ueber die Umstelltage im Viertelstundenraster.
+// --------------------------------------------------------------------------
+
+test('wallTimeToInstantMs rechnet wie localToUTCPrecise - auch in Luecke und Doppelstunde', async () => {
+  const { localToUTCPrecise } = await import('../server/utils/timezone.js');
+  const zones = [
+    'Europe/Berlin', 'America/New_York', 'Pacific/Chatham', 'Australia/Lord_Howe',
+    'Asia/Kolkata', 'Pacific/Honolulu', 'UTC',
+  ];
+  const days = ['2026-03-08', '2026-03-29', '2026-04-05', '2026-09-18', '2026-09-27', '2026-10-04', '2026-10-25', '2026-11-01'];
+  const pad = (n) => String(n).padStart(2, '0');
+  let compared = 0;
+  let gaps = 0;
+  let folds = 0;
+  const wrong = [];
+  for (const zone of zones) {
+    for (const day of days) {
+      for (let minute = 0; minute < 24 * 60; minute += 15) {
+        const wall = `${day}T${pad(Math.floor(minute / 60))}:${pad(minute % 60)}:00`;
+        const expected = Date.parse(localToUTCPrecise(wall, zone));
+        const actual = tz.wallTimeToInstantMs(wall, zone);
+        compared += 1;
+        const candidates = tz.wallTimeCandidates(wall, zone).length;
+        if (candidates === 0) gaps += 1;
+        if (candidates > 1) folds += 1;
+        if (actual !== expected) wrong.push(`${zone} ${wall}: ${new Date(actual).toISOString()} statt ${new Date(expected).toISOString()}`);
+      }
+    }
+  }
+  assert.deepEqual(wrong.slice(0, 10), [], `${wrong.length} Abweichungen vom Server`);
+  // Ohne diese Zaehler waere der Vergleich auch dann gruen, wenn das Raster an
+  // den Umstellungen vorbeiliefe - genau dort liegen die zwei Sonderfaelle.
+  assert.ok(gaps >= 4, `das Raster trifft nicht existierende Ortszeiten (${gaps})`);
+  assert.ok(folds >= 4, `das Raster trifft doppelte Ortszeiten (${folds})`);
+  assert.ok(compared > 5000);
+});
+
+test('wallTimeToInstantMs traegt einen Sekundenbruchteil genau einmal - wie der Server (#1658)', async () => {
+  // Der Spiegel las den Offset wie der Server an einem Zeitpunkt MIT
+  // Millisekunden gegen eine Wanduhr in ganzen Sekunden: der Bruchteil kam
+  // doppelt bis dreifach an. Verglichen wird wieder gegen die Serverfunktion
+  // UND gegen einen ausgeschriebenen Wert - zwei gleich falsche Seiten waeren
+  // sich sonst einig.
+  const { localToUTCPrecise } = await import('../server/utils/timezone.js');
+  assert.equal(
+    new Date(tz.wallTimeToInstantMs('2031-07-15T11:00:00.250', 'Europe/Berlin')).toISOString(),
+    '2031-07-15T09:00:00.250Z',
+  );
+  assert.equal(
+    new Date(tz.wallTimeToInstantMs('2031-07-15T11:00:00.750', 'America/New_York')).toISOString(),
+    '2031-07-15T15:00:00.750Z',
+  );
+  const pad = (n) => String(n).padStart(2, '0');
+  const wrong = [];
+  for (const [zone, day] of [['Europe/Berlin', '2031-03-30'], ['Europe/Berlin', '2031-10-26'], ['America/New_York', '2031-03-09'], ['America/New_York', '2031-11-02']]) {
+    for (let minute = 0; minute < 24 * 60; minute += 15) {
+      const wall = `${day}T${pad(Math.floor(minute / 60))}:${pad(minute % 60)}:00`;
+      for (const [suffix, extra] of [['.250', 250], ['.999', 999]]) {
+        const actual = tz.wallTimeToInstantMs(`${wall}${suffix}`, zone);
+        const whole = tz.wallTimeToInstantMs(wall, zone) + extra;
+        const server = Date.parse(localToUTCPrecise(`${wall}${suffix}`, zone));
+        if (actual !== whole || actual !== server) wrong.push(`${zone} ${wall}${suffix}: ${actual} / ganze Sekunde ${whole} / Server ${server}`);
+      }
+    }
+  }
+  assert.deepEqual(wrong.slice(0, 10), [], `${wrong.length} Abweichungen`);
+});
+
+test('wallTimeToInstantMs: Formen, Rueckfall und unlesbare Werte', () => {
+  // Minuten ohne Sekunden, ein reines Datum als Mitternacht - wie
+  // `storedToInstantMsPrecise` auf dem Server.
+  assert.equal(tz.wallTimeToInstantMs('2026-09-18T09:00', 'Europe/Berlin'), Date.parse('2026-09-18T07:00:00Z'));
+  assert.equal(tz.wallTimeToInstantMs('2026-09-18', 'Europe/Berlin'), Date.parse('2026-09-17T22:00:00Z'));
+  // Ein Wert mit eigener Zone ist bereits ein Zeitpunkt und wird nicht umgerechnet.
+  assert.equal(tz.wallTimeToInstantMs('2026-09-18T09:00:00Z', 'Europe/Berlin'), Date.parse('2026-09-18T09:00:00Z'));
+  assert.equal(tz.wallTimeToInstantMs('2026-09-18T09:00:00+02:00', 'America/New_York'), Date.parse('2026-09-18T07:00:00Z'));
+  // Ohne gesetzte Haushaltszone bleibt es beim Browser (hier America/Toronto) -
+  // dieselbe Regel wie ueberall in dieser Datei.
+  assert.equal(displayTimeZone(), null);
+  assert.equal(tz.wallTimeToInstantMs('2026-09-18T09:00'), new Date('2026-09-18T09:00').getTime());
+  assert.equal(tz.wallTimeToInstantMs('2026-09-18T09:00'), Date.parse('2026-09-18T13:00:00Z'));
+  // Mit gesetzter Zone gilt sie auch ohne ausdruecklichen Parameter.
+  assert.equal(withZone('Europe/Berlin', () => tz.wallTimeToInstantMs('2026-09-18T09:00')), Date.parse('2026-09-18T07:00:00Z'));
+  for (const bad of ['', null, undefined, 'kein Datum', '2026-13-45T09:00']) {
+    assert.equal(tz.wallTimeToInstantMs(bad, 'Europe/Berlin'), null, `${String(bad)} ist unlesbar`);
+  }
 });

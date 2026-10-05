@@ -5,15 +5,19 @@
 import { api } from '/api.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { wireTablist } from '/utils/tablist.js';
-import { renderSkeletonList } from '/utils/skeleton.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
+import { renderSkeletonChart } from '/utils/skeleton.js';
+import { growBars } from '/utils/ux.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
-import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup } from '/utils/chart.js';
-import { formatMoneyAxis } from '/utils/money.js';
+import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup, niceDomain } from '/utils/chart.js';
+import { formatMoneyAxis, formatSignedAmount } from '/utils/money.js';
+import { addLocalDays } from '/utils/date.js';
+import { trendMarkup } from '/utils/metric-card.js';
 
 // Zeitraum und Anker gehören dem Modul (budget.js) und kommen über ctx herein.
 // Vorher hielt dieser View beides selbst - damit gab es zwei Zeitachsen im selben
 // Modul, die nie synchron waren (Critique 2026-07-30, P1).
-const view = { range: 'month', anchor: null, data: null, error: false, ctx: null, root: null };
+const view = { range: 'month', anchor: null, data: null, prev: null, error: false, ctx: null, root: null };
 
 const RANGE_LABELS = {
   week: 'budget.statsRangeWeek',
@@ -44,12 +48,14 @@ async function loadStats() {
   // ebenfalls ein Skelett; hier blieb das Panel bis zur Antwort einfach leer.
   if (body) {
     body.replaceChildren();
-    body.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 4, lines: 2 }));
+    // Diagrammfoermig, nicht als Liste: danach stehen hier Verlauf und Anteile.
+    body.insertAdjacentHTML('beforeend', renderSkeletonChart({ charts: 2 }));
   }
   try {
     const res = await api.get(`/budget/stats?range=${view.range}&anchor=${view.anchor}${scopeQuery()}`);
     view.data = res.data;
     view.error = false;
+    view.prev = await loadPrevious(res.data);
   } catch (err) {
     console.error('[Budget] stats load error:', err);
     view.data = null;
@@ -58,6 +64,23 @@ async function loadStats() {
     view.error = err;
   }
   renderBodyContent(body);
+}
+
+/* DER VORZEITRAUM FUER DEN KATEGORIEVERGLEICH. Die Antwort traegt nur seine
+ * Summen (`comparison`), nicht seine Kategorien - der Client fragt denselben
+ * Endpunkt deshalb ein zweites Mal, verankert am Tag vor dem Zeitraum: das ist
+ * die Vorwoche, der Vormonat oder das Vorjahr, je nach Aufloesung, und die
+ * Grenzen dafuer zieht der Server wie beim ersten Aufruf. Scheitert nur dieser
+ * Aufruf, fehlt der Vergleich - die Auswertung selbst bleibt stehen. */
+async function loadPrevious(data) {
+  if (!data?.from) return null;
+  try {
+    const res = await api.get(`/budget/stats?range=${view.range}&anchor=${addLocalDays(data.from, -1)}${scopeQuery()}`);
+    return res.data;
+  } catch (err) {
+    console.error('[Budget] stats comparison load error:', err);
+    return null;
+  }
 }
 
 function renderShell() {
@@ -103,6 +126,9 @@ function wire() {
     activeClass: 'is-active',
     onChange: (id) => view.ctx.onRangeChange(id),
   });
+  // Gleitende Auswahl-Kapsel wie jede Segmentleiste (Kanon, Runde 7 D8); das
+  // Panel wird mit dem Berichte-Tab neu gebaut, der Schluessel haelt die Lage.
+  attachSegmentIndicator(view.root.querySelector('.budget-stats__ranges'), { key: 'budget-stats-range' });
 }
 
 function renderBodyContent(body) {
@@ -133,25 +159,35 @@ function renderBodyContent(body) {
     });
     return;
   }
+  /* KEINE ZWEITE UEBERSICHT (Critique 2026-09-25). Hier standen dieselben
+   * drei Kennzahl-Karten und dieselbe Kategorieliste wie auf dem Reiter
+   * „Uebersicht" - fuer den Monat 1:1 dieselben Zahlen. Die Statistik
+   * beantwortet jetzt, was die Uebersicht nicht kann: wie sich der Zeitraum
+   * aufbaut (kumulierter Verlauf) und was sich gegenueber dem Vorzeitraum
+   * je Kategorie veraendert hat. Die Summen stehen in der Legende des
+   * Verlaufs, samt Veraenderung. */
+  /* EINE BAHN WIE DIE UEBRIGEN REITER (Critique 2026-09-26, A5 P2-5). Die
+   * drei Diagramme standen untereinander auf dem Lesemass und endeten 404px
+   * vor der Bahn, an der Uebersicht, Konten, Abos, Darlehen und Aufteilung
+   * enden. Ab 960px Modulflaeche steht die Statistik in derselben Zweispalte
+   * wie die Uebersicht (budget.css, Container der Budget-Seite): links Verlauf und
+   * Kategorievergleich auf dem Lesemass, rechts die Ausgaben-Anteile als
+   * Seitenleiste. Der Verlauf bleibt links, weil sein SVG mit der Breite auch
+   * in der Hoehe und in der Schrift waechst. */
   body.replaceChildren();
   body.insertAdjacentHTML('beforeend', `
-    <div class="metric-grid">
-      <div class="metric-card metric-card--income">
-        <div class="metric-card__label">${t('budget.statsIncome')}</div>
-        <div class="metric-card__value">${fmtAmount(d.totals.income)}</div>
-      </div>
-      <div class="metric-card metric-card--expenses">
-        <div class="metric-card__label">${t('budget.statsExpenses')}</div>
-        <div class="metric-card__value">${fmtAmount(Math.abs(d.totals.expenses))}</div>
-      </div>
-      <div class="metric-card ${d.totals.balance >= 0 ? 'metric-card--balance-positive' : 'metric-card--balance-negative'}">
-        <div class="metric-card__label">${t('budget.statsBalance')}</div>
-        <div class="metric-card__value">${fmtAmount(d.totals.balance)}</div>
-      </div>
+    ${/* DER RING IST DER KOPF DER KATEGORIELISTE (R16 Schritt 2b). Er stand im
+        * Markup HINTER den Balken: mobil 874px von ihnen entfernt, am Desktop in
+        * einer Seitenleiste, die unter ihm leer blieb, waehrend links 700px
+        * Balken liefen. Jetzt: Verlauf und Ring teilen die erste Zeile (Ring
+        * rechts), die Balken nehmen darunter die ganze Bahn; einspaltig steht
+        * der Ring zwischen Verlauf und Balken. Keine leere Leiste, kein
+        * Anheften. */ ''}
+    <div class="budget-stats__grid">
+      <div id="budget-stats-trend" class="budget-stats__main"></div>
+      <div id="budget-stats-donut" class="budget-stats__aside"></div>
+      <div id="budget-stats-cat" class="budget-stats__main budget-stats__main--wide"></div>
     </div>
-    <div id="budget-stats-trend"></div>
-    <div id="budget-stats-cat"></div>
-    <div id="budget-stats-donut"></div>
     <div class="budget-stats__export"></div>
   `);
   renderTrendChart();
@@ -171,49 +207,136 @@ const DONUT_COLORS = [
 ];
 const DONUT_SEGMENTS = DONUT_COLORS.length;
 
+function signed(n) {
+  return formatSignedAmount(n, { currency: view.ctx.currency, role: 'flow' }).text;
+}
+
+// Je Kategorie die Summe EINER Richtung (Einnahmen oder Ausgaben) - dieselbe
+// Trennung wie im Monats-Diagramm (budget.js `categoryBlocks`).
+function categoryAmounts(byCategory, kind) {
+  const map = new Map();
+  for (const c of byCategory ?? []) {
+    const value = Number(kind === 'expenses' ? c.expenses : c.income) || 0;
+    if (value !== 0) map.set(c.category, value);
+  }
+  return map;
+}
+
+// Der Vorzeitraum als Text: „August 2026", „2025" oder „01.09. - 07.09.".
+function previousPeriodLabel(prev) {
+  if (!prev?.from) return '';
+  if (view.range === 'year') return prev.from.slice(0, 4);
+  if (view.range === 'month') {
+    const [y, m] = prev.from.split('-').map(Number);
+    return new Intl.DateTimeFormat(getLocale(), { month: 'long', year: 'numeric' }).format(new Date(y, m - 1, 1));
+  }
+  return `${formatDate(prev.from)} - ${formatDate(prev.to)}`;
+}
+
+/* VERGLEICH JE KATEGORIE STATT EINER ZWEITEN KATEGORIELISTE (Critique
+ * 2026-09-25). Zwei Bloecke wie im Monats-Diagramm, jeder nach seinem eigenen
+ * Maximum; neben jedem Betrag die Veraenderung gegenueber dem Vorzeitraum,
+ * mit Pfeil (Richtung) und Farbe (Bewertung: mehr Ausgaben sind schlechter,
+ * mehr Einnahmen besser) - dieselbe Trend-Sprache wie die Kennzahl-Karten.
+ * Eine Kategorie, die nur im Vorzeitraum vorkam, steht mit null da: ihr
+ * Wegfall ist genau die Veraenderung, nach der man hier sucht. */
+/* EINE FARBE JE KATEGORIE IN BEIDEN DIAGRAMMEN (R14 P8, A5 P2-8). Die
+ * Ausgabenbalken standen alle im Modulton, der Donut daneben in sieben
+ * Serienfarben - dieselben Betraege in zwei Farbsystemen. Jetzt nimmt jeder
+ * Balken die Farbe seines Donut-Segments (dieselbe Reihenfolge wie
+ * donutSlices: groesste Ausgabe zuerst, jenseits der Palette die Farbe der
+ * Sammelscheibe). */
+function categoryColorIndex(byCategory) {
+  const order = (byCategory ?? [])
+    .filter((c) => c.expenses < 0)
+    .sort((a, b) => Math.abs(b.expenses) - Math.abs(a.expenses));
+  return new Map(order.map((c, i) => [c.category, Math.min(i, DONUT_SEGMENTS - 1)]));
+}
+
 function renderCatBars() {
   const host = view.root.querySelector('#budget-stats-cat');
-  const cats = view.data.byCategory.filter((c) => c.total !== 0);
-  if (!host || !cats.length) return;
-  const maxAbs = Math.max(...cats.map((c) => Math.abs(c.total)), 1);
+  if (!host) return;
+  const hasPrev = !!view.prev;
   // Budgetplan-Ziele nur im Monatsbereich einblenden — dort deckt sich der
   // Zeitraum exakt mit dem stetigen Monatsplan (kein irreführendes Hochskalieren).
   const plans = view.data.range === 'month' ? (view.data.plans || {}) : {};
-  const rows = cats.map((c) => {
-    const isExp = c.total < 0;
-    // Der Anteil ist der Anteil, wie im Monats-Chart: gleiche Bauart, gleiche
-    // Regel. Der frühere 6-%-Boden zeichnete vier Kategorien mit dem
-    // 9,4-Fachen Abstand gleich lang; der Mindestbalken steht jetzt als Länge
-    // im CSS (--bar-visible). Begründung ausführlich in budget.js.
-    const scale = Math.abs(c.total) / maxAbs;
-    const target = isExp ? plans[c.category] : undefined;
-    const targetPos = target != null ? Math.min(1, target / maxAbs) : null;
-    const targetMarker = targetPos != null
-      ? `<div class="budget-bar-row__target" style="--target-pos:${targetPos.toFixed(4)}"
-             title="${t('budget.planTarget', { amount: view.ctx.formatAmount(target) })}"></div>`
-      : '';
-    const catLabel = view.ctx.esc(view.ctx.categoryLabel(c.category));
-    // --mirrored: gemeinsame Mittelachse wie im Monats-Chart (Critique
-    // 2026-08-10, P0); der Budgetplan-Zielmarker rechnet im CSS mit.
+  const blocks = [
+    { kind: 'expenses', labelKey: 'budget.statsExpenses', betterWhen: 'lower' },
+    { kind: 'income', labelKey: 'budget.statsIncome', betterWhen: 'higher' },
+  ].map((b) => {
+    const now = categoryAmounts(view.data.byCategory, b.kind);
+    const before = categoryAmounts(view.prev?.byCategory, b.kind);
+    const rows = [...new Set([...now.keys(), ...before.keys()])]
+      .map((category) => ({ category, amount: now.get(category) ?? 0, prev: before.get(category) ?? 0 }))
+      .sort((x, y) => (Math.abs(y.amount) - Math.abs(x.amount)) || (Math.abs(y.prev) - Math.abs(x.prev)));
+    return { ...b, rows };
+  }).filter((b) => b.rows.some((r) => r.amount !== 0));
+  if (!blocks.length) return;
+
+  const colors = categoryColorIndex(view.data.byCategory);
+  const html = blocks.map(({ kind, labelKey, betterWhen, rows }) => {
+    // DAS EIGENE MAXIMUM DES BLOCKS, wie im Monats-Diagramm.
+    const max = Math.max(...rows.map((r) => Math.abs(r.amount)), 1);
+    const total = rows.reduce((sum, r) => sum + r.amount, 0);
+    const absTotal = rows.reduce((sum, r) => sum + Math.abs(r.amount), 0);
+    const titleId = `budget-stats-${kind}-title`;
+    const body = rows.map((r) => {
+      // Der Anteil ist der Anteil: kein Boden (Critique 2026-08-13, Guard in
+      // test:frontend-audit) - der Mindeststummel steht als Laenge im CSS.
+      const scale = Math.abs(r.amount) / max;
+      const target = kind === 'expenses' ? plans[r.category] : undefined;
+      const targetPos = target != null ? Math.min(1, target / max) : null;
+      const targetMarker = targetPos != null
+        ? `<div class="budget-bar-row__target" style="--target-pos:${targetPos.toFixed(4)}"
+               title="${view.ctx.esc(t('budget.planTarget', { amount: view.ctx.formatAmount(target) }))}"></div>`
+        : '';
+      const catLabel = view.ctx.esc(view.ctx.categoryLabel(r.category));
+      // Betragsraum wie auf den Karten: Ausgaben als Betrag, damit „+" mehr
+      // ausgegeben heisst und nicht weniger.
+      const delta = Math.abs(r.amount) - Math.abs(r.prev);
+      const deltaHtml = hasPrev
+        ? trendMarkup({ delta, betterWhen, text: view.ctx.esc(signed(delta)) })
+        : '';
+      // Ausgaben: Farbe des Donut-Segments und der Anteil als Text - die Farbe
+      // ist Zuordnung, der Anteil die Aussage (auch ohne Farbsehen lesbar).
+      const colorIndex = kind === 'expenses' ? colors.get(r.category) : undefined;
+      const fillColor = colorIndex != null ? `;--bar-fill:${DONUT_COLORS[colorIndex]}` : '';
+      const share = kind === 'expenses' && absTotal > 0 && r.amount !== 0
+        ? ` <span class="budget-bar-row__share">${Math.round((Math.abs(r.amount) / absTotal) * 100)}%</span>`
+        : '';
+      return `
+        <div class="budget-bar-row budget-bar-row--compare">
+          <div class="budget-bar-row__label" title="${catLabel}">${catLabel}</div>
+          <div class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}">
+            <div class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}${fillColor}" data-bar-key="${kind}:${view.ctx.esc(String(r.category))}"></div>
+            ${targetMarker}
+          </div>
+          <div class="budget-bar-row__amount">${view.ctx.esc(signed(r.amount))}${share}</div>
+          ${deltaHtml ? `<div class="budget-bar-row__delta">${deltaHtml}</div>` : ''}
+        </div>`;
+    }).join('');
     return `
-      <div class="budget-bar-row budget-bar-row--mirrored">
-        <div class="budget-bar-row__label" title="${catLabel}">${catLabel}</div>
-        <div class="budget-bar-row__track">
-          <div class="budget-bar-row__fill ${isExp ? 'budget-bar-row__fill--expenses' : 'budget-bar-row__fill--income'}"
-               style="--bar-scale:${scale.toFixed(4)};--bar-visible:${c.total !== 0 ? 1 : 0}"></div>
-          ${targetMarker}
-        </div>
-        <div class="budget-bar-row__amount" style="color:${isExp ? 'var(--color-danger)' : 'var(--color-success)'};">
-          ${isExp ? '' : '+'}${view.ctx.formatAmount(c.total)}
-        </div>
-      </div>`;
+      <section class="budget-chart-block budget-chart-block--${kind}" aria-labelledby="${titleId}">
+        <h3 class="budget-chart-block__title" id="${titleId}">
+          <span>${t(labelKey)}</span>
+          <span class="budget-chart-block__total">${view.ctx.esc(signed(total))}</span>
+        </h3>
+        <div class="budget-chart-block__rows">${body}</div>
+      </section>`;
   }).join('');
+
+  const note = hasPrev
+    ? `<p class="budget-stats__compare-note">${view.ctx.esc(t('budget.statsCompareNote', { period: previousPeriodLabel(view.prev) }))}</p>`
+    : '';
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', `
     <div class="budget-chart-section">
-      <div class="budget-chart-section__title">${t('budget.statsCategoryTitle')}</div>
-      <div class="budget-chart">${rows}</div>
+      <h2 class="budget-chart-section__title">${t('budget.statsCategoryTitle')}</h2>
+      ${note}
+      <div class="budget-chart">${html}</div>
     </div>`);
+  if (window.lucide) lucide.createIcons({ el: host });
+  growBars(host, { selector: '.budget-bar-row__fill', memo: 'budget-stats-categories' });
 }
 
 // Segmente auf die Palettengröße begrenzen: alles jenseits davon fließt in eine
@@ -248,13 +371,12 @@ function renderDonut() {
     offset += frac * C;
     return seg;
   }).join('');
-  // Die Legende trägt Betrag und Anteil als Text — die Farbe ist Beiwerk, nicht
-  // der einzige Träger der Information (gilt auch für Farbfehlsichtigkeit).
-  const legend = exp.map((e, i) => `
-    <span class="budget-stats__legend-item">
-      <i class="budget-stats__swatch" style="background:${DONUT_COLORS[i]};"></i>
-      ${view.ctx.esc(e.label)} · ${fmtAmount(e.value)} · ${pctOf(e.value)}%
-    </span>`).join('');
+  // KEINE ZWEITE LEGENDE (R14 P8): Betrag und Anteil je Kategorie stehen an
+  // den Balken, die dieselbe Farbe tragen (categoryColorIndex). Die
+  // Donut-Legende zaehlte alles ein zweites Mal auf. Die Zusammenfassung
+  // (Zahl der Segmente, groesstes, Summe) steht seit R16 SICHTBAR neben dem
+  // Ring: sie war nur fuer Screenreader da, und der Ring stand ohne ein Wort
+  // neben 198px Leere.
   const summary = t('budget.statsDonutSummary', {
     count: exp.length,
     top: exp[0].label,
@@ -265,11 +387,10 @@ function renderDonut() {
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', `
     <div class="budget-chart-section">
-      <div class="budget-chart-section__title">${t('budget.statsDonutTitle')}</div>
-      <p class="sr-only">${view.ctx.esc(summary)}</p>
+      <h2 class="budget-chart-section__title">${t('budget.statsDonutTitle')}</h2>
       <div class="budget-stats__donut-wrap">
         <svg viewBox="0 0 160 160" class="budget-stats__donut" aria-hidden="true">${segs}</svg>
-        <div class="budget-stats__legend budget-stats__legend--wrap">${legend}</div>
+        <p class="budget-stats__donut-note">${view.ctx.esc(summary)}</p>
       </div>
     </div>`);
 }
@@ -289,12 +410,29 @@ function renderExport() {
 function renderTrendChart() {
   const host = view.root.querySelector('#budget-stats-trend');
   if (!host) return;
+  const comparison = view.data.comparison;
   const s = view.data.series;
-  const incomes  = s.map((p) => p.income);
-  const expenses = s.map((p) => Math.abs(p.expenses));
+  const rawIncomes  = s.map((p) => p.income);
+  const rawExpenses = s.map((p) => Math.abs(p.expenses));
+  /* AUFSUMMIERT, SOLANGE DIE PUNKTE TAGE SIND (Critique 2026-09-25). Als
+   * Tageswerte war der Monat eine flache Linie mit zwei Zacken (Gehalt, Miete)
+   * - wie der Monat verlaeuft, ob die Ausgaben die Einnahmen einholen, sah man
+   * nicht. Aufsummiert endet jede Kurve bei der Summe des Zeitraums, und der
+   * Abstand zwischen beiden ist der Saldo bis zu diesem Tag. Das Jahr bleibt
+   * je Monat: zwoelf Monatswerte vergleicht man nebeneinander. */
+  const cumulative = s.length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(s[0].period);
+  const running = (arr) => { let acc = 0; return arr.map((v) => (acc += v)); };
+  const incomes  = cumulative ? running(rawIncomes) : rawIncomes;
+  const expenses = cumulative ? running(rawExpenses) : rawExpenses;
+  const shown = s.map((p, i) => ({ period: p.period, income: incomes[i], expenses: expenses[i] }));
   const max = Math.max(1, ...incomes, ...expenses);
-  const points = (arr) => arr.map((v, i) => `${chartX(i, s.length).toFixed(1)},${chartY(v, 0, max).toFixed(1)}`).join(' ');
+  // Runde Achse (C4): 0 / 2.000 / 4.000 / 6.000 statt Vierteln des Hoechstwerts
+  // (5.550 / 4.163 / 2.775 / 1.388). `max` bleibt der echte Spitzenwert fuer
+  // die Zusammenfassung, die Kurve misst gegen die gerundete Obergrenze.
+  const axis = niceDomain(0, max, { integer: true });
+  const points = (arr) => arr.map((v, i) => `${chartX(i, s.length).toFixed(1)},${chartY(v, 0, axis.max).toFixed(1)}`).join(' ');
   const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const pointKey = cumulative ? 'budget.statsPointLabelCumulative' : 'budget.statsPointLabel';
 
   // DIE ACHSE STEHT JETZT IM BILD (utils/chart.js).
   //
@@ -313,8 +451,8 @@ function renderTrendChart() {
   // rein visuelle SVG bleibt daher bewusst aria-hidden.
   const summary = t('budget.statsTrendSummary', {
     periods: s.length,
-    income: fmtAmount(sum(incomes)),
-    expenses: fmtAmount(sum(expenses)),
+    income: fmtAmount(sum(rawIncomes)),
+    expenses: fmtAmount(sum(rawExpenses)),
     peak: fmtAmount(max),
   });
 
@@ -322,11 +460,11 @@ function renderTrendChart() {
   // viel". Je Datenpunkt eine unsichtbare Schaltfläche über dem Diagramm — der
   // Wert steht in ihrem aria-label (also auch ohne Maus erreichbar, nicht als
   // Hover-only-Tooltip) und erscheint sichtbar in der Ableselinie darunter.
-  const hotspots = s.map((p, i) => {
-    const label = t('budget.statsPointLabel', {
+  const hotspots = shown.map((p, i) => {
+    const label = t(pointKey, {
       period: periodLabel(p.period),
       income: fmtAmount(p.income),
-      expenses: fmtAmount(Math.abs(p.expenses)),
+      expenses: fmtAmount(p.expenses),
     });
     const frac = chartX(i, s.length) / CHART.W;
     return `<button type="button" class="budget-stats__point" data-index="${i}"
@@ -338,16 +476,16 @@ function renderTrendChart() {
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', `
     <div class="budget-chart-section">
-      <div class="budget-chart-section__title">${t('budget.statsTrendTitle')}</div>
+      <h2 class="budget-chart-section__title">${t(cumulative ? 'budget.statsTrendTitleCumulative' : 'budget.statsTrendTitle')}</h2>
       <p class="sr-only">${view.ctx.esc(summary)}</p>
       <div class="budget-stats__trend-wrap">
         <div class="budget-stats__plot">
-          <svg class="budget-stats__trend" viewBox="0 0 ${CHART.W} ${CHART.H}" aria-hidden="true">
-            ${chartGridMarkup(0, max, (val) => formatMoneyAxis(val, view.ctx.currency))}
+          <svg class="chart budget-stats__trend" viewBox="0 0 ${CHART.W} ${CHART.H}" aria-hidden="true">
+            ${chartGridMarkup(0, axis.max, (val) => formatMoneyAxis(val, view.ctx.currency), CHART, axis.steps)}
             ${chartXLabelsMarkup(s.map((p) => periodLabel(p.period)))}
             <polyline fill="none" stroke="var(--color-success)" stroke-width="2"
                       vector-effect="non-scaling-stroke" points="${points(incomes)}" />
-            <polyline fill="none" stroke="var(--color-danger)" stroke-width="2" stroke-dasharray="6 4"
+            <polyline fill="none" stroke="var(--color-text-secondary)" stroke-width="2" stroke-dasharray="6 4"
                       vector-effect="non-scaling-stroke" points="${points(expenses)}" />
           </svg>
           <div class="budget-stats__points" role="group" aria-label="${t('budget.statsPointsLabel')}">${hotspots}</div>
@@ -355,11 +493,12 @@ function renderTrendChart() {
       </div>
       <div class="budget-stats__readout" id="budget-stats-readout" aria-hidden="true"></div>
       <div class="budget-stats__legend">
-        <span><i class="budget-stats__swatch budget-stats__swatch--income"></i>${t('budget.statsIncome')} · ${fmtAmount(sum(incomes))}</span>
-        <span><i class="budget-stats__swatch budget-stats__swatch--expense"></i>${t('budget.statsExpenses')} · ${fmtAmount(sum(expenses))}</span>
+        <span class="budget-stats__legend-item"><i class="budget-stats__swatch budget-stats__swatch--income"></i>${t('budget.statsIncome')} · ${fmtAmount(sum(rawIncomes))}${totalTrend(sum(rawIncomes), comparison?.income, 'higher')}</span>
+        <span class="budget-stats__legend-item"><i class="budget-stats__swatch budget-stats__swatch--expense"></i>${t('budget.statsExpenses')} · ${fmtAmount(sum(rawExpenses))}${totalTrend(sum(rawExpenses), comparison && Math.abs(comparison.expenses), 'lower')}</span>
       </div>
     </div>`);
-  wireTrendPoints(host, s);
+  if (window.lucide) lucide.createIcons({ el: host });
+  wireTrendPoints(host, shown, pointKey, s);
 }
 
 // Bucket-Schlüssel der Serie: 'YYYY-MM' (Monatsraster) oder 'YYYY-MM-DD' (Tage).
@@ -375,21 +514,33 @@ function periodLabel(period) {
 // ganze Kurve (nicht 31 bei einem Monatsraster), Pfeiltasten wandern, Zeigen
 // und Antippen wählen direkt. Der Wert steht ohnehin im aria-label jedes
 // Punktes — die sichtbare Zeile ist die Entsprechung für alle anderen.
-function wireTrendPoints(host, series) {
+/* Die Summe des Zeitraums gegen den Vorzeitraum, in der Trend-Sprache der
+ * Kennzahl-Karten - die Karten selbst stehen auf der Uebersicht. */
+function totalTrend(current, previous, betterWhen) {
+  if (previous == null) return '';
+  const delta = current - previous;
+  return ` ${trendMarkup({ delta, betterWhen, text: view.ctx.esc(signed(delta)) })}`;
+}
+
+function wireTrendPoints(host, series, labelKey, raw = series) {
   const group = host.querySelector('.budget-stats__points');
   const readout = host.querySelector('#budget-stats-readout');
   if (!group || !readout) return;
   const buttons = [...group.querySelectorAll('.budget-stats__point')];
   if (!buttons.length) return;
 
-  const show = (index, { focus = false } = {}) => {
+  // `mark: false` fuer den Ausgangswert: die Ableselinie nennt ihn mit Datum,
+  // aber die senkrechte Marke erscheint erst, wenn jemand zeigt, tippt oder
+  // per Tastatur wandert. Ungefragt am letzten Datenpunkt stehend las sie sich
+  // als "heute" (Critique 2026-10-05, R16).
+  const show = (index, { focus = false, mark = true } = {}) => {
     const point = series[index];
     if (!point) return;
     buttons.forEach((b, i) => {
-      b.classList.toggle('is-active', i === index);
+      b.classList.toggle('is-active', mark && i === index);
       b.tabIndex = i === index ? 0 : -1;
     });
-    readout.textContent = t('budget.statsPointLabel', {
+    readout.textContent = t(labelKey, {
       period: periodLabel(point.period),
       income: fmtAmount(point.income),
       expenses: fmtAmount(Math.abs(point.expenses)),
@@ -404,6 +555,21 @@ function wireTrendPoints(host, series) {
   group.addEventListener('pointerover', (e) => {
     const btn = e.target.closest('.budget-stats__point');
     if (btn) show(Number(btn.dataset.index));
+  });
+  /* DIE GANZE FLAECHE IST DAS ZIEL (Critique 2026-09-25). Ein Punkt war eine
+   * Spalte von 100 % / Tage - 22-24px am Desktop, 10px am Telefon. Zeigen und
+   * Wischen waehlen jetzt ueber die ganze Diagrammflaeche den naechsten Tag,
+   * wie ein Regler; die Knoepfe bleiben fuer Tastatur und Screenreader. */
+  group.addEventListener('pointermove', (e) => {
+    const rect = group.getBoundingClientRect();
+    if (!rect.width) return;
+    const x = (e.clientX - rect.left) / rect.width;
+    let best = 0;
+    buttons.forEach((b, i) => {
+      if (Math.abs(Number(b.style.getPropertyValue('--point-x')) - x)
+        < Math.abs(Number(buttons[best].style.getPropertyValue('--point-x')) - x)) best = i;
+    });
+    show(best);
   });
   group.addEventListener('keydown', (e) => {
     const current = buttons.findIndex((b) => b.tabIndex === 0);
@@ -420,9 +586,10 @@ function wireTrendPoints(host, series) {
   // Jüngster Zeitabschnitt MIT Daten als Ausgangswert: der Monatsletzte ist
   // oft noch leer und "31.07. · 0,00" wäre ein nichtssagender Start
   // (Audit A2-05). Ganz ohne Daten bleibt der letzte Abschnitt.
-  let initial = series.length - 1;
-  while (initial > 0 && !series[initial].income && !series[initial].expenses) initial--;
-  show(initial);
+  // Aufsummiert ist kein Wert mehr null - gesucht wird am ROHEN Abschnitt.
+  let initial = raw.length - 1;
+  while (initial > 0 && !raw[initial].income && !raw[initial].expenses) initial--;
+  show(initial, { mark: false });
 }
 
 // Der Zeitraum steht im geteilten Kopf, nicht mehr im Panel. Gemeldet wird er
@@ -430,3 +597,6 @@ function wireTrendPoints(host, series) {
 function updatePeriodLabel() {
   if (view.data) view.ctx.onPeriod({ from: view.data.from, to: view.data.to });
 }
+
+// Nur fuer Tests: die Farbzuordnung von Balken und Donut (R14 P8).
+export const __test = { categoryColorIndex, DONUT_SEGMENTS };

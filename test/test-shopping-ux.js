@@ -95,7 +95,9 @@ function resetShoppingState() {
 
 /** Kleinstes DOM, das toggleCategoryCollapse bedient: closest + ein Kind je Selektor. */
 function makeCategoryGroup(key, { collapsed = false } = {}) {
-  const rowsEl = { hidden: collapsed };
+  // `style` wie am echten Element: das Einklappen setzt waehrend der Bewegung
+  // overflow und raeumt es danach (collapseOut() in utils/ux.js).
+  const rowsEl = { hidden: collapsed, style: {} };
   const chevron = {
     _collapsed: collapsed,
     classList: {
@@ -105,7 +107,7 @@ function makeCategoryGroup(key, { collapsed = false } = {}) {
   const groupEl = {
     _sel: '.list-group',
     querySelector(sel) {
-      if (sel === '.list-rows') return rowsEl;
+      if (sel === '.row-carrier') return rowsEl;
       return null;
     },
   };
@@ -206,11 +208,14 @@ test('pruneCollapsedCategories: ruehrt nichts an, wenn alles noch gueltig ist (k
 // Kategorie-Einklappen: der Umschalter selbst
 // --------------------------------------------------------
 
-test('toggleCategoryCollapse: klappt zu, meldet aria-expanded/hidden/Chevron und speichert', () => {
+test('toggleCategoryCollapse: klappt zu, meldet aria-expanded/hidden/Chevron und speichert', async () => {
   resetShoppingState();
   const { button, rowsEl, chevron } = makeCategoryGroup('id:1', { collapsed: false });
 
   __test.toggleCategoryCollapse(button);
+  // `hidden` faellt erst NACH dem Einklappen (Critique 2026-09-26, A3 P1-4) -
+  // ohne Layout gibt es keine Bewegung, das Ende kommt im naechsten Tick.
+  await new Promise((r) => setTimeout(r, 0));
 
   assert.equal(rowsEl.hidden, true, 'die Zeilen bleiben im DOM, werden aber ausgeblendet');
   assert.equal(button.getAttribute('aria-expanded'), 'false');
@@ -254,6 +259,56 @@ test('updateCheckedActions: vorbelegte (geladene) Artikel zeigen KEINE Pille', (
   __test.state.items = [{ id: 1, is_checked: 1 }, { id: 2, is_checked: 0 }];
   __test.updateCheckedActions(fakeContainer());
   assert.equal(__test.getPillPhaseForTest(), 'idle');
+});
+
+// --------------------------------------------------------
+// Werkzeugmenue: die Abgehakt-Gruppe (Critique 2026-10-05, R16)
+// --------------------------------------------------------
+// "In den Vorrat" und "Abgehakt loeschen" lebten NUR in der Pille - fuenf
+// Sekunden nach dem ersten Abhaken, danach unterdrueckt, bis die Zahl auf 0
+// faellt. Wer zwanzig Artikel im Laden abhakt und zu Hause einraeumt, fand den
+// Weg nicht wieder. Das Menue traegt ihn dauerhaft.
+
+function toolActions(items) {
+  return items.flatMap((item) => (item.group ? item.items : [item])).filter((i) => i.action).map((i) => i.action);
+}
+
+test('Werkzeugmenue: mit abgehakten Artikeln steht die Gruppe "Abgehakt" mit beiden Wegen vorn', () => {
+  resetShoppingState();
+  global.window.yuvomi = { isModuleDisabled: () => false, canWriteModule: () => true };
+  __test.state.activeList = { id: 1, name: 'Wocheneinkauf' };
+  __test.state.items = [{ id: 1, is_checked: 1 }, { id: 2, is_checked: 1 }, { id: 3, is_checked: 0 }];
+  const items = __test.listToolsItems();
+  assert.ok(items[0].group, 'die erste Position ist die Gruppe');
+  assert.match(items[0].group, /2/, 'die Gruppe nennt die Zahl');
+  assert.deepEqual(items[0].items.map((i) => i.action), ['checked-to-pantry', 'clear-checked']);
+  assert.equal(items[0].items[1].danger, true);
+  assert.equal(items[1].separator, true);
+  // Liste | Stammdaten | Destruktiv: drei weitere Gruppen, durch Trenner geschieden.
+  assert.equal(items.filter((i) => i.separator).length, 3);
+  const actions = toolActions(items);
+  assert.ok(actions.indexOf('send-list') < actions.indexOf('manage-categories'));
+  assert.equal(actions.at(-1), 'delete-list');
+  global.window.yuvomi = {};
+});
+
+test('Werkzeugmenue: ohne abgehakte Artikel gibt es keine Abgehakt-Gruppe', () => {
+  resetShoppingState();
+  __test.state.activeList = { id: 1, name: 'Wocheneinkauf' };
+  __test.state.items = [{ id: 1, is_checked: 0 }];
+  const items = __test.listToolsItems();
+  assert.equal(items.some((i) => i.group), false);
+  assert.equal(items[0].action, 'rename-list');
+});
+
+test('Werkzeugmenue: ohne Schreibrecht im Vorrat bleibt nur das Loeschen in der Gruppe', () => {
+  resetShoppingState();
+  global.window.yuvomi = { isModuleDisabled: (m) => m === 'pantry' };
+  __test.state.activeList = { id: 1, name: 'Wocheneinkauf' };
+  __test.state.items = [{ id: 1, is_checked: 1 }];
+  const items = __test.listToolsItems();
+  assert.deepEqual(items[0].items.map((i) => i.action), ['clear-checked']);
+  global.window.yuvomi = {};
 });
 
 test('updateCheckedActions: ein echter Abhak-Treffer aus dem Ruhezustand oeffnet die Pille', () => {
@@ -640,6 +695,27 @@ test('Abhaken ueberlebt eine Auffrischung, deren GET aelter ist als der PATCH', 
   assert.equal(__test.checkedOf(__test.state.items[0]), 1,
     'die alte Antwort darf die Bearbeitung nicht zurueckdrehen');
   delete globalThis.__apiStub;
+});
+
+test('die Haptik kommt im Moment des Tipps, nicht erst mit der Serverantwort (R16)', async () => {
+  // Die Zeile wechselt sofort (optimistisch), das Vibrieren kam erst nach dem
+  // PATCH - auf einer langsamen Leitung im Laden also spuerbar nach dem Bild.
+  // Zwei Rueckmeldungen fuer EINEN Tipp gehoeren in denselben Moment.
+  resetShoppingState();
+  __test.state.lists = [{ id: 1, name: 'Einkauf', item_total: 1, item_checked: 0 }];
+  __test.state.items = [milk(0)];
+  const pulses = [];
+  globalThis.__vibrateStub = (pattern) => pulses.push(pattern);
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  globalThis.__apiStub = { patch: () => gate.then(() => ({ data: null })) };
+  const pending = __test.toggleShoppingItem(10, 0, makeNullContainer());
+  assert.deepEqual(pulses, [10], 'vibriert, waehrend der PATCH noch laeuft');
+  release();
+  await pending;
+  assert.deepEqual(pulses, [10], 'genau einmal - die Antwort vibriert nicht noch einmal');
+  delete globalThis.__apiStub;
+  delete globalThis.__vibrateStub;
 });
 
 test('ein spaeter begonnenes Laden raeumt den Merker - fremde Aenderungen kommen durch', async () => {
@@ -1919,6 +1995,48 @@ test('Speichern im Artikeldialog: ist der Artikel inzwischen weg, wirft das Spei
   delete globalThis.__openModal;
 });
 
+test('Artikeldialog: Loeschen steht links im Fuss und geht den Weg mit Rueckgaengig (A4 P1-1)', () => {
+  // Am Touchgeraet war die Wischgeste der einzige Weg, EINEN Artikel zu
+  // loeschen (WCAG 2.5.1) - VoiceOver faengt sie ab. Der Dialogfuss traegt
+  // jetzt Loeschen wie Mahlzeit und Rezept, und es loescht widerrufbar.
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  __test.state.categories = [{ id: 1, name: 'Sonstiges' }];
+  let opts = null;
+  let undo = null;
+  const closed = [];
+  globalThis.__openModal = (o) => { opts = o; };
+  globalThis.__undoStub = (o) => { undo = o; };
+  globalThis.__closeModal = (...args) => { closed.push(args[0] ?? {}); };
+  try {
+    __test.openItemDetails(10, makeNullContainer());
+    const footer = /<div class="modal-panel__footer[^"]*">([\s\S]*?)<\/div>/.exec(opts.content)?.[1] ?? '';
+    const del = footer.indexOf('id="item-details-delete"');
+    assert.ok(del >= 0, 'der Fuss traegt einen Loeschen-Knopf');
+    assert.match(footer, /class="btn btn--danger-outline" id="item-details-delete"/, 'Kanon: btn--danger-outline wie Mahlzeit');
+    assert.ok(del < footer.indexOf('id="item-details-cancel"'), 'Loeschen steht links vor Abbrechen');
+
+    const clicks = {};
+    const panel = makeDialogPanel(dialogFields('Milch'));
+    const base = panel.querySelector;
+    panel.querySelector = (sel) => (sel === '#item-details-delete'
+      ? { addEventListener(type, fn) { clicks[type] = fn; } }
+      : base(sel));
+    opts.onSave(panel);
+    assert.equal(typeof clicks.click, 'function', 'der Knopf ist verdrahtet');
+    clicks.click();
+    assert.deepEqual(closed, [{ force: true }], 'der Dialog schliesst ohne Verwerfen-Rueckfrage');
+    assert.ok(!__test.state.items.some((i) => i.id === 10), 'die Zeile geht sofort');
+    assert.equal(typeof undo?.restore, 'function', 'mit Rueckgaengig wie der Wisch-Pfad');
+    assert.match(undo.message, /Milch|itemDeletedToast/, 'der Toast nennt den Artikel');
+  } finally {
+    delete globalThis.__openModal;
+    delete globalThis.__undoStub;
+    delete globalThis.__closeModal;
+  }
+});
+
 /** Zwei Makrotasks reichen, damit die Warteschlange Stub-Antworten verarbeitet hat. */
 const settle = async () => { for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0)); };
 
@@ -2093,4 +2211,163 @@ test('wireQuickAdd: der Submit-Handler ruft den Kategorie-Rueckfall wirklich auf
   assert.match(submitBlock, /nameInput\.value = '';/);
   assert.match(submitBlock, /resetQuickAddCategory\(catSelect\);/,
     'der Submit-Handler muss resetQuickAddCategory(catSelect) aufrufen.');
+});
+
+// Desktop-Kopf auf dem Referenzmass (Critique 2026-09-26, R1-Folge): seit die
+// Listenleiste im __center-Slot des Kuechenkopfs steht, bestimmt ihr hoechstes
+// Kind die Zeile. Der Neu-Knopf mit 48px machte den Einkaufskopf 4px hoeher
+// als Essensplan, Rezepte, Vorrat und Dokumente (73 statt 69px). Am Desktop
+// baut er nicht hoeher als die Kapseln daneben; mobil bleibt die Touch-Hoehe.
+test('der Neu-Knopf der Listenleiste baut am Desktop nicht hoeher als die Kapseln', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/shopping.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const minHeight = (rule) => rule?.body.match(/min-height:\s*([^;]+);/)?.[1].trim();
+  const tab = rules.find((r) => r.selector.trim() === '.list-tab' && r.at.length === 0);
+  assert.ok(minHeight(tab), '.list-tab nennt keine Mindesthoehe - der Test liest shopping.css nicht mehr');
+  const desktop = rules.filter((r) => r.selector.trim() === '.list-tab__new'
+    && r.at.some((a) => /min-width:\s*1024px/.test(a)) && minHeight(r));
+  assert.equal(desktop.length, 1, 'am Desktop (min-width: 1024px) setzt genau eine Regel die Hoehe des Neu-Knopfs');
+  assert.equal(minHeight(desktop[0]), minHeight(tab), 'Neu-Knopf und Kapsel bauen am Desktop gleich hoch');
+  const base = rules.find((r) => r.selector.trim() === '.list-tab__new' && r.at.length === 0);
+  assert.equal(minHeight(base), 'var(--target-lg)', 'mobil bleibt der Neu-Knopf auf der Touch-Hoehe');
+});
+
+// Zwei Spalten am Desktop (Re-Critique 2026-09-27, A4 P1 / R10 L4). Gemessen
+// bei 1440x900: die Liste stand auf 252-972, rechts 436px leer, 1576px
+// Scrollhoehe. Ab 60rem EINKAUFSFLAECHE (nicht Viewport) stehen die
+// Kategorien in zwei Spalten. Das Lesemass der Kategorie bleibt die Variable,
+// die hier auf die Spalte zeigt; die Eingabezeile endet mit der ersten Spalte.
+//
+// DICHT OHNE NATIVES MASONRY (R11 H5): die Basis war ein Grid mit zwei
+// Spalten, und Chrome/Firefox liessen unter einer kurzen Kategorie die Luft
+// ihrer Zeile stehen (208px, 1440x900). Jetzt packt Multicol auf einer Huelle
+// ohne feste Hoehe; Masonry bleibt der Fortschritt hinter @supports.
+test('ab 60rem Einkaufsflaeche stehen die Kategorien dicht gepackt in zwei Spalten', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/shopping.css', import.meta.url), 'utf8');
+  const js = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const root = rules.find((r) => r.selector.trim() === '.shopping-page' && /container:\s*shopping-surface\s*\/\s*inline-size/.test(r.body));
+  assert.ok(root, 'die Seite ist der Container shopping-surface - die Abfrage misst die Seite, nicht den Viewport');
+  const QUERY = /^@container shopping-surface \(min-width: 60rem\)$/;
+  const inQuery = (r) => r.at.some((a) => QUERY.test(a));
+  const plain = (r) => inQuery(r) && r.at.length === 1;
+  const find = (sel, pred = plain) => rules.find((r) => pred(r) && r.selector.trim() === sel);
+
+  // Die Huelle steht im Markup UM die Gruppen - der Scroller selbst hat eine
+  // feste Hoehe, und Multicol liefe dort seitlich statt nach unten weiter.
+  assert.match(js, /insertAdjacentHTML\('beforeend', `<div class="items-lanes">\$\{renderItems\(\)\}<\/div>`\)/);
+  const narrow = rules.find((r) => r.at.length === 0 && r.selector.trim() === '.items-lanes');
+  assert.match(narrow?.body ?? '', /display:\s*contents/, 'schmal aendert die Huelle nichts');
+
+  assert.match(find('.shopping-page .items-list')?.body ?? '', /--page-measure:\s*100%/, 'die Kategorie kappt auf ihre Spalte, ueber dieselbe Variable');
+  const lanes = find('.shopping-page .items-lanes')?.body ?? '';
+  assert.match(lanes, /columns:\s*2/, 'die Basis packt ohne Masonry: zwei Spalten im Fluss');
+  assert.match(lanes, /column-gap:\s*var\(--space-5\)/);
+  assert.doesNotMatch(lanes, /grid-template-columns/, 'kein Raster als Basis - dort bliebe Luft unter kurzen Kategorien');
+  assert.match(find('.shopping-page .items-lanes > .list-group')?.body ?? '', /break-inside:\s*avoid/, 'eine Kategorie bricht nie ueber zwei Spalten');
+
+  for (const [cond, decl] of [['grid-template-rows: masonry', /grid-template-rows:\s*masonry/], ['display: grid-lanes', /display:\s*grid-lanes/]]) {
+    const enh = find('.shopping-page .items-lanes', (r) => inQuery(r) && r.at.some((a) => a === `@supports (${cond})`));
+    assert.ok(enh, `natives Masonry (${cond}) nur hinter @supports`);
+    assert.match(enh.body, decl);
+    assert.match(enh.body, /columns:\s*auto/, 'mit Masonry faellt Multicol weg');
+    assert.match(enh.body, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  }
+  const quick = find('.shopping-page .quick-add');
+  assert.match(quick?.body ?? '', /max-width:\s*calc\(\(100% - var\(--space-5\)\) \/ 2\)/,
+    'die Eingabezeile endet mit der ersten Spalte (Spaltenluecke = column-gap)');
+});
+
+// Re-Critique 2026-09-28 (P7 / A4 P2-5): der Wisch-Chevron ">" an jeder
+// Einkaufszeile sagt in iOS "tippe fuer Detail" - hier hiess er "wische", und
+// Tippen hakt ab. Die Geste lehrt der vorhandene Nudge (swipe-row--hint); der
+// Chevron und seine Polster-Reserve fallen in der Einkaufsliste weg.
+test('Einkauf: kein Wisch-Chevron an der Zeile, keine Reserve dafuer', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readFileSync(new URL('../public/styles/shopping.css', import.meta.url), 'utf8'))];
+  const off = rules.find((r) => r.selector.trim() === '.swipe-row:has(> .shopping-item)::after' && !r.at.length);
+  assert.match(off?.body ?? '', /content:\s*none/, 'der Chevron der geteilten Zeile faellt in der Einkaufsliste weg');
+  const reserve = rules.filter((r) => r.selector.trim() === '.shopping-item' && r.at.some((a) => /hover:\s*none/.test(a))
+    && /padding-inline-end:\s*calc\(var\(--space-2\) \+ var\(--space-3\) \+ var\(--space-2\)\)/.test(r.body));
+  assert.deepEqual(reserve.map((r) => r.at.join(' ')), [], 'die Reserve fuer den Pfeil ist mit ihm gegangen');
+});
+
+// Re-Critique 2026-09-28 (P7 / A4 P2-4): am Zeiger standen zwei violette "+"
+// fuer dieselbe Absicht - die angedockte Kopf-Pille "+ Artikel" und der
+// Absender des Schnellfelds. Das "+" bleibt der Pille; der Absender ist die
+// ruhige Return-Glyphe wie in Erinnerungen (tippen, Enter).
+test('Einkauf: EIN Plus - der Absender des Schnellfelds ist eine ruhige Return-Glyphe', async () => {
+  const src = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+  const btn = /<button class="quick-add__btn"[^>]*>\s*<i data-lucide="([^"]+)"/.exec(src);
+  assert.ok(btn, 'der Absender bleibt ein echter Submit-Knopf');
+  assert.equal(btn[1], 'corner-down-left', 'kein zweites Plus neben der Kopf-Pille');
+  const { eachRule } = await import('./css-rules.js');
+  const rule = [...eachRule(readFileSync(new URL('../public/styles/shopping.css', import.meta.url), 'utf8'))]
+    .find((r) => r.selector.trim() === '.quick-add__btn' && !r.at.length);
+  assert.doesNotMatch(rule?.body ?? '', /background-color:\s*var\(--color-accent\)/, 'keine zweite gefuellte Stimme');
+  assert.match(rule?.body ?? '', /color:\s*var\(--color-text-(?:secondary|tertiary)\)/);
+});
+
+// Re-Critique 2026-09-28 (P11 / A4 P2-8): eine neu gezeichnete Einkaufsliste
+// liess den abgehakten Artikel ans Gruppenende SPRINGEN. FLIP haelt die Lage
+// vor dem Neubau fest und laesst jede bewegte Zeile gleiten - wiedererkannt am
+// Schluessel, weil der Neubau neue Knoten baut.
+function flipRow(key, top) {
+  const calls = [];
+  return {
+    calls,
+    getAttribute: (a) => (a === 'data-swipe-id' ? key : null),
+    getBoundingClientRect: () => ({ left: 0, top }),
+    animate: (frames, opts) => { calls.push({ frames, opts }); return {}; },
+  };
+}
+const flipRoot = (rows) => ({ querySelectorAll: () => rows });
+
+test('FLIP: nur bewegte, wiedererkannte Zeilen gleiten - von der alten Lage in die neue, per transform', async () => {
+  const { flipSnapshot, flipPlay } = await import('../public/utils/flip.js');
+  const prevMM = window.matchMedia;
+  window.matchMedia = () => ({ matches: false });
+  try {
+    const before = flipSnapshot(flipRoot([flipRow('1', 0), flipRow('2', 50), flipRow('3', 100)]), '.swipe-row', 'data-swipe-id');
+    assert.deepEqual([...before.keys()], ['1', '2', '3']);
+    // Nach dem Neubau: 1 wandert ans Ende, 2 und 3 ruecken auf, 4 ist neu.
+    const a = flipRow('2', 0); const b = flipRow('3', 50); const c = flipRow('1', 100); const d = flipRow('4', 150);
+    const moved = flipPlay(flipRoot([a, b, c, d]), '.swipe-row', 'data-swipe-id', before, { duration: 200, easing: 'ease-out' });
+    assert.equal(moved, 3);
+    assert.deepEqual(c.calls[0].frames, [{ transform: 'translate(0px, -100px)' }, { transform: 'none' }], 'von oben ans Ende gleiten');
+    assert.deepEqual(a.calls[0].frames[0], { transform: 'translate(0px, 50px)' });
+    assert.equal(d.calls.length, 0, 'eine neue Zeile hat keine alte Lage');
+    assert.deepEqual(c.calls[0].opts, { duration: 200, easing: 'ease-out' });
+  } finally {
+    window.matchMedia = prevMM;
+  }
+});
+
+test('FLIP: reduzierte Bewegung und eine unbewegte Liste spielen nichts', async () => {
+  const { flipSnapshot, flipPlay } = await import('../public/utils/flip.js');
+  const prevMM = window.matchMedia;
+  try {
+    window.matchMedia = () => ({ matches: false });
+    const still = flipRow('1', 10);
+    const before = flipSnapshot(flipRoot([flipRow('1', 10)]), '.swipe-row', 'data-swipe-id');
+    assert.equal(flipPlay(flipRoot([still]), '.swipe-row', 'data-swipe-id', before, { duration: 1, easing: 'x' }), 0);
+    window.matchMedia = () => ({ matches: true });
+    const moved = flipRow('1', 90);
+    assert.equal(flipPlay(flipRoot([moved]), '.swipe-row', 'data-swipe-id', before, { duration: 1, easing: 'x' }), 0);
+    assert.equal(moved.calls.length, 0, 'reduzierte Bewegung springt wie bisher');
+  } finally {
+    window.matchMedia = prevMM;
+  }
+});
+
+test('FLIP ist im Neubau der Einkaufsliste verdrahtet: messen vor mountItems, spielen danach', () => {
+  const src = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('function updateItemsList(container) {'), src.indexOf('function updateItemsList(container) {') + 900);
+  const snap = body.indexOf("flipSnapshot(listEl, '.swipe-row[data-swipe-id]', 'data-swipe-id')");
+  const mount = body.indexOf('mountItems(listEl, container)');
+  const play = body.indexOf("flipPlay(listEl, '.swipe-row[data-swipe-id]', 'data-swipe-id', before)");
+  assert.ok(snap > -1 && mount > -1 && play > -1, 'Messen, Neubau und Abspielen stehen im Neubau');
+  assert.ok(snap < mount && mount < play, 'erst messen, dann neu bauen, dann abspielen');
 });

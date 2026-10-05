@@ -109,6 +109,31 @@ test('der Thumbnail-Proxy nimmt nur UUIDs an', async () => {
   }
 });
 
+test('ein Foto aus Immich landet nicht im HTTP-Cache des Geraets', async () => {
+  // Ein lokaler Schein-Immich statt des echten Servers: die Suite erreicht
+  // weiterhin kein fremdes Netz, prueft aber den Weg bis zur Antwort.
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+  const fake = (await import('node:http')).createServer((_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'image/jpeg' });
+    res.end(JPEG);
+  });
+  await new Promise((r) => fake.listen(0, '127.0.0.1', r));
+  process.env.IMMICH_URL = `http://127.0.0.1:${fake.address().port}`;
+  process.env.IMMICH_API_KEY = 'secret';
+  try {
+    const res = await fetch(`${baseUrl}/photos/0b4f5b2e-6f1a-4c3d-9e8f-1a2b3c4d5e6f`);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'image/jpeg');
+    // Familienfotos gehoeren nicht als Kopie in den Browser-Cache eines
+    // Wandtablets, das jeder im Haushalt bedient.
+    assert.equal(res.headers.get('cache-control'), 'no-store');
+  } finally {
+    delete process.env.IMMICH_URL;
+    delete process.env.IMMICH_API_KEY;
+    await new Promise((r) => fake.close(r));
+  }
+});
+
 test('eine Album-Id, die keine UUID ist, wird verworfen statt weitergereicht', async () => {
   const invalid = await call('PUT', '/config', { albumId: 'alle-fotos' });
   assert.equal(invalid.status, 400);

@@ -7,10 +7,11 @@
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
 import { openModal as openSharedModal, closeModal, wireBlurValidation, validateAll, btnSuccess, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender } from '/components/modal.js';
-import { stagger, vibrate, scheduleUndoableDelete, animationSettled } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, animationSettled, collapseOut, expandIn, wireScrollFade } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { rowActionHtml } from '/utils/row-action.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
@@ -23,21 +24,27 @@ import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import '/components/category-manager.js';
 import '/components/tag-manager.js';
 import { findPageFab } from '/utils/fab.js';
+import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { isSoloHousehold, hidesPrivacyControls } from '/utils/household.js';
-import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
+import { popoverMenuHtml, installPopoverMenus, pageToolsMenuHtml, pageToolsActionEl, syncPopoverMenuItem } from '/utils/popover-menu.js';
+import { filterButtonHtml, syncFilterButton, openFilterSheet } from '/utils/filter-sheet.js';
+import { toggleRowHtml } from '/settings/components.js';
+import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { todayKey, parseLocalDateKey } from '/utils/date.js';
 import { makeSortable } from '/utils/sortable.js';
-import { zonedDateKey } from '/utils/timezone.js';
+import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
+import { zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { historyDayLabel } from '/utils/day-label.js';
 import {
   PRIORITIES, PRIO_ORDER, STATUSES, FILTER_STATUSES, PRIORITY_LABELS, STATUS_LABELS, statusLabel,
-  FALLBACK_CATEGORY, isArchived, formatDueDate, normalizeTagList,
+  FALLBACK_CATEGORY, isArchived, formatDueDate, normalizeTagList, seriesDoneText,
   catLabel as catLabelOf, catSortIndex as catSortIndexOf,
   canEditTaskDefinition as canEditTaskDefinitionFor,
 } from '/utils/task-fields.js';
 import {
-  openTaskDetail, deleteTaskWithUndo, addSubtask,
+  openTaskDetail, deleteTaskWithUndo,
   setTaskArchived, toggleSubtaskStatus,
 } from '/components/task-detail.js';
 
@@ -128,10 +135,6 @@ let taskDocuments = null;
 // --------------------------------------------------------
 // Hilfsfunktionen
 // --------------------------------------------------------
-
-function initials(name = '') {
-  return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-}
 
 // Sichtbarkeits-Indikator (#474): nur für eingeschränkte Elemente ein dezentes
 // Icon — „Alle" bleibt icon-los (keine visuelle Flut, „Kraft ohne Lärm").
@@ -304,19 +307,28 @@ function renderPriorityBadge(priority) {
 function renderDueDate(dateStr, timeStr, isDone = false) {
   const d = formatDueDate(dateStr, timeStr, isDone);
   if (!d) return '';
+  // Das Label steht in einem eigenen Span, damit es mit Ellipse enden kann
+  // (R9 M1): am Flex-Chip selbst greift `text-overflow` nicht, dort wurde
+  // „Überfällig - 24.09." hart abgeschnitten.
   return `<span class="due-date ${d.cls}">
-    <i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> ${d.label}
+    <i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> <span class="due-date__label">${d.label}</span>
   </span>`;
 }
 
+/* Der Start-Badge vergleicht KEYS, und "heute" ist der Tag des Haushalts.
+ *
+ * Hier stand `new Date(); setHours(0, 0, 0, 0)` gegen `new Date(key + 'T00:00:00')`:
+ * beides Mitternacht der GERAETE-Zone. Mit Haushalt in Berlin und Telefon in
+ * New York stand kurz nach Berliner Mitternacht an einer ab heute laufenden
+ * Aufgabe noch "Beginnt am ...". Und `formatDate` bekam das Date statt des Keys
+ * und rechnete es in die Anzeigezone um - mit Geraet in Berlin und Haushalt auf
+ * Honolulu zeigte der Badge den Vortag. */
 function renderStartDateBadge(startDateStr) {
   if (!startDateStr) return '';
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const startDay = new Date(`${startDateStr}T00:00:00`);
-  if (startDay <= today) return '';
+  const startKey = String(startDateStr).slice(0, 10);
+  if (startKey <= todayKey()) return '';
   return `<span class="due-date">
-    <i data-lucide="calendar-clock" class="icon-sm" aria-hidden="true"></i> ${t('tasks.startsOn', { date: formatDate(startDay) })}
+    <i data-lucide="calendar-clock" class="icon-sm" aria-hidden="true"></i> <span class="due-date__label">${t('tasks.startsOn', { date: formatDate(startKey) })}</span>
   </span>`;
 }
 
@@ -437,6 +449,17 @@ async function wireSyncTarget(panel, task) {
 }
 
 /**
+ * Das Schloss einer gesperrten Aufgabe - EINE Bauart fuer Liste und Brett
+ * (#1607: das Brett liess es weg, wer die Ansicht wechselte, erfuhr die Sperre
+ * erst am abgelehnten Zug). `role="img"`, damit das `aria-label` gilt.
+ */
+function renderLockedBadge(task) {
+  if (!task.locked) return '';
+  const label = esc(t('tasks.lockedBadge'));
+  return `<span class="due-date" role="img" aria-label="${label}" title="${label}"><i data-lucide="lock" class="icon-sm" aria-hidden="true"></i></span>`;
+}
+
+/**
  * EINE Metazeile, und sie bricht nicht um.
  *
  * Die Zeile trug bis zu acht Elemente mit `flex-wrap: wrap` und wurde damit je
@@ -457,7 +480,7 @@ async function wireSyncTarget(panel, task) {
  * Zeile, an der eine Anzahl OHNE ihren Gegenstand stand.
  */
 function renderTaskCard(task, opts = {}) {
-  const { expandedSubtasks = false, showCheckbox = false, isChecked = false, showCategory = true } = opts;
+  const { expandedSubtasks = false, selecting = false, selected = false, showCategory = true } = opts;
   const isDone = task.status === 'done';
   const archived = isArchived(task);
   // Gesperrte Aufgabe (#830): abhaken bleibt, umschreiben nicht. Die Knoepfe,
@@ -502,8 +525,17 @@ function renderTaskCard(task, opts = {}) {
                er gar nicht erst erscheint. Jetzt nennt die Beschriftung den
                ZUSTAND statt einer Handlung, und ein `span` verspricht nichts.
                Dass eine Teilaufgabe am Display spaeter eine eigene
-               Personenauswahl bekommt, ist eine Folgeentscheidung. */''}
-          ${darfAbhaken ? `
+               Personenauswahl bekommt, ist eine Folgeentscheidung.
+
+               IM AUSWAHLMODUS GILT DASSELBE (Codex an #1483): dort ersetzte
+               nur der Auswahlkreis den Statuskreis der Elternaufgabe, Haken,
+               Umbenennen, Loeschen und „Teilaufgabe hinzufuegen" darunter
+               blieben bedienbar - ein Tipp in die Karte aenderte eine
+               Teilaufgabe, statt die Aufgabe auszuwaehlen. Wie die
+               Zeilenaktionen treten sie ab; der Zustand bleibt als Zeichen.
+               Der Fortschritts-Umschalter bleibt: er klappt nur auf und zu
+               (READ_SAFE_ACTIONS) und zeigt, was man gerade auswaehlt. */''}
+          ${darfAbhaken && !selecting ? `
           <button class="subtask-item__checkbox ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
                   data-action="toggle-subtask" data-id="${s.id}"
                   data-status="${s.status}" aria-label="${t('tasks.subtaskMarkDone', { title: esc(s.title) })}">
@@ -514,14 +546,14 @@ function renderTaskCard(task, opts = {}) {
             ${s.status === 'done' ? '<i data-lucide="check" class="subtask-item__checkbox-icon" aria-hidden="true"></i>' : ''}
           </span>`}
           <span class="subtask-item__title">${esc(s.title)}</span>
-          ${canEditTaskDefinition(s, task) ? `
+          ${!selecting && canEditTaskDefinition(s, task) ? `
           <div class="subtask-item__actions">
-            <button class="btn btn--ghost btn--icon btn--icon-sm subtask-item__action"
+            <button type="button" class="row-action subtask-item__action"
                     data-action="rename-subtask" data-id="${s.id}" data-title="${esc(s.title)}"
                     aria-label="${t('tasks.subtaskRename', { title: esc(s.title) })}">
               <i data-lucide="pencil" aria-hidden="true"></i>
             </button>
-            <button class="btn btn--ghost btn--icon btn--icon-sm subtask-item__action"
+            <button type="button" class="row-action row-action--danger subtask-item__action"
                     data-action="delete-subtask" data-id="${s.id}" data-title="${esc(s.title)}"
                     aria-label="${t('tasks.subtaskDelete', { title: esc(s.title) })}">
               <i data-lucide="trash-2" aria-hidden="true"></i>
@@ -531,14 +563,23 @@ function renderTaskCard(task, opts = {}) {
     : '';
 
   return `
-    <div class="task-card ${isDone ? 'task-card--done' : ''} ${archived ? 'task-card--archived' : ''}" data-task-id="${task.id}">
+    <div class="task-card ${isDone ? 'task-card--done' : ''} ${archived ? 'task-card--archived' : ''}" data-task-id="${task.id}" data-md-id="${task.id}">
       <div class="list-row list-row--roomy task-card__main">
-        ${showCheckbox ? `
-        <input type="checkbox" class="task-bulk-checkbox" data-task-id="${task.id}"
-               ${isChecked ? 'checked' : ''} aria-label="${t('tasks.selectTask')}">
-        ` : ''}
+        ${/* IM AUSWAHLMODUS ERSETZT DER AUSWAHLKREIS DEN STATUSKREIS - er
+             steht nicht daneben (Re-Critique 2026-09-27, D5; Muster: Apples
+             Erinnerungen). Vorher sass eine native Checkbox im Browser-Blau
+             VOR Haken und Personenwahl: drei Kreise in einer Zeile, und der
+             Tipp auf den falschen hakte ab statt auszuwaehlen. Ein Modus, ein
+             Kreis, eine Bedeutung - die Zeilenaktionen treten solange ab. */ ''}
+        ${selecting ? `
+        <button type="button" class="select-circle task-select-btn${selected ? ' select-circle--on' : ''}"
+                data-action="toggle-select" data-id="${task.id}" aria-pressed="${selected}"
+                aria-label="${esc(t('tasks.selectTaskNamed', { title: task.title }))}">
+          <i data-lucide="check" class="select-circle__check" aria-hidden="true"></i>
+        </button>
+        ` : `
         ${darfAbhaken ? `
-        <button class="task-status-btn task-status-btn--${task.status}"
+        <button class="task-status-btn task-status-btn--${task.status} check-ring"
                 data-action="toggle-status" data-id="${task.id}" data-status="${task.status}"
                 aria-label="${isDone ? t('tasks.markOpen', { title: esc(task.title) }) : t('tasks.markDone', { title: esc(task.title) })}">
           <i data-lucide="check" class="task-status-btn__check" aria-hidden="true"></i>
@@ -550,7 +591,7 @@ function renderTaskCard(task, opts = {}) {
              Mensch mit Leserecht bekommt keinen Picker, und ohne dieses
              Zeichen verschwaende die Zeile die Auskunft, die der Haken traegt:
              ob die Aufgabe erledigt ist. */''}
-        <span class="task-status-btn task-status-btn--${task.status} task-status-btn--static"
+        <span class="task-status-btn task-status-btn--${task.status} task-status-btn--static check-ring check-ring--static"
               role="img" aria-label="${esc(`${task.title}: ${statusLabel(task.status)}`)}">
           <i data-lucide="check" class="task-status-btn__check" aria-hidden="true"></i>
         </span>
@@ -564,9 +605,10 @@ function renderTaskCard(task, opts = {}) {
              am Display also gar keinen Knopf, und der Picker darunter zeichnet
              sich fuer sie ohnehin nicht. */''}
         ${renderDoerPicker(task, isDone, archived)}
+        `}
 
         <div class="task-card__body">
-          <button type="button" class="task-card__title u-card-title u-compact" data-action="open-task" data-id="${task.id}">
+          <button type="button" class="task-card__title u-row-title" data-action="open-task" data-id="${task.id}" data-md-focus>
             ${esc(task.title)}
           </button>
           <div class="task-card__meta">
@@ -582,31 +624,34 @@ function renderTaskCard(task, opts = {}) {
                 hier standen zwei Kopien ohne Rolle (PR-Review #754). */ ''}
             ${task.is_recurring ? `<span class="due-date" role="img" aria-label="${esc(t('tasks.recurring'))}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>` : ''}
             ${task.document_count > 0 ? `<span class="due-date task-card__docs" role="img" aria-label="${esc(t('tasks.documentsCount', { count: task.document_count }))}"><i data-lucide="paperclip" class="icon-sm" aria-hidden="true"></i></span>` : ''}
-            ${task.locked ? `<span class="due-date" role="img" aria-label="${esc(t('tasks.lockedBadge'))}" title="${esc(t('tasks.lockedBadge'))}"><i data-lucide="lock" class="icon-sm" aria-hidden="true"></i></span>` : ''}
+            ${renderLockedBadge(task)}
             ${renderVisibilityBadge(task.visibility)}
             ${showCategory && task.category !== FALLBACK_CATEGORY ? `<span class="due-date task-card__category">${esc(catLabel(task.category))}</span>` : ''}
             ${renderTagBadges(task.tags, ROW_TAG_BADGES_VISIBLE, task.priority)}
           </div>
         </div>
 
-        ${renderAvatarStack(task.assigned_users ?? [], { size: 28 })}
+        ${/* 24px STATT 28 (R9 M1): mobil steht der Stapel in der Metazeile
+              (tasks.css, Raster unter 640px), und die ist 25px hoch - eine
+              28er-Scheibe haette jede Zeile um 3px gestreckt. */ ''}
+        ${renderAvatarStack(task.assigned_users ?? [], { size: 24 })}
 
         ${/* Bleibt auch mit vorhandenen Unteraufgaben: bis D#1017 verschwand der
               Einstieg nach der ersten, und der zweite Einstieg lag am Ende der
               eingeklappten Liste - gelesen als "nur eine Unteraufgabe je Aufgabe". */ ''}
-        ${canEdit && !archived && !task.parent_task_id ? `
-        <button class="btn btn--ghost btn--icon btn--icon-sm task-card__inline-action" data-action="add-subtask" data-parent="${task.id}"
-                aria-label="${t('tasks.subtaskAdd')}" title="${t('tasks.subtaskAdd')}">
+        ${!selecting && canEdit && !archived && !task.parent_task_id ? `
+        <button type="button" class="row-action task-card__inline-action" data-action="add-subtask" data-parent="${task.id}"
+                aria-label="${esc(t('tasks.subtaskAddNamed', { title: task.title }))}" title="${t('tasks.subtaskAdd')}">
           <i data-lucide="list-plus" class="icon-md" aria-hidden="true"></i>
         </button>` : ''}
-        ${canEdit ? `
-        <button class="btn btn--ghost btn--icon btn--icon-sm task-card__inline-action" data-action="edit-task" data-id="${task.id}"
-                aria-label="${t('tasks.editButton')}">
+        ${!selecting && canEdit ? `
+        <button type="button" class="row-action task-card__inline-action" data-action="edit-task" data-id="${task.id}"
+                aria-label="${esc(t('common.editNamed', { name: task.title }))}">
           <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
         </button>
-        <button class="btn btn--ghost btn--icon btn--icon-sm task-card__inline-action"
+        <button type="button" class="row-action task-card__inline-action"
                 data-action="${archived ? 'unarchive-task' : 'archive-task'}" data-id="${task.id}"
-                aria-label="${archived ? t('tasks.unarchiveButton') : t('tasks.archiveButton')}"
+                aria-label="${esc(t(archived ? 'tasks.unarchiveNamed' : 'tasks.archiveNamed', { title: task.title }))}"
                 title="${archived ? t('tasks.unarchiveButton') : t('tasks.archiveButton')}">
           <i data-lucide="${archived ? 'archive-restore' : 'archive'}" class="icon-md" aria-hidden="true"></i>
         </button>` : ''}
@@ -626,33 +671,49 @@ function renderTaskCard(task, opts = {}) {
         <div class="subtask-list ${expandedSubtasks ? 'subtask-list--visible' : ''}"
              id="subtasks-${task.id}">
           ${subtasksHtml}
-          ${canEdit ? `
-          <button class="subtask-item__add" data-action="add-subtask" data-parent="${task.id}">
-            ${t('tasks.subtaskAdd')}
+          ${!selecting && canEdit ? `
+          <button type="button" class="subtask-item__add" data-action="add-subtask" data-parent="${task.id}">
+            <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i><span>${t('tasks.subtaskAdd')}</span>
           </button>` : ''}
         </div>` : ''}
     </div>`;
 }
 
-// Effektive Fälligkeit: mit due_time wenn vorhanden, sonst 23:59:59 des Tages
+/* Effektive Faelligkeit als Wanduhr-Stempel des Haushalts ('YYYY-MM-DDTHH:MM'),
+ * ohne due_time das Tagesende ('T23:59:59').
+ *
+ * `due_date`/`due_time` sind zonenlose Wanduhrzeit - dieselbe Regel wie in
+ * `formatDueDate` (utils/task-fields.js). Hier stand ein Umweg ueber
+ * `new Date(`${due_date}T${due_time}`)`, und der las die Ziffern in der Zone des
+ * GERAETS: in dessen Zeitumstellungs-Luecke rueckte eine Uhrzeit um eine Stunde
+ * vor und ueberholte eine spaetere Aufgabe desselben Tages, und "jetzt" war die
+ * Uhr des Geraets statt die des Haushalts. Als Stempel derselben Zone sind beide
+ * Seiten als Text vergleichbar. */
 function effectiveDue(task) {
   if (!task.due_date) return null;
-  return task.due_time
-    ? new Date(`${task.due_date}T${task.due_time}`)
-    : new Date(`${task.due_date}T23:59:59`);
+  const day = String(task.due_date).slice(0, 10);
+  // Ohne Uhrzeit das Tagesende 23:59:59: als Text hinter einem ausdruecklichen
+  // 23:59, sonst fiele der Vergleich bei Gleichstand auf die Prioritaet.
+  const time = task.due_time ? String(task.due_time).slice(0, 5) : '23:59:59';
+  return `${day}T${time}`;
+}
+
+/** Jetzt als Wanduhr-Stempel des Haushalts - einmal je Sortierlauf, nicht je Vergleich. */
+function taskSortNow(now = new Date()) {
+  return `${zonedDateKey(now)}T${zonedTimeKey(now)}`;
 }
 
 // Einheitliche Sortierung: überfällig zuerst → Datum/Zeit ASC → Prio als Tiebreaker
-function sortTasks(a, b, now) {
-  const aDate = effectiveDue(a);
-  const bDate = effectiveDue(b);
-  const aOver = aDate && aDate < now ? 1 : 0;
-  const bOver = bDate && bDate < now ? 1 : 0;
+function sortTasks(a, b, nowStamp) {
+  const aDue = effectiveDue(a);
+  const bDue = effectiveDue(b);
+  const aOver = aDue && aDue < nowStamp ? 1 : 0;
+  const bOver = bDue && bDue < nowStamp ? 1 : 0;
   if (bOver !== aOver) return bOver - aOver;
-  if (!aDate && !bDate) return (PRIO_ORDER[a.priority] ?? 4) - (PRIO_ORDER[b.priority] ?? 4);
-  if (!aDate) return 1;
-  if (!bDate) return -1;
-  if (aDate.getTime() !== bDate.getTime()) return aDate < bDate ? -1 : 1;
+  if (!aDue && !bDue) return (PRIO_ORDER[a.priority] ?? 4) - (PRIO_ORDER[b.priority] ?? 4);
+  if (!aDue) return 1;
+  if (!bDue) return -1;
+  if (aDue !== bDue) return aDue < bDue ? -1 : 1;
   return (PRIO_ORDER[a.priority] ?? 4) - (PRIO_ORDER[b.priority] ?? 4);
 }
 
@@ -683,7 +744,7 @@ function renderTaskGroups(tasks, groupMode) {
       });
   }
 
-  const now = new Date();
+  const now = taskSortNow();
   const groups = groupBy(tasks, groupMode);
   return groups.map(({ id, label, tasks: groupTasks }) => {
     const sorted = [...groupTasks].sort((a, b) => sortTasks(a, b, now));
@@ -714,10 +775,10 @@ function renderTaskGroups(tasks, groupMode) {
         </button>
         <span class="list-group__count">${groupTasks.length}</span>
       </h2>
-      ${collapsed ? '' : `<div class="list-rows">
+      ${collapsed ? '' : `<div class="row-carrier">
         ${sorted.map((t) => renderSwipeRow(t, renderTaskCard(t, {
-          showCheckbox: state.bulkSelectMode,
-          isChecked: state.selectedTaskIds.has(t.id),
+          selecting: state.bulkSelectMode,
+          selected: state.bulkSelectMode && state.selectedTaskIds.has(t.id),
           expandedSubtasks: state.subtasksExpandedByDefault,
           showCategory: groupMode !== 'category',
         }))).join('')}
@@ -886,12 +947,76 @@ function wireTagBadgeFilter(container) {
   }, true);
 
   // Gruppenkopf auf- und zuklappen (#812).
-  container.addEventListener('click', (e) => {
+  //
+  // DIE ZEILEN KLAPPEN, STATT ZU SPRINGEN (Critique 2026-09-26, A3 P1-4). Die
+  // Liste zeichnet eine zugeklappte Gruppe ohne `.row-carrier` - also klappt
+  // beim Zuklappen erst die alte Zeilenflaeche weg und danach wird neu
+  // gezeichnet; beim Aufklappen wird erst gezeichnet und die neue Flaeche von
+  // null aufgezogen. Der Winkel dreht dabei ueber seine eigene Transition
+  // (list-row.css), auch am frisch gezeichneten Knopf. Der Fokus bleibt auf dem
+  // Kopf: das Neuzeichnen ersetzt den Knopf, und ohne Rueckgabe landete er auf
+  // <body>.
+  container.addEventListener('click', async (e) => {
     const toggle = e.target.closest('[data-group-toggle]');
     if (!toggle || !container.contains(toggle)) return;
-    toggleGroup(state.groupMode, toggle.dataset.groupToggle);
+    if (toggle.dataset.moving) return;
+    const id = toggle.dataset.groupToggle;
+    const collapsing = !isGroupCollapsed(state.groupMode, id);
+    const hadFocus = document.activeElement === toggle;
+    if (collapsing) {
+      toggle.dataset.moving = '1';
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.querySelector('.list-group__chevron')?.classList.add('list-group__chevron--collapsed');
+      await collapseOut(toggle.closest('.list-group')?.querySelector('.row-carrier'));
+    }
+    toggleGroup(state.groupMode, id);
     renderTaskList(container);
+    const fresh = [...container.querySelectorAll('[data-group-toggle]')]
+      .find((btn) => btn.dataset.groupToggle === id);
+    if (!fresh) return;
+    if (hadFocus) fresh.focus();
+    if (!collapsing) {
+      const chevron = fresh.querySelector('.list-group__chevron');
+      if (chevron) {
+        // Vom zugeklappten Winkel aus starten, damit die Transition etwas hat,
+        // wovon sie ausgeht - das Neuzeichnen setzt ihn sonst ohne Uebergang.
+        // Der Hinweg OHNE Transition: `focus()` oben hat den Stil des neuen
+        // Winkels schon berechnet, und ein Hinweg mit Transition kehrte sich
+        // beim Entfernen der Klasse sofort um - gemessen: keine Drehung.
+        chevron.style.transition = 'none';
+        chevron.classList.add('list-group__chevron--collapsed');
+        void getComputedStyle(chevron).transform;
+        chevron.style.transition = '';
+        chevron.classList.remove('list-group__chevron--collapsed');
+      }
+      expandIn(fresh.closest('.list-group')?.querySelector('.row-carrier'));
+    }
   });
+}
+
+/**
+ * Was hinter „Weitere Einstellungen" des Aufgabendialogs liegt, als Hinweis
+ * unter dem Aufklapper (DESIGN.md: „Weitere Einstellungen nennt, was dahinter
+ * liegt"; A3 P1-2). Dieselbe Bauart wie eventAdvancedTopics() im Kalender.
+ */
+function taskAdvancedTopics({ privacy = true, recurrence = false, reminder = false } = {}) {
+  const topics = [
+    t('tasks.startDateLabel'),
+    t('tasks.pointsLabel'),
+    t('tasks.tagsLabel'),
+    t('tasks.statusLabel'),
+    privacy ? t('common.visibility.label') : null,
+    t('tasks.documentsLabel'),
+    // Nur solange sie leer hinter dem Aufklapper liegen (R16) - der Hinweis
+    // nennt, was dahinter IST, nicht was dort sein koennte.
+    recurrence ? t('rrule.labelRepeat') : null,
+    reminder ? t('reminders.sectionTitle') : null,
+  ].filter(Boolean);
+  try {
+    return new Intl.ListFormat(getLocale(), { style: 'long', type: 'conjunction' }).format(topics);
+  } catch {
+    return topics.join(', ');
+  }
 }
 
 function renderModalContent({ task = null, users = [], reminder = null } = {}) {
@@ -949,13 +1074,9 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   // Zusammenfassung noch den alten Wert nannte.
   const statusValue = STATUSES().find((s) => s.value === task?.status)?.value ?? STATUSES()[0].value;
 
+  // Prioritaet und Kategorie stehen nicht mehr in der Zusammenfassung: sie
+  // stehen offen im Hauptteil (A3 P1-2, siehe unten).
   const advancedSummary = [];
-  if (isEdit && task.priority && task.priority !== 'none') {
-    advancedSummary.push(PRIORITY_LABELS()[task.priority] ?? task.priority);
-  }
-  if (isEdit && task.category && task.category !== FALLBACK_CATEGORY) {
-    advancedSummary.push(catLabel(task.category));
-  }
   if (isEdit && task.start_date) advancedSummary.push(formatDate(task.start_date));
   const summaryPoints = isEdit ? Number(task.points) : prefillPoints;
   if (summaryPoints > 0) advancedSummary.push(t('tasks.pointsSummary', { count: summaryPoints }));
@@ -976,24 +1097,35 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   const advancedLabel = advancedSummary.length
     ? `${t('modal.moreSettings')} · ${advancedSummary.join(' · ')}`
     : undefined;
+  /* WIEDERHOLUNG UND ERINNERUNG LIEGEN HINTER DEM AUFKLAPPER, SOLANGE SIE LEER
+   * SIND (Critique 2026-10-05, R16). Beide standen offen unter ihm - eine
+   * Auswahl "Keine" samt Hinweis und ein ausgeschalteter Schalter, zusammen
+   * rund 200px fuer zwei Angaben, die die meisten Aufgaben nicht tragen. Ein
+   * GESETZTER Wert bleibt offen an seinem alten Platz: beim Bearbeiten darf
+   * nichts Gesetztes versteckt sein, und eine Serie in eine Zusammenfassung zu
+   * kuerzen hiesse, ihre Regel zu verschweigen. Der Abschnitt selbst entfaellt
+   * ohne Recht (`renderReminderSection` liefert dann nichts). */
+  const recurrenceHtml = renderRRuleFields('task', task?.recurrence_rule, {
+    allowFromCompletion: true,
+    fromCompletion: !!task?.recurrence_from_completion,
+    // AUSDRUECKLICH FALSE, nicht weggelassen (#960). Eine Aufgabe ist eine
+    // Zeile mit einem Faelligkeitsdatum, das Liste, Ueberfaelligkeit und
+    // Countdown direkt lesen - sie wird nicht wie eine Kalenderserie vom
+    // Startdatum aus expandiert. Der Monatsletzten-Hinweis muss das sagen,
+    // sonst verspricht er einen Termin, den es hier nicht gibt.
+    expandsFromStart: false,
+  });
+  const reminderHtml = renderReminderSection(task, reminder);
+  const recurrenceTucked = !task?.recurrence_rule;
+  const reminderTucked = !reminder && reminderHtml !== '';
+  const advancedHint = taskAdvancedTopics({
+    privacy: !hidesPrivacyControls('tasks'),
+    recurrence: recurrenceTucked,
+    reminder: reminderTucked,
+  });
 
   const advancedFieldsHtml = `
       <div class="modal-grid modal-grid--2">
-        <div class="form-group">
-          <label class="label" for="task-priority">${t('tasks.priorityLabel')}</label>
-          <select class="input" id="task-priority" name="priority">
-            ${priorityOptions}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="label" for="task-category">${t('tasks.categoryLabel')}</label>
-          <select class="input" id="task-category" name="category">
-            ${categoryOptions}
-          </select>
-        </div>
-      </div>
-
-      <div class="modal-grid modal-grid--2" style="margin-top:var(--space-4)">
         <div class="form-group">
           <label class="label" for="task-start-date">${t('tasks.startDateLabel')}</label>
           <yuvomi-datepicker type="date" id="task-start-date" name="start_date"
@@ -1064,6 +1196,7 @@ ${syncTargetFieldHtml(task)}
         </select>
         <p class="task-field-hint">${t('common.visibility.hint')}</p>
         <p class="task-field-hint field-hint--warn" id="task-visibility-warning" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('common.visibility.assigneesNobodyHint')}</span></p>
+        <p class="task-field-hint field-hint--warn" id="task-visibility-private-warning" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('common.visibility.privateAssignedHint')}</span></p>
       </div>
 
       <!-- #830: Die Sperre steht neben der Sichtbarkeit, weil beide dieselbe
@@ -1083,7 +1216,9 @@ ${syncTargetFieldHtml(task)}
       ${renderDocumentAttachField({
         attachments: (task?.documents ?? []).map((doc) => ({ document_id: doc.id, name: doc.name, mime_type: doc.mime_type })),
         label: t('tasks.documentsLabel'),
-      })}`;
+      })}
+${recurrenceTucked ? `<div class="task-form__tucked">${recurrenceHtml}</div>` : ''}
+${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`;
 
   return `
     <form id="task-form" novalidate>
@@ -1091,7 +1226,7 @@ ${syncTargetFieldHtml(task)}
 
       <div class="form-group">
         <div class="form-field">
-          <label class="label" for="task-title">${t('tasks.titleLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+          <label class="label" for="task-title">${t('tasks.titleLabel')}${REQUIRED_MARK}</label>
           <input class="input" type="text" id="task-title" name="title"
                  value="${esc(task?.title)}" placeholder="${t('tasks.titlePlaceholder')}"
                  required autocomplete="off">
@@ -1103,20 +1238,6 @@ ${syncTargetFieldHtml(task)}
             ${t('common.required')}
           </div>
         </div>
-      </div>
-
-      <!-- Notiz steht beim Titel, nicht hinter dem Aufklapper: sie ist sein
-           Gegenstueck, und eine Zusammenfassung kann Freitext nicht tragen.
-           Genau deshalb sind zwei Zeilen zu wenig gewesen (#731): das Feld war
-           auf die Groesse einer Zusammenfassung gebaut, obwohl der Kommentar
-           darueber das Gegenteil begruendet. -->
-      <div class="form-group">
-        <label class="label" for="task-description">${t('tasks.descriptionLabel')}</label>
-        ${renderMarkdownToolbar()}
-        <textarea class="input" id="task-description" name="description"
-                  rows="6" placeholder="${t('tasks.descriptionPlaceholder')}"
-                 >${esc(task?.description)}</textarea>
-        <small class="form-hint">${t('tasks.descriptionMarkdownHint')}</small>
       </div>
 
       <div class="modal-grid modal-grid--2">
@@ -1163,28 +1284,56 @@ ${syncTargetFieldHtml(task)}
         <p class="task-field-hint field-hint--warn" id="task-countdown-warning" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('tasks.countdownNeedsDue')}</span></p>
       </div>
 
-      ${advancedSection(advancedFieldsHtml, { label: advancedLabel })}
+      ${/* PRIORITAET UND KATEGORIE IM HAUPTTEIL, als kompakte Zeile (A3 P1-2).
+          * Die Liste ist standardmaessig nach Kategorie gruppiert; wer sie
+          * hinter „Weitere Einstellungen" nicht fand, landete unter
+          * „Sonstiges", und „Wichtig" suchte man dort gar nicht erst. */ ''}
+      <div class="modal-grid modal-grid--2 task-form__prio-cat" style="margin-top:var(--space-4)">
+        <div class="form-group">
+          <label class="label" for="task-priority">${t('tasks.priorityLabel')}</label>
+          <select class="input" id="task-priority" name="priority">
+            ${priorityOptions}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="label" for="task-category">${t('tasks.categoryLabel')}</label>
+          <select class="input" id="task-category" name="category">
+            ${categoryOptions}
+          </select>
+        </div>
+      </div>
 
-      ${renderRRuleFields('task', task?.recurrence_rule, {
-        allowFromCompletion: true,
-        fromCompletion: !!task?.recurrence_from_completion,
-        // AUSDRUECKLICH FALSE, nicht weggelassen (#960). Eine Aufgabe ist eine
-        // Zeile mit einem Faelligkeitsdatum, das Liste, Ueberfaelligkeit und
-        // Countdown direkt lesen - sie wird nicht wie eine Kalenderserie vom
-        // Startdatum aus expandiert. Der Monatsletzten-Hinweis muss das sagen,
-        // sonst verspricht er einen Termin, den es hier nicht gibt.
-        expandsFromStart: false,
-      })}
+      <!-- DIE NOTIZ STEHT NACH DEM, WAS EINE AUFGABE AUSMACHT (Critique
+           2026-10-05, R16). Sie stand direkt unter dem Titel, und mit ihrer
+           Formatierleiste lag die Faelligkeit mobil bei y=700 von 844 - wann,
+           wer und wie wichtig kamen erst nach dem Freitext. Im Hauptteil
+           bleibt sie trotzdem: eine Zusammenfassung kann Freitext nicht
+           tragen (#731), hinter den Aufklapper gehoert sie nicht. Die Leiste
+           erscheint erst mit dem Fokus im Feld (utils/markdown-toolbar.js). -->
+      <div class="form-group" style="margin-top:var(--space-4)">
+        <label class="label" for="task-description">${t('tasks.descriptionLabel')}</label>
+        ${renderMarkdownToolbar()}
+        <textarea class="input" id="task-description" name="description"
+                  rows="6" placeholder="${t('tasks.descriptionPlaceholder')}"
+                 >${esc(task?.description)}</textarea>
+        <small class="form-hint">${t('tasks.descriptionMarkdownHint')}</small>
+      </div>
 
-      ${renderReminderSection(task, reminder)}
+      ${advancedSection(advancedFieldsHtml, { label: advancedLabel, hint: advancedHint })}
+
+      ${recurrenceTucked ? '' : recurrenceHtml}
+
+      ${reminderTucked ? '' : reminderHtml}
 
       <div id="task-form-error" class="form-error" role="alert" hidden></div>
 
       <div class="modal-panel__footer modal-panel__footer--plain">
         ${isEdit ? `
           <button type="button" class="btn btn--danger-outline" data-action="delete-task"
-                  data-id="${task.id}" style="margin-right:auto">${t('common.delete')}</button>` : ''}
-        <button type="button" class="btn btn--ghost" data-action="close-modal">${t('common.cancel')}</button>
+                  data-id="${task.id}" style="margin-inline-end:auto">
+            <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
+          </button>` : ''}
+        <button type="button" class="btn btn--secondary" data-action="close-modal">${t('common.cancel')}</button>
         <button type="submit" class="btn btn--primary" id="task-submit-btn">
           ${isEdit ? t('common.save') : t('common.create')}
         </button>
@@ -1195,6 +1344,18 @@ ${syncTargetFieldHtml(task)}
 // --------------------------------------------------------
 // Seiten-State
 // --------------------------------------------------------
+
+/**
+ * Der Ruhezustand des Statusfilters: die Liste zeigt, was zu tun ist.
+ *
+ * EINE QUELLE fuer drei Stellen (Critique 2026-10-05, R16): den Startwert des
+ * Zustands, den Zaehler am Filterknopf und das Zuruecksetzen im Blatt. Sie
+ * liefen auseinander - der Startwert war „Offen", der Zaehler zaehlte ihn als
+ * Filter („Filter 1" im Ruhezustand), und „Alle Filter aufheben" fuehrte in
+ * einen dritten Zustand mit leerem Status, der auch Erledigtes zeigt.
+ */
+const DEFAULT_STATUS_FILTER = Object.freeze(['open']);
+const defaultFilters = () => ({ status: [...DEFAULT_STATUS_FILTER], priority: [], assigned_to: [], category: [], tags: [] });
 
 let state = {
   tasks:           [],
@@ -1238,7 +1399,7 @@ let state = {
   // wie jeder andere Filter in dieser Leiste auch (#586).
   // Status, Priorität und Person halten mehrere Werte (#671); innerhalb einer
   // Achse wirken sie ODER, zwischen den Achsen UND. Tags bleiben UND-verknüpft.
-  filters:         { status: ['open'], priority: [], assigned_to: [], category: [], tags: [] },
+  filters:         defaultFilters(),
   groupMode:       'category',   // 'category' | 'due'
   viewMode:        'list',       // 'list' | 'kanban' | 'history' (resolved at render time)
   // Der Verlauf (#791) hat einen eigenen Bestand, weil er etwas anderes zeigt
@@ -1259,11 +1420,102 @@ let state = {
   // nach Status, und ein gemeinsamer Speicher haette den Status "done" der
   // einen Ansicht in der anderen verschwinden lassen.
   collapsedKanbanCols: new Set(),
-  filterPanelOpen: false,
+  // Das offene Filterblatt (Modal-Panel), damit ein Filterwechsel von aussen
+  // - Tag an der Karte, geloeschte Kategorie - seine Chips nachzieht. `null`,
+  // solange keins offen ist; ein geschlossenes erkennt renderFilters am
+  // fehlenden isConnected.
+  filterSheet:     null,
+  // Aus welcher Ansicht der Verlauf geoeffnet wurde - das Menue schaltet ihn
+  // als Schalter, und „aus" fuehrt dorthin zurueck statt immer in die Liste.
+  viewBeforeHistory: 'list',
   bulkSelectMode:  false,
   selectedTaskIds: new Set(),
   searchQuery:     '',
+  // „Bis heute faellig" (Re-Critique 2026-09-27): ein Filter, den die ADRESSE
+  // setzt (`?due=today`, der Link „+n weitere heute" der Uebersicht) und das
+  // Filterblatt wieder nimmt. Bewusst nicht gemerkt: er gehoert zum Besuch,
+  // nicht zum Geraet - wer die Aufgaben spaeter normal oeffnet, sieht alle.
+  dueToday:        false,
+  // Hat „Bis heute faellig" den Standard-Status selbst geweitet? Nur dann nimmt
+  // das Ausschalten die Weitung zurueck - ein bewusst gewaehlter Status bleibt.
+  dueTodayWidened: false,
 };
+
+/**
+ * `?due=today` in der Adresse? Andere Werte kennt die Seite (noch) nicht und
+ * laesst sie still fallen, statt eine leere Liste zu zeigen.
+ */
+function dueTodayFromSearch(search) {
+  return new URLSearchParams(search || '').get('due') === 'today';
+}
+
+/**
+ * „Bis heute faellig" an- oder ausschalten - der EINE Weg fuer beide Einstiege,
+ * die Adresse beim Betreten und den Schalter im Blatt. Beim Einschalten weitet
+ * der Statusfilter sich vom Standard „Offen" auf „Offen" + „In Bearbeitung":
+ * die Heute-Liste der Uebersicht zeigt begonnene Aufgaben mit, und der Link
+ * verspricht genau diese Zeilen. Die zwei Chips stehen sichtbar im Blatt, die
+ * Zahl am Knopf zaehlt sie - nichts wird still umgestellt. Einen vom Nutzer
+ * gesetzten Statusfilter laesst der Filter stehen. Beim Ausschalten nimmt er
+ * nur die EIGENE Weitung zurueck, und nur, solange niemand den Status seither
+ * geaendert hat.
+ *
+ * Vorher weitete nur die Adresse; der Schalter im Blatt filterte bloss die
+ * geladene Liste. Derselbe Filter zeigte dann je Einstieg andere Zeilen, und
+ * ein Neuladen der geschriebenen Adresse vergroesserte die Liste (Review R11).
+ * Nachladen muss der Aufrufer: der Seitenaufbau laedt ohnehin gleich danach.
+ */
+function setDueToday(on) {
+  state.dueToday = !!on;
+  const status = state.filters.status;
+  if (state.dueToday) {
+    if (status.length === 1 && status[0] === 'open') {
+      state.filters.status = ['open', 'in_progress'];
+      state.dueTodayWidened = true;
+    }
+    // Sonst bleibt die Marke, wie sie ist: aus dem Aus-Zustand kommend ist sie
+    // schon false, und ein zweites Einschalten ueber einer eigenen Weitung
+    // (erneuter Besuch mit ?due=today) behaelt sie.
+    return;
+  }
+  if (state.dueTodayWidened && status.length === 2 && status[0] === 'open' && status[1] === 'in_progress') {
+    state.filters.status = ['open'];
+  }
+  state.dueTodayWidened = false;
+}
+
+/** Die Adresse beim Betreten lesen - ueber denselben Weg wie das Blatt. */
+function applyDueTodayFromAddress(search) {
+  setDueToday(dueTodayFromSearch(search));
+}
+
+/**
+ * Offen und bis heute faellig - UEBERFAELLIGES eingeschlossen, wie die
+ * Heute-Liste der Uebersicht, auf die der Link verweist, und wie „Heute" in
+ * Apples Erinnerungen. Der Tag kommt aus `todayKey()` (Haushaltszone), der
+ * Vergleich ist ein reiner Schluesselvergleich YYYY-MM-DD.
+ */
+function isDueByToday(task, today = todayKey()) {
+  return task.status !== 'done' && !!task.due_date && String(task.due_date).slice(0, 10) <= today;
+}
+
+/**
+ * Den Filter in die Adresse schreiben bzw. herausnehmen - per replaceState,
+ * wie der Budget-Reiter: ein Filter ist kein Ort, zu dem „Zurueck" einzeln
+ * fuehren soll. `path` im State, weil der Router ihn bei popstate liest.
+ */
+function writeDueTodayToUrl(on) {
+  const loc = globalThis.location;
+  const hist = globalThis.history;
+  if (!loc || typeof hist?.replaceState !== 'function') return;
+  const params = new URLSearchParams(loc.search || '');
+  if (on) params.set('due', 'today');
+  else params.delete('due');
+  const search = params.toString() ? `?${params}` : '';
+  if (search === (loc.search || '')) return;
+  const path = `${loc.pathname}${search}${loc.hash || ''}`;
+  hist.replaceState({ ...(hist.state ?? {}), path }, '', path);
+}
 
 /**
  * Aufgaben nach der Toolbar-Suche gefiltert. Rein clientseitig über Titel und
@@ -1273,8 +1525,11 @@ let state = {
  */
 function filteredTasks() {
   const q = state.searchQuery.trim().toLowerCase();
-  if (!q) return state.tasks;
-  return state.tasks.filter((task) =>
+  const base = state.dueToday
+    ? state.tasks.filter((task) => isDueByToday(task))
+    : state.tasks;
+  if (!q) return base;
+  return base.filter((task) =>
     (task.title       || '').toLowerCase().includes(q) ||
     (task.description || '').toLowerCase().includes(q) ||
     (task.tags ?? []).some((tag) => tag.toLowerCase().includes(q))
@@ -1315,15 +1570,61 @@ function taskQuery() {
   return params.toString() ? `?${params}` : '';
 }
 
-async function loadTasks(container) {
+async function loadTasks(container, renderOpts = {}) {
   // Ohne Container steht diese Seite gar nicht - die Aufgabe wurde von der
   // Uebersicht oder aus dem Kalender geoeffnet (#918), und dort frischt der
   // Aufrufer seine eigene Ansicht auf.
   if (!container) return;
+  await fetchTasks();
+  renderTaskList(container, renderOpts);
+}
+
+/** Nur der Bestand, ohne Neuzeichnen - fuer Wege, die dazwischen noch eine Bewegung spielen. */
+async function fetchTasks() {
   persistAssignedToMe();
   const data  = await api.get(`/tasks${taskQuery()}`);
   state.tasks = data.data ?? [];
+}
+
+/*
+ * AUSTRITT BEIM ABHAKEN (Critique 2026-09-26, A3 P1-4).
+ *
+ * Vorher: die abgehakte Zeile verschwand ohne Uebergang, und weil jedes
+ * Neuzeichnen stagger() rief, fuhr der ganze Rest von 8px unten neu ein. Jetzt
+ * bleibt die Zeile einen Moment im Erledigt-Zustand stehen - man SIEHT, was man
+ * getan hat -, dann klappt ihre Hoehe weg und die Nachbarn ruecken nach. Erst
+ * danach zeichnet die Liste neu, und die ist dann schon so hoch wie das Bild.
+ *
+ * NUR WENN DIE ZEILE DIE ANSICHT WIRKLICH VERLAESST. Ob sie das tut, weiss erst
+ * der neue Bestand (Statusfilter, Suche): die Frage geht an `filteredTasks()`
+ * NACH dem Laden. Bleibt sie stehen - „Erledigt" im Filter, Liste ohne
+ * Statusfilter -, wird nur neu gezeichnet. Ist sie die letzte ihrer Gruppe,
+ * geht die ganze Gruppe mit, sonst stuende ein leerer Kopf bis zum Neuzeichnen.
+ *
+ * Der umgekehrte Weg („Rueckgaengig" im Toast) zieht eine zurueckgekehrte Zeile
+ * auf, statt sie hineinspringen zu lassen.
+ */
+const EXIT_HOLD_MS = 450;
+
+function taskRowEl(container, taskId) {
+  return [...(container.querySelectorAll?.('#task-list .swipe-row') ?? [])]
+    .find((row) => row.dataset.swipeId === String(taskId)) ?? null;
+}
+
+async function reloadWithRowMotion(container, taskId, { holdUntil = 0 } = {}) {
+  if (!container) return;
+  await fetchTasks();
+  const row = state.viewMode === 'list' ? taskRowEl(container, taskId) : null;
+  const staysInView = filteredTasks().some((task) => String(task.id) === String(taskId));
+  if (row && row.isConnected && !staysInView) {
+    const wait = holdUntil - performance.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    const group = row.closest('.task-group');
+    const lastInGroup = group && group.querySelectorAll('.swipe-row').length === 1;
+    await collapseOut(lastInGroup ? group : row);
+  }
   renderTaskList(container);
+  if (!row && staysInView && state.viewMode === 'list') expandIn(taskRowEl(container, taskId));
 }
 
 /**
@@ -1353,12 +1654,53 @@ async function refreshTags() {
  *        Uebergang nach „erledigt" sinnvoll; der Server verwirft die Angabe an
  *        jedem anderen Wechsel still, damit eine Sammelaktion nicht an einem
  *        mitgeschickten Feld scheitert.
+ * @returns {Promise<object>} die Antwort des Servers. Sie traegt bei einer
+ *        erledigten Serie `next_due_date` (#1603) - wer abhakt, reicht sie an
+ *        die Quittung weiter (`seriesDoneText`).
  */
 async function toggleTaskStatus(id, currentStatus, doneByUserId = null) {
   const next = currentStatus === 'done' ? 'open' : 'done';
-  await api.patch(`/tasks/${id}/status`, doneByUserId == null
+  return api.patch(`/tasks/${id}/status`, doneByUserId == null
     ? { status: next }
     : { status: next, done_by_user_id: doneByUserId });
+}
+
+/**
+ * Die Quittung nach Haken oder Wisch in der Liste - EINE fuer beide Gesten.
+ *
+ * Derselbe Rueckweg an beiden: die Geste hatte zwei Endpunkte mit zwei
+ * Antworten, der Wisch bot Undo an, der Tipp - die haeufigere Bedienung - liess
+ * den Eintrag kommentarlos aus dem gefilterten Bild verschwinden.
+ *
+ * BEI EINER SERIE NENNT SIE DAS NAECHSTE MAL (#1603): dort verschwindet nichts,
+ * die Folgeinstanz steht nach dem Neuladen an derselben Stelle, und „Als
+ * erledigt markiert." neben einer offenen Zeile las sich wie ein Fehler.
+ *
+ * Die Schluessel heissen weiter `swiped*`: ihr TEXT ist gestenneutral ("Als
+ * erledigt markiert."), nur der Name nennt die Wischgeste. Ein Rename kostet
+ * jede Locale-Datei fuer eine Namensschuld, die kein Nutzer sieht - vermerkt
+ * statt bezahlt.
+ *
+ * @param {HTMLElement|null} container
+ * @param {number|string} taskId
+ * @param {string} nextStatus der Status NACH dem Wechsel
+ * @param {object} response die Antwort von `toggleTaskStatus`
+ */
+function acknowledgeStatusToggle(container, taskId, nextStatus, response) {
+  window.yuvomi.showToast(
+    seriesDoneText(response)
+      ?? t(nextStatus === 'done' ? 'tasks.swipedDoneToast' : 'tasks.swipedOpenToast'),
+    'default',
+    5000,
+    async () => {
+      try {
+        await toggleTaskStatus(taskId, nextStatus);
+        await reloadWithRowMotion(container, taskId);
+      } catch (err) {
+        window.yuvomi.showToast(err.message, 'danger');
+      }
+    },
+  );
 }
 
 async function loadTaskForEdit(id) {
@@ -1470,8 +1812,9 @@ function renderReminderSection(task = null, reminder = null) {
   //
   // Die Hinweiszeile traegt `.task-field-hint` aus tasks.css und KEINE eigene
   // Klasse: derselbe Satz in derselben Rolle darf nicht dreimal verschieden
-  // aussehen, und die Warnung davor steht schon an `.cal-field-hint` in
-  // calendar.css. Tragfaehig ist das, weil BEIDE Wege in dieses Markup
+  // aussehen. (Der Kalender-Dialog hatte dafuer `.cal-field-hint`; seit
+  // `.form-hint` global in layout.css steht, nimmt er diese.) Tragfaehig ist
+  // das, weil BEIDE Wege in dieses Markup
   // tasks.css mitbringen - die Route /tasks laedt es als Seiten-Blatt, und
   // `openTaskById()` (Dashboard, Kalender) awaitet vorher `ensureTaskStyles()`.
   const locked = access === 'read';
@@ -1613,16 +1956,31 @@ function reminderRemindAtFromForm(form, { dueDate, dueTime = null } = {}) {
 // Modal-Verwaltung (delegiert an Shared Modal-System)
 // --------------------------------------------------------
 
-// Blendet einen Hinweis ein, wenn „Nur Zugewiesene" gewählt ist, aber niemand
-// zugewiesen wurde — dann sieht faktisch nur der Ersteller den Eintrag (#474 Guard).
-function wireVisibilityWarning(panel, selectSel, msName, warnSel) {
+// Zwei Hinweise an der Sichtbarkeit, beide warnen nur und aendern nichts
+// (dieselbe Regel wie im Termin-Dialog, pages/calendar.js):
+// - „Nur Zugewiesene" ohne Person: dann sieht faktisch nur der Ersteller den
+//   Eintrag (#474 Guard).
+// - „Nur ich" mit mindestens einer anderen Person als dem Ersteller: die Zugewiesenen sehen den Eintrag
+//   nicht. Die Kombination bleibt erlaubt und die
+//   Zuweisung stehen - Bestandsdaten und API-Clients fuehren sie.
+function wireVisibilityWarning(panel, selectSel, msName, warnSel, privateWarnSel, creatorId = null) {
   const select = panel.querySelector(selectSel);
   const warn   = panel.querySelector(warnSel);
   if (!select || !warn) return;
+  const privateWarn = privateWarnSel ? panel.querySelector(privateWarnSel) : null;
   const ms = panel.querySelector(`.user-ms[data-ms-name="${msName}"]`);
   const update = () => {
-    const count = getSelectedUserIds(panel, msName).length;
-    warn.hidden = !(select.value === 'assignees' && count === 0);
+    const ids = getSelectedUserIds(panel, msName).map(Number);
+    warn.hidden = !(select.value === 'assignees' && ids.length === 0);
+    // Wer den Eintrag angelegt hat, sieht ihn auch als „Nur ich": gezaehlt
+    // werden nur die anderen. Massgeblich ist `created_by` des Eintrags, nicht
+    // wer ihn gerade bearbeitet; ein neuer gehoert dem angemeldeten Konto.
+    const others = creatorId == null ? ids : ids.filter((id) => id !== Number(creatorId));
+    if (privateWarn) privateWarn.hidden = !(select.value === 'private' && others.length > 0);
+    // Die Sichtbarkeit steht unter „Weitere Einstellungen", die Personen
+    // darueber: aufklappen, nie zuklappen.
+    const shown = [warn, privateWarn].find((el) => el && !el.hidden);
+    shown?.closest('details')?.setAttribute('open', '');
   };
   select.addEventListener('change', update);
   ms?.addEventListener('click', () => setTimeout(update, 0));
@@ -1652,12 +2010,30 @@ function wireCountdownGate(panel) {
   const due    = panel.querySelector('#task-due-date');
   const warn   = panel.querySelector('#task-countdown-warning');
   if (!toggle || !due) return;
+  // DIE WARNUNG ANTWORTET AUF EINEN VERSUCH, sie kuendigt keinen an (Critique
+  // 2026-09-26): sie stand orange auf jedem frischen Formular, bevor jemand
+  // irgendetwas eingegeben hatte - eine Fehlermeldung ohne Fehler. Sie
+  // erscheint jetzt, wenn jemand den gesperrten Schalter antippt, oder wenn
+  // das Entfernen der Faelligkeit einen gesetzten Haken mitnimmt; beides ist
+  // ein Moment, in dem jemand wissen will, warum. Der gesperrte Schalter
+  // selbst und die Hilfszeile darunter bleiben die stille Auskunft.
+  let asked = false;
   const update = () => {
     const hasDue = !!parseDateInput(due.value || '');
-    if (!hasDue && toggle.checked) toggle.checked = false;
+    if (!hasDue && toggle.checked) {
+      toggle.checked = false;
+      asked = true;
+    }
     toggle.disabled = !hasDue;
-    if (warn) warn.hidden = hasDue;
+    if (warn) warn.hidden = hasDue || !asked;
   };
+  // Ein gesperrtes Feld meldet keinen Klick, sein Label schon - der Tipp auf
+  // Bahn oder Text landet dort.
+  toggle.closest?.('label')?.addEventListener('click', () => {
+    if (!toggle.disabled) return;
+    asked = true;
+    update();
+  });
   due.addEventListener('change', update);
   due.addEventListener('input', update);
   update();
@@ -1774,7 +2150,8 @@ function wireTaskForm(panel, { task = null, container = null, onChanged = () => 
   // RRULE-Events binden
   bindRRuleEvents(document, 'task');
   bindUserMultiSelect(panel, 'task_assigned');
-  wireVisibilityWarning(panel, '#task-visibility', 'task_assigned', '#task-visibility-warning');
+  wireVisibilityWarning(panel, '#task-visibility', 'task_assigned', '#task-visibility-warning', '#task-visibility-private-warning',
+    task?.created_by ?? state.currentUserId);
   wireCountdownGate(panel);
 
   // Tag-Editor (#586)
@@ -1919,7 +2296,8 @@ function openBulkTagDialog(taskIds, mode, container) {
           </datalist>
           <p class="task-field-hint">${t('tasks.bulkTagHint', { count: taskIds.length })}</p>
         </div>
-        <div class="modal-actions">
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="close-modal">${t('common.cancel')}</button>
           <button type="submit" class="btn btn--primary">${t('common.apply')}</button>
         </div>
       </form>`,
@@ -2171,8 +2549,15 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
   try {
     let savedTaskId = taskId;
     if (taskId) {
-      await api.put(`/tasks/${taskId}`, body);
-      window.yuvomi.showToast(t('tasks.savedToast'), 'success');
+      // Das Status-Feld hakt genauso ab wie die Checkbox, und der Server legt
+      // dabei genauso die Folgeinstanz an (#1620). Ohne den Hinweis schloss das
+      // Formular mit „gespeichert" ueber einer offenen Zeile, die aussieht wie
+      // die eben erledigte. Derselbe Helfer wie auf jedem anderen Abhak-Weg,
+      // und wie in der Detailansicht haengt der Hinweis am Erledigen selbst:
+      // PUT liefert `next_due_date` nur beim Uebergang nach „erledigt".
+      const response = await api.put(`/tasks/${taskId}`, body);
+      const seriesText = body.status === 'done' ? seriesDoneText(response) : null;
+      window.yuvomi.showToast(seriesText ?? t('tasks.savedToast'), 'success');
     } else {
       const res = await api.post('/tasks', body);
       savedTaskId = res.data?.id;
@@ -2242,7 +2627,8 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
 async function handleRenameSubtask(id, currentTitle, container) {
   const title = await promptModal(t('tasks.subtaskRenamePrompt'), currentTitle);
   // Abbruch (null) und "unverändert" gehen beide ohne Request weiter; ein
-  // leergeräumtes Feld ist kein gültiger Titel und wird wie Abbruch behandelt.
+  // leergeräumtes Feld ist kein gültiger Titel, das meldet promptModal selbst
+  // am Feld und bleibt offen (#1607).
   if (!title || title.trim() === currentTitle) return;
   try {
     await api.put(`/tasks/${id}`, { title: title.trim() });
@@ -2310,10 +2696,13 @@ async function moveTaskToColumn(before, column) {
   // Statuswechsel nötig ist, muss sich auf den alten Stand beziehen.
   if (column === 'archived') {
     await setTaskArchived(before.id, true);
-    return;
+    return null;
   }
   if (before.archived_at) await setTaskArchived(before.id, false);
-  if (before.status !== column) await api.patch(`/tasks/${before.id}/status`, { status: column });
+  // Die Antwort des Statuswechsels geht zurueck: an ihr haengt die Quittung
+  // einer erledigten Serie (#1603). Ohne Statuswechsel gibt es keine.
+  if (before.status !== column) return api.patch(`/tasks/${before.id}/status`, { status: column });
+  return null;
 }
 
 /** Optimistisches Spiegelbild von moveTaskToColumn auf dem State-Objekt. */
@@ -2335,12 +2724,19 @@ async function runColumnMove(task, column, container) {
   const before = { id: task.id, status: task.status, archived_at: task.archived_at };
   applyColumnLocally(task, column);
   renderKanban(container);
+  let seriesText = null;
   try {
-    await moveTaskToColumn(before, column);
+    const response = await moveTaskToColumn(before, column);
+    if (column === 'done') seriesText = seriesDoneText(response);
   } catch (err) {
     window.yuvomi.showToast(err.message, 'danger');
   }
   await loadTasks(container);
+  // NACH dem Neuladen, wie in der Liste: die Karte liegt in „Erledigt", und in
+  // „Offen" ist im selben Moment eine gleich aussehende aufgetaucht. Der Satz
+  // sagt, dass das die naechste ist und nicht dieselbe (#1603). Ohne Serie
+  // bleibt das Brett still - die gewanderte Karte ist dort die Quittung.
+  if (seriesText) window.yuvomi.showToast(seriesText, 'default', 5000);
 }
 
 function renderKanbanCard(task) {
@@ -2358,6 +2754,17 @@ function renderKanbanCard(task) {
       : next === 'in_progress'
         ? t('tasks.kanbanMoveToInProgress')
         : t('tasks.kanbanMoveToOpen');
+  // DER NAME NENNT DIE AUFGABE (#1607). Der Knopf ist ein Icon ohne Text; mit
+  // dem Verb allein hiessen alle Knoepfe einer Spalte gleich, und ein
+  // Screenreader konnte sie nicht auseinanderhalten. Der Tooltip bleibt beim
+  // Verb - die Karte, ueber der er steht, zeigt ihren Titel selbst.
+  const nextName = archived
+    ? t('tasks.unarchiveNamed', { title: task.title })
+    : next === 'done'
+      ? t('tasks.kanbanMoveToDoneNamed', { title: task.title })
+      : next === 'in_progress'
+        ? t('tasks.kanbanMoveToInProgressNamed', { title: task.title })
+        : t('tasks.kanbanMoveToOpenNamed', { title: task.title });
   return `
     <!-- KEIN draggable-Attribut, obwohl die Karte ziehbar ist: SortableJS zieht
          ueber seine draggable-OPTION (einen Selektor), und ein echtes
@@ -2374,6 +2781,7 @@ function renderKanbanCard(task) {
       <div class="kanban-card__meta">
         ${renderPriorityBadge(task.priority)}
         ${due ? `<span class="due-date ${due.cls}"><i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> ${due.label}</span>` : ''}
+        ${renderLockedBadge(task)}
         ${renderTagBadges(task.tags, TAG_BADGES_VISIBLE, task.priority)}
       </div>
       <div class="kanban-card__footer">
@@ -2383,7 +2791,7 @@ function renderKanbanCard(task) {
               weg - zusammen mit dem Ziehen, das dieselbe Bewegung macht. */ ''}
         ${readOnly() ? '' : `
         <button class="kanban-card__status-btn" type="button"
-                data-next-status="${next}" title="${nextLabel}" aria-label="${nextLabel}">
+                data-next-status="${next}" title="${esc(nextLabel)}" aria-label="${esc(nextName)}">
           <i data-lucide="${icon}" aria-hidden="true"></i>
         </button>`}
       </div>
@@ -2403,7 +2811,7 @@ function renderKanban(container) {
     else grouped['open'].push(t);
   }
 
-  const now = new Date();
+  const now = taskSortNow();
   for (const col of cols) {
     grouped[col.status].sort((a, b) => sortTasks(a, b, now));
   }
@@ -2437,13 +2845,93 @@ function renderKanban(container) {
     return;
   }
 
-  const kanbanHtml = kanbanBoardHtml(cols, grouped);
+  const kanbanHtml = kanbanPagerHtml(cols) + kanbanBoardHtml(cols, grouped);
   listEl.replaceChildren();
   listEl.insertAdjacentHTML('beforeend', kanbanHtml);
 
   if (window.lucide) window.lucide.createIcons({ el: listEl });
   wireKanbanSortable(container);
   wireKanbanClicks(container);
+  wireKanbanPager(container);
+}
+
+/**
+ * MOBIL IST DAS BRETT EIN BLAETTERN, KEINE LAENGERE LISTE (R9 M2, A3 P2-7).
+ *
+ * Gemessen 390x844 vorher: die Spalten standen untereinander, „In Bearbeitung"
+ * begann bei y=1561 - zwei Bildschirme Wischen bis zur zweiten Spalte. Unter
+ * 640px legt tasks.css die Spalten nebeneinander in einen Scroll-Snap-Traeger,
+ * eine Spalte je Seite. Die Punkte darueber sagen, wo man ist, und fuehren per
+ * Tipp dorthin - der Spaltenkopf nennt Titel und Zahl, die Punkte nur die Lage.
+ * Ab 640px sind sie ausgeblendet; dort stehen die Spalten ohnehin nebeneinander.
+ *
+ * DIE SEITE UEBERLEBT DAS NEUZEICHNEN. renderKanban() baut das Brett nach
+ * jedem Spaltenwechsel neu, und ohne den Merker spraenge es danach auf die
+ * erste Spalte zurueck - genau dann, wenn man in einer anderen arbeitet.
+ */
+let kanbanPage = null;
+let kanbanPagerObserver = null;
+
+function kanbanPagerHtml(cols) {
+  const current = cols.some((col) => col.status === kanbanPage) ? kanbanPage : cols[0]?.status;
+  return `
+    <div class="kanban-pager" role="group" aria-label="${esc(t('tasks.kanbanView'))}">
+      ${cols.map((col) => `
+      <button type="button" class="kanban-pager__dot" data-kanban-page="${col.status}"
+              aria-label="${esc(col.label)}"${col.status === current ? ' aria-current="true"' : ''}></button>`).join('')}
+    </div>`;
+}
+
+function wireKanbanPager(container) {
+  kanbanPagerObserver?.disconnect();
+  kanbanPagerObserver = null;
+  const board = container.querySelector('.kanban-board');
+  const pager = container.querySelector('.kanban-pager');
+  if (!board || !pager) return;
+
+  const columnOf = (status) => board.querySelector(`.kanban-col[data-status="${status}"]`);
+  const mark = (status) => {
+    if (!status) return;
+    kanbanPage = status;
+    pager.querySelectorAll('[data-kanban-page]').forEach((dot) => {
+      if (dot.dataset.kanbanPage === status) dot.setAttribute('aria-current', 'true');
+      else dot.removeAttribute('aria-current');
+    });
+  };
+  // Relativ zur Lage im Traeger statt ueber offsetLeft: so stimmt es auch in
+  // einer RTL-Sprache, wo die erste Spalte rechts steht.
+  const scrollToColumn = (status, behavior) => {
+    const col = columnOf(status);
+    if (!col) return;
+    const delta = col.getBoundingClientRect().left - board.getBoundingClientRect().left;
+    if (delta) board.scrollBy({ left: delta, behavior });
+  };
+
+  pager.addEventListener('click', (e) => {
+    const dot = e.target.closest?.('[data-kanban-page]');
+    if (!dot) return;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    scrollToColumn(dot.dataset.kanbanPage, reduce ? 'auto' : 'smooth');
+    mark(dot.dataset.kanbanPage);
+  });
+
+  // Nur wenn das Brett wirklich blaettert (mobil) - am Desktop stehen alle
+  // Spalten nebeneinander, und dort gibt es nichts nachzuziehen.
+  if (board.scrollWidth <= board.clientWidth) return;
+  if (kanbanPage) scrollToColumn(kanbanPage, 'auto');
+
+  // `scrollsnapchange` meldet die Spalte, auf der der Traeger zur Ruhe kommt
+  // (Chrome/Edge); Safari und Firefox kennen es nicht, dort zieht ein
+  // IntersectionObserver die Punkte nach - schon waehrend des Wischens.
+  if ('onscrollsnapchange' in window) {
+    board.addEventListener('scrollsnapchange', (e) => mark(e.snapTargetInline?.dataset?.status));
+  } else if (typeof IntersectionObserver === 'function') {
+    kanbanPagerObserver = new IntersectionObserver((entries) => {
+      const seen = entries.find((entry) => entry.isIntersecting);
+      if (seen) mark(seen.target.dataset.status);
+    }, { root: board, threshold: 0.6 });
+    board.querySelectorAll('.kanban-col').forEach((col) => kanbanPagerObserver.observe(col));
+  }
 }
 
 /**
@@ -2516,11 +3004,16 @@ function kanbanBoardHtml(cols, grouped) {
               </span>
             </button>
             <span class="kanban-col__count">${grouped[col.status].length}</span>
-            ${col.status === 'done' && grouped.done.length && !readOnly() ? `
-            <button type="button" class="btn btn--ghost btn--icon btn--icon-sm kanban-col__action" data-kanban-archive-done
-                    aria-label="${t('tasks.kanbanArchiveDone')}" title="${t('tasks.kanbanArchiveDone')}">
-              <i data-lucide="archive" class="icon-sm" aria-hidden="true"></i>
-            </button>` : ''}
+            ${/* Die Archiv-Aktion ist eine Zeilenaktion (Kanon), kein 44px-Knopf:
+                * der hob den Erledigt-Kopf 20px ueber seine Nachbarn (A3 P2-1). */ ''}
+            ${col.status === 'done' && grouped.done.length && !readOnly()
+              ? rowActionHtml({
+                icon: 'archive',
+                label: t('tasks.kanbanArchiveDone'),
+                className: 'kanban-col__action',
+                attrs: { 'data-kanban-archive-done': true, title: t('tasks.kanbanArchiveDone') },
+              })
+              : ''}
           </div>
           <div class="kanban-col__body" id="${bodyId}" data-drop-zone="${col.status}"${collapsed ? ' hidden' : ''}>
             ${grouped[col.status].length
@@ -2799,7 +3292,7 @@ function renderDoerPicker(task, isDone, archived) {
     // Handlung, und eines davon fuehrte in eine 403.
     icon: tablett ? 'check' : 'user-round-check',
     triggerClass: tablett
-      ? 'task-status-btn task-status-btn--open task-status-btn--pick'
+      ? 'task-status-btn task-status-btn--open task-status-btn--pick check-ring'
       : 'btn btn--ghost btn--icon btn--icon-sm task-doer-btn',
     items: members.map((u) => ({
       action: 'pick-doer', id: u.id, label: u.display_name, icon: 'user-round',
@@ -2829,8 +3322,17 @@ function renderHistoryEntry(entry) {
   // Der Avatar traegt hier NICHTS bei, was nicht daneben stuende: der Name
   // steht als Text in der Metazeile. Ohne aria-hidden liest die Sprachausgabe
   // „AJ ... Alex Johnson" - derselbe Mensch zweimal, einmal als Kuerzel.
+  //
+  // LISTE + DETAIL (#1550): die Zeile ist eine Zeile des Bausteins wie eine
+  // Aufgabe in der Liste. `data-md-id` ist die AUFGABE, nicht der Vorgang -
+  // `?open=` nennt in der ganzen App eine Aufgabe, und eine Aufgabe ist
+  // hoechstens einmal erledigt (uniq_task_completion), also traegt keine
+  // zweite Zeile dieselbe ID. `data-task-id` laesst das Loeschen aus der
+  // Spalte die Zeile sofort ausblenden (taskRowsIn in task-detail.js), wie in
+  // der Liste. Die Zeile ist selbst der Knopf, also braucht sie kein
+  // `data-md-focus`: Pfeile, Enter und Esc landen auf ihr.
   return `
-    <button type="button" class="list-row history-row" data-history-task="${entry.task_id}">
+    <button type="button" class="list-row history-row" data-history-task="${entry.task_id}" data-md-id="${entry.task_id}" data-task-id="${entry.task_id}">
       <span class="history-row__avatar" aria-hidden="true">${avatar}</span>
       <span class="list-row__main history-row__main">
         <span class="list-row__name">${esc(entry.title)}</span>
@@ -2909,6 +3411,14 @@ function renderHistoryPeople() {
 
 /** Die Personen-Chips verdrahten - beide Zweige von renderHistory zeigen sie. */
 function wireHistoryPeople(root, container) {
+  // Die Leiste entsteht bei jedem Laden neu - der Schluessel laesst die neue
+  // Kapsel von der Stelle der alten gleiten.
+  const people = root.querySelector('.history-people');
+  if (people) attachSegmentIndicator(people, { key: 'tasks-history-people' });
+  // Die Reihe scrollt, sobald sie nicht passt - in der Listenbahn neben dem
+  // Detail (#1550, 420-520px) schon mit vier Mitgliedern. Ohne Anriss saehe
+  // sie dort vollstaendig aus (DESIGN.md, Scroll-Affordanz).
+  wireScrollFade(people);
   root.querySelectorAll('[data-history-user]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const raw = btn.dataset.historyUser;
@@ -2918,9 +3428,12 @@ function wireHistoryPeople(root, container) {
   });
 }
 
-function renderHistory(container) {
+function renderHistory(container, { afterWrite = false, quiet = false } = {}) {
   const listEl = container.querySelector('#task-list');
   if (!listEl) return;
+  // Die Reihenfolge VOR dem Neuzeichnen - fuer das Weiterruecken der Spalte,
+  // wie in der Liste (syncHistoryPane).
+  const orderBefore = mdRowIds(listEl);
 
   if (state.history.error) {
     // Die Personenauswahl bleibt STEHEN. Ohne sie war ein Fehler unter einem
@@ -2940,6 +3453,7 @@ function renderHistory(container) {
     });
     wireHistoryPeople(listEl, container);
     if (window.lucide) window.lucide.createIcons({ el: listEl });
+    syncHistoryPane(listEl, orderBefore, { afterWrite, quiet });
     return;
   }
 
@@ -2951,7 +3465,7 @@ function renderHistory(container) {
             <span>${esc(historyDayLabel(day))}</span>
             <span class="list-group__count">${dayEntries.length}</span>
           </h2>
-          <div class="list-rows">${dayEntries.map(renderHistoryEntry).join('')}</div>
+          <div class="row-carrier">${dayEntries.map(renderHistoryEntry).join('')}</div>
         </div>`).join('')
     // Ein Leerzustand ohne Anlegen-Knopf: „erledige etwas" ist keine Handlung,
     // die dieser Bildschirm anbieten kann, und der Hinweis erklärt stattdessen,
@@ -2976,7 +3490,7 @@ function renderHistory(container) {
     </div>` : ''}
   `);
   if (window.lucide) window.lucide.createIcons({ el: listEl });
-  stagger(listEl.querySelectorAll('.history-row'));
+  stagger(listEl.querySelectorAll('.history-row'), { host: listEl });
 
   wireHistoryPeople(listEl, container);
   listEl.querySelector('#history-more')?.addEventListener('click', (e) => {
@@ -2987,25 +3501,34 @@ function renderHistory(container) {
     loadHistory(container, { append: true });
   });
   listEl.querySelectorAll('[data-history-task]').forEach((row) => {
-    row.addEventListener('click', () => openTaskFromHistory(row.dataset.historyTask, container));
+    row.addEventListener('click', () => openHistoryEntry(row.dataset.historyTask, row, container));
   });
+  syncHistoryPane(listEl, orderBefore, { afterWrite, quiet });
 }
 
-/** Ein Verlaufseintrag führt zu seiner Aufgabe - der einzige Weg von hier weg. */
-async function openTaskFromHistory(id, container) {
-  try {
-    const [task, reminder] = await Promise.all([loadTaskForEdit(id), loadReminderForTask(id)]);
-    openTaskView(task, reminder, container);
-  } catch (err) {
-    window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
-  }
+/**
+ * Ein Verlaufseintrag fuehrt zu seiner Aufgabe - der einzige Weg von hier weg.
+ *
+ * DERSELBE WEG WIE DER TITEL EINER AUFGABE IN DER LISTE (#1550): ab der
+ * Schwelle waehlt der Klick die Zeile aus und die Aufgabe steht rechts in der
+ * Spalte, darunter geht ihr Blatt auf (openTaskSheet ueber `openNarrow`).
+ * Bis dahin oeffnete der Verlauf das Blatt auf jeder Breite selbst, und neben
+ * der 720px-Bahn blieb die rechte Haelfte leer.
+ */
+function openHistoryEntry(id, trigger, container) {
+  if (taskMd) taskMd.open(id, trigger);
+  else openTaskSheet(id, container);
 }
 
 /**
  * Verlauf laden. `append` hängt die nächste Seite an, alles andere fängt vorn
  * an - ein Personenwechsel darf keine Mischung aus zwei Abfragen stehen lassen.
+ *
+ * `afterWrite`: nachgeladen, weil etwas geschrieben wurde (renderTaskList) -
+ * die Spalte zieht dann nach (syncHistoryPane); `quiet`: die Aenderung kam
+ * aus der Spalte selbst, sie zeigt sie schon.
  */
-async function loadHistory(container, { append = false } = {}) {
+async function loadHistory(container, { append = false, afterWrite = false, quiet = false } = {}) {
   // Ein zweiter Aufruf, waehrend einer laeuft, WARTET auf den ersten und faehrt
   // dann selbst - er wird nicht verworfen. Ein blosses `return` hier hatte den
   // Klick auf ein Personen-Chip stillschweigend geschluckt: `userId` war schon
@@ -3036,7 +3559,7 @@ async function loadHistory(container, { append = false } = {}) {
   } finally {
     state.history.loading = null;
     release();
-    renderHistory(container);
+    renderHistory(container, { afterWrite, quiet });
   }
 }
 
@@ -3044,7 +3567,7 @@ async function loadHistory(container, { append = false } = {}) {
 // Partielle DOM-Updates
 // --------------------------------------------------------
 
-function renderTaskList(container) {
+function renderTaskList(container, { paneQuiet = false } = {}) {
   // VOR dem Ladefehler der Aufgaben: der Verlauf hat seinen eigenen Bestand und
   // seinen eigenen Fehler. Ein gescheitertes `/tasks` sagt nichts darüber, ob
   // die Vorgänge zu haben sind - stünde die Weiche danach, zeigte der Verlauf
@@ -3055,8 +3578,9 @@ function renderTaskList(container) {
     // dort aendert sich der Verlauf mit: ein wieder geoeffneter Haken loescht
     // seinen Eintrag serverseitig. Ohne das Nachladen blieb die zurueckgenommene
     // Erledigung stehen, bis jemand die Ansicht verliess.
-    loadHistory(container);
-    return;
+    // Das Versprechen geht zurueck: render() wartet beim Einstieg darauf, bevor
+    // es Liste + Detail einhaengt (der Deep-Link braucht die Zeilen).
+    return loadHistory(container, { afterWrite: true, quiet: paneQuiet });
   }
   // VOR der Kanban-Weiche: nach einem Ladefehler ist `state.tasks` ebenfalls
   // leer, und beide Ansichten haengen an demselben `#task-list`. Nur die
@@ -3069,7 +3593,7 @@ function renderTaskList(container) {
         description: t('common.loadErrorDescription'),
         error: state.loadError,
         retryLabel: t('common.retry'),
-        onRetry: () => render(container, { user: state.user }),
+        onRetry: () => render(container, { user: state.user, signal: pageSignal }),
       });
     }
     return;
@@ -3080,410 +3604,370 @@ function renderTaskList(container) {
   }
   const listEl = container.querySelector('#task-list');
   if (!listEl) return;
+  // Die Reihenfolge VOR dem Neuzeichnen: verlaesst die ausgewaehlte Zeile die
+  // Ansicht, rueckt die Auswahl auf ihre Nachbarin (syncPaneAfterRender).
+  const orderBefore = mdRowIds(listEl);
   listEl.replaceChildren();
   listEl.insertAdjacentHTML('beforeend', renderTaskGroups(filteredTasks(), state.groupMode));
   if (window.lucide) window.lucide.createIcons({ el: listEl });
-  stagger(listEl.querySelectorAll('.swipe-row, .kanban-card'));
+  syncPaneAfterRender(listEl, orderBefore, { quiet: paneQuiet });
+  stagger(listEl.querySelectorAll('.swipe-row, .kanban-card'), { host: listEl });
   updateBulkActionsBar(container);
   wireSwipeGestures(container);
-  maybeShowSwipeHint(container);
+  // Kein Hinweis auf eine Geste, die der Auswahlmodus gerade abschaltet.
+  if (!state.bulkSelectMode) maybeShowSwipeHint(container);
   listEl.querySelector('#empty-cta-tasks')?.addEventListener('click', () => {
     document.querySelector('.page-fab')?.click();
   });
 }
 
-function makeRemoveSpan() {
-  const rm = document.createElement('span');
-  rm.className = 'filter-chip__remove';
-  rm.setAttribute('aria-hidden', 'true');
-  const icon = document.createElement('i');
-  icon.setAttribute('data-lucide', 'x');
-  icon.className = 'icon-sm';
-  rm.appendChild(icon);
-  return rm;
-}
-
 /**
- * Ein Filter-Chip. Immer ein <button> — die Chips schalten Filter, sind also
- * Bedienelemente und müssen fokussierbar sein und ihren Zustand melden.
- * Dokumente und Kontakte rendern dieselbe .filter-chip-Klasse ebenfalls als
- * Button mit aria-pressed; hier lag zuvor ein <span> ohne Tastaturzugang.
+ * Wie viele Filter gerade wirken - die ZAHL am Knopf „Filter (n)".
  *
- * pressed === null markiert Aktions-Chips (zuletzt verwendete Filter), die
- * keinen Ein/Aus-Zustand haben und daher kein aria-pressed tragen dürfen.
+ * Sie ersetzt die Chipzeile, die bis zur Kopfregel mobil (2026-09-26) unter
+ * dem Kopf stand und dort 54px kostete: der Zustand ist jetzt eine Zahl am
+ * Knopf, die Filter selbst stehen beschriftet im Blatt (Kalender-Muster).
+ *
+ * Im Kanban zaehlt der Statusfilter nicht mit: die Spalten SIND der Status,
+ * er wird dort weder gesendet noch angeboten, und eine Zahl, die ihn mitzaehlt,
+ * behauptete einen unsichtbaren Filter (Audit P3). „Geplante anzeigen" zaehlt
+ * dagegen mit, obwohl es die Liste erweitert statt sie einzuengen: auch das ist
+ * ein gesetzter Zustand, den man von aussen sehen muss - vorher trug ihn ein
+ * eigener Chip, jetzt nur noch diese Zahl.
  */
-function makeChip({ label, active = false, extraClass = '', pressed = undefined, withRemove = false }) {
-  const chip = document.createElement('button');
-  chip.type = 'button';
-  chip.className = `filter-chip${active ? ' filter-chip--active' : ''}${extraClass ? ` ${extraClass}` : ''}`;
-  if (pressed !== null) chip.setAttribute('aria-pressed', String(pressed ?? active));
-  // Das Entfernen-X ist aria-hidden (Dekor im selben Button); die Entfernen-
-  // Aktion muss deshalb in den Accessible Name des Chips selbst.
-  if (withRemove && label != null) {
-    chip.setAttribute('aria-label', t('tasks.removeFilter', { label }));
-  }
-  if (label != null) chip.appendChild(document.createTextNode(label));
-  if (withRemove) chip.appendChild(makeRemoveSpan());
-  return chip;
-}
-
-function renderFilters(container) {
-  const bar   = container.querySelector('#filter-bar');
-  const panel = container.querySelector('#filter-panel');
-  const toggleSlot = container.querySelector('#filter-toggle-slot');
-  if (!bar || !panel || !toggleSlot) return;
-
-  // Jedes Rendern tauscht die Chips aus. Stand der Fokus auf einem davon, fiele
-  // er danach aufs Dokument - und Escape erreichte das Panel nicht mehr, genau
-  // nachdem jemand darin einen Filter gewaehlt hat (#1373, Review). Also merken,
-  // WELCHER Chip es war, und ihn nach dem Rendern auf dem neuen Knoten setzen.
-  const focusBefore = rememberFilterFocus(document.activeElement, { bar, panel, toggleSlot });
-
-  const statusLabels   = STATUS_LABELS();
-  const priorityLabels = PRIORITY_LABELS();
-  // Im Kanban ist der Statusfilter unwirksam (die Spalten SIND der Status) und
-  // wird nicht als Chip gezeigt - daher auch nicht mitzählen, sonst behauptet
-  // "Filter N" einen unsichtbaren Filter (Audit P3).
-  const activeCount    = (state.viewMode === 'kanban' ? 0 : state.filters.status.length)
+function activeFilterCount() {
+  return statusDeviationCount()
     + state.filters.priority.length
     + state.filters.assigned_to.length
     + state.filters.category.length
-    + state.filters.tags.length;
+    + state.filters.tags.length
+    + (state.showFuture ? 1 : 0)
+    + (state.dueToday ? 1 : 0);
+}
 
-  // ---- Chip-Leiste: nur aktive Filter + Toggle-Button ----
-  bar.replaceChildren();
+/**
+ * Wie viele Filter der Statusachse zaehlen: nur eine ABWEICHUNG vom Standard.
+ *
+ * - Der Standard „Offen" zaehlt nicht - er ist der Ruhezustand, und ein Knopf,
+ *   der im Ruhezustand „Filter 1" in Aktiv-Farbe traegt, sagt nichts mehr.
+ * - Im Brett wirkt die Achse nicht (die Spalten SIND der Status).
+ * - Die Weitung, die „Bis heute faellig" selbst gesetzt hat, ist Teil DIESES
+ *   Filters und zaehlt nicht doppelt.
+ * - Sonst jeder gewaehlte Wert; der leere Status („alle") ist eine Abweichung
+ *   und zaehlt als einer.
+ */
+function statusDeviationCount() {
+  if (state.viewMode === 'kanban') return 0;
+  const status = state.filters.status;
+  const isDefault = status.length === DEFAULT_STATUS_FILTER.length
+    && DEFAULT_STATUS_FILTER.every((value) => status.includes(value));
+  if (isDefault) return 0;
+  const widenedByDueToday = state.dueToday && state.dueTodayWidened
+    && status.length === 2 && status.includes('open') && status.includes('in_progress');
+  if (widenedByDueToday) return 0;
+  return Math.max(1, status.length);
+}
 
-  // Ein Chip je gewähltem Wert, in jeder Achse. Jeder trägt seinen eigenen
-  // Wert, damit das Entfernen genau diesen einen löst und nicht die ganze
-  // Auswahl (#671) - vorher gab es je Achse nur einen Wert und damit einen Chip.
-  if (state.viewMode !== 'kanban') {
-    state.filters.status.forEach((value) => {
-      const chip = makeChip({ label: statusLabels[value] ?? value, active: true, withRemove: true });
-      chip.dataset.filter = 'status';
-      chip.dataset.value = value;
-      bar.appendChild(chip);
-    });
+/**
+ * Die Eintraege des EINEN Werkzeugmenues im Kopf.
+ *
+ * Die Mehrfachauswahl gibt es nur in der Liste: im Brett ist ein Eintrag
+ * `disabled` statt weg, damit das Menue beim Ansichtswechsel nicht umspringt.
+ * Nur-lesen (#467) nimmt die schreibenden Eintraege ganz heraus - Auswahl
+ * fuehrt nur zur Sammelaktionsleiste, und die schreibt in jeder Spalte.
+ */
+function toolsMenuItems() {
+  const isList = state.viewMode === 'list';
+  const items = [];
+  if (!readOnly()) {
+    items.push({ action: 'bulk-select', label: t('tasks.bulkSelect'), icon: 'list-checks',
+      checked: state.bulkSelectMode, disabled: !isList });
+    // Nur waehrend der Auswahl sichtbar (syncBulkMenu): die drei Sammelaktionen,
+    // die in der einzeiligen Pille keinen Platz haben.
+    items.push(
+      { action: 'bulk-archive', label: t('tasks.bulkArchive'), icon: 'archive', disabled: true },
+      { action: 'bulk-tag-add', label: t('tasks.bulkTagAdd'), icon: 'tag', disabled: true },
+      { action: 'bulk-tag-remove', label: t('tasks.bulkTagRemove'), icon: 'eraser', disabled: true },
+    );
   }
-  state.filters.priority.forEach((value) => {
-    const chip = makeChip({ label: priorityLabels[value] ?? value, active: true, withRemove: true });
-    chip.dataset.filter = 'priority';
-    chip.dataset.value = value;
-    bar.appendChild(chip);
-  });
-  // Aktive Personen-Filter — außer der eigenen ID, die deckt der dedizierte
-  // „Mir zugewiesen"-Chip ab (keine Doppel-Anzeige).
-  state.filters.assigned_to.forEach((value) => {
-    if (state.currentUserId != null && Number(value) === Number(state.currentUserId)) return;
-    const u = state.users.find((user) => user.id === Number(value));
-    const chip = makeChip({
-      label: u?.display_name ?? t('tasks.filterGroupPerson'),
-      active: true,
-      withRemove: true,
-    });
-    chip.dataset.filter = 'assigned_to';
-    chip.dataset.value = value;
-    bar.appendChild(chip);
-  });
-  // Ein Chip je gewähltem Tag. Jeder trägt seinen eigenen Wert, damit das
-  // Entfernen genau diesen einen löst und nicht die ganze Auswahl.
-  state.filters.category.forEach((value) => {
-    const chip = makeChip({ label: catLabel(value), active: true, withRemove: true });
-    chip.dataset.filter = 'category';
-    chip.dataset.value = value;
-    bar.appendChild(chip);
-  });
-  state.filters.tags.forEach((tag) => {
-    const chip = makeChip({ label: tag, active: true, withRemove: true });
-    chip.dataset.filter = 'tag';
-    chip.dataset.value = tag;
-    bar.appendChild(chip);
-  });
-
-  // "Mir zugewiesen" Schnellzugriff — nur sinnvoll bei mehreren Familienmitgliedern.
-  // Icon+Label bewusst identisch zum Kalender-Toggle (gleiche Fähigkeit, eine Gestalt).
-  if (state.users.length > 1 && state.currentUserId != null) {
-    const meActive = isAssignedToMe();
-    const meChip = makeChip({ label: null, active: meActive, extraClass: 'filter-chip--toggle' });
-    meChip.id = 'filter-assigned-me';
-    const meIcon = document.createElement('i');
-    meIcon.setAttribute('data-lucide', 'user');
-    meIcon.className = 'icon-sm';
-    meIcon.setAttribute('aria-hidden', 'true');
-    const meLabel = document.createElement('span');
-    meLabel.textContent = t('tasks.assignedToMe');
-    meChip.append(meIcon, meLabel);
-    if (meActive) meChip.appendChild(makeRemoveSpan());
-    bar.appendChild(meChip);
+  items.push({ action: 'toggle-history', label: t('tasks.historyView'), icon: 'history',
+    checked: state.viewMode === 'history' });
+  if (!readOnly()) {
+    items.push(
+      { separator: true },
+      { action: 'manage-categories', label: t('tasks.manageCategories'), icon: 'folder-tree' },
+      // Das Etiketten-Icon fuer die Tags, der Ordnerbaum fuer die Kategorien:
+      // die beiden Achsen sind bewusst getrennt, dieselbe Bildsprache haette
+      // sie wieder eingeebnet.
+      { action: 'manage-tags', label: t('tasks.manageTags'), icon: 'tags' },
+    );
   }
+  return items;
+}
 
-  // "Geplante anzeigen" Toggle-Chip — Icon+Label wie „Mir zugewiesen" (beide Toggles).
-  const futureChip = makeChip({ label: null, active: state.showFuture, extraClass: 'filter-chip--toggle' });
-  futureChip.id = 'filter-show-future';
-  const futureIcon = document.createElement('i');
-  futureIcon.setAttribute('data-lucide', 'calendar-clock');
-  futureIcon.className = 'icon-sm';
-  futureIcon.setAttribute('aria-hidden', 'true');
-  const futureLabel = document.createElement('span');
-  futureLabel.textContent = t('tasks.showFuture');
-  futureChip.append(futureIcon, futureLabel);
-  if (state.showFuture) {
-    futureChip.appendChild(makeRemoveSpan());
-  }
-  bar.appendChild(futureChip);
+/** Ein Filter-Chip im Blatt: Button mit aria-pressed, Wert am Knoten. */
+function filterChipHtml({ filter, value, label, active }) {
+  return `<button type="button" class="filter-chip filter-chip--sm${active ? ' filter-chip--active' : ''}"
+    data-filter="${esc(filter)}" data-value="${esc(String(value))}" aria-pressed="${active}">${esc(label)}</button>`;
+}
 
-  const toggleBtn = document.createElement('button');
-  toggleBtn.id = 'filter-toggle-btn';
-  // `filter-chip` trägt die Form, `filter-toggle-btn` nur noch die Abweichung:
-  // der Knopf stand mit einer eigenen, zeichengleichen Kopie derselben vierzehn
-  // Deklarationen daneben (siehe tasks.css) und war damit der vierte Chip, den
-  // die geteilte Datei eigentlich abgelöst hat.
-  toggleBtn.className = `filter-chip filter-toggle-btn${state.filterPanelOpen ? ' filter-toggle-btn--open' : ''}${activeCount > 0 ? ' filter-toggle-btn--active' : ''}`;
-  toggleBtn.setAttribute('aria-expanded', String(state.filterPanelOpen));
-  toggleBtn.setAttribute('aria-controls', 'filter-panel');
+/**
+ * Die Gruppen des Filterblatts, als `{ heading, html }` fuer openFilterSheet.
+ *
+ * Eine reine Funktion des Zustands: gemessen wird, WAS das Blatt anbietet,
+ * nicht wie es aufgeht (test:task-filters).
+ *
+ * - Zuletzt verwendet: die gemerkten Sets als Aktions-Chips (kein Ein/Aus,
+ *   deshalb ohne aria-pressed), zuerst, weil sie die schnellste Wahl sind.
+ * - Anzeigen: „Mir zugewiesen" und „Geplante anzeigen" als Schalter - die
+ *   beiden Chips, die vorher dauerhaft in der Zeile unter dem Kopf standen.
+ * - Gruppieren nach: nur in der Liste; das Brett gruppiert nach Status.
+ * - Status (nicht im Kanban, Audit A1-07), Prioritaet, Person, Kategorie
+ *   (D#1017), Tag: je Wert ein Chip, Mehrfachauswahl je Achse (#671).
+ */
+function filterSheetGroups() {
+  const groups = [];
+  const chipsHtml = (key, label, items) => `
+    <div class="filter-panel__chips" role="group" aria-label="${esc(label)}">
+      ${items.map((item) => filterChipHtml({
+        filter: key, value: item.value, label: item.label,
+        active: key === 'tag' ? hasTagFilter(item.value) : hasFilter(key, item.value),
+      })).join('')}
+    </div>`;
 
-  const iconWrap = document.createElement('i');
-  iconWrap.setAttribute('data-lucide', 'sliders-horizontal');
-  iconWrap.className = 'icon-sm';
-  iconWrap.setAttribute('aria-hidden', 'true');
-  toggleBtn.appendChild(iconWrap);
-
-  const label = document.createElement('span');
-  label.textContent = t('tasks.filterBtn');
-  toggleBtn.appendChild(label);
-
-  if (activeCount > 0) {
-    const badge = document.createElement('span');
-    badge.className = 'filter-toggle-btn__count';
-    badge.textContent = String(activeCount);
-    toggleBtn.appendChild(badge);
-  }
-
-  // In den festen Platz VOR der Leiste, nicht ans Ende der scrollenden Leiste
-  // (#1373): dort schob jeder gewaehlte Filter den Knopf weiter nach rechts aus
-  // dem sichtbaren Streifen, und das offene Panel hatte keinen Rueckweg mehr.
-  toggleSlot.replaceChildren(toggleBtn);
-
-  // ---- Zuletzt verwendete Filter als Quick-Chips ----
-  const statusLabelsMap   = STATUS_LABELS();
-  const priorityLabelsMap = PRIORITY_LABELS();
-  const recent = getRecentFilters();
-  recent.forEach((f) => {
+  const statusLabels = STATUS_LABELS();
+  const priorityLabels = PRIORITY_LABELS();
+  const recent = getRecentFilters().map((f) => {
     const parts = [];
     // Jeder Wert jeder Achse wird benannt: seit #671 kann ein gemerktes Set
     // "Hoch" UND "Mittel" enthalten, und ein Chip, der nur den ersten nennt,
-    // schaltete beim Klick mehr, als er behauptet.
-    f.status.forEach((v) => parts.push(statusLabelsMap[v] ?? v));
-    f.priority.forEach((v) => parts.push(priorityLabelsMap[v] ?? v));
+    // schaltete beim Klick mehr, als er behauptet. Die Tags gehoeren dazu,
+    // weil der Chip sie mitsetzt (#586).
+    f.status.forEach((v) => parts.push(statusLabels[v] ?? v));
+    f.priority.forEach((v) => parts.push(priorityLabels[v] ?? v));
     f.assigned_to.forEach((v) => {
       const u = state.users.find((user) => user.id === Number(v));
       if (u) parts.push(u.display_name);
     });
     f.category.forEach((v) => parts.push(catLabel(v)));
-    // Die Tags gehören in die Beschriftung, weil der Chip sie beim Klick
-    // mitsetzt: ohne sie hieße ein Chip „Offen" und schaltete zusätzlich
-    // Tag-Filter, die niemand am Chip ablesen kann (#586).
     parts.push(...f.tags);
-    if (!parts.length) return;
-    // Aktions-Chip (wendet ein Filter-Set an), kein Ein/Aus-Zustand → pressed:null.
-    const chip = makeChip({ label: parts.join(' · '), extraClass: 'filter-chip--recent', pressed: null });
-    chip.dataset.recentFilter = JSON.stringify(f);
-    bar.appendChild(chip);
-  });
-
-  if (window.lucide) {
-    window.lucide.createIcons({ el: bar });
-    window.lucide.createIcons({ el: toggleSlot });
-  }
-
-  // ---- Filter-Panel: Gruppen mit allen Optionen ----
-  panel.hidden = !state.filterPanelOpen;
-  panel.replaceChildren();
-
-  if (state.filterPanelOpen) {
-    // Im Kanban entfällt die Status-Gruppe: die Spalten übernehmen diese
-    // Achse bereits (Audit A1-07).
-    const groups = [
-      ...(state.viewMode !== 'kanban' ? [{
-        key: 'status',
-        label: t('tasks.filterGroupStatus'),
-        items: FILTER_STATUSES().map((s) => ({ value: s.value, label: s.label })),
-      }] : []),
-      {
-        key: 'priority',
-        label: t('tasks.filterGroupPriority'),
-        items: PRIORITIES().map((p) => ({ value: p.value, label: p.label })),
-      },
-    ];
-    if (state.users.length > 1) {
-      groups.push({
-        key: 'assigned_to',
-        label: t('tasks.filterGroupPerson'),
-        items: state.users.map((u) => ({ value: String(u.id), label: u.display_name })),
-      });
-    }
-    // Kategorie in beiden Ansichten: die Liste kann danach gruppieren, das
-    // Board nicht, weil seine Spalten schon der Status sind (D#1017). Die
-    // Beschriftung ist dieselbe wie im Formular, nicht ein fuenfter Wortlaut.
-    if (state.categories.length) {
-      groups.push({
-        key: 'category',
-        label: t('tasks.categoryLabel'),
-        items: state.categories.map((c) => ({ value: c.key, label: catLabel(c.key) })),
-      });
-    }
-    // Tags nur anbieten, wenn welche vergeben sind — ohne CalDAV-Spiegel und ohne
-    // eigene Vergabe bleibt die Gruppe sonst als leere Zeile stehen (#586).
-    if (state.allTags.length) {
-      groups.push({
-        key: 'tag',
-        label: t('tasks.filterGroupTag'),
-        items: state.allTags.map((entry) => ({ value: entry.tag, label: entry.tag })),
-      });
-    }
-
-    groups.forEach((group) => {
-      const section = document.createElement('div');
-      section.className = 'filter-panel__group';
-      section.setAttribute('role', 'group');
-      section.setAttribute('aria-label', group.label);
-
-      const heading = document.createElement('div');
-      heading.className = 'filter-panel__label';
-      heading.textContent = group.label;
-      section.appendChild(heading);
-
-      const row = document.createElement('div');
-      row.className = 'filter-panel__chips';
-
-      group.items.forEach((item) => {
-        // Jede Gruppe erlaubt Mehrfachauswahl (#671); die Tags unterscheiden
-        // sich nur darin, dass ihre Zugehörigkeit die Schreibweise ignoriert.
-        const isActive = group.key === 'tag'
-          ? hasTagFilter(item.value)
-          : hasFilter(group.key, item.value);
-        const chip = makeChip({ label: item.label, active: isActive, withRemove: isActive });
-        chip.dataset.filter = group.key;
-        chip.dataset.value = item.value;
-        row.appendChild(chip);
-      });
-
-      section.appendChild(row);
-      panel.appendChild(section);
+    return parts.length ? { set: f, label: parts.join(' · ') } : null;
+  }).filter(Boolean);
+  if (recent.length) {
+    groups.push({
+      heading: t('tasks.filterGroupRecent'),
+      html: `<div class="filter-panel__chips">${recent.map((r) => `
+        <button type="button" class="filter-chip filter-chip--sm filter-chip--recent"
+                data-recent-filter="${esc(JSON.stringify(r.set))}">${esc(r.label)}</button>`).join('')}</div>`,
     });
-
-    // Fusszeile: „Alle zuruecksetzen" am Anfang, das Schliessen am Ende.
-    const footer = document.createElement('div');
-    footer.className = 'filter-panel__footer';
-    if (activeCount > 0) {
-      const clearBtn = document.createElement('button');
-      clearBtn.className = 'filter-panel__clear';
-      clearBtn.id = 'filter-clear-all';
-      clearBtn.textContent = t('tasks.filterClearAll');
-      footer.appendChild(clearBtn);
-    }
-
-    // Ein Schliessen AM ENDE des Panels (#1373). Der Knopf oben ist der eine
-    // Ort, der das Panel oeffnet; mit vielen Personen, Kategorien und Tags
-    // wird es aber hoeher als der Bildschirm, und wer unten waehlt, sieht ihn
-    // nicht mehr. Kein Uebernehmen: jeder Chip wirkt sofort, der Knopf klappt
-    // nur zu.
-    const doneBtn = document.createElement('button');
-    doneBtn.type = 'button';
-    doneBtn.className = 'btn btn--secondary btn--sm filter-panel__done';
-    doneBtn.id = 'filter-panel-done';
-    doneBtn.textContent = t('tasks.filterPanelDone');
-    footer.appendChild(doneBtn);
-    panel.appendChild(footer);
-
-    if (window.lucide) window.lucide.createIcons({ el: panel });
   }
 
-  wireFilterChips(container);
-  wireFilterPanelDismiss(container, panel, toggleSlot);
-  restoreFilterFocus(focusBefore, { bar, panel, toggleSlot });
-}
-
-/**
- * Wo in Filterleiste, Knopfplatz oder Panel der Fokus stand, als Beschreibung
- * statt als Knoten - der Knoten ist nach dem Rendern weg. `null`, wenn er
- * woanders stand: dann faesst das Rendern ihn auch nicht an.
- */
-function rememberFilterFocus(active, { bar, panel, toggleSlot }) {
-  if (!active || typeof active !== 'object') return null;
-  const zone = [['panel', panel], ['bar', bar], ['slot', toggleSlot]]
-    .find(([, el]) => el.contains(active) && el !== active)?.[0];
-  if (!zone) return null;
-  return {
-    zone,
-    id: active.id || null,
-    filter: active.dataset?.filter ?? null,
-    value: active.dataset?.value ?? null,
-  };
-}
-
-/**
- * Setzt den Fokus auf den Nachfolger des gemerkten Chips. Gibt es ihn nicht mehr
- * (ein entfernter Filter-Chip der Leiste, ein zugeklapptes Panel), geht er an
- * den Filterknopf - der steht immer da und oeffnet und schliesst das Panel.
- */
-function restoreFilterFocus(before, { bar, panel, toggleSlot }) {
-  if (!before) return;
-  const root = { panel, bar, slot: toggleSlot }[before.zone];
-  let match = null;
-  if (before.filter) {
-    match = [...root.querySelectorAll('[data-filter]')]
-      .find((el) => el.dataset.filter === before.filter && el.dataset.value === before.value) ?? null;
-  } else if (before.id) {
-    match = root.querySelector(`#${before.id}`);
+  const showRows = [];
+  if (state.users.length > 1 && state.currentUserId != null) {
+    showRows.push(toggleRowHtml({ label: t('tasks.assignedToMe'), icon: 'user', checked: isAssignedToMe(),
+      attrs: { 'data-filter-mine': 'true' } }));
   }
-  (match ?? toggleSlot.querySelector('#filter-toggle-btn'))?.focus();
+  showRows.push(toggleRowHtml({ label: t('tasks.filterDueToday'), icon: 'calendar-check', checked: state.dueToday,
+    attrs: { 'data-filter-due-today': 'true' } }));
+  groups.push({ heading: t('tasks.filterGroupShow'), html: showRows.join('') });
+
+  if (state.viewMode !== 'kanban') {
+    groups.push({ heading: t('tasks.filterGroupStatus'),
+      html: chipsHtml('status', t('tasks.filterGroupStatus'), FILTER_STATUSES().map((s) => ({ value: s.value, label: s.label }))) });
+  }
+  groups.push({ heading: t('tasks.filterGroupPriority'),
+    html: chipsHtml('priority', t('tasks.filterGroupPriority'), PRIORITIES().map((p) => ({ value: p.value, label: p.label }))) });
+  if (state.users.length > 1) {
+    groups.push({ heading: t('tasks.filterGroupPerson'),
+      html: chipsHtml('assigned_to', t('tasks.filterGroupPerson'), state.users.map((u) => ({ value: String(u.id), label: u.display_name }))) });
+  }
+  // KATEGORIE UND TAG SIND EINGEKLAPPT, SOLANGE NICHTS GEWAEHLT IST (Critique
+  // 2026-10-05, R16). Das Blatt mass 35 Bedienelemente und 1084px in 591px;
+  // die beiden langen Achsen - je Haushalt ein Dutzend Chips und mehr - sind
+  // die seltenen. Eine gesetzte Wahl steht offen: was wirkt, ist nie hinter
+  // einem Aufklapper versteckt (dieselbe Regel wie im Aufgaben-Dialog).
+  if (state.categories.length) {
+    groups.push({ heading: t('tasks.categoryLabel'),
+      fold: state.filters.category.length ? 'open' : 'closed',
+      html: chipsHtml('category', t('tasks.categoryLabel'), state.categories.map((c) => ({ value: c.key, label: catLabel(c.key) }))) });
+  }
+  // Tags nur, wenn welche vergeben sind - sonst stuende eine leere Gruppe da (#586).
+  if (state.allTags.length) {
+    groups.push({ heading: t('tasks.filterGroupTag'),
+      fold: state.filters.tags.length ? 'open' : 'closed',
+      html: chipsHtml('tag', t('tasks.filterGroupTag'), state.allTags.map((entry) => ({ value: entry.tag, label: entry.tag }))) });
+  }
+
+  // ANSICHT, ABGESETZT AM ENDE (R16). „Gruppieren nach" und „Geplante anzeigen"
+  // standen zwischen den Filtern, engen aber nichts ein: das eine ordnet die
+  // Liste, das andere weitet sie um das, was noch nicht dran ist. Sie stehen
+  // jetzt als eigener Abschnitt hinter allen Achsen.
+  const viewRows = [];
+  if (state.viewMode === 'list') {
+    const modes = [['category', 'tasks.categoryLabel', 'folder'], ['due', 'tasks.dueDateLabel', 'calendar-clock']];
+    viewRows.push(`
+        <div class="segmented tasks-group-mode" id="group-mode-toggle" role="radiogroup" aria-label="${esc(t('tasks.groupToggleLabel'))}">
+          ${modes.map(([mode, key, icon]) => {
+            const on = state.groupMode === mode;
+            return `<button type="button" class="segmented__item${on ? ' is-active' : ''}" role="radio"
+                    data-tab-id="${mode}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}">
+              <i data-lucide="${icon}" aria-hidden="true"></i>${esc(t(key))}</button>`;
+          }).join('')}
+        </div>`);
+  }
+  viewRows.push(toggleRowHtml({ label: t('tasks.showFuture'), icon: 'calendar-clock', checked: state.showFuture,
+    attrs: { 'data-filter-future': 'true' } }));
+  groups.push({ heading: t('tasks.viewToggleLabel'), variant: 'view', html: viewRows.join('') });
+  return groups;
 }
 
 /**
- * Schliesst das Filter-Panel und gibt den Fokus an den Knopf zurueck, der es
- * geoeffnet hat. `renderFilters` baut den Knopf neu, also muss der Fokus auf
- * den NEUEN - der alte haengt nach dem Rendern nirgends mehr.
- */
-function closeFilterPanel(container) {
-  if (!state.filterPanelOpen) return;
-  state.filterPanelOpen = false;
-  renderFilters(container);
-  container.querySelector('#filter-toggle-btn')?.focus();
-}
-
-/* Welche Panels ihre Escape-Verdrahtung schon tragen. Das Panel und der
- * Knopfplatz ueberleben jedes `renderFilters` (nur ihre Kinder werden
- * getauscht); ein Listener je Rendern stapelte sich also mit jedem Chip-Klick. */
-const filterPanelDismissWired = new WeakSet();
-
-/**
- * Escape schliesst das Panel, solange der Fokus in ihm oder auf seinem Knopf
- * steht (#1373) - wie die Suchleiste des Kalenders, das andere Bedienfeld, das
- * an Ort und Stelle aufklappt.
+ * Zieht den Zustand eines OFFENEN Blatts nach, ohne es neu zu bauen.
  *
- * KEIN SCHLIESSEN PER TIPP DANEBEN, obwohl der Melder es vorschlug. Die App
- * schliesst so nur SCHWEBENDE Ebenen (Popover-Menues, Datumswahl,
- * Schnellaktionen, Detail-Popover): sie verdecken, was darunter liegt, und
- * verschwinden, ohne dass sich etwas verschiebt. Dieses Panel steht IM Fluss
- * und schiebt die Liste nach unten. Ginge es beim Tipp auf eine Aufgabe zu,
- * rutschte die Liste unter dem Finger um die Panelhoehe nach oben, und der
- * Tipp traefe eine andere Zeile als die gemeinte. Die Zurueck-Geste bleibt aus
- * demselben Grund bei den Overlays (utils/overlay-history.js).
+ * Neu bauen hiesse: der gerade getippte Chip ist danach ein anderer Knoten,
+ * und der Fokus fiele aufs Dokument - genau der Fehler, den #1373 im alten
+ * Inline-Panel zweimal hatte. Also nur Klassen, `aria-pressed` und Haken.
  */
-function wireFilterPanelDismiss(container, panel, toggleSlot) {
-  if (filterPanelDismissWired.has(panel)) return;
-  filterPanelDismissWired.add(panel);
-  const onKeydown = (e) => {
-    if (e.key !== 'Escape' || !state.filterPanelOpen) return;
-    e.preventDefault();
-    e.stopPropagation();
-    closeFilterPanel(container);
-  };
-  panel.addEventListener('keydown', onKeydown);
-  toggleSlot.addEventListener('keydown', onKeydown);
-  panel.addEventListener('click', (e) => {
-    if (e.target.closest('#filter-panel-done')) closeFilterPanel(container);
+function syncFilterSheet(panel) {
+  if (!panel?.isConnected) return;
+  panel.querySelectorAll('[data-filter]').forEach((chip) => {
+    const on = chip.dataset.filter === 'tag'
+      ? hasTagFilter(chip.dataset.value)
+      : hasFilter(chip.dataset.filter, chip.dataset.value);
+    chip.classList.toggle('filter-chip--active', on);
+    chip.setAttribute('aria-pressed', String(on));
+    // WAS WIRKT, STEHT OFFEN - auch wenn es NACH dem Oeffnen des Blatts gesetzt
+    // wurde. Ein gemerktes Set ("Zuletzt benutzt") kann Kategorie oder Tag
+    // setzen, waehrend deren Aufklapper zu ist: der Chip wurde aktiv, blieb
+    // aber verborgen. Nur aufklappen, nie zuklappen und nichts neu bauen - der
+    // Fokus steht vielleicht gerade in der Falte.
+    if (on) {
+      const fold = chip.closest('details.filter-sheet__fold');
+      if (fold && !fold.open) fold.open = true;
+    }
   });
+  const mine = panel.querySelector('[data-filter-mine]');
+  if (mine) mine.checked = isAssignedToMe();
+  const future = panel.querySelector('[data-filter-future]');
+  if (future) future.checked = state.showFuture;
+  const dueToday = panel.querySelector('[data-filter-due-today]');
+  if (dueToday) dueToday.checked = state.dueToday;
+}
+
+/**
+ * Knopf und offenes Blatt auf den Filterzustand ziehen.
+ *
+ * Der Name bleibt aus der Zeit der Chipzeile: jeder Pfad, der einen Filter
+ * aendert (Tag an der Karte, Kategorie geloescht, gemerktes Set), ruft ihn
+ * schon. Er baut nichts mehr, er gleicht ab.
+ */
+function renderFilters(container) {
+  syncFilterButton(container?.querySelector?.('#tasks-filter-btn'), activeFilterCount());
+  if (state.filterSheet && !state.filterSheet.isConnected) state.filterSheet = null;
+  syncFilterSheet(state.filterSheet);
+}
+
+/**
+ * Das Filterblatt oeffnen - EIN Knopf im Kopf statt einer Chipzeile darunter.
+ *
+ * Ein Ansichtsblatt, kein Formular: jeder Chip und jeder Schalter wirkt sofort
+ * (utils/filter-sheet.js). Das alte Inline-Panel stand im Fluss, schob die
+ * Liste um seine Hoehe nach unten und lief am Desktop 1156px ueber einer
+ * 720px-Liste (A3 P2-8); Schliessen per Esc, Tipp daneben und Zurueck-Geste
+ * bringt das Blatt jetzt von der Modal-Schicht mit, den Fokus gibt sie an den
+ * Knopf zurueck.
+ */
+function openTaskFilters(container) {
+  const panel = openFilterSheet({
+    groups: filterSheetGroups(),
+    // Nicht „Alle Filter aufheben": der Knopf stellt den Standard her (Status
+    // „Offen"), und so heisst er auch.
+    resetLabel: t('common.filtersResetDefault'),
+    onChange: (input) => onFilterSheetChange(input, container),
+    onReset: () => { resetTaskFilters(container); },
+  });
+  if (!panel) return null;
+  state.filterSheet = panel;
+  panel.addEventListener('click', (e) => onFilterSheetClick(e, container));
+  const groupMode = panel.querySelector('#group-mode-toggle');
+  if (groupMode) {
+    wireTablist(groupMode, {
+      activeId: state.groupMode,
+      activeClass: 'is-active',
+      mode: 'select',
+      onChange: (mode) => {
+        state.groupMode = mode;
+        renderTaskList(container);
+      },
+    });
+    attachSegmentIndicator(groupMode);
+  }
+  return panel;
+}
+
+/** Schalter im Blatt (Checkboxen der toggle-rows). */
+async function onFilterSheetChange(input, container) {
+  if (input.matches('[data-filter-mine]')) {
+    // „Mir zugewiesen" nimmt die eigene ID in den Personenfilter auf bzw.
+    // wieder heraus. Seit #671 eine Achse mit mehreren Werten: eine bereits
+    // gewaehlte zweite Person bleibt dabei stehen.
+    await toggleValueFilter('assigned_to', state.currentUserId, container);
+    return;
+  }
+  if (input.matches('[data-filter-future]')) {
+    state.showFuture = input.checked;
+    try { localStorage.setItem(SHOW_FUTURE_KEY, state.showFuture ? '1' : '0'); } catch {}
+    renderFilters(container);
+    await loadTasks(container);
+    return;
+  }
+  if (input.matches('[data-filter-due-today]')) {
+    // Derselbe Weg wie die Adresse (setDueToday): die Statusweitung laeuft mit,
+    // also muss der Bestand nachgeladen werden - wie bei „Geplante anzeigen".
+    // Die Adresse zieht mit, damit ein Neuladen dasselbe zeigt.
+    setDueToday(input.checked);
+    writeDueTodayToUrl(state.dueToday);
+    renderFilters(container);
+    await loadTasks(container);
+  }
+}
+
+/** Chips im Blatt: ein Wert je Achse an/aus, oder ein gemerktes Set. */
+async function onFilterSheetClick(e, container) {
+  const recent = e.target.closest('[data-recent-filter]');
+  if (recent) {
+    try {
+      state.filters = normalizeFilterSet(JSON.parse(recent.dataset.recentFilter));
+    } catch { return; }
+    renderFilters(container);
+    await loadTasks(container);
+    return;
+  }
+  const chip = e.target.closest('[data-filter]');
+  if (!chip) return;
+  if (chip.dataset.filter === 'tag') {
+    await toggleTagFilter(chip.dataset.value, container);
+    return;
+  }
+  await toggleValueFilter(chip.dataset.filter, chip.dataset.value, container);
+}
+
+/**
+ * „Filter zuruecksetzen": zurueck auf den STANDARD (Status „Offen", sonst
+ * nichts), und auch „Geplante anzeigen" aus - sonst bliebe nach dem
+ * Zuruecksetzen eine Zahl am Knopf stehen, die das Blatt gerade weggenommen
+ * haben will. Bis R16 leerte der Knopf auch den Status: ein dritter Zustand,
+ * der Erledigtes mitzeigt und weder Ruhezustand noch gewaehlt war.
+ */
+async function resetTaskFilters(container) {
+  state.filters = defaultFilters();
+  state.showFuture = false;
+  state.dueToday = false;
+  state.dueTodayWidened = false;
+  writeDueTodayToUrl(false);
+  try { localStorage.setItem(SHOW_FUTURE_KEY, '0'); } catch {}
+  renderFilters(container);
+  await loadTasks(container);
 }
 
 /* DIESES MODUL FUEHRT DIE ZAHL NICHT MEHR (#868).
@@ -3765,22 +4249,17 @@ function wireSwipeGestures(container) {
         const taskId = row.dataset.swipeId;
         const capturedStatus = row.dataset.swipeStatus;
         const nextStatus = capturedStatus === 'done' ? 'open' : 'done';
+        // Die Karte ist hinausgeflogen, und `resetCard(false)` hat sie eben
+        // ohne Uebergang zurueckgesetzt: unsichtbar halten, bis die Liste neu
+        // steht - sonst blitzt sie fuer den Roundtrip wieder auf, und der
+        // Austritt klappte eine Zeile zusammen, die gerade zurueckkam. Das
+        // Neuzeichnen (auch im Fehlerfall) bringt eine frische Karte.
+        const card = row.querySelector('.task-card');
+        if (card) card.style.visibility = 'hidden';
         try {
-          await toggleTaskStatus(taskId, capturedStatus);
-          await loadTasks(container);
-          window.yuvomi.showToast(
-            t(nextStatus === 'done' ? 'tasks.swipedDoneToast' : 'tasks.swipedOpenToast'),
-            'default',
-            5000,
-            async () => {
-              try {
-                await toggleTaskStatus(taskId, nextStatus);
-                await loadTasks(container);
-              } catch (err) {
-                window.yuvomi.showToast(err.message, 'danger');
-              }
-            },
-          );
+          const response = await toggleTaskStatus(taskId, capturedStatus);
+          await reloadWithRowMotion(container, taskId);
+          acknowledgeStatusToggle(container, taskId, nextStatus, response);
         } catch (err) {
           window.yuvomi.showToast(err.message, 'danger');
           await loadTasks(container);
@@ -3793,6 +4272,9 @@ function wireSwipeGestures(container) {
       reveal: '.swipe-reveal--edit',
       run: async (row) => {
         const taskId = row.dataset.swipeId;
+        // In der Spaltenform ist „Ansehen" das Auswaehlen - das Detail steht
+        // daneben, ein Sheet darueber verdeckte es.
+        if (taskMd?.isSplit()) { taskMd.select(taskId); return; }
         try {
           const [task, reminder] = await Promise.all([
             loadTaskForEdit(taskId),
@@ -3805,6 +4287,18 @@ function wireSwipeGestures(container) {
       },
     },
   };
+  // IM AUSWAHLMODUS GAR KEINE WISCHGESTE (Codex an #1483). Die Karten stecken
+  // weiter in `renderSwipeRow()`, und ein Wisch hakte die Aufgabe ab (fuehrend)
+  // oder oeffnete sie (nachlaufend) - mitten in einer Auswahl, die nur
+  // auswaehlen soll. Der Modus nimmt beide Seiten, und die Zeilen bekommen gar
+  // keine Beruehrungs-Hoerer: auch eine Geste ohne Seite schoebe die Karte
+  // sichtbar unter dem Finger weg. Beim Verlassen zeichnet `exitBulkSelect`
+  // die Liste neu, und dieser Aufruf verdrahtet wieder beide Seiten.
+  if (state.bulkSelectMode) {
+    optionen.leading = null;
+    optionen.trailing = null;
+    return optionen;
+  }
   wireSwipeRows(listEl, optionen);
   return optionen;
 }
@@ -3813,61 +4307,6 @@ function wireSwipeGestures(container) {
 // Event-Verdrahtung
 // --------------------------------------------------------
 
-function wireFilterChips(container) {
-  // Toggle-Button öffnet/schließt das Panel
-  container.querySelector('#filter-toggle-btn')?.addEventListener('click', () => {
-    state.filterPanelOpen = !state.filterPanelOpen;
-    renderFilters(container);
-    // Der Knopf ist gerade neu gebaut worden; ohne das stuende der Fokus
-    // danach auf dem Dokument statt auf dem Knopf, der ihn hatte.
-    container.querySelector('#filter-toggle-btn')?.focus();
-  });
-
-  // Alle Filter zurücksetzen
-  container.querySelector('#filter-clear-all')?.addEventListener('click', async () => {
-    state.filters = { status: [], priority: [], assigned_to: [], category: [], tags: [] };
-    renderFilters(container);
-    await loadTasks(container);
-  });
-
-  // "Geplante anzeigen" Toggle
-  container.querySelector('#filter-show-future')?.addEventListener('click', async () => {
-    state.showFuture = !state.showFuture;
-    try { localStorage.setItem(SHOW_FUTURE_KEY, state.showFuture ? '1' : '0'); } catch {}
-    renderFilters(container);
-    await loadTasks(container);
-  });
-
-  // "Mir zugewiesen" Toggle — nimmt die eigene ID in den Personen-Filter auf
-  // bzw. wieder heraus. Seit #671 eine Achse mit mehreren Werten: eine bereits
-  // gewählte zweite Person bleibt dabei stehen, statt still zu verschwinden.
-  container.querySelector('#filter-assigned-me')?.addEventListener('click', async () => {
-    await toggleValueFilter('assigned_to', state.currentUserId, container);
-  });
-
-  // Chip-Klicks (in Bar + Panel)
-  container.querySelectorAll('[data-filter]').forEach((chip) => {
-    chip.addEventListener('click', async () => {
-      const filter = chip.dataset.filter;
-      if (filter === 'tag') {
-        await toggleTagFilter(chip.dataset.value, container);
-        return;
-      }
-      await toggleValueFilter(filter, chip.dataset.value, container);
-    });
-  });
-
-  // Recent-Filter-Chips anwenden
-  container.querySelectorAll('[data-recent-filter]').forEach((chip) => {
-    chip.addEventListener('click', async () => {
-      try {
-        state.filters = normalizeFilterSet(JSON.parse(chip.dataset.recentFilter));
-      } catch { return; }
-      renderFilters(container);
-      await loadTasks(container);
-    });
-  });
-}
 
 /**
  * Alles am Seitenkopf, was von der gewaehlten Ansicht abhaengt - an EINER
@@ -3899,40 +4338,50 @@ function syncViewChrome(container) {
   // Wechsel - genau das, was @Kyrodan gemeldet hat. Das Lesemass haengt jetzt
   // wie im Kalender an der SEITE: die Wurzel ist `app-page--full` (kein Mass),
   // Liste und Verlauf holen sich die Lesebahn per `is-reading-measure` zurueck,
-  // ihre Zeilen und die Filterzeile kappen sich selbst daran (layout.css,
-  // `.app-page :is(.tasks-filters-row, ...)`), das Board bleibt ungekappt.
+  // ihre Zeilen kappen sich selbst daran (layout.css, Lesemass-Liste), das
+  // Board bleibt ungekappt. Das gilt auch fuer die Kopfregel mobil
+  // (2026-09-26): der Kopf wird NICHT --narrow, obwohl die Liste bei 720px
+  // endet - ein Kopf, der mit der Ansicht die Breite wechselt, ist genau der
+  // Sprung aus #1012 (DECISIONS.md §3).
   // Die Gegenrichtung - Seite auf Lesemass, Kopf freigeben - gibt es nicht:
   // PAGE-016 verlangt, dass ein Mass, das etwas kappt, im Kopf sichtbar ist.
   container.querySelector('.tasks-page')?.classList.toggle('is-reading-measure', !isKanbanMode());
+  // LISTE + DETAIL IN LISTE UND VERLAUF (#1550, Entscheidung 2026-09-29). Ab
+  // der Schwelle steht neben einem Verlaufseintrag seine Aufgabe, so wie neben
+  // einer Zeile der Liste - damit enden Liste, Brett und Verlauf an derselben
+  // Aussenkante. Unter der Schwelle behaelt der Verlauf wie die Liste die
+  // Lesebahn (`is-reading-measure` oben). Bis dahin endete er bei 1440 436px
+  // vor dem Kopf: die leere rechte Haelfte, die die Breitenregel nicht mehr
+  // zulaesst. Das Brett bleibt Flaeche; ohne die Klasse ist die Wurzel dort
+  // auch kein Container: die Detailspalte bleibt verborgen, und nichts im
+  // Brett bezieht sich auf einen neuen Containing Block (Drag-Ghosts,
+  // fixierte Ebenen). Die Auswahl raeumt setViewMode bei jedem Wechsel ab.
+  container.querySelector('.tasks-page')?.classList.toggle('app-page--list-detail', !isKanbanMode());
+  syncSplitHeight(container);
 
-  // Suche, Filterleiste, Gruppierung und Sammelauswahl fragen alle nach
-  // AUFGABEN. Der Verlauf zeigt Vorgaenge - ein Statusfilter darueber waere
-  // eine Auswahl, die nichts veraendern kann.
+  // Suche, Filter und Sammelauswahl fragen alle nach AUFGABEN. Der Verlauf
+  // zeigt Vorgaenge - ein Statusfilter darueber waere eine Auswahl, die nichts
+  // veraendern kann. Die Gruppierung steht im Filterblatt und fragt dort beim
+  // Oeffnen selbst nach der Ansicht.
   const search = container.querySelector('.tasks-toolbar__search');
   if (search) search.hidden = isHistory;
-  const filtersRow = container.querySelector('.tasks-filters-row');
-  if (filtersRow) filtersRow.hidden = isHistory;
-  // Das aufgeklappte Filter-Panel ist ein GESCHWISTER der Zeile, kein Kind -
-  // die Zeile zu verstecken laesst es stehen, und dann schwebten Status- und
-  // Prioritaets-Chips ueber einer Liste von Vorgaengen.
-  const filterPanel = container.querySelector('#filter-panel');
-  if (filterPanel && isHistory) filterPanel.hidden = true;
-  const groupToggle = container.querySelector('#group-mode-toggle');
-  if (groupToggle) groupToggle.hidden = !isList;
-  const bulkSelectBtn = container.querySelector('#btn-bulk-select');
-  if (bulkSelectBtn) {
-    bulkSelectBtn.hidden = !isList;
-    if (!isList) {
-      state.bulkSelectMode = false;
-      state.selectedTaskIds.clear();
-      bulkSelectBtn.classList.remove('btn--active');
-      bulkSelectBtn.setAttribute('aria-pressed', 'false');
-    }
+  const filterBtn = container.querySelector('#tasks-filter-btn');
+  if (filterBtn) filterBtn.hidden = isHistory;
+  if (!isList) {
+    state.bulkSelectMode = false;
+    state.selectedTaskIds.clear();
   }
-  // Die Auswahl zu LEEREN raeumt die Leiste nicht weg: sie haengt an
-  // `bar.hidden`, das nur updateBulkActionsBar setzt. Ohne diesen Aufruf blieb
-  // „Als erledigt markieren / Ablegen / Loeschen" ueber dem Verlauf stehen -
-  // mit leerer Auswahl, also Knoepfe ohne Gegenstand.
+  // Das Menue wird nicht neu gebaut (Fokus, offener Zustand): Haken und
+  // Sperre der beiden Eintraege, die an der Ansicht haengen, zieht es nach.
+  const menu = container.querySelector('#tasks-tools-menu');
+  syncPopoverMenuItem(menu, 'toggle-history', isHistory);
+  syncPopoverMenuItem(menu, 'bulk-select', state.bulkSelectMode);
+  const bulkItem = menu?.querySelector('.popover-menu__item[data-action="bulk-select"]');
+  if (bulkItem) bulkItem.disabled = !isList;
+  // Die Auswahl zu LEEREN raeumt die Pille nicht weg: sie steht, bis
+  // updateBulkActionsBar sie abraeumt. Ohne diesen Aufruf blieb
+  // „Erledigt / Archivieren / Loeschen" ueber dem Verlauf stehen - mit leerer
+  // Auswahl, also Kapseln ohne Gegenstand.
   updateBulkActionsBar(container);
 }
 
@@ -3946,172 +4395,276 @@ function wireViewToggle(container) {
   if (!toggle) return;
   syncViewChrome(container);
   toggle.querySelectorAll('[data-view]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.viewMode = btn.dataset.view;
-      localStorage.setItem('yuvomi-tasks-view', state.viewMode);
-      renderFilters(container);
-      syncViewChrome(container);
+    btn.addEventListener('click', () => setViewMode(container, btn.dataset.view));
+  });
+  // Die Kapsel gleitet zwischen Liste und Kanban (utils/segment-indicator.js,
+  // D8) und folgt `aria-pressed` aus syncViewChrome selbst; im Verlauf ist
+  // keines gedrueckt, dann steht sie nicht da.
+  attachSegmentIndicator(toggle);
+}
 
-      // Skeleton-Flash: einen Frame Render-Feedback geben, dann Ansicht aufbauen
-      const listEl = container.querySelector('#task-list');
-      if (listEl) listEl.style.opacity = '0.4';
-      const restore = () => {
-        const el = container.querySelector('#task-list');
-        if (el) { el.style.transition = 'opacity 0.15s'; el.style.opacity = ''; }
-      };
-      requestAnimationFrame(() => {
-        // Der Verlauf holt Vorgaenge, die beiden anderen Ansichten Aufgaben -
-        // zwei Abfragen, und der Umschalter darf nicht die falsche fahren. Ein
-        // gemeinsames loadTasks() haette den Verlauf mit einer Aufgabenliste
-        // befuellt, die er gar nicht anzeigt.
-        if (state.viewMode === 'history') {
-          loadHistory(container).finally(restore);
-          return;
-        }
-        // Task-Menge neu laden: der Kanban lädt alle Stati (kein status-Param),
-        // die Liste wendet den Statusfilter wieder an (Audit A1-07/P3). Fällt bei
-        // Netzfehler auf ein reines Re-Render der vorhandenen Aufgaben zurück.
-        loadTasks(container).catch(() => renderTaskList(container)).finally(() => {
-          updateBulkActionsBar(container);
-          restore();
-        });
-      });
+/**
+ * Ansicht wechseln - aus dem Segment (Liste/Kanban) und aus dem Menue
+ * (Verlauf), ueber EINEN Weg, damit Merker, Kopf und Abfrage nie auseinander-
+ * laufen.
+ */
+function setViewMode(container, mode) {
+  if (mode === state.viewMode) return;
+  if (mode === 'history') state.viewBeforeHistory = state.viewMode;
+  state.viewMode = mode;
+  localStorage.setItem('yuvomi-tasks-view', state.viewMode);
+  // DIE AUSWAHL GEHOERT ZU DEN ZEILEN DER ANSICHT, DIE GEHT. Liste und Verlauf
+  // teilen sich EINE Spalte (#1550), aber nicht ihre Zeilen: eine Aufgabe aus
+  // der Liste stuende rechts neben einem Verlauf ohne ihre Zeile. Ein Wechsel
+  // ist ein neuer Zusammenhang wie ein Ordnerwechsel in Mail - die neue
+  // Ansicht waehlt ihre erste Zeile vor, sobald sie steht (`repick`), das
+  // Brett gar keine (dort steht keine Spalte). Ersetzt, nicht gestapelt: der
+  // Wechsel selbst schreibt keinen Zurueck-Schritt.
+  taskMd?.clear({ history: 'replace', repick: true });
+  renderFilters(container);
+  syncViewChrome(container);
+
+  // Skeleton-Flash: einen Frame Render-Feedback geben, dann Ansicht aufbauen
+  const listEl = container.querySelector('#task-list');
+  if (listEl) listEl.style.opacity = '0.4';
+  const restore = () => {
+    const el = container.querySelector('#task-list');
+    if (el) { el.style.transition = 'opacity var(--transition-fast)'; el.style.opacity = ''; }
+  };
+  requestAnimationFrame(() => {
+    // Der Verlauf holt Vorgaenge, die beiden anderen Ansichten Aufgaben -
+    // zwei Abfragen, und der Umschalter darf nicht die falsche fahren. Ein
+    // gemeinsames loadTasks() haette den Verlauf mit einer Aufgabenliste
+    // befuellt, die er gar nicht anzeigt.
+    if (state.viewMode === 'history') {
+      loadHistory(container).finally(restore);
+      return;
+    }
+    // Task-Menge neu laden: der Kanban lädt alle Stati (kein status-Param),
+    // die Liste wendet den Statusfilter wieder an (Audit A1-07/P3). Fällt bei
+    // Netzfehler auf ein reines Re-Render der vorhandenen Aufgaben zurück.
+    loadTasks(container).catch(() => renderTaskList(container)).finally(() => {
+      updateBulkActionsBar(container);
+      restore();
     });
   });
 }
 
-function wireGroupToggle(container) {
-  const toggle = container.querySelector('#group-mode-toggle');
-  if (!toggle) return;
-  toggle.querySelectorAll('.group-toggle__btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.groupMode = btn.dataset.mode;
-      toggle.querySelectorAll('.group-toggle__btn').forEach((b) => {
-        const on = b.dataset.mode === state.groupMode;
-        b.classList.toggle('group-toggle__btn--active', on);
-        b.setAttribute('aria-pressed', String(on));
-      });
-      renderTaskList(container);
-    });
+/**
+ * Das Werkzeugmenue und der Filterknopf im Kopf. Die Menue-Eintraege tragen
+ * `data-action`; ein Listener am Kopf reicht (das Panel liegt im Top-Layer,
+ * haengt im DOM aber im Kopf - ein Klick darin steigt dorthin auf).
+ */
+function wireToolbar(container) {
+  const toolbar = container.querySelector('.tasks-toolbar');
+  if (!toolbar) return;
+  toolbar.addEventListener('click', (e) => {
+    if (e.target.closest('#tasks-filter-btn')) {
+      openTaskFilters(container);
+      return;
+    }
+    const item = pageToolsActionEl(e.target);
+    if (!item || item.disabled) return;
+    // Der Fokus steht auf einem Eintrag, den das Menue gerade versteckt hat.
+    // Ein Dialog (Kategorien, Tags) gaebe ihn beim Schliessen dorthin zurueck,
+    // und er fiele aufs Dokument - also vorher auf den Menueknopf.
+    toolbar.querySelector('.page-tools-btn')?.focus();
+    switch (item.dataset.action) {
+      case 'toggle-history':
+        setViewMode(container, state.viewMode === 'history' ? (state.viewBeforeHistory || 'list') : 'history');
+        break;
+      case 'bulk-select':
+        toggleBulkSelect(container);
+        break;
+      case 'bulk-archive':
+        runBulkAction('archive', container);
+        break;
+      case 'bulk-tag-add':
+        runBulkAction('tag-add', container);
+        break;
+      case 'bulk-tag-remove':
+        runBulkAction('tag-remove', container);
+        break;
+      case 'manage-categories':
+        if (!readOnly()) openTaskCategoryManager(container);
+        break;
+      case 'manage-tags':
+        if (!readOnly()) openTagManager(container);
+        break;
+      default:
+    }
   });
 }
 
 function wireNewTaskBtn(container) {
   const handler = () => {
-    // Der FAB liegt in der Shell-Layer und wird ueber html[data-module-readonly]
-    // per CSS ausgeblendet (layout.css), der Kopfknopf traegt `.toolbar-new-btn`
-    // und faellt derselben Regel zu. Der Riegel bleibt trotzdem: eine
-    // CSS-Regel ist keine Sperre.
+    // Der FAB liegt in der Shell-Layer (am Zeigergeraet im Kopf angedockt) und
+    // wird ueber html[data-module-readonly] per CSS ausgeblendet (layout.css).
+    // Der Riegel bleibt trotzdem: eine CSS-Regel ist keine Sperre.
     if (readOnly()) return;
     openTaskModal({ users: state.users }, container);
   };
-  container.querySelector('#btn-new-task')?.addEventListener('click', handler);
   findPageFab('fab-new-task')?.addEventListener('click', handler);
 }
 
+/**
+ * Die Sammelaktionen der Mehrfachauswahl - in der Pille der Shell
+ * (utils/bulk-pill.js), wie Einkauf, Kontakte und Vorrat (Re-Critique
+ * 2026-09-27, D5). Vorher stand hier eine eigene Leiste ueber der Liste mit
+ * sechs `.btn`-Knoepfen und einem gefuellten roten „Loeschen", ohne Weg
+ * zurueck ausser ueber das Menue.
+ *
+ * DIE PILLE IST EINZEILIG, und ihre Kapseln schrumpfen nie - also traegt sie
+ * drei: den Status, Loeschen und „Fertig", den sichtbaren Ausstieg. Der Status
+ * ist EINE Kapsel, die dem Bestand folgt: sind alle gewaehlten Aufgaben
+ * erledigt, heisst sie „Offen", sonst „Erledigt". Ablegen und die beiden
+ * Tag-Aktionen stehen waehrend der Auswahl beschriftet im Werkzeugmenue
+ * (syncBulkMenu). Gemessen bei 390px (2026-09-27): mit „Archivieren" als
+ * vierter Kapsel blieben dem Subjekt auf Deutsch 30 von 86px („3 …"), und
+ * Ungarisch („Befejezettként jelölés") liefe ueber die Pille hinaus.
+ *
+ * Loeschen fragt in der Pille (`confirm`) und bleibt danach fuenf Sekunden
+ * rueckgaengig zu machen (handleBulkDelete) - die Frage schuetzt vor dem
+ * Fehltipp neben „Fertig", das Rueckgaengig vor dem Irrtum.
+ */
 function updateBulkActionsBar(container) {
-  const bar = container.querySelector('#bulk-actions-bar');
-  const count = container.querySelector('#bulk-count');
-  if (!bar) return;
+  // Ein spaet ankommender Neuaufbau einer verlassenen Seite darf die Pille
+  // eines anderen Moduls nicht abraeumen.
+  if (container && container.isConnected === false) return;
+  syncBulkMenu(container);
+  if (!state.bulkSelectMode || readOnly()) { clearBulkPill(); return; }
+  const n = state.selectedTaskIds.size;
+  const actions = [];
+  if (n > 0) {
+    const chosen = state.tasks.filter((task) => state.selectedTaskIds.has(task.id));
+    const allDone = chosen.length > 0 && chosen.every((task) => task.status === 'done');
+    actions.push(
+      {
+        label: t(allDone ? 'tasks.bulkMarkOpen' : 'tasks.bulkMarkDone'),
+        onClick: () => runBulkAction(allDone ? 'mark-open' : 'mark-done', container),
+      },
+      {
+        label: t('tasks.bulkDelete'),
+        ariaLabel: t('tasks.bulkDeleteAsk', { count: n }),
+        count: n,
+        danger: true,
+        confirm: { question: t('tasks.bulkDeleteAsk', { count: n }) },
+        onClick: () => runBulkAction('delete', container),
+      },
+    );
+  }
+  actions.push({ label: t('tasks.bulkFinish'), onClick: () => exitBulkSelect(container) });
+  setBulkPill({ label: t('tasks.bulkSelectedCount', { count: n }), actions });
+}
 
-  const selected = state.selectedTaskIds.size;
-  const buttons = bar.querySelectorAll('button[id^="bulk-"]');
-
-  bar.hidden = !(state.bulkSelectMode && selected > 0);
-  bar.classList.toggle('bulk-actions-bar--active', selected > 0);
-  buttons.forEach((button) => {
-    button.disabled = selected === 0;
+/**
+ * Ablegen und die Tag-Eintraege des Werkzeugmenues gibt es nur waehrend der
+ * Auswahl, und erst mit einer Aufgabe darin sind sie bedienbar.
+ */
+function syncBulkMenu(container) {
+  const menu = container?.querySelector?.('#tasks-tools-menu');
+  if (!menu) return;
+  const on = state.bulkSelectMode && !readOnly();
+  menu.querySelectorAll('.popover-menu__item[data-action="bulk-archive"], .popover-menu__item[data-action^="bulk-tag-"]').forEach((item) => {
+    item.hidden = !on;
+    item.disabled = !on || state.selectedTaskIds.size === 0;
   });
+}
 
-  if (count) {
-    count.textContent = t('tasks.bulkSelectedCount', { count: selected });
+/** Eine Sammelaktion auf die aktuelle Auswahl. */
+async function runBulkAction(action, container) {
+  if (readOnly()) return;
+  const taskIds = [...state.selectedTaskIds];
+  if (taskIds.length === 0) return;
+
+  // Löschen läuft über dasselbe Optimistic-Undo-Muster wie der Einzel-Delete.
+  if (action === 'delete') {
+    handleBulkDelete(taskIds, container);
+    return;
+  }
+
+  if (action === 'tag-add' || action === 'tag-remove') {
+    openBulkTagDialog(taskIds, action === 'tag-add' ? 'add' : 'remove', container);
+    return;
+  }
+
+  if (action === 'archive') {
+    state.selectedTaskIds.clear();
+    updateBulkActionsBar(container);
+    await archiveTaskIds(taskIds, container);
+    return;
+  }
+
+  try {
+    if (action === 'mark-done' || action === 'mark-open') {
+      const status = action === 'mark-done' ? 'done' : 'open';
+      await Promise.all(taskIds.map(id => api.patch(`/tasks/${id}/status`, { status })));
+      window.yuvomi.showToast(t('tasks.bulkStatusChanged'), 'success');
+    }
+
+    state.selectedTaskIds.clear();
+    updateBulkActionsBar(container);
+    await loadTasks(container);
+  } catch (err) {
+    window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
   }
 }
 
-function wireBulkSelect(container) {
-  const toggleBtn = container.querySelector('#btn-bulk-select');
-  if (!toggleBtn) return;
-  // Die Mehrfachauswahl existiert nur fuer die Sammelaktionsleiste, und die
-  // schreibt in jeder ihrer sechs Spalten. Ohne sie waere sie eine Auswahl
-  // ohne Verb.
-  if (readOnly()) return;
-
-  toggleBtn.addEventListener('click', () => {
-    state.bulkSelectMode = !state.bulkSelectMode;
-    if (!state.bulkSelectMode) {
-      state.selectedTaskIds.clear();
-    }
-    toggleBtn.classList.toggle('btn--active', state.bulkSelectMode);
-    toggleBtn.setAttribute('aria-pressed', String(state.bulkSelectMode));
-    loadTasks(container);
-  });
+/**
+ * Mehrfachauswahl an/aus - ein Schalter im Werkzeugmenue (menuitemcheckbox).
+ * Den Zustand traegt der Haken im Menue; sichtbar ist er ausserdem an den
+ * Auswahlkreisen jeder Zeile und an der Pille.
+ */
+function toggleBulkSelect(container) {
+  if (state.bulkSelectMode) { exitBulkSelect(container); return; }
+  // Die Mehrfachauswahl existiert nur fuer die Sammelaktionen, und die
+  // schreiben alle. Ohne sie waere sie eine Auswahl ohne Verb.
+  if (readOnly() || state.viewMode !== 'list') return;
+  state.bulkSelectMode = true;
+  state.selectedTaskIds.clear();
+  syncPopoverMenuItem(container.querySelector('#tasks-tools-menu'), 'bulk-select', true);
+  renderTaskList(container);
 }
 
-function wireBulkCheckboxes(container) {
-  const listEl = container.querySelector('#task-list');
-  if (!listEl) return;
-
-  listEl.addEventListener('change', (e) => {
-    const checkbox = e.target.closest('.task-bulk-checkbox');
-    if (!checkbox) return;
-
-    const taskId = Number(checkbox.dataset.taskId);
-    if (checkbox.checked) {
-      state.selectedTaskIds.add(taskId);
-    } else {
-      state.selectedTaskIds.delete(taskId);
-    }
-    updateBulkActionsBar(container);
-  });
+/**
+ * Der Ausstieg - aus „Fertig" in der Pille, dem Menue-Haken oder Escape.
+ * Stand der Fokus in der Pille, die gleich verschwindet, geht er an den
+ * Menueknopf, ueber den man hineingekommen ist - sonst fiele er auf <body>.
+ */
+function exitBulkSelect(container) {
+  if (!state.bulkSelectMode) return;
+  const pillHadFocus = !!document.activeElement?.closest?.('.list-bulkbar');
+  state.bulkSelectMode = false;
+  state.selectedTaskIds.clear();
+  syncPopoverMenuItem(container.querySelector('#tasks-tools-menu'), 'bulk-select', false);
+  renderTaskList(container);
+  if (pillHadFocus) container.querySelector('.tasks-toolbar .page-tools-btn')?.focus();
 }
 
-function wireBulkActions(container) {
-  const bar = container.querySelector('#bulk-actions-bar');
-  if (!bar) return;
-  if (readOnly()) return;
+/** Escape beendet die Auswahl - ein Modus, den nur das Menue verlaesst, waere eine Falle. */
+function wireBulkEscape(container) {
+  const onKey = (e) => {
+    if (e.key !== 'Escape' || !state.bulkSelectMode || e.defaultPrevented) return;
+    if (!container.isConnected) { document.removeEventListener('keydown', onKey); return; }
+    // Ein offener Dialog oder ein offenes Menue schliesst zuerst selbst.
+    if (document.querySelector('.modal-overlay')) return;
+    try { if (document.querySelector(':popover-open')) return; } catch { /* alter Browser */ }
+    exitBulkSelect(container);
+  };
+  document.addEventListener('keydown', onKey, pageSignal ? { signal: pageSignal } : undefined);
+}
 
-  bar.addEventListener('click', async (e) => {
-    const btn = e.target.closest('button[id^="bulk-"]');
-    if (!btn) return;
-
-    const taskIds = [...state.selectedTaskIds];
-    if (taskIds.length === 0) return;
-
-    const action = btn.id;
-
-    // Löschen läuft über dasselbe Optimistic-Undo-Muster wie der Einzel-Delete
-    // (kein ungestylter window.confirm, immer rückgängig machbar — Critique P1).
-    if (action === 'bulk-delete') {
-      handleBulkDelete(taskIds, container);
-      return;
-    }
-
-    if (action === 'bulk-tag-add' || action === 'bulk-tag-remove') {
-      openBulkTagDialog(taskIds, action === 'bulk-tag-add' ? 'add' : 'remove', container);
-      return;
-    }
-
-    if (action === 'bulk-archive') {
-      state.selectedTaskIds.clear();
-      updateBulkActionsBar(container);
-      await archiveTaskIds(taskIds, container);
-      return;
-    }
-
-    try {
-      if (action === 'bulk-mark-done' || action === 'bulk-mark-open') {
-        const status = btn.dataset.status;
-        await Promise.all(taskIds.map(id => api.patch(`/tasks/${id}/status`, { status })));
-        window.yuvomi.showToast(t('tasks.bulkStatusChanged'), 'success');
-      }
-
-      state.selectedTaskIds.clear();
-      updateBulkActionsBar(container);
-      await loadTasks(container);
-    } catch (err) {
-      window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
-    }
-  });
+/** Ein Tipp auf den Auswahlkreis: in die Auswahl oder heraus. */
+function toggleTaskSelection(btn, container) {
+  const taskId = Number(btn.dataset.id);
+  if (!Number.isInteger(taskId)) return;
+  const on = !state.selectedTaskIds.has(taskId);
+  if (on) state.selectedTaskIds.add(taskId);
+  else state.selectedTaskIds.delete(taskId);
+  btn.classList.toggle('select-circle--on', on);
+  btn.setAttribute('aria-pressed', String(on));
+  vibrate(10);
+  updateBulkActionsBar(container);
 }
 
 // Server-Obergrenze von POST /tasks/archive (MAX_BULK_TASKS in
@@ -4164,7 +4717,25 @@ function handleBulkDelete(taskIds, container) {
   state.selectedTaskIds.clear();
   updateBulkActionsBar(container);
 
-  const restore = () => els.forEach(el => { el.style.display = prevDisplay.get(el) ?? ''; });
+  // DIE SPALTE FOLGT SOFORT, nicht erst nach dem Rueckgaengig-Fenster. Stand
+  // die angezeigte Aufgabe in der Loeschung, blieben ihre Aktionen (Bearbeiten,
+  // Status, Ablage, Loeschen) sonst fuenf Sekunden bedienbar neben einer Liste,
+  // in der sie schon fehlt. Dieselbe Regel wie beim Austritt einer einzelnen
+  // Zeile: weiter auf die Nachbarin, sonst Leerzustand.
+  const listEl = container.querySelector('#task-list');
+  const shown = taskMd?.selectedId() ?? null;
+  const shownGoes = shown != null && listEl && taskIds.some((id) => String(id) === String(shown));
+  if (shownGoes) moveSelectionOn(listEl, mdRowIds(listEl), shown);
+  const movedTo = shownGoes ? (taskMd?.selectedId() ?? null) : null;
+
+  const restore = () => {
+    els.forEach(el => { el.style.display = prevDisplay.get(el) ?? ''; });
+    // Rueckgaengig: die Aufgabe kommt auch rechts zurueck - ausser der Nutzer
+    // hat in der Zwischenzeit selbst etwas anderes gewaehlt.
+    if (shownGoes && taskMd && taskMd.selectedId() === movedTo && taskMd.isSplit()) {
+      taskMd.select(shown, { history: 'replace' });
+    }
+  };
 
   scheduleUndoableDelete({
     message: t('tasks.bulkDeleted'),
@@ -4210,16 +4781,20 @@ async function completeTaskFor(container, taskId, userId) {
   const quelle = actingAsDisplay() ? (state.displayPeople ?? []) : (state.users ?? []);
   const person = quelle.find((u) => u.id === userId);
   try {
-    await toggleTaskStatus(taskId, 'open', userId);
-    await loadTasks(container);
+    const response = await toggleTaskStatus(taskId, 'open', userId);
+    await reloadWithRowMotion(container, taskId);
+    // EIN Toast, nie zwei: bei einer Serie sagt derselbe Satz, wer es war UND
+    // wann es weitergeht (#1603) - auch am Wandtablett, wo die neue Zeile sonst
+    // wie ein Haken aussieht, der nicht gehalten hat.
+    const name = person?.display_name ?? '';
     window.yuvomi.showToast(
-      t('tasks.doneByToast', { name: person?.display_name ?? '' }),
+      seriesDoneText(response, { name }) ?? t('tasks.doneByToast', { name }),
       'default',
       5000,
       actingAsDisplay() ? null : async () => {
         try {
           await toggleTaskStatus(taskId, 'done');
-          await loadTasks(container);
+          await reloadWithRowMotion(container, taskId);
         } catch (err) {
           window.yuvomi.showToast(err.message, 'danger');
         }
@@ -4231,6 +4806,111 @@ async function completeTaskFor(container, taskId, userId) {
   }
 }
 
+/**
+ * DIE PERSONENWAHL AM KONTEXTMENUE DER ZEILE (R9 M1).
+ *
+ * Mobil steht der Knopf „Wer hat erledigt?" nicht mehr in der Zeile (tasks.css,
+ * Raster unter 640px): er nahm dem Titel 44px, und sein Ziel lag 0px neben dem
+ * Haken - gemessen 7 von 12 Titeln abgeschnitten, Fehlgriff Haken/Picker
+ * (Re-Critique 2026-09-27, A3 P1-1). Die Frage bleibt an drei Stellen offen:
+ * in der Detailansicht (task-detail.js), per Long-Press auf die Zeile und per
+ * Kontextmenue (Rechtsklick, Menue-Taste, Android-Long-Press). Alle drei
+ * oeffnen DASSELBE Panel, das renderDoerPicker schon rendert - kein zweites
+ * Menue mit eigener Liste, das auseinanderlaufen koennte.
+ *
+ * GEOEFFNET WIRD ERST NACH DEM LOSLASSEN, und das ist keine Geschmacksfrage:
+ * das Light-Dismiss der Popover-API schliesst beim `pointerup` jedes Popover,
+ * das nicht schon beim `pointerdown` offen war. Ein Menue, das mitten im
+ * Druck aufgeht, ginge beim Loslassen sofort wieder zu. Waehrend des Drucks
+ * quittiert deshalb nur die Vibration, dass er erkannt ist.
+ */
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_SLOP = 10;
+
+function doerPanelOf(card) {
+  return card?.querySelector?.(`.popover-menu[id^="${DOER_PANEL_PREFIX}"]`) ?? null;
+}
+
+function openDoerMenu(card) {
+  const panel = doerPanelOf(card);
+  if (!panel || typeof panel.showPopover !== 'function') return false;
+  if (!panel.matches(':popover-open')) panel.showPopover();
+  return true;
+}
+
+function wireDoerContextMenu(listEl) {
+  let press = null;
+  let swallowClick = false;
+  const clear = () => {
+    if (press?.timer) clearTimeout(press.timer);
+    press = null;
+  };
+  const openAfterRelease = (card, primary) => {
+    // Der Klick, der dem Loslassen folgt, gehoert zum Druck und nicht zur
+    // Zeile - sonst hakte er ab oder oeffnete das Detail. Nur fuer die
+    // Primaertaste: ein Rechtsklick erzeugt keinen `click`, und ein stehen
+    // gebliebener Riegel schluckte den naechsten echten.
+    if (primary) {
+      swallowClick = true;
+      setTimeout(() => { swallowClick = false; }, LONG_PRESS_MS);
+    }
+    setTimeout(() => openDoerMenu(card), 0);
+  };
+
+  listEl.addEventListener('pointerdown', (e) => {
+    clear();
+    if (state.bulkSelectMode) return;
+    const card = e.target.closest?.('.task-card');
+    if (!doerPanelOf(card) || e.target.closest('.popover-menu')) return;
+    const primary = e.pointerType !== 'mouse' || e.button === 0;
+    press = { card, x: e.clientX, y: e.clientY, armed: false, primary, timer: null };
+    // Die Maus hat ihr Kontextmenue (Rechtsklick) - ein Halten mit der
+    // linken Taste ist dort ein Markieren, keine Frage nach der Person.
+    if (e.pointerType !== 'mouse') {
+      press.timer = setTimeout(() => {
+        if (!press) return;
+        press.timer = null;
+        press.armed = true;
+        vibrate(15);
+      }, LONG_PRESS_MS);
+    }
+  });
+  listEl.addEventListener('pointermove', (e) => {
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > LONG_PRESS_SLOP) clear();
+  });
+  listEl.addEventListener('pointerup', () => {
+    if (press?.armed) openAfterRelease(press.card, press.primary);
+    clear();
+  });
+  // Der Browser uebernimmt die Geste (Scrollen, Systemmenue): war der Druck
+  // schon erkannt, steht die Frage trotzdem - sonst verpuffte er.
+  listEl.addEventListener('pointercancel', () => {
+    if (press?.armed) openAfterRelease(press.card, false);
+    clear();
+  });
+  listEl.addEventListener('contextmenu', (e) => {
+    if (state.bulkSelectMode) return;
+    const card = e.target.closest?.('.task-card');
+    if (!doerPanelOf(card)) return;
+    e.preventDefault();
+    // Waehrend eines Drucks (macOS-Rechtsklick, Android-Long-Press) erst nach
+    // dem Loslassen oeffnen; sonst sofort (Menue-Taste, Windows nach mouseup).
+    if (press && press.card === card) {
+      if (press.timer) clearTimeout(press.timer);
+      press.timer = null;
+      press.armed = true;
+      return;
+    }
+    openDoerMenu(card);
+  });
+  listEl.addEventListener('click', (e) => {
+    if (!swallowClick) return;
+    swallowClick = false;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, { capture: true });
+}
+
 function wireTaskList(container) {
   const listEl = container.querySelector('#task-list');
   if (!listEl) return;
@@ -4240,6 +4920,7 @@ function wireTaskList(container) {
   // `listEl`: `toggle`/`beforetoggle` steigen nicht auf, und die Panels sitzen
   // im Top-Layer - ein Listener an der Liste selbst sieht sie nie.
   installPopoverMenus(container);
+  wireDoerContextMenu(listEl);
 
   listEl.addEventListener('click', async (e) => {
     const target = e.target.closest('[data-action]');
@@ -4255,6 +4936,18 @@ function wireTaskList(container) {
       || (actingAsDisplay() && DISPLAY_WRITE_ACTIONS.has(action));
     if (readOnly() && !erlaubt) return;
 
+    if (action === 'toggle-select') {
+      toggleTaskSelection(target, container);
+      return;
+    }
+    // Im Auswahlmodus waehlt auch der Titel aus, statt zu oeffnen - die ganze
+    // Zeile ist dann Auswahlflaeche, wie in Apples Erinnerungen.
+    if (action === 'open-task' && state.bulkSelectMode) {
+      const circle = target.closest('.task-card')?.querySelector('[data-action="toggle-select"]');
+      if (circle) toggleTaskSelection(circle, container);
+      return;
+    }
+
     if (action === 'toggle-status') {
       const status = target.dataset.status;
       const nextStatus = status === 'done' ? 'open' : 'done';
@@ -4269,32 +4962,15 @@ function wireTaskList(container) {
       // `loadTasks()` ersetzt den Knopf, und ohne dieses Warten war `check-pop`
       // (tasks.css:703) in 0 von 6 Messungen zu sehen. Siehe animationSettled().
       const settled = animationSettled(target);
+      // Die Haltezeit laeuft ab dem Tipp, neben dem Roundtrip - ein langsames
+      // Netz verlaengert sie nicht noch einmal (EXIT_HOLD_MS).
+      const holdUntil = performance.now() + EXIT_HOLD_MS;
       try {
-        await toggleTaskStatus(id, status);
+        const response = await toggleTaskStatus(id, status);
         await settled;
-        await loadTasks(container);
-        // Derselbe Rückweg wie beim Wischen. Die Geste hatte hier zwei
-        // Endpunkte mit zwei Antworten: der Wisch bot Undo an, der Tipp - die
-        // häufigere Bedienung - liess den Eintrag kommentarlos aus dem
-        // gefilterten Bild verschwinden.
-        //
-        // Die Schlüssel heissen weiter `swiped*`: ihr TEXT ist gestenneutral
-        // ("Als erledigt markiert."), nur der Name nennt die Wischgeste. Ein
-        // Rename kostet 24 Locale-Dateien für eine Namensschuld, die kein
-        // Nutzer sieht - vermerkt statt bezahlt.
-        window.yuvomi.showToast(
-          t(nextStatus === 'done' ? 'tasks.swipedDoneToast' : 'tasks.swipedOpenToast'),
-          'default',
-          5000,
-          async () => {
-            try {
-              await toggleTaskStatus(id, nextStatus);
-              await loadTasks(container);
-            } catch (err) {
-              window.yuvomi.showToast(err.message, 'danger');
-            }
-          },
-        );
+        await reloadWithRowMotion(container, id, { holdUntil });
+        // Derselbe Rückweg wie beim Wischen - und dieselbe Quittung.
+        acknowledgeStatusToggle(container, id, nextStatus, response);
       } catch (err) {
         window.yuvomi.showToast(err.message, 'danger');
         await loadTasks(container);
@@ -4335,17 +5011,16 @@ function wireTaskList(container) {
       }
     }
 
-    if (action === 'edit-task' || action === 'open-task') {
-      try {
-        const [task, reminder] = await Promise.all([
-          loadTaskForEdit(id),
-          loadReminderForTask(id),
-        ]);
-        openTaskView(task, reminder, container);
-      } catch (err) {
-        window.yuvomi.showToast(t('tasks.loadError'), 'danger');
-      }
+    // LISTE + DETAIL: ab der Schwelle waehlt der Titel die Zeile aus, und das
+    // Detail steht rechts daneben; darunter oeffnet er wie bisher das Sheet.
+    // Der Stift steht in der Spaltenform nicht (tasks.css), er fuehrt deshalb
+    // weiter den Weg unter der Schwelle.
+    if (action === 'open-task') {
+      if (taskMd) taskMd.open(id, target);
+      else await openTaskSheet(id, container);
     }
+
+    if (action === 'edit-task') await openTaskSheet(id, container);
 
     if (action === 'archive-task' || action === 'unarchive-task') {
       const archive = action === 'archive-task';
@@ -4358,8 +5033,22 @@ function wireTaskList(container) {
       }
     }
 
+    // TEILAUFGABE AUS DER LISTE: die Leseansicht der Aufgabe oeffnet sich mit
+    // der Eingabezeile (A3 P1-1) - dort legt Enter an und laesst den Fokus fuer
+    // die naechste stehen. Frueher fragte hier ein modaler Prompt je Punkt.
+    // Steht die Aufgabe schon rechts in der Spalte, geht nur das Feld dort auf.
     if (action === 'add-subtask') {
-      await addSubtask(target.dataset.parent, { onChanged: () => loadTasks(container) });
+      const parentId = String(target.dataset.parent);
+      const paneComposer = taskMd?.isSplit() && String(taskMd.selectedId()) === parentId
+        ? container.querySelector('.detail-subtask--add')
+        : null;
+      if (paneComposer) {
+        paneComposer.click();
+      } else {
+        composeSubtaskFor = parentId;
+        if (taskMd) taskMd.open(parentId, target);
+        else await openTaskSheet(parentId, container);
+      }
     }
 
     if (action === 'rename-subtask') {
@@ -4384,16 +5073,32 @@ function wireTaskList(container) {
  * sie ohne Mounter oeffnet, bekommt eine ohne Bearbeiten-Knopf statt einen,
  * der ins Leere fuehrt.
  */
-function openTaskView(task, reminder, container) {
+// Die Aufgabe, deren Leseansicht mit offener Teilaufgaben-Zeile aufgehen soll
+// (Aktion `add-subtask` der Liste). Einmal gelesen, dann verbraucht - sonst
+// oeffnete jede spaetere Ansicht derselben Aufgabe das Feld mit.
+let composeSubtaskFor = null;
+
+function openTaskView(task, reminder, container, { pane = null } = {}) {
+  const composeSubtask = composeSubtaskFor != null && composeSubtaskFor === String(task.id);
+  composeSubtaskFor = null;
   openTaskDetail({
     task,
+    composeSubtask,
     reminder,
     users: state.users,
     currentUserId: state.currentUserId,
     isAdmin: state.isAdmin,
     categories: state.categories,
     container,
-    onChanged: () => loadTasks(container),
+    // In der Spalte zeigt die Ansicht ihre eigene Aenderung (Teilaufgabe,
+    // Kommentar) schon selbst - die Liste zieht nach, ohne das Detail neu zu
+    // malen und dabei den Fokus aus dem Knopf zu reissen, der ihn gerade hat.
+    onChanged: pane ? () => loadTasks(container, { paneQuiet: true }) : () => loadTasks(container),
+    pane,
+    onClose: pane ? () => onPaneActionClosed(container) : undefined,
+    // Bestaetigt geschrieben, Nachladen gescheitert: die Spalte neu zeichnen -
+    // frisch vom Server oder als Fehlerzustand mit „Erneut versuchen".
+    onStale: pane ? () => taskMd?.refresh({ repaint: true }) : undefined,
     // Ohne Mounter baut die geteilte Ansicht keinen Bearbeiten-Knopf (#918) -
     // besser als einer, der ins Leere fuehrt. openTaskDetail zieht denselben
     // Schluss ohnehin noch einmal ueber canEditTaskDefinition(); der Verzicht
@@ -4407,8 +5112,297 @@ function openTaskView(task, reminder, container) {
         pane.insertAdjacentHTML('beforeend', renderModalContent({ task, users: state.users, reminder }));
         wireTaskForm(panel, { task, container });
       },
+      // Aus der Detailspalte: das regulaere Formular-Modal, mit Fusszeile,
+      // Verwerfen-Frage und Fokusfuehrung (detail-view.js, openInPane).
+      standalone: pane ? () => openTaskModal({ task, users: state.users, reminder }, container) : undefined,
     },
   });
+}
+
+// --------------------------------------------------------
+// Liste + Detail (Breitenregel, DESIGN.md; utils/master-detail.js)
+//
+// Ab der Schwelle steht rechts neben der Liste das Detail der AUSGEWAEHLTEN
+// Aufgabe - wie in Erinnerungen auf dem Mac. In der Liste und im Verlauf
+// (#1550: neben einem Eintrag steht seine Aufgabe), nicht im Brett: das
+// braucht die ganze Flaeche. Die Wurzel traegt `.app-page--list-detail`
+// deshalb nur dort (syncViewChrome), darunter und im Brett bleibt alles, wie
+// es war. Beide Ansichten zeichnen in dasselbe `#task-list` und teilen sich
+// EINE Instanz des Bausteins (es gibt je Seite hoechstens eine).
+//
+// Die Adresse ist `?open=<id>` und nicht `?id=`: diesen Deep-Link gibt es seit
+// der globalen Suche (router.js), und EIN Parameter fuer beide Regime heisst,
+// dass derselbe Link am Handy das Sheet oeffnet und am Desktop die Zeile waehlt.
+// --------------------------------------------------------
+
+/** Handle des Bausteins, solange die Seite steht; sonst null. */
+let taskMd = null;
+/** Das Router-Signal der Seite - der Wiederholen-Weg des Ladefehlers baut damit neu auf. */
+let pageSignal = null;
+/** Stand der ausgewaehlten Aufgabe beim letzten Zeichnen des Details. */
+let paneTaskSig = null;
+/** Eine Aktion der Spalte (Status, Ablage) hat sie abgemeldet - neu malen. */
+let paneRepaintDue = false;
+
+const TASK_DETAIL_PARAM = 'open';
+
+/** Alle Zeilen-IDs in Dokumentreihenfolge (auch verborgene). */
+function mdRowIds(listEl) {
+  return [...listEl.querySelectorAll('[data-md-id]')].map((row) => row.dataset.mdId);
+}
+
+/** Die IDs der Zeilen, die gerade zu sehen sind. */
+function visibleMdIds(listEl) {
+  return new Set([...listEl.querySelectorAll('[data-md-id]')]
+    .filter((row) => !row.hidden && row.getClientRects().length > 0)
+    .map((row) => row.dataset.mdId));
+}
+
+/**
+ * Die Nachbarin einer Zeile, die gegangen ist: zuerst die naechste darunter,
+ * dann die darueber - wie Mail nach dem Loeschen einer Nachricht. `null`, wenn
+ * keine mehr steht (dann Leerzustand).
+ */
+function neighborMdId(order, goneId, visible) {
+  const index = order.indexOf(String(goneId));
+  if (index < 0) return null;
+  for (let i = index + 1; i < order.length; i += 1) if (visible.has(order[i])) return order[i];
+  for (let i = index - 1; i >= 0; i -= 1) if (visible.has(order[i])) return order[i];
+  return null;
+}
+
+/** Fingerabdruck einer Aufgabe aus der Liste - aendert er sich, ist das Detail alt. */
+function taskSig(id) {
+  const task = state.tasks.find((x) => String(x.id) === String(id));
+  return task ? JSON.stringify(task) : null;
+}
+
+/**
+ * Nach jedem Neuzeichnen der Liste: Auswahl halten, nachziehen oder weiterruecken.
+ *
+ * - Die Zeile steht noch: Auswahl bleibt (Abhaken, Filter, Suche). Hat sich
+ *   die Aufgabe geaendert (Status aus der Liste, gespeichertes Formular),
+ *   malt das Detail neu - ausser die Aenderung kam aus dem Detail selbst.
+ * - Die Aufgabe ist noch da, nur nicht gezeichnet (Gruppe eingeklappt): die
+ *   Auswahl bleibt stehen, bis die Zeile zurueckkommt.
+ * - Sie hat die Ansicht verlassen (abgehakt unter „Offen", abgelegt,
+ *   geloescht, weggefiltert): die Auswahl rueckt auf die Nachbarin, sonst
+ *   Leerzustand. Die Adresse wird ersetzt, nicht gestapelt - das Weiterruecken
+ *   ist keine Navigation, die ein Zurueck verdiente.
+ */
+function syncPaneAfterRender(listEl, orderBefore, { quiet = false } = {}) {
+  if (!taskMd) return;
+  const selected = taskMd.selectedId();
+  if (selected == null) { taskMd.refresh(); return; }
+  const row = listEl.querySelector(`[data-md-id="${CSS.escape(selected)}"]`);
+  if (row) {
+    const sig = taskSig(selected);
+    const repaint = paneRepaintDue || (!quiet && paneTaskSig != null && sig !== paneTaskSig);
+    paneRepaintDue = false;
+    paneTaskSig = sig;
+    taskMd.refresh({ repaint });
+    return;
+  }
+  if (filteredTasks().some((task) => String(task.id) === selected)) return;
+  moveSelectionOn(listEl, orderBefore, selected);
+}
+
+/**
+ * Dasselbe fuer den Verlauf (#1550) - nach jedem Neuzeichnen seiner Eintraege.
+ *
+ * Der Verlauf hat keinen eigenen Bestand an Aufgaben, an dem sich ein
+ * Fingerabdruck messen liesse (`taskSig` liest `state.tasks`, und dort steht
+ * eine erledigte Aufgabe unter dem Statusfilter gar nicht). Die Frage ist
+ * deshalb, WARUM neu gezeichnet wurde:
+ *
+ * - Nach einem Schreibvorgang (`afterWrite`, renderTaskList): die Zeile steht
+ *   noch, dann malt das Detail neu - ausser die Aenderung kam aus ihm selbst
+ *   (`quiet`). Ist sie weg (Haken zurueckgenommen, geloescht), rueckt die
+ *   Auswahl auf die Nachbarin wie in der Liste.
+ * - Sonst (Person gewechselt, Erneut versuchen, „Mehr anzeigen"): ein neuer
+ *   Zusammenhang oder nur mehr Zeilen. Das entscheidet der Baustein selbst
+ *   (refresh): bleibt die Zeile, bleibt die Auswahl; fiel eine gezeigte weg,
+ *   steht die erste rechts.
+ */
+function syncHistoryPane(listEl, orderBefore, { afterWrite = false, quiet = false } = {}) {
+  if (!taskMd) return;
+  const selected = taskMd.selectedId();
+  if (selected == null) { taskMd.refresh(); return; }
+  if (listEl.querySelector(`[data-md-id="${CSS.escape(selected)}"]`)) {
+    const repaint = paneRepaintDue || (afterWrite && !quiet);
+    paneRepaintDue = false;
+    taskMd.refresh({ repaint });
+    return;
+  }
+  if (afterWrite) moveSelectionOn(listEl, orderBefore, selected);
+  else taskMd.refresh();
+}
+
+/** Die ausgewaehlte Zeile ist weg: auf die Nachbarin oder in den Leerzustand. */
+function moveSelectionOn(listEl, order, goneId) {
+  paneRepaintDue = false;
+  const next = taskMd.isSplit() ? neighborMdId(order, goneId, visibleMdIds(listEl)) : null;
+  // Stand der Fokus auf der gegangenen Zeile, faellt er mit ihr auf <body>.
+  // Dann geht er mit der Auswahl - Tastaturbedienung verliert sonst ihren Ort.
+  const focusLost = !document.activeElement || document.activeElement === document.body;
+  if (next) taskMd.select(next, { history: 'replace', focus: focusLost ? 'row' : false });
+  else taskMd.clear({ history: 'replace' });
+}
+
+/**
+ * Eine Aktion im Detail hat die Ansicht abgemeldet (detail-view.js ruft
+ * `onClose` aus `close()`). Status und Ablage laden danach die Liste nach -
+ * dort entscheidet syncPaneAfterRender. Das Loeschen blendet die Zeile sofort
+ * aus und laedt erst nach dem Rueckgaengig-Fenster; die Auswahl rueckt deshalb
+ * gleich weiter, statt fuenf Sekunden eine geloeschte Aufgabe zu zeigen.
+ */
+function onPaneActionClosed(container) {
+  paneRepaintDue = true;
+  setTimeout(() => {
+    const listEl = container.querySelector('#task-list');
+    const selected = taskMd?.selectedId();
+    if (!listEl || selected == null || !taskMd.isSplit()) return;
+    if (visibleMdIds(listEl).has(selected)) return;
+    if (!listEl.querySelector(`[data-md-id="${CSS.escape(selected)}"]`)) return;
+    moveSelectionOn(listEl, mdRowIds(listEl), selected);
+  }, 0);
+}
+
+/**
+ * Das Sheet bzw. Popover einer Aufgabe - der Weg unter der Schwelle.
+ *
+ * Erst zwei Anfragen, dann das Blatt. `signal` kommt vom Baustein (openNarrow)
+ * und bricht ab, wenn in der Zwischenzeit Zurueck gedrueckt, das Fenster breit
+ * (Detail in der Spalte) oder die Seite verlassen wurde - dann gilt das
+ * Ergebnis nicht mehr, und ein Blatt legte sich ueber die neue Lage.
+ */
+async function openTaskSheet(id, container, signal = null) {
+  try {
+    const [task, reminder] = await Promise.all([
+      loadTaskForEdit(id),
+      loadReminderForTask(id),
+    ]);
+    if (signal?.aborted) return;
+    openTaskView(task, reminder, container);
+  } catch (err) {
+    if (!signal?.aborted) window.yuvomi.showToast(t('tasks.loadError'), 'danger');
+  }
+}
+
+/**
+ * Das Detail einer Aufgabe in die Spalte zeichnen.
+ *
+ * Geladen wird die volle Aufgabe wie fuer das Sheet: die Listenzeile traegt
+ * weder Beschreibung noch Dokumente. Dauert es, weicht der alte Inhalt einem
+ * Skelett - sonst stuende die vorige Aufgabe neben der neuen Auswahl.
+ */
+async function renderTaskPane(id, body, signal, container) {
+  const slow = setTimeout(() => {
+    if (signal.aborted) return;
+    body.replaceChildren();
+    body.insertAdjacentHTML('beforeend', `
+      <div class="tasks-pane-skeleton" aria-hidden="true">
+        <div class="skeleton skeleton-line skeleton-line--medium"></div>
+        <div class="skeleton skeleton-line skeleton-line--full"></div>
+        <div class="skeleton skeleton-line skeleton-line--short"></div>
+      </div>`);
+  }, 150);
+  let task = null;
+  let reminder = null;
+  try {
+    [task, reminder] = await Promise.all([loadTaskForEdit(id), loadReminderForTask(id)]);
+  } catch (err) {
+    clearTimeout(slow);
+    if (signal.aborted) return undefined;
+    // Weg oder nicht (mehr) sichtbar: `false`, der Baustein faellt still in
+    // den Leerzustand und nimmt `?open=` weg. Alles andere (Netz, 500) ist
+    // voruebergehend: werfen - die Auswahl bleibt, und die Spalte zeigt den
+    // Fehler mit „Erneut versuchen" (Vertrag in utils/master-detail.js).
+    if (err?.status === 404 || err?.status === 403) return false;
+    throw err;
+  }
+  clearTimeout(slow);
+  if (signal.aborted) return undefined;
+  if (!task) return false;
+  paneTaskSig = taskSig(id);
+  openTaskView(task, reminder, container, { pane: body });
+  return undefined;
+}
+
+/**
+ * Die Hoehenkette der Spaltenform. Beide Spalten scrollen fuer sich - dafuer
+ * braucht `.split-view` eine feste Hoehe, und die bekommt sie nur, wenn die
+ * Seite die Hauptspalte fuellt statt mit ihrem Inhalt zu wachsen. Eine
+ * Container-Abfrage kann ihren eigenen Container nicht gestalten, also setzt
+ * diese Funktion die Klasse - gefragt wird dabei das CSS (steht die
+ * Detailspalte?), nicht eine zweite Schwelle.
+ */
+function syncSplitHeight(container) {
+  const page = container.querySelector('.tasks-page');
+  const detail = page?.querySelector('.split-view__detail');
+  if (!page || !detail) return;
+  const split = getComputedStyle(detail).display !== 'none';
+  page.classList.toggle('tasks-page--split', split);
+  // In der Spaltenform scrollt die Liste selbst, nicht mehr `.app-content` -
+  // sie traegt dann die Rolle, damit der Nachlauf der Shell-Flaechen (FAB,
+  // Banner, Pille) an IHREM Ende reitet (layout.css, „Der Nachlauf gehoert an
+  // das, was wirklich scrollt"). Darunter faellt die Rolle weg, und die Seite
+  // scrollt wie bisher als Ganzes.
+  page.querySelector('#task-list')?.classList.toggle('page-scrollport', split);
+}
+
+function mountTaskSplit(container, signal) {
+  const root = container.querySelector('.tasks-split');
+  const page = container.querySelector('.tasks-page');
+  if (!root || !page || signal?.aborted) return;
+
+  // Ein Deep-Link auf eine Aufgabe, die in dieser Liste nicht steht (erledigt,
+  // abgelegt, weggefiltert - die globale Suche findet alle): keine Auswahl
+  // ohne Zeile, sondern das Sheet wie bisher. Der Link BLEIBT in der Adresse
+  // (Kopieren, Neuladen, Vor - Codex an #1477); der Baustein laesst nur diese
+  // Anfangsauswahl liegen, statt sie ohne Zeile zu beanspruchen.
+  const initial = new URLSearchParams(location.search).get(TASK_DETAIL_PARAM);
+  const sheetFor = initial && !root.querySelector(`[data-md-id="${CSS.escape(initial)}"]`) ? initial : null;
+
+  taskMd = mountMasterDetail({
+    root,
+    param: TASK_DETAIL_PARAM,
+    signal,
+    deepLinkNarrow: true,
+    claimInitial: sheetFor == null,
+    renderDetail: (id, body, ctx) => renderTaskPane(id, body, ctx.signal, container),
+    openNarrow: (id, _trigger, { signal }) => openTaskSheet(id, container, signal),
+    // Enter auf der gewaehlten Zeile: Bearbeiten, wie der Knopf im Kopf der
+    // Spalte - ohne Schreibrecht steht dort keiner, dann fuehrt Enter ins
+    // Detail.
+    onEnter: () => {
+      const edit = root.querySelector('#detail-pane-edit');
+      if (edit) edit.click();
+      else root.querySelector('.split-view__detail')?.focus();
+    },
+  });
+  const handle = taskMd;
+  signal?.addEventListener('abort', () => {
+    if (taskMd === handle) taskMd = null;
+    paneTaskSig = null;
+    paneRepaintDue = false;
+  }, { once: true });
+
+  if (typeof ResizeObserver === 'function') {
+    const ro = new ResizeObserver(() => syncSplitHeight(container));
+    ro.observe(page);
+    signal?.addEventListener('abort', () => ro.disconnect(), { once: true });
+  }
+  syncSplitHeight(container);
+  // Ein Deep-Link weiter unten in der Liste: die gewaehlte Zeile ins Bild,
+  // sonst steht rechts ein Detail, dessen Zeile niemand sieht.
+  const chosen = taskMd.isSplit() && taskMd.selectedId() != null
+    ? root.querySelector(`[data-md-id="${CSS.escape(taskMd.selectedId())}"]`)
+    : null;
+  chosen?.scrollIntoView?.({ block: 'nearest' });
+  // Mit dem Signal der Seite: verlaesst der Nutzer sie waehrend der Anfragen,
+  // geht kein Blatt ueber der Zielseite auf.
+  if (sheetFor) openTaskSheet(sheetFor, container, signal);
 }
 
 /**
@@ -4551,9 +5545,24 @@ export async function openTaskById(taskId, { user = null, container = null, onCh
   });
 }
 
-export async function render(container, { user }) {
+export async function render(container, { user, signal } = {}) {
+  // Ein Wiederholen, das erst nach dem Wegnavigieren ankommt, baut nichts mehr:
+  // es raeumte sonst unten die Instanz ab, die eine NEUE Aufgaben-Seite schon
+  // eingehaengt hat.
+  if (signal?.aborted) return;
+  pageSignal = signal ?? null;
+  // Ein Neuaufbau (auch der Wiederholen-Weg des Ladefehlers) haengt die
+  // Detailspalte frisch ein; die alte Instanz gehoert zur alten Wurzel.
+  taskMd?.destroy();
+  taskMd = null;
+  paneTaskSig = null;
+  paneRepaintDue = false;
   state.user = user ?? null;
   state.currentUserId = user?.id ?? null;
+  // Die Auswahl gehoert zum Besuch, nicht zum Modul: die Shell raeumt die
+  // Pille beim Seitenwechsel ab (router.js), also faengt auch der Modus neu an.
+  state.bulkSelectMode = false;
+  state.selectedTaskIds.clear();
   loadCollapsedGroups();
   loadCollapsedKanbanCols();
   // Die Rolle entscheidet nur darüber, ob ein fremder Kommentar entfernt werden
@@ -4579,6 +5588,8 @@ export async function render(container, { user }) {
 
   // showFuture aus localStorage wiederherstellen
   try { state.showFuture = localStorage.getItem(SHOW_FUTURE_KEY) === '1'; } catch {}
+  // „Bis heute faellig" kommt nur aus der Adresse (siehe state.dueToday).
+  applyDueTodayFromAddress(window.location.search);
 
   const isKanban = state.viewMode === 'kanban';
   // Was nur die Aufgabenliste betrifft, blendet `syncViewChrome` gleich nach
@@ -4589,7 +5600,7 @@ export async function render(container, { user }) {
   // Initiales Skeleton (all values are from i18n keys or hardcoded constants, no user data)
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <div class="tasks-page app-page app-page--full" data-composition="full">
+    <div class="tasks-page app-page app-page--full${state.viewMode !== 'kanban' ? ' app-page--list-detail' : ''}" data-composition="full">
       <div class="page-toolbar page-toolbar--wrap tasks-toolbar">
         <h1 class="page-toolbar__title">${t('tasks.title')}</h1>
         ${renderPageSearch({
@@ -4601,21 +5612,17 @@ export async function render(container, { user }) {
           className: 'tasks-toolbar__search page-toolbar__center',
         })}
         <div class="page-toolbar__actions">
-          <!-- ICON PLUS LABEL, wie beim Geschwister-Umschalter in der Filterreihe
-               (#group-mode-toggle, ~60 Zeilen tiefer). tasks.css:143 sagt ueber
-               den Label-Verlust ausdruecklich „Der Ansichts-Umschalter im Kopf
-               bekommt sie mit; er ist dasselbe Bauteil" - nur trug er gar kein
-               Label, das haette fallen koennen. Die Regel lief hier ins Leere,
-               und uebrig blieben drei stumme Glyphen (Critique 2026-08-28, P1:
-               ein Kanban-Rechteck und ein Verlaufs-Pfeil sind kein geteiltes
-               Vokabular). Unter 640px faellt das Label ueber die vorhandene
-               Regel weg, mobil bleibt also die Icon-Form - iOS-Kanon.
-               Die drei EINZELNEN Knoepfe daneben behalten ihre reine Icon-Form:
-               ihre Namen sind Verben („Kategorien verwalten"), und ein
-               aria-label als sichtbaren Text weiterzureichen verbietet
-               DESIGN.md. Damit trennt jetzt auch der Text, was vorher nur die
-               Behaelterform andeutete: benannte Ansichten in der Gruppe,
-               unbenannte Werkzeuge daneben. -->
+          <!-- KOPFREGEL MOBIL (2026-09-26): unter dem Large Title EINE Zeile -
+               Such-Icon, Ansicht, „Filter (n)" und EIN Werkzeugmenue, wie in
+               den Dokumenten. Vorher standen hier sechs lose Knoepfe (Liste,
+               Kanban, Verlauf, Mehrfachauswahl, Kategorien, Tags), die Suche
+               fiel dadurch allein in eine dritte Zeile, und darunter kam noch
+               eine Chipzeile: Kopf 176px, erste Aufgabe bei y=287 (A3 P1-2).
+               Die Chipzeile ist ins Filterblatt gewandert - "Offen", "Mir
+               zugewiesen", "Geplante" und die Gruppierung stehen dort
+               beschriftet, die ZAHL am Knopf sagt, dass etwas gesetzt ist
+               (Kalender-Muster). Der Verlauf ist keine dritte Ansicht der
+               Aufgaben, sondern eine Liste von Vorgaengen: er steht im Menue. -->
           <div class="group-toggle group-toggle--icons" id="view-toggle" role="group" aria-label="${t('tasks.viewToggleLabel')}">
             <button type="button" class="group-toggle__btn ${isKanban || isHistory ? '' : 'group-toggle__btn--active'}" data-view="list"
                     title="${t('tasks.listView')}" aria-label="${t('tasks.listView')}" aria-pressed="${!isKanban && !isHistory}">
@@ -4627,115 +5634,39 @@ export async function render(container, { user }) {
               <i data-lucide="columns" class="icon-md group-toggle__icon" aria-hidden="true"></i>
               <span class="group-toggle__label">${t('tasks.kanbanView')}</span>
             </button>
-            <button type="button" class="group-toggle__btn ${isHistory ? 'group-toggle__btn--active' : ''}" data-view="history"
-                    title="${t('tasks.historyView')}" aria-label="${t('tasks.historyView')}" aria-pressed="${isHistory}">
-              <i data-lucide="history" class="icon-md group-toggle__icon" aria-hidden="true"></i>
-              <span class="group-toggle__label">${t('tasks.historyView')}</span>
-            </button>
           </div>
-          ${/* DREI WERKZEUGE, DIE ALLE SCHREIBEN (#467). Sammelauswahl fuehrt
-                zur Sammelaktionsleiste, die beiden Verwalter legen Kategorien
-                und Etiketten an, benennen um und loeschen. Keins davon zeigt
-                einen Zustand an, den ein Nur-lesen-Nutzer vermissen wuerde -
-                Kategorien und Etiketten stehen als Filter im Blatt und an den
-                Karten. */ ''}
-          ${readOnly() ? '' : `
-          <button class="btn btn--ghost btn--icon" id="btn-bulk-select"
-                  title="${t('tasks.bulkSelect')}" aria-label="${t('tasks.bulkSelect')}" aria-pressed="false">
-            <i data-lucide="list-checks" class="icon-lg" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--icon btn--ghost" id="btn-manage-categories"
-                  aria-label="${t('tasks.manageCategories')}" title="${t('tasks.manageCategories')}">
-            <i data-lucide="folder-tree" class="icon-lg" aria-hidden="true"></i>
-          </button>`}
-          <!-- Der Tag-Verwalter bekommt das Etiketten-Icon, die Kategorien den
-               Ordnerbaum: die beiden Achsen sind bewusst getrennt, und dieselbe
-               Bildsprache für beide hätte genau das wieder eingeebnet. -->
-          ${readOnly() ? '' : `
-          <button class="btn btn--icon btn--ghost" id="btn-manage-tags"
-                  aria-label="${t('tasks.manageTags')}" title="${t('tasks.manageTags')}">
-            <i data-lucide="tags" class="icon-lg" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--primary toolbar-new-btn" id="btn-new-task" style="gap:var(--space-1)"
-                  aria-label="${t('tasks.newTask')}">
-            <i data-lucide="plus" class="icon-lg" aria-hidden="true"></i> <span class="toolbar-new-btn__label">${t('newLabel.tasks')}</span>
-          </button>`}
+          ${filterButtonHtml({ id: 'tasks-filter-btn', count: activeFilterCount(), showLabel: true, className: 'tasks-toolbar__filter' })}
+          ${/* Alles, was die Seite VERWALTET statt zeigt, steht beschriftet
+                im Menue (documents-tools-btn). Die schreibenden Eintraege
+                fehlen bei Nur-lesen (#467), der Verlauf bleibt: er zeigt nur. */ ''}
+          ${pageToolsMenuHtml({ id: 'tasks-tools-menu', label: t('common.moreActions'), items: toolsMenuItems() })}
+          ${/* DIE PRIMAERAKTION IST DER FAB (#fab-new-task, unten): die Shell
+                dockt ihn am Zeigergeraet mit seinem Nomen hier an
+                (dockFabIntoToolbar), wie in jedem Modul. Ein eigener Kopfknopf
+                war die zweite Bauart derselben Handlung (Re-Critique
+                2026-09-27, D3). */ ''}
         </div>
       </div>
 
       <div class="tasks-body">
-        <div class="tasks-filters-row">
-          <!-- Der Filterknopf steht VOR der Chip-Leiste, nicht in ihr (#1373):
-               die Leiste scrollt auf dem Telefon seitlich, und jeder gewaehlte
-               Filter schob den Knopf als letztes Kind aus dem sichtbaren
-               Streifen - das offene Panel liess sich nicht mehr schliessen. -->
-          <div class="tasks-filters__start" id="filter-toggle-slot"></div>
-          <div class="tasks-filters" id="filter-bar" role="group" aria-label="${t('tasks.filterBtn')}"></div>
-          <div class="tasks-filters__end">
-            <!-- Icon PLUS Label, nicht Icon ODER Label: unter 640px faellt das
-                 Label weg (Label-Verlust-Regel, tasks.css), und dann traegt das
-                 Icon allein. Das aria-label steht deshalb IMMER da - der
-                 zugaengliche Name darf nicht an einer Media-Query haengen. -->
-            <div class="group-toggle" id="group-mode-toggle" role="group"
-                 aria-label="${t('tasks.groupToggleLabel')}">
-              <button type="button" class="group-toggle__btn group-toggle__btn--active"
-                      data-mode="category" aria-pressed="true"
-                      aria-label="${t('tasks.categoryLabel')}">
-                <i data-lucide="folder" class="group-toggle__icon" aria-hidden="true"></i>
-                <span class="group-toggle__label">${t('tasks.categoryLabel')}</span>
-              </button>
-              <button type="button" class="group-toggle__btn"
-                      data-mode="due" aria-pressed="false"
-                      aria-label="${t('tasks.dueDateLabel')}">
-                <i data-lucide="calendar-clock" class="group-toggle__icon" aria-hidden="true"></i>
-                <span class="group-toggle__label">${t('tasks.dueDateLabel')}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="filter-panel" id="filter-panel" hidden></div>
-        ${readOnly() ? '' : `
-        <div class="bulk-actions-bar" id="bulk-actions-bar" hidden>
-          <span class="bulk-actions-bar__count" id="bulk-count"></span>
-          <div class="bulk-actions-bar__actions">
-            <button class="btn btn--secondary btn--sm" id="bulk-mark-done" data-status="done">
-              <i data-lucide="check" class="icon-md" aria-hidden="true"></i>
-              ${t('tasks.bulkMarkDone')}
-            </button>
-            <button class="btn btn--secondary btn--sm" id="bulk-mark-open" data-status="open">
-              <i data-lucide="rotate-ccw" class="icon-md" aria-hidden="true"></i>
-              ${t('tasks.bulkMarkOpen')}
-            </button>
-            <button class="btn btn--secondary btn--sm" id="bulk-archive">
-              <i data-lucide="archive" class="icon-md" aria-hidden="true"></i>
-              ${t('tasks.bulkArchive')}
-            </button>
-            <button class="btn btn--secondary btn--sm" id="bulk-tag-add">
-              <i data-lucide="tag" class="icon-md" aria-hidden="true"></i>
-              ${t('tasks.bulkTagAdd')}
-            </button>
-            <button class="btn btn--secondary btn--sm" id="bulk-tag-remove">
-              <!-- Nicht "tag-off": das Icon gibt es im gebuendelten Lucide nicht,
-                   der Knopf stand deshalb leer da. "eraser" traegt das Wegnehmen
-                   und laesst sich vom "tag" des Nachbarknopfs unterscheiden -
-                   zweimal dasselbe Icon nebeneinander waere keine Wahl. -->
-              <i data-lucide="eraser" class="icon-md" aria-hidden="true"></i>
-              ${t('tasks.bulkTagRemove')}
-            </button>
-            <button class="btn btn--danger btn--sm" id="bulk-delete">
-              <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
-              ${t('tasks.bulkDelete')}
-            </button>
-          </div>
-        </div>`}
-
-        <div id="task-list">
+        ${/* DIE SAMMELAKTIONEN STEHEN IN DER PILLE DER SHELL
+              (utils/bulk-pill.js, updateBulkActionsBar), wie in Einkauf,
+              Kontakten und Vorrat - nicht mehr als eigene Leiste ueber der
+              Liste (Re-Critique 2026-09-27, D5). */ ''}
+        <div class="split-view tasks-split">
+        <div id="task-list" class="split-view__list">
           ${[1,2,3].map(() => `
             <div class="widget-skeleton" style="margin-bottom:var(--space-2)">
               <div class="skeleton skeleton-line skeleton-line--medium" style="height:18px;margin-bottom:var(--space-3)"></div>
               <div class="skeleton skeleton-line skeleton-line--full" style="height:14px;margin-bottom:var(--space-2)"></div>
               <div class="skeleton skeleton-line skeleton-line--short" style="height:12px"></div>
             </div>`).join('')}
+        </div>
+        ${splitViewDetailHtml({
+          id: 'tasks',
+          label: t('tasks.detailPaneLabel'),
+          empty: { icon: 'list-checks', title: t('tasks.pickOne'), hint: t('tasks.pickOneHint') },
+        })}
         </div>
         ${readOnly() ? '' : `
         <button class="page-fab" id="fab-new-task" aria-label="${t('tasks.newTask')}" data-dock-label="${t('newLabel.tasks')}">
@@ -4746,6 +5677,8 @@ export async function render(container, { user }) {
   `);
 
   if (window.lucide) window.lucide.createIcons({ el: container });
+  // Schon das Skelett steht in der Spaltenform, nicht erst die Liste.
+  syncSplitHeight(container);
 
   // Daten laden (Filter-State aus vorheriger Session berücksichtigen)
   try {
@@ -4804,22 +5737,17 @@ export async function render(container, { user }) {
   }
 
   // UI verdrahten
+  installPopoverMenus(container);
   wireViewToggle(container);
-  wireGroupToggle(container);
+  wireToolbar(container);
   wireNewTaskBtn(container);
   wireTaskList(container);
-  wireBulkSelect(container);
-  wireBulkCheckboxes(container);
-  wireBulkActions(container);
+  wireBulkEscape(container);
   wireTagBadgeFilter(container);
-  container.querySelector('#btn-manage-categories')
-    ?.addEventListener('click', () => openTaskCategoryManager(container));
-  container.querySelector('#btn-manage-tags')
-    ?.addEventListener('click', () => openTagManager(container));
   renderFilters(container);
   // Im Verlauf holt renderTaskList den Bestand selbst nach - er steckt nicht in
   // `/tasks`, und sein Ladefehler ist ein eigener.
-  renderTaskList(container);
+  const firstPaint = renderTaskList(container);
 
   wirePageSearch(container, {
     id: 'tasks-search',
@@ -4829,28 +5757,38 @@ export async function render(container, { user }) {
     },
   });
 
-  // Deep-Link: ?open=<id> öffnet die Detailansicht
-  const openId = new URLSearchParams(window.location.search).get('open');
-  if (openId) {
-    try {
-      const [task, reminder] = await Promise.all([
-        loadTaskForEdit(openId),
-        loadReminderForTask(openId),
-      ]);
-      openTaskView(task, reminder, container);
-    } catch { /* Task existiert nicht oder kein Zugriff */ }
-  }
+  // Liste + Detail einhaengen - erst jetzt, weil die Zeilen stehen muessen:
+  // der Deep-Link `?open=<id>` waehlt ab der Schwelle seine Zeile aus und
+  // oeffnet darunter (und im Brett) die Detailansicht wie bisher. Der Verlauf
+  // zeichnet seine Zeilen erst nach einer eigenen Anfrage (#1550): ohne das
+  // Warten fehlte die Zeile beim Einhaengen, und ein `?open=` auf einen
+  // Eintrag ginge als Blatt ueber der Spalte auf statt ihn auszuwaehlen.
+  // `loadHistory` faengt seinen Fehler selbst ab und wirft nie.
+  if (state.viewMode === 'history') await firstPaint;
+  mountTaskSplit(container, signal);
 }
 
 // Testfläche: nur reine Funktionen, deren Vertrag außerhalb dieser Datei zählt.
 export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
+  // Die Quittung nach dem Abhaken (#1603), je Weg am laufenden Aufruf: Haken
+  // und Wisch teilen sich eine, die Personenwahl und das Brett haben je ihre.
+  acknowledgeStatusToggle, completeTaskFor, runColumnMove,
+  // Die Reihenfolge innerhalb einer Gruppe (ihr Aufrufer `renderTaskGroups`
+  // steht weiter unten): Wanduhr des Haushalts, nicht die des Geraets.
+  sortTasks, taskSortNow,
+  // `?due=today` (Re-Critique 2026-09-27): was die Adresse setzt, was die
+  // Liste daraus zeigt, und dass das Blatt es wieder nimmt - samt Adresse.
+  dueTodayFromSearch, isDueByToday, applyDueTodayFromAddress, setDueToday,
   // Das Brett als Markup plus seine Spaltenliste (#1250). Beides steht hier,
   // weil die Spaltenzahl eine Zusicherung GEGEN das Stylesheet ist: das Raster
   // muss so viele Spalten legen, wie diese Liste fuehrt, und genau dort ist es
   // einmal auseinandergelaufen. `toggleKanbanCol` kommt mit, damit der
   // eingeklappte Zustand gesetzt werden kann, ohne in den Speicher zu greifen.
-  kanbanBoardHtml, KANBAN_COLS, toggleKanbanCol,
+  kanbanBoardHtml, KANBAN_COLS, toggleKanbanCol, taskAdvancedTopics,
+  // Mobil blaettert das Brett (R9 M2): die Punkte ueber den Spalten und ihr
+  // Tipp, der zur Spalte fuehrt.
+  kanbanPagerHtml, wireKanbanPager,
   // Das Einhaengen des Ziehens einzeln, weil sein Riegel KEIN Markup hat: eine
   // Ablegezone, die gar nicht erst verdrahtet wird, sieht im HTML aus wie jede
   // andere. SortableJS liest keine Sichtbarkeit - eine Instanz auf einem
@@ -4860,7 +5798,7 @@ export const __test = {
   // Sammel-Ablage (#1250): die Mehrfachauswahl und der Kopf der Erledigt-
   // Spalte, beide mit dem Aufruf, den sie absetzen - gezaehlt wird, WIE OFT
   // sie den Server fragen, und das sieht kein Textguard.
-  wireBulkActions, archiveDoneColumn, filteredTasks,
+  runBulkAction, updateBulkActionsBar, toggleTaskSelection, archiveDoneColumn, filteredTasks,
   // Was ein Wandtablett zu sehen und zu fassen bekommt (#1209). Die Karte
   // traegt drei Wege zum selben Statuswechsel - Haken, Wisch, Teilaufgabe -,
   // und am Display darf nur der erste erscheinen, weil nur er nach der Person
@@ -4878,12 +5816,16 @@ export const __test = {
   // Die Verdrahtung steht mit hier: die Regel allein zu messen hiesse, den
   // haeufigsten Ausfall auszulassen - einen Listener, den niemand anhaengt.
   syncReminderAfterDue, wireReminderAfterDue,
+  // Der Countdown-Riegel und WANN er sich erklaert (Critique 2026-09-26: die
+  // Warnung stand auf jedem leeren Formular).
+  wireCountdownGate,
   // Und der AUFRUFER dazu: eine Regel, die richtig ist und die niemand ruft,
   // ist derselbe Ausfall wie eine falsche Regel.
   wireTaskForm,
   // Die Personenauswahl beim Abhaken (#1205): WANN sie ueberhaupt erscheint,
   // ist die halbe Entscheidung - ein Solo-Haushalt bekommt sie nie zu sehen.
   renderDoerPicker,
+  wireDoerContextMenu,
   // Welche Bedienelemente eine Boardkarte und eine leere Liste ueberhaupt
   // anbieten. Die Nur-lesen-Regel (#467) ist eine Aussage ueber genau dieses
   // Markup: was verschwindet, und was als Zeichen stehen bleibt, das den
@@ -4893,10 +5835,13 @@ export const __test = {
   // Gemerkte Filter: der Vertrag ist, dass Lesen und Schreiben AUSEINANDER
   // gehen - sonst schriebe das Bereinigen sich fest (siehe getRecentFilters).
   getRecentFilters, storedRecentFilters, saveRecentFilter,
-  // Filterleiste und -panel als Verhalten (#1373): wo der Knopf landet, und
-  // dass Escape und „Fertig" das Panel wirklich schliessen - samt der
-  // Verdrahtung, die `renderFilters` selbst anhaengt.
-  renderFilters,
+  // Kopf und Filterblatt (Kopfregel mobil, 2026-09-26): was das Menue und
+  // das Blatt anbieten, welche Zahl der Knopf zeigt, und dass ein Filter-
+  // wechsel ein OFFENES Blatt nachzieht, ohne seine Knoten zu tauschen (der
+  // Fokus bleibt auf dem getippten Chip - die Lehre aus #1373). Der Klick-
+  // und Schalterweg im Blatt steht mit hier, weil er die Verdrahtung ist.
+  renderFilters, activeFilterCount, toolsMenuItems, filterSheetGroups, syncFilterSheet,
+  onFilterSheetClick, onFilterSheetChange, resetTaskFilters,
   // Die Frische der Referenzlisten ist nur verhaltensgetrieben pruefbar: sie
   // haengt daran, WIE die Antwort kam, nicht daran, dass eine kam.
   refreshTags,
@@ -4905,6 +5850,24 @@ export const __test = {
   // entscheidet, ob eine Anfrage rausgeht. Ein Textguard kann das nicht sehen:
   // er liest den Aufruf, nicht das Ausbleiben. Deshalb steht der Handler hier.
   handleFormSubmit, reminderAccess,
+  // Liste + Detail: was nach einem Neuzeichnen mit der Auswahl geschieht
+  // (bleiben, nachziehen, weiterruecken) - ein Verhalten, das kein Textguard
+  // sieht. `useTaskMd` setzt den Baustein ein, wie mountTaskSplit es tut.
+  syncPaneAfterRender, neighborMdId, onPaneActionClosed,
+  useTaskMd: (md) => { taskMd = md; paneTaskSig = null; paneRepaintDue = false; },
+  // Das Blatt unter der Schwelle und die Spalte: beide laden erst, dann
+  // entscheidet, ob das Ergebnis noch gilt.
+  openTaskSheet, renderTaskPane,
+  // Der Aufbau von Liste + Detail samt Rueckfall fuer `?open=` ausserhalb
+  // der Liste: was er mit der Adresse tut, ist Verhalten (Codex an #1477).
+  mountTaskSplit,
+  // Sammel-Loeschen: was die Spalte tut, waehrend das Rueckgaengig-Fenster laeuft.
+  handleBulkDelete,
+  // Der Verlauf in Liste + Detail (#1550): welche Ansicht die Spalte bekommt
+  // (Klassen an der Wurzel), dass ein Wechsel die Auswahl der alten Ansicht
+  // abraeumt und die Vorwahl wieder scharf stellt, was eine Zeile traegt, wohin
+  // ihr Klick fuehrt und was nach dem Neuzeichnen mit der Auswahl geschieht.
+  syncViewChrome, setViewMode, renderHistoryEntry, openHistoryEntry, syncHistoryPane, renderTaskList,
   // Der Lader steht hier, weil die PRAEMISSE des gesperrten Zweigs an ihm
   // haengt: dass `calendar: read` die Erinnerung wirklich bekommt. War das nur
   // Prosa, liess sich das `none` still zu `!== write` verengen und der ganze

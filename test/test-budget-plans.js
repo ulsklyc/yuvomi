@@ -23,9 +23,13 @@ const test = async (name, fn) => { try { await fn(); console.log(`  ✓ ${name}`
 const database = db.get();
 // Das Urteil (over/met) liefert computePlanProgress nur fuer den LAUFENDEN Monat (#1005),
 // also laeuft die Suite darauf - sonst pruefte sie eine Zusicherung, die es dort nicht gibt.
-const { thisMonthLocalKey } = await import('../server/routes/budget/helpers.js');
+const helpers = await import('../server/routes/budget/helpers.js');
+const { thisMonthLocalKey } = helpers;
 const MONTH = thisMonthLocalKey();
 const PAST_MONTH = '2026-01';
+// Die Logik-Tests rechnen bewusst ueber den ganzen Haushalt - ausdruecklich,
+// denn ohne Kontext wirft computePlanProgress (fail-closed, #659).
+const HOUSEHOLD = { householdWide: true };
 
 database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('owner', 'Owner', 'x', 'admin')").run();
 
@@ -57,9 +61,31 @@ const base = `http://127.0.0.1:${server.address().port}/budget`;
 
 try {
   // ---- computePlanProgress: reine Logik -------------------------------------
+  await test('computePlanProgress: ohne Betrachter-Kontext wirft sie statt alles zu zaehlen', () => {
+    // Ein stiller Default auf den ganzen Haushalt oeffnete das Leck aus #659
+    // fuer jeden kuenftigen Aufrufer, der die Argumente vergisst - gruen.
+    const { budgetFilter, budgetCategoryExpr } = helpers;
+    const req = { query: {}, authUserId: 1, session: { userId: 1 } };
+    for (const [label, ctx] of [
+      ['ohne Kontext', undefined],
+      ['leeres Objekt', {}],
+      ['nur Filter', { filter: budgetFilter(req, 'budget_entries') }],
+      ['nur Kategorie-Ausdruck', { categoryExpr: budgetCategoryExpr(req, 'budget_entries') }],
+      ['householdWide nicht true', { householdWide: 1 }],
+      ['householdWide plus Filter', { householdWide: true, filter: budgetFilter(req, 'budget_entries') }],
+    ]) {
+      assert.throws(() => computePlanProgress(database, MONTH, ctx), TypeError, `${label}: muss werfen`);
+    }
+    assert.ok(computePlanProgress(database, MONTH, {
+      filter: budgetFilter(req, 'budget_entries'),
+      categoryExpr: budgetCategoryExpr(req, 'budget_entries'),
+    }), 'mit Betrachter-Kontext rechnet sie');
+    assert.ok(computePlanProgress(database, MONTH, HOUSEHOLD), 'ausdruecklich haushaltsweit ebenso');
+  });
+
   await test('computePlanProgress: leer → keine Pläne, kein Sparziel', () => {
     seedEntries();
-    const r = computePlanProgress(database, MONTH);
+    const r = computePlanProgress(database, MONTH, HOUSEHOLD);
     assert.deepEqual(r.plans, []);
     assert.equal(r.savings, null);
     assert.equal(r.totalPlanned, 0);
@@ -69,7 +95,7 @@ try {
     seedEntries();
     database.prepare('INSERT INTO budget_plans (category, amount) VALUES (?, ?)').run(catA, 300); // Ist 200 < 300
     database.prepare('INSERT INTO budget_plans (category, amount) VALUES (?, ?)').run(catB, 400); // Ist 450 > 400
-    const r = computePlanProgress(database, MONTH);
+    const r = computePlanProgress(database, MONTH, HOUSEHOLD);
     const byCat = Object.fromEntries(r.plans.map((p) => [p.category, p]));
     assert.equal(byCat[catA].planned, 300);
     assert.equal(byCat[catA].actual, 200);
@@ -87,7 +113,7 @@ try {
   await test('computePlanProgress: Sparziel vs. Netto-Saldo', () => {
     seedEntries(); // income 3000, expenses 650 → balance 2350
     database.prepare('INSERT INTO budget_plans (category, amount) VALUES (?, ?)').run(BUDGET_SAVINGS_KEY, 2000);
-    const r = computePlanProgress(database, MONTH);
+    const r = computePlanProgress(database, MONTH, HOUSEHOLD);
     assert.ok(r.savings);
     assert.equal(r.savings.planned, 2000);
     assert.equal(r.savings.actual, 2350);
@@ -98,7 +124,7 @@ try {
   await test('computePlanProgress: Sparziel nicht erreicht', () => {
     seedEntries();
     database.prepare('INSERT INTO budget_plans (category, amount) VALUES (?, ?)').run(BUDGET_SAVINGS_KEY, 3000);
-    const r = computePlanProgress(database, MONTH);
+    const r = computePlanProgress(database, MONTH, HOUSEHOLD);
     assert.equal(r.savings.met, false);
     assert.equal(r.savings.remaining, 650); // 3000 - 2350
   });
@@ -107,8 +133,8 @@ try {
   await test('vergangener Monat: geplant/ist bleiben, over faellt weg', () => {
     seedEntries();
     database.prepare('INSERT INTO budget_plans (category, amount) VALUES (?, ?)').run(catB, 400);
-    const now  = computePlanProgress(database, MONTH);
-    const past = computePlanProgress(database, PAST_MONTH);
+    const now  = computePlanProgress(database, MONTH, HOUSEHOLD);
+    const past = computePlanProgress(database, PAST_MONTH, HOUSEHOLD);
     assert.equal(now.isCurrentMonth, true);
     assert.equal(past.isCurrentMonth, false);
     assert.equal(now.plans[0].over, true, 'laufender Monat behaelt sein Urteil');
@@ -123,9 +149,9 @@ try {
     // Betrag kippte vorher das "ueber Budget" eines abgeschlossenen Monats.
     seedEntries();
     database.prepare('INSERT INTO budget_plans (category, amount) VALUES (?, ?)').run(catB, 500);
-    const before = computePlanProgress(database, PAST_MONTH).plans.find((p) => p.category === catB);
+    const before = computePlanProgress(database, PAST_MONTH, HOUSEHOLD).plans.find((p) => p.category === catB);
     database.prepare('UPDATE budget_plans SET amount = ? WHERE category = ?').run(400, catB);
-    const after = computePlanProgress(database, PAST_MONTH).plans.find((p) => p.category === catB);
+    const after = computePlanProgress(database, PAST_MONTH, HOUSEHOLD).plans.find((p) => p.category === catB);
     assert.equal(before.over, null);
     assert.equal(after.over, null, 'kein Urteil, also auch kein rueckwirkend gedrehtes');
   });
@@ -133,8 +159,8 @@ try {
   await test('vergangener Monat: auch das Sparziel urteilt nicht', () => {
     seedEntries();
     database.prepare('INSERT INTO budget_plans (category, amount) VALUES (?, ?)').run(BUDGET_SAVINGS_KEY, 2000);
-    assert.equal(computePlanProgress(database, MONTH).savings.met, true);
-    assert.equal(computePlanProgress(database, PAST_MONTH).savings.met, null);
+    assert.equal(computePlanProgress(database, MONTH, HOUSEHOLD).savings.met, true);
+    assert.equal(computePlanProgress(database, PAST_MONTH, HOUSEHOLD).savings.met, null);
   });
 
   // ---- Routen ---------------------------------------------------------------

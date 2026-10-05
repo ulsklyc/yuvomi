@@ -1,17 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
-process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), 'yuvomi-fasting-migration-')), 'unused.db');
+process.env.DB_PATH = join(tempDir('yuvomi-fasting-migration-'), 'unused.db');
 const { MIGRATIONS } = await import('../server/db.js');
 const migration = MIGRATIONS.find((item) => item.version === 209);
 
 function migrated() {
-  const database = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-fasting-migration-')), 'db.sqlite'));
+  const database = new Database(join(tempDir('yuvomi-fasting-migration-'), 'db.sqlite'));
   database.exec(`CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT NOT NULL); INSERT INTO users VALUES (1, 'a'), (2, 'b');`);
   database.exec(migration.up);
   return database;

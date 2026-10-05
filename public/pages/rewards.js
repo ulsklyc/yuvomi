@@ -8,15 +8,22 @@
 
 import { api } from '/api.js';
 import { t, formatDate, getLocale, getNumberFormat } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
+import { rowActionHtml } from '/utils/row-action.js';
 import { wireTablist } from '/utils/tablist.js';
-import { wireScrollFade } from '/utils/ux.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
+import { wireScrollFade, stagger } from '/utils/ux.js';
+import { swapContent } from '/utils/content-swap.js';
+import { collapseRow } from '/utils/list-motion.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
+import { renderPageColumns } from '/utils/page-layout.js';
 import { isNavModuleReadOnly } from '/permissions.js';
+import { isRedeemable, nextRewardGoal } from '/utils/reward-goal.js';
 
 const TABS = ['overview', 'catalog', 'ledger'];
 
@@ -26,6 +33,7 @@ let state = {
   overview: null,      // { balances, catalog, pendingCount, isAdmin, me }
   catalog: [],
   ledger: [],
+  recentLedger: null,  // letzte Buchungen fuer die Seitenspalte der Uebersicht; null = unbekannt
   redemptions: [],     // pending requests (admin) or own requests
   participants: [],    // admin only
   ledgerFilter: null,  // user_id | null
@@ -140,10 +148,6 @@ function pointsLabel(n) {
   return `${fmtPoints(n)} ${t('rewards.pointsUnit')}`;
 }
 
-function initials(name = '') {
-  return name.split(' ').filter(Boolean).map((p) => p[0]).join('').slice(0, 2).toUpperCase() || '?';
-}
-
 function avatar(member, size = 40) {
   const dim = `width:${size}px;height:${size}px`;
   if (member?.avatar_data || member?.user_avatar) {
@@ -156,7 +160,7 @@ function avatar(member, size = 40) {
   // in dashboard.js, calendar.js, notes.js und user-multi-select.js.
   const color = member?.avatar_color || member?.user_color || AVATAR_FALLBACK_COLOR;
   const name = member?.display_name || member?.user_name || '';
-  return `<span class="rw-avatar rw-avatar--initials" style="${dim};--rw-avatar-bg:${esc(color)};color:${getReadableTextColor(color)}">${esc(initials(name))}</span>`;
+  return `<span class="rw-avatar rw-avatar--initials" style="${dim};--rw-avatar-bg:${esc(color)};color:${getReadableTextColor(color)}">${esc(initials(name, '?'))}</span>`;
 }
 
 /**
@@ -212,6 +216,21 @@ async function loadLedger() {
   state.ledger = res.data || [];
 }
 
+/* Die letzten Buchungen fuer die Seitenspalte der Uebersicht - ungefiltert,
+ * unabhaengig vom Filter des Verlaufs-Reiters. Scheitert die Abfrage, bleibt
+ * der Wert `null` und die Spalte entfaellt: eine leere Liste hiesse "es gibt
+ * keine Buchungen", und das weiss die Seite dann gerade nicht. */
+const RECENT_LEDGER_ROWS = 6;
+
+async function loadRecentLedger() {
+  try {
+    const res = await api.get(`/rewards/ledger?limit=${RECENT_LEDGER_ROWS}`);
+    state.recentLedger = (res.data || []).slice(0, RECENT_LEDGER_ROWS);
+  } catch {
+    state.recentLedger = null;
+  }
+}
+
 function balances() {
   return state.overview?.balances || [];
 }
@@ -241,22 +260,26 @@ let fab = null;
 // FAB-Aktion je Tab setzen (nur Admins erstellen; sonst ausgeblendet).
 function updateRewardsFab() {
   if (!fab) return;
-  if (readOnly()) { setPageFabAction(fab, { hidden: true }); return; }
+  // Ausgeblendet behaelt der Knopf sein Nomen: der Router dockt ihn am Desktop
+  // nur beim Seitenaufbau und nur mit `data-dock-label` an (siehe health.js).
+  const keepNoun = () => fab.dataset?.dockLabel || t('newLabel.rewards');
+  if (readOnly()) { setPageFabAction(fab, { hidden: true, dockLabel: keepNoun() }); return; }
   if (state.tab === 'catalog' && isAdmin()) {
-    setPageFabAction(fab, { label: t('rewards.addReward'), onClick: () => openRewardModal(null) });
+    setPageFabAction(fab, { label: t('rewards.addReward'), dockLabel: t('newLabel.rewards'), onClick: () => openRewardModal(null) });
   } else if (state.tab === 'ledger' && isAdmin()) {
-    setPageFabAction(fab, { label: t('rewards.grantBonus'), onClick: () => openBonusModal() });
+    setPageFabAction(fab, { label: t('rewards.grantBonus'), dockLabel: t('newLabel.rewardsBonus'), onClick: () => openBonusModal() });
   } else {
-    setPageFabAction(fab, { hidden: true });
+    setPageFabAction(fab, { hidden: true, dockLabel: keepNoun() });
   }
 }
 
 function renderShell(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <div class="rewards-page app-page app-page--reading page-measure--narrow" data-composition="reading">
+    <div class="rewards-page app-page app-page--dashboard app-page--columns" data-composition="dashboard">
       <header class="page-toolbar page-toolbar--narrow rewards-toolbar">
         <h1 class="page-toolbar__title" id="rewards-title">${esc(t('rewards.title'))}</h1>
+        <div class="page-toolbar__actions"></div>
         <nav class="rewards-tabs page-toolbar__bar" role="tablist" aria-label="${esc(t('rewards.title'))}">
           ${tabButton('overview', 'trophy', t('rewards.tabOverview'))}
           ${tabButton('catalog', 'gift', t('rewards.tabCatalog'))}
@@ -268,11 +291,14 @@ function renderShell(container) {
 
   wireTablist(container.querySelector('.rewards-tabs'), {
     activeId: state.tab,
-    onChange: (id) => { state.tab = id; renderCurrentTab(container); },
+    onChange: (id, { direction = 0 } = {}) => { state.tab = id; renderCurrentTab(container, { direction }); },
   });
+  // Geteilte gleitende Kapsel (Re-Critique 2026-09-27, D8); `key`, weil die
+  // Seite den Kopf bei jedem Aufruf neu baut.
+  attachSegmentIndicator(container.querySelector('.rewards-tabs'), { key: 'rewards-tabs' });
   // Scroll-Affordanz der Bar-Zeile (geteilter Peek-Fade, .page-toolbar__bar).
   wireScrollFade(container.querySelector('.rewards-tabs'));
-  fab = createPageFab({ id: 'rewards-fab' });
+  fab = createPageFab({ id: 'rewards-fab', dockLabel: t('newLabel.rewards') });
   container.querySelector('.rewards-page').appendChild(fab);
   updateRewardsFab();
   icons(container);
@@ -282,16 +308,54 @@ function content() {
   return document.getElementById('rewards-content');
 }
 
-async function renderCurrentTab(container) {
+/* EINE KANTE FUER ALLE DREI REITER (Critique R16, 2026-10-05). Der Kopf
+ * folgte hier dem Reiter (`--wide` nur im Katalog): die angedockte Pille stand
+ * im Katalog bei 1408 und im Verlauf bei 972 (1440er Fenster), sie sprang beim
+ * Reiterwechsel um 431px. Die Seite fuehrt jetzt das breite Mass (`dashboard`),
+ * der Kopf endet in jedem Reiter an der Modulkante, und Uebersicht und Verlauf
+ * fuellen die Flaeche mit einer Seitenspalte (`.page-columns`, layout.css)
+ * statt den Kopf zu sich zu ziehen. */
+
+/* DAS SKELETT GEHOERT ZUM ERSTEN LADEN, NICHT ZU JEDEM WECHSEL (Critique R16,
+ * P2 Bewegung). Hier wurde der Traeger bei JEDEM Aufruf geleert und ein
+ * Skelett gezeigt - beim Reiterwechsel und nach jeder Buchung, Freigabe oder
+ * Ablehnung. Die Seite blitzte dreimal je Handlung: Inhalt, Skelett, Inhalt.
+ * Jetzt bleibt stehen, was da ist, bis die Antwort kommt:
+ *   - erster Aufbau der Seite: Skelett, dann gestaffelt einblenden;
+ *   - Reiterwechsel (`direction`): der neue Reiter blendet in Schrittrichtung
+ *     ein (utils/content-swap.js);
+ *   - Auffrischen nach einer Handlung: Tausch ohne Blende - die Bewegung traegt
+ *     dort die betroffene Zeile selbst (`collapseRow` in decideRedemption).
+ * `renderSeq` verwirft eine Antwort, die ein spaeterer Wechsel ueberholt hat. */
+let renderSeq = 0;
+/** Traeger, die schon einmal Inhalt gezeigt haben (ueberlebt keinen Seitenneubau). */
+const filledHosts = new WeakSet();
+
+async function renderCurrentTab(container, { direction = null } = {}) {
   const el = content();
   if (!el) return;
-  el.replaceChildren();
-  el.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 3 }));
+  const seq = ++renderSeq;
+  const first = !filledHosts.has(el);
+  if (first) {
+    el.replaceChildren();
+    el.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 3 }));
+  }
+  const tab = state.tab;
   try {
-    if (state.tab === 'overview') { await loadOverview(); renderOverview(el); }
-    else if (state.tab === 'catalog') { await Promise.all([loadCatalog(), loadOverview()]); renderCatalog(el); }
-    else { await Promise.all([loadLedger(), loadOverview()]); renderLedger(el); }
+    if (tab === 'overview') await Promise.all([loadOverview(), loadRecentLedger()]);
+    else if (tab === 'catalog') await Promise.all([loadCatalog(), loadOverview()]);
+    else await Promise.all([loadLedger(), loadOverview()]);
+    if (seq !== renderSeq) return;
+    const draw = () => {
+      if (tab === 'overview') renderOverview(el);
+      else if (tab === 'catalog') renderCatalog(el);
+      else renderLedger(el);
+    };
+    swapContent(el, draw, { direction: direction ?? 0, animate: !first && direction !== null });
+    filledHosts.add(el);
+    if (first) stagger(el.querySelectorAll('.rw-pending, .rw-standing, .rw-reward-card, .rw-ledger-row'), { host: el });
   } catch (err) {
+    if (seq !== renderSeq) return;
     // War ein Leerzustand ohne Rolle und ohne Ausweg - der gefangene Fehler
     // wurde nicht einmal gelesen. Jetzt traegt er den Statuscode und einen
     // Wiederholen-CTA auf denselben Tab.
@@ -310,36 +374,22 @@ async function renderCurrentTab(container) {
 // Tab: Übersicht
 // --------------------------------------------------------
 
-/*
- * VERGRIFFEN IST SO GUT WIE NICHT DA - fuer alles, was auf eine Einloesung
- * zulaeuft (#1310). `remaining` kommt vom Server: `null` heisst unbegrenzt, `0`
- * heisst, jede Einheit ist vergeben. Eine Praemie mit 0 bleibt im Katalog
- * sichtbar, damit der Haushalt sieht, dass es sie gibt - aber sie taugt weder
- * als Ziel eines Fortschrittsbalkens noch als Angebot im Einloese-Dialog.
- */
-function isRedeemable(c) {
-  return c.is_active !== 0 && c.remaining !== 0;
-}
-
+// Vergriffen-Regel und Zielwahl stehen in /utils/reward-goal.js - das
+// Dashboard-Widget zeichnet denselben Balken und darf kein anderes Ziel nennen.
 function nextRewardHint(balance) {
-  // Günstigste noch nicht erreichbare einlösbare Prämie → Fortschritt dorthin.
-  const active = (state.catalog || []).filter(isRedeemable);
-  const reachableCheapestUnaffordable = active
-    .filter((c) => c.cost > balance)
-    .sort((a, b) => a.cost - b.cost)[0];
-  if (!reachableCheapestUnaffordable) {
-    const anyAffordable = active.some((c) => c.cost <= balance);
-    if (anyAffordable && active.length) {
-      return { pct: 100, label: t('rewards.canRedeemNow') };
-    }
-    return null;
-  }
-  const target = reachableCheapestUnaffordable;
-  const pct = Math.max(0, Math.min(100, Math.round((balance / target.cost) * 100)));
-  const remaining = target.cost - balance;
+  // EIN MINUS STEHT NIE OHNE SATZ DA (#1607). Der Saldo kann unter null
+  // fallen, wenn eine Aufgabe wieder geoeffnet wird, deren Punkte schon in
+  // einer Praemie stecken. "Noch 110 bis Kinoabend" waere dann zwar richtig
+  // gerechnet, erklaerte aber die Zahl daneben nicht. Der Satz sagt, was sie
+  // bedeutet und dass sie von selbst wieder verschwindet - auch ohne Katalog,
+  // deshalb steht er vor der Zielsuche. Der Balken bleibt bei 0.
+  if (Number(balance) < 0) return { pct: 0, label: t('rewards.balanceBelowZero') };
+  const goal = nextRewardGoal(balance, state.catalog);
+  if (!goal) return null;
+  if (goal.reached) return { pct: 100, label: t('rewards.canRedeemNow') };
   return {
-    pct,
-    label: t('rewards.remainingToReward', { points: fmtPoints(remaining), reward: target.name }),
+    pct: goal.pct,
+    label: t('rewards.remainingToReward', { points: fmtPoints(goal.missing), reward: goal.target.name }),
   };
 }
 
@@ -432,7 +482,7 @@ function renderSetupHints() {
     </li>`).join('');
   return `
     <section class="rw-section rw-setup" aria-labelledby="rw-setup-title">
-      <h2 class="rw-section__title u-section-title" id="rw-setup-title"><i data-lucide="sparkles" aria-hidden="true"></i>${esc(t('rewards.setupTitle'))}</h2>
+      <h2 class="rw-section__title u-section-title" id="rw-setup-title">${esc(t('rewards.setupTitle'))}</h2>
       <ol class="rw-setup-list">${items}</ol>
     </section>`;
 }
@@ -440,12 +490,31 @@ function renderSetupHints() {
 function renderPendingPanel() {
   if (!state.redemptions.length) return '';
   const heading = isAdmin() ? t('rewards.pendingApprovals') : t('rewards.yourPending');
+  /* EIN HINWEIS, KEINE SPERRE (#1607). Faellt der Saldo nach dem Stellen der
+   * Anfrage unter null (die Aufgabe dahinter wurde wieder geoeffnet), bleibt
+   * die Anfrage offen und die Entscheidung bei den Eltern - aber sie sollen
+   * sie nicht blind treffen. Der Satz steht nur bei wem er zutrifft und nur
+   * fuer die, die entscheiden; das Kind liest denselben Stand in seiner
+   * eigenen Zeile darunter. */
+  /* DER SALDO KOMMT MIT DER ANFRAGE (#1623). `overview.balances` fuehrt nur,
+   * wer gerade teilnimmt; wer mit offener Anfrage ausgetragen wurde, fiel dort
+   * heraus, `balanceOf()` sagte 0 und der Hinweis fehlte genau dann. Der
+   * Rueckgriff bleibt fuer eine Antwort ohne das Feld (aelterer Server hinter
+   * einer frischen Oberflaeche). */
+  const belowZero = (r) => {
+    const bal = r.user_balance != null && Number.isFinite(Number(r.user_balance))
+      ? Number(r.user_balance) : balanceOf(r.user_id);
+    return isAdmin() && bal < 0
+      ? `<p class="rw-pending__meta">${esc(t('rewards.pendingBalanceBelowZero', { points: fmtPoints(bal) }))}</p>`
+      : '';
+  };
   const rows = state.redemptions.map((r) => `
     <li class="rw-pending" data-redemption="${r.id}">
       ${avatar(r, 32)}
       <div class="rw-pending__text">
         <p class="rw-pending__title">${esc(r.reward_icon ? `${r.reward_icon} ` : '')}${esc(r.reward_name)}</p>
         <p class="rw-pending__meta">${esc(isAdmin() ? r.user_name : '')}${isAdmin() ? ' · ' : ''}${esc(pointsLabel(r.cost))}${r.note ? ` · „${esc(r.note)}“` : ''}</p>
+        ${belowZero(r)}
       </div>
       ${/* DIE LISTE BLEIBT, DIE KNOEPFE GEHEN. Dass eine Anfrage offen ist, ist
             eine Auskunft und gehoert auch dem, der sie nicht entscheiden darf -
@@ -458,7 +527,7 @@ function renderPendingPanel() {
           <button class="btn btn--primary btn--sm" type="button" data-decide="fulfill" data-id="${r.id}">${esc(t('rewards.approve'))}</button>
           <button class="btn btn--ghost btn--sm" type="button" data-decide="reject" data-id="${r.id}">${esc(t('rewards.reject'))}</button>
         ` : `
-          <button class="btn btn--ghost btn--sm" type="button" data-decide="cancel" data-id="${r.id}">${esc(t('common.cancel'))}</button>
+          <button class="btn btn--secondary btn--sm" type="button" data-decide="cancel" data-id="${r.id}">${esc(t('common.cancel'))}</button>
         `}
       </div>`}
     </li>`).join('');
@@ -470,7 +539,7 @@ function renderPendingPanel() {
    * dasselbe Vokabular, das die Zeilengruppen schon fuehren. */
   return `
     <section class="rw-section">
-      <h2 class="rw-section__title u-section-title"><i data-lucide="hourglass" aria-hidden="true"></i>${esc(heading)}<span class="list-group__count">${state.redemptions.length}</span></h2>
+      <h2 class="rw-section__title u-section-title">${esc(heading)}<span class="list-group__count">${state.redemptions.length}</span></h2>
       <ul class="rw-pending-list rw-pending-panel">${rows}</ul>
     </section>`;
 }
@@ -482,16 +551,29 @@ function renderOverview(el) {
     const action = isAdmin() && !readOnly()
       ? { label: t('rewards.manageParticipants'), icon: 'user-plus', className: 'rw-manage-participants' }
       : null;
+    /* DAS ANFRAGEN-PANEL HAENGT NICHT AN DEN PUNKTESTAENDEN (#1623). Wird die
+     * letzte Teilnehmende mit offener Anfrage ausgetragen, ist `balances` leer -
+     * und die Anfrage trotzdem da. Ohne das Panel hier konnte niemand sie
+     * sehen oder entscheiden. Es steht VOR dem Leerzustand: das Dringende
+     * zuerst, wie in der gefuellten Uebersicht. Nur-lesen regelt das Panel
+     * selbst (Liste bleibt, Knoepfe gehen). */
     el.insertAdjacentHTML('beforeend',
-      `<div class="rewards-content__inner">${emptyState('trophy', t('rewards.emptyOverviewTitle'), isAdmin() ? t('rewards.emptyOverviewAdmin') : t('rewards.emptyOverviewMember'), action)}</div>`);
+      `<div class="rewards-content__inner">${renderPageColumns({
+        main: `${renderPendingPanel()}${emptyState('trophy', t('rewards.emptyOverviewTitle'), isAdmin() ? t('rewards.emptyOverviewAdmin') : t('rewards.emptyOverviewMember'), action)}`,
+        rail: renderRecentLedger(),
+      })}</div>`);
     wireOverview(el);
     icons(el);
     return;
   }
   const adminBar = isAdmin() && !readOnly() ? `
     <button class="btn btn--ghost btn--sm rw-manage-participants" type="button"><i data-lucide="users-round" aria-hidden="true"></i>${esc(t('rewards.manageParticipants'))}</button>` : '';
+  // Anfragen und Punktestaende links, die letzten Buchungen ab der
+  // Split-Schwelle rechts daneben (mobil darunter) - `.page-columns`.
   el.insertAdjacentHTML('beforeend', `
     <div class="rewards-content__inner">
+      ${renderPageColumns({
+        main: `
       ${renderSetupHints()}
       ${renderPendingPanel()}
       <section class="rw-section">
@@ -500,7 +582,9 @@ function renderOverview(el) {
           ${adminBar}
         </div>
         <ul class="row-carrier rw-standings">${list.map(renderStandingRow).join('')}</ul>
-      </section>
+      </section>`,
+        rail: renderRecentLedger(),
+      })}
     </div>`);
   wireOverview(el);
   icons(el);
@@ -508,6 +592,9 @@ function renderOverview(el) {
 }
 
 function wireOverview(el) {
+  el.querySelector('.rw-section__more')?.addEventListener('click', () => {
+    document.querySelector('.rewards-tabs [data-tab-id="ledger"]')?.click();
+  });
   el.querySelector('.rw-manage-participants')?.addEventListener('click', openParticipantsModal);
   el.querySelectorAll('.rw-redeem-open').forEach((btn) => {
     btn.addEventListener('click', () => openRedeemModal(Number(btn.dataset.member)));
@@ -526,7 +613,9 @@ function wireOverview(el) {
 function handleSetupStep(action) {
   if (action === 'participants') openParticipantsModal();
   else if (action === 'tasks') location.href = '/tasks';
-  else if (action === 'catalog') document.querySelector('[data-rw-tab="catalog"]')?.click();
+  // `data-tab-id` ist das Attribut der Reiter (tabButton); hier stand
+  // `data-rw-tab`, das es nie gab - der Schritt „Praemien anlegen" tat nichts.
+  else if (action === 'catalog') document.querySelector('.rewards-tabs [data-tab-id="catalog"]')?.click();
 }
 
 // --------------------------------------------------------
@@ -572,12 +661,10 @@ function renderRewardCard(item) {
         ${unitsLine}
       </div>
       <div class="rw-reward-card__foot">
-        <span class="rw-cost"><i data-lucide="coins" aria-hidden="true"></i>${esc(pointsLabel(item.cost))}</span>
+        <span class="rw-cost"><i data-lucide="coins" class="icon-md" aria-hidden="true"></i>${esc(pointsLabel(item.cost))}</span>
         <div class="rw-reward-card__actions">
-          ${isAdmin() && !readOnly() ? `
-            <button class="btn btn--icon btn--sm" type="button" data-edit="${item.id}" aria-label="${esc(t('common.edit'))}"><i data-lucide="pencil" aria-hidden="true"></i></button>
-          ` : ''}
-          ${canRedeemBtn ? `<button class="btn btn--secondary btn--sm" type="button" data-redeem-item="${item.id}"><i data-lucide="gift" aria-hidden="true"></i>${esc(redeemVerb())}</button>` : shortHint}
+          ${isAdmin() && !readOnly() ? rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: item.name }), attrs: { 'data-edit': item.id } }) : ''}
+          ${canRedeemBtn ? `<button class="btn btn--secondary btn--sm" type="button" data-redeem-item="${item.id}"><i data-lucide="gift" class="icon-md" aria-hidden="true"></i>${esc(redeemVerb())}</button>` : shortHint}
         </div>
       </div>
     </article>`;
@@ -586,10 +673,12 @@ function renderRewardCard(item) {
 function renderCatalog(el) {
   el.replaceChildren();
   const items = state.catalog || [];
+  // „Praemien" unter dem Reiter „Praemien" nennt die Ebene ein zweites Mal:
+  // die Ueberschrift haelt die Gliederung, sie steht nicht da (`.sr-only`,
+  // test-typography.js). Bis R16 trug sie ein Icon vor dem Wort - genau das
+  // machte den Guard blind, und am Desktop stand der Titel sichtbar da.
   const header = isAdmin() ? `
-    <div class="rw-section__head">
-      <h2 class="rw-section__title u-section-title"><i data-lucide="gift" aria-hidden="true"></i>${esc(t('rewards.tabCatalog'))}</h2>
-    </div>` : '';
+      <h2 class="sr-only">${esc(t('rewards.tabCatalog'))}</h2>` : '';
   if (!items.length) {
     const action = isAdmin() && !readOnly()
       ? { label: t('rewards.addReward'), icon: 'plus', className: 'rw-add-reward' }
@@ -599,7 +688,7 @@ function renderCatalog(el) {
   } else {
     el.insertAdjacentHTML('beforeend', `
       <div class="rewards-content__inner">
-        <section class="rw-section">
+        <section class="rw-section rw-section--wide">
           ${header}
           <div class="rw-reward-grid">${items.map(renderRewardCard).join('')}</div>
         </section>
@@ -623,45 +712,121 @@ const LEDGER_ICON = {
   earn: 'check-circle', bonus: 'sparkles', redeem: 'gift', adjust: 'sliders-horizontal', reversal: 'undo-2',
 };
 
+/* EINE GEGENBUCHUNG TRAEGT DENSELBEN TITEL WIE IHRE GUTSCHRIFT (#1607) - und
+ * ohne eigenen Satz staenden im Verlauf zwei Zeilen "Zimmer aufraeumen", eine
+ * mit Plus und eine mit Minus, ohne dass eine sagt, was geschehen ist.
+ * `reversal` allein unterscheidet sie nicht: die Rueckbuchung einer
+ * abgelehnten Einloesung ist derselbe Typ, gibt aber Punkte ZURUECK. Das
+ * Vorzeichen ist die Unterscheidung, die auch dann haelt, wenn die Aufgabe
+ * laengst geloescht ist und `task_id` leer zurueckkommt. */
+function isTaskReopened(row) {
+  return row.type === 'reversal' && row.delta < 0;
+}
+
 function ledgerReason(row) {
+  if (isTaskReopened(row)) {
+    return row.reason
+      ? t('rewards.ledgerTaskReopenedNamed', { task: row.reason })
+      : t('rewards.ledgerTaskReopened');
+  }
   if (row.reason) return row.reason;
   return t(`rewards.ledgerType.${row.type}`);
+}
+
+/** Eine Buchungszeile - der Verlauf und die Seitenspalte der Uebersicht teilen sie.
+ * Sie ist eine `.list-row` im `.row-carrier` (list-row.css): Zeichen | Grund +
+ * Meta | Punkte. Bis R16 baute rewards.css Traeger, Zeile, Trennlinie und
+ * Schnitt als `.rw-ledger*` ein zweites Mal nach. */
+function ledgerRowHtml(row) {
+  const positive = row.delta > 0;
+  return `
+      <li class="list-row rw-ledger-row">
+        <span class="rw-ledger-row__icon rw-ledger-row__icon--${esc(row.type)}"><i data-lucide="${LEDGER_ICON[row.type] || 'circle'}" aria-hidden="true"></i></span>
+        <div class="list-row__main">
+          <p class="list-row__name rw-ledger-row__reason">${esc(ledgerReason(row))}</p>
+          <p class="list-row__meta rw-ledger-row__meta">${esc(row.user_name)} · ${esc(formatDate(row.created_at))}</p>
+        </div>
+        <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>
+      </li>`;
+}
+
+/* Seitenspalte der Uebersicht: die letzten Buchungen, derselbe Baustein wie im
+ * Reiter Verlauf, gekappt. Der Abschnittstitel ist der Weg dorthin (der Name
+ * des Reiters, mit Pfeil) - kein zweiter Knopf, kein neuer Text. Ohne Buchung
+ * oder ohne Antwort entfaellt die Spalte. */
+function renderRecentLedger() {
+  const rows = state.recentLedger;
+  if (!rows?.length) return '';
+  return `
+      <section class="rw-section rw-recent">
+        <h2 class="rw-section__title u-section-title">
+          <button class="section-title-link rw-section__more" type="button">${esc(t('rewards.tabLedger'))}<i data-lucide="chevron-right" aria-hidden="true"></i></button>
+        </h2>
+        <ul class="rw-ledger row-carrier">${rows.map(ledgerRowHtml).join('')}</ul>
+      </section>`;
+}
+
+/* Seitenspalte des Verlaufs: die Punktestaende in Kurzform (Person, Punkte) -
+ * dieselbe Zeile wie in der Uebersicht ohne Fortschritt und Einloesen; der
+ * Tipp oeffnet dasselbe Mitglieds-Detail. */
+function renderBalancesRail() {
+  const list = balances();
+  if (!list.length) return '';
+  const rows = list.map((member) => `
+          <li class="list-row rw-standing rw-standing--compact">
+            <button class="rw-standing__id" type="button" data-member="${member.id}"
+                    aria-label="${esc(`${member.display_name}, ${pointsLabel(member.balance)}. ${t('rewards.openDetails')}`)}">
+              ${avatar(member, 40)}
+              <span class="rw-standing__idtext">
+                <span class="rw-standing__name">${esc(member.display_name)}</span>
+                <span class="rw-standing__points"><strong>${fmtPoints(member.balance)}</strong> ${esc(t('rewards.pointsUnit'))}</span>
+              </span>
+            </button>
+          </li>`).join('');
+  return `
+      <section class="rw-section">
+        <h2 class="rw-section__title u-section-title">${esc(t('rewards.standings'))}</h2>
+        <ul class="row-carrier rw-standings">${rows}</ul>
+      </section>`;
 }
 
 function renderLedger(el) {
   el.replaceChildren();
   const filterChips = [{ id: null, label: t('rewards.all') }]
     .concat(balances().map((b) => ({ id: b.id, label: b.display_name })))
-    .map((c) => `<button class="rw-chip${(state.ledgerFilter ?? null) === c.id ? ' rw-chip--active' : ''}" type="button" data-filter="${c.id ?? ''}">${esc(c.label)}</button>`)
+    // Kanon-Filterchip (Re-Critique 2026-09-28 P2-6): vorher `.rw-chip`, 31px
+    // hoch und ohne aria-pressed - der Screenreader hoerte nicht, wer gefiltert ist.
+    .map((c) => {
+      const on = (state.ledgerFilter ?? null) === c.id;
+      return `<button class="filter-chip filter-chip--sm${on ? ' filter-chip--active' : ''}" type="button" data-filter="${c.id ?? ''}" aria-pressed="${on}">${esc(c.label)}</button>`;
+    })
     .join('');
   // Bonus vergeben läuft über den Kontext-FAB (Ledger-Tab, Admin); kein Inline-Button.
   const adminBar = '';
 
-  const rows = state.ledger.map((row) => {
-    const positive = row.delta > 0;
-    return `
-      <li class="rw-ledger-row">
-        <span class="rw-ledger-row__icon rw-ledger-row__icon--${esc(row.type)}"><i data-lucide="${LEDGER_ICON[row.type] || 'circle'}" aria-hidden="true"></i></span>
-        <div class="rw-ledger-row__text">
-          <p class="rw-ledger-row__reason">${esc(ledgerReason(row))}</p>
-          <p class="rw-ledger-row__meta">${esc(row.user_name)} · ${esc(formatDate(row.created_at))}</p>
-        </div>
-        <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>
-      </li>`;
-  }).join('');
+  const rows = state.ledger.map(ledgerRowHtml).join('');
 
+  // Die Buchungen links, die Punktestaende als Seitenspalte: neben der Liste
+  // der Bewegungen steht, worauf sie sich summieren.
   el.insertAdjacentHTML('beforeend', `
     <div class="rewards-content__inner">
+      ${renderPageColumns({
+        main: `
       <section class="rw-section">
         <div class="rw-section__head">
           <div class="rw-chips">${filterChips}</div>
           ${adminBar}
         </div>
         ${state.ledger.length
-          ? `<ul class="rw-ledger">${rows}</ul>`
+          ? `<ul class="rw-ledger row-carrier">${rows}</ul>`
           : emptyState('history', t('rewards.emptyLedgerTitle'), t('rewards.emptyLedgerBody'))}
-      </section>
+      </section>`,
+        rail: renderBalancesRail(),
+      })}
     </div>`);
+  el.querySelectorAll('.rw-standing__id').forEach((btn) => {
+    btn.addEventListener('click', () => openMemberDetail(Number(btn.dataset.member)));
+  });
 
   el.querySelectorAll('[data-filter]').forEach((chip) => chip.addEventListener('click', async () => {
     const val = chip.dataset.filter;
@@ -703,7 +868,7 @@ async function openRedeemModal(memberId, presetItemId = null) {
     <div class="form-group">
       <label class="label" for="rw-redeem-item">${esc(t('rewards.reward'))}</label>
       <select class="input" id="rw-redeem-item">
-        ${affordable.map((c) => `<option value="${c.id}" data-cost="${c.cost}" ${c.id === presetItemId ? 'selected' : ''}>${esc(c.icon ? `${c.icon} ` : '')}${esc(c.name)} — ${esc(pointsLabel(c.cost))}</option>`).join('')}
+        ${affordable.map((c) => `<option value="${c.id}" data-cost="${c.cost}" ${c.id === presetItemId ? 'selected' : ''}>${esc(c.icon ? `${c.icon} ` : '')}${esc(c.name)} - ${esc(pointsLabel(c.cost))}</option>`).join('')}
       </select>
     </div>`;
 
@@ -808,6 +973,10 @@ async function decideRedemption(id, action, btn) {
     const msg = action === 'fulfill' ? t('rewards.toastApproved')
       : action === 'reject' ? t('rewards.toastRejected') : t('rewards.toastCancelled');
     toast(msg, action === 'fulfill' ? 'success' : 'default');
+    // Die entschiedene Anfrage klappt aus, bevor die Liste ohne sie neu steht;
+    // mit der letzten geht der ganze Abschnitt (Titel + Traeger).
+    const row = btn?.closest?.('.rw-pending');
+    await collapseRow(row, { group: row?.closest?.('.rw-section'), selector: '.rw-pending' });
     await refreshActiveTab();
     // Nur nach der Rueckfrage: "Einloesen" fragt nicht, schliesst also keinen
     // Dialog, und das Nachfassen griffe auf den Merker eines frueheren zurueck (#1083).
@@ -898,12 +1067,12 @@ function openRewardModal(item) {
             <input class="input rw-emoji-input" id="rw-reward-icon" maxlength="4" value="${esc(item?.icon ?? '')}" placeholder="🎁">
           </div>
           <div class="form-group">
-            <label class="label" for="rw-reward-name">${esc(t('rewards.nameLabel'))}<span class="required-marker" aria-hidden="true"> *</span></label>
+            <label class="label" for="rw-reward-name">${esc(t('rewards.nameLabel'))}${REQUIRED_MARK}</label>
             <input class="input" id="rw-reward-name" required maxlength="120" value="${esc(item?.name ?? '')}" placeholder="${esc(t('rewards.namePlaceholder'))}">
           </div>
         </div>
         <div class="form-group">
-          <label class="label" for="rw-reward-cost">${esc(t('rewards.costLabel'))}<span class="required-marker" aria-hidden="true"> *</span></label>
+          <label class="label" for="rw-reward-cost">${esc(t('rewards.costLabel'))}${REQUIRED_MARK}</label>
           <input class="input" id="rw-reward-cost" type="number" inputmode="numeric" min="1" step="1" required value="${esc(item?.cost ?? '')}" placeholder="100">
         </div>
         <div class="form-group">
@@ -1042,12 +1211,12 @@ async function openMemberDetail(memberId) {
   const hint = nextRewardHint(member.balance);
   const rows = ledger.length ? ledger.map((row) => {
     const positive = row.delta > 0;
-    return `<li class="rw-ledger-row rw-ledger-row--compact">
+    return `<li class="list-row rw-ledger-row rw-ledger-row--compact">
       <span class="rw-ledger-row__icon rw-ledger-row__icon--${esc(row.type)}"><i data-lucide="${LEDGER_ICON[row.type] || 'circle'}" aria-hidden="true"></i></span>
-      <div class="rw-ledger-row__text"><p class="rw-ledger-row__reason">${esc(ledgerReason(row))}</p><p class="rw-ledger-row__meta">${esc(formatDate(row.created_at))}</p></div>
+      <div class="list-row__main"><p class="list-row__name rw-ledger-row__reason">${esc(ledgerReason(row))}</p><p class="list-row__meta rw-ledger-row__meta">${esc(formatDate(row.created_at))}</p></div>
       <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>
     </li>`;
-  }).join('') : `<li class="rw-ledger-row rw-ledger-row--compact"><p class="rw-ledger-row__meta">${esc(t('rewards.emptyLedgerBody'))}</p></li>`;
+  }).join('') : `<li class="list-row rw-ledger-row rw-ledger-row--compact"><p class="list-row__meta rw-ledger-row__meta">${esc(t('rewards.emptyLedgerBody'))}</p></li>`;
   const canRedeem = actingAsDisplay()
     ? displayMayRedeemFor(member.id)
     : (!readOnly() && (isAdmin() || member.id === state.overview?.me));
@@ -1061,7 +1230,7 @@ async function openMemberDetail(memberId) {
           ${hint ? `<p class="rw-detail-hint">${esc(hint.label)}</p>` : ''}
         </div>
       </div>
-      <ul class="rw-ledger rw-ledger--compact">${rows}</ul>
+      <ul class="rw-ledger rw-ledger--compact row-divided">${rows}</ul>
       ${canRedeem ? `<div class="modal-panel__footer modal-panel__footer--plain">
         <button type="button" class="btn btn--primary" id="rw-detail-redeem"><i data-lucide="gift" aria-hidden="true"></i>${esc(redeemVerb())}</button>
       </div>` : ''}`,
@@ -1092,6 +1261,10 @@ async function refreshActiveTab() {
 export const __test = {
   renderStandingRow, renderRewardCard, renderPendingPanel, renderSetupHints,
   readOnly, state,
+  // R10 L7: Kopf und Inhalt teilen je Reiter eine Kante (test-dashboard-rewards.js).
+  renderCatalog, renderLedger, renderOverview, handleSetupStep,
+  // #1607: der Verlaufssatz einer Gegenbuchung.
+  ledgerReason,
 };
 
 export async function render(container, { user } = {}) {

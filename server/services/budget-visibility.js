@@ -196,6 +196,16 @@ export function maskBudgetEntry(row, viewerId, mode) {
   delete masked.documents;
   delete masked.inventory_items;
   delete masked.recurrence_rule;
+  // Eine Darlehensrate ist dieselbe Art Verknuepfung: Titel und Partner des
+  // Darlehens nennen den Zweck woertlich, die IDs fuehren zu ihm. Eine Rate
+  // erbt die Stufe ihres Darlehens, laesst sich aber einzeln auf
+  // 'shared_amount' stellen - dann darf ein privates Darlehen nicht ueber die
+  // Buchungsliste herausfallen.
+  delete masked.loan_payment_id;
+  delete masked.loan_id;
+  delete masked.loan_installment_number;
+  delete masked.loan_title;
+  delete masked.loan_borrower;
   return masked;
 }
 

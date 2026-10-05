@@ -20,10 +20,10 @@ export function rewardsPaths() {
       delete: op({ summary: 'Delete reward', tag: 'Rewards', admin: true, params: [idParam()], stateChanging: true }),
     },
     '/api/v1/rewards/ledger': {
-      get: op({ summary: 'Point transaction history (filter by user_id)', tag: 'Rewards' }),
+      get: op({ summary: 'Point transaction history (filter by user_id)', tag: 'Rewards', description: 'Every entry carries its person, points and type. `reason` and `task_id` of an entry that belongs to a task are `null` unless the entry is the caller\'s own or the caller can see that task (same rule as GET /tasks, no admin bypass); once the task is deleted they stay with the entry\'s owner. Bonus, adjustment and redemption entries keep their `reason` for everyone.' }),
     },
     '/api/v1/rewards/redemptions': {
-      get: op({ summary: 'List redemption requests (filter by status)', tag: 'Rewards' }),
+      get: op({ summary: 'List redemption requests (filter by status)', tag: 'Rewards', description: 'An administrator gets every request, everyone else only their own. Each row carries `user_balance`: the current point balance of the member the request is for, summed from the ledger at the time of the call (not the balance when the request was made). It is present for members who no longer take part in rewards as well, which `balances` in the overview is not, and it can be below zero.' }),
       post: op({ summary: 'Request a redemption (reserves points)', tag: 'Rewards', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { catalog_id, user_id?, note? }. Points are reserved immediately; whether anyone has to approve stays with the household setting. `user_id` redeems on behalf of someone else and is otherwise ignored: an administrator may do it for any member, and a paired wall display must do it, naming the person chosen on the device (#1209). For a display the person is required rather than optional, because the display account takes no part in rewards itself, and it has to be a household member who may write this module. The request is booked as the display having asked and the person having received. A reward whose units are all fulfilled answers 409 with `reason: "out_of_stock"`; nothing is booked, so no points are taken.' }),
     },
     '/api/v1/rewards/redemptions/{id}': {

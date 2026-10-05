@@ -11,6 +11,7 @@ import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { openModal, closeModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
+import { rowActionHtml } from '/utils/row-action.js';
 
 const KINDS = ['vaccination', 'checkup'];
 const MAX_INTERVAL_MONTHS = 600;
@@ -57,21 +58,18 @@ function typesListMarkup() {
     return `<p class="settings-card-description">${esc(t('settings.healthPreventionTypesEmpty'))}</p>`;
   }
   return `
-    <div class="list-rows">
+    <div class="row-divided">
       ${_types.map((type) => `
         <div class="list-row" data-type-id="${esc(type.id)}">
           <div class="list-row__main">
-            <div class="list-row__name">
+            <div class="list-row__name settings-prevention-type__name">
               <i data-lucide="${esc(type.icon || 'syringe')}" class="icon-sm" aria-hidden="true"></i>
               ${esc(type.name)}
             </div>
             <div class="list-row__meta">${esc(t(`settings.healthPreventionKind.${type.kind}`))} · ${esc(typeIntervalLabel(type))}</div>
           </div>
           <div class="list-row__actions">
-            <button type="button" class="btn btn--icon btn--sm" data-edit-type="${esc(type.id)}"
-                    aria-label="${esc(t('common.edit'))}">
-              <i data-lucide="pencil" aria-hidden="true"></i>
-            </button>
+            ${rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: type.name }), attrs: { 'data-edit-type': type.id } })}
           </div>
         </div>`).join('')}
     </div>`;
@@ -153,9 +151,11 @@ function openTypeModal(type) {
           </button>
           <input type="hidden" id="hpt-icon" value="${esc(type?.icon || 'syringe')}">
         </div>
-        <div class="modal-actions">
-          ${isEdit ? `<button type="button" class="btn btn--danger btn--ghost" data-action="delete">${esc(t('common.delete'))}</button>` : ''}
-          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="delete" style="margin-inline-end:auto">
+            <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}
+          </button>` : ''}
+          <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>
       </form>`,

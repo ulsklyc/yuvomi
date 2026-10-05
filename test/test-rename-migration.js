@@ -12,10 +12,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, existsSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 let scenarioCounter = 0;
 
@@ -40,7 +40,7 @@ function seedLegacyDb(filePath, marker) {
 }
 
 function tmpDir() {
-  return mkdtempSync(join(tmpdir(), 'yuvomi-rename-'));
+  return tempDir('yuvomi-rename-');
 }
 
 test('Stale Legacy-Sidecars (-wal/-shm) werden nach erfolgreichem Checkpoint entfernt', async () => {

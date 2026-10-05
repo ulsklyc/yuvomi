@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { getSupportedLocales } from '../public/i18n.js';
 import { readdirSync, readFileSync } from 'node:fs';
 import {
   noteMatchesCategories,
@@ -287,7 +288,7 @@ test('all supported locales contain every note-category translation', () => {
     'moreAction', 'moreAction_one', 'personalManagementHint',
   ];
   const files = readdirSync(directory).filter((file) => file.endsWith('.json'));
-  assert.equal(files.length, 24);
+  assert.equal(files.length, getSupportedLocales().length);
   for (const file of files) {
     const locale = JSON.parse(readFileSync(new URL(file, directory), 'utf8'));
     for (const key of keys) {
@@ -297,6 +298,26 @@ test('all supported locales contain every note-category translation', () => {
     for (const key of ['permCapabilitiesHeading', 'permCapabilityBlocked', 'permCapabilityAllowed']) {
       assert.equal(typeof locale.settings?.[key], 'string', `${file}: settings.${key}`);
       assert.notEqual(locale.settings[key].trim(), '', `${file}: settings.${key} is empty`);
+    }
+  }
+});
+
+test('category hints say that notes in a personal category stay visible to the household (#1514)', () => {
+  // Nur die KATEGORIE ist persoenlich: GET /notes liefert jede Notiz an jedes
+  // Mitglied, hydrateNotesWithCategories() filtert nur die Kategorien der
+  // Notiz. Ein Hinweis, der allein "nur du siehst sie" sagt, wird als Aussage
+  // ueber die Notiz gelesen. Beide Hinweise zaehlen: scopeHelp erscheint nur
+  // mit Bereichswahl (wer den Haushaltskatalog verwalten darf), alle anderen
+  // sehen im Kategorie-Manager nur personalManagementHint.
+  const directory = new URL('../public/locales/', import.meta.url);
+  const expectations = {
+    'de.json': /Notizen[^.]*sichtbar/,
+    'en.json': /notes[^.]*visible/i,
+  };
+  for (const [file, pattern] of Object.entries(expectations)) {
+    const locale = JSON.parse(readFileSync(new URL(file, directory), 'utf8'));
+    for (const key of ['scopeHelp', 'personalManagementHint']) {
+      assert.match(locale.noteCategories[key], pattern, `${file}: noteCategories.${key} must say the notes stay visible`);
     }
   }
 });

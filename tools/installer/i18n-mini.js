@@ -6,7 +6,7 @@
  * de ist die Referenzlocale, en der Fallback für fehlende Schlüssel.
  */
 
-export const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi', 'hu', 'ko', 'id', 'fa', 'fil'];
+export const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt-BR', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi', 'hu', 'ko', 'id', 'fa', 'fil', 'nb'];
 const FALLBACK_LOCALE = 'en';
 const RTL_LOCALES = ['ar', 'fa'];
 const STORAGE_KEY = 'yuvomi-installer-locale';
@@ -23,15 +23,38 @@ function storedLocale() {
   } catch { return null; }
 }
 
-/** Gemerkte Wahl > Browsersprache > Englisch, analog public/i18n.js:31-34. */
+// Sprachcodes, die eine vorhandene Locale meinen: ein norwegischer Browser meldet
+// oft `no` (Makrosprache) statt `nb`, und `nn` (Nynorsk) hat keine eigene Datei.
+// Rueckfall, kein Ersatz - siehe LANGUAGE_ALIAS in public/i18n.js.
+const LANGUAGE_ALIAS = { no: 'nb', nn: 'nb' };
+
+/**
+ * Gemerkte Wahl > Browsersprache > Englisch, wie resolveLocale() in
+ * public/i18n.js. Je Tag erst Sprache mit Region (pt-BR), dann die
+ * Basissprache - bis #1437 zaehlte nur der Teil vor dem ersten Bindestrich,
+ * und ein brasilianischer Browser bekam `pt`.
+ */
 export function resolveLocale(languages = navigator.languages || [navigator.language]) {
   const stored = storedLocale();
   if (stored) return stored;
   for (const tag of languages) {
-    const base = (tag || '').split('-')[0].toLowerCase();
-    if (SUPPORTED_LOCALES.includes(base)) return base;
+    const [rawLang = '', region = ''] = (tag || '').split('-');
+    const lang = rawLang.toLowerCase();
+    const hit = matchLanguage(lang, region);
+    if (hit) return hit;
+    if (Object.prototype.hasOwnProperty.call(LANGUAGE_ALIAS, lang)) {
+      const alias = matchLanguage(LANGUAGE_ALIAS[lang], region);
+      if (alias) return alias;
+    }
   }
   return FALLBACK_LOCALE;
+}
+
+/** Sprache mit Region, sonst die Basissprache, sonst null. */
+function matchLanguage(lang, region) {
+  const full = `${lang}-${region.toUpperCase()}`;
+  if (region && SUPPORTED_LOCALES.includes(full)) return full;
+  return SUPPORTED_LOCALES.includes(lang) ? lang : null;
 }
 
 async function loadLocale(locale) {

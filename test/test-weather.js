@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 
-const BASE_ENV_KEYS = ['OPENWEATHER_API_KEY', 'OPENWEATHER_CITY', 'WEATHER_LAT', 'WEATHER_LON', 'WEATHER_CITY', 'WEATHER_UNITS'];
+const BASE_ENV_KEYS = ['OPENWEATHER_API_KEY', 'OPENWEATHER_CITY', 'OPENWEATHER_LANG', 'WEATHER_LAT', 'WEATHER_LON', 'WEATHER_CITY', 'WEATHER_UNITS'];
 
 // Spin up the weather router with injected cfgGet (DB) + fetchFn (upstream).
 // Returns { baseUrl, close }.
-async function startApp({ env = {}, db = {}, fetchFn, userId } = {}) {
+async function startApp({ env = {}, db = {}, fetchFn, userId, logger } = {}) {
   for (const k of BASE_ENV_KEYS) delete process.env[k];
   Object.assign(process.env, env);
 
@@ -14,6 +14,7 @@ async function startApp({ env = {}, db = {}, fetchFn, userId } = {}) {
   const router = buildRouter({
     cfgGet: (key) => (key in db ? db[key] : null),
     fetchFn,
+    ...(logger ? { logger } : {}),
   });
 
   const app = express();
@@ -76,12 +77,105 @@ async function getJson(baseUrl) {
   return { status: res.status, body: await res.json() };
 }
 
-test('no provider configured → { data: null }', async () => {
+test('no provider configured → { data: null, reason: not_configured }', async () => {
   const { baseUrl, close } = await startApp({});
   try {
     const { status, body } = await getJson(baseUrl);
     assert.equal(status, 200);
-    assert.deepEqual(body, { data: null });
+    assert.deepEqual(body, { data: null, reason: 'not_configured' });
+  } finally { await close(); }
+});
+
+// --------------------------------------------------------
+// Eingerichtet, aber gescheitert: ein eigener Grund und eine Log-Zeile
+// --------------------------------------------------------
+// Vorher war jede leere Antwort `{ data: null }` - der Client konnte "gibt es
+// hier nicht" von "gerade kaputt" nicht unterscheiden und liess die Kachel in
+// beiden Faellen verschwinden, samt ihrem Platz in der Anpassen-Ablage. Und
+// wer als Betreiber nachsah, fand hoechstens eine Zeile ohne Anbieter.
+
+function spyLogger() {
+  const lines = [];
+  const push = (level) => (msg) => lines.push({ level, msg: String(msg) });
+  return { lines, debug: push('debug'), info: push('info'), warn: push('warn'), error: push('error') };
+}
+
+const OM_DB = { weather_provider: 'open-meteo', weather_lat: '51.51', weather_lon: '7.47' };
+
+test('Open-Meteo antwortet mit HTTP 503 → upstream_error, Log nennt Anbieter und Status', async () => {
+  const logger = spyLogger();
+  const { baseUrl, close } = await startApp({
+    db: OM_DB, logger,
+    fetchFn: async () => ({ ok: false, status: 503, json: async () => ({}) }),
+  });
+  try {
+    const { status, body } = await getJson(baseUrl);
+    assert.equal(status, 200);
+    assert.deepEqual(body, { data: null, reason: 'upstream_error' });
+    const warn = logger.lines.filter((l) => l.level === 'warn');
+    assert.equal(warn.length, 1, 'genau eine Zeile');
+    assert.match(warn[0].msg, /Open-Meteo/);
+    assert.match(warn[0].msg, /503/);
+    assert.ok(!/51\.51|7\.47/.test(warn[0].msg), 'keine Koordinaten im Log');
+  } finally { await close(); }
+});
+
+test('Netzfehler (ENOTFOUND) → upstream_error, Log nennt den Fehlercode, nie die URL', async () => {
+  const logger = spyLogger();
+  const { baseUrl, close } = await startApp({
+    env: { OPENWEATHER_API_KEY: 'geheim-123' },
+    db: { weather_provider: 'openweathermap' },
+    logger,
+    fetchFn: async (url) => {
+      const err = new TypeError(`fetch failed for ${url}`);
+      err.cause = { code: 'ENOTFOUND' };
+      throw err;
+    },
+  });
+  try {
+    const { body } = await getJson(baseUrl);
+    assert.deepEqual(body, { data: null, reason: 'upstream_error' });
+    const warn = logger.lines.filter((l) => l.level === 'warn');
+    assert.equal(warn.length, 1);
+    assert.match(warn[0].msg, /openweathermap/);
+    assert.match(warn[0].msg, /ENOTFOUND/);
+    assert.ok(!warn[0].msg.includes('geheim-123'), 'der API-Key steht nicht im Log');
+  } finally { await close(); }
+});
+
+test('ein ausgefallener Anbieter schreibt EINE Zeile je Cache-Periode, nicht eine je Aufruf', async () => {
+  const logger = spyLogger();
+  const { baseUrl, close } = await startApp({
+    db: OM_DB, logger,
+    fetchFn: async () => ({ ok: false, status: 500, json: async () => ({}) }),
+  });
+  try {
+    for (let i = 0; i < 5; i += 1) {
+      const { body } = await getJson(baseUrl);
+      assert.equal(body.reason, 'upstream_error', `Aufruf ${i + 1}: der Grund bleibt`);
+    }
+    assert.equal(logger.lines.filter((l) => l.level === 'warn').length, 1);
+  } finally { await close(); }
+});
+
+test('OpenWeatherMap gewaehlt, aber ohne API-Key → not_configured, und das Log sagt warum', async () => {
+  const logger = spyLogger();
+  const { baseUrl, close } = await startApp({ db: { weather_provider: 'openweathermap' }, logger });
+  try {
+    const { body } = await getJson(baseUrl);
+    assert.deepEqual(body, { data: null, reason: 'not_configured' });
+    const warn = logger.lines.filter((l) => l.level === 'warn');
+    assert.equal(warn.length, 1);
+    assert.match(warn[0].msg, /OPENWEATHER_API_KEY/);
+  } finally { await close(); }
+});
+
+test('gar nichts eingerichtet: kein Log - das ist kein Befund', async () => {
+  const logger = spyLogger();
+  const { baseUrl, close } = await startApp({ logger });
+  try {
+    await getJson(baseUrl);
+    assert.equal(logger.lines.length, 0);
   } finally { await close(); }
 });
 
@@ -127,6 +221,43 @@ test('OWM legacy via env: provider + raw OWM icon code', async () => {
     assert.equal(body.data.city, 'Hamburg');
     assert.equal(body.data.current.icon, '04d');
   } finally { await close(); }
+});
+
+// #1523: `lang` ging unveraendert an OWM. Der Client schickt seine App-Locale,
+// OWM hat eigene Codes - `pt-BR` heisst dort `pt_br`, `ko` `kr`, `cs` `cz`, und
+// einen unbekannten Code beantwortet OWM auf Englisch statt mit einem Fehler.
+// Gemessen wird die URL, die wirklich hinausgeht, in BEIDEN Abrufen.
+async function owmLangSent({ query, env = {} }) {
+  const sent = [];
+  const fetchFn = (url) => {
+    sent.push(new URL(String(url)).searchParams.getAll('lang'));
+    return OWM_FETCH(url);
+  };
+  const { baseUrl, close } = await startApp({
+    env: { OPENWEATHER_API_KEY: 'key123', OPENWEATHER_CITY: 'Hamburg', ...env },
+    fetchFn,
+  });
+  try {
+    const res = await fetch(`${baseUrl}/${query === undefined ? '' : `?lang=${encodeURIComponent(query)}`}`);
+    assert.equal(res.status, 200);
+  } finally { await close(); }
+  assert.equal(sent.length, 2, 'aktuelles Wetter und Vorhersage');
+  return sent;
+}
+
+test('OWM: die App-Locale geht als OWM-Code hinaus, nicht wie geschrieben (#1523)', async () => {
+  for (const [appLocale, owmCode] of [['pt-BR', 'pt_br'], ['ko', 'kr'], ['cs', 'cz'], ['zh', 'zh_cn'], ['nb', 'no'], ['de', 'de']]) {
+    assert.deepEqual(await owmLangSent({ query: appLocale }), [[owmCode], [owmCode]], `lang=${appLocale}`);
+  }
+});
+
+test('OWM: was OWM nicht kennt, geht nicht in die URL - OPENWEATHER_LANG, sonst Englisch (#1523)', async () => {
+  assert.deepEqual(await owmLangSent({ query: 'fil' }), [['en'], ['en']], 'Filipino kennt OWM nicht');
+  assert.deepEqual(await owmLangSent({ query: 'fil', env: { OPENWEATHER_LANG: 'zh_tw' } }), [['zh_tw'], ['zh_tw']],
+    'OPENWEATHER_LANG ist der Rueckfall des Betreibers und traegt einen OWM-Code');
+  assert.deepEqual(await owmLangSent({ query: undefined, env: { OPENWEATHER_LANG: 'ua' } }), [['ua'], ['ua']]);
+  // Vorher landete der Wert roh in der Query: ein `&` darin setzte eigene Parameter.
+  assert.deepEqual(await owmLangSent({ query: 'de&units=imperial' }), [['en'], ['en']]);
 });
 
 test('per-user override beats household coords', async () => {
@@ -470,4 +601,102 @@ test('OWM: die Tagesbuckets folgen dem Ortstag, nicht dem UTC-Tag', async () => 
     // Das Symbol kommt vom Schritt, der dem ORTSMITTAG am naechsten liegt.
     assert.equal(entry.desc, 'sonnig');
   } finally { await close(); }
+});
+
+test('GET /icon/:code: das Icon landet nicht im HTTP-Cache', async () => {
+  // Hinter derselben Anmeldung wie jede andere Route; eine oeffentlich
+  // cachebare Antwort nahm dort einen Set-Cookie-Kopf mit in fremde Caches
+  // (services/display-accounts.js, DISPLAY_COOKIE_REFRESH_AFTER_MS).
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+  const { baseUrl, close } = await startApp({
+    fetchFn: async (url) => {
+      assert.equal(new URL(String(url)).hostname, 'openweathermap.org');
+      return { ok: true, arrayBuffer: async () => PNG };
+    },
+  });
+  try {
+    const res = await fetch(`${baseUrl}/icon/01d`);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'image/png');
+    assert.equal(res.headers.get('cache-control'), 'no-store');
+  } finally { await close(); }
+});
+
+// ----------------------------------------------------------------
+// Quellenermittlung (services/weather-source.js). Die Vorrangregel steht
+// EINMAL dort; der Proxy holt damit seine Daten, die Admin-Seite zeigt damit
+// an, woher das Wetter kommt. Vorher las die Seite nur die Datenbank und sagte
+// "Nicht konfiguriert", waehrend das Widget Wetter aus der `.env` zeigte.
+// ----------------------------------------------------------------
+const { resolveWeatherSource } = await import('../server/services/weather-source.js');
+
+const ENV_OM = { WEATHER_LAT: '52.52', WEATHER_LON: '13.41', WEATHER_CITY: 'Berlin', WEATHER_UNITS: 'imperial' };
+const ENV_OWM = { OPENWEATHER_API_KEY: 'owm-secret-key-123', OPENWEATHER_CITY: 'Hamburg' };
+const DB_OM = { weather_provider: 'open-meteo', weather_lat: '48.14', weather_lon: '11.58', weather_city: 'München' };
+
+// Szenario -> erwartete Quelle/Anbieter. Die Datenbank gewinnt, ein gesetzter,
+// aber unvollstaendiger DB-Anbieter sperrt die `.env` (dann gar kein Wetter).
+const SOURCE_CASES = [
+  { name: 'nichts konfiguriert', env: {}, db: {}, source: 'none', provider: null },
+  { name: 'nur WEATHER_*', env: ENV_OM, db: {}, source: 'env', provider: 'open-meteo' },
+  { name: 'nur OPENWEATHER_* (Legacy)', env: ENV_OWM, db: {}, source: 'env', provider: 'openweathermap' },
+  { name: 'WEATHER_* vor OPENWEATHER_*', env: { ...ENV_OM, ...ENV_OWM }, db: {}, source: 'env', provider: 'open-meteo' },
+  { name: 'DB gewinnt gegen WEATHER_*', env: ENV_OM, db: DB_OM, source: 'db', provider: 'open-meteo' },
+  { name: 'DB gewinnt gegen OPENWEATHER_*', env: ENV_OWM, db: DB_OM, source: 'db', provider: 'open-meteo' },
+  { name: 'DB-Koordinaten ohne Anbieter gewinnen', env: ENV_OM,
+    db: { weather_lat: '48.14', weather_lon: '11.58' }, source: 'db', provider: 'open-meteo' },
+  { name: 'DB-Anbieter OWM mit Key aus der .env', env: ENV_OWM,
+    db: { weather_provider: 'openweathermap' }, source: 'db', provider: 'openweathermap' },
+  { name: 'DB-Anbieter OWM ohne Key sperrt WEATHER_*', env: ENV_OM,
+    db: { weather_provider: 'openweathermap' }, source: 'none', provider: null },
+  { name: 'DB-Anbieter Open-Meteo ohne Koordinaten sperrt WEATHER_*', env: ENV_OM,
+    db: { weather_provider: 'open-meteo' }, source: 'none', provider: null },
+];
+
+function storedFrom(db) {
+  return {
+    provider: db.weather_provider ?? null,
+    lat: db.weather_lat ?? null,
+    lon: db.weather_lon ?? null,
+    city: db.weather_city ?? null,
+    units: db.weather_units ?? null,
+  };
+}
+
+test('resolveWeatherSource: DB vor .env, WEATHER_* vor OPENWEATHER_*', () => {
+  for (const c of SOURCE_CASES) {
+    const got = resolveWeatherSource(storedFrom(c.db), c.env);
+    assert.equal(got.source, c.source, `${c.name}: Quelle`);
+    assert.equal(got.provider, c.provider, `${c.name}: Anbieter`);
+  }
+});
+
+test('resolveWeatherSource: env-Quelle traegt Stadt, Koordinaten und Einheit - nie den Key', () => {
+  assert.deepEqual(resolveWeatherSource(storedFrom({}), { ...ENV_OM, ...ENV_OWM }), {
+    source: 'env', provider: 'open-meteo', lat: '52.52', lon: '13.41', city: 'Berlin', units: 'imperial',
+  });
+  const owm = resolveWeatherSource(storedFrom({}), { ...ENV_OWM, OPENWEATHER_UNITS: 'imperial' });
+  assert.deepEqual(owm, {
+    source: 'env', provider: 'openweathermap', lat: null, lon: null, city: 'Hamburg', units: 'imperial',
+  });
+  for (const c of SOURCE_CASES) {
+    const json = JSON.stringify(resolveWeatherSource(storedFrom(c.db), c.env));
+    assert.ok(!json.includes(ENV_OWM.OPENWEATHER_API_KEY), `${c.name}: API-Key im Ergebnis`);
+  }
+});
+
+test('der Proxy folgt derselben Quellenermittlung wie die Admin-Seite', async () => {
+  // Der Proxy antwortet mit dem Anbieter, den resolveWeatherSource nennt -
+  // sonst zeigte die Admin-Seite eine andere Quelle als das Dashboard.
+  const ANY_FETCH = async (url) => (new URL(String(url)).hostname === 'api.open-meteo.com'
+    ? OM_FETCH(url)
+    : OWM_FETCH(url));
+  for (const c of SOURCE_CASES) {
+    const { baseUrl, close } = await startApp({ env: c.env, db: c.db, fetchFn: ANY_FETCH });
+    try {
+      const { body } = await getJson(baseUrl);
+      assert.equal(body.data?.provider ?? null, c.provider, `${c.name}: Proxy`);
+    } finally { await close(); }
+  }
+  for (const k of [...BASE_ENV_KEYS, 'OPENWEATHER_UNITS']) delete process.env[k];
 });

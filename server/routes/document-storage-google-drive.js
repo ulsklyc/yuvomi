@@ -1,11 +1,13 @@
 import express from 'express';
+import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { requireAdmin } from '../auth.js';
 import { createLogger } from '../logger.js';
 import * as googleDriveStorage from '../services/google-drive-storage.js';
 
 const log = createLogger('GoogleDriveStorageRoutes');
 const router = express.Router();
-const SETTINGS_URL = '/settings/documents/storage';
+// Seit R10 ein Abschnitt im Modulblatt Dokumente (die Alt-Adresse leitet nur um).
+const SETTINGS_URL = '/settings/modules/documents?section=documents-storage';
 
 function sendStorageError(res, error) {
   const storageCode = error?.storageCode;
@@ -24,7 +26,7 @@ function sendStorageError(res, error) {
   });
 }
 
-router.get('/auth', requireAdmin, (req, res) => {
+router.get('/auth', requireAdmin, refuseWhileRestoring, (req, res) => {
   try {
     res.redirect(googleDriveStorage.getAuthUrl(req.session));
   } catch (error) {
@@ -33,11 +35,11 @@ router.get('/auth', requireAdmin, (req, res) => {
   }
 });
 
-router.get('/callback', requireAdmin, async (req, res) => {
+router.get('/callback', requireAdmin, refuseWhileRestoring, async (req, res) => {
   const { code, error, state } = req.query;
   if (error || !code) {
     delete req.session.googleDriveOAuthState;
-    return res.redirect(`${SETTINGS_URL}?drive_error=1`);
+    return res.redirect(`${SETTINGS_URL}&drive_error=1`);
   }
   if (
     !state
@@ -46,16 +48,16 @@ router.get('/callback', requireAdmin, async (req, res) => {
   ) {
     delete req.session.googleDriveOAuthState;
     log.error('OAuth state mismatch');
-    return res.redirect(`${SETTINGS_URL}?drive_error=1`);
+    return res.redirect(`${SETTINGS_URL}&drive_error=1`);
   }
   delete req.session.googleDriveOAuthState;
 
   try {
     await googleDriveStorage.handleCallback(code);
-    return res.redirect(`${SETTINGS_URL}?drive_ok=1`);
+    return res.redirect(`${SETTINGS_URL}&drive_ok=1`);
   } catch (callbackError) {
     log.error('GET /callback error:', callbackError);
-    return res.redirect(`${SETTINGS_URL}?drive_error=1`);
+    return res.redirect(`${SETTINGS_URL}&drive_error=1`);
   }
 });
 

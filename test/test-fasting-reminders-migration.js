@@ -1,13 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
 import { applyMigration, buildMigratedDatabase } from './helpers/migrated-database.js';
+import { tempDir } from './tmp-dir.js';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
-process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), 'yuvomi-fasting-migration-')), 'unused.db');
+process.env.DB_PATH = join(tempDir('yuvomi-fasting-migration-'), 'unused.db');
 const { MIGRATIONS } = await import('../server/db.js');
 const REMINDER_MIGRATION_VERSION = 220;
 const reminderMigration = MIGRATIONS.find((item) => item.version === REMINDER_MIGRATION_VERSION);
@@ -23,7 +22,7 @@ function migratedWithReminderWidening() {
   const database = buildMigratedDatabase(
     Database,
     MIGRATIONS.filter((migration) => migration.version < REMINDER_MIGRATION_VERSION),
-    join(mkdtempSync(join(tmpdir(), 'yuvomi-fasting-migration-')), 'db.sqlite'),
+    join(tempDir('yuvomi-fasting-migration-'), 'db.sqlite'),
   );
   database.prepare(`INSERT INTO users (id, username, display_name, password_hash, role)
     VALUES (1, 'a', 'A', 'hash', 'member')`).run();

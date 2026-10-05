@@ -1,7 +1,14 @@
 import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
-import { confirmModal } from '/components/modal.js';
+import { confirmModal, whenModalClosed } from '/components/modal.js';
 import { formatCronSchedule } from '/settings/cron-label.js';
+import {
+  backupKeyFieldHtml,
+  encodeBackupKey,
+  keyFieldAfterError,
+  keyFieldDescribedBy,
+  restoreErrorText,
+} from '/settings/backup-key.js';
 import {
   createDisclosure,
   createInfoRow,
@@ -65,6 +72,7 @@ function renderPage(container) {
             </label>
             <input class="sr-only" type="file" id="backup-restore-file" accept=".db,.sqlite,.sqlite3,application/octet-stream" />
             <div class="settings-backup-file" id="backup-selected-file" hidden></div>
+            ${backupKeyFieldHtml(window.location.protocol)}
             <div id="backup-restore-error" class="form-error" role="alert" hidden></div>
             <div class="settings-form-actions">
               <button type="submit" class="btn btn--danger-outline" id="backup-restore-btn" disabled>${t('settings.backupRestoreButton')}</button>
@@ -80,14 +88,12 @@ function renderPage(container) {
       </div>
 
       <div class="settings-card" id="backup-webdav-card">
-        <h3 class="settings-card__title">
-          <i data-lucide="cloud-upload" class="icon-sm" aria-hidden="true"></i>
-          ${t('settings.backupWebdavTitle')}
-        </h3>
+        <h3 class="settings-card__title">${t('settings.backupWebdavTitle')}</h3>
         <p class="form-hint">${t('settings.backupWebdavHint')}</p>
         <form class="settings-form settings-webdav-form" id="backup-webdav-form" novalidate>
           <div class="settings-webdav-toggle-row">
             ${toggleRowHtml({
+              control: 'switch',
               label: t('settings.backupWebdavEnabled'),
               attrs: { id: 'webdav-enabled', name: 'enabled' },
             })}
@@ -148,7 +154,7 @@ function buildCliContent() {
     <pre class="settings-code-block"><code>SERVICE=yuvomi
 BACKUP="$PWD/yuvomi-backup.db"
 docker compose stop "$SERVICE"
-docker compose run --rm -v "$BACKUP:/tmp/yuvomi-restore.db:ro" --entrypoint sh "$SERVICE" -c 'set -eu; target="\${DB_PATH:-/data/yuvomi.db}"; case "$target" in */oikos.db) target="\${target%/oikos.db}/yuvomi.db";; esac; stamp=$(date -u +%Y%m%dT%H%M%SZ); if [ -f "$target" ]; then cp "$target" "$target.pre-restore-$stamp"; fi; rm -f "$target-wal" "$target-shm"; cp /tmp/yuvomi-restore.db "$target"; chown node:node "$target" 2&gt;/dev/null || true'
+docker compose run --rm -v "$BACKUP:/tmp/yuvomi-restore.db:ro" --entrypoint sh "$SERVICE" -c 'set -eu; node server/check-backup.js /tmp/yuvomi-restore.db; target="\${DB_PATH:-/data/yuvomi.db}"; case "$target" in */oikos.db) target="\${target%/oikos.db}/yuvomi.db";; esac; stamp=$(date -u +%Y%m%dT%H%M%SZ); if [ -f "$target" ]; then cp "$target" "$target.pre-restore-$stamp.0.partial"; sync; mv "$target.pre-restore-$stamp.0.partial" "$target.pre-restore-$stamp"; fi; staging="$target.restore-tmp-0-$stamp"; cp /tmp/yuvomi-restore.db "$staging"; chmod 600 "$staging" 2&gt;/dev/null || true; chown node:node "$staging" 2&gt;/dev/null || true; sync; if [ -f "$target-wal" ]; then if [ -s "$target" ]; then mv "$target-wal" "$target.pre-restore-$stamp-wal"; else mv "$target-wal" "$target.pre-restore-$stamp.wal-kept"; fi; fi; rm -f "$target-shm"; sync; mv "$staging" "$target"; sync'
 docker compose up -d "$SERVICE"</code></pre>
     <p class="form-hint">${t('settings.backupCliForeignKeyHint')}</p>
     <p class="form-hint">${t('settings.backupCliBackupHint')}</p>
@@ -386,6 +392,16 @@ async function loadWebdavConfig(container) {
   }
 }
 
+/**
+ * Fehlermeldung einer WebDAV-Anfrage: `password_required` (neuer Server oder
+ * Benutzer ohne neues Passwort) uebersetzt, sonst der Text des Servers.
+ * Exportiert fuer test/test-settings-backup-key.js.
+ */
+export function webdavErrorMessage(err) {
+  if (err?.data?.errorCode === 'password_required') return t('settings.backupWebdavPasswordRequired');
+  return err?.message ?? t('common.errorGeneric');
+}
+
 function bindWebdavBackupEvents(container) {
   const form = container.querySelector('#backup-webdav-form');
   const testBtn = container.querySelector('#webdav-test-btn');
@@ -431,7 +447,9 @@ function bindWebdavBackupEvents(container) {
       }
     } catch (err) {
       if (resultEl) {
-        resultEl.textContent = t('settings.backupWebdavTestFailed', { error: err.message });
+        resultEl.textContent = err?.data?.errorCode === 'password_required'
+          ? webdavErrorMessage(err)
+          : t('settings.backupWebdavTestFailed', { error: err.message });
         resultEl.className = 'form-hint form-hint--danger';
       }
     } finally {
@@ -459,22 +477,62 @@ function bindWebdavBackupEvents(container) {
       window.yuvomi?.showToast(t('settings.backupWebdavSaved'), 'success');
       loadWebdavConfig(container);
     } catch (err) {
-      window.yuvomi?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(webdavErrorMessage(err), 'danger');
     } finally {
       if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = t('settings.backupWebdavSaveBtn'); }
     }
   });
 }
 
-function bindRestoreEvents(container) {
+/** Exportiert fuer test/test-settings-backup-key.js: dort laeuft der Handler als Programm. */
+export function bindRestoreEvents(container) {
   const form = container.querySelector('#backup-restore-form');
   const fileInput = container.querySelector('#backup-restore-file');
   const selectedFile = container.querySelector('#backup-selected-file');
   const restoreBtn = container.querySelector('#backup-restore-btn');
   const errorEl = container.querySelector('#backup-restore-error');
   const dropzone = container.querySelector('#backup-dropzone');
+  const keyGroup = container.querySelector('#backup-restore-key-group');
+  const keyInput = container.querySelector('#backup-restore-key');
+  const httpWarning = container.querySelector('#backup-restore-key-http');
 
   if (!form || !fileInput || !selectedFile || !restoreBtn || !errorEl) return;
+
+  // Das Feld erscheint erst, wenn der Server sagt, dass es gebraucht wird: ein
+  // Backup DIESER Installation oeffnet der eigene Schluessel, und ein Feld, das
+  // immer dasteht, fragt nach einem Geheimnis, das niemand eingeben muss.
+  function showKeyField() {
+    if (!keyGroup || !keyInput) return;
+    keyGroup.hidden = false;
+    // Ueber HTTP geht der Schluessel im Klartext uebers Netz - sagen, nicht sperren.
+    const { protocol } = window.location;
+    if (httpWarning) httpWarning.hidden = protocol !== 'http:';
+    describeKeyField();
+  }
+
+  function resetKeyField() {
+    if (!keyGroup || !keyInput) return;
+    keyInput.value = '';
+    keyInput.removeAttribute('aria-invalid');
+    keyGroup.hidden = true;
+  }
+
+  // Die Fehlerbox gehoert ins describedby des Feldes, solange sie zu sehen ist
+  // - Regel und Grund in keyFieldDescribedBy().
+  function describeKeyField() {
+    keyInput?.setAttribute(
+      'aria-describedby',
+      keyFieldDescribedBy(window.location.protocol, { withError: !errorEl.hidden }),
+    );
+  }
+
+  function hideError() {
+    errorEl.hidden = true;
+    describeKeyField();
+  }
+
+  // Ein neuer Versuch am Schluessel nimmt die Markierung des alten zurueck.
+  keyInput?.addEventListener('input', () => keyInput.removeAttribute('aria-invalid'));
 
   function setFile(file) {
     if (!file) {
@@ -489,7 +547,8 @@ function bindRestoreEvents(container) {
   }
 
   fileInput.addEventListener('change', () => {
-    errorEl.hidden = true;
+    hideError();
+    resetKeyField();
     setFile(fileInput.files?.[0]);
   });
 
@@ -510,33 +569,72 @@ function bindRestoreEvents(container) {
     const transfer = new DataTransfer();
     transfer.items.add(file);
     fileInput.files = transfer.files;
-    errorEl.hidden = true;
+    hideError();
+    resetKeyField();
     setFile(file);
   });
 
+  // Waehrend des Requests wird der Knopf NICHT `disabled` - dasselbe wie bei
+  // „Auf anderen Geraeten abmelden" (#1423): ein deaktivierter Knopf nimmt den
+  // Fokus nicht an, den das Modal ihm beim Schliessen zurueckgibt, und er fiel
+  // auf #main-content. Die Sperre haelt `restoring`, `aria-disabled` sagt sie an.
+  let restoring = false;
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (restoring) return;
     const file = fileInput.files?.[0];
     if (!file) return;
+    restoring = true;
     // Die Warnung zu Dateien ausserhalb der DB stand bisher nur auf dem
     // Dokumentenspeicher-Blatt - also nicht dort, wo sie gebraucht wird.
     if (!await confirmModal(t('settings.backupRestoreConfirm'), {
       danger: true,
       confirmLabel: t('settings.backupRestoreButton'),
       detail: t('settings.backupRestoreDetail'),
-    })) return;
+    })) {
+      restoring = false;
+      return;
+    }
+    // Mobil ist das Modal hier noch nicht zu: es schliesst animiert (bis zu
+    // 400 ms) und gibt DANN den Fokus an den Ausloeser zurueck. Eine schnellere
+    // Antwort setzte den Fokus ins Feld, und das Schliessen zoege ihn wieder ab.
+    const modalClosed = whenModalClosed();
 
-    errorEl.hidden = true;
-    restoreBtn.disabled = true;
+    hideError();
+    restoreBtn.setAttribute('aria-disabled', 'true');
     restoreBtn.textContent = t('settings.backupRestoring');
+    // Nur im Header, nie in der URL; nach dem Versuch nicht aufbewahrt.
+    const backupKey = keyGroup && !keyGroup.hidden ? keyInput?.value ?? '' : '';
+    const headers = backupKey ? { 'X-Backup-Key': encodeBackupKey(backupKey) } : {};
     try {
-      await api.rawPost('/backup/restore', file);
+      await api.rawPost('/backup/restore', file, headers);
+      resetKeyField();
       window.yuvomi?.showToast(t('settings.backupRestoredToast'), 'success');
       window.location.reload();
     } catch (err) {
-      showError(errorEl, err.message ?? t('common.errorGeneric'));
-      restoreBtn.disabled = false;
+      const reason = err?.data?.reason;
+      const action = keyFieldAfterError(reason);
+      if (action === 'show') showKeyField();
+      else if (action === 'reset') resetKeyField();
+      // Nur ein widerlegter Schluessel ist ein ungueltiger Eintrag.
+      if (reason === 'backup_key_wrong') keyInput?.setAttribute('aria-invalid', 'true');
+      else keyInput?.removeAttribute('aria-invalid');
+      showError(errorEl, restoreErrorText(err));
+      describeKeyField();
+      restoring = false;
+      restoreBtn.removeAttribute('aria-disabled');
       restoreBtn.textContent = t('settings.backupRestoreButton');
+      await modalClosed;
+      // Nur einen Fokus umsetzen, den niemand selbst gewaehlt hat: wo das
+      // Modal ihn abgelegt hat (Knopf, Seitenwurzel, body) oder schon im Feld.
+      // Wer waehrend einer langen Anfrage weitergearbeitet hat, bleibt dort.
+      const current = document.activeElement;
+      const untouched = !current || current === document.body || current.id === 'main-content'
+        || current === restoreBtn || current === keyInput;
+      if (!untouched) return;
+      const fieldAppeared = action === 'show' && keyGroup && !keyGroup.hidden;
+      (fieldAppeared ? keyInput : restoreBtn).focus();
     }
   });
 }

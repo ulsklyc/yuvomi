@@ -63,7 +63,10 @@
    * die Liste blieb so hoch wie ihre Zeilen (1500px im Vorrat), statt auf den
    * verfügbaren Platz zu fallen. Sichtbar war das nicht, weil .pantry-page
    * `overflow: hidden` trägt; die Höhe propagierte aber nach oben und machte
-   * .app-content zu einem zweiten Scroller neben der Liste. */
+   * .app-content zu einem zweiten Scroller neben der Liste. Die zweite
+   * Ursache desselben Symptoms - absolut positionierte Nachfahren (.sr-only),
+   * die dem Clipping entkommen - behebt die Rolle .page-scrollport, die den
+   * Scroller zum Containing Block macht (layout.css). */
   min-height: 0;
   overflow-y: auto;
   /* Gruppen stapeln über gap, nicht über margin-bottom am Gruppen-Element: der
@@ -192,8 +195,10 @@
   cursor: pointer;
 }
 
+/* Der Winkel dreht im Takt der Zeilen, die darunter weg- oder aufklappen
+ * (collapseOut()/expandIn() in utils/ux.js: --duration-lg, --ease-in-out). */
 .list-group__chevron {
-  transition: transform var(--transition-fast);
+  transition: transform var(--duration-lg) var(--ease-in-out);
 }
 
 /* Zugeklappt zeigt der Winkel zur Seite - die Richtung, in die sich die Gruppe
@@ -205,11 +210,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .list-group__chevron { transition: none; }
-}
-
-.list-group__title i {
-  color: var(--module-accent);
-  flex-shrink: 0;
 }
 
 /* Am Ende der Überschrift, nicht am Ende der Gruppenbreite: bei 720px stand die
@@ -571,7 +571,8 @@
    verschwindet dann, statt eine folgenlose Handlung anzubieten - über
    :only-child, damit die Regel ohne Zutun des Renderers gilt (auch nach dem
    Löschen der vorletzten Zeile, das die Liste nicht neu aufbaut). */
-.list-rows > .swipe-row:only-child .list-row__drag {
+.list-rows > .swipe-row:only-child .list-row__drag,
+.row-carrier > .swipe-row:only-child .list-row__drag {
   display: none;
 }
 
@@ -632,10 +633,11 @@
  * und genau das ist beim Bau einmal passiert. */
 /* ZWEI Klassen, weil „wer trägt" und „wer trennt" nicht dieselbe Frage sind.
  * Meist ist es dieselbe Box - dann steht `.row-carrier` allein. Liegt die Liste
- * aber schon IN einer Karte (die Abo-Liste steckt in `.subscriptions-list-section`,
- * gemessen: weiß, 16px Radius, Schatten), dann ist DIE der Träger, und eine
+ * aber schon IN einer Karte (die Vitalwert-Liste der Gesundheit, die
+ * Mitgliederliste der Einstellungen), dann ist DIE der Träger, und eine
  * zweite Fläche darin wäre genau der Kasten-in-Kasten, den §2 verbietet. Dort
- * trägt die Liste nur `.row-divided`.
+ * trägt die Liste nur `.row-divided`. (Die Abo-Liste war bis R16 so ein Fall;
+ * ihr Kopf steht jetzt auf der Bühne und sie ist selbst `.row-carrier`.)
  *
  * Dieselbe Grammatik wie beim Well und beim Lesemaß: der Träger entscheidet. */
 /* Der Träger nimmt seinen Zeilen die Kante, statt dass jedes Modul sie sich
@@ -708,6 +710,41 @@
 }
 
 /* --------------------------------------------------------
+ * Abhakkreis: EIN Ring fuer jede Zeile, die sich erledigen laesst
+ * -------------------------------------------------------- */
+/* EINE GROESSE, EINE TONREGEL (Critique 2026-10-05, R16 P1 "Bausteine werden
+ * nicht vererbt"). Der Ring stand zweimal da: 20px in `--color-text-tertiary`
+ * an der Aufgabe (tasks.css), 24px im Modulton an der Haushaltshilfe
+ * (housekeeping.css) - dieselbe Geste, zwei Zeichen. Die Aufgaben-Fassung ist
+ * die Referenz und steht jetzt hier; beide Knoepfe tragen `.check-ring`.
+ *
+ * - RUHE: 20px, 2px, `--color-text-tertiary`. Das meistgenutzte Steuerelement
+ *   der Zeile darf nicht das blasseste sein (`--color-border` war im Dark kaum
+ *   zu sehen), aber es traegt auch nicht den Modulton: der Modulton LAEDT EIN,
+ *   Gruen BESTAETIGT, Ruhe ist neutral.
+ * - EINLADUNG: unter dem Zeiger nimmt der Ring den Modulton an.
+ * - ZEICHEN STATT KNOPF (`--static`): keine Einladung - der Ring ist dann eine
+ *   Auskunft. Per `:not()` ausgenommen statt per Gegenregel, die eine
+ *   Zustandsfarbe ueberstimmen koennte (Review zu PR #1252).
+ *
+ * Trefferflaeche, Zustand (`--done`, `--in_progress`) und die Stellung in der
+ * Zeile bleiben beim Modul: sie haengen an dessen Markup. Das eckige
+ * `.item-check` des Einkaufs ist ein Kaestchen, kein Kreis, und bleibt eigen.
+ * Guard: test-frontend-audit.js, "der Abhakkreis steht einmal". */
+.check-ring::after {
+  content: '';
+  width: var(--space-5);
+  height: var(--space-5);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-text-tertiary);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.check-ring:not(.check-ring--static):hover::after {
+  border-color: var(--module-accent, var(--color-accent));
+}
+
+/* --------------------------------------------------------
  * Rangmarke: der Prioritätspunkt
  * -------------------------------------------------------- */
 /* EINE Fassung für alle Listen, die einen Rang zeigen.
@@ -734,3 +771,45 @@
 .priority-dot--medium { background-color: var(--color-priority-medium); }
 .priority-dot--high   { background-color: var(--color-priority-high); }
 .priority-dot--urgent { background-color: var(--color-priority-urgent); }
+
+/* --------------------------------------------------------
+   Ablauf-Chip (Dokumente, Inventar-Fristen)
+   Aus documents.css hierher (Critique 2026-09-26): die Inventarzeile zeigt
+   ihre Frist mit demselben Chip, und der Router laedt je Seite nur EIN
+   Modul-Stylesheet - list-row.css laedt global. Die Ortsetiketten und die
+   Kurz-/Langform bleiben in documents.css, sie gibt es nur dort.
+   -------------------------------------------------------- */
+
+/* Kapsel wie jeder Chip der App (DESIGN.md, Chips: --radius-full). */
+.doc-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.4;
+}
+
+.doc-badge svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.doc-badge--unavailable {
+  background: var(--color-danger-light);
+  color: var(--color-danger-ink);
+}
+
+/* Ablauf-Chip (dateStatus()): "expiring" bald faellig (Warnung) - "valid" zeigt
+   gar keinen Chip. "expired" (bereits ueberfaellig) teilt sich bewusst die
+   Gefahr-Farbe mit .doc-badge--unavailable statt einer eigenen, identischen
+   Regel (DESIGN.md, Colors: die Skalen-Regel - zwei Modifier duerfen nicht
+   unabsichtlich gleich aussehen, ohne sich eine Regel zu teilen). */
+.doc-badge--expiring {
+  background: var(--color-warning-light);
+  color: var(--color-warning-ink);
+}

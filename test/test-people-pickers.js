@@ -97,6 +97,69 @@ test('tasks: a solo household keeps hiding the assignee picker when only one per
   assert.equal(assigneeGroup(tasks.renderModalContent({ task: null, users: [ANNA] })).hidden, true);
 });
 
+// Feldfolge des Aufgaben-Dialogs (Critique 2026-10-05, R16). Unter dem Titel
+// stand die Notiz samt Formatierleiste, die Faelligkeit mobil erst bei y=700
+// von 844; Wiederholung und Erinnerung standen offen unter dem Aufklapper,
+// 1455px Formular in 591px. Was eine Aufgabe ausmacht - wann, wer, wie
+// wichtig -, steht jetzt vor dem Freitext, und die beiden seltenen Abschnitte
+// liegen hinter "Weitere Einstellungen", SOLANGE sie leer sind.
+// Der Loader stubt Aufklapper und Wiederholung auf nichts; hier zaehlt gerade,
+// WO sie stehen, also bekommen beide ein erkennbares Markup.
+function withFormLandmarks(run) {
+  globalThis.__advancedSection = (inner, { hint = '' } = {}) => (
+    `<details class="form-advanced"><span class="form-advanced__hint">${hint}</span>${inner}</details>`);
+  globalThis.__renderRRuleFields = (prefix) => `<select id="${prefix}-rrule-freq"></select>`;
+  try { return run(); } finally {
+    delete globalThis.__advancedSection;
+    delete globalThis.__renderRRuleFields;
+  }
+}
+const taskDialog = (opts) => withFormLandmarks(() => tasks.renderModalContent(opts));
+
+function advancedRange(html) {
+  const start = html.indexOf('<details class="form-advanced"');
+  return [start, html.indexOf('</details>', start)];
+}
+const inAdvanced = (html, needle) => {
+  const [start, end] = advancedRange(html);
+  const at = html.indexOf(needle);
+  assert.ok(at > 0, `${needle} fehlt im Dialog`);
+  return at > start && at < end;
+};
+
+test('tasks: the dialog asks when, who and how important before the free-text note', () => {
+  setHouseholdSize(2);
+  const html = taskDialog({ task: null, users: [ANNA, CLARA] });
+  const order = ['id="task-title"', 'id="task-due-date"', 'id="task-due-time"', 'task_assigned', 'id="task-priority"', 'id="task-description"', '<details class="form-advanced"']
+    .map((needle) => html.indexOf(needle));
+  assert.ok(order.every((at) => at > 0), 'every field is in the dialog');
+  assert.deepEqual(order, [...order].sort((a, b) => a - b), 'title, due, assignee, priority, note, more settings');
+});
+
+test('tasks: an empty recurrence and an empty reminder wait behind "more settings"', () => {
+  setHouseholdSize(2);
+  const html = taskDialog({ task: null, users: [ANNA, CLARA] });
+  assert.equal(inAdvanced(html, 'id="task-rrule-freq"'), true);
+  assert.equal(inAdvanced(html, 'id="reminder-toggle"'), true);
+  assert.match(html, /form-advanced__hint">[^<]*rrule\.labelRepeat[^<]*reminders\.sectionTitle/,
+    'the hint names what moved behind the disclosure');
+});
+
+test('tasks: a set recurrence or reminder is never hidden behind the disclosure', () => {
+  setHouseholdSize(2);
+  const task = { id: 9, title: 'Muell', status: 'open', priority: 'none', visibility: 'all', due_date: '2026-10-09', recurrence_rule: 'FREQ=WEEKLY' };
+  const series = taskDialog({ task, users: [ANNA, CLARA] });
+  assert.equal(inAdvanced(series, 'id="task-rrule-freq"'), false, 'a series shows its rule');
+  assert.equal(inAdvanced(series, 'id="reminder-toggle"'), true, 'its empty reminder still waits');
+  const reminded = taskDialog({
+    task: { ...task, recurrence_rule: null }, users: [ANNA, CLARA],
+    reminder: { id: 1, remind_at: '2026-10-08T09:00:00.000Z' },
+  });
+  assert.equal(inAdvanced(reminded, 'id="reminder-toggle"'), false, 'a set reminder shows');
+  assert.equal(inAdvanced(reminded, 'id="task-rrule-freq"'), true);
+  assert.doesNotMatch(reminded, /form-advanced__hint">[^<]*reminders\.sectionTitle/, 'the hint only names what is behind it');
+});
+
 // Die Auswahl "wer hat es getan" beim Abhaken (#1205). Sie hat keinen eigenen
 // Dialog: sie ist ein zweites Ziel in der Zeile, und die ganze Entscheidung
 // liegt darin, WANN es ueberhaupt dasteht.
@@ -133,6 +196,108 @@ test('tasks: a task that is already done or filed away offers no doer picker', (
   tasks.state.users = [ANNA, BEA];
   assert.equal(tasks.renderDoerPicker(OPEN_TASK, true, false), '');
   assert.equal(tasks.renderDoerPicker(OPEN_TASK, false, true), '');
+});
+
+// Mobil verlaesst die Personenwahl die Zeile (R9 M1, tasks.css) - sie bleibt
+// ueber Long-Press und Kontextmenue erreichbar (wireDoerContextMenu). Gemessen
+// wird die Geste an einer kleinen Liste mit Listener-Registry: ob das Panel
+// aufgeht, WANN, und ob der Klick danach die Zeile noch erreicht.
+function doerList() {
+  const listeners = {};
+  const panel = {
+    open: false, shown: 0,
+    matches(sel) { return sel === ':popover-open' && this.open; },
+    showPopover() { this.open = true; this.shown += 1; },
+  };
+  const card = { querySelector: (sel) => (sel.startsWith('.popover-menu') ? panel : null) };
+  const target = { closest: (sel) => (sel === '.task-card' ? card : null) };
+  const list = {
+    addEventListener(type, fn, opts) {
+      (listeners[type] ??= []).push({ fn, capture: opts === true || Boolean(opts?.capture) });
+    },
+  };
+  const fire = (type, extra = {}) => {
+    const ev = {
+      type, target, clientX: 10, clientY: 10, pointerType: 'touch', button: 0,
+      defaultPrevented: false, stopped: false,
+      preventDefault() { this.defaultPrevented = true; },
+      stopImmediatePropagation() { this.stopped = true; },
+      ...extra,
+    };
+    for (const { fn } of [...(listeners[type] ?? [])].sort((a, b) => Number(b.capture) - Number(a.capture))) {
+      if (ev.stopped) break;
+      fn(ev);
+    }
+    return ev;
+  };
+  return { list, panel, fire };
+}
+
+test('tasks: a long press on a row opens the doer menu after release and keeps the tap to itself', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  tasks.state.bulkSelectMode = false;
+  const { list, panel, fire } = doerList();
+  tasks.wireDoerContextMenu(list);
+
+  fire('pointerdown');
+  t.mock.timers.tick(600);
+  assert.equal(panel.shown, 0, 'waehrend des Drucks noch nicht - das Light-Dismiss schloesse es beim Loslassen');
+  fire('pointerup');
+  t.mock.timers.tick(1);
+  assert.equal(panel.shown, 1, 'nach dem Loslassen steht die Frage');
+  const click = fire('click');
+  assert.equal(click.defaultPrevented, true, 'der Klick des Drucks hakt nicht ab und oeffnet kein Detail');
+});
+
+test('tasks: a short tap, a scroll or a held mouse button never opens the doer menu', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  tasks.state.bulkSelectMode = false;
+  const { list, panel, fire } = doerList();
+  tasks.wireDoerContextMenu(list);
+
+  fire('pointerdown'); t.mock.timers.tick(200); fire('pointerup'); t.mock.timers.tick(600);
+  assert.equal(panel.shown, 0, 'ein Tipp ist ein Tipp');
+  assert.equal(fire('click').defaultPrevented, false, 'und sein Klick erreicht die Zeile');
+
+  fire('pointerdown'); fire('pointermove', { clientX: 40 }); t.mock.timers.tick(600); fire('pointerup'); t.mock.timers.tick(1);
+  assert.equal(panel.shown, 0, 'wer wischt oder scrollt, fragt nicht nach der Person');
+
+  fire('pointerdown', { pointerType: 'mouse' }); t.mock.timers.tick(600); fire('pointerup', { pointerType: 'mouse' }); t.mock.timers.tick(1);
+  assert.equal(panel.shown, 0, 'mit der Maus ist Halten Markieren - sie hat ihr Kontextmenue');
+});
+
+test('tasks: the context menu (right click, menu key) opens the same doer panel', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  tasks.state.bulkSelectMode = false;
+  const { list, panel, fire } = doerList();
+  tasks.wireDoerContextMenu(list);
+
+  const ev = fire('contextmenu');
+  assert.equal(ev.defaultPrevented, true, 'das Systemmenue weicht');
+  assert.equal(panel.shown, 1, 'ohne laufenden Druck (Menue-Taste) sofort');
+
+  panel.open = false;
+  fire('pointerdown', { pointerType: 'mouse', button: 2 });
+  fire('contextmenu');
+  assert.equal(panel.shown, 1, 'waehrend eines Rechtsklicks erst nach dem Loslassen');
+  fire('pointerup', { pointerType: 'mouse', button: 2 }); t.mock.timers.tick(1);
+  assert.equal(panel.shown, 2);
+  assert.equal(fire('click').defaultPrevented, false,
+    'ein Rechtsklick hinterlaesst keinen Riegel, der den naechsten echten Klick schluckt');
+});
+
+test('tasks: in select mode a long press selects, it does not ask for a person', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  tasks.state.bulkSelectMode = true;
+  try {
+    const { list, panel, fire } = doerList();
+    tasks.wireDoerContextMenu(list);
+    fire('pointerdown'); t.mock.timers.tick(600); fire('pointerup'); t.mock.timers.tick(1);
+    fire('contextmenu');
+    assert.equal(panel.shown, 0);
+  } finally {
+    tasks.state.bulkSelectMode = false;
+  }
 });
 
 // --------------------------------------------------------------------------
@@ -329,4 +494,103 @@ test('settings: saving a calendar subscription keeps a stored assignee that is n
   assert.deepEqual(icsSettings.assigneePatch(select('', ANNA.id, CLARA.id), CLARA.id), { default_assignee_user_id: null },
     'removing an assignee who is on offer still works');
   assert.deepEqual(icsSettings.assigneePatch(select(String(ANNA.id), ANNA.id), null), { default_assignee_user_id: ANNA.id });
+});
+
+// --------------------------------------------------------------------------
+// "Nur ich" mit zugewiesenen Personen - Aufgaben-Dialog
+//
+// Dieselbe Regel wie im Termin-Dialog (test:calendar-sync-target-hint): wer
+// zugewiesen ist, sieht einen privaten Eintrag nicht. Der Dialog sagt es und
+// laesst Zuweisung und Sichtbarkeit stehen. Das Markup kommt aus
+// `renderModalContent`, verdrahtet wird ueber `wireTaskForm` - ein Doppel, das
+// fuer jeden unbekannten Selektor `null` liefert, an dem die uebrigen
+// Verdrahtungen aussteigen.
+// --------------------------------------------------------------------------
+
+function taskVisibilityForm({ visibility = 'all', assigned = [], task = null } = {}) {
+  const html = tasks.renderModalContent({ task, users: [ANNA, BEN] });
+  const group = /<select class="input" id="task-visibility"[\s\S]*?<\/div>/.exec(html)?.[0];
+  assert.ok(group, 'the task dialog has a visibility select');
+  const el = (extra = {}) => ({
+    listeners: {},
+    addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); },
+    fire(type) { for (const fn of this.listeners[type] ?? []) fn(); },
+    ...extra,
+  });
+  const details = { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; } };
+  const nodes = {
+    '#task-visibility': el({ value: visibility }),
+    '.user-ms[data-ms-name="task_assigned"]': el(),
+  };
+  for (const [, id, hidden, key] of group.matchAll(/<p class="task-field-hint field-hint--warn" id="([\w-]+)" role="status"( hidden)?>[\s\S]*?<span>([^<]*)<\/span><\/p>/g)) {
+    nodes[`#${id}`] = el({ hidden: Boolean(hidden), textContent: key, closest: (sel) => (sel === 'details' ? details : null) });
+  }
+  const form = { nodes, details, assigned: [...assigned] };
+  globalThis.__getSelectedUserIds = () => form.assigned;
+  const panel = { querySelector: (sel) => nodes[sel] ?? null, querySelectorAll: () => [], addEventListener: () => {} };
+  tasks.wireTaskForm(panel, { task });
+  form.pick = (value) => { nodes['#task-visibility'].value = value; nodes['#task-visibility'].fire('change'); };
+  form.assign = async (ids) => {
+    form.assigned = ids;
+    nodes['.user-ms[data-ms-name="task_assigned"]'].fire('click');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  };
+  form.warn = (id) => {
+    assert.ok(nodes[id], `${id} is in the dialog markup`);
+    return nodes[id];
+  };
+  return form;
+}
+
+test('task dialog: "only me" with an assigned person says they will not see the entry', async () => {
+  const PRIVATE_ASSIGNED = '#task-visibility-private-warning';
+  const NOBODY = '#task-visibility-warning';
+  try {
+    const form = taskVisibilityForm({ assigned: [BEN.id] });
+    assert.equal(form.warn(PRIVATE_ASSIGNED).hidden, true, 'nothing to say while everyone sees it');
+    assert.equal(form.warn(PRIVATE_ASSIGNED).textContent, 'common.visibility.privateAssignedHint');
+
+    form.pick('private');
+    assert.equal(form.warn(PRIVATE_ASSIGNED).hidden, false, 'private with a person: the hint shows');
+    assert.equal(form.warn(NOBODY).hidden, true, 'the nobody-assigned warning is a different case');
+    assert.equal(form.details.attrs.open, '', 'the section the hint lives in opens');
+
+    await form.assign([]);
+    assert.equal(form.warn(PRIVATE_ASSIGNED).hidden, true, 'private with nobody: no hint');
+    await form.assign([BEN.id]);
+    assert.equal(form.warn(PRIVATE_ASSIGNED).hidden, false, 'assigning follows');
+
+    for (const value of ['assignees', 'all']) {
+      form.pick(value);
+      assert.equal(form.warn(PRIVATE_ASSIGNED).hidden, true, value);
+      assert.equal(form.warn(NOBODY).hidden, true, value);
+    }
+    assert.deepEqual(form.assigned, [BEN.id], 'the dialog warns, it does not clear the assignment');
+  } finally {
+    delete globalThis.__getSelectedUserIds;
+  }
+});
+
+test('task dialog: whoever created the entry does not count as an assigned person who cannot see it', async () => {
+  const PRIVATE_ASSIGNED = '#task-visibility-private-warning';
+  const vorher = tasks.state.currentUserId;
+  const TASK = { id: 5, title: 'Geschenk', status: 'open', priority: 'none', visibility: 'private' };
+  try {
+    // Neue Aufgabe: Ersteller ist das angemeldete Konto.
+    tasks.state.currentUserId = ANNA.id;
+    const own = taskVisibilityForm({ visibility: 'private', assigned: [ANNA.id] });
+    assert.equal(own.warn(PRIVATE_ASSIGNED).hidden, true, 'only the creator is assigned: no hint');
+    await own.assign([ANNA.id, BEN.id]);
+    assert.equal(own.warn(PRIVATE_ASSIGNED).hidden, false, 'creator plus another person: the hint shows');
+
+    // Bearbeiten: es zaehlt created_by der Aufgabe, nicht wer bearbeitet.
+    const foreign = taskVisibilityForm({ visibility: 'private', assigned: [ANNA.id], task: { ...TASK, created_by: BEN.id } });
+    assert.equal(foreign.warn(PRIVATE_ASSIGNED).hidden, false, 'the editor is assigned but did not create it: the hint shows');
+    tasks.state.currentUserId = BEN.id;
+    const theirs = taskVisibilityForm({ visibility: 'private', assigned: [ANNA.id], task: { ...TASK, created_by: ANNA.id } });
+    assert.equal(theirs.warn(PRIVATE_ASSIGNED).hidden, true, 'the creator is assigned, someone else edits: no hint');
+  } finally {
+    tasks.state.currentUserId = vorher;
+    delete globalThis.__getSelectedUserIds;
+  }
 });

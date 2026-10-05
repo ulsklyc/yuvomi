@@ -17,6 +17,11 @@ import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js'
 
 const router = express.Router();
 const log = createLogger('Schedule');
+// Startfarbe einer Schichtart ohne eigene Wahl (nur NEUE Datensaetze; keine
+// Migration). Vorher '#6C3AED' - die Marke selbst. Wert aus der EINEN
+// Startpalette `USER_COLOR_DEFAULT` in public/utils/color.js (der Server kann
+// das Frontend-Modul nicht importieren; test-schedule.js haelt beide gleich).
+const SHIFT_COLOR_DEFAULT = '#0891B2';
 const actorId = (req) => req.authUserId || req.session?.userId;
 const fail = (res, code, error) => res.status(code).json({ error, code });
 const userExists = (value) => !!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(value);
@@ -211,7 +216,7 @@ router.get('/shift-types', (_req, res) => {
 });
 router.post('/shift-types', (req, res) => {
   const name = str(req.body?.name, 'name'); const shortCode = str(req.body?.short_code, 'short_code', { required: false, max: 12 });
-  const start = time(req.body?.start_time, 'start_time'); const end = time(req.body?.end_time, 'end_time'); const shade = color(req.body?.color || '#6C3AED', 'color');
+  const start = time(req.body?.start_time, 'start_time'); const end = time(req.body?.end_time, 'end_time'); const shade = color(req.body?.color || SHIFT_COLOR_DEFAULT, 'color');
   const icon = shiftIcon(req.body?.icon);
   const errors = collectErrors([name, shortCode, start, end, shade, icon]);
   if ((start.value == null) !== (end.value == null)) errors.push('start_time and end_time must be provided together.');

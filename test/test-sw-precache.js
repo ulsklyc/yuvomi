@@ -38,7 +38,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createContext, runInContext } from 'node:vm';
 import { posix } from 'node:path';
@@ -151,6 +151,14 @@ const IMPORT_EXCEPTIONS = [
       + 'Precacht haette pdf.js nichts zu zeigen, und allein reichte es ohnehin nicht - Worker '
       + '(1.4 MB) und standard_fonts/ gehoerten dazu. Seit der Guard dynamische Importe liest '
       + '(21.09.2026) sichtbar; die Entscheidung liegt beim Maintainer.',
+    stillValid: () => !API_CACHE_WHITELIST.some((p) => p === '/documents' || p.startsWith('/documents/')),
+  },
+  {
+    dep: '/vendor/pdfjs/pdf.min.mjs',
+    from: '/utils/document-thumbs.js',
+    reason: 'Dieselbe Lage fuer die Vorschaubilder der Dokumentenseite (Critique 2026-09-25): '
+      + 'sie rendern die erste Seite aus derselben /preview-Datei, die offline nicht kommt - '
+      + 'und sie DARF nicht kommen, die Datei soll in keinem Cache des Geraets liegen.',
     stillValid: () => !API_CACHE_WHITELIST.some((p) => p === '/documents' || p.startsWith('/documents/')),
   },
 ];
@@ -314,6 +322,20 @@ test('keine Doppeleinträge zwischen den Precache-Listen', () => {
   const all = [...APP_SHELL, ...PAGE_MODULES, ...APP_LOCALES];
   const dupes = all.filter((p, i) => all.indexOf(p) !== i);
   assert.deepEqual([...new Set(dupes)], [], `Mehrfach precacht: ${dupes.join(', ')}`);
+});
+
+test('jede Locale-Datei ist precacht', () => {
+  // i18n.js holt die Sprache per fetch('/locales/<code>.json'), nicht per
+  // Import - der Modulgraph-Guard oben sieht die Dateien deshalb nie. Fehlt
+  // eine hier, faellt die Sprache offline still auf den Default zurueck,
+  // waehrend sie online tadellos laedt. pt-BR (#1437) kam mit Datei und
+  // Eintrag in SUPPORTED_LOCALES, aber ohne Zeile in APP_LOCALES.
+  const files = readdirSync(new URL('../public/locales/', import.meta.url))
+    .filter((file) => file.endsWith('.json'))
+    .map((file) => `/locales/${file}`)
+    .sort();
+  assert.deepEqual([...APP_LOCALES].sort(), files,
+    'APP_LOCALES in public/sw.js deckt sich nicht mit public/locales/*.json');
 });
 
 test('jedes Settings-Blatt der Registry ist precacht', () => {

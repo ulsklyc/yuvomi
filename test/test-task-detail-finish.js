@@ -187,3 +187,99 @@ test('eine abgelegte Aufgabe fuehrt gar keine Weiterschaltung', () => {
   assert.ok(!ids.includes('task-detail-start'), 'und kein Starten');
   assert.ok(ids.includes('task-detail-archive'), 'der Zurueckhol-Knopf bleibt');
 });
+
+// --------------------------------------------------------------------------
+// „Wer hat es erledigt?" im Detail (R9 M1). Mobil hat die Personenwahl ihren
+// Platz in der Zeile abgegeben; das Detail ist ihr Tastatur- und Vorleseweg.
+// Gemessen wird, WANN die Ansicht sie anbietet, und was ein Eintrag schreibt -
+// ein Knopf, den niemand verdrahtet, saehe im Markup aus wie jeder andere.
+// --------------------------------------------------------------------------
+
+const ANNA = { id: 1, display_name: 'Anna' };
+const BEA = { id: 2, display_name: 'Bea' };
+
+function aktionenMitLeuten(status, users, extra = {}) {
+  let gesehen = null;
+  globalThis.__openDetailView = (options) => { gesehen = options; };
+  try {
+    openTaskDetail({ task: { ...BASIS, status, ...extra }, currentUserId: 2, users });
+  } finally {
+    delete globalThis.__openDetailView;
+  }
+  return (gesehen?.actions ?? []).map((a) => a.id);
+}
+
+test('eine offene Aufgabe im Haushalt mit zwei Menschen fragt im Detail, wer sie erledigt hat', () => {
+  const ids = aktionenMitLeuten('open', [ANNA, BEA]);
+  assert.ok(ids.includes('task-detail-done-by'),
+    `die Personenwahl fehlt im Detail, gefunden: ${ids.join(', ')}`);
+  assert.equal(ids.indexOf('task-detail-done-by'), ids.indexOf('task-detail-finish') + 1,
+    'sie steht direkt hinter Erledigen - sie ist dessen zweite Antwort');
+});
+
+test('die Personenwahl im Detail folgt der Schwelle der Zeile', () => {
+  assert.ok(!aktionenMitLeuten('open', [ANNA]).includes('task-detail-done-by'),
+    'ein Menue mit einem Eintrag fragt nichts');
+  assert.ok(!aktionenMitLeuten('done', [ANNA, BEA]).includes('task-detail-done-by'),
+    'an einer erledigten Aufgabe gibt es nichts mehr zu benennen');
+  assert.ok(!aktionenMitLeuten('open', [ANNA, BEA], { archived_at: '2026-09-01T10:00:00Z' })
+    .includes('task-detail-done-by'), 'und an einer abgelegten auch nicht');
+});
+
+test('ein Eintrag der Personenwahl erledigt die Aufgabe fuer genau diese Person', async () => {
+  // Kleine Knoten statt mini-dom: gemessen wird die Verdrahtung (Ausloeser,
+  // Panel, Eintrag), nicht das Rendern.
+  const el = (tag) => {
+    const node = {
+      tag, id: '', className: '', dataset: {}, attrs: {}, children: [], listeners: {}, disabled: false,
+      classList: { list: new Set(), add(...c) { c.forEach((x) => this.list.add(x)); }, remove() {} },
+      setAttribute(k, v) { this.attrs[k] = String(v); if (k === 'id') this.id = String(v); },
+      getAttribute(k) { return this.attrs[k] ?? null; },
+      append(...n) { this.children.push(...n); },
+      appendChild(n) { this.children.push(n); return n; },
+      addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); },
+      set textContent(v) { this._text = v; },
+      get textContent() { return this._text ?? ''; },
+    };
+    return node;
+  };
+  const footer = el('div');
+  const button = el('button');
+  button.id = 'task-detail-done-by';
+  button.parentElement = footer;
+  let panel = null;
+  button.after = (node) => { panel = node; };
+  const vorher = { createElement: globalThis.document.createElement, getElementById: globalThis.document.getElementById };
+  globalThis.document.getElementById = (id) => (id === button.id ? button : null);
+  let geschrieben = null;
+  globalThis.__apiStub = { patch: async (url, body) => { geschrieben = { url, body }; return { data: null }; } };
+  globalThis.window = globalThis.window ?? {};
+  globalThis.window.yuvomi = { showToast() {} };
+  const pane = { querySelector: (sel) => (sel === '#task-detail-done-by' ? button : null) };
+
+  let aktionen = null;
+  // Die Abschnitte baut die Ansicht noch mit mini-dom; erst danach - wenn sie
+  // die Aktionen abgibt - gelten die kleinen Knoten, die ihre Listener merken.
+  globalThis.__openDetailView = (options) => {
+    aktionen = options.actions;
+    globalThis.document.createElement = (tag) => el(tag);
+  };
+  try {
+    openTaskDetail({ task: { ...BASIS, status: 'open' }, currentUserId: 2, users: [ANNA, BEA], pane });
+    assert.ok(aktionen.some((a) => a.id === 'task-detail-done-by'));
+    assert.equal(button.getAttribute('aria-haspopup'), 'menu', 'der Ausloeser kuendigt ein Menue an');
+    assert.ok(panel, 'das Menue wurde neben den Ausloeser gehaengt');
+    assert.equal(button.getAttribute('popovertarget'), panel.id, 'und der Ausloeser oeffnet genau dieses');
+    assert.match(button.getAttribute('aria-label'), /Tisch decken|doneByPick/, 'sein Name nennt die Aufgabe');
+    const bea = panel.children.find((item) => item.dataset.id === String(BEA.id));
+    assert.ok(bea, 'jede Person steht als Eintrag im Menue');
+    await bea.listeners.click[0]();
+    assert.deepEqual(geschrieben, { url: '/tasks/7/status', body: { status: 'done', done_by_user_id: BEA.id } },
+      'der Eintrag erledigt fuer die gewaehlte Person, nicht fuer die angemeldete');
+  } finally {
+    globalThis.document.createElement = vorher.createElement;
+    globalThis.document.getElementById = vorher.getElementById;
+    delete globalThis.__openDetailView;
+    delete globalThis.__apiStub;
+  }
+});

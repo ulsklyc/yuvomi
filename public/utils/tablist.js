@@ -114,10 +114,18 @@ export function wireTablist(container, { activeId, onChange, activeClass = 'sub-
 
   const setActive = (id, { focus = false } = {}) => {
     if (!id || id === current) return;
+    // Richtung des Wechsels in der Reihenfolge der Leiste: > 0 heisst "zu einem
+    // spaeteren Reiter". Der Aufrufer reicht sie an swapContent() weiter
+    // (utils/content-swap.js), damit der neue Inhalt von der Seite kommt, zu
+    // der man gewechselt hat. 0, wenn einer der beiden nicht in der Leiste steht.
+    const order = buttons().map((b) => b.dataset.tabId);
+    const from = order.indexOf(current);
+    const to = order.indexOf(id);
+    const direction = from < 0 || to < 0 ? 0 : Math.sign(to - from);
     current = id;
     paint();
     if (focus) buttons().find((b) => b.dataset.tabId === id)?.focus();
-    onChange?.(id);
+    onChange?.(id, { direction });
   };
 
   container.addEventListener('click', (e) => {

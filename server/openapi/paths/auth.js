@@ -125,6 +125,24 @@ export function authPaths() {
     '/api/v1/auth/logout': {
       post: op({ summary: 'Logout current session', tag: 'Auth', stateChanging: true }),
     },
+    '/api/v1/auth/logout-others': {
+      post: op({
+        summary: 'Sign out all other sessions',
+        tag: 'Auth',
+        stateChanging: true,
+        description: 'Ends every browser session of the signed-in user except the calling one (#1354) and '
+          + 'answers `{ ok: true, ended }` with the number of sessions ended. Only a browser session may call '
+          + 'it: an API token or a wall display has no current session to keep and gets 403. API tokens and '
+          + 'paired wall displays are not sessions and stay valid; revoke them under API tokens and Displays.',
+        responses: {
+          200: { description: 'Other sessions ended; `ended` is their number' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          429: { description: 'Too many requests' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
     '/api/v1/auth/oidc/config': {
       get: op({
         summary: 'Get sign-in availability',
@@ -159,7 +177,12 @@ export function authPaths() {
         summary: 'Handle OIDC callback',
         tag: 'Auth',
         auth: false,
-        description: 'Consumes the OIDC callback, validates state/nonce/PKCE, creates or finds the linked user, establishes a session, and redirects back to the app. With OIDC_ALLOW_SIGNUP=false an identity that matches no existing account is redirected to /login?error=oidc_signup_disabled instead of being provisioned.',
+        description: 'Consumes the OIDC callback, validates state/nonce/PKCE, creates or finds the linked user, establishes a session, and redirects back to the app. '
+          + 'An identity without a linked account is matched by its verified email address against accounts not yet linked (split-expense guests excluded). '
+          + 'It links only an account whose address nobody but an admin can have set: an account without a password (SSO-only) or an admin account. '
+          + 'Two or more matching accounts redirect to /login?error=oidc_email_ambiguous; a single matching member account that has a password redirects to /login?error=oidc_link_required, and that member links SSO while signed in (POST /api/v1/auth/oidc/link/start). '
+          + 'Neither case creates or links an account, whatever OIDC_ALLOW_SIGNUP says. '
+          + 'With OIDC_ALLOW_SIGNUP=false an identity that matches no existing account is redirected to /login?error=oidc_signup_disabled instead of being provisioned.',
         responses: {
           302: { description: 'Redirect to app or login error page' },
         },
@@ -199,8 +222,12 @@ export function authPaths() {
         tag: 'Auth',
         auth: false,
         requestBody: jsonBody('#/components/schemas/SetupRequest'),
+        description: 'Unknown body fields are ignored. `language` and `timezone` are optional; servers before they were added ignore them as well. '
+          + 'A rejected `timezone` answers 400 with `reason: "invalid_timezone"`, so a client can retry without the field; other validation errors carry no `reason`. '
+          + 'Every failed request counts against the login rate limit.',
         responses: {
           201: { description: 'Admin user created' },
+          400: { $ref: '#/components/responses/BadRequest' },
           403: { $ref: '#/components/responses/Forbidden' },
           409: { description: 'Username already taken' },
         },
@@ -210,7 +237,9 @@ export function authPaths() {
       post: op({
         summary: 'Request a password-reset link',
         description: 'Always responds 200 with a generic body to prevent account enumeration. '
-          + 'A reset email is sent only when the account exists, has a linked email, SMTP is configured, and BASE_URL is set.',
+          + 'A reset email is sent only when the account exists, has a linked email, SMTP is configured, and BASE_URL is set. '
+          + 'The response is sent before the account is looked up; the lookup and the email run afterwards in the background, so the response time does not reveal whether the account exists. '
+          + 'An email address matches regardless of surrounding whitespace and capitalisation; if it belongs to more than one account, no email is sent (guests of shared expenses do not count towards that), so such accounts reset by username.',
         tag: 'Auth',
         auth: false,
         requestBody: {
@@ -393,8 +422,16 @@ export function authPaths() {
       patch: op({
         summary: 'Update current user profile',
         tag: 'Auth',
+        description: 'An address that already belongs to another account (primary or additional address, compared without surrounding whitespace and ASCII letter case; guests of shared expenses do not count) is refused with 409 and `reason: "email_in_use"` when the caller is not an admin. Only newly introduced addresses are checked, so saving an unchanged address stays possible.',
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/ProfileUpdateRequest'),
+        responses: {
+          200: { description: 'Successful response' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          409: { description: 'The email address already belongs to another account (`reason: "email_in_use"`)' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
     '/api/v1/auth/users': {

@@ -137,9 +137,15 @@ export function renderWallTimer({ state, remainingMs } = readWallTimer()) {
   }
 
   const done = state === 'done';
+  // `role="timer"`, nicht `status`: eine Statusregion ist hoeflich live, und
+  // der Sekundentakt schreibt in sie hinein - der Screenreader sagte „09:59",
+  // „09:58", … an, solange der Timer lief. Die Timer-Rolle ist genau dafuer da
+  // und schweigt (aria-live off). Die ZUSTANDSWECHSEL sagt `wireWallTimer`
+  // ueber die Region des Aufrufers an: eine Region, die mit jedem Render neu
+  // entsteht, wird von Screenreadern nicht verlaesslich gehoert.
   return {
     display: `
-      <div class="wall__timer" data-state="${done ? 'done' : 'running'}" role="status">
+      <div class="wall__timer" data-state="${done ? 'done' : 'running'}" role="timer">
         <span class="wall__timer-value">${done ? t('dashboard.wallTimerDone') : formatWallTimer(remainingMs)}</span>
       </div>`,
     controls: `
@@ -232,8 +238,12 @@ function makeAudioContext() {
  * @param {HTMLElement} wall     Die `.wall`-Flaeche.
  * @param {() => void}  rerender Baut die Flaeche neu - fuer die Zustandswechsel.
  * @param {AbortSignal} signal   Raeumt Listener und Intervall beim Seitenwechsel ab.
+ * @param {{ announce?: (message: string) => void }} [options]
+ *   `announce` sagt Start, Abbruch und Ablauf an - ueber eine Live-Region, die
+ *   den Neuaufbau der Flaeche ueberlebt. Ohne sie bleibt der Timer stumm wie
+ *   bisher.
  */
-export function wireWallTimer(wall, rerender, signal) {
+export function wireWallTimer(wall, rerender, signal, { announce = () => {} } = {}) {
   // Auch ohne Flaeche: ein Takt aus einem frueheren Aufruf haette sonst
   // weitergezaehlt und in ein DOM geschrieben, das es nicht mehr gibt.
   stopTick();
@@ -244,20 +254,49 @@ export function wireWallTimer(wall, rerender, signal) {
   };
 
   wall.querySelectorAll('[data-wall-timer-start]').forEach((btn) => {
-    btn.addEventListener('click', () => {
+    /* DER ERSTE ZEIGER AUF EINER SCHLAFENDEN WAND WECKT NUR (Critique
+     * 2026-09-23). Die Wand bringt ihren Betrachtern bei, dass eine Beruehrung
+     * sie weckt (`data-wall-awake`, wireWallSurface) - und die Startknoepfe
+     * liegen im Fussband, genau dort, wo so eine Beruehrung landet. Ein Tipp,
+     * der die Flaeche wecken sollte, startete einen Timer, der Minuten spaeter
+     * im leeren Flur laeutet und bis dahin den Screensaver blockiert.
+     *
+     * Gemessen wird der Zustand BEIM pointerdown: das Wecken haengt als
+     * Bubble-Listener am window und setzt das Attribut erst danach, der click
+     * kaeme also immer auf eine wache Wand. Die Tastatur (click mit detail 0,
+     * ohne pointerdown) ist davon ausgenommen - wer fokussiert, sieht den
+     * Knopf per :focus-visible bereits voll.
+     *
+     * Der Ausstieg und der Abbruch-Knopf sind NICHT gedrosselt: der eine ist
+     * der Notausgang der Flaeche, der andere beendet einen Timer, den man
+     * laufen sieht. */
+    let pressedWhileAsleep = false;
+    btn.addEventListener('pointerdown', () => {
+      pressedWhileAsleep = !wall.hasAttribute('data-wall-awake');
+    }, { signal });
+    btn.addEventListener('click', (event) => {
+      const wakeOnly = pressedWhileAsleep && event.detail !== 0;
+      pressedWhileAsleep = false;
+      if (wakeOnly) return;
       // Angelegt bei der ersten Geste - eine Autoplay-Sperre laesst Ton nur
       // daraus zu, und spaeter gibt es keine mehr.
       audioCtx = audioCtx ?? makeAudioContext();
-      startWallTimer(Number(btn.dataset.wallTimerStart));
+      const minutes = Number(btn.dataset.wallTimerStart);
+      startWallTimer(minutes);
       setRunningAttr(true);
       rerender();
+      announce(t('dashboard.wallTimerStarted', { duration: t('dashboard.wallTimerMinutes', { count: minutes }) }));
     }, { signal });
   });
 
   wall.querySelector('#wall-timer-stop')?.addEventListener('click', () => {
+    const wasDone = readWallTimer().state === 'done';
     clearWallTimer();
     setRunningAttr(false);
     rerender();
+    // Quittieren braucht keine Ansage: das Laeuten war die Nachricht, und der
+    // Knopf, auf dem der Fokus lag, heisst schon „Timer aus".
+    if (!wasDone) announce(t('dashboard.wallTimerCancelled'));
   }, { signal });
 
   const value = wall.querySelector('.wall__timer-value');
@@ -278,6 +317,9 @@ export function wireWallTimer(wall, rerender, signal) {
     setRunningAttr(false);
     chime(audioCtx);
     rerender();
+    // Das Laeuten ist die Nachricht fuer den Flur, die Ansage die fuer den
+    // Screenreader: die neu gebaute Anzeige selbst spricht nicht (role timer).
+    announce(t('dashboard.wallTimerDone'));
   }, 1000);
   // DAS ATTRIBUT GEHOERT NICHT DEM INTERVALL. Wer den Wandmodus mit laufendem
   // Timer verlaesst, bricht dieses Verdrahten ab - und ausserhalb der Wand

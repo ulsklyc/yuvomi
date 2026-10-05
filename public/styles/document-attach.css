@@ -333,6 +333,24 @@ a.doc-attach__chip-name:focus-visible {
   outline-offset: var(--focus-ring-offset);
 }
 
+/* Der Input bleibt auch fokussiert unsichtbar. `.sr-only:focus-visible`
+ * (layout.css) holt versteckte Elemente als Skip-Link-Streifen nach oben links
+ * - hier stand dann "Dateien auswaehlen - Keine ausgewaehlt" ueber dem
+ * Dialogkopf, sobald der Dialog der Drop-Zone den Erstfokus gab (seit
+ * 2026-09-25 ist sie der einzige Weg zur Dateiwahl und damit das erste Feld).
+ * Den Fokus zeigt die Zone selbst ueber `:focus-within` darueber. */
+.document-dropzone .sr-only:focus-visible {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .document-dropzone--active {
   transform: translateY(-1px);
 }

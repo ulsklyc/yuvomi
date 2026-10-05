@@ -9,14 +9,15 @@ import { mayWriteModule } from '../permissions.js';
 import express from 'express';
 import * as db from '../db.js';
 import { documentVisibleSql } from '../services/document-access.js';
-import { assertDocumentsNotDeleting, sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
+import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
+import { assertDocumentLinkTargetsAvailable, documentViewer, sendDocumentLinkRefusal } from '../services/document-links.js';
 import { nextDueAfterCompletion } from '../services/recurrence.js';
-import { syncTaskRewards } from '../services/rewards.js';
+import { syncTaskRewards, seriesOfTask } from '../services/rewards.js';
 import { completionFeed, seriesHistory, syncTaskCompletion } from '../services/task-completions.js';
 import { normalizeCategoryFilter, taskCategoryWhere, taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
 import { normalizeVisibility, visibilityWhere } from '../services/visibility.js';
 import {
-  flushOutbound, markTodoOutbound, queueTodoDeletion,
+  flushOutbound, markTodoOutbound, queueTodoDeletion, recurrenceFollowupTarget,
 } from '../services/caldav-todo-outbound.js';
 import { uniqueKey } from '../utils/category-slug.js';
 import { toLocalDateKey } from '../../public/utils/date.js';
@@ -29,6 +30,7 @@ import { householdMemberSql, isHouseholdMember, newNonMembers, nonMemberMessage 
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
 import { pushService } from '../services/push.js';
 import { todayKey } from '../utils/timezone.js';
+import { runExternalJob } from '../utils/restore-state.js';
 import {
   allTags, applyTagChanges, loadTags, loadTagsFor, normalizeTags,
   removeTagEverywhere, renameTag, setTags, tagKey, tagsKey, taskIdsWithTag,
@@ -210,16 +212,24 @@ function addAssignedUsers(task) {
  * Hängt jedem Task die Anzahl der für die Person sichtbaren, verknüpften
  * Dokumente an (document_count, #503). Eine einzige gruppierte Abfrage statt
  * pro-Task, damit die Listen-Route günstig bleibt.
+ *
+ * Auch die ZAHL gehoert dem Dokumente-Modul (#1358): ohne dessen Leserecht
+ * (Mitgliedsrecht UND Token-Scope, `documentViewer(req)`) ist sie `null` -
+ * "nicht gesagt", nicht 0 ("keine").
  */
-function attachDocumentCounts(tasks, me) {
+function attachDocumentCounts(tasks, viewer) {
   if (!tasks.length) return tasks;
+  if (!viewer?.readsDocuments) {
+    for (const task of tasks) task.document_count = null;
+    return tasks;
+  }
   const counts = db.get().prepare(`
     SELECT td.task_id AS id, COUNT(*) AS n
     FROM task_documents td
     JOIN family_documents d ON d.id = td.document_id
     WHERE d.status != 'archived' AND ${DOC_VISIBLE_SQL}
     GROUP BY td.task_id
-  `).all({ me });
+  `).all({ me: viewer.userId });
   const map = new Map(counts.map((r) => [r.id, r.n]));
   for (const task of tasks) task.document_count = map.get(task.id) ?? 0;
   return tasks;
@@ -337,7 +347,7 @@ function mayEditTaskDefinition(task, req) {
   return lock.created_by === (req.authUserId || req.session?.userId);
 }
 
-const LOCKED_ERROR = { error: 'This task is locked; only its creator and administrators can change it.', code: 403 };
+const LOCKED_ERROR = { error: 'This task is locked; only its creator and administrators can change it.', code: 403, reason: 'task_locked' };
 
 /**
  * Aufgaben-IDs, deren Definition diese Person anfassen darf - fuer die
@@ -464,7 +474,7 @@ router.get('/sync-targets', (req, res) => {
     // Server-URLs" - `listUrl` ist eine. Wer nicht schreiben darf, sieht den
     // Dialog nie; ein Wandtablett mit `tasks:read` hatte die Liste trotzdem.
     if (!mayWriteModule(req, 'tasks')) {
-      return res.status(403).json({ error: 'Write access to tasks is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to tasks is required.', code: 403, reason: 'cross_module_access' });
     }
     const caldav = db.get().prepare(`
       SELECT s.account_id AS accountId, a.name AS accountName,
@@ -934,7 +944,7 @@ router.get('/', (req, res) => {
     `;
 
     const rows = db.get().prepare(sql).all(...params).map(task => ({ ...task, subtasks: JSON.parse(task.subtasks || '[]') })).map(addAssignedUsers);
-    res.json({ data: attachTags(attachDocumentCounts(rows, me)) });
+    res.json({ data: attachTags(attachDocumentCounts(rows, documentViewer(req))) });
   } catch (err) {
     log.error('GET / error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -962,14 +972,15 @@ router.get('/:id', (req, res) => {
 
     addAssignedUsers(task);
     task.subtasks = loadSubtasks(task.id, me);
-    attachDocumentCounts([task], me);
+    const viewer = documentViewer(req);
+    attachDocumentCounts([task], viewer);
     // Die verknüpften Dokumente beim Namen, nicht nur gezählt (#733). Die
     // Detailansicht zeigte hier seit jeher eine Zeile „Dokumente" an, las dafür
     // aber ein Feld, das die API nie gefüllt hat - die Zeile war deshalb immer
     // leer, egal wie viele Dokumente an der Aufgabe hingen. Die Liste kommt aus
     // derselben Funktion wie GET /:id/documents, also mit derselben
-    // Sichtbarkeitsprüfung.
-    task.documents = loadTaskDocuments(task.id, me);
+    // Sichtbarkeitsprüfung - und ohne Dokumentenrecht `null` (#1358).
+    task.documents = loadTaskDocuments(task.id, viewer);
     attachTags([task]);
     res.json({ data: task });
   } catch (err) {
@@ -1068,9 +1079,12 @@ router.post('/', (req, res) => {
 
     // Tiefe begrenzen: Subtasks dürfen keine eigenen Subtasks haben (max. 2 Ebenen)
     if (parent_task_id) {
-      const parent = db.get().prepare('SELECT id, parent_task_id, locked, created_by FROM tasks WHERE id = ?')
+      const parent = db.get().prepare('SELECT id, parent_task_id, locked, created_by, visibility FROM tasks WHERE id = ?')
         .get(parent_task_id);
-      if (!parent) return res.status(404).json({ error: 'Parent task not found.', code: 404 });
+      // Unsichtbar heisst hier dasselbe wie nicht vorhanden: sonst verriete 201
+      // gegen 404 die Kennung, und der Punkt stuende in einer fremden Checkliste.
+      if (!parent || !mayAccessTask(parent, req.authUserId || req.session.userId))
+        return res.status(404).json({ error: 'Parent task not found.', code: 404 });
       if (parent.parent_task_id)
         return res.status(400).json({ error: 'Maximal 2 Verschachtelungsebenen erlaubt.', code: 400 });
       // Einen Punkt an eine gesperrte Checkliste zu haengen aendert, was die
@@ -1114,7 +1128,8 @@ router.post('/', (req, res) => {
         syncTaskCompletion(db.get(), newId, 'open', status, actingUserId);
         // Erledigt angelegte Serie: die naechste Instanz gehoert dazu, genau wie
         // beim Abhaken. Ohne sie endete eine Serie in dem Moment, in dem sie
-        // entsteht.
+        // entsteht. Erbt sie ein Ziel (#1515), dann dasselbe, das `syncTarget`
+        // unten ohnehin zum Sofortversuch macht.
         if (status === 'done') {
           spawnRecurrenceFollowup(db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(newId));
         }
@@ -1144,8 +1159,11 @@ router.post('/', (req, res) => {
 // Aufgabe vollständig aktualisieren.
 // Body: { title, description?, category?, tags?, priority?, status?,
 //         due_date?, due_time?, assigned_to? }
-// Response: { data: Task }
+// Response: { data: Task & { next_due_date } }
 // tags fehlt → bleiben unangetastet; tags: [] → alle entfernt.
+// `next_due_date` (#1620) folgt derselben Regel wie in PATCH /:id/status
+// (nextDueDateAfter): gesetzt nur, wenn dieses Speichern eine Serie erledigt
+// hat und ein Vorkommen ansteht, das der Aufrufer sieht - sonst null.
 // --------------------------------------------------------
 router.put('/:id', (req, res) => {
   try {
@@ -1273,6 +1291,8 @@ router.put('/:id', (req, res) => {
     // derselbe stille Serienabbruch, den dieser Weg gerade erst verloren hat.
     let pending = false;
     let undone  = 0;
+    let spawned = false;
+    let nextDueDate = null;
     let updated;
     db.get().transaction(() => {
       db.get().prepare(`
@@ -1334,15 +1354,19 @@ router.put('/:id', (req, res) => {
       // Das Status-Dropdown im Bearbeiten-Formular hakt genauso ab wie die Checkbox -
       // also muss es die Serie genauso weiterschreiben. Grundlage ist die frisch
       // gelesene Zeile, damit im selben Zug geänderte Regel/Fälligkeit schon zählen.
-      if (status === 'done' && task.status !== 'done') spawnRecurrenceFollowup(updated);
+      if (status === 'done' && task.status !== 'done') spawned = spawnRecurrenceFollowup(updated);
+      // Und es sagt genauso, wann es weitergeht (#1620): dieselbe Regel wie in
+      // PATCH /:id/status, ueber denselben Helfer.
+      nextDueDate = nextDueDateAfter(req, task.id, task.status, status);
     })();
 
     addAssignedUsers(updated);
     updated.subtasks = loadSubtasks(updated.id, req.authUserId || req.session.userId);
+    updated.next_due_date = nextDueDate;
 
     res.json({ data: updated });
 
-    if (pending || undone || syncTarget) pushToCalDAV('Änderung');
+    if (pending || undone || syncTarget || spawned) pushToCalDAV('Änderung');
   } catch (err) {
     log.error('PUT /:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1369,6 +1393,91 @@ function recurrenceFollowupOf(taskId) {
       WHERE recurrence_origin_id = ? AND parent_task_id IS NULL
       ORDER BY id LIMIT 1`
   ).get(taskId) ?? null;
+}
+
+/**
+ * Das naechste Vorkommen hinter einer Aufgabe, das NOCH ANSTEHT, oder null
+ * (#1603).
+ *
+ * DIE SERIE IST EINE KETTE, KEIN STERN: `recurrence_origin_id` zeigt auf den
+ * direkten Vorgaenger (A <- B <- C), nicht auf eine Stammzeile. Das direkte
+ * Kind allein beantwortet die Frage deshalb nicht. Wer A wieder oeffnet,
+ * nachdem B schon erledigt wurde, behaelt B (discardRecurrenceFollowup wirft
+ * erledigte Arbeit nicht weg) - und beim erneuten Abhaken von A ist das
+ * naechste Mal C. Erledigte und abgelegte Glieder werden uebersprungen, das
+ * erste, das noch ansteht, zaehlt.
+ *
+ * „STEHT NOCH AN" HEISST NICHT ERLEDIGT UND NICHT ABGELEGT - nicht: Status
+ * genau 'open'. Gefragt wird ueber die eine Definition von erledigt, die auch
+ * Spawn, Punkte und Verlauf benutzen (`status === 'done'`), statt ueber eine
+ * zweite Liste der Status, die als offen gelten: eine begonnene Folgeinstanz
+ * ('in_progress') ist das naechste Mal, und ein Status, der spaeter zu
+ * REAL_STATUSES dazukommt, faellt hier nicht still durch.
+ *
+ * DIE SUCHE ENDET IMMER. Der Server baut keinen Kreis, eine wiederhergestellte
+ * oder von Hand bearbeitete Datenbank kann einen tragen, und der Treiber ist
+ * synchron: eine Schleife ohne Ende stuende fuer den ganzen Prozess. Dafuer
+ * reicht die besuchte Menge - jede Zeile wird hoechstens einmal gelesen, die
+ * Kette ist also so lang wie die Serie und nie laenger als die Tabelle. Eine
+ * feste Obergrenze stand hier frueher zusaetzlich und schnitt eine taegliche
+ * Serie nach 500 erledigten Gliedern ab, kurz vor dem offenen.
+ *
+ * `mayRead` IST DIE SICHTBARKEIT DES AUFRUFERS. Eine Folgeinstanz erbt ihre
+ * Sichtbarkeit, laesst sich danach aber einzeln umstellen. Wer das fruehere
+ * Vorkommen abhakt, darf das Datum eines spaeteren, das er nicht sieht, nicht
+ * ueber diese Antwort erfahren - dann gibt es fuer ihn kein „naechstes Mal".
+ */
+function nextPendingOccurrenceOf(taskId, mayRead = () => true) {
+  const seen = new Set([Number(taskId)]);
+  let current = recurrenceFollowupOf(taskId);
+  while (current) {
+    if (seen.has(current.id)) return null;
+    seen.add(current.id);
+    if (current.status !== 'done' && !current.archived_at) return mayRead(current) ? current : null;
+    current = recurrenceFollowupOf(current.id);
+  }
+  return null;
+}
+
+/**
+ * `next_due_date` der Antwort auf einen Statuswechsel (#1603, #1620): die
+ * Faelligkeit des naechsten Vorkommens, das noch ansteht - oder null.
+ *
+ * DIE REGEL STEHT NUR HIER. Abgehakt wird ueber zwei Wege, die Checkbox
+ * (PATCH /:id/status) und das Status-Feld im Bearbeiten-Formular (PUT /:id),
+ * und beide legen dieselbe Folgeinstanz an. Die Regel wurde im Review zu
+ * #1615 viermal nachgeschaerft (Kette, begonnen, abgelegt, Sichtbarkeit) -
+ * eine zweite Ausformulierung in der anderen Route haette jede dieser Runden
+ * verfehlt. Wer sie aendert, aendert sie fuer beide.
+ *
+ * NUR BEIM UEBERGANG NACH 'done'. Ohne Uebergang gibt es keine Quittung: ein
+ * zweiter Tipp auf eine erledigte Aufgabe oder eine Titelkorrektur an ihr
+ * wiederholte den Hinweis sonst jedes Mal, obwohl nichts erledigt wurde.
+ *
+ * NACH DEM SPAWN RUFEN, in derselben Transaktion: die Folgeinstanz entsteht
+ * erst in dieser Anfrage. Gelesen wird die Kette und nicht der Rueckgabewert
+ * des Spawns - der sagt nur, ob ein Upload ansteht. Gefragt ist, was nach
+ * diesem Haken als Naechstes ansteht, und das ist auch die Folgeinstanz, die
+ * ein frueheres Abhaken angelegt hat und die das Zuruecknehmen stehen liess
+ * (discardRecurrenceFollowup), oder das Vorkommen HINTER ihr.
+ *
+ * SICHTBARKEIT DES AUFRUFERS: ein Display sieht nur, was alle sehen (dieselbe
+ * Regel wie fuer die Aufgabe selbst, #1209), ein Mensch, was mayAccessTask
+ * ihm zeigt.
+ *
+ * @param {import('express').Request} req
+ * @param {number|string} taskId
+ * @param {string} prevStatus Status vor dieser Anfrage
+ * @param {string} status     Status nach dieser Anfrage
+ * @returns {string|null} YYYY-MM-DD oder null
+ */
+function nextDueDateAfter(req, taskId, prevStatus, status) {
+  if (status !== 'done' || prevStatus === 'done') return null;
+  const viewer = req.authUserId || req.session.userId;
+  const mayRead = isDisplayRequest(req)
+    ? (task) => task.visibility === 'all'
+    : (task) => mayAccessTask(task, viewer);
+  return nextPendingOccurrenceOf(taskId, mayRead)?.due_date ?? null;
 }
 
 /**
@@ -1436,7 +1545,9 @@ function discardRecurrenceFollowup(taskId) {
   if (isFollowupSubtasksTouched(followup) || recurrenceFollowupOf(followup.id)) return 0;
 
   // Vor dem DELETE vormerken, wie in DELETE /:id: danach sind UID und Objekt-URL
-  // weg. Lokal erzeugte Folgeinstanzen sind nicht gespiegelt, dann ist das ein No-op.
+  // weg. Eine noch nicht hochgeladene Folgeinstanz ist kein Spiegel - auch nicht
+  // mit geerbtem Ziel (#1515), das verschwindet mit der Zeile -, dann ist das ein
+  // No-op. Ist sie schon oben, geht die Löschung wie jede andere hinaus.
   const queued = queueTodoDeletion('tasks', followup) ? 1 : 0;
   db.get().prepare('DELETE FROM tasks WHERE id = ?').run(followup.id);
   return queued;
@@ -1466,18 +1577,21 @@ function shiftedStartDate(startDate, dueDate, nextDue) {
  * das Status-Dropdown im Bearbeiten-Dialog (PUT /:id). Lag der Spawn nur im
  * einen, beendete der andere die Serie lautlos.
  *
- * Ohne Rückgabewert, anders als discardRecurrenceFollowup: die Folgeinstanz
- * entsteht ohne external_uid/external_source, markTodoOutbound lässt sie
- * deshalb liegen. Es gibt nichts zu pushen.
+ * Die Folgeinstanz entsteht ohne external_uid/external_source: sie ist auf dem
+ * Server ein neuer Eintrag, keine Kopie der Vorgängerin - mit deren UID
+ * überschriebe der Upload das eben erledigte Vorkommen. Das Sync-Ziel dagegen
+ * erbt sie (#1515): eine in eine Erinnerungsliste geschickte Serie blieb sonst
+ * ab dem zweiten Vorkommen lokal. Rückgabe: true, wenn die Folgeinstanz damit
+ * auf ihren Upload wartet und der Aufrufer den Sofortversuch anstoßen soll.
  *
  * Beide Aufrufer halten bereits eine Transaktion, die eigene läuft darin als
  * Savepoint. Sie bleibt trotzdem stehen: sie hält Aufgabe, Zuweisungen und Tags
  * auch dann zusammen, wenn später jemand von außerhalb einer Transaktion ruft.
  */
 function spawnRecurrenceFollowup(task) {
-  if (!task?.is_recurring || !task.recurrence_rule || task.parent_task_id) return;
+  if (!task?.is_recurring || !task.recurrence_rule || task.parent_task_id) return false;
   // Höchstens eine Folgeinstanz je Erledigung - sonst legt doppeltes Abhaken nach.
-  if (recurrenceFollowupOf(task.id)) return;
+  if (recurrenceFollowupOf(task.id)) return false;
 
   // Zwei Verankerungen, die Aufgabe entscheidet (#658): ab Fälligkeit
   // (Vorgabe, holt übersprungene Vorkommen auf, damit die nächste Instanz
@@ -1489,7 +1603,7 @@ function spawnRecurrenceFollowup(task) {
     completedOn,
     fromCompletion: !!task.recurrence_from_completion,
   });
-  if (!nextDate) return;
+  if (!nextDate) return false;
 
   const existingAssignments = db.get()
     .prepare('SELECT user_id FROM task_assignments WHERE task_id = ?')
@@ -1504,13 +1618,17 @@ function spawnRecurrenceFollowup(task) {
   const existingSubtasks = db.get()
     .prepare('SELECT * FROM tasks WHERE parent_task_id = ? ORDER BY id ASC')
     .all(task.id);
+  // Das Ziel erbt nur die Aufgabe selbst. Unteraufgaben gehen nie als eigenes
+  // VTODO hinaus (pendingCreations), ihre Kopien unten nehmen keines mit.
+  const syncTarget = recurrenceFollowupTarget(task);
 
   db.get().transaction(() => {
     const newTask = db.get().prepare(`
       INSERT INTO tasks (title, description, category, priority, status,
         start_date, due_date, due_time, assigned_to, created_by, is_recurring, recurrence_rule,
-        points, visibility, recurrence_from_completion, countdown, recurrence_origin_id)
-      VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+        points, visibility, recurrence_from_completion, countdown, locked, recurrence_origin_id,
+        target_caldav_account_id, target_caldav_list_url, recurrence_series_id)
+      VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       task.title, task.description, task.category, task.priority,
       shiftedStartDate(task.start_date, task.due_date, nextDate),
@@ -1526,7 +1644,21 @@ function spawnRecurrenceFollowup(task) {
       // Erledigung rechnet - der Countdown, der genau davon lebt, dürfte beim
       // ersten Zurücksetzen nicht verschwinden.
       task.countdown ? 1 : 0,
-      task.id
+      // Und die Sperre (#1488). Sie ist an einer Serie gerade der Zweck: das
+      // Kind hakt das erste Vorkommen ab, und genau dieses Abhaken legt das
+      // zweite an. Fiel sie hier weg, war die Serie ab dem zweiten Vorkommen
+      // wieder frei umschreib- und loeschbar - von der Person, fuer die sie
+      // gesperrt wurde. created_by wandert oben mit, also bleiben Ersteller:in
+      // und Admins auch an der Folgeinstanz berechtigt.
+      task.locked ? 1 : 0,
+      task.id,
+      syncTarget?.accountId ?? null, syncTarget?.listUrl ?? null,
+      // Die Serie reist als WERT mit, nicht als Verweis (#1603).
+      // `recurrence_origin_id` daneben ist ON DELETE SET NULL: wird das eben
+      // erledigte Vorkommen geloescht, weiss die Folgeinstanz nicht mehr, woher
+      // sie kommt - und der Punkte-Deckel je Serie saehe in ihr eine neue
+      // Aufgabe. Die Kennung ist die ID des ersten Vorkommens und ueberlebt es.
+      seriesOfTask(db.get(), task)
     );
     setAssignments(db.get(), newTask.lastInsertRowid, existingAssignments);
     setTags(db.get(), newTask.lastInsertRowid, existingTags);
@@ -1542,19 +1674,29 @@ function spawnRecurrenceFollowup(task) {
       const newSub = db.get().prepare(`
         INSERT INTO tasks (title, description, category, priority, status,
           start_date, due_date, due_time, assigned_to, created_by, parent_task_id,
-          is_recurring, recurrence_rule, points, visibility, recurrence_origin_id)
-        VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)
+          is_recurring, recurrence_rule, points, visibility, locked, recurrence_origin_id,
+          recurrence_series_id)
+        VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?)
       `).run(
         sub.title, sub.description, sub.category, sub.priority,
         shiftedStartDate(sub.start_date, subAnchorDate, nextDate) ?? sub.start_date,
         sub.due_date ? (shiftedStartDate(sub.due_date, subAnchorDate, nextDate) ?? nextDate) : null,
         sub.due_time, sub.assigned_to, sub.created_by, newTask.lastInsertRowid,
-        sub.points, sub.visibility, sub.id
+        // Eine Unteraufgabe kann eine eigene Sperre tragen (POST nimmt `locked`
+        // auch dort an) - die geerbte der Elternaufgabe kommt ueber
+        // lockingTask(), die eigene muss mitkopiert werden (#1488).
+        sub.points, sub.visibility, sub.locked ? 1 : 0, sub.id,
+        // Auch die Teilaufgabe traegt ihre eigene Serie (#1603): sie hat
+        // eigene Punkte, entsteht mit jeder Folgeinstanz neu und steht nicht im
+        // Verlauf - ohne Kennung zahlte dieselbe Checklistenzeile mit jeder
+        // Kopie am selben Tag noch einmal.
+        seriesOfTask(db.get(), sub)
       );
       setAssignments(db.get(), newSub.lastInsertRowid, subAssignments);
       setTags(db.get(), newSub.lastInsertRowid, subTags);
     }
   })();
+  return !!syncTarget;
 }
 
 // --------------------------------------------------------
@@ -1562,8 +1704,15 @@ function spawnRecurrenceFollowup(task) {
 // Status einer Aufgabe schnell wechseln (z.B. Swipe-Geste / Checkbox).
 // Body: { status: 'open' | 'in_progress' | 'done' | 'archived',
 //         done_by_user_id?: number|null }
-// Response: { data: { id, status, archived_at } }
+// Response: { data: { id, status, archived_at, next_due_date } }
 // 'archived' legt die Aufgabe ab, ohne ihren Status anzufassen (#688).
+//
+// `next_due_date` (#1603) ist die Faelligkeit der Folgeinstanz, wenn dieser
+// Wechsel eine Serie erledigt hat und es danach ein naechstes Vorkommen gibt,
+// das noch ansteht (nicht erledigt, nicht abgelegt) - sonst null. Die
+// Oberflaeche kann nur daran sagen, WANN es weitergeht: die neue Zeile sieht
+// aus wie die eben abgehakte, und ohne den Hinweis wirkte der Haken wie
+// verschluckt.
 //
 // `done_by_user_id` benennt, WER die Aufgabe erledigt hat (#1205) - wer
 // abgehakt hat, steht ohnehin fest und kommt weiter aus der Sitzung. Ohne
@@ -1588,6 +1737,16 @@ router.patch('/:id/status', (req, res) => {
     const prev = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
     if (!prev)
       return res.status(404).json({ error: 'Task not found.', code: 404 });
+    // 404 statt 403: ob es die Aufgabe gibt, ist selbst schon eine Auskunft.
+    // Dieser Weg hat die Sichtbarkeit fuer Mitglieder nie gefragt - nur der
+    // Display-Zweig darunter tat es. Eine geratene id genuegte, um eine fremde
+    // private Aufgabe abzuhaken, zurueckzunehmen oder abzulegen, mit allem, was
+    // am Uebergang haengt: Punkte, Verlauf, Folgeinstanz. Die Pruefung steht
+    // VOR dem Display-Block und vor der Ablage-Abkuerzung, weil beide selbst
+    // antworten; dieselbe Regel wie PUT, /archive, /check und DELETE.
+    if (!mayAccessTask(prev, req.authUserId || req.session.userId)) {
+      return res.status(404).json({ error: 'Task not found.', code: 404 });
+    }
 
     // EIN WANDTABLETT HAKT AB, UND ZWAR NUR DAS (#1209).
     //
@@ -1635,11 +1794,12 @@ router.patch('/:id/status', (req, res) => {
         return res.status(403).json({
           error: 'A paired display can only tick a task off.',
           code: 403,
+          reason: 'display_action',
         });
       }
       const actor = displayActingPerson(req, req.body.done_by_user_id, 'tasks', { db: db.get() });
       if (!actor.ok) {
-        return res.status(actor.status).json({ error: actor.error, code: actor.status });
+        return res.status(actor.status).json({ error: actor.error, code: actor.status, ...(actor.reason ? { reason: actor.reason } : {}) });
       }
       displayDoneBy = actor.userId;
     }
@@ -1699,6 +1859,8 @@ router.patch('/:id/status', (req, res) => {
     // ohne Statuswechsel gibt es auch nichts zu pushen.
     let pending = false;
     let undone  = 0;
+    let spawned = false;
+    let nextDueDate = null;
     db.get().transaction(() => {
       db.get().prepare('UPDATE tasks SET status = ? WHERE id = ?').run(status, req.params.id);
       pending = markTodoOutbound('tasks', prev, { ...prev, status });
@@ -1719,13 +1881,20 @@ router.patch('/:id/status', (req, res) => {
 
       // Wiederkehrende Aufgabe: nächste Instanz erstellen wenn erledigt
       if (status === 'done' && prev.status !== 'done') {
-        spawnRecurrenceFollowup(db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id));
+        spawned = spawnRecurrenceFollowup(db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id));
       }
+      // Nach dem Spawn, in derselben Transaktion; die Regel steht im Helfer.
+      nextDueDate = nextDueDateAfter(req, prev.id, prev.status, status);
     })();
 
-    res.json({ data: { id: Number(req.params.id), status, archived_at: prev.archived_at } });
+    res.json({
+      data: {
+        id: Number(req.params.id), status, archived_at: prev.archived_at,
+        next_due_date: nextDueDate,
+      },
+    });
 
-    if (pending || undone) pushToCalDAV('Statuswechsel');
+    if (pending || undone || spawned) pushToCalDAV('Statuswechsel');
   } catch (err) {
     log.error('PATCH /:id/status error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1900,8 +2069,14 @@ function findVisibleTask(id, me) {
   `).get(id, me, me);
 }
 
-/** Für die Person sichtbare, mit der Aufgabe verknüpfte Dokumente. */
-function loadTaskDocuments(taskId, me) {
+/**
+ * Für die Person sichtbare, mit der Aufgabe verknüpfte Dokumente. Ohne
+ * Leserecht auf das Dokumente-Modul `null` (#1358): die Aufgabe sagt dann
+ * weder Namen noch IDs noch, wie viele es sind.
+ */
+function loadTaskDocuments(taskId, viewer) {
+  if (!viewer?.readsDocuments) return null;
+  const me = viewer.userId;
   return db.get().prepare(`
     SELECT d.id, d.name, d.category, d.original_name, d.mime_type, d.file_size,
            d.storage_backend, td.created_at AS linked_at
@@ -1943,7 +2118,14 @@ router.get('/:id/documents', (req, res) => {
     const me = req.authUserId || req.session.userId;
     const task = findVisibleTask(req.params.id, me);
     if (!task) return res.status(404).json({ error: 'Task not found.', code: 404 });
-    res.json({ data: loadTaskDocuments(task.id, me) });
+    // Die Route liefert nur Dokumente: ohne Leserecht dort dieselbe Antwort,
+    // die der Pfad-Guard vor /documents gaebe (#1358). Erst nach der Aufgabe
+    // gefragt, damit eine unsichtbare Aufgabe weiter 404 bleibt.
+    const viewer = documentViewer(req);
+    if (!viewer.readsDocuments) {
+      return res.status(403).json({ error: 'Reading linked documents requires access to documents.', code: 403, reason: 'cross_module_access' });
+    }
+    res.json({ data: loadTaskDocuments(task.id, viewer) });
   } catch (err) {
     log.error('GET /:id/documents error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1963,13 +2145,13 @@ router.put('/:id/documents', (req, res) => {
     // Formular, der Zettel, auf den die Aufgabe verweist (#830).
     if (!mayEditTaskDefinition(task, req)) return res.status(403).json(LOCKED_ERROR);
 
-    const requested = Array.isArray(req.body.document_ids)
-      ? [...new Set(req.body.document_ids.map(Number).filter((n) => Number.isInteger(n) && n > 0))]
-      : [];
-
-    const canSee = db.get().prepare(`SELECT 1 FROM family_documents d WHERE d.id = @id AND ${DOC_VISIBLE_SQL}`);
-    const visibleIds = requested.filter((id) => canSee.get({ id, me }));
-    assertDocumentsNotDeleting(visibleIds);
+    // Sichtbarkeit, Loeschsperre und Dokumentenrecht aus der einen Stelle
+    // (services/document-links.js): ohne Leserecht auf die Dokumente ist jede
+    // nicht leere Liste dieselbe 403, vor jeder weiteren Pruefung (#1358).
+    const viewer = documentViewer(req);
+    const visibleIds = assertDocumentLinkTargetsAvailable(db.get(), req.body.document_ids, viewer);
+    // Ohne Leserecht ist nichts sichtbar - eine leere Liste loest also nichts.
+    if (!viewer.readsDocuments) return res.json({ data: null });
 
     db.get().transaction(() => {
       // Nur die für diese Person sichtbaren Alt-Verknüpfungen entfernen.
@@ -1985,9 +2167,10 @@ router.put('/:id/documents', (req, res) => {
       for (const id of visibleIds) ins.run(task.id, id, me);
     })();
 
-    res.json({ data: loadTaskDocuments(task.id, me) });
+    res.json({ data: loadTaskDocuments(task.id, viewer) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     log.error('PUT /:id/documents error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
@@ -2054,12 +2237,17 @@ function notifyMentions(task, comment, authorId, previousComment = '') {
     if (!target) continue;
     const perms = resolvePermissions(db.get(), target);
     if (!perms.admin && perms.modules?.tasks === 'none') continue;
-    pushService.sendPushToUser(id, {
+    // Als Job (#1532): der Versand schreibt nach dem await `last_used_at` oder
+    // loescht eine erloschene Subscription. Ohne Job saehe ein Restore ihn nicht
+    // und die Zeile landete in der eingespielten Datenbank. Waehrend eines
+    // Restores beginnt er nicht - der Kommentar liegt dann in der Datenbank, die
+    // der Restore gerade ersetzt.
+    runExternalJob(() => pushService.sendPushToUser(id, {
       title: task.title,
       body: `${author}: ${comment}`.slice(0, 300),
       url: `/tasks?open=${task.id}`,
       tag: `task-comment-${task.id}`,
-    }).catch((err) => log.warn('Erwähnungs-Push fehlgeschlagen:', err?.message || err));
+    })).catch((err) => log.warn('Erwähnungs-Push fehlgeschlagen:', err?.message || err));
   }
 }
 

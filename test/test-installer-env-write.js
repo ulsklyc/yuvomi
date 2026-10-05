@@ -1085,3 +1085,129 @@ test('jedes Feld des Preflights wird im Wizard auch gelesen', () => {
     `Der Preflight liefert Felder, die der Wizard nie liest: ${unused.join(', ')}. `
     + 'Entweder auswerten oder Feld, Spawn, Zusicherung und README-Satz gemeinsam entfernen.');
 });
+
+/* Sprachuebergabe an /api/v1/auth/setup (#1567), gemessen am echten Proxy.
+ *
+ * Ein Fake-Upstream steht an der Stelle der frisch gestarteten App und nimmt
+ * jeden Setup-Request auf. So laesst sich pruefen, was der Proxy WIRKLICH
+ * weiterreicht - und dass ein Image, das den Sprachcode ablehnt, die Anlage
+ * des ersten Admins nicht verhindert. Das ist die eine Stelle im Wizard, an
+ * der ein Fehlschlag den Nutzer ohne Konto vor einer laufenden App stehen liesse.
+ */
+async function withFakeSetup(respond, fn) {
+  const { createServer } = await import('node:http');
+  const seen = [];
+  const upstream = createServer((req, res) => {
+    let raw = '';
+    req.on('data', d => { raw += d; });
+    req.on('end', () => {
+      const body = JSON.parse(raw || '{}');
+      seen.push({ path: req.url, body });
+      const [status, payload] = respond(body, seen.length);
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(payload));
+    });
+  });
+  // 127.0.0.1, nicht `localhost`: test-suite-chain.js verlangt die Loopback-IP
+  // als zweites Argument. Der Proxy spricht `localhost` an; Node probiert beim
+  // Verbinden beide Familien (autoSelectFamily), also erreicht er auch diese.
+  await new Promise(r => upstream.listen(0, '127.0.0.1', r));
+  const { port } = upstream.address();
+  const dir = mkdtempSync(join(tmpdir(), 'yuvomi-setup-lang-'));
+  try {
+    await withServer(dir, base => fn({ base, port, seen }));
+  } finally {
+    await new Promise(r => upstream.close(r));
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const ADMIN = { username: 'family.admin7', display_name: 'Admin', password: 'correct-horse-9' };
+const postAdmin = (base, body) => fetch(`${base}/api/create-admin`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+});
+
+test('create-admin reicht die Wizard-Sprache an /auth/setup weiter', async () => {
+  await withFakeSetup(() => [201, { user: { id: 1 } }], async ({ base, port, seen }) => {
+    const r = await postAdmin(base, { ...ADMIN, port, language: 'fr' });
+    assert.equal(r.status, 201);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].path, '/api/v1/auth/setup');
+    assert.deepEqual(seen[0].body, { ...ADMIN, language: 'fr' },
+      'der Proxy muss Konto UND Sprache weiterreichen - und nichts sonst (kein port)');
+  });
+});
+
+test('create-admin laesst Sprachcodes weg, die die App nicht annimmt', async () => {
+  // Die App nimmt nur Kurzcodes aus getSupportedLocales(); `de-DE` oder `DE`
+  // waeren ein 400. Was nicht auf der Allowlist steht, erreicht sie gar nicht.
+  for (const language of ['de-DE', 'DE', 'xx', '', 42, null]) {
+    await withFakeSetup(() => [201, { user: { id: 1 } }], async ({ base, port, seen }) => {
+      const r = await postAdmin(base, { ...ADMIN, port, language });
+      assert.equal(r.status, 201);
+      assert.equal(seen.length, 1, `${JSON.stringify(language)}: genau ein Request`);
+      assert.ok(!('language' in seen[0].body),
+        `${JSON.stringify(language)} darf nicht weitergereicht werden: ${JSON.stringify(seen[0].body)}`);
+    });
+  }
+});
+
+test('lehnt ein Image die Sprache mit 400 ab, entsteht der Admin trotzdem', async () => {
+  // Nachgebildet: ein Image, das `language` kennt, diesen Code aber nicht.
+  const respond = body => ('language' in body
+    ? [400, { error: 'Unsupported language. Allowed: de, en', code: 400 }]
+    : [201, { user: { id: 1 } }]);
+  await withFakeSetup(respond, async ({ base, port, seen }) => {
+    const r = await postAdmin(base, { ...ADMIN, port, language: 'fil' });
+    assert.equal(r.status, 201, 'die Kontoanlage darf nicht an der Sprache scheitern');
+    assert.equal(seen.length, 2, 'genau ein zweiter Versuch');
+    assert.equal(seen[0].body.language, 'fil');
+    assert.deepEqual(seen[1].body, ADMIN, 'der zweite Versuch geht ohne Sprache, sonst unveraendert');
+  });
+});
+
+test('ein 400 ohne Sprachbezug wird nicht endlos wiederholt', async () => {
+  // Immer 400 (z.B. ungueltiger Benutzername): mit Sprache genau EIN Retry,
+  // dessen Antwort gilt; ohne Sprache gar keiner.
+  const respond = () => [400, { error: 'Username invalid.', code: 400 }];
+  await withFakeSetup(respond, async ({ base, port, seen }) => {
+    const r = await postAdmin(base, { ...ADMIN, port, language: 'de' });
+    assert.equal(r.status, 400);
+    assert.equal((await r.json()).error, 'Username invalid.');
+    assert.equal(seen.length, 2);
+  });
+  await withFakeSetup(respond, async ({ base, port, seen }) => {
+    const r = await postAdmin(base, { ...ADMIN, port });
+    assert.equal(r.status, 400);
+    assert.equal(seen.length, 1, 'ohne Sprache gibt es nichts wegzulassen - kein zweiter Versuch');
+  });
+});
+
+test('der Setup-Proxy loggt weder Passwort noch Anmeldedaten', async () => {
+  const respond = body => ('language' in body ? [400, { error: 'x' }] : [201, { user: { id: 1 } }]);
+  const lines = [];
+  const orig = { log: console.log, error: console.error, warn: console.warn };
+  for (const k of Object.keys(orig)) console[k] = (...a) => { lines.push(a.map(String).join(' ')); };
+  try {
+    await withFakeSetup(respond, async ({ base, port }) => {
+      await postAdmin(base, { ...ADMIN, port, language: 'de' });
+    });
+  } finally {
+    Object.assign(console, orig);
+  }
+  const out = lines.join('\n');
+  assert.ok(lines.length > 0, 'der Retry-Pfad soll sichtbar sein - sonst misst dieser Test nichts');
+  for (const secret of [ADMIN.password, ADMIN.username]) {
+    assert.ok(!out.includes(secret), `Log enthaelt ${secret === ADMIN.password ? 'das Passwort' : 'den Benutzernamen'}: ${out}`);
+  }
+});
+
+test('der Wizard schickt beim Anlegen des Admins seine aktuelle Sprache mit', () => {
+  // getLocale() und nicht der Startwert: wer im Wizard auf Franzoesisch
+  // umgeschaltet hat, meint Franzoesisch.
+  const html = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
+  const fn = html.slice(html.indexOf('async function createAdmin()'));
+  const body = fn.slice(0, fn.indexOf('\n}')).match(/fetch\('\/api\/create-admin',[\s\S]*?body: JSON\.stringify\((\{[^\n]*\})\)/);
+  assert.ok(body, 'der create-admin-Aufruf wurde nicht gefunden');
+  assert.match(body[1], /\blanguage: getLocale\(\)/, 'language fehlt im Body von /api/create-admin');
+});

@@ -12,7 +12,7 @@ import { normalizeRecipeMealTypes } from '../../public/utils/recipe-meal-types.j
 import { ingredientMatchKey } from '../../public/utils/ingredient-match-key.js';
 import { getAdapter } from '../services/recipe-providers/index.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
-import { hiddenModulesFor, mayWriteModule } from '../permissions.js';
+import { mayReadModule, mayWriteModule } from '../permissions.js';
 
 const log = createLogger('Recipes');
 const router = express.Router();
@@ -65,7 +65,7 @@ function attachPantryMatches(req, ingredients) {
   // nie nach `pantry`. Benannt wird hier aber eine Zeile des VORRATS, mit
   // ihrem Namen. Dieselbe Mischstelle wie die Import-Kandidaten in
   // server/routes/birthdays.js (Pfad `calendar`, Inhalt aus `contacts`), und
-  // derselbe Aufruf schliesst sie: `hiddenModulesFor` prueft beide Achsen,
+  // derselbe Aufruf schliesst sie: `mayReadModule` prueft beide Achsen,
   // Mitgliedsrecht UND Token-Scope.
   //
   // Dass `pantryMatchEl()` in public/pages/recipes.js bei `access === 'none'`
@@ -74,7 +74,7 @@ function attachPantryMatches(req, ingredients) {
   //
   // Was zurueckbleibt, ist `null` und nicht das Weglassen der Felder: die Zutat
   // ist fuer diesen Betrachter unzugeordnet, und die Antwort behaelt ihre Form.
-  if (hiddenModulesFor(req, ['pantry']).has('pantry')) {
+  if (!mayReadModule(req, 'pantry')) {
     return ingredients.map((ing) => ({ ...ing, pantry_item_id: null, pantry_item_name: null }));
   }
   const recipeIds = [...new Set(ingredients.map((i) => i.recipe_id))];
@@ -231,14 +231,19 @@ router.put('/:id', (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Ungueltige Rezept-ID', code: 400 });
 
-    const existing = db.get().prepare('SELECT id, created_by, provider_account_id, meal_types FROM recipes WHERE id = ?').get(id);
+    const existing = db.get().prepare('SELECT id, provider_account_id, meal_types FROM recipes WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'Recipe not found', code: 404 });
+    // KEIN Besitzer-Riegel (#1577, Entscheidung 30.09.2026): Rezepte gehoeren
+    // dem Haushalt wie Aufgaben, Einkauf und Notizen. Wer das Modulrecht
+    // `meals: write` hat, bearbeitet und loescht jedes Rezept - das prueft der
+    // Modul-Riegel in server/index.js (moduleAccessVerdict), fuer Mitglieds-
+    // rechte und Token-Scopes; `meals: read` bleibt dort abgewiesen. `created_by`
+    // sagt nur, wer ein Rezept angelegt hat, nicht wer es aendern darf.
+    //
     // Mirror-Rezepte sind read-only: der Quell-Provider bleibt Quelle der
-    // Wahrheit für ihren Inhalt. Der Check steht vor der created_by-Prüfung,
-    // weil sonst genau der Nutzer, der den Provider-Account angelegt hat (und
-    // damit als created_by dieser Rezepte gilt), sie über die API editieren könnte.
-    if (existing.provider_account_id) return res.status(403).json({ error: 'Mirrored recipes are managed by their source provider and cannot be edited here.', code: 403 });
-    if (existing.created_by !== (req.authUserId || req.session.userId)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    // Wahrheit für ihren Inhalt - fuer jeden, auch fuer den Nutzer, der den
+    // Provider-Account angelegt hat (und damit als created_by dieser Rezepte gilt).
+    if (existing.provider_account_id) return res.status(403).json({ error: 'Mirrored recipes are managed by their source provider and cannot be edited here.', code: 403, reason: 'recipe_mirrored' });
 
     const { ingredients = [] } = req.body;
 
@@ -355,10 +360,10 @@ router.get('/:id/image', (req, res) => {
     res.setHeader('Content-Type', match[1]);
     res.setHeader('Content-Length', String(buffer.length));
     // Dieselben Kopfzeilen wie der Provider-Proxy: der Browser soll den Typ
-    // nicht raten, und ein Bild aus der eigenen Datenbank gehoert niemandem
-    // sonst in den Cache.
+    // nicht raten, und ein Bild aus der eigenen Datenbank bleibt nicht als
+    // Kopie im Browser-Cache liegen - der ueberlebt das Abmelden.
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
     res.end(buffer);
   } catch (err) {
@@ -372,13 +377,13 @@ router.delete('/:id', (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
 
-    const existing = db.get().prepare('SELECT id, created_by, provider_account_id FROM recipes WHERE id = ?').get(id);
+    const existing = db.get().prepare('SELECT id, provider_account_id FROM recipes WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'Recipe not found.', code: 404 });
-    // Siehe PUT /:id: Mirror-Rezepte lassen sich nur durch Löschen des
+    // Siehe PUT /:id: kein Besitzer-Riegel, das Modulrecht `meals: write`
+    // genuegt (#1577). Mirror-Rezepte lassen sich nur durch Löschen des
     // Provider-Accounts entfernen (DELETE /recipe-providers/accounts/:id), nicht
     // einzeln hier.
-    if (existing.provider_account_id) return res.status(403).json({ error: 'Mirrored recipes are managed by their source provider and cannot be deleted here.', code: 403 });
-    if (existing.created_by !== (req.authUserId || req.session.userId)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (existing.provider_account_id) return res.status(403).json({ error: 'Mirrored recipes are managed by their source provider and cannot be deleted here.', code: 403, reason: 'recipe_mirrored' });
 
     const result = db.get().prepare('DELETE FROM recipes WHERE id = ?').run(id);
     if (result.changes === 0) return res.status(404).json({ error: 'Recipe not found', code: 404 });
@@ -422,7 +427,7 @@ router.get('/:id/provider-thumbnail', async (req, res) => {
     res.setHeader('Content-Type', mime);
     res.setHeader('Content-Length', String(thumb.buffer.length));
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
     res.end(thumb.buffer);
   } catch (err) {
@@ -463,7 +468,7 @@ router.post('/:id/to-shopping-list', (req, res) => {
     // Schreibrecht - als Mitglied wie als Token. Vor den 404ern, damit die
     // Antwort keine Rezept- und Listen-IDs bestaetigt.
     if (!mayWriteModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
     }
 
     const id = parseInt(req.params.id, 10);
@@ -548,7 +553,7 @@ router.post('/:id/to-shopping-list', (req, res) => {
 router.put('/:id/ingredient-match', (req, res) => {
   try {
     if (!mayWriteModule(req, 'pantry')) {
-      return res.status(403).json({ error: 'Write access to the pantry is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to the pantry is required.', code: 403, reason: 'cross_module_access' });
     }
 
     const id = parseInt(req.params.id, 10);

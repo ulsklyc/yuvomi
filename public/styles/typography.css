@@ -39,8 +39,7 @@
  * bleibt stabil"). Ein Kommentar, der zwei Groessen nennt, wo eine steht, laesst
  * die naechste Suche im falschen Stylesheet anfangen.
  * ------------------------------------------------------------------------ */
-.u-page-title,
-.page__title {
+.u-page-title {
   font-size: var(--type-page-title-mobile);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-tight);
@@ -67,10 +66,6 @@
  * `.page-toolbar__title` an, an ihm geht er vorbei. */
 .page-toolbar__dock-title,
 .settings-leaf-header__title,
-/* Die Settings-Übersicht lief als .page__title auf 22px mobil / 28px Desktop,
- * während jedes andere Modul seinen Seitentitel mit 20px rendert - zwei
- * h1-Größen für denselben Seitentyp (Critique 2026-07-27). */
-.settings-shell-header__title,
 .split-title {
   font-size: var(--type-toolbar-title);
   font-weight: var(--font-weight-bold);
@@ -103,6 +98,17 @@
   }
 }
 
+/* DAS EINSTELLUNGS-BLATT MOBIL: EINE EBENE TIEFER, EINE GRAMMATIK (R14,
+ * A8 P2-4). Unter 768px steht ueber dem Blatt die Zurueck-Leiste, der Titel
+ * steht im Inhalt - bisher im Inline-Schnitt (22px), direkt ueber einem
+ * 20px-Abschnitt ("Design"), kaum eine Stufe. Ein Gesundheit-Bereich zeigt
+ * dieselbe Geste mit Zurueck plus Large Title. Jetzt beide so. */
+@media (max-width: 767px) {
+  .settings-leaf-header__title {
+    font-size: var(--type-page-title-mobile);
+  }
+}
+
 /* In der kompakten HÖHENKLASSE gibt es den Large-Title-Zustand nicht: dort
  * steht der Titel inline, wie ihn iOS im Querformat führt. Den Umbruch dazu
  * macht layout.css; hier steht, dass er dabei auf den Inline-Schnitt
@@ -130,6 +136,7 @@
  * Liste, ist er versal; benennt er einen eigenen Bereich, ist er Überschrift.
  * ------------------------------------------------------------------------ */
 .u-section-title,
+.panel-head__title,
 .budget-page .split-title,
 .budget-chart-section__title,
 .budget-list-header__title,
@@ -140,11 +147,12 @@
 .day-view__date-label,
 .today-cockpit__header h2,
 .settings-section__title,
+/* Die Reichweite eines Einstellungsblatts ("Fuer mich" / "Fuer den Haushalt")
+ * gliedert Abschnitte, also traegt sie deren Stufe - siehe die Stufenleiter
+ * weiter unten (R16). */
+.settings-scope__title,
 .settings-navigation-panel__title,
-.settings-mobile-overview__title,
 .split-group-name,
-.housekeeping-card h2,
-.subscriptions-chart h2,
 .subscriptions-section-head h2,
 .subscriptions-logo-picker-head h3 {
   font-size: var(--type-section-title);
@@ -175,8 +183,11 @@
  * Überschrift in Satzschreibung (Block darüber); einer, der sich mit
  * wechselndem Wert über eine Liste wiederholt, ist ein Versal-Mikro-Label
  * (dieser Block). Was ein Kopf benennt, ist keine Eigenschaft seines Markups -
- * `.panel-head__title` und `.settings-section__title` sind strukturell
- * dasselbe Element und stehen absichtlich in verschiedenen Blöcken.
+ * `.panel-head__title` stand bis 2026-09-25 in DIESEM Block, obwohl es
+ * einen Bereich benennt (Konten, Darlehen) - als einziger Titel eines Panels
+ * war das Versal-Label die zweite Ueberschriftsgrammatik des Budgets neben
+ * „Nach Kategorie" (Critique 2026-09-25). Es ist jetzt ein <h2> im Block
+ * darueber.
  *
  * Ein Guard darüber wäre deshalb ein Guard über DIESE LISTE, nicht über die
  * Regel - genau die Bauart, die dieses Repo bei der Küche und beim Budget schon
@@ -189,8 +200,8 @@
  * ------------------------------------------------------------------------ */
 .event-icon-picker__category-label,
 .metric-card__label,
+.budget-chart-block__title,
 .loan-report__section-title,
-.panel-head__title,
 .contact-group__header,
 .day-header__name,
 .meal-slot__type-label,
@@ -221,9 +232,7 @@
  * ------------------------------------------------------------------------ */
 .nav-section-label,
 .settings-shell__navigation-heading,
-.settings-shell__navigation-toggle,
-.kanban-col__title,
-.filter-panel__label {
+.kanban-col__title {
   font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
@@ -234,19 +243,20 @@
  * Card-/Item-Titel
  * ------------------------------------------------------------------------ */
 .u-card-title,
-.agenda-event__title,
 .detail-popover__title,
 .budget-loan-card__title,
-.budget-entry__title,
-.contact-item__name,
-.birthday-item__name,
 .document-card__title,
 .document-row__title,
 .document-viewer__unsupported-title,
 .recipe-card__title,
-.housekeeping-task__body h2,
-.split-card-title,
 .settings-card__title,
+/* EINE STUFENLEITER IM EINSTELLUNGSBLATT (Critique 2026-10-05, R16). Gemessen
+ * im Kalender-Blatt: Blatt 22px, Reichweite 16px, Abschnitt 20px, Karte 17px -
+ * die Reichweite, die alles darunter gliedert, war die KLEINSTE Stufe. Jetzt
+ * folgt die Groesse der Tiefe: Blatt 22, Reichweite 20, Abschnitt 17, Karte 16.
+ * Ein Blatt ohne Reichweite hat eine Stufe weniger (22 / 20 / 17) - dieselbe
+ * Leiter, nur kuerzer. Die Ebene im Baum zieht shell.js nach (`aria-level`). */
+.settings-scope .settings-section__title,
 .settings-member__name,
 .settings-provider__name,
 .settings-sync-info__name,
@@ -275,7 +285,6 @@
 .dms-result__title,
 .meal-card__title,
 .housekeeping-section-heading span,
-.subscription-card__name,
 .reminder-section__title,
 .cat-row__name,
 .cat-subrow__name,
@@ -287,6 +296,45 @@
   font-size: var(--type-secondary);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-snug);
+}
+
+/* --------------------------------------------------------------------------
+ * Zeilentitel: der Name einer Listenzeile (`.list-row`)
+ *
+ * EINE ROLLE (Critique 2026-10-05, R16 P1 "Bausteine werden nicht vererbt").
+ * Gemessen standen vier Schnitte fuer dieselbe Stelle: 15/600 (Aufgaben),
+ * 16/400 (Buchung, Abo - der Knopf-Reset `font: inherit` hatte das Gewicht
+ * mitgenommen), 16/500 (`.list-row__name` in vierzehn Modulen) und 17/600
+ * (Agenda, Kontakte, Geburtstage, Dokumente - sie standen in der Headline-
+ * Registrierung darueber, obwohl sie Zeilen sind). Kanon ist der haeufigste:
+ * 16px, medium.
+ *
+ * DIE GRENZE ZUR HEADLINE: ein KARTEN-Titel (Rezeptkarte, Darlehen, Widget,
+ * Kanban-Karte, Notizkarte) bleibt Headline bzw. ihre Dichte-Variante - eine
+ * Karte ist ein Objekt mit eigener Flaeche und fuehrt ihren Titel als
+ * Ueberschrift. Eine ZEILE steht in einem Traeger neben ihresgleichen; ihr
+ * Name ist Lesetext mit Betonung, keine Ueberschrift. Wer `.list-row` traegt,
+ * nimmt diese Rolle - ueber `.list-row__name` am Namen oder, wo der Name ein
+ * eigenes Element mit eigener Geometrie ist, ueber die Registrierung hier.
+ *
+ * BENANNTE AUSNAHME: die Dokumentzeile (`.document-row__title`) bleibt
+ * Headline. Raster und Liste zeigen dort DASSELBE Objekt in zwei Ansichten,
+ * und der Umschalter darf den Titel nicht umsetzen (test-typography.js,
+ * "Raster und Liste der Dokumente verwenden dieselbe Titelrolle").
+ *
+ * Die Zeilenhoehe erbt die Zeile (Body, 1.47): ein Name darf umbrechen
+ * (list-row.css), und zwei Zeilen Lesetext stehen im Body-Abstand.
+ * Guard: test-typography.js, "der Zeilentitel ist eine Rolle".
+ * ------------------------------------------------------------------------ */
+.u-row-title,
+.settings-scope .settings-card__title,
+.list-row__name,
+.agenda-event__title,
+.contact-item__name,
+.subscription-card__name,
+.rw-standing__name {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
 }
 
 /* --------------------------------------------------------------------------
@@ -323,8 +371,7 @@
     font-size: var(--type-hero-desktop);
   }
 
-  .u-page-title,
-  .page__title {
+  .u-page-title {
     font-size: var(--type-page-title-desktop);
   }
 }

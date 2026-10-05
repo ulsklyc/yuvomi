@@ -5,21 +5,13 @@ import {
   t,
 } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
+import { confirmModal } from '/components/modal.js';
 import { prefersInkText } from '/utils/contrast.js';
-
-function initials(name) {
-  if (!name) return '?';
-  return name
-    .split(' ')
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-}
 
 function avatarHtml(user, className = 'settings-avatar') {
   const safeName = esc(user?.display_name || '');
-  const fallback = esc(initials(user?.display_name || ''));
+  const fallback = esc(initials(user?.display_name, '?'));
   const background = esc(user?.avatar_color) || 'var(--color-accent)';
   const inkClass = prefersInkText(user?.avatar_color) ? ' settings-avatar--ink' : '';
   return `
@@ -157,7 +149,7 @@ function consumeOidcNotice() {
  * @param {{ enabled: boolean, pending: boolean, recovery_remaining: number, required: boolean }|null} state
  * @returns {string}
  */
-function twoFactorCardHtml(state) {
+export function twoFactorCardHtml(state) {
   if (!state) return '';
 
   const body = state.enabled
@@ -166,22 +158,22 @@ function twoFactorCardHtml(state) {
         <i data-lucide="shield-check" aria-hidden="true"></i>
         <span>${t('settings.twoFactorActive')}</span>
       </p>
-      <p class="form-hint">${t('settings.twoFactorRecoveryLeft', { count: state.recovery_remaining })}</p>
+      <p class="form-hint settings-2fa__note">${t('settings.twoFactorRecoveryLeft', { count: state.recovery_remaining })}</p>
       ${state.recovery_remaining === 0
-        ? `<p class="form-error" role="status">${t('settings.twoFactorNoRecoveryLeft')}</p>`
+        ? `<p class="form-error settings-2fa__note" role="status">${t('settings.twoFactorNoRecoveryLeft')}</p>`
         : ''}
-      <div class="settings-form-actions">
+      <div class="settings-form-actions settings-2fa__actions">
         <button type="button" class="btn btn--secondary" id="two-factor-regenerate">${t('settings.twoFactorNewCodes')}</button>
         ${state.required
           ? ''
           : `<button type="button" class="btn btn--danger-outline" id="two-factor-disable">${t('settings.twoFactorDisable')}</button>`}
       </div>
-      ${state.required ? `<p class="form-hint">${t('settings.twoFactorRequiredByHousehold')}</p>` : ''}
+      ${state.required ? `<p class="form-hint settings-2fa__note">${t('settings.twoFactorRequiredByHousehold')}</p>` : ''}
     `
     : `
       <p class="form-hint">${t('settings.twoFactorHint')}</p>
-      ${state.required ? `<p class="form-error" role="status">${t('settings.twoFactorRequiredSetUpNow')}</p>` : ''}
-      <div class="settings-form-actions">
+      ${state.required ? `<p class="form-error settings-2fa__note" role="status">${t('settings.twoFactorRequiredSetUpNow')}</p>` : ''}
+      <div class="settings-form-actions settings-2fa__actions">
         <button type="button" class="btn btn--primary" id="two-factor-start">${t('settings.twoFactorSetUp')}</button>
       </div>
     `;
@@ -190,7 +182,7 @@ function twoFactorCardHtml(state) {
     <div class="settings-card" id="two-factor-card">
       <h3 class="settings-card__title">${t('settings.twoFactorTitle')}</h3>
       ${body}
-      <div id="two-factor-error" class="form-error" role="alert" hidden></div>
+      <div id="two-factor-error" class="form-error settings-2fa__note" role="alert" hidden></div>
     </div>
   `;
 }
@@ -252,12 +244,12 @@ function renderRecoveryCodes(card, codes, onDone) {
     <ul class="settings-2fa__codes">
       ${codes.map((code) => `<li><code>${esc(code)}</code></li>`).join('')}
     </ul>
-    <div class="settings-form-actions">
+    <div class="settings-form-actions settings-2fa__actions">
       <button type="button" class="btn btn--secondary" id="two-factor-copy">${t('settings.twoFactorCopyCodes')}</button>
       <button type="button" class="btn btn--secondary" id="two-factor-download">${t('settings.twoFactorDownloadCodes')}</button>
       <button type="button" class="btn btn--primary" id="two-factor-done">${t('settings.twoFactorCodesSaved')}</button>
     </div>
-    <p class="form-hint" id="two-factor-copy-status" role="status"></p>
+    <p class="form-hint settings-2fa__note" id="two-factor-copy-status" role="status"></p>
   `);
 
   const status = card.querySelector('#two-factor-copy-status');
@@ -301,7 +293,7 @@ function askForCode(card, texts, onConfirm, onCancel) {
   card.insertAdjacentHTML('beforeend', `
     <h3 class="settings-card__title">${esc(texts.title)}</h3>
     <p class="form-hint">${esc(texts.lead)}</p>
-    <form id="two-factor-confirm-form" class="settings-form">
+    <form id="two-factor-confirm-form" class="settings-form settings-2fa__form">
       <div class="form-group">
         <label class="form-label" for="two-factor-confirm-code">${t('settings.twoFactorCodeOrRecoveryLabel')}</label>
         <input class="form-input settings-2fa__code" type="text" id="two-factor-confirm-code"
@@ -340,6 +332,40 @@ function askForCode(card, texts, onConfirm, onCancel) {
       input.select();
     }
   });
+}
+
+/**
+ * Karte "Auf anderen Geraeten abmelden" (#1354, #1423). Hinweis, Status und
+ * Knopfreihe tragen eigene Klassen fuer ihren Abstand (settings.css): ohne ihn
+ * las sich der Status als vierte Zeile des Hinweises, und der Fokusring des
+ * Knopfes lag auf dem Statustext. Die Statuszeile bleibt LEER im Markup - erst
+ * ihr Text gibt ihr den Abstand (`:not(:empty)`), sonst stuende Leerraum da.
+ * @returns {string}
+ */
+export function otherSessionsCardHtml() {
+  return `
+      <div class="settings-card settings-sessions">
+        <h3 class="settings-card__title">${t('settings.otherSessionsTitle')}</h3>
+        <p class="form-hint">${t('settings.otherSessionsHint')}</p>
+        <p class="form-hint settings-sessions__status" id="logout-others-status" role="status"></p>
+        <div id="logout-others-error" class="form-error settings-sessions__error" role="alert" hidden></div>
+        <div class="settings-form-actions settings-sessions__actions">
+          <button type="button" class="btn btn--danger-outline" id="logout-others-btn">${t('settings.otherSessionsButton')}</button>
+        </div>
+      </div>`;
+}
+
+/**
+ * Fehlertext fuer "Auf anderen Geraeten abmelden" (#1354). Ein 429 heisst nur
+ * "zu schnell geklickt" - dann sagt die Seite, dass Warten hilft, statt einen
+ * Fehlschlag zu melden, nach dem man es gleich wieder versucht.
+ *
+ * @param {{ status?: number }} err
+ * @returns {string}
+ */
+export function logoutOthersErrorText(err) {
+  if (err?.status === 429) return t('settings.otherSessionsTooManyAttempts');
+  return t('settings.otherSessionsError');
 }
 
 /**
@@ -531,6 +557,8 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
       ${twoFactorCardHtml(twoFactorState)}
 
       ${oidcCardHtml(oidcState, oidcNotice)}
+
+      ${otherSessionsCardHtml()}
     </section>
 
     <section class="settings-section">
@@ -649,10 +677,19 @@ function bindEvents(container, user, profileState) {
         Object.assign(user, response.user);
         profileState.avatarData = response.user.avatar_data ?? null;
         updatePreview();
+        // Die Kontozeile der Seitenleiste zeigt Name und Avatar (router.js,
+        // syncSidebarAccount) und zieht mit, ohne dass die Shell neu baut.
+        window.dispatchEvent(new CustomEvent('yuvomi:profile-changed', { detail: {
+          display_name: response.user.display_name,
+          avatar_color: response.user.avatar_color,
+          avatar_data: response.user.avatar_data ?? null,
+        } }));
       }
       window.yuvomi?.showToast(t('settings.profileSavedToast'), 'success');
     } catch (error) {
-      showError(profileError, error.message);
+      showError(profileError, error.data?.reason === 'email_in_use'
+        ? t('common.emailInUse')
+        : error.message);
     } finally {
       submitButton.disabled = false;
     }
@@ -685,6 +722,41 @@ function bindEvents(container, user, profileState) {
       showError(passwordError, error.message);
     } finally {
       submitButton.disabled = false;
+    }
+  });
+
+  // Auf anderen Geraeten abmelden (#1354). Der Knopf wird waehrend des Requests
+  // nicht `disabled`: ein fokussierter Knopf, der deaktiviert wird, verliert den
+  // Fokus, und das Modal hat ihn gerade erst dorthin zurueckgegeben.
+  const logoutOthersButton = container.querySelector('#logout-others-btn');
+  let logoutOthersBusy = false;
+  logoutOthersButton?.addEventListener('click', async () => {
+    if (logoutOthersBusy) return;
+    const status = container.querySelector('#logout-others-status');
+    const errorBox = container.querySelector('#logout-others-error');
+    const confirmed = await confirmModal(t('settings.otherSessionsConfirm'), {
+      confirmLabel: t('settings.otherSessionsButton'),
+      detail: t('settings.otherSessionsConfirmDetail'),
+      danger: true,
+    });
+    if (!confirmed) return;
+    logoutOthersBusy = true;
+    logoutOthersButton.setAttribute('aria-disabled', 'true');
+    clearError(errorBox);
+    if (status) status.textContent = '';
+    try {
+      const { ended = 0 } = await auth.logoutOthers() ?? {};
+      if (status) {
+        status.textContent = ended > 0
+          ? t('settings.otherSessionsEnded', { count: ended })
+          : t('settings.otherSessionsNone');
+      }
+    } catch (error) {
+      showError(errorBox, logoutOthersErrorText(error));
+    } finally {
+      logoutOthersBusy = false;
+      logoutOthersButton.removeAttribute('aria-disabled');
+      if (!container.contains(document.activeElement)) logoutOthersButton.focus({ preventScroll: true });
     }
   });
 
@@ -745,3 +817,7 @@ export async function render(container, { user }) {
     throw error;
   }
 }
+
+// Der Avatar als Programm (test:initials): welche Zeichen ohne Bild auf der
+// Scheibe stehen.
+export const __test = { avatarHtml };

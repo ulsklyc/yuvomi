@@ -22,7 +22,7 @@
 
 .split-topbar,
 .split-panel-head,
-.split-card-head,
+.split-section-head,
 .split-group-header,
 .split-header-actions,
 .split-form-row {
@@ -37,7 +37,7 @@
 
 .split-title,
 .split-group-name,
-.split-card-title {
+.split-section-title {
   margin: 0;
   letter-spacing: var(--tracking-normal);
   color: var(--color-text-primary);
@@ -64,7 +64,7 @@
 .split-subtitle,
 .split-group-header p,
 .split-muted,
-.split-card-head span {
+.split-section-head span {
   margin: var(--space-1) 0 0;
   color: var(--color-text-secondary);
 }
@@ -85,7 +85,6 @@
  * (Begründung an .metric-card in budget.css). Diese Datei setzte auf
  * denselben Rollen --glass-bg-card und widersprach damit der Regel innerhalb
  * des eigenen Moduls. */
-.split-card,
 .split-groups-panel {
   background-color: var(--color-surface);
   border: 1px solid transparent;
@@ -104,6 +103,9 @@
 .split-groups-panel {
   padding: var(--space-3);
   min-height: 0;
+  /* So hoch wie seine Gruppen, nicht wie der Hauptbereich daneben: gestreckt
+   * stand bei 1440 unter zwei Gruppen eine leere Flaeche von ueber 1000px. */
+  align-self: start;
   /* Träger der Zeilenliste (tokens.css): die Zeilen laufen bis an die Kante,
    * also muss der Träger sie an seinem Radius beschneiden. */
   overflow: hidden;
@@ -113,66 +115,85 @@
   min-width: 0;
 }
 
+/* DIE EINE ZEILE DER GRUPPENWAHL (R16). Breit ausgeblendet: dort steht die
+ * Liste als eigene Spalte. Schmal (Regeln unten bei max-width: 639px) ist sie
+ * der Kopf des Panels und klappt die Liste auf. Sie traegt die Bauart der
+ * Gruppenzeile (.split-group), damit zu- und aufgeklappt dieselbe Zeile an
+ * derselben Stelle steht. */
+.split-group-switch {
+  display: none;
+}
+
 .split-panel-head {
   justify-content: space-between;
+  flex-wrap: wrap;
   padding: 0 var(--space-1) var(--space-2);
 }
 
+/* Die Gruppensuche steht im Kopf der Liste (.section-toolbar, R14 P1): mobil
+ * als Icon neben „+", damit die erste Gruppe eine Zeile hoeher steht. Erst wo
+ * die Gruppen eine eigene schmale Spalte bekommen (zweispaltig ab 976px
+ * Container, unten), bliebe ihr neben Titel und „+" nur ~80px - dort nimmt
+ * sie die eigene Zeile darunter. */
+@container split-page (min-width: 976px) {
+  /* ZWEISPALTIG STEHT AUCH "GRUPPEN" AUF DER BUEHNE (R16 Schritt 2b): Titel,
+   * Suche und Aktiv/Archiviert sind der Kopf der Spalte, die Flaeche traegt
+   * nur noch die Gruppenzeilen - dieselbe Grammatik wie rechts daneben und in
+   * den anderen Reitern. Einspaltig bleibt das Panel die aufklappbare Zeile
+   * der Gruppenwahl (R16 1b) und damit selbst die Flaeche. */
+  .split-groups-panel {
+    padding: 0;
+    overflow: visible;
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  .split-groups-panel .split-panel-head {
+    min-height: var(--target-base);
+    padding: 0 0 var(--space-1);
+  }
+
+  .split-groups-panel .split-groups {
+    margin-inline: 0;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background-color: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .split-groups-panel .split-groups:has(> .empty-state),
+  .split-groups-panel .split-groups:empty {
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  .split-panel-head.section-toolbar > label.split-search {
+    order: 3;
+    flex: 1 0 100%;
+    max-width: none;
+    margin-inline-start: 0;
+  }
+}
+
+/* GEWICHTE AUS DEN TOKENS (Critique 2026-10-05, R16). Hier standen 800, 800,
+ * 900, 700 und `600 !important` als Literale - fuenf Gewichte, von denen die
+ * Skala drei gar nicht kennt, und der Betrag einer geteilten Ausgabe stand
+ * fetter da als der Kontosaldo. Jetzt: Titel semibold, Zeilenname medium
+ * (Rolle Zeilentitel), Betrag semibold (die Betragsregel in budget.css). */
 .split-panel-title {
-  font-weight: 800;
+  font-weight: var(--font-weight-semibold);
 }
 
-.split-search {
-  display: grid;
-  gap: var(--space-1);
+/* Der Zaehler der Gruppenliste in der geteilten Zaehler-Tinte
+ * (`.list-group__count`, list-row.css), mit Abstand zum Titel. */
+.split-panel-title .list-group__count {
+  margin-inline-start: var(--space-2);
 }
 
-.split-search__label {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-}
-
-.split-search__control {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  border: 1px solid var(--color-border-control);
-  border-radius: var(--radius-md);
-  padding: 0 var(--space-3);
-  background: var(--color-surface-2);
-}
-
-/* Tastaturfokus: das Feld darin ist randlos (outline: 0 unten), also zeigt
- * der TRÄGER den Zustand - dasselbe Rezept wie .input:focus im Feldkanon
- * (layout.css). Ohne diese Regel war das Suchfeld das einzige der App ohne
- * jeden sichtbaren Fokus (WCAG 2.4.7). */
-.split-search:focus-within {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-light);
-}
-
-.split-search input {
-  width: 100%;
-  min-height: 42px;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--color-text-primary);
-  /* Drop WebKit's native type=search magnifier; the explicit leading icon is
-   * the only magnifier this field should show. */
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.split-search input::-webkit-search-decoration,
-.split-search input::-webkit-search-results-decoration,
-.split-search input::-webkit-search-results-button,
-.split-search input::-webkit-search-cancel-button {
-  -webkit-appearance: none;
-  appearance: none;
-  display: none;
-}
+/* Das Suchfeld ist das geteilte (renderPageSearch, page-search.css). Hier
+ * stand ein eigenes mit sichtbarem Label ueber dem Feld, Kante, 12px-Ecke und
+ * eigenem Fokusring - eine der fuenf Suchfeld-Varianten der Critique
+ * 2026-09-26 (P1). Die Seitenleiste braucht vom Feld nichts Eigenes. */
 
 /* Statusfilter der Gruppenliste (Aktiv/Archiviert, #574). Teilt die
  * .filter-chip-Vokabel mit Aufgaben/Dokumenten. */
@@ -194,15 +215,22 @@
  * Jetzt trägt ihn die Fläche allein, wie die Sidebar-Pille. */
 .split-groups {
   margin-top: var(--space-3);
+  /* Die LISTE laeuft bis an die Traegerkante, nicht jede Zeile einzeln ueber
+   * ihre Liste hinaus: vorher trug `.split-group` die negativen Raender samt
+   * `width: calc(100% + 2 * space-3)`, und #split-groups meldete scrollWidth
+   * 306 bei 294 Breite - 12px Ueberstand, den nur das `overflow: hidden` des
+   * Panels verdeckte (Critique 2026-09-25). Jetzt ist die Box so breit wie ihre
+   * Zeilen; Treffflaeche und Flaeche bis zur Kante bleiben gleich. */
+  margin-inline: calc(var(--space-3) * -1);
 }
 
 .split-group {
   /* Die Zeile läuft bis an die Trägerkante: das Panel trägt --space-3 Polster,
    * und eine Zeile ohne Radius, die davor stehenbleibt, wäre ein rechtwinkliges
    * Farbrechteck in einer runden Karte - der Kasten im Kasten in neuer Form.
-   * Das Textpolster kommt deshalb aus der Zeile selbst zurück. */
-  width: calc(100% + var(--space-3) * 2);
-  margin-inline: calc(var(--space-3) * -1);
+   * Den Weg bis zur Kante geht die Liste (.split-groups oben), das
+   * Textpolster kommt aus der Zeile selbst zurück. */
+  width: 100%;
   min-height: 64px;
   padding: var(--space-2) var(--space-3);
   display: flex;
@@ -265,7 +293,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 800;
+  font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
 }
 
@@ -303,7 +331,7 @@
 .split-group-header {
   justify-content: space-between;
   padding: var(--space-4);
-  /* Arbeitsfläche, also opak - dieselbe Regel wie .split-card darüber. */
+  /* Arbeitsfläche, also opak - dieselbe Regel wie das Gruppen-Panel darüber. */
   background-color: var(--color-surface);
   border: 1px solid transparent;
   border-radius: var(--radius-lg);
@@ -339,33 +367,55 @@
   justify-content: flex-end;
 }
 
+/* DIE AUSGABEN TRAGEN DIE BREITE SPALTE (Critique R16, 2026-10-05). Bis hierhin
+ * standen Salden und Aktivitaetsprotokoll links in der breiten Spalte und die
+ * „Letzten Ausgaben" - das, wofuer man den Reiter oeffnet - rechts in der
+ * schmalen (305px bei 1280). Die Reihenfolge im Markup bleibt Salden, Ausgaben,
+ * Aktivitaet (einspaltig unveraendert); zweispaltig stehen die Ausgaben links
+ * ueber beide Zeilen, Salden und Aktivitaet rechts untereinander. */
 .split-content-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.9fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(300px, 1fr);
   gap: var(--space-4);
+  align-items: start;
 }
 
-.split-card {
-  padding: var(--space-4);
+/* EIN ABSCHNITT = TITEL AUF DER BUEHNE + ZEILENTRAEGER (R16 Schritt 2b). Der
+ * Abschnitt selbst traegt keine Flaeche mehr (vorher `.split-card`: Flaeche,
+ * 16px Polster, Titel darin); die Zeilen liegen in einem `.row-carrier` und
+ * bringen ihr Polster selbst mit. */
+.split-section {
   min-width: 0;
 }
 
-.split-card:nth-child(2) {
-  grid-row: span 2;
+.split-content-grid > .split-section {
+  grid-column: 2;
 }
 
-.split-card-head {
+.split-content-grid > .split-section:nth-child(2) {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.split-section-head {
   justify-content: space-between;
-  margin-bottom: var(--space-3);
+  /* Ein volles Ziel hoch, wie der Listenkopf der Uebersicht - der Titel steht
+   * damit in jedem Reiter gleich weit ueber seiner Flaeche. */
+  min-height: var(--target-base);
+  margin-bottom: var(--space-1);
   /* Titel und Zusatz („vereinfachte Schulden") sind zwei eigenständige Zeilen,
    * sobald sie nebeneinander nicht mehr passen - ohne Umbruch schiebt der
    * Zusatz über den Kartenrand in die Nachbarkarte. */
   flex-wrap: wrap;
 }
 
-.split-card-head > * {
+.split-section-head > * {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.split-section-head > span {
+  margin-block-start: 0;
 }
 
 .split-debt,
@@ -374,7 +424,9 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) 0;
+  /* Das Zeilenpolster des Traegers (`.list-row`: --space-3 inline) - die
+   * Flaeche um die Zeile ist weg, also bringt die Zeile ihren Rand mit. */
+  padding: var(--space-3);
   border-top: 1px solid var(--color-border-subtle);
 }
 
@@ -391,7 +443,8 @@
 .split-debt strong,
 .split-expense__amount {
   flex: 0 0 auto;
-  font-weight: 900;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
   color: var(--color-text-primary);
 }
 
@@ -474,12 +527,22 @@ button.split-expense:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  font-weight: 700;
+  font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
 }
 
 .split-form-row > label {
   flex: 1 1 0;
+}
+
+/* Abbrechen und Speichern bleiben ein Paar, wenn der Dialogfuss umbricht
+ * (mobil: Loeschen bzw. „Gast erstellen" oben links, das Paar darunter
+ * rechts) - frei umbrechend stand „Speichern" allein in der zweiten Zeile.
+ * Dieselbe Gruppe wie im Budget und in den Kontakten. */
+.split-form__footer-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-inline-start: auto;
 }
 
 /* Formular-Gruppen im Sheet: Inset-Well statt Kasten (tokens.css). */
@@ -491,10 +554,12 @@ button.split-expense:hover {
   background: var(--color-fill-well);
 }
 
-.split-check {
-  flex-direction: row !important;
+/* Zwei Klassen statt `!important`: (0,2,0) schlaegt `.split-form label`
+ * (0,1,1) auch ohne den Hammer. */
+.split-form .split-check {
+  flex-direction: row;
   align-items: center;
-  font-weight: 600 !important;
+  font-weight: var(--font-weight-medium);
 }
 
 .split-participant-row {
@@ -529,8 +594,14 @@ button.split-expense:hover {
  *   split-main  → .split-content-grid (Karten hinter dem Gruppen-Panel)
  * -------------------------------------------------------- */
 
-/* Zweispaltig braucht das Panel (max. 320px) + Gap + rund 380px Rest. */
-@container split-page (max-width: 719px) {
+/* NEBENEINANDER NUR, WENN DER HAUPTBEREICH DANEBEN ZWEISPALTIG BLEIBT
+ * (Critique 2026-09-25). Die Grenze lag bei 720px: bei 1024x768 (Seite 740px)
+ * stand das Gruppen-Panel mit 320px neben einem 404px-Hauptbereich, dessen
+ * Karten sich dort einspaltig stapelten - eine Spalte von 194% Viewporthoehe.
+ * Die Rechnung: Panel 320 + Gap 16 + 640 (ab da ist .split-content-grid
+ * zweispaltig, siehe split-main unten) = 976. Darunter steht die kurze
+ * Gruppenliste oben, und der Hauptbereich bekommt die volle Breite. */
+@container split-page (max-width: 975px) {
   .split-layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -547,13 +618,119 @@ button.split-expense:hover {
 
 @container split-page (max-width: 639px) {
   /* Die Kennzahl-Zeile bricht über .metric-grid (budget.css) um; die frühere
-     2+1-Reihe ließ die dritte Karte auf halber Breite mit einem Loch daneben. */
+     2+1-Reihe ließ die dritte Karte auf halber Breite mit einem Loch daneben.
+
+     KEINE VOLLE ZEILE FUER EINE ZIFFER (Re-Critique 2026-09-27, A5 / R10
+     L11): die Waise der Umbruchregel war die Karte „Aktive Gruppen" - 59px
+     Hoehe ueber die ganze Breite fuer „2" (390x844, y225-284). Die Zahl steht
+     jetzt am Kopf der Gruppenliste, die sie zaehlt (`.split-panel-count`);
+     mobil bleiben die beiden Betraege, nebeneinander in einer Zeile. */
+  .split-summary-groups {
+    display: none;
+  }
 
   .split-group-header,
   .split-topbar {
     align-items: stretch;
     flex-direction: column;
   }
+
+  /* VERWALTUNG VOR INHALT (R16, Critique 2026-10-05 P1 mobil). Gemessen bei
+     390x844: Gruppen-Panel 284px, Gruppenkopf 197px, Salden 145px - die erste
+     Ausgabe stand bei y=975, unter dem Falz. Jetzt:
+     - die Gruppenwahl ist EINE Zeile (aktive Gruppe, Aufklapp-Pfeil); Suche,
+       „+", Aktiv/Archiviert und die Liste klappen darunter auf;
+     - der Gruppenkopf wiederholt Namen und Typ nicht (sie stehen in der Zeile
+       darueber) und ist nur noch die Aktionszeile; Name, Typ und Beschreibung
+       bleiben im Baum, Archiv-Marke und die Angaben bei `budget: read`
+       bleiben sichtbar;
+     - Salden und Karten ruecken zusammen. */
+  .split-layout,
+  .split-main {
+    gap: var(--space-3);
+  }
+
+  .split-groups-panel {
+    padding-block: 0;
+  }
+
+  .split-group-switch {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: calc(100% + 2 * var(--space-3));
+    min-height: 64px;
+    margin-inline: calc(var(--space-3) * -1);
+    padding: var(--space-2) var(--space-3);
+    border: none;
+    background: transparent;
+    color: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .split-group-switch__chevron {
+    flex-shrink: 0;
+    margin-inline-start: auto;
+    color: var(--color-text-secondary);
+    transition: rotate var(--duration-sm) var(--ease-out);
+  }
+
+  .split-groups-panel--open .split-group-switch__chevron {
+    rotate: 180deg;
+  }
+
+  .split-groups-panel:not(.split-groups-panel--open) > .split-groups-body {
+    display: none;
+  }
+
+  .split-groups-panel--open > .split-groups-body {
+    padding-block: var(--space-2) 0;
+    border-block-start: 1px solid var(--color-border-subtle);
+  }
+
+  .split-group-header {
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+    gap: var(--space-2);
+  }
+
+  .split-group-header .split-group-name,
+  .split-group-header .split-group-type,
+  .split-group-header .split-group-desc {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .split-group-header__text:not(:has(.split-archived-badge, .split-group-meta)) {
+    display: contents;
+  }
+
+  .split-header-actions .btn.split-group-tools {
+    flex: 0 0 auto;
+  }
+
+  .split-content-grid {
+    gap: var(--space-2);
+  }
+
+  /* Der Abschnittskopf traegt mobil kein Werkzeug, also kein volles Ziel. */
+  .split-section-head {
+    min-height: var(--target-md);
+  }
+
+  /* Salden kompakt: die Zeile traegt einen Satz und eine Zahl, kein Icon -
+     sie braucht nicht das Polster der Ausgabenzeile mit ihrer 42px-Marke. */
+  .split-debt {
+    padding-block: var(--space-2);
+  }
+
 
   .split-header-actions {
     justify-content: stretch;
@@ -571,7 +748,9 @@ button.split-expense:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .split-card:nth-child(2) {
+  .split-content-grid > .split-section,
+  .split-content-grid > .split-section:nth-child(2) {
+    grid-column: auto;
     grid-row: auto;
   }
 }

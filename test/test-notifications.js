@@ -55,21 +55,34 @@ function makeDb({ withNotificationTables = true } = {}) {
       end_at TEXT,
       goal_minutes INTEGER
     );
+    -- Die Sichtbarkeitsspalten und Zuweisungstabellen, an denen die Zustellung
+    -- seit services/reminder-targets.js haengt - mit den Vorgaben des echten
+    -- Schemas, damit eine Zeile ohne Angabe wie in Produktion fuer alle da ist.
     CREATE TABLE tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
-      created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE
+      created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      visibility TEXT NOT NULL DEFAULT 'all'
     );
+    CREATE TABLE task_assignments (task_id INTEGER NOT NULL, user_id INTEGER NOT NULL);
     CREATE TABLE calendar_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL
+      title TEXT NOT NULL,
+      created_by INTEGER,
+      visibility TEXT NOT NULL DEFAULT 'all',
+      external_source TEXT NOT NULL DEFAULT 'local',
+      subscription_id INTEGER
     );
+    CREATE TABLE event_assignments (event_id INTEGER NOT NULL, user_id INTEGER NOT NULL);
+    CREATE TABLE ics_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, shared INTEGER NOT NULL DEFAULT 0, created_by INTEGER);
     CREATE TABLE budget_subscriptions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       amount REAL,
       currency TEXT,
-      next_payment_date TEXT
+      next_payment_date TEXT,
+      owner_id INTEGER,
+      visibility TEXT NOT NULL DEFAULT 'shared'
     );
     CREATE TABLE inventory_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -92,11 +105,16 @@ function makeDb({ withNotificationTables = true } = {}) {
       created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
     );
     -- Minimal, nur genug fuer den 'document_expiry'-Zweig in processDueNotifications().
+    -- Sichtbarkeit und Freigaben wie im echten Schema: die Zustellung fragt
+    -- seit services/reminder-targets.js, ob ein Dokument fuer alle da ist.
     CREATE TABLE family_documents (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
-      expires_at TEXT
+      expires_at TEXT,
+      created_by INTEGER,
+      visibility TEXT NOT NULL DEFAULT 'family'
     );
+    CREATE TABLE family_document_access (document_id INTEGER NOT NULL, user_id INTEGER NOT NULL);
     -- Minimal, nur genug fuer den 'health_prevention_due'-Zweig in
     -- processDueNotifications() UND fuer syncAllPreventionReminders() -
     -- ohne diese zwei Tabellen scheitert schon die Sync-Abfrage, bevor die
@@ -750,7 +768,11 @@ test('next-fast channel notification uses household-localized actionable copy', 
   const { processDueNotifications } = await import('../server/services/notifications.js');
   const db = makeDb();
   const store = createNotificationChannelStore({ db });
-  store.createChannel({ provider: 'ntfy', name: 'ntfy', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} });
+  // Fasten ist Gesundheit und geht nur an die Person selbst: an ihren eigenen
+  // Kanal, nie an den des Haushalts (services/reminder-targets.js). Beide
+  // stehen hier, damit der Test auch sieht, wohin die Meldung NICHT geht.
+  store.createChannel({ provider: 'ntfy', name: 'household', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} });
+  store.createChannel({ provider: 'ntfy', name: 'mine', enabled: true, scope: 'user', userId: 1, config: { baseUrl: 'https://ntfy.test', topic: 'me' }, secrets: {} });
   db.prepare("INSERT INTO sync_config (key, value) VALUES ('language', 'en')").run();
   db.prepare(`INSERT INTO health_fasting_settings
     (user_id, default_goal_minutes, remind_goal, remind_next_start) VALUES (1, 960, 0, 1)`).run();
@@ -760,7 +782,7 @@ test('next-fast channel notification uses household-localized actionable copy', 
     .run('2026-06-19T09:59:00.000Z');
   const payloads = [];
   const providers = {
-    ntfy: { id: 'ntfy', send: async ({ payload }) => { payloads.push(payload); return { ok: true, status: 200 }; } },
+    ntfy: { id: 'ntfy', send: async ({ channel, payload }) => { payloads.push({ ...payload, channel: channel.name }); return { ok: true, status: 200 }; } },
   };
 
   await processDueNotifications({
@@ -771,7 +793,7 @@ test('next-fast channel notification uses household-localized actionable copy', 
     now: new Date('2026-06-19T10:00:00.000Z'),
   });
 
-  assert.equal(payloads.length, 1);
+  assert.deepEqual(payloads.map((p) => p.channel), ['mine']);
   assert.equal(payloads[0].title, 'Fasting');
   assert.equal(payloads[0].body, 'Ready for your next fast');
   assert.equal(payloads[0].url, '/health/fasting');

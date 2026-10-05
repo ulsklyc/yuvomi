@@ -108,3 +108,10 @@ MSG_document_google_drive_client_secret="  Pamalit na client secret (blangko = g
 MSG_document_google_drive_err_pair="Dapat parehong nakatakda o parehong blangko ang client ID at secret ng Google Drive."
 MSG_document_google_drive_err_credentials="Kailangan ng Google Drive ang sarili nitong OAuth pair o mga naka-configure na kredensyal ng Google Calendar."
 MSG_review_document_google_drive="Mga dok sa Google Drive"
+# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst, durch Leerzeichen
+# getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein Prompt in [x/N],
+# [X/n] oder [M] zeigt, muss hier stehen. Gross/klein faltet install.sh nur fuer A-Z: ein Wort
+# mit anderen Zeichen steht auch in Grossbuchstaben und gross geschrieben da (test:installer-cli-i18n).
+MSG_yes_chars="oo"
+MSG_no_chars="hindi"
+MSG_manual_chars="m"

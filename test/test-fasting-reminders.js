@@ -1,11 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
 import { syncFastingRemindersForUser } from '../server/services/fasting-reminders.js';
 import { applyMigration, buildMigratedDatabase } from './helpers/migrated-database.js';
+import { tempDir } from './tmp-dir.js';
 
 process.env.DB_PATH = ':memory:';
 const { MIGRATIONS } = await import('../server/db.js');
@@ -15,7 +14,7 @@ function setup() {
   const database = buildMigratedDatabase(
     Database,
     MIGRATIONS.filter((migration) => migration.version < REMINDER_MIGRATION_VERSION),
-    join(mkdtempSync(join(tmpdir(), 'yuvomi-fasting-reminders-')), 'db.sqlite'),
+    join(tempDir('yuvomi-fasting-reminders-'), 'db.sqlite'),
   );
   applyMigration(database, MIGRATIONS.find((migration) => migration.version === REMINDER_MIGRATION_VERSION));
   database.prepare(`INSERT INTO users (id, username, display_name, password_hash, role, family_role)

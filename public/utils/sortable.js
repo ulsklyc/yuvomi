@@ -8,7 +8,7 @@
  * daneben einen tastaturbedienbaren Reorder-Pfad (z. B. Auf/Ab-Buttons)
  * behalten, der denselben Persistenz-Handler aufruft.
  */
-import { vibrate } from './ux.js';
+import { vibrate, durationToken, easingToken } from './ux.js';
 
 let sortablePromise = null;
 let SortableCtor = null;
@@ -85,8 +85,10 @@ export async function makeSortable(listEl, { handle, draggable, filter, group, s
     preventOnFilter: false,
     group,
     sort,
-    animation: reduced ? 0 : 150,
-    easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+    // Dauer und Feder aus tokens.css (--duration-sm, --ease-glass): die Kurve
+    // stand hier als zweite Quelle neben dem Token.
+    animation: reduced ? 0 : durationToken('--duration-sm', 150),
+    easing: easingToken('--ease-glass', 'ease-out'),
     delay: 120,
     delayOnTouchOnly: true,
     touchStartThreshold: 5,

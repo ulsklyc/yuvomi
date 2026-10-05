@@ -6,8 +6,10 @@
  */
 
 import { auth, ApiError } from '/api.js';
-import { t } from '/i18n.js';
+import { getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { authHeroHtml, authErrorHtml, wirePasswordToggle } from '/utils/auth-ui.js';
+import { browserTimeZone } from '/utils/timezone.js';
 
 const VERSION_URL = '/api/v1/version';
 const DEFAULT_APP_NAME = 'Yuvomi';
@@ -34,10 +36,7 @@ export async function render(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <main class="auth-page" id="main-content">
-      <div class="auth-hero">
-        <h1 class="auth-hero__title">${esc(storedAppName)}</h1>
-        <p class="auth-hero__tagline">${esc(t('setup.tagline'))}</p>
-      </div>
+      ${authHeroHtml({ appName: storedAppName, tagline: t('setup.tagline') })}
       <div class="auth-card card card--padded">
         <form class="auth-form" id="setup-form" novalidate>
           <div class="form-group">
@@ -64,7 +63,7 @@ export async function render(container) {
               autocomplete="new-password"
               placeholder="${esc(t('setup.confirmPasswordPlaceholder'))}" required />
           </div>
-          <div class="form-error" id="setup-error" role="alert" aria-live="polite" hidden></div>
+          ${authErrorHtml('setup-error')}
           <button type="submit" class="btn btn--primary auth-form__submit" id="setup-btn">
             <span class="auth-btn__label">${esc(t('setup.submitButton'))}</span>
           </button>
@@ -80,28 +79,11 @@ export async function render(container) {
   const versionEl = container.querySelector('#setup-version');
   const passwordInput = form.querySelector('#password');
 
-  // Passwort-Sichtbarkeits-Toggle (wie Login)
-  const passwordWrapper = document.createElement('div');
-  passwordWrapper.className = 'input-password-wrapper';
-  passwordInput.parentNode.insertBefore(passwordWrapper, passwordInput);
-  passwordWrapper.appendChild(passwordInput);
-  const toggleBtn = document.createElement('button');
-  toggleBtn.type = 'button';
-  toggleBtn.className = 'password-toggle';
-  toggleBtn.setAttribute('aria-label', t('setup.showPassword'));
-  const toggleIcon = document.createElement('i');
-  toggleIcon.setAttribute('data-lucide', 'eye');
-  toggleIcon.setAttribute('aria-hidden', 'true');
-  toggleBtn.appendChild(toggleIcon);
-  passwordWrapper.appendChild(toggleBtn);
-  if (window.lucide) lucide.createIcons({ el: toggleBtn });
-  toggleBtn.addEventListener('click', () => {
-    const isPassword = passwordInput.type === 'password';
-    passwordInput.type = isPassword ? 'text' : 'password';
-    toggleIcon.setAttribute('data-lucide', isPassword ? 'eye-off' : 'eye');
-    toggleBtn.setAttribute('aria-label', t(isPassword ? 'setup.hidePassword' : 'setup.showPassword'));
-    if (window.lucide) lucide.createIcons({ el: toggleBtn });
-  });
+  // Das Auge an BEIDEN Feldern - der geteilte Baustein (utils/auth-ui.js). Bis
+  // R16 trug es nur das erste; die Wiederholung tippte man blind.
+  const eye = { show: t('setup.showPassword'), hide: t('setup.hidePassword') };
+  wirePasswordToggle(passwordInput, eye);
+  wirePasswordToggle(form.querySelector('#confirm_password'), eye);
 
   setAppBranding(storedAppName);
 
@@ -151,7 +133,29 @@ export async function render(container) {
     submitBtn.insertBefore(spinner, labelEl);
 
     try {
-      await auth.setup(username, displayName, password);
+      // Die Sprache, in der diese Seite gerade steht: der Server macht daraus
+      // die Datensprache des Haushalts, statt still auf Englisch zu fallen.
+      // Dazu die Zone dieses Browsers als Haushaltszone, sonst rechnet der
+      // Server "heute" in der Zone des Containers (im Container meist UTC, und
+      // "heute" liegt oestlich davon stundenlang auf gestern). Nennt der
+      // Browser keine brauchbare, fehlt das Feld ganz: `undefined` laesst
+      // JSON.stringify weg, ein `null` reiste als Wert mit.
+      const language = getLocale();
+      const timezone = browserTimeZone() ?? undefined;
+      try {
+        await auth.setup(username, displayName, password, language, timezone);
+      } catch (err) {
+        // Der Server prueft die Zone gegen SEINE ICU-Daten und lehnt eine
+        // unbekannte mit 400 und `reason: invalid_timezone` ab. Das darf kein
+        // Admin-Konto kosten: einmal ohne Zone wiederholen, sie ist in den
+        // Einstellungen nachtraeglich waehlbar. NUR an diesem Anker, nicht an
+        // jedem 400: Setup haengt am Login-Limiter, und eine Wiederholung je
+        // Fehleingabe verbrauchte die fuenf Versuche doppelt so schnell.
+        const zoneRejected = err instanceof ApiError && err.status === 400
+          && err.data?.reason === 'invalid_timezone';
+        if (!zoneRejected) throw err;
+        await auth.setup(username, displayName, password, language);
+      }
       // Setup erfolgreich -> direkt einloggen
       const result = await auth.login(username, password);
       window.yuvomi.navigate('/', result.user);

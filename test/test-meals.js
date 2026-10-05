@@ -629,6 +629,41 @@ test('formatWeekLabel() befragt tatsaechlich matchMedia fuer den schmalen Umscha
   }
 });
 
+// Projektregel „- statt Em-/En-Dash, auch in UI-Texten" (A4 P3, 2026-09-26):
+// das Wochenlabel trug als einziger Zeitraum-Kopf einen Halbgeviertstrich,
+// der Kalender schreibt „27.08. - 29.08.". Der Browser-Loader stubbt die
+// Datumsformate auf `String(d)`; der Trenner ist das Einzige, was die
+// Funktion selbst beitraegt, und genau der wird hier geprueft.
+test('formatWeekLabel() trennt mit Bindestrich, nicht mit Halbgeviertstrich', () => {
+  const zuvorWindow = globalThis.window;
+  for (const narrow of [false, true]) {
+    globalThis.window = { matchMedia: () => ({ matches: narrow }) };
+    try {
+      const label = mealsUi.formatWeekLabel('2026-09-14');
+      assert(!/[\u2013\u2014]/.test(label), `Wochenlabel (${narrow ? 'schmal' : 'breit'}) enthaelt einen Gedankenstrich: ${label}`);
+      assert(/ - /.test(label), 'die beiden Enden trennt „ - "');
+    } finally {
+      globalThis.window = zuvorWindow;
+    }
+  }
+});
+
+// Kuechenkopf (Kopfregel mobil, 2026-09-26): Zufallsplan und Rezept-Spalte
+// standen als loser Textknopf und loses Icon im Kopf; mobil brach der
+// Textknopf auf eine eigene Zeile um (Kopf 177px). Jetzt sind beide Eintraege
+// des EINEN Werkzeugmenues - mit Label, und die Spalte als Schalter mit Haken.
+test('Wochenplan: Zufallsplan und Rezept-Spalte stehen im Werkzeugmenue', () => {
+  const html = mealsUi.mealsToolsMenuHtml();
+  assert(/class="[^"]*page-tools-btn[^"]*popover-menu__trigger"/.test(html), 'der Trigger ist das geteilte Werkzeugmenue');
+  const panel = html.slice(html.indexOf('<div class="popover-menu"'));
+  assert(/role="menuitem"[^>]*data-action="randomize-plan"/.test(panel), 'Zufallsplan ist ein Menueeintrag');
+  assert(/role="menuitemcheckbox" aria-checked="true"[^>]*data-action="toggle-rail"/.test(panel),
+    'die Rezept-Spalte ist ein Schalter mit Zustand');
+  // Der Kopf selbst traegt keine losen Knoepfe mehr dafuer.
+  assert(!/id="week-randomize"|id="rail-toggle"/.test(mealsSource),
+    'Zufallsplan und Spalten-Schalter duerfen nicht als lose Kopfknoepfe zurueckkommen');
+});
+
 // --------------------------------------------------------
 // Rezept skalieren: Zutatenmengen (Umschrift nach Region)
 // --------------------------------------------------------
@@ -1469,6 +1504,330 @@ test('#1317: touch-action: none sitzt am Griff der schmalen Zeile und NUR dort, 
     && !r.selector.split(',').every((s) => s.trim().endsWith('.meal-card__drag')));
   assert(offenders.length === 0,
     `touch-action: none ausserhalb des Griffs zerlegt das Scrollen der Woche: ${offenders.map((r) => r.selector.trim()).join(' | ')}`);
+});
+
+// --------------------------------------------------------
+// Montag (Critique 2026-09-26, A4 P1)
+//
+// Bei 1440px lag der Montag beim Laden unter der Gutter-Spalte: renderWeekGrid()
+// fragte „heute verdeckt?" bei OFFENER Rezept-Spalte, zentrierte den Samstag, und
+// erst danach klappte wireRailToggle() die Spalte zu - scrollLeft klemmte auf
+// 52px. Die Probe faehrt die ECHTEN Funktionen gegen ein Board, dessen Breite an
+// der Rezept-Spalte haengt, wie im Browser: offen laeuft die Woche ueber, zu
+// passt sie.
+// --------------------------------------------------------
+
+function mondayBoard({ stored = null } = {}) {
+  const layoutClasses = new Set();
+  const calls = [];
+  const railOpen = () => !layoutClasses.has('meals-layout--rail-hidden');
+  const todayHeader = {
+    // Samstag: bei offener Spalte rechts hinter der Kante, zu im Blick.
+    getBoundingClientRect: () => (railOpen() ? { left: 1300, right: 1440 } : { left: 1104, right: 1252 }),
+    scrollIntoView: (opts) => calls.push(opts),
+    closest: () => null,
+  };
+  const grid = {
+    get scrollWidth() { return railOpen() ? 1208 : 1152; },
+    get clientWidth() { return railOpen() ? 836 : 1156; },
+    getBoundingClientRect: () => ({ left: 252, right: railOpen() ? 1088 : 1408 }),
+    querySelector: (sel) => {
+      if (sel === '.day-header--today') return todayHeader;
+      if (sel === '.week-gutter-label') return { getBoundingClientRect: () => ({ width: 116 }) };
+      return null;
+    },
+  };
+  const layout = { classList: {
+    toggle: (c, force) => (force ? layoutClasses.add(c) : layoutClasses.delete(c)),
+    contains: (c) => layoutClasses.has(c),
+  } };
+  const item = { addEventListener() {} };
+  const container = {
+    querySelector: (sel) => {
+      if (sel === '#week-grid') return grid;
+      if (sel === '.meals-layout') return layout;
+      if (sel === '.popover-menu__item[data-action="toggle-rail"]') return item;
+      return null;
+    },
+  };
+  return { container, grid, calls, railOpen, stored };
+}
+
+function withBoardEnv(stored, fn) {
+  const zuvorWindow = globalThis.window;
+  const zuvorStorage = globalThis.localStorage;
+  globalThis.window = { matchMedia: () => ({ matches: false }) };
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true, writable: true,
+    value: { getItem: () => stored, setItem() {} },
+  });
+  try { return fn(); } finally {
+    globalThis.window = zuvorWindow;
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, writable: true, value: zuvorStorage });
+  }
+}
+
+test('A4 P1: vor der Entscheidung der Rezept-Spalte scrollt das Board nicht zu „heute"', () => {
+  withBoardEnv(null, () => {
+    const b = mondayBoard();
+    mealsUi.setContainerForTest(b.container);
+    // Erster Bildaufbau: Spalte offen, die Woche laeuft ueber, heute liegt rechts
+    // hinter der Kante - frueher der Moment, in dem der Samstag zentriert wurde.
+    mealsUi.revealToday(b.grid);
+    assert(b.calls.length === 0, `das Board scrollte bei offener Spalte zu heute (${b.calls.length}x) - danach klappt die Spalte zu und der Montag liegt unter der Gutter`);
+    mealsUi.wireRailToggle();
+    assert(!b.railOpen(), 'ohne Merker klappt die Spalte zu, wenn die Woche mit ihr nicht passt');
+    assert(b.calls.length === 0, 'mit zugeklappter Spalte passt die Woche - kein Scroll, der Montag bleibt stehen');
+  });
+});
+
+test('A4 P1: mit gemerkter offener Spalte holt das Board „heute" NACH der Entscheidung in den Blick', () => {
+  withBoardEnv('shown', () => {
+    const b = mondayBoard();
+    mealsUi.setContainerForTest(b.container);
+    mealsUi.revealToday(b.grid);
+    assert(b.calls.length === 0, 'vor der Entscheidung kein Scroll');
+    mealsUi.wireRailToggle();
+    assert(b.railOpen(), 'der Merker haelt die Spalte offen');
+    assert(b.calls.length === 1 && b.calls[0].inline === 'center',
+      `heute ist verdeckt und muss genau einmal in den Blick (${b.calls.length}x)`);
+  });
+});
+
+test('Critique 2026-09-26: die Anlege-Knoepfe nennen ihren Tag, sieben Tage sind sieben Namen', () => {
+  // 2026-09-21 ist ein Montag. Ein leerer Slot (Plus im Board) und ein belegter
+  // (Plus unter der Karte) - beide Anlegewege je Tag.
+  const type = { key: 'breakfast', label: 'Frühstück' };
+  const labelsOf = (html) => [...html.matchAll(/data-action="add-meal"[\s\S]*?aria-label="([^"]*)"/g)].map((m) => m[1]);
+  const week = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27'];
+  const empty = week.map((date) => labelsOf(mealsUi.renderSlot(date, type, [], 2, 2))[0]);
+  assert(new Set(empty).size === 7, `sieben Tage, aber ${new Set(empty).size} verschiedene Namen: ${empty.join(' | ')}`);
+  const monday = pageEsc(pageT('meals.addMealTypeOnDay', { type: type.label, day: pageT('calendar.dayLongMonday') }));
+  assert(empty[0] === monday, `Montag heisst „${empty[0]}", erwartet „${monday}"`);
+  const filled = labelsOf(mealsUi.renderSlot('2026-09-27', type,
+    [{ id: 3, date: '2026-09-27', meal_type: 'breakfast', title: 'Porridge', ingredients: [] }], 2, 2));
+  assert(filled.length === 1 && filled[0].includes(pageT('calendar.dayLongSunday')),
+    `das Plus unter der Karte nennt seinen Tag nicht: ${filled.join(' | ')}`);
+  // Der Tagesknopf (mobil) zieht denselben Namen, nur ohne Mahlzeittyp.
+  assert(/class="day-add"[^>]*aria-label="\$\{esc\(t\('meals\.addMealOnDay', \{ day: dayLongName\(date\) \}\)\)\}"/.test(mealsSource),
+    'der Tagesknopf .day-add muss meals.addMealOnDay mit dem Tagesnamen tragen');
+});
+
+test('Critique 2026-09-26: die Kartenaktionen tragen mobil die Stufe der Zeilenaktionen, nicht 12px', () => {
+  const html = mealsUi.renderSlot('2026-09-21', { key: 'dinner', label: 'Abendessen' },
+    [{ id: 9, date: '2026-09-21', meal_type: 'dinner', title: 'Suppe', ingredients: [] }], 2, 2);
+  const actions = html.slice(html.indexOf('class="meal-card__actions"'), html.indexOf('meal-slot__add-more-btn'));
+  assert(/data-lucide="trash-2"/.test(actions), 'kein Loeschen-Zeichen in der Aktionsleiste gefunden - der Test liest die Karte nicht mehr');
+  assert(!/class="icon-sm"/.test(actions), 'ein Kartenaktions-Zeichen steht noch auf --icon-sm (12px)');
+  const css = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
+  const touch = [...eachRule(css)].find((r) => r.selector.trim() === '.meal-card__action-btn svg'
+    && r.at?.join(' ').includes('max-width: 639px'));
+  assert(touch && /width:\s*var\(--icon-lg\)/.test(touch.body) && /height:\s*var\(--icon-lg\)/.test(touch.body),
+    'im 48px-Knopf (hover: none / schmal) muss das Zeichen --icon-lg tragen');
+});
+
+test('A4 P1: bei 1440px passen sieben Tage ohne Querscroll (116 Gutter + 7 Spalten + 7 Luecken <= 1156)', () => {
+  const css = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(css)].find((r) => r.selector.trim() === '.week-grid' && /grid-template-columns/.test(r.body));
+  assert(rule, 'keine .week-grid-Regel mit grid-template-columns gefunden - der Test liest meals.css nicht mehr');
+  const gutter = Number(rule.body.match(/--meal-gutter-width:\s*(\d+)px/)?.[1]);
+  const col = Number(rule.body.match(/repeat\(7,\s*minmax\((\d+)px/)?.[1]);
+  assert(gutter > 0 && col > 0, `Gutter/Spalte nicht lesbar (${gutter}/${col})`);
+  // Gap --space-2 = 8px (tokens.css); 1156px = Hauptspalte bei 1440 mit
+  // ausgeklappter Seitenleiste (1220) minus Seitenpolster.
+  const need = gutter + 7 * col + 7 * 8;
+  assert(need <= 1156, `Bedarf ${need}px > 1156px - bei 1440 laeuft die Woche ueber, der Montag wird angeschnitten`);
+});
+
+test('D3 Kueche: alle vier Tab-Koepfe halten die Kante der Kuechen-Leiste, keiner das Lesemass (Re-Critique 2026-09-27, A1 P2-5)', () => {
+  // Die Primaeraktion dockt am Ende des Kopfes an. Trugen Rezepte, Vorrat und
+  // Einkauf `--narrow`, endete ihr Kopf am Lesemass (FAB x 865 bei 1440),
+  // der Essensplan an der Leistenkante (x 1288): der Knopf sprang beim
+  // Tabwechsel um 420px. Ein Gruppenkopf gehoert der Leiste seiner Gruppe.
+  const pages = ['meals', 'recipes', 'pantry', 'shopping'];
+  let heads = 0;
+  for (const name of pages) {
+    const src = readFileSync(new URL(`../public/pages/${name}.js`, import.meta.url), 'utf8');
+    const lists = [
+      ...src.matchAll(/class="([^"]*\bpage-toolbar--in-group\b[^"]*)"/g),
+      ...src.matchAll(/className\s*=\s*'([^']*\bpage-toolbar--in-group\b[^']*)'/g),
+    ].map((m) => m[1]);
+    assert(lists.length === 1, `${name}.js: genau ein Gruppenkopf erwartet, gefunden ${lists.length} - der Test liest den Kopf nicht mehr`);
+    for (const cls of lists) {
+      heads += 1;
+      assert(!/\bpage-toolbar--narrow\b/.test(cls), `${name}.js: "${cls}" - der Kuechenkopf endet an der Leistenkante, nicht am Lesemass`);
+    }
+    assert(/data-dock-label|dataset\.dockLabel\s*=/.test(src), `${name}.js: die Primaeraktion traegt kein Nomen zum Andocken (data-dock-label)`);
+  }
+  assert(heads === 4, `nur ${heads} Kuechenkoepfe gelesen`);
+});
+
+test('D7 Essensplan: Kartenaktionen und "weitere Mahlzeit" sind dauerhaft sichtbar, auch mit Zeiger', () => {
+  const css = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
+  const hidden = [...eachRule(css)].filter((r) => /(^|,)\s*\.(?:meal-card__actions|meal-slot__add-more-btn)\s*(,|$)/.test(r.selector)
+    && /(?:^|[;\s{])opacity\s*:\s*0(?![.\d])/.test(r.body));
+  assert(hidden.length === 0, `Aktion erst beim Ueberfahren sichtbar: ${hidden.map((r) => `${r.selector.trim()} [${(r.at || []).join(' ')}]`).join('; ')}`);
+  const base = [...eachRule(css)].find((r) => r.selector.trim() === '.meal-card__actions' && !(r.at || []).length);
+  assert(base, 'keine Basisregel .meal-card__actions gefunden - der Test liest meals.css nicht mehr');
+});
+
+// --------------------------------------------------------
+// R9 M6 (Re-Critique 2026-09-27, A4 P2): mobil ist ein Tag EIN Traeger mit
+// Haarlinien-Zeilen. Gemessen bei 390px: Woche 3217px -> 2014px Scrollhoehe
+// (-37 %), Zeile 74-102px -> 48-78px, ~6 -> ~11 Mahlzeiten je Bildschirm.
+// --------------------------------------------------------
+test('R9 M6: die Mahlzeit-Zeile traegt den Typ als Vorsatz, der Papierkorb ist markiert, "+" steht im Tageskopf', () => {
+  const html = mealsUi.renderSlot('2026-09-21', { key: 'dinner', label: 'Abendessen' },
+    [{ id: 7, date: '2026-09-21', meal_type: 'dinner', title: 'Spaghetti <Bolognese>', ingredients: [] }], 1, 1);
+  const title = html.match(/<span class="meal-card__title">([\s\S]*?)<\/span>\s*(?:<span class="meal-card__meta"|<\/button>)/)?.[1] ?? '';
+  assert(/^<span class="meal-card__type">Abendessen<\/span><span class="meal-card__title-text">Spaghetti &lt;Bolognese&gt;<\/span>/.test(title),
+    `der Typ muss als Vorsatz VOR dem Namen im Titel stehen (ein Textfluss, eine Klammer), gefunden: ${title}`);
+  assert(/class="meal-card__action-btn meal-card__action-btn--delete"\s+data-action="delete-meal"/.test(html),
+    'der Papierkorb braucht seine Kennklasse - mobil verlaesst er die Zeile');
+  const grid = mealsSource.slice(mealsSource.indexOf('function renderWeekGrid('), mealsSource.indexOf('function renderSlot('));
+  const header = grid.match(/<div class="day-header[\s\S]*?<\/div>/)?.[0] ?? '';
+  assert(/<button class="day-add"/.test(header), 'der Tagesknopf steht im Tageskopf, nicht als 48px-Kachel unter dem Tag');
+  assert(/<span class="day-add__label">/.test(header), 'das Wort des Tagesknopfs braucht eine eigene Klasse (mobil faellt es, der Knopf behaelt sein aria-label)');
+  const modal = mealsUi.buildModalContent({ mode: 'edit', date: '2026-09-21', mealType: 'dinner',
+    meal: { id: 7, title: 'Pasta & Co', meal_type: 'dinner', date: '2026-09-21', ingredients: [] } });
+  assert(/id="modal-delete" data-delete-name="Pasta &amp; Co"/.test(modal),
+    'Loeschen lebt mobil im Dialogfuss - dort nennt es seine Mahlzeit (M8, data-delete-name)');
+});
+
+test('R9 M6: meals.css - ein Traeger je Tag, Haarlinie nur zwischen belegten Slots, Griff klein am Ende, Papierkorb weg', () => {
+  const css = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const narrow = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
+  const body = (sel, pred = narrow) => rules.filter((r) => pred(r) && r.selector.split(',').some((s) => s.trim() === sel)).map((r) => r.body).join(';');
+  assert(/background-color:\s*var\(--color-surface\)/.test(body('.day-slots')) && /border-radius:\s*var\(--radius-lg\)/.test(body('.day-slots')),
+    '.day-slots ist mobil der Traeger des Tages (Flaeche + Radius wie .row-carrier)');
+  assert(/border-top:\s*1px solid var\(--color-border-subtle\)/.test(body('.day-slots > .meal-slot--has-meal ~ .meal-slot--has-meal')),
+    'Haarlinie ueber `~` zwischen BELEGTEN Slots - `+` zaehlte die ausgeblendeten leeren mit');
+  assert(!rules.some((r) => narrow(r) && /\.day-slots > \*\s*\+\s*\*/.test(r.selector)), 'keine Haarlinie ueber `> * + *` - sie stuende nach einem leeren Slot an der Oberkante');
+  assert(/display:\s*none/.test(body('.day-slots > .meal-slot--has-meal > .meal-slot__type-label')), 'die Overline-Zeile faellt mobil');
+  assert(/display:\s*inline/.test(body('.meal-card__type')), 'der Vorsatz steht mobil im Fluss des Titels');
+  assert(/display:\s*none/.test(body('.meal-card__type', (r) => !r.at.length)), 'ausserhalb der schmalen Fassung nennt das Slot-Label den Typ - kein zweiter');
+  assert(/line-clamp:\s*2/.test(body('.meal-card__title')), 'Vorsatz und Name teilen EINE Zwei-Zeilen-Klammer');
+  assert(/display:\s*none/.test(body('.meal-card__action-btn--delete')), 'der Papierkorb verlaesst mobil die Zeile (nicht neben dem Griff)');
+  const drag = body('.meal-card__drag');
+  assert(/order:\s*1/.test(drag), 'der Griff steht am Zeilenende');
+  assert(/min-width:\s*var\(--space-8\)/.test(drag), 'der Griff ist klein (32px), keine eigene 48px-Flaeche');
+  const add = body('.day-header > .day-add');
+  assert(/min-width:\s*var\(--target-base\)/.test(add) && /min-height:\s*var\(--target-base\)/.test(add),
+    'der Tagesknopf behaelt als Icon-Knopf die volle Zielgroesse');
+});
+
+test('Essensplan-Board am Desktop: Woche oben, Kopf einzeilig, leere Slots ohne Kante bis sie gemeint sind (A4 P1-2)', () => {
+  // Gemessen bei 1440: Zeilen 96/128/128/219/128px - das Raster dehnte sich auf
+  // die Scrollport-Hoehe, 27 gestrichelte Leerkarten, Wochentag und Datum an
+  // entgegengesetzten Kanten des Kopfs.
+  const css = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
+  const desktop = (r) => r.at.some((a) => /min-width:\s*1024px/.test(a));
+  const rules = [...eachRule(css)].filter(desktop);
+  const find = (sel) => rules.find((r) => r.selector.split(',').some((s) => s.trim() === sel));
+  assert(/align-content:\s*start/.test(find('.week-grid')?.body ?? ''), 'die Woche dehnt ihre Zeilen nicht auf die Hoehe');
+  assert(/justify-content:\s*flex-start/.test(find('.day-header')?.body ?? ''), 'Wochentag und Datum stehen beieinander');
+  // Zwei Klassen: glass.css setzt die Slotflaeche mit `.meals-page .meal-slot`,
+  // eine Klasse allein verlor dagegen still (im Browser gemessen: weiss).
+  const empty = find('.week-grid .meal-slot--empty');
+  assert(/border-color:\s*transparent/.test(empty?.body ?? ''), `der leere Slot traegt keine Kante: ${empty?.body}`);
+  assert(/background-color:\s*transparent/.test(empty?.body ?? ''), `und keine Kartenflaeche: ${empty?.body}`);
+  const meant = rules.find((r) => /\.week-grid \.meal-slot--empty:focus-within/.test(r.selector));
+  assert(meant && /border-color:\s*var\(--color-border\)/.test(meant.body), 'bei Fokus kommt die Kante zurueck');
+  assert(/:hover/.test(meant.selector), 'und beim Zeiger darueber');
+  const drop = [...eachRule(css)].find((r) => r.selector.trim() === '.meal-slot--drop-target');
+  assert(drop && /outline:/.test(drop.body), 'die Ablage-Markierung bleibt');
+});
+
+// Re-Critique 2026-09-28 (P7 / A4 P2-10): "Zutat hinzufuegen" sprach zwei
+// Dialekte (Mahlzeit = orangefarbener Textlink, Rezept = violette Kapsel),
+// beide auf ingredientRowHTML; der Loeschen-Knopf im Dialogfuss zwei Stile
+// (Vorrat ghost, Mahlzeit/Rezept outline).
+test('Kueche: "Zutat hinzufuegen" ist in beiden Editoren derselbe Knopf, Dialog-Loeschen ein Stil', () => {
+  const recipesSrc = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
+  const pantrySrc = readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8');
+  const btn = (src, id) => new RegExp(`<button class="([^"]*)"[^>]*id="${id}"[^>]*>\\s*<i data-lucide="plus"`).exec(src);
+  const meal = btn(mealsSource, 'add-ingredient-btn');
+  const recipe = btn(recipesSrc, 'recipe-add-ingredient');
+  assert(meal && recipe, 'beide Knoepfe tragen das Plus als erstes Kind');
+  const dialect = (cls) => cls.split(/\s+/).filter((c) => c.startsWith('btn')).join(' ');
+  assert(dialect(meal[1]) === 'btn btn--secondary', `Mahlzeit: ${meal[1]}`);
+  assert(dialect(recipe[1]) === dialect(meal[1]), `Rezept (${recipe[1]}) und Mahlzeit (${meal[1]}) sprechen verschieden`);
+  const mealsCss = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
+  const own = [...eachRule(mealsCss)].find((r) => r.selector.trim() === '.add-ingredient-btn');
+  assert(!/color:\s*var\(--module-accent\)/.test(own?.body ?? ''), 'kein Modulton-Textlink mehr');
+  assert(!/btn--danger-ghost/.test(pantrySrc), 'Vorrat: Loeschen im Dialogfuss wie Mahlzeit und Rezept (btn--danger-outline)');
+  assert(/class="btn btn--danger-outline pantry-form__delete"/.test(pantrySrc), 'Vorrat: btn--danger-outline');
+});
+
+// Re-Critique 2026-09-28 (P7 / A4 P2-9): "Mahlzeit hinzufuegen" aus einem
+// Slot fragte zuerst Datum und Mahlzeit - genau das, was der Slot schon weiss;
+// der Name lag bei 427px Hoehe unter dem Falz.
+test('Mahlzeit aus dem Slot: Name zuerst, Tag und Mahlzeit als Zusammenfassung darunter', () => {
+  const at = (html, id) => html.indexOf(`id="${id}"`);
+  const slot = mealsUi.buildModalContent({ mode: 'create', date: '2026-09-28', mealType: 'lunch', fromSlot: true });
+  assert(at(slot, 'modal-title') > -1 && at(slot, 'modal-date') > -1, 'beide Felder stehen da');
+  assert(at(slot, 'modal-title') < at(slot, 'modal-date'), 'aus dem Slot steht der Name vor dem Datum');
+  assert(at(slot, 'modal-title') < at(slot, 'modal-type'), 'und vor der Mahlzeit');
+  assert(/class="[^"]*\bmeal-modal__when\b/.test(slot), 'Tag und Mahlzeit stehen als eigene, ruhige Zeile');
+  const plain = mealsUi.buildModalContent({ mode: 'create', date: '2026-09-28', mealType: 'lunch' });
+  assert(at(plain, 'modal-date') < at(plain, 'modal-title'), 'ohne Slot (FAB) bleibt die Reihenfolge: erst wann, dann was');
+  assert(/openMealModal\(\{ mode: 'create', date: btn\.dataset\.date, mealType: btn\.dataset\.type, fromSlot: true \}\)/.test(mealsSource),
+    'der Slot-Knopf sagt, dass er aus dem Slot kommt');
+});
+
+// Re-Critique 2026-09-28 (P11 / A4 P2-8): der Rezept-Aufklapper oeffnete
+// hart. Der Zustand bleibt `hidden` (sichtbarer Default, auch headless), die
+// Bewegung kommt aus dem geteilten Paar expandIn/collapseOut (utils/ux.js) -
+// Oeffnen zieht auf, Schliessen klappt erst ein und versteckt dann.
+test('Rezepte mobil: der Aufklapper zieht auf und klappt ein, statt zu springen', () => {
+  const recipesSrc = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
+  assert(/import \{[^}]*\bexpandIn\b[^}]*\bcollapseOut\b[^}]*\} from '\/utils\/ux\.js'|import \{[^}]*\bcollapseOut\b[^}]*\bexpandIn\b[^}]*\} from '\/utils\/ux\.js'/.test(recipesSrc),
+    'das geteilte Paar aus utils/ux.js');
+  const branch = recipesSrc.slice(recipesSrc.indexOf("if (btn.dataset.action === 'toggle-detail') {"),
+    recipesSrc.indexOf("if (btn.dataset.action === 'edit') {"));
+  assert(/panel\.hidden = false;[\s\S]*expandIn\(panel\)/.test(branch), 'Oeffnen: sichtbar machen, dann aufziehen');
+  assert(/collapseOut\(panel\)\.then\([\s\S]*panel\.hidden = true/.test(branch), 'Schliessen: erst einklappen, dann verstecken');
+  assert(/getAnimations(?:\?\.)?\(\)\.forEach\(\(a\) => a\.cancel\(\)\)/.test(branch),
+    'die gehaltene Einklapp-Animation (fill: forwards) wird danach verworfen - sonst oeffnete das Panel beim naechsten Mal auf Hoehe 0');
+});
+
+// Re-Critique 2026-09-28 (P7 / A4 P2-7): die Mahlzeit-Typen im
+// Rezeptformular waren native Checkbox PLUS Farbbadge je Option -
+// Doppelkodierung, und der Kanon nennt die native Checkbox fuer Mehrfachauswahl
+// unter "Nicht mehr". Jetzt Umschalt-Chips (`filter-chip`, aria-pressed).
+test('Rezeptformular: Mahlzeit-Typen sind Umschalt-Chips mit aria-pressed, ohne Checkbox und Badge', () => {
+  const recipesSrc = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
+  const group = recipesSrc.slice(recipesSrc.indexOf('id="recipe-meal-types"'), recipesSrc.indexOf('id="recipe-meal-types"') + 700);
+  assert(/<button type="button" class="filter-chip recipe-meal-types__chip"[^>]*data-meal-type="\$\{option\.key\}"[^>]*aria-pressed=/.test(group),
+    'jede Option ist ein Umschalt-Chip');
+  assert(!/type="checkbox"/.test(group), 'keine native Checkbox mehr');
+  assert(!/meal-type-badge/.test(group), 'kein zweites Farbzeichen je Option');
+  assert(/role="group" aria-labelledby="recipe-meal-types-label"/.test(recipesSrc), 'die Chips sind eine benannte Gruppe');
+  assert(/#recipe-meal-types \[aria-pressed="true"\]/.test(recipesSrc), 'gespeichert wird, was gedrueckt ist');
+});
+
+// Re-Critique 2026-09-28 (P7 / A4 P2-7): die Zutatenzeile teilte drei Felder
+// in EINER Flex-Reihe - im 520px-Dialog las sich die Kategorie als
+// "Fleisch &...", mobil blieben ihr rund 100px. Regel: der Name steht allein
+// in der ersten Zeile (mit dem Entfernen-Knopf), Menge und Kategorie teilen
+// sich die zweite; kein Feld der Zeile wird per Flex-Anteil gekappt.
+test('Zutatenzeile: Name allein in Zeile eins, Menge und Kategorie teilen Zeile zwei', () => {
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)].filter((r) => /(^|,)\s*\.ingredient-row(\b|__)/.test(r.selector));
+  const row = rules.find((r) => r.selector.trim() === '.ingredient-row' && !r.at.length);
+  assert(row && /display:\s*grid/.test(row.body), '.ingredient-row ist ein Raster');
+  const areas = (row.body.match(/grid-template-areas:\s*([^;]+);/) || [])[1] || '';
+  const lines = [...areas.matchAll(/"([^"]+)"/g)].map((m) => m[1].trim().split(/\s+/));
+  assert(lines.length === 2, 'zwei Zeilen');
+  assert(lines[0].includes('name') && !lines[0].includes('qty') && !lines[0].includes('cat'), 'Zeile eins traegt nur den Namen');
+  assert(lines[1].includes('qty') && lines[1].includes('cat'), 'Zeile zwei traegt Menge und Kategorie');
+  for (const r of rules) {
+    assert(!/(^|[;\s])flex:/.test(r.body), `${r.selector.trim()}: kein Flex-Anteil kappt ein Feld`);
+    assert(!/(?:^|[;\s])(?:max-)?width:\s*\d+px/.test(r.body), `${r.selector.trim()}: keine feste Pixelbreite`);
+  }
+  assert(rules.some((r) => r.selector.trim() === '.ingredient-row > .row-action' && /grid-area:\s*remove/.test(r.body)),
+    'der Entfernen-Knopf steht in Zeile eins neben dem Namen');
 });
 
 // --------------------------------------------------------

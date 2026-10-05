@@ -613,3 +613,49 @@ test('die Oberflaeche nennt den unzugeordneten Zustand unbekannt, nicht fehlend'
   assert.match(seite, /recipes\.ingredientMatchNone/,
     'public/pages/recipes.js zeigt den unzugeordneten Zustand nicht an');
 });
+
+// =========================================================================
+// 6. Einmal statt sechsmal (Re-Critique 2026-09-27, W2)
+// =========================================================================
+//
+// „Nicht zugeordnet" stand an jeder offenen Zutat - sechsmal je Rezept,
+// unterstrichen, lauter als die Menge. Die Regel jetzt: an der ZEILE steht nur
+// eine bestehende Zuordnung; der Weg zu den offenen ist EIN Knopf unter der
+// Liste, nur fuer Konten mit Schreibrecht am Vorrat. Und das Detail traegt echte
+// Abschnittskoepfe, eine Stufe unter dem Rezepttitel (<h2>).
+test('die Zeile nennt nur bestehende Zuordnungen, der Weg zu den offenen steht einmal', () => {
+  let seite = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
+  for (let prev = ''; prev !== seite;) {
+    prev = seite;
+    seite = seite.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  }
+  const body = (name) => {
+    const at = seite.indexOf(`function ${name}(`);
+    assert.ok(at >= 0, `${name} fehlt in recipes.js`);
+    return seite.slice(at, seite.indexOf('\n}\n', at));
+  };
+  const zeile = body('pantryMatchEl');
+  assert.doesNotMatch(zeile, /ingredientMatchNone/,
+    'pantryMatchEl schreibt den offenen Zustand wieder an jede Zeile');
+  assert.match(zeile, /if \(!matched\) return document\.createDocumentFragment\(\)/,
+    'eine offene Zutat bekommt an der Zeile kein Element');
+
+  const sammel = body('pantryMatchBulkEl');
+  assert.match(sammel, /pantryAccess\(\) !== 'write'\) return null/,
+    'der Sammelknopf ist eine Handlung - Nur-Lesende bekommen ihn nicht (#467)');
+  assert.match(sammel, /ingredientMatchOpen/, 'der Sammelknopf nennt die Zahl der offenen Zutaten');
+  assert.match(body('ingredientsSectionEl'), /pantryMatchBulkEl\(recipe\)/,
+    'der Zutaten-Abschnitt traegt den einen Sammelknopf');
+
+  const kopf = body('detailSectionEl');
+  assert.match(kopf, /createElement\('h3'\)/, 'Abschnittskopf ist eine echte Ueberschrift unter dem <h2>-Titel');
+  const detail = body('fillRecipeDetail');
+  assert.match(detail, /ingredientsSectionEl\(recipe\)/, 'Zutaten stehen im Abschnitt mit Kopf');
+  assert.match(detail, /detailSectionEl\(t\('recipes\.notesLabel'\)\)/, 'Notizen stehen im Abschnitt mit Kopf');
+
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  for (const key of ['ingredientMatchOpen', 'ingredientMatchOpen_one', 'ingredientMatchBulkTitle', 'ingredientMatchBulkHint']) {
+    assert.doesNotMatch(de.recipes[key], /fehlt|fehlend|nicht vorhanden/i,
+      `recipes.${key} liest sich wie eine Auskunft ueber den Bestand - Stufe 1 gibt keine`);
+  }
+});

@@ -22,7 +22,7 @@ import { memberEmail, listEmailableMembers } from '../services/member-email.js';
 import { isHouseholdMember } from '../services/household-members.js';
 import { buildShoppingListMail } from '../services/shopping-mail.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
-import { mayWriteModule } from '../permissions.js';
+import { mayReadModule, mayWriteModule } from '../permissions.js';
 
 const log = createLogger('Shopping');
 
@@ -660,7 +660,7 @@ router.post('/items/undo-transfer', (req, res) => {
     const findSource = db.get().prepare('SELECT added_from_meal FROM shopping_items WHERE id = ?');
     const touchesMealPlan = ids.some((id) => findSource.get(id)?.added_from_meal);
     if (touchesMealPlan && !mayWriteModule(req, 'meals')) {
-      return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403, reason: 'cross_module_access' });
     }
 
     const removed = db.get().transaction(() => {
@@ -1190,7 +1190,7 @@ router.post('/:listId/import-meal-plan', (req, res) => {
     // die rechnet, und ein Import, der danach mit 403 endet, waeren eine
     // Zusage, die nicht haelt.
     if (!mayWriteModule(req, 'meals')) {
-      return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403, reason: 'cross_module_access' });
     }
 
     const list = db.get()
@@ -1272,9 +1272,18 @@ router.post('/:listId/import-meal-plan', (req, res) => {
 // Alternative gewesen; dann muesste der Toast eine Anzahl versprechen, die erst
 // der Server kennt (Duplikate werden hier uebersprungen). Deshalb echtes Undo:
 // sofort einfuegen, IDs zurueckgeben, auf Wunsch genau diese wieder loeschen.
+//
+// LESEN BRAUCHT DAS LESERECHT DER QUELLE. Der Pfad-Guard misst diese Route als
+// `shopping`; Name und Kategorie der Vorratszeilen stehen danach auf der
+// Liste. Deshalb fragt die Route selbst nach `pantry: read` (beide Achsen),
+// vor der Listensuche wie die Uebertraege darueber.
 // --------------------------------------------------------
 router.post('/:listId/import-pantry', (req, res) => {
   try {
+    if (!mayReadModule(req, 'pantry')) {
+      return res.status(403).json({ error: 'Read access to the pantry is required.', code: 403, reason: 'cross_module_access' });
+    }
+
     const list = db.get()
       .prepare('SELECT id FROM shopping_lists WHERE id = ?')
       .get(req.params.listId);

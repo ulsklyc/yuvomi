@@ -85,7 +85,7 @@ export function healthPaths() {
     },
     '/api/v1/health/medications/{id}/logs': {
       get: op({ summary: 'List a medication\'s dose log', tag: 'Health', params: [idParam()], description: 'Optional `from`/`to` filters on `scheduled_at`.' }),
-      post: op({ summary: 'Add a dose-log entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { scheduled_at?, schedule_id?, status?, taken_at?, dose_qty?, note? }; `status` defaults to `pending`.' + TAKEN_NOW + WALL_CLOCK_INPUT }),
+      post: op({ summary: 'Add a dose-log entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { scheduled_at?, schedule_id?, status?, taken_at?, dose_qty?, note? }; `status` defaults to `pending`. Only a `taken` entry keeps `taken_at`: sent alongside `pending` or `skipped`, it is dropped and stored as null.' + TAKEN_NOW + WALL_CLOCK_INPUT }),
     },
     '/api/v1/health/logs/{id}': {
       patch: op({
@@ -123,6 +123,7 @@ export function healthPaths() {
       post: op({ summary: 'Add an analyte result to a lab report', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/health/results/{id}': {
+      patch: op({ summary: 'Update an analyte result', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Partial body (analyte, value_num, unit, ref_low, ref_high, flag?). The merged row is validated like a new result. A stored value_num cannot be cleared (400). The flag is kept unless the body names one or value or reference range change, in which case it is re-derived.' }),
       delete: op({ summary: 'Delete an analyte result', tag: 'Health', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/health/activities': {

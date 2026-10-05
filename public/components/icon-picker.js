@@ -29,6 +29,7 @@
 
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { iconNames, iconElement } from '/utils/lucide-icons.js';
 import { attachOverlay, dropOverlay } from '/utils/overlay-history.js';
 
@@ -133,9 +134,12 @@ function buildDialog(current, resolve, suggestions) {
         <h2 class="icon-picker__title">${esc(t('iconPicker.title'))}</h2>
       </header>
       <div class="icon-picker__search">
-        <label class="sr-only" for="icon-picker-search">${esc(t('iconPicker.searchLabel'))}</label>
-        <input type="search" class="form-input" id="icon-picker-search"
-               placeholder="${esc(t('iconPicker.searchPlaceholder'))}" autocomplete="off">
+        ${renderPageSearch({
+          id: 'icon-picker-search',
+          label: t('iconPicker.searchLabel'),
+          placeholder: t('iconPicker.searchPlaceholder'),
+          clearLabel: t('common.searchClear'),
+        })}
       </div>
       <div class="icon-picker__results" id="icon-picker-results" role="group"
            aria-label="${esc(t('iconPicker.resultsLabel'))}"></div>
@@ -152,12 +156,10 @@ function buildDialog(current, resolve, suggestions) {
 
   let token = null;
   let settled = false;
-  let debounce = null;
 
   function finish(value) {
     if (settled) return;
     settled = true;
-    clearTimeout(debounce);
     if (token !== null) dropOverlay(token);
     dialog.remove();
     resolve(value);
@@ -174,13 +176,11 @@ function buildDialog(current, resolve, suggestions) {
 
   paint('');
 
-  input.addEventListener('input', () => {
-    /* Ein Tastendruck zeichnet bis zu 120 Symbole neu. Ohne die kurze Pause
-     * geriet das Tippen auf dem Telefon ins Stocken - gemessen an „calendar",
-     * wo jeder der acht Buchstaben ein volles Raster kostet. */
-    clearTimeout(debounce);
-    debounce = setTimeout(() => paint(input.value), 120);
-  });
+  /* Ein Tastendruck zeichnet bis zu 120 Symbole neu. Ohne die kurze Pause
+   * geriet das Tippen auf dem Telefon ins Stocken - gemessen an „calendar",
+   * wo jeder der acht Buchstaben ein volles Raster kostet. Die Pause haelt
+   * jetzt das geteilte Suchfeld (delay), das auch den Leeren-Knopf verdrahtet. */
+  wirePageSearch(dialog, { id: 'icon-picker-search', delay: 120, onQuery: paint });
 
   results.addEventListener('click', (e) => {
     const chosen = e.target.closest('.icon-picker__tile');
@@ -236,6 +236,9 @@ export function openIconPicker(current = null, { suggestions = SUGGESTIONS } = {
 
     const picker = buildDialog(current, resolve, suggestions);
     document.body.appendChild(picker.dialog);
+    // Lupe und Leeren-Knopf des geteilten Suchfelds sind <i data-lucide>; die
+    // Kacheln baut iconElement() selbst und brauchen das nicht.
+    window.lucide?.createIcons?.({ el: picker.dialog });
     picker.dialog.showModal();
     picker.register();
     picker.focus();

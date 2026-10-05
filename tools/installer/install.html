@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title data-i18n="title">Yuvomi Setup</title>
+  <meta name="description" content="Set up your self-hosted Yuvomi family planner: server, security keys, integrations and the first admin account.">
   <!-- Fallback-Tokens VOR dem tokens.css-Link: lädt tokens.css (inkl. Dark-Mode-
        Media-Query), gewinnen dessen spätere :root-Regeln per Cascade. Fehlt
        tokens.css (falscher OIKOS_INSTALLER_ROOT, Packaging-/Volume-Fehler), bleibt
@@ -25,8 +26,21 @@
       --color-surface: #FFFFFF;
       --color-surface-2: #FBFAF7;
       --color-border: #E4E0D7;
+      /* Ruhekante der Eingabefelder, wie in tokens.css eine Stufe der Neutral-
+         Rampe. --color-border (Karten, Gruppen) liegt auf der Feldflaeche bei
+         rund 1,3:1 - ein leeres Feld war damit kaum als Feld zu erkennen, und
+         WCAG 1.4.11 verlangt fuer die Kante eines Bedienelements 3:1. */
+      --neutral-500: #8C8880;
+      --color-border-control: var(--neutral-500);
+      /* Bahn eines ausgeschalteten Schalters (.toggle__track), wie in der App:
+         3:1 gegen die Karte und die Zeile im Hover (WCAG 1.4.11, #1572). */
+      --color-switch-off: #88847C;
       --color-text-primary: #1D1B17;
       --color-text-secondary: #63615B;
+      --color-text-tertiary: #6B675F;
+      /* Haarlinie zwischen den Zeilen einer Inset-Gruppe (Kasten-in-Kasten-
+         Regel der App): leiser als --color-border, das Karten abgrenzt. */
+      --color-border-subtle: #EDEAE3;
       /* tokens.css leitet dieses Token aus --color-text-tertiary ab; hier steht
          dessen Wert direkt, weil der Fallback keine zweite Ebene braucht. */
       --color-text-placeholder: #6B675F;
@@ -60,9 +74,33 @@
       --text-lg:   1.125rem;
       --text-xl:   1.25rem;
       --text-2xl:  1.375rem;
+      --text-3xl:  1.75rem;
+      /* Rollen der Apple-Skala, die der Installer seit dem Anschluss an die
+         App fuehrt: Subheadline fuer Untertitel, Footnote fuer Hinweise. */
+      --type-secondary: 0.9375rem;
+      --type-caption:   0.8125rem;
+      --line-height-tight: 1.21;
+      --tracking-tight: -0.015em;
+      --tracking-label: 0.05em;
       --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.04);
       --shadow-md: 0 2px 10px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
       --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
+      /* Motion der App (tokens.css, Abschnitt Bewegung). Jede Transition und
+         Animation im Installer rechnet nur mit diesen Stufen; ohne tokens.css
+         waeren die var() sonst leer und jede Bewegung ungueltig. */
+      --duration-xs:  120ms;
+      --duration-sm:  150ms;
+      --duration-md:  200ms;
+      --duration-lg:  250ms;
+      --duration-xl:  300ms;
+      --duration-2xl: 400ms;
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
+      /* Die Feder des Schalterknopfs beim Einschalten (tokens.css, Glass-
+         Uebergaenge) und sein Glanz - der Glanz haengt dort an
+         --glass-inset-strength, das in beiden Themes 1 ist. */
+      --ease-glass: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --glass-inset-thumb: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(0, 0, 0, 0.08);
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -73,9 +111,10 @@
            Neutralen-Rampe, tokens.css setzt es im Dark-Mode eigens. */
         --color-bg: #191816; --color-surface: #2B2825; --color-surface-2: #0F0E0D;
         --color-border: #47423B; --color-text-primary: #F5F3ED; --color-text-secondary: #B4AEA5;
-        --color-text-placeholder: #A9A39A;
+        --color-text-placeholder: #A9A39A; --color-text-tertiary: #A9A39A;
+        --color-border-subtle: #3E3933;
         --color-accent: #A78BFA; --color-accent-hover: #BCA6FC; --color-ink-on-vivid: #0A0A0C;
-        --neutral-950: #FBFAF7;
+        --neutral-950: #FBFAF7; --neutral-500: #948E85; --color-switch-off: #948E85;
         --color-success: #30D158; --color-warning: #FF9F0A; --color-danger: #FF6961;
         /* Inkl. des 1px-Kantenrings aus tokens.css (Dark-Kur 2026-08-17): ein
            reiner Schwarz-Wurf ist auf der Kohle-Buehne unsichtbar, die Karte
@@ -92,10 +131,14 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     [hidden] { display: none !important; }
+    /* Die Fussleiste schwebt ueber dem Inhalt (sticky, 73px). Ohne diesen Rand
+       hielt der Browser ein Feld fuer "sichtbar", das unter ihr lag - Fokus per
+       Tab, reveal() nach einem Fehler und aufgeklappte Akkordeons endeten
+       dahinter. scroll-padding verschiebt den Fangbereich um ihre Hoehe. */
+    html { scroll-padding-block: 16px 96px; }
     body {
       font-family: var(--font-sans); color: var(--color-text-primary);
-      min-height: 100dvh; display: flex; flex-direction: column;
-      align-items: center; padding: 48px 16px 80px;
+      min-height: 100dvh; padding: 48px 16px 80px;
       /* HIER STAND EIN AKZENT-HAUCH am oberen Rand - ein radialer Verlauf, der
          bis v2.0.0 wortgleich auf der Login-Seite der App stand. Dort ist er mit
          dem HIG-Redesign gefallen, und der Grund gilt hier genauso: die Marke
@@ -107,13 +150,21 @@
          als „kahl" wieder gefüllt wird: sie ist absichtlich der Seitengrund. */
       background: var(--color-bg);
       position: relative;   /* Bezug fuer .lang-switch */
-      /* Die Karte hing oben und liess rund 40 % der Höhe leer. `safe` verhindert
-         den klassischen Zentrier-Bug: ohne das Schlüsselwort schneidet ein
-         überhoher Schritt (Advanced sind 4 Bildschirme) oben unscrollbar ab.
-         Browser ohne `safe`-Unterstützung verwerfen die Zeile und bleiben beim
-         bisherigen Verhalten. */
-      justify-content: safe center;
+      /* Kein vertikales Zentrieren mehr. `justify-content: safe center` stellte
+         jeden Schritt in die Mitte seiner eigenen Hoehe, und damit sprang die
+         Ueberschrift bei jedem Wechsel an eine andere Stelle (gemessen 77px
+         zwischen zwei Schritten). Oben verankert steht sie immer am selben Ort -
+         wie der Kopf jeder Seite der App. */
     }
+
+    /* Die Buehne: Marke plus Schrittliste links, Inhalt rechts ab 1024px (siehe
+       Desktop-Block unten); darunter eine Spalte. Die Inhaltsspalte ist 680px
+       breit, das Lesemass der App fuer Formulare und Listen. */
+    .shell { max-width: 680px; margin-inline: auto; }
+    .rail { min-width: 0; }
+    /* Die Schrittliste traegt den Fortschritt erst ab 1024px. Darunter reichen
+       Zaehler und Balken, eine zweite Liste stuende vor dem Inhalt. */
+    .steps-nav { display: none; }
 
     /* Marken-Anker über der Karte: Zeichen plus Wortmarke, dasselbe Motiv wie
        .login-hero__mark in der App. Der Wizard trug bisher kein Yuvomi-Zeichen. */
@@ -129,18 +180,23 @@
       box-shadow: var(--shadow-md), inset 0 1px 0 color-mix(in srgb, var(--color-ink-on-vivid) 22%, transparent);
     }
     .brand__mark svg { width: 55%; height: 55%; }
+    /* Absender, nicht Ueberschrift: die Wortmarke stand mit 20px/700 gleich laut
+       wie die Schritt-H2 darunter, und das Auge hatte zwei Titel zur Wahl. Jetzt
+       spricht sie in Headline-Staerke, der Titel des Schritts fuehrt. */
     .brand__word {
-      font-size: var(--text-xl); font-weight: 700;
+      font-size: var(--text-base); font-weight: 600;
       /* Label-Farbe, nicht Akzent. auth.css:77-81 haelt fest, dass DESIGN.md
          einen Titel in Akzentfarbe ausdruecklich verbietet, und hat die
          Anmeldeseite genau deshalb zurueckgesetzt. Der Installer ist die ERSTE
          Begegnung mit dem Produkt und trug als einziges Yuvomi-Artefakt noch
          die abgeloeste Fassung. Die Marke traegt das Tile darueber. */
-      letter-spacing: -.02em; color: var(--color-text-primary);
+      letter-spacing: -.01em; color: var(--color-text-primary);
     }
     .progress-track { position: fixed; top: 0; left: 0; right: 0; height: 3px; background: var(--color-border); z-index: 100; }
-    /* scaleX statt width: kein Layout-Reflow, flüssiger Fortschrittsbalken. */
-    .progress-fill  { height: 100%; background: var(--color-accent); transform-origin: left center; transform: scaleX(0); transition: transform .4s cubic-bezier(.4,0,.2,1); }
+    /* scaleX statt width: kein Layout-Reflow, flüssiger Fortschrittsbalken.
+       Die Kurve ist die der App (--ease-out), nicht Materials Standardkurve:
+       der Balken kommt schnell an und laeuft weich aus wie jede Bewegung der App. */
+    .progress-fill  { height: 100%; background: var(--color-accent); transform-origin: left center; transform: scaleX(0); transition: transform var(--duration-2xl) var(--ease-out); }
     html[dir="rtl"] .progress-fill { transform-origin: right center; }
 
     /* Sprachumschaltung: oben rechts, überschreibt die Browser-Erkennung. */
@@ -153,7 +209,7 @@
     .lang-switch select {
       appearance: none; -webkit-appearance: none;
       padding: 6px 26px 6px 10px; font-size: var(--text-sm); font-weight: 600;
-      border: 1.5px solid var(--color-border); border-radius: var(--radius-sm);
+      border: 1.5px solid var(--color-border-control); border-radius: var(--radius-sm);
       background: var(--color-surface); color: var(--color-text-primary);
       font-family: var(--font-sans); cursor: pointer; min-height: 36px;
     }
@@ -179,7 +235,10 @@
       padding: 20px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md);
       background: var(--color-surface); color: var(--color-text-primary);
       font-family: var(--font-sans); cursor: pointer;
-      transition: border-color .15s, box-shadow .15s, transform .15s;
+      transition:
+        border-color var(--duration-sm) var(--ease-out),
+        box-shadow var(--duration-sm) var(--ease-out),
+        transform var(--duration-sm) var(--ease-out);
     }
     .mode-card:hover { border-color: var(--color-accent); box-shadow: var(--shadow-md); transform: translateY(-2px); }
     .mode-card:focus-visible { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent); }
@@ -220,8 +279,8 @@
     .mode-card:disabled .mode-card__meta svg { stroke: var(--color-text-secondary); }
 
     /* Simple-Bereitschaftsliste: „alles erledigt"-Zusammenfassung. */
-    .ready-list { display: flex; flex-direction: column; gap: 12px; margin: 4px 0 20px; }
-    .ready-item { display: flex; align-items: flex-start; gap: 11px; font-size: var(--text-sm); line-height: 1.45; }
+    .ready-list { margin: 0 0 20px; }
+    .ready-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; font-size: var(--text-sm); line-height: 1.45; }
     .ready-item svg { width: 20px; height: 20px; flex-shrink: 0; stroke: var(--color-success); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; margin-top: 1px; }
     .ready-item b { font-weight: 600; }
     .ready-item span { color: var(--color-text-secondary); }
@@ -230,21 +289,76 @@
       font-size: var(--text-sm); font-weight: 600; color: var(--color-accent); cursor: pointer; text-decoration: underline;
     }
     .link-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: var(--radius-xs); }
-    .card {
-      /* Kein 1px-Rahmen PLUS 28px-Schatten: die Karte der App traegt --shadow-sm
-         und keine Kante (layout.css:3260). Die Kombination aus feiner Linie und
-         weitem Schatten ist genau das Muster, das der Detektor als
-         gpt-thin-border-wide-shadow meldet - hier zu Recht. */
-      background: var(--color-surface);
-      border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
-      width: 100%; max-width: 560px;
-    }
-    .step { display: none; animation: up .25s ease; }
+    /* Die Karte ist keine Flaeche mehr, sondern die Inhaltsspalte. Solange sie
+       weiss war, haetten die Inset-Gruppen der App (weisse Traeger auf dem
+       Grouped-Grund) als Kasten im Kasten gestanden - genau das, was die
+       Kasten-in-Kasten-Regel in DESIGN.md verbietet. Titel und Untertitel stehen
+       jetzt auf der Buehne, die Fragen in weissen Gruppen darunter, wie auf
+       jedem Einstellungsblatt der App. */
+    .card { width: 100%; max-width: 680px; }
+    .step { display: none; }
     .step.active { display: block; }
-    @keyframes up { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
-    .card-head { padding: 28px 32px 22px; border-bottom: 1px solid var(--color-border); }
-    .step-tag { font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--color-accent); margin-bottom: 8px; }
-    .card-head h2 { font-size: var(--text-xl); font-weight: 700; letter-spacing: -.02em; }
+
+    /* ── Schrittwechsel mit Richtung ───────────────────────────────────────────
+       Vorwaerts kommt der neue Schritt von der Leserichtung her (rechts, in RTL
+       links), zurueck von der Gegenseite - der Weg durch den Wizard bekommt
+       eine Raumrichtung. Kleiner Weg (12px), Blende mit --ease-out, wie der
+       Seitenwechsel der App (layout.css, Abschnitt Seiten-Uebergang).
+
+       Zwei Wege zum selben Bild (swapStep() im Skript setzt die Attribute):
+       - Mit View Transitions gleitet der alte Schritt kurz hinaus und der neue
+         hinein. Nur die Inhaltsspalte (.card) traegt dabei einen Namen, und nur
+         fuer die Dauer des Wechsels: die Wurzel (Schrittliste, Kopfzeile,
+         Balken) zeigt ihr LEBENDES Bild ohne Blende, damit ihre eigenen
+         Uebergaenge laufen, und die Fussleiste steht unter eigenem Namen still.
+       - Ohne API, unter reduzierter Bewegung oder im verdeckten Tab faehrt nur
+         der neue Schritt per CSS-Animation ein - Kopf und Inhalt, nie die
+         Fussleiste (sie ist sticky und gehoert zum Chrome, nicht zum Inhalt).
+       `data-step-dir` am <html> traegt die Richtung; waehrend einer View
+       Transition (html.step-vt) ruht die CSS-Animation, sonst liefe sie im
+       neuen Bild ein zweites Mal. */
+    html[data-step-dir="forward"] { --step-shift: 12px; }
+    html[data-step-dir="back"] { --step-shift: -12px; }
+    html[dir="rtl"][data-step-dir="forward"] { --step-shift: -12px; }
+    html[dir="rtl"][data-step-dir="back"] { --step-shift: 12px; }
+    @keyframes step-in { from { opacity: 0; transform: translateX(var(--step-shift, 0px)); } }
+    @keyframes step-out { to { opacity: 0; transform: translateX(calc(var(--step-shift, 0px) * -1)); } }
+    @keyframes step-fade { from { opacity: 0; } }
+    html:not(.step-vt)[data-step-dir] .step.active > :not(.card-foot) {
+      animation: step-in var(--duration-lg) var(--ease-out);
+    }
+    html.step-vt .card { view-transition-name: step; }
+    html.step-vt .step.active > .card-foot { view-transition-name: step-foot; }
+    ::view-transition-old(root) { display: none; }
+    ::view-transition-new(root) { animation: none; }
+    ::view-transition-group(step),
+    ::view-transition-group(step-foot) { animation: none; }
+    /* Jedes Bild in seiner eigenen Breite: der Gruppenrahmen hat schon die
+       NEUE Geometrie, und der Einstieg (560px, einspaltig) wurde sonst auf die
+       680px der Inhaltsspalte gezogen. */
+    ::view-transition-old(step),
+    ::view-transition-new(step) { inline-size: auto; }
+    /* Hinaus schneller als herein (Exit vor Entrance). */
+    ::view-transition-old(step) { animation: step-out var(--duration-sm) var(--ease-out) both; }
+    ::view-transition-new(step) { animation: step-in var(--duration-lg) var(--ease-out) both; }
+    ::view-transition-old(step-foot) { display: none; }
+    ::view-transition-new(step-foot) { animation: none; }
+    /* Waehrend der Blende trifft Chromium jeden Zeiger nur auf <html>;
+       swapStep() bricht deshalb beim ersten Tipp ab (wie swapPage der App). */
+    ::view-transition { pointer-events: none; }
+    .card-head { padding: 0 0 24px; }
+    /* Der Zaehler ist echte Information (Schritt 3 von 9), keine Zierzeile: er
+       bleibt, verliert aber den Akzent. Violett ist die EINE Stimme der
+       Primaeraktion - eine versale Akzentzeile ueber jedem Titel war eine zweite. */
+    .step-tag { font-size: var(--type-caption); font-weight: 600; color: var(--color-text-secondary); margin-bottom: 6px; }
+    /* Title 1 der App-Skala (28/34, bold, -0.015em). Die H2 stand auf 20px und
+       damit auf der Stufe der Wortmarke - zwei gleich laute Titel uebereinander,
+       und keiner fuehrte (Critique 2026-09-29, "Typo flach"). */
+    .card-head h2 {
+      font-size: var(--text-3xl); font-weight: 700;
+      letter-spacing: var(--tracking-tight); line-height: var(--line-height-tight);
+      text-wrap: balance;
+    }
     /* showStep() fokussiert die Überschrift programmatisch, damit Tastatur- und
        Screenreader-Nutzer der Navigation folgen (WCAG 2.4.3). Der blaue
        UA-Default-Ring liess sie dabei bei jedem Schrittwechsel wie ein
@@ -255,22 +369,231 @@
     }
     /* Visuell versteckt, für Screenreader vorhanden (persistenter Seiten-H1). */
     .vh { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-    .card-head p  { font-size: var(--text-sm); color: var(--color-text-secondary); margin-top: 7px; line-height: 1.55; }
-    .card-body { padding: 24px 32px; }
-    .card-foot { padding: 16px 32px; border-top: 1px solid var(--color-border); display: flex; justify-content: flex-end; gap: 10px; }
+    /* Subheadline der App-Skala. 62ch halten das Lesemass, auch wenn die Spalte
+       auf dem Desktop 680px breit ist. */
+    .card-head p  {
+      font-size: var(--type-secondary); color: var(--color-text-secondary);
+      margin-top: 8px; line-height: 1.4; max-width: 62ch;
+    }
+    .card-body { padding: 0; }
+    /* Sticky in JEDER Breite, nicht nur mobil: bei 1440x900 lag die Fussleiste
+       von Schritt 1 bei y=901, also einen Pixel unter dem Falz - die
+       Primaeraktion war auf dem Desktop erst nach dem Scrollen zu sehen. Die
+       Leiste schwebt wie das Chrome der App: opak als Grundfall, Glas nur mit
+       backdrop-filter (gleiche @supports-Weiche wie glass.css). Seit die Karte
+       keine Flaeche mehr ist, liegt die Leiste auf der Buehne und nimmt deren
+       Farbe - eine weisse Leiste unter weissen Gruppen hiesse eine weitere
+       Karte am Seitenende. */
+    .card-foot {
+      margin-top: 24px; padding: 12px 0;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      border-top: 1px solid var(--color-border);
+      display: flex; justify-content: flex-end; gap: 10px;
+      position: sticky; bottom: 0; z-index: 10;
+      background: var(--color-bg);
+    }
+    @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+      .card-foot {
+        /* 82 % Deckung: der Inhalt darunter ist als Bewegung zu ahnen, aber
+           nicht lesbar - Text hinter Text waere Rauschen neben der Primaeraktion.
+           Die Blur-Tokens kommen aus tokens.css; der Fallback steht im var(). */
+        background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+        backdrop-filter: var(--blur-md, blur(20px)) saturate(var(--lg-glass-saturate, 200%));
+        -webkit-backdrop-filter: var(--blur-md, blur(20px)) saturate(var(--lg-glass-saturate, 200%));
+      }
+    }
+    /* Ohne Unschaerfe (tokens.css setzt --blur-* hier auf 0) waere die
+       Teiltransparenz nur noch durchscheinender Text - dann lieber opak. */
+    @media (prefers-reduced-transparency: reduce) {
+      .card-foot { background: var(--color-bg); }
+    }
+
+    /* ── Inset-Gruppen: die Formensprache der Einstellungen ───────────────────
+       Zusammengehoerige Fragen stehen in EINEM weissen Traeger auf dem
+       Grouped-Grund, Zeilen durch Haarlinien getrennt - dieselbe Grammatik wie
+       .row-carrier in der App (list-row.css): 16px Radius fuer den
+       Zeilentraeger, --shadow-sm statt Kante, die Trennung leistet die
+       --color-border-subtle-Linie.
+
+       Die Haarlinie haengt an JEDER Zeile oben, und die Zeile rueckt 1px nach
+       oben: die Linie der ersten sichtbaren Zeile liegt damit ausserhalb des
+       Traegers und wird von overflow:hidden gekappt. Das `* + *` der App reicht
+       hier nicht, weil Zeilen per `hidden` wegfallen (Pruefseite) - die erste
+       SICHTBARE Zeile truege dann eine Linie ueber sich. Fehlerbanner, die
+       fail() unter ein Feld zieht, sind keine Zeile und bleiben aussen vor. */
+    .inset-group {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .inset-group + .inset-group { margin-top: 24px; }
+    .inset-group > :not(.error-banner),
+    .inset-sub > :not(.error-banner) {
+      border-top: 1px solid var(--color-border-subtle); margin-top: -1px;
+    }
+    .inset-group .field { padding: 12px 16px; margin: 0; }
+    .inset-group .error-banner { margin: 0 16px 12px; }
+    /* Gruppen-Label im Stil des Versal-Mikro-Labels der App (typography.css):
+       der Sektionskopf einer Grouped-Liste, 12px semibold, 0.05em, um die
+       16px der Zeilen eingerueckt, damit er mit deren Text fluchtet. Die
+       Haarlinie darunter ist gegangen - die Gruppe grenzt sich selbst ab. */
+    .group-label {
+      font-size: var(--text-xs); font-weight: 600; line-height: var(--line-height-tight);
+      letter-spacing: var(--tracking-label); text-transform: uppercase;
+      color: var(--color-text-secondary);
+      margin: 28px 0 8px; padding-inline: 16px;
+    }
+    /* Das erste Label eines Schritts rueckt an den Kopf heran; erst zwischen
+       zwei Gruppen braucht es den vollen Abstand. */
+    .card-body > .group-label:not(.inset-group ~ .group-label) { margin-top: 0; }
+    /* Erklaerung zu einer ganzen Gruppe: steht zwischen Label und Traeger, weil
+       sie VOR der Entscheidung gelesen werden muss (Heimnetz-Freigaben). */
+    .group-note {
+      font-size: var(--type-caption); line-height: 1.38; color: var(--color-text-secondary);
+      padding-inline: 16px; margin: -2px 0 10px; max-width: 70ch;
+    }
+    /* Nach einer Gruppe: ein Ausweg zu ihr (Kalender -> weitere Konten in der
+       App). Abstand wie unter einem Label, nur in die andere Richtung. */
+    .inset-group + .group-note { margin: 10px 0 0; }
+    /* Kopf einer Pruefseiten-Gruppe: Label links, "Aendern" rechts. */
+    /* Mittig ausgerichtet, damit "Aendern" auf der Zeile des Labels steht; der
+       negative Abstand unten gleicht die 44px-Zielhoehe des Knopfs aus, sonst
+       stuende die Gruppe weiter vom Label ab als ueberall sonst. */
+    .group-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin: 20px 0 -6px;
+    }
+    .group-head .group-label { margin: 0; }
+    .group-head + .inset-group { margin-top: 0; }
+    .rv-group:first-of-type > .group-head { margin-top: 0; }
+    .group-edit {
+      background: none; border: none; cursor: pointer;
+      font-family: var(--font-sans); font-size: var(--type-secondary); font-weight: 600;
+      color: var(--color-accent);
+      min-height: 44px; padding: 0 16px; border-radius: var(--radius-full);
+    }
+    .group-edit:hover { background: color-mix(in srgb, var(--color-accent) var(--tint-state, 12%), transparent); }
+    .group-edit:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
     .field { margin-bottom: 18px; }
     .field label { display: block; font-size: var(--text-sm); font-weight: 600; margin-bottom: 6px; }
-    /* Die Kästchen waren 13x13 neben einem 16px hohen Label und verfehlten damit
-       jede Zielgrösse (WCAG 2.2 SC 2.5.8 verlangt 24x24 CSS-Pixel). Das gilt in
-       jeder Breite, nicht nur mobil - deshalb keine Media-Query. */
-    input[type=checkbox] {
-      inline-size: 24px; block-size: 24px; flex-shrink: 0;
-      margin: 0; accent-color: var(--color-accent); cursor: pointer;
+    /* ── Schalter: die Boolean-Einstellung der App ───────────────────────────
+       Komponenten-Kanon (DESIGN.md, "Boolean in den Einstellungen"): ein
+       Schalter wie in Apples Einstellungen, Label links, Zustand rechts. Die
+       native Checkbox steht dort unter "Nicht mehr" - der Installer war die
+       erste Begegnung mit Yuvomi und sprach als einzige Stelle noch den alten
+       Dialekt (Critique 2026-09-29, 2. Runde, P1). Nachgebaut nach
+       toggleRowHtml({ control: 'switch' }) (settings/components.js) und der
+       .toggle-Bahn (layout.css, glass.css), nicht importiert: der Installer ist
+       eine Einzeldatei. Der Knoten bleibt eine input[type=checkbox] mit
+       role="switch" - .checked und change lesen sich wie vorher, ein
+       Screenreader sagt "Schalter, an" statt "Kontrollkaestchen, aktiviert".
+       Den Modifikator toggle-row--switch der App braucht es hier nicht: eine
+       Haken-Zeile gibt es im Installer nicht mehr.
+
+       Die ganze Zeile ist das Label und damit die Trefferflaeche. Das Polster
+       sitzt deshalb im Label, nicht im Feld: sonst endete das Ziel am letzten
+       Buchstaben, und der Daumen traf daneben. `label.` hebt die Regel ueber
+       `.field label` (Block, Abstand darunter). */
+    .inset-group .field:has(> .toggle-row) { padding: 0; }
+    label.toggle-row {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 0; cursor: pointer;
+      min-height: 48px; padding: 12px 16px;
     }
-    .field label:has(input[type=checkbox]) {
-      display: flex; align-items: center; gap: 10px; margin-bottom: 0; cursor: pointer;
+    .toggle-row__label { flex: 1; min-width: 0; }
+    .toggle { position: relative; display: inline-flex; flex-shrink: 0; margin-inline-start: auto; }
+    /* Visuell versteckt, aber im Fokus-Weg: Space schaltet, der Ring steht an
+       der Zeile. position: relative oben haelt das Kaestchen in der Zeile - die
+       App fand ohne das einen Scroll-Sprung ins falsche Element (#483). */
+    .toggle input {
+      position: absolute; width: 1px; height: 1px; margin: 0;
+      overflow: hidden; clip: rect(0, 0, 0, 0);
     }
-    .opt { font-weight: 400; color: var(--color-text-secondary); font-size: var(--text-xs); }
+    .toggle__track {
+      position: relative; width: 44px; height: 26px; flex-shrink: 0;
+      border-radius: var(--radius-full);
+      background-color: var(--color-switch-off);
+      transition: background-color var(--duration-sm) var(--ease-out);
+    }
+    /* Der Knopf traegt den Glanz der App (Specular oben, Schattenkante unten). */
+    .toggle__track::after {
+      content: ''; position: absolute; top: 3px; inset-inline-start: 3px;
+      width: 20px; height: 20px; border-radius: var(--radius-full);
+      background: var(--color-surface);
+      box-shadow: var(--shadow-sm), var(--glass-inset-thumb);
+      transition: transform var(--duration-sm) var(--ease-out);
+    }
+    .toggle input:checked + .toggle__track { background-color: var(--color-accent); }
+    /* Einschalten federt (--ease-glass wie in der App), Ausschalten gleitet
+       ruhig zurueck - dieselbe Asymmetrie wie layout.css. */
+    .toggle input:checked + .toggle__track::after {
+      transform: translateX(18px);
+      transition: transform var(--duration-xl) var(--ease-glass);
+    }
+    /* In RTL steht "an" links, wie bei Apple: die Zeile spiegelt sich per
+       Flex, der Knopf per inset-inline-start - nur sein Weg braucht das
+       Vorzeichen. */
+    html[dir="rtl"] .toggle input:checked + .toggle__track::after { transform: translateX(-18px); }
+    .toggle input:disabled + .toggle__track { opacity: 0.4; }
+    label.toggle-row:has(input:disabled) { cursor: not-allowed; }
+    /* Der Ring steht an der Zeile und nur bei Tastaturfokus (wie
+       .toggle-row--switch der App). Nach innen gezogen wie an .toggle-head: die
+       Gruppe clippt ihre Kanten, ein aeusserer Ring fehlte links und rechts. */
+    label.toggle-row:has(input:focus-visible) { box-shadow: inset 0 0 0 2px var(--color-accent); }
+    /* Hinweis unter einer Schalterzeile: das Polster sitzt IM Hinweis, das
+       Lesemass waechst um genau das, sonst braeche er frueher um als die
+       Hinweise der Textfelder. */
+    .inset-group .field > .toggle-row ~ .hint {
+      margin-top: -6px; padding: 0 16px 12px; max-width: calc(70ch + 32px);
+    }
+    /* "Mehr erfahren": Hintergrund zu einer Frage, der beim Ausfuellen nicht
+       gebraucht wird (was eine Abschaltung spaeter bewirkt, wie sich Werte
+       ueberlagern). Auf dem Handy stand er als Absatz von bis zu sechs Zeilen
+       zwischen den Feldern; jetzt zeigt ihn ein Tipp. Ab 641px ist Platz, dort
+       oeffnet syncHintMore() ihn und die Zeile "Mehr erfahren" entfaellt. */
+    .hint-more > summary {
+      display: flex; align-items: center; gap: 4px; min-height: 44px; width: fit-content;
+      font-size: var(--type-caption); font-weight: 600; color: var(--color-accent);
+      cursor: pointer; list-style: none;
+    }
+    .hint-more > summary::-webkit-details-marker { display: none; }
+    .hint-more > summary::after {
+      content: ''; width: 12px; height: 12px; flex-shrink: 0; background: currentColor;
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+      transition: transform var(--duration-sm) var(--ease-out);
+    }
+    .hint-more[open] > summary::after { transform: rotate(180deg); }
+    /* Weich auf und zu statt zu schnappen: der Inhalt von <details> ist seit
+       ::details-content als Box ansprechbar, interpolate-size laesst seine Hoehe
+       nach `auto` gleiten. --ease-in-out wie jede Hoehe der App (tokens.css):
+       der Absatz darunter wandert mit und braucht Anlauf UND Auslauf.
+       content-visibility schaltet diskret erst am Ende ab - bis dahin ist der
+       Text beim Zuklappen noch zu sehen, danach wie gewohnt fuer Tastatur und
+       Screenreader weg. Wo ::details-content fehlt, faellt die Regel ganz weg
+       und <details> schnappt wie bisher; wo nur interpolate-size fehlt
+       (Safari, Firefox), springt die Hoehe - beides ohne Schaden. */
+    .hint-more { interpolate-size: allow-keywords; }
+    .hint-more::details-content {
+      block-size: 0; overflow: clip;
+      transition:
+        block-size var(--duration-lg) var(--ease-in-out),
+        content-visibility var(--duration-lg) var(--ease-in-out) allow-discrete;
+    }
+    .hint-more[open]::details-content { block-size: auto; }
+    .hint-more > summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: var(--radius-xs); }
+    .hint-more > .hint { margin-top: 0; }
+    /* Unter einer Schalterzeile: der Knopf ueberlappt deren unteres Polster,
+       damit er 44px Ziel hat, ohne 44px Hoehe dazuzulegen. */
+    .inset-group .field > .toggle-row ~ .hint-more { margin-top: -12px; padding: 0 16px 4px; }
+    .inset-group .field > .toggle-row ~ .hint-more > .hint { padding-bottom: 8px; }
+    .toggle-body > .hint-more { padding: 2px 16px 0; }
+    @media (min-width: 641px) {
+      .hint-more > summary { display: none; }
+      .toggle-body > .hint-more { padding-top: 12px; }
+      .inset-group .field > .toggle-row ~ .hint-more { margin-top: -6px; }
+    }
+    .opt { font-weight: 400; color: var(--color-text-tertiary); font-size: var(--text-xs); }
     /* Der Platzhalter war NIRGENDS gesetzt und fiel damit auf Chromes UA-Default
        #757575 zurück, der im Dark Mode nicht mitkippt: gemessen 3.36:1 auf dem
        dunklen Feldgrund, über alle 25 Felder mit placeholder-Attribut. Dieselbe
@@ -292,10 +615,12 @@
        hervorgehobenen Sicherheits-Select. */
     select { padding-inline-end: 40px; text-overflow: ellipsis; }
     input[type=text], input[type=password], input[type=email], input[type=number], select {
-      width: 100%; padding: 10px 12px; border: 1.5px solid var(--color-border); border-radius: var(--radius-sm);
+      /* Kante --color-border-control (3:1, WCAG 1.4.11), nicht --color-border:
+         die Kartenkante verschwand auf der Feldflaeche fast ganz. */
+      width: 100%; padding: 10px 12px; border: 1.5px solid var(--color-border-control); border-radius: var(--radius-sm);
       background: var(--color-surface); color: var(--color-text-primary); font-family: var(--font-sans);
       font-size: var(--text-base);
-      outline: none; transition: border-color .15s;
+      outline: none; transition: border-color var(--duration-sm) var(--ease-out);
     }
     input:focus, select:focus {
       border-color: var(--color-accent);
@@ -316,9 +641,27 @@
        in die zweite. min-width: 0 verhindert, dass der Feldinhalt die Zeile
        aufspannt und den Umbruch aushebelt. */
     .secret-row input { flex: 1 1 100%; min-width: 0; font-family: var(--font-mono); font-size: var(--text-sm); }
-    /* 14px wie die Hinweise der App (auth.css:115). Auf 12px war ausgerechnet
-       die erklaerende Prosa fuer Laien kleiner als in der fertigen App. */
-    .hint { font-size: var(--text-sm); color: var(--color-text-secondary); margin-top: 5px; line-height: 1.4; }
+    /* Passwortzeilen (Admin, SMTP, WebDAV, Drive) tragen nur ein Auge neben
+       einem gewoehnlichen Passwort, keinen 64-Zeichen-Schluessel. Mit der
+       Basis 100 % der Schluesselzeile rutschte das Auge auch auf dem Desktop
+       allein unter das Feld. Hier bleibt es daneben, und das Feld traegt die
+       Schrift der uebrigen Felder (16px - darunter zoomt iOS beim Fokus). */
+    .pw-row { flex-wrap: nowrap; }
+    .pw-row input { flex: 1 1 auto; font-family: var(--font-sans); font-size: var(--text-base); }
+    /* Der Haken steht HINTER dem Satz und ist bis zur Mindestlaenge nur
+       unsichtbar: vorne haette er den Hinweis gegen alle anderen eingerueckt
+       oder beim achten Zeichen seitlich geschoben. */
+    .pass-hint { display: flex; align-items: center; gap: 6px; }
+    .pass-hint__mark {
+      width: 14px; height: 14px; flex-shrink: 0; fill: none; stroke: var(--color-success);
+      stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; visibility: hidden;
+    }
+    .pass-hint[data-state="ok"] .pass-hint__mark { visibility: visible; }
+    /* Footnote der App-Skala (13/18), in Sekundaertext statt Tertiaer: das ist
+       erklaerende Prosa fuer Laien, keine Metazeile, und sie braucht den
+       Kontrast. Auf 12px war sie einmal kleiner als in der fertigen App; die
+       Footnote ist die Stufe, auf der Apple Feld- und Gruppenfussnoten setzt. */
+    .hint { font-size: var(--type-caption); color: var(--color-text-secondary); margin-top: 6px; line-height: 1.38; max-width: 70ch; }
     .hint a { color: var(--color-accent); }
     /* Redirect-URIs sind unzerbrechliche Maschinenwerte in fester Kartenbreite:
        ohne Umbruch clippte overflow:hidden der Toggle-Card sie mobil kommentarlos
@@ -331,15 +674,21 @@
        eine fremde Grammatik. --radius-full lag ungenutzt im Dokument. */
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-      min-height: 44px; padding: 10px 20px;
+      /* 48px wie .btn der App (DESIGN.md, --target-lg); 44px ist das
+         Minimum, kein Ziel. */
+      min-height: 48px; padding: 10px 20px;
       border-radius: var(--radius-full); font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600;
-      cursor: pointer; border: none; transition: background .12s, opacity .12s;
+      cursor: pointer; border: none;
+      transition: background var(--duration-xs) var(--ease-out), opacity var(--duration-xs) var(--ease-out);
     }
     /* Dieselbe Mischung wie .btn--primary der App (layout.css:3957): der reine
        Akzent war ein messbar anderes Violett als jeder Primaerbutton der App -
        direkt neben einem Marken-Tile, das die App-Farbe korrekt traegt. */
-    .btn-primary { background: color-mix(in srgb, var(--color-accent) 88%, var(--neutral-950)); color: var(--color-ink-on-vivid); }
-    .btn-primary:hover:not(:disabled) { background: var(--color-accent-hover); }
+    /* .open-link teilt die Flaeche: der Abschluss-CTA trug den reinen Akzent
+       und war damit das einzige Violett der Reise, das von allen Primaerknoepfen
+       davor abwich - ausgerechnet im letzten Schritt. */
+    .btn-primary, .open-link { background: color-mix(in srgb, var(--color-accent) 88%, var(--neutral-950)); color: var(--color-ink-on-vivid); }
+    .btn-primary:hover:not(:disabled), .open-link:hover { background: var(--color-accent-hover); }
     /* Scharfgestellte Zwei-Klick-Bestaetigung (Speichern & Starten): der Zustand
        muss SICHTBAR sein, nicht nur im Buttontext - ein Doppelklicker liest das
        Label nie, ein Zoegerer haelt den ersten Klick sonst fuer wirkungslos.
@@ -348,54 +697,195 @@
       background: var(--color-accent-hover);
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 28%, transparent);
     }
-    .btn-ghost   { background: var(--color-surface-2); color: var(--color-text-primary); border: 1.5px solid var(--color-border); }
-    .btn-ghost:hover:not(:disabled) { background: var(--color-border); }
+    /* Flaeche wie .btn--secondary der App (layout.css): transparent mit Kante.
+       --color-surface-2 liegt im Dark Mode TIEFER als die Karte (#0F0E0D auf
+       #2B2825) - der Zurueck-Knopf sah dort aus wie ein Loch in der Leiste.
+       Hover toent wie in der App mit --tint-state statt eine Kante zu fuellen. */
+    .btn-ghost   { background: transparent; color: var(--color-text-primary); border: 1.5px solid var(--color-border); }
+    .btn-ghost:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--color-accent) var(--tint-state, 12%), transparent);
+      border-color: var(--color-accent);
+    }
     .btn-sm      { min-height: 40px; padding: 6px 12px; font-size: var(--text-xs); }
     .btn:disabled { opacity: .45; cursor: not-allowed; }
     .btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+    /* margin-bottom: fail() zieht das Banner unter das schuldige Feld, und dort
+       klebte es ohne Abstand am naechsten Label. Am Ende des card-body traegt
+       das Padding den Abstand, deshalb dort 0. */
     .error-banner {
-      display: none; margin-top: 12px; padding: 10px 14px; border-radius: var(--radius-sm);
+      display: none; margin-top: 12px; margin-bottom: 18px; padding: 10px 14px; border-radius: var(--radius-sm);
       background: color-mix(in srgb, var(--color-danger) 8%, transparent);
       border: 1.5px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
       color: var(--color-danger); font-size: var(--text-sm);
     }
+    .error-banner:last-child { margin-bottom: 0; }
     .info-banner {
       margin-bottom: 18px; padding: 10px 14px; border-radius: var(--radius-sm);
       background: color-mix(in srgb, var(--color-accent) 8%, transparent);
       border: 1.5px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
       color: var(--color-text-primary); font-size: var(--text-sm); line-height: 1.45;
     }
-    .toggle-card { border: 1.5px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 14px; }
+    /* Ein Akkordeon ist eine ZEILE seiner Gruppe, keine eigene Karte: vorher
+       trug jedes seine 1,5px-Kante und stand als Kasten auf der weissen Karte,
+       bis zu fuenf davon untereinander. Jetzt ist der Kopf eine Zeile wie jede
+       andere, der aufgeklappte Inhalt setzt die Zeilen unter einer Haarlinie
+       fort - dieselbe Flaeche, kein zweiter Grund. */
+    .toggle-card { margin: 0; }
     .toggle-head {
-      display: flex; align-items: center; justify-content: space-between;
-      width: 100%; padding: 13px 16px; cursor: pointer; user-select: none;
-      font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; text-align: start;
-      background: var(--color-surface); color: var(--color-text-primary); border: none;
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; padding: 12px 16px; cursor: pointer; user-select: none;
+      font-family: var(--font-sans); font-size: var(--text-base); font-weight: 600; text-align: start;
+      background: transparent; color: var(--color-text-primary); border: none;
       /* Aus 13 + 17 + 13 wurden gemessene 43px. Der Knopf trägt keine .btn-Klasse
          und fiel damit durch beide Netze: weder `.btn { min-height: 44px }` noch
          die mobile `.btn-sm`-Regel erfassen ihn. Sieben dieser Köpfe stehen im
-         Erweitert-Schritt untereinander. */
-      min-height: 44px;
+         Erweitert-Schritt untereinander. 48px wie jede Zeile der App. */
+      min-height: 48px;
     }
-    .toggle-head:hover { background: var(--color-surface-2); }
+    /* Neutral statt --color-surface-2: das liegt im Dark Mode TIEFER als die
+       Gruppe (#0F0E0D auf #2B2825), die Zeile fiel beim Hover in ein Loch. */
+    .toggle-head:hover { background: color-mix(in srgb, var(--color-text-primary) 5%, var(--color-surface)); }
     .toggle-head:focus-visible {
       outline: none; box-shadow: inset 0 0 0 2px var(--color-accent);
     }
-    .toggle-badge { font-size: var(--text-xs); font-weight: 500; color: var(--color-text-secondary); }
-    .toggle-body { display: none; padding: 16px; border-top: 1.5px solid var(--color-border); background: var(--color-surface-2); }
-    .toggle-body.open { display: block; }
-    .status-box { background: var(--color-surface-2); border: 1.5px solid var(--color-border); border-radius: var(--radius-sm); padding: 16px; }
-    .status-row { display: flex; align-items: center; gap: 10px; font-size: var(--text-sm); }
-    .spinner { width: 18px; height: 18px; border: 2px solid var(--color-border); border-top-color: var(--color-accent); border-radius: 50%; animation: spin .65s linear infinite; flex-shrink: 0; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .ok-icon  { color: var(--color-success); font-size: var(--text-xl); line-height: 1; }
-    .err-icon { color: var(--color-danger);  font-size: var(--text-xl); line-height: 1; }
-    .elapsed  { font-size: var(--text-xs); color: var(--color-text-secondary); margin-top: 3px; }
+    /* Der Winkel sagt, dass die Zeile aufklappt - vorher verriet das nur der
+       Cursor. Maske statt Bild, damit er dem Theme folgt (wie .lang-switch). */
+    .toggle-head::after {
+      content: ''; width: 16px; height: 16px; flex-shrink: 0;
+      background: var(--color-text-secondary);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
+      transition: transform var(--duration-sm) var(--ease-out);
+    }
+    .toggle-head[aria-expanded="true"]::after { transform: rotate(180deg); }
+    /* Zustand statt Dauerbeschriftung: refreshBadges() schreibt "Eingerichtet",
+       sobald die Zeile ausgefuellt oder eingeschaltet ist. Vorher stand an allen
+       zehn Koepfen fuer immer "Optional", auch an einem fertig eingerichteten
+       Google-Kalender. */
+    .toggle-badge {
+      margin-inline-start: auto;
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: var(--type-caption); font-weight: 500; color: var(--color-text-secondary);
+    }
+    .toggle-badge[data-state="set"] { color: var(--color-text-primary); }
+    /* Einordnung einer Zeile, kein Zustand: "Legacy" an der Apple-Zeile. Leise
+       wie ein Etikett in der App - Kante statt Flaeche, keine Akzentfarbe, die
+       gehoert der einen Primaeraktion. */
+    .toggle-tag {
+      font-size: var(--type-caption); font-weight: 600; line-height: 1.38;
+      color: var(--color-text-secondary);
+      padding: 0 8px; border-radius: var(--radius-full); white-space: nowrap; flex-shrink: 0;
+      box-shadow: inset 0 0 0 1px var(--color-border);
+    }
+    .toggle-badge[data-state="set"]::before {
+      content: ''; width: 14px; height: 14px; flex-shrink: 0;
+      background: var(--color-success);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5L20 7'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5L20 7'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+    }
+    /* Weich auf und zu statt per display zu schnappen. Die Karte ist ein Raster
+       aus Kopf und Inhalt, und die Inhaltszeile gleitet von 0fr nach 1fr -
+       Rasterspuren interpolieren in jedem Browser, anders als eine Hoehe nach
+       `auto` (interpolate-size kann Safari nicht, siehe layout.css der App,
+       Faltzeile). --ease-in-out wie jede Hoehe der App: die Zeilen darunter
+       wandern mit und brauchen Anlauf UND Auslauf.
+
+       Damit die Zeile wirklich auf 0 geht, darf der Inhalt kein eigenes Mass
+       tragen: die Haarlinie ist ein innerer Schatten statt einer Kante, der
+       Abstand unten ein ::after statt Polster. Zugeklappt ist der Inhalt
+       `visibility: hidden` - fuer Tastatur und Screenreader so unerreichbar wie
+       vorher mit display:none. Beim Zuklappen schaltet die Sichtbarkeit erst
+       NACH dem Gleiten ab (Verzoegerung = Dauer), beim Aufklappen sofort. */
+    .toggle-card {
+      display: grid; grid-template-rows: auto 0fr;
+      transition: grid-template-rows var(--duration-lg) var(--ease-in-out);
+    }
+    .toggle-card:has(> .toggle-body.open) { grid-template-rows: auto 1fr; }
+    .toggle-body {
+      min-height: 0; overflow: hidden; visibility: hidden;
+      box-shadow: inset 0 1px 0 var(--color-border-subtle);
+      transition: visibility 0s linear var(--duration-lg);
+    }
+    .toggle-body.open { visibility: visible; transition-delay: 0s; }
+    .toggle-body::after { content: ''; display: block; height: 4px; }
+    .toggle-body > .hint { padding: 12px 16px 0; margin: 0; }
+    .toggle-body > .field ~ .field { border-top: 1px solid var(--color-border-subtle); }
+    /* ── Docker-Schirm: drei Phasen als Checkliste ─────────────────────────────
+       Vorher stand hier ein Spinner mit einem Satz, der die Phase nannte - wie
+       weit es ist und was noch kommt, verriet er nicht. Jetzt dieselbe Grammatik
+       wie .ready-list im Einfach-Pfad (Zeilen in einer Inset-Gruppe, Zeichen
+       links, Text rechts), jede Phase mit Zustand: wartend (leerer Ring), laeuft
+       (drehender Bogen), fertig (Haken), Fehler (Kreuz). renderPhases() setzt
+       data-state; die Uebergaenge zwischen den Zustaenden sind der eine
+       Moment, den dieser Schirm bekommt - der Haken setzt sich, wenn eine Phase
+       fertig ist. Die Ansage fuer Screenreader traegt die Live-Region darunter. */
+    .phase-list { list-style: none; }
+    .phase {
+      display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+      font-size: var(--text-sm); line-height: 1.45; color: var(--color-text-secondary);
+      transition: color var(--duration-md) var(--ease-out);
+    }
+    .phase[data-state="active"] { color: var(--color-text-primary); font-weight: 600; }
+    .phase[data-state="done"] { color: var(--color-text-primary); }
+    .phase[data-state="failed"] { color: var(--color-danger); font-weight: 600; }
+    .phase__mark {
+      position: relative; width: 20px; height: 20px; flex-shrink: 0;
+      border-radius: var(--radius-full);
+      box-shadow: inset 0 0 0 1.5px var(--color-border-control);
+      transition:
+        box-shadow var(--duration-md) var(--ease-out),
+        background-color var(--duration-md) var(--ease-out);
+    }
+    /* Der Bogen der laufenden Phase: ein zweiter Ring, nur oben gefaerbt. */
+    .phase__mark::after {
+      content: ''; position: absolute; inset: 0; border-radius: inherit;
+      border: 2px solid transparent; border-top-color: var(--color-accent);
+      opacity: 0; transition: opacity var(--duration-sm) var(--ease-out);
+    }
+    .phase[data-state="active"] .phase__mark { box-shadow: inset 0 0 0 2px var(--color-border); }
+    .phase[data-state="active"] .phase__mark::after {
+      opacity: 1;
+      animation: phase-spin calc(var(--duration-2xl) * 2) linear infinite;
+    }
+    @keyframes phase-spin { to { transform: rotate(360deg); } }
+    @keyframes phase-pulse { to { opacity: 0.35; } }
+    /* Haken und Kreuz: dieselbe Maske wie Schrittliste und Bereitschaftsliste,
+       sie setzen sich mit einem kleinen Sprung aus 60 % Groesse. */
+    .phase__mark::before {
+      content: ''; position: absolute; inset: 3px;
+      opacity: 0; transform: scale(0.6);
+      transition:
+        opacity var(--duration-md) var(--ease-out),
+        transform var(--duration-xl) var(--ease-out);
+    }
+    .phase[data-state="done"] .phase__mark,
+    .phase[data-state="failed"] .phase__mark { box-shadow: none; }
+    .phase[data-state="done"] .phase__mark { background-color: color-mix(in srgb, var(--color-success) 14%, transparent); }
+    .phase[data-state="failed"] .phase__mark { background-color: color-mix(in srgb, var(--color-danger) 14%, transparent); }
+    .phase[data-state="done"] .phase__mark::before,
+    .phase[data-state="failed"] .phase__mark::before { opacity: 1; transform: none; }
+    .phase[data-state="done"] .phase__mark::before {
+      background: var(--color-success);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5L20 7'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5L20 7'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+    }
+    .phase[data-state="failed"] .phase__mark::before {
+      background: var(--color-danger);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+    }
+    /* Fussnote unter der Gruppe (Dauer, Erwartung), eingerueckt wie deren Text. */
+    .phase-meta { padding: 8px 16px 0; }
+    .elapsed  { font-size: var(--type-caption); color: var(--color-text-secondary); line-height: 1.38; }
+    .phase-meta + .warn-banner { margin-top: 16px; }
+    /* Radius --radius-sm wie das Warnbanner direkt darueber: mit 4px stand
+       die Box als einzige eckige Flaeche zwischen 10px-Bannern und 16px-Gruppen
+       (frueher sogar 4px IN einer 10px-Box - nicht konzentrisch). */
     .log-box  {
       display: none; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-secondary);
       white-space: pre-wrap; max-height: 180px; overflow-y: auto;
-      margin-top: 12px; padding: 10px; background: var(--color-surface-2);
-      border: 1px solid var(--color-border); border-radius: var(--radius-xs);
+      margin-top: 12px; padding: 10px 12px; background: var(--color-surface-2);
+      border: 1px solid var(--color-border); border-radius: var(--radius-sm);
     }
     /* Die Box ist per Tastatur fokussier- und scrollbar (tabindex im Markup):
        im Fehlerfall ist das Protokoll die einzige Diagnose. */
@@ -406,10 +896,18 @@
        Pruefseite die GANZE Seite seitlich (gemessen 534px body-scrollWidth bei
        375px Viewport, WCAG 1.4.10) - ausgerechnet der Kontrollschirm vor dem
        irreversiblen Klick. Die Schluesselspalte gibt auf schmalen Viewports mit. */
-    .review-grid { display: grid; grid-template-columns: minmax(110px, 160px) minmax(0, 1fr); gap: 8px 12px; font-size: var(--text-sm); }
-    .review-grid > :not(.review-key) { overflow-wrap: anywhere; }
-    .review-key  { color: var(--color-text-secondary); }
-    .masked      { font-family: var(--font-mono); letter-spacing: 3px; color: var(--color-text-secondary); }
+    /* Seit der Gruppierung eine Zeile je Wert in einer Inset-Gruppe; die
+       Spaltenregel gilt je Zeile, die Lehre von oben bleibt dieselbe. */
+    .rv-row {
+      display: grid; grid-template-columns: minmax(96px, 38%) minmax(0, 1fr); gap: 2px 16px;
+      padding: 12px 16px; font-size: var(--type-secondary); line-height: 1.35;
+    }
+    .rv-row dt { color: var(--color-text-secondary); }
+    .rv-row dd { overflow-wrap: anywhere; }
+    /* Die EINE Zeile fuer alles, was nicht eingerichtet ist - statt fuenf
+       Zeilen mit einem Strich. Leiser als die Werte darueber: sie meldet eine
+       Abwesenheit, keine Entscheidung. */
+    .rv-row--unset dd { color: var(--color-text-secondary); }
     .done-wrap   { text-align: center; padding: 20px 0 8px; }
     /* Der Abschluss trug ein 🎉-Systemsemoji: der einzige Bildinhalt der ganzen
        Reise, auf jedem Betriebssystem anders gerendert und gegen PRODUCT.md:22
@@ -422,16 +920,23 @@
       box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-success) 34%, transparent);
     }
     .done-mark svg { width: 40px; height: 40px; }
-    .done-wrap h2 { font-size: var(--text-2xl); font-weight: 700; letter-spacing: -.02em; }
-    .done-wrap p  { color: var(--color-text-secondary); margin: 8px 0 28px; font-size: var(--text-base); }
-    .open-link {
-      display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 32px;
-      background: var(--color-accent); color: var(--color-ink-on-vivid); text-decoration: none;
-      border: none; cursor: pointer; font-family: var(--font-sans);
-      border-radius: var(--radius-full); font-weight: 700; font-size: var(--text-base);
-      transition: background .12s;
+    /* Dieselbe Title-1-Rolle wie jede Schritt-H2: der Abschluss ist kein
+       leiserer Schritt als die davor. */
+    .done-wrap h2 {
+      font-size: var(--text-3xl); font-weight: 700;
+      letter-spacing: var(--tracking-tight); line-height: var(--line-height-tight); text-wrap: balance;
     }
-    .open-link:hover { background: var(--color-accent-hover); }
+    .done-wrap p  { color: var(--color-text-secondary); margin: 8px 0 28px; font-size: var(--text-base); }
+    /* Geometrie und Schrift wie .btn: setDoneEmphasis() tauscht den Download
+       zwischen .open-link und .btn-ghost, und mit 700/16px gegen 600/14px
+       sprang der Knopf beim Tausch in Hoehe und Gewicht. Flaeche siehe .btn-primary. */
+    .open-link {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 48px; padding: 10px 20px; text-decoration: none;
+      border: none; cursor: pointer; font-family: var(--font-sans);
+      border-radius: var(--radius-full); font-weight: 600; font-size: var(--text-sm);
+      transition: background var(--duration-xs) var(--ease-out);
+    }
     .open-link:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
     /* Sekundäre Variante: gleiche Größe/Prominenz, aber ohne Vollfläche -
        wird dem sicherheitskritischen Download untergeordnet, nicht winzig. */
@@ -439,20 +944,18 @@
       background: transparent; color: var(--color-accent);
       box-shadow: inset 0 0 0 1.5px var(--color-border);
     }
-    .open-link--muted:hover { background: var(--color-surface-2); }
+    .open-link--muted:hover { background: color-mix(in srgb, var(--color-accent) var(--tint-state, 12%), transparent); }
     .done-actions { display: flex; flex-direction: column; align-items: center; gap: 14px; }
     .done-actions .open-link, .done-actions .btn { width: 100%; max-width: 300px; }
-    .done-check { color: var(--color-success); }
 
-    /* „Als Naechstes" auf dem Abschluss. Zeilen in EINEM Traeger, getrennt durch
-       Haarlinien ueber den +-Kombinator - dieselbe Grammatik wie .ready-list im
-       Einfach-Pfad, damit der Abschluss nicht eine dritte Listenform erfindet. */
+    /* „Als Naechstes" auf dem Abschluss. Zeilen in EINER Inset-Gruppe - dieselbe
+       Grammatik wie .ready-list im Einfach-Pfad und wie jede Gruppe davor,
+       damit der Abschluss nicht eine dritte Listenform erfindet. */
     .next-steps { margin-top: 28px; text-align: start; }
     .next-step {
-      display: flex; align-items: flex-start; gap: 12px; padding: 14px 0;
+      display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px;
       color: inherit; text-decoration: none; font-size: var(--text-sm); line-height: 1.5;
     }
-    .next-step + .next-step { border-top: 1px solid var(--color-border); }
     /* fill/stroke-Angaben ausgeschrieben: die gemeinsame .icon-svg-Regel gilt nur
        für `.btn .icon-svg, .open-link .icon-svg`. Ohne sie rendert Lucide als
        gefüllte schwarze Fläche statt als Strichzeichnung - im ersten Screenshot
@@ -464,8 +967,8 @@
     }
     .next-step b { font-weight: 600; }
     .next-step span span { color: var(--color-text-secondary); }
-    a.next-step:hover { background: var(--color-surface-2); }
-    a.next-step:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: var(--radius-xs); }
+    a.next-step:hover { background: color-mix(in srgb, var(--color-text-primary) 5%, var(--color-surface)); }
+    a.next-step:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--color-accent); }
 
     /* Hochkonsequente Warnung (Schlüsselverlust, Backup-Erinnerung) - stärker als .info-banner. */
     .danger-banner {
@@ -493,24 +996,16 @@
        etablierten Kanal wegnehmen, um eine Schwelle zu erfuellen, die fuer
        dekorative Icons nicht gilt. */
     .warn-banner .warn-icon { color: var(--color-warning); font-size: var(--text-base); line-height: 1.4; flex-shrink: 0; }
+    /* Das Warnzeichen war das Unicode-Glyph U+26A0: je nach System ein buntes
+       Emoji oder ein Schriftzeichen in fremder Strichstaerke, neben lauter
+       Lucide-Linien. Jetzt Lucide "triangle-alert" in der Bannerfarbe; 2px
+       nach unten, damit es auf der ersten Textzeile (14px x 1.5) sitzt. */
+    .warn-icon svg { display: block; width: 18px; height: 18px; margin-top: 2px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-    /* Sektionsüberschrift im Advanced-Schritt - Haarlinie statt zweitem Eyebrow,
-       damit sie sich klar vom akzentfarbenen .step-tag unterscheidet. */
-    .group-label {
-      font-size: var(--text-xs); font-weight: 700; letter-spacing: .01em;
-      color: var(--color-text-secondary); margin: 22px 0 10px;
-      padding-bottom: 6px; border-bottom: 1px solid var(--color-border);
-    }
-    .group-label:first-child { margin-top: 4px; }
-    .group-label + .field, .group-label + .toggle-card { margin-top: 0; }
-
-    /* Der Proxy-Select ist sicherheitsrelevant - visuell hervorheben. */
-    .field-emphasis {
-      padding: 14px; border-radius: var(--radius-sm);
-      background: color-mix(in srgb, var(--color-accent) 5%, transparent);
-      border: 1.5px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
-    }
-    .field-emphasis label { color: var(--color-accent); }
+    /* .field-emphasis ist gegangen: eine violett getoente Box mit violettem Label
+       in einer weissen Gruppe waere Kasten-in-Kasten UND eine zweite violette
+       Stimme gewesen. Die Proxy-Frage steht jetzt als erste Zeile ihrer eigenen
+       Gruppe "Zugriff" - die Stellung hebt sie hervor, nicht die Farbe. */
 
     /* Eye-/Copy-Icons: Lucide-SVG statt Emoji, konsistent zum App-Icon-Set. */
     .btn .icon-svg, .open-link .icon-svg { width: 16px; height: 16px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -520,12 +1015,171 @@
     [data-eye][aria-pressed="true"] .icon-off { display: inline; }
     .copied-note { font-size: var(--text-xs); color: var(--color-success); }
 
-    /* Touch-Ziele ≥44px und erreichbarer Footer auf Mobilgeräten. */
+    /* ── Desktop ab 1024px: Schrittliste links, Inhalt rechts ─────────────────
+       Die 560px-Karte stand auf 1440px allein in der Mitte, und der Fortschritt
+       war ein 3px-Strich am oberen Rand. Jetzt traegt eine feste Liste die
+       Orientierung (wo bin ich, was kommt, wohin zurueck), die Inhaltsspalte
+       bleibt beim Lesemass von 680px. Einstieg und Abschluss bleiben einspaltig
+       (.shell--solo): vor der Wahl des Weges gibt es keine Schritte, die eine
+       Liste zeigen koennte, und nach dem letzten ist sie nur noch Rueckschau. */
+    @media (min-width: 1024px) {
+      body { padding: 56px 32px 96px; }
+      .progress-track { display: none; }
+      .shell:not(.shell--solo) {
+        display: grid; grid-template-columns: 240px minmax(0, 680px);
+        column-gap: 48px; justify-content: center; align-items: start;
+        max-width: none;
+      }
+      .shell:not(.shell--solo) .rail { position: sticky; top: 56px; }
+      .shell:not(.shell--solo) .brand {
+        display: flex; align-items: center; gap: 10px;
+        text-align: start; margin-bottom: 28px;
+      }
+      .shell:not(.shell--solo) .brand__mark { width: 40px; height: 40px; margin-bottom: 0; border-radius: var(--radius-md); }
+      .shell:not(.shell--solo) .steps-nav { display: block; }
+      /* Der Zaehler bleibt fuer den Screenreader (aria-describedby der H2), die
+         Liste zeigt dasselbe sichtbar. */
+      .shell:not(.shell--solo) .step-tag {
+        position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden;
+        clip: rect(0 0 0 0); white-space: nowrap;
+      }
+      .shell--solo { max-width: 560px; }
+    }
+    .steps-nav__list { list-style: none; display: grid; gap: 2px; }
+    .steps-nav__link {
+      display: flex; align-items: center; gap: 12px; width: 100%;
+      min-height: 44px; padding: 8px 12px; border: none; border-radius: var(--radius-md);
+      background: transparent; color: var(--color-text-primary); text-align: start;
+      font-family: var(--font-sans); font-size: var(--type-secondary); font-weight: 500; line-height: 1.25;
+      cursor: pointer;
+      /* Die Pille des aktuellen Schritts wandert nicht, sie blendet: der alte
+         Eintrag verliert die Toenung, waehrend der neue sie bekommt - so kurz
+         wie ein Farbwechsel der App (--duration-md). */
+      transition:
+        background-color var(--duration-md) var(--ease-out),
+        color var(--duration-md) var(--ease-out);
+    }
+    button.steps-nav__link:hover:not(:disabled) { background: color-mix(in srgb, var(--color-text-primary) 6%, transparent); }
+    .steps-nav__link:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+    /* Kommende Schritte: gedaempft, aber lesbar (Sekundaertext haelt AA) und
+       ohne Hand-Cursor - sie sind die Vorschau, nicht das Ziel. */
+    .steps-nav__link:disabled { cursor: default; color: var(--color-text-secondary); }
+    /* Der aktuelle Schritt traegt die Toenung der Sidebar-Pille der App - und als
+       einziger in der Liste das Violett, die eine Stimme. */
+    .steps-nav__item[data-state="current"] .steps-nav__link {
+      background: color-mix(in srgb, var(--color-accent) var(--tint-state, 12%), transparent);
+      color: var(--color-text-primary); font-weight: 600;
+    }
+    /* "erledigt" nur fuer den Screenreader und nur am erledigten Eintrag: der
+       Haken sagt es dem Auge, aria-current nennt nur den aktuellen Schritt. */
+    .steps-nav__item:not([data-state="done"]):not([data-run="ok"]) .steps-nav__done { display: none; }
+    .steps-nav__item:not([data-run="failed"]) .steps-nav__failed { display: none; }
+    /* Der Docker-Eintrag ist kein Knopf: kein Hand-Cursor, und kommend
+       gedaempft wie die gesperrten Knoepfe daneben. */
+    span.steps-nav__link { cursor: default; }
+    .steps-nav__item[data-state="upcoming"] span.steps-nav__link { color: var(--color-text-secondary); }
+    .steps-nav__mark {
+      position: relative; display: inline-grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0;
+      border-radius: var(--radius-full);
+      box-shadow: inset 0 0 0 1.5px var(--color-border-control);
+      font-size: var(--text-xs); font-weight: 600; font-variant-numeric: tabular-nums;
+      color: var(--color-text-secondary);
+      transition:
+        background-color var(--duration-md) var(--ease-out),
+        box-shadow var(--duration-md) var(--ease-out),
+        color var(--duration-md) var(--ease-out);
+    }
+    .steps-nav__item[data-state="current"] .steps-nav__mark {
+      background: color-mix(in srgb, var(--color-accent) 88%, var(--neutral-950));
+      box-shadow: none; color: var(--color-ink-on-vivid);
+    }
+    /* Erledigt: der Haken in Erfolgsgruen, wie auf der Bereitschaftsliste und
+       dem Abschluss - die Ziffer weicht ihm. */
+    .steps-nav__item[data-state="done"] .steps-nav__mark,
+    .steps-nav__item[data-run="ok"] .steps-nav__mark {
+      box-shadow: none; font-size: 0;
+      background: color-mix(in srgb, var(--color-success) 14%, transparent);
+    }
+    /* Der Haken setzt sich, wenn ein Schritt erledigt ist - derselbe kleine
+       Sprung wie auf dem Docker-Schirm. Ein Pseudo-Element entsteht erst mit
+       dem Zustand, also Animation statt Transition. */
+    @keyframes check-in { from { opacity: 0; transform: scale(0.6); } }
+    .steps-nav__item[data-state="done"] .steps-nav__mark::before,
+    .steps-nav__item[data-run="ok"] .steps-nav__mark::before {
+      animation: check-in var(--duration-md) var(--ease-out);
+      content: ''; width: 14px; height: 14px; background: var(--color-success);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5L20 7'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5L20 7'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+    }
+    /* Der laufende Start: leerer Ring mit dem drehenden Bogen der Docker-
+       Checkliste (.phase__mark) statt der gefuellten Ziffer - die Liste zeigt
+       dasselbe Zeichen wie der Schirm daneben, nur kleiner und leiser. */
+    .steps-nav__item[data-run="running"] .steps-nav__mark {
+      background: none; box-shadow: inset 0 0 0 2px var(--color-border);
+    }
+    .steps-nav__item[data-run="running"] .steps-nav__mark::after {
+      content: ''; position: absolute; inset: 0; border-radius: inherit;
+      border: 2px solid transparent; border-top-color: var(--color-accent);
+      animation: phase-spin calc(var(--duration-2xl) * 2) linear infinite;
+    }
+    /* Gescheitert: das Kreuz der Checkliste auf Danger-Toenung. */
+    .steps-nav__item[data-run="failed"] .steps-nav__mark {
+      box-shadow: none; background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+    }
+    .steps-nav__item[data-run="failed"] .steps-nav__mark::before {
+      content: ''; width: 12px; height: 12px; background: var(--color-danger);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+    }
+
+    /* Touch-Ziele ≥44px auf Mobilgeräten. Die Fussleiste ist in jeder Breite
+       sticky (siehe .card-foot) und steht deshalb nicht mehr hier. */
     @media (max-width: 640px) {
-      /* Der Sprachumschalter sitzt absolut oben rechts und ist auf 44px
-         Zielgroesse gewachsen: er reichte damit bis 56px herunter, waehrend der
-         Inhalt bei 48px begann und das Markenzeichen anschnitt. */
-      body { padding-top: 68px; }
+      /* ── Kompakte Kopfzeile ab Schritt 1 ──────────────────────────────────
+         Bis hierher stand ueber jedem Schritt die Einstiegsmarke: 68px Rand
+         fuer den Sprachumschalter, 64px-Tile, Wortmarke darunter - der Inhalt
+         begann bei 191px (Critique 2026-09-29), fast ein Viertel des
+         Bildschirms war Absender. Jetzt teilen sich Tile (40px, wie die
+         Schrittliste auf dem Desktop), Wortmarke und Sprachumschalter EINE
+         Zeile, der Schritt beginnt bei 72px.
+
+         Die Zeile scrollt mit, statt zu kleben: unten schwebt schon die
+         Fussleiste, eine zweite Leiste oben haette jedem Bildschirm weitere
+         56px genommen. Die Orientierung haelt der fixe Fortschrittsbalken am
+         oberen Rand, und der Schrittzaehler steht ueber jeder H2.
+
+         Einstieg und Abschluss (.shell--solo) behalten das grosse Tile: dort
+         ist die Marke die Aussage, und darunter liegt keine Formularstrecke. */
+      body { padding-top: 12px; padding-bottom: 0; }
+      .lang-switch { top: 12px; inset-inline-end: 16px; }
+      .shell--solo { padding-bottom: 32px; }
+      .shell--solo .brand { padding-top: 56px; }
+      .shell:not(.shell--solo) .brand {
+        display: flex; align-items: center; gap: 10px;
+        min-height: 44px; margin-bottom: 16px; text-align: start;
+      }
+      .shell:not(.shell--solo) .brand__mark { width: 40px; height: 40px; margin-bottom: 0; border-radius: var(--radius-md); }
+
+      /* ── Fussleiste: Zurueck als Symbol, Primaeraktion fuellt die Zeile ──
+         Bei 360px blieben neben "Zurueck" 209px fuer die Primaeraktion, und
+         die laengsten Beschriftungen brauchen mehr ("Нажмите ещё раз..."
+         270px, Griechisch "Speichern & Docker starten" 229px) - sie brachen
+         um. Der Pfeil nach links ist auf dem Handy das Zurueck der Plattform;
+         der Text bleibt als zugaenglicher Name im Knopf (font-size: 0 blendet
+         ihn nur aus), die Primaeraktion bekommt die ganze restliche Breite und
+         liegt damit dort, wo der Daumen ohnehin ist. */
+      .card-foot { gap: 8px; }
+      .card-foot .btn-primary { flex: 1 1 auto; padding-inline: 12px; }
+      .card-foot .btn-ghost[data-back] {
+        flex: none; width: 48px; padding: 0; font-size: 0;
+      }
+      .card-foot .btn-ghost[data-back]::before {
+        content: ''; width: 20px; height: 20px; background: currentColor;
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15 18-6-6 6-6'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15 18-6-6 6-6'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+      }
+      html[dir="rtl"] .card-foot .btn-ghost[data-back]::before { transform: scaleX(-1); }
+
       .btn-sm { min-height: 44px; min-width: 44px; padding: 8px 12px; }
       .secret-row .btn-sm { flex: 0 0 auto; }
       /* Der Select war das letzte Bedienelement unter der Grenze (Primärbutton
@@ -536,23 +1190,50 @@
          Spezifität nicht an - die Zeile darüber hat ihn deshalb nie erreicht, er
          blieb bei seinen 36px. Gleiche Spezifität, spätere Regel, sie gewinnt. */
       .lang-switch select { min-height: 44px; }
-      .card-foot {
-        position: sticky; bottom: 0; z-index: 10;
-        background: var(--color-surface);
-        box-shadow: 0 -1px 0 var(--color-border);
-      }
     }
 
-    /* Reduced-Motion: alle Bewegungen zu sofortigen Zustandswechseln herabstufen. */
+    /* Reduced-Motion: weniger und sanfter, nicht nichts. Was sich BEWEGT
+       (Gleiten, Drehen, Aufziehen), wird zur Blende oder zum sofortigen
+       Wechsel; was einen Zustand meldet (Farbe, Deckkraft), bleibt lesbar.
+       Der Guard in test-installer-a11y.js verlangt fuer jede Animation und
+       jede bewegte Transition oben eine Regel hier. */
     @media (prefers-reduced-motion: reduce) {
-      .step { animation: none; }
-      .spinner { animation: none; }
+      /* Schrittwechsel ohne Gleiten: eine kurze Blende (<= 150ms). */
+      html:not(.step-vt)[data-step-dir] .step.active > :not(.card-foot) {
+        animation: step-fade var(--duration-sm) var(--ease-out);
+      }
+      ::view-transition-old(step) { animation: step-fade var(--duration-sm) var(--ease-out) reverse both; }
+      ::view-transition-new(step) { animation: step-fade var(--duration-sm) var(--ease-out) both; }
       .progress-fill { transition: none; }
       /* Der Modus-Karten-Hover hob sich um 2px und der Abschluss-CTA blendete
          die Farbe - beide liefen unter `reduce` weiter. */
-      .mode-card { transition: border-color .15s, box-shadow .15s; }
+      .mode-card {
+        transition: border-color var(--duration-sm) var(--ease-out), box-shadow var(--duration-sm) var(--ease-out);
+      }
       .mode-card:hover { transform: none; }
       .btn, .open-link, input, select { transition: none; }
+      /* Akkordeons klappen sofort, ohne Gleiten und ohne verzoegertes Abschalten. */
+      .toggle-card, .toggle-body { transition: none; }
+      .hint-more::details-content { transition: none; }
+      .toggle-head::after, .hint-more > summary::after { transition: none; }
+      /* Der Schalter springt in seine Lage, wie in der App. */
+      .toggle__track,
+      .toggle__track::after,
+      .toggle input:checked + .toggle__track::after { transition: none; }
+      /* Der stehende Spinner wirkte wie ein haengender Schirm. Statt zu drehen
+         atmet der Bogen: ein langsamer Deckkraft-Puls, keine Bewegung. */
+      .phase[data-state="active"] .phase__mark::after {
+        animation: phase-pulse calc(var(--duration-2xl) * 2) var(--ease-in-out) infinite alternate;
+      }
+      /* Haken und Kreuz blenden nur ein, ohne Sprung. */
+      .phase__mark::before { transform: none; transition: opacity var(--duration-md) var(--ease-out); }
+      .steps-nav__item[data-state="done"] .steps-nav__mark::before,
+      .steps-nav__item[data-run="ok"] .steps-nav__mark::before {
+        animation: step-fade var(--duration-md) var(--ease-out);
+      }
+      .steps-nav__item[data-run="running"] .steps-nav__mark::after {
+        animation: phase-pulse calc(var(--duration-2xl) * 2) var(--ease-in-out) infinite alternate;
+      }
     }
   </style>
 </head>
@@ -562,6 +1243,18 @@
 
   <!-- Sprachumschaltung: überschreibt die Browser-Erkennung, Wahl wird gemerkt. -->
 
+  <!-- Marke und Schrittliste teilen sich ab 1024px die linke, feste Spalte.
+       Die Liste steht im DOM VOR dem Inhalt, weil sie dort auch sichtbar steht
+       (WCAG 1.3.2); showStep() setzt den Fokus trotzdem auf die H2 des Schritts,
+       die Liste ist per Shift+Tab von dort aus der naechste Halt. -->
+  <!-- shell--solo im Markup = das Layout, das renderStep() fuer den Einstieg
+       setzt. Ohne die Klasse malte der erste Frame bis zum Laden der
+       Uebersetzungen das Desktop-Raster, dann sprang die Marke in die Mitte -
+       eine Layoutverschiebung beim Laden. Der Willkommen-Schritt bleibt bis
+       dahin bewusst unsichtbar: englischer Text, der sich eine Sekunde spaeter
+       in eine andere Sprache umbricht, verschoebe wieder. -->
+  <div class="shell shell--solo" id="shell">
+  <div class="rail">
   <!-- Absender der Reise. Die Wortmarke ist ein Eigenname und bleibt in jeder
        Sprache gleich, braucht also keinen Locale-Key. -->
   <div class="brand">
@@ -577,14 +1270,46 @@
     <div class="brand__word">Yuvomi</div>
   </div>
 
+  <!-- Die Schrittliste. Statisches Markup fuer JEDEN nummerierten Schritt beider
+       Wege; renderStepNav() blendet aus, was nicht zum gewaehlten Weg gehoert,
+       setzt die Nummern und den Zustand. Die Beschriftungen sind die Titel der
+       Schritte selbst: wer einen Eintrag waehlt, landet unter derselben
+       Ueberschrift. Erledigte Eintraege sind Knoepfe zurueck, kommende sind
+       gesperrt - vorwaerts fuehrt nur "Weiter", damit keine Pruefung entfaellt. -->
+  <nav class="steps-nav" aria-label="Setup steps" data-i18n-aria="common.stepsNav">
+    <ol class="steps-nav__list">
+      <li class="steps-nav__item" data-nav-step="simple" hidden><button type="button" class="steps-nav__link" data-goto="simple" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="simple.title">Ready to go</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="config" hidden><button type="button" class="steps-nav__link" data-goto="config" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="config.title">Basic Configuration</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="secrets" hidden><button type="button" class="steps-nav__link" data-goto="secrets" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="secrets.title">Security Keys</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="weather" hidden><button type="button" class="steps-nav__link" data-goto="weather" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="weather.title">Weather Widget</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="calendar" hidden><button type="button" class="steps-nav__link" data-goto="calendar" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="calendar.title">Calendar Sync</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="email" hidden><button type="button" class="steps-nav__link" data-goto="email" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="email.title">Email &amp; Password Reset</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="storage" hidden><button type="button" class="steps-nav__link" data-goto="storage" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="storage.title">Storage &amp; backups</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="advanced" hidden><button type="button" class="steps-nav__link" data-goto="advanced" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="advanced.title">Advanced Settings</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <li class="steps-nav__item" data-nav-step="review" hidden><button type="button" class="steps-nav__link" data-goto="review" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="review.title">Review</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+      <!-- Der Containerstart hat keine Nummer (er fragt nichts), aber einen
+           Platz in der Liste: ohne ihn stand die Liste waehrend des laengsten
+           Wartens ohne aktuellen Eintrag da, und niemand wusste, wo er ist.
+           Kein Knopf: zurueck auf einen laufenden oder fertigen Start fuehrt
+           nichts. renderStepNav() setzt data-run (running/ok/failed), solange
+           sein Schirm steht; "(fehlgeschlagen)" sagt nur der Screenreader. -->
+      <li class="steps-nav__item" data-nav-step="docker" hidden><span class="steps-nav__link"><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="docker.navLabel">Start Yuvomi</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span><span class="vh steps-nav__failed" data-i18n="docker.stepFailed">(failed)</span></span></li>
+      <li class="steps-nav__item" data-nav-step="admin" hidden><button type="button" class="steps-nav__link" data-goto="admin" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="admin.title">Create Admin Account</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
+    </ol>
+  </nav>
+  </div>
+
   <main class="card">
     <h1 class="vh" data-i18n="title">Yuvomi Setup</h1>
 
     <!-- Step: Welcome / mode selection -->
     <div class="step" id="step-welcome">
       <div class="card-head">
-        <h2 tabindex="-1" data-i18n="welcome.title">Welcome to Yuvomi</h2>
-        <p data-i18n="welcome.subtitle">Let's get your private family planner running. Choose how you'd like to set it up.</p>
+        <!-- Die Aufgabe, nicht der Absender: "Willkommen bei Yuvomi" stand direkt
+             unter der Wortmarke "Yuvomi" - zweimal derselbe Absender, und keine
+             Zeile sagte, was hier zu tun ist. -->
+        <h2 tabindex="-1" data-i18n="welcome.title">How would you like to set up Yuvomi?</h2>
+        <p data-i18n="welcome.subtitle">Afterwards, your private family planner runs on your own server.</p>
       </div>
       <div class="card-body">
         <!-- Kein data-i18n: der Text wird zur Laufzeit mit {{list}} und einem
@@ -614,8 +1339,11 @@
         <div class="mode-grid">
           <button type="button" class="mode-card is-primary" id="mode-simple">
             <div class="mode-card__top">
+              <!-- Lucide "zap" statt eines Hakens: der Haken las sich auf der
+                   einzigen hervorgehobenen Karte wie "schon ausgewaehlt".
+                   Der Blitz sagt, was der Weg verspricht - schnell fertig. -->
               <span class="mode-card__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>
+                <svg viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>
               </span>
               <div>
                 <div class="mode-card__title" data-i18n="welcome.simpleTitle">Simple setup</div>
@@ -655,7 +1383,7 @@
         <p data-i18n="simple.subtitle">We've prepared everything with safe defaults. Just create your account next.</p>
       </div>
       <div class="card-body">
-        <div class="ready-list">
+        <div class="ready-list inset-group">
           <div class="ready-item">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>
             <div><b data-i18n="simple.itemKeysTitle">Security keys generated</b><br><span data-i18n="simple.itemKeysDesc">Your session and database are encrypted automatically.</span></div>
@@ -677,7 +1405,7 @@
              gesperrt und lenkt in den Erweitert-Pfad um (startFlow), wo
              #cfg-existing warnt. -->
         <div class="warn-banner" role="note">
-          <span class="warn-icon" aria-hidden="true">&#x26A0;</span>
+          <span class="warn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
           <span data-i18n="simple.backupReminder">After setup, back up the generated .env file - it holds your only encryption keys.</span>
         </div>
         <button type="button" class="link-btn" id="simple-to-advanced" data-i18n="simple.switchAdvanced">Need more options? Switch to advanced setup</button>
@@ -700,11 +1428,13 @@
       </div>
       <div class="card-body">
         <div class="warn-banner" id="cfg-existing" role="note" style="display:none">
-          <span class="warn-icon" aria-hidden="true">&#x26A0;</span>
+          <span class="warn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
           <span data-i18n="config.existing">Existing configuration detected - your current .env file will be backed up before saving.</span>
         </div>
         <!-- Wie #welcome-prereq: Text zur Laufzeit, kein data-i18n. -->
         <div class="error-banner" id="cfg-prereq" role="alert"></div>
+        <div class="group-label" data-i18n="common.groupServer">Server</div>
+        <div class="inset-group">
         <div class="field">
           <label for="cfg-host" data-i18n="config.hostLabel">Domain or IP address</label>
           <input type="text" id="cfg-host" value="localhost" placeholder="localhost or 192.168.1.x">
@@ -717,6 +1447,11 @@
         <div class="field">
           <label for="cfg-tz" data-i18n="config.tzLabel">Timezone</label>
           <input type="text" id="cfg-tz" placeholder="Europe/Berlin">
+          <!-- TZ ist nur die Vorbelegung der Haushaltszone (#829); die App fuehrt
+               sie als eigene Einstellung. Wer das nicht weiss, haelt das Feld fuer
+               endgueltig und sucht spaeter in der .env statt in der App. -->
+          <div class="hint" data-i18n="config.tzHint">Used as the household default. You can change it later in the app under Settings → Account → Appearance.</div>
+        </div>
         </div>
 
         <!-- Proxy-Wahl und oeffentliche Adresse standen bis 2026-08-15 im
@@ -729,7 +1464,9 @@
              Yuvomi zu?"). Nebenwirkung: plannedOrigin() kennt die endgueltige
              Adresse jetzt schon im Kalenderschritt, der frueher davor lag.
              Die Locale-Schluessel behalten ihr advanced.*-Praefix. -->
-        <div class="field field-emphasis">
+        <div class="group-label" data-i18n="review.access">Access</div>
+        <div class="inset-group">
+        <div class="field">
           <label for="adv-proxy" data-i18n="advanced.proxyLabel">How is Yuvomi exposed?</label>
           <select id="adv-proxy">
             <option value="proxy" data-i18n="advanced.proxyBehindHttps">Behind a reverse proxy with HTTPS (Caddy, nginx, Traefik)</option>
@@ -751,6 +1488,7 @@
           <input type="text" id="adv-base-url" placeholder="https://yuvomi.example.com">
           <div class="hint" data-i18n="advanced.baseUrlHint">The address your family opens Yuvomi at - not the container's host and port. Used for password reset and invitation links.</div>
         </div>
+        </div>
 
         <div class="error-banner" id="cfg-err" role="alert"></div>
       </div>
@@ -769,12 +1507,16 @@
       </div>
       <div class="card-body">
         <div class="danger-banner" role="note">
-          <span class="warn-icon" aria-hidden="true">&#x26A0;</span>
+          <span class="warn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
           <span data-i18n="secrets.dangerWarn">Save these keys now. If you lose them, your encrypted data cannot be recovered - there is no reset.</span>
         </div>
         <div class="info-banner" id="sec-preserved" style="display:none" role="note" data-i18n="secrets.preserved">
           Your existing keys are kept, so this setup will not lock you out of the current database. Leave a field empty to keep its key; entering a new value replaces it.
         </div>
+        <!-- Eine Gruppe ohne Label: der Schritt heisst schon "Sicherheitsschluessel",
+             ein gleichlautendes Label darueber waere die Titelwiederholung, die
+             DESIGN.md verbietet. -->
+        <div class="inset-group">
         <div class="field">
           <label for="sec-session" data-i18n="secrets.sessionLabel">Session Secret</label>
           <div class="secret-row">
@@ -807,6 +1549,7 @@
           <span class="copied-note" id="sec-db-copied" role="status" aria-live="polite"></span>
           <div class="hint" data-i18n="secrets.dbHint">Encrypts the SQLite database at rest.</div>
         </div>
+        </div>
         <div class="error-banner" id="sec-err" role="alert"></div>
       </div>
       <div class="card-foot">
@@ -823,10 +1566,18 @@
         <p data-i18n="weather.subtitle">Show live weather on your dashboard. No account or API key needed.</p>
       </div>
       <div class="card-body">
+        <!-- Schalter und Felder in EINER Gruppe: die Felder sind die Fortsetzung
+             der Zeile, die sie einschaltet (wie ein Schalter in den Einstellungen). -->
+        <div class="inset-group">
         <div class="field">
-          <label><input type="checkbox" id="wea-enable"> <span data-i18n="weather.enable">Enable weather widget</span></label>
+          <label class="toggle-row"><span class="toggle-row__label" data-i18n="weather.enable">Enable weather widget</span><span class="toggle"><input type="checkbox" role="switch" id="wea-enable"><span class="toggle__track" aria-hidden="true"></span></span></label>
+          <!-- Zwei Quellen fuer denselben Standort: WEATHER_* aus der .env und der
+               Haushalts-Standort der App. Der gespeicherte Standort gewinnt
+               (#1568) - ohne diesen Satz wirkt eine spaetere Aenderung hier wie
+               ein Fehler, weil die App weiter ihren eigenen Wert zeigt. -->
+          <div class="hint" data-i18n="weather.appHint">These values apply until a household location is saved in the app under Settings → Household → Integrations.</div>
         </div>
-        <div id="wea-fields" style="display:none">
+        <div class="inset-sub" id="wea-fields" style="display:none">
           <div class="field">
             <label for="wea-lat" data-i18n="weather.latLabel">Latitude</label>
             <input type="number" id="wea-lat" step="any" min="-90" max="90" placeholder="52.52">
@@ -848,6 +1599,7 @@
             </select>
           </div>
         </div>
+        </div>
         <div class="error-banner" id="wea-err" role="alert"></div>
       </div>
       <div class="card-foot">
@@ -861,16 +1613,18 @@
       <div class="card-head">
         <div class="step-tag"></div>
         <h2 tabindex="-1" data-i18n="calendar.title">Calendar Sync</h2>
-        <p data-i18n="calendar.subtitle">Connect Yuvomi to Google Calendar, Apple iCloud or Outlook. All optional - expand to configure.</p>
+        <p data-i18n="calendar.subtitle">Connect Yuvomi to Google Calendar, Outlook or Apple iCloud. All optional - expand to configure.</p>
       </div>
       <div class="card-body">
-        <div class="toggle-card">
+        <!-- Drei Anbieter, EINE Gruppe: jede Zeile klappt in sich selbst auf. -->
+        <div class="inset-group">
+        <div class="toggle-card" data-setup="gcal-id gcal-secret">
           <button type="button" class="toggle-head" data-toggle="gcal-body" aria-expanded="false" aria-controls="gcal-body">
             <span data-i18n="calendar.google">Google Calendar</span>
-            <span class="toggle-badge" id="gcal-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" id="gcal-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="gcal-body">
-            <p class="hint" id="gcal-hint" style="margin-bottom:12px">
+            <p class="hint" id="gcal-hint">
               Create OAuth credentials at <a href="https://console.cloud.google.com" target="_blank" rel="noopener">console.cloud.google.com</a>.
               Redirect URI: <code id="gcal-redirect-hint"></code>
             </p>
@@ -878,7 +1632,7 @@
                  baut dessen Inhalt per applyRich mit replaceChildren neu auf, und
                  ein Kind wäre beim ersten Sprachdurchlauf spurlos verschwunden.
                  Genau das ist beim ersten Anlauf passiert. -->
-            <p class="hint" style="margin-bottom:12px">
+            <p class="hint">
               <!-- Sichtbare Beschriftung statt nur aria-label: fünf gleich
                    aussehende Icon-Knöpfe waren in der Elementliste eines
                    Screenreaders nicht unterscheidbar, und ein Erstinstallierer
@@ -900,41 +1654,17 @@
             <p class="hint" data-i18n="calendar.googleSelectNote">After connecting, you can choose which calendar to sync in the app settings (default: primary calendar).</p>
           </div>
         </div>
-        <div class="toggle-card">
-          <button type="button" class="toggle-head" data-toggle="apple-body" aria-expanded="false" aria-controls="apple-body">
-            <span data-i18n="calendar.apple">Apple iCloud CalDAV</span>
-            <span class="toggle-badge" id="apple-badge" data-i18n="common.optional">Optional</span>
-          </button>
-          <div class="toggle-body" id="apple-body">
-            <p class="hint" id="apple-hint" style="margin-bottom:12px">
-              Create an app-specific password at <a href="https://appleid.apple.com" target="_blank" rel="noopener">appleid.apple.com</a>.
-            </p>
-            <div class="field">
-              <label for="apple-user" data-i18n="calendar.appleUserLabel">Apple ID (email)</label>
-              <input type="email" id="apple-user">
-            </div>
-            <div class="field">
-              <label for="apple-pass" data-i18n="calendar.applePassLabel">App-Specific Password</label>
-              <input type="password" id="apple-pass">
-            </div>
-            <div class="field">
-              <label for="apple-url"><span data-i18n="calendar.appleUrlLabel">CalDAV URL</span> <span class="opt" data-i18n="common.opt">(optional)</span></label>
-              <input type="text" id="apple-url" placeholder="https://caldav.icloud.com">
-              <div class="hint" data-i18n="calendar.appleUrlHint">Leave empty unless your provider uses a different CalDAV endpoint.</div>
-            </div>
-          </div>
-        </div>
-        <div class="toggle-card">
+        <div class="toggle-card" data-setup="outlook-id outlook-secret">
           <button type="button" class="toggle-head" data-toggle="outlook-body" aria-expanded="false" aria-controls="outlook-body">
             <span data-i18n="calendar.outlook">Outlook Calendar (Microsoft Graph)</span>
-            <span class="toggle-badge" id="outlook-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" id="outlook-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="outlook-body">
-            <p class="hint" id="outlook-hint" style="margin-bottom:12px">
+            <p class="hint" id="outlook-hint">
               Create a free Entra ID app registration ("Personal Microsoft accounts only") at <a href="https://entra.microsoft.com" target="_blank" rel="noopener">entra.microsoft.com</a> - see the installation guide.
               Redirect URI: <code id="outlook-redirect-hint"></code>
             </p>
-            <p class="hint" style="margin-bottom:12px">
+            <p class="hint">
               <button type="button" class="btn btn-ghost btn-sm" data-copy="outlook-redirect-hint">
                 <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 <span data-i18n="common.copyRedirect">Copy redirect URI</span>
@@ -952,6 +1682,38 @@
             <p class="hint" data-i18n="calendar.outlookNote">One-way push: Yuvomi stays the source of truth and overwrites changes made in Outlook. Family accounts are connected later in the app under Settings.</p>
           </div>
         </div>
+        <!-- Apple zuletzt und als "Legacy": die .env traegt genau EIN iCloud-Konto,
+             die App verwaltet beliebig viele CalDAV-Konten (auch Nextcloud) und
+             kann sie pruefen. Die Zeile bleibt, weil bestehende Installationen sie
+             nutzen - sie ist nur nicht mehr der Weg, den der Wizard nahelegt. -->
+        <div class="toggle-card" data-setup="apple-user apple-pass">
+          <button type="button" class="toggle-head" data-toggle="apple-body" aria-expanded="false" aria-controls="apple-body">
+            <span data-i18n="calendar.apple">Apple iCloud CalDAV</span>
+            <span class="toggle-tag" data-i18n="calendar.legacy">Legacy</span>
+            <span class="toggle-badge" id="apple-badge" data-state="optional">Optional</span>
+          </button>
+          <div class="toggle-body" id="apple-body">
+            <p class="hint" id="apple-hint">
+              Create an app-specific password at <a href="https://appleid.apple.com" target="_blank" rel="noopener">appleid.apple.com</a>.
+            </p>
+            <div class="field">
+              <label for="apple-user" data-i18n="calendar.appleUserLabel">Apple ID (email)</label>
+              <input type="email" id="apple-user">
+            </div>
+            <div class="field">
+              <label for="apple-pass" data-i18n="calendar.applePassLabel">App-Specific Password</label>
+              <input type="password" id="apple-pass">
+            </div>
+            <div class="field">
+              <label for="apple-url"><span data-i18n="calendar.appleUrlLabel">CalDAV URL</span> <span class="opt" data-i18n="common.opt">(optional)</span></label>
+              <input type="text" id="apple-url" placeholder="https://caldav.icloud.com">
+              <div class="hint" data-i18n="calendar.appleUrlHint">Leave empty unless your provider uses a different CalDAV endpoint.</div>
+            </div>
+          </div>
+        </div>
+        </div>
+        <!-- Der Ausweg zur Legacy-Zeile, sichtbar ohne Aufklappen. -->
+        <p class="group-note" data-i18n="calendar.moreInApp">Add more CalDAV accounts, such as Nextcloud or a second iCloud account, in the app under Settings → Modules → Calendar.</p>
       </div>
       <div class="card-foot">
         <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
@@ -967,11 +1729,21 @@
         <p data-i18n="email.subtitle">Let family members reset a forgotten password by email. Optional - skip if you don't need it.</p>
       </div>
       <div class="card-body">
+        <div class="inset-group">
         <div class="field">
-          <label><input type="checkbox" id="email-enable"> <span data-i18n="email.enable">Enable email sending</span></label>
+          <label class="toggle-row"><span class="toggle-row__label" data-i18n="email.enable">Enable email sending</span><span class="toggle"><input type="checkbox" role="switch" id="email-enable"><span class="toggle__track" aria-hidden="true"></span></span></label>
           <div class="hint" data-i18n="email.hint">Uses your own SMTP server (mailbox provider, self-hosted, or a transactional service).</div>
+          <!-- Die .env gewinnt ueber die Datenbank, und die App sperrt jedes Feld,
+               das die Umgebung setzt (admin-email.js). Wer SMTP in der App testen
+               und nachstellen will, muss das VOR dieser Entscheidung wissen. -->
+          <div class="hint" data-i18n="email.appHint">Whatever you enter here is read-only in the app. If you'd rather manage and test SMTP in the app under Settings → Household → Email (SMTP), skip this step.</div>
         </div>
+        </div>
+        <!-- Eingeschaltet folgen zwei Gruppen entlang der Frage, die sie
+             beantworten: wie Yuvomi den Server erreicht, und als wer es schreibt. -->
         <div id="email-fields" style="display:none">
+          <div class="group-label" data-i18n="common.groupServer">Server</div>
+          <div class="inset-group">
           <div class="field">
             <label for="email-host" data-i18n="email.hostLabel">SMTP server</label>
             <input type="text" id="email-host" placeholder="smtp.example.com">
@@ -994,7 +1766,7 @@
           </div>
           <div class="field">
             <label for="email-pass" data-i18n="email.passLabel">Password</label>
-            <div class="secret-row">
+            <div class="secret-row pw-row">
               <input type="password" id="email-pass" autocomplete="new-password">
               <button type="button" class="btn btn-ghost btn-sm" data-eye="email-pass" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
                 <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1002,6 +1774,9 @@
               </button>
             </div>
           </div>
+          </div>
+          <div class="group-label" data-i18n="email.groupSender">Sender</div>
+          <div class="inset-group">
           <div class="field">
             <label for="email-from" data-i18n="email.fromLabel">Sender address</label>
             <input type="email" id="email-from" placeholder="yuvomi@example.com">
@@ -1010,6 +1785,7 @@
           <div class="field">
             <label for="email-from-name"><span data-i18n="email.fromNameLabel">Sender name</span> <span class="opt" data-i18n="common.opt">(optional)</span></label>
             <input type="text" id="email-from-name" placeholder="Yuvomi">
+          </div>
           </div>
         </div>
         <div class="error-banner" id="email-err" role="alert"></div>
@@ -1040,21 +1816,34 @@
         <p data-i18n="storage.subtitle">Where your data lives on the server, and where copies of it go. All optional - the defaults work.</p>
       </div>
       <div class="card-body">
+        <div class="inset-group">
         <div class="field">
           <label for="adv-data-dir" data-i18n="advanced.dataDirLabel">Host data folder</label>
           <input type="text" id="adv-data-dir" placeholder="./data">
           <div class="hint" data-i18n="advanced.dataDirHint">Where the database and app data live on the server. Leave empty to use ./data next to the compose file.</div>
         </div>
+        <!-- MAX_UPLOAD_MB stand im Schema und in buildEnv, aber in keinem Feld:
+             S.MAX_UPLOAD_MB blieb immer leer, der Wert liess sich nur von Hand in
+             die .env schreiben. Er gilt fuer JEDEN Upload (Dokumente, Anhaenge,
+             Importe), deshalb hier neben dem Datenordner und nicht in der
+             Dokumentgruppe. Grenzen wie server/utils/upload-limit.js. -->
+        <div class="field">
+          <label for="adv-max-upload" data-i18n="storage.maxUploadLabel">Upload limit (MB)</label>
+          <input type="text" id="adv-max-upload" inputmode="numeric" placeholder="5">
+          <div class="hint" data-i18n="storage.maxUploadHint">Largest file anyone can upload, 1-100 MB. Leave empty for 5 MB - higher values need more memory.</div>
+        </div>
+        </div>
 
         <div class="group-label" data-i18n="storage.sectionBackups">Backups</div>
-        <div class="toggle-card">
+        <div class="inset-group">
+        <div class="toggle-card" data-setup="adv-backup-enable">
           <button type="button" class="toggle-head" data-toggle="backup-body" aria-expanded="false" aria-controls="backup-body">
             <span data-i18n="advanced.backup">Automatic Backups</span>
-            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="backup-body">
             <div class="field">
-              <label><input type="checkbox" id="adv-backup-enable" checked> <span data-i18n="advanced.backupEnable">Enable automatic backups</span></label>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.backupEnable">Enable automatic backups</span><span class="toggle"><input type="checkbox" role="switch" id="adv-backup-enable" checked><span class="toggle__track" aria-hidden="true"></span></span></label>
             </div>
             <div class="field">
               <label for="adv-backup-schedule" data-i18n="advanced.backupScheduleLabel">Schedule (cron)</label>
@@ -1067,15 +1856,15 @@
             </div>
           </div>
         </div>
-        <div class="toggle-card">
+        <div class="toggle-card" data-setup="adv-webdav-backup-enable">
           <button type="button" class="toggle-head" data-toggle="webdav-backup-body" aria-expanded="false" aria-controls="webdav-backup-body">
             <span data-i18n="advanced.webdavBackup">Off-site Backups (WebDAV)</span>
-            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="webdav-backup-body">
-            <p class="hint" style="margin-bottom:12px" data-i18n="advanced.webdavBackupHint">Copy each backup to a WebDAV server (e.g. Nextcloud) so it survives a disk failure.</p>
+            <p class="hint" data-i18n="advanced.webdavBackupHint">Copy each backup to a WebDAV server (e.g. Nextcloud) so it survives a disk failure.</p>
             <div class="field">
-              <label><input type="checkbox" id="adv-webdav-backup-enable"> <span data-i18n="advanced.webdavBackupEnable">Also send backups to WebDAV</span></label>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.webdavBackupEnable">Also send backups to WebDAV</span><span class="toggle"><input type="checkbox" role="switch" id="adv-webdav-backup-enable"><span class="toggle__track" aria-hidden="true"></span></span></label>
             </div>
             <div class="field">
               <label for="adv-webdav-backup-url" data-i18n="advanced.webdavBackupUrlLabel">WebDAV URL</label>
@@ -1087,7 +1876,7 @@
             </div>
             <div class="field">
               <label for="adv-webdav-backup-password" data-i18n="advanced.webdavBackupPasswordLabel">Password</label>
-              <div class="secret-row">
+              <div class="secret-row pw-row">
                 <input type="password" id="adv-webdav-backup-password" autocomplete="new-password">
                 <button type="button" class="btn btn-ghost btn-sm" data-eye="adv-webdav-backup-password" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
                   <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1105,16 +1894,18 @@
             </div>
           </div>
         </div>
+        </div>
 
         <div class="group-label" data-i18n="storage.sectionDocuments">Document storage</div>
-        <div class="toggle-card">
+        <div class="inset-group">
+        <div class="toggle-card" data-setup="adv-document-local-enable">
           <button type="button" class="toggle-head" data-toggle="document-local-body" aria-expanded="false" aria-controls="document-local-body">
             <span data-i18n="advanced.documentLocal">Local Document Storage</span>
-            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="document-local-body">
             <div class="field">
-              <label><input type="checkbox" id="adv-document-local-enable"> <span data-i18n="advanced.documentLocalEnable">Store new documents in a local folder</span></label>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.documentLocalEnable">Store new documents in a local folder</span><span class="toggle"><input type="checkbox" role="switch" id="adv-document-local-enable"><span class="toggle__track" aria-hidden="true"></span></span></label>
             </div>
             <div class="field">
               <label for="adv-document-local-dir" data-i18n="advanced.documentLocalDirLabel">Host folder</label>
@@ -1128,15 +1919,15 @@
             </div>
           </div>
         </div>
-        <div class="toggle-card">
+        <div class="toggle-card" data-setup="adv-document-webdav-enable">
           <button type="button" class="toggle-head" data-toggle="document-webdav-body" aria-expanded="false" aria-controls="document-webdav-body">
             <span data-i18n="advanced.documentWebdav">WebDAV Document Storage</span>
-            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="document-webdav-body">
-            <p class="hint" style="margin-bottom:12px" data-i18n="advanced.documentWebdavHint">Non-empty environment values override the corresponding settings stored in the database.</p>
+            <details class="hint-more"><summary data-i18n="common.learnMore">Learn more</summary><p class="hint" data-i18n="advanced.documentWebdavHint">Non-empty environment values override the corresponding settings stored in the database.</p></details>
             <div class="field">
-              <label><input type="checkbox" id="adv-document-webdav-enable"> <span data-i18n="advanced.documentWebdavEnable">Store new documents on WebDAV</span></label>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.documentWebdavEnable">Store new documents on WebDAV</span><span class="toggle"><input type="checkbox" role="switch" id="adv-document-webdav-enable"><span class="toggle__track" aria-hidden="true"></span></span></label>
             </div>
             <div class="field">
               <label for="adv-document-webdav-url" data-i18n="advanced.documentWebdavUrlLabel">WebDAV URL</label>
@@ -1148,7 +1939,7 @@
             </div>
             <div class="field">
               <label for="adv-document-webdav-password" data-i18n="advanced.documentWebdavPasswordLabel">Password</label>
-              <div class="secret-row">
+              <div class="secret-row pw-row">
                 <input type="password" id="adv-document-webdav-password" autocomplete="new-password">
                 <button type="button" class="btn btn-ghost btn-sm" data-eye="adv-document-webdav-password" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
                   <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1163,15 +1954,15 @@
             </div>
                       </div>
         </div>
-        <div class="toggle-card">
+        <div class="toggle-card" data-setup="adv-document-google-drive-enable">
           <button type="button" class="toggle-head" data-toggle="document-google-drive-body" aria-expanded="false" aria-controls="document-google-drive-body">
             <span data-i18n="advanced.documentGoogleDrive">Google Drive Document Storage</span>
-            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+            <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="document-google-drive-body">
-            <p class="hint" style="margin-bottom:12px" data-i18n="advanced.documentGoogleDriveHint">Configure OAuth credentials here, then connect and explicitly select Google Drive in Document settings after installation.</p>
+            <details class="hint-more"><summary data-i18n="common.learnMore">Learn more</summary><p class="hint" data-i18n="advanced.documentGoogleDriveHint">Configure OAuth credentials here, then connect and explicitly select Google Drive in Document settings after installation.</p></details>
             <div class="field">
-              <label><input type="checkbox" id="adv-document-google-drive-enable"> <span data-i18n="advanced.documentGoogleDriveEnable">Configure Google Drive for Documents</span></label>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.documentGoogleDriveEnable">Configure Google Drive for Documents</span><span class="toggle"><input type="checkbox" role="switch" id="adv-document-google-drive-enable"><span class="toggle__track" aria-hidden="true"></span></span></label>
             </div>
             <div class="field">
               <label for="adv-document-google-drive-client-id" data-i18n="advanced.documentGoogleDriveClientIdLabel">Own client ID (optional)</label>
@@ -1179,7 +1970,7 @@
             </div>
             <div class="field">
               <label for="adv-document-google-drive-client-secret" data-i18n="advanced.documentGoogleDriveClientSecretLabel">Own client secret (optional)</label>
-              <div class="secret-row">
+              <div class="secret-row pw-row">
                 <input type="password" id="adv-document-google-drive-client-secret" autocomplete="new-password">
                 <button type="button" class="btn btn-ghost btn-sm" data-eye="adv-document-google-drive-client-secret" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
                   <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1197,6 +1988,7 @@
             </div>
           </div>
         </div>
+        </div>
 
         <div class="error-banner" id="storage-err" role="alert"></div>
       </div>
@@ -1208,19 +2000,21 @@
 
     <div class="step" id="step-advanced">
       <div class="card-head">
-        <div class="step-tag" data-i18n="advanced.tag">Advanced · optional</div>
+        <div class="step-tag"></div>
         <h2 tabindex="-1" data-i18n="advanced.title">Advanced Settings</h2>
         <p data-i18n="advanced.subtitle">Single sign-on, access to your home network, and a few fine adjustments. All optional.</p>
       </div>
       <div class="card-body">
-        <div class="group-label" data-i18n="advanced.sectionIntegrations">Single sign-on</div>
-        <div class="toggle-card">
+        <!-- Ohne Label: ueber einer einzigen Zeile "Single Sign-On (OIDC)" stand
+             das Label "Single Sign-On" - derselbe Name zweimal untereinander. -->
+        <div class="inset-group">
+        <div class="toggle-card" data-setup="oidc-issuer oidc-client-id oidc-client-secret">
           <button type="button" class="toggle-head" data-toggle="oidc-body" aria-expanded="false" aria-controls="oidc-body">
-            <span data-i18n="advanced.oidc">Single Sign-On (OIDC)</span>
-            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+            <span data-i18n="advanced.oidc">Single sign-on (OIDC)</span>
+            <span class="toggle-badge" data-state="optional">Optional</span>
           </button>
           <div class="toggle-body" id="oidc-body">
-            <p class="hint" style="margin-bottom:12px" data-i18n="advanced.oidcHint">Fill in all four fields to enable SSO, or leave them empty.</p>
+            <p class="hint" data-i18n="advanced.oidcHint">Fill in all four fields to enable SSO, or leave them empty.</p>
             <div class="field">
               <label for="oidc-issuer" data-i18n="advanced.oidcIssuerLabel">Issuer URL</label>
               <input type="text" id="oidc-issuer" placeholder="https://auth.example.com/application/o/oikos/">
@@ -1238,24 +2032,20 @@
               <input type="text" id="oidc-redirect">
             </div>
             <div class="field">
-              <label><input type="checkbox" id="adv-oidc-trust-email"> <span data-i18n="advanced.oidcTrustEmail">Trust email without a verified claim</span></label>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.oidcTrustEmail">Trust email without a verified claim</span><span class="toggle"><input type="checkbox" role="switch" id="adv-oidc-trust-email"><span class="toggle__track" aria-hidden="true"></span></span></label>
               <div class="hint" data-i18n="advanced.oidcTrustEmailHint">Only enable this if your provider does not send email_verified and you trust it.</div>
             </div>
             <div class="field">
-              <label><input type="checkbox" id="adv-oidc-allow-signup" checked> <span data-i18n="advanced.oidcAllowSignup">Let SSO sign-ins create new accounts</span></label>
-              <div class="hint" data-i18n="advanced.oidcAllowSignupHint">Turn this off when your provider serves more people than this household. Existing accounts still sign in and still get linked.</div>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.oidcAllowSignup">Let SSO sign-ins create new accounts</span><span class="toggle"><input type="checkbox" role="switch" id="adv-oidc-allow-signup" checked><span class="toggle__track" aria-hidden="true"></span></span></label>
+              <details class="hint-more"><summary data-i18n="common.learnMore">Learn more</summary><div class="hint" data-i18n="advanced.oidcAllowSignupHint">Turn this off when your provider serves more people than this household. Existing accounts still sign in and still get linked.</div></details>
             </div>
             <div class="field">
-              <label><input type="checkbox" id="adv-auth-password-login" checked> <span data-i18n="advanced.authPasswordLogin">Keep the username and password login</span></label>
-              <div class="hint" data-i18n="advanced.authPasswordLoginHint">Turning this off makes SSO the only way in: the login form and password reset disappear. It takes effect once at least one account is linked to your provider, so a fresh install can still create its first admin. If your provider becomes unreachable, the way back is editing the .env file and restarting.</div>
+              <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.authPasswordLogin">Keep the username and password login</span><span class="toggle"><input type="checkbox" role="switch" id="adv-auth-password-login" checked><span class="toggle__track" aria-hidden="true"></span></span></label>
+              <details class="hint-more"><summary data-i18n="common.learnMore">Learn more</summary><div class="hint" data-i18n="advanced.authPasswordLoginHint">Turning this off makes SSO the only way in: the login form and password reset disappear. It takes effect once at least one account is linked to your provider, so a fresh install can still create its first admin. If your provider becomes unreachable, the way back is editing the .env file and restarting.</div></details>
             </div>
           </div>
         </div>
-
-
-
-
-
+        </div>
 
         <!-- Die drei Freigaben stehen zusammen, weil sie DIESELBE Frage beantworten:
              darf Yuvomi Ziele im eigenen Netz erreichen? Sie hingen vorher an drei
@@ -1264,32 +2054,35 @@
              sie laengst zu einer Zeile zusammen und begruendet das dort auch; was sie
              als eine Auskunft zeigt, wird hier als eine Frage gestellt. -->
         <div class="group-label" data-i18n="advanced.sectionPrivateNetwork">Access to your home network</div>
-        <p class="hint" style="margin-bottom:12px" data-i18n="advanced.privateNetworkHint">Yuvomi refuses connections to addresses on your own network by default, which protects against a server being tricked into reaching internal services. Enable what you actually run at home.</p>
+        <p class="group-note" data-i18n="advanced.privateNetworkHint">Yuvomi refuses connections to addresses on your own network by default, which protects against a server being tricked into reaching internal services. Enable what you actually run at home.</p>
         <!-- Die drei Einzel-Hints lagen fertig uebersetzt in allen 24 Locales,
              wurden aber nie gerendert - dabei tragen genau sie die Anker
              (Mealie, Tandoor, Nextcloud), an denen ein Erstinstallierer erkennt,
              ob ihn die Freigabe betrifft. -->
+        <div class="inset-group">
         <div class="field">
-          <label><input type="checkbox" id="adv-ics-private"> <span data-i18n="advanced.icsPrivateNetwork">Allow calendar subscriptions from your home network</span></label>
+          <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.icsPrivateNetwork">Allow calendar subscriptions from your home network</span><span class="toggle"><input type="checkbox" role="switch" id="adv-ics-private"><span class="toggle__track" aria-hidden="true"></span></span></label>
           <div class="hint" data-i18n="advanced.icsPrivateNetworkHint">Needed for ICS feeds from devices on your own network. Lifts the SSRF protection for calendar subscriptions.</div>
         </div>
         <div class="field">
-          <label><input type="checkbox" id="adv-recipe-provider-private"> <span data-i18n="advanced.recipeProviderPrivateNetwork">Allow recipe provider mirrors on your home network</span></label>
+          <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.recipeProviderPrivateNetwork">Allow recipe provider mirrors on your home network</span><span class="toggle"><input type="checkbox" role="switch" id="adv-recipe-provider-private"><span class="toggle__track" aria-hidden="true"></span></span></label>
           <div class="hint" data-i18n="advanced.recipeProviderPrivateNetworkHint">Needed for a Mealie or Tandoor instance on your own network. Lifts the SSRF protection for recipe provider mirrors.</div>
         </div>
         <div class="field">
-          <label><input type="checkbox" id="adv-waste-source-private"> <span data-i18n="advanced.wasteSourcePrivateNetwork">Allow waste collection feeds on your home network</span></label>
+          <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.wasteSourcePrivateNetwork">Allow waste collection feeds on your home network</span><span class="toggle"><input type="checkbox" role="switch" id="adv-waste-source-private"><span class="toggle__track" aria-hidden="true"></span></span></label>
           <div class="hint" data-i18n="advanced.wasteSourcePrivateNetworkHint">Needed for a municipal waste calendar mirrored on your own network. Lifts the SSRF protection for waste collection URL sources.</div>
         </div>
         <div class="field">
-          <label><input type="checkbox" id="adv-document-webdav-private"> <span data-i18n="advanced.documentWebdavPrivateNetwork">Allow a WebDAV target on your home network</span></label>
+          <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.documentWebdavPrivateNetwork">Allow a WebDAV target on your home network</span><span class="toggle"><input type="checkbox" role="switch" id="adv-document-webdav-private"><span class="toggle__track" aria-hidden="true"></span></span></label>
           <div class="hint" data-i18n="advanced.documentWebdavPrivateNetworkHint">Needed for a Nextcloud on your own network. Lifts the SSRF protection for this target.</div>
+        </div>
         </div>
 
         <div class="group-label" data-i18n="advanced.sectionMore">More options</div>
         <!-- Stand hart auf 15 im Code und wurde bei jedem weiteren Lauf wieder
              auf 15 zurückgeschrieben - wer wegen iCloud-Ratenbegrenzung auf 60
              gestellt hatte, verlor die Einstellung stillschweigend. -->
+        <div class="inset-group">
         <div class="field">
           <label for="adv-sync-interval" data-i18n="advanced.syncIntervalLabel">Calendar sync interval (minutes)</label>
           <input type="number" id="adv-sync-interval" min="5" max="1440" step="5" placeholder="15">
@@ -1304,6 +2097,7 @@
           <label for="adv-push-subject" data-i18n="advanced.pushSubjectLabel">Push contact address</label>
           <input type="text" id="adv-push-subject" placeholder="mailto:admin@example.com">
           <div class="hint" data-i18n="advanced.pushSubjectHint">Sent to push services as a contact for your server. Leave empty to use the default.</div>
+        </div>
         </div>
 
         <div class="error-banner" id="adv-err" role="alert"></div>
@@ -1323,45 +2117,90 @@
       </div>
       <div class="card-body">
         <div class="info-banner" data-i18n="review.finalNote">This writes your .env (an existing one is backed up) and starts the container.</div>
-        <div class="review-grid">
-          <div class="review-key" data-i18n="review.host">Host</div>           <div id="rv-host"></div>
-          <div class="review-key" data-i18n="review.port">Port</div>           <div id="rv-port"></div>
-          <div class="review-key" data-i18n="review.tz">Timezone</div>       <div id="rv-tz"></div>
-          <div class="review-key" data-i18n="review.access">Access</div>       <div id="rv-access"></div>
-          <!-- Der einzige Wert, dessen Fehler AUSSCHLIESSLICH still auftritt:
-               falsch gesetzt zeigen Reset- und Einladungslinks ins Leere, und
-               das faellt erst Wochen spaeter auf. Er wurde auf Schritt 1
-               erfragt und danach nirgends mehr gezeigt - waehrend die Seite
-               drei SSRF-Schalter listet, die sofort sichtbar scheitern. -->
-          <div class="review-key" data-i18n="review.baseUrl">Public address</div><div id="rv-base-url"></div>
-          <!-- Hier standen acht Punkte hinter „SESSION_SECRET" und
-               „DB_ENCRYPT_KEY". Beides war unbrauchbar: die Maskierung verbarg
-               genau den Wert, den eine Prüfseite prüfbar machen soll, und
-               DB_ENCRYPT_KEY war nicht einmal der echte Variablenname (er heißt
-               DB_ENCRYPTION_KEY) - wer danach in seiner .env suchte, fand nichts.
-               Die nützliche Auskunft ist nicht der Wert, sondern was mit ihm
-               geschieht: neu erzeugt oder aus der bestehenden .env übernommen. -->
-          <div class="review-key" data-i18n="review.sessionSecret">Session key</div> <div id="rv-session-secret"></div>
-          <div class="review-key" data-i18n="review.dbKey">Database key</div>        <div id="rv-db-key"></div>
-          <div class="review-key" data-i18n="review.weather">Weather</div>        <div id="rv-weather"></div>
-          <div class="review-key" data-i18n="review.google">Google Calendar</div><div id="rv-google"></div>
-          <div class="review-key" data-i18n="review.apple">Apple CalDAV</div>   <div id="rv-apple"></div>
-          <div class="review-key" data-i18n="review.outlook">Outlook Calendar</div><div id="rv-outlook"></div>
-          <div class="review-key" data-i18n="review.email">Email</div>          <div id="rv-email"></div>
-          <div class="review-key" data-i18n="review.oidc">Single Sign-On</div>  <div id="rv-oidc"></div>
-          <div class="review-key" data-i18n="review.backups">Backups</div>       <div id="rv-backups"></div>
-          <div class="review-key" data-i18n="review.webdavBackup">Off-site backups</div><div id="rv-webdav-backup"></div>
-          <div class="review-key" data-i18n="review.documentLocal">Local documents</div><div id="rv-document-local"></div>
-          <div class="review-key" data-i18n="review.documentWebdav">WebDAV documents</div><div id="rv-document-webdav"></div>
-          <div class="review-key" data-i18n="review.documentGoogleDrive">Google Drive documents</div><div id="rv-document-google-drive"></div>
-          <!-- Der Host-Ordner ist ein Mount, kein Detail: liegt er falsch, sind
-               die Daten beim nächsten `pull && up -d` weg. -->
-          <div class="review-key" data-i18n="review.dataDir">Data folder</div><div id="rv-data-dir"></div>
-          <!-- Und die beiden SSRF-Aufhebungen: der Wizard fragt sie ab, die
-               Prüfseite zeigte sie nicht. Eine Prüfseite, die ausgerechnet die
-               sicherheitsrelevanten Schalter auslässt, prüft das Falsche. -->
-          <div class="review-key" data-i18n="review.privateNetwork">Private-network access</div><div id="rv-private-network"></div>
-        </div>
+        <!-- Gruppiert nach den Schritten, aus denen die Werte kommen - jede Gruppe
+             mit einem Weg zurueck. Vorher standen 20 Zeilen ungegliedert
+             untereinander, 11 davon mit einem Strich (Critique 2026-09-29).
+             Was nicht eingerichtet ist, steht je Gruppe in EINER Zeile.
+             "Aendern" fuehrt zum ersten Schritt der Gruppe; "Weiter" fuehrt nach
+             ihrem letzten zurueck hierher, die Schritte dazwischen pruefen sich
+             dabei erneut (siehe next()). Die Werte setzt renderReview(). -->
+        <section class="rv-group" aria-labelledby="rvg-config">
+          <div class="group-head">
+            <h3 class="group-label" id="rvg-config" data-i18n="config.title">Basic Configuration</h3>
+            <!-- aria-labelledby: fuenf Knoepfe "Aendern" waren in der Elementliste
+                 eines Screenreaders nicht unterscheidbar. -->
+            <button type="button" class="group-edit" id="rve-config" data-edit="config" aria-labelledby="rve-config rvg-config" data-i18n="review.edit">Change</button>
+          </div>
+          <dl class="inset-group">
+            <div class="rv-row"><dt data-i18n="review.host">Host</dt><dd id="rv-host"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.port">Port</dt><dd id="rv-port"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.tz">Timezone</dt><dd id="rv-tz"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.access">Access</dt><dd id="rv-access"></dd></div>
+            <!-- Der einzige Wert, dessen Fehler AUSSCHLIESSLICH still auftritt:
+                 falsch gesetzt zeigen Reset- und Einladungslinks ins Leere, und
+                 das faellt erst Wochen spaeter auf. -->
+            <div class="rv-row"><dt data-i18n="review.baseUrl">Public address</dt><dd id="rv-base-url"></dd></div>
+          </dl>
+        </section>
+        <section class="rv-group" aria-labelledby="rvg-secrets">
+          <div class="group-head">
+            <h3 class="group-label" id="rvg-secrets" data-i18n="secrets.title">Security Keys</h3>
+            <button type="button" class="group-edit" id="rve-secrets" data-edit="secrets" aria-labelledby="rve-secrets rvg-secrets" data-i18n="review.edit">Change</button>
+          </div>
+          <!-- Nicht der Wert, sondern was mit ihm geschieht: neu erzeugt oder aus
+               der bestehenden .env uebernommen. Die Schluessel selbst erscheinen
+               hier nie. -->
+          <dl class="inset-group">
+            <div class="rv-row"><dt data-i18n="review.sessionSecret">Session key</dt><dd id="rv-session-secret"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.dbKey">Database key</dt><dd id="rv-db-key"></dd></div>
+          </dl>
+        </section>
+        <section class="rv-group" aria-labelledby="rvg-integrations">
+          <div class="group-head">
+            <h3 class="group-label" id="rvg-integrations" data-i18n="review.groupIntegrations">Integrations</h3>
+            <!-- Die Gruppe umfasst drei Schritte: data-edit-until sagt, nach
+                 welchem es zurueck zur Pruefung geht. -->
+            <button type="button" class="group-edit" id="rve-integrations" data-edit="weather" data-edit-until="email" aria-labelledby="rve-integrations rvg-integrations" data-i18n="review.edit">Change</button>
+          </div>
+          <dl class="inset-group">
+            <div class="rv-row"><dt data-i18n="review.weather">Weather</dt><dd id="rv-weather"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.google">Google Calendar</dt><dd id="rv-google"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.outlook">Outlook Calendar</dt><dd id="rv-outlook"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.apple">Apple CalDAV</dt><dd id="rv-apple"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.email">Email</dt><dd id="rv-email"></dd></div>
+            <div class="rv-row rv-row--unset"><dt data-i18n="review.notSetUp">Not set up</dt><dd id="rv-integrations-unset"></dd></div>
+          </dl>
+        </section>
+        <section class="rv-group" aria-labelledby="rvg-storage">
+          <div class="group-head">
+            <h3 class="group-label" id="rvg-storage" data-i18n="storage.title">Storage &amp; backups</h3>
+            <button type="button" class="group-edit" id="rve-storage" data-edit="storage" aria-labelledby="rve-storage rvg-storage" data-i18n="review.edit">Change</button>
+          </div>
+          <dl class="inset-group">
+            <!-- Der Host-Ordner ist ein Mount, kein Detail: liegt er falsch, sind
+                 die Daten beim nächsten `pull && up -d` weg. -->
+            <div class="rv-row"><dt data-i18n="review.dataDir">Data folder</dt><dd id="rv-data-dir"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.backups">Backups</dt><dd id="rv-backups"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.webdavBackup">Off-site backups</dt><dd id="rv-webdav-backup"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.documentLocal">Local documents</dt><dd id="rv-document-local"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.documentWebdav">WebDAV documents</dt><dd id="rv-document-webdav"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.documentGoogleDrive">Google Drive documents</dt><dd id="rv-document-google-drive"></dd></div>
+            <div class="rv-row rv-row--unset"><dt data-i18n="review.notSetUp">Not set up</dt><dd id="rv-storage-unset"></dd></div>
+          </dl>
+        </section>
+        <section class="rv-group" aria-labelledby="rvg-advanced">
+          <div class="group-head">
+            <h3 class="group-label" id="rvg-advanced" data-i18n="advanced.title">Advanced Settings</h3>
+            <button type="button" class="group-edit" id="rve-advanced" data-edit="advanced" aria-labelledby="rve-advanced rvg-advanced" data-i18n="review.edit">Change</button>
+          </div>
+          <dl class="inset-group">
+            <div class="rv-row"><dt data-i18n="review.oidc">Single sign-on</dt><dd id="rv-oidc"></dd></div>
+            <!-- Die SSRF-Aufhebungen: eine Pruefseite, die ausgerechnet die
+                 sicherheitsrelevanten Schalter auslaesst, prueft das Falsche. -->
+            <div class="rv-row"><dt data-i18n="review.privateNetwork">Private-network access</dt><dd id="rv-private-network"></dd></div>
+            <div class="rv-row rv-row--unset"><dt data-i18n="review.notSetUp">Not set up</dt><dd id="rv-advanced-unset"></dd></div>
+          </dl>
+        </section>
         <div class="error-banner" id="rev-err" role="alert"></div>
       </div>
       <div class="card-foot">
@@ -1379,45 +2218,72 @@
     <div class="step" id="step-docker">
       <div class="card-head">
         <div class="step-tag"></div>
-        <h2 tabindex="-1" data-i18n="docker.title">Starting Yuvomi</h2>
-        <p data-i18n="docker.subtitle">Pulling the image and starting the Docker container.</p>
+        <!-- Titel und Untertitel wechseln mit dem Ausgang (setDockerHead): der
+             Schlussstand "Yuvomi laeuft" bzw. "konnte nicht gestartet werden"
+             steht dort, wo man zuerst hinsieht. data-i18n wandert mit, damit
+             ein Sprachwechsel den Zustand behaelt. -->
+        <h2 tabindex="-1" id="dkr-title" data-i18n="docker.title">Starting Yuvomi</h2>
+        <p id="dkr-subtitle" data-i18n="docker.subtitle">Pulling the image and starting the Docker container.</p>
       </div>
       <div class="card-body">
-        <div class="status-box">
-          <div class="status-row" role="status" aria-live="polite">
-            <div class="spinner" id="dkr-icon" aria-hidden="true"></div>
-            <div>
-              <!-- Kein data-i18n: der Text wird zur Laufzeit gesetzt (Phase, Erfolg,
-                   Fehlschlag) und liegt in der aria-live-Region. Mit data-i18n
-                   ersetzte ein Sprachwechsel „Start fehlgeschlagen" durch
-                   „Image wird geladen" - neben rotem Kreuz und Fehlerprotokoll,
-                   und wurde auch noch angesagt. Siehe dockerTextKey. -->
-              <div id="dkr-text">Downloading image</div>
-              <!-- Die Dauererwartung steht ab Sekunde 0 da, nicht erst wenn es
-                   zu lange dauert: das ist der Unterschied zwischen „es laeuft"
-                   und „es haengt". -->
-              <!-- aria-hidden, obwohl sichtbar: der Zaehler wird JEDE SEKUNDE neu
-                   geschrieben und liegt in einer aria-live-Region. Ein Screenreader
-                   sagte dadurch bis zu 900 Mal die verstrichene Zeit an - und die
-                   Phasenwechsel darueber, die die eigentliche Auskunft tragen,
-                   gingen darin unter. Die Region bleibt fuer #dkr-text zustaendig. -->
-              <div class="elapsed" id="dkr-elapsed" aria-hidden="true"></div>
-              <div class="elapsed" id="dkr-expect" data-i18n="docker.firstRunHint">The first run can take several minutes.</div>
-            </div>
-          </div>
-          <div class="warn-banner" id="dkr-stalled" role="status" style="display:none">
-            <span class="warn-icon" aria-hidden="true">&#x26A0;</span>
-            <span data-i18n="docker.stalled">This is taking longer than usual. The log below shows why.</span>
-          </div>
-          <!-- tabindex: die Box scrollt, und im Fehlerfall ist das Protokoll die
-               einzige Diagnose - ohne Fokus war sie per Tastatur unscrollbar
-               (WCAG 2.1.1). -->
-          <div class="log-box" id="dkr-log" tabindex="0" role="region" aria-label="Container log" data-i18n-aria="docker.logLabel"></div>
+        <!-- Die drei Phasen, die /api/status meldet, als Checkliste. Zustand in
+             data-state (renderPhases); fuer Screenreader traegt die laufende
+             Phase aria-current, eine erledigte oder gescheiterte einen
+             versteckten Zusatz. Die Zeichen sind reine Grafik. -->
+        <ol class="phase-list inset-group" id="dkr-phases">
+          <li class="phase" data-phase="pull" data-state="active">
+            <span class="phase__mark" aria-hidden="true"></span>
+            <span data-i18n="docker.stepPull">Download image</span>
+            <span class="vh phase__state"></span>
+          </li>
+          <li class="phase" data-phase="boot" data-state="waiting">
+            <span class="phase__mark" aria-hidden="true"></span>
+            <span data-i18n="docker.stepBoot">Start container</span>
+            <span class="vh phase__state"></span>
+          </li>
+          <li class="phase" data-phase="health" data-state="waiting">
+            <span class="phase__mark" aria-hidden="true"></span>
+            <span data-i18n="docker.stepHealth">Health check</span>
+            <span class="vh phase__state"></span>
+          </li>
+        </ol>
+        <div class="phase-meta">
+          <!-- aria-hidden, obwohl sichtbar: der Zaehler wird JEDE SEKUNDE neu
+               geschrieben. Ein Screenreader sagte ihn in der Live-Region bis zu
+               900 Mal an, und die Phasenwechsel, die die eigentliche Auskunft
+               tragen, gingen darin unter. Nach dem Erfolg friert er als
+               "Fertig in N s" ein. -->
+          <div class="elapsed" id="dkr-elapsed" aria-hidden="true"></div>
+          <!-- Die Dauererwartung steht ab Sekunde 0 da, nicht erst wenn es
+               zu lange dauert: das ist der Unterschied zwischen „es laeuft"
+               und „es haengt". -->
+          <div class="elapsed" id="dkr-expect" data-i18n="docker.firstRunHint">The first run can take several minutes.</div>
         </div>
+        <!-- Die Ansage fuer Screenreader. Sichtbar steht dasselbe schon in der
+             Checkliste und im Titel; hier nur ein Satz je Wechsel.
+             Kein data-i18n: der Text wird zur Laufzeit gesetzt (Phase, Erfolg,
+             Fehlschlag). Mit data-i18n ersetzte ein Sprachwechsel „Start
+             fehlgeschlagen" durch „Image wird geladen" und sagte das auch noch
+             an. Siehe dockerTextKey. -->
+        <div class="vh status-row" role="status" aria-live="polite">
+          <span id="dkr-text">Downloading image</span>
+        </div>
+        <div class="warn-banner" id="dkr-stalled" role="status" style="display:none">
+          <span class="warn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+          <span data-i18n="docker.stalled">This is taking longer than usual. The log below shows why.</span>
+        </div>
+        <!-- tabindex: die Box scrollt, und im Fehlerfall ist das Protokoll die
+             einzige Diagnose - ohne Fokus war sie per Tastatur unscrollbar
+             (WCAG 2.1.1). -->
+        <!-- Der Umschalter steht beim Protokoll, nicht in der Fussleiste: dort
+             brach er neben "Erneut versuchen" bei 360px auf Deutsch zweizeilig
+             um (336px Bedarf, 328px Platz), und er gehoert zu dem, was er
+             aufklappt - das Banner darueber sagt "das Protokoll unten".
+             Kein data-i18n: wechselt zwischen Anzeigen und Verbergen. -->
+        <button type="button" class="btn btn-ghost btn-sm" id="dkr-logs-toggle" aria-controls="dkr-log" aria-expanded="false" style="display:none">Show log</button>
+        <div class="log-box" id="dkr-log" tabindex="0" role="region" aria-label="Container log" data-i18n-aria="docker.logLabel"></div>
       </div>
       <div class="card-foot" id="dkr-foot" style="display:none">
-        <!-- Kein data-i18n: wechselt zwischen Anzeigen und Verbergen. -->
-        <button class="btn btn-ghost" id="dkr-logs-toggle" style="display:none">Show log</button>
         <!-- Kein data-i18n: zustandsbehaftet (siehe setDockerPrimary). -->
         <button class="btn btn-primary" id="dkr-next">Continue to Admin Setup</button>
       </div>
@@ -1431,6 +2297,7 @@
         <p data-i18n="admin.subtitle">Set up your first login. This account has full access to Yuvomi.</p>
       </div>
       <div class="card-body">
+        <div class="inset-group">
         <div class="field">
           <label for="adm-user" data-i18n="admin.userLabel">Username</label>
           <!-- required: die Wizard-Konvention ist "alles optional" - gerade darum
@@ -1445,22 +2312,46 @@
         </div>
         <div class="field">
           <label for="adm-pass" data-i18n="admin.passLabel">Password</label>
-          <div class="secret-row">
-            <input type="password" id="adm-pass" placeholder="At least 8 characters" data-i18n-ph="admin.passPlaceholder" autocomplete="new-password" required aria-required="true">
+          <!-- Die Mindestlaenge steht als Hinweis UNTER dem Feld statt als
+               Platzhalter darin: der verschwand beim ersten Zeichen, genau
+               dann, wenn man ihn braucht. data-describedby merkt sich die
+               eigene Beschreibung, damit fail()/clearFieldInvalid() sie nach
+               einem Fehler zurueckgeben statt sie mit wegzuraeumen. -->
+          <div class="secret-row pw-row">
+            <input type="password" id="adm-pass" autocomplete="new-password" required aria-required="true" aria-describedby="adm-pass-hint" data-describedby="adm-pass-hint">
             <button type="button" class="btn btn-ghost btn-sm" data-eye="adm-pass" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
               <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
               <svg class="icon-svg icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 7 10 7a9.12 9.12 0 0 0 5.4-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
             </button>
           </div>
+          <!-- Leise Rueckmeldung beim Tippen, keine Staerke-Ampel: der Server
+               prueft nur die Laenge, eine Ampel wuerde eine Regel erfinden.
+               Zwei Saetze mit data-i18n, umgeschaltet per hidden - so uebersteht
+               der Zustand einen Sprachwechsel. aria-live sagt nur den Wechsel an. -->
+          <div class="hint pass-hint" id="adm-pass-hint" data-state="short" aria-live="polite">
+            <span data-pass-state="short" data-i18n="admin.passHint">At least 8 characters</span>
+            <span data-pass-state="ok" data-i18n="admin.passOk" hidden>Long enough</span>
+            <svg class="pass-hint__mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
         </div>
         <div class="field">
           <label for="adm-conf" data-i18n="admin.confLabel">Confirm Password</label>
-          <input type="password" id="adm-conf" autocomplete="new-password" required aria-required="true">
+          <div class="secret-row pw-row">
+            <input type="password" id="adm-conf" autocomplete="new-password" required aria-required="true">
+            <button type="button" class="btn btn-ghost btn-sm" data-eye="adm-conf" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
+              <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="icon-svg icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 7 10 7a9.12 9.12 0 0 0 5.4-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+            </button>
+          </div>
+        </div>
         </div>
         <div class="error-banner" id="adm-err" role="alert"></div>
       </div>
+      <!-- Kein "Zurueck": davor liegt nur der erledigte Docker-Schirm, und
+           zurueck hinter den Container-Start fuehrt kein Weg mehr - die .env
+           steht, der Container laeuft. Ein Knopf, der auf einen Schirm ohne
+           Aufgabe fuehrt, waere ein Umweg mit Fragezeichen. -->
       <div class="card-foot">
-        <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
         <button class="btn btn-primary" id="adm-next" data-i18n="admin.create">Create Account</button>
       </div>
     </div>
@@ -1485,7 +2376,7 @@
                Rerun-Aussage verschlucken. localize() setzt ihn stattdessen. -->
           <p id="done-subtitle">Your family planner is running and your admin account is set up.</p>
           <div class="warn-banner" role="note" style="text-align:start">
-            <span class="warn-icon" aria-hidden="true">&#x26A0;</span>
+            <span class="warn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
             <span data-i18n="done.backupReminder">Remember to back up your .env file now - it holds your keys.</span>
           </div>
           <div class="done-actions">
@@ -1519,17 +2410,23 @@
                Instanz-Adresse gehängt (siehe fillNextSteps). -->
           <div class="next-steps">
             <div class="group-label" data-i18n="done.nextTitle">Next up</div>
+            <div class="inset-group">
             <a class="next-step" id="next-invite" href="#" target="_blank" rel="noopener">
               <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
               <span><b data-i18n="done.nextInvite">Invite your family</b><br><span data-i18n="done.nextInviteDesc">Create invitation links so everyone picks their own password.</span></span>
             </a>
             <a class="next-step" id="next-modules" href="#" target="_blank" rel="noopener">
               <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-              <span><b data-i18n="done.nextModules">Choose your modules</b><br><span data-i18n="done.nextModulesDesc">Turn on what your household actually uses and hide the rest.</span></span>
+              <span><b data-i18n="done.nextModules">Active modules</b><br><span data-i18n="done.nextModulesDesc">Turn on what your household actually uses and hide the rest.</span></span>
+            </a>
+            <a class="next-step" id="next-region" href="#" target="_blank" rel="noopener">
+              <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+              <span><b data-i18n="done.nextRegion">Region &amp; language</b><br><span data-i18n="done.nextRegionDesc">Set currency, date format and holidays to match where you live.</span></span>
             </a>
             <div class="next-step next-step--static">
               <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
               <span><b data-i18n="done.nextInstall">Install it on your phones</b><br><span data-i18n="done.nextInstallDesc">Open Yuvomi on a phone and add it to the home screen - it works offline.</span></span>
+            </div>
             </div>
           </div>
         </div>
@@ -1537,6 +2434,7 @@
     </div>
 
   </main>
+  </div>
 
   <!-- Der Sprachumschalter steht am ENDE des Dokuments, nicht davor.
        showStep() setzt den Fokus bei jedem Schrittwechsel auf die Ueberschrift
@@ -1555,7 +2453,9 @@
       <option value="fr">Français</option>
       <option value="it">Italiano</option>
       <option value="pt">Português</option>
+      <option value="pt-BR">Português (Brasil)</option>
       <option value="nl">Nederlands</option>
+      <option value="nb">Norsk bokmål</option>
       <option value="sv">Svenska</option>
       <option value="pl">Polski</option>
       <option value="cs">Čeština</option>
@@ -1605,6 +2505,12 @@ const UNNUMBERED = new Set(['welcome', 'docker', 'done']);
 let flow = FLOWS.advanced;
 let mode = 'advanced';
 let currentStep = 0;
+// Einstieg und Abschluss stehen einspaltig: vor der Wahl des Weges gibt es
+// keine Schritte, die die Liste zeigen koennte, danach ist sie nur Rueckschau.
+const SOLO_STEPS = new Set(['welcome', 'done']);
+// Rueckweg zur Pruefseite: Index des Schritts, nach dem "Weiter" wieder auf
+// der Pruefseite landet. null = der normale Weg vorwaerts. Siehe next().
+let reviewReturn = null;
 
 // Persistenter Knoten für die Google-Redirect-URI: applyRich baut die Hint-Kinder
 // bei jedem Sprachwechsel neu, dieser <code>-Knoten behält seinen Text.
@@ -1642,6 +2548,18 @@ let simpleLockedByEnv = false;
 // zweite Klick-Sicherung war weg, der naechste Klick schrieb die .env.
 let dockerPrimaryKey = 'docker.toAdmin';
 let dockerTextKey = 'docker.phasePull';
+// Die Phasen des Docker-Schirms in ihrer Reihenfolge, wie /api/status sie
+// meldet (install-server.js, classifyHealth/classifyContainerState). Der
+// erreichte Stand zaehlt nur vorwaerts: der Server kann zwischen zwei Abfragen
+// von `health` auf `boot` zurueckfallen (Healthcheck noch ohne Aussage), die
+// Liste soll dabei keinen Haken wieder verlieren. Steht vor localize(), weil
+// localize() die Liste beim Sprachwechsel neu beschriftet.
+const PHASE_ORDER = ['pull', 'boot', 'health'];
+let phaseReached = 0;
+/** null solange es laeuft, sonst 'running' oder 'failed'. */
+let dockerOutcome = null;
+/** Sekunden bis zum Erfolg, fuer "Fertig in N s" (auch nach Sprachwechsel). */
+let dockerDoneSecs = null;
 let reviewConfirmed = false;
 // Zeitstempel des Scharfstellens: ein woertlicher Doppelklick (~200 ms) traf
 // sonst beide Stufen der Zwei-Klick-Bestaetigung in einer Geste - derselbe
@@ -1683,6 +2601,8 @@ function localize() {
   $('rev-next').textContent = t(reviewConfirmed ? 'review.confirm' : 'review.save');
   $('dkr-next').textContent = t(dockerPrimaryKey);
   $('dkr-text').textContent = t(dockerTextKey);
+  renderPhases();
+  if (dockerDoneSecs !== null) $('dkr-elapsed').textContent = t('docker.doneIn', { n: dockerDoneSecs });
   $('dkr-logs-toggle').textContent = t(logsOpen ? 'docker.hideLogs' : 'docker.showLogs');
   // Der Abschluss-Untertitel haengt am Zustand, nicht nur an der Sprache.
   $('done-subtitle').textContent = t(adminExisted ? 'done.subtitleExisting' : 'done.subtitle');
@@ -1692,15 +2612,37 @@ function localize() {
   // die Werte ("Neu erzeugt", "Direkt / HTTP") kommen aus renderReview - ohne
   // diesen Aufruf blieb der Kontrollschirm nach einem Sprachwechsel zweisprachig.
   if (wizardReady) renderReview();
+  // Die Badges tragen kein data-i18n (sie haengen am Zustand), also hier.
+  refreshBadges();
   applyStepCounters();
+}
+
+/**
+ * Wo ein Schritt auf dem Weg steht, in der Zaehlung von "Schritt n von m".
+ * EINE Rechnung fuer Zaehler UND Balken: vorher teilte der Balken durch alle
+ * Schirme (Einstieg, Docker, Abschluss mitgezaehlt), der Zaehler durch die
+ * nummerierten - "Schritt 1 von 9" stand bei 9 %, "2 von 2" bei 75 %.
+ * Unnummerierte Schirme liegen zwischen ihren Nachbarn: der Einstieg bei 0,
+ * der Abschluss bei m, der Docker-Schirm auf halbem Weg zwischen dem Schritt
+ * davor und dem danach. Er fragt nichts und traegt deshalb keine Nummer, aber
+ * er ist ein Stueck des Weges - der Balken rueckt waehrend des Wartens vor,
+ * statt auf dem Stand der Pruefseite stehen zu bleiben.
+ */
+function stepPosition(name) {
+  const nums = flow.filter(s => !UNNUMBERED.has(s));
+  const total = nums.length;
+  if (!UNNUMBERED.has(name)) return { n: nums.indexOf(name) + 1, total };
+  const idx = flow.indexOf(name);
+  const before = flow.slice(0, idx).filter(s => !UNNUMBERED.has(s)).length;
+  const edge = idx === 0 || idx === flow.length - 1;
+  return { n: edge ? before : before + 0.5, total };
 }
 
 /** „Schritt N von M" für die nummerierten Schritte des aktiven Flows setzen. */
 function applyStepCounters() {
-  const nums = flow.filter(s => !UNNUMBERED.has(s));
-  nums.forEach((name, i) => {
+  flow.filter(s => !UNNUMBERED.has(s)).forEach(name => {
     const tag = document.querySelector(`#step-${name} .step-tag`);
-    if (tag) tag.textContent = t('common.stepCounter', { n: i + 1, total: nums.length });
+    if (tag) tag.textContent = t('common.stepCounter', stepPosition(name));
   });
 }
 
@@ -1714,6 +2656,17 @@ $('lang-switch').addEventListener('change', async e => {
   // Dynamisch gefüllte Texte des aktuellen Schritts (z. B. Simple-Zugriffszeile) auffrischen.
   onEnterStep(flow[currentStep]);
 });
+
+// "Mehr erfahren" klappt nur auf dem Handy zu. Ab 641px ist Platz fuer den
+// Absatz, dort blendet das CSS den Knopf aus - und ein zugeklappter <details>
+// ohne sichtbaren Knopf waere Text, an den niemand mehr herankommt. Deshalb
+// folgt `open` der Breite, auch beim Drehen des Geraets.
+const hintMoreMq = matchMedia('(max-width: 640px)');
+function syncHintMore() {
+  document.querySelectorAll('details.hint-more').forEach(d => { d.open = !hintMoreMq.matches; });
+}
+hintMoreMq.addEventListener('change', syncHintMore);
+syncHintMore();
 
 localize();
 
@@ -2019,20 +2972,50 @@ async function checkPrereqs() {
 checkPrereqs();
 $('prereq-recheck').addEventListener('click', checkPrereqs);
 
+/** Der Balken (nur unter 1024px sichtbar) aus derselben Rechnung wie der Zaehler. */
 function setProgress(n) {
-  const ratio = flow.length > 1 ? n / (flow.length - 1) : 0;
-  $('prog').style.transform = `scaleX(${ratio})`;
+  const { n: at, total } = stepPosition(flow[n]);
+  $('prog').style.transform = `scaleX(${total ? at / total : 0})`;
 }
 
-function showStep(n) {
+/** Zaehlt die Schrittwechsel; nur der juengste darf noch zeichnen. */
+let stepSwap = 0;
+
+/**
+ * Zu Schritt `n` wechseln. Der ZUSTAND (currentStep, Balken, onEnterStep)
+ * steht sofort, das BILD zeichnet renderStep() - mit View Transition erst im
+ * naechsten Frame (siehe swapStep).
+ *
+ * `animate: false` fuer Ketten: next() klickt auf dem Rueckweg zur Pruefseite
+ * sofort das "Weiter" des neuen Schritts, und dessen Pruefung braucht den
+ * Schritt SICHTBAR - ein Fehler fokussiert dort ein Feld und holt es in Sicht.
+ * Liefe dazwischen noch ein Bildwechsel, fiele der Fokus ins Leere.
+ */
+function showStep(n, { animate = true } = {}) {
+  const from = currentStep;
   currentStep = n;
-  const active = flow[n];
   clearInvalid();
+  setProgress(n);
+  const dir = n > from ? 'forward' : n < from ? 'back' : '';
+  const swap = ++stepSwap;
+  // Ein ueberholter Wechsel zeichnet nicht mehr: sein Rueckruf kaeme nach dem
+  // juengsten und risse Fokus und Scrollstand an sich.
+  swapStep(() => { if (swap === stepSwap) renderStep(); }, dir, animate && dir !== '');
+  onEnterStep(flow[n]);
+}
+
+/**
+ * Das Bild des aktuellen Schritts: aktiver Schritt, Layout, Schrittliste,
+ * Scrollstand, Fokus. Liest nur den Zustand, deshalb gleich, wann es laeuft.
+ */
+function renderStep() {
+  const active = flow[currentStep];
   ALL_STEPS.forEach(name => {
     const el = $(`step-${name}`);
     if (el) el.classList.toggle('active', name === active);
   });
-  setProgress(n);
+  $('shell').classList.toggle('shell--solo', SOLO_STEPS.has(active));
+  renderStepNav();
   window.scrollTo(0, 0);
   // Fokus auf die Überschrift des neuen Schritts, damit Tastatur-/Screenreader-
   // Nutzer der Navigation folgen (WCAG 2.4.3). preventScroll verhindert Sprünge.
@@ -2050,10 +3033,155 @@ function showStep(n) {
     }
     heading.focus({ preventScroll: true });
   }
-  onEnterStep(active);
 }
 
-function next() { showStep(currentStep + 1); }
+/** Ob der Wechsel als View Transition laufen kann und soll (wie canViewTransition der App). */
+function canViewTransition() {
+  if (typeof document.startViewTransition !== 'function') return false;
+  // Verdeckt verwirft der Browser sie ohnehin (InvalidStateError).
+  if (document.visibilityState === 'hidden') return false;
+  // Reduzierte Bewegung: kein Gleiten, der CSS-Weg blendet nur kurz.
+  return !matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/** Die laufende View Transition des Schrittwechsels, falls eine laeuft. */
+let stepTransition = null;
+
+/**
+ * Das Bild wechseln - mit Richtung. Muster wie swapPage der App
+ * (public/utils/view-transition.js): die Namen stehen nur waehrend des
+ * Wechsels (html.step-vt), ein Tipp bricht ab, eine verworfene Transition ist
+ * kein Fehler. Ohne View Transition laeuft `update` sofort, und die CSS-
+ * Animation am neuen Schritt traegt die Richtung (data-step-dir).
+ */
+function swapStep(update, dir, animate) {
+  const root = document.documentElement;
+  if (!animate || !canViewTransition()) {
+    // Eine noch laufende Transition gehoert zu einem ueberholten Wechsel.
+    stepTransition?.skipTransition();
+    stepTransition = null;
+    root.classList.remove('step-vt');
+    if (dir) root.dataset.stepDir = dir;
+    else delete root.dataset.stepDir;
+    update();
+    return;
+  }
+  // VOR startViewTransition: der Browser nimmt das alte Bild gleich danach auf,
+  // und ohne Namen glitte die Fussleiste mit.
+  root.dataset.stepDir = dir;
+  root.classList.add('step-vt');
+  const transition = document.startViewTransition(update);
+  stepTransition = transition;
+  // `ready` lehnt ab, wenn der Browser die Transition verwirft - der Tausch
+  // selbst laeuft trotzdem.
+  transition.ready.catch(() => {});
+  // Waehrend der Blende trifft Chromium jeden Zeiger nur auf <html>; der erste
+  // Tipp beendet sie, damit der naechste die Seite erreicht (swapPage der App).
+  const skipOnTap = () => transition.skipTransition();
+  document.addEventListener('pointerdown', skipOnTap, { capture: true, once: true });
+  transition.finished.catch(() => {}).finally(() => {
+    document.removeEventListener('pointerdown', skipOnTap, { capture: true });
+    if (stepTransition !== transition) return;
+    stepTransition = null;
+    // Beide zugleich: ohne step-vt, aber mit Richtung startete die CSS-
+    // Animation am schon stehenden Schritt ein zweites Mal.
+    root.classList.remove('step-vt');
+    delete root.dataset.stepDir;
+  });
+}
+
+/**
+ * Einen Schritt vorwaerts - oder, nach einem "Aendern" von der Pruefseite aus,
+ * zurueck dorthin.
+ *
+ * Der Rueckweg springt NICHT direkt auf die Pruefseite. Die Schritte haengen
+ * aneinander: der Host aus Schritt 1 steckt in drei Redirect-URIs, die erst
+ * adv-next endgueltig setzt, und die Drive-Pruefung in storage-next liest die
+ * Google-Zugangsdaten aus dem Kalenderschritt. Ein Sprung haette diese Werte
+ * auf dem alten Stand gelassen - die Pruefseite zeigte dann etwas anderes als
+ * das, was in die .env geht. Stattdessen druecken wir fuer jeden Schritt
+ * dazwischen dessen eigenes "Weiter": dieselbe Pruefung wie beim ersten Mal,
+ * und scheitert sie, bleibt der Nutzer genau dort stehen, mit Fehler und
+ * markiertem Feld.
+ */
+function next() {
+  const target = currentStep + 1;
+  // Auf dem Rueckweg zur Pruefseite folgt sofort der naechste Klick - dann
+  // ohne Bildwechsel (siehe showStep).
+  showStep(target, { animate: !(reviewReturn !== null && target > reviewReturn) });
+  // onEnterStep('review') hat reviewReturn beim Ankommen schon geloescht.
+  if (reviewReturn !== null && target > reviewReturn) {
+    $(`step-${flow[target]}`)?.querySelector('.card-foot .btn-primary')?.click();
+  }
+}
+
+/**
+ * Zu einem frueheren Schritt zurueck (Schrittliste, "Aendern" der Pruefseite).
+ * Nur rueckwaerts: vorwaerts fuehrt allein "Weiter", damit kein Schritt seine
+ * Pruefung verliert. Kommt der Sprung von der Pruefseite, fuehrt "Weiter" nach
+ * `until` wieder dorthin zurueck.
+ */
+function jumpBack(name, until = name) {
+  const idx = flow.indexOf(name);
+  if (idx < 0 || idx >= currentStep) return;
+  if (flow[currentStep] === 'review') reviewReturn = Math.max(idx, flow.indexOf(until));
+  showStep(idx);
+}
+
+/**
+ * Die Schrittliste auf den Stand des Weges bringen. Zeigt nur die nummerierten
+ * Schritte des gewaehlten Weges, in derselben Zaehlung wie "Schritt n von m".
+ * Zurueck geht es nur, solange noch nichts geschrieben ist: ab dem Start des
+ * Containers steht die .env, und ein Schritt davor aenderte nichts mehr.
+ */
+function renderStepNav() {
+  const nums = flow.filter(s => !UNNUMBERED.has(s));
+  const docker = flow.indexOf('docker');
+  const canReturn = docker === -1 || currentStep < docker;
+  document.querySelectorAll('[data-nav-step]').forEach(item => {
+    const name = item.dataset.navStep;
+    const idx = flow.indexOf(name);
+    item.hidden = idx === -1;
+    if (idx === -1) return;
+    const state = idx === currentStep ? 'current' : idx < currentStep ? 'done' : 'upcoming';
+    item.dataset.state = state;
+    // Der Docker-Eintrag traegt keine Ziffer: sein Ring bleibt leer, solange
+    // er kommt, und zeigt waehrend seines Schirms den Ausgang des Starts.
+    const pos = nums.indexOf(name);
+    item.querySelector('.steps-nav__mark').textContent = pos === -1 ? '' : String(pos + 1);
+    if (name === 'docker' && state === 'current') {
+      item.dataset.run = dockerOutcome === 'running' ? 'ok' : dockerOutcome === 'failed' ? 'failed' : 'running';
+    } else {
+      delete item.dataset.run;
+    }
+    const link = item.querySelector('.steps-nav__link');
+    if (link.tagName === 'BUTTON') link.disabled = !(state === 'done' && canReturn);
+    if (state === 'current') link.setAttribute('aria-current', 'step');
+    else link.removeAttribute('aria-current');
+  });
+}
+
+/**
+ * Die Akkordeon-Abzeichen aus dem Zustand ihrer Felder setzen: "Eingerichtet",
+ * sobald alle in data-setup genannten Felder gefuellt bzw. angehakt sind, sonst
+ * "Optional". EINE Funktion fuer alle Karten - die Regel steht im Markup der
+ * Karte, nicht in neun Kopien hier.
+ */
+function refreshBadges() {
+  document.querySelectorAll('.toggle-card[data-setup]').forEach(card => {
+    const ready = card.dataset.setup.split(/\s+/).every(id => {
+      const el = $(id);
+      if (!el) return false;
+      return el.type === 'checkbox' ? el.checked : el.value.trim() !== '';
+    });
+    const badge = card.querySelector('.toggle-badge');
+    if (!badge) return;
+    badge.dataset.state = ready ? 'set' : 'optional';
+    badge.textContent = t(ready ? 'common.setUp' : 'common.optional');
+  });
+}
+document.addEventListener('input', refreshBadges);
+document.addEventListener('change', refreshBadges);
 
 /** Schritt-Eintritts-Hooks: was beim Anzeigen eines Schritts vorbereitet wird. */
 function onEnterStep(name) {
@@ -2068,6 +3196,8 @@ function onEnterStep(name) {
     $('simple-next').classList.remove('is-armed');
     $('simple-armed-note').textContent = '';
   } else if (name === 'review') {
+    // Angekommen: der Rueckweg ist gegangen, "Weiter" heisst wieder vorwaerts.
+    reviewReturn = null;
     renderReview();
     // Bestätigungszustand zurücksetzen, falls der Nutzer erneut hierher
     // navigiert - dieselbe Entwaffnung wie beim Einfach-Pfad oben.
@@ -2101,8 +3231,16 @@ function onEnterStep(name) {
     // an DIESEM Schritt haengen und nicht an dem einen Weg dorthin.
     const appUrl = S.BASE_URL || deriveBaseUrl();
     $('done-link').href = appUrl;
+    // Nur echte Blaetter aus public/settings/registry.js, keine Alt-Pfade:
+    // /settings/modules/options leitet seit #1489 ins Budget-Blatt weiter, der
+    // Link "Module waehlen" landete damit bei den Budget-Optionen. Der Guard in
+    // test-installer-static.js prueft jedes Ziel gegen die Registry.
     $('next-invite').href = `${appUrl}/settings/admin/family`;
-    $('next-modules').href = `${appUrl}/settings/modules/options`;
+    $('next-modules').href = `${appUrl}/settings/modules/active`;
+    // Region, Waehrung, Datumsformat und Datensprache stehen im Blatt
+    // "Darstellung". Die Sprache hat der Installer schon uebergeben, die Region
+    // kann er nicht ableiten (`de` ist DE, AT oder CH) - also der Weg dorthin.
+    $('next-region').href = `${appUrl}/settings/personal/appearance`;
     if (savedEnvPath) {
       const p = $('done-path');
       p.textContent = t('done.savedTo', { path: savedEnvPath });
@@ -2118,8 +3256,15 @@ function setDoneEmphasis() {
   const dl = $('done-download');
   const open = $('done-link');
   const downloadLeads = mode === 'simple' && !keysDownloaded;
+  // Der Tausch ist ein Zustandswechsel, keine Hover-Geste, und darf nicht
+  // animieren: die Flaeche blendete in 120ms, die Schriftfarbe sprang sofort -
+  // beim Abstufen stand Violett auf Violett, beim Aufstufen Weiss auf Weiss.
+  // Transition kurz aus, Stil per Reflow festschreiben, Transition zurueck.
+  for (const el of [dl, open]) el.style.transition = 'none';
   dl.className = downloadLeads ? 'open-link' : 'btn btn-ghost';
   open.className = downloadLeads ? 'open-link open-link--muted' : 'open-link';
+  void dl.offsetWidth;
+  for (const el of [dl, open]) el.style.transition = '';
 }
 
 // „Fertig": eine Kopie der geschriebenen .env herunterladen, damit Nicht-Techniker
@@ -2175,8 +3320,8 @@ $('done-link').addEventListener('click', e => {
     e.preventDefault();
     openWarned = true;
     const dl = $('done-download');
-    dl.focus();
-    dl.scrollIntoView({ block: 'center' });
+    dl.focus({ preventScroll: true });
+    reveal(dl);
   }
 });
 
@@ -2231,6 +3376,7 @@ async function startFlow(m) {
   }
   mode = m;
   flow = FLOWS[m];
+  reviewReturn = null;
   applyStepCounters();
   if (m === 'simple') applySimpleDefaults();
   showStep(1);
@@ -2246,10 +3392,30 @@ function showErr(id, msg) {
 function clearInvalid(root = document) {
   root.querySelectorAll('[aria-invalid="true"]').forEach(el => {
     el.removeAttribute('aria-invalid');
-    // Nur fail() setzt describedby; mit der Markierung geht auch die Bindung.
-    el.removeAttribute('aria-describedby');
+    // fail() haengt das Banner an; mit der Markierung geht die Bindung, die
+    // eigene Beschreibung des Feldes (data-describedby) kommt zurueck.
+    const own = el.dataset?.describedby;
+    if (own) el.setAttribute('aria-describedby', own);
+    else el.removeAttribute('aria-describedby');
   });
 }
+
+// Die Markierung geht, sobald der Nutzer das Feld anfasst, nicht erst beim
+// naechsten Absenden: ein rot umrandetes Feld, in dem gerade korrigiert wird,
+// meldet einen Fehler, der vielleicht schon behoben ist - und der Screenreader
+// sagt weiter "ungueltig". Das Banner bleibt stehen, bis erneut geprueft wird;
+// ob die Korrektur stimmt, weiss erst die Pruefung beim Absenden.
+function clearFieldInvalid(e) {
+  const el = e.target;
+  if (el.getAttribute?.('aria-invalid') !== 'true') return;
+  el.removeAttribute('aria-invalid');
+  // Das Banner geht, der eigene Hinweis (z. B. die Mindestlaenge) bleibt.
+  const own = el.dataset?.describedby;
+  if (own) el.setAttribute('aria-describedby', own);
+  else el.removeAttribute('aria-describedby');
+}
+document.addEventListener('input', clearFieldInvalid);
+document.addEventListener('change', clearFieldInvalid);
 
 /** Banner-Fehler zeigen UND das schuldige Feld markieren + fokussieren (WCAG 3.3.1). */
 function fail(bannerId, msg, inputId) {
@@ -2269,10 +3435,51 @@ function fail(bannerId, msg, inputId) {
     el.setAttribute('aria-invalid', 'true');
     // Meldung programmatisch ans Feld binden: wer spaeter zum Feld
     // zurueckkehrt, hoert den Grund, nicht nur "ungueltig" (WCAG 3.3.1/1.3.1).
-    el.setAttribute('aria-describedby', bannerId);
+    // Die eigene Beschreibung bleibt dahinter stehen: der Grund zuerst, dann
+    // die Regel, gegen die er verstoesst ("mindestens 8 Zeichen").
+    el.setAttribute('aria-describedby', [bannerId, el.dataset.describedby].filter(Boolean).join(' '));
     el.focus({ preventScroll: true });
-    el.scrollIntoView({ block: 'center' });
+    // Liegt das Feld ueber dem Bildschirm, fuehrt es (das Banner folgt
+    // darunter); sonst das Banner, damit Feld UND Grund zu sehen sind.
+    const wrap = el.closest('.field') || el;
+    reveal(banner && wrap.getBoundingClientRect().top >= 0 ? banner : wrap);
   }
+}
+
+/**
+ * Sanft und nur so weit wie noetig in Sicht holen. `block: 'center'` riss die
+ * Seite bei jedem Fehler um einen halben Bildschirm herum, auch wenn das Feld
+ * schon zu sehen war - auf dem Handy verlor man dabei den Ort, an dem man
+ * gerade getippt hatte. `nearest` bewegt nur, was fehlt; den Rand der
+ * schwebenden Fussleiste traegt scroll-padding am <html>. Unter
+ * reduced-motion springt die Seite, statt zu gleiten.
+ */
+function reveal(el) {
+  if (!el) return;
+  const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  el.scrollIntoView({ block: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
+}
+
+/**
+ * `fn` ausfuehren, sobald die Transition an `el` durch ist - sofort, wenn dort
+ * keine laeuft (reduced-motion, Rueckfall ohne Unterstuetzung). Die Dauer
+ * kommt aus dem berechneten Stil, nicht aus einer zweiten Zahl im Skript. Der
+ * Zeitgeber faengt ab, dass `transitionend` ausbleibt (unterbrochen, Tab
+ * verdeckt); was zuerst kommt, gewinnt, `fn` laeuft einmal.
+ */
+function afterTransition(el, fn) {
+  const ms = el ? Math.max(0, ...getComputedStyle(el).transitionDuration.split(',').map(v => parseFloat(v) * (v.trim().endsWith('ms') ? 1 : 1000))) : 0;
+  if (!ms) { fn(); return; }
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    el.removeEventListener('transitionend', onEnd);
+    fn();
+  };
+  const onEnd = e => { if (e.target === el) finish(); };
+  el.addEventListener('transitionend', onEnd);
+  setTimeout(finish, ms + 50);
 }
 
 document.addEventListener('click', async e => {
@@ -2350,9 +3557,25 @@ document.addEventListener('click', async e => {
   if (toggleBtn) {
     const open = $(toggleBtn.dataset.toggle).classList.toggle('open');
     toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    // Beim Öffnen die Sektion in Sicht holen, damit die neu erschienenen Felder
-    // nicht unter der Sticky-Fußzeile verschwinden (v. a. mobil).
-    if (open) toggleBtn.scrollIntoView({ block: 'nearest' });
+    // Beim Öffnen die ganze Sektion in Sicht holen, nicht nur ihren Kopf: die
+    // neu erschienenen Felder lagen sonst unter der Sticky-Fußzeile (v. a.
+    // mobil). Ist sie höher als der Bildschirm, bleibt der Kopf oben stehen.
+    // Erst NACH dem Aufziehen: zu Beginn ist die Karte noch so hoch wie ihr
+    // Kopf, und `nearest` hielte sie damit schon fuer ganz sichtbar.
+    const card = toggleBtn.closest('.toggle-card');
+    if (open) afterTransition(card, () => reveal(card || toggleBtn));
+    return;
+  }
+
+  const goto = e.target.closest('[data-goto]');
+  if (goto) {
+    if (!goto.disabled) jumpBack(goto.dataset.goto);
+    return;
+  }
+
+  const edit = e.target.closest('[data-edit]');
+  if (edit) {
+    jumpBack(edit.dataset.edit, edit.dataset.editUntil || edit.dataset.edit);
     return;
   }
 
@@ -2599,6 +3822,15 @@ $('storage-next').addEventListener('click', () => {
   // unveraendert, nur der Fehler-Container heisst hier storage-err.
   const origin = S.BASE_URL;
 
+  // Zuerst, weil es das oberste Feld des Schritts ist. Streng wie der Port:
+  // der Server rundet ab und klemmt still auf 1-100, "7.5" oder "500" landeten
+  // sonst als etwas anderes in der App, als hier stand. Leer = Server-Default.
+  const maxUpload = $('adv-max-upload').value.trim();
+  if (maxUpload && !(/^[1-9]\d*$/.test(maxUpload) && Number(maxUpload) <= 100)) {
+    fail('storage-err', t('storage.errMaxUpload'), 'adv-max-upload');
+    return;
+  }
+
   const driveEnabled = $('adv-document-google-drive-enable').checked;
   const driveClientId = $('adv-document-google-drive-client-id').value.trim();
   const driveClientSecret = $('adv-document-google-drive-client-secret').value;
@@ -2661,6 +3893,7 @@ $('storage-next').addEventListener('click', () => {
   S.WEBDAV_BACKUP_KEEP = webdavKeep;
 
   S.DATA_DIR = $('adv-data-dir').value.trim();
+  S.MAX_UPLOAD_MB = maxUpload;
 
   next();
 });
@@ -2747,52 +3980,73 @@ $('adv-next').addEventListener('click', () => {
  * onEnterStep('review') und localize() dieselbe Funktion.
  */
 function renderReview() {
-  $('rv-host').textContent    = S.host;
-  $('rv-port').textContent    = S.port;
-  $('rv-tz').textContent      = S.tz;
-  $('rv-access').textContent  = S.SESSION_SECURE === 'true' ? t('review.accessProxy') : t('review.accessDirect');
-  $('rv-weather').textContent = S.WEATHER_LAT
-    ? t('review.weatherEnabled', { city: S.WEATHER_CITY || `${S.WEATHER_LAT}, ${S.WEATHER_LON}` })
-    : '-';
-  $('rv-google').textContent  = S.GOOGLE_CLIENT_ID ? t('review.configured') : '-';
-  $('rv-apple').textContent   = S.APPLE_USERNAME || '-';
-  $('rv-outlook').textContent = S.MS_CLIENT_ID ? t('review.configured') : '-';
-  $('rv-email').textContent   = S.EMAIL_SMTP_HOST ? (S.EMAIL_FROM_ADDRESS || t('review.configured')) : '-';
-  $('rv-oidc').textContent    = S.OIDC_ISSUER ? t('review.configured') : '-';
-  $('rv-backups').textContent = S.BACKUP_ENABLED === 'false' ? t('review.off') : t('review.on');
-  $('rv-webdav-backup').textContent = S.WEBDAV_BACKUP_ENABLED === 'true'
-    ? (S.WEBDAV_BACKUP_URL || t('review.configured'))
-    : '-';
-  // Beide Enden des Mounts zeigen: der Host-Ordner ist die Hälfte, die
-  // bisher fehlte und ohne die Uploads beim nächsten Update verschwanden.
-  $('rv-document-local').textContent = S.DOCUMENT_STORAGE_LOCAL_ENABLED === 'true'
-    ? `${S.DOCUMENT_STORAGE_LOCAL_DIR || './documents'} → ${S.DOCUMENT_STORAGE_LOCAL_PATH || '/documents'}`
-    : '-';
-  $('rv-document-webdav').textContent = S.DOCUMENT_STORAGE_WEBDAV_ENABLED === 'true'
-    ? (S.DOCUMENT_STORAGE_WEBDAV_URL || t('review.configured'))
-    : '-';
-  $('rv-document-google-drive').textContent = S.GOOGLE_DRIVE_REDIRECT_URI
-    ? t('review.configured')
-    : '-';
+  const setUp = t('common.setUp');
+  // Kein Wert zeigt je "-": was nicht eingerichtet ist, verschwindet aus seiner
+  // Zeile und steht stattdessen in der EINEN Zeile "Nicht eingerichtet" seiner
+  // Gruppe. Wo ein leerer Wert einen Default bedeutet, steht der Default.
+  fillReviewGroup(null, [
+    ['rv-host', S.host],
+    ['rv-port', S.port],
+    ['rv-tz', S.tz],
+    ['rv-access', S.SESSION_SECURE === 'true' ? t('review.accessProxy') : t('review.accessDirect')],
+    ['rv-base-url', S.BASE_URL || deriveBaseUrl()],
+  ]);
   // Was mit den Schlüsseln geschieht, nicht wie sie aussehen. preservedKeys
   // kennt die Antwort schon, seit der Preflight sie meldet.
-  for (const [id, key] of [['rv-session-secret', 'SESSION_SECRET'], ['rv-db-key', 'DB_ENCRYPTION_KEY']]) {
-    $(id).textContent = preservedKeys.has(key) ? t('review.keyPreserved') : t('review.keyGenerated');
-  }
-  $('rv-base-url').textContent = S.BASE_URL || '-';
-  $('rv-data-dir').textContent = S.DATA_DIR || './data';
-  // Die drei Schalter zusammen in einer Zeile: sie beantworten dieselbe Frage
-  // („darf Yuvomi Ziele im eigenen Netz erreichen?") und stehen im Wizard nur
-  // deshalb getrennt, weil sie an verschiedenen Feldern hängen.
+  fillReviewGroup(null, [['rv-session-secret', 'SESSION_SECRET'], ['rv-db-key', 'DB_ENCRYPTION_KEY']]
+    .map(([id, key]) => [id, t(preservedKeys.has(key) ? 'review.keyPreserved' : 'review.keyGenerated')]));
+  fillReviewGroup('rv-integrations-unset', [
+    ['rv-weather', S.WEATHER_LAT ? (S.WEATHER_CITY || `${S.WEATHER_LAT}, ${S.WEATHER_LON}`) : ''],
+    ['rv-google', S.GOOGLE_CLIENT_ID ? setUp : ''],
+    ['rv-outlook', S.MS_CLIENT_ID ? setUp : ''],
+    ['rv-apple', S.APPLE_USERNAME],
+    ['rv-email', S.EMAIL_SMTP_HOST ? (S.EMAIL_FROM_ADDRESS || setUp) : ''],
+  ]);
+  fillReviewGroup('rv-storage-unset', [
+    ['rv-data-dir', S.DATA_DIR || './data'],
+    ['rv-backups', S.BACKUP_ENABLED === 'false' ? t('review.off') : t('review.on')],
+    ['rv-webdav-backup', S.WEBDAV_BACKUP_ENABLED === 'true' ? (S.WEBDAV_BACKUP_URL || setUp) : ''],
+    // Beide Enden des Mounts zeigen: der Host-Ordner ist die Hälfte, die
+    // bisher fehlte und ohne die Uploads beim nächsten Update verschwanden.
+    ['rv-document-local', S.DOCUMENT_STORAGE_LOCAL_ENABLED === 'true'
+      ? `${S.DOCUMENT_STORAGE_LOCAL_DIR || './documents'} → ${S.DOCUMENT_STORAGE_LOCAL_PATH || '/documents'}`
+      : ''],
+    ['rv-document-webdav', S.DOCUMENT_STORAGE_WEBDAV_ENABLED === 'true' ? (S.DOCUMENT_STORAGE_WEBDAV_URL || setUp) : ''],
+    ['rv-document-google-drive', S.GOOGLE_DRIVE_REDIRECT_URI ? setUp : ''],
+  ]);
+  // Die vier Heimnetz-Schalter zusammen in einer Zeile: sie beantworten dieselbe
+  // Frage („darf Yuvomi Ziele im eigenen Netz erreichen?"). Ein Schalter ist
+  // nie "nicht eingerichtet", also steht die Zeile immer da - im Grundzustand
+  // mit "Aus".
   const privateNet = [
     S.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK === 'true' && t('review.privateNetworkIcs'),
     S.RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK === 'true' && t('review.privateNetworkRecipes'),
     S.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK === 'true' && t('review.privateNetworkWaste'),
     S.DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK === 'true' && t('review.privateNetworkWebdav'),
   ].filter(Boolean);
-  // "nicht freigegeben" statt "deaktiviert": der unberuehrte Default ist keine
-  // getroffene Entscheidung und soll auch nicht wie eine klingen.
-  $('rv-private-network').textContent = privateNet.length ? privateNet.join(', ') : t('review.notEnabled');
+  fillReviewGroup('rv-advanced-unset', [
+    ['rv-oidc', S.OIDC_ISSUER ? setUp : ''],
+    ['rv-private-network', privateNet.length ? privateNet.join(', ') : t('review.off')],
+  ]);
+}
+
+/**
+ * Eine Gruppe der Pruefseite fuellen. Leere Werte blenden ihre Zeile aus und
+ * sammeln deren Beschriftung (das schon uebersetzte <dt>) in der Zeile
+ * `unsetId`; die verschwindet, wenn alles eingerichtet ist.
+ */
+function fillReviewGroup(unsetId, rows) {
+  const unset = [];
+  for (const [id, value] of rows) {
+    const cell = $(id);
+    cell.textContent = value || '';
+    cell.parentElement.hidden = !value;
+    if (!value) unset.push(cell.previousElementSibling.textContent.trim());
+  }
+  if (!unsetId) return;
+  const cell = $(unsetId);
+  cell.textContent = unset.join(', ');
+  cell.parentElement.hidden = unset.length === 0;
 }
 
 $('rev-next').addEventListener('click', async () => {
@@ -2914,6 +4168,9 @@ async function startDocker() {
   dockerStart = Date.now();
   pollFailures = 0;
   dockerDone = false;
+  phaseReached = 0;
+  dockerOutcome = null;
+  dockerDoneSecs = null;
   setPhase('pull');
   tickElapsed();
   try {
@@ -2933,9 +4190,53 @@ function setDockerText(key) {
   $('dkr-text').textContent = t(key);
 }
 
+/** Den erreichten Stand vorruecken - nie zurueck (siehe PHASE_ORDER). */
+function reachPhase(phase) {
+  const idx = PHASE_ORDER.indexOf(phase);
+  if (idx > phaseReached) phaseReached = idx;
+}
+
 function setPhase(phase) {
-  const key = PHASE_KEYS[phase];
-  if (key) setDockerText(key);
+  reachPhase(phase);
+  const key = PHASE_KEYS[PHASE_ORDER[phaseReached]];
+  if (key && key !== dockerTextKey) setDockerText(key);
+  renderPhases();
+}
+
+/**
+ * Die Checkliste aus dem Zustand zeichnen: vor dem erreichten Stand fertig,
+ * der erreichte laeuft (oder ist gescheitert), danach wartend. Nach dem Erfolg
+ * ist alles fertig. Der versteckte Zusatz traegt den Zustand fuer
+ * Screenreader, die Zeichen sind aria-hidden.
+ */
+function renderPhases() {
+  document.querySelectorAll('#dkr-phases .phase').forEach(row => {
+    const idx = PHASE_ORDER.indexOf(row.dataset.phase);
+    let state = 'waiting';
+    if (dockerOutcome === 'running' || idx < phaseReached) state = 'done';
+    else if (idx === phaseReached) state = dockerOutcome === 'failed' ? 'failed' : 'active';
+    row.dataset.state = state;
+    if (state === 'active') row.setAttribute('aria-current', 'step');
+    else row.removeAttribute('aria-current');
+    const note = row.querySelector('.phase__state');
+    if (note) note.textContent = state === 'done' ? t('common.stepDone') : state === 'failed' ? t('docker.stepFailed') : '';
+  });
+  // Die Schrittliste zeigt denselben Ausgang (laeuft, fertig, gescheitert) -
+  // jeder Wechsel des Docker-Zustands laeuft hier durch.
+  renderStepNav();
+}
+
+/**
+ * Titel und Untertitel des Docker-Schirms setzen. data-i18n wandert mit, damit
+ * applyTranslations beim Sprachwechsel den ZUSTAND uebersetzt und nicht den
+ * Grundtext zurueckschreibt.
+ */
+function setDockerHead(titleKey, subtitleKey) {
+  for (const [id, key] of [['dkr-title', titleKey], ['dkr-subtitle', subtitleKey]]) {
+    const el = $(id);
+    el.dataset.i18n = key;
+    el.textContent = t(key);
+  }
 }
 
 /** Protokoll fortlaufend zeigen, sobald es etwas zu zeigen gibt. */
@@ -2989,6 +4290,7 @@ $('dkr-logs-toggle').addEventListener('click', () => {
   log.style.display = open ? 'block' : 'none';
   logsOpen = open;
   $('dkr-logs-toggle').textContent = t(logsOpen ? 'docker.hideLogs' : 'docker.showLogs');
+  $('dkr-logs-toggle').setAttribute('aria-expanded', String(open));
   if (open) log.scrollTop = log.scrollHeight;
 });
 
@@ -3013,6 +4315,7 @@ async function pollDocker() {
       dockerSucceeded();
     } else if (d.status === 'error') {
       clearInterval(pollInterval);
+      reachPhase(d.phase);
       dockerFailed(d.logs || t('docker.unknownError'));
     } else {
       setPhase(d.phase);
@@ -3033,20 +4336,28 @@ function dockerSucceeded() {
   if (dockerDone) return;
   clearInterval(pollInterval);
   dockerDone = true;
-  $('dkr-icon').className = 'ok-icon';
-  $('dkr-icon').textContent = '✓';
+  dockerOutcome = 'running';
+  renderPhases();
   setDockerText('docker.running');
+  // Der Zaehler bleibt stehen und sagt jetzt, wie lange es gedauert hat.
+  dockerDoneSecs = Math.max(1, Math.round((Date.now() - dockerStart) / 1000));
+  $('dkr-elapsed').textContent = t('docker.doneIn', { n: dockerDoneSecs });
+  setDockerHead('docker.doneTitle', 'docker.doneSubtitle');
   $('dkr-stalled').style.display = 'none';
   $('dkr-expect').style.display = 'none';
   $('dkr-logs-toggle').style.display = 'none';
   $('dkr-log').style.display = 'none';
   setDockerPrimary('docker.toAdmin', () => next());
   $('dkr-foot').style.display = 'flex';
+  // Der Schirm hat sein Ergebnis: der Fokus geht auf den neuen Titel, wie bei
+  // jedem Schrittwechsel - von dort ist "Weiter" der naechste Tab-Halt. Nur
+  // solange der Schritt noch steht (ein spaeter Tick darf nicht springen).
+  if (flow[currentStep] === 'docker') $('dkr-title').focus({ preventScroll: true });
 }
 
 function restartDocker() {
-  $('dkr-icon').className = 'spinner';
-  $('dkr-icon').textContent = '';
+  setDockerHead('docker.title', 'docker.subtitle');
+  $('dkr-elapsed').style.display = '';
   $('dkr-stalled').style.display = 'none';
   $('dkr-expect').style.display = '';
   $('dkr-log').style.display = 'none';
@@ -3054,6 +4365,7 @@ function restartDocker() {
   $('dkr-logs-toggle').style.display = 'none';
   logsOpen = false;
   $('dkr-logs-toggle').textContent = t('docker.showLogs');
+  $('dkr-logs-toggle').setAttribute('aria-expanded', 'false');
   $('dkr-foot').style.display = 'none';
   startDocker();
 }
@@ -3066,9 +4378,15 @@ function dockerFailed(logs) {
   if (dockerDone) return;
   clearInterval(pollInterval);
   dockerDone = true;
-  $('dkr-icon').className = 'err-icon';
-  $('dkr-icon').textContent = '✗';
+  // Markiert wird die Phase, in der es stand - bzw. die, die der Server als
+  // gescheitert meldet (pollDocker rueckt vorher vor).
+  dockerOutcome = 'failed';
+  renderPhases();
   setDockerText('docker.failed');
+  // Kein Fokuswechsel: der Fehler kann mitten ins Lesen des Protokolls
+  // fallen, die Live-Region sagt ihn an. Der Titel nennt ihn sichtbar.
+  setDockerHead('docker.failed', 'docker.failedSubtitle');
+  $('dkr-elapsed').style.display = 'none';
   $('dkr-stalled').style.display = 'none';
   $('dkr-expect').style.display = 'none';
   const logEl = $('dkr-log');
@@ -3082,6 +4400,24 @@ function dockerFailed(logs) {
 
 $('adm-next').addEventListener('click', createAdmin);
 
+// Dieselbe Regel wie der Server (server/auth.js, /auth/setup): Laenge nach
+// NFC-Normalisierung, mindestens 8. Ein Umlaut aus zwei Codepunkten zaehlt dort
+// einfach - hier also auch, sonst sagte der Hinweis "reicht", der Server nein.
+const ADMIN_PASS_MIN = 8;
+const passLongEnough = p => p.normalize('NFC').length >= ADMIN_PASS_MIN;
+
+/** Hinweis unter dem Admin-Passwort: "Mindestens 8 Zeichen" oder "reicht". */
+function renderPassHint() {
+  const ok = passLongEnough($('adm-pass').value);
+  const hint = $('adm-pass-hint');
+  if (hint.dataset.state === (ok ? 'ok' : 'short')) return;
+  hint.dataset.state = ok ? 'ok' : 'short';
+  hint.querySelectorAll('[data-pass-state]').forEach(el => {
+    el.hidden = el.dataset.passState !== hint.dataset.state;
+  });
+}
+$('adm-pass').addEventListener('input', renderPassHint);
+
 async function createAdmin() {
   clearInvalid();
   const u  = $('adm-user').value.trim();
@@ -3090,7 +4426,7 @@ async function createAdmin() {
   const c  = $('adm-conf').value;
   if (!u || !dn || !p) { fail('adm-err', t('admin.errAll'), !u ? 'adm-user' : !dn ? 'adm-name' : 'adm-pass'); return; }
   if (!/^[a-zA-Z0-9._-]{3,64}$/.test(u)) { fail('adm-err', t('admin.errUser'), 'adm-user'); return; }
-  if (p.length < 8) { fail('adm-err', t('admin.errPass'), 'adm-pass'); return; }
+  if (!passLongEnough(p)) { fail('adm-err', t('admin.errPass'), 'adm-pass'); return; }
   if (p !== c) { fail('adm-err', t('admin.errMatch'), 'adm-conf'); return; }
 
   const btn = $('adm-next');
@@ -3099,7 +4435,11 @@ async function createAdmin() {
     const r = await fetch('/api/create-admin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: u, display_name: dn, password: p, port: parseInt(S.port, 10) }),
+      // Die Sprache, in der der Wizard gerade steht, wird die Datensprache des
+      // Haushalts (Geburtstagstitel, Kalender-Export). Der Proxy reicht nur
+      // Codes weiter, die die App kennt, und wiederholt ohne, falls ein Image
+      // sie ablehnt - die Kontoanlage haengt nie an der Sprache.
+      body: JSON.stringify({ username: u, display_name: dn, password: p, port: parseInt(S.port, 10), language: getLocale() }),
     });
     const d = await r.json();
     // 201 = angelegt. 403/404 = es gibt schon eins, und das ist beim Rerun der

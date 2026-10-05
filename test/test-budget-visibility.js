@@ -116,6 +116,8 @@ test('maskBudgetEntry: Betrag bleibt, Zweck geht - inklusive Verknuepfungen', ()
     category: 'leisure', subcategory: 'games', recurrence_rule: 'FREQ=MONTHLY',
     visibility: 'shared_amount', owner_id: 5,
     attachments: [{ id: 7, name: 'beleg.pdf' }],
+    loan_payment_id: 4, loan_id: 2, loan_installment_number: 1,
+    loan_title: 'Kredit Zahnspange', loan_borrower: 'Bank Geheim',
   };
   const masked = maskBudgetEntry(row, 9, 'personal');
   assert(masked.amount === -25, 'Betrag muss bleiben - er ist der Zweck der Stufe');
@@ -126,6 +128,9 @@ test('maskBudgetEntry: Betrag bleibt, Zweck geht - inklusive Verknuepfungen', ()
   assert(masked.details_hidden === true, 'Flag fuer die Oberflaeche');
   assert(masked.attachments === undefined, 'Belege verraten den Zweck genauso');
   assert(masked.recurrence_rule === undefined, 'Wiederholungsregel weg');
+  for (const key of ['loan_payment_id', 'loan_id', 'loan_installment_number', 'loan_title', 'loan_borrower']) {
+    assert(masked[key] === undefined, `Darlehens-Verknuepfung ${key} weg`);
+  }
   assert(!JSON.stringify(masked).includes('Overwatch'), 'kein Rest des Titels irgendwo');
 });
 

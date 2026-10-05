@@ -6,6 +6,7 @@
  *          function, the unref'd timers simply don't hold the process open.
  * Dependencies: server/services/waste-url-source.js, server/db.js
  */
+import { runExternalJob } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { listDueUrlSources, WasteConflictError } from './waste-store.js';
@@ -27,7 +28,16 @@ const SCAN_INTERVAL_MS = 5 * 60_000;
 // waste-url-source.js#inFlight und meldet sich unten als WasteConflictError.
 let scanRunning = false;
 
-export async function runDueWasteSourceRefreshes() {
+/**
+ * Als Job, der liest, nach aussen wartet und dann schreibt: waehrend eines
+ * Restores beginnt er nicht, ein laufender wird abgewartet (Codex-Befund in
+ * #1431, siehe server/utils/restore-state.js).
+ */
+export function runDueWasteSourceRefreshes() {
+  return runExternalJob(() => runDueWasteSourceRefreshesUntracked());
+}
+
+async function runDueWasteSourceRefreshesUntracked() {
   if (scanRunning) {
     log.info('Waste source scan already running - skipped this tick.');
     return;

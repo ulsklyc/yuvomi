@@ -20,10 +20,15 @@ const layoutCss = readFileSync(new URL('../public/styles/layout.css', import.met
 const glassCss = readFileSync(new URL('../public/styles/glass.css', import.meta.url), 'utf8');
 const tokensCss = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
 
+/* Der Rumpf der ersten Regel, deren Selektorliste GENAU diesen Selektor
+ * fuehrt. Frueher ein Regex auf `<selektor> {` - das fand auch das Ende eines
+ * laengeren Selektors: seit `html.page-swapping .nav-bottom` (Re-Critique
+ * 2026-09-28, G1) las der Safe-Area-Guard den Uebergangsnamen statt der Bar. */
 function cssRuleBody(css, selector) {
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = css.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 'm'));
-  return match?.[1] ?? '';
+  for (const rule of eachRule(css)) {
+    if (rule.selector.split(',').some((part) => part.trim() === selector)) return rule.body;
+  }
+  return '';
 }
 
 test('mobile scrolling keeps navigation and fixed layers stable', () => {
@@ -73,7 +78,12 @@ test('mobile bottom navigation reserves safe-area space without scroll-time root
     /padding(-bottom)?:[^;]*var\(--safe-area-inset-bottom\)/,
     'die Bar muss die Safe-Area selbst reservieren',
   );
-  assert.match(tokensCss, /--nav-bottom-height:\s*calc\(var\(--nav-height-mobile\)[^;]*var\(--safe-area-inset-bottom\)\)/);
+  // Die Zone rechnet mit der gemessenen Kapselhoehe und der Token-Hoehe als
+  // Rueckfall (Review zu #1475, test:mobile-chrome); die Zusage hier ist nur,
+  // dass die Safe-Area in der Zone steckt.
+  const zone = tokensCss.match(/--nav-bottom-height:\s*([^;]+);/)?.[1] ?? '';
+  assert.match(zone, /var\(--nav-height-mobile\)/);
+  assert.match(zone, /var\(--safe-area-inset-bottom\)\)$/);
   assert.equal(rootRule.includes('nav-bottom--hidden'), false);
 });
 
@@ -118,10 +128,18 @@ test('cold dashboard load does not transform the scroll surface', () => {
     /const shouldAnimate = Boolean\(previousPath\);/,
     'the router must distinguish a cold load from an in-app navigation',
   );
+  // Seit 2026-09-26 blendet der Wechsel per View Transition; nur der Rueckfall
+  // ohne API setzt noch eine Klasse, und auch die nur nach einer bestehenden
+  // Route. Eine Blende ohne Versatz transformiert ohnehin nichts (test-motion.js).
   assert.match(
     routerJs,
-    /if \(shouldAnimate\) \{\s*pageWrapper\.classList\.add\(inClass\);/,
-    'the slide class must only be applied after an existing route',
+    /animate: shouldAnimate,/,
+    'the view transition must only run after an existing route',
+  );
+  assert.match(
+    routerJs,
+    /if \(shouldAnimate && !transition\) \{\s*pageWrapper\.classList\.add\('page-transition--in'\);/,
+    'the fallback fade must only be applied after an existing route',
   );
 });
 
@@ -208,13 +226,13 @@ test('the router resets the surviving scrollport on every navigation', () => {
  * Grenze (siehe utils/scroll-restore.js und SPEC, Responsive Composition), keine
  * versehentliche.
  *
- * Dieser Guard hält die Liste ehrlich: kommt ein neuntes Modul dazu oder
+ * Dieser Guard hält die Liste ehrlich: kommt ein zehntes Modul dazu oder
  * verliert eines seinen inneren Scroller, verschiebt sich die Reichweite der
  * Zusage - und Kommentar wie Spezifikation müssen mitziehen, statt still falsch
  * zu werden. Geprüft wird die REGEL über alle Modul-Stylesheets, nicht eine
  * Handvoll bekannter Dateien.
  */
-test('the modules with an inner scroll container are the documented eight', () => {
+test('the modules with an inner scroll container are the documented nine', () => {
   const styleDir = new URL('../public/styles/', import.meta.url);
   const found = [];
 
@@ -230,7 +248,10 @@ test('the modules with an inner scroll container are the documented eight', () =
   assert.deepEqual(
     [...new Set(found)].sort(),
     [
-      '.budget-page', '.calendar-page', '.contacts-page', '.meals-page',
+      // .health-page seit R10: Liste + Detail wie Kontakte und Rezepte - ab der
+      // Split-Schwelle scrollen Liste und Bereich je fuer sich, darunter EIN
+      // Port (.health-browse, ein .page-scrollport mit Nachlauf).
+      '.budget-page', '.calendar-page', '.contacts-page', '.health-page', '.meals-page',
       '.notes-page', '.pantry-page', '.recipes-page', '.shopping-page',
     ],
     'Die Module mit innerem Scroller haben sich geändert. Sie sind genau die, in '

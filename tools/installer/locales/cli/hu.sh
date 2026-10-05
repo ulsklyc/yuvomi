@@ -108,3 +108,10 @@ MSG_document_google_drive_client_secret="  Kliens titkos kulcsának felülírás
 MSG_document_google_drive_err_pair="A Google Drive kliensazonosítóját és titkos kulcsát vagy együtt kell megadni, vagy mindkettőt üresen kell hagyni."
 MSG_document_google_drive_err_credentials="A Google Drive használatához saját OAuth-pár vagy beállított Google Naptár-hitelesítő adatok szükségesek."
 MSG_review_document_google_drive="Google Drive-dokumentumok"
+# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst, durch Leerzeichen
+# getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein Prompt in [x/N],
+# [X/n] oder [M] zeigt, muss hier stehen. Gross/klein faltet install.sh nur fuer A-Z: ein Wort
+# mit anderen Zeichen steht auch in Grossbuchstaben und gross geschrieben da (test:installer-cli-i18n).
+MSG_yes_chars="igen"
+MSG_no_chars="nem"
+MSG_manual_chars="m"

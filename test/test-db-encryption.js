@@ -21,13 +21,13 @@
 
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, existsSync, readFileSync, readdirSync, copyFileSync, writeFileSync, chmodSync, rmSync, renameSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, copyFileSync, writeFileSync, chmodSync, rmSync, renameSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 const KEY = 'test-encryption-key-0123456789';
 const PLAINTEXT_HEADER = Buffer.from('SQLite format 3\0', 'binary');
@@ -48,7 +48,7 @@ async function bootDb(dbPath, encryptionKey) {
 }
 
 function tmpDir() {
-  return mkdtempSync(join(tmpdir(), 'yuvomi-encryption-'));
+  return tempDir('yuvomi-encryption-');
 }
 
 /** true, wenn die Datei mit dem unverschlüsselten SQLite-Header beginnt. */
@@ -1698,8 +1698,10 @@ for (const [fall, key] of SCHLUESSEL_FAELLE) {
     const run = cliRestore(backupDasNachDemKopierenScheitert(), { dbPath: ziel, key });
     assert.equal(run.status, 1, 'der Restore muss scheitern');
     assert.ok(run.failure, `als „Restore failed: ...": ${run.stderr}`);
-    const rollbacks = readdirSync(dir).filter((name) => /\.pre-restore-[^.]+$/.test(name) && !/-(wal|shm)$/.test(name));
-    assert.equal(rollbacks.length, 1, 'Vorbedingung: gescheitert ist er erst nach dem Kopieren, die Rollback-Kopie steht');
+    // Gescheitert ist er erst nach dem Tausch, in init(): die Validierung
+    // meldet sich mit „Backup ...". Den Rollback macht seit Review #1431 ein
+    // rename - die Rollback-Kopie IST danach wieder DB_PATH.
+    assert.doesNotMatch(run.failure, /^Backup /, 'Vorbedingung: gescheitert ist er erst nach dem Tausch, nicht in der Validierung');
     assert.ok(
       !/Rollback after failed restore also failed/.test(run.stderr),
       `die leere Datei wieder zu verweigern ist der alte Stand, kein gescheiterter Rollback: ${run.stderr}`
@@ -1713,9 +1715,9 @@ for (const [fall, key] of SCHLUESSEL_FAELLE) {
     );
     assert.equal(existsSync(`${ziel}-shm`) && sha256(`${ziel}-shm`), shmVorher, 'samt -shm');
     assert.deepEqual(
-      readdirSync(dir).filter((name) => name.startsWith(rollbacks[0]) && name !== rollbacks[0]),
+      readdirSync(dir).filter((name) => name.includes('.pre-restore-') || name.includes('.restore-tmp')),
       [],
-      'und nichts mehr neben der Rollback-Kopie, unter keinem Namen'
+      'und nichts mehr von der Rollback-Kopie oder der Arbeitsdatei, unter keinem Namen'
     );
     await assert.rejects(
       () => bootDb(ziel, key),

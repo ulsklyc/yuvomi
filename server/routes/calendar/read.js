@@ -11,12 +11,14 @@ import {
   expandAndResolveEventRows, getUpcomingEvents, hydrateEventAttachmentBodies,
 } from '../../services/calendar-event-reader.js';
 import { SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN } from '../../services/calendar-events.js';
-import { buildMatchQuery, resolveEventSearchRows } from '../../services/search.js';
-import { visibilityWhere } from '../../services/visibility.js';
+import { buildMatchQuery, eventSearchWindow, resolveEventSearchRows } from '../../services/search.js';
+import { icsSubscriptionVisibleWhere, visibilityWhere } from '../../services/visibility.js';
+import { documentViewer } from '../../services/document-links.js';
 import {
   VALID_SOURCES, ASSIGNED_USERS_SQL, getUserId, isAdminUser, serializeEvents,
 } from './helpers.js';
-import { shiftDateKey, todayKey } from '../../utils/timezone.js';
+import { todayKey } from '../../utils/timezone.js';
+import { birthdaysSwitchedOff, notBirthdayEventSql } from '../../services/household-modules.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
@@ -79,18 +81,21 @@ router.get('/', (req, res) => {
         OR
         (e.recurrence_rule IS NOT NULL AND DATE(e.start_datetime) <= ?)
       )
-      AND (
-        e.external_source <> 'ics'
-        OR e.subscription_id IN (
-          SELECT id FROM ics_subscriptions WHERE shared = 1 OR created_by = ?
-        )
-      )
+      AND ${icsSubscriptionVisibleWhere('e')}
     `;
     const params = [to, from, to, getUserId(req)];
 
     // Sichtbarkeit (#474): eigene + für alle sichtbare + zugewiesene-sichtbare.
     sql += ` AND ${visibilityWhere('e', 'event_assignments', 'event_id')}`;
     params.push(getUserId(req), getUserId(req));
+
+    // GEBURTSTAGE HAUSHALTSWEIT ABGESCHALTET (#1660): ihre Termine sind eine
+    // Einblendung aus einem anderen Modul und laufen dann nicht mehr mit. Der
+    // Kalender selbst bleibt, wie er ist - abschalten ist keine Sperre, aber
+    // was eine Antwort ungefragt aus einem abgeschalteten Modul mitbringt,
+    // folgt dem Schalter (docs/DECISIONS.md 11). Der einzelne Termin bleibt
+    // ueber GET /:id erreichbar, und die Geburtstage ueber ihre eigenen Routen.
+    if (birthdaysSwitchedOff(db.get())) sql += ` AND ${notBirthdayEventSql('e')}`;
 
     if (req.query.assigned_to) {
       sql += ' AND EXISTS (SELECT 1 FROM event_assignments ea WHERE ea.event_id = e.id AND ea.user_id = ?)';
@@ -108,6 +113,7 @@ router.get('/', (req, res) => {
     const rawEvents = database.prepare(sql).all(...params);
     const serialization = {
       database,
+      viewer: documentViewer(req),
       actorId: getUserId(req),
       isAdmin: isAdminUser(req),
     };
@@ -134,9 +140,11 @@ router.get('/upcoming', (req, res) => {
     const database = db.get();
     const expanded = serializeEvents(hydrateEventAttachmentBodies(
       database,
+      // Geburtstage abgeschaltet: der geteilte Leser laesst sie aus (#1660).
       getUpcomingEvents(database, { userId: getUserId(req), limit }),
     ), {
       database,
+      viewer: documentViewer(req),
       actorId: getUserId(req),
       isAdmin: isAdminUser(req),
     });
@@ -159,7 +167,10 @@ router.get('/upcoming', (req, res) => {
 // --------------------------------------------------------
 router.get('/search', (req, res) => {
   try {
-    const match = buildMatchQuery(req.query.q ?? '');
+    // Mit der Verbindung, damit Wortteile tragen wie in der globalen Suche
+    // ("zahn" findet die "Kinderzahnarzt"-Kontrolle) - beide Suchen sollen fuers
+    // gleiche Stichwort dieselben Termine liefern (#471).
+    const match = buildMatchQuery(req.query.q ?? '', { database: db.get() });
     if (!match) return res.json({ data: [], total: 0 });
 
     const userId = getUserId(req);
@@ -168,13 +179,10 @@ router.get('/search', (req, res) => {
     // geteilten/eigenen Abos). Als Fragment wiederverwendet für Count + Liste.
     const whereSql = `
       s.entity = 'event' AND s.search_index MATCH @match
-      AND (
-        e.external_source <> 'ics'
-        OR e.subscription_id IN (
-          SELECT id FROM ics_subscriptions WHERE shared = 1 OR created_by = @userId
-        )
-      )
-      AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}`;
+      AND ${icsSubscriptionVisibleWhere('e', '@userId')}
+      AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}${
+        // Wie GET /: ohne Geburtstage, wenn der Haushalt sie abgeschaltet hat (#1660).
+        birthdaysSwitchedOff(db.get()) ? ` AND ${notBirthdayEventSql('e')}` : ''}`;
 
     const total = db.get().prepare(`
       SELECT COUNT(*) AS n
@@ -221,17 +229,16 @@ router.get('/search', (req, res) => {
     `).all({ match, userId, limit: LIMIT });
 
     // Wiederkehrende Treffer auf die nächste Instanz ab heute auflösen (statt des
-    // Serienstarts, der Jahre zurückliegen kann). Findet die Serie im 1-Jahres-
-    // Fenster keine kommende Instanz, bleibt der Master-Termin unverändert (#471).
-    const today  = todayKey(db.get());
-    // 2-Jahres-Fenster: fängt auch Serien, deren nächste Instanz mehr als ein Jahr
-    // voraus liegt (z. B. mehrjährige Intervalle). Findet sich keine, bleibt der Master.
-    const future = shiftDateKey(today, 730);
+    // Serienstarts, der Jahre zurückliegen kann). Findet die Serie im Fenster
+    // keine kommende Instanz, bleibt der Master-Termin unverändert (#471). Das
+    // Fenster teilt sich diese Route mit der globalen Suche (#1607).
     const database = db.get();
-    const resolved = resolveEventSearchRows(database, rows, today, future);
+    const window = eventSearchWindow(database);
+    const resolved = resolveEventSearchRows(database, rows, window.from, window.to);
 
     res.json({
       data: serializeEvents(resolved, {
+        viewer: documentViewer(req),
         database,
         actorId: userId,
         isAdmin: isAdminUser(req),

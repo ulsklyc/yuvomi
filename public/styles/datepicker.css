@@ -127,11 +127,15 @@ yuvomi-datepicker[disabled] .ydp__trigger {
   color: var(--color-text-primary);
   opacity: 0;
   transform: translateY(-4px) scale(0.98);
+  /* Dauer und Kurve einzeln: `var(--transition-fast)` ist schon „150ms ease",
+   * mit einer zweiten Kurve dahinter war die GANZE Liste ungueltig - das
+   * Popover sprang trotz `@starting-style` auf und zu (gemessen
+   * transitionDuration 0s, Critique 2026-09-26 P2-2). Guard: test-motion.js. */
   transition:
-    opacity var(--transition-fast) var(--ease-out),
-    transform var(--transition-fast) var(--ease-out),
-    overlay var(--transition-fast) allow-discrete,
-    display var(--transition-fast) allow-discrete;
+    opacity var(--duration-sm) var(--ease-out),
+    transform var(--duration-sm) var(--ease-out),
+    overlay var(--duration-sm) allow-discrete,
+    display var(--duration-sm) allow-discrete;
 }
 
 /* Zweizweigig, wie im Kopf von glass.css vorgeschrieben: Safari < 18 kennt nur

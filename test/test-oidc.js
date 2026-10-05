@@ -138,7 +138,7 @@ const { _setTestDatabase } = await import('../server/db.js');
 const sessionDb = buildSchemaDb(); // schema_migrations + alle Migrationen; die sessions-Tabelle legt der BetterSQLiteStore-Konstruktor selbst per CREATE TABLE IF NOT EXISTS an
 _setTestDatabase(sessionDb);
 
-const { findOrCreateOidcUser } = await import('../server/auth.js');
+const { findOrCreateOidcUser, assertSsoOnlyAllowed } = await import('../server/auth.js');
 
 function buildOidcTestDb() {
   const db = new DatabaseSync(':memory:');
@@ -180,7 +180,15 @@ function buildOidcTestDb() {
     CREATE TABLE contacts (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       name           TEXT NOT NULL,
+      category       TEXT,
+      phone          TEXT,
       email          TEXT,
+      family_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
+    );
+    -- Ein neues SSO-Konto bekommt seinen Kontakt ueber syncFamilyMemberArtifacts
+    -- (#1357); die Funktion fragt dabei auch nach einem Geburtstag.
+    CREATE TABLE birthdays (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
       family_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
     );
     CREATE TABLE contact_emails (
@@ -191,14 +199,32 @@ function buildOidcTestDb() {
       is_primary INTEGER NOT NULL DEFAULT 0
     );
   `);
+  // node:sqlite kennt kein `transaction()` wie better-sqlite3; findOrCreateOidcUser
+  // legt Konto und Kontakt in einer Transaktion an (#1357). Dieselbe Semantik:
+  // BEGIN, bei Wurf ROLLBACK und weiterwerfen.
+  db.transaction = (fn) => (...args) => {
+    db.exec('BEGIN');
+    try {
+      const out = fn(...args);
+      db.exec('COMMIT');
+      return out;
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+  };
   return db;
 }
 
-// Legt einen lokalen (Nicht-OIDC) Family-User samt Kontakt-E-Mail an.
-function addLocalUserWithEmail(db, username, email) {
+// Legt einen lokalen, noch nicht verknuepften Family-User samt Kontakt-E-Mail
+// an. Standard ist das Konto, das ein Admin fuer die erste SSO-Anmeldung
+// vorbereitet: OHNE Passwort (`$oidc$`). Nur so eines verknuepft ueber die
+// Adresse (GHSA-6pmj-w42g-g6qv); `{ password: true }` legt ein Konto mit
+// Passwort an, dessen Adresse das Mitglied selbst pflegt.
+function addLocalUserWithEmail(db, username, email, { password = false } = {}) {
   const { lastInsertRowid: userId } = db.prepare(
-    "INSERT INTO users (username, display_name, password_hash) VALUES (?, ?, '$2b$12$fakehash')",
-  ).run(username, username);
+    'INSERT INTO users (username, display_name, password_hash) VALUES (?, ?, ?)',
+  ).run(username, username, password ? '$2b$12$fakehash' : '$oidc$');
   db.prepare(
     'INSERT INTO contacts (name, email, family_user_id) VALUES (?, ?, ?)',
   ).run(username, email, userId);
@@ -258,6 +284,73 @@ test('matcht E-Mail case-insensitiv', () => {
   assert(user.id === localId, 'Case-insensitiver E-Mail-Match fehlgeschlagen');
 });
 
+test('verknüpft auch, wenn die gespeicherte Adresse Leerraum traegt (primaer und sekundaer)', () => {
+  // Der Claim wird getrimmt (#1357), die gespeicherte Seite nicht: ein Kontakt
+  // mit ' dora@example.com ' (Kontaktformular, Import) verfehlte das Konto, und
+  // der Haushalt bekam ein zweites Mitglied mit derselben Adresse.
+  const db = buildOidcTestDb();
+  const primaryId = addLocalUserWithEmail(db, 'dora', '  Dora@Example.com ');
+  const primary = findOrCreateOidcUser(db, { sub: 'link-sub-ws1', email: 'dora@example.com', email_verified: true });
+  assert(primary.id === primaryId, `Primaere Adresse mit Leerraum verfehlt: ${primary.id} statt ${primaryId}`);
+
+  const db2 = buildOidcTestDb();
+  const secId = addLocalUserWithEmail(db2, 'ella', 'ella.primary@example.com');
+  const contact = db2.prepare('SELECT id FROM contacts WHERE family_user_id = ?').get(secId);
+  db2.prepare("INSERT INTO contact_emails (contact_id, label, value, is_primary) VALUES (?, 'work', ?, 0)")
+    .run(contact.id, ' ella.work@example.com  ');
+  const secondary = findOrCreateOidcUser(db2, { sub: 'link-sub-ws2', email: 'ella.work@example.com', email_verified: true });
+  assert(secondary.id === secId, `Sekundaere Adresse mit Leerraum verfehlt: ${secondary.id} statt ${secId}`);
+  assert(db2.prepare('SELECT count(*) AS n FROM users').get().n === 1, 'kein zweites Konto');
+});
+
+test('verknüpft auch über Tab, CR und geschütztes Leerzeichen (NBSP) in der gespeicherten Adresse', () => {
+  // SQLites trim() nimmt nur Leerzeichen weg. Ein Import bringt auch Tab, CR
+  // oder NBSP mit - beide Seiten laufen deshalb durch dieselbe JS-Regel.
+  for (const [i, stored] of ['\tfrida@example.com\r', '\u00a0Frida@Example.com\u00a0'].entries()) {
+    const db = buildOidcTestDb();
+    const localId = addLocalUserWithEmail(db, `frida${i}`, stored);
+    const user = findOrCreateOidcUser(db, { sub: `link-sub-nbsp-${i}`, email: 'frida@example.com', email_verified: true });
+    assert(user.id === localId, `Adresse ${JSON.stringify(stored)} verfehlt: ${user.id} statt ${localId}`);
+  }
+});
+
+test('verknüpft NICHT über Unicode-Faltung (Kelvin-Zeichen statt K)', () => {
+  // Klein geschrieben wird nur ASCII, wie SQLites lower(). JS toLowerCase()
+  // faltet das Kelvin-Zeichen U+212A zu "k" - eine Adresse, die der Anbieter
+  // so meldet, ist aber nicht die gespeicherte ASCII-Adresse.
+  const db = buildOidcTestDb();
+  const localId = addLocalUserWithEmail(db, 'kate', 'kate@x.de');
+  const user = findOrCreateOidcUser(db, { sub: 'link-sub-kelvin', email: '\u212Aate@x.de', email_verified: true });
+  assert(user.id !== localId, 'Kelvin-Adresse wurde mit dem ASCII-Konto verknuepft');
+  assert(db.prepare('SELECT count(*) AS n FROM users').get().n === 2, 'es entsteht ein eigenes Konto');
+});
+
+test('Konto ohne Passwort: die Doppelprüfung sieht dieselbe Adresse mit Leerraum, wie der Linker', () => {
+  // Die Pruefung vor `sso_only` muss genau das vorhersagen, woran die
+  // Verknuepfung scheitert. Sieht der Linker zwei Konten mit derselben Adresse
+  // (eine davon mit Leerraum gespeichert), darf die Pruefung kein drittes,
+  // passwortloses Konto mit dieser Adresse durchwinken.
+  const saved = {};
+  const env = {
+    OIDC_ISSUER: 'https://idp.example.com', OIDC_CLIENT_ID: 'c', OIDC_CLIENT_SECRET: 's',
+    OIDC_REDIRECT_URI: 'https://home.example/api/v1/auth/oidc/callback',
+  };
+  for (const [k, v] of Object.entries(env)) { saved[k] = process.env[k]; process.env[k] = v; }
+  try {
+    for (const [i, stored] of [' gina@example.com ', '\tGina@Example.com\u00a0'].entries()) {
+      const db = buildOidcTestDb();
+      _setTestDatabase(db);
+      addLocalUserWithEmail(db, `gina${i}`, stored);
+      const err = assertSsoOnlyAllowed(true, '', { email: 'gina@example.com' });
+      assert(err && /already belongs to another member/.test(err),
+        `Adresse ${JSON.stringify(stored)} wurde nicht als belegt erkannt: ${err}`);
+    }
+  } finally {
+    _setTestDatabase(sessionDb);
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
+});
+
 test('verknüpft NICHT bei unverifizierter E-Mail (Takeover-Schutz)', () => {
   const db = buildOidcTestDb();
   addLocalUserWithEmail(db, 'charlie', 'charlie@example.com');
@@ -292,15 +385,121 @@ test('verknüpft wenn email_verified fehlt und OIDC_TRUST_EMAIL_WITHOUT_VERIFIED
   delete process.env.OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM;
 });
 
-test('verknüpft NICHT bei mehrdeutiger E-Mail (mehrere Treffer)', () => {
+test('mehrdeutige E-Mail: abgewiesen, weder verknuepft noch ein neues Konto (GHSA-6pmj-w42g-g6qv)', () => {
+  // Bis v2.69.0 entstand hier still ein drittes Konto, das den sub fuer immer
+  // band - jede spaetere Anmeldung landete dort, auch nach behobener Doppelung.
+  for (const password of [false, true]) {
+    const db = buildOidcTestDb();
+    const a = addLocalUserWithEmail(db, 'twin-a', 'twins@example.com');
+    const b = addLocalUserWithEmail(db, 'twin-b', ' Twins@Example.com', { password });
+    const userinfo = { sub: 'link-sub-006', email: 'twins@example.com', email_verified: true };
+    const user = findOrCreateOidcUser(db, userinfo);
+    assert(user && user.refused === 'oidc_email_ambiguous', `Erwartet oidc_email_ambiguous, war ${JSON.stringify(user)}`);
+    assert(JSON.stringify([...user.accountIds].sort()) === JSON.stringify([a, b].map(Number).sort()),
+      `das Log braucht die beteiligten Konten: ${user.accountIds}`);
+    const count = db.prepare('SELECT count(*) as n FROM users').get();
+    assert(count.n === 2, `Es darf kein Konto entstehen, es waren ${count.n}`);
+    assert(!db.prepare("SELECT 1 FROM users WHERE oidc_sub = 'link-sub-006'").get(), 'der sub darf nirgends haengen');
+  }
+});
+
+test('mehrdeutige E-Mail wird auch mit OIDC_ALLOW_SIGNUP=false als Mehrdeutigkeit gemeldet', () => {
   const db = buildOidcTestDb();
   addLocalUserWithEmail(db, 'twin-a', 'twins@example.com');
-  addLocalUserWithEmail(db, 'twin-b', 'twins@example.com');
-  const userinfo = { sub: 'link-sub-006', email: 'twins@example.com', email_verified: true };
-  const user = findOrCreateOidcUser(db, userinfo);
-  const count = db.prepare('SELECT count(*) as n FROM users').get();
-  assert(count.n === 3, 'Mehrdeutige E-Mail muss neuen Account erzeugen, nicht raten');
-  assert(user.oidc_sub === 'link-sub-006', 'Neuer Account muss oidc_sub tragen');
+  addLocalUserWithEmail(db, 'twin-b', 'twins@example.com', { password: true });
+  const before = process.env.OIDC_ALLOW_SIGNUP;
+  process.env.OIDC_ALLOW_SIGNUP = 'false';
+  try {
+    const user = findOrCreateOidcUser(db, { sub: 'link-sub-006b', email: 'twins@example.com', email_verified: true });
+    assert(user?.refused === 'oidc_email_ambiguous',
+      `"kein Konto" waere falsch - es gibt zwei: ${JSON.stringify(user)}`);
+  } finally {
+    if (before === undefined) delete process.env.OIDC_ALLOW_SIGNUP; else process.env.OIDC_ALLOW_SIGNUP = before;
+  }
+});
+
+test('ein Konto MIT Passwort verknuepft nicht ueber die Adresse, es wird abgewiesen (GHSA-6pmj-w42g-g6qv)', () => {
+  // Die Adresse eines Kontos mit Passwort kann sein Mitglied selbst gesetzt
+  // haben - auch auf die einer Person, die sich erst noch per SSO anmeldet.
+  // Deren erste Anmeldung laege sonst im Konto des Mitglieds. Kein Ersatzkonto
+  // (still doppelt) und keine Verknuepfung: eigener Grund, der zum Verknuepfen
+  // unter Einstellungen fuehrt.
+  for (const signup of [undefined, 'false']) {
+    const db = buildOidcTestDb();
+    const memberId = addLocalUserWithEmail(db, 'mallory', 'newbie@example.com', { password: true });
+    const before = process.env.OIDC_ALLOW_SIGNUP;
+    if (signup === undefined) delete process.env.OIDC_ALLOW_SIGNUP; else process.env.OIDC_ALLOW_SIGNUP = signup;
+    let user;
+    try {
+      user = findOrCreateOidcUser(db, { sub: 'sub-newbie', email: 'newbie@example.com', email_verified: true });
+    } finally {
+      if (before === undefined) delete process.env.OIDC_ALLOW_SIGNUP; else process.env.OIDC_ALLOW_SIGNUP = before;
+    }
+    assert(user?.refused === 'oidc_link_required', `Erwartet oidc_link_required (signup=${signup}), war ${JSON.stringify(user)}`);
+    assert(Number(user.accountIds[0]) === Number(memberId), 'das Log nennt das Konto');
+    assert(db.prepare('SELECT oidc_sub FROM users WHERE id = ?').get(memberId).oidc_sub === null,
+      'der sub darf nicht am Konto des Mitglieds haengen');
+    assert(db.prepare('SELECT count(*) AS n FROM users').get().n === 1, 'kein Ersatzkonto');
+  }
+});
+
+test('ein Admin-Konto mit Passwort verknuepft weiterhin ueber die Adresse', () => {
+  // Die Adresse eines Admin-Kontos kann nur ein Admin gesetzt haben - die
+  // Person selbst ist einer, und fremde Mitglieds-Adressen aendert nur ein
+  // Admin. Das ist der Weg, auf dem der erste Admin einer frischen Installation
+  // (aus /setup, mit Passwort) sein Konto mit dem Anbieter verbindet.
+  const db = buildOidcTestDb();
+  const adminId = addLocalUserWithEmail(db, 'root', 'root@example.com', { password: true });
+  db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(adminId);
+  const user = findOrCreateOidcUser(db, { sub: 'sub-root', email: 'root@example.com', email_verified: true });
+  assert(user?.id === adminId && user.oidc_sub === 'sub-root', `Erwartet Verknuepfung mit ${adminId}, war ${JSON.stringify(user)}`);
+});
+
+test('Gaeste der geteilten Ausgaben zaehlen fuer die Verknuepfung nicht mit (GHSA-6pmj-w42g-g6qv)', () => {
+  // Ein Gast mit derselben Adresse macht sie nicht mehrdeutig ...
+  const db = buildOidcTestDb();
+  const veraId = addLocalUserWithEmail(db, 'vera', 'vera@example.com');
+  const guestId = addLocalUserWithEmail(db, 'vera-gast', 'vera@example.com', { password: true });
+  db.prepare('INSERT INTO split_expense_guest_users (user_id) VALUES (?)').run(guestId);
+  const user = findOrCreateOidcUser(db, { sub: 'sub-vera', email: 'vera@example.com', email_verified: true });
+  assert(user?.id === veraId, `Erwartet das vorbereitete Konto ${veraId}, war ${JSON.stringify(user)}`);
+  assert(user.oidc_sub === 'sub-vera');
+
+  // ... und ein Gast allein wird nicht verknuepft - weder mit noch ohne Passwort.
+  for (const password of [true, false]) {
+    const db2 = buildOidcTestDb();
+    const gId = addLocalUserWithEmail(db2, 'gast', 'neu@example.com', { password });
+    db2.prepare('INSERT INTO split_expense_guest_users (user_id) VALUES (?)').run(gId);
+    const created = findOrCreateOidcUser(db2, { sub: 'sub-neu', email: 'neu@example.com', email_verified: true, preferred_username: 'neu' });
+    assert(created?.id && created.id !== gId, `der Gast wurde verknuepft: ${JSON.stringify(created)}`);
+    assert(db2.prepare('SELECT oidc_sub FROM users WHERE id = ?').get(gId).oidc_sub === null, 'kein sub am Gast');
+  }
+});
+
+test('die Pruefung vor einem Konto ohne Passwort zaehlt Gaeste nicht, Konten mit Passwort schon', () => {
+  // Sie muss genau das vorhersagen, woran der Linker scheitert: ein Gast mit
+  // der Adresse stoert ihn nicht, ein Mitglied mit Passwort und derselben
+  // Adresse macht sie mehrdeutig.
+  const saved = {};
+  const env = {
+    OIDC_ISSUER: 'https://idp.example.com', OIDC_CLIENT_ID: 'c', OIDC_CLIENT_SECRET: 's',
+    OIDC_REDIRECT_URI: 'https://home.example/api/v1/auth/oidc/callback',
+  };
+  for (const [k, v] of Object.entries(env)) { saved[k] = process.env[k]; process.env[k] = v; }
+  try {
+    const db = buildOidcTestDb();
+    _setTestDatabase(db);
+    const gId = addLocalUserWithEmail(db, 'gast', 'hanna@example.com', { password: true });
+    db.prepare('INSERT INTO split_expense_guest_users (user_id) VALUES (?)').run(gId);
+    assert(assertSsoOnlyAllowed(true, '', { email: 'hanna@example.com' }) === null,
+      'ein Gast darf das Anlegen nicht blockieren - der Linker sieht ihn nicht');
+    addLocalUserWithEmail(db, 'hanna-pw', 'hanna@example.com', { password: true });
+    assert(/already belongs to another member/.test(assertSsoOnlyAllowed(true, '', { email: 'hanna@example.com' }) || ''),
+      'ein Mitglied mit Passwort und derselben Adresse macht sie mehrdeutig');
+  } finally {
+    _setTestDatabase(sessionDb);
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
 });
 
 test('verknüpft NICHT mit bereits OIDC-gebundenem Account', () => {
@@ -628,6 +827,20 @@ test('der abgewiesene Fall bekommt einen eigenen Grund, keine Sammelmeldung', ()
     'der Callback nennt den Grund nicht - dann kann die Anmeldeseite ihn nicht unterscheiden');
   assert(login.includes('oidc_signup_disabled') && login.includes('ssoNoAccount'),
     'die Anmeldeseite kennt den Grund nicht und zeigt weiter die Sammelmeldung');
+});
+
+test('die beiden Absagen der E-Mail-Verknuepfung haben eigene, uebersetzte Meldungen (GHSA-6pmj-w42g-g6qv)', () => {
+  // "SSO-Anmeldung fehlgeschlagen, bitte erneut versuchen" liesse den Nutzer
+  // einen Weg wiederholen, der genauso endet. Jede Absage nennt den Ausweg.
+  const login = readFileSync(new URL('../public/pages/login.js', import.meta.url), 'utf8');
+  for (const [reason, key] of [['oidc_email_ambiguous', 'ssoEmailAmbiguous'], ['oidc_link_required', 'ssoLinkRequired']]) {
+    assert(new RegExp(`\\['${reason}', \\(\\) => t\\('login\\.${key}'\\)\\]`).test(login),
+      `die Anmeldeseite bildet ${reason} nicht auf login.${key} ab`);
+    for (const file of readdirSync(new URL('../public/locales/', import.meta.url)).filter((f) => f.endsWith('.json'))) {
+      const locale = JSON.parse(readFileSync(new URL(`../public/locales/${file}`, import.meta.url), 'utf8'));
+      assert(typeof locale.login?.[key] === 'string' && locale.login[key].length > 0, `${file}: login.${key} fehlt`);
+    }
+  }
 });
 
 // ─── Verknuepfen und Loesen (#832) ────────────────────────────────────────────

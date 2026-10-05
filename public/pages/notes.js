@@ -10,11 +10,14 @@ import { wireCategoryScopeHelp } from '/components/category-manager.js';
 import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
 import { t } from '/i18n.js';
 import { esc, renderMarkdownLight } from '/utils/html.js';
+import { rowActionHtml } from '/utils/row-action.js';
 import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
+import { pageToolsMenuHtml, pageToolsActionEl, installPopoverMenus } from '/utils/popover-menu.js';
 import { findPageFab } from '/utils/fab.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
 import { AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import {
@@ -234,20 +237,36 @@ export async function render(container, { user, signal }) {
   // Spalten stutzen. Kopf und Koerper enden deshalb beide an der Nutzbreite.
   container.insertAdjacentHTML('beforeend', `
     <div class="notes-page app-page app-page--full" data-composition="full">
-      <div class="page-toolbar notes-toolbar">
+      <div class="page-toolbar page-toolbar--title-tools notes-toolbar">
         <h1 class="page-toolbar__title">${t('notes.title')}</h1>
-        ${renderPageSearch({ id: 'notes-search', label: t('notes.searchPlaceholder'), placeholder: t('notes.searchPlaceholder'), value: state.filterQuery, clearLabel: t('common.searchClear'), className: 'notes-toolbar__search' })}
-        <button class="btn btn--secondary notes-manage-categories" id="notes-manage-categories" aria-label="${t('category.manageTitle')}">
-          <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
-          <span>${t('noteCategories.categories')}</span>
-        </button>
-        <button class="btn btn--primary toolbar-new-btn" id="notes-add-btn" aria-label="${t('notes.addNoteLabel')}">
-          <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
-          <span class="toolbar-new-btn__label">${t('newLabel.notes')}</span>
-        </button>
+        ${renderPageSearch({ id: 'notes-search', label: t('notes.searchPlaceholder'), placeholder: t('notes.searchPlaceholder'), value: state.filterQuery, clearLabel: t('common.searchClear'), className: 'notes-toolbar__search page-toolbar__center' })}
+        ${/* KATEGORIEN VERWALTEN STEHT IM WERKZEUGMENUE (Kopfregel mobil,
+              2026-09-26): am Desktop war es ein 131px-Textknopf neben der
+              Suche, mobil ein loses Icon - Verwaltung, die im Kopf so laut
+              stand wie die Suche (A8). Der Traeger behaelt die Klasse
+              `notes-manage-categories`: an ihr blendet die Shell den
+              Verwaltungsweg bei Nur-lesen aus (layout.css), auch wenn sich das
+              Recht ohne Neuladen aendert. */ ''}
+        ${/* DER AKTIONS-SLOT DES KANONKOPFS (Re-Critique 2026-09-27, D3): in
+              ihn dockt die Shell am Zeigergeraet den FAB mit seinem Nomen an
+              (dockFabIntoToolbar) - ohne Slot schwebte er weiter. Er steht
+              auch bei Nur-lesen, dann leer; unter 1024px blendet die Shell
+              einen leeren Slot aus. */ ''}
+        <div class="page-toolbar__actions">
+          ${readOnly() ? '' : `
+          <div class="notes-manage-categories notes-toolbar__tools">
+            ${pageToolsMenuHtml({ id: 'notes-tools-menu', label: t('common.moreActions'), items: [
+              { action: 'manage-categories', label: t('category.manageTitle'), icon: 'tags' },
+            ] })}
+          </div>`}
+        </div>
       </div>
-      <div class="notes-filters" id="notes-filters" hidden></div>
       <div class="notes-scroll page-scrollport">
+        <!-- DIE CHIPREIHE IST DAS ERSTE KIND DES PORTS (Kopfregel mobil,
+             2026-09-26). Zwischen Kopf und Port kostete sie dauerhaft 65px
+             (Port ab y=179 statt 114), die auch der Kopf-Kollaps nicht
+             zurueckholte (A8); hier scrollt sie mit dem Raster weg. -->
+        <div class="notes-filters page-chip-row" id="notes-filters" hidden></div>
         <div id="notes-grid" class="notes-grid" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 3 })}</div>
       </div>
       <button class="page-fab" id="fab-new-note" aria-label="${t('notes.addNoteLabel')}" data-dock-label="${t('newLabel.notes')}">
@@ -310,15 +329,21 @@ export async function render(container, { user, signal }) {
   const filterFade = wireScrollFade(container.querySelector('#notes-filters'));
   signal?.addEventListener('abort', () => filterFade.destroy(), { once: true });
 
-  // Beide Anlegewege sind per CSS ausgeblendet (html[data-module-readonly]),
+  // Der Anlegeweg ist per CSS ausgeblendet (html[data-module-readonly]),
   // der Handler bleibt trotzdem gesperrt: ausgeblendet ist nicht dasselbe wie
   // unerreichbar (derselbe Satz wie am FAB in waste.js).
   const addHandler = () => { if (!readOnly()) openNoteModal({ mode: 'create' }); };
-  // #notes-add-btn ist per .toolbar-new-btn global ausgeblendet (FAB übernimmt),
-  // bleibt aber als einheitliches Modul-Muster erhalten (frontend-audit 1.9).
-  _container.querySelector('#notes-add-btn').addEventListener('click', addHandler);
-  _container.querySelector('#notes-manage-categories').addEventListener('click', () => {
-    if (!readOnly()) openNoteCategoryManager();
+  // Das Werkzeugmenue: Positionierung, Light-Dismiss und Pfeiltasten aus der
+  // geteilten Popover-Mechanik, der Klick ueber `data-action` am Kopf.
+  installPopoverMenus(_container);
+  _container.querySelector('.notes-toolbar')?.addEventListener('click', (e) => {
+    if (pageToolsActionEl(e.target, 'manage-categories') && !readOnly()) {
+      // Der Fokus steht auf einem Eintrag, den das Menue gerade versteckt hat;
+      // der Dialog gaebe ihn beim Schliessen dorthin zurueck und er fiele aufs
+      // Dokument. Also vorher auf den Knopf, der das Menue geoeffnet hat.
+      _container.querySelector('.notes-toolbar .page-tools-btn')?.focus();
+      openNoteCategoryManager();
+    }
   });
   findPageFab('fab-new-note').addEventListener('click', addHandler);
 
@@ -482,15 +507,20 @@ function renderGrid() {
   const rest   = visible.filter((n) => !n.pinned);
   const heading = (label) => `<h2 class="notes-group__title u-section-title">${label}</h2>`;
 
-  const html = (pinned.length && rest.length)
-    ? heading(t('notes.groupPinned')) + pinned.map(renderNoteCard).join('')
-      + heading(t('notes.groupOthers')) + rest.map(renderNoteCard).join('')
-    : visible.map(renderNoteCard).join('');
+  // Der Notiztitel ist eine echte Ueberschrift (R8 H15), eine Ebene unter
+  // dem, was darueber steht: unter den Gruppenkoepfen (h2) ein h3, sonst
+  // direkt unter dem Seitentitel (h1) ein h2 - keine uebersprungene Ebene.
+  const grouped = Boolean(pinned.length && rest.length);
+  const card = (n) => renderNoteCard(n, { headingLevel: grouped ? 3 : 2 });
+  const html = grouped
+    ? heading(t('notes.groupPinned')) + pinned.map(card).join('')
+      + heading(t('notes.groupOthers')) + rest.map(card).join('')
+    : visible.map(card).join('');
 
   grid.replaceChildren();
   grid.insertAdjacentHTML('beforeend', html);
   if (window.lucide) lucide.createIcons({ el: grid });
-  stagger(grid.querySelectorAll('.note-card'));
+  stagger(grid.querySelectorAll('.note-card'), { host: grid });
 }
 
 /**
@@ -534,7 +564,22 @@ function notesEmptyStateHtml(isFiltered) {
   });
 }
 
-function renderNoteCard(note) {
+/**
+ * Wie der Screenreader eine Notiz an ihren Kartenknoepfen nennt: der Titel,
+ * sonst die erste Textzeile ohne Markdown-Zeichen, sonst "Notiz". Zwanzig
+ * Knoepfe, die alle "Notiz loeschen" heissen, sind fuer ihn einer.
+ */
+export function noteName(note) {
+  const title = String(note?.title || '').trim();
+  if (title) return title;
+  const line = String(note?.content || '').split('\n')
+    .map((l) => l.replace(/^\s*(?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+|>\s*)/, '').replace(/[*_`~]/g, '').trim())
+    .find(Boolean);
+  if (!line) return t('notes.viewNote');
+  return line.length > 40 ? `${line.slice(0, 40).trimEnd()}…` : line;
+}
+
+function renderNoteCard(note, { headingLevel = 2 } = {}) {
   // KEINE INITIALEN AUF EINER 16px-SCHEIBE (Initialen-Schwelle-Regel).
   //
   // Hier standen bis zuletzt zwei Buchstaben auf einer 16-%-Waschung - unter der
@@ -551,8 +596,22 @@ function renderNoteCard(note) {
     <div class="note-card ${note.pinned ? 'note-card--pinned' : ''}"
          data-id="${note.id}"
          style="--note-color:${esc(note.color)};">
+      ${/* DIE KARTE OEFFNET SELBST (R9 M13, A6 P2-6). Der Oeffnen-Knopf sass
+          * als dritter 44px-Kreis in der Fusszeile, neben Nadel und Loeschen -
+          * mobil trug jede Karte damit drei Bedienkreise und war 248px hoch.
+          * Er bleibt der Tastatur- und Vorleseweg (die Karte selbst ist ein
+          * Div), liegt aber jetzt unsichtbar UEBER der ganzen Karte: der
+          * Fokusring umrahmt die Karte, ein Tipp irgendwo darauf trifft ihn,
+          * und Nadel, Loeschen und Checklisten-Haken liegen darueber
+          * (notes.css, z-index). */ ''}
+      <button type="button" class="note-card__open" data-action="open" data-id="${note.id}"
+              aria-label="${esc(t('notes.openNamed', { name: noteName(note) }))}"></button>
       ${pinMarkup(note)}
-      ${note.title ? `<div class="note-card__title">${esc(note.title)}</div>` : ''}
+      ${/* ECHTE UEBERSCHRIFT STATT `div` (R8 H15): die Ueberschriften-
+          * Navigation eines Screenreaders fand bis dahin keine einzige Notiz.
+          * Die Optik traegt allein die Klasse (typography.css, notes.css);
+          * `reset.css` nimmt den UA-Rand, die Groesse setzt die Rolle. */ ''}
+      ${note.title ? `<h${headingLevel === 3 ? 3 : 2} class="note-card__title">${esc(note.title)}</h${headingLevel === 3 ? 3 : 2}>` : ''}
       <div class="note-card__content">${renderMarkdownLight(note.content, CHECKLIST_OPTS())}</div>
       ${(note.categories || []).length ? `<div class="note-card__categories" role="group" aria-label="${t('noteCategories.categories')}">
         ${note.categories.map(renderCategoryBadge).join('')}
@@ -568,18 +627,7 @@ function renderNoteCard(note) {
           <span>${esc(note.creator_name || '')}</span>
         </div>
         <div class="note-card__actions">
-          <!-- Die Karte selbst ist ein Div mit Klick-Handler und daher nicht
-               fokussierbar. Ohne diesen Button gäbe es für Tastatur- und
-               Screenreader-Nutzung keinen Weg, eine Notiz zu öffnen. Analog zur
-               Inline-Aktion auf der Aufgaben-Karte. -->
-          <button class="note-card__open" data-action="open" data-id="${note.id}"
-                  aria-label="${t('notes.openNote')}">
-            <i data-lucide="maximize-2" class="icon-sm" aria-hidden="true"></i>
-          </button>
-          ${readOnly() ? '' : `
-          <button class="note-card__delete" data-action="delete" data-id="${note.id}" aria-label="${t('notes.deleteLabel')}">
-            <i data-lucide="trash-2" class="icon-sm" aria-hidden="true"></i>
-          </button>`}
+          ${readOnly() ? '' : rowActionHtml({ icon: 'trash-2', tone: 'danger', action: 'delete', className: 'note-card__delete', label: t('common.deleteNamed', { name: noteName(note) }), attrs: { 'data-id': note.id } })}
         </div>
       </div>
     </div>
@@ -759,17 +807,23 @@ function openNoteModal({ mode, note = null }) {
 
       <div class="note-edit-view" id="note-pane-edit" data-pane="edit" role="tabpanel"
            aria-labelledby="note-tab-edit"${initialView === 'edit' ? '' : ' hidden'}>
-    <div class="form-group">
-      <label class="form-label" for="note-title">${t('notes.titleLabel')}</label>
-      <input type="text" class="form-input" id="note-title"
-             placeholder="${t('notes.titlePlaceholder')}" value="${esc(isEdit && note.title ? note.title : '')}">
+    <!-- DER EDITOR IST EINE ARBEITSFLAECHE (Critique 2026-10-05, R16). Titel
+         und Text standen als zwei Formularfelder mit Label untereinander, das
+         Textfeld sechs Zeilen hoch (160px) und mobil ab y=534 - unter der
+         Tastaturlinie. Der Dialog ist fuer genau dieses Feld da. Die Labels
+         bleiben als Namen (sr-only), der Platzhalter sagt Sehenden dasselbe;
+         das Textfeld traegt die Mindesthoehe der Flaeche (notes.css,
+         .note-editor__text). -->
+    <div class="form-group note-editor__title">
+      <label class="form-label sr-only" for="note-title">${t('notes.titleLabel')}</label>
+      <input type="text" class="form-input note-editor__title-input" id="note-title"
+             placeholder="${t('notes.titleLabel')}" value="${esc(isEdit && note.title ? note.title : '')}">
     </div>
-    <div class="form-group">
-      <label class="form-label" for="note-content">${t('notes.contentLabel')} <span class="form-label__hint">${t('notes.contentMarkdownHint')}</span></label>
+    <div class="form-group note-editor">
+      <label class="form-label sr-only" for="note-content">${t('notes.contentLabel')} <span class="form-label__hint">${t('notes.contentMarkdownHint')}</span></label>
       ${renderMarkdownToolbar()}
-      <textarea class="form-input" id="note-content" rows="6"
-                placeholder="${t('notes.contentPlaceholder')}"
-                style="resize:vertical;">${esc(isEdit ? note.content : '')}</textarea>
+      <textarea class="form-input note-editor__text" id="note-content" rows="12"
+                placeholder="${t('notes.contentPlaceholder')}">${esc(isEdit ? note.content : '')}</textarea>
     </div>
     ${renderCategoryEditor(isEdit ? (note.categories || []).map((category) => category.id) : [])}
     ${advancedSection(`
@@ -798,9 +852,12 @@ function openNoteModal({ mode, note = null }) {
       </div>
 
       <div class="modal-panel__footer modal-panel__footer--plain note-modal__footer">
-        ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="note-modal-delete" style="margin-right:auto">${t('common.delete')}</button>` : ''}
+        ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="note-modal-delete" style="margin-inline-end:auto">
+          <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
+        </button>` : ''}
         <button type="button" class="btn btn--secondary" id="note-modal-cancel" data-editor-only>${t('common.cancel')}</button>
         <button type="button" class="btn btn--primary" id="note-modal-save" data-editor-only>${isEdit ? t('common.save') : t('common.create')}</button>
+        ${isEdit ? `<button type="button" class="btn btn--primary" id="note-modal-edit" data-reader-only>${t('common.edit')}</button>` : ''}
       </div>
     </div>`;
 
@@ -828,11 +885,21 @@ function openNoteModal({ mode, note = null }) {
       const readPane    = panel.querySelector('[data-pane="read"]');
       const editPane    = panel.querySelector('[data-pane="edit"]');
       const editorOnly  = [...panel.querySelectorAll('[data-editor-only]')];
+      const readerOnly  = [...panel.querySelectorAll('[data-reader-only]')];
       const titleEl     = document.getElementById('shared-modal-title');
       const modeTabs    = [...panel.querySelectorAll('.note-mode-switch .sub-tab')];
+      // Lesen/Bearbeiten gleitet wie jede Segment-Leiste (D8); die Kapsel
+      // folgt `sub-tab--active` aus setView() von selbst.
+      const modeSwitch = panel.querySelector('.note-mode-switch');
+      if (modeSwitch) attachSegmentIndicator(modeSwitch);
       const viewTitle   = panel.querySelector('#note-title');
       const viewContent = panel.querySelector('#note-content');
       const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function syncFooter(view) {
+        editorOnly.forEach((el) => { el.style.display = view === 'read' ? 'none' : ''; });
+        readerOnly.forEach((el) => { el.style.display = view === 'read' ? '' : 'none'; });
+      }
 
       function animatePane(pane) {
         if (reduceMotion) return;
@@ -856,7 +923,10 @@ function openNoteModal({ mode, note = null }) {
         // beiden Modi stehen: zuvor verschwand die Fußzeile im Lese-Modus
         // komplett, wodurch die geöffnete Notiz keine einzige Objektaktion mehr
         // anbot — anders als das Aufgaben-Modal, das Löschen inline führt.
-        editorOnly.forEach((el) => { el.style.display = view === 'read' ? 'none' : ''; });
+        // Im Lese-Modus steht rechts "Bearbeiten" als Primaerknopf: sonst war
+        // "Loeschen" die einzige und damit lauteste Fussaktion (Critique
+        // 2026-09-26) - die zerstoerende Handlung als Hauptweg.
+        syncFooter(view);
         modeTabs.forEach((b) => {
           const on = b.dataset.view === view;
           b.classList.toggle('sub-tab--active', on);
@@ -905,7 +975,10 @@ function openNoteModal({ mode, note = null }) {
       });
 
       // Initialen Footer-Zustand an die Startansicht angleichen.
-      editorOnly.forEach((el) => { el.style.display = initialView === 'read' ? 'none' : ''; });
+      syncFooter(initialView);
+      panel.querySelector('#note-modal-edit')?.addEventListener('click', () => {
+        setView('edit', { focusField: true });
+      });
       viewTitle.addEventListener('input', syncHeaderTitle);
 
       panel.querySelector('#note-modal-delete')?.addEventListener('click', () => {

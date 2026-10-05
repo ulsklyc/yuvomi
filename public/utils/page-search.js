@@ -5,8 +5,9 @@
  * documents, birthdays, split-expenses ...). A persistent input keeps the
  * visible (sr-only) label and one-tap reachability that the audit's R4 and the
  * "search fields keep visible labels" a11y guard require. Calendar keeps its
- * own icon-reveal bar as a documented exception: its search is a heavyweight
- * server-FTS results view, not a client-side list filter.
+ * reveal-on-demand bar as a documented exception (the field inside is this
+ * capsule): its search is a heavyweight server-FTS results view that replaces
+ * the view, not a client-side list filter.
  *
  * Visual/behaviour live here once; modules pass an id + labels and wire a
  * single onQuery callback. Toolbar positioning (flex/max-width/margin) stays a

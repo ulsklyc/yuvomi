@@ -10,13 +10,20 @@ import { hashPassword, normalizePassword } from '../utils/password.js';
 import { createLogger } from '../logger.js';
 import { collectErrors, date as validateDate, id as validateId, str, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { documentLinksFor, loadDocumentLinks, replaceDocumentLinks, visibleDocumentRef } from '../services/document-links.js';
+import {
+  documentLinksFor, documentLinksOf, documentRefForViewer, documentViewer, loadDocumentLinks, replaceDocumentLinks,
+  sendDocumentLinkRefusal, visibleDocumentRef,
+} from '../services/document-links.js';
 import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
-import { buildSplits, decorateMoney, minorToDecimal, parseMoneyToMinor, simplifyDebts } from '../services/split-expenses.js';
+import {
+  buildSplits, decorateMoney, groupBalanceRows, insertExpenseLedger, membershipRefusal, minorToDecimal, parseMoneyToMinor, simplifyDebts, splitSnapshot,
+} from '../services/split-expenses.js';
 import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
 import { syncBirthdayArtifacts } from '../services/birthdays.js';
 import { householdMemberSql, newNonMembers, staffMessage } from '../services/household-members.js';
+import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts } from '../services/contact-identity.js';
 import { todayKey } from '../utils/timezone.js';
+import { mayReadModule, mayWriteModule } from '../permissions.js';
 
 const log = createLogger('SplitExpenses');
 const router = express.Router();
@@ -93,6 +100,17 @@ function activity(groupId, actorId, type, entityType, entityId, metadata = {}) {
   `).run(groupId, actorId, type, entityType, entityId, JSON.stringify(metadata));
 }
 
+/**
+ * Was ein Verlaufseintrag ueber eine Ausgabe festhaelt (#1607): Titel, Betrag
+ * und Waehrung im Augenblick des Schreibens. Der Verlauf ist Geschichte - las
+ * die Oberflaeche den Betrag aus der geladenen Ausgabe, schrieb jede spaetere
+ * Bearbeitung alle frueheren Eintraege um. Minor-Units wie bei
+ * ledger_restored; die Leseroute ergaenzt die Dezimalform.
+ */
+function expenseSnapshot(title, amountMinor, currency) {
+  return { title, amount_minor: amountMinor, currency };
+}
+
 function groupSelectWhere(where) {
   return `
     SELECT g.*,
@@ -126,16 +144,28 @@ function normalizeLedgerRow(row) {
  * „storniert", waehrend der Saldo die Zahlung wieder zaehlt. So verschwinden
  * Zustand und Wirkung nur gemeinsam. `settlements.status` bleibt unberuehrt:
  * sein zweiter Wert heisst 'deleted', und ein Storno ist keine Loeschung.
+ *
+ * Die Gegenbuchung traegt den `created_by` ihrer Originalzeile (wer die Zahlung
+ * erfasst hat), damit Buchung und Gegenbuchung am selben Konto haengen und nur
+ * gemeinsam fallen. Wer storniert hat, steht deshalb nicht im Ledger, sondern
+ * im Verlauf (`payment_reversed`, actor_id) - `null`, wenn das Konto fehlt.
  */
 function settlementReversal(database, settlementId) {
   const row = database.prepare(`
-    SELECT created_at AS reversed_at, created_by AS reversed_by
+    SELECT created_at AS reversed_at
     FROM expense_ledger_entries
     WHERE source_type = 'settlement_reversal' AND source_id = ?
     ORDER BY id ASC
     LIMIT 1
   `).get(settlementId);
-  return row || null;
+  if (!row) return null;
+  const actor = database.prepare(`
+    SELECT actor_id FROM expense_activity
+    WHERE type = 'payment_reversed' AND entity_type = 'settlement' AND entity_id = ?
+    ORDER BY id ASC
+    LIMIT 1
+  `).get(settlementId);
+  return { reversed_at: row.reversed_at, reversed_by: actor ? actor.actor_id : null };
 }
 
 /**
@@ -170,17 +200,87 @@ function uniqueUsername(base) {
   return username;
 }
 
-async function userFromContact(database, contactId, actorId) {
+/**
+ * Eine Abweisung aus einer Transaktion heraus: der Wurf rollt alles zurueck,
+ * was die Transaktion bis dahin geschrieben hat, und der Handler antwortet mit
+ * Status und Text. So bleibt nach einer Abweisung nie ein halber Zustand
+ * (etwa ein Gast ohne Mitgliedschaft) stehen.
+ */
+class Refusal extends Error {
+  constructor(status, message, reason = null) {
+    super(message);
+    this.status = status;
+    this.reason = reason;
+  }
+}
+
+function sendRefusal(res, err) {
+  return res.status(err.status).json({
+    error: err.message,
+    code: err.status,
+    ...(err.reason && { reason: err.reason }),
+  });
+}
+
+/**
+ * Die Gruppenpruefung der Schreibrouten, in der Form, die eine Transaktion
+ * braucht: sie wirft statt zu antworten.
+ */
+function assertManagesGroup(groupId, req) {
+  if (!requireGroupAccess(groupId, req)) throw new Refusal(404, 'Group not found.');
+  if (!canManageGroup(groupId, req)) throw new Refusal(403, 'Not authorized.');
+}
+
+/** Ein zufaelliges Passwort fuer einen Gast, der sich nie selbst anmeldet. */
+function randomGuestPasswordHash() {
+  return hashPassword(crypto.randomBytes(24).toString('base64url'));
+}
+
+/**
+ * Der Nutzer zu einem Kontakt, notfalls als neuer Gast. SYNCHRON und nur
+ * innerhalb der Transaktion des Aufrufers: er liest den Kontakt und schreibt
+ * auf dem Gelesenen. `passwordHash` bringt der Aufrufer mit, gehasht VOR der
+ * Transaktion (der einzige asynchrone Schritt).
+ *
+ * Ein aus einem Kontakt angelegtes Konto ist IMMER ein Gast der Gruppe
+ * `groupId`, genau wie POST /groups/:id/guests es anlegt. Ohne den Eintrag in
+ * split_expense_guest_users zaehlte es als volles Haushaltsmitglied - angelegt
+ * von einem Mitglied, obwohl Haushaltskonten Admin-Sache sind, und mit der
+ * Kontakt-Adresse als Ziel des Passwort-Resets. Konto, Verknuepfung,
+ * Gast-Zeile, Aktivitaet und Artefakte entstehen in der Transaktion des
+ * Aufrufers zusammen oder gar nicht; ein Konto ohne Gast-Zeile bleibt so nie
+ * stehen.
+ *
+ * Der Geburtstag aus dem Kontakt ist Kontaktdatum (wie in den
+ * Mitglieds-Kandidaten) und der angelegte Geburtstag ein Folgeeintrag des
+ * Gastes (docs/DECISIONS.md Abschnitt 10) - beides fragt kein Kalenderrecht.
+ */
+function userFromContact(database, contactId, actorId, groupId, passwordHash, { checkEmails = true } = {}) {
   const contact = database.prepare('SELECT * FROM contacts WHERE id = ?').get(contactId);
-  if (!contact) throw new Error('Contact not found.');
+  if (!contact) throw new Refusal(404, 'Contact not found.');
   if (contact.family_user_id) return contact.family_user_id;
-  const username = uniqueUsername(contact.name);
-  const passwordHash = await hashPassword(crypto.randomBytes(24).toString('base64url'));
+  // Ohne Hash kein Gast. Kommt hier nur an, wenn der Kontakt bei der
+  // Vorabfrage schon verknuepft war und es jetzt nicht mehr ist - ohne await
+  // dazwischen unmoeglich, also ein Programmierfehler, kein Nutzerfehler.
+  if (!passwordHash) throw new Error('userFromContact: contact lost its user without a yield.');
+  // Ab hier wird der Kontakt verknuepft, seine Adressen werden die eines Kontos.
+  // Traegt eine davon schon ein anderes Konto, legt ein Mitglied den Gast nicht
+  // an (GHSA-6pmj-w42g-g6qv); ein Admin darf es.
+  if (checkEmails) {
+    const secondary = database.prepare('SELECT value FROM contact_emails WHERE contact_id = ?')
+      .all(contact.id).map((r) => r.value);
+    if (emailsTakenByOtherAccounts(database, { after: [contact.email, ...secondary] }).length) {
+      throw new Refusal(409, EMAIL_IN_USE_MESSAGE, 'email_in_use');
+    }
+  }
   const created = database.prepare(`
     INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
     VALUES (?, ?, ?, ?, 'member', 'other')
-  `).run(username, contact.name, passwordHash, randomAvatarColor());
+  `).run(uniqueUsername(contact.name), contact.name, passwordHash, randomAvatarColor());
   database.prepare('UPDATE contacts SET family_user_id = ? WHERE id = ?').run(created.lastInsertRowid, contact.id);
+  database.prepare('INSERT OR IGNORE INTO split_expense_guest_users (user_id, group_id, created_by) VALUES (?, ?, ?)')
+    .run(created.lastInsertRowid, groupId, actorId);
+  activity(groupId, actorId, 'guest_created', 'member', created.lastInsertRowid, { display_name: contact.name });
   if (contact.birthday) {
     syncGuestArtifacts(database, created.lastInsertRowid, {
       displayName: contact.name,
@@ -275,7 +375,7 @@ function loadExpense(expenseId, req) {
 // Belege einer Ausgabe: Tabellen-Adresse für den geteilten Verknüpfungs-Service.
 const EXPENSE_ATTACHMENTS = { table: 'expense_attachments', ownerColumn: 'expense_id', extraColumns: ['kind'] };
 
-function serializeExpense(expense, prefetched, viewerId) {
+function serializeExpense(expense, prefetched, viewer) {
   const splits = prefetched
     ? (prefetched.splits.get(expense.id) || [])
     : db.get().prepare(`
@@ -289,8 +389,8 @@ function serializeExpense(expense, prefetched, viewerId) {
   // abgelegter Beleg bleibt privat, auch wenn die Ausgabe der ganzen Gruppe
   // gehört. Vorher lieferte der Join den Namen an jedes Gruppenmitglied aus.
   const attachments = prefetched
-    ? (prefetched.attachments.get(expense.id) || [])
-    : documentLinksFor(db.get(), { ...EXPENSE_ATTACHMENTS, ownerId: expense.id, userId: viewerId });
+    ? documentLinksOf(prefetched.attachments, expense.id, viewer)
+    : documentLinksFor(db.get(), { ...EXPENSE_ATTACHMENTS, ownerId: expense.id, viewer });
   return {
     ...decorateMoney(expense, ['amount_minor', 'converted_amount_minor']),
     splits,
@@ -303,7 +403,7 @@ function serializeExpense(expense, prefetched, viewerId) {
  * rows in 2 queries total (WHERE expense_id IN (...)) instead of 2 per row.
  * Kills the N+1 in the list endpoints (was up to ~201 queries for 100 rows).
  */
-function serializeExpenseList(expenses, viewerId) {
+function serializeExpenseList(expenses, viewer) {
   if (!expenses.length) return [];
   const ids = expenses.map((e) => e.id);
   const placeholders = ids.map(() => '?').join(', ');
@@ -321,30 +421,32 @@ function serializeExpenseList(expenses, viewerId) {
     splits.get(expense_id).push({ ...rest, amount: minorToDecimal(rest.amount_minor, rest.currency) });
   }
 
-  const attachments = loadDocumentLinks(db.get(), { ...EXPENSE_ATTACHMENTS, ownerIds: ids, userId: viewerId });
+  const attachments = loadDocumentLinks(db.get(), { ...EXPENSE_ATTACHMENTS, ownerIds: ids, viewer });
 
   const prefetched = { splits, attachments };
-  return expenses.map((expense) => serializeExpense(expense, prefetched, viewerId));
+  return expenses.map((expense) => serializeExpense(expense, prefetched, viewer));
 }
 
-function insertExpenseLedger(database, expense, splits, actorId, sourceType = 'expense') {
-  const insert = database.prepare(`
-    INSERT INTO expense_ledger_entries
-      (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  insert.run(expense.group_id, sourceType, expense.id, expense.payer_id, null, expense.converted_amount_minor, expense.converted_currency, expense.title, actorId);
-  for (const split of splits) {
-    insert.run(expense.group_id, sourceType, expense.id, split.user_id, expense.payer_id, -split.amount_minor, split.currency, expense.title, actorId);
-  }
+/**
+ * Eine Zahlung, wie sie dieser Anfrage gezeigt wird. Der Zahlungsnachweis ist
+ * ein Dokument: seine ID geht nur an, wer das Dokumente-Modul lesen darf und
+ * das Dokument sieht (#1358) - storniert etwa ein Gruppenverwalter die Zahlung
+ * eines anderen, nannte die Antwort sonst die ID eines fremden privaten
+ * Dokuments.
+ */
+function settlementForViewer(row, req) {
+  return {
+    ...decorateMoney(row),
+    proof_document_id: documentRefForViewer(db.get(), row.proof_document_id, documentViewer(req)),
+  };
 }
 
-function replaceExpenseSplits(database, expense, splits, actorId) {
+function replaceExpenseSplits(database, expense, splits) {
   database.prepare('DELETE FROM expense_splits WHERE expense_id = ?').run(expense.id);
   database.prepare('DELETE FROM expense_ledger_entries WHERE source_type IN (?, ?) AND source_id = ?').run('expense', 'expense_reversal', expense.id);
   const insertSplit = database.prepare('INSERT INTO expense_splits (expense_id, user_id, amount_minor, currency) VALUES (?, ?, ?, ?)');
   for (const split of splits) insertSplit.run(expense.id, split.user_id, split.amount_minor, split.currency);
-  insertExpenseLedger(database, expense, splits, actorId);
+  insertExpenseLedger(database, expense, splits);
 }
 
 function parseExpenseBody(body, fallbackCurrency) {
@@ -454,7 +556,7 @@ router.get('/dashboard', (req, res) => {
       ORDER BY e.expense_date DESC, e.created_at DESC
       LIMIT 8
     `).all({ uid, restrictedGroupId, isGuest });
-    const recentSerialized = serializeExpenseList(recent, userId(req));
+    const recentSerialized = serializeExpenseList(recent, documentViewer(req));
     res.json({ data: { total_owed: totalOwed, total_owing: totalOwing, groups, recent_expenses: recentSerialized } });
   } catch (err) {
     log.error('GET /dashboard error:', err);
@@ -664,15 +766,31 @@ router.get('/groups/:id/member-candidates', (req, res) => {
         AND NOT EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = u.id)
       ORDER BY display_name COLLATE NOCASE ASC
     `).all({ groupId });
-    const contacts = db.get().prepare(`
+    // DIE FELDER FOLGEN DEM RECHT IHRER QUELLE. Der Pfad gehoert `budget`,
+    // Telefon und E-Mail kommen aber aus `contacts`, das Geburtsdatum eines
+    // Mitglieds aus den Geburtstagen (`calendar`). Ohne das jeweilige
+    // Leserecht (Mitgliedsrecht UND Token-Scope) bleiben die Felder null. Freie
+    // Kontakte bietet die Auswahl nur mit dem SCHREIBRECHT auf `contacts` an:
+    // hinzufuegen verknuepft sie mit einem Konto (POST /groups/:id/members),
+    // ohne das Recht endete die Wahl im 403. Die Route selbst bleibt offen:
+    // die Auswahl braucht nur Name und ID der Haushaltsmitglieder.
+    const readsContacts = mayReadModule(req, 'contacts');
+    const readsBirthdays = mayReadModule(req, 'calendar');
+    const visiblePeople = people.map((row) => ({
+      ...row,
+      phone: readsContacts ? row.phone : null,
+      email: readsContacts ? row.email : null,
+      birth_date: readsBirthdays ? row.birth_date : null,
+    }));
+    const contacts = mayWriteModule(req, 'contacts') ? db.get().prepare(`
       SELECT 'contact' AS source, NULL AS user_id, c.id AS contact_id, c.name AS display_name,
              NULL AS username, '#2563EB' AS avatar_color, 'other' AS family_role,
              c.phone, c.email, c.birthday AS birth_date, 0 AS in_group, NULL AS group_role
       FROM contacts c
       WHERE c.family_user_id IS NULL
       ORDER BY c.name COLLATE NOCASE ASC
-    `).all();
-    res.json({ data: [...people, ...contacts] });
+    `).all() : [];
+    res.json({ data: [...visiblePeople, ...contacts] });
   } catch (err) {
     log.error('GET /groups/:id/member-candidates error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -687,22 +805,69 @@ router.post('/groups/:id/members', async (req, res) => {
     const vUserId = req.body.user_id ? validateId(req.body.user_id, 'user_id') : { value: null, error: null };
     const vContactId = req.body.contact_id ? validateId(req.body.contact_id, 'contact_id') : { value: null, error: null };
     if (vUserId.error || vContactId.error) return res.status(400).json({ error: vUserId.error || vContactId.error, code: 400 });
+    if (!vUserId.value && !vContactId.value) return res.status(400).json({ error: 'user_id or contact_id is required.', code: 400 });
     const role = GROUP_ROLES.includes(req.body.role) && req.body.role !== 'owner' ? req.body.role : 'guest';
-    const memberUserId = vContactId.value ? await userFromContact(db.get(), vContactId.value, userId(req)) : vUserId.value;
-    if (!memberUserId) return res.status(400).json({ error: 'user_id or contact_id is required.', code: 400 });
-    const exists = db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(memberUserId);
-    if (!exists) return res.status(404).json({ error: 'User not found.', code: 404 });
-    // Mitglieder und Gaeste, aber kein Hauspersonal (#1207). Eine bestehende
-    // Mitgliedschaft bleibt gueltig und laesst sich weiter aendern.
-    const already = db.get().prepare('SELECT 1 FROM expense_group_members WHERE group_id = ? AND user_id = ?').get(groupId, memberUserId);
-    const staff = newNonMembers([memberUserId], { stored: already ? [memberUserId] : [], guestsAllowed: true });
-    if (staff.length) return res.status(400).json({ error: staffMessage(staff), code: 400 });
-    db.get().prepare(`
-      INSERT INTO expense_group_members (group_id, user_id, role, invited_by)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(group_id, user_id) DO UPDATE SET role = excluded.role
-    `).run(groupId, memberUserId, role, userId(req));
-    activity(groupId, userId(req), 'member_added', 'member', memberUserId, { role });
+    // Ein Kontakt ist Quelldatum aus `contacts`: ohne dessen Leserecht (beide
+    // Achsen) dieselbe Antwort wie fuer eine unbekannte ID, und die Route
+    // schreibt nichts - der Gast truege Name, Telefon und E-Mail des Kontakts.
+    // Ein schon verknuepfter Kontakt wird nur gelesen; ein freier wird
+    // BESCHRIEBEN (weiter unten, `mayWriteModule`).
+    if (vContactId.value && !mayReadModule(req, 'contacts')) {
+      return res.status(404).json({ error: 'Contact not found.', code: 404 });
+    }
+
+    // KEIN YIELD ZWISCHEN LESEN UND SCHREIBEN. Der Passwort-Hash eines neuen
+    // Gastes ist der einzige asynchrone Schritt und laeuft deshalb ZUERST. Die
+    // Vorabfrage spart ihn nur, wenn der Kontakt fehlt oder schon einen Nutzer
+    // hat. Alles, worauf danach geschrieben wird - Gruppe, Verwalterrecht,
+    // Kontakt, Mitgliedschaft -, liest die Transaktion neu: eine Gruppe, die
+    // waehrend des Hashes verschwand, hinterlaesst sonst einen Gast ohne
+    // Gruppe, und zwei gleichzeitige Anfragen legen zwei Gaeste an.
+    let passwordHash = null;
+    if (vContactId.value) {
+      const known = db.get().prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(vContactId.value);
+      if (!known) return res.status(404).json({ error: 'Contact not found.', code: 404 });
+      if (!known.family_user_id) {
+        // Ein freier Kontakt bekommt ein Konto: `userFromContact()` setzt
+        // `family_user_id` und schreibt Name, Telefon und E-Mail ueber
+        // `syncGuestArtifacts()`; ab da spiegelt das Konto den Kontakt. Das
+        // ist ein Schreibvorgang in `contacts` und braucht dessen Schreibrecht
+        // (beide Achsen) - vor dem Hash, damit nichts angefangen wird.
+        if (!mayWriteModule(req, 'contacts')) {
+          return res.status(403).json({ error: 'Write access to contacts is required to add a contact without an account.', code: 403, reason: 'cross_module_access' });
+        }
+        passwordHash = await randomGuestPasswordHash();
+      }
+    }
+
+    let memberUserId;
+    try {
+      memberUserId = db.transaction(() => {
+        assertManagesGroup(groupId, req);
+        const uid = vContactId.value
+          ? userFromContact(db.get(), vContactId.value, userId(req), groupId, passwordHash, {
+            checkEmails: !isAdminRequest(req),
+          })
+          : vUserId.value;
+        const exists = db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(uid);
+        if (!exists) throw new Refusal(404, 'User not found.');
+        // Mitglieder und Gaeste, aber kein Hauspersonal (#1207). Eine bestehende
+        // Mitgliedschaft bleibt gueltig und laesst sich weiter aendern.
+        const already = db.get().prepare('SELECT 1 FROM expense_group_members WHERE group_id = ? AND user_id = ?').get(groupId, uid);
+        const staff = newNonMembers([uid], { stored: already ? [uid] : [], guestsAllowed: true });
+        if (staff.length) throw new Refusal(400, staffMessage(staff));
+        db.get().prepare(`
+          INSERT INTO expense_group_members (group_id, user_id, role, invited_by)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(group_id, user_id) DO UPDATE SET role = excluded.role
+        `).run(groupId, uid, role, userId(req));
+        activity(groupId, userId(req), 'member_added', 'member', uid, { role });
+        return uid;
+      });
+    } catch (err) {
+      if (err instanceof Refusal) return sendRefusal(res, err);
+      throw err;
+    }
     res.status(201).json({ data: { group_id: groupId, user_id: memberUserId, role } });
   } catch (err) {
     log.error('POST /groups/:id/members error:', err);
@@ -743,32 +908,53 @@ router.post('/groups/:id/guests', async (req, res) => {
     const password = String(req.body.password || '');
     if (normalizePassword(password).length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters long.', code: 400 });
     const familyRole = FAMILY_ROLES.includes(req.body.family_role) ? req.body.family_role : 'other';
-    const username = req.body.username && /^[a-zA-Z0-9._-]{3,64}$/.test(req.body.username)
+    const requestedUsername = req.body.username && /^[a-zA-Z0-9._-]{3,64}$/.test(req.body.username)
       ? String(req.body.username)
-      : uniqueUsername(vDisplayName.value);
-    const exists = db.get().prepare('SELECT 1 FROM users WHERE username = ?').get(username);
-    if (exists) return res.status(409).json({ error: 'Username is already taken.', code: 409 });
+      : null;
+
+    // KEIN YIELD ZWISCHEN LESEN UND SCHREIBEN (wie POST /members): erst der
+    // Hash, dann in EINER synchronen Transaktion Gruppe und Verwalterrecht neu
+    // pruefen, den Benutzernamen pruefen bzw. vergeben und anlegen. Stand die
+    // Namenspruefung vor dem Hash, endeten zwei gleichzeitige Anfragen mit
+    // demselben Namen im 500 statt im 409, und eine waehrend des Hashes
+    // geloeschte Gruppe liess einen Gast ohne Gruppe zurueck.
     const hash = await hashPassword(password);
 
-    const createdUserId = db.transaction(() => {
-      const created = db.get().prepare(`
-        INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
-        VALUES (?, ?, ?, ?, 'member', ?)
-      `).run(username, vDisplayName.value, hash, randomAvatarColor(), familyRole);
-      syncGuestArtifacts(db.get(), created.lastInsertRowid, {
-        displayName: vDisplayName.value,
-        phone: vPhone.value,
-        email: vEmail.value,
-        birthDate: vBirthDate.value,
-        actorUserId: userId(req),
+    let createdUserId;
+    try {
+      createdUserId = db.transaction(() => {
+        assertManagesGroup(groupId, req);
+        const username = requestedUsername ?? uniqueUsername(vDisplayName.value);
+        const exists = db.get().prepare('SELECT 1 FROM users WHERE username = ?').get(username);
+        if (exists) throw new Refusal(409, 'Username is already taken.');
+        // Die Adresse des Gastes steht an einem verknuepften Kontakt. Traegt sie
+        // schon ein anderes Konto, legt ein Mitglied den Gast nicht an
+        // (GHSA-6pmj-w42g-g6qv); ein Admin darf es.
+        if (!isAdminRequest(req) && emailsTakenByOtherAccounts(db.get(), { after: [vEmail.value] }).length) {
+          throw new Refusal(409, EMAIL_IN_USE_MESSAGE, 'email_in_use');
+        }
+        const created = db.get().prepare(`
+          INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
+          VALUES (?, ?, ?, ?, 'member', ?)
+        `).run(username, vDisplayName.value, hash, randomAvatarColor(), familyRole);
+        syncGuestArtifacts(db.get(), created.lastInsertRowid, {
+          displayName: vDisplayName.value,
+          phone: vPhone.value,
+          email: vEmail.value,
+          birthDate: vBirthDate.value,
+          actorUserId: userId(req),
+        });
+        db.get().prepare('INSERT INTO expense_group_members (group_id, user_id, role, invited_by) VALUES (?, ?, ?, ?)')
+          .run(groupId, created.lastInsertRowid, 'guest', userId(req));
+        db.get().prepare('INSERT OR IGNORE INTO split_expense_guest_users (user_id, group_id, created_by) VALUES (?, ?, ?)')
+          .run(created.lastInsertRowid, groupId, userId(req));
+        activity(groupId, userId(req), 'guest_created', 'member', created.lastInsertRowid, { display_name: vDisplayName.value });
+        return created.lastInsertRowid;
       });
-      db.get().prepare('INSERT INTO expense_group_members (group_id, user_id, role, invited_by) VALUES (?, ?, ?, ?)')
-        .run(groupId, created.lastInsertRowid, 'guest', userId(req));
-      db.get().prepare('INSERT OR IGNORE INTO split_expense_guest_users (user_id, group_id, created_by) VALUES (?, ?, ?)')
-        .run(created.lastInsertRowid, groupId, userId(req));
-      activity(groupId, userId(req), 'guest_created', 'member', created.lastInsertRowid, { display_name: vDisplayName.value });
-      return created.lastInsertRowid;
-    });
+    } catch (err) {
+      if (err instanceof Refusal) return sendRefusal(res, err);
+      throw err;
+    }
 
     const user = db.get().prepare(`
       SELECT u.id, u.username, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
@@ -805,7 +991,7 @@ router.get('/groups/:id/expenses', (req, res) => {
       ORDER BY e.expense_date DESC, e.created_at DESC
       LIMIT @limit OFFSET @offset
     `).all({ groupId, search, category, recurringOnly: recurringOnly ? 1 : 0, limit, offset });
-    const serialized = serializeExpenseList(rows, userId(req));
+    const serialized = serializeExpenseList(rows, documentViewer(req));
     res.json({ data: serialized, pagination: { limit, offset, has_more: serialized.length === limit } });
   } catch (err) {
     log.error('GET /groups/:id/expenses error:', err);
@@ -820,11 +1006,9 @@ router.post('/groups/:id/expenses', (req, res) => {
     if (!group) return res.status(404).json({ error: 'Group not found.', code: 404 });
     const parsed = parseExpenseBody(req.body, group.default_currency);
     const payerId = Number(req.body.payer_id || userId(req));
-    if (!memberRole(groupId, payerId)) return res.status(400).json({ error: 'Payer must be a group member.', code: 400 });
     const participants = Array.isArray(req.body.participants) ? req.body.participants : [payerId];
-    for (const participantId of participants) {
-      if (!memberRole(groupId, Number(participantId))) return res.status(400).json({ error: 'All participants must be group members.', code: 400 });
-    }
+    const refusal = membershipRefusal(db.get(), groupId, payerId, participants);
+    if (refusal) return res.status(400).json({ error: refusal, code: 400 });
     const splits = buildSplits({
       method: parsed.method,
       amountMinor: parsed.convertedAmountMinor,
@@ -839,22 +1023,23 @@ router.post('/groups/:id/expenses', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, JSON.stringify(req.body.exchange_snapshot || null), payerId, parsed.category, parsed.method, parsed.expenseDate, userId(req));
       const expense = db.get().prepare('SELECT * FROM expenses WHERE id = ?').get(result.lastInsertRowid);
-      replaceExpenseSplits(db.get(), expense, splits, userId(req));
+      replaceExpenseSplits(db.get(), expense, splits);
       // Belege (#583): nur sichtbare Dokumente, sonst liesse sich über geratene
       // IDs der Name eines fremden Dokuments auslesen.
       replaceDocumentLinks(db.get(), {
         ...EXPENSE_ATTACHMENTS,
         ownerId: expense.id,
         documentIds: req.body.attachment_document_ids,
-        userId: userId(req),
+        viewer: documentViewer(req),
         extraValues: { kind: 'receipt' },
       });
-      activity(groupId, userId(req), 'expense_created', 'expense', expense.id, { title: parsed.title });
+      activity(groupId, userId(req), 'expense_created', 'expense', expense.id, expenseSnapshot(parsed.title, parsed.amountMinor, parsed.currency));
       return expense.id;
     });
-    res.status(201).json({ data: serializeExpense(loadExpense(createdId, req), null, userId(req)) });
+    res.status(201).json({ data: serializeExpense(loadExpense(createdId, req), null, documentViewer(req)) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     const message = err.message || 'Invalid expense.';
     log.error('POST /groups/:id/expenses error:', err);
     res.status(message.includes('Internal') ? 500 : 400).json({ error: message, code: message.includes('Internal') ? 500 : 400 });
@@ -869,15 +1054,8 @@ router.put('/expenses/:id', (req, res) => {
     const parsed = parseExpenseBody(req.body, existing.converted_currency);
     const payerId = Number(req.body.payer_id || existing.payer_id);
     const participants = Array.isArray(req.body.participants) ? req.body.participants : db.get().prepare('SELECT user_id FROM expense_splits WHERE expense_id = ?').all(existing.id).map((r) => r.user_id);
-    // Dieselbe Regel wie beim Anlegen (GHSA-4p5w-5346-8598): Zahler und
-    // Beteiligte muessen Mitglieder DIESER Gruppe sein. Der PUT nahm die IDs
-    // bisher ungeprueft - ein Mitglied konnte einer Person, die nie in der
-    // Gruppe war, eine Schuld zuschreiben, die diese nirgends sieht und nicht
-    // bestreiten kann.
-    if (!memberRole(existing.group_id, payerId)) return res.status(400).json({ error: 'Payer must be a group member.', code: 400 });
-    for (const participantId of participants) {
-      if (!memberRole(existing.group_id, Number(participantId))) return res.status(400).json({ error: 'All participants must be group members.', code: 400 });
-    }
+    const refusal = membershipRefusal(db.get(), existing.group_id, payerId, participants);
+    if (refusal) return res.status(400).json({ error: refusal, code: 400 });
     const splits = buildSplits({ method: parsed.method, amountMinor: parsed.convertedAmountMinor, currency: parsed.convertedCurrency, participants, splits: req.body.splits });
     db.transaction(() => {
       db.get().prepare(`
@@ -887,7 +1065,7 @@ router.put('/expenses/:id', (req, res) => {
         WHERE id = ?
       `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, JSON.stringify(req.body.exchange_snapshot || null), payerId, parsed.category, parsed.method, parsed.expenseDate, existing.id);
       const expense = db.get().prepare('SELECT * FROM expenses WHERE id = ?').get(existing.id);
-      replaceExpenseSplits(db.get(), expense, splits, userId(req));
+      replaceExpenseSplits(db.get(), expense, splits);
       // Belege nur anfassen, wenn das Feld mitkommt - ein PUT, das nur den
       // Betrag korrigiert, darf sie nicht stillschweigend abräumen.
       if (req.body.attachment_document_ids !== undefined) {
@@ -895,15 +1073,16 @@ router.put('/expenses/:id', (req, res) => {
           ...EXPENSE_ATTACHMENTS,
           ownerId: existing.id,
           documentIds: req.body.attachment_document_ids,
-          userId: userId(req),
+          viewer: documentViewer(req),
           extraValues: { kind: 'receipt' },
         });
       }
-      activity(existing.group_id, userId(req), 'expense_edited', 'expense', existing.id, { title: parsed.title });
+      activity(existing.group_id, userId(req), 'expense_edited', 'expense', existing.id, expenseSnapshot(parsed.title, parsed.amountMinor, parsed.currency));
     });
-    res.json({ data: serializeExpense(loadExpense(existing.id, req), null, userId(req)) });
+    res.json({ data: serializeExpense(loadExpense(existing.id, req), null, documentViewer(req)) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     log.error('PUT /expenses/:id error:', err);
     res.status(400).json({ error: err.message || 'Invalid expense.', code: 400 });
   }
@@ -952,11 +1131,7 @@ router.delete('/expenses/:id', (req, res) => {
       }
       // Der Betrag, unter dem die Ausgabe in der Liste stand (eingegeben, in
       // seiner Waehrung); das Ledger fuehrt den umgerechneten.
-      activity(existing.group_id, userId(req), 'expense_deleted', 'expense', existing.id, {
-        title: existing.title,
-        amount: minorToDecimal(existing.amount_minor, existing.currency),
-        currency: existing.currency,
-      });
+      activity(existing.group_id, userId(req), 'expense_deleted', 'expense', existing.id, expenseSnapshot(existing.title, existing.amount_minor, existing.currency));
     });
     res.json({ data: { ok: true } });
   } catch (err) {
@@ -972,7 +1147,7 @@ router.post('/expenses/:id/comments', (req, res) => {
     const vComment = str(req.body.comment, 'Comment', { max: MAX_TEXT });
     if (vComment.error) return res.status(400).json({ error: vComment.error, code: 400 });
     const result = db.get().prepare('INSERT INTO expense_comments (expense_id, user_id, comment) VALUES (?, ?, ?)').run(expense.id, userId(req), vComment.value);
-    activity(expense.group_id, userId(req), 'comment_added', 'expense', expense.id);
+    activity(expense.group_id, userId(req), 'comment_added', 'expense', expense.id, { title: expense.title });
     res.status(201).json({ data: { id: result.lastInsertRowid, expense_id: expense.id, user_id: userId(req), comment: vComment.value } });
   } catch (err) {
     log.error('POST /expenses/:id/comments error:', err);
@@ -984,15 +1159,9 @@ router.get('/groups/:id/balances', (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    const rows = db.get().prepare(`
-      SELECT l.currency, l.user_id, u.display_name, SUM(l.amount_minor) AS net_minor
-      FROM expense_ledger_entries l
-      LEFT JOIN users u ON u.id = l.user_id
-      WHERE l.group_id = ?
-      GROUP BY l.currency, l.user_id
-      HAVING net_minor != 0
-      ORDER BY l.currency ASC, u.display_name COLLATE NOCASE ASC
-    `).all(groupId);
+    // Dieselbe Saldenquelle wie die Kennzahl auf dem Dashboard
+    // (openBalancesForUser) - ein Fix an den Salden heilt beide.
+    const rows = groupBalanceRows(db.get(), groupId);
     res.json({
       data: {
         balances: rows.map((row) => ({ ...row, net: minorToDecimal(row.net_minor, row.currency) })),
@@ -1021,7 +1190,7 @@ router.post('/groups/:id/settlements', (req, res) => {
     // Zahlungsnachweis: nur ein Dokument, das diese Person sehen darf (#583).
     // Vorher wurde die rohe ID übernommen - eine geratene fremde ID hätte sich
     // so an die Zahlung heften lassen.
-    const proofDocumentId = visibleDocumentRef(db.get(), req.body.proof_document_id, userId(req));
+    const proofDocumentId = visibleDocumentRef(db.get(), req.body.proof_document_id, documentViewer(req));
     const settlementId = db.transaction(() => {
       const result = db.get().prepare(`
         INSERT INTO settlements (group_id, payer_id, payee_id, amount_minor, currency, notes, proof_document_id, created_by)
@@ -1039,9 +1208,10 @@ router.post('/groups/:id/settlements', (req, res) => {
       return result.lastInsertRowid;
     });
     const row = db.get().prepare('SELECT * FROM settlements WHERE id = ?').get(settlementId);
-    res.status(201).json({ data: decorateMoney(row) });
+    res.status(201).json({ data: settlementForViewer(row, req) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     log.error('POST /groups/:id/settlements error:', err);
     res.status(400).json({ error: err.message || 'Invalid settlement.', code: 400 });
   }
@@ -1068,7 +1238,7 @@ router.post('/groups/:id/settlements/:settlementId/reverse', (req, res) => {
     const outcome = db.transaction(() => {
       if (settlementReversal(db.get(), settlement.id)) return 'already_reversed';
       const booked = db.get().prepare(`
-        SELECT user_id, counterparty_id, amount_minor, currency
+        SELECT user_id, counterparty_id, amount_minor, currency, created_by
         FROM expense_ledger_entries
         WHERE source_type = 'settlement' AND source_id = ?
         ORDER BY id ASC
@@ -1078,8 +1248,14 @@ router.post('/groups/:id/settlements/:settlementId/reverse', (req, res) => {
         INSERT INTO expense_ledger_entries (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
         VALUES (?, 'settlement_reversal', ?, ?, ?, ?, ?, ?, ?)
       `);
+      // `created_by` kommt aus der Originalzeile, nicht von der stornierenden
+      // Person: beide Zeilen haengen per ON DELETE CASCADE an diesem Konto und
+      // fallen so nur gemeinsam. Mit dem Konto der stornierenden Person
+      // verschwaende sonst nur die Gegenbuchung, und die stornierte Zahlung
+      // zaehlte still wieder im Saldo. Wer storniert hat, steht in
+      // `payment_reversed` (expense_activity.actor_id).
       for (const row of booked) {
-        insert.run(groupId, settlement.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, 'Settlement reversal', userId(req));
+        insert.run(groupId, settlement.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, 'Settlement reversal', row.created_by);
       }
       activity(groupId, userId(req), 'payment_reversed', 'settlement', settlement.id, {
         amount: minorToDecimal(settlement.amount_minor, settlement.currency),
@@ -1089,7 +1265,7 @@ router.post('/groups/:id/settlements/:settlementId/reverse', (req, res) => {
     });
     if (outcome === 'already_reversed') return res.status(409).json({ error: 'Settlement is already reversed.', code: 409 });
     if (outcome === 'nothing_booked') return res.status(409).json({ error: 'Settlement has no ledger entries to reverse.', code: 409 });
-    res.json({ data: { ...decorateMoney(settlement), ...settlementReversal(db.get(), settlement.id) } });
+    res.json({ data: { ...settlementForViewer(settlement, req), ...settlementReversal(db.get(), settlement.id) } });
   } catch (err) {
     log.error('POST /groups/:id/settlements/:settlementId/reverse error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1130,6 +1306,9 @@ function activityCursor(query) {
   return { cursor: { beforeAt: query.before_at, beforeId } };
 }
 
+// Typen, deren Metadaten einen Betrag in Minor-Units festhalten.
+const AMOUNT_SNAPSHOT_ACTIVITY = new Set(['ledger_restored', 'ledger_removed', 'expense_created', 'expense_edited', 'expense_deleted']);
+
 router.get('/groups/:id/activity', (req, res) => {
   try {
     const groupId = Number(req.params.id);
@@ -1149,7 +1328,19 @@ router.get('/groups/:id/activity', (req, res) => {
       LIMIT @size OFFSET @offset
     `).all({ groupId, size: limit + 1, offset, ...(cursor || {}) });
     const hasMore = fetched.length > limit;
-    const rows = fetched.slice(0, limit).map((row) => ({ ...row, metadata: row.metadata ? JSON.parse(row.metadata) : null }));
+    const rows = fetched.slice(0, limit).map((row) => {
+      const metadata = row.metadata ? JSON.parse(row.metadata) : null;
+      // 'ledger_restored' (Migration v226) und 'ledger_removed' (v227)
+      // speichern den Betrag in Minor-Units: eingefrorenes SQL kennt die
+      // Nachkommastellen je Waehrung nicht. Hier bekommt er dieselbe
+      // Dezimalform wie payment_registered (`amount`). Dasselbe gilt fuer den
+      // Betrag, den expense_created/_edited/_deleted festhalten (#1607);
+      // Eintraege von vor dem Snapshot tragen keinen und bleiben, wie sie sind.
+      if (AMOUNT_SNAPSHOT_ACTIVITY.has(row.type) && Number.isInteger(metadata?.amount_minor) && metadata.currency) {
+        return { ...row, metadata: decorateMoney(metadata) };
+      }
+      return { ...row, metadata };
+    });
     attachSettlementState(rows, groupId, req);
     attachExpenseState(rows, groupId);
     const last = rows[rows.length - 1];
@@ -1266,7 +1457,13 @@ router.post('/groups/:id/recurring', (req, res) => {
     if (!frequency) return res.status(400).json({ error: 'Invalid frequency.', code: 400 });
     const payerId = Number(req.body.payer_id || userId(req));
     const participants = Array.isArray(req.body.participants) ? req.body.participants : [payerId];
-    const snapshot = { participants, splits: req.body.splits || [] };
+    const refusal = membershipRefusal(db.get(), groupId, payerId, participants);
+    if (refusal) return res.status(400).json({ error: refusal, code: 400 });
+    // Dieselbe Pruefung wie bei einer Ausgabe, hier VOR dem ersten Termin: der
+    // Buchungslauf rechnet den Snapshot spaeter ohne Nutzer vor dem Bildschirm
+    // durch, und eine Serie, die dort wirft, haelt den ganzen Lauf an.
+    // Gespeichert wird die gepruefte Fassung, nicht der Request.
+    const snapshot = splitSnapshot({ method: parsed.method, amountMinor: parsed.amountMinor, currency: parsed.currency, participants, splits: req.body.splits });
     const result = db.get().prepare(`
       INSERT INTO recurring_expenses
         (group_id, title, description, amount_minor, currency, payer_id, category, split_method, split_snapshot, frequency, next_run_date, created_by)
@@ -1319,7 +1516,7 @@ router.get('/search', (req, res) => {
         AND (@isGuest = 0 OR g.id = @restrictedGroupId)
       ORDER BY e.expense_date DESC LIMIT 10
     `).all({ uid, q, restrictedGroupId, isGuest });
-    const expensesSerialized = serializeExpenseList(expenses, userId(req));
+    const expensesSerialized = serializeExpenseList(expenses, documentViewer(req));
     const people = db.get().prepare(`
       SELECT DISTINCT u.id, u.display_name, u.username, u.avatar_color
       FROM users u

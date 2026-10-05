@@ -15,16 +15,15 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 // DB_PATH vor dem Import auf eine Wegwerf-Datei setzen: db.js initialisiert beim
 // Modul-Load (und migriert dabei). Geprüft wird hier nur die exportierte v124-SQL
 // gegen eine eigens aufgebaute Vor-v124-DB.
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
-process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), 'yuvomi-guestmig-')), 'unused.db');
+process.env.DB_PATH = join(tempDir('yuvomi-guestmig-'), 'unused.db');
 const { MIGRATIONS } = await import('../server/db.js');
 
 const V124 = MIGRATIONS.find((m) => m.version === 124);
@@ -33,7 +32,7 @@ const V124 = MIGRATIONS.find((m) => m.version === 124);
 // group_id hängt per CASCADE an expense_groups. Zwei Gäste in zwei Gruppen,
 // damit sichtbar wird, dass eine Gruppenlöschung nur den einen Gast betrifft.
 function seedPreV124() {
-  const db = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-guestmig-')), 'db.sqlite'));
+  const db = new Database(join(tempDir('yuvomi-guestmig-'), 'db.sqlite'));
   db.pragma('foreign_keys = ON');
   db.exec(`
     CREATE TABLE users (

@@ -38,7 +38,15 @@ setMode('shared');
 let actor = { id: A };
 const app = express();
 app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = actor.id; req.session = { userId: actor.id }; next(); });
+app.use((req, _res, next) => {
+  req.authUserId = actor.id;
+  req.session = { userId: actor.id };
+  // Beide Rechte-Achsen wie requireAuth/applyRoleModuleAccess; ohne Angabe
+  // unbeschraenkt, damit die uebrigen Faelle unveraendert laufen.
+  req.sessionModuleAccess = actor.moduleAccess ?? null;
+  req.authScopes = actor.scopes ?? null;
+  next();
+});
 app.use('/items', itemsRouter);
 app.use('/entries', entriesRouter);
 const server = app.listen(0, '127.0.0.1');
@@ -266,4 +274,87 @@ test('Buchung loeschen entfernt nur die Verknuepfung', async () => {
   db.prepare('DELETE FROM budget_entries WHERE id = ?').run(entry);
   assert.equal(db.prepare('SELECT COUNT(*) AS c FROM inventory_item_entries WHERE entry_id = ?').get(entry).c, 0);
   assert.ok(db.prepare('SELECT id FROM inventory_items WHERE id = ?').get(item.id));
+});
+
+// ── Budgetrecht: verknuepfte Buchungen folgen dem Leserecht auf `budget` ─
+//
+// Der Pfad gehoert `inventory`, Titel, Betrag und Datum kommen aber aus
+// `budget`. Ohne dessen Leserecht (Mitgliedsrecht ODER Token-Scope) liefert
+// der Gegenstand keine Buchungen, die Historie keine Buchungszeilen, und jede
+// Geste, die eine Buchung nachschlaegt, antwortet wie bei einer unbekannten.
+
+const NO_BUDGET = { id: A, moduleAccess: { budget: 'none' } };
+const TOKEN_NO_BUDGET = { id: A, scopes: ['inventory:write'] };
+
+test('Budgetrecht: mit vollem Recht stehen die Buchungen da (Vorbedingung)', async () => {
+  const entry = insertEntry({ title: 'Rechte-Vorbedingung', amount: -250, date: '2030-02-01' });
+  const item = await createItem({ entry_id: entry });
+  const detail = await call('GET', `/items/${item.id}`);
+  assert.equal(detail.body.data.linked_entries.length, 1);
+  assert.equal(detail.body.data.linked_entries[0].title, 'Rechte-Vorbedingung');
+  // Die Historie fuehrt nur Wartungsrollen; eine Kaufbuchung zaehlt dort nicht.
+  const wartung = insertEntry({ title: 'Rechte-Wartung', amount: -40, date: '2030-02-01' });
+  assert.equal((await call('POST', `/items/${item.id}/entries`, { body: { entry_id: wartung, role: 'maintenance' } })).status, 201);
+  const hist = await call('GET', `/items/${item.id}/history`);
+  assert.ok(hist.body.data.timeline.some((row) => row.type === 'budget_entry' && row.label === 'Rechte-Wartung'));
+  assert.equal(hist.body.data.total, -40);
+});
+
+for (const [name, viewer] of [['budget: none', NO_BUDGET], ['Token ohne budget:read', TOKEN_NO_BUDGET]]) {
+  test(`Budgetrecht (${name}): Detail, Liste und Historie liefern keine Buchung`, async () => {
+    const entry = insertEntry({ title: `Geheim ${name}`, amount: -777, date: '2030-02-02' });
+    const item = await createItem({ entry_id: entry, name: `Gegenstand ${name}` });
+    const wartung = insertEntry({ title: `Wartung ${name}`, amount: -40, date: '2030-02-02' });
+    assert.equal((await call('POST', `/items/${item.id}/entries`, { body: { entry_id: wartung, role: 'maintenance' } })).status, 201);
+
+    const detail = await call('GET', `/items/${item.id}`, { as: viewer });
+    assert.equal(detail.status, 200);
+    assert.deepEqual(detail.body.data.linked_entries, [], 'keine verknuepfte Buchung');
+    assert.equal(detail.body.data.linked_entries_total, 0, 'keine Summe');
+
+    const list = await call('GET', '/items', { as: viewer });
+    const row = list.body.data.find((r) => r.id === item.id);
+    assert.deepEqual(row.linked_entries, [], 'auch nicht in der Liste');
+
+    const hist = await call('GET', `/items/${item.id}/history`, { as: viewer });
+    assert.equal(hist.status, 200);
+    assert.equal(hist.body.data.timeline.some((r) => r.type === 'budget_entry'), false, 'keine Buchungszeile in der Historie');
+    assert.equal(hist.body.data.total, 0, 'keine Summe in der Historie');
+  });
+
+  test(`Budgetrecht (${name}): Nachschlagen einer Buchung antwortet wie bei einer unbekannten`, async () => {
+    const entry = insertEntry({ title: `Nachschlag ${name}`, amount: -55, date: '2030-02-03' });
+    const item = await createItem();
+    const links = () => db.prepare('SELECT COUNT(*) AS c FROM inventory_item_entries WHERE entry_id = ?').get(entry).c;
+
+    assert.equal((await call('POST', `/items/${item.id}/entries`, { as: viewer, body: { entry_id: entry } })).status, 404);
+    assert.equal(links(), 0, 'keine Verknuepfung angelegt');
+
+    const before = db.prepare('SELECT COUNT(*) AS c FROM inventory_items').get().c;
+    assert.equal((await call('POST', '/items', { as: viewer, body: { name: 'Vorbelegt', entry_id: entry } })).status, 404,
+      'die Kaufpreis-Vorbelegung liest den Betrag der Buchung');
+    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM inventory_items').get().c, before);
+
+    assert.equal((await call('GET', `/entries/${entry}/items`, { as: viewer })).status, 404);
+  });
+
+  test(`Budgetrecht (${name}): Entfernen einer Verknuepfung antwortet 404, der Link bleibt`, async () => {
+    const entry = insertEntry({ title: `Entfernen ${name}`, amount: -12, date: '2030-02-05' });
+    const item = await createItem({ entry_id: entry });
+    const links = () => db.prepare('SELECT COUNT(*) AS c FROM inventory_item_entries WHERE item_id = ? AND entry_id = ?').get(item.id, entry).c;
+    assert.equal(links(), 1, 'Vorbedingung: die Verknuepfung steht');
+
+    const r = await call('DELETE', `/items/${item.id}/entries/${entry}`, { as: viewer });
+    assert.equal(r.status, 404, 'wie bei einer unbekannten Buchung');
+    assert.equal(links(), 1, 'die Verknuepfung steht noch');
+  });
+}
+
+test('Budgetrecht: read reicht', async () => {
+  const entry = insertEntry({ title: 'Lesend', amount: -30, date: '2030-02-04' });
+  const item = await createItem({ entry_id: entry });
+  const detail = await call('GET', `/items/${item.id}`, { as: { id: A, moduleAccess: { budget: 'read' } } });
+  assert.equal(detail.body.data.linked_entries.length, 1);
+  const token = await call('GET', `/items/${item.id}`, { as: { id: A, scopes: ['inventory:read', 'budget:read'] } });
+  assert.equal(token.body.data.linked_entries.length, 1);
 });

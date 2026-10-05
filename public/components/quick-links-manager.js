@@ -20,6 +20,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { rowActionHtml } from '/utils/row-action.js';
 import { AVATAR_COLORS } from '/utils/color.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { openModal, closeModal, confirmOverModal, reportFieldError, btnError, refocusAfterRender } from '/components/modal.js';
@@ -203,7 +204,7 @@ function formHtml(state, isEdit) {
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
       ${isEdit
-    ? `<button type="button" class="btn btn--danger-outline" id="quick-link-delete" style="margin-right:auto">${esc(t('common.delete'))}</button>`
+    ? `<button type="button" class="btn btn--danger-outline" id="quick-link-delete" style="margin-inline-end:auto">${esc(t('common.delete'))}</button>`
     : ''}
       <button type="button" class="btn btn--secondary" id="quick-link-cancel">${esc(t('common.cancel'))}</button>
       <button type="button" class="btn btn--primary" id="quick-link-save">${esc(isEdit ? t('common.save') : t('common.create'))}</button>
@@ -430,9 +431,7 @@ function listRowHtml(s, canEdit) {
     ? `<i data-lucide="lock" class="quick-link-manage-row__private" aria-label="${esc(t('quickLinks.privateBadge'))}"></i>`
     : ''}
       ${canEdit
-    ? `<button type="button" class="btn-icon" data-edit="${s.id}" aria-label="${esc(t('quickLinks.editOne', { name: s.name }))}">
-             <i data-lucide="pencil"></i>
-           </button>`
+    ? rowActionHtml({ icon: 'pencil', label: t('quickLinks.editOne', { name: s.name }), attrs: { 'data-edit': s.id } })
     // EINE FREMDE KACHEL IST SICHTBAR, ABER NICHT BEARBEITBAR, und das steht
     // hier auch so da. Ein Knopf, den der Server mit 403 beantwortet, wäre die
     // schlechtere Auskunft als gar keiner.

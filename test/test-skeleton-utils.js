@@ -62,3 +62,13 @@ test('renderSkeletonList: nutzt nur global definierte Klassen (keine widget-skel
   const html = renderSkeletonList();
   assert.doesNotMatch(html, /widget-skeleton/);
 });
+
+// R16 (Bewegung): die Statistik laedt in Diagrammform, nicht als Liste.
+test('renderSkeletonChart: Titel, Diagrammblock und Legendenzeile je Karte', async () => {
+  const { renderSkeletonChart } = await import('../public/utils/skeleton.js');
+  const html = renderSkeletonChart({ charts: 2 });
+  assert.equal((html.match(/class="skeleton skeleton-chart"/g) || []).length, 2);
+  assert.equal((html.match(/skeleton-line--title/g) || []).length, 2);
+  assert.match(html, /^<div class="skeleton-list" aria-hidden="true">/, 'dieselbe Huelle wie die Liste, fuer Screenreader stumm');
+  assert.equal((renderSkeletonChart({ charts: 0 }).match(/skeleton-chart/g) || []).length, 1, 'mindestens eine Flaeche');
+});

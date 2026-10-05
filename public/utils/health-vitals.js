@@ -201,15 +201,114 @@ function toFiniteOrNull(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Laenge des gleitenden Standardfensters je Zeitraum (Tage, endend heute). */
+export const ROLLING_WINDOW_DAYS = { week: 7, month: 30 };
+
+/** Kennung des Kalenderzeitraums eines Tages: Wochenanfang bzw. YYYY-MM. */
+function periodId(range, key, weekStartsOn) {
+  return range === 'week' ? startOfLocalWeekKey(key, weekStartsOn) : key.slice(0, 7);
+}
+
+/** Letzter Tag des Kalenderzeitraums (Woche/Monat), in dem `key` liegt. */
+function periodEnd(range, key, weekStartsOn) {
+  if (range === 'week') return addLocalDays(startOfLocalWeekKey(key, weekStartsOn), 6);
+  const d = parseLocalDateKey(key);
+  return toLocalDateKey(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+}
+
+/**
+ * Gilt fuer diesen Anker das gleitende Fenster? Nur, wenn er im laufenden
+ * Zeitraum liegt UND nicht hinter heute. Ein Anker hinter heute im laufenden
+ * Zeitraum meint dessen Kalenderfenster: Messwerte und Einheiten duerfen ein
+ * Datum in der Zukunft tragen, und der Rest der Woche bzw. des Monats laege
+ * sonst in KEINEM erreichbaren Fenster (gleitend endet heute, "Weiter"
+ * begann erst mit dem naechsten Kalenderzeitraum).
+ */
+export function isRollingAnchor(range, anchorKey, weekStartsOn = 1, { today = todayKey() } = {}) {
+  if (range !== 'week' && range !== 'month') return false;
+  const anchor = anchorKey || today;
+  return anchor <= today && periodId(range, anchor, weekStartsOn) === periodId(range, today, weekStartsOn);
+}
+
+/**
+ * Blaettert den Anker um einen Zeitraum. Die Fenster reihen sich lueckenlos:
+ *
+ *   ... voriger Kalenderzeitraum <-> gleitend bis heute
+ *       <-> laufender Kalenderzeitraum <-> naechster Kalenderzeitraum ...
+ *
+ * Der Halt "laufender Kalenderzeitraum" (Anker = dessen letzter Tag) entfaellt,
+ * wenn heute selbst der letzte Tag ist - dann liegt nichts mehr dahinter. Der
+ * Monat blaettert ueber den Monatsersten: `setMonth()` auf einem 31. lief in
+ * den uebernaechsten Monat ueber und liess einen ganzen Monat aus.
+ *
+ * @param {'week'|'month'|'year'} range
+ * @param {string} anchorKey  YYYY-MM-DD
+ * @param {number} dir        -1 zurueck, +1 weiter
+ * @param {number} [weekStartsOn=1]
+ * @param {{ today?: string }} [opts]  `today` nur fuer Tests
+ * @returns {string} der neue Anker
+ */
+export function stepVitalAnchor(range, anchorKey, dir, weekStartsOn = 1, { today = todayKey() } = {}) {
+  const anchor = anchorKey || today;
+  if (range === 'year') {
+    const d = parseLocalDateKey(anchor);
+    d.setFullYear(d.getFullYear() + dir);
+    return toLocalDateKey(d);
+  }
+  const kind = range === 'week' ? 'week' : 'month';
+  const current = periodId(kind, today, weekStartsOn);
+  const end = periodEnd(kind, today, weekStartsOn);
+  const hasRest = end > today;
+  if (periodId(kind, anchor, weekStartsOn) === current) {
+    if (anchor <= today && dir > 0 && hasRest) return end;
+    if (anchor > today && dir < 0) return today;
+  }
+  let next;
+  if (kind === 'week') {
+    next = addLocalDays(anchor, 7 * dir);
+  } else {
+    const d = parseLocalDateKey(anchor);
+    next = toLocalDateKey(new Date(d.getFullYear(), d.getMonth() + dir, 1));
+  }
+  if (periodId(kind, next, weekStartsOn) !== current) return next;
+  // Von hinten kommend zuerst das Kalenderfenster, von vorn das gleitende.
+  return dir < 0 && hasRest ? end : today;
+}
+
 /**
  * Baut die Bucket-Achse für einen Zeitraum.
- * - week:  7 Tages-Buckets ab Wochenanfang (weekStartsOn, Default Montag=1)
- * - month: ein Tages-Bucket je Kalendertag des Anker-Monats
+ * - week:  7 Tages-Buckets
+ * - month: ein Tages-Bucket je Tag
  * - year:  12 Monats-Buckets (Jan–Dez) des Anker-Jahres
+ *
+ * DER LAUFENDE ZEITRAUM IST GLEITEND (Critique 2026-10-05, R16). Woche und
+ * Monat waren Kalenderfenster: am 05.10. zeigte "Monat" fuenf Tage, und ueber
+ * vier Messungen der Vorwoche stand "Zu wenige Messwerte fuer einen Trend".
+ * Liegt HEUTE im Kalenderzeitraum des Ankers und der Anker nicht hinter heute
+ * (`isRollingAnchor`), ist das Fenster deshalb die letzten 7 bzw. 30 Tage,
+ * endend heute. Wer zurueckblaettert (der Anker liegt
+ * in einer anderen Woche, einem anderen Monat), bekommt wie bisher die
+ * Kalenderwoche ab `weekStartsOn` bzw. den Kalendermonat - "September" ist
+ * dort die Frage, nicht "die 30 Tage vor dem 5. September". `from`/`to` nennen
+ * das Fenster, das wirklich gilt; die Beschriftung liest sie.
+ *
+ * @param {'week'|'month'|'year'} range
+ * @param {string} [anchorKey]   YYYY-MM-DD im Zeitraum, Standard heute
+ * @param {number} [weekStartsOn=1]
+ * @param {{ today?: string }} [opts]  `today` nur fuer Tests; sonst `todayKey()`
+ *        (Tag des Haushalts, utils/date.js).
  * @returns {{ buckets: Array<{key,date,gran}>, from: string, to: string, gran: string }}
  */
-export function buildVitalBuckets(range, anchorKey, weekStartsOn = 1) {
-  const anchor = anchorKey || todayKey();
+export function buildVitalBuckets(range, anchorKey, weekStartsOn = 1, { today = todayKey() } = {}) {
+  const anchor = anchorKey || today;
+  const rolling = (days) => {
+    const buckets = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = addLocalDays(today, -i);
+      buckets.push({ key: d, date: d, gran: 'day' });
+    }
+    return { buckets, from: buckets[0].date, to: today, gran: 'day' };
+  };
 
   if (range === 'year') {
     const year = parseLocalDateKey(anchor).getFullYear();
@@ -223,6 +322,7 @@ export function buildVitalBuckets(range, anchorKey, weekStartsOn = 1) {
 
   if (range === 'week') {
     const start = startOfLocalWeekKey(anchor, weekStartsOn);
+    if (isRollingAnchor('week', anchor, weekStartsOn, { today })) return rolling(ROLLING_WINDOW_DAYS.week);
     const buckets = [];
     for (let i = 0; i < 7; i++) {
       const d = addLocalDays(start, i);
@@ -232,6 +332,11 @@ export function buildVitalBuckets(range, anchorKey, weekStartsOn = 1) {
   }
 
   // month (Default)
+  // Am 31. reichen 30 Tage nur bis zum 2.: der Monatserste laege weder hier
+  // noch im Vormonat. Das Fenster waechst dann auf den ganzen Monat.
+  if (isRollingAnchor('month', anchor, weekStartsOn, { today })) {
+    return rolling(Math.max(ROLLING_WINDOW_DAYS.month, Number(today.slice(8, 10))));
+  }
   const d = parseLocalDateKey(anchor);
   const year = d.getFullYear();
   const month = d.getMonth();
@@ -267,7 +372,7 @@ export function buildVitalBuckets(range, anchorKey, weekStartsOn = 1) {
  * }}
  */
 export function computeVitalSeries(rows, opts = {}) {
-  const { type, range = 'month', anchor, weekStartsOn = 1 } = opts;
+  const { type, range = 'month', anchor, weekStartsOn = 1, today } = opts;
   const metric = vitalMetric(type);
   const channels = metric ? metric.channels : ['value_num'];
 
@@ -294,7 +399,7 @@ export function computeVitalSeries(rows, opts = {}) {
   }
 
   // Zeitraum-Serie: Buckets aufbauen und Messungen einsortieren.
-  const { buckets, from, to, gran } = buildVitalBuckets(range, anchor, weekStartsOn);
+  const { buckets, from, to, gran } = buildVitalBuckets(range, anchor, weekStartsOn, today ? { today } : undefined);
   const index = new Map(buckets.map((b, i) => [b.key, i]));
   const acc = buckets.map(() => ({
     count: 0,

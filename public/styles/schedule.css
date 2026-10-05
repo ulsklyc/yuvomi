@@ -295,6 +295,15 @@
   flex: 0 0 auto;
 }
 
+/* Swatches im Dark mit Kante (Re-Critique 2026-09-28, P9): die Presets halten
+ * dort jetzt >= 3:1, eine BESTANDSFARBE aus der Zeit davor (700-900er Toene,
+ * keine Migration) faellt aber unter 2:1 und verschwaende in der Karte. Die
+ * Kante aus dem Kanten-Token traegt den Punkt unabhaengig von seinem Ton. */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .schedule-swatch { box-shadow: inset 0 0 0 1px var(--color-border-strong); }
+}
+:root[data-theme="dark"] .schedule-swatch { box-shadow: inset 0 0 0 1px var(--color-border-strong); }
+
 .schedule-entry-row,
 .schedule-override {
   align-items: center;
@@ -348,7 +357,9 @@
 @media (max-width: 639px) {
   .schedule-page {
     gap: var(--space-3);
-    padding-bottom: calc(var(--nav-bottom-height) + var(--space-6));
+    /* Die Kapselzone traegt der Shell-Nachlauf (--nav-tail, layout.css);
+     * hier steht nur das eigene Ende der Seite. */
+    padding-bottom: var(--space-6);
   }
 
   .schedule-toolbar {
@@ -485,15 +496,46 @@
   gap: var(--space-2);
 }
 
+/* DER ZEITRAUM WIRD SCHMAL ZUR AUSWAHL, NICHT ZUM SCROLLER (R9 M11).
+ *
+ * Hier stand `overflow-x: auto`: bei 390px war das Feld 324px breit, die drei
+ * Segmente brauchten 387px, und "Eigener Zeitraum" endete bei x=418 hinter
+ * dem Rand - eine Wahl, die man erst durch Wischen findet (A2 P2). Das Segment
+ * umbrechen zu lassen hiesse zwei Zeilen fuer drei Worte. Unter der Breite,
+ * die es braucht, steht deshalb das native Auswahlfeld mit denselben drei
+ * Eintraegen (schedule.js, STATISTICS_RANGES).
+ *
+ * Der Container ist das Feld selbst, nicht das Fenster: ob drei Labels
+ * passen, haengt an der Breite der Karte (und der Sprache), und dieselbe
+ * Karte steht am Desktop in einer Spalte. Die Schwelle ist die gemessene
+ * Segmentbreite in Deutsch plus Polster. */
+.schedule-stat-range {
+  container: schedule-stat-range / inline-size;
+}
+
 .schedule-stat-range__choices {
   display: flex;
   inline-size: 100%;
   max-inline-size: 100%;
-  overflow-x: auto;
 }
 
 .schedule-stat-range__choices .segmented__item {
   flex: 1 0 auto;
+}
+
+.schedule-stat-range__select {
+  display: none;
+}
+
+@container schedule-stat-range (max-width: 399px) {
+  .schedule-stat-range__choices {
+    display: none;
+  }
+
+  .schedule-stat-range__select {
+    display: block;
+    inline-size: 100%;
+  }
 }
 
 .schedule-stat-period,
@@ -528,17 +570,7 @@
   --summary-cards: 3;
 }
 
-/* Ein Hinweis, kein Urteil: die Karte nennt sich selbst "Ueberstunden" im
- * Label (Text traegt die Aussage, nicht nur die Farbe) und tont sich am
- * reservierten Warnton, denselben, den Budget und Gesundheit fuer ihre
- * eigenen Schwellenwerte schon verwenden. */
-.metric-card--warning {
-  border-color: color-mix(in oklch, var(--color-warning) 40%, transparent);
-}
-
-.metric-card--warning .metric-card__value {
-  color: var(--color-warning);
-}
+/* `.metric-card--warning` steht seit 2026-09-25 in panel.css - eine Variante der geteilten Karte. */
 
 .schedule-stat-card > div > h2 {
   margin-bottom: var(--space-1);
@@ -565,6 +597,13 @@
   flex: 0 0 auto;
 }
 
+/* Eine Stundenzahl ist drei Ziffern breit, nicht die ganze Karte: das Feld
+ * lief am Desktop 1116px weit (Re-Critique 2026-09-27, A2 P1). */
+.schedule-reminder-settings__row--hours .input {
+  inline-size: 10ch;
+  flex: 0 0 auto;
+}
+
 .schedule-stat-list {
   display: grid;
   gap: var(--space-2);
@@ -578,12 +617,6 @@
   gap: var(--space-1);
 }
 
-.schedule-stat-total {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 .schedule-stat-row__head {
   display: flex;
   align-items: center;
@@ -595,8 +628,7 @@
   flex: 1;
 }
 
-.schedule-stat-row strong,
-.schedule-stat-total strong {
+.schedule-stat-row strong {
   font-variant-numeric: tabular-nums;
 }
 
@@ -632,20 +664,42 @@
   }
 }
 
-.schedule-stat-total {
-  justify-content: space-between;
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-border);
-}
-
 @media screen and (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .schedule-page input[type="month"] { color-scheme: dark; }
 }
 
 :root[data-theme="dark"] .schedule-page input[type="month"] { color-scheme: dark; }
 
+/* Auswertung mobil: zwei Zeilen statt einer 257px-Formularkarte (R16) - die
+ * Begruendung steht am Dateiende bei der Bedienflaeche des Vergleichs. */
 @media (max-width: 639px) {
-  .schedule-stat-filters { grid-template-columns: minmax(0, 1fr); }
+  .schedule-stat-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+  }
+
+  .schedule-stat-filters > :first-child,
+  .schedule-stat-range {
+    grid-column: auto;
+  }
+
+  .schedule-stat-filters > :first-child > .label,
+  .schedule-stat-range > .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .schedule-stat-filter-actions > .btn {
+    flex: 1 1 0;
+  }
 }
 
 /* Desktop follows the shared full-width module shell.  The Schedule page
@@ -657,7 +711,12 @@
     align-items: start;
   }
 
-  .schedule-library--shifts > h2 {
+  /* Kopf (Ueberschrift + Vorlagen) und Leerzustand ueber beide Spalten -
+   * der Kopf steckt seit dem Vorlagen-Umbau in `.schedule-library__head`;
+   * ein Selektor auf `> h2` griff ins Leere, und die erste Karte rutschte
+   * neben die Ueberschrift. */
+  .schedule-library--shifts > .schedule-library__head,
+  .schedule-library--shifts > .empty-state {
     grid-column: 1 / -1;
   }
 
@@ -719,6 +778,21 @@
 
 /* ---- Uebersicht-Tab: mehrere Personen nebeneinander ---- */
 
+/* Wie `.schedule-page`: die Tab-Sektionen sind Grids, und eine implizite
+ * `auto`-Spur waechst mit dem breitesten Kind - mobil schob die Werkzeugleiste
+ * (441px bei 390) Sektion und Leerzustand ueber den Rand. */
+.schedule-overview {
+  grid-template-columns: minmax(0, 1fr);
+  /* Mindestbreite EINER Personenspur je Tag (Re-Critique 2026-09-28, A2
+   * P2-5). Vorher 220px fest: mit einer Person 1676px Inhalt in 1156px, Sa/So
+   * hinter einem Seitwaerts-Scroll. 8rem reichen fuer Titel + Uhrzeit (die
+   * Kalenderwoche fasst ihre Tage bei 1440 in 151px); die Tage teilen sich
+   * den Rest (.schedule-overview__day unten). Gescrollt wird erst, wenn
+   * mehrere Personen zusammen das Minimum ueberschreiten. Die Spurspalten im
+   * Markup (renderOverview()) lesen denselben Wert. */
+  --schedule-lane-min: 8rem;
+}
+
 .schedule-overview__toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -730,11 +804,25 @@
 
 .schedule-overview__week-nav {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
 }
 
+.schedule-overview__stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Der Wert steht ZWISCHEN den Pfeilen (Zeitraum-Kopf, DESIGN.md) und haelt
+ * eine Mindestbreite, damit der rechte Pfeil beim Blaettern nicht wandert. */
 .schedule-overview__week-label {
+  min-inline-size: 9rem;
+  text-align: center;
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-secondary);
@@ -758,6 +846,14 @@
 
 .schedule-overview__day {
   flex: 0 0 auto;
+}
+
+/* Die sieben Tage teilen sich die Breite; ihre Mindestbreite ist die Summe
+ * ihrer Spuren (min-content), darunter scrollt der Container. Die Zeitspalte
+ * bleibt auf ihrer festen Breite. */
+.schedule-overview__day:not(.schedule-overview__gutter) {
+  flex: 1 1 0;
+  min-width: min-content;
 }
 
 .schedule-overview__day + .schedule-overview__day {
@@ -832,10 +928,32 @@
   display: none;
 }
 
+/* PUNKT STATT RANDSTREIFEN (Re-Critique 2026-09-27, Detektor side-tab).
+ * Feiertag und Planblock trugen eine 3px-Vollton-Kante an der Startseite -
+ * das Muster, das der Detektor als Kartenstreifen meldet. Die Farbe steckt
+ * schon in der Toenung der Flaeche; das Vollton-Signal traegt jetzt ein Punkt
+ * vor dem Namen, wie in Apples Kalender die Farbe eines Termins im Monat.
+ * Er ist Zeichen, nicht Inhalt: der Name steht daneben, die Farbe sagt nichts,
+ * was der Text nicht auch sagt. Mit dem Vollton im Punkt ist die Schrift
+ * NEUTRAL (DESIGN.md, Skalen-Regel "Rangmarke -> Vollton-Punkt, Schrift
+ * neutral"): getoente Flaeche plus gemischte Schrift derselben Farbe hiesse
+ * den Ton zweimal blass nennen, und die Kante, die das vorher auffing, ist weg. */
+.schedule-overview__holiday > span::before,
+.schedule-overview__block-title::before {
+  content: '';
+  display: inline-block;
+  inline-size: var(--space-1h);
+  block-size: var(--space-1h);
+  margin-inline-end: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--dot-color);
+  vertical-align: middle;
+}
+
 .schedule-overview__holiday {
+  --dot-color: var(--holi-color);
   background: color-mix(in srgb, var(--holi-color) var(--tint-surface), var(--color-surface-work));
-  color: color-mix(in srgb, var(--holi-color) 38%, var(--color-text-primary));
-  border-inline-start: 3px solid var(--holi-color);
+  color: var(--color-text-primary);
   border-radius: var(--radius-xs);
   padding: var(--space-0h) var(--space-1);
   font-size: var(--text-xs);
@@ -851,7 +969,7 @@
 }
 
 .schedule-overview__lane {
-  min-width: 220px;
+  min-width: 0;
 }
 
 .schedule-overview__lane-head {
@@ -923,9 +1041,9 @@
   border-radius: var(--radius-xs);
   padding: var(--space-0h) var(--space-1);
   font-size: var(--text-xs);
+  --dot-color: var(--schedule-color);
   background: color-mix(in srgb, var(--schedule-color) var(--tint-surface), var(--color-surface-work));
-  color: color-mix(in srgb, var(--schedule-color) 38%, var(--color-text-primary));
-  border-inline-start: 3px solid var(--schedule-color);
+  color: var(--color-text-primary);
   overflow: clip;
   line-height: 1.3;
   z-index: 1;
@@ -1071,4 +1189,91 @@
   margin: 0;
   min-width: 0;
   text-align: end;
+}
+
+/* MOBIL: DIE BEDIENFLAECHE VOR DEM INHALT (R16, Critique 2026-10-05 P1).
+ * Gemessen 390x844: Vergleich 263px (Personenwahl 165px in drei Chipreihen,
+ * darunter Ansicht + Stepper + Label auf zwei Zeilen), Auswertung 257px (eine
+ * Formularkarte, je Feld eine Zeile mit Label) - der Inhalt begann bei y=417
+ * bzw. 441. Beide sind jetzt zwei Zeilen.
+ *
+ * VERGLEICH: Zeile 1 = Ansicht (Woche/Tag) und die Personen als EINE
+ * waagerecht scrollende Chipreihe; Zeile 2 = der Stepper, Label mittig
+ * zwischen den Pfeilen, „Heute" am Zeilenende. Die Gruppe `week-nav` loest
+ * sich dafuer auf (`display: contents`), ihre Kinder sind Rasterkinder der
+ * Bedienflaeche. Die Beschriftung der Personenwahl bleibt der Name der
+ * Gruppe, sie steht nur nicht mehr als eigene Zeile da.
+ *
+ * AUSWERTUNG: Person und Zeitraum nebeneinander, die Aktionen darunter, ohne
+ * Kartenflaeche. Die Feld-Labels bleiben die Namen der Felder (geclippt); ein
+ * Auswahlfeld, das „Linda" bzw. „Dieser Monat" zeigt, sagt, was es ist. Die
+ * Datumsfelder eines eigenen Zeitraums behalten ihre Labels - dort stehen zwei
+ * gleichartige Felder nebeneinander. */
+@media (max-width: 767px) {
+  .schedule-overview__toolbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "view people"
+      "step step";
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+
+  .schedule-overview__week-nav {
+    display: contents;
+  }
+
+  .schedule-overview__week-nav > .segmented {
+    grid-area: view;
+  }
+
+  .schedule-overview__toolbar > .user-ms {
+    grid-area: people;
+    min-width: 0;
+  }
+
+  .schedule-overview__toolbar > .user-ms > .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .schedule-overview__toolbar > .user-ms > .user-ms__options {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    /* Der Fokusring der Chips liegt ausserhalb ihrer Box; ohne Polster
+       schneidet der Scroller ihn ab. */
+    padding: var(--space-1);
+    margin: calc(var(--space-1) * -1);
+  }
+
+  .schedule-overview__toolbar > .user-ms .user-ms__option {
+    flex: 0 0 auto;
+  }
+
+  /* In der einen Zeile stehen die Personen vorn; „Auswahl leeren" (124px)
+     schob sonst die erste Person halb aus dem Bild. */
+  .schedule-overview__toolbar > .user-ms .user-ms__option--none {
+    order: 1;
+  }
+
+  .schedule-overview__stepper {
+    grid-area: step;
+    flex-wrap: nowrap;
+  }
+
+  /* Die Reihenfolge Pfeil, Wert, Pfeil, Heute steht seit R16 Schritt 2 im
+     Markup; hier bleibt nur, dass der Wert die Zeile fuellt und kuerzt. */
+  .schedule-overview__stepper > .schedule-overview__week-label {
+    flex: 1 1 0;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }

@@ -67,7 +67,8 @@ test('überspringt nicht unterstützte und nimmt das nächste unterstützte Tag'
 });
 
 test('navigator.language (Singular) als Fallback wenn languages fehlt', () => {
-  assert.equal(runLangInit({ language: 'pt-BR' }), 'pt');
+  assert.equal(runLangInit({ language: 'pt-BR' }), 'pt-BR');
+  assert.equal(runLangInit({ language: 'pt-PT' }), 'pt');
 });
 
 test('blockierter localStorage (Privatmodus) wirft nicht, nutzt navigator', () => {
@@ -164,9 +165,9 @@ test('lang-init.js setzt die Schreibrichtung fuer dieselben Sprachen wie i18n.js
 // --- Aufloesung auf die spezifischste Locale --------------------------------
 //
 // Gemessen wird mit Listen, die es im Repository nicht gibt. Ueber den echten
-// Bestand - 24 reine Sprachcodes - liefern die alte und die neue Aufloesung
-// dasselbe Ergebnis, ein Test darueber misst also nichts. Deshalb nimmt
-// pickLocale() die Liste als Argument.
+// Bestand - bis auf pt-BR (#1437) reine Sprachcodes - liefern die alte und die
+// neue Aufloesung fast ueberall dasselbe Ergebnis, ein Test darueber misst also
+// kaum etwas. Deshalb nimmt pickLocale() die Liste als Argument.
 
 test('i18n.js loest ein Regions-Tag auf die spezifischste unterstuetzte Locale auf', () => {
   const mitHant = ['de', 'en', 'zh', 'zh-Hant'];
@@ -198,15 +199,21 @@ test('i18n.js loest ein Regions-Tag auf die spezifischste unterstuetzte Locale a
   assert.equal(pickLocale([], mitHant), 'en');
 });
 
-test('keine der 24 Sprachen loest anders auf als bisher', () => {
+test('keine der unterstuetzten Sprachen loest anders auf als bisher', () => {
   const alle = getSupportedLocales();
   for (const locale of alle) {
     assert.equal(pickLocale([locale], alle), locale, `${locale} findet sich selbst nicht mehr`);
   }
   assert.equal(pickLocale(['de-AT'], alle), 'de');
-  assert.equal(pickLocale(['pt-BR'], alle), 'pt');
+  // pt-BR ist seit #1437 eine eigene Locale; `pt` bleibt die Antwort fuer
+  // jede andere portugiesische Region und fuer den blossen Sprachcode.
+  assert.equal(pickLocale(['pt-BR'], alle), 'pt-BR');
+  assert.equal(pickLocale(['pt-br'], alle), 'pt-BR');
+  assert.equal(pickLocale(['pt-PT'], alle), 'pt');
+  assert.equal(pickLocale(['pt'], alle), 'pt');
   assert.equal(pickLocale(['en-US'], alle), 'en');
   assert.equal(pickLocale(['fil-PH'], alle), 'fil');
+  assert.equal(pickLocale(['nb-NO'], alle), 'nb');
   assert.equal(pickLocale(['zh-TW'], alle), 'zh',
     'Ohne eine traditionelle Locale im Bestand bleibt `zh` die Antwort.');
   assert.equal(pickLocale(['th-TH'], alle), 'en');
@@ -215,8 +222,8 @@ test('keine der 24 Sprachen loest anders auf als bisher', () => {
 
 test('lang-init.js loest dieselben Tags auf wie i18n.js', () => {
   const alle = getSupportedLocales();
-  for (const tag of ['zh-TW', 'zh-CN', 'de-AT', 'pt-BR', 'th-TH', 'en-US', 'fil-PH',
-    'fil', 'ZH-hant-TW', 'ar-EG', 'fa-IR', 'id-ID', 'xx-YY', '']) {
+  for (const tag of ['zh-TW', 'zh-CN', 'de-AT', 'pt-BR', 'pt-PT', 'pt', 'th-TH', 'en-US', 'fil-PH',
+    'fil', 'nb-NO', 'ZH-hant-TW', 'ar-EG', 'fa-IR', 'id-ID', 'xx-YY', '']) {
     assert.equal(runLangInit({ languages: [tag] }), pickLocale([tag], alle),
       `Die beiden Fassungen der Resolve-Logik beantworten ${tag || '(leer)'} verschieden. `
       + 'Der Body rendert dann in der einen Sprache und das lang-Attribut nennt die andere.');
@@ -232,7 +239,7 @@ test('lang-init.js loest dieselben Tags auf wie i18n.js', () => {
  * ECHTE Quelltext mit ausgetauschter Eingabe, nicht ein Nachbau der Logik.
  *
  * Damit die Ersetzung nicht still danebengeht und der Test dann ueber die echten
- * 24 Codes gruen ist, prueft jeder Aufrufer zuerst eine Antwort, die nur mit der
+ * Codes gruen ist, prueft jeder Aufrufer zuerst eine Antwort, die nur mit der
  * eingesetzten Liste herauskommen kann.
  */
 function withSupported(locales) {
@@ -255,4 +262,42 @@ test('lang-init.js loest zh-TW auf zh-Hant auf, sobald es diese Locale gibt', ()
   const ohneHant = withSupported(['de', 'en', 'zh']);
   assert.equal(runLangInit({ languages: ['zh-TW'], src: ohneHant }), 'zh');
   assert.equal(runLangInit({ languages: ['zh-CN'], src: ohneHant }), 'zh');
+});
+
+// --- Sprachcodes, die eine vorhandene Locale meinen -------------------------
+//
+// `nb` ist seit v2.72.0 eine Locale, aber ein norwegischer Browser meldet haeufig
+// die Makrosprache `no` (oder `no-NO`), und wer Nynorsk eingestellt hat, `nn`.
+// Beide bekamen Englisch, obwohl die norwegische Datei daneben lag.
+
+const NORWEGISCH = ['no', 'no-NO', 'NO-no', 'nn', 'nn-NO'];
+
+test('pickLocale: `no` und `nn` fallen auf `nb`, nicht auf Englisch', () => {
+  const alle = getSupportedLocales();
+  for (const tag of NORWEGISCH) {
+    assert.equal(pickLocale([tag], alle), 'nb', tag);
+  }
+  assert.equal(pickLocale(['nn-NO', 'de'], alle), 'nb',
+    'Die Reihenfolge von navigator.languages entscheidet: Nynorsk vor Deutsch heisst Bokmaal vor Deutsch.');
+  assert.equal(pickLocale(['th-TH', 'no'], alle), 'nb');
+});
+
+test('pickLocale: der Alias ist ein Rueckfall, kein Ersatz', () => {
+  // Eine eigene Locale gewinnt, sobald es sie gibt - mit einer Liste gemessen,
+  // die es im Repository nicht gibt, wie bei zh-Hant oben.
+  assert.equal(pickLocale(['nn-NO'], ['en', 'nb', 'nn']), 'nn');
+  assert.equal(pickLocale(['no'], ['en', 'nb', 'no']), 'no');
+  // Ohne das Ziel in der Liste bleibt es bei Englisch, statt eine Locale zu
+  // nennen, deren Datei nicht existiert.
+  assert.equal(pickLocale(['no-NO'], ['en', 'de']), 'en');
+  assert.equal(pickLocale(['nn'], ['en', 'de']), 'en');
+});
+
+test('lang-init.js loest `no` und `nn` wie i18n.js auf', () => {
+  for (const tag of NORWEGISCH) {
+    assert.equal(runLangInit({ languages: [tag] }), 'nb', tag);
+    assert.equal(runLangInit({ language: tag }), 'nb', `${tag} ueber navigator.language`);
+  }
+  assert.equal(runLangInit({ languages: ['nn-NO', 'de'] }), 'nb');
+  assert.equal(runLangInit({ stored: 'de', languages: ['no'] }), 'de', 'die gemerkte Wahl gewinnt weiter');
 });

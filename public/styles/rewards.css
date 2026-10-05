@@ -15,6 +15,16 @@
   flex-direction: column;
 }
 
+/* EINE TITELZEILE, EINE HOEHE (wie housekeeping.css): Katalog und Buchungen
+ * docken am Desktop ihre Kopf-Pille an, die Uebersicht hat keine - ohne
+ * Mindesthoehe ruckte der Inhalt bei jedem Tabwechsel. Nur ab 1024px
+ * (dockFabIntoToolbar in router.js). */
+@media (min-width: 1024px) {
+  .rewards-toolbar > .page-toolbar__actions {
+    min-height: var(--target-base);
+  }
+}
+
 /* Die Tab-Reihe ist die Bar-Zeile des Kopfs (.page-toolbar__bar, layout.css,
  * Werkzeugzeilen-Regel 2026-08-27): volle Zeile unter dem Titel auf ALLEN
  * Viewports, nicht mehr nur in der kompakten Groessenklasse. Das fruehere
@@ -41,6 +51,30 @@
    -------------------------------------------------------- */
 .rw-section { display: flex; flex-direction: column; gap: var(--space-4); }
 
+/* JEDER ABSCHNITT ENDET AN DER MODULKANTE (Critique R16, 2026-10-05). Die
+ * Seite fuehrt das breite Mass; Uebersicht und Verlauf stehen im Spaltenraster
+ * (`.page-columns`, layout.css), das die Zeilenlisten auf dem Lesemass haelt
+ * und die Seitenspalte bis zur Kante fuehrt. Das Katalograster nimmt die volle
+ * Breite des Masses. Vorher endeten Zeilenlisten samt Kopf bei 720px und das
+ * Raster an der Spalte - zwei Kanten in einem Modul. */
+.rewards-page .rw-section {
+  max-width: var(--page-measure, none);
+}
+
+/* Die Spalten und ihre Abschnitte teilen den Abstand der Seite. */
+.rewards-content__inner {
+  --page-columns-gap: var(--space-8);
+}
+
+/* Der Abschnittstitel als Weg in den Reiter (Seitenspalte der Uebersicht) ist
+ * `.section-title-link` (layout.css) - derselbe Knopf wie „Agenda >" in der
+ * Tagesansicht des Kalenders. */
+
+/* Punktestand in Kurzform (Seitenspalte des Verlaufs): nur Person und Punkte. */
+.rw-standing--compact {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .rw-section__head {
   display: flex;
   align-items: center;
@@ -61,7 +95,6 @@
   margin: 0;
   color: var(--color-text-primary);
 }
-.rw-section__title i { width: 18px; height: 18px; color: var(--module-accent); }
 
 .rw-toolbar-row { display: flex; gap: var(--space-2); }
 
@@ -148,12 +181,12 @@
  * schon in derselben Zeile und ist handlungsfaehig. */
 .rw-standing__idtext { min-width: 0; display: flex; flex-direction: column; }
 .rw-standing__name {
-  font-weight: 600;
+  /* Schnitt aus der Rolle Zeilentitel (typography.css). */
   color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: color 140ms ease;
+  transition: color var(--transition-fast);
 }
 .rw-standing__points { font-size: var(--text-sm); color: var(--color-text-secondary); }
 /* Der Punktestand ist die Hauptaussage seiner Zeile und trägt Label-Farbe: der
@@ -258,10 +291,17 @@
 /* --------------------------------------------------------
    Offene Anfragen
    -------------------------------------------------------- */
+/* Der Listen-Reset steht VOR dem Panel: beide Klassen sitzen am selben `ul`
+ * und haben dieselbe Spezifitaet, also gewinnt die spaetere Regel. Stand er
+ * dahinter, nahm sein `padding: 0` dem Panel das Polster, und der Avatar klebte
+ * an der Kante der getoenten Flaeche (Re-Kritik 2026-09-28, P1). Guard:
+ * test/test-rewards-ui.js rechnet die Kaskade fuer die Klassenliste nach. */
+.rw-pending-list { list-style: none; margin: 0; padding: 0; }
 /* Randlose Karte wie jede andere: die getönte Fläche MIT getönter Kante war
  * dasselbe Muster, das Runde 1 in der Haushaltshilfe entfernt hat. Die Tönung
  * bleibt als Dringlichkeitssignal, die Kante geht - sie sagte nichts, was die
  * Fläche nicht schon sagt. */
+
 /* DIE ALTE BEGRUENDUNG MASS GEGEN DIE FALSCHE FLAECHE.
  * Hier stand "16 %, nicht 8: gemessen 1.25:1 light / 1.29:1 dark" - beide Werte
  * gegen `--color-surface`, also gegen WEISS. Nachgemessen am Dokument ist die
@@ -286,7 +326,6 @@
   background: color-mix(in srgb, var(--module-accent) var(--tint-wash), var(--color-bg));
   box-shadow: var(--shadow-sm);
 }
-.rw-pending-list { list-style: none; margin: 0; padding: 0; }
 .rw-pending {
   display: flex;
   align-items: center;
@@ -342,19 +381,26 @@
   background: var(--color-fill-well);
   font-size: var(--text-2xl);
 }
-.rw-reward-card__icon i { width: 22px; height: 22px; color: var(--color-text-secondary); }
+/* `svg`, nicht `i`: Lucide ersetzt das <i> - die alte Regel griff nie, und die
+ * Ersatz-Glyphe (Praemie ohne eigenes Zeichen) stand ungemessen in der Kachel. */
+.rw-reward-card__icon svg { width: var(--icon-xl); height: var(--icon-xl); flex-shrink: 0; color: var(--color-text-secondary); }
 .rw-reward-card__body { flex: 1 1 auto; }
 .rw-reward-card__name { margin: 0; font-weight: 600; color: var(--color-text-primary); }
 .rw-reward-card__desc { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--color-text-secondary); }
 .rw-reward-card__foot {
   display: flex;
+  /* Preis und Aktionen passen in der schmalsten Kachel (235px Innenbreite bei
+   * 1440px) nicht nebeneinander, seit die Glyphen bemessen sind - vorher
+   * schrumpften sie auf 0px und versteckten den Ueberlauf. Die Aktionen
+   * brechen dann in eine eigene Zeile und bleiben rechts. */
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   margin-top: auto;
   padding-top: var(--space-2);
 }
-.rw-reward-card__actions { display: flex; align-items: center; gap: var(--space-2); }
+.rw-reward-card__actions { display: flex; align-items: center; gap: var(--space-2); margin-inline-start: auto; }
 /* Die Stückzahl steht im Körper unter der Beschreibung, nicht neben dem Preis:
  * `__foot` teilt mit `space-between` in genau zwei Seiten, ein drittes Kind
  * risse die Reihe auseinander. Sie ist eine Auskunft über die Prämie, kein
@@ -372,7 +418,8 @@
   font-size: var(--text-sm);
   color: var(--color-text-primary);
 }
-.rw-cost i { width: 15px; height: 15px; }
+/* Die Muenze traegt `.icon-md` im Markup (Groesse + flex-shrink: 0) - eine
+ * Regel auf `.rw-cost i` griff nie, Lucide ersetzt das <i> (Critique 2026-09-26). */
 
 .rw-tag {
   display: inline-block;
@@ -389,56 +436,24 @@
    Verlauf (Ledger)
    -------------------------------------------------------- */
 .rw-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.rw-chip {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
-}
-.rw-chip:hover { border-color: var(--color-border-strong); }
-/* Ein Filter-Chip, kein Segment: er trägt den Ton als getönte Fläche, nicht
- * deckend gefüllt (Rezept: tokens.css, Abschnitt 6c). Deckend war er die eine
- * Stelle, an der ein Chip wie ein Segment aussah. */
-.rw-chip--active {
-  background: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), transparent);
-  border-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-hint), transparent);
-  color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
-}
+/* Die Chips selbst sind `.filter-chip filter-chip--sm` (filter-chip.css) -
+ * hier stand bis zur Re-Critique 2026-09-28 ein eigener `.rw-chip` mit 31px
+ * Hoehe und ohne Zustand fuer den Screenreader. */
 
-/* Verlaufsliste: EIN Träger (Zeilenlisten-Regel, tokens.css). Der Träger endet
- * mit der Liste, deshalb trennt der +-Kombinator statt border-bottom je Zeile. */
+/* Verlaufsliste: Traeger und Zeile kommen aus list-row.css (`.row-carrier` +
+ * `.list-row`) - Flaeche, Radius, Trennlinie, Polster und der Schnitt des
+ * Grundes (`.list-row__name`) standen hier ein zweites Mal (Critique
+ * 2026-10-05, R16). Hier bleibt nur der Listen-Reset. */
 .rw-ledger {
   list-style: none;
   margin: 0;
   padding: 0;
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-}
-.rw-ledger-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-}
-.rw-ledger-row + .rw-ledger-row {
-  border-top: 1px solid var(--color-border-subtle);
 }
 /* Der Träger entscheidet (tokens.css): im Modal ist der Grund schon
  * --color-surface, eine zweite weisse Karte darauf wäre unsichtbar. Die
- * Kurzfassung der Liste bleibt deshalb trägerlos, nur mit Haarlinien. */
-.rw-ledger--compact {
-  background: none;
-  border-radius: 0;
-  box-shadow: none;
-  overflow: visible;
-}
-.rw-ledger-row--compact { padding: var(--space-2) 0; }
+ * Kurzfassung der Liste bleibt deshalb trägerlos, nur mit Haarlinien
+ * (`.row-divided`), und ohne seitliches Polster - der Dialog polstert. */
+.rw-ledger-row--compact { padding-inline: 0; }
 .rw-ledger-row__icon {
   flex: 0 0 auto;
   display: inline-flex;
@@ -450,7 +465,6 @@
   background: var(--color-surface-2);
   color: var(--color-text-secondary);
 }
-.rw-ledger-row__icon i { width: 17px; height: 17px; }
 
 /* DAS ZEICHEN UNTERSCHEIDET, NICHT DER TON.
  *
@@ -473,10 +487,9 @@
  * zwei stumm neutral. Die Scheibe bleibt deshalb bei der neutralen Basis oben;
  * ein Vollton-Siegel je Zeile wäre die Gegenrichtung desselben Fehlers und
  * streute die Modulmarke durch die Liste ihres eigenen Moduls. */
-.rw-ledger-row__text { flex: 1 1 auto; min-width: 0; }
-.rw-ledger-row__reason { margin: 0; font-weight: 500; color: var(--color-text-primary); }
-.rw-ledger-row__meta { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--color-text-secondary); }
-.rw-delta { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rw-ledger-row__reason,
+.rw-ledger-row__meta { margin: 0; }
+.rw-delta { flex: 0 0 auto; font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; }
 /* Die Richtung der Buchung ist eine WERT-Aussage, keine Modul-Aussage: sie
  * nimmt den Zuwachs-Ton der App (Geld-Vokabular des Budgets), nicht den Ton des
  * Aufgabenmoduls, aus dem der Punkt zufällig stammte. */
@@ -545,18 +558,13 @@
 .rw-switch input { accent-color: var(--color-accent); width: 18px; height: 18px; }
 .rw-switch--compact { margin-left: auto; }
 
-/* Kleine Button-Variante (global additiv, für dichte Aktionsreihen) */
-.btn--sm {
-  min-height: var(--target-sm);
-  padding: var(--space-1) var(--space-3);
-  font-size: var(--text-sm);
-  gap: var(--space-1);
-}
-.btn--sm i { width: 15px; height: 15px; }
+/* `.btn--sm` STEHT IN layout.css (2026-09-24), samt seiner Touch-Hoehe.
+ * Hier lebte die Variante als „global additiv", aber der Router laedt dieses
+ * Blatt nur auf /rewards - in Einstellungen, Aufgaben, Gesundheit, Kalender
+ * und rund zwanzig weiteren Stellen war der kleine Knopf ein normaler. */
 
 /* Touch-Geräte: dichte Aktionsreihen brauchen 44-pt-Trefferflächen. */
 @media (pointer: coarse) {
-  .btn--sm,
   .rw-setup-step__go { min-height: var(--target-base); }
   .rw-pending__actions { gap: var(--space-3); }
 }
@@ -570,21 +578,58 @@
 
 @media (max-width: 639px) {
   .rewards-content__inner { gap: var(--space-6); padding-top: var(--space-4); }
-  .rw-reward-grid { grid-template-columns: 1fr; }
-  /* Schmaler Viewport ⇒ mit hoher Wahrscheinlichkeit Touch: 44-pt-Ziele. */
-  .btn--sm,
-  .rw-setup-step__go { min-height: var(--target-base); }
-  /* Nur die Spaltenzahl: der Abstand ist seit dem Umzug auf `.list-row`
-   * derselbe Wert wie dort, und ihn hier zu wiederholen wäre ein Nachbau. */
-  .rw-standing {
-    grid-template-columns: 1fr;
+  .rw-reward-grid { grid-template-columns: 1fr; gap: var(--space-2); }
+  /* DIE PRAEMIE IST MOBIL EINE KOMPAKTE KARTE (R16, Critique 2026-10-05 P1).
+   * Als gestapelte Kachel mass sie 358x218 - zweieinhalb je Bildschirm, mit
+   * dem Zeichen allein auf einer eigenen Zeile. Jetzt stehen Zeichen und Text
+   * nebeneinander, Preis und Aktion darunter ueber die ganze Breite: rund
+   * 130px, fuenf je Bildschirm. Ab 640px bleibt die Kachel. */
+  .rw-reward-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--space-3);
+    row-gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
   }
-  .rw-standing__actions { justify-content: stretch; }
-  .rw-standing__actions .btn { flex: 1 1 auto; }
-  .rw-pending { flex-wrap: wrap; }
-  .rw-pending__actions { flex-shrink: 0; }
+  .rw-reward-card__foot {
+    grid-column: 1 / -1;
+    margin-top: 0;
+    padding-top: 0;
+  }
+  /* Die Uebersicht endet seit R16 mit den letzten Buchungen (am Desktop die
+   * Seitenspalte, sechs Zeilen). Mobil stehen sie UNTER den Punktestaenden:
+   * drei reichen als Blick, der Titel fuehrt in den Reiter Verlauf. */
+  .rw-recent .rw-ledger > :nth-child(n + 4) {
+    display: none;
+  }
+  /* Schmaler Viewport ⇒ mit hoher Wahrscheinlichkeit Touch: 44-pt-Ziele. */
+  .rw-setup-step__go { min-height: var(--target-base); }
+  /* EINE ZEILE JE PERSON (Re-Critique 2026-09-28, P5 / A3 P2-5). Hier fiel
+   * die Zeile auf eine Spalte mit voller Einloesen-Kapsel: gemessen ca. 180px
+   * je Person, die zweite endete unter dem Toast. Jetzt wie die
+   * Zusammenfassung in Apple Health: Person und Punkte links, Einloesen als
+   * kompakte Kapsel rechts, die duenne Leiste darunter ueber die volle Zeile.
+   * Der Abstand kommt weiter aus `.list-row`. */
+  .rw-standing {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "id actions" "progress progress";
+    row-gap: var(--space-2);
+  }
+  .rw-standing__id { grid-area: id; }
+  .rw-standing__actions { grid-area: actions; }
+  .rw-standing__progress { grid-area: progress; }
+  /* Die offene Anfrage: Avatar und Titel in EINER Zeile, die Knoepfe darunter
+   * auf der Textkante - `flex-wrap` stellte den Avatar allein ueber den Titel. */
+  .rw-pending {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--space-3);
+    row-gap: var(--space-2);
+  }
+  .rw-pending__actions { grid-column: 2; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rw-progress__fill, .rw-chip, .rw-standing__name { transition: none; }
+  .rw-progress__fill, .rw-standing__name { transition: none; }
 }

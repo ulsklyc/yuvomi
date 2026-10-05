@@ -58,15 +58,57 @@ export function hasWarrantyAlert(item, todayKey = householdToday()) {
   return !!status && status.state !== 'valid';
 }
 
-/** Trifft der Listen-Hinweis zu - Garantie ODER irgendeine getrackte Frist
- *  laeuft bald ab/ist abgelaufen? Ein Icon fuer beide Quellen (Design-Doc). */
+/**
+ * Wie lange eine ABGELAUFENE Garantie noch Aufmerksamkeit verlangt, in Tagen
+ * nach ihrem Ende (Critique 2026-09-26). Gegen eine abgelaufene Garantie ist
+ * nichts mehr zu tun - sie hielt "Braucht Aufmerksamkeit" und das Nav-Badge
+ * trotzdem dauerhaft an ("Familienauto", 17 Monate nach Ablauf), und ein
+ * Alarm, der nie ausgeht, wird ueberlesen. Der Nachlauf laesst den Hinweis
+ * lange genug stehen, um einen gerade verpassten Ablauf noch zu bemerken.
+ * Getrackte Fristen (TUeV, Service) haben KEINEN Nachlauf: sie sind handelbar
+ * und bleiben faellig, bis sie als erledigt vermerkt sind.
+ */
+export const WARRANTY_EXPIRED_ATTENTION_DAYS = 30;
+
+// Rangfolge, wenn ein Gegenstand mehrere faellige Fristen hat: was man tun
+// kann und schon versaeumt hat, vor dem, was bald ansteht, vor der Garantie,
+// die nur noch nachklingt.
+const RANK_OVERDUE = 0;
+const RANK_EXPIRING = 1;
+const RANK_WARRANTY_ENDED = 2;
+
+/**
+ * Die EINE faellige Frist, die die Listenzeile als Chip zeigt - oder null.
+ * Aus derselben Regel liest hasUpcomingDeadline() (Filter, Kennzahl,
+ * Nav-Badge), damit Chip und Zaehler nie auseinanderlaufen.
+ *
+ * @param {object} item
+ * @param {string} [todayKey]
+ * @returns {{ kind: 'warranty'|'tracked', label: string|null, state: 'expiring'|'expired',
+ *            endDateKey: string, days: number, tone: 'expiring'|'unavailable' } | null}
+ */
+export function deadlineChipSpec(item, todayKey = householdToday()) {
+  const candidates = [];
+  const warranty = warrantyStatus(item, todayKey);
+  if (warranty && (warranty.state === 'expiring'
+    || (warranty.state === 'expired' && -warranty.days <= WARRANTY_EXPIRED_ATTENTION_DAYS))) {
+    candidates.push({ rank: warranty.state === 'expired' ? RANK_WARRANTY_ENDED : RANK_EXPIRING, kind: 'warranty', label: null, ...warranty });
+  }
+  for (const tracked of item?.tracked_dates || []) {
+    const status = dateStatus(tracked.date, todayKey);
+    if (!status || status.state === 'valid') continue;
+    candidates.push({ rank: status.state === 'expired' ? RANK_OVERDUE : RANK_EXPIRING, kind: 'tracked', label: tracked.label ?? null, ...status });
+  }
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => a.rank - b.rank || a.days - b.days);
+  const { kind, label, state, endDateKey, days } = candidates[0];
+  return { kind, label, state, endDateKey, days, tone: state === 'expired' ? 'unavailable' : 'expiring' };
+}
+
+/** Trifft der Listen-Hinweis zu - eine Garantie oder getrackte Frist ist bald
+ *  faellig, ueberfaellig oder (Garantie) gerade erst abgelaufen? */
 export function hasUpcomingDeadline(item, todayKey = householdToday()) {
-  if (hasWarrantyAlert(item, todayKey)) return true;
-  const trackedDates = item?.tracked_dates || [];
-  return trackedDates.some((d) => {
-    const status = dateStatus(d.date, todayKey);
-    return !!status && status.state !== 'valid';
-  });
+  return deadlineChipSpec(item, todayKey) !== null;
 }
 
 /** Wie viele Items haben eine bald ablaufende/abgelaufene Garantie oder

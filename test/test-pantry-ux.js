@@ -14,6 +14,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 global.HTMLElement = class HTMLElement {};
 global.customElements = { define() {}, get() { return undefined; } };
@@ -41,6 +42,9 @@ function makeNode() {
 }
 
 global.window = { matchMedia: () => ({ matches: false }), addEventListener() {}, yuvomi: {} };
+// maybeShowSwipeHint() (utils/swipe-row.js) liest den Pfad: seit R16 2b traegt
+// auch die Vorratsliste den Wisch, also braucht das Mini-DOM eine Adresse.
+global.location = { pathname: '/pantry' };
 global.document = {
   createElement: () => makeNode(),
   getElementById: () => null,
@@ -413,4 +417,226 @@ test('eine aeltere Auffrischung ueberschreibt keine juengere', async () => {
   await ladenAlt;
   assert.equal(__test.state.items[0].quantity, 9,
     'die ueberholte Antwort darf den juengeren Stand nicht ersetzen');
+});
+
+// --------------------------------------------------------
+// Kopfregel mobil (2026-09-26): die Chipreihe steht IM Port
+// --------------------------------------------------------
+
+// Die Filter-Chips waren eine feste Zeile zwischen Kopf und Liste und hielten
+// den Port mobil bei y181 fest. Jetzt sind sie das erste Kind von #pantry-list
+// und scrollen mit weg - das geht nur, wenn der Neuaufbau der Liste sie stehen
+// laesst. `renderList()` laeuft bei jedem Filter, jeder Suche und jedem
+// ±-Schritt; ein nacktes `replaceChildren()` warf die Reihe beim ersten Mal
+// aus dem DOM, und die Filter waeren danach verschwunden.
+test('renderList() laesst die Chipreihe als erstes Kind des Ports stehen', () => {
+  resetPantry();
+  const chipRow = makeNode();
+  const list = makeNode();
+  list.querySelector = (sel) => (sel === ':scope > #pantry-filters' ? chipRow : null);
+  list.replaceChildren = (...kids) => { list.children = [...kids]; };
+  list.children = [chipRow, makeNode(), makeNode()];
+  __test.setContainerForTest({ querySelector: (sel) => (sel === '#pantry-list' ? list : null) });
+
+  // Der Leerzustand baut Text-Knoten; der generische Knoten reicht dafuer.
+  const zuvor = global.document.createTextNode;
+  global.document.createTextNode = () => makeNode();
+  try {
+    __test.renderList();
+  } finally {
+    global.document.createTextNode = zuvor;
+  }
+
+  assert.equal(list.children[0], chipRow, 'die Chipreihe muss den Neuaufbau als erstes Kind ueberleben');
+  assert.equal(list.children.filter((c) => c === chipRow).length, 1, 'und genau einmal');
+  assert.ok(list.children.length >= 2, 'Gegenprobe: hinter der Reihe steht der neue Inhalt (hier der Leerzustand)');
+});
+
+// --------------------------------------------------------
+// Nebenpanel „Braucht Aufmerksamkeit" (Re-Critique 2026-09-27, A4 P1 / R10 L4)
+// --------------------------------------------------------
+
+// Am Desktop standen die Lagerort-Gruppen auf 252-972, rechts 436px leer. Das
+// Panel fuellt die Flaeche mit den drei Fragen der Filterchips - und muss
+// dieselbe Zuordnung sprechen, sonst stuende ein Artikel im Panel unter
+// „Fast leer", den der gleichnamige Chip nicht findet.
+const WATCH_TODAY = '2026-09-27';
+const watchItems = () => [
+  rice(5, { id: 1, name: 'Reis' }),                                                  // ruhig
+  rice(1, { id: 2, name: 'Milch', expires_on: '2026-09-25', location_name: 'fridge' }), // abgelaufen
+  rice(1, { id: 3, name: 'Joghurt', expires_on: '2026-09-29' }),                       // bald
+  rice(1, { id: 4, name: 'Eier', expires_on: '2026-09-28' }),                          // bald, frueher
+  rice(1, { id: 5, name: 'Mehl', min_quantity: 2 }),                                   // fast leer
+  rice(0, { id: 6, name: 'Zucker' }),                                                  // leer
+];
+
+// NUR ZEITKRITISCHES (Re-Critique 2026-09-28, P7 / A4 P2-6): "Fast leer"
+// stand dreifach da - Zeilen-Badge, Chip mit Zaehler und hier; 14 von 21
+// Artikeln standen rechts ein zweites Mal. Die Frist ist die Frage, die nicht
+// warten kann; "Fast leer" bleibt Chip und Warenkorb an der Zeile.
+test('das Panel ordnet wie die Filterchips, aber nur, was eine Frist hat: abgelaufen, bald', async () => {
+  resetPantry();
+  assert.equal(typeof __test.pantryWatchGroups, 'function', 'pantryWatchGroups fehlt im __test-Export');
+  const { matchesPantryFilter } = await import('../public/utils/pantry-status.js');
+  const groups = __test.pantryWatchGroups(watchItems(), WATCH_TODAY);
+  assert.deepEqual(groups.map((g) => [g.key, g.items.map((i) => i.name)]), [
+    ['expired', ['Milch']],
+    ['soon', ['Eier', 'Joghurt']],
+  ]);
+  for (const g of groups) {
+    const chip = watchItems().filter((i) => matchesPantryFilter(i, g.key, WATCH_TODAY)).map((i) => i.id).sort();
+    assert.deepEqual(g.items.map((i) => i.id).sort(), chip, `${g.key}: Panel und Chip meinen dieselben Artikel`);
+  }
+  assert.deepEqual(__test.pantryWatchGroups([rice(5)], WATCH_TODAY), [], 'nichts faellig heisst keine Abschnitte');
+});
+
+test('renderList zeichnet das Panel mit - unabhaengig von Suche und aktivem Filter', () => {
+  resetPantry();
+  const list = makeNode();
+  list.replaceChildren = (...kids) => { list.children = [...kids]; };
+  const watch = makeNode();
+  watch.hidden = true;
+  __test.setContainerForTest({
+    querySelector: (sel) => (sel === '#pantry-list' ? list : sel === '#pantry-watch' ? watch : null),
+  });
+  __test.state.todayKey = WATCH_TODAY;
+  __test.state.items = watchItems();
+  __test.state.filter = 'low';
+  __test.state.query = 'mehl';
+  const zuvor = global.document.createTextNode;
+  global.document.createTextNode = () => makeNode();
+  try {
+    __test.renderList();
+  } finally {
+    global.document.createTextNode = zuvor;
+  }
+  assert.equal(watch.hidden, false, 'mit Artikeln steht das Panel');
+  assert.equal(watch.children.length, 2, 'zwei Abschnitte (abgelaufen, bald), obwohl die Liste nur „Mehl" unter „Fast leer" zeigt');
+  // Ohne jeden Artikel: kein Panel (der Leerzustand der Liste spricht).
+  __test.state.items = [];
+  __test.renderWatch();
+  assert.equal(watch.hidden, true);
+  // Artikel, aber nichts faellig: ein ruhiger Satz statt eines leeren Kastens.
+  __test.state.items = [rice(5)];
+  __test.renderWatch();
+  assert.equal(watch.hidden, false);
+  assert.equal(watch.children.length, 1);
+  assert.equal(watch.children[0].textContent, 'pantry.watchEmpty');
+});
+
+test('das Panel steht nur ab 60rem Vorratsflaeche, und die Liste fuellt die Spalte bis zu ihm', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/pantry.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  assert.ok(rules.some((r) => r.selector.trim() === '.pantry-page' && /container:\s*pantry-surface\s*\/\s*inline-size/.test(r.body)),
+    'die Seite ist der Container - die Abfrage misst die Vorratsflaeche, nicht den Viewport');
+  const base = rules.find((r) => r.selector.trim() === '.pantry-watch' && !r.at.length);
+  assert.match(base?.body ?? '', /display:\s*none/, 'unter der Schwelle tragen die Chips die Frage');
+  const wide = (sel) => rules.find((r) => r.selector.trim() === sel && r.at.includes('@container pantry-surface (min-width: 60rem)'));
+  assert.match(wide('.pantry-watch:not([hidden])')?.body ?? '', /display:\s*grid/);
+  assert.match(wide('.pantry-watch:not([hidden])')?.body ?? '', /overflow-y:\s*auto/, 'ein langes Panel scrollt fuer sich');
+  assert.match(wide('.pantry-body')?.body ?? '', /flex-direction:\s*row/);
+  assert.match(wide('.pantry-body > .pantry-list')?.body ?? '', /--page-measure:\s*100%/,
+    'die Gruppen kappen auf die Spalte, ueber dieselbe Variable wie ueberall');
+  const src = readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8');
+  assert.match(src, /body\.append\(list, watch\)/, 'Liste und Panel teilen den Koerper');
+  assert.match(src, /watch\.addEventListener\('click', onWatchClick\)/, 'eine Panelzeile oeffnet ihren Artikel');
+});
+
+// Codex P2 zu R10 L4: das Panel zeichnete aus `withIntent`, der Klick holte den
+// Artikel aber aus dem nackten Serverstand. Stepper-Schritt, Zeile im Panel
+// oeffnen, anderes Feld speichern - und der PUT schrieb die alte Menge zurueck.
+// Gemessen am Feld, das der Dialog wirklich fuellt, fuer BEIDE Einstiege.
+test('der Bearbeiten-Dialog zeigt die Menge eines noch entprellten Schritts - aus Panel und Liste', () => {
+  resetPantry();
+  __test.state.items = [rice(1, { id: 2, name: 'Milch' })];
+  __test.intents.set(2, { quantity: 4, seq: 1, timer: null, flush: () => {} });
+
+  const fieldsOf = (open) => {
+    const fields = {};
+    const panel = {
+      querySelector: (sel) => {
+        fields[sel] ??= { value: '', addEventListener() {} };
+        return fields[sel];
+      },
+    };
+    open.onSave(panel);
+    return fields;
+  };
+  const opened = [];
+  globalThis.__openModal = (opts) => { opened.push(opts); };
+  try {
+    const watchBtn = { dataset: { watchId: '2' } };
+    __test.onWatchClick({ target: { closest: (sel) => (sel === '[data-watch-id]' ? watchBtn : null) } });
+    assert.equal(opened.length, 1, 'die Panelzeile oeffnet den Dialog');
+    assert.equal(fieldsOf(opened[0])['#pantry-quantity'].value, '4', 'Panel: die Menge der Absicht, nicht der Serverstand 1');
+
+    const row = { dataset: { id: '2' } };
+    const editBtn = { dataset: { action: 'edit' }, closest: (sel) => (sel === '.pantry-row[data-id]' ? row : null) };
+    __test.onListClick({ target: { closest: (sel) => (sel === '[data-action]' ? editBtn : null) } });
+    assert.equal(opened.length, 2, 'die Listenzeile oeffnet den Dialog');
+    assert.equal(fieldsOf(opened[1])['#pantry-quantity'].value, '4', 'Liste: dieselbe Menge wie die Zeile');
+
+    // Gegenprobe ohne Absicht: der Serverstand.
+    __test.intents.clear();
+    __test.onWatchClick({ target: { closest: (sel) => (sel === '[data-watch-id]' ? watchBtn : null) } });
+    assert.equal(fieldsOf(opened[2])['#pantry-quantity'].value, '1');
+  } finally {
+    delete globalThis.__openModal;
+    resetPantry();
+  }
+});
+
+// Re-Critique 2026-09-28 (P7 / A4 P3-11): im 364px-Sheet passte
+// `minmax(11rem, 1fr)` nie zweispaltig - "1,5" und "kg" belegten je eine volle
+// Zeile, der Koerper lief 1053px bei 591px sichtbar.
+test('Vorrats-Sheet: Menge und Einheit stehen mobil nebeneinander', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/pantry.css', import.meta.url), 'utf8');
+  const row = [...eachRule(css)].find((r) => r.selector.trim() === '.pantry-form-row' && !r.at.length);
+  const min = /minmax\((\d+(?:\.\d+)?)rem,\s*1fr\)/.exec(row?.body ?? '');
+  assert.ok(min, 'die Zeile bleibt ein auto-fit-Raster mit rem-Untergrenze');
+  // Sheet 364px, Innenabstand 2x16, Luecke 12: zwei Spalten brauchen 2*min*16 + 12 <= 332.
+  assert.ok(2 * Number(min[1]) * 16 + 12 <= 332, `minmax(${min[1]}rem) passt im 364px-Sheet nicht zweispaltig`);
+});
+
+
+/* R16 Schritt 2b (Critique 2026-10-05, Kuechenregel in DESIGN.md): der Vorrat
+ * war der letzte Kuechen-Reiter ohne Loesch-Wisch. Gegen den Stand davor rot
+ * gelaufen (rowEl lieferte die nackte Zeile, wirePantrySwipe fehlte). */
+test('R16: die Vorratszeile liegt auf einer Wisch-Buehne - Zeilenende loescht, Stepper und Warenkorb sind Ausnahmezone', () => {
+  resetPantry();
+  const wrap = __test.rowEl({ id: 7, name: 'Reis', quantity: 2, unit: 'kg' });
+  assert.match(wrap.className, /\bswipe-row\b/, 'das Listenelement ist die Buehne');
+  assert.equal(wrap.dataset.swipeId, '7');
+  const row = wrap.children.at(-1);
+  assert.match(row.className, /\blist-row pantry-row\b/, 'die Zeile liegt als letztes Kind in der Buehne');
+  assert.equal(row.dataset.id, '7', 'die Zeile behaelt ihre id - Klick, Stepper und Auffrischung suchen sie dort');
+
+  assert.equal(typeof __test.wirePantrySwipe, 'function');
+  const optionen = __test.wirePantrySwipe(makeNode());
+  assert.equal(optionen.card, '.pantry-row');
+  assert.equal(optionen.leading, undefined, 'nur eine Seite: am Zeilenanfang gibt es nichts zu erledigen');
+  assert.equal(optionen.trailing.reveal, '.swipe-reveal--delete');
+  assert.notEqual(optionen.trailing.flyOut, true, 'die Karte federt zurueck - removeItem() blendet aus und holt sie beim Undo wieder');
+  for (const zone of ['.pantry-stepper', '.pantry-row__cart']) {
+    assert.ok(optionen.ignore.split(',').map((s) => s.trim()).includes(zone), `${zone} ist Ausnahmezone`);
+  }
+  const src = readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8');
+  assert.match(src, /wrap\.insertAdjacentHTML\('beforeend', `\s*<div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">/);
+  assert.match(src, /wirePantrySwipe\(list\);/, 'renderList verdrahtet die Geste nach jedem Aufbau');
+  assert.match(src, /inner\?\.closest\('\.swipe-row'\) \?\? inner/, 'ausgeblendet wird die Buehne, nicht nur die Zeile darin');
+});
+
+test('R16: ein Werkzeugmenue mit einem einzigen Eintrag ist ein direkter Knopf', async () => {
+  const { pageToolsMenuHtml } = await import('../public/utils/popover-menu.js');
+  const einer = pageToolsMenuHtml({ id: 'x-menu', label: 'Mehr', items: [{ action: 'manage-locations', label: 'Lagerorte verwalten', icon: 'map-pin' }] });
+  assert.match(einer, /<button type="button" class="btn btn--secondary btn--icon page-tools-btn page-tools-btn--direct"\s+data-action="manage-locations"\s+aria-label="Lagerorte verwalten" title="Lagerorte verwalten">/);
+  assert.match(einer, /data-lucide="map-pin"/, 'das Icon der Handlung, kein Auslassungszeichen');
+  assert.doesNotMatch(einer, /popovertarget|role="menu"|ellipsis/, 'kein Menue, kein Popover');
+  const zwei = pageToolsMenuHtml({ id: 'x-menu', label: 'Mehr', items: [
+    { action: 'a', label: 'A', icon: 'tag' }, { separator: true }, { action: 'b', label: 'B', icon: 'tag' }] });
+  assert.match(zwei, /popovertarget="x-menu"[\s\S]*role="menu"/, 'ab zwei Eintraegen das Menue');
+  const schalter = pageToolsMenuHtml({ id: 'x-menu', label: 'Mehr', items: [{ action: 'a', label: 'A', icon: 'tag', checked: true }] });
+  assert.match(schalter, /role="menuitemcheckbox"/, 'ein Schalter bleibt im Menue - sein Zustand braucht den Haken');
 });

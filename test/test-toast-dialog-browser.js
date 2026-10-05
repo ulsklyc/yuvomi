@@ -1,0 +1,770 @@
+/**
+ * Modul: Toast ueber offenem Dialog (#1160) - Browser-Sonde
+ * Zweck: Ein Toast bleibt sichtbar, waehrend ein Dialog offen ist, aber er
+ *        verdeckt keinen Bedienknopf des Dialogs und nimmt keinen Klick, der
+ *        dem Dialog gilt.
+ * Ausfuehren: npm run test:toast-dialog-browser (haengt an test:document-guards)
+ *
+ * ANLASS (12.09.2026): der Toast einer faelligen Erinnerung lag bei 1280x900
+ * genau auf "Speichern" des Kalenderdialogs. `elementFromPoint` auf der Mitte
+ * des Knopfs lieferte `.toast--reminder`, der Klick verwarf die Erinnerung
+ * (`PATCH /reminders/:id/dismiss`) und speicherte nichts. Drei Kalender-Sonden
+ * der Dokument-Guards wurden dadurch rot; der Harness verwirft seitdem jede
+ * Erinnerung des Seeds, damit die uebrigen Sonden nicht am Lauftag haengen.
+ * Diese Sonde legt die Erinnerung deshalb SELBST an: sie haengt nicht davon ab,
+ * ob der Seed am Lauftag eine faellige traegt.
+ *
+ * GEMESSEN WIRD DER KLICK, NICHT DIE LAGE ALLEIN. Eine Sonde, die nur Rechtecke
+ * vergleicht, waere gruen, wenn der Toast unsichtbar ueber dem Knopf laege und
+ * trotzdem den Treffer nimmt; eine, die nur `elementFromPoint` fragt, waere
+ * gruen, wenn der Toast verschwindet. Deshalb drei Zusicherungen: jeder Knopf
+ * in Kopf und Fuss des Dialogs ist an seiner Mitte das oberste Element, der
+ * Toast ist dabei sichtbar im Bild, und ein echter Mausklick auf "Speichern"
+ * speichert - ohne die Erinnerung zu verwerfen.
+ *
+ * SEIT R9 (M14, Re-Critique 2026-09-27) WEICHT DIE ERINNERUNG. Ein dauerhafter
+ * Toast stand hier dreissig Sekunden ueber dem Formular, in dem jemand gerade
+ * schreibt. Er bleibt nur noch sichtbar, wo er den Dialog nicht beruehrt
+ * (neben ihm); sonst ist er zurueckgenommen (`toast--tucked` + inert) und kommt
+ * mit dem Schliessen wieder (toast-placement.js, persistentToastMustYield).
+ * Die Erinnerungs-Faelle pruefen deshalb diese Regel (`assertReminderYields`).
+ * Wo die Sonde einen SICHTBAREN Stapel ueber einem Dialog braucht - mehrere
+ * Toasts, Felder unter dem Stapel, Tab-Fokus -, misst sie gewoehnliche Toasts
+ * mit Aktion und langer Standzeit (`showProbeToasts`): sie laufen durch
+ * dieselbe Lage-Regel und weichen nicht.
+ */
+
+import { test, before, beforeEach, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { startHarness, openPage, gotoRoute } from './document-guards-harness.js';
+
+let harness;
+
+before(async () => {
+  harness = await startHarness();
+});
+
+beforeEach(async () => {
+  await harness.reset();
+});
+
+after(async () => {
+  await harness?.close();
+});
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Legt einen Termin und eine faellige Erinnerung dafuer an und laesst die
+ * Erinnerungen sofort abgleichen - das Polling wartet sonst eine Minute.
+ */
+async function seedDueReminder(page, { count = 1, refresh = true } = {}) {
+  const ids = await page.evaluate(async ({ count, refresh }) => {
+    const { api } = await import('/api.js');
+    const created = [];
+    for (let i = 0; i < count; i += 1) {
+      const { data: event } = await api.post('/calendar', {
+        title: i === 0 ? 'Toast probe event' : `Toast probe event ${i + 1}`,
+        start_datetime: '2048-04-03T09:00:00',
+        end_datetime: '2048-04-03T10:00:00',
+      });
+      await api.post('/reminders', {
+        entity_type: 'event',
+        entity_id: event.id,
+        remind_at: '2020-01-01T08:00:00',
+      });
+      created.push(event.id);
+    }
+    if (refresh) (await import('/reminders.js')).refresh();
+    return created;
+  }, { count, refresh });
+  if (refresh) await waitForToasts(page, count);
+  return ids[0];
+}
+
+/** Ein Termin ohne Erinnerung - fuer die Sonden, die gewoehnliche Toasts messen. */
+async function seedEvent(page) {
+  return page.evaluate(async () => {
+    const { api } = await import('/api.js');
+    const { data: event } = await api.post('/calendar', {
+      title: 'Toast probe event',
+      start_datetime: '2048-04-03T09:00:00',
+      end_datetime: '2048-04-03T10:00:00',
+    });
+    return event.id;
+  });
+}
+
+/** Wartet, bis mindestens `count` Erinnerungs-Toasts im Stapel stehen. */
+async function waitForToasts(page, count) {
+  await page.waitForFunction(
+    (n) => document.querySelectorAll('.toast--reminder').length >= n,
+    { timeout: 10000 },
+    count,
+  );
+}
+
+/** Gewoehnliche Toasts (nicht dauerhaft): kein Erinnerungs- und kein Fehler-Toast. */
+const PROBE_TOAST = '.toast:not(.toast--reminder):not(.toast--danger):not(.toast--warning)';
+
+/**
+ * Legt `count` gewoehnliche Toasts mit einem Knopf und langer Standzeit an -
+ * die Messkoerper fuer einen sichtbaren Stapel ueber einem Dialog (R9 M14:
+ * eine Erinnerung ist das nicht mehr, sie weicht).
+ */
+async function showProbeToasts(page, count) {
+  const before = await page.$$eval(PROBE_TOAST, (list) => list.length);
+  await page.evaluate(({ n, from }) => {
+    for (let i = 0; i < n; i += 1) {
+      window.yuvomi.showToast(`Toast probe ${from + i + 1}`, 'default', 120000, { label: 'Probe', onClick: () => {} });
+    }
+  }, { n: count, from: before });
+  await page.waitForFunction(
+    ({ n, sel }) => document.querySelectorAll(sel).length >= n,
+    { timeout: 10000 },
+    { n: before + count, sel: PROBE_TOAST },
+  );
+}
+
+/**
+ * R9 M14: keine sichtbare Erinnerung liegt ueber dem Dialog, und jede, die
+ * nicht zu sehen ist, ist zurueckgenommen UND inert - nicht verloren und nicht
+ * per Tab erreichbar.
+ */
+function assertReminderYields(measured) {
+  assert.ok(measured.reminders.total >= 1, 'die Erinnerung ist verschwunden - so misst die Sonde nichts');
+  assert.equal(measured.reminders.overPanel, 0,
+    `eine Erinnerung liegt ueber dem Dialog - sie weicht (R9 M14): ${JSON.stringify(measured.reminders)}`);
+  assert.equal(measured.reminders.lost, 0,
+    `eine unsichtbare Erinnerung ist nicht zurueckgenommen oder nicht inert: ${JSON.stringify(measured.reminders)}`);
+}
+
+/** Wartet, bis jede laufende Animation der Seite zu Ende ist. */
+async function settleAnimations(page) {
+  // Endlose Animationen (der Hintergrund der Shell driftet dauernd) enden nie.
+  await page.evaluate(() => Promise.all(
+    document.getAnimations()
+      .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
+      .map((a) => a.finished.catch(() => {})),
+  ));
+  // Zwei Frames fuer die Reaktion auf `animationend`.
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+}
+
+/**
+ * Misst das oberste Dialogfenster: welche Knoepfe in Kopf und Fuss an ihrer
+ * Mitte etwas anderes treffen, und ob der Toast dabei sichtbar ist.
+ */
+const MODAL_PANEL = '.modal-overlay:not([inert]) .modal-panel';
+const MODAL_CONTROLS = '.modal-panel__header button, .modal-panel__footer button, .modal-panel__footer a, .modal-actions button';
+
+async function measureDialog(page, { panelSelector = MODAL_PANEL, controlSelector = MODAL_CONTROLS, toastSelector = '.toast--reminder' } = {}) {
+  return page.evaluate(({ panelSelector, controlSelector, toastSelector }) => {
+    const panels = [...document.querySelectorAll(panelSelector)];
+    const panel = panels.at(-1);
+    if (!panel) return { panel: false };
+    const controls = [...panel.querySelectorAll(controlSelector)].filter((el) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
+    });
+    const covered = [];
+    for (const el of controls) {
+      const r = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      // Ein gesperrter Knopf nimmt keine Zeiger an (`.btn:disabled`), der Treffer
+      // faellt durch ihn hindurch; verdeckt ist er dann nur, wenn der Stapel dort liegt.
+      const blocked = el.disabled ? Boolean(hit?.closest('.shell-bottom-stack')) : !el.contains(hit);
+      if (blocked) {
+        covered.push({
+          control: el.id || el.className || el.textContent.trim(),
+          hit: hit?.closest('.toast')?.className || hit?.className || String(hit),
+        });
+      }
+    }
+    // Sichtbar heisst: mindestens EIN Toast ganz im Bild und an seiner Mitte
+    // oben. Bei engem Platz zeigt der Stapel nur einen (die uebrigen bleiben
+    // fuer die Live-Region im Dokument), also zaehlt der beste.
+    const toasts = [...document.querySelectorAll(toastSelector)];
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const seen = (toast) => {
+      const r = toast.getBoundingClientRect();
+      const inView = r.top >= 0 && r.left >= 0 && r.bottom <= vh && r.right <= vw && r.height > 1 && r.width > 1;
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return inView && toast.contains(hit);
+    };
+    const toastVisible = toasts.some(seen);
+    // R9 M14: wo liegen die Erinnerungen - neben dem Dialog, oder zurueckgenommen?
+    const pr = panel.getBoundingClientRect();
+    const reminderList = [...document.querySelectorAll('.toast--reminder')];
+    const shown = reminderList.filter((t) => !t.classList.contains('toast--tucked') && t.getClientRects().length > 0);
+    const reminders = {
+      total: reminderList.length,
+      visible: reminderList.filter(seen).length,
+      overPanel: shown.filter((t) => {
+        const r = t.getBoundingClientRect();
+        return r.left < pr.right && r.right > pr.left && r.top < pr.bottom && r.bottom > pr.top;
+      }).length,
+      lost: reminderList.filter((t) => !seen(t) && !(t.classList.contains('toast--tucked') && t.inert)).length,
+    };
+    return { panel: true, controls: controls.length, covered, toast: toasts.length > 0, toastVisible, reminders };
+  }, { panelSelector, controlSelector, toastSelector });
+}
+
+async function openEventEditor(page, eventId) {
+  await page.evaluate((path) => window.yuvomi.navigate(path), `/calendar?open=${eventId}&date=2048-04-03`);
+  await page.waitForSelector('#detail-popover-edit, #detail-view-edit');
+  // Der Weg in den Editor ist nicht Gegenstand der Sonde: ein Klick per Knoten,
+  // damit ihn kein Toast abfaengt, bevor die Messung beginnt.
+  await page.$eval('#detail-popover-edit, #detail-view-edit', (el) => el.click());
+  await page.waitForSelector('#modal-save');
+  await settleAnimations(page);
+}
+
+for (const device of ['desktop', 'mobile', 'short']) {
+  test(`#1160 ${device} - der Erinnerungs-Toast verdeckt keinen Knopf des Kalenderdialogs und nimmt "Speichern" keinen Klick`, async () => {
+    const page = await openPage(harness, { device, locale: 'de' });
+    try {
+      const eventId = await seedDueReminder(page);
+      await openEventEditor(page, eventId);
+
+      const measured = await measureDialog(page);
+      assert.equal(measured.panel, true, 'kein offener Dialog');
+      assert.ok(measured.controls >= 2, `zu wenige Knoepfe gemessen (${measured.controls})`);
+      assert.equal(measured.toast, true, 'der Erinnerungs-Toast ist verschwunden - so misst die Sonde nichts');
+
+      // Erst klicken, dann urteilen: so zeigt ein roter Lauf beide Befunde,
+      // den verdeckten Knopf UND den geschluckten Klick.
+      const requests = [];
+      page.on('request', (req) => {
+        requests.push(`${req.method()} ${new URL(req.url()).pathname}`);
+      });
+      const box = await page.$eval('#modal-save', (el) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      });
+      await page.mouse.click(box.x, box.y);
+      await page.waitForFunction(() => !document.querySelector('.modal-overlay'), { timeout: 5000 })
+        .catch(() => {});
+      await wait(300);
+      assert.ok(
+        requests.includes(`PUT /api/v1/calendar/${eventId}`),
+        `der Klick auf Speichern hat nicht gespeichert: ${JSON.stringify(requests)}`,
+      );
+      assert.ok(
+        !requests.some((r) => /^PATCH \/api\/v1\/reminders\/\d+\/dismiss$/.test(r)),
+        `der Klick auf Speichern hat die Erinnerung verworfen: ${JSON.stringify(requests)}`,
+      );
+      assert.deepEqual(measured.covered, [], 'ein Knopf des Dialogs ist an seiner Mitte verdeckt');
+      assertReminderYields(measured);
+      // Mit dem Dialog geht auch das Weichen: die Erinnerung steht wieder da
+      // und ist bedienbar (R9 M14).
+      await settleAnimations(page);
+      const back = await page.evaluate(() => [...document.querySelectorAll('.toast--reminder')]
+        .map((t) => ({ tucked: t.classList.contains('toast--tucked'), inert: t.inert, shown: t.getClientRects().length > 0 })));
+      assert.ok(back.length >= 1 && back.every((r) => !r.tucked && !r.inert && r.shown),
+        `nach dem Schliessen ist die Erinnerung nicht zurueck: ${JSON.stringify(back)}`);
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+for (const device of ['desktop', 'mobile']) {
+  test(`#1160 ${device} - auch eine kurze Rueckfrage bleibt bedienbar, der Toast bleibt sichtbar`, async () => {
+    const page = await openPage(harness, { device, locale: 'de' });
+    try {
+      await seedDueReminder(page);
+      await page.evaluate(async () => {
+        const { confirmModal } = await import('/components/modal.js');
+        window.__toastProbeConfirm = confirmModal('Toast probe question?', { confirmLabel: 'Ja', cancelLabel: 'Nein' });
+      });
+      await page.waitForSelector('#confirm-modal-ok');
+      await settleAnimations(page);
+      const measured = await measureDialog(page);
+      assert.equal(measured.panel, true, 'kein offener Dialog');
+      assert.equal(measured.toast, true, 'der Erinnerungs-Toast ist verschwunden - so misst die Sonde nichts');
+      assert.deepEqual(measured.covered, [], 'ein Knopf der Rueckfrage ist an seiner Mitte verdeckt');
+      // Neben der kleinen Rueckfrage ist Platz: dort bleibt die Erinnerung
+      // sichtbar, ohne den Dialog zu beruehren (R9 M14).
+      assert.equal(measured.toastVisible, true, 'der Toast muss sichtbar und oben bleiben');
+      assertReminderYields(measured);
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+/*
+ * DIALOGE OHNE `.modal-panel`-LEISTEN (Review an #1421).
+ *
+ * Die erste Fassung kannte Bedienleisten nur als `.modal-panel__header/__footer`
+ * und `.modal-actions`; fehlten sie, galt der ganze Dialog als Leiste. Fuer
+ * einen Vollbild-Dialog rechnete sie den Stapel damit ueber den oberen Rand
+ * hinaus - die Erinnerung war weg und nicht mehr wegzuklicken. Der Rundgang
+ * beim ersten Start ist genau so ein Dialog (`role="dialog"` auf der ganzen
+ * Flaeche), die Dokumentauswahl einer mit eigenen Kopf- und Fusszeilen.
+ */
+for (const device of ['mobile', 'desktop']) {
+  test(`#1160 ${device} - ueber dem Vollbild-Rundgang weicht die Erinnerung, seine Knoepfe bleiben frei`, async () => {
+    const page = await openPage(harness, { device, locale: 'de' });
+    try {
+      await seedDueReminder(page);
+      // Der Harness unterdrueckt den Rundgang ueber diesen Schluessel; das
+      // Konto des Seeds hat ihn noch nicht gesehen.
+      await page.evaluate(() => localStorage.removeItem('yuvomi-onboarded'));
+      await gotoRoute(page, '/');
+      await page.waitForSelector('.onboarding-overlay .onboarding-actions button', { timeout: 10000 });
+      await page.waitForSelector('.toast--reminder', { timeout: 10000 });
+      await settleAnimations(page);
+      const measured = await measureDialog(page, {
+        panelSelector: '.onboarding-overlay',
+        controlSelector: '.onboarding-actions button',
+      });
+      assert.equal(measured.panel, true, 'kein Rundgang offen');
+      assert.ok(measured.controls >= 1, 'keine Knoepfe im Rundgang gemessen');
+      assert.equal(measured.toast, true, 'der Erinnerungs-Toast ist verschwunden - so misst die Sonde nichts');
+      // Der Rundgang deckt das ganze Bild: neben ihm ist kein Platz, die
+      // Erinnerung weicht ganz und kommt nach ihm wieder (R9 M14) - verloren
+      // oder ueber den Rand geschoben ist sie nicht.
+      assertReminderYields(measured);
+      assert.deepEqual(measured.covered, [], 'ein Knopf des Rundgangs ist an seiner Mitte verdeckt');
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+for (const device of ['mobile', 'desktop']) {
+  test(`#1160 ${device} - die Dokumentauswahl in einem Formular bleibt bedienbar, die Erinnerung weicht ihr`, async () => {
+    const page = await openPage(harness, { device, locale: 'de' });
+    try {
+      await seedDueReminder(page);
+      // Die echten Bausteine: openModal mit dem Anhangsfeld, das die Aufgaben,
+      // das Budget und das Inventar ebenso einbinden.
+      await page.evaluate(async () => {
+        const { openModal } = await import('/components/modal.js');
+        const attach = await import('/components/document-attach.js');
+        openModal({
+          title: 'Toast probe attach',
+          // Hoch wie ein echtes Formular: die Auswahl liegt IM Panel und wird von
+          // dessen Rand beschnitten, ein Zwei-Zeilen-Formular schnitte sie ab.
+          content: `<div class="modal-panel__body"><div style="min-height: 520px">${attach.renderDocumentAttachField()}</div></div>
+            <div class="modal-panel__footer"><button class="btn btn--primary" type="button">OK</button></div>`,
+          dirtyGuard: false,
+        });
+        const panel = document.querySelector('#shared-modal-overlay .modal-panel');
+        attach.bindDocumentAttachField(panel);
+      });
+      await page.waitForSelector('[data-doc-attach-pick]');
+      await settleAnimations(page);
+      await page.$eval('[data-doc-attach-pick]', (el) => el.click());
+      await page.waitForSelector('.doc-attach-picker__panel [data-picker-confirm]');
+      await page.waitForNetworkIdle({ idleTime: 300, timeout: 5000 }).catch(() => {});
+      await settleAnimations(page);
+      const measured = await measureDialog(page, {
+        panelSelector: '.doc-attach-picker__panel',
+        controlSelector: '.doc-attach-picker__header button, .doc-attach-picker__footer button',
+      });
+      assert.equal(measured.panel, true, 'keine Dokumentauswahl offen');
+      assert.ok(measured.controls >= 3, `zu wenige Knoepfe gemessen (${measured.controls})`);
+      assert.equal(measured.toast, true, 'der Erinnerungs-Toast ist verschwunden - so misst die Sonde nichts');
+      assertReminderYields(measured);
+      assert.deepEqual(measured.covered, [], 'ein Knopf der Dokumentauswahl ist an seiner Mitte verdeckt');
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+/*
+ * DIE UNTERE NAVIGATION BLEIBT FREI (Review an #1421).
+ *
+ * Ein modales Overlay deckt die Tab-Leiste ab, ein Popover nicht: die
+ * Detailansicht ist ab 768px ein nicht-modales Popover, und bis 1023px steht
+ * die Leiste noch. Die erste Fassung hielt ihr `--nav-bottom-height` nur an der
+ * Grundlage des Stapels frei; unter einem hohen Popover legte sie ihn auf die
+ * Leiste, und der Erinnerungs-Toast nahm dreissig Sekunden lang deren Tipps.
+ */
+test('#1160 800x900 - unter einem hohen Popover legt sich der Toast nicht auf die Tab-Leiste', async () => {
+  const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+  try {
+    await page.setViewport({ width: 800, height: 900, deviceScaleFactor: 1 });
+    await seedDueReminder(page);
+    await page.evaluate(async () => {
+      const { openDetailView } = await import('/components/detail-view.js');
+      const anchor = document.createElement('button');
+      anchor.textContent = 'Anker';
+      anchor.style.cssText = 'position:fixed;top:40px;left:300px';
+      document.body.append(anchor);
+      // Zehn Zeilen: der Popover endet bei 800x900 gemessen um y=775, knapp
+      // ueber der Leiste (824). Ueber ihm ist kein Platz, unter ihm - zwischen
+      // Popover und Leiste - genau nicht genug; dort lag der Stapel (787..853).
+      openDetailView({
+        title: 'Toast probe popover',
+        anchor,
+        sections: Array.from({ length: 10 }, (_, i) => ({ icon: 'info', label: `Zeile ${i + 1}`, value: 'Eine Notiz.', multiline: true })),
+        actions: [{ label: 'Aktion', variant: 'secondary', onClick: () => {} }],
+      });
+    });
+    await page.waitForSelector('.detail-popover');
+    await settleAnimations(page);
+    const result = await page.evaluate(() => {
+      const nav = document.querySelector('.nav-bottom');
+      const navRect = nav.getBoundingClientRect();
+      const targets = [...nav.querySelectorAll('a, button')].filter((el) => el.getBoundingClientRect().width > 0);
+      const covered = targets.filter((el) => {
+        const r = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return Boolean(hit?.closest('.shell-bottom-stack'));
+      }).map((el) => el.getAttribute('aria-label') || el.textContent.trim());
+      const toast = document.querySelector('.toast--reminder');
+      const t = toast?.getBoundingClientRect();
+      const popover = document.querySelector('.detail-popover').getBoundingClientRect();
+      // Die Flaeche zaehlt, nicht nur die Mitte der Ziele: ein Toast, der die
+      // obere Haelfte der Leiste deckt, nimmt dort jeden Tipp, und gemessen lag
+      // er genau so (787..853 ueber einer Leiste ab 824, Zielmitten bei 862).
+      const overlapsNav = Boolean(t && t.bottom > navRect.top && t.top < navRect.bottom
+        && t.right > navRect.left && t.left < navRect.right);
+      return {
+        overlapsNav,
+        navVisible: navRect.height > 0,
+        targets: targets.length,
+        covered,
+        toast: Boolean(toast),
+        toastInView: Boolean(t && t.top >= 0 && t.bottom <= innerHeight && t.height > 0),
+        popoverBottom: Math.round(popover.bottom),
+        toastTop: t ? Math.round(t.top) : null,
+        navTop: Math.round(navRect.top),
+      };
+    });
+    assert.equal(result.navVisible, true, 'bei 800px muss die Tab-Leiste stehen - sonst misst die Sonde nichts');
+    assert.ok(result.targets >= 3, `zu wenige Ziele in der Tab-Leiste (${result.targets})`);
+    assert.equal(result.toast, true, 'der Erinnerungs-Toast ist verschwunden - so misst die Sonde nichts');
+    assert.equal(result.toastInView, true, `der Toast muss im Bild bleiben (${JSON.stringify(result)})`);
+    assert.equal(result.overlapsNav, false, `der Toast liegt auf der Tab-Leiste (${JSON.stringify(result)})`);
+    assert.deepEqual(result.covered, [], `der Toast deckt Ziele der Tab-Leiste (${JSON.stringify(result)})`);
+  } finally {
+    await page.close();
+  }
+});
+
+/*
+ * DIE ZWEITE REVIEW-RUNDE (Ersatz-Review an #1421, im Browser gemessen).
+ *
+ * 1. openModal-Dialoge tragen immer `.modal-panel__header`; ihre Speichern-
+ *    Zeile steht aber oft in einer eigenen Klasse im Koerper
+ *    (`.settings-form-actions`, `.housekeeping-form-submit`). Sobald der Kopf
+ *    als Leiste zaehlte, fiel der Rueckfall auf die Bedienelemente weg, und
+ *    "Speichern" lag wieder unter dem Toast.
+ * 2. Der Koerper scrollt; ohne Neumessen beim Scrollen wanderte die
+ *    Aktionszeile unter den Toast, der vor dem Scrollen richtig lag.
+ * 3. Drei Toasts im Kalender-Editor fanden auf kleinen Bildern keinen freien
+ *    Platz und deckten Loeschen und Abbrechen.
+ */
+const FAMILY_SIZES = [
+  { label: '1280x900', device: 'desktop', viewport: { width: 1280, height: 900, deviceScaleFactor: 1 } },
+  { label: '1280x700', device: 'desktop', viewport: { width: 1280, height: 700, deviceScaleFactor: 1 } },
+  { label: '320x568', device: 'mobile', viewport: { width: 320, height: 568, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
+];
+
+for (const size of FAMILY_SIZES) {
+  test(`#1160 ${size.label} - Mitglied bearbeiten, ans Ende gescrollt: Speichern und Abbrechen bleiben frei (2 Toasts)`, async () => {
+    const page = await openPage(harness, { device: size.device, locale: 'de' });
+    try {
+      await page.setViewport(size.viewport);
+      await gotoRoute(page, '/settings/admin/family');
+      await showProbeToasts(page, 2);
+      await page.waitForSelector('[data-edit-user]');
+      await page.$eval('[data-edit-user]', (el) => el.click());
+      await page.waitForSelector('#edit-member-cancel');
+      // Der Dialog laedt nach (Rollen, Konten): erst wenn nichts mehr kommt,
+      // steht sein Ende fest. Mit Erinnerungen wartete die Sonde vorher auf
+      // deren Abgleich und oeffnete den Dialog spaeter; die Probe-Toasts
+      // stehen sofort da (gemessen: einzeln 3/3 rot, Knoepfe unter dem Rand).
+      await page.waitForNetworkIdle({ idleTime: 300, timeout: 5000 }).catch(() => {});
+      await settleAnimations(page);
+      // Ans Ende des Koerpers scrollen, wie ein Mensch es tut, um zu speichern.
+      await page.$eval('#shared-modal-overlay .modal-panel__body', (body) => {
+        body.scrollTop = body.scrollHeight;
+      });
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await settleAnimations(page);
+      const measured = await measureDialog(page, {
+        controlSelector: `${MODAL_CONTROLS}, .settings-form-actions button`,
+        toastSelector: PROBE_TOAST,
+      });
+      assert.equal(measured.panel, true, 'kein Dialog offen');
+      assert.ok(measured.controls >= 3, `zu wenige Knoepfe gemessen (${measured.controls})`);
+      assert.equal(measured.toast, true, 'die Toasts sind verschwunden - so misst die Sonde nichts');
+      assert.equal(measured.toastVisible, true, 'mindestens ein Toast muss sichtbar bleiben');
+      assert.deepEqual(measured.covered, [], 'Speichern oder Abbrechen liegt unter dem Stapel');
+
+      const requests = [];
+      page.on('request', (req) => requests.push(`${req.method()} ${new URL(req.url()).pathname}`));
+      const box = await page.$eval('#edit-member-cancel', (el) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      });
+      await page.mouse.click(box.x, box.y);
+      await page.waitForFunction(() => !document.querySelector('.modal-overlay'), { timeout: 5000 }).catch(() => {});
+      assert.equal(await page.$('.modal-overlay'), null, `Abbrechen hat den Dialog nicht geschlossen: ${JSON.stringify(requests)}`);
+      assert.ok(!requests.some((r) => /reminders\/\d+\/dismiss/.test(r)), `der Klick verwarf eine Erinnerung: ${JSON.stringify(requests)}`);
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+const SMALL_SIZES = [
+  { label: '667x375', device: 'desktop', viewport: { width: 667, height: 375, deviceScaleFactor: 1 } },
+  { label: '320x568', device: 'mobile', viewport: { width: 320, height: 568, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
+  // Telefon quer: hier findet selbst der Kalender-Editor fuer drei Toasts keinen
+  // freien Platz mehr; ohne das Zuruecknehmen bis auf einen lag der Stapel auf
+  // "Zurueck" im Kopf (gemessen, Gegenprobe mit abgeschaltetem Zuruecknehmen).
+  { label: '568x320', device: 'mobile', viewport: { width: 568, height: 320, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
+];
+
+for (const size of SMALL_SIZES) {
+  test(`#1160 ${size.label} - drei Toasts im Kalender-Editor decken keinen seiner Knoepfe`, async () => {
+    const page = await openPage(harness, { device: size.device, locale: 'de' });
+    try {
+      const eventId = await seedEvent(page);
+      await page.setViewport(size.viewport);
+      await gotoRoute(page, '/calendar');
+      await showProbeToasts(page, 3);
+      await openEventEditor(page, eventId);
+      const measured = await measureDialog(page, { toastSelector: PROBE_TOAST });
+      assert.equal(measured.panel, true, 'kein Dialog offen');
+      assert.ok(measured.controls >= 3, `zu wenige Knoepfe gemessen (${measured.controls})`);
+      assert.equal(measured.toast, true, 'die Toasts sind verschwunden - so misst die Sonde nichts');
+      assert.equal(measured.toastVisible, true, 'mindestens ein Toast muss sichtbar bleiben');
+      assert.deepEqual(measured.covered, [], 'ein Knopf des Editors liegt unter dem Stapel');
+      assert.equal(await page.$$eval(PROBE_TOAST, (list) => list.length), 3,
+        'die verborgenen Toasts muessen im Dokument bleiben (Live-Region)');
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+/*
+ * WELCHER TOAST BLEIBT, UND WAS DIE ANDEREN NOCH KOENNEN (Review an #1421).
+ *
+ * Die bestimmte Live-Region (Fehler) steht im Stapel immer HINTER der
+ * hoeflichen (Erinnerungen). Wer den letzten nach DOM-Reihenfolge behielt,
+ * behielt jede Fehlermeldung und nahm die Erinnerung zurueck, die gerade kam.
+ * Und ein zurueckgenommener Toast ist unsichtbar - seine Knoepfe (Verwerfen,
+ * Oeffnen) duerfen dann auch per Tab nicht erreichbar sein.
+ */
+test('#1160 568x320 - der juengste Toast bleibt sichtbar, auch nach einem Fehler; die zurueckgenommenen sind inert', async () => {
+  const page = await openPage(harness, { device: 'mobile', locale: 'de' });
+  try {
+    // Gewoehnliche Toasts statt Erinnerungen: eine Erinnerung weicht dem
+    // Editor seit R9 ganz (M14, siehe die Sonden oben) und stuende hier nicht
+    // mehr zur Wahl. Die Frage bleibt dieselbe: wer bleibt, wenn der Stapel
+    // zuruecknehmen muss - der juengste, nicht der letzte in DOM-Reihenfolge.
+    const eventId = await seedEvent(page);
+    await page.setViewport({ width: 568, height: 320, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    await gotoRoute(page, '/calendar');
+    await showProbeToasts(page, 1);
+    await openEventEditor(page, eventId);
+    // Erst ein Fehler (bestimmt, lange Standzeit), DANACH ein neuer Toast.
+    await page.evaluate(() => window.yuvomi.showToast('Toast probe error', 'danger', 30000));
+    await page.waitForFunction(() => document.querySelectorAll('.toast--danger').length >= 1);
+    await showProbeToasts(page, 1);
+    await settleAnimations(page);
+    const state = await page.evaluate((sel) => {
+      const newest = [...document.querySelectorAll(sel)].at(-1);
+      const all = [...document.querySelectorAll('.shell-bottom-stack .toast')];
+      return {
+        count: all.length,
+        tucked: all.filter((t) => t.classList.contains('toast--tucked')).length,
+        newestTucked: newest.classList.contains('toast--tucked'),
+        newestInert: newest.inert,
+        dangerTucked: document.querySelector('.toast--danger')?.classList.contains('toast--tucked'),
+        tuckedNotInert: all.filter((t) => t.classList.contains('toast--tucked') && !t.inert).length,
+      };
+    }, PROBE_TOAST);
+    assert.equal(state.count, 3, `drei Toasts erwartet (${JSON.stringify(state)})`);
+    assert.ok(state.tucked >= 1, `bei 568x320 muss der Stapel zuruecknehmen, sonst misst die Sonde nichts (${JSON.stringify(state)})`);
+    assert.equal(state.newestTucked, false, `der zuletzt eingetroffene Toast wurde zurueckgenommen (${JSON.stringify(state)})`);
+    assert.equal(state.newestInert, false, 'der sichtbare Toast darf nicht inert sein');
+    assert.equal(state.dangerTucked, true, `der aeltere Fehler muss zuruecktreten (${JSON.stringify(state)})`);
+    assert.equal(state.tuckedNotInert, 0, 'ein zurueckgenommener Toast ist per Tab erreichbar (nicht inert)');
+    const measured = await measureDialog(page, { toastSelector: PROBE_TOAST });
+    assert.deepEqual(measured.covered, [], 'ein Knopf des Editors liegt unter dem Stapel');
+    assert.equal(measured.toastVisible, true, 'der juengste Toast muss sichtbar sein');
+
+    // Nach dem Schliessen kommen die zurueckgenommenen Toasts zurueck - und
+    // wieder bedienbar. Ohne `inert = false` in untuck() blieben sie sichtbar,
+    // aber Verwerfen und Oeffnen reagierten nicht mehr (Review an #1421).
+    await page.evaluate(async () => (await import('/components/modal.js')).closeModal({ force: true }));
+    await page.waitForFunction(() => !document.querySelector('.modal-overlay'), { timeout: 5000 });
+    await settleAnimations(page);
+    const after = await page.evaluate(() => {
+      const all = [...document.querySelectorAll('.shell-bottom-stack .toast')];
+      return {
+        count: all.length,
+        inert: all.filter((t) => t.inert).length,
+        tucked: all.filter((t) => t.classList.contains('toast--tucked')).length,
+      };
+    });
+    assert.ok(after.count >= 2, `die Toasts sind mit dem Dialog verschwunden (${JSON.stringify(after)})`);
+    assert.equal(after.tucked, 0, `nach dem Schliessen ist noch ein Toast zurueckgenommen (${JSON.stringify(after)})`);
+    assert.equal(after.inert, 0, `nach dem Schliessen ist noch ein Toast inert (${JSON.stringify(after)})`);
+  } finally {
+    await page.close();
+  }
+});
+
+/*
+ * DER KLAPPEN-AUSLOESER IST EIN BEDIENELEMENT (a11y-Runde auf 64cc2f5c0): im
+ * Budget-Dialog bei 1280px lag "Weitere Einstellungen" (`<summary>`) ganz unter
+ * dem Stapel, ein Klick dort traf den Toast. `summary` zaehlt seitdem wie ein
+ * Knopf.
+ */
+test('#1160 desktop - Budget-Eintrag: "Weitere Einstellungen" bleibt frei', async () => {
+  const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+  try {
+    await gotoRoute(page, '/budget');
+    await showProbeToasts(page, 2);
+    await page.waitForSelector('#fab-new-budget.page-fab--docked');
+    await page.$eval('#fab-new-budget', (el) => el.click());
+    await page.waitForSelector('#bm-title');
+    await settleAnimations(page);
+    // Unten im Koerper: erst ins Bild holen, wie ein Mensch es tut.
+    await page.$eval('.form-advanced__summary', (el) => el.scrollIntoView({ block: 'end' }));
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await settleAnimations(page);
+    const measured = await measureDialog(page, { controlSelector: '.form-advanced__summary', toastSelector: PROBE_TOAST });
+    assert.equal(measured.panel, true, 'kein Dialog offen');
+    assert.equal(measured.controls, 1, 'der Klappen-Ausloeser fehlt - so misst die Sonde nichts');
+    assert.equal(measured.toast, true, 'die Toasts sind verschwunden - so misst die Sonde nichts');
+    assert.deepEqual(measured.covered, [], '"Weitere Einstellungen" liegt unter dem Stapel');
+    assert.equal(measured.toastVisible, true, 'mindestens ein Toast muss sichtbar bleiben');
+  } finally {
+    await page.close();
+  }
+});
+
+/*
+ * WCAG 2.4.11, FOCUS NOT OBSCURED (a11y-Runde auf 64cc2f5c0). Die Platzierung
+ * hielt Knoepfe frei, Felder nicht: in "Mitglied bearbeiten" bei 375px lag ein
+ * Feld ganz unter dem Stapel, und wer per Tab dorthin kam, sah seinen Fokus
+ * nicht. Seitdem zaehlt das GERADE fokussierte Element als Bedienflaeche, und
+ * `focusin` misst neu. Die Sonde geht per Tab durch jedes Feld des Dialogs und
+ * fragt an seiner Mitte, ob es oben liegt. Vorbedingung: beim Oeffnen liegt der
+ * Stapel ueber mindestens einem Feld - sonst misst sie nichts.
+ */
+test('#1160 375x812 - Mitglied bearbeiten: jedes Feld, auf dem der Tab-Fokus landet, liegt frei (WCAG 2.4.11)', async () => {
+  const page = await openPage(harness, { device: 'mobile', locale: 'de' });
+  try {
+    await gotoRoute(page, '/settings/admin/family');
+    await showProbeToasts(page, 2);
+    await page.waitForSelector('[data-edit-user]');
+    await page.$eval('[data-edit-user]', (el) => el.click());
+    await page.waitForSelector('#edit-member-cancel');
+    await page.waitForNetworkIdle({ idleTime: 300, timeout: 5000 }).catch(() => {});
+    await settleAnimations(page);
+
+    const FIELDS = 'input:not([type="hidden"]), select, textarea';
+    const underStack = await page.evaluate((fields) => {
+      const stack = document.querySelector('.shell-bottom-stack').getBoundingClientRect();
+      const panel = [...document.querySelectorAll('.modal-overlay:not([inert]) .modal-panel')].at(-1);
+      return [...panel.querySelectorAll(fields)].filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0
+          && r.left < stack.right && r.right > stack.left && r.top < stack.bottom && r.bottom > stack.top;
+      }).map((el) => el.id || el.name || el.type);
+    }, FIELDS);
+    assert.ok(underStack.length >= 1, 'beim Oeffnen liegt kein Feld unter dem Stapel - so misst die Sonde nichts');
+
+    // Ohne Uebergaenge: sonst misst schon das `transitionend` des Fokusrings neu,
+    // und die Sonde saehe nicht, ob `focusin` es tut. Ein Feld ohne Uebergang
+    // im Fokusstil (Checkbox) hat nur diesen einen Anlass (Gegenprobe ohne den
+    // Listener: gruen, solange Uebergaenge liefen).
+    await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; }' });
+
+    const covered = [];
+    const seen = new Set();
+    for (let i = 0; i < 40; i += 1) {
+      await page.keyboard.press('Tab');
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await settleAnimations(page);
+      const probe = await page.evaluate((fields) => {
+        const el = document.activeElement;
+        const panel = [...document.querySelectorAll('.modal-overlay:not([inert]) .modal-panel')].at(-1);
+        if (!el || !panel?.contains(el) || !el.matches(fields)) return null;
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) return null;
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return {
+          field: el.id || el.name || el.type,
+          free: Boolean(hit) && (el === hit || el.contains(hit) || Boolean(el.labels?.[0]?.contains(hit))),
+          hit: hit?.closest('.toast')?.className || hit?.className || String(hit),
+        };
+      }, FIELDS);
+      if (!probe) continue;
+      if (seen.has(probe.field)) break;
+      seen.add(probe.field);
+      if (!probe.free) covered.push(probe);
+    }
+    assert.ok(seen.size >= 3, `zu wenige Felder per Tab erreicht (${[...seen].join(', ')})`);
+    const measured = await measureDialog(page, { controlSelector: `${MODAL_CONTROLS}, .settings-form-actions button`, toastSelector: PROBE_TOAST });
+    assert.equal(measured.toast, true, 'die Toasts sind verschwunden - so misst die Sonde nichts');
+    assert.deepEqual(covered, [], `ein fokussiertes Feld liegt unter dem Stapel (beim Oeffnen darunter: ${underStack.join(', ')})`);
+    assert.equal(measured.toastVisible, true, 'mindestens ein Toast muss sichtbar bleiben');
+  } finally {
+    await page.close();
+  }
+});
+
+
+/*
+ * DER FOKUS EINES CHIPS IST DER CHIP (#1429-Folge). Die Personenauswahl
+ * (`.user-ms`) versteckt ihre Checkbox als 1x1-Pixel am linken Rand des Chips;
+ * den Fokusring zeichnet das Label (`:has(:focus-visible)`). Die Platzierung
+ * hielt nur dieses eine Pixel frei, und die Sonde oben fragt nur die Mitte des
+ * fokussierten Elements - beide sahen den Chip nicht. Gemessen im Kalender-
+ * Editor bei 1280x900 mit einer Erinnerung: jeder der fuenf Chips lag beim
+ * Tab-Fokus unter dem Toast, das Pixel nie. Die Sonde misst deshalb die
+ * Flaeche des sichtbaren Chips gegen die sichtbaren Toasts.
+ */
+test('#1429 1280x900 - Kalender-Editor: ein fokussierter Personen-Chip liegt ganz frei, nicht nur sein 1px-Input', async () => {
+  const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+  try {
+    const eventId = await seedEvent(page);
+    await gotoRoute(page, '/calendar');
+    await showProbeToasts(page, 1);
+    await openEventEditor(page, eventId);
+    await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; }' });
+
+    const covered = [];
+    let chips = 0;
+    for (let i = 0; i < 40 && chips < 5; i += 1) {
+      await page.keyboard.press('Tab');
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await settleAnimations(page);
+      const probe = await page.evaluate(() => {
+        const el = document.activeElement;
+        if (!el?.classList.contains('user-ms__checkbox')) return null;
+        const chip = el.closest('label').getBoundingClientRect();
+        const toasts = [...document.querySelectorAll('.shell-bottom-stack .toast')]
+          .filter((t) => !t.classList.contains('toast--tucked') && t.getClientRects().length > 0)
+          .map((t) => t.getBoundingClientRect());
+        const overlap = toasts.some((t) => t.left < chip.right && t.right > chip.left && t.top < chip.bottom && t.bottom > chip.top);
+        return { chip: el.closest('label').textContent.replace(/\s+/g, ' ').trim(), top: Math.round(chip.top), bottom: Math.round(chip.bottom), overlap };
+      });
+      if (!probe) continue;
+      chips += 1;
+      if (probe.overlap) covered.push(probe);
+    }
+    assert.ok(chips >= 2, `zu wenige Personen-Chips per Tab erreicht (${chips}) - so misst die Sonde nichts`);
+    const measured = await measureDialog(page, { toastSelector: PROBE_TOAST });
+    assert.equal(measured.toast, true, 'der Toast ist verschwunden - so misst die Sonde nichts');
+    assert.deepEqual(covered, [], 'ein fokussierter Personen-Chip liegt unter dem Toast');
+  } finally {
+    await page.close();
+  }
+});

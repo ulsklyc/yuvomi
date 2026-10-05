@@ -11,7 +11,7 @@ import express from 'express';
 import * as db from '../../db.js';
 import { createLogger } from '../../logger.js';
 import { id as idParam } from '../../middleware/validate.js';
-import { visibleEntry } from './entry-links.js';
+import { budgetViewer, visibleEntry } from './entry-links.js';
 
 const log = createLogger('Inventory');
 const router = express.Router();
@@ -23,8 +23,7 @@ router.get('/:entryId/items', (req, res) => {
   try {
     const vEntryId = idParam(req.params.entryId, 'Buchung-ID');
     if (vEntryId.error) return res.status(400).json({ error: vEntryId.error, code: 400 });
-    const userId = req.authUserId || req.session.userId;
-    const entry = visibleEntry(vEntryId.value, userId);
+    const entry = visibleEntry(vEntryId.value, budgetViewer(req));
     if (!entry) return res.status(404).json({ error: 'Booking not found.', code: 404 });
 
     const items = db.get().prepare(`

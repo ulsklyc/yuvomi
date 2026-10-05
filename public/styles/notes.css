@@ -57,35 +57,42 @@
 /* --------------------------------------------------------
  * Header / Toolbar
  * -------------------------------------------------------- */
-/* Gerüst (Shell + Titel) jetzt geteilt via .page-toolbar in layout.css.
- * margin-inline-start:auto drängt die Suche ans logische Zeilenende (ersetzt das frühere
- * justify-content:space-between des bespoke Toolbars). */
-/* Layout only — control visual lives in page-search.css (shared). */
-.notes-toolbar__search {
-  flex: 1 1 0;
-  max-width: 280px;
-  margin-inline-start: auto;
-}
+/* Gerüst (Shell + Titel + Aktions-Slot) geteilt via .page-toolbar in
+ * layout.css. Die Suche steht im Center-Slot hinter dem Titel und bekommt
+ * Breite und Stelle aus page-search.css (Re-Critique 2026-09-27, D4) - hier
+ * stand eine eigene 280px-Breite mit Auto-Rand, die sie ans Zeilenende schob. */
 
 .notes-toolbar .page-toolbar__title {
   flex: 0 0 auto;
 }
 
+/* Traeger des Werkzeugmenues: haelt nur den Knopf in der Zeile (das Panel
+ * liegt im Top-Layer). Er existiert fuer die Nur-lesen-Regel der Shell. */
+.notes-toolbar__tools {
+  display: flex;
+  flex-shrink: 0;
+}
+
 /* --------------------------------------------------------
  * Masonry-Grid
  * -------------------------------------------------------- */
-/* Ersteller-Filter: eigene Zeile zwischen Kopf und Raster, gleiche Grammatik
- * wie .documents-filters. Erscheint nur ab zwei Autorinnen/Autoren (JS setzt
- * [hidden]) — die Regel darunter sorgt dafür, dass das Attribut gegen den
- * display:flex dieser Zeile gewinnt. */
+/* Ersteller- und Kategorie-Filter: die Chipreihe im Scrollport
+ * (`.page-chip-row`, layout.css) - das erste Kind von `.notes-scroll`, sie
+ * scrollt mit dem Raster weg. Bis zur Kopfregel mobil (2026-09-26) stand sie
+ * fest zwischen Kopf und Port und kostete dauerhaft 65px (A8). Kein eigenes
+ * Seitenpolster mehr und keine Trennlinie: der Port traegt die Inhaltsspalte
+ * (#577), und eine Linie unter einer Reihe, die wegscrollt, trennte nichts.
+ * Erscheint nur, wenn es etwas zu waehlen gibt (JS setzt [hidden]) - die
+ * Regel darunter sorgt dafür, dass das Attribut gegen den display:flex
+ * dieser Zeile gewinnt.
+ *
+ * Sichtbare duenne Scrollleiste statt der versteckten des Bausteins: am
+ * Desktop wischt niemand, und die Reihe laeuft mit vielen Kategorien ueber. */
 .notes-filters {
   display: flex;
   flex-wrap: nowrap;
   gap: var(--space-2);
   padding-block: var(--space-2);
-  padding-inline: var(--page-inline-pad);
-  border-bottom: 1px solid var(--color-border-subtle);
-  flex-shrink: 0;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -93,7 +100,10 @@
   -webkit-overflow-scrolling: touch;
 }
 
-.notes-filters::-webkit-scrollbar { height: 10px; }
+/* `display: block` holt die Leiste gegen das `display: none` des Bausteins
+ * (`.page-chip-row::-webkit-scrollbar`) zurueck - gleiche Spezifitaet, diese
+ * Datei laedt spaeter. */
+.notes-filters::-webkit-scrollbar { display: block; height: 10px; }
 .notes-filters::-webkit-scrollbar-track { background: transparent; }
 .notes-filters::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--module-accent) var(--tint-hint), transparent);
@@ -126,10 +136,11 @@
   /* Scroll + Einrückung liegen jetzt auf .notes-scroll; hier bleibt nur das
    * Raster selbst (Guard: bewusst CSS-Grid, keine CSS-Columns). */
   padding-top: var(--space-4);
-  /* Der FAB schwebt über dieser scrollenden Fläche. Ohne eigene Reserve lag die
-   * letzte Kartenreihe dauerhaft darunter — .tasks-body rechnet denselben
-   * Freiraum bereits ein. */
-  padding-bottom: calc(var(--space-16) + var(--space-8));
+  /* Nur der eigene Abstand. Die Reserve fuer den FAB (hier stand 96px) rechnet
+   * die Shell als Nachlauf an `.notes-scroll` (`--shell-tail`: Tab-Kapsel,
+   * FAB, Sammelpille; layout.css) - doppelt gerechnet endete die letzte
+   * Kartenreihe mobil 116px ueber der Kapsel (Kopfregel mobil, 2026-09-26). */
+  padding-bottom: var(--space-6);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
@@ -253,13 +264,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  /* Unsichtbar heisst auch unklickbar: ohne pointer-events bleibt hier ein
-   * volles Trefferziel stehen, das niemand sieht (Guard
-   * `verborgene Reveal-Aktionen sind nicht klickbar` in test-frontend-audit.js). */
-  pointer-events: none;
-  transition: opacity var(--transition-fast), background-color var(--transition-fast);
-  color: inherit;
+  /* DAUERHAFT SICHTBAR, RUHIG (Re-Critique 2026-09-27, D7; ignore.md): die
+   * Nadel erschien vorher erst beim Ueberfahren der Karte - am Tablet und am
+   * Trackpad gibt es dieses Ueberfahren nicht verlaesslich. Ohne Flaeche und
+   * in der Tertiaerfarbe steht sie still da; angepinnt traegt sie Flaeche und
+   * volle Tinte (Regel darunter), das ist der Zustand. */
+  background: transparent;
+  color: var(--color-text-tertiary);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .note-card__pin::before {
@@ -269,21 +281,15 @@
 }
 
 .note-card--pinned .note-card__pin {
-  opacity: 1;
   pointer-events: auto;
   background: var(--note-action-bg);
-}
-
-.note-card:hover .note-card__pin {
-  opacity: 1;
-  pointer-events: auto;
+  color: inherit;
 }
 
 .note-card__pin:not(.note-card__pin--static):hover,
 .note-card__pin:not(.note-card__pin--static):focus-visible {
-  opacity: 1;
-  pointer-events: auto;
   background: var(--note-action-bg-hover);
+  color: inherit;
 }
 
 /* ZUSTANDSZEICHEN STATT KNOPF (#1265 P1, dieselbe Bauart wie
@@ -297,11 +303,10 @@
  * nur gewirkt, solange keine Farbe dazwischenkommt).
  *
  * ZWEI SELEKTOREN, WEIL DIE KASKADE ES VERLANGT. `.note-card--pinned
- * .note-card__pin` (zwei Klassen) und der @media-Block (pointer: coarse) weiter
- * unten setzen `pointer-events: auto`; eine einzelne Klasse verliert gegen die
- * eine und gegen die andere durch Quellreihenfolge. Die zweite Zeile hat
- * dieselbe Spezifitaet wie die Ueberschreibung und steht DANACH - ohne sie
- * finge das Zeichen die Klicks ab, mit denen die Karte sich oeffnet. */
+ * .note-card__pin` (zwei Klassen) setzt `pointer-events: auto`; eine einzelne
+ * Klasse verliert dagegen. Die zweite Zeile hat dieselbe Spezifitaet wie die
+ * Ueberschreibung und steht DANACH - ohne sie finge das Zeichen die Klicks ab,
+ * mit denen die Karte sich oeffnet. */
 .note-card__pin--static,
 .note-card--pinned .note-card__pin--static {
   cursor: default;
@@ -507,11 +512,6 @@
 .note-category-editor__create[hidden] { display: none; }
 
 @media (max-width: 639px) {
-  .notes-manage-categories {
-    width: var(--target-base);
-    height: var(--target-base);
-  }
-  .notes-manage-categories span { display: none; }
   .notes-filter-group + .notes-filter-group {
     padding-inline-start: 0;
     border-inline-start: 0;
@@ -569,44 +569,31 @@
   gap: var(--space-1);
 }
 
-.note-card__open,
 .note-card__delete {
   width: var(--target-base);
   height: var(--target-base);
+  /* Loeschen traegt seit Runde 5 die geteilte `.row-action` (48px-Minimum);
+   * auf der Karte gilt dasselbe Mass wie fuer die Nadel. */
+  min-width: var(--target-base);
+  min-height: var(--target-base);
   border-radius: var(--radius-full);
-  background: var(--note-action-bg);
+  /* Dauerhaft sichtbar und ruhig wie die Nadel (D7): keine Flaeche, die
+   * Tertiaerfarbe der geteilten `.row-action`. */
+  background: transparent;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  color: inherit;
-  opacity: 0;
-  /* Unsichtbar heisst auch unklickbar: ohne pointer-events bleibt hier ein
-   * volles Trefferziel stehen, das niemand sieht (Guard
-   * `verborgene Reveal-Aktionen bleiben nicht klickbar`, test-frontend-audit.js). */
-  pointer-events: none;
-  transition: opacity var(--transition-fast), background-color var(--transition-fast);
+  color: var(--color-text-tertiary);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
-.note-card__open::before,
 .note-card__delete::before {
   content: '';
   position: absolute;
   inset: 0;
-}
-
-.note-card:hover .note-card__open,
-.note-card:hover .note-card__delete,
-.note-card__open:focus-visible,
-.note-card__delete:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.note-card__open:hover {
-  background: var(--note-action-bg-hover);
 }
 
 .note-card__delete:hover {
@@ -614,15 +601,85 @@
   color: var(--color-danger-ink);
 }
 
-@media (pointer: coarse) {
-  .note-card__pin,
-  .note-card__open,
-  .note-card__delete {
-    opacity: 1;
-  pointer-events: auto;
-  }
+/* DIE KARTE IST DER OEFFNEN-KNOPF (R9 M13). Der Knopf liegt unsichtbar ueber
+ * der ganzen Karte - ein Tipp irgendwo darauf oeffnet, und der Fokusring
+ * umrahmt die Karte statt eines 44px-Kreises in der Fusszeile. Was auf der
+ * Karte selbst bedienbar bleibt (Nadel, Loeschen, Checklisten-Haken, Links),
+ * liegt eine Ebene darueber. */
+.note-card__open {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
 }
 
+.note-card__open:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.note-card__pin {
+  z-index: 1;
+}
+
+.note-card__actions,
+.note-card__content .note-md-box,
+.note-card__content a {
+  position: relative;
+  z-index: 1;
+}
+
+/* DER TITEL IST NICHT KLEINER ALS DER TEXT (R9 M13, A6 P2-6). Die geteilte
+ * Kompaktrolle (typography.css) setzte ihn auf 15px ueber 17px Fliesstext -
+ * die Ueberschrift las sich als Nebensatz. Hier traegt er die Rolle, die
+ * `.u-card-title` ueberall sonst traegt; das Gewicht unterscheidet ihn. */
+.note-card .note-card__title {
+  font-size: var(--type-card-title);
+  line-height: var(--line-height-snug);
+}
+
+/* MOBIL PASST MEHR ALS ZWEI NOTIZEN AUF DEN SCHIRM (R9 M13).
+ *
+ * Gemessen 390x844 vorher: Karten 221-276px, rund 2,3 Notizen je Screen - 12
+ * Zeilen Vorschau und eine 57px-Fusszeile mit drei Kreisen. Jetzt: Vorschau
+ * drei Zeilen - weiter in der Bodyrolle (test-typography: Notiz-Fliesstext
+ * bleibt 17px), nur mit dem Zeilenabstand des Fliesstexts statt des weiten -,
+ * und die Fusszeile nur so hoch wie ihre Schrift -
+ * der Loeschen-Knopf behaelt seine volle Trefflaeche und haengt sie per
+ * negativem Rand in die Polsterung, statt die Zeile damit hochzudruecken
+ * („kompakt aussehen, voll treffen", tokens.css). */
+@media (max-width: 639px) {
+  .note-card__content {
+    line-height: var(--line-height-base);
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+
+  .note-card__footer {
+    margin-top: var(--space-1);
+    padding-top: var(--space-1);
+  }
+
+  .note-card__delete {
+    margin-block: calc((var(--space-6) - var(--target-base)) / 2);
+  }
+
+  /* Die Nadel einer angepinnten Notiz traegt ihre Flaeche als kleine Scheibe
+   * (32px) in der vollen Trefflaeche - vorher fuellte die Scheibe die ganzen
+   * 48px und war das groesste Zeichen der Karte. Zwei Klassen, weil die
+   * Kurzschrift `background` der angepinnten Nadel (0,2,0) den Clip sonst
+   * zuruecksetzt. */
+  .note-card .note-card__pin {
+    padding: var(--space-2);
+    background-clip: content-box;
+  }
+}
 
 /* --------------------------------------------------------
  * Notes-Modal Content-Styles (Overlay/Panel via shared modal.js)
@@ -634,7 +691,48 @@
 .note-mode-switch {
   display: inline-flex;
   gap: var(--space-1);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+/* --------------------------------------------------------
+ * Der Editor als Arbeitsflaeche (Critique 2026-10-05, R16).
+ *
+ * Gemessen bei 390x844: Formatierleiste 332x162 (dreireihig), Textfeld 332x160
+ * ab y=534 - unter der Tastaturlinie. Am Desktop ein 680x752-Modal mit einem
+ * Textfeld von 646x160. Das Feld, fuer das der Dialog da ist, war sein
+ * kleinstes Stueck.
+ *
+ * Jetzt: Titel und Text ohne Labelzeile (die Labels bleiben als Name, .sr-only),
+ * 8px statt 16px zwischen den Stuecken, und das Textfeld traegt eine
+ * Mindesthoehe, die das Blatt fuellt. Was dahinter kommt (Kategorien, "Weitere
+ * Einstellungen" mit Farbe und Anheften), liegt unter der Flaeche und scrollt.
+ * `field-sizing: content` laesst das Feld mit dem Text wachsen, wo der Browser
+ * es kann; sonst scrollt es in sich.
+ * -------------------------------------------------------- */
+.note-edit-view > .note-editor__title,
+.note-edit-view > .note-editor {
+  margin-bottom: var(--space-2);
+}
+
+.note-editor__title-input {
+  font-size: var(--type-card-title);
+  font-weight: var(--font-weight-semibold);
+}
+
+.note-editor__text {
+  min-height: max(18.75rem, 38vh);
+  min-height: max(18.75rem, 38dvh);
+  field-sizing: content;
+  resize: vertical;
+  line-height: var(--line-height-relaxed);
+}
+
+/* Breiter Dialog (lg, 680px): das Modal hat die Hoehe, das Feld nimmt sie. */
+@container modal-body (min-width: 600px) {
+  .note-editor__text {
+    min-height: max(25rem, 45vh);
+    min-height: max(25rem, 45dvh);
+  }
 }
 
 /* Leseansicht: gerendertes Markdown (.note-md-* aus typography.css) auf einer
@@ -669,7 +767,7 @@
 }
 
 .note-pane--enter {
-  animation: notePaneEnter 160ms var(--ease-out);
+  animation: notePaneEnter var(--duration-sm) var(--ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {

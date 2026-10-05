@@ -108,3 +108,10 @@ MSG_document_google_drive_client_secret="  Rahasia klien pengganti (kosong untuk
 MSG_document_google_drive_err_pair="ID klien dan rahasia klien Google Drive harus diisi keduanya atau dikosongkan keduanya."
 MSG_document_google_drive_err_credentials="Google Drive memerlukan pasangan kredensial OAuth sendiri atau kredensial Google Calendar yang telah dikonfigurasi."
 MSG_review_document_google_drive="Dokumen Google Drive"
+# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst, durch Leerzeichen
+# getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein Prompt in [x/N],
+# [X/n] oder [M] zeigt, muss hier stehen. Gross/klein faltet install.sh nur fuer A-Z: ein Wort
+# mit anderen Zeichen steht auch in Grossbuchstaben und gross geschrieben da (test:installer-cli-i18n).
+MSG_yes_chars="ya"
+MSG_no_chars="tidak"
+MSG_manual_chars="m"

@@ -190,7 +190,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
  * weil `advancedSection` sie im Dialog unter „Weitere Einstellungen" legt (der
  * Loader stubt modal.js, das Markup hier traegt es deshalb nicht selbst).
  */
-async function openForm({ mode = 'create', event = null, targets = TARGETS, defaultTarget = FAMILIE, assigned = [] } = {}) {
+async function openForm({ mode = 'create', event = null, targets = TARGETS, defaultTarget = FAMILIE, assigned = [], visibility = null } = {}) {
   calendar.state.defaultSyncTarget = defaultTarget;
   const markup = calendar.buildEventModalContent({ mode, event, date: '2026-10-02', reminder: [] });
   const group = /<select class="form-input" id="event-sync-target">[\s\S]*?<\/div>/.exec(markup)?.[0];
@@ -217,6 +217,23 @@ async function openForm({ mode = 'create', event = null, targets = TARGETS, defa
     const hint = add('small', /id="([\w-]+)"/.exec(attrs)?.[1] ?? null, { classes: ['form-hint'] }, details);
     hint.hidden = /\shidden\b/.test(attrs);
     hint.textContent = text.trim();
+  }
+
+  // Die Sichtbarkeit samt ihrer Warnungen, ebenfalls aus dem Markup des
+  // Dialogs: Auswahl, Eintraege, ids und `hidden` wie dort. Eine Warnung, die
+  // der Dialog nicht schreibt, steht auch hier nicht.
+  const visGroup = /<select class="input" id="modal-visibility"[\s\S]*?<\/div>/.exec(markup)?.[0];
+  assert.ok(visGroup, 'der Dialog hat eine Sichtbarkeitswahl');
+  const visSelect = add('select', 'modal-visibility', { classes: ['input'] }, details);
+  for (const [, value, selected] of visGroup.matchAll(/<option value="(\w+)"\s*(selected)?/g)) {
+    const option = add('option', null, { value }, visSelect);
+    option.selected = Boolean(selected);
+  }
+  if (visibility) visSelect.value = visibility;
+  for (const [, id, hidden, key] of visGroup.matchAll(/<p class="form-hint field-hint--warn" id="([\w-]+)" role="status"( hidden)?>[\s\S]*?<span>([^<]*)<\/span><\/p>/g)) {
+    const warn = add('p', id, { classes: ['form-hint', 'field-hint--warn'] }, details);
+    warn.hidden = Boolean(hidden);
+    warn.textContent = key;
   }
 
   add('button', 'modal-cancel');
@@ -381,4 +398,137 @@ test('#1332: ein bestehender Termin mit zwei Personen zieht nicht um und erklaer
 
   assert.equal(target(panel), LEO, 'das gespeicherte Ziel bleibt');
   assert.equal(hint(panel, SEVERAL).hidden, true);
+});
+
+// --------------------------------------------------------------------------
+// "Nur ich" mit zugewiesenen Personen
+//
+// `private` heisst: nur wer den Termin angelegt hat, sieht ihn. Das Formular
+// laesst trotzdem Personen zuweisen - sie sehen den Termin dann nicht.
+// Verboten wird die Kombination nicht (Bestandsdaten
+// und API-Clients bleiben gueltig), der Dialog sagt es. Gemessen am selben
+// Aufrufer wie oben: Markup aus `buildEventModalContent`, Verdrahtung ueber
+// `wireEventForm`, die Hand an Auswahl und Kaestchen.
+// --------------------------------------------------------------------------
+
+const PRIVATE_ASSIGNED = '#modal-visibility-private-warning';
+const NOBODY = '#modal-visibility-warning';
+
+/** Die Hand an der Sichtbarkeitswahl. */
+function userPicksVisibility(panel, value) {
+  const select = panel.querySelector('#modal-visibility');
+  select.value = value;
+  select.dispatch('change');
+}
+
+/** Ein Klick auf ein Kaestchen der Personenauswahl - `click`, dann `change`, wie im Browser. */
+async function userClicksPerson(panel, id, checked = true) {
+  const box = personBox(panel, id);
+  box.checked = checked;
+  box.dispatch('click');
+  box.dispatch('change');
+  await settle();
+}
+
+test('"Nur ich" mit einer zugewiesenen Person: der Dialog sagt, dass sie den Termin nicht sieht', async () => {
+  const panel = await openForm();
+  await userClicksPerson(panel, 3);
+  assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, true, 'bei "alle" gibt es nichts zu sagen');
+
+  userPicksVisibility(panel, 'private');
+  assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, false, 'der Hinweis steht da');
+  assert.equal(hint(panel, PRIVATE_ASSIGNED).textContent, 'common.visibility.privateAssignedHint');
+  assert.equal(hint(panel, NOBODY).hidden, true, 'die Niemand-Warnung ist ein anderer Fall');
+  assert.equal(advancedOpen(panel), true, 'die Einstellungen, in denen er steht, sind aufgeklappt');
+});
+
+test('"Nur ich" ohne zugewiesene Person: kein Hinweis', async () => {
+  const panel = await openForm();
+  userPicksVisibility(panel, 'private');
+  assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, true);
+  assert.equal(hint(panel, NOBODY).hidden, true);
+});
+
+test('"alle" und "Nur Zugewiesene" mit einer Person: kein Hinweis', async () => {
+  const panel = await openForm();
+  await userClicksPerson(panel, 3);
+  for (const value of ['all', 'assignees']) {
+    userPicksVisibility(panel, value);
+    assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, true, value);
+    assert.equal(hint(panel, NOBODY).hidden, true, value);
+  }
+});
+
+test('der Hinweis zieht nach: Person an- und abwaehlen, Sichtbarkeit wechseln', async () => {
+  const panel = await openForm();
+  userPicksVisibility(panel, 'private');
+  await userClicksPerson(panel, 3);
+  assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, false, 'die erste Person bringt ihn');
+  await userClicksPerson(panel, 4);
+  assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, false);
+  await userClicksPerson(panel, 3, false);
+  await userClicksPerson(panel, 4, false);
+  assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, true, 'ohne Person ist er weg');
+
+  await userClicksPerson(panel, 4);
+  userPicksVisibility(panel, 'assignees');
+  assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, true, 'der Rat aus dem Hinweis, befolgt, raeumt ihn weg');
+  userPicksVisibility(panel, 'private');
+  assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, false);
+
+  // Die Zuweisung bleibt, wie sie ist - der Dialog warnt, er leert nichts.
+  assert.equal(personBox(panel, 4).checked, true);
+  assert.equal(panel.querySelector('#modal-visibility').value, 'private');
+});
+
+test('ein bestehender privater Termin mit Zugewiesenen zeigt den Hinweis schon beim Oeffnen', async () => {
+  const event = {
+    id: 13, title: 'Geschenk besorgen', start_datetime: '2026-10-02T19:00', end_datetime: '2026-10-02T20:30',
+    all_day: 0, created_by: 1, recurrence_rule: null, visibility: 'private', assigned_users: [{ id: 3 }],
+  };
+  const panel = await openForm({ mode: 'edit', event, assigned: [3] });
+  assert.equal(panel.querySelector('#modal-visibility').value, 'private', 'die Auswahl kommt aus dem Markup');
+  assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, false);
+});
+
+// Wer den Termin angelegt hat, sieht ihn auch als "Nur ich" - `created_by`
+// zaehlt deshalb nicht zu den Personen, vor denen der Hinweis warnt. Beim
+// Bearbeiten ist das die Erstellerin des Termins, nicht wer gerade bearbeitet;
+// bei einem neuen Termin das angemeldete Konto.
+
+async function asAccount(id, run) {
+  const vorher = calendar.state.currentUserId;
+  calendar.state.currentUserId = id;
+  try { return await run(); } finally { calendar.state.currentUserId = vorher; }
+}
+
+test('"Nur ich", zugewiesen ist nur, wer den Termin anlegt: kein Hinweis - erst eine weitere Person bringt ihn', async () => {
+  await asAccount(3, async () => {
+    const panel = await openForm();
+    await userClicksPerson(panel, 3);
+    userPicksVisibility(panel, 'private');
+    assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, true, 'die Erstellerin sieht ihren eigenen Termin');
+
+    await userClicksPerson(panel, 4);
+    assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, false, 'Leo sieht ihn nicht');
+    await userClicksPerson(panel, 4, false);
+    assert.equal(hint(panel, PRIVATE_ASSIGNED).hidden, true);
+  });
+});
+
+test('Bearbeiten eines fremden Termins: es zaehlt created_by, nicht wer bearbeitet', async () => {
+  const base = {
+    id: 14, title: 'Geschenk besorgen', start_datetime: '2026-10-02T19:00', end_datetime: '2026-10-02T20:30',
+    all_day: 0, recurrence_rule: null, visibility: 'private',
+  };
+  await asAccount(3, async () => {
+    // Papa hat den Termin angelegt, Emma bearbeitet ihn und ist allein zugewiesen.
+    const fremd = await openForm({ mode: 'edit', event: { ...base, created_by: 1, assigned_users: [{ id: 3 }] }, assigned: [3] });
+    assert.equal(hint(fremd, PRIVATE_ASSIGNED).hidden, false, 'die Bearbeitende ist nicht die Erstellerin - sie saehe den Termin nicht');
+  });
+  await asAccount(1, async () => {
+    // Emma hat ihn angelegt und ist allein zugewiesen, Papa bearbeitet.
+    const eigen = await openForm({ mode: 'edit', event: { ...base, created_by: 3, assigned_users: [{ id: 3 }] }, assigned: [3] });
+    assert.equal(hint(eigen, PRIVATE_ASSIGNED).hidden, true, 'die Erstellerin sieht ihren Termin, gleich wer ihn bearbeitet');
+  });
 });

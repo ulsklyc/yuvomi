@@ -91,9 +91,20 @@ export function toggleRowHtml({
   // sie mit Initialen, wenn sie groß genug dafür ist.
   swatchColor = null,
   swatchLabel = '',
+  // SCHALTER ODER HAKEN (Komponenten-Kanon, 2026-09-26). Eine Boolean-
+  // EINSTELLUNG ist ein Schalter wie in Apples Einstellungen: der Zustand
+  // steht rechts, das Label links, und das Umlegen wirkt sofort. Die native
+  // 18px-Checkbox bleibt der Default, weil dieselbe Zeile auch Filterblaetter
+  // traegt (Kalender, Aufgaben), deren Zeilen eine AUSWAHL sind - die Frage,
+  // ob auch dort Schalter stehen, ist offen und nicht Teil dieser Runde.
+  // `'switch'` rendert die geteilte `.toggle`-Bahn und `role="switch"`; der
+  // Knoten bleibt eine `input[type=checkbox]`, Leser (`.checked`, `change`)
+  // aendern sich nicht. Ratchet: test:control-dialect "settings-checkbox".
+  control = 'checkbox',
   attrs = {},
 }) {
-  const rowClass = ['toggle-row', className].filter(Boolean).join(' ');
+  const isSwitch = control === 'switch';
+  const rowClass = ['toggle-row', isSwitch ? 'toggle-row--switch' : '', className].filter(Boolean).join(' ');
   const iconHtml = icon ? moduleIconHTML(icon) : '';
   // DIE TINTE WIRD GERECHNET, NICHT GESETZT. `--color-ink-on-vivid` gilt fuer
   // KURATIERTE Toene, deren Helligkeit bekannt ist. Eine frei gewaehlte Farbe
@@ -106,12 +117,57 @@ export function toggleRowHtml({
       + `${esc(String(swatchLabel ?? ''))}</span>`
     : '';
   const labelClass = labelVisible ? '' : ' class="sr-only"';
+  if (isSwitch) {
+    const textClass = labelVisible ? 'toggle-row__label' : 'toggle-row__label sr-only';
+    return `<label class="${rowClass}">`
+      + iconHtml
+      + swatchHtml
+      + `<span class="${textClass}">${esc(String(label ?? ''))}</span>`
+      + '<span class="toggle">'
+      + `<input type="checkbox" role="switch"${attrsHtml({ ...attrs, checked, disabled })}>`
+      + '<span class="toggle__track" aria-hidden="true"></span>'
+      + '</span>'
+      + '</label>';
+  }
   return `<label class="${rowClass}">`
     + `<input type="checkbox"${attrsHtml({ ...attrs, checked, disabled })}>`
     + iconHtml
     + swatchHtml
     + `<span${labelClass}>${esc(String(label ?? ''))}</span>`
     + '</label>';
+}
+
+/**
+ * EIN SCHALTER WIRKT SOFORT (Komponenten-Kanon "Schalter in Einstellungen",
+ * Re-Critique 2026-09-28 R15 A7 P1-1). Auch wenn er in einem Formular mit
+ * "Speichern" steht: umlegen speichert, ein Fehler legt ihn zurueck. Das
+ * Element traegt dazu `data-instant-save` im Markup - daran erkennt der
+ * Verlassen-Schutz (settings/dirty-guard.js), dass er keinen offenen Stand
+ * hinterlaesst. Dasselbe Muster wie die Sofort-Speicherer in
+ * modules-options.js, nur einmal statt je Blatt.
+ *
+ * @param {HTMLInputElement|null} input
+ * @param {object} options
+ * @param {(checked: boolean) => Promise<unknown>} options.save
+ * @param {string} options.savedMessage  Toast nach dem Speichern
+ * @param {(checked: boolean) => void} [options.onRevert]  Folgezustand nach dem Zuruecklegen nachziehen
+ */
+export function bindInstantSwitch(input, { save, savedMessage, onRevert = () => {} }) {
+  if (!input) return;
+  input.addEventListener('change', async () => {
+    const value = input.checked;
+    input.disabled = true;
+    try {
+      await save(value);
+      window.yuvomi?.showToast(savedMessage, 'success');
+    } catch (error) {
+      input.checked = !value;
+      onRevert(!value);
+      window.yuvomi?.showToast(error?.message || t('common.errorGeneric'), 'danger');
+    } finally {
+      if (input.isConnected) input.disabled = false;
+    }
+  });
 }
 
 export function createToggleRow(options) {

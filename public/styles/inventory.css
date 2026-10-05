@@ -1,7 +1,7 @@
 /**
  * Modul: Inventar (Inventory)
  * Zweck: Seiten-Layout, Statusbadges und Detailansicht. Die Liste selbst
- *        traegt KEINE eigene Zeilen-Geometrie mehr: .list-group/.list-rows/
+ *        traegt KEINE eigene Zeilen-Geometrie mehr: .list-group/.row-carrier/
  *        .list-row/.list-row__main--interactive/.list-row__name/
  *        .list-row__meta (styles/list-row.css) sind dasselbe geteilte
  *        Vokabular, das Vorrat und Einkauf schon nutzen - Inventar soll
@@ -17,7 +17,8 @@
 
 /* display:grid (nicht flex-column) aus demselben Grund wie .list-scroller
  * (list-row.css, dessen Rolle diese Klasse fuer Inventar uebernimmt): jedes
- * `.list-rows`-Kind (list-row.css) traegt `align-self: start`, das NUR in
+ * `.row-carrier`-Kind (list-row.css; bis Runde 5 `.list-rows`) traegt
+ * `align-self: start`, das NUR in
  * einem Grid-Elternteil ausschliesslich die Block-Achse (Hoehe) betrifft. In
  * einer Flex-Spalte waere `align-self` stattdessen die Quer-Achse (Breite)
  * und schrumpfte die Zeilenliste auf ihre Inhaltsbreite zusammen - genau das
@@ -80,48 +81,46 @@
 }
 
 /* --------------------------------------------------------
- * Zurueck-Link + Titel der Kategorie-Detailansicht - abgeleitet von
- * .settings-leaf-back-link (settings.css), aber als Button statt Link (kein
- * echter Routenwechsel, siehe Global Constraints) und ohne dessen
- * responsive Ausblendung: Inventar hat keine parallele Desktop-Sidebar, die
- * den Zurueck-Weg sonst schon anbietet.
+ * Rueckweg aus einer Kategorie (Re-Critique 2026-09-28, A6 P1-1)
+ *
+ * Apples Navigationsleiste: „‹ Inventar" als eigene Zeile ueber dem
+ * Kategorienamen, der als Titel im Kopf steht (inventory.js,
+ * syncInventoryHeader). Dieselbe Form wie „‹ Gesundheit" (health.css). Bis
+ * dahin stand hier ein grauer Textlink „Zurueck zum Inventar" UNTER den
+ * Filterchips samt zweitem Titel, und die Ebene hatte keine Adresse - die
+ * Zurueck-Geste verliess das Modul. In jeder Breite: auch am Desktop ersetzt
+ * die Kategorie die Liste, es gibt keine Seitenspalte, die den Rueckweg traegt.
  * -------------------------------------------------------- */
 
-.inventory-back-link {
+.inventory-toolbar:has(> .inventory-toolbar__back:not([hidden])) {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+
+.inventory-toolbar__back {
   display: inline-flex;
+  flex-basis: 100%;
   align-items: center;
-  gap: var(--space-2);
-  width: fit-content;
+  gap: var(--space-1);
   min-height: var(--target-base);
-  margin-bottom: var(--space-2);
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--color-text-secondary);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-}
-
-.inventory-back-link:hover {
+  /* Die Treffflaeche reicht bis an die Kante, das Zeichen steht auf der
+   * Fluchtlinie des Inhalts (wie health-toolbar__back). */
+  margin-inline-start: calc(-1 * var(--space-2));
+  padding-inline: var(--space-2);
   color: var(--color-accent);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
 }
 
-.inventory-back-link__icon {
-  width: var(--space-4);
-  height: var(--space-4);
+.inventory-toolbar__back[hidden] {
+  display: none;
+}
+
+.inventory-toolbar__back-icon {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
   flex: 0 0 auto;
-}
-
-/* Der Kommentar hier behauptete "Groesse/Rolle kommt vom semantischen <h2>
- * selbst" - falsch: reset.css setzt fuer h1-h6 nur font-weight/line-height
- * zurueck, nie font-size, also rendierte dieser Kopf am UA-Default (~24px),
- * keiner Design-Stufe (Polish-Audit, PLAN.md #7). Traegt jetzt u-section-title
- * im Markup, hier bleibt nur Abstand/Farbe. */
-.inventory-category-title {
-  margin: 0 0 var(--space-3);
-  color: var(--color-text-primary);
 }
 
 /* --------------------------------------------------------
@@ -482,8 +481,9 @@
 }
 
 /* --------------------------------------------------------
- * Garantiestatus-Zeile (Stufe 4) - eigene Klasse statt .form-hint, das nur in
- * der page-scoped settings.css gestylt ist und hier fehlt.
+ * Garantiestatus-Zeile (Stufe 4) - eigene Klasse, weil sie drei Tonlagen
+ * kennt (gueltig, laeuft ab, abgelaufen). Die Groesse ist die von `.form-hint`
+ * (layout.css); die Klasse entstand, als diese nur in settings.css lebte.
  * -------------------------------------------------------- */
 
 .inventory-warranty-status {
@@ -604,6 +604,8 @@
 }
 
 .inventory-history-entry__label {
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
   overflow-wrap: anywhere;
 }
 
@@ -636,4 +638,144 @@
 
 .inventory-tracked-date-detail-row__done {
   margin-left: auto;
+}
+
+/* --------------------------------------------------------
+ * Liste + Detail (Breitenregel, DESIGN.md; Baustein utils/master-detail.js)
+ *
+ * Die Geometrie der Spalten gehoert der Shell (layout.css `.split-view`). Hier
+ * steht nur, was Inventar anders macht: es hat keinen eigenen Scrollport, die
+ * Liste scrollt mit #main-content wie unter der Schwelle. Statt die Seite in
+ * eine gedeckelte Flex-Spalte umzubauen (das aenderte mobil Kopf-Kollaps und
+ * Filterzeile), klebt die Detailspalte unter dem Kopf und scrollt fuer sich.
+ * Den Versatz setzt inventory.js (`--inventory-head-block`, gemessene
+ * Kopfhoehe). Schwelle = `--layout-split-threshold` (65rem), `@container`
+ * kann keine Variable lesen.
+ *
+ * R10 L3 (A8 P1-2): die Spalte war eine 301px-Karte, 12px unter der Liste.
+ * Jetzt steht sie BUENDIG mit der Liste (kein `margin-block-start`) und reicht
+ * bis zur Luft ueber dem Fensterrand (`height` statt `max-height`) - wie in
+ * Kontakten, Rezepten und Aufgaben.
+ * -------------------------------------------------------- */
+@container module-surface (min-width: 65rem) {
+  .inventory-page .split-view {
+    align-items: start;
+  }
+
+  /* Die Liste waechst mit ihrem Inhalt; ein Scrollport hier waere ohne
+   * feste Hoehe wirkungslos und finge nur die klebenden Gruppentitel ein. */
+  .inventory-page .split-view__list {
+    overflow: visible;
+  }
+
+  /* DIE KATEGORIENLISTE HAT KEINE DETAILSPALTE (Re-Critique 2026-09-28,
+   * A8 P2-1). Gemessen bei 1440: 4 Kategorien links in 424px, rechts 676px
+   * „Waehle einen Gegenstand" - neben einer Liste, die keinen Gegenstand
+   * zeigt. Auf dieser Ebene nimmt die Liste die volle Flaeche: Kennzahlen als
+   * schmale Spalte vorn, die Kategorien daneben breit (DOM-Reihenfolge =
+   * Lesereihenfolge, kein Sprung der Tabulatortaste). Treffer der Suche und
+   * eine geoeffnete Kategorie zeigen Gegenstaende - dort steht die Spalte
+   * wieder. `data-inventory-level` setzt inventory.js (syncInventoryHeader). */
+  .inventory-page[data-inventory-level="categories"] .split-view {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inventory-page[data-inventory-level="categories"] .split-view__detail {
+    display: none;
+  }
+
+  .inventory-page[data-inventory-level="categories"] .inventory-list:has(> .metric-grid + .row-carrier) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    column-gap: var(--space-6);
+    align-items: start;
+  }
+
+  /* Beide Spalten beginnen auf derselben Hoehe: die Kennzahlen tragen hier
+   * ihren Blockabstand (unten), die Kategorien bekommen denselben. */
+  .inventory-page[data-inventory-level="categories"] .inventory-list > .metric-grid + .row-carrier {
+    margin-block-start: var(--space-3);
+  }
+
+  .inventory-page .split-view__detail {
+    position: sticky;
+    /* Dieselbe Luft unter dem Kopf, ob die Spalte ruht oder klebt. */
+    top: calc(var(--inventory-head-block, 0px) + var(--space-3));
+    /* Von der GEMESSENEN Oberkante bis zur Luft ueber dem Fensterrand
+     * (inventory.js, syncDetailTop): in Ruhe steht die Filterzeile zwischen
+     * Kopf und Spalte, beim Kleben nicht mehr. Ohne Messwert (erster Frame)
+     * gilt der Klebestand. Volle Hoehe statt Hoechstmass: die Spalte ist ein
+     * Ort, keine Karte, die mit ihrem Inhalt waechst. */
+    height: calc(var(--viewport-height) - var(--inventory-detail-top, calc(var(--inventory-head-block, 0px) + var(--space-3))) - var(--space-4) - var(--shell-tail, 0px));
+  }
+
+  /* KENNZAHLEN ALS ZEILEN, NICHT ALS DREI KACHELN IN 424PX. Drei Kacheln je
+   * 136px brachen „Braucht Aufmerksamkeit" auf drei Zeilen und mitten im Wort
+   * („AUFMERKSAMKE/IT", A8). In der Listenspur stehen sie wie eine gruppierte
+   * Liste bei Apple: ein Traeger, je Kennzahl eine Zeile, Wort links, Zahl
+   * rechts; die waehlbare Zeile (Fristen-Filter) traegt einen Chevron und
+   * liest sich damit als Knopf, nicht als dritte statische Kachel (A6). */
+  .inventory-list .metric-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: auto;
+    gap: 0;
+    padding: 0;
+    margin-block: var(--space-3);
+    background-color: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  .inventory-list .metric-grid > .metric-card {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: var(--target-md);
+    padding: var(--space-2) var(--space-4);
+    background-color: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    text-align: start;
+  }
+
+  .inventory-list .metric-grid > .metric-card + .metric-card {
+    border-block-start: var(--space-px) solid var(--color-border-subtle);
+  }
+
+  .inventory-list .metric-grid .metric-card__label {
+    overflow-wrap: normal;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .inventory-list .metric-grid .metric-card__value {
+    font-size: var(--text-lg);
+    flex-shrink: 0;
+  }
+
+  /* Die waehlbare Zeile (Fristen-Filter) spricht in Akzenttinte wie eine
+   * Aktionszeile bei Apple - sie ist ein Knopf, keine dritte Kennzahl. */
+  .inventory-list .metric-grid > .metric-card--select .metric-card__label {
+    color: var(--color-accent);
+  }
+
+  .inventory-list .metric-grid > .metric-card--select:hover {
+    background-color: var(--color-surface-elevated-hover);
+  }
+
+  /* Gedrueckt (Filter an): dieselbe Flaeche wie eine ausgewaehlte Zeile. */
+  .inventory-list .metric-grid > .metric-card--select.is-active {
+    background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), var(--color-surface));
+  }
+}
+
+/* Hover-Feedback blendet (R16, Bewegung): diese Datei fuehrte keine einzige
+ * Transition - die zwei Flaechen, die unter dem Zeiger ihren Grund wechseln,
+ * sprangen. Nur die Farbe, aus dem Shorthand der Shell. */
+.inventory-photo-action,
+.inventory-booking-picker__item {
+  transition: background-color var(--transition-fast);
 }

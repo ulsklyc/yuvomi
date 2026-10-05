@@ -356,8 +356,11 @@ test('sichtbare Split-Expense-Überschriften besitzen explizite Rollen', () => {
   // Klassen statt Tags: eingebettet rendert die Seite <h3>/<h4>, sonst <h2>/<h3> (#1148).
   assertTypeRole(typography, 'typography.css', '.split-group-name', '--type-section-title',
     'Gruppenüberschriften dürfen nicht auf die Browser-Standardgröße zurückfallen');
-  assertTypeRole(typography, 'typography.css', '.split-card-title', '--type-card-title',
-    'Kartenüberschriften dürfen nicht auf die Browser-Standardgröße zurückfallen');
+  // Seit R16 Schritt 2b stehen Salden, Ausgaben und Verlauf als Abschnittstitel
+  // auf der Buehne (`.u-section-title`), nicht mehr als Kartentitel in der Flaeche.
+  assertTypeRole(typography, 'typography.css', '.u-section-title', '--type-section-title',
+    'Abschnittsüberschriften dürfen nicht auf die Browser-Standardgröße zurückfallen');
+  assert.doesNotMatch(typography, /\.split-card-title/, 'die Kartentitel-Rolle der Aufteilung ist entfallen');
 });
 
 test('Settings zeigen auf Leaf-Seiten nur den Leaf-Titel als sichtbare Hauptüberschrift', () => {
@@ -386,26 +389,33 @@ test('Settings-Blätter wiederholen ihren eigenen Titel nicht als Unterüberschr
   // Er hat nie gesehen, dass ein Blatt seinen EIGENEN Titel direkt darunter als
   // h2 wiederholt - fünf taten es, eines sogar mit demselben i18n-Key. Die Suite
   // war grün und der Defekt drei Critique-Läufe lang vorhanden (2026-07-27).
-  const { SETTINGS_LEAVES } = await import('../public/settings/registry.js');
+  // Seit R10 besteht ein Blatt aus Abschnitten (fruehere Blaetter, je ein
+  // Loader): geprueft wird jeder Abschnitt gegen den Titel SEINES Blatts.
+  const { SETTINGS_LEAVES, settingsSheetSections } = await import('../public/settings/registry.js');
   const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
   const translate = (key) => key.split('.').reduce((value, segment) => value?.[segment], de);
   const normalize = (value) => String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 
   const failures = [];
+  let seen = 0;
   for (const leaf of SETTINGS_LEAVES) {
-    const file = String(leaf.loader).match(/\/settings\/(pages\/[\w-]+\.js)/)?.[1];
-    assert.ok(file, `${leaf.id}: Loader-Pfad nicht erkennbar`);
-    const source = readFileSync(new URL(`../public/settings/${file}`, import.meta.url), 'utf8');
     const label = normalize(translate(leaf.labelKey));
+    for (const section of settingsSheetSections(leaf, null, { all: true })) {
+      const file = String(section.loader).match(/\/settings\/(pages\/[\w-]+\.js)/)?.[1];
+      assert.ok(file, `${section.id}: Loader-Pfad nicht erkennbar`);
+      seen += 1;
+      const source = readFileSync(new URL(`../public/settings/${file}`, import.meta.url), 'utf8');
 
-    // Statische Überschriften im Markup: <h2 …>${t('key')}</h2>, auch via esc().
-    for (const match of source.matchAll(/<h([23])\b[^>]*>\s*\$\{(?:esc\()?\s*t\(\s*['"]([\w.]+)['"]/g)) {
-      const [, level, key] = match;
-      if (normalize(translate(key)) === label) {
-        failures.push(`${leaf.id}: <h${level}> wiederholt den Blatt-Titel "${translate(key)}" (${key})`);
+      // Statische Überschriften im Markup: <h2 …>${t('key')}</h2>, auch via esc().
+      for (const match of source.matchAll(/<h([23])\b[^>]*>\s*\$\{(?:esc\()?\s*t\(\s*['"]([\w.]+)['"]/g)) {
+        const [, level, key] = match;
+        if (normalize(translate(key)) === label) {
+          failures.push(`${leaf.id}/${section.id}: <h${level}> wiederholt den Blatt-Titel "${translate(key)}" (${key})`);
+        }
       }
     }
   }
+  assert.ok(seen >= 30, `nur ${seen} Abschnitte gelesen`);
   assert.deepEqual(failures, []);
 });
 
@@ -679,4 +689,219 @@ test('Such- und Schnellformular-Eingaben bleiben bei 16px', () => {
       `${selector} darf auf Desktop nicht unter 16px fallen`,
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// EIN WORT BRICHT NUR MIT STRICH (Re-Critique 2026-09-27, W1)
+//
+// `overflow-wrap: break-word | anywhere` (und `word-break: break-word |
+// break-all`) erlauben dem Browser, ein Wort zu brechen, das nicht in die Zeile
+// passt - und zwar an JEDER Stelle, ohne Zeichen. Gemessen: „Tomatensupp / e"
+// im Essensplan, „SAUERSTOFFSÄTTI / GUNG" in der Gesundheit, „AUFMERKSAMKE / IT"
+// im Inventar. `hyphens: auto` fragt vorher das Silbenwoerterbuch der
+// Dokumentsprache (lang folgt der Locale, i18n.js) und setzt den Strich an eine
+// Silbengrenze; break-word bleibt dann die letzte Stufe fuer Woerter ohne
+// Trennstelle.
+//
+// Die Regel, nicht die Schreibweise: gefragt wird, ob eine Regel, die ein Wort
+// brechen LAESST, fuer ihr Subjekt (die letzte Klasse des Selektors) auch die
+// Silbentrennung hat - in derselben Regel, in einer Basisregel desselben
+// Subjekts oder in einer Regel im selben @media-Kontext. Kommentare zaehlen
+// nicht (eachRule entfernt sie), und ein `hyphens: auto` in einer Media-Query
+// deckt die Basis NICHT - mobil bricht sonst, was am Desktop trennt.
+// ---------------------------------------------------------------------------
+
+/** Letzter Wert einer Eigenschaft im Rumpf einer Regel (die spaetere gewinnt). */
+function lastDeclaration(body, prop) {
+  const all = [...body.matchAll(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;]+)`, 'g'))];
+  return all.length ? all[all.length - 1][1].trim() : '';
+}
+
+/**
+ * Jede Regel je Komma-Teil mit ihrem Subjekt: der letzten Klasse des letzten
+ * Compounds. Argumente von Pseudoklassen zaehlen nicht - in
+ * `.btn:not(.btn--icon)` ist das Subjekt `.btn`, nicht die ausgeschlossene
+ * Klasse.
+ */
+function wordBreakRules() {
+  const out = [];
+  for (const file of cssFiles) {
+    const css = readFileSync(new URL(file, STYLES_DIR), 'utf8');
+    for (const { selector, body, at } of eachRule(css)) {
+      const overflowWrap = lastDeclaration(body, 'overflow-wrap');
+      const wordBreak = lastDeclaration(body, 'word-break');
+      const hyphens = lastDeclaration(body, 'hyphens');
+      const whiteSpace = lastDeclaration(body, 'white-space');
+      for (const part of selector.split(',')) {
+        const sel = part.trim().replace(/\s+/g, ' ');
+        let compound = sel.split(/[\s>+~]+/).pop();
+        // Pseudoklassen-Argumente bis zur Stabilitaet entfernen (verschachtelt).
+        for (let prev = ''; prev !== compound;) {
+          prev = compound;
+          compound = compound.replace(/:[\w-]+\([^()]*\)/g, '');
+        }
+        const subject = (compound.match(/\.[\w-]+/g) ?? []).pop();
+        if (!subject) continue;
+        out.push({
+          file, selector: sel, subject, context: at.join(' | '),
+          breaks: /break-word|anywhere/.test(overflowWrap) || /break-word|break-all/.test(wordBreak),
+          hyphens,
+          // Eine Regel, die gar nicht umbricht, braucht keinen Strich.
+          keepsWhole: /nowrap/.test(whiteSpace) || overflowWrap === 'normal',
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Brechende Regeln OHNE Silbentrennung - der eingefrorene Bestand. Die Karte darf
+ * nur schrumpfen: ein neuer Eintrag ist rot, ein erfuellter auch.
+ *
+ * NO_SYLLABLES  Der Inhalt hat keine Silben: Adresse, Link, Datei- oder
+ *               Pfadname, Zahl. Ein Trennstrich darin waere eine Falschauskunft
+ *               (ein „-" mitten in einer URL gehoert zur URL). Dauerhaft.
+ * DELIBERATE    Am Ort begruendete Asymmetrie (Datei nennen, Kommentar dort).
+ * LEGACY        Text mit Silben, der noch ohne Trennung bricht. Wer die Datei
+ *               anfasst, zieht `hyphens: auto; hyphenate-limit-chars: 6 4 4`
+ *               nach und streicht den Eintrag.
+ */
+const BREAKS_WITHOUT_HYPHENS = {
+  '.contact-detail__link': 'NO_SYLLABLES',
+  '.document-dropzone__file': 'NO_SYLLABLES',
+  '.folder-upload-preview': 'NO_SYLLABLES',
+  '.folder-upload-tree__name': 'NO_SYLLABLES',
+  '.fasting-widget__timer': 'NO_SYLLABLES',
+  '.fasting-hero__timer': 'NO_SYLLABLES',
+  '.inventory-detail-list__link': 'NO_SYLLABLES',
+  '.caldav-calendar-source': 'NO_SYLLABLES',
+  '.item-details__link': 'NO_SYLLABLES',
+  '.note-md-link': 'NO_SYLLABLES',
+  // list-row.css: „NUR HIER, NICHT AN DER METAZEILE" - hyphens: auto wuerde dort
+  // auch trennen, wo ein Umbruch an einer Leerstelle moeglich ist.
+  '.list-row__meta': 'DELIBERATE',
+  '.btn': 'LEGACY',
+  '.calendar-all-day-label': 'LEGACY',
+  '.contact-card__sub': 'LEGACY',
+  '.detail-row__value': 'LEGACY',
+  '.document-dropzone__hint': 'LEGACY',
+  '.documents-folder-browser__toggle-label': 'LEGACY',
+  '.documents-folder-item__name': 'LEGACY',
+  '.document-row__title': 'LEGACY',
+  '.folder-upload-tree__status': 'LEGACY',
+  '.document-viewer__text': 'LEGACY',
+  '.dms-preview__title': 'LEGACY',
+  '.health-dose__name': 'LEGACY',
+  '.health-nutrition-progress__label': 'LEGACY',
+  '.health-nutrition-row__title': 'LEGACY',
+  '.search-scope': 'LEGACY',
+  '.split-view__detail-title': 'LEGACY',
+  '.note-card__title': 'LEGACY',
+  '.note-category-badge__name': 'LEGACY',
+  '.note-card__content': 'LEGACY',
+  '.note-read__body': 'LEGACY',
+  '.settings-shell__navigation-result-text': 'LEGACY',
+  '.settings-info-value--danger': 'LEGACY',
+  '.settings-document-storage-error': 'LEGACY',
+  '.caldav-calendar-name': 'LEGACY',
+  '.caldav-calendar-error': 'LEGACY',
+  '.backfill-moved__title': 'LEGACY',
+  '.split-group-meta': 'LEGACY',
+  '.task-comment__text': 'LEGACY',
+};
+
+/** Die harte Form desselben Fehlers: ausdruecklich `hyphens: manual | none`
+ *  neben einem Bruch. Ohne Ausnahme - bis auf die Wunsch-Diffs, die ein anderer
+ *  Schritt anwendet (Eintrag wird dann rot und faellt weg). */
+const OPT_OUT_PENDING = {};
+
+test('wer ein Wort brechen laesst, schaltet den Strich nicht ab (W1)', () => {
+  const rules = wordBreakRules();
+  assert.ok(rules.filter((r) => r.breaks).length > 40,
+    'kaum brechende Regeln gefunden - misst der Scanner noch?');
+  const optOut = rules
+    .filter((r) => /^(manual|none)\b/.test(r.hyphens) && !r.keepsWhole)
+    .filter((r) => rules.some((o) => o.subject === r.subject && o.breaks))
+    .map((r) => r.selector);
+  const fresh = [...new Set(optOut)].filter((s) => !(s in OPT_OUT_PENDING));
+  assert.deepEqual(fresh, [],
+    'hyphens: manual/none neben overflow-wrap: break-word/anywhere bricht Woerter OHNE Strich '
+    + '(„Tomatensupp / e"). Stattdessen hyphens: auto; hyphenate-limit-chars: 6 4 4.');
+  const stale = Object.keys(OPT_OUT_PENDING).filter((s) => !optOut.includes(s));
+  assert.deepEqual(stale, [], 'erfuellte Eintraege aus OPT_OUT_PENDING streichen');
+});
+
+test('ein brechendes Wort wird silbengetrennt, nicht zerhackt (W1)', () => {
+  const rules = wordBreakRules();
+  const hyphenated = (r) => rules.some((o) => o.subject === r.subject && /^auto\b/.test(o.hyphens)
+    && (o.context === '' || o.context === r.context));
+  const missing = new Map();
+  for (const r of rules.filter((x) => x.breaks && !hyphenated(x))) {
+    missing.set(r.subject, [...(missing.get(r.subject) ?? []), `${r.file}: ${r.selector}`]);
+  }
+  const fresh = [...missing.keys()].filter((s) => !(s in BREAKS_WITHOUT_HYPHENS));
+  assert.deepEqual(fresh.map((s) => `${s} (${missing.get(s).join('; ')})`), [],
+    'diese Regeln lassen ein Wort brechen, ohne dass das Subjekt Silbentrennung hat - '
+    + 'hyphens: auto; hyphenate-limit-chars: 6 4 4 ergaenzen (Basisregel oder derselbe @media-Kontext)');
+  const stale = Object.keys(BREAKS_WITHOUT_HYPHENS).filter((s) => !missing.has(s));
+  assert.deepEqual(stale, [], 'erfuellte Eintraege aus BREAKS_WITHOUT_HYPHENS streichen');
+});
+
+test('die Messwoerter der Re-Critique trennen an der Basis ihres Subjekts (W1)', () => {
+  // Die drei gemessenen Brueche als Ankerfaelle: ihr Subjekt muss existieren und
+  // ohne Media-Query `hyphens: auto` tragen. Ein Guard ueber verschwundene
+  // Klassen waere vakuum-wahr.
+  const rules = wordBreakRules();
+  for (const subject of ['.meal-card__title-text', '.metric-card__label', '.meal-slot__type-text']) {
+    const own = rules.filter((r) => r.subject === subject);
+    assert.ok(own.length, `${subject} kommt in keinem Stylesheet mehr vor`);
+    assert.ok(own.some((r) => /^auto\b/.test(r.hyphens) && r.context === ''),
+      `${subject}: hyphens: auto fehlt an der Basisregel`);
+  }
+});
+
+/* R16 (Critique 2026-10-05, P1 Bausteine): der Name einer Listenzeile stand in
+ * vier Schnitten da (15/600, 16/400, 16/500, 17/600). Kanon ist 16px medium,
+ * registriert als Rolle Zeilentitel. Gegen den Stand davor rot gelaufen. */
+test('der Zeilentitel ist eine Rolle (R16)', () => {
+  const typo = [...eachRule(readFileSync(new URL('typography.css', STYLES_DIR), 'utf8'))];
+  const sels = (rule) => rule.selector.split(',').map((s) => s.trim());
+  const rolle = typo.find((rule) => sels(rule).includes('.list-row__name'));
+  assert.ok(rolle, 'typography.css registriert `.list-row__name`');
+  assert.match(rolle.body, /font-size:\s*var\(--text-base\)/);
+  assert.match(rolle.body, /font-weight:\s*var\(--font-weight-medium\)/);
+  for (const sel of ['.u-row-title', '.agenda-event__title', '.contact-item__name', '.subscription-card__name', '.rw-standing__name']) {
+    assert.ok(sels(rolle).includes(sel), `${sel} nimmt die Rolle`);
+  }
+
+  // Eine Zeile steht nicht in der Headline-Registrierung (17/600) und nicht in
+  // ihrer Dichte-Variante (15/600): das sind Karten-Titel.
+  const ZEILEN = ['.agenda-event__title', '.budget-entry__title', '.contact-item__name', '.birthday-item__name',
+    '.housekeeping-task__body h2', '.subscription-card__name', '.task-card__title'];
+  const headline = typo.filter((rule) => /--type-card-title|--type-secondary/.test(rule.body) && /font-weight-semibold/.test(rule.body));
+  assert.ok(headline.length >= 2, 'Headline und Dichte-Variante gefunden');
+  const doppelt = headline.flatMap(sels).filter((sel) => ZEILEN.includes(sel));
+  assert.deepStrictEqual(doppelt, [], 'Zeilen stehen nicht in der Karten-Titel-Rolle');
+
+  // Der Knopf-Reset der Buchungszeile nahm das Gewicht mit (16/400).
+  const budget = [...eachRule(readFileSync(new URL('budget.css', STYLES_DIR), 'utf8'))];
+  const knopf = budget.find((rule) => rule.selector.trim() === 'button.budget-entry__title');
+  assert.ok(knopf);
+  assert.doesNotMatch(knopf.body, /(?:^|[;\s])font:\s*inherit/, '`font: inherit` setzt das Gewicht der Rolle zurueck');
+
+  // Die Aufgabenzeile traegt die Rolle, nicht mehr die Dichte-Variante der Headline.
+  const tasks = readFileSync(new URL('../pages/tasks.js', STYLES_DIR), 'utf8');
+  assert.match(tasks, /class="task-card__title u-row-title"/);
+
+  // Und kein Modul setzt am Zeilennamen ein eigenes Gewicht als Literal.
+  const funde = [];
+  for (const name of cssFiles.filter((n) => n !== 'typography.css' && n !== 'list-row.css')) {
+    for (const rule of eachRule(readFileSync(new URL(name, STYLES_DIR), 'utf8'))) {
+      if (!sels(rule).some((sel) => /\.(?:list-row__name|rw-standing__name|subscription-card__name|contact-item__name)$/.test(sel))) continue;
+      const w = rule.body.match(/font-weight:\s*([^;]+)/);
+      if (w && !/font-weight-medium/.test(w[1])) funde.push(`${name}: ${rule.selector.trim()} { font-weight: ${w[1].trim()} }`);
+    }
+  }
+  assert.deepStrictEqual(funde, [], 'ein eigenes Gewicht am Zeilentitel ist ein Dialekt');
 });

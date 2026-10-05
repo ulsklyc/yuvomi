@@ -40,29 +40,26 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  /* Schlanker als die Modul-Tabs darüber: liest sich als sekundäre Sub-Leiste,
-   * nicht als zweite gleichrangige Navigation. */
-  padding-block: var(--space-1);
-  padding-inline: var(--page-inline-pad);
-  border-bottom: 1px solid var(--color-border);
-  background-color: var(--color-surface);
+  /* KONTEXTZEILE DES KUECHENKOPFS (Kopfregel mobil, 2026-09-26). Die Leiste
+   * steht im __center-Slot einer .page-toolbar und bringt deshalb weder Rand,
+   * Grund noch Seitenpolster mit - die Kopfzeile traegt alle drei, wie in den
+   * drei Geschwister-Tabs. Vorher war sie selbst die Zeile, mit eigenem Grund,
+   * eigener Unterkante und einem klebenden Menue am Ende. */
+  flex: 1 1 auto;
+  min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
-  flex-shrink: 0;
+  /* Luft fuer den Fokusring: ein waagerechter Scroller clippt senkrecht mit.
+   * Der negative Rand gibt sie der Kopfzeile zurueck, die Hoehe bleibt. */
+  padding: var(--space-1);
+  margin: calc(-1 * var(--space-1));
 }
 
 .list-tabs-bar::-webkit-scrollbar { display: none; }
 
-/* Kategorie-Marker: bleibt links stehen (scrollt nicht mit den Chips weg). */
-.list-tabs-bar__marker {
-  position: sticky;
-  left: 0;
-  flex-shrink: 0;
-  width: var(--space-4);
-  height: var(--space-4);
-  color: var(--color-text-tertiary);
-  background-color: var(--color-surface);
-}
+/* Der fuehrende Listen-Marker ist entfallen: ein nicht tippbares `list`-Glyph
+ * vor den Kapseln sah aus wie ein Menue (A4, P3). Die Kapseln sagen selbst,
+ * dass sie Listen sind, und die Kopfzeile grenzt sie von der Kuechen-Leiste ab. */
 
 .list-tab {
   display: inline-flex;
@@ -139,38 +136,36 @@
   min-height: var(--target-lg);
 }
 
+/* DESKTOP-KOPF AUF DEM REFERENZMASS (Critique 2026-09-26, R1-Folge). Seit
+ * die Listenleiste im __center-Slot des Kuechenkopfs steht, bestimmt ihr
+ * hoechstes Kind die Zeile: der Neu-Knopf mit 48px machte den Einkaufskopf 4px
+ * hoeher als Essensplan, Rezepte, Vorrat und Dokumente (Zeile 73 statt 69px),
+ * und er stand als 44x48-Oval neben 44px-Kapseln. Am Desktop hat er die Hoehe
+ * der Kapseln; mobil bleibt die Touch-Hoehe. */
+@media (min-width: 1024px) {
+  .list-tab__new {
+    min-height: var(--target-base);
+  }
+}
+
 .list-tab__new:hover {
   border-color: var(--color-accent);
   color: var(--color-accent);
 }
 
-/* Aktionen der GEWÄHLTEN Liste am hinteren Ende der Leiste.
- *
- * Gegenstück zum Marker links: der Trigger klebt am Rand, während die Chips
- * darunter durchscrollen. Er braucht denselben opaken Grund wie der Marker -
- * gemessen laufen am linken Scrollanschlag zwei Chips unter die Zone, und der
- * Grund ist das Einzige, was sie verdeckt.
- *
- * DIE KANTE IST `--color-border`, NICHT `--color-border-subtle`: sie grenzt an
- * Scrollgut, nicht an eine ruhige Kartenkante, und nimmt deshalb dieselbe Linie,
- * die die Leiste selbst als Unterkante trägt. Eine dritte Stufe wäre hier kein
- * Gewinn - alle drei Linien-Tokens liegen bewusst unter 3:1 (1.20 / 1.32 / 1.65
- * auf --color-surface), die Kante erklärt die Überlappung, sie ruft sie nicht
- * aus. Was den Chip wirklich abschneidet, ist der opake Grund.
- *
- * `right: 0` statt `inset-inline-end`: `position: sticky` löst logische
- * Eigenschaften zwar korrekt auf, aber die Leiste scrollt physisch, und der
- * Marker gegenüber steht aus demselben Grund auf `left: 0`. */
-.list-tabs-bar__actions {
-  position: sticky;
-  right: 0;
+/* Aktionen der GEWAEHLTEN Liste: das Werkzeugmenue im __actions-Slot des
+ * Kopfs (`.page-tools-btn`, layout.css). Hier stand bis 2026-09-26 eine
+ * klebende Aktionszone am Ende der Chip-Leiste mit eigenem opaken Grund und
+ * Trennkante - im Kopf-Slot scrollt nichts mehr darunter durch. Der Traeger
+ * selbst ist nur ein Flex-Rahmen, damit der Router den Primaerknopf daneben
+ * andocken kann, ohne ihn hinauszuwerfen. */
+.shopping-tools {
   display: flex;
   align-items: center;
-  flex-shrink: 0;
-  margin-inline-start: auto;
-  padding-inline-start: var(--space-2);
-  border-inline-start: 1px solid var(--color-border);
-  background-color: var(--color-surface);
+}
+
+.shopping-tools:empty {
+  display: none;
 }
 
 /* --------------------------------------------------------
@@ -193,7 +188,7 @@
  * UMBENENNEN unerreichbar: `rename-list` hängt ausschließlich an diesem Titel.
  * Erst wenn die Aktion einen zweiten Weg hat (etwa im Überlaufmenü), ist das
  * eine Option." Genau das ist jetzt der Fall: Umbenennen ist der erste Eintrag
- * im Menü von `.list-tabs-bar__actions`, zusammen mit den drei übrigen
+ * im Listenmenü des Kopfes (`#shopping-tools`), zusammen mit den drei übrigen
  * Aktionen. Damit entfällt auch die responsive Doppelfassung - eine Darstellung
  * auf allen Breiten, ein Ort. */
 
@@ -475,16 +470,14 @@
   width: var(--target-base);
   height: var(--target-base);
   border-radius: var(--radius-full);
-  /* DIE EINE STIMME (Critique 2026-08-13). Hier stand der Modulton, begründet
-   * mit „wie FAB und Fokus-Ringe daneben (Audit F-05)" - und beide tragen ihn
-   * seit v2.2.0 nicht mehr, weil die Eine-Stimme-Regel ihn zurückgenommen hat.
-   * Die Ausnahme blieb stehen, ihr Anlass war drei Versionen weg. Genau die
-   * Form von Drift, gegen die HIG-Session 27 den Satz aufgeschrieben hat: eine
-   * Ausnahme braucht ein Verfallsdatum an BEIDEN Enden, dem Anlass und dem
-   * Verstoß. Der Guard sah sie nicht, weil er das Chrome aus Selektorformen
-   * ableitet und dieser Knopf keine davon trägt. */
-  background-color: var(--color-accent);
-  color: var(--color-ink-on-vivid);
+  /* EIN PLUS, UND ES GEHOERT DER PILLE (Re-Critique 2026-09-28, A4 P2-4).
+   * Hier stand ein gefuellter Kreis in der Stimme mit "+" - am Zeiger direkt
+   * unter der angedockten Kopf-Pille "+ Artikel", die dasselbe tut (sie
+   * fokussiert dieses Feld). Zwei violette Plus fuer eine Absicht. Der
+   * Absender ist jetzt die ruhige Return-Glyphe wie in Erinnerungen: wer
+   * tippt, drueckt Enter; der Knopf bleibt fuer Maus und Touch da. */
+  background-color: transparent;
+  color: var(--color-text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -495,7 +488,7 @@
   min-height: var(--target-lg);
 }
 
-.quick-add__btn:hover { background-color: var(--color-accent-hover); }
+.quick-add__btn:hover { background-color: var(--color-surface-2); color: var(--color-text-primary); }
 
 /* Autocomplete-Dropdown */
 .autocomplete-dropdown {
@@ -593,34 +586,13 @@
  * .item-category braucht keine eigene Kappung mehr: es liegt in der gekappten
  * .items-list. Einen Listenkopf gibt es seit 2026-08-11 gar nicht mehr - die
  * Chip-Leiste trägt Name und Aktionen (siehe „Liste-Header" oben). */
-@media (min-width: 1024px) {
-  /* Die Leiste beginnt an der Rail-Kante und endet an der Lesekante, wie jeder
-   * andere Block der Seite („Blocks on one page end at one right edge", v2.8.0).
-   *
-   * DIE KAPPUNG RECHNET DAS EIGENE POLSTER EIN, und das ist der ganze Punkt:
-   * `box-sizing` ist `border-box`, also zieht `padding-inline` von einer
-   * max-width ab, statt sie zu verlaengern. Mit dem generischen Lesemass aus
-   * layout.css (720px) und 2x203.5px Polster blieben bei 1907px genau 313px
-   * fuer die Chips - ein Haushalt mit sieben Listen sah sie mitten im Namen
-   * abbrechen (#758). Das rechte Polster faellt weg, damit die sichtbare
-   * Flaeche samt Trenner dort endet, wo `.quick-add` und die Zeilentraeger
-   * enden, und nicht 203px spaeter.
-   *
-   * Unterhalb 1024px gilt die Regel bewusst nicht: dort polstert die Basisregel
-   * symmetrisch, die Kappung greift ohnehin nicht, und der Chip-Streifen
-   * braucht seinen rechten Auslauf zum Scrollen. */
-  .shopping-page .list-tabs-bar {
-    padding-inline: var(--page-inline-pad);
-  }
-
-  .page-measure--narrow .list-tabs-bar {
-    max-width: calc(var(--page-measure) + var(--page-inline-pad));
-    padding-inline-end: 0;
-  }
-}
+/* Die Desktop-Kappung der Leiste (#758) ist mit dem Kopf-Umbau entfallen: die
+ * Leiste steht im __center-Slot des Kuechenkopfs. Seit der Re-Critique
+ * 2026-09-27 (D3) endet dieser Kopf an der Kuechen-Leiste, nicht am Lesemass:
+ * die Primaeraktion steht in allen vier Tabs an derselben Stelle. */
 
 /* Gruppenkopf und Gruppenfläche kommen aus .list-group__title /
- * .list-rows. Das eigene .item-category__icon entfällt: der Kopf nutzt jetzt
+ * .row-carrier. Das eigene .item-category__icon entfällt: der Kopf nutzt jetzt
  * die geteilte .icon-sm-Größe wie die Geschwistertabs. */
 
 /* Engerer Gruppen-Rhythmus, NUR im Einkauf (#1039). Die geteilten Werte
@@ -636,6 +608,96 @@
 
 .shopping-page .list-group {
   gap: var(--space-1);
+}
+
+/* ZWEI SPALTEN AM DESKTOP (Re-Critique 2026-09-27, A4 P1 / R10 L4).
+ *
+ * Gemessen bei 1440x900: die Liste stand auf dem Lesemass 252-972, rechts
+ * davon 436px leere Buehne, und 23 Artikel brauchten 1576px Scrollhoehe - im
+ * Tab, den man am Desktop fuer den Wocheneinkauf offen hat. Ab einer
+ * Einkaufsflaeche von 60rem (1280er-Laptop mit Seitenleiste: 1060px; ein
+ * 1200er-Fenster: 980px) stehen die Kategorien deshalb in zwei Spalten, und
+ * die Liste endet an derselben Kante wie Essensplan und Rezepte - die
+ * Kuechen-Tabs teilen eine Fluchtlinie (252 bis 1408 bei 1440).
+ *
+ * DICHT GEPACKT OHNE NATIVES MASONRY (Re-Critique 2026-09-27, R11 H5). Bis R11
+ * war die Basis ein Grid mit zwei Spalten, Masonry nur hinter `@supports`.
+ * Chrome und Firefox kennen beides nicht: eine kurze Kategorie endete dort mit
+ * Luft unter sich, weil ihre Zeile so hoch war wie die Nachbarin (gemessen bei
+ * 1440x900: 208px unter einer kurzen Kategorie). Jetzt ist die Basis Multicol - dieselbe
+ * Rezeptur wie im Leitfaden fuer Masonry-Ersatz: `columns` auf einer Huelle
+ * ohne feste Hoehe (`.items-lanes`, shopping.js), `break-inside: avoid` je
+ * Kategorie. Natives Masonry bleibt der Fortschritt hinter `@supports`.
+ *
+ * WAS MULTICOL KOSTET, KOSTET MASONRY AUCH: klappt eine Kategorie zu, kann die
+ * naechste in die andere Spalte wandern - Masonry legt ebenso jede Gruppe in
+ * die gerade kuerzere Bahn. Die Lesefolge folgt der sichtbaren Spalte (erst
+ * links hinab, dann rechts), die Tastatur mit ihr, weil das DOM dieselbe
+ * Reihenfolge hat.
+ *
+ * DIE ABFRAGE MISST DIE SEITE, NICHT DEN VIEWPORT - dieselbe Regel wie der
+ * Liste-+-Detail-Baustein (layout.css, module-surface): neben der
+ * ausgeklappten Seitenleiste ist ein 1200er-Fenster 980px breit. */
+.shopping-page {
+  container: shopping-surface / inline-size;
+}
+
+/* Schmal traegt die Huelle nichts: die Gruppen stehen wie bisher direkt im
+ * Raster des Scrollers und erben dessen Abstand. */
+.items-lanes {
+  display: contents;
+}
+
+@container shopping-surface (min-width: 60rem) {
+  /* Die Kategorie kappt weiter ueber `--page-measure` (list-row.css) - hier
+   * ist das Mass die Spalte selbst, wie im Liste-+-Detail-Baustein. */
+  .shopping-page .items-list {
+    --page-measure: 100%;
+  }
+
+  .shopping-page .items-lanes {
+    display: block;
+    columns: 2;
+    column-gap: var(--space-5);
+  }
+
+  .shopping-page .items-lanes > .list-group {
+    break-inside: avoid;
+    margin-block-end: var(--space-3);
+  }
+
+  /* Die Eingabezeile endet mit der ersten Spalte statt mitten in der zweiten. */
+  .shopping-page .quick-add {
+    max-width: calc((100% - var(--space-5)) / 2);
+  }
+
+  @supports (grid-template-rows: masonry) {
+    .shopping-page .items-lanes {
+      display: grid;
+      columns: auto;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: masonry;
+      gap: var(--space-3) var(--space-5);
+      align-items: start;
+    }
+
+    .shopping-page .items-lanes > .list-group {
+      margin-block-end: 0;
+    }
+  }
+
+  @supports (display: grid-lanes) {
+    .shopping-page .items-lanes {
+      display: grid-lanes;
+      columns: auto;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-3) var(--space-5);
+    }
+
+    .shopping-page .items-lanes > .list-group {
+      margin-block-end: 0;
+    }
+  }
 }
 
 /* --------------------------------------------------------
@@ -664,22 +726,14 @@
   padding-block: 0;
 }
 
-/* Platz für den Swipe-Hinweis-Pfeil (.swipe-row::after in layout.css: 12px
- * breit, 8px von der rechten Kante, opacity 0.3).
- *
- * Er lag vorher unter dem letzten Zeilen-Button und war damit unsichtbar - bei
- * 4px Zeilenpolster reichte der Stift bis 296px, der Pfeil sitzt bei 280..292.
- * Mit dem geteilten 12px-Polster endet der Stift bei 288px und der Pfeil kam
- * darunter hervor: zwei Glyphen nebeneinander, von denen einer keine Aktion ist.
- *
- * Die Reserve steht hier statt in layout.css, weil `.swipe-row` auch von
- * Aufgaben benutzt wird und deren Zeile eine andere Bedienzone hat. Nur auf
- * Touch: auf Desktop blendet layout.css den Pfeil ohnehin aus (ab 1024px), und
- * dort löscht man aus der Zeile statt per Swipe. */
-@media (hover: none) {
-  .shopping-item {
-    padding-inline-end: calc(var(--space-2) + var(--space-3) + var(--space-2));
-  }
+/* KEIN WISCH-CHEVRON IN DER EINKAUFSLISTE (Re-Critique 2026-09-28, A4 P2-5).
+ * Die geteilte Zeile (.swipe-row::after, layout.css) malt ein ">" an den
+ * Rand - in iOS heisst das "tippe fuer Detail", hier hiess es "wische", und
+ * Tippen hakt ab. Oma Ingrid tippte auf ein Versprechen, das es nicht gibt.
+ * Die Geste lehrt der vorhandene Nudge (`swipe-row--hint`, einmal je Liste).
+ * Mit dem Pfeil geht auch die Polster-Reserve, die hier fuer ihn stand. */
+.swipe-row:has(> .shopping-item)::after {
+  content: none;
 }
 
 /* ABGEHAKT TRITT ÜBER DIE TEXTFARBEN ZURÜCK, NICHT ÜBER DIE DECKUNG DER ZEILE.
@@ -731,7 +785,7 @@
  * Abhakmoment ohne sie (Signaturelement-Runde 2026-08-31). Grün bleibt die
  * BESTÄTIGUNG: „erledigt" spricht app-weit --color-success, der Modulton
  * lädt nur ein. */
-.item-check:hover::before {
+.item-check:not(.item-check--static):hover::before {
   border-color: var(--module-accent, var(--color-accent));
 }
 
@@ -763,6 +817,26 @@
 
 .item-check--checked .item-check__icon { display: block; }
 
+/* DAS ZEICHEN STATT DES KNOPFS (#1265 P4, Bauart `.task-status-btn--static`).
+ * Bei `shopping: read` bleibt der Kasten stehen, weil er die Auskunft traegt -
+ * abgehakt oder offen -, aber nichts an ihm lockt zum Tippen: neutraler Zeiger,
+ * kein Hover-Rahmen (den nimmt die Hover-Regel oben per `:not()` aus, keine
+ * Gegenregel hier) und kein Pop beim Zeichnen - der Pop quittiert eine
+ * Beruehrung, und bei jedem Neuaufbau einer gelesenen Liste liefe er ohne eine.
+ *
+ * ZWEI KLASSEN IM SELEKTOR: `.item-check--checked` traegt die Animation mit
+ * derselben Spezifitaet (0,1,0); eine einzelne Klasse hier hinge an der
+ * Quellreihenfolge (dieselbe Falle wie in tasks.css, Review zu PR #1252). */
+.item-check.item-check--static {
+  cursor: default;
+  animation: none;
+}
+
+/* Die Zeile hakt bei `read` nicht ab - also auch kein Zeiger, der es verspricht. */
+.shopping-item.shopping-item--static {
+  cursor: default;
+}
+
 /* Textspalte, Name und Menge kommen aus .list-row__main / __name / __meta
  * (styles/list-row.css).
  *
@@ -772,6 +846,14 @@
  * gegen 176px Bedarf, lesbar blieben vier Zeichen („Broc…", „Cherr…"), und das
  * in genau der Situation, für die diese Liste gebaut ist. Der geteilte Name
  * bricht stattdessen um, wie es das MHD im Vorrat schon tat. */
+/* Der Wechsel auf die gedaempfte Farbe blendet (R16, Bewegung): Name und
+ * Metazeile sprangen beim Abhaken ohne Uebergang um, waehrend der Kreis
+ * daneben poppt. Nur `color` - der Durchstrich selbst ist nicht animierbar. */
+.shopping-item .list-row__name,
+.shopping-item .item-meta {
+  transition: color var(--transition-fast);
+}
+
 .shopping-item--checked .list-row__name {
   text-decoration: line-through;
   color: var(--color-text-secondary);
@@ -884,7 +966,7 @@
 
 /* Kein Margin mehr am shopping-item selbst (übernimmt swipe-row).
  *
- * KEIN border-radius mehr: den trägt jetzt die Gruppe (.list-rows, 12px, mit
+ * KEIN border-radius mehr: den trägt jetzt die Gruppe (.row-carrier, --radius-lg, mit
  * overflow: hidden), und die klippt die Swipe-Fläche mit. Ein eigener Radius auf
  * der Zeile war der letzte Rest des Karten-Paradigmas im Einkauf und hätte
  * innerhalb der Gruppenfläche als doppelte Rundung gelesen. */

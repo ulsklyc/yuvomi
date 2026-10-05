@@ -25,11 +25,8 @@
 
 /* Gerüst (Shell + Titel) jetzt geteilt via .page-toolbar in layout.css.
  * Damit wird der Documents-Kopf wie alle anderen sticky und nutzt --color-bg. */
-/* Layout only — control visual lives in page-search.css (shared). */
-.documents-toolbar__search {
-  flex: 1;
-  min-width: 180px;
-}
+/* .documents-toolbar__search traegt keine Breite (Re-Critique 2026-09-27, D4):
+ * Breite und Stelle der Kopfsuche kommen aus page-search.css. */
 
 .documents-view-toggle {
   display: inline-flex;
@@ -39,9 +36,16 @@
   background: var(--color-surface-3);
 }
 
+/* EINE KOPFHOEHE (Critique 2026-09-25): gemessen standen Suche 44, dieser
+ * Umschalter 48 und der Menueknopf 44 (mobil 48 / 52 / 48) nebeneinander -
+ * der Well legte seine 2px Rand AUF die Zielgroesse. Die Knoepfe sind jetzt
+ * genau um diesen Rand kleiner, der Well ist damit so hoch wie jedes andere
+ * Kopf-Bedienelement: --target-base, am Zeiger 44, am Finger 48. Die
+ * Segmente stehen als Reihe (WCAG 2.5.8, Zielgroessen-Regel in tokens.css),
+ * dieselbe Rechnung wie der Ansichts-Umschalter der Aufgaben (tasks.css). */
 .documents-view-toggle__btn {
-  width: var(--target-base);
-  height: var(--target-base);
+  width: calc(var(--target-base) - 2 * var(--space-0h));
+  height: calc(var(--target-base) - 2 * var(--space-0h));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -64,33 +68,37 @@
   color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
 }
 
-/* Folder upload is a separate page action, not a hidden second choice in the
- * document form. On narrow displays it remains a 44px icon next to the view
- * toggle, while its aria-label preserves the accessible name. */
-.documents-upload-folder-btn {
-  flex-shrink: 0;
-}
-
+/* EIN WEG ZUR ANSICHT JE BREITE (R16, Kopfregel mobil 1a). Unter 768px stehen
+ * die Werkzeuge in der Titelzeile, und die traegt kein Segment: die Ansicht
+ * steht dort als Einfachauswahl im Kopf-Menue (documentsToolsMenuHtml), der
+ * Umschalter ist ausgeblendet. Ab 768px umgekehrt. */
 @media (max-width: 767px) {
-  .documents-upload-folder-btn {
-    width: var(--target-base);
-    min-width: var(--target-base);
-    height: var(--target-base);
-    min-height: var(--target-base);
-    padding-inline: 0;
-  }
-
-  .documents-upload-folder-btn__label {
+  .documents-view-toggle {
     display: none;
   }
 }
 
-/* Eigene Filterzeile unter dem Kopf (wie Kontakte): Status- + Kategorie-Chips
- * scrollen gemeinsam horizontal, statt in die Kopfzeile gequetscht zu werden.
- * Das behebt das Überlappen/Abschneiden auf Desktop (Issue #506). */
-/* Die Filterzeile selbst scrollt NICHT — nur ihre Kategorie-Facette tut das
- * (siehe .documents-filter-chips). Ein einziger Scroller statt verschachtelter
- * hält Status-Umschalter, Sortierung und Auswahl immer sichtbar. */
+@media (min-width: 768px) {
+  .documents-tools-menu__view {
+    display: none;
+  }
+}
+
+/* Kopf-Menue fuer Sortierung und Auswahl (documentsToolsMenuHtml). Die
+ * Groesse des Icon-Knopfs gehoert der Shell (.btn--icon); hier steht nur,
+ * dass er in der Aktionszeile nicht schrumpft. */
+.documents-tools-btn {
+  flex-shrink: 0;
+}
+
+/* Eigene Filterzeile unter dem Kopf (wie Kontakte), statt in die Kopfzeile
+ * gequetscht (Issue #506). Sie traegt seit der Critique 2026-09-25 nur noch
+ * zwei Dinge: das Status-Segment und die Spur der Facetten-Chips.
+ *
+ * Die Filterzeile selbst scrollt NICHT, auf keiner Breite - nur die Chip-Spur
+ * (.documents-filters__chips) tut das. Mobil scrollte bis dahin die ganze
+ * Zeile, 1267px Inhalt auf 375px, und Sortierung und Auswahl lagen am Ende
+ * ausserhalb des Bilds. Die stehen jetzt im Kopf-Menue. */
 .documents-filters {
   display: flex;
   align-items: center;
@@ -102,18 +110,23 @@
   flex-shrink: 0;
 }
 
-.documents-filter-group {
-  display: inline-flex;
-  gap: var(--space-2);
+/* Aktiv/Archiviert ist das Segment der Shell (.segmented, panel.css) - eine
+ * Einfachauswahl, keine Facette. Es steht fest; nur die Chips daneben
+ * scrollen. */
+.documents-status {
   flex-shrink: 0;
 }
 
-/* Die Kategorie-Facette scrollt horizontal in EINER Zeile — auf jedem Gerät.
- * Vorher brach sie auf Desktop um und wuchs unbegrenzt: bei schmalem Fenster
- * stapelten sich 15 Chips auf 8 Zeilen (461px), das erste Dokument lag unter der
- * Falz. Eine Zeile plus Rand-Fade hält die Kopfzone konstant hoch. */
-.documents-filter-chips {
+/* Die Chip-Spur scrollt horizontal in EINER Zeile - auf jedem Geraet und als
+ * EINZIGER Scroller der Zeile. Vorher brach die Facette auf Desktop um und wuchs
+ * unbegrenzt: bei schmalem Fenster stapelten sich 15 Chips auf 8 Zeilen
+ * (461px), das erste Dokument lag unter der Falz. Eine Zeile plus Rand-Fade
+ * haelt die Kopfzone konstant hoch. Kategorie- und Ablauf-Chip liegen in
+ * derselben Spur: zwei Scroller nebeneinander waeren zwei Gesten fuer eine
+ * Reihe. */
+.documents-filters__chips {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
   min-width: 0;
   flex: 1 1 auto;
@@ -124,22 +137,32 @@
   border-inline-start: 1px solid var(--color-border);
 }
 
-.documents-filter-chips::-webkit-scrollbar { display: none; }
+.documents-filters__chips::-webkit-scrollbar { display: none; }
 
-.documents-filters__end {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-shrink: 0;
-  margin-inline-start: auto;
-  padding-inline-start: var(--space-3);
-  border-inline-start: 1px solid var(--color-border);
+/* Traegt keine Gruppe einen Chip (leere Ansicht, documents.js
+ * renderCategoryChips), geht die Spur samt Haarlinie: ein Strich neben dem
+ * Segment, hinter dem nichts kommt, waere Moebel ohne Zweck. */
+.documents-filters__chips:not(:has(.filter-chip)) {
+  display: none;
 }
 
-.documents-sort {
-  width: auto;
-  min-height: var(--target-md);
-  font-size: var(--text-sm);
+.documents-filter-chips {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.documents-filter-chips:empty {
+  display: none;
+}
+
+/* Fristen stehen vorn in der Spur (Re-Critique 2026-09-25, P1) und sind von
+ * den Kategorien abgesetzt: dieselbe Haarlinie wie zwischen Segment und Spur,
+ * kein neuer Ton. Nur wenn der Chip steht - die leere Gruppe ist ausgeblendet,
+ * und eine Linie ohne Chip davor waere ein Strich ins Leere. */
+.documents-filter-chips--deadlines:not(:empty) {
+  padding-inline-end: var(--space-2);
+  border-inline-end: 1px solid var(--color-border);
 }
 
 /* Rand-Fade für horizontal scrollende Leisten (Kategorie-Chips + Ordner-Chips):
@@ -149,80 +172,48 @@
 
 /* --------------------------------------------------------
  * Auswahl-Modus (Bulk)
+ *
+ * Die Sammelaktionen stehen seit R11 (H4) in der Pille der Shell
+ * (utils/bulk-pill.js), nicht mehr in einer eigenen Leiste ueber der Liste.
+ * Hier bleibt nur, wie eine gewaehlte Karte oder Zeile aussieht.
  * -------------------------------------------------------- */
-.documents-selectbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding-block: var(--space-2);
-  padding-inline: var(--page-inline-pad);
-  border-bottom: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--module-accent) var(--tint-wash), var(--color-bg));
-  flex-wrap: wrap;
-}
 
-/* `.btn`/`.documents-selectbar` setzen ein eigenes display und schlagen damit
- * das UA-`[hidden] { display: none }`. Ohne diesen Guard blieb der DMS-Button
- * sichtbar, obwohl gar kein DMS-Konto konfiguriert ist. */
-.documents-selectbar[hidden],
+/* `.btn` setzt ein eigenes display und schlaegt damit das UA-`[hidden]
+ * { display: none }`. Ohne diesen Guard blieb der DMS-Button sichtbar, obwohl
+ * gar kein DMS-Konto konfiguriert ist. */
 .documents-dms-link-btn[hidden] {
   display: none;
 }
 
-.documents-selectbar__count {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
-}
-
-.documents-selectbar__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-inline-start: auto;
-  flex-wrap: wrap;
-}
-
-.document-select {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  flex-shrink: 0;
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--module-accent) var(--tint-surface), transparent);
-  cursor: pointer;
-}
-
-.document-select input {
-  width: 20px;
-  height: 20px;
-  accent-color: var(--module-accent);
-  cursor: pointer;
-}
-
-/* Die RASTERKARTE traegt ihre Auswahl als Ring - sie ist ein eigenes Objekt mit
- * eigener Kante. Die ZEILE hat beides nicht mehr und traegt sie als getoente
+/* Die RASTERKARTE traegt ihre Auswahl als Ring - sie ist ein eigenes Objekt
+ * (randlos seit 2026-09-25, der Ring ist deshalb ein Schatten, keine Kante). Die ZEILE hat beides nicht mehr und traegt sie als getoente
  * Flaeche: dasselbe Vokabular wie jeder andere ausgewaehlte Zustand der App
  * (§2, getoente Flaeche statt Kante). Ein Ring um eine Zeile in einer Liste
  * malte ihr die Karte zurueck, die sie gerade abgegeben hat. */
 .document-card.is-selected {
-  border-color: var(--module-accent);
-  box-shadow: 0 0 0 1px var(--module-accent), var(--shadow-md);
+  box-shadow: 0 0 0 2px var(--module-accent), var(--shadow-md);
 }
 
 .document-row.is-selected {
   background-color: color-mix(in srgb, var(--module-accent) var(--tint-surface), var(--color-surface));
 }
 
+/* DIE LEISTE BIS 280px (Re-Critique 2026-09-27, R11 H4 / A6 P2-7). Bei 240px
+ * blieben dem Ordnernamen neben Pfeil, Symbol, Zaehler und dem immer
+ * sichtbaren Kebab 73px - aus „Gesundheit" wurde „Gesund-heit", aus
+ * „Versicherungen" „Versiche-rungen", auch bei 1440px. Mit 280px und dem
+ * engeren Zeilenabstand unten sind es 121px: die mitgelieferten Namen stehen
+ * auf einer Zeile, und nur wirklich lange eigene Namen trennen noch - nach
+ * Silben (`hyphens: auto` der Namensrolle), nie mitten im Wort. */
 .documents-browser-layout {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
   align-items: start;
   gap: var(--space-4);
   padding-inline: var(--page-inline-pad);
-  padding-bottom: calc(var(--nav-bottom-height) + var(--space-8));
+  /* Nur der eigene Abstand: Tab-Leiste und FAB rechnet die Shell als
+   * Nachlauf (`--shell-tail`, layout.css, Kopfregel mobil 2026-09-26). */
+  padding-bottom: var(--space-8);
 }
 
 /* NUR NOCH POSITION, KEINE FLAECHE MEHR.
@@ -338,9 +329,12 @@
 }
 
 /* `.list-row` stellt display, Polsterung, Hoehe und Hover. Hier bleibt der
- * Positionsanker fuer das Kebab-Menue. */
+ * Positionsanker fuer das Kebab-Menue - und ein engerer Abstand: die Zeile
+ * traegt Pfeil, Ziel und Kebab nebeneinander, und die 12px der Listenzeile
+ * gingen zweimal vom Namen ab (R11 H4). */
 .documents-folder-item {
   position: relative;
+  column-gap: var(--space-2);
 }
 
 /* ------------------------------------------------------------------ */
@@ -350,9 +344,10 @@
 /* Die Einrueckung je Ebene. 14px und nicht --space-4: der Pfeil davor ist
  * 20px breit, zusammen ergibt das die Stufe, an der das Auge die Ebene liest,
  * ohne dass bei fuenf Ebenen (der Grenze) auf einer 280px-Leiste weniger als
- * die halbe Breite fuer den Namen bleibt. */
+ * die halbe Breite fuer den Namen bleibt. Die Stufe kommt AUF das Polster von
+ * `.list-row` (--space-3), sonst klebt Tiefe 0 an der Kante der Leiste. */
 .documents-folder-item {
-  padding-inline-start: calc(var(--folder-depth, 0) * 14px);
+  padding-inline-start: calc(var(--space-3) + var(--folder-depth, 0) * 14px);
 }
 
 /* Aufklappen ist ein EIGENER Knopf neben dem Namen, nicht die Zeile - die
@@ -487,23 +482,32 @@
   color: var(--module-accent);
 }
 
-/* Overflow-Kebab: dezent, erscheint bei Hover/Fokus; auf Touch stets sichtbar. */
+/* Overflow-Kebab: IMMER SICHTBAR, ruhig durch Kontrast (Critique 2026-09-25).
+ * Er erschien erst bei Hover/Fokus - gegen die eine Sichtbarkeitsregel der
+ * Zeilenaktionen (list-row.css, Bedienzone), und auf Tablet/Trackpad ohne
+ * verlaessliches hover-Signal war er gar nicht zu finden. Ruhe kommt aus der
+ * Tertiaerfarbe; Hover und Fokus hellen ihn auf.
+ *
+ * --target-md und nicht --target-sm: sichtbar heisst gemessen. Die Ordnerzeilen
+ * liegen mehr als 16px auseinander, der Kebab ist also ein EINZELZIEL und
+ * braucht am Zeiger 40px (Sonde 4, test-document-guards.js). Solange er
+ * unsichtbar und ohne pointer-events war, fiel das nicht auf. */
 .documents-folder-item__menu {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--target-sm);
-  height: var(--target-sm);
+  /* Traegt seit Runde 5 (2026-09-26) die geteilte .row-action; deren 48px
+   * stehen auch als min-width/min-height da - hier mitziehen, sonst gewinnt
+   * das Minimum ueber die 40px am Zeiger. */
+  width: var(--target-md);
+  height: var(--target-md);
+  min-width: var(--target-md);
+  min-height: var(--target-md);
   margin-right: var(--space-0h);
   flex-shrink: 0;
   border-radius: var(--radius-full);
   color: var(--color-text-tertiary);
-  opacity: 0;
-  /* Unsichtbar heisst auch unklickbar: ohne pointer-events bleibt hier ein
-   * volles Trefferziel stehen, das niemand sieht (Guard
-   * `verborgene Reveal-Aktionen bleiben nicht klickbar`, test-frontend-audit.js). */
-  pointer-events: none;
-  transition: opacity var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
 .documents-folder-item__menu svg {
@@ -511,28 +515,21 @@
   height: 16px;
 }
 
-.documents-folder-item:hover .documents-folder-item__menu,
-.documents-folder-item:focus-within .documents-folder-item__menu {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 .documents-folder-item__menu:hover {
   color: var(--module-accent);
   background: color-mix(in srgb, var(--module-accent) var(--tint-state), transparent);
 }
 
-/* Touch: den Kebab auf Finger-Maße heben. Er ist ein REIHEN-Ziel (je Ordnerzeile
- * einer, 8px Abstand zum nächsten) und hält damit am Zeiger schon mit 32x32 die
- * Regel - am Finger fehlt ihm die Fläche trotzdem. Der Ordner-Hinzufügen-Knopf
+/* Touch: den Kebab auf Finger-Maße heben (am Zeiger trägt er --target-md,
+ * siehe oben). Der Ordner-Hinzufügen-Knopf
  * steht hier nicht mehr: er trägt seit Phase 3c --target-base und bekommt seine
  * 48px damit aus demselben Token wie alle anderen. */
 @media (hover: none) {
   .documents-folder-item__menu {
-    opacity: 1;
-    pointer-events: auto;
     width: var(--target-lg);
     height: var(--target-lg);
+    min-width: var(--target-lg);
+    min-height: var(--target-lg);
   }
 
   .documents-context-menu__item {
@@ -560,10 +557,47 @@
   border-radius: var(--radius-md);
   background: var(--color-surface);
   box-shadow: var(--shadow-lg);
+  /* Ein- und Ausgang wie `.popover-menu` (layout.css), hier rein in CSS: das
+   * Menue erschien und verschwand hart. `@starting-style` traegt die Einfahrt,
+   * `overlay`/`display` diskret den kuerzeren Ausgang. Rueckfall: ohne
+   * `allow-discrete` faellt die zweite Deklaration weg (harter Ausgang), ohne
+   * `@starting-style` steht es sofort - beides der Stand von vorher. */
+  opacity: 0;
+  transform: scale(0.96);
+  pointer-events: none;
+  transition:
+    opacity var(--duration-xs) var(--ease-out),
+    transform var(--duration-xs) var(--ease-out);
+  transition:
+    opacity var(--duration-xs) var(--ease-out),
+    transform var(--duration-xs) var(--ease-out),
+    overlay var(--duration-xs) allow-discrete,
+    display var(--duration-xs) allow-discrete;
 }
 
 .documents-context-menu:popover-open {
   display: flex;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition:
+    opacity var(--duration-md) var(--ease-out),
+    transform var(--duration-md) var(--ease-out);
+}
+
+@starting-style {
+  .documents-context-menu:popover-open {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .documents-context-menu,
+  .documents-context-menu:popover-open {
+    transform: none;
+    transition: none;
+  }
 }
 
 .documents-context-menu__item {
@@ -621,25 +655,36 @@
   height: 17px;
 }
 
+/* ZWEI ZEILEN STATT "Versicheru..." (Critique 2026-09-25). Mit dem immer
+ * sichtbaren Kebab bleibt dem Namen noch weniger Breite; einzeilig mit Ellipse
+ * war er nirgends ganz zu lesen. Er bricht jetzt zweizeilig um, und was auch
+ * dann nicht passt, steht ganz im title (renderFolderBrowser). */
 .documents-folder-item__name {
   min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
+/* Dasselbe Rezept wie .filter-chip__count: die Fuellung mischt die eigene
+ * Tinte. --color-surface-2 lag in Dark UNTER der Buehne und las sich als Loch
+ * (Re-Critique 2026-09-25); aus currentColor gemischt steht der Zaehler auf
+ * jeder Zeilenflaeche - Ruhe, Hover, aktiv - einen Hauch ueber ihr. */
 .documents-folder-item__count {
   min-width: 24px;
   padding: 2px var(--space-2);
   border-radius: var(--radius-full);
-  background: var(--color-surface-2);
+  background: color-mix(in srgb, currentColor var(--tint-state), transparent);
   color: var(--color-text-tertiary);
   font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
   text-align: center;
 }
 
 .documents-folder-item--active .documents-folder-item__count {
-  background: color-mix(in srgb, var(--module-accent) var(--tint-surface), var(--color-surface));
   color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
 }
 
@@ -651,11 +696,16 @@
   min-height: calc(var(--target-lg) * 4);
 }
 
-/* minmax so gewählt, dass jede Karte die schlanke Aktionszeile
- * (Ansehen · Download · Kebab) ohne Umbruch trägt. */
+/* MINDESTENS ZWEI SPALTEN, AM DESKTOP DREI (Critique 2026-09-25). Vorher
+ * minmax(270px): bei 1280px zwei Spalten a 362px (Liste 740px), auf dem
+ * Telefon eine, und mit der Vorschau war jede Karte 443-451px hoch - zwei
+ * Dokumente pro Bildschirm. `min(200px, 50% - gap/2)` haelt die Spalte nie
+ * breiter als die Haelfte, also stehen immer zwei nebeneinander, und ab
+ * 3 x 200px + 2 gaps eine dritte. 200px tragen die Leiste (drei 40px-Knoepfe)
+ * samt Kartenpolsterung. */
 .documents-list--grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, calc(50% - var(--space-4) / 2)), 1fr));
   gap: var(--space-4);
 }
 
@@ -679,11 +729,13 @@
  * Werten auf (--glass-bg-card == --color-surface im Basistheme). Der DESIGN.md-Ban
  * „kein backdrop-filter auf Datenkarten" bleibt gewahrt — hier wird nur die
  * geteilte Karten-Vokabel genutzt, KEIN Blur. Kein backdrop-filter ergänzen. */
+/* KARTENKANON (DESIGN.md, Cards / Containers): 12px, randlos auf dem
+ * Grouped-Grund, die Trennung leistet der Schatten. Hier stand eine Kante aus
+ * --color-border-subtle und --radius-lg (16px, der Radius des Zeilen-Traegers). */
 .document-card {
-  border: 1px solid var(--color-border-subtle);
   background-color: var(--color-surface);
   box-shadow: var(--shadow-sm);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
 }
 
 /* `:not(.is-selected)` ist hier kein Feinschliff: beide Regeln setzen dieselbe
@@ -695,17 +747,28 @@
 
 /* Inhaltsgetriebene Höhe statt fixer min-height: kompaktere Karten, weniger
  * Leerraum. In mehrspaltigen Grids gleichen sich Karten je Reihe automatisch an
- * (align-items: stretch); body { flex: 1 } hält die Aktionen unten bündig. */
+ * (align-items: stretch); body { flex: 1 } hält die Leiste unten bündig.
+ * Kompaktes Innenmass (DESIGN.md: 16px, kompakt 12px) - die Karte ist seit
+ * 2026-09-25 hoechstens halb so breit wie die Liste.
+ *
+ * Die Karte ist ein Container: was in ihr steht, entscheidet IHRE Breite,
+ * nicht das Fenster (Kurzform des Ablauf-Chips, Datum in der Fusszeile). */
 .document-card {
   display: flex;
   flex-direction: column;
-  padding: var(--space-4);
+  padding: var(--space-3);
+  container: document-card / inline-size;
 }
 
-.document-card__icon,
 .document-row__icon {
   width: 42px;
   height: 42px;
+  /* QUADRATISCH BLEIBEN (Critique 2026-09-25). In der Zeile ist die Kachel ein
+   * Flex-Item neben `.list-row__main`, und deren Basis ist die Breite ihres
+   * Inhalts - mit einer vollen Meta-Zeile weit mehr als die Zeile hat. Beim
+   * Schrumpfen gab die Kachel anteilig mit ab: gemessen bei 375px 28x42, mit
+   * langem Titel 14x42. Die Breite ist eine Zusage, keine Verhandlungsmasse. */
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -722,7 +785,6 @@
   background: var(--color-fill-well);
 }
 
-.document-card__icon svg,
 .document-row__icon svg {
   width: 22px;
   height: 22px;
@@ -751,10 +813,12 @@
   transition: transform var(--transition-base);
 }
 
-/* Die ganze Karte ist bereits Klick-Ziel (cursor: pointer). Sobald ein Thumbnail
-   geladen ist, quittiert der Slot den Hover mit einem sanften Zoom - eine kleine
-   Bestätigung, dass diese Vorschau die Karte öffnet. Kein eigener Cursor nötig. */
-.document-thumb--ready:hover .document-thumb__img {
+/* Die ganze Zeile ist bereits Klick-Ziel (cursor: pointer). Sobald ein Thumbnail
+   geladen ist, quittiert die kleine Kachel den Hover mit einem sanften Zoom - eine
+   kleine Bestätigung, dass diese Vorschau das Dokument öffnet. NUR die 42px-Kachel
+   der Zeile: auf der grossen Kartenvorschau schnitt derselbe Zoom den Briefkopf an,
+   und die Karte meldet den Hover schon mit ihrer Anhebung (Critique 2026-09-25). */
+.document-row__icon.document-thumb--ready:hover .document-thumb__img {
   transform: scale(1.06);
 }
 
@@ -762,27 +826,67 @@
   .document-thumb__img {
     transition: none;
   }
-  .document-thumb--ready:hover .document-thumb__img {
+  .document-row__icon.document-thumb--ready:hover .document-thumb__img {
     transform: none;
   }
 }
 
-.document-card__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+/* DIE VORSCHAU IST EIN AUSSCHNITT, KEIN ZERRBILD (Critique 2026-09-25,
+ * Entscheidung 2). Jede Datei steht in einem Rahmen fester Form und fuellt ihn
+ * per object-fit: cover - geschnitten, nie gestaucht (DESIGN.md, media-thumb).
+ * Oben verankert, weil der Kopf eines Dokuments es erkennbar macht: Briefkopf,
+ * Titel, Absender. Der Rahmen liegt als ::after UEBER dem Bild, sonst
+ * verschwaende ein weisses Blatt im hellen Modus randlos in der weissen Karte. */
+.document-thumb--ready .document-thumb__img {
+  object-position: top center;
 }
 
-.document-card__date {
-  font-size: var(--text-xs);
+.document-thumb--ready::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--color-border-subtle);
+  pointer-events: none;
+}
+
+/* Die Rasterkarte traegt die grosse Vorschau oben. JEDE Karte hat den Rahmen,
+ * auch ohne Bild (dann mit der Kategorie-Glyphe): eine Reihe bleibt eine Reihe,
+ * und ein Bild, das erst beim Scrollen ankommt, schiebt nichts mehr zur Seite.
+ * 4:3 statt 16:10 (Critique 2026-09-25): mit zwei bis drei Spalten ist die
+ * Karte schmal, und der obere Ausschnitt eines Blatts (Briefkopf, Titel) liest
+ * sich in einem etwas hoeheren Rahmen besser als in einem Breitbild. */
+.document-card__media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-sm);
   color: var(--color-text-tertiary);
-  white-space: nowrap;
-  flex-shrink: 0;
+  background: var(--color-fill-well);
+}
+
+.document-card__media svg {
+  width: 32px;
+  height: 32px;
+}
+
+/* Einblenden nur, wer Bewegung nicht abbestellt hat - und nur das Bild, das
+ * gerade angekommen ist (data-thumb-fresh), nicht das aus dem Seitenspeicher. */
+@media (prefers-reduced-motion: no-preference) {
+  .document-thumb__img[data-thumb-fresh] {
+    animation: document-thumb-in var(--duration-md) var(--ease-out);
+  }
+}
+
+@keyframes document-thumb-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .document-card__body {
   flex: 1;
+  min-width: 0;
   margin-top: var(--space-3);
 }
 
@@ -793,12 +897,28 @@
   overflow-wrap: anywhere;
 }
 
+/* Hoechstens zwei Zeilen; der ganze Name steht im title und im Betrachter.
+ * Silbentrennung statt Bruch an beliebiger Stelle: in der Telefonspalte
+ * (140px) brach "Zahnarztrechnung" sonst als "Zahnarztrechnun / g". */
+.document-card__title {
+  hyphens: auto;
+  overflow-wrap: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+/* Nur wenn es eine gibt, und dann eine Zeile. Der feste Mindest-Leerraum
+ * (42px) fuer eine fehlende Beschreibung ist mit ihrem Ersatz entfallen. */
 .document-card__description {
-  min-height: 42px;
-  margin: var(--space-2) 0 0;
+  margin: var(--space-1) 0 0;
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .document-card__meta,
@@ -809,23 +929,70 @@
   font-size: var(--text-xs);
 }
 
-/* Die KARTE darf ihre Meta umbrechen und braucht den Abstand zum Titel: sie ist
- * ein Objekt mit eigenem Medium, kein Zeilentakt. Die ZEILE bekommt beides von
- * `.list-row__main` (2px Stapelabstand) und bleibt einzeilig - genau der
- * Unterschied, der die Listenansicht von 265px je Eintrag auf den Beat der
- * übrigen neun Module bringt. */
+/* Die Karte braucht den Abstand zum Titel; die ZEILE bekommt ihn von
+ * `.list-row__main` (2px Stapelabstand). Einzeilig sind seit 2026-09-25 beide
+ * (Regel darunter): die Karte stapelte bis zu drei Meta-Zeilen und trug damit
+ * die Hoehe, die ihr die Vorschau ohnehin schon gab. */
 .document-card__meta {
-  flex-wrap: wrap;
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
 }
 
-.document-row__meta {
-  flex-wrap: nowrap;
+/* EINE ZEILE, UND WAS NICHT PASST, FAELLT GANZ (Critique 2026-09-25).
+ *
+ * Vorher `flex-wrap: nowrap` plus `overflow: hidden`. Das liess zwei Fehler
+ * zu: der Ablauf-Chip stand zuletzt und war bei 375px 0px sichtbar, und die
+ * Eintraege schrumpften als Flex-Items auf ihre Mindestbreite und brachen IN
+ * SICH um ("Ganze / Familie") - die Meta wurde 35-69px hoch, die Zeilen
+ * sprangen zwischen 76 und 159px.
+ *
+ * Jetzt dieselbe Mechanik wie `.allday-event__label` im Kalender: eine
+ * umbrechende Flex-Zeile, genau eine Zeile hoch, der Rest abgeschnitten.
+ * Flexbox bricht nach der vollen Breite eines Eintrags um, also steht ein
+ * Eintrag ganz in Zeile eins oder ganz in der unsichtbaren zweiten - kein
+ * Stumpf, keine Ellipse, in jeder Sprache ohne Schwellwert. Welche fallen,
+ * entscheidet die Reihenfolge in renderMeta(): der Ablauf steht vorn.
+ * `+ 2px` ist die Polsterung des .doc-badge (1px oben und unten), die ueber
+ * die Zeilenhoehe hinausragt; der Zeilenabstand (--space-2) haelt Zeile zwei
+ * sicher unterhalb. Screenreader lesen alle Eintraege weiter. */
+.document-row__meta,
+.document-card__meta {
+  flex-wrap: wrap;
+  align-items: center;
+  height: calc(1lh + 2px);
   overflow: hidden;
 }
 
-.document-card__meta span,
-.document-row__meta span {
+.document-row__meta > *,
+.document-card__meta > * {
+  white-space: nowrap;
+}
+
+/* Der vorderste Eintrag steht allein in Zeile eins, wenn er breiter ist als
+ * die Spalte - gemessen "Seit 10 Tagen abgelaufen" 165px in 153px bei 375px.
+ * Dann kuerzt der Chip mit Ellipse, statt mitten im Buchstaben abgeschnitten
+ * zu werden. Block statt inline-flex, weil `text-overflow` an einem
+ * Flex-Container nicht greift (sein Text ist ein anonymes Flex-Item); das
+ * Glyph steht dafuer inline auf der Mittellinie. */
+.document-row__meta > .doc-badge,
+.document-card__meta > .doc-badge {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.document-row__meta > .doc-badge svg,
+.document-card__meta > .doc-badge svg {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-inline-end: var(--space-1);
+}
+
+/* Nur die direkten Eintraege: die zwei Textfassungen IM Ablauf-Chip sind
+ * gewoehnliche Inline-Spans - als inline-flex wuerde die Langform zu einem
+ * atomaren Kasten, und die Ellipse des Chips griffe nicht mehr. */
+.document-card__meta > span,
+.document-row__meta > span {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
@@ -844,13 +1011,58 @@
   gap: var(--space-1);
 }
 
-/* Karten-Aktionen: zentriert, mit Trennlinie oben */
+/* Fusszeile der Karte: links das Datum, rechts die Leiste (bzw. im
+ * Auswahlmodus die Auswahlkachel). Keine Trennlinie mehr - die Leiste steht
+ * am Kartenende und braucht keine Kante, um als Abschluss zu lesen. */
+.document-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.document-card__date {
+  min-width: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .document-card__actions {
-  justify-content: center;
-  flex-wrap: wrap;
-  padding-top: var(--space-3);
-  margin-top: var(--space-3);
-  border-top: 1px solid var(--color-border-subtle);
+  margin-inline-start: auto;
+  gap: 0;
+}
+
+/* Die drei Knoepfe stehen als REIHE (Abstand < 16px): fuer sie gilt WCAG 2.5.8,
+ * nicht die Freistehend-Groesse (Zielgroessen-Regel, tokens.css 11b). 40px
+ * halten die Leiste bei zwei Spalten auf dem Telefon in einer Zeile - drei
+ * 48px-Knoepfe waeren 144px in einer 140px-Karte. Die Zeile behaelt ihre. */
+.document-card__actions .row-action {
+  width: var(--target-md);
+  height: var(--target-md);
+  min-width: var(--target-md);
+  min-height: var(--target-md);
+}
+
+/* Schmale Karte (zwei Spalten am Telefon): das Datum weicht der Leiste, der
+ * Ablauf-Chip nimmt seine Kurzform (Regel bei .doc-badge__short), und der
+ * Titel geht auf Subheadline mit bis zu drei Zeilen. In Headline-Groesse
+ * (17px) passten in die 140px-Spalte rund zwoelf Zeichen je Zeile, vier von
+ * vierzehn Titeln endeten nach zwei Zeilen in "..." (Re-Critique 2026-09-25).
+ * Gemessen mit 15px und drei Zeilen: einer, ein 62-Zeichen-Titel; die Karte
+ * waechst um hoechstens 14px. Der ganze Name steht im title und im Betrachter. */
+@container document-card (max-width: 12rem) {
+  .document-card__title {
+    font-size: var(--type-secondary);
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+
+  .document-card__date {
+    display: none;
+  }
 }
 
 /* SIE TRÄGT `.list-row` (Critique 2026-08-13, P0). Anzeigeart, Abstand,
@@ -917,8 +1129,22 @@
    * fuer die Tastatur (Codex-Review zu PR #754, dort als Tastaturfall gemeldet).
    * Die Dichte holt sich die Breite aus den Statistiken und dem
    * Herunterladen-Link - das Herunterladen bietet der Betrachter selbst noch
-   * einmal an, das Ansehen bietet sonst nichts. */
+   * einmal an. Seit 2026-09-25 geht auch das Auge (Regel unten): die Zeile
+   * oeffnet den Betrachter per Klick, und das Kebab-Menue fuehrt "Ansehen",
+   * sobald die Leiste es nicht zeigt - der Weg ins Dokument bleibt fuer Maus,
+   * Touch und Tastatur. */
   .document-row__actions a[download] {
+    display: none;
+  }
+
+  /* DAS AUGE GEHT, DIE ZEILE OEFFNET (Re-Critique 2026-09-25, P2). Mit Auge
+   * und Kebab blieben dem Titel bei 375px 153px, und lange Titel brachen auf
+   * vier Zeilen - fuer einen Knopf, der dasselbe tut wie ein Tipp auf die
+   * Zeile. Der Kebab bleibt das eine nachlaufende Element; fuer die Tastatur
+   * traegt sein Menue dann "Ansehen" (openDocumentMenu), und der Tab-Stopp der
+   * Leiste rueckt auf ihn (utils/roving-toolbar.js, repairRovingStops). Raster
+   * und breite Liste behalten das Auge. */
+  .document-row__actions [data-action="view"] {
     display: none;
   }
 }
@@ -927,28 +1153,81 @@
   color: var(--color-danger);
 }
 
+/* Die Erinnerungstage liegen in einer Huelle, damit `hidden` sie ohne Datum
+ * ausblendet. `.modal-grid > .form-group` (layout.css) erreicht das Feld darin
+ * nicht mehr - dieselbe Zuruecknahme des Abstands hier, sonst stuende es tiefer
+ * als das Datum daneben. */
+.document-expiry-reminder > .form-group {
+  margin-bottom: 0;
+}
+
+/* Der Ablaufblock ist ein zweites Raster unter dem Hauptraster; ohne eigenen
+ * Abstand stiess "Laeuft ab am" an den Ordner-Hinweis darueber (0px statt der
+ * 12px Zeilenluft innerhalb des Rasters). */
+.document-expiry-grid {
+  margin-top: var(--space-3);
+}
+
 .document-form__hint {
   margin-top: var(--space-1);
   color: var(--color-text-tertiary);
   font-size: var(--text-xs);
 }
 
-/* Folder upload stays within one form: the file or folder choice sits above a
- * controllable plan that expands in the same area. */
-.document-upload-choices {
+/* Folder upload stays within one form: the drop zone picks files, a secondary
+ * link picks a folder, and the plan expands in the same area below. */
+.document-upload-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  column-gap: var(--space-3);
+  min-width: 0;
 }
 
-.document-upload-choice {
-  flex: 1 1 auto;
+.document-upload-meta .document-form__hint {
+  flex: 1 1 16rem;
+  min-width: 0;
 }
 
-.document-upload-choice.is-disabled {
-  opacity: 0.55;
-  pointer-events: none;
+/* Der Nebenweg zum Ordner (Critique 2026-09-25): ein Textknopf in der Stimme,
+ * keine zweite Knopfreihe ueber der Drop-Zone. Die Zeile misst die Zielgroesse
+ * ueber `min-height`, die Schrift bleibt die des Hinweises daneben. */
+.document-folder-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-md);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.document-folder-link[hidden] {
+  display: none;
+}
+
+.document-folder-link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+.document-folder-link:disabled {
+  color: var(--color-text-tertiary);
+  cursor: default;
+}
+
+@media (hover: none) {
+  .document-folder-link {
+    min-height: var(--target-lg);
+  }
 }
 
 .folder-upload-preview {
@@ -975,7 +1254,6 @@
 }
 
 .folder-upload-preview__summary span,
-.folder-upload-preview__limit,
 .folder-upload-progress {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
@@ -1071,10 +1349,6 @@
 }
 
 @media (max-width: 639px) {
-  .document-upload-choices {
-    flex-direction: column;
-  }
-
   .folder-upload-preview__summary {
     align-items: stretch;
     flex-direction: column;
@@ -1203,55 +1477,28 @@
   /* Chip-Höhe kommt aus .filter-chip--sm (an `hover: none` gekoppelt, nicht an
    * der Breite) — deckt damit auch Tablets zwischen 768 und 1023px ab. */
 
-  /* EINE Bedienzeile, die seitlich scrollt (2026-08-10).
+  /* EINE Bedienzeile - und seit der Critique 2026-09-25 scrollt nicht mehr
+   * SIE, sondern nur ihre Chip-Spur.
    *
-   * Hier stand `flex-wrap: wrap` mit `order: 3` und `flex-basis: 100%` fuer die
-   * Chips - Sortierung und Auswahl in Zeile 1, Chips in Zeile 2. Gemessen auf
-   * 375x812 waren das 177px Filterzeile unter einem 174px hohen Kopf: 351px
-   * Chrome, bevor der erste Ordner kam. Die Chrome-Regel (DESIGN.md) laesst
-   * Kopf plus EINE Bedienzeile.
-   *
-   * Die Antwort ist dieselbe wie in der kompakten Hoehe (Block darunter, der
-   * damit nur noch die Hoehen-Not abdeckt): eine Zeile, die seitlich scrollt,
-   * so wie sie es in der Kueche schon tut. Was die BREITE hier weiter regelt,
-   * sind die Naehte - die Trennlinien zwischen den Gruppen fallen weg, weil
-   * eine scrollende Zeile keine Spalten hat. */
+   * Bis dahin stand hier `overflow-x: auto` auf der ganzen Zeile (2026-08-10):
+   * Status, Chips, Sortierung und Auswahl in einem Streifen, gemessen 1267px
+   * Inhalt auf 375px, die Werkzeuge bei x=1020 und x=1203. Die Zeile blieb
+   * einzeilig (Chrome-Regel, DESIGN.md: Kopf plus EINE Bedienzeile), aber was
+   * am Ende lag, war nur per Wischen ins Ungewisse erreichbar. Jetzt stehen die
+   * Werkzeuge im Kopf-Menue, das Segment steht fest, und der Rest der Breite
+   * gehoert der Chip-Spur mit ihrem Fade. Mobil faellt nur die Naht zwischen
+   * Segment und Spur schmaler aus, und das Segment rueckt enger zusammen,
+   * damit neben "Archiviert" noch ein Chip ins Bild passt. */
   .documents-filters {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
+    gap: var(--space-2);
   }
 
-  .documents-filters::-webkit-scrollbar {
-    display: none;
+  .documents-status .segmented__item {
+    padding-inline: var(--space-2);
   }
 
-  .documents-filters > * {
-    flex-shrink: 0;
-  }
-
-  .documents-filters__end {
-    margin-inline-start: 0;
-    padding-inline-start: 0;
-    border-inline-start: none;
-  }
-
-  .documents-filter-chips {
-    order: 0;
-    flex-basis: auto;
-    padding-inline-start: 0;
-    border-inline-start: none;
-    /* KEIN eigener Scroller mehr, wo die ganze Zeile schon einer ist. Der
-     * Block oben sagt „eine Bedienzeile, die seitlich scrollt" - und
-     * `.documents-filters > * { flex-shrink: 0 }` zwei Absätze weiter oben
-     * lässt diesen Streifen auf seine Inhaltsbreite wachsen. Sein geerbtes
-     * `overflow-x: auto` kann damit nie greifen: gemessen bei 390px stand er
-     * auf 802px Breite bei 802px Scrollbreite, also ein Scroll-Kontext, in dem
-     * nichts zu scrollen war, verschachtelt in den, der die Arbeit tut (390px
-     * sichtbar, 1242px Inhalt). Zwei ineinander liegende Scroller sind genau
-     * das, was die Regel oben ausschliesst. */
-    overflow-x: visible;
+  .documents-filters__chips {
+    padding-inline-start: var(--space-2);
   }
 
   /* HIER STAND EIN VERSCHACHTELTER `max-height: 499px`-BLOCK mit genau den
@@ -1260,11 +1507,6 @@
    * nicht mehr umbricht, ist er wortgleich mit seinem Elternblock. Sein
    * Geltungsbereich war ohnehin derselbe: er lag INNERHALB von
    * (max-width: 767px). */
-
-  .documents-selectbar__actions {
-    margin-inline-start: 0;
-    width: 100%;
-  }
 
   /* „Aus DMS verknüpfen" fällt mobil zum kompakten Icon-Button zusammen
    * (Text via aria-label/title erhalten), damit er die Kopfzeile nicht
@@ -1340,7 +1582,6 @@
 .document-card {
   cursor: pointer;
   transition:
-    background-color var(--transition-fast),
     box-shadow var(--transition-fast),
     transform var(--transition-fast);
 }
@@ -1352,10 +1593,20 @@
   cursor: pointer;
 }
 
+/* DIE KARTE DARF SICH HEBEN, weil sie etwas tut (DESIGN.md, Cards: „Hover-
+ * Anhebung nur fuer interaktive Karten" - ein Klick oeffnet den Betrachter).
+ * Im Mass der Notizkarte (notes.css): 1px und shadow-md. Vorher 2px plus
+ * Flaechenwechsel plus 6 % Zoom der Vorschau - drei Antworten auf eine Geste,
+ * auf einer Flaeche, die seit der Vorschau halb aus Bild besteht. */
 .document-card:hover {
-  background-color: var(--color-surface-hover);
   box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .document-card:hover {
+    transform: none;
+  }
 }
 
 /* Die ZEILE bekommt keinen Schatten mehr. Ein Hover-Schatten zieht ihr eine
@@ -1417,14 +1668,32 @@
  * erbt sie von dort. Wird nur gerendert, wenn es etwas zu erklaeren gibt. */
 .document-viewer__note {
   flex-basis: 100%;
+  /* Lesemass (Critique 2026-09-25: 153 Zeichen auf 926px). 50ch wie die
+   * Hinweise der Einstellungen (settings.css, dort nachgemessen: bei Plus
+   * Jakarta Sans ist 1ch breiter als ein Durchschnittszeichen, 50ch tragen
+   * rund 75 Zeichen).
+   *
+   * UEBER DIE POLSTERUNG, NICHT UEBER max-width: die volle Basis ist es, die
+   * den Hinweis in seine eigene Zeile bricht. Ein max-width kappt die Basis
+   * mit, und der Hinweis rueckte als 378px-Kasten neben die Aktionen (gemessen
+   * bei 1280px). Die Polsterung nimmt der Zeile nur die Breite jenseits des
+   * Lesemasses; % bezieht sich auf die Meta-Zeile. */
+  box-sizing: border-box;
+  padding-inline-end: max(0px, calc(100% - 50ch));
   margin: 0;
 }
 
+/* `safe center`: ist der Rumpf kuerzer als der Inhalt (iframe fest 65vh,
+ * Meta-Zeile mit Ablaufzeile und Teilen-Hinweis hoch), laeuft der Inhalt nur
+ * nach UNTEN ueber und der Modal-Rumpf scrollt. Mit `center` lief er nach
+ * beiden Seiten und deckte am Telefon den Hinweis ab (gemessen 375x812).
+ * `center` davor ist der Rueckfall fuer Browser ohne `safe`. */
 .document-viewer__body {
   flex: 1;
   min-height: 0;
   display: flex;
   align-items: center;
+  align-items: safe center;
   justify-content: center;
   padding-top: var(--space-4);
 }
@@ -1654,16 +1923,9 @@
   margin-bottom: var(--space-3);
 }
 
-/* .form-hint ist nur in der page-scoped settings.css gestylt und fehlt hier
-   (Dokumente-Seite lädt sie nicht). Ohne diese Regel fielen der ASN-Hinweis und
-   die „Keine Treffer"-Meldungen im DMS-Modal auf den schwarzen Browser-Default
-   zurück. Kein display setzen, damit [hidden] am Hinweis weiter greift. */
-.dms-search-hint,
-.dms-results .form-hint {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-}
-
+/* Der ASN-Hinweis und die „Keine Treffer"-Meldungen im DMS-Modal tragen
+   `.form-hint` (layout.css, global); bis 2026-09-24 stand hier eine Kopie
+   davon, weil die Regel nur in settings.css lebte. */
 .dms-search-hint {
   margin: var(--space-2) 0 0;
 }
@@ -1741,9 +2003,13 @@
   }
 }
 
-/* Ist die Vorschau ein Link ins DMS, taucht beim Hover/Fokus ein Öffnen-Symbol
-   über der Kachel auf - eine kleine Belohnung dafür, dass die Vorschau mehr kann
-   als nur zeigen (Issue #533). */
+/* Ist die Vorschau ein Link ins DMS oder oeffnet sie die grosse Vorschau,
+   sagt ein Zeichen in der Ecke, dass sie mehr kann als zeigen (Issue #533).
+   DAUERHAFT SICHTBAR (R8 H14): bis dahin legte sich das Zeichen erst beim
+   Ueberfahren als Schleier ueber die ganze Kachel - auf Touch und Tablet gab
+   es die Auskunft also nie (ignore.md: Aktionen stehen dauerhaft). Als Marke
+   in der Ecke verdeckt es die Vorschau nicht; das Ziel ist die Kachel selbst,
+   deshalb bleibt das Zeichen ohne eigene Treffflaeche. */
 .dms-result__media--link,
 .dms-result__media--action {
   cursor: pointer;
@@ -1756,30 +2022,36 @@
 
 .dms-result__open {
   position: absolute;
-  inset: 0;
+  inset-block-end: var(--space-1);
+  inset-inline-end: var(--space-1);
+  width: var(--space-6);
+  height: var(--space-6);
   display: grid;
   place-items: center;
-  opacity: 0;
-  /* Unsichtbar heisst auch unklickbar: ohne pointer-events bleibt hier ein
-   * volles Trefferziel stehen, das niemand sieht (Guard
-   * `verborgene Reveal-Aktionen bleiben nicht klickbar`, test-frontend-audit.js). */
+  border-radius: var(--radius-full);
   pointer-events: none;
   color: var(--color-surface);
   background: color-mix(in srgb, var(--color-text-primary) 52%, transparent);
-  transition: opacity var(--transition-fast);
+  transition: background-color var(--transition-fast);
 }
 
 .dms-result__open svg {
-  width: 20px;
-  height: 20px;
+  width: var(--space-4);
+  height: var(--space-4);
 }
 
+/* Hover und Fokus verstaerken die Marke, statt sie erst herbeizuholen. */
 .dms-result__media--link:hover .dms-result__open,
 .dms-result__media--link:focus-visible .dms-result__open,
 .dms-result__media--action:not(:disabled):hover .dms-result__open,
 .dms-result__media--action:not(:disabled):focus-visible .dms-result__open {
-  opacity: 1;
-  pointer-events: auto;
+  background: color-mix(in srgb, var(--color-text-primary) 76%, transparent);
+}
+
+/* Ohne Vorschau und ohne Link (die Kachel wird zur reinen Anzeige) gibt es
+   nichts zu oeffnen - dann auch kein Zeichen, das es verspricht. */
+.dms-result__media--action:disabled .dms-result__open {
+  display: none;
 }
 
 .dms-result__media--link:focus-visible,
@@ -1912,52 +2184,65 @@
    DMS External Badge
    -------------------------------------------------------- */
 
-.doc-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px var(--space-2);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-medium);
-  line-height: 1.4;
-}
-
-.doc-badge--dms {
-  background: var(--color-info-light);
-  color: var(--color-info-ink);
-}
-
-.doc-badge--webdav {
-  background: var(--color-success-light);
-  color: var(--color-success-ink);
-}
-
-/* Google Drive: eigener Violett-Tint, klar getrennt vom Info-Blau des DMS-Badges,
-   damit "wo liegt diese Datei" auf einen Blick lesbar bleibt. */
-.doc-badge--google-drive {
-  background: var(--color-accent-subtle);
-  color: var(--color-accent);
-}
-
-.doc-badge--unavailable {
-  background: var(--color-danger-light);
-  color: var(--color-danger-ink);
-}
-
-/* Local folder storage: neutral, distinct from the semantic-colored backends. */
+/* Kapsel, Glyphe und die Ablauf-Toene (`--expiring`, `--unavailable`) stehen
+ * in list-row.css: der Chip ist seit der Critique 2026-09-26 auch die Frist
+ * der Inventarzeile, und der Router laedt je Seite nur EIN Modul-Stylesheet.
+ * Hier bleibt, was nur Dokumente hat - Ortsetiketten, Kurz-/Langform. */
+/* ORTSETIKETTEN: NEUTRAL, EIN TON FUER ALLE ORTE (Critique 2026-09-25). DMS
+ * stand in Info-Blau, WebDAV in Erfolgs-Gruen, Google Drive im Violett der
+ * App-Stimme - drei Statusfarben fuer eine Angabe, die keinen Status hat. Der
+ * records-Ton als Waschung waere dieselbe Farbe zweimal blass gewesen, im
+ * Raum, der sie schon beantwortet (DESIGN.md, Colors: die Skalen-Regel; Guard
+ * `was keine Marke ist, nennt seinen Ton auch nicht zweimal blass`). Also die
+ * neutrale Antwort der Zuordnung: Well-Flaeche, Sekundaerschrift. Die Orte
+ * unterscheiden Glyphe und Text (storageBadgeHtml); Farbe tragen nur noch
+ * Zustaende: bald ab, abgelaufen, nicht verfuegbar. */
+.doc-badge--dms,
+.doc-badge--webdav,
+.doc-badge--google-drive,
 .doc-badge--folder {
-  background: var(--color-border-subtle);
-  color: var(--color-text-primary);
+  background: var(--color-fill-well);
+  color: var(--color-text-secondary);
 }
 
-/* Ablauf-Chip (dateStatus()): "expiring" bald faellig (Warnung) - "valid" zeigt
-   gar keinen Chip. "expired" (bereits ueberfaellig) teilt sich bewusst die
-   Gefahr-Farbe mit .doc-badge--unavailable statt einer eigenen, identischen
-   Regel (DESIGN.md, Colors: die Skalen-Regel - zwei Modifier duerfen nicht
-   unabsichtlich gleich aussehen, ohne sich eine Regel zu teilen). */
-.doc-badge--expiring {
-  background: var(--color-warning-light);
-  color: var(--color-warning-ink);
+/* Kurz- und Langform des Ablauf-Chips (expiryChipHtml). Breit steht die
+ * Langform; die Kurzform ist aria-hidden und nur fuers Auge da. */
+.doc-badge__short {
+  display: none;
+}
+
+/* Schmal steht die Kurzform, die Langform bleibt fuer Screenreader im Text -
+ * visuell weg, nicht display: none. Zwei Anlaesse, derselbe Tausch: die Zeile
+ * unter 30rem (Container list-rows) und die Karte unter 12rem (eigener
+ * Container, .document-card). */
+@container list-rows (max-width: 30rem) {
+  .document-row__meta .doc-badge__short {
+    display: inline;
+  }
+
+  .document-row__meta .doc-badge__full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@container document-card (max-width: 12rem) {
+  .document-card__meta .doc-badge__short {
+    display: inline;
+  }
+
+  .document-card__meta .doc-badge__full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 .document-storage-target {

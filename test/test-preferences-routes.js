@@ -251,6 +251,67 @@ test('GET timezone: gewählter Wert und geltender Wert sind zwei Felder', async 
     'ohne Einstellung nennt timezone_effective den Serverrueckfall (process.env.TZ am Dateikopf)');
 });
 
+/* Der Merker zum Zonen-Hinweis (#1607, Punkt 4).
+ *
+ * `timezone: null` hat zwei Bedeutungen, die gleich aussehen: "nie gesetzt"
+ * (Bestandshaushalt, der Server rechnet still in `TZ`) und "bewusst
+ * Automatisch". Die Oberflaeche fragt deshalb einmal nach, und die Antwort
+ * "So lassen" muss fuer ALLE Admins auf ALLEN Geraeten gelten - also liegt sie
+ * in sync_config und nicht im localStorage. Geprueft wird mit einem zweiten
+ * Admin (andere userId): ein Merker je Konto bestuende einen Test mit nur
+ * einem Akteur.
+ */
+test('timezone_hint_dismissed: haushaltsweit, nur Admin schreibt, nur ein Boolean gilt', async () => {
+  cfgDelete('household_timezone');
+  cfgDelete('household_timezone_hint_dismissed');
+  assert.equal((await get()).body.data.timezone_hint_dismissed, false, 'ohne Eintrag ist nichts gemerkt');
+
+  assert.equal((await put({ timezone_hint_dismissed: true }, { role: 'member' })).status, 403);
+  assert.equal((await get()).body.data.timezone_hint_dismissed, false, 'ein 403 darf nichts geschrieben haben');
+  // Auch nicht die ANDEREN Felder desselben Requests: der Check steht vor
+  // jedem Schreiben, ein gemischtes Payload wendet sich nicht teilweise an.
+  const before = (await get()).body.data.visible_meal_types;
+  const other = before.includes('snack') ? ['breakfast'] : ['snack'];
+  assert.equal((await put({ visible_meal_types: other, timezone_hint_dismissed: true }, { role: 'member' })).status, 403);
+  assert.deepEqual((await get()).body.data.visible_meal_types, before, 'ein 403 hat nichts teilweise angewendet');
+  assert.equal((await put({ visible_meal_types: other, timezone_hint_dismissed: 'ja' })).status, 400);
+  assert.deepEqual((await get()).body.data.visible_meal_types, before, 'ein 400 hat nichts teilweise angewendet');
+  for (const bad of ['1', 1, 'true', null, {}]) {
+    assert.equal((await put({ timezone_hint_dismissed: bad })).status, 400, `${JSON.stringify(bad)} ist kein Boolean`);
+  }
+  assert.equal((await get()).body.data.timezone_hint_dismissed, false, 'ein 400 darf nichts geschrieben haben');
+
+  const saved = await put({ timezone_hint_dismissed: true }, { userId: 1 });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.data.timezone_hint_dismissed, true, 'die PUT-Antwort traegt den Merker');
+  assert.equal(saved.body.data.timezone, null, '"So lassen" setzt keine Zone');
+  // Der ZWEITE Admin und ein Mitglied lesen denselben Merker.
+  assert.equal((await get({ userId: 2 })).body.data.timezone_hint_dismissed, true);
+  assert.equal((await get({ role: 'member', userId: 3 })).body.data.timezone_hint_dismissed, true);
+
+  assert.equal((await put({ timezone_hint_dismissed: false })).body.data.timezone_hint_dismissed, false);
+  assert.equal((await get({ userId: 2 })).body.data.timezone_hint_dismissed, false);
+});
+
+test('eine Zonen-Entscheidung des Admins beendet den Hinweis - auch "Automatisch"', async () => {
+  // Wer die Zone setzt, hat entschieden. Wer sie danach bewusst wieder auf
+  // Automatisch stellt, ebenfalls: ohne den Merker saehe das genauso aus wie
+  // "nie gesetzt", und der Hinweis kaeme fuer alle Admins zurueck.
+  cfgDelete('household_timezone');
+  cfgDelete('household_timezone_hint_dismissed');
+  assert.equal((await put({ timezone: 'Asia/Seoul' })).body.data.timezone_hint_dismissed, true);
+  cfgDelete('household_timezone_hint_dismissed');
+  const auto = (await put({ timezone: null })).body.data;
+  assert.equal(auto.timezone, null);
+  assert.equal(auto.timezone_hint_dismissed, true);
+
+  // Abgelehnte Schreibversuche entscheiden nichts.
+  cfgDelete('household_timezone_hint_dismissed');
+  await put({ timezone: 'Mars/Olympus_Mons' });
+  await put({ timezone: 'Asia/Seoul' }, { role: 'member' });
+  assert.equal((await get()).body.data.timezone_hint_dismissed, false);
+});
+
 // --------------------------------------------------------
 // app_name (str-Validator, empty->delete)
 // --------------------------------------------------------
@@ -789,4 +850,127 @@ test('PUT module_order ohne authUserId: cfgUserSet ist No-op, kein Fehler', asyn
   assert.equal(res.status, 200);
   // Ohne User-Kontext wird nichts per-user gespeichert -> Leseseite bleibt leer.
   assert.deepEqual(res.body.data.module_order, []);
+});
+
+// --------------------------------------------------------
+// Ganze Patch oder nichts (#1622)
+//
+// Der Handler prueft und schreibt Feld fuer Feld. Scheiterte ein spaeteres
+// Feld, standen die frueheren schon in der Datenbank, waehrend die Antwort
+// "abgelehnt" sagte. Jede Probe schickt deshalb eine gemischte Patch, deren
+// LETZTES Feld (in Handler-Reihenfolge) ungueltig ist, und liest danach die
+// GANZE Antwort des GET gegen den Stand davor - nicht nur das eine Feld, das
+// die Probe benennt: ein zweites, mitgeschriebenes Feld fiele sonst durch.
+// --------------------------------------------------------
+async function assertPatchAppliesNothing(patch, expected, actorOpts = {}) {
+  const before = (await get(actorOpts)).body.data;
+  const res = await put(patch, actorOpts);
+  assert.equal(res.status, expected.status);
+  // Die Antwort selbst bleibt, wie sie war: Status und Body des abgelehnten Feldes.
+  assert.deepEqual(res.body, { error: expected.error, code: expected.status });
+  const after = (await get(actorOpts)).body.data;
+  for (const key of expected.untouched) {
+    assert.deepEqual(after[key], before[key], `${key} wurde trotz ${expected.status} geschrieben`);
+  }
+  assert.deepEqual(after, before);
+}
+
+test('abgelehnte Patch: ein HAUSHALTSFELD vor dem ungueltigen Feld bleibt unveraendert (#1622)', async () => {
+  cfgSet('week_start', 'monday');
+  await assertPatchAppliesNothing(
+    { week_start: 'sunday', holiday_school_color: 'kein-hex' },
+    { status: 400, error: 'holiday_school_color muss ein gültiger Hex-Farbwert sein (z. B. #34C759).', untouched: ['week_start'] },
+  );
+  assert.equal(db.prepare("SELECT value FROM sync_config WHERE key = 'week_start'").get().value, 'monday');
+  cfgDelete('week_start');
+});
+
+test('abgelehnte Patch: ein NUTZERFELD vor dem ungueltigen Feld bleibt unveraendert (#1622)', async () => {
+  cfgSet('hidden_modules:user:1', '["budget"]');
+  await assertPatchAppliesNothing(
+    { hidden_modules: ['tasks'], holiday_school_color: 'kein-hex' },
+    { status: 400, error: 'holiday_school_color muss ein gültiger Hex-Farbwert sein (z. B. #34C759).', untouched: ['hidden_modules'] },
+  );
+  assert.equal(db.prepare("SELECT value FROM sync_config WHERE key = 'hidden_modules:user:1'").get().value, '["budget"]');
+  cfgDelete('hidden_modules:user:1');
+});
+
+test('abgelehnte Patch: ein ADMIN-FELD vor dem ungueltigen Feld bleibt unveraendert (#1622)', async () => {
+  // Der Fall aus dem Issue: ein gueltiger Merker, danach eine ungueltige Sprache.
+  cfgDelete('household_timezone_hint_dismissed');
+  cfgSet('budget_mode', 'shared');
+  await assertPatchAppliesNothing(
+    { timezone_hint_dismissed: true, budget_mode: 'personal', holiday_school_color: 'kein-hex' },
+    { status: 400, error: 'holiday_school_color muss ein gültiger Hex-Farbwert sein (z. B. #34C759).', untouched: ['timezone_hint_dismissed', 'budget_mode'] },
+  );
+  assert.equal(db.prepare("SELECT value FROM sync_config WHERE key = 'household_timezone_hint_dismissed'").get(), undefined);
+  assert.equal(db.prepare("SELECT value FROM sync_config WHERE key = 'budget_mode'").get().value, 'shared');
+  const viaLanguage = await put({ timezone_hint_dismissed: true, language: 'xx-nicht-da' });
+  assert.equal(viaLanguage.status, 400);
+  assert.equal((await get()).body.data.timezone_hint_dismissed, false);
+  cfgDelete('budget_mode');
+});
+
+test('abgelehnte Patch: auch ein 403 nimmt die Felder davor zurueck (#1622)', async () => {
+  cfgSet('week_start', 'monday');
+  cfgSet('hidden_modules:user:1', '["budget"]');
+  await assertPatchAppliesNothing(
+    { week_start: 'saturday', hidden_modules: ['tasks'], holiday_show_public: true },
+    { status: 403, error: 'Admin access required.', untouched: ['week_start', 'hidden_modules'] },
+    { role: 'member' },
+  );
+  cfgDelete('week_start'); cfgDelete('hidden_modules:user:1');
+});
+
+test('abgelehnte Patch: ein Sync, den ein frueheres Feld anstoesst, bleibt nicht stehen (#1622)', async () => {
+  // disabled_modules oeffnet im Handler eine eigene (jetzt verschachtelte)
+  // Transaktion. Sie darf nicht fuer sich committen, wenn danach ein Feld faellt.
+  cfgSet('disabled_modules', '[]');
+  await assertPatchAppliesNothing(
+    { disabled_modules: ['health'], holiday_school_color: 'kein-hex' },
+    { status: 400, error: 'holiday_school_color muss ein gültiger Hex-Farbwert sein (z. B. #34C759).', untouched: ['disabled_modules'] },
+  );
+  cfgDelete('disabled_modules');
+});
+
+test('eine gueltige gemischte Patch wird weiterhin ganz geschrieben, und danach ist keine Transaktion offen (#1622)', async () => {
+  const ok = await put({ week_start: 'sunday', hidden_modules: ['tasks'], budget_mode: 'personal' });
+  assert.equal(ok.status, 200);
+  assert.equal(db.inTransaction, false);
+  const d = (await get()).body.data;
+  assert.equal(d.week_start, 'sunday');
+  assert.deepEqual(d.hidden_modules, ['tasks']);
+  assert.equal(d.budget_mode, 'personal');
+  await put({ week_start: 'sunday', holiday_school_color: 'kein-hex' });
+  assert.equal(db.inTransaction, false);
+  cfgDelete('week_start'); cfgDelete('hidden_modules:user:1'); cfgDelete('budget_mode');
+});
+
+test('wirft die Berechnung der Erfolgsantwort, ist die Patch nicht geschrieben (#1622, Review zu #1627)', async () => {
+  // Die Antwort liest aus der Datenbank zurueck, und ein Notiz-Widget mit
+  // Kategorie-Filter fragt dafuer den Kategorien-Katalog ab. Eine TEMP-Tabelle
+  // gleichen Namens verdeckt ihn: die Feldfolge laeuft sauber durch, erst der
+  // Bau der Antwort wirft. Stand das COMMIT davor, sagte die Antwort 500 und
+  // die Patch war trotzdem gespeichert.
+  cfgSet('week_start', 'monday');
+  cfgDelete('dashboard_widgets:user:1');
+  const before = (await get()).body.data;
+  db.exec('CREATE TEMP TABLE note_categories (verdeckt INTEGER)');
+  let res;
+  try {
+    res = await put({
+      week_start: 'sunday',
+      dashboard_widgets: [{ id: 'notes', options: { categories: [1] } }],
+    });
+  } finally {
+    db.exec('DROP TABLE temp.note_categories');
+  }
+  assert.equal(res.status, 500);
+  assert.deepEqual(res.body, { error: 'Interner Fehler', code: 500 });
+  assert.equal(db.inTransaction, false);
+  const after = (await get()).body.data;
+  assert.equal(after.week_start, 'monday', 'week_start wurde trotz 500 geschrieben');
+  assert.deepEqual(after, before);
+  assert.equal(db.prepare("SELECT value FROM sync_config WHERE key = 'dashboard_widgets:user:1'").get(), undefined);
+  cfgDelete('week_start');
 });

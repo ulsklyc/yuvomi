@@ -9,10 +9,28 @@ import express from 'express';
 import * as db from '../db.js';
 import * as CardDAVSync from '../services/cardav-sync.js';
 import { str, bool, collectErrors, MAX_TITLE } from '../middleware/validate.js';
+import { requireAdmin } from '../middleware/require-admin.js';
 
 const log = createLogger('CardDAV');
 const MAX_URL = 500;
 const router = express.Router();
+
+// JEDE ROUTE HIER IST KONTOVERWALTUNG, und die gehoert dem Admin - wie bei
+// CalDAV (routes/calendar/caldav.js). Bis v2.69.0 stand die Grenze nur in der
+// Oberflaeche (`adminOnly` am Blatt `sync-contacts`), der Server fragte nur das
+// Modulrecht `contacts` ab. Das haben Mitglieder standardmaessig, und damit
+// konnte jedes Mitglied und jedes Token mit `contacts:write` die Adresse eines
+// Haushaltskontos umbiegen und die gespeicherten Zugangsdaten per Test oder
+// Sync an einen beliebigen Host schicken, dazu Konten auflisten, anlegen und
+// loeschen.
+//
+// Als Router-Riegel und nicht je Route: eine neue Route erbt ihn, statt ihn
+// vergessen zu koennen. Tokens laufen ueber dieselbe Regel - `req.authRole`
+// ist die Rolle des Token-Subjekts -, und der Scope `contacts` bleibt davor
+// zusaetzlich Pflicht (Scope-Gate in server/index.js). Der Kontakt-Abgleich
+// selbst laeuft im Hintergrund (`sync()`), und Kontakte lesen geht ueber
+// /contacts; beides beruehrt dieser Riegel nicht.
+router.use(requireAdmin);
 
 /**
  * Fehlerantwort mit stabilem, maschinenlesbarem Schlüssel. Der Client übersetzt
@@ -75,7 +93,9 @@ router.post('/accounts', async (req, res) => {
  * PUT /api/v1/contacts/cardav/accounts/:id
  * Zugangsdaten eines Kontos ändern. Ohne diesen Pfad blieb bei einem rotierten
  * Passwort nur Löschen und Neuanlegen - samt Verlust der Adressbuch-Auswahl.
- * Body: { name, cardavUrl, username, password? } - leeres Passwort = unverändert.
+ * Body: { name, cardavUrl, username, password? } - leeres Passwort = unverändert,
+ * aber nur solange Server (Schema, Host, Port) und Benutzername bleiben; sonst
+ * 400 `password_required` (siehe `updateAccount`).
  * Response: { data: Account }
  */
 router.put('/accounts/:id', async (req, res) => {
@@ -109,6 +129,9 @@ router.put('/accounts/:id', async (req, res) => {
     if (updated === 'not-found') return fail(res, 404, 'account_not_found', 'Account not found');
     if (updated === 'conflict') {
       return fail(res, 409, 'account_duplicate', 'Account with this URL and username already exists');
+    }
+    if (updated === 'password-required') {
+      return fail(res, 400, 'password_required', 'A new server or username needs the password again');
     }
 
     res.json({ data: updated });

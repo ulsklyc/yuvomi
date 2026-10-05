@@ -14,6 +14,11 @@ const EVENT_FANOUT = ' For `entity_type=event`, a reminder set by the person who
 /**
  * `remind_at` ist naiv-UTC; ein Offset wird dorthin umgerechnet (#1364).
  */
+const TARGET_VISIBLE = ' The entity has to exist and be visible to the caller under the rule of its own module '
+  + '(task and event visibility, shared calendar subscriptions, private subscriptions in personal budget mode); '
+  + 'otherwise the answer is 404, the same for both cases. `GET /reminders/pending` and notifications skip a '
+  + 'reminder whose entity is hidden from its recipient; the reminder is kept and resumes once the entity is visible again.';
+
 const REMIND_AT_INPUT = ' `remind_at` is stored as UTC without a zone suffix, always as `YYYY-MM-DDTHH:MM:SS`. A value '
   + 'without offset already is UTC and is only brought into that form: missing seconds become `:00`, fractions '
   + 'are dropped, and a date alone becomes midnight UTC, the moment it fired at before. A value with `Z` or a '
@@ -27,8 +32,8 @@ export function remindersPaths() {
     '/api/v1/reminders/all': { get: op({ summary: 'List all reminders for an entity', tag: 'Reminders', description: 'Returns every non-dismissed reminder for the given entity (calendar events support multiple reminders).' }) },
     '/api/v1/reminders': {
       get: op({ summary: 'List reminders', tag: 'Reminders' }),
-      post: op({ summary: 'Create reminder', tag: 'Reminders', stateChanging: true, requestBody: jsonBody(null), description: '`pantry_item` is rejected with 400: the notification run rebuilds pantry reminders every pass, so a hand-set date would be gone within a minute. Reading and dismissing work as for any other reminder. Other derived types (subscription, inventory) stay settable - there the module only writes when its object changes.' + REMIND_AT_INPUT + EVENT_FANOUT }),
-      put: op({ summary: 'Replace reminder set for an entity', tag: 'Reminders', stateChanging: true, requestBody: jsonBody(null), description: 'Replaces all reminders of an entity with the given `remind_ats` list (deduplicated, max 5). `pantry_item` is rejected with 400: the notification run rebuilds pantry reminders every pass, so a hand-set date would be gone within a minute. Reading and dismissing work as for any other reminder. Other derived types (subscription, inventory) stay settable - there the module only writes when its object changes. Entries are deduplicated after conversion, so the same instant in two notations is one reminder.' + REMIND_AT_INPUT + EVENT_FANOUT }),
+      post: op({ summary: 'Create reminder', tag: 'Reminders', stateChanging: true, requestBody: jsonBody(null), description: '`pantry_item` is rejected with 400: the notification run rebuilds pantry reminders every pass, so a hand-set date would be gone within a minute. Reading and dismissing work as for any other reminder. Other derived types (subscription, inventory) stay settable - there the module only writes when its object changes.' + TARGET_VISIBLE + REMIND_AT_INPUT + EVENT_FANOUT }),
+      put: op({ summary: 'Replace reminder set for an entity', tag: 'Reminders', stateChanging: true, requestBody: jsonBody(null), description: 'Replaces all reminders of an entity with the given `remind_ats` list (deduplicated, max 5). `pantry_item` is rejected with 400: the notification run rebuilds pantry reminders every pass, so a hand-set date would be gone within a minute. Reading and dismissing work as for any other reminder. Other derived types (subscription, inventory) stay settable - there the module only writes when its object changes. Entries are deduplicated after conversion, so the same instant in two notations is one reminder.' + TARGET_VISIBLE + REMIND_AT_INPUT + EVENT_FANOUT }),
       delete: op({ summary: 'Delete reminders by filter', tag: 'Reminders', stateChanging: true, description: '`pantry_item` is rejected with 400 - the notification run recreates the row every pass. Dismiss it instead.' + EVENT_FANOUT }),
     },
     '/api/v1/reminders/{id}/dismiss': {

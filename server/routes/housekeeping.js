@@ -13,8 +13,10 @@ import { normalizeAvatarData, syncFamilyMemberArtifacts } from '../auth.js';
 import { collectErrors, color, date, datetime, month, num, oneOf, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { minutesBetween, computeHourlyAmount } from '../services/housekeeping-billing.js';
-import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
-import { assertDocumentLinkTargetsAvailable } from '../services/document-links.js';
+import { assertDocumentsNotDeleting, sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
+import {
+  assertDocumentLinkTargetsAvailable, documentViewer, mayReadDocuments, sendDocumentLinkRefusal,
+} from '../services/document-links.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 import {
   formatDateKey,
@@ -29,16 +31,31 @@ import {
   queueEventDeletion,
 } from '../services/calendar-outbound.js';
 import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
+import { documentVisibleSql } from '../services/document-access.js';
 import { tokenAllows } from '../scopes.js';
 import {
+  configuredHouseholdTimeZone,
   householdTimeZone,
+  daysBetweenDateKeys,
+  hasExplicitZone,
+  isValidTimeZone,
   localToUTCPrecise,
   shiftDateKey,
   storedToInstantMs,
   todayKey,
+  utcDateKey,
   utcToWall,
 } from '../utils/timezone.js';
 import { addMonthsClamped } from '../utils/interval-date.js';
+import { recordLocalColorChoice } from '../services/legacy-color-snapshot.js';
+import {
+  byCheckInDesc,
+  checkInInstantMs,
+  householdMonthOf as householdMonthOfIn,
+  householdMonthWindow,
+  latestVisit,
+  widenedWindow,
+} from '../services/housekeeping-month.js';
 
 const log = createLogger('Housekeeping');
 const router = express.Router();
@@ -46,7 +63,14 @@ const router = express.Router();
 const MAX_PHOTO_DATA_LENGTH = 6 * 1024 * 1024;
 const IMAGE_DATA_RE = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i;
 const PAYMENT_SCHEDULES = ['daily', 'twice_monthly', 'monthly'];
+// Lese-Rueckfall fuer eine Zeile ohne Farbe - Bestand, deshalb unveraendert.
 const DEFAULT_CALENDAR_COLOR = '#7C3AED';
+// Startfarbe eines NEUEN Profils ohne eigene Wahl: die Vorgabe der geteilten
+// Nutzerfarben-Palette (public/utils/color.js USER_COLOR_DEFAULT, Cyan),
+// nicht mehr #7C3AED - das ist im Dark exakt die Flaeche des Primaerknopfs
+// (Re-Critique 2026-09-28, P9). Ein bestehendes Profil behaelt beim
+// Speichern ohne Farbfeld seine gespeicherte Farbe; keine Migration.
+const NEW_WORKER_COLOR = '#0891B2';
 const HOUSEKEEPING_EVENT_ICON = 'paintbrush';
 const PAYMENT_TASKS_PREF = 'housekeeping_payment_tasks';
 
@@ -79,72 +103,108 @@ function currentMonth() {
 }
 
 /**
- * Der Monat (YYYY-MM), in dem ein gespeicherter Zeitpunkt im Haushalt liegt.
- * `check_in` ist ein UTC-Instant, `last_completed` fuehrt daneben zonenlose
- * Wanduhrzeit (#1364) - `storedToInstantMs()` liest beide Formen.
+ * Monat eines Besuchs in der Haushaltszone - die Regel steht
+ * in services/housekeeping-month.js, weil die Uebersicht dieselbe Frage stellt
+ * (#1451). Hier nur mit der Zone des Haushalts als Vorgabe.
  */
 function householdMonthOf(value, tz = householdTimeZone(db.get())) {
-  const ms = storedToInstantMs(value, tz);
-  if (ms === null) return null;
-  return utcToWall(new Date(ms).toISOString(), tz)?.date.slice(0, 7) ?? null;
+  return householdMonthOfIn(value, tz);
 }
 
 /**
- * Ein Monat des Haushalts als halboffenes Intervall [start, end) in UTC, in
- * der Schreibweise von `check_in` (`toISOString()`), damit der Textvergleich
- * in SQL dem Zeitvergleich entspricht. `substr(check_in, 1, 7)` war der
- * UTC-Monat: ein Besuch am Ersten um 00:30 Berliner Zeit stand im Vormonat.
+ * Die Besuche EINES Haushaltsmonats lesen: `start`/`end` sind das SQL-Fenster
+ * mit Rand, `keep` siebt danach auf den Monat aus. Die genauen Grenzen als
+ * Textvergleich tragen nur die Instant-Form von `check_in` - eine zonenlose
+ * Zeile stand in den Monatslisten im Nachbarmonat, waehrend Monatsgrafik und
+ * Uebersicht sie richtig einordneten (services/housekeeping-month.js).
  */
-function householdMonthRange(monthValue, tz = householdTimeZone(db.get())) {
-  const toInstant = (key) => new Date(localToUTCPrecise(`${key}-01T00:00:00`, tz)).toISOString();
-  const next = addMonthsClamped(`${monthValue}-01`, 1).slice(0, 7);
+function monthVisits(monthValue, tz = householdTimeZone(db.get())) {
   return {
-    start: toInstant(monthValue),
-    // Nach 9999-12 gibt es keinen vierstelligen Monat mehr, den ein
-    // gespeicherter Besuch tragen koennte.
-    end: /^\d{4}-\d{2}$/.test(next) ? toInstant(next) : '9999-12-31T23:59:59.999Z',
+    ...householdMonthWindow(monthValue, tz),
+    keep: (row) => householdMonthOfIn(row.check_in, tz) === monthValue,
+    // Die Reihenfolge der Listen: nach Zeitpunkt, nicht nach Text.
+    order: byCheckInDesc(tz),
   };
 }
 
-function localDateString(dateValue = new Date()) {
-  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
-}
-
-function localDayContext(source = {}) {
-  const dateValue = typeof source.local_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(source.local_date)
+/**
+ * Der heutige Tag der Haushaltshilfe und seine Grenzen (#1556).
+ *
+ * Welche Uhr gilt, der Reihe nach:
+ *   1. die eingestellte Haushaltszone. Dann zaehlt nichts, was der Client
+ *      schickt: eine Oberflaeche aus dem Cache des Service Workers schickt noch
+ *      Tag und Offset ihres GERAETS, und ein Geraet auf Reisen legte den
+ *      Check-in um 00:30 im Haushalt auf den Vortag.
+ *   2. ohne Einstellung die Zone, in der die Oberflaeche anzeigt (`timezone`) -
+ *      dann die des Browsers, wie ueberall in der Anzeige
+ *      (public/utils/timezone.js). `TZ` des Servers sagt nichts darueber, wo der
+ *      Haushalt lebt, im Container ist es meist UTC.
+ *   3. eine aeltere Oberflaeche ohne `timezone`: ihr `local_date` mit ihrem
+ *      `timezone_offset_minutes`, wie bisher. Der Offset ist der von JETZT und
+ *      verschiebt an Umstelltagen eine Grenze um eine Stunde - das endet mit
+ *      dem naechsten Laden der Seite.
+ *   4. sonst die Uhr des Servers (`householdTimeZone`); ein `local_date` eines
+ *      API-Aufrufs bleibt dann der Tag.
+ *
+ * @param {object} [source]  req.query bzw. req.body
+ * @param {Date} [now]
+ * @returns {{localDate: string, timeZone?: string, timezoneOffsetMinutes?: number}}
+ */
+function localDayContext(source = {}, now = new Date()) {
+  const database = db.get();
+  const configured = configuredHouseholdTimeZone(database);
+  const clientZone = isValidTimeZone(source.timezone) ? source.timezone : null;
+  const clientDate = typeof source.local_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(source.local_date)
     ? source.local_date
-    : localDateString();
-  const offset = Number(source.timezone_offset_minutes);
-  return {
-    localDate: dateValue,
-    timezoneOffsetMinutes: Number.isFinite(offset) ? offset : new Date().getTimezoneOffset(),
-  };
+    : null;
+  const rawOffset = source.timezone_offset_minutes;
+  const offset = rawOffset === undefined || rawOffset === null || rawOffset === '' ? NaN : Number(rawOffset);
+  if (!configured && !clientZone && clientDate && Number.isFinite(offset)) {
+    return { localDate: clientDate, timezoneOffsetMinutes: offset };
+  }
+  const timeZone = configured ?? clientZone ?? householdTimeZone(database);
+  const today = utcToWall(now.toISOString(), timeZone)?.date ?? utcDateKey(now);
+  return { localDate: configured || clientZone ? today : (clientDate ?? today), timeZone };
 }
 
+/**
+ * Mitternacht eines Tages in einer Zone als Zeitpunkt, in der Form von
+ * `check_in` (`toISOString()`). Als Text taugt sie nur fuer das Vorsieb in SQL,
+ * entschieden wird am Zeitpunkt (`loadTodaySession`).
+ */
+function dayStartIso(dateKey, timeZone) {
+  return new Date(localToUTCPrecise(`${dateKey}T00:00:00`, timeZone)).toISOString();
+}
+
+// Beide Grenzen sind je fuer sich umgerechnete Mitternaechte: ein Offset fuer
+// den ganzen Tag hat an den Umstelltagen 23 bzw. 25 Stunden nicht.
 function localDayRange(context = localDayContext()) {
   const normalized = context && typeof context === 'object' && typeof context.localDate === 'string'
     ? context
     : localDayContext();
+  if (normalized.timeZone) {
+    return {
+      start: dayStartIso(normalized.localDate, normalized.timeZone),
+      end: dayStartIso(shiftDateKey(normalized.localDate, 1), normalized.timeZone),
+    };
+  }
   const [year, monthValue, day] = normalized.localDate.split('-').map(Number);
   const startMs = Date.UTC(year, monthValue - 1, day) + (normalized.timezoneOffsetMinutes * 60_000);
-  const start = new Date(startMs);
-  const end = new Date(startMs + 86_400_000);
-  return { start: start.toISOString(), end: end.toISOString() };
+  return { start: new Date(startMs).toISOString(), end: new Date(startMs + 86_400_000).toISOString() };
 }
 
-function publicSession(row) {
+// `receipts` ist das Urteil aus `receiptAccess(req)`; ohne es bleibt der Beleg
+// maskiert (#1358). Der Name steht nur in Liste und Bericht, die ID ueberall.
+function publicSession(row, receipts = MASKED_RECEIPTS) {
   if (!row) return null;
+  const { receipt_document_id: receiptDocumentId, has_receipt: hasReceipt } = receipts.view(row);
   return {
     id: row.id,
     worker_id: row.worker_id ?? null,
     calendar_event_id: row.calendar_event_id ?? null,
     payment_task_id: row.payment_task_id ?? null,
-    receipt_document_id: row.receipt_document_id ?? null,
+    receipt_document_id: receiptDocumentId,
+    has_receipt: hasReceipt,
     check_in: row.check_in,
     check_out: row.check_out,
     daily_rate: Number(row.daily_rate || 0),
@@ -158,7 +218,7 @@ function publicSession(row) {
   };
 }
 
-function publicWorker(row, context = localDayContext()) {
+function publicWorker(row, context = localDayContext(), receipts = MASKED_RECEIPTS) {
   if (!row) return null;
   const todaySession = loadTodaySession(row.id, context);
   return {
@@ -181,8 +241,8 @@ function publicWorker(row, context = localDayContext()) {
     // `today_session` heisst "war heute da" und traegt die Zeitangabe darunter.
     // Solange beide die letzte Sitzung des Tages lieferten, blieb ein Arbeiter
     // nach dem Auschecken "eingecheckt" (#1133).
-    current_session: publicSession(loadOpenSession(row.id)),
-    today_session: publicSession(todaySession),
+    current_session: publicSession(loadOpenSession(row.id), receipts),
+    today_session: publicSession(todaySession, receipts),
     notes: row.notes ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -253,31 +313,57 @@ function validatePhotoUrl(value) {
   return { value: trimmed, error: null };
 }
 
+// "Die spaeteste" ist ueberall der spaeteste ZEITPUNKT (`latestVisit`), nicht
+// der groesste Text: in `check_in` stehen Schreibweisen nebeneinander, die als
+// Text anders sortieren als auf der Uhr (services/housekeeping-month.js).
 function loadOpenSession(workerId = null) {
-  if (workerId) {
-    return db.get().prepare(`
-      SELECT * FROM housekeeping_work_sessions
-      WHERE check_out IS NULL AND worker_id = ?
-      ORDER BY check_in DESC
-      LIMIT 1
-    `).get(workerId);
-  }
-  return db.get().prepare(`
-    SELECT * FROM housekeeping_work_sessions
-    WHERE check_out IS NULL
-    ORDER BY check_in DESC
-    LIMIT 1
-  `).get();
+  const tz = householdTimeZone(db.get());
+  if (workerId) return latestVisit(db.get(), tz, 'check_out IS NULL AND worker_id = ?', [workerId]);
+  return latestVisit(db.get(), tz, 'check_out IS NULL');
 }
 
+/**
+ * Die letzte Sitzung des heutigen Haushaltstags.
+ *
+ * Die Tagesgrenzen als Textvergleich tragen nur die Instant-Form mit
+ * Millisekunden. Eine zonenlose Zeile ('2026-07-15T23:30:00', 23:30 in Berlin)
+ * sortiert hinter das Tagesende '2026-07-15T22:00:00.000Z' und fehlte "heute",
+ * die vom Vorabend stand dafuer drin. SQL holt deshalb den Tag mit einem Tag
+ * Rand, und Grenzen wie Reihenfolge entscheidet der Zeitpunkt - dieselbe Bauart
+ * wie bei den Monatslisten (`monthVisits`).
+ *
+ * Gelesen wird eine zonenlose Zeile auf DERSELBEN Uhr, die den Tag bestimmt
+ * (`localDayContext`): ohne eingestellte Haushaltszone ist das die Zone der
+ * Oberflaeche bzw. der Offset eines aelteren Clients, nicht `TZ` des Servers -
+ * sonst laege 00:30 in Los Angeles bei einem UTC-Server vor dem Tagesanfang.
+ */
 function loadTodaySession(workerId, context = localDayContext()) {
-  const { start, end } = localDayRange(context);
+  const day = context && typeof context === 'object' && typeof context.localDate === 'string'
+    ? context
+    : localDayContext();
+  const range = localDayRange(day);
+  const [startMs, endMs] = [Date.parse(range.start), Date.parse(range.end)];
+  const window = widenedWindow(range);
+  const at = (row) => dayClockInstantMs(row.check_in, day);
   return db.get().prepare(`
     SELECT * FROM housekeeping_work_sessions
     WHERE worker_id = ? AND check_in >= ? AND check_in < ?
-    ORDER BY check_in DESC
-    LIMIT 1
-  `).get(workerId, start, end);
+  `).all(workerId, window.start, window.end)
+    .filter((row) => {
+      const ms = at(row);
+      return ms !== null && ms >= startMs && ms < endMs;
+    })
+    .sort((a, b) => (at(b) - at(a)) || (b.id - a.id))[0];
+}
+
+// Ein gespeicherter `check_in` als Zeitpunkt, auf der Uhr eines Tageskontexts:
+// in dessen Zone, oder - aelterer Client ohne Zone - mit dessen Offset.
+function dayClockInstantMs(value, context) {
+  if (context.timeZone) return checkInInstantMs(value, context.timeZone);
+  // In UTC gelesen ist eine zonenlose Zeile ihre eigene Ziffernfolge.
+  const wallMs = checkInInstantMs(value, 'UTC');
+  if (wallMs === null || hasExplicitZone(String(value ?? '').trim())) return wallMs;
+  return wallMs + (context.timezoneOffsetMinutes * 60_000);
 }
 
 function housekeepingPaymentTasksEnabled(database = db.get()) {
@@ -288,11 +374,7 @@ function housekeepingPaymentTasksEnabled(database = db.get()) {
 function defaultDailyRate() {
   const worker = loadWorker();
   if (worker) return Number(worker.daily_rate || 0);
-  const row = db.get().prepare(`
-    SELECT daily_rate FROM housekeeping_work_sessions
-    ORDER BY check_in DESC
-    LIMIT 1
-  `).get();
+  const row = latestVisit(db.get(), householdTimeZone(db.get()));
   return Number(row?.daily_rate || 0);
 }
 
@@ -376,8 +458,20 @@ function createPaymentTask(database, worker, checkIn, amount, actorId, title = n
   return result.lastInsertRowid;
 }
 
-function updateVisitLinks(database, session, worker, checkIn, dailyRate, extras, eventTitle = null, paymentTitle = null, paymentDescription = null) {
-  const visitDate = checkIn.slice(0, 10);
+/**
+ * Der Tag (YYYY-MM-DD) und die Uhrzeit (HH:MM:SS) eines gespeicherten
+ * `check_in` auf der Uhr des Haushalts. `check_in.slice(0, 10)` ist der
+ * UTC-Tag: ein Besuch um 00:30 in Berlin stand sonst am Vortag (#1540).
+ */
+function householdWallOf(checkIn, tz) {
+  const ms = checkInInstantMs(checkIn, tz);
+  return ms === null ? null : utcToWall(new Date(ms).toISOString(), tz);
+}
+
+// `visitDate` ist der Tag, den die Person im Formular gewaehlt hat - derselbe,
+// auf den der Check-in Termin und Zahlungsaufgabe gelegt hat (`local_date`).
+// Hier stand `checkIn.slice(0, 10)`, der UTC-Tag des Besuchs (#1540).
+function updateVisitLinks(database, session, worker, visitDate, dailyRate, extras, eventTitle = null, paymentTitle = null, paymentDescription = null) {
   if (session.calendar_event_id) {
     // Datum, Titel und Farbe des Termins stehen in MIRRORED_FIELDS. Ein Besuch,
     // den der Apple-Sync bereits hochgeladen hat, trägt external_source='apple'
@@ -408,6 +502,12 @@ function updateVisitLinks(database, session, worker, checkIn, dailyRate, extras,
       session.calendar_event_id,
     );
     const after = database.prepare('SELECT * FROM calendar_events WHERE id = ?').get(session.calendar_event_id);
+    // Die Farbe der Betreuungskraft ist eine lokale Wahl: ein gespiegelter
+    // Besuch ist damit keine Altlast der Farb-Heilung (#1270) mehr.
+    if (before && after && after.external_source === 'caldav'
+        && String(before.color ?? '').toLowerCase() !== String(after.color ?? '').toLowerCase()) {
+      recordLocalColorChoice(database, [session.calendar_event_id]);
+    }
     // Marker inline statt über markEventOutbound, aus zwei Gründen:
     //
     //   - markEventOutbound lehnt einen schreibgeschützten Provider ab
@@ -489,52 +589,51 @@ function loadWorkerById(workerId) {
 }
 
 function monthlySummary(monthValue = currentMonth()) {
-  const { start, end } = householdMonthRange(monthValue);
-  const row = db.get().prepare(`
-    SELECT
-      COUNT(*) AS session_count,
-      COALESCE(SUM(daily_rate), 0) AS daily_total,
-      COALESCE(SUM(extras), 0) AS extras_total,
-      COALESCE(SUM(daily_rate + extras), 0) AS total_amount
+  const { start, end, keep } = monthVisits(monthValue);
+  const rows = db.get().prepare(`
+    SELECT check_in, daily_rate, extras
     FROM housekeeping_work_sessions
     WHERE check_in >= ? AND check_in < ?
-  `).get(start, end);
+  `).all(start, end).filter(keep);
+  const dailyTotal = rows.reduce((sum, row) => sum + Number(row.daily_rate || 0), 0);
+  const extrasTotal = rows.reduce((sum, row) => sum + Number(row.extras || 0), 0);
 
   return {
     month: monthValue,
-    session_count: row.session_count,
-    daily_total: Number(row.daily_total || 0),
-    extras_total: Number(row.extras_total || 0),
-    total_amount: Number(row.total_amount || 0),
+    session_count: rows.length,
+    daily_total: dailyTotal,
+    extras_total: extrasTotal,
+    total_amount: dailyTotal + extrasTotal,
   };
 }
 
-function housekeepingDashboard() {
+// `daySource` ist req.query: dieselbe Angabe zur Zone wie bei `/workers` (#1556).
+function housekeepingDashboard(receipts = MASKED_RECEIPTS, daySource = {}) {
   reconcilePaymentTasks();
   const tz = householdTimeZone(db.get());
   const monthValue = currentMonth();
-  const monthRange = householdMonthRange(monthValue, tz);
-  const context = localDayContext();
-  const workers = loadWorkers().map((row) => publicWorker(row, context));
+  const monthWindow = monthVisits(monthValue, tz);
+  const context = localDayContext(daySource);
+  const workers = loadWorkers().map((row) => publicWorker(row, context, receipts));
   const worker = workers[0] ?? null;
   const summary = monthlySummary(monthValue);
-  const lastVisit = db.get().prepare(`
-    SELECT * FROM housekeeping_work_sessions
-    ORDER BY check_in DESC
-    LIMIT 1
-  `).get();
+  const lastVisit = latestVisit(db.get(), tz);
   const payment = db.get().prepare(`
-    SELECT
-      COALESCE(SUM(CASE WHEN paid_at IS NULL THEN daily_rate + extras ELSE 0 END), 0) AS pending,
-      COALESCE(SUM(CASE WHEN paid_at IS NOT NULL THEN daily_rate + extras ELSE 0 END), 0) AS paid
+    SELECT check_in, daily_rate, extras, paid_at
     FROM housekeeping_work_sessions
     WHERE check_in >= ? AND check_in < ?
-  `).get(monthRange.start, monthRange.end);
+  `).all(monthWindow.start, monthWindow.end).filter(monthWindow.keep).reduce((acc, row) => {
+    acc[row.paid_at ? 'paid' : 'pending'] += Number(row.daily_rate || 0) + Number(row.extras || 0);
+    return acc;
+  }, { pending: 0, paid: 0 });
   const taskRows = db.get().prepare('SELECT * FROM housekeeping_decay_tasks').all();
   const tasks = taskRows.map((row) => publicDecayTask(row, tz));
   // Gruppiert wird in JS statt per `substr(check_in, 1, 7)`: der Monat eines
   // Besuchs ist der des Haushalts, und den kennt SQLite nicht.
-  const chartStart = householdMonthRange(addMonthsClamped(`${monthValue}-01`, -5).slice(0, 7), tz).start;
+  // Das Fenster hat einen Tag Rand (zonenlose Zeilen am Ersten), der Monat
+  // davor bleibt ueber `chartFirstMonth` draussen.
+  const chartFirstMonth = addMonthsClamped(`${monthValue}-01`, -5).slice(0, 7);
+  const chartStart = householdMonthWindow(chartFirstMonth, tz).start;
   const chartByMonth = new Map();
   for (const row of db.get().prepare(`
     SELECT check_in, daily_rate, extras, paid_at
@@ -542,7 +641,7 @@ function housekeepingDashboard() {
     WHERE check_in >= ?
   `).all(chartStart)) {
     const key = householdMonthOf(row.check_in, tz);
-    if (!key) continue;
+    if (!key || key < chartFirstMonth) continue;
     const bucket = chartByMonth.get(key) ?? { month: key, total: 0, pending: 0 };
     const amount = Number(row.daily_rate || 0) + Number(row.extras || 0);
     bucket.total += amount;
@@ -556,7 +655,7 @@ function housekeepingDashboard() {
     workers,
     current_session: null,
     visits_this_month: summary.session_count,
-    last_visit: publicSession(lastVisit),
+    last_visit: publicSession(lastVisit, receipts),
     pending_tasks: tasks.filter((task) => task.urgency_status !== 'ok').length,
     finished_tasks_this_month: taskRows
       .filter((task) => task.last_completed && householdMonthOf(task.last_completed, tz) === monthValue).length,
@@ -620,6 +719,81 @@ function visitCapabilities(row, req) {
   };
 }
 
+// DER BELEG GEHOERT DEM DOKUMENTE-MODUL, NICHT DEM BESUCH (#1358).
+//
+// Der Besuch bleibt beim Quellmodul housekeeping (docs/DECISIONS.md: automatische
+// Folgeeintraege folgen dem Quellmodul), sein Beleg ist aber eine Zeile aus
+// family_documents. Der Pfad-Guard in server/index.js urteilt am ersten
+// Segment und fragt hier deshalb nie nach `documents`. Vorher gingen Name und
+// ID an jeden Leser von housekeeping - bei `documents: none`, mit einem Token
+// ohne documents-Scope oder bei einem fremden privaten Dokument. Dass die Seite
+// den Namen bei `none` nicht zeichnet, ist eine Darstellungsentscheidung, die
+// API beantwortet die Frage am Browser vorbei.
+//
+// EIN Urteil fuer Name UND ID, aus den geteilten Stellen und ohne Nachbau: die
+// Modulachse (`mayReadDocuments` aus services/document-links.js: Mitgliedsrecht
+// UND Token-Scope, dieselbe Frage wie bei Budget, Ausgaben und Inventar) und die
+// Sichtbarkeit des einzelnen Dokuments (`documentVisibleSql`, dieselbe Regel
+// wie im Dokumente-Modul). Wer durchfaellt, bekommt `null` fuer beide - auch die
+// ID verraet sonst, dass es ein Dokument dieser Nummer gibt (document-access.js).
+// Uebrig bleibt `has_receipt`, eine Aussage ueber den Besuch - aber nur fuer
+// wer Dokumente lesen darf. Ohne dieses Recht ist es `null` wie `attachments`
+// bei Budget, Ausgaben und Inventar und `document_count` bei Aufgaben: kein
+// Beleg und kein Hinweis darauf (#1358, einheitlich seit dem 22.09.).
+//
+// Das Urteil entsteht einmal je Anfrage und geht an `publicSession()`; wer es
+// nicht mitgibt, bekommt die maskierte Form. Ein kuenftiger Serialisierer, der
+// es vergisst, leakt deshalb nichts.
+function receiptAccess(req) {
+  const hidden = !mayReadDocuments(req);
+  const viewer = userId(req);
+  const names = new Map();
+  const load = (ids) => {
+    const wanted = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0 && !names.has(id)))];
+    // Die Modulachse steht nur hier: ohne Dokumentenzugriff wird nichts
+    // geladen, und ein nicht geladenes Dokument ist fuer `visible()` unsichtbar.
+    if (hidden || !wanted.length) return;
+    for (const id of wanted) names.set(id, undefined);
+    const rows = db.get().prepare(`
+      SELECT d.id, d.name FROM family_documents d
+      WHERE d.id IN (${wanted.map(() => '?').join(', ')}) AND ${documentVisibleSql('d')}
+    `).all(...wanted, { userId: viewer });
+    for (const row of rows) names.set(row.id, row.name);
+  };
+  const visible = (id) => {
+    if (id == null) return false;
+    load([id]);
+    return names.get(id) !== undefined;
+  };
+  return {
+    /** Laedt die Belege einer Liste in einer Abfrage statt je Zeile. */
+    preload(rows) {
+      load(rows.filter(Boolean).map((row) => row.receipt_document_id));
+      return this;
+    },
+    /** Darf diese Anfrage auf das Dokument als Beleg zugreifen? */
+    visible,
+    view(row) {
+      const id = row.receipt_document_id ?? null;
+      const seen = visible(id);
+      return {
+        receipt_document_id: seen ? id : null,
+        receipt_document_name: seen ? names.get(id) : null,
+        has_receipt: hidden ? null : id != null,
+      };
+    },
+  };
+}
+
+// Die Form ohne Urteil: nichts vom Dokument, auch nicht, ob es einen Beleg gibt.
+const MASKED_RECEIPTS = Object.freeze({
+  view: () => ({
+    receipt_document_id: null,
+    receipt_document_name: null,
+    has_receipt: null,
+  }),
+});
+
 async function createWorkerUser({ username, displayName, avatarColor, avatarData, actorUserId }) {
   const finalUsername = username || `housekeeper_${Date.now()}`;
   const password = crypto.randomBytes(24).toString('base64url');
@@ -627,7 +801,7 @@ async function createWorkerUser({ username, displayName, avatarColor, avatarData
   const result = db.get().prepare(`
     INSERT INTO users (username, display_name, password_hash, avatar_color, avatar_data, role, family_role)
     VALUES (?, ?, ?, ?, ?, 'member', 'other')
-  `).run(finalUsername, displayName, hash, avatarColor || '#7C3AED', avatarData ?? null);
+  `).run(finalUsername, displayName, hash, avatarColor || NEW_WORKER_COLOR, avatarData ?? null);
   syncFamilyMemberArtifacts(db.get(), result.lastInsertRowid, {
     displayName,
     avatarData: avatarData ?? null,
@@ -661,9 +835,9 @@ function defaultShoppingList(actorId) {
   return result.lastInsertRowid;
 }
 
-router.get('/dashboard', (_req, res) => {
+router.get('/dashboard', (req, res) => {
   try {
-    res.json({ data: housekeepingDashboard() });
+    res.json({ data: housekeepingDashboard(receiptAccess(req), req.query) });
   } catch (err) {
     log.error('GET /dashboard error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -681,7 +855,7 @@ router.get('/task-templates', (_req, res) => {
 
 router.get('/worker', (req, res) => {
   try {
-    res.json({ data: publicWorker(loadWorker(), localDayContext(req.query)) });
+    res.json({ data: publicWorker(loadWorker(), localDayContext(req.query), receiptAccess(req)) });
   } catch (err) {
     log.error('GET /worker error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -691,7 +865,8 @@ router.get('/worker', (req, res) => {
 router.get('/workers', (req, res) => {
   try {
     const context = localDayContext(req.query);
-    res.json({ data: loadWorkers().map((worker) => publicWorker(worker, context)) });
+    const receipts = receiptAccess(req);
+    res.json({ data: loadWorkers().map((worker) => publicWorker(worker, context, receipts)) });
   } catch (err) {
     log.error('GET /workers error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -715,7 +890,7 @@ router.post('/worker', async (req, res) => {
     const vBirthDate = date(req.body.birth_date, 'birth_date');
     const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: true });
     const vSchedule = oneOf(req.body.payment_schedule || 'monthly', PAYMENT_SCHEDULES, 'payment_schedule');
-    const vCalendarColor = color(req.body.calendar_color || DEFAULT_CALENDAR_COLOR, 'calendar_color');
+    const vCalendarColor = color(req.body.calendar_color || existing?.calendar_color || NEW_WORKER_COLOR, 'calendar_color');
     const vNotes = str(req.body.notes, 'notes', { max: MAX_TEXT, required: false });
     const vRateType = oneOf(req.body.rate_type || 'daily', ['daily', 'hourly'], 'rate_type');
     const vHourlyRate = num(req.body.hourly_rate, 'hourly_rate');
@@ -730,7 +905,7 @@ router.post('/worker', async (req, res) => {
     if ((vHourlyRate.value ?? 0) < 0) {
       return res.status(400).json({ error: 'hourly_rate must be greater than or equal to zero.', code: 400 });
     }
-    const avatarColor = String(req.body.avatar_color || '#7C3AED').trim();
+    const avatarColor = String(req.body.avatar_color || existing?.avatar_color || NEW_WORKER_COLOR).trim();
     const avatarData = req.body.avatar_data !== undefined
       ? normalizeAvatarData(req.body.avatar_data)
       : existing?.avatar_data ?? null;
@@ -755,7 +930,7 @@ router.post('/worker', async (req, res) => {
       `).run(
         vUsername.value || existing?.username || `housekeeper_${targetUserId}`,
         vDisplayName.value,
-        avatarColor || '#7C3AED',
+        avatarColor || NEW_WORKER_COLOR,
         avatarData ?? null,
         targetUserId,
       );
@@ -781,7 +956,7 @@ router.post('/worker', async (req, res) => {
     })();
 
     const saved = existing ? loadWorkerById(existing.id) : loadWorkers().find((worker) => worker.user_id === targetUserId);
-    res.status(existing ? 200 : 201).json({ data: publicWorker(saved) });
+    res.status(existing ? 200 : 201).json({ data: publicWorker(saved, localDayContext(), receiptAccess(req)) });
   } catch (err) {
     if (err.message?.includes('UNIQUE constraint')) {
       return res.status(409).json({ error: 'Username is already taken.', code: 409 });
@@ -797,7 +972,7 @@ router.get('/summary', (req, res) => {
     if (vMonth.error) return res.status(400).json({ error: vMonth.error, code: 400 });
     res.json({
       data: {
-        current_session: publicSession(loadOpenSession()),
+        current_session: publicSession(loadOpenSession(), receiptAccess(req)),
         default_daily_rate: defaultDailyRate(),
         summary: monthlySummary(vMonth.value || currentMonth()),
       },
@@ -813,13 +988,13 @@ router.get('/work-sessions', (req, res) => {
     reconcilePaymentTasks();
     const vMonth = month(req.query.month, 'month');
     if (vMonth.error) return res.status(400).json({ error: vMonth.error, code: 400 });
-    const { start, end } = householdMonthRange(vMonth.value || currentMonth());
+    const { start, end, keep, order } = monthVisits(vMonth.value || currentMonth());
     const rows = db.get().prepare(`
       SELECT * FROM housekeeping_work_sessions
       WHERE check_in >= ? AND check_in < ?
-      ORDER BY check_in DESC
-    `).all(start, end);
-    res.json({ data: rows.map(publicSession) });
+    `).all(start, end).filter(keep).sort(order);
+    const receipts = receiptAccess(req).preload(rows);
+    res.json({ data: rows.map((row) => publicSession(row, receipts)) });
   } catch (err) {
     log.error('GET /work-sessions error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -836,7 +1011,7 @@ router.get('/visits', (req, res) => {
       : { value: null, error: null };
     if (vWorkerId.error) return res.status(400).json({ error: vWorkerId.error, code: 400 });
     const selectedMonth = vMonth.value || currentMonth();
-    const { start, end } = householdMonthRange(selectedMonth);
+    const { start, end, keep, order } = monthVisits(selectedMonth);
     const rows = db.get().prepare(`
       SELECT hws.*,
              hw.payment_schedule,
@@ -844,26 +1019,24 @@ router.get('/visits', (req, res) => {
              u.avatar_color AS worker_avatar_color,
              u.avatar_data AS worker_avatar_data,
              t.status AS payment_task_status,
-             t.title AS payment_task_title,
-             fd.name AS receipt_document_name
+             t.title AS payment_task_title
       FROM housekeeping_work_sessions hws
       LEFT JOIN housekeeping_workers hw ON hw.id = hws.worker_id
       LEFT JOIN users u ON u.id = hw.user_id
       LEFT JOIN tasks t ON t.id = hws.payment_task_id
-      LEFT JOIN family_documents fd ON fd.id = hws.receipt_document_id
       WHERE hws.check_in >= ? AND hws.check_in < ?
         AND (? IS NULL OR hws.worker_id = ?)
-      ORDER BY hws.check_in DESC
-    `).all(start, end, vWorkerId.value, vWorkerId.value);
+    `).all(start, end, vWorkerId.value, vWorkerId.value).filter(keep).sort(order);
+    const receipts = receiptAccess(req).preload(rows);
     const visits = rows.map((row) => ({
-      ...publicSession(row),
+      ...publicSession(row, receipts),
       worker_name: row.worker_name ?? null,
       worker_avatar_color: row.worker_avatar_color ?? DEFAULT_CALENDAR_COLOR,
       worker_avatar_data: row.worker_avatar_data ?? null,
       payment_schedule: row.payment_schedule ?? 'monthly',
       payment_task_status: row.payment_task_status ?? null,
       payment_task_title: row.payment_task_title ?? null,
-      receipt_document_name: row.receipt_document_name ?? null,
+      receipt_document_name: receipts.view(row).receipt_document_name,
       total_amount: Number(row.daily_rate || 0) + Number(row.extras || 0),
       ...visitCapabilities(row, req),
     }));
@@ -891,7 +1064,6 @@ router.post('/work-sessions/check-in', (req, res) => {
     if (!worker) return res.status(404).json({ error: 'Housekeeper not found.', code: 404 });
     const workerRateType = worker.rate_type || 'daily';
     const workerHourlyRate = worker.hourly_rate ?? 0;
-    const context = localDayContext(req.body);
     // Nur eine OFFENE Sitzung sperrt. Vorher sperrte jede Sitzung des Tages,
     // auch eine laengst abgeschlossene - geteilte Schichten, eine Pause mit
     // Wiederaufnahme und zwei getrennte Besuche am selben Tag waren damit
@@ -911,6 +1083,9 @@ router.post('/work-sessions/check-in', (req, res) => {
 
     const actorId = userId(req);
     const checkIn = nowIso();
+    // Termin und Zahlungsaufgabe liegen am Tag des Check-ins - gelesen an
+    // derselben Uhr wie "heute" auf der Seite (#1556).
+    const context = localDayContext(req.body, new Date(checkIn));
     const result = db.get().transaction(() => {
       const eventId = createVisitCalendarEvent(db.get(), worker, checkIn, actorId, vEventTitle.value, context.localDate);
       const totalAmount = Number(vDailyRate.value || 0) + Number(vExtras.value || 0);
@@ -923,7 +1098,7 @@ router.post('/work-sessions/check-in', (req, res) => {
       `).run(worker.id, checkIn, null, vDailyRate.value, vExtras.value ?? 0, eventId, taskId, actorId, workerRateType, workerHourlyRate);
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ data: publicSession(row), summary: monthlySummary() });
+    res.status(201).json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary() });
   } catch (err) {
     log.error('POST /work-sessions/check-in error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -941,25 +1116,24 @@ router.get('/visits/:id', (req, res) => {
              u.avatar_color AS worker_avatar_color,
              u.avatar_data  AS worker_avatar_data,
              t.status  AS payment_task_status,
-             t.title   AS payment_task_title,
-             fd.name   AS receipt_document_name
+             t.title   AS payment_task_title
       FROM housekeeping_work_sessions hws
       LEFT JOIN housekeeping_workers hw ON hw.id = hws.worker_id
       LEFT JOIN users u ON u.id = hw.user_id
       LEFT JOIN tasks t ON t.id = hws.payment_task_id
-      LEFT JOIN family_documents fd ON fd.id = hws.receipt_document_id
       WHERE hws.id = ?
     `).get(vId.value);
     if (!row) return res.status(404).json({ error: 'Visit not found.', code: 404 });
+    const receipts = receiptAccess(req);
     const visit = {
-      ...publicSession(row),
+      ...publicSession(row, receipts),
       worker_name: row.worker_name ?? null,
       worker_avatar_color: row.worker_avatar_color ?? null,
       worker_avatar_data: row.worker_avatar_data ?? null,
       payment_schedule: row.payment_schedule ?? 'monthly',
       payment_task_status: row.payment_task_status ?? null,
       payment_task_title: row.payment_task_title ?? null,
-      receipt_document_name: row.receipt_document_name ?? null,
+      receipt_document_name: receipts.view(row).receipt_document_name,
       total_amount: Number(row.daily_rate || 0) + Number(row.extras || 0),
       ...visitCapabilities(row, req),
     };
@@ -979,6 +1153,8 @@ router.put('/visits/:id', (req, res) => {
     if (!assertMayTouchSettled(existing, req, res)) return;
 
     const vDate = date(req.body.date, 'date', true);
+    // Der Tag, den das Formular vorbelegt hat - siehe unten bei `baseDay`.
+    const vOriginalDate = date(req.body.original_date, 'original_date', false);
     const isHourly = existing.rate_type === 'hourly';
     const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: !isHourly });
     const vExtras = num(req.body.extras, 'extras');
@@ -992,15 +1168,39 @@ router.put('/visits/:id', (req, res) => {
       ? num(req.body.minutes_worked, 'minutes_worked')
       : { value: null, error: null };
     if (vMinutesWorked.error) return res.status(400).json({ error: vMinutesWorked.error, code: 400 });
-    const errors = collectErrors([vDate, vDailyRate, vExtras, vEventTitle, vPaymentTitle, vPaymentDescription, vReceiptId]);
+    const errors = collectErrors([vDate, vOriginalDate, vDailyRate, vExtras, vEventTitle, vPaymentTitle, vPaymentDescription, vReceiptId]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-    const receiptDocumentId = req.body.receipt_document_id !== undefined && vReceiptId.value !== null
-      ? assertDocumentLinkTargetsAvailable(
-        db.get(),
-        [vReceiptId.value],
-        req.authUserId || req.session.userId,
-      )[0] ?? null
-      : vReceiptId.value;
+    // Der Beleg folgt Regel 2 aus services/document-links.js: entfernen oder
+    // ersetzen kann man nur, was man sieht (#1358). Wer den GESPEICHERTEN Beleg
+    // nicht sieht, bekommt seine ID maskiert (`receiptAccess`), und der Dialog
+    // schickt dann `null` zurueck - das heisst "behalten", nicht "loesen", ohne
+    // jede weitere Pruefung. JEDE Zahl ist dann dieselbe 403, auch die
+    // gespeicherte: fragte der Zweig erst "unveraendert?", antwortete die
+    // richtig geratene ID mit 200 (oder 409 aus der Loeschsperre) und alle
+    // anderen mit 403 - bei fortlaufenden rowids ein Orakel fuer die maskierte
+    // ID. Die Sichtbarkeit steht deshalb VOR jedem Vergleich mit ihr.
+    // Eine NEUE Verknuepfung verlangt Zugriff auf das Dokumente-Modul
+    // (Mitgliedsrecht UND Token-Scope) und die Sichtbarkeit des Dokuments; ein
+    // unsichtbares faellt wie bisher still auf `null`. Die Loeschsperre gilt
+    // auch fuer die unveraenderte ID - fuer den, der den Beleg sieht.
+    const receipts = receiptAccess(req);
+    const storedReceipt = existing.receipt_document_id ?? null;
+    let receiptDocumentId = storedReceipt;
+    if (req.body.receipt_document_id !== undefined) {
+      const wanted = vReceiptId.value;
+      if (storedReceipt !== null && !receipts.visible(storedReceipt)) {
+        if (wanted !== null) {
+          return res.status(403).json({ error: 'You cannot change a receipt you may not see.', code: 403 });
+        }
+      } else if (wanted !== null && wanted === storedReceipt) {
+        assertDocumentsNotDeleting([wanted]);
+      } else if (wanted === null) {
+        receiptDocumentId = null;
+      } else {
+        // Ohne Dokumentenzugriff wirft das die geteilte 403 (document-links.js).
+        receiptDocumentId = assertDocumentLinkTargetsAvailable(db.get(), [wanted], documentViewer(req))[0] ?? null;
+      }
+    }
     if (vDailyRate.value < 0 || (vExtras.value ?? 0) < 0) {
       return res.status(400).json({ error: 'Amounts must be greater than or equal to zero.', code: 400 });
     }
@@ -1010,8 +1210,28 @@ router.put('/visits/:id', (req, res) => {
       effectiveDailyRate = computeHourlyAmount(vMinutesWorked.value, existing.hourly_rate || 0);
     }
 
-    const originalTime = existing.check_in?.slice(11) || '09:00:00.000Z';
-    const checkIn = `${vDate.value}T${originalTime}`;
+    // Ein neuer Tag verschiebt den Besuch um die Tage zwischen altem und neuem
+    // Tag, zur selben Uhrzeit des Haushalts (#1540). Hier stand der gewaehlte
+    // Tag mit der UTC-Uhrzeit: wer einen Besuch um 00:30 in Berlin auf seinen
+    // eigenen Tag „korrigierte", schob ihn um einen Tag. Unveraenderter Tag =
+    // unveraenderter Zeitpunkt, damit ein reines Betragsupdate nichts bewegt.
+    //
+    // „Der alte Tag" ist der, den das FORMULAR gezeigt hat (`original_date`),
+    // nicht der auf der Uhr des Servers: ohne eingestellte Haushaltszone liest
+    // die Oberflaeche die Zone des Browsers und der Server `TZ` - im Container
+    // meist UTC -, und ein Vergleich mit dem Server-Tag hielt ein reines
+    // Betragsupdate fuer einen neuen Tag. Ohne das Feld (API) gilt der Server-Tag.
+    const tz = householdTimeZone(db.get());
+    const originalWall = householdWallOf(existing.check_in, tz);
+    const baseDay = vOriginalDate.value ?? originalWall?.date ?? null;
+    const dayShift = baseDay ? daysBetweenDateKeys(baseDay, vDate.value) : null;
+    let checkIn;
+    if (dayShift === 0) checkIn = existing.check_in;
+    else if (originalWall && dayShift !== null) {
+      checkIn = new Date(localToUTCPrecise(`${shiftDateKey(originalWall.date, dayShift)}T${originalWall.time}`, tz)).toISOString();
+    } else {
+      checkIn = new Date(localToUTCPrecise(`${vDate.value}T09:00:00`, tz)).toISOString();
+    }
     const worker = existing.worker_id ? loadWorkerById(existing.worker_id) : null;
     db.get().transaction(() => {
       db.get().prepare(`
@@ -1023,7 +1243,7 @@ router.put('/visits/:id', (req, res) => {
         checkIn,
         effectiveDailyRate,
         vExtras.value ?? 0,
-        req.body.receipt_document_id !== undefined ? receiptDocumentId : existing.receipt_document_id,
+        receiptDocumentId,
         vMinutesWorked.value !== null ? vMinutesWorked.value : existing.minutes_worked,
         existing.id,
       );
@@ -1031,7 +1251,7 @@ router.put('/visits/:id', (req, res) => {
         db.get(),
         existing,
         worker,
-        checkIn,
+        vDate.value,
         effectiveDailyRate,
         vExtras.value ?? 0,
         vEventTitle.value,
@@ -1040,9 +1260,10 @@ router.put('/visits/:id', (req, res) => {
       );
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
-    res.json({ data: publicSession(row), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
+    res.json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     log.error('PUT /visits/:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
@@ -1063,7 +1284,7 @@ router.post('/visits/:id/pay', (req, res) => {
       }
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
-    res.json({ data: publicSession(row), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
+    res.json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
   } catch (err) {
     log.error('POST /visits/:id/pay error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1093,7 +1314,7 @@ router.post('/visits/:id/unpay', (req, res) => {
       })();
     }
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
-    res.json({ data: publicSession(row), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
+    res.json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
   } catch (err) {
     log.error('POST /visits/:id/unpay error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1151,7 +1372,7 @@ router.post('/work-sessions/check-out', (req, res) => {
       `).run(checkOut, vExtras.value ?? session.extras, updateRate, minutesWorked, sessionRateType, sessionHourlyRate, session.id);
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(session.id);
-    res.json({ data: publicSession(row), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
+    res.json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
   } catch (err) {
     log.error('POST /work-sessions/check-out error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1274,7 +1495,7 @@ router.post('/supply-requests', (req, res) => {
     // Als Erstes, vor Validierung und Transaktion: eine Antwort darf einem
     // Gesperrten nichts ueber den Einkauf verraten, und angelegt wird nichts.
     if (!mayWriteModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403 });
+      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
     }
 
     const vName = str(req.body.name, 'name', { max: MAX_TITLE });

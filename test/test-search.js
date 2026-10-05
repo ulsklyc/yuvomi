@@ -6,8 +6,11 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
+import { readFileSync } from 'node:fs';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
-import { runSearch, buildMatchQuery } from '../server/services/search.js';
+import {
+  runSearch, buildMatchQuery, runTableSearch, escapeLike, INFIX_TERM_CAP, searchExcerpt,
+} from '../server/services/search.js';
 
 let passed = 0;
 let failed = 0;
@@ -151,6 +154,40 @@ test('Suche deckt alle Entitäten ab', () => {
   assert(r.waste.some((w) => w.title === 'Cake-day recycling'), 'Abfall-Typ gefunden');
 });
 
+// AUSSCHNITT (Re-Critique 2026-09-28, A1 P2-2): ein Treffer, dessen Wort nicht
+// im Titel steht, zeigte in der Palette nur Titel und Datum - "sch" fand
+// "Klavier ueben" ohne Grund. Solche Zeilen tragen `excerpt`.
+test('Treffer ausserhalb des Titels tragen einen Ausschnitt, Titeltreffer nicht', () => {
+  const r = runSearch(db, 'sponge', uid);
+  const cake = r.tasks.find((t) => t.title === 'Buy birthday cake');
+  assert(cake, 'Aufgabe ueber die Beschreibung gefunden');
+  assert(cake.excerpt === 'chocolate sponge', `Ausschnitt aus der Beschreibung erwartet, erhalten ${JSON.stringify(cake.excerpt)}`);
+  assert(!('_body' in cake), 'das interne Feld _body darf nicht in die Antwort');
+  const byTitle = runSearch(db, 'birthday', uid).tasks[0];
+  assert(!('excerpt' in byTitle), 'ein Titeltreffer braucht keinen Ausschnitt');
+  const note = runSearch(db, 'early', uid).notes.find((n) => n.title === 'Party');
+  assert(note?.excerpt === 'order the cake early', `Notiz: ${JSON.stringify(note?.excerpt)}`);
+  const ev = runSearch(db, 'flavor', uid).events.find((e) => e.title === 'Cake tasting');
+  assert(ev?.excerpt === 'pick a flavor', `Termin: ${JSON.stringify(ev?.excerpt)}`);
+  const act = runSearch(db, 'jog', uid).activities.find((a) => a.title === 'running');
+  assert(act?.excerpt === 'morning jog', `Aktivitaet: ${JSON.stringify(act?.excerpt)}`);
+});
+
+test('searchExcerpt schneidet um die Fundstelle, an Wortgrenzen, mit Auslassung', () => {
+  const long = 'Am Montag bringen wir die Noten fuer die Schule mit und danach geht es direkt weiter zum Klavierunterricht bei Frau Weber';
+  const ex = searchExcerpt('schul', 'Klavier ueben', [long]);
+  assert(ex && ex.includes('Schule'), `Fundstelle fehlt: ${ex}`);
+  assert(ex.startsWith('\u2026') && ex.endsWith('\u2026'), `Auslassung an beiden Enden erwartet: ${ex}`);
+  assert(!/^\u2026\S*[a-z]\S* /.test(ex) || long.includes(ex.slice(1, ex.indexOf(' '))), 'kein angeschnittenes Wort');
+  // Akzente und ss wie der Index, der Ausschnitt zeigt den Originaltext.
+  assert(searchExcerpt('grosse', 'Einkauf', ['eine große Tüte']) === 'eine große Tüte');
+  assert(searchExcerpt('mull', 'Kontakt', ['Frau Müller']) === 'Frau Müller');
+  // Steht alles im Titel, gibt es keinen Ausschnitt; fehlt ein Wort im Titel, zeigt der Ausschnitt dieses.
+  assert(searchExcerpt('cake', 'Buy birthday cake', ['cake chocolate']) === null);
+  assert(searchExcerpt('cake choc', 'Buy birthday cake', ['cake chocolate']) === 'cake chocolate');
+  assert(searchExcerpt('xyz', 'Titel', ['nichts davon', null, '']) === null, 'kein Feld passt');
+});
+
 test('Suche findet Abfall-Typ über Namen, verbirgt archivierte Typen', () => {
   const r = runSearch(db, 'recycling', uid);
   const titles = r.waste.map((w) => w.title);
@@ -196,6 +233,101 @@ test('globale Suche liefert den aufgelösten verschobenen Termin mit Originalide
   assert(result[0].series_id === Number(masterId), 'series_id fehlt');
   assert(result[0].recurrence_id === '2030-07-01', 'originale recurrence_id fehlt');
   assert(result[0].is_occurrence_override === true, 'Override-Kennzeichen fehlt');
+});
+
+// #1607 (M4a): die globale Suche lieferte fuer eine Serie den Start der
+// STAMMZEILE - ein Geburtstag von 1990 oeffnete den Kalender im Jahr 1990,
+// waehrend die Kalendersuche dieselbe Serie laengst an ihrem naechsten Termin
+// zeigte. Uhr und Zone stehen im Test: `todayKey` fragt beide.
+// Die Suite baut ihr Schema aus einzelnen Migrationen; `sync_config` (Traeger
+// der Haushaltszone) ist nicht dabei. Dieselbe Form wie in der Migration.
+db.exec(`CREATE TABLE IF NOT EXISTS sync_config (
+  key TEXT PRIMARY KEY, value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);`);
+const searchModule = await import('../server/services/search.js');
+
+function mitUhr(isoNow, zone, fn) {
+  const Echt = globalThis.Date;
+  const fest = new Echt(isoNow).getTime();
+  class FesteUhr extends Echt {
+    constructor(...args) { if (args.length) super(...args); else super(fest); }
+    static now() { return fest; }
+  }
+  db.prepare(`INSERT INTO sync_config (key, value) VALUES ('household_timezone', ?)
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(zone);
+  globalThis.Date = FesteUhr;
+  // KEIN await zwischen Setzen und Zuruecksetzen.
+  try { return fn(); } finally {
+    globalThis.Date = Echt;
+    db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run();
+  }
+}
+
+test('globale Suche zeigt eine alte Serie an ihrem naechsten Termin, nicht im Startjahr (#1607)', () => {
+  const id = db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, all_day, recurrence_rule, created_by)
+    VALUES ('Geburtstag Qzxbirthday', '1990-10-14', 1, 'FREQ=YEARLY', ?)
+  `).run(uid).lastInsertRowid;
+  const treffer = mitUhr('2026-10-02T10:00:00Z', 'UTC', () => runSearch(db, 'Qzxbirthday', uid).events);
+  assert(treffer.length === 1, `genau ein Treffer erwartet, bekommen ${treffer.length}`);
+  assert(treffer[0].id === Number(id), 'der Treffer bleibt die Serie selbst');
+  assert(treffer[0].start_datetime.slice(0, 10) === '2026-10-14',
+    `erwartet den naechsten Termin 2026-10-14, bekommen ${treffer[0].start_datetime}`);
+  assert(treffer[0].all_day === 1, 'ganztaegig bleibt ganztaegig');
+});
+
+test('"heute" der globalen Suche ist der Tag der Haushaltszone (#1607)', () => {
+  // 00:30 UTC am 15.: in Los Angeles ist noch der 14., der Geburtstag also
+  // heute; in UTC ist er vorbei und der naechste liegt ein Jahr spaeter. Die
+  // beiden Antworten MUESSEN sich unterscheiden.
+  const jetzt = '2026-10-15T00:30:00Z';
+  const la = mitUhr(jetzt, 'America/Los_Angeles', () => runSearch(db, 'Qzxbirthday', uid).events[0]);
+  const utc = mitUhr(jetzt, 'UTC', () => runSearch(db, 'Qzxbirthday', uid).events[0]);
+  assert(la.start_datetime.slice(0, 10) === '2026-10-14', `Los Angeles: ${la.start_datetime}`);
+  assert(utc.start_datetime.slice(0, 10) === '2027-10-14', `UTC: ${utc.start_datetime}`);
+});
+
+test('globale Suche und Kalendersuche fragen dasselbe Fenster ab (#1607)', () => {
+  // Synchron, wie jeder Test dieser Datei: der eigene Zaehler wartet nicht.
+  const { eventSearchWindow } = searchModule;
+  assert(typeof eventSearchWindow === 'function', 'das gemeinsame Fenster fehlt');
+  const fenster = mitUhr('2026-10-02T10:00:00Z', 'UTC', () => eventSearchWindow(db));
+  assert(fenster.from === '2026-10-02' && fenster.to === '2028-10-01',
+    `Fenster: ${JSON.stringify(fenster)}`);
+  // UND BEIDE AUFRUFER NEHMEN ES: eine zweite Rechnung in der Route liefe beim
+  // naechsten Umbau auseinander, und dieselbe Serie stuende wieder an zwei Tagen.
+  const route = readFileSync(new URL('../server/routes/calendar/read.js', import.meta.url), 'utf8');
+  assert(/eventSearchWindow\(/.test(route), 'die Kalendersuche rechnet ihr Fenster selbst');
+  assert(!/shiftDateKey\(today, 730\)/.test(route), 'in der Route steht noch eine eigene Fensterrechnung');
+});
+
+test('die fuenf Treffer sind die fuenf fruehesten ANGEZEIGTEN Tage, nicht die fuenf aeltesten Stammzeilen (#1607)', () => {
+  // Gedeckelt wurde nach dem Start der Stammzeile, angezeigt wird der naechste
+  // Termin. Fuenf alte Serien, deren naechster Termin Monate entfernt liegt,
+  // verdraengten so einen sechsten Treffer von morgen (Review an PR #1618).
+  const ins = db.prepare(`INSERT INTO calendar_events (title, start_datetime, all_day, recurrence_rule, created_by)
+                          VALUES (?, ?, 1, ?, ?)`);
+  for (let i = 0; i < 5; i++) ins.run(`Jahrestag Qzxcrowd ${i}`, `198${i}-03-0${i + 1}`, 'FREQ=YEARLY', uid);
+  ins.run('Morgen Qzxcrowd', '2026-10-03', null, uid);
+  const treffer = mitUhr('2026-10-02T10:00:00Z', 'UTC', () => runSearch(db, 'Qzxcrowd', uid).events);
+  assert(treffer.length === 5, `fuenf Treffer: ${treffer.length}`);
+  assert(treffer[0].title === 'Morgen Qzxcrowd',
+    `der Termin von morgen steht vorn: ${treffer.map((e) => `${e.title} ${e.start_datetime}`).join(' | ')}`);
+  const tage = treffer.map((e) => e.start_datetime.slice(0, 10));
+  assert(JSON.stringify(tage) === JSON.stringify([...tage].sort()), `aufsteigend: ${tage.join(', ')}`);
+});
+
+test('ohne kommenden Termin bleibt der Treffer die Stammzeile; ein Einzeltermin bleibt, wo er liegt (#1607)', () => {
+  db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, all_day, recurrence_rule, created_by)
+    VALUES ('Beendet Qzxended', '2001-03-05', 1, 'FREQ=YEARLY;UNTIL=20050305', ?),
+           ('Einmal Qzxsingle', '1999-06-01T09:00:00', 0, NULL, ?)
+  `).run(uid, uid);
+  const beendet = mitUhr('2026-10-02T10:00:00Z', 'UTC', () => runSearch(db, 'Qzxended', uid).events[0]);
+  assert(beendet.start_datetime.slice(0, 10) === '2001-03-05', `beendete Serie: ${beendet.start_datetime}`);
+  const einmal = mitUhr('2026-10-02T10:00:00Z', 'UTC', () => runSearch(db, 'Qzxsingle', uid).events[0]);
+  assert(einmal.start_datetime === '1999-06-01T09:00:00', `Einzeltermin: ${einmal.start_datetime}`);
 });
 
 test('globale Suche löst große Anhänge auf, ohne attachment_data zu lesen', () => {
@@ -346,6 +478,176 @@ test('Leere/kurze Query liefert leere Ergebnisse', () => {
     && r.contacts.length === 0 && r.items.length === 0
     && r.meds.length === 0 && r.activities.length === 0 && r.waste.length === 0, 'Alles leer');
 });
+
+// --------------------------------------------------------------------------
+// WORTTEILE (Re-Critique 2026-09-27, A1 P2-6): "Milch" fand die "Vollmilch"
+// nicht - FTS5 kennt nur Praefixe. Die Abfrage holt sich jetzt aus dem
+// Vokabular des Index die Woerter, die das Suchwort ENTHALTEN. Jeder Test
+// prueft vorher, dass der reine Praefix NICHTS faende - sonst maesse er den
+// alten Weg.
+// --------------------------------------------------------------------------
+db.prepare(`INSERT INTO tasks (title, priority, status, created_by)
+  VALUES ('Vollmilch holen', 'low', 'open', ?)`).run(uid);
+db.prepare(`INSERT INTO tasks (title, priority, status, created_by)
+  VALUES ('Fremde Hafermilch', 'low', 'open', ?)`).run(otherUid);
+db.prepare(`INSERT INTO shopping_items (list_id, name) VALUES (?, 'Tiefkühlerbsen')`).run(list.lastInsertRowid);
+db.prepare(`INSERT INTO shopping_items (list_id, name) VALUES (?, 'Gießkanne')`).run(list.lastInsertRowid);
+
+function prefixOnly(q, entity) {
+  return db.prepare(`SELECT entity_id FROM search_index WHERE entity = ? AND search_index MATCH ?`)
+    .all(entity, buildMatchQuery(q));
+}
+
+test('Wortteil: "milch" findet "Vollmilch" (Praefix allein findet nichts)', () => {
+  assert(prefixOnly('milch', 'task').length === 0, 'Vorbedingung: der reine Praefix trifft nicht');
+  const hits = runSearch(db, 'milch', uid).tasks.map((t) => t.title);
+  assert(hits.includes('Vollmilch holen'), `Vollmilch fehlt: ${JSON.stringify(hits)}`);
+});
+
+test('Wortteil aendert keine Besitzerfilter: fremde "Hafermilch" bleibt verborgen', () => {
+  const hits = runSearch(db, 'milch', uid).tasks.map((t) => t.title);
+  assert(!hits.includes('Fremde Hafermilch'), 'die fremde Aufgabe kam ueber den Wortteil herein');
+});
+
+test('Wortteil faltet Akzente wie der Index: "kuhl" findet "Tiefkühlerbsen"', () => {
+  assert(prefixOnly('kuhl', 'item').length === 0, 'Vorbedingung: der reine Praefix trifft nicht');
+  assert(runSearch(db, 'kuhl', uid).items.some((i) => i.title === 'Tiefkühlerbsen'), 'Tiefkühlerbsen fehlt');
+  assert(runSearch(db, 'KÜHL', uid).items.some((i) => i.title === 'Tiefkühlerbsen'), 'Grossschreibung mit Umlaut');
+});
+
+test('Wortteil kennt ß/ss: "iess" findet "Gießkanne"', () => {
+  assert(prefixOnly('iess', 'item').length === 0, 'Vorbedingung: der reine Praefix trifft nicht');
+  assert(runSearch(db, 'iess', uid).items.some((i) => i.title === 'Gießkanne'), 'Gießkanne fehlt');
+});
+
+test('Wortteil erst ab drei Zeichen: "lc" bleibt beim Praefix', () => {
+  assert(!runSearch(db, 'lc', uid).tasks.some((t) => t.title === 'Vollmilch holen'),
+    'zwei Buchstaben sollen nicht in jedes Wort greifen');
+});
+
+test('LIKE-Steuerzeichen sind Text: "il_h" trifft "Vollmilch" nicht, "%" ist kein Joker', () => {
+  // Ungeflohen hiesse `_` "ein beliebiges Zeichen" - "%il_h%" traefe "milch".
+  assert(!runSearch(db, 'il_h', uid).tasks.some((t) => t.title === 'Vollmilch holen'), '_ wirkte als Joker');
+  assert(!runSearch(db, 'v%h', uid).tasks.some((t) => t.title === 'Vollmilch holen'), '% wirkte als Joker');
+  assert(escapeLike('a_b%c\\') === 'a\\_b\\%c\\\\', `escapeLike: ${escapeLike('a_b%c\\')}`);
+});
+
+test('Wortteil ist gedeckelt: hoechstens INFIX_TERM_CAP zusaetzliche Woerter je Suchwort', () => {
+  const ins = db.prepare(`INSERT INTO notes (title, content, created_by) VALUES (?, 'x', ?)`);
+  for (let i = 0; i < INFIX_TERM_CAP + 10; i++) ins.run(`Zqwort${String(i).padStart(3, '0')}`, uid);
+  const match = buildMatchQuery('qwort', { database: db });
+  const branches = match.split(' OR ').length;
+  assert(branches <= INFIX_TERM_CAP + 3, `${branches} Zweige, Deckel ${INFIX_TERM_CAP} + Praefixvarianten`);
+  db.prepare("DELETE FROM notes WHERE title LIKE 'Zqwort%'").run();
+});
+
+// --------------------------------------------------------------------------
+// TREFFERARTEN OHNE FTS-INDEX (runTableSearch): Rezepte, Vorrat, Inventar,
+// Dokumente, Geburtstage, Budget. Gegen das ECHTE Schema (alle Migrationen),
+// nicht gegen den Auszug in db-schema-test.js - die Sichtbarkeitsspalten von
+// Dokumenten und Budget kamen spaet und stehen dort nicht.
+// --------------------------------------------------------------------------
+process.env.DB_PATH = ':memory:';
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'search-test-secret';
+const { MIGRATIONS, get: getModuleDb } = await import('../server/db.js');
+const { default: BetterSqlite } = await import('better-sqlite3-multiple-ciphers');
+getModuleDb().close();
+const full = new BetterSqlite(':memory:');
+full.pragma('foreign_keys = ON');
+full.exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, description TEXT NOT NULL,
+  applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')))`);
+for (const m of MIGRATIONS) {
+  if (typeof m.up === 'function') m.up(full); else full.exec(m.up);
+  if (typeof m.afterUp === 'function') m.afterUp(full);
+  full.prepare('INSERT INTO schema_migrations (version, description) VALUES (?, ?)').run(m.version, m.description);
+}
+const fa = full.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('fa', 'A', 'x', 'admin')`).run().lastInsertRowid;
+const fb = full.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('fb', 'B', 'x', 'member')`).run().lastInsertRowid;
+
+full.prepare('INSERT INTO recipes (title, notes, created_by) VALUES (?, ?, ?)').run('Omas Apfelkuchen', 'mit Zimt', fb);
+full.prepare('INSERT INTO recipes (title, notes, created_by) VALUES (?, ?, ?)').run('Linsensuppe', 'Vollmilch statt Sahne', fb);
+full.prepare('INSERT INTO pantry_items (name, quantity, unit) VALUES (?, 2, ?)').run('Gemüsebrühe', 'Glas');
+full.prepare("INSERT INTO inventory_items (name, brand, status) VALUES ('Alte Bohrmaschine', 'Bosch', 'sold')").run();
+full.prepare("INSERT INTO inventory_items (name, brand, status) VALUES ('Akku-Bohrmaschine', 'Makita', 'active')").run();
+full.prepare('INSERT INTO birthdays (name, birth_date, created_by) VALUES (?, ?, ?)').run('Onkel Straßer', '1960-05-01', fb);
+const insDoc = full.prepare(`INSERT INTO family_documents
+  (name, original_name, mime_type, file_size, content_data, visibility, status, created_by)
+  VALUES (?, 'a.pdf', 'application/pdf', 1, 'x', ?, ?, ?)`);
+insDoc.run('Steuerbescheid familie', 'family', 'active', fb);
+insDoc.run('Steuerbescheid privat fremd', 'private', 'active', fb);
+const restricted = insDoc.run('Steuerbescheid freigegeben', 'restricted', 'active', fb).lastInsertRowid;
+insDoc.run('Steuerbescheid restricted ohne mich', 'restricted', 'active', fb);
+insDoc.run('Steuerbescheid archiviert', 'family', 'archived', fb);
+full.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(restricted, fa);
+const insEntry = full.prepare(`INSERT INTO budget_entries (title, amount, date, created_by, owner_id, visibility)
+  VALUES (?, -10, '2030-01-15', ?, ?, ?)`);
+insEntry.run('Zahnarztrechnung geteilt', fb, fb, 'shared');
+insEntry.run('Zahnarztrechnung privat fremd', fb, fb, 'private');
+insEntry.run('Zahnarztrechnung betrag fremd', fb, fb, 'shared_amount');
+insEntry.run('Zahnarztrechnung privat meins', fa, fa, 'private');
+
+const titles = (rows) => rows.map((r) => r.title);
+
+test('Tabellensuche: Wortteil im Titel und in der Notiz (Rezepte)', () => {
+  assert(titles(runTableSearch(full, 'kuchen', fa).recipes).includes('Omas Apfelkuchen'), 'kuchen -> Apfelkuchen');
+  assert(titles(runTableSearch(full, 'milch', fa).recipes).includes('Linsensuppe'), 'Notiz traegt den Wortteil');
+  assert(titles(runTableSearch(full, 'omas kuchen', fa).recipes).length === 1, 'mehrere Woerter: UND');
+  assert(runTableSearch(full, 'omas torte', fa).recipes.length === 0, 'ein fehlendes Wort -> kein Treffer');
+});
+
+test('Tabellensuche faltet Akzente und ß/ss wie der Index', () => {
+  assert(titles(runTableSearch(full, 'bruhe', fa).pantry).includes('Gemüsebrühe'), 'bruhe -> Gemüsebrühe');
+  assert(titles(runTableSearch(full, 'strasser', fa).birthdays).includes('Onkel Straßer'), 'strasser -> Straßer');
+  assert(titles(runTableSearch(full, 'STRAß', fa).birthdays).includes('Onkel Straßer'), 'Grossschreibung mit ß');
+});
+
+test('Tabellensuche: LIKE-Zeichen bleiben Text', () => {
+  assert(runTableSearch(full, 'k_chen', fa).recipes.length === 0, '_ ist kein Joker');
+  assert(runTableSearch(full, 'k%n', fa).recipes.length === 0, '% ist kein Joker');
+});
+
+test('Tabellensuche: Inventar mit Marke, aktive Gegenstaende zuerst', () => {
+  const hits = titles(runTableSearch(full, 'bohr', fa).inventory);
+  assert(hits[0] === 'Akku-Bohrmaschine' && hits[1] === 'Alte Bohrmaschine', JSON.stringify(hits));
+  assert(titles(runTableSearch(full, 'makita', fa).inventory).includes('Akku-Bohrmaschine'), 'Marke durchsucht');
+});
+
+test('Tabellensuche: Dokumente mit der Sichtbarkeit der Liste (eigen, Familie, freigegeben; nur aktiv)', () => {
+  const hits = titles(runTableSearch(full, 'steuer', fa).documents).sort();
+  assert(JSON.stringify(hits) === JSON.stringify(['Steuerbescheid familie', 'Steuerbescheid freigegeben']),
+    `Dokumente: ${JSON.stringify(hits)}`);
+});
+
+test('Tabellensuche: Budget im gemeinsamen Modus findet jeden Titel', () => {
+  full.prepare("DELETE FROM sync_config WHERE key = 'budget_mode'").run();
+  assert(runTableSearch(full, 'zahnarzt', fa).budget.length === 4, 'shared-Modus: alle vier');
+});
+
+test('Tabellensuche: Budget im persoenlichen Modus nur, wo der Betrachter den ZWECK sieht', () => {
+  full.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('budget_mode', 'personal')").run();
+  try {
+    const hits = titles(runTableSearch(full, 'zahnarzt', fa).budget).sort();
+    assert(JSON.stringify(hits) === JSON.stringify(['Zahnarztrechnung geteilt', 'Zahnarztrechnung privat meins']),
+      `Budget: ${JSON.stringify(hits)} - fremd privat und fremd "nur Betrag" duerfen nicht ueber den Titel auffindbar sein`);
+  } finally {
+    full.prepare("DELETE FROM sync_config WHERE key = 'budget_mode'").run();
+  }
+});
+
+test('Tabellensuche deckelt bei SEARCH_LIMIT je Trefferart', () => {
+  const ins = full.prepare('INSERT INTO pantry_items (name) VALUES (?)');
+  for (let i = 0; i < 8; i++) ins.run(`Dosentomaten ${i}`);
+  assert(runTableSearch(full, 'tomaten', fa).pantry.length === 5, 'fuenf je Art');
+});
+
+test('Tabellensuche: gesperrte Module und abgeschaltete Eintraege bleiben leer', () => {
+  const r = runTableSearch(full, 'kuchen', fa, { hiddenModules: new Set(['meals']) });
+  assert(r.recipes.length === 0, 'meals gesperrt -> keine Rezepte');
+  const d = runTableSearch(full, 'strasser', fa, { disabledNav: new Set(['birthdays']) });
+  assert(d.birthdays.length === 0, 'Geburtstage abgeschaltet');
+});
+
+full.close();
 
 console.log(`\n[Search-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);
 if (failed > 0) process.exit(1);

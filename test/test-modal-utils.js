@@ -986,7 +986,15 @@ test('das Popover gibt den Fokus nur zurueck, wo niemand woanders hin wollte (#1
   const fn = src.match(/export function closeDetailView\([\s\S]*?\n\}/)?.[0] ?? '';
   assert.match(fn, /if \(fokus && merker\) restoreFocusAfterClose\(merker\);\s*else forgetRestore\(\);/,
     'Rueckgabe mit eigenem Merker, sonst verwerfen - nie einen fremden stehen lassen');
-  assert.match(src, /!popover\.contains\(e\.target\)\) closeDetailView\(\{ fokus: false \}\)/,
+  // Die Regel am Klick-daneben-Handler selbst, nicht an einer Zeile: seit er
+  // den Klick schluckt (Re-Kritik 2026-09-28, E2), steht die Pruefung auf
+  // "im Popover" als eigene Frueh-Rueckkehr davor - geschlossen wird danach
+  // weiterhin ohne Fokus-Rueckgabe, und nirgends im Handler mit.
+  const outside = src.match(/const onOutsideClick = \(e\) => \{[\s\S]*?\n {2}\};/)?.[0] ?? '';
+  assert.ok(outside, 'der Klick-daneben-Handler des Popovers ist auffindbar');
+  const schliesst = [...outside.matchAll(/closeDetailView\(([^)]*)\)/g)].map((m) => m[1].trim());
+  assert.ok(schliesst.length > 0, 'ein Klick daneben schliesst das Popover');
+  assert.deepEqual([...new Set(schliesst)], ['{ fokus: false }'],
     'ein Klick daneben wollte woanders hin - der Fokus springt nicht zurueck');
   assert.match(src, /if \(activePopover\) closeDetailView\(\{ fokus: false \}\)/,
     'eine neue Ansicht nimmt den Fokus selbst');
@@ -1052,30 +1060,52 @@ test('_tryRefocus schreibt das tatsaechlich gesetzte Ziel in den Merker zurueck'
 // Scrollen des Inhalts. Die Geste darf das Panel dann nicht anfassen - vorher
 // schrieb sie bei jedem Aufwaerts-Frame `translateY(0)`, und ein frisch
 // geoeffneter Dialog steht immer oben, also begann jede Wischgeste so.
+//
+// Seit der Re-Critique 2026-09-27 laeuft die Geste ueber den geteilten Helfer
+// utils/sheet-drag.js (Dialog-Sheet UND Mehr-Blatt) und schreibt `translate`
+// statt `transform`: die Einfahrt haelt `transform` per `forwards`, und eine
+// gefuellte Animation schlaegt jedes Inline-`transform` - gemessen blieb die
+// Tafel bei `style.transform = 'translateY(100px)'` stehen. Der Faktor 0.6 ist
+// 1:1 gewichen (vorher `translateY(24px)` fuer 50px Weg, jetzt 40px).
 // --------------------------------------------------------
 const { __test: modalInternals } = await import('../public/components/modal.js');
+const sheetDrag = await import('../public/utils/sheet-drag.js');
 
-function fakeSheet() {
+function fakeSheet({ wire = (panel) => modalInternals.wireSheetSwipe(panel), top = 100 } = {}) {
   const handlers = {};
   const writes = [];
-  let transform = '';
+  const attrs = {};
+  let translate = '';
+  let clock = 1000;
   const panel = {
     addEventListener: (type, fn) => { handlers[type] = fn; },
+    removeEventListener: () => {},
     querySelector: () => ({ scrollTop: 0 }),
-    getBoundingClientRect: () => ({ top: 100 }),
+    getBoundingClientRect: () => ({ top }),
+    setAttribute: (k, v) => { attrs[k] = v; },
+    removeAttribute: (k) => { delete attrs[k]; },
+    getAttribute: (k) => attrs[k] ?? null,
     style: {
-      get transform() { return transform; },
-      set transform(v) { writes.push(v); transform = v; },
+      get translate() { return translate; },
+      set translate(v) { writes.push(v); translate = v; },
     },
   };
-  modalInternals.wireSheetSwipe(panel);
-  const at = (y) => ({ touches: [{ clientY: y }], changedTouches: [{ clientY: y }] });
+  wire(panel);
+  // Jede Probe 16ms nach der vorigen, ausser der Test gibt die Zeit vor.
+  const at = (y, dt = 16) => {
+    clock += dt;
+    return { timeStamp: clock, touches: [{ clientY: y }], changedTouches: [{ clientY: y }] };
+  };
   return {
     writes,
-    get transform() { return transform; },
-    start: (y) => handlers.touchstart(at(y)),
-    move: (y) => handlers.touchmove(at(y)),
-    end: (y) => handlers.touchend(at(y)),
+    attrs,
+    get translate() { return translate; },
+    start: (y) => handlers.touchstart(at(y, 0)),
+    move: (y, dt) => handlers.touchmove(at(y, dt)),
+    end: (y, dt) => handlers.touchend(at(y, dt)),
+    cancel: (y, dt) => handlers.touchcancel(at(y, dt)),
+    // Ein zweiter Finger setzt auf: touchstart meldet zwei Beruehrungen.
+    secondFinger: (y) => { clock += 16; handlers.touchstart({ timeStamp: clock, touches: [{ clientY: y }, { clientY: y + 80 }], changedTouches: [{ clientY: y + 80 }] }); },
   };
 }
 
@@ -1097,28 +1127,175 @@ test('Sheet-Swipe: ein Zittern nach oben verwirft eine Schliessgeste nicht', () 
   sheet.move(592); // 8px nach oben: innerhalb der Schwelle
   assert.deepEqual(sheet.writes, [], 'innerhalb der Schwelle kein Schreibzugriff');
   sheet.move(650);
-  assert.equal(sheet.transform, 'translateY(24px)', 'die Geste zieht das Sheet trotz des Zitterns');
+  assert.equal(sheet.translate, '0px 40px', 'die Geste zieht das Sheet trotz des Zitterns - 1:1 ab der Schwelle');
 });
 
-test('Sheet-Swipe: ein begonnener Zug bleibt verfolgt und setzt das Panel einmal zurueck', () => {
+test('Sheet-Swipe: 1:1 - der Versatz folgt dem Finger Pixel fuer Pixel', () => {
+  const sheet = fakeSheet();
+  sheet.start(600);
+  sheet.move(620);
+  assert.equal(sheet.translate, '0px 10px');
+  sheet.move(655);
+  assert.equal(sheet.translate, '0px 45px', 'kein Faktor 0.6 mehr');
+  assert.equal(sheet.attrs['data-sheet-drag'], 'drag', 'waehrend des Zugs keine Transition (Marke fuer layout.css)');
+});
+
+test('Sheet-Swipe: ein begonnener Zug bleibt verfolgt; ueber dem Start gibt das Blatt nur als Gummiband nach', () => {
   global.requestAnimationFrame = (fn) => fn();
   try {
     const sheet = fakeSheet();
     sheet.start(600);
     sheet.move(650); // 50px nach unten: das Sheet folgt
-    assert.equal(sheet.transform, 'translateY(24px)');
+    assert.equal(sheet.translate, '0px 40px');
     sheet.move(590); // der Finger kehrt ueber den Start zurueck
-    assert.equal(sheet.transform, '', 'zurueckgesetzt, sobald der Finger ueber dem Start steht (b7c0312c)');
-    const writesAfterReset = sheet.writes.length;
-    sheet.move(570);
-    sheet.move(550);
-    assert.equal(sheet.writes.length, writesAfterReset, 'zurueckgesetzt wird einmal, nicht in jedem Frame');
+    const up = parseFloat(sheet.translate.split(' ')[1]);
+    assert.ok(up < 0 && up > -10, `Gummiband: leicht nach oben, gedaempft (${sheet.translate})`);
+    sheet.move(300); // 300px ueber dem Start
+    const far = parseFloat(sheet.translate.split(' ')[1]);
+    assert.ok(far < up && far > -24, `das Gummiband hat eine Grenze (${sheet.translate})`);
     sheet.move(640);
-    sheet.end(640); // 40px: kein Schliessen, zurueck in die Ruhelage
-    assert.equal(sheet.transform, '', 'touchend raeumt den Zug ab');
+    sheet.end(640, 400); // 40px, langsam: kein Schliessen, zurueck in die Ruhelage
+    assert.equal(sheet.translate, '', 'touchend raeumt den Zug ab');
+    assert.equal(sheet.attrs['data-sheet-drag'], undefined, 'ohne Marke federt `translate` per Transition zurueck');
   } finally {
     delete global.requestAnimationFrame;
   }
+});
+
+test('Sheet-Drag: schliesst ab 80px Weg ODER bei einem Flick > 0.5px/ms, sonst federt es zurueck', () => {
+  global.requestAnimationFrame = (fn) => fn();
+  try {
+    const run = (moves, endY, endDt) => {
+      let dismissed = 0;
+      const sheet = fakeSheet({ wire: (p) => sheetDrag.wireSheetDrag(p, { onDismiss: () => { dismissed += 1; } }) });
+      sheet.start(600);
+      for (const [y, dt] of moves) sheet.move(y, dt);
+      sheet.end(endY, endDt);
+      return { dismissed, translate: sheet.translate };
+    };
+    // 90px langsam gezogen (Tempo 0.1px/ms): der Weg reicht.
+    assert.equal(run([[630, 300], [660, 300], [690, 300]], 690, 100).dismissed, 1);
+    // 40px, aber schnell (40px in 32ms = 1.25px/ms): ein Flick schliesst.
+    assert.equal(run([[620, 16], [640, 16]], 640, 1).dismissed, 1, 'kurzer Flick schliesst (vorher: sprang zurueck)');
+    // 40px langsam: weder Weg noch Tempo - das Blatt federt zurueck.
+    const slow = run([[620, 300], [640, 300]], 640, 300);
+    assert.equal(slow.dismissed, 0);
+    assert.equal(slow.translate, '');
+    // Beim Schliessen bleibt der Zug stehen: der Ausgang startet am Finger.
+    const kept = run([[700, 16]], 700, 16);
+    assert.equal(kept.dismissed, 1);
+    assert.equal(kept.translate, '0px 90px', 'der Ausgang startet dort, wo der Finger losliess');
+  } finally {
+    delete global.requestAnimationFrame;
+  }
+});
+
+test('Sheet-Drag: bleibt das Blatt stehen (onDismiss -> false, Rueckfrage), federt es in die Ruhelage', () => {
+  global.requestAnimationFrame = (fn) => fn();
+  try {
+    const sheet = fakeSheet({ wire: (p) => sheetDrag.wireSheetDrag(p, { onDismiss: () => false }) });
+    sheet.start(600);
+    sheet.move(720);
+    sheet.end(720);
+    assert.equal(sheet.translate, '');
+  } finally {
+    delete global.requestAnimationFrame;
+  }
+});
+
+test('Sheet-Drag: touchcancel bricht die Geste ab - es schliesst nie, das Blatt federt zurueck', () => {
+  // Ein abgebrochener Touch (Browser uebernimmt die Geste, Unterbrechung) ist
+  // keine Absicht zu schliessen, auch wenn der letzte Stand wie ein Flick aussah.
+  global.requestAnimationFrame = (fn) => fn();
+  try {
+    let dismissed = 0;
+    const sheet = fakeSheet({ wire: (p) => sheetDrag.wireSheetDrag(p, { onDismiss: () => { dismissed += 1; } }) });
+    sheet.start(600);
+    sheet.move(650, 16);
+    sheet.move(720, 16); // 120px schnell: als touchend waere das ein Schliessen
+    sheet.cancel(720, 1);
+    assert.equal(dismissed, 0, 'touchcancel darf onDismiss nie ausloesen');
+    assert.equal(sheet.translate, '', 'der Zug wird zurueckgenommen');
+    assert.equal(sheet.attrs['data-sheet-drag'], undefined, 'ohne Marke federt es per Transition zurueck');
+  } finally {
+    delete global.requestAnimationFrame;
+  }
+});
+
+test('Sheet-Drag: ein zweiter Finger mitten im Zug laesst das Blatt nicht versetzt stehen', () => {
+  global.requestAnimationFrame = (fn) => fn();
+  try {
+    let dismissed = 0;
+    const sheet = fakeSheet({ wire: (p) => sheetDrag.wireSheetDrag(p, { onDismiss: () => { dismissed += 1; } }) });
+    sheet.start(600);
+    sheet.move(660);
+    assert.equal(sheet.translate, '0px 50px');
+    sheet.secondFinger(660);
+    sheet.end(660);
+    assert.equal(dismissed, 0);
+    assert.equal(sheet.translate, '', 'der Versatz faellt zurueck, statt bei 50px zu kleben');
+    assert.equal(sheet.attrs['data-sheet-drag'], undefined, 'die Zieh-Marke (keine Transition) bleibt nicht haengen');
+  } finally {
+    delete global.requestAnimationFrame;
+  }
+});
+
+test('Sheet-Drag: Entscheidung und Tempo als reine Funktionen', () => {
+  assert.equal(sheetDrag.shouldDismissSheet({ distance: 80, velocity: 0 }), true);
+  assert.equal(sheetDrag.shouldDismissSheet({ distance: 79, velocity: 0.5 }), false, 'die Grenze ist "groesser als 0.5"');
+  assert.equal(sheetDrag.shouldDismissSheet({ distance: 10, velocity: 0.51 }), true);
+  // Tempo misst die letzten 100ms, nicht die ganze Geste: langer Anlauf, schneller Schluss.
+  const v = sheetDrag.releaseVelocity([{ y: 0, t: 0 }, { y: 10, t: 900 }, { y: 40, t: 950 }, { y: 80, t: 1000 }]);
+  assert.ok(Math.abs(v - 0.7) < 1e-9, `Tempo der letzten 100ms (${v})`);
+  assert.equal(sheetDrag.rubberBand(10), 0);
+  assert.ok(sheetDrag.rubberBand(-1000) > -24);
+});
+
+test('Sheet-Drag: ein Tipp schreibt nichts (Schwelle), auch nicht beim Loslassen', () => {
+  const sheet = fakeSheet({ wire: (p) => sheetDrag.wireSheetDrag(p, { onDismiss: () => assert.fail('ein Tipp schliesst nicht') }) });
+  sheet.start(600);
+  sheet.move(605);
+  sheet.end(605);
+  assert.deepEqual(sheet.writes, []);
+});
+
+test('Sheet-Griff: sichtbar im hellen Theme, in der Kopfzone statt ueber einem leeren Streifen, gleich an Dialog und Mehr-Blatt (Re-Critique 2026-09-27, P1 #1)', () => {
+  const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+  const layout = read('../public/styles/layout.css');
+  const glass = read('../public/styles/glass.css');
+  const tokens = read('../public/styles/tokens.css');
+  const mobile = [...eachRule(layout)].filter((r) => r.at.some((a) => /max-width:\s*767px/.test(a)));
+  const body = (rules, sel) => rules.find((r) => r.selector === sel)?.body ?? '';
+  // Vorher: `--modal-handle-color: var(--glass-border)` fuer JEDES Theme -
+  // Glas-Weiss 65 % auf weisser Tafel, gemessen unsichtbar.
+  assert.ok(![...eachRule(glass)].some((r) => /--modal-handle-color|--sheet-grabber/.test(r.body)),
+    'glass.css faerbt den Griff nicht mehr fuer jedes Theme um - das Glas-Weiss gehoert nur dem Dark (Token)');
+  assert.match(tokens, /--_sheet-grabber:\s*var\(--color-border-strong\)/, 'hell: die kraeftigere neutrale Kante');
+  assert.equal((tokens.match(/--_sheet-grabber:\s*var\(--glass-border\)/g) || []).length, 2, 'dunkel (Media + data-theme): Glas-Weiss');
+  const grip = body(mobile, '.modal-panel::before');
+  assert.match(grip, /background-color:\s*var\(--sheet-grabber\)/);
+  assert.match(grip, /width:\s*36px/);
+  assert.match(grip, /height:\s*5px/);
+  // Der leere 36px-Streifen (`--space-4 + 20px`) ist weg; Griff-Oberkante bis
+  // Titel-Oberkante 16px (8px + Kopfpolster 12px + Zentrierung neben dem X).
+  assert.match(body(mobile, '.modal-panel'), /padding-top:\s*0/);
+  assert.match(grip, /top:\s*var\(--space-2\)/);
+  assert.match(body(mobile, '.modal-panel > .modal-panel__header'), /padding-top:\s*var\(--space-3\)/);
+  // Das Mehr-Blatt traegt denselben Griff.
+  const more = body([...eachRule(layout)], '.more-sheet__handle');
+  assert.match(more, /background-color:\s*var\(--sheet-grabber\)/);
+  assert.match(more, /height:\s*5px/);
+});
+
+test('Sheet-Grammatik: das Mehr-Blatt zieht ueber denselben Helfer wie der Dialog und federt per translate zurueck', () => {
+  const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+  const router = read('../public/router.js');
+  const layout = read('../public/styles/layout.css');
+  assert.match(router, /wireSheetDrag\(sheet, \{[\s\S]{0,200}resetAfterDismiss: true/);
+  assert.doesNotMatch(router, /clientY - _touchStartY > 60/, 'die alte Geste (erst bei touchend, ab 60px) ist weg');
+  const more = [...eachRule(layout)].find((r) => r.selector === '.more-sheet' && !r.at.length)?.body ?? '';
+  assert.match(more, /translate var\(--duration-lg\) var\(--ease-out\)/, 'Rueckfedern mit Token-Dauer und -Kurve');
+  assert.match(more, /border-radius:\s*var\(--radius-lg\)/, 'Radius des Dialog-Sheets');
 });
 
 /* DER ERSTFOKUS NIMMT KEINEN SPAETER GESETZTEN FOKUS WEG (#1156).
@@ -1284,4 +1461,311 @@ test('Erstfokus: ein auf body gefallener Fokus ist keine Wahl, das erste Feld ko
   } finally {
     lage.aufraeumen();
   }
+});
+
+// --------------------------------------------------------
+// Dialogfuss mit Loeschen mobil (Re-Critique 2026-09-27, R9 M8)
+// --------------------------------------------------------
+
+/**
+ * Eine Attrappe, die genau so viel DOM kann, wie `decorateFooterDelete`
+ * braucht: Klassen, data-Attribute, Kindknoten (Text und Elemente) und ein
+ * Selektor-Matcher fuer die Formen, die dort vorkommen (`.klasse`, `[attr]`,
+ * `tag`, `input[type="text"]`, `input:not([type])`, Kommalisten).
+ */
+function fussAttrappe() {
+  const matches = (el, sel) => sel.split(',').map((s) => s.trim()).some((s) => {
+    if (el.nodeType !== 1) return false;
+    if (s === 'input:not([type])') return el.tagName === 'INPUT' && !('type' in el.attrs);
+    const typed = s.match(/^(\w+)\[type="(\w+)"\]$/);
+    if (typed) return el.tagName === typed[1].toUpperCase() && el.attrs.type === typed[2];
+    if (s.startsWith('.')) return el.classes.has(s.slice(1));
+    if (s.startsWith('[')) {
+      const name = s.slice(1, -1);
+      return name.startsWith('data-')
+        ? el.dataset[name.slice(5).replace(/-(\w)/g, (_m, c) => c.toUpperCase())] !== undefined
+        : name in el.attrs;
+    }
+    return el.tagName === s.toUpperCase();
+  });
+  const all = (root) => root.childNodes.flatMap((c) => (c.nodeType === 1 ? [c, ...all(c)] : []));
+  const el = (tag, { cls = [], attrs = {}, data = {}, text = null, kids = [] } = {}) => {
+    const node = {
+      nodeType: 1, tagName: tag.toUpperCase(), attrs: { ...attrs }, dataset: { ...data },
+      classes: new Set(cls), childNodes: [], parentElement: null, value: attrs.value ?? '', form: null,
+      get classList() {
+        const set = node.classes;
+        return {
+          add: (...c) => c.forEach((x) => set.add(x)),
+          remove: (...c) => c.forEach((x) => set.delete(x)),
+          contains: (c) => set.has(c),
+          toggle: (c, on) => { if (on) set.add(c); else set.delete(c); },
+        };
+      },
+      set className(v) { node.classes = new Set(String(v).split(/\s+/).filter(Boolean)); },
+      get className() { return [...node.classes].join(' '); },
+      textContent: text ?? '',
+      hasAttribute: (n) => n in node.attrs,
+      getAttribute: (n) => node.attrs[n] ?? null,
+      setAttribute: (n, v) => { node.attrs[n] = String(v); },
+      appendChild(c) { c.parentElement = node; node.childNodes.push(c); return c; },
+      prepend(c) { c.parentElement = node; node.childNodes.unshift(c); },
+      querySelectorAll: (s) => all(node).filter((c) => matches(c, s)),
+      querySelector: (s) => all(node).find((c) => matches(c, s)) ?? null,
+      closest(s) { for (let x = node; x; x = x.parentElement) if (matches(x, s)) return x; return null; },
+    };
+    for (const k of kids) node.appendChild(k);
+    return node;
+  };
+  const txt = (s) => {
+    const node = { nodeType: 3, textContent: s, parentElement: null };
+    node.remove = () => { const p = node.parentElement.childNodes; p.splice(p.indexOf(node), 1); };
+    return node;
+  };
+  const withText = (node, ...texts) => { for (const s of texts) { const n = txt(s); n.parentElement = node; node.childNodes.push(n); } return node; };
+  return { el, txt, withText };
+}
+
+test('M8: der Loeschen-Knopf im Fuss wird erkannt, bekommt Symbol, Wortspanne und Objektnamen', async () => {
+  const { decorateFooterDelete } = await import('../public/components/modal.js');
+  const { el, withText } = fussAttrappe();
+  const savedWindow = globalThis.window;
+  const savedCreate = global.document.createElement;
+  globalThis.window = { lucide: { icons: { Trash2: [] }, createElement: () => el('svg', { attrs: { 'data-icon': 'trash-2' } }) } };
+  global.document.createElement = (tag) => el(tag);
+  try {
+    const titel = el('input', { attrs: { type: 'text', value: 'Wocheneinkauf' } });
+    const del = withText(el('button', { cls: ['btn', 'btn--danger-ghost'] }), '\n  ', 'Loeschen', '\n');
+    const cancel = withText(el('button', { cls: ['btn', 'btn--secondary'] }), 'Abbrechen');
+    const save = withText(el('button', { cls: ['btn', 'btn--primary'] }), 'Speichern');
+    const footer = el('div', { cls: ['modal-panel__footer'], kids: [del, cancel, save] });
+    const form = el('form', { kids: [titel] });
+    for (const b of [del, cancel, save]) b.form = form;
+    el('div', { cls: ['modal-panel'], kids: [el('div', { cls: ['modal-panel__body'], kids: [form] }), footer] });
+
+    const found = decorateFooterDelete(footer);
+    assert.deepEqual(found, [del], 'genau der Gefahrenknopf ist Loeschen');
+    assert.ok(del.classList.contains('modal-panel__delete'));
+    assert.ok(footer.classList.contains('modal-panel__footer--has-delete'));
+    assert.ok(footer.classList.contains('modal-panel__footer--one-row'), 'Dreiheit Loeschen/Abbrechen/Primaer steht in einer Zeile');
+    const label = del.childNodes.find((n) => n.nodeType === 1 && n.classList.contains('modal-panel__delete-label'));
+    assert.equal(label?.textContent, 'Loeschen', 'das Wort steht in einer eigenen Spanne, die das CSS mobil ausblendet');
+    assert.equal(del.childNodes[0].tagName, 'SVG', 'fehlendes Papierkorb-Symbol kommt dazu');
+    assert.match(del.getAttribute('aria-label'), /common\.deleteNamed.*Wocheneinkauf/, 'Objektname aus dem ersten Textfeld');
+
+    decorateFooterDelete(footer);
+    assert.equal(del.childNodes.filter((n) => n.nodeType === 1 && n.classList.contains('modal-panel__delete-label')).length, 1, 'idempotent');
+    assert.equal(del.childNodes.filter((n) => n.tagName === 'SVG').length, 1, 'kein zweites Symbol');
+  } finally {
+    globalThis.window = savedWindow;
+    global.document.createElement = savedCreate;
+  }
+});
+
+test('M8: data-delete-name und ein vorhandenes aria-label gewinnen; off und die Detailansicht mit drei Aktionen bleiben beim Umbruch', async () => {
+  const { decorateFooterDelete } = await import('../public/components/modal.js');
+  const { el, withText } = fussAttrappe();
+  const savedCreate = global.document.createElement;
+  const savedWindow = globalThis.window;
+  global.document.createElement = (tag) => el(tag);
+  globalThis.window = {};
+  try {
+    const named = withText(el('button', { cls: ['btn', 'btn--danger-outline'], data: { deleteName: 'Blutdruck 12.09.' } }), 'Loeschen');
+    const f1 = el('div', { cls: ['modal-panel__footer'], kids: [named, withText(el('button', { cls: ['btn'] }), 'Abbrechen')] });
+    decorateFooterDelete(f1);
+    assert.match(named.getAttribute('aria-label'), /Blutdruck 12\.09\./);
+
+    const labelled = withText(el('button', { cls: ['btn', 'btn--danger-outline'], attrs: { 'aria-label': 'Eintrag „Miete" loeschen' } }), 'Loeschen');
+    decorateFooterDelete(el('div', { cls: ['modal-panel__footer'], kids: [labelled] }));
+    assert.equal(labelled.getAttribute('aria-label'), 'Eintrag „Miete" loeschen', 'ein vorhandenes aria-label wird nie ueberschrieben');
+
+    const primary = withText(el('button', { cls: ['btn', 'btn--danger-outline'], data: { footerDelete: 'off' } }), 'Liste leeren');
+    const f3 = el('div', { cls: ['modal-panel__footer'], kids: [primary] });
+    assert.deepEqual(decorateFooterDelete(f3), [], 'off nimmt den Knopf heraus');
+    assert.equal(f3.classList.contains('modal-panel__footer--has-delete'), false);
+
+    const detail = el('div', { cls: ['modal-panel__footer'], kids: [
+      withText(el('button', { cls: ['btn', 'btn--danger-ghost'] }), 'Loeschen'),
+      withText(el('button', { cls: ['btn', 'btn--secondary'] }), 'Erledigen'),
+      withText(el('button', { cls: ['btn', 'btn--ghost'] }), 'Starten'),
+      withText(el('button', { cls: ['btn', 'btn--ghost'] }), 'Aufgabe archivieren'),
+    ] });
+    const detailTitle = el('h2', { cls: ['modal-panel__title'], text: 'Kinderzimmer aufraeumen' });
+    detail.classList.add('detail-view__footer');
+    el('div', { cls: ['modal-panel'], kids: [el('div', { cls: ['modal-panel__header'], kids: [detailTitle] }), detail] });
+    decorateFooterDelete(detail);
+    assert.ok(detail.classList.contains('modal-panel__footer--has-delete'), 'der Papierkorb gilt auch hier');
+    assert.match(detail.childNodes[0].getAttribute('aria-label') ?? '', /Kinderzimmer aufraeumen/,
+      'in der Detailansicht ist der Dialogtitel der Objektname');
+    assert.equal(detail.classList.contains('modal-panel__footer--one-row'), false,
+      'drei beschriftete Aktionen neben Loeschen quetschen sich in einer Zeile auf ~80px - dort bleibt der Umbruch');
+
+    const konto = el('div', { cls: ['modal-panel__footer'], kids: [
+      el('div', { kids: [withText(el('button', { cls: ['btn', 'btn--danger-outline'] }), 'Loeschen'), el('button', { cls: ['btn', 'btn--secondary', 'btn--icon'] })] }),
+      el('div', { kids: [withText(el('button', { cls: ['btn'] }), 'Abbrechen'), withText(el('button', { cls: ['btn', 'btn--primary'] }), 'Speichern')] }),
+    ] });
+    decorateFooterDelete(konto);
+    assert.ok(konto.classList.contains('modal-panel__footer--one-row'), 'ein Icon-Knopf daneben zaehlt nicht als beschriftete Aktion');
+  } finally {
+    global.document.createElement = savedCreate;
+    globalThis.window = savedWindow;
+  }
+});
+
+test('M8: mountFooter dekoriert die gehobene Fusszeile', () => {
+  const src = readFileSync(new URL('../public/components/modal.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('export function mountFooter'), src.indexOf('export const FOOTER_DELETE_SELECTOR'));
+  assert.match(fn, /panel\.appendChild\(bodyFooter\);\s*decorateFooterDelete\(bodyFooter\);/,
+    'ohne den Aufruf bleibt jede Regel unten wirkungslos - der Fuss traegt nie die Klassen');
+});
+
+test('M8: mobil ist Loeschen ein Icon-Knopf der Zielgroesse, das Wort nur fuer den Screenreader, die Dreiheit bricht nicht um', () => {
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const mobile = [...eachRule(css)].filter((r) => r.at.some((a) => /max-width:\s*639px/.test(a)));
+  const rule = (sel) => mobile.find((r) => r.selector.split(',').map((s) => s.trim()).includes(sel))?.body ?? '';
+  const btn = rule('.modal-panel__footer .btn.modal-panel__delete');
+  assert.match(btn, /width:\s*var\(--target-base\)/, 'Treffflaeche der Geraeteklasse (44 Zeiger / 48 Finger)');
+  assert.match(btn, /min-width:\s*var\(--target-base\)/);
+  assert.match(btn, /padding:\s*0/);
+  const label = rule('.modal-panel__footer .modal-panel__delete .modal-panel__delete-label');
+  assert.match(label, /position:\s*absolute/, 'das Wort verlaesst das Bild ...');
+  assert.match(label, /clip:\s*rect\(0,\s*0,\s*0,\s*0\)/, '... aber nicht den Baum (sr-only, nicht display:none)');
+  assert.doesNotMatch(label, /display:\s*none/);
+  const row = rule('.modal-panel__footer.modal-panel__footer--one-row');
+  assert.match(row, /flex-wrap:\s*nowrap/, 'Speichern steht nie allein in Zeile 2');
+  assert.match(rule('.modal-panel__footer.modal-panel__footer--one-row .btn:not(.modal-panel__delete):not(.btn--icon)'),
+    /overflow-wrap:\s*anywhere/, 'eine lange Beschriftung bricht innen statt den Fuss nach links hinauszuschieben (#872)');
+});
+
+/*
+ * F3 (Re-Critique 2026-09-28, A5 P2-4): IN JEDEM FUSS PASST LOESCHEN IN SEINEN
+ * KNOPF. Die Detailansicht (components/detail-view.js) baut ihre Knoepfe mit
+ * Symbol und einer `.btn__label`-Spanne, nicht mit losem Text. decorateFooterDelete
+ * packte nur losen Text in `.modal-panel__delete-label`; das Wort blieb sichtbar
+ * und ragte bei 390px aus dem 48px-Quadrat (Kontakt-Detail: Inhalt 72px, der
+ * Papierkorb 5px vom Blattrand). Die Regel, die jeder Fuss erfuellen muss: kein
+ * sichtbares Wort im Loeschen-Knopf ausserhalb der ausgeblendeten Spanne.
+ */
+function visibleWordsOutsideLabel(btn) {
+  const out = [];
+  const walk = (node, hidden) => {
+    for (const c of node.childNodes) {
+      if (c.nodeType === 3) { if (!hidden && c.textContent.trim()) out.push(c.textContent.trim()); continue; }
+      if (c.tagName === 'SVG' || c.tagName === 'I') continue;
+      const inLabel = hidden || c.classList.contains('modal-panel__delete-label');
+      if (!inLabel && !c.childNodes.length && c.textContent.trim()) out.push(c.textContent.trim());
+      walk(c, inLabel);
+    }
+  };
+  walk(btn, false);
+  return out;
+}
+
+test('F3: in jedem Fuss liegt das Wort des Loeschen-Knopfs in der ausgeblendeten Spanne - auch mit .btn__label', async () => {
+  const { decorateFooterDelete } = await import('../public/components/modal.js');
+  const { el, withText } = fussAttrappe();
+  const savedCreate = global.document.createElement;
+  const savedWindow = globalThis.window;
+  global.document.createElement = (tag) => el(tag);
+  globalThis.window = {};
+  try {
+    const cases = {
+      // Die Form aus detail-view.js: Symbol + .btn__label.
+      detailansicht: () => el('button', { cls: ['btn', 'btn--danger-ghost'], kids: [
+        el('i', { data: { lucide: 'trash-2' } }),
+        el('span', { cls: ['btn__label'], text: 'Loeschen' }),
+      ] }),
+      // Die Form der Formular-Dialoge: loser Text.
+      formular: () => withText(el('button', { cls: ['btn', 'btn--danger-outline'] }), 'Loeschen'),
+      // Symbol und loser Text gemischt.
+      gemischt: () => withText(el('button', { cls: ['btn', 'btn--danger-outline'], kids: [el('i', { data: { lucide: 'trash-2' } })] }), 'Loeschen'),
+    };
+    for (const [name, make] of Object.entries(cases)) {
+      const del = make();
+      const footer = el('div', { cls: ['modal-panel__footer', 'detail-view__footer'], kids: [del, withText(el('button', { cls: ['btn', 'btn--primary'] }), 'Bearbeiten')] });
+      el('div', { cls: ['modal-panel'], kids: [el('h2', { cls: ['modal-panel__title'], text: 'Dr. Anna Weber' }), footer] });
+      decorateFooterDelete(footer);
+      assert.ok(del.classList.contains('modal-panel__delete'), `${name}: nicht erkannt`);
+      assert.deepEqual(visibleWordsOutsideLabel(del), [],
+        `${name}: das Wort bleibt sichtbar und sprengt mobil das 48px-Quadrat`);
+      const labels = del.querySelectorAll('.modal-panel__delete-label');
+      assert.equal(labels.length, 1, `${name}: genau eine Wortspanne`);
+      assert.equal(labels[0].textContent, 'Loeschen', `${name}: das Wort bleibt fuer den Screenreader im Baum`);
+      decorateFooterDelete(footer);
+      assert.equal(del.querySelectorAll('.modal-panel__delete-label').length, 1, `${name}: idempotent`);
+    }
+  } finally {
+    global.document.createElement = savedCreate;
+    globalThis.window = savedWindow;
+  }
+});
+
+/*
+ * LOESCHEN STEHT IM DIALOGFUSS AM ANFANG (Re-Critique 2026-09-28, A2 P1-2).
+ * Der Termindialog - das Vorbild des Kanons - stellte "Loeschen" 12px neben
+ * "Abbrechen" an den rechten Rand, weil der Fuss rechtsbuendig ist und nur
+ * wer den Knopf selbst wegschob (`style="margin-inline-end:auto"`, zwanzig
+ * Module), ihn links hatte. Die Zusage gilt fuer JEDEN Fuss mit Loeschen:
+ * (1) EINE Regel in layout.css schiebt den erkannten Knopf (und seine Gruppe)
+ * an den Anfang, (2) in jedem Fuss-Markup ist Loeschen der erste Knopf -
+ * sonst schoebe die Regel Abbrechen mit nach links.
+ */
+function footerChunks(source) {
+  const chunks = [];
+  for (const m of source.matchAll(/<div class="modal-panel__footer[^"]*"[^>]*>/g)) {
+    let depth = 0;
+    let end = source.length;
+    const tokens = /<div\b|<\/div>/g;
+    tokens.lastIndex = m.index;
+    for (let t = tokens.exec(source); t; t = tokens.exec(source)) {
+      depth += t[0] === '</div>' ? -1 : 1;
+      if (depth === 0) { end = t.index; break; }
+    }
+    chunks.push(source.slice(m.index, end));
+  }
+  return chunks;
+}
+
+const DELETE_BUTTON = /class="[^"]*\bbtn--danger-(?:outline|ghost)\b|data-footer-delete(?!="off")/;
+
+test('A2 P1-2: in jedem Dialogfuss steht Loeschen am Anfang, Abbrechen und Primaer am Ende', async () => {
+  const { readdirSync, statSync } = await import('node:fs');
+  const { join, relative } = await import('node:path');
+  const root = new URL('..', import.meta.url).pathname;
+  const files = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      if (name === 'vendor' || name === 'locales') continue;
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) walk(path);
+      else if (name.endsWith('.js')) files.push(path);
+    }
+  };
+  walk(join(root, 'public'));
+
+  const rules = [...eachRule(layoutCss)].filter((r) => !r.at.length && /margin-inline-end:\s*auto/.test(r.body));
+  const selectors = rules.flatMap((r) => r.selector.split(',').map((s) => s.trim().replace(/\s+/g, ' ')));
+  const globalRule = selectors.includes('.modal-panel__footer > .modal-panel__delete')
+    && selectors.includes('.modal-panel__footer > :has(> .modal-panel__delete)');
+
+  let seen = 0;
+  const notFirst = [];
+  const notStart = [];
+  for (const path of files) {
+    const file = relative(root, path);
+    for (const chunk of footerChunks(readFileSync(path, 'utf8'))) {
+      const buttons = [...chunk.matchAll(/<button\b[^>]*>/g)].map((b) => b[0]);
+      const del = buttons.findIndex((b) => DELETE_BUTTON.test(b));
+      if (del < 0) continue;
+      seen += 1;
+      if (del !== 0) notFirst.push(file);
+      const own = /margin-inline-end:\s*auto/.test(buttons[del])
+        || /<div[^>]*margin-inline-end:\s*auto[^>]*>\s*(?:\$\{[^`]*`)?\s*<button[^>]*btn--danger/.test(chunk);
+      if (!globalRule && !own) notStart.push(file);
+    }
+  }
+  assert.ok(seen >= 15, `nur ${seen} Fuesse mit Loeschen gefunden - der Guard waere blind`);
+  assert.deepEqual(notFirst, [], 'Loeschen ist nicht der erste Knopf im Fuss - die Regel schoebe Abbrechen mit nach links');
+  assert.deepEqual(notStart, [], 'hier steht Loeschen neben Abbrechen am Ende statt am Anfang');
+  assert.ok(globalRule, 'die eine Regel in layout.css fehlt - jeder neue Fuss muesste wieder selbst schieben');
 });

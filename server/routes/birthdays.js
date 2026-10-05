@@ -3,7 +3,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { collectErrors, date as validateDate, oneOf, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
-import { hiddenModulesFor } from '../permissions.js';
+import { mayReadModule } from '../permissions.js';
 import {
   deleteBirthdayArtifacts,
   hydrateBirthday,
@@ -243,19 +243,19 @@ router.post('/', (req, res) => {
  * seine aufgeloesten Rechte melden `contacts: none`), aber die Luecke ist
  * aelter und trifft jedes gescopte API-Token genauso.
  *
- * `hiddenModulesFor()` prueft beide Achsen in einem Aufruf - Token-Scopes UND
+ * `mayReadModule()` prueft beide Achsen in einem Aufruf - Token-Scopes UND
  * die Modulrechte der Rolle. Dieselbe Klasse Befund wie die Abo-URLs in
  * #1241 Runde 1 und wie #823: eine Mischstelle braucht ihre eigene Pruefung,
  * weil die Middleware am Pfad haengt.
  */
 function contactsHidden(req) {
-  return hiddenModulesFor(req, ['contacts']).has('contacts');
+  return !mayReadModule(req, 'contacts');
 }
 
 router.get('/import/candidates', (req, res) => {
   try {
     if (contactsHidden(req)) {
-      return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403 });
+      return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403, reason: 'cross_module_access' });
     }
     const data = listBirthdayImportCandidates(db.get());
     res.json({ data });
@@ -271,7 +271,7 @@ router.post('/import', (req, res) => {
     // Umweg offen, sich die abgewiesene Liste ueber die angelegten
     // Geburtstagseintraege doch noch zusammenzusetzen.
     if (contactsHidden(req)) {
-      return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403 });
+      return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403, reason: 'cross_module_access' });
     }
     const userId = req.authUserId || req.session.userId;
     const ids = Array.isArray(req.body.contact_ids) ? req.body.contact_ids : null;

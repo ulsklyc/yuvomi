@@ -7,7 +7,9 @@ import express from 'express';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { num, collectErrors, MONTH_RE } from '../../middleware/validate.js';
-import { bookedOnly, cents, thisMonthLocalKey, validExpenseCategoryKeys } from './helpers.js';
+import {
+  bookedOnly, cents, thisMonthLocalKey, validExpenseCategoryKeys, budgetFilter, budgetCategoryExpr,
+} from './helpers.js';
 
 const log = createLogger('Budget');
 const router = express.Router();
@@ -17,6 +19,23 @@ const router = express.Router();
 // entfernt Unterstriche an den Rändern nicht, aber Nutzerkategorien sind lesbare
 // Wörter; zusätzlich validiert das Schreiben gegen die echten Kategorie-Keys).
 export const BUDGET_SAVINGS_KEY = '__savings__';
+
+const HOUSEHOLD_WIDE = Object.freeze({
+  f: Object.freeze({ clause: '', params: Object.freeze([]) }),
+  c: Object.freeze({ expr: 'category', params: Object.freeze([]) }),
+});
+
+/** Prueft den Kontext von computePlanProgress; wirft bei fehlendem oder halbem. */
+function planContext(context) {
+  const { filter, categoryExpr, householdWide } = context || {};
+  const isFilter = filter && typeof filter.clause === 'string' && Array.isArray(filter.params);
+  const isExpr = categoryExpr && typeof categoryExpr.expr === 'string' && categoryExpr.expr !== ''
+    && Array.isArray(categoryExpr.params);
+  if (householdWide === true && filter === undefined && categoryExpr === undefined) return HOUSEHOLD_WIDE;
+  if (householdWide === undefined && isFilter && isExpr) return { f: filter, c: categoryExpr };
+  throw new TypeError('computePlanProgress: context needs { filter, categoryExpr } '
+    + 'from budgetFilter()/budgetCategoryExpr(), or an explicit { householdWide: true }');
+}
 
 /**
  * Berechnet Plan-vs-Ist für einen Monat.
@@ -32,9 +51,30 @@ export const BUDGET_SAVINGS_KEY = '__savings__';
  * geplant und ist sind Tatsachen und werden weiter geliefert, das Urteil nicht. Faellt
  * spaeter eine echte Plan-Historie an (#1001), kann `isCurrentMonth` ersatzlos weg.
  *
+ * **Ist ist das, was der Betrachter sieht (#659).** Im personal-Modus gilt dieselbe
+ * Regel wie in Summary und Statistik: `filter` aus budgetFilter() (Sichtbarkeit +
+ * Mein/Haushalt-Scope), `categoryExpr` aus budgetCategoryExpr(). Fremde private
+ * Buchungen zaehlen dann gar nicht, fremde 'shared_amount'-Betraege nur im
+ * Sammel-Bucket '__private__'. Fuer den gibt es keinen Plan, er taucht also in
+ * keiner Zeile auf und fliesst nur in Einnahmen und Saldo des Sparziels - wie
+ * in der Uebersicht, wo sein Betrag zaehlt, sein Zweck aber nicht.
+ *
+ * **DER KONTEXT IST PFLICHT, FAIL-CLOSED.** Wer einer Person antwortet - Route,
+ * Widget, Benachrichtigung -, gibt `{ filter, categoryExpr }` mit. Ein bewusst
+ * betrachterloser Aufrufer sagt `{ householdWide: true }` und bekommt den ganzen
+ * Haushalt ohne Sichtbarkeit (Altverhalten, identisch zum shared-Modus). Fehlt
+ * beides, wirft die Funktion: ein stiller Default auf "alles" hiesse, dass ein
+ * kuenftiger Aufrufer, der die Argumente vergisst, fremde private Ausgaben
+ * wieder ueber ihre Kategorie-Summe verraet - und zwar gruen, ohne Fehler.
+ *
+ * @param {object} database
+ * @param {string} month  YYYY-MM
+ * @param {{ filter: {clause: string, params: any[]}, categoryExpr: {expr: string, params: any[]} }
+ *        | { householdWide: true }} context
  * @returns {object} { month, isCurrentMonth, plans: [], savings: {}|null, totalPlanned, totalActual }
  */
-export function computePlanProgress(database, month) {
+export function computePlanProgress(database, month, context) {
+  const { f, c } = planContext(context);
   const from = `${month}-01`;
   const to   = `${month}-31`;
   const isCurrentMonth = month === thisMonthLocalKey();
@@ -43,10 +83,14 @@ export function computePlanProgress(database, month) {
   const planMap  = new Map(planRows.map((r) => [r.category, cents(r.amount)]));
 
   // Ist-Ausgaben je Kategorie (als positive Beträge) für den Monat.
+  // GROUP BY 1, nicht GROUP BY category: bei gleichnamigem Output-Alias gewinnt
+  // in SQLite die ECHTE Spalte, und der maskierte Betrag landete wieder unter
+  // seiner echten Kategorie. Der Bind des Ausdrucks steht in der SELECT-Liste,
+  // also VOR den WHERE-Binds.
   const spentRows = database.prepare(`
-    SELECT category, SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END) AS spent
-    FROM budget_entries WHERE date BETWEEN ? AND ?${bookedOnly()} GROUP BY category
-  `).all(from, to);
+    SELECT ${c.expr} AS category, SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END) AS spent
+    FROM budget_entries WHERE date BETWEEN ? AND ?${f.clause}${bookedOnly()} GROUP BY 1
+  `).all(...c.params, from, to, ...f.params);
   const spentMap = new Map(spentRows.map((r) => [r.category, cents(r.spent || 0)]));
 
   const plans = [];
@@ -71,8 +115,8 @@ export function computePlanProgress(database, month) {
   const totals = database.prepare(`
     SELECT SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income,
            SUM(amount) AS balance
-    FROM budget_entries WHERE date BETWEEN ? AND ?${bookedOnly()}
-  `).get(from, to);
+    FROM budget_entries WHERE date BETWEEN ? AND ?${f.clause}${bookedOnly()}
+  `).get(from, to, ...f.params);
   const income  = cents(totals.income || 0);
   const balance = cents(totals.balance || 0); // Netto-Ersparnis des Monats
 
@@ -97,7 +141,13 @@ export function computePlanProgress(database, month) {
 router.get('/plans', (req, res) => {
   try {
     const month = MONTH_RE.test(req.query.month || '') ? req.query.month : thisMonthLocalKey();
-    res.json({ data: computePlanProgress(db.get(), month) });
+    // Sichtbarkeit/Scope wie Summary und Statistik (#476/#505/#659).
+    res.json({
+      data: computePlanProgress(db.get(), month, {
+        filter: budgetFilter(req, 'budget_entries'),
+        categoryExpr: budgetCategoryExpr(req, 'budget_entries'),
+      }),
+    });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Internal error', code: 500 });

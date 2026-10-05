@@ -55,6 +55,7 @@ export function weatherLocationFieldsHtml({ scope, values = {}, autoLocateDisabl
     </div>
     <div class="form-group">
       ${toggleRowHtml({
+        control: 'switch',
         label: t('settings.weatherAutoLocateLabel'),
         checked: !!values.auto_locate,
         disabled: autoLocateDisabled,

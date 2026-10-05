@@ -111,7 +111,8 @@ signal is ignored). The steps come
 from the `test` script itself, so a new suite is still registered there
 and nowhere else. Because suites run side by side, a suite takes a free port
 (`listen(0, '127.0.0.1')`) and a temp path of its own (`freshTestDbPath()`, `mkdtemp`), never a
-fixed one. CI runs `npm test`, one suite after the other.
+fixed one. CI runs `npm test`, one suite after the other, and next to it one browser suite,
+`test:fasting-browser`, as a job of its own.
 
 ---
 
@@ -206,17 +207,20 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
 **Examples:**
 
 ```
-feat(meals): add drag & drop between day slots
-fix(calendar): handle timezone offset in recurring events
-docs(readme): add Apple CalDAV setup instructions
-refactor(auth): extract session validation into middleware
-test(budget): add CSV export edge cases
-chore: update helmet to 8.3
+feat(auth): sessions slide for 90 days, re-dated every 12 h
+fix(health): a dose posted as taken without a time gets "now"
+fix(tasks): filter panel stays closable on the phone
+docs: calendar sync carries no reminders
+fix(api): birthdays refuse invalid reminder fields
+chore(deps): bump puppeteer to 25.11.0
 ```
 
 **Rules:**
 
-- Subject line: imperative mood, lowercase, no period, max 72 characters
+- Subject line: says what is true after the change, from the reader's side ("a dose posted as taken gets
+  now"), not an order to the code ("set taken_at"); lowercase, no period, max 72 characters. It is what
+  the release notes and the CHANGELOG are written from, so it names the effect, not the edit. Automated
+  commits (Dependabot's "bump ...") keep their own form.
 - Body (optional): explain *why*, not *what* - the diff shows the what
 - One logical change per commit - don't mix features with formatting
 
@@ -341,7 +345,7 @@ without this repository's private tooling.
 
 - Web Component prefix: `yuvomi-` (one component per file). Not every file in `public/components/` is a Web Component: most are ES modules that export functions, such as `openModal`, `openDetailView` or `renderUserMultiSelect`.
 - All UI text via i18n keys (`t('key')`) - never hardcode text in components. German (`de`) is the reference locale.
-- **Adding a new i18n key:** add it to **all** files in `public/locales/` (24 languages; a
+- **Adding a new i18n key:** add it to **all** files in `public/locales/` (26 languages; a
   non-German value may start as the English text). The JSON files are 4-space indented
   and nested - edit them in place, never reserialize a whole file. A key interpolating a
   numeric `count` needs an `_one` singular variant (`{{count}}` placeholder), otherwise
@@ -459,7 +463,7 @@ This is a promise the project can keep because it is not a promise: it is a cond
 
 ### The pre-release handrail
 
-`npm run test:document-guards` is the one suite that is deliberately not in `npm test` and not in CI. It drives a real browser against a seeded server and costs around 80 minutes (82 measured on 2 September 2026), which is not a price worth paying on every push for invariants that only change in bursts. It is a handrail run once before a release instead.
+`npm run test:document-guards` is the one suite that is deliberately not in `npm test` and not in CI (only its part `test:fasting-browser` also runs in CI, as a job of its own). It drives a real browser against a seeded server and costs around 80 minutes (82 measured on 2 September 2026), which is not a price worth paying on every push for invariants that only change in bursts. It is a handrail run once before a release instead.
 
 **It is required for any release that carries the interface train**, that is, any release whose diff touches `public/pages`, `public/styles`, `public/utils`, `public/components` or `public/settings`. A release on the other track does not need it: those probes measure the rendered document, and a change that never reaches the document cannot move them.
 

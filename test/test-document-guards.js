@@ -367,14 +367,26 @@ test('save confirmations preserve the same editor across repeated gates and keep
     }), true);
 
     // Delete callers omit the new option and still close on confirmation.
+    // Seit dem echten Ausgang (Critique 2026-09-26, P1-1) loest die Rueckfrage
+    // auf, sobald das Schliessen BEGINNT; abgehaengt wird das Overlay erst am
+    // Ende der Animation (Netz: MODAL_EXIT_FALLBACK_MS = 400). Gemessen wird
+    // die Regel, nicht der Zeitpunkt: beim Aufloesen laeuft der Ausgang schon
+    // (oder ist durch), und danach ist der Editor binnen zwei Sekunden weg. Ein
+    // Editor, der nie schliesst, bleibt damit rot.
     await page.evaluate(() => {
       window.saveGateTest.pending = window.saveGateTest.modal.confirmOverModal('Delete this event?');
     });
     await clickPastDeadTime(page, '#confirm-modal-ok');
     assert.deepEqual(await page.evaluate(async () => {
       const confirmed = await window.saveGateTest.pending;
-      return { confirmed, closeCount: window.saveGateTest.closeCount(), editorConnected: window.saveGateTest.editor.isConnected };
-    }), { confirmed: true, closeCount: 1, editorConnected: false });
+      const { editor } = window.saveGateTest;
+      return {
+        confirmed,
+        closeCount: window.saveGateTest.closeCount(),
+        closing: !editor.isConnected || editor.classList.contains('modal-overlay--closing'),
+      };
+    }), { confirmed: true, closeCount: 1, closing: true });
+    await page.waitForFunction(() => !window.saveGateTest.editor.isConnected, { timeout: 2000 });
   } finally {
     await page.close();
   }
@@ -386,6 +398,36 @@ test('save confirmations preserve the same editor across repeated gates and keep
 // Speichern-Knopf ins erste Feld. Unter Last war das Zufall; hier wird der Timer
 // fuer das eine Oeffnen auf 1500 ms gestreckt, damit er SICHER hinter dem
 // Fortsetzen liegt und die Sonde bei jedem Lauf misst, was vorher nur manchmal kam.
+// EIN TIPP BEENDET DIE BLENDE (2026-09-27). Solange die Wurzel-Transition eines
+// Seitenwechsels laeuft (~250-470ms), trifft Chromium jeden Zeiger nur auf
+// <html>, trotz `::view-transition { pointer-events: none }` - gemessen verpufften
+// Seitenleisten-Tipps 30 und 110ms nach dem Wechsel alle. swapPage bricht die
+// Blende beim ersten pointerdown ab: der erste Tipp bleibt verloren (sein Ziel
+// war schon <html>), der zweite erreicht die neue Seite.
+test('ein zweiter Tipp waehrend des Seitenwechsels erreicht die Seitenleiste', async () => {
+  const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+  try {
+    const tapNotes = async () => {
+      const box = await (await page.$('.nav-sidebar [data-route="/notes"]')).boundingBox();
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    };
+    await page.evaluate(() => window.yuvomi.navigate('/calendar'));
+    await page.waitForFunction(() => location.pathname === '/calendar' && !document.documentElement.classList.contains('navigating'));
+    await page.evaluate(() => window.yuvomi.navigate('/tasks'));
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(await page.evaluate(() => document.documentElement.classList.contains('navigating')), true,
+      'Vorbedingung: der Wechsel laeuft noch als View Transition - sonst misst die Sonde nichts');
+    await tapNotes();
+    await new Promise((r) => setTimeout(r, 80));
+    await tapNotes();
+    await page.waitForFunction(() => location.pathname === '/notes', { timeout: 3000 }).catch(() => {});
+    assert.equal(await page.evaluate(() => location.pathname), '/notes',
+      'der zweite Tipp auf "Notizen" verpuffte waehrend der Blende');
+  } finally {
+    await page.close();
+  }
+});
+
 test('der verspaetete Erstfokus nimmt dem fortgesetzten Speichern-Tor den Fokus nicht weg (#1156)', async () => {
   const page = await openPage(harness, { device: 'desktop', locale: 'de' });
   try {
@@ -511,6 +553,16 @@ async function openCalendarSaveGateEditor(page, { wholeSeriesOnly = false } = {}
   }, wholeSeriesOnly);
   await page.evaluate((path) => window.yuvomi.navigate(path), `/calendar?open=${seriesId}&date=2048-04-03`);
   await page.waitForSelector('#detail-popover-edit, #detail-view-edit');
+  // ERST NACH DEM SEITENWECHSEL KLICKEN (Critique 2026-09-26, P2-1). Der Wechsel
+  // laeuft seit R3 als View Transition, und solange sie laeuft, trifft Chromium
+  // jeden Klick auf <html> - trotz `::view-transition { pointer-events: none }`
+  // (gemessen: elementsFromPoint liefert nur HTML). Der Deep-Link oeffnet das
+  // Popover schon ~170ms nach dem Start, die Transition endet ~250ms spaeter;
+  // ein sofortiger Klick schloss das Popover als Aussenklick, und der Editor kam
+  // nie. Das Fenster ist kuerzer als eine menschliche Reaktion, und die Sonde
+  // misst das Speichern-Tor, nicht den Seitenwechsel. `navigating` faellt mit
+  // `finished` der Transition (router.js).
+  await page.waitForFunction(() => !document.documentElement.classList.contains('navigating'));
   await page.click('#detail-popover-edit, #detail-view-edit');
   await page.waitForSelector('#modal-title');
   await page.evaluate(() => {
@@ -639,7 +691,7 @@ test('PR2 #975 - das zusammengesetzte Kalenderformular und seine Seriennamen ble
   const title = 'PR2 Serienprobe 975';
   try {
     await gotoRoute(page, '/calendar');
-    await page.click('#cal-add');
+    await page.click('#fab-new-event');
     await page.waitForSelector('#modal-title');
 
     const hints = await page.evaluate((eventTitle) => {
@@ -689,8 +741,18 @@ test('PR2 #975 - das zusammengesetzte Kalenderformular und seine Seriennamen ble
       'nach dem Umschalten bestimmt das echte Ganztagsfeld die Vorschau');
 
     await page.click('#modal-save');
-    await page.waitForFunction((eventTitle) => [...document.querySelectorAll('.month-day__event span')]
-      .some((el) => el.textContent === eventTitle), {}, title);
+    // Die Serie beginnt am 15.09. mit BYMONTHDAY=-1: ihr erstes Vorkommen ist der
+    // 30.09., der 15.09. selbst ist keines. Jeder Monat ab dann traegt eines an
+    // seinem letzten Tag - dort muss die neue Serie stehen, ohne Neuladen. Bis
+    // hierhin stand nach dem Anlegen nur die Stammzeile auf ihrem Beginn im
+    // Raster: im September als Chip am 15.09. (kein Vorkommen, aber die alte
+    // Fassung dieser Sonde wartete genau darauf), ab Oktober gar nicht mehr.
+    await page.waitForFunction((eventTitle) => {
+      const inMonth = [...document.querySelectorAll('.month-day:not(.month-day--outside)')];
+      const lastDay = inMonth.at(-1);
+      return Boolean(lastDay) && [...lastDay.querySelectorAll('.month-day__event span')]
+        .some((el) => el.textContent === eventTitle);
+    }, {}, title);
     const monthA11y = await page.evaluate((eventTitle) => {
       const chip = [...document.querySelectorAll('.month-day__event')]
         .find((el) => el.querySelector('span:last-child')?.textContent === eventTitle);
@@ -718,6 +780,70 @@ test('PR2 #975 - das zusammengesetzte Kalenderformular und seine Seriennamen ble
     await page.close();
   }
 });
+
+/* Eine neue Serie laedt nach dem Anlegen den sichtbaren Bereich neu, statt die
+ * Stammzeile anzuhaengen (siehe die Sonde darueber). Dieses Neuladen darf sie
+ * nicht verlieren: scheitert das GET nach dem POST, oder kommt es aus dem
+ * Offline-Cache des Service Workers (`x-cached-at`, ein Stand von VOR dem
+ * Anlegen), steht die Serie danach trotzdem im Zustand - als Stammzeile an
+ * ihrem Beginn, wie vor dem Neuladen. Sonst schloss der Dialog mit "Termin
+ * erstellt", und der Termin fehlte bis zur naechsten Navigation ganz. */
+for (const [name, answer] of [
+  ['GET scheitert', (req) => req.abort('failed')],
+  ['GET kommt aus dem Cache', (req) => req.respond({
+    status: 200,
+    contentType: 'application/json',
+    headers: { 'x-cached-at': String(Date.now() - 60_000) },
+    body: JSON.stringify({ data: [] }),
+  })],
+]) {
+  test(`neue Serie bleibt sichtbar, wenn das Neuladen danach nichts Frisches liefert (${name})`, async () => {
+    const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+    const title = `Serie ohne Neuladen ${randomUUID().slice(0, 8)}`;
+    try {
+      await gotoRoute(page, '/calendar');
+      await page.click('#cal-view-tab-day');
+      await page.waitForSelector('#cal-view-tab-day[aria-selected="true"]');
+      await page.click('#fab-new-event');
+      await page.waitForSelector('#modal-title');
+      await page.evaluate((eventTitle) => {
+        const change = (el) => el.dispatchEvent(new Event('change', { bubbles: true }));
+        document.querySelector('#modal-title').value = eventTitle;
+        for (const [selector, value] of [['#modal-start-time', '10:00'], ['#modal-end-time', '11:00']]) {
+          const el = document.querySelector(selector);
+          el.value = value;
+          change(el);
+        }
+        const freq = document.querySelector('#event-rrule-freq');
+        freq.value = 'WEEKLY';
+        change(freq);
+      }, title);
+
+      let posted = false;
+      let answered = 0;
+      page.__yuvomiRequestInterceptor = (req) => {
+        const url = new URL(req.url());
+        if (url.pathname !== '/api/v1/calendar') return false;
+        if (req.method() === 'POST') { posted = true; return false; }
+        if (req.method() !== 'GET' || !posted || answered > 0) return false;
+        answered += 1;
+        answer(req);
+        return true;
+      };
+      const created = page.waitForResponse((res) => res.request().method() === 'POST'
+        && new URL(res.url()).pathname === '/api/v1/calendar');
+      await page.click('#modal-save');
+      const id = (await (await created).json()).data.id;
+      await page.waitForFunction(() => !document.querySelector('#modal-title'));
+      assert.equal(answered, 1, 'das Neuladen nach dem Anlegen muss die praeparierte Antwort bekommen haben');
+      const shown = await page.evaluate((eventId) => document.querySelectorAll(`[data-id="${eventId}"]`).length, id);
+      assert.ok(shown > 0, `die neue Serie ${id} fehlt in der Tagesansicht ihres Beginns`);
+    } finally {
+      page.__yuvomiRequestInterceptor = null;
+      await page.close();
+    }
+  });
+}
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Sonde 1: Kopf-Ueberlauf
@@ -1034,9 +1160,14 @@ const SHAPE_EXEMPT = new Map([
   ['cal-toolbar__view-btn', 'Zustandsschalter: Segment der Kalender-Ansicht'],
   ['ydp__trigger', 'Griff: Feld-Oeffner des Datepickers, traegt Feldkante'],
   ['more-sheet__search', 'Griff: Suchfeld des More-Sheets, traegt Feldkante'],
-  ['theme-toggle__btn', 'Zustandsschalter: Segment der Farbwelt-Wahl'],
+  // Das Kanon-Segment (panel.css, DESIGN.md: konzentrisch eingesetzte
+  // .segmented__item im radius-md-Traeger). Es stand bis 2026-09-25 auf keiner
+  // gemessenen Route im Bild; seit der Dokumente-Critique traegt der Status
+  // Aktiv/Archiviert es direkt auf /documents.
+  ['segmented__item', 'Zustandsschalter: Segment des geteilten Segmented Controls (panel.css)'],
   // 3. Zellen eines Rasters
-  ['month-day', 'Rasterzelle: Tag im Kalender-Monat'],
+  // `.month-day` stand hier, bis die Monatszelle 2026-09-24 vom role="button" zur
+  // gridcell eines ARIA-Grids wurde - Sonde 3 misst sie seitdem nicht mehr.
   ['more-action', 'Rasterzelle: Kachel im More-Sheet-Raster'],
   ['metric-card--select', 'Rasterzelle: waehlbare Kennzahlkachel (.metric-card, Block-2-Konsolidierung)'],
   // Die Zyklus-Kachel ist seit #1181 ein <button>, der als GANZE Kachel zum
@@ -1047,11 +1178,26 @@ const SHAPE_EXEMPT = new Map([
   // Nachbarn - dieselbe Begruendung wie bei .cal-task-chip. Gefunden vom
   // Handlauf des Releases v2.67.0, dem ersten vollen Lauf seit dem Merge.
   ['health-overview__card--link', 'Rasterzelle: klickbare Kachel der Health-Uebersicht, gleiche Optik wie die Nachbarkacheln (.health-overview__card)'],
+  // Terminbloecke sind seit der Kalender-Critique 2026-09-24 (P1) Knoepfe:
+  // vorher trugen sie nur `cursor: pointer`, per Tastatur war kein Termin der
+  // Woche zu oeffnen. Ihre Form ist die des Zeitrasters, in dem sie stehen -
+  // ein Block ueber seine Dauer, die Kante im Vollton (DESIGN.md, Event-Bloecke).
+  // Eine Kapsel ueber 90 Minuten waere keine Buttonform, sondern ein Fehler.
+  ['week-event', 'Rasterzelle: Terminblock im Zeitraster der Woche, Hoehe = Dauer'],
+  ['day-event', 'Rasterzelle: Terminblock im Zeitraster des Tages, Hoehe = Dauer'],
+  ['allday-event', 'Rasterzelle: Ganztags-Balken der Woche/des Tages, gleiche Bar wie .month-day__event'],
+  // Seit R9 M13 (Re-Critique 2026-09-27) oeffnet die Notizkarte als GANZE
+  // Karte: der Oeffnen-Knopf liegt unsichtbar ueber ihr (notes.css, keine
+  // Flaeche, keine Kante) und erbt ihren Radius nur, damit der Fokusring die
+  // Karte umrahmt. Die Form, die man sieht und tippt, ist die der Karte - und
+  // die Notizen sind laut DESIGN.md („Drei Flaechen sind AUSDRUECKLICH keine
+  // Zeilenliste") ein Raster, keine Zeilenliste. Dieselbe Begruendung wie bei
+  // `.health-overview__card--link`: eine Kapsel waere hier eine zweite Form
+  // neben den gleichen Karten des Rasters.
+  ['note-card__open', 'Rasterzelle: ganze Notizkarte als Oeffner im Notizraster (Masonry, DESIGN.md)'],
   // 4. Zeilen einer Zeilenliste
   ['nav-item', 'Zeile: Eintrag der Sidebar-Navigation'],
-  ['settings-shell__navigation-toggle', 'Zeile: Domaenenkopf der Settings-Navigation (Akkordeon)'],
   ['note-item', 'Zeile: Notiz im Dashboard-Widget'],
-  ['rewards-widget-row', 'Zeile: Rang im Belohnungs-Widget'],
   ['rw-standing__id', 'Zeile: Oeffner einer Mitglieds-Zeile'],
   ['documents-folder-item__select', 'Zeile: Ordner in der Dokumentenliste'],
   // Der Chip traegt seit 031597b1 (Juli 2026) role="button" und dieselbe flache
@@ -1222,16 +1368,49 @@ async function measureTargets(page, min) {
     const out = [];
     els.forEach((el, i) => {
       const r = rects[i];
-      const cx = Math.round(r.left + r.width / 2);
-      const cy = Math.round(r.top + r.height / 2);
+      let cx = Math.round(r.left + r.width / 2);
+      let cy = Math.round(r.top + r.height / 2);
       // Ein Ziel, dessen eigenes Zentrum es nicht selbst trifft, ist verdeckt
       // oder ausserhalb des Viewports - dort misst die Sonde nichts, statt
       // etwas Falsches zu messen.
+      // Das Label, das dieses Element bedient (Falle 4 unten): ein Treffer
+      // darin trifft das Element. Ein Schalter ist ein unsichtbarer Input
+      // unter seiner gezeichneten Spur (`.toggle__track`) - ohne diese
+      // Beziehung galt JEDER Schalter der Settings-Blaetter als verdeckt und
+      // wurde nie gemessen (gefunden mit der Liste unten, #1456).
+      const labelFound = el.closest('label') ?? (el.id ? document.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null);
+      const ownLabel = labelFound && (labelFound.control === el || labelFound.contains(el)) ? labelFound : null;
       const mine = (x, y) => {
         const hit = document.elementFromPoint(x, y);
-        return !!hit && (hit === el || el.contains(hit));
+        return !!hit && (hit === el || el.contains(hit) || (!!ownLabel && ownLabel.contains(hit)));
       };
-      if (!mine(cx, cy)) return;
+      // ABER SIE SAGT, WAS SIE NICHT GEMESSEN HAT (#1456). Das Auslassen blieb
+      // bis dahin spurlos: ein Bauteil, das in JEDER Lage unter dem Kopf, dem
+      // FAB, der Tab-Leiste oder einem offenen Blatt lag, wurde nie gemessen
+      // und nie genannt, und der Zaehler hielt auf den uebrigen Zielen. Die
+      // Zeile traegt deshalb, was das Zentrum stattdessen traf.
+      // EIN UMBROCHENER LINK HAT SEINE MITTE ZWISCHEN DEN ZEILEN. Das Rechteck
+      // eines zweizeiligen Inline-Links reicht ueber beide Zeilen, und sein
+      // Zentrum liegt auf dem Text daneben (`Zur Anleitung` in einem Hinweis
+      // der Dokumente-Einstellungen, mobil). Getastet wird dann von der Mitte
+      // des ersten Zeilenstuecks aus, das das Element selbst trifft.
+      if (!mine(cx, cy)) {
+        const fragment = [...el.getClientRects()]
+          .map((f) => [Math.round(f.left + f.width / 2), Math.round(f.top + f.height / 2)])
+          .find(([x, y]) => mine(x, y));
+        if (fragment) [cx, cy] = fragment;
+      }
+      if (!mine(cx, cy)) {
+        const hit = document.elementFromPoint(cx, cy);
+        out.push({
+          key: key(el),
+          covered: true,
+          by: hit
+            ? `${hit.tagName.toLowerCase()}${hit.classList.length ? `.${[...hit.classList].join('.')}` : ''}`
+            : '(ausserhalb des Viewports)',
+        });
+        return;
+      }
       const reach = (dx, dy) => {
         let n = 0;
         while (n < min && mine(cx + dx * (n + 1), cy + dy * (n + 1))) n += 1;
@@ -1256,9 +1435,8 @@ async function measureTargets(page, min) {
       // sondern eine HTML-Beziehung - und die ist eine Regel, keine
       // Ausnahmeliste: `label.control` bzw. `label[for]` sagt verbindlich,
       // welches Element das Label bedient.
-      const label = el.closest('label') ?? (el.id ? document.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null);
-      if (label && (label.control === el || label.contains(el))) {
-        const lr = label.getBoundingClientRect();
+      if (ownLabel) {
+        const lr = ownLabel.getBoundingClientRect();
         if (lr.width > 0 && lr.height > 0) {
           w = Math.max(w, lr.width);
           h = Math.max(h, lr.height);
@@ -1380,39 +1558,54 @@ async function measureTargets(page, min) {
  *
  * Die App hat ZWEI Scrollport-Architekturen (Handoff §6): meist scrollt die
  * Seite, in Kueche und Budget ist der Modul-Root `overflow: hidden` und ein
- * Container darin scrollt. Gesucht wird deshalb der Container mit dem groessten
- * Ueberhang, nicht ein fester Knoten.
+ * Container darin scrollt. Gesucht wird deshalb nach Ueberhang, nicht ein
+ * fester Knoten.
+ *
+ * JEDER CONTAINER, NICHT NUR DER GROESSTE (#1456). Bis dahin scrollte die
+ * Sonde nur den Container mit dem groessten Ueberhang. Auf den Desktop-
+ * Settings-Blaettern ist das die Blattliste links (`.settings-shell__navigation`),
+ * nicht der Inhalt - die Sonde sah dort nie mehr als den ersten Bildschirm
+ * eines Blatts. In der Aufgaben-Detailspalte blieb der Kommentar-Knopf unter
+ * der Fussleiste, weil die Spalte neben der Liste selbst scrollt. Jetzt faehrt
+ * sie den groessten Container zuerst ab wie bisher und danach jeden weiteren,
+ * der im Bild liegt - der vorige bleibt dabei an seinem Ende stehen.
  */
 async function measureScrolled(page, min, maxSteps = 6) {
-  const pick = () => {
-    const el = document.scrollingElement;
-    let best = el;
-    let bestOver = el.scrollHeight - el.clientHeight;
+  const count = await page.evaluate(() => {
+    const over = (el) => el.scrollHeight - el.clientHeight;
+    const list = [document.scrollingElement];
     for (const node of document.querySelectorAll('*')) {
       const cs = getComputedStyle(node);
       if (!/auto|scroll/.test(cs.overflowY)) continue;
-      const over = node.scrollHeight - node.clientHeight;
-      if (over > bestOver) { best = node; bestOver = over; }
+      if (over(node) <= 1) continue;
+      const r = node.getBoundingClientRect();
+      if (r.bottom <= 0 || r.top >= innerHeight || r.right <= 0 || r.left >= innerWidth) continue;
+      list.push(node);
     }
-    return best;
-  };
-  const out = [];
-  await page.evaluate(pick).catch(() => {});
-  for (let step = 0; step < maxSteps; step += 1) {
-    out.push(await measureTargets(page, min));
-    const moved = await page.evaluate((pickSrc) => {
-      // eslint-disable-next-line no-new-func
-      const el = new Function(`return (${pickSrc})()`)();
-      const before = el.scrollTop;
-      // 70 % statt 100 %: was genau auf der Falz sitzt, wuerde sonst in keiner
-      // der beiden Messungen vollstaendig im Bild stehen.
-      el.scrollTop = before + el.clientHeight * 0.7;
-      return el.scrollTop > before + 1;
-    }, pick.toString());
-    if (!moved) break;
-    // Der kollabierende Kopf und die Sticky-Leisten brauchen einen Frame, sonst
-    // misst die Sonde eine Zwischenposition.
-    await new Promise((r) => { setTimeout(r, 250); });
+    // Der groesste zuerst, wie bisher - seine Messungen bleiben die ersten.
+    list.sort((a, b) => over(b) - over(a));
+    window.__yuvomiProbeScrollers = list;
+    return list.length;
+  }).catch(() => 0);
+
+  const out = [await measureTargets(page, min)];
+  for (let index = 0; index < count; index += 1) {
+    for (let step = 1; step < maxSteps; step += 1) {
+      const moved = await page.evaluate((i) => {
+        const el = window.__yuvomiProbeScrollers?.[i];
+        if (!el || !el.isConnected) return false;
+        const before = el.scrollTop;
+        // 70 % statt 100 %: was genau auf der Falz sitzt, wuerde sonst in keiner
+        // der beiden Messungen vollstaendig im Bild stehen.
+        el.scrollTop = before + el.clientHeight * 0.7;
+        return el.scrollTop > before + 1;
+      }, index).catch(() => false);
+      if (!moved) break;
+      // Der kollabierende Kopf und die Sticky-Leisten brauchen einen Frame, sonst
+      // misst die Sonde eine Zwischenposition.
+      await new Promise((r) => { setTimeout(r, 250); });
+      out.push(await measureTargets(page, min));
+    }
   }
   return out;
 }
@@ -1435,10 +1628,20 @@ describe('Sonde 4 - eine Reihe traegt ihre Dichte, ein Einzelziel ist allein tre
       // darunter - erst mit dieser Menge ist das Urteil vollstaendig.
       const rowBuilt = new Set();
       let seen = 0;
+      // Bauteile, die gemessen wurden, und solche, die NUR verdeckt vorkamen.
+      const measured = new Set();
+      const coveredOnly = new Map(); // key -> { pages, by }
       for (const name of sweep('Sonde 4')) {
         await gotoRoute(page, ALL_ROUTES[name]);
         for (const rows of await measureScrolled(page, min)) {
           for (const row of rows) {
+            if (row.covered) {
+              if (!coveredOnly.has(row.key)) coveredOnly.set(row.key, { pages: new Set(), by: new Set() });
+              coveredOnly.get(row.key).pages.add(name);
+              coveredOnly.get(row.key).by.add(row.by);
+              continue;
+            }
+            measured.add(row.key);
             // DER ZAEHLER STEHT IN DER MESSUNG, NICHT DAVOR. Bis 2026-08-09
             // zaehlte er `querySelectorAll(...).length` - rohe DOM-Knoten, in
             // den Tausenden. `measureTargets()` steigt aber pro Element bei
@@ -1512,6 +1715,19 @@ describe('Sonde 4 - eine Reihe traegt ihre Dichte, ein Einzelziel ist allein tre
         + 'Zielgroesse in mindestens einer Achse, ein eingeengtes erfuellt WCAG '
         + '2.5.8. Wer kompakt aussehen und voll treffen will, dehnt seine Flaeche '
         + 'per ::before aus - .weather-widget__refresh ist der Musterfall.');
+
+      // DER ZAEHLER IST GLOBAL, DIE BLINDHEIT NICHT (#1456). `seen >= 600`
+      // haelt auf ein paar hundert anderen Zielen, auch wenn ein ganzes Bauteil
+      // in jeder Lage jedes Zustands verdeckt war. Ein Bauteil, das im Dokument
+      // stand und NIE gemessen wurde, ist deshalb ein eigener Befund - mit den
+      // Zustaenden und dem, was sein Zentrum stattdessen traf.
+      const neverMeasured = [...coveredOnly]
+        .filter(([key]) => !measured.has(key))
+        .map(([key, { pages, by }]) => `${key}: auf ${[...pages].join(', ')} verdeckt von ${[...by].join(' | ')}`);
+      assert.deepEqual(neverMeasured.sort(), [],
+        `Bauteile, die bei ${device} im Dokument standen und in keiner Lage gemessen wurden - `
+        + 'ihr Zentrum lag in jedem Zustand und jeder Scrollposition unter einem anderen Element '
+        + 'oder ausserhalb des Viewports. Die Sonde weiss ueber sie nichts.');
     });
   }
 });
@@ -1632,12 +1848,35 @@ describe('Sonde 5 - eine Wischzeile antwortet, und jede Rolle liegt an ihrer Kan
         if (!hasRows) return;
         listsSeen += 1;
 
+        // WELCHE KANTEN DIE ZEILE TRAEGT, STEHT IM DOKUMENT (R16). Bis dahin
+        // setzte die Sonde voraus, dass jede Wischzeile BEIDE Kanten belegt, und
+        // meldete die Vorratszeile - nur Loeschen am Zeilenende, am Anfang gibt
+        // es dort nichts Positives zu erledigen - als "nicht verdrahtet". Das
+        // war die falsche Diagnose fuer eine richtig verdrahtete Zeile. Gemessen
+        // wird jetzt je Kante, was die Zeile dort zusagt: ein Panel antwortet,
+        // eine Kante ohne Panel deckt nichts auf. Eine Zeile ganz ohne Panel
+        // bleibt ein Befund - sonst waere "keine Geste" wieder gruen.
+        const sides = await page.evaluate(() => {
+          const row = document.querySelector('.swipe-row');
+          return ['leading', 'trailing'].filter((side) => row?.querySelector(`.swipe-reveal--${side}`));
+        });
+        if (!sides.length) {
+          findings.push(`${name}: die erste Wischzeile traegt an keiner Kante ein Panel.`);
+          return;
+        }
+
         // In RTL deckt derselbe Finger die andere Kante auf - die Erwartung
         // spiegelt mit, die Kante bleibt dieselbe.
         for (const [sign, side] of [[1, rtl ? 'trailing' : 'leading'], [-1, rtl ? 'leading' : 'trailing']]) {
           const classes = await uncoveredPanel(page, sign);
           const move = sign > 0 ? 'nach rechts' : 'nach links';
 
+          if (!sides.includes(side)) {
+            if (classes?.length) {
+              findings.push(`${name}: der Wisch ${move} deckt ${classes.join('.')} auf, obwohl die Zeile an der ${side}-Kante kein Panel traegt.`);
+            }
+            continue;
+          }
           if (!classes?.length) {
             findings.push(`${name}: der Wisch ${move} deckt nichts auf - die Zeilen sind nicht verdrahtet.`);
             continue;
@@ -1714,6 +1953,15 @@ async function metricRowHeights(page) {
   return page.evaluate(() => {
     const carriers = new Map();
     for (const card of document.querySelectorAll('.metric-card')) {
+      // EINE KARTE OHNE KASTEN IST KEINE KACHEL DER REIHE. `display: none`
+      // (selbst oder an einem Vorfahren) erzeugt kein Rasterelement und keine
+      // Zelle - die Reihe hat dann eine Karte weniger, keine leere. Gemessen
+      // lieferte so eine Karte `top 0, Hoehe 0`, galt damit als eigene
+      // Rasterzeile und als Kachel der Hoehe 0: die Abrechnung blendet ihre
+      // Gruppen-Kachel mobil per Container-Query aus (R10 L11), und die Sonde
+      // meldete „Hoehen 59, 59, 0". Gefiltert wird NUR, was gar keinen Kasten
+      // hat; eine gerenderte Karte der Hoehe 0 bleibt ein Befund.
+      if (!card.getClientRects().length) continue;
       const parent = card.parentElement;
       if (!parent) continue;
       if (!carriers.has(parent)) carriers.set(parent, []);
@@ -1751,6 +1999,34 @@ async function metricRowHeights(page) {
   });
 }
 
+/**
+ * Klappt jede eingeklappte Kennzahlreihe der Ansicht auf und meldet, wie viele.
+ *
+ * SEIT R16 STEHEN DIE KENNZAHLEN MOBIL HINTER EINER KURZZEILE (metric-glance.js):
+ * ein Knopf mit `aria-expanded="false"` und `aria-controls` auf die Reihe, die
+ * solange `display: none` traegt. Die Sonde sah von dort an mobil vier Reihen
+ * statt sieben und haette die uebrigen nie wieder gemessen - eine Reihe, die
+ * erst nach einem Tipp im Bild steht, ist trotzdem eine Reihe. Gelesen wird die
+ * BEZIEHUNG im Dokument (ein Aufklapper, dessen Bereich Kennzahlkarten traegt),
+ * kein Klassenname: ein neuer Traeger der Kurzzeile ist damit schon gemessen.
+ */
+async function openMetricDisclosures(page) {
+  const opened = await page.evaluate(() => {
+    let n = 0;
+    for (const btn of document.querySelectorAll('[aria-expanded="false"][aria-controls]')) {
+      if (!btn.getClientRects().length) continue;
+      const region = document.getElementById(btn.getAttribute('aria-controls'));
+      if (!region || !region.querySelector('.metric-card')) continue;
+      btn.click();
+      n += 1;
+    }
+    return n;
+  });
+  // Das Aufklappen laeuft als Hoehen-Uebergang; gemessen wird der Endzustand.
+  if (opened) await new Promise((resolve) => { setTimeout(resolve, 700); });
+  return opened;
+}
+
 describe('Sonde 6 - die Kacheln einer Kennzahlreihe sind gleich hoch', () => {
   for (const device of ['mobile', 'desktop']) {
     test(`Geraet ${device}`, async () => {
@@ -1773,7 +2049,10 @@ describe('Sonde 6 - die Kacheln einer Kennzahlreihe sind gleich hoch', () => {
       // Ohne sie saehe die Sonde von sieben Kennzahlreihen genau eine.
       for (const name of sweep('Sonde 6')) {
         await gotoRoute(page, ALL_ROUTES[name]);
-        await visitViews(page, name, async (where) => check(where, await metricRowHeights(page)));
+        await visitViews(page, name, async (where) => {
+          await openMetricDisclosures(page);
+          check(where, await metricRowHeights(page));
+        });
       }
       await page.close();
 
@@ -2052,7 +2331,16 @@ async function headDocking(page) {
   });
 }
 
-/** Scrollt jeden Port bis ans Ende und meldet die groesste gefundene Reserve. */
+/**
+ * Scrollt jeden Port bis ans Ende und meldet die groesste gefundene Reserve.
+ *
+ * MIT DER GESTE DAVOR: seit der Re-Kritik 2026-09-25 klappt ein gedeckelter
+ * Kopf (Budget, Kalender, Notizen, Kontakte) nur auf einen Scroll ein, dem
+ * eine Nutzergeste im selben Port vorausging (`wireCollapsingHeader`,
+ * utils/ux.js) - sonst klappte der Sprung der Woche auf „jetzt" ihn ein. Ein
+ * blosses `scrollTop` ist fuer die Shell genau so ein Sprung; das Rad-Ereignis
+ * davor macht daraus den Nutzer-Scroll, den diese Sonde nachstellen will.
+ */
 async function scrollEveryPort(page) {
   return page.evaluate(() => {
     let most = 0;
@@ -2060,6 +2348,7 @@ async function scrollEveryPort(page) {
       const oy = getComputedStyle(el).overflowY;
       const reserve = el.scrollHeight - el.clientHeight;
       if ((oy === 'auto' || oy === 'scroll') && reserve > 8) {
+        el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: reserve }));
         el.scrollTop = reserve;
         most = Math.max(most, reserve);
       }
@@ -3444,12 +3733,14 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
   test('desktop 1280x900', async () => {
     const page = await openPage(harness, { device: 'desktop', theme: 'light', locale: 'de' });
     const offenders = [];
-    let seen = 0;
+    // Zustaende, in denen die Vorbedingung fehlte - JE ZUSTAND, nicht als Summe.
+    const unmeasured = [];
 
     for (const name of sweep('Sonde 16')) {
       await gotoRoute(page, ALL_ROUTES[name]);
       const found = await page.evaluate(() => {
-        const out = { animated: 0, offenders: [] };
+        const out = { animated: 0, blobs: 0, blobsRunning: 0, offenders: [] };
+        out.blobs = document.querySelectorAll('.lg-blob').length;
         for (const el of document.querySelectorAll('*')) {
           const cs = getComputedStyle(el);
           // `infinite` liest sich berechnet als 'infinite'; mehrere Animationen
@@ -3462,6 +3753,7 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
             && cs.animationDuration.split(',').some((v) => parseFloat(v) > 0);
           if (!endless || !running) continue;
           out.animated += 1;
+          if (el.classList.contains('lg-blob')) out.blobsRunning += 1;
           const filter = cs.filter;
           if (filter && filter !== 'none') {
             out.offenders.push(`${el.tagName.toLowerCase()}.${el.className || '(ohne Klasse)'} -> ${filter}`);
@@ -3469,7 +3761,10 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
         }
         return out;
       });
-      seen += found.animated;
+      if (found.blobs === 0 || found.blobsRunning < found.blobs) {
+        unmeasured.push(`${name}: ${found.blobs} .lg-blob, davon ${found.blobsRunning} endlos animiert `
+          + `(${found.animated} dauerlaufende Animationen insgesamt)`);
+      }
       for (const o of found.offenders) offenders.push(`${name}: ${o}`);
     }
     await page.close();
@@ -3477,12 +3772,19 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
     // Dieselbe Zusicherung wie bei den Sonden 3, 4 und 15, und hier ist sie
     // besonders leicht zu verlieren: waeren die Blobs eines Tages nicht mehr
     // animiert, faende die Sonde nichts mehr zu pruefen und bliebe still gruen.
-    // Der lebende Backdrop laeuft auf JEDER Route, also sind vier Blobs mal der
-    // Zahl der abgefahrenen Zustaende die Untergrenze.
-    assert.ok(seen >= 4 * sweep('Sonde 16').length,
-      `Nur ${seen} dauerlaufende Animationen ueber ${sweep('Sonde 16').length} Zustaende `
-      + '- die Sonde hat nichts gemessen, statt nichts zu finden. Laeuft der lebende '
-      + 'Backdrop (.lg-blob) noch?');
+    //
+    // JE ZUSTAND, NICHT ALS SUMME (#1456). Die erste Fassung verlangte vier
+    // Animationen mal die Zahl der Zustaende. Ein Volllauf sah 125 von 192 und
+    // konnte nicht sagen, welche Zustaende zu kurz kamen; und ein Lauf, in dem
+    // einigen die Shell fehlte, waehrend andere Spinner oder Skelette trugen,
+    // blieb gruen, obwohl jene Zustaende nie geprueft waren. Die Vorbedingung
+    // ist der lebende Backdrop, und der steht in JEDEM Zustand: mindestens ein
+    // `.lg-blob`, und jeder davon laeuft endlos. Fehlt er, nennt die Meldung
+    // den Zustand - die Zahl der Blobs kommt aus dem Dokument, nicht von hier.
+    assert.deepEqual(unmeasured, [],
+      'Zustaende ohne laufenden Backdrop - dort hat die Sonde nichts gemessen, statt nichts '
+      + 'zu finden. Fehlt die Shell (Route nicht aufgebaut, auf /login gelandet), oder laufen '
+      + `die .lg-blob nicht mehr?\n  ${unmeasured.join('\n  ')}`);
 
     assert.deepEqual(offenders.sort(), [],
       'Ein endlos animiertes Element traegt einen `filter` und rastert ihn damit pro '
@@ -3741,6 +4043,13 @@ async function fabAtScrollEnd(page) {
     res.unterFab = [];
     for (const el of document.querySelectorAll(SEL)) {
       if (el === fab || fab.contains(el) || el.contains(fab)) continue;
+      // DER SCROLLPORT UND WAS IHN UMSCHLIESST IST KEIN ZIEL UNTER DEM KNOPF,
+      // sondern die Flaeche, auf der alles scrollt. Seit der Inhalt mobil unter die
+      // Glas-Kapsel laeuft (Kopfregel mobil, 2026-09-26), reicht der Port bis zur
+      // Unterkante und liegt damit immer auch unter dem FAB. Budget legt um seinen
+      // Port ein fokussierbares Tabpanel (`#budget-body`, tabindex=0) und wurde
+      // deshalb mit „div (1 %)" gemeldet. Was IM Port liegt, prueft die Sonde weiter.
+      if (scroller && (el === scroller || el.contains(scroller))) continue;
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.visibility === 'hidden' || cs.pointerEvents === 'none') continue;
       const b = el.getBoundingClientRect();
@@ -3772,15 +4081,19 @@ describe('Sonde 18 - am Scroll-Ende liegt nichts Bedienbares unter dem FAB', () 
       const page = await openPage(harness, { device, theme: 'light', locale: 'de' });
       const findings = [];
       let seen = 0;
-      let angedockt = 0;
-      let eingeklappt = 0;
+      const angedockt = [];
+      const eingeklappt = [];
+      const schwebend = [];
       let ohneFab = 0;
 
       for (const name of sweep('Sonde 18')) {
         await gotoRoute(page, ALL_ROUTES[name]);
         const m = await fabAtScrollEnd(page);
-        if (m.angedockt) angedockt += 1;
-        if (m.eingeklappt) eingeklappt += 1;
+        if (m.angedockt) angedockt.push(name);
+        if (m.eingeklappt) eingeklappt.push(name);
+        // Unabhaengig vom Scrollstand: ob ein Knopf schwebt, ist eine Frage
+        // der Seite, nicht davon, ob die Messung ihr Ende erreicht hat.
+        if (!m.keinFab) schwebend.push(name);
 
         /* Der Nachlauf darf den Scrollport nicht verkuerzen: das war die Marge,
          * und ihr Preis war die abgeschnittene Widget-Reihe.
@@ -3811,11 +4124,11 @@ describe('Sonde 18 - am Scroll-Ende liegt nichts Bedienbares unter dem FAB', () 
       }
       await page.close();
 
-      /* AM ZEIGER SCHWEBT SEIT ETAPPE 2 FAST KEIN FAB MEHR, und damit hat die
-       * Frage dieser Sonde dort kaum noch einen Gegenstand. Sie prueft deshalb
-       * zuerst die AUFTEILUNG - wer andockt, wer einklappt, wer keinen hat -
-       * und misst die Ueberlappung nur noch fuer den einen, der wirklich
-       * schwebt.
+      /* AM ZEIGER SCHWEBT SEIT R14 KEIN FAB MEHR (seit Etappe 2 nur noch das
+       * Speed-Dial der Uebersicht), und damit hat die Frage dieser Sonde dort
+       * keinen Gegenstand. Sie prueft deshalb zuerst die AUFTEILUNG - wer
+       * andockt, wer einklappt, wer keinen hat - und misst die Ueberlappung
+       * fuer jeden, der wieder schwebt.
        *
        * WARUM DAS KEIN NACHGEBEN IST: die alte Fassung hat auf dem Zeiger nicht
        * etwa nichts gefunden, sie hat FALSCH gefunden. Sie mass die
@@ -3831,33 +4144,47 @@ describe('Sonde 18 - am Scroll-Ende liegt nichts Bedienbares unter dem FAB', () 
        * Inhalt - dass am Scroll-Ende trotzdem nichts Bedienbares unter ihm
        * liegt, ist genau die Zusage, die zu pruefen bleibt. */
       if (device === 'desktop') {
-        /* GENAU EINER SCHWEBT DORT NOCH, und das ist eine Entscheidung, keine
-         * Luecke: das Speed-Dial des Dashboards dockt bewusst nicht an, weil es
-         * ein MENUE ist und ein halber Umzug schlechter waere als keiner
-         * (dc23972f). Fuer ihn gilt die Frage dieser Sonde weiter, und er ist
-         * der einzige Fall, in dem sie auf dem Zeiger ueberhaupt etwas misst. */
-        assert.equal(seen, 1,
-          `Auf dem Zeigergeraet schwebt genau ein FAB ueber dem Inhalt (das Dashboard-Speed-Dial), `
-          + `gemessen wurden ${seen}. Entweder dockt ein Modul nicht mehr an, oder die Einklapp-Regel greift nicht.`);
-        // Die Aufteilung wird MITGEPRUEFT, nicht nur abgezogen: sonst verschwiege
-        // die Sonde still, dass ein Modul seinen FAB ganz verloren hat.
-        /* NUR die beiden Zahlen, die dieser Sonde gehoeren. `ohneFab` waere die
-         * dritte, aber der Sweep faehrt ausser den 15 Modulrouten auch jedes
-         * Einstellungs-Blatt an - gemessen 29 statt 3, und diese Zahl haengt an
+        /* AM ZEIGER SCHWEBT KEINER MEHR - DAS IST DIE REGEL, NICHT EINE ZAHL.
+         *
+         * Bis R14 schwebte genau einer, das Speed-Dial der Uebersicht, und die
+         * Sonde fragte nach `seen === 1`. Seit R14 (A8 P3-2, #1493) traegt die
+         * Uebersicht am Desktop „+ Neu" als angedockte Pille im Kopf mit
+         * demselben Menue; die Zahl 1 wurde damit zu 0 und die Sonde rot, ohne
+         * dass sich an der Zusage etwas geaendert haette. Gefragt wird deshalb
+         * die Regel selbst: auf dem Zeigergeraet schwebt KEIN Knopf ueber dem
+         * Inhalt, jeder dockt an. Wer wieder schwebt, steht hier mit Namen -
+         * und die Ueberlappungsfrage oben misst ihn trotzdem weiter.
+         *
+         * Gegengeprueft: mit einem Riegel in `dockFabIntoToolbar` (router.js),
+         * der /tasks nicht andocken laesst, wird diese Zeile rot und nennt
+         * `tasks`. */
+        assert.deepEqual(schwebend, [],
+          'Auf dem Zeigergeraet schwebt kein FAB ueber dem Inhalt - jede Primaeraktion dockt im Kopf an '
+          + '(seit R14 auch die Uebersicht als Pille "+ Neu"). Es schweben: ' + schwebend.join(', '));
+        /* Die Aufteilung wird MITGEPRUEFT, nicht nur abgezogen: sonst verschwiege
+         * die Sonde still, dass ein Modul seinen FAB ganz verloren hat. Mit
+         * NAMEN, nicht als Zahl - die Meldung sagt dann, wer fehlt.
+         *
+         * `ohneFab` gehoert nicht hierher: der Sweep faehrt ausser den
+         * Modulrouten auch jedes Einstellungs-Blatt an, und diese Zahl haengt an
          * der Zahl der Einstellungsseiten, nicht am FAB. Ein Modul, das seinen
-         * FAB verliert, faellt trotzdem auf: es fehlt dann in einem der beiden
-         * Toepfe hier. */
-        assert.deepEqual({ angedockt, eingeklappt }, { angedockt: 5, eingeklappt: 6 },
-          'Erwartet auf dem Zeiger: 5 FABs in der Kopfleiste (Vorrat, Mahlzeiten, Rezepte, '
-          + 'Geburtstage, Dokumente) und 6 eingeklappte (dort traegt der Modulkopf seinen eigenen '
-          + `Knopf). Gezaehlt wurden ${angedockt} und ${eingeklappt}, dazu ${ohneFab} Seiten ohne FAB. `
-          + 'Aendert sich das, aendert sich die Reichweite dieser Sonde.');
+         * FAB verliert, faellt trotzdem auf: es fehlt dann in der Liste hier.
+         *
+         * Einkauf dockt seit der Kopfregel mobil (2026-09-26) an, Aufgaben,
+         * Notizen, Kontakte, Kalender und Budget seit #1483 ("one add button"),
+         * die Uebersicht seit R14. Eingeklappt ist keiner mehr. */
+        const ANGEDOCKT_AM_ZEIGER = ['dashboard', 'tasks', 'calendar', 'shopping', 'meals', 'recipes',
+          'pantry', 'notes', 'contacts', 'birthdays', 'budget', 'documents'];
+        assert.deepEqual({ angedockt: [...angedockt].sort(), eingeklappt },
+          { angedockt: [...ANGEDOCKT_AM_ZEIGER].sort(), eingeklappt: [] },
+          `Erwartet auf dem Zeiger: ${ANGEDOCKT_AM_ZEIGER.length} FABs in der Kopfleiste und kein eingeklappter, `
+          + `dazu ${ohneFab} Seiten ohne FAB. Aendert sich das, aendert sich die Reichweite dieser Sonde.`);
       } else {
         // 15 Routen minus die drei ohne FAB.
         assert.ok(seen >= 12,
           `Nur ${seen} Zustaende am Scroll-Ende gemessen - erwartet sind mindestens 12. Entweder `
           + 'fehlt Modulen ihr FAB, oder keine Seite kam an ihr Scroll-Ende.');
-        assert.equal(angedockt, 0, 'am Finger dockt kein FAB an - der Platz dafuer ist die Nav-Kapsel');
+        assert.deepEqual(angedockt, [], 'am Finger dockt kein FAB an - der Platz dafuer ist die Nav-Kapsel');
       }
 
       assert.deepEqual(findings, [],
@@ -3996,7 +4323,7 @@ describe('Sonde 19 - in der regulaeren Groessenklasse traegt der Modulkopf eine 
                   // aus und nimmt `--content-max-width-narrow` NUR als
                   // Rueckfall fuer Seiten, die keins erklaeren. Diese Sonde las
                   // den Rueckfall von :root und meldete damit jede Seite mit
-                  // eigener Komposition als defekt - housekeeping ist
+                  // eigener Komposition als defekt - housekeeping war damals
                   // `app-page--data` (--layout-content, 60rem), sein Kopf endete
                   // korrekt bei 960px und wurde gegen 720px geprueft.
                   //
@@ -4344,7 +4671,7 @@ function holdNextNoteSave(page, { method = 'POST', noteId = null } = {}) {
 }
 
 async function openReadyNoteModal(page) {
-  await page.click('#notes-add-btn');
+  await page.click('#fab-new-note');
   await page.waitForSelector('#note-content');
   // Shared-modal initialization applies its first focus after 50 ms and takes
   // the dirty baseline after 150 ms. The 300 ms barrier includes both timers
@@ -5104,7 +5431,17 @@ test('Sonde 24 - spaeter Umbenennungskonflikt ersetzt keinen neuen Notizeditor',
     }, { firstName: renamedCategory, secondName: conflictingCategory });
     await gotoRoute(page, '/notes');
 
-    await page.click('#notes-manage-categories');
+    // Seit der Kopfregel mobil (2026-09-26) ein Werkzeug des Kopfs - und seit
+    // R16 ein direkter Knopf, solange es das einzige ist (`pageToolsMenuHtml`:
+    // ein Eintrag ist ein Knopf, kein Menue). Die Sonde nimmt die Bauart, die
+    // im Dokument steht; kommt ein zweiter Eintrag dazu, geht sie durchs Menue.
+    const directTool = await page.$('.notes-toolbar .page-tools-btn--direct[data-action="manage-categories"]');
+    if (directTool) {
+      await directTool.click();
+    } else {
+      await page.click('.notes-toolbar .page-tools-btn');
+      await page.click('#notes-tools-menu [data-action="manage-categories"]');
+    }
     await page.waitForSelector(`yuvomi-category-manager .cat-row[data-key="${categoryIds[0]}"]`);
     await page.click(`yuvomi-category-manager .cat-row[data-key="${categoryIds[0]}"] .cat-row__name`);
     await page.waitForSelector('#prompt-modal-input');

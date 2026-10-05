@@ -12,26 +12,40 @@ import { clearApiCache } from '/sw-register.js';
 import { forgetLayoutHint } from '/utils/dashboard-layout-hint.js';
 import { initI18n, getLocale, t, formatDate, formatTime } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
 import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
-import { wireScrollFade, wireCollapsingHeader, wireSwipeToDismiss } from '/utils/ux.js';
-import { TOAST_SURFACES, toastSurface } from '/utils/toast-surface.js';
+import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight } from '/utils/ux.js';
+import { TOAST_SURFACES } from '/utils/toast-surface.js';
+import { showToast } from '/utils/toast-show.js';
+import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
+import { pageMountTarget } from '/utils/page-mount.js';
+import { friendlyError } from '/utils/friendly-error.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
+import { watchToastPlacement } from '/utils/toast-placement.js';
 import { COMPOSITION_MODES } from '/utils/page-layout.js';
 import { init as initReminders, stop as stopReminders } from '/reminders.js';
 import { initPush, stopPush } from '/push.js';
 import { numberLocaleFor } from '/settings/region-presets.js';
-import { setDisplayTimeZone } from '/utils/timezone.js';
+import { setDisplayTimeZone, zonedDateKey } from '/utils/timezone.js';
+import { rememberZonePrefs, forgetZonePrefs, noteZoneDecision } from '/utils/household-zone-hint.js';
 import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
+import { swapPage } from '/utils/view-transition.js';
 import { moduleAccentToken, moduleAccentVar } from '/utils/module-accent.js';
 import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
 import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
 import { activityType } from '/utils/health-activity.js';
+import {
+  SEARCH_SECTIONS, NEW_ACTIONS, searchResultCount, markSegments, paletteCommands,
+} from '/utils/search-sections.js';
 import { buildHelpRows } from '/utils/help.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
+import { wirePaletteCombobox } from '/utils/palette-combobox.js';
 import { triggerPageFab } from '/utils/fab.js';
+import { hasLeaveGuard, mayLeave } from '/utils/leave-guard.js';
+import { wireSheetDrag } from '/utils/sheet-drag.js';
 import {
   handleBackNavigation, closeAllOverlays, consumeOverlayMarker,
-  pushOverlay, dropOverlay, attachOverlay,
+  pushOverlay, dropOverlay, attachOverlay, whenHistorySettled,
 } from '/utils/overlay-history.js';
 import {
   applyNavBadges, setNavBadge, resetNavBadges, navBadgeRoutes,
@@ -46,9 +60,14 @@ import {
   forgetScrollPositions,
 } from '/utils/scroll-restore.js';
 import { openModal, confirmModal } from '/components/modal.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
+import { prefersInkText } from '/utils/contrast.js';
+import { handleMasterDetailPopstate } from '/utils/master-detail.js';
 import '/components/datepicker.js';
 import { NAV_ICONS, MODULE_ICON, moduleIconEl } from '/nav-icons.js';
-import { RENAMED_SETTINGS_SOURCE_PATHS, SETTINGS_LEAVES } from '/settings/registry.js';
+import {
+  RENAMED_SETTINGS_SOURCE_PATHS, SETTINGS_LEAVES, searchSettings, settingsOptionUrl, settingsSectionUrl,
+} from '/settings/registry.js';
 import {
   NAV_SECTION,
   resolveMobileNavOrder,
@@ -448,9 +467,6 @@ let _setupRequired = false;
 // Router
 // --------------------------------------------------------
 
-const ROUTE_ORDER = ['/', '/calendar', '/schedule', '/tasks', '/meals', '/recipes', '/shopping', '/pantry',
-                     '/birthdays', '/notes', '/contacts', '/budget', '/inventory', '/documents', '/housekeeping', '/waste', '/health', '/settings'];
-
 const MOBILE_FAVORITE_COUNT = 3;
 
 // Domänen-Gruppierung der Haupt-Navigation. Die Reihenfolge bestimmt die
@@ -471,11 +487,11 @@ const APP_VERSION_STORAGE_KEY = 'yuvomi-app-version';
 
 // Reduziert einen (Sub-)Pfad auf seine Top-Level-Sektion. /settings/* Blätter
 // teilen sich dadurch eine Sektion: ein Wechsel zwischen zwei Settings-Blättern
-// gilt als gleiche Sektion (keine seitliche Seitentransition).
+// gilt als gleiche Sektion (dasselbe aktive Nav-Ziel).
 function topLevelSection(path) {
   if (typeof path === 'string' && path.startsWith('/settings')) return '/settings';
-  // /health/* Sub-Tabs teilen sich eine Sektion (Soft-Nav zwischen Tabs, keine
-  // seitliche Seitentransition) — analog zu den Settings-Blättern.
+  // /health/* Sub-Tabs teilen sich eine Sektion (Soft-Nav zwischen Tabs, ein
+  // aktives Nav-Ziel) - analog zu den Settings-Blättern.
   if (typeof path === 'string' && path.startsWith('/health')) return '/health';
   // /schedule/* Sub-Tabs ebenso (S-10) — derselbe Grund wie bei /health.
   // Exaktes '/schedule' ODER '/schedule/...' (Review zu #1099): ein blosses
@@ -483,15 +499,6 @@ function topLevelSection(path) {
   // wie '/schedules...', der zu keinem echten Schedule-Tab gehoert.
   if (typeof path === 'string' && (path === '/schedule' || path.startsWith('/schedule/'))) return '/schedule';
   return path ?? '/';
-}
-
-function getDirection(fromPath, toPath) {
-  const fromSection = topLevelSection(fromPath ?? '/');
-  const toSection   = topLevelSection(toPath);
-  const fromIdx = ROUTE_ORDER.indexOf(fromSection);
-  const toIdx   = ROUTE_ORDER.indexOf(toSection);
-  if (fromIdx === -1 || toIdx === -1 || fromSection === toSection) return 'right';
-  return toIdx > fromIdx ? 'right' : 'left';
 }
 
 function getAppName() {
@@ -546,12 +553,6 @@ function updateBranding(path = currentPath) {
   const appName = getAppName();
   const sidebarLogoName = document.querySelector('.nav-sidebar__brand-name');
   if (sidebarLogoName) sidebarLogoName.textContent = appName;
-  const sidebarVersion = document.querySelector('.nav-sidebar__version');
-  if (sidebarVersion) {
-    const version = getAppVersion();
-    sidebarVersion.textContent = version ? t('login.version', { version }) : '';
-    sidebarVersion.hidden = !version;
-  }
 
   const loginTitle = document.querySelector('.auth-hero__title');
   if ((path === '/login' || path === '/setup') && loginTitle) loginTitle.textContent = appName;
@@ -628,6 +629,38 @@ function createFocusTrap(container) {
 }
 
 /**
+ * Der Umweg fuer eine Adresse ohne Route (#1607), oder null. Regeln in
+ * utils/unknown-route.js. Bekannt ist, was allRoutes() kennt - also erst
+ * verlaesslich, wenn die Erweiterungsrouten geladen sind (nach der Anmeldung).
+ * Landeplatz ist jede Route ausser einem abgeschalteten oder gesperrten Modul
+ * und den zwei Seiten, von denen eine angemeldete Sitzung sofort wieder
+ * wegfuehrt. Die Route eines solchen Moduls SELBST ist bekannt und bleibt den
+ * Modul-Guards in navigate().
+ *
+ * OHNE SITZUNG (#1640) urteilt nur der oeffentliche Teil der Tabelle: `/pair`
+ * und `/join` sind bekannt, bevor sich jemand angemeldet hat, also fuehrt
+ * `/pair/extra` auf `/pair` statt ueber die Uebersicht auf die Anmeldung. Alles
+ * andere bleibt offen bis hinter den Auth-Guard - dort erst stehen die
+ * Erweiterungsrouten und die Rechte.
+ */
+function unknownDetourFor(path) {
+  const routes = allRoutes();
+  const known = routes.map((r) => r.path);
+  const landable = routes
+    .filter((r) => r.path === '/' || (r.path !== '/login' && r.path !== '/setup'
+      && !(r.module && (_disabledModules.has(r.module) || !canAccessNavModule(r.module)))))
+    .map((r) => r.path);
+  if (!currentUser) {
+    return publicPathDetour(path, {
+      known,
+      open: routes.filter((r) => !r.requiresAuth).map((r) => r.path),
+      landable,
+    });
+  }
+  return unknownPathDetour(path, { known, landable });
+}
+
+/**
  * Navigiert zu einem Pfad und rendert die entsprechende Seite.
  * @param {string} path
  * @param {Object|boolean} userOrPushState - Direkt ein User-Objekt nach Login,
@@ -636,7 +669,58 @@ function createFocusTrap(container) {
  */
 async function navigate(path, userOrPushState = true, pushState = true) {
   if (isNavigating) return;
+  // UNBEKANNTE ADRESSE (#1607): statt still die Uebersicht unter der toten
+  // Adresse zu zeichnen, laeuft DIESE Navigation mit dem naechsten bekannten
+  // Vorfahren weiter. Bewusst kein zweites navigate(): das gab im finally die
+  // Sperre frei, waehrend das innere noch lud, und fragte den Verlassen-Schutz
+  // zweimal (Review #1638). takeDetour berichtigt nur den Pfad; Adresse und
+  // Hinweis folgen erst hinter Schutz und Sperre.
+  let detourAddress = null;
+  let unknownNotice = false;
+  const takeDetour = (push) => {
+    const detour = unknownDetourFor(path);
+    if (!detour) return false;
+    const corrected = detourPaths(detour, path, { pushState: push, location });
+    path = corrected.path;
+    detourAddress = corrected.address;
+    unknownNotice = detour.notify;
+    return true;
+  };
+  // Kaltstart und Zurueck/Vor: die tote Adresse IST der laufende Eintrag und
+  // wird ersetzt, Zurueck fuehrt danach nicht wieder auf sie. Bei einem Wechsel
+  // in der App schreibt der regulaere Eintrag weiter unten die berichtigte.
+  const commitDetourAddress = (push) => {
+    if (!push && detourAddress) history.replaceState({ path }, '', detourAddress);
+  };
+  // In einer laufenden Sitzung steht die Modulliste schon (sie kommt mit den
+  // Praeferenzen) - dann VOR dem Verlassen-Schutz, damit er nach dem Ziel
+  // fragt, auf dem die Navigation endet. Sonst nach dem zweiten Lookup unten.
+  // Ohne Sitzung (#1640) ebenfalls hier, aber nur fuer oeffentliche Vorfahren:
+  // der Lookup unten fiele sonst auf die Uebersicht zurueck, die eine Sitzung
+  // verlangt, und `/pair/extra` endete auf der Anmeldung statt auf `/pair`.
+  if (typeof userOrPushState !== 'object' && (!currentUser || _preferencesLoaded)) takeDetour(userOrPushState);
+  // VERLASSEN-SCHUTZ (utils/leave-guard.js, Re-Critique 2026-09-28 A7 P2-1):
+  // eine Seite mit ungespeicherter Arbeit - der Anpassen-Modus der Uebersicht -
+  // fragt, bevor sie verschwindet. Jeder Weg endet hier: Seitenleiste,
+  // Tab-Leiste, Mehr-Blatt, Befehlspalette, Zurueck (popstate). Nur fuer
+  // Wechsel einer angemeldeten Sitzung: das Anmelden (Objekt) und ein
+  // Sitzungsablauf fragen nicht. Ohne Waechter kein await: zwischen der
+  // Pruefung oben und `isNavigating = true` darf keine Luecke entstehen.
+  if (currentUser && typeof userOrPushState !== 'object' && hasLeaveGuard() && !(await mayLeave(path))) {
+    // Ein Zurueck hat die Adresse schon gewechselt - sie gehoert wieder der
+    // Seite, die stehen bleibt.
+    // Erst wenn die Rueckfrage ihren History-Eintrag zurueckgegeben hat
+    // (whenHistorySettled in utils/overlay-history.js) - sonst truege deren
+    // spaetes back() die Adresse gleich wieder weg.
+    if (userOrPushState === false && currentPath) {
+      const stay = currentPath;
+      await whenHistorySettled();
+      history.pushState({ path: stay }, '', stay);
+    }
+    return;
+  }
   isNavigating = true;
+  commitDetourAddress(userOrPushState);
 
   // Offenes „Mehr“-Sheet beim Navigieren immer schließen — robust und
   // unabhängig vom Klick-Bubbling (das reißt, wenn die Navigation
@@ -661,9 +745,9 @@ async function navigate(path, userOrPushState = true, pushState = true) {
       pushState = userOrPushState;
     }
 
-    // Alten Pfad merken, bevor currentPath aktualisiert wird - für Richtungsberechnung
+    // Alten Pfad merken, bevor currentPath aktualisiert wird - Kaltstart oder Wechsel
     const previousPath = currentPath;
-    const basePath = path.split('?')[0];
+    let basePath = path.split('?')[0];
     currentPath = basePath;
 
     // Scrollstand der Seite festhalten, die gerade verlassen wird - er ist die
@@ -674,8 +758,8 @@ async function navigate(path, userOrPushState = true, pushState = true) {
       rememberScrollPosition(previousPath, document.getElementById('main-content')?.scrollTop ?? 0);
     }
     // Vorwärts heißt oben anfangen, Zurück/Vor heißt weitermachen. Details und
-    // die Begründung gegen getDirection() in utils/scroll-restore.js.
-    const scrollTarget = scrollPositionFor(basePath, { restore: !pushState });
+    // die Begründung gegen eine Nav-Reihenfolge in utils/scroll-restore.js.
+    let scrollTarget = scrollPositionFor(basePath, { restore: !pushState });
 
     // First-Run-Weiche: Solange kein Account existiert und niemand eingeloggt ist,
     // alle Routen außer /setup auf /setup umleiten.
@@ -695,20 +779,38 @@ async function navigate(path, userOrPushState = true, pushState = true) {
 
     let route = allRoutes().find((r) => r.path === basePath) ?? ROUTES.find((r) => r.path === '/');
 
+    // DIESE Navigation laeuft auf einem anderen Pfad weiter (#1640), wie beim
+    // Umweg oben: kein zweites navigate(). Das gab im finally die Sperre frei,
+    // waehrend das innere noch lud, und liess den Eintrag der Adresse stehen,
+    // von der die Weiche gleich wieder wegfuehrt - Zurueck landete in ihr.
+    // Kaltstart und Zurueck/Vor ersetzen den laufenden Eintrag, ein Wechsel in
+    // der App schreibt weiter unten das berichtigte Ziel.
+    const continueOn = (target) => {
+      path = target;
+      basePath = target;
+      currentPath = target;
+      scrollTarget = scrollPositionFor(target, { restore: !pushState });
+      route = allRoutes().find((r) => r.path === target) ?? route;
+      detourAddress = target;
+      commitDetourAddress(pushState);
+    };
+
     // Split-Guest-Weiche: Gäste einer Ausgabenteilung sehen nur das Budget-Modul.
     // ABER: hat der Nutzer zusätzlich eine Familienrolle OHNE Budget-Recht, würde
-    // ein bedingungsloses navigate('/budget') vom Modul-Guard (canAccessNavModule)
+    // ein bedingungsloser Wechsel auf '/budget' vom Modul-Guard (canAccessNavModule)
     // sofort wieder auf '/' geworfen — und '/' schickt zurück auf '/budget':
     // Endlosschleife bis Stack-Overflow (#480). Daher nur umleiten, wenn Budget
     // tatsächlich zugänglich ist; sonst greift der reguläre Rechte-Guard und der
     // Nutzer landet auf einer für ihn erlaubten Seite.
+    // Zugaenglich heisst auch: im Haushalt nicht abgeschaltet (#1640). Der
+    // Modul-Guard wirft von einem abgeschalteten '/budget' auf '/', die Weiche
+    // von '/' wieder zurueck - dieselbe Schleife - und hinter dem Auth-Guard
+    // prueft nach der Weiche niemand mehr die Abschaltung.
     if (currentUser?.access_scope === 'split_guest'
         && route.path !== '/budget'
-        && canAccessNavModule('budget')) {
-      currentPath = null;
-      isNavigating = false;
-      navigate('/budget');
-      return;
+        && canAccessNavModule('budget')
+        && !_disabledModules.has('budget')) {
+      continueOn('/budget');
     }
 
     // Modul-Guard: deaktivierte ODER per Rechte gesperrte Module leiten auf das
@@ -750,29 +852,52 @@ async function navigate(path, userOrPushState = true, pushState = true) {
 
     route = allRoutes().find((r) => r.path === basePath) ?? route;
 
+    // Unbekannte Adresse, zweite Stelle (Kaltstart, Anmeldung): ERST HIER
+    // sind die Erweiterungsrouten geladen (syncThirdPartyModules im Auth-Guard),
+    // davor waere jede "unbekannt". Einen Verlassen-Schutz gibt es auf diesem
+    // Weg nicht - es steht noch keine Seite. Die Guards danach urteilen ueber
+    // die berichtigte Route.
+    if (takeDetour(pushState)) {
+      basePath = path.split('?')[0];
+      currentPath = basePath;
+      scrollTarget = scrollPositionFor(basePath, { restore: !pushState });
+      route = allRoutes().find((r) => r.path === basePath) ?? route;
+      commitDetourAddress(pushState);
+    }
+
     // Split-Guest-Weiche: Gäste einer Ausgabenteilung sehen nur das Budget-Modul.
     // ABER: hat der Nutzer zusätzlich eine Familienrolle OHNE Budget-Recht, würde
-    // ein bedingungsloses navigate('/budget') vom Modul-Guard (canAccessNavModule)
+    // ein bedingungsloser Wechsel auf '/budget' vom Modul-Guard (canAccessNavModule)
     // sofort wieder auf '/' geworfen — und '/' schickt zurück auf '/budget':
     // Endlosschleife bis Stack-Overflow (#480). Daher nur umleiten, wenn Budget
     // tatsächlich zugänglich ist; sonst greift der reguläre Rechte-Guard und der
     // Nutzer landet auf einer für ihn erlaubten Seite.
+    // Zugaenglich heisst auch: im Haushalt nicht abgeschaltet (#1640). Der
+    // Modul-Guard wirft von einem abgeschalteten '/budget' auf '/', die Weiche
+    // von '/' wieder zurueck - dieselbe Schleife - und hinter dem Auth-Guard
+    // prueft nach der Weiche niemand mehr die Abschaltung.
     if (currentUser?.access_scope === 'split_guest'
         && route.path !== '/budget'
-        && canAccessNavModule('budget')) {
-      currentPath = null;
-      isNavigating = false;
-      navigate('/budget');
-      return;
+        && canAccessNavModule('budget')
+        && !_disabledModules.has('budget')) {
+      continueOn('/budget');
     }
 
-    // Rechte-Guard nach frisch geladenen Rechten (Deep-Link auf ein für diese
-    // Rolle/dieses Mitglied gesperrtes Modul → Dashboard). #467
-    if (route.module && route.path !== '/' && !canAccessNavModule(route.module)) {
-      currentPath = null;
-      isNavigating = false;
-      navigate('/');
-      return;
+    // Modul-Guard, zweite Stelle: nach frisch geladenen Rechten UND Praeferenzen
+    // (Deep-Link auf ein gesperrtes oder abgeschaltetes Modul → Dashboard). #467
+    //
+    // Dieselbe Regel wie am Modul-Guard oben. Die Abschaltung fehlte hier: beim
+    // Kaltstart laeuft der Guard oben, bevor die Praeferenzen geladen sind -
+    // `_disabledModules` ist dann noch leer - und hier pruefte nur das Recht.
+    // Der Direktlink auf ein abgeschaltetes Modul wurde gezeichnet.
+    //
+    // Wie die Gast-Weiche darueber laeuft DIESE Navigation weiter, statt eine
+    // zweite zu starten (#1640). Das Ziel '/' nimmt die Bedingung selbst aus:
+    // es kann weder abgeschaltet noch gesperrt sein, eine Schleife gibt es nicht.
+    if (route.module
+        && route.path !== '/'
+        && (_disabledModules.has(route.module) || !canAccessNavModule(route.module))) {
+      continueOn('/');
     }
 
     if (!route.requiresAuth && currentUser && path === '/login') {
@@ -792,8 +917,8 @@ async function navigate(path, userOrPushState = true, pushState = true) {
        * WAR ER ES, TRITT DIE NEUE SEITE AN SEINE STELLE. Laege sie darueber,
        * zeigte der Rueckweg zuerst auf einen Eintrag mit derselben Adresse -
        * eine Geste, die sichtbar nichts tut. */
-      if (consumeOverlayMarker()) history.replaceState({ path }, '', path);
-      else history.pushState({ path }, '', path);
+      if (consumeOverlayMarker()) history.replaceState({ path }, '', detourAddress ?? path);
+      else history.pushState({ path }, '', detourAddress ?? path);
     }
 
     // Soft-Navigation innerhalb desselben Moduls (z. B. Settings-Blatt → Blatt
@@ -869,6 +994,12 @@ async function navigate(path, userOrPushState = true, pushState = true) {
     focusMainContentAfterNavigation(basePath);
   } finally {
     isNavigating = false;
+    // Im finally, weil auch die Soft-Navigation (Settings-Blatt) frueh
+    // zurueckkehrt - und nach dem Rendern, weil es die Toast-Flaeche beim
+    // Kaltstart erst mit der Shell gibt. Deshalb leitet die Gast-Weiche oben
+    // nicht mehr ueber ein zweites navigate() weiter (#1640): dieses finally
+    // lief dann VOR dessen Rendern, und der Hinweis fand keine Flaeche.
+    if (unknownNotice) showToast(t('common.unknownAddress'), 'default', 5000);
     // auth:expired kann waehrend einer Navigation gefeuert haben (z.B. wenn ein
     // paralleler API-Call 401 zurueckgab). Jetzt wo die Navigation abgeschlossen
     // ist, holen wir die Login-Weiterleitung nach.
@@ -898,6 +1029,10 @@ async function syncPreferencesOnce() {
     // der nichts darueber aussagt, wo dieser Haushalt lebt. Ohne getroffene
     // Wahl bleibt die Anzeige also beim Browser, so wie bisher.
     setDisplayTimeZone(res?.data?.timezone ?? null);
+    // Der Zonen-Hinweis der Uebersicht (#1607) liest genau diese Antwort: sie
+    // ist da, bevor die erste Seite zeichnet, also steht er schon neben dem
+    // Skelett und schiebt nichts nach.
+    rememberZonePrefs(res?.data);
     // Region als Formatier-Locale für Zahlen/Währung spiegeln (z. B. de-CH →
     // 123'456.78). getFormatLocale() in i18n.js liest diesen Wert.
     const numberLocale = numberLocaleFor({
@@ -1073,6 +1208,164 @@ function sidebarActionEl({ labelKey, icon, className, onClick }) {
   labelEl.textContent = label;
   button.append(wrap, labelEl);
   return button;
+}
+
+/** Apple-Tastatur? Entscheidet nur, welches Kuerzel die Suche NENNT. */
+function isApplePlatform() {
+  const platform = navigator.userAgentData?.platform || navigator.platform || '';
+  return /mac|iphone|ipad|ipod/i.test(platform);
+}
+
+/** Das Kuerzel der globalen Suche, wie es die Plattform schreibt. */
+function searchShortcutLabel() {
+  return isApplePlatform() ? '\u2318K' : 'Ctrl+K';
+}
+
+/**
+ * Namen der Werkzeuge in der Logo-Zeile der Seitenleiste (Suche, Einklappen).
+ * Sie stehen ausserhalb von `.nav-sidebar__items`, das `rebuildNavigation()`
+ * neu baut - also zieht der Sprachpfad sie hier nach (Codex an #1477).
+ * Einklappen nennt die Handlung, die der Klick ausloest, also haengt sein
+ * Name am Zustand.
+ */
+function syncSidebarTools(root = document.querySelector('.nav-sidebar__logo-actions')) {
+  const search = root?.querySelector('.nav-sidebar__search');
+  if (search) {
+    const searchLabel = `${t('nav.search')} (${searchShortcutLabel()})`;
+    search.setAttribute('aria-label', searchLabel);
+    search.setAttribute('title', searchLabel);
+  }
+  const toggle = root?.querySelector('.nav-sidebar__toggle');
+  if (toggle) {
+    const collapsed = document.documentElement.classList.contains('sidebar-collapsed');
+    const toggleLabel = collapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse');
+    toggle.setAttribute('aria-label', toggleLabel);
+    toggle.setAttribute('title', toggleLabel);
+  }
+}
+
+/**
+ * Die Kontozeile am Fuss der Seitenleiste: Avatar, Name, und dahinter das
+ * Konto-Menue (Hilfe, Aenderungen, Abmelden).
+ *
+ * Gebaut per DOM-API, weil Name und Bild Nutzerdaten sind; Farbe und Bild
+ * setzt `syncSidebarAccount()`, das auch nach einer Profil-Aenderung laeuft.
+ * Der Punkt fuer ein verfuegbares Update haengt am Avatar (applyUpdateBadge),
+ * sonst verschwaende der Hinweis hinter einem geschlossenen Menue.
+ */
+function sidebarAccountEl({ isDisplayShell = false } = {}) {
+  const wrap = document.createElement('div');
+  wrap.className = 'nav-sidebar__account';
+
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'nav-item nav-sidebar__account-trigger popover-menu__trigger';
+  trigger.setAttribute('popovertarget', 'nav-account-menu');
+  trigger.setAttribute('aria-haspopup', 'menu');
+  trigger.setAttribute('aria-expanded', 'false');
+
+  const iconWrap = document.createElement('span');
+  iconWrap.className = 'nav-item__icon-wrap';
+  const avatar = document.createElement('span');
+  avatar.className = 'nav-sidebar__avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  iconWrap.appendChild(avatar);
+
+  const name = document.createElement('span');
+  name.className = 'nav-item__label nav-sidebar__account-name';
+
+  const chevron = document.createElement('i');
+  chevron.dataset.lucide = 'chevrons-up-down';
+  chevron.className = 'nav-sidebar__account-chevron';
+  chevron.setAttribute('aria-hidden', 'true');
+
+  trigger.append(iconWrap, name, chevron);
+
+  const menu = document.createElement('div');
+  menu.className = 'popover-menu nav-sidebar__account-menu';
+  menu.id = 'nav-account-menu';
+  menu.setAttribute('popover', '');
+  menu.setAttribute('role', 'menu');
+  // Ueber dem Ausloeser und an seiner linken Kante - er steht am Fuss der
+  // Leiste, nach unten ist kein Platz (popover-menu.js, `placement`).
+  menu.dataset.placement = 'top-start';
+
+  const item = (action, icon, labelKey, extraClass = '') => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('role', 'menuitem');
+    btn.className = `popover-menu__item${extraClass ? ` ${extraClass}` : ''}`;
+    btn.dataset.action = action;
+    const i = document.createElement('i');
+    i.dataset.lucide = icon;
+    i.className = 'icon-md';
+    i.setAttribute('aria-hidden', 'true');
+    const span = document.createElement('span');
+    span.textContent = t(labelKey);
+    btn.append(i, span);
+    return btn;
+  };
+  menu.append(
+    item('help', 'circle-help', 'nav.help', 'nav-account__help'),
+    // `nav-item--changelog` traegt den Update-Hinweis im Namen (applyUpdateBadge).
+    item('changelog', 'history', 'nav.changelog', 'nav-item--changelog'),
+  );
+  // FUER EIN DISPLAY GIBT ES KEIN ABMELDEN (#1208). Ein Tablett meldet sich
+  // nicht ab, es wird widerrufen - und `POST /auth/logout` beantwortet der
+  // Server ihm mit 403. Der Eintrag haette eine Abmeldung versprochen, die nie
+  // stattfindet. Monochrom wie die Geschwister: Danger-Rot erst im Confirm.
+  if (!isDisplayShell) {
+    const sep = document.createElement('div');
+    sep.className = 'popover-menu__separator';
+    sep.setAttribute('role', 'separator');
+    menu.append(sep, item('logout', 'log-out', 'settings.logout', 'nav-account__logout'));
+  }
+  menu.addEventListener('click', (event) => {
+    const action = event.target.closest?.('.popover-menu__item')?.dataset.action;
+    if (action === 'help') showHelpModal();
+    else if (action === 'changelog') showChangelogModal();
+    else if (action === 'logout') confirmAndLogout();
+  });
+
+  wrap.append(trigger, menu);
+  syncSidebarAccount(wrap);
+  return wrap;
+}
+
+/**
+ * Name, Farbe und Bild der Kontozeile aus dem angemeldeten Nutzer. Laeuft beim
+ * Aufbau, beim Sprachwechsel und nach einer Profil-Aenderung
+ * (`yuvomi:profile-changed`, personal-account.js).
+ */
+function syncSidebarAccount(root = document.querySelector('.nav-sidebar__account')) {
+  if (!root) return;
+  const trigger = root.querySelector('.nav-sidebar__account-trigger');
+  const avatar = root.querySelector('.nav-sidebar__avatar');
+  const nameEl = root.querySelector('.nav-sidebar__account-name');
+  const displayName = currentUser?.display_name || currentUser?.username || '';
+  nameEl.textContent = displayName;
+  const color = currentUser?.avatar_color || '';
+  avatar.style.backgroundColor = color;
+  const ink = Boolean(color) && prefersInkText(color);
+  avatar.classList.toggle('nav-sidebar__avatar--ink', ink);
+  avatar.classList.toggle('nav-sidebar__avatar--on-color', Boolean(color) && !ink);
+  if (currentUser?.avatar_data) {
+    const img = document.createElement('img');
+    img.src = currentUser.avatar_data;
+    img.alt = '';
+    avatar.replaceChildren(img);
+  } else {
+    avatar.textContent = initials(displayName);
+  }
+  const label = displayName ? t('nav.accountMenu', { name: displayName }) : t('nav.accountMenuAnonymous');
+  trigger.dataset.baseLabel = label;
+  trigger.setAttribute('aria-label', withUpdateHint(label, pendingUpdateVersion()));
+  trigger.setAttribute('title', label);
+  for (const btn of root.querySelectorAll('.popover-menu__item')) {
+    const key = { help: 'nav.help', changelog: 'nav.changelog', logout: 'settings.logout' }[btn.dataset.action];
+    const span = btn.querySelector('span');
+    if (key && span) span.textContent = t(key);
+  }
 }
 
 // System-/Utility-Zeilen unter dem App-Launcher-Grid: Einstellungen (Route),
@@ -1457,7 +1750,7 @@ function buildMoreSheetBody() {
 /**
  * Lädt und rendert eine Seite dynamisch.
  * @param {{ path: string, page: string }} route
- * @param {string|null} previousPath - Pfad vor der Navigation (für Richtungsberechnung)
+ * @param {string|null} previousPath - Pfad vor der Navigation (null beim Kaltstart)
  * @param {number} scrollTarget - Scrollstand der Zielseite (0 vorwärts, gemerkt bei popstate)
  */
 async function renderPage(route, previousPath = null, scrollTarget = 0) {
@@ -1523,90 +1816,112 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
       refreshModuleCountsUnlessPageProvides(route.path);
     }
 
-    const content = document.getElementById('main-content') || app;
+    // Eine Seite ohne Anmeldung haengt an der App-Wurzel, nie im `main` ihrer
+    // Vorgaengerin (utils/page-mount.js).
+    const content = pageMountTarget(route, app);
 
-    // Richtung bestimmen (previousPath ist der alte Pfad vor der Navigation)
-    const direction = getDirection(previousPath, route.path);
-    const inClass   = direction === 'right' ? 'page-transition--in-right' : 'page-transition--in-left';
+    // Seitenwechsel (Critique 2026-09-26, P2-1): der Tausch laeuft als View
+    // Transition, wo der Browser sie kann - alter Inhalt blendet in den neuen,
+    // Navigation, Kopf und Kuechen-Leiste stehen (utils/view-transition.js).
+    // Beim Kaltstart gibt es nichts zu ueberblenden.
     const shouldAnimate = Boolean(previousPath);
 
     // Performance: backdrop-filter während Übergang deaktivieren (Android-Optimierung).
     // glass.css setzt alle backdrop-filter im app-content auf none solange diese Klasse aktiv ist.
     if (shouldAnimate) document.documentElement.classList.add('navigating');
 
-    // Alter Inhalt ist jetzt weg - altes Stylesheet kann entfernt werden
-    const pageWrapper = document.createElement('div');
-    pageWrapper.className = 'page-transition';
-    pageWrapper.style.opacity = '0';
-    content.replaceChildren(pageWrapper);
-    // Scrollport auf Anfang, solange er leer ist. `content` IST der Scrollport
-    // (#main-content == .app-content) und überlebt die Navigation; ohne diese
-    // Zeile öffnet die Zielseite auf dem Scrollstand der Vorseite.
-    //
-    // HIER, NICHT NACH DEM RENDER: Module scrollen beim Aufbau selbst - die
-    // Tagesansicht des Kalenders zur aktuellen Stunde, der Essensplan zum
-    // heutigen Tag. Ein Reset danach würde genau das wieder einkassieren. Die
-    // Wiederherstellung bei popstate darf und soll das dagegen überschreiben,
-    // sie steht deshalb unten hinter dem await.
-    content.scrollTop = 0;
-    // Der FAB der alten Seite lebt in der Shell und fiele sonst nicht mit ihrem
-    // Inhalt weg - er bliebe über der neuen Seite stehen, bis diese adoptiert.
-    // Hier und nicht eine Zeile höher: der Scroll-Reset gehört unmittelbar an
-    // den Inhaltstausch (Guard in test-mobile-scroll-layout.js).
-    clearPageFab();
-    // Dieselbe Begründung, dieselbe Schicht: die Sammelaktions-Pille gehört zur
-    // Teilmenge EINER Liste und darf nicht über der nächsten Seite stehen
-    // bleiben. Sie hat kein Gegenstück zu adoptPageFab() - wer sie braucht,
-    // setzt sie beim Rendern.
-    clearBulkPill();
-    style.cleanup();
-    // Lebenszyklus-Vertrag (#976): der Router besitzt EIN AbortController je
-    // Seitenaufbau und bricht ihn hier ab, wo die Route ersetzt wird. Die
-    // Seite bekommt das Signal als `context.signal` und haengt Timer und
-    // Listener daran (Bruecke: utils/page-lifecycle.js). Bis dahin gab es
-    // keinen Teardown fuer Seiten - das Dashboard brach seinen Controller nur
-    // zu Beginn des NAECHSTEN eigenen render() ab, also nie beim Verlassen:
-    // Uhr, stiller Refresh, Wetter- und Wandtimer liefen gegen einen
-    // abgehaengten Container weiter und starteten Anfragen hinter der
-    // naechsten Seite.
-    _pageController?.abort();
-    _pageController = new AbortController();
+    let pageWrapper = null;
+    let renderPromise = null;
+    // Der SYNCHRONE Teil des Wechsels: Inhalt tauschen, Scrollport zuruecksetzen,
+    // alte Seite abbauen, render() starten. Er ist der Update-Callback der View
+    // Transition - der Browser haelt bis zu seinem Ende das alte Bild, es gibt
+    // also keinen leeren Frame mehr dazwischen. Die Daten wartet er NICHT ab:
+    // das Bild stuende sonst fuer die Dauer eines Abrufs.
+    const swap = () => {
+      // Alter Inhalt ist jetzt weg - altes Stylesheet kann entfernt werden
+      pageWrapper = document.createElement('div');
+      pageWrapper.className = 'page-transition';
+      // Sofort sichtbar: das neue Bild der View Transition wird gleich nach
+      // diesem Callback aufgenommen und darf nicht bei 0 stehen. Die Blende
+      // des Rueckfalls ist eine Animation und schlaegt den Inline-Wert.
+      pageWrapper.style.opacity = '1';
+      content.replaceChildren(pageWrapper);
+      // Scrollport auf Anfang, solange er leer ist. `content` IST der Scrollport
+      // (#main-content == .app-content) und überlebt die Navigation; ohne diese
+      // Zeile öffnet die Zielseite auf dem Scrollstand der Vorseite.
+      //
+      // HIER, NICHT NACH DEM RENDER: Module scrollen beim Aufbau selbst - die
+      // Tagesansicht des Kalenders zur aktuellen Stunde, der Essensplan zum
+      // heutigen Tag. Ein Reset danach würde genau das wieder einkassieren. Die
+      // Wiederherstellung bei popstate darf und soll das dagegen überschreiben,
+      // sie steht deshalb unten hinter dem await.
+      content.scrollTop = 0;
+      // Der FAB der alten Seite lebt in der Shell und fiele sonst nicht mit ihrem
+      // Inhalt weg - er bliebe über der neuen Seite stehen, bis diese adoptiert.
+      // Hier und nicht eine Zeile höher: der Scroll-Reset gehört unmittelbar an
+      // den Inhaltstausch (Guard in test-mobile-scroll-layout.js).
+      clearPageFab();
+      // Dieselbe Begründung, dieselbe Schicht: die Sammelaktions-Pille gehört zur
+      // Teilmenge EINER Liste und darf nicht über der nächsten Seite stehen
+      // bleiben. Sie hat kein Gegenstück zu adoptPageFab() - wer sie braucht,
+      // setzt sie beim Rendern.
+      clearBulkPill();
+      style.cleanup();
+      // Lebenszyklus-Vertrag (#976): der Router besitzt EIN AbortController je
+      // Seitenaufbau und bricht ihn hier ab, wo die Route ersetzt wird. Die
+      // Seite bekommt das Signal als `context.signal` und haengt Timer und
+      // Listener daran (Bruecke: utils/page-lifecycle.js). Bis dahin gab es
+      // keinen Teardown fuer Seiten - das Dashboard brach seinen Controller nur
+      // zu Beginn des NAECHSTEN eigenen render() ab, also nie beim Verlassen:
+      // Uhr, stiller Refresh, Wetter- und Wandtimer liefen gegen einen
+      // abgehaengten Container weiter und starteten Anfragen hinter der
+      // naechsten Seite.
+      _pageController?.abort();
+      _pageController = new AbortController();
 
-    // Teardown abgeschlossen: ein evtl. gemerktes Soft-Update-Ziel ist jetzt
-    // ungültig, bis das neue Modul erfolgreich gerendert hat.
-    _renderedModule = null;
-    _renderedModuleName = null;
+      // Teardown abgeschlossen: ein evtl. gemerktes Soft-Update-Ziel ist jetzt
+      // ungültig, bis das neue Modul erfolgreich gerendert hat.
+      _renderedModule = null;
+      _renderedModuleName = null;
 
-    // render() synchron starten: Der synchrone Teil (Grundgerüst + Lade-Skeleton)
-    // ist danach bereits im DOM. Den Wrapper SOFORT einblenden — so wird das
-    // Skeleton während des Daten-await des Moduls sichtbar (statt leerer Fläche;
-    // der Wrapper war zuvor bis zur vollständigen Auflösung von render() opak-0,
-    // wodurch jedes vor dem Daten-await geseedete Skeleton beim Erstladen nie
-    // erschien). Der Rest von render() (Daten + Verdrahtung) wird danach abgewartet.
-    //
-    // Ein Erweiterungsmodul rendert nicht in den nackten Wrapper, sondern in
-    // die Seitenwurzel seines im Manifest erklaerten Modus (`page.composition`,
-    // `page.width`; docs/PAGE-COMPOSITION.md). Angewandt wird die Erklaerung
-    // HIER, sonst waere sie ein Feld ohne Wirkung: der Server prueft sie, die
-    // Admin-Liste zeigt sie, und die Seite saehe trotzdem aus wie ohne.
-    const target = route.thirdPartyModule
-      ? mountExtensionPage(pageWrapper, route.thirdPartyModule)
-      : pageWrapper;
-    const context = route.thirdPartyModule
-      ? { user: currentUser, page: { ...route.thirdPartyModule.page }, signal: _pageController.signal }
-      : { user: currentUser, signal: _pageController.signal };
-    const renderPromise = module.render(target, context);
+      // render() synchron starten: Der synchrone Teil (Grundgerüst + Lade-Skeleton)
+      // ist danach bereits im DOM. Den Wrapper SOFORT einblenden - so wird das
+      // Skeleton während des Daten-await des Moduls sichtbar (statt leerer Fläche;
+      // der Wrapper war zuvor bis zur vollständigen Auflösung von render() opak-0,
+      // wodurch jedes vor dem Daten-await geseedete Skeleton beim Erstladen nie
+      // erschien). Der Rest von render() (Daten + Verdrahtung) wird danach abgewartet.
+      //
+      // Ein Erweiterungsmodul rendert nicht in den nackten Wrapper, sondern in
+      // die Seitenwurzel seines im Manifest erklaerten Modus (`page.composition`,
+      // `page.width`; docs/PAGE-COMPOSITION.md). Angewandt wird die Erklaerung
+      // HIER, sonst waere sie ein Feld ohne Wirkung: der Server prueft sie, die
+      // Admin-Liste zeigt sie, und die Seite saehe trotzdem aus wie ohne.
+      const target = route.thirdPartyModule
+        ? mountExtensionPage(pageWrapper, route.thirdPartyModule)
+        : pageWrapper;
+      const context = route.thirdPartyModule
+        ? { user: currentUser, page: { ...route.thirdPartyModule.page }, signal: _pageController.signal }
+        : { user: currentUser, signal: _pageController.signal };
+      renderPromise = module.render(target, context);
 
-    // Schon jetzt umziehen, nicht erst nach den Daten: die meisten Seiten legen
-    // ihren FAB im synchronen Teil an, und er soll gar nicht erst im Scrollport
-    // erscheinen. Der zweite Aufruf unten holt die Nachzügler.
-    adoptPageFab();
-    wirePageToolbars();
+      // Schon jetzt umziehen, nicht erst nach den Daten: die meisten Seiten legen
+      // ihren FAB im synchronen Teil an, und er soll gar nicht erst im Scrollport
+      // erscheinen. Der zweite Aufruf unten holt die Nachzügler.
+      adoptPageFab();
+      wirePageToolbars();
+    };
 
-    // Sichtbar machen und Einblend-Animation starten (Skeleton/Grundgerüst).
-    pageWrapper.style.opacity = shouldAnimate ? '' : '1';
-    if (shouldAnimate) {
-      pageWrapper.classList.add(inClass);
+    const { transition, finished } = await swapPage(swap, {
+      content,
+      from: previousPath,
+      animate: shouldAnimate,
+    });
+
+    // Mit View Transition macht der Browser die Blende. Ohne sie (keine API,
+    // reduzierte Bewegung, verdeckter Tab) eine reine Blende ohne Versatz und
+    // ohne Feder: `.page-transition--in`.
+    if (shouldAnimate && !transition) {
+      pageWrapper.classList.add('page-transition--in');
 
       // navigating-Klasse nach Ende der Einblend-Animation entfernen.
       // Fallback-Timeout falls animationend nicht feuert (z.B. prefers-reduced-motion).
@@ -1617,6 +1932,10 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
         clearTimeout(navEndTimeout);
         document.documentElement.classList.remove('navigating');
       }, { once: true });
+    } else if (transition) {
+      // Die Transition haelt das Bild bis zu ihrem Ende; erst dann darf das
+      // Glas im Inhalt zurueck.
+      finished.then(() => document.documentElement.classList.remove('navigating'));
     } else {
       document.documentElement.classList.remove('navigating');
     }
@@ -1679,9 +1998,13 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
   }
 }
 
+/** Baut den Beobachter der Toast-Lage ab (#1160); je Shell-Aufbau einer. */
+let _stopToastPlacement = null;
+
 /**
  * App-Shell mit Navigation einmalig aufbauen (nach erstem Login).
  */
+
 function renderAppShell(container) {
   // Gast und Display teilen sich die schmale Navigation: beide sind
   // Nicht-Mitglieder mit einer festen, kleinen Erlaubnis, und beide haben
@@ -1747,12 +2070,10 @@ function renderAppShell(container) {
   const sidebarLogoSpan = document.createElement('span');
   sidebarLogoSpan.className = 'nav-sidebar__brand-name';
   sidebarLogoSpan.textContent = getAppName();
-  const sidebarVersion = document.createElement('small');
-  sidebarVersion.className = 'nav-sidebar__version';
-  const cachedVersion = getAppVersion();
-  sidebarVersion.textContent = cachedVersion ? t('login.version', { version: cachedVersion }) : '';
-  sidebarVersion.hidden = !cachedVersion;
-  sidebarBrandText.append(sidebarLogoSpan, sidebarVersion);
+  // KEINE VERSION UNTER DER WORTMARKE (R14, A1 P3-7): sie stand dauerhaft da
+  // und sagte in jeder Sitzung dasselbe. Wer sie sucht, findet sie in den
+  // Neuigkeiten (aktuelle Version) und im Blatt System.
+  sidebarBrandText.append(sidebarLogoSpan);
   sidebarLogo.appendChild(sidebarBrandText);
 
   const sidebarToggle = document.createElement('button');
@@ -1866,25 +2187,41 @@ function renderAppShell(container) {
     document.documentElement.classList.remove('sidebar-collapse-pointer-lock');
   });
 
-  sidebar.appendChild(sidebarLogo);
-  sidebar.appendChild(sidebarToggle);
-
-  // Sichtbarer Desktop-Einstieg in die globale Suche (Audit R2, A1-01): vor den
-  // Modul-Items, bleibt im eingeklappten Modus als Lupe erreichbar. Kein
-  // data-route, damit Delegation/Indikator das Item ignorieren.
-  const sidebarSearch = sidebarActionEl({
-    labelKey: 'nav.search',
-    icon: 'search',
-    className: 'nav-item--search',
-    onClick: () => _openSearch?.(),
-  });
-  sidebarSearch.setAttribute('aria-keyshortcuts', '/');
-  sidebarSearch.setAttribute('title', `${t('nav.search')} (/)`);
+  // DIE LOGO-ZEILE TRAEGT SUCHE UND EINKLAPPEN (Critique 2026-09-26, P1-2).
+  //
+  // Beide standen in eigenen 40px-Zeilen unter dem Logo, und zusammen mit
+  // dem Fuss (Hilfe, Aenderungen, Abmelden: 104px) blieben auf 1440x900 580px
+  // fuer 750px Module - Geburtstage, Gesundheit und Budget lagen unter der
+  // Falz, auf 1280x800 rund 270px. Apples Mac-Seitenleiste stellt dieselben
+  // zwei Werkzeuge als Icons neben den Titel; die Suche nennt ihr Kuerzel im
+  // Namen (⌘K / Ctrl+K, dazu weiter `/`).
+  //
+  // Kein data-route an beiden: Delegation und Aktiv-Pille ignorieren sie.
+  const sidebarLogoActions = document.createElement('div');
+  sidebarLogoActions.className = 'nav-sidebar__logo-actions';
   // Die Suche greift ueber alle Module und ist fuer ein Wandtablett nicht
   // freigegeben (`search` steht nicht in DISPLAY_SCOPES) - sie antwortete dort
   // mit 403. Ein Knopf, der nur scheitern kann, gehoert nicht an die Wand.
-  if (!isDisplayShell) sidebar.appendChild(sidebarSearch);
+  if (!isDisplayShell) {
+    const sidebarSearch = document.createElement('button');
+    sidebarSearch.type = 'button';
+    sidebarSearch.className = 'nav-sidebar__tool nav-sidebar__search';
+    const searchLabel = `${t('nav.search')} (${searchShortcutLabel()})`;
+    sidebarSearch.setAttribute('aria-label', searchLabel);
+    sidebarSearch.setAttribute('title', searchLabel);
+    sidebarSearch.setAttribute('aria-keyshortcuts', `${isApplePlatform() ? 'Meta' : 'Control'}+K /`);
+    const searchIcon = document.createElement('i');
+    searchIcon.dataset.lucide = 'search';
+    searchIcon.setAttribute('aria-hidden', 'true');
+    sidebarSearch.appendChild(searchIcon);
+    sidebarSearch.addEventListener('click', () => _openSearch?.());
+    sidebarLogoActions.appendChild(sidebarSearch);
+  }
+  sidebarToggle.classList.add('nav-sidebar__tool');
+  sidebarLogoActions.appendChild(sidebarToggle);
+  sidebarLogo.appendChild(sidebarLogoActions);
 
+  sidebar.appendChild(sidebarLogo);
   sidebar.appendChild(sidebarItems);
 
   // Der gepinnte Eintrag steht zwischen Liste und Fuss-Aktionen: er IST eine
@@ -1892,40 +2229,15 @@ function renderAppShell(container) {
   // darunter, aber auch nicht mehr in den Scroller darueber.
   pinnedSidebarItems.forEach((el) => sidebar.appendChild(el));
 
-  // Footer-Aktionen (keine Routen → kein data-route, damit Delegation/Indikator
-  // sie ignorieren): Hilfe und Live-Changelog.
-  const sidebarFooter = document.createElement('div');
-  sidebarFooter.className = 'nav-sidebar__footer-actions';
-  sidebarFooter.append(
-    sidebarActionEl({
-      labelKey: 'nav.help',
-      icon: 'circle-help',
-      className: 'nav-item--help',
-      onClick: () => showHelpModal(),
-    }),
-    sidebarActionEl({
-      labelKey: 'nav.changelog',
-      icon: 'history',
-      className: 'nav-item--changelog',
-      onClick: () => showChangelogModal(),
-    }),
-    // Abmelden als terminale Aktion: bricht in eine eigene, volle Zeile unter
-    // Hilfe/Änderungen (CSS: flex-wrap + border-top). Monochrom wie die
-    // Geschwister — Danger-Rot erscheint erst im Confirm.
-    //
-    // FUER EIN DISPLAY GIBT ES SIE NICHT (#1208). Ein Tablett meldet sich nicht
-    // ab, es wird widerrufen - und `POST /auth/logout` beantwortet der Server
-    // ihm mit 403. Der Knopf haette eine Abmeldung versprochen, die nie
-    // stattfindet, und den Bildschirm im Zweifel in einem Fehlerdialog stehen
-    // lassen.
-    ...(isDisplayShell ? [] : [sidebarActionEl({
-      labelKey: 'settings.logout',
-      icon: 'log-out',
-      className: 'nav-item--logout',
-      onClick: () => confirmAndLogout(),
-    })]),
-  );
-  sidebar.appendChild(sidebarFooter);
+  // HILFE, AENDERUNGEN UND ABMELDEN STEHEN HINTER DEM AVATAR (Critique
+  // 2026-09-26, P1-2). Als Fussleiste kosteten sie 104px Hoehe fuer drei
+  // Handgriffe, die man selten braucht - genau die Hoehe, die den Modulen auf
+  // Laptop-Hoehen fehlte. Das Konto-Menue ist das geteilte popover-menu (Rollen,
+  // Pfeiltasten, Esc und Fokusrueckgabe wie im Werkzeugmenue der Dokumente);
+  // die Zeile selbst nennt, WER angemeldet ist, was die Leiste vorher nirgends
+  // sagte.
+  sidebar.appendChild(sidebarAccountEl({ isDisplayShell }));
+  installPopoverMenus(sidebar);
 
   if (window.lucide) window.lucide.createIcons({ el: sidebar });
 
@@ -2049,9 +2361,10 @@ function renderAppShell(container) {
   searchStatus.setAttribute('role', 'status');
   searchStatus.setAttribute('aria-live', 'polite');
   searchPanel.appendChild(searchStatus);
-  // Schließen NACH den Treffern im DOM (visuell absolut oben rechts): Tab aus
-  // dem Suchfeld erreicht so direkt das erste Ergebnis statt erst den
-  // Schließen-Button (Audit A1-14); Esc bleibt der schnelle Ausstieg.
+  // Schließen NACH den Treffern im DOM (visuell absolut oben rechts). Die
+  // Treffer selbst stehen nicht mehr in der Tab-Folge: das Feld ist eine
+  // Combobox, Pfeile markieren und Enter oeffnet (utils/palette-combobox.js);
+  // Tab fuehrt vom Feld zum Schliessen, Esc bleibt der schnelle Ausstieg.
   searchPanel.appendChild(searchClose);
   searchOverlay.appendChild(searchPanel);
 
@@ -2129,6 +2442,11 @@ function renderAppShell(container) {
   if (moreSheet)  shellNodes.push(moreSheet);
   shellNodes.push(searchOverlay, routeAnnouncer);
   container.replaceChildren(...shellNodes);
+  // Der Stapel weicht den Knoepfen offener Dialoge aus (#1160, Begruendung in
+  // utils/toast-placement.js). Ein neuer Shell-Aufbau baut einen neuen Stapel,
+  // also geht der Beobachter des alten mit.
+  _stopToastPlacement?.();
+  _stopToastPlacement = watchToastPlacement(bottomStack);
   // Die Kapsel ist ein NEUER Knoten; der Beobachter des Tab-Indikators haengt
   // sonst am verworfenen (siehe observeNavCapsule weiter unten).
   observeNavCapsule();
@@ -2201,6 +2519,13 @@ function adoptPageFab() {
   // nur der Knopf um, bliebe die Mechanik im Scrollport zurück - der halbe
   // Umzug wäre schlimmer als keiner, weil er nach Erledigung aussieht.
   if (fresh) layer.replaceChildren(fresh.closest('.page-fab-group') ?? fresh);
+  // DER KOPF KANN NACH DEM FAB KOMMEN: eine Seite, die ihren Kopf erst nach
+  // ihren awaits baut, hatte beim ersten Aufruf keinen Slot - der FAB schwebt
+  // dann schon in der Ebene, und `#main-content` findet ihn nicht mehr. Die
+  // Ebene gehoert der aktuellen Seite (clearPageFab() beim Routenwechsel),
+  // also darf der schwebende Knopf hier nachdocken.
+  const floating = layer.querySelector('.page-fab');
+  if (floating && dockFabIntoToolbar(floating)) return null;
   return layer.querySelector('.page-fab');
 }
 
@@ -2229,12 +2554,10 @@ function adoptPageFab() {
  * Knopf stehen - sichtbar falsch statt unsichtbar uneinheitlich. Ein Guard in
  * test-frontend-audit hält dazu, dass jeder `.page-fab` das Attribut trägt.
  *
- * DREI SACHEN DOCKEN NICHT AN, jede aus ihrem eigenen Grund:
+ * ZWEI SACHEN DOCKEN NICHT AN, jede aus ihrem eigenen Grund:
  *   - eine .page-fab-group (das Speed-Dial der Übersicht): sie ist ein Menü,
  *     kein Knopf, und ihre Aktionsliste ist fixiert. Ein halber Umzug wäre
  *     schlimmer als keiner.
- *   - Module, die ihren eigenen .toolbar-new-btn mitbringen: sonst stünden
- *     zwei Primärknöpfe nebeneinander.
  *   - Module ohne Aktions-Slot im Kopf: dort bleibt der schwebende Knopf, bis
  *     ihr Kopf einen bekommt. Lieber ein Modul mit dem alten Weg als eines
  *     ohne Primäraktion.
@@ -2243,7 +2566,6 @@ function dockFabIntoToolbar(fab) {
   if (!isDesktopViewport()) return false;
   if (fab.closest('.page-fab-group')) return false;
   const main = document.getElementById('main-content');
-  if (main?.querySelector('.toolbar-new-btn')) return false;
   const slot = main?.querySelector('.page-toolbar__actions');
   if (!slot) return false;
   const label = fab.dataset.dockLabel;
@@ -2439,7 +2761,9 @@ const SIDEBAR_COLLAPSED_KEY = 'yuvomi.sidebar.collapsed';
 const SHORTCUTS = [
   // Direkt auf die Overlay-Funktion — der alte Umweg über einen Klick auf die
   // Suchleiste im (geschlossenen, inerten) Mehr-Sheet war eine fragile Kette.
-  { key: '/',   description: () => t('shortcuts.search'),  action: () => _openSearch?.() },
+  // ⌘K / Ctrl+K oeffnet dieselbe Suche (Seitenleiste, Critique 2026-09-26);
+  // der Dispatcher faengt die Kombination vor der Modifikator-Weiche ab.
+  { key: '/',   label: () => `/ \u00b7 ${searchShortcutLabel()}`, description: () => t('shortcuts.search'),  action: () => _openSearch?.() },
   // Ein Selektor reicht: der Schnellaktionen-FAB des Dashboards war der einzige
   // Grund für den früheren Zweitweg über `#fab-main` (Audit A1-12), und er ist
   // seit dem Folgevorgang zu #634 selbst ein `.page-fab`.
@@ -2476,7 +2800,52 @@ const SHORTCUTS = [
   // bevor sich ein unmerkbares Schema festsetzt (Critique 2026-08-31, Alex).
   { key: 'g b', description: () => t('nav.budget'),   action: () => navigate('/budget') },
   { key: 'g e', description: () => t('nav.settings'), action: () => navigate('/settings') },
+  // KALENDER (Critique 2026-09-24, P1, Persona Alex): die Handgriffe von Google
+  // Kalender. Nur auf /calendar (`route`) - anderswo sind die Buchstaben frei
+  // und die Hilfe zeigt sie nicht. Die Seite entscheidet, was „heute" oder
+  // „vor" in ihrer Ansicht heisst (calendar.js, onCalendarCommand); hier steht
+  // nur, WELCHE Taste es ist, damit der Akkord „g d" nie zugleich „d" ist.
+  // Die Pfeile nur ohne Fokus auf einem Bedienelement (`bareFocusOnly`): im
+  // Raster, in der Tablist und in jedem Feld gehoeren sie dem Element.
+  { key: 't', route: '/calendar', description: () => t('shortcuts.calToday'), action: () => calendarCommand('today') },
+  { key: 'k', route: '/calendar', label: () => `k / ${arrowGlyph('prev')}`, aliases: () => [arrowKey('prev')], bareFocusOnly: true,
+    description: () => t('shortcuts.calPrev'), action: () => calendarCommand('prev') },
+  { key: 'j', route: '/calendar', label: () => `j / ${arrowGlyph('next')}`, aliases: () => [arrowKey('next')], bareFocusOnly: true,
+    description: () => t('shortcuts.calNext'), action: () => calendarCommand('next') },
+  { key: 'm', route: '/calendar', description: () => t('calendar.viewMonth'),  action: () => calendarCommand('view', 'month') },
+  { key: 'w', route: '/calendar', description: () => t('calendar.viewWeek'),   action: () => calendarCommand('view', 'week') },
+  { key: 'd', route: '/calendar', description: () => t('calendar.viewDay'),    action: () => calendarCommand('view', 'day') },
+  { key: 'a', route: '/calendar', description: () => t('calendar.viewAgenda'), action: () => calendarCommand('view', 'agenda') },
 ];
+
+function calendarCommand(command, view) {
+  document.dispatchEvent(new CustomEvent('yuvomi:calendar-command', { detail: { command, view } }));
+}
+
+// „Zurueck" ist die Pfeiltaste, die auf den Zurueck-Knopf zeigt - in RTL rechts.
+function arrowKey(dir) {
+  const rtl = document.documentElement.dir === 'rtl';
+  return (dir === 'prev') !== rtl ? 'arrowleft' : 'arrowright';
+}
+function arrowGlyph(dir) {
+  return arrowKey(dir) === 'arrowleft' ? '\u2190' : '\u2192';
+}
+
+/**
+ * Welche Einzeltaste-Kuerzel hier und jetzt gelten: die globalen immer, die
+ * einer Seite nur auf ihrer Route. Geteilt von Dispatcher und Hilfe, damit
+ * die Hilfe nie eine Taste nennt, die an dieser Stelle nichts tut.
+ */
+function shortcutApplies(s, path = location.pathname) {
+  return !s.route || s.route === path;
+}
+
+/** Fokus auf „nichts": <body>, oder ein Knopf der Zeitraum-Navigation. */
+function focusIsBare() {
+  const el = document.activeElement;
+  if (!el || el === document.body || el === document.documentElement) return true;
+  return Boolean(el.closest?.('.cal-toolbar__month'));
+}
 
 let _pendingKey = null;
 let _pendingTimer = null;
@@ -2485,6 +2854,16 @@ let _openSearch = null;
 
 function initKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
+    // ⌘K / Ctrl+K: das Kuerzel, das die Suche in der Seitenleiste nennt. Es
+    // gilt auch aus einem Eingabefeld heraus (so kennt man es aus jeder App
+    // mit Befehlssuche), aber nicht ueber einem offenen Dialog, und nie mit
+    // Alt oder Umschalt - die gehoeren dem Browser.
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
+      if (document.querySelector('.modal-overlay') || !_openSearch) return;
+      e.preventDefault();
+      _openSearch();
+      return;
+    }
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (document.activeElement?.isContentEditable) return;
@@ -2534,7 +2913,8 @@ function initKeyboardShortcuts() {
       return;
     }
 
-    const shortcut = SHORTCUTS.find((s) => s.key === key && !s.key.includes(' '));
+    const shortcut = SHORTCUTS.find((s) => !s.key.includes(' ') && shortcutApplies(s)
+      && (s.key === key || (s.aliases?.().includes(key) && (!s.bareFocusOnly || focusIsBare()))));
     if (shortcut) { e.preventDefault(); shortcut.action(); }
   });
 }
@@ -2543,7 +2923,7 @@ function showHelpModal() {
   // Mirrors the CSS sidebar↔bottom-nav breakpoint (sidebar is min-width:1024px):
   // without a keyboard, shortcut rows are useless — show a plain-language guide.
   const coarsePointer = window.matchMedia('(max-width: 1023px)').matches;
-  const helpRows = buildHelpRows({ coarsePointer, shortcuts: SHORTCUTS, t });
+  const helpRows = buildHelpRows({ coarsePointer, shortcuts: SHORTCUTS.filter((s) => shortcutApplies(s)), t });
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -2671,9 +3051,13 @@ function withUpdateHint(label, version) {
 
 function applyUpdateBadge() {
   const version = pendingUpdateVersion();
-  for (const el of document.querySelectorAll('.nav-item--changelog, .more-item--changelog, #more-btn')) {
+  // Die Kontozeile traegt den Punkt fuer das Menue, in dem „Aenderungen" jetzt
+  // steht - hinter einem geschlossenen Menue waere der Hinweis sonst unsichtbar.
+  for (const el of document.querySelectorAll('.nav-sidebar__account-trigger, .nav-sidebar__account-menu .nav-item--changelog, .more-item--changelog, #more-btn')) {
     toggleUpdateDot(el, Boolean(version));
   }
+  const account = document.querySelector('.nav-sidebar__account-trigger');
+  if (account?.dataset.baseLabel) account.setAttribute('aria-label', withUpdateHint(account.dataset.baseLabel, version));
   // Den Namen des „Mehr"-Buttons setzt setMoreButtonState bei jeder Navigation
   // neu; sein Zusatz gehört deshalb dorthin und nicht hierher, sonst wäre er
   // nach dem ersten Seitenwechsel wieder weg.
@@ -3088,28 +3472,24 @@ function initMoreSheet(container, openSearch) {
     }
   });
 
-  /* WISCHEN SCHLIESST NUR VOM ANFANG DER LISTE AUS.
+  /* WISCHEN SCHLIESST NUR VOM ANFANG DER LISTE AUS - ODER VOM GRIFF.
    *
    * Vorher schloss jede Abwaertsbewegung ueber 60px das Blatt, egal wo sie
    * begann. Seit `.more-sheet__body` scrollt (die Obergrenze gegen den
    * Blattueberstand bei 320px), IST diese Geste auch das Zurueckscrollen in den
    * Gruppen: wer unten steht und nach oben zurueckwischt, bewegt den Finger
-   * abwaerts und schloss damit das Blatt (PR-Review #754).
+   * abwaerts und schloss damit das Blatt (PR-Review #754). Der Stand wird beim
+   * BEGINN der Geste gemerkt, nicht am Ende.
    *
-   * Der Stand wird beim BEGINN der Geste gemerkt, nicht am Ende: bis dahin hat
-   * der Scroller laengst reagiert und stuende auch nach einem echten
-   * Zieh-zum-Schliessen auf 0. */
-  let _touchStartY = 0;
-  let _touchStartAtTop = true;
-  sheet.addEventListener('touchstart', (e) => {
-    _touchStartY = e.touches[0].clientY;
-    const body = sheet.querySelector('.more-sheet__body');
-    _touchStartAtTop = !body || body.scrollTop <= 0;
-  }, { passive: true });
-  sheet.addEventListener('touchend', (e) => {
-    if (!_touchStartAtTop) return;
-    if (e.changedTouches[0].clientY - _touchStartY > 60) closeSheet();
-  }, { passive: true });
+   * Die Geste selbst ist seit der Re-Critique 2026-09-27 dieselbe wie am
+   * Dialog-Sheet (utils/sheet-drag.js): das Blatt geht 1:1 mit, schliesst ab
+   * 80px ODER bei einem Flick, federt sonst zurueck. Vorher entschied erst
+   * `touchend` ab 60px, und das Blatt stand waehrenddessen still. */
+  wireSheetDrag(sheet, {
+    scroller: () => sheet.querySelector('.more-sheet__body'),
+    onDismiss: () => closeSheet(),
+    resetAfterDismiss: true,
+  });
 
   sheet.addEventListener('click', (e) => {
     if (e.target.closest('[data-route]')) closeSheet({ restoreFocus: false });
@@ -3135,17 +3515,48 @@ function initMoreSheet(container, openSearch) {
 /**
  * Initialisiert die Suchfunktion (Overlay + API-Calls).
  */
-// Durchsuchbare Domänen des /search-Endpunkts, in Anzeige-Reihenfolge. Dienen
-// im Leerzustand als Direktsprung-Kacheln (labelKey/icon gespiegelt aus der
-// Haupt-Navigation, damit Suche und Nav dieselbe Sprache sprechen).
-const SEARCH_SCOPES = [
-  { labelKey: 'nav.tasks',    route: '/tasks'    },
-  { labelKey: 'nav.calendar', route: '/calendar' },
-  { labelKey: 'nav.notes',    route: '/notes'    },
-  { labelKey: 'nav.contacts', route: '/contacts' },
-  { labelKey: 'nav.shopping', route: '/shopping' },
-  { labelKey: 'nav.health',   route: '/health'   },
-];
+// Die Palette hinter ⌘K (Re-Critique 2026-09-28, A1 P2-1): zuerst ORTE und
+// HANDLUNGEN, dann Daten. Die Orte sind genau die Ziele der Navigation
+// (navItems - abgeschaltet, gesperrt oder ausgeblendet faellt heraus), dazu die
+// Einstellungsblaetter aus derselben Suche wie in den Einstellungen; die
+// Handlungen sind die Anlege-Aktionen (utils/search-sections.js NEW_ACTIONS),
+// nur wo der Betrachter schreiben darf.
+function paletteLocal(q) {
+  const targets = navItems();
+  const places = targets.map((item) => ({
+    label: item.label, route: item.navHref ?? item.path, module: item.module, icon: item.icon,
+  }));
+  const settings = [];
+  if (currentUser && targets.some((item) => item.module === 'settings')) {
+    const found = searchSettings(q, { user: currentUser, translate: t });
+    const settingsLabel = t('nav.settings');
+    found.leaves.forEach((leaf) => settings.push({
+      label: t(leaf.labelKey), route: leaf.path, context: settingsLabel, module: 'settings',
+    }));
+    found.sections.forEach(({ leaf, section, label }) => settings.push({
+      label, route: settingsSectionUrl(leaf, section.id), context: t(leaf.labelKey), module: 'settings',
+    }));
+    found.options.forEach(({ leaf, key, label }) => settings.push({
+      label, route: settingsOptionUrl(leaf, key), context: t(leaf.labelKey), module: 'settings',
+    }));
+  }
+  const visible = new Set(targets.map((item) => item.module));
+  const verb = t('search.newSection');
+  const actions = NEW_ACTIONS
+    .filter((action) => visible.has(action.module) && navModuleAccess(action.module) === 'write')
+    .map((action) => ({
+      label: t(action.labelKey), route: action.route, module: action.module,
+      context: t(`nav.${action.module}`), verb, create: true,
+    }));
+  // Hilfe hat keine Seite, nur ein Blatt - am Desktop lag sie hinter dem
+  // Avatar (R14, A1 P3-6). Die Tastenkombinationen stehen im Hilfeblatt.
+  const commands = [
+    { label: t('nav.help'), run: () => showHelpModal() },
+    { label: t('shortcuts.help'), run: () => showHelpModal() },
+    { label: t('nav.changelog'), run: () => showChangelogModal() },
+  ];
+  return paletteCommands(q, { places, settings, actions, commands });
+}
 
 function initSearch(container) {
   const searchClose = container.querySelector('#search-close');
@@ -3154,6 +3565,12 @@ function initSearch(container) {
   const results      = container.querySelector('#search-results');
   const status       = container.querySelector('#search-status');
   if (!overlay || !input || !results) return null;
+
+  // Das Feld ist eine Combobox ueber der Trefferliste (Re-Critique
+  // 2026-09-28, A1 P1-1): Enter oeffnet die markierte Zeile, Pfeiltasten
+  // bewegen nur die Markierung, der Fokus bleibt im Feld. Nach jedem Rendern
+  // liest `combo.refresh()` die Zeilen neu ein (utils/palette-combobox.js).
+  const combo = wirePaletteCombobox({ input, listbox: results });
 
   function setStatus(text) {
     if (status) status.textContent = text || '';
@@ -3183,19 +3600,24 @@ function initSearch(container) {
     scopes.appendChild(scopesHeading);
     const list = document.createElement('div');
     list.className = 'search-scopes__list';
-    SEARCH_SCOPES.forEach((scope) => {
+    // ALLE SICHTBAREN ZIELE, nicht die durchsuchten Module: "Direkt oeffnen"
+    // kannte Schichtplan, Haushaltshilfe, Belohnungen und Mahlzeiten nicht,
+    // weil die Suche dort keine Daten hat (Re-Critique 2026-09-28, A1 P2-1).
+    navItems().forEach((item) => {
+      const scope = { label: item.label, route: item.navHref ?? item.path };
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'search-scope';
       // Markensiegel (Herkunfts-Regel, Block 2): die Kachel benennt ihr
-      // Zielmodul ueber Familienton + Icon; der Slug ist die Route selbst.
+      // Zielmodul ueber Familienton + Icon.
       const seal = document.createElement('span');
       seal.className = 'module-seal module-seal--sm search-scope__seal';
       seal.setAttribute('aria-hidden', 'true');
-      seal.style.setProperty('--seal-accent', moduleAccentVar(scope.route.slice(1)));
-      seal.appendChild(moduleIconEl(MODULE_ICON[scope.route.slice(1)]));
+      const accent = item.accent ? `var(--${item.accent}, var(--color-accent))` : moduleAccentVar(item.module);
+      if (accent) seal.style.setProperty('--seal-accent', accent);
+      seal.appendChild(moduleIconEl(item.icon));
       const label = document.createElement('span');
-      label.textContent = t(scope.labelKey);
+      label.textContent = scope.label;
       btn.append(seal, label);
       btn.addEventListener('click', () => {
         closeSearch({ restoreFocus: false });
@@ -3205,6 +3627,9 @@ function initSearch(container) {
     });
     scopes.appendChild(list);
     results.appendChild(scopes);
+    // Die Kacheln sind per Pfeil erreichbar, aber nichts ist vorgewaehlt:
+    // Enter auf ein leeres Feld oeffnet keine Kachel.
+    combo.refresh({ preselect: false });
     // Auch aus dem input-Handler (< 2 Zeichen) aufgerufen, wo openSearch die
     // Icons nicht nachzieht — daher hier selbst rendern.
     window.lucide?.createIcons({ el: results });
@@ -3214,6 +3639,15 @@ function initSearch(container) {
   let searchOverlayToken = null;
 
   function openSearch() {
+    // SCHON OFFEN: nur zurueck ins Feld. ⌘K gilt auch aus Eingabefeldern,
+    // also auch aus dem Suchfeld selbst - ein zweiter Durchlauf merkte sich
+    // das Suchfeld als Ausloeser (Fokus ginge beim Schliessen ins Leere) und
+    // haengte einen zweiten Focus-Trap an, den closeSearch() nie abnimmt.
+    if (overlay.classList.contains('search-overlay--visible')) {
+      input.focus();
+      input.select();
+      return;
+    }
     if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
     lastFocusedBeforeSearch = document.activeElement;
     if (searchOverlayToken === null) searchOverlayToken = pushOverlay(() => closeSearch());
@@ -3245,6 +3679,7 @@ function initSearch(container) {
     input.value = '';
     results.replaceChildren();
     results.removeAttribute('aria-busy');
+    combo.clear();
     setStatus('');
     if (restoreFocus) returnFocus(lastFocusedBeforeSearch);
   }
@@ -3257,55 +3692,69 @@ function initSearch(container) {
     }
   });
 
-  // Pfeiltasten führen vom Suchfeld durch die Treffer (Audit A1-14): Enter
-  // aktiviert den fokussierten Treffer nativ (Buttons), Esc schließt.
-  overlay.addEventListener('keydown', (e) => {
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-    const hits = [...results.querySelectorAll('.search-result')];
-    if (!hits.length) return;
-    e.preventDefault();
-    const idx = hits.indexOf(document.activeElement);
-    if (e.key === 'ArrowDown') {
-      (idx < 0 ? hits[0] : hits[Math.min(idx + 1, hits.length - 1)]).focus();
-    } else if (idx > 0) {
-      hits[idx - 1].focus();
-    } else if (idx === 0) {
-      input.focus();
-    }
-  });
+  // Pfeiltasten und Enter gehoeren dem Feld selbst (Combobox oben): die
+  // Pfeile schoben frueher den Fokus in die Treffer, und Enter im Feld tat
+  // nichts (A1 P1-1).
+
+  const announceCount = (count) => setStatus(
+    count === 0 ? t('search.noResults')
+      : count === 1 ? t('search.resultCountOne', { count })
+      : t('search.resultCountMany', { count }),
+  );
 
   let searchTimer = null;
   input.addEventListener('input', () => {
     clearTimeout(searchTimer);
     const q = input.value.trim();
-    if (q.length < 2) {
+    if (q.length < 1) {
       renderSearchHint();
       return;
     }
+    // ORTE UND HANDLUNGEN SOFORT, ohne Server und ab dem ersten Zeichen: sie
+    // kennt der Client selbst. Die Daten kommen ab zwei Zeichen dazu.
+    const local = paletteLocal(q);
+    const onClose = () => closeSearch({ restoreFocus: false });
+    if (q.length < 2) {
+      // Ohne Ort und ohne Aktion bliebe die Flaeche leer: der Server wird
+      // unter zwei Zeichen nicht gefragt, sein "Keine Ergebnisse" kommt nie.
+      // Dann steht weiter der Hinweis mit den Kacheln.
+      const localCount = local.places.length + local.actions.length;
+      if (localCount === 0) {
+        renderSearchHint();
+        return;
+      }
+      renderSearchResults(results, null, onClose, { local, query: q });
+      combo.refresh();
+      results.setAttribute('aria-busy', 'false');
+      announceCount(localCount);
+      return;
+    }
+    renderSearchResults(results, null, onClose, { local, query: q });
+    combo.refresh();
     searchTimer = setTimeout(async () => {
       // Ladezustand erst wenn der Fetch wirklich startet (nach dem Debounce):
-      // Skeletons + „Suche läuft…" statt einer eingefroren wirkenden Fläche auf
-      // langsamem Home-Server (Critique P1). Kein Flackern bei schnellem Tippen.
-      results.replaceChildren();
+      // Skeletons + „Suche läuft…" unter den Orten statt einer eingefroren
+      // wirkenden Fläche auf langsamem Home-Server (Critique P1).
       results.setAttribute('aria-busy', 'true');
       results.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 4, lines: 2 }));
       setStatus(t('search.loading'));
       try {
         const data = await api.get(`/search?q=${encodeURIComponent(q)}`);
-        const count = renderSearchResults(results, data, () => closeSearch({ restoreFocus: false }));
+        const count = renderSearchResults(results, data, onClose, { local, query: q });
+        // Die Daten kommen UNTER die Orte: eine schon bewegte Markierung
+        // bleibt, wo sie ist; war noch keine gesetzt, steht sie jetzt oben.
+        combo.refresh({ keep: true });
         results.setAttribute('aria-busy', 'false');
-        setStatus(
-          count === 0 ? t('search.noResults')
-            : count === 1 ? t('search.resultCountOne', { count })
-            : t('search.resultCountMany', { count }),
-        );
+        announceCount(count);
       } catch {
         // Fehler nicht verschlucken: sichtbare Meldung statt „wirkt wie 0 Treffer".
-        // Die Ansage besitzt jetzt #search-status; der sichtbare Text bleibt rein
+        // Die Ansage besitzt #search-status; der sichtbare Text bleibt rein
         // visuell (kein role=status), sonst läse der Screenreader ihn doppelt.
-        results.replaceChildren();
+        // Die Orte bleiben stehen - sie brauchen den Server nicht.
+        renderSearchResults(results, null, onClose, { local, query: q, silent: true });
         results.setAttribute('aria-busy', 'false');
         results.appendChild(emptyHintEl(t('search.error')));
+        combo.refresh({ keep: true });
         setStatus(t('search.error'));
       }
     }, 300);
@@ -3314,17 +3763,33 @@ function initSearch(container) {
   return openSearch;
 }
 
+/** Text mit markierten Fundstellen als Knoten (`<mark>`), ohne innerHTML. */
+function appendMarked(el, text, query) {
+  for (const seg of markSegments(text, query)) {
+    if (seg.mark) {
+      const mark = document.createElement('mark');
+      mark.className = 'search-result__hit';
+      mark.textContent = seg.text;
+      el.appendChild(mark);
+    } else {
+      el.appendChild(document.createTextNode(seg.text));
+    }
+  }
+}
+
 /**
- * Rendert Suchergebnisse in den Ergebnis-Container.
+ * Rendert die Palette: Orte und Aktionen (lokal) vor den Datentreffern.
+ * `data` ist null, solange der Server nicht geantwortet hat (oder unter zwei
+ * Zeichen gar nicht gefragt wird).
+ * @returns {number} Zahl aller Zeilen - fuer die Ansage
  */
-function renderSearchResults(container, data, onClose) {
+function renderSearchResults(container, data, onClose, { local = { places: [], actions: [] }, query = '', silent = false } = {}) {
   container.replaceChildren();
-  const { tasks = [], events = [], notes = [], contacts = [], items = [], meds = [], activities = [], waste = [] } = data;
-  const total = tasks.length + events.length + notes.length + contacts.length + items.length
-    + meds.length + activities.length + waste.length;
+  const localCount = local.places.length + local.actions.length;
+  const total = localCount + (data ? searchResultCount(data) : 0);
 
   if (total === 0) {
-    container.appendChild(emptyHintEl(t('search.noResults')));
+    if (data && !silent) container.appendChild(emptyHintEl(t('search.noResults')));
     return 0;
   }
 
@@ -3339,7 +3804,7 @@ function renderSearchResults(container, data, onClose) {
   // der Sektion ist die Herkunft damit selbstverstaendlich, die Zeilen
   // bleiben siegelfrei. Die Zeilen selbst liegen in GENAU EINEM Traeger
   // (Zeilenlisten-Regel) statt als Karte pro Treffer.
-  function makeSection(labelKey, sealModule, items, routeFn, labelFn, metaFn) {
+  function makeSection(label, sealModule, items, { route, title, meta, go }) {
     if (!items.length) return;
     const section = document.createElement('div');
     section.className = 'search-section';
@@ -3353,29 +3818,33 @@ function renderSearchResults(container, data, onClose) {
       sealEl.appendChild(moduleIconEl(MODULE_ICON[sealModule]));
       heading.appendChild(sealEl);
     }
-    heading.appendChild(document.createTextNode(t(labelKey)));
+    heading.appendChild(document.createTextNode(label));
     section.appendChild(heading);
     const rows = document.createElement('div');
     rows.className = 'search-section__rows';
     items.forEach((item) => {
       const btn = document.createElement('button');
+      btn.type = 'button';
       btn.className = 'search-result';
-      const title = document.createElement('span');
-      title.className = 'search-result__title';
-      title.textContent = labelFn ? labelFn(item) : item.title;
-      btn.appendChild(title);
-      // Zweitzeile mit Datum/Detail: Treffer ohne jeden Kontext waren nicht
-      // unterscheidbar (Audit A1-14).
-      const metaText = metaFn?.(item);
-      if (metaText) {
-        const meta = document.createElement('span');
-        meta.className = 'search-result__meta';
-        meta.textContent = metaText;
-        btn.appendChild(meta);
+      const titleEl = document.createElement('span');
+      titleEl.className = 'search-result__title';
+      appendMarked(titleEl, title(item), query);
+      btn.appendChild(titleEl);
+      // Zweitzeile: Datum/Detail (Audit A1-14) und - steht das Suchwort nicht
+      // im Titel - der Ausschnitt, in dem es steht (A1 P2-2). Ohne ihn las sich
+      // "sch" -> "Klavier üben" wie ein Zufall.
+      const metaText = meta?.(item) || '';
+      const excerpt = item.excerpt || '';
+      if (metaText || excerpt) {
+        const metaEl = document.createElement('span');
+        metaEl.className = 'search-result__meta';
+        appendMarked(metaEl, [metaText, excerpt].filter(Boolean).join(' · '), query);
+        btn.appendChild(metaEl);
       }
       btn.addEventListener('click', () => {
         onClose();
-        navigate(routeFn(item));
+        if (go) go(item);
+        else navigate(route(item));
       });
       rows.appendChild(btn);
     });
@@ -3383,18 +3852,40 @@ function renderSearchResults(container, data, onClose) {
     container.appendChild(section);
   }
 
-  makeSection('nav.tasks',    'tasks',    tasks,    (i) => `/tasks?open=${i.id}`, null,
-    (i) => (i.due_date ? formatDate(i.due_date) : ''));
-  makeSection('nav.calendar', 'calendar', events,   (i) => `/calendar?open=${i.id}`, null,
-    (i) => (i.start_datetime ? `${formatDate(i.start_datetime)}${i.all_day ? '' : ` · ${formatTime(i.start_datetime)}`}` : ''));
-  makeSection('nav.notes',    'notes',    notes,    (i) => `/notes?open=${i.id}`);
-  makeSection('nav.contacts', 'contacts', contacts, (i) => `/contacts?open=${i.id}`);
-  makeSection('nav.shopping', 'shopping', items,    (i) => `/shopping?list=${i.list_id}&highlight=${i.id}`);
-  makeSection('health.tabs.meds',     'health', meds,       () => '/health/meds', null,
-    (i) => i.dosage_text || '');
-  makeSection('health.tabs.activity', 'health', activities, () => '/health/activity', activityLabel,
-    (i) => (i.performed_at ? formatDate(i.performed_at) : ''));
-  makeSection('nav.waste', 'waste', waste, (i) => `/waste?type=${i.id}`);
+  // 1. GEHE ZU - Navigationsziele und Einstellungsblaetter.
+  makeSection(t('search.goTo'), null, local.places, {
+    title: (item) => item.label,
+    meta: (item) => item.context || '',
+    go: (item) => (item.run ? item.run() : navigate(item.route)),
+  });
+  // 2. NEU ANLEGEN - die Seite oeffnen und ihre Primaeraktion ausloesen, genau
+  //    wie der Kurzbefehl `n` (triggerPageFab: nichts, wo kein FAB zu sehen ist).
+  makeSection(t('search.newSection'), null, local.actions, {
+    title: (item) => item.label,
+    meta: (item) => item.context || '',
+    go: async (item) => {
+      await navigate(item.route);
+      triggerPageFab();
+    },
+  });
+
+  // 3. DATEN - Reihenfolge, Ueberschrift, Ziel und Zweitzeile je Trefferart:
+  // utils/search-sections.js (test:search-permissions prueft sie gegen die
+  // Antwort des Servers).
+  // `dateKey` ist der Kalendertag in der ANZEIGEZONE: der Termin-Treffer baut
+  // daraus den Tag seines Links (#1607), und ein synchronisierter Termin liegt
+  // als Instant in der Zeile - sein UTC-Tag waere der falsche.
+  const fmt = { formatDate, formatTime, activityLabel, dateKey: zonedDateKey };
+  if (data) {
+    SEARCH_SECTIONS.forEach((section) => {
+      const hits = Array.isArray(data?.[section.bucket]) ? data[section.bucket] : [];
+      makeSection(t(section.labelKey), section.module, hits, {
+        route: (item) => section.route(item, fmt),
+        title: (item) => (section.label ? section.label(item, fmt) : item.title),
+        meta: section.meta ? (item) => section.meta(item, fmt) : null,
+      });
+    });
+  }
 
   // Die Siegel-Icons kommen als data-lucide-Platzhalter; der Treffer-Pfad
   // rendert sie selbst (der Leerzustands-Pfad tut es bereits genauso).
@@ -4209,125 +4700,16 @@ function errorDetails(err) {
 // Toast-Benachrichtigungen (global)
 // --------------------------------------------------------
 
-/**
- * Zeigt eine Toast-Benachrichtigung an.
- * @param {string} message
- * @param {'default'|'success'|'danger'|'warning'} type
- * @param {number} duration - ms
- */
-const TOAST_SUCCESS_KEY = 'yuvomi:toastSuccessCount';
-const TOAST_SUCCESS_MAX = 50;
-
-function _toastSvg(children) {
-  const NS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('class', 'toast__icon');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('fill', 'none');
-  svg.setAttribute('stroke', 'currentColor');
-  svg.setAttribute('stroke-width', '2.5');
-  svg.setAttribute('aria-hidden', 'true');
-  for (const [tag, attrs] of children) {
-    const el = document.createElementNS(NS, tag);
-    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
-    svg.appendChild(el);
-  }
-  return svg;
-}
-
-const TOAST_ICONS = {
-  success: () => _toastSvg([['polyline', { points: '20 6 9 17 4 12' }]]),
-  danger:  () => _toastSvg([
-    ['circle', { cx: '12', cy: '12', r: '10' }],
-    ['line',   { x1: '12', y1: '8',  x2: '12',   y2: '12' }],
-    ['line',   { x1: '12', y1: '16', x2: '12.01', y2: '16' }],
-  ]),
-  warning: () => _toastSvg([
-    ['path', { d: 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z' }],
-    ['line', { x1: '12', y1: '9',  x2: '12',   y2: '13' }],
-    ['line', { x1: '12', y1: '17', x2: '12.01', y2: '17' }],
-  ]),
-};
-
-function showToast(message, type = 'default', duration = 3000, onUndo = null) {
-  const container = toastSurface((type === 'danger' || type === 'warning') ? 'assertive' : 'polite');
-  if (!container) return;
-
-  // Aktions-Button: Legacy-Undo (Funktion) oder benannte Aktion ({ label, onClick }).
-  const action = typeof onUndo === 'function'
-    ? { label: t('common.undo'), onClick: onUndo }
-    : (onUndo && typeof onUndo.onClick === 'function' ? onUndo : null);
-
-  // Long Loop: Success-Toasts nach TOAST_SUCCESS_MAX Aufrufen unterdrücken.
-  // Aktions-Toasts (Undo oder benannte Aktion) sind wichtig → nie unterdrücken.
-  if (type === 'success' && !action) {
-    const successCount = parseInt(localStorage.getItem(TOAST_SUCCESS_KEY) ?? '0', 10) + 1;
-    localStorage.setItem(TOAST_SUCCESS_KEY, String(successCount));
-    if (successCount > TOAST_SUCCESS_MAX) return;
-  }
-
-  // Max. 3 gleichzeitige Toasts (global): ältesten entfernen falls Limit erreicht
-  const existing = document.querySelectorAll('.toast-container .toast');
-  if (existing.length >= 3) existing[0].remove();
-
-  const toast = document.createElement('div');
-  toast.className = `toast ${type !== 'default' ? `toast--${type}` : ''}`;
-  toast.setAttribute('role', 'alert');
-
-  const iconEl = TOAST_ICONS[type]?.();
-  if (iconEl) toast.appendChild(iconEl);
-  const span = document.createElement('span');
-  span.textContent = message;
-  toast.appendChild(span);
-
-  if (action) {
-    const actionBtn = document.createElement('button');
-    actionBtn.className = 'toast__undo';
-    actionBtn.textContent = action.label;
-    actionBtn.addEventListener('click', () => {
-      clearTimeout(dismissTimer);
-      toast.remove();
-      action.onClick();
-    });
-    toast.appendChild(actionBtn);
-  }
-
-  container.appendChild(toast);
-  const dismiss = () => {
-    clearTimeout(dismissTimer);
-    toast.classList.add('toast--out');
-    toast.addEventListener('animationend', () => toast.remove(), { once: true });
-  };
-  const dismissTimer = setTimeout(dismiss, duration);
-
-  // Wischen zum Verwerfen: die Geste samt ihrer zwei Fallen liegt in
-  // `wireSwipeToDismiss` (utils/ux.js), das CSS-Gegenstück ist das
-  // `touch-action: pan-y` auf `.toast`.
-  wireSwipeToDismiss(toast, { onDismiss: dismiss });
-}
+// showToast lebt in utils/toast-show.js (Frist mit Pause, Ansage trotz
+// Erfolgs-Zaehler); window.yuvomi.showToast unten reicht sie weiter.
 
 // --------------------------------------------------------
 // Event-Listener
 // --------------------------------------------------------
 
-// --------------------------------------------------------
-// Fehler-Hilfsfunktion
-// --------------------------------------------------------
-
-function friendlyError(err) {
-  // Offline-Mutation (ApiError status 0): spezifische Meldung — auch wenn
-  // navigator.onLine fälschlich true meldet (Netz weg, aber kein offline-Event).
-  if (err?.status === 0) return t('common.errorOfflineMutation');
-  if (!navigator.onLine) return t('common.errorOffline');
-  const status = err?.status ?? err?.response?.status;
-  if (status === 403) return t('common.errorForbidden');
-  if (status === 404) return t('common.errorNotFound');
-  if (status >= 500) return t('common.errorServer');
-  if (err?.name === 'AbortError' || err?.name === 'TimeoutError') return t('common.errorTimeout');
-  if (/Failed to fetch|NetworkError|Load failed/i.test(err?.message || '')) return t('common.errorServer');
-  if (err?.name === 'TypeError') return t('common.unexpectedError');
-  return err?.data?.error || err?.message || t('common.errorGeneric');
-}
+// friendlyError lebt in utils/friendly-error.js (#1640), damit die Zuordnung
+// Fehler -> Satz ohne Browser pruefbar ist; window.yuvomi.friendlyError unten
+// reicht sie weiter.
 
 // --------------------------------------------------------
 // Globale Fehler-Handler (Error Boundary)
@@ -4397,7 +4779,12 @@ if ('serviceWorker' in navigator) {
 // beantwortet die Frage erst danach.
 window.addEventListener('popstate', (e) => {
   const target = e.state?.path || location.pathname;
-  handleBackNavigation().then((handled) => {
+  handleBackNavigation().then((overlay) => {
+    // Eine Auswahl in Liste + Detail (`?open=`) ist ein Zustand DERSELBEN Seite:
+    // der Baustein stellt ihn aus der Adresse wieder her, statt die Seite neu
+    // zu zeichnen (utils/master-detail.js). Erst NACH den Dialogen gefragt -
+    // ueber einem offenen Dialog meint die Geste den Dialog (#871).
+    const handled = overlay || handleMasterDetailPopstate();
     if (!handled) navigate(target, false);
   });
 });
@@ -4421,6 +4808,7 @@ window.addEventListener('popstate', (e) => {
 function forgetSessionState() {
   currentUser = null;
   _preferencesLoaded = false;
+  forgetZonePrefs();
   _hiddenModules = new Set();
   _moduleOrder = [];
   _mobileNavOrder = [];
@@ -4491,6 +4879,8 @@ function rebuildNavigation({ updateLabels = true } = {}) {
     if (navSidebar)   navSidebar.setAttribute('aria-label', t('nav.main'));
     if (navBottom)    navBottom.setAttribute('aria-label', t('nav.navigation'));
     if (moreBtnLabel) moreBtnLabel.textContent = t('nav.more');
+    syncSidebarAccount();
+    syncSidebarTools();
   }
 
   if (navSidebarItems) {
@@ -4552,6 +4942,15 @@ function rebuildNavigation({ updateLabels = true } = {}) {
   dropBadgesForRemovedRoutes();
 }
 
+// Profil geaendert (Name, Farbe, Bild): die Kontozeile der Seitenleiste zieht
+// nach, ohne Neuaufbau der Shell. personal-account.js meldet den neuen Stand.
+window.addEventListener('yuvomi:profile-changed', (e) => {
+  if (currentUser && e.detail && typeof e.detail === 'object') {
+    currentUser = { ...currentUser, ...e.detail };
+  }
+  syncSidebarAccount();
+});
+
 // Sprache geändert: Navigation und aktuelle Seite gemeinsam neu rendern.
 window.addEventListener('locale-changed', () => {
   rebuildNavigation();
@@ -4574,6 +4973,10 @@ window.addEventListener('date-format-changed', refreshCurrentRoute);
 // Die Anzeigezone wirkt auf jede Uhrzeit auf dem Schirm - dasselbe Neuzeichnen
 // wie beim Datums-/Zeitformat (#829 Teil 3).
 window.addEventListener('timezone-changed', refreshCurrentRoute);
+// Und der Zonen-Hinweis der Uebersicht erfaehrt hier, dass entschieden ist
+// (#1607): das Auswahlfeld der Einstellungen schreibt an ihm vorbei. Das
+// Neuzeichnen oben laeuft per setTimeout, liest also schon den neuen Stand.
+window.addEventListener('timezone-changed', (event) => noteZoneDecision(event.detail?.timezone));
 window.addEventListener('time-format-changed', refreshCurrentRoute);
 
 window.addEventListener('resize', () => {
@@ -4601,6 +5004,9 @@ function observeNavCapsule() {
   if (!items || items.dataset.indicatorObserved === '1') return;
   items.dataset.indicatorObserved = '1';
   new ResizeObserver(() => requestAnimationFrame(() => positionTabIndicator())).observe(items);
+  // Dieselbe Kapsel, ihre HOEHE: umbrechende Labels machen sie hoeher als
+  // --nav-height-mobile, und die Zone darunter muss mitwachsen (Review zu #1475).
+  watchNavCapsuleHeight(items);
 }
 observeNavCapsule();
 
@@ -4616,7 +5022,7 @@ observeNavCapsule();
 // hing an einem einzelnen `resize`, und blieb ein zweites aus, war die
 // Primäraktion des Moduls dauerhaft weg - dieselbe Falle wie beim
 // Scroll-Retract, den #634 entfernt hat. Der FAB ist der einzige Weg zum
-// Anlegen (`.toolbar-new-btn` ist überall ausgeblendet), also kostet ein
+// Anlegen (angedockt wird erst ab 1024px), also kostet ein
 // Falsch-Positiv hier das ganze Modul.
 //
 // Eine Tastatur ist offen, wenn ein Texteingabefeld den Fokus hat. Das ist
@@ -4751,12 +5157,19 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
 // Globale Exporte
 window.yuvomi = {
   navigate,
+  // Die globale Suche fuer Seiten, die einen eigenen Einstieg anbieten (die
+  // Uebersicht mobil, Re-Critique 2026-09-27 A1 P2-6) - dasselbe Overlay wie
+  // Seitenleiste, Mehr-Blatt und Cmd-K.
+  openSearch: () => _openSearch?.(),
   showToast,
   friendlyError,
   setThemeColor,
   setDisabledModules,
   setHiddenModules,
   setModuleOrder,
+  // Die Anordnung der Seitenleiste, fuer die Modulblaetter der Einstellungen
+  // (settings/registry.js, settingsSheetsForDomain) - eine Reihenfolge, zwei Orte.
+  moduleOrder: () => _moduleOrder.slice(),
   setMobileNavOrder,
   refreshThirdPartyModules,
   isModuleDisabled,
@@ -4766,6 +5179,29 @@ window.yuvomi = {
   // Die Uebersichtsseite reicht ihre `/dashboard`-Antwort herein, statt sie ein
   // zweites Mal holen zu lassen. Begruendung an `primeModuleCountsFrom`.
   primeModuleCountsFrom,
+  // Fuer eine Seite, die sich SELBST neu aufbaut, ohne dass der Router
+  // navigiert - die Uebersicht beim Betreten und Verlassen des Wand-Modus, nach
+  // „erneut versuchen" oder einer Aenderung aus einer Kachel. renderPage()
+  // laeuft dann nicht, und mit ihm fehlten beide Haelften des FAB-Wechsels
+  // (#1588):
+  //   - clearPageFab(): der Knopf des vorigen Aufbaus haengt schon in der
+  //     Shell-Ebene neben dem Container. Bringt der neue Aufbau keinen mit (die
+  //     Wand), stand der alte bedienbar auf der Wand, bis die Seite ihn nach
+  //     ihren Daten selbst raeumte.
+  //   - adoptPageFab(): bringt er einen mit, blieb der im Scrollport - ohne
+  //     Glyph (die Icons zeichnet sonst erst updateNav()), und die Tab-Kapsel
+  //     hielt ihr hinteres Ende nicht mehr frei, weil ihre Reserve an
+  //     `.fab-layer .page-fab` haengt: die Slots liefen unter den Knopf.
+  // Aufzurufen direkt nach dem synchronen Teil von render(), wie in renderPage().
+  replacePageFab: () => {
+    clearPageFab();
+    const fab = adoptPageFab();
+    if (fab) {
+      markFabShortcut(fab);
+      window.lucide?.createIcons({ el: fab.closest('.page-fab-group') ?? fab });
+    }
+    return fab;
+  },
   applyTheme: (value) => {
     if (value === 'dark') {
       document.documentElement.setAttribute('data-theme', 'dark');

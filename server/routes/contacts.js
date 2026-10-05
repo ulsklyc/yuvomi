@@ -11,6 +11,10 @@ import { str, oneOf, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from 
 import { uniqueKey } from '../utils/category-slug.js';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
+import {
+  contactActorFromRequest, mayChangeContactEmails, bodyChangesContactEmails,
+  emailsTakenByOtherAccounts, EMAIL_IN_USE_MESSAGE,
+} from '../services/contact-identity.js';
 
 const log = createLogger('Contacts');
 
@@ -588,6 +592,47 @@ router.put('/:id', (req, res) => {
       }
     }
 
+    // Die E-Mail-Adressen eines verknuepften Kontakts fuehren zu seinem Konto
+    // (Passwort-Reset, SSO-Verknuepfung): sie aendern nur die Person selbst
+    // oder ein Admin. Die Regel steht in services/contact-identity.js.
+    const actor = contactActorFromRequest(req);
+    if (!mayChangeContactEmails(contact, actor)) {
+      const storedEmails = db.get()
+        .prepare('SELECT value FROM contact_emails WHERE contact_id = ?')
+        .all(id).map((r) => r.value);
+      if (bodyChangesContactEmails(contact, storedEmails, req.body)) {
+        return res.status(403).json({
+          error: 'Only this member or an admin, signed in or with a full-access token, can change the email addresses of a household member.',
+          code: 403,
+          reason: 'contact_email_protected',
+        });
+      }
+      // Gleiche Adressen (etwa nur anders geschrieben): die gespeicherten
+      // bleiben unangetastet, wie sie sind.
+      delete req.body.email;
+      delete req.body.emails;
+    } else if (contact.family_user_id && !actor.isAdmin
+      && (req.body.email !== undefined || Array.isArray(req.body.emails))) {
+      // Die Person selbst an ihrem eigenen Kontakt: eine Adresse, die schon ein
+      // anderes Konto traegt, fuehrt sie nicht neu ein (GHSA-6pmj-w42g-g6qv,
+      // dieselbe Regel wie PATCH /auth/me/profile). Synchron bis zum
+      // Schreiben, kein await dazwischen.
+      const storedEmails = db.get()
+        .prepare('SELECT value FROM contact_emails WHERE contact_id = ?')
+        .all(id).map((r) => r.value);
+      const taken = emailsTakenByOtherAccounts(db.get(), {
+        userId: contact.family_user_id,
+        before: [contact.email, ...storedEmails],
+        after: [
+          req.body.email !== undefined ? req.body.email : contact.email,
+          ...(Array.isArray(req.body.emails) ? req.body.emails.map((e) => e?.value) : storedEmails),
+        ],
+      });
+      if (taken.length) {
+        return res.status(409).json({ error: EMAIL_IN_USE_MESSAGE, code: 409, reason: 'email_in_use' });
+      }
+    }
+
     // Update contact and multi-value fields in a transaction
     const transaction = db.get().transaction(() => {
       // Update scalar fields
@@ -704,7 +749,7 @@ router.delete('/:id', (req, res) => {
     if (!contact) return res.status(404).json({ error: 'Kontakt nicht gefunden', code: 404 });
     
     if (contact.family_user_id) {
-      return res.status(403).json({ error: 'Familienmitglieder können nicht aus der Kontaktliste gelöscht werden.', code: 403 });
+      return res.status(403).json({ error: 'Familienmitglieder können nicht aus der Kontaktliste gelöscht werden.', code: 403, reason: 'family_member_contact' });
     }
 
     const result = db.get().prepare('DELETE FROM contacts WHERE id = ?').run(id);

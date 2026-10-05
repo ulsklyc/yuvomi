@@ -21,12 +21,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 import { startTestServer, cookieHeader } from './server-ready.js';
+import { tempDir } from './tmp-dir.js';
 
 const { baseUrl: BASE } = await startTestServer({
   name: 'shopping-versions',
@@ -319,7 +318,7 @@ test('DELETE /shopping/items/:id: unbekannter Artikel bleibt 404', async () => {
 test('v196: bestehende Listen bekommen beim Update ihre Zeile mit 0', () => {
   const V = MIGRATIONS.find((m) => m.version === 196);
   assert.ok(V, 'Migration v196 vorhanden');
-  const old = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-versions-')), 'db.sqlite'));
+  const old = new Database(join(tempDir('yuvomi-versions-'), 'db.sqlite'));
   old.exec(`
     CREATE TABLE shopping_lists (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);
     CREATE TABLE shopping_items (

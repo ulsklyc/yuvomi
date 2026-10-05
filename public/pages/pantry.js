@@ -9,7 +9,7 @@
 
 import { api } from '/api.js';
 import { t, getNumberFormat, formatDate } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import {
   openModal as openSharedModal,
   closeModal as closeSharedModal,
@@ -19,23 +19,29 @@ import {
   refocusAfterRender,
 } from '/components/modal.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
-import { resolveShoppingTarget, announceTransfer } from '/utils/kitchen-transfer.js';
+import { resolveShoppingTarget, announceTransfer, mayTransferPantryToShopping } from '/utils/kitchen-transfer.js';
+import { mayWritePath } from '/utils/module-access.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
+import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 // Alias, weil dieses Modul selbst eine `emptyStateEl()`-Funktion hat, die den
 // Renderer mit den Vorrats-Texten füllt.
 import { emptyStateEl as emptyStateComponentEl, mountLoadError } from '/utils/empty-state.js';
-import { scheduleUndoableDelete, vibrate, wireScrollFade } from '/utils/ux.js';
+import { scheduleUndoableDelete, vibrate, wireScrollFade, collapseOut, expandIn } from '/utils/ux.js';
+import { redrawList } from '/utils/list-motion.js';
+import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { todayKey } from '/utils/date.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { locationLabel } from '/utils/pantry-locations.js';
 import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
-import { PANTRY_UNITS, normalizePantryQuantity, pantryUnitStep } from '/utils/pantry-units.js';
+import { PANTRY_UNITS, normalizePantryQuantity, pantryUnitStep, pantryQuantityLabel } from '/utils/pantry-units.js';
 import {
   PANTRY_FILTERS,
   daysUntil,
   matchesPantryFilter,
+  pantryExpiryPhrase,
   pantryFilterCounts,
+  pantryFilterFromSearch,
   pantryItemStatus,
 } from '/utils/pantry-status.js';
 
@@ -134,8 +140,9 @@ function unitLabel(unit) {
   return label === key ? String(unit ?? '') : label;
 }
 
+/** „6 Dosen", nicht „6 Dose": die Einheit flektiert mit der Menge (W2). */
 function quantityText(item) {
-  return `${formatQuantity(item.quantity)} ${unitLabel(item.unit)}`;
+  return pantryQuantityLabel(item.quantity, item.unit, { t, formatNumber: formatQuantity });
 }
 
 /**
@@ -147,16 +154,13 @@ function expiryBadge(item) {
   const { expiry } = pantryItemStatus(item, state.todayKey);
   if (!expiry) return null;
 
-  const days = daysUntil(item.expires_on, state.todayKey);
-  if (expiry === 'expired') {
-    return {
-      tone: 'danger',
-      text: days === -1 ? t('pantry.badgeExpiredYesterday') : t('pantry.badgeExpiredDays', { count: Math.abs(days) }),
-    };
-  }
-  if (days === 0) return { tone: 'warning', text: t('pantry.badgeExpiresToday') };
-  if (days === 1) return { tone: 'warning', text: t('pantry.badgeExpiresTomorrow') };
-  return { tone: 'warning', text: t('pantry.badgeExpiresDays', { count: days }) };
+  // Der Satz kommt aus pantryExpiryPhrase(), den auch die Dashboard-Kachel
+  // „Läuft bald ab" spricht - dieselbe Charge heisst an beiden Orten gleich.
+  const phrase = pantryExpiryPhrase(daysUntil(item.expires_on, state.todayKey));
+  return {
+    tone: expiry === 'expired' ? 'danger' : 'warning',
+    text: phrase.count === undefined ? t(phrase.key) : t(phrase.key, { count: phrase.count }),
+  };
 }
 
 function stockBadge(item) {
@@ -267,6 +271,11 @@ export async function render(container) {
   state.todayKey = todayKey();
   // Frische Seite: die Chip-Leiste darf beim ersten Zeichnen wieder scrollen.
   _scrolledFilter = null;
+  // Deep-Link der Dashboard-Kachel „Läuft bald ab" (`?filter=expired|soon`).
+  // Trifft der Chip gerade nichts, setzt die Chip-Leiste ohnehin auf „Alle"
+  // zurück - ein veralteter Link endet nie in einer leeren Liste.
+  const linkedFilter = pantryFilterFromSearch(window.location.search);
+  if (linkedFilter) state.filter = linkedFilter;
 
   const page = document.createElement('div');
   page.className = 'pantry-page app-page app-page--reading page-measure--narrow';
@@ -289,33 +298,52 @@ export async function render(container) {
   // layout.css): Suche im __center-Slot, Lagerort-Verwaltung im __actions-Slot -
   // dieselbe Slot-Ordnung wie in den drei Geschwister-Tabs.
   const toolbar = document.createElement('div');
-  // --narrow: der Kopf endet beim Lesemaß der Liste darunter (.list-scroller),
-  // nicht an der Content-Spalte. Siehe layout.css.
-  toolbar.className = 'page-toolbar page-toolbar--in-group page-toolbar--narrow';
+  // Kein --narrow (Re-Critique 2026-09-27, D3): der Kuechenkopf gehoert der
+  // Kuechen-Leiste und endet an ihrer Kante wie in den drei Geschwister-Tabs -
+  // sonst sprang die angedockte Primaeraktion beim Tabwechsel zwischen
+  // Lesemass (x 865) und Leistenkante (x 1288). Test: test-meals.js (D3).
+  toolbar.className = 'page-toolbar page-toolbar--in-group';
+  // Die Suche IST der Center-Slot (Re-Critique 2026-09-27, D4): Breite und
+  // Stelle traegt page-search.css, wie in Dokumenten - kein Wrapper.
   toolbar.insertAdjacentHTML('beforeend', `
-    <div class="page-toolbar__center">
-      ${renderPageSearch({
-        id: 'pantry-search',
-        // Label und Placeholder aus demselben Key: „Vorrat durchsuchen" benennt
-        // das Feld vollständig, wie in notes/contacts/documents. Ein eigener
-        // Label-Key wäre ein Schlüssel über 23 Locales ohne zusätzliche Aussage.
-        label: t('pantry.searchPlaceholder'),
-        placeholder: t('pantry.searchPlaceholder'),
-        value: state.query,
-        clearLabel: t('common.searchClear'),
-        className: 'pantry-search',
+    ${renderPageSearch({
+      id: 'pantry-search',
+      // Label und Placeholder aus demselben Key: „Vorrat durchsuchen" benennt
+      // das Feld vollständig, wie in notes/contacts/documents. Ein eigener
+      // Label-Key wäre ein Schlüssel über 23 Locales ohne zusätzliche Aussage.
+      label: t('pantry.searchPlaceholder'),
+      placeholder: t('pantry.searchPlaceholder'),
+      value: state.query,
+      clearLabel: t('common.searchClear'),
+      className: 'pantry-search page-toolbar__center',
+    })}
+    ${readOnly() ? '' : `<div class="page-toolbar__actions">
+      ${pageToolsMenuHtml({
+        id: 'pantry-tools-menu',
+        label: t('common.moreActions'),
+        // KUECHENKOPF (Kopfregel mobil, 2026-09-26): die Verwaltung steht im
+        // EINEN Werkzeugmenue. Mit einem einzigen Eintrag wird daraus der
+        // direkte Knopf (pageToolsMenuHtml, R16): "Lagerorte verwalten" mit
+        // map-pin wie im Inventar - "archive" war dasselbe Zeichen wie der
+        // Vorrat-Tab darueber (A4, P3). Kommt ein zweiter Eintrag dazu, ist es
+        // von selbst wieder das Menue.
+        // Regel 7 in utils/module-access.js: der AUFRUFER nimmt den Ausloeser
+        // weg. Bei `pantry: read` endete jede Handlung im Verwalter (anlegen,
+        // umbenennen, sortieren, loeschen) im 403.
+        items: [{ action: 'manage-locations', label: t('pantry.manageLocations'), icon: 'map-pin' }],
       })}
-    </div>
-    <div class="page-toolbar__actions">
-      <button class="btn btn--ghost btn--icon" data-action="manage-locations"
-              aria-label="${esc(t('pantry.manageLocations'))}" title="${esc(t('pantry.manageLocations'))}">
-        <i data-lucide="archive" class="icon-md" aria-hidden="true"></i>
-      </button>
-    </div>`);
+    </div>`}`);
 
+  // DIE CHIPREIHE STEHT IM SCROLLPORT (Kopfregel mobil, Regel 3): als erstes
+  // Kind von #pantry-list scrollt sie mit der Liste weg, statt dauerhaft 60px
+  // ueber dem Port zu belegen (A8: fix bis y181). renderList() ersetzt nur,
+  // was HINTER ihr steht.
   const filters = document.createElement('div');
-  filters.className = 'pantry-filters';
+  filters.className = 'page-chip-row pantry-filters';
   filters.id = 'pantry-filters';
+  filters.setAttribute('role', 'group');
+  filters.setAttribute('aria-label', t('common.filters'));
+  filters.hidden = true;
 
   // Hier stand der Slot für die Sammelaktions-Leiste. Sie ist seit Etappe 5
   // eine Pille in der unteren Shell-Zone (utils/bulk-pill.js) und braucht in
@@ -326,6 +354,7 @@ export async function render(container) {
   list.className = 'list-scroller page-scrollport pantry-list';
   list.id = 'pantry-list';
   list.setAttribute('aria-busy', 'true');
+  list.append(filters);
   list.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 6, lines: 2 }));
 
   const fab = document.createElement('button');
@@ -336,7 +365,22 @@ export async function render(container) {
   fab.dataset.dockLabel = t('newLabel.pantry');
   fab.insertAdjacentHTML('beforeend', '<i data-lucide="plus" aria-hidden="true"></i>');
 
-  page.append(title, live, toolbar, filters, list, fab);
+  // DAS NEBENPANEL „IM BLICK" (Re-Critique 2026-09-27, A4 P1 / R10 L4): am
+  // Desktop steht neben der Liste fest, was bald ablaeuft oder knapp wird -
+  // dieselben drei Fragen wie die Filterchips, nur ohne dass man sie stellen
+  // muss. Unter der Schwelle blendet es CSS aus; dort tragen die Chips die
+  // Frage. Liste und Panel teilen einen Koerper, weil ein Container sich
+  // selbst nicht umstellen kann (die Abfrage steht an `.pantry-page`).
+  const body = document.createElement('div');
+  body.className = 'pantry-body';
+  const watch = document.createElement('aside');
+  watch.className = 'pantry-watch';
+  watch.id = 'pantry-watch';
+  watch.setAttribute('aria-label', t('pantry.watchLabel'));
+  watch.hidden = true;
+  body.append(list, watch);
+
+  page.append(title, live, toolbar, body, fab);
   container.replaceChildren(page);
   renderKitchenTabsBar(container, '/pantry');
 
@@ -358,7 +402,8 @@ export async function render(container) {
     },
   });
 
-  toolbar.querySelector('[data-action="manage-locations"]').addEventListener('click', openLocationManager);
+  installPopoverMenus(toolbar);
+  toolbar.querySelector('[data-action="manage-locations"]')?.addEventListener('click', openLocationManager);
   fab.addEventListener('click', () => openItemModal('create'));
 
   filters.addEventListener('click', (e) => {
@@ -370,6 +415,7 @@ export async function render(container) {
   });
 
   list.addEventListener('click', onListClick);
+  watch.addEventListener('click', onWatchClick);
 
   try {
     await loadPantry();
@@ -522,7 +568,9 @@ function renderFilters() {
  */
 function renderBulkBar() {
   const items = visibleItems();
-  if (state.filter !== 'low' || !state.items.length || !items.length) {
+  // Die Pille traegt genau EINE Aktion, und die schreibt in den EINKAUF
+  // (#1265): ohne Schreibrecht dort endete sie im 403 - also keine Pille.
+  if (state.filter !== 'low' || !state.items.length || !items.length || !mayTransferPantryToShopping()) {
     clearBulkPill();
     return;
   }
@@ -536,12 +584,56 @@ function renderBulkBar() {
   });
 }
 
-function renderList() {
+/**
+ * Darf dieses Konto in den Vorrat schreiben? Regel 1 in utils/module-access.js.
+ * Als Funktion, damit jedes Neuzeichnen neu fragt.
+ *
+ * WAS BEI `read` BLEIBT: Suche, Filterchips, das Nebenpanel, die Zeile mit
+ * Menge, MHD und Badges als ZEICHEN - und der Tipp auf sie, der dann die
+ * Leseansicht oeffnet (Regel 9). WAS GEHT: der Stepper, der Bearbeiten-Dialog
+ * samt Loeschen, das Anlegen (FAB und Leerzustand), die Lagerort-Verwaltung und
+ * der Loesch-Wisch (Regel 3). DER WARENKORB FOLGT NICHT DIESEM RECHT: er
+ * schreibt in den Einkauf und fragt `mayTransferPantryToShopping()` (Regel 8) -
+ * mit `pantry: read` und `shopping: write` bleibt er also stehen, und der
+ * Server nimmt den Uebertrag an.
+ *
+ * KEIN WANDTABLETT: ein Display fuehrt `pantry` nicht in seiner Scope-Liste
+ * (server/display-scopes.js) und erreicht diese Seite nicht; ein
+ * `actingAsDisplay()` davor braucht es hier nicht.
+ */
+function readOnly() {
+  return !mayWritePath('/pantry');
+}
+
+/**
+ * Die `data-action`s der Liste, die NICHT in den Vorrat schreiben - eine
+ * Positivliste wie in shopping.js: eine morgen ergaenzte Schreib-Aktion ist bei
+ * `read` zu, bis sie hier ausdruecklich steht. `to-shopping` schreibt in den
+ * Einkauf und traegt seinen eigenen Riegel (`sendToShopping`).
+ */
+const READ_SAFE_ACTIONS = new Set(['details', 'to-shopping']);
+
+const PANTRY_ROW = '.pantry-swipe[data-swipe-id]';
+
+/* `motion: true` setzt, wer die DATEN geaendert hat (Artikel angelegt,
+ * gespeichert, geloescht): dann zieht die neue Zeile auf, und was dadurch die
+ * Stelle wechselt, gleitet (utils/list-motion.js). Filter und Suche zeichnen
+ * ohne Bewegung neu - dort wechselt die Frage, nicht die Liste, und jede
+ * hinzukommende Zeile einzeln aufzuziehen waere Unruhe. */
+function renderList({ motion = false } = {}) {
   const list = _container?.querySelector('#pantry-list');
   if (!list) return;
+  if (motion) redrawList(list, () => drawList(list), { selector: PANTRY_ROW, keyAttr: 'data-swipe-id' });
+  else drawList(list);
+}
+
+function drawList(list) {
   list.removeAttribute('aria-busy');
-  list.replaceChildren();
+  // Die Chipreihe ist das erste Kind des Ports und ueberlebt den Neuaufbau.
+  const chipRow = list.querySelector(':scope > #pantry-filters');
+  list.replaceChildren(...(chipRow ? [chipRow] : []));
   renderBulkBar();
+  renderWatch();
 
   if (!state.items.length) {
     list.appendChild(emptyStateEl());
@@ -590,13 +682,114 @@ function renderList() {
     }
 
     const rows = document.createElement('ul');
-    rows.className = 'list-rows pantry-rows';
+    rows.className = 'row-carrier pantry-rows';
     for (const item of group.items) rows.appendChild(rowEl(withIntent(item)));
     section.appendChild(rows);
     list.appendChild(section);
   }
 
+  wirePantrySwipe(list);
   if (window.lucide) window.lucide.createIcons({ el: list });
+}
+
+// --------------------------------------------------------
+// Nebenpanel „Im Blick" (Desktop)
+// --------------------------------------------------------
+
+// NUR ZEITKRITISCHES (Re-Critique 2026-09-28, P7 / A4 P2-6). Hier stand auch
+// "Fast leer": dieselbe Aussage stand damit dreimal da (Zeilen-Badge, Chip mit
+// Zaehler, Panel), 14 von 21 Artikeln rechts ein zweites Mal, und "Fast leer
+// 10" uebertoente die Fristen. Das Panel beantwortet jetzt nur, was nicht
+// warten kann; "Fast leer" bleibt Chip plus Warenkorb an der Zeile.
+const WATCH_SECTIONS = [
+  { key: 'expired', label: 'pantry.filterExpired', icon: 'circle-alert', tone: 'danger' },
+  { key: 'soon', label: 'pantry.filterSoon', icon: 'clock', tone: 'warning' },
+];
+
+/**
+ * Die drei Abschnitte des Panels, mit genau der Zuordnung der Filterchips
+ * (`matchesPantryFilter`) - ein Artikel steht im Panel, wenn und weil ihn der
+ * gleichnamige Chip traefe. Unabhaengig von Suche und aktivem Filter: das
+ * Panel beantwortet „was braucht Aufmerksamkeit", nicht „was zeigt die Liste".
+ * Sortiert wie die flache Filterliste: Ablauf nach Datum, Bestand nach Menge.
+ */
+function pantryWatchGroups(items, today) {
+  return WATCH_SECTIONS.map((section) => {
+    const rows = items.filter((item) => matchesPantryFilter(item, section.key, today));
+    rows.sort((a, b) => String(a.expires_on).localeCompare(String(b.expires_on)));
+    return { ...section, items: rows };
+  }).filter((section) => section.items.length);
+}
+
+function watchRowEl(item, section) {
+  const li = document.createElement('li');
+  li.className = 'list-row pantry-watch__row';
+  const main = document.createElement('button');
+  main.type = 'button';
+  main.className = 'list-row__main list-row__main--interactive';
+  main.dataset.watchId = String(item.id);
+  const name = document.createElement('span');
+  name.className = 'list-row__name';
+  name.textContent = item.name;
+  const meta = document.createElement('span');
+  meta.className = 'list-row__meta';
+  // Der Satz der Zeile („Laeuft morgen ab"), in der Tinte seiner Dringlichkeit.
+  const expiry = expiryBadge(item);
+  const lead = document.createElement('span');
+  lead.className = `pantry-watch__due pantry-watch__due--${expiry ? expiry.tone : section.tone}`;
+  lead.textContent = expiry ? expiry.text : quantityText(item);
+  meta.appendChild(lead);
+  if (item.location_name) meta.append(` · ${locationLabel(item.location_name)}`);
+  main.append(name, meta);
+  li.appendChild(main);
+  return li;
+}
+
+/** Zeichnet das Panel neu; ohne Artikel bleibt es verborgen. */
+function renderWatch() {
+  const watch = _container?.querySelector('#pantry-watch');
+  if (!watch) return;
+  watch.replaceChildren();
+  if (!state.items.length) {
+    watch.hidden = true;
+    return;
+  }
+  watch.hidden = false;
+  const groups = pantryWatchGroups(state.items.map(withIntent), state.todayKey);
+  if (!groups.length) {
+    const calm = document.createElement('p');
+    calm.className = 'pantry-watch__empty';
+    calm.textContent = t('pantry.watchEmpty');
+    watch.appendChild(calm);
+    return;
+  }
+  for (const section of groups) {
+    const el = document.createElement('section');
+    el.className = 'list-group pantry-watch__group';
+    const heading = document.createElement('h2');
+    heading.className = 'list-group__title';
+    heading.insertAdjacentHTML('beforeend', `<i data-lucide="${esc(section.icon)}" class="icon-sm" aria-hidden="true"></i>`);
+    const label = document.createElement('span');
+    label.textContent = t(section.label);
+    const count = document.createElement('span');
+    count.className = 'list-group__count';
+    count.textContent = String(section.items.length);
+    heading.append(label, count);
+    const rows = document.createElement('ul');
+    rows.className = 'row-carrier';
+    for (const item of section.items) rows.appendChild(watchRowEl(item, section));
+    el.append(heading, rows);
+    watch.appendChild(el);
+  }
+  if (window.lucide) window.lucide.createIcons({ el: watch });
+}
+
+/** Eine Panelzeile oeffnet denselben Dialog wie ihre Zeile in der Liste. */
+function onWatchClick(e) {
+  const btn = e.target.closest('[data-watch-id]');
+  if (!btn) return;
+  const item = state.items.find((i) => i.id === Number(btn.dataset.watchId));
+  if (item) openItemModal('edit', item);
 }
 
 /**
@@ -633,12 +826,16 @@ function noResultsEl() {
 }
 
 function emptyStateEl() {
+  // Bei `read` nur der Zustand (Regel 9): Beschreibung („Trage ein ...") und
+  // Hinweis (Artikel aus dem Einkauf uebernehmen) laden beide zu einer
+  // Handlung ein, die es dann nicht gibt.
+  const ro = readOnly();
   return emptyStateComponentEl({
     icon: 'archive',
     title: t('pantry.emptyTitle'),
-    description: t('pantry.emptyDescription'),
-    hint: t('emptyHint.pantry'),
-    action: {
+    description: ro ? undefined : t('pantry.emptyDescription'),
+    hint: ro ? undefined : t('emptyHint.pantry'),
+    action: ro ? null : {
       label: t('pantry.emptyAction'),
       icon: 'plus',
       onClick: () => openItemModal('create'),
@@ -650,7 +847,31 @@ function emptyStateEl() {
 function rowEl(item) {
   const status = pantryItemStatus(item, state.todayKey);
 
-  const li = document.createElement('li');
+  // DIE ZEILE LAESST SICH WEGWISCHEN (R16 Schritt 2b, Kuechenregel in
+  // DESIGN.md: Loeschen = Wisch mobil + ein fester Ort am Desktop). Der Vorrat
+  // war der letzte Kuechen-Reiter ohne die Geste; Loeschen stand nur im
+  // Dialogfuss. Das `li` ist die Buehne (`.swipe-row`) mit dem Reveal-Panel am
+  // Zeilenende, die Zeile selbst liegt als `div` darin. Nur EINE Seite: am
+  // Zeilenanfang gibt es im Vorrat nichts Positives zu erledigen. Stepper und
+  // Warenkorb sind Ausnahmezone (wirePantrySwipe, `ignore`) - wer dort tippt
+  // und dabei rutscht, loescht nichts.
+  const ro = readOnly();
+  const wrap = document.createElement('li');
+  // `.swipe-row--static`: ohne Geste auch kein Wisch-Chevron (layout.css).
+  wrap.className = ro ? 'swipe-row swipe-row--static pantry-swipe' : 'swipe-row pantry-swipe';
+  wrap.dataset.swipeId = String(item.id);
+  // Nur-lesen: die Buehne bleibt (Zeilenschluessel fuer Neuzeichnen und
+  // Auffrischung), das Loeschen-Panel entfaellt - es verspraeche ein DELETE,
+  // das im 403 endet (Regel 3 in utils/module-access.js).
+  if (!ro) {
+    wrap.insertAdjacentHTML('beforeend', `
+    <div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">
+      <i data-lucide="trash-2" class="icon-md"></i>
+      <span>${esc(t('common.delete'))}</span>
+    </div>`);
+  }
+
+  const li = document.createElement('div');
   // Geteilte Zeilen-Grammatik (styles/list-row.css). Ohne --reserve-end: der
   // Warenkorb sitzt nicht mehr an der Zeilenkante, sondern in einem festen Slot
   // am Anfang der Bedienzone (siehe unten).
@@ -669,7 +890,9 @@ function rowEl(item) {
   const main = document.createElement('button');
   main.type = 'button';
   main.className = 'list-row__main list-row__main--interactive pantry-row__main';
-  main.dataset.action = 'edit';
+  // Bei `read` oeffnet derselbe Tipp die Leseansicht (Regel 9) - unter einem
+  // eigenen Namen, damit die Positivliste im Handler ihn durchlaesst.
+  main.dataset.action = ro ? 'details' : 'edit';
 
   // Name und Status in EINER Zeile: das Badge qualifiziert den Artikel, es ist
   // keine eigene Information. Auf einer eigenen Zeile wuchs jede betroffene
@@ -761,11 +984,14 @@ function rowEl(item) {
   }
   main.appendChild(meta);
 
-  // Was der Button tut - nur für Screenreader, am Ende des Namens.
-  const action = document.createElement('span');
-  action.className = 'sr-only';
-  action.textContent = t('common.edit');
-  main.appendChild(action);
+  // Was der Button tut - nur für Screenreader, am Ende des Namens. Bei `read`
+  // entfaellt der Zusatz: „Bearbeiten" verspraeche, was der Tipp nicht tut.
+  if (!ro) {
+    const action = document.createElement('span');
+    action.className = 'sr-only';
+    action.textContent = t('common.edit');
+    main.appendChild(action);
+  }
 
   // Warenkorb und Stepper bilden EINE Gruppe: als getrennte Flex-Kinder brach
   // nur der Stepper um und der Warenkorb blieb allein oben rechts stehen - der
@@ -799,8 +1025,22 @@ function rowEl(item) {
   // genau der Grund, aus dem der Knopf ursprünglich an die Zeilenkante wanderte.
   const cartSlot = document.createElement('div');
   cartSlot.className = 'pantry-row__cart-slot';
-  if (status.out || status.low) cartSlot.appendChild(cartEl(item));
+  // Der Warenkorb schreibt in den EINKAUF, gefragt wird also dessen Recht
+  // (#1265, Regel 1 in utils/module-access.js). Der Slot bleibt trotzdem.
+  if ((status.out || status.low) && mayTransferPantryToShopping()) cartSlot.appendChild(cartEl(item));
   actions.appendChild(cartSlot);
+
+  // Nur-lesen: KEIN Stepper (Regel 2). Die Menge steht als Zeichen in der
+  // Meta-Zeile; Plus und Minus aenderten sie optimistisch, der PATCH endete im
+  // 403, und die Zeile sprang zurueck. Die Bedienzone traegt dann nur noch den
+  // Warenkorb-Slot - und entfaellt ganz, wenn auch der Einkauf nicht
+  // beschreibbar ist: eine leere Zone naehme dem Namen nur die Breite.
+  if (ro) {
+    li.appendChild(main);
+    if (mayTransferPantryToShopping()) li.appendChild(actions);
+    wrap.appendChild(li);
+    return wrap;
+  }
 
   const stepper = document.createElement('div');
   stepper.className = 'pantry-stepper';
@@ -838,7 +1078,34 @@ function rowEl(item) {
   // ausnahmslos mit dem Namen führen. Nebeneffekt: die Namenskante steht jetzt
   // von selbst, statt mit der Stepper-Breite zu wandern (Critique 2026-07-29).
   li.append(main, actions);
-  return li;
+  wrap.appendChild(li);
+  return wrap;
+}
+
+/**
+ * Wisch zum Zeilenende loescht - mit dem Rueckweg, den removeItem() schon hat
+ * (Undo-Toast). Die Karte federt zurueck statt hinauszufliegen: removeItem()
+ * blendet die Zeile selbst aus und holt sie bei "Rueckgaengig" wieder.
+ */
+function wirePantrySwipe(list) {
+  // Regel 3 in utils/module-access.js: bei Nur-lesen bleibt die VERDRAHTUNG
+  // aus, samt Wisch-Hinweis. Ein Riegel in `run` kaeme zu spaet - die Zeile
+  // waere schon weggewischt, bevor jemand fragt.
+  if (readOnly()) return null;
+  const optionen = {
+    card: '.pantry-row',
+    ignore: '.pantry-stepper, .pantry-row__cart',
+    trailing: {
+      reveal: '.swipe-reveal--delete',
+      run: (row) => {
+        const item = state.items.find((i) => String(i.id) === row.dataset.swipeId);
+        if (item) removeItem(item);
+      },
+    },
+  };
+  wireSwipeRows(list, optionen);
+  maybeShowSwipeHint(list);
+  return optionen;
 }
 
 /** Kontextuelle Einkaufs-Aktion einer Zeile; nur bei leeren/knappen Artikeln. */
@@ -865,6 +1132,12 @@ function onListClick(e) {
   const item = state.items.find((i) => i.id === Number(row.dataset.id));
   if (!item) return;
 
+  // Der eine Riegel fuer alle Aktionen darunter (siehe READ_SAFE_ACTIONS): das
+  // Markup nimmt die Affordanz, diese Zeile den Effekt eines Knotens, den ein
+  // Rechtewechsel ueberholt hat.
+  if (readOnly() && !READ_SAFE_ACTIONS.has(btn.dataset.action)) return;
+
+  if (btn.dataset.action === 'details') { openItemReadModal(item); return; }
   if (btn.dataset.action === 'edit') { openItemModal('edit', item); return; }
   if (btn.dataset.action === 'to-shopping') { sendToShopping([item], btn); return; }
   if (btn.dataset.action === 'increase') { adjustQuantity(item, +1, row); return; }
@@ -881,6 +1154,9 @@ function onListClick(e) {
  * Fehltap. Die Auswahl aktualisiert sich beim nächsten vollen Render.
  */
 function adjustQuantity(item, direction, row) {
+  // Zweite Linie hinter dem fehlenden Stepper: ohne Schreibrecht keine
+  // optimistische Menge und kein PATCH.
+  if (readOnly()) return;
   const step = Number(row.querySelector('.pantry-stepper')?.dataset.step) || 1;
   // Der Ausgangspunkt ist, was die Zeile ZEIGT - eine schon laufende Absicht
   // eingeschlossen, sonst zaehlte jeder Schritt vom Serverstand aus neu.
@@ -1024,6 +1300,9 @@ function refreshRowQuantity(row, item) {
   row.querySelector('.pantry-row__cart-slot')?.replaceWith(fresh.querySelector('.pantry-row__cart-slot'));
 
   if (window.lucide) window.lucide.createIcons({ el: row });
+  // Das Panel spricht von denselben Mengen: ein Schritt, der einen Artikel
+  // unter den Mindestbestand bringt, gehoert sofort unter „Fast leer".
+  renderWatch();
 }
 
 // --------------------------------------------------------
@@ -1038,11 +1317,15 @@ function shortfallText(item) {
   if (item.min_quantity == null) return null;
   const missing = normalizePantryQuantity(Number(item.min_quantity) - Number(item.quantity), { fallback: 0 });
   if (missing <= 0) return null;
-  return `${formatQuantity(missing)} ${unitLabel(item.unit)}`;
+  // Derselbe Helfer wie die Zeile: auch auf dem Einkaufszettel „2 Dosen".
+  return pantryQuantityLabel(missing, item.unit, { t, formatNumber: formatQuantity });
 }
 
 async function sendToShopping(items, btn) {
   if (!items.length) return;
+  // Zweite Linie hinter Warenkorb und Pille - auch fuer einen Knoten, den ein
+  // Rechtewechsel ueberholt hat.
+  if (!mayTransferPantryToShopping()) return;
 
   let lists;
   try {
@@ -1101,8 +1384,76 @@ async function sendToShopping(items, btn) {
 // Artikel-Formular
 // --------------------------------------------------------
 
+/**
+ * Eine Zeile der Leseansicht - das Markup von `detailRowEl()` aus
+ * components/detail-view.js (Icon, Beschriftung, Wert), als Zeichenkette wie
+ * in shopping.js und birthdays.js. Ohne Wert keine Zeile: ein Strich waere ein
+ * Wert, den es nicht gibt.
+ */
+function readRowHtml({ icon, label, value, multiline = false }) {
+  if (!value) return '';
+  return `
+        <div class="detail-row${multiline ? ' detail-row--multiline' : ''}">
+          <i class="detail-row__icon" data-lucide="${icon}" aria-hidden="true"></i>
+          <div class="detail-row__text">
+            <span class="detail-row__label">${esc(label)}</span>
+            <span class="detail-row__value">${esc(value)}</span>
+          </div>
+        </div>`;
+}
+
+/**
+ * Der Artikel bei `pantry: read`: Leseansicht, sonst nichts (Regel 9, Bauart
+ * `openItemReadModal()` in shopping.js und `openNoteReadModal()` in notes.js).
+ * Alles, was der Bearbeiten-Dialog zeigt - Menge mit Einheit, Lagerort,
+ * Kategorie, MHD, Mindestbestand, Notiz -, als Wert statt als Eingabe; der Name
+ * steht im Titel. Kategorie, Mindestbestand und Notiz stehen NUR im Editor, die
+ * Zeile zeigt sie nie. Kein Fusszeilen-Knopf, das X schliesst.
+ */
+function itemReadHtml(item) {
+  const amount = (value) => pantryQuantityLabel(Number(value) || 0, item.unit, { t, formatNumber: formatQuantity });
+  return `
+    <div class="pantry-item-read detail-view" data-view="read" data-item-id="${esc(String(item.id))}">
+      <div class="detail-view__rows">
+        ${readRowHtml({ icon: 'hash', label: t('pantry.quantityLabel'), value: amount(item.quantity) })}
+        ${readRowHtml({ icon: 'map-pin', label: t('pantry.locationLabel'), value: item.location_name ? locationLabel(item.location_name) : t('pantry.unlocated') })}
+        ${readRowHtml({ icon: 'tag', label: t('pantry.categoryLabel'), value: item.category ? categoryLabel(item.category) : '' })}
+        ${readRowHtml({ icon: 'calendar', label: t('pantry.expiresLabel'), value: item.expires_on ? formatDate(item.expires_on) : '' })}
+        ${readRowHtml({ icon: 'triangle-alert', label: t('pantry.minQuantityLabel'), value: item.min_quantity != null ? amount(item.min_quantity) : '' })}
+        ${readRowHtml({ icon: 'align-left', label: t('pantry.notesLabel'), value: item.notes || '', multiline: true })}
+      </div>
+    </div>`;
+}
+
+function openItemReadModal(item) {
+  openSharedModal({
+    title: item.name,
+    size: 'md',
+    content: itemReadHtml(item),
+    onSave(panel) {
+      if (window.lucide) window.lucide.createIcons({ el: panel });
+    },
+  });
+}
+
 function openItemModal(mode, item = null) {
   const isEdit = mode === 'edit';
+  // Der Riegel steht VOR jeder Vorbereitung, und er steht HIER, weil Liste,
+  // Nebenpanel, FAB und Leerzustand alle diesen Weg nehmen: bei `read` geht
+  // fuer einen Artikel die Leseansicht auf, und Anlegen gibt es nicht. Den FAB
+  // blendet CSS aus (html[data-module-readonly]) - ausgeblendet ist nicht
+  // unerreichbar.
+  if (readOnly()) {
+    if (isEdit && item) openItemReadModal(withIntent(item));
+    return;
+  }
+  // Der Dialog zeigt den Artikel, wie ihn die Zeile zeigt: mit der Absicht
+  // eines Stepper-Schritts, dessen PATCH noch im Entprell-Fenster steht. Aus
+  // dem nackten Serverstand gefuellt stuende dort die alte Menge, und wer dann
+  // ein anderes Feld speichert, schriebe sie per PUT zurueck - der Schritt
+  // waere still verloren. Hier statt beim Aufrufer, weil Liste und Nebenpanel
+  // denselben Weg nehmen.
+  if (isEdit) item = withIntent(item);
   const locations = state.locations;
   const categories = state.categories;
 
@@ -1122,7 +1473,7 @@ function openItemModal(mode, item = null) {
     size: 'md',
     content: `
       <div class="form-group">
-        <label class="form-label" for="pantry-name">${esc(t('common.nameLabel'))}</label>
+        <label class="form-label" for="pantry-name">${esc(t('common.nameLabel'))}${REQUIRED_MARK}</label>
         <input id="pantry-name" class="form-input" type="text" required
                placeholder="${esc(t('pantry.namePlaceholder'))}">
       </div>
@@ -1165,7 +1516,7 @@ function openItemModal(mode, item = null) {
         </div>`,
       { open: isEdit && (item.min_quantity != null || !!item.notes) })}
       <div class="modal-panel__footer modal-panel__footer--plain">
-        ${isEdit ? `<button type="button" class="btn btn--danger-ghost pantry-form__delete" id="pantry-delete">${esc(t('common.delete'))}</button>` : ''}
+        ${isEdit ? `<button type="button" class="btn btn--danger-outline pantry-form__delete" id="pantry-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
         <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
         <button type="button" class="btn btn--primary" id="pantry-save">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
       </div>`,
@@ -1194,6 +1545,8 @@ function openItemModal(mode, item = null) {
 }
 
 async function saveItem(panel, mode, item) {
+  // Ein Dialog, den ein Rechtewechsel ueberholt hat: POST und PUT endeten im 403.
+  if (readOnly()) return;
   const saveBtn = panel.querySelector('#pantry-save');
   const nameInput = panel.querySelector('#pantry-name');
   const name = nameInput.value.trim();
@@ -1231,7 +1584,7 @@ async function saveItem(panel, mode, item) {
     await loadPantry();
     closeSharedModal({ force: true });
     renderFilters();
-    renderList();
+    renderList({ motion: true });
     window.yuvomi?.showToast(mode === 'create' ? t('pantry.created') : t('pantry.updated'), 'success');
   } catch (err) {
     saveBtn.disabled = false;
@@ -1240,8 +1593,19 @@ async function saveItem(panel, mode, item) {
 }
 
 async function removeItem(item) {
-  const rowEl_ = _container?.querySelector(`.pantry-row[data-id="${item.id}"]`);
-  if (rowEl_) rowEl_.style.display = 'none';
+  // VOR dem Ausklappen: sonst verschwaende die Zeile, das DELETE endete im
+  // 403, und sie kaeme mit Fehlermeldung zurueck.
+  if (readOnly()) return;
+  // Die Buehne (`li.swipe-row`), nicht nur die Zeile darin: sonst bliebe ein
+  // leeres Listenelement samt Trennlinie stehen.
+  const inner = _container?.querySelector(`.pantry-row[data-id="${item.id}"]`);
+  const rowEl_ = inner?.closest('.swipe-row') ?? inner;
+  // Die Zeile klappt aus, die Nachbarn ruecken nach (vorher `display: none`:
+  // sie war weg, der Rest sprang). `display: none` folgt erst DANACH und bleibt
+  // das Netz fuer alles, was nicht animiert (reduzierte Bewegung, kein
+  // `animate`): der Zustand "weg" haengt an keiner Animation.
+  let restored = false;
+  if (rowEl_) collapseOut(rowEl_).then(() => { if (!restored) rowEl_.style.display = 'none'; });
 
   scheduleUndoableDelete({
     message: t('pantry.deleted'),
@@ -1253,7 +1617,14 @@ async function removeItem(item) {
       renderList();
     },
     restore: (err) => {
-      if (rowEl_) rowEl_.style.display = '';
+      restored = true;
+      if (rowEl_) {
+        rowEl_.style.display = '';
+        // collapseOut haelt die Hoehe 0 (fill: forwards) - verwerfen, dann aufziehen.
+        rowEl_.getAnimations?.().forEach((anim) => anim.cancel());
+        rowEl_.style.overflow = '';
+        expandIn(rowEl_);
+      }
       if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     },
   });
@@ -1264,6 +1635,8 @@ async function removeItem(item) {
 // --------------------------------------------------------
 
 async function openLocationManager() {
+  // Zweite Linie hinter dem fehlenden Knopf im Kopf (Regel 7).
+  if (readOnly()) return;
   await import('/components/category-manager.js');
 
   // Die Auffrischung haengt am Ereignis, nicht am Schliessen: beim Loeschen
@@ -1321,6 +1694,9 @@ async function openLocationManager() {
 export const __test = {
   state,
   adjustQuantity,
+  // Kopfregel mobil: die Chipreihe ist das erste Kind des Ports und muss den
+  // Neuaufbau der Liste ueberleben (test-pantry-ux.js).
+  renderList,
   loadPantry,
   intents,
   quantityOf,
@@ -1333,4 +1709,25 @@ export const __test = {
   // Bestaetigung aus einem frueheren Fall schuetzt sonst den Artikel des
   // naechsten vor seiner eigenen Auffrischung.
   resetLoadOrderForTest: () => { _pantryAppliedLoad = 0; settledAt.clear(); },
+  // #1265 P4: der Warenkorb der Zeile und sein Handler schreiben in den
+  // Einkauf - gemessen am echten Knoten und als Programm
+  // (test-shopping-readonly-ui.js).
+  rowEl,
+  sendToShopping,
+  // R10 L4: das Nebenpanel ordnet wie die Filterchips (test-pantry-ux.js).
+  pantryWatchGroups,
+  renderWatch,
+  // Beide Wege in den Bearbeiten-Dialog (test-pantry-ux.js).
+  onListClick,
+  onWatchClick,
+  // R16 2b: der Lösch-Wisch der Vorratszeile (test-pantry-ux.js).
+  wirePantrySwipe,
+  removeItem,
+  // Nur-lesen im Vorrat: Leseansicht, Anlegen, Leerzustand und
+  // Lagerort-Verwaltung (test-shopping-readonly-ui.js).
+  READ_SAFE_ACTIONS,
+  openItemModal,
+  itemReadHtml,
+  emptyStateEl,
+  openLocationManager,
 };

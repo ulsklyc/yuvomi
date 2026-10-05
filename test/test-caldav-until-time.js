@@ -47,6 +47,8 @@ function buildDb() {
   d.exec(`
     CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, display_name TEXT);
     INSERT INTO users (display_name) VALUES ('Owner');
+    -- Die Frist der Farb-Heilung (#1270) liegt hier.
+    CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     CREATE TABLE caldav_accounts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT, caldav_url TEXT, username TEXT, password TEXT, last_sync TEXT
@@ -62,6 +64,8 @@ function buildDb() {
       default_assignee_user_id INTEGER, UNIQUE(source, external_id)
     );
     CREATE TABLE calendar_events (
+      -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL, description TEXT,
       start_datetime TEXT, end_datetime TEXT, all_day INTEGER NOT NULL DEFAULT 0,

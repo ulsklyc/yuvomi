@@ -93,6 +93,7 @@ const EXPECTED = [
   'PATCH /labs/:id',
   'DELETE /labs/:id',
   'POST /labs/:id/results',
+  'PATCH /results/:id',
   'DELETE /results/:id',
   // activities
   'GET /activities',

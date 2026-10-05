@@ -513,6 +513,10 @@
   height: 28px;
   border-radius: var(--radius-full);
   border: 2px solid transparent;
+  /* Eine ruhige Innenkante in beiden Themes (Re-Critique 2026-09-28, P9):
+     im Dark lief ein Swatch ohne Kante in den Kartengrund, und der Ring der
+     Auswahl stand dann um ein Feld, dessen Rand man nicht sah. */
+  box-shadow: inset 0 0 0 1px var(--color-border);
   position: relative;
   cursor: pointer;
   transition: transform var(--transition-fast), border-color var(--transition-fast);
@@ -531,3 +535,77 @@
    gegen ZEHN verschiedene Fuellungen bestehen, und --module-accent ist selbst
    ein Gruenton - auf dem gruenen Swatch waere die Auswahl unsichtbar gewesen. */
 .waste-color-swatch--active { border-color: var(--color-text-primary); transform: scale(1.1); }
+
+/* -------------------------------------------------------------------- */
+/* EIN Leerzustand statt drei (Re-Critique 2026-09-28, P4)                */
+/* -------------------------------------------------------------------- */
+
+/* Ohne jede Abfallart haben Abholungen und Quellen nichts zu sagen, und der
+   Abschnittstitel doppelt den Titel des Leerzustands. Der Kopfknopf faellt
+   weg, weil der FAB in diesem Zustand "Abfallart" heisst (waste.js,
+   fabIntent) - zweimal derselbe Weg macht die Wahl schwerer. */
+.waste-page--onboarding .waste-upcoming-section,
+.waste-page--onboarding .waste-sources-section,
+.waste-page--onboarding .waste-types-section .waste-section-title,
+.waste-page--onboarding #waste-add-type-btn {
+  display: none;
+}
+
+/* EIN WEG ZUR ABFALLART JE BREITE (R16, Kopfregel mobil 1a). Unter 768px
+   stehen die Werkzeuge in der Titelzeile, und die traegt nur Icon-Knoepfe:
+   der beschriftete Kopfknopf (193px) wird dort zum Eintrag im "..."-Menue.
+   Ab 768px steht der Knopf und der Eintrag ist ausgeblendet. Im Onboarding
+   heisst der FAB "Abfallart" - dort entfaellt auch der Eintrag. */
+@media (max-width: 767px) {
+  #waste-add-type-btn {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) {
+  #waste-page-menu [data-action="add-type"] {
+    display: none;
+  }
+}
+
+.waste-page--onboarding #waste-page-menu [data-action="add-type"] {
+  display: none;
+}
+
+.waste-onboarding {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding-block-end: var(--space-6);
+}
+
+/* Die Vorlagen als Chips derselben Kapselsprache wie jeder Filter der App -
+   hier aber als Aktion: ein Tipp legt die Abfallart an (kein aria-pressed,
+   es gibt keinen Zustand zu halten). Das Symbol traegt die Startfarbe. */
+.waste-onboarding__presets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  max-inline-size: 32rem;
+}
+
+.waste-onboarding__preset svg {
+  inline-size: var(--icon-md);
+  block-size: var(--icon-md);
+  flex-shrink: 0;
+}
+
+/* Die Abschnitte stehen im Spaltenraster der Seite (`.page-columns`,
+   layout.css): Abholungen links, Abfallarten und Quellen in der Seitenspalte.
+   Im Onboarding ist die Listenspalte leer - ohne sie rueckt der Leerzustand in
+   die erste Spur und steht auf dem Lesemass statt in der schmalen Spalte. */
+.waste-page--onboarding .page-columns__main {
+  display: none;
+}
+
+/* Der Abstand der Abschnitte bleibt der des Seitenkoerpers vor dem Raster. */
+.waste-page {
+  --page-columns-gap: var(--space-3);
+}

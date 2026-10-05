@@ -52,6 +52,22 @@
   display: grid;
   gap: var(--space-4);
   grid-template-columns: 1fr;
+  /* IMMER DICHT, AUCH MIT EIGENER REIHENFOLGE UND IM BEARBEITEN-MODUS
+   * (Critique 2026-09-23, Entscheidung Ulas) - und in jeder Breite mit mehr
+   * als einer Spalte; bei 768px liess die Quellordnung zwei Loecher. Ab 1024px
+   * stand hier `.dashboard__grid--preserve-order` mit `grid-auto-flow: row`:
+   * wer seine Kacheln umsortiert hatte oder gerade bearbeitete, bekam die
+   * Quellordnung statt der Lueckenfuellung. Der Zweck war richtig - eine
+   * Kachel, die man nach hinten gestellt hat, soll nicht vorn auftauchen -,
+   * der Preis war zu hoch: gemessen 18 % leere Flaeche bei 1440px, und beim
+   * Umschalten in den Bearbeiten-Modus sprangen die Karten auf andere Plaetze.
+   *
+   * Was vom Zweck bleibt, traegt `dense` selbst: die gespeicherte Reihenfolge
+   * ist die RANGFOLGE, in der jede Kachel ihren fruehesten freien Platz
+   * bekommt. Nach vorn wandert nur, was in ein Loch passt, das sonst leer
+   * bliebe. Bleibt trotzdem eines, liegt es an den Groessen, und dafuer hat
+   * der Bearbeiten-Modus seinen Hinweis (`.dashboard-grid-hint`). */
+  grid-auto-flow: row dense;
 }
 
 /* Widgets füllen die gesamte Gridzeilen-Höhe, so dass alle Widgets
@@ -186,12 +202,6 @@
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
     grid-auto-rows: minmax(132px, auto);
     gap: var(--space-5);
-    grid-auto-flow: row dense;
-  }
-
-  /* Bewusst umsortiert oder im Bearbeiten-Modus: Quellordnung vor Lückenfüllung. */
-  .dashboard__grid--preserve-order {
-    grid-auto-flow: row;
   }
 
   .widget-size--2x1,
@@ -248,6 +258,18 @@
   }
 }
 
+/* DIE KACHEL VOR EINER FREIEN ZELLE WAECHST IN DEN ZEILENREST (Re-Critique
+ * 2026-09-27, A7 P2-12 / R10 L9). Welche und wie weit, rechnet
+ * `applyRowFill()` (dashboard.js) nach der Packung aus und setzt es als
+ * Darstellung, nicht als Groesse: gespeichert bleibt, was der Nutzer gewaehlt
+ * hat. Gemessen 1440x900: rechts neben Kennzahlen und Notizen blieb je eine
+ * 367px-Spalte leer. Nur ab zwei Spalten - einspaltig gibt es keinen Rest. */
+@media (min-width: 768px) {
+  .dashboard__grid > [data-row-fill] {
+    grid-column: span var(--widget-fill-span);
+  }
+}
+
 /* Kein eigener 1440px-Block mehr: `repeat(auto-fill, minmax(240px, 1fr))` ab 1024px
  * leitet die Spaltenzahl aus der Breite ab und deckt Wide-Screens (4–6 Spalten)
  * stufenlos ab — die frühere feste 3-→4-Spalten-Stufe war die Quelle der starren
@@ -283,6 +305,7 @@
 .widget--housekeeping { --widget-accent: var(--module-housekeeping); }
 .widget--schedule { --widget-accent: var(--module-schedule); }
 .widget--waste    { --widget-accent: var(--module-waste); }
+.widget--pantry   { --widget-accent: var(--module-pantry); }
 /* Wie das Wetter: eine Kachel, die keinem Modul gehoert, traegt den Ton der
  * Seite. Der Countdown (#647) sammelt aus Kalender UND Aufgaben ein - jeder
  * der beiden Toene waere fuer die andere Haelfte der Liste falsch. Ohne diese
@@ -719,6 +742,164 @@
   color: var(--color-accent);
 }
 
+/* Beendet heute (#1449): der Termin tritt zurueck, ueber die Farbe und nicht
+ * ueber die Deckung (#1230). Der Titel geht auf die Sekundaerstimme, das
+ * Etikett sagt „Vorbei" statt „Heute" - der Zustand haengt nicht an der Farbe
+ * allein. Die Zeile bleibt antippbar: der Termin ist vorbei, nicht weg. */
+.event-item--ended .event-item__title {
+  color: var(--color-text-secondary);
+}
+
+/* „+N frühere heute": die gefalteten beendeten Termine als ruhige Zahl ueber
+ * den zwei, die noch einzeln stehen. */
+.event-list__earlier {
+  margin: 0;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: var(--type-caption);
+  color: var(--color-text-tertiary);
+}
+
+/* --------------------------------------------------------
+ * „Diese Woche" - das Kalender-Widget in 2x1 (renderWeekStrip)
+ *
+ * Sieben Spalten in EINEM Raster: Kopf (Wochentag + Datum) in Zeile 1, je
+ * Band-Spur eine Zeile, die Punkte in der letzten. Der Tag selbst ist ein
+ * leerer Link, der seine ganze Spalte ueberdeckt - das Sichtbare liegt
+ * darueber und laesst den Tipp mit `pointer-events: none` durch. So ist die
+ * Spalte EIN Ziel (rund 48px breit auf 366px, ganze Hoehe), und ein Band
+ * kann ueber mehrere Spalten laufen, ohne einem Tag zu gehoeren.
+ *
+ * Die Zeilen stehen als Inline-`grid-row` am Markup, nicht als
+ * `grid-template-rows: repeat(var(--week-lanes), …)`: bei null Spuren waere
+ * `repeat(0, …)` ungueltig und risse die ganze Deklaration mit.
+ *
+ * Heute ist wie im Monatsraster NUR die Ziffer im gefuellten Akzent-Kreis -
+ * die Stimme einmal, klein. Punkt und Band tragen die freie Terminfarbe und
+ * deshalb den Ring in `--color-text-tertiary` (DESIGN.md, „Der Punkt braucht
+ * einen Ring"): sie sind hier der einzige Traeger der Auskunft.
+ * -------------------------------------------------------- */
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  column-gap: var(--space-0h);
+  grid-auto-rows: auto;
+}
+
+.week-strip__day {
+  position: relative;
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-fast);
+}
+
+.week-strip__day:hover {
+  background-color: var(--color-surface-hover);
+}
+
+.week-strip__day:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
+.week-strip__head,
+.week-strip__dots,
+.week-strip__band {
+  position: relative;
+  pointer-events: none;
+}
+
+.week-strip__head {
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-0h);
+  padding-top: var(--space-1h);
+}
+
+.week-strip__weekday {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  line-height: 1.2;
+}
+
+.week-strip__date {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  /* Wie .month-day__number: sonst sitzt die Ziffer im Kreis zu tief (#569). */
+  line-height: 1;
+  color: var(--color-text-primary);
+}
+
+.week-strip__head--today .week-strip__date {
+  background-color: var(--color-accent);
+  color: var(--color-ink-on-vivid);
+  font-weight: var(--font-weight-bold);
+}
+
+.week-strip__band {
+  align-self: start;
+  height: var(--space-1h);
+  margin: var(--space-1) var(--space-0h) 0;
+  border-radius: var(--radius-full);
+  background: var(--dot-color);
+  box-shadow: inset 0 0 0 var(--space-px) var(--color-text-tertiary);
+}
+
+/* Laeuft ueber den Rand des Streifens: das Ende ist offen - gerade Kante bis
+ * an den Rand statt der Rundung, die „hier hoert es auf" sagen wuerde. */
+.week-strip__band--before {
+  margin-inline-start: 0;
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+.week-strip__band--after {
+  margin-inline-end: 0;
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.week-strip__dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-0h) var(--space-2);
+}
+
+.week-strip__dot {
+  width: var(--space-2h);
+  height: var(--space-2h);
+  border-radius: var(--radius-full);
+  background: var(--dot-color);
+  box-shadow: inset 0 0 0 var(--space-px) var(--color-text-tertiary);
+}
+
+.week-strip__more {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  line-height: var(--space-2h);
+  font-variant-numeric: tabular-nums;
+}
+
+.week-strip__empty {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
 /* --------------------------------------------------------
  * Essen-Widget (Slot-Grid)
  * -------------------------------------------------------- */
@@ -1043,6 +1224,9 @@
   max-width: min(var(--content-max-width-narrow), 100vw);
   max-height: 50vh;
   overflow: auto;
+  /* Kategorienamen trennen statt brechen (W1, test:typography). */
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
   overflow-wrap: anywhere;
   color: var(--color-text-primary);
   background: var(--color-surface);
@@ -1227,7 +1411,13 @@
   color: var(--color-text-secondary);
   border-radius: var(--radius-full);
   cursor: pointer;
-  z-index: 1;
+  /* UEBER DEM KOPF, nicht darunter. Hier stand `z-index: 1`, und
+   * `.widget__header` traegt seit dem Kopf-Umbau `z-index: 2` ueber die volle
+   * Kartenbreite: der Knopf war zu sehen und nicht zu treffen - an seinem
+   * Zentrum lieferte elementFromPoint den Kopf (Critique 2026-09-23, gemessen
+   * 390 und 1440). Sonde 4 misst verdeckte Ziele bewusst nicht und blieb gruen;
+   * test-dashboard-a11y-browser.js prueft genau diesen Fall. */
+  z-index: 3;
   transition: background var(--transition-fast);
 }
 
@@ -1254,10 +1444,6 @@
 
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-.weather-widget__refresh--spinning i {
-  animation: spin 0.7s linear infinite;
 }
 
 .weather-widget__inner {
@@ -1947,13 +2133,34 @@ svg.weather-forecast__icon {
   outline-offset: var(--focus-ring-offset);
 }
 
+/* Der Loch-Hinweis im Bearbeiten-Modus (dashboard.js, `gridHoleSuggestion`).
+ * Eine Zeile Sekundaertext mit ihrem einen Knopf, ohne eigene Flaeche: er
+ * steht ueber einem Raster, das im Bearbeiten-Modus schon getoent und
+ * gestrichelt ist, und eine dritte Rahmung darueber waere Laerm. */
+.dashboard-grid-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  margin-bottom: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: var(--type-secondary);
+}
+
+/* Der Knopf folgt dem Satz, statt am anderen Ende der Zeile zu stehen: er ist
+ * dessen zweite Haelfte, nicht eine Aktion der Seite. */
+.dashboard-grid-hint__text {
+  min-width: 0;
+  margin: 0;
+}
+
 /* --------------------------------------------------------
  * Wieder-Einblenden-Leiste (Inline-Edit-Modus)
  * Löst die Einbahnstraße des früheren Nur-Ausblenden-Inline-Modus ab; ersetzt
  * zugleich das entfernte zweite Editor-Modal.
  * -------------------------------------------------------- */
 .widget-restore {
-  margin-top: var(--space-4);
+  margin-bottom: var(--space-4);
   padding: var(--space-4);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
@@ -1973,10 +2180,16 @@ svg.weather-forecast__icon {
   gap: var(--space-2);
 }
 
+/* Die Chips stehen in einer Reihe und duerften nach der Zielgroessen-Regel
+ * dicht sein - aber ihr Nachbar in derselben Gruppe, der Optionen-Kreis, misst
+ * --target-md, und jedes andere Bedienelement des Anpassen-Modus auch. 38,6px
+ * (gemessen 1440) waren kein Entschluss, sondern Innenabstand plus Zeilenhoehe.
+ * Am Finger hebt die (pointer: coarse)-Regel unten weiter auf --target-base. */
 .widget-restore-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  min-height: var(--target-md);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
@@ -2080,7 +2293,7 @@ svg.weather-forecast__icon {
 }
 
 .onboarding-overlay--out {
-  animation: onboarding-out var(--duration-lg) ease forwards;
+  animation: onboarding-out var(--duration-lg) var(--ease-out) forwards;
 }
 
 @keyframes onboarding-in {
@@ -2224,8 +2437,9 @@ svg.weather-forecast__icon {
   gap: var(--space-3);
   /* Teil des Masthead-Bands: kein eigener Rahmen, nur ein feiner Divider trennt
    * die Glance-Zeile von der Begrüßung darüber. */
+  /* Die violette Haarlinie ueber dem Blatt ist weg (R14, A7 P3): Deko ohne
+   * Aussage, und der Gruss trennt sich vom Blatt schon durch dessen Flaeche. */
   padding-top: var(--space-4);
-  border-top: 1px solid color-mix(in srgb, var(--module-accent) var(--tint-hint), var(--color-border));
   /* Container bleibt deklariert: der Schmal-Fallback unten fragt den EIGENEN
    * Platz ab (sidebar-bewusst, nicht Viewport). Siehe tokens.css §11c. */
   container: today-cockpit / inline-size;
@@ -2387,6 +2601,86 @@ svg.weather-forecast__icon {
   font-size: var(--type-caption);
 }
 
+/* „+N weitere heute" ist ein Weg (Re-Critique 2026-09-27, A7 P2-9): dieselbe
+ * Fusszeile, aber als Zeile mit Ziel - volle Breite, Zielhoehe der Geraetewelt,
+ * Chevron am Ende wie jede navigierende Zeile, und der Text eine Stufe kraeftiger
+ * als die stille Coda, weil man ihn antippen soll. */
+.today-cockpit__more--link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--target-base);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.today-cockpit__more--link:hover,
+.today-cockpit__more--link:focus-visible {
+  background: color-mix(in srgb, var(--color-text-primary) var(--tint-state), var(--color-surface));
+  color: var(--color-text-primary);
+}
+
+.today-cockpit__more--link:focus-visible {
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
+/* Der Aufklapp-Knopf (Codex an #1485): zeigt keine Ansicht alle verdeckten
+ * Zeilen, klappt dieselbe Fusszeile sie an Ort und Stelle auf. Als <button>
+ * braucht sie den Reset auf die Optik des Links; das Chevron zeigt nach unten
+ * und dreht sich im offenen Zustand. */
+button.today-cockpit__more--link {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--color-border-subtle);
+  background: none;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.today-cockpit__more-icon {
+  transition: transform var(--transition-fast);
+}
+
+.today-cockpit__more[aria-expanded="true"] .today-cockpit__more-icon,
+.today-cockpit-card--group[aria-expanded="true"] .today-cockpit__more-icon {
+  transform: rotate(180deg);
+}
+
+/* DIE SAMMELZEILE DER UEBERFAELLIGEN (R14, dashboard.js groupOverdueRows).
+ * Sie ist ein Aufklapp-Knopf ohne Route, zeigt aber dieselbe Beruehrung wie
+ * jede Zeile mit Ziel - im Ton ihres Raums. Am Ende stehen die gestapelten
+ * Avatare und das Chevron, wo sonst die Zeit steht. */
+.today-cockpit-card--group:hover,
+.today-cockpit-card--group:focus-visible {
+  background: color-mix(in srgb, var(--today-card-accent) var(--tint-state), var(--color-surface));
+}
+
+.today-cockpit-card--group:focus-visible {
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
+.today-cockpit-card__trail {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+}
+
+/* Die aufgeklappten Zeilen setzen die Liste mit derselben Haarlinie fort. */
+.today-cockpit__rows--group > .today-cockpit-card:first-child,
+.today-cockpit__rows--group + .today-cockpit-card {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .today-cockpit__more-icon {
+    transition: none;
+  }
+}
+
 .today-cockpit-card--task {
   --today-card-accent: var(--module-tasks);
 }
@@ -2401,6 +2695,72 @@ svg.weather-forecast__icon {
 
 .today-cockpit-card--dinner {
   --today-card-accent: var(--module-meals);
+}
+
+/* Die Quellen des Beitrags-Vertrags (public/utils/today-sheet.js): jede Zeile
+ * spricht im Ton ihres Raums, wie die vier oben. Erinnerungen tragen den Ton
+ * ihrer Herkunft (Abo = Budget, Frist = Dokumente), nicht einen eigenen. */
+.today-cockpit-card--health       { --today-card-accent: var(--module-health); }
+.today-cockpit-card--rewards      { --today-card-accent: var(--module-rewards); }
+.today-cockpit-card--waste        { --today-card-accent: var(--module-waste); }
+.today-cockpit-card--birthdays    { --today-card-accent: var(--module-birthdays); }
+.today-cockpit-card--schedule     { --today-card-accent: var(--module-schedule); }
+.today-cockpit-card--housekeeping { --today-card-accent: var(--module-housekeeping); }
+.today-cockpit-card--budget       { --today-card-accent: var(--module-budget); }
+.today-cockpit-card--inventory    { --today-card-accent: var(--module-inventory); }
+.today-cockpit-card--documents    { --today-card-accent: var(--module-documents); }
+.today-cockpit-card--pantry       { --today-card-accent: var(--module-pantry); }
+
+/* Die Zeilen des Programms als eigene Liste im Traeger: Mehr-Zeile, Einkauf und
+ * Coda stehen darunter ueber die volle Breite, auch wenn die Zeilen sich auf
+ * breiter Buehne in zwei Spalten teilen. */
+.today-cockpit__rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Die Einkaufszeile folgt der Liste, nicht einer Geschwisterzeile - dieselbe
+ * Haarlinie wie zwischen den Zeilen. */
+.today-cockpit__rows + .today-cockpit-card {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* Die aufgeklappten verdeckten Zeilen (Codex an #1485) setzen die Liste fort:
+ * dieselbe Haarlinie zur letzten sichtbaren Zeile, und zugeklappt nimmt ihr
+ * `display: grid` dem `hidden` nicht die Wirkung. */
+.today-cockpit__rows--more[hidden] {
+  display: none;
+}
+
+.today-cockpit__rows + .today-cockpit__rows--more {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* ZWEI SPALTEN AB 720PX CONTAINERBREITE (Critique 23.09.2026). Das Blatt ist am
+ * Desktop 1140px breit; eine Zeile ueber die volle Breite hielt den Titel links
+ * und die Uhrzeit ueber 900px davon entfernt rechts - das Auge musste die Zeile
+ * absuchen. Zwei Spalten halbieren den Weg und die Hoehe. Gefuellt wird
+ * SPALTENWEISE (grid-auto-flow: column): links die fruehere, rechts die spaetere
+ * Haelfte, das Programm liest sich weiter von oben nach unten. Die Zahl der
+ * Zeilen je Spalte setzt das Markup (`--today-rows-per-column`), weil nur es sie
+ * kennt. Unter 720px - Telefon, Tablet hochkant, Desktop mit schmaler Spalte -
+ * bleibt es die eine Liste in unveraenderter Hoehe. */
+@container today-cockpit (min-width: 720px) {
+  .today-cockpit__rows--split {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: repeat(var(--today-rows-per-column, 1), auto);
+    grid-auto-flow: column;
+  }
+
+  .today-cockpit__rows--split > .today-cockpit-card--col2 {
+    border-left: 1px solid var(--color-border-subtle);
+  }
+
+  /* Die erste Zeile der rechten Spalte steht oben am Traeger - dort gehoert
+   * keine Haarlinie hin, auch wenn sie im Markup auf eine Zeile folgt. */
+  .today-cockpit__rows--split > .today-cockpit-card--col-start {
+    border-top: none;
+  }
 }
 
 /* Sehr schmale Container (iPhone-SE-Klasse): die Liste ist bereits einspaltig;
@@ -2460,41 +2820,98 @@ svg.weather-forecast__icon {
   container: dashboard-overview / inline-size;
 }
 
-/* Oben buendig, nicht mittig: der Grusstapel ist drei bis vier Zeilen hoch, die
- * Werkzeugspalte eine bis zwei - zentriert landete der Knopf auf halber
- * Titelhoehe und der Stand-Anker daneben im Nichts. Buendig oben steht beides
- * auf der Datumszeile. */
+/* DATUMSZEILE MIT WERKZEUGEN, DARUNTER DER TITEL UEBER DIE VOLLE BREITE
+ * (Critique 2026-09-23, P1).
+ *
+ * Hier stand eine Flex-Zeile: links der Grusstapel, rechts die Werkzeugspalte.
+ * Mobil nahm die Spalte dem Large Title die halbe Breite - bei 390px blieben
+ * ihm 171px, „Guten Abend, Linda" brach dreizeilig um, das Datum zweizeilig,
+ * und der erste Inhalt stand bei 274 von 844px. Die Knoepfe gehoeren in die
+ * Datumszeile, wie die Leistenknoepfe ueber einem Large Title; der Titel
+ * bekommt die ganze Zeile darunter. Gemessen danach: einzeilig bei 390 und 375,
+ * erster Inhalt bei rund 160px.
+ *
+ * Ab 640px Kopfbreite passt beides nebeneinander, und dort bleibt die alte
+ * Gestalt: die Werkzeuge stehen oben rechts auf Hoehe des Datums und ueberspannen
+ * die Zeilen des Grusses, statt der Datumszeile ihre 40px Hoehe aufzuzwingen.
+ * Der Desktop-Kopf wird dadurch nicht hoeher, sondern um den Stand-Anker
+ * niedriger (67 → 63px). */
 .dashboard-overview__header {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "date    tools"
+    "title   title"
+    "weather weather";
+  align-items: center;
+  column-gap: var(--space-3);
 }
 
-/* Bearbeiten-Modus: die Customize-Toolbar braucht volle Breite, daher mobil unter
- * die Begrüßung umbrechen; ab Container-Breite wieder einzeilig. Der schlanke
- * Normalzustand bleibt einzeilig (Icon rechts, vertikal zur Begrüßung zentriert). */
+@container dashboard-overview (min-width: 640px) {
+  .dashboard-overview__header {
+    grid-template-areas:
+      "date    tools"
+      "title   tools"
+      "weather tools";
+    align-items: start;
+  }
+}
+
+/* Bearbeiten-Modus: die Werkzeugleiste (Hinweis, Knoepfe, Speichern) braucht
+ * eine eigene Zeile und laeuft mobil unter dem Gruss ueber die volle Breite; ab
+ * 640px Kopfbreite steht sie wieder rechts, mittig zum Gruss. */
 .dashboard-overview__header--editing {
-  flex-direction: column;
-  align-items: stretch;
+  grid-template-areas:
+    "date    date"
+    "title   title"
+    "weather weather"
+    "tools   tools";
+  row-gap: var(--space-2);
 }
 
 @container dashboard-overview (min-width: 640px) {
   .dashboard-overview__header--editing {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+    grid-template-areas:
+      "date    tools"
+      "title   tools"
+      "weather tools";
+    row-gap: 0;
+  }
+
+  .dashboard-overview__header--editing > .dashboard-overview__tools {
+    align-self: center;
   }
 }
 
-.dashboard-overview__heading {
-  min-width: 0;
+/* DIE KOMPAKTE HOEHENKLASSE (DESIGN.md, „Die Chrome-Regel"): unter 500px
+ * Fensterhoehe faellt der Kopf auf seine Bar-Zeile. Hier ist das die
+ * Datumszeile mit den Knoepfen - Gruss und Wetterzeile treten ab. Bei 640x400
+ * (ein 1280x800-Laptop bei 200 % Zoom) standen sonst gut 150px Kopf ueber
+ * einem Inhalt von 400. Der Gruss bleibt als Ueberschrift im Dokument, nur
+ * nicht im Bild: Screenreader finden die Seite weiter unter ihrem h2. */
+@media (max-height: 499px) {
+  .dashboard-overview__header:not(.dashboard-overview__header--editing) > .dashboard-overview__title,
+  .dashboard-overview__header:not(.dashboard-overview__header--editing) > .dashboard-overview__weather {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
 }
 
 .dashboard-overview__date {
   /* Apple-News-Muster: Datum als Versal-Footnote über dem Large Title.
    * Echte Information, kein dekorativer Kicker — Kanon-Bestandteil. */
+  grid-area: date;
+  /* Am FUSS seiner Zeile, direkt ueber dem Titel, zu dem es gehoert; die
+   * Knoepfe daneben sind hoeher (48px) und ragen nach oben. Mittig stand es
+   * 19px ueber dem Titel und las sich als Beschriftung der Knoepfe. */
+  align-self: end;
   display: block;
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
@@ -2504,6 +2921,7 @@ svg.weather-forecast__icon {
 }
 
 .dashboard-overview__title {
+  grid-area: title;
   margin: var(--space-1) 0 0;
   color: var(--color-text-primary);
   overflow-wrap: normal;
@@ -2525,6 +2943,7 @@ svg.weather-forecast__icon {
  * Gruss in der Sekundaerstimme - nie lauter als der Large Title. Ersetzt die
  * Wetter-Karte als Default; die Karte bleibt Wandtablet-Opt-in. */
 .dashboard-overview__weather {
+  grid-area: weather;
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -2547,36 +2966,17 @@ svg.weather-forecast__icon {
   color: var(--weather-tone, currentColor);
 }
 
-/* DIE WERKZEUGE HAENGEN OBEN, SIE SCHWEBEN NICHT IN DER MITTE. `align-items:
- * center` zentrierte den Zweizeiler aus Knopf und Stand-Anker gegen einen
- * Grusstapel, der drei Zeilen hoch ist (Datum, Large Title, Wetter) und mobil
- * vier - der Anker landete auf halber Hoehe neben dem Titel, ohne Bezug zu
- * irgendetwas. Oben buendig steht er ueber der Datumszeile, also dort, wo die
- * Seite ihre Metaangaben ohnehin fuehrt. */
+/* Die Werkzeuge: Wand-Einstieg und Anpassen, im Bearbeiten-Modus davor der
+ * Hinweis und die Leiste. Sie brechen um statt zu quetschen, damit die Leiste
+ * auf schmalen Koepfen eine zweite Zeile nehmen kann. */
 .dashboard-overview__tools {
+  grid-area: tools;
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
-  /* Umbruch statt eigener Spalte: der Stand-Anker (A8) legt sich als eigene
-   * Zeile UNTER den Anpassen-Knopf, ohne dass die Bearbeiten-Werkzeugleiste
-   * daneben ihre Zeile verliert. */
   flex-wrap: wrap;
   gap: var(--space-2);
   min-width: 0;
-  flex: 0 0 auto;
-}
-
-/* „Stand 14:32" - der leiseste Text der Seite. Er beweist am Wandtablet, dass
- * der stille Refresh laeuft, und darf dafuer nichts weiter tun: Footnote-Groesse,
- * tertiaere Farbe, kein Icon, keine eigene Flaeche. Tabellenziffern, damit die
- * Zeile beim Aktualisieren nicht in der Breite zuckt. */
-.dashboard-overview__updated {
-  flex: 0 0 100%;
-  margin: 0;
-  text-align: right;
-  color: var(--color-text-tertiary);
-  font-size: var(--type-caption);
-  font-variant-numeric: tabular-nums;
 }
 
 .dashboard-icon-btn {
@@ -2626,7 +3026,11 @@ svg.weather-forecast__icon {
   }
 }
 
-@media (min-width: 1024px) {
+/* Am Zeiger reichen die 40px der Desktop-Welt (--target-md, Zielgroessen-Regel
+ * in tokens.css §11b). Die Regel hing bis 2026-09-23 allein an der BREITE und
+ * nahm damit auch dem Touch-Tablet ab 1024px seine Fingergroesse - gemessen
+ * 40x40 bei 1180px. Das Kriterium ist die Zeigerfaehigkeit, nicht die Breite. */
+@media (min-width: 1024px) and (hover: hover) {
   .dashboard-icon-btn {
     width: var(--target-md);
     height: var(--target-md);
@@ -2664,20 +3068,113 @@ svg.weather-forecast__icon {
   color: var(--color-text-tertiary);
 }
 
+/* DER ANPASSEN-KOPF MOBIL: EINE ZEILE [Abbrechen] Titel [Fertig] (R9 M7).
+ *
+ * Gemessen vorher bei 390px: Reichweiten-Satz, "Als Vorgabe fuer alle",
+ * Abbrechen und Speichern brachen rechtsbuendig in drei Zeilen um (y 123-284),
+ * der Kopf war 248px hoch, und das erste Widget begann bei y 946 von 844
+ * (A7 P1-2). Das iOS-Muster fuer einen Bearbeiten-Modus ist die Leiste mit
+ * Abbrechen links, Titel in der Mitte und "Fertig" rechts - sie steht jetzt
+ * ueber Datum und Gruss. Der Reichweiten-Satz und die zwei Knoepfe, die die
+ * Reichweite aendern, stehen als Fussnote unter dem Raster
+ * (`.dashboard-customize-footnote`, dashboard.js).
+ *
+ * 639px am Fenster, nicht am Kopf-Container: die Fussnote steht ausserhalb
+ * des Kopfes, und beide muessen dieselbe Frage gleich beantworten. Zwischen
+ * 640px Fenster und 640px Kopfbreite bleibt die bisherige schmale Fassung
+ * stehen (Leiste unter dem Gruss) - mit allen Knoepfen an ihrem Ort. */
+.dashboard-customize-toolbar__title,
+.dashboard-customize-footnote {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .dashboard-overview__header--editing {
+    grid-template-areas:
+      "tools   tools"
+      "date    date"
+      "title   title"
+      "weather weather";
+  }
+
+  .dashboard-overview__header--editing .dashboard-customize-scope,
+  .dashboard-overview__header--editing .dashboard-customize-scope-action {
+    display: none;
+  }
+
+  .dashboard-overview__header--editing > .dashboard-overview__tools {
+    display: block;
+  }
+
+  .dashboard-customize-toolbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  /* Abbrechen links, auch wenn es im Markup hinter dem Titel steht: die
+   * Reihenfolge der Leiste bleibt fuer die breite Buehne, wo der Titel fehlt. */
+  .dashboard-customize-toolbar > .btn--secondary {
+    order: -1;
+  }
+
+  .dashboard-customize-toolbar__title {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+  }
+
+  .dashboard-customize-footnote {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-4) 0;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm);
+  }
+
+  .dashboard-customize-footnote p {
+    margin: 0;
+  }
+
+  .dashboard-customize-footnote__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+
+  /* "Heute wichtig" wird beim Anpassen nicht angeordnet - es klappt auf seine
+   * Kopfzeile mit dem Ausblenden-Knopf zusammen. Offen war das Band bei 390px
+   * 613px hoch und schob das erste Rasterwidget auf y 833 von 844; die
+   * Kacheln, um die es in diesem Modus geht, lagen unter dem Bildschirm.
+   * Breit steht das Band neben dem Raster nicht im Weg und bleibt offen. */
+  .today-cockpit--editing .today-cockpit__grid {
+    display: none;
+  }
+}
+
 /* Kein min-height-Override hier: der Basis-.btn ist bereits 48px (mobil) / 40px
  * (Desktop). Der frühere Override auf --target-md (40px) schrumpfte die Toolbar-
  * Buttons auch mobil unter das 44px-iOS-Minimum (Assessment B). */
 
-.dashboard-customize-toolbar .btn i {
-  width: 16px;
-  height: 16px;
-}
-
+/* Der Modus zeigt sich an der KANTE, nicht an einer Flaeche: die violette
+ * Toenung ueber dem ganzen Raster (Critique 2026-09-26) faerbte jede Kachel
+ * mit ein und machte den Bearbeiten-Zustand lauter als den Inhalt. Die
+ * gestrichelte Kante und die Leiste je Kachel sagen dasselbe leiser. */
 .dashboard__grid--editing {
   padding: var(--space-2);
   border: 1px dashed color-mix(in srgb, var(--module-accent) var(--tint-hint), var(--color-border));
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--module-accent) var(--tint-state), transparent);
 }
 
 .widget-wrapper--editing {
@@ -2794,6 +3291,109 @@ svg.weather-forecast__icon {
   flex-wrap: wrap;
 }
 
+/* DAS GROESSEN-MENUE DER EINSPALTIGEN BUEHNE (R9 M7, dashboard.js
+ * `renderWidgetSizeMenu`). Dieselbe Grenze wie das Raster: unter 768px ist es
+ * eine Spalte, und dort wirkt nur die Hoehe. Der Knopf zeigt die aktuelle
+ * Form und hat die Gestalt seiner Nachbarn (Ausblenden, Verschieben). Mit ihm
+ * passt die Leiste einer Kachel in EINE Zeile. */
+.widget-edit-controls__size-menu {
+  display: none;
+}
+
+.widget-edit-controls__size-trigger {
+  width: var(--target-md);
+  height: var(--target-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.widget-edit-controls__size-trigger .widget-size-mini,
+.widget-size-menu__item .widget-size-mini {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+/* Der Name in der Leiste gilt nur fuer die kompakte Liste auf dem Telefon
+ * (unten); breit traegt der Kachelkopf darunter den Namen. Fuer den
+ * Screenreader nennt ihn die Gruppe (`aria-label`) - der Text ist Bild. */
+.widget-edit-controls__caption {
+  display: none;
+}
+
+/* ANPASSEN AUF DEM TELEFON IST EINE LISTE (R14, A7 P2-2), wie „Widgets
+ * bearbeiten" in iOS: je Kachel eine Zeile mit Name, Verschieben, Groesse,
+ * Optionen und Auge - ohne den Kachelinhalt. Gemessen vorher 3924px Seite im
+ * Anpassen-Modus; angeordnet wird die Reihenfolge, und die liest man an den
+ * Namen, nicht an den Inhalten. */
+@media (max-width: 639px) {
+  /* Alles ausser der Leiste: auch die Kennzahlreihe, die kein `.widget` ist. */
+  .widget-wrapper--editing > :not(.widget-edit-controls) {
+    display: none;
+  }
+
+  /* Der Vorrat oben ist EINE wischbare Zeile, keine Wand aus 14 Chips
+   * (gemessen 503px hoch) - sonst stuende er dort, wo er die Liste verdeckt. */
+  .widget-restore__chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    margin-inline: calc(var(--space-4) * -1);
+    padding-inline: var(--space-4);
+  }
+
+  .widget-restore-chip,
+  .widget-restore-chip-group {
+    flex: 0 0 auto;
+  }
+
+  .widget-wrapper--editing {
+    padding: 0;
+    outline: none;
+  }
+
+  .dashboard__grid--editing {
+    gap: var(--space-2);
+  }
+
+  .widget-wrapper--editing > .widget-edit-controls {
+    flex-wrap: nowrap;
+    min-height: var(--target-base);
+    padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+
+  .widget-edit-controls__caption {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+  }
+}
+
+@media (max-width: 767px) {
+  .widget-edit-controls__size {
+    display: none;
+  }
+
+  .widget-edit-controls__size-menu {
+    display: inline-flex;
+    margin-inline-start: auto;
+  }
+}
+
 /* Segmentierter Größen-Button: ein klickbares Mini-Grid pro Preset. Ersetzt das
  * frühere Mini-Grid+Select+Label-Trio — eine Kontrolle, glanzbar, platzsparend. */
 .widget-size-btn {
@@ -2832,6 +3432,7 @@ svg.weather-forecast__icon {
 
   .widget-size-btn,
   .widget-edit-controls__hide,
+  .widget-edit-controls__size-trigger,
   .widget-edit-controls__move-btn {
     min-width: var(--target-base);
     min-height: var(--target-base);
@@ -3239,11 +3840,6 @@ svg.weather-forecast__icon {
   color: color-mix(in srgb, var(--countdown-accent, var(--color-accent)) 35%, var(--color-text-primary));
 }
 
-.countdown-item__icon i {
-  width: 16px;
-  height: 16px;
-}
-
 .countdown-item__body {
   min-width: 0;
 }
@@ -3421,6 +4017,38 @@ svg.weather-forecast__icon {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* Der gemeinsame Termin (Critique 2026-09-23): EINE Zeile statt derselben
+ * Auskunft in jeder Personenzeile. Ihr Zeichen ist kein Gesicht, sondern die
+ * Gruppe - neutral auf dem Well-Ton, denn die Farben gehoeren den Menschen,
+ * und ein erfundener Gruppenton spraeche als zehnter Familienton. */
+.family-widget-avatar--group {
+  background: var(--color-fill-well);
+  color: var(--color-text-secondary);
+}
+
+.family-widget-avatar--group svg {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+}
+
+/* DER REST, DER NICHT IN DIE KACHEL PASST (Aufgaben, Geburtstage, Notizen,
+ * Einkaufslisten). Dieselbe Fussnote wie `.countdown-more`: Sekundaerton und
+ * keine Trennlinie davor - sie ist ein Hinweis zur Liste, kein weiterer
+ * Eintrag darin. */
+.widget-list-more {
+  margin: var(--space-2) 0 0;
+  padding: 0 var(--space-2);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+}
+
+/* Die Notizkachel hat keinen `.widget__body`; das Raster traegt sein Polster
+ * selbst, die Fussnote steht darunter in derselben Flucht. */
+.widget--notes > .widget-list-more {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-3);
 }
 
 .budget-widget {
@@ -3634,62 +4262,231 @@ svg.weather-forecast__icon {
   line-height: 1.4;
 }
 
-/* --------------------------------------------------------
- * Belohnungen-Widget (Familien-Punktestand)
- * Mini-Ranking: Rang · Avatar · Name · Punkte. Der Spitzenreiter
- * bekommt eine dezente Modul-Tönung statt Pokal/Emoji (Kinder-UI-Verbot).
- * -------------------------------------------------------- */
-.rewards-widget {
+/* Die drei groessten Ausgaben der hohen Kachel (renderBudgetTopExpenses). Sie
+ * bleiben die Fusszeile - unten verankert, per Haarlinie abgesetzt -, nur mit
+ * drei Zeilen statt einer. Betraege rechtsbuendig in Tabellenziffern, damit die
+ * drei untereinander vergleichbar sind; Farbe traegt hier nichts, das sagt
+ * schon die rote Ausgabensumme darueber. */
+.budget-widget__top-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+/* DIE HOHE KARTE VERTEILT IHREN RAUM, STATT EIN LOCH ZU OEFFNEN (Integration
+ * 2026-09-23). Die Zeilenhoehe kommt von den Nachbarn: seit Geburtstage und
+ * Aufgaben unter ihrer Liste „+N weitere" nennen, ist die Zeile eine Textzeile
+ * hoeher, und die unten verankerte Fusszeile riss dasselbe Band wieder auf, das
+ * die Top-3-Liste geschlossen hatte (44px statt 19px bei 1280px). Die Fusszeile
+ * bleibt der letzte Block der Karte; der freie Raum faellt jetzt gleichmaessig
+ * zwischen Saldo, Sparquote, Ein-/Ausgaben und Liste statt in eine Luecke. */
+.dashboard .budget-widget:has(> .budget-widget__top) {
+  justify-content: space-between;
+}
+
+.dashboard .budget-widget:has(> .budget-widget__top) > .budget-widget__top {
+  margin-block-start: var(--space-3);
+}
+
+.budget-widget__top-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.rewards-widget-row {
-  display: grid;
-  grid-template-columns: 20px 32px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1h) var(--space-2);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  touch-action: pan-y pinch-zoom;
-  transition: background-color var(--transition-fast);
+.budget-widget__top-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
 }
 
-.rewards-widget-row:hover {
-  background-color: var(--color-surface-2);
+.budget-widget__top-row > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* DER SPITZENREITER WIRD AUSGEZEICHNET, NICHT EINGEFAERBT.
- *
- * Hier stand eine Modulton-Waschung, und die Rangziffer darauf trug denselben
- * Ton voll (Regel weiter unten) - zwei Kanaele fuer eine Aussage, und beide
- * sagten „Belohnungen" statt „vorne". Das Widget nennt seine Herkunft schon im
- * Kopf-Siegel; nach der Skalen-Regel bleibt eine Zuordnung neutral, wenn die
- * genannte Identitaet die des Raums ist. Die Auszeichnung traegt jetzt die
- * neutrale Well-Stufe, der Rang steht in der Schrift. */
-.rewards-widget-row--leader {
-  background: var(--color-fill-well);
-}
-
-.rewards-widget-row--leader:hover {
-  background: var(--color-surface-elevated-hover);
-}
-
-.rewards-widget-row__rank {
-  text-align: center;
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-tertiary);
+.budget-widget__top-row > strong {
+  flex: 0 0 auto;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
 }
 
-.rewards-widget-row--leader .rewards-widget-row__rank {
-  color: var(--color-text-primary);
+/* --------------------------------------------------------
+ * Belohnungen-Widget: der eigene Weg zur Praemie
+ *
+ * HIER STAND EIN MINI-RANKING (Rang · Avatar · Name · Punkte, der Spitzenreiter
+ * auf der Well-Stufe). Ein Kind las darin Wettbewerb statt Fortschritt
+ * (Critique 2026-09-23, Persona Emma). Es gibt keinen Rang und keine
+ * Auszeichnung mehr: das Kind sieht seinen Stand und einen Balken zum Ziel,
+ * Eltern sehen je Kind denselben Balken, nebeneinander.
+ *
+ * RUHIG, NICHT BUNT. Der Balken ist die einzige Farbflaeche und traegt den
+ * Modulton (--widget-accent = Familienton work); ein erreichtes Ziel ist ein
+ * voller Balken und ein Satz, kein Konfetti, keine zweite Farbe.
+ * -------------------------------------------------------- */
+/* Der Koerper ist eine Flex-Spalte (Fusszeilen-Regel oben); der Abstand zum
+ * Freigabe-Chip kommt aus `gap`, weil dessen `margin-block-start: auto` jeden
+ * eigenen Rand ueberschreibt und ohne Ueberschuss auf 0 faellt. */
+.dashboard .rewards-widget {
+  gap: var(--space-3);
 }
 
-.rewards-widget-row__avatar {
+.rewards-goal__track {
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-3);
+  overflow: hidden;
+}
+
+.rewards-goal__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--widget-accent);
+  transform-origin: left center;
+  transform: scaleX(var(--rewards-progress, 0));
+  transition: transform var(--transition-slow);
+}
+
+[dir="rtl"] .rewards-goal__fill {
+  transform-origin: right center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rewards-goal__fill { transition: none; }
+}
+
+.rewards-goal__label {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--type-caption);
+  line-height: var(--line-height-snug);
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  overflow-wrap: anywhere;
+}
+
+.rewards-goal__label--muted {
+  color: var(--color-text-tertiary);
+}
+
+/* Die Kurzform auf der Kachel, die eine Rasterzeile hoch ist (#1623). Sie
+ * darf umbrechen, hoechstens zwei Zeilen: stehen zwei Mitglieder nebeneinander
+ * (Viewports um 500 und um 1000px), bleiben dem Satz 165-197px, und ein
+ * Einzeiler mit Ellipse schnitt de, fr und el ab. Umbruch und Silbentrennung
+ * erbt sie von `.rewards-goal__label`. */
+.rewards-goal__label--compact {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+/* Die eigene Sicht: Stand, Balken, Satz - und daneben (breit) oder darunter
+ * (hoch) die zuletzt verdienten Punkte. `auto-fit` entscheidet das an der
+ * Breite der Karte, nicht an einer Groessenklasse. */
+.rewards-self {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-3) var(--space-5);
+  align-items: start;
+}
+
+.rewards-self__goal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.rewards-self__points {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.rewards-self__recent {
+  min-width: 0;
+}
+
+.rewards-self__recent-title {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-medium);
+}
+
+.rewards-recent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rewards-recent__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-block: var(--space-1h);
+  font-size: var(--type-secondary);
+}
+
+.rewards-recent__row + .rewards-recent__row {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.rewards-recent__delta {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.rewards-recent__reason {
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rewards-recent__when {
+  color: var(--color-text-tertiary);
+  font-size: var(--type-caption);
+  white-space: nowrap;
+}
+
+/* Die Eltern-Sicht: je Kind eine Zelle, nebeneinander, soweit die Breite
+ * reicht - auf einer breiten Karte stehen die Kinder Seite an Seite, auf einer
+ * schmalen untereinander. Nach Namen geordnet, keine Zelle hervorgehoben. */
+.rewards-widget__members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--space-3) var(--space-5);
+}
+
+.rewards-member {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.rewards-member__avatar {
   width: 32px;
   height: 32px;
   border-radius: var(--radius-full);
@@ -3701,13 +4498,28 @@ svg.weather-forecast__icon {
   overflow: hidden;
 }
 
-.rewards-widget-row__avatar img {
+.rewards-member__avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.rewards-widget-row__name {
+.rewards-member__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1h);
+  min-width: 0;
+}
+
+.rewards-member__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.rewards-member__name {
   color: var(--color-text-primary);
   font-weight: var(--font-weight-medium);
   overflow: hidden;
@@ -3715,20 +4527,21 @@ svg.weather-forecast__icon {
   white-space: nowrap;
 }
 
-.rewards-widget-row__points {
-  color: var(--color-text-tertiary);
-  font-size: var(--text-xs);
+.rewards-member__points {
+  color: var(--color-text-secondary);
+  font-size: var(--type-caption);
   white-space: nowrap;
-}
-
-.rewards-widget-row__points strong {
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
 }
 
-/* Der Fuss-Chip ist ein Bedienelement (role="button", er springt in die
- * Belohnungen) und war 38px hoch - unter der Zielgroesse der Geraetewelt.
+.rewards-widget__more {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--type-caption);
+}
+
+/* Der Fuss-Chip ist ein Bedienelement (ein Link, er springt in die
+ * Belohnungen, wo die Freigaben stehen) und war 38px hoch - unter der Zielgroesse der Geraetewelt.
  * Die Breite trug die Zeile ohnehin; gefehlt hat nur die Hoehe, deshalb
  * min-height statt eines groesseren Innenabstands: der Chip soll ein Chip
  * bleiben und nicht zur Schaltflaeche werden. */
@@ -3747,6 +4560,7 @@ svg.weather-forecast__icon {
   color: var(--color-text-primary);
   font-size: var(--type-secondary);
   font-weight: var(--font-weight-medium);
+  text-decoration: none;
   cursor: pointer;
   transition: background-color var(--transition-fast);
 }
@@ -3766,8 +4580,8 @@ svg.weather-forecast__icon {
 
 /* --------------------------------------------------------
  * Schedule-Widget (wer heute im Dienst oder frei ist)
- * Dieselbe Zeilen-Grammatik wie das Belohnungen-Widget (Avatar · Name ·
- * rechtsbuendiger Zustand), nur ohne Rang: eine feste Reihenfolge waere hier
+ * Zeilen-Grammatik der Mitglieder-Widgets (Avatar · Name ·
+ * rechtsbuendiger Zustand), ohne Rang: eine feste Reihenfolge waere hier
  * eine erfundene Rangfolge unter Diensten.
  * -------------------------------------------------------- */
 .schedule-widget {
@@ -3960,6 +4774,116 @@ svg.weather-forecast__icon {
   width: 15px;
   height: 15px;
   flex-shrink: 0;
+}
+
+/* --------------------------------------------------------
+ * Vorrat-Widget „Laeuft bald ab" (Critique 2026-09-23)
+ * Dieselbe Zeilenform wie Geburtstage und Countdown - Marke, Name mit
+ * Metazeile, rechts die Resttage, Haarlinie per +-Kombinator: alle drei
+ * beantworten „was, und wie lange noch", und zwei Formen dafuer waeren zwei
+ * Sorten Eintrag. Die Marke ist der LAGERORT (Kuehlschrank, Gefrierschrank),
+ * neutral auf der Mulde: die Farbe der Zeile gehoert der Dringlichkeit, der
+ * Modulton steht einmal im Siegel des Kopfes.
+ * -------------------------------------------------------- */
+.pantry-widget-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  /* Kein Radius: eine Zeile in EINEM Traeger ist keine Karte (Zeilenlisten-
+   * Regel, test:frontend-audit „row lists sit in exactly one carrier"). */
+  cursor: pointer;
+  touch-action: pan-y pinch-zoom;
+  transition: background-color var(--transition-fast);
+}
+
+.pantry-widget-row + .pantry-widget-row {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* Das benannte Token, kein Schatten - dieselbe Antwort wie .countdown-item. */
+.dashboard .pantry-widget-row:hover {
+  background-color: var(--color-surface-hover);
+}
+
+@media (pointer: coarse) {
+  .dashboard .pantry-widget-row {
+    min-height: var(--target-base);
+    box-sizing: border-box;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pantry-widget-row { transition: none; }
+}
+
+.pantry-widget-row__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-fill-well);
+  color: var(--color-text-secondary);
+}
+
+.pantry-widget-row__icon svg,
+.pantry-widget-row__icon i {
+  width: 16px;
+  height: 16px;
+}
+
+.pantry-widget-row__body {
+  min-width: 0;
+}
+
+.pantry-widget-row__name {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pantry-widget-row__meta {
+  margin-top: var(--space-0h);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Die Resttage sind der Grund, warum die Zeile da steht: rechts, mit Gewicht,
+ * ohne Badge-Flaeche - „Laeuft morgen ab" ist ein Satzteil, kein Etikett.
+ * Drei Raenge aus pantryExpiryTone() (utils/pantry-status.js): */
+.pantry-widget-row__days {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+/* Abgelaufen - das Einzige, das jetzt eine Entscheidung verlangt (essen,
+ * pruefen, wegwerfen). Der Gefahrenton steht nur hier, in der Schrift. */
+.pantry-widget-row__days--expired {
+  color: var(--color-danger);
+  font-weight: var(--font-weight-bold);
+}
+/* Heute und morgen - der Tag, an dem man es noch verbrauchen kann. */
+.pantry-widget-row__days--now { color: var(--color-warning); }
+/* `soon` bleibt beim Sekundaerton der Basisregel: nah genug fuer die Liste,
+ * nicht nah genug, um zu rufen. */
+
+/* Der Rest, der nicht in die Kachel passt - eine Fussnote, kein Eintrag. */
+.pantry-widget-more {
+  margin: var(--space-2) 0 0;
+  padding: 0 var(--space-2);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
 }
 
 /* --------------------------------------------------------
@@ -4266,7 +5190,7 @@ svg.weather-forecast__icon {
   }
 
   .dashboard-overview__header {
-    gap: var(--space-2);
+    column-gap: var(--space-2);
   }
 
   .dashboard-overview__tools {
@@ -4300,6 +5224,15 @@ svg.weather-forecast__icon {
   .today-cockpit-card {
     padding: var(--space-3);
     gap: var(--space-3);
+  }
+
+  /* EINE ZEILE TITEL NEBEN DEM LABEL (R14, A7 P2-2). Neben „Ueberfaellig"
+   * brach der Titel in zwei Zeilen um, die Zeile wuchs von 64 auf 87px. Der
+   * Titel kuerzt sich jetzt wie in den Erinnerungen-Widgets; ganz lesen ihn
+   * der Screenreader und die Aufgabe hinter dem Tipp. */
+  .today-cockpit-card__value {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
   }
 }
 
@@ -4348,6 +5281,18 @@ svg.weather-forecast__icon {
   display: none;
 }
 
+/* Meldungen stehen auf der Wand OBEN (#1559). Unten liegt der Fuss mit
+ * Ausstieg und Timer-Startknoepfen, und der Stapel rechnet dort mit einer
+ * Tab-Leiste, die hier gar nicht steht: der Hinweis beim Einschalten lag am
+ * Telefon acht Sekunden lang auf „5 Min" und nahm den Tipp. Oben steht nur die
+ * Uhr, die nichts annimmt. Die Lage neben einem offenen Dialog
+ * (`[data-dock]`, utils/toast-placement.js) bleibt dessen Sache. */
+[data-wall-mode] .shell-bottom-stack:not([data-dock]) {
+  top: calc(var(--safe-area-inset-top) + var(--space-4));
+  bottom: auto;
+  left: 50%;
+}
+
 .dashboard--wall {
   padding: 0;
   margin: 0;
@@ -4363,7 +5308,13 @@ svg.weather-forecast__icon {
   /* Die Distanz-Skala der Fläche - einmal hier, nirgends als Einzelwert. */
   --wall-clock:      clamp(var(--text-5xl), 9vw, var(--text-6xl));
   --wall-clock-date: clamp(var(--text-xl), 2.6vw, var(--text-4xl));
-  --wall-section:    clamp(var(--text-base), 1.6vw, var(--text-xl));
+  /* Abschnittstitel an `vmin` wie die Zeilen, nicht an `vw` (Critique
+   * 2026-09-23): an `vw` gebunden kappten sie bei 1280px auf 20px - aus zwei
+   * Metern die kleinste Schrift der Flaeche, kleiner als die Unterzeilen, die
+   * sie ueberschreiben. Jetzt 24px bei 1280x800, 28px ab rund 930px Hoehe:
+   * weiter unter dem Zeilentitel, damit die Rangfolge Uhr - Zeile - Titel
+   * haelt. */
+  --wall-section:    clamp(var(--text-xl), 3vmin, var(--text-3xl));
   --wall-row-title:  clamp(var(--text-xl), 4vmin, var(--text-4xl));
   --wall-row-sub:    clamp(var(--text-sm), 2.2vmin, var(--text-2xl));
   --wall-pad:        clamp(var(--space-4), 3vmin, var(--space-10));
@@ -4469,6 +5420,23 @@ svg.weather-forecast__icon {
 }
 
 /* ── Das Tagesprogramm ── */
+/* WENIGE ZEILEN, GROESSERE ZEILEN (Critique 2026-09-23). Der Deckel von vier
+ * Zeilen plus Einkauf ist fuer den vollen Tag gerechnet (WALL_ROW_CAP); an
+ * einem ruhigen Tag mit zwei Zeilen blieben bei 1280x800 die unteren 40 % der
+ * Wand leer, waehrend die Zeilen in der Groesse standen, die fuer fuenf
+ * gebraucht wird. Bis drei Eintraege tritt die Zeile deshalb eine Stufe auf die
+ * Display-Stufe: der Zeilentitel waechst bis 48px (5.5vmin, bei 800px Hoehe
+ * 44px), die Unterzeile mit. Drei so hohe Zeilen passen bei 1280x800 mit Uhr,
+ * Titel und Fuss ins Bild (rund 660px) - die Rechnung, die WALL_ROW_CAP fuer
+ * den vollen Tag fuehrt, gilt hier fuer den leeren. Ab der vierten Zeile gilt
+ * wieder die Grundskala, damit der volle Tag unten nicht aus dem Bild laeuft.
+ * Gezaehlt wird am Traeger selbst (`:has`), nicht im Skript: die Liste weiss,
+ * wie lang sie ist. */
+.wall-program__list:not(:has(> :nth-child(4))) {
+  --wall-row-title: clamp(var(--text-2xl), 5.5vmin, var(--text-5xl));
+  --wall-row-sub:   clamp(var(--text-base), 2.8vmin, var(--text-3xl));
+}
+
 /* Zeilenliste in EINEM Träger, getrennt per Haarlinie über den +-Kombinator -
  * dieselbe Grammatik wie das Cockpit, nur in Distanzgröße. */
 .wall-program__list {
@@ -4558,6 +5526,18 @@ svg.weather-forecast__icon {
 .wall-row--event    { --wall-row-accent: var(--module-calendar); }
 .wall-row--shopping { --wall-row-accent: var(--module-shopping); }
 .wall-row--dinner   { --wall-row-accent: var(--module-meals); }
+/* Die Quellen des Beitrags-Vertrags (public/utils/today-sheet.js): derselbe
+ * Satz Raeume wie im Cockpit, damit Wand und Blatt dieselbe Herkunft zeigen. */
+.wall-row--health       { --wall-row-accent: var(--module-health); }
+.wall-row--rewards      { --wall-row-accent: var(--module-rewards); }
+.wall-row--waste        { --wall-row-accent: var(--module-waste); }
+.wall-row--birthdays    { --wall-row-accent: var(--module-birthdays); }
+.wall-row--schedule     { --wall-row-accent: var(--module-schedule); }
+.wall-row--housekeeping { --wall-row-accent: var(--module-housekeeping); }
+.wall-row--budget       { --wall-row-accent: var(--module-budget); }
+.wall-row--inventory    { --wall-row-accent: var(--module-inventory); }
+.wall-row--documents    { --wall-row-accent: var(--module-documents); }
+.wall-row--pantry       { --wall-row-accent: var(--module-pantry); }
 
 /* Überlauf („+N weitere") und Coda („danach nichts mehr") sprechen als eine
  * ruhige Fußzeile UNTER dem Träger - sie erzählen zu Ende, sie sind keine
@@ -4789,11 +5769,67 @@ svg.weather-forecast__icon {
 }
 
 /* ── Fuß: Datenstand und der leise Ausstieg ── */
+/* DREI SPALTEN, DIE MITTE STEHT FEST. Hier stand `flex` mit `space-between`:
+ * die Mitte lag damit zwischen Stand und Ausstieg, nicht in der Mitte - und der
+ * Ausstieg waechst beim Wecken um seine Beschriftung. Die Startknoepfe rutschten
+ * dabei um 91px (gemessen 1440): wer die schlafende Wand auf „5 Min" antippte
+ * (das weckt nur, wall-timer.js) und an derselben Stelle nachtippte, startete
+ * „10 Min". Zwei gleich breite Aussenspalten halten die Mitte unbewegt, egal was
+ * rechts oder links waechst. */
 .wall__foot {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-4);
+  /* DER FUSS KLEBT AN DER UNTERKANTE, WENN DIE FLAECHE LAENGER IST ALS DAS BILD
+   * (#1559). Auf 390x844 lag der Ausstieg bei y=832-880, auf 375x667 ganz
+   * darunter: der einzige Weg hinaus nur per Scrollen erreichbar, und nichts
+   * sagte das. Keine Regel nach Geraeteklasse (d697fa1e4) - `sticky` greift nur,
+   * wenn der Platz fehlt; passt die Wand ins Bild, steht der Fuss wie bisher
+   * unter der Buehne.
+   *
+   * Polster und Gegenrand heben sich im Fluss auf: der Fuss nimmt keine Zeile
+   * mehr Platz ein als vorher (1280x800 passt weiter, siehe
+   * test:dashboard-surface-browser). Klebt er, fuellt sein Grund den Streifen
+   * bis zur Kante - der Inhalt scrollt DARUNTER durch, nicht zwischen Knopf und
+   * Kante hindurch -, und unten haelt er den Abstand der Flaeche, mindestens
+   * aber die Safe-Area (Home-Indikator). `--nav-tail` ist im Wandmodus 0
+   * (layout.css, Leiste ausgeblendet) - dieselbe Regel wie jede klebende
+   * Fusszeile im Inhalt (test:mobile-chrome). */
+  position: sticky;
+  bottom: var(--nav-tail);
+  z-index: 1;
+  margin-block: calc(-1 * var(--space-2)) calc(-1 * var(--wall-pad));
+  padding-block: var(--space-2) max(var(--wall-pad), var(--safe-area-inset-bottom));
+  background: var(--color-bg);
+}
+
+.wall__foot > :first-child {
+  justify-self: start;
+}
+
+.wall__foot > :last-child {
+  justify-self: end;
+}
+
+/* Eine Zeile braucht Platz fuer beides: fuenf Startknoepfe (340px) und je
+ * Aussenspalte einen wachen Ausstieg samt Beschriftung (220px, de). Fehlt er,
+ * werden die Aussenspalten ungleich und die Mitte rutscht wieder (gemessen: bei
+ * einer 800px breiten Flaeche um 26px). Die Bedienung bekommt dann eine eigene
+ * Zeile ueber Stand und Ausstieg; der alte Fuss lief bei 390px sogar rechts
+ * aus dem Bild (Ausstieg wach bei 356-478). Gefragt wird die FLAECHE
+ * (`container: wall`, siehe `.wall`), nicht das Fenster. */
+@container wall (max-width: 1023px) {
+  .wall__foot {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--space-2);
+  }
+
+  .wall__foot > :nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: center;
+  }
 }
 
 /* Woher man weiß, dass die Fläche lebt: eine absolute Uhrzeit, keine
@@ -4812,21 +5848,23 @@ svg.weather-forecast__icon {
  * fremde Klasse getragen oder ihre Werte kopiert; beides ist ein Vokabular, das
  * beim nächsten Anfassen auseinanderläuft.
  *
- * LEISE DA, HELL AUF BERÜHRUNG. Ein dauerhaft voller Knopf widerspräche der
- * ruhigen Fläche, ein unsichtbarer wäre eine Falle. Im Ruhezustand steht
- * deshalb nur das Zeichen da - in Sekundärfarbe, also weiterhin AA und
- * weiterhin fokussierbar. Jede Berührung setzt `data-wall-awake` und hebt ihn
- * für sechs Sekunden auf die volle Kapsel samt Beschriftung.
+ * LEISE, ABER MIT WORT; HELL AUF BERÜHRUNG. Ein dauerhaft voller Knopf
+ * widerspräche der ruhigen Fläche, ein unsichtbarer wäre eine Falle. Bis #1559
+ * stand im Ruhezustand nur das Zeichen da, und das WAR die Falle: wer den
+ * Modus aus Versehen eingeschaltet hatte, sah ein graues Symbol ohne Namen und
+ * fand nicht hinaus (D#1494). Das Wort steht deshalb immer da, in
+ * Sekundärfarbe ohne Kapsel - die Ruhe kommt aus der Farbe, nicht aus dem
+ * Weglassen. Jede Berührung setzt `data-wall-awake` und hebt den Knopf für
+ * sechs Sekunden auf die volle Kapsel.
  *
- * Die Beschriftung wird ein- und ausgeblendet, nicht animiert: eine Breiten-
- * Transition wäre eine Layout-Animation für einen Zustand, den ohnehin niemand
- * beobachtet, der zwei Meter entfernt steht. Bewegt wird nur Farbe. */
+ * Das Polster ist in beiden Zuständen dasselbe: der Knopf ändert beim Wecken
+ * seine Breite nicht, nur Grund, Kante und Schrift. Bewegt wird nur Farbe. */
 .wall__foot-btn {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   min-height: var(--target-lg);
-  padding: 0 var(--space-2);
+  padding: 0 var(--space-4);
   border: 1px solid transparent;
   border-radius: var(--radius-full);
   background: transparent;
@@ -4843,23 +5881,12 @@ svg.weather-forecast__icon {
   flex-shrink: 0;
 }
 
-.wall__foot-btn-label {
-  display: none;
-}
-
 .wall__foot-btn:hover,
 .wall__foot-btn:focus-visible,
 .wall[data-wall-awake] .wall__foot-btn {
-  padding: 0 var(--space-4);
   border-color: var(--color-border);
   background: var(--color-surface);
   color: var(--color-text-primary);
-}
-
-.wall__foot-btn:hover .wall__foot-btn-label,
-.wall__foot-btn:focus-visible .wall__foot-btn-label,
-.wall[data-wall-awake] .wall__foot-btn-label {
-  display: inline;
 }
 
 .wall__foot-btn:focus-visible {
@@ -4912,7 +5939,16 @@ svg.weather-forecast__icon {
 }
 
 /* Leise da, hell auf Berührung - dieselbe Grammatik wie der Fuß-Knopf daneben,
- * nur schmaler: fünf davon stehen nebeneinander. */
+ * nur schmaler: fünf davon stehen nebeneinander.
+ *
+ * LEISE HEISST SICHTBAR (Critique 2026-09-23). Hier stand `color: transparent`:
+ * fünf klickbare Flächen, von denen im Ruhezustand nichts zu sehen war - und ein
+ * Tipp auf die schlafende Wand startete einen Timer, den niemand gewählt hatte.
+ * Das ist die Defektklasse, die `.impeccable/critique/ignore.md` als
+ * „unsichtbare, klickbare Bänder" führt; Ruhe entsteht durch Kontrast, nicht
+ * durch Unsichtbarkeit. Die Beschriftung steht deshalb in Tertiärfarbe da, eine
+ * Stufe unter dem Zeichen des Ausstiegs (Sekundär), ohne Kapsel. Dass der erste
+ * Tipp auf eine schlafende Wand nur weckt, regelt wall-timer.js. */
 .wall__timer-preset {
   min-height: var(--target-lg);
   min-width: var(--target-lg);
@@ -4920,7 +5956,7 @@ svg.weather-forecast__icon {
   border: 1px solid transparent;
   border-radius: var(--radius-full);
   background: transparent;
-  color: transparent;
+  color: var(--color-text-tertiary);
   font-family: inherit;
   font-size: var(--type-secondary);
   font-variant-numeric: tabular-nums;
@@ -5390,7 +6426,7 @@ svg.weather-forecast__icon {
 .nutrition-widget { display: grid; gap: var(--space-3); padding: var(--space-4); }
 .nutrition-widget__rows { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .nutrition-widget__row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-2) var(--space-3); }
-.nutrition-widget__label { font-size: var(--text-sm); color: var(--color-text-secondary); min-width: 0; overflow-wrap: anywhere; }
+.nutrition-widget__label { font-size: var(--text-sm); color: var(--color-text-secondary); min-width: 0; hyphens: auto; hyphenate-limit-chars: 6 4 4; overflow-wrap: anywhere; }
 .nutrition-widget__bar { grid-column: 1 / -1; grid-row: 2; display: block; block-size: var(--space-2); border-radius: var(--radius-full); background: var(--color-fill-well); overflow: hidden; }
 .nutrition-widget__fill { display: block; block-size: 100%; inline-size: 100%; transform: scaleX(var(--nutrition-scale, 0)); transform-origin: left center; border-radius: inherit; background: var(--module-health); }
 .nutrition-widget__bar--over .nutrition-widget__fill { background: var(--color-warning); }

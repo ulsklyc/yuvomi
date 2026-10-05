@@ -887,3 +887,25 @@ test('eine Serie ohne jedes Vorkommen liefert kein Countdown-Datum (#960)', () =
   const voll = { ...leer, recurrence_rule: 'FREQ=MONTHLY;BYMONTHDAY=-1;UNTIL=20260215' };
   assert.equal(nextEventDate(voll, '2026-01-01', null, GRACE), '2026-01-31');
 });
+
+test('ein Countdown auf einem Termin aus fremdem ungeteiltem ICS-Abo bleibt bei der Eigentuemerin des Abos', () => {
+  // Die Zeilen-Sichtbarkeit eines importierten Termins steht auf `all`; was ihn
+  // vor den anderen verbirgt, ist das ungeteilte Abo. Die Kalenderliste zieht
+  // diese zweite Klausel, die Countdown-Abfrage tat es nicht.
+  reset();
+  const other = seedUser('ics-other', 'member');
+  const sub = (shared) => get().prepare(
+    "INSERT INTO ics_subscriptions (name, url, shared, created_by) VALUES ('Abo', 'https://ics.test/c.ics', ?, ?)",
+  ).run(shared, ALICE).lastInsertRowid;
+  const attach = (id, subId) => get().prepare(
+    "UPDATE calendar_events SET external_source = 'ics', subscription_id = ? WHERE id = ?",
+  ).run(subId, id);
+  attach(seedEvent({ title: 'Abo privat', start: '2026-08-20' }), sub(0));
+  attach(seedEvent({ title: 'Abo geteilt', start: '2026-08-21' }), sub(1));
+  seedEvent({ title: 'Lokal', start: '2026-08-22' });
+
+  assert.deepEqual(cd({ userId: other, todayKey: '2026-08-17' }).map((c) => c.title), ['Abo geteilt', 'Lokal']);
+  assert.deepEqual(cd({ userId: ALICE, todayKey: '2026-08-17' }).map((c) => c.title), ['Abo privat', 'Abo geteilt', 'Lokal']);
+  get().prepare('DELETE FROM calendar_events').run();
+  get().prepare('DELETE FROM ics_subscriptions').run();
+});

@@ -14,9 +14,40 @@
    * den zweiten Kopf unter der Leiste flach (Issue #577). */
 }
 
+/* DIE LEISTE STEHT, DIE KAPSEL GLEITET (Critique 2026-09-26, A4 P2).
+ *
+ * Zwischen zwei Kuechen-Tabs ist die Leiste derselbe Knoten
+ * (utils/kitchen-tabs.js), und die View Transition des Seitenwechsels zeigt
+ * von ihr nur das lebende Bild (layout.css, Abschnitt Seiten-Uebergang) - sie
+ * gleitet nicht mehr mit der Seite herein.
+ *
+ * Die Auswahl ist eine eigene Kapsel HINTER den Labels, die vom alten zum
+ * neuen Tab gleitet. Seit der Re-Critique 2026-09-27 ist sie der geteilte
+ * Baustein aller Segment-Leisten (utils/segment-indicator.js, Regeln in
+ * sub-tabs.css) - hier steht nur noch, dass die Leiste beim Seitentausch
+ * steht. */
+.kitchen-tabs-bar {
+  view-transition-name: kitchen-tabs;
+}
+
 @media (max-width: 639px) {
+  /* KEIN ABSTAND ZWISCHEN DEN TABS (R9, 375px). Die Tabs tragen je 4px
+   * Polster, zwischen zwei Labels stehen damit 8px - der Leisten-Abstand
+   * legte 2px darauf, viermal (drei Tabs, dazu der Abstandhalter der
+   * Werkzeuge). Genau diese 8px fehlten bei 375px: Rezepte lief 3px, Vorrat
+   * 9px ueber, und die Leiste scrollte fuer vier Tabs. */
   .kitchen-tabs-bar {
-    gap: var(--space-0h);
+    gap: 0;
+  }
+
+  /* Der Zaehler ruckt ans Wort: 2px Innenpolster statt 4 und kein eigener
+   * Aussenrand - der Abstand zum Label kommt vom Tab (gap unten). Er bleibt
+   * eine Pille (min-width aus sub-tabs.css), nur ohne Luft, die die Zahl
+   * nicht braucht. Zusammen mit dem Abstand oben passt die Leiste bei 375px
+   * in allen vier Tabs; gerechnet in test-kitchen-tabs.js. */
+  .kitchen-tabs-bar .sub-tab__badge {
+    margin-inline-start: 0;
+    padding-inline: var(--space-0h);
   }
 
   /* Der Modultitel „Küche" entfällt mobil: die Bottom-Nav zeigt dasselbe Wort
@@ -60,10 +91,35 @@
      * statt als Segment. Die Rechnung der obigen Notiz bleibt gültig, nur mit
      * 64px statt 16px Polster: 234 Label + 42 Badge + 64 + 6 Gap = 346px, passt
      * in 375px. Darunter greift der dort beschriebene Weg - die Leiste scrollt,
-     * statt ein Wort zu kürzen. */
-    padding-inline: var(--space-2);
+     * statt ein Wort zu kürzen.
+     *
+     * 4px SEIT R9 (M10): die Leiste traegt in Rezepte/Vorrat jetzt auch Lupe und
+     * Werkzeugmenue (unten), und 8px je Seite waren genau die 32px, die bei 390px
+     * fehlten - "Vorrat 11" stand angeschnitten am Rand. Die Kapsel bleibt 48px
+     * hoch; sie liest sich weiter als Segment, weil die Labels selbst nie
+     * enger als 4px an ihre Kante ruecken. */
+    padding-inline: var(--space-1);
   }
 
+  /* DAS SIEGEL WEICHT MOBIL MIT DEM TITEL (R9 M10). Es wiederholte dasselbe
+   * Besteck, das die untere Leiste als aktiven Eintrag „Kueche" fuehrt, und
+   * kostete 26px der 358px, die vier Tabs plus Werkzeuge teilen. Am Desktop
+   * steht es weiter vor dem Titel. */
+  .kitchen-tabs-bar .module-seal {
+    display: none;
+  }
+
+  /* EINE REGEL FUER DEN KUECHENKOPF (Re-Critique 2026-09-28, P7 / A4 P2-3).
+   * Hier legten sich Lupe und "..." von Rezepte und Vorrat IN die Zeile der
+   * Leiste (R9 M10), und dafuer schrumpften dort die Zaehler zu Punkten -
+   * waehrend Mahlzeiten (Wochenzeile) und Einkauf (Listenzeile) ihre Werkzeuge
+   * in einer eigenen Kontextzeile trugen. Vier Tabs, vier Kopfbauarten, und
+   * "Einkauf 23" war je nach Tab eine Zahl oder ein 6px-Punkt. Jetzt gilt EINE
+   * Regel: die Leiste traegt nur Tabs mit ihren Zahlen, jedes Werkzeug steht
+   * in der Kontextzeile seines Tabs (der Kopf der Seite unter der Leiste).
+   * Traegt diese Zeile NUR Werkzeuge (Rezepte, Vorrat), faltet sie angedockt
+   * ein und kommt oben wieder (R17 K1) - erkannt von wireCollapsingHeader
+   * (utils/ux.js), gefaltet in layout.css ("DIE FALTZEILE"), nicht hier. */
   /* Mobil weicht das Icon, nicht das Label. Vier Tabs teilen sich auf 393px
    * ~90px pro Stück; „Mahlzeiten" allein braucht 73px Label + 16px Icon + die
    * Abstände, also ~95px - beides passt nicht nebeneinander. Das Wort ist der

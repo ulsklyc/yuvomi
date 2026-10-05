@@ -108,3 +108,10 @@ MSG_document_google_drive_client_secret="  Перевизначити секре
 MSG_document_google_drive_err_pair="Ідентифікатор і секрет клієнта Google Drive мають бути або обидва вказані, або обидва залишені порожніми."
 MSG_document_google_drive_err_credentials="Для Google Drive потрібна власна пара OAuth або налаштовані облікові дані Google Календаря."
 MSG_review_document_google_drive="Документи Google Drive"
+# Antworten, die install.sh als Ja / Nein / manuelle Eingabe gelten laesst, durch Leerzeichen
+# getrennt; y/yes, n/no und m gelten zusaetzlich immer. Der Buchstabe, den ein Prompt in [x/N],
+# [X/n] oder [M] zeigt, muss hier stehen. Gross/klein faltet install.sh nur fuer A-Z: ein Wort
+# mit anderen Zeichen steht auch in Grossbuchstaben und gross geschrieben da (test:installer-cli-i18n).
+MSG_yes_chars="так ТАК Так"
+MSG_no_chars="ні НІ Ні"
+MSG_manual_chars="m"

@@ -200,11 +200,11 @@ test('Verlauf: expense_deleted nennt Titel und Betrag, die angelegte Ausgabe tra
   const deleted = items.find((a) => a.type === 'expense_deleted' && a.entity_id === E1);
   assert.ok(deleted, 'expense_deleted im Verlauf');
   assert.equal(deleted.actor_id, CR.id);
-  assert.deepEqual(deleted.metadata, { title: 'Einkauf', amount: '30.00', currency: 'EUR' });
+  assert.deepEqual(deleted.metadata, { title: 'Einkauf', amount_minor: 3000, currency: 'EUR', amount: '30.00' });
   const deletedFx = items.find((a) => a.type === 'expense_deleted' && a.entity_id === E2);
   // Der Betrag, unter dem die Ausgabe in der Liste stand: der eingegebene, in
   // seiner Waehrung - nicht der umgerechnete, den das Ledger fuehrt.
-  assert.deepEqual(deletedFx.metadata, { title: 'Mietwagen', amount: '20.00', currency: 'USD' });
+  assert.deepEqual(deletedFx.metadata, { title: 'Mietwagen', amount_minor: 2000, currency: 'USD', amount: '20.00' });
 
   const created = items.find((a) => a.type === 'expense_created' && a.entity_id === E1);
   assert.equal(created.expense.id, E1);

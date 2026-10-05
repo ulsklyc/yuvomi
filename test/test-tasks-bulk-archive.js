@@ -25,9 +25,43 @@ globalThis.localStorage = {
   removeItem: (k) => { store.delete(k); },
   clear: () => store.clear(),
 };
-globalThis.document = globalThis.document ?? {
-  documentElement: { classList: { toggle() {}, add() {}, remove() {}, contains() { return false; } } },
+/**
+ * Gerade genug DOM fuer die Sammelaktions-Pille (utils/bulk-pill.js): sie baut
+ * ihre Knoten per createElement und haengt sie per replaceChildren in die
+ * Schicht. Die Schicht merkt sich, was zuletzt darin stand - daran liest der
+ * Test ab, welche Kapseln die Aufgaben anbieten.
+ */
+class FakeEl {
+  constructor(tag) { this.tagName = tag; this.children = []; this.attrs = {}; this.classList = new Set(); this.listeners = {}; this.textContent = ''; }
+  set className(v) { this.classList = new Set(String(v).split(/\s+/).filter(Boolean)); }
+  get className() { return [...this.classList].join(' '); }
+  setAttribute(k, v) { this.attrs[k] = String(v); }
+  getAttribute(k) { return this.attrs[k] ?? null; }
+  appendChild(c) { this.children.push(c); return c; }
+  addEventListener(type, fn) { this.listeners[type] = fn; }
+  querySelector() { return null; }
+  querySelectorAll() { return []; }
+  contains() { return false; }
+}
+const pillLayer = {
+  bar: null,
+  replaceChildren(...nodes) { this.bar = nodes[0] ?? null; },
+  querySelector: () => null,
 };
+globalThis.document = {
+  documentElement: { classList: { toggle() {}, add() {}, remove() {}, contains() { return false; } } },
+  activeElement: null,
+  getElementById: (id) => (id === 'bulk-pill-layer' ? pillLayer : null),
+  createElement: (tag) => new FakeEl(tag),
+};
+/** Die Kapseln der Pille, wie sie gerade steht: Beschriftung + Merkmale. */
+function pillCapsules() {
+  const bar = pillLayer.bar;
+  if (!bar) return null;
+  return bar.children
+    .filter((c) => c.classList.has('list-bulkbar__action'))
+    .map((c) => ({ label: c.textContent, danger: c.classList.has('list-bulkbar__action--danger'), aria: c.attrs['aria-label'] ?? null }));
+}
 const toasts = [];
 globalThis.window = globalThis.window ?? {};
 globalThis.window.yuvomi = { showToast: (msg, type) => toasts.push({ msg, type }) };
@@ -47,18 +81,15 @@ function recordApi(postAnswer = (_path, body) => ({ data: { archived: body.ids.l
   return calls;
 }
 
-/** Ein Container mit nichts als der Sammelaktionsleiste. */
+/**
+ * Seit D5 (Re-Critique 2026-09-27) laufen die Sammelaktionen ueber die Pille
+ * der Shell: jede Kapsel ruft `runBulkAction(action, container)`. Gemessen wird
+ * genau dieser Weg - der Container braucht dafuer nichts als `querySelector`.
+ */
 function fakeContainer() {
-  let onClick = null;
-  const bar = {
-    hidden: true,
-    classList: { toggle() {} },
-    querySelectorAll: () => [],
-    addEventListener: (type, fn) => { if (type === 'click') onClick = fn; },
-  };
   return {
-    container: { querySelector: (sel) => (sel === '#bulk-actions-bar' ? bar : null) },
-    click: (id) => onClick({ target: { closest: (sel) => (sel === 'button[id^="bulk-"]' ? { id, dataset: {} } : null) } }),
+    container: { querySelector: () => null },
+    click: (action) => tasks.runBulkAction(action, { querySelector: () => null }),
   };
 }
 
@@ -79,11 +110,10 @@ test.afterEach(() => {
 
 test('Mehrfachauswahl: ein POST /tasks/archive fuer alle, kein PATCH je Aufgabe', async () => {
   const calls = recordApi();
-  const { container, click } = fakeContainer();
-  tasks.wireBulkActions(container);
+  const { click } = fakeContainer();
   select([11, 12, 13]);
 
-  await click('bulk-archive');
+  await click('archive');
 
   const writes = calls.filter(([m]) => m !== 'get');
   assert.deepEqual(writes, [['post', '/tasks/archive', { ids: [11, 12, 13] }]]);
@@ -94,11 +124,10 @@ test('Mehrfachauswahl: ein POST /tasks/archive fuer alle, kein PATCH je Aufgabe'
 
 test('Mehrfachauswahl: uebersprungene gesperrte Aufgaben stehen im Toast', async () => {
   recordApi(() => ({ data: { archived: 1, skipped: 2 } }));
-  const { container, click } = fakeContainer();
-  tasks.wireBulkActions(container);
+  const { click } = fakeContainer();
   select([21, 22, 23]);
 
-  await click('bulk-archive');
+  await click('archive');
 
   assert.equal(toasts.length, 1);
   assert.equal(toasts[0].type, 'success');
@@ -107,11 +136,10 @@ test('Mehrfachauswahl: uebersprungene gesperrte Aufgaben stehen im Toast', async
 
 test('Mehrfachauswahl: nach einem Fehler wird trotzdem neu geladen', async () => {
   const calls = recordApi(() => { throw new Error('Too many requests'); });
-  const { container, click } = fakeContainer();
-  tasks.wireBulkActions(container);
+  const { click } = fakeContainer();
   select([31, 32]);
 
-  await click('bulk-archive');
+  await click('archive');
 
   assert.deepEqual(toasts, [{ msg: 'Too many requests', type: 'danger' }]);
   assert.ok(calls.some(([m]) => m === 'get'), 'die Liste darf nicht stehen bleiben, was schon abgelegt ist');
@@ -119,12 +147,11 @@ test('Mehrfachauswahl: nach einem Fehler wird trotzdem neu geladen', async () =>
 
 test('Mehrfachauswahl: mehr als 500 geht in Teilen zu je hoechstens 500', async () => {
   const calls = recordApi();
-  const { container, click } = fakeContainer();
-  tasks.wireBulkActions(container);
+  const { click } = fakeContainer();
   const ids = Array.from({ length: 501 }, (_, i) => i + 1);
   select(ids);
 
-  await click('bulk-archive');
+  await click('archive');
 
   const posts = calls.filter(([m]) => m === 'post');
   assert.equal(posts.length, 2);
@@ -174,4 +201,136 @@ test('Erledigt-Spalte: der Knopf steht nur am Kopf einer nicht leeren Erledigt-S
   // Gegenfall: leere Erledigt-Spalte, kein Knopf ohne Gegenstand.
   const empty = tasks.kanbanBoardHtml(cols, { ...grouped, done: [] });
   assert.doesNotMatch(empty, /data-kanban-archive-done/);
+});
+
+// ---------------------------------------------------------------------------
+// D5 (Re-Critique 2026-09-27): Pille statt eigener Leiste, Auswahlkreis statt
+// nativer Checkbox. Beide Faelle waren gegen den Stand davor rot: die Pille
+// gab es in tasks.js nicht (`updateBulkActionsBar` schrieb in #bulk-actions-bar),
+// und die Zeile trug `<input type="checkbox" class="task-bulk-checkbox">` VOR
+// dem Statuskreis.
+// ---------------------------------------------------------------------------
+
+test('Pille: ausserhalb des Auswahlmodus leer, darin „Fertig" - und mit Auswahl Status und Loeschen', () => {
+  tasks.state.viewMode = 'list';
+  tasks.state.tasks = [
+    { id: 1, title: 'A', status: 'open' },
+    { id: 2, title: 'B', status: 'done' },
+  ];
+  const container = { querySelector: () => null };
+  try {
+    tasks.state.bulkSelectMode = false;
+    pillLayer.bar = { stale: true };
+    tasks.updateBulkActionsBar(container);
+    assert.equal(pillLayer.bar, null, 'ohne Auswahlmodus raeumt die Pille ab');
+
+    tasks.state.bulkSelectMode = true;
+    tasks.updateBulkActionsBar(container);
+    assert.deepEqual(pillCapsules().map((c) => c.label), ['tasks.bulkFinish'],
+      'leere Auswahl: nur der Ausstieg, keine Kapsel ohne Gegenstand');
+
+    tasks.state.selectedTaskIds.add(1);
+    tasks.state.selectedTaskIds.add(2);
+    tasks.updateBulkActionsBar(container);
+    const caps = pillCapsules();
+    assert.deepEqual(caps.map((c) => c.label), ['tasks.bulkMarkDone', 'tasks.bulkDelete', 'tasks.bulkFinish'],
+      'drei Kapseln - Ablegen und Tags stehen waehrend der Auswahl im Werkzeugmenue');
+    assert.deepEqual(caps.filter((c) => c.danger).map((c) => c.label), ['tasks.bulkDelete'],
+      'nur Loeschen traegt die Gefahr - im Pillen-Stil, nicht als gefuellte rote Kapsel');
+    assert.match(caps[1].aria, /tasks\.bulkDeleteAsk\{"count":2\}/, 'Loeschen nennt, wie viele');
+
+    tasks.state.selectedTaskIds.delete(1);
+    tasks.updateBulkActionsBar(container);
+    assert.equal(pillCapsules()[0].label, 'tasks.bulkMarkOpen', 'nur Erledigtes gewaehlt: die Statuskapsel oeffnet wieder');
+  } finally {
+    tasks.state.bulkSelectMode = false;
+    tasks.state.selectedTaskIds.clear();
+    pillLayer.bar = null;
+  }
+});
+
+test('Auswahlkreis: ersetzt Statuskreis und Personenwahl, traegt den Titel im Namen, keine native Checkbox', () => {
+  const task = { id: 7, title: 'Muell <raus>', status: 'open', priority: 'none', subtasks: [] };
+  const normal = tasks.renderTaskCard(task);
+  assert.match(normal, /task-status-btn/, 'Gegenprobe: ohne Auswahlmodus steht der Statuskreis');
+
+  const selecting = tasks.renderTaskCard(task, { selecting: true, selected: false });
+  assert.doesNotMatch(selecting, /type="checkbox"/, 'keine native Checkbox in der Zeile');
+  assert.doesNotMatch(selecting, /task-status-btn|task-doer-btn/, 'der Auswahlkreis steht AN der Stelle, nicht daneben');
+  assert.doesNotMatch(selecting, /data-action="(?:edit-task|archive-task|add-subtask)"/, 'Zeilenaktionen treten ab');
+  const circle = selecting.match(/<button[^>]*class="select-circle[^"]*"[^>]*>/)?.[0] ?? '';
+  assert.ok(circle, 'der Auswahlkreis ist ein Knopf');
+  assert.match(circle, /aria-pressed="false"/);
+  assert.match(circle, /aria-label="tasks\.selectTaskNamed\{&quot;title&quot;:&quot;Muell &lt;raus&gt;&quot;\}"/,
+    'der Name nennt die Aufgabe - und maskiert sie');
+
+  const on = tasks.renderTaskCard(task, { selecting: true, selected: true });
+  assert.match(on, /class="select-circle task-select-btn select-circle--on"[^>]*aria-pressed="true"/);
+});
+
+test('Auswahlmodus: keine Wischgeste - ein Wisch hakt nicht ab und oeffnet nichts', () => {
+  // Codex an #1483: die Karten stecken im Auswahlmodus weiter in
+  // `renderSwipeRow()`, und `renderTaskList()` verdrahtete die Geste - ein
+  // Wisch nach vorn hakte die Aufgabe ab, statt auszuwaehlen. Gemessen an den
+  // verdrahteten Seiten UND an den Hoerern der Zeile: auch eine Geste ohne
+  // Seite schoebe die Karte unter dem Finger weg.
+  const hoerer = [];
+  const zeile = {
+    dataset: {}, classList: { add() {}, remove() {} },
+    querySelector: () => ({ style: {} }),
+    addEventListener: (type) => hoerer.push(type),
+  };
+  const liste = { querySelectorAll: (sel) => (sel === '.swipe-row' ? [zeile] : []), querySelector: () => null };
+  const container = { querySelector: (sel) => (sel === '#task-list' ? liste : null) };
+  const vorher = tasks.state.user;
+  tasks.state.user = { id: 2 };
+  try {
+    const normal = tasks.wireSwipeGestures(container);
+    assert.ok(normal.leading && normal.trailing, 'Gegenprobe: ausserhalb der Auswahl beide Seiten');
+    assert.ok(hoerer.includes('touchend'), 'Gegenprobe: die Zeile ist verdrahtet');
+
+    hoerer.length = 0;
+    tasks.state.bulkSelectMode = true;
+    const auswahl = tasks.wireSwipeGestures(container);
+    assert.equal(auswahl.leading, null, 'kein Abhaken per Wisch in der Auswahl');
+    assert.equal(auswahl.trailing, null, 'kein Oeffnen per Wisch in der Auswahl');
+    assert.deepEqual(hoerer, [], 'die Zeile bekommt gar keine Beruehrungs-Hoerer');
+  } finally {
+    tasks.state.bulkSelectMode = false;
+    tasks.state.user = vorher;
+  }
+});
+
+test('Auswahlmodus: Teilaufgaben zeigen ihren Zustand, bieten aber nichts an - die Karte waehlt nur aus', () => {
+  // Codex an #1483: der Auswahlkreis ersetzte nur den Statuskreis der
+  // Elternaufgabe; Haken, Umbenennen, Loeschen und „Teilaufgabe hinzufuegen"
+  // blieben bedienbar. ALLOWLIST statt Liste der verbotenen Aktionen: eine
+  // kuenftige Teilaufgaben-Aktion faellt hier auf, ohne dass jemand sie
+  // nachtraegt.
+  const task = {
+    id: 7, title: 'Muell', status: 'open', priority: 'none', subtask_total: 2, subtask_done: 1,
+    subtasks: [
+      { id: 8, title: 'Tonne', status: 'open', parent_task_id: 7 },
+      { id: 9, title: 'Sack', status: 'done', parent_task_id: 7 },
+    ],
+  };
+  const vorher = tasks.state.user;
+  tasks.state.user = { id: 2 };
+  try {
+    const aktionen = (html) => new Set([...html.matchAll(/data-action="([^"]+)"/g)].map((m) => m[1]));
+    const normal = aktionen(tasks.renderTaskCard(task));
+    for (const a of ['toggle-subtask', 'rename-subtask', 'delete-subtask', 'add-subtask']) {
+      assert.ok(normal.has(a), `Gegenprobe: ohne Auswahl bietet die Karte ${a} an`);
+    }
+
+    const html = tasks.renderTaskCard(task, { selecting: true });
+    const ERLAUBT = new Set(['toggle-select', 'open-task', 'toggle-subtasks']);
+    assert.deepEqual([...aktionen(html)].filter((a) => !ERLAUBT.has(a)), [],
+      'in der Auswahl nur auswaehlen, oeffnen (waehlt dort aus) und auf-/zuklappen');
+    assert.equal((html.match(/subtask-item__checkbox--static/g) ?? []).length, 2, 'der Zustand jeder Teilaufgabe bleibt als Zeichen');
+    assert.match(html, /subtask-item__checkbox--done subtask-item__checkbox--static|subtask-item__checkbox--static[^"]*subtask-item__checkbox--done/,
+      'die erledigte Teilaufgabe bleibt als erledigt erkennbar');
+  } finally {
+    tasks.state.user = vorher;
+  }
 });

@@ -121,10 +121,15 @@ export function renderPageHeader({
   inGroup = false,
   capped = false,
   stacked = false,
+  titleTools = false,
 } = {}) {
   const classes = [
     'page-toolbar',
     wrap && 'page-toolbar--wrap',
+    // Werkzeuge in der Titelzeile (mobil): nur fuer einen Kopf, dessen
+    // Werkzeugzeile hoechstens zwei Icon-Knoepfe traegt (DESIGN.md, Kopfregel
+    // mobil 1a; layout.css `.page-toolbar--title-tools`).
+    titleTools && 'page-toolbar--title-tools',
     narrow && 'page-toolbar--narrow',
     inGroup && 'page-toolbar--in-group',
     capped && 'page-toolbar--capped',
@@ -238,4 +243,20 @@ export function renderListSection({ className = '', content = '', id = '' } = {}
 export function renderMetricBand({ content, className = '' } = {}) {
   const cls = ['metric-grid', 'page-measure', esc(className)].filter(Boolean).join(' ');
   return `<div class="${cls}">\n${content}\n</div>`;
+}
+
+/**
+ * Flaeche mit Spalten (`.page-columns`, layout.css): die Liste links auf dem
+ * Lesemass, ab `--layout-split-threshold` eine Seitenspalte bis zur
+ * Modulkante. Die Seitenwurzel traegt dazu `app-page--columns` (Container).
+ * Ohne `rail` bleibt die Seitenspalte leer und die Liste steht auf derselben
+ * Breite wie in den Reitern mit Seitenspalte. `railFirst`: die Seitenspalte
+ * steht im DOM (und damit mobil) vor der Liste, am Desktop rechts daneben.
+ */
+export function renderPageColumns({ main = '', rail = '', railFirst = false, className = '' } = {}) {
+  const cls = ['page-columns', railFirst && rail && 'page-columns--rail-first', esc(className)]
+    .filter(Boolean).join(' ');
+  const mainHtml = `<div class="page-columns__main">\n${main}\n</div>`;
+  const railHtml = rail ? `<div class="page-columns__rail">\n${rail}\n</div>` : '';
+  return `<div class="${cls}">\n${railFirst ? railHtml + mainHtml : mainHtml + railHtml}\n</div>`;
 }

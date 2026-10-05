@@ -3,11 +3,29 @@ import assert from 'node:assert/strict';
 import { startHarness, openPage, gotoRoute } from './document-guards-harness.js';
 import { captureFastingViewport } from './fasting-visual-harness.js';
 
+// Die Statistik erscheint seit R14 (Re-Critique 2026-09-28, A6 P2-1) erst ab
+// dem ersten abgeschlossenen Fasten - vorher standen neun Nullen und sieben
+// leere Wochenkaesten da. Die Proben legen deshalb ein Fasten AUSSERHALB der
+// gezeigten Woche an: die Statistik steht, und jeder Tag der Woche ist ohne
+// Eintrag - genau der Zustand, den "Bez zaznamu" beschreibt.
+const seedFastOutsideWeek = (page) => page.evaluate(async () => {
+  const { api } = await import('/api.js');
+  const start = new Date(Date.now() - 40 * 86400000);
+  await api.post('/health/fasting', {
+    start_at: start.toISOString(), end_at: new Date(start.getTime() + 3600000).toISOString(),
+    start_tzid: 'UTC', acknowledge_safety: true,
+  });
+});
+
 test('weekly chart distinguishes absent records and captured goals', async () => {
   const harness = await startHarness();
   try {
     await harness.reset();
     const page = await openPage(harness, { locale: 'cs' });
+    await gotoRoute(page, '/health/fasting');
+    await page.waitForSelector('[data-fasting-action]');
+    assert.equal(await page.$('.fasting-stats'), null, 'ohne ein Fasten keine Statistik aus Nullen');
+    await seedFastOutsideWeek(page);
     await gotoRoute(page, '/health/fasting');
     await page.waitForSelector('.fasting-week');
     assert.match(await page.$eval('.fasting-week', (el) => el.textContent), /Bez záznamu/);
@@ -92,6 +110,7 @@ test('Arabic weekly series retain the left-right legend order', async () => {
   try {
     await harness.reset();
     const page = await openPage(harness, { device: 'mobile', theme: 'light', locale: 'ar' });
+    await seedFastOutsideWeek(page);
     await gotoRoute(page, '/health/fasting'); await page.waitForSelector('.fasting-week__track');
     assert.equal(await page.evaluate(() => document.documentElement.dir), 'rtl');
     assert.equal(await page.$eval('.fasting-week__track', (el) => getComputedStyle(el).direction), 'ltr', 'Series order matches the left/right legend in RTL');

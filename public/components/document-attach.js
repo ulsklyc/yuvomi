@@ -49,6 +49,7 @@
 import { api } from '/api.js';
 import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { isPreviewable } from '/utils/document-preview.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { attachOverlay } from '/utils/overlay-history.js';
@@ -123,7 +124,7 @@ export function renderDocumentAttachField({
         </button>
       </div>
       ${canUpload ? `<input class="sr-only" type="file" multiple accept="${ACCEPT}" data-doc-attach-input
-             aria-labelledby="doc-attach-label">` : ''}
+             aria-labelledby="doc-attach-label" tabindex="-1">` : ''}
       ${hintText ? `<p class="form-hint">${esc(hintText)}</p>` : ''}
     </div>`;
 }
@@ -144,6 +145,9 @@ export function renderDocumentAttachField({
  */
 export function attachmentLinksNode(attachments = []) {
   if (pathAccess('/documents') === 'none') return null;
+  // Ohne Leserecht auf die Dokumente kommt `attachments: null` (#1358): kein
+  // Beleg und keine Anzahl, also auch keine Zeile und kein Hinweis. Eine Zeile
+  // ohne ID wird nie zum Link auf `/documents/null`.
   const docs = (attachments || []).filter((a) => a?.document_id);
   if (!docs.length) return null;
   const wrap = document.createElement('div');
@@ -412,20 +416,23 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
     overlay.insertAdjacentHTML('afterbegin', `
       <div class="doc-attach-picker__panel" role="dialog" aria-modal="true"
            aria-label="${esc(t('documentAttach.pickerTitle'))}">
-        <div class="doc-attach-picker__header">
+        <div class="doc-attach-picker__header" data-dialog-actions>
           <strong>${esc(t('documentAttach.pickerTitle'))}</strong>
           <button class="btn btn--icon" type="button" data-picker-close
                   aria-label="${esc(t('common.cancel'))}">
             <i data-lucide="x" aria-hidden="true"></i>
           </button>
         </div>
-        <input class="form-input doc-attach-picker__search" type="search" data-picker-search
-               placeholder="${esc(t('documentAttach.searchPlaceholder'))}"
-               aria-label="${esc(t('documentAttach.searchPlaceholder'))}">
+        ${renderPageSearch({
+          id: 'doc-attach-picker-search',
+          label: t('documentAttach.searchPlaceholder'),
+          clearLabel: t('common.searchClear'),
+          className: 'doc-attach-picker__search',
+        })}
         <div class="doc-attach-picker__list" data-picker-list>
           <p class="doc-attach-picker__status">${esc(t('common.loading'))}</p>
         </div>
-        <div class="doc-attach-picker__footer">
+        <div class="doc-attach-picker__footer" data-dialog-actions>
           <button class="btn btn--secondary" type="button" data-picker-close>${esc(t('common.cancel'))}</button>
           <button class="btn btn--primary" type="button" data-picker-confirm disabled>
             ${esc(t('documentAttach.confirmSelection'))}
@@ -436,7 +443,7 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
     if (window.lucide) window.lucide.createIcons({ el: overlay });
 
     const listEl = overlay.querySelector('[data-picker-list]');
-    const searchEl = overlay.querySelector('[data-picker-search]');
+    const searchEl = overlay.querySelector('#doc-attach-picker-search');
     const confirmEl = overlay.querySelector('[data-picker-confirm]');
     // Der Auslöser bekommt den Fokus zurück - das Overlay liegt über einem
     // offenen Modal, sonst fiele der Fokus auf <body>.
@@ -495,7 +502,7 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
       confirmEl.disabled = selected.size === 0;
     });
 
-    searchEl.addEventListener('input', renderList);
+    wirePageSearch(overlay, { id: 'doc-attach-picker-search', delay: 0, onQuery: renderList });
     overlay.querySelectorAll('[data-picker-close]').forEach((button) => {
       button.addEventListener('click', () => close([]));
     });

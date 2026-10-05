@@ -184,7 +184,7 @@ peopleRouter.get('/people', (req, res) => {
     // ist 403 und nicht 404: den Pfad gibt es, er ist nur nicht fuer diesen
     // Aufrufer.
     if (req.authMethod !== 'display') {
-      return res.status(403).json({ error: 'This route is for paired displays.', code: 403 });
+      return res.status(403).json({ error: 'This route is for paired displays.', code: 403, reason: 'display_only' });
     }
     const d = db.get();
     const rows = d.prepare(`

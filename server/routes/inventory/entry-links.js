@@ -16,6 +16,14 @@
  * anders als bei einem Kontostand fehlt hier keine Summe, wenn die Buchung
  * wegbleibt. Deshalb budgetDetailsVisibleWhere() statt budgetVisibilityWhere().
  *
+ * UND NUR MIT LESERECHT AUF DAS BUDGET. Der Pfad gehoert `inventory`, Titel,
+ * Betrag und Datum kommen aus `budget`. Jede Funktion hier nimmt deshalb
+ * einen `viewer` aus `budgetViewer(req)` statt einer nackten Nutzer-ID: ohne
+ * `budget: read` (Mitgliedsrecht UND Token-Scope) gibt es keine Buchung - die
+ * Liste bleibt leer, ein Nachschlagen antwortet wie bei einer unbekannten ID.
+ * Ohne `viewer` gilt dasselbe, ein vergessener Aufrufer leakt also nichts
+ * (Muster wie `documentViewer()` in services/document-links.js).
+ *
  * Erwartete (is_pending) Buchungen sind grundsaetzlich nicht verknuepfbar -
  * nicht nur aus der Summe ausgeschlossen (Design-Doc §5.3), sondern gar nicht
  * erst linkbar, damit ein Verknuepfen nie unsichtbar folgenlos bleibt.
@@ -23,6 +31,7 @@
 
 import * as db from '../../db.js';
 import { resolveBudgetMode, budgetDetailsVisibleWhere } from '../../services/budget-visibility.js';
+import { mayReadModule } from '../../permissions.js';
 
 export const ROLES = ['purchase', 'refund', 'instalment', 'maintenance', 'accessory'];
 
@@ -31,15 +40,31 @@ function mode() {
 }
 
 /**
+ * Wer schaut, und darf er das Budget lesen? Einmal je Anfrage gebildet und an
+ * jede Funktion dieses Moduls gereicht.
+ * @param {import('express').Request} req
+ * @returns {{ userId: number, readsBudget: boolean }}
+ */
+export function budgetViewer(req) {
+  return Object.freeze({
+    userId: req.authUserId || req.session?.userId,
+    readsBudget: mayReadModule(req, 'budget'),
+  });
+}
+
+const readsBudget = (viewer) => viewer?.readsBudget === true;
+
+/**
  * Liest eine einzelne Buchung, wenn sie fuer diese:n Betrachter:in sichtbar
  * ist - sonst null (bewusst nicht zwischen "existiert nicht" und "fremd"
  * unterschieden, das verriete ueber geratene IDs, welche Buchungen existieren).
  */
-export function visibleEntry(entryId, userId) {
+export function visibleEntry(entryId, viewer) {
+  if (!readsBudget(viewer)) return null;
   const m = mode();
   const clause = budgetDetailsVisibleWhere('be', '?', { mode: m });
   const params = [entryId];
-  if (m === 'personal') params.push(userId);
+  if (m === 'personal') params.push(viewer.userId);
   return db.get().prepare(`SELECT be.* FROM budget_entries be WHERE be.id = ? AND ${clause}`).get(...params);
 }
 
@@ -69,8 +94,8 @@ export function entryHasLinks(entryId) {
  * Verknuepft eine Buchung mit einem Gegenstand.
  * @returns {{ok:true}|{error:string, code:number}}
  */
-export function linkEntry({ itemId, entryId, role, amountShare, userId }) {
-  const entry = visibleEntry(entryId, userId);
+export function linkEntry({ itemId, entryId, role, amountShare, viewer }) {
+  const entry = visibleEntry(entryId, viewer);
   if (!entry) return { error: 'Booking not found.', code: 404 };
   const linkError = linkabilityError(entry);
   if (linkError) return linkError;
@@ -83,7 +108,7 @@ export function linkEntry({ itemId, entryId, role, amountShare, userId }) {
   db.get().prepare(`
     INSERT INTO inventory_item_entries (item_id, entry_id, role, amount_share, created_by)
     VALUES (?, ?, ?, ?, ?)
-  `).run(itemId, entryId, role, amountShare ?? null, userId);
+  `).run(itemId, entryId, role, amountShare ?? null, viewer.userId);
   return { ok: true };
 }
 
@@ -92,8 +117,8 @@ export function linkEntry({ itemId, entryId, role, amountShare, userId }) {
  * (rollenunabhaengig - der Pfad hat kein Rollen-Segment).
  * @returns {{ok:true}|{error:string, code:number}}
  */
-export function unlinkEntry({ itemId, entryId, userId }) {
-  const entry = visibleEntry(entryId, userId);
+export function unlinkEntry({ itemId, entryId, viewer }) {
+  const entry = visibleEntry(entryId, viewer);
   if (!entry) return { error: 'Booking not found.', code: 404 };
   db.get().prepare('DELETE FROM inventory_item_entries WHERE item_id = ? AND entry_id = ?').run(itemId, entryId);
   return { ok: true };
@@ -103,16 +128,16 @@ export function unlinkEntry({ itemId, entryId, userId }) {
  * Verknuepfte, sichtbare, gebuchte Buchungen mehrerer Gegenstaende in einer
  * Abfrage (kein N+1 in Listen). Map itemId -> Buchungen, neueste zuerst.
  */
-export function loadLinkedEntriesForItems(itemIds, userId) {
+export function loadLinkedEntriesForItems(itemIds, viewer) {
   const ids = [...new Set((itemIds || []).filter((id) => Number.isInteger(id) && id > 0))];
   const byItem = new Map();
-  if (!ids.length) return byItem;
+  if (!ids.length || !readsBudget(viewer)) return byItem;
 
   const m = mode();
   const visClause = budgetDetailsVisibleWhere('be', '?', { mode: m });
   const placeholders = ids.map(() => '?').join(', ');
   const params = [...ids];
-  if (m === 'personal') params.push(userId);
+  if (m === 'personal') params.push(viewer.userId);
 
   const rows = db.get().prepare(`
     SELECT iie.item_id AS itemId, iie.id, iie.entry_id, iie.role, iie.amount_share, iie.created_at,
@@ -131,8 +156,8 @@ export function loadLinkedEntriesForItems(itemIds, userId) {
 }
 
 /** Verknuepfte Buchungen eines einzelnen Gegenstands. */
-export function loadLinkedEntries(itemId, userId) {
-  return loadLinkedEntriesForItems([itemId], userId).get(itemId) || [];
+export function loadLinkedEntries(itemId, viewer) {
+  return loadLinkedEntriesForItems([itemId], viewer).get(itemId) || [];
 }
 
 /** Vorzeichenbehaftete Summe ueber die (bereits gebucht/sichtbar gefilterten) Verknuepfungen. */

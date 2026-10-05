@@ -13,13 +13,15 @@ import {
   SETTINGS_STORAGE_KEY,
   filterSettingsDomains,
   findSettingsLeaf,
+  movedSettingsUrl,
   readStoredSettingsDestination,
 } from '/settings/registry.js';
 import { renderSettingsShell } from '/settings/shell.js';
 
 const SETTINGS_ROOT = '/settings';
 const ACCOUNT_LEAF = '/settings/personal/account';
-const SYNC_CALENDAR_LEAF = '/settings/sync/calendar';
+const SYNC_CALENDAR_LEAF = '/settings/modules/calendar';
+const SYNC_CALENDAR_SECTION = 'sync-calendar'; // seit R10 ein Abschnitt im Blatt Kalender
 const OVERVIEW_VIEWS = new Set(['domains', 'domain']);
 
 // Container der zuletzt gemounteten Shell — Basis für das Soft-Update (update()).
@@ -39,11 +41,9 @@ async function refreshUser(user) {
   return user;
 }
 
-// Wir werden aus render() heraus aufgerufen, während der Router noch mitten in
-// seiner navigate()-Schleife steckt (isNavigating === true). Ein direkter
-// navigate()-Aufruf wäre dort ein No-op. Daher wird die History sofort
-// korrigiert, die eigentliche Navigation aber auf den nächsten Macrotask
-// verschoben — nach dem finally des laufenden navigate().
+// Aufgerufen aus render(), waehrend der Router noch in navigate() steckt (dort
+// waere ein direkter navigate()-Aufruf ein No-op): History sofort korrigieren,
+// die Navigation auf den naechsten Macrotask verschieben.
 function redirectTo(target) {
   history.replaceState({ path: target }, '', target);
   setTimeout(() => {
@@ -67,7 +67,7 @@ export async function render(container, { user } = {}) {
 
     if (path === SETTINGS_ROOT) {
       if (hasOAuthResult) {
-        const target = `${SYNC_CALENDAR_LEAF}?${query.toString()}`;
+        const target = `${SYNC_CALENDAR_LEAF}?section=${SYNC_CALENDAR_SECTION}&${query.toString()}`;
         if (findSettingsLeaf(SYNC_CALENDAR_LEAF, currentUser)) {
           await redirectTo(target);
           return;
@@ -100,9 +100,10 @@ export async function render(container, { user } = {}) {
       await redirectTo(ACCOUNT_LEAF);
       return;
     }
-    // Verschobenes Blatt: auf den kanonischen Pfad umleiten, sonst zeigte die
-    // Adresszeile die alte URL und der Breadcrumb die neue Domäne.
-    if (leaf.path !== path) { await redirectTo(leaf.path); return; }
+    // Verschobenes Blatt oder ausgemusterte Option: aufs heutige Blatt samt
+    // Abschnitt (S2); die uebrigen Parameter (OAuth-Ergebnis) reisen mit.
+    const moved = movedSettingsUrl(path, window.location.search);
+    if (leaf.path !== path || moved) { await redirectTo(moved ?? leaf.path); return; }
 
     try {
       sessionStorage.setItem(SETTINGS_STORAGE_KEY, leaf.path);
@@ -152,8 +153,8 @@ export async function update({ user, path, query } = {}) {
   }
 
   const leaf = findSettingsLeaf(path, user);
-  // Verschobenes Blatt nicht inkrementell rendern: der reguläre Pfad leitet um.
-  if (!leaf || leaf.path !== path) return false;
+  // Verschoben (Blatt oder Option): nicht inkrementell, der reguläre Pfad leitet um.
+  if (!leaf || leaf.path !== path || movedSettingsUrl(path, search)) return false;
 
   try {
     sessionStorage.setItem(SETTINGS_STORAGE_KEY, leaf.path);

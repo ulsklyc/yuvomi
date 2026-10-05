@@ -214,14 +214,18 @@ async function makeAuthApp(db) {
   const app = express();
   app.use(express.json());
   const router = express.Router();
+  const pending = [];
   buildResetRoutes(router, {
     database: db,
     emailService: { isConfigured: () => true, sendMail: async (m) => { sent.push(m); } },
     resetService: createPasswordResetService({ db }),
     baseUrl: 'https://oikos.test',
     limiter: (_req, _res, next) => next(),
+    // Der Versand laeuft nach der Antwort; `drain` wartet auf ihn.
+    defer: (fn) => { pending.push(new Promise((r) => setImmediate(() => Promise.resolve(fn()).finally(r)))); },
   });
   app.use('/auth', router);
+  app.locals.drain = () => Promise.all(pending.splice(0));
   return { app, sent };
 }
 
@@ -236,6 +240,7 @@ async function callJson(app, method, path, body) {
   });
   const json = await res.json().catch(() => null);
   server.close();
+  await app.locals.drain?.();
   return { status: res.status, json };
 }
 
@@ -514,11 +519,23 @@ test('die Doppelpruefung der Adresse folgt exakt dem Linker', () => {
   // genau die Faelle, an denen der Linker spaeter scheitert - andere
   // Schreibweise, oder dieselbe Adresse als ZWEITadresse eines anderen
   // Mitglieds. Das Konto stuende dann ohne Passwort und ohne Verknuepfung da.
+  // Beide fragen seit GHSA-6pmj-w42g-g6qv EINE Funktion, `ssoLinkCandidates`
+  // (unverknuepft, ohne Gaeste, Haupt- und Zweitadressen); das Verhalten selbst
+  // halten test:oidc (Leerraum, Tab, NBSP, Gaeste) und test:oidc-email-link.
   const start = authSrc.indexOf('function assertSsoOnlyAllowed');
   const body = authSrc.slice(start, authSrc.indexOf('\n}', start));
-  assert.match(body, /lower\(c\.email\) = lower\(\?\) OR lower\(ce\.value\) = lower\(\?\)/,
-    'die Clash-Pruefung kennt weder lower() noch die Zweitadressen');
-  assert.match(body, /LEFT JOIN contact_emails/);
+  const linkStart = authSrc.indexOf('export function findOrCreateOidcUser');
+  const linker = authSrc.slice(linkStart, authSrc.indexOf('\n}', linkStart));
+  assert.match(body, /ssoLinkCandidates\(db\.get\(\), address, \{ excludeUserId \}\)/,
+    'die Clash-Pruefung fragt nicht dieselbe Funktion wie der Linker');
+  assert.match(linker, /ssoLinkCandidates\(database, email\)/,
+    'der Linker fragt nicht mehr die gemeinsame Funktion');
+  assert.doesNotMatch(body + linker, /accountIdsByEmail\(/,
+    'eine eigene Abfrage neben der gemeinsamen Funktion waere die zweite Regel');
+  const helperStart = authSrc.indexOf('function ssoLinkCandidates');
+  const helper = authSrc.slice(helperStart, authSrc.indexOf('\n}', helperStart));
+  assert.match(helper, /secondary: true, unlinkedOnly: true, withoutSplitGuests: true/,
+    'die gemeinsame Funktion zaehlt Zweitadressen, nur Unverknuepfte und keine Gaeste');
 });
 
 test('der Reset wird nicht beworben, wenn es kein Passwort mehr gibt', () => {

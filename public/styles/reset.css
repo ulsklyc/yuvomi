@@ -128,13 +128,34 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius-xs);
 }
 
-/* Reduzierte Bewegung (Barrierefreiheit) */
+/* Reduzierte Bewegung (Barrierefreiheit)
+ *
+ * BEWEGUNG FAELLT WEG, UEBERBLENDEN BLEIBT (Re-Critique 2026-09-27, C5). Hier
+ * stand `transition-duration: 0s !important` fuer jedes Element - auch fuer
+ * die Opacity-Blenden, die als bewegungsfreier Ersatz fuer einen Slide gebaut
+ * sind (Mehr-Blatt, Such-Overlay in layout.css). Sie liefen nie, aus der
+ * Blende wurde ein harter Schnitt. Apple ersetzt Bewegung durch Ueberblenden.
+ *
+ * Die Sperre gilt weiter fuer alles; eine Ersatz-Blende meldet sich per
+ * `--motion-fade` ab. Die Variable steht auf JEDEM Element auf 0s, damit ein
+ * Kind die Abmeldung seines Elternteils nicht erbt (sonst liefe dessen
+ * Transform-Transition wieder). Wer sich abmeldet, darf nur Opacity
+ * uebergehen lassen - das haelt test:motion, Punkt 7. Die Abmeldungen stehen
+ * unten gesammelt, damit es EINE Liste der erlaubten Blenden gibt. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
+    --motion-fade: 0s;
     animation-duration: 0s !important;
     animation-delay: 0s !important;
-    transition-duration: 0s !important;
+    transition-duration: var(--motion-fade) !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Ersatz-Blenden (die Opacity-Transition steht in layout.css). */
+  .more-sheet,
+  .search-overlay,
+  .popover-menu {
+    --motion-fade: var(--duration-sm);
   }
 }
 

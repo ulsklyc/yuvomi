@@ -8,6 +8,7 @@ import express from 'express';
 import * as caldavSync from '../../services/caldav-sync.js';
 import * as caldavReminders from '../../services/caldav-reminders-sync.js';
 import { requireAdmin } from '../../auth.js';
+import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
@@ -52,6 +53,11 @@ router.put('/caldav/accounts/:id', requireAdmin, async (req, res) => {
     const result = await caldavSync.updateAccount(accountId, { name, caldavUrl, username, password });
     res.json({ data: result });
   } catch (err) {
+    // Neuer Server oder Benutzer ohne neues Passwort - keine Stoerung, sondern
+    // eine Eingabe, die fehlt (siehe updateAccount).
+    if (err.code === 'password_required') {
+      return res.status(400).json({ error: err.message, errorCode: 'password_required', code: 400 });
+    }
     log.error('CalDAV account update failed:', err);
     res.status(500).json({ error: err.message || 'Failed to update CalDAV account.', code: 500 });
   }
@@ -73,7 +79,9 @@ router.delete('/caldav/accounts/:id', requireAdmin, (req, res) => {
 
 // Calendar Selection
 
-router.get('/caldav/accounts/:id/calendars', requireAdmin, async (req, res) => {
+// `?refresh=true` schreibt die Kalenderliste nach dem Abruf neu: waehrend eines
+// Restores 503, sonst festgehalten wie eine schreibende Anfrage (#1551).
+router.get('/caldav/accounts/:id/calendars', requireAdmin, refuseWhileRestoring, async (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
     const refresh = req.query.refresh === 'true';
@@ -148,7 +156,8 @@ router.get('/caldav/status', (req, res) => {
 
 // Reminder-list discovery & selection
 
-router.get('/caldav/accounts/:id/reminder-lists', requireAdmin, async (req, res) => {
+// Der erste Aufruf und `?refresh=true` schreiben die Listen nach dem Abruf (#1551).
+router.get('/caldav/accounts/:id/reminder-lists', requireAdmin, refuseWhileRestoring, async (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
     const refresh = req.query.refresh === 'true';

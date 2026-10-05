@@ -143,21 +143,32 @@ async function deliver(database, now = NOW) {
   const push = new Set();
   const channel = new Set();
   const bodies = new Map();
+  const pushBodies = new Map();
   await processDueNotifications({
     database,
     channelStore: createNotificationChannelStore({ db: database }),
-    pushService: { sendPushToUser: async (_userId, payload) => { push.add(payload.tag); return 1; } },
+    pushService: { sendPushToUser: async (_userId, payload) => { push.add(payload.tag); pushBodies.set(payload.tag, payload.body); return 1; } },
     providers: {
       ntfy: { id: 'ntfy', send: async ({ payload }) => { channel.add(payload.tag); bodies.set(payload.tag, payload.body); return { ok: true, status: 200 }; } },
     },
     now,
   });
-  return { push, channel, bodies };
+  return { push, channel, bodies, pushBodies };
 }
 
 function assertDelivered(run, reminderId, message) {
   assert.ok(run.push.has(`reminder-${reminderId}`), `${message} (Push)`);
   assert.ok(run.channel.has(`reminder-${reminderId}`), `${message} (Kanal)`);
+}
+
+/**
+ * Gesundheits-Herkuenfte gehen nur an die Person selbst: Push ja, der Kanal des
+ * Haushalts nie (services/reminder-targets.js, HOUSEHOLD_CHANNEL_POLICY). Der
+ * Kanal dieser Suite ist ein Haushaltskanal.
+ */
+function assertDeliveredPersonally(run, reminderId, message) {
+  assert.ok(run.push.has(`reminder-${reminderId}`), `${message} (Push)`);
+  assert.ok(!run.channel.has(`reminder-${reminderId}`), `${message} - ging an den Haushaltskanal`);
 }
 
 function assertNotDelivered(run, reminderId, message) {
@@ -266,7 +277,7 @@ test('Zyklus: Health abgeschaltet raeumt die Erinnerung ab, nach dem Einschalten
   const on = await deliver(database);
   const [recreated] = nudges();
   assert.ok(recreated, 'nach dem Wiedereinschalten legt der Lauf die Erinnerung nicht neu an');
-  assertDelivered(on, recreated.id, 'die neu angelegte Zyklus-Erinnerung ging nicht raus');
+  assertDeliveredPersonally(on, recreated.id, 'die neu angelegte Zyklus-Erinnerung ging nicht raus');
   assert.ok((await pending(user)).some((r) => r.entity_type === 'cycle_log_nudge'));
   database.close();
 });
@@ -291,8 +302,8 @@ test('Zyklus: die Partner-Meldung nennt die Person, deren Periode erwartet wird'
   const run = await deliver(database);
   const row = database.prepare("SELECT id FROM reminders WHERE entity_type = 'cycle_period' AND created_by = ?").get(partner);
   assert.ok(row, 'Vorbedingung: die Partner-Erinnerung steht');
-  assertDelivered(run, row.id, 'die Partner-Erinnerung ging nicht raus');
-  assert.match(run.bodies.get(`reminder-${row.id}`), /Anna/,
+  assertDeliveredPersonally(run, row.id, 'die Partner-Erinnerung ging nicht raus');
+  assert.match(run.pushBodies.get(`reminder-${row.id}`), /Anna/,
     'die Partner-Meldung faellt auf den neutralen Text zurueck, obwohl der Name bekannt ist');
   database.close();
 });

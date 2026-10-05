@@ -22,15 +22,25 @@
  * (.nav-bottom__items), nicht mehr auf der Bar-Zone (Liquid Glass).
  * Der Schatten der Kapsel steht vollstaendig in §41 - hier stand er ein
  * zweites Mal, wortgleich, und wurde von dort ohnehin ueberschrieben. */
+/* Ausserhalb von @supports der DECKENDERE Grund: ohne backdrop-filter liefe
+ * der Inhalt ungefiltert durch das duenne Kapselglas, also traegt die Kapsel
+ * dort die Deckung der uebrigen Chrome-Flaechen. Der Lichtfang steht ebenfalls
+ * hier - er ist Material, kein Blur, und kippt mit seinem Token unter
+ * reduzierter Transparenz und erhoehtem Kontrast auf transparent. */
 .nav-bottom__items {
   background-color: var(--glass-bg-elevated);
+  background-image: linear-gradient(to bottom, var(--glass-sheen-capsule), transparent 45%);
 }
 
-/* Blur nur wenn unterstützt (webkit-Fallback für Safari < 18) */
+/* Blur nur wenn unterstützt (webkit-Fallback für Safari < 18). Erst mit Blur
+ * wird das Glas duenn (--glass-bg-capsule): Toenung, Ton-Filter, Saettigung
+ * und Labelfarbe sind gemeinsam gemessen, die Rechnung steht in tokens.css
+ * (a1). */
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
   .nav-bottom__items {
-    backdrop-filter: var(--blur-md) saturate(var(--lg-glass-saturate));
-    -webkit-backdrop-filter: var(--blur-md) saturate(var(--lg-glass-saturate));
+    background-color: var(--glass-bg-capsule);
+    backdrop-filter: var(--blur-lg) saturate(var(--lg-capsule-saturate)) var(--glass-capsule-tone);
+    -webkit-backdrop-filter: var(--blur-lg) saturate(var(--lg-capsule-saturate)) var(--glass-capsule-tone);
   }
 }
 
@@ -192,16 +202,12 @@
   }
 }
 
-/* Bottom-Sheet Handle: im Glass-Modus nur die Linienfarbe umfärben. NICHT das
-   background-Shorthand setzen — das löschte das Griff-Linien-Gradient aus
-   layout.css und machte aus der dünnen Linie einen vollen 36×44-Block (#569). */
-@media (max-width: 767px) {
-  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-    .modal-panel::before {
-      --modal-handle-color: var(--glass-border);
-    }
-  }
-}
+/* Bottom-Sheet-Griff: hier stand `--modal-handle-color: var(--glass-border)`
+ * fuer JEDES Theme - Glas-Weiss 65 % auf der weissen Tafel, im hellen Theme
+ * also unsichtbar (Re-Critique 2026-09-27, P1 #1). Die Farbe ist jetzt ein
+ * Token mit zwei Werten (`--sheet-grabber`, tokens.css): hell die kraeftigere
+ * Kante, dunkel weiter das Glas-Weiss. Gezeichnet wird der Griff in
+ * layout.css (Dialog-Sheet) und an `.more-sheet__handle`. */
 
 /* ================================================================
  * 4. Buttons — Specular Highlight
@@ -230,21 +236,13 @@
  * doppelt und mit einem zweiten Farbwert danebenstand. */
 
 /* ================================================================
- * 5. FAB — Specular Highlight
+ * 5. FAB - entfallen (2026-09-26)
+ *
+ * Hier standen Specular-Kanten fuer `.fab`. Diese Klasse vergibt seit dem
+ * Umbau auf `.page-fab` (utils/fab.js) niemand mehr; der FAB traegt seine
+ * Kanten in Abschnitt 1b an `.page-fab`. Abschnitt 23 (Ring-Pulse) fiel aus
+ * demselben Grund - er lief nie.
  * ================================================================ */
-.fab {
-  box-shadow:
-    var(--shadow-lg),
-    var(--glass-inset-elevated),
-    var(--glass-inset-bottom-base);
-}
-
-.fab:hover {
-  box-shadow:
-    var(--shadow-lg),
-    var(--glass-inset-strong),
-    var(--glass-inset-bottom-hover);
-}
 
 /* ================================================================
  * 6. Cards — Glass auf hover (nur interaktive Cards)
@@ -290,9 +288,7 @@
   }
 
   .btn--primary,
-  .btn--primary:hover,
-  .fab,
-  .fab:hover {
+  .btn--primary:hover {
     box-shadow: var(--shadow-sm);
   }
 }
@@ -303,15 +299,9 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .nav-item,
-  .nav-sidebar .nav-item,
-  .btn,
-  .fab,
-  .card--interactive {
-    transition-duration: 0.01ms !important;
-  }
-}
+/* Hier stand ein eigener reduced-motion-Block mit `0.01ms !important` - eine
+ * zweite "aus"-Konvention neben reset.css, das in diesem Medienzustand jede
+ * Transition auf 0s nimmt. Es gilt die eine dort. */
 
 /* ================================================================
  * PHASE 2 — Modul-Komponenten
@@ -364,16 +354,31 @@ textarea.form-input {
  * weg, und das ist der Punkt, der den Konflikt mit „Glas gehört der Shell"
  * auflöst: in der Shell-Schicht gilt Shell-Material, nicht Modul-Tinte. */
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .toast:not(.toast--success):not(.toast--danger):not(.toast--warning),
+  .toast:not(.toast--danger):not(.toast--warning),
   .list-bulkbar {
-    background-color: color-mix(in srgb, var(--neutral-800) 90%, transparent);
+    background-color: color-mix(in srgb, var(--toast-bg) 90%, transparent);
     backdrop-filter: var(--blur-sm);
     -webkit-backdrop-filter: var(--blur-sm);
     border: 1px solid var(--glass-border-overlay);
   }
 }
 
-.toast--success,
+/* ERFOLG IST KEINE VOLLFLAECHE (Re-Critique 2026-09-27, C2). „Gespeichert"
+ * stand 118-mal als gruene Flaeche im Bild - Kraft ohne Anlass. Erfolg zeigt
+ * sich im Ergebnis; der Toast bestaetigt nur und steht deshalb auf dem Glas
+ * jedes Toasts, das Gruen traegt allein das Haekchen. Fehler und Warnungen
+ * bleiben Vollflaechen: sie sollen unterbrechen. Die Regel steht hier und
+ * nicht in layout.css, weil hier das Material wohnt; der opake Grund gilt
+ * auch ohne backdrop-filter (dieselben Farben wie die Basis in layout.css). */
+.toast.toast--success {
+  background-color: var(--toast-bg);
+  color: var(--toast-text);
+}
+
+.toast--success .toast__icon {
+  color: var(--shell-success-ink);
+}
+
 .toast--danger,
 .toast--warning {
   border-radius: var(--radius-glass-card);
@@ -453,16 +458,18 @@ textarea.form-input {
 
   /* DER TOAST STAND IN DER REGEL DES CHIPS UND HAT IHN NICHT ÜBERLEBT. Beide
    * verlieren hier ihr Glas, aber sie haben nicht denselben Grund darunter:
-   * der Chip ist ein helles Element mit dunkler Schrift, der Toast ist die
-   * dunkle Fläche der Shell und trägt `color: var(--neutral-50)`. Auf
+   * der Chip ist ein helles Element mit dunkler Schrift, der Toast steht auf
+   * dem Shell-Material (`--toast-bg`, seit R16 in BEIDEN Themes dunkel - bis
+   * dahin wurde es im Dunkelmodus hell, und dieser Satz stimmte nur halb)
+   * und trägt `color: var(--toast-text)`. Auf
    * --color-accent-light (#F3EFFE) stand damit Weiss auf Fast-Weiss: gemessen
    * im gerenderten Dokument mit emulierter Medienabfrage 1.08:1, jetzt 13.69:1.
    * Der Fallback, der die Lesbarkeit sichern sollte, hat sie abgeschafft.
    * Sein opaker Grund ist der, den layout.css ohnehin deklariert;
    * hier muss nur das Glas weg. Die Pille teilt Material und damit auch das. */
-  .toast:not(.toast--success):not(.toast--danger):not(.toast--warning),
+  .toast:not(.toast--danger):not(.toast--warning),
   .list-bulkbar {
-    background-color: var(--neutral-800);
+    background-color: var(--toast-bg);
     border-color: var(--glass-border-overlay);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -472,10 +479,6 @@ textarea.form-input {
 @media (prefers-reduced-motion: reduce) {
   .toggle__track::after {
     transition: none;
-  }
-
-  .toast {
-    animation-duration: 0.01ms !important;
   }
 }
 
@@ -509,7 +512,12 @@ textarea.form-input {
 @keyframes glass-sheet-in {
   from {
     opacity: 0.6;
-    transform: translateY(40%);
+    /* 24px (= `--sheet-lift`, tokens.css), NICHT 40 %. Mit 40 % Hub warf die
+     * Feder die Tafel gemessen 28,5px ueber ihre Ruhelage (Bodenluft 12 -> 41px),
+     * und die Einfahrt war nicht mehr "dezent". Die Kurve bleibt die Feder
+     * (Glas-Element, ignore.md; `--sheet-in`), der Hub
+     * nicht: 24px mal Ueberschwinger sind knapp 3px. */
+    transform: translateY(24px);
   }
   to {
     opacity: 1;
@@ -517,32 +525,35 @@ textarea.form-input {
   }
 }
 
+/* `:not(.modal-panel--closing)`, und das ist die ganze Reparatur (Critique
+ * 2026-09-26, P1-1): diese Datei laedt nach layout.css, und bei gleicher
+ * Spezifitaet schlug `.modal-panel { animation: glass-sheet-in }` die
+ * Schliess-Regel `.modal-panel--closing { animation: sheet-out }`. Die Tafel
+ * stand beim Schliessen 400ms still (die Einfahrt war laengst durch) und
+ * verschwand dann hart, weil `animationend` nie kam und der Timer in modal.js
+ * abraeumte. Die Einfahrt gilt nur, solange die Tafel NICHT schliesst - dann
+ * haengt der Ausgang an keiner Ladereihenfolge. Guard: test-motion.js. */
 @media (min-width: 768px) {
-  .modal-panel {
-    animation: glass-modal-scale-in 0.32s var(--ease-glass) forwards;
+  .modal-panel:not(.modal-panel--closing) {
+    animation: glass-modal-scale-in var(--duration-xl) var(--ease-glass) forwards;
   }
 }
 
 @media (max-width: 767px) {
-  .modal-panel {
-    animation: glass-sheet-in 0.30s var(--ease-glass) forwards;
+  .modal-panel:not(.modal-panel--closing) {
+    animation: glass-sheet-in var(--sheet-in) forwards;
   }
 }
 
 /* ================================================================
- * 19. Seitentransitionen — Spring Easing
+ * 19. Seitentransitionen - entfallen (2026-09-26)
+ *
+ * Hier gab die Feder `--ease-glass` dem Seiteninhalt einen Ueberschwinger
+ * (gemessen x = -1,95px bei 148ms) - Feder gehoert dem Glas, nicht dem Inhalt
+ * (DESIGN.md, Motion). Der Seitenwechsel ist jetzt eine View Transition
+ * (utils/view-transition.js, Regeln in layout.css); die `--out-*`-Klassen,
+ * die hier auch noch standen, vergab nie jemand.
  * ================================================================ */
-.page-transition--in-right,
-.page-transition--in-left {
-  animation-duration: 0.20s;
-  animation-timing-function: var(--ease-glass);
-}
-
-.page-transition--out-left,
-.page-transition--out-right {
-  animation-duration: var(--duration-xs);
-  animation-timing-function: var(--ease-out);
-}
 
 /* Blank-Screen-on-Scroll Prevention (iOS 26+ WebKit + Android Blink):
  * Jedes Element mit backdrop-filter ODER filter innerhalb von overflow:auto wird
@@ -567,14 +578,6 @@ html.navigating .app-content *::before,
 html.navigating .app-content *::after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-}
-
-/* ================================================================
- * 20. List-Stagger — Spring Timing
- * ================================================================ */
-.list-stagger > * {
-  animation-duration: 280ms;
-  animation-timing-function: var(--ease-glass);
 }
 
 /* ================================================================
@@ -607,21 +610,6 @@ html.navigating .app-content *::after {
 }
 
 /* ================================================================
- * 23. FAB — Attention Pulse
- * ================================================================ */
-@keyframes fab-ring-pulse {
-  0%   { box-shadow: var(--shadow-lg), var(--glass-inset-elevated), 0 0 0 0 color-mix(in srgb, var(--color-accent) 50%, transparent); }
-  60%  { box-shadow: var(--shadow-lg), var(--glass-inset-elevated), 0 0 0 10px transparent; }
-  100% { box-shadow: var(--shadow-lg), var(--glass-inset-elevated), 0 0 0 0 transparent; }
-}
-
-.fab {
-  animation:
-    fab-in 420ms var(--ease-out) backwards,
-    fab-ring-pulse 600ms var(--ease-out) 450ms 1 backwards;
-}
-
-/* ================================================================
  * 24. Accessibility — Phase 3
  * ================================================================ */
 @media (prefers-reduced-motion: reduce) {
@@ -629,22 +617,7 @@ html.navigating .app-content *::after {
     transition: none;
   }
 
-  .modal-panel {
-    animation: none;
-  }
-
-  .page-transition--in-right,
-  .page-transition--in-left,
-  .page-transition--out-left,
-  .page-transition--out-right {
-    animation-duration: 0.01ms !important;
-  }
-
-  .list-stagger > * {
-    animation-duration: 0.01ms !important;
-  }
-
-  .fab {
+  .modal-panel:not(.modal-panel--closing) {
     animation: none;
   }
 }
@@ -1050,7 +1023,7 @@ textarea.form-input {
   filter: blur(90px);
   /* Blob 1 wechselt seine Farbe mit der Stimme - der Übergang gehört an die
    * Farbe, also hierher zum Gradienten und nicht an die bewegte Hülle. */
-  transition: background 600ms var(--ease-out);
+  transition: background var(--duration-2xl) var(--ease-out);
 }
 
 /* Blob-Positionen meiden die Chrome-Zonen (Sidebar links, schwebende Tab-Bar
@@ -1116,8 +1089,11 @@ textarea.form-input {
  * Begruendung, warum es nicht --glass-shadow-md ist, steht am Token.
  * ================================================================ */
 .nav-bottom__items {
+  /* Der Glanzrand der Kapsel ist kraeftiger als der Specular der Sidebar
+   * (--glass-inset-capsule, tokens.css): das duennere Glas braucht eine
+   * gefasste Kante, sonst verschwimmt es mit dem, was darunter scrollt. */
   box-shadow:
-    inset 0 var(--space-px) 0 color-mix(in srgb, white calc(var(--lg-specular) * 100%), transparent),
+    var(--glass-inset-capsule),
     var(--glass-inset-bottom-lift),
     var(--glass-shadow-capsule);
 }

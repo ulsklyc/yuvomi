@@ -82,6 +82,39 @@ export function recipeThumbEl({ recipeId, hasImage, hasOwnImage, className, icon
 }
 
 /**
+ * Das Kopfbild eines Rezepts im Detail - oder `null`, wenn es kein eigenes gibt.
+ *
+ * KEIN PLATZHALTER (Critique 2026-10-05, R16). In der Liste haelt der
+ * Platzhalter die Zeilen buendig; im Detail waere er ein grauer 3:2-Block ueber
+ * den Zutaten, der nichts zeigt. Ohne Bild gibt es das Element deshalb gar
+ * nicht, und ein Bild, das beim Laden scheitert, nimmt seinen Rahmen mit.
+ *
+ * NUR DAS EIGENE BILD. Die Provider-Route liefert ein Vorschaubild (klein
+ * gerechnet); auf Detailbreite gezogen waere es unscharf. Das selbst
+ * hochgeladene kommt in der Groesse, in der es gespeichert wurde.
+ *
+ * @param {object}  opts
+ * @param {number}  opts.recipeId
+ * @param {boolean} opts.hasOwnImage
+ * @param {string}  [opts.className]  Klasse des Rahmens; das Bild traegt `<klasse>-img`.
+ * @returns {HTMLElement|null}
+ */
+export function recipeHeroEl({ recipeId, hasOwnImage, className = 'recipe-detail__hero' }) {
+  if (!recipeId || !hasOwnImage) return null;
+  const frame = document.createElement('div');
+  frame.className = className;
+  const img = document.createElement('img');
+  img.className = `${className}-img`;
+  img.src = `/api/v1/recipes/${Number(recipeId)}/image`;
+  img.alt = '';
+  img.loading = 'lazy';
+  img.decoding = 'async';
+  img.addEventListener('error', () => { frame.remove(); }, { once: true });
+  frame.appendChild(img);
+  return frame;
+}
+
+/**
  * Dieselbe Vorschau als HTML-Schnipsel, fuer Flaechen, die ihre Karten als
  * String bauen (Planer, Uebersichtskachel).
  *

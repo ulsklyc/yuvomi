@@ -16,9 +16,10 @@
 //
 // DIE RICHTUNG ENTSCHEIDET, NICHT DIE SEITENTRANSITION. Ein eigener Aufruf
 // (pushState) heißt „neue Seite, oben anfangen"; Browser-Zurück/-Vor (popstate)
-// heißt „dorthin, wo ich war". getDirection() im Router taugt dafür nicht: das
-// ist die Slide-Richtung nach ROUTE_ORDER und liefert 'left' genauso für einen
-// Vorwärts-Tap auf einen weiter links liegenden Nav-Eintrag. Maßgeblich ist
+// heißt „dorthin, wo ich war". Die Slide-Richtung nach Nav-Reihenfolge, die der
+// Router bis 2026-09-26 fuer seinen Seitenwechsel rechnete, taugte dafür nie: sie
+// lieferte 'left' genauso für einen Vorwärts-Tap auf einen weiter links liegenden
+// Nav-Eintrag (der Wechsel ist seitdem eine Blende ohne Richtung). Maßgeblich ist
 // allein das pushState-Flag von navigate() - false kommt nur vom popstate-
 // Handler und vom Erstladen, und beim Erstladen ist die Map leer.
 //
@@ -26,10 +27,10 @@
 // bewahrt nicht die Position der Zielseite, sondern die der Seite, von der man
 // gerade kommt - dass das gelegentlich gleich aussieht, ist Zufall.
 //
-// REICHWEITE: Das Merken hängt am Scrollstand von `#main-content`. Acht
-// Modul-Roots (.budget-page, .calendar-page, .contacts-page, .meals-page,
-// .notes-page, .pantry-page, .recipes-page, .shopping-page) sind `overflow:
-// hidden` auf voller Höhe und scrollen einen inneren Container; dort steht
+// REICHWEITE: Das Merken hängt am Scrollstand von `#main-content`. Neun
+// Modul-Roots (.budget-page, .calendar-page, .contacts-page, .health-page,
+// .meals-page, .notes-page, .pantry-page, .recipes-page, .shopping-page) sind
+// `overflow: hidden` auf voller Höhe und scrollen einen inneren Container; dort steht
 // `#main-content` immer auf 0, es gibt also nichts zu merken und ein Zurück
 // landet oben. Das OBEN-ANFANGEN stimmt trotzdem überall - jene inneren
 // Container entstehen bei jeder Navigation neu und starten zwangsläufig bei 0.

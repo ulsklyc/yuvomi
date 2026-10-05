@@ -308,15 +308,16 @@ test('Datum: der Tag in der Haushaltszone, nicht der UTC-Tag', () => {
 test('geloeschte Ausgabe (#1382): Zeichen am Anlege-Eintrag, Loesch-Eintrag nennt sie ohne Zeichen', () => {
   const vorher = { ...split.state };
   const ausgabe = (extra = {}) => ({ id: 9, title: 'Einkauf', amount_minor: 3000, amount: '30.00', currency: 'EUR', deleted_at: null, ...extra });
+  // Titel und Betrag stehen seit #1607 in den Metadaten des Eintrags.
+  const metadata = { title: 'Einkauf', amount_minor: 3000, amount: '30.00', currency: 'EUR' };
   const zeichne = (activity, modus = 'write') => {
     Object.assign(split.state, { activity, activityCursor: null, groupStatus: 'active' });
     return withAccess({ budget: modus }, () => split.renderActivity());
   };
   try {
     // Aktiv: die Zeile nennt die Ausgabe, kein Zeichen, nicht durchgestrichen.
-    const aktiv = zeichne([eintrag(1, { entity_id: 9, expense: ausgabe() })]);
-    // Der t()-Stub haengt die Parameter an: Titel und der Betrag in seiner Waehrung.
-    const detail = /<span class="split-activity-payment">splitExpenses\.expenseDetail\{&quot;title&quot;:&quot;Einkauf&quot;,&quot;amount&quot;:&quot;30,00\s€&quot;\}<\/span>/;
+    const aktiv = zeichne([eintrag(1, { entity_id: 9, metadata, expense: ausgabe() })]);
+    const detail = /<span class="split-activity-payment">Einkauf · 30,00\s€<\/span>/;
     assert.match(aktiv, detail);
     assert.doesNotMatch(aktiv, /split-activity-item--reversed|split-activity-reversed/);
 
@@ -324,8 +325,8 @@ test('geloeschte Ausgabe (#1382): Zeichen am Anlege-Eintrag, Loesch-Eintrag nenn
     const weg = ausgabe({ deleted_at: '2026-09-21T08:00:00Z' });
     for (const modus of ['write', 'read']) {
       const html = zeichne([
-        eintrag(2, { type: 'expense_deleted', entity_id: 9, expense: weg }),
-        eintrag(1, { entity_id: 9, expense: weg }),
+        eintrag(2, { type: 'expense_deleted', entity_id: 9, metadata, expense: weg }),
+        eintrag(1, { entity_id: 9, metadata, expense: weg }),
       ], modus);
       const [loeschung, anlage] = html.split('<div class="split-activity-item').slice(1);
       assert.match(anlage, /^ split-activity-item--reversed"/, modus);
@@ -338,4 +339,165 @@ test('geloeschte Ausgabe (#1382): Zeichen am Anlege-Eintrag, Loesch-Eintrag nenn
   } finally {
     Object.assign(split.state, vorher);
   }
+});
+
+// Migration v226 schreibt 'ledger_restored' ohne Akteur (#1382): der Eintrag
+// traegt den uebersetzten Typ und "System" statt eines Namens - und der Key
+// steht in jeder Sprache, sonst zeigte die Seite den rohen Key.
+test('Buchung wiederhergestellt: eigener Typtext, "System" als Akteur, in jeder Sprache uebersetzt', async () => {
+  const vorher = { ...split.state };
+  try {
+    Object.assign(split.state, {
+      activity: [eintrag(1, { type: 'ledger_restored', actor_id: null, actor_name: null, metadata: { title: 'Einkauf', amount_minor: 1850, currency: 'EUR' } })],
+      activityCursor: null, groupStatus: 'active',
+    });
+    const html = withAccess({ budget: 'write' }, () => split.renderActivity());
+    assert.match(html, /<strong>splitExpenses\.activityType\.ledger_restored<\/strong>/);
+    assert.match(html, /splitExpenses\.system · /, 'ohne Akteur steht "System"');
+    assert.doesNotMatch(html, /data-reverse-settlement/, 'keine Handlung am Eintrag');
+  } finally {
+    Object.assign(split.state, vorher);
+  }
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const files = readdirSync(dir).filter((f) => f.endsWith('.json'));
+  // Anzahl aus SUPPORTED_LOCALES wie test-datepicker.js, keine feste Zahl.
+  const supported = readFileSync(new URL('../public/i18n.js', import.meta.url), 'utf8')
+    .match(/const SUPPORTED_LOCALES = \[([^\]]+)\]/)[1]
+    .match(/'[^']+'/g).length;
+  assert.equal(files.length, supported);
+  for (const file of files) {
+    const text = JSON.parse(readFileSync(new URL(file, dir), 'utf8')).splitExpenses?.activityType?.ledger_restored;
+    assert.ok(typeof text === 'string' && text.trim() && !text.includes('activityType'), `${file}: ledger_restored fehlt`);
+  }
+});
+
+// Mehrere reparierte Ausgaben sollen unterscheidbar sein: der Eintrag nennt
+// Titel und Betrag (Dezimalform `amount` ergaenzt der Server), maskiert.
+test('Buchung wiederhergestellt: nennt Titel und Betrag, maskiert', () => {
+  const vorher = { ...split.state };
+  try {
+    Object.assign(split.state, {
+      activity: [
+        eintrag(2, { type: 'ledger_restored', actor_id: null, actor_name: null, metadata: { title: 'Brot <b>&</b>', amount_minor: 450, amount: '4.50', currency: 'EUR' } }),
+        eintrag(1, { type: 'ledger_restored', actor_id: null, actor_name: null, metadata: { title: 'Urlaub', amount_minor: 1850, amount: '18.50', currency: 'EUR' } }),
+      ],
+      activityCursor: null, groupStatus: 'active',
+    });
+    const html = withAccess({ budget: 'write' }, () => split.renderActivity());
+    const details = [...html.matchAll(/<span class="split-activity-payment">([^<]*)<\/span>/g)].map((m) => m[1]);
+    assert.equal(details.length, 2, 'je Eintrag eine Zeile');
+    assert.match(details[0], /^Brot &lt;b&gt;&amp;&lt;\/b&gt; · /, 'Titel maskiert');
+    assert.match(details[0], /4,50/, 'Betrag im Zahlformat');
+    assert.match(details[1], /^Urlaub · .*18,50/);
+    assert.doesNotMatch(html, /<b>/, 'kein rohes Markup aus dem Titel');
+  } finally {
+    Object.assign(split.state, vorher);
+  }
+});
+
+// Migration v227 (#1445) entfernt die Zeilen einer Ausgabe, die es nicht mehr
+// gibt, und schreibt dafuer 'ledger_removed' - dieselbe Form wie
+// 'ledger_restored': eigener Typtext in jeder Sprache, "System", Titel und
+// Betrag, maskiert. Eine Ausgabenliste kennt die Ausgabe nicht mehr; was der
+// Eintrag nennt, steht allein in seinen Metadaten.
+test('Buchung entfernt: eigener Typtext, "System", Titel und Betrag maskiert, in jeder Sprache uebersetzt', async () => {
+  const vorher = { ...split.state };
+  try {
+    Object.assign(split.state, {
+      expenses: [],
+      activity: [eintrag(1, { type: 'ledger_removed', actor_id: null, actor_name: null, metadata: { title: 'Urlaub <i>', amount_minor: 1850, amount: '18.50', currency: 'EUR' } })],
+      activityCursor: null, groupStatus: 'active',
+    });
+    const html = withAccess({ budget: 'write' }, () => split.renderActivity());
+    assert.match(html, /<strong>splitExpenses\.activityType\.ledger_removed<\/strong>/);
+    assert.match(html, /splitExpenses\.system · /, 'ohne Akteur steht "System"');
+    const details = [...html.matchAll(/<span class="split-activity-payment">([^<]*)<\/span>/g)].map((m) => m[1]);
+    assert.equal(details.length, 1, 'eine Zeile mit Titel und Betrag');
+    assert.match(details[0], /^Urlaub &lt;i&gt; · .*18,50/);
+    assert.doesNotMatch(html, /data-reverse-settlement/, 'keine Handlung am Eintrag');
+  } finally {
+    Object.assign(split.state, vorher);
+  }
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const dir = new URL('../public/locales/', import.meta.url);
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const types = JSON.parse(readFileSync(new URL(file, dir), 'utf8')).splitExpenses?.activityType;
+    const text = types?.ledger_removed;
+    assert.ok(typeof text === 'string' && text.trim() && !text.includes('activityType'), `${file}: ledger_removed fehlt`);
+    assert.notEqual(text, types.ledger_restored, `${file}: entfernt und wiederhergestellt lesen sich gleich`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// R10 L11 (Re-Critique 2026-09-27, A5 P2-8 und distill): der Verlauf nennt
+// Objekt und Betrag, und die Gruppenzahl belegt mobil keine volle Zeile.
+// ---------------------------------------------------------------------------
+
+test('der Verlauf nennt die Ausgabe und den Betrag von damals - nicht fuenfmal „Ausgabe erstellt"', () => {
+  const vorher = { ...split.state };
+  Object.assign(split.state, {
+    activeGroupId: 9, groupStatus: 'active', user: null,
+    // Die geladene Ausgabe traegt den HEUTIGEN Betrag (nach einer Bearbeitung).
+    expenses: [{ id: 5, title: 'Wocheneinkauf', amount: '10.00', currency: 'USD' }],
+    activity: [
+      eintrag(5, { metadata: { title: 'Wocheneinkauf', amount_minor: 14230, amount: '142.30', currency: 'EUR' } }),
+      eintrag(6, { type: 'expense_deleted', entity_id: 77, metadata: { title: 'Kino', amount_minor: 900, amount: '9.00', currency: 'EUR' } }),
+      eintrag(7, { type: 'comment_added', entity_id: 5, metadata: { title: 'Wocheneinkauf' } }),
+      eintrag(8, { type: 'group_updated', entity_type: 'group', entity_id: 9 }),
+      // Bestand von vor dem Snapshot (#1607): nur der Titel. Der Betrag der
+      // geladenen Ausgabe waere der heutige, nicht der von damals.
+      eintrag(9, { entity_id: 5, metadata: { title: 'Wocheneinkauf' } }),
+      eintrag(10, { type: 'expense_edited', entity_id: 5, metadata: { title: 'Wocheneinkauf' } }),
+      // Bestands-Kommentar ohne Metadaten: nennt die Ausgabe weiter beim Namen.
+      eintrag(11, { type: 'comment_added', entity_id: 5 }),
+    ],
+    activityCursor: null,
+  });
+  try {
+    const html = withAccess({ budget: 'write' }, () => split.renderActivity());
+    const items = html.split('split-activity-item').slice(1);
+    assert.equal(items.length, 7);
+    assert.match(items[0], /<span class="split-activity-payment">Wocheneinkauf · [^<]*142[.,]30[^<]*<\/span>/,
+      'erstellt: Titel und Betrag aus den Metadaten');
+    assert.doesNotMatch(items[0], /10[.,]00/, 'erstellt: nicht der heutige Betrag der Ausgabe');
+    assert.match(items[1], /<span class="split-activity-payment">Kino · [^<]*9[.,]00[^<]*<\/span>/,
+      'geloescht: der festgehaltene Betrag, auch wenn die Ausgabe nicht mehr geladen ist');
+    assert.match(items[2], /<span class="split-activity-payment">Wocheneinkauf<\/span>/,
+      'Kommentar: nennt die Ausgabe, an der er haengt - ohne Betrag');
+    assert.doesNotMatch(items[3], /split-activity-payment/, 'eine Gruppenaenderung hat kein Ausgabenobjekt');
+    assert.match(items[4], /<span class="split-activity-payment">Wocheneinkauf<\/span>/,
+      'erstellt ohne Snapshot: der Titel allein, ein Betrag waere der heutige');
+    assert.match(items[5], /<span class="split-activity-payment">Wocheneinkauf<\/span>/,
+      'bearbeitet ohne Snapshot: der Titel allein');
+    assert.match(items[6], /<span class="split-activity-payment">Wocheneinkauf<\/span>/,
+      'Kommentar ohne Snapshot: Titel der geladenen Ausgabe, kein Betrag');
+  } finally {
+    Object.assign(split.state, vorher);
+  }
+});
+
+test('die Gruppenzahl steht am Kopf der Liste, mobil entfaellt ihre Kennzahlkarte', async () => {
+  const summary = { html: '', replaceChildren() { this.html = ''; }, insertAdjacentHTML(_p, h) { this.html += h; } };
+  const zaehler = { textContent: '' };
+  const vorher = { ...split.state };
+  Object.assign(split.state, {
+    groupStatus: 'active', groups: [{ id: 1 }, { id: 2 }],
+    dashboard: { total_owed: [], total_owing: [] }, meta: { currencies: ['EUR'], default_currency: 'EUR' },
+  });
+  try {
+    split.renderSummaryForTest({ querySelector: (sel) => (sel === '#split-summary' ? summary : sel === '#split-group-count' ? zaehler : null) });
+  } finally {
+    Object.assign(split.state, vorher);
+  }
+  assert.equal(zaehler.textContent, '2', 'der Kopf „Gruppen" traegt die Zahl');
+  assert.match(summary.html, /class="metric-card split-summary-groups"/, 'die Karte ist benennbar, damit mobil nur sie entfaellt');
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/split-expenses.css', import.meta.url), 'utf8');
+  const regel = [...eachRule(css)].find((r) => r.selector.trim() === '.split-summary-groups');
+  assert.ok(regel?.at.includes('@container split-page (max-width: 639px)'), 'nur schmal - am Desktop bleibt die Dreierreihe');
+  assert.match(regel.body, /display:\s*none/, 'keine volle Zeile fuer eine Ziffer (59px fuer „2", 390x844)');
+  const src = readFileSync(new URL('../public/pages/split-expenses.js', import.meta.url), 'utf8');
+  assert.match(src, /class="split-panel-title u-section-title">\$\{t\('splitExpenses\.groups'\)\}<span class="list-group__count split-panel-count" id="split-group-count">/);
 });

@@ -197,6 +197,45 @@ test('der Kopf-Button im Formular verspricht kein Speichern', async () => {
   assert.doesNotMatch(form, /common\.done/, '„Fertig" verspricht ein Speichern, das nicht stattfindet');
 });
 
+test('im Sheet steht Bearbeiten als Hauptaktion unten, Löschen zurückgenommen am Anfang (Critique 2026-09-24)', async () => {
+  const src = await detailJs();
+  const sheet = src.slice(src.indexOf('function openAsSheet'), src.indexOf('// Präsentation: Popover'));
+  // Der Knopf entsteht in der FUSSZEILE, als Primaerknopf, NACH den Aktionen
+  // des Aufrufers - also am Ende, in der Daumenzone.
+  assert.match(sheet, /\[\.\.\.\(opts\.actions \?\? \[\]\), \{\s*id: 'detail-view-edit',[\s\S]{0,120}variant: 'primary'/,
+    'mit edit.primary gehört Bearbeiten als Primärknopf ans Ende der Fußzeile');
+  // Oben bleibt kein zweites Bearbeiten stehen; der Kopfknopf erscheint erst im
+  // Formular, als „Zurück".
+  assert.match(sheet, /hidden: primaryEdit/, 'der Kopfknopf muss in der Leseansicht verborgen sein');
+  const back = src.slice(src.indexOf('function switchToDetail'), src.indexOf('// Kopf-Aktion'));
+  assert.match(back, /hidden: state\.primaryEdit/, 'zurück in der Leseansicht muss der Kopfknopf wieder verschwinden');
+  // Löschen steht am ANFANG - logisch, damit RTL es nicht an das Ende schiebt.
+  const css = await detailCss();
+  assert.match(css, /\.detail-view__action--start \{\s*margin-inline-end: auto;/, 'Löschen muss am Anfang stehen, auch in RTL');
+  // Der Kalender nimmt die Option; sein Löschen bleibt zurückgenommen.
+  const cal = await calendarJs();
+  const detail = cal.slice(cal.indexOf('async function openEventDetail('), cal.indexOf('async function loadReminderForEvent('));
+  assert.match(detail, /primary: true,/, 'der Termin-Sheet setzt Bearbeiten nicht als Hauptaktion');
+  assert.match(detail, /id: 'detail-delete',[\s\S]{0,80}variant: 'danger-ghost',[\s\S]{0,40}align: 'start'/,
+    'Löschen bleibt destruktiv gestylt und am Anfang, nicht an der Primärposition');
+});
+
+test('im Popover gilt dieselbe Ordnung wie im Sheet: Löschen am Anfang, Bearbeiten primär am Ende (Re-Kritik 2026-09-25)', async () => {
+  const src = await detailJs();
+  const popover = src.slice(src.indexOf('function openAsPopover'), src.indexOf('const footer = detailFooterEl(actions)'));
+  // Mit edit.primary kommt Bearbeiten NACH den Aktionen des Aufrufers - sonst
+  // steht Löschen direkt daneben und sein `--start` wirkt nicht, weil es nicht
+  // mehr das erste Element ist.
+  assert.match(popover, /opts\.edit\?\.primary\s*\?\s*\[\.\.\.\(opts\.actions \?\? \[\]\), edit\]/,
+    'mit edit.primary gehört Bearbeiten ans Ende der Popover-Fußzeile');
+  assert.match(popover, /opts\.edit\.primary \? \{ variant: 'primary'/,
+    'mit edit.primary ist Bearbeiten auch im Popover der Primärknopf');
+  // Ohne die Option bleibt alles wie bisher (Kontakte, Inventar, Budget ...).
+  assert.match(popover, /:\s*\[edit, \.\.\.\(opts\.actions \?\? \[\]\)\]/,
+    'ohne edit.primary steht Bearbeiten weiter vorne');
+  assert.match(popover, /: \{ variant: 'secondary' \}/, 'ohne edit.primary bleibt Bearbeiten sekundär');
+});
+
 test('beide Fußzeilen werden aufbewahrt statt verworfen', async () => {
   const src = await detailJs();
   assert.match(src, /function detachFooter\(/, 'Fußzeilen werden abgehängt, nicht entfernt');
@@ -273,7 +312,8 @@ test('das alte Termin-Popup ist rückstandslos entfernt', async () => {
 
 test('jeder Weg zu einem Termin führt in die Detailansicht', async () => {
   const src = await calendarJs();
-  assert.match(src, /async function openEventDetail\(ev, anchor = null\)/, 'ein einziger Einstieg');
+  // Seit R10 (L5) mit der Detailspalte der Agenda als drittem Ort - derselbe Einstieg.
+  assert.match(src, /async function openEventDetail\(ev, anchor = null, \{ pane = null \} = \{\}\)/, 'ein einziger Einstieg');
   assert.match(src, /import \{ openDetailView.*\} from '\/components\/detail-view\.js'/);
 
   // Kein Aufrufpfad darf an der Detailansicht vorbei ins Formular führen; der
@@ -337,20 +377,30 @@ test('die Termin-Detailansicht zeigt, was das alte Popup verschwieg', async () =
 
 test('der Ort öffnet sich als ausdrückliche Aktion in einer Karte, nicht als Link auf dem Text (#1110)', async () => {
   const src = await calendarJs();
-  const fn = src.slice(src.indexOf('async function openEventDetail'), src.indexOf('async function loadReminderForEvent'));
+  const fn = src.slice(src.indexOf('function mapRowAction'), src.indexOf('function renderEventDetail'));
   // Die Aktion hängt an der Karten-URL, und die entsteht nur aus einem Ortstext,
   // der nach fmtLocation etwas übrig lässt. Kodierung und Leerfall misst
   // test:calendar, das Aufräumen der Test gleich darunter.
-  assert.match(fn, /const mapUrl = eventMapUrl\(ev\.location\);\s*if \(mapUrl\) \{\s*actions\.push\(\{/,
+  assert.match(fn, /const mapUrl = eventMapUrl\(ev\.location\);\s*if \(!mapUrl\) return null;/,
     'nur mit Ort gibt es die Aktion');
   assert.match(fn, /id: 'detail-open-map'/);
   assert.match(fn, /label: t\('calendar\.openInMap'\)/);
   assert.match(fn, /window\.open\(mapUrl, '_blank', 'noopener'\)/,
     'neuer Tab ohne Zugriff zurück auf die App - wie der vCard-Export in Kontakte');
 
-  // Die Zeile "Ort" bleibt reiner Text: Freitext wie "Zoom" ist keine Adresse.
+  // R10 L6 (A2 P3): die Aktion ist Folgeaktion der Ort-Zeile, nicht dritte
+  // Fusszeilen-Aktion - der Fuss blieb sonst dreireihig. Der Wert bleibt
+  // reiner Text: Freitext wie "Zoom" ist keine Adresse.
   const detail = src.slice(src.indexOf('function renderEventDetail'), src.indexOf('async function openEventDetail'));
-  assert.match(detail, /\{ icon: 'map-pin', label: t\('calendar\.locationLabel'\), value: ev\.location \? fmtLocation\(ev\.location\) : '' \}/);
+  assert.match(detail, /\{ icon: 'map-pin', label: t\('calendar\.locationLabel'\), value: ev\.location \? fmtLocation\(ev\.location\) : '', action: mapRowAction\(ev\) \}/);
+  const open = src.slice(src.indexOf('async function openEventDetail'), src.indexOf('async function loadReminderForEvent'));
+  assert.doesNotMatch(open, /detail-open-map|eventMapUrl\(/, 'die Karte steht nicht mehr in der Fusszeile');
+
+  // Die geteilte Zeile kennt die Folgeaktion: ein Knopf (keine Verlinkung des Werts).
+  const dv = await detailJs();
+  const row = dv.slice(dv.indexOf('export function detailRowEl'), dv.indexOf('function visibilityRow') > 0 ? dv.indexOf('function visibilityRow') : undefined);
+  assert.match(row, /action && typeof action\.onClick === 'function'/);
+  assert.match(row, /btn\.className = 'btn btn--ghost btn--sm detail-row__action'/);
 });
 
 test('die Kartensuche räumt den Ortstext über das ECHTE fmtLocation auf (#1110)', async () => {
@@ -392,8 +442,21 @@ test('jeder Weg zu einer bestehenden Aufgabe führt in die Detailansicht', async
   // Die Zahl steht hier als BUCHFÜHRUNG, nicht als Obergrenze: ein neuer
   // Einstieg soll diesen Test rot machen, damit jemand entscheidet, wohin er
   // führt. Beim Verlauf (#791) hat er genau das getan.
+  //
+  // Liste + Detail (2026-09-26): Listenzeile, Stift und Deep-Link laufen unter
+  // der Schwelle ueber EINEN Weg (`openTaskSheet`, zugleich `openNarrow` des
+  // Bausteins); ab der Schwelle zeichnet `renderTaskPane` dieselbe Ansicht in
+  // die Detailspalte - mit `{ pane }`, also nicht als Sheet.
+  //
+  // Verlauf in Liste + Detail (#1550): ein Verlaufseintrag hat keinen eigenen
+  // Aufruf mehr, er geht durch denselben Baustein (`openHistoryEntry` ->
+  // `taskMd.open`, darunter `openTaskSheet`) - daher einer weniger.
   const detailCalls = [...src.matchAll(/^\s+openTaskView\(task, reminder, container\);$/gm)];
-  assert.equal(detailCalls.length, 5, 'Listenzeile/Stift, Kanban, Wischen, Deep-Link und Verlauf');
+  assert.equal(detailCalls.length, 3, 'Kanban, Wischen und openTaskSheet (Listenzeile/Stift/Deep-Link/Verlauf)');
+  assert.match(src, /function openHistoryEntry\(id, trigger, container\) \{\n  if \(taskMd\) taskMd\.open\(id, trigger\);\n  else openTaskSheet\(id, container\);/,
+    'der Verlauf fuehrt ueber den Baustein bzw. openTaskSheet in dieselbe Ansicht');
+  assert.match(src, /openTaskView\(task, reminder, container, \{ pane: body \}\)/,
+    'die Detailspalte zeigt dieselbe Leseansicht, nicht eine eigene');
 
   // Übrig bleibt genau ein openTaskModal-Aufruf: der FAB für neue Aufgaben.
   // Die Definition darüber trägt Defaults (`= {}`) und zählt nicht mit.
@@ -677,7 +740,13 @@ test('beide Kontakt-Einstiege führen in die Leseansicht', async () => {
   // Listenzeile und Deep-Link (?open=<id> aus der globalen Suche) landeten
   // beide direkt im Formular - genau der Fall, den die Komponente ablöst.
   assert.match(src, /if \(c\) openContactDetail\(c\)/, 'Antippen in der Liste');
-  assert.match(src, /if \(contact\) openContactDetail\(contact\)/, 'Deep-Link ?open=<id>');
+  // Den Deep-Link loest seit R4 der Liste-+-Detail-Baustein ein (EIN Leser fuer
+  // `?open=`): in der Spalte waehlt er aus, darunter ruft er `openNarrow` - und
+  // der ist derselbe Weg wie das Antippen, also die Leseansicht.
+  const mount = src.slice(src.indexOf('mountMasterDetail({'));
+  const opts = mount.slice(0, mount.indexOf('\n    });'));
+  assert.match(opts, /deepLinkNarrow:\s*true/, 'Deep-Link ?open=<id> auch unter der Schwelle');
+  assert.match(opts, /openNarrow:\s*\(id\)\s*=>\s*openContactById\(id\)/, 'Deep-Link ?open=<id> in die Leseansicht');
 
   // Die Neuanlage bleibt im Formular: dort ist Tippen die Absicht.
   assert.match(src, /openContactModal\(\{ mode: 'create'/, 'Neuanlage weiterhin direkt ins Formular');
@@ -778,7 +847,11 @@ test('detail-view.css deckt beide Präsentationen und Bewegungsreduktion ab', as
 
 test('detail-view.css nutzt ausschließlich Tokens', async () => {
   const css = await detailCss();
-  const body = css.replace(/\/\*[\s\S]*?\*\//g, ''); // Kommentare erklären Werte, sie setzen keine
+  const body = css.replace(/\/\*[\s\S]*?\*\//g, '') // Kommentare erklären Werte, sie setzen keine
+    // Eine Bruchstelle kann kein Token sein (var() gilt in @media nicht); seit
+    // R14 traegt die Datei die mobile Fussregel der Aufgaben-Detailansicht.
+    // Geprueft werden die Deklarationen, nicht die Praeambel.
+    .replace(/@media[^{]*\{/g, '@media {');
   assert.doesNotMatch(body, /#[0-9a-fA-F]{3,8}\b/, 'kein rohes Hex');
   assert.doesNotMatch(body, /:\s*-?\d+(\.\d+)?(px|rem|em)\b/, 'keine rohen Längen');
   assert.doesNotMatch(body, /rgba?\(/, 'keine rohen Farben');
@@ -836,6 +909,175 @@ test('die abgelösten Schlüssel sind überall entfernt', async () => {
       for (const key of keys) {
         assert.equal(json[group]?.[key], undefined, `${file}: ${group}.${key} ist abgelöst und muss weg`);
       }
+    }
+  }
+});
+
+/**
+ * DER KLICK NEBEN DAS POPOVER SCHLIESST NUR (Re-Kritik 2026-09-28, P1).
+ *
+ * Im Kalender lief der Klick, der die Leseansicht schloss, weiter zur leeren
+ * Wochenspalte darunter - und die oeffnete "Neuer Termin". Die Regel gilt fuer
+ * JEDES Popover der Leseansicht, nicht nur im Kalender, also wird sie hier am
+ * laufenden openDetailView() gemessen und nicht am Quelltext: das echte Modul,
+ * ein Klick, der den Ablauf des Browsers nachgeht (Capture am Dokument, dann
+ * das Ziel, dann Bubbling zurueck zum Dokument), und ein Seiten-Handler am
+ * Ziel, der mitzaehlt. Der Loader leitet nur i18n und modal.js auf Stubs um;
+ * detail-view.js und overlay-history.js laufen wie im Browser.
+ */
+test('Klick neben das Popover schliesst es und loest darunter nichts aus', async () => {
+  const { register } = await import('node:module');
+  register('./test-browser-loader.mjs', import.meta.url);
+
+  const saved = {};
+  for (const k of ['window', 'document', 'history', 'location', 'matchMedia', 'HTMLElement']) {
+    saved[k] = Object.getOwnPropertyDescriptor(globalThis, k);
+  }
+
+  // Ein Dokument mit echter Ereignisreihenfolge: Capture-Listener am Dokument,
+  // Listener am Ziel, Bubble-Listener am Dokument - mit stopPropagation und
+  // stopImmediatePropagation wie im DOM. Mehr braucht das Popover nicht.
+  const docListeners = [];
+  class FakeEl {
+    constructor(tag) {
+      this.tagName = tag.toUpperCase();
+      this.children = [];
+      this.parent = null;
+      this.attrs = {};
+      this.dataset = {};
+      this.style = { setProperty() {} };
+      this.classList = { add() {}, remove() {}, contains: () => false, toggle() {} };
+      this.listeners = [];
+      this.className = '';
+      this.id = '';
+      this.textContent = '';
+    }
+    get isConnected() {
+      let n = this;
+      while (n.parent) n = n.parent;
+      return n === body;
+    }
+    setAttribute(k, v) { this.attrs[k] = String(v); }
+    getAttribute(k) { return this.attrs[k] ?? null; }
+    appendChild(c) { if (c && typeof c === 'object') c.parent = this; this.children.push(c); return c; }
+    append(...cs) { cs.forEach((c) => this.appendChild(c)); }
+    replaceChild(next, prev) { const i = this.children.indexOf(prev); this.children[i] = next; next.parent = this; }
+    remove() { if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; }
+    contains(n) { for (let c = n; c; c = c.parent) if (c === this) return true; return false; }
+    closest(sel) {
+      for (let c = this; c; c = c.parent) {
+        if (sel.split(',').some((s) => {
+          const t = s.trim();
+          if (t.startsWith('.')) return String(c.className).split(/\s+/).includes(t.slice(1));
+          const m = t.match(/^\[role="(.+)"\]$/);
+          return m ? c.attrs?.role === m[1] : false;
+        })) return c;
+      }
+      return null;
+    }
+    addEventListener(type, fn) { this.listeners.push({ type, fn }); }
+    removeEventListener(type, fn) { this.listeners = this.listeners.filter((l) => l.fn !== fn); }
+    querySelectorAll() { return []; }
+    focus() {}
+    getBoundingClientRect() { return { top: 100, bottom: 120, left: 100, right: 200, width: 100, height: 20 }; }
+  }
+  const body = new FakeEl('body');
+  const doc = {
+    body,
+    documentElement: { clientWidth: 1440, clientHeight: 900 },
+    activeElement: null,
+    createElement: (tag) => new FakeEl(tag),
+    createTextNode: (text) => ({ nodeType: 3, textContent: String(text) }),
+    addEventListener(type, fn, opts) {
+      const capture = opts === true || Boolean(opts?.capture);
+      docListeners.push({ type, fn, capture });
+    },
+    removeEventListener(type, fn, opts) {
+      const capture = opts === true || Boolean(opts?.capture);
+      const i = docListeners.findIndex((l) => l.type === type && l.fn === fn && l.capture === capture);
+      if (i !== -1) docListeners.splice(i, 1);
+    },
+  };
+
+  function click(target) {
+    const ev = {
+      type: 'click', target, isTrusted: true, defaultPrevented: false,
+      stopped: false, stoppedNow: false,
+      preventDefault() { this.defaultPrevented = true; },
+      stopPropagation() { this.stopped = true; },
+      stopImmediatePropagation() { this.stopped = true; this.stoppedNow = true; },
+    };
+    const run = (list) => {
+      for (const l of [...list]) {
+        if (ev.stoppedNow) return;
+        l.fn(ev);
+      }
+    };
+    run(docListeners.filter((l) => l.type === 'click' && l.capture));
+    if (!ev.stopped) run(target.listeners.filter((l) => l.type === 'click'));
+    if (!ev.stopped) run(docListeners.filter((l) => l.type === 'click' && !l.capture));
+    return ev;
+  }
+
+  Object.assign(globalThis, {
+    window: { innerWidth: 1440, lucide: undefined },
+    document: doc,
+    history: { state: null, pushState() {}, back() {} },
+    location: { href: 'http://localhost/calendar' },
+    matchMedia: () => ({ matches: false }),
+    HTMLElement: FakeEl,
+  });
+
+  try {
+    const { openDetailView } = await import('../public/components/detail-view.js');
+
+    // Die leere Wochenspalte: ihr Klick-Handler legt einen Termin an.
+    const column = new FakeEl('div');
+    body.appendChild(column);
+    let angelegt = 0;
+    column.addEventListener('click', () => { angelegt += 1; });
+    const anchor = new FakeEl('button');
+    column.appendChild(anchor);
+
+    const view = openDetailView({ title: 'Emmas Geburtstagsfeier', anchor, sections: [] });
+    assert.ok(body.children.some((c) => c.id === 'detail-view-popover'), 'die Weiche hat ein Popover gebaut');
+    // Der Listener bindet erst im naechsten Tick (sonst schloesse der oeffnende Klick).
+    await new Promise((r) => setTimeout(r, 0));
+
+    const outside = docListeners.find((l) => l.type === 'click');
+    assert.ok(outside, 'das Popover hoert auf Klicks daneben');
+    assert.equal(outside.capture, true,
+      'der Klick daneben muss VOR den Handlern der Seite ankommen (Capture), sonst hat die Spalte schon angelegt');
+
+    const erster = click(column);
+    assert.equal(view.isOpen(), false, 'der Klick daneben schliesst das Popover');
+    assert.equal(angelegt, 0, 'der Klick, der das Popover schliesst, darf darunter nichts anlegen');
+    assert.equal(erster.defaultPrevented, true, 'auch die Standardaktion (ein Link darunter) bleibt aus');
+    assert.equal(docListeners.filter((l) => l.type === 'click').length, 0, 'der Listener ist mit dem Popover weg');
+
+    click(column);
+    assert.equal(angelegt, 1, 'der ZWEITE Klick legt wie gewohnt an');
+
+    // Gegenfall: ein Knopf in einer anderen Ebene (Rueckfrage ueber dem Popover)
+    // muss tun, was er sagt - er schliesst das Popover, wird aber nicht geschluckt.
+    const view2 = openDetailView({ title: 'Termin', anchor, sections: [] });
+    await new Promise((r) => setTimeout(r, 0));
+    const overlay = new FakeEl('div');
+    overlay.className = 'modal-overlay';
+    body.appendChild(overlay);
+    const confirmBtn = new FakeEl('button');
+    overlay.appendChild(confirmBtn);
+    let bestaetigt = 0;
+    confirmBtn.addEventListener('click', () => { bestaetigt += 1; });
+    click(confirmBtn);
+    assert.equal(bestaetigt, 1, 'ein Knopf in einem Dialog ueber dem Popover bleibt bedienbar');
+    assert.equal(view2.isOpen(), false);
+    // Das Overlay-Register gleicht die History im Microtask ab - erst danach
+    // duerfen die Attrappen weg, sonst stolpert es nach dem Test ins Leere.
+    await new Promise((r) => setTimeout(r, 0));
+  } finally {
+    for (const [k, d] of Object.entries(saved)) {
+      if (d) Object.defineProperty(globalThis, k, d); else delete globalThis[k];
     }
   }
 });

@@ -220,11 +220,11 @@ export function formatDueDate(dateStr, timeStr, isDone = false) {
     (parseLocalDateKey(dayKey) - parseLocalDateKey(todayDay)) / (1000 * 60 * 60 * 24),
   );
 
-  const timeLabel = dueTime ? ` – ${formatTime(dueStamp)}` : '';
+  const timeLabel = dueTime ? `, ${formatTime(dueStamp)}` : '';
 
   /* DAS JAHR STEHT NUR DA, WO ES ETWAS UNTERSCHEIDET.
    *
-   * Gemessen bei 390px: die Metazeile hat 228px, und „Überfällig – 11.08.2026"
+   * Gemessen bei 390px: die Metazeile hat 228px, und „Überfällig · 11.08.2026"
    * allein belegte 154px davon - mit dem Prioritäts-Chip davor lief die Zeile
    * über und schnitt sich selbst an („11.08.202|6"). Das Jahr war dabei die
    * einzige Angabe, die nichts beitrug: eine Aufgabe, die dieses Jahr fällig
@@ -245,7 +245,7 @@ export function formatDueDate(dateStr, timeStr, isDone = false) {
 
   // Beide Seiten sind Wanduhrzeit DERSELBEN Zone und damit als Text vergleichbar.
   if (dueStamp < nowStamp) {
-    return { label: `${t('tasks.overdue')} – ${fullLabel}`, cls: 'due-date--overdue' };
+    return { label: `${t('tasks.overdue')} · ${fullLabel}`, cls: 'due-date--overdue' };
   }
   if (calDayDiff === 0) {
     return { label: `${t('tasks.dueToday')}${timeLabel}`, cls: 'due-date--today' };
@@ -254,4 +254,44 @@ export function formatDueDate(dateStr, timeStr, isDone = false) {
     return { label: `${t('tasks.dueTomorrow')}${timeLabel}`, cls: '' };
   }
   return { label: fullLabel, cls: '' };
+}
+
+// --------------------------------------------------------
+// Quittung nach dem Abhaken einer Serie (#1603)
+// --------------------------------------------------------
+
+/**
+ * Der Text, der nach einem bestaetigten Abhaken sagt, wann es weitergeht -
+ * oder null, wenn dieser Haken keine Serie fortgeschrieben hat.
+ *
+ * WARUM ES IHN GIBT: der Server legt beim Erledigen einer wiederkehrenden
+ * Aufgabe sofort die naechste an. Die Ansicht laedt neu und zeigt eine offene
+ * Zeile, die aussieht wie die eben abgehakte - bei „ab Erledigung wiederholen"
+ * sogar mit demselben Datum. Der Haken war gebucht, es sah nur aus wie ein
+ * verschluckter Tipp.
+ *
+ * EIN HELFER FUER ALLE WEGE (Detailansicht, Haken, Wisch, Personenwahl, Brett,
+ * Wandtablett): jeder reicht die Antwort von PATCH /tasks/:id/status herein
+ * und nimmt mit `?? t(...)` seinen bisherigen Text, wenn es keine Serie war.
+ * Das Bearbeiten-Formular reicht die Antwort von PUT /tasks/:id herein, die
+ * das Feld nach derselben Regel traegt (#1620).
+ * So bleibt es je Haken bei EINEM Toast - mit `name` sagt derselbe Satz auch,
+ * wer es erledigt hat, statt dass zwei Meldungen uebereinander stehen.
+ *
+ * DAS DATUM kommt aus `formatDueDate` und damit aus den Formatierern der
+ * Einstellung und der Uhr des Haushalts: Tag und Monat, das Jahr nur, wo es
+ * etwas unterscheidet. `isDone = true` waehlt die neutrale Form - „Ueberfaellig"
+ * oder „Heute faellig" gehoeren an die Zeile, nicht in diesen Satz.
+ *
+ * @param {{ data?: { next_due_date?: string|null } | null } | null | undefined} response
+ * @param {{ name?: string }} [who] die benannte Person (#1205), falls es eine gibt
+ * @returns {string|null}
+ */
+export function seriesDoneText(response, { name } = {}) {
+  const next = response?.data?.next_due_date;
+  const due = next ? formatDueDate(next, null, true) : null;
+  if (!due) return null;
+  return name
+    ? t('tasks.seriesDoneByToast', { name, date: due.label })
+    : t('tasks.seriesDoneToast', { date: due.label });
 }

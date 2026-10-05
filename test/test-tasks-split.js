@@ -1,0 +1,711 @@
+/**
+ * Test: Aufgaben in Liste + Detail (Breitenregel, DESIGN.md; utils/master-detail.js)
+ *
+ * Zweck: Ab der Schwelle steht rechts neben der Aufgabenliste das Detail der
+ *        ausgewaehlten Aufgabe. Zwei Zusagen haengen daran, die kein Textguard
+ *        sieht, weil sie Verhalten sind:
+ *
+ *   1. DIE ANSICHT IN DER SPALTE SCHLIESST NICHT WIE EIN MODAL. Ihre Aktionen
+ *      (Erledigen, Starten, Ablegen) riefen `closeDetailView()` - das ist in
+ *      der Spalte ein blindes `closeModal()` und schloesse ein fremdes, gerade
+ *      offenes Modal. Sie muessen das `close` nehmen, das die Ansicht ihnen
+ *      reicht (detail-view.js, openInPane).
+ *   2. DIE AUSWAHL UEBERLEBT DAS NEUZEICHNEN DER LISTE. Abhaken, Filter, Suche
+ *      zeichnen die Liste neu. Bleibt die Zeile, bleibt die Auswahl; hat sich
+ *      die Aufgabe geaendert, malt das Detail neu - ausser die Aenderung kam
+ *      aus dem Detail selbst. Verlaesst die Zeile die Ansicht, rueckt die
+ *      Auswahl auf die Nachbarin (erst darunter, dann darueber), sonst
+ *      Leerzustand.
+ *   3. DER VERLAUF STEHT IN DERSELBEN SPALTE (#1550). Ab der Schwelle steht
+ *      neben einem Verlaufseintrag seine Aufgabe, so wie neben einer Zeile der
+ *      Liste - dieselbe Instanz des Bausteins, dieselbe Adresse (`?open=`),
+ *      dieselbe Tastatur. Bis dahin endete der Verlauf auf der 720px-Bahn und
+ *      liess bei 1440 436px vor der Kopfkante leer.
+ *
+ * Ausfuehren: npm run test:tasks-split
+ */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { installMiniDom } from './mini-dom.js';
+
+globalThis.HTMLElement = globalThis.HTMLElement ?? class {};
+globalThis.customElements = globalThis.customElements ?? { define() {}, get() {} };
+const store = new Map();
+globalThis.localStorage = {
+  getItem: (k) => (store.has(k) ? store.get(k) : null),
+  setItem: (k, v) => { store.set(k, String(v)); },
+  removeItem: (k) => { store.delete(k); },
+  clear: () => store.clear(),
+};
+installMiniDom();
+globalThis.document.documentElement.classList = {
+  toggle() {}, add() {}, remove() {}, contains() { return false; },
+};
+globalThis.CSS = globalThis.CSS ?? { escape: (v) => String(v) };
+globalThis.window = globalThis.window ?? {};
+globalThis.window.yuvomi = { showToast() {} };
+
+const { openTaskDetail } = await import('../public/components/task-detail.js');
+const { __test: tasks } = await import('../public/pages/tasks.js');
+
+// ── 1. Die Ansicht in der Spalte ──────────────────────────────────────────
+
+const BASIS = { id: 7, title: 'Tisch decken', visibility: 'all', created_by: 2, subtasks: [] };
+
+function openInPane(extra = {}) {
+  let gesehen = null;
+  globalThis.__openDetailView = (options) => { gesehen = options; };
+  const pane = { isPane: true };
+  const onClose = () => {};
+  const standalone = () => {};
+  try {
+    openTaskDetail({
+      task: { ...BASIS, status: 'open' },
+      currentUserId: 2,
+      categories: [{ key: 'household' }],
+      pane,
+      onClose,
+      edit: { mount() {}, standalone },
+      ...extra,
+    });
+  } finally {
+    delete globalThis.__openDetailView;
+  }
+  assert.ok(gesehen, 'die Leseansicht wurde gar nicht geoeffnet');
+  return { options: gesehen, pane, onClose, standalone };
+}
+
+test('die Leseansicht reicht Spalte, Abmeldung und Bearbeiten-Weg an detail-view durch', () => {
+  const { options, pane, onClose, standalone } = openInPane();
+  assert.equal(options.pane, pane, 'ohne `pane` oeffnete sie ein Sheet ueber der Spalte');
+  assert.equal(options.onClose, onClose, 'ohne `onClose` erfaehrt die Liste nicht, dass eine Aktion lief');
+  assert.equal(options.edit?.standalone, standalone,
+    'ohne `standalone` fehlt in der Spalte der Bearbeiten-Knopf (openInPane baut ihn nur damit)');
+});
+
+for (const [id, label] of [['task-detail-finish', 'Erledigen'], ['task-detail-start', 'Starten'], ['task-detail-archive', 'Ablegen']]) {
+  test(`${label} in der Spalte schliesst ueber das gereichte close, nicht ueber closeDetailView`, async () => {
+    globalThis.__apiStub = { patch: async () => ({ data: null }) };
+    let geaendert = 0;
+    const { options } = openInPane({ onChanged: () => { geaendert += 1; } });
+    const action = options.actions.find((a) => a.id === id);
+    assert.ok(action, `${id} fehlt`);
+    const closes = [];
+    const button = { id, disabled: false, classList: { add() {}, remove() {} } };
+    try {
+      await action.onClick({ button, close: (opts) => { closes.push(opts); return Promise.resolve(); } });
+    } finally {
+      delete globalThis.__apiStub;
+    }
+    assert.equal(closes.length, 1, 'das close der Ansicht muss laufen - closeDetailView schloesse ein fremdes Modal');
+    assert.deepEqual(closes[0], { force: true }, 'ohne Verwerfen-Frage: der Status steht schon beim Server');
+    assert.equal(geaendert, 1, 'und danach zieht die Umgebung nach');
+  });
+}
+
+// ── 2. Die Auswahl ueber das Neuzeichnen ──────────────────────────────────
+
+/** Eine Liste mit Zeilen in Dokumentreihenfolge; `hidden` = nicht zu sehen. */
+function listOf(ids, { hidden = [] } = {}) {
+  const rows = ids.map((id) => ({
+    dataset: { mdId: String(id) },
+    hidden: false,
+    getClientRects: () => (hidden.includes(id) ? [] : [{}]),
+  }));
+  return {
+    querySelectorAll: (sel) => { assert.equal(sel, '[data-md-id]'); return rows; },
+    querySelector: (sel) => {
+      const m = sel.match(/^\[data-md-id="([^"]+)"\]$/);
+      assert.ok(m, `Stub kennt den Selektor nicht: ${sel}`);
+      return rows.find((row) => row.dataset.mdId === m[1]) ?? null;
+    },
+  };
+}
+
+/** Der Baustein als Protokoll: was die Seite mit ihm tut. */
+function fakeMd(selected, { split = true } = {}) {
+  const calls = [];
+  const md = {
+    selectedId: () => selected,
+    isSplit: () => split,
+    refresh: (opts = {}) => calls.push(['refresh', opts]),
+    select: (id, opts = {}) => { selected = String(id); calls.push(['select', String(id), opts]); },
+    clear: (opts = {}) => { selected = null; calls.push(['clear', opts]); },
+  };
+  return { md, calls };
+}
+
+function withTasks(list, fn) {
+  const before = tasks.state.tasks;
+  const query = tasks.state.searchQuery;
+  tasks.state.tasks = list;
+  tasks.state.searchQuery = '';
+  try { return fn(); } finally {
+    tasks.state.tasks = before;
+    tasks.state.searchQuery = query;
+    tasks.useTaskMd(null);
+  }
+}
+
+const T = (id, over = {}) => ({ id, title: `T${id}`, status: 'open', ...over });
+
+test('die Nachbarin ist erst die Zeile darunter, dann die darueber', () => {
+  const order = ['1', '2', '3', '4'];
+  assert.equal(tasks.neighborMdId(order, '2', new Set(['1', '3', '4'])), '3');
+  assert.equal(tasks.neighborMdId(order, '4', new Set(['1', '2', '3'])), '3', 'am Ende: die darueber');
+  assert.equal(tasks.neighborMdId(order, '2', new Set(['1', '4'])), '4', 'uebersprungen wird, was auch fehlt');
+  assert.equal(tasks.neighborMdId(order, '2', new Set()), null, 'keine mehr: Leerzustand');
+  assert.equal(tasks.neighborMdId(order, '9', new Set(['1'])), null, 'eine unbekannte Zeile hat keine Nachbarin');
+});
+
+test('bleibt die Zeile, bleibt die Auswahl - ohne Neumalen, solange sich nichts geaendert hat', () => {
+  withTasks([T(1), T(2)], () => {
+    const { md, calls } = fakeMd('2');
+    tasks.useTaskMd(md);
+    const list = listOf([1, 2]);
+    tasks.syncPaneAfterRender(list, ['1', '2']); // erster Stand wird gemerkt
+    calls.length = 0;
+    tasks.syncPaneAfterRender(list, ['1', '2']);
+    assert.deepEqual(calls, [['refresh', { repaint: false }]]);
+  });
+});
+
+test('aendert sich die ausgewaehlte Aufgabe (Status aus der Liste), malt das Detail neu', () => {
+  const data = [T(1), T(2)];
+  withTasks(data, () => {
+    const { md, calls } = fakeMd('2');
+    tasks.useTaskMd(md);
+    const list = listOf([1, 2]);
+    tasks.syncPaneAfterRender(list, ['1', '2']);
+    tasks.state.tasks = [T(1), T(2, { status: 'done' })];
+    calls.length = 0;
+    tasks.syncPaneAfterRender(list, ['1', '2']);
+    assert.deepEqual(calls, [['refresh', { repaint: true }]],
+      'die Zeile blieb, aber das Detail zeigte den alten Status');
+  });
+});
+
+test('kam die Aenderung aus dem Detail selbst, malt es NICHT neu (Fokus bleibt im Knopf)', () => {
+  withTasks([T(1), T(2)], () => {
+    const { md, calls } = fakeMd('2');
+    tasks.useTaskMd(md);
+    const list = listOf([1, 2]);
+    tasks.syncPaneAfterRender(list, ['1', '2']);
+    tasks.state.tasks = [T(1), T(2, { subtask_done: 1 })];
+    calls.length = 0;
+    tasks.syncPaneAfterRender(list, ['1', '2'], { quiet: true });
+    assert.deepEqual(calls, [['refresh', { repaint: false }]]);
+  });
+});
+
+test('nach einer Aktion der Spalte (Status, Ablage) malt das Detail neu, auch ohne Datenaenderung', () => {
+  withTasks([T(1), T(2)], () => {
+    const { md, calls } = fakeMd('2');
+    tasks.useTaskMd(md);
+    const list = listOf([1, 2]);
+    tasks.syncPaneAfterRender(list, ['1', '2']);
+    tasks.onPaneActionClosed({ querySelector: () => null });
+    calls.length = 0;
+    tasks.syncPaneAfterRender(list, ['1', '2'], { quiet: true });
+    assert.deepEqual(calls, [['refresh', { repaint: true }]]);
+  });
+});
+
+test('verlaesst die Zeile die Ansicht, rueckt die Auswahl auf die Nachbarin darunter', () => {
+  withTasks([T(1), T(3)], () => {
+    const { md, calls } = fakeMd('2');
+    tasks.useTaskMd(md);
+    tasks.syncPaneAfterRender(listOf([1, 3]), ['1', '2', '3']);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0][0], 'select', `erwartet Weiterruecken, war ${JSON.stringify(calls)}`);
+    assert.equal(calls[0][1], '3');
+    assert.equal(calls[0][2].history, 'replace', 'das Weiterruecken ist keine Navigation - kein neuer Eintrag');
+  });
+});
+
+test('die letzte Zeile geht: Auswahl auf die darueber', () => {
+  withTasks([T(1), T(2)], () => {
+    const { md, calls } = fakeMd('3');
+    tasks.useTaskMd(md);
+    tasks.syncPaneAfterRender(listOf([1, 2]), ['1', '2', '3']);
+    assert.deepEqual(calls.map((c) => c.slice(0, 2)), [['select', '2']]);
+  });
+});
+
+test('geht die einzige Zeile, steht der Leerzustand', () => {
+  withTasks([], () => {
+    const { md, calls } = fakeMd('1');
+    tasks.useTaskMd(md);
+    tasks.syncPaneAfterRender(listOf([]), ['1']);
+    assert.deepEqual(calls, [['clear', { history: 'replace' }]]);
+  });
+});
+
+test('ist die Aufgabe noch da, nur nicht gezeichnet (Gruppe zu), bleibt die Auswahl stehen', () => {
+  withTasks([T(1), T(2)], () => {
+    const { md, calls } = fakeMd('2');
+    tasks.useTaskMd(md);
+    tasks.syncPaneAfterRender(listOf([1]), ['1', '2']);
+    assert.deepEqual(calls, [], 'Zuklappen ist kein Verlassen der Ansicht');
+  });
+});
+
+test('ohne Auswahl raeumt das Neuzeichnen nur die Markierung auf', () => {
+  withTasks([T(1)], () => {
+    const { md, calls } = fakeMd(null);
+    tasks.useTaskMd(md);
+    tasks.syncPaneAfterRender(listOf([1]), ['1']);
+    assert.deepEqual(calls, [['refresh', {}]]);
+  });
+});
+
+// ── Das Blatt unter der Schwelle: erst laden, dann nur oeffnen, wenn es noch gilt ──
+
+test('openTaskSheet oeffnet nach dem Laden nur, solange das Signal des Bausteins steht', async () => {
+  // Zwei Anfragen, dann das Blatt. Ging der Nutzer dazwischen zurueck oder
+  // wurde das Fenster breit (Detail in der Spalte), legte die Fortsetzung
+  // trotzdem das alte Blatt darueber.
+  const opened = [];
+  let release;
+  globalThis.__apiStub = {
+    get: (path) => (String(path).startsWith('/tasks/')
+      ? new Promise((resolve) => { release = () => resolve({ data: { ...BASIS, status: 'open' } }); })
+      : Promise.resolve({ data: null })),
+  };
+  globalThis.__openDetailView = (options) => opened.push(options.title);
+  try {
+    const stale = new AbortController();
+    const first = tasks.openTaskSheet('7', {}, stale.signal);
+    stale.abort();
+    release();
+    await first;
+    assert.deepEqual(opened, [], 'ueberholt: kein Blatt');
+
+    const live = new AbortController();
+    const second = tasks.openTaskSheet('7', {}, live.signal);
+    release();
+    await second;
+    assert.deepEqual(opened, ['Tisch decken'], 'steht das Signal, geht das Blatt auf');
+  } finally {
+    delete globalThis.__apiStub;
+    delete globalThis.__openDetailView;
+  }
+  // Der Aufrufer reicht das Signal des Bausteins durch.
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  assert.match(src, /openNarrow: \(id, _trigger, \{ signal \}\) => openTaskSheet\(id, container, signal\)/,
+    'mountTaskSplit gibt das Signal aus openNarrow an openTaskSheet weiter');
+});
+
+test('renderTaskPane: nur 404/403 heisst „gibt es nicht"; ein Netz- oder Serverfehler wirft', async () => {
+  // Im Vertrag des Bausteins raeumt `false` Auswahl und `?open=` ab. Bei einem
+  // 500 oder einer Zeitueberschreitung gibt es die Aufgabe aber noch - die
+  // Spalte zeigt dann einen Fehler mit Erneut versuchen (master-detail.js).
+  const failWith = (status) => {
+    globalThis.__apiStub = { get: () => Promise.reject(Object.assign(new Error('x'), { status })) };
+  };
+  const body = { replaceChildren() {}, insertAdjacentHTML() {} };
+  const signal = new AbortController().signal;
+  try {
+    failWith(404);
+    assert.equal(await tasks.renderTaskPane('7', body, signal, {}), false, '404: weg');
+    failWith(403);
+    assert.equal(await tasks.renderTaskPane('7', body, signal, {}), false, '403: nicht sichtbar');
+    failWith(500);
+    await assert.rejects(tasks.renderTaskPane('7', body, signal, {}), (err) => err.status === 500,
+      '500: voruebergehend - der Baustein haelt die Auswahl');
+    globalThis.__apiStub = { get: () => Promise.reject(new TypeError('Failed to fetch')) };
+    await assert.rejects(tasks.renderTaskPane('7', body, signal, {}), TypeError, 'offline: ebenso');
+  } finally {
+    delete globalThis.__apiStub;
+  }
+});
+
+test('der Rueckfall fuer ?open= auf eine Aufgabe ausserhalb der Liste haengt am Seiten-Signal', () => {
+  // Archiviert oder weggefiltert: das Blatt statt einer Auswahl. Es laedt erst -
+  // verlaesst der Nutzer die Seite vorher, darf es nicht ueber der Zielseite
+  // aufgehen (openTaskSheet prueft das Signal nach dem Laden, Test oben).
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  const mount = src.slice(src.indexOf('function mountTaskSplit('));
+  const body = mount.slice(0, mount.indexOf('\n}\n'));
+  assert.match(body, /if \(sheetFor\) openTaskSheet\(sheetFor, container, signal\)/,
+    'mountTaskSplit reicht das Signal der Seite an den Rueckfall weiter');
+});
+
+test('Wiederholen nach dem Ladefehler baut mit dem Seiten-Signal neu auf', () => {
+  // Ohne Signal haengte ein Wiederholen, dessen Antwort erst nach dem
+  // Wegnavigieren kommt, den Baustein gegen den alten Baum ein - und
+  // raeumte die Instanz der Zielseite ab.
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  assert.match(src, /onRetry: \(\) => render\(container, \{ user: state\.user, signal: pageSignal \}\)/,
+    'der Wiederholen-Weg reicht das Signal der Seite weiter');
+  const render = src.slice(src.indexOf('export async function render('));
+  const head = render.slice(0, render.indexOf('taskMd?.destroy();'));
+  assert.match(head, /if \(signal\?\.aborted\) return;/,
+    'ein Neuaufbau fuer eine verlassene Seite bricht ab, bevor er die lebende Instanz abraeumt');
+  assert.match(head, /pageSignal = signal \?\? null;/, 'render merkt sich das Signal fuer den Wiederholen-Weg');
+});
+
+// ── Der Rueckfall fuer ?open= ausserhalb der Liste behaelt die Adresse ─────
+
+test('?open= auf eine Aufgabe ausserhalb der Liste: das Blatt geht auf, die Adresse behaelt den Link, die Spalte waehlt nichts', async () => {
+  // Codex an #1477 (Thread 4112556721): der Rueckfall nahm `?open=` VOR dem
+  // Blatt aus der Adresse, damit der Baustein die Zeile nicht beansprucht, die
+  // es nicht gibt. Die Adresse hiess danach `/tasks` - Kopieren, Neuladen und
+  // Vor oeffneten die Aufgabe nicht mehr. Jetzt bleibt der Link stehen, und
+  // der Baustein laesst genau diese Anfangsauswahl liegen (claimInitial).
+  const node = (extra = {}) => ({
+    hidden: false,
+    isConnected: true,
+    classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
+    addEventListener() {},
+    removeEventListener() {},
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    getAttribute: () => null,
+    setAttribute() {},
+    removeAttribute() {},
+    getClientRects: () => [1],
+    ...extra,
+  });
+  const list = node();
+  const detail = node({ display: 'flex' });
+  const empty = node();
+  const body = node();
+  const root = node({
+    querySelector: (sel) => ({
+      '.split-view__list': list, '.split-view__detail': detail, '[data-md-empty]': empty, '[data-md-body]': body,
+    })[sel] ?? null,
+  });
+  const page = node({ querySelector: (sel) => (sel === '.split-view__detail' ? detail : null) });
+  const container = node({ querySelector: (sel) => ({ '.tasks-split': root, '.tasks-page': page })[sel] ?? null });
+
+  const url = { current: new URL('http://yuvomi.test/tasks?open=7') };
+  const writes = [];
+  const saved = { location: globalThis.location, history: globalThis.history, gcs: globalThis.getComputedStyle };
+  globalThis.location = {
+    get href() { return url.current.href; },
+    get pathname() { return url.current.pathname; },
+    get search() { return url.current.search; },
+    get hash() { return url.current.hash; },
+  };
+  globalThis.history = {
+    state: null,
+    replaceState(state, _t, to) { writes.push(['replace', to]); url.current = new URL(to, url.current); },
+    pushState(state, _t, to) { writes.push(['push', to]); url.current = new URL(to, url.current); },
+  };
+  globalThis.getComputedStyle = (el) => ({ display: el.display ?? 'block' });
+  const opened = [];
+  globalThis.__apiStub = {
+    get: (path) => Promise.resolve({ data: String(path).startsWith('/tasks/') ? { ...BASIS, status: 'done' } : null }),
+  };
+  globalThis.__openDetailView = (options) => opened.push({ title: options.title, pane: options.pane ?? null });
+  const page$ = new AbortController();
+  try {
+    tasks.mountTaskSplit(container, page$.signal);
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(location.search, '?open=7', 'der Rueckfall hat den Link aus der Adresse genommen - Kopieren und Neuladen oeffnen die Aufgabe nicht mehr');
+    assert.deepEqual(writes, [], 'weder Rueckfall noch Baustein schreiben die Adresse');
+    assert.deepEqual(opened, [{ title: 'Tisch decken', pane: null }],
+      'genau das Blatt geht auf - kein Detail in der Spalte fuer eine Aufgabe ohne Zeile');
+  } finally {
+    page$.abort();
+    globalThis.location = saved.location;
+    globalThis.history = saved.history;
+    globalThis.getComputedStyle = saved.gcs;
+    delete globalThis.__apiStub;
+    delete globalThis.__openDetailView;
+  }
+});
+
+test('Status in der Spalte bestaetigt, Nachladen scheitert: die alten Knoepfe kommen nie zurueck', async () => {
+  // Bei einer Serie ist das ein Datenrisiko: nach einem bestaetigten Erledigen
+  // stuende „Starten" wieder bedienbar da, und der Server kehrte die
+  // Erledigung um und verwarf die Folgeinstanz.
+  const task = { ...BASIS, status: 'open' };
+  let options = null;
+  globalThis.__openDetailView = (o) => { options = o; };
+  const start = { id: 'task-detail-start', disabled: false };
+  const savedGet = globalThis.document.getElementById;
+  globalThis.document.getElementById = (id) => (id === 'task-detail-start' ? start : null);
+  const toasts = [];
+  const savedToast = globalThis.window.yuvomi.showToast;
+  globalThis.window.yuvomi.showToast = (msg, tone) => toasts.push([msg, tone]);
+  let stale = 0;
+  globalThis.__apiStub = { patch: async () => ({ data: {} }) };
+  try {
+    openTaskDetail({
+      task, currentUserId: 2, categories: [{ key: 'household' }], pane: { isPane: true },
+      onChanged: async () => { throw Object.assign(new Error('offline'), { status: 0 }); },
+      onStale: () => { stale += 1; },
+    });
+    const finish = options.actions.find((a) => a.id === 'task-detail-finish');
+    await finish.onClick({ button: { id: 'task-detail-finish' }, close: async () => {} });
+    assert.equal(task.status, 'done', 'der Server hat erledigt - die Ansicht behauptet nichts anderes');
+    assert.equal(start.disabled, true, '„Starten" bleibt gesperrt');
+    assert.equal(stale, 1, 'die Umgebung erfaehrt, dass die Spalte veraltet ist (neu zeichnen oder Erneut versuchen)');
+    assert.deepEqual(toasts.map(([, tone]) => tone), ['danger'], 'das gescheiterte Nachladen wird gesagt');
+    assert.notEqual(toasts[0][0], 'offline', 'als Ladefehler, nicht als gescheiterter Schreibvorgang');
+
+    // Scheitert der SCHREIBVORGANG, bleibt alles wie vorher bedienbar.
+    toasts.length = 0;
+    const t2 = { ...BASIS, status: 'open' };
+    globalThis.__apiStub = { patch: async () => { throw new Error('Serverfehler'); } };
+    openTaskDetail({ task: t2, currentUserId: 2, categories: [{ key: 'household' }], pane: { isPane: true }, onStale: () => { stale += 1; } });
+    start.disabled = false;
+    await options.actions.find((a) => a.id === 'task-detail-finish').onClick({ button: {}, close: async () => {} });
+    assert.equal(t2.status, 'open');
+    assert.equal(start.disabled, false);
+    assert.equal(stale, 1);
+  } finally {
+    delete globalThis.__openDetailView;
+    delete globalThis.__apiStub;
+    globalThis.document.getElementById = savedGet;
+    globalThis.window.yuvomi.showToast = savedToast;
+  }
+  // Die Aufgaben-Seite gibt der Spalte den Weg zurueck: neu zeichnen (frisch
+  // vom Server oder der Fehlerzustand mit Erneut versuchen, master-detail.js).
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  assert.match(src, /onStale: pane \? \(\) => taskMd\?\.refresh\(\{ repaint: true \}\) : undefined/,
+    'openTaskView reicht onStale fuer die Spalte durch');
+});
+
+test('Sammel-Loeschen mit der angezeigten Aufgabe: die Spalte rueckt sofort weiter, Rueckgaengig holt sie zurueck', () => {
+  // Die Zeilen werden nur ausgeblendet, geloescht wird erst nach dem
+  // Rueckgaengig-Fenster. Bis dahin standen Bearbeiten, Status, Ablage und
+  // Loeschen der geloeschten Aufgabe fuenf Sekunden bedienbar in der Spalte.
+  const rows = [1, 2, 3, 4].map((id) => {
+    const row = { dataset: { mdId: String(id) }, hidden: false, style: { display: '' } };
+    row.getClientRects = () => (row.style.display === 'none' ? [] : [{}]);
+    return row;
+  });
+  const list = {
+    querySelectorAll: () => rows,
+    querySelector: (sel) => rows.find((r) => sel === `[data-md-id="${r.dataset.mdId}"]`) ?? null,
+  };
+  const container = {
+    querySelector: (sel) => {
+      if (sel === '#task-list') return list;
+      const m = sel.match(/^\[data-task-id="(\d+)"\]$/);
+      return m ? rows.find((r) => r.dataset.mdId === m[1]) ?? null : null;
+    },
+  };
+  let undo = null;
+  globalThis.__undoStub = (opts) => { undo = opts; };
+  try {
+    withTasks([T(1), T(2), T(3), T(4)], () => {
+      const { md, calls } = fakeMd('2');
+      tasks.useTaskMd(md);
+      tasks.handleBulkDelete(['2', '3'], container);
+      assert.deepEqual(calls.map(([op, id, o]) => [op, id, o?.history]), [['select', '4', 'replace']],
+        'die Spalte zeigt sofort die naechste stehende Aufgabe, nicht die geloeschte');
+      calls.length = 0;
+      undo.restore();
+      assert.deepEqual(calls, [['select', '2', { history: 'replace' }]], 'Rueckgaengig: die Aufgabe steht wieder rechts');
+
+      // Hat der Nutzer inzwischen selbst gewaehlt, bleibt seine Wahl.
+      rows.forEach((r) => { r.style.display = ''; });
+      tasks.handleBulkDelete(['2'], container);
+      md.select('1');
+      calls.length = 0;
+      undo.restore();
+      assert.deepEqual(calls, [], 'Rueckgaengig reisst eine neue Wahl nicht um');
+
+      // Steht die angezeigte Aufgabe nicht in der Loeschung, bleibt die Spalte.
+      rows.forEach((r) => { r.style.display = ''; });
+      calls.length = 0;
+      tasks.handleBulkDelete(['3'], container);
+      assert.deepEqual(calls, []);
+    });
+  } finally {
+    delete globalThis.__undoStub;
+  }
+});
+
+// ── 3. Der Verlauf in Liste + Detail (#1550) ──────────────────────────────
+
+/** Eine Seitenwurzel, deren Klassen der Test liest - sonst nichts im Baum. */
+function viewContainer() {
+  const classes = new Set(['tasks-page', 'app-page', 'app-page--full']);
+  const page = {
+    classList: {
+      toggle: (name, on) => { if (on) classes.add(name); else classes.delete(name); return on; },
+      add: (name) => classes.add(name),
+      remove: (name) => classes.delete(name),
+      contains: (name) => classes.has(name),
+    },
+    querySelector: () => null,
+  };
+  return {
+    classes,
+    isConnected: true,
+    querySelector: (sel) => (sel === '.tasks-page' ? page : null),
+    querySelectorAll: () => [],
+  };
+}
+
+test('Liste und Verlauf sind Liste + Detail mit Lesebahn darunter, das Brett ist Flaeche', () => {
+  const before = tasks.state.viewMode;
+  try {
+    for (const [mode, splitAllowed] of [['list', true], ['history', true], ['kanban', false]]) {
+      tasks.state.viewMode = mode;
+      const c = viewContainer();
+      tasks.syncViewChrome(c);
+      assert.equal(c.classes.has('app-page--list-detail'), splitAllowed,
+        `${mode}: die Wurzel ${splitAllowed ? 'muss' : 'darf nicht'} der Container der Schwelle sein`
+        + (mode === 'history' ? ' - ohne ihn endet der Verlauf bei 1440 436px vor der Kopfkante (#1550)' : ''));
+      // Unter der Schwelle: Liste und Verlauf behalten die 720px-Bahn, das Brett nicht.
+      assert.equal(c.classes.has('is-reading-measure'), splitAllowed, `${mode}: Lesebahn unter der Schwelle`);
+    }
+  } finally {
+    tasks.state.viewMode = before;
+  }
+});
+
+test('ein Ansichtswechsel raeumt die Auswahl der alten Ansicht ab und stellt die Vorwahl wieder scharf', () => {
+  // Liste und Verlauf teilen sich EINE Spalte, aber nicht ihre Zeilen: ohne
+  // das Abraeumen stuende eine Aufgabe der Liste rechts neben dem Verlauf.
+  const before = tasks.state.viewMode;
+  const savedRaf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = () => 0;
+  try {
+    for (const [from, to] of [['list', 'history'], ['history', 'list'], ['history', 'kanban'], ['kanban', 'history']]) {
+      tasks.state.viewMode = from;
+      const { md, calls } = fakeMd('5');
+      tasks.useTaskMd(md);
+      tasks.setViewMode(viewContainer(), to);
+      assert.deepEqual(calls, [['clear', { history: 'replace', repick: true }]],
+        `${from} -> ${to}: die Auswahl geht ersetzend, und die neue Ansicht waehlt ihre erste Zeile vor`);
+    }
+  } finally {
+    tasks.state.viewMode = before;
+    globalThis.requestAnimationFrame = savedRaf;
+    tasks.useTaskMd(null);
+  }
+});
+
+test('eine Verlaufszeile ist eine Zeile des Bausteins: ihre ID ist die Aufgabe', () => {
+  const html = tasks.renderHistoryEntry({
+    id: 31, task_id: 7, title: 'Tisch decken', completed_at: '2026-09-30T08:00:00Z',
+    user_id: 2, person_name: 'Linda', is_recurring: 0,
+  });
+  assert.match(html, /<button type="button" class="list-row history-row"/, 'die Zeile ist selbst der Knopf');
+  assert.match(html, /data-md-id="7"/, 'ohne data-md-id findet der Baustein die Zeile nicht - keine Auswahl, keine Pfeiltasten');
+  assert.doesNotMatch(html, /data-md-id="31"/, '?open= nennt eine Aufgabe, nie einen Vorgang');
+  assert.match(html, /data-task-id="7"/, 'Loeschen aus der Spalte blendet die Zeile sofort aus (taskRowsIn)');
+});
+
+test('ein Klick auf einen Eintrag geht durch den Baustein: Spalte ab der Schwelle, darunter das Blatt', async () => {
+  const opened = [];
+  const md = { open: (id, trigger) => opened.push([id, trigger]) };
+  const trigger = { isRow: true };
+  tasks.useTaskMd(md);
+  try {
+    tasks.openHistoryEntry('7', trigger, {});
+    assert.deepEqual(opened, [['7', trigger]], 'der Baustein entscheidet: auswaehlen oder Blatt');
+  } finally {
+    tasks.useTaskMd(null);
+  }
+  // Ohne Baustein (noch nicht eingehaengt): das Blatt wie bisher.
+  const views = [];
+  globalThis.__apiStub = { get: (path) => Promise.resolve({ data: String(path).startsWith('/tasks/') ? { ...BASIS, status: 'done' } : null }) };
+  globalThis.__openDetailView = (options) => views.push({ title: options.title, pane: options.pane ?? null });
+  try {
+    tasks.openHistoryEntry('7', trigger, {});
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    assert.deepEqual(views, [{ title: 'Tisch decken', pane: null }]);
+  } finally {
+    delete globalThis.__apiStub;
+    delete globalThis.__openDetailView;
+  }
+});
+
+test('Verlauf neu gezeichnet: Auswahl halten, nach einem Schreibvorgang neu malen, weitergehen oder dem Baustein ueberlassen', () => {
+  // Steht die Zeile noch und wurde nur geblaettert oder gefiltert: Auswahl
+  // bleibt, das Detail malt NICHT neu.
+  let { md, calls } = fakeMd('2');
+  tasks.useTaskMd(md);
+  try {
+    tasks.syncHistoryPane(listOf([1, 2, 3]), ['1', '2', '3']);
+    assert.deepEqual(calls, [['refresh', { repaint: false }]]);
+
+    // Nach einem Schreibvorgang (gespeichertes Formular): das Detail zieht nach.
+    calls.length = 0;
+    tasks.syncHistoryPane(listOf([1, 2, 3]), ['1', '2', '3'], { afterWrite: true });
+    assert.deepEqual(calls, [['refresh', { repaint: true }]],
+      'der Verlauf hat keinen Bestand fuer einen Fingerabdruck - ohne Neumalen stuende die alte Fassung rechts');
+
+    // Kam die Aenderung aus der Spalte selbst, bleibt der Fokus im Knopf.
+    calls.length = 0;
+    tasks.syncHistoryPane(listOf([1, 2, 3]), ['1', '2', '3'], { afterWrite: true, quiet: true });
+    assert.deepEqual(calls, [['refresh', { repaint: false }]]);
+
+    // Eine Aktion der Spalte (Wieder oeffnen) hat sie abgemeldet: neu malen.
+    tasks.onPaneActionClosed({ querySelector: () => null });
+    calls.length = 0;
+    tasks.syncHistoryPane(listOf([1, 2, 3]), ['1', '2', '3'], { afterWrite: true, quiet: true });
+    assert.deepEqual(calls, [['refresh', { repaint: true }]]);
+
+    // Haken zurueckgenommen oder geloescht: der Eintrag ist weg, die Auswahl
+    // rueckt auf die Nachbarin darunter - wie in der Liste, per replace.
+    calls.length = 0;
+    tasks.syncHistoryPane(listOf([1, 3]), ['1', '2', '3'], { afterWrite: true });
+    assert.deepEqual(calls.map(([op, id, o]) => [op, id, o?.history]), [['select', '3', 'replace']]);
+
+    // Eine andere Person gewaehlt: neuer Zusammenhang, das entscheidet der
+    // Baustein (erste Zeile, wenn die gezeigte wegfiel) - kein Weiterruecken.
+    ({ md, calls } = fakeMd('2'));
+    tasks.useTaskMd(md);
+    tasks.syncHistoryPane(listOf([4, 5]), ['1', '2', '3']);
+    assert.deepEqual(calls, [['refresh', {}]]);
+
+    // Ohne Auswahl nur die Vorwahl/Markierung.
+    ({ md, calls } = fakeMd(null));
+    tasks.useTaskMd(md);
+    tasks.syncHistoryPane(listOf([1]), []);
+    assert.deepEqual(calls, [['refresh', {}]]);
+  } finally {
+    tasks.useTaskMd(null);
+  }
+});
+
+test('der Verlauf zeichnet seine Zeilen, BEVOR Liste + Detail eingehaengt wird (Deep-Link auf einen Eintrag)', async () => {
+  // Im Verlauf kommen die Zeilen aus einer eigenen Anfrage. Haengte render()
+  // den Baustein vorher ein, fehlte die Zeile zu `?open=` - und der Rueckfall
+  // fuer „Aufgabe ohne Zeile" oeffnete ein Blatt ueber der Spalte.
+  const before = tasks.state.viewMode;
+  const history = tasks.state.history;
+  let rendered = false;
+  const listEl = {
+    querySelectorAll: () => [],
+    querySelector: () => null,
+    replaceChildren() {},
+    insertAdjacentHTML: (_pos, html) => { if (/data-md-id="7"/.test(html)) rendered = true; },
+  };
+  const container = { querySelector: (sel) => (sel === '#task-list' ? listEl : null) };
+  globalThis.__apiStub = {
+    get: (path) => Promise.resolve(String(path).startsWith('/tasks/completions')
+      ? { data: [{ id: 1, task_id: 7, title: 'Tisch decken', completed_at: '2026-09-30T08:00:00Z', user_id: 2, person_name: 'Linda' }], has_more: false }
+      : { data: null }),
+  };
+  tasks.state.viewMode = 'history';
+  tasks.state.history = { entries: [], hasMore: false, cursor: null, userId: null, loading: null, error: null };
+  try {
+    const firstPaint = tasks.renderTaskList(container);
+    assert.ok(firstPaint && typeof firstPaint.then === 'function', 'renderTaskList gibt im Verlauf das Laden zurueck');
+    assert.equal(rendered, false);
+    await firstPaint;
+    assert.equal(rendered, true, 'nach dem Warten stehen die Zeilen');
+  } finally {
+    delete globalThis.__apiStub;
+    tasks.state.viewMode = before;
+    tasks.state.history = history;
+  }
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  const render = src.slice(src.indexOf('export async function render('));
+  const awaitAt = render.indexOf("if (state.viewMode === 'history') await firstPaint;");
+  const mountAt = render.indexOf('mountTaskSplit(container, signal);');
+  assert.ok(awaitAt > 0 && mountAt > awaitAt, 'render() wartet im Verlauf auf die Zeilen, bevor es den Baustein einhaengt');
+});

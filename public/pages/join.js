@@ -6,6 +6,7 @@
 import { auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { authHeroHtml, authErrorHtml, wirePasswordToggle } from '/utils/auth-ui.js';
 
 // Dieselbe Regel wie im Server (POST /auth/invites/accept). Sie hier zu spiegeln
 // erspart dem Nutzer ein 400, das sich sonst nicht von einem toten Token
@@ -25,10 +26,11 @@ export async function render(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <main class="auth-page" id="main-content">
+      ${authHeroHtml({ heading: false })}
       <div class="auth-card card card--padded">
         <h1 class="auth-card__title">${esc(t('join.title'))}</h1>
         <p class="auth-card__intro" id="join-intro">${esc(t('join.intro'))}</p>
-        <div class="form-error" id="join-error" role="alert" tabindex="-1" hidden></div>
+        ${authErrorHtml('join-error')}
         <div class="form-success" id="join-success" role="status" aria-live="polite" hidden></div>
         <form class="auth-form" id="join-form" novalidate>
           <div class="form-group">
@@ -68,6 +70,11 @@ export async function render(container) {
   const successEl = container.querySelector('#join-success');
   const btn = container.querySelector('#join-btn');
   const usernameEl = container.querySelector('#join-username');
+  // Das Auge an beiden Passwortfeldern (utils/auth-ui.js): ein NEUES Passwort
+  // tippte man hier zweimal blind.
+  const eye = { show: t('login.showPassword'), hide: t('login.hidePassword') };
+  wirePasswordToggle(container.querySelector('#join-password'), eye);
+  wirePasswordToggle(container.querySelector('#join-confirm'), eye);
   const usernameHint = container.querySelector('#join-username-hint');
   const displayNameEl = container.querySelector('#join-display-name');
   const displayNameHint = container.querySelector('#join-display-name-hint');

@@ -164,7 +164,7 @@ test('Aufgabenzeile mit `tasks: read`: der Haken wird zum Zustandszeichen', () =
     const html = tasks.renderTaskCard(aufgabe({ subtasks: [{ id: 8, title: 'Tonne', status: 'done' }] }));
 
     // Zustand ANZEIGEN: bleibt stehen - als span, nicht als gesperrter Knopf.
-    assert.match(html, /<span class="task-status-btn task-status-btn--open task-status-btn--static"[\s\S]*?role="img"/,
+    assert.match(html, /<span class="task-status-btn task-status-btn--open task-status-btn--static check-ring check-ring--static"[\s\S]*?role="img"/,
       'der Erledigt-Haken zeigt den Zustand der Aufgabe und darf nicht verschwinden');
     assert.doesNotMatch(html, /data-action="toggle-status"/,
       'aber er ist kein Knopf mehr: ein disabled-Knopf verspricht eine Berührung, die nichts tut');
@@ -206,7 +206,7 @@ test('Zustandszeichen bei `tasks: read`: eine begonnene Aufgabe heisst "In Bearb
   withAccess({ tasks: 'read' }, () => {
     for (const [status, key] of zustaende) {
       const html = tasks.renderTaskCard(aufgabe({ status }));
-      const zeichen = html.match(/<span class="task-status-btn [^"]*task-status-btn--static"[^>]*aria-label="([^"]*)"/);
+      const zeichen = html.match(/<span class="task-status-btn [^"]*task-status-btn--static check-ring check-ring--static"[^>]*aria-label="([^"]*)"/);
       assert.ok(zeichen, `Zeichen fuer ${status} vorhanden`);
       assert.equal(zeichen[1], `Müll rausbringen: ${key}`, `Aufgabe im Zustand ${status}`);
 
@@ -450,18 +450,22 @@ test('dieselbe Zusicherung fuer die Teilaufgabe (#1209 und #467 teilen sich das 
 // -------------------------------------------------------------------------
 
 test('das Zustandszeichen reagiert nicht auf Ueberfahren, und der Ring behaelt seine Farbe', () => {
+  // Der Ring samt Einladung steht seit R16 geteilt in list-row.css
+  // (`.check-ring`), der Zustand weiter in tasks.css - gemessen wird die
+  // Kaskade in Ladereihenfolge (index.html: list-row.css vor dem Seiten-CSS).
+  const KASKADE = `${readFileSync(new URL('../public/styles/list-row.css', import.meta.url), 'utf8')}\n${TASKS_CSS}`;
   for (const [name, klassen, ruhend] of [
-    ['erledigt', ['task-status-btn', 'task-status-btn--done', 'task-status-btn--static'], 'var(--color-success)'],
-    ['in Arbeit', ['task-status-btn', 'task-status-btn--in_progress', 'task-status-btn--static'], 'var(--color-warning)'],
+    ['erledigt', ['task-status-btn', 'task-status-btn--done', 'task-status-btn--static', 'check-ring', 'check-ring--static'], 'var(--color-success)'],
+    ['in Arbeit', ['task-status-btn', 'task-status-btn--in_progress', 'task-status-btn--static', 'check-ring', 'check-ring--static'], 'var(--color-warning)'],
   ]) {
-    assert.equal(effektiverWert(TASKS_CSS, klassen, 'border-color', ':hover::after'), null,
+    assert.equal(effektiverWert(KASKADE, klassen, 'border-color', ':hover::after'), null,
       `${name}: keine Hover-Regel darf das Zeichen treffen`);
-    assert.equal(effektiverWert(TASKS_CSS, klassen, 'border-color', '::after'), ruhend,
+    assert.equal(effektiverWert(KASKADE, klassen, 'border-color', '::after'), ruhend,
       `${name}: der Ring behaelt die Farbe, die den Zustand traegt`);
   }
   // Der bedienbare Knopf behaelt seine Hover-Reaktion.
   assert.match(
-    effektiverWert(TASKS_CSS, ['task-status-btn', 'task-status-btn--done'], 'border-color', ':hover::after') ?? '',
+    effektiverWert(KASKADE, ['task-status-btn', 'task-status-btn--done', 'check-ring'], 'border-color', ':hover::after') ?? '',
     /module-accent/,
   );
 });
@@ -772,10 +776,12 @@ test('requestDeleteEvent() riegelt alle drei Serien-Löschwege ab', () => {
   assert.ok(fn.indexOf('if (readOnly()) return;') > -1 && fn.indexOf('if (readOnly()) return;') < 200);
 });
 
-test('Kalender: FAB, Kopfknopf und beide Leerzustands-CTAs hängen an readOnly()', () => {
+test('Kalender: FAB und beide Leerzustands-CTAs hängen an readOnly()', () => {
+  // Einen eigenen Kopfknopf gibt es nicht mehr (Re-Critique 2026-09-27, D3):
+  // am Zeigergeraet dockt die Shell den FAB in den Kopf.
+  assert.doesNotMatch(CAL_CODE, /toolbar-new-btn(?![\w-])/, 'kein zweiter Primaerknopf neben dem FAB');
   for (const [name, muster] of [
     ['der FAB', /\$\{readOnly\(\) \? '' : `\s*<button class="page-fab" id="fab-new-event"/],
-    ['der Kopfknopf', /\$\{readOnly\(\) \? '' : `\s*<button class="btn btn--primary toolbar-new-btn" id="cal-add"/],
     ['der Agenda-CTA', /action: readOnly\(\) \? undefined : \{ label: t\('calendar\.newEvent'\), attrs: \{ id: 'agenda-empty-cta' \} \}/],
     ['der Such-CTA', /\$\{readOnly\(\) \? '' : `<button class="btn btn--secondary" id="cal-search-empty-cta">/],
   ]) {
@@ -790,28 +796,37 @@ test('Kalender-Detailansicht: Löschen, Zurücksetzen und Bearbeiten fallen weg,
     'auch das Zurücksetzen eines ICS-Termins ist ein Schreibvorgang');
   assert.match(CAL_CODE, /edit: readOnly\(\) \? undefined : \{/,
     'ohne Mounter baut die geteilte Ansicht keinen Bearbeiten-Knopf');
-  // Und die einzige nicht schreibende Aktion bleibt bedingungslos drin.
+  // Und die einzige nicht schreibende Aktion bleibt bedingungslos drin - seit
+  // R10 als Folgeaktion der Ort-Zeile (mapRowAction), nicht im Fuss.
   assert.match(CAL_CODE, /id: 'detail-open-map'/);
-  const mapBlock = CAL_CODE.slice(CAL_CODE.indexOf('const mapUrl = eventMapUrl(ev.location);'), CAL_CODE.indexOf("id: 'detail-open-map'"));
-  assert.ok(!mapBlock.includes('readOnly()'), '"In Karte öffnen" schreibt nichts und gehört auch einem Nur-lesen-Nutzer');
+  const mapBlock = CAL_CODE.slice(CAL_CODE.indexOf('function mapRowAction'), CAL_CODE.indexOf("id: 'detail-open-map'"));
+  assert.ok(mapBlock.length > 0 && !mapBlock.includes('readOnly()'), '"In Karte öffnen" schreibt nichts und gehört auch einem Nur-lesen-Nutzer');
+  assert.match(CAL_CODE, /action: mapRowAction\(ev\)/, 'die Ort-Zeile traegt die Karte fuer jeden, auch Nur-lesen');
 });
 
 // -------------------------------------------------------------------------
 // Die Begründung für das Ausblenden des Einlösens - am Server gemessen
 // -------------------------------------------------------------------------
 
-test('die Ausnahmen vom Modulrecht stehen am Server, und es sind genau zwei Sorten', () => {
+test('die Ausnahmen vom Modulrecht stehen am Server, und es sind genau zwei Sorten', async () => {
   // WOVON DIESE SEITE ABHÄNGT. Bekäme `/rewards/redemptions` eine
   // Niveau-Senkung wie `/schedule/preferences`, gehörte der Einlöse-Knopf
   // einem Menschen mit `rewards: read` zurück. Und verlöre ein Display seine
   // benannten Schreibrouten, gehörten Personenauswahl und Tablett-Einlösen
   // weg. Beides sind Entscheidungen, die anderswo fallen - dieser Test macht
   // die Kopplung sichtbar, statt sie zu erraten.
-  const scopes = readFileSync(new URL('../server/scopes.js', import.meta.url), 'utf8');
-  const fn = scopes.slice(scopes.indexOf('function sessionModuleAccessRequirement(path, method) {'));
-  const body = fn.slice(0, fn.indexOf('\n}\n'));
-  assert.match(body, /path === '\/schedule\/preferences'/);
-  assert.ok(!body.includes('rewards'),
+  //
+  // Die Senkungen stehen seit #1290 in EINER Tabelle (`READ_LEVEL_WRITES` in
+  // server/scopes.js), die beide Gates lesen - gemessen wird deshalb das
+  // Urteil, nicht die Schreibweise der Funktion.
+  const { READ_LEVEL_WRITES, sessionModuleAccessRequirement } = await import('../server/scopes.js');
+  assert.equal(sessionModuleAccessRequirement('/schedule/preferences', 'PUT').access, 'read',
+    'Gegenprobe: die Tabelle wird wirklich gelesen');
+  for (const pfad of ['/rewards/redemptions', '/rewards/redemptions/1/approve', '/rewards/1/redeem', '/rewards']) {
+    assert.equal(sessionModuleAccessRequirement(pfad, 'POST').access, 'write',
+      `eine Senkung für ${pfad} hieße: der Einlöse-Knopf gehört in rewards.js zurück`);
+  }
+  assert.ok(!READ_LEVEL_WRITES.some((e) => /rewards/i.test(e.pattern)),
     'eine Senkung für /rewards hieße: der Einlöse-Knopf gehört in rewards.js zurück');
 
   // Die zweite Sorte: benannte Routen für ein gekoppeltes Gerät.
@@ -1379,6 +1394,28 @@ test('Notizkarte mit Schreibrecht: Nadel, Loeschen und das antippbare Kaestchen'
   }));
 });
 
+test('R8 H15: der Notiztitel ist eine echte Ueberschrift der passenden Ebene, ohne neue Optik', async () => {
+  mitEchtemMarkdown(() => withAccess({ notes: 'read' }, () => {
+    const html = notes.renderNoteCard(notiz({ title: 'Einkauf' }));
+    assert.match(html, /<h2 class="note-card__title">Einkauf<\/h2>/,
+      'ohne Gruppenkoepfe steht die Notiz direkt unter dem Seitentitel (h1)');
+    assert.doesNotMatch(html, /<div class="note-card__title">/, 'ein `div` findet die Ueberschriften-Navigation nicht');
+    assert.match(notes.renderNoteCard(notiz({ title: 'Einkauf' }), { headingLevel: 3 }), /<h3 class="note-card__title">/,
+      'unter "Angeheftet"/"Weitere" (h2) eine Ebene tiefer');
+    assert.doesNotMatch(notes.renderNoteCard(notiz({ title: '' })), /note-card__title/, 'ohne Titel keine leere Ueberschrift');
+  }));
+  // Die Optik haengt an der Klasse, nicht am Element: die Rolle setzt die
+  // Groesse, sonst griffe die UA-Groesse eines h2.
+  const { readFileSync } = await import('node:fs');
+  const typo = readFileSync(new URL('../public/styles/typography.css', import.meta.url), 'utf8');
+  assert.ok([...eachRule(typo)].some((r) => r.selector.split(',').map((x) => x.trim()).includes('.note-card__title')
+    && /font-size\s*:/.test(r.body)), '.note-card__title bringt seine Schriftgroesse selbst mit');
+  // Der Aufruf mit `map()` reichte den Index als zweites Argument durch - die
+  // Ebene kommt deshalb als benanntes Objekt, und das Raster ruft sie so auf.
+  const src = readFileSync(new URL('../public/pages/notes.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /\.map\(renderNoteCard\)/, 'map() darf renderNoteCard keinen Index als Optionen geben');
+});
+
 test('Notizkarte mit `notes: read`: das Kaestchen wird zum Zustandszeichen', () => {
   mitEchtemMarkdown(() => withAccess({ notes: 'read' }, () => {
     const html = notes.renderNoteCard(notiz());
@@ -1508,11 +1545,100 @@ const kontakt = (over = {}) => ({
   ...over,
 });
 
+/**
+ * KONTAKT-ZEILENMENUE NACH KANON (Re-Kritik 2026-09-28, A5 P2-5 im P1 "Sam
+ * erreicht ... nicht"). Das Menue war ein Eigenbau: `role="menu"` ohne
+ * `aria-haspopup`/`aria-expanded` am Ausloeser und ohne Pfeiltasten - Sam
+ * hoerte "Menue", und nichts davon hielt. Der Kanon-Baustein
+ * (utils/popover-menu.js) bringt Semantik UND Bedienung mit; hier wird
+ * gemessen, dass die Zeile ihn nimmt, und dass die lesenden Eintraege als
+ * Aktionen weiter an ihrem Ziel ankommen.
+ */
+test('Kontaktzeile: das Mehr-Menue ist der Kanon-Baustein mit Menue-Semantik', () => {
+  withAccess({ contacts: 'write' }, () => {
+    const html = contacts.renderContactItem(kontakt());
+    assert.match(html, /popovertarget="[^"]+" aria-haspopup="menu" aria-expanded="false"/,
+      'der Ausloeser sagt, dass er ein Menue oeffnet, und ob es offen ist');
+    assert.match(html, /class="popover-menu" id="[^"]+" popover role="menu"/,
+      'das Panel ist das geteilte popover-menu (Pfeiltasten, Fokus, aria-expanded aus popover-menu.js)');
+    for (const action of ['contact-email', 'contact-maps', 'contact-export', 'delete']) {
+      assert.match(html, new RegExp(`class="popover-menu__item[^"]*"\\s+data-action="${action}" data-id="4"`),
+        `Eintrag ${action} ist ein Kanon-Eintrag`);
+    }
+    assert.doesNotMatch(html, /contact-more-menu__panel|contact-menu-item/, 'kein Eigenbau mehr daneben');
+  });
+});
+
+test('Kontaktzeile: die lesenden Menue-Eintraege kommen an ihrem Ziel an', () => {
+  const opened = [];
+  const savedOpen = globalThis.window?.open;
+  const savedLocation = globalThis.window?.location;
+  globalThis.window = globalThis.window ?? {};
+  globalThis.window.open = (...args) => { opened.push(args); return null; };
+  const loc = { href: '' };
+  globalThis.window.location = loc;
+  try {
+    const c = kontakt();
+    contacts.runContactMenuAction('contact-email', c);
+    assert.equal(loc.href, 'mailto:praxis@example.org');
+    contacts.runContactMenuAction('contact-maps', c);
+    assert.deepEqual(opened.at(-1), ['https://www.openstreetmap.org/search?query=Hauptstr.%201', '_blank', 'noopener']);
+    contacts.runContactMenuAction('contact-export', c);
+    assert.deepEqual(opened.at(-1), ['/api/v1/contacts/4/vcard', '_blank', 'noopener']);
+    assert.equal(contacts.runContactMenuAction('delete', c), false, 'Loeschen bleibt beim Schreib-Zweig der Liste');
+  } finally {
+    globalThis.window.open = savedOpen;
+    globalThis.window.location = savedLocation;
+  }
+});
+
 test('Kontaktzeile mit Schreibrecht: das Menue fuehrt auch Loeschen', () => {
   withAccess({ contacts: 'write' }, () => {
     const html = contacts.renderContactItem(kontakt());
     assert.match(html, /data-action="delete"/);
   });
+});
+
+// Die E-Mail-Adressen eines verknuepften Kontakts fuehren zu seinem Konto
+// (Passwort-Reset, SSO); aendern duerfen sie nur die Person selbst und ein
+// Admin, der Server weist alle anderen mit 403 ab (contact-identity.js). Das
+// Formular zeigt sie den anderen deshalb nur-lesen, mit Hinweis statt
+// Hinzufuegen-Knopf. Gemessen am ERZEUGTEN Markup, immer im Paar.
+function emailGruppe(html) {
+  const start = html.indexOf('data-mv-group="email"');
+  assert.ok(start > 0, 'E-Mail-Gruppe fehlt im Formular');
+  // Bis zum ersten Feld dahinter (Adresse, im aufklappbaren Abschnitt).
+  const ende = html.indexOf('id="cm-address"', start);
+  assert.ok(ende > start, 'Adressfeld hinter der E-Mail-Gruppe fehlt');
+  return html.slice(start, ende);
+}
+
+test('Kontaktformular: E-Mail am verknuepften Kontakt eines ANDEREN ist nur-lesen', () => {
+  const vorher = contacts.state.user;
+  try {
+    const linked = { ...kontakt({ family_user_id: 7 }), emails: [{ label: 'work', value: 'a@example.org' }], phones: [] };
+    contacts.state.user = { id: 9, role: 'member' };
+    const fremd = contacts.buildContactForm({ mode: 'edit', contact: linked }).content;
+    const gruppe = emailGruppe(fremd);
+    assert.match(gruppe, /type="email"[^>]*readonly/);
+    assert.match(gruppe, /id="cm-email-locked"/);
+    assert.doesNotMatch(gruppe, /data-mv-add/);
+    assert.doesNotMatch(gruppe, /data-mv-remove/);
+    // Die uebrigen Felder bleiben offen.
+    assert.doesNotMatch(fremd.slice(0, fremd.indexOf('data-mv-group="email"')), /readonly/);
+
+    for (const user of [{ id: 7, role: 'member' }, { id: 1, role: 'admin' }]) {
+      contacts.state.user = user;
+      const offen = emailGruppe(contacts.buildContactForm({ mode: 'edit', contact: linked }).content);
+      assert.doesNotMatch(offen, /readonly/, `gesperrt fuer ${JSON.stringify(user)}`);
+      assert.match(offen, /data-mv-add/);
+    }
+    contacts.state.user = { id: 9, role: 'member' };
+    const unverknuepft = emailGruppe(contacts.buildContactForm({ mode: 'edit', contact: { ...linked, family_user_id: null } }).content);
+    assert.doesNotMatch(unverknuepft, /readonly/);
+  } finally {
+    contacts.state.user = vorher;
+  }
 });
 
 test('Kontaktzeile mit `contacts: read`: Loeschen weg, jeder Leseweg bleibt', () => {
@@ -1524,10 +1650,13 @@ test('Kontaktzeile mit `contacts: read`: Loeschen weg, jeder Leseweg bleibt', ()
     // Die vier lesenden bleiben - und das Menue ist damit nie leer, es entsteht
     // hier also kein Knopf ohne Inhalt (der Befund aus waste.js).
     assert.match(html, /href="tel:/);
-    assert.match(html, /href="mailto:/);
-    assert.match(html, /openstreetmap\.org/);
-    assert.match(html, /\/api\/v1\/contacts\/4\/vcard/);
-    assert.match(html, /contact-more-menu__panel/);
+    // Seit dem Kanon-Menue (Re-Kritik 2026-09-28) sind Mail, Karte und Export
+    // Menue-Aktionen statt Links; wohin sie fuehren, misst der Test
+    // "die lesenden Menue-Eintraege kommen an ihrem Ziel an".
+    assert.match(html, /data-action="contact-email"/);
+    assert.match(html, /data-action="contact-maps"/);
+    assert.match(html, /data-action="contact-export"/);
+    assert.match(html, /class="popover-menu"/);
     // Und die Zeile fuehrt weiter in die Detailansicht, mit ihrem Inhalt.
     assert.match(html, /data-open="4"/);
     assert.match(html, /Dr\. Meier/);
@@ -1535,24 +1664,31 @@ test('Kontaktzeile mit `contacts: read`: Loeschen weg, jeder Leseweg bleibt', ()
 });
 
 test('Kontakte-Kopf mit `contacts: read`: Kategorien, Auswahl und Import fallen weg', () => {
+  // Seit der Kopfregel mobil (2026-09-26) stehen die drei als Eintraege im
+  // EINEN Werkzeugmenue - geprueft wird dieselbe Frage an ihrem neuen Ort.
   withAccess({ contacts: 'write' }, () => {
     const html = contacts.toolbarActionsHtml();
-    assert.match(html, /id="contacts-manage-cats"/);
-    assert.match(html, /id="contacts-select-btn"/);
+    assert.match(html, /data-action="manage-categories"/);
+    assert.match(html, /data-action="select-mode"/);
+    assert.match(html, /data-action="import-vcard"/);
     assert.match(html, /id="contacts-import-input"/);
+    assert.match(html, /page-tools-btn/);
   });
   withAccess({ contacts: 'read' }, () => {
     const html = contacts.toolbarActionsHtml();
-    assert.doesNotMatch(html, /contacts-manage-cats/,
+    assert.doesNotMatch(html, /manage-categories/,
       'der Kategorie-Verwalter legt an und loescht - keine CSS-Regel hat ihn je erfasst');
-    assert.doesNotMatch(html, /contacts-select-btn/,
+    assert.doesNotMatch(html, /select-mode|contacts-select-cancel/,
       'der Auswahlmodus hat als einzige Aktion „Loeschen"');
-    assert.doesNotMatch(html, /contacts-import-input/,
+    assert.doesNotMatch(html, /import-vcard|contacts-import-input/,
       'und der Import legt Kontakte an');
-    // Der Primaerknopf bleibt im Markup: ihn blendet `html[data-module-readonly]`
-    // schon per `.toolbar-new-btn` aus (layout.css). Waere er hier weg, prueften
-    // die drei Zeilen darueber eine leere Zeichenkette.
-    assert.match(html, /toolbar-new-btn/);
+    assert.doesNotMatch(html, /page-tools-btn/,
+      'ein Werkzeugmenue ohne Eintraege waere ein Knopf, der ins Leere oeffnet');
+    // Der Slot bleibt LEER: die Primaeraktion ist seit der Re-Critique
+    // 2026-09-27 (D3) der FAB, den die Shell andockt und den
+    // `html[data-module-readonly]` ausblendet (layout.css). Die Zeilen darueber
+    // pruefen damit eine leere Zeichenkette - genau das ist die Zusage.
+    assert.equal(html.trim(), '', 'bei Nur-lesen steht im Kopf-Slot nichts, das schreibt');
   });
 });
 
@@ -1744,6 +1880,7 @@ test('Geburtstagszeile mit Schreibrecht: zwei Knoepfe und zwei Wischflaechen', (
     assert.match(html, /data-action="delete"/);
     assert.match(html, /swipe-reveal--edit/);
     assert.match(html, /swipe-reveal--delete/);
+    assert.doesNotMatch(html, /swipe-row--static/, 'mit Geste bleibt der Wisch-Chevron');
   });
 });
 
@@ -1754,6 +1891,9 @@ test('Geburtstagszeile mit `calendar: read`: beide Handlungen weg, die Auskunft 
     assert.doesNotMatch(html, /data-action="delete"/);
     assert.doesNotMatch(html, /swipe-reveal/,
       'eine Reveal-Flaeche ohne Geste kuendigt eine Bedienung an, die es nicht gibt');
+    // Ebenso der Wisch-Chevron (`.swipe-row::after`, Muster aus #1426): auf
+    // Touch stand der Pfeil an einer Zeile, die sich nicht wischen laesst.
+    assert.match(html, /class="swipe-row swipe-row--static"/, 'ohne Geste auch kein Wisch-Chevron');
     assert.doesNotMatch(html, /row-actions/);
 
     // Nichts davon war ein Zustand, der ohne die Knoepfe unlesbar wuerde - die
@@ -1796,8 +1936,11 @@ test('Wischgeste der Geburtstage: bei `calendar: read` wird keine Seite verdraht
 test('Import-Knopf der Geburtstage: er braucht BEIDE Rechte', () => {
   // Er schreibt Geburtstage (`calendar`) und liest Kontakte (`contacts`) -
   // server/routes/birthdays.js prueft beides, also fragt der Knopf beides.
+  // Seit Runde 5 (2026-09-26) steht der Import als Eintrag im EINEN
+  // Werkzeugmenue des Kopfs statt als Textknopf daneben; die Rechtefrage ist
+  // dieselbe, und ohne Import gibt es kein Menue.
   withAccess({ calendar: 'write', contacts: 'read' }, () => {
-    assert.match(birthdays.importActionHtml(), /id="birthdays-import-btn"/,
+    assert.match(birthdays.importActionHtml(), /data-action="import-contacts"/,
       'Kontakte LESEN reicht fuer die Quelle');
   });
   withAccess({ calendar: 'write', contacts: 'none' }, () => {
@@ -1906,19 +2049,39 @@ function mitGeburtstagen(liste, fn) {
   try { return fn(); } finally { birthdays.state.birthdays = vorher; }
 }
 
-test('Geburtstagszeile mit `calendar: read`: die Textspalte ist der Weg zum Eintrag', () => {
+test('Geburtstagszeile: die Textspalte ist fuer Lesende UND Schreibende der Weg zum Eintrag (H8)', () => {
   withAccess({ calendar: 'write' }, () => {
     const html = birthdays.birthdayItemHtml(geburtstag());
-    assert.doesNotMatch(html, /data-open=/, 'mit Schreibrecht bleiben Wisch und Stift der Weg in den Editor');
-    assert.match(html, /<div class="list-row__main">/);
+    // Bis R8 blieb die Spalte mit Schreibrecht ein `div`: ein Tipp auf die
+    // Zeile tat nichts, waehrend der Wisch-Chevron Navigation versprach.
+    // `data-md-focus` (R10): im Split landet der Pfeiltasten-Fokus auf diesem
+    // Knopf - weitere Attribute aendern nichts an der Regel.
+    assert.match(html, /<button type="button" class="list-row__main list-row__main--interactive" data-open="9"[^>]*>/,
+      'mit Schreibrecht ist die Hauptspalte ein Knopf, der den Editor oeffnet');
+    assert.doesNotMatch(html, /<div class="list-row__main">/);
+    assert.doesNotMatch(html, /swipe-row--static/, 'Schreibende behalten die Geste und ihren Chevron');
+  });
+  withAccess({ calendar: 'read' }, () => {
+    assert.match(birthdays.birthdayItemHtml(geburtstag()), /class="swipe-row swipe-row--static"/,
+      'Nur-Lesende sehen keinen Chevron, der eine Geste verspricht');
   });
   withAccess({ calendar: 'read' }, () => {
     const html = birthdays.birthdayItemHtml(geburtstag());
-    const knopf = /<button type="button" class="list-row__main list-row__main--interactive" data-open="9">([\s\S]*?)<\/button>/.exec(html);
+    const knopf = /<button type="button" class="list-row__main list-row__main--interactive" data-open="9"[^>]*>([\s\S]*?)<\/button>/.exec(html);
     assert.ok(knopf, 'ohne diesen Knopf oeffnet bei `read` gar nichts - und die Notiz ist auf dem Telefon ausgeblendet');
     assert.match(knopf[1], /Oma Erna/, 'der Knopf traegt die Zeile selbst, nicht eine leere Flaeche');
     assert.doesNotMatch(knopf[1], /<div/, 'in einem `button` steht nur Phrasing-Inhalt');
   });
+});
+
+test('Ein Tipp auf die Geburtstagszeile mit Schreibrecht oeffnet den Editor mit dem Bestand (H8)', () => {
+  const eintrag = geburtstag();
+  const offen = mitGeburtstagen([eintrag], () => withAccess({ calendar: 'write' }, () => (
+    modalOptionen(() => birthdays.onListClick(klickAuf({ '[data-open]': { dataset: { open: '9' } } })))
+  )));
+  assert.ok(offen, 'der Tipp oeffnet einen Dialog');
+  assert.match(offen.content, /id="bd-save"/, 'der Editor, nicht die Leseansicht');
+  assert.match(offen.content, /id="bd-name"[^>]*value="Oma Erna"/, 'mit dem Bestand vorbelegt');
 });
 
 test('Ein Tipp bei `calendar: read` oeffnet die Leseansicht, und sie zeigt, was der Editor zeigt', () => {
@@ -2011,6 +2174,7 @@ function editorElement(felder = {}) {
   const handler = {};
   return {
     value: '', hidden: false, disabled: false, ...felder,
+    handlers: handler,
     addEventListener(type, fn) { (handler[type] ??= []).push(fn); },
     async feuern(type) { for (const fn of handler[type] ?? []) await fn({ target: this }); },
     click() {}, focus() {}, replaceChildren() {}, insertAdjacentHTML() {},
@@ -2510,22 +2674,249 @@ test('canEditFor(): das Modulrecht steht VOR der Betreuungs-Freigabe', () => {
 const messung = (over = {}) => ({ id: 41, type: 'weight', value_num: 72.4, unit: 'kg', measured_at: '2026-06-15T08:00', ...over });
 const gewicht = () => ({ type: 'weight', labelKey: 'health.vitals.metric.weight', units: ['kg'], icon: 'scale', channels: null, decimals: 1 });
 
-test('Vitalwerte-Historie mit `health: read`: die Messung bleibt, ihr Loeschweg geht', () => {
+test('Vitalwerte-Historie mit `health: read`: die Messung bleibt, ihr Bearbeiten-Weg geht', () => {
   mitView('vitals', { meId: 1, personId: 1, rows: [messung()], range: 'month', __reset: { rows: [] } }, () => {
     withAccess({ health: 'write' }, () => {
       const html = health.recentMeasurementsMarkup(gewicht());
-      assert.match(html, /data-delete-vital="41"/);
-      assert.match(html, /health\.vitals\.deleteMeasurement/);
+      // R8 H9: die Zeile oeffnet Bearbeiten (Stift) statt nur zu loeschen.
+      assert.match(html, /data-vital-edit="41"/);
+      assert.match(html, /health\.vitals\.editMeasurement/);
+      assert.doesNotMatch(html, /data-delete-vital/, 'Loeschen steht im Dialogfuss, nicht mehr in der Zeile');
     });
     withAccess({ health: 'read' }, () => {
       const html = health.recentMeasurementsMarkup(gewicht());
-      assert.doesNotMatch(html, /data-delete-vital/);
+      assert.doesNotMatch(html, /data-vital-edit/);
       assert.doesNotMatch(html, /<button/);
       // Der Inhalt, den nur ein wirklich gelaufener Renderer ausgeben kann:
       assert.match(html, /health\.vitals\.recentMeasurements/);
       assert.match(html, /72[.,]4/);
     });
   });
+});
+
+test('R8 H9: eine Messung oeffnet sich mit Bestand, Loeschen steht links im Dialogfuss', () => {
+  const bp = { id: 52, type: 'bp', value_num: 128, value_num2: 84, value_num3: 66, unit: 'mmHg', measured_at: '2026-06-15T08:30', visibility: 'family', note: 'nach dem Laufen' };
+  const offen = withAccess({ health: 'write' }, () => modalOptionen(() => health.openVitalModal({ row: bp })));
+  assert.ok(offen, 'mit Schreibrecht geht der Dialog auf');
+  assert.equal(offen.title, 'health.vitals.edit');
+  assert.match(offen.content, /id="vital-sys"[^>]*value="128"/, 'der Bestand steht im Formular');
+  assert.match(offen.content, /id="vital-dia"[^>]*value="84"/);
+  assert.match(offen.content, /id="vital-pulse"[^>]*value="66"/);
+  assert.match(offen.content, /value="2026-06-15T08:30"/, 'der Messzeitpunkt, nicht jetzt');
+  assert.match(offen.content, /<option value="family" selected/, 'die gespeicherte Sichtbarkeit, nicht die Voreinstellung');
+  assert.match(offen.content, />nach dem Laufen<\/textarea>/);
+  assert.match(offen.content, /id="vital-type" disabled/, 'die Metrik einer Messung steht fest');
+  const fuss = /<div class="modal-panel__footer[^"]*">([\s\S]*?)<\/div>/.exec(offen.content)[1];
+  const loeschen = fuss.indexOf('data-action="vital-delete"');
+  assert.ok(loeschen >= 0, 'Loeschen steht im Dialogfuss');
+  assert.ok(loeschen < fuss.indexOf('data-action="cancel"'), 'links vor Abbrechen und Speichern (Kanon)');
+  assert.match(fuss, /btn--danger-outline" data-action="vital-delete"[^>]* style="margin-inline-end:auto"/);
+  // Mobil ist Loeschen ein Papierkorb ohne Wort (R9 M8, modal.js); sein Name
+  // kommt aus data-delete-name - ohne nahm modal.js das erste Feld ("128").
+  assert.match(fuss, /data-action="vital-delete" data-delete-name="health\.vitals\.metric\.bp"/, 'der Papierkorb nennt die Metrik');
+
+  const neu = withAccess({ health: 'write' }, () => modalOptionen(() => health.openVitalModal()));
+  assert.equal(neu.title, 'health.vitals.add');
+  assert.doesNotMatch(neu.content, /vital-delete/, 'ohne Bestand gibt es nichts zu loeschen');
+  assert.doesNotMatch(neu.content, /id="vital-type" disabled/);
+});
+
+test('R8 H9: PATCH einer Messung leert, was der Dialog nicht mehr zeigt', () => {
+  assert.deepEqual(
+    health.vitalPatchBody({ type: 'bp', value_num: 120, value_num2: 80, visibility: 'private', measured_at: '2026-06-15T08:30' }),
+    { type: 'bp', value_num: 120, value_num2: 80, value_num3: null, note: null, visibility: 'private', measured_at: '2026-06-15T08:30' },
+    'ein geleertes Pulsfeld darf den alten Puls nicht stehen lassen',
+  );
+});
+
+/**
+ * Oeffnet den Vitalwert-Dialog im Bearbeiten-Modus, verdrahtet ihn gegen eine
+ * Attrappe aus seinem eigenen Markup (die Einheit als Auswahl mit
+ * Browser-Verhalten), laesst `bedienen` daran drehen und schickt das Formular
+ * ab. Zurueck kommen die Schreibaufrufe, durch JSON wie in api.js.
+ */
+async function vitalwertSpeichern(row, bedienen = () => {}) {
+  const optionen = withAccess({ health: 'write' }, () => modalOptionen(() => health.openVitalModal({ row })));
+  assert.ok(optionen, 'mit Schreibrecht geht der Dialog auf');
+  const html = optionen.content;
+  // Die Wertefelder so, wie das Markup der Metrik sie stellt: der einfache
+  // Wert, das Paar (Blutdruck) oder die Dauer - jedes mit seinem Bestand.
+  const wertefelder = {};
+  for (const id of ['vital-value', 'vital-sys', 'vital-dia', 'vital-pulse', 'vital-hours', 'vital-minutes']) {
+    const feld = new RegExp(`<input[^>]*id="${id}"[^>]*>`).exec(html);
+    if (feld) wertefelder[`#${id}`] = editorElement({ value: /value="([^"]*)"/.exec(feld[0])?.[1] ?? '' });
+  }
+  assert.ok(Object.keys(wertefelder).length, 'das Markup traegt Wertefelder mit Bestand');
+  // Die Einheit, wie sie im Markup steht: Auswahl, verstecktes Feld - oder
+  // gar keins (das Paar). Ein erfundenes Feld wuerde den Fehler verdecken.
+  const versteckt = /<input type="hidden" id="vital-unit" value="([^"]*)">/.exec(html);
+  const einheit = /<select[^>]*id="vital-unit"/.test(html) ? editorAuswahl(html, 'vital-unit')
+    : versteckt ? editorElement({ value: versteckt[1] }) : null;
+  const form = editorElement();
+  const el = {
+    '#vital-form': form,
+    '#vital-type': editorElement({ value: row.type }),
+    '#vital-value-fields': editorElement({ querySelector: () => null }),
+    '#vital-visibility': editorElement({ value: row.visibility || 'private' }),
+    '#vital-measured-at': editorElement({ value: row.measured_at }),
+    '#vital-note': editorElement({ value: row.note ?? '' }),
+    ...wertefelder,
+    '#vital-unit': einheit,
+    '[type="submit"]': editorElement(),
+  };
+  optionen.onSave({ querySelector: (sel) => el[sel] ?? null });
+  bedienen(el);
+  const gesendet = [];
+  const vorher = { api: globalThis.__apiStub, window: globalThis.window, hatteWindow: 'window' in globalThis };
+  const mitschreiben = (method) => async (path, body) => {
+    gesendet.push({ method, path, body: JSON.parse(JSON.stringify(body)) });
+    return { data: { id: row.id } };
+  };
+  globalThis.__apiStub = { get: async () => ({ data: [] }), patch: mitschreiben('patch'), post: mitschreiben('post') };
+  globalThis.window = { yuvomi: { showToast() {} } };
+  try {
+    await withAccess({ health: 'write' }, async () => {
+      for (const fn of form.handlers?.submit ?? []) await fn({ preventDefault() {}, target: form });
+    });
+  } finally {
+    globalThis.__apiStub = vorher.api;
+    if (vorher.hatteWindow) globalThis.window = vorher.window;
+    else delete globalThis.window;
+  }
+  return { gesendet, html };
+}
+
+test('Codex an #1485: eine Einheit ausserhalb der Liste bleibt beim Bearbeiten stehen', async () => {
+  const stone = { id: 61, type: 'weight', value_num: 12, unit: 'stone', measured_at: '2026-06-15T08:00', visibility: 'private', note: '' };
+  const { gesendet, html } = await vitalwertSpeichern(stone, (el) => { el['#vital-note'].value = 'nach dem Fruehstueck'; });
+  const { gewaehlt } = auswahlAusMarkup(html, 'vital-unit');
+  assert.equal(gewaehlt.value, 'stone', 'die gespeicherte Einheit steht gewaehlt da, nicht still die erste der Liste');
+  assert.equal(gesendet.length, 1, 'genau ein Schreibaufruf');
+  assert.equal(gesendet[0].method, 'patch');
+  assert.equal(gesendet[0].body.note, 'nach dem Fruehstueck');
+  assert.ok(!('unit' in gesendet[0].body),
+    `eine Notiz-Korrektur fasst die Einheit nicht an (aus 12 stone wurden 12 kg): ${JSON.stringify(gesendet[0].body)}`);
+
+  // Waehlt der Mensch die Einheit selbst, geht sie mit.
+  const umgestellt = await vitalwertSpeichern(stone, (el) => { el['#vital-unit'].value = 'lb'; });
+  assert.equal(umgestellt.gesendet[0].body.unit, 'lb');
+  // Eine gelistete Einheit bleibt, wie sie war, ohne verwaiste Zusatzoption.
+  const kg = await vitalwertSpeichern({ ...stone, unit: 'kg' });
+  assert.deepEqual(auswahlAusMarkup(kg.html, 'vital-unit').optionen.map((o) => o.value), ['kg', 'lb']);
+});
+
+test('Codex an #1485: ein Blutdruck in kPa bleibt beim Speichern einer Notiz kPa', async () => {
+  // Das Paar hat kein Einheitenfeld; collectVitalBody() setzt fest mmHg. Ohne
+  // Feld gab es nichts zu vergleichen, und ein per API in kPa erfasster Wert
+  // wurde beim Speichern einer Notiz still zu mmHg umbeschriftet.
+  const kpa = { id: 71, type: 'bp', value_num: 16, value_num2: 10.5, value_num3: 62, unit: 'kPa', measured_at: '2026-06-15T08:30', visibility: 'private', note: '' };
+  const { gesendet, html } = await vitalwertSpeichern(kpa, (el) => { el['#vital-note'].value = 'nach dem Laufen'; });
+  assert.doesNotMatch(html, /id="vital-unit"/, 'Voraussetzung: das Paar-Markup traegt kein Einheitenfeld');
+  assert.equal(gesendet.length, 1, 'genau ein Schreibaufruf');
+  assert.equal(gesendet[0].method, 'patch');
+  assert.equal(gesendet[0].body.note, 'nach dem Laufen');
+  assert.equal(gesendet[0].body.value_num, 16, 'der Wert selbst geht mit');
+  assert.ok(!('unit' in gesendet[0].body),
+    `ohne Einheitenfeld geht keine Einheit mit (aus kPa wurde mmHg): ${JSON.stringify(gesendet[0].body)}`);
+
+  // Auch die Dauer mit ihrem versteckten Feld schreibt die Einheit nie um.
+  const schlaf = { id: 72, type: 'sleep', value_num: 7.5, unit: 'min', measured_at: '2026-06-15T08:30', visibility: 'private', note: '' };
+  const dauer = await vitalwertSpeichern(schlaf, (el) => { el['#vital-note'].value = 'unruhig'; });
+  assert.ok(!('unit' in dauer.gesendet[0].body),
+    `ein verstecktes Einheitenfeld schreibt keine Einheit um: ${JSON.stringify(dauer.gesendet[0].body)}`);
+});
+
+test('R8 H9: ein Laborwert laesst sich korrigieren, nicht nur loeschen', () => {
+  const analyt = { id: 3, analyte: 'Ferritin', value_num: 88, unit: 'ng/ml', ref_low: 30, ref_high: 300, flag: 'normal' };
+  const zeile = health.resultEditRowMarkup(analyt);
+  assert.match(zeile, /data-result-edit="3"/, 'die Zeile traegt einen Stift');
+  assert.match(zeile, /common\.editNamed/, 'mit dem Objektnamen');
+  assert.match(zeile, /data-result-del="3"/);
+  const form = health.resultFormMarkup(analyt);
+  assert.match(form, /id="res-analyte"[^>]*value="Ferritin"/, 'das Formular traegt den Bestand');
+  assert.match(form, /id="res-value"[^>]*value="88"/);
+  assert.match(form, /id="res-ref-high"[^>]*value="300"/);
+  assert.match(form, /data-action="res-save"/);
+  assert.match(form, /data-action="res-edit-cancel"/);
+  assert.doesNotMatch(form, /data-action="res-add"/);
+  const leer = health.resultFormMarkup();
+  assert.match(leer, /data-action="res-add"/);
+  assert.doesNotMatch(leer, /value="/, 'ohne Bestand bleibt das Formular leer');
+});
+
+/**
+ * Faehrt den Analyt-Editor eines Befunds gegen eine Attrappe: `felder` setzt
+ * die Eingaben, dann ein Klick auf Hinzufuegen bzw. Uebernehmen. Zurueck
+ * kommen Schreibaufrufe und gemeldete Feldfehler.
+ */
+async function analytSpeichern(report, { editId = null, felder = {}, badInput = false } = {}) {
+  const elemente = new Map();
+  const element = (sel) => {
+    if (!elemente.has(sel)) elemente.set(sel, editorElement({ querySelector: () => null }));
+    return elemente.get(sel);
+  };
+  let markup = '';
+  const host = {
+    replaceChildren() { markup = ''; elemente.clear(); },
+    insertAdjacentHTML(_pos, html) { markup += html; },
+    querySelector: (sel) => element(sel),
+    querySelectorAll: () => [],
+  };
+  const panel = { querySelector: (sel) => (sel === '#lab-results-editor' ? host : null) };
+  const gesendet = [];
+  const fehler = [];
+  const vorher = { api: globalThis.__apiStub, fehler: globalThis.__reportFieldError, window: globalThis.window, hatteWindow: 'window' in globalThis };
+  const mitschreiben = (method) => async (path, body) => {
+    gesendet.push({ method, path, body: JSON.parse(JSON.stringify(body)) });
+    return { data: { id: editId ?? 99, ...body } };
+  };
+  globalThis.__apiStub = { get: async () => ({ data: [] }), patch: mitschreiben('patch'), post: mitschreiben('post') };
+  globalThis.__reportFieldError = (el, text) => { fehler.push(text); };
+  globalThis.window = { yuvomi: { showToast() {} } };
+  try {
+    health.renderResultEditor(panel, report, { editId });
+    const knopf = editId != null ? 'res-save' : 'res-add';
+    assert.match(markup, new RegExp(`data-action="${knopf}"`), 'der Editor steht im erwarteten Modus');
+    for (const [sel, wert] of Object.entries(felder)) element(sel).value = wert;
+    element('#res-value').validity = { badInput };
+    const klick = element('[data-action="res-add"], [data-action="res-save"]');
+    for (const fn of klick.handlers.click ?? []) await fn({ currentTarget: klick, target: klick });
+  } finally {
+    globalThis.__apiStub = vorher.api;
+    if (vorher.fehler === undefined) delete globalThis.__reportFieldError;
+    else globalThis.__reportFieldError = vorher.fehler;
+    if (vorher.hatteWindow) globalThis.window = vorher.window;
+    else delete globalThis.window;
+  }
+  return { gesendet, fehler };
+}
+
+test('Codex an #1485: ein Laborwert ohne Zahl laesst sich bearbeiten, ohne eine erfinden zu muessen', async () => {
+  const ohneWert = { id: 5, analyte: 'Befundtext', value_num: null, unit: null, ref_low: null, ref_high: null, flag: null };
+  const report = { id: 2, results: [ohneWert] };
+  const bearbeitet = await analytSpeichern(report, {
+    editId: 5,
+    felder: { '#res-analyte': 'Befundtext Urin', '#res-value': '' },
+  });
+  assert.deepEqual(bearbeitet.fehler, [], 'kein Pflichtfeld-Fehler: value_num ist nullable');
+  assert.equal(bearbeitet.gesendet.length, 1, 'genau ein Schreibaufruf');
+  assert.equal(bearbeitet.gesendet[0].method, 'patch');
+  assert.equal(bearbeitet.gesendet[0].body.analyte, 'Befundtext Urin');
+  assert.equal(bearbeitet.gesendet[0].body.value_num, null, 'null bleibt null');
+
+  // Eine Eingabe, die keine Zahl ist, bleibt ein Fehler.
+  const kaputt = await analytSpeichern(report, { editId: 5, felder: { '#res-analyte': 'X', '#res-value': 'abc' } });
+  assert.deepEqual(kaputt.gesendet, []);
+  assert.deepEqual(kaputt.fehler, ['health.labs.results.valueRequired']);
+  // Ein Zahlenfeld meldet eine halbe Eingabe ("1e") als leer - sie wird nicht still zu null.
+  const halb = await analytSpeichern(report, { editId: 5, felder: { '#res-analyte': 'X', '#res-value': '' }, badInput: true });
+  assert.deepEqual(halb.gesendet, []);
+  assert.deepEqual(halb.fehler, ['health.labs.results.valueRequired']);
+
+  // Anlegen bleibt, wie es ist: der Wert ist dort Pflicht.
+  const neu = await analytSpeichern({ id: 2, results: [] }, { felder: { '#res-analyte': 'Ferritin', '#res-value': '' } });
+  assert.deepEqual(neu.gesendet, []);
+  assert.deepEqual(neu.fehler, ['health.labs.results.valueRequired']);
 });
 
 // -------------------------------------------------------------------------
@@ -2847,8 +3238,11 @@ test('renderCycleShell() reicht beide Antworten getrennt weiter', () => {
 
 test('READ_SAFE_ACTIONS ist eine Positivliste und enthaelt nur lesende Aktionen', () => {
   const erlaubt = [...health.READ_SAFE_ACTIONS].sort();
-  assert.deepEqual(erlaubt, ['cancel', 'ov-go-cycle', 'ov-go-meds'],
-    'Dialog schliessen und zwei Tabwechsel - alles andere dieser Seite schreibt');
+  // R16: dazu der dritte Tabwechsel (Kartentitel "Letzte Vitalwerte") und der
+  // CSV-Export im Kopf - ein Download, der schon als Karte ohne Schreibrecht
+  // offenstand (dort als blosse Links, deshalb ohne `data-action`).
+  assert.deepEqual(erlaubt, ['cancel', 'health-export', 'ov-go-cycle', 'ov-go-meds', 'ov-go-vitals'],
+    'Dialog schliessen, drei Tabwechsel und der Export-Dialog - alles andere dieser Seite schreibt');
 
   // Und die Gegenprobe gegen den Quelltext: JEDE andere `data-action` der Seite
   // ist damit gesperrt. Kaeme morgen eine dazu, waere sie es auch - das ist der
@@ -2871,7 +3265,7 @@ test('WRITE_HOOKS nennt jeden schreibenden Bedienhaken ohne `data-action`', () =
   const erwartet = [
     'data-med-edit', 'data-medlog-edit', 'data-dose-take', 'data-dose-skip',
     'data-ov-dose-take', 'data-ov-dose-skip', 'data-prn-take',
-    'data-activity-edit', 'data-prevention-edit', 'data-delete-vital',
+    'data-activity-edit', 'data-prevention-edit', 'data-vital-edit',
     'data-cycle-day', 'data-cycle-edit',
     'data-nutrition-edit', 'data-nutrition-target',
   ];
@@ -2905,7 +3299,7 @@ test('der Riegel steht in jeder Verdrahtung VOR der ersten Schreib-Aktion', () =
     ['wireMeds', 'data-med-edit'],
     ['wireActivity', 'data-activity-edit'],
     ['wirePrevention', 'data-prevention-edit'],
-    ['renderDetail', 'data-delete-vital'],
+    ['renderDetail', 'data-vital-edit'],
   ];
   for (const [name, ersteAktion] of faelle) {
     const fn = healthFn(name);
@@ -3030,6 +3424,10 @@ const LAYOUT_CSS = readFileSync(new URL('../public/styles/layout.css', import.me
  * WELCHE Knoepfe ein Renderer verdrahten will. Die Verdrahtung hat kein Markup;
  * ohne diese Spur liefe „bei read haengt nichts" ins Leere.
  */
+// Die Aufgabenliste verdrahtet seit R16 den Wisch; dessen einmaliger Hinweis
+// (`maybeShowSwipeHint`, utils/swipe-row.js) liest den Pfad der Seite.
+globalThis.location = globalThis.location ?? { pathname: '/housekeeping' };
+
 function hkContainer() {
   return {
     html: '',
@@ -3196,6 +3594,123 @@ test('Besuchszeile mit `housekeeping: read`: Bearbeiten und Loeschen weg, der Za
 // Aufgaben
 // -------------------------------------------------------------------------
 
+// Re-Critique 2026-09-27 (R11 H6): ein Tipp auf die Aufgabenzeile tat nichts,
+// mobil war der Stift das einzige Ziel. Wie die Geburtstagszeile (R8) ist die
+// Hauptspalte mit Schreibrecht jetzt der Knopf zum Bearbeiten. Bei `read`
+// verspricht die Spalte kein Bearbeiten.
+//
+// R16 (Critique 2026-10-05, P1 Bausteine): der Stift doppelte genau diesen
+// Knopf und ist weg, der Papierkorb steht im Dialogfuss und auf dem Wisch.
+// Die Zeile fuehrt KEINE Aktionszone mehr.
+test('H6: die Aufgabenzeile der Haushaltshilfe oeffnet mit Schreibrecht das Bearbeiten - lesend verspricht sie nichts', () => {
+  hkState({
+    tasks: [{ id: 3, name: 'Fenster putzen', area: 'Wohnzimmer', frequency_days: 14, urgency_status: 'today', last_completed: '2026-07-01' }],
+  });
+  const schreiben = hkContainer();
+  withAccess({ housekeeping: 'write' }, () => hk.renderTasks(schreiben));
+  const haupt = schreiben.html.match(/<button type="button" class="list-row__main list-row__main--interactive[^"]*" data-edit-task="3">([\s\S]*?)<\/button>/);
+  assert.ok(haupt, 'die Hauptspalte ist ein Knopf mit dem Bearbeiten-Ziel der Zeile');
+  assert.match(haupt[1], /Fenster putzen/, 'er traegt den Namen');
+  assert.match(haupt[1], /housekeeping\.dueToday/, 'und die Metazeile samt Dringlichkeit');
+  assert.doesNotMatch(haupt[1], /<(?:h\d|p|div)\b/, 'in einem Knopf steht nur Phrasing-Inhalt');
+  assert.equal(schreiben.html.match(/data-edit-task="3"/g).length, 1, 'ein Bearbeiten-Ziel je Zeile, nicht zwei mit derselben Wirkung');
+  assert.doesNotMatch(schreiben.html, /row-action|list-row__actions|data-delete-task/, 'keine Zeilenaktion: Loeschen steht im Dialog und auf dem Wisch');
+  assert.match(schreiben.html, /<div class="swipe-row" data-swipe-id="3">[\s\S]*?swipe-reveal--done swipe-reveal--leading[\s\S]*?swipe-reveal--delete swipe-reveal--trailing/,
+    'die Wischflaechen: erledigen am Zeilenanfang, loeschen am Zeilenende');
+  assert.match(schreiben.html, /class="housekeeping-task__check check-ring"/, 'der Kreis ist der geteilte Abhakkreis');
+  assert.ok(schreiben.gefragt.includes('[data-edit-task]'), 'die Zeile ist verdrahtet');
+  assert.ok(schreiben.gefragt.includes('.swipe-row'), 'und der Wisch auch');
+
+  const lesen = hkContainer();
+  withAccess({ housekeeping: 'read' }, () => hk.renderTasks(lesen));
+  assert.doesNotMatch(lesen.html, /list-row__main--interactive|data-edit-task/, 'lesend kein Bearbeiten-Versprechen');
+  assert.match(lesen.html, /class="swipe-row swipe-row--static"/, 'lesend ohne Wisch-Chevron');
+  assert.doesNotMatch(lesen.html, /swipe-reveal/, 'und ohne Wischflaechen');
+  assert.ok(!lesen.gefragt.includes('.swipe-row'), 'die Geste ist lesend nicht verdrahtet');
+  assert.match(lesen.html, /<h2 class="list-row__name">Fenster putzen<\/h2>/, 'die Zeile bleibt Auskunft mit Ueberschrift');
+});
+
+// Review PR #1673: wohin der Fokus nach dem Loeschen geht. Die Modal-Schicht
+// sucht denselben Knopf wieder und kennt keinen Nachbarn - nach dem Loeschen
+// blieb ihr nur die Seitenwurzel.
+test('nach dem Loeschen aus dem Dialog bekommt die nachgerueckte Zeile den Fokus', () => {
+  const echtesDocument = globalThis.document;
+  const knopf = (id) => ({ dataset: { editTask: String(id) }, focus() { doc.activeElement = this; } });
+  const liste = (ids) => { const k = ids.map(knopf); return { k, querySelectorAll: (sel) => (sel === '[data-edit-task]' ? k : []) }; };
+  const body = { tagName: 'BODY' };
+  const doc = { body, activeElement: body };
+  globalThis.document = doc;
+  try {
+    // Die mittlere von drei Zeilen (Index 1) ist weg: die dritte rueckt nach.
+    let content = liste([1, 3]);
+    hk.focusTaskRowAfterDelete(content, 2, 1);
+    assert.equal(doc.activeElement, content.k[1], 'die Zeile an der alten Stelle');
+
+    // Es war die letzte: die neue letzte.
+    doc.activeElement = body;
+    content = liste([1, 2]);
+    hk.focusTaskRowAfterDelete(content, 3, 2);
+    assert.equal(doc.activeElement, content.k[1]);
+
+    // Die Seitenwurzel (Rueckfall der Modal-Schicht) gilt als frei.
+    doc.activeElement = { id: 'main-content' };
+    hk.focusTaskRowAfterDelete(content, 3, 0);
+    assert.equal(doc.activeElement, content.k[0]);
+
+    // Der Dialog schliesst noch (Ausgangsanimation), das Neuzeichnen war
+    // schneller: der Fokus in ihm ist keine Wahl des Nutzers.
+    doc.activeElement = { id: '', closest: (sel) => (sel === '.modal-overlay--closing' ? {} : null) };
+    hk.focusTaskRowAfterDelete(content, 3, 1);
+    assert.equal(doc.activeElement, content.k[1]);
+
+    // "Rueckgaengig" hat die Zeile zurueckgeholt: sie selbst.
+    doc.activeElement = body;
+    content = liste([1, 2, 3]);
+    hk.focusTaskRowAfterDelete(content, 2, 1);
+    assert.equal(doc.activeElement, content.k[1]);
+    hk.focusTaskRowAfterDelete(content, 3, 0);
+    assert.equal(doc.activeElement, content.k[1], 'ein gewaehlter Fokus bleibt, wo er ist');
+  } finally {
+    globalThis.document = echtesDocument;
+  }
+});
+
+// Review PR #1673: `deleteTask()` klappt die Zeile aus und zeichnet die Liste
+// ERST DANACH neu. Der Bearbeiten-Dialog rief `refocusAfterRender()` im selben
+// Atemzug wie das Loeschen - die alte Zeile stand noch, der Fokus galt als
+// heil, und das Neuzeichnen liess ihn fallen. `afterRepaint` laeuft nach dem
+// Neuzeichnen und sieht die Liste ohne die Zeile.
+test('deleteTask ruft afterRepaint erst nach dem Neuzeichnen der Liste', async () => {
+  const { mock } = await import('node:test');
+  const vorher = globalThis.__apiStub;
+  mock.timers.enable({ apis: ['setTimeout'] });
+  globalThis.__apiStub = { delete: async () => ({}) };
+  try {
+    const task = { id: 901, name: 'ZZ Fenster', area: 'Bad', frequency_days: 7, urgency_status: 'today', last_completed: '2026-07-01' };
+    hkState({ tab: 'tasks', tasks: [task, { ...task, id: 902, name: 'ZZ Boden' }] });
+    const content = hkContainer();
+    const seen = [];
+    withAccess({ housekeeping: 'write' }, () => {
+      hk.renderTasks(content);
+      assert.match(content.html, /ZZ Fenster/);
+      hk.deleteTask(task, content, () => seen.push(content.html));
+    });
+    assert.equal(seen.length, 0, 'im selben Atemzug steht die alte Liste noch - kein Rueckruf');
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(seen.length, 1, 'nach dem Ausklappen und Neuzeichnen genau einmal');
+    assert.doesNotMatch(seen[0], /ZZ Fenster/, 'der Rueckruf sieht die Liste OHNE die Zeile');
+    assert.match(seen[0], /ZZ Boden/);
+    // Das Undo-Fenster laeuft ab: der Server loescht, die Liste bleibt.
+    mock.timers.runAll();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(seen.length, 1);
+  } finally {
+    mock.timers.reset();
+    if (vorher === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = vorher;
+    hkState({});
+  }
+});
+
 test('Aufgaben-Tab mit `housekeeping: read`: kein Anlegen, kein Abhaken, keine Zeilenaktion - die Dringlichkeit bleibt', () => {
   hkState({
     templates: [{ key: 'kitchen', name: 'Kueche', area: 'Kueche', frequency_days: 7 }],
@@ -3209,16 +3724,73 @@ test('Aufgaben-Tab mit `housekeeping: read`: kein Anlegen, kein Abhaken, keine Z
   assert.doesNotMatch(lesen.html, /<button/, 'auf diesem Tab schreibt jeder Knopf');
   assert.match(lesen.html, /Fenster putzen/, 'der Renderer lief - die Aufgabe steht da');
   assert.match(lesen.html, /housekeeping\.overdue/, 'und ihre Dringlichkeit, als Wort');
-  assert.match(lesen.html, /housekeeping-task--overdue housekeeping-task--readonly/, 'und als Toenung, ohne die Spalte des Kreises');
+  assert.match(lesen.html, /housekeeping-task--overdue housekeeping-task--readonly/, 'und als Zustandsklasse (seit R10 faerbt sie nur das Wort), ohne die Spalte des Kreises');
   assert.deepEqual(lesen.gefragt, [], 'keine Verdrahtung - jede auf diesem Tab schreibt');
 
   const schreiben = hkContainer();
   withAccess({ housekeeping: 'write' }, () => hk.renderTasks(schreiben));
-  for (const da of ['data-template-index="0"', 'id="housekeeping-task-form"', 'data-complete-task="3"', 'data-undo-task="3"', 'data-edit-task="3"', 'data-delete-task="3"']) {
+  for (const da of ['data-complete-task="3"', 'data-edit-task="3"', 'data-swipe-id="3"']) {
     assert.ok(schreiben.html.includes(da), `mit Schreibrecht steht ${da} da`);
+  }
+  // Die Liste ZUERST (Critique 2026-09-26): Vorlagen und Formular sitzen im
+  // Anlegedialog hinter dem FAB, nicht mehr vor der Liste. Das Zuruecknehmen
+  // ist der Toast nach dem Erledigen, kein Zeilenknopf mehr.
+  for (const weg of ['data-template-index', 'housekeeping-task-form', 'data-undo-task']) {
+    assert.doesNotMatch(schreiben.html, new RegExp(weg), `${weg} steht nicht mehr im Tab`);
   }
   assert.doesNotMatch(schreiben.html, /housekeeping-task--readonly/);
   assert.ok(schreiben.gefragt.includes('[data-complete-task]'));
+
+  // Der Anlegedialog: bei `read` geht er gar nicht auf, mit Schreibrecht traegt
+  // er die Vorlagen und das Formular.
+  assert.deepEqual(mitModal(() => withAccess({ housekeeping: 'read' }, () => hk.openTaskCreateModal(schreiben))), [],
+    'bei read oeffnet kein Anlegedialog');
+  const [dialog] = mitModal(() => withAccess({ housekeeping: 'write' }, () => hk.openTaskCreateModal(schreiben)));
+  assert.ok(dialog, 'mit Schreibrecht oeffnet er');
+  for (const da of ['data-template-index="0"', 'id="housekeeping-task-form"']) {
+    assert.ok(dialog.content.includes(da), `der Dialog traegt ${da}`);
+  }
+});
+
+test('Anlegedialog: eine Vorlage, die schon als Aufgabe dasteht, schlaegt nichts mehr vor', () => {
+  hkState({
+    templates: [
+      { key: 'a', name: 'Fenster putzen', area: 'Wohnzimmer', frequency_days: 14 },
+      { key: 'b', name: 'Bad putzen', area: 'Bad', frequency_days: 7 },
+    ],
+    tasks: [{ id: 3, name: 'fenster putzen ', area: 'Wohnzimmer', frequency_days: 14, urgency_status: 'ok' }],
+  });
+  const [dialog] = mitModal(() => withAccess({ housekeeping: 'write' }, () => hk.openTaskCreateModal(hkContainer())));
+  assert.doesNotMatch(dialog.content, /data-template-index="0"/, 'Fenster putzen steht schon in der Liste');
+  assert.match(dialog.content, /data-template-index="1"/, 'der Index bleibt der der Vorlagenliste');
+  hkState({ templates: [{ key: 'a', name: 'Fenster putzen', area: 'Wohnzimmer', frequency_days: 14 }],
+    tasks: [{ id: 3, name: 'Fenster putzen', area: 'Wohnzimmer', frequency_days: 14, urgency_status: 'ok' }] });
+  const [leer] = mitModal(() => withAccess({ housekeeping: 'write' }, () => hk.openTaskCreateModal(hkContainer())));
+  assert.doesNotMatch(leer.content, /housekeeping-templates-title/, 'ohne Vorschlag faellt der Abschnitt weg');
+  assert.match(leer.content, /id="housekeeping-task-form"/, 'das Formular bleibt');
+});
+
+test('Erledigen: der Toast nimmt es zurueck - auf den VORHERIGEN Zeitpunkt, nicht auf leer', async () => {
+  const toasts = [];
+  hkState({ tab: 'dashboard' });
+  const anfragen = await mitHkApi(async () => {
+    globalThis.window.yuvomi.showToast = (...args) => toasts.push(args);
+    await withAccess({ housekeeping: 'write' }, () => hk.completeTask({ id: 3, last_completed: '2026-09-07T07:00:00Z' }, hkContainer()));
+    const undo = toasts.find((args) => args[0] === 'housekeeping.taskDoneToast')?.[3];
+    assert.equal(typeof undo, 'function', 'der Erledigt-Toast traegt einen Rueckweg');
+    await withAccess({ housekeeping: 'write' }, () => undo());
+  });
+  assert.ok(anfragen.includes('POST /housekeeping/decay-tasks/3/complete'));
+  assert.ok(anfragen.includes('PATCH /housekeeping/decay-tasks/3'));
+  // Der Stub reicht den Body als `body` zurueck - hier die Probe darauf.
+  let body = null;
+  await mitHkApi(async () => {
+    globalThis.__apiStub.patch = async (_url, b) => { body = b; return { data: null }; };
+    globalThis.window.yuvomi.showToast = (...args) => toasts.push(args);
+    await withAccess({ housekeeping: 'write' }, () => hk.completeTask({ id: 3, last_completed: '2026-09-07T07:00:00Z' }, hkContainer()));
+    await withAccess({ housekeeping: 'write' }, () => toasts.at(-1)[3]?.());
+  });
+  assert.deepEqual(body, { last_completed: '2026-09-07T07:00:00Z' });
 });
 
 // -------------------------------------------------------------------------
@@ -3228,10 +3800,13 @@ test('Aufgaben-Tab mit `housekeeping: read`: kein Anlegen, kein Abhaken, keine Z
 test('Berichte-Tab mit `housekeeping: read`: kein Bezahlen, Monat und Bericht bleiben', () => {
   hkState({ tab: 'reports', visitReport: { month: '2026-08', visits: [hkBesuch()], totals: { pending: 40 } }, reports: [hkBesuch()] });
   const lesen = hkContainer();
+  // Der Monat steht im Kopf der Seite (Critique 2026-09-26), nicht im Inhalt.
+  const kopf = hkContainer();
+  lesen.closest = (sel) => (sel === '.housekeeping-page' ? { querySelector: (s) => (s === '#housekeeping-period' ? kopf : null) } : null);
   withAccess({ housekeeping: 'read' }, () => hk.renderReports(lesen));
   assert.doesNotMatch(lesen.html, /data-pay-report/, 'auch nicht mit veraltetem `can_mark_paid: true`');
   assert.match(lesen.html, /data-visit-report="12"/, 'der Bericht bleibt');
-  assert.match(lesen.html, /id="housekeeping-report-prev"/, 'die Monatswahl bleibt');
+  assert.match(kopf.html, /id="housekeeping-report-prev"/, 'die Monatswahl bleibt');
   assert.ok(!lesen.gefragt.includes('[data-pay-report]'), 'das Bezahlen wird nicht verdrahtet');
   assert.ok(lesen.gefragt.includes('[data-visit-report]'));
 
@@ -3507,6 +4082,57 @@ test('Beleg-Feld: die Ablage haengt am Schreibrecht auf die DOKUMENTE, nicht auf
   });
 });
 
+test('Beleg, den der Server nicht nennt: ein ruhiges Zeichen statt einer leeren Ablage (#1358)', () => {
+  // So kommt ein Besuch an, dessen Beleg ein privates Dokument einer anderen
+  // Person ist: `has_receipt` bleibt, Name und ID sind maskiert.
+  const verdeckt = hkBesuch({ has_receipt: true, receipt_document_id: null, receipt_document_name: null });
+  const zeichen = /<dt>housekeeping\.receiptLabel<\/dt><dd>documentAttach\.lockedPrivate<\/dd>/;
+  for (const documents of ['write', 'read']) {
+    withAccess({ housekeeping: 'write', documents }, () => {
+      const feld = hk.receiptFieldHtml(verdeckt);
+      assert.doesNotMatch(feld, /type="file"|document-dropzone/, `documents: ${documents} - keine Ablage, die den Beleg ersetzen wuerde`);
+      assert.match(feld, zeichen, `documents: ${documents} - der Dialog sagt, dass es einen Beleg gibt`);
+      assert.doesNotMatch(feld, /undefined|null/);
+    });
+    const [bericht] = mitModal(() => withAccess({ housekeeping: 'read', documents }, () => hk.openVisitReportModal(verdeckt)));
+    assert.match(bericht.content, zeichen, `documents: ${documents} - der Bericht zeigt dasselbe wie der Dialog`);
+  }
+  withAccess({ housekeeping: 'write', documents: 'none' }, () => {
+    assert.equal(hk.receiptFieldHtml(verdeckt), '', 'bei `documents: none` bleibt die Stelle leer wie bisher');
+  });
+
+  // Verdeckt heisst: die ID ist maskiert - nicht "der Name fehlt". Ein Besuch
+  // mit sichtbarer ID, aber ohne Namen (leerer Dokumentname, ein Serialisierer
+  // ohne Namensfeld) gehoert dem Betrachter und behaelt seine Ablage.
+  for (const ohneName of [
+    hkBesuch({ has_receipt: true, receipt_document_id: 44, receipt_document_name: '' }),
+    hkBesuch({ has_receipt: true, receipt_document_id: 44 }),
+  ]) {
+    withAccess({ housekeeping: 'write', documents: 'write' }, () => {
+      const feld = hk.receiptFieldHtml(ohneName);
+      assert.match(feld, /id="housekeeping-receipt-file" type="file"/, 'mit sichtbarer ID bleibt die Ablage');
+      assert.doesNotMatch(feld, zeichen);
+    });
+  }
+});
+
+test('Beleg, den der Server nicht nennt: Speichern schickt null und laedt nichts hoch (#1358)', async () => {
+  hkState({ workers: [{ id: 7, display_name: 'Ana' }] });
+  const verdeckt = hkBesuch({ has_receipt: true, receipt_document_id: null, receipt_document_name: null });
+  let gesendet = null;
+  const anfragen = await mitFileReader(() => mitHkApi(async () => {
+    const put = globalThis.__apiStub.put;
+    globalThis.__apiStub.put = async (url, body) => { gesendet = body; return put(url, body); };
+    await withAccess({ housekeeping: 'write', documents: 'write' }, () => {
+      const [dialog] = mitModal(() => hk.openVisitEditModal(verdeckt, hkContainer()));
+      return besuchAbsenden(dialog)();
+    });
+  }, { 'POST /documents': { data: { id: 99 } } }));
+  assert.ok(!anfragen.includes('POST /documents'), 'keine Ablage, also kein Hochladen');
+  assert.ok(anfragen.includes('PUT /housekeeping/visits/12'));
+  assert.equal(gesendet.receipt_document_id, null, 'null heisst beim Server "behalten"');
+});
+
 test('Beleg beim Absenden: ohne Schreibrecht auf die Dokumente kein POST /documents, der Einsatz speichert trotzdem', async () => {
   hkState({ workers: [{ id: 7, display_name: 'Ana' }] });
   const besuch = hkBesuch({ receipt_document_id: 44, receipt_document_name: 'Beleg' });
@@ -3644,11 +4270,18 @@ test('das Zeichen „gerade im Haus" traegt keinen Zeiger und keine Hover-Quittu
     'Status statt Disabled-Grau (Audit F9) - die Farben der frueheren :disabled-Regel');
 });
 
-test('die Aufgabenzeile ohne Kreis gibt dessen Spalte frei', () => {
-  const zeile = ['housekeeping-task', 'housekeeping-task--overdue'];
-  assert.equal(effektiverWert(HK_CSS, zeile, 'grid-template-columns'), '56px 1fr');
-  assert.equal(effektiverWert(HK_CSS, [...zeile, 'housekeeping-task--readonly'], 'grid-template-columns'), 'minmax(0, 1fr)',
-    'sonst laege die Auskunft in der 56px-Spalte des Kreises');
+test('die Aufgabenzeile ohne Kreis reserviert keine Spalte fuer ihn', () => {
+  // Seit 2026-09-26 eine `.list-row` (Flex): Kreis | Text | Aktionen. Eine feste
+  // Kreisspalte wie das fruehere Grid `56px 1fr` gibt es nicht mehr - fehlt der
+  // Kreis (`read`), steht der Text an der Kante.
+  const zeile = ['list-row', 'housekeeping-task', 'housekeeping-task--overdue'];
+  assert.equal(effektiverWert(HK_CSS, zeile, 'grid-template-columns'), null);
+  assert.equal(effektiverWert(HK_CSS, [...zeile, 'housekeeping-task--readonly'], 'grid-template-columns'), null);
+  assert.equal(effektiverWert(HK_CSS, zeile, 'display'), null, 'die Geometrie kommt aus list-row.css');
+  hkState({ tasks: [{ id: 3, name: 'Fenster putzen', area: 'Wohnzimmer', frequency_days: 14, urgency_status: 'overdue' }] });
+  const lesen = hkContainer();
+  withAccess({ housekeeping: 'read' }, () => hk.renderTasks(lesen));
+  assert.match(lesen.html, /<article class="list-row housekeeping-task /);
 });
 
 // -------------------------------------------------------------------------
@@ -3666,4 +4299,439 @@ test('Haushaltshilfe hat keine Display-Ausnahme, und ein Display erreicht die Se
     'ohne Scope setzt server/permissions.js das Modul fuer ein Display auf none - die Seite ist fuer es nicht offen');
 });
 
+test('Aufgaben-Dokumente ohne Dokumentenrecht: keine Zahl, keine Zeile, kein Link auf /documents/null (#1358)', () => {
+  // So kommt eine Aufgabe ohne Leserecht auf die Dokumente an: der Server sagt
+  // weder wie viele noch welche (`document_count` und `documents` sind null).
+  const verdeckt = aufgabe({ document_count: null, documents: null });
+  const mitDokumenten = aufgabe({ document_count: 2, documents: [{ id: 5, name: 'Anleitung.pdf', mime_type: 'application/pdf' }] });
+  withAccess({ tasks: 'write', documents: 'read' }, () => {
+    assert.doesNotMatch(tasks.renderTaskCard(verdeckt), /task-card__docs|null/, 'keine Klammer ohne Zahl');
+    assert.match(tasks.renderTaskCard(mitDokumenten), /task-card__docs/, 'Gegenfall: mit Zahl die Klammer');
+    assert.equal(detail.documentListNode(null), null, 'keine Zeile ohne Liste');
+    assert.equal(detail.documentListNode([{ id: null, name: null }]), null, 'ein Eintrag ohne ID wird kein Link');
+    const node = detail.documentListNode(mitDokumenten.documents);
+    assert.equal(node.childNodes[0].href, '/api/v1/documents/5/preview', 'Gegenfall: mit ID der Link');
+  });
+  withAccess({ tasks: 'write', documents: 'none' }, () => {
+    assert.equal(detail.documentListNode(mitDokumenten.documents), null,
+      'bei `documents: none` keine Zeile - jeder Link ginge ins 403');
+  });
+});
+
 test.after(() => miniDomAbraeumen());
+
+test('Termin-Dialog: die Anhang-Ablage steht nur mit documents-Schreibrecht (#1358, DECISIONS.md Eintrag 10)', () => {
+  // Ein neuer Anhang legt ein Dokument an - eine Uebertragung ins
+  // Dokumente-Modul. Der Server verlangt dafuer `documents: write`, der Dialog
+  // bietet die Ablage deshalb nur dann an.
+  const ohne = { id: 7, title: 'Arzt', start_datetime: '2030-05-01T10:00', end_datetime: '2030-05-01T11:00', visibility: 'all' };
+  const mit = {
+    ...ohne, attachment_document_id: 12, attachment_name: 'befund.pdf', attachment_mime: 'application/pdf',
+    attachment_preview_url: '/api/v1/documents/12/preview', attachment_download_url: '/api/v1/documents/12/download',
+  };
+  const render = (documents, event) => withAccess({ calendar: 'write', documents },
+    () => calendar.buildEventModalContent({ mode: 'edit', event }));
+  for (const event of [ohne, mit]) {
+    assert.match(render('write', event), /id="modal-attachment"/, 'write: die Ablage steht');
+    assert.doesNotMatch(render('read', event), /id="modal-attachment"/, 'read: keine Ablage');
+    assert.doesNotMatch(render('none', event), /id="modal-attachment/, 'none: gar nichts vom Anhang');
+  }
+  assert.match(render('read', mit), /id="modal-remove-attachment"/, 'read: ein sichtbarer Anhang laesst sich loesen');
+  assert.match(render('read', mit), /documents\/12\/download/, 'read: und bleibt als Vorschau');
+  assert.doesNotMatch(render('read', ohne), /calendar\.attachmentLabel/, 'read ohne Anhang: die Stelle faellt weg');
+});
+
+test('Termin-Dialog: ein fremder privater Anhang ist ein klarer Zustand, ohne Ablage und ohne Entfernen (#1358)', () => {
+  const gesperrt = {
+    id: 8, title: 'Arzt', start_datetime: '2030-05-01T10:00', end_datetime: '2030-05-01T11:00', visibility: 'all',
+    attachment_locked: true, attachment_document_id: null, attachment_name: null,
+  };
+  for (const documents of ['write', 'read']) {
+    const html = withAccess({ calendar: 'write', documents }, () => calendar.buildEventModalContent({ mode: 'edit', event: gesperrt }));
+    assert.match(html, /id="modal-attachment-locked"[^>]*>documentAttach\.lockedPrivate</, `${documents}: der Zustand steht da`);
+    assert.doesNotMatch(html, /id="modal-attachment"/, `${documents}: keine Ablage zum Ersetzen`);
+    assert.doesNotMatch(html, /id="modal-remove-attachment"/, `${documents}: kein Entfernen`);
+  }
+  const none = withAccess({ calendar: 'write', documents: 'none' }, () => calendar.buildEventModalContent({ mode: 'edit', event: gesperrt }));
+  assert.doesNotMatch(none, /modal-attachment/, 'none: gar nichts');
+});
+
+test('Termin-Dialog: Anhang-Absagen des Servers kommen uebersetzt, der Entfernen-Knopf folgt dem Zustand (#1358)', () => {
+  const fehler = (data) => ({ data });
+  assert.equal(calendar.calendarSaveErrorMessage(fehler({ error: 'Changing this attachment needs access to its document.', reason: 'ATTACHMENT_CHANGE_REFUSED' })),
+    'calendar.attachmentChangeRefused');
+  assert.equal(calendar.calendarSaveErrorMessage(fehler({ error: 'Attaching a file needs write access to documents.', reason: 'ATTACHMENT_UPLOAD_REFUSED' })),
+    'calendar.attachmentUploadRefused');
+  assert.equal(calendar.calendarSaveErrorMessage(fehler({ error: 'Titel fehlt' })), 'Titel fehlt', 'andere Meldungen wie bisher');
+  assert.equal(calendar.calendarSaveErrorMessage(new Error('x')), 'calendar.saveError');
+
+  const mit = { attachment_document_id: 12, attachment_name: 'befund.pdf' };
+  assert.equal(calendar.hasCurrentAttachment({ name: 'befund.pdf', changed: false }, mit), true);
+  assert.equal(calendar.hasCurrentAttachment({ name: null, changed: true, removed: true }, mit), false,
+    'nach dem Entfernen ist nichts mehr zu entfernen - auch ohne Ablage (Stufe read)');
+  assert.equal(calendar.hasCurrentAttachment({ name: null, changed: false }, { attachment_data: 'data:x' }), true,
+    'ein alter Anhang ohne Namen bleibt entfernbar');
+});
+
+test('Termin-Dialog, Stufe read: nach dem Entfernen bleibt der Entfernen-Knopf nicht allein stehen (#1358)', () => {
+  // Ausgefuehrt, nicht gelesen: wireEventForm() an einem Panel ohne Ablage
+  // (so rendert es die Stufe read) und ein Klick auf "Entfernen".
+  const permissiv = () => new Proxy(function stub() {}, {
+    get(target, prop) {
+      if (prop in target) return target[prop];
+      if (prop === Symbol.iterator) return function* leer() {};
+      if (prop === Symbol.toPrimitive) return () => '';
+      if (prop === 'then') return undefined;
+      if (prop === 'length') return 0;
+      if (prop === 'querySelectorAll' || prop === 'getElementsByTagName') return () => [];
+      if (prop === 'value' || prop === 'textContent') return '';
+      if (prop === 'checked' || prop === 'hidden' || prop === 'disabled') return false;
+      return permissiv();
+    },
+    apply() { return permissiv(); },
+    set(target, prop, value) { target[prop] = value; return true; },
+  });
+  const listeners = {};
+  const entfernen = {
+    hidden: false,
+    addEventListener(type, fn) { listeners[type] = fn; },
+  };
+  const fehlend = new Set(['#modal-selected-attachment', '#modal-attachment', '#modal-attachment-dropzone']);
+  const panel = new Proxy({}, {
+    get(_target, prop) {
+      if (prop === 'querySelector') {
+        return (selector) => {
+          if (fehlend.has(selector)) return null;
+          if (selector === '#modal-remove-attachment') return entfernen;
+          return permissiv();
+        };
+      }
+      if (prop === 'querySelectorAll') return () => [];
+      return permissiv()[prop];
+    },
+  });
+  const event = {
+    id: 9, title: 'Arzt', start_datetime: '2030-05-01T10:00', end_datetime: '2030-05-01T11:00', visibility: 'all',
+    attachment_document_id: 12, attachment_name: 'befund.pdf', attachment_mime: 'application/pdf',
+  };
+  withAccess({ calendar: 'write', documents: 'read' }, () => {
+    calendar.wireEventForm(panel, { mode: 'edit', event });
+  });
+  assert.equal(typeof listeners.click, 'function', 'der Knopf ist verdrahtet');
+  assert.equal(entfernen.hidden, false, 'vor dem Entfernen steht er');
+  listeners.click();
+  assert.equal(entfernen.hidden, true, 'nach dem Entfernen ist er weg');
+});
+
+test('Termin-Lesepopup: ein fremder privater Anhang zeigt denselben Hinweis wie der Dialog (#1358)', () => {
+  const gesperrt = {
+    id: 8, title: 'Arzt', attachment_locked: true,
+    attachment_document_id: null, attachment_name: null, attachment_data: null,
+  };
+  const node = calendar.attachmentNode(gesperrt);
+  assert.ok(node, 'die Zeile steht da');
+  assert.equal(node.textContent, 'documentAttach.lockedPrivate', 'derselbe Text wie im Dialog');
+  assert.equal(node.href, undefined, 'kein Link');
+  assert.equal(node.tagName?.toLowerCase(), 'span', 'ein Zustand, keine Handlung');
+  // Ohne Sperre und ohne Anhang bleibt die Zeile weg wie bisher.
+  assert.equal(calendar.attachmentNode({ id: 9, attachment_locked: false }), null);
+  assert.equal(calendar.attachmentNode({ id: 9, attachment_locked: null }), null);
+});
+
+// -------------------------------------------------------------------------
+// Dokumente: Bearbeiten im Betrachter (Re-Critique 2026-09-25, P2)
+// -------------------------------------------------------------------------
+
+// Die Seite liest beim Laden ihre Ansicht und Sortierung aus localStorage;
+// Node kennt es nicht. Ein leerer Speicher reicht (Muster aus test-people-pickers.js).
+globalThis.localStorage = globalThis.localStorage ?? {
+  getItem: () => null, setItem() {}, removeItem() {}, clear() {},
+};
+const { __test: documentsPage } = await import('../public/pages/documents.js');
+
+test('Dokument-Betrachter: Bearbeiten nur mit Schreibrecht auf die Dokumente', () => {
+  const doc = {
+    id: 31, name: 'Pass', category: 'identity', mime_type: 'image/png', file_size: 1200,
+    storage_backend: 'local', visibility: 'family', status: 'active',
+  };
+  const bearbeiten = /data-action="edit-document"/;
+  // Eigenes Mini-DOM: das der Suite baut `test.after` oben ab, und unter
+  // Node 22/24 laeuft dieser Hook schon vor einem Test, der erst nach einem
+  // `await import` registriert wird - der Betrachter liest `document.activeElement`.
+  const abbau = installMiniDom();
+  try {
+    const [lesen] = mitModal(() => withAccess({ documents: 'read' }, () => documentsPage.openDocumentViewer(doc)));
+    assert.ok(lesen, 'der Betrachter oeffnet auch nur lesend');
+    assert.doesNotMatch(lesen.content, bearbeiten, 'kein Bearbeiten, das am 403 endet');
+    assert.match(lesen.content, /download/, 'Herunterladen bleibt');
+    const [schreiben] = mitModal(() => withAccess({ documents: 'write' }, () => documentsPage.openDocumentViewer(doc)));
+    assert.match(schreiben.content, bearbeiten, 'mit Schreibrecht steht es - sonst maesse die Zeile oben nichts');
+    const [fremd] = mitModal(() => withAccess({ documents: 'write', tasks: 'read' }, () => documentsPage.openDocumentViewer(doc)));
+    assert.match(fremd.content, bearbeiten, 'ein FREMDES Modul auf read sperrt es nicht');
+  } finally {
+    abbau();
+  }
+});
+
+// -------------------------------------------------------------------------
+// Komponenten-Kanon, Runde 5 (Critique 2026-09-26): Menschen-Module
+//
+// Die Ratchet-Suite (test:control-dialect) zaehlt nur, OB eine Zeilenaktion
+// ihr Objekt nennt; hier steht, WELCHES sie nennt - an den Renderern selbst,
+// mit dem Namen des Datensatzes, den die Zeile zeigt. Dazu die Beifang-Fixes,
+// deren Wirkung kein Textguard sieht (Warnung erst auf den Versuch, der
+// Lesedialog der Notiz mit "Bearbeiten").
+// -------------------------------------------------------------------------
+
+test('Kanon R5: Kontaktzeile nennt die Person an Anrufen und am Mehr-Menue', () => {
+  withAccess({ contacts: 'write' }, () => {
+    const html = contacts.renderContactItem(kontakt());
+    assert.match(html, /href="tel:[^"]*"[^>]*aria-label="contacts\.callNamed\{&quot;name&quot;:&quot;Dr\. Meier&quot;\}"/,
+      'zwoelf Zeilen, die alle "Anrufen" heissen, sind fuer den Screenreader eine');
+    assert.match(html, /contact-more-menu__trigger popover-menu__trigger"[^>]*aria-label="common\.moreActionsNamed\{&quot;name&quot;:&quot;Dr\. Meier&quot;\}"/);
+  });
+});
+
+test('Kanon R5: Geburtstagszeile nennt die Person an Bearbeiten und Loeschen', () => {
+  withAccess({ calendar: 'write' }, () => {
+    const html = birthdays.birthdayItemHtml({
+      id: 5, name: 'Oma Ingrid', birth_date: '1955-03-01', next_birthday: '2027-03-01',
+      days_until: 156, age_next: 72,
+    });
+    assert.match(html, /class="row-action" data-action="edit" aria-label="common\.editNamed\{&quot;name&quot;:&quot;Oma Ingrid&quot;\}"/);
+    assert.match(html, /class="row-action row-action--danger" data-action="delete" aria-label="common\.deleteNamed\{&quot;name&quot;:&quot;Oma Ingrid&quot;\}"/);
+  });
+});
+
+test('Kanon R5: Haushaltshilfe nennt Aufgabe und Person an ihren Zeilenaktionen', () => {
+  const abbau = installMiniDom();
+  try {
+    hkState({
+      tasks: [{ id: 3, name: 'Fenster putzen', area: 'Wohnzimmer', frequency_days: 14, urgency_status: 'ok', last_completed: '2026-07-01' }],
+    });
+    const aufgaben = hkContainer();
+    withAccess({ housekeeping: 'write' }, () => hk.renderTasks(aufgaben));
+    // Die Aufgabenzeile fuehrt seit R16 keine Zeilenaktion mehr: der Kreis
+    // nennt die Aufgabe, der Zeilenkoerper traegt ihren Namen als Inhalt, und
+    // das Loeschen im Dialogfuss nennt sie wieder (openTaskEditModal()).
+    assert.match(aufgaben.html, /data-complete-task="3"\s+aria-label="housekeeping\.completeTask\{&quot;name&quot;:&quot;Fenster putzen&quot;\}"/);
+    assert.match(HK_CODE, /data-delete-task="\$\{esc\(task\.id\)\}"\s+aria-label="\$\{esc\(t\('common\.deleteNamed', \{ name: task\.name \}\)\)\}"/);
+
+    hkState({ tab: 'staff', workers: [{ id: 7, display_name: 'Ana', phone: '0151 000' }] });
+    const personal = hkContainer();
+    withAccess({ housekeeping: 'write' }, () => hk.renderStaff(personal));
+    assert.match(personal.html, /class="row-action" type="button" data-edit-worker="7" aria-label="common\.editNamed\{&quot;name&quot;:&quot;Ana&quot;\}"/,
+      'die geteilte Zeilenaktion statt eines violetten Sekundaerkreises, mit Namen');
+  } finally {
+    abbau();
+  }
+});
+
+test('Kanon R5: Aufgabenkarte nennt die Aufgabe an Bearbeiten, Ablegen und Teilaufgabe', () => {
+  withAccess({ tasks: 'write' }, () => {
+    const html = tasks.renderTaskCard(aufgabe({ title: 'Muell rausbringen' }));
+    const titel = '\\{&quot;title&quot;:&quot;Muell rausbringen&quot;\\}';
+    assert.match(html, new RegExp(`class="row-action task-card__inline-action" data-action="edit-task"[^>]*aria-label="common\\.editNamed\\{&quot;name&quot;:&quot;Muell rausbringen&quot;\\}"`));
+    assert.match(html, new RegExp(`data-action="archive-task"[^>]*aria-label="tasks\\.archiveNamed${titel}"`));
+    assert.match(html, new RegExp(`data-action="add-subtask"[^>]*aria-label="tasks\\.subtaskAddNamed${titel}"`));
+  });
+});
+
+test('Kanon R5: "Teilaufgabe hinzufuegen" traegt kein "+" im Text - beide Knoepfe bringen das Plus-Icon mit', async () => {
+  // In der Detailansicht (task-detail.js) stand das Icon neben einem Text, der
+  // selbst mit "+ " begann: "+ + Teilaufgabe hinzufuegen".
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const mitPlus = readdirSync(dir).filter((f) => f.endsWith('.json'))
+    .filter((f) => /^\s*\+/.test(JSON.parse(readFileSync(new URL(f, dir), 'utf8')).tasks.subtaskAdd));
+  assert.deepEqual(mitPlus, []);
+  withAccess({ tasks: 'write' }, () => {
+    const html = tasks.renderTaskCard(aufgabe({ subtasks: [{ id: 8, title: 'Tonne', status: 'open' }] }));
+    assert.match(html, /class="subtask-item__add"[^>]*>\s*<i data-lucide="plus"/, 'die Kartenliste bringt ihr Plus jetzt als Icon');
+  });
+});
+
+test('Kanon R5: die Countdown-Warnung antwortet auf einen Versuch, nicht auf ein leeres Formular', () => {
+  const el = (extra = {}) => ({
+    listeners: {},
+    addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); },
+    fire(type) { for (const fn of this.listeners[type] ?? []) fn(); },
+    ...extra,
+  });
+  const label = el();
+  const toggle = el({ checked: false, disabled: false, closest: (sel) => (sel === 'label' ? label : null) });
+  const due = el({ value: '' });
+  const warn = { hidden: true };
+  const nodes = { '#task-countdown': toggle, '#task-due-date': due, '#task-countdown-warning': warn };
+  tasks.wireCountdownGate({ querySelector: (sel) => nodes[sel] ?? null });
+
+  assert.equal(toggle.disabled, true, 'ohne Faelligkeit bleibt der Schalter gesperrt');
+  assert.equal(warn.hidden, true, 'auf dem frischen Formular steht keine Warnung');
+
+  label.fire('click');
+  assert.equal(warn.hidden, false, 'wer den gesperrten Schalter antippt, erfaehrt warum');
+
+  due.value = '26.09.2026';
+  due.fire('change');
+  assert.equal(toggle.disabled, false);
+  assert.equal(warn.hidden, true, 'mit Faelligkeit ist die Frage beantwortet');
+
+  // Wer den Haken setzt und die Faelligkeit dann wieder entfernt, verliert ihn -
+  // das ist der zweite Moment, in dem die Erklaerung gebraucht wird.
+  const frischLabel = el();
+  const frischToggle = el({ checked: true, disabled: false, closest: () => frischLabel });
+  const frischDue = el({ value: '26.09.2026' });
+  const frischWarn = { hidden: true };
+  const frisch = { '#task-countdown': frischToggle, '#task-due-date': frischDue, '#task-countdown-warning': frischWarn };
+  tasks.wireCountdownGate({ querySelector: (sel) => frisch[sel] ?? null });
+  assert.equal(frischWarn.hidden, true);
+  frischDue.value = '';
+  frischDue.fire('input');
+  assert.equal(frischToggle.checked, false);
+  assert.equal(frischWarn.hidden, false);
+});
+
+test('Kanon R5: der Lesedialog einer Notiz fuehrt "Bearbeiten" als Primaerknopf, nicht nur "Loeschen"', () => {
+  const abbau = installMiniDom();
+  try {
+    const offen = mitEchtemMarkdown(() => withAccess({ notes: 'write' }, () => (
+      modalOptionen(() => notes.openNoteModal({ mode: 'edit', note: notiz() }))
+    )));
+    assert.match(offen.content, /<button type="button" class="btn btn--primary" id="note-modal-edit" data-reader-only>common\.edit<\/button>/);
+    assert.match(offen.content, /id="note-modal-delete"[^>]*>\s*<i data-lucide="trash-2"/, 'Loeschen als Textknopf mit Icon, links');
+    const neu = withAccess({ notes: 'write' }, () => modalOptionen(() => notes.openNoteModal({ mode: 'create' })));
+    assert.doesNotMatch(neu.content, /note-modal-edit/, 'eine neue Notiz oeffnet im Editor - dort gibt es nichts umzuschalten');
+  } finally {
+    abbau();
+  }
+});
+
+test('Kanon R5: Notizkarte nennt die Notiz an Oeffnen und Loeschen', () => {
+  mitEchtemMarkdown(() => withAccess({ notes: 'write' }, () => {
+    const html = notes.renderNoteCard(notiz({ title: '' }));
+    // Ohne Titel nennt sie die erste Zeile, ohne Markdown-Zeichen.
+    assert.match(html, /class="note-card__open"[^>]*aria-label="notes\.openNamed\{&quot;name&quot;:&quot;Milch&quot;\}"/);
+    assert.match(html, /class="row-action row-action--danger note-card__delete"[^>]*aria-label="common\.deleteNamed\{&quot;name&quot;:&quot;Milch&quot;\}"/);
+  }));
+});
+
+test('Kanon R5: die Geburtstagsdialoge tragen den Modulton selbst - sie haengen nicht unter der Seite', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../public/styles/birthdays.css', import.meta.url), 'utf8');
+  const setzt = (sel) => [...eachRule(css)].some((r) => r.selector.split(',').map((s) => s.trim()).includes(sel)
+    && /--module-accent\s*:\s*var\(--module-birthdays\)/.test(r.body) && r.at.length === 0);
+  // Ohne das war `--module-accent` im Dialog leer und jedes color-mix() darauf
+  // ungueltig: die Bildflaeche des Editors stand ohne Hintergrund.
+  assert.ok(setzt('.birthday-modal'), '.birthday-modal setzt --module-accent');
+  assert.ok(setzt('.bd-import'), '.bd-import setzt --module-accent');
+});
+
+test('Kanon R5: der Kanban-Statusknopf trifft auf --target-base, obwohl er 24px zeigt', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../public/styles/tasks.css', import.meta.url), 'utf8');
+  const regeln = [...eachRule(css)];
+  const knopf = regeln.find((r) => r.selector === '.kanban-card__status-btn');
+  const flaeche = regeln.find((r) => r.selector === '.kanban-card__status-btn::before');
+  assert.ok(knopf && /position:\s*relative/.test(knopf.body), 'der Knopf ist Bezugsrahmen seines ::before');
+  assert.doesNotMatch(knopf.body, /overflow\s*:/, 'overflow am Knopf clippte das eigene ::before (die Falle am Budget-Titel)');
+  assert.ok(flaeche, 'ohne ::before ist die 24px-Box die ganze Trefferflaeche');
+  assert.match(flaeche.body, /content:\s*''/);
+  assert.match(flaeche.body, /position:\s*absolute/);
+  assert.match(flaeche.body, /inset:\s*calc\(\(100% - var\(--target-base\)\) \/ 2\)/);
+});
+
+// -------------------------------------------------------------------------
+// R8 H14: Kontakte und Dokumente waehlen per Auswahlkreis, nicht per Checkbox
+// -------------------------------------------------------------------------
+
+/** Ein Knoten mit Klassenliste und Attributen, genug fuer die Umschalter. */
+function schalterKnoten(attrs = {}) {
+  const klassen = new Set();
+  const knoten = {
+    dataset: {}, disabled: false, attrs: { ...attrs },
+    classList: { toggle: (k, an) => { if (an) klassen.add(k); else klassen.delete(k); }, contains: (k) => klassen.has(k) },
+    setAttribute(k, v) { this.attrs[k] = String(v); },
+    getAttribute(k) { return this.attrs[k] ?? null; },
+  };
+  knoten.klassen = klassen;
+  return knoten;
+}
+
+test('R8 H14: Kontakt-Auswahl ist ein Knopf mit Auswahlkreis und Objektnamen, keine native Checkbox', async () => {
+  const vorher = { mode: contacts.state.selectMode, sel: new Set(contacts.state.selected) };
+  // Der Tipp malt die Bulk-Pille (utils/bulk-pill.js liest `document`). Ohne
+  // eigenes document hing der Test davon ab, ob ein frueherer Test eines
+  // liegen liess: im vollen Lauf gruen, einzeln und in der CI rot. Ohne
+  // Shell-Schicht (getElementById -> null) malt die Pille nichts.
+  const echtesDocument = globalThis.document;
+  globalThis.document = { getElementById: () => null };
+  try {
+    contacts.state.selectMode = true;
+    contacts.state.selected = new Set([7]);
+    const an = contacts.renderContactItem({ id: 7, name: 'Ada Lovelace' });
+    assert.doesNotMatch(an, /type="checkbox"/, 'die native Checkbox ist weg');
+    assert.match(an, /<button type="button" class="select-circle select-circle--on" data-select="7"\s+aria-pressed="true" aria-label="contacts\.selectNamed\{&quot;name&quot;:&quot;Ada Lovelace&quot;\}"/);
+    assert.match(an, /<div class="contact-item__open list-row__main--interactive contact-item__select">/,
+      'die Zeile bleibt Trefflaeche, ist aber kein Knopf mit aria-label, der Name und Nummer verschluckt');
+    const aus = contacts.renderContactItem({ id: 8, name: 'Grace' });
+    assert.match(aus, /<button type="button" class="select-circle" data-select="8"\s+aria-pressed="false"/);
+    assert.match(contacts.renderContactItem({ id: 9, name: 'Papa', family_user_id: 3 }), /data-select="9"[^>]*disabled>/,
+      'Familien-Kontakte sind einzeln nicht loeschbar und damit nicht waehlbar');
+
+    // Der Tipp als Programm: Menge, aria-pressed, Kreis und Zeile gehen zusammen.
+    const zeile = schalterKnoten();
+    const knopf = schalterKnoten({ 'aria-pressed': 'false' });
+    knopf.dataset.select = '8';
+    knopf.closest = (sel) => (sel === '.contact-item' ? zeile : null);
+    contacts.toggleContactSelection(knopf);
+    assert.ok(contacts.state.selected.has(8));
+    assert.equal(knopf.attrs['aria-pressed'], 'true');
+    assert.ok(knopf.klassen.has('select-circle--on'));
+    assert.ok(zeile.klassen.has('contact-item--selected'));
+    contacts.toggleContactSelection(knopf);
+    assert.ok(!contacts.state.selected.has(8));
+    assert.equal(knopf.attrs['aria-pressed'], 'false');
+    knopf.disabled = true;
+    contacts.toggleContactSelection(knopf);
+    assert.ok(!contacts.state.selected.has(8), 'ein gesperrter Knopf waehlt nicht');
+  } finally {
+    contacts.state.selectMode = vorher.mode;
+    contacts.state.selected = vorher.sel;
+    globalThis.document = echtesDocument;
+  }
+});
+
+test('R8 H14: Dokument-Auswahl ist ein Auswahlkreis mit Objektnamen, keine native Checkbox', () => {
+  const st = documentsPage.state;
+  const vorher = { mode: st.selectMode, sel: new Set(st.selected) };
+  // Eigenes document: die Sammelaktions-Pille sucht ihre Schicht - ohne Shell
+  // gibt es keine, und der Test darf nicht vom Rest eines frueheren leben.
+  const echtesDocument = globalThis.document;
+  globalThis.document = { getElementById: () => null };
+  try {
+    st.selectMode = true;
+    st.selected = new Set([4]);
+    const an = documentsPage.renderSelectBox({ id: 4, name: 'Mietvertrag.pdf' });
+    assert.doesNotMatch(an, /type="checkbox"/);
+    assert.match(an, /<button type="button" class="select-circle select-circle--on"/);
+    assert.match(an, /data-select-id="4" aria-pressed="true"/);
+    assert.match(an, /aria-label="documents\.selectDocument\{&quot;name&quot;:&quot;Mietvertrag\.pdf&quot;\}"/);
+    assert.match(documentsPage.renderSelectBox({ id: 5, name: 'x' }), /aria-pressed="false"/);
+
+    documentsPage.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [] });
+    const kreis = schalterKnoten({ 'aria-pressed': 'false' });
+    const karte = schalterKnoten();
+    karte.dataset.id = '5';
+    karte.querySelector = (sel) => (sel === '[data-select-id]' ? kreis : null);
+    documentsPage.toggleDocumentSelection(karte);
+    assert.ok(st.selected.has(5));
+    assert.equal(kreis.attrs['aria-pressed'], 'true');
+    assert.ok(kreis.klassen.has('select-circle--on'));
+    assert.ok(karte.klassen.has('is-selected'));
+  } finally {
+    st.selectMode = vorher.mode;
+    st.selected = vorher.sel;
+    documentsPage.setContainerForTest(null);
+    globalThis.document = echtesDocument;
+  }
+});

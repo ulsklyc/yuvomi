@@ -22,9 +22,10 @@
  * der Seite, die ihn oeffnet (`/tasks/categories` in tasks.js, `/pantry/locations`
  * in pantry.js ...) - die Frage ist also dieselbe, die die Seite fuer ihre
  * anderen Knoepfe ohnehin mit ihrem `readOnly()` stellt, und der Aufrufer
- * versteckt bei Nur-lesen den AUSLOESER (Vorbild: `#btn-manage-categories` in
- * tasks.js). Fragte die Komponente selbst, stuende die Frage zweimal da, und
- * der Ausloeser bliebe trotzdem stehen - er oeffnete dann einen Dialog, in dem
+ * versteckt bei Nur-lesen den AUSLOESER (Vorbild: der Menue-Eintrag
+ * `manage-categories` im Werkzeugmenue von tasks.js). Fragte die Komponente
+ * selbst, stuende die Frage zweimal da, und der Ausloeser bliebe trotzdem
+ * stehen - er oeffnete dann einen Dialog, in dem
  * es nichts zu tun gibt. `npm run test:module-write-access` haelt die
  * Voraussetzung: ein `basePath` in ein FREMDES Modul macht die Suite rot, denn
  * dort muesste der Aufrufer `mayWritePath()` aus /utils/module-access.js fragen.
@@ -34,6 +35,7 @@ import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { makeSortable, isDragActive } from '/utils/sortable.js';
 import { wireTablist } from '/utils/tablist.js';
+import { rowActionHtml } from '/utils/row-action.js';
 
 /** Platzhalter-Id fuer den Eintrag ohne Ton: eine leere `data-tab-id` waere kein Knopf. */
 const NO_COLOR_ID = '__none__';
@@ -476,27 +478,37 @@ class CategoryManagerElement extends HTMLElement {
         ${this._markHtml(cat)}
         <button type="button" class="cat-row__name" data-action="rename"
               title="${esc(t('category.renameHint'))}">${esc(this._labelResolver(cat))}</button>
-        <div class="cat-row__actions">
-          <button class="btn btn--icon btn--ghost" data-action="rename"
-                  aria-label="${esc(t('category.renameHint'))}" title="${esc(t('category.renameHint'))}">
-            <i data-lucide="pencil" class="icon-sm" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--icon btn--ghost" data-action="up"
-                  aria-label="${esc(t('category.moveUp'))}" ${isFirst ? 'disabled' : ''}>
-            <i data-lucide="chevron-up" class="icon-md" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--icon btn--ghost" data-action="down"
-                  aria-label="${esc(t('category.moveDown'))}" ${isLast ? 'disabled' : ''}>
-            <i data-lucide="chevron-down" class="icon-md" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--icon btn--danger-outline" data-action="delete"
-                  aria-label="${esc(t('category.delete'))}">
-            <i data-lucide="trash-2" class="icon-sm" aria-hidden="true"></i>
-          </button>
+        <div class="cat-row__actions row-actions">
+          ${this._rowActionsHtml(this._labelResolver(cat), { isFirst, isLast })}
         </div>
         ${this._colorStripHtml(cat)}
         ${this._subListHtml(cat, group)}
       </li>`;
+  }
+
+  /**
+   * Die vier Zeilenaktionen einer Kategorie oder Unterkategorie.
+   *
+   * ZEILENAKTION DER SHELL (Komponenten-Kanon 2026-09-26): `.row-action`, das
+   * Loeschen `.row-action--danger`, und jeder Knopf nennt sein OBJEKT. Vorher
+   * standen hier `btn--icon btn--ghost` und fuer das Loeschen ein roter Ring
+   * (`btn--danger-outline`) - fuenfmal untereinander, und alle fuenf hiessen fuer
+   * einen Screenreader nur „Loeschen" (Critique A7, Sam), waehrend die Familie
+   * nebenan „Alex Johnson loeschen" sagte.
+   */
+  _rowActionsHtml(name, { isFirst, isLast, sub = false }) {
+    const prefix = sub ? 'sub-' : '';
+    return [
+      rowActionHtml({ icon: 'pencil', action: `${prefix}rename`, label: t('category.renameNamed', { name }) }),
+      rowActionHtml({ icon: 'chevron-up', action: `${prefix}up`, label: t('category.moveUpNamed', { name }), attrs: { disabled: isFirst } }),
+      rowActionHtml({ icon: 'chevron-down', action: `${prefix}down`, label: t('category.moveDownNamed', { name }), attrs: { disabled: isLast } }),
+      rowActionHtml({
+        icon: 'trash-2',
+        tone: 'danger',
+        action: `${prefix}delete`,
+        label: t(sub ? 'category.deleteSubNamed' : 'category.deleteNamed', { name }),
+      }),
+    ].join('');
   }
 
   /**
@@ -569,15 +581,8 @@ class CategoryManagerElement extends HTMLElement {
               <i data-lucide="grip-vertical" class="icon-sm" aria-hidden="true"></i>
             </span>
             <button type="button" class="cat-subrow__name" data-action="sub-rename">${esc(this._labelResolver(s))}</button>
-            <div class="cat-row__actions">
-              <button class="btn btn--icon btn--ghost" data-action="sub-rename" aria-label="${esc(t('category.renameHint'))}" title="${esc(t('category.renameHint'))}">
-                <i data-lucide="pencil" class="icon-sm" aria-hidden="true"></i></button>
-              <button class="btn btn--icon btn--ghost" data-action="sub-up" aria-label="${esc(t('category.moveUp'))}" ${j === 0 ? 'disabled' : ''}>
-                <i data-lucide="chevron-up" class="icon-sm" aria-hidden="true"></i></button>
-              <button class="btn btn--icon btn--ghost" data-action="sub-down" aria-label="${esc(t('category.moveDown'))}" ${j === arr.length - 1 ? 'disabled' : ''}>
-                <i data-lucide="chevron-down" class="icon-sm" aria-hidden="true"></i></button>
-              <button class="btn btn--icon btn--danger-outline" data-action="sub-delete" aria-label="${esc(t('category.delete'))}">
-                <i data-lucide="trash-2" class="icon-sm" aria-hidden="true"></i></button>
+            <div class="cat-row__actions row-actions">
+              ${this._rowActionsHtml(this._labelResolver(s), { isFirst: j === 0, isLast: j === arr.length - 1, sub: true })}
             </div>
           </li>`).join('')}
         <li><form class="cat-subadd-form" data-parent="${esc(this._keyOf(cat))}" novalidate autocomplete="off">

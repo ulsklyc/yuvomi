@@ -388,3 +388,86 @@ test('ein halb getipptes Datum ist kein Datum - der Verlass, auf dem der input-L
   // Listener davon sieht.
   assert.equal(tasks.afterDueResolution('offset_after_due', { dueDate: '', storedRemindAt: AFTER_DUE.remind_at }), null);
 });
+
+// --------------------------------------------------------------------------
+// Haushaltszone und Geraetezone liegen auseinander (#1522)
+//
+// Die Faelligkeit ist Wanduhrzeit der HAUSHALTSZONE, `remind_at` ein Zeitpunkt.
+// `remindAtFromPreset` und `parseOffsetMsFromReminder` lasen die Faelligkeit per
+// `new Date('YYYY-MM-DDTHH:MM')` in der Zone des Geraets: jede Erinnerung lag um
+// den Zonenabstand daneben. Der Prozess laeuft in Asia/Yekaterinburg (UTC+5),
+// der Haushalt hier in Europe/Berlin - 09:00 am 18.09. ist dort 07:00 UTC, in
+// Yekaterinburg waere es 04:00 UTC.
+// --------------------------------------------------------------------------
+
+const { setDisplayTimeZone } = await import('../public/utils/timezone.js');
+
+function inHouseholdZone(zone, fn) {
+  setDisplayTimeZone(zone);
+  try { return fn(); } finally { setDisplayTimeZone(null); }
+}
+
+/** Speichern, wie der Dialog es tut: Auswahl gesetzt, Zeitpunkt aus dem Formular. */
+function saveWith(task, preset) {
+  const html = tasks.renderReminderSection(task, null);
+  return tasks.reminderRemindAtFromForm(formFromMarkup(html, { 'reminder-offset': preset }), {
+    dueDate: task.due_date, dueTime: task.due_time,
+  });
+}
+
+test('#1522: die Vorbedingung - Geraet und Haushalt stehen in verschiedenen Zonen', () => {
+  assert.equal(process.env.TZ, 'Asia/Yekaterinburg');
+});
+
+test('#1522: Speichern rechnet von der Faelligkeit in der Haushaltszone', () => {
+  inHouseholdZone('Europe/Berlin', () => {
+    assert.equal(saveWith({ ...TASK, due_time: '09:00' }, 'offset_1h'), '2026-09-18T06:00:00',
+      '09:00 Berlin minus eine Stunde = 06:00 UTC, nicht 03:00 UTC');
+    // Ohne Uhrzeit gilt 23:59:59 - ebenfalls in Berlin (21:59:59 UTC).
+    assert.equal(saveWith(TASK, 'offset_1d'), '2026-09-17T21:59:59');
+  });
+});
+
+test('#1522: Wiederoeffnen zeigt den Vorlauf in der Haushaltszone', () => {
+  inHouseholdZone('Europe/Berlin', () => {
+    const timed = { ...TASK, due_time: '09:00' };
+    assert.equal(selectedOffset(tasks.renderReminderSection(timed, { remind_at: '2026-09-18T06:00:00' })), 'offset_1h',
+      'eine Stunde vorher, nicht „nach der Faelligkeit"');
+    assert.equal(selectedOffset(tasks.renderReminderSection(TASK, { remind_at: '2026-09-17T21:59:59' })), 'offset_1d');
+  });
+});
+
+test('#1522: Speichern und Wiederoeffnen - der Vorlauf bleibt, auch ueber drei Runden', () => {
+  inHouseholdZone('Europe/Berlin', () => {
+    const task = { ...TASK, due_time: '09:00' };
+    let remindAt = saveWith(task, 'offset_1h');
+    for (let round = 0; round < 3; round++) {
+      const preset = selectedOffset(tasks.renderReminderSection(task, { remind_at: remindAt }));
+      assert.equal(preset, 'offset_1h', `Runde ${round + 1}: der Vorlauf bleibt`);
+      remindAt = saveWith(task, preset);
+      assert.equal(remindAt, '2026-09-18T06:00:00', `Runde ${round + 1}: der Zeitpunkt wandert nicht`);
+    }
+  });
+});
+
+test('#1522: an der Sommerzeitgrenze des Haushalts zaehlt ein Tag 24 echte Stunden', () => {
+  inHouseholdZone('Europe/Berlin', () => {
+    // 25.10.2026: Berlin stellt von CEST auf CET zurueck. 23:59:59 CET =
+    // 22:59:59 UTC, ein Tag Vorlauf liegt 24 Stunden davor.
+    const task = { ...TASK, due_date: '2026-10-25' };
+    assert.equal(saveWith(task, 'offset_1d'), '2026-10-24T22:59:59');
+    assert.equal(selectedOffset(tasks.renderReminderSection(task, { remind_at: '2026-10-24T22:59:59' })), 'offset_1d');
+    // 29.03.2026: 02:30 gibt es in Berlin nicht. Wie der Server
+    // (`localToUTCPrecise`) wird die Uhrzeit um die Luecke vorgeschoben:
+    // 03:30 CEST = 01:30 UTC.
+    const gap = { ...TASK, due_date: '2026-03-29', due_time: '02:30' };
+    assert.equal(saveWith(gap, 'offset_1h'), '2026-03-29T00:30:00');
+  });
+});
+
+test('#1522: steht der Haushalt in der Zone des Geraets, bleibt alles, wie es war', () => {
+  inHouseholdZone('Asia/Yekaterinburg', () => {
+    assert.equal(saveWith(TASK, 'offset_1d'), ONE_DAY_BEFORE.remind_at);
+    assert.equal(selectedOffset(tasks.renderReminderSection(TASK, ONE_DAY_BEFORE)), 'offset_1d');
+  });
+});

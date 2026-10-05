@@ -97,6 +97,20 @@ test('tasks: read - /Tasks nimmt keinen Schreibzugriff an', async () => {
   assert.equal(rows.n, 0, 'die Aufgabe wurde nicht angelegt');
 });
 
+// #1607: das Gate sagt in einem maschinenlesbaren Feld, WARUM es ablehnt. Der
+// englische Satz in `error` stand sonst in jeder Oberflaechensprache im Toast;
+// die App uebersetzt ueber `reason` (public/api.js).
+test('das Gate nennt seinen Grund: module_access_denied und module_read_only', async () => {
+  const denied = await member('GET', '/notes');
+  assert.equal(denied.status, 403);
+  assert.equal(denied.body.reason, 'module_access_denied');
+  assert.equal(typeof denied.body.error, 'string', 'der Satz bleibt fuer API-Nutzer stehen');
+
+  const readOnly = await member('POST', '/tasks', { title: 'darf nicht entstehen' });
+  assert.equal(readOnly.status, 403);
+  assert.equal(readOnly.body.reason, 'module_read_only');
+});
+
 test('tasks: read - Lesen bleibt unter jeder Schreibweise erlaubt', async () => {
   for (const path of ['/tasks', '/Tasks']) {
     const r = await member('GET', path);

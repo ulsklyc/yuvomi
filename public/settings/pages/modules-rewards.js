@@ -7,30 +7,20 @@ import { getPreferences, savePreferences } from '/settings/preferences-cache.js'
 // Spiegelt MAX_POINTS in server/routes/tasks.js.
 const MAX_TASK_POINTS = 10000;
 
-// Belohnungen ist kein eigener Boolean-Schalter, sondern Teil der modulweiten
-// Sichtbarkeit (disabled_modules). „Aktiviert" == Modul-Slug NICHT in der Liste.
-function isRewardsEnabled(preferences) {
-  const disabled = Array.isArray(preferences.disabled_modules) ? preferences.disabled_modules : [];
-  return !disabled.includes('rewards');
-}
+// KEIN AN/AUS-SCHALTER MEHR (Re-Critique 2026-09-27, A7 P1-3): "Belohnungen
+// aktivieren" stand hier UND in Aktive Module - zwei Schalter fuer denselben
+// Eintrag in `disabled_modules`. Das Modul geht nur noch dort an und aus; die
+// Statuszeile des Blatts (shell.js) zeigt den Zustand und verlinkt dorthin.
 
 function renderPage(container, preferences) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">
       <div class="settings-card">
-        <h2 class="settings-card__title">${t('settings.rewardsEnableTitle')}</h2>
-        <p class="form-hint">${t('settings.rewardsEnableHint')}</p>
-        ${toggleRowHtml({
-          label: t('settings.rewardsEnableLabel'),
-          checked: isRewardsEnabled(preferences),
-          attrs: { id: 'rewards-enabled' },
-        })}
-      </div>
-      <div class="settings-card">
         <h2 class="settings-card__title">${t('settings.rewardsApprovalTitle')}</h2>
         <p class="form-hint">${t('settings.rewardsApprovalHint')}</p>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.rewardsApprovalLabel'),
           checked: preferences.rewards_require_approval !== false,
           attrs: { id: 'rewards-require-approval' },
@@ -39,19 +29,20 @@ function renderPage(container, preferences) {
       <div class="settings-card">
         <h2 class="settings-card__title">${t('settings.rewardsDefaultPointsTitle')}</h2>
         <p class="form-hint">${t('settings.rewardsDefaultPointsHint')}</p>
+        <!-- EIN SPEICHERMODELL AUF DER SEITE (Re-Critique 2026-09-27, A7 P2-8):
+             die Schalter daneben speichern sofort, also tut es das Zahlenfeld
+             auch - beim Verlassen und mit Enter. Ein eigener Speichern-Knopf nur
+             fuer dieses Feld liess offen, ob die Schalter ihn auch brauchen. -->
         <form class="settings-form settings-form--compact" id="rewards-default-points-form" novalidate autocomplete="off">
           <div class="form-group">
             <label class="form-label" for="rewards-default-points">${t('settings.rewardsDefaultPointsLabel')}</label>
             <input class="form-input" type="number" id="rewards-default-points" inputmode="numeric"
-                   min="0" max="${MAX_TASK_POINTS}" step="1"
+                   min="0" max="${MAX_TASK_POINTS}" step="1" enterkeyhint="done"
                    aria-describedby="rewards-default-points-off-hint rewards-default-points-error"
                    value="${Number(preferences.tasks_default_points) || 0}">
             <p class="settings-card-description" id="rewards-default-points-off-hint">${t('settings.rewardsDefaultPointsOffHint')}</p>
           </div>
           <div id="rewards-default-points-error" class="form-error" role="alert" hidden></div>
-          <div class="settings-form-actions">
-            <button type="submit" class="btn btn--primary">${t('common.save')}</button>
-          </div>
         </form>
       </div>
     </section>
@@ -59,27 +50,6 @@ function renderPage(container, preferences) {
 }
 
 function bindEvents(container, preferences) {
-  const enableToggle = container.querySelector('#rewards-enabled');
-  enableToggle?.addEventListener('change', async () => {
-    enableToggle.disabled = true;
-    const current = Array.isArray(preferences.disabled_modules) ? preferences.disabled_modules : [];
-    const next = enableToggle.checked
-      ? current.filter((m) => m !== 'rewards')
-      : [...new Set([...current, 'rewards'])];
-    try {
-      const res = await savePreferences({ disabled_modules: next });
-      const saved = res?.data?.disabled_modules ?? next;
-      preferences.disabled_modules = saved;
-      window.yuvomi?.setDisabledModules?.(saved);
-      window.yuvomi?.showToast(t('settings.rewardsSaved'), 'success');
-    } catch (error) {
-      enableToggle.checked = !enableToggle.checked;
-      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
-    } finally {
-      enableToggle.disabled = false;
-    }
-  });
-
   const approvalToggle = container.querySelector('#rewards-require-approval');
   approvalToggle?.addEventListener('change', async () => {
     approvalToggle.disabled = true;
@@ -98,35 +68,55 @@ function bindEvents(container, preferences) {
 }
 
 /**
- * Standard-Punkte für neue Aufgaben (#578). Kein Instant-Save: nach dem
- * Speichern folgt die Rückfrage, ob bestehende Aufgaben mitgezogen werden
- * sollen — dafür braucht es einen bewussten Abschluss der Eingabe.
+ * Standard-Punkte für neue Aufgaben (#578). Speichert wie die Schalter der
+ * Seite ohne eigenen Knopf: beim Verlassen des Feldes und mit Enter
+ * (Re-Critique 2026-09-27, H12). Die Rückfrage, ob bestehende Aufgaben
+ * mitgezogen werden, folgt dem gespeicherten Wert wie bisher - der Abschluss
+ * der Eingabe ist jetzt das Verlassen des Feldes statt eines Klicks.
+ *
+ * Nicht bei jedem `change`: an Zahlenfeldern feuert er auch für jeden
+ * Pfeilschritt, und jeder Zwischenwert wäre ein Schreibzugriff samt Rückfrage.
+ * Escape nimmt eine noch nicht gespeicherte Eingabe zurück.
  */
-function bindDefaultPoints(container, preferences) {
+export function bindDefaultPoints(container, preferences) {
   const form     = container.querySelector('#rewards-default-points-form');
   const input    = container.querySelector('#rewards-default-points');
   const errorEl  = container.querySelector('#rewards-default-points-error');
   if (!form || !input) return;
 
   let persisted = Number(preferences.tasks_default_points) || 0;
+  let saving = false;
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
+  const showError = (message) => {
+    errorEl.textContent = message;
+    errorEl.hidden = false;
+    input.setAttribute('aria-invalid', 'true');
+  };
+  const clearError = () => {
     errorEl.hidden = true;
+    input.removeAttribute('aria-invalid');
+  };
 
-    const next = Math.trunc(Number(input.value));
-    if (!Number.isFinite(next) || next < 0 || next > MAX_TASK_POINTS) {
-      errorEl.textContent = t('settings.rewardsDefaultPointsInvalid', { max: MAX_TASK_POINTS });
-      errorEl.hidden = false;
+  async function commit() {
+    if (saving) return;
+    const raw = String(input.value ?? '').trim();
+    const next = Math.trunc(Number(raw));
+    if (raw === '' || !Number.isFinite(next) || next < 0 || next > MAX_TASK_POINTS) {
+      showError(t('settings.rewardsDefaultPointsInvalid', { max: MAX_TASK_POINTS }));
       return;
     }
-    if (next === persisted) return;
+    clearError();
+    if (next === persisted) {
+      input.value = String(next);
+      return;
+    }
 
-    // Feld mitsperren, nicht nur den Button: sonst überschreibt der Erfolgspfad
-    // eine Eingabe, die während des laufenden Requests getippt wurde.
-    const submitBtn = form.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-    input.disabled = true;
+    // Feld sperren, solange der Request laeuft - sonst ueberschreibt der
+    // Erfolgspfad eine Eingabe, die waehrenddessen getippt wurde. `readOnly`
+    // statt `disabled`: ein deaktiviertes Feld verliert nach Enter den Fokus.
+    saving = true;
+    input.readOnly = true;
+    input.setAttribute('aria-busy', 'true');
     const previous = persisted;
     try {
       await savePreferences({ tasks_default_points: next });
@@ -136,15 +126,30 @@ function bindDefaultPoints(container, preferences) {
       window.yuvomi?.showToast(t('settings.rewardsDefaultPointsSaved'), 'success');
     } catch (error) {
       input.value = String(previous); // Rollback
-      errorEl.textContent = error.message || t('common.errorGeneric');
-      errorEl.hidden = false;
+      showError(error.message || t('common.errorGeneric'));
       return;
     } finally {
-      if (submitBtn.isConnected) submitBtn.disabled = false;
-      if (input.isConnected) input.disabled = false;
+      saving = false;
+      input.readOnly = false;
+      input.removeAttribute('aria-busy');
     }
 
-    await offerRebase(previous, next);
+    // Wer das Blatt schon verlassen hat, bekommt die Rueckfrage nicht auf der
+    // naechsten Seite: der neue Standard ist gespeichert, das Nachziehen optional.
+    if (input.isConnected) await offerRebase(previous, next);
+  }
+
+  // Die Handler geben das Versprechen zurueck: dem Browser ist es gleich, ein
+  // Test kann so auf den ganzen Speichervorgang warten.
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    return commit();
+  });
+  input.addEventListener('blur', () => commit());
+  input.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || saving) return;
+    input.value = String(persisted);
+    clearError();
   });
 }
 

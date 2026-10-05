@@ -228,6 +228,119 @@ test('die Wanduhrzeit geht als Stempel an die Formatierer, nicht als Date', () =
   }
 });
 
+// ── Die Reihenfolge in der Gruppe geht nach der Wanduhr des Haushalts ──────
+/* `sortTasks` baute aus `due_date`/`due_time` ein `new Date(...)` und las die
+ * Ziffern damit in der Zone des GERAETS. Die Gruppierung und die Beschriftung
+ * daneben folgen laengst der Haushaltszone (siehe oben); die Reihenfolge war
+ * die letzte Uhr der Liste, die es nicht tat.
+ *
+ * Sichtbar wird das in der Zeitumstellungs-Luecke des Geraets: in New York gibt
+ * es am 2026-03-08 kein 02:30, `new Date('2026-03-08T02:30')` rueckt auf 03:30
+ * EDT vor und ueberholt damit eine 03:15 faellige Aufgabe. Fuer einen Haushalt
+ * in Berlin ist 02:30 an dem Tag eine gewoehnliche Uhrzeit und kommt zuerst.
+ * Die Rangstufe "ueberfaellig zuerst" allein verschiebt dagegen nichts: wer
+ * ueberfaellig ist, hat ohnehin den frueheren Stempel.
+ *
+ * Beide Zonen sind festgenagelt - die des Prozesses (das Geraet) UND die
+ * Anzeigezone (der Haushalt). In der UTC-CI gaebe es keine Luecke, ein Test
+ * ohne `TZ` waere gruen und blind. Der Zeitpunkt ist fest und liegt kurz vor
+ * Mitternacht des Geraets, als dort noch der Vortag war. */
+
+const LUECKE_FRUEH = { id: 801, title: 'Frueh', category: 'household', priority: 'low', status: 'open', due_date: '2026-03-08', due_time: '02:30' };
+const LUECKE_SPAET = { id: 802, title: 'Spaet', category: 'household', priority: 'low', status: 'open', due_date: '2026-03-08', due_time: '03:15' };
+
+function withZones(deviceZone, householdZone, fn) {
+  const prevTz = process.env.TZ;
+  process.env.TZ = deviceZone;
+  tzModule.setDisplayTimeZone(householdZone);
+  try {
+    return fn();
+  } finally {
+    tzModule.setDisplayTimeZone(null);
+    if (prevTz === undefined) delete process.env.TZ; else process.env.TZ = prevTz;
+  }
+}
+
+test('sortTasks ordnet nach der Wanduhr des Haushalts, nicht nach der Zone des Geraets', () => {
+  withZones('America/New_York', 'Europe/Berlin', () => {
+    // Gegenprobe der Umgebung: ohne Luecke im Geraet misst der Fall nichts.
+    assert.equal(new Date('2026-03-08T02:30').getHours(), 3,
+      'die Prozesszone muss am 2026-03-08 eine Luecke um 02:30 haben');
+    // 04:59Z: in New York der 7. um 23:59, in Berlin der 8. um 05:59.
+    const now = tasks.taskSortNow(new Date('2026-03-08T04:59:00Z'));
+    const sorted = [LUECKE_SPAET, LUECKE_FRUEH].sort((a, b) => tasks.sortTasks(a, b, now));
+    assert.deepEqual(sorted.map((t) => t.title), ['Frueh', 'Spaet'],
+      '02:30 kommt vor 03:15 - im Haushalt gibt es die Uhrzeit, und sie ist die fruehere');
+  });
+});
+
+test('die Liste ruft die Sortierung mit der Uhr des Haushalts auf', () => {
+  // Der Aufrufer, nicht nur die Regel: `renderTaskGroups` bildet "jetzt" selbst.
+  withZones('America/New_York', 'Europe/Berlin', () => {
+    const html = tasks.renderTaskGroups([LUECKE_SPAET, LUECKE_FRUEH], 'category');
+    const frueh = html.indexOf('data-swipe-id="801"');
+    const spaet = html.indexOf('data-swipe-id="802"');
+    assert.ok(frueh >= 0 && spaet >= 0, 'beide Aufgaben muessen in der Liste stehen');
+    assert.ok(frueh < spaet, 'in der Liste steht 02:30 vor 03:15');
+  });
+});
+
+// Ohne Uhrzeit heisst "bis Tagesende", also NACH einer Aufgabe, die ausdruecklich
+// um 23:59 faellig ist - auch wenn die ohne Uhrzeit die hoehere Prioritaet hat.
+// Ein gemeinsamer Stempel 23:59 liess den Vergleich auf die Prioritaet fallen
+// (Codex-Befund in #1590); die fruehere Fassung und die Uebersicht rechnen
+// Tagesende als 23:59:59.
+const TAGESENDE_OHNE_ZEIT = { id: 803, title: 'Ohne Zeit', category: 'household', priority: "urgent", status: "open", due_date: "2026-10-05", due_time: null };
+const TAGESENDE_UM_2359 = { id: 804, title: "Um 23:59", category: 'household', priority: "low", status: "open", due_date: "2026-10-05", due_time: "23:59" };
+
+test("eine Aufgabe ohne Uhrzeit steht hinter einer, die um 23:59 faellig ist", () => {
+  withZones("Europe/Berlin", "Europe/Berlin", () => {
+    const vormittags = tasks.taskSortNow(new Date("2026-10-05T08:00:00Z"));
+    const sorted = [TAGESENDE_OHNE_ZEIT, TAGESENDE_UM_2359].sort((a, b) => tasks.sortTasks(a, b, vormittags));
+    assert.deepEqual(sorted.map((t) => t.title), ["Um 23:59", 'Ohne Zeit'],
+      "Tagesende kommt nach 23:59, die Prioritaet entscheidet erst bei gleicher Faelligkeit");
+    // Um 23:59 ist die Aufgabe ohne Uhrzeit noch nicht ueberfaellig, die um 23:59 schon nicht mehr offen im Soll.
+    const um2359 = tasks.taskSortNow(new Date("2026-10-05T21:59:30Z"));
+    const spaet = [TAGESENDE_OHNE_ZEIT, TAGESENDE_UM_2359].sort((a, b) => tasks.sortTasks(a, b, um2359));
+    assert.deepEqual(spaet.map((t) => t.title), ["Um 23:59", 'Ohne Zeit'],
+      "um 23:59 ist die Aufgabe ohne Uhrzeit noch am selben Tag faellig, nicht ueberfaellig");
+  });
+});
+
+// ── Der Start-Badge fragt den Tag des Haushalts ─────────────────────────────
+/* `renderStartDateBadge` verglich `new Date(); setHours(0, 0, 0, 0)` mit
+ * `new Date(key + 'T00:00:00')` - zweimal Mitternacht der GERAETE-Zone - und
+ * reichte `formatDate` das Date statt des Keys. Geprueft ueber den Aufrufer
+ * `renderTaskCard` (der Badge steht nur ohne Faelligkeit), mit festgenagelter
+ * Prozess-Zone, Anzeigezone und Uhr. */
+
+const START_TASK = { id: 811, title: 'Startet', category: 'household', priority: 'low', status: 'open', due_date: null, start_date: null };
+
+test('der Start-Badge verschwindet, sobald im Haushalt der Starttag da ist', (t) => {
+  // 22:30Z: in Berlin (Haushalt) schon der 2. um 00:30, in New York (Geraet)
+  // noch der 1. um 18:30.
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-01T22:30:00Z') });
+  withZones('America/New_York', 'Europe/Berlin', () => {
+    const heute = tasks.renderTaskCard({ ...START_TASK, start_date: '2026-10-02' });
+    assert.ok(!heute.includes('tasks.startsOn'),
+      'im Haushalt ist der 2. schon heute - kein "Beginnt am"');
+    const morgen = tasks.renderTaskCard({ ...START_TASK, start_date: '2026-10-03' });
+    assert.ok(morgen.includes('tasks.startsOn'), 'der Folgetag des Haushalts bekommt den Badge');
+  });
+});
+
+test('der Start-Badge reicht formatDate den Datums-Key, nicht ein Date', (t) => {
+  // Ein Date auf Berliner Mitternacht ist auf Honolulu noch der Vortag, und
+  // `formatDate` rechnet ein Date in die Anzeigezone um. Der i18n-Stub gibt
+  // zurueck, was er bekommt - der Key muss also unveraendert ankommen.
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-01T12:00:00Z') });
+  withZones('Europe/Berlin', 'Pacific/Honolulu', () => {
+    const html = tasks.renderTaskCard({ ...START_TASK, start_date: '2026-10-20' });
+    assert.ok(html.includes('tasks.startsOn{"date":"2026-10-20"}'),
+      `formatDate bekommt den Key, erhalten: ${/tasks\.startsOn[^<]*/.exec(html)?.[0]}`);
+  });
+});
+
 // --------------------------------------------------------
 // Filterachse Kategorie (D#1017): der Server kannte `?category=` seit #825,
 // das Panel bot die Achse nie an. Der Filterzustand muss sie tragen, der
@@ -256,4 +369,147 @@ test('taskQuery sendet jede gewaehlte Kategorie als eigenen Parameter, auch im K
   } finally {
     Object.assign(tasks.state, before);
   }
+});
+
+// -------------------------------------------------------------------------
+// Teilaufgaben als Eingabezeile (Re-Critique 2026-09-28, A3 P1-1)
+//
+// "Teilaufgabe hinzufuegen" oeffnete einen modalen Prompt je Punkt; fuenf
+// Punkte kosteten fuenfzehn Gesten. Jetzt wird der Knopf an Ort und Stelle
+// zum Feld: Enter legt an und laesst den Fokus stehen, Escape schliesst.
+// Gefahren wird der echte Knoten aus subtaskListNode() gegen einen kleinen
+// DOM mit Ereignissen (mini-dom kennt keine) und einen eigenen api-Stub.
+// -------------------------------------------------------------------------
+
+function eventDom() {
+  let active = null;
+  const make = (tag) => {
+    const el = {
+      tagName: tag.toUpperCase(), attrs: new Map(), dataset: {}, children: [], handlers: {},
+      hidden: false, value: '', disabled: false, parent: null, isConnected: true,
+      setAttribute(k, v) { this.attrs.set(k, String(v)); },
+      getAttribute(k) { return this.attrs.get(k) ?? null; },
+      removeAttribute(k) { this.attrs.delete(k); },
+      appendChild(n) { n.parent = this; this.children.push(n); return n; },
+      append(...ns) { ns.forEach((n) => this.appendChild(n)); },
+      replaceChildren(...ns) { this.children = []; this.append(...ns); },
+      // Wie im echten DOM: ein schon eingehaengter Knoten WANDERT.
+      insertBefore(n, ref) {
+        if (n.parent) n.parent.children = n.parent.children.filter((c) => c !== n);
+        n.parent = this;
+        const i = this.children.indexOf(ref);
+        this.children.splice(i < 0 ? this.children.length : i, 0, n);
+        return n;
+      },
+      contains(n) { for (let x = n; x; x = x.parent) if (x === this) return true; return false; },
+      addEventListener(type, fn) { (this.handlers[type] ??= []).push(fn); },
+      focus() { active = this; },
+      fire(type, extra = {}) {
+        const ev = { type, target: this, defaultPrevented: false, propagationStopped: false,
+          preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.propagationStopped = true; }, ...extra };
+        return Promise.all((this.handlers[type] ?? []).map((fn) => fn(ev))).then(() => ev);
+      },
+    };
+    return el;
+  };
+  return { document: { createElement: make }, active: () => active };
+}
+
+test('Teilaufgabe: der Knopf wird zur Eingabezeile, Enter legt an und behaelt den Fokus, Escape schliesst', async () => {
+  const dom = eventDom();
+  const vorher = { document: globalThis.document, window: globalThis.window, api: globalThis.__apiStub };
+  globalThis.document = dom.document;
+  globalThis.window = { yuvomi: { showToast() {} } };
+  const posts = [];
+  globalThis.__apiStub = { post: async (url, body) => { posts.push([url, body]); return { data: { id: 90 + posts.length, title: body.title, status: 'open' } }; } };
+  try {
+    const { __test: detail } = await import('../public/components/task-detail.js');
+    let changed = 0;
+    const task = { id: 7, title: 'Umzug', status: 'open', subtasks: [] };
+    const wrap = detail.subtaskListNode(task, { onChanged: () => { changed += 1; } });
+    const add = wrap.children.find((n) => /detail-subtask--add/.test(n.className));
+    const form = wrap.children.find((n) => n.tagName === 'FORM');
+    const input = form.children[0];
+    assert.ok(add && form && input, 'Knopf und Eingabezeile stehen in der Liste');
+    assert.equal(form.hidden, true, 'die Zeile ist zu, bis sie gebraucht wird');
+    assert.match(input.getAttribute('aria-label') ?? '', /tasks\.subtaskAddNamed/, 'das Feld hat einen Namen');
+
+    await add.fire('click');
+    assert.equal(form.hidden, false, 'ein Klick oeffnet das Feld an Ort und Stelle');
+    assert.equal(add.hidden, true);
+    assert.equal(dom.active(), input, 'der Fokus steht im Feld');
+
+    for (const title of ['Kartons', 'Transporter']) {
+      input.value = title;
+      const ev = await form.fire('submit');
+      assert.ok(ev.defaultPrevented, 'kein Seitenwechsel durch das Formular');
+      assert.equal(input.value, '', 'nach dem Anlegen ist das Feld leer fuer die naechste');
+      assert.equal(form.hidden, false, 'und bleibt offen');
+      assert.equal(dom.active(), input, 'mit dem Fokus darin');
+    }
+    assert.deepEqual(posts.map(([url, body]) => [url, body.title, body.parent_task_id]),
+      [['/tasks', 'Kartons', 7], ['/tasks', 'Transporter', 7]]);
+    assert.equal(changed, 2, 'die Umgebung erfaehrt jede Anlage');
+    const rows = wrap.children.filter((n) => n.dataset.subtaskId);
+    assert.deepEqual(rows.map((r) => r.dataset.subtaskId), ['91', '92'], 'die neuen Zeilen stehen vor dem Feld');
+    assert.ok(wrap.children.indexOf(rows[1]) < wrap.children.indexOf(add));
+
+    const esc = await input.fire('keydown', { key: 'Escape' });
+    assert.ok(esc.propagationStopped, 'Escape schliesst nur das Feld, nicht das Blatt darum');
+    assert.equal(form.hidden, true);
+    assert.equal(add.hidden, false);
+    assert.equal(dom.active(), add, 'der Fokus kehrt auf den Knopf zurueck');
+
+    await add.fire('click');
+    input.value = '   ';
+    await form.fire('submit');
+    assert.equal(form.hidden, true, 'Enter auf leerem Feld schliesst');
+    assert.equal(posts.length, 2, 'und legt nichts an');
+  } finally {
+    globalThis.document = vorher.document;
+    globalThis.window = vorher.window;
+    if (vorher.api === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = vorher.api;
+  }
+});
+
+test('Teilaufgabe: kein modaler Prompt mehr, weder in der Leseansicht noch aus der Liste', () => {
+  const detail = readFileSync(new URL('../public/components/task-detail.js', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  assert.ok(!/promptModal\(/.test(detail), 'task-detail.js fragt den Titel nicht mehr per Dialog ab');
+  const handler = page.slice(page.indexOf("if (action === 'add-subtask') {"));
+  assert.ok(handler.length > 0 && !/promptModal\(|addSubtask\(/.test(handler.slice(0, 800)),
+    'die Aktion der Liste oeffnet die Leseansicht mit der Eingabezeile');
+  assert.match(handler.slice(0, 800), /composeSubtaskFor = parentId/);
+});
+
+test('Aufgabendialog: Prioritaet und Kategorie offen im Hauptteil, der Aufklapper nennt, was dahinter liegt (A3 P1-2)', () => {
+  const vorher = globalThis.__advancedSection;
+  const optionen = [];
+  globalThis.__advancedSection = (inner, options) => { optionen.push(options); return `<ADV>${inner}</ADV>`; };
+  try {
+    const html = tasks.renderModalContent({ task: null, users: [], reminder: null });
+    const adv = html.indexOf('<ADV>');
+    assert.ok(adv > 0, 'der Aufklapper steht im Dialog');
+    for (const id of ['task-priority', 'task-category']) {
+      const at = html.indexOf(`id="${id}"`);
+      assert.ok(at > 0 && at < adv, `${id} steht vor dem Aufklapper, nicht dahinter`);
+    }
+    const hint = optionen.at(-1)?.hint ?? '';
+    assert.ok(hint.length > 0, 'ohne hint sagt "Weitere Einstellungen" nicht, was dahinter liegt');
+    for (const key of ['tasks.startDateLabel', 'tasks.pointsLabel', 'tasks.tagsLabel']) {
+      assert.ok(hint.includes(key), `der Hinweis nennt ${key}: ${hint}`);
+    }
+    assert.ok(!hint.includes('tasks.priorityLabel'), 'was offen steht, nennt der Hinweis nicht');
+  } finally {
+    if (vorher === undefined) delete globalThis.__advancedSection; else globalThis.__advancedSection = vorher;
+  }
+});
+
+test('Teilaufgabe: Knopf und Feld verstecken sich wirklich - display: flex sticht sonst hidden', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/detail-view.css', import.meta.url), 'utf8');
+  const hides = (sel) => [...eachRule(css)].some((r) => r.selector.split(',').some((s) => s.trim() === sel)
+    && /display:\s*none/.test(r.body));
+  assert.ok(hides('.detail-subtask--add[hidden]'), 'der Knopf verschwindet, solange das Feld offen ist');
+  assert.ok(hides('.detail-subtask-compose[hidden]'), 'das Feld verschwindet, solange es zu ist');
 });

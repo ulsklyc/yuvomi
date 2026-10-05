@@ -36,3 +36,17 @@ export const TOAST_SURFACES = Object.freeze({
 export function toastSurface(urgency = 'polite') {
   return document.getElementById(TOAST_SURFACES[urgency] ?? TOAST_SURFACES.polite);
 }
+
+/**
+ * DAUERHAFTE TOASTS - die, die nicht nach Sekunden von selbst gehen, sondern
+ * stehen bleiben, bis jemand sie verwirft (die faellige Erinnerung, 30 s).
+ * Eine Rueckmeldung mit Frist darf kurz ueber einem Dialog liegen; ein
+ * dauerhafter Toast lag dort eine halbe Minute ueber dem Formular (Re-Critique
+ * 2026-09-27, Casey; R9 M14). Die Toast-Lage (toast-placement.js) laesst ihn
+ * deshalb weichen, und mobil ist er kompakt (layout.css).
+ *
+ * Der Name steht HIER, weil hier steht, wo Toasts leben: wer einen neuen
+ * dauerhaften Toast baut, setzt `data-toast-persistent` und muss die Lage-Regel
+ * nicht kennen.
+ */
+export const PERSISTENT_TOAST_SELECTOR = '.toast--reminder, [data-toast-persistent]';

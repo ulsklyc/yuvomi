@@ -94,6 +94,7 @@ function buildConnectionForm() {
     `
     <div class="settings-webdav-toggle-row">
       ${toggleRowHtml({
+        control: 'switch',
         label: t("settings.documentStorageEnabled"),
         attrs: { id: "document-storage-enabled", name: "enabled" },
       })}
@@ -453,7 +454,7 @@ function buildGoogleDriveProvider(data, reload) {
   provider.appendChild(description);
   provider.appendChild(
     createInfoList([
-      { label: t("settings.documentStorageGoogleDriveAccount"), value: drive.account_email || "–" },
+      { label: t("settings.documentStorageGoogleDriveAccount"), value: drive.account_email || "-" },
       { label: t("settings.documentStorageGoogleDriveFolder"), value: drive.folder_name || "Yuvomi/Documents" },
       { label: t("settings.documentStorageGoogleDriveCount"), value: String(Number(drive.document_count ?? 0)) },
       {

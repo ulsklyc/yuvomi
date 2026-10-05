@@ -23,17 +23,32 @@ ask()     { printf "%s%s%s " "$BOLD" "$*" "$RESET"; }
 # der Umgebung (OIKOS_INSTALLER_LANG > LC_ALL > LC_MESSAGES > LANG), analog der App.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLI_LOCALES_DIR="$SCRIPT_DIR/tools/installer/locales/cli"
-SUPPORTED_LOCALES=(de en es fr it sv el ru tr zh ja ar hi pt uk pl nl cs vi hu ko id fa fil)
+SUPPORTED_LOCALES=(de en es fr it sv el ru tr zh ja ar hi pt-BR pt uk pl nl cs vi hu ko id fa fil nb)
 FALLBACK_LOCALE=en
 ACTIVE_LOCALE=$FALLBACK_LOCALE
 
 in_array() { local needle="$1"; shift; local e; for e in "$@"; do [ "$e" = "$needle" ] && return 0; done; return 1; }
 
-# Rohen Locale-Tag (z. B. de_DE.UTF-8) auf eine unterstützte Basissprache abbilden.
+# Rohen Locale-Tag (z. B. de_DE.UTF-8, pt_BR.UTF-8, --lang pt-BR) auf eine
+# unterstützte Locale abbilden: erst Sprache mit Region (pt-BR), dann die
+# Basissprache (de). Gross/klein ueber tr statt ${x,,} - das kennt die bash 3.2
+# von macOS nicht und brach dort mit "bad substitution" ab.
 normalize_locale() {
-  local raw="${1:-}"
-  raw="${raw%%.*}"; raw="${raw%%@*}"; raw="${raw%%_*}"; raw="${raw,,}"
-  if in_array "$raw" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$raw"
+  local raw="${1:-}" lang region="" alias=""
+  raw="${raw%%.*}"; raw="${raw%%@*}"; raw="${raw//_/-}"
+  lang="$(printf '%s' "${raw%%-*}" | tr '[:upper:]' '[:lower:]')"
+  case "$raw" in
+    *-*) region="$(printf '%s' "${raw#*-}" | tr '[:lower:]' '[:upper:]')"; region="${region%%-*}" ;;
+  esac
+  if [ -n "$region" ] && in_array "$lang-$region" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$lang-$region"; return; fi
+  if in_array "$lang" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$lang"; return; fi
+  # Sprachcodes, die eine vorhandene Locale meinen: `no_NO.UTF-8` ist auf vielen
+  # Systemen der Name fuer Norwegisch, `nn_NO` (Nynorsk) hat keine eigene Datei.
+  # Rueckfall, kein Ersatz - dieselbe Zuordnung wie LANGUAGE_ALIAS in public/i18n.js.
+  case "$lang" in
+    no|nn) alias="nb" ;;
+  esac
+  if [ -n "$alias" ] && in_array "$alias" "${SUPPORTED_LOCALES[@]}"; then printf '%s' "$alias"
   else printf '%s' "$FALLBACK_LOCALE"; fi
 }
 
@@ -59,6 +74,32 @@ t() {
   # shellcheck disable=SC2059
   printf "$fmt" "$@"
 }
+
+# Antworten auf Ja/Nein- und Auswahlfragen. Die Prompts zeigen den Buchstaben
+# ihrer Sprache ([j/N], [s/N], [e/H], [R]učně ...), gelesen wurde aber nur `y`,
+# `n` und `m`: wer auf Deutsch der Anzeige folgte und "j" tippte, bekam still
+# ein Nein, und auf Tuerkisch brach "h" die Zusammenfassung nicht ab. y/yes,
+# n/no und m gelten immer, dazu die Woerter aus MSG_yes_chars, MSG_no_chars und
+# MSG_manual_chars der aktiven Locale (en.sh legt die Basis).
+#
+# Gross/klein: ${x,,} kennt die bash 3.2 von macOS nicht (siehe
+# normalize_locale), und `tr '[:upper:]'` faltet je nach System und Locale
+# verschieden - GNU-tr nur ASCII, BSD-tr unter UTF-8 auch Í. Deshalb wird hier
+# nur A-Z gefaltet, unter LC_ALL=C auf allen Systemen gleich, und die Antwort
+# zusaetzlich roh verglichen. Woerter mit anderen Zeichen (sí, НЕТ, ΝΑΙ, HAYİR)
+# stehen dafuer in der Locale auch gross; test:installer-cli-i18n prueft das.
+answer_matches() {
+  local raw="${1:-}" folded word
+  [ -n "$raw" ] || return 1
+  folded="$(printf '%s' "$raw" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')"
+  for word in $2; do
+    if [ "$raw" = "$word" ] || [ "$folded" = "$word" ]; then return 0; fi
+  done
+  return 1
+}
+is_yes()    { answer_matches "${1:-}" "y yes ${MSG_yes_chars:-}"; }
+is_no()     { answer_matches "${1:-}" "n no ${MSG_no_chars:-}"; }
+is_manual() { answer_matches "${1:-}" "m ${MSG_manual_chars:-}"; }
 
 ACTIVE_LOCALE="$(resolve_locale)"
 load_locale "$ACTIVE_LOCALE"
@@ -154,7 +195,10 @@ check_prereqs() {
     warn "$(t prereq.engine_missing)"
     ok=0
   fi
-  [ $ok -eq 0 ] && err "$(t prereq.fix)"
+  # if statt `[ ... ] && err`: als letzte Zeile gab die Kurzform bei erfuellten
+  # Voraussetzungen 1 zurueck, und `set -e` beendete den Installer lautlos
+  # direkt nach der Pruefung. Dasselbe gilt fuer die Abbruchfrage in review_and_confirm.
+  if [ $ok -eq 0 ]; then err "$(t prereq.fix)"; fi
 }
 
 # ── Step 1: Basic config ───────────────────────────────────────────────────────
@@ -264,7 +308,7 @@ configure_secrets() {
 
     ask "$(t secrets.choice)"
     read -r choice
-    if [ "${choice,,}" = "m" ]; then
+    if is_manual "$choice"; then
       ask "$(t secrets.enter)"
       local val; read -rs val; printf "\n"
       printf -v "$varname" '%s' "$val"
@@ -296,7 +340,7 @@ configure_weather() {
 
   ask "$(t weather.enable)"
   read -r want_weather
-  if [ "${want_weather,,}" = "y" ]; then
+  if is_yes "$want_weather"; then
     info "$(t weather.coords_hint)"
 
     # Leere Eingabe bricht ab statt erneut zu fragen. Ohne diesen Ausstieg ist
@@ -332,7 +376,7 @@ configure_calendar() {
 
   ask "$(t calendar.google_enable)"
   read -r want_google
-  if [ "${want_google,,}" = "y" ]; then
+  if is_yes "$want_google"; then
     info "$(t calendar.google_hint)"
     info "$(t calendar.redirect_hint "${YUVOMI_BASE_URL}/api/v1/calendar/google/callback")"
     ask "$(t calendar.client_id)"; read -r GOOGLE_CLIENT_ID
@@ -342,7 +386,7 @@ configure_calendar() {
 
   ask "$(t calendar.apple_enable)"
   read -r want_apple
-  if [ "${want_apple,,}" = "y" ]; then
+  if is_yes "$want_apple"; then
     info "$(t calendar.apple_hint)"
     ask "$(t calendar.apple_id)"; read -r APPLE_USERNAME
     ask "$(t calendar.apple_pass)"; read -rs APPLE_APP_SPECIFIC_PASSWORD; printf "\n"
@@ -350,7 +394,7 @@ configure_calendar() {
 
   ask "$(t calendar.outlook_enable)"
   read -r want_outlook
-  if [ "${want_outlook,,}" = "y" ]; then
+  if is_yes "$want_outlook"; then
     info "$(t calendar.outlook_hint)"
     info "$(t calendar.redirect_hint "${YUVOMI_BASE_URL}/api/v1/calendar/outlook/callback")"
     ask "$(t calendar.client_id)"; read -r MS_CLIENT_ID
@@ -376,7 +420,7 @@ configure_document_storage() {
   info "$(t document_local.hint)"
   ask "$(t document_local.enable)"
   read -r want_document_local
-  if [ "${want_document_local,,}" = "y" ]; then
+  if is_yes "$want_document_local"; then
     DOCUMENT_STORAGE_LOCAL_ENABLED='true'
     ask "$(t document_local.path)"; read -r DOCUMENT_STORAGE_LOCAL_PATH
     DOCUMENT_STORAGE_LOCAL_PATH="${DOCUMENT_STORAGE_LOCAL_PATH:-/documents}"
@@ -386,7 +430,7 @@ configure_document_storage() {
   info "$(t document_webdav.hint)"
   ask "$(t document_webdav.enable)"
   read -r want_document_webdav
-  if [ "${want_document_webdav,,}" = "y" ]; then
+  if is_yes "$want_document_webdav"; then
     DOCUMENT_STORAGE_WEBDAV_ENABLED='true'
     ask "$(t document_webdav.url)"; read -r DOCUMENT_STORAGE_WEBDAV_URL
     ask "$(t document_webdav.username)"; read -r DOCUMENT_STORAGE_WEBDAV_USERNAME
@@ -399,7 +443,7 @@ configure_document_storage() {
   info "$(t document_google_drive.hint)"
   ask "$(t document_google_drive.enable)"
   read -r want_document_google_drive
-  if [ "${want_document_google_drive,,}" = "y" ]; then
+  if is_yes "$want_document_google_drive"; then
     info "$(t document_google_drive.redirect_hint "${YUVOMI_BASE_URL}/api/v1/documents/storage/google-drive/callback")"
     ask "$(t document_google_drive.client_id)"; read -r GOOGLE_DRIVE_CLIENT_ID
     ask "$(t document_google_drive.client_secret)"; read -rs GOOGLE_DRIVE_CLIENT_SECRET; printf "\n"
@@ -438,7 +482,7 @@ review_and_confirm() {
   printf "\n"
   ask "$(t review.proceed)"
   read -r confirm
-  [ "${confirm,,}" = "n" ] && { info "$(t review.aborted)"; exit 0; }
+  if is_no "$confirm"; then info "$(t review.aborted)"; exit 0; fi
 }
 
 # Die Schlüssel, die dieser Dialog selbst belegt. Alles andere in einer
@@ -607,7 +651,9 @@ create_admin() {
     -H "Content-Type: application/json" \
     -d "$payload")
   http_code=$(printf '%s' "$response" | tail -n1)
-  body=$(printf '%s' "$response" | head -n-1)
+  # sed '$d' statt head -n-1: das BSD-head von macOS kennt keine negative Zeilenzahl,
+  # und `set -e` beendete den Installer nach dem Anlegen des Kontos ohne Meldung.
+  body=$(printf '%s' "$response" | sed '$d')
 
   # Die Adresse, unter der der Haushalt die App tatsächlich öffnet, nicht die,
   # auf die der Container hört. Hinter einem Proxy sind das zwei verschiedene,

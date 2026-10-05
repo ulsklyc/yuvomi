@@ -9,19 +9,18 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
-process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), 'yuvomi-cyclesymptomsmig-')), 'unused.db');
+process.env.DB_PATH = join(tempDir('yuvomi-cyclesymptomsmig-'), 'unused.db');
 const { MIGRATIONS } = await import('../server/db.js');
 
 const V178 = MIGRATIONS.find((m) => m.version === 178);
 
 function seedPreV178() {
-  const db = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-cyclesymptomsmig-')), 'db.sqlite'));
+  const db = new Database(join(tempDir('yuvomi-cyclesymptomsmig-'), 'db.sqlite'));
   db.exec(`
     CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL);
     CREATE TABLE cycle_day_logs (
@@ -143,7 +142,7 @@ test('cycle_day_log_symptoms kaskadiert beim Loeschen des Tages-Logs', () => {
 const V211 = MIGRATIONS.find((m) => m.version === 211);
 
 function seedPreV211() {
-  const db = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-cyclefeelingsmig-')), 'db.sqlite'));
+  const db = new Database(join(tempDir('yuvomi-cyclefeelingsmig-'), 'db.sqlite'));
   db.exec(`
     CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL);
     CREATE TABLE cycle_day_logs (

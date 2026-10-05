@@ -70,6 +70,9 @@
   text-align: center;
   /* Der Datumsbereich darf nicht zwischen den beiden Chevrons zerbrechen. */
   white-space: nowrap;
+  /* Gleich breite Ziffern: der Weiter-Pfeil wandert beim Wochenwechsel nicht
+   * mehr um die Breite einer anderen Ziffer (R16: x=483/485/491). */
+  font-variant-numeric: tabular-nums;
   /* KEINE Mindestbreite. Naheliegend wäre eine, damit die Chevrons beim
    * Wochenwechsel nicht um die Breite eines Monatsübergangs wandern. Als feste
    * 14rem sprengte sie bei 320px die Zeile, und als `min(14rem, 100%)` erzeugte
@@ -149,10 +152,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-}
-
-.week-nav__randomize {
-  min-height: var(--target-base);
 }
 
 /* --------------------------------------------------------
@@ -402,23 +401,33 @@
   flex-shrink: 0;
 }
 
-/* Labels werden nie silbengetrennt: die früheren Notlösungen (Ellipse in F-04,
- * hyphens:auto in A1-09) kurierten nur Symptome der 7-Spalten-Quetsche und
- * zerhackten „MITTAG-ESSEN" in jeder Karte (Critique P1). Das Desktop-Board
- * gibt den Spalten jetzt eine Mindestbreite (Scroll-Fenster unter 1440px) und
- * trägt die Typ-Labels in einer Gutter-Spalte — hier bleibt nur der Backstop
- * für unhyphenierbare Langwörter. Eigener Span, weil die Umbruch-Regeln nicht
- * auf anonyme Flex-Textknoten wirken. */
+/* EIN WORT BRICHT NUR MIT STRICH (Re-Critique 2026-09-27, W1).
+ *
+ * Hier stand `hyphens: manual` neben `overflow-wrap: break-word`, mit der
+ * Begruendung, die Labels wuerden sonst „MITTAG-ESSEN" zeigen. Die Kombination
+ * verbietet aber nicht den Bruch, sondern nur den STRICH: passt ein Wort nicht,
+ * bricht break-word es trotzdem, und zwar an einer beliebigen Stelle. Die
+ * Mindestbreite der Spalten (Scroll-Fenster unter 1440px, Typ-Label in der
+ * Gutter-Spalte) sorgt dafuer, dass das im Normalfall gar nicht passiert; wo es
+ * doch passiert, trennt das Silbenwoerterbuch der Dokumentsprache, und
+ * `hyphenate-limit-chars` haelt mindestens vier Zeichen auf jeder Seite
+ * (dieselbe Untergrenze wie `.more-item__label`, layout.css). break-word bleibt
+ * die letzte Stufe fuer Woerter ohne Trennstelle. Eigener Span, weil die
+ * Umbruch-Regeln nicht auf anonyme Flex-Textknoten wirken. Die Regel haelt
+ * test:typography („wer ein Wort brechen laesst, schaltet den Strich nicht ab"). */
 .meal-slot__type-text {
   min-width: 0;
-  hyphens: manual;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
   overflow-wrap: break-word;
 }
 
-.meal-slot[data-type="breakfast"] .meal-slot__type-label { --meal-type-dot: var(--meal-breakfast); }
-.meal-slot[data-type="lunch"]     .meal-slot__type-label { --meal-type-dot: var(--meal-lunch); }
-.meal-slot[data-type="dinner"]    .meal-slot__type-label { --meal-type-dot: var(--meal-dinner); }
-.meal-slot[data-type="snack"]     .meal-slot__type-label { --meal-type-dot: var(--meal-snack); }
+/* Am Slot, nicht am Label: seit R9 (M6) traegt mobil der Typ-Vorsatz der
+ * Karte (`.meal-card__type`) denselben Punkt, und beide erben ihn von hier. */
+.meal-slot[data-type="breakfast"] { --meal-type-dot: var(--meal-breakfast); }
+.meal-slot[data-type="lunch"]     { --meal-type-dot: var(--meal-lunch); }
+.meal-slot[data-type="dinner"]    { --meal-type-dot: var(--meal-dinner); }
+.meal-slot[data-type="snack"]     { --meal-type-dot: var(--meal-snack); }
 
 /* Gutter-Zeilenlabels des Desktop-Boards (≥1024px, siehe unten): mobil und auf
  * Tablets existiert keine Gutter-Spalte — die Slots tragen ihre Labels selbst. */
@@ -473,43 +482,16 @@
   /* 28px lagen unter --target-md; der Button ist auf Desktop der Weg, eine
    * zweite Mahlzeit in denselben Slot zu legen (Critique 2026-07-29). */
   min-height: var(--target-md);
-  opacity: 0;
-  /* Unsichtbar heisst auch unklickbar: ohne pointer-events bleibt hier ein
-   * volles Trefferziel stehen, das niemand sieht (Guard
-   * `verborgene Reveal-Aktionen bleiben nicht klickbar`, test-frontend-audit.js). */
-  pointer-events: none;
-  transition: color var(--transition-fast), background-color var(--transition-fast), opacity var(--transition-fast);
-}
-
-.meal-slot:hover .meal-slot__add-more-btn,
-.meal-slot:focus-within .meal-slot__add-more-btn {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Ohne Zeigergerät gibt es kein Hover: dauerhaft sichtbar und bedienbar. Das
- * Muster ist dasselbe wie bei .meal-card__actions und .recipe-card__icon-actions
- * - dieser Button war beim Umbau übersehen worden (Critique 2026-07-30). */
-@media (hover: none) {
-  .meal-slot__add-more-btn {
-    opacity: 1;
-    pointer-events: auto;
-  }
+  /* Dauerhaft sichtbar, auch mit Zeiger (Re-Critique 2026-09-27, D7): eine
+   * Aktion, die erst beim Ueberfahren erscheint, findet auf Tablet und
+   * Trackpad niemand (ignore.md sanktioniert sichtbare Zeilenaktionen). Ruhig
+   * haelt sie die Tertiaerfarbe und die gestrichelte Kante, keine Flaeche. */
+  transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
 .meal-slot__add-more-btn:hover {
   color: var(--module-accent);
   background-color: color-mix(in srgb, var(--module-accent) var(--tint-state), transparent);
-}
-
-/* Touch-Geräte kennen kein Hover: Button dauerhaft sichtbar und auf
- * vollwertiges Touch-Target heben, sonst bleibt er unerreichbar. */
-@media (hover: none) {
-  .meal-slot__add-more-btn {
-    opacity: 1;
-  pointer-events: auto;
-    min-height: var(--target-md);
-  }
 }
 
 /* --------------------------------------------------------
@@ -563,11 +545,23 @@
   min-width: 0;
 }
 
+/* Der Typ-Vorsatz der schmalen Zeile (R9 M6, siehe dort). Am Board und am
+ * Tablet nennt das Slot-Label den Typ; ein zweites stuende daneben. */
+.meal-card__type {
+  display: none;
+}
+
+/* Die Trennregel steht an der BASIS, nicht an den Umbruch-Varianten: mobil
+ * (Zeilenkarte) und am Board (2-Zeilen-Clamp) bricht der Titel, und beide
+ * erben sie von hier. Solange die Basis einzeilig ellipsiert, ist sie
+ * wirkungslos. Warum Trennung statt Bruch: siehe das Board weiter unten. */
 .meal-card__title-text {
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
 }
 
 .meal-card__recurrence {
@@ -604,17 +598,13 @@
  * unsichtbaren Trefferflächen. Bei --space-1 taten sie das um 20px: wer auf
  * dem Desktop den Warenkorb anvisierte, landete im Papierkorb daneben
  * (Critique 2026-07-29). */
-/* Sichtbar per Default, nur auf Zeigergeräten eingeblendet.
+/* Dauerhaft sichtbar, auf jedem Geraet (Re-Critique 2026-09-27, D7).
  *
- * Vorher stand `opacity: 0` unbedingt hier und wurde erst per
- * `@media (max-width: 639px)` zurückgenommen. Zwei Folgen, beide gemessen:
- * Ein Tablet ohne Hover und über 640px bekam die Aktionen nie zu sehen (sie
- * waren dort nicht entdeckbar, nur zufällig treffbar), und im ausgeblendeten
- * Zustand blieb ein 114px breites, unsichtbares aber klickbares Band stehen,
- * weil `pointer-events` mitzuziehen vergessen wurde (Critique 2026-07-29).
- *
- * Die Umschaltung hängt jetzt an der Geräte-Fähigkeit, nicht an der
- * Viewport-Breite - dasselbe Muster, das .meal-slot__add-more-btn schon nutzt. */
+ * Bis dahin blendeten Zeigergeraete die Leiste erst beim Ueberfahren des
+ * Slots ein. Die Aktionen einer Karte (Einkaufsliste, Rezept, Loeschen) waren
+ * so auf dem Desktop unentdeckbar; ignore.md sanktioniert dauerhaft sichtbare
+ * Zeilenaktionen. Ruhig bleiben sie ueber die Tertiaerfarbe der Knoepfe
+ * (.meal-card__action-btn), nicht ueber Unsichtbarkeit. */
 .meal-card__actions {
   display: flex;
   gap: var(--space-4);
@@ -623,21 +613,6 @@
    * (siehe .meal-card__open). */
   padding: 0 var(--space-4) var(--space-4);
   align-self: stretch;
-  transition: opacity var(--transition-fast);
-}
-
-@media (hover: hover) {
-  .meal-card__actions {
-    opacity: 0;
-    /* Unsichtbar heißt auch unklickbar. */
-    pointer-events: none;
-  }
-
-  .meal-slot:hover .meal-card__actions,
-  .meal-slot:focus-within .meal-card__actions {
-    opacity: 1;
-    pointer-events: auto;
-  }
 }
 
 /* Bewusst NICHT .row-action, als einziger der vier Küchen-Tabs.
@@ -848,11 +823,158 @@
     cursor: grabbing;
   }
 
-  /* Das Typ-Label ist die Überschrift des Slots, nicht seine erste Zeile: es
-   * trägt nur noch, was es sagt. Vorher lief darüber und darunter das volle
-   * Karten-Padding mit. */
-  .meal-slot__type-label {
-    padding: var(--space-2) var(--space-3) 0;
+  /* EIN TAG, EIN TRAEGER (R9 M6, Re-Critique 2026-09-27 A4 P2).
+   *
+   * Bis hierher war jede Mahlzeit eine eigene Karte mit Overline-Zeile ("●
+   * FRUEHSTUECK") darueber, Griff und Papierkorb daneben: gemessen 74-102px je
+   * Mahlzeit, 27 Mahlzeiten = 3217px Scrollhoehe bei 390px, rund sechs
+   * Mahlzeiten je Bildschirm. Jetzt traegt ein Tag EINE Flaeche mit
+   * Haarlinien-Zeilen, wie jede Liste der Kueche: Typpunkt und Typ als Vorsatz
+   * vor dem Namen, die Aktionen daneben, der Griff klein am Zeilenende. Der
+   * Tagesknopf "+ Mahlzeit" stand als 48px-Kachel unter jedem Tag (7 x 60px
+   * je Woche) und steht jetzt als Icon-Knopf im Tageskopf, neben dem Datum.
+   *
+   * WARUM NICHT DIE KLASSE `.row-carrier`: `.day-slots` ist ab 640px ein 2-
+   * bzw. 4-spaltiges Slot-Raster und am Board `display: contents` - die Klasse
+   * braechte dort Flaeche, Schatten, Lesemass und einen Container mit, die
+   * erst wieder abgeraeumt werden muessten. Und ihre Haarlinie (`> * + *`)
+   * zaehlt die ausgeblendeten leeren Slots mit: stuende der erste belegte Slot
+   * hinter einem leeren Fruehstueck, truege er eine Linie an der Oberkante.
+   * Deshalb hier dieselben Werte (list-row.css, `.row-carrier`) und eine
+   * Haarlinie, die nur belegte Geschwister zaehlt (`~`). */
+  .day-column {
+    border-bottom: none;
+  }
+
+  /* Der Traeger laeuft bis an die Kante der Woche, wie die Listen der drei
+   * Geschwister-Tabs (x 16 bei 390px) - vorher stand der Slot-Stapel mit
+   * eigenem 16px-Einzug bei x 32 und gab den Namen 32px ab. */
+  .day-slots {
+    display: block;
+    margin: 0 0 var(--space-3);
+    padding: 0;
+    background-color: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  .day-slots > .meal-slot--has-meal {
+    min-height: var(--target-lg);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: none;
+  }
+
+  .day-slots > .meal-slot--has-meal ~ .meal-slot--has-meal {
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  /* Ein Tag ohne Mahlzeit hat keinen Traeger - nur seinen Kopf mit dem "+".
+   * Sonst stuende eine leere weisse Flaeche da (derselbe Grundsatz wie
+   * `.row-carrier:has(> .empty-state)`). */
+  .day-slots:not(:has(> .meal-slot--has-meal)) {
+    display: none;
+  }
+
+  /* Das Slot-Label weicht dem Vorsatz in der Zeile; den Typ nennt jetzt die
+   * Karte selbst (auch im Namen ihres Oeffnen-Knopfs). */
+  .day-slots > .meal-slot--has-meal > .meal-slot__type-label {
+    display: none;
+  }
+
+  /* Vorsatz: Punkt und Typ in der Label-Rolle (typography.css), im Fluss vor
+   * dem Namen - kein eigenes Zeilenband. Zwei Zeilen fuer Vorsatz plus Name
+   * haelt die Klammer am Titel unten. */
+  .meal-card__type {
+    display: inline;
+    margin-inline-end: var(--space-1h);
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .meal-card__type::before {
+    content: '';
+    display: inline-block;
+    width: var(--space-2);
+    height: var(--space-2);
+    margin-inline-end: var(--space-1h);
+    border-radius: var(--radius-full);
+    background: var(--meal-type-dot, var(--color-text-disabled));
+    vertical-align: 0.1em;
+  }
+
+  .meal-card__title-text {
+    display: inline;
+  }
+
+  .meal-card__title .meal-card__recurrence {
+    display: inline-flex;
+    margin-inline-start: var(--space-1);
+    vertical-align: middle;
+  }
+
+  /* Die Klammer sitzt am Titel, weil Vorsatz und Name EIN Textfluss sind. */
+  .meal-card__title {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  /* DER PAPIERKORB VERLAESST DIE ZEILE. Er stand 48px direkt neben dem Griff:
+   * ein verrutschter Zug war ein Loeschen (A4, Persona Casey). Loeschen lebt
+   * mobil im Dialog der Mahlzeit - links im Fuss seit R8, derselbe Weg
+   * (`deleteMeal`: Serienabfrage, Rueckgaengig) -, und der Dialog ist einen
+   * Tipp auf die Zeile entfernt. */
+  .meal-card__action-btn--delete {
+    display: none;
+  }
+
+  /* DER GRIFF IST KLEIN UND STEHT AM ENDE. Er bleibt der einzige Ort mit
+   * `touch-action: none` (#1317, oben) und nimmt weiter die volle Zeilenhoehe
+   * als Greifzone - nur die Breite gibt er ab, wie `.list-row__drag`: die
+   * Zieh-Achse ist vertikal. */
+  .meal-card__drag {
+    order: 1;
+    min-width: var(--space-8);
+  }
+
+  /* DER TAGESKNOPF STEHT IM TAGESKOPF (R9 M6). Er verliert dort sein Wort
+   * und wird zum Icon-Knopf seiner Familie - mit voller Zielgroesse
+   * (Label-Verlust-Regel, tokens.css 11b); den Namen ("Mahlzeit am Montag
+   * hinzufuegen") traegt er ohnehin als aria-label am Knopf. Der Kopf gibt
+   * dafuer sein Polster nach oben ab, damit er nicht um die 44px waechst. */
+  .day-header {
+    padding: 0 var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .day-header__date {
+    margin-inline-start: auto;
+  }
+
+  .day-header > .day-add {
+    flex: none;
+    width: var(--target-base);
+    min-width: var(--target-base);
+    min-height: var(--target-base);
+    margin: 0;
+    margin-inline-end: calc(-1 * var(--space-2));
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-full);
+    color: var(--module-accent);
+  }
+
+  .day-header > .day-add .day-add__label {
+    display: none;
   }
 }
 
@@ -877,10 +999,22 @@
 }
 
 .meal-modal__autocomplete-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   cursor: pointer;
   font-size: var(--text-sm);
   transition: background-color var(--transition-fast);
+}
+
+/* Ein gespeichertes Rezept traegt seine Art als Wort am Ende: es bringt
+ * Zutaten mit, ein frueherer Mahlzeitname nicht (Re-Kritik 2026-09-28). */
+.meal-modal__autocomplete-kind {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
 }
 
 .meal-modal__autocomplete-item:hover,
@@ -900,17 +1034,12 @@
  * das im modul-fremden Overlay rendert). Hier bleibt nur der meals-eigene
  * Container .ingredient-list und der Add-Button. */
 
+/* EIN DIALEKT FUER "ZUTAT HINZUFUEGEN" (Re-Critique 2026-09-28, A4 P2-10):
+ * hier stand ein orangefarbener Textlink, im Rezeptdialog eine violette
+ * Kapsel - beide vor derselben Zeile (ingredientRowHTML). Beide sind jetzt
+ * `btn btn--secondary` mit Plus; hier bleibt nur die Lage. */
 .add-ingredient-btn {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--module-accent);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: var(--space-1) 0;
-  min-height: var(--target-lg);
+  align-self: flex-start;
 }
 
 /* Einkaufsliste-Auswahl im Modal */
@@ -1007,12 +1136,6 @@
   font-size: var(--text-sm);
 }
 
-.meal-recurrence-note i {
-  color: var(--module-meals);
-  flex: none;
-  margin-top: var(--space-0h);
-}
-
 /* Leere Slots tragen keinen „Kein Essen geplant"-Text mehr (Rauschen auf dem
  * Planer-Raster) — nur noch Typ-Label + Plus-Affordanz. */
 
@@ -1026,11 +1149,31 @@
   opacity: 0.85;
   box-shadow: var(--glass-shadow-lg);
   transform: rotate(2deg) scale(1.03);
+  /* `transition: none` bleibt: der Geist folgt dem Zeiger ueber `left`/`top`,
+   * jede Transition darauf liesse ihn nachziehen. Das ABHEBEN laeuft deshalb
+   * als Keyframe-Animation auf `transform`/`opacity` - sie beruehrt die Lage
+   * nicht (R16, Bewegung: der Geist stand vorher im ersten Frame gedreht da). */
   transition: none;
+  animation: meal-ghost-lift var(--duration-xs) var(--ease-out);
+}
+
+@keyframes meal-ghost-lift {
+  from { transform: none; opacity: 1; }
+}
+
+/* Die Quelle blendet beim Abheben ab und beim Ablegen wieder auf, statt
+ * zwischen 1 und 0.35 zu springen. Eigene Regel NACH `.meal-slot`, damit die
+ * Liste dort (border-color) erhalten bleibt. */
+.meal-slot {
+  transition: border-color var(--transition-fast), opacity var(--transition-fast);
 }
 
 .meal-slot--dragging {
   opacity: 0.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meal-card--ghost { animation: none; }
 }
 
 .meal-slot--drop-target {
@@ -1067,6 +1210,15 @@
 
   .meal-card__action-btn::before {
     inset: 0;
+  }
+
+  /* Im 48px-Knopf der Zeile traegt das Zeichen die Stufe der Zeilenaktionen
+   * (Einkauf, Vorrat), nicht die Board-Stufe --icon-md: gemessen standen hier
+   * 12px-Glyphen neben 18px-Zeichen der Nachbartabs (Critique 2026-09-26). Die
+   * Ausnahme bleibt die 24px-Box im 148px-Wochenslot des Boards. */
+  .meal-card__action-btn svg {
+    width: var(--icon-lg);
+    height: var(--icon-lg);
   }
 }
 
@@ -1117,14 +1269,33 @@
    * Silbentrennung in den Gerichtenamen, gegen die die Mindestbreite überhaupt
    * eingeführt wurde. Die 8px bei 1440 gegen ein Regressionsrisiko bei 1280 zu
    * tauschen, ist eine Struktur-, keine Feinschliff-Entscheidung: die eigentliche
-   * Frage ist, ob eine 7-Tage-Ansicht auf Laptop-Breite die richtige Ansicht ist. */
+   * Frage ist, ob eine 7-Tage-Ansicht auf Laptop-Breite die richtige Ansicht ist.
+   *
+   * ENTSCHIEDEN 2026-09-26 (Critique A4 P1, Ulas): 140px. Die 1440er-Breite mit
+   * ausgeklappter Seitenleiste ist die verbreitetste Desktop-Breite, und dort
+   * lag der Montag angeschnitten unter der Gutter-Spalte. 140px brechen
+   * Gerichtenamen noch an Wortgrenzen (die Silbentrennung kam bei ~117px);
+   * 1280px bleibt ein Scroll-Fenster wie zuvor.
+   *
+   *   Bedarf   116 Gutter + 7 × 140 Spalte + 7 × 8 Gap = 1152px
+   *   1440px   1156 verfügbar → passt, 7/7 sichtbar (Rezept-Spalte eingeklappt)
+   *
+   * NACHGEMESSEN 2026-10-05 (Critique R16, „bei 1280 liegt der Sonntag
+   * ausserhalb"), am Demo-Haushalt mit 27 Karten: sieben Spalten in 996px
+   * sind 117,7px je Tag und 83px Titelbreite (heute 105). Abgeschnitten
+   * („…" nach zwei Zeilen) waeren 12 von 27 Titeln statt 2, getrennt 13 von
+   * 49 Woertern statt 3; mit 12px statt 16px Kartenpolster (91px Titel) immer
+   * noch 10 von 27. Sieben Tage ohne Querscroll kosten bei 1280 also fast
+   * jede zweite Karte ihren Namen - das Scroll-Fenster bleibt. Wer es
+   * aufloesen will, baut die Ansicht um (5 + 2 Tage oder eine Tagesliste),
+   * nicht die Spaltenbreite. */
   .week-grid {
     display: grid;
     /* Breit genug für das längste deutsche Typ-Label („Mittagessen" ≈ 84px
      * bei text-sm/medium) plus Punkt, Lücke und Innenabstand — sonst chopt
      * der break-word-Backstop das Label wortmittig. */
     --meal-gutter-width: 116px;
-    grid-template-columns: var(--meal-gutter-width) repeat(7, minmax(148px, 1fr));
+    grid-template-columns: var(--meal-gutter-width) repeat(7, minmax(140px, 1fr));
     column-gap: var(--space-2);
     row-gap: var(--space-2);
     align-items: stretch;
@@ -1133,6 +1304,11 @@
      * Shell-Flächen DARAUF und überschriebe ein direktes Padding hier. */
     --scrollport-pad: var(--space-3);
     min-width: 0;
+    /* DIE WOCHE STEHT OBEN, SIE WIRD NICHT GEDEHNT (A4 P1-2). Mit dem
+     * Vorgabewert `normal` streckte das Raster seine Zeilen auf die Hoehe des
+     * Scrollports: gemessen 96px Tageskopf fuer 21px Text und 128px je leerem
+     * Slot statt seiner 72px Mindesthoehe. */
+    align-content: start;
     overflow-x: auto;
     scroll-snap-type: x proximity;
     scroll-padding-left: calc(var(--meal-gutter-width) + var(--space-2));
@@ -1248,9 +1424,37 @@
 
   .recipe-sidebar__card {
     display: grid;
-    gap: var(--space-2);
-    padding: var(--space-3);
     cursor: grab;
+  }
+
+  /* Der Knopf fuellt die Karte (Re-Kritik 2026-09-28, A4 P1-1): Klick, Tipp
+   * oder Enter plant das Rezept ein, Ziehen am `article` darum bleibt. Das
+   * Polster wandert deshalb von der Karte in den Knopf - sonst laege ein
+   * toter Rand um die Trefferflaeche. */
+  .recipe-sidebar__card-open {
+    display: grid;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: var(--target-md);
+    padding: var(--space-3);
+    border: none;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: start;
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+  }
+
+  @media (hover: hover) {
+    .recipe-sidebar__card-open:hover {
+      background-color: var(--color-surface-2);
+    }
+  }
+
+  .recipe-sidebar__card-open:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset-inset);
   }
 
   /* Die Trennlinie gehoert der ZWEITEN Zeile, nicht jeder: so hat die erste
@@ -1286,12 +1490,35 @@
     padding: var(--space-3) var(--space-1) var(--space-2);
     gap: var(--space-1);
     min-width: 0;
+    /* Einzeilig beieinander („Mo 28.09.") statt an die Kanten der Spalte
+     * gedrueckt: Wochentag und Datum sind EINE Angabe (A8 P3-1). */
+    justify-content: flex-start;
   }
 
   /* Slots in Grid-Zellen heben: Zeile = Mahlzeit-Typ, Spalte = Wochentag. */
   .meal-slot {
     grid-column: var(--day-col);
     grid-row: var(--type-row);
+  }
+
+  /* DER LEERE SLOT IST EINE RUHIGE MULDE (A4 P1-2). 27 weisse Karten mit
+   * gestrichelter Kante und je einem „+" waren die lauteste Flaeche fuer den
+   * Zustand „nichts geplant". Am Board traegt er nur eine Andeutung der
+   * Kartenflaeche und das tertiaere Plus; die Kante - die Griff- und
+   * Ablage-Affordanz - kommt erst, wenn er gemeint ist: Zeiger darueber,
+   * Tastaturfokus auf dem Plus oder ein Rezept, das darueber gezogen wird
+   * (`--drop-target` darunter traegt dafuer seinen eigenen Rahmen).
+   * Unter `.week-grid`, weil glass.css die Slotflaeche mit
+   * `.meals-page .meal-slot` (zwei Klassen) setzt - eine Klasse allein verlor
+   * dagegen (gemessen: weiss geblieben). */
+  .week-grid .meal-slot--empty {
+    border-color: transparent;
+    background-color: transparent;
+  }
+
+  .week-grid .meal-slot--empty:hover,
+  .week-grid .meal-slot--empty:focus-within {
+    border-color: var(--color-border);
   }
 
   /* Slot-eigene Typ-Labels: visuell übernimmt sie die Gutter-Spalte, im
@@ -1341,9 +1568,11 @@
     margin-top: var(--space-1);
   }
 
+  /* Dieselbe Umbruchregel wie `.meal-slot__type-text` oben. */
   .week-gutter-label__text {
     min-width: 0;
-    hyphens: manual;
+    hyphens: auto;
+    hyphenate-limit-chars: 6 4 4;
     overflow-wrap: break-word;
   }
 
@@ -1360,17 +1589,23 @@
   }
 
   /* Karten-Titel im Board: zwei Zeilen statt Einzeiler-Ellipse nach ~5
-   * Zeichen ("Tomat…") — Wiedererkennung vor Kompaktheit. Keine
-   * Auto-Silbentrennung mehr: die Mindest-Spaltenbreite (148px) lässt
-   * Gerichtenamen an Wortgrenzen umbrechen; break-word bleibt Backstop
-   * für Einzelwörter jenseits der Spaltenbreite (Critique P1). */
+   * Zeichen ("Tomat…") - Wiedererkennung vor Kompaktheit.
+   *
+   * MIT SILBENTRENNUNG, WEIL DIE SPALTE SCHMALER IST ALS EIN KOMPOSITUM. Hier
+   * stand, die Mindest-Spaltenbreite (140px) lasse Gerichtenamen an
+   * Wortgrenzen umbrechen. Gemessen bei 1440 und 1280: 105,6px Textbreite
+   * (Karte minus Polster), und „Tomatensuppe" oder „Lammkoteletts" passen
+   * nicht hinein. `hyphens: manual` machte daraus „Tomatensupp / e" und
+   * „Lammkotelett / s" (Re-Critique 2026-09-27, A4). Mit `hyphens: auto` und
+   * der Untergrenze von vier Zeichen je Seite steht dort „Tomaten- / suppe",
+   * „Lammkote- / letts"; break-word bleibt die letzte Stufe. Die Trennung
+   * selbst erbt die Regel von der Basis (`.meal-card__title-text` oben). */
   .meal-card__title-text {
     white-space: normal;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     line-clamp: 2;
-    hyphens: manual;
     overflow-wrap: break-word;
   }
 }
@@ -1386,18 +1621,19 @@
  * Die Spalte kostet 272-320px. Genau die fehlen dem Board für den sechsten und
  * siebten Tag: mit ihr sind Samstag und Sonntag nur über horizontales Scrollen
  * erreichbar - ausgerechnet die Tage, an denen am meisten gekocht wird. Ohne
- * sie passen alle sieben Spalten in voller Breite, ohne dass die 148px-
- * Mindestbreite angetastet werden muss.
+ * sie passen ab 1440px alle sieben Spalten in voller Breite (140px-
+ * Mindestbreite, siehe .week-grid).
  * -------------------------------------------------------- */
-.week-nav__rail-toggle {
-  display: none;
+/* Der Schalter steht seit der Kopfregel mobil (2026-09-26) als Eintrag im
+ * Werkzeugmenue. Die Spalte gibt es erst ab 1024px (.meals-layout oben),
+ * darunter waere der Haken ein Schalter ohne Wirkung. */
+@media (max-width: 1023px) {
+  .popover-menu__item[data-action="toggle-rail"] {
+    display: none;
+  }
 }
 
 @media (min-width: 1024px) {
-  .week-nav__rail-toggle {
-    display: inline-flex;
-  }
-
   .meals-layout--rail-hidden {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1451,4 +1687,11 @@
   justify-content: center;
   background-color: var(--color-surface-2);
   color: var(--color-text-tertiary);
+}
+
+/* Aus dem Slot fuehrt der Name (Re-Critique 2026-09-28, A4 P2-9); Tag und
+ * Mahlzeit stehen darunter als ruhige Zusammenfassung - weiter editierbar,
+ * aber nicht mehr die erste Frage. */
+.meal-modal__when .form-label {
+  color: var(--color-text-secondary);
 }

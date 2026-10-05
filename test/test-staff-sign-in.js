@@ -162,7 +162,8 @@ test('Passwort-Login: ein Personal-Konto bekommt weiterhin 403 und keine Sitzung
   });
 
   assert.equal(res.status, 403);
-  assert.deepEqual(await res.json(), { error: 'This account cannot sign in.', code: 403 });
+  // `reason` seit #1607: an ihm erkennt die App, dass dieser Satz eine eigene Auskunft ist.
+  assert.deepEqual(await res.json(), { error: 'This account cannot sign in.', code: 403, reason: 'account_cannot_sign_in' });
   assert.equal(sessionsOf(staff.id), 0);
 });
 
@@ -190,9 +191,11 @@ test('SSO: eine unbekannte Identitaet bekommt weiterhin ein Mitgliedskonto und e
   assert.equal(sessionsOf(user.id), 1);
 });
 
-test('SSO: ein Mitglied mit Kontakt-E-Mail wird weiterhin verknuepft und angemeldet', async () => {
+test('SSO: ein vorbereitetes Mitglied mit Kontakt-E-Mail wird weiterhin verknuepft und angemeldet', async () => {
+  // Ohne Passwort, wie ein Admin es fuer die erste SSO-Anmeldung vorbereitet:
+  // nur so ein Konto verknuepft ueber die Adresse (GHSA-6pmj-w42g-g6qv).
   const { lastInsertRowid } = database.prepare(`
-    INSERT INTO users (username, display_name, password_hash) VALUES ('mitglied-mail', 'Mitglied Mail', 'x')
+    INSERT INTO users (username, display_name, password_hash) VALUES ('mitglied-mail', 'Mitglied Mail', '$oidc$')
   `).run();
   const memberId = Number(lastInsertRowid);
   database.prepare('INSERT INTO contacts (name, email, family_user_id) VALUES (?, ?, ?)')

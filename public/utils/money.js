@@ -397,10 +397,57 @@ export function toStoredNumber(value, { maximumFractionDigits = 2 } = {}) {
 }
 
 export function centsToAmountInput(cents, currency) {
+  return amountToInput(Number(cents) / 10 ** currencyFractionDigits(currency), currency);
+}
+
+/**
+ * Ein Dezimalbetrag (Zahl oder Punkt-Dezimaltext vom Server, "12.50") als Wert
+ * für ein Eingabefeld - das Gegenstück zu `toDecimalString`.
+ *
+ * Trenner und Ziffern der Region, ohne Gruppierung, aufgefüllt auf die Stellen
+ * der Währung: EUR/de "12,50", EUR/en-US "12.50", JPY "1300". Es ist dieselbe
+ * Schreibweise, die `amountPlaceholder` und `amountExample` zeigen, und
+ * `centsToAmountInput` rechnet nur vorher um.
+ *
+ * Nach oben NICHT gekappt: ein Bestandswert neben dem Raster (12,5 JPY, in EUR
+ * erfasst) erscheint so, wie er gespeichert ist. Ihn hier zu runden hiesse, beim
+ * blossen Öffnen des Dialogs einen anderen Betrag ins Feld zu schreiben.
+ *
+ * Gearbeitet wird auf dem TEXT, nicht auf der Zahl: Ganzzahl- und Bruchteil
+ * werden getrennt übernommen und nur Ziffern und Trenner der Region eingesetzt.
+ * Der Server rechnet Geld in ganzen Einheiten bis `Number.MAX_SAFE_INTEGER`, als
+ * Dezimalbetrag passt das nicht mehr in ein Gleitkomma: `90071992547409.91`
+ * stand über `Number()` als `90071992547409,90` im Feld, und wer den Dialog
+ * öffnete und unverändert speicherte, zog einen Cent ab.
+ *
+ * Leer bleibt leer, und was keine Zahl ist, kommt unverändert zurück - ein
+ * Feld soll nie "NaN" zeigen.
+ */
+export function amountToInput(amount, currency) {
+  if (amount === '' || amount == null) return '';
+  // Eine Zahl (die Übergabe aus dem Budget reicht 12.5) hat als Text ihre
+  // kürzeste eindeutige Schreibweise; ein Dezimaltext des Servers bleibt, was
+  // er ist. Exponentenschreibweise trifft das Muster nicht und läuft unten
+  // über Intl.
+  const text = String(amount).trim();
   const digits = currencyFractionDigits(currency);
-  return getNumberFormat({
-    useGrouping: false, minimumFractionDigits: digits, maximumFractionDigits: digits,
-  }).format(Number(cents) / 10 ** digits);
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(text);
+  if (!match) {
+    const value = Number(text);
+    if (text === '' || !Number.isFinite(value)) return String(amount);
+    return getNumberFormat({
+      useGrouping: false, minimumFractionDigits: digits, maximumFractionDigits: Math.max(digits, 20),
+    }).format(value);
+  }
+  const [, sign, whole, fraction = ''] = match;
+  // Ziffern und Trenner aus Intl abgeleitet, wie in toDecimalString - genau die
+  // Zeichen, die jene Funktion beim Speichern wieder liest.
+  const plain = getNumberFormat({ useGrouping: false, maximumFractionDigits: 0 });
+  const regional = (run) => [...run].map((char) => plain.format(Number(char))).join('');
+  const decimalSep = getNumberFormat({ useGrouping: false, minimumFractionDigits: 1 })
+    .formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.';
+  const padded = fraction.padEnd(digits, '0');
+  return sign + regional(whole) + (padded ? decimalSep + regional(padded) : '');
 }
 
 /**
@@ -416,6 +463,70 @@ export function amountInputToCents(text, currency) {
   const digits = currencyFractionDigits(currency);
   const cents = Math.round(Number(norm) * 10 ** digits);
   return Number.isFinite(cents) ? cents : null;
+}
+
+/**
+ * Warum ein eingetippter Betrag nicht gespeichert werden kann - oder `null`.
+ *
+ * Die Antwort ist ein GRUND, kein Ja/Nein: ein Formular, das nur den
+ * Speichern-Knopf sperrt, lässt die übliche Schreibweise für zehntausend Won
+ * ("10,000") kommentarlos liegen (#1607). Den Text dazu wählt der Aufrufer.
+ *
+ * - `'grouped'`: Tausendergruppierung. `toDecimalString` löst sie bewusst nicht
+ *   auf (siehe dort), hier bekommt die Ablehnung einen Namen.
+ * - `'invalid'`: keine Dezimalzahl in der Schreibweise, die der Server liest.
+ * - `'notPositive'`: null oder negativ.
+ * - `'precision'`: mehr Nachkommastellen, als die Währung kennt.
+ *
+ * Die Stellen werden am TEXT gezählt, nicht an der Zahl: "10.000" ist unter
+ * ko-KR die Zahl 10 und passt damit ins Raster von KRW, gesendet wird aber der
+ * Text, und parseMoneyToMinor() auf dem Server zählt die Stellen hinter dem
+ * Punkt. `fitsCurrencyGrid` sieht diese Nullen nicht.
+ *
+ * Ein leeres Feld hat keinen Grund - das ist Sache der Pflichtfeld-Prüfung.
+ *
+ * `original` ist der Bestandswert des Feldes (wie bei `amountIsSavable`): ein
+ * unangetasteter Betrag neben dem Raster bleibt speicherbar, solange er nicht
+ * MEHR Stellen trägt als vorher. Ein Währungswechsel hebt den Schutz auf
+ * (`originalCurrency`): 12.50 EUR, auf JPY umgestellt, ist ein neuer Betrag.
+ */
+export function amountInputProblem(text, currency, { original = null, originalCurrency = null, required = false } = {}) {
+  const raw = String(text ?? '').trim();
+  // Leer ist Sache des Pflichtfelds - ausser der Aufrufer sagt, dass ein Betrag
+  // da sein muss: `required` des Browsers nimmt ein Feld aus Leerzeichen an,
+  // und die Genau-Beträge einer Aufteilung haben gar kein Pflichtfeld.
+  if (!raw) return required ? 'notPositive' : null;
+  const decimal = toDecimalString(raw);
+  // Leer trotz Eingabe heisst: toDecimalString hat eine Gruppierung abgewiesen.
+  // Ein Leerzeichen zwischen Ziffern ist dasselbe in der Schreibweise von fr
+  // oder sv ("10 000").
+  if (!decimal || /\d\s+\d/.test(decimal)) return 'grouped';
+  if (!/^-?\d+(\.\d+)?$/.test(decimal)) return 'invalid';
+  const value = Number(decimal);
+  if (!(value > 0)) return 'notPositive';
+  const places = fractionLength(decimal);
+  if (places <= currencyFractionDigits(currency)) return null;
+  const untouched = original != null && Number(original) === value
+    && (originalCurrency == null || originalCurrency === currency)
+    && places <= fractionLength(String(original));
+  return untouched ? null : 'precision';
+}
+
+/** Stellen hinter dem Punkt einer Dezimalangabe: "10.000" -> 3, "10" -> 0. */
+function fractionLength(decimal) {
+  return (String(decimal).split('.')[1] ?? '').length;
+}
+
+/**
+ * Ein Beispiel für die erwartete Schreibweise eines Betrags: ohne Gruppierung,
+ * mit Trenner und Ziffern der Region und den Stellen der Währung.
+ * EUR/de -> "1250,00", KRW -> "1250".
+ */
+export function amountExample(currency) {
+  const digits = currencyFractionDigits(currency);
+  return getNumberFormat({
+    useGrouping: false, minimumFractionDigits: digits, maximumFractionDigits: digits,
+  }).format(1250);
 }
 
 /**

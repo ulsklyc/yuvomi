@@ -19,8 +19,9 @@
  *          - ein Set ohne Rest verschwindet ganz
  *          - der Speicher wird nicht umgeschrieben
  *          - nach einem Ladefehler wird NICHT gefiltert
- *          - #1373: das Filter-Panel laesst sich schliessen, egal wie viele
- *            Filter gewaehlt sind (Knopfplatz, Escape, „Fertig")
+ *          - Kopfregel mobil: „Filter (n)" zaehlt, das Blatt bietet an, was
+ *            vorher in der Chipzeile stand, und zieht sich nach, ohne seine
+ *            Knoten zu tauschen (die Lehre aus #1373); das Werkzeugmenue
  * Ausführen: node --loader ./test/test-browser-loader.mjs --test test/test-task-filters.js
  */
 import test from 'node:test';
@@ -253,176 +254,454 @@ test('derselbe Filter verdraengt sich weiterhin selbst', () => {
 });
 
 // ---------------------------------------------------------------------------
-// #1373: Das Filter-Panel muss sich schliessen lassen, egal wie viele Filter
-// gewaehlt sind.
+// Kopfregel mobil (2026-09-26): „Filter (n)" im Kopf, die Filter im Blatt.
 //
-// Auf dem Telefon scrollt `#filter-bar` seitlich. Der Filterknopf war ihr
-// LETZTES Kind: jeder gewaehlte Filter setzte einen Chip davor und schob den
-// Knopf weiter aus dem sichtbaren Streifen (gemessen auf 375x812: von x=122 auf
-// x=437, Streifen endet bei 243). Das Panel hatte keinen zweiten Schliessweg.
+// Unter dem Kopf stand eine Chipzeile (aktive Filter, „Mir zugewiesen",
+// „Geplante", Gruppierung) und darunter ein Inline-Panel. Mobil kostete das
+// 54px unter einem 176px-Kopf, die erste Aufgabe stand bei y=287 (A3 P1-2);
+// am Desktop lief das Panel 1156px ueber einer 720px-Liste (A3 P2-8). Jetzt
+// traegt der Kopf EINEN Knopf mit der ZAHL der wirkenden Filter, und alles
+// andere steht beschriftet im Filterblatt (utils/filter-sheet.js).
 //
-// Gemessen wird das VERHALTEN von `renderFilters` auf einem kleinen DOM-Stub:
-// wo der Knopf nach dem Waehlen steht, und dass Escape und „Fertig" das Panel
-// wirklich zuklappen - ueber die Verdrahtung, die `renderFilters` selbst
-// anhaengt, nicht ueber eine direkt gerufene Hilfsfunktion.
+// Gemessen wird, WAS Knopf und Blatt anbieten und dass ein Filterwechsel ein
+// offenes Blatt nachzieht, ohne seine Knoten zu tauschen - der Fokus bleibt
+// auf dem getippten Chip. Das ist die Lehre aus #1373: dort fiel er nach jedem
+// Rendern aufs Dokument, und Escape erreichte das Panel nicht mehr.
 // ---------------------------------------------------------------------------
 
-class StubEl {
-  constructor(tag) {
-    this.tagName = tag.toUpperCase();
-    this.children = [];
-    this.parent = null;
+const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+
+/** Ausgangslage: Liste, zwei Personen, Standardfilter „Offen". */
+function baseState(overrides = {}) {
+  withKnown({ users: [1, 2], categories: ['haushalt'], tags: ['garten'] });
+  Object.assign(tasks.state, {
+    viewMode: 'list',
+    currentUserId: 1,
+    showFuture: false,
+    groupMode: 'category',
+    bulkSelectMode: false,
+    filterSheet: null,
+    filters: { status: ['open'], priority: [], assigned_to: [], category: [], tags: [] },
+    ...overrides,
+  });
+}
+
+test('Filter (n): die Zahl nennt nur ABWEICHUNGEN vom Standard (R16)', () => {
+  // „Filter 1" brannte im Ruhezustand: der Startwert „Offen" zaehlte mit, der
+  // Knopf trug also immer eine Zahl und die Aktiv-Farbe - und sagte damit
+  // nichts mehr (Critique 2026-10-05, R16).
+  baseState();
+  assert.equal(tasks.activeFilterCount(), 0, 'der Standard ist kein Filter');
+  tasks.state.filters.priority = ['high', 'urgent'];
+  tasks.state.filters.tags = ['garten'];
+  assert.equal(tasks.activeFilterCount(), 3, 'jeder Wert jeder Achse zaehlt (#671)');
+  tasks.state.showFuture = true;
+  assert.equal(tasks.activeFilterCount(), 4,
+    '„Geplante anzeigen" hatte einen eigenen Chip - ohne ihn traegt allein die Zahl, dass er an ist');
+  tasks.state.viewMode = 'kanban';
+  assert.equal(tasks.activeFilterCount(), 4,
+    'im Brett wirkt der Status nicht (die Spalten SIND er) - mitgezaehlt behauptete die Zahl einen unsichtbaren Filter');
+});
+
+test('Filter (n): ein Status abseits von „Offen" ist eine Abweichung - auch der leere (R16)', () => {
+  baseState();
+  tasks.state.filters.status = [];
+  assert.equal(tasks.activeFilterCount(), 1, '„alle Status" zeigt mehr als der Standard und ist damit ein Filterzustand');
+  tasks.state.filters.status = ['done'];
+  assert.equal(tasks.activeFilterCount(), 1);
+  tasks.state.filters.status = ['open', 'in_progress'];
+  assert.equal(tasks.activeFilterCount(), 2, 'jeder gewaehlte Wert zaehlt');
+  // „Bis heute faellig" weitet den Status selbst: das ist EIN Filter, nicht drei.
+  baseState();
+  tasks.setDueToday(true);
+  assert.deepEqual(tasks.state.filters.status, ['open', 'in_progress']);
+  assert.equal(tasks.activeFilterCount(), 1);
+  tasks.setDueToday(false);
+  assert.equal(tasks.activeFilterCount(), 0);
+});
+
+test('das Blatt: Filter zuerst, Kategorie und Tag eingeklappt, „Ansicht" abgesetzt am Ende (R16)', () => {
+  baseState();
+  const groups = () => tasks.filterSheetGroups();
+  const headingsOf = () => groups().map((g) => g.heading);
+  const groupOf = (heading) => groups().find((g) => g.heading === heading) ?? {};
+  const htmlOf = (heading) => groupOf(heading).html ?? '';
+
+  assert.deepEqual(headingsOf(), [
+    'tasks.filterGroupShow', 'tasks.filterGroupStatus', 'tasks.filterGroupPriority',
+    'tasks.filterGroupPerson', 'tasks.categoryLabel', 'tasks.filterGroupTag', 'tasks.viewToggleLabel',
+  ]);
+  const show = htmlOf('tasks.filterGroupShow');
+  assert.match(show, /type="checkbox"[^>]*data-filter-mine/, '„Mir zugewiesen" ist ein Schalter im Blatt');
+  assert.doesNotMatch(show, /data-filter-future/, '„Geplante anzeigen" ist eine Ansichtsoption, kein Filter der ersten Gruppe');
+
+  // „Ansicht": Gruppierung und „Geplante anzeigen", abgesetzt.
+  const view = groupOf('tasks.viewToggleLabel');
+  assert.equal(view.variant, 'view');
+  assert.match(view.html, /role="radiogroup"/, 'die Gruppierung ist EINE Wahl aus zwei, kein Paar von Schaltern');
+  assert.match(view.html, /data-tab-id="category"[^>]*aria-checked="true"|aria-checked="true"[^>]*data-tab-id="category"/);
+  assert.match(view.html, /type="checkbox"[^>]*data-filter-future/);
+  assert.match(htmlOf('tasks.filterGroupStatus'), /data-filter="status" data-value="open" aria-pressed="true"/,
+    'der gewaehlte Status traegt seinen Zustand als aria-pressed');
+
+  // Kategorie und Tag: eingeklappt, solange nichts gewaehlt ist - offen, sobald etwas wirkt.
+  assert.deepEqual([groupOf('tasks.categoryLabel').fold, groupOf('tasks.filterGroupTag').fold], ['closed', 'closed']);
+  assert.equal(groupOf('tasks.filterGroupStatus').fold, undefined, 'die haeufigen Achsen bleiben offen');
+  tasks.state.filters.category = ['haushalt'];
+  tasks.state.filters.tags = ['garten'];
+  assert.deepEqual([groupOf('tasks.categoryLabel').fold, groupOf('tasks.filterGroupTag').fold], ['open', 'open'],
+    'eine gesetzte Wahl ist nie hinter einem Aufklapper versteckt');
+
+  // Das Brett: kein Status (die Spalten sind er), keine Gruppierung - „Geplante" bleibt.
+  baseState();
+  tasks.state.viewMode = 'kanban';
+  assert.ok(!headingsOf().includes('tasks.filterGroupStatus'));
+  assert.doesNotMatch(htmlOf('tasks.viewToggleLabel'), /radiogroup/);
+  assert.match(htmlOf('tasks.viewToggleLabel'), /data-filter-future/);
+
+  // Allein im Haushalt: keine Personenachse und kein „Mir zugewiesen".
+  baseState();
+  tasks.state.users = [{ id: 1, display_name: 'U1' }];
+  assert.ok(!headingsOf().includes('tasks.filterGroupPerson'));
+  assert.doesNotMatch(htmlOf('tasks.filterGroupShow'), /data-filter-mine/);
+  assert.match(htmlOf('tasks.viewToggleLabel'), /data-filter-future/, '„Geplante" bleibt - es haengt an niemandem');
+});
+
+test('gemerkte Sets stehen zuerst im Blatt, als Aktion ohne Ein/Aus-Zustand', () => {
+  baseState();
+  put({ priority: ['high'], tags: ['garten'] });
+  const [first] = tasks.filterSheetGroups();
+  assert.equal(first.heading, 'tasks.filterGroupRecent');
+  assert.match(first.html, /data-recent-filter="/);
+  assert.doesNotMatch(first.html, /aria-pressed/, 'ein Set anwenden ist eine Aktion, kein Schalter');
+  assert.match(first.html, /garten/, 'die Tags gehoeren in die Beschriftung, weil der Chip sie mitsetzt (#586)');
+});
+
+/** Ein Knoten mit genau dem, was das Blatt anfasst. */
+class SheetEl {
+  constructor({ dataset = {}, checked = false } = {}) {
+    this.dataset = dataset;
+    this.checked = checked;
     this.attrs = new Map();
-    this.dataset = {};
-    this.listeners = new Map();
-    this.hidden = false;
-    this.text = '';
+    this.cls = new Set();
+    this.classList = {
+      toggle: (c, on) => { if (on) this.cls.add(c); else this.cls.delete(c); },
+      contains: (c) => this.cls.has(c),
+    };
   }
-  set id(v) { this.attrs.set('id', String(v)); }
-  get id() { return this.attrs.get('id') ?? ''; }
-  set className(v) { this.attrs.set('class', String(v)); }
-  get className() { return this.attrs.get('class') ?? ''; }
-  set textContent(v) { this.children = []; this.text = String(v); }
-  get textContent() { return this.text + this.children.map((c) => c.textContent ?? '').join(''); }
-  setAttribute(k, v) { this.attrs.set(k, String(v)); if (k === 'id') this.id = v; }
+  setAttribute(k, v) { this.attrs.set(k, String(v)); }
   getAttribute(k) { return this.attrs.get(k) ?? null; }
-  appendChild(n) { n.parent = this; this.children.push(n); return n; }
-  append(...ns) { ns.forEach((n) => this.appendChild(n)); }
-  replaceChildren(...ns) { this.children.forEach((c) => { c.parent = null; }); this.children = []; this.append(...ns); }
-  contains(n) { for (let x = n; x; x = x.parent) if (x === this) return true; return false; }
-  *walk() { for (const c of this.children) { if (c instanceof StubEl) { yield c; yield* c.walk(); } } }
   matches(sel) {
-    if (sel.startsWith('#')) return this.id === sel.slice(1);
     const m = sel.match(/^\[data-([a-z-]+)\]$/);
-    if (m) {
-      const key = m[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      return this.dataset[key] !== undefined;
-    }
-    throw new Error(`stub kennt den Selektor nicht: ${sel}`);
+    const key = m?.[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    return key !== undefined && this.dataset[key] !== undefined;
   }
-  querySelector(sel) { for (const e of this.walk()) if (e.matches(sel)) return e; return null; }
-  querySelectorAll(sel) { return [...this.walk()].filter((e) => e.matches(sel)); }
-  closest(sel) { for (let x = this; x instanceof StubEl; x = x.parent) if (x.matches(sel)) return x; return null; }
-  addEventListener(type, fn) {
-    if (!this.listeners.has(type)) this.listeners.set(type, []);
-    this.listeners.get(type).push(fn);
-  }
-  dispatch(type, init = {}) {
-    const ev = { type, target: this, key: init.key, defaultPrevented: false, stopped: false,
-      preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; } };
-    for (let x = this; x && !ev.stopped; x = x.parent) (x.listeners.get(type) ?? []).forEach((fn) => fn(ev));
-    return ev;
-  }
-  click() { return this.dispatch('click'); }
-  focus() { globalThis.document.activeElement = this; }
+  closest(sel) { return this.matches(sel) ? this : null; }
 }
 
-function mountFilterDom() {
-  globalThis.document = {
-    createElement: (tag) => new StubEl(tag),
-    createTextNode: (text) => ({ textContent: String(text), parent: null }),
-    activeElement: null,
+function mountSheet() {
+  const chips = [
+    new SheetEl({ dataset: { filter: 'status', value: 'open' } }),
+    new SheetEl({ dataset: { filter: 'priority', value: 'high' } }),
+    new SheetEl({ dataset: { filter: 'tag', value: 'Garten' } }),
+  ];
+  const mine = new SheetEl({ dataset: { filterMine: 'true' } });
+  const future = new SheetEl({ dataset: { filterFuture: 'true' } });
+  const panel = {
+    isConnected: true,
+    querySelectorAll: (sel) => (sel === '[data-filter]' ? chips : []),
+    querySelector: (sel) => ({ '[data-filter-mine]': mine, '[data-filter-future]': future })[sel] ?? null,
   };
-  globalThis.window = globalThis.window ?? {};
-  const container = new StubEl('div');
-  const row = container.appendChild(new StubEl('div'));
-  row.className = 'tasks-filters-row';
-  for (const id of ['filter-toggle-slot', 'filter-bar']) row.appendChild(new StubEl('div')).id = id;
-  container.appendChild(new StubEl('div')).id = 'filter-panel';
-  return container;
+  // Kein Seiten-DOM: Knopf und Liste fehlen, renderFilters und loadTasks
+  // laufen dann nur ueber den Zustand und das offene Blatt.
+  const container = { querySelector: () => null, querySelectorAll: () => [] };
+  tasks.state.filterSheet = panel;
+  return { chips, mine, future, panel, container };
 }
 
-/** Die Ausgangslage aus dem Issue: Panel offen, mehrere Filter gewaehlt. */
-function openWithFilters(container) {
-  withKnown({ users: [1, 2] });
-  tasks.state.viewMode = 'list';
-  tasks.state.currentUserId = 1;
-  tasks.state.filters = { status: ['open'], priority: ['high', 'urgent', 'medium'], assigned_to: ['2'], category: [], tags: [] };
-  tasks.state.filterPanelOpen = true;
+test('ein Chip im Blatt schaltet seinen Wert und bleibt DERSELBE Knoten (Lehre aus #1373)', async () => {
+  baseState();
+  const { chips, container } = mountSheet();
+  const high = chips[1];
+  await tasks.onFilterSheetClick({ target: high }, container);
+  assert.deepEqual(tasks.state.filters.priority, ['high']);
+  assert.equal(high.getAttribute('aria-pressed'), 'true', 'der getippte Knoten traegt den neuen Zustand selbst');
+  assert.equal(high.classList.contains('filter-chip--active'), true);
+  assert.equal(chips[0].getAttribute('aria-pressed'), 'true', 'die anderen Chips werden mit abgeglichen');
+
+  // Tags vergleichen ohne Schreibweise - der Chip heisst „Garten", der Filter „garten".
+  tasks.state.filters.tags = ['garten'];
   tasks.renderFilters(container);
+  assert.equal(chips[2].getAttribute('aria-pressed'), 'true');
+
+  await tasks.onFilterSheetClick({ target: high }, container);
+  assert.deepEqual(tasks.state.filters.priority, [], 'ein zweiter Tipp nimmt den Wert wieder heraus');
+  assert.equal(high.getAttribute('aria-pressed'), 'false');
+});
+
+// Review PR #1673: Kategorie und Tag stehen im Blatt eingeklappt, solange
+// nichts gewaehlt ist. Ein gemerktes Set setzt sie bei OFFENEM Blatt - der Chip
+// wurde aktiv, seine Falte blieb zu, und ein wirkender Filter war verborgen.
+test('ein gemerktes Set klappt die Falte seiner Achse auf - derselbe Knoten, nichts klappt zu', async () => {
+  baseState();
+  const { chips, panel, container } = mountSheet();
+  const fold = (open) => ({ open });
+  const withFold = (dataset, f) => {
+    const chip = new SheetEl({ dataset });
+    chip.closest = (sel) => (sel === 'details.filter-sheet__fold' ? f : SheetEl.prototype.closest.call(chip, sel));
+    return chip;
+  };
+  const tagFold = fold(false);
+  const catFold = fold(false);
+  const tagChip = withFold({ filter: 'tag', value: 'Garten' }, tagFold);
+  const catChip = withFold({ filter: 'category', value: 'household' }, catFold);
+  chips.push(tagChip, catChip);
+  tasks.state.filterSheet = panel;
+
+  const recent = new SheetEl({ dataset: {
+    recentFilter: JSON.stringify({ status: ['open'], priority: [], assigned_to: [], category: [], tags: ['garten'] }),
+  } });
+  await tasks.onFilterSheetClick({ target: recent }, container);
+  assert.deepEqual(tasks.state.filters.tags, ['garten']);
+  assert.equal(tagChip.getAttribute('aria-pressed'), 'true');
+  assert.equal(tagFold.open, true, 'die Falte mit dem wirkenden Tag steht offen');
+  assert.equal(catFold.open, false, 'eine Achse ohne Wahl bleibt zu');
+
+  // Faellt die Wahl wieder weg, bleibt die Falte offen: zuklappen naehme dem
+  // Chip, auf dem der Fokus steht, den Boden.
+  await tasks.onFilterSheetClick({ target: tagChip }, container);
+  assert.deepEqual(tasks.state.filters.tags, []);
+  assert.equal(tagFold.open, true);
+});
+
+test('die Schalter im Blatt: „Mir zugewiesen" ist die eigene ID in der Personenachse', async () => {
+  baseState({ filters: { status: ['open'], priority: [], assigned_to: ['2'], category: [], tags: [] } });
+  const { mine, future, container } = mountSheet();
+  await tasks.onFilterSheetChange(mine, container);
+  assert.deepEqual(tasks.state.filters.assigned_to, ['2', '1'],
+    'eine schon gewaehlte zweite Person bleibt stehen (#671)');
+  assert.equal(mine.checked, true, 'der Schalter wird aus dem Zustand nachgezogen');
+
+  future.checked = true;
+  await tasks.onFilterSheetChange(future, container);
+  assert.equal(tasks.state.showFuture, true);
+  assert.equal(store.get('yuvomi:taskShowFuture'), '1', 'pro Geraet gemerkt wie vorher der Chip');
+});
+
+test('„Filter zuruecksetzen" stellt den Standard her, keinen dritten Zustand (R16)', async () => {
+  // „Alle Filter aufheben" leerte auch den Status: das zeigte Erledigtes mit,
+  // war also weder der Ruhezustand noch das, was vorher eingestellt war.
+  baseState({ showFuture: true });
+  tasks.state.filters.priority = ['high'];
+  tasks.state.filters.status = ['done'];
+  const { container } = mountSheet();
+  await tasks.resetTaskFilters(container);
+  assert.deepEqual(tasks.state.filters, { status: ['open'], priority: [], assigned_to: [], category: [], tags: [] });
+  assert.equal(tasks.state.showFuture, false);
+  assert.equal(tasks.activeFilterCount(), 0);
+});
+
+test('das Werkzeugmenue: Verwalten nur mit Schreibrecht, Auswahl nur in der Liste', () => {
+  baseState();
+  const byAction = () => Object.fromEntries(tasks.toolsMenuItems().filter((i) => i.action).map((i) => [i.action, i]));
+  assert.deepEqual(Object.keys(byAction()), ['bulk-select', 'bulk-archive', 'bulk-tag-add', 'bulk-tag-remove', 'toggle-history', 'manage-categories', 'manage-tags'],
+    'alles, was vorher als loses Icon im Kopf stand, steht beschriftet im Menue');
+  assert.equal(byAction()['bulk-select'].disabled, false);
+  // Ablegen und die Tag-Sammelaktionen passen nicht in die einzeilige Pille
+  // (D5): sie stehen im Menue, gesperrt, bis eine Auswahl sie freigibt.
+  assert.equal(byAction()['bulk-archive'].disabled, true);
+  assert.equal(byAction()['bulk-tag-add'].disabled, true);
+  assert.equal(byAction()['bulk-tag-remove'].disabled, true);
+  assert.equal(byAction()['toggle-history'].checked, false);
+
+  tasks.state.viewMode = 'kanban';
+  assert.equal(byAction()['bulk-select'].disabled, true, 'im Brett gibt es keine Mehrfachauswahl');
+  tasks.state.viewMode = 'history';
+  assert.equal(byAction()['toggle-history'].checked, true, 'der Verlauf ist ein Schalter mit Haken');
+
+  setPermissions({ admin: false, modules: { tasks: 'read' }, widgets: {}, capabilities: {} });
+  try {
+    assert.deepEqual(Object.keys(byAction()), ['toggle-history'],
+      'bei Nur-lesen bleibt nur, was zeigt (#467) - Auswahl fuehrt nur zu schreibenden Sammelaktionen');
+  } finally {
+    clearPermissions();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// `?due=today` (Re-Critique 2026-09-27, S2): „+n weitere heute" in der
+// Uebersicht zeigt auf die Aufgabenliste, und die Liste muss dann die Zeilen
+// zeigen, die dort verdeckt waren - offen und bis heute faellig, das
+// Ueberfaellige eingeschlossen. Der Filter kommt aus der Adresse, zaehlt am
+// Knopf mit, steht im Blatt als Schalter und nimmt beim Ausschalten auch die
+// Adresse wieder mit - sonst stuende er nach dem Neuladen wieder da.
+// ---------------------------------------------------------------------------
+const { todayKey: dueTodayKey, toLocalDateKey } = await import('../public/utils/date.js');
+
+function dayOffset(days) {
+  const d = new Date(`${dueTodayKey()}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return toLocalDateKey(d);
 }
 
-test('#1373: der Filterknopf scrollt nicht mit der Chip-Leiste weg, egal wie viele Filter', () => {
-  const container = mountFilterDom();
-  openWithFilters(container);
-  const bar = container.querySelector('#filter-bar');
-  const toggle = container.querySelector('#filter-toggle-btn');
-  assert.ok(toggle, 'der Knopf wird gerendert');
-  assert.ok(bar.querySelectorAll('[data-filter]').length >= 5, 'Gegenprobe: die Leiste traegt die gewaehlten Chips');
-  assert.equal(bar.contains(toggle), false,
-    'der Knopf steht nicht in der seitlich scrollenden Leiste, sonst schieben ihn die Chips hinaus');
-  assert.equal(container.querySelector('#filter-toggle-slot').contains(toggle), true,
-    'der Knopf steht in seinem festen Platz vor der Leiste');
+test('die Adresse setzt „Bis heute faellig" - nur mit genau diesem Wert', () => {
+  assert.equal(tasks.dueTodayFromSearch('?due=today'), true);
+  assert.equal(tasks.dueTodayFromSearch('?open=4&due=today'), true, 'neben anderen Parametern');
+  assert.equal(tasks.dueTodayFromSearch('?due=tomorrow'), false, 'ein unbekannter Wert filtert nicht still leer');
+  assert.equal(tasks.dueTodayFromSearch(''), false);
 });
 
-test('#1373: Escape im offenen Panel klappt es zu und gibt den Fokus an den Knopf', () => {
-  const container = mountFilterDom();
-  openWithFilters(container);
-  const panel = container.querySelector('#filter-panel');
-  assert.equal(panel.hidden, false, 'Ausgangslage: das Panel ist offen');
-  const chip = panel.querySelector('[data-filter]');
-  const ev = chip.dispatch('keydown', { key: 'Escape' });
-  assert.equal(tasks.state.filterPanelOpen, false);
-  assert.equal(panel.hidden, true, 'das Panel ist zu');
-  assert.equal(ev.defaultPrevented, true);
-  assert.equal(globalThis.document.activeElement, container.querySelector('#filter-toggle-btn'),
-    'der Fokus steht auf dem NEU gebauten Knopf');
-
-  // Andere Tasten schliessen nicht - sonst waere das Panel mit jeder Taste zu.
-  openWithFilters(container);
-  panel.querySelector('[data-filter]').dispatch('keydown', { key: 'Enter' });
-  assert.equal(tasks.state.filterPanelOpen, true);
+test('„Bis heute faellig" zeigt Offenes von heute UND Ueberfaelliges, sonst nichts', () => {
+  baseState();
+  tasks.state.searchQuery = '';
+  tasks.state.tasks = [
+    { id: 1, title: 'gestern', status: 'open', due_date: dayOffset(-1) },
+    { id: 2, title: 'heute', status: 'in_progress', due_date: dueTodayKey() },
+    { id: 3, title: 'morgen', status: 'open', due_date: dayOffset(1) },
+    { id: 4, title: 'ohne', status: 'open', due_date: null },
+    { id: 5, title: 'erledigt', status: 'done', due_date: dueTodayKey() },
+  ];
+  tasks.state.dueToday = false;
+  assert.equal(tasks.filteredTasks().length, 5, 'ohne den Filter alles');
+  tasks.state.dueToday = true;
+  assert.deepEqual(tasks.filteredTasks().map((task) => task.id), [1, 2]);
+  assert.equal(tasks.activeFilterCount(), 1, 'nur dieser zaehlt - der Standard „Offen" ist seit R16 kein Filter mehr');
+  tasks.state.searchQuery = 'gest';
+  assert.deepEqual(tasks.filteredTasks().map((task) => task.id), [1], 'die Suche engt weiter ein');
+  tasks.state.searchQuery = '';
+  tasks.state.dueToday = false;
 });
 
-test('#1373: „Fertig" am Ende des Panels klappt es zu, ohne die Filter anzufassen', () => {
-  const container = mountFilterDom();
-  openWithFilters(container);
-  const panel = container.querySelector('#filter-panel');
-  const done = panel.querySelector('#filter-panel-done');
-  assert.ok(done, 'das Panel traegt einen eigenen Schliessweg');
-  assert.equal(done.textContent, 'tasks.filterPanelDone');
-  done.click();
-  assert.equal(panel.hidden, true);
-  assert.equal(tasks.state.filterPanelOpen, false);
-  assert.deepEqual(tasks.state.filters.priority, ['high', 'urgent', 'medium'], 'die Auswahl bleibt');
+test('im Blatt ein Schalter; Ausschalten nimmt ihn aus Zustand UND Adresse, Aufheben ebenso', async () => {
+  const replaced = [];
+  const prevLocation = globalThis.location;
+  const prevHistory = globalThis.history;
+  globalThis.location = { pathname: '/tasks', search: '?due=today', hash: '' };
+  globalThis.history = {
+    state: null,
+    replaceState: (_s, _t, path) => {
+      replaced.push(path);
+      const [, search = ''] = path.split('?');
+      globalThis.location.search = search ? `?${search}` : '';
+    },
+  };
+  try {
+    baseState({ dueToday: true });
+    const show = tasks.filterSheetGroups().find((g) => g.heading === 'tasks.filterGroupShow').html;
+    assert.match(show, /type="checkbox"[^>]*checked[^>]*data-filter-due-today|data-filter-due-today[^>]*checked/,
+      'der Schalter steht an, wenn die Adresse ihn gesetzt hat');
+
+    const { container } = mountSheet();
+    const input = new SheetEl({ dataset: { filterDueToday: 'true' }, checked: false });
+    await tasks.onFilterSheetChange(input, container);
+    assert.equal(tasks.state.dueToday, false);
+    assert.deepEqual(replaced, ['/tasks'], 'die Adresse verliert ?due=today');
+
+    input.checked = true;
+    await tasks.onFilterSheetChange(input, container);
+    assert.equal(tasks.state.dueToday, true);
+    assert.equal(replaced.at(-1), '/tasks?due=today', 'und bekommt ihn beim Einschalten zurueck');
+
+    await tasks.resetTaskFilters(container);
+    assert.equal(tasks.state.dueToday, false, '„Alle Filter aufheben" nimmt ihn mit');
+    assert.equal(replaced.at(-1), '/tasks');
+    assert.equal(tasks.activeFilterCount(), 0);
+  } finally {
+    globalThis.location = prevLocation;
+    globalThis.history = prevHistory;
+  }
 });
 
-test('#1373: die Escape-Verdrahtung stapelt sich nicht mit jedem Rendern', () => {
-  const container = mountFilterDom();
-  openWithFilters(container);
-  for (let i = 0; i < 5; i++) tasks.renderFilters(container);
-  const panel = container.querySelector('#filter-panel');
-  assert.equal(panel.listeners.get('keydown').length, 1, 'ein Listener, nicht einer je Rendern');
+test('?due=today weitet den Standard-Status auf „In Bearbeitung" - einen eigenen laesst es stehen', () => {
+  baseState();
+  tasks.applyDueTodayFromAddress('?due=today');
+  assert.equal(tasks.state.dueToday, true);
+  assert.deepEqual(tasks.state.filters.status, ['open', 'in_progress'],
+    'die Heute-Liste der Uebersicht zeigt begonnene Aufgaben mit - der Link muss sie auch zeigen');
+  assert.match(tasks.taskQuery(), /status=open&status=in_progress/, 'und der Server bekommt beide');
+
+  baseState({ filters: { status: ['done'], priority: [], assigned_to: [], category: [], tags: [] } });
+  tasks.applyDueTodayFromAddress('?due=today');
+  assert.deepEqual(tasks.state.filters.status, ['done'], 'ein bewusst gesetzter Status bleibt');
+
+  baseState();
+  tasks.applyDueTodayFromAddress('');
+  assert.equal(tasks.state.dueToday, false);
+  assert.deepEqual(tasks.state.filters.status, ['open'], 'ohne die Adresse aendert sich nichts');
+  tasks.state.dueToday = false;
 });
 
-test('#1373: nach dem Waehlen eines Chips im Panel schliesst Escape es weiterhin', () => {
-  // Review zu #1385: das Rendern tauscht den fokussierten Chip aus, der Fokus
-  // fiel aufs Dokument, und Escape erreichte das Panel nie - genau in dem
-  // Zustand mit mehreren gewaehlten Filtern, um den es im Issue geht.
-  const container = mountFilterDom();
-  openWithFilters(container);
-  const panel = container.querySelector('#filter-panel');
-  const low = () => panel.querySelectorAll('[data-filter]')
-    .find((el) => el.dataset.filter === 'priority' && el.dataset.value === 'low');
-  const before = low();
-  before.focus();
-  // Was der Klick-Handler tut: Zustand aendern, neu rendern.
-  tasks.state.filters.priority.push('low');
-  tasks.renderFilters(container);
-  const after = low();
-  assert.notEqual(after, before, 'Gegenprobe: der Chip ist wirklich ein neuer Knoten');
-  assert.equal(globalThis.document.activeElement, after, 'der Fokus steht auf dem Nachfolger des Chips');
-  globalThis.document.activeElement.dispatch('keydown', { key: 'Escape' });
-  assert.equal(tasks.state.filterPanelOpen, false, 'Escape schliesst das Panel');
-});
+// Review R11: der Schalter im Blatt filterte nur die geladene Liste, die
+// Adresse weitete dazu den Status und lud nach. Derselbe Filter zeigte je
+// Einstieg andere Zeilen, und das Neuladen der vom Blatt geschriebenen Adresse
+// vergroesserte die Liste. Beide Einstiege muessen denselben Zustand UND
+// dieselbe Abfrage ergeben; Ausschalten nimmt die eigene Weitung zurueck.
+// Der Test bringt Adresse, Verlauf und Server-Stub selbst mit und raeumt ab.
+test('„Bis heute faellig": Blatt und Adresse ergeben denselben Status und dieselbe Abfrage', async () => {
+  const prevLocation = globalThis.location;
+  const prevHistory = globalThis.history;
+  const prevStub = globalThis.__apiStub;
+  const abfragen = [];
+  globalThis.location = { pathname: '/tasks', search: '', hash: '' };
+  globalThis.history = {
+    state: null,
+    replaceState: (_s, _t, path) => {
+      const [, search = ''] = path.split('?');
+      globalThis.location.search = search ? `?${search}` : '';
+    },
+  };
+  globalThis.__apiStub = { get: async (url) => { abfragen.push(url); return { data: [] }; } };
+  try {
+    // Einstieg ueber die Adresse: der Massstab.
+    baseState({ dueToday: false, dueTodayWidened: false });
+    tasks.applyDueTodayFromAddress('?due=today');
+    const perAdresse = { status: [...tasks.state.filters.status], query: tasks.taskQuery() };
 
-test('#1373: verschwindet der fokussierte Chip, geht der Fokus an den Filterknopf', () => {
-  const container = mountFilterDom();
-  openWithFilters(container);
-  const bar = container.querySelector('#filter-bar');
-  const chip = bar.querySelectorAll('[data-filter]').find((el) => el.dataset.value === 'urgent');
-  chip.focus();
-  tasks.state.filters.priority = tasks.state.filters.priority.filter((v) => v !== 'urgent');
-  tasks.renderFilters(container);
-  assert.equal(globalThis.document.activeElement, container.querySelector('#filter-toggle-btn'));
+    // Einstieg ueber das Blatt, vom selben Ausgangszustand.
+    baseState({ dueToday: false, dueTodayWidened: false });
+    const { container } = mountSheet();
+    const input = new SheetEl({ dataset: { filterDueToday: 'true' }, checked: true });
+    await tasks.onFilterSheetChange(input, container);
+    assert.equal(tasks.state.dueToday, true);
+    assert.deepEqual(tasks.state.filters.status, perAdresse.status,
+      'das Blatt weitet den Status wie die Adresse - sonst zeigt derselbe Filter andere Zeilen');
+    assert.equal(abfragen.at(-1), `/tasks${perAdresse.query}`, 'und laedt mit derselben Abfrage nach');
+
+    // Neuladen der geschriebenen Adresse aendert nichts mehr.
+    const vorReload = [...tasks.state.filters.status];
+    tasks.applyDueTodayFromAddress(globalThis.location.search);
+    assert.deepEqual(tasks.state.filters.status, vorReload, 'ein Neuladen der Adresse vergroessert die Liste nicht');
+
+    // Ausschalten nimmt die eigene Weitung zurueck und laedt wieder.
+    const vorAus = abfragen.length;
+    input.checked = false;
+    await tasks.onFilterSheetChange(input, container);
+    assert.equal(tasks.state.dueToday, false);
+    assert.deepEqual(tasks.state.filters.status, ['open'], 'zurueck auf den Standard');
+    assert.ok(abfragen.length > vorAus, 'und laedt ohne „In Bearbeitung" nach');
+    assert.equal(abfragen.at(-1), '/tasks?status=open');
+
+    // Ueber die Adresse eingeschaltet, im Blatt ausgeschaltet: ebenso zurueck.
+    baseState({ dueToday: false, dueTodayWidened: false });
+    tasks.applyDueTodayFromAddress('?due=today');
+    await tasks.onFilterSheetChange(input, container);
+    assert.deepEqual(tasks.state.filters.status, ['open']);
+
+    // Ein bewusst gesetzter Status bleibt in beide Richtungen stehen.
+    baseState({ dueToday: false, dueTodayWidened: false,
+      filters: { status: ['open', 'in_progress'], priority: [], assigned_to: [], category: [], tags: [] } });
+    input.checked = true;
+    await tasks.onFilterSheetChange(input, container);
+    input.checked = false;
+    await tasks.onFilterSheetChange(input, container);
+    assert.deepEqual(tasks.state.filters.status, ['open', 'in_progress'],
+      'eine selbst gewaehlte Auswahl ist keine Weitung des Filters');
+  } finally {
+    globalThis.location = prevLocation;
+    globalThis.history = prevHistory;
+    if (prevStub === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = prevStub;
+    tasks.state.dueToday = false;
+    tasks.state.dueTodayWidened = false;
+    tasks.state.filterSheet = null;
+  }
 });

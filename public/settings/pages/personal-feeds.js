@@ -25,6 +25,16 @@
  * haelt Zyklusdaten aus dem Betreuungs-Freigabe-System heraus (#584). Der
  * Schichtplan-Feed liegt genauso: gefeedet werden nur die eigenen aufgeloesten
  * Eintraege des Token-Besitzers, siehe server/services/schedule-ics.js.
+ *
+ * EIN FEED, EIN SCHALTER, IM BLATT SEINES MODULS (R14, A7 P2-3). Das
+ * Kalender-Blatt war 4703px lang und trug fuenf "Feed aktivieren" als
+ * Primaerknoepfe, darunter die Exporte fremder Module (Fristen = Inventar,
+ * Zyklus = Gesundheit, Schichtplan, Abholungen = Entsorgung). Jetzt rendert
+ * diese Datei EINEN Feed je Abschnitt (`props.part` in ../registry.js, als
+ * `data-part` am Traeger), und der Abschnitt steht im Blatt des Moduls, dessen
+ * Daten er exportiert. An/Aus ist ein Schalter wie in Apples Einstellungen;
+ * Adresse, Kopieren, Abonnieren und Neuer Link stehen darunter, solange er an
+ * ist. Ausschalten fragt wie vorher nach.
  */
 
 import { api } from '/api.js';
@@ -37,152 +47,231 @@ function showToast(message, tone = 'default') {
   window.yuvomi?.showToast(message, tone);
 }
 
-function renderPage(container) {
-  container.replaceChildren();
-  container.insertAdjacentHTML('beforeend', `
-    <section class="settings-section">
-      <h2 class="settings-section__title">${t('settings.feedExportTitle')}</h2>
-      <div class="settings-card">
-        <p class="settings-card-description">${t('settings.feedExportDescription')}</p>
-        <div id="feed-export-body"></div>
-      </div>
-    </section>
+/**
+ * Die fuenf Feeds, jeder mit seinen Texten. Die Schluessel stehen hier
+ * ausgeschrieben statt aus einem Praefix gebaut: die Wachen (test:settings-copy,
+ * test:frontend-audit) lesen die t()-Aufrufe im Quelltext, und eine gebaute Adresse
+ * saehen sie nicht. `path` ist die Route: GET liest, DELETE schaltet ab, POST
+ * `<path>/regenerate` erzeugt die Adresse - beim ersten Mal heisst das "an".
+ */
+export const FEEDS = Object.freeze({
+  calendar: {
+    path: '/calendar/feed',
+    text: {
+      title: () => t('settings.feedExportTitle'),
+      description: () => t('settings.feedExportDescription'),
+      urlLabel: () => t('settings.feedExportUrlLabel'),
+      hint: () => t('settings.feedExportHint'),
+      copy: () => t('settings.feedExportCopy'),
+      copied: () => t('settings.feedExportCopied'),
+      subscribe: () => t('settings.feedExportSubscribe'),
+      regenerate: () => t('settings.feedExportRegenerate'),
+    },
+    confirmDisable: () => confirmModal(t('settings.feedExportDisableConfirm'),
+      { danger: true, confirmLabel: t('settings.feedExportDisable'), detail: t('settings.feedExportDisableConfirmDetail') }),
+    confirmRegenerate: () => confirmModal(t('settings.feedExportRegenerateConfirm'),
+      { danger: true, confirmLabel: t('settings.feedExportRegenerate'), detail: t('settings.feedExportRegenerateConfirmDetail') }),
+  },
+  inventory: {
+    path: '/inventory/deadlines-feed',
+    text: {
+      title: () => t('settings.inventoryFeedTitle'),
+      description: () => t('settings.inventoryFeedDescription'),
+      urlLabel: () => t('settings.inventoryFeedUrlLabel'),
+      hint: () => t('settings.inventoryFeedHint'),
+      copy: () => t('settings.inventoryFeedCopy'),
+      copied: () => t('settings.inventoryFeedCopied'),
+      subscribe: () => t('settings.inventoryFeedSubscribe'),
+      regenerate: () => t('settings.inventoryFeedRegenerate'),
+    },
+    confirmDisable: () => confirmModal(t('settings.inventoryFeedDisableConfirm'),
+      { danger: true, confirmLabel: t('settings.inventoryFeedDisable'), detail: t('settings.inventoryFeedDisableConfirmDetail') }),
+    confirmRegenerate: () => confirmModal(t('settings.inventoryFeedRegenerateConfirm'),
+      { danger: true, confirmLabel: t('settings.inventoryFeedRegenerate'), detail: t('settings.inventoryFeedRegenerateConfirmDetail') }),
+  },
+  cycle: {
+    path: '/health/cycle/feed',
+    text: {
+      title: () => t('settings.cycleFeedTitle'),
+      description: () => t('settings.cycleFeedDescription'),
+      urlLabel: () => t('settings.cycleFeedUrlLabel'),
+      hint: () => t('settings.cycleFeedHint'),
+      copy: () => t('settings.cycleFeedCopy'),
+      copied: () => t('settings.cycleFeedCopied'),
+      subscribe: () => t('settings.cycleFeedSubscribe'),
+      regenerate: () => t('settings.cycleFeedRegenerate'),
+    },
+    confirmDisable: () => confirmModal(t('settings.cycleFeedDisableConfirm'),
+      { danger: true, confirmLabel: t('settings.cycleFeedDisable'), detail: t('settings.cycleFeedDisableConfirmDetail') }),
+    confirmRegenerate: () => confirmModal(t('settings.cycleFeedRegenerateConfirm'),
+      { danger: true, confirmLabel: t('settings.cycleFeedRegenerate'), detail: t('settings.cycleFeedRegenerateConfirmDetail') }),
+  },
+  schedule: {
+    path: '/schedule/feed',
+    text: {
+      title: () => t('settings.scheduleFeedTitle'),
+      description: () => t('settings.scheduleFeedDescription'),
+      urlLabel: () => t('settings.scheduleFeedUrlLabel'),
+      hint: () => t('settings.scheduleFeedHint'),
+      copy: () => t('settings.scheduleFeedCopy'),
+      copied: () => t('settings.scheduleFeedCopied'),
+      subscribe: () => t('settings.scheduleFeedSubscribe'),
+      regenerate: () => t('settings.scheduleFeedRegenerate'),
+    },
+    confirmDisable: () => confirmModal(t('settings.scheduleFeedDisableConfirm'),
+      { danger: true, confirmLabel: t('settings.scheduleFeedDisable'), detail: t('settings.scheduleFeedDisableConfirmDetail') }),
+    confirmRegenerate: () => confirmModal(t('settings.scheduleFeedRegenerateConfirm'),
+      { danger: true, confirmLabel: t('settings.scheduleFeedRegenerate'), detail: t('settings.scheduleFeedRegenerateConfirmDetail') }),
+  },
+  waste: {
+    path: '/waste/feed',
+    text: {
+      title: () => t('settings.wasteFeedTitle'),
+      description: () => t('settings.wasteFeedDescription'),
+      urlLabel: () => t('settings.wasteFeedUrlLabel'),
+      hint: () => t('settings.wasteFeedHint'),
+      copy: () => t('settings.wasteFeedCopy'),
+      copied: () => t('settings.wasteFeedCopied'),
+      subscribe: () => t('settings.wasteFeedSubscribe'),
+      regenerate: () => t('settings.wasteFeedRegenerate'),
+    },
+    confirmDisable: () => confirmModal(t('settings.wasteFeedDisableConfirm'),
+      { danger: true, confirmLabel: t('settings.wasteFeedDisable'), detail: t('settings.wasteFeedDisableConfirmDetail') }),
+    confirmRegenerate: () => confirmModal(t('settings.wasteFeedRegenerateConfirm'),
+      { danger: true, confirmLabel: t('settings.wasteFeedRegenerate'), detail: t('settings.wasteFeedRegenerateConfirmDetail') }),
+  },
+});
 
-    <section class="settings-section">
-      <h2 class="settings-section__title">${t('settings.inventoryFeedTitle')}</h2>
-      <div class="settings-card">
-        <p class="settings-card-description">${t('settings.inventoryFeedDescription')}</p>
-        <div id="inventory-feed-body"></div>
-      </div>
-    </section>
 
-    <section class="settings-section">
-      <h2 class="settings-section__title">${t('settings.cycleFeedTitle')}</h2>
-      <div class="settings-card">
-        <p class="settings-card-description">${t('settings.cycleFeedDescription')}</p>
-        <div id="cycle-feed-body"></div>
-      </div>
-    </section>
-    <section class="settings-section">
-      <h2 class="settings-section__title">${t('settings.scheduleFeedTitle')}</h2>
-      <div class="settings-card">
-        <p class="settings-card-description">${t('settings.scheduleFeedDescription')}</p>
-        <div id="schedule-feed-body"></div>
-      </div>
-    </section>
-
-    <section class="settings-section">
-      <h2 class="settings-section__title">${t('settings.wasteFeedTitle')}</h2>
-      <div class="settings-card">
-        <p class="settings-card-description">${t('settings.wasteFeedDescription')}</p>
-        <div id="waste-feed-body"></div>
-      </div>
-    </section>
-
-  `);
+function wasteFeedTypeRowsHtml(types, selectedIds) {
+  return types.map((type) => toggleRowHtml({
+    control: 'switch',
+    label: type.name,
+    checked: selectedIds === null || selectedIds.includes(type.id),
+    swatchColor: type.color,
+    attrs: { 'data-waste-feed-type': String(type.id) },
+  })).join('');
 }
 
-// --------------------------------------------------------------------------
-// Read-only ICS export feed
-// --------------------------------------------------------------------------
-
-function renderFeedExportInactive(body) {
-  body.replaceChildren();
-  body.insertAdjacentHTML('beforeend', `
-    <p class="settings-card-description">${t('settings.feedExportInactive')}</p>
-    <div class="settings-form-actions">
-      <button type="button" class="btn btn--primary" id="feed-activate">${t('settings.feedExportActivate')}</button>
-    </div>
-  `);
-}
-
-function renderFeedExportActive(body, data) {
-  const webcal = data.url.replace(/^https?:\/\//i, 'webcal://');
-  body.replaceChildren();
-  body.insertAdjacentHTML('beforeend', `
-    <div class="form-group">
-      <label class="form-label" for="feed-url">${t('settings.feedExportUrlLabel')}</label>
-      <input id="feed-url" class="form-input" type="text" readonly value="${esc(data.url)}">
-      <p class="form-hint">${t('settings.feedExportHint')}</p>
-    </div>
+/** Was nur ein Feed kennt: Personen im Titel (Kalender), Arten (Entsorgung). */
+function extrasHtml(part, data, types) {
+  if (part === 'calendar') {
+    return `
     <div class="form-group">
       ${toggleRowHtml({
+        control: 'switch',
         label: t('settings.feedExportShowAssignees'),
         checked: !!data.showAssignees,
         attrs: { id: 'feed-show-assignees', 'aria-describedby': 'feed-show-assignees-hint' },
       })}
       <p class="form-hint" id="feed-show-assignees-hint">${t('settings.feedExportShowAssigneesHint')}</p>
-    </div>
-    <div class="settings-form-actions">
-      <button type="button" class="btn btn--secondary" id="feed-copy">${t('settings.feedExportCopy')}</button>
-      <a class="btn btn--secondary" href="${esc(webcal)}">${t('settings.feedExportSubscribe')}</a>
-      <button type="button" class="btn btn--secondary" id="feed-regen">${t('settings.feedExportRegenerate')}</button>
-      <button type="button" class="btn btn--danger-outline" id="feed-disable">${t('settings.feedExportDisable')}</button>
+    </div>`;
+  }
+  if (part === 'waste' && types.length) {
+    return `
+    <div class="form-group">
+      <span class="form-label">${t('settings.wasteFeedTypesLabel')}</span>
+      <p class="form-hint">${t('settings.wasteFeedTypesHint')}</p>
+      <div id="waste-feed-types">${wasteFeedTypeRowsHtml(types, data.type_ids)}</div>
+    </div>`;
+  }
+  return '';
+}
+
+function renderFeed(host, part, feed, data, types) {
+  const on = Boolean(data);
+  const urlId = `${part}-feed-url`;
+  host.replaceChildren();
+  host.insertAdjacentHTML('beforeend', `
+    <div class="settings-card">
+      ${toggleRowHtml({
+        control: 'switch',
+        label: feed.text.title(),
+        checked: on,
+        attrs: { 'data-feed-switch': part, 'aria-describedby': `${part}-feed-description` },
+      })}
+      <p class="settings-card-description" id="${part}-feed-description">${feed.text.description()}</p>
+      ${on ? `
+      <div class="form-group">
+        <label class="form-label" for="${urlId}">${feed.text.urlLabel()}</label>
+        <input id="${urlId}" class="form-input" type="text" readonly value="${esc(data.url)}">
+        <p class="form-hint">${feed.text.hint()}</p>
+      </div>
+      ${extrasHtml(part, data, types)}
+      <div class="settings-form-actions">
+        <button type="button" class="btn btn--secondary" data-feed-copy>${feed.text.copy()}</button>
+        <a class="btn btn--secondary" href="${esc(data.url.replace(/^https?:\/\//i, 'webcal://'))}">${feed.text.subscribe()}</a>
+        <button type="button" class="btn btn--secondary" data-feed-regen>${feed.text.regenerate()}</button>
+      </div>` : ''}
     </div>
   `);
 }
 
-async function loadFeedExport(container) {
-  const body = container.querySelector('#feed-export-body');
-  if (!body) return;
-
-  const reload = () => loadFeedExport(container);
-
-  let res;
+async function loadFeed(host, part) {
+  const feed = FEEDS[part];
+  const reload = () => loadFeed(host, part);
+  let data;
+  let types = [];
   try {
-    res = await api.get('/calendar/feed');
+    const [res, typesRes] = await Promise.all([
+      api.get(feed.path),
+      part === 'waste' ? api.get('/waste/types') : null,
+    ]);
+    data = res?.data ?? null;
+    types = typesRes?.data ?? [];
   } catch (err) {
-    body.replaceChildren();
-    body.appendChild(createInlineError(err.message || t('common.errorGeneric')));
+    host.replaceChildren();
+    host.appendChild(createInlineError(err.message || t('common.errorGeneric')));
     return;
   }
 
-  const data = res?.data;
-  if (!data) {
-    renderFeedExportInactive(body);
-    body.querySelector('#feed-activate')?.addEventListener('click', async () => {
-      try {
-        await api.post('/calendar/feed/regenerate');
-        showToast(t('settings.feedExportTitle'), 'success');
-        await reload();
-      } catch (err) {
-        showToast(err.message || t('common.errorGeneric'), 'danger');
+  renderFeed(host, part, feed, data, types);
+
+  host.querySelector('[data-feed-switch]')?.addEventListener('change', async (e) => {
+    const input = e.currentTarget;
+    const next = input.checked;
+    // Aus heisst: der Link liefert sofort nichts mehr, und ein spaeteres An
+    // erzeugt eine neue Adresse - dieselbe Rueckfrage wie der fruehere Knopf.
+    if (!next && !await feed.confirmDisable()) {
+      input.checked = true;
+      return;
+    }
+    input.disabled = true;
+    try {
+      if (next) {
+        await api.post(`${feed.path}/regenerate`);
+        showToast(feed.text.title(), 'success');
+      } else {
+        await api.delete(feed.path);
       }
-    });
-    return;
-  }
+      await reload();
+    } catch (err) {
+      input.checked = !next;
+      input.disabled = false;
+      showToast(err.message || t('common.errorGeneric'), 'danger');
+    }
+  });
 
-  renderFeedExportActive(body, data);
+  if (!data) return;
 
-  body.querySelector('#feed-copy')?.addEventListener('click', async () => {
+  host.querySelector('[data-feed-copy]')?.addEventListener('click', async () => {
     try {
       await navigator.clipboard?.writeText(data.url);
-      showToast(t('settings.feedExportCopied'), 'success');
+      showToast(feed.text.copied(), 'success');
     } catch (err) {
       showToast(err.message || t('common.errorGeneric'), 'danger');
     }
   });
-  body.querySelector('#feed-regen')?.addEventListener('click', async () => {
-    if (!await confirmModal(t('settings.feedExportRegenerateConfirm'),
-      { danger: true, detail: t('settings.feedExportRegenerateConfirmDetail') })) return;
+  host.querySelector('[data-feed-regen]')?.addEventListener('click', async () => {
+    if (!await feed.confirmRegenerate()) return;
     try {
-      await api.post('/calendar/feed/regenerate');
+      await api.post(`${feed.path}/regenerate`);
       await reload();
     } catch (err) {
       showToast(err.message || t('common.errorGeneric'), 'danger');
     }
   });
-  body.querySelector('#feed-disable')?.addEventListener('click', async () => {
-    if (!await confirmModal(t('settings.feedExportDisableConfirm'),
-      { danger: true, detail: t('settings.feedExportDisableConfirmDetail') })) return;
-    try {
-      await api.delete('/calendar/feed');
-      await reload();
-    } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    }
-  });
-  body.querySelector('#feed-show-assignees')?.addEventListener('change', async (e) => {
+  host.querySelector('#feed-show-assignees')?.addEventListener('change', async (e) => {
     const input = e.currentTarget;
     const next = input.checked;
     input.disabled = true;
@@ -196,411 +285,14 @@ async function loadFeedExport(container) {
       input.disabled = false;
     }
   });
-}
-
-// --------------------------------------------------------------------------
-// Read-only ICS export feed - inventory warranty deadlines
-// --------------------------------------------------------------------------
-
-function renderInventoryFeedInactive(body) {
-  body.replaceChildren();
-  body.insertAdjacentHTML('beforeend', `
-    <p class="settings-card-description">${t('settings.inventoryFeedInactive')}</p>
-    <div class="settings-form-actions">
-      <button type="button" class="btn btn--primary" id="inventory-feed-activate">${t('settings.inventoryFeedActivate')}</button>
-    </div>
-  `);
-}
-
-function renderInventoryFeedActive(body, data) {
-  const webcal = data.url.replace(/^https?:\/\//i, 'webcal://');
-  body.replaceChildren();
-  body.insertAdjacentHTML('beforeend', `
-    <div class="form-group">
-      <label class="form-label" for="inventory-feed-url">${t('settings.inventoryFeedUrlLabel')}</label>
-      <input id="inventory-feed-url" class="form-input" type="text" readonly value="${esc(data.url)}">
-      <p class="form-hint">${t('settings.inventoryFeedHint')}</p>
-    </div>
-    <div class="settings-form-actions">
-      <button type="button" class="btn btn--secondary" id="inventory-feed-copy">${t('settings.inventoryFeedCopy')}</button>
-      <a class="btn btn--secondary" href="${esc(webcal)}">${t('settings.inventoryFeedSubscribe')}</a>
-      <button type="button" class="btn btn--secondary" id="inventory-feed-regen">${t('settings.inventoryFeedRegenerate')}</button>
-      <button type="button" class="btn btn--danger-outline" id="inventory-feed-disable">${t('settings.inventoryFeedDisable')}</button>
-    </div>
-  `);
-}
-
-async function loadInventoryFeed(container) {
-  const body = container.querySelector('#inventory-feed-body');
-  if (!body) return;
-
-  const reload = () => loadInventoryFeed(container);
-
-  let res;
-  try {
-    res = await api.get('/inventory/deadlines-feed');
-  } catch (err) {
-    body.replaceChildren();
-    body.appendChild(createInlineError(err.message || t('common.errorGeneric')));
-    return;
-  }
-
-  const data = res?.data;
-  if (!data) {
-    renderInventoryFeedInactive(body);
-    body.querySelector('#inventory-feed-activate')?.addEventListener('click', async () => {
-      try {
-        await api.post('/inventory/deadlines-feed/regenerate');
-        showToast(t('settings.inventoryFeedTitle'), 'success');
-        await reload();
-      } catch (err) {
-        showToast(err.message || t('common.errorGeneric'), 'danger');
-      }
-    });
-    return;
-  }
-
-  renderInventoryFeedActive(body, data);
-
-  body.querySelector('#inventory-feed-copy')?.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard?.writeText(data.url);
-      showToast(t('settings.inventoryFeedCopied'), 'success');
-    } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    }
-  });
-  body.querySelector('#inventory-feed-regen')?.addEventListener('click', async () => {
-    if (!await confirmModal(t('settings.inventoryFeedRegenerateConfirm'),
-      { danger: true, detail: t('settings.inventoryFeedRegenerateConfirmDetail') })) return;
-    try {
-      await api.post('/inventory/deadlines-feed/regenerate');
-      await reload();
-    } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    }
-  });
-  body.querySelector('#inventory-feed-disable')?.addEventListener('click', async () => {
-    if (!await confirmModal(t('settings.inventoryFeedDisableConfirm'),
-      { danger: true, detail: t('settings.inventoryFeedDisableConfirmDetail') })) return;
-    try {
-      await api.delete('/inventory/deadlines-feed');
-      await reload();
-    } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    }
-  });
-}
-
-// --------------------------------------------------------------------------
-// Read-only ICS export feed - predicted cycle (Phase 5)
-// --------------------------------------------------------------------------
-
-function renderCycleFeedInactive(body) {
-  body.replaceChildren();
-  body.insertAdjacentHTML('beforeend', `
-    <p class="settings-card-description">${t('settings.cycleFeedInactive')}</p>
-    <div class="settings-form-actions">
-      <button type="button" class="btn btn--primary" id="cycle-feed-activate">${t('settings.cycleFeedActivate')}</button>
-    </div>
-  `);
-}
-
-function renderCycleFeedActive(body, data) {
-  const webcal = data.url.replace(/^https?:\/\//i, 'webcal://');
-  body.replaceChildren();
-  body.insertAdjacentHTML('beforeend', `
-    <div class="form-group">
-      <label class="form-label" for="cycle-feed-url">${t('settings.cycleFeedUrlLabel')}</label>
-      <input id="cycle-feed-url" class="form-input" type="text" readonly value="${esc(data.url)}">
-      <p class="form-hint">${t('settings.cycleFeedHint')}</p>
-    </div>
-    <div class="settings-form-actions">
-      <button type="button" class="btn btn--secondary" id="cycle-feed-copy">${t('settings.cycleFeedCopy')}</button>
-      <a class="btn btn--secondary" href="${esc(webcal)}">${t('settings.cycleFeedSubscribe')}</a>
-      <button type="button" class="btn btn--secondary" id="cycle-feed-regen">${t('settings.cycleFeedRegenerate')}</button>
-      <button type="button" class="btn btn--danger-outline" id="cycle-feed-disable">${t('settings.cycleFeedDisable')}</button>
-    </div>
-  `);
-}
-
-async function loadCycleFeed(container) {
-  const body = container.querySelector('#cycle-feed-body');
-  if (!body) return;
-
-  const reload = () => loadCycleFeed(container);
-
-  let res;
-  try {
-    res = await api.get('/health/cycle/feed');
-  } catch (err) {
-    body.replaceChildren();
-    body.appendChild(createInlineError(err.message || t('common.errorGeneric')));
-    return;
-  }
-
-  const data = res?.data;
-  if (!data) {
-    renderCycleFeedInactive(body);
-    body.querySelector('#cycle-feed-activate')?.addEventListener('click', async () => {
-      try {
-        await api.post('/health/cycle/feed/regenerate');
-        showToast(t('settings.cycleFeedTitle'), 'success');
-        await reload();
-      } catch (err) {
-        showToast(err.message || t('common.errorGeneric'), 'danger');
-      }
-    });
-    return;
-  }
-
-  renderCycleFeedActive(body, data);
-
-  body.querySelector('#cycle-feed-copy')?.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard?.writeText(data.url);
-      showToast(t('settings.cycleFeedCopied'), 'success');
-    } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    }
-  });
-  body.querySelector('#cycle-feed-regen')?.addEventListener('click', async () => {
-    if (!await confirmModal(t('settings.cycleFeedRegenerateConfirm'),
-      { danger: true, detail: t('settings.cycleFeedRegenerateConfirmDetail') })) return;
-    try {
-      await api.post('/health/cycle/feed/regenerate');
-      await reload();
-    } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    }
-  });
-  body.querySelector('#cycle-feed-disable')?.addEventListener('click', async () => {
-    if (!await confirmModal(t('settings.cycleFeedDisableConfirm'),
-      { danger: true, detail: t('settings.cycleFeedDisableConfirmDetail') })) return;
-    try {
-      await api.delete('/health/cycle/feed');
-      await reload();
-    } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    }
-  });
-}
-
-// --------------------------------------------------------------------------
-// Read-only ICS export feed - own schedule
-// --------------------------------------------------------------------------
-
-function renderScheduleFeedInactive(body) {
-  body.replaceChildren();
-  body.insertAdjacentHTML('beforeend', `
-    <p class="settings-card-description">${t('settings.scheduleFeedInactive')}</p>
-    <div class="settings-form-actions">
-      <button type="button" class="btn btn--primary" id="schedule-feed-activate">${t('settings.scheduleFeedActivate')}</button>
-    </div>
-  `);
-}
-
-function renderScheduleFeedActive(body, data) {
-  const webcal = data.url.replace(/^https?:\/\//i, 'webcal://');
-  body.replaceChildren();
-  body.insertAdjacentHTML('beforeend', `
-    <div class="form-group">
-      <label class="form-label" for="schedule-feed-url">${t('settings.scheduleFeedUrlLabel')}</label>
-      <input id="schedule-feed-url" class="form-input" type="text" readonly value="${esc(data.url)}">
-      <p class="form-hint">${t('settings.scheduleFeedHint')}</p>
-    </div>
-    <div class="settings-form-actions">
-      <button type="button" class="btn btn--secondary" id="schedule-feed-copy">${t('settings.scheduleFeedCopy')}</button>
-      <a class="btn btn--secondary" href="${esc(webcal)}">${t('settings.scheduleFeedSubscribe')}</a>
-      <button type="button" class="btn btn--secondary" id="schedule-feed-regen">${t('settings.scheduleFeedRegenerate')}</button>
-      <button type="button" class="btn btn--danger-outline" id="schedule-feed-disable">${t('settings.scheduleFeedDisable')}</button>
-    </div>
-  `);
-}
-
-async function loadScheduleFeed(container) {
-  const body = container.querySelector('#schedule-feed-body');
-  if (!body) return;
-
-  const reload = () => loadScheduleFeed(container);
-
-  let res;
-  try {
-    res = await api.get('/schedule/feed');
-  } catch (err) {
-    body.replaceChildren();
-    body.appendChild(createInlineError(err.message || t('common.errorGeneric')));
-    return;
-  }
-
-  const data = res?.data;
-  if (!data) {
-    renderScheduleFeedInactive(body);
-    body.querySelector('#schedule-feed-activate')?.addEventListener('click', async () => {
-      try {
-        await api.post('/schedule/feed/regenerate');
-        showToast(t('settings.scheduleFeedTitle'), 'success');
-        await reload();
-      } catch (err) {
-        showToast(err.message || t('common.errorGeneric'), 'danger');
-      }
-    });
-    return;
-  }
-
-  renderScheduleFeedActive(body, data);
-
-  body.querySelector('#schedule-feed-copy')?.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard?.writeText(data.url);
-      showToast(t('settings.scheduleFeedCopied'), 'success');
-    } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    }
-  });
-  body.querySelector('#schedule-feed-regen')?.addEventListener('click', async () => {
-    if (!await confirmModal(t('settings.scheduleFeedRegenerateConfirm'),
-      { danger: true, confirmLabel: t('settings.scheduleFeedRegenerate'), detail: t('settings.scheduleFeedRegenerateConfirmDetail') })) return;
-    try {
-      await api.post('/schedule/feed/regenerate');
-      await reload();
-    } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    }
-  });
-  body.querySelector('#schedule-feed-disable')?.addEventListener('click', async () => {
-    if (!await confirmModal(t('settings.scheduleFeedDisableConfirm'),
-      { danger: true, confirmLabel: t('settings.scheduleFeedDisable'), detail: t('settings.scheduleFeedDisableConfirmDetail') })) return;
-    try {
-      await api.delete('/schedule/feed');
-      await reload();
-    } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    }
-  });
-}
-
-// --------------------------------------------------------------------------
-// Read-only ICS export feed - waste pickups, with an optional per-type
-// selection (#1063 Phase 10). Content is household-wide like the inventory
-// feed above (no owner/visibility column on waste data) - only the token and
-// the type selection are personal, see server/services/waste-ics.js.
-// --------------------------------------------------------------------------
-
-function renderWasteFeedInactive(body) {
-  body.replaceChildren();
-  body.insertAdjacentHTML('beforeend', `
-    <p class="settings-card-description">${t('settings.wasteFeedInactive')}</p>
-    <div class="settings-form-actions">
-      <button type="button" class="btn btn--primary" id="waste-feed-activate">${t('settings.wasteFeedActivate')}</button>
-    </div>
-  `);
-}
-
-function wasteFeedTypeRowsHtml(types, selectedIds) {
-  return types.map((type) => toggleRowHtml({
-    label: type.name,
-    checked: selectedIds === null || selectedIds.includes(type.id),
-    swatchColor: type.color,
-    attrs: { 'data-waste-feed-type': String(type.id) },
-  })).join('');
-}
-
-function renderWasteFeedActive(body, data, types) {
-  const webcal = data.url.replace(/^https?:\/\//i, 'webcal://');
-  body.replaceChildren();
-  body.insertAdjacentHTML('beforeend', `
-    <div class="form-group">
-      <label class="form-label" for="waste-feed-url">${t('settings.wasteFeedUrlLabel')}</label>
-      <input id="waste-feed-url" class="form-input" type="text" readonly value="${esc(data.url)}">
-      <p class="form-hint">${t('settings.wasteFeedHint')}</p>
-    </div>
-    ${types.length ? `
-      <div class="form-group">
-        <span class="form-label">${t('settings.wasteFeedTypesLabel')}</span>
-        <p class="form-hint">${t('settings.wasteFeedTypesHint')}</p>
-        <div id="waste-feed-types">${wasteFeedTypeRowsHtml(types, data.type_ids)}</div>
-      </div>
-    ` : ''}
-    <div class="settings-form-actions">
-      <button type="button" class="btn btn--secondary" id="waste-feed-copy">${t('settings.wasteFeedCopy')}</button>
-      <a class="btn btn--secondary" href="${esc(webcal)}">${t('settings.wasteFeedSubscribe')}</a>
-      <button type="button" class="btn btn--secondary" id="waste-feed-regen">${t('settings.wasteFeedRegenerate')}</button>
-      <button type="button" class="btn btn--danger-outline" id="waste-feed-disable">${t('settings.wasteFeedDisable')}</button>
-    </div>
-  `);
-}
-
-async function loadWasteFeed(container) {
-  const body = container.querySelector('#waste-feed-body');
-  if (!body) return;
-
-  const reload = () => loadWasteFeed(container);
-
-  let res;
-  let typesRes;
-  try {
-    [res, typesRes] = await Promise.all([api.get('/waste/feed'), api.get('/waste/types')]);
-  } catch (err) {
-    body.replaceChildren();
-    body.appendChild(createInlineError(err.message || t('common.errorGeneric')));
-    return;
-  }
-
-  const data = res?.data;
-  const types = typesRes?.data ?? [];
-  if (!data) {
-    renderWasteFeedInactive(body);
-    body.querySelector('#waste-feed-activate')?.addEventListener('click', async () => {
-      try {
-        await api.post('/waste/feed/regenerate');
-        showToast(t('settings.wasteFeedTitle'), 'success');
-        await reload();
-      } catch (err) {
-        showToast(err.message || t('common.errorGeneric'), 'danger');
-      }
-    });
-    return;
-  }
-
-  renderWasteFeedActive(body, data, types);
-
-  body.querySelector('#waste-feed-copy')?.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard?.writeText(data.url);
-      showToast(t('settings.wasteFeedCopied'), 'success');
-    } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    }
-  });
-  body.querySelector('#waste-feed-regen')?.addEventListener('click', async () => {
-    if (!await confirmModal(t('settings.wasteFeedRegenerateConfirm'),
-      { danger: true, detail: t('settings.wasteFeedRegenerateConfirmDetail') })) return;
-    try {
-      await api.post('/waste/feed/regenerate');
-      await reload();
-    } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    }
-  });
-  body.querySelector('#waste-feed-disable')?.addEventListener('click', async () => {
-    if (!await confirmModal(t('settings.wasteFeedDisableConfirm'),
-      { danger: true, detail: t('settings.wasteFeedDisableConfirmDetail') })) return;
-    try {
-      await api.delete('/waste/feed');
-      await reload();
-    } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    }
-  });
   // Leeres Ergebnis (alle abgewaehlt) oder alle angehakt heisst wieder "kein
   // Filter" - derselbe "leeres Set = alle"-Vertrag wie ueberall sonst in
   // dieser Codebase (state.people in calendar.js), server-seitig als null
   // statt eines leeren Arrays gespeichert (siehe waste-ics.js).
-  body.querySelector('#waste-feed-types')?.addEventListener('change', async (e) => {
+  host.querySelector('#waste-feed-types')?.addEventListener('change', async (e) => {
     const input = e.target;
     if (!(input instanceof HTMLInputElement) || !input.dataset.wasteFeedType) return;
-    const checked = [...body.querySelectorAll('[data-waste-feed-type]')]
+    const checked = [...host.querySelectorAll('[data-waste-feed-type]')]
       .filter((el) => el.checked)
       .map((el) => Number(el.dataset.wasteFeedType));
     const typeIds = (checked.length === 0 || checked.length === types.length) ? null : checked;
@@ -621,12 +313,10 @@ async function loadWasteFeed(container) {
 // Entry point
 // --------------------------------------------------------------------------
 
+/** Ein Abschnitt, ein Feed: welcher, sagt `data-part` (registry.js `props.part`). */
 export async function render(container) {
-  renderPage(container);
-  await loadFeedExport(container);
-  await loadInventoryFeed(container);
-  await loadCycleFeed(container);
-  await loadScheduleFeed(container);
-  await loadWasteFeed(container);
+  const part = FEEDS[container.dataset?.part] ? container.dataset.part : 'calendar';
+  container.replaceChildren();
+  await loadFeed(container, part);
   window.lucide?.createIcons({ el: container });
 }

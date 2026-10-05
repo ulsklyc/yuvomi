@@ -28,11 +28,21 @@ function makeDb() {
       subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, resource_type TEXT NOT NULL,
       resource_key TEXT NOT NULL, access TEXT NOT NULL,
       PRIMARY KEY (subject_type, subject_id, resource_type, resource_key));
+    -- Die Sichtbarkeitsspalten und Zuweisungstabellen, an denen die Zustellung
+    -- seit services/reminder-targets.js haengt - mit den Vorgaben des echten
+    -- Schemas, damit eine Zeile ohne Angabe wie in Produktion fuer alle da ist.
     CREATE TABLE tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
-      created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE);
-    CREATE TABLE calendar_events (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL);
+      created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      visibility TEXT NOT NULL DEFAULT 'all');
+    CREATE TABLE task_assignments (task_id INTEGER NOT NULL, user_id INTEGER NOT NULL);
+    CREATE TABLE calendar_events (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
+      created_by INTEGER, visibility TEXT NOT NULL DEFAULT 'all',
+      external_source TEXT NOT NULL DEFAULT 'local', subscription_id INTEGER);
+    CREATE TABLE event_assignments (event_id INTEGER NOT NULL, user_id INTEGER NOT NULL);
+    CREATE TABLE ics_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, shared INTEGER NOT NULL DEFAULT 0, created_by INTEGER);
     CREATE TABLE budget_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
-      amount REAL, currency TEXT, next_payment_date TEXT);
+      amount REAL, currency TEXT, next_payment_date TEXT,
+      owner_id INTEGER, visibility TEXT NOT NULL DEFAULT 'shared');
     CREATE TABLE inventory_items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
       purchase_date TEXT, warranty_months INTEGER);
     CREATE TABLE inventory_item_dates (id INTEGER PRIMARY KEY AUTOINCREMENT, item_id INTEGER NOT NULL,
@@ -40,8 +50,11 @@ function makeDb() {
     CREATE TABLE pantry_items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
       quantity REAL NOT NULL DEFAULT 1, expires_on TEXT, created_by INTEGER REFERENCES users(id) ON DELETE SET NULL);
     -- Minimal, nur genug fuer den 'document_expiry'-Zweig in processDueNotifications().
+    -- Sichtbarkeit und Freigaben wie im echten Schema: die Zustellung fragt
+    -- seit services/reminder-targets.js, ob ein Dokument fuer alle da ist.
     CREATE TABLE family_documents (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
-      expires_at TEXT);
+      expires_at TEXT, created_by INTEGER, visibility TEXT NOT NULL DEFAULT 'family');
+    CREATE TABLE family_document_access (document_id INTEGER NOT NULL, user_id INTEGER NOT NULL);
     -- Minimal, nur genug fuer den 'health_prevention_due'-Zweig in
     -- processDueNotifications() UND fuer syncAllPreventionReminders() -
     -- ohne diese zwei Tabellen scheitert schon die Sync-Abfrage mit "no such

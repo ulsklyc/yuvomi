@@ -6,6 +6,7 @@ import {
   t,
 } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { AVATAR_COLORS } from '/utils/color.js';
 import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
@@ -69,11 +70,6 @@ function appendCapabilityState(text, state) {
   return state ? `${text} · ${state}` : text;
 }
 
-function initials(name) {
-  if (!name) return '?';
-  return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-}
-
 function familyRoleLabel(role) {
   return t(`settings.familyRole${String(role || 'other').replace(/(^|_)([a-z])/g, (_, __, c) => c.toUpperCase())}`);
 }
@@ -98,7 +94,7 @@ function clearError(element) {
 
 function avatarHtml(user, className = 'settings-avatar') {
   const safeName = esc(user?.display_name || '');
-  const fallback = esc(initials(user?.display_name || ''));
+  const fallback = esc(initials(user?.display_name, '?'));
   const background = esc(user?.avatar_color) || 'var(--color-accent)';
   // Die Farbe waehlt das Mitglied selbst; auf hellen Toenen lagen die weissen
   // Initialen bei 3,5:1 und 2,8:1 (Critique 2026-07-27).
@@ -116,7 +112,8 @@ function avatarEditorHtml(user, prefix) {
       <button type="button" class="settings-avatar-button" id="${prefix}-avatar-preview" aria-label="${t('settings.profilePictureLabel')}">
         ${avatarHtml(user, 'settings-avatar settings-avatar--lg')}
       </button>
-      <input class="sr-only" type="file" id="${prefix}-avatar-file" accept="image/png,image/jpeg,image/webp" />
+      <input class="sr-only" type="file" id="${prefix}-avatar-file" accept="image/png,image/jpeg,image/webp"
+        aria-label="${t('settings.profilePictureLabel')}" tabindex="-1" />
       <div class="settings-avatar-actions">
         <button type="button" class="settings-avatar-action" id="${prefix}-avatar-edit" aria-label="${t('settings.profilePictureLabel')}" title="${t('settings.profilePictureLabel')}">
           <i data-lucide="edit-2" aria-hidden="true"></i>
@@ -161,7 +158,7 @@ function memberHtml(u, currentUserId) {
   // erst bei Hover/Fokus laut. Der eigene Account bekommt keine Lösch-Aktion
   // in der Mitgliederliste (Audit A2-25d).
   const deleteBtn = u.id === currentUserId ? '' : `
-      <button class="row-action row-action--danger" data-delete-user="${u.id}" data-name="${esc(u.display_name)}" aria-label="${esc(u.display_name)} ${t('settings.deleteMemberLabel')}" title="${t('settings.deleteMemberLabel')}">
+      <button class="row-action row-action--danger" data-delete-user="${u.id}" data-name="${esc(u.display_name)}" aria-label="${esc(t('common.deleteNamed', { name: u.display_name }))}" title="${t('settings.deleteMemberLabel')}">
         <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
       </button>`;
   return `
@@ -172,37 +169,23 @@ function memberHtml(u, currentUserId) {
         <span class="settings-member__meta">@${esc(u.username)} · ${esc(familyRole)}${systemRole}</span>
         ${profileMeta ? `<span class="settings-member__meta">${profileMeta}</span>` : ''}
       </div>
-      <button class="row-action" data-edit-user="${u.id}" aria-label="${esc(u.display_name)} ${t('settings.editMemberLabel')}" title="${t('settings.editMemberLabel')}">
+      <button class="row-action" data-edit-user="${u.id}" aria-label="${esc(t('common.editNamed', { name: u.display_name }))}" title="${t('settings.editMemberLabel')}">
         <i data-lucide="edit-2" class="icon-md" aria-hidden="true"></i>
       </button>${deleteBtn}
     </li>
   `;
 }
 
-function renderPage(container) {
-  container.replaceChildren();
-  container.insertAdjacentHTML('beforeend', `
-    <section class="settings-section">
-      <h2 class="settings-section__title">${t('settings.sectionFamily')}</h2>
-      <div class="settings-card" id="members-card">
-        <ul class="settings-members" id="members-list"></ul>
-        <button class="btn btn--primary settings-add-btn" id="add-member-btn" hidden>${t('settings.addMember')}</button>
-      </div>
-
-      <div class="settings-card" id="two-factor-household-card">
-        <h3 class="settings-card__title">${t('settings.twoFactorTitle')}</h3>
-        <p class="form-hint">${t('settings.twoFactorHouseholdHint')}</p>
-        ${toggleRowHtml({
-          label: t('settings.twoFactorRequireLabel'),
-          attrs: { id: 'two-factor-require' },
-          disabled: true,
-        })}
-        <ul class="settings-2fa__members" id="two-factor-members"></ul>
-        <div id="two-factor-household-error" class="form-error" role="alert" hidden></div>
-      </div>
-
-      <div class="settings-card settings-card--hidden" id="add-member-form-card">
-        <h3 class="settings-card__title">${t('settings.newMemberTitle')}</h3>
+/* FAMILIE SPRICHT DEN KANON (R14, A7 P2-4). "Mitglied hinzufuegen" und
+ * "Einladung erstellen" oeffneten 850px Inline-Formular unter der Liste, mit
+ * [Erstellen][Abbrechen] - die einzige Stelle der App mit der Primaeraktion
+ * links. Jetzt ist es ein Blatt-Dialog wie jedes Anlegen, Fuss
+ * [Abbrechen][Primaer] (`.modal-panel__footer`, von mountFooter an den
+ * Blattrand gehoben), und der Fokus kehrt beim Schliessen von selbst zum
+ * Knopf zurueck (modal.js). Der Knopf selbst ist kein violetter Balken ueber
+ * die volle Breite mehr, sondern ein ruhiger Knopf unter der Liste. */
+function addMemberFormHtml() {
+  return `
         <form id="add-member-form" class="settings-form">
           <div class="form-group">
             <label class="form-label" for="new-username">${t('settings.usernameLabel')}</label>
@@ -220,6 +203,7 @@ function renderPage(container) {
           </div>
           ${ssoAvailable ? `
           ${toggleRowHtml({
+            control: 'switch',
             label: t('settings.memberSsoOnlyLabel'),
             attrs: { id: 'new-member-sso-only' },
           })}
@@ -251,27 +235,21 @@ function renderPage(container) {
             <p class="form-hint">${t('settings.memberContactBirthdayHint')}</p>
           </div>
           ${toggleRowHtml({
+            control: 'switch',
             label: t('settings.systemAdminLabel'),
             attrs: { id: 'new-system-admin' },
           })}
           <p class="form-hint">${t('settings.systemAdminHint')}</p>
           <div id="member-error" class="form-error" role="alert" hidden></div>
-          <div class="settings-form-actions">
-            <button type="submit" class="btn btn--primary">${t('settings.createMember')}</button>
+          <div class="modal-panel__footer modal-panel__footer--plain">
             <button type="button" class="btn btn--secondary" id="cancel-add-member">${t('settings.cancelAddMember')}</button>
+            <button type="submit" class="btn btn--primary">${t('settings.createMember')}</button>
           </div>
-        </form>
-      </div>
+        </form>`;
+}
 
-      <div class="settings-card" id="invites-card">
-        <h3 class="settings-card__title">${t('settings.invites.title')}</h3>
-        <p class="form-hint">${t('settings.invites.intro')}</p>
-        <ul class="settings-members" id="invites-list"></ul>
-        <button class="btn btn--primary settings-add-btn" id="add-invite-btn" hidden>${t('settings.invites.add')}</button>
-      </div>
-
-      <div class="settings-card settings-card--hidden" id="add-invite-form-card">
-        <h3 class="settings-card__title">${t('settings.invites.submit')}</h3>
+function addInviteFormHtml() {
+  return `
         <form id="add-invite-form" class="settings-form">
           <div class="form-group">
             <label class="form-label" for="invite-username">${t('settings.usernameLabel')}</label>
@@ -301,19 +279,17 @@ function renderPage(container) {
             <input class="form-input" type="email" id="invite-email" autocomplete="email" />
           </div>
           ${toggleRowHtml({
+            control: 'switch',
             label: t('settings.invites.sendEmail'),
             attrs: { id: 'invite-send-email' },
           })}
           ${toggleRowHtml({
+            control: 'switch',
             label: t('settings.systemAdminLabel'),
             attrs: { id: 'invite-system-admin' },
           })}
           <p class="form-hint">${t('settings.systemAdminHint')}</p>
           <div id="invite-error" class="form-error" role="alert" hidden></div>
-          <div class="settings-form-actions">
-            <button type="submit" class="btn btn--primary">${t('settings.invites.submit')}</button>
-            <button type="button" class="btn btn--secondary" id="cancel-add-invite">${t('settings.cancelAddMember')}</button>
-          </div>
         </form>
         <div id="invite-link-output" class="settings-token-output" hidden>
           <label class="form-label" for="invite-link-value">${t('settings.invites.linkTitle')}</label>
@@ -327,9 +303,64 @@ function renderPage(container) {
           <p class="form-hint">${t('settings.invites.linkOnce')}</p>
           <p class="form-hint" id="invite-email-note" hidden></p>
         </div>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" id="cancel-add-invite">${t('settings.cancelAddMember')}</button>
+          <button type="submit" class="btn btn--primary" form="add-invite-form">${t('settings.invites.submit')}</button>
+        </div>`;
+}
+
+function renderPage(container) {
+  container.replaceChildren();
+  container.insertAdjacentHTML('beforeend', `
+    <section class="settings-section">
+      <h2 class="settings-section__title">${t('settings.sectionFamily')}</h2>
+      <div class="settings-card" id="members-card">
+        <ul class="settings-members row-divided" id="members-list"></ul>
+        <button class="btn btn--secondary settings-add-btn" id="add-member-btn" hidden>${t('settings.addMember')}</button>
       </div>
+
+      <div class="settings-card" id="two-factor-household-card">
+        <h3 class="settings-card__title">${t('settings.twoFactorTitle')}</h3>
+        <p class="form-hint">${t('settings.twoFactorHouseholdHint')}</p>
+        ${toggleRowHtml({
+          control: 'switch',
+          label: t('settings.twoFactorRequireLabel'),
+          attrs: { id: 'two-factor-require' },
+          disabled: true,
+        })}
+        <ul class="settings-2fa__members" id="two-factor-members"></ul>
+        <div id="two-factor-household-error" class="form-error" role="alert" hidden></div>
+      </div>
+
+      <div class="settings-card" id="invites-card">
+        <h3 class="settings-card__title">${t('settings.invites.title')}</h3>
+        <p class="form-hint">${t('settings.invites.intro')}</p>
+        <ul class="settings-members row-divided" id="invites-list"></ul>
+        <button class="btn btn--secondary settings-add-btn" id="add-invite-btn" hidden>${t('settings.invites.add')}</button>
+      </div>
+
     </section>
   `);
+}
+
+/**
+ * Leerzustand oder Fehlerkarte einer der beiden `<ul>` (Mitglieder,
+ * Einladungen). Eine Liste traegt nur `<li>`: ein `<p>` oder `<div>` direkt
+ * darin ist ungueltiges Markup, und Screenreader zaehlen die Liste falsch
+ * (axe `list`, a11y-Runde). Ein Text wird zum Hinweis, ein Knoten kommt so,
+ * wie er ist, in die Zeile.
+ * @param {string|Node} content
+ * @returns {HTMLLIElement}
+ */
+function listNotice(content) {
+  const item = document.createElement('li');
+  if (typeof content === 'string') {
+    item.className = 'form-hint';
+    item.textContent = content;
+  } else {
+    item.appendChild(content);
+  }
+  return item;
 }
 
 function renderMemberList(container, users, currentUserId) {
@@ -337,10 +368,7 @@ function renderMemberList(container, users, currentUserId) {
   if (!list) return;
   list.replaceChildren();
   if (!users.length) {
-    const empty = document.createElement('p');
-    empty.className = 'form-hint';
-    empty.textContent = t('settings.familyEmpty');
-    list.appendChild(empty);
+    list.appendChild(listNotice(t('settings.familyEmpty')));
   } else {
     list.insertAdjacentHTML('beforeend', users.map((u) => memberHtml(u, currentUserId)).join(''));
   }
@@ -377,10 +405,7 @@ function renderInviteList(container, invites) {
   if (!list) return;
   list.replaceChildren();
   if (!invites.length) {
-    const empty = document.createElement('p');
-    empty.className = 'form-hint';
-    empty.textContent = t('settings.invites.empty');
-    list.appendChild(empty);
+    list.appendChild(listNotice(t('settings.invites.empty')));
   } else {
     list.insertAdjacentHTML('beforeend', invites.map(inviteHtml).join(''));
   }
@@ -410,142 +435,140 @@ async function copyInviteLink(input) {
 }
 
 function bindInviteEvents(container, initialInvites) {
-  const card = container.querySelector('#add-invite-form-card');
-  const form = container.querySelector('#add-invite-form');
   const list = container.querySelector('#invites-list');
   const addBtn = container.querySelector('#add-invite-btn');
-  if (!card || !form || !list || !addBtn) return;
+  if (!list || !addBtn) return;
 
   let invites = [...initialInvites];
-  const output = container.querySelector('#invite-link-output');
-  const outputValue = container.querySelector('#invite-link-value');
-  const emailNote = container.querySelector('#invite-email-note');
-  const errorEl = container.querySelector('#invite-error');
-
-  // Startrechte (#869): das Feld waehlt eine Vorlage, der Hinweis darunter sagt,
-  // was sie im MOMENT bedeutet. Ohne ihn waere "wie das Rollenprofil" eine
-  // Angabe ueber etwas, das man nur auf einem anderen Blatt nachsehen kann -
-  // und genau das Nachsehen unterbleibt beim Einladen.
-  const presetSelect = container.querySelector('#invite-permission-preset');
-  const roleSelect = container.querySelector('#invite-family-role');
-  const presetHint = container.querySelector('#invite-preset-hint');
-  // Ein Rollenprofil aendert sich waehrend eines Formularaufrufs nicht, und
-  // jeder Wechsel zwischen zwei Rollen wuerde es sonst erneut holen.
-  const roleProfiles = new Map();
-
-  async function updatePresetHint() {
-    if (!presetSelect || !presetHint) return;
-    const role = roleSelect?.value || 'other';
-    if (presetSelect.value === 'restricted') {
-      const names = (permissionCatalog?.invitePresets?.restrictedModules || []).map(moduleLabel);
-      const base = names.length
-        ? t('settings.invites.presetHintRestricted', { modules: names.join(', ') })
-        : t('settings.invites.presetHintUnavailable');
-      presetHint.textContent = appendCapabilityState(base, capabilityStateText('health_use_fasting', null, true));
-      return;
-    }
-    if (!roleProfiles.has(role)) {
-      try {
-        roleProfiles.set(role, (await api.get(`/permissions/role/${encodeURIComponent(role)}`))?.data || null);
-      } catch {
-        // Kein Profil zu holen heisst nicht "kein Profil vorhanden": eine
-        // Behauptung waere hier schlimmer als keine.
-        roleProfiles.set(role, null);
-      }
-    }
-    // Zwischen Anfrage und Antwort kann eine andere Rolle gewaehlt worden sein.
-    if ((roleSelect?.value || 'other') !== role || presetSelect.value !== 'role') return;
-    const profile = roleProfiles.get(role);
-    const roleName = familyRoleLabel(role);
-    if (!profile) {
-      presetHint.textContent = t('settings.invites.presetHintUnavailable');
-      return;
-    }
-    const denied = deniedModuleNames(profile.modules);
-    const base = denied.length
-      ? t('settings.invites.presetHintRoleLimited', { role: roleName, modules: denied.join(', ') })
-      : t('settings.invites.presetHintRoleOpen', { role: roleName });
-    presetHint.textContent = appendCapabilityState(
-      base,
-      capabilityStateText('health_use_fasting', profile, profile.modules?.health === 'none'),
-    );
-  }
-
-  presetSelect?.addEventListener('change', updatePresetHint);
-  roleSelect?.addEventListener('change', updatePresetHint);
 
   addBtn.hidden = false;
-  addBtn.addEventListener('click', () => {
-    card.classList.remove('settings-card--hidden');
-    addBtn.hidden = true;
-    updatePresetHint();
-    container.querySelector('#invite-username')?.focus();
-  });
+  addBtn.addEventListener('click', () => openInviteModal());
 
-  container.querySelector('#cancel-add-invite')?.addEventListener('click', () => {
-    card.classList.add('settings-card--hidden');
-    addBtn.hidden = false;
-    form.reset();
-    updatePresetHint();
-    errorEl.hidden = true;
-    output.hidden = true;
-  });
+  function openInviteModal() {
+    openModal({
+      title: t('settings.invites.submit'),
+      size: 'md',
+      content: addInviteFormHtml(),
+      onSave(panel) {
+        const form = panel.querySelector('#add-invite-form');
+        const output = panel.querySelector('#invite-link-output');
+        const outputValue = panel.querySelector('#invite-link-value');
+        const emailNote = panel.querySelector('#invite-email-note');
+        const errorEl = panel.querySelector('#invite-error');
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    errorEl.hidden = true;
-    output.hidden = true;
-    const sendEmail = container.querySelector('#invite-send-email')?.checked === true;
-    const payload = {
-      username: container.querySelector('#invite-username').value.trim(),
-      display_name: container.querySelector('#invite-display-name').value.trim(),
-      email: container.querySelector('#invite-email').value.trim(),
-      family_role: container.querySelector('#invite-family-role').value,
-      permission_preset: container.querySelector('#invite-permission-preset').value,
-      system_admin: container.querySelector('#invite-system-admin')?.checked === true,
-      send_email: sendEmail,
-    };
+        // Startrechte (#869): das Feld waehlt eine Vorlage, der Hinweis darunter sagt,
+        // was sie im MOMENT bedeutet. Ohne ihn waere "wie das Rollenprofil" eine
+        // Angabe ueber etwas, das man nur auf einem anderen Blatt nachsehen kann -
+        // und genau das Nachsehen unterbleibt beim Einladen.
+        const presetSelect = panel.querySelector('#invite-permission-preset');
+        const roleSelect = panel.querySelector('#invite-family-role');
+        const presetHint = panel.querySelector('#invite-preset-hint');
+        // Ein Rollenprofil aendert sich waehrend eines Formularaufrufs nicht, und
+        // jeder Wechsel zwischen zwei Rollen wuerde es sonst erneut holen.
+        const roleProfiles = new Map();
 
-    const btn = form.querySelector('[type=submit]');
-    btn.disabled = true;
-    try {
-      const res = await auth.createInvite(payload);
-      invites.unshift(res.data.invite);
-      renderInviteList(container, invites);
-      form.reset();
-      updatePresetHint();
-      // Der Klartext-Token kommt nur aus dieser einen Antwort. Die Karte bleibt
-      // deshalb offen: würde sie sich wie beim Mitglied-Anlegen schließen, wäre
-      // der Link im selben Moment weg, in dem er entsteht.
-      outputValue.value = `${window.location.origin}/join?token=${encodeURIComponent(res.data.token)}`;
-      output.hidden = false;
-      if (sendEmail) {
-        emailNote.textContent = res.data.email_sent
-          ? t('settings.invites.emailSent')
-          : t('settings.invites.emailNotSent');
-        emailNote.hidden = false;
-      } else {
-        emailNote.hidden = true;
-      }
-      window.lucide?.createIcons({ el: output });
-      outputValue.focus();
-      outputValue.select();
-      window.yuvomi?.showToast(t('settings.invites.created'), 'success');
-    } catch (err) {
-      showError(errorEl, err.message);
-    } finally {
-      btn.disabled = false;
-    }
-  });
+        async function updatePresetHint() {
+          if (!presetSelect || !presetHint) return;
+          const role = roleSelect?.value || 'other';
+          if (presetSelect.value === 'restricted') {
+            const names = (permissionCatalog?.invitePresets?.restrictedModules || []).map(moduleLabel);
+            const base = names.length
+              ? t('settings.invites.presetHintRestricted', { modules: names.join(', ') })
+              : t('settings.invites.presetHintUnavailable');
+            presetHint.textContent = appendCapabilityState(base, capabilityStateText('health_use_fasting', null, true));
+            return;
+          }
+          if (!roleProfiles.has(role)) {
+            try {
+              roleProfiles.set(role, (await api.get(`/permissions/role/${encodeURIComponent(role)}`))?.data || null);
+            } catch {
+              // Kein Profil zu holen heisst nicht "kein Profil vorhanden": eine
+              // Behauptung waere hier schlimmer als keine.
+              roleProfiles.set(role, null);
+            }
+          }
+          // Zwischen Anfrage und Antwort kann eine andere Rolle gewaehlt worden sein.
+          if ((roleSelect?.value || 'other') !== role || presetSelect.value !== 'role') return;
+          const profile = roleProfiles.get(role);
+          const roleName = familyRoleLabel(role);
+          if (!profile) {
+            presetHint.textContent = t('settings.invites.presetHintUnavailable');
+            return;
+          }
+          const denied = deniedModuleNames(profile.modules);
+          const base = denied.length
+            ? t('settings.invites.presetHintRoleLimited', { role: roleName, modules: denied.join(', ') })
+            : t('settings.invites.presetHintRoleOpen', { role: roleName });
+          presetHint.textContent = appendCapabilityState(
+            base,
+            capabilityStateText('health_use_fasting', profile, profile.modules?.health === 'none'),
+          );
+        }
 
-  container.querySelector('#invite-link-copy')?.addEventListener('click', async () => {
-    if (!outputValue.value) return;
-    const copied = await copyInviteLink(outputValue);
-    window.yuvomi?.showToast(
-      copied ? t('settings.invites.copied') : t('settings.invites.copyFailed'),
-      copied ? 'success' : 'danger',
-    );
-  });
+        presetSelect?.addEventListener('change', updatePresetHint);
+        roleSelect?.addEventListener('change', updatePresetHint);
+        updatePresetHint();
+
+        panel.querySelector('#cancel-add-invite')?.addEventListener('click', () => closeModal());
+
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          errorEl.hidden = true;
+          output.hidden = true;
+          const sendEmail = panel.querySelector('#invite-send-email')?.checked === true;
+          const payload = {
+            username: panel.querySelector('#invite-username').value.trim(),
+            display_name: panel.querySelector('#invite-display-name').value.trim(),
+            email: panel.querySelector('#invite-email').value.trim(),
+            family_role: panel.querySelector('#invite-family-role').value,
+            permission_preset: panel.querySelector('#invite-permission-preset').value,
+            system_admin: panel.querySelector('#invite-system-admin')?.checked === true,
+            send_email: sendEmail,
+          };
+
+          const btn = panel.querySelector('[type=submit]');
+          btn.disabled = true;
+          try {
+            const res = await auth.createInvite(payload);
+            invites.unshift(res.data.invite);
+            renderInviteList(container, invites);
+            form.reset();
+            updatePresetHint();
+            // Der Klartext-Token kommt nur aus dieser einen Antwort. Der Dialog
+            // bleibt deshalb offen: wuerde er sich wie beim Mitglied-Anlegen
+            // schliessen, waere der Link im selben Moment weg, in dem er entsteht.
+            outputValue.value = `${window.location.origin}/join?token=${encodeURIComponent(res.data.token)}`;
+            output.hidden = false;
+            if (sendEmail) {
+              emailNote.textContent = res.data.email_sent
+                ? t('settings.invites.emailSent')
+                : t('settings.invites.emailNotSent');
+              emailNote.hidden = false;
+            } else {
+              emailNote.hidden = true;
+            }
+            window.lucide?.createIcons({ el: output });
+            outputValue.focus();
+            outputValue.select();
+            window.yuvomi?.showToast(t('settings.invites.created'), 'success');
+          } catch (err) {
+            showError(errorEl, err.message);
+          } finally {
+            btn.disabled = false;
+          }
+        });
+
+        panel.querySelector('#invite-link-copy')?.addEventListener('click', async () => {
+          if (!outputValue.value) return;
+          const copied = await copyInviteLink(outputValue);
+          window.yuvomi?.showToast(
+            copied ? t('settings.invites.copied') : t('settings.invites.copyFailed'),
+            copied ? 'success' : 'danger',
+          );
+        });
+      },
+    });
+  }
 
   list.addEventListener('click', async (event) => {
     const btn = event.target.closest('[data-revoke-invite]');
@@ -577,10 +600,10 @@ async function loadInvites(container) {
     const res = await auth.getInvites();
     invites = res.data?.invites ?? [];
   } catch (err) {
-    list.replaceChildren(createRetryState({
+    list.replaceChildren(listNotice(createRetryState({
       message: err.message || t('common.errorGeneric'),
       onRetry: () => loadInvites(container),
-    }));
+    })));
     return;
   }
 
@@ -703,6 +726,7 @@ async function openEditMemberModal(member, currentUser, users, container) {
         </div>
         ${ssoAvailable ? `
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.memberSsoOnlyLabel'),
           checked: member.sso_only === true,
           attrs: { id: 'edit-member-sso-only' },
@@ -715,13 +739,14 @@ async function openEditMemberModal(member, currentUser, users, container) {
           <p class="form-hint">${t('settings.resetPasswordHint')}</p>
         </div>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.systemAdminLabel'),
           checked: member.role === 'admin',
           attrs: { id: 'edit-member-system-admin' },
         })}
         <p class="form-hint">${t('settings.systemAdminHint')}</p>
         <div id="edit-member-error" class="form-error" role="alert" hidden></div>
-        <div class="settings-form-actions">
+        <div class="modal-panel__footer modal-panel__footer--plain">
           <button type="button" class="btn btn--secondary" id="edit-member-cancel">${t('common.cancel')}</button>
           <button type="submit" class="btn btn--primary">${t('settings.saveMember')}</button>
         </div>
@@ -863,79 +888,70 @@ function syncSsoOnlyField(container) {
   if (email) email.required = on;
 }
 
+function openAddMemberModal(container, currentUser, users) {
+  openModal({
+    title: t('settings.newMemberTitle'),
+    size: 'md',
+    content: addMemberFormHtml(),
+    onSave(panel) {
+      const form = panel.querySelector('#add-member-form');
+      form.querySelector('#new-member-sso-only')
+        ?.addEventListener('change', () => syncSsoOnlyField(panel));
+      syncSsoOnlyField(panel);
+      panel.querySelector('#cancel-add-member')?.addEventListener('click', () => closeModal());
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const errorEl = panel.querySelector('#member-error');
+        errorEl.hidden = true;
+        const birthDateRaw = panel.querySelector('#new-member-birth-date')?.value || '';
+        if (!isDateInputValid(birthDateRaw)) {
+          showError(errorEl, t('settings.memberBirthDateInvalid'));
+          return;
+        }
+
+        const ssoOnly = panel.querySelector('#new-member-sso-only')?.checked === true;
+        const data = {
+          username: panel.querySelector('#new-username').value.trim(),
+          display_name: panel.querySelector('#new-display-name').value.trim(),
+          // Beides zugleich weist der Server ab - er kann nicht raten, welches
+          // von beidem gemeint war.
+          ...(ssoOnly ? { sso_only: true } : { password: panel.querySelector('#new-member-password').value }),
+          avatar_color: panel.querySelector('#new-avatar-color').value,
+          family_role: panel.querySelector('#new-family-role').value,
+          system_admin: panel.querySelector('#new-system-admin')?.checked === true,
+          phone: panel.querySelector('#new-member-phone')?.value.trim() || null,
+          email: panel.querySelector('#new-member-email')?.value.trim() || null,
+          birth_date: parseDateInput(birthDateRaw) || null,
+        };
+
+        const btn = panel.querySelector('[type=submit]');
+        btn.disabled = true;
+        try {
+          const res = await auth.createUser(data);
+          users.push(res.user);
+          renderMemberList(container, users, currentUser?.id);
+          bindDeleteButtons(container);
+          bindEditButtons(container, currentUser, users);
+          // Der Dialog gibt den Fokus beim Schliessen an "Mitglied hinzufuegen"
+          // zurueck (modal.js) - kein Fall auf BODY wie beim Inline-Formular.
+          closeModal({ force: true });
+          window.yuvomi?.showToast(t('settings.memberAddedToast', { name: res.user.display_name }), 'success');
+        } catch (err) {
+          showError(errorEl, err.message);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    },
+  });
+}
+
 function bindEvents(container, currentUser, users) {
   const addMemberBtn = container.querySelector('#add-member-btn');
   if (addMemberBtn) {
     addMemberBtn.hidden = false;
-    addMemberBtn.addEventListener('click', () => {
-      container.querySelector('#add-member-form-card').classList.remove('settings-card--hidden');
-      addMemberBtn.hidden = true;
-    });
-  }
-
-  const cancelAddMember = container.querySelector('#cancel-add-member');
-  if (cancelAddMember) {
-    cancelAddMember.addEventListener('click', () => {
-      container.querySelector('#add-member-form-card').classList.add('settings-card--hidden');
-      container.querySelector('#add-member-btn').hidden = false;
-      container.querySelector('#add-member-form').reset();
-      syncSsoOnlyField(container);
-      container.querySelector('#new-avatar-color').value = randomAvatarColor();
-      container.querySelector('#member-error').hidden = true;
-    });
-  }
-
-  const addMemberForm = container.querySelector('#add-member-form');
-  if (addMemberForm) {
-    addMemberForm.querySelector('#new-member-sso-only')
-      ?.addEventListener('change', () => syncSsoOnlyField(container));
-    syncSsoOnlyField(container);
-
-    addMemberForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const errorEl = container.querySelector('#member-error');
-      errorEl.hidden = true;
-      const birthDateRaw = container.querySelector('#new-member-birth-date')?.value || '';
-      if (!isDateInputValid(birthDateRaw)) {
-        showError(errorEl, t('settings.memberBirthDateInvalid'));
-        return;
-      }
-
-      const ssoOnly = container.querySelector('#new-member-sso-only')?.checked === true;
-      const data = {
-        username: container.querySelector('#new-username').value.trim(),
-        display_name: container.querySelector('#new-display-name').value.trim(),
-        // Beides zugleich weist der Server ab - er kann nicht raten, welches
-        // von beidem gemeint war.
-        ...(ssoOnly ? { sso_only: true } : { password: container.querySelector('#new-member-password').value }),
-        avatar_color: container.querySelector('#new-avatar-color').value,
-        family_role: container.querySelector('#new-family-role').value,
-        system_admin: container.querySelector('#new-system-admin')?.checked === true,
-        phone: container.querySelector('#new-member-phone')?.value.trim() || null,
-        email: container.querySelector('#new-member-email')?.value.trim() || null,
-        birth_date: parseDateInput(birthDateRaw) || null,
-      };
-
-      const btn = addMemberForm.querySelector('[type=submit]');
-      btn.disabled = true;
-      try {
-        const res = await auth.createUser(data);
-        users.push(res.user);
-        renderMemberList(container, users, currentUser?.id);
-        addMemberForm.reset();
-        syncSsoOnlyField(container);
-        container.querySelector('#new-avatar-color').value = randomAvatarColor();
-        container.querySelector('#add-member-form-card').classList.add('settings-card--hidden');
-        container.querySelector('#add-member-btn').hidden = false;
-        window.yuvomi?.showToast(t('settings.memberAddedToast', { name: res.user.display_name }), 'success');
-        bindDeleteButtons(container);
-        bindEditButtons(container, currentUser, users);
-      } catch (err) {
-        showError(errorEl, err.message);
-      } finally {
-        btn.disabled = false;
-      }
-    });
+    addMemberBtn.addEventListener('click', () => openAddMemberModal(container, currentUser, users));
   }
 
   bindDeleteButtons(container);
@@ -953,10 +969,10 @@ async function loadMembers(container, currentUser) {
     const res = await auth.getUsers();
     users = res.data ?? [];
   } catch (err) {
-    list.replaceChildren(createRetryState({
+    list.replaceChildren(listNotice(createRetryState({
       message: err.message || t('common.errorGeneric'),
       onRetry: reload,
-    }));
+    })));
     return;
   }
 
@@ -1045,3 +1061,7 @@ export async function render(container, { user } = {}) {
   await loadInvites(container);
   window.lucide?.createIcons({ el: container });
 }
+
+// Der Avatar als Programm (test:initials): welche Zeichen ohne Bild auf der
+// Scheibe stehen.
+export const __test = { avatarHtml };
