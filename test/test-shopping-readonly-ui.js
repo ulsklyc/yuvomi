@@ -660,6 +660,182 @@ test('Vorrat: ohne Schreibrecht kein Loeschen-Panel und kein verdrahteter Wisch'
     'Gegenfall: mit Schreibrecht ist die Geste verdrahtet');
 });
 
+/* Nur-lesen im Vorrat selbst (Critique R16): #1673 sperrte nur den
+ * Loesch-Wisch. Mit `pantry: read` blieben der Stepper, der Bearbeiten-Dialog
+ * (aus Liste und Nebenpanel, samt Speichern und Loeschen), das Anlegen aus dem
+ * Leerzustand und die Lagerort-Verwaltung stehen - jede Handlung endete im 403.
+ * Regeln 2, 7 und 9 in utils/module-access.js. Gegen den Stand davor rot
+ * gelaufen (dort nur um die Testflaeche in `__test` ergaenzt). */
+const NUR_VORRAT_LESEN = { pantry: 'read', shopping: 'write' };
+const NUR_LESEN = { pantry: 'read', shopping: 'read' };
+const VORRAT_VOLL = { pantry: 'write', shopping: 'write' };
+
+const reichlich = () => ({
+  id: 7, name: 'Hafermilch', quantity: 3, min_quantity: 2, unit: 'pcs', category: 'Getraenke-Regal',
+  location_id: 4, location_name: 'Kellerregal', expires_on: '2027-02-24', notes: 'Nur die ungesuesste',
+});
+
+function vorratZustand(items) {
+  pantry.intents.clear();
+  pantry.resetLoadOrderForTest();
+  Object.assign(pantry.state, { items, locations: [{ id: 4, name: 'Kellerregal' }], categories: [], filter: 'all', query: '' });
+}
+
+/** Ein Klick in der Liste, wie `onListClick` ihn sieht: der Knopf einer Aktion in der Zeile des Artikels. */
+function listenKlick(action, id) {
+  // Was `adjustQuantity()` an der Zeile anfasst (wie makeRow() in test-pantry-ux.js); alles andere gibt es nicht.
+  const knoten = () => ({ dataset: { step: '1' }, classList: { toggle() {}, add() {}, remove() {} }, style: {}, textContent: '', disabled: false });
+  const teile = { '.pantry-row__quantity': knoten(), '[data-action="decrease"]': knoten(), '.pantry-stepper': knoten() };
+  const row = { ...knoten(), dataset: { id: String(id) }, querySelector: (sel) => teile[sel] ?? null };
+  const btn = { dataset: { action }, closest: (sel) => (sel === '.pantry-row[data-id]' ? row : null) };
+  return { target: { closest: (sel) => (sel === '[data-action]' ? btn : null) } };
+}
+
+/** Die `data-action`s eines Knotens und seiner Kinder - der Mini-DOM schreibt `dataset` nicht ins Markup. */
+function aktionen(el) {
+  const eigene = el.dataset?.action ? [el.dataset.action] : [];
+  return [...eigene, ...(el.childNodes ?? []).flatMap(aktionen)];
+}
+
+test('Vorrat bei `read`: die Zeile zeigt die Menge, traegt aber weder Stepper noch Bearbeiten', async () => {
+  const knoten = (modules) => withAccess(modules, () => pantry.rowEl(knapp()));
+  const zeile = async (modules) => (await knoten(modules)).outerHTML;
+
+  const lesend = await zeile(NUR_VORRAT_LESEN);
+  assert.doesNotMatch(lesend, /pantry-stepper/, 'Plus und Minus endeten im 403 und sprangen zurueck');
+  assert.deepEqual(aktionen(await knoten(NUR_VORRAT_LESEN)), ['details', 'to-shopping'],
+    'der Tipp bleibt und fuehrt in die Leseansicht; der Warenkorb gehoert dem Einkauf');
+  for (const action of aktionen(await knoten(NUR_VORRAT_LESEN))) {
+    assert.ok(pantry.READ_SAFE_ACTIONS.has(action), `${action} steht im Markup, aber nicht in der Positivliste`);
+  }
+  assert.doesNotMatch(lesend, /common\.edit/, 'der Screenreader-Zusatz verspraeche ein Bearbeiten');
+  assert.match(lesend, /pantry-row__quantity/, 'die Menge bleibt als Zeichen');
+  assert.match(lesend, /pantry-badge/, 'der Status bleibt als Zeichen');
+  assert.match(lesend, /swipe-row--static/, 'ohne Geste kein Wisch-Chevron');
+  assert.match(lesend, /pantry-row__cart"/, 'der Warenkorb folgt dem EINKAUF (Regel 8) und bleibt');
+
+  const beides = await zeile(NUR_LESEN);
+  assert.doesNotMatch(beides, /pantry-row__cart"/);
+  assert.deepEqual(aktionen(await knoten(NUR_LESEN)), ['details']);
+  assert.doesNotMatch(beides, /list-row__actions/, 'eine leere Bedienzone naehme dem Namen nur die Breite');
+
+  const gegen = await zeile(VORRAT_VOLL);
+  assert.deepEqual(aktionen(await knoten(VORRAT_VOLL)), ['edit', 'to-shopping', 'decrease', 'increase'],
+    'Gegenfall: mit Schreibrecht stehen Bearbeiten und Stepper');
+  assert.match(gegen, /pantry-stepper/);
+  assert.match(gegen, /common\.edit/);
+  assert.doesNotMatch(gegen, /swipe-row--static/);
+});
+
+test('Vorrat bei `read`: ein stehen gebliebener Stepper-Knoten schickt keinen PATCH', async () => {
+  pantry.setQuantityDebounceMsForTest(0);
+  const schritt = (modules, ueber) => withAccess(modules, () => aufrufe(async () => {
+    vorratZustand([knapp()]);
+    pantry.setContainerForTest(null);
+    ueber();
+    await new Promise((r) => setTimeout(r, 15));
+  }, { 'PATCH /pantry/3': { data: { quantity: 2 } } }));
+  try {
+    const perHandler = () => pantry.onListClick(listenKlick('increase', 3));
+    const direkt = () => pantry.adjustQuantity(pantry.state.items[0], +1, listenKlick('increase', 3).target.closest('[data-action]').closest('.pantry-row[data-id]'));
+
+    assert.deepEqual(await schritt(NUR_VORRAT_LESEN, perHandler), [], 'die Positivliste im Handler laesst `increase` nicht durch');
+    assert.equal(pantry.intents.size, 0, 'und es entsteht keine optimistische Menge');
+    assert.deepEqual(await schritt(NUR_VORRAT_LESEN, direkt), [], 'zweite Linie: adjustQuantity() fragt selbst');
+    assert.deepEqual(await schritt(VORRAT_VOLL, perHandler), ['PATCH /pantry/3'], 'Gegenfall: mit Schreibrecht geht der Schritt raus');
+  } finally {
+    pantry.setQuantityDebounceMsForTest(null);
+    vorratZustand([]);
+  }
+});
+
+test('Vorrat bei `read`: Liste und Nebenpanel oeffnen die Leseansicht, nie den Editor', async () => {
+  const offen = (modules, ueber) => withAccess(modules, () => {
+    vorratZustand([reichlich()]);
+    return modalMitschnitt(ueber);
+  });
+  const panelKlick = { target: { closest: (sel) => (sel === '[data-watch-id]' ? { dataset: { watchId: '7' } } : null) } };
+  const wege = {
+    'Zeile (Leseknoten)': () => pantry.onListClick(listenKlick('details', 7)),
+    'Nebenpanel': () => pantry.onWatchClick(panelKlick),
+    'openItemModal direkt': () => pantry.openItemModal('edit', pantry.state.items[0]),
+  };
+  try {
+    for (const [name, weg] of Object.entries(wege)) {
+      const [dialog, ...mehr] = await offen(NUR_VORRAT_LESEN, weg);
+      assert.ok(dialog && !mehr.length, `${name}: genau ein Dialog`);
+      assert.equal(dialog.title, 'Hafermilch', `${name}: der Name steht im Titel`);
+      assert.match(dialog.content, /data-view="read"/, `${name}: Leseansicht`);
+      assert.doesNotMatch(dialog.content, /pantry-save|pantry-delete|form-input|<input|<select|<textarea|<button/,
+        `${name}: keine Eingabe, kein Speichern, kein Loeschen`);
+    }
+    // Ein Bearbeiten-Knoten, den ein Rechtewechsel ueberholt hat, oeffnet nichts.
+    assert.deepEqual(await offen(NUR_VORRAT_LESEN, () => pantry.onListClick(listenKlick('edit', 7))), []);
+
+    const [editor] = await offen(VORRAT_VOLL, () => pantry.onListClick(listenKlick('edit', 7)));
+    assert.match(editor.content, /id="pantry-save"/, 'Gegenfall: mit Schreibrecht geht der Editor auf');
+    assert.match(editor.content, /id="pantry-delete"/);
+  } finally {
+    vorratZustand([]);
+  }
+});
+
+test('Vorrat bei `read`: die Leseansicht zeigt alles, was der Editor zeigt', async () => {
+  const html = await withAccess(NUR_VORRAT_LESEN, () => pantry.itemReadHtml(reichlich()));
+  for (const label of ['quantityLabel', 'locationLabel', 'categoryLabel', 'expiresLabel', 'minQuantityLabel', 'notesLabel']) {
+    assert.match(html, new RegExp(`pantry\\.${label}`), `das Feld ${label} fehlt`);
+  }
+  assert.match(html, /Kellerregal/);
+  assert.match(html, /Getraenke-Regal/, 'die Kategorie steht NUR im Editor - also hier');
+  assert.match(html, /Nur die ungesuesste/, 'die Notiz steht NUR im Editor - also hier');
+  assert.match(html, /detail-row--multiline/);
+  assert.equal((html.match(/class="detail-row[ "]/g) ?? []).length, 6);
+
+  // Ohne Wert keine Zeile; der Lagerort nennt „ohne Ort" wie die Auswahl im Editor.
+  const karg = await withAccess(NUR_VORRAT_LESEN, () => pantry.itemReadHtml(knapp()));
+  assert.doesNotMatch(karg, /pantry\.(expiresLabel|notesLabel)/);
+  assert.match(karg, /pantry\.unlocated/);
+
+  // Nutzerdaten laufen durch esc().
+  const boese = await withAccess(NUR_VORRAT_LESEN,
+    () => pantry.itemReadHtml({ ...reichlich(), notes: '<img src=x onerror=alert(1)>', location_name: '<b>Keller</b>' }));
+  assert.doesNotMatch(boese, /<img|<b>/);
+});
+
+test('Vorrat bei `read`: kein Anlegen, kein einladender Leerzustand, keine Lagerort-Verwaltung', async () => {
+  vorratZustand([]);
+  const anlegen = (modules) => withAccess(modules, () => modalMitschnitt(() => pantry.openItemModal('create')));
+  assert.deepEqual(await anlegen(NUR_VORRAT_LESEN), [], 'FAB und Leerzustand laufen ueber diesen Weg');
+  assert.equal((await anlegen(VORRAT_VOLL)).length, 1, 'Gegenfall: mit Schreibrecht geht das Formular auf');
+
+  const leer = (modules) => withAccess(modules, () => pantry.emptyStateEl().outerHTML);
+  const lesend = await leer(NUR_VORRAT_LESEN);
+  assert.match(lesend, /pantry\.emptyTitle/, 'der Zustand bleibt');
+  assert.doesNotMatch(lesend, /pantry\.emptyAction|pantry\.emptyDescription|emptyHint\.pantry/,
+    'Knopf, Beschreibung und Hinweis laden zu einer Handlung ein');
+  assert.match(await leer(VORRAT_VOLL), /pantry\.emptyAction/, 'Gegenfall');
+
+  // Der Verwalter: als Programm (kein Dialog) und am Ausloeser im Kopf.
+  const verwalter = async (modules) => {
+    const geoeffnet = [];
+    const zuvor = globalThis.__openModal;
+    globalThis.__openModal = (opts) => { geoeffnet.push(opts); };
+    try {
+      await withAccess(modules, () => pantry.openLocationManager());
+    } finally {
+      globalThis.__openModal = zuvor;
+    }
+    return geoeffnet.length;
+  };
+  assert.equal(await verwalter(NUR_VORRAT_LESEN), 0, 'jede Handlung im Verwalter endete im 403');
+  assert.equal(await verwalter(VORRAT_VOLL), 1, 'Gegenfall');
+
+  const quelle = readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.match(quelle, /\$\{readOnly\(\) \? '' : `<div class="page-toolbar__actions">\s*\$\{pageToolsMenuHtml\(/,
+    'der Ausloeser der Lagerort-Verwaltung steht nur mit Schreibrecht im Kopf (Regel 7)');
+});
+
 test('Vorrat: die Sammel-Pille fragt denselben Riegel wie der Warenkorb', () => {
   // renderBulkBar() zeichnet in die Shell-Schicht und liest den Seitenzustand;
   // als Fallback die kommentarfreie Quelle (siehe den Kopf von

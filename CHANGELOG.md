@@ -249,6 +249,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   switching to pale in one step.
 - **The page title in Budget, calendar, notes and contacts no longer stutters while the header
   collapses** on a phone; it changed its size across several layout steps during scrolling.
+- **Pantry: read-only access no longer offers what the server refuses.** With read-only access
+  to the pantry, the plus and minus buttons still changed the quantity until the server said no
+  and the row jumped back, a tap on a row opened the edit dialog with "Save" and "Delete", and
+  "Manage locations" and the "Add item" button of the empty pantry were there as well. The row
+  now shows its quantity without the buttons, and a tap opens a read-only view with everything
+  the dialog shows - quantity, location, category, best-before date, minimum stock and note.
+  The cart button stays for members who may write to the shopping list.
 
 ## [2.73.0] - 2026-10-04
 

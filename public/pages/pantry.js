@@ -317,7 +317,7 @@ export async function render(container) {
       clearLabel: t('common.searchClear'),
       className: 'pantry-search page-toolbar__center',
     })}
-    <div class="page-toolbar__actions">
+    ${readOnly() ? '' : `<div class="page-toolbar__actions">
       ${pageToolsMenuHtml({
         id: 'pantry-tools-menu',
         label: t('common.moreActions'),
@@ -327,9 +327,12 @@ export async function render(container) {
         // map-pin wie im Inventar - "archive" war dasselbe Zeichen wie der
         // Vorrat-Tab darueber (A4, P3). Kommt ein zweiter Eintrag dazu, ist es
         // von selbst wieder das Menue.
+        // Regel 7 in utils/module-access.js: der AUFRUFER nimmt den Ausloeser
+        // weg. Bei `pantry: read` endete jede Handlung im Verwalter (anlegen,
+        // umbenennen, sortieren, loeschen) im 403.
         items: [{ action: 'manage-locations', label: t('pantry.manageLocations'), icon: 'map-pin' }],
       })}
-    </div>`);
+    </div>`}`);
 
   // DIE CHIPREIHE STEHT IM SCROLLPORT (Kopfregel mobil, Regel 3): als erstes
   // Kind von #pantry-list scrollt sie mit der Liste weg, statt dauerhaft 60px
@@ -400,7 +403,7 @@ export async function render(container) {
   });
 
   installPopoverMenus(toolbar);
-  toolbar.querySelector('[data-action="manage-locations"]').addEventListener('click', openLocationManager);
+  toolbar.querySelector('[data-action="manage-locations"]')?.addEventListener('click', openLocationManager);
   fab.addEventListener('click', () => openItemModal('create'));
 
   filters.addEventListener('click', (e) => {
@@ -584,10 +587,31 @@ function renderBulkBar() {
 /**
  * Darf dieses Konto in den Vorrat schreiben? Regel 1 in utils/module-access.js.
  * Als Funktion, damit jedes Neuzeichnen neu fragt.
+ *
+ * WAS BEI `read` BLEIBT: Suche, Filterchips, das Nebenpanel, die Zeile mit
+ * Menge, MHD und Badges als ZEICHEN - und der Tipp auf sie, der dann die
+ * Leseansicht oeffnet (Regel 9). WAS GEHT: der Stepper, der Bearbeiten-Dialog
+ * samt Loeschen, das Anlegen (FAB und Leerzustand), die Lagerort-Verwaltung und
+ * der Loesch-Wisch (Regel 3). DER WARENKORB FOLGT NICHT DIESEM RECHT: er
+ * schreibt in den Einkauf und fragt `mayTransferPantryToShopping()` (Regel 8) -
+ * mit `pantry: read` und `shopping: write` bleibt er also stehen, und der
+ * Server nimmt den Uebertrag an.
+ *
+ * KEIN WANDTABLETT: ein Display fuehrt `pantry` nicht in seiner Scope-Liste
+ * (server/display-scopes.js) und erreicht diese Seite nicht; ein
+ * `actingAsDisplay()` davor braucht es hier nicht.
  */
 function readOnly() {
   return !mayWritePath('/pantry');
 }
+
+/**
+ * Die `data-action`s der Liste, die NICHT in den Vorrat schreiben - eine
+ * Positivliste wie in shopping.js: eine morgen ergaenzte Schreib-Aktion ist bei
+ * `read` zu, bis sie hier ausdruecklich steht. `to-shopping` schreibt in den
+ * Einkauf und traegt seinen eigenen Riegel (`sendToShopping`).
+ */
+const READ_SAFE_ACTIONS = new Set(['details', 'to-shopping']);
 
 const PANTRY_ROW = '.pantry-swipe[data-swipe-id]';
 
@@ -802,12 +826,16 @@ function noResultsEl() {
 }
 
 function emptyStateEl() {
+  // Bei `read` nur der Zustand (Regel 9): Beschreibung („Trage ein ...") und
+  // Hinweis (Artikel aus dem Einkauf uebernehmen) laden beide zu einer
+  // Handlung ein, die es dann nicht gibt.
+  const ro = readOnly();
   return emptyStateComponentEl({
     icon: 'archive',
     title: t('pantry.emptyTitle'),
-    description: t('pantry.emptyDescription'),
-    hint: t('emptyHint.pantry'),
-    action: {
+    description: ro ? undefined : t('pantry.emptyDescription'),
+    hint: ro ? undefined : t('emptyHint.pantry'),
+    action: ro ? null : {
       label: t('pantry.emptyAction'),
       icon: 'plus',
       onClick: () => openItemModal('create'),
@@ -827,13 +855,15 @@ function rowEl(item) {
   // Zeilenanfang gibt es im Vorrat nichts Positives zu erledigen. Stepper und
   // Warenkorb sind Ausnahmezone (wirePantrySwipe, `ignore`) - wer dort tippt
   // und dabei rutscht, loescht nichts.
+  const ro = readOnly();
   const wrap = document.createElement('li');
-  wrap.className = 'swipe-row pantry-swipe';
+  // `.swipe-row--static`: ohne Geste auch kein Wisch-Chevron (layout.css).
+  wrap.className = ro ? 'swipe-row swipe-row--static pantry-swipe' : 'swipe-row pantry-swipe';
   wrap.dataset.swipeId = String(item.id);
   // Nur-lesen: die Buehne bleibt (Zeilenschluessel fuer Neuzeichnen und
   // Auffrischung), das Loeschen-Panel entfaellt - es verspraeche ein DELETE,
   // das im 403 endet (Regel 3 in utils/module-access.js).
-  if (!readOnly()) {
+  if (!ro) {
     wrap.insertAdjacentHTML('beforeend', `
     <div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">
       <i data-lucide="trash-2" class="icon-md"></i>
@@ -860,7 +890,9 @@ function rowEl(item) {
   const main = document.createElement('button');
   main.type = 'button';
   main.className = 'list-row__main list-row__main--interactive pantry-row__main';
-  main.dataset.action = 'edit';
+  // Bei `read` oeffnet derselbe Tipp die Leseansicht (Regel 9) - unter einem
+  // eigenen Namen, damit die Positivliste im Handler ihn durchlaesst.
+  main.dataset.action = ro ? 'details' : 'edit';
 
   // Name und Status in EINER Zeile: das Badge qualifiziert den Artikel, es ist
   // keine eigene Information. Auf einer eigenen Zeile wuchs jede betroffene
@@ -952,11 +984,14 @@ function rowEl(item) {
   }
   main.appendChild(meta);
 
-  // Was der Button tut - nur für Screenreader, am Ende des Namens.
-  const action = document.createElement('span');
-  action.className = 'sr-only';
-  action.textContent = t('common.edit');
-  main.appendChild(action);
+  // Was der Button tut - nur für Screenreader, am Ende des Namens. Bei `read`
+  // entfaellt der Zusatz: „Bearbeiten" verspraeche, was der Tipp nicht tut.
+  if (!ro) {
+    const action = document.createElement('span');
+    action.className = 'sr-only';
+    action.textContent = t('common.edit');
+    main.appendChild(action);
+  }
 
   // Warenkorb und Stepper bilden EINE Gruppe: als getrennte Flex-Kinder brach
   // nur der Stepper um und der Warenkorb blieb allein oben rechts stehen - der
@@ -994,6 +1029,18 @@ function rowEl(item) {
   // (#1265, Regel 1 in utils/module-access.js). Der Slot bleibt trotzdem.
   if ((status.out || status.low) && mayTransferPantryToShopping()) cartSlot.appendChild(cartEl(item));
   actions.appendChild(cartSlot);
+
+  // Nur-lesen: KEIN Stepper (Regel 2). Die Menge steht als Zeichen in der
+  // Meta-Zeile; Plus und Minus aenderten sie optimistisch, der PATCH endete im
+  // 403, und die Zeile sprang zurueck. Die Bedienzone traegt dann nur noch den
+  // Warenkorb-Slot - und entfaellt ganz, wenn auch der Einkauf nicht
+  // beschreibbar ist: eine leere Zone naehme dem Namen nur die Breite.
+  if (ro) {
+    li.appendChild(main);
+    if (mayTransferPantryToShopping()) li.appendChild(actions);
+    wrap.appendChild(li);
+    return wrap;
+  }
 
   const stepper = document.createElement('div');
   stepper.className = 'pantry-stepper';
@@ -1085,6 +1132,12 @@ function onListClick(e) {
   const item = state.items.find((i) => i.id === Number(row.dataset.id));
   if (!item) return;
 
+  // Der eine Riegel fuer alle Aktionen darunter (siehe READ_SAFE_ACTIONS): das
+  // Markup nimmt die Affordanz, diese Zeile den Effekt eines Knotens, den ein
+  // Rechtewechsel ueberholt hat.
+  if (readOnly() && !READ_SAFE_ACTIONS.has(btn.dataset.action)) return;
+
+  if (btn.dataset.action === 'details') { openItemReadModal(item); return; }
   if (btn.dataset.action === 'edit') { openItemModal('edit', item); return; }
   if (btn.dataset.action === 'to-shopping') { sendToShopping([item], btn); return; }
   if (btn.dataset.action === 'increase') { adjustQuantity(item, +1, row); return; }
@@ -1101,6 +1154,9 @@ function onListClick(e) {
  * Fehltap. Die Auswahl aktualisiert sich beim nächsten vollen Render.
  */
 function adjustQuantity(item, direction, row) {
+  // Zweite Linie hinter dem fehlenden Stepper: ohne Schreibrecht keine
+  // optimistische Menge und kein PATCH.
+  if (readOnly()) return;
   const step = Number(row.querySelector('.pantry-stepper')?.dataset.step) || 1;
   // Der Ausgangspunkt ist, was die Zeile ZEIGT - eine schon laufende Absicht
   // eingeschlossen, sonst zaehlte jeder Schritt vom Serverstand aus neu.
@@ -1328,8 +1384,69 @@ async function sendToShopping(items, btn) {
 // Artikel-Formular
 // --------------------------------------------------------
 
+/**
+ * Eine Zeile der Leseansicht - das Markup von `detailRowEl()` aus
+ * components/detail-view.js (Icon, Beschriftung, Wert), als Zeichenkette wie
+ * in shopping.js und birthdays.js. Ohne Wert keine Zeile: ein Strich waere ein
+ * Wert, den es nicht gibt.
+ */
+function readRowHtml({ icon, label, value, multiline = false }) {
+  if (!value) return '';
+  return `
+        <div class="detail-row${multiline ? ' detail-row--multiline' : ''}">
+          <i class="detail-row__icon" data-lucide="${icon}" aria-hidden="true"></i>
+          <div class="detail-row__text">
+            <span class="detail-row__label">${esc(label)}</span>
+            <span class="detail-row__value">${esc(value)}</span>
+          </div>
+        </div>`;
+}
+
+/**
+ * Der Artikel bei `pantry: read`: Leseansicht, sonst nichts (Regel 9, Bauart
+ * `openItemReadModal()` in shopping.js und `openNoteReadModal()` in notes.js).
+ * Alles, was der Bearbeiten-Dialog zeigt - Menge mit Einheit, Lagerort,
+ * Kategorie, MHD, Mindestbestand, Notiz -, als Wert statt als Eingabe; der Name
+ * steht im Titel. Kategorie, Mindestbestand und Notiz stehen NUR im Editor, die
+ * Zeile zeigt sie nie. Kein Fusszeilen-Knopf, das X schliesst.
+ */
+function itemReadHtml(item) {
+  const amount = (value) => pantryQuantityLabel(Number(value) || 0, item.unit, { t, formatNumber: formatQuantity });
+  return `
+    <div class="pantry-item-read detail-view" data-view="read" data-item-id="${esc(String(item.id))}">
+      <div class="detail-view__rows">
+        ${readRowHtml({ icon: 'hash', label: t('pantry.quantityLabel'), value: amount(item.quantity) })}
+        ${readRowHtml({ icon: 'map-pin', label: t('pantry.locationLabel'), value: item.location_name ? locationLabel(item.location_name) : t('pantry.unlocated') })}
+        ${readRowHtml({ icon: 'tag', label: t('pantry.categoryLabel'), value: item.category ? categoryLabel(item.category) : '' })}
+        ${readRowHtml({ icon: 'calendar', label: t('pantry.expiresLabel'), value: item.expires_on ? formatDate(item.expires_on) : '' })}
+        ${readRowHtml({ icon: 'triangle-alert', label: t('pantry.minQuantityLabel'), value: item.min_quantity != null ? amount(item.min_quantity) : '' })}
+        ${readRowHtml({ icon: 'align-left', label: t('pantry.notesLabel'), value: item.notes || '', multiline: true })}
+      </div>
+    </div>`;
+}
+
+function openItemReadModal(item) {
+  openSharedModal({
+    title: item.name,
+    size: 'md',
+    content: itemReadHtml(item),
+    onSave(panel) {
+      if (window.lucide) window.lucide.createIcons({ el: panel });
+    },
+  });
+}
+
 function openItemModal(mode, item = null) {
   const isEdit = mode === 'edit';
+  // Der Riegel steht VOR jeder Vorbereitung, und er steht HIER, weil Liste,
+  // Nebenpanel, FAB und Leerzustand alle diesen Weg nehmen: bei `read` geht
+  // fuer einen Artikel die Leseansicht auf, und Anlegen gibt es nicht. Den FAB
+  // blendet CSS aus (html[data-module-readonly]) - ausgeblendet ist nicht
+  // unerreichbar.
+  if (readOnly()) {
+    if (isEdit && item) openItemReadModal(withIntent(item));
+    return;
+  }
   // Der Dialog zeigt den Artikel, wie ihn die Zeile zeigt: mit der Absicht
   // eines Stepper-Schritts, dessen PATCH noch im Entprell-Fenster steht. Aus
   // dem nackten Serverstand gefuellt stuende dort die alte Menge, und wer dann
@@ -1428,6 +1545,8 @@ function openItemModal(mode, item = null) {
 }
 
 async function saveItem(panel, mode, item) {
+  // Ein Dialog, den ein Rechtewechsel ueberholt hat: POST und PUT endeten im 403.
+  if (readOnly()) return;
   const saveBtn = panel.querySelector('#pantry-save');
   const nameInput = panel.querySelector('#pantry-name');
   const name = nameInput.value.trim();
@@ -1474,6 +1593,9 @@ async function saveItem(panel, mode, item) {
 }
 
 async function removeItem(item) {
+  // VOR dem Ausklappen: sonst verschwaende die Zeile, das DELETE endete im
+  // 403, und sie kaeme mit Fehlermeldung zurueck.
+  if (readOnly()) return;
   // Die Buehne (`li.swipe-row`), nicht nur die Zeile darin: sonst bliebe ein
   // leeres Listenelement samt Trennlinie stehen.
   const inner = _container?.querySelector(`.pantry-row[data-id="${item.id}"]`);
@@ -1513,6 +1635,8 @@ async function removeItem(item) {
 // --------------------------------------------------------
 
 async function openLocationManager() {
+  // Zweite Linie hinter dem fehlenden Knopf im Kopf (Regel 7).
+  if (readOnly()) return;
   await import('/components/category-manager.js');
 
   // Die Auffrischung haengt am Ereignis, nicht am Schliessen: beim Loeschen
@@ -1599,4 +1723,11 @@ export const __test = {
   // R16 2b: der Lösch-Wisch der Vorratszeile (test-pantry-ux.js).
   wirePantrySwipe,
   removeItem,
+  // Nur-lesen im Vorrat: Leseansicht, Anlegen, Leerzustand und
+  // Lagerort-Verwaltung (test-shopping-readonly-ui.js).
+  READ_SAFE_ACTIONS,
+  openItemModal,
+  itemReadHtml,
+  emptyStateEl,
+  openLocationManager,
 };
