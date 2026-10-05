@@ -7,6 +7,7 @@
 import { api, auth } from '/api.js';
 import { t, formatDate, formatDayMonth, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { periodStepperHtml, syncPeriodReset } from '/utils/period-stepper.js';
 import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -1195,18 +1196,13 @@ function applyVisitReport(data) {
  * Label wuchs in den freien Platz, und der Weiter-Pfeil ruckte um die
  * Knopfbreite, sobald man den laufenden Monat verliess. */
 function reportMonthNavHtml(shownMonth, isCurrentMonth) {
-  return `
-          <button class="btn btn--icon" type="button" id="housekeeping-report-prev"
-                  aria-label="${esc(t('housekeeping.prevMonth'))}" aria-describedby="housekeeping-report-month">
-            <i data-lucide="chevron-left" aria-hidden="true"></i>
-          </button>
-          <span class="housekeeping-month-nav__label" id="housekeeping-report-month">${esc(formatMonthLabel(shownMonth))}</span>
-          <button class="btn btn--icon" type="button" id="housekeeping-report-next"
-                  aria-label="${esc(t('housekeeping.nextMonth'))}" aria-describedby="housekeeping-report-month">
-            <i data-lucide="chevron-right" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--secondary housekeeping-month-nav__current${isCurrentMonth ? ' is-current' : ''}" type="button"
-                  id="housekeeping-report-current"${isCurrentMonth ? ' inert' : ''}>${esc(t('housekeeping.currentMonth'))}</button>`;
+  // Markup und Reihenfolge kommen aus dem EINEN Baustein (utils/period-stepper.js).
+  return periodStepperHtml({
+    prev: { id: 'housekeeping-report-prev', label: t('housekeeping.prevMonth'), attrs: { 'aria-describedby': 'housekeeping-report-month' } },
+    value: { id: 'housekeeping-report-month', className: `housekeeping-month-nav__label${isCurrentMonth ? '' : ' period-stepper__value--away'}`, text: formatMonthLabel(shownMonth) },
+    next: { id: 'housekeeping-report-next', label: t('housekeeping.nextMonth'), attrs: { 'aria-describedby': 'housekeeping-report-month' } },
+    reset: { id: 'housekeeping-report-current', className: 'housekeeping-month-nav__current', label: t('housekeeping.currentMonth'), current: isCurrentMonth },
+  });
 }
 
 /** Der Zeitraum-Slot im Kopf der Seite, zu der `content` gehoert. */
@@ -1236,11 +1232,8 @@ function syncReportPeriod(content) {
   const reset = slot.querySelector('#housekeeping-report-current');
   if (label && reset) {
     label.textContent = formatMonthLabel(shownMonth);
-    // Hatte der Reset den Fokus, holt ihn vorher der Zurueck-Pfeil - `inert`
-    // wirft ihn sonst auf <body>.
-    if (isCurrentMonth && document.activeElement === reset) slot.querySelector('#housekeeping-report-prev')?.focus();
-    reset.classList.toggle('is-current', isCurrentMonth);
-    reset.inert = isCurrentMonth;
+    // Verbergen, Fokus-Uebergabe und `inert`: die eine Regel in period-stepper.js.
+    syncPeriodReset(slot, { reset: '#housekeeping-report-current', isCurrent: isCurrentMonth, prev: '#housekeeping-report-prev', next: '#housekeeping-report-next' });
   } else {
     slot.replaceChildren();
     slot.insertAdjacentHTML('beforeend', reportMonthNavHtml(shownMonth, isCurrentMonth));

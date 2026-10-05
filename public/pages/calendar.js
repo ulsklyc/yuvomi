@@ -13,6 +13,7 @@ import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js'
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate } from '/utils/ux.js';
 import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation } from '/utils/html.js';
+import { periodStepperHtml, syncPeriodReset } from '/utils/period-stepper.js';
 import { initials } from '/utils/initials.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
          monthPeriodKeys, startOfLocalWeekKey, addLocalDays, defaultDateInPeriod,
@@ -2228,19 +2229,13 @@ export async function render(container, { user }) {
 function periodNavHtml() {
   const keys = periodArrowKeys();
   const labels = periodArrowLabels(currentPeriodStep());
-  return `
-      <button class="btn btn--icon" id="cal-prev" aria-label="${esc(labels.prev)}" title="${esc(labels.prev)}"
-              aria-keyshortcuts="${CAL_SHORTCUT_KEYS.prev} ${keys.prev}">
-        <i data-lucide="chevron-left" aria-hidden="true"></i>
-      </button>
-      <span class="cal-toolbar__label" id="cal-label"></span>
-      <button class="btn btn--icon" id="cal-next" aria-label="${esc(labels.next)}" title="${esc(labels.next)}"
-              aria-keyshortcuts="${CAL_SHORTCUT_KEYS.next} ${keys.next}">
-        <i data-lucide="chevron-right" aria-hidden="true"></i>
-      </button>
-      <button class="btn btn--secondary cal-toolbar__today" id="cal-today"
-              aria-keyshortcuts="${CAL_SHORTCUT_KEYS.today}">${t('calendar.today')}</button>
-  `;
+  // Markup und Reihenfolge kommen aus dem EINEN Baustein (utils/period-stepper.js).
+  return periodStepperHtml({
+    prev: { id: 'cal-prev', label: labels.prev, title: true, keys: `${CAL_SHORTCUT_KEYS.prev} ${keys.prev}` },
+    value: { id: 'cal-label', className: 'cal-toolbar__label' },
+    next: { id: 'cal-next', label: labels.next, title: true, keys: `${CAL_SHORTCUT_KEYS.next} ${keys.next}` },
+    reset: { id: 'cal-today', className: 'cal-toolbar__today', label: t('calendar.today'), keys: CAL_SHORTCUT_KEYS.today },
+  });
 }
 
 /**
@@ -2578,15 +2573,8 @@ function syncTodayButton(root = _container) {
   const isCurrent = (state.view === 'month' && isMonthSplit())
     ? state.cursor === state.today
     : state.today >= from && state.today <= to;
-  // `typeof document` statt eines nackten Bezeichners: Testumgebungen ohne
-  // DOM stubben `document` nicht immer, und ein nackter Bezeichner wirft dort
-  // schon beim Werteauswerten, bevor `isCurrent` ihn kurzschliessen kann.
-  const active = typeof document !== 'undefined' ? document.activeElement : null;
-  if (isCurrent && active === btn) {
-    (root.querySelector('#cal-prev') || root.querySelector('#cal-next'))?.focus();
-  }
-  btn.classList.toggle('is-current', isCurrent);
-  btn.inert = isCurrent;
+  // Verbergen, Fokus-Uebergabe und `inert`: die eine Regel in period-stepper.js.
+  syncPeriodReset(root, { reset: '#cal-today', isCurrent, prev: '#cal-prev', next: '#cal-next' });
 }
 
 function getWeekNumber(dateStr) {

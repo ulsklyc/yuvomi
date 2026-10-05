@@ -192,6 +192,7 @@ const APP_SHELL = [
   '/utils/page-search.js',
   '/utils/search-sections.js',
   '/utils/palette-combobox.js',
+  '/utils/period-stepper.js',
   '/utils/pantry-locations.js',
   '/utils/pantry-status.js',
   '/utils/pantry-units.js',

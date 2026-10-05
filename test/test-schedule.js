@@ -2646,7 +2646,10 @@ test('R16: Vergleich und Auswertung tragen mobil zwei Bedienzeilen', async () =>
   // Der Stepper ist EIN Rasterkind: ohne den Kasten fielen Pfeile und Label einzeln ins Raster.
   // Seit R16 Schritt 2 in der Reihenfolge des Zeitraum-Kopfs: zurueck, Wert,
   // vor, dahinter der Reset - im Markup, nicht per `order` (Tab-Folge).
-  assert.match(src, /<div class="schedule-overview__stepper">[\s\S]*?data-direction="prev"[\s\S]*?schedule-overview__week-label[\s\S]*?data-direction="next"[\s\S]*?data-direction="today"[\s\S]*?<\/div>/);
+  // Seit R16 Schritt 2b kommt das Markup aus dem geteilten Baustein
+  // (utils/period-stepper.js); "Heute" verbirgt sich, wenn heute zu sehen ist.
+  assert.match(src, /<div class="schedule-overview__stepper">\$\{periodStepperHtml\(\{[\s\S]*?'data-direction': 'prev'[\s\S]*?schedule-overview__week-label[\s\S]*?'data-direction': 'next'[\s\S]*?current: showsToday[\s\S]*?'data-direction': 'today'[\s\S]*?<\/div>/);
+  assert.match(src, /const showsToday = weekDays\.includes\(todayKey\(\)\);/);
   const stepper = src.match(/<div class="schedule-overview__stepper">[\s\S]*?<\/div>/)[0];
   assert.doesNotMatch(stepper, /calendar\.back|calendar\.forward/, 'die Pfeile nennen ihr Objekt (Woche/Tag), nicht nur die Richtung');
   assert.match(stepper, /calendar\.prevWeek[\s\S]*calendar\.nextWeek/);

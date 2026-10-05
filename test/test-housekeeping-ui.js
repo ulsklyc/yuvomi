@@ -172,7 +172,7 @@ test('Startzustand: laufender Monat, Reset verborgen', async () => {
   assert.match(head, /id="housekeeping-report-month">September 2026</);
   // `.is-current` + `inert` wie Budget und Kalender (#1200), nicht `hidden`:
   // der Reset behaelt seinen Platz, und der Weiter-Pfeil ruckt nicht.
-  assert.match(head, /class="btn btn--secondary housekeeping-month-nav__current is-current" type="button"\s+id="housekeeping-report-current" inert>/,
+  assert.match(head, /<button type="button" class="btn btn--secondary period-stepper__reset housekeeping-month-nav__current is-current" id="housekeeping-report-current" inert>/,
     'Reset im laufenden Monat verborgen, sein Platz bleibt');
   assert.ok(head.indexOf('housekeeping-report-prev') < head.indexOf('housekeeping-report-month')
     && head.indexOf('housekeeping-report-month') < head.indexOf('housekeeping-report-next')

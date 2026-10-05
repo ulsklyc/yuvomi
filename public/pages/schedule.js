@@ -1,6 +1,7 @@
 import { api } from '/api.js';
 import { t, formatDate, formatDayMonth, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { periodStepperHtml } from '/utils/period-stepper.js';
 import { initials } from '/utils/initials.js';
 import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, advancedSection, refocusAfterRender, reportFieldError } from '/components/modal.js';
@@ -1650,6 +1651,7 @@ function scheduleOverviewEntryTitle(entry) {
 function renderOverview() {
   const picker = renderUserMultiSelect(overview.people, overview.selectedIds, 'overview-people', 'schedule.overviewPeopleLabel', 'schedule.overviewClearSelection');
   const weekDays = overviewVisibleDays();
+  const showsToday = weekDays.includes(todayKey());
   const weekLabel = overview.viewMode === 'day'
     ? formatDayMonth(weekDays[0])
     : `${formatDayMonth(weekDays[0])} - ${formatDayMonth(weekDays[weekDays.length - 1])}`;
@@ -1670,11 +1672,16 @@ function renderOverview() {
            Namen "Zurueck"/"Weiter": die eine Stelle, an der "Heute" zwischen
            den Pfeilen sass und die Pfeile ihr Objekt nicht nannten. Die
            Reihenfolge steht im MARKUP (= Tab-Folge), nicht per `order`. */ ''}
-      <div class="schedule-overview__stepper">
-        <button type="button" class="btn btn--icon" data-action="overview-week" data-direction="prev" aria-label="${esc(t(overview.viewMode === 'day' ? 'calendar.prevDay' : 'calendar.prevWeek'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-        <span class="schedule-overview__week-label" aria-live="polite">${esc(weekLabel)}</span>
-        <button type="button" class="btn btn--icon" data-action="overview-week" data-direction="next" aria-label="${esc(t(overview.viewMode === 'day' ? 'calendar.nextDay' : 'calendar.nextWeek'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
-        <button type="button" class="btn btn--secondary" data-action="overview-week" data-direction="today">${esc(t('calendar.today'))}</button>
+      ${/* Markup, Reihenfolge und die Reset-Regel kommen aus dem EINEN
+           Baustein (utils/period-stepper.js). Neu fuer den Schichtplan: "Heute"
+           steht nur, wenn der heutige Tag NICHT zu sehen ist - bis R16 2b stand
+           es auch in der laufenden Woche, als einziger der fuenf Stepper. */ ''}
+      <div class="schedule-overview__stepper">${periodStepperHtml({
+        prev: { label: t(overview.viewMode === 'day' ? 'calendar.prevDay' : 'calendar.prevWeek'), attrs: { 'data-action': 'overview-week', 'data-direction': 'prev' } },
+        value: { className: `schedule-overview__week-label${showsToday ? '' : ' period-stepper__value--away'}`, text: weekLabel, live: true },
+        next: { label: t(overview.viewMode === 'day' ? 'calendar.nextDay' : 'calendar.nextWeek'), attrs: { 'data-action': 'overview-week', 'data-direction': 'next' } },
+        reset: { label: t('calendar.today'), current: showsToday, attrs: { 'data-action': 'overview-week', 'data-direction': 'today' } },
+      })}
       </div>
     </div>
   </div>`;

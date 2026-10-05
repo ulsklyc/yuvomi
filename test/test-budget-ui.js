@@ -3713,10 +3713,20 @@ test('R16: der Budgetkopf fuehrt den Zeitraum mobil in der Titelzeile', () => {
     'der Titel gibt nach (Basis 0) - mit der Basis der Large-Title-Regel nimmt er die ganze Zeile');
   assert.match(of('> .page-toolbar__center'), /flex:\s*0 0 auto/,
     'der Center-Slot beansprucht keine eigene Zeile und gibt selbst nicht nach');
-  // Der Ruecksprung haelt hier keinen Platz frei: er steht per `order` VOR dem
-  // Stepper, und der ist am Zeilenende verankert - kein Pfeil bewegt sich (#1200).
-  assert.match(of('> .page-toolbar__center > .btn.is-current'), /display:\s*none/);
-  assert.match(of('> .page-toolbar__center > .btn--secondary'), /order:\s*-1/);
+  // Der Ruecksprung haelt hier keinen Platz frei und nimmt ihn auch nicht vom
+  // Titel (R16 Schritt 2b): er liegt durchsichtig UEBER dem Wert, zwischen den
+  // Pfeilen. Ein Tipp aufs Monatslabel springt zum laufenden Monat, der Knopf
+  // behaelt Namen und Platz in der Tab-Folge, und kein Pfeil bewegt sich (#1200).
+  assert.match(of('> .page-toolbar__center > .period-stepper__reset.is-current'), /display:\s*none/);
+  const ueber = of('> .page-toolbar__center > .period-stepper__reset');
+  assert.match(ueber, /position:\s*absolute/);
+  assert.match(ueber, /inset-inline:\s*var\(--target-base\)/, 'zwischen den Pfeilen, nicht darueber');
+  assert.match(ueber, /color:\s*transparent/);
+  assert.doesNotMatch(ueber, /order:|opacity:|visibility:|display:\s*none/, 'kein Umsortieren, und der Knopf bleibt fokussierbar samt Ring');
+  assert.match(of('> .page-toolbar__center > .period-stepper__value--away'), /color:\s*var\(--module-accent\)/,
+    'der Wert sagt im Modulton, dass man neben dem laufenden Zeitraum steht');
+  assert.equal(mobile.filter((r) => /:has\(> \.page-toolbar__center > \.btn--secondary/.test(r.selector)).length, 0,
+    'der Titel verlaesst das Bild nicht mehr, solange der Ruecksprung steht');
   // Das Label traegt die Kurzform des Monats und eine feste Breite.
   assert.match(budget, /lbl\.setAttribute\('data-short', ym \? formatMonthYear\(y, m, \{ month: 'short' \}\)/);
   const label = [...eachRule(budgetCss)].filter((r) => r.at.some((a) => /max-width:\s*767px/.test(a))
@@ -3795,4 +3805,62 @@ test('R16 Aufteilung: null ist weder Gewinn noch Schuld - der Ton haengt am Betr
   assert.match(src, /class="metric-card\$\{owed\.length \? ' metric-card--positive' : ''\}"/);
   assert.match(src, /class="metric-card\$\{owing\.length \? ' metric-card--negative' : ''\}"/);
   assert.doesNotMatch(src, /class="metric-card metric-card--(?:positive|negative)">\s*<div class="metric-card__label">\$\{t\('splitExpenses\.you/);
+});
+
+/* R16 Schritt 2b - EIN ZEITRAUM-KOPF (Critique 2026-10-05, P1 Bausteine): fuenf
+ * Module bauten den Stepper je selbst, vier kopierten die Reset-Regel, der
+ * Schichtplan hatte sie nicht. Verhalten am Baustein, nicht am Quelltext.
+ * Gegen den Stand davor rot gelaufen (Baustein fehlte). */
+test('R16: der Zeitraum-Stepper ist ein Baustein - Reihenfolge, Namen, Reset-Regel', async () => {
+  const { periodStepperHtml, syncPeriodReset } = await import('../public/utils/period-stepper.js');
+  const html = periodStepperHtml({
+    prev: { id: 'p', label: 'Vorheriger Monat' },
+    value: { id: 'v', className: 'x__label', text: 'Mai <2026>', live: true },
+    next: { id: 'n', label: 'Nächster Monat', keys: 'j' },
+    reset: { id: 'r', className: 'x__today', label: 'Aktuell', current: true },
+  });
+  const at = (needle) => html.indexOf(needle);
+  assert.ok(at('id="p"') > 0 && at('id="p"') < at('id="v"') && at('id="v"') < at('id="n"') && at('id="n"') < at('id="r"'),
+    'Markup = Tab-Folge: zurueck, Wert, vor, dahinter der Reset');
+  assert.match(html, /<button type="button" class="btn btn--icon period-stepper__prev" id="p" aria-label="Vorheriger Monat">/);
+  assert.match(html, /class="btn btn--icon period-stepper__next" id="n" aria-label="Nächster Monat" aria-keyshortcuts="j"/);
+  assert.match(html, /<span class="period-stepper__value x__label" id="v" aria-live="polite">Mai &lt;2026&gt;<\/span>/, 'der Wert ist Klartext und wird escaped');
+  assert.match(html, /class="btn btn--secondary period-stepper__reset x__today is-current" id="r" inert>Aktuell</,
+    'im laufenden Zeitraum verborgen per .is-current + inert, nie per hidden');
+  assert.doesNotMatch(html, /\shidden[\s>]/);
+  assert.throws(() => periodStepperHtml({ prev: {}, next: { label: 'x' } }), /braucht einen Namen/, 'ein Pfeil ohne Objekt-Namen wird nicht ausgeliefert');
+
+  // Reset-Regel: Fokus zuerst zum Zurueck-Pfeil, dann inert; der Wert merkt "daneben".
+  const classes = () => { const set = new Set(); return { toggle: (c, on) => (on ? set.add(c) : set.delete(c)), contains: (c) => set.has(c) }; };
+  const valueEl = { classList: classes() };
+  const btn = { classList: classes(), inert: false, parentElement: { querySelector: () => valueEl } };
+  let focused = false;
+  const prevBtn = { focus: () => { focused = true; } };
+  const root = { querySelector: (sel) => (sel === '#r' ? btn : sel === '#p' ? prevBtn : null) };
+  const zuvor = global.document;
+  try {
+    global.document = { ...zuvor, activeElement: btn };
+    syncPeriodReset(root, { reset: '#r', isCurrent: false, prev: '#p' });
+    assert.equal(btn.inert, false);
+    assert.equal(focused, false);
+    assert.equal(valueEl.classList.contains('period-stepper__value--away'), true);
+    syncPeriodReset(root, { reset: '#r', isCurrent: true, prev: '#p' });
+    assert.equal(focused, true, 'der Fokus wandert VOR dem inert-Werden');
+    assert.equal(btn.inert, true);
+    assert.equal(btn.classList.contains('is-current'), true);
+    assert.equal(valueEl.classList.contains('period-stepper__value--away'), false);
+  } finally {
+    global.document = zuvor;
+  }
+});
+
+test('R16: Kalender, Essensplan, Budget, Haushaltshilfe und Schichtplan bauen ihren Stepper nicht selbst', () => {
+  const seiten = { calendar: 4, meals: 4, budget: 4, housekeeping: 4, schedule: 4 };
+  for (const name of Object.keys(seiten)) {
+    const src = withoutHtmlComments(withoutComments(read(`../public/pages/${name}.js`)));
+    assert.match(src, /import \{ periodStepperHtml(?:, syncPeriodReset)? \} from '\/utils\/period-stepper\.js';/, `${name}.js nimmt den Baustein`);
+    assert.match(src, /periodStepperHtml\(\{\s*prev: \{[^}]*label:[\s\S]*?value: \{[\s\S]*?next: \{[^}]*label:[\s\S]*?reset: \{/, `${name}.js: prev, value, next, reset`);
+    assert.doesNotMatch(src, /classList\.toggle\('is-current'/, `${name}.js fuehrt keine eigene Fassung der Reset-Regel`);
+    assert.doesNotMatch(src, /\.inert = isCurrent/, `${name}.js setzt inert nicht selbst`);
+  }
 });

@@ -3802,15 +3802,16 @@ html.fab-anim-done .page-fab {
  * nach. Der Kopf misst damit auf JEDEM Reiter dasselbe, ob der Slot einen
  * Stepper oder die Notiz traegt (Budget 162 -> 117px).
  *
- * DER RUECKSPRUNG RESERVIERT HIER KEINEN PLATZ. `.btn.is-current` haelt seine
- * Box sonst per `visibility` (siehe dort, #1200): der Stepper stand links, und
- * ein auftauchender Knopf schob den Weiter-Pfeil unter dem Finger weg. Hier ist
- * der Stepper am Zeilenende verankert und der Ruecksprung steht per `order`
- * VOR ihm - er erscheint links vom Zurueck-Pfeil, und kein Pfeil bewegt sich.
- * Den Platz dafuer gibt der Titel: solange der Ruecksprung steht, verlaesst er
- * das Bild (nicht den Baum), genau wie der eingeklappte Titel eines
- * Zeitraum-Kopfs oben. Siegel, Tab-Leiste und Navigation sagen weiter, wo man
- * ist.
+ * DER RUECKSPRUNG LIEGT HIER AUF DEM WERT (R16 Schritt 2b). Zuerst stand er per
+ * `order` links vom Stepper und nahm sich den Platz vom Titel: solange
+ * "Aktuell" stand, war "Budget" aus dem Bild. Jetzt ist der Wert selbst das
+ * Ziel: der Reset-Knopf (utils/period-stepper.js, `.period-stepper__reset`)
+ * liegt durchsichtig ueber dem Monatslabel, ein Tipp darauf springt zum
+ * laufenden Zeitraum. Er bleibt ein Knopf mit seinem Namen ("Aktuell") an
+ * seiner Stelle in der Tab-Folge - hinter dem Weiter-Pfeil -, und sein
+ * Fokusring umschliesst das Label. Dass man NEBEN dem laufenden Zeitraum
+ * steht, sagt der Wert im Modulton (`.period-stepper__value--away`). Kein
+ * Pfeil bewegt sich, und der Titel bleibt stehen.
  *
  * EINGEKLAPPT BLEIBT DER TITEL STEHEN: er teilt die Zeile mit dem Stepper,
  * sein Verschwinden sparte keine Hoehe mehr. Er faellt nur auf den
@@ -3834,13 +3835,31 @@ html.fab-anim-done .page-fab {
     gap: 0;
   }
 
-  .page-toolbar--period-inline > .page-toolbar__center > .btn.is-current {
+  .page-toolbar--period-inline > .page-toolbar__center {
+    position: relative;
+  }
+
+  .page-toolbar--period-inline > .page-toolbar__center > .period-stepper__reset.is-current {
     display: none;
   }
 
-  .page-toolbar--period-inline > .page-toolbar__center > .btn--secondary {
-    order: -1;
-    margin-inline-end: var(--space-1);
+  /* Zwischen den beiden Pfeilen (je ein volles Ziel breit), ueber dem Wert. */
+  .page-toolbar--period-inline > .page-toolbar__center > .period-stepper__reset {
+    position: absolute;
+    inset-block: 0;
+    inset-inline: var(--target-base);
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    color: transparent;
+  }
+
+  .page-toolbar--period-inline > .page-toolbar__center > .period-stepper__value--away {
+    color: var(--module-accent);
   }
 
   .page-toolbar.page-toolbar--period-inline.page-toolbar--capped.is-collapsed > .page-toolbar__title {
@@ -3854,14 +3873,6 @@ html.fab-anim-done .page-fab {
     display: inline-flex;
   }
 
-  .page-toolbar.page-toolbar--period-inline:has(> .page-toolbar__center > .btn--secondary:not(.is-current):not([hidden])) > .page-toolbar__title {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
 }
 
 /* WERKZEUGE IN DER TITELZEILE (R16, Critique 2026-10-05 P1 mobil; DESIGN.md,

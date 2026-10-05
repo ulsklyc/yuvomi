@@ -14,6 +14,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { periodStepperHtml, syncPeriodReset } from '/utils/period-stepper.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { render as renderSplitExpenses, prefillSplitExpense, canAddSplitExpense, openNewSplitExpense } from '/pages/split-expenses.js';
@@ -642,15 +643,13 @@ async function loadBudgetMeta() {
  * statt Quelltext zu lesen.
  */
 function monthNavHtml() {
-  return `
-          <button class="btn btn--icon" id="budget-prev" aria-label="${t('budget.prevMonth')}">
-            <i data-lucide="chevron-left" aria-hidden="true"></i>
-          </button>
-          <span class="budget-nav__label" id="budget-label" aria-live="polite"></span>
-          <button class="btn btn--icon" id="budget-next" aria-label="${t('budget.nextMonth')}">
-            <i data-lucide="chevron-right" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--secondary budget-nav__today" id="budget-today">${t('budget.currentMonth')}</button>
+  // Markup und Reihenfolge kommen aus dem EINEN Baustein (utils/period-stepper.js).
+  return `${periodStepperHtml({
+    prev: { id: 'budget-prev', label: t('budget.prevMonth') },
+    value: { id: 'budget-label', className: 'budget-nav__label', live: true },
+    next: { id: 'budget-next', label: t('budget.nextMonth') },
+    reset: { id: 'budget-today', className: 'budget-nav__today', label: t('budget.currentMonth') },
+  })}
           <span class="budget-nav__note" id="budget-period-note" hidden></span>
   `;
 }
@@ -702,15 +701,8 @@ function syncCurrentButton(root = _container) {
   const isCurrent = !caps.month || (state.activeTab === 'reports'
     ? reportShowsToday()
     : state.month === currentMonth());
-  // `typeof document` statt eines nackten Bezeichners: Testumgebungen ohne DOM
-  // stubben `document` nicht immer, und ein nackter Bezeichner wirft dort
-  // schon beim Werteauswerten.
-  const active = typeof document !== 'undefined' ? document.activeElement : null;
-  if (isCurrent && active === btn) {
-    (root.querySelector('#budget-prev') || root.querySelector('#budget-next'))?.focus();
-  }
-  btn.classList.toggle('is-current', isCurrent);
-  btn.inert = isCurrent;
+  // Verbergen, Fokus-Uebergabe und `inert`: die eine Regel in period-stepper.js.
+  syncPeriodReset(root, { reset: '#budget-today', isCurrent, prev: '#budget-prev', next: '#budget-next' });
 }
 
 export async function render(container, { user }) {

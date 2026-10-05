@@ -9,6 +9,7 @@ import { openModal as openSharedModal, closeModal as closeSharedModal, selectMod
 import { stagger, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
 import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { periodStepperHtml, syncPeriodReset } from '/utils/period-stepper.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { DEFAULT_CATEGORY_NAME } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
@@ -500,16 +501,13 @@ async function loadPreferences() {
  * Quelltext zu lesen.
  */
 function weekNavHtml() {
-  return `
-          <button class="btn btn--icon" id="week-prev" aria-label="${t('meals.prevWeek')}">
-            <i data-lucide="chevron-left" aria-hidden="true"></i>
-          </button>
-          <span class="week-nav__label" id="week-label"></span>
-          <button class="btn btn--icon" id="week-next" aria-label="${t('meals.nextWeek')}">
-            <i data-lucide="chevron-right" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--secondary week-nav__today" id="week-today">${t('meals.today')}</button>
-  `;
+  // Markup und Reihenfolge kommen aus dem EINEN Baustein (utils/period-stepper.js).
+  return periodStepperHtml({
+    prev: { id: 'week-prev', label: t('meals.prevWeek') },
+    value: { id: 'week-label', className: 'week-nav__label' },
+    next: { id: 'week-next', label: t('meals.nextWeek') },
+    reset: { id: 'week-today', className: 'week-nav__today', label: t('meals.today') },
+  });
 }
 
 /**
@@ -543,15 +541,8 @@ function syncTodayButton(root = _container) {
   const btn = root?.querySelector('#week-today');
   if (!btn) return;
   const isCurrent = state.currentWeek === getMondayOf(todayKey());
-  // `typeof document` statt eines nackten Bezeichners: Testumgebungen ohne DOM
-  // stubben `document` nicht immer, und ein nackter Bezeichner wirft dort
-  // schon beim Werteauswerten.
-  const active = typeof document !== 'undefined' ? document.activeElement : null;
-  if (isCurrent && active === btn) {
-    (root.querySelector('#week-prev') || root.querySelector('#week-next'))?.focus();
-  }
-  btn.classList.toggle('is-current', isCurrent);
-  btn.inert = isCurrent;
+  // Verbergen, Fokus-Uebergabe und `inert`: die eine Regel in period-stepper.js.
+  syncPeriodReset(root, { reset: '#week-today', isCurrent, prev: '#week-prev', next: '#week-next' });
 
   const label = t('meals.today');
   btn.setAttribute('aria-label', label);
