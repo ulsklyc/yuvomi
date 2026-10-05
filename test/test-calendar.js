@@ -2146,6 +2146,37 @@ test('Telefon-Monat: „+" legt fuer den gewaehlten Tag an, der Reset fuehrt zu 
   }
 });
 
+// PR #1673 Review: die Tagesansicht laedt seit R16 die Folgetage fuer die
+// Seitenspalte mit. syncTodayButton() las diese LADESPANNE als angezeigten
+// Zeitraum - stand der Cursor bis zu sieben Tage vor heute, galt die Ansicht
+// als aktuell und der Reset war weg; am Telefon (ohne Spalte) ohne Rueckweg.
+// Gegen den Stand davor rot gelaufen.
+test('Tagesansicht: der Reset ist nur am heutigen TAG aktuell, nicht in der Ladespanne der Seitenspalte', () => {
+  const { state, syncTodayButton, getRangeForView } = calendarHelpers;
+  const zuvor = { view: state.view, cursor: state.cursor, today: state.today };
+  const btn = fakeResetButton();
+  const root = { querySelector: (sel) => (sel === '#cal-today' ? btn : null), contains: () => false };
+  try {
+    Object.assign(state, { view: 'day', today: '2026-10-05', cursor: '2026-10-02' });
+    const { from, to } = getRangeForView('day', state.cursor);
+    assert(state.today >= from && state.today <= to, 'Vorbedingung: heute liegt in der Ladespanne des Tages');
+    syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === false, 'drei Tage vor heute muss „Heute" erreichbar sein');
+    assert(btn.inert === false, 'drei Tage vor heute darf der Reset nicht inert sein');
+
+    state.cursor = '2026-10-05';
+    syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === true, 'am heutigen Tag traegt der Reset .is-current');
+    assert(btn.inert === true, 'am heutigen Tag ist der Reset inert');
+
+    state.cursor = '2026-10-06';
+    syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === false, 'einen Tag nach heute muss „Heute" erreichbar sein');
+  } finally {
+    Object.assign(state, zuvor);
+  }
+});
+
 // Schichtplan-Bloecke im Zeitraster: Ueberlappungs-Layout (#1043)
 //
 // Vorher bekam JEDER Schichtplan-Block dieselben festen Aussenraender
