@@ -233,6 +233,10 @@ function readOnlyBlocks(action) {
   return readOnly() && !READ_SAFE_ACTIONS.has(action);
 }
 
+function shouldIgnoreShoppingRowToggle(target) {
+  return Boolean(target?.closest?.('button, a, input, select, textarea, [data-no-row-toggle]'));
+}
+
 // --------------------------------------------------------
 // Sammelaktions-Pille: Zustandsautomat (#1039)
 //
@@ -1335,29 +1339,13 @@ function renderItem(item) {
       <div class="list-row shopping-item ${isDone ? 'shopping-item--checked' : ''}${ro ? ' shopping-item--static' : ''}"
            data-item-id="${item.id}">
         ${renderItemCheck(item, isDone)}
-        ${/* DER ZEILENKOERPER OEFFNET DEN ARTIKEL (Critique 2026-10-05, R16 P1;
-           * DESIGN.md "Was eine Zeile tut"). Bis dahin hakte ein Tipp auf die
-           * Zeile ab, der Stift daneben oeffnete den Dialog - und im Vorrat
-           * nebenan oeffnete derselbe Tipp den Dialog, in den Rezepten das
-           * Rezept: eine Geste, drei Bedeutungen in einer Modulgruppe. Abhaken
-           * bleibt das Kaestchen (48px) und auf Touch der Wisch vom
-           * Zeilenanfang; der Stift entfaellt, weil der Koerper ihn ersetzt.
-           * Ein echter Knopf, damit der Weg auch per Tastatur da ist - darum
-           * tragen Name und Meta `span` (Phrasing-Inhalt). Bei `read` bleibt
-           * die Spalte Text, der Info-Knopf fuehrt in die Leseansicht. */ ''}
-        ${ro ? `<div class="list-row__main">
+        <div class="list-row__main">
           <div class="list-row__name">${esc(item.name)}${renderItemMeta(item)}</div>
           ${item.quantity || item.tags?.length ? `<div class="list-row__meta">
             ${item.quantity ? `<span class="shopping-item__quantity">${esc(item.quantity)}</span>` : ''}
             ${renderItemTags(item.tags)}
           </div>` : ''}
-        </div>` : `<button type="button" class="list-row__main list-row__main--interactive" data-action="item-details" data-id="${item.id}">
-          <span class="list-row__name">${esc(item.name)}${renderItemMeta(item)}</span>
-          ${item.quantity || item.tags?.length ? `<span class="list-row__meta">
-            ${item.quantity ? `<span class="shopping-item__quantity">${esc(item.quantity)}</span>` : ''}
-            ${renderItemTags(item.tags)}
-          </span>` : ''}
-        </button>`}
+        </div>
         <!-- Geteilte .row-action-Grammatik aus layout.css (app-weit von sieben
              Modulen genutzt), gruppiert in der geteilten .list-row__actions -
              vorher hingen die zwei Buttons als direkte Flex-Kinder in der Zeile,
@@ -1366,13 +1354,17 @@ function renderItem(item) {
           ${ro ? renderReadActions(item) : `<!-- Griff für die Handsortierung (#678). Ein BUTTON, kein role="img"
                wie im Kategorie-Manager: dort steht daneben ein Auf/Ab-Paar als
                Tastaturpfad, hier trägt der Griff ihn selbst (Pfeiltasten bei
-               Fokus). Die Einkaufszeile hat schon Abhaken, Löschen und zwei
-               Wischgesten - zwei weitere Knöpfe hätten die Bedienzone auf dem
-               Handy zugestellt. -->
+               Fokus). Die Einkaufszeile hat schon Abhaken, Details, Löschen und
+               zwei Wischgesten - zwei weitere Knöpfe hätten die Bedienzone auf
+               dem Handy zugestellt. -->
           <button class="row-action list-row__drag" data-action="reorder-handle" data-id="${item.id}"
                   aria-label="${t('shopping.reorderHandle', { name: esc(item.name) })}"
                   title="${t('shopping.reorderHandleHint')}">
             <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
+          </button>
+          <button class="row-action" data-action="item-details" data-id="${item.id}"
+                  aria-label="${t('shopping.detailsLabel', { name: esc(item.name) })}">
+            <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
           </button>
           <button class="row-action row-action--danger" data-action="delete-item" data-id="${item.id}"
                   aria-label="${t('shopping.deleteItemLabel', { name: esc(item.name) })}">
@@ -1983,13 +1975,10 @@ function refreshItemName(container, item) {
   const hasTags = !!item.tags?.length;
   if (item.quantity || hasTags) {
     if (!metaEl) {
-      // Die Spalte ist mit Schreibrecht ein Knopf (renderItem()): darin steht
-      // nur Phrasing-Inhalt, also ein `span`.
-      const tag = main?.tagName === 'BUTTON' ? 'span' : 'div';
-      main?.insertAdjacentHTML('beforeend', `<${tag} class="list-row__meta">
+      main?.insertAdjacentHTML('beforeend', `<div class="list-row__meta">
         ${item.quantity ? `<span class="shopping-item__quantity">${esc(item.quantity)}</span>` : ''}
         ${renderItemTags(item.tags)}
-      </${tag}>`);
+      </div>`);
     } else {
       const qtyEl = metaEl.querySelector('.shopping-item__quantity');
       if (item.quantity && qtyEl) {
@@ -3248,11 +3237,17 @@ function wireListContentEvents(container) {
     }
 
     const target = e.target.closest('[data-action]');
-    // KEIN ZEILENKLICK MEHR, DER ABHAKT (R16): die Zeile hat drei benannte
-    // Ziele - Kaestchen (abhaken), Koerper (oeffnen), Papierkorb (loeschen) -,
-    // und ein Tipp in die Polsterung dazwischen tut nichts, statt eines der
-    // drei zu raten.
-    if (!target) return;
+    if (!target) {
+      // Der Zeilenklick hakt ab - bei `read` gibt es nichts abzuhaken.
+      if (readOnly()) return;
+      if (shouldIgnoreShoppingRowToggle(e.target)) return;
+      const row = e.target.closest('.shopping-item');
+      if (!row) return;
+      const toggle = row.querySelector('[data-action="toggle-item"]');
+      if (!toggle) return;
+      await toggleShoppingItem(Number(row.dataset.itemId), Number(toggle.dataset.checked), container);
+      return;
+    }
     const action = target.dataset.action;
 
     // Der eine Riegel fuer alle Aktionen darunter (siehe READ_SAFE_ACTIONS):
@@ -3722,6 +3717,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
 }
 
 export const __test = {
+  shouldIgnoreShoppingRowToggle,
   // Mengen-Zerlegung fuer den Vorrats-Uebertrag: haengt an der Format-Locale,
   // ist also nur verhaltensgetrieben pruefbar (siehe test-shopping-ux.js).
   parseShoppingQuantity,

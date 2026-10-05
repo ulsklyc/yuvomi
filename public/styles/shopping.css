@@ -706,8 +706,7 @@
 /* Geometrie, Trennlinie, Hover und Zielhöhe kommen aus .list-row. Hier bleibt
  * nur, was den Einkauf unterscheidet. */
 .shopping-item {
-  /* Kein Zeiger an der Zeile: seit R16 hakt der Zeilenklick nicht mehr ab, die
-   * drei Ziele (Kaestchen, Koerper, Papierkorb) tragen ihren Zeiger selbst. */
+  cursor: pointer;
   transition: opacity var(--transition-fast);
   /* KOMPAKTE ZEILE, NUR HIER (#1039). .list-row traegt 8px Block-Polster
    * (--space-2) UND min-height: --target-lg (48px) - beides zusammen ergab

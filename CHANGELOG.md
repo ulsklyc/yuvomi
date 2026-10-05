@@ -20,12 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   semibold in Tasks, 16px regular in Budget entries and subscriptions, 16px medium in most
   modules, 17px semibold in the agenda, contacts and birthdays. It is 16px medium everywhere
   now; card titles keep their heading size.
-- **Shopping: tapping an item opens it, the checkbox ticks it off.** A tap anywhere on a
-  shopping row used to tick the item off, and a pencil next to it opened the item - while the
-  same tap opened the item in Pantry and the recipe in Recipes. The row body now opens the
-  item everywhere in the kitchen, the pencil is gone, and the name gets its width (228 instead
-  of 158px on a phone). Ticking off stays on the checkbox and on the swipe from the start of
-  the row.
 - **The shift plan steps through weeks like every other period.** The compare view read
   "back, Today, forward, week"; it now reads back, week, forward and then "Today", as in the
   calendar and the budget, and the arrows say what they move ("Previous week").
