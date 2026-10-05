@@ -14,6 +14,7 @@ import {
   settingsOptionUrl,
   settingsOverviewUrl,
   settingsSectionUrl,
+  settingsSheetJumpTargets,
   settingsSheetSections,
   settingsSheetsForDomain,
 } from './registry.js';
@@ -789,6 +790,48 @@ function revealSheetSection(leafContainer, sectionId) {
 }
 
 /**
+ * Sprungmarken am Blattanfang (Critique 2026-10-05, R16) - oder `null`, wenn
+ * das Blatt kurz ist (`settingsSheetJumpTargets`, registry.js).
+ *
+ * Echte Links auf `?section=`: Mittelklick und "Adresse kopieren" fuehren an
+ * den Abschnitt, und ohne Skript liefe der Weg ueber die Adresse. Der Klick
+ * springt im STEHENDEN Blatt - derselbe Sprung wie nach einer Umleitung
+ * (`revealSheetSection`: Abschnitt an die Kante, Fokus auf seine Ueberschrift)
+ * -, statt das Blatt ueber den Router neu zu bauen. Die Adresse zieht mit,
+ * damit ein Neuladen dort ankommt, wo man stand.
+ *
+ * Die `<nav>` heisst wie das Blatt (`aria-labelledby` auf seinen Titel): eine
+ * eigene Beschriftung waere ein neuer Text fuer etwas, das der Titel schon sagt.
+ */
+function createSheetJump(leaf, user, leafContainer, headingId) {
+  const targets = settingsSheetJumpTargets(leaf, user);
+  if (!targets.length) return null;
+  const nav = document.createElement('nav');
+  nav.className = 'settings-sheet-jump';
+  nav.setAttribute('aria-labelledby', headingId);
+  const list = document.createElement('ul');
+  list.className = 'settings-sheet-jump__list';
+  list.setAttribute('role', 'list');
+  for (const target of targets) {
+    const item = document.createElement('li');
+    const link = document.createElement('a');
+    link.className = 'filter-chip filter-chip--sm settings-sheet-jump__link';
+    link.href = target.url;
+    link.textContent = t(target.labelKey);
+    link.addEventListener('click', (event) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button > 0) return;
+      event.preventDefault();
+      revealSheetSection(leafContainer, target.id);
+      window.history?.replaceState?.(window.history.state, '', target.url);
+    });
+    item.appendChild(link);
+    list.appendChild(item);
+  }
+  nav.appendChild(list);
+  return nav;
+}
+
+/**
  * Rendert EINEN Abschnitt in seinen Traeger. Ein Fehler bleibt im Abschnitt:
  * scheitert die Kalender-Synchronisation, stehen die Termin-Vorgaben darueber
  * trotzdem (vorher war ein Blatt ein Abschnitt, und der Fehler nahm das Blatt).
@@ -861,6 +904,10 @@ async function renderLeafContent(content, leaf, domain, user, query) {
   const scoped = Boolean(leaf.module);
   const status = createModuleStatus(leaf, user);
   if (status) leafContainer.appendChild(status);
+  // Sprungmarken (R16): nur in Blaettern mit mehr als drei Abschnitten.
+  if (!heading.id) heading.id = `settings-sheet-title-${leaf.id}`;
+  const jump = createSheetJump(leaf, user, leafContainer, heading.id);
+  if (jump) leafContainer.appendChild(jump);
 
   const hosts = [];
   for (const scope of ['mine', 'household']) {

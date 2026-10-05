@@ -891,6 +891,30 @@ export function settingsSectionUrl(sheet, sectionId) {
   return `${sheet.path}?section=${encodeURIComponent(sectionId)}`;
 }
 
+/** Ab wie vielen Abschnitten ein Blatt Sprungmarken fuehrt: MEHR als drei. */
+export const SHEET_JUMP_MIN_SECTIONS = 4;
+
+/**
+ * Die Sprungmarken eines Blatts: je sichtbarem Abschnitt Id, Name und Adresse.
+ *
+ * NUR FUER LANGE BLAETTER (Critique 2026-10-05, R16). Das Kalender-Blatt mass
+ * mobil 4319px, fuenf Abschnitte untereinander; das Sprungziel `?section=` gab
+ * es laengst, aber keinen Weg dorthin, der im Blatt steht. Drei Abschnitte
+ * sind ein Blick - darunter gibt es keine Marken, sonst stuende vor jedem
+ * kurzen Blatt eine Navigation, die laenger ist als ihr Weg.
+ *
+ * @returns {Array<{ id: string, labelKey: string, url: string }>}
+ */
+export function settingsSheetJumpTargets(sheet, user = null) {
+  const sections = settingsSheetSections(sheet, user);
+  if (sections.length < SHEET_JUMP_MIN_SECTIONS) return [];
+  return sections.map((section) => ({
+    id: section.id,
+    labelKey: section.labelKey,
+    url: settingsSectionUrl(sheet, section.id),
+  }));
+}
+
 /**
  * Das Blatt, das am Desktop vorgewaehlt wird, wenn die Adresse keines nennt
  * (S3): das erste sichtbare des gewuenschten Bereichs, sonst das erste

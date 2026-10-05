@@ -2943,3 +2943,50 @@ test('#1607: ein Modulblatt folgt dem Modulrecht - none blendet aus, read bleibt
     clearPermissions();
   }
 });
+
+// Critique 2026-10-05 (R16): das Kalender-Blatt mass mobil 4319px, fuenf
+// Abschnitte untereinander, der erste Schalter bei y=517. Das Sprungziel gab
+// es laengst (`?section=`, Ziel der Umleitungen) - nur keinen Weg dorthin, der
+// im Blatt selbst steht. Blaetter mit mehr als drei Abschnitten fuehren jetzt
+// Sprungmarken am Blattanfang; kurze Blaetter bleiben ohne.
+test('R16: ein Blatt mit mehr als drei Abschnitten fuehrt Sprungmarken auf seine Abschnitte', async () => {
+  const { SETTINGS_LEAVES, settingsSheetJumpTargets, settingsSheetSections } = await import('../public/settings/registry.js');
+  const admin = { id: 1, role: 'admin', is_admin: true };
+  const sheet = (id) => SETTINGS_LEAVES.find((entry) => entry.id === id);
+
+  const calendar = settingsSheetJumpTargets(sheet('module-calendar'), admin);
+  assert.deepEqual(calendar.map((target) => target.id),
+    ['personal-calendar', 'personal-calendar-subscriptions', 'personal-feeds', 'modules-calendar', 'sync-calendar'],
+    'in der Reihenfolge des Blatts: erst "Fuer mich", dann der Haushalt');
+  assert.equal(calendar[4].url, '/settings/modules/calendar?section=sync-calendar', 'dasselbe Ziel wie die Umleitungen');
+  assert.equal(calendar[0].labelKey, 'settings.pageCalendarDefaults', 'die Marke heisst wie der Abschnitt in der Registry');
+
+  // Drei Abschnitte sind ein Blick, keine Navigation.
+  const tasks = sheet('module-tasks');
+  assert.equal(settingsSheetSections(tasks, admin).length, 3);
+  assert.deepEqual(settingsSheetJumpTargets(tasks, admin), []);
+  // Was ein Mitglied nicht sieht, zaehlt nicht mit und steht nicht in den Marken.
+  const member = { id: 2, role: 'member', is_admin: false };
+  const memberTargets = settingsSheetJumpTargets(sheet('module-calendar'), member);
+  assert.ok(memberTargets.every((target) => settingsSheetSections(sheet('module-calendar'), member).some((s) => s.id === target.id)));
+});
+
+test('R16: die Sprungmarken sind Links im Blatt, eine scrollende Zeile, und springen ohne Neuaufbau', async () => {
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  assert.match(shell, /settingsSheetJumpTargets\(leaf, user\)/, 'die Shell fragt die Registry, sie zaehlt nicht selbst');
+  assert.match(shell, /link\.href = target\.url/, 'ein echter Link: Mittelklick und "Adresse kopieren" fuehren an den Abschnitt');
+  assert.match(shell, /event\.preventDefault\(\);\s*\n\s*revealSheetSection\(leafContainer, target\.id\)/,
+    'der Klick springt im stehenden Blatt (Fokus auf die Abschnittsueberschrift), statt es neu zu laden');
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const row = rules.find((r) => r.selector.trim() === '.settings-sheet-jump__list' && !r.at.length);
+  assert.match(row?.body ?? '', /overflow-x:\s*auto/);
+  assert.match(row?.body ?? '', /flex-wrap:\s*nowrap/, 'eine Zeile: umgebrochen kosteten fuenf Marken mobil drei Reihen vor dem ersten Schalter');
+});
+
+test('R16: mobil ist die Blattbeschreibung zwei Zeilen lang', async () => {
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const phone = [...eachRule(css)].find((r) => r.at.some((a) => /\(max-width:\s*767px\)/.test(a))
+    && r.selector.split(',').some((s) => s.trim() === '.settings-leaf-header__description'));
+  assert.match(phone?.body ?? '', /-webkit-line-clamp:\s*2/, 'vier Zeilen Vorspann standen vor dem ersten Schalter');
+});

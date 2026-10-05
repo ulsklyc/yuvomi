@@ -550,6 +550,60 @@
   .settings-leaf-header { margin-top: 0; }
 }
 
+/* MOBIL ZWEI ZEILEN VORSPANN (Critique 2026-10-05, R16). Die Blattbeschreibung
+ * lief im Kalender-Blatt ueber vier Zeilen (77px) vor dem ersten Schalter; sie
+ * zaehlt auf, was im Blatt steht, und genau das tun darunter die
+ * Sprungmarken und die Abschnittstitel. Gekuerzt wird nur das Bild - der Text
+ * steht ganz im Baum. */
+@media (max-width: 767px) {
+  .settings-leaf-header__description {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+}
+
+/* --------------------------------------------------------
+   Sprungmarken am Blattanfang (R16)
+
+   Nur in Blaettern mit mehr als drei Abschnitten (registry.js,
+   settingsSheetJumpTargets). EINE Zeile, die scrollt: umgebrochen kosteten
+   fuenf Marken mobil drei Reihen - vor dem ersten Schalter, den sie
+   erreichbar machen sollen. Die Marken sind die geteilten Chips
+   (filter-chip.css), hier als Links.
+   -------------------------------------------------------- */
+.settings-sheet-jump {
+  margin-bottom: var(--space-4);
+}
+
+.settings-sheet-jump__list {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  margin: 0;
+  /* Luft fuer den Fokusring, den `overflow` sonst kappte. */
+  padding: var(--space-1);
+  margin-inline: calc(var(--space-1) * -1);
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.settings-sheet-jump__list::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-sheet-jump__list > li {
+  flex: 0 0 auto;
+}
+
+.settings-sheet-jump__link {
+  text-decoration: none;
+}
+
 /* --------------------------------------------------------
    Ein Blatt je Modul (Re-Critique 2026-09-27, S1)
 
