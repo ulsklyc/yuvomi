@@ -132,8 +132,16 @@ async function member(displayName, extra = {}) {
   const password = `${username}-pass-123`;
   const r = await admin('POST', '/auth/users', { username, display_name: displayName, password, ...extra });
   assert.equal(r.status, 201, `create ${username}`);
-  const session = await login(username, password);
-  return { id: r.body.user.id, username, password, session, call: as(session), name: displayName };
+  // Angemeldet wird erst, wenn ein Test die Sitzung braucht: der allgemeine
+  // API-Limiter zaehlt jede Anfrage (300 je Minute und Adresse), und die
+  // meisten Konten hier werden nur angelegt und entfernt.
+  const user = { id: r.body.user.id, username, password, name: displayName, session: null };
+  user.login = async () => {
+    if (!user.session) user.session = await login(username, password);
+    return user.session;
+  };
+  user.call = async (method, path, body) => as(await user.login())(method, path, body);
+  return user;
 }
 
 const remove = (user) => admin('DELETE', `/auth/users/${user.id}`);
@@ -141,14 +149,15 @@ const row = (id) => db.prepare('SELECT * FROM users WHERE id = ?').get(id);
 const count = (sql, ...args) => db.prepare(sql).get(...args).n;
 
 /**
- * Hinterlaesst eine Spur: eine angelegte Aufgabe (`tasks.created_by`). Kein
- * Quick-Link - deren Zahl ist je Haushalt gedeckelt, und diese Suite
- * deaktiviert mehr Konten, als der Deckel Kacheln zulaesst.
+ * Hinterlaesst eine Spur: eine angelegte Aufgabe (`tasks.created_by`), direkt
+ * in der Datenbank - wie die Aufgabe entstand, ist hier nicht das Thema, und
+ * jede Anfrage weniger haelt die Suite unter dem API-Limit. Kein Quick-Link:
+ * deren Zahl ist je Haushalt gedeckelt.
  */
-async function leaveTrace(user) {
-  const r = await user.call('POST', '/tasks', { title: `Aufgabe von ${user.name}` });
-  assert.equal(r.status, 201, 'Vorbedingung: Aufgabe angelegt');
-  return r.body.data.id;
+function leaveTrace(user) {
+  return Number(db.prepare(`
+    INSERT INTO tasks(title, status, visibility, created_by) VALUES (?, 'open', 'all', ?) RETURNING id
+  `).get(`Aufgabe von ${user.name}`, user.id).id);
 }
 
 /** Deaktiviert ein Mitglied ueber die Route und prueft, dass es so kam. */
@@ -191,6 +200,7 @@ async function ssoSignIn({ claims, userinfo = {} }) {
 
 test('ohne Spuren: das Konto wird geloescht, samt der Verweise ohne Fremdschluessel', async () => {
   const u = await member('Ohne Spur');
+  await u.login();
   // Eigene Einstellung und abweichende Rechte: zwei Verweise ohne FK, die bisher
   // als Waisen liegen blieben.
   db.prepare("INSERT INTO sync_config (key, value) VALUES (?, 'x')").run(`dashboard_layout:user:${u.id}`);
@@ -397,6 +407,7 @@ test('bestehende Sitzung, auch wenn ihre Zeile noch dasteht: 401', async () => {
   // hat, schreibt sie per INSERT OR REPLACE zurueck. Nachgestellt, indem die
   // Zeile nach dem Deaktivieren wieder eingesetzt wird.
   const u = await member('Sitzung zwei');
+  await u.login();
   const kept = db.prepare('SELECT * FROM sessions').all()
     .filter((r) => JSON.parse(r.sess).userId === u.id);
   assert.equal(kept.length, 1);
@@ -417,6 +428,31 @@ test('bestehende Sitzung, auch wenn ihre Zeile noch dasteht: 401', async () => {
   for (const column of ['calendar_feed_token', 'inventory_deadlines_feed_token', 'cycle_feed_token', 'schedule_feed_token', 'waste_feed_token']) {
     assert.equal(row(u.id)[column], null, column);
   }
+});
+
+test('Sitzung eines GELOESCHTEN Administrators, deren Zeile wieder dasteht: 401, auch an Admin-Routen', async () => {
+  // Die Sitzung traegt Konto-Id und Rolle. Ohne Pruefung kaeme eine
+  // zurueckgeschriebene Sitzung weiter an `requireAdmin` vorbei, obwohl es das
+  // Konto nicht mehr gibt.
+  const u = await member('Geloeschter Admin');
+  db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(u.id);
+  const uAdmin = await login(u.username, u.password);
+  const call = as(uAdmin);
+  assert.equal((await call('GET', '/auth/api-tokens')).status, 200, 'Vorbedingung: die Sitzung ist die eines Administrators');
+  const kept = db.prepare('SELECT * FROM sessions').all().filter((r) => JSON.parse(r.sess).userId === u.id);
+
+  const r = await remove(u);
+  assert.equal(r.body.outcome, 'deleted');
+  const insert = (rowData) => {
+    const columns = Object.keys(rowData);
+    db.prepare(`INSERT INTO sessions (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`).run(...columns.map((c) => rowData[c]));
+  };
+  kept.forEach(insert);
+  assert.equal(sessionsOf(u.id), kept.length, 'Vorbedingung: die Sitzungen stehen wieder da');
+  assert.equal((await call('GET', '/auth/api-tokens')).status, 401);
+  assert.equal((await call('GET', '/auth/users')).status, 401);
+  assert.equal((await call('POST', '/auth/users', { username: 'von-niemandem', display_name: 'X', password: 'von-niemandem-123' })).status, 401);
+  assert.equal(count("SELECT COUNT(*) AS n FROM users WHERE username = 'von-niemandem'"), 0);
 });
 
 test('SSO per sub: abgewiesen, und es entsteht kein Ersatzkonto', async () => {
@@ -926,6 +962,26 @@ test('Betreuung: ein Ehemaliger betreut niemanden mehr und laesst sich nicht neu
   assert.equal(again.body.reason, 'account_deactivated');
 });
 
+test('Betreuung: fuer die Daten eines Ehemaligen kommt kein NEUER Leser dazu, wer schon betreut, bleibt', async () => {
+  const former = await member('Betreute Ehemalige');
+  const carer = await member('Bisherige Betreuung');
+  const newcomer = await member('Neue Betreuung');
+  assert.equal((await admin('PUT', `/health/caregivers/${former.id}`, { caregiver_ids: [carer.id] })).status, 200);
+  await deactivate(former);
+  const grants = () => db.prepare('SELECT caregiver_id FROM health_care_grants WHERE subject_id = ? ORDER BY caregiver_id').all(former.id).map((r) => r.caregiver_id);
+  assert.deepEqual(grants(), [carer.id], 'die bestehende Betreuung bleibt');
+
+  const add = await admin('PUT', `/health/caregivers/${former.id}`, { caregiver_ids: [carer.id, newcomer.id] });
+  assert.equal(add.status, 400);
+  assert.equal(add.body.reason, 'account_deactivated');
+  assert.deepEqual(grants(), [carer.id]);
+  assert.deepEqual((await newcomer.call('GET', '/health/caregivers/me')).body.data, [], 'der Neue liest nichts');
+  // Unveraendert speichern und kuerzen geht weiter.
+  assert.equal((await admin('PUT', `/health/caregivers/${former.id}`, { caregiver_ids: [carer.id] })).status, 200);
+  assert.equal((await admin('PUT', `/health/caregivers/${former.id}`, { caregiver_ids: [] })).status, 200);
+  assert.deepEqual(grants(), []);
+});
+
 // --------------------------------------------------------------------------
 // Der letzte Administrator
 // --------------------------------------------------------------------------
@@ -964,6 +1020,7 @@ test('ein deaktivierter Administrator ist keiner mehr, und er zaehlt nicht als v
 
 test('scheitert das Deaktivieren, bleibt ALLES, wie es war - auch die Sitzung', async () => {
   const u = await member('Atomar');
+  await u.login();
   await leaveTrace(u);
   const t = await admin('POST', '/auth/api-tokens', { name: 'atomar', subject_user_id: u.id });
   assert.equal(t.status, 201);
@@ -994,5 +1051,6 @@ test('scheitert das Deaktivieren, bleibt ALLES, wie es war - auch die Sitzung', 
 // diese Suite laeuft in weniger als einer Minute. Wer sie erweitert, soll das
 // hier erfahren und nicht als 429 in irgendeinem Test weiter oben.
 test('die Suite bleibt unter dem API-Limit von 300 Anfragen', () => {
+  console.log(`# ${apiRequests} Anfragen an /api/`);
   assert.ok(apiRequests < 280, `${apiRequests} Anfragen an /api/ - Tests in eine zweite Suite auslagern`);
 });

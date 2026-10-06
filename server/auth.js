@@ -20,7 +20,6 @@ import { createLogger } from './logger.js';
 import { memberEmail } from './services/member-email.js';
 import {
   accessScopeSql, activeAccountSql, deactivatedAtColumnSql, householdMemberSql, isActiveAccount,
-  isDeactivatedAccount,
 } from './services/household-members.js';
 import { RemovalRefused, removeUser } from './services/user-removal.js';
 import {
@@ -986,7 +985,14 @@ function requireAuth(req, res, next) {
   // Zeile ins Leere; bei einem deaktivierten zeigte sie auf ein Konto, das es
   // noch gibt - und waere bis zu ihrem Ablauf ein Zugang. Deshalb die eine
   // Abfrage je Request, auf dem Primaerschluessel.
-  if (req.session && req.session.userId && isDeactivatedAccount(req.session.userId, { db: db.get() })) {
+  //
+  // UND DIE SITZUNG EINES GELOESCHTEN KONTOS GILT EBENSO WENIG. "Zeigt ins
+  // Leere" stimmt nur fuer Routen, die die Zeile nachschlagen: die Sitzung
+  // traegt Konto-Id UND Rolle, und `requireAdmin` liest die Rolle aus ihr. Die
+  // zurueckgeschriebene Sitzung eines geloeschten Administrators kaeme sonst
+  // weiter an jede Admin-Route. Gefragt wird deshalb "ist dieses Konto aktiv",
+  // nicht "ist es deaktiviert" - ein Konto, das es nicht gibt, ist es nicht.
+  if (req.session && req.session.userId && !isActiveAccount(req.session.userId, { db: db.get() })) {
     return res.status(401).json({ error: 'Not authenticated.', code: 401 });
   }
 
@@ -3685,7 +3691,11 @@ router.delete('/users/:id', requireAuth, requireAdmin, csrfMiddleware, (req, res
     res.json({ ok: true, outcome: result.outcome, traces: result.traces });
   } catch (err) {
     if (err instanceof RemovalRefused) {
-      return res.status(400).json({ error: err.message, code: 400, reason: err.reason });
+      // Die beiden Gruende als Literale: `test:api` fuehrt jede Stelle, an der
+      // ein `reason` durch eine Variable gereicht wird.
+      return err.reason === 'last_sso_admin'
+        ? res.status(400).json({ error: err.message, code: 400, reason: 'last_sso_admin' })
+        : res.status(400).json({ error: err.message, code: 400, reason: 'last_admin' });
     }
     log.error('User deletion error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

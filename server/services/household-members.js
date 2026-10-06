@@ -68,16 +68,6 @@ export function isActiveAccount(userId, { db } = {}) {
 }
 
 /**
- * Gibt es dieses Konto, und ist es deaktiviert? Nicht das Gegenteil von
- * `isActiveAccount()`: ein Konto, das es nicht gibt, ist weder das eine noch
- * das andere.
- */
-export function isDeactivatedAccount(userId, { db } = {}) {
-  const database = db || dbModule.get();
-  return Boolean(database.prepare(`SELECT 1 FROM users u WHERE u.id = ? AND NOT (${activeAccountSql('u')})`).get(userId));
-}
-
-/**
  * SQL-Bedingung "die users-Zeile unter `alias` ist ein Haushaltsmitglied".
  *
  * Nimmt bewusst KEINE Optionen mehr. Die frueheren `includeGuests` und

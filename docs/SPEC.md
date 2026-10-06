@@ -85,7 +85,7 @@ without a database import, handed on by `server/services/household-members.js`).
 out of `newNonMembers()` for newly chosen people, while a stored reference keeps its name and stays
 saveable. `canSignIn()` asks it for password login, the OIDC callback, email linking and the second
 factor (`POST /auth/2fa/verify` asks before it spends a recovery code); `requireAuth` asks it per
-request for sessions and through the token join for API tokens, for subject and issuer alike;
+request for sessions (a session whose account is deactivated or no longer exists is refused) and through the token join for API tokens, for subject and issuer alike;
 the feed token lookups, `sendPushToUser()`, `memberEmail()` and the due-reminder query ask it too.
 `GET /api/v1/auth/users` keeps listing deactivated accounts, after the active ones, with
 `deactivated_at`. The response of the delete route stays `200 { ok: true }` and adds

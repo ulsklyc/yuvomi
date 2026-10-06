@@ -98,6 +98,20 @@ router.put('/caregivers/:subjectId', requireAdmin, (req, res) => {
           reason: 'account_deactivated',
         });
       }
+      // UND NIEMAND BEKOMMT NEU ZUGRIFF AUF DIE DATEN EINES EHEMALIGEN. Dessen
+      // Gesundheitsdaten bleiben beim Deaktivieren stehen, und eine Betreuung
+      // macht sie lesbar und schreibbar. Wer schon betreut, behaelt das (die
+      // Liste laesst sich auch kuerzen und leeren); eine NEUE Betreuung waere
+      // ein neuer Leser fuer Daten, deren Eigentuemer nicht mehr widersprechen
+      // kann. Was mit diesen Daten geschieht, ist offen (#1381).
+      const added = ids.filter((id) => !stored.has(id));
+      if (added.length && !isActiveAccount(subjectId, { db: db.get() })) {
+        return res.status(400).json({
+          error: 'A deactivated account cannot get new caregivers.',
+          code: 400,
+          reason: 'account_deactivated',
+        });
+      }
     }
 
     const insert = db.get().prepare(

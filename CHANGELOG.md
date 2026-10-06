@@ -60,8 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   be removed.
   **Private data stays where it is.** Health and cycle records, private notes, shift plans and
   the person's own contact card and birthday are kept when an account is deactivated; nobody
-  can sign in to read them, and people who look after that person keep the access they had.
-  Removing that data is not part of this change. A deactivated person can no longer be picked
+  can sign in to read them, and people who look after that person keep the access they had,
+  but nobody new can be given it. Removing that data is not part of this change. A deactivated person can no longer be picked
   as assignee, attendee or group member, while everything they were already part of keeps
   them. Bringing an account back is not possible yet. For API clients:
   `DELETE /api/v1/auth/users/{id}` still answers `200 { "ok": true }` and now adds
