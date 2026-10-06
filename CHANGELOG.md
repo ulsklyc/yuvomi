@@ -31,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `payer_name`, `participants`, `splits`, `blocked_reason`, `can_edit`, `missed_count` and
   `resume_date`; activity types `recurring_edited` and `recurring_deleted`. No migration.
 
+- **The Singapore dollar is a currency a household can pick, and Singapore is a region** (#1697,
+  from D#982). SGD was missing from the list the household setting, subscriptions and shared
+  expenses all read, and the server checks a saved currency against that same list - so a
+  household in Singapore could not record its money in its own currency at all. Choosing
+  **English (Singapore)** as the region now sets the dollar together with the local date and time
+  format in one step (06/10/2026, twelve-hour clock), and amounts are grouped the way they are
+  written there.
+
 - **A meal can name the member who cooks it, and the week plan and the overview show who that
   is** (#1679, from D#1661, asked by @matejhermanek for a shared flat that plans who cooks which
   meal). A planned meal carried a date, a type, a title, notes and a recipe, and the only person on it was whoever

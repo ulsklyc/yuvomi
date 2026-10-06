@@ -138,6 +138,29 @@ test('New Zealand preset uses NZD and local number formatting', () => {
   assert.ok(formatted.includes('1,234.56'));
 });
 
+// #1697: Singapur konnte seine Waehrung gar nicht waehlen - SGD fehlte in
+// CURRENCY_CODES, und die Preferences-Route validiert gegen dieselbe Liste. Das
+// Tripel ist der CLDR-Default von en-SG und wird hier GEMESSEN statt
+// abgeschrieben: Tag vor Monat mit Schraegstrich, Stunde im 12er-Takt.
+test('Singapore preset uses SGD and the CLDR date and time defaults of en-SG (#1697)', () => {
+  assert.ok(CURRENCY_CODES.includes('SGD'), 'SGD fehlt in CURRENCY_CODES');
+  assert.deepEqual(REGION_PRESETS['en-SG'], { currency: 'SGD', date_format: 'dmy_slash', time_format: '12h' });
+
+  const locale = numberLocaleFor({ region: 'en-SG', ...REGION_PRESETS['en-SG'] });
+  assert.equal(locale, 'en-SG');
+  // Ohne gespeicherte Region fuehrt das Tripel allein zurueck nach Singapur:
+  // kein anderes Preset teilt SGD.
+  assert.equal(detectRegion({ currency: 'SGD', date_format: 'dmy_slash', time_format: '12h' }), 'en-SG');
+
+  const amount = new Intl.NumberFormat(locale, { style: 'currency', currency: 'SGD' }).format(1234.56);
+  assert.ok(amount.includes('$'), amount);
+  assert.ok(amount.includes('1,234.56'), amount);
+
+  const when = new Date(Date.UTC(2026, 9, 6, 15, 5));
+  assert.equal(new Intl.DateTimeFormat('en-SG', { timeZone: 'UTC' }).format(when), '06/10/2026');
+  assert.equal(new Intl.DateTimeFormat('en-SG', { timeZone: 'UTC', hour: 'numeric' }).resolvedOptions().hour12, true);
+});
+
 test('numberLocaleFor derives the tag even without a stored region, and empties for custom', () => {
   // Region nicht gesetzt, aber Formate entsprechen einem Preset → abgeleiteter Tag.
   assert.equal(numberLocaleFor({ ...REGION_PRESETS['de-CH'] }), 'de-CH');

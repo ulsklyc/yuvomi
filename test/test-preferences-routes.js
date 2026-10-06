@@ -168,6 +168,16 @@ test('PUT currency: ungültig -> 400, gültig -> persist', async () => {
   assert.equal((await put({ currency: 'USD' })).body.data.currency, 'USD');
   assert.equal((await get()).body.data.currency, 'USD');
 });
+// #1697: der Singapur-Dollar stand nicht in der Liste, gegen die diese Route
+// prueft - ein Haushalt in Singapur bekam auf seine Waehrung eine 400.
+test('PUT currency SGD und Region en-SG werden angenommen (#1697)', async () => {
+  const saved = (await put({ currency: 'SGD', region: 'en-SG', date_format: 'dmy_slash', time_format: '12h' }));
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.data.currency, 'SGD');
+  assert.equal(saved.body.data.region, 'en-SG');
+  assert.equal((await get()).body.data.currency, 'SGD');
+  await put({ currency: 'USD', region: null });
+});
 test('PUT date_format: ungültig -> 400, gültig -> persist', async () => {
   assert.equal((await put({ date_format: 'zzz' })).status, 400);
   assert.equal((await put({ date_format: 'mdy' })).body.data.date_format, 'mdy');
