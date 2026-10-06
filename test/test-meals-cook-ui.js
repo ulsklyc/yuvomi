@@ -71,7 +71,7 @@ const MITTAG = { key: 'lunch', label: 'Mittag' };
 const mahlzeit = (over = {}) => ({
   id: 11, title: 'Linsensuppe', date: '2026-10-07', meal_type: 'lunch', recipe_id: null,
   recipe_url: null, notes: null, recurrence_template_id: null, recurrence_end_date: null,
-  cook_user_id: null, cook_name: null, cook_color: null, cook_avatar: null,
+  cook_user_id: null, cook_name: null, cook_color: null,
   ingredients: [{ id: 1, name: 'Linsen', quantity: '200 g', category: 'Vorrat', on_shopping_list: 0 }],
   ...over,
 });
@@ -170,8 +170,25 @@ test('Wochenansicht: ein Koch ohne Zutaten bekommt seine eigene Meta-Zeile; ein 
   assert.match(meta, /meal-card__cook/);
   assert.doesNotMatch(meta, /meal-card__ingredients-count/);
 
-  const mitBild = await withAccess(SCHREIBEN, () => kachel(mitBen({ cook_avatar: 'data:image/png;base64,QkVO' })));
-  assert.match(mitBild, /<img src="data:image\/png;base64,QkVO" alt="Ben"/);
+  // DAS BILD KOMMT AUS DER MITGLIEDERLISTE, nicht aus der Mahlzeit: der Server
+  // haengt es nicht mehr an jede Zeile der Woche. Die Mahlzeit nennt nur die id.
+  const BEN_MIT_BILD = { ...BEN, avatar_data: 'data:image/png;base64,QkVO' };
+  const karte = (modules, members) => withAccess(modules, () => mitPlan({ members }, () => kachel(mitBen())));
+  const mitBild = await karte(SCHREIBEN, [ANNA, BEN_MIT_BILD]);
+  assert.match(mitBild, /<img src="data:image\/png;base64,QkVO" alt="Ben"/, 'das Profilbild des Mitglieds steht an der Karte');
+  assert.match(abschnitt(mitBild, 'class="meal-card__cook"', '</button>'), /<img src="data:image\/png;base64,QkVO"/, 'und zwar am Koch-Zeichen');
+  assert.match(await karte(LESEN, [ANNA, BEN_MIT_BILD]), /<img src="data:image\/png;base64,QkVO" alt="Ben"/, 'auch bei `read`');
+
+  // Ohne Bild am Mitglied, und fuer einen Koch, der in der Liste nicht steht
+  // (ehemalig, Hauspersonal): die Initialen auf seiner Farbe, kein leeres Bild.
+  for (const members of [MITGLIEDER, [ANNA], []]) {
+    const ohneBild = await karte(SCHREIBEN, members);
+    assert.match(ohneBild, /class="meal-card__cook"/, 'das Zeichen bleibt');
+    assert.doesNotMatch(ohneBild, /<img src="data:/, 'kein Bild');
+    assert.match(ohneBild, /background-color:#34C759/, 'die Farbe aus der Mahlzeit');
+  }
+  // Ein Bildfeld an der Mahlzeit selbst liest niemand mehr.
+  assert.doesNotMatch(await withAccess(SCHREIBEN, () => mitPlan({}, () => kachel(mitBen({ cook_avatar: 'data:image/png;base64,QUxU' })))), /QUxU/);
 });
 
 test('Wochenansicht: der Name des Kochs laeuft durch esc()', async () => {
@@ -193,7 +210,7 @@ test('Wochenansicht bei `read`: der Koch bleibt als Zeichen an der Karte', async
 
 test('Uebersicht: der Slot einer Mahlzeit mit Koch traegt den Avatar in der Kopfzeile, vor dem Symbol der Mahlzeitenart', () => {
   const html = dashboard.renderTodayMeals([
-    { meal_type: 'lunch', title: 'Linsensuppe', cook_user_id: 2, cook_name: 'Ben', cook_color: '#34C759', cook_avatar: null },
+    { meal_type: 'lunch', title: 'Linsensuppe', cook_user_id: 2, cook_name: 'Ben', cook_color: '#34C759' },
     { meal_type: 'dinner', title: 'Pasta', cook_user_id: null, cook_name: null },
   ], ['lunch', 'dinner']);
 
@@ -216,15 +233,28 @@ test('Uebersicht, Heute-Blatt: die Zeile der Mahlzeit traegt den Koch als ihre P
   // Alle drei Mahlzeitenarten, damit die Auswahl "was steht als Naechstes an"
   // zu jeder Uhrzeit eine Mahlzeit findet - der Test haengt nicht an der Uhr.
   const heute = (over) => ['breakfast', 'lunch', 'dinner'].map((meal_type, i) => ({
-    id: 30 + i, meal_type, title: `Gericht ${i}`, cook_user_id: null, cook_name: null, cook_color: null, cook_avatar: null, ...over,
+    id: 30 + i, meal_type, title: `Gericht ${i}`, cook_user_id: null, cook_name: null, cook_color: null, ...over,
   }));
-  const zeile = (todayMeals) => dashboard.buildTodayProgram({ todayMeals }, { includeTasks: false, includeCalendar: false })
+  const zeile = (todayMeals, users) => dashboard.buildTodayProgram({ todayMeals, users }, { includeTasks: false, includeCalendar: false })
     .rows.find((row) => row.kind === 'meal');
 
-  const mit = zeile(heute({ cook_user_id: 2, cook_name: 'Ben', cook_color: '#34C759', cook_avatar: 'data:image/png;base64,QkVO' }));
+  // Das Bild steht in `users` derselben Dashboard-Antwort, nicht an der Mahlzeit.
+  const USERS = [{ id: 1, display_name: 'Anna', avatar_color: '#FF9500', avatar_data: null },
+    { id: 2, display_name: 'Ben', avatar_color: '#34C759', avatar_data: 'data:image/png;base64,QkVO' }];
+  const mit = zeile(heute({ cook_user_id: 2, cook_name: 'Ben', cook_color: '#34C759' }), USERS);
   assert.ok(mit, 'Vorbedingung: das Heute-Blatt hat seine Mahlzeit-Zeile');
   assert.deepEqual(mit.who, { id: 2, display_name: 'Ben', color: '#34C759', avatar_data: 'data:image/png;base64,QkVO' },
     'wen die Zeile angeht, ist der Koch - das Ueberlappungszeichen liest genau diese Person');
+  assert.equal(zeile(heute({ cook_user_id: 2, cook_name: 'Ben', cook_color: '#34C759' })).who.avatar_data, null,
+    'ohne `users` (oder fuer einen Koch, der dort nicht steht) bleiben die Initialen');
+
+  // Die Kachel "Heute essen" nimmt denselben Weg.
+  const slot = (users) => dashboard.renderTodayMeals(
+    [{ meal_type: 'lunch', title: 'Suppe', cook_user_id: 2, cook_name: 'Ben', cook_color: '#34C759' }], ['lunch'], users);
+  assert.match(abschnitt(slot(USERS), 'class="meal-slot__cook"', 'meal-slot__icon'), /<img src="data:image\/png;base64,QkVO" alt="Ben"/,
+    'das Profilbild im Kopf des Slots');
+  assert.doesNotMatch(slot([USERS[0]]), /<img src="data:/, 'ohne Eintrag in `users` kein Bild');
+  assert.match(slot(undefined), /class="meal-slot__cook"/, 'und ohne Liste bleibt das Zeichen');
 
   const ohne = zeile(heute());
   assert.ok(ohne, 'Vorbedingung');
@@ -359,15 +389,17 @@ test('loadMembers: ein gescheiterter Abruf wird gemeldet und loescht die geladen
   assert.deepEqual(members, MITGLIEDER, 'die schon geladene Liste bleibt - kein "es gibt keine Mitglieder"');
 });
 
-test('bei `read` wird die Mitgliederliste gar nicht erst geladen; mit Schreibrecht kommt sie aus /family/members', async () => {
+test('die Mitgliederliste kommt aus /family/members - auch bei `read`, wo sie das Bild des Kochs traegt', async () => {
   const laden = (modules) => withAccess(modules, () => mitPlan({ members: [{ id: 99 }] }, async () => {
     const liste = await aufrufe(() => meals.loadMembers(), { 'GET /family/members': { data: MITGLIEDER } });
     return { pfade: liste.map((a) => `${a.method} ${a.path}`), members: meals.state.members };
   }));
 
+  // Bei `read` gibt es keine Wahl (die Leseansicht hat keine Auswahl), die
+  // Liste traegt aber das Profilbild, das nicht mehr an jeder Mahlzeit haengt.
   const lesend = await laden(LESEN);
-  assert.deepEqual(lesend.pfade, [], 'ohne Wahl keine Liste');
-  assert.deepEqual(lesend.members, []);
+  assert.deepEqual(lesend.pfade, ['GET /family/members'], 'EIN Abruf fuer die ganze Seite, keiner je Mahlzeit');
+  assert.deepEqual(lesend.members, MITGLIEDER);
 
   const schreibend = await laden(SCHREIBEN);
   assert.deepEqual(schreibend.pfade, ['GET /family/members'], 'die eine Mitgliederliste (householdMemberSql)');

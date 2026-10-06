@@ -16,8 +16,8 @@ import { newNonMembers, nonMemberMessage } from './household-members.js';
 
 /**
  * Der Koch einer Mahlzeit (#1679), wie ihn die Leseabfragen neben `created_by`
- * herausgeben: `cook_user_id` steht schon in `m.*`, dazu Name, Farbe und Bild
- * der Person. EIN Ausdruck fuer jede Abfrage, die Mahlzeiten liest - hier und
+ * herausgeben: `cook_user_id` steht schon in `m.*`, dazu Name und Farbe der
+ * Person. EIN Ausdruck fuer jede Abfrage, die Mahlzeiten liest - hier und
  * in der Uebersicht (server/routes/dashboard.js) -, mit dem Join daneben. Die
  * Mahlzeit steht in beiden Abfragen unter dem Alias `m`.
  *
@@ -26,9 +26,16 @@ import { newNonMembers, nonMemberMessage } from './household-members.js';
  * der inzwischen ehemalig ist, behaelt seinen Namen an der Mahlzeit, so wie der
  * Zustaendige einer Aufgabe; wer NEU waehlbar ist, entscheidet `cookRefusal()`.
  */
+/*
+ * DAS BILD GEHT NICHT MIT. `users.avatar_data` ist eine Data-URL bis in die
+ * Hunderte Kilobyte; an jeder Mahlzeit haengend kaeme dasselbe Bild in einem
+ * Wochenabruf so oft, wie die Person kocht - 21 Mahlzeiten, 21-mal. Name und
+ * Farbe reichen fuer die Initialen-Scheibe; das Bild holt die Oberflaeche
+ * einmal je Person aus der Mitgliederliste, die sie ohnehin laedt
+ * (`/family/members` im Planer, `users` in der Antwort von `/dashboard`).
+ */
 export const MEAL_COOK_COLUMNS_SQL = `
-           cook.display_name AS cook_name, cook.avatar_color AS cook_color,
-           cook.avatar_data AS cook_avatar`;
+           cook.display_name AS cook_name, cook.avatar_color AS cook_color`;
 export const MEAL_COOK_JOIN_SQL = 'LEFT JOIN users cook ON cook.id = m.cook_user_id';
 
 /**

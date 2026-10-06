@@ -255,7 +255,7 @@ router.get('/suggestions', (req, res) => {
  * Response: { data: Meal[], weekStart: string, weekEnd: string }
  *
  * Meal: { id, date, meal_type, title, notes, created_by, cook_user_id, cook_name,
- *         cook_color, cook_avatar, recurrence_cook_user_id, ingredients: Ingredient[] }
+ *         cook_color, recurrence_cook_user_id, ingredients: Ingredient[] }
  * Ingredient: { id, meal_id, name, quantity, on_shopping_list }
  */
 router.get('/', (req, res) => {

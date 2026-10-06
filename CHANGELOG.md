@@ -30,8 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calendar, a reminder for the cook and a view per person are not part of this. For API clients:
   `cook_user_id` on `POST /api/v1/meals`, `PUT /api/v1/meals/{id}` (with `?scope=series` for the
   series) and on each assignment of `POST /api/v1/meals/apply-plan`; meals come back with
-  `cook_user_id`, `cook_name`, `cook_color` and `cook_avatar`, also in `todayMeals` of the
-  overview (migration 235). The id is a positive integer or `null`; an empty string or any other
+  `cook_user_id`, `cook_name` and `cook_color`, also in `todayMeals` of the overview (migration
+  235); the cook's picture is not repeated on every meal, it is on the member
+  (`GET /api/v1/family/members`). The id is a positive integer or `null`; an empty string or any other
   form is refused with 400. A meal of a series also returns `recurrence_cook_user_id`, the cook
   stored on the series.
 

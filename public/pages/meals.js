@@ -515,14 +515,15 @@ async function loadRecipes() {
  * Wer als Koch waehlbar ist (#1679): die Haushaltsmitglieder, wie
  * `/family/members` sie durch das eine Mitglieder-Praedikat liefert - ohne
  * Hauspersonal, Gaeste und Wandtabletts (docs/DECISIONS.md, Eintrag 4). Die
- * Route lehnt genau die ab, die hier fehlen. Bei `read` gibt es keine Wahl,
- * also auch keine Liste: die Leseansicht zeigt den Koch aus der Mahlzeit.
+ * Route lehnt genau die ab, die hier fehlen.
+ *
+ * AUCH BEI `read`. Eine Wahl gibt es dort nicht, die Liste traegt aber das
+ * BILD des Kochs: die Mahlzeit nennt nur id, Name und Farbe (mealCook()), das
+ * Profilbild steht einmal je Person hier statt an jeder Mahlzeit der Woche.
+ * `/family/members` ist kein Modul der Rechteverwaltung und fuer jede Sitzung
+ * lesbar; scheitert der Abruf, bleiben die Initialen.
  */
 async function loadMembers() {
-  if (readOnly()) {
-    state.members = [];
-    return;
-  }
   try {
     const res = await api.get('/family/members');
     state.members = Array.isArray(res.data) ? res.data : [];
@@ -539,8 +540,12 @@ async function loadMembers() {
 /**
  * Der Koch einer Mahlzeit als Person, wie `renderAvatarStack()` und
  * `withChosenPeople()` sie lesen - oder null. Die Leseabfragen liefern ihn
- * flach neben der Mahlzeit (`cook_user_id`, `cook_name`, `cook_color`,
- * `cook_avatar`), im Planer wie in der Uebersicht.
+ * flach neben der Mahlzeit (`cook_user_id`, `cook_name`, `cook_color`), im
+ * Planer wie in der Uebersicht.
+ *
+ * DAS BILD KOMMT AUS DER MITGLIEDERLISTE, nicht aus der Mahlzeit: der Server
+ * haengt es nicht mehr an jede Zeile. Ein Koch, der kein Mitglied (mehr) ist,
+ * steht dort nicht und zeigt seine Initialen auf seiner Farbe.
  */
 function mealCook(meal) {
   if (!meal?.cook_user_id) return null;
@@ -548,7 +553,7 @@ function mealCook(meal) {
     id: meal.cook_user_id,
     display_name: meal.cook_name ?? '',
     color: meal.cook_color ?? null,
-    avatar_data: meal.cook_avatar ?? null,
+    avatar_data: state.members.find((member) => member.id === meal.cook_user_id)?.avatar_data ?? null,
   };
 }
 

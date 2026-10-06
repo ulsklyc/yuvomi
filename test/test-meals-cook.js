@@ -133,14 +133,14 @@ test('Migration 235: beide Spalten, nullable, auf users(id) mit ON DELETE SET NU
 // Speichern und Lesen
 // --------------------------------------------------------------------------
 
-test('POST /: der Koch wird gespeichert und kommt mit Name, Farbe und Bild zurueck', async () => {
+test('POST /: der Koch wird gespeichert und kommt mit Name und Farbe zurueck - ohne sein Bild', async () => {
   db.prepare("UPDATE users SET avatar_data = 'data:image/png;base64,QkVO' WHERE id = ?").run(BEN);
   const r = await createMeal({ cook_user_id: BEN });
   assert.equal(r.status, 201);
   assert.equal(r.body.data.cook_user_id, BEN);
   assert.equal(r.body.data.cook_name, 'Ben');
   assert.equal(r.body.data.cook_color, '#34C759');
-  assert.equal(r.body.data.cook_avatar, 'data:image/png;base64,QkVO');
+  assert.ok(!('cook_avatar' in r.body.data), 'das Bild haengt nicht an der Mahlzeit');
   assert.equal(r.body.data.created_by, ANNA, 'wer eintraegt, bleibt eine eigene Angabe neben dem Koch');
   assert.equal(cookOf(r.body.data.id), BEN);
 });
@@ -201,7 +201,9 @@ test('Uebersicht: die Mahlzeit von heute traegt ihren Koch', async () => {
     assert.equal(meal.cook_user_id, BEN);
     assert.equal(meal.cook_name, 'Ben');
     assert.equal(meal.cook_color, '#34C759');
-    assert.equal(meal.cook_avatar, 'data:image/png;base64,QkVO');
+    assert.ok(!('cook_avatar' in meal), 'das Bild haengt nicht an der Mahlzeit');
+    assert.equal(r.body.users.find((u) => u.id === BEN).avatar_data, 'data:image/png;base64,QkVO',
+      'es steht einmal in `users` derselben Antwort - von dort nimmt es die Oberflaeche, auch am Wandtablett');
   } finally {
     db.prepare('DELETE FROM meals WHERE id = ?').run(id);
   }
@@ -633,4 +635,44 @@ test('GET / und jede Antwort eines Schreibwegs nennen den Koch der Serie als `re
 
   const ohneSerie = (await createMeal({ date: '2035-06-01', cook_user_id: BEN })).body.data;
   assert.equal(ohneSerie.recurrence_cook_user_id, null, 'ohne Serie gibt es keinen Serienkoch');
+});
+
+// `users.avatar_data` ist eine Data-URL bis in die Hunderte Kilobyte. An jeder
+// Mahlzeit haengend kam dasselbe Bild in EINEM Wochenabruf so oft, wie die
+// Person kocht: 21 Mahlzeiten, 21-mal (Review zu #1737).
+test('das Bild des Kochs haengt an keiner Mahlzeit: eine volle Woche wiegt nicht 21 Profilbilder', async () => {
+  const BILD = `data:image/png;base64,${'QUJD'.repeat(50_000)}`; // 200 KB
+  const KOCH = addUser('bildkoch', 'Bildkoch');
+  db.prepare('UPDATE users SET avatar_data = ? WHERE id = ?').run(BILD, KOCH);
+  const montag = '2052-01-01'; // ein Montag
+  assert.equal(new Date(`${montag}T00:00:00Z`).getUTCDay(), 1, 'Vorbedingung: die Woche beginnt hier');
+
+  const plan = [];
+  for (let tag = 0; tag < 7; tag += 1) {
+    for (const meal_type of ['breakfast', 'lunch', 'dinner']) {
+      plan.push({ date: addDays(montag, tag), meal_type, title: `${meal_type} ${tag}`, cook_user_id: KOCH });
+    }
+  }
+  const angelegt = await call('POST', '/apply-plan', { assignments: plan });
+  assert.equal(angelegt.status, 201);
+  assert.equal(angelegt.body.data.length, 21);
+
+  const res = await fetch(`${baseUrl}/?week=${montag}`);
+  const text = await res.text();
+  // Die Serien der Tests darueber laufen ohne Ende und stehen auch in dieser
+  // Woche; gemessen werden die 21 Mahlzeiten dieses Kochs, gewogen wird alles.
+  const woche = JSON.parse(text).data.filter((meal) => meal.cook_user_id === KOCH);
+  assert.equal(woche.length, 21, 'Vorbedingung: die ganze Woche ist gelesen');
+  for (const meal of woche) {
+    assert.equal(meal.cook_name, 'Bildkoch', 'Name und Farbe fuer die Initialen-Scheibe bleiben');
+    assert.equal(meal.cook_color, '#34C759');
+    assert.ok(!('cook_avatar' in meal), 'kein Bildfeld an der Mahlzeit');
+  }
+  assert.ok(!text.includes('QUJDQUJD'), 'und das Bild steht unter keinem anderen Namen in der Antwort');
+  assert.ok(text.length < BILD.length / 4, `die Woche wiegt ${text.length} Zeichen - weniger als ein Viertel EINES Bildes (${BILD.length})`);
+
+  // Dieselbe Frage an jede andere Antwort, die eine Mahlzeit herausgibt.
+  const einzeln = JSON.stringify((await call('PUT', `/${woche[0].id}`, { title: 'Umbenannt' })).body)
+    + JSON.stringify(angelegt.body);
+  assert.ok(!einzeln.includes('QUJDQUJD') && !einzeln.includes('cook_avatar'), 'auch PUT und apply-plan tragen es nicht');
 });
