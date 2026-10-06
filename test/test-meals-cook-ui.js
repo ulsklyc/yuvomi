@@ -47,6 +47,7 @@ globalThis.__bindUserMultiSelect = picker.bindUserMultiSelect;
 
 const { setPermissions, clearPermissions } = await import('../public/permissions.js');
 const { setHouseholdSize, clearHouseholdSize } = await import('../public/utils/household.js');
+const { toLocalDateKey } = await import('../public/utils/date.js');
 const { __test: meals } = await import('../public/pages/meals.js');
 const { __test: dashboard } = await import('../public/pages/dashboard.js');
 
@@ -228,6 +229,54 @@ test('Uebersicht, Heute-Blatt: die Zeile der Mahlzeit traegt den Koch als ihre P
   const ohne = zeile(heute());
   assert.ok(ohne, 'Vorbedingung');
   assert.equal(ohne.who, null, 'ohne Koch bleibt die Zeile, wie sie war');
+});
+
+// Entschieden zu #1737: Kochen ist eine Zustaendigkeit wie eine Aufgabe, also
+// zaehlt der Koch am Wandtablett unter "Wer heute dran ist" mit. Der Abschnitt
+// zaehlt `who` ueber alle Zeilen des Tages; faellt `who` an der Mahlzeit-Zeile
+// weg, verschwindet, wer heute NUR kocht, ohne dass sonst etwas rot wuerde.
+test('Wandtablett, "Wer heute dran ist": der Koch der heutigen Mahlzeit zaehlt mit', () => {
+  const heute = (over) => ['breakfast', 'lunch', 'dinner'].map((meal_type, i) => ({
+    id: 30 + i, meal_type, title: `Gericht ${i}`, cook_user_id: null, cook_name: null, cook_color: null, ...over,
+  }));
+  const ANNA_WAND = { id: 1, display_name: 'Anna Beispiel', avatar_color: '#FF9500', avatar_data: null };
+  const BEN_WAND = { id: 2, display_name: 'Ben Beispiel', avatar_color: '#34C759', avatar_data: null };
+  const wer = (todayMeals, urgentTasks = []) => {
+    // Ohne App-Huelle, wie test-dashboard.js die Wand rendert: `window.yuvomi`
+    // traegt hier nur den Toast-Stub, keine Modul-Abfrage.
+    const zuvor = globalThis.window.yuvomi;
+    globalThis.window.yuvomi = null;
+    try {
+      const html = dashboard.renderWallSurface({ todayMeals, urgentTasks, users: [ANNA_WAND, BEN_WAND] }, null, {});
+      return abschnitt(html, 'class="wall__who"', '</section>');
+    } finally {
+      globalThis.window.yuvomi = zuvor;
+    }
+  };
+  const mitglieder = (html) => [...html.matchAll(/<span aria-hidden="true">(\d+)<\/span>[\s\S]*?<span class="wall-who__name">([^<]*)<\/span>/g)]
+    .map((m) => `${m[2]}:${m[1]}`);
+
+  setHouseholdSize(2);
+  try {
+    const nurKoch = wer(heute({ cook_user_id: 2, cook_name: 'Ben Beispiel', cook_color: '#34C759' }));
+    assert.ok(nurKoch, 'Vorbedingung: der Abschnitt ist gebaut');
+    assert.deepEqual(mitglieder(nurKoch), ['Ben:1'], 'wer heute nur kocht, ist heute dran - mit einer Sache');
+    assert.doesNotMatch(nurKoch, /wall-who__none/);
+
+    // Kochen zaehlt NEBEN einer Aufgabe, nicht statt ihrer.
+    const aufgabe = { id: 5, title: 'Muell', status: 'open', due_date: toLocalDateKey(new Date()), due_time: '08:00', assigned_users: [{ id: 2, display_name: 'Ben Beispiel', color: '#34C759' }] };
+    const beides = wer(heute({ cook_user_id: 2, cook_name: 'Ben Beispiel', cook_color: '#34C759' }), [aufgabe]);
+    const ohneKochen = wer(heute(), [aufgabe]);
+    assert.deepEqual(mitglieder(ohneKochen), ['Ben:1'], 'Vorbedingung: die Aufgabe allein zaehlt eins');
+    assert.deepEqual(mitglieder(beides), ['Ben:2'], 'Aufgabe und Kochen sind zwei Dinge');
+
+    // Gegenfall: ohne Koch ist niemand dran.
+    const niemand = wer(heute());
+    assert.match(niemand, /wall-who__none/, 'eine Mahlzeit ohne Koch setzt niemanden auf die Liste');
+    assert.deepEqual(mitglieder(niemand), []);
+  } finally {
+    clearHouseholdSize();
+  }
 });
 
 test('Uebersicht: der Name des Kochs laeuft durch esc()', () => {

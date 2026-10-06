@@ -14,7 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   meal). A planned meal carried a date, a type, a title, notes and a recipe, and the only person on it was whoever
   entered it. The meal dialog now offers the household members in the same person picker the task
   dialog uses, limited to one person; the cook's avatar then stands on the meal in the week plan
-  and on today's meal on the overview. A meal without a cook looks as it did. A repeating meal
+  and on today's meal on the overview. On a wall tablet, cooking counts under "Who's up today"
+  like a task does. A meal without a cook looks as it did. A repeating meal
   keeps its cook: every meal the series creates starts with it, changing the cook of one meal
   leaves the series alone, and changing it for the whole series reaches all its meals - also
   when the meal you save from already carries that cook on its own and only the series does not.
