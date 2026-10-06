@@ -30,7 +30,9 @@ globalThis.customElements = globalThis.customElements ?? { define() {}, get() {}
 const { installMiniDom } = await import('./mini-dom.js');
 installMiniDom();
 
-const { initials, compactInitials, graphemes } = await import('../public/utils/initials.js');
+const {
+  initials, compactInitials, graphemes, resolveInitials, setInitialsRoster, clearInitialsRoster,
+} = await import('../public/utils/initials.js');
 
 const PUBLIC = new URL('../public/', import.meta.url);
 const read = (rel) => readFileSync(new URL(rel, PUBLIC), 'utf8');
@@ -44,6 +46,8 @@ const FAMILY = '\u{1F469}\u200D\u{1F467}'; // Frau + ZWJ + Maedchen: ein Graphem
 const FLAG = '\u{1F1F0}\u{1F1F7}'; // zwei Regional-Indikatoren: ein Graphem
 const KEYCAP_1 = '1\uFE0F\u20E3'; // Ziffer + Variantenselektor + Tastenkappe: ein Graphem
 const KEYCAP_2 = '2\uFE0F\u20E3';
+// Die Flagge von England: schwarze Flagge + sechs Tag-Zeichen (gbeng + Ende).
+const ENGLAND = '\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}';
 // Derselbe Name, kanonisch ZERLEGT: jede Silbe steht als zwei oder drei Jamo
 // da (Import, macOS-Dateinamen). Namen werden ohne NFC-Normalisierung
 // gespeichert, also kommt das auf der Scheibe an.
@@ -89,6 +93,44 @@ const TABLE = [
   [`${E_ACUTE}lodie`, 'E\u0301', 'ein kombinierendes Zeichen bleibt bei seinem Buchstaben'],
   [NFD_KIM_MINSU, NFD_MINSU, 'zerlegtes Hangul: drei Silben aus acht Jamo, der Rufname bleibt ganz'],
   [`${KEYCAP_1} Eins`, `${KEYCAP_1}E`, 'eine Tastenkappe bleibt ganz'],
+  // GROSSSCHREIBUNG KANN EIN ZEICHEN VERLAENGERN (#1464): `toUpperCase()` macht
+  // aus einem Buchstaben zwei oder drei, und die Scheibe trug drei Zeichen.
+  ['ßeta Schmidt', 'SS', 'ß wird gross zu SS - auf der Scheibe bleibt EIN Zeichen je Wort'],
+  ['ßeta', 'S', 'dasselbe bei einem Wort'],
+  ['\uFB01ona \uFB02ora', 'FF', 'die Ligaturen fi und fl werden gross zu FI und FL'],
+  ['\uFB03 x', 'FX', 'ffi wird zu drei Buchstaben'],
+  ['\u0149gomo', 'N', 'U+0149 wird zu Apostroph + N: der Buchstabe zaehlt, nicht der Apostroph'],
+  ['\u01F0an', 'J\u030C', 'U+01F0 wird zu J + Hatschek: zwei Codepoints, EIN Zeichen'],
+  ['\u0587 x', '\u0535X', 'die armenische Ligatur wird zu zwei Buchstaben'],
+  // Tuerkisch: OHNE Locale, damit dieselbe Person bei jedem Betrachter
+  // dieselben Zeichen traegt - die Sprache des Namens kennt die App nicht.
+  ['İpek Yılmaz', 'İY', 'das grosse I mit Punkt bleibt, wie es eingegeben wurde'],
+  ['ipek', 'I', 'ein kleines i wird zu I, in jeder Oberflaechensprache'],
+  ['ırmak', 'I', 'das i ohne Punkt wird zu I'],
+  // Schriften ohne Gross und Klein bleiben, wie sie sind.
+  ['محمد', 'م', 'Arabisch: ein Wort'],
+  ['محمد علي', 'م\u200Cع', 'Arabisch: zwei Buchstaben verbinden sich NICHT zu einem Wort (U+200C dazwischen)'],
+  ['فاطمة Müller', 'فM', 'Arabisch neben Latein: nichts zu trennen'],
+  ['दीपक कुमार', 'दीकु', 'Devanagari: der Vokal bleibt an seinem Konsonanten'],
+  ['გიორგი', 'გ', 'Georgisch: `toUpperCase()` gaebe Mtavruli, das kaum eine Schrift zeichnet'],
+  ['Ελένη Παπαδοπούλου', 'ΕΠ', 'Griechisch'],
+  ['дмитрий иванов', 'ДИ', 'Kyrillisch wird gross'],
+  // Was kein Buchstabe, keine Ziffer und kein Emoji ist, steht nicht auf der
+  // Scheibe, solange der Name etwas anderes hergibt.
+  ['(Oma) Erika', 'OE', 'eine Klammer vorn'],
+  ['"Anna" Schmidt', 'AS', 'Anfuehrungszeichen'],
+  ['¡Ana! ¿Ruiz?', 'AR', 'spanische Satzzeichen'],
+  ["'t Hooft", 'TH', 'ein Apostroph vorn'],
+  ['-Anna', 'A', 'ein Strich vorn, ein Wort'],
+  ['Anna -', 'A', 'ein Wort nur aus Satzzeichen zaehlt nicht'],
+  ['- Anna Schmidt', 'AS', 'auch vorn nicht'],
+  ['Anna & Bert', 'AB', 'und in der Mitte nicht'],
+  ['\u200Fمحمد', 'م', 'ein unsichtbares Richtungszeichen vorn ergab eine leere Scheibe'],
+  ['\uFEFFAnna', 'A', 'ebenso ein BOM'],
+  [':-)', ':', 'NUR Satzzeichen: dann das erste, wie bisher - keine leere Scheibe'],
+  ['#1 Papa', '1P', 'eine Ziffer zaehlt'],
+  [`${ENGLAND} Harry`, `${ENGLAND}H`, 'eine Flagge aus Tag-Zeichen bleibt ganz'],
+  ['ﾔﾏﾀﾞ', 'ﾏﾀﾞ', 'halbbreite Katakana: das Truebungszeichen bleibt an seiner Silbe'],
 ];
 
 // Namen in den Schriften, in denen die App spricht - fuer den Vergleich des
@@ -106,6 +148,9 @@ const NAMES_BY_SCRIPT = [
   // GB6-GB8), auch gemischt mit einer fertigen Silbe.
   NFD_KIM_MINSU, '한글'.normalize('NFD'), '\u1100\uAC00\u11A8', '\uAC00\u1161', '\uAC01\u1161',
   `${KEYCAP_1}${KEYCAP_2}`,
+  // #1464: Tag-Zeichen (Flaggen von England, Schottland, Wales), halbbreite
+  // Katakana mit Truebungszeichen, U+200C zwischen zwei arabischen Initialen.
+  `${ENGLAND}A`, 'ﾔﾏﾀﾞ', 'ﾊﾟﾊﾟ', 'م\u200Cع',
 ];
 
 test('die Regel: Name -> Zeichen auf der Scheibe', () => {
@@ -168,6 +213,9 @@ test('die kleine Scheibe: zwei Geviert-Zeichen werden zu einem, lateinische blei
   assert.equal(compactInitials('Anna Schmidt'), 'AS');
   assert.equal(compactInitials('Anna'), 'A');
   assert.equal(compactInitials('', '?'), '?');
+  // Halbbreite Katakana sind ein halbes Geviert breit: zwei passen (#1464).
+  assert.equal(compactInitials('ﾔﾏﾀﾞ'), 'ﾏﾀﾞ', 'halbbreit: beide Zeichen bleiben');
+  assert.equal(compactInitials('ヤマダ'), 'ダ', 'vollbreit: eines');
   // Geschwister mit demselben Familiennamen bleiben auch dort verschieden.
   assert.notEqual(compactInitials('김민수'), compactInitials('김민지'));
 });
@@ -460,4 +508,300 @@ test('Uebersicht: Familie, Geburtstage, Dienstplan, Belohnungen und Wandansicht'
 
   const wall = dashboard.renderWallWho({ users: [user] }, { allRows: [{ who: { id: 1 } }] });
   assertShows(wall, '민수', 'Wandansicht');
+});
+
+// --------------------------------------------------------
+// 4. Gleiche Initialen im Haushalt (#1464)
+// --------------------------------------------------------
+
+const LINDA = 'Linda Johnson';
+const LEO = 'Leo Johnson';
+const resolved = (names) => Object.fromEntries(resolveInitials(names));
+
+function permutations(list) {
+  if (list.length < 2) return [list];
+  return list.flatMap((item, i) => permutations([...list.slice(0, i), ...list.slice(i + 1)]).map((rest) => [item, ...rest]));
+}
+
+test('gleiche Initialen: der zweite Buchstabe des Vornamens unterscheidet', () => {
+  assert.equal(initials(LINDA), 'LJ', 'Vorbedingung: ohne Haushalt tragen beide LJ');
+  assert.equal(initials(LEO), 'LJ');
+  assert.deepEqual(resolved([LINDA, LEO, 'Anna Schmidt']), { [LINDA]: 'LI', [LEO]: 'LE', 'Anna Schmidt': 'AS' });
+});
+
+test('gleiche Initialen: die Tabelle der Regel', () => {
+  for (const [names, expected, why] of [
+    [['Anna Schmidt', 'Ben Vogt'], { 'Anna Schmidt': 'AS', 'Ben Vogt': 'BV' }, 'ohne Kollision bleibt alles'],
+    [[LINDA, LEO, 'Lars Johnson'], { [LINDA]: 'LI', [LEO]: 'LE', 'Lars Johnson': 'LA' }, 'drei mit LJ'],
+    [[LINDA, 'Lisa Johnson', LEO], { [LEO]: 'LE', [LINDA]: 'LI', 'Lisa Johnson': 'LS' },
+      'LI ist nach Linda vergeben (Namensfolge): Lisa nimmt ihren naechsten Buchstaben'],
+    [[LINDA, LEO, 'Lisa Imhof'], { [LINDA]: 'LN', [LEO]: 'LE', 'Lisa Imhof': 'LI' },
+      'LI gehoert schon jemandem ohne Kollision - die behaelt es, Linda weicht aus'],
+    [['Leo Johnson', 'Leo Jansen'], { 'Leo Jansen': 'LE', 'Leo Johnson': 'LO' }, 'derselbe Vorname: der naechste freie Buchstabe'],
+    [['Jo Lang', 'Jo Lenz'], { 'Jo Lang': 'JO', 'Jo Lenz': 'JE' }, 'der Vorname ist aufgebraucht: der Familienname ab dem zweiten Buchstaben'],
+    [['Linda', 'Leo'], { Linda: 'LI', Leo: 'LE' }, 'ein Wort: L und L'],
+    [['Linda', 'Leo Johnson'], { Linda: 'L', 'Leo Johnson': 'LJ' }, 'L und LJ sind schon verschieden'],
+    [['ßeta Schmidt', 'Sven Schmidt'], { 'ßeta Schmidt': 'SE', 'Sven Schmidt': 'SV' }, 'ß zaehlt als ein Zeichen'],
+    [["D'Arcy Lee", 'Dora Lee'], { "D'Arcy Lee": 'DA', 'Dora Lee': 'DO' }, 'ein Apostroph ist kein zweiter Buchstabe'],
+    [['김민수', '박민수'], { 김민수: '김수', 박민수: '박수' }, 'Hangul: Familienname + letztes Zeichen des Rufnamens'],
+    [['田中 太郎', '山田太郎'], { '田中 太郎': '田郎', 山田太郎: '山郎' }, 'Han, mit und ohne Leerraum'],
+    [['محمد علي', 'مريم علي'], { 'محمد علي': 'م‌ح', 'مريم علي': 'م‌ر' }, 'Arabisch'],
+    [['Ab Cd', 'AB CD'], { 'AB CD': 'AB', 'Ab Cd': 'AD' }, 'nur Gross und Klein verschieden: auch die werden unterscheidbar'],
+    [['Al Jo', 'Alf Jo'], { 'Al Jo': 'AL', 'Alf Jo': 'AF' }, 'ein Name im anderen enthalten'],
+    [['A B', 'a b'], { 'A B': 'AB', 'a b': 'AB' }, 'kein Buchstabe mehr frei: beide behalten ihre Zeichen'],
+    [[LINDA, LINDA, ' Linda  Johnson '], { [LINDA]: 'LJ' }, 'derselbe Name zweimal ist keine Kollision'],
+    [[LINDA, '', null, undefined, '  '], { [LINDA]: 'LJ' }, 'leere Namen zaehlen nicht'],
+  ]) {
+    assert.deepEqual(resolved(names), expected, why);
+  }
+});
+
+test('gleiche Initialen: hoechstens zwei Zeichen, und jedes Ergebnis nur einmal', () => {
+  const household = [LINDA, LEO, 'Lisa Imhof', 'Lars Jensen', 'Leo Jansen', 'Anna Schmidt', 'Arne Sommer', '김민수', '박민수', 'ßeta Schmidt'];
+  const map = resolveInitials(household);
+  assert.equal(map.size, household.length);
+  for (const [name, text] of map) {
+    assert.ok(graphemes(text).length <= 2, `${name}: ${text} passt in zwei Zeichen`);
+  }
+  assert.equal(new Set(map.values()).size, map.size, `jeder traegt eigene Zeichen: ${JSON.stringify([...map])}`);
+});
+
+test('gleiche Initialen: die Reihenfolge der Liste aendert nichts', () => {
+  const household = [LINDA, LEO, 'Lisa Imhof', 'Lars Jensen', 'Anna Schmidt', 'Arne Sommer'];
+  const expected = resolved(household);
+  const all = permutations(household);
+  assert.equal(all.length, 720);
+  for (const order of all) assert.deepEqual(resolved(order), expected, order.join(', '));
+});
+
+test('der Haushalt gilt fuer JEDEN Aufruf des Helfers, und nur bis zum Abmelden', () => {
+  try {
+    setInitialsRoster([LINDA, LEO, 'Anna Schmidt']);
+    assert.equal(initials(LINDA), 'LI');
+    assert.equal(initials(LEO, '?'), 'LE');
+    assert.equal(initials('  Linda   Johnson '), 'LI', 'Leerraum aendert die Person nicht');
+    assert.equal(compactInitials(LINDA), 'LI', 'die kleine Scheibe traegt dieselben Zeichen');
+    assert.equal(initials('Anna Schmidt'), 'AS', 'ohne Kollision bleibt alles');
+    assert.equal(initials('Lars Jensen'), 'LJ', 'ein Name, der im Haushalt nicht steht, folgt der einfachen Regel');
+    assert.equal(initials('', '?'), '?');
+
+    // Eine Antwort OHNE Liste (aelterer Server waehrend eines Updates) setzt
+    // nicht zurueck - sonst sprangen die Zeichen fuer einen Seitenaufruf um.
+    setInitialsRoster(undefined);
+    setInitialsRoster(null);
+    assert.equal(initials(LINDA), 'LI');
+
+    // Wird ein Konto GELOESCHT, faellt es aus der Liste; ein deaktiviertes
+    // bleibt darin (server/auth.js, test:household-members).
+    setInitialsRoster([LINDA, 'Anna Schmidt']);
+    assert.equal(initials(LINDA), 'LJ');
+
+    // Die kleine Scheibe zeigt von zwei Geviert-Zeichen eines. Bei einer
+    // Ausweichform ist das letzte gerade das gemeinsame - dann das erste.
+    setInitialsRoster(['김민수', '박민수', '이지수']);
+    assert.equal(initials('김민수'), '김수');
+    assert.equal(compactInitials('김민수'), '김');
+    assert.equal(compactInitials('박민수'), '박');
+    assert.equal(compactInitials('이지수'), '수', 'ohne Kollision bleibt es beim letzten Zeichen');
+
+    setInitialsRoster([LINDA, LEO]);
+    clearInitialsRoster();
+    assert.equal(initials(LINDA), 'LJ', 'nach dem Abmelden gilt der Haushalt nicht mehr');
+  } finally {
+    clearInitialsRoster();
+  }
+});
+
+test('mit Haushalt: JEDER Aufrufer zeigt fuer Linda LI und fuer Leo LE', async () => {
+  const ums = await import('../public/components/user-multi-select.js');
+  const { whoMark } = await import('../public/utils/seal-pair.js');
+  const family = await import('../public/settings/pages/admin-family.js');
+  const account = await import('../public/settings/pages/personal-account.js');
+  const permissions = await import('../public/settings/pages/admin-permissions.js');
+  const { __test: calendar } = await import('../public/pages/calendar.js');
+  const { __test: schedule } = await import('../public/pages/schedule.js');
+  const { __test: contacts } = await import('../public/pages/contacts.js');
+  const { __test: birthdays } = await import('../public/pages/birthdays.js');
+  const { __test: rewards } = await import('../public/pages/rewards.js');
+  const { __test: hk } = await import('../public/pages/housekeeping.js');
+  const { __test: dashboard, renderUpcomingBirthdays } = await import('../public/pages/dashboard.js');
+
+  const withState = (state, patch, run) => {
+    const before = Object.fromEntries(Object.keys(patch).map((key) => [key, state[key]]));
+    Object.assign(state, patch);
+    try { return run(); } finally { Object.assign(state, before); }
+  };
+  const person = (name) => ({ id: 1, display_name: name, color: '#34C759', avatar_color: '#34C759' });
+  const shift = { id: 1, name: 'Frueh', short_code: 'F', color: '#6C3AED' };
+
+  const CALLERS = {
+    'Stapel 28px': (name) => ums.renderAvatarStack([person(name)], { size: 28 }),
+    'Stapel 22px': (name) => ums.renderAvatarStack([person(name)], { size: 22 }),
+    Personenauswahl: (name) => ums.renderUserMultiSelect([person(name)], [], 'assignees', 'tasks.assignedTo'),
+    'Siegel-Avatar': (name) => whoMark(person(name)),
+    'Einstellungen Familie': (name) => family.__test.avatarHtml(person(name)),
+    'Einstellungen Konto': (name) => account.__test.avatarHtml(person(name)),
+    'Einstellungen Rechte': (name) => permissions.memberChipHtml(person(name)),
+    'Kalender Filterblatt': (name) => calendar.personFilterRowsHtml([person(name)]),
+    'Dienstplan Spur': (name) => withState(schedule.scheduleState(), { users: [{ id: 5, display_name: name }] },
+      () => schedule.overviewLaneHeader(5)),
+    Kontaktzeile: (name) => contacts.renderContactItem({
+      id: 1, name, category: 'family', family_user_id: 5, family_display_name: name, family_avatar_color: '#34C759',
+    }),
+    Geburtstagszeile: (name) => birthdays.birthdayItemHtml({
+      id: 9, name, birth_date: '1990-10-06', next_birthday: '2026-10-06', next_age: 36, days_until: 10,
+      family_user_id: 5, family_display_name: name,
+    }),
+    Geburtstagsvorschau: (name) => birthdays.birthdayPreviewHtml(name, null),
+    'Belohnungen Punktestand': (name) => {
+      const member = { id: 3, display_name: name, avatar_color: '#34C759', balance: 20 };
+      return withState(rewards.state, {
+        user: { role: 'admin' }, overview: { me: 1, balances: [member] }, catalog: [], redemptions: [], prevBalances: new Map(),
+      }, () => rewards.renderStandingRow(member));
+    },
+    Hauspersonal: (name) => withState(hk.state(), {
+      workers: [{ id: 7, display_name: name, current_session: null, today_session: null }],
+    }, () => hk.renderWorkerSummary()),
+    'Uebersicht Familie': (name) => dashboard.renderFamilyWidget([person(name), { id: 2, display_name: 'Anna Schmidt' }], { upcomingEvents: [] }),
+    'Uebersicht Geburtstage': (name) => renderUpcomingBirthdays([{ id: 1, name, days_until: 3, next_birthday: '2026-10-06', next_age: 9 }], '1x2'),
+    'Uebersicht Dienstplan': (name) => dashboard.renderScheduleWidget({ hasTypes: true, entries: [{ user_id: 1, shift_type: shift }] }, [person(name)], '1x2'),
+    'Uebersicht Belohnungen': (name) => dashboard.renderRewardsWidget({
+      view: 'household', me: 99, standings: [{ id: 1, display_name: name, avatar_color: '#34C759', balance: 10 }], catalog: [], recent: [],
+    }, '2x2'),
+    'Uebersicht Wandansicht': (name) => dashboard.renderWallWho({ users: [person(name)] }, { allRows: [{ who: { id: 1 } }] }),
+  };
+
+  // Die Kontozeile der Seitenleiste: derselbe Weg wie im Test weiter oben.
+  const router = read('router.js');
+  const start = router.indexOf('function syncSidebarAccount(');
+  const source = router.slice(start, router.indexOf('\n}\n', start) + 2);
+  const node = () => ({
+    textContent: '', style: {}, dataset: {}, classList: { toggle() {} }, setAttribute() {}, replaceChildren() {},
+    querySelector() { return null; }, querySelectorAll() { return []; },
+  });
+  CALLERS['Seitenleiste Kontozeile'] = (name) => {
+    const avatar = node();
+    const parts = { '.nav-sidebar__account-trigger': node(), '.nav-sidebar__avatar': avatar, '.nav-sidebar__account-name': node() };
+    // Der Nutzer steht im geteilten Zustand des Routers (`routerState`, #1657).
+    new Function(
+      'routerState', 'initials', 'prefersInkText', 't', 'withUpdateHint', 'pendingUpdateVersion', 'document',
+      `${source}\nreturn syncSidebarAccount;`,
+    )({ currentUser: { display_name: name } }, initials, () => false, (key) => key, (label) => label, () => null, { querySelector: () => null })(
+      { querySelector: (sel) => parts[sel], querySelectorAll: () => [] },
+    );
+    return `<span>${avatar.textContent}</span>`;
+  };
+
+  // Positivkontrolle: OHNE Haushalt zeigt jeder Aufrufer LJ - sonst traefe
+  // `>LI<` unten vielleicht etwas anderes als die Scheibe.
+  for (const [where, render] of Object.entries(CALLERS)) {
+    assert.ok(SHOWS(render(LINDA), 'LJ'), `${where}: ohne Haushalt LJ\n${String(render(LINDA)).slice(0, 400)}`);
+  }
+
+  try {
+    setInitialsRoster([LINDA, LEO, 'Anna Schmidt']);
+    for (const [where, render] of Object.entries(CALLERS)) {
+      for (const [name, text] of [[LINDA, 'LI'], [LEO, 'LE'], ['Anna Schmidt', 'AS']]) {
+        const html = render(name);
+        assert.ok(SHOWS(html, text), `${where}: ${name} zeigt ${text}\n${String(html).slice(0, 400)}`);
+        assert.ok(!SHOWS(html, 'LJ'), `${where}: ${name} zeigt nicht mehr LJ`);
+      }
+    }
+  } finally {
+    clearInitialsRoster();
+  }
+});
+
+// --------------------------------------------------------
+// 5. Die kleine Scheibe in einer Kollisionsgruppe (Review zu #1690)
+// --------------------------------------------------------
+
+const compactOf = (names) => {
+  try {
+    setInitialsRoster(names);
+    return Object.fromEntries(names.map((name) => [name, compactInitials(name)]));
+  } finally {
+    clearInitialsRoster();
+  }
+};
+
+test('die kleine Scheibe unterscheidet in einer Kollisionsgruppe - am Zeichen, das verschieden ist', () => {
+  // Wortregel mit drei Woertern: die Ausweichform ist 김진 / 김아, das ERSTE
+  // Zeichen ist das gemeinsame. Die erste Fassung nahm es unbedingt.
+  assert.deepEqual(compactOf(['김 민 수진', '김 민 수아']), { '김 민 수진': '진', '김 민 수아': '아' });
+  // Ein Wort aus zwei Emoji: beide tragen 😀, die Ausweichform haengt das zweite an.
+  assert.deepEqual(compactOf(['😀😺', '😀🐶']), { '😀😺': '😺', '😀🐶': '🐶' });
+  // Dasselbe als zwei Woerter ist keine Kollision (😀😺 und 😀🐶 sind schon
+  // verschieden) und folgt der Regel der kleinen Scheibe: das letzte Zeichen.
+  assert.deepEqual(compactOf(['😀 😺', '😀 🐶']), { '😀 😺': '😺', '😀 🐶': '🐶' });
+  // Namen nach Regel 2 und 3: dort unterscheidet das ERSTE Zeichen.
+  assert.deepEqual(compactOf(['김민수', '박민수']), { 김민수: '김', 박민수: '박' });
+  assert.deepEqual(compactOf(['田中 太郎', '山田太郎']), { '田中 太郎': '田', 山田太郎: '山' });
+  // Keines der beiden Zeichen unterscheidet fuer sich allein alle drei: jede
+  // bekommt eines, das in der Gruppe sonst niemand zeigt.
+  const mixed = ['김민수', '민 가 수', '민 가 수아'];
+  assert.deepEqual(resolved(mixed), { 김민수: '김수', '민 가 수': '민수', '민 가 수아': '민아' }, 'Vorbedingung: 수, 수, 아 und 김, 민, 민');
+  const three = compactOf(mixed);
+  assert.equal(new Set(Object.values(three)).size, 3, JSON.stringify(three));
+  assert.equal(three['민 가 수아'], '아', 'wer mit dem letzten Zeichen auskommt, behaelt es');
+  // DER BEKANNTE REST, keine Kollision der Initialen: 민수 und 지수 sind
+  // verschieden, die kleine Scheibe zeigt von beiden das letzte Zeichen
+  // (Regel aus #1637). Nur eine Kollisionsgruppe wird aufgeloest.
+  assert.deepEqual(compactOf(['김민수', '이지수']), { 김민수: '수', 이지수: '수' });
+});
+
+test('die kleine Scheibe: jede aufloesbare Kollisionsgruppe ist auch dort aufgeloest', () => {
+  const POOL = [
+    '김민수', '박민수', '이민수', '김 민수', '김 민 수진', '김 민 수아', '박 민 수진', '김 가 나다', '김 가 나라', '박가나',
+    '田中太郎', '山田太郎', '田中 太郎', '😀😺', '😀🐶', '😀', '😀 😺', '🐶😀', '이지수', '민수', LINDA, LEO, '김 Smith', '김 Sato', '민 가 수', '민 가 수아',
+  ];
+  const wide = (text) => {
+    const chars = graphemes(text);
+    return chars.length === 2 && chars.every((char) => compactInitials(char) === char && compactInitials(`${char} ${char}`) === char);
+  };
+  // Gibt es eine Zuordnung "je Person eines ihrer Zeichen", bei der alle
+  // verschieden sind? Ausprobiert, nicht berechnet.
+  const solvable = (fulls) => {
+    const walk = (i, used) => i === fulls.length
+      || graphemes(fulls[i]).some((char) => !used.has(char) && walk(i + 1, new Set([...used, char])));
+    return walk(0, new Set());
+  };
+
+  let groups = 0;
+  let changed = 0;
+  let neitherSide = 0;
+  const subsets = [];
+  for (let a = 0; a < POOL.length; a += 1) {
+    for (let b = a + 1; b < POOL.length; b += 1) {
+      subsets.push([POOL[a], POOL[b]]);
+      for (let c = b + 1; c < POOL.length; c += 1) subsets.push([POOL[a], POOL[b], POOL[c]]);
+    }
+  }
+  for (const names of subsets) {
+    const base = Object.fromEntries(names.map((name) => [name, initials(name)]));
+    const full = resolved(names);
+    const key = (name) => name.trim().split(/\s+/u).join(' ');
+    const compact = compactOf(names);
+    const byBase = new Map();
+    for (const name of names) byBase.set(base[name], [...(byBase.get(base[name]) ?? []), name]);
+    for (const group of byBase.values()) {
+      if (group.length < 2) {
+        // Ohne Kollision bleibt die Regel der kleinen Scheibe.
+        assert.equal(compact[group[0]], compactInitials(group[0]), `${names.join(', ')}: ${group[0]} ohne Kollision`);
+        continue;
+      }
+      const fulls = group.map((name) => full[key(name)]);
+      const allWide = fulls.every(wide);
+      if (!allWide || new Set(fulls).size !== fulls.length || !solvable(fulls)) continue;
+      groups += 1;
+      const shown = group.map((name) => compact[name]);
+      if (group.some((name, i) => shown[i] !== graphemes(fulls[i])[1])) changed += 1;
+      if ([0, 1].every((side) => new Set(fulls.map((text) => graphemes(text)[side])).size < fulls.length)) neitherSide += 1;
+      assert.equal(new Set(shown).size, shown.length, `${names.join(', ')}: ${JSON.stringify(fulls)} -> ${JSON.stringify(shown)}`);
+      group.forEach((name, i) => assert.ok(graphemes(fulls[i]).includes(shown[i]), `${name}: ${shown[i]} ist eines der Zeichen aus ${fulls[i]}`));
+    }
+  }
+  assert.ok(groups > 50, `der Lauf sieht aufloesbare Gruppen (${groups})`);
+  assert.ok(changed > 10, `und darunter solche, in denen das letzte Zeichen nicht reicht (${changed})`);
+  assert.ok(neitherSide > 0, `und solche, in denen keine Seite fuer sich alle unterscheidet (${neitherSide})`);
 });

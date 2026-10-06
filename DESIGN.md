@@ -3424,8 +3424,9 @@ Zeile des Aufklappers nennt sie.
   erscheint, oeffnet ihn - aufklappen, nie zuklappen.
 - **„Niemand" ist ein ruhiger Eintrag, keine Person:** kein Avatar, keine Striche um das Wort
   (`.user-ms__option--none`, gilt fuer jede Personenwahl). Doppelte Initialen (Leo und Linda
-  Johnson, beide „LJ") sind offen: rund ein Dutzend Kopien der Initialen-Regel, eine
-  Kollisionsregel gehoert in EINE geteilte Funktion.
+  Johnson, beide „LJ") loest die EINE geteilte Funktion auf (`public/utils/initials.js`,
+  #1464): wer seine Zeichen teilt, bekommt den naechsten freien Buchstaben seines Vornamens
+  („LE", „LI"), aus der Liste aller Konten, also in jeder Ansicht gleich.
 
 ### Der Wand-Modus (Signature Component)
 **Der WACHE Zustand des Dashboards - keine zweite Seite, sondern dieselbe Flaeche in anderer

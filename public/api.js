@@ -7,6 +7,7 @@
 import { clearApiCache } from '/sw-register.js';
 import { setPermissions, clearPermissions } from '/permissions.js';
 import { setHouseholdSize, setOtherReaders, clearHouseholdSize } from '/utils/household.js';
+import { setInitialsRoster, clearInitialsRoster } from '/utils/initials.js';
 import { forgetLayoutHint } from '/utils/dashboard-layout-hint.js';
 import { t } from '/i18n.js';
 import { REFUSAL_MESSAGES } from '/utils/friendly-error.js';
@@ -278,6 +279,7 @@ const auth = {
     setPermissions(res?.permissions);
     setHouseholdSize(res?.householdSize);
     setOtherReaders(res?.othersCanRead);
+    setInitialsRoster(res?.initialsRoster);
     return res;
   },
   // Zweiter Schritt der Anmeldung (#672). Der Code darf ein TOTP-Code oder ein
@@ -287,6 +289,7 @@ const auth = {
     setPermissions(res?.permissions);
     setHouseholdSize(res?.householdSize);
     setOtherReaders(res?.othersCanRead);
+    setInitialsRoster(res?.initialsRoster);
     return res;
   },
   // Verwaltung des eigenen zweiten Faktors.
@@ -303,6 +306,7 @@ const auth = {
     } finally {
       clearPermissions();
       clearHouseholdSize();
+      clearInitialsRoster();
       // API-Cache IMMER leeren — auch wenn der Logout-Request offline oder bei
       // nicht erreichbarem Server fehlschlägt. Der Settings-Handler navigiert in
       // seinem finally trotzdem zu /login, daher darf hier kein offline gecachter
@@ -321,6 +325,7 @@ const auth = {
     // niemand einzeln holen soll: die Haushaltsgroesse (utils/household.js).
     setHouseholdSize(res?.householdSize);
     setOtherReaders(res?.othersCanRead);
+    setInitialsRoster(res?.initialsRoster);
     return res;
   },
   // `language` und `timezone` sind optional: fehlt eines, laesst JSON.stringify
@@ -346,7 +351,15 @@ const auth = {
     await auth.me().catch(() => {});
     return res;
   },
-  updateProfile: (data) => api.patch('/auth/me/profile', data),
+  // Der eigene Name steht in der Liste, aus der gleiche Initialen aufgeloest
+  // werden (`initialsRoster`, utils/initials.js, #1464): derselbe Rundweg,
+  // sonst truege ein umbenanntes Konto bis zum naechsten Kaltstart die Zeichen
+  // seines alten Namens - oder dieselben wie ein anderes.
+  updateProfile: async (data) => {
+    const res = await api.patch('/auth/me/profile', data);
+    await auth.me().catch(() => {});
+    return res;
+  },
   markOnboardingSeen: () => api.post('/auth/onboarding-seen', {}),
   deleteUser: async (id) => {
     const res = await api.delete(`/auth/users/${id}`);

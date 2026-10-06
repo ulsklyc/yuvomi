@@ -104,6 +104,35 @@ function householdSize(database) {
 }
 
 /**
+ * Die Namen, aus denen der Client gleiche Initialen aufloest (#1464,
+ * public/utils/initials.js): Linda Johnson und Leo Johnson tragen sonst beide
+ * "LJ". Die Liste reist an jeder Auth-Antwort mit, wie `householdSize`, damit
+ * JEDE Avatar-Scheibe dieselbe Antwort gibt - auch die eines Aufrufers, der nur
+ * einen Namen in der Hand hat.
+ *
+ * WER DARIN STEHT: jedes Konto, das `/auth/users` zeigt, also auch Hauspersonal
+ * und Gaeste (sie stehen als Scheibe neben Mitgliedern), aber kein Wandtablett.
+ * EHEMALIGE BLEIBEN DARIN: fiele ein deaktiviertes Konto heraus, aenderten sich
+ * die Zeichen eines aktiven Mitglieds in dem Moment, in dem ein anderes geht -
+ * und der Ehemalige steht weiter an alten Eintraegen.
+ *
+ * WER SIE NICHT BEKOMMT: ein Gast geteilter Ausgaben. Er erreicht ausserhalb
+ * jenes Moduls keine Seite (Gast-Sperre in server/index.js), und dort steht
+ * keine Avatar-Scheibe - die Namen des Haushalts gehen ihn nichts an.
+ */
+const INITIALS_ROSTER_SQL = `
+  SELECT display_name FROM users
+  WHERE NOT EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = users.id)
+  ORDER BY id
+`;
+
+function initialsRoster(database, userId) {
+  const guest = database.prepare('SELECT 1 FROM split_expense_guest_users WHERE user_id = ?').get(userId);
+  if (guest) return [];
+  return database.prepare(INITIALS_ROSTER_SQL).all().map((row) => row.display_name);
+}
+
+/**
  * Welche Module ausser diesem Konto noch jemand lesen kann - fuer die
  * Schutzsteuerungen (Sichtbarkeit, Sperre, Freigabe), nicht fuer die Anzeige.
  *
@@ -1190,6 +1219,7 @@ function loginPayload(req, user) {
     // stuende ein Solo-Haushalt bis zum naechsten Kaltstart wieder voller
     // Familienfelder.
     householdSize: householdSize(db.get()),
+    initialsRoster: initialsRoster(db.get(), user.id),
     othersCanRead: othersCanRead(db.get(), user.id),
     csrfToken: req.session.csrfToken,
   };
@@ -2608,6 +2638,7 @@ router.get('/me', requireAuth, (req, res) => {
         user: publicUser(user),
         permissions: clientPermissions(db.get(), user),
         householdSize: householdSize(db.get()),
+        initialsRoster: initialsRoster(db.get(), user.id),
         othersCanRead: othersCanRead(db.get(), user.id),
       });
     }
@@ -2649,6 +2680,7 @@ router.get('/me', requireAuth, (req, res) => {
       // (`canSignIn()` weist es ab). Sie bleiben deshalb beim Standard `false`.
       permissions: clientPermissions(db.get(), user, { isDisplay: req.authMethod === 'display' }),
       householdSize: householdSize(db.get()),
+      initialsRoster: initialsRoster(db.get(), user.id),
       othersCanRead: othersCanRead(db.get(), user.id),
       csrfToken: req.session.csrfToken,
     });

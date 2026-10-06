@@ -117,6 +117,10 @@ const ALLOWLIST = [
     reason: 'User administration: lists every account and flags staff (is_worker) and guests (access_scope). No picker reads it since #1207; the calendar and schedule pages use it only to name people a record already stores.',
   },
   {
+    file: 'server/auth.js', site: 'initialsRoster', lists: 1, deactivated: 'shown',
+    reason: 'Names for telling apart two avatar discs with the same initials (#1464), sent with every auth answer. No picker reads it and nobody is listed from it: the client only derives two characters per name. It covers the accounts GET /users names - staff and guests stand as discs next to members - and keeps a deactivated account, so that the initials of an active member do not change the moment someone else leaves. A split guest gets an empty list.',
+  },
+  {
     file: 'server/auth.js', site: 'GET /api-tokens', lists: 1, deactivated: 'excluded',
     reason: 'API token subjects for admins: a token is issued for an account, staff included; guests are left out through access_scope because POST /api-tokens rejects them.',
   },
@@ -1095,12 +1099,25 @@ test('every allowlisted list says what it does with a deactivated account, and d
  * Gefahr nicht ausloesen, gegen die der Deckel gebaut ist (eine Ausnahmekarte,
  * die still zu einem zweiten Praedikat waechst).
  *
+ * Am 06.10.2026 fuer #1464 auf 17 gehoben - fuer genau einen Eintrag:
+ * `initialsRoster` in server/auth.js, die Namen, aus denen der Client gleiche
+ * Initialen aufloest (Linda Johnson und Leo Johnson trugen beide "LJ").
+ *
+ * Warum der Fall keine Aufweichung ist: aus dieser Antwort wird niemand
+ * gelistet, angeboten oder ausgewaehlt - der Client leitet je Namen zwei
+ * Zeichen ab und zeigt sie nur dort, wo ein Datensatz die Person ohnehin
+ * nennt. Aufs Praedikat kann sie nicht: das schliesst Ehemalige aus (#1381),
+ * und fiele ein deaktiviertes Konto aus der Rechnung, aenderten sich die
+ * Zeichen eines aktiven Mitglieds in dem Moment, in dem ein anderes geht.
+ * Sie nennt dieselben Konten wie `GET /users` und geht an dieselben Leser;
+ * ein Gast geteilter Ausgaben bekommt sie leer.
+ *
  * Wer die naechste Zahl hebt, schreibt hier wieder hin, welcher Eintrag es war
  * und warum er keine Personenliste ist. Steht das nicht dabei, ist die Antwort
  * nein - dann gehoert die Liste auf das Praedikat.
  */
 test('the allowlist stays short and every entry names a reason', () => {
-  assert.ok(ALLOWLIST.length <= 16, 'a long allowlist is a second predicate - move lists onto the predicate instead');
+  assert.ok(ALLOWLIST.length <= 17, 'a long allowlist is a second predicate - move lists onto the predicate instead');
   for (const entry of ALLOWLIST) {
     assert.ok(entry.reason && entry.reason.length > 20, `${entry.file} :: ${entry.site} needs a reason`);
   }

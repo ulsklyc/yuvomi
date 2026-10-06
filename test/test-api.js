@@ -331,6 +331,62 @@ test('auth.updateUser holt danach /auth/me, damit othersCanRead in derselben Sit
   assert.ok(me > patch, `nach dem PATCH fehlt GET /auth/me: ${calls.join(', ')}`);
 });
 
+// ─── Gleiche Initialen im Haushalt (#1464) ──────────────────────────────────
+// Der Helfer kennt den Haushalt nur aus den Auth-Antworten. Gemessen wird am
+// ECHTEN Helfer: was `initials()` nach dem Aufruf liefert.
+
+test('auth.me, login und verifyTwoFactor reichen initialsRoster an den Initialen-Helfer; logout nimmt ihn zurueck', async () => {
+  const { initials, clearInitialsRoster } = await import('../public/utils/initials.js');
+  for (const [name, run] of [
+    ['me', () => auth.me()],
+    ['login', () => auth.login('linda', 'pw')],
+    ['verifyTwoFactor', () => auth.verifyTwoFactor('123456')],
+  ]) {
+    setup();
+    clearInitialsRoster();
+    assert.equal(initials('Linda Johnson'), 'LJ', `${name}: Vorbedingung`);
+    _mockFetch = () => mockResponse(200, { user: {}, initialsRoster: ['Linda Johnson', 'Leo Johnson'] });
+    await run();
+    assert.equal(initials('Linda Johnson'), 'LI', `${name}: der Haushalt ist angekommen`);
+    assert.equal(initials('Leo Johnson'), 'LE', name);
+  }
+
+  // logout() raeumt auch die Wurzelklasse des Solo-Haushalts ab und braucht
+  // dafuer ein Wurzelelement, das dieser Lauf sonst nicht hat.
+  const hadRoot = Object.hasOwn(globalThis.document, 'documentElement');
+  const root = globalThis.document.documentElement;
+  if (!root) globalThis.document.documentElement = { classList: { remove() {}, toggle() {} } };
+  try {
+    _mockFetch = () => mockResponse(200, {});
+    await auth.logout();
+  } finally {
+    if (!hadRoot) delete globalThis.document.documentElement;
+    else globalThis.document.documentElement = root;
+  }
+  assert.equal(initials('Linda Johnson'), 'LJ', 'nach dem Abmelden kennt der Helfer den Haushalt nicht mehr');
+});
+
+test('auth.updateProfile holt danach /auth/me: der eigene neue Name steht sofort im Haushalt', async () => {
+  const { initials, clearInitialsRoster } = await import('../public/utils/initials.js');
+  setup();
+  clearInitialsRoster();
+  const calls = [];
+  _mockFetch = (url, opts = {}) => {
+    calls.push(`${opts.method || 'GET'} ${url}`);
+    return mockResponse(200, { user: { display_name: 'Leo Johnson' }, initialsRoster: ['Linda Johnson', 'Leo Johnson'] });
+  };
+  try {
+    const res = await auth.updateProfile({ display_name: 'Leo Johnson' });
+    assert.equal(res.user.display_name, 'Leo Johnson', 'die Antwort des PATCH kommt unveraendert zurueck');
+    const patch = calls.findIndex((c) => /^PATCH .*\/auth\/me\/profile$/.test(c));
+    const me = calls.findIndex((c) => /^GET .*\/auth\/me$/.test(c));
+    assert.ok(patch >= 0 && me > patch, `nach dem PATCH fehlt GET /auth/me: ${calls.join(', ')}`);
+    assert.equal(initials('Leo Johnson'), 'LE');
+  } finally {
+    clearInitialsRoster();
+  }
+});
+
 // ─── #1431: 503 waehrend eines Restores ─────────────────────────────────────
 
 test('503 mit reason restore_in_progress: uebersetzte Meldung statt englischem Servertext', async () => {
