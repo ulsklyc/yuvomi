@@ -811,6 +811,7 @@
         "recipeScaleLabel": "Zutaten skalieren",
         "deletedToast": "Mahlzeit gelöscht.",
         "recurrenceLabel": "Wöchentlich wiederholen",
+        "recurrenceWeekly": "Wöchentlich",
         "recurrenceHint": "Yuvomi legt diese Mahlzeit in zukünftigen Wochen automatisch am gleichen Wochentag an.",
         "recurrenceUntilLabel": "Wiederholen bis",
         "recurrenceUntilHint": "Leer lassen, damit die Serie unbegrenzt läuft.",

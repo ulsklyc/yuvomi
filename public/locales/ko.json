@@ -811,6 +811,7 @@
         "recipeScaleLabel": "재료 비율 조절",
         "deletedToast": "식사가 삭제되었습니다.",
         "recurrenceLabel": "매주 반복",
+        "recurrenceWeekly": "매주",
         "recurrenceHint": "Yuvomi가 이 식사를 앞으로의 주에도 같은 요일에 자동으로 추가합니다.",
         "recurrenceUntilLabel": "반복 종료일",
         "recurrenceUntilHint": "무기한 반복하려면 비워 두세요.",

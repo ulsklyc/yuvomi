@@ -811,6 +811,7 @@
         "recipeScaleLabel": "مقیاس‌بندی مواد",
         "deletedToast": "وعده حذف شد.",
         "recurrenceLabel": "تکرار هفتگی",
+        "recurrenceWeekly": "هفتگی",
         "recurrenceHint": "Yuvomi این وعده را در هفته‌های آینده به‌طور خودکار در همان روز هفته اضافه می‌کند.",
         "recurrenceUntilLabel": "تکرار تا",
         "recurrenceUntilHint": "برای تکرار نامحدود خالی بگذارید.",

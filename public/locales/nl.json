@@ -797,6 +797,7 @@
         "recipeScaleLabel": "Ingrediënten schalen",
         "deletedToast": "Maaltijd verwijderd.",
         "recurrenceLabel": "Wekelijks herhalen",
+        "recurrenceWeekly": "Wekelijks",
         "recurrenceHint": "Yuvomi voegt deze maaltijd in toekomstige weken automatisch op dezelfde weekdag toe.",
         "recurrenceUntilLabel": "Herhalen tot",
         "recurrenceUntilHint": "Laat leeg om onbeperkt te herhalen.",

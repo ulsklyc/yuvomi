@@ -797,6 +797,7 @@
         "recipeScaleLabel": "Κλιμάκωση υλικών",
         "deletedToast": "Το γεύμα διαγράφηκε.",
         "recurrenceLabel": "Επανάληψη κάθε εβδομάδα",
+        "recurrenceWeekly": "Εβδομαδιαία",
         "recurrenceHint": "Το Yuvomi δημιουργεί αυτό το γεύμα αυτόματα την ίδια ημέρα της εβδομάδας στις επόμενες εβδομάδες.",
         "recurrenceUntilLabel": "Επανάληψη έως",
         "recurrenceUntilHint": "Αφήστε το κενό για επ' αόριστον επανάληψη.",

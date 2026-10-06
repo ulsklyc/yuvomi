@@ -811,6 +811,7 @@
         "recipeScaleLabel": "Skala bahan",
         "deletedToast": "Makanan dihapus.",
         "recurrenceLabel": "Ulangi mingguan",
+        "recurrenceWeekly": "Mingguan",
         "recurrenceHint": "Yuvomi secara otomatis menambahkan makanan ini pada hari yang sama di minggu-minggu mendatang.",
         "recurrenceUntilLabel": "Ulangi sampai",
         "recurrenceUntilHint": "Kosongkan untuk mengulang tanpa batas.",

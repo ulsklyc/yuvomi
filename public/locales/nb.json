@@ -797,6 +797,7 @@
         "recipeScaleLabel": "Skaler ingredienser",
         "deletedToast": "Måltid slettet.",
         "recurrenceLabel": "Gjenta ukentlig",
+        "recurrenceWeekly": "Ukentlig",
         "recurrenceHint": "Yuvomi legger automatisk til dette måltidet på samme ukedag i fremtidige uker.",
         "recurrenceUntilLabel": "Gjenta til",
         "recurrenceUntilHint": "La det stå tomt for å gjenta på ubestemt tid.",
