@@ -445,6 +445,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the allowed category keys, the keys of the built-in income categories are still German
   words - they are stored keys, not wording. Other modules are unchanged (#1668).
 
+- **With read-only access, a screen reader now says that a row opens its details** (#1682).
+  In the pantry and under Birthdays, a row announced only its content when you may read
+  but not change: with write access it ends on "Edit", and with read access that word was
+  removed and nothing took its place. The row now ends on "Show details". The info button of
+  a shopping item says the same, followed by the item's name. Along with it, in the pantry on
+  a narrow phone: a row with a cart button hid its best-before date to make room for the
+  plus and minus buttons. A read-only row has no such buttons, so the date stays visible
+  there. Behind the scenes the three read views (birthdays, shopping, pantry) now draw their
+  rows with one shared building block instead of three copies.
+
 ## [2.73.0] - 2026-10-04
 
 ### Fixed

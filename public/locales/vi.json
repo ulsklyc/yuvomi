@@ -17,6 +17,7 @@
         "moreActions": "Hành động khác",
         "moreActionsNamed": "Hành động khác cho {{name}}",
         "editNamed": "Chỉnh sửa {{name}}",
+        "showDetails": "Hiển thị chi tiết",
         "deleteNamed": "Xóa {{name}}",
         "removeNamed": "Gỡ {{name}}",
         "filters": "Bộ lọc",

@@ -10,6 +10,7 @@ import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { flipSnapshot, flipPlay } from '/utils/flip.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { readRowHtml, readDetailsLabel } from '/utils/read-row.js';
 import { promptModal, openModal, closeModal, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { addLocalDays, todayKey } from '/utils/date.js';
@@ -1353,7 +1354,7 @@ function renderReadActions(item) {
   if (!hasReadDetails(item)) return '';
   return `
           <button class="row-action" data-action="item-details" data-id="${item.id}"
-                  aria-label="${t('shopping.detailsLabel', { name: esc(item.name) })}">
+                  aria-label="${esc(readDetailsLabel(item.name))}">
             <i data-lucide="info" class="icon-md" aria-hidden="true"></i>
           </button>`;
 }
@@ -2079,24 +2080,6 @@ function refreshItemName(container, item) {
  * Weg an einer Stelle, an der man gerade einen Namen tippt, wäre eine
  * Fehlerquelle, kein Gewinn.
  */
-/**
- * Eine Zeile der Leseansicht - das Markup von `detailRowEl()` aus
- * components/detail-view.js (Icon, Beschriftung, Wert), als Zeichenkette wie
- * in birthdays.js. Ohne Wert keine Zeile: ein Strich waere ein Wert, den es
- * nicht gibt.
- */
-function readRowHtml({ icon, label, valueHtml, multiline = false }) {
-  if (!valueHtml) return '';
-  return `
-        <div class="detail-row${multiline ? ' detail-row--multiline' : ''}">
-          <i class="detail-row__icon" data-lucide="${icon}" aria-hidden="true"></i>
-          <div class="detail-row__text">
-            <span class="detail-row__label">${esc(label)}</span>
-            <span class="detail-row__value">${valueHtml}</span>
-          </div>
-        </div>`;
-}
-
 /** Der Preis als Betrag in der Haushaltswaehrung, in deren kleinster Einheit gespeichert. */
 function priceReadText(cents) {
   if (cents == null) return '';
@@ -2118,12 +2101,12 @@ function itemReadHtml(item) {
   return `
     <div class="item-details-read detail-view" data-view="read" data-item-id="${item.id}">
       <div class="detail-view__rows">
-        ${readRowHtml({ icon: 'hash', label: t('shopping.itemQtyLabel'), valueHtml: esc(item.quantity || '') })}
-        ${readRowHtml({ icon: 'tag', label: t('shopping.categoryLabel'), valueHtml: item.category ? esc(categoryLabel(item.category)) : '' })}
-        ${readRowHtml({ icon: 'receipt', label: t('shopping.priceLabel'), valueHtml: esc(priceReadText(item.price_cents)) })}
-        ${readRowHtml({ icon: 'store', label: t('shopping.storeLabel'), valueHtml: esc(storeName(item)) })}
+        ${readRowHtml({ icon: 'hash', label: t('shopping.itemQtyLabel'), value: item.quantity || '' })}
+        ${readRowHtml({ icon: 'tag', label: t('shopping.categoryLabel'), value: item.category ? categoryLabel(item.category) : '' })}
+        ${readRowHtml({ icon: 'receipt', label: t('shopping.priceLabel'), value: priceReadText(item.price_cents) })}
+        ${readRowHtml({ icon: 'store', label: t('shopping.storeLabel'), value: storeName(item) })}
         ${readRowHtml({ icon: 'link', label: t('shopping.urlLabel'), valueHtml: link })}
-        ${readRowHtml({ icon: 'align-left', label: t('shopping.notesLabel'), valueHtml: esc(item.notes || ''), multiline: true })}
+        ${readRowHtml({ icon: 'align-left', label: t('shopping.notesLabel'), value: item.notes || '', multiline: true })}
       </div>
     </div>`;
 }

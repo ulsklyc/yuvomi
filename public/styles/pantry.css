@@ -438,9 +438,14 @@
  *
  * 26rem: die Trägerbreiten sind gemessen 358px (390er-Telefon) und 720px (ab
  * 768px). Der Schnitt liegt dazwischen, und auf dem breiten Träger stehen
- * beide Angaben in jeder Zeile. */
+ * beide Angaben in jeder Zeile.
+ *
+ * NUR MIT STEPPER (#1682): die 168px gelten fuer eine Zeile, in der Warenkorb
+ * UND Stepper stehen. Bei `pantry: read` gibt es keinen Stepper, die Bedienzone
+ * ist nur der Warenkorb, und die Textspalte hat den Platz wieder - dort bleibt
+ * das Datum stehen. */
 @container list-rows (max-width: 26rem) {
-  .pantry-row:has(.pantry-row__cart) .pantry-row__expiry {
+  .pantry-row:has(.pantry-row__cart):has(.pantry-stepper) .pantry-row__expiry {
     display: none;
   }
 }

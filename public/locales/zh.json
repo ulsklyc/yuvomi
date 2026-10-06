@@ -17,6 +17,7 @@
         "moreActions": "更多操作",
         "moreActionsNamed": "{{name}} 的更多操作",
         "editNamed": "编辑 {{name}}",
+        "showDetails": "显示详情",
         "deleteNamed": "删除 {{name}}",
         "removeNamed": "移除 {{name}}",
         "filters": "筛选",

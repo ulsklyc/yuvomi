@@ -17,6 +17,7 @@
         "moreActions": "Mais ações",
         "moreActionsNamed": "Mais ações para {{name}}",
         "editNamed": "Editar {{name}}",
+        "showDetails": "Mostrar detalhes",
         "deleteNamed": "Excluir {{name}}",
         "removeNamed": "Remover {{name}}",
         "filters": "Filtros",
