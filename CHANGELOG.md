@@ -550,6 +550,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   there. Behind the scenes the three read views (birthdays, shopping, pantry) now draw their
   rows with one shared building block instead of three copies.
 
+- **Every chart leaves its axis values the room they need, not only the Budget trend**
+  (#1722). The Health charts (vitals, lab values, activity, and the cycle trends) and the
+  odometer chart of an inventory item kept a fixed margin sized for short numbers. The
+  severity trend of a cycle symptom writes words on that axis, and their length depends on
+  the language: in Polish, "Umiarkowane" started to the left of its chart and ended up one
+  pixel from the edge of its card on a phone; Filipino and Russian stuck out as well. Each
+  of these charts is now measured the moment it appears, the same way the Budget trend
+  already was, so a long word or a seven-digit odometer reading stays inside its chart. A
+  chart with short values looks exactly as before.
+
 ## [2.73.0] - 2026-10-04
 
 ### Fixed

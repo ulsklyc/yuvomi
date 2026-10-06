@@ -646,7 +646,8 @@
  * 12px-Schrift 67px breit und stand links ausserhalb seines Scrollports.
  * `fitChartGutter()` (utils/chart.js) schreibt die Breite des breitesten
  * Y-Werts als `--chart-label-width` an das Elternelement des SVG und gibt ihm
- * diese Klasse. Der Wert steht rechtsbuendig bei PAD_L - AXIS_GAP = 50
+ * diese Klasse - fuer jedes `svg.chart`, das ins Dokument kommt
+ * (`watchChartGutters()`, #1722). Der Wert steht rechtsbuendig bei PAD_L - AXIS_GAP = 50
  * Einheiten; damit sein linkes Ende im Bild bleibt, muss gelten
  *   inset + 50 * (P - inset) / W >= L,  also  inset >= (L * W - P * 50) / (W - 50),
  * L = Breite des Werts plus var(--space-1) Luft zur Kante. Die Mindestbreite

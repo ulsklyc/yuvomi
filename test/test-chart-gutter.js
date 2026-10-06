@@ -12,8 +12,10 @@
  * Systemschrift, 12px) und stehen hier als Eingabe. Gerechnet wird mit der
  * FORMEL AUS DEM STYLESHEET, nicht mit einer Abschrift: sie wird aus
  * `panel.css` gelesen und ausgewertet, mit den Token aus `tokens.css`. Dass
- * der Browser dieselbe Formel so anwendet und dass die Budget-Seite den Helfer
- * wirklich ruft, misst `test:ko-layout-browser` an der gerenderten Seite.
+ * der Browser dieselbe Formel so anwendet, misst `test:ko-layout-browser` am
+ * Budget-Verlauf; dass jedes Diagramm gemessen wird, sobald es im Dokument
+ * steht (#1722), misst `test:chart-gutter-browser` an den gerenderten Seiten.
+ * Hier steht der Beobachter dazu an Attrappen.
  *
  * Fehlt `.chart-host`, rechnet der Test mit der Regel in `:root` weiter - also
  * mit dem Stand vor dem Fix. Er wird dann am Won-Wert rot und nicht an einer
@@ -22,9 +24,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { eachRule } from './css-rules.js';
-import { CHART, AXIS_GAP, chartGridMarkup, fitChartGutter } from '../public/utils/chart.js';
+import { CHART, AXIS_GAP, chartGridMarkup, fitChartGutter, watchChartGutters } from '../public/utils/chart.js';
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 const panelRules = [...eachRule(read('../public/styles/panel.css'))].filter((rule) => rule.at.length === 0);
@@ -175,14 +177,186 @@ test('fitChartGutter laesst stehen, was keine Breite hat', () => {
   assert.doesNotThrow(() => fitChartGutter({}));
 });
 
-/* TEXTGUARD, und als solcher gemeint: dass der Budget-Verlauf den Helfer NACH
- * dem Einsetzen ruft, steht hier nur als Reihenfolge im Quelltext. Den Aufruf
- * selbst faehrt test:ko-layout-browser. */
-test('der Budget-Verlauf misst seine Achse, nachdem er im Dokument steht', () => {
-  const src = read('../public/pages/budget-stats.js');
-  const fn = src.slice(src.indexOf('function renderTrendChart()'), src.indexOf('function periodLabel('));
-  const inserted = fn.indexOf("host.insertAdjacentHTML('beforeend'");
-  const fitted = fn.search(/^\s*fitChartGutter\(host\);/m);
-  assert.ok(inserted > 0, 'renderTrendChart setzt das Diagramm nicht mehr per insertAdjacentHTML ein');
-  assert.ok(fitted > inserted, 'fitChartGutter(host) muss nach dem Einsetzen stehen: vorher hat kein Wert eine Breite');
+test('fitChartGutter misst im neuen Massstab nach und nimmt den groesseren Wert', () => {
+  // Das Polster aendert den Massstab, und Chrome setzt denselben Text darin anders breit (#1722).
+  const grows = fakeHost();
+  const widthAfter = (host, first, second) => () => ({ width: host.props['--chart-label-width'] ? second : first });
+  const growing = fakeLabels(grows, [0]);
+  growing[0].getBoundingClientRect = widthAfter(grows, 69.4, 75.8);
+  fitChartGutter(fakeRoot(growing));
+  assert.equal(grows.props['--chart-label-width'], '76px', 'der Wert ist im Massstab nach dem Polster breiter: der breitere gilt');
+  // Wird er schmaler, bleibt der erste Wert - nach unten wird nicht nachgezogen, sonst pendelt es.
+  const shrinks = fakeHost();
+  const shrinking = fakeLabels(shrinks, [0]);
+  shrinking[0].getBoundingClientRect = widthAfter(shrinks, 77.6, 70.7);
+  fitChartGutter(fakeRoot(shrinking));
+  assert.equal(shrinks.props['--chart-label-width'], '78px');
+  assert.deepEqual(shrinks.classes, ['chart-host'], 'ein Traeger wird nur einmal angefasst, wenn sich nichts aendert');
+});
+
+/* ── watchChartGutters: Einsetzen und Messen sind ein Schritt (#1722) ────── */
+
+/** Die beiden Beobachter als Attrappen: der Test loest ihre Rueckrufe selbst aus. */
+function fakeObservers() {
+  const seen = { added: [], sized: [] };
+  class Added {
+    constructor(callback) { this.callback = callback; this.targets = []; this.connected = true; seen.added.push(this); }
+    observe(target, options) { this.targets.push({ target, options }); }
+    disconnect() { this.connected = false; }
+  }
+  class Sized {
+    constructor(callback) { this.callback = callback; this.targets = new Set(); this.connected = true; seen.sized.push(this); }
+    observe(target) { this.targets.add(target); }
+    unobserve(target) { this.targets.delete(target); }
+    disconnect() { this.connected = false; this.targets.clear(); }
+  }
+  return { seen, options: { MutationObserver: Added, ResizeObserver: Sized } };
+}
+
+/** Ein `svg.chart` mit Werten an einem Traeger. `shown` schaltet, ob es eine Flaeche hat. */
+function fakeChart(labelWidths) {
+  const host = fakeHost();
+  const svg = {
+    nodeType: 1, isConnected: true, shown: true, parentElement: host,
+    closest: (selector) => (selector === 'svg.chart' ? svg : null),
+    querySelectorAll: () => [],
+    getBoundingClientRect: () => ({ width: svg.shown ? 300 : 0 }),
+  };
+  const labels = labelWidths.map((width) => ({
+    closest: (selector) => (selector === 'svg.chart' ? svg : null),
+    getBoundingClientRect: () => ({ width: svg.shown ? width : 0 }),
+  }));
+  host.querySelectorAll = (selector) => (selector === 'svg.chart .chart__axis--y' ? labels : []);
+  return { host, svg };
+}
+/** Ein Knoten, der Diagramme ENTHAELT - so kommt ein ganzer Abschnitt ins Dokument. */
+const fakeSection = (...svgs) => ({
+  nodeType: 1,
+  closest: () => null,
+  querySelectorAll: (selector) => (selector === 'svg.chart' ? svgs : []),
+});
+const fakeBody = (...svgs) => ({ ...fakeSection(...svgs), isBody: true });
+const insert = (observer, ...nodes) => observer.callback([{ addedNodes: nodes, removedNodes: [] }]);
+const remove = (observer, ...nodes) => observer.callback([{ addedNodes: [], removedNodes: nodes }]);
+
+test('watchChartGutters misst ein Diagramm, sobald es im Dokument steht - ohne Aufruf der Seite', () => {
+  const { seen, options } = fakeObservers();
+  const body = fakeBody();
+  watchChartGutters(body, options);
+  assert.equal(seen.added.length, 1);
+  assert.deepEqual(seen.added[0].targets, [{ target: body, options: { childList: true, subtree: true } }],
+    'beobachtet wird der ganze Baum: ein Diagramm kommt als Teil eines Abschnitts');
+  const direct = fakeChart([20.2]);
+  const nested = fakeChart([77.6, 31]);
+  insert(seen.added[0], direct.svg, { nodeType: 3 }, fakeSection(nested.svg));
+  assert.equal(direct.host.props['--chart-label-width'], '21px');
+  assert.equal(nested.host.props['--chart-label-width'], '78px', 'ein Wort an der Achse ("Umiarkowane", 77.6px) bekommt seinen Platz');
+  assert.deepEqual(nested.host.classes, ['chart-host']);
+  assert.equal(seen.sized[0].targets.size, 0, 'ein gemessenes Diagramm wartet auf nichts mehr');
+});
+
+test('watchChartGutters misst, was beim Start schon im Dokument steht', () => {
+  const { options } = fakeObservers();
+  const chart = fakeChart([44]);
+  watchChartGutters(fakeBody(chart.svg), options);
+  assert.equal(chart.host.props['--chart-label-width'], '44px');
+});
+
+test('watchChartGutters wartet auf ein Diagramm ohne Flaeche und misst es, wenn es eine hat', () => {
+  // Der Schweregrad-Verlauf liegt in einem geschlossenen Aufklapper.
+  const { seen, options } = fakeObservers();
+  watchChartGutters(fakeBody(), options);
+  const chart = fakeChart([77.6]);
+  chart.svg.shown = false;
+  insert(seen.added[0], fakeSection(chart.svg));
+  assert.deepEqual(chart.host.props, {}, 'ohne Flaeche gibt es nichts zu messen');
+  const waiting = seen.sized[0];
+  assert.ok(waiting.targets.has(chart.svg), 'das Diagramm muss auf seine Flaeche warten');
+  // Ein Rueckruf, solange es weiter keine Flaeche hat, aendert nichts.
+  waiting.callback([{ target: chart.svg }]);
+  assert.deepEqual(chart.host.props, {});
+  assert.ok(waiting.targets.has(chart.svg));
+  chart.svg.shown = true;
+  waiting.callback([{ target: chart.svg }]);
+  assert.equal(chart.host.props['--chart-label-width'], '78px');
+  assert.ok(!waiting.targets.has(chart.svg), 'einmal gemessen, wird es entlassen: die Schrift skaliert nicht mit');
+});
+
+test('watchChartGutters entlaesst ein wartendes Diagramm, das aus dem Dokument geht', () => {
+  const { seen, options } = fakeObservers();
+  watchChartGutters(fakeBody(), options);
+  const chart = fakeChart([50]);
+  chart.svg.shown = false;
+  const section = fakeSection(chart.svg);
+  insert(seen.added[0], section);
+  assert.ok(seen.sized[0].targets.has(chart.svg));
+  remove(seen.added[0], section);
+  assert.ok(!seen.sized[0].targets.has(chart.svg));
+  // Und ein Diagramm, das schon wieder weg ist, wenn der Rueckruf laeuft, wird nicht angefasst.
+  const gone = fakeChart([50]);
+  gone.svg.isConnected = false;
+  insert(seen.added[0], gone.svg);
+  assert.deepEqual(gone.host.props, {});
+  assert.ok(!seen.sized[0].targets.has(gone.svg));
+});
+
+test('watchChartGutters misst neu, wenn nur die Achse eines Diagramms getauscht wird', () => {
+  const { seen, options } = fakeObservers();
+  watchChartGutters(fakeBody(), options);
+  const chart = fakeChart([90]);
+  insert(seen.added[0], { nodeType: 1, closest: (selector) => (selector === 'svg.chart' ? chart.svg : null), querySelectorAll: () => [] });
+  assert.equal(chart.host.props['--chart-label-width'], '90px');
+});
+
+test('watchChartGutters laesst sich beenden und braucht keinen ResizeObserver', () => {
+  const { seen, options } = fakeObservers();
+  const stop = watchChartGutters(fakeBody(), options);
+  stop();
+  assert.equal(seen.added[0].connected, false);
+  assert.equal(seen.sized[0].connected, false);
+  // Ohne ResizeObserver bleibt ein Diagramm ohne Flaeche bei der Mindestbreite - kein Wurf.
+  const bare = fakeObservers();
+  watchChartGutters(fakeBody(), { MutationObserver: bare.options.MutationObserver, ResizeObserver: undefined });
+  const hidden = fakeChart([50]);
+  hidden.svg.shown = false;
+  assert.doesNotThrow(() => insert(bare.seen.added[0], hidden.svg));
+  const shown = fakeChart([50]);
+  insert(bare.seen.added[0], shown.svg);
+  assert.equal(shown.host.props['--chart-label-width'], '50px');
+  // Ohne MutationObserver (Node, alte Umgebung) passiert nichts.
+  assert.doesNotThrow(() => watchChartGutters(fakeBody(), { MutationObserver: undefined })());
+  assert.doesNotThrow(() => watchChartGutters(null)());
+});
+
+/* DER BEOBACHTER STARTET MIT DEM MODUL. Ein `.chart__axis--y` entsteht nur
+ * ueber `chartGridMarkup()`; wer ein Diagramm zeichnen kann, hat chart.js
+ * geladen. Hier wird das Modul ein zweites Mal geladen, mit einem Dokument:
+ * gefahren, nicht gelesen. Dass der Browser es genauso tut und jedes der neun
+ * Diagramme davon erreicht wird, misst test:chart-gutter-browser. */
+test('chart.js beobachtet document.body, sobald es geladen ist', async () => {
+  const { seen, options } = fakeObservers();
+  const body = fakeBody();
+  const before = { document: globalThis.document, MutationObserver: globalThis.MutationObserver, ResizeObserver: globalThis.ResizeObserver };
+  Object.assign(globalThis, { document: { body }, ...options });
+  try {
+    await import('../public/utils/chart.js?mit-dokument');
+  } finally {
+    for (const [name, value] of Object.entries(before)) {
+      if (value === undefined) delete globalThis[name];
+      else globalThis[name] = value;
+    }
+  }
+  assert.equal(seen.added.length, 1, 'beim Laden muss genau ein Beobachter entstehen');
+  assert.equal(seen.added[0].targets[0]?.target, body);
+  const chart = fakeChart([67.1]);
+  insert(seen.added[0], fakeSection(chart.svg));
+  assert.equal(chart.host.props['--chart-label-width'], '68px');
+});
+
+test('keine Seite ruft fitChartGutter selbst: der Weg ist einer', () => {
+  // TEXTGUARD, und als solcher gemeint: ein zweiter Weg neben dem Beobachter
+  // waere wieder ein Aufruf, den die naechste Seite vergessen kann.
+  for (const file of readdirSync(new URL('../public/pages/', import.meta.url)).filter((name) => name.endsWith('.js'))) {
+    assert.doesNotMatch(read(`../public/pages/${file}`), /\bfitChartGutter\b/, `${file} ruft fitChartGutter selbst`);
+  }
 });
