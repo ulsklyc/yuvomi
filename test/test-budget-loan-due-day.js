@@ -11,8 +11,10 @@
  *          - der Server liefert das Datum, wer es als `paid_date` durchreicht,
  *            bucht die Rate in den Monat, in dem sie faellig ist - gleich, wann
  *            getippt wird;
- *          - ohne Faelligkeitstag ist `next_due_date` null, und ein eigenes
- *            `paid_date` per API bleibt, was es war;
+ *          - ohne Faelligkeitstag ist `next_due_date` fuer die Rate des
+ *            laufenden Monats null (gebucht wird auf heute), fuer eine Rate,
+ *            deren Monat schon vorbei ist, der Erste dieses Monats (#1741);
+ *          - ein eigenes `paid_date` per API bleibt, was es war;
  *          - ein ungueltiger Tag ist eine Absage mit Grund, kein gerundeter Wert;
  *          - "bereits gezahlte Raten" tragen den Tag nur beim Anlegen;
  *          - die Migration laeuft auf einer Bestands-DB und laesst sie, wie sie war.
@@ -23,6 +25,11 @@
  * (Pacific/Kiritimati, UTC+14) schon der 2. November ist, waehrend UTC noch den
  * 1. zeigt. Wer das Datum aus "heute" ableitete, in welcher Zone auch immer,
  * fiele hier auf.
+ *
+ * OHNE FAELLIGKEITSTAG IST ES SEIT #1741 DOCH EINE FRAGE AN DIE UHR - an den
+ * MONAT des Haushalts: ist der Faelligkeitsmonat vorbei? Jeder Test, der dort
+ * ein Datum oder null erwartet, stellt deshalb Uhr und Zone, und zwei tun es
+ * am Monatswechsel, einmal mit dem Haushalt vor UTC, einmal dahinter.
  *
  * Ausfuehren: node --experimental-sqlite --test test/test-budget-loan-due-day.js
  */
@@ -168,15 +175,21 @@ test('ein Darlehen mit Faelligkeitstag nennt das Datum der naechsten Rate', asyn
   assert.equal(listed.next_due_date, '2026-10-27');
 });
 
-test('ohne Faelligkeitstag ist next_due_date null, der Monat bleibt', async () => {
-  const created = await createLoan();
-  assert.equal(created.status, 201);
-  assert.equal(created.body.data.due_day, null);
-  assert.equal(created.body.data.next_due_month, '2026-10');
-  assert.equal(created.body.data.next_due_date, null);
-  const listed = await loanFromList(created.body.data.id);
-  assert.equal(listed.next_due_date, null);
-  assert.ok('next_due_date' in listed, 'das Feld steht da, auch wenn es leer ist');
+test('ohne Faelligkeitstag ist next_due_date fuer die Rate des laufenden Monats null, der Monat bleibt', async () => {
+  await at('2026-10-06T10:00:00Z', 'Europe/Berlin', async () => {
+    const created = await createLoan();
+    assert.equal(created.status, 201);
+    assert.equal(created.body.data.due_day, null);
+    assert.equal(created.body.data.next_due_month, '2026-10');
+    assert.equal(created.body.data.next_due_date, null);
+    const listed = await loanFromList(created.body.data.id);
+    assert.equal(listed.next_due_date, null);
+    assert.ok('next_due_date' in listed, 'das Feld steht da, auch wenn es leer ist');
+    // Eine Rate, die erst kommt, hat ebenso wenig ein Datum.
+    const future = await createLoan({ start_month: '2027-03' });
+    assert.equal(future.body.data.next_due_date, null);
+    assert.equal((await loanFromList(future.body.data.id)).next_due_date, null);
+  });
 });
 
 test('Tag 31: jede Rate bekommt den letzten Tag ihres Monats, das getilgte Darlehen kein Datum', async () => {
@@ -247,16 +260,125 @@ test('spaet markiert: am 2. November fuer den 27. Oktober landet die Rate im Okt
   });
 });
 
-test('ohne Faelligkeitstag bleibt es bei heute - dem Tag des Haushalts', async () => {
+test('ohne Faelligkeitstag bleibt die Rate des laufenden Monats bei heute - dem Tag des Haushalts', async () => {
   db.prepare('DELETE FROM budget_entries').run();
-  const created = await createLoan();
+  const created = await createLoan({ start_month: '2026-11' });
   await at('2026-11-01T11:00:00Z', 'Pacific/Kiritimati', async () => {
+    assert.equal(todayKey(db), '2026-11-02', 'Vorbedingung: der Haushalt steht auf dem 2. November');
+    assert.equal((await loanFromList(created.body.data.id)).next_due_date, null);
     const paid = await markPaid(created.body.data.id);
     assert.equal(paid.status, 201);
     assert.equal(paid.body.data.payment.paid_date, '2026-11-02');
     assert.equal(entryOf(paid.body.data.payment).date, '2026-11-02');
     assert.equal(await monthExpenses('2026-11'), -100, 'wie bisher: im Monat des Tippens');
     assert.ok((await monthExpenses('2026-10')) === 0, 'und nicht im Oktober');
+  });
+});
+
+// --------------------------------------------------------------------------
+// Ohne Faelligkeitstag: eine ueberfaellige Rate gehoert in ihren Monat (#1741)
+// --------------------------------------------------------------------------
+
+test('#1741: ein Darlehen von 2022 ohne Faelligkeitstag - drei heute markierte Raten landen in 2022-01, -02, -03', async () => {
+  db.prepare('DELETE FROM budget_entries').run();
+  const created = await createLoan({ title: 'Hypothek', total_amount: 240000, installment_count: 240, start_month: '2022-01' });
+  const id = created.body.data.id;
+  await at('2026-10-06T10:00:00Z', 'Europe/Berlin', async () => {
+    assert.equal(todayKey(db), '2026-10-06');
+    for (const [month, expected] of [['2022-01', '2022-01-01'], ['2022-02', '2022-02-01'], ['2022-03', '2022-03-01']]) {
+      const loan = await loanFromList(id);
+      assert.equal(loan.due_day, null);
+      assert.equal(loan.next_due_month, month);
+      assert.equal(loan.next_due_date, expected, 'der Erste des Faelligkeitsmonats, wie bei "bereits gezahlte Raten"');
+      const paid = await markPaid(id);
+      assert.equal(paid.status, 201);
+      assert.equal(paid.body.data.payment.paid_date, expected);
+      assert.equal(entryOf(paid.body.data.payment).date, expected, 'der Budget-Eintrag traegt dasselbe Datum');
+      assert.equal(await monthExpenses(month), -1000, `die Rate zaehlt in ${month}`);
+    }
+    assert.ok((await monthExpenses('2026-10')) === 0, 'und keine im Monat des Tippens');
+    // Die Antwort auf das Buchen nennt schon das Datum der naechsten Rate.
+    const fourth = await markPaid(id);
+    assert.equal(fourth.body.data.payment.paid_date, '2022-04-01');
+    assert.equal(fourth.body.data.loan.next_due_date, '2022-05-01');
+  });
+});
+
+test('#1741: aufgeholt bis zum laufenden Monat - der letzte vergangene Monat bekommt den Ersten, der laufende heute', async () => {
+  db.prepare('DELETE FROM budget_entries').run();
+  const created = await createLoan({ start_month: '2026-09' });
+  const id = created.body.data.id;
+  await at('2026-10-06T10:00:00Z', 'Europe/Berlin', async () => {
+    const september = await markPaid(id);
+    assert.equal(september.body.data.payment.paid_date, '2026-09-01');
+    assert.equal(september.body.data.loan.next_due_month, '2026-10');
+    assert.equal(september.body.data.loan.next_due_date, null, 'die Rate des laufenden Monats hat kein Datum');
+    const october = await markPaid(id);
+    assert.equal(october.body.data.payment.paid_date, '2026-10-06', 'sie bleibt bei heute');
+    assert.equal(october.body.data.loan.next_due_date, null, 'und eine kuenftige ebenso');
+  });
+});
+
+test('#1741: "vorbei" misst der Monat des Haushalts, nicht der von UTC - Haushalt vor UTC', async () => {
+  db.prepare('DELETE FROM budget_entries').run();
+  const created = await createLoan({ start_month: '2026-10' });
+  const id = created.body.data.id;
+  // 31.10. 11:00 UTC: in Pacific/Kiritimati (UTC+14) ist es der 01.11., 01:00.
+  await at('2026-10-31T11:00:00Z', 'Pacific/Kiritimati', async () => {
+    assert.equal(utcDateKey(), '2026-10-31', 'Vorbedingung: UTC steht noch im Oktober');
+    assert.equal(todayKey(db), '2026-11-01', 'Vorbedingung: der Haushalt steht im November');
+    assert.equal((await loanFromList(id)).next_due_date, '2026-10-01', 'fuer den Haushalt ist der Oktober vorbei');
+    const paid = await markPaid(id);
+    assert.equal(paid.body.data.payment.paid_date, '2026-10-01');
+    assert.equal(await monthExpenses('2026-10'), -100);
+    assert.ok((await monthExpenses('2026-11')) === 0);
+  });
+});
+
+test('#1741: "vorbei" misst der Monat des Haushalts, nicht der von UTC - Haushalt hinter UTC', async () => {
+  db.prepare('DELETE FROM budget_entries').run();
+  const created = await createLoan({ start_month: '2026-10' });
+  const id = created.body.data.id;
+  // 01.11. 05:00 UTC: in America/Los_Angeles (UTC-7) ist es der 31.10., 22:00.
+  await at('2026-11-01T05:00:00Z', 'America/Los_Angeles', async () => {
+    assert.equal(utcDateKey(), '2026-11-01', 'Vorbedingung: UTC steht schon im November');
+    assert.equal(todayKey(db), '2026-10-31', 'Vorbedingung: der Haushalt steht noch im Oktober');
+    assert.equal((await loanFromList(id)).next_due_date, null, 'fuer den Haushalt laeuft der Oktober noch');
+    const paid = await markPaid(id);
+    assert.equal(paid.body.data.payment.paid_date, '2026-10-31', 'gebucht wird auf heute, den Tag des Haushalts');
+    assert.equal(await monthExpenses('2026-10'), -100);
+  });
+});
+
+test('#1741: mit Faelligkeitstag aendert sich nichts - auch nicht fuer eine Rate von 2022', async () => {
+  const created = await createLoan({ due_day: 5, total_amount: 240000, installment_count: 240, start_month: '2022-01' });
+  const id = created.body.data.id;
+  await at('2026-10-06T10:00:00Z', 'Europe/Berlin', async () => {
+    for (const expected of ['2022-01-05', '2022-02-05', '2022-03-05']) {
+      assert.equal((await loanFromList(id)).next_due_date, expected);
+      assert.equal((await markPaid(id)).body.data.payment.paid_date, expected);
+    }
+  });
+  // Und der Tag der laufenden Rate haengt weiter nicht an der Uhr.
+  const current = await createLoan({ due_day: 27, start_month: '2026-10' });
+  for (const [iso, zone] of [['2026-10-06T10:00:00Z', 'Europe/Berlin'], ['2026-12-24T10:00:00Z', 'Europe/Berlin'], ['2026-09-01T10:00:00Z', 'Pacific/Kiritimati']]) {
+    await at(iso, zone, async () => {
+      assert.equal((await loanFromList(current.body.data.id)).next_due_date, '2026-10-27');
+    });
+  }
+});
+
+test('#1741: ein eigenes paid_date bleibt auch fuer eine ueberfaellige Rate ohne Faelligkeitstag, was es war', async () => {
+  const created = await createLoan({ start_month: '2022-01' });
+  const id = created.body.data.id;
+  await at('2026-10-06T10:00:00Z', 'Europe/Berlin', async () => {
+    const own = await call('POST', `/loans/${id}/payments`, { paid_date: '2026-10-06' });
+    assert.equal(own.status, 201);
+    assert.equal(own.body.data.payment.paid_date, '2026-10-06', 'der Server setzt den Ersten nicht selbst ein');
+    assert.equal(entryOf(own.body.data.payment).date, '2026-10-06');
+    const missing = await call('POST', `/loans/${id}/payments`, {});
+    assert.equal(missing.status, 400);
+    assert.equal(missing.body.reason, 'loan_payment_date_invalid');
   });
 });
 
@@ -315,31 +437,34 @@ test('PUT /loans/:id: beide Wege lehnen einen ungueltigen Tag ab und lassen den 
 });
 
 test('PUT /loans/:id: der Tag laesst sich setzen, aendern und wieder wegnehmen; fehlt er, bleibt er', async () => {
-  const created = await createLoan();
-  const id = created.body.data.id;
-  const full = { borrower: 'Bank', title: 'Autokredit', start_month: '2026-10', interest_mode: 'none', total_amount: 1200, installment_count: 12 };
+  // Uhr gestellt: ohne Tag haengt next_due_date am Monat des Haushalts (#1741).
+  await at('2026-10-06T10:00:00Z', 'Europe/Berlin', async () => {
+    const created = await createLoan();
+    const id = created.body.data.id;
+    const full = { borrower: 'Bank', title: 'Autokredit', start_month: '2026-10', interest_mode: 'none', total_amount: 1200, installment_count: 12 };
 
-  const set = await call('PUT', `/loans/${id}`, { ...full, due_day: 27 });
-  assert.equal(set.status, 200);
-  assert.equal(set.body.data.due_day, 27);
-  assert.equal(set.body.data.next_due_date, '2026-10-27');
+    const set = await call('PUT', `/loans/${id}`, { ...full, due_day: 27 });
+    assert.equal(set.status, 200);
+    assert.equal(set.body.data.due_day, 27);
+    assert.equal(set.body.data.next_due_date, '2026-10-27');
 
-  // Ein Teil-Update ohne das Feld (API) fasst den Tag nicht an - auf beiden Wegen.
-  assert.equal((await call('PUT', `/loans/${id}`, { title: 'Auto' })).body.data.due_day, 27);
-  assert.equal((await call('PUT', `/loans/${id}`, full)).body.data.due_day, 27);
+    // Ein Teil-Update ohne das Feld (API) fasst den Tag nicht an - auf beiden Wegen.
+    assert.equal((await call('PUT', `/loans/${id}`, { title: 'Auto' })).body.data.due_day, 27);
+    assert.equal((await call('PUT', `/loans/${id}`, full)).body.data.due_day, 27);
 
-  const changed = await call('PUT', `/loans/${id}`, { due_day: 31 });
-  assert.equal(changed.body.data.due_day, 31);
-  assert.equal(changed.body.data.next_due_date, '2026-10-31');
+    const changed = await call('PUT', `/loans/${id}`, { due_day: 31 });
+    assert.equal(changed.body.data.due_day, 31);
+    assert.equal(changed.body.data.next_due_date, '2026-10-31');
 
-  const cleared = await call('PUT', `/loans/${id}`, { ...full, due_day: null });
-  assert.equal(cleared.status, 200);
-  assert.equal(cleared.body.data.due_day, null);
-  assert.equal(cleared.body.data.next_due_date, null);
+    const cleared = await call('PUT', `/loans/${id}`, { ...full, due_day: null });
+    assert.equal(cleared.status, 200);
+    assert.equal(cleared.body.data.due_day, null);
+    assert.equal(cleared.body.data.next_due_date, null);
 
-  await call('PUT', `/loans/${id}`, { due_day: 15 });
-  const clearedPartial = await call('PUT', `/loans/${id}`, { due_day: '' });
-  assert.equal(clearedPartial.body.data.due_day, null);
+    await call('PUT', `/loans/${id}`, { due_day: 15 });
+    const clearedPartial = await call('PUT', `/loans/${id}`, { due_day: '' });
+    assert.equal(clearedPartial.body.data.due_day, null);
+  });
 });
 
 // --------------------------------------------------------------------------
@@ -364,22 +489,25 @@ test('ohne Faelligkeitstag bleiben bereits gezahlte Raten auf dem Ersten', async
 });
 
 test('ein spaeter gesetzter oder geaenderter Tag fasst keine bestehende Rate an', async () => {
-  const withDay = await createLoan({ due_day: 31, start_month: '2026-01', paid_installments: 2 });
-  const withoutDay = await createLoan({ start_month: '2026-01', paid_installments: 2 });
-  // Dazu je eine regulaer gebuchte Rate mit eigenem Datum.
-  await call('POST', `/loans/${withDay.body.data.id}/payments`, { paid_date: '2026-03-04' });
-  await call('POST', `/loans/${withoutDay.body.data.id}/payments`, { paid_date: '2026-03-04' });
-  const before = [paymentsOf(withDay.body.data.id), paymentsOf(withoutDay.body.data.id)];
-  const entriesBefore = db.prepare('SELECT id, date FROM budget_entries ORDER BY id').all();
+  await at('2026-10-06T10:00:00Z', 'Europe/Berlin', async () => {
+    const withDay = await createLoan({ due_day: 31, start_month: '2026-01', paid_installments: 2 });
+    const withoutDay = await createLoan({ start_month: '2026-01', paid_installments: 2 });
+    // Dazu je eine regulaer gebuchte Rate mit eigenem Datum.
+    await call('POST', `/loans/${withDay.body.data.id}/payments`, { paid_date: '2026-03-04' });
+    await call('POST', `/loans/${withoutDay.body.data.id}/payments`, { paid_date: '2026-03-04' });
+    const before = [paymentsOf(withDay.body.data.id), paymentsOf(withoutDay.body.data.id)];
+    const entriesBefore = db.prepare('SELECT id, date FROM budget_entries ORDER BY id').all();
 
-  assert.equal((await call('PUT', `/loans/${withDay.body.data.id}`, { due_day: 15 })).body.data.next_due_date, '2026-04-15');
-  assert.equal((await call('PUT', `/loans/${withoutDay.body.data.id}`, { due_day: 27 })).body.data.next_due_date, '2026-04-27');
-  assert.deepEqual([paymentsOf(withDay.body.data.id), paymentsOf(withoutDay.body.data.id)], before);
+    assert.equal((await call('PUT', `/loans/${withDay.body.data.id}`, { due_day: 15 })).body.data.next_due_date, '2026-04-15');
+    assert.equal((await call('PUT', `/loans/${withoutDay.body.data.id}`, { due_day: 27 })).body.data.next_due_date, '2026-04-27');
+    assert.deepEqual([paymentsOf(withDay.body.data.id), paymentsOf(withoutDay.body.data.id)], before);
 
-  assert.equal((await call('PUT', `/loans/${withDay.body.data.id}`, { due_day: null })).body.data.next_due_date, null);
-  assert.deepEqual(paymentsOf(withDay.body.data.id), before[0]);
-  assert.deepEqual(db.prepare('SELECT id, date FROM budget_entries ORDER BY id').all(), entriesBefore,
-    'und kein Budget-Eintrag hat sein Datum gewechselt');
+    // Ohne Tag nennt die ueberfaellige April-Rate den Ersten ihres Monats (#1741).
+    assert.equal((await call('PUT', `/loans/${withDay.body.data.id}`, { due_day: null })).body.data.next_due_date, '2026-04-01');
+    assert.deepEqual(paymentsOf(withDay.body.data.id), before[0]);
+    assert.deepEqual(db.prepare('SELECT id, date FROM budget_entries ORDER BY id').all(), entriesBefore,
+      'und kein Budget-Eintrag hat sein Datum gewechselt');
+  });
 });
 
 // --------------------------------------------------------------------------
