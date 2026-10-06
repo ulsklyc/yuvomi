@@ -522,6 +522,8 @@
         "bulkDeleteConfirm": "{{count}} Aufgaben unwiderruflich löschen?",
         "bulkDeleteAsk": "{{count}} Aufgaben löschen?",
         "bulkDeleteAsk_one": "{{count}} Aufgabe löschen?",
+        "bulkDeleteLabel": "{{count}} Aufgaben löschen",
+        "bulkDeleteLabel_one": "{{count}} Aufgabe löschen",
         "bulkStatusChanged": "Status geändert.",
         "bulkArchived": "Aufgaben archiviert.",
         "bulkDeleted": "Aufgaben gelöscht.",

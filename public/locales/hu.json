@@ -471,6 +471,8 @@
         "bulkDeleteConfirm": "{{count}} feladatot véglegesen törölni akar?",
         "bulkDeleteAsk": "Törölsz {{count}} feladatot?",
         "bulkDeleteAsk_one": "Törölsz {{count}} feladatot?",
+        "bulkDeleteLabel": "{{count}} feladat törlése",
+        "bulkDeleteLabel_one": "{{count}} feladat törlése",
         "bulkStatusChanged": "Állapot megváltozott.",
         "bulkArchived": "Feladatok archiválva.",
         "bulkDeleted": "Feladatok törölve.",

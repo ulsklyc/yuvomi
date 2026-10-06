@@ -510,6 +510,8 @@
         "bulkDeleteConfirm": "¿Eliminar {{count}} tareas de forma permanente?",
         "bulkDeleteAsk": "¿Eliminar {{count}} tareas?",
         "bulkDeleteAsk_one": "¿Eliminar {{count}} tarea?",
+        "bulkDeleteLabel": "Eliminar {{count}} tareas",
+        "bulkDeleteLabel_one": "Eliminar {{count}} tarea",
         "bulkDeleted": "Tareas eliminadas.",
         "bulkMarkDone": "Completada",
         "bulkMarkOpen": "Abierta",

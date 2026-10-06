@@ -510,6 +510,8 @@
         "bulkDeleteConfirm": "{{count}} görev kalıcı olarak silinsin mi?",
         "bulkDeleteAsk": "{{count}} görev silinsin mi?",
         "bulkDeleteAsk_one": "{{count}} görev silinsin mi?",
+        "bulkDeleteLabel": "{{count}} görevi sil",
+        "bulkDeleteLabel_one": "{{count}} görevi sil",
         "bulkDeleted": "Görevler silindi.",
         "bulkMarkDone": "Tamamlandı",
         "bulkMarkOpen": "Açık",

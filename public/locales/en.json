@@ -471,6 +471,8 @@
         "bulkDeleteConfirm": "Delete {{count}} tasks permanently?",
         "bulkDeleteAsk": "Delete {{count}} tasks?",
         "bulkDeleteAsk_one": "Delete {{count}} task?",
+        "bulkDeleteLabel": "Delete {{count}} tasks",
+        "bulkDeleteLabel_one": "Delete {{count}} task",
         "bulkStatusChanged": "Status changed.",
         "bulkArchived": "Tasks archived.",
         "bulkDeleted": "Tasks deleted.",

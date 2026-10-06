@@ -311,6 +311,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Holiday countries and regions are named in your language, and the delete button of the task
+  selection is no longer announced as a question** (#1723). Under Settings, Calendar, the list of
+  countries for public holidays showed English names in every language, in English order. The
+  names now follow the language of the app and the list is sorted in it; a country the browser
+  cannot name keeps the name it had. The regions below a country (federal states, cantons) come
+  from the holiday service, which carries them in several languages: the app now asks for yours
+  and falls back to English where the service has none. The three nations of the United Kingdom
+  stay in English. In Tasks, with several tasks selected, a screen reader read the delete button
+  as "Delete 3 tasks?" where the screen says "Delete" - the question belongs to the confirmation
+  step that follows. The button is now called "Delete 3 tasks". That name is new in all 26
+  languages; in Vietnamese, Hindi, Arabic, Persian, Korean, Japanese, Chinese and Filipino it was
+  not written by a native speaker. For API clients:
+  `GET /api/v1/preferences/holidays/subdivisions/{countryCode}` takes an optional `lang`; without
+  it the answer is in English, as before.
+- **A monthly shared expense on the 29th, 30th or 31st no longer skips a month** (#1721). A
+  recurring shared expense only knew its next date, not the day it was meant for. After a
+  booking on 31 January the next date overflowed to 3 March: February got no booking at all,
+  nothing said so, and the series stayed on the 3rd from then on (on the 2nd or 1st when it
+  started on the 30th or 29th, or after a 30-day month). A series now remembers its day. In a
+  shorter month it books on the last day and returns to its day afterwards: 31 January,
+  28 February (29 in a leap year), 31 March. A yearly series from 29 February books on
+  28 February and on 29 February again in a leap year, instead of moving to 1 March for good.
+  Resuming a paused series counts the same way. Weekly series were not affected.
+  **Existing series that demonstrably drifted off the 29th-31st return to their day; the month
+  that was skipped is not booked afterwards.** The evidence is the first expense the series
+  booked: if it lies on the 29th, 30th or 31st and the next date sits on the 1st, 2nd or 3rd
+  where the overflow left it, the next date moves to that day (or the last day) of the same
+  month. If the skipped month is still ahead at the time of the update - the series booked on
+  31 October and waits for 1 December, and it is 10 November - the date moves into that month
+  instead (30 November), so it is not left empty; that is a date in the future, not a booking
+  made up afterwards. A series that was really created on the 1st to 3rd stays there. So does
+  one whose first expense has been deleted or was ever edited, because then nothing shows
+  reliably where the series started: an edit can have changed the date, and the app does not
+  record what an edit changed, so an edit of the title alone counts as well. Two more cases
+  keep the date where it is. If the series already has an expense in that month, the series
+  returns with the following booking. And no date is ever moved into the past, where the next
+  run would book it at once: a paused series whose date already lies behind returns when it is
+  resumed. A yearly series that stands on 1 March and cannot be moved back for one of these
+  reasons stays on 1 March. If a month is missing in your group, add that expense by hand.
+  Shared expenses only: subscriptions and tasks keep their own rules. For API clients:
+  recurring expenses carry `anchor_day` (migration 234).
+
 - **The PDFs in the demo data are real PDFs** (#1511). The demo documents carried a line of
   placeholder text under a `.pdf` name, so the built-in preview could not open them and
   every screenshot of an opened document showed an error. Each one is now a one-page PDF with
@@ -564,6 +606,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   plus and minus buttons. A read-only row has no such buttons, so the date stays visible
   there. Behind the scenes the three read views (birthdays, shopping, pantry) now draw their
   rows with one shared building block instead of three copies.
+
+- **Every chart leaves its axis values the room they need, not only the Budget trend**
+  (#1722). The Health charts (vitals, lab values, activity, and the cycle trends) and the
+  odometer chart of an inventory item kept a fixed margin sized for short numbers. The
+  severity trend of a cycle symptom writes words on that axis, and their length depends on
+  the language: in Polish, "Umiarkowane" started to the left of its chart and ended up one
+  pixel from the edge of its card on a phone; Filipino and Russian stuck out as well. Each
+  of these charts is now measured the moment it appears, the same way the Budget trend
+  already was, so a long word or a seven-digit odometer reading stays inside its chart. A
+  chart with short values looks exactly as before.
 
 ## [2.73.0] - 2026-10-04
 

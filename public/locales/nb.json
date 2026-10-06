@@ -471,6 +471,8 @@
         "bulkDeleteConfirm": "Slett {{count}} oppgaver permanent?",
         "bulkDeleteAsk": "Slett {{count}} oppgaver?",
         "bulkDeleteAsk_one": "Slett {{count}} oppgave?",
+        "bulkDeleteLabel": "Slett {{count}} oppgaver",
+        "bulkDeleteLabel_one": "Slett {{count}} oppgave",
         "bulkStatusChanged": "Status endret.",
         "bulkArchived": "Oppgaver arkivert.",
         "bulkDeleted": "Oppgaver slettet.",

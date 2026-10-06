@@ -510,6 +510,8 @@
         "bulkDeleteConfirm": "{{count}} कार्य स्थायी रूप से हटाएँ?",
         "bulkDeleteAsk": "{{count}} कार्य हटाएँ?",
         "bulkDeleteAsk_one": "{{count}} कार्य हटाएँ?",
+        "bulkDeleteLabel": "{{count}} कार्य हटाएँ",
+        "bulkDeleteLabel_one": "{{count}} कार्य हटाएँ",
         "bulkDeleted": "कार्य हटाए गए।",
         "bulkMarkDone": "पूर्ण",
         "bulkMarkOpen": "खुला",

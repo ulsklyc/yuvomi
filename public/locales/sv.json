@@ -510,6 +510,8 @@
         "bulkDeleteConfirm": "Vill du ta bort {{count}} uppgifter permanent?",
         "bulkDeleteAsk": "Radera {{count}} uppgifter?",
         "bulkDeleteAsk_one": "Radera {{count}} uppgift?",
+        "bulkDeleteLabel": "Radera {{count}} uppgifter",
+        "bulkDeleteLabel_one": "Radera {{count}} uppgift",
         "bulkDeleted": "Uppgifter raderade.",
         "bulkMarkDone": "Markera klar",
         "bulkMarkOpen": "Markera öppen",

@@ -11,7 +11,7 @@ import * as db from '../db.js';
 import * as holidays from '../services/holidays.js';
 import { str, MAX_SHORT } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { getSupportedLocales, isRegionTag, isSupportedLocale, resolveHouseholdLocale } from '../utils/i18n.js';
+import { getSupportedLocales, isRegionTag, isSupportedLocale, resolveHouseholdLocale, supportedLocaleFor } from '../utils/i18n.js';
 import { householdTimeZone, isValidTimeZone } from '../utils/timezone.js';
 import { retitleBirthdayEvents } from '../services/birthdays.js';
 import { resolveWeatherSource } from '../services/weather-source.js';
@@ -1531,14 +1531,18 @@ router.get('/holidays/countries', async (_req, res) => {
   }
 });
 
-// GET /api/v1/preferences/holidays/subdivisions/:countryCode
+// GET /api/v1/preferences/holidays/subdivisions/:countryCode?lang=
+// `lang` ist die UI-Sprache des Lesers (#1723). Sie geht durch
+// supportedLocaleFor(), also durch die Liste der Locale-Dateien: alles andere
+// (unbekannter Code, Pfadzeichen, doppelter Parameter) wird zu null und damit
+// zu Englisch - wie bei `lang` der Budget-Kategorien, kein 400.
 router.get('/holidays/subdivisions/:countryCode', async (req, res) => {
   const { countryCode } = req.params;
   if (!COUNTRY_ISO_RE.test(countryCode)) {
     return res.status(400).json({ error: 'Ungültiger Ländercode.', code: 400 });
   }
   try {
-    const subdivisions = await holidays.getSubdivisions(countryCode);
+    const subdivisions = await holidays.getSubdivisions(countryCode, supportedLocaleFor(req.query.lang));
     res.json({ data: subdivisions });
   } catch (err) {
     log.error('GET /holidays/subdivisions/:countryCode', err);

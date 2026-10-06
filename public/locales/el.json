@@ -510,6 +510,8 @@
         "bulkDeleteConfirm": "Οριστική διαγραφή {{count}} εργασιών;",
         "bulkDeleteAsk": "Διαγραφή {{count}} εργασιών;",
         "bulkDeleteAsk_one": "Διαγραφή {{count}} εργασίας;",
+        "bulkDeleteLabel": "Διαγραφή {{count}} εργασιών",
+        "bulkDeleteLabel_one": "Διαγραφή {{count}} εργασίας",
         "bulkDeleted": "Οι εργασίες διαγράφηκαν.",
         "bulkMarkDone": "Ολοκληρώθηκε",
         "bulkMarkOpen": "Ανοιχτό",

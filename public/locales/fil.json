@@ -522,6 +522,8 @@
         "bulkDeleteConfirm": "Permanenteng tanggalin ang {{count}} na (mga) gawain?",
         "bulkDeleteAsk": "Burahin ang {{count}} gawain?",
         "bulkDeleteAsk_one": "Burahin ang {{count}} gawain?",
+        "bulkDeleteLabel": "Burahin ang {{count}} gawain",
+        "bulkDeleteLabel_one": "Burahin ang {{count}} gawain",
         "bulkStatusChanged": "Nabago ang katayuan.",
         "bulkArchived": "Naitago na ang mga gawain.",
         "bulkDeleted": "Natanggal na ang mga gawain.",

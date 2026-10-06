@@ -1700,7 +1700,8 @@ test('module-specific settings leaves preserve their required controls and behav
     assert.match(calendar, controlIdPattern(id));
   }
   assert.match(calendar, /api\.get\('\/preferences\/holidays\/countries'\)/);
-  assert.match(calendar, /api\.get\(`\/preferences\/holidays\/subdivisions\/\$\{countryCode\}`\)/);
+  // Mit der UI-Sprache fuer die Regionsnamen (#1723).
+  assert.match(calendar, /api\.get\(`\/preferences\/holidays\/subdivisions\/\$\{countryCode\}\?lang=\$\{encodeURIComponent\(getLocale\(\)\)\}`\)/);
   assert.match(calendar, /api\.post\('\/preferences\/holidays\/sync', \{\}\)/);
   // Die per-user-Vorgaben sind nach personal-calendar gezogen; hier bleibt nur
   // Haushaltweites plus der Verweis dorthin (Critique 2026-07-27).

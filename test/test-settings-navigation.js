@@ -1252,6 +1252,114 @@ test('mobile navigation fills unavailable favorites from defaults and remaining 
   );
 });
 
+// #1723: die Laenderliste stand in jeder UI-Sprache auf Englisch, weil die
+// Seite den Namen des Servers druckte. Die Tests importieren dynamisch, damit
+// ein fehlender Export EINEN Fall rot macht und nicht die ganze Datei.
+test('#1723: holiday countries are named and sorted in the UI language', async () => {
+  const { localizeHolidayCountries } = await import('../public/settings/pages/modules-calendar.js');
+  assert.equal(typeof localizeHolidayCountries, 'function', 'localizeHolidayCountries fehlt');
+  // So kommt die Liste vom Server: englische Namen, englisch sortiert.
+  const vomServer = [
+    { isoCode: 'AT', name: 'Austria' },
+    { isoCode: 'DE', name: 'Germany' },
+    { isoCode: 'ES', name: 'Spain' },
+    { isoCode: 'US', name: 'United States', schoolHolidays: false },
+  ];
+  const kopie = structuredClone(vomServer);
+
+  const de = localizeHolidayCountries(vomServer, 'de');
+  assert.deepEqual(de.map((c) => c.name), ['Deutschland', 'Österreich', 'Spanien', 'Vereinigte Staaten'],
+    'deutsche Namen, deutsch sortiert (Ö bei O, nicht hinter Z)');
+  assert.deepEqual(de.map((c) => c.isoCode), ['DE', 'AT', 'ES', 'US']);
+  assert.equal(de.find((c) => c.isoCode === 'US').schoolHolidays, false, 'das Schulferien-Flag reist mit');
+  assert.deepEqual(vomServer, kopie, 'die Eingabe bleibt, wie sie war');
+
+  assert.deepEqual(localizeHolidayCountries(vomServer, 'fr').map((c) => c.name),
+    ['Allemagne', 'Autriche', 'Espagne', 'États-Unis']);
+  assert.deepEqual(localizeHolidayCountries(vomServer, 'en').map((c) => c.isoCode), ['AT', 'DE', 'ES', 'US']);
+
+  // Ohne Angabe gilt die UI-Sprache (getLocale), nicht die Region des Haushalts.
+  const before = globalThis.__locale;
+  try {
+    globalThis.__locale = 'sv';
+    assert.equal(localizeHolidayCountries(vomServer).find((c) => c.isoCode === 'DE').name, 'Tyskland');
+  } finally {
+    globalThis.__locale = before;
+  }
+});
+
+test('#1723: a country Intl cannot name keeps the name the server sent', async () => {
+  const { localizeHolidayCountries } = await import('../public/settings/pages/modules-calendar.js');
+  assert.equal(typeof localizeHolidayCountries, 'function', 'localizeHolidayCountries fehlt');
+  const liste = [
+    { isoCode: 'ZZZZ', name: 'Zzyzx' },           // kein gueltiger Regionscode: Intl wirft
+    { isoCode: 'QQ', name: 'Nowhere' },           // gueltige Form, unbekanntes Land
+    { isoCode: '', name: 'Blank' },
+    { isoCode: 'DE', name: 'Germany' },
+  ];
+  assert.deepEqual(localizeHolidayCountries(liste, 'de').map((c) => c.name),
+    ['Blank', 'Deutschland', 'Nowhere', 'Zzyzx'], 'der Servername bleibt, statt des Codes oder einer Luecke');
+  // Eine Sprache, die Intl nicht annimmt, kostet die Uebersetzung, nicht die Liste.
+  assert.deepEqual(localizeHolidayCountries(liste, 'not a locale').map((c) => c.name).sort(),
+    ['Blank', 'Germany', 'Nowhere', 'Zzyzx']);
+  assert.deepEqual(localizeHolidayCountries(null, 'de'), []);
+});
+
+// Gefahren wird der echte Abruf der Seite (loadSubdivisions) gegen den
+// API-Stub des Loaders: welche Adresse er fragt und in welcher Reihenfolge die
+// Optionen im Auswahlfeld landen.
+test('#1723: holiday regions are asked for in the UI language and sorted in it', async () => {
+  const { loadSubdivisions, sortHolidayEntries } = await import('../public/settings/pages/modules-calendar.js');
+  assert.equal(typeof loadSubdivisions, 'function', 'loadSubdivisions ist nicht exportiert');
+  assert.equal(typeof sortHolidayEntries, 'function', 'sortHolidayEntries fehlt');
+
+  // Schwedisch stellt Ö ans Ende des Alphabets, Deutsch zu O.
+  const regionen = [{ isoCode: 'A', name: 'Örebro' }, { isoCode: 'B', name: 'Uppsala' }, { isoCode: 'C', name: 'Skåne' }];
+  assert.deepEqual(sortHolidayEntries(regionen, 'sv').map((r) => r.name), ['Skåne', 'Uppsala', 'Örebro']);
+  assert.deepEqual(sortHolidayEntries(regionen, 'de').map((r) => r.name), ['Örebro', 'Skåne', 'Uppsala']);
+  assert.deepEqual(sortHolidayEntries(regionen, 'not a locale').length, 3, 'eine unbrauchbare Sprache kostet nicht die Liste');
+
+  const saved = { document: globalThis.document, api: globalThis.__apiStub, locale: globalThis.__locale };
+  const fakeSelect = () => ({
+    options: [],
+    disabled: false,
+    replaceChildren(...nodes) { this.options = [...nodes]; },
+    appendChild(node) { this.options.push(node); },
+  });
+  const gefragt = [];
+  globalThis.document = { createElement: () => ({}) };
+  globalThis.__apiStub = { get: async (url) => { gefragt.push(url); return { data: regionen }; } };
+  try {
+    for (const [locale, country, erwartet] of [
+      ['sv', 'SE', ['Skåne', 'Uppsala', 'Örebro']],
+      ['de', 'SE', ['Örebro', 'Skåne', 'Uppsala']],
+      ['pt-BR', 'PT', ['Örebro', 'Skåne', 'Uppsala']],
+    ]) {
+      globalThis.__locale = locale;
+      const select = fakeSelect();
+      const result = await loadSubdivisions(select, { value: country }, country, 'B', { latestRequestId: 0 });
+      assert.equal(gefragt.at(-1), `/preferences/holidays/subdivisions/${country}?lang=${locale}`);
+      assert.deepEqual(select.options.slice(1).map((o) => o.textContent), erwartet, `${locale}: Reihenfolge im Auswahlfeld`);
+      assert.equal(select.options.find((o) => o.value === 'B').selected, true, 'die gespeicherte Region bleibt gewaehlt');
+      assert.deepEqual(result, { selectedResolved: true });
+    }
+  } finally {
+    globalThis.document = saved.document;
+    globalThis.__apiStub = saved.api;
+    globalThis.__locale = saved.locale;
+  }
+});
+
+// Die Funktionen oben helfen nur, wenn die Seite sie auch ruft - ein Export
+// ohne Aufrufer besteht jeden Test darueber.
+test('#1723: the holiday form builds the country dropdown through localizeHolidayCountries', async () => {
+  const source = await readFile(new URL('../public/settings/pages/modules-calendar.js', import.meta.url), 'utf8');
+  const initial = source.slice(source.indexOf('const countriesResult = await runHolidayDiscovery('));
+  assert.match(initial, /const countries = localizeHolidayCountries\(/, 'die Laenderliste laeuft durch localizeHolidayCountries');
+  assert.match(initial, /countriesData = countries;\s*appendOptions\(\s*countrySelect,\s*countries,/,
+    'und genau diese Liste fuellt das Auswahlfeld und die Schulferien-Pruefung');
+});
+
 test('stale holiday subdivision responses are rejected', () => {
   assert.equal(shouldApplySubdivisionResponse({
     requestId: 1,

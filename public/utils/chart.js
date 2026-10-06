@@ -126,26 +126,109 @@ export function chartGridMarkup(min, max, formatTick, geo = CHART, steps = 4) {
  * Schrift skaliert nicht mit, die Breite eines Werts haengt also nicht an der
  * des Fensters.
  *
- * NACH dem Einsetzen ins Dokument aufrufen: ein Wert, der nicht im Bild steht,
- * hat keine Breite, und dann bleibt es bei der Mindestbreite. Ein Diagramm ohne
- * diesen Aufruf verliert nichts - es behaelt den Gutter, den es hatte.
+ * Ein Wert, der nicht im Bild steht, hat keine Breite, und dann bleibt es bei
+ * der Mindestbreite. Keine Seite ruft das selbst: `watchChartGutters()` unten
+ * misst jedes `svg.chart`, sobald es im Dokument steht.
  *
- * @param {ParentNode} root  enthaelt die eben eingesetzten `svg.chart`
+ * @param {ParentNode} root  enthaelt die `svg.chart`, die im Dokument stehen
  */
 export function fitChartGutter(root) {
   if (!root || typeof root.querySelectorAll !== 'function') return;
-  const widest = new Map();
-  for (const label of root.querySelectorAll('svg.chart .chart__axis--y')) {
-    const host = label.closest('svg.chart')?.parentElement;
-    if (!host) continue;
-    widest.set(host, Math.max(widest.get(host) ?? 0, label.getBoundingClientRect().width));
-  }
-  for (const [host, width] of widest) {
-    if (!(width > 0)) continue;
-    host.classList.add('chart-host');
-    host.style.setProperty('--chart-label-width', `${Math.ceil(width)}px`);
+  const labels = [...root.querySelectorAll('svg.chart .chart__axis--y')];
+  const fitted = new Map();
+  // ZWEIMAL GEMESSEN, DER GROESSERE WERT GILT (#1722). Das Polster aendert den
+  // Massstab des Diagramms, und Chrome setzt denselben Text je nach Massstab
+  // um bis zu einem Zehntel anders breit: "Umiarkowane" mass 69px, 71px und
+  // 78px in derselben 12px-Schrift. Der zweite Durchgang misst im Massstab,
+  // den der erste hergestellt hat. Nur nach oben, damit nichts pendelt.
+  for (let pass = 0; pass < 2; pass += 1) {
+    const widest = new Map();
+    for (const label of labels) {
+      const host = label.closest('svg.chart')?.parentElement;
+      if (!host) continue;
+      widest.set(host, Math.max(widest.get(host) ?? 0, label.getBoundingClientRect().width));
+    }
+    let changed = false;
+    for (const [host, measured] of widest) {
+      const width = Math.ceil(measured);
+      if (!(width > (fitted.get(host) ?? 0))) continue;
+      fitted.set(host, width);
+      host.classList.add('chart-host');
+      host.style.setProperty('--chart-label-width', `${width}px`);
+      changed = true;
+    }
+    if (!changed) break;
   }
 }
+
+/**
+ * EINSETZEN UND MESSEN SIND EIN SCHRITT (#1722).
+ *
+ * `fitChartGutter()` rief nur der Budget-Verlauf. Die sieben Diagramme der
+ * Gesundheit und der Kilometerstand des Inventars behielten die Mindestbreite,
+ * und die traegt Zahlen, aber keine Woerter: an der Achse des
+ * Schweregrad-Verlaufs steht in polnischer Sprache "Umiarkowane", 78px breit
+ * bei 375px Fensterbreite - das Wort begann 16px links vom Diagramm und 1px
+ * vor der Kante seiner Karte. Acht Aufrufe haetten das behoben und der neunte
+ * Aufrufer haette ihn wieder vergessen, still, mit der Mindestbreite als
+ * Ergebnis. Deshalb beobachtet EINE Stelle das Dokument: was als `svg.chart`
+ * hineinkommt, wird gemessen. Der Beobachter laeuft als Mikrotask, also nach
+ * dem Skript, das eingesetzt hat, und vor dem naechsten Bild.
+ *
+ * EIN DIAGRAMM, DAS BEIM EINSETZEN NICHT IM BILD STEHT, HAT KEINE BREITE - der
+ * Schweregrad-Verlauf liegt in einem geschlossenen Aufklapper. Ein solches
+ * SVG wartet in einem ResizeObserver, bis es eine Flaeche hat, wird dann
+ * gemessen und wieder entlassen. Geht es vorher aus dem Dokument, ebenfalls.
+ *
+ * @param {Node} root  beobachtete Wurzel, im Betrieb `document.body` (Blaetter
+ *        und Dialoge haengen dort, nicht im Seiteninhalt)
+ * @returns {() => void}  beendet die Beobachtung
+ */
+export function watchChartGutters(root, {
+  MutationObserver: Added = globalThis.MutationObserver,
+  ResizeObserver: Sized = globalThis.ResizeObserver,
+} = {}) {
+  if (!root || typeof Added !== 'function') return () => {};
+  const waiting = typeof Sized === 'function'
+    ? new Sized((entries) => {
+      for (const { target } of entries) {
+        if (!(target.getBoundingClientRect().width > 0)) continue;
+        fitChartGutter(target.parentElement);
+        waiting.unobserve(target);
+      }
+    })
+    : null;
+  // Auch ein Knoten IN einem Diagramm zaehlt: wer nur die Achse austauscht,
+  // hat andere Werte an derselben Flaeche.
+  const chartsAt = (node) => {
+    if (node.nodeType !== 1) return [];
+    const own = node.closest('svg.chart');
+    return own ? [own] : [...node.querySelectorAll('svg.chart')];
+  };
+  const fit = (svg) => {
+    if (!svg.isConnected) return;
+    if (svg.getBoundingClientRect().width > 0) fitChartGutter(svg.parentElement);
+    else waiting?.observe(svg);
+  };
+  const added = new Added((records) => {
+    for (const record of records) {
+      for (const node of record.removedNodes) for (const svg of chartsAt(node)) waiting?.unobserve(svg);
+      for (const node of record.addedNodes) for (const svg of chartsAt(node)) fit(svg);
+    }
+  });
+  added.observe(root, { childList: true, subtree: true });
+  for (const svg of chartsAt(root)) fit(svg);
+  return () => {
+    added.disconnect();
+    waiting?.disconnect();
+  };
+}
+
+// Hier und nicht im Router: ein `.chart__axis--y` entsteht nur ueber
+// `chartGridMarkup()` oben. Wer ein Diagramm zeichnen kann, hat dieses Modul
+// geladen und damit den Beobachter - einen Aufruf, den eine Seite vergessen
+// koennte, gibt es nicht.
+if (typeof document !== 'undefined' && document.body) watchChartGutters(document.body);
 
 /**
  * X-Achsen-Labels (erstes, mittleres, letztes) unter dem Plot, an den

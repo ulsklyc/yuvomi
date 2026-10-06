@@ -5,6 +5,7 @@ import { op, jsonBody, idParam, DOCUMENT_LINKS_READ_NOTE } from '../helpers.js';
 const AMOUNT_NOTE = 'Amounts are decimal strings with a dot (`"12.50"`, not a number), with at most the currency\'s decimal places, and must be greater than zero: `0`, `-0` and negative values are answered with `400`.';
 const EXACT_SPLIT_NOTE = 'With `split_method: "exact"`, every participant needs a `splits[].amount` under the same rule, and the shares must add up to the expense amount.';
 const RECURRING_SPLIT_NOTE = 'The split is checked when the recurring expense is created, by the same rule as a single expense: `payer_id` and every entry of `participants` must be members of the group, `exact` amounts must add up to the amount, `percentage` values to 100, and `shares` must be positive integers. Anything else is answered with `400` and nothing is stored.';
+const RECURRING_ANCHOR_NOTE = 'Every recurring expense carries `anchor_day`, the day of the month it is meant for (1-31), taken from the first `next_run_date` when it is created; it cannot be set directly. Monthly and yearly steps clamp to the last day of a shorter month and return to the anchor where the month has it: a series on the 31st books on 28 or 29 February and on 31 March, a yearly one from 29 February books on 28 February and on 29 February again in a leap year. Weekly series step by seven days.';
 
 const apiError = (description) => ({
   description,
@@ -171,8 +172,8 @@ export function splitexpensesPaths() {
       }),
     },
     '/api/v1/split-expenses/groups/{id}/recurring': {
-      get: op({ summary: 'List recurring expenses in group', tag: 'SplitExpenses', params: [idParam()] }),
-      post: op({ summary: 'Create recurring expense in group', description: `${AMOUNT_NOTE} ${EXACT_SPLIT_NOTE} ${RECURRING_SPLIT_NOTE}`, tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      get: op({ summary: 'List recurring expenses in group', description: RECURRING_ANCHOR_NOTE, tag: 'SplitExpenses', params: [idParam()] }),
+      post: op({ summary: 'Create recurring expense in group', description: `${AMOUNT_NOTE} ${EXACT_SPLIT_NOTE} ${RECURRING_SPLIT_NOTE} ${RECURRING_ANCHOR_NOTE}`, tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/expenses/{id}': {
       put: op({ summary: 'Update expense (`attachment_document_ids` replaces the receipt links; omit the field to leave them untouched)', tag: 'SplitExpenses', params: [idParam()], description: `${AMOUNT_NOTE} ${EXACT_SPLIT_NOTE} ${DOCUMENT_LINKS_READ_NOTE}`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
@@ -190,7 +191,7 @@ export function splitexpensesPaths() {
     '/api/v1/split-expenses/recurring/{id}/pause': {
       post: op({
         summary: 'Pause or resume recurring expense',
-        description: 'A toggle: an active recurring expense is paused, a paused one is resumed. Allowed for group owners/admins and for whoever created it. Resuming skips the dates that fell due during the pause: `next_run_date` moves to the first date of the series that is not before today, counted from the old `next_run_date` in whole intervals exactly as the hourly run counts, and nothing is booked for the past. "Today" is the day in the household time zone; a date that is today is not missed and is booked by the next run. A resume that skipped dates writes `metadata.skipped` (their number) into its `recurring_resumed` activity entry. Send `missed: "book"` to keep `next_run_date` instead: the hourly run then books every missed date, one per run, each with its original date (the behaviour before this option existed). When the call pauses, `missed` changes nothing about the pause, but its value is checked on every call: anything other than `skip` or `book` is refused with 400 and the recurring expense stays as it was.',
+        description: 'A toggle: an active recurring expense is paused, a paused one is resumed. Allowed for group owners/admins and for whoever created it. Resuming skips the dates that fell due during the pause: `next_run_date` moves to the first date of the series that is not before today, counted from the old `next_run_date` in whole intervals exactly as the hourly run counts (with the same `anchor_day`, so a series on the 31st resumes on the 31st or the last day of the month), and nothing is booked for the past. "Today" is the day in the household time zone; a date that is today is not missed and is booked by the next run. A resume that skipped dates writes `metadata.skipped` (their number) into its `recurring_resumed` activity entry. Send `missed: "book"` to keep `next_run_date` instead: the hourly run then books every missed date, one per run, each with its original date (the behaviour before this option existed). When the call pauses, `missed` changes nothing about the pause, but its value is checked on every call: anything other than `skip` or `book` is refused with 400 and the recurring expense stays as it was.',
         tag: 'SplitExpenses',
         params: [idParam()],
         stateChanging: true,
