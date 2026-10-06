@@ -52,3 +52,25 @@ export function addYearsClamped(value, years) {
   date.setUTCDate(Math.min(day, lastDay));
   return dateKey(date);
 }
+
+/**
+ * Hebt den Tag von `value` (YYYY-MM-DD) auf `anchorDay`, soweit der Monat ihn
+ * hat - sonst auf den Monatsletzten. Der Monat bleibt, und gesenkt wird nie.
+ *
+ * Das Gegenstueck zum Klemmen oben: `addMonthsClamped('2026-01-31', 1)` ist der
+ * 28.02., und der naechste Schritt von dort der 28.03. - der 31. ist vergessen.
+ * Eine Serie, die ihren Tag kennt, hebt nach jedem Schritt wieder an:
+ * 31 -> 28/29 -> 31 (#1721).
+ *
+ * Ohne brauchbaren Anker (NULL, keine ganze Zahl von 1 bis 31) bleibt `value`,
+ * wie es ist: dann gilt das Klemmen allein.
+ */
+export function liftToAnchorDay(value, anchorDay) {
+  if (!Number.isInteger(anchorDay) || anchorDay < 1 || anchorDay > 31) return value;
+  const date = parseDateKey(value);
+  const lastDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+  const day = Math.min(anchorDay, lastDay);
+  if (day <= date.getUTCDate()) return value;
+  date.setUTCDate(day);
+  return dateKey(date);
+}

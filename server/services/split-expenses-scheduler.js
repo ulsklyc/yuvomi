@@ -8,36 +8,54 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { buildSplits, insertExpenseLedger, membershipRefusal, SplitInputError } from './split-expenses.js';
 import { todayKey } from '../utils/timezone.js';
+import { addMonthsClamped, addYearsClamped, dateKey, liftToAnchorDay, parseDateKey } from '../utils/interval-date.js';
 
 const log = createLogger('SplitExpenseScheduler');
 
-function addInterval(dateText, frequency) {
-  const date = new Date(`${dateText}T00:00:00Z`);
+// Der naechste Termin einer Serie nach `dateText` - die EINE Rechnung, durch die
+// der Buchungslauf (generateRecurringExpense) und das Fortsetzen
+// (nextRunNotBefore) gehen.
+//
+// Monate und Jahre klemmen aufs Monatsende (server/utils/interval-date.js) und
+// heben den Tag danach wieder auf `anchorDay`, den Tag, fuer den die Serie
+// gedacht ist (`recurring_expenses.anchor_day`): 31.01. -> 28.02. -> 31.03.,
+// jaehrlich 29.02. -> 28.02. -> im Schaltjahr wieder 29.02. Bis #1721 stand
+// hier `setUTCMonth(+1)`: der 31. lief in den Folgemonat ueber (31.01. ->
+// 03.03.), der Februar blieb ohne Buchung, und weil der naechste Schritt vom
+// uebergelaufenen Datum ausging, kam die Serie nie zurueck.
+//
+// Ohne Anker (NULL) klemmt der Schritt nur. Woechentlich sind es sieben Tage,
+// der Anker spielt dort nicht mit.
+function addInterval(dateText, frequency, anchorDay = null) {
+  if (frequency === 'monthly') return liftToAnchorDay(addMonthsClamped(dateText, 1), anchorDay);
+  if (frequency === 'yearly') return liftToAnchorDay(addYearsClamped(dateText, 1), anchorDay);
+  const date = parseDateKey(dateText);
   if (frequency === 'weekly') date.setUTCDate(date.getUTCDate() + 7);
-  if (frequency === 'monthly') date.setUTCMonth(date.getUTCMonth() + 1);
-  if (frequency === 'yearly') date.setUTCFullYear(date.getUTCFullYear() + 1);
-  return date.toISOString().slice(0, 10);
+  return dateKey(date);
 }
 
 // Der erste Termin der Serie, der nicht vor `today` liegt, gezaehlt ab
 // `dateText` in ganzen Intervallen - mit addInterval, also mit genau der
 // Rechnung, mit der der Lauf nach jeder Buchung weiterrueckt. Bewusst gezaehlt
-// und nicht gesprungen: addInterval laesst einen Monatstermin am 31. in den
-// Folgemonat ueberlaufen (31.01. -> 03.03. -> 03.04.), der naechste Termin
-// haengt also vom vorigen ab und nicht nur vom Starttag. Ein Sprung
-// "Starttag + n Monate" laege neben dem Raster, das der Lauf selbst gebucht
-// haette.
+// und nicht gesprungen: wo die Serie nach n Schritten steht, sagt der Lauf, und
+// eine zweite Rechnung daneben muesste ihm erst wieder gleichen (ohne Anker
+// haengt der naechste Termin vom vorigen ab: 31.01. -> 28.02. -> 28.03.).
+//
+// `anchorDay` ist der Ankertag der Zeile; wer ihn weglaesst, bekommt das Raster
+// einer Serie ohne Anker.
 //
 // `skipped` zaehlt die uebergangenen Termine. Ein Termin am Tag `today` gilt
 // nicht als versaeumt: der naechste Lauf bucht ihn.
-function nextRunNotBefore(dateText, frequency, today) {
+function nextRunNotBefore(dateText, frequency, today, anchorDay = null) {
   // Ein Datum, das keins ist, oder ein Rhythmus, der nicht vorrueckt, bleibt
   // stehen, statt zu werfen oder endlos zu zaehlen.
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateText)) || !/^\d{4}-\d{2}-\d{2}$/.test(String(today))) return { date: dateText, skipped: 0 };
   let date = dateText;
   let skipped = 0;
   while (date < today) {
-    const next = addInterval(date, frequency);
+    let next;
+    // "2026-02-31" hat die Form eines Datums und ist keins.
+    try { next = addInterval(date, frequency, anchorDay); } catch { break; }
     if (!(next > date)) break;
     date = next;
     skipped += 1;
@@ -123,7 +141,7 @@ function generateRecurringExpense(database, recurring) {
 
   insertActivity(database, recurring.group_id, recurring.created_by, 'recurring_generated', 'expense', expenseId, { recurring_expense_id: recurring.id, title: recurring.title });
   database.prepare('UPDATE recurring_expenses SET next_run_date = ? WHERE id = ?')
-    .run(addInterval(recurring.next_run_date, recurring.frequency), recurring.id);
+    .run(addInterval(recurring.next_run_date, recurring.frequency, recurring.anchor_day), recurring.id);
   return expenseId;
 }
 

@@ -388,9 +388,12 @@ test('ein spaeter gesetzter oder geaenderter Tag fasst keine bestehende Rate an'
 
 const DUE_DAY_MIGRATION = MIGRATIONS.find((m) => m.description.includes('(#1631)'));
 
-test('die Migration steht am Ende der Kette', () => {
+// Die Nummer, nicht "der letzte Eintrag": das stand hier bis #1721 und wurde mit
+// der naechsten Migration (234) rot, ohne dass an dieser etwas falsch war. Dass
+// neue Eintraege ans Ende gehoeren, haelt test:migrations-append-only.
+test('die Migration traegt die Nummer 233', () => {
   assert.ok(DUE_DAY_MIGRATION, 'Vorbedingung: die Migration wurde gefunden');
-  assert.equal(MIGRATIONS.at(-1), DUE_DAY_MIGRATION, 'ein neuer Eintrag gehoert ans Ende');
+  assert.equal(DUE_DAY_MIGRATION.version, 233);
 });
 
 test('Bestands-DB: die Migration laeuft, due_day ist NULL, nichts sonst aendert sich', () => {

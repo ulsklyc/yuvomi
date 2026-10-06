@@ -311,6 +311,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A monthly shared expense on the 29th, 30th or 31st no longer skips a month** (#1721). A
+  recurring shared expense only knew its next date, not the day it was meant for. After a
+  booking on 31 January the next date overflowed to 3 March: February got no booking at all,
+  nothing said so, and the series stayed on the 3rd from then on (on the 2nd or 1st when it
+  started on the 30th or 29th, or after a 30-day month). A series now remembers its day. In a
+  shorter month it books on the last day and returns to its day afterwards: 31 January,
+  28 February (29 in a leap year), 31 March. A yearly series from 29 February books on
+  28 February and on 29 February again in a leap year, instead of moving to 1 March for good.
+  Resuming a paused series counts the same way. Weekly series were not affected.
+  **Existing series that demonstrably drifted off the 29th-31st return to their day; the month
+  that was skipped is not booked afterwards.** The evidence is the first expense the series
+  booked: if it lies on the 29th, 30th or 31st and the next date sits on the 1st, 2nd or 3rd
+  where the overflow left it, the next date moves to that day (or the last day) of the same
+  month. A series that was really created on the 1st to 3rd stays there, and so does one whose
+  first expense has been deleted, because nothing shows where it started. If the series already
+  has an expense in that month, the date stays and the series returns with the following
+  booking. If a month is missing in your group, add that expense by hand. Shared expenses only:
+  subscriptions and tasks keep their own rules. For API clients: recurring expenses carry
+  `anchor_day` (migration 234).
+
 - **The PDFs in the demo data are real PDFs** (#1511). The demo documents carried a line of
   placeholder text under a `.pdf` name, so the built-in preview could not open them and
   every screenshot of an opened document showed an error. Each one is now a one-page PDF with
