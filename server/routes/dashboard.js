@@ -29,7 +29,7 @@ import { isAdminUser, serializeEvents } from './calendar/helpers.js';
 import { getOccurrences as getWasteOccurrences } from '../services/waste-store.js';
 import { scheduleData } from '../services/schedule.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { activeCatalog } from '../services/rewards.js';
+import { activeCatalog, ledgerBalanceSql } from '../services/rewards.js';
 import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL } from '../services/meal-cook.js';
 import { clampEventLimit } from '../../public/utils/dashboard-event-limit.js';
 
@@ -842,7 +842,7 @@ router.get('/', (req, res) => {
     const members = d.prepare(`
       SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
              ${memberPositionSql('u')} AS sort_order,
-             COALESCE((SELECT SUM(delta) FROM reward_ledger l WHERE l.user_id = u.id), 0) AS balance
+             ${ledgerBalanceSql('points', 'u.id')} AS balance
       FROM users u
       JOIN reward_participants rp ON rp.user_id = u.id AND rp.enabled = 1
       WHERE ${MEMBER_FILTER}
@@ -855,6 +855,12 @@ router.get('/', (req, res) => {
     // Dieselben Personen wie die Liste darueber (#1207): eine alte
     // Einschreibung von Personal oder Gast bleibt stehen, zaehlt aber nicht.
     const participantCount = members.length;
+    // GELD-ANFRAGEN (#1734) ZAEHLEN HIER MIT, UND DIE BEIDEN ZWEIGE SIND SCHON
+    // DIE REGEL: wer freigibt, ist Admin und darf jede lesen; wer selbst
+    // sammelt, zaehlt nur die eigenen (`user_id = ?`). Die Sicht `family`
+    // (Wandtablett, Grosseltern) bekommt 0. Ein Geschwisterkind erfaehrt so
+    // nicht, dass jemand Geld abheben will. Geld selbst zeigt die Kachel
+    // nicht - weder Saldo noch Buchung.
     const pending = view === 'approver'
       ? d.prepare("SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending'").get().n
       : view === 'self'
@@ -874,7 +880,7 @@ router.get('/', (req, res) => {
     const ownRecent = own && (view === 'self' || members.length === 1)
       ? d.prepare(`
           SELECT delta, type, reason, created_at FROM reward_ledger l
-          WHERE user_id = ? AND delta > 0 AND type IN ('earn', 'bonus')
+          WHERE user_id = ? AND delta > 0 AND type IN ('earn', 'bonus') AND l.unit = 'points'
             AND NOT EXISTS (SELECT 1 FROM reward_ledger r WHERE r.reverses_id = l.id)
           ORDER BY created_at DESC, id DESC
           LIMIT 3

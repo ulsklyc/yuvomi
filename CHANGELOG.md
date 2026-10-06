@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rewards can hold pocket money: a money balance per child, credited on a schedule, paid out on
+  request** (#1734, from D#916, asked by @trinitrion). The parents are the bank: they set an amount
+  per week or per month and the day it is due, the child sees its balance, asks to withdraw a free
+  amount or to pay something in (birthday money handed over for safekeeping), and the balance
+  changes when a parent confirms - that confirmation is the moment the cash changes hands, so the
+  number always matches what the parents hold. Parents can also book a credit or a deduction
+  directly. It lives in Rewards and not in Budget because everything it needs is already there - a
+  ledger, a request one person files and another decides - and a budget account has no owner; a
+  payout creates no budget entry. Money and points are two balances that never meet: there is no
+  conversion, and no point total changes when money is booked. Only the child and the
+  administrators see a money balance and its history - not the siblings, not a wall tablet, and a
+  scoped API token only under the same rule; that is narrower than points, which everybody with
+  the module sees. There is no overdraft: a withdrawal above the balance is refused when it is
+  asked for and checked again when it is approved, and if the money is gone by then the request
+  stays open so a parent can credit first. A withdrawal always waits for a parent, also in a
+  household that has switched approval off for rewards. Due dates missed while the server was off
+  are booked afterwards, each exactly once; a paused plan books nothing and does not catch up when
+  it is resumed; the plan of a deactivated account is paused. A monthly plan on the 31st pays on
+  the last day of a shorter month and returns to the 31st. The amount is in the household
+  currency; changing that currency keeps the numbers and changes the label. No interest, no
+  savings goals, no second currency per child. With read access to Rewards the balance stays
+  visible and the requests are gone, as with redeeming. For API clients: `GET /api/v1/rewards/money`,
+  `GET /api/v1/rewards/money/ledger`, `POST /api/v1/rewards/money/entries`,
+  `PUT`/`DELETE /api/v1/rewards/money/plans/{userId}`; a request is `POST /api/v1/rewards/redemptions`
+  with `kind: "withdrawal"` or `"deposit"` and a decimal-string `amount`, and rows of
+  `GET /api/v1/rewards/redemptions` now carry `kind`. `GET /api/v1/rewards/ledger` stays the points
+  history (migration 236).
+
 - **The Singapore dollar is a currency a household can pick, and Singapore is a region** (#1697,
   from D#982). SGD was missing from the list the household setting, subscriptions and shared
   expenses all read, and the server checks a saved currency against that same list - so a

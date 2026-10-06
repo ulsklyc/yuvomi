@@ -374,6 +374,7 @@ export {
   decorateMoney,
   groupBalanceRows,
   minorToDecimal,
+  minorUnit,
   openBalancesForUser,
   parseMoneyToMinor,
   simplifyDebts,
