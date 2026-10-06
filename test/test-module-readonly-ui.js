@@ -836,6 +836,143 @@ test('eine Geld-Anfrage in der Liste: Betrag in Geld, nicht in Punkten - und nur
   }, { role: 'admin', me: 1 });
 });
 
+// DIE NACHKOMMASTELLEN KOMMEN VOM SERVER (Review zu #1745). Der Plan-Dialog
+// belegte sein Betragsfeld ueber `Intl` vor: fuer COP, HUF, IDR, IRR und PYG
+// (CLDR 0 Stellen, ISO 4217 zwei) stand der Betrag hundertfach im Feld, und
+// jedes Speichern verhundertfachte das Taschengeld. Gemessen wird der ganze
+// Rundlauf - Server-Betrag -> Feld -> Pruefung -> Text an den Server ->
+// Server-Betrag - mit dem ECHTEN Parser des Servers und fuer JEDE waehlbare
+// Waehrung, nicht fuer drei Beispiele.
+test('Taschengeld: ein Betrag ueberlebt den Rundlauf durch das Feld, in jeder waehlbaren Waehrung', async () => {
+  const { CURRENCY_CODES } = await import('../public/utils/currency-codes.js');
+  const { minorUnit, parseMoneyToMinor } = await import('../server/services/split-expenses.js');
+  const { toDecimalString, currencyFractionDigits } = await import('../public/utils/money.js');
+  assert.ok(CURRENCY_CODES.length >= 20, 'die Liste der Waehrungen ist da');
+  const vorher = rewards.state.money;
+  const abweichend = [];
+  try {
+    for (const currency of CURRENCY_CODES) {
+      const digits = minorUnit(currency);
+      if (digits !== currencyFractionDigits(currency)) abweichend.push(currency);
+      rewards.state.money = { currency, minor_unit: digits, accounts: [], candidates: [] };
+      // Glatt, mit Nachkommastellen (wo die Waehrung welche hat), klein, gross.
+      for (const minor of [5000 * 10 ** digits, 123456, 1, 10 ** 12]) {
+        const field = rewards.minorToAmountInput(minor);
+        assert.equal(rewards.moneyAmountProblem(field), null, `${currency} ${minor}: "${field}" ist speicherbar`);
+        assert.equal(parseMoneyToMinor(toDecimalString(field), currency), minor,
+          `${currency}: ${minor} steht als "${field}" im Feld und kommt als derselbe Betrag zurueck`);
+        assert.equal(rewards.decimalToMinor(toDecimalString(field)), minor, `${currency}: der Vergleich mit dem Guthaben rechnet gleich`);
+      }
+      // Eine Stelle mehr, als der Server annimmt, ist ein Grund am Feld.
+      assert.equal(rewards.moneyAmountProblem(`1,${'1'.repeat(digits + 1)}`), 'precision', `${currency}: zu viele Stellen`);
+    }
+  } finally {
+    rewards.state.money = vorher;
+  }
+  // Ohne diese Waehrungen maesse der Rundlauf den Fehler gar nicht.
+  assert.ok(abweichend.includes('HUF') && abweichend.includes('IDR'),
+    `die Probe braucht Waehrungen, bei denen Intl und ISO 4217 auseinandergehen (gefunden: ${abweichend.join(', ')})`);
+});
+
+test('Taschengeld: der Plan-Dialog eines Forint-Haushalts zeigt 5000, nicht 500000', () => {
+  const vorher = rewards.state.money;
+  try {
+    rewards.state.money = { currency: 'HUF', minor_unit: 2, accounts: [], candidates: [] };
+    assert.equal(rewards.minorToAmountInput(500000), '5000');
+    assert.equal(rewards.minorToAmountInput(500050), '5000,50', 'ein Betrag mit Filler bleibt, wie er gespeichert ist');
+    rewards.state.money = { currency: 'EUR', minor_unit: 2, accounts: [], candidates: [] };
+    assert.equal(rewards.minorToAmountInput(500), '5,00');
+    rewards.state.money = { currency: 'JPY', minor_unit: 0, accounts: [], candidates: [] };
+    assert.equal(rewards.minorToAmountInput(500), '500');
+    rewards.state.money = { currency: 'KWD', minor_unit: 3, accounts: [], candidates: [] };
+    assert.equal(rewards.minorToAmountInput(1234), '1,234');
+  } finally {
+    rewards.state.money = vorher;
+  }
+});
+
+test('Taschengeld: der Plan-Dialog selbst belegt das Feld mit dem Betrag, den der Server gespeichert hat', () => {
+  // Der Helfer oben kann stimmen und der Dialog trotzdem an ihm vorbei rechnen:
+  // gelesen wird deshalb das Feld, das der Dialog baut.
+  const vorher = { money: rewards.state.money, user: rewards.state.user, open: globalThis.__openModal };
+  const dialoge = [];
+  globalThis.__openModal = (options) => { dialoge.push(options); };
+  try {
+    rewards.state.user = { role: 'admin' };
+    withAccess({ rewards: 'write' }, () => {
+      for (const [currency, minor_unit, stored, shown] of [['HUF', 2, 500000, '5000'], ['IDR', 2, 15000000, '150000'], ['EUR', 2, 500, '5,00'], ['JPY', 0, 500, '500'], ['KWD', 3, 1500, '1,500']]) {
+        rewards.state.money = {
+          currency, minor_unit, candidates: [],
+          accounts: [{ id: 3, display_name: 'Emma', balance_minor: 0, plan: { amount_minor: stored, frequency: 'weekly', anchor_day: 5, next_run_date: '2026-10-09', paused: false } }],
+        };
+        dialoge.length = 0;
+        rewards.openMoneyPlanModal(3);
+        assert.equal(dialoge.length, 1, `${currency}: der Dialog oeffnet`);
+        const value = dialoge[0].content.match(/id="rw-money-amount"[^>]*value="([^"]*)"/)?.[1];
+        assert.equal(value, shown, `${currency}: ${stored} kleinste Einheiten stehen als "${shown}" im Feld`);
+      }
+    });
+  } finally {
+    rewards.state.money = vorher.money;
+    rewards.state.user = vorher.user;
+    globalThis.__openModal = vorher.open;
+  }
+});
+
+/** Zaehlt, wie oft die Seite sich neu laden will (`refreshActiveTab` sucht ihren Traeger). */
+async function mitSeitenSonde(fn) {
+  const vorher = { document: globalThis.document, api: globalThis.__apiStub, confirm: globalThis.__confirmModal };
+  const sonde = { reloads: 0, gefragt: [] };
+  globalThis.document = {
+    querySelector: (sel) => { if (sel === '.rewards-page') sonde.reloads += 1; return null; },
+    getElementById: () => null,
+    body: {},
+  };
+  globalThis.__confirmModal = async (text) => { sonde.gefragt.push(text); return true; };
+  try {
+    return await fn(sonde);
+  } finally {
+    globalThis.document = vorher.document;
+    globalThis.__apiStub = vorher.api;
+    globalThis.__confirmModal = vorher.confirm;
+  }
+}
+
+test('Taschengeld: scheitert "Plan beenden", sagt die Seite es - keine unbehandelte Rejection', async () => {
+  await mitTaschengeld(() => withAccess({ rewards: 'write' }, () => mitSeitenSonde(async (sonde) => {
+    globalThis.__apiStub = { delete: async () => { throw Object.assign(new Error('Server nicht erreichbar'), { status: 503 }); } };
+    await assert.doesNotReject(rewards.removeMoneyPlan({ id: 3, display_name: 'Emma' }),
+      'das Formular ist schon zu - der Fehler darf nicht ins Leere fallen');
+    assert.deepEqual(sonde.gefragt, ['Server nicht erreichbar'], 'die Meldung steht in einem Dialog');
+    assert.equal(sonde.reloads, 1, 'und die Liste zeigt danach, was gilt');
+
+    sonde.gefragt.length = 0;
+    const calls = [];
+    globalThis.__apiStub = { delete: async (path) => { calls.push(path); return { ok: true }; } };
+    await rewards.removeMoneyPlan({ id: 3, display_name: 'Emma' });
+    assert.deepEqual(calls, ['/rewards/money/plans/3']);
+    assert.deepEqual(sonde.gefragt, [], 'gelingt es, fragt niemand nach');
+  })), { role: 'admin', me: 1 });
+});
+
+test('Taschengeld: reicht das Guthaben bei der Freigabe nicht mehr, laedt die Liste neu', async () => {
+  await mitTaschengeld(() => withAccess({ rewards: 'write' }, () => mitSeitenSonde(async (sonde) => {
+    globalThis.__apiStub = {
+      patch: async () => { throw Object.assign(new Error('The balance no longer covers this withdrawal'), { data: { reason: 'insufficient_funds' } }); },
+    };
+    await rewards.decideRedemption(31, 'fulfill', null);
+    assert.equal(sonde.gefragt.length, 1);
+    assert.match(sonde.gefragt[0], /rewards\.money\.insufficientOnApprove/, 'der Satz ist uebersetzt, nicht der Servertext');
+    assert.equal(sonde.reloads, 1, 'das Guthaben neben der Anfrage war der Stand von vor der Absage');
+
+    // Ein anderer Fehler laesst die Liste stehen, wie bisher.
+    sonde.reloads = 0;
+    globalThis.__apiStub = { patch: async () => { throw new Error('kaputt'); } };
+    await rewards.decideRedemption(31, 'fulfill', null);
+    assert.equal(sonde.reloads, 0);
+  })), { role: 'admin', me: 1 });
+});
+
 test('Geldbuchungen im Verlauf: was sie waren, steht in ihren Feldern', () => {
   mitTaschengeld(() => {
     assert.equal(rewards.moneyRowKind({ delta: 500, type: 'bonus', allowance_date: '2026-10-09' }), 'allowance');

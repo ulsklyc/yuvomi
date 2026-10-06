@@ -25,8 +25,8 @@ import { renderPageColumns } from '/utils/page-layout.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { isRedeemable, nextRewardGoal } from '/utils/reward-goal.js';
 import {
-  formatMoney, amountPlaceholder, amountExample, amountInputProblem, centsToAmountInput,
-  currencyFractionDigits, smallestUnitLabel, toDecimalString,
+  formatMoney, amountPlaceholder, amountExample, amountInputProblem,
+  amountToInput, currencyFractionDigits, toDecimalString,
 } from '/utils/money.js';
 
 const TABS = ['overview', 'catalog', 'ledger'];
@@ -203,10 +203,11 @@ async function loadOverview() {
     state.displayPeople = people.data ?? [];
   }
   if (isAdmin()) {
-    const r = await api.get('/rewards/redemptions?status=pending');
+    // `kind=all`: ohne die Angabe liefert die Route nur Praemien-Anfragen (#1734).
+    const r = await api.get('/rewards/redemptions?status=pending&kind=all');
     state.redemptions = r.data || [];
   } else {
-    const r = await api.get('/rewards/redemptions');
+    const r = await api.get('/rewards/redemptions?kind=all');
     state.redemptions = (r.data || []).filter((x) => x.user_id === state.overview.me && x.status === 'pending');
   }
 }
@@ -1038,7 +1039,9 @@ async function decideRedemption(id, action, btn) {
     await confirmModal(vergriffen ? t('rewards.outOfStock')
       : ohneDeckung ? t('rewards.money.insufficientOnApprove') : (err?.message || t('common.error')),
     { confirmLabel: t('rewards.gotIt') });
-    if (vergriffen) {
+    // Auch ohne Deckung neu laden: das Guthaben neben der Anfrage ist der
+    // Stand von vor der Absage - also genau der, der sie nicht mehr erklaert.
+    if (vergriffen || ohneDeckung) {
       await refreshActiveTab();
       refocusAfterRender();
     }
@@ -1314,11 +1317,49 @@ function moneyCurrencyCode() {
   return state.money?.currency || 'EUR';
 }
 
+/*
+ * DIE NACHKOMMASTELLEN KOMMEN VOM SERVER, NIE AUS `Intl` (Review zu #1745).
+ *
+ * Der Server speichert Geld in den Stellen nach ISO 4217 und sagt sie in
+ * `minor_unit` an. `Intl` (und damit `currencyFractionDigits()` und
+ * `centsToAmountInput()`) liefert die ANZEIGE-Konvention des CLDR, und die
+ * weicht ab: COP, HUF, IDR, IRR und PYG zeigt der CLDR ohne Nachkommastellen,
+ * ISO gibt ihnen zwei. Die Vorbelegung des Plan-Dialogs rechnete mit `Intl` -
+ * ein Plan ueber 5000 Ft (gespeichert 500000) stand als "500000" im Feld, und
+ * jedes Speichern, auch nur zum Pausieren, verhundertfachte das Taschengeld.
+ * Jede Rechnung zwischen kleinsten Einheiten und einem Feld geht deshalb durch
+ * `moneyDigits()`; `Intl` waehlt nur noch Trenner und Ziffern.
+ */
+function moneyDigits() {
+  return Number.isInteger(state.money?.minor_unit) ? state.money.minor_unit : currencyFractionDigits(moneyCurrencyCode());
+}
+
 /** Kleinste Einheiten als Betrag in der Haushaltswaehrung ("77,31 EUR"). */
 function fmtMoney(minor) {
+  return formatMoney(Number(minor || 0) / 10 ** moneyDigits(), moneyCurrencyCode());
+}
+
+/**
+ * Kleinste Einheiten als Punkt-Dezimaltext ("500000" bei zwei Stellen ->
+ * "5000.00"), ueber den Text gerechnet und nicht ueber eine Division.
+ */
+function minorToDecimal(minor) {
+  const digits = moneyDigits();
+  const text = String(Math.abs(Math.trunc(Number(minor) || 0))).padStart(digits + 1, '0');
+  return digits ? `${text.slice(0, -digits)}.${text.slice(-digits)}` : text;
+}
+
+/**
+ * Kleinste Einheiten als Wert fuer das Betragsfeld, in der Schreibweise der
+ * Region. Glatte Betraege einer Waehrung, die die Region ohne Nachkommastellen
+ * schreibt, stehen ohne da ("5000" Ft, nicht "5000,00"); alles andere behaelt
+ * seine Stellen, damit kein Betrag beim Oeffnen ein anderer wird.
+ */
+function minorToAmountInput(minor) {
   const currency = moneyCurrencyCode();
-  const digits = Number.isInteger(state.money?.minor_unit) ? state.money.minor_unit : currencyFractionDigits(currency);
-  return formatMoney(Number(minor || 0) / 10 ** digits, currency);
+  let decimal = minorToDecimal(minor);
+  if (currencyFractionDigits(currency) === 0 && /\.0+$/.test(decimal)) decimal = decimal.replace(/\.0+$/, '');
+  return amountToInput(decimal, currency);
 }
 
 function moneyAccounts() {
@@ -1418,7 +1459,22 @@ function moneyAmountProblemText(problem, currency) {
   if (problem === 'grouped') return t('common.amountGrouped', { example: amountExample(currency) });
   if (problem === 'invalid') return t('common.amountInvalid', { example: amountExample(currency) });
   if (problem === 'notPositive') return t('common.amountNotPositive');
-  return t('common.amountPrecisionRequired', { currency, step: smallestUnitLabel(currency) });
+  // Der kleinste Schritt nach den Stellen des SERVERS, nicht nach `Intl`.
+  const digits = moneyDigits();
+  const step = getNumberFormat({ minimumFractionDigits: digits, maximumFractionDigits: digits }).format(1 / 10 ** digits);
+  return t('common.amountPrecisionRequired', { currency, step });
+}
+
+/**
+ * Warum der Text im Betragsfeld nicht gesendet werden kann - oder `null`.
+ * Gruppierung, Schreibweise und Vorzeichen prueft `amountInputProblem()`; wie
+ * viele Nachkommastellen erlaubt sind, sagt der Server (`moneyDigits()`).
+ */
+function moneyAmountProblem(text) {
+  const problem = amountInputProblem(text, moneyCurrencyCode(), { required: true });
+  if (problem && problem !== 'precision') return problem;
+  const fraction = toDecimalString(text).split('.')[1] || '';
+  return fraction.length > moneyDigits() ? 'precision' : null;
 }
 
 /**
@@ -1427,7 +1483,7 @@ function moneyAmountProblemText(problem, currency) {
  */
 function readMoneyAmount(input, errEl) {
   const currency = moneyCurrencyCode();
-  const problem = amountInputProblem(input.value, currency, { required: true });
+  const problem = moneyAmountProblem(input.value);
   if (problem) {
     errEl.textContent = moneyAmountProblemText(problem, currency);
     errEl.hidden = false;
@@ -1449,8 +1505,7 @@ function moneyAmountField(id, value = '') {
 
 /** Der Betrag eines Dezimaltexts in kleinsten Einheiten - nur fuer den Vergleich mit dem Guthaben. */
 function decimalToMinor(decimal) {
-  const digits = Number.isInteger(state.money?.minor_unit) ? state.money.minor_unit : currencyFractionDigits(moneyCurrencyCode());
-  return Math.round(Number(decimal) * 10 ** digits);
+  return Math.round(Number(decimal) * 10 ** moneyDigits());
 }
 
 /* ABHEBEN ODER EINZAHLEN: EINE ANFRAGE, KEINE BUCHUNG. Sie geht ueber
@@ -1592,7 +1647,6 @@ function openMoneyPlanModal(memberId) {
   const candidates = state.money?.candidates || [];
   if (!account && !candidates.length) return;
   const plan = account?.plan || null;
-  const currency = moneyCurrencyCode();
   const frequency = plan?.frequency || 'weekly';
   const weekday = plan?.frequency === 'weekly' ? plan.anchor_day : 1;
   const monthDay = plan?.frequency === 'monthly' ? plan.anchor_day : 1;
@@ -1610,7 +1664,7 @@ function openMoneyPlanModal(memberId) {
     content: `
       <form id="rw-plan-form" novalidate>
         ${memberField}
-        ${moneyAmountField('rw-money-amount', plan ? centsToAmountInput(plan.amount_minor, currency) : '')}
+        ${moneyAmountField('rw-money-amount', plan ? minorToAmountInput(plan.amount_minor) : '')}
         <div class="form-group">
           <label class="label" for="rw-plan-frequency">${esc(t('rewards.money.frequency'))}</label>
           <select class="input" id="rw-plan-frequency">
@@ -1655,10 +1709,7 @@ function openMoneyPlanModal(memberId) {
         const ok = await confirmOverModal(t('rewards.money.confirmRemovePlan', { name: account.display_name }),
           { confirmLabel: t('rewards.money.removePlan'), detail: t('rewards.money.removePlanDetail') });
         if (!ok) return;
-        await api.delete(`/rewards/money/plans/${account.id}`);
-        toast(t('rewards.toastSaved'), 'default');
-        await refreshActiveTab();
-        refocusAfterRender();
+        await removeMoneyPlan(account);
       });
 
       panel.querySelector('#rw-plan-form').addEventListener('submit', async (e) => {
@@ -1686,6 +1737,23 @@ function openMoneyPlanModal(memberId) {
       });
     },
   });
+}
+
+/* PLAN BEENDEN. Die Rueckfrage hat das Formular schon geschlossen, wenn dieser
+ * Aufruf laeuft: scheitert das Loeschen, gibt es kein Fehlerfeld mehr, in dem
+ * es stehen koennte. Ohne `catch` war das eine unbehandelte Rejection - der
+ * Plan stand weiter da, und niemand erfuhr, warum (Review zu #1745). Die
+ * Meldung kommt als Dialog wie bei den Nachbarn, und die Liste wird in beiden
+ * Faellen neu geladen: sie zeigt, was jetzt gilt. */
+async function removeMoneyPlan(account) {
+  try {
+    await api.delete(`/rewards/money/plans/${account.id}`);
+    toast(t('rewards.toastSaved'), 'default');
+  } catch (err) {
+    await confirmModal(err?.message || t('common.error'), { confirmLabel: t('rewards.gotIt') });
+  }
+  await refreshActiveTab();
+  refocusAfterRender();
 }
 
 const MONEY_LEDGER_ICON = {
@@ -1772,6 +1840,7 @@ export const __test = {
   ledgerReason,
   // #1734: Taschengeld.
   renderMoneySection, renderMoneyRow, moneyLedgerRowHtml, moneyRowKind, moneyPlanLine, fmtMoney,
+  minorToAmountInput, moneyAmountProblem, decimalToMinor, removeMoneyPlan, decideRedemption, openMoneyPlanModal,
 };
 
 export async function render(container, { user } = {}) {
