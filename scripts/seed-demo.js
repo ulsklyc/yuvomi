@@ -37,6 +37,7 @@ import bcrypt from 'bcrypt';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { computeLoanSchedule } from '../server/services/loan-amortization.js';
+import { buildDemoPdf } from './seed-demo-pdf.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -928,6 +929,7 @@ const WEEK_BEFORE = '10080';
 console.log('Inserting documents…');
 const insertFolder = db.prepare('INSERT INTO family_document_folders (name, created_by) VALUES (?, ?)');
 const folderId = {};
+const folderName = {};
 for (const [slug, name] of [
   ['medical',   L('Medical',   'Gesundheit')],
   ['school',    L('School',    'Schule')],
@@ -938,6 +940,7 @@ for (const [slug, name] of [
   ['receipts',  L('Receipts',  'Belege')],
 ]) {
   folderId[slug] = insertFolder.run(name, alexId).lastInsertRowid;
+  folderName[slug] = name;
 }
 // Build a base64 payload of a given byte size so file sizes look realistic.
 function payload(bytes) {
@@ -967,10 +970,30 @@ const documents = [
 ];
 const documentIdByName = {};
 for (const [name, description, category, visibility, folder, original, mime, size, created_by] of documents) {
-  const p = payload(Math.min(size, 4096)); // store a small placeholder, report a realistic size
+  // PDFs sind echte PDFs (#1511): die Vorschau der App und der PDF-Viewer des
+  // Browsers öffnen sie, statt einen Fehler zu zeigen. Als Buffer gebunden
+  // landet der Inhalt als BLOB in der Spalte - das Format, in dem die App seit
+  // Migration 67 selbst schreibt. Die Bilder bleiben ein Text-Platzhalter.
+  // `size` ist in beiden Fällen die angezeigte, realistische Grösse, nicht die
+  // der abgelegten Bytes.
+  const content = mime === 'application/pdf'
+    ? buildDemoPdf({
+      title: name,
+      subtitle: description,
+      lines: [
+        `${L('Folder', 'Ordner')}: ${folderName[folder]}`,
+        `${L('File', 'Datei')}: ${original}`,
+        '',
+        L('This page stands in for the real document. The demo household keeps its papers here: scanned, filed in folders and shared with the family.',
+          'Diese Seite steht für das echte Dokument. Der Demo-Haushalt legt hier seine Unterlagen ab: gescannt, in Ordnern sortiert und mit der Familie geteilt.'),
+      ],
+      footer: L('Yuvomi demo document - sample content, not a real record.',
+        'Yuvomi-Demodokument - Beispielinhalt, keine echte Unterlage.'),
+    })
+    : payload(Math.min(size, 4096)).base64; // store a small placeholder, report a realistic size
   documentIdByName[name] = insertDoc.run({
     name, description, category, visibility, folder: folderId[folder],
-    original, mime, size, content: p.base64, created_by,
+    original, mime, size, content, created_by,
   }).lastInsertRowid;
 }
 
