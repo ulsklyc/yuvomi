@@ -826,3 +826,105 @@ test('der Bearbeiten-Dialog gibt den Fokus NACH dem Neuzeichnen weiter, nicht da
   assert.doesNotMatch(handler, /^\s*refocusAfterRender\(\);\s*$/m,
     'ein Aufruf als eigene Anweisung laeuft vor dem Neuzeichnen und tut nichts');
 });
+
+// ---------------------------------------------------------------------------
+// #1723, Punkt 6: ein Wort fuer die Person, drei Schluessel fuer drei Aufgaben
+// ---------------------------------------------------------------------------
+//
+// `housekeeping.staff` ("Personal") war zugleich Reiter, Ersatz fuer einen
+// fehlenden Namen und Rollenname in Einstellungen > Familie. Der Reiter will
+// die Mehrzahl, die anderen beiden die Einzahl - ein Schluessel kann das nicht.
+// Gefahren werden die drei Stellen selbst; der i18n-Stub gibt den Schluessel
+// zurueck, den sie lesen.
+
+async function wordsForThePerson() {
+  // Reiter: der Kopf der Seite, wie renderShell() ihn baut.
+  let shell = '';
+  const page = { appendChild() {}, addEventListener() {} };
+  hk.state().tab = 'tasks';
+  // renderShell() baut den FAB ueber die DOM-API; mehr als ein Element, das
+  // Attribute annimmt, braucht er dafuer nicht.
+  const realDocument = globalThis.document;
+  const element = () => ({ dataset: {}, setAttribute() {}, appendChild() {}, addEventListener() {} });
+  globalThis.document = { createElement: element };
+  try {
+    hk.renderShell({
+      replaceChildren() { shell = ''; },
+      insertAdjacentHTML(_position, markup) { shell += markup; },
+      querySelector: (sel) => (sel === '.housekeeping-page' ? page : null),
+    });
+  } finally {
+    globalThis.document = realDocument;
+  }
+  const tab = shell.match(/data-tab-id="staff"[\s\S]*?<span class="sub-tab__label">([^<]+)<\/span>/)?.[1];
+
+  // Ersatzname: ein Besuch ohne `worker_name` im Monatsbericht.
+  const reports = await freshReports();
+  delete globalThis.__apiStub;
+  const placeholder = reports.html.match(/housekeeping\.\w+(?= · )/)?.[0];
+
+  // Rolle: die Zeile eines Haushaltshilfe-Kontos in Einstellungen > Familie.
+  const { __test: family } = await import('../public/settings/pages/admin-family.js');
+  const row = family.memberHtml({
+    id: 4, username: 'carla', display_name: 'Carla', role: 'member', family_role: 'other',
+    avatar_color: '#123456', is_worker: true, is_household_member: false, deactivated_at: null,
+  }, 1);
+  const role = row.match(/@carla · ([\w.]+)/)?.[1];
+  return { tab, placeholder, role };
+}
+
+test('#1723: Reiter, Ersatzname und Rolle der Haushaltshilfe lesen drei verschiedene Schluessel', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const words = await wordsForThePerson();
+  for (const [where, key] of Object.entries(words)) {
+    assert.match(key ?? '', /^housekeeping\.\w+$/, `${where}: kein Schluessel im Markup gefunden - der Test misst dann nichts`);
+  }
+  assert.equal(new Set(Object.values(words)).size, 3,
+    `zwei der drei Stellen teilen sich einen Schluessel: ${JSON.stringify(words)}`);
+
+  const dir = new URL('../public/locales/', import.meta.url);
+  const read = (file) => JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
+  const value = (locale, key) => key.split('.').reduce((o, k) => o?.[k], locale);
+  const de = read('de.json');
+  const en = read('en.json');
+  // Ein Nomen: Haushaltshilfe / Housekeeper. Der Reiter und seine Ueberschrift
+  // tragen die Mehrzahl, der Knopf "+" die Einzahl.
+  assert.equal(value(de, words.tab), 'Haushaltshilfen');
+  assert.equal(value(en, words.tab), 'Housekeepers');
+  for (const key of [words.placeholder, words.role, 'newLabel.housekeepingWorker']) {
+    assert.equal(value(de, key), 'Haushaltshilfe', `de ${key}`);
+    assert.equal(value(en, key), 'Housekeeper', `en ${key}`);
+  }
+  // Der Modulname bleibt, wie er ist.
+  assert.equal(de.housekeeping.title, 'Haushaltshilfe');
+  assert.equal(en.housekeeping.title, 'Housekeeping');
+
+  for (const file of readdirSync(dir).filter((name) => name.endsWith('.json'))) {
+    const locale = read(file);
+    assert.equal(locale.housekeeping.staff, undefined, `${file}: housekeeping.staff ist als toter Schluessel geblieben`);
+    for (const key of Object.values(words)) {
+      assert.equal(typeof value(locale, key), 'string', `${file}: ${key} fehlt`);
+    }
+    // Die Person, die der Knopf "+" anlegt, heisst wie die Person, die in der
+    // Zeile steht - nicht "Person" hier und "Personal" dort.
+    assert.equal(value(locale, 'newLabel.housekeepingWorker'), value(locale, words.role),
+      `${file}: der Knopf nennt die Person anders als ihre Rolle`);
+  }
+});
+
+test('#1723: die Ueberschrift des Reiters heisst wie der Reiter', async () => {
+  const words = await wordsForThePerson();
+  const state = hk.state();
+  state.workers = [{ id: 7, display_name: 'Ana' }];
+  state.selectedStaffId = '7';
+  state.staffVisits = [];
+  state.tab = 'staff';
+  const content = fakeContainer();
+  hk.renderStaff(content);
+  // Unsichtbar: ein sichtbares h2 mit dem Namen des Reiters nennt die Ebene
+  // zweimal (test-typography.js). Die Gliederung behaelt es.
+  const heading = content.html.match(/<h2 class="sr-only">([^<]+)<\/h2>/)?.[1];
+  assert.equal(heading, words.tab, 'Reiter und Ueberschrift nennen dieselbe Liste verschieden');
+  assert.doesNotMatch(content.html.split('page-columns__rail')[0], /<h2 class="u-section-title">/,
+    'ueber der Liste steht eine zweite, sichtbare Ueberschrift');
+});

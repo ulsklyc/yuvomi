@@ -134,7 +134,7 @@ const WASTE_TYPE_COLOR_NAMES = () => ({
   '#EF4444': t('waste.colorRed'),
   '#0891B2': t('waste.colorCyan'),
   '#EA580C': t('waste.colorOrange'),
-  '#EC4899': t('waste.colorMagenta'),
+  '#EC4899': t('waste.colorPink'),
 });
 
 let _container = null;

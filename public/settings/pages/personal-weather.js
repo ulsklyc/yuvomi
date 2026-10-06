@@ -62,7 +62,7 @@ function bindEvents(container, user) {
     errorElement.hidden = true;
     const location = readWeatherLocation(container, SCOPE);
     if (!hasValidWeatherCoords(location.lat, location.lon)) {
-      errorElement.textContent = `${t('settings.weatherLatLabel')} / ${t('settings.weatherLonLabel')}`;
+      errorElement.textContent = t('settings.weatherCoordsInvalid');
       errorElement.hidden = false;
       return;
     }

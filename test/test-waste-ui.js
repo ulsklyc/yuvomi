@@ -504,6 +504,12 @@ test('WASTE_TYPE_COLORS: jede Preset-Farbe liegt im Raster', () => {
  * Gemessen wird der Farbton des Hex-Werts gegen den Sektor, den der
  * Schluesselname behauptet. Die Sektoren sind grob und ueberlappen nicht; sie
  * sollen einen vertauschten Namen fangen, keine Nuance.
+ *
+ * Eine Ausnahme vom Nicht-Ueberlappen (#1723): Magenta und Fuchsia teilen
+ * sich einen Sektor, weil sie derselbe Farbton sind (300 Grad, in CSS sogar
+ * derselbe Wert). #EC4899 liegt bei 330 und hiess trotzdem "Magenta" - der
+ * Sektor stand hier zu weit und hat den Namen gedeckt, statt ihn zu pruefen.
+ * 310 bis 345 ist Pink.
  */
 const HUE_SECTORS = {
   colorRed: [345, 15],
@@ -516,7 +522,8 @@ const HUE_SECTORS = {
   colorBlue: [200, 250],
   colorViolet: [250, 280],
   colorFuchsia: [280, 310],
-  colorMagenta: [310, 345],
+  colorMagenta: [280, 310],
+  colorPink: [310, 345],
 };
 
 function hueAndSaturation(hex) {
@@ -552,6 +559,32 @@ test('WASTE_TYPE_COLOR_NAMES: jeder Farbname liegt im Farbton seines Hex-Werts (
     if (!inside) failures.push(`${hex} heisst ${key}, liegt aber bei Farbton ${Math.round(hue)}`);
   }
   assert.deepEqual(failures, []);
+});
+
+test('#EC4899 heisst in jeder Sprache Pink, und der alte Name ist kein zweiter (#1723)', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  // Das Etikett ist neu, der gespeicherte Wert nicht: eine Abfallart traegt den
+  // Hex-Wert, und der bleibt in der Palette.
+  assert.ok(WASTE_TYPE_COLORS.includes('#EC4899'), '#EC4899 ist nicht mehr waehlbar - Bestandsdaten zeigten dann auf nichts');
+  const name = WASTE_CODE.match(/'#EC4899':\s*t\('waste\.(color\w+)'\)/);
+  assert.ok(name, '#EC4899 hat keinen Namen mehr');
+  assert.equal(name[1], 'colorPink');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const files = readdirSync(dir).filter((file) => file.endsWith('.json'));
+  assert.ok(files.length >= 20, 'zu wenige Locale-Dateien gelesen');
+  const seen = new Map();
+  for (const file of files) {
+    const { waste } = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
+    assert.equal(typeof waste.colorPink, 'string', `${file}: waste.colorPink fehlt`);
+    assert.equal(waste.colorMagenta, undefined, `${file}: waste.colorMagenta ist ein toter zweiter Name`);
+    // Kein Name darf doppelt in der Palette stehen - ein Screenreader koennte
+    // die zwei Swatches sonst nicht unterscheiden.
+    const names = Object.entries(waste).filter(([key]) => /^color[A-Z]/.test(key) && key !== 'colorCurrent').map(([, value]) => value);
+    assert.equal(new Set(names).size, names.length, `${file}: zwei Farben heissen gleich (${names.join(', ')})`);
+    seen.set(file, waste.colorPink);
+  }
+  assert.equal(seen.get('de.json'), 'Pink');
+  assert.equal(seen.get('en.json'), 'Pink');
 });
 
 test('WASTE_TYPE_COLORS: eine kuratierte Auswahl ohne Dubletten und ohne Extremwerte', () => {

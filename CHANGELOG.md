@@ -332,6 +332,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ("Overview, Plan, Home") and now simply says the modules are sorted within their group. In
   German, the empty waste page read "Papier -, um".
 
+- **Wording: one word for the housekeeper, a pink that is called pink, "Square (2×2)", and a
+  real sentence when weather coordinates are missing** (#1723). In Housekeeping the person had
+  four names: the tab said "Staff", its heading "Housekeeping staff", the add button
+  "Housekeeper", and in German the short add label just "Person". It is "Housekeeper"
+  ("Haushaltshilfe") everywhere now; the tab and its heading read "Housekeepers", and a
+  housekeeper's account under Settings, Family carries that word as its role instead of
+  "Staff". The module keeps its name. In the waste type dialog the swatch called "Magenta" is a
+  pink and is now called that - only the name a screen reader announces changes, saved waste
+  types keep their colour. On the overview, the largest of the four tile sizes was called
+  "Standard (2×2)" although no tile starts in it; it is "Square (2×2)", saved layouts are
+  untouched. And in the weather settings, saving without valid coordinates showed the two
+  field names, "Latitude / Longitude", as the error; it now says "Enter valid coordinates."
+  The new wording is in all 26 languages; in Vietnamese, Hindi, Arabic, Persian, Korean,
+  Japanese, Chinese and Filipino it was not written by a native speaker.
+
 - **Resuming a paused recurring shared expense no longer books every date it missed** (#1647).
   A recurring expense that was paused for six months and then resumed got six expenses within
   six hours, one per hourly run, each with its original date. Resuming now skips the missed

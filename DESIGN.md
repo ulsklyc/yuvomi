@@ -1263,7 +1263,7 @@ angedockte Primaerknopf sprang mit (Belohnungen 271/431px). Seitdem gilt:
   nur, was es als Daten und Baustein schon gibt: Belohnungen/Uebersicht die letzten Buchungen
   (der Abschnittstitel fuehrt in den Reiter Verlauf), Belohnungen/Verlauf die Punktestaende,
   Entsorgung Abfallarten und Quellen neben den Abholungen, Haushaltshilfe/Berichte die
-  Kennzahlen (`railFirst`: mobil ueber der Liste, am Desktop daneben), Haushaltshilfe/Personal
+  Kennzahlen (`railFirst`: mobil ueber der Liste, am Desktop daneben), Haushaltshilfe/Haushaltshilfen
   das Protokoll der gewaehlten Person. Ein Reiter ohne zweiten Inhalt (Haushaltshilfe/Aufgaben)
   laesst die Spur leer, statt Inhalt zu erfinden.
 - Unter der Schwelle steht alles einspaltig in Quelltextreihenfolge auf dem Lesemass.
