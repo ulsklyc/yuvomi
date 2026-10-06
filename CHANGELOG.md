@@ -259,6 +259,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The reminder-list settings have one name: "Reminder sync"** (#1524). The section under
+  Settings, Tasks was headed "Show/hide reminder lists", while the settings search and the link
+  from the task defaults called it "Reminder sync" - whoever searched for the one found the
+  other. The heading now carries the name the search and the links use. It is also the name
+  that says what the section does: its switches decide which CalDAV lists the household syncs
+  and whether a list feeds Tasks or Shopping, nothing in it merely hides a list.
+
+- **Wording: waste colours are named after what they show, and two stale sentences are gone**
+  (#1507). In the waste type dialog the swatch called "Violet" was fuchsia and the one called
+  "Teal" was emerald; both now carry those names, which is what a screen reader announces. The
+  hint above the module order under Settings, Navigation listed groups that no longer exist
+  ("Overview, Plan, Home") and now simply says the modules are sorted within their group. In
+  German, the empty waste page read "Papier -, um".
+
 - **An avatar never shows more than one character per name part** (#1464). A name starting
   with "ß" put three letters on the disc ("ßeta Schmidt" showed "SSS"), because writing a
   letter in capitals can turn it into two; the same went for the ligatures "ﬁ" and "ﬂ". The
