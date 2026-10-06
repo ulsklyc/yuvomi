@@ -1715,7 +1715,11 @@
         "handoverToSplit": "Áthelyezés a közös kiadásokba",
         "loanRemainingInstallmentsForecast": "{{forecast}} (terv: {{plan}})",
         "detailDateLabel": "Dátum",
-        "loanDetailStartMonthLabel": "Első esedékesség hónapja"
+        "loanDetailStartMonthLabel": "Első esedékesség hónapja",
+        "loanDueDayLabel": "Esedékesség napja",
+        "loanDueDayHint": "Nem kötelező: a hónap napja, 1 és 31 között. A fizetettként jelölt részletek ekkor erre a napra kerülnek a mai nap helyett. Rövidebb hónapokban az utolsó nap érvényes.",
+        "loanDueDayInvalid": "Adjon meg egy napot 1 és 31 között, vagy hagyja üresen",
+        "loanPaymentAddedOnToast": "Fizetés rögzítve ezzel a dátummal: {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Ciklus fül megjelenítése",

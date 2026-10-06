@@ -1729,7 +1729,11 @@
         "handoverToSplit": "공동 지출로 옮기기",
         "loanRemainingInstallmentsForecast": "{{forecast}} (계획: {{plan}})",
         "detailDateLabel": "날짜",
-        "loanDetailStartMonthLabel": "첫 상환 월"
+        "loanDetailStartMonthLabel": "첫 상환 월",
+        "loanDueDayLabel": "상환일",
+        "loanDueDayHint": "선택 사항: 매월 1일부터 31일 중 하루입니다. 상환 완료로 표시한 회차는 오늘이 아니라 이 날짜로 기록됩니다. 더 짧은 달에는 말일이 적용됩니다.",
+        "loanDueDayInvalid": "1에서 31 사이의 날짜를 입력하거나 비워 두세요",
+        "loanPaymentAddedOnToast": "{{date}} 날짜로 결제가 기록되었습니다"
     },
     "settings": {
         "healthCycleEnableLabel": "주기 탭 표시",

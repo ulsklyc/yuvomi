@@ -1715,7 +1715,11 @@
         "handoverToSplit": "Passar para despesas compartilhadas",
         "loanRemainingInstallmentsForecast": "{{forecast}} (plano: {{plan}})",
         "detailDateLabel": "Data",
-        "loanDetailStartMonthLabel": "Primeiro mês de vencimento"
+        "loanDetailStartMonthLabel": "Primeiro mês de vencimento",
+        "loanDueDayLabel": "Dia de vencimento",
+        "loanDueDayHint": "Opcional: dia do mês, de 1 a 31. As parcelas marcadas como pagas passam a ser datadas neste dia, e não hoje. Em meses mais curtos vale o último dia.",
+        "loanDueDayInvalid": "Informe um dia de 1 a 31 ou deixe o campo vazio",
+        "loanPaymentAddedOnToast": "Pagamento registrado com data de {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Mostrar a aba de ciclo",

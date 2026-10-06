@@ -13,7 +13,7 @@ import { translate, resolveHouseholdLocale } from '../../utils/i18n.js';
 import {
   budgetFilter, mayEdit, getBudgetMode, loanSummaryRow, loadLoan, refreshLoanStatus, cents,
   budgetCurrency, toBudgetAmount, CURRENCY_RE, validateAccountRef, addMonths,
-  LOAN_DIRECTIONS, bookingFor, refusal, refusals, refuse,
+  LOAN_DIRECTIONS, bookingFor, refusal, refusals, refuse, dueDateInMonth,
 } from './helpers.js';
 
 const log = createLogger('Budget');
@@ -38,6 +38,32 @@ function validateDirection(body, loan = null) {
   const raw = String(body.direction || '').trim();
   if (!LOAN_DIRECTIONS.includes(raw)) return refusal('loan_direction_invalid', 'Direction must be either lent or borrowed.');
   return { value: raw };
+}
+
+/**
+ * Faelligkeitstag aus dem Request (#1631): optional, eine ganze Zahl von 1 bis 31.
+ *
+ * Fehlt das Feld, bleibt es beim Bestand (PUT) bzw. bei "kein Tag" (POST); `null`
+ * oder ein leerer String nimmt den Tag wieder weg. Angenommen wird die Zahl
+ * selbst oder ihre Ziffernfolge, wie ein Formularfeld sie schickt - `1.5`,
+ * `"x"`, `true` und alles ausserhalb von 1 bis 31 sind eine Absage und werden
+ * nicht still gerundet: ein Tag, den der Nutzer nicht gemeint hat, datierte
+ * jede kuenftige Rate falsch.
+ *
+ * @param {object} body       Request-Body
+ * @param {object|null} loan  Bestehendes Darlehen (PUT) - liefert den Default
+ * @returns {{ value: number|null }|{ error: string, reason: string }}
+ */
+function validateDueDay(body, loan = null) {
+  const raw = body.due_day;
+  if (raw === undefined) return { value: loan?.due_day ?? null };
+  if (raw === null || (typeof raw === 'string' && raw.trim() === '')) return { value: null };
+  const day = typeof raw === 'number' ? raw
+    : (typeof raw === 'string' && /^\d{1,2}$/.test(raw.trim()) ? Number(raw.trim()) : NaN);
+  if (!Number.isInteger(day) || day < 1 || day > 31) {
+    return refusal('loan_due_day_invalid', 'Due day must be a whole number between 1 and 31.');
+  }
+  return { value: day };
 }
 
 /**
@@ -250,6 +276,10 @@ router.get('/loans', (req, res) => {
  * liefen nie über den Haushalt - sie als Buchungen anzulegen hieße, vergangene
  * Monate mit Ausgaben zu füllen, die dort nie stattgefunden haben, und Kontostände
  * wie Statistik zu verfälschen.
+ *
+ * Mit Faelligkeitstag (#1631) traegt jede dieser Raten den Tag ihres Monats,
+ * ohne ihn wie bisher den Ersten. Das gilt nur hier, beim Anlegen: ein spaeter
+ * gesetzter oder geaenderter Tag fasst keine bestehende Rate an.
  */
 function seedPaidInstallments(loanId, count, userId) {
   const loan = loadLoan(loanId);
@@ -261,11 +291,12 @@ function seedPaidInstallments(loanId, count, userId) {
       if (remaining <= 0) break;
       const amount = Math.min(perInstallment, remaining);
       if (amount <= 0) break;
+      const month = addMonths(loan.start_month, n - 1);
       db.get().prepare(`
         INSERT INTO budget_loan_payments
           (loan_id, installment_number, amount, paid_date, budget_entry_id, created_by)
         VALUES (?, ?, ?, ?, NULL, ?)
-      `).run(loanId, n, amount, `${addMonths(loan.start_month, n - 1)}-01`, userId);
+      `).run(loanId, n, amount, dueDateInMonth(month, loan.due_day) ?? `${month}-01`, userId);
       booked = cents(booked + amount);
     }
   })();
@@ -313,6 +344,8 @@ router.post('/loans', (req, res) => {
     if (dir.error) errors.push(dir);
     const account = validateAccountRef(req.body.account_id);
     if (account.error) errors.push(refusal('loan_account_invalid', account.error));
+    const dueDay = validateDueDay(req.body);
+    if (dueDay.error) errors.push(dueDay);
 
     // Altlasten beim Anlegen (#813): Ein Darlehen, das schon läuft, wenn es hier
     // eingetragen wird, startet sonst mit lauter offenen Raten - der Nutzer müsste
@@ -343,8 +376,8 @@ router.post('/loans', (req, res) => {
       INSERT INTO budget_loans
         (title, borrower, total_amount, installment_count, start_month, notes, created_by, owner_id, visibility,
          interest_mode, principal, fixed_rate, initial_repayment_rate, fixed_period_months, followup_rate,
-         currency, exchange_rate, direction, account_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         currency, exchange_rate, direction, account_id, due_day)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       vTitle.value,
       vBorrower.value,
@@ -356,7 +389,7 @@ router.post('/loans', (req, res) => {
       terms.interest_mode, terms.principal, terms.fixed_rate, terms.initial_repayment_rate,
       terms.fixed_period_months, terms.followup_rate,
       money.currency, money.exchange_rate,
-      dir.value, account.value
+      dir.value, account.value, dueDay.value
     );
 
     const loanId = result.lastInsertRowid;
@@ -420,6 +453,8 @@ router.put('/loans/:id', (req, res) => {
         ? { value: loan.account_id }
         : validateAccountRef(req.body.account_id);
       if (iAccount.error) iErrors.push(refusal('loan_account_invalid', iAccount.error));
+      const iDueDay = validateDueDay(req.body, loan);
+      if (iDueDay.error) iErrors.push(iDueDay);
       if (iErrors.length) return refuse(res, iErrors);
 
       db.get().prepare(`
@@ -430,7 +465,7 @@ router.put('/loans/:id', (req, res) => {
           notes = ?,
           total_amount = ?, installment_count = ?, interest_mode = ?, principal = ?,
           fixed_rate = ?, initial_repayment_rate = ?, fixed_period_months = ?, followup_rate = ?,
-          currency = ?, exchange_rate = ?, direction = ?, account_id = ?
+          currency = ?, exchange_rate = ?, direction = ?, account_id = ?, due_day = ?
         WHERE id = ?
       `).run(
         req.body.title?.trim() ?? null,
@@ -439,7 +474,7 @@ router.put('/loans/:id', (req, res) => {
         req.body.notes !== undefined ? (req.body.notes?.trim() || null) : loan.notes,
         terms.total_amount, terms.installment_count, terms.interest_mode, terms.principal,
         terms.fixed_rate, terms.initial_repayment_rate, terms.fixed_period_months, terms.followup_rate,
-        iMoney.currency, iMoney.exchange_rate, iDir.value, iAccount.value,
+        iMoney.currency, iMoney.exchange_rate, iDir.value, iAccount.value, iDueDay.value,
         id
       );
       if (iDir.value !== loan.direction) rebookPayments(id, iDir.value);
@@ -478,6 +513,8 @@ router.put('/loans/:id', (req, res) => {
       ? { value: loan.account_id }
       : validateAccountRef(req.body.account_id);
     if (account.error) errors.push(refusal('loan_account_invalid', account.error));
+    const dueDay = validateDueDay(req.body, loan);
+    if (dueDay.error) errors.push(dueDay);
     if (errors.length) return refuse(res, errors);
 
     db.get().prepare(`
@@ -491,7 +528,8 @@ router.put('/loans/:id', (req, res) => {
           currency = ?,
           exchange_rate = ?,
           direction = ?,
-          account_id = ?
+          account_id = ?,
+          due_day = ?
       WHERE id = ?
     `).run(
       req.body.title?.trim() ?? null,
@@ -501,7 +539,7 @@ router.put('/loans/:id', (req, res) => {
       req.body.start_month ?? null,
       req.body.notes !== undefined ? (req.body.notes?.trim() || null) : loan.notes,
       money.currency, money.exchange_rate,
-      dir.value, account.value,
+      dir.value, account.value, dueDay.value,
       id
     );
     if (dir.value !== loan.direction) rebookPayments(id, dir.value);

@@ -1715,7 +1715,11 @@
         "handoverToSplit": "Basculer vers les dépenses partagées",
         "loanRemainingInstallmentsForecast": "{{forecast}} (plan : {{plan}})",
         "detailDateLabel": "Date",
-        "loanDetailStartMonthLabel": "Premier mois d’échéance"
+        "loanDetailStartMonthLabel": "Premier mois d’échéance",
+        "loanDueDayLabel": "Jour d’échéance",
+        "loanDueDayHint": "Facultatif : jour du mois, de 1 à 31. Les échéances marquées comme payées sont alors datées de ce jour et non d’aujourd’hui. Les mois plus courts prennent leur dernier jour.",
+        "loanDueDayInvalid": "Indiquez un jour de 1 à 31 ou laissez le champ vide",
+        "loanPaymentAddedOnToast": "Paiement enregistré au {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Afficher l’onglet cycle",

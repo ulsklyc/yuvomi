@@ -1729,7 +1729,11 @@
         "handoverToSplit": "In geteilte Ausgaben übernehmen",
         "loanRemainingInstallmentsForecast": "{{forecast}} (Plan: {{plan}})",
         "detailDateLabel": "Datum",
-        "loanDetailStartMonthLabel": "Erster Fälligkeitsmonat"
+        "loanDetailStartMonthLabel": "Erster Fälligkeitsmonat",
+        "loanDueDayLabel": "Fälligkeitstag",
+        "loanDueDayHint": "Optional: Tag im Monat, 1 bis 31. Als bezahlt markierte Raten werden dann auf diesen Tag gebucht statt auf heute. In kürzeren Monaten gilt der letzte Tag.",
+        "loanDueDayInvalid": "Tag von 1 bis 31 eingeben oder leer lassen",
+        "loanPaymentAddedOnToast": "Zahlung erfasst zum {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Zyklus-Tab anzeigen",

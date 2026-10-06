@@ -6,7 +6,7 @@
  * Datum neuer Einträge folgt dem angezeigten Monat, Tab-Leisten tragen echtes
  * ARIA, Charts haben Textalternativen, keine Farb- oder Textliterale im JS.
  */
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { withoutHtmlComments } from './source-text.js';
@@ -3489,7 +3489,9 @@ test('#1648: jedes Darlehensfeld steht genau einmal im Quelltext, und beide Dial
 test('#1648: die Feldliste traegt "Bereits gezahlte Raten" bei der Neuanlage, nicht beim Bearbeiten', () => {
   const neu = budgetUi.loanFormFieldsHtml(null, { startMonth: '2026-03' });
   const ids = [...neu.matchAll(/<(?:input|select|textarea)[^>]*\sid="(lm-[a-z-]+)"/g)].map((m) => m[1]);
-  assert.equal(ids[ids.indexOf('lm-start') + 1], 'lm-paid', 'direkt unter dem ersten Faelligkeitsmonat');
+  // Dazwischen steht nur der Faelligkeitstag (#1631), der zum Monat gehoert.
+  assert.deepEqual(ids.slice(ids.indexOf('lm-start') + 1, ids.indexOf('lm-paid') + 1), ['lm-due-day', 'lm-paid'],
+    'unter dem ersten Faelligkeitsmonat und seinem Tag');
   assert.match(neu, /id="lm-start" value="2026-03"/, 'der Aufrufer bestimmt die Vorbelegung des Startmonats');
 
   const bestehend = budgetUi.loanFormFieldsHtml(
@@ -4220,4 +4222,224 @@ test('R16: ein Kontoname bricht auf zwei Zeilen um, statt gekappt zu werden', ()
   assert.match(rule.body, /overflow-wrap:\s*anywhere/, 'ein langes Wort ohne Leerzeichen laeuft sonst unter den Saldo');
   const figures = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-account__figures' && !r.at.length);
   assert.match(figures?.body ?? '', /flex:\s*0 0 auto/, 'die Saldo-Spalte schrumpft weiter nie');
+});
+
+// --------------------------------------------------------
+// Faelligkeitstag am Darlehen (#1631)
+// --------------------------------------------------------
+
+const { setDisplayTimeZone } = await import('../public/utils/timezone.js');
+
+/** Uhr und Haushaltszone der SEITE fuer die Dauer von `fn` stellen. */
+async function seiteAm(iso, zone, fn) {
+  setDisplayTimeZone(zone);
+  mock.timers.enable({ apis: ['Date'], now: new Date(iso) });
+  try {
+    return await fn();
+  } finally {
+    mock.timers.reset();
+    setDisplayTimeZone(null);
+  }
+}
+
+const tagesDarlehen = (over = {}) => ({
+  id: 7, title: 'Autokredit', borrower: 'Bank', direction: 'borrowed', status: 'active',
+  total_amount: 1200, remaining_amount: 1200, paid_amount: 0, paid_installments: 0,
+  installment_count: 12, installment_amount: 100, is_settled: false, payments: [],
+  next_installment_number: 1, next_due_month: '2026-10', next_due_date: '2026-10-27', due_day: 27, ...over,
+});
+
+test('#1631: die Karte nennt das volle Datum, wenn der Server eines liefert, sonst den Monat', () => {
+  // formatDate ist im Loader String(d): steht der Schluessel in der Zeile, ist
+  // der Datums-Formatierer gerufen worden und nicht der des Monats.
+  assert.equal(budgetUi.loanNextDueLabel(tagesDarlehen()), '2026-10-27');
+  assert.match(budgetUi.renderLoanCard(tagesDarlehen()),
+    /<span>budget\.loanNextDue\{"month":"2026-10-27"\}<\/span>/);
+  // Der Server klemmt, die Karte zeigt, was er liefert - sie rechnet nicht selbst.
+  assert.match(budgetUi.renderLoanCard(tagesDarlehen({ due_day: 31, next_due_month: '2026-02', next_due_date: '2026-02-28' })),
+    /budget\.loanNextDue\{"month":"2026-02-28"\}/);
+
+  // Ohne Faelligkeitstag wie bisher der Monat.
+  const ohne = tagesDarlehen({ due_day: null, next_due_date: null });
+  assert.equal(budgetUi.loanNextDueLabel(ohne), 'Oktober 2026');
+  assert.match(budgetUi.renderLoanCard(ohne), /<span>budget\.loanNextDue\{"month":"Oktober 2026"\}<\/span>/);
+  // Ein Darlehen aus einer Antwort, die das Feld noch nicht kennt (Cache), bleibt beim Monat.
+  const { next_due_date: _weg, ...alt } = tagesDarlehen();
+  assert.equal(budgetUi.loanNextDueLabel(alt), 'Oktober 2026');
+
+  // Getilgt: keine naechste Rate, auch mit Faelligkeitstag.
+  const getilgt = tagesDarlehen({ is_settled: true, next_due_month: null, next_due_date: null, next_installment_number: null });
+  assert.equal(budgetUi.loanNextDueLabel(getilgt), 'budget.loanPaidStatus');
+});
+
+/**
+ * "Als bezahlt markieren" als Programm: der echte markLoanPayment() gegen einen
+ * API-Stub, der mitschreibt, was gesendet wird, und einen Toast, der mitschreibt,
+ * was die Seite sagt.
+ */
+async function markiere(loan) {
+  const posts = [];
+  const toasts = [];
+  const apiBefore = globalThis.__apiStub;
+  const yuvomiBefore = global.window.yuvomi;
+  const saved = { ...budgetUi.state };
+  const loans = { loans: [loan], summary: {} };
+  globalThis.__apiStub = {
+    post: async (url, body) => { posts.push([url, body]); return { data: { payment: { id: 55 } } }; },
+    get: async (url) => (url === '/budget/loans' ? { data: loans } : { data: url.startsWith('/budget/summary') ? {} : [] }),
+  };
+  global.window.yuvomi = { ...yuvomiBefore, showToast: (...args) => toasts.push(args) };
+  // Ein Container ohne #budget-body: renderBody() kehrt dort um, der Rest laeuft.
+  budgetUi.renderBodyForTest({ querySelector: () => null, querySelectorAll: () => [] });
+  budgetUi.state.loans = loans;
+  try {
+    await budgetUi.markLoanPayment(loan.id);
+    return { posts, toasts };
+  } finally {
+    Object.assign(budgetUi.state, saved);
+    globalThis.__apiStub = apiBefore;
+    global.window.yuvomi = yuvomiBefore;
+  }
+}
+
+test('#1631: "Als bezahlt markieren" schickt das Datum des Servers und nennt es in der Bestaetigung', async () => {
+  // Getippt am 2. November (Haushalt) fuer die Rate vom 27. Oktober.
+  await seiteAm('2026-11-01T11:00:00Z', 'Pacific/Kiritimati', async () => {
+    assert.equal(todayKey(), '2026-11-02', 'Vorbedingung: der Haushalt steht auf dem 2. November');
+    const { posts, toasts } = await markiere(tagesDarlehen());
+    assert.deepEqual(posts, [['/budget/loans/7/payments', { installment_number: 1, amount: 100, paid_date: '2026-10-27' }]]);
+    assert.equal(toasts.length, 1);
+    assert.equal(toasts[0][0], 'budget.loanPaymentAddedOnToast{"date":"2026-10-27"}', 'die Bestaetigung nennt das gebuchte Datum');
+    assert.equal(typeof toasts[0][3], 'function', 'und behaelt ihr Rueckgaengig');
+  });
+  // Frueh getippt: am 25. fuer den 27.
+  await seiteAm('2026-10-25T10:00:00Z', 'Europe/Berlin', async () => {
+    const { posts } = await markiere(tagesDarlehen());
+    assert.equal(posts[0][1].paid_date, '2026-10-27');
+  });
+});
+
+test('#1631: ohne Faelligkeitstag faellt "Als bezahlt markieren" auf den Tag des Haushalts zurueck', async () => {
+  // 01.11. 11:00 UTC: in Pacific/Kiritimati (UTC+14) ist es der 02.11. Wer den
+  // UTC-Tag naehme, schickte den 1.
+  await seiteAm('2026-11-01T11:00:00Z', 'Pacific/Kiritimati', async () => {
+    const ohne = tagesDarlehen({ due_day: null, next_due_date: null });
+    assert.equal(budgetUi.loanPaymentDate(ohne), '2026-11-02');
+    const { posts, toasts } = await markiere(ohne);
+    assert.equal(posts.length, 1);
+    assert.equal(posts[0][1].paid_date, '2026-11-02');
+    assert.equal(toasts[0][0], 'budget.loanPaymentAddedOnToast{"date":"2026-11-02"}');
+    // Auch eine Antwort ohne das Feld (alter Cache) bucht auf heute statt auf nichts.
+    const { next_due_date: _weg, ...alt } = tagesDarlehen();
+    assert.equal((await markiere(alt)).posts[0][1].paid_date, '2026-11-02');
+  });
+});
+
+/** Ein Darlehens-Dialog aus Feldwerten - nur was saveLoanFromPanel() liest. */
+function darlehensPanel(werte) {
+  const felder = Object.fromEntries(Object.entries(werte).map(([id, value]) => [
+    `#${id}`,
+    typeof value === 'object' ? { id, ...value } : { id, value, validity: { badInput: false } },
+  ]));
+  return { querySelector: (sel) => felder[sel] ?? null, querySelectorAll: () => [] };
+}
+
+async function speichere(werte, { loan = null } = {}) {
+  const sent = [];
+  const marks = [];
+  const apiBefore = globalThis.__apiStub;
+  const yuvomiBefore = global.window.yuvomi;
+  const saved = { ...budgetUi.state };
+  const write = async (url, body) => { sent.push([url, body]); return { data: {} }; };
+  globalThis.__apiStub = {
+    post: write, put: write,
+    get: async (url) => ({ data: url === '/budget/loans' ? { loans: [], summary: {} } : (url.startsWith('/budget/summary') ? {} : []) }),
+  };
+  globalThis.__reportFieldError = (input, message) => marks.push([input.id, message]);
+  global.window.yuvomi = { ...yuvomiBefore, showToast() {} };
+  budgetUi.renderBodyForTest({ querySelector: () => null, querySelectorAll: () => [] });
+  try {
+    await budgetUi.saveLoanFromPanel(darlehensPanel({
+      'lm-borrower': 'Bank', 'lm-title': 'Autokredit', 'lm-start': '2026-10', 'lm-notes': '',
+      'lm-amount': '1200', 'lm-installments': '12', 'lm-direction': 'borrowed', ...werte,
+    }), { disabled: false, textContent: '' }, { loan });
+    return { sent, marks };
+  } finally {
+    Object.assign(budgetUi.state, saved);
+    globalThis.__apiStub = apiBefore;
+    global.window.yuvomi = yuvomiBefore;
+    delete globalThis.__reportFieldError;
+  }
+}
+
+test('#1631: der Dialog hat EIN optionales Feld fuer den Faelligkeitstag, 1 bis 31', () => {
+  const neu = budgetUi.loanFormFieldsHtml(null, { startMonth: '2026-03' });
+  const feld = neu.match(/<input[^>]*id="lm-due-day"[^>]*>/)?.[0] ?? '';
+  assert.equal([...neu.matchAll(/id="lm-due-day"/g)].length, 1, 'genau ein Feld');
+  assert.match(feld, /type="number"/);
+  assert.match(feld, /min="1" max="31"/);
+  assert.match(feld, /step="1"/);
+  assert.match(feld, /value=""/, 'neu: leer, also kein Tag');
+  assert.match(neu, /<label class="form-label" for="lm-due-day">budget\.loanDueDayLabel<\/label>/,
+    'beschriftet und ohne Pflichtzeichen');
+  assert.match(feld, /aria-describedby="lm-due-day-hint"/);
+  assert.match(neu, /id="lm-due-day-hint">budget\.loanDueDayHint</);
+
+  const bestehend = budgetUi.loanFormFieldsHtml(
+    { id: 1, title: 'Auto', borrower: 'Bank', total_amount: 1200, installment_count: 12, start_month: '2025-01', due_day: 27 },
+    { startMonth: '2026-03' },
+  );
+  assert.match(bestehend, /id="lm-due-day"[^>]*value="27"/, 'Bearbeiten zeigt den gespeicherten Tag');
+});
+
+test('#1631: Speichern schickt den Tag als Zahl, ein leeres Feld als null', async () => {
+  const mit = await speichere({ 'lm-due-day': '27' });
+  assert.equal(mit.sent.length, 1);
+  assert.equal(mit.sent[0][0], '/budget/loans');
+  assert.strictEqual(mit.sent[0][1].due_day, 27);
+  assert.deepEqual(mit.marks, []);
+
+  const leer = await speichere({ 'lm-due-day': '' });
+  assert.strictEqual(leer.sent[0][1].due_day, null);
+
+  // Bearbeiten: ein geleertes Feld nimmt den Tag wieder weg - null, nicht "fehlt".
+  const weg = await speichere({ 'lm-due-day': '' }, { loan: { id: 4, total_amount: 1200, due_day: 27 } });
+  assert.equal(weg.sent[0][0], '/budget/loans/4');
+  assert.ok('due_day' in weg.sent[0][1]);
+  assert.strictEqual(weg.sent[0][1].due_day, null);
+});
+
+test('#1631: ein ungueltiger Tag wird am Feld gemeldet und nicht gesendet', async () => {
+  for (const value of ['0', '32', '1.5', '-1']) {
+    const out = await speichere({ 'lm-due-day': value });
+    assert.deepEqual(out.sent, [], `"${value}" geht nicht an den Server`);
+    assert.deepEqual(out.marks, [['lm-due-day', 'budget.loanDueDayInvalid']], `"${value}" steht am Feld`);
+  }
+  // Unlesbares ("abc") liefert ein type=number-Feld als '' mit badInput.
+  const unlesbar = await speichere({ 'lm-due-day': { value: '', validity: { badInput: true } } });
+  assert.deepEqual(unlesbar.sent, []);
+  assert.deepEqual(unlesbar.marks, [['lm-due-day', 'budget.loanDueDayInvalid']]);
+});
+
+test('#1631: die Absage des Servers zu einem ungueltigen Tag steht am Feld, im Satz der Oberflaeche', () => withOnline(() => {
+  const err = { status: 400, message: SERVER_SENTENCE, data: { error: SERVER_SENTENCE, code: 400, reason: 'loan_due_day_invalid' } };
+  assert.deepEqual(budgetUi.loanSaveError(err), { fields: '#lm-due-day', message: 'budget.loanDueDayInvalid' });
+}));
+
+test('#1631: die neuen Saetze stehen in jeder Sprache, uebersetzt und mit ihrem Platzhalter', () => {
+  const dir = new URL('../public/locales/', import.meta.url);
+  const files = readdirSync(dir).filter((name) => name.endsWith('.json'));
+  assert.ok(files.length >= 26, `zu wenige Sprachdateien gelesen (${files.length})`);
+  const locales = new Map(files.map((name) => [name, JSON.parse(readFileSync(new URL(name, dir), 'utf8')).budget]));
+  for (const key of ['loanDueDayLabel', 'loanDueDayHint', 'loanDueDayInvalid', 'loanPaymentAddedOnToast']) {
+    for (const [name, budgetKeys] of locales) {
+      const text = budgetKeys[key];
+      assert.ok(typeof text === 'string' && text.trim().length > 0, `${name}: budget.${key} fehlt`);
+      assert.doesNotMatch(text, /[–—]/, `${name}: budget.${key} traegt einen Gedankenstrich`);
+      if (key === 'loanPaymentAddedOnToast') assert.match(text, /\{\{date\}\}/, `${name}: der Platzhalter fehlt`);
+      if (name === 'de.json' || name === 'en.json') continue;
+      assert.notEqual(text, locales.get('de.json')[key], `${name}: budget.${key} ist der deutsche Satz`);
+      assert.notEqual(text, locales.get('en.json')[key], `${name}: budget.${key} ist der englische Satz`);
+    }
+  }
 });

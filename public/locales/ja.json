@@ -1715,7 +1715,11 @@
         "handoverToSplit": "共有支出に移す",
         "loanRemainingInstallmentsForecast": "{{forecast}}（計画: {{plan}}）",
         "detailDateLabel": "日付",
-        "loanDetailStartMonthLabel": "初回支払月"
+        "loanDetailStartMonthLabel": "初回支払月",
+        "loanDueDayLabel": "支払日",
+        "loanDueDayHint": "任意：毎月の日付（1から31）。返済済みにした回は、今日ではなくこの日付で記録されます。日数の少ない月は末日になります。",
+        "loanDueDayInvalid": "1から31の日付を入力するか、空欄にしてください",
+        "loanPaymentAddedOnToast": "{{date}}付で返済を記録しました"
     },
     "settings": {
         "healthCycleEnableLabel": "周期タブを表示",

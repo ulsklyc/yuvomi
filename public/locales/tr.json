@@ -1715,7 +1715,11 @@
         "handoverToSplit": "Paylaşılan giderlere aktar",
         "loanRemainingInstallmentsForecast": "{{forecast}} (plana göre: {{plan}})",
         "detailDateLabel": "Tarih",
-        "loanDetailStartMonthLabel": "İlk vade ayı"
+        "loanDetailStartMonthLabel": "İlk vade ayı",
+        "loanDueDayLabel": "Vade günü",
+        "loanDueDayHint": "İsteğe bağlı: ayın günü, 1 ile 31 arası. Ödendi olarak işaretlenen taksitler bugün yerine bu günün tarihiyle kaydedilir. Daha kısa aylarda son gün geçerlidir.",
+        "loanDueDayInvalid": "1 ile 31 arasında bir gün girin veya boş bırakın",
+        "loanPaymentAddedOnToast": "Ödeme {{date}} tarihiyle kaydedildi"
     },
     "settings": {
         "healthCycleEnableLabel": "Döngü sekmesini göster",

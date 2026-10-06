@@ -2701,8 +2701,8 @@ function openLoanReport(loan) {
 
 /**
  * Die Angaben des Darlehens-Dialogs, die weder die Karte noch der Bericht
- * sonst trug (#1265 P7): Konto, erster Faelligkeitsmonat, Zinsmodell samt
- * Anfangstilgung und Notizen. Der Bericht IST die Leseansicht eines Darlehens -
+ * sonst trug (#1265 P7): Konto, erster Faelligkeitsmonat, Faelligkeitstag
+ * (#1631), Zinsmodell samt Anfangstilgung und Notizen. Der Bericht IST die Leseansicht eines Darlehens -
  * die Karte oeffnet ihn fuer jeden, und bei `budget: read` ist er der einzige
  * Weg zu diesen Werten. Leere Angaben fallen weg: die Antwort folgt dem
  * Datensatz. Jeder Wert geht durch esc() - Konto und Notiz sind Eingaben.
@@ -2712,6 +2712,7 @@ function loanReportDetails(loan) {
   const rows = [
     [t('budget.loanAccountLabel'), accountName(loan.account_id), false],
     [t('budget.loanDetailStartMonthLabel'), loan.start_month ? formatMonthLabel(loan.start_month) : '', false],
+    [t('budget.loanDueDayLabel'), loan.due_day != null ? getNumberFormat().format(Number(loan.due_day)) : '', false],
     [t('budget.loanInitialRepaymentLabel'), it?.initial_repayment_rate != null
       ? getNumberFormat({ maximumFractionDigits: 2 }).format(Number(it.initial_repayment_rate)) : '', false],
     [t('budget.loanInterestModeLabel'), it ? loanInterestMeta(it, loan) : '', true],
@@ -2752,9 +2753,35 @@ function loanInterestMeta(it, loan) {
   return `${monthly} · ${phase}`;
 }
 
+/**
+ * Wann die naechste Rate faellig ist (#1631): das volle Datum, wenn das
+ * Darlehen einen Faelligkeitstag hat (der Server liefert `next_due_date`, schon
+ * auf den letzten Tag kuerzerer Monate geklemmt), sonst wie bisher der Monat.
+ * Ein getilgtes Darlehen hat keine naechste Rate.
+ */
+function loanNextDueLabel(loan) {
+  if (loan.next_due_date) return formatDate(loan.next_due_date);
+  return loan.next_due_month ? formatMonthLabel(loan.next_due_month) : t('budget.loanPaidStatus');
+}
+
+/**
+ * Das Datum, auf das "Als bezahlt markieren" die naechste Rate bucht (#1631).
+ *
+ * Mit Faelligkeitstag der Tag IM MONAT, IN DEM DIE RATE FAELLIG IST - egal, ob
+ * frueh oder spaet getippt wird: am 2. November fuer den 27. Oktober landet die
+ * Buchung im Oktober. Ohne Faelligkeitstag bleibt es bei heute, und heute ist
+ * der Tag des Haushalts (`todayKey()`), nicht der des Geraets. Der Server
+ * rechnet das Datum, die Seite reicht es nur durch.
+ *
+ * @returns {string} YYYY-MM-DD
+ */
+function loanPaymentDate(loan) {
+  return loan.next_due_date || todayKey();
+}
+
 function renderLoanCard(loan) {
   const paidPct = Math.min(100, Math.round((loan.paid_amount / loan.total_amount) * 100));
-  const nextDue = loan.next_due_month ? formatMonthLabel(loan.next_due_month) : t('budget.loanPaidStatus');
+  const nextDue = loanNextDueLabel(loan);
   // is_settled statt der Raten-Zaehlung: ein frueh volltilgtes Zins-Darlehen hat
   // noch ungebuchte Plan-Raten, aber nichts mehr zu bezahlen (#954). Der Server
   // wiese die Buchung ohnehin mit 409 ab - der Knopf soll das nicht erst anbieten.
@@ -4104,6 +4131,14 @@ function loanFormFieldsHtml(loan, { startMonth }) {
       <label class="form-label" for="lm-start">${t('budget.loanStartMonthLabel')}${REQUIRED_MARK}</label>
       <input type="month" class="form-input" id="lm-start" value="${esc(loan?.start_month ?? startMonth)}">
     </div>
+    ${/* Faelligkeitstag (#1631): optional. Leer = kein Tag, die Rate wird wie
+        * bisher auf den Tag des Abhakens gebucht. */ ''}
+    <div class="form-group">
+      <label class="form-label" for="lm-due-day">${t('budget.loanDueDayLabel')}</label>
+      <input type="number" class="form-input" id="lm-due-day" step="1" min="1" max="31"
+             inputmode="numeric" value="${loan?.due_day ?? ''}" aria-describedby="lm-due-day-hint">
+      <p class="form-hint budget-loan-hint" id="lm-due-day-hint">${t('budget.loanDueDayHint')}</p>
+    </div>
     ${isEdit ? '' : `
     <div class="form-group">
       <label class="form-label" for="lm-paid">${t('budget.loanPaidInstallmentsLabel')}</label>
@@ -4167,6 +4202,7 @@ const LOAN_REFUSALS = new Map([
   ['loan_currency_invalid', ['#lm-currency', 'budget.loanCurrencyInvalid']],
   ['loan_exchange_rate_invalid', ['#lm-exchange-rate', 'budget.loanExchangeRateRequired']],
   ['loan_account_invalid', ['#lm-account', 'budget.accountNotFound']],
+  ['loan_due_day_invalid', ['#lm-due-day', 'budget.loanDueDayInvalid']],
   ['loan_paid_installments_invalid', ['#lm-paid', 'budget.loanPaidInstallmentsInvalid']],
   ['loan_paid_installments_exceed', ['#lm-paid', 'budget.loanPaidInstallmentsTooMany', 'budget.loanPaidInstallmentsMax']],
   ['loan_term_below_paid', ['#lm-installments, #lm-initial-repayment', 'budget.loanTermBelowPaid']],
@@ -4352,6 +4388,26 @@ function readPaidInstallments(panel) {
 }
 
 /**
+ * Prueft den Faelligkeitstag am Feld, bevor etwas gesendet wird (#1631).
+ * Leer ist gueltig und heisst "kein Tag" - als `null`, damit ein Bearbeiten den
+ * Tag auch wieder wegnehmen kann.
+ *
+ * @returns {{ value: number|null }|{ invalid: true }}
+ */
+function readDueDay(panel) {
+  const field = panel.querySelector('#lm-due-day');
+  // Wie bei den gezahlten Raten: ein type=number-Feld liefert '' auch fuer
+  // Unlesbares, das sagt validity.badInput.
+  if (!field || (field.value.trim() === '' && !field.validity?.badInput)) return { value: null };
+  const value = Number(field.value);
+  if (field.value.trim() === '' || !Number.isInteger(value) || value < 1 || value > 31) {
+    reportFieldError(field, t('budget.loanDueDayInvalid'));
+    return { invalid: true };
+  }
+  return { value };
+}
+
+/**
  * Mit Zins leitet der Server die Laufzeit ab. Die Vorschau liefert genau diese
  * Zahl - hier wird sie fuer den Koerper gefragt, der gleich gespeichert wird,
  * statt eine zweite Zinsformel im Client zu fuehren oder sich auf eine Vorschau
@@ -4465,6 +4521,9 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
     if (paid.invalid) return;
     if (paid.value !== null) body.paid_installments = paid.value;
   }
+  const dueDay = readDueDay(panel);
+  if (dueDay.invalid) return;
+  body.due_day = dueDay.value;
   body.currency = currency;
   body.exchange_rate = exchange_rate;
   // Richtung (#638) und Konto: der Server leitet daraus Vorzeichen, Kategorie und
@@ -4537,14 +4596,17 @@ async function markLoanPayment(id) {
   if (readOnly()) return;
   const loan = state.loans.loans.find((item) => item.id === id);
   if (!loan?.next_installment_number) return;
-  const today = todayKey();
+  const paidDate = loanPaymentDate(loan);
+  // Die Bestaetigung nennt das Datum (#1631): gebucht wird ohne Dialog, und mit
+  // Faelligkeitstag ist es nicht der Tag, an dem getippt wurde.
+  const booked = t('budget.loanPaymentAddedOnToast', { date: formatDate(paidDate) });
   try {
     const res = await api.post(`/budget/loans/${id}/payments`, {
       installment_number: loan.next_installment_number,
       amount: loan.next_installment_number === loan.installment_count
         ? loan.remaining_amount
         : Math.min(loan.installment_amount, loan.remaining_amount),
-      paid_date: today,
+      paid_date: paidDate,
     });
     const paymentId = res.data?.payment?.id;
     await loadMonth(state.month);
@@ -4554,7 +4616,7 @@ async function markLoanPayment(id) {
     // Undo wie bei Löschungen: die eine Geld-Aktion, die eine Verpflichtung
     // *erzeugt*, bekommt dasselbe 5-Sekunden-Netz — Rücknahme löscht die Rate.
     if (paymentId) {
-      window.yuvomi?.showToast(t('budget.loanPaymentAddedToast'), 'default', 5000, async () => {
+      window.yuvomi?.showToast(booked, 'default', 5000, async () => {
         try {
           await api.delete(`/budget/loans/${id}/payments/${paymentId}`);
           await loadMonth(state.month);
@@ -4564,7 +4626,7 @@ async function markLoanPayment(id) {
         }
       });
     } else {
-      window.yuvomi?.showToast(t('budget.loanPaymentAddedToast'), 'success');
+      window.yuvomi?.showToast(booked, 'success');
     }
   } catch (err) {
     showBudgetError(err);
@@ -5061,6 +5123,12 @@ export const __test = {
   renderAccountsPage,
   renderLoansPage,
   renderLoanCard,
+  // #1631: Faelligkeitstag - das Datum der Karte und das, was "Als bezahlt
+  // markieren" wirklich schickt, als Programm.
+  loanNextDueLabel,
+  loanPaymentDate,
+  markLoanPayment,
+  saveLoanFromPanel,
   // R15 A5 P1-1: der Titelknopf oeffnet den Bericht - gemessen als Programm.
   wireLoanCards,
   renderLoanPaymentEntry,

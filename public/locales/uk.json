@@ -1863,7 +1863,11 @@
         "handoverToSplit": "Перенести до спільних витрат",
         "loanRemainingInstallmentsForecast": "{{forecast}} (план: {{plan}})",
         "detailDateLabel": "Дата",
-        "loanDetailStartMonthLabel": "Перший місяць сплати"
+        "loanDetailStartMonthLabel": "Перший місяць сплати",
+        "loanDueDayLabel": "День сплати",
+        "loanDueDayHint": "За бажанням: день місяця, від 1 до 31. Платежі, позначені як сплачені, записуються тоді цим днем, а не сьогоднішнім. У коротших місяцях береться останній день.",
+        "loanDueDayInvalid": "Вкажіть день від 1 до 31 або залиште поле порожнім",
+        "loanPaymentAddedOnToast": "Платіж записано на дату {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Показати вкладку циклу",

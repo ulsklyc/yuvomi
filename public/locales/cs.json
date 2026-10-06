@@ -1789,7 +1789,11 @@
         "handoverToSplit": "Převést do sdílených výdajů",
         "loanRemainingInstallmentsForecast": "{{forecast}} (plán: {{plan}})",
         "detailDateLabel": "Datum",
-        "loanDetailStartMonthLabel": "První měsíc splatnosti"
+        "loanDetailStartMonthLabel": "První měsíc splatnosti",
+        "loanDueDayLabel": "Den splatnosti",
+        "loanDueDayHint": "Volitelné: den v měsíci, 1 až 31. Splátky označené jako zaplacené se pak datují na tento den místo dneška. V kratších měsících platí poslední den.",
+        "loanDueDayInvalid": "Zadejte den od 1 do 31, nebo pole nechte prázdné",
+        "loanPaymentAddedOnToast": "Platba zaznamenána k datu {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Zobrazit kartu cyklu",

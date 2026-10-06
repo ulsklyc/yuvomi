@@ -142,8 +142,10 @@ test('beide Einstiege zeigen dieselben Darlehensfelder, "Bereits gezahlte Raten"
   assert.ok(overview.includes('lm-paid:input/number'),
     'der Typ "Kredit" im Eintrags-Dialog hat "Bereits gezahlte Raten" (#1648)');
   assert.deepEqual(overview, loansTab, 'dieselben Felder in derselben Reihenfolge, egal von wo');
-  assert.equal(overview.indexOf('lm-paid:input/number'), overview.indexOf('lm-start:input/month') + 1,
-    'das Feld steht direkt unter dem ersten Faelligkeitsmonat');
+  // Dazwischen steht nur der Faelligkeitstag (#1631), der zum Monat gehoert.
+  const start = overview.indexOf('lm-start:input/month');
+  assert.deepEqual(overview.slice(start + 1, start + 3), ['lm-due-day:input/number', 'lm-paid:input/number'],
+    'das Feld steht unter dem ersten Faelligkeitsmonat und seinem Tag');
 });
 
 for (const entry of Object.keys(ENTRIES)) {

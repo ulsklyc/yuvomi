@@ -1715,7 +1715,11 @@
         "handoverToSplit": "Μεταφορά στα κοινά έξοδα",
         "loanRemainingInstallmentsForecast": "{{forecast}} (σχέδιο: {{plan}})",
         "detailDateLabel": "Ημερομηνία",
-        "loanDetailStartMonthLabel": "Πρώτος μήνας λήξης"
+        "loanDetailStartMonthLabel": "Πρώτος μήνας λήξης",
+        "loanDueDayLabel": "Ημέρα λήξης",
+        "loanDueDayHint": "Προαιρετικό: ημέρα του μήνα, 1 έως 31. Οι δόσεις που σημειώνονται ως πληρωμένες παίρνουν τότε αυτή την ημέρα αντί για τη σημερινή. Στους μικρότερους μήνες ισχύει η τελευταία ημέρα.",
+        "loanDueDayInvalid": "Εισαγάγετε ημέρα από 1 έως 31 ή αφήστε το πεδίο κενό",
+        "loanPaymentAddedOnToast": "Η πληρωμή καταγράφηκε με ημερομηνία {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Εμφάνιση καρτέλας κύκλου",

@@ -1937,7 +1937,11 @@
         "handoverToSplit": "نقل إلى النفقات المشتركة",
         "loanRemainingInstallmentsForecast": "{{forecast}} (الخطة: {{plan}})",
         "detailDateLabel": "التاريخ",
-        "loanDetailStartMonthLabel": "أول شهر استحقاق"
+        "loanDetailStartMonthLabel": "أول شهر استحقاق",
+        "loanDueDayLabel": "يوم الاستحقاق",
+        "loanDueDayHint": "اختياري: يوم من الشهر، من 1 إلى 31. تُؤرَّخ الأقساط التي تُسجَّل كمدفوعة بهذا اليوم بدلاً من اليوم الحالي. في الأشهر الأقصر يُعتمد اليوم الأخير.",
+        "loanDueDayInvalid": "أدخل يوماً من 1 إلى 31 أو اترك الحقل فارغاً",
+        "loanPaymentAddedOnToast": "تم تسجيل الدفع بتاريخ {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "إظهار علامة تبويب الدورة",

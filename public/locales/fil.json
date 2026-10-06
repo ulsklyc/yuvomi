@@ -1729,7 +1729,11 @@
         "handoverToSplit": "Ilipat sa shared expenses",
         "loanRemainingInstallmentsForecast": "{{forecast}} (plano: {{plan}})",
         "detailDateLabel": "Petsa",
-        "loanDetailStartMonthLabel": "Unang buwan ng taning"
+        "loanDetailStartMonthLabel": "Unang buwan ng taning",
+        "loanDueDayLabel": "Araw ng taning",
+        "loanDueDayHint": "Opsyonal: araw ng buwan, 1 hanggang 31. Ang mga hulog na minarkahang bayad ay itatala sa araw na ito sa halip na ngayong araw. Sa mas maiikling buwan, ang huling araw ang gagamitin.",
+        "loanDueDayInvalid": "Maglagay ng araw mula 1 hanggang 31, o iwanang blangko",
+        "loanPaymentAddedOnToast": "Naitala ang bayad sa petsang {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Ipakita ang tab ng siklo",

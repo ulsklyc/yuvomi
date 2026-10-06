@@ -331,6 +331,20 @@ test('leerer Monat: ein Satz und der Knopf, keine dreifache Null (Critique 2026-
   assert.doesNotMatch(BUDGET_CODE, /budget\.loansEmptyDescription/, 'auch der Darlehen-Leerzustand verweist nicht mehr auf die +-Schaltflaeche');
 });
 
+test('Darlehenskarte mit `budget: read` und Faelligkeitstag: das volle Datum bleibt, das Buchen geht (#1631)', () => {
+  const mitTag = darlehen({ due_day: 27, next_due_month: '2026-07', next_due_date: '2026-07-27' });
+  withAccess({ budget: 'read' }, () => {
+    const html = budget.renderLoanCard(mitTag);
+    assert.match(html, /<span>budget\.loanNextDue\{"month":"2026-07-27"\}<\/span>/, 'die Faelligkeit ist Auskunft');
+    assert.doesNotMatch(html, /loan-pay|budget-loan-card__actions/);
+  });
+  withAccess({ budget: 'write' }, () => {
+    const html = budget.renderLoanCard(mitTag);
+    assert.match(html, /budget\.loanNextDue\{"month":"2026-07-27"\}/);
+    assert.match(html, /data-action="loan-pay"/);
+  });
+});
+
 test('Keine Darlehen mit `budget: read`: kein Anlegen-CTA und keine Anleitung dazu', () => {
   const vorher = budget.state.loans;
   budget.state.loans = { loans: [], summary: {} };
@@ -1405,12 +1419,14 @@ function berichtKacheln(html) {
 test('Darlehen: der Bericht zeigt jeden Wert des Darlehens-Dialogs, den Karte und Kennzahlen nicht tragen', () => {
   mitKonten([konto()], () => {
     const loan = darlehen({
-      account_id: 4, start_month: '2026-01', notes: 'Sondertilgung <jaehrlich>', currency: 'EUR',
+      account_id: 4, start_month: '2026-01', due_day: 27, notes: 'Sondertilgung <jaehrlich>', currency: 'EUR',
       interest: { mode: 'fixed', principal: 20000, fixed_rate: 3.2, initial_repayment_rate: 2, monthly_payment: 850 },
     });
     const werte = {
       'budget.loanAccountLabel': [[/<option value="4" selected>Girokonto</], /^Girokonto$/],
       'budget.loanDetailStartMonthLabel': [[/id="lm-start" value="2026-01"/], /2026/],
+      // #1631: der Faelligkeitstag steht im Dialog als Feld, im Bericht als Wert.
+      'budget.loanDueDayLabel': [[/id="lm-due-day"[^>]*value="27"/], /^27$/],
       'budget.loanInitialRepaymentLabel': [[/id="lm-initial-repayment"[^>]*value="2"/], /^2$/],
       'budget.loanInterestModeLabel': [[/<option value="fixed" selected>/, /id="lm-fixed-rate"[^>]*value="3\.2"/],
         /^budget\.loanMonthlyRate\{"amount":"850,00\s€"\} · budget\.loanRateFixed\{"rate":"3,2\s%"\}$/],
@@ -1426,6 +1442,14 @@ test('Darlehen: der Bericht zeigt jeden Wert des Darlehens-Dialogs, den Karte un
     // Der erste Faelligkeitsmonat steht als Monatsname, nicht als Schluessel.
     assert.notEqual(berichtKacheln(html)['budget.loanDetailStartMonthLabel'], '2026-01');
     assert.equal(budget.loanReportDetails(darlehen()), '', 'ohne Angaben keine leere Kachelreihe');
+    // Ohne Faelligkeitstag keine Kachel dafuer - die Antwort folgt dem Datensatz.
+    assert.ok(!('budget.loanDueDayLabel' in berichtKacheln(budget.loanReportDetails({ ...loan, due_day: null }))));
+    // Und der Bericht zeigt den Tag mit `budget: read` genauso, ohne Bedienung.
+    withAccess({ budget: 'read' }, () => {
+      const lesen = budget.loanReportDetails(loan);
+      assert.equal(berichtKacheln(lesen)['budget.loanDueDayLabel'], '27');
+      assert.doesNotMatch(lesen, /<input|<button|lm-due-day/);
+    });
   });
 });
 

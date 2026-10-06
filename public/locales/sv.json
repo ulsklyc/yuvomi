@@ -1715,7 +1715,11 @@
         "handoverToSplit": "Flytta till delade utgifter",
         "loanRemainingInstallmentsForecast": "{{forecast}} (enligt plan: {{plan}})",
         "detailDateLabel": "Datum",
-        "loanDetailStartMonthLabel": "Första förfallomånaden"
+        "loanDetailStartMonthLabel": "Första förfallomånaden",
+        "loanDueDayLabel": "Förfallodag",
+        "loanDueDayHint": "Valfritt: dag i månaden, 1 till 31. Delbetalningar som markeras som betalda dateras då på den här dagen i stället för i dag. I kortare månader gäller den sista dagen.",
+        "loanDueDayInvalid": "Ange en dag från 1 till 31, eller lämna fältet tomt",
+        "loanPaymentAddedOnToast": "Betalning registrerad med datum {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Visa cykelfliken",

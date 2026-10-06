@@ -2515,6 +2515,9 @@ Until #954 the value was a plan figure, read off the amortisation schedule at th
 | exchange_rate | REAL | NOT NULL DEFAULT 1 — fixed rate, 1 loan currency = `exchange_rate` budget currency; forced to 1 whenever `currency` is NULL (migration v102, #582) |
 | direction | TEXT | NOT NULL DEFAULT `lent` — `lent` \| `borrowed`; decides sign and category of the coupled budget entry (migration v126, #638) |
 | account_id | INTEGER | FK → Budget Accounts, nullable (ON DELETE SET NULL) — default account the instalments charge (migration v126, #638) |
+| due_day | INTEGER | nullable, CHECK 1-31 and integer — day of the month an instalment is due; NULL = no due day (#1631) |
+
+**Due day (#1631):** a loan knows the month an instalment is due (`start_month` + instalments paid) and, optionally, the day. The loan response carries both derived values: `next_due_month` (`YYYY-MM`, `null` once the loan is settled) and `next_due_date` (`YYYY-MM-DD`, `null` without a due day or once settled). `next_due_date` is the due day in `next_due_month`, clamped to the last day of a shorter month (31 becomes 30 April, 28 or 29 February); the clamping lives in one place, `dueDateInMonth()` in `server/routes/budget/helpers.js`, and does not depend on the clock or on a time zone. "Mark paid" in the interface sends `next_due_date` as `paid_date` and falls back to the household's today when it is `null`, so an instalment marked early or late is dated on its due day in the month it is due (marked on 2 November for 27 October, it lands in October). The payment endpoint itself is unchanged: `paid_date` stays required and is stored as sent. `POST`/`PUT /loans` accept `due_day` as a whole number from 1 to 31, `null` or an empty string for "none"; anything else is a 400 with `reason: loan_due_day_invalid`. Changing or removing the day never touches instalments that are already recorded. An entry booked ahead of its date counts in the month's totals, statistics and plan at once; an account's `current_balance` counts it from its date on (`projected_balance` at once).
 
 ### Budget Loan Payments
 Individual payment records for a budget loan. Each installment number is unique per loan.
@@ -2530,7 +2533,8 @@ Individual payment records for a budget loan. Each installment number is unique 
 
 **Backfilling a running loan (#813):** `POST /loans` accepts an optional `paid_installments` count and
 writes that many payment rows straight away, numbered from 1, dated to their own due month
-(`start_month` + n-1), each carrying the loan's `installment_amount` with the last one capped at the
+(`start_month` + n-1; on the loan's due day if it has one, clamped like `next_due_date`, otherwise
+on the 1st, #1631), each carrying the loan's `installment_amount` with the last one capped at the
 remaining total. Those rows deliberately have **no coupled budget entry**: a regular installment books
 into the budget because it is being paid now, whereas these were paid before Yuvomi existed and never
 went through the household — booking them would fill past months with expenses that never happened and

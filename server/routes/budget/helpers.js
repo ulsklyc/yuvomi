@@ -694,6 +694,30 @@ export function addMonths(ym, n) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/**
+ * Der Faelligkeitstag eines Darlehens in einem Monat, als Tagesschluessel (#1631).
+ *
+ * DIE EINE STELLE, AN DER GEKLEMMT WIRD: ein Tag, den der Monat nicht hat, wird
+ * zu dessen letztem - der 31. im April zum 30., im Februar zum 28. oder 29.
+ * Gerechnet wird am Schluessel, nicht an einem Zeitpunkt: `Date.UTC(y, m, 0)`
+ * fragt nur nach der Laenge des Monats, eine Zone kommt nicht vor, und "heute"
+ * auch nicht - der Faelligkeitstag einer Rate haengt nicht daran, wann jemand
+ * fragt.
+ *
+ * @param {string} ym       Monat "YYYY-MM"
+ * @param {unknown} dueDay  1 bis 31; alles andere heisst "kein Faelligkeitstag"
+ * @returns {string|null}   "YYYY-MM-DD" oder null
+ */
+export function dueDateInMonth(ym, dueDay) {
+  if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31) return null;
+  const match = /^(\d{4})-(\d{2})$/.exec(String(ym ?? ''));
+  if (!match) return null;
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) return null;
+  const lastDay = new Date(Date.UTC(Number(match[1]), month, 0)).getUTCDate();
+  return `${match[1]}-${match[2]}-${String(Math.min(dueDay, lastDay)).padStart(2, '0')}`;
+}
+
 export function cents(value) {
   return Math.round(Number(value || 0) * 100) / 100;
 }
@@ -804,6 +828,8 @@ export function loanSummaryRow(loan, baseCurrency = budgetCurrency()) {
   const currency = loan.currency || baseCurrency;
   const rate = currency === baseCurrency ? 1 : loanRate(loan);
 
+  const nextDueMonth = !settled ? addMonths(loan.start_month, paidInstallments) : null;
+
   return {
     ...loan,
     currency,
@@ -822,7 +848,11 @@ export function loanSummaryRow(loan, baseCurrency = budgetCurrency()) {
     remaining_installments_forecast: forecastRemainingInstallments(loan, interest, paidInstallments),
     is_settled: settled,
     next_installment_number: !settled ? paidInstallments + 1 : null,
-    next_due_month: !settled ? addMonths(loan.start_month, paidInstallments) : null,
+    next_due_month: nextDueMonth,
+    // Der Tag dazu (#1631), wenn das Darlehen einen nennt - sonst null, und
+    // "Als bezahlt markieren" bleibt bei heute. Die Oberflaeche reicht den Wert
+    // als paid_date durch, statt selbst zu klemmen.
+    next_due_date: nextDueMonth ? dueDateInMonth(nextDueMonth, loan.due_day) : null,
     interest,
     payments,
   };

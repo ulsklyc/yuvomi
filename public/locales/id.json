@@ -1729,7 +1729,11 @@
         "handoverToSplit": "Pindahkan ke pengeluaran bersama",
         "loanRemainingInstallmentsForecast": "{{forecast}} (rencana: {{plan}})",
         "detailDateLabel": "Tanggal",
-        "loanDetailStartMonthLabel": "Bulan jatuh tempo pertama"
+        "loanDetailStartMonthLabel": "Bulan jatuh tempo pertama",
+        "loanDueDayLabel": "Hari jatuh tempo",
+        "loanDueDayHint": "Opsional: tanggal dalam bulan, 1 sampai 31. Cicilan yang ditandai terbayar akan diberi tanggal ini, bukan hari ini. Pada bulan yang lebih pendek berlaku hari terakhir.",
+        "loanDueDayInvalid": "Masukkan tanggal dari 1 sampai 31, atau kosongkan",
+        "loanPaymentAddedOnToast": "Pembayaran dicatat per {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Tampilkan tab siklus",

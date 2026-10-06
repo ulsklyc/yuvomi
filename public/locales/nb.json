@@ -1715,7 +1715,11 @@
         "handoverToSplit": "Flytt til Split Expenses",
         "loanRemainingInstallmentsForecast": "{{forecast}} (plan: {{plan}})",
         "detailDateLabel": "Dato",
-        "loanDetailStartMonthLabel": "Første forfallsmåned"
+        "loanDetailStartMonthLabel": "Første forfallsmåned",
+        "loanDueDayLabel": "Forfallsdag",
+        "loanDueDayHint": "Valgfritt: dag i måneden, 1 til 31. Avdrag som markeres som betalt, dateres da på denne dagen i stedet for i dag. I kortere måneder gjelder den siste dagen.",
+        "loanDueDayInvalid": "Angi en dag fra 1 til 31, eller la feltet stå tomt",
+        "loanPaymentAddedOnToast": "Betaling registrert med dato {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Vis syklusfane",

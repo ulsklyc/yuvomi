@@ -1715,7 +1715,11 @@
         "handoverToSplit": "转入共享支出",
         "loanRemainingInstallmentsForecast": "{{forecast}}（计划：{{plan}}）",
         "detailDateLabel": "日期",
-        "loanDetailStartMonthLabel": "首期月份"
+        "loanDetailStartMonthLabel": "首期月份",
+        "loanDueDayLabel": "还款日",
+        "loanDueDayHint": "可选：每月的日期，1 到 31。标记为已还的期数将记在这一天，而不是今天。天数较少的月份取最后一天。",
+        "loanDueDayInvalid": "请输入 1 到 31 之间的日期，或留空",
+        "loanPaymentAddedOnToast": "还款已记录，日期为 {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "显示周期标签页",

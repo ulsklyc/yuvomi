@@ -1715,7 +1715,11 @@
         "handoverToSplit": "Chuyển sang chi tiêu chung",
         "loanRemainingInstallmentsForecast": "{{forecast}} (kế hoạch: {{plan}})",
         "detailDateLabel": "Ngày",
-        "loanDetailStartMonthLabel": "Tháng đáo hạn đầu tiên"
+        "loanDetailStartMonthLabel": "Tháng đáo hạn đầu tiên",
+        "loanDueDayLabel": "Ngày đáo hạn",
+        "loanDueDayHint": "Tùy chọn: ngày trong tháng, từ 1 đến 31. Các kỳ được đánh dấu đã trả sẽ được ghi vào ngày này thay vì hôm nay. Với tháng ngắn hơn, ngày cuối tháng được áp dụng.",
+        "loanDueDayInvalid": "Nhập ngày từ 1 đến 31 hoặc để trống",
+        "loanPaymentAddedOnToast": "Đã ghi nhận thanh toán vào ngày {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Hiện tab chu kỳ",

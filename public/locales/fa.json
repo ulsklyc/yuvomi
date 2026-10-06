@@ -1729,7 +1729,11 @@
         "handoverToSplit": "انتقال به هزینه‌های مشترک",
         "loanRemainingInstallmentsForecast": "{{forecast}} (طرح: {{plan}})",
         "detailDateLabel": "تاریخ",
-        "loanDetailStartMonthLabel": "اولین ماه سررسید"
+        "loanDetailStartMonthLabel": "اولین ماه سررسید",
+        "loanDueDayLabel": "روز سررسید",
+        "loanDueDayHint": "اختیاری: روزی از ماه، از 1 تا 31. اقساطی که پرداخت‌شده علامت می‌خورند به جای امروز با این روز ثبت می‌شوند. در ماه‌های کوتاه‌تر آخرین روز ماه در نظر گرفته می‌شود.",
+        "loanDueDayInvalid": "روزی از 1 تا 31 وارد کنید یا خالی بگذارید",
+        "loanPaymentAddedOnToast": "پرداخت با تاریخ {{date}} ثبت شد"
     },
     "settings": {
         "healthCycleEnableLabel": "نمایش برگهٔ چرخه",

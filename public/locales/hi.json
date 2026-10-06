@@ -1715,7 +1715,11 @@
         "handoverToSplit": "साझा खर्च में ले जाएं",
         "loanRemainingInstallmentsForecast": "{{forecast}} (योजना: {{plan}})",
         "detailDateLabel": "तारीख",
-        "loanDetailStartMonthLabel": "पहला देय महीना"
+        "loanDetailStartMonthLabel": "पहला देय महीना",
+        "loanDueDayLabel": "देय दिन",
+        "loanDueDayHint": "वैकल्पिक: महीने का दिन, 1 से 31 तक। भुगतान दर्ज की गई किस्तें तब आज की जगह इसी दिन की तारीख पर दर्ज होती हैं। छोटे महीनों में आख़िरी दिन लागू होता है।",
+        "loanDueDayInvalid": "1 से 31 तक का दिन दर्ज करें या खाली छोड़ें",
+        "loanPaymentAddedOnToast": "भुगतान {{date}} की तारीख पर दर्ज किया गया"
     },
     "settings": {
         "healthCycleEnableLabel": "चक्र टैब दिखाएँ",

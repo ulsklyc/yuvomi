@@ -1715,7 +1715,11 @@
         "handoverToSplit": "Passa alle spese condivise",
         "loanRemainingInstallmentsForecast": "{{forecast}} (piano: {{plan}})",
         "detailDateLabel": "Data",
-        "loanDetailStartMonthLabel": "Primo mese di scadenza"
+        "loanDetailStartMonthLabel": "Primo mese di scadenza",
+        "loanDueDayLabel": "Giorno di scadenza",
+        "loanDueDayHint": "Facoltativo: giorno del mese, da 1 a 31. Le rate segnate come pagate vengono allora datate a questo giorno invece che a oggi. Nei mesi più corti vale il giorno finale del mese.",
+        "loanDueDayInvalid": "Inserisci un giorno da 1 a 31 oppure lascia il campo vuoto",
+        "loanPaymentAddedOnToast": "Pagamento registrato in data {{date}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Mostra la scheda ciclo",
