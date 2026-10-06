@@ -1519,6 +1519,19 @@
   text-align: start;
   color: var(--color-text-primary);
   margin-bottom: var(--space-2);
+  /* EIN TITEL OHNE LEERZEICHEN BRICHT IN DER KARTE UM (#1607). Ohne diese Zeile
+   * hat ein langes Wort - eine Adresse, ein zusammengesetztes Wort, 200 mal
+   * derselbe Buchstabe - keine Stelle, an der es umbrechen darf, und lief aus
+   * der Karte: gemessen 2092px Titel in einer 188px breiten Spalte, quer ueber
+   * die Nachbarspalten. Normale Titel brechen weiter an ihren Leerzeichen;
+   * mitten im Wort wird nur getrennt, wenn es allein keine Zeile fuellt.
+   * In der mobilen Zeile (unten, `nowrap` mit Ellipse) greift das nicht.
+   * Mit Silbentrennung davor (test:typography, W1): ein langes Wort, das die
+   * Sprache der Oberflaeche kennt, bekommt seinen Strich an einer Silbengrenze,
+   * und `anywhere` bleibt die letzte Stufe fuer alles ohne Trennstelle. */
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
 }
 
 .kanban-card--done .kanban-card__title {

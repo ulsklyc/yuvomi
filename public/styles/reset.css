@@ -49,6 +49,30 @@ html {
   height: 100%;
 }
 
+/* KOREANISCH BRICHT AN DER WORTGRENZE, NICHT ZWISCHEN ZWEI SILBEN (#1607).
+ * Der Browser behandelt Hangul wie chinesische Schrift und darf zwischen je zwei
+ * Zeichen umbrechen; Koreanisch trennt seine Woerter aber mit Leerzeichen.
+ * Gemessen bei 375px im Blatt "Darstellung": "선택합니 / 다.", "6 / 시까지는",
+ * "다 / 른" - eine einzelne Silbe allein auf der naechsten Zeile, 68 solche
+ * Stellen in 27 von 46 Ansichten. `keep-all` nimmt genau diese Stellen weg.
+ *
+ * NUR FUER `ko`, und am Wurzelelement statt an jedem Element: Japanisch und
+ * Chinesisch schreiben ohne Leerzeichen, dort waere jeder Satz EIN Wort - und
+ * `html:lang(ko)` trifft nur `<html>` (i18n.js setzt `lang` beim Sprachwechsel),
+ * alles darunter erbt, und jede Regel, die an ihrem Element selbst etwas anderes
+ * sagt, gewinnt weiter.
+ *
+ * `overflow-wrap` GEHOERT DAZU: mit `keep-all` hat ein Wort, das breiter ist
+ * als seine Zeile, keine Umbruchstelle mehr (ein Titel aus 200 Silben ohne
+ * Leerzeichen liefe aus seiner Karte). `break-word` und nicht `anywhere`: es
+ * trennt erst, wenn das Wort allein nicht passt, und laesst die Mindestbreite
+ * eines Elements beim laengsten Wort - `anywhere` zoege sie auf ein Zeichen
+ * zusammen (list-row.css beschreibt, was das in einer Flex-Zeile anrichtet). */
+html:lang(ko) {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
 body {
   /* Dieselbe Kette wie an .app-shell in layout.css, mit der Begruendung dort
    * (#1276): 100dvh, wo der Browser dvh kennt; sonst -webkit-fill-available,

@@ -641,6 +641,27 @@
   --chart-inset: max(0px, calc((var(--space-16) * 600 - 100% * 56) / 544));
 }
 
+/* DER GUTTER FOLGT DEM BREITESTEN WERT, WO ER GEMESSEN IST (#1607). Die
+ * Mindestbreite oben ist an "5.550 €" bemessen; "₩6,000,000" ist in derselben
+ * 12px-Schrift 67px breit und stand links ausserhalb seines Scrollports.
+ * `fitChartGutter()` (utils/chart.js) schreibt die Breite des breitesten
+ * Y-Werts als `--chart-label-width` an das Elternelement des SVG und gibt ihm
+ * diese Klasse. Der Wert steht rechtsbuendig bei PAD_L - AXIS_GAP = 50
+ * Einheiten; damit sein linkes Ende im Bild bleibt, muss gelten
+ *   inset + 50 * (P - inset) / W >= L,  also  inset >= (L * W - P * 50) / (W - 50),
+ * L = Breite des Werts plus var(--space-1) Luft zur Kante. Die Mindestbreite
+ * bleibt als untere Grenze stehen: ein Diagramm mit kurzen Werten steht genau
+ * dort, wo es vorher stand. Die Formel steht ein zweites Mal hier und nicht in
+ * `:root`, weil eine Variable dort aufgeloest wird, wo sie deklariert ist - in
+ * `:root` saehe sie die Breite nie, die erst an diesem Element haengt. */
+.chart-host {
+  --chart-inset: max(
+    0px,
+    calc((var(--space-16) * 600 - 100% * 56) / 544),
+    calc(((var(--chart-label-width, 0px) + var(--space-1)) * 600 - 100% * 50) / 550)
+  );
+}
+
 svg.chart {
   box-sizing: content-box;
   width: calc(100% - var(--chart-inset));
