@@ -17,6 +17,7 @@
         "moreActions": "その他の操作",
         "moreActionsNamed": "{{name}} のその他の操作",
         "editNamed": "{{name}} を編集",
+        "showDetails": "詳細を表示",
         "deleteNamed": "{{name}} を削除",
         "removeNamed": "{{name}} を外す",
         "filters": "フィルター",

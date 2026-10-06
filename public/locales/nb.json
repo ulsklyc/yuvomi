@@ -17,6 +17,7 @@
         "moreActions": "Flere handlinger",
         "moreActionsNamed": "Flere handlinger for {{name}}",
         "editNamed": "Rediger {{name}}",
+        "showDetails": "Vis detaljer",
         "deleteNamed": "Slett {{name}}",
         "removeNamed": "Fjern {{name}}",
         "filters": "Filtre",

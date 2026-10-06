@@ -17,6 +17,7 @@
         "moreActions": "Higit pang aksyon",
         "moreActionsNamed": "Higit pang aksyon para sa {{name}}",
         "editNamed": "I-edit ang {{name}}",
+        "showDetails": "Ipakita ang mga detalye",
         "deleteNamed": "Tanggalin ang {{name}}",
         "removeNamed": "Alisin ang {{name}}",
         "filters": "Mga filter",

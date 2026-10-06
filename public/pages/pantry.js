@@ -10,6 +10,7 @@
 import { api } from '/api.js';
 import { t, getNumberFormat, formatDate } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { readRowHtml, readRowHintEl } from '/utils/read-row.js';
 import {
   openModal as openSharedModal,
   closeModal as closeSharedModal,
@@ -985,8 +986,11 @@ function rowEl(item) {
   main.appendChild(meta);
 
   // Was der Button tut - nur für Screenreader, am Ende des Namens. Bei `read`
-  // entfaellt der Zusatz: „Bearbeiten" verspraeche, was der Tipp nicht tut.
-  if (!ro) {
+  // waere „Bearbeiten" ein Versprechen, das der Tipp nicht haelt; dort sagt
+  // der geteilte Zusatz, dass die Zeile ihre Details zeigt (#1682).
+  if (ro) {
+    main.appendChild(readRowHintEl());
+  } else {
     const action = document.createElement('span');
     action.className = 'sr-only';
     action.textContent = t('common.edit');
@@ -1383,24 +1387,6 @@ async function sendToShopping(items, btn) {
 // --------------------------------------------------------
 // Artikel-Formular
 // --------------------------------------------------------
-
-/**
- * Eine Zeile der Leseansicht - das Markup von `detailRowEl()` aus
- * components/detail-view.js (Icon, Beschriftung, Wert), als Zeichenkette wie
- * in shopping.js und birthdays.js. Ohne Wert keine Zeile: ein Strich waere ein
- * Wert, den es nicht gibt.
- */
-function readRowHtml({ icon, label, value, multiline = false }) {
-  if (!value) return '';
-  return `
-        <div class="detail-row${multiline ? ' detail-row--multiline' : ''}">
-          <i class="detail-row__icon" data-lucide="${icon}" aria-hidden="true"></i>
-          <div class="detail-row__text">
-            <span class="detail-row__label">${esc(label)}</span>
-            <span class="detail-row__value">${esc(value)}</span>
-          </div>
-        </div>`;
-}
 
 /**
  * Der Artikel bei `pantry: read`: Leseansicht, sonst nichts (Regel 9, Bauart

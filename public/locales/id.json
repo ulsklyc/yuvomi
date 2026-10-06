@@ -17,6 +17,7 @@
         "moreActions": "Tindakan lain",
         "moreActionsNamed": "Tindakan lain untuk {{name}}",
         "editNamed": "Ubah {{name}}",
+        "showDetails": "Tampilkan detail",
         "deleteNamed": "Hapus {{name}}",
         "removeNamed": "Lepaskan {{name}}",
         "filters": "Filter",

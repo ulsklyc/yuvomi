@@ -17,6 +17,7 @@
         "moreActions": "További műveletek",
         "moreActionsNamed": "További műveletek: {{name}}",
         "editNamed": "{{name}} szerkesztése",
+        "showDetails": "Részletek megjelenítése",
         "deleteNamed": "{{name}} törlése",
         "removeNamed": "{{name}} eltávolítása",
         "filters": "Szűrők",

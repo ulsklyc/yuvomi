@@ -17,6 +17,7 @@
         "moreActions": "Fler åtgärder",
         "moreActionsNamed": "Fler åtgärder för {{name}}",
         "editNamed": "Redigera {{name}}",
+        "showDetails": "Visa detaljer",
         "deleteNamed": "Radera {{name}}",
         "removeNamed": "Ta bort {{name}}",
         "filters": "Filter",

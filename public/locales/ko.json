@@ -17,6 +17,7 @@
         "moreActions": "추가 작업",
         "moreActionsNamed": "{{name}} 추가 작업",
         "editNamed": "{{name}} 편집",
+        "showDetails": "상세 보기",
         "deleteNamed": "{{name}} 삭제",
         "removeNamed": "{{name}} 제거",
         "filters": "필터",

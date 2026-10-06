@@ -54,6 +54,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Overlapping events in the day and week view are placed by person, not by start time**
+  (D#1605, #1633). Events at the same time used to be packed by the clock alone: whoever
+  started first stood on the left, so the same person could be left at nine and right at
+  eleven, and two events with the same start and end could swap places from one load to the
+  next. Now every person in a group of overlapping events gets a column of their own, in the
+  order in which the household's members are listed - the order of the people filter. An event with several people stands where the first of them in
+  that order stands; events of people who are not household members follow after the members,
+  and an event with nobody assigned comes last. Two events of the same person at the same
+  time stand next to each other. Nothing is reserved: an event that overlaps nothing keeps
+  the full width, and a person who is not part of a group takes no room in it. The price is
+  width in a chain: with 9:00-10:00, 9:30-11:00 and 10:30-12:00 for three people, the third
+  used to take the place the first had left and the group was two columns wide; now it is
+  three, because the third may not stand in the first one's column, and a longer chain of
+  different people grows by a column per person. Schedule blocks, the all-day row, the month
+  and the agenda are unchanged.
+
 - **Two people with the same initials no longer look the same** (#1464). Linda Johnson and Leo
   Johnson both showed "LJ" on their avatars, in the people picker, in avatar stacks and on the
   overview, and colour was the only difference. Whoever shares their initials with somebody
@@ -297,6 +313,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ("Overview, Plan, Home") and now simply says the modules are sorted within their group. In
   German, the empty waste page read "Papier -, um".
 
+- **Resuming a paused recurring shared expense no longer books every date it missed** (#1647).
+  A recurring expense that was paused for six months and then resumed got six expenses within
+  six hours, one per hourly run, each with its original date. Resuming now skips the missed
+  dates: the series continues at its next date that is not in the past, in its own rhythm, and
+  nothing is booked for the time it was paused. A date that falls on today is still booked.
+  The app has no control for this yet, so it concerns API clients: this changes what
+  `POST /api/v1/split-expenses/recurring/{id}/pause` does by default when it resumes. To get
+  the previous behaviour, send `{ "missed": "book" }`; `"skip"` is the default, and any other
+  value answers 400 with `reason: "invalid_missed"`.
+
 - **An avatar never shows more than one character per name part** (#1464). A name starting
   with "ß" put three letters on the disc ("ßeta Schmidt" showed "SSS"), because writing a
   letter in capitals can turn it into two; the same went for the ligatures "ﬁ" and "ﬂ". The
@@ -494,6 +520,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "₩6,000,000" was cut off at its currency sign, on a phone and on a desktop alike. The
   chart now measures its amounts and leaves them the room they need, whatever the currency
   and region; a chart with short amounts looks exactly as before.
+
+- **With read-only access, a screen reader now says that a row opens its details** (#1682).
+  In the pantry and under Birthdays, a row announced only its content when you may read
+  but not change: with write access it ends on "Edit", and with read access that word was
+  removed and nothing took its place. The row now ends on "Show details". The info button of
+  a shopping item says the same, followed by the item's name. Along with it, in the pantry on
+  a narrow phone: a row with a cart button hid its best-before date to make room for the
+  plus and minus buttons. A read-only row has no such buttons, so the date stays visible
+  there. Behind the scenes the three read views (birthdays, shopping, pantry) now draw their
+  rows with one shared building block instead of three copies.
 
 ## [2.73.0] - 2026-10-04
 

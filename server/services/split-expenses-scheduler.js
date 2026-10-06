@@ -19,6 +19,32 @@ function addInterval(dateText, frequency) {
   return date.toISOString().slice(0, 10);
 }
 
+// Der erste Termin der Serie, der nicht vor `today` liegt, gezaehlt ab
+// `dateText` in ganzen Intervallen - mit addInterval, also mit genau der
+// Rechnung, mit der der Lauf nach jeder Buchung weiterrueckt. Bewusst gezaehlt
+// und nicht gesprungen: addInterval laesst einen Monatstermin am 31. in den
+// Folgemonat ueberlaufen (31.01. -> 03.03. -> 03.04.), der naechste Termin
+// haengt also vom vorigen ab und nicht nur vom Starttag. Ein Sprung
+// "Starttag + n Monate" laege neben dem Raster, das der Lauf selbst gebucht
+// haette.
+//
+// `skipped` zaehlt die uebergangenen Termine. Ein Termin am Tag `today` gilt
+// nicht als versaeumt: der naechste Lauf bucht ihn.
+function nextRunNotBefore(dateText, frequency, today) {
+  // Ein Datum, das keins ist, oder ein Rhythmus, der nicht vorrueckt, bleibt
+  // stehen, statt zu werfen oder endlos zu zaehlen.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateText)) || !/^\d{4}-\d{2}-\d{2}$/.test(String(today))) return { date: dateText, skipped: 0 };
+  let date = dateText;
+  let skipped = 0;
+  while (date < today) {
+    const next = addInterval(date, frequency);
+    if (!(next > date)) break;
+    date = next;
+    skipped += 1;
+  }
+  return { date, skipped };
+}
+
 function insertActivity(database, groupId, actorId, type, entityType, entityId, metadata = {}) {
   database.prepare(`
     INSERT INTO expense_activity (group_id, actor_id, type, entity_type, entity_id, metadata)
@@ -185,4 +211,4 @@ function startScheduler() {
   }, 60 * 60 * 1000).unref();
 }
 
-export { generateRecurringExpense, processDueRecurringExpenses, startScheduler };
+export { generateRecurringExpense, nextRunNotBefore, processDueRecurringExpenses, startScheduler };

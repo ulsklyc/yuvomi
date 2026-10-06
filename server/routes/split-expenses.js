@@ -18,6 +18,7 @@ import { sendDocumentDeletionConflict } from '../services/document-deletion-lock
 import {
   buildSplits, decorateMoney, groupBalanceRows, insertExpenseLedger, membershipRefusal, minorToDecimal, parseMoneyToMinor, simplifyDebts, splitSnapshot,
 } from '../services/split-expenses.js';
+import { nextRunNotBefore } from '../services/split-expenses-scheduler.js';
 import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
 import { syncBirthdayArtifacts } from '../services/birthdays.js';
 import { activeAccountSql, householdMemberSql, newNonMembers, staffMessage } from '../services/household-members.js';
@@ -1483,15 +1484,47 @@ router.post('/groups/:id/recurring', (req, res) => {
   }
 });
 
+// Was beim Fortsetzen mit den Terminen geschieht, die waehrend der Pause
+// faellig gewesen waeren. `skip` ist die Vorgabe.
+const MISSED_MODES = ['skip', 'book'];
+
 router.post('/recurring/:id/pause', (req, res) => {
   try {
     const id = Number(req.params.id);
     const row = db.get().prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(id);
     if (!row || !requireGroupAccess(row.group_id, req)) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
     if (!canManageGroup(row.group_id, req) && row.created_by !== userId(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    db.get().prepare("UPDATE recurring_expenses SET paused_at = CASE WHEN paused_at IS NULL THEN strftime('%Y-%m-%dT%H:%M:%SZ', 'now') ELSE NULL END WHERE id = ?").run(id);
-    activity(row.group_id, userId(req), row.paused_at ? 'recurring_resumed' : 'recurring_paused', 'recurring_expense', id);
-    res.json({ data: decorateMoney(db.get().prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(id)) });
+    const missed = req.body?.missed ?? 'skip';
+    if (!MISSED_MODES.includes(missed)) {
+      return res.status(400).json({ error: 'missed must be "skip" or "book".', code: 400, reason: 'invalid_missed' });
+    }
+    // Lesen und Schreiben in EINER Transaktion: ob pausiert oder fortgesetzt
+    // wird und von welchem Termin aus gezaehlt wird, entscheidet die Zeile, die
+    // hier gelesen wird, nicht die von vor der Rechtepruefung.
+    const database = db.get();
+    const updated = database.transaction(() => {
+      const current = database.prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(id);
+      if (!current) return null;
+      if (!current.paused_at) {
+        database.prepare("UPDATE recurring_expenses SET paused_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(id);
+        activity(current.group_id, userId(req), 'recurring_paused', 'recurring_expense', id);
+      } else {
+        // Fortsetzen ueberspringt, was waehrend der Pause faellig gewesen
+        // waere (#1647). Bliebe `next_run_date` stehen, buchte der stuendliche
+        // Lauf je Lauf einen versaeumten Termin mit Originaldatum nach: sechs
+        // Monate Pause wurden sechs Ausgaben in sechs Stunden. `missed: "book"`
+        // behaelt genau das. "Heute" ist der Tag des Haushalts, derselbe, an
+        // dem der Lauf Faelligkeit misst.
+        const next = missed === 'book'
+          ? { date: current.next_run_date, skipped: 0 }
+          : nextRunNotBefore(current.next_run_date, current.frequency, todayKey(database));
+        database.prepare('UPDATE recurring_expenses SET paused_at = NULL, next_run_date = ? WHERE id = ?').run(next.date, id);
+        activity(current.group_id, userId(req), 'recurring_resumed', 'recurring_expense', id, next.skipped ? { skipped: next.skipped } : {});
+      }
+      return database.prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(id);
+    })();
+    if (!updated) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
+    res.json({ data: decorateMoney(updated) });
   } catch (err) {
     log.error('POST /recurring/:id/pause error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

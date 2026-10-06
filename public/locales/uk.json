@@ -17,6 +17,7 @@
         "moreActions": "Більше дій",
         "moreActionsNamed": "Більше дій для {{name}}",
         "editNamed": "Редагувати {{name}}",
+        "showDetails": "Показати деталі",
         "deleteNamed": "Видалити {{name}}",
         "removeNamed": "Вилучити {{name}}",
         "filters": "Фільтри",

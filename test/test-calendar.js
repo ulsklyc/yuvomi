@@ -2786,6 +2786,141 @@ test('layoutOverlaps: am Starttag reicht der Nacht-Termin bis Mitternacht und te
 });
 
 // --------------------------------------------------------
+// #1633: Ueberlappende Termine stehen nach PERSON nebeneinander, nicht nach
+// Ankunft. Die Regel selbst misst test-overlap-lanes.js an der reinen Funktion;
+// hier steht die VERDRAHTUNG: dass der Rang der Index in `state.users` ist (und
+// kein Namensvergleich), dass die Personen aus `assigned_users` kommen, dass
+// Tag und Woche dieselbe Platzierung zeigen und dass Schichtplan-Bloecke bei
+// der Packung nach Zeit bleiben.
+// --------------------------------------------------------
+
+// Die IDs laufen gegen die Listenreihenfolge, die Namen gegen beide.
+const LANE_USERS = [
+  { id: 30, display_name: 'Zora' },
+  { id: 20, display_name: 'Mika' },
+  { id: 10, display_name: 'Adam' },
+];
+
+function laneEvent(id, day, start, end, userIds = [], extra = {}) {
+  return {
+    id, title: `Termin ${id}`, all_day: 0,
+    assigned_users: userIds.map((userId) => ({ id: userId })),
+    start_datetime: `${day}T${start}`, end_datetime: `${day}T${end}`,
+    ...extra,
+  };
+}
+
+function withLaneUsers(users, fn) {
+  const previous = calendarHelpers.state.users;
+  try {
+    calendarHelpers.state.users = users;
+    return fn();
+  } finally {
+    calendarHelpers.state.users = previous;
+  }
+}
+
+function laneEqual(actual, expected, message = '') {
+  assert(JSON.stringify(actual) === JSON.stringify(expected),
+    `${message} - erwartet ${JSON.stringify(expected)}, bekommen ${JSON.stringify(actual)}`);
+}
+
+function laneSpots(layout, events) {
+  return events.map((ev) => {
+    const entry = layout.get(ev);
+    return entry ? `${entry.colIndex}/${entry.totalCols}` : 'fehlt';
+  });
+}
+
+test('layoutOverlaps: der Rang ist die Position in state.users, nicht ID und nicht Name (#1633)', () => {
+  const zora = laneEvent(1, '2026-06-15', '09:00', '10:00', [30]);
+  const mika = laneEvent(2, '2026-06-15', '09:00', '10:00', [20]);
+  const adam = laneEvent(3, '2026-06-15', '09:00', '10:00', [10]);
+  const ohne = laneEvent(4, '2026-06-15', '09:00', '10:00', []);
+  const geladen = [ohne, adam, mika, zora];
+
+  withLaneUsers(LANE_USERS, () => {
+    laneEqual(laneSpots(calendarHelpers.layoutOverlaps(geladen, '2026-06-15'), [zora, mika, adam, ohne]),
+      ['0/4', '1/4', '2/4', '3/4'],
+      'Zora steht in der Mitgliederliste vorn und deshalb links - nach ID oder Name staende sie hinten');
+  });
+  // Dieselben Termine, die Liste umgedreht: die Positionen drehen sich mit.
+  withLaneUsers([...LANE_USERS].reverse(), () => {
+    laneEqual(laneSpots(calendarHelpers.layoutOverlaps(geladen, '2026-06-15'), [zora, mika, adam, ohne]),
+      ['2/4', '1/4', '0/4', '3/4'],
+      'der Rang wird aus state.users GELESEN: wer die Liste anders reiht, reiht die Spalten');
+  });
+});
+
+test('layoutOverlaps: mehrere Zugewiesene zaehlen als die erste in der Mitgliederliste - nicht assigned_to, nicht assigned_users[0] (#1633)', () => {
+  // Adam (10) steht im Termin vorn UND ist die primaere Zuweisung; Zora (30)
+  // steht in der Mitgliederliste vor ihm und bestimmt den Platz.
+  const beide = laneEvent(1, '2026-06-15', '09:00', '10:00', [10, 30], { assigned_to: 10 });
+  const mika = laneEvent(2, '2026-06-15', '09:00', '10:00', [20]);
+  withLaneUsers(LANE_USERS, () => {
+    laneEqual(laneSpots(calendarHelpers.layoutOverlaps([mika, beide], '2026-06-15'), [beide, mika]),
+      ['0/2', '1/2']);
+  });
+});
+
+test('renderDayView/renderWeekView: dieselben Personen stehen an zwei Tagen an derselben Position, in beiden Ansichten (#1633)', () => {
+  // Montag beginnt Zora zuerst, Dienstag Mika. Der Termin ohne Person beginnt
+  // an beiden Tagen als Erster.
+  const events = [
+    laneEvent(11, '2026-06-15', '08:00', '10:00', []),
+    laneEvent(12, '2026-06-15', '09:00', '10:00', [30]),
+    laneEvent(13, '2026-06-15', '09:30', '10:30', [20]),
+    laneEvent(21, '2026-06-16', '08:00', '10:00', []),
+    laneEvent(22, '2026-06-16', '09:00', '10:00', [20]),
+    laneEvent(23, '2026-06-16', '09:30', '10:30', [30]),
+    // Ueberlappt nichts: volle Breite, an jedem Tag.
+    laneEvent(31, '2026-06-15', '14:00', '15:00', [10]),
+  ];
+  const blocks = (html) => Object.fromEntries(
+    [...html.matchAll(TIMED_BLOCK_RE)].map((m) => [Number(m[2]), `${m[5]} | ${m[6]}`]));
+  const third = (index, inset, total) => `calc(${(index / 3) * 100}% + ${inset}px) | calc(${100 / 3}% - ${total}px)`;
+
+  withOvernightState({ users: LANE_USERS, events, cursor: '2026-06-15' }, () => {
+    const week = fakeContainer();
+    calendarHelpers.renderWeekView(week);
+    const montag = blocks(weekColumnHtml(week.html, '2026-06-15'));
+    const dienstag = blocks(weekColumnHtml(week.html, '2026-06-16'));
+    laneEqual(montag, {
+      12: third(0, 2, 4), 13: third(1, 2, 4), 11: third(2, 2, 4), 31: 'calc(0% + 2px) | calc(100% - 4px)',
+    }, 'Woche, Montag: Zora, Mika, ohne Person');
+    laneEqual(dienstag, {
+      23: third(0, 2, 4), 22: third(1, 2, 4), 21: third(2, 2, 4),
+    }, 'Woche, Dienstag: Zora bleibt links, obwohl Mika zuerst beginnt');
+
+    const day = fakeContainer();
+    calendarHelpers.renderDayView(day);
+    laneEqual(blocks(day.html), {
+      12: third(0, 4, 14), 13: third(1, 4, 14), 11: third(2, 4, 14), 31: 'calc(0% + 4px) | calc(100% - 14px)',
+    }, 'Tag, Montag: dieselben Spalten wie in der Woche');
+  });
+  withOvernightState({ users: LANE_USERS, events, cursor: '2026-06-16' }, () => {
+    const day = fakeContainer();
+    calendarHelpers.renderDayView(day);
+    laneEqual(blocks(day.html), {
+      23: third(0, 4, 14), 22: third(1, 4, 14), 21: third(2, 4, 14),
+    }, 'Tag, Dienstag: dieselben Spalten wie in der Woche');
+  });
+});
+
+test('layoutScheduleBlocks: Schichtplan-Bloecke bleiben nach Zeit gepackt, die Person spielt keine Rolle (#1633)', () => {
+  // Die Kette aus dem Issue, je Block eine andere Person, in der Reihenfolge
+  // GEGEN die Mitgliederliste: nach Person gepackt waere sie drei breit und
+  // gespiegelt.
+  const a = { ...scheduleEntry({ start: '09:00', end: '10:00' }), user_id: 10 };
+  const b = { ...scheduleEntry({ start: '09:30', end: '11:00' }), user_id: 20 };
+  const c = { ...scheduleEntry({ start: '10:30', end: '12:00' }), user_id: 30 };
+  withLaneUsers(LANE_USERS, () => {
+    laneEqual(laneSpots(calendarHelpers.layoutScheduleBlocks([c, b, a]), [a, b, c]),
+      ['0/2', '1/2', '0/2']);
+  });
+});
+
+// --------------------------------------------------------
 // PR #1323 Review, Befund 1: der Zeit-Text am Block meint den TAG, auf dem er
 // steht.
 //

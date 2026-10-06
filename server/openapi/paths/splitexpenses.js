@@ -188,7 +188,35 @@ export function splitexpensesPaths() {
       post: op({ summary: 'Add expense comment', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/recurring/{id}/pause': {
-      post: op({ summary: 'Pause or resume recurring expense', tag: 'SplitExpenses', params: [idParam()], stateChanging: true }),
+      post: op({
+        summary: 'Pause or resume recurring expense',
+        description: 'A toggle: an active recurring expense is paused, a paused one is resumed. Allowed for group owners/admins and for whoever created it. Resuming skips the dates that fell due during the pause: `next_run_date` moves to the first date of the series that is not before today, counted from the old `next_run_date` in whole intervals exactly as the hourly run counts, and nothing is booked for the past. "Today" is the day in the household time zone; a date that is today is not missed and is booked by the next run. A resume that skipped dates writes `metadata.skipped` (their number) into its `recurring_resumed` activity entry. Send `missed: "book"` to keep `next_run_date` instead: the hourly run then books every missed date, one per run, each with its original date (the behaviour before this option existed). When the call pauses, `missed` changes nothing about the pause, but its value is checked on every call: anything other than `skip` or `book` is refused with 400 and the recurring expense stays as it was.',
+        tag: 'SplitExpenses',
+        params: [idParam()],
+        stateChanging: true,
+        requestBody: {
+          required: false,
+          description: 'Optional. Without a body the missed dates are skipped.',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  missed: { type: 'string', enum: ['skip', 'book'], default: 'skip', description: 'What a resume does with the dates that fell due during the pause. `skip`: continue from the next date that is not in the past. `book`: leave `next_run_date` and let the hourly run book each missed date.' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'The recurring expense after the toggle, with its `paused_at` and `next_run_date`' },
+          400: apiError('`missed` is neither `skip` nor `book` (`reason: "invalid_missed"`)'),
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: apiError('Neither a manager of the group nor the creator of the recurring expense'),
+          404: apiError('Recurring expense not found or not visible to the caller'),
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
     },
     '/api/v1/split-expenses/search': {
       get: op({ summary: 'Search split-expense groups, expenses, and people', tag: 'SplitExpenses' }),

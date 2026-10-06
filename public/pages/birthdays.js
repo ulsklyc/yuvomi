@@ -6,6 +6,7 @@ import { t, formatDate, parseDateInput, isDateInputValid, getLocale, formatUnit 
 import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { rowActionHtml } from '/utils/row-action.js';
+import { readRowHtml, readRowHintHtml } from '/utils/read-row.js';
 import { pageToolsMenuHtml, pageToolsActionEl, installPopoverMenus } from '/utils/popover-menu.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { todayKey } from '/utils/date.js';
@@ -437,7 +438,7 @@ export function birthdayItemHtml(birthday) {
       </div>`}
     <article class="list-row birthday-item ${isToday ? 'birthday-item--today' : ''}" data-id="${birthday.id}" data-md-id="${birthday.id}">
       <div class="birthday-item__media">${photoAvatar(birthday)}</div>
-      <button type="button" class="list-row__main list-row__main--interactive" data-open="${birthday.id}" data-md-focus>${hauptspalte}</button>
+      <button type="button" class="list-row__main list-row__main--interactive" data-open="${birthday.id}" data-md-focus>${hauptspalte}${ro ? readRowHintHtml() : ''}</button>
       ${ro ? '' : `
       <div class="row-actions birthday-item__actions">
         ${rowActionHtml({ icon: 'pencil', action: 'edit', label: t('common.editNamed', { name: birthday.name }), attrs: { 'data-id': birthday.id } })}
@@ -776,25 +777,6 @@ function nameDayReadText(nameDay) {
   if (!month || !day) return '';
   return new Intl.DateTimeFormat(getLocale(), { day: 'numeric', month: 'long', timeZone: 'UTC' })
     .format(new Date(Date.UTC(2000, month - 1, day)));
-}
-
-/**
- * Eine Zeile der Leseansicht. Das Markup ist das von `detailRowEl()` aus
- * components/detail-view.js - Icon, Beschriftung, Wert -, als Zeichenkette,
- * weil der geteilte Dialog seinen Inhalt als Markup bekommt. Die Gestalt kommt
- * damit aus detail-view.css (in der Shell geladen), nicht aus einer eigenen
- * Regel. Wie dort: eine Zeile ohne Wert faellt weg.
- */
-function readRowHtml({ icon, label, value, multiline = false }) {
-  if (!value) return '';
-  return `
-          <div class="detail-row${multiline ? ' detail-row--multiline' : ''}">
-            <i class="detail-row__icon" data-lucide="${icon}" aria-hidden="true"></i>
-            <div class="detail-row__text">
-              <span class="detail-row__label">${esc(label)}</span>
-              <span class="detail-row__value">${esc(value)}</span>
-            </div>
-          </div>`;
 }
 
 /**
