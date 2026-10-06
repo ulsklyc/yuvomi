@@ -21,6 +21,8 @@ export const REGION_PRESETS = {
   'en-AU': { currency: 'AUD', date_format: 'dmy_slash', time_format: '12h' },
   'en-NZ': { currency: 'NZD', date_format: 'dmy_slash', time_format: '12h' },
   'en-PH': { currency: 'PHP', date_format: 'mdy', time_format: '12h' },
+  // #1697: Singapur, CLDR-Default von en-SG (06/10/2026, 3:05 pm).
+  'en-SG': { currency: 'SGD', date_format: 'dmy_slash', time_format: '12h' },
   'fil-PH': { currency: 'PHP', date_format: 'mdy', time_format: '12h' },
   'es-ES': { currency: 'EUR', date_format: 'dmy_slash', time_format: '24h' },
   'es-CL': { currency: 'CLP', date_format: 'dmy_slash', time_format: '24h' },
