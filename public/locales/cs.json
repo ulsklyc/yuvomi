@@ -2036,6 +2036,7 @@
         "removeMemberNamed": "Odebrat účet {{name}}",
         "memberDeactivatedToast": "Účet {{name}} byl deaktivován. Záznamy zůstávají.",
         "memberFormerBadge": "Bývalý člen",
+        "memberOrderHint": "Toto pořadí platí pro celou domácnost: řídí se jím kalendář, rozvrh i každý seznam osob. Změníte ho přetažením úchytu, nebo na něj přesuňte fokus a stiskněte klávesy se šipkami. Noví členové jsou zařazeni za něj, seřazení podle jména.",
         "logout": "Odhlásit se",
         "logoutConfirm": "Odhlásit se z tohoto zařízení?",
         "synchronizing": "Synchronizuji…",

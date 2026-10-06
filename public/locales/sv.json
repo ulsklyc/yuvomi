@@ -1915,6 +1915,7 @@
         "removeMemberNamed": "Ta bort {{name}}",
         "memberDeactivatedToast": "{{name}} har inaktiverats. Posterna finns kvar.",
         "memberFormerBadge": "Tidigare medlem",
+        "memberOrderHint": "Den här ordningen gäller för hela hushållet: kalendern, schemat och alla listor med personer följer den. Ändra den genom att dra i ett handtag eller fokusera det och trycka på piltangenterna. Nya medlemmar kommer efteråt, sorterade efter namn.",
         "logout": "Logga ut",
         "logoutConfirm": "Logga ut från den här enheten?",
         "synchronizing": "Synkroniseras...",

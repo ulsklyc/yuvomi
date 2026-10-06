@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A household can put its members in an order of its own, and every list of people follows it**
+  (#1644, from D#1605, asked by @ChaCha500). Until now members were listed alphabetically
+  everywhere, so "parents first" or "oldest first" was not possible. Under Settings, Family, an
+  administrator now drags the members into the wanted order - or focuses a handle and presses
+  the arrow keys. There is one order per household, the same for everyone who looks: the
+  calendar's person filter, the timetable, the assignee pickers in tasks, budget and shared
+  expenses, rewards, the family card and the wall display all use it. A member who has not been
+  placed (a new one, and everyone in a household that never touches the setting) comes after
+  the placed ones, sorted by name, so a household that leaves it alone sees the order it had.
+  Not by age, as first suggested: birth dates are optional, and "parents first, then the
+  children" cannot be read from a date. Two things changed for everyone, placed or not. Lists
+  that sorted names by the language of the device now sort them the way the server does, so
+  two devices of one household agree; and a few lists that put a lower-case name after all
+  capitalised ones (the account list, the task filter and the overview among them) now ignore
+  letter case like the others. Housekeeping staff, guests of shared expenses, wall tablets and deactivated
+  accounts have no place in the order. For API clients: `PATCH /api/v1/family/members/reorder`
+  with `{ order }`, administrators only; `sort_order` on `GET /api/v1/family/members` and
+  `GET /api/v1/auth/users`, and `is_household_member` on every user object (migration 232).
+
 - **Revoked and expired API tokens can be removed from the list** (D#1672, asked by @torbenvanassche). Under
   Settings, API access, a revoked token stayed in the list for good, with a greyed-out button
   next to it. The list now has two parts: the tokens that work, each with "Revoke", and below

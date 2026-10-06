@@ -12,7 +12,7 @@ import { dateKeysInRange, scheduleData, fieldsForShiftTypes, fieldValuesFor, typ
 // routes/schedule-extras.js' eigener Kopfkommentar seit jeher vermeidet.
 export { scheduleData, fieldValuesFor } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
-import { householdMemberSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
+import { householdMemberSql, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js';
 
 const router = express.Router();
@@ -51,7 +51,7 @@ const mineOrAdmin = (req, userId) => isAdminRequest(req) || actorId(req) === use
 // als Einzelpruefung je Zeile, nicht neu geschrieben.
 router.get('/household-members', (_req, res) => {
   const rows = db.get()
-    .prepare(`SELECT u.id, u.display_name, u.avatar_color, u.avatar_data FROM users u WHERE ${householdMemberSql('u')} ORDER BY u.display_name COLLATE NOCASE`)
+    .prepare(`SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, ${memberPositionSql('u')} AS sort_order FROM users u WHERE ${householdMemberSql('u')} ORDER BY ${memberOrderSql('u')}`)
     .all();
   res.json({ data: rows });
 });

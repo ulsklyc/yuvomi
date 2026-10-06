@@ -2,6 +2,7 @@
 import { daysBetweenDateKeys, shiftDateKey } from '../utils/timezone.js';
 import * as db from '../db.js';
 import { activeAccountSql } from './account-state.js';
+import { memberOrderSql } from './household-members.js';
 
 export function cyclePosition(anchorDate, cycleLength, dateKey) {
   const days = daysBetweenDateKeys(anchorDate, dateKey);
@@ -128,7 +129,7 @@ export function scheduleData(from, to, userId) {
     }
   }
   // Der Plan aller zeigt keine Ehemaligen (#1381); ihre Eintraege bleiben gespeichert.
-  const users = userId ? [userId] : database.prepare(`SELECT id FROM users WHERE ${activeAccountSql('users')} ORDER BY id`).all().map((row) => row.id);
+  const users = userId ? [userId] : database.prepare(`SELECT id FROM users WHERE ${activeAccountSql('users')} ORDER BY ${memberOrderSql('users')}`).all().map((row) => row.id);
   const entries = []; const warnings = [];
   for (const memberId of users) {
     const overrides = database.prepare('SELECT * FROM schedule_overrides WHERE user_id = ? AND date_key BETWEEN ? AND ?').all(memberId, from, to);

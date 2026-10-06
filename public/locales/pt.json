@@ -1915,6 +1915,7 @@
         "removeMemberNamed": "Remover {{name}}",
         "memberDeactivatedToast": "Conta de {{name}} desativada. As entradas são mantidas.",
         "memberFormerBadge": "Antigo membro",
+        "memberOrderHint": "Esta ordem vale para todo o agregado: o calendário, o horário e todas as listas de pessoas seguem-na. Para a alterar, arraste uma pega ou coloque o foco nela e prima as teclas de seta. Os novos membros ficam a seguir, ordenados por nome.",
         "logout": "Sair",
         "logoutConfirm": "Terminar sessão neste dispositivo?",
         "synchronizing": "Sincronizando…",

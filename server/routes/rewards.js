@@ -10,7 +10,7 @@ import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { getBalance, isEnrolled, postLedger, CATALOG_SELECT, activeCatalog } from '../services/rewards.js';
-import { householdMemberSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
+import { householdMemberSql, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { visibilityWhere } from '../services/visibility.js';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
@@ -65,11 +65,14 @@ function withRanks(rows) {
 function balancesOfEnrolled(d) {
   const rows = d.prepare(`
     SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
+           ${memberPositionSql('u')} AS sort_order,
            COALESCE((SELECT SUM(delta) FROM reward_ledger l WHERE l.user_id = u.id), 0) AS balance
     FROM users u
     JOIN reward_participants p ON p.user_id = u.id AND p.enabled = 1
     WHERE ${MEMBER_FILTER}
-    ORDER BY balance DESC, u.display_name COLLATE NOCASE ASC
+    -- Eine RANGLISTE: der Punktestand ordnet, die Haushaltsreihenfolge (#1644)
+    -- entscheidet nur den Gleichstand.
+    ORDER BY balance DESC, ${memberOrderSql('u')}
   `).all();
   return withRanks(rows);
 }
@@ -124,12 +127,13 @@ router.get('/participants', requireAdmin, (req, res) => {
   try {
     const rows = db.get().prepare(`
       SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
+             ${memberPositionSql('u')} AS sort_order,
              CASE WHEN p.user_id IS NOT NULL AND p.enabled = 1 THEN 1 ELSE 0 END AS enabled,
              COALESCE((SELECT SUM(delta) FROM reward_ledger l WHERE l.user_id = u.id), 0) AS balance
       FROM users u
       LEFT JOIN reward_participants p ON p.user_id = u.id
       WHERE ${MEMBER_FILTER}
-      ORDER BY u.display_name COLLATE NOCASE ASC
+      ORDER BY ${memberOrderSql('u')}
     `).all().map((r) => ({ ...r, enabled: r.enabled === 1 }));
     res.json({ data: rows });
   } catch (err) {

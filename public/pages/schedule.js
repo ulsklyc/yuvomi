@@ -8,6 +8,7 @@ import { initials } from '/utils/initials.js';
 import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, advancedSection, refocusAfterRender, reportFieldError } from '/components/modal.js';
 import { makeSortable } from '/utils/sortable.js';
+import { memberRanks, memberRankOf } from '/utils/member-order.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
 import { rowActionHtml } from '/utils/row-action.js';
@@ -90,8 +91,13 @@ function saveOverviewViewMode(mode) {
  */
 function normalizeOverviewSelection(rawIds, eligibleIds) {
   if (!Array.isArray(rawIds)) return [];
-  const eligible = new Set(eligibleIds);
-  return rawIds.filter((id) => eligible.has(id));
+  // IN DER REIHENFOLGE DER WAEHLBAREN, NICHT DER GESPEICHERTEN (#1644). Die
+  // Spuren stehen in der Haushaltsreihenfolge, in der `eligibleIds` vom Server
+  // kommt. Die gespeicherte Folge war die des Auswahlfelds beim letzten
+  // Antippen - nach einem Umordnen der Familie haette sie die alte Ordnung
+  // gehalten, bis jemand ein Haekchen anfasst.
+  const chosen = new Set(rawIds);
+  return [...eligibleIds].filter((id) => chosen.has(id));
 }
 
 function loadSavedOverviewSelection() {
@@ -1051,9 +1057,32 @@ function sameFieldValues(a = {}, b = {}) {
   return keysA.every((key) => a[key] === b[key]);
 }
 
+/**
+ * Vergleich fuer Zeilen, die an einer Person haengen: Haushaltsreihenfolge
+ * (#1644), bei Gleichstand die user_id. `state.users` ist das Kontenverzeichnis
+ * und traegt die Position; wer dort fehlt, steht am Ende. Die user_id bleibt
+ * als letzter Schluessel, damit die Zeilen EINER Person zusammenstehen - das
+ * Verschmelzen aufeinanderfolgender Tage darunter verlaesst sich darauf.
+ */
+function byPersonThenDate(people = state.users) {
+  const ranks = memberRanks(people);
+  return (a, b) => memberRankOf(ranks, a.user_id) - memberRankOf(ranks, b.user_id)
+    || Number(a.user_id) - Number(b.user_id) || a.date_key.localeCompare(b.date_key);
+}
+
+/**
+ * Die Muster in der Haushaltsreihenfolge ihrer Personen (#1644). Der Server
+ * liefert sie nach user_id und darin das juengste zuerst; `sort` ist stabil,
+ * die Folge je Person bleibt also, wie sie kam.
+ */
+function patternsInMemberOrder(patterns = state.patterns, people = state.users) {
+  const ranks = memberRanks(people);
+  return [...patterns].sort((a, b) => memberRankOf(ranks, a.user_id) - memberRankOf(ranks, b.user_id)
+    || Number(a.user_id) - Number(b.user_id));
+}
+
 function overrideGroups(overrides = state.overrides) {
-  const sorted = [...overrides].sort((a, b) =>
-    Number(a.user_id) - Number(b.user_id) || a.date_key.localeCompare(b.date_key));
+  const sorted = [...overrides].sort(byPersonThenDate());
   const groups = [];
   for (const row of sorted) {
     const last = groups[groups.length - 1];
@@ -1152,8 +1181,7 @@ function emptyExtraShiftsState() {
 // Parameter mit state-Default wie overrideGroups(): so laesst sich das
 // Verschmelzen behavioral testen, ohne state von aussen zu beschreiben.
 function extraGroups(extras = state.extras) {
-  const sorted = [...extras].sort((a, b) =>
-    Number(a.user_id) - Number(b.user_id) || a.date_key.localeCompare(b.date_key));
+  const sorted = [...extras].sort(byPersonThenDate());
   const groups = [];
   for (const row of sorted) {
     const last = groups[groups.length - 1];
@@ -1324,7 +1352,7 @@ function planningPanel() {
   if (planningNeedsShiftTypes()) {
     return '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + emptyPlanningNeedsTypesState() + '</section>';
   }
-  return '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + (state.patterns.length ? state.patterns.map(patternCard).join('') : emptyPatternState()) + '</section>'
+  return '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + (state.patterns.length ? patternsInMemberOrder().map(patternCard).join('') : emptyPatternState()) + '</section>'
         // App-weite UX-Durchsicht 2026-09-12 (Batch 4, "bis zu vier
         // konkurrierende Anlege-Wege"): Override/Extra trugen bisher JE EINEN
         // Anlege-Knopf im Abschnittskopf, IMMER sichtbar - zusaetzlich zur
@@ -1483,10 +1511,10 @@ function renderToday() {
 //
 // Feste Spur je Person, nie nach Aktivitaet umsortiert. Die Reihenfolge kommt
 // unveraendert aus `getSelectedUserIds()` (DOM-Reihenfolge des Multi-Select-
-// Widgets, alphabetisch nach display_name) - NICHT aus der Klickreihenfolge,
+// Widgets, also die Haushaltsreihenfolge aus #1644) - NICHT aus der Klickreihenfolge,
 // wie ein frueherer Stand dieses Kommentars behauptete (Review-Fund
 // 2026-09-05, #1022). Das ist das richtige Verhalten, nur die Beschreibung
-// war falsch: alphabetisch bleibt stabil ueber jede Auswahlaenderung hinweg,
+// war falsch: die Haushaltsreihenfolge bleibt stabil ueber jede Auswahlaenderung hinweg,
 // eine Klickreihenfolge wuerde sich bei jedem Abwaehlen/Neuwaehlen verschieben.
 // Der ganze Sinn der Ansicht ist, dass "Kind 2s Spalte" jeden Tag an
 // derselben Stelle steht, damit das Auge sie ueber eine Woche verfolgen kann;
@@ -3096,4 +3124,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };

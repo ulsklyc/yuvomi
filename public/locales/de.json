@@ -1973,6 +1973,7 @@
         "removeMemberNamed": "{{name}} entfernen",
         "memberDeactivatedToast": "{{name}} deaktiviert. Die Einträge bleiben erhalten.",
         "memberFormerBadge": "Ehemalig",
+        "memberOrderHint": "Diese Reihenfolge gilt im ganzen Haushalt: Kalender, Stundenplan und jede Personenauswahl folgen ihr. Zum Ändern am Griff ziehen oder ihn fokussieren und die Pfeiltasten drücken. Neue Mitglieder stehen danach, nach Namen sortiert.",
         "logout": "Abmelden",
         "logoutConfirm": "Von diesem Gerät abmelden?",
         "synchronizing": "Synchronisiere…",

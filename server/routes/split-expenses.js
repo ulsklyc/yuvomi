@@ -21,7 +21,9 @@ import {
 import { nextRunNotBefore } from '../services/split-expenses-scheduler.js';
 import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
 import { syncBirthdayArtifacts } from '../services/birthdays.js';
-import { activeAccountSql, householdMemberSql, newNonMembers, staffMessage } from '../services/household-members.js';
+import {
+  activeAccountSql, householdMemberSql, memberOrderOverColumnsSql, memberOrderSql, memberPositionSql, newNonMembers, staffMessage,
+} from '../services/household-members.js';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts } from '../services/contact-identity.js';
 import { todayKey } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../permissions.js';
@@ -384,7 +386,7 @@ function serializeExpense(expense, prefetched, viewer) {
         FROM expense_splits s
         LEFT JOIN users u ON u.id = s.user_id
         WHERE s.expense_id = ?
-        ORDER BY u.display_name COLLATE NOCASE ASC
+        ORDER BY ${memberOrderSql('u')}
       `).all(expense.id).map((row) => ({ ...row, amount: minorToDecimal(row.amount_minor, row.currency) }));
   // Belege laufen über die Sichtbarkeit des Dokumente-Moduls (#583): ein privat
   // abgelegter Beleg bleibt privat, auch wenn die Ausgabe der ganzen Gruppe
@@ -415,7 +417,7 @@ function serializeExpenseList(expenses, viewer) {
     FROM expense_splits s
     LEFT JOIN users u ON u.id = s.user_id
     WHERE s.expense_id IN (${placeholders})
-    ORDER BY u.display_name COLLATE NOCASE ASC
+    ORDER BY ${memberOrderSql('u')}
   `).all(...ids)) {
     const { expense_id, ...rest } = row;
     if (!splits.has(expense_id)) splits.set(expense_id, []);
@@ -710,7 +712,7 @@ router.get('/groups/:id/members', (req, res) => {
       FROM expense_group_members gm
       JOIN users u ON u.id = gm.user_id
       WHERE gm.group_id = ?
-      ORDER BY CASE gm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, u.display_name COLLATE NOCASE ASC
+      ORDER BY CASE gm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, ${memberOrderSql('u')}
     `).all(groupId);
     res.json({ data: rows });
   } catch (err) {
@@ -728,11 +730,17 @@ router.get('/groups/:id/member-candidates', (req, res) => {
     // existiert fuer geteilte Ausgaben: er gehoert zu der Gruppe, fuer die er
     // angelegt wurde, und zu jeder, in der er schon Mitglied ist. Gaeste
     // anderer Gruppen bietet die Auswahl nicht an.
+    // DAS UNION STEHT IN EINER UNTERABFRAGE, damit die Haushaltsreihenfolge
+    // (#1644) darueber sortieren kann: direkt hinter einem UNION nimmt SQLite
+    // nur Ergebnisspalten als Sortierbegriff, keinen Ausdruck wie
+    // "sort_order IS NULL".
     const people = db.get().prepare(`
+      SELECT * FROM (
       SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
              u.avatar_color, u.family_role, c.phone, c.email, b.birth_date,
              CASE WHEN gm.user_id IS NULL THEN 0 ELSE 1 END AS in_group,
-             gm.role AS group_role
+             gm.role AS group_role,
+             ${memberPositionSql('u')} AS sort_order
       FROM users u
       LEFT JOIN contacts c ON c.family_user_id = u.id
       LEFT JOIN birthdays b ON b.family_user_id = u.id
@@ -742,7 +750,8 @@ router.get('/groups/:id/member-candidates', (req, res) => {
       SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
              u.avatar_color, u.family_role, c.phone, c.email, b.birth_date,
              CASE WHEN gm.user_id IS NULL THEN 0 ELSE 1 END AS in_group,
-             gm.role AS group_role
+             gm.role AS group_role,
+             ${memberPositionSql('u')} AS sort_order
       FROM split_expense_guest_users g
       JOIN users u ON u.id = g.user_id
       LEFT JOIN contacts c ON c.family_user_id = u.id
@@ -757,7 +766,8 @@ router.get('/groups/:id/member-candidates', (req, res) => {
       SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
              u.avatar_color, u.family_role, c.phone, c.email, b.birth_date,
              1 AS in_group,
-             gm.role AS group_role
+             gm.role AS group_role,
+             ${memberPositionSql('u')} AS sort_order
       FROM expense_group_members gm
       JOIN users u ON u.id = gm.user_id
       LEFT JOIN contacts c ON c.family_user_id = u.id
@@ -765,7 +775,8 @@ router.get('/groups/:id/member-candidates', (req, res) => {
       WHERE gm.group_id = @groupId
         AND NOT (${householdMemberSql('u')})
         AND NOT EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = u.id)
-      ORDER BY display_name COLLATE NOCASE ASC
+      )
+      ORDER BY ${memberOrderOverColumnsSql({ position: 'sort_order', name: 'display_name', id: 'user_id' })}
     `).all({ groupId });
     // DIE FELDER FOLGEN DEM RECHT IHRER QUELLE. Der Pfad gehoert `budget`,
     // Telefon und E-Mail kommen aber aus `contacts`, das Geburtsdatum eines
@@ -1172,7 +1183,7 @@ router.get('/groups/:id/balances', (req, res) => {
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
     // Dieselbe Saldenquelle wie die Kennzahl auf dem Dashboard
     // (openBalancesForUser) - ein Fix an den Salden heilt beide.
-    const rows = groupBalanceRows(db.get(), groupId);
+    const rows = groupBalanceRows(db.get(), groupId, memberOrderSql('u'));
     res.json({
       data: {
         balances: rows.map((row) => ({ ...row, net: minorToDecimal(row.net_minor, row.currency) })),
@@ -1564,7 +1575,7 @@ router.get('/search', (req, res) => {
         AND (@isGuest = 0 OR gm.group_id = @restrictedGroupId)
         -- Ehemalige bleiben in Buchungen und Salden stehen, die Suche bietet sie nicht an (#1381).
         AND ${activeAccountSql('u')}
-      ORDER BY u.display_name COLLATE NOCASE ASC LIMIT 10
+      ORDER BY ${memberOrderSql('u')} LIMIT 10
     `).all({ uid, q, restrictedGroupId, isGuest });
     res.json({ data: { groups, expenses: expensesSerialized, people } });
   } catch (err) {

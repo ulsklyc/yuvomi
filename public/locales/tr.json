@@ -1915,6 +1915,7 @@
         "removeMemberNamed": "{{name}} hesabını kaldır",
         "memberDeactivatedToast": "{{name}} devre dışı bırakıldı. Kayıtlar korunuyor.",
         "memberFormerBadge": "Eski üye",
+        "memberOrderHint": "Bu sıra tüm hane için geçerlidir: takvim, ders programı ve her kişi listesi onu izler. Değiştirmek için bir tutamacı sürükleyin veya ona odaklanıp ok tuşlarına basın. Yeni üyeler ada göre sıralanarak sonra gelir.",
         "logout": "Çıkış yap",
         "logoutConfirm": "Bu cihazdan çıkış yapılsın mı?",
         "synchronizing": "Senkronize ediliyor…",

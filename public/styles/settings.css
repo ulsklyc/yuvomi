@@ -1560,6 +1560,49 @@
   margin-top: 1px;
 }
 
+/* Der Griff der Haushaltsreihenfolge (#1644). Derselbe Gedanke wie der Griff
+ * der Einkaufszeile (list-row.css, `.list-row__drag`): schmal, aber hoch - die
+ * Zieh-Achse ist vertikal, also braucht er seine Flaeche in der Hoehe, und auf
+ * 375px kostete ein 48er-Quadrat Namensbreite. Die negative Marge nimmt auf
+ * beiden Seiten den Zeilenabstand zurueck: die Greifflaeche bleibt, der Name
+ * verliert nur die Breite des Zeichens. `touch-action: none`, sonst nimmt der
+ * Browser die Geste als Seiten-Scroll und der Zug endet, bevor er beginnt. */
+.settings-member__drag {
+  cursor: grab;
+  touch-action: none;
+  width: auto;
+  min-width: 0;
+  min-height: var(--target-md);
+  padding-inline: var(--space-1);
+  margin-inline: calc(-1 * var(--space-2));
+}
+
+/* Der freigehaltene Platz einer Zeile ohne Position: dieselbe Box, nichts zu
+ * sehen und nichts zu greifen. */
+.settings-member__drag--none {
+  visibility: hidden;
+  cursor: default;
+  touch-action: auto;
+}
+
+.settings-member.sortable-chosen .settings-member__drag {
+  cursor: grabbing;
+}
+
+.settings-member.sortable-ghost {
+  opacity: 0.4;
+}
+
+.settings-member.sortable-chosen {
+  background: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) var(--tint-state), var(--color-surface));
+}
+
+.settings-member.sortable-drag {
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-glass-inner);
+}
+
 /* Ein ehemaliges Konto (#1381) tritt zurueck, bleibt aber lesbar: der Name in
  * der Sekundaerfarbe, die Marke steht als Text in der Meta-Zeile. */
 .settings-member--former .settings-member__name {

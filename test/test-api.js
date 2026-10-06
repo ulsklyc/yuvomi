@@ -820,6 +820,9 @@ const REASONS_WITHOUT_SENTENCE = new Set([
   // Fremde Terminserie (Einzelausnahme): der Grund reist als `reason: error.code`
   // durch eine Variable und fehlte dem Leser bis #1669. Der Servertext ist deutsch.
   'not_authorized',
+  // Haushaltsreihenfolge (#1644): das Blatt, das sie setzt, erreicht nur ein
+  // Administrator, und es zeigt bei jedem Scheitern seinen eigenen Satz.
+  'admin_required',
 ]);
 
 // ─── #1669: ein Grund, der durch eine Variable gereicht wird ────────────────
@@ -851,6 +854,7 @@ const REASONS_PASSED_THROUGH = new Map([
     why: 'Refusal: ein Grund nur an 409 (email_in_use); die 403 dort tragen keinen' }],
   ['auth.js: err.code', { sites: 1, at403: [], why: 'feste 409 (2FA)' }],
   ['routes/notes.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
+  ['routes/family.js: problem.reason', { sites: 1, at403: [], why: 'memberOrderProblem: feste 400; die 403 daneben traegt ein Literal' }],
   ['routes/tasks.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
   ['routes/backup.js: err.reason', { sites: 1, at403: [], why: 'Restore: 409, 503 oder 400' }],
   // refuse() (#1656, #1668): die eine Stelle, ueber die jede Absage der

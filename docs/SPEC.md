@@ -36,6 +36,34 @@ Every table: `id INTEGER PRIMARY KEY`, `created_at TEXT`, `updated_at TEXT` (ISO
 | waste_feed_token | TEXT | Nullable (migration v205) - secret token of this member's Waste pickup ICS feed. Partial UNIQUE index WHERE NOT NULL |
 | waste_feed_type_ids | TEXT | Nullable (migration v205) - JSON array of `waste_types.id` for that feed; `NULL` = every active type |
 | deactivated_at | TEXT | Nullable (migration v231, #1381) - ISO 8601 moment the account was deactivated; `NULL` = active. See "Removing an account" below |
+| sort_order | INTEGER | Nullable (migration v232, #1644) - position in the household member order; `NULL` = not placed. No backfill. See "Household member order" below |
+
+**Household member order (v232, #1644).** One order per household, the same for everyone who
+looks; not per user, not per module. It is set in Settings, Family by dragging (or with the arrow
+keys on a focused handle), administrators only, through `PATCH /api/v1/family/members/reorder`
+with `{ order }`: the ids of ALL household members in the wanted order. They get the positions
+1..n; every other row loses its number. The route answers 403 `admin_required` for anyone else
+and 400 with `invalid_order`, `duplicate_member`, `not_a_household_member` or `incomplete_order`,
+and writes nothing on a refusal.
+
+- **One reader.** `memberOrderSql()` in `server/services/household-members.js` is the only place
+  that sorts people on the server, `compareMembers()` in `public/utils/member-order.js` the only
+  one in the browser; both are held against the same people by `npm run test:member-order`.
+- **The rule:** placed members first, by position (gaps are allowed); unplaced members after
+  them by display name with `COLLATE NOCASE` (ASCII letter case ignored, anything else by code
+  point - an umlaut sorts after Z, as before v232); ties by id.
+- **Only a household member has a position.** The reader hides the stored number of a row that
+  is no member (housekeeping staff, split-expense guest, wall display, deactivated account)
+  instead of clearing it at every write path; routes return it as `sort_order` through
+  `memberPositionSql()`, never the raw column. A new member is unplaced. A deactivated member
+  drops out and the others keep their places; the gap is harmless.
+- **Lists that order by something else first** keep doing so and use the member order to break
+  ties: the reward standings (balance), the members of an expense group (role), the wall
+  display's "who" tile (number of rows). Names written into exported calendar titles
+  ("Title (A, B)", ICS feed and Outlook push) stay alphabetical, so reordering the family does
+  not rewrite every exported event; the people stored on one record (`assigned_users`,
+  `responsible_users`) keep the order they were saved in.
+- There is no "back to alphabetical": none of the sortable lists has a reset.
 
 **Removing an account: deactivate or delete (v231, #1381).** `DELETE /api/v1/auth/users/:id` used
 to run `DELETE FROM users` and let the foreign keys decide. For shared data that was wrong in two

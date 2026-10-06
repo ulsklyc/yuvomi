@@ -1932,6 +1932,7 @@
         "removeMemberNamed": "Eltávolítás: {{name}}",
         "memberDeactivatedToast": "{{name}} fiókja inaktiválva. A bejegyzések megmaradnak.",
         "memberFormerBadge": "Korábbi tag",
+        "memberOrderHint": "Ez a sorrend az egész háztartásra érvényes: a naptár, az órarend és minden személylista ezt követi. A módosításhoz húzd a fogantyút, vagy állítsd rá a fókuszt, és nyomd meg a nyílbillentyűket. Az új tagok utána következnek, név szerint rendezve.",
         "logout": "Kijelentkezés",
         "logoutConfirm": "Kijelentkezik erről az eszközről?",
         "synchronizing": "Szinkronizálás…",

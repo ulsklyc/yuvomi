@@ -1915,6 +1915,7 @@
         "removeMemberNamed": "Retirer {{name}}",
         "memberDeactivatedToast": "{{name}} : compte désactivé. Les éléments sont conservés.",
         "memberFormerBadge": "Ancien membre",
+        "memberOrderHint": "Cet ordre vaut pour tout le foyer : le calendrier, l'emploi du temps et chaque liste de personnes le suivent. Pour le modifier, faites glisser une poignée ou placez le focus dessus et utilisez les flèches. Les nouveaux membres viennent ensuite, triés par nom.",
         "logout": "Se déconnecter",
         "logoutConfirm": "Se déconnecter de cet appareil ?",
         "synchronizing": "Synchronisation…",
