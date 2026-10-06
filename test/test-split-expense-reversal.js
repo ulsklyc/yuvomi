@@ -226,9 +226,18 @@ test('Verlauf: expense_deleted nennt Titel und Betrag, die angelegte Ausgabe tra
 // Ausgabe stehen (die Klasse, die Migration v227 einmal entfernt hat). Die
 // Gegenbuchung traegt deshalb den `created_by` ihrer Originalzeile, wie das
 // Storno einer Zahlung; wer geloescht hat, steht in `expense_activity.actor_id`
-// (expense_deleted). Die Konten in beiden Tests nehmen an keiner Buchung teil -
-// sonst hielte `user_id ON DELETE RESTRICT` das Loeschen auf.
-test('Konto der LOESCHENDEN Person geloescht: die Ausgabe bleibt aufgehoben, Salden bleiben', async () => {
+// (expense_deleted).
+//
+// Seit #1381 erreicht `DELETE /auth/users/:id` diese Kaskade nicht mehr: beide
+// Konten haben eine Spur (Verlauf bzw. Ausgabe) und werden DEAKTIVIERT. Die
+// ersten beiden Tests halten das am echten Weg fest - nichts faellt, nichts
+// verwaist, kein Saldo bewegt sich. Die Kaskade selbst steht weiter im Schema
+// (Bestandsdatenbanken, jeder direkte Zugriff); der dritte Test faehrt sie auf
+// Datenbankebene und haelt die Autor-Regel dort fest, wo sie noch traegt.
+const ledgerTotal = () => db.prepare('SELECT COUNT(*) AS n FROM expense_ledger_entries').get().n;
+const deactivatedAt = (id) => db.prepare('SELECT deactivated_at FROM users WHERE id = ?').get(id)?.deactivated_at;
+
+test('Konto der LOESCHENDEN Person entfernt: deaktiviert, die Ausgabe bleibt aufgehoben, Salden bleiben', async () => {
   const A2 = await member('author2', 'Anna');
   const M2 = await member('manager2', 'Mara');
   assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: A2.id, role: 'guest' })).status, 201);
@@ -239,11 +248,16 @@ test('Konto der LOESCHENDEN Person geloescht: die Ausgabe bleibt aufgehoben, Sal
   assert.equal((await del(M2, eid)).status, 200);
   assert.deepEqual(await balances(), base);
 
-  const eintrag = db.prepare("SELECT actor_id FROM expense_activity WHERE type = 'expense_deleted' AND entity_type = 'expense' AND entity_id = ?").get(eid);
-  assert.equal(eintrag.actor_id, M2.id, 'wer geloescht hat, steht im Verlauf');
+  const eintrag = () => db.prepare("SELECT actor_id FROM expense_activity WHERE type = 'expense_deleted' AND entity_type = 'expense' AND entity_id = ?").get(eid);
+  assert.equal(eintrag().actor_id, M2.id, 'wer geloescht hat, steht im Verlauf');
 
+  const rows = ledgerTotal();
   const gone = await adminCall('DELETE', `/auth/users/${M2.id}`);
   assert.equal(gone.status, 200);
+  assert.equal(gone.body.outcome, 'deactivated', 'Mara steht im Verlauf - das ist eine Spur');
+  assert.ok(deactivatedAt(M2.id), 'das Konto steht noch, deaktiviert');
+  assert.equal(ledgerTotal(), rows, 'keine Ledger-Zeile verschwindet');
+  assert.equal(eintrag().actor_id, M2.id, 'der Verlauf nennt sie weiter');
   assert.deepEqual(await balances(), base, 'die geloeschte Ausgabe zaehlt nicht wieder');
   const booked = ledger(eid, 'expense');
   const reversed = ledger(eid, 'expense_reversal');
@@ -253,21 +267,106 @@ test('Konto der LOESCHENDEN Person geloescht: die Ausgabe bleibt aufgehoben, Sal
   assert.deepEqual(reversed.map((row) => row.created_by), booked.map((row) => row.created_by), 'Gegenbuchung traegt den Autor der Originalzeile');
 });
 
-test('Konto der ANLEGENDEN Person geloescht: Buchung und Gegenbuchung fallen gemeinsam', async () => {
+// BIS #1381 STAND HIER DAS GEGENTEIL: das Konto liess sich loeschen, und
+// Ausgabe, Buchung und Gegenbuchung fielen per CASCADE gemeinsam. Jetzt ist die
+// Ausgabe eine Spur, das Konto wird deaktiviert, und alles bleibt stehen.
+test('Konto der ANLEGENDEN Person entfernt: deaktiviert, Ausgabe, Buchung und Gegenbuchung bleiben', async () => {
   const A3 = await member('author3', 'Arne');
   assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: A3.id, role: 'guest' })).status, 201);
   const base = await balances();
   const eid = await addExpense(A3, { title: 'Pizza', amount: '6.00', currency: 'EUR', payer_id: OWN.id, participants: [OWN.id, OTH.id] });
   assert.equal((await del(MGR, eid)).status, 200);
   assert.deepEqual(await balances(), base);
+  const booked = ledger(eid, 'expense');
+  const reversed = ledger(eid, 'expense_reversal');
+  assert.equal(booked.length, 3);
 
-  // Die Ausgabe haengt per `expenses.created_by` CASCADE an Arne.
+  // Arne nimmt an keiner Buchung teil; die Ausgabe haengt per
+  // `expenses.created_by` CASCADE an ihm. Genau deshalb ist sie eine Spur.
+  const rows = ledgerTotal();
   const gone = await adminCall('DELETE', `/auth/users/${A3.id}`);
   assert.equal(gone.status, 200);
+  assert.equal(gone.body.outcome, 'deactivated');
+  assert.ok(deactivatedAt(A3.id));
+  assert.equal(ledgerTotal(), rows, 'keine Ledger-Zeile verschwindet');
+  assert.equal(db.prepare('SELECT status FROM expenses WHERE id = ?').get(eid)?.status, 'deleted', 'die Ausgabe bleibt, als geloescht');
+  assert.deepEqual(ledger(eid, 'expense'), booked, 'die Buchung bleibt');
+  assert.deepEqual(ledger(eid, 'expense_reversal'), reversed, 'die Gegenbuchung bleibt');
+  assert.deepEqual(shape(reversed), mirror(booked));
+  assert.deepEqual(await balances(), base, 'Salden unveraendert');
+});
+
+// Die Kaskade selbst, an der Route vorbei. Die Konten nehmen an keiner Buchung
+// teil - sonst hielte `user_id ON DELETE RESTRICT` das Loeschen auf.
+test('Kaskade auf Datenbankebene: Buchung und Gegenbuchung haengen am selben Konto und fallen nur gemeinsam', async () => {
+  const A4 = await member('author4', 'Asta');
+  const M4 = await member('manager4', 'Mio');
+  assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: A4.id, role: 'guest' })).status, 201);
+  assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: M4.id, role: 'admin' })).status, 201);
+  const base = await balances();
+  const eid = await addExpense(A4, { title: 'Eis', amount: '6.00', currency: 'EUR', payer_id: OWN.id, participants: [OWN.id, OTH.id] });
+  assert.equal((await del(M4, eid)).status, 200);
+  assert.deepEqual(await balances(), base);
+
+  // Loeschende Person: nichts im Ledger haengt an ihr.
+  const rows = ledgerTotal();
+  assert.equal(db.prepare('DELETE FROM users WHERE id = ?').run(M4.id).changes, 1);
+  assert.equal(ledgerTotal(), rows, 'die Gegenbuchung faellt nicht mit der loeschenden Person');
+  assert.deepEqual(await balances(), base, 'die geloeschte Ausgabe zaehlt nicht wieder');
+
+  // Anlegende Person: Ausgabe, Buchung und Gegenbuchung gehen zusammen.
+  assert.equal(db.prepare('DELETE FROM users WHERE id = ?').run(A4.id).changes, 1);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM expenses WHERE id = ?').get(eid).n, 0);
   assert.equal(ledger(eid, 'expense').length, 0);
   assert.equal(ledger(eid, 'expense_reversal').length, 0, 'keine Gegenbuchung ohne ihre Buchung');
+  assert.equal(ledgerTotal(), rows - 6);
   assert.deepEqual(await balances(), base, 'Salden wie vor der Ausgabe');
+});
+
+// Zusammenspiel mit #1381: ein deaktiviertes Konto bleibt in Buchungen und
+// Salden stehen. Eine Ausgabe, die es angelegt hat und an der ein weiteres
+// deaktiviertes Konto beteiligt ist (als Zahler und mit einem Anteil), muss
+// sich von einem aktiven Mitglied weiter loeschen lassen - mit vollstaendiger
+// Gegenbuchung, auch fuer die Zeilen der Ehemaligen.
+test('Ausgabe mit deaktivierten Konten (angelegt von / beteiligt): aktives Mitglied loescht, Gegenbuchung vollstaendig', async () => {
+  const A5 = await member('author5', 'Alma');
+  const P5 = await member('payer5', 'Paul');
+  for (const u of [A5, P5]) {
+    assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: u.id, role: 'guest' })).status, 201);
+  }
+  const base = await balances();
+  assert.equal(base[`${P5.id}:EUR`], undefined, 'Fixture: Paul hat vorher keinen Saldo');
+  // 9.00 EUR, Alma traegt ein, Paul hat bezahlt, Paul + Olivia + Otto.
+  const eid = await addExpense(A5, { title: 'Blumen', amount: '9.00', currency: 'EUR', payer_id: P5.id, participants: [P5.id, OWN.id, OTH.id] });
+  const withExpense = await balances();
+  assert.equal(withExpense[`${P5.id}:EUR`], 600, 'Fixture: Paul bekommt 6.00');
+  assert.equal(withExpense[`${OWN.id}:EUR`], base[`${OWN.id}:EUR`] - 300);
+
+  for (const u of [A5, P5]) {
+    const gone = await adminCall('DELETE', `/auth/users/${u.id}`);
+    assert.equal(gone.status, 200);
+    assert.equal(gone.body.outcome, 'deactivated');
+    assert.ok(deactivatedAt(u.id));
+  }
+  assert.deepEqual(await balances(), withExpense, 'Deaktivieren bewegt keinen Saldo, Paul steht weiter darin');
+  assert.equal((await del(P5, eid)).status, 401, 'der Ehemalige selbst kommt nicht mehr herein');
+  assert.equal((await del(OTH, eid)).status, 403, 'die Rechte sind dieselben geblieben');
+
+  const booked = ledger(eid, 'expense');
+  assert.equal(booked.length, 4, 'Zahler + drei Anteile');
+  assert.equal((await del(MGR, eid)).status, 200);
+  const reversed = ledger(eid, 'expense_reversal');
+  assert.deepEqual(ledger(eid, 'expense'), booked, 'die Buchung bleibt');
+  assert.deepEqual(shape(reversed), mirror(booked), 'jede Zeile aufgehoben, auch die des Ehemaligen');
+  assert.ok(reversed.some((row) => row.user_id === P5.id), 'Fixture: die Gegenbuchung fasst Pauls Zeilen an');
+  assert.ok(reversed.every((row) => row.created_by === A5.id), 'Autor bleibt die (deaktivierte) anlegende Person');
+  const after = await balances();
+  assert.equal(after[`${P5.id}:EUR`] ?? 0, 0, 'Pauls Guthaben ist wieder heraus');
+  assert.deepEqual(Object.fromEntries(Object.entries(after).filter(([, v]) => v !== 0)), Object.fromEntries(Object.entries(base).filter(([, v]) => v !== 0)), 'Salden der anderen wie ohne die Ausgabe');
+  assert.equal(db.prepare("SELECT actor_id FROM expense_activity WHERE type = 'expense_deleted' AND entity_id = ?").get(eid).actor_id, MGR.id);
+  assert.equal((await del(MGR, eid)).status, 404, 'zweites Loeschen bucht nichts');
+  assert.equal(ledger(eid, 'expense_reversal').length, 4);
+  assert.ok(deactivatedAt(A5.id) && deactivatedAt(P5.id), 'beide bleiben deaktiviert');
 });
 
 // 10.00 durch drei laesst einen Rest-Cent bei einer Person. Die Gegenbuchung

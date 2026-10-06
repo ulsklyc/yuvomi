@@ -1133,7 +1133,9 @@ router.delete('/expenses/:id', (req, res) => {
       // zaehlte still wieder im Saldo; mit dem Konto der anlegenden Person
       // fielen Ausgabe und Buchung, und die Gegenbuchung bliebe als Waise
       // stehen. Wer geloescht hat, steht in `expense_deleted`
-      // (expense_activity.actor_id).
+      // (expense_activity.actor_id). Seit #1381 deaktiviert das Entfernen
+      // eines Kontos mit solchen Zeilen es nur noch; die Kaskade steht aber
+      // weiter im Schema, und die Regel haelt das Paar auch dort zusammen.
       for (const row of booked) {
         insert.run(row.group_id, existing.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, row.memo, row.created_by);
       }
