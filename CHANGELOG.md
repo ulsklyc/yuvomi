@@ -233,6 +233,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Documents: Esc closes the viewer again when the PDF took the focus by itself.** Opened by
+  keyboard, a file whose preview fails - one that claims to be a PDF and is not one - left the
+  focus inside the browser's built-in PDF viewer without anyone having touched it, and from
+  there no key reaches the page: Esc did nothing. The same happened after Tab from a blank spot
+  of the dialog. Focus that arrives in the PDF while you are on the keyboard now goes back to
+  the control that had it, so Esc closes and the focus returns to the document you opened. What
+  stays as it is: after a click into the PDF, Esc does not close until you click the dialog or
+  its X. The built-in viewer is a separate part of the browser that keeps its keystrokes, and
+  taking the focus away from a click would break selecting and copying in the PDF (#1511).
 - **Settings: the sheet you are on is visible in the sidebar, not hidden under its search.** The
   sidebar scrolls on its own and its search field stays at the top while it does. When the open
   sheet lay above the visible part - after Back, from the command palette, from a link - the
