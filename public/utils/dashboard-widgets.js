@@ -446,3 +446,30 @@ export function dashboardQuery(config) {
   const query = params.toString();
   return query ? `/dashboard?${query}` : '/dashboard';
 }
+
+/* WELCHE PARAMETER DIE ZAHLEN DER ANTWORT UNBERUEHRT LASSEN (#1680).
+ *
+ * Die Navigations-Badges und Modulkacheln nehmen die `/dashboard`-Antwort der
+ * Seite nur an, wenn sie ungefiltert ist (router.js, `primeModuleCountsFrom`):
+ * `tasks_category` aendert `openTaskCount`, und eine eingeschraenkte Zahl ist
+ * eine andere Zahl. `events_limit` schraenkt nichts ein - es verlaengert eine
+ * Liste, die in keine Zahl eingeht. Ohne diese Ausnahme galt jede Antwort mit
+ * gewaehlter Stufe als gefiltert, und der Router holte anderthalb Sekunden
+ * spaeter dieselbe Aggregation ein zweites Mal, bei jedem Kaltstart.
+ *
+ * ALLOWLIST: was hier nicht steht, gilt als Filter. Ein neuer Parameter kostet
+ * so hoechstens den zweiten Abruf, nie eine falsche Zahl. `events_scope` und
+ * `events_birthdays` stehen bewusst nicht hier - sie waren vor #1680 schon
+ * „gefiltert", und ob sie es bleiben, ist nicht Sache dieser Aenderung. */
+const COUNT_NEUTRAL_PARAMS = new Set(['events_limit']);
+
+/**
+ * @param {string} query Pfad der Uebersichts-Abfrage ('/dashboard' oder '/dashboard?…')
+ * @returns {boolean} true, wenn die Antwort darauf andere Zahlen tragen kann als die ungefilterte
+ */
+export function dashboardQueryFiltersCounts(query) {
+  const text = String(query ?? '');
+  const at = text.indexOf('?');
+  if (at === -1) return false;
+  return [...new URLSearchParams(text.slice(at + 1)).keys()].some((key) => !COUNT_NEUTRAL_PARAMS.has(key));
+}

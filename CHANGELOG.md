@@ -32,7 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   roughly twice as tall as with 5. At "Wide (2x1)" the tile remains the week strip, and the
   Today sheet and wall mode keep their own number of rows. For API clients:
   `GET /api/v1/dashboard` takes `events_limit` with exactly `5`, `8` or `12`; any other value
-  means 5.
+  means 5. "Set as household default" now shows the result at once when a tile option changed
+  what the overview asks for; until now the tile kept its old list until the next refresh.
 
 ### Changed
 

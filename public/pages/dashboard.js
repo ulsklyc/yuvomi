@@ -38,7 +38,7 @@ import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
   COCKPIT_COVERED_WIDGETS,
   nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans,
-  dashboardQuery,
+  dashboardQuery, dashboardQueryFiltersCounts,
 } from '/utils/dashboard-widgets.js';
 import { EVENT_LIMIT_STEPS, EVENT_LIMIT_DEFAULT, clampEventLimit } from '/utils/dashboard-event-limit.js';
 import {
@@ -6161,9 +6161,12 @@ export async function render(container, { user, signal: routeSignal = null } = {
      * Antwort (#868). Sie hier hereinzureichen spart die zweite Aggregation,
      * die der Shell-Aufbau sonst beim Anmelden anstiess - `layoutHintQuery`
      * schraenkt sie allerdings ein, und eine eingeschraenkte Zahl ist eine
-     * andere Zahl, also nimmt der Speicher sie nur ungefiltert an. */
+     * andere Zahl, also nimmt der Speicher sie nur ungefiltert an. Die Stufe
+     * der Kalender-Kachel (`events_limit`, #1680) ist kein Filter: sie aendert
+     * keine Zahl, und mit ihr als „gefiltert" holte der Router die Antwort bei
+     * jedem Kaltstart ein zweites Mal (`dashboardQueryFiltersCounts`). */
     window.yuvomi?.primeModuleCountsFrom?.(dashRes, {
-      filtered: layoutHintQuery('/dashboard') !== '/dashboard',
+      filtered: dashboardQueryFiltersCounts(layoutHintQuery('/dashboard')),
     });
     // Geburtstags-Termine tragen serverseitig einen sprachneutralen Titel
     // („Birthday: <Name>"); anhand von birthday_name in die aktive Sprache
@@ -6511,6 +6514,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       detail: t('dashboard.customizeSetDefaultDetail'),
     });
     if (!confirmed) return;
+    const previousQuery = dashboardQuery(savedWidgetConfig);
     const payload = {
       dashboard_widgets_default: widgetConfig,
       dashboard_today_glance_default: glanceVisible,
@@ -6529,6 +6533,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
     savedGlanceVisible = glanceVisible;
     rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig));
     isCustomizing = false;
+    // Wie beim Speichern: haben sich mit den Optionen die Parameter der Abfrage
+    // geaendert, steht noch die alte Antwort da. Ohne den Abruf zeigte die
+    // Kachel nach „Als Vorgabe fuer alle" weiter fuenf Termine, obwohl gerade
+    // zwoelf veroeffentlicht wurden (#1680) - und „nur meine" weiter alle.
+    await reloadIfQueryChanged(previousQuery);
     rebuildDashboard(widgetConfig);
     window.yuvomi?.showToast(t('dashboard.customizeSetDefaultDone'), 'success');
   }

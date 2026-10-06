@@ -19,6 +19,12 @@
  *        Uhr und Zone sind festgenagelt (Berlin wie die Demo-Saat) mit einem
  *        Gegenlauf in einer Zone, die den Tag verschiebt.
  *
+ *        4. Was die Stufe NICHT sein darf (Codex-Review zu PR #1684): ein
+ *           Filter fuer die Zahlen der Navigation - sonst holt der Router die
+ *           Antwort bei jedem Kaltstart ein zweites Mal -, und beim
+ *           Veroeffentlichen als Haushaltsvorgabe darf die alte Antwort nicht
+ *           stehen bleiben.
+ *
  * Ausfuehren: npm run test:dashboard-event-limit
  */
 import test, { mock } from 'node:test';
@@ -28,6 +34,7 @@ import http from 'node:http';
 import { register } from 'node:module';
 import Database from 'better-sqlite3-multiple-ciphers';
 import express from 'express';
+import { readFileSync } from 'node:fs';
 
 register('./test-browser-loader.mjs', import.meta.url);
 
@@ -491,3 +498,89 @@ test('Heute-Blatt und Wand behalten ihren Deckel, auch mit zwoelf Terminen in de
   assert.equal(wall(today).rows.length, wall(five).rows.length, 'und nicht mehr Zeilen als mit fuenf');
   assert.equal(sheet(today).overflow, 12 - dash.PROGRAM_ROW_CAP, 'der Rest steht hinter „+N weitere"');
 }));
+
+// --------------------------------------------------------------------------
+// 4. Die Stufe ist kein Filter, und Veroeffentlichen holt die Antwort neu
+// --------------------------------------------------------------------------
+
+const badges = await import('../public/utils/nav-badges.js');
+
+test('dashboardQueryFiltersCounts: events_limit allein ist kein Filter, alles andere schon', () => {
+  const f = widgets.dashboardQueryFiltersCounts;
+  assert.equal(f('/dashboard'), false);
+  assert.equal(f('/dashboard?events_limit=8'), false);
+  assert.equal(f('/dashboard?events_limit=12'), false);
+  assert.equal(f(widgets.dashboardQuery(calendarTile({ limit: 12 }))), false, 'der Pfad, den die Seite wirklich baut');
+  // Allowlist: was nicht bekannt zahlenneutral ist, gilt als Filter.
+  assert.equal(f('/dashboard?tasks_category=household'), true);
+  assert.equal(f('/dashboard?notes_category=3'), true);
+  assert.equal(f('/dashboard?events_scope=mine'), true);
+  assert.equal(f('/dashboard?events_birthdays=hide'), true);
+  assert.equal(f('/dashboard?events_limit=12&tasks_category=household'), true, 'die Stufe entschuldigt keinen Filter daneben');
+  assert.equal(f('/dashboard?events_scope=mine&events_limit=12'), true);
+  assert.equal(f('/dashboard?something_new=1'), true);
+  assert.equal(f(undefined), false);
+});
+
+test('die Zahlen der Navigation sind mit und ohne Stufe dieselben - und mit einem echten Filter andere', withClock(THU_14_BERLIN, 'Europe/Berlin', async () => {
+  seedFullCalendar();
+  db.prepare('DELETE FROM tasks').run();
+  const addTask = db.prepare("INSERT INTO tasks (title, priority, status, category, due_date, created_by) VALUES (?, 'high', 'open', ?, ?, ?)");
+  addTask.run('Haushalt ueberfaellig', 'household', '2026-09-20', ADMIN);
+  addTask.run('Haushalt offen', 'household', '2026-09-30', ADMIN);
+  addTask.run('Anderes ueberfaellig', 'other', '2026-09-21', ADMIN);
+  try {
+    const counts = (data) => ({
+      module: badges.moduleCountsFrom(data, { isAdmin: true, shoppingVisible: true }),
+      nav: badges.navBadgeCountsFrom(data),
+    });
+    const plain = counts(await getJson('/'));
+    assert.equal(plain.module.tasks, 3, 'Vorbedingung: drei offene Aufgaben werden gezaehlt');
+    assert.equal(plain.nav['/tasks'], 2, 'Vorbedingung: zwei davon ueberfaellig');
+    for (const step of [8, 12]) {
+      assert.deepEqual(counts(await getJson(`/?events_limit=${step}`)), plain, `events_limit=${step} darf keine Zahl bewegen`);
+    }
+    // Die Messung sieht einen Filter, wenn es einer ist - sonst waere das Gleichheitszeichen oben nichts wert.
+    const filtered = counts(await getJson('/?tasks_category=household'));
+    assert.equal(filtered.module.tasks, 2);
+    assert.equal(filtered.nav['/tasks'], 1);
+  } finally {
+    db.prepare('DELETE FROM tasks').run();
+  }
+}));
+
+// Beide Stellen sind Closures in `render()` und ohne Browser nicht aufrufbar
+// (dieselbe Lage wie in test-waste-dashboard.js). Der Text haelt deshalb den
+// AUFRUF fest; das Verhalten dahinter - die geteilte Funktion und die Zahlen -
+// messen die zwei Tests darueber, den Ablauf die Browser-Probe im PR.
+const pageSource = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+/** Der Rumpf einer Funktion bis zur schliessenden Klammer auf ihrer Einrueckung. */
+function functionBody(source, signature) {
+  const start = source.indexOf(signature);
+  assert.ok(start >= 0, `${signature} nicht gefunden`);
+  const indent = source.slice(source.lastIndexOf('\n', start) + 1, start);
+  const end = source.indexOf(`\n${indent}}\n`, start);
+  assert.ok(end > start, `Ende von ${signature} nicht gefunden`);
+  return source.slice(start, end);
+}
+
+test('die Seite reicht dem Zahlenspeicher die Antwort nach der geteilten Regel, nicht nach „hat Parameter"', () => {
+  const call = /primeModuleCountsFrom\?\.\(dashRes, \{\s*filtered: ([^\n]+?),?\s*\}\)/.exec(pageSource);
+  assert.ok(call, 'der Aufruf von primeModuleCountsFrom ist nicht mehr zu finden');
+  assert.equal(call[1], "dashboardQueryFiltersCounts(layoutHintQuery('/dashboard'))");
+});
+
+test('„Als Vorgabe fuer alle" holt die Antwort neu, wenn sich die Abfrage geaendert hat', () => {
+  const body = functionBody(pageSource, 'async function publishHouseholdDefault()');
+  const before = body.indexOf('const previousQuery = dashboardQuery(savedWidgetConfig);');
+  const saved = body.indexOf('savedWidgetConfig = widgetConfig.map(');
+  const reload = body.indexOf('await reloadIfQueryChanged(previousQuery);');
+  const rebuild = body.indexOf('rebuildDashboard(widgetConfig);');
+  assert.ok(before >= 0, 'der Pfad VOR dem Speichern wird nicht festgehalten');
+  assert.ok(reload >= 0, 'nach dem Veroeffentlichen wird nicht neu geholt - die Kachel zeigte weiter die alte Zahl');
+  assert.ok(before < saved, 'der alte Pfad muss gelesen sein, bevor savedWidgetConfig ueberschrieben wird');
+  assert.ok(saved < reload && reload < rebuild, 'erst speichern, dann neu holen, dann zeichnen');
+  // Derselbe Ablauf wie beim Speichern - der Zwilling, an dem die Luecke auffiel.
+  const persist = functionBody(pageSource, 'async function persistWidgetConfig(nextConfig)');
+  assert.match(persist, /await reloadIfQueryChanged\(previousQuery\);\s*rebuildDashboard\(widgetConfig\);/);
+});
