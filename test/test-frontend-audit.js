@@ -1700,7 +1700,8 @@ test('module-specific settings leaves preserve their required controls and behav
     assert.match(calendar, controlIdPattern(id));
   }
   assert.match(calendar, /api\.get\('\/preferences\/holidays\/countries'\)/);
-  assert.match(calendar, /api\.get\(`\/preferences\/holidays\/subdivisions\/\$\{countryCode\}`\)/);
+  // Mit der UI-Sprache fuer die Regionsnamen (#1723).
+  assert.match(calendar, /api\.get\(`\/preferences\/holidays\/subdivisions\/\$\{countryCode\}\?lang=\$\{encodeURIComponent\(getLocale\(\)\)\}`\)/);
   assert.match(calendar, /api\.post\('\/preferences\/holidays\/sync', \{\}\)/);
   // Die per-user-Vorgaben sind nach personal-calendar gezogen; hier bleibt nur
   // Haushaltweites plus der Verweis dorthin (Critique 2026-07-27).
@@ -19591,7 +19592,13 @@ test('R16: die Abschnittstitel der Haushaltshilfe stehen auf der Buehne, ueber d
   const page = withoutHtmlComments(read('../public/pages/housekeeping.js'));
   assert.doesNotMatch(page, /<section class="housekeeping-card/, 'kein Abschnitt ist selbst die Karte');
   const koepfe = page.match(/<section class="housekeeping-section[^"]*">\s*<div class="housekeeping-section-heading">[\s\S]*?<h2 class="u-section-title">[\s\S]*?<div class="housekeeping-card">/g) ?? [];
-  assert.equal(koepfe.length, 4, 'Letzte Besuche, Zahlungen, Haushaltshilfen, Protokoll: Titel VOR der Flaeche');
+  // Drei, nicht mehr vier (#1723): der Reiter heisst seither wie die Liste
+  // darunter ("Haushaltshilfen"), und eine sichtbare Ueberschrift, die den
+  // Reiter wiederholt, verbietet test-typography.js. Sie bleibt als `.sr-only`
+  // in der Gliederung - vor der Flaeche wie die anderen.
+  assert.equal(koepfe.length, 3, 'Letzte Besuche, Zahlungen, Protokoll: Titel VOR der Flaeche');
+  const liste = page.match(/<section class="housekeeping-section">\s*<h2 class="sr-only">\$\{esc\(t\('housekeeping\.staffTitle'\)\)\}<\/h2>\s*<div class="housekeeping-card">/g) ?? [];
+  assert.equal(liste.length, 1, 'die Liste der Haushaltshilfen traegt ihre Ueberschrift unsichtbar, vor der Flaeche');
   for (const kopf of koepfe) {
     assert.ok(kopf.indexOf('u-section-title') < kopf.indexOf('class="housekeeping-card"'));
   }

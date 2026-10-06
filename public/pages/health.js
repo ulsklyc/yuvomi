@@ -7616,8 +7616,9 @@ function bbtTrendChartMarkup(series) {
  * Tick-Beschriftung zeigt die Intensitäts-WÖRTER ("Leicht"/"Mäßig"/"Stark",
  * dieselben wie symptomIntensityLabelKey() im Tooltip/der Tabelle) statt der
  * nackten Zahl 1-3 - eine ordinale Skala ohne Einheit ist als Wort auf Anhieb
- * lesbar, eine Zahl bräuchte eine zusätzliche Legende dafür. PAD_L (56)
- * trägt die längsten dieser drei Wörter ("Mäßig") ohne Überlauf.
+ * lesbar, eine Zahl bräuchte eine zusätzliche Legende dafür. Wie breit die
+ * Wörter sind, entscheidet die Sprache ("Mäßig" 36px, "Umiarkowane" 78px):
+ * den Platz dafür misst `watchChartGutters()` (utils/chart.js, #1722).
  */
 function symptomIntensityTrendChartMarkup(trend, symptomLabel) {
   return simpleLineChartMarkup({

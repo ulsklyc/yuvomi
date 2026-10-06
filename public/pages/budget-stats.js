@@ -9,7 +9,7 @@ import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { renderSkeletonChart } from '/utils/skeleton.js';
 import { growBars } from '/utils/ux.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
-import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup, niceDomain, fitChartGutter } from '/utils/chart.js';
+import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup, niceDomain } from '/utils/chart.js';
 import { formatMoneyAxis, formatSignedAmount } from '/utils/money.js';
 import { addLocalDays } from '/utils/date.js';
 import { trendMarkup } from '/utils/metric-card.js';
@@ -498,9 +498,9 @@ function renderTrendChart() {
       </div>
     </div>`);
   // Der Gutter folgt dem breitesten Achsenwert (#1607): "₩6,000,000" ist breiter
-  // als die Mindestbreite, die an "5.550 €" bemessen ist. Nach dem Einsetzen,
-  // weil nur ein Wert im Dokument eine Breite hat.
-  fitChartGutter(host);
+  // als die Mindestbreite, die an "5.550 €" bemessen ist. Gemessen wird ohne
+  // Aufruf von hier: `watchChartGutters()` (utils/chart.js) sieht das SVG, sobald
+  // es im Dokument steht (#1722).
   if (window.lucide) lucide.createIcons({ el: host });
   wireTrendPoints(host, shown, pointKey, s);
 }

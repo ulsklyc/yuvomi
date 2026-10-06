@@ -420,6 +420,14 @@
   gap: var(--space-1) var(--space-2);
 }
 
+/* Die Einkaufskategorie einer Zutat. Sie steht sonst nur im Formular; bei
+ * `meals: read` (#1265) steht sie hinter dem Namen, leise wie die Zuordnung
+ * daneben - eine Angabe zur Zutat, nicht ihr Inhalt. */
+.recipe-detail__ingredient-category {
+  font-size: var(--type-caption);
+  color: var(--color-text-tertiary);
+}
+
 /* Die bestaetigte Zuordnung zu einer Vorratszeile (#1314). Als Knopf, wenn das
  * Konto den Vorrat schreiben darf, sonst als stiller Text - derselbe Platz,
  * dieselbe Groesse, damit der Zustand nicht springt. */

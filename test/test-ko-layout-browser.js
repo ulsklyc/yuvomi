@@ -13,8 +13,8 @@
  * Stylesheet-Scan. `getComputedStyle` kennt auch keinen abgeschnittenen
  * SVG-Text - gemessen wird deshalb die Lage des Texts gegen die Kante, die ihn
  * abschneidet. Die Rechnung hinter Punkt 3 haelt `test:chart-gutter` ohne
- * Browser; ob die Budget-Seite den Helfer ruft und Chrome die Formel so
- * anwendet, steht nur hier.
+ * Browser; ob der Budget-Verlauf gemessen wird und Chrome die Formel so
+ * anwendet, steht nur hier (die uebrigen Diagramme: `test:chart-gutter-browser`).
  *
  * DIE GANZE APP im Harness der Dokument-Guards: echter Server, Demo-Seed,
  * angemeldet. Was eine Sonde braucht (Aufgaben, Buchungen, Waehrung), legt sie

@@ -1,5 +1,5 @@
 import { api } from '/api.js';
-import { formatDate, formatTime, t } from '/i18n.js';
+import { formatDate, formatTime, getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { weekStartIndex, weekdayOrder } from '/utils/date.js';
 import { bindInstantSwitch, toggleRowHtml } from '/settings/components.js';
@@ -196,6 +196,52 @@ function appendOptions(select, entries, selectedCode) {
   }
 }
 
+/**
+ * Eine Auswahlliste in der UI-Sprache sortieren (#1723). Der Server sortiert
+ * nach dem Namen, den ER kennt; sobald die Seite die Namen uebersetzt oder in
+ * einer anderen Sprache anfragt, stimmt dessen Reihenfolge nicht mehr.
+ * Gibt eine neue Liste zurueck, die Eingabe bleibt unberuehrt.
+ */
+export function sortHolidayEntries(entries, locale = getLocale()) {
+  const list = Array.isArray(entries) ? [...entries] : [];
+  let compare = (a, b) => a.localeCompare(b);
+  try {
+    compare = new Intl.Collator([locale]).compare;
+  } catch {
+    // Eine Sprache, die Intl nicht annimmt, kostet die Feinheiten der Sortierung, nicht die Liste.
+  }
+  return list.sort((a, b) => compare(String(a?.name ?? ''), String(b?.name ?? '')));
+}
+
+/**
+ * Die Feiertagslaender in der UI-Sprache (#1723). Der Server liefert englische
+ * Namen (OpenHolidays ohne Sprachwunsch, dazu die lokal berechneten Laender),
+ * die Seite druckte sie in jeder Sprache so. Der Name entsteht hier aus dem
+ * ISO-Code, wie bei Sprachen (personal-appearance.js) und Waehrungen
+ * (currency.js); was Intl nicht benennen kann, behaelt den Namen des Servers.
+ * `fallback: 'none'` ist dafuer noetig: sonst gaebe `of()` fuer ein
+ * unbekanntes Land den Code zurueck und der Servername kaeme nie zum Zug.
+ * Alle uebrigen Felder (`schoolHolidays`) reisen mit.
+ */
+export function localizeHolidayCountries(countries, locale = getLocale()) {
+  let displayNames = null;
+  try {
+    displayNames = new Intl.DisplayNames([locale], { type: 'region', fallback: 'none' });
+  } catch {
+    // Ohne DisplayNames bleiben die Namen des Servers stehen.
+  }
+  const named = (Array.isArray(countries) ? countries : []).map((entry) => {
+    let name = null;
+    try {
+      name = displayNames?.of(entry.isoCode) || null;
+    } catch {
+      // `of()` wirft bei einem Code, der keine Region sein kann.
+    }
+    return name ? { ...entry, name } : { ...entry };
+  });
+  return sortHolidayEntries(named, locale);
+}
+
 export function shouldApplySubdivisionResponse({
   requestId,
   latestRequestId,
@@ -334,7 +380,7 @@ export async function runHolidayDiscovery(load, onError) {
   }
 }
 
-async function loadSubdivisions(
+export async function loadSubdivisions(
   select,
   countrySelect,
   countryCode,
@@ -350,7 +396,10 @@ async function loadSubdivisions(
   if (!countryCode) return { selectedResolved: true };
 
   try {
-    const response = await api.get(`/preferences/holidays/subdivisions/${countryCode}`);
+    // `lang` ist die UI-Sprache: die Regionsnamen kommen vom Server, Intl kennt
+    // sie nicht (#1723). Der Pfad bleibt als Literal am Aufruf stehen, damit
+    // test:frontend-audit den Endpunkt dieses Blatts weiter sieht.
+    const response = await api.get(`/preferences/holidays/subdivisions/${countryCode}?lang=${encodeURIComponent(getLocale())}`);
     if (!shouldApplySubdivisionResponse({
       requestId,
       latestRequestId: requestState.latestRequestId,
@@ -361,7 +410,7 @@ async function loadSubdivisions(
     }
 
     const subdivisions = Array.isArray(response?.data) ? response.data : [];
-    appendOptions(select, subdivisions, selectedCode);
+    appendOptions(select, sortHolidayEntries(subdivisions), selectedCode);
     select.disabled = subdivisions.length === 0;
     return {
       selectedResolved: isHolidayValueResolved(subdivisions, selectedCode),
@@ -789,9 +838,9 @@ async function bindEvents(container, preferences) {
   );
   if (!countriesResult.ok || !container.isConnected) return;
 
-  const countries = Array.isArray(countriesResult.value?.data)
-    ? countriesResult.value.data
-    : [];
+  const countries = localizeHolidayCountries(
+    Array.isArray(countriesResult.value?.data) ? countriesResult.value.data : [],
+  );
   countriesData = countries;
   appendOptions(
     countrySelect,

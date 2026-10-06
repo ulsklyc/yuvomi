@@ -203,7 +203,7 @@ function templateLabel(template, field) {
 function visitTextPayload(worker, dateValue, dailyRate, extras) {
   const visitDate = dateValue || todayKey();
   const total = Number(dailyRate || 0) + Number(extras || 0);
-  const name = worker?.display_name || t('housekeeping.staff');
+  const name = worker?.display_name || t('housekeeping.unnamedWorker');
   return {
     event_title: t('housekeeping.calendarVisitTitle', { name }),
     payment_title: t('housekeeping.paymentTaskTitle', { name }),
@@ -357,7 +357,7 @@ function renderShell(container) {
           ${renderTabButton('dashboard', 'layout-dashboard', t('housekeeping.dashboard'))}
           ${renderTabButton('tasks', 'list-checks', t('housekeeping.tasks'))}
           ${renderTabButton('reports', 'file-text', t('housekeeping.reports'))}
-          ${renderTabButton('staff', 'users-round', t('housekeeping.staff'))}
+          ${renderTabButton('staff', 'users-round', t('housekeeping.staffTitle'))}
         </nav>
       </header>
       <div class="housekeeping-content" id="housekeeping-content"></div>
@@ -1181,7 +1181,7 @@ async function unpayVisit(visit, onUnpaid) {
  */
 function visitRowHtml(visit, { dateText, actionsHtml = '', showWorker = true, paymentText, className = '' } = {}) {
   const meta = [
-    showWorker ? (visit.worker_name || t('housekeeping.staff')) : null,
+    showWorker ? (visit.worker_name || t('housekeeping.unnamedWorker')) : null,
     money(visit.total_amount),
     paymentText ?? visitPaymentMeta(visit),
   ].filter(Boolean).join(' · ');
@@ -1554,7 +1554,7 @@ function openVisitReportModal(visit, content = null, { onRefresh = null } = {}) 
             ${visit.worker_avatar_data ? `<img src="${esc(visit.worker_avatar_data)}" alt="${esc(visit.worker_name || '')}">` : esc(initials(visit.worker_name || 'HK'))}
           </div>
           <div>
-            <strong>${esc(visit.worker_name || t('housekeeping.staff'))}</strong>
+            <strong>${esc(visit.worker_name || t('housekeeping.unnamedWorker'))}</strong>
             <span>${esc(scheduleLabel(visit.payment_schedule))}</span>
           </div>
         </div>
@@ -1622,12 +1622,14 @@ function renderStaff(content) {
   `).join('');
   // Personen links, das Protokoll der gewaehlten Person ab der Split-Schwelle
   // daneben (mobil darunter, wie bisher).
+  // „Haushaltshilfen" unter dem Reiter „Haushaltshilfen" nennt die Ebene ein
+  // zweites Mal (#1723: Reiter und Ueberschrift tragen dasselbe Wort, vorher
+  // hiess der Reiter „Personal"). Die Ueberschrift haelt die Gliederung, sie
+  // steht nicht da - wie „Praemien" in den Belohnungen (test-typography.js).
   content.insertAdjacentHTML('beforeend', renderPageColumns({
     main: `
     <section class="housekeeping-section">
-      <div class="housekeeping-section-heading">
-        <h2 class="u-section-title">${esc(t('housekeeping.staffTitle'))}</h2>
-      </div>
+      <h2 class="sr-only">${esc(t('housekeeping.staffTitle'))}</h2>
       <div class="housekeeping-card">
       <div class="housekeeping-staff-list">
         ${workerRows || `<p class="housekeeping-muted">${esc(t('housekeeping.noWorkers'))}</p>`}
@@ -2011,11 +2013,11 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
             if (file.size > maxUploadBytes()) throw new Error(t('documents.fileTooLarge', { size: maxUploadMb() }));
             const receipt = await api.post('/documents', {
               name: t('housekeeping.receiptDocumentName', {
-                name: worker?.display_name || t('housekeeping.staff'),
+                name: worker?.display_name || t('housekeeping.unnamedWorker'),
                 date: formatDate(dateValue),
               }),
               description: t('housekeeping.receiptDocumentDescription', {
-                name: worker?.display_name || t('housekeeping.staff'),
+                name: worker?.display_name || t('housekeeping.unnamedWorker'),
                 date: formatDate(dateValue),
               }),
               category: 'finance',

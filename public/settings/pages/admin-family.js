@@ -167,8 +167,10 @@ function memberHtml(u, currentUserId, { orderable = false, aligned = false } = {
         <i data-lucide="grip-vertical" class="icon-md"></i>
       </span>` : '';
   // Konten der Haushaltshilfe sind keine Familienmitglieder: sie tragen das
-  // Personal-Label statt einer Familienrolle (Audit A2-25e).
-  const familyRole = u.is_worker ? t('housekeeping.staff') : familyRoleLabel(u.family_role);
+  // Label ihrer Rolle statt einer Familienrolle (Audit A2-25e). Ein eigener
+  // Schluessel: der Reiter im Modul nennt die Mehrzahl, der Ersatz fuer einen
+  // fehlenden Namen ist kein Rollenname (#1723).
+  const familyRole = u.is_worker ? t('housekeeping.workerRole') : familyRoleLabel(u.family_role);
   const systemRole = u.role === 'admin' ? ` · ${esc(t('settings.systemAdminBadge'))}` : '';
   // Ein ehemaliges Konto (#1381): die Zeile bleibt, damit sichtbar ist, wen
   // die Verwaltung deaktiviert hat - Eintraege nennen die Person weiter.

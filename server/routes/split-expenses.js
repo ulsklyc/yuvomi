@@ -1481,11 +1481,18 @@ router.post('/groups/:id/recurring', (req, res) => {
     // durch, und eine Serie, die dort wirft, haelt den ganzen Lauf an.
     // Gespeichert wird die gepruefte Fassung, nicht der Request.
     const snapshot = splitSnapshot({ method: parsed.method, amountMinor: parsed.amountMinor, currency: parsed.currency, participants, splits: req.body.splits });
+    // Der Ankertag (#1721): der Tag des ersten Termins ist der Tag, fuer den
+    // die Serie gedacht ist. Der Lauf klemmt in kuerzeren Monaten aufs
+    // Monatsende und hebt danach wieder auf diesen Tag (31 -> 28/29 -> 31).
+    // Gesetzt wird er hier und nirgends sonst: keine Route aendert das Datum
+    // einer Serie, und das Fortsetzen zaehlt nur weiter. Eine Route, die einem
+    // Nutzer das Datum in die Hand gibt, muss den Anker mitsetzen.
+    const anchorDay = Number(parsed.expenseDate.slice(8, 10));
     const result = db.get().prepare(`
       INSERT INTO recurring_expenses
-        (group_id, title, description, amount_minor, currency, payer_id, category, split_method, split_snapshot, frequency, next_run_date, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, parsed.category, parsed.method, JSON.stringify(snapshot), frequency, parsed.expenseDate, userId(req));
+        (group_id, title, description, amount_minor, currency, payer_id, category, split_method, split_snapshot, frequency, next_run_date, anchor_day, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, parsed.category, parsed.method, JSON.stringify(snapshot), frequency, parsed.expenseDate, anchorDay, userId(req));
     activity(groupId, userId(req), 'recurring_created', 'recurring_expense', result.lastInsertRowid, { title: parsed.title, frequency });
     const row = db.get().prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json({ data: decorateMoney(row) });
@@ -1528,7 +1535,7 @@ router.post('/recurring/:id/pause', (req, res) => {
         // dem der Lauf Faelligkeit misst.
         const next = missed === 'book'
           ? { date: current.next_run_date, skipped: 0 }
-          : nextRunNotBefore(current.next_run_date, current.frequency, todayKey(database));
+          : nextRunNotBefore(current.next_run_date, current.frequency, todayKey(database), current.anchor_day);
         database.prepare('UPDATE recurring_expenses SET paused_at = NULL, next_run_date = ? WHERE id = ?').run(next.date, id);
         activity(current.group_id, userId(req), 'recurring_resumed', 'recurring_expense', id, next.skipped ? { skipped: next.skipped } : {});
       }

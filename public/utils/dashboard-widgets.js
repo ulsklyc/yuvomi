@@ -55,7 +55,11 @@ export const WIDGET_SIZE_PRESETS = [
   // (Re-Critique 2026-09-27, W2).
   { value: '2x1', labelKey: 'dashboard.widgetSizeWide'     },
   { value: '1x2', labelKey: 'dashboard.widgetSizeTall'     },
-  { value: '2x2', labelKey: 'dashboard.widgetSizeStandard' },
+  // 2x2 ist die GROESSTE der vier Formen, aber keine ist mehr der Vorschlag:
+  // defaultWidgetSize() liefert 1x2, 2x1 oder 1x1. Der Schluessel hiess
+  // `widgetSizeStandard` („Standard (2×2)") und behauptete damit einen
+  // Ausgangswert, den es nicht gibt (#1723). Der Name sagt jetzt die Form.
+  { value: '2x2', labelKey: 'dashboard.widgetSizeSquare'   },
 ];
 
 // Alle bekannten Größen inkl. Legacy-Werte — für normalizeDashboardConfig-Validierung

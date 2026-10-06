@@ -7,7 +7,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addMonthsClamped, addYearsClamped } from '../server/utils/interval-date.js';
+import { addMonthsClamped, addYearsClamped, liftToAnchorDay } from '../server/utils/interval-date.js';
 import { addBillingCycle } from '../server/services/subscriptions.js';
 import { warrantyEndDate } from '../server/services/inventory-deadlines.js';
 
@@ -47,4 +47,23 @@ test('Parität: addBillingCycle(yearly) stimmt mit addYearsClamped überein', ()
 
 test('Parität: warrantyEndDate stimmt mit addMonthsClamped überein', () => {
   assert.equal(warrantyEndDate('2026-01-31', 1), addMonthsClamped('2026-01-31', 1));
+});
+
+// liftToAnchorDay (#1721): das Gegenstueck zum Klemmen. Der Monat bleibt,
+// gesenkt wird nie, und ohne brauchbaren Anker bleibt das Datum, wie es ist.
+test('liftToAnchorDay hebt auf den Anker, wo der Monat ihn hat, sonst auf den Monatsletzten', () => {
+  assert.equal(liftToAnchorDay('2026-03-28', 31), '2026-03-31');
+  assert.equal(liftToAnchorDay('2026-04-28', 31), '2026-04-30');
+  assert.equal(liftToAnchorDay('2026-02-28', 31), '2026-02-28');
+  assert.equal(liftToAnchorDay('2028-02-28', 29), '2028-02-29');
+  assert.equal(liftToAnchorDay(addMonthsClamped(addMonthsClamped('2026-01-31', 1), 1), 31), '2026-03-31');
+});
+
+test('liftToAnchorDay senkt nie und laesst ohne Anker alles stehen', () => {
+  assert.equal(liftToAnchorDay('2026-03-20', 15), '2026-03-20');
+  assert.equal(liftToAnchorDay('2026-03-15', 15), '2026-03-15');
+  for (const anker of [null, undefined, 0, 32, 1.5, '31', NaN]) {
+    assert.equal(liftToAnchorDay('2026-03-28', anker), '2026-03-28', String(anker));
+  }
+  assert.throws(() => liftToAnchorDay('2026-02-31', 31));
 });

@@ -510,6 +510,33 @@ test('die Groessennamen der Uebersicht sagen die Form, in jeder Sprache verschie
   }
 });
 
+// „Standard (2×2)" hiess die groesste der vier Formen - aber keine Kachel
+// beginnt in ihr (#1723). Ein Name, der einen Ausgangswert behauptet, den es
+// nicht gibt, ist dieselbe Sorte Fehler wie „Schmal" fuer zwei Spalten.
+test('2×2 heisst nach seiner Form, nicht „Standard" - keine Kachel beginnt in dieser Groesse', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const { WIDGET_SIZE_PRESETS, WIDGET_IDS, defaultWidgetSize } = await import('../public/utils/dashboard-widgets.js');
+  const square = WIDGET_SIZE_PRESETS.find((p) => p.value === '2x2');
+  assert.ok(square, '2x2 ist keine waehlbare Groesse mehr - der Test prueft dann nichts');
+  // Die Voraussetzung des Namens, gemessen statt behauptet: sobald ein Widget
+  // wieder in 2x2 beginnt, ist diese Zeile rot und der Name neu zu entscheiden.
+  assert.ok(WIDGET_IDS.length > 5, 'zu wenige Widgets gelesen');
+  assert.deepEqual(WIDGET_IDS.filter((id) => defaultWidgetSize(id) === '2x2'), [],
+    'ein Widget beginnt in 2x2');
+  assert.doesNotMatch(square.labelKey, /standard|default/i, 'der Schluessel nennt 2x2 den Ausgangswert');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const label = (file) => square.labelKey.split('.').reduce((o, k) => o?.[k],
+    JSON.parse(readFileSync(new URL(file, dir), 'utf8')));
+  assert.equal(label('de.json'), 'Quadrat (2×2)');
+  assert.equal(label('en.json'), 'Square (2×2)');
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const { dashboard } = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
+    assert.equal(dashboard.widgetSizeStandard, undefined, `${file}: der alte Name ist als toter Schluessel geblieben`);
+    // Das Malzeichen und die Ziffern der Sprache bleiben, wie die Nachbarn sie fuehren.
+    assert.match(label(file), /\s\((2×2|۲×۲)\)$/u, `${file}: die Massangabe fehlt (${label(file)})`);
+  }
+});
+
 // --------------------------------------------------------
 // Ein einfacher Bindestrich in Faelligkeit und Leerwerten (#1455)
 // --------------------------------------------------------

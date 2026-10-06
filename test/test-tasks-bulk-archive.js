@@ -237,7 +237,10 @@ test('Pille: ausserhalb des Auswahlmodus leer, darin „Fertig" - und mit Auswah
       'drei Kapseln - Ablegen und Tags stehen waehrend der Auswahl im Werkzeugmenue');
     assert.deepEqual(caps.filter((c) => c.danger).map((c) => c.label), ['tasks.bulkDelete'],
       'nur Loeschen traegt die Gefahr - im Pillen-Stil, nicht als gefuellte rote Kapsel');
-    assert.match(caps[1].aria, /tasks\.bulkDeleteAsk\{"count":2\}/, 'Loeschen nennt, wie viele');
+    // #1723: der Name des Knopfs ist eine AUSSAGE ("2 Aufgaben loeschen"). Bis
+    // dahin trug er die Frage des Bestaetigungsschritts, ein Screenreader las
+    // "2 Aufgaben loeschen?" vor, wo sichtbar "Loeschen" steht.
+    assert.equal(caps[1].aria, 'tasks.bulkDeleteLabel{"count":2}', 'Loeschen nennt, wie viele - als Aussage');
 
     tasks.state.selectedTaskIds.delete(1);
     tasks.updateBulkActionsBar(container);
@@ -246,6 +249,39 @@ test('Pille: ausserhalb des Auswahlmodus leer, darin „Fertig" - und mit Auswah
     tasks.state.bulkSelectMode = false;
     tasks.state.selectedTaskIds.clear();
     pillLayer.bar = null;
+  }
+});
+
+// #1723: dass der Knopf einen eigenen Schluessel nimmt, hilft nur, wenn dessen
+// Text in JEDER Sprache keine Frage ist. Gefahren wird das echte t() mit der
+// echten Locale-Datei, nicht der Stub des Loaders - der gibt den Schluessel
+// zurueck und saehe ein vergessenes Fragezeichen nie.
+test('Sammel-Loeschen: der Knopfname ist in jeder Sprache eine Aussage, die Rueckfrage bleibt eine Frage (#1723)', async () => {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const dateien = readdirSync(dir).filter((f) => f.endsWith('.json'));
+  assert.ok(dateien.length >= 26, `nur ${dateien.length} Locale-Dateien gelesen`);
+  // ASCII, vollbreit, arabisch, spanisch eroeffnend, und das griechische
+  // Fragezeichen (ein Semikolon, U+003B oder U+037E).
+  const FRAGE = /[?？؟¿;;]/;
+  for (const datei of dateien) {
+    const locale = datei.replace(/\.json$/, '');
+    const tasksKeys = JSON.parse(readFileSync(new URL(datei, dir), 'utf8')).tasks;
+    const formen = (basis) => Object.keys(tasksKeys).filter((k) => k === basis || k.startsWith(`${basis}_`));
+    const label = formen('bulkDeleteLabel');
+    const ask = formen('bulkDeleteAsk');
+    assert.ok(label.length >= 2, `${locale}: tasks.bulkDeleteLabel fehlt`);
+    assert.deepEqual(label.map((k) => k.replace('bulkDeleteLabel', '')).sort(), ask.map((k) => k.replace('bulkDeleteAsk', '')).sort(),
+      `${locale}: der Knopfname fuehrt dieselben Pluralformen wie die Rueckfrage`);
+    for (const key of label) {
+      assert.doesNotMatch(tasksKeys[key], FRAGE, `${locale}: tasks.${key} ist eine Frage: ${tasksKeys[key]}`);
+      assert.notEqual(tasksKeys[key], tasksKeys[key.replace('bulkDeleteLabel', 'bulkDeleteAsk')], `${locale}: tasks.${key} gleicht der Rueckfrage`);
+    }
+    // Gegenprobe am Detektor: die Rueckfrage MUSS er als Frage erkennen, sonst
+    // waere "keine Frage" oben fuer diese Sprache eine leere Aussage.
+    for (const key of ask) {
+      assert.match(tasksKeys[key], FRAGE, `${locale}: tasks.${key} sieht der Detektor nicht als Frage: ${tasksKeys[key]}`);
+    }
   }
 });
 

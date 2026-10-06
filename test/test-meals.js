@@ -1732,7 +1732,9 @@ test('Essensplan-Board am Desktop: Woche oben, Kopf einzeilig, leere Slots ohne 
   const empty = find('.week-grid .meal-slot--empty');
   assert(/border-color:\s*transparent/.test(empty?.body ?? ''), `der leere Slot traegt keine Kante: ${empty?.body}`);
   assert(/background-color:\s*transparent/.test(empty?.body ?? ''), `und keine Kartenflaeche: ${empty?.body}`);
-  const meant = rules.find((r) => /\.week-grid \.meal-slot--empty:focus-within/.test(r.selector));
+  // `:not(.meal-slot--static)`: bei `meals: read` ist der leere Platz nur Zustand
+  // und nie gemeint (#1265, test-kitchen-readonly-ui.js).
+  const meant = rules.find((r) => /\.week-grid \.meal-slot--empty:not\(\.meal-slot--static\):focus-within/.test(r.selector));
   assert(meant && /border-color:\s*var\(--color-border\)/.test(meant.body), 'bei Fokus kommt die Kante zurueck');
   assert(/:hover/.test(meant.selector), 'und beim Zeiger darueber');
   const drop = [...eachRule(css)].find((r) => r.selector.trim() === '.meal-slot--drop-target');

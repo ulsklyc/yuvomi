@@ -641,8 +641,13 @@ test('die Zeile nennt nur bestehende Zuordnungen, der Weg zu den offenen steht e
     'eine offene Zutat bekommt an der Zeile kein Element');
 
   const sammel = body('pantryMatchBulkEl');
-  assert.match(sammel, /pantryAccess\(\) !== 'write'\) return null/,
+  // Seit #1265 fragt der Knopf BEIDE Rechte, die der Server verlangt (Pfad-Guard
+  // `meals: write`, Route `pantry: write`) - ueber `mayMatchIngredient()`. Das
+  // Verhalten je Rechtekombination faehrt test-kitchen-readonly-ui.js.
+  assert.match(sammel, /if \(!mayMatchIngredient\(recipe\.id\)\) return null/,
     'der Sammelknopf ist eine Handlung - Nur-Lesende bekommen ihn nicht (#467)');
+  assert.match(body('mayMatchIngredient'), /return pantryAccess\(\) === 'write' && mayWritePath\(/,
+    'die Zuordnung braucht das Schreibrecht am Vorrat UND das der Kueche');
   assert.match(sammel, /ingredientMatchOpen/, 'der Sammelknopf nennt die Zahl der offenen Zutaten');
   assert.match(body('ingredientsSectionEl'), /pantryMatchBulkEl\(recipe\)/,
     'der Zutaten-Abschnitt traegt den einen Sammelknopf');
