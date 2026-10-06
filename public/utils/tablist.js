@@ -66,18 +66,69 @@ import { wireScrollFade } from '/utils/ux.js';
  */
 /**
  * Holt einen Tab in den sichtbaren Bereich SEINER Leiste, indem nur deren
- * scrollLeft angepasst wird — anders als Element.scrollIntoView werden
+ * scrollLeft angepasst wird - anders als Element.scrollIntoView werden
  * scrollbare Vorfahren (inkl. overflow:hidden-Container) NICHT mitgescrollt.
- * Auf nicht-überlaufenden Leisten (Desktop) ist es ein No-op.
+ * Auf nicht-ueberlaufenden Leisten (Desktop) ist es ein No-op, ein schon ganz
+ * sichtbarer Tab bewegt die Leiste nicht.
+ *
+ * DAS ZIEL IST EIN RASTPUNKT, NICHT DER KLEINSTE VERSATZ (#1504). Die Bar-Leisten
+ * rasten ein (`scroll-snap-type: x proximity`, Reiter `snap-align: start`,
+ * layout.css) und tragen ein Scroll-Polster (`.u-scroll-fade`, filter-chip.css).
+ * Die Vorfassung schob genau um die fehlenden Pixel - und der Browser zog die
+ * Leiste danach auf den naechsten Rastpunkt, der auch HINTER ihr liegen kann:
+ * Budget "Kredite" bei 390px stand bei 327-404, die Leiste endet bei 374,
+ * scrollLeft blieb 0. Ob es traf, hing an Breite und Sprache (375 zufaellig
+ * ja; 320, 360, 390, 414 nein).
+ *
+ * Deshalb wird die Lage selbst gewaehlt: der erste Rastpunkt, an dem der Tab
+ * samt Polster in die Leiste passt. Ein Rastpunkt ist die Lage, an der ein
+ * Reiter mit seinem Anfang am Polster steht - dort hat das Einrasten nichts
+ * mehr zu verschieben. Gerechnet wird in der Leserichtung (Abstand vom Anfang
+ * der Leiste), damit RTL denselben Weg nimmt: dort laeuft scrollLeft ins
+ * Negative.
  */
 function scrollTabIntoView(container, btn) {
   const c = container.getBoundingClientRect();
-  const b = btn.getBoundingClientRect();
-  if (b.left < c.left) {
-    container.scrollLeft -= c.left - b.left;
-  } else if (b.right > c.right) {
-    container.scrollLeft += b.right - c.right;
+  const size = c.right - c.left;
+  if (!(size > 0)) return;
+  const style = globalThis.getComputedStyle?.(container);
+  const rtl = style?.direction === 'rtl';
+  const sign = rtl ? -1 : 1;
+  const pos = sign * container.scrollLeft;
+  const padStart = parseFloat(style?.scrollPaddingInlineStart) || 0;
+  const padEnd = parseFloat(style?.scrollPaddingInlineEnd) || 0;
+  // Anfang und Ende eines Reiters als Abstand vom Anfang des Leisteninhalts.
+  const span = (el) => {
+    const r = el.getBoundingClientRect();
+    const start = (rtl ? c.right - r.right : r.left - c.left) + pos;
+    return { start, end: start + (r.right - r.left) };
+  };
+  const tab = span(btn);
+  const TOLERANCE = 0.5; // Sub-Pixel: ein buendiger Reiter gilt als sichtbar
+  if (tab.start >= pos - TOLERANCE && tab.end <= pos + size + TOLERANCE) return;
+
+  // Die Lage, an der der Tab selbst am Polster steht - weiter darf die Leiste
+  // nie laufen, sonst verschwaende sein Anfang.
+  const own = tab.start - padStart;
+  let target = own;
+  if (tab.start >= pos) {
+    // Der Tab liegt hinter dem sichtbaren Bereich: so wenig wie moeglich
+    // schieben, aber bis zu einer Lage, die stehen bleibt.
+    const need = tab.end - size + padEnd;
+    const snaps = style?.scrollSnapType && style.scrollSnapType !== 'none'
+      && String(globalThis.getComputedStyle?.(btn)?.scrollSnapAlign ?? '').includes('start');
+    if (snaps) {
+      const points = [...container.querySelectorAll('[data-tab-id]')]
+        .map((b) => span(b).start - padStart)
+        .filter((p) => p >= need && p <= own);
+      if (points.length) target = Math.min(...points);
+    } else {
+      target = Math.min(need, own);
+    }
   }
+  const max = container.scrollWidth - container.clientWidth;
+  if (Number.isFinite(max)) target = Math.min(target, Math.max(0, max));
+  container.scrollLeft = sign * Math.max(0, target);
 }
 
 export function wireTablist(container, { activeId, onChange, activeClass = 'sub-tab--active', mode = 'tabs', manualActivation = false } = {}) {

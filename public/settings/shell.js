@@ -284,17 +284,30 @@ function createNavigation(domains, user, activeLeaf) {
  * ihr sichtbar sein, sonst zeigte ein Deep-Link auf "Gesundheit" rechts das
  * Blatt und links nur Konto und Haushalt. Nur die Leiste scrollt, nie die
  * Seite - `scrollIntoView` zoege den ganzen Port mit.
+ *
+ * SICHTBAR HEISST UNTER DER SUCHE (#1509). Die Suche klebt an der Oberkante
+ * der Leiste (settings.css) und verdeckt dort ihre eigene Hoehe. Die Vorfassung
+ * rechnete mit der Oberkante der Leiste, als laege dort nichts: nach einem
+ * Sprung zu einem Blatt OBERHALB des Ausschnitts (Zurueck, Palette, Deep-Link)
+ * stand der aktive Link bei 32-72 unter der Suche bei 32-100 - alle 40px
+ * verdeckt. Gemessen wird deshalb an den Rechtecken, wie sie stehen: was die
+ * Suche gerade verdeckt, ist ihre Unterkante minus die Oberkante der Leiste.
+ * Eine Suche, die nicht klebt, verdeckt nichts.
  */
 function revealActiveNavigationLink(navigation) {
   const link = navigation?.querySelector('.settings-shell__navigation-link--active');
   if (!link || navigation.scrollHeight <= navigation.clientHeight) return;
-  // Die klebende Leiste ist positioniert und damit der offsetParent der Links.
-  const top = link.offsetParent === navigation ? link.offsetTop : link.offsetTop - navigation.offsetTop;
-  const bottom = top + link.offsetHeight;
-  if (top < navigation.scrollTop) navigation.scrollTop = top;
-  else if (bottom > navigation.scrollTop + navigation.clientHeight) {
-    navigation.scrollTop = bottom - navigation.clientHeight;
-  }
+  const view = navigation.getBoundingClientRect();
+  const box = link.getBoundingClientRect();
+  const search = navigation.querySelector('.settings-shell__navigation-search');
+  const sticks = search && globalThis.getComputedStyle?.(search)?.position === 'sticky';
+  const covered = sticks ? Math.max(0, search.getBoundingClientRect().bottom - view.top) : 0;
+  // Rechtecke stehen in Bildschirmpixeln, scrollTop in Layoutpixeln: waehrend
+  // einer skalierenden Eintrittsanimation weichen die beiden voneinander ab.
+  const scale = (view.height > 0 && navigation.offsetHeight > 0) ? view.height / navigation.offsetHeight : 1;
+  const top = view.top + covered;
+  if (box.top < top) navigation.scrollTop -= (top - box.top) / scale;
+  else if (box.bottom > view.bottom) navigation.scrollTop += (box.bottom - view.bottom) / scale;
 }
 
 // Aktualisiert nur den Aktivzustand der bestehenden Navigation, ohne die Links
@@ -1157,4 +1170,4 @@ export async function renderSettingsShell(container, {
 }
 
 /** Nur fuer Tests (test-settings-navigation.js). */
-export const __test = { awaitSections, SECTION_WAIT_MS };
+export const __test = { awaitSections, SECTION_WAIT_MS, revealActiveNavigationLink };

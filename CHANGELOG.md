@@ -273,6 +273,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same way in every language of the interface, so a person does not show different initials
   depending on who looks: "ipek" gives "I", and whoever types "İpek" keeps the "İ".
 
+- **Documents: Esc closes the viewer again when the PDF took the focus by itself.** Opened by
+  keyboard, a file whose preview fails - one that claims to be a PDF and is not one - left the
+  focus inside the browser's built-in PDF viewer without anyone having touched it, and from
+  there no key reaches the page: Esc did nothing. The same happened after Tab from a blank spot
+  of the dialog. Focus that arrives in the PDF while you are on the keyboard now goes back to
+  the control that had it, so Esc closes and the focus returns to the document you opened. What
+  stays as it is: after a click into the PDF, Esc does not close until you click the dialog or
+  its X. The built-in viewer is a separate part of the browser that keeps its keystrokes, and
+  taking the focus away from a click would break selecting and copying in the PDF (#1511).
+- **Settings: the sheet you are on is visible in the sidebar, not hidden under its search.** The
+  sidebar scrolls on its own and its search field stays at the top while it does. When the open
+  sheet lay above the visible part - after Back, from the command palette, from a link - the
+  sidebar scrolled it to its very top edge, exactly where the search sits: at 1280x700 the active
+  entry stood at 32-72 under a search at 32-100, all 40px of it covered. An entry half behind
+  the search was not moved at all. The sidebar now brings the entry to just below the search
+  (#1509).
+- **Calendar: the week follows the screen when it crosses the phone width.** On a phone the week
+  is a window of three days around the selected day, on a wider screen the whole week, and the
+  label, the arrows and the loaded range follow the same threshold. Only the month was redrawn
+  when the width crossed it. Rotating a tablet or resizing the window from 1280px to 390px left
+  seven columns of 49px each under "CW 41"; the other way round, three columns of 311px each
+  under "05.10. - 07.10.2026", with arrows that still stepped by three days. The week is now
+  rebuilt on that change, its range reloaded first when the other form shows a day that was not
+  loaded (the selected day at the edge of the week), and the day view switches between the long
+  and the short weekday in its label (#1504).
+- **Phones: the tab you are on stays inside the tab strip.** A tab strip that does not fit the
+  screen scrolls, and it snaps to the start of a tab. Opening a tab that lay past the edge moved
+  the strip by exactly the missing pixels, and the snapping then pulled it back to the nearest
+  snap point, which could be the one behind it. Budget "Loans" at 390px stood at 327-404 in a
+  strip that ends at 374, 30px outside and without the strip having moved at all; the same at
+  320px (subscriptions, 21px), 360px (reports, 8px) and 414px (loans 6px, reports 20px), on a tap
+  as well as after a reload. At 375px it happened to work, which is why it looked fixed. The
+  strip now moves to the first snap point at which the tab fits with its padding, so there is
+  nothing left to pull back, and it does so in right-to-left languages too (#1504).
 - **A refused change is sent to the server once, not twice.** When the server turned a change
   down with a reason - a locked task, a read-only module, a recipe managed elsewhere - the app
   sent the same request a second time before showing the message. The repeat exists to recover

@@ -3011,3 +3011,89 @@ test('R16: im Blatt mit Sprungmarken steht die Beschreibung mobil nur im Baum', 
   assert.doesNotMatch(phone?.body ?? '', /display:\s*none/);
 });
 
+
+// #1509: das aktive Blatt steht in der Seitenleiste SICHTBAR, nicht unter der
+// klebenden Suche. Gemessen im Browser (1280x700, Leiste 32-700, Suche klebt
+// bei 32-100): nach einem Sprung zu einem Blatt OBERHALB des sichtbaren
+// Ausschnitts (Zurueck, Palette, Deep-Link) stand der aktive Link bei 32-72,
+// alle 40px unter der Suche. Die Vorfassung rechnete mit der Oberkante der
+// Leiste, als laege dort nichts.
+//
+// Der Stub ist die Leiste als Geometrie: ein Scrollport mit einer Suche, die
+// an seiner Oberkante klebt, und einem Link an fester Stelle im Inhalt. Die
+// Rechtecke folgen scrollTop, wie im Browser.
+function settingsNavigationStub({ linkTop, scrollTop = 0, sticky = true }) {
+  const VIEW_TOP = 32;
+  const CLIENT = 668;
+  const SCROLL = 1408;
+  const SEARCH = 68;
+  const LINK = 40;
+  const state = { top: scrollTop };
+  const search = {
+    offsetHeight: SEARCH,
+    getBoundingClientRect: () => (sticky
+      ? { top: VIEW_TOP, bottom: VIEW_TOP + SEARCH }
+      : { top: VIEW_TOP - state.top, bottom: VIEW_TOP - state.top + SEARCH }),
+  };
+  const link = {
+    offsetTop: linkTop,
+    offsetHeight: LINK,
+    getBoundingClientRect: () => ({ top: VIEW_TOP + linkTop - state.top, bottom: VIEW_TOP + linkTop - state.top + LINK }),
+  };
+  const navigation = {
+    offsetTop: 0,
+    offsetHeight: CLIENT,
+    clientHeight: CLIENT,
+    scrollHeight: SCROLL,
+    get scrollTop() { return state.top; },
+    set scrollTop(value) { state.top = Math.min(SCROLL - CLIENT, Math.max(0, value)); },
+    getBoundingClientRect: () => ({ top: VIEW_TOP, bottom: VIEW_TOP + CLIENT, height: CLIENT }),
+    querySelector: (sel) => (sel.includes('navigation-link--active') ? link : sel.includes('navigation-search') ? search : null),
+  };
+  link.offsetParent = navigation;
+  globalThis.getComputedStyle = (node) => ({ position: node === search && sticky ? 'sticky' : 'static' });
+  /** Wie viele Pixel des Links unter der Suche oder ausserhalb der Leiste liegen. */
+  const hidden = () => {
+    const l = link.getBoundingClientRect();
+    const s = search.getBoundingClientRect();
+    const under = Math.max(0, Math.min(l.bottom, s.bottom) - Math.max(l.top, s.top));
+    return under + Math.max(0, VIEW_TOP - l.top) + Math.max(0, l.bottom - (VIEW_TOP + CLIENT));
+  };
+  return { navigation, hidden };
+}
+
+test('settings sidebar: the active link is revealed below the sticky search, not under it', async () => {
+  const { __test } = await import('/settings/shell.js');
+  assert.equal(typeof __test?.revealActiveNavigationLink, 'function');
+  const previous = globalThis.getComputedStyle;
+  try {
+    // Der gemessene Fall: Leiste weit unten, das aktive Blatt weiter oben.
+    const above = settingsNavigationStub({ linkTop: 485, scrollTop: 728 });
+    __test.revealActiveNavigationLink(above.navigation);
+    assert.equal(above.hidden(), 0, 'ein Link oberhalb des Ausschnitts landet unter der Suche');
+    assert.equal(above.navigation.scrollTop, 485 - 68, 'er steht direkt unter der Suche, nicht weiter');
+
+    // Halb verdeckt: die Oberkante liegt im Ausschnitt, aber hinter der Suche.
+    const half = settingsNavigationStub({ linkTop: 300, scrollTop: 270 });
+    __test.revealActiveNavigationLink(half.navigation);
+    assert.equal(half.hidden(), 0, 'ein von der Suche angeschnittener Link bleibt angeschnitten');
+
+    // Unterhalb: wie bisher bis an die Unterkante.
+    const below = settingsNavigationStub({ linkTop: 1300, scrollTop: 0 });
+    __test.revealActiveNavigationLink(below.navigation);
+    assert.equal(below.hidden(), 0);
+    assert.equal(below.navigation.scrollTop, 1300 + 40 - 668, 'ein Link darunter rueckt nur bis an die Unterkante');
+
+    // Schon sichtbar: die Leiste bleibt stehen.
+    const visible = settingsNavigationStub({ linkTop: 400, scrollTop: 275 });
+    __test.revealActiveNavigationLink(visible.navigation);
+    assert.equal(visible.navigation.scrollTop, 275, 'ein sichtbarer Link bewegt die Leiste nicht');
+
+    // Ohne klebende Suche gibt es nichts abzuziehen.
+    const plain = settingsNavigationStub({ linkTop: 485, scrollTop: 728, sticky: false });
+    __test.revealActiveNavigationLink(plain.navigation);
+    assert.equal(plain.navigation.scrollTop, 485, 'eine mitscrollende Suche verdeckt nichts');
+  } finally {
+    globalThis.getComputedStyle = previous;
+  }
+});
