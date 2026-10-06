@@ -37,6 +37,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Two people with the same initials no longer look the same** (#1464). Linda Johnson and Leo
+  Johnson both showed "LJ" on their avatars, in the people picker, in avatar stacks and on the
+  overview, and colour was the only difference. Whoever shares their initials with somebody
+  else in the household now gets the first letter of their first name and the next letter of
+  it that nobody carries yet: "LI" and "LE". If that letter is taken as well - by Lisa Imhof,
+  "LI" - the next one is used ("LN"), and after the first name the letters of the last name.
+  Everybody whose initials are theirs alone keeps them, it stays at two characters, and the
+  result is the same in every view and for everyone who looks, because it is worked out from
+  the names of all accounts and not from the list a page happens to show. A deactivated
+  account still counts, so nobody's initials change when somebody leaves; they can change
+  when a new person joins or somebody is renamed. Names written without a space in Hangul,
+  Han or Kana take the family name's first character and the given name's last (김민수 and
+  박민수 become 김수 and 박수). Two accounts with exactly the same name stay the same. For
+  API clients: `GET /api/v1/auth/me` and the login answer carry `initialsRoster`, the display
+  names of all accounts; a shared-expenses guest gets an empty list.
+
 - **Removing a member no longer takes their entries with it** (#1381). Deleting someone under
   Settings, Family used to delete everything that person had created as well - appointments,
   tasks, notes, documents, and payments they had recorded for others, which silently changed
@@ -232,6 +248,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shopping on a phone: the add field unfolds** instead of pushing the list down in one step.
 
 ### Fixed
+
+- **An avatar never shows more than one character per name part** (#1464). A name starting
+  with "ß" put three letters on the disc ("ßeta Schmidt" showed "SSS"), because writing a
+  letter in capitals can turn it into two; the same went for the ligatures "ﬁ" and "ﬂ". The
+  disc now keeps one character each ("SS"). Along with it: brackets, quotation marks and
+  other punctuation at the start of a name are skipped ("(Grandma) Erika" shows "GE", not
+  "(E"), and a name part made of punctuation only does not count; an invisible direction
+  mark in front of an Arabic or Hebrew name no longer leaves the disc empty; two Arabic
+  initials stand side by side instead of joining into a word; Georgian letters stay as
+  typed instead of turning into a capital form most fonts cannot draw; the flags of England,
+  Scotland and Wales stay whole on browsers without `Intl.Segmenter`; and two half-width
+  katakana fit the small disc, so they are no longer cut to one. Capitals are formed the
+  same way in every language of the interface, so a person does not show different initials
+  depending on who looks: "ipek" gives "I", and whoever types "İpek" keeps the "İ".
 
 - **A refused change is sent to the server once, not twice.** When the server turned a change
   down with a reason - a locked task, a read-only module, a recipe managed elsewhere - the app
