@@ -1136,6 +1136,17 @@
   font-size: var(--text-sm);
 }
 
+/* Der Rezept-Link in der Leseansicht einer Mahlzeit (`meals: read`, #1265) -
+ * dieselbe Form wie `.item-details__link` im Einkauf, der dort dieselbe Zeile
+ * traegt. Ihn zu oeffnen ist Lesen, also bleibt er ein Link. */
+.meal-read__link {
+  color: var(--module-accent, var(--color-accent));
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.meal-read__link:hover { text-decoration: underline; }
+
 /* Leere Slots tragen keinen „Kein Essen geplant"-Text mehr (Rauschen auf dem
  * Planer-Raster) — nur noch Typ-Label + Plus-Affordanz. */
 
@@ -1516,8 +1527,11 @@
     background-color: transparent;
   }
 
-  .week-grid .meal-slot--empty:hover,
-  .week-grid .meal-slot--empty:focus-within {
+  /* `:not(.meal-slot--static)`: bei `meals: read` (#1265) ist der leere Platz
+   * nur noch Zustand - er traegt kein Plus und nimmt kein Rezept auf. Die
+   * Kante unter dem Zeiger verspraeche beides. */
+  .week-grid .meal-slot--empty:not(.meal-slot--static):hover,
+  .week-grid .meal-slot--empty:not(.meal-slot--static):focus-within {
     border-color: var(--color-border);
   }
 

@@ -311,6 +311,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Meal plan and recipes with read-only access: no more buttons that end in an error message**
+  (#1265). A member who may only read the Kitchen still saw every control on both tabs: the plus
+  buttons and the empty slots, the edit dialog with Save and Delete, the bin on a meal, the drag
+  handle, "Fill plan at random", the recipe column, and on a recipe Edit, Duplicate, Delete and
+  "Add to meal plan". Each of them ended in "no permission"; a dragged meal jumped back, and a
+  deleted one came back after the undo window. Those controls are now gone for such a member.
+  What the plan and the list show stays, and is readable in full: tapping a meal opens a
+  read-only view with everything the form shows - date, meal, ingredients with their shopping
+  category, the saved recipe, notes, the recipe link and whether it repeats. A recipe opens its
+  details as before, which now also name the meals it is meant for and the category of each
+  ingredient. An empty week or an empty recipe list only says so, instead of inviting you to add
+  something. "Add to shopping list" on a recipe keeps following the right it needs: it stays
+  for a member who may read the Kitchen and edit Shopping. Assigning a recipe ingredient to a
+  pantry row needs write access to both the Kitchen and the Pantry, as the server requires; with
+  only the Pantry right the button used to be offered and the save was refused.
+
 - **The PDFs in the demo data are real PDFs** (#1511). The demo documents carried a line of
   placeholder text under a `.pdf` name, so the built-in preview could not open them and
   every screenshot of an opened document showed an error. Each one is now a one-page PDF with
