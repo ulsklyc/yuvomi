@@ -745,16 +745,20 @@ test('Ersteinrichtung mit `rewards: read`: keine Aufforderung, die ins 403 führ
 // Taschengeld (#1734): der Geld-Saldo ist ein Zustand, Abheben/Einzahlen/
 // Buchen/Plan sind Handlungen. WER ein Konto sieht, entscheidet der Server -
 // hier steht nur, was die Seite aus der Antwort macht.
-function mitTaschengeld(fn, { role = 'member', me = 3 } = {}) {
+function mitTaschengeld(fn, { role = 'member', me = 3, former = false } = {}) {
   const vorher = { overview: rewards.state.overview, user: rewards.state.user, money: rewards.state.money, redemptions: rewards.state.redemptions };
   rewards.state.user = { role };
   rewards.state.overview = { me, balances: [] };
+  // DER HAUSHALT FUEHRT INZWISCHEN YEN, das Konto wurde in EUR eroeffnet (#1734):
+  // jede Zahl unten muss aus der Waehrung des KONTOS kommen. Kaeme sie aus der
+  // des Haushalts, staende "7.731 JPY" da und kein "77,31".
+  const EUR = { currency: 'EUR', minor_unit: 2 };
   rewards.state.money = {
-    currency: 'EUR', minor_unit: 2,
-    accounts: [{ id: 3, display_name: 'Emma', balance_minor: 7731, plan: { amount_minor: 500, frequency: 'weekly', anchor_day: 5, next_run_date: '2026-10-09', paused: false } }],
+    currency: 'JPY', minor_unit: 0,
+    accounts: [{ id: 3, display_name: 'Emma', balance_minor: 7731, former, ...EUR, plan: { amount_minor: 500, ...EUR, frequency: 'weekly', anchor_day: 5, next_run_date: '2026-10-09', paused: false } }],
     candidates: role === 'admin' ? [{ id: 4, display_name: 'Leo' }] : [],
   };
-  rewards.state.redemptions = [{ id: 31, user_id: 3, user_name: 'Emma', kind: 'withdrawal', reward_name: 'withdrawal', cost: 421, user_balance: 7731, status: 'pending' }];
+  rewards.state.redemptions = [{ id: 31, user_id: 3, user_name: 'Emma', kind: 'withdrawal', reward_name: 'withdrawal', cost: 421, ...EUR, user_balance: 7731, status: 'pending' }];
   try {
     return fn();
   } finally {
@@ -809,6 +813,46 @@ test('Taschengeld fuer Eltern: buchen, planen, einrichten - und mit `rewards: re
   }, { role: 'admin', me: 1 });
 });
 
+test('Taschengeld: ein ehemaliges Konto traegt das Zeichen und genau eine Handlung - auszahlen', () => {
+  const vorher = globalThis.__openModal;
+  const dialoge = [];
+  globalThis.__openModal = (options) => { dialoge.push(options); };
+  try {
+    mitTaschengeld(() => {
+      withAccess({ rewards: 'write' }, () => {
+        const html = rewards.renderMoneySection();
+        assert.match(html, /settings\.memberFormerBadge/, 'als ehemalig gekennzeichnet');
+        assert.match(html, /data-money-book="3"/, 'abbuchen geht');
+        assert.match(html, /rewards\.money\.debit/);
+        assert.doesNotMatch(html, /rewards\.money\.book[^a-zA-Z]/, 'nicht "Buchen": gutschreiben gibt es nicht mehr');
+        assert.doesNotMatch(html, /data-money-plan|data-money-request/, 'kein Plan, keine Anfrage');
+        assert.match(html, /77[.,]31/, 'das Restguthaben steht da');
+
+        rewards.openMoneyPlanModal(3);
+        assert.equal(dialoge.length, 0, 'der Plan-Dialog oeffnet fuer ein ehemaliges Konto nicht');
+        rewards.openMoneyBookModal(3);
+        assert.equal(dialoge.length, 1);
+        assert.match(dialoge[0].content, /type="hidden" id="rw-money-direction" value="debit"/, 'der Dialog bucht nur ab');
+        assert.doesNotMatch(dialoge[0].content, /value="credit"/);
+      });
+      withAccess({ rewards: 'read' }, () => {
+        const html = rewards.renderMoneySection();
+        assert.doesNotMatch(html, /data-money-book/, 'nur-lesen: auch das Auszahlen ist eine Handlung');
+        assert.match(html, /settings\.memberFormerBadge/);
+      });
+    }, { role: 'admin', me: 1, former: true });
+    // Ein aktives Konto bietet weiter beides.
+    mitTaschengeld(() => withAccess({ rewards: 'write' }, () => {
+      dialoge.length = 0;
+      rewards.openMoneyBookModal(3);
+      assert.match(dialoge[0].content, /value="credit"/);
+      assert.doesNotMatch(rewards.renderMoneySection(), /settings\.memberFormerBadge/);
+    }), { role: 'admin', me: 1 });
+  } finally {
+    globalThis.__openModal = vorher;
+  }
+});
+
 test('Taschengeld: ohne Antwort oder ohne Konto steht kein leerer Abschnitt da', () => {
   mitTaschengeld(() => {
     withAccess({ rewards: 'write' }, () => {
@@ -854,17 +898,24 @@ test('Taschengeld: ein Betrag ueberlebt den Rundlauf durch das Feld, in jeder wa
     for (const currency of CURRENCY_CODES) {
       const digits = minorUnit(currency);
       if (digits !== currencyFractionDigits(currency)) abweichend.push(currency);
-      rewards.state.money = { currency, minor_unit: digits, accounts: [], candidates: [] };
+      // Das KONTO rechnet in `currency`; der Haushalt fuehrt inzwischen eine
+      // andere Waehrung mit anderen Stellen (#1734). Jede Rechnung muss dem
+      // Konto folgen.
+      const household = digits === 0 ? { currency: 'KWD', minor_unit: 3 } : { currency: 'JPY', minor_unit: 0 };
+      rewards.state.money = { ...household, accounts: [], candidates: [] };
+      const account = { currency, minor_unit: digits };
       // Glatt, mit Nachkommastellen (wo die Waehrung welche hat), klein, gross.
       for (const minor of [5000 * 10 ** digits, 123456, 1, 10 ** 12]) {
-        const field = rewards.minorToAmountInput(minor);
-        assert.equal(rewards.moneyAmountProblem(field), null, `${currency} ${minor}: "${field}" ist speicherbar`);
+        const field = rewards.minorToAmountInput(minor, account);
+        assert.equal(rewards.moneyAmountProblem(field, account), null, `${currency} ${minor}: "${field}" ist speicherbar`);
         assert.equal(parseMoneyToMinor(toDecimalString(field), currency), minor,
           `${currency}: ${minor} steht als "${field}" im Feld und kommt als derselbe Betrag zurueck`);
-        assert.equal(rewards.decimalToMinor(toDecimalString(field)), minor, `${currency}: der Vergleich mit dem Guthaben rechnet gleich`);
+        assert.equal(rewards.decimalToMinor(toDecimalString(field), account), minor, `${currency}: der Vergleich mit dem Guthaben rechnet gleich`);
       }
       // Eine Stelle mehr, als der Server annimmt, ist ein Grund am Feld.
-      assert.equal(rewards.moneyAmountProblem(`1,${'1'.repeat(digits + 1)}`), 'precision', `${currency}: zu viele Stellen`);
+      assert.equal(rewards.moneyAmountProblem(`1,${'1'.repeat(digits + 1)}`, account), 'precision', `${currency}: zu viele Stellen`);
+      // Ohne Konto (ein neues wird eroeffnet) gilt die Waehrung des Haushalts.
+      assert.equal(rewards.minorToAmountInput(1, undefined), rewards.minorToAmountInput(1, household));
     }
   } finally {
     rewards.state.money = vorher;
@@ -901,15 +952,18 @@ test('Taschengeld: der Plan-Dialog selbst belegt das Feld mit dem Betrag, den de
     rewards.state.user = { role: 'admin' };
     withAccess({ rewards: 'write' }, () => {
       for (const [currency, minor_unit, stored, shown] of [['HUF', 2, 500000, '5000'], ['IDR', 2, 15000000, '150000'], ['EUR', 2, 500, '5,00'], ['JPY', 0, 500, '500'], ['KWD', 3, 1500, '1,500']]) {
+        // Der Haushalt fuehrt eine ANDERE Waehrung als das Konto.
+        const household = minor_unit === 0 ? { currency: 'KWD', minor_unit: 3 } : { currency: 'JPY', minor_unit: 0 };
         rewards.state.money = {
-          currency, minor_unit, candidates: [],
-          accounts: [{ id: 3, display_name: 'Emma', balance_minor: 0, plan: { amount_minor: stored, frequency: 'weekly', anchor_day: 5, next_run_date: '2026-10-09', paused: false } }],
+          ...household, candidates: [],
+          accounts: [{ id: 3, display_name: 'Emma', balance_minor: 0, currency, minor_unit, plan: { amount_minor: stored, currency, minor_unit, frequency: 'weekly', anchor_day: 5, next_run_date: '2026-10-09', paused: false } }],
         };
         dialoge.length = 0;
         rewards.openMoneyPlanModal(3);
         assert.equal(dialoge.length, 1, `${currency}: der Dialog oeffnet`);
         const value = dialoge[0].content.match(/id="rw-money-amount"[^>]*value="([^"]*)"/)?.[1];
         assert.equal(value, shown, `${currency}: ${stored} kleinste Einheiten stehen als "${shown}" im Feld`);
+        assert.match(dialoge[0].content, new RegExp(`\\(${currency}\\)`), `${currency}: das Feld nennt die Waehrung des Kontos, nicht die des Haushalts`);
       }
     });
   } finally {
@@ -980,7 +1034,9 @@ test('Geldbuchungen im Verlauf: was sie waren, steht in ihren Feldern', () => {
     assert.equal(rewards.moneyRowKind({ delta: -1234, type: 'redeem', request_kind: 'withdrawal' }), 'withdrawal');
     assert.equal(rewards.moneyRowKind({ delta: 300, type: 'bonus' }), 'credit');
     assert.equal(rewards.moneyRowKind({ delta: -300, type: 'adjust' }), 'debit');
-    const html = rewards.moneyLedgerRowHtml({ delta: -1234, type: 'redeem', request_kind: 'withdrawal', reason: '<b>Kino</b>', created_at: '2026-10-06T10:00:00Z' });
+    const html = rewards.moneyLedgerRowHtml({ delta: -1234, currency: 'EUR', minor_unit: 2, type: 'redeem', request_kind: 'withdrawal', reason: '<b>Kino</b>', created_at: '2026-10-06T10:00:00Z' });
+    // Eine Zeile aus der Zeit vor einem Neuanfang traegt ihre eigene Waehrung.
+    assert.match(rewards.moneyLedgerRowHtml({ delta: 500, currency: 'KWD', minor_unit: 3, type: 'bonus', created_at: '2026-10-06T10:00:00Z' }), /0[.,]500/);
     assert.match(html, /12[.,]34/);
     assert.match(html, /rw-delta--neg/);
     assert.doesNotMatch(html, /<b>Kino<\/b>/, 'die Notiz des Kindes laeuft durch esc()');

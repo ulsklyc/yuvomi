@@ -15,7 +15,7 @@
  *
  * GELD UND PUNKTE BEGEGNEN SICH NIE. Beide liegen in `reward_ledger`, getrennt
  * durch `unit`; es gibt keinen Umtausch. Geld steht in ganzen kleinsten
- * Einheiten der Haushaltswaehrung (wie `amount_minor` der geteilten Ausgaben),
+ * Einheiten mit ihrem Waehrungscode (wie `amount_minor` der geteilten Ausgaben),
  * nie als Gleitkommazahl.
  *
  * KEIN `await` IN DIESER DATEI. Der Treiber ist synchron, und jede Pruefung
@@ -23,8 +23,8 @@
  * Lesen und Schreiben kommt kein anderer Request dazwischen.
  */
 
-import { householdMemberSql, isHouseholdMember, memberOrderSql, memberPositionSql } from './household-members.js';
-import { ledgerBalance, ledgerBalanceSql } from './rewards.js';
+import { activeAccountSql, householdMemberSql, isActiveAccount, isHouseholdMember, memberOrderSql, memberPositionSql } from './household-members.js';
+import { ledgerBalance, ledgerBalanceSql, postLedger } from './rewards.js';
 import { minorUnit, parseMoneyToMinor } from './split-expenses.js';
 import { isDisplayRequest } from './display-acting.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
@@ -55,10 +55,11 @@ export function creditFits(d, userId, amountMinor) {
   return ledgerBalance(d, userId, 'money') + amountMinor <= Number.MAX_SAFE_INTEGER;
 }
 
-/** Ein Fehler in der Form, die die Routen als 400 weiterreichen. */
-function inputError(message) {
+/** Ein Fehler in der Form, die die Routen als 400 weiterreichen - mit maschinenlesbarem Grund, wo es einen gibt. */
+function inputError(message, reason = null) {
   const err = new Error(message);
   err.name = 'SplitInputError';
+  if (reason) err.reason = reason;
   return err;
 }
 
@@ -122,24 +123,96 @@ export function moneyParams(reader) {
 // Betraege
 // --------------------------------------------------------
 
-/** Waehrung und Nachkommastellen, in denen dieser Haushalt Geld fuehrt. */
-export function moneyCurrency(d) {
-  const currency = householdCurrency(d);
+/** Ein Waehrungscode mit den Nachkommastellen, in denen er gespeichert wird (ISO 4217). */
+function currencyView(currency) {
   return { currency, minor_unit: minorUnit(currency) };
+}
+
+/**
+ * Waehrung und Nachkommastellen des HAUSHALTS, heute. Darin wird ein NEUES
+ * Konto eroeffnet - ein bestehendes rechnet in seiner eigenen (`accountCurrency`).
+ */
+export function moneyCurrency(d) {
+  return currencyView(householdCurrency(d));
+}
+
+/*
+ * EIN KONTO HAT GENAU EINE WAEHRUNG, UND SIE STEHT AN SEINEN ZEILEN (#1734).
+ *
+ * Die erste Fassung fuehrte keinen Code: wechselte der Haushalt von EUR auf
+ * JPY, wurden aus 1,00 EUR (100 kleinste Einheiten) hundert Yen. Jetzt traegt
+ * jede Geldzeile, jede Geld-Anfrage und der Plan ihren Code, wie die geteilten
+ * Ausgaben. Festgelegt wird er beim EROEFFNEN - die Haushaltswaehrung jenes
+ * Tages -, und ein spaeterer Wechsel des Haushalts laesst das Konto, wie es ist.
+ *
+ * WELCHE WAEHRUNG EIN KONTO HAT, sagt, was an ihm noch gilt, in dieser Folge:
+ *   1. der Plan;
+ *   2. eine offene Geld-Anfrage;
+ *   3. das Guthaben: ist der Saldo nicht null, die juengste Geldzeile.
+ * Gilt nichts davon - kein Plan, nichts offen, Saldo null -, ist das Konto
+ * LEER und hat keine Waehrung (`null`). Das naechste Eroeffnen nimmt dann die
+ * heutige Haushaltswaehrung. Die alten Zeilen behalten ihren Code und summieren
+ * sich in ihm zu null; deshalb bleibt die eine Summe ueber alle Geldzeilen der
+ * Saldo, auch ueber einen solchen Neuanfang hinweg. Ein Konto MIT Guthaben
+ * wechselt nie: umrechnen hiesse einen Kurs erfinden.
+ */
+export function accountCurrency(d, userId) {
+  const plan = d.prepare('SELECT currency FROM reward_allowances WHERE user_id = ?').get(userId);
+  if (plan) return plan.currency;
+  const open = d.prepare(`
+    SELECT currency FROM reward_redemptions
+    WHERE user_id = ? AND status = 'pending' AND kind != 'reward' ORDER BY id DESC LIMIT 1
+  `).get(userId);
+  if (open) return open.currency;
+  if (ledgerBalance(d, userId, 'money') === 0) return null;
+  return d.prepare("SELECT currency FROM reward_ledger WHERE user_id = ? AND unit = 'money' ORDER BY id DESC LIMIT 1").get(userId)?.currency ?? null;
+}
+
+/** Waehrung und Nachkommastellen, in denen DIESES Konto rechnet (ein leeres: die des Haushalts). */
+export function moneyCurrencyOf(d, userId) {
+  return currencyView(accountCurrency(d, userId) ?? householdCurrency(d));
+}
+
+/**
+ * Die Waehrung fuer eine Buchung, eine Anfrage oder einen Plan dieser Person.
+ * Nennt der Aufrufer selbst einen Code (`requested`), muss es dieser sein -
+ * sonst ein Eingabefehler mit `currency_mismatch`. Ohne Angabe gilt die des
+ * Kontos.
+ */
+export function resolveMoneyCurrency(d, userId, requested = undefined) {
+  const view = moneyCurrencyOf(d, userId);
+  if (requested !== undefined && requested !== null && requested !== view.currency) {
+    throw inputError(`This pocket money account is kept in ${view.currency}.`, 'currency_mismatch');
+  }
+  return view;
+}
+
+/**
+ * DIE EINE STELLE, DIE EINE GELDZEILE SCHREIBT (ausser der Gutschrift nach
+ * Plan, die den Code ihres Plans traegt). Sie prueft IN DER TRANSAKTION des
+ * Aufrufers, dass die Zeile die Waehrung des Kontos traegt: zwischen dem
+ * Lesen der Kontowaehrung und der Buchung liegt kein `await`.
+ */
+export function postMoney(d, { userId, delta, type, reason = null, redemptionId = null, createdBy = null, currency }) {
+  const account = accountCurrency(d, userId);
+  if (typeof currency !== 'string' || (account && account !== currency)) {
+    throw inputError(`This pocket money account is kept in ${account ?? 'another currency'}.`, 'currency_mismatch');
+  }
+  return postLedger(d, { userId, delta, type, reason, redemptionId, createdBy, unit: 'money', currency });
 }
 
 /**
  * Ein Betrag aus dem Request als ganze kleinste Einheiten.
  *
  * Als Dezimal-TEXT ("5.00"), nie als Zahl: derselbe Parser wie die geteilten
- * Ausgaben, mit den ISO-4217-Stellen der Haushaltswaehrung. Er wirft
- * `SplitInputError` mit einem Satz, den die Route als 400 weiterreicht.
+ * Ausgaben, mit den ISO-4217-Stellen der KONTO-Waehrung (`currency`, aus
+ * `resolveMoneyCurrency()`). Er wirft `SplitInputError` mit einem Satz, den die
+ * Route als 400 weiterreicht.
  */
-export function parseMoneyAmount(d, value, field = 'amount') {
+export function parseMoneyAmount(value, currency, field = 'amount') {
   // NUR EIN TEXT. `parseMoneyToMinor()` zwingt alles andere durch String():
   // aus `["5"]` wurde "5" und damit ein gueltiger Betrag (Review zu #1745).
   if (typeof value !== 'string') throw inputError(`${field} must be sent as a decimal string.`);
-  const { currency } = moneyCurrency(d);
   const minor = parseMoneyToMinor(value, currency, field);
   if (minor > MAX_MONEY_MINOR) throw inputError(`${field} is too large.`);
   return minor;
@@ -188,6 +261,7 @@ function planView(row) {
   if (!row) return null;
   return {
     amount_minor: row.amount_minor,
+    ...currencyView(row.currency),
     frequency: row.frequency,
     anchor_day: row.anchor_day,
     next_run_date: row.next_run_date,
@@ -195,14 +269,65 @@ function planView(row) {
   };
 }
 
+/*
+ * EIN EHEMALIGES KONTO WIRD NUR NOCH AUSGEZAHLT (#1734).
+ *
+ * Wer kein Haushaltsmitglied mehr ist (deaktiviertes Konto), sammelt nicht
+ * weiter und stellt nichts mehr an - aber sein Restguthaben ist Geld, das die
+ * Eltern noch verwahren. Die erste Fassung nahm das Konto aus jeder Liste: das
+ * Guthaben stand dann auf einem Konto, das niemand mehr sah, und eine alte
+ * offene Einzahlung liess sich darauf sogar noch freigeben.
+ *
+ * Die Regel fuer den Zustand, an EINER Stelle (`closeFormerMoney()` fuer den
+ * Wechsel, `isFormerMoneyAccount()` fuer die Frage):
+ *   - offene Geld-Anfragen werden storniert, der Plan pausiert;
+ *   - solange Guthaben da ist, sehen ADMINS das Konto weiter (`former: true`)
+ *     und duerfen nur noch abbuchen, nie unter null;
+ *   - Gutschrift, Freigabe einer Anfrage, Plan aendern oder fortsetzen: abgewiesen
+ *     mit `account_deactivated`;
+ *   - bei Saldo null verschwindet es aus der Liste.
+ * Wird das Konto wieder aktiviert, ist es ein Mitglied wie zuvor; der Plan
+ * bleibt pausiert, bis ihn jemand fortsetzt, und Storniertes bleibt storniert.
+ */
+
+/** Gibt es dieses Konto, und ist es deaktiviert? */
+export function isFormerMoneyAccount(d, userId) {
+  if (!userId || !d.prepare('SELECT 1 AS yes FROM users WHERE id = ?').get(userId)) return false;
+  return !isActiveAccount(userId, { db: d });
+}
+
 /**
- * Die Konten, die dieser Leser sehen darf - mit Saldo und Plan. Fuer ein Kind
- * hoechstens das eigene, fuer Admins alle, fuer ein Display keins. Nur
- * Haushaltsmitglieder (#1207): ein deaktiviertes Konto behaelt seine
- * Buchungen, steht aber in keiner Liste.
+ * Was am Geld endet, wenn jemand kein Haushaltsmitglied mehr ist: offene
+ * Geld-Anfragen werden storniert (mit Grund, `decided_by` NULL - das war
+ * niemand), der Plan pausiert. Idempotent. Gerufen dort, wo der Zustand
+ * wechselt (`deactivate()` in server/services/user-removal.js), und vom Lauf
+ * fuer Konten, die schon vorher deaktiviert waren.
+ */
+export function closeFormerMoney(d, userId) {
+  const cancelled = d.prepare(`
+    UPDATE reward_redemptions
+    SET status = 'cancelled', decision_reason = 'account_deactivated', decided_by = NULL,
+        decided_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+    WHERE user_id = ? AND status = 'pending' AND kind != 'reward'
+  `).run(userId).changes;
+  const paused = d.prepare(`
+    UPDATE reward_allowances
+    SET paused_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+    WHERE user_id = ? AND paused_at IS NULL
+  `).run(userId).changes;
+  return { cancelled, paused };
+}
+
+/**
+ * Die Konten, die dieser Leser sehen darf - mit Saldo, Waehrung und Plan. Fuer
+ * ein Kind hoechstens das eigene, fuer Admins alle, fuer ein Display keins.
+ * Haushaltsmitglieder (#1207) - und, NUR FUER ADMINS, ehemalige Konten mit
+ * Restguthaben (`former: true`, ans Ende sortiert). Der Admin-Zweig steht als
+ * eigene Bedingung an dieser Abfrage und nicht in `moneyVisibleSql()`: ein
+ * Ehemaliger ist auch fuer sich selbst keine Zeile mehr.
  */
 export function listMoneyAccounts(d, reader) {
-  const rows = d.prepare(`
+  const members = d.prepare(`
     SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
            ${memberPositionSql('u')} AS sort_order,
            ${ledgerBalanceSql('money', 'u.id')} AS balance_minor
@@ -213,7 +338,34 @@ export function listMoneyAccounts(d, reader) {
     ORDER BY ${memberOrderSql('u')}
   `).all(moneyParams(reader));
   const plan = d.prepare('SELECT * FROM reward_allowances WHERE user_id = ?');
-  return rows.map((row) => ({ ...row, plan: planView(plan.get(row.id)) }));
+  const view = (former) => (row) => ({
+    ...row,
+    former,
+    ...moneyCurrencyOf(d, row.id),
+    plan: planView(plan.get(row.id)),
+  });
+  return [...members.map(view(false)), ...listFormerMoneyAccounts(d, reader).map(view(true))];
+}
+
+/**
+ * Ehemalige Konten mit Restguthaben - NUR FUER ADMINS, und die einzige
+ * Personenliste dieses Moduls, die bewusst am Mitglieder-Praedikat vorbeigeht
+ * (Allowlist in test/test-household-member-guard.js): sie zeigt genau die
+ * Konten, die keine Mitglieder mehr sind, damit das Geld darauf nicht
+ * unsichtbar wird. Fuer jeden anderen Leser ist sie leer, ohne die Datenbank
+ * zu fragen.
+ */
+function listFormerMoneyAccounts(d, reader) {
+  if (!reader || !reader.admin || reader.display) return [];
+  const balance = ledgerBalanceSql('money', 'u.id');
+  return d.prepare(`
+    SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
+           NULL AS sort_order,
+           ${balance} AS balance_minor
+    FROM users u
+    WHERE NOT ${activeAccountSql('u')} AND ${balance} > 0
+    ORDER BY u.display_name COLLATE NOCASE ASC, u.id ASC
+  `).all();
 }
 
 /** Mitglieder ohne Konto - die Auswahl, aus der Eltern eines eroeffnen. */
@@ -232,7 +384,7 @@ export function listMoneyCandidates(d) {
  */
 export function listMoneyLedger(d, reader, { userId = null, limit = 100 } = {}) {
   return d.prepare(`
-    SELECT l.id, l.user_id, l.delta, l.type, l.reason, l.allowance_date,
+    SELECT l.id, l.user_id, l.delta, l.currency, l.type, l.reason, l.allowance_date,
            l.redemption_id, r.kind AS request_kind, l.created_at,
            u.display_name AS user_name, u.avatar_color AS user_color, u.avatar_data AS user_avatar,
            a.display_name AS actor_name
@@ -245,7 +397,8 @@ export function listMoneyLedger(d, reader, { userId = null, limit = 100 } = {}) 
       ${userId ? 'AND l.user_id = @userId' : ''}
     ORDER BY l.created_at DESC, l.id DESC
     LIMIT @limit
-  `).all({ ...moneyParams(reader), ...(userId ? { userId } : {}), limit });
+  `).all({ ...moneyParams(reader), ...(userId ? { userId } : {}), limit })
+    .map((row) => ({ ...row, minor_unit: minorUnit(row.currency) }));
 }
 
 // --------------------------------------------------------
@@ -278,7 +431,7 @@ function stepAnchor(plan) {
 /**
  * Plan einer Person lesen und pruefen. Gibt `{ error }` oder die Werte zurueck.
  */
-export function readPlanInput(d, body) {
+export function readPlanInput(d, userId, body) {
   const frequency = body?.frequency;
   if (!ALLOWANCE_FREQUENCIES.includes(frequency)) return { error: 'frequency must be weekly or monthly.' };
   const anchorDay = Number(body?.anchor_day);
@@ -287,15 +440,17 @@ export function readPlanInput(d, body) {
     return { error: `anchor_day must be a whole number from 1 to ${max}.` };
   }
   let amountMinor;
+  let currency;
   try {
-    amountMinor = parseMoneyAmount(d, body?.amount);
+    ({ currency } = resolveMoneyCurrency(d, userId, body?.currency));
+    amountMinor = parseMoneyAmount(body?.amount, currency);
   } catch (err) {
-    if (err?.name === 'SplitInputError') return { error: err.message };
+    if (err?.name === 'SplitInputError') return { error: err.message, reason: err.reason };
     throw err;
   }
   if (body?.paused !== undefined && typeof body.paused !== 'boolean') return { error: 'paused must be a boolean.' };
   // `undefined` heisst "nicht angefasst": der gespeicherte Zustand bleibt.
-  return { frequency, anchorDay, amountMinor, paused: body?.paused };
+  return { frequency, anchorDay, amountMinor, currency, paused: body?.paused };
 }
 
 /**
@@ -329,6 +484,10 @@ export function savePlan(d, userId, input, { actorId = null, today = todayKey(d)
     const before = d.prepare('SELECT * FROM reward_allowances WHERE user_id = ?').get(userId);
     if (before && before.paused_at == null && before.next_run_date <= today) creditPlan(d, before, today);
     const existing = d.prepare('SELECT * FROM reward_allowances WHERE user_id = ?').get(userId);
+    // DIE WAEHRUNG DES PLANS IST DIE DES KONTOS, geprueft hier in der
+    // Transaktion: ein bestehender Plan behaelt seinen Code fuer immer, ein
+    // neuer nimmt den des Kontos - oder, ist es leer, den des Haushalts heute.
+    const { currency } = resolveMoneyCurrency(d, userId, input.currency);
     input = { ...input, paused: input.paused ?? (existing ? existing.paused_at != null : false) };
     const rasterChanged = !existing
       || existing.frequency !== input.frequency || existing.anchor_day !== input.anchorDay;
@@ -340,9 +499,9 @@ export function savePlan(d, userId, input, { actorId = null, today = todayKey(d)
 
     if (!existing) {
       d.prepare(`
-        INSERT INTO reward_allowances (user_id, amount_minor, frequency, anchor_day, next_run_date, paused_at, created_by)
-        VALUES (?, ?, ?, ?, ?, CASE WHEN ? = 1 THEN strftime('%Y-%m-%dT%H:%M:%SZ', 'now') END, ?)
-      `).run(userId, input.amountMinor, input.frequency, input.anchorDay, nextRun, input.paused ? 1 : 0, actorId);
+        INSERT INTO reward_allowances (user_id, amount_minor, currency, frequency, anchor_day, next_run_date, paused_at, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, CASE WHEN ? = 1 THEN strftime('%Y-%m-%dT%H:%M:%SZ', 'now') END, ?)
+      `).run(userId, input.amountMinor, currency, input.frequency, input.anchorDay, nextRun, input.paused ? 1 : 0, actorId);
     } else {
       d.prepare(`
         UPDATE reward_allowances
@@ -371,8 +530,8 @@ export function savePlan(d, userId, input, { actorId = null, today = todayKey(d)
  * und neu angelegt wird, zwei Prozesse auf derselben Datei - alle buchen einmal.
  */
 const CREDIT_SQL = `
-  INSERT INTO reward_ledger (user_id, delta, type, reason, created_by, unit, allowance_date)
-  VALUES (?, ?, 'bonus', NULL, NULL, 'money', ?)
+  INSERT INTO reward_ledger (user_id, delta, type, reason, created_by, unit, currency, allowance_date)
+  VALUES (?, ?, 'bonus', NULL, NULL, 'money', ?, ?)
   ON CONFLICT(user_id, allowance_date) WHERE allowance_date IS NOT NULL DO NOTHING
 `;
 
@@ -395,11 +554,7 @@ const CREDIT_SQL = `
  */
 function creditPlan(d, plan, today) {
   if (!isHouseholdMember(plan.user_id, { db: d })) {
-    d.prepare(`
-      UPDATE reward_allowances
-      SET paused_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-      WHERE id = ? AND paused_at IS NULL
-    `).run(plan.id);
+    closeFormerMoney(d, plan.user_id);
     return { credited: 0, paused: true };
   }
   const credit = d.prepare(CREDIT_SQL);
@@ -410,7 +565,7 @@ function creditPlan(d, plan, today) {
     // Ein Saldo jenseits der exakten Zahlen ist keiner mehr: der Plan bleibt
     // auf diesem Termin stehen, statt eine Summe zu bauen, die niemand lesen kann.
     if (!creditFits(d, plan.user_id, plan.amount_minor)) break;
-    credited += credit.run(plan.user_id, plan.amount_minor, date).changes;
+    credited += credit.run(plan.user_id, plan.amount_minor, plan.currency, date).changes;
     const next = addInterval(date, plan.frequency, anchor);
     // Ein Schritt, der nicht vorrueckt, liefe sonst bis zur Obergrenze im Kreis.
     if (!(next > date)) break;
@@ -444,6 +599,22 @@ export function creditDueAllowances(d, { now = new Date(), today = todayKey(d, n
     ORDER BY next_run_date ASC, id ASC
   `).all(today);
   const result = { credited: 0, paused: 0, failed: 0 };
+  // Konten, die schon deaktiviert waren, bevor es diese Regel gab (oder deren
+  // Zustand an `deactivate()` vorbei wechselte): ihre offenen Geld-Anfragen
+  // enden beim naechsten Lauf. Den Plan faengt die Schleife darunter.
+  const stranded = d.prepare(`
+    SELECT DISTINCT r.user_id FROM reward_redemptions r
+    JOIN users u ON u.id = r.user_id
+    WHERE r.status = 'pending' AND r.kind != 'reward' AND NOT ${householdMemberSql('u')}
+  `).all();
+  for (const row of stranded) {
+    try {
+      d.transaction(() => closeFormerMoney(d, row.user_id))();
+    } catch (err) {
+      result.failed += 1;
+      onError?.({ id: null, user_id: row.user_id }, err);
+    }
+  }
   for (const plan of due) {
     try {
       const out = d.transaction(() => creditPlan(d, plan, today))();

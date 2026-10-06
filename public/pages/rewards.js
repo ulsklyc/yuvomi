@@ -537,9 +537,9 @@ function renderPendingPanel() {
   const title = (r) => (isMoneyRequest(r)
     ? esc(t(r.kind === 'deposit' ? 'rewards.money.ledgerDeposit' : 'rewards.money.ledgerWithdrawal'))
     : `${esc(r.reward_icon ? `${r.reward_icon} ` : '')}${esc(r.reward_name)}`);
-  const amount = (r) => (isMoneyRequest(r) ? fmtMoney(r.cost) : pointsLabel(r.cost));
+  const amount = (r) => (isMoneyRequest(r) ? fmtMoney(r.cost, r) : pointsLabel(r.cost));
   const moneyBalance = (r) => (isMoneyRequest(r) && isAdmin() && r.user_balance != null
-    ? `<p class="rw-pending__meta">${esc(t('rewards.money.title'))}: ${esc(fmtMoney(r.user_balance))}</p>`
+    ? `<p class="rw-pending__meta">${esc(t('rewards.money.title'))}: ${esc(fmtMoney(r.user_balance, r))}</p>`
     : '');
   const rows = state.redemptions.map((r) => `
     <li class="rw-pending" data-redemption="${r.id}">
@@ -1313,8 +1313,20 @@ function isMoneyRequest(row) {
   return !!row && row.kind != null && row.kind !== 'reward';
 }
 
-function moneyCurrencyCode() {
-  return state.money?.currency || 'EUR';
+/*
+ * JEDES GELDOBJEKT NENNT SEINE WAEHRUNG SELBST (#1734). Ein Konto rechnet in
+ * der Waehrung, in der es eroeffnet wurde - nicht in der, die der Haushalt
+ * heute fuehrt. Konto, Plan, Anfrage und Buchung kommen deshalb mit `currency`
+ * und `minor_unit` vom Server, und jeder Helfer darunter nimmt das Objekt als
+ * `ctx`. Ohne `ctx` (ein Konto, das es noch nicht gibt) gilt die Waehrung des
+ * Haushalts aus `state.money` - darin wird ein neues eroeffnet.
+ */
+function moneyCtx(ctx) {
+  return ctx?.currency ? ctx : state.money;
+}
+
+function moneyCurrencyCode(ctx) {
+  return moneyCtx(ctx)?.currency || 'EUR';
 }
 
 /*
@@ -1330,21 +1342,22 @@ function moneyCurrencyCode() {
  * Jede Rechnung zwischen kleinsten Einheiten und einem Feld geht deshalb durch
  * `moneyDigits()`; `Intl` waehlt nur noch Trenner und Ziffern.
  */
-function moneyDigits() {
-  return Number.isInteger(state.money?.minor_unit) ? state.money.minor_unit : currencyFractionDigits(moneyCurrencyCode());
+function moneyDigits(ctx) {
+  const unit = moneyCtx(ctx)?.minor_unit;
+  return Number.isInteger(unit) ? unit : currencyFractionDigits(moneyCurrencyCode(ctx));
 }
 
-/** Kleinste Einheiten als Betrag in der Haushaltswaehrung ("77,31 EUR"). */
-function fmtMoney(minor) {
-  return formatMoney(Number(minor || 0) / 10 ** moneyDigits(), moneyCurrencyCode());
+/** Kleinste Einheiten als Betrag in der Waehrung des Geldobjekts `ctx` ("77,31 EUR"). */
+function fmtMoney(minor, ctx) {
+  return formatMoney(Number(minor || 0) / 10 ** moneyDigits(ctx), moneyCurrencyCode(ctx));
 }
 
 /**
  * Kleinste Einheiten als Punkt-Dezimaltext ("500000" bei zwei Stellen ->
  * "5000.00"), ueber den Text gerechnet und nicht ueber eine Division.
  */
-function minorToDecimal(minor) {
-  const digits = moneyDigits();
+function minorToDecimal(minor, ctx) {
+  const digits = moneyDigits(ctx);
   const text = String(Math.abs(Math.trunc(Number(minor) || 0))).padStart(digits + 1, '0');
   return digits ? `${text.slice(0, -digits)}.${text.slice(-digits)}` : text;
 }
@@ -1355,9 +1368,9 @@ function minorToDecimal(minor) {
  * schreibt, stehen ohne da ("5000" Ft, nicht "5000,00"); alles andere behaelt
  * seine Stellen, damit kein Betrag beim Oeffnen ein anderer wird.
  */
-function minorToAmountInput(minor) {
-  const currency = moneyCurrencyCode();
-  let decimal = minorToDecimal(minor);
+function minorToAmountInput(minor, ctx) {
+  const currency = moneyCurrencyCode(ctx);
+  let decimal = minorToDecimal(minor, ctx);
   if (currencyFractionDigits(currency) === 0 && /\.0+$/.test(decimal)) decimal = decimal.replace(/\.0+$/, '');
   return amountToInput(decimal, currency);
 }
@@ -1373,7 +1386,7 @@ function moneyAccount(userId) {
 /** Der Plan in einem Satz - oder dass es keinen gibt. */
 function moneyPlanLine(plan) {
   if (!plan) return t('rewards.money.noPlan');
-  const amount = fmtMoney(plan.amount_minor);
+  const amount = fmtMoney(plan.amount_minor, plan);
   const rhythm = t(plan.frequency === 'weekly' ? 'rewards.money.planWeekly' : 'rewards.money.planMonthly', { amount });
   if (plan.paused) return `${rhythm} · ${t('rewards.money.planPaused')}`;
   return `${rhythm} · ${t('rewards.money.nextCredit', { date: formatDate(plan.next_run_date) })}`;
@@ -1384,14 +1397,22 @@ function renderMoneyRow(account) {
   const manage = isAdmin() && !readOnly();
   // Eltern buchen direkt und pflegen den Plan; das Kind stellt Anfragen. Wer
   // beides waere (ein Elternteil mit eigenem Konto), bucht.
-  const actions = manage ? `
+  // EIN EHEMALIGES KONTO (deaktiviert, mit Restguthaben) wird nur noch
+  // ausgezahlt: eine Handlung, kein Plan. Der Server schickt es nur Eltern.
+  const actions = manage && account.former ? `
+        <div class="rw-standing__actions">
+          <button class="btn btn--secondary btn--sm" type="button" data-money-book="${account.id}">
+            <i data-lucide="banknote" aria-hidden="true"></i>${esc(t('rewards.money.debit'))}
+          </button>
+        </div>`
+    : manage ? `
         <div class="rw-standing__actions">
           <button class="btn btn--secondary btn--sm" type="button" data-money-book="${account.id}">
             <i data-lucide="banknote" aria-hidden="true"></i>${esc(t('rewards.money.book'))}
           </button>
           ${rowActionHtml({ icon: 'calendar-clock', label: `${t('rewards.money.planTitle')}: ${account.display_name}`, attrs: { 'data-money-plan': account.id } })}
         </div>`
-    : (mine && !readOnly()) ? `
+    : (mine && !account.former && !readOnly()) ? `
         <div class="rw-standing__actions">
           <button class="btn btn--secondary btn--sm" type="button" data-money-request="withdrawal" data-member="${account.id}"
                   ${account.balance_minor > 0 ? '' : 'disabled'}>
@@ -1404,11 +1425,11 @@ function renderMoneyRow(account) {
   return `
     <li class="list-row rw-standing rw-money">
       <button class="rw-standing__id" type="button" data-money-member="${account.id}"
-              aria-label="${esc(`${account.display_name}, ${fmtMoney(account.balance_minor)}. ${t('rewards.openDetails')}`)}">
+              aria-label="${esc(`${account.display_name}, ${fmtMoney(account.balance_minor, account)}. ${t('rewards.openDetails')}`)}">
         ${avatar(account, 40)}
         <span class="rw-standing__idtext">
-          <span class="rw-standing__name">${esc(account.display_name)}</span>
-          <span class="rw-standing__points"><strong>${esc(fmtMoney(account.balance_minor))}</strong></span>
+          <span class="rw-standing__name">${esc(account.display_name)}${account.former ? ` <span class="rw-tag">${esc(t('settings.memberFormerBadge'))}</span>` : ''}</span>
+          <span class="rw-standing__points"><strong>${esc(fmtMoney(account.balance_minor, account))}</strong></span>
         </span>
       </button>
       <div class="rw-standing__progress">
@@ -1455,12 +1476,13 @@ function wireMoney(el) {
 }
 
 /** Der Satz zu einem Grund aus amountInputProblem() - dieselben Texte wie in den geteilten Ausgaben. */
-function moneyAmountProblemText(problem, currency) {
+function moneyAmountProblemText(problem, ctx) {
+  const currency = moneyCurrencyCode(ctx);
   if (problem === 'grouped') return t('common.amountGrouped', { example: amountExample(currency) });
   if (problem === 'invalid') return t('common.amountInvalid', { example: amountExample(currency) });
   if (problem === 'notPositive') return t('common.amountNotPositive');
   // Der kleinste Schritt nach den Stellen des SERVERS, nicht nach `Intl`.
-  const digits = moneyDigits();
+  const digits = moneyDigits(ctx);
   const step = getNumberFormat({ minimumFractionDigits: digits, maximumFractionDigits: digits }).format(1 / 10 ** digits);
   return t('common.amountPrecisionRequired', { currency, step });
 }
@@ -1470,22 +1492,21 @@ function moneyAmountProblemText(problem, currency) {
  * Gruppierung, Schreibweise und Vorzeichen prueft `amountInputProblem()`; wie
  * viele Nachkommastellen erlaubt sind, sagt der Server (`moneyDigits()`).
  */
-function moneyAmountProblem(text) {
-  const problem = amountInputProblem(text, moneyCurrencyCode(), { required: true });
+function moneyAmountProblem(text, ctx) {
+  const problem = amountInputProblem(text, moneyCurrencyCode(ctx), { required: true });
   if (problem && problem !== 'precision') return problem;
   const fraction = toDecimalString(text).split('.')[1] || '';
-  return fraction.length > moneyDigits() ? 'precision' : null;
+  return fraction.length > moneyDigits(ctx) ? 'precision' : null;
 }
 
 /**
  * Liest das Betragsfeld. Gibt den Dezimaltext zurueck, den der Server
  * erwartet ("12.50"), oder `null` - dann steht der Grund schon im Fehlerfeld.
  */
-function readMoneyAmount(input, errEl) {
-  const currency = moneyCurrencyCode();
-  const problem = moneyAmountProblem(input.value);
+function readMoneyAmount(input, errEl, ctx) {
+  const problem = moneyAmountProblem(input.value, ctx);
   if (problem) {
-    errEl.textContent = moneyAmountProblemText(problem, currency);
+    errEl.textContent = moneyAmountProblemText(problem, ctx);
     errEl.hidden = false;
     input.setAttribute('aria-invalid', 'true');
     return null;
@@ -1494,18 +1515,18 @@ function readMoneyAmount(input, errEl) {
   return toDecimalString(input.value);
 }
 
-function moneyAmountField(id, value = '') {
+function moneyAmountField(id, value = '', ctx = undefined) {
   return `
         <div class="form-group">
-          <label class="label" for="${id}">${esc(t('rewards.money.amount'))} (${esc(moneyCurrencyCode())})${REQUIRED_MARK}</label>
+          <label class="label" for="${id}">${esc(t('rewards.money.amount'))} (${esc(moneyCurrencyCode(ctx))})${REQUIRED_MARK}</label>
           <input class="input" id="${id}" inputmode="decimal" autocomplete="off" required
-                 value="${esc(value)}" placeholder="${esc(amountPlaceholder(moneyCurrencyCode()))}">
+                 value="${esc(value)}" placeholder="${esc(amountPlaceholder(moneyCurrencyCode(ctx)))}">
         </div>`;
 }
 
 /** Der Betrag eines Dezimaltexts in kleinsten Einheiten - nur fuer den Vergleich mit dem Guthaben. */
-function decimalToMinor(decimal) {
-  return Math.round(Number(decimal) * 10 ** moneyDigits());
+function decimalToMinor(decimal, ctx) {
+  return Math.round(Number(decimal) * 10 ** moneyDigits(ctx));
 }
 
 /* ABHEBEN ODER EINZAHLEN: EINE ANFRAGE, KEINE BUCHUNG. Sie geht ueber
@@ -1522,9 +1543,9 @@ function openMoneyRequestModal(kind, memberId) {
     content: `
       <form id="rw-money-request-form" novalidate>
         <div class="rw-redeem-summary">
-          <div class="rw-redeem-summary__row"><span>${esc(t('rewards.money.title'))}</span><strong>${esc(fmtMoney(account.balance_minor))}</strong></div>
+          <div class="rw-redeem-summary__row"><span>${esc(t('rewards.money.title'))}</span><strong>${esc(fmtMoney(account.balance_minor, account))}</strong></div>
         </div>
-        ${moneyAmountField('rw-money-amount')}
+        ${moneyAmountField('rw-money-amount', '', account)}
         <div class="form-group">
           <label class="label" for="rw-money-note">${esc(t('rewards.noteOptional'))}</label>
           <input class="input" id="rw-money-note" maxlength="500">
@@ -1542,10 +1563,10 @@ function openMoneyRequestModal(kind, memberId) {
       panel.querySelector('#rw-money-request-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         errEl.hidden = true;
-        const amount = readMoneyAmount(input, errEl);
+        const amount = readMoneyAmount(input, errEl, account);
         if (amount == null) return;
         // Der Server prueft die Deckung (zweimal); hier steht nur der fruehe Satz.
-        if (withdrawal && decimalToMinor(amount) > account.balance_minor) {
+        if (withdrawal && decimalToMinor(amount, account) > account.balance_minor) {
           errEl.textContent = t('rewards.money.insufficient'); errEl.hidden = false; return;
         }
         submit.disabled = true;
@@ -1574,20 +1595,23 @@ function openMoneyBookModal(memberId) {
   const account = moneyAccount(memberId);
   if (!account) return;
   openModal({
-    title: `${t('rewards.money.book')} · ${account.display_name}`,
+    // Ein ehemaliges Konto wird nur noch ausgezahlt: der Dialog bietet die
+    // Gutschrift gar nicht erst an (der Server wiese sie ab).
+    title: `${t(account.former ? 'rewards.money.debit' : 'rewards.money.book')} · ${account.display_name}`,
     content: `
       <form id="rw-money-book-form" novalidate>
         <div class="rw-redeem-summary">
-          <div class="rw-redeem-summary__row"><span>${esc(t('rewards.money.title'))}</span><strong>${esc(fmtMoney(account.balance_minor))}</strong></div>
+          <div class="rw-redeem-summary__row"><span>${esc(t('rewards.money.title'))}</span><strong>${esc(fmtMoney(account.balance_minor, account))}</strong></div>
         </div>
+        ${account.former ? '<input type="hidden" id="rw-money-direction" value="debit">' : `
         <div class="form-group">
           <label class="label" for="rw-money-direction">${esc(t('rewards.money.book'))}</label>
           <select class="input" id="rw-money-direction">
             <option value="credit">${esc(t('rewards.money.credit'))}</option>
             <option value="debit">${esc(t('rewards.money.debit'))}</option>
           </select>
-        </div>
-        ${moneyAmountField('rw-money-amount')}
+        </div>`}
+        ${moneyAmountField('rw-money-amount', '', account)}
         <div class="form-group">
           <label class="label" for="rw-money-reason">${esc(t('rewards.reasonOptional'))}</label>
           <input class="input" id="rw-money-reason" maxlength="200">
@@ -1604,7 +1628,7 @@ function openMoneyBookModal(memberId) {
       panel.querySelector('#rw-money-book-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         errEl.hidden = true;
-        const amount = readMoneyAmount(input, errEl);
+        const amount = readMoneyAmount(input, errEl, account);
         if (amount == null) return;
         submit.disabled = true;
         try {
@@ -1646,7 +1670,12 @@ function openMoneyPlanModal(memberId) {
   const account = memberId != null ? moneyAccount(memberId) : null;
   const candidates = state.money?.candidates || [];
   if (!account && !candidates.length) return;
+  // Ein ehemaliges Konto behaelt seinen Plan pausiert - kein Dialog dafuer.
+  if (account?.former) return;
   const plan = account?.plan || null;
+  // In welcher Waehrung dieser Plan rechnet: in seiner eigenen, sonst in der
+  // des Kontos, und fuer ein Konto, das es noch nicht gibt, in der des Haushalts.
+  const planCtx = plan || account || undefined;
   const frequency = plan?.frequency || 'weekly';
   const weekday = plan?.frequency === 'weekly' ? plan.anchor_day : 1;
   const monthDay = plan?.frequency === 'monthly' ? plan.anchor_day : 1;
@@ -1664,7 +1693,7 @@ function openMoneyPlanModal(memberId) {
     content: `
       <form id="rw-plan-form" novalidate>
         ${memberField}
-        ${moneyAmountField('rw-money-amount', plan ? minorToAmountInput(plan.amount_minor) : '')}
+        ${moneyAmountField('rw-money-amount', plan ? minorToAmountInput(plan.amount_minor, plan) : '', planCtx)}
         <div class="form-group">
           <label class="label" for="rw-plan-frequency">${esc(t('rewards.money.frequency'))}</label>
           <select class="input" id="rw-plan-frequency">
@@ -1715,7 +1744,7 @@ function openMoneyPlanModal(memberId) {
       panel.querySelector('#rw-plan-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         errEl.hidden = true;
-        const amount = readMoneyAmount(panel.querySelector('#rw-money-amount'), errEl);
+        const amount = readMoneyAmount(panel.querySelector('#rw-money-amount'), errEl, planCtx);
         if (amount == null) return;
         const weekly = freqEl.value === 'weekly';
         const target = account ? account.id : Number(panel.querySelector('#rw-plan-member').value);
@@ -1788,7 +1817,7 @@ function moneyLedgerRowHtml(row) {
         <p class="list-row__name rw-ledger-row__reason">${esc(moneyRowLabel(kind))}</p>
         <p class="list-row__meta rw-ledger-row__meta">${esc(when)}${row.reason ? ` · ${esc(row.reason)}` : ''}</p>
       </div>
-      <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${esc(fmtMoney(Math.abs(row.delta)))}</span>
+      <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${esc(fmtMoney(Math.abs(row.delta), row))}</span>
     </li>`;
 }
 
@@ -1808,7 +1837,7 @@ async function openMoneyDetail(memberId) {
       <div class="rw-detail-head">
         ${avatar(account, 52)}
         <div>
-          <p class="rw-detail-points"><strong>${esc(fmtMoney(account.balance_minor))}</strong></p>
+          <p class="rw-detail-points"><strong>${esc(fmtMoney(account.balance_minor, account))}</strong></p>
           <p class="rw-detail-hint">${esc(moneyPlanLine(account.plan))}</p>
         </div>
       </div>
@@ -1840,7 +1869,7 @@ export const __test = {
   ledgerReason,
   // #1734: Taschengeld.
   renderMoneySection, renderMoneyRow, moneyLedgerRowHtml, moneyRowKind, moneyPlanLine, fmtMoney,
-  minorToAmountInput, moneyAmountProblem, decimalToMinor, removeMoneyPlan, decideRedemption, openMoneyPlanModal,
+  minorToAmountInput, moneyAmountProblem, decimalToMinor, removeMoneyPlan, decideRedemption, openMoneyPlanModal, openMoneyBookModal,
 };
 
 export async function render(container, { user } = {}) {

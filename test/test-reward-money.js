@@ -28,144 +28,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
-import { startTestServer, cookieHeader } from './server-ready.js';
+import { rewardMoneyHousehold } from './reward-money-harness.js';
 
-const { baseUrl: BASE } = await startTestServer({
-  name: 'reward-money',
-  env: {
-    SESSION_SECRET: 'test-reward-money-secret-min32chars!',
-    RATE_LIMIT_MAX_ATTEMPTS: '60',
-    RATE_LIMIT_WINDOW_MS: '60000',
-  },
-});
-const dbmod = await import('../server/db.js');
-const db = dbmod.get();
-const { DISPLAY_COOKIE } = await import('../server/services/display-accounts.js');
-const rewards = await import('../server/services/rewards.js');
-const money = await import('../server/services/reward-money.js');
-const { todayKey, shiftDateKey } = await import('../server/utils/timezone.js');
-const { parseDateKey } = await import('../server/utils/interval-date.js');
-
-await fetch(`${BASE}/api/v1/auth/setup`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ username: 'admin', display_name: 'Admin', password: 'adminpass123' }),
-});
-
-async function login(username, password) {
-  const res = await fetch(`${BASE}/api/v1/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
-  });
-  assert.equal(res.status, 200, `login ${username}`);
-  const cookie = cookieHeader(res.headers.get('set-cookie'));
-  const me = await (await fetch(`${BASE}/api/v1/auth/me`, { headers: { Cookie: cookie } })).json();
-  return { cookie, csrfToken: me.csrfToken };
-}
-
-function as(session) {
-  const headers = { 'Content-Type': 'application/json', Cookie: session.cookie, 'X-CSRF-Token': session.csrfToken };
-  return async (method, path, body) => {
-    const res = await fetch(`${BASE}/api/v1${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
-    return { status: res.status, body: await res.json().catch(() => null) };
-  };
-}
-
-function withToken(token) {
-  return async (method, path, body) => {
-    const res = await fetch(`${BASE}/api/v1${path}`, {
-      method,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    return { status: res.status, body: await res.json().catch(() => null) };
-  };
-}
-
-/** Ein Request wie vom Tablett: Geraete-Cookie plus die leere Sitzung fuer den CSRF-Token (test-display-actions.js). */
-function asDisplay(token) {
-  const jar = new Map([[DISPLAY_COOKIE, token]]);
-  let csrf = null;
-  const send = async (method, path, body) => {
-    const headers = { 'Content-Type': 'application/json', Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; ') };
-    if (csrf) headers['X-CSRF-Token'] = csrf;
-    const res = await fetch(`${BASE}/api/v1${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
-    for (const line of res.headers.getSetCookie?.() ?? []) {
-      const [pair] = line.split(';');
-      const eq = pair.indexOf('=');
-      if (eq > 0) jar.set(pair.slice(0, eq), pair.slice(eq + 1));
-    }
-    const fresh = res.headers.get('x-csrf-token');
-    if (fresh) csrf = fresh;
-    return { status: res.status, body: await res.json().catch(() => null) };
-  };
-  return async (method, path, body) => {
-    if (!csrf && !['GET', 'HEAD', 'OPTIONS'].includes(method)) await send('GET', '/preferences');
-    return send(method, path, body);
-  };
-}
-
-const admin = as(await login('admin', 'adminpass123'));
-const ADMIN_ID = db.prepare("SELECT id FROM users WHERE username = 'admin'").get().id;
-
-async function member(username) {
-  const created = await admin('POST', '/auth/users', { username, display_name: username, password: `${username}-pass-123` });
-  assert.equal(created.status, 201, `Konto ${username}`);
-  return { id: created.body.user.id, call: as(await login(username, `${username}-pass-123`)) };
-}
-
-// EMMA hat Taschengeld und sammelt Punkte. LEO ist das Geschwisterkind, mit
-// eigenem Konto - er darf seines sehen und ihres nicht. MIA hat kein Konto.
-const emma = await member('emma');
-const leo = await member('leo');
-const mia = await member('mia');
-for (const m of [emma, leo]) {
-  assert.equal((await admin('PUT', `/rewards/participants/${m.id}`, { enabled: true })).status, 200);
-}
-
-// Das Wandtablett.
-const createdDisplay = await admin('POST', '/displays', { display_name: 'Kueche' });
-const DISPLAY_ID = createdDisplay.body.data.id;
-const issued = await admin('POST', `/displays/${DISPLAY_ID}/pairing-code`, {});
-const paired = await fetch(`${BASE}/api/v1/displays/pair`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ code: issued.body.data.code }),
-});
-const display = asDisplay(decodeURIComponent(
-  String(paired.headers.get('set-cookie') || '').match(new RegExp(`${DISPLAY_COOKIE}=([^;]+)`))[1],
-));
-
-// Unverwechselbare Betraege: was in einer Antwort an Leo oder das Tablett
-// auftaucht, laesst sich am Text finden.
-const EMMA_START = 7_731;   // 77,31
-const LEO_START = 1_203;    // 12,03
-
-const credit = (m, minor, reason = null) => admin('POST', '/rewards/money/entries', {
-  user_id: m.id, amount: (minor / 100).toFixed(2), direction: 'credit', ...(reason ? { reason } : {}),
-});
-assert.equal((await credit(emma, EMMA_START, 'Startguthaben-Emma')).status, 201);
-assert.equal((await credit(leo, LEO_START, 'Startguthaben-Leo')).status, 201);
-
-const moneyOf = (id) => rewards.ledgerBalance(db, id, 'money');
-const pointsOf = (id) => rewards.ledgerBalance(db, id, 'points');
-const moneyRows = (id) => db.prepare("SELECT * FROM reward_ledger WHERE user_id = ? AND unit = 'money' ORDER BY id").all(id);
-
-/** Ein frisches Mitglied ohne Vorgeschichte - fuer Faelle, die einen sauberen Saldo brauchen. */
-let seq = 0;
-function freshKid({ enrolled = false } = {}) {
-  seq += 1;
-  const id = Number(db.prepare(`
-    INSERT INTO users(username, display_name, password_hash, role, family_role)
-    VALUES (?, ?, '$argon2id$v=19$m=1,t=1,p=1$c2FsdA$aGFzaA', 'member', 'child') RETURNING id
-  `).get(`fresh-${seq}`, `Fresh ${seq}`).id);
-  if (enrolled) db.prepare('INSERT INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(id);
-  return id;
-}
-const sqlMoney = (id, delta, type = 'bonus') => db.prepare(
-  "INSERT INTO reward_ledger (user_id, delta, type, unit) VALUES (?, ?, ?, 'money')",
-).run(id, delta, type);
+const {
+  BASE, dbmod, db, rewards, money, todayKey, shiftDateKey, parseDateKey, withToken, admin, ADMIN_ID, member, emma, leo, mia, display, DISPLAY_ID, EMMA_START, LEO_START, credit, moneyOf, pointsOf, moneyRows, freshKid, sqlMoney,
+} = await rewardMoneyHousehold('reward-money');
 
 // ==========================================================================
 // 1. Punkte und Geld mischen sich nie
@@ -177,12 +44,15 @@ test('die Summe geht nicht ohne Einheit', () => {
   assert.throws(() => rewards.ledgerBalanceSql(undefined, 'u.id'), /ledger unit/);
   assert.throws(() => rewards.ledgerBalanceSql('points', "u.id) OR (1=1"), /qualified column/);
   assert.throws(() => rewards.postLedger(db, { userId: emma.id, delta: 1, type: 'bonus', unit: 'euro' }), /ledger unit/);
+  // Eine Geldzeile ohne Waehrung und eine Punktezeile mit einer gibt es nicht.
+  assert.throws(() => rewards.postLedger(db, { userId: emma.id, delta: 1, type: 'bonus', unit: 'money' }), /carries a currency/);
+  assert.throws(() => rewards.postLedger(db, { userId: emma.id, delta: 1, type: 'bonus', currency: 'EUR' }), /carries a currency/);
 });
 
 test('services/rewards.js: eine Geldbuchung bewegt den Punktestand nicht, und umgekehrt', () => {
   const kid = freshKid({ enrolled: true });
   rewards.postLedger(db, { userId: kid, delta: 40, type: 'bonus' });
-  rewards.postLedger(db, { userId: kid, delta: 2_500, type: 'bonus', unit: 'money' });
+  rewards.postLedger(db, { userId: kid, delta: 2_500, type: 'bonus', unit: 'money', currency: 'EUR' });
   assert.equal(rewards.getBalance(db, kid), 40, 'getBalance ist der Punktestand');
   assert.equal(rewards.ledgerBalance(db, kid, 'points'), 40);
   assert.equal(rewards.ledgerBalance(db, kid, 'money'), 2_500);
@@ -258,7 +128,7 @@ test('der Netto-Stand einer Aufgabe liest keine Geldzeile: vergeben und zurueckn
   db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(task, kid);
   // Eine Geldzeile, die (von Hand) dieselbe Aufgabe nennt. Ohne Einheiten-Filter
   // gaelte die Aufgabe als schon verguetet.
-  db.prepare("INSERT INTO reward_ledger (user_id, delta, type, task_id, unit) VALUES (?, 300, 'earn', ?, 'money')").run(kid, task);
+  db.prepare("INSERT INTO reward_ledger (user_id, delta, type, task_id, unit, currency) VALUES (?, 300, 'earn', ?, 'money', 'EUR')").run(kid, task);
 
   rewards.syncTaskRewards(db, task, 'open', 'done', ADMIN_ID);
   assert.equal(pointsOf(kid), 5, 'die Punkte werden trotz der Geldzeile vergeben');
@@ -382,7 +252,7 @@ test('das Wandtablett liest kein Geld - auch keines, das an seinem eigenen Konto
   // Die Absage soll nicht daran haengen, dass das Geraet zufaellig keine Zeilen
   // hat: es bekommt welche, von Hand.
   sqlMoney(DISPLAY_ID, 4_242);
-  db.prepare("INSERT INTO reward_redemptions (user_id, kind, reward_name, cost, status) VALUES (?, 'deposit', 'deposit', 4243, 'pending')").run(DISPLAY_ID);
+  db.prepare("INSERT INTO reward_redemptions (user_id, kind, currency, reward_name, cost, status) VALUES (?, 'deposit', 'EUR', 'deposit', 4243, 'pending')").run(DISPLAY_ID);
   const open = await emma.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '3.33' });
   assert.equal(open.status, 201);
 
@@ -659,30 +529,39 @@ test('wer kein Konto hat, stellt keine Anfrage; Eltern eroeffnen es mit der erst
   assert.equal(moneyOf(guest), 0);
 });
 
-test('ein Betrag ist ein Dezimaltext in ganzen kleinsten Einheiten der Haushaltswaehrung: 2, 0 und 3 Stellen', async () => {
+test('ein Betrag ist ein Dezimaltext in ganzen kleinsten Einheiten der Kontowaehrung: 2, 0 und 3 Stellen', async () => {
   const setCurrency = (code) => db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('currency', ?)").run(code);
   try {
     // EUR: zwei Stellen.
-    assert.equal(money.parseMoneyAmount(db, '5.00'), 500);
-    assert.equal(money.parseMoneyAmount(db, '5'), 500);
+    assert.equal(money.parseMoneyAmount('5.00', 'EUR'), 500);
+    assert.equal(money.parseMoneyAmount('5', 'EUR'), 500);
     for (const bad of [5, '5.001', '0', '-1.00', 'abc', '', '1,50']) {
       const res = await emma.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: bad });
       assert.equal(res.status, 400, `${JSON.stringify(bad)} wird abgewiesen`);
     }
-    // JPY: keine.
+    // JPY: keine. Ein Konto, das unter JPY eroeffnet wird, rechnet in ganzen Yen.
     setCurrency('JPY');
-    assert.equal(money.parseMoneyAmount(db, '500'), 500);
-    assert.throws(() => money.parseMoneyAmount(db, '5.5'), /decimal places/);
-    assert.equal((await emma.call('GET', '/rewards/money')).body.data.minor_unit, 0);
-    const yen = await emma.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '300' });
+    assert.equal(money.parseMoneyAmount('500', 'JPY'), 500);
+    assert.throws(() => money.parseMoneyAmount('5.5', 'JPY'), /decimal places/);
+    const yenKid = await member('yenkid');
+    assert.equal((await admin('POST', '/rewards/money/entries', { user_id: yenKid.id, amount: '1000', direction: 'credit' })).status, 201);
+    const yenAccount = (await yenKid.call('GET', '/rewards/money')).body.data.accounts[0];
+    assert.deepEqual([yenAccount.currency, yenAccount.minor_unit, yenAccount.balance_minor], ['JPY', 0, 1000]);
+    const yen = await yenKid.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '300' });
     assert.equal(yen.body.data.cost, 300);
-    await emma.call('PATCH', `/rewards/redemptions/${yen.body.data.id}`, { action: 'cancel' });
+    assert.equal(yen.body.data.currency, 'JPY');
+    assert.equal((await yenKid.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '3.5' })).status, 400);
+    await yenKid.call('PATCH', `/rewards/redemptions/${yen.body.data.id}`, { action: 'cancel' });
     // KWD: drei.
     setCurrency('KWD');
-    assert.equal(money.parseMoneyAmount(db, '1.234'), 1_234);
-    assert.equal(money.parseMoneyAmount(db, '1'), 1_000);
-    assert.throws(() => money.parseMoneyAmount(db, '1.2345'), /decimal places/);
-    assert.equal((await emma.call('GET', '/rewards/money')).body.data.minor_unit, 3);
+    assert.equal(money.parseMoneyAmount('1.234', 'KWD'), 1_234);
+    assert.equal(money.parseMoneyAmount('1', 'KWD'), 1_000);
+    assert.throws(() => money.parseMoneyAmount('1.2345', 'KWD'), /decimal places/);
+    const dinarKid = await member('dinarkid');
+    assert.equal((await admin('POST', '/rewards/money/entries', { user_id: dinarKid.id, amount: '1.234', direction: 'credit' })).status, 201);
+    const dinar = (await dinarKid.call('GET', '/rewards/money')).body.data;
+    assert.deepEqual([dinar.accounts[0].currency, dinar.accounts[0].minor_unit, dinar.accounts[0].balance_minor], ['KWD', 3, 1_234]);
+    assert.deepEqual([dinar.currency, dinar.minor_unit], ['KWD', 3], 'oben steht die Waehrung des Haushalts: darin wird ein neues Konto eroeffnet');
   } finally {
     db.prepare("DELETE FROM sync_config WHERE key = 'currency'").run();
   }
@@ -789,10 +668,10 @@ test('die Idempotenz steht im Schema: derselbe Termin laesst sich je Person nich
 
   // Und ohne den Lauf: das Schema selbst sagt nein.
   assert.throws(() => db.prepare(
-    "INSERT INTO reward_ledger (user_id, delta, type, unit, allowance_date) VALUES (?, 100, 'bonus', 'money', '2026-10-06')",
+    "INSERT INTO reward_ledger (user_id, delta, type, unit, currency, allowance_date) VALUES (?, 100, 'bonus', 'money', 'EUR', '2026-10-06')",
   ).run(kid), /UNIQUE/);
   // Eine andere Person am selben Tag ist kein Konflikt, und Zeilen ohne Termin auch nicht.
-  db.prepare("INSERT INTO reward_ledger (user_id, delta, type, unit, allowance_date) VALUES (?, 100, 'bonus', 'money', '2026-10-06')").run(other);
+  db.prepare("INSERT INTO reward_ledger (user_id, delta, type, unit, currency, allowance_date) VALUES (?, 100, 'bonus', 'money', 'EUR', '2026-10-06')").run(other);
   sqlMoney(kid, 1);
   sqlMoney(kid, 1);
   db.prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(kid);
@@ -899,7 +778,7 @@ test('PUT /rewards/money/plans: anlegen, lesen, pruefen, beenden - und der Plan 
 
   const saved = await admin('PUT', `/rewards/money/plans/${mia.id}`, { amount: '5.00', frequency: 'weekly', anchor_day: weekday });
   assert.equal(saved.status, 200);
-  assert.deepEqual(saved.body.data.plan, { amount_minor: 500, frequency: 'weekly', anchor_day: weekday, next_run_date: inThree, paused: false });
+  assert.deepEqual(saved.body.data.plan, { amount_minor: 500, currency: 'EUR', minor_unit: 2, frequency: 'weekly', anchor_day: weekday, next_run_date: inThree, paused: false });
   assert.equal(saved.body.data.balance_minor, 0);
 
   const forMia = (await mia.call('GET', '/rewards/money')).body.data;
@@ -987,8 +866,8 @@ test('die Obergrenze haengt nicht an der Waehrung: zwei Millionen Rupiah sind ei
     assert.equal((await admin('PUT', `/rewards/money/plans/${kid.id}`, { amount: '150000', frequency: 'monthly', anchor_day: 1, paused: true })).status, 200);
 
     // Es gibt weiter eine Grenze, und sie ist eine der Rechnung.
-    assert.equal(money.parseMoneyAmount(db, '10000000000'), money.MAX_MONEY_MINOR);
-    assert.throws(() => money.parseMoneyAmount(db, '10000000000.01'), /too large/);
+    assert.equal(money.parseMoneyAmount('10000000000', 'IDR'), money.MAX_MONEY_MINOR);
+    assert.throws(() => money.parseMoneyAmount('10000000000.01', 'IDR'), /too large/);
     assert.equal((await kid.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '10000000000.01' })).status, 400);
     assert.ok(money.MAX_MONEY_MINOR * 5200 < Number.MAX_SAFE_INTEGER, 'hundert Jahre Wochenplan am Deckel bleiben exakt');
   } finally {
@@ -1076,20 +955,23 @@ test('PUT ohne `paused` laesst einen pausierten Plan pausiert', async () => {
 });
 
 test('nur Haushaltsmitglieder: ein deaktiviertes Konto steht in keiner Kontenliste, und fuer einen Gast stellt niemand eine Anfrage', async () => {
+  // Ein deaktiviertes Konto OHNE Guthaben (nur Plan) steht in keiner Liste mehr.
   const gone = freshKid();
-  sqlMoney(gone, 4_321);
-  assert.ok((await admin('GET', '/rewards/money')).body.data.accounts.some((a) => a.id === gone), 'Vorbedingung: mit Geld steht das Konto in der Liste');
+  money.savePlan(db, gone, { amountMinor: 500, frequency: 'weekly', anchorDay: 5, paused: true }, { today: '2026-10-06' });
+  assert.ok((await admin('GET', '/rewards/money')).body.data.accounts.some((a) => a.id === gone), 'Vorbedingung: mit Plan steht das Konto in der Liste');
   db.prepare("UPDATE users SET deactivated_at = '2026-10-05T00:00:00Z' WHERE id = ?").run(gone);
   const listed = (await admin('GET', '/rewards/money')).body.data;
-  assert.ok(!listed.accounts.some((a) => a.id === gone), 'deaktiviert: nicht mehr in der Liste');
+  assert.ok(!listed.accounts.some((a) => a.id === gone), 'deaktiviert und ohne Guthaben: nicht mehr in der Liste');
   assert.ok(!listed.candidates.some((c) => c.id === gone), 'und auch kein Kandidat');
-  assert.equal(moneyOf(gone), 4_321, 'die Buchungen bleiben');
+  db.prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(gone);
 
   // Ein Gast der geteilten Ausgaben mit einer (von Hand angelegten) Geldzeile:
-  // "hat ein Konto" allein darf nicht reichen.
+  // "hat ein Konto" allein darf nicht reichen - und "ehemalig" ist er auch nicht.
   const guest = freshKid();
   db.prepare('INSERT INTO split_expense_guest_users(user_id) VALUES (?)').run(guest);
   sqlMoney(guest, 1_000);
+  assert.ok(!(await admin('GET', '/rewards/money')).body.data.accounts.some((a) => a.id === guest), 'ein Gast steht auch fuer Admins in keiner Kontenliste');
+  assert.equal((await admin('POST', '/rewards/money/entries', { user_id: guest, amount: '1.00', direction: 'debit' })).status, 400, 'und wird nicht "ausgezahlt"');
   assert.equal(money.hasMoneyAccount(db, guest), true, 'Vorbedingung: die Kontopruefung allein liesse ihn durch');
   const before = db.prepare('SELECT COUNT(*) AS n FROM reward_redemptions WHERE user_id = ?').get(guest).n;
   const res = await admin('POST', '/rewards/redemptions', { kind: 'withdrawal', amount: '1.00', user_id: guest });
@@ -1140,6 +1022,7 @@ test('die Migration auf Bestand: jede Zeile ist Punkte, die Salden stehen, die f
 
   assert.deepEqual(conn.prepare('SELECT DISTINCT unit FROM reward_ledger').all().map((r) => r.unit), ['points']);
   assert.deepEqual(sums(), before, 'kein Saldo hat sich bewegt');
+  assert.deepEqual(before, [{ user_id: 1, bal: 15 }, { user_id: 2, bal: 0 }]);
   assert.equal(conn.prepare('SELECT COUNT(*) AS n FROM reward_ledger WHERE allowance_date IS NOT NULL').get().n, 0);
   assert.deepEqual(conn.prepare('SELECT DISTINCT kind FROM reward_redemptions').all().map((r) => r.kind), ['reward']);
 
@@ -1152,15 +1035,28 @@ test('die Migration auf Bestand: jede Zeile ist Punkte, die Salden stehen, die f
   // Die Einheit ist geprueft, nicht nur benannt.
   assert.throws(() => conn.exec("INSERT INTO reward_ledger (user_id, delta, type, unit) VALUES (1, 1, 'bonus', 'cents')"), /CHECK/);
   assert.throws(() => conn.exec("INSERT INTO reward_redemptions (user_id, reward_name, cost, kind) VALUES (1, 'x', 1, 'loan')"), /CHECK/);
-  assert.throws(() => conn.exec("INSERT INTO reward_allowances (user_id, amount_minor, frequency, anchor_day, next_run_date) VALUES (1, 0, 'weekly', 1, '2026-01-01')"), /CHECK/);
-  conn.exec("INSERT INTO reward_allowances (user_id, amount_minor, frequency, anchor_day, next_run_date) VALUES (1, 500, 'weekly', 1, '2026-01-01')");
-  assert.throws(() => conn.exec("INSERT INTO reward_allowances (user_id, amount_minor, frequency, anchor_day, next_run_date) VALUES (1, 500, 'monthly', 1, '2026-01-01')"), /UNIQUE/, 'ein Plan je Person');
+  assert.throws(() => conn.exec("INSERT INTO reward_allowances (user_id, amount_minor, currency, frequency, anchor_day, next_run_date) VALUES (1, 0, 'EUR', 'weekly', 1, '2026-01-01')"), /CHECK/);
+  conn.exec("INSERT INTO reward_allowances (user_id, amount_minor, currency, frequency, anchor_day, next_run_date) VALUES (1, 500, 'EUR', 'weekly', 1, '2026-01-01')");
+  assert.throws(() => conn.exec("INSERT INTO reward_allowances (user_id, amount_minor, currency, frequency, anchor_day, next_run_date) VALUES (1, 500, 'EUR', 'monthly', 1, '2026-01-01')"), /UNIQUE/, 'ein Plan je Person');
+  assert.throws(() => conn.exec("INSERT INTO reward_allowances (user_id, amount_minor, frequency, anchor_day, next_run_date) VALUES (2, 500, 'weekly', 1, '2026-01-01')"), /NOT NULL/, 'kein Plan ohne Waehrung');
+
+  // Die Waehrung haengt an der Einheit: Bestand (Punkte) traegt keine, Geld immer eine.
+  assert.equal(conn.prepare('SELECT COUNT(*) AS n FROM reward_ledger WHERE currency IS NOT NULL').get().n, 0);
+  assert.equal(conn.prepare('SELECT COUNT(*) AS n FROM reward_redemptions WHERE currency IS NOT NULL').get().n, 0);
+  conn.exec("INSERT INTO reward_ledger (user_id, delta, type, unit, currency) VALUES (1, 100, 'bonus', 'money', 'EUR')");
+  assert.throws(() => conn.exec("INSERT INTO reward_ledger (user_id, delta, type, unit) VALUES (1, 100, 'bonus', 'money')"), /CHECK/, 'Geld ohne Code');
+  assert.throws(() => conn.exec("INSERT INTO reward_ledger (user_id, delta, type, currency) VALUES (1, 100, 'bonus', 'EUR')"), /CHECK/, 'Punkte mit Code');
+  conn.exec("INSERT INTO reward_redemptions (user_id, reward_name, cost, kind, currency) VALUES (1, 'deposit', 100, 'deposit', 'EUR')");
+  assert.throws(() => conn.exec("INSERT INTO reward_redemptions (user_id, reward_name, cost, kind) VALUES (1, 'deposit', 100, 'deposit')"), /CHECK/, 'Geld-Anfrage ohne Code');
+  assert.throws(() => conn.exec("INSERT INTO reward_redemptions (user_id, reward_name, cost, currency) VALUES (1, 'Eis', 5, 'EUR')"), /CHECK/, 'Praemien-Anfrage mit Code');
+  assert.equal(conn.prepare("SELECT SUM(delta) AS bal FROM reward_ledger WHERE user_id = 1 AND unit = 'points'").get().bal, 15, 'und die Punkte stehen, wie sie waren');
   conn.close();
 });
 
 test('die laufende Datenbank traegt dasselbe: Spalten, Index, Plan-Tabelle', () => {
   const cols = (table) => db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
-  assert.ok(cols('reward_ledger').includes('unit') && cols('reward_ledger').includes('allowance_date'));
+  assert.ok(cols('reward_ledger').includes('unit') && cols('reward_ledger').includes('allowance_date') && cols('reward_ledger').includes('currency'));
+  assert.ok(cols('reward_redemptions').includes('currency') && cols('reward_allowances').includes('currency'));
   assert.ok(cols('reward_redemptions').includes('kind'));
   assert.ok(cols('reward_allowances').includes('anchor_day'));
   const names = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'reward_ledger'").all().map((r) => r.name);

@@ -10362,10 +10362,18 @@ const MIGRATIONS = [
     // und ADD COLUMN baut die Tabelle nicht neu: die fuenf Indizes
     // (idx_reward_ledger_user, _redemption, _task, _series, _reverses)
     // bleiben, und `uniq_reward_earn` kommt nicht zurueck (Migration 230).
-    // Geld steht in ganzen kleinsten Einheiten der Haushaltswaehrung (Cent),
-    // wie `amount_minor` der geteilten Ausgaben. Eine Waehrung je Zeile gibt
-    // es nicht: wechselt der Haushalt sie, bleiben die Zahlen und das Etikett
-    // aendert sich - wie ueberall, wo ein Betrag ohne Code liegt.
+    // Geld steht in ganzen kleinsten Einheiten (Cent) MIT SEINEM WAEHRUNGSCODE,
+    // wie `amount_minor` und `currency` der geteilten Ausgaben.
+    //
+    // `currency` STEHT AN JEDER GELDZEILE, AN JEDER GELD-ANFRAGE UND AM PLAN.
+    // Ein Konto hat genau EINE Waehrung: die Haushaltswaehrung des Tages, an
+    // dem es eroeffnet wurde. Wechselt der Haushalt seine Waehrung spaeter,
+    // bleibt das Konto, wie es ist - 1,00 EUR werden nicht zu 100 Yen. Die
+    // CHECKs binden die Spalte an die Einheit: eine Geldzeile ohne Code und
+    // eine Punktezeile mit Code lehnt das Schema ab (bei der Anfrage dasselbe
+    // ueber `kind`). DASS ein Konto bei EINER Waehrung bleibt, kann ein CHECK
+    // nicht sagen - das prueft die Schreibschicht in der Transaktion jeder
+    // Buchung (`postMoney()` in server/services/reward-money.js).
     //
     // KEIN NEUER `type`: der CHECK auf `type` liesse sich nur per Rebuild
     // aendern. Eine Gutschrift nach Plan ist ein `bonus` mit unit 'money',
@@ -10397,21 +10405,26 @@ const MIGRATIONS = [
     // (1 = Montag bis 7 = Sonntag).
     //
     // Ein kuenftiger Rebuild von reward_ledger oder reward_redemptions muss
-    // `unit`, `allowance_date`, `kind` und den Index mitnehmen.
+    // `unit`, `allowance_date`, `currency`, `kind` und den Index mitnehmen.
     up: `
       ALTER TABLE reward_ledger ADD COLUMN unit TEXT NOT NULL DEFAULT 'points'
         CHECK(unit IN ('points', 'money'));
       ALTER TABLE reward_ledger ADD COLUMN allowance_date TEXT;
+      ALTER TABLE reward_ledger ADD COLUMN currency TEXT
+        CHECK((unit = 'money') = (currency IS NOT NULL));
       CREATE UNIQUE INDEX uniq_reward_allowance_credit
         ON reward_ledger(user_id, allowance_date) WHERE allowance_date IS NOT NULL;
 
       ALTER TABLE reward_redemptions ADD COLUMN kind TEXT NOT NULL DEFAULT 'reward'
         CHECK(kind IN ('reward', 'withdrawal', 'deposit'));
+      ALTER TABLE reward_redemptions ADD COLUMN currency TEXT
+        CHECK((kind = 'reward') = (currency IS NULL));
 
       CREATE TABLE reward_allowances (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id       INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         amount_minor  INTEGER NOT NULL CHECK(amount_minor > 0),
+        currency      TEXT    NOT NULL,
         frequency     TEXT    NOT NULL CHECK(frequency IN ('weekly', 'monthly')),
         anchor_day    INTEGER NOT NULL CHECK(anchor_day BETWEEN 1 AND 31),
         next_run_date TEXT    NOT NULL,

@@ -1464,16 +1464,21 @@ const MIGRATIONS_SQL = {
     ALTER TABLE reward_ledger ADD COLUMN unit TEXT NOT NULL DEFAULT 'points'
       CHECK(unit IN ('points', 'money'));
     ALTER TABLE reward_ledger ADD COLUMN allowance_date TEXT;
+    ALTER TABLE reward_ledger ADD COLUMN currency TEXT
+      CHECK((unit = 'money') = (currency IS NOT NULL));
     CREATE UNIQUE INDEX uniq_reward_allowance_credit
       ON reward_ledger(user_id, allowance_date) WHERE allowance_date IS NOT NULL;
 
     ALTER TABLE reward_redemptions ADD COLUMN kind TEXT NOT NULL DEFAULT 'reward'
       CHECK(kind IN ('reward', 'withdrawal', 'deposit'));
+    ALTER TABLE reward_redemptions ADD COLUMN currency TEXT
+      CHECK((kind = 'reward') = (currency IS NULL));
 
     CREATE TABLE reward_allowances (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id       INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
       amount_minor  INTEGER NOT NULL CHECK(amount_minor > 0),
+      currency      TEXT    NOT NULL,
       frequency     TEXT    NOT NULL CHECK(frequency IN ('weekly', 'monthly')),
       anchor_day    INTEGER NOT NULL CHECK(anchor_day BETWEEN 1 AND 31),
       next_run_date TEXT    NOT NULL,

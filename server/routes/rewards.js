@@ -11,10 +11,12 @@ import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { getBalance, isEnrolled, ledgerBalanceSql, postLedger, CATALOG_SELECT, activeCatalog } from '../services/rewards.js';
 import {
-  MONEY_KINDS, creditFits, hasMoneyAccount, listMoneyAccounts, listMoneyCandidates, listMoneyLedger,
+  MONEY_KINDS, closeFormerMoney, creditFits, hasMoneyAccount, isFormerMoneyAccount,
+  listMoneyAccounts, listMoneyCandidates, listMoneyLedger,
   moneyBalance, moneyCurrency, moneyParams, moneyReader, moneyVisibleSql,
-  parseMoneyAmount, readOptionalText, readPlanInput, savePlan,
+  parseMoneyAmount, postMoney, readOptionalText, readPlanInput, resolveMoneyCurrency, savePlan,
 } from '../services/reward-money.js';
+import { minorUnit } from '../services/split-expenses.js';
 import { isHouseholdMember } from '../services/household-members.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
@@ -438,8 +440,8 @@ router.get('/redemptions', (req, res) => {
     const me = actingUser(req);
     const reader = moneyReader(req);
     const rows = db.get().prepare(`
-      SELECT r.id, r.user_id, r.catalog_id, r.kind, r.reward_name, r.reward_icon, r.cost, r.status,
-             r.note, r.decided_at, r.created_at,
+      SELECT r.id, r.user_id, r.catalog_id, r.kind, r.currency, r.reward_name, r.reward_icon, r.cost, r.status,
+             r.note, r.decision_reason, r.decided_at, r.created_at,
              u.display_name AS user_name, u.avatar_color AS user_color, u.avatar_data AS user_avatar,
              dec.display_name AS decided_by_name
       FROM reward_redemptions r
@@ -464,6 +466,8 @@ router.get('/redemptions', (req, res) => {
       const key = `${money ? 'money' : 'points'}:${row.user_id}`;
       if (!balanceByUser.has(key)) balanceByUser.set(key, money ? moneyBalance(d, row.user_id) : getBalance(d, row.user_id));
       row.user_balance = balanceByUser.get(key);
+      // Eine Geld-Anfrage sagt, in welchen Stellen ihr Betrag steht (#1734).
+      row.minor_unit = money ? minorUnit(row.currency) : null;
     }
     res.json({ data: rows });
   } catch (err) {
@@ -566,6 +570,13 @@ router.post('/redemptions', (req, res) => {
   }
 });
 
+/** Ein Eingabefehler am Geld als 400 - mit dem Grund, wo der Fehler einen traegt (`currency_mismatch`). */
+function moneyInputRefusal(res, err) {
+  const body = { error: err.message, code: 400 };
+  if (err.reason) body.reason = err.reason;
+  return res.status(400).json(body);
+}
+
 /*
  * GELD-ANFRAGE STELLEN: ABHEBUNG ODER EINZAHLUNG (#1734).
  *
@@ -598,11 +609,15 @@ function fileMoneyRequest(req, res, d, me) {
   }
   let amount;
   let note;
+  let currency;
   try {
-    amount = parseMoneyAmount(d, req.body?.amount);
+    // Die Anfrage steht in der Waehrung des KONTOS, nicht in der, die der
+    // Haushalt heute fuehrt; ein mitgeschickter fremder Code ist ein Fehler.
+    ({ currency } = resolveMoneyCurrency(d, targetId, req.body?.currency));
+    amount = parseMoneyAmount(req.body?.amount, currency);
     note = readOptionalText(req.body?.note, 'note', 500);
   } catch (err) {
-    if (err?.name === 'SplitInputError') return res.status(400).json({ error: err.message, code: 400 });
+    if (err?.name === 'SplitInputError') return moneyInputRefusal(res, err);
     throw err;
   }
 
@@ -611,9 +626,9 @@ function fileMoneyRequest(req, res, d, me) {
     // `reward_name` ist NOT NULL und hat bei Geld nichts zu halten: dort steht
     // die Art der Anfrage als fester Marker, den die Oberflaeche uebersetzt.
     const r = d.prepare(`
-      INSERT INTO reward_redemptions (user_id, catalog_id, kind, reward_name, reward_icon, cost, note, requested_by)
-      VALUES (?, NULL, ?, ?, NULL, ?, ?, ?)
-    `).run(targetId, kind, kind, amount, note, me);
+      INSERT INTO reward_redemptions (user_id, catalog_id, kind, currency, reward_name, reward_icon, cost, note, requested_by)
+      VALUES (?, NULL, ?, ?, ?, NULL, ?, ?, ?)
+    `).run(targetId, kind, currency, kind, amount, note, me);
     return { id: r.lastInsertRowid };
   })();
   if (out.insufficient) {
@@ -643,12 +658,20 @@ function decideMoneyRequest(res, d, row, action, me) {
   const nextStatus = action === 'fulfill' ? 'fulfilled' : action === 'reject' ? 'rejected' : 'cancelled';
   const refused = d.transaction(() => {
     if (action === 'fulfill') {
+      // EIN EHEMALIGES KONTO WIRD NUR NOCH AUSGEZAHLT, und zwar von den Eltern
+      // direkt. Eine Anfrage, die das Deaktivieren ueberlebt hat (aelter als
+      // die Regel), wird hier nicht mehr freigegeben, sondern storniert - die
+      // Einzahlung landete sonst auf einem Konto, das keine Liste mehr zeigt.
+      if (!isHouseholdMember(row.user_id, { db: d })) {
+        closeFormerMoney(d, row.user_id);
+        return 'account_deactivated';
+      }
       const withdrawal = row.kind === 'withdrawal';
       if (withdrawal && moneyBalance(d, row.user_id) < row.cost) return 'insufficient_funds';
       if (!withdrawal && !creditFits(d, row.user_id, row.cost)) return 'balance_too_large';
-      postLedger(d, {
+      postMoney(d, {
         userId: row.user_id, delta: withdrawal ? -row.cost : row.cost, type: withdrawal ? 'redeem' : 'bonus',
-        reason: row.note, redemptionId: row.id, createdBy: me, unit: 'money',
+        reason: row.note, redemptionId: row.id, createdBy: me, currency: row.currency,
       });
     }
     d.prepare(`
@@ -664,6 +687,12 @@ function decideMoneyRequest(res, d, row, action, me) {
     return res.status(409).json({
       error: 'The balance no longer covers this withdrawal; the request stays open.',
       code: 409, reason: 'insufficient_funds', data: updated,
+    });
+  }
+  if (refused === 'account_deactivated') {
+    return res.status(409).json({
+      error: 'This account is deactivated; the request was cancelled. Pay out the remaining balance directly.',
+      code: 409, reason: 'account_deactivated', data: updated,
     });
   }
   if (refused) {
@@ -798,6 +827,8 @@ router.get('/money', (req, res) => {
     const reader = moneyReader(req);
     const manage = reader.admin && !reader.display;
     res.json({ data: {
+      // Die Waehrung des HAUSHALTS: darin wird ein neues Konto eroeffnet. Jedes
+      // Konto darunter nennt seine eigene.
       ...moneyCurrency(d),
       accounts: listMoneyAccounts(d, reader),
       // Aus wem Eltern ein neues Konto eroeffnen - nur fuer sie.
@@ -832,29 +863,42 @@ router.post('/money/entries', requireAdmin, (req, res) => {
     if (!Number.isFinite(userId)) return res.status(400).json({ error: 'user_id is required.', code: 400 });
     if (direction !== 'credit' && direction !== 'debit')
       return res.status(400).json({ error: 'direction must be credit or debit.', code: 400 });
-    if (!isHouseholdMember(userId, { db: d }))
-      return res.status(400).json({ error: 'Only household members can have pocket money.', code: 400 });
+    // EIN EHEMALIGES KONTO WIRD NUR NOCH AUSGEZAHLT: abziehen ja (nie unter
+    // null), gutschreiben nein. Wer sonst kein Haushaltsmitglied ist (Gast,
+    // Hauspersonal), hat kein Taschengeld.
+    if (!isHouseholdMember(userId, { db: d })) {
+      if (!isFormerMoneyAccount(d, userId) || !hasMoneyAccount(d, userId))
+        return res.status(400).json({ error: 'Only household members can have pocket money.', code: 400 });
+      if (direction !== 'debit') {
+        return res.status(409).json({
+          error: 'This account is deactivated; its remaining balance can only be paid out.',
+          code: 409, reason: 'account_deactivated',
+        });
+      }
+    }
     let amount;
     let reason;
+    let currency;
     try {
-      amount = parseMoneyAmount(d, req.body?.amount);
+      ({ currency } = resolveMoneyCurrency(d, userId, req.body?.currency));
+      amount = parseMoneyAmount(req.body?.amount, currency);
       reason = readOptionalText(req.body?.reason, 'reason', 200);
     } catch (err) {
-      if (err?.name === 'SplitInputError') return res.status(400).json({ error: err.message, code: 400 });
+      if (err?.name === 'SplitInputError') return moneyInputRefusal(res, err);
       throw err;
     }
     if (direction === 'credit' && !creditFits(d, userId, amount))
       return res.status(400).json({ error: 'amount is too large.', code: 400 });
     const insufficient = d.transaction(() => {
       if (direction === 'debit' && moneyBalance(d, userId) < amount) return true;
-      postLedger(d, {
+      postMoney(d, {
         userId, delta: direction === 'credit' ? amount : -amount, type: direction === 'credit' ? 'bonus' : 'adjust',
-        reason, createdBy: actingUser(req), unit: 'money',
+        reason, createdBy: actingUser(req), currency,
       });
       return false;
     })();
     if (insufficient) return res.status(400).json({ error: 'Insufficient funds.', code: 400, reason: 'insufficient_funds' });
-    res.status(201).json({ data: { user_id: userId, balance_minor: moneyBalance(d, userId) } });
+    res.status(201).json({ data: { user_id: userId, balance_minor: moneyBalance(d, userId), currency, minor_unit: minorUnit(currency) } });
   } catch (err) {
     log.error('POST /money/entries error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -868,10 +912,18 @@ router.put('/money/plans/:userId', requireAdmin, (req, res) => {
     const userId = toInt(req.params.userId);
     if (!Number.isFinite(userId) || !d.prepare('SELECT id FROM users WHERE id = ?').get(userId))
       return res.status(404).json({ error: 'User not found.', code: 404 });
-    if (!isHouseholdMember(userId, { db: d }))
+    if (!isHouseholdMember(userId, { db: d })) {
+      // Der Plan eines ehemaligen Kontos bleibt pausiert: weder aendern noch
+      // fortsetzen. Beenden (DELETE) geht weiter.
+      if (isFormerMoneyAccount(d, userId)) {
+        return res.status(409).json({
+          error: 'This account is deactivated; its plan stays paused.', code: 409, reason: 'account_deactivated',
+        });
+      }
       return res.status(400).json({ error: 'Only household members can have pocket money.', code: 400 });
-    const input = readPlanInput(d, req.body);
-    if (input.error) return res.status(400).json({ error: input.error, code: 400 });
+    }
+    const input = readPlanInput(d, userId, req.body);
+    if (input.error) return moneyInputRefusal(res, { message: input.error, reason: input.reason });
     // Was am alten Plan faellig war, bucht savePlan() VOR der Aenderung, und
     // einen ersten Termin heute gleich danach - alles in einer Transaktion.
     const plan = savePlan(d, userId, input, { actorId: actingUser(req) });

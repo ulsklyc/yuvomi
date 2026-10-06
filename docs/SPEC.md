@@ -493,6 +493,7 @@ in between counting and writing.
 | note | TEXT | optional member note |
 | decision_reason | TEXT | nullable, migration v221 - machine-readable reason for an automatic decision (`out_of_stock`); `NULL` = decided by hand |
 | kind | TEXT | NOT NULL DEFAULT `reward`, CHECK `reward` / `withdrawal` / `deposit` (#1734) - `reward` is a catalogue redemption and every row from before; the other two are pocket money requests with a free amount in `cost` (minor units), no `catalog_id`, and the kind itself as the `reward_name` marker |
+| currency | TEXT | nullable, CHECK: set exactly when `kind` is not `reward` (#1734) - the ISO 4217 code of the account the money request belongs to |
 | requested_by / decided_by | INTEGER | FK → Users (SET NULL) |
 | decided_at | TEXT | ISO timestamp, nullable |
 
@@ -509,6 +510,7 @@ in between counting and writing.
 | series_id | INTEGER | nullable, no FK (migration v230, #1603) - on an `earn` row the series it was earned in (`tasks.recurrence_series_id`, or the task's own id); the once-a-day cap reads it |
 | reverses_id | INTEGER | nullable, no FK (migration v230, #1607) - on a task `reversal` the id of the `earn` row it takes back |
 | unit | TEXT | NOT NULL DEFAULT `points`, CHECK `points` / `money` (#1734) - what `delta` counts; every row from before is points |
+| currency | TEXT | nullable, CHECK: set exactly when `unit` is `money` (#1734) - the ISO 4217 code the amount is in |
 | allowance_date | TEXT | nullable (#1734) - on a scheduled pocket money credit the due date it was booked for; partial UNIQUE `(user_id, allowance_date) WHERE allowance_date IS NOT NULL` |
 | created_by | INTEGER | FK → Users (SET NULL) |
 
@@ -520,13 +522,27 @@ entry 6). A payout creates no budget entry.
 
 - **Two balances that never meet.** `unit` says what a row counts. A child's points and a child's
   money are two sums over the same table, and there is no conversion in either direction. Money is an
-  `INTEGER` in minor units of the household currency (`sync_config.currency`, decimals per ISO 4217
-  as in split expenses); a currency is not stored per row, so changing the household currency keeps
-  the numbers and changes the label. **Every sum over `delta` needs the unit filter**, which is why
+  `INTEGER` in minor units (decimals per ISO 4217, as in split expenses) **with its currency code on
+  the row**. **Every sum over `delta` needs the unit filter**, which is why
   the sum exists in one place that throws without a unit (`ledgerBalanceSql()` and `ledgerBalance()`
   in `server/services/rewards.js`): the standings, `/rewards/participants`, the Overview tile and its
   "recently earned" list, the cover check of a redemption and the net of a task all read points only.
   `GET /rewards/ledger` is the points history and carries no money row.
+- **An account has exactly one currency.** It is the household currency (`sync_config.currency`,
+  read through `server/utils/household-currency.js`) of the day the account was opened, and it
+  stands on every money entry, every money request and the plan, as split expenses do it. A later
+  change of the household currency leaves the account alone: balance, plan and open requests keep
+  reading and booking in the account's currency, 1.00 EUR does not become 100 yen, and a new
+  account opened afterwards takes the new currency. Which currency an account has is read from what
+  still holds on it, in this order: the plan, an open money request, and - if the balance is not
+  zero - the latest money entry (`accountCurrency()` in `server/services/reward-money.js`). If none
+  of them holds, the account is **empty** and takes the household currency again the next time it
+  is opened; the old rows keep their code and sum to zero in it, so the one sum over all money rows
+  stays the balance. An account with a balance never changes currency - converting would mean
+  inventing a rate. The CHECKs tie the column to the unit; that an account stays with ONE currency
+  is checked by the write layer inside the transaction of every booking (`postMoney()`), and a
+  booking, request or plan that names another code is refused with `currency_mismatch`. Every money
+  object in the API carries `currency` and `minor_unit`, and the page formats and parses from those.
 - **No new ledger `type`.** Changing the `CHECK` on `type` means rebuilding the table, and a rebuild
   drops its five indexes. A scheduled credit is a `bonus`, a payout a `redeem`, a parent's booking a
   `bonus` or an `adjust`, each with `unit = 'money'`. Both columns come by `ALTER TABLE ADD COLUMN`.
@@ -570,15 +586,26 @@ entry 6). A payout creates no budget entry.
   the same transaction - a new amount or anchor day never reaches back; leaving `paused` out keeps
   the stored state. A single amount is capped at 10^12 minor units whatever the currency, and a
   credit that would take the balance past the exact integers is refused. A paused plan books nothing and **skips** its missed dates when it is
-  resumed. A plan whose member is no longer part of the household (deactivated account) is paused
-  instead of credited.
+  resumed.
+- **A deactivated child is only paid out.** Where the state changes (`deactivate()` in
+  `server/services/user-removal.js`) the open money requests are cancelled with
+  `decision_reason = 'account_deactivated'` and the plan is paused; the hourly run does the same for
+  accounts that were deactivated before this rule existed (`closeFormerMoney()`). While a balance is
+  left, administrators - and nobody else - still see the account, marked `former`, and may only
+  book it down, never below zero. A credit, the approval of an old open request, and changing or
+  resuming the plan are refused with `account_deactivated`. At balance zero the account leaves the
+  list. A reactivated account is a member's account again; its plan stays paused until an
+  administrator resumes it, and what was cancelled stays cancelled. For removal this means: money
+  entries are a trace, so an account that has any is deactivated rather than deleted; a plan alone
+  is a setting and goes with the account.
 
 **Reward Allowances** - the pocket money plan, one row per member (#1734).
 
 | Column | Type | Constraint |
 |--------|------|-----------|
 | user_id | INTEGER | FK → Users (CASCADE delete), NOT NULL, UNIQUE |
-| amount_minor | INTEGER | NOT NULL, > 0 - minor units of the household currency |
+| amount_minor | INTEGER | NOT NULL, > 0 - minor units of `currency` |
+| currency | TEXT | NOT NULL - the ISO 4217 code of the account; never changes while the plan exists |
 | frequency | TEXT | `weekly` / `monthly` |
 | anchor_day | INTEGER | NOT NULL, 1-31 - monthly: day of the month; weekly: weekday, 1 = Monday to 7 = Sunday |
 | next_run_date | TEXT | NOT NULL, YYYY-MM-DD - the next due date |
@@ -5332,16 +5359,18 @@ gone. The data model, including why the balance is always derived from the ledge
   the reader's language, because the server sends the reason as a code and not as a sentence.
 - **Pocket money (#1734):** a section of its own on the Overview, above the point balances and only
   when there is something to show: a child sees its own account, an administrator every account, a
-  wall tablet none (the tablet does not even ask). A row carries the balance in the household
-  currency and the plan in one sentence ("5.00 per week · next credit: 9 October"); tapping it opens
+  wall tablet none (the tablet does not even ask). A row carries the balance in the account's own
+  currency (which is not necessarily the one the household uses today) and the plan in one sentence ("5.00 per week · next credit: 9 October"); tapping it opens
   the money history. The child's own row offers **Withdraw** and **Pay in**, both of which file a
   request and say so in the dialog; an administrator's rows offer **Book** (credit or debit) and the
   plan, and "Set up pocket money" opens an account for a member who has none. Money requests stand
   in the same pending list as reward requests, with the amount as money and the balance next to it
-  for whoever decides. With `rewards: read` the balance, the plan and the open requests stay and
+  for whoever decides. The account of a deactivated child with money left stays in the
+  administrators' list with the "Former" badge and one action, deducting; it has no plan dialog and
+  no credit. With `rewards: read` the balance, the plan and the open requests stay and
   every one of these actions goes. Amounts are typed in the region's notation and checked by the
-  shared money helpers (`public/utils/money.js`); how many decimals an amount has comes from the
-  server's `minor_unit` (ISO 4217), never from `Intl`, whose display convention shows HUF, IDR, COP,
+  shared money helpers (`public/utils/money.js`); which currency and how many decimals an amount has
+  comes from the money object itself (`currency`, `minor_unit` per ISO 4217), never from `Intl`, whose display convention shows HUF, IDR, COP,
   IRR and PYG without the two decimals they are stored with. A plan row belongs to the account and
   goes with it; money entries are a trace, so an account that has any is deactivated, not deleted.
 - **Context FAB:** creates a reward on the Catalog tab and grants a bonus on the Ledger tab, both

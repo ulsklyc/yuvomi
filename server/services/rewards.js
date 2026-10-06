@@ -12,8 +12,8 @@ import { seriesRootOf } from './task-completions.js';
 import { householdTimeZone, todayKey, utcToWall } from '../utils/timezone.js';
 
 const REWARD_TX = `
-  INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, redemption_id, created_by, unit)
-  VALUES (@user_id, @delta, @type, @reason, @task_id, @redemption_id, @created_by, @unit)
+  INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, redemption_id, created_by, unit, currency)
+  VALUES (@user_id, @delta, @type, @reason, @task_id, @redemption_id, @created_by, @unit, @currency)
 `;
 
 /*
@@ -360,9 +360,17 @@ export function syncTaskRewards(d, taskId, oldStatus, newStatus, actingUserId, d
  * Freie Buchung (Bonus/Korrektur/Reversal) - vom Route-Handler genutzt.
  * Ohne `unit` sind es Punkte, wie jede Buchung von vor #1734.
  */
-export function postLedger(d, { userId, delta, type, reason = null, taskId = null, redemptionId = null, createdBy = null, unit = 'points' }) {
+export function postLedger(d, { userId, delta, type, reason = null, taskId = null, redemptionId = null, createdBy = null, unit = 'points', currency = null }) {
+  // Eine Geldzeile traegt ihren Waehrungscode, eine Punktezeile keinen - das
+  // Schema lehnt beides andere ab. Geld bucht `postMoney()` in
+  // server/services/reward-money.js: dort steht die Regel, dass ein Konto bei
+  // seiner EINEN Waehrung bleibt.
+  if ((checkedUnit(unit) === 'money') !== (currency != null)) {
+    throw new Error('a money entry carries a currency, a points entry none.');
+  }
   return d.prepare(REWARD_TX).run({
-    unit: checkedUnit(unit),
+    unit,
+    currency,
     user_id: userId,
     delta,
     type,

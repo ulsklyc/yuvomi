@@ -872,6 +872,9 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/rewards.js: item.name', { sites: 1, at403: [], why: 'Buchungstext im Punktekonto, keine Antwort' }],
   ['routes/rewards.js: row.reward_name', { sites: 1, at403: [], why: 'Buchungstext im Punktekonto, keine Antwort' }],
   ['routes/rewards.js: row.note', { sites: 1, at403: [], why: 'Buchungstext im Taschengeldkonto (#1734), keine Antwort' }],
+  // Eingabefehler am Taschengeld (#1734): der einzige Grund ist `currency_mismatch`, immer an einer 400.
+  ['routes/rewards.js: input.reason', { sites: 1, at403: [], why: 'feste 400' }],
+  ['services/reward-money.js: err.reason', { sites: 1, at403: [], why: 'Rueckgabe an die Route, dort feste 400' }],
   ['services/ics-parser.js: !uid ? \'missing UID\' : \'missing or unparsable DTSTART\'', { sites: 1, at403: [],
     why: 'onSkip fuers Log, keine Antwort' }],
 ]);
