@@ -36,6 +36,7 @@ import {
 import { getReadableTextColor } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
 import { packLanes } from '/utils/week-strip.js';
+import { assignLanes, assignLanesByPerson, memberRank } from '/utils/overlap-lanes.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc, naiveUtc } from '/utils/reminder-offset.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
@@ -4747,69 +4748,6 @@ function timeRangeForEvent(ev, dayStr = null) {
   };
 }
 
-// Gruppiert sich ueberlappende Eintraege (per `rangeFn` bestimmt) in Cluster,
-// innerhalb derer sie sich Spalten teilen muessen - unabhaengig von der Frage,
-// WAS ein Eintrag ist (Termin oder Schichtplan-Block). Haelfte-offen: ein
-// Eintrag, der genau dort endet, wo der naechste beginnt, ueberlappt nicht.
-function overlapGroups(items, rangeFn) {
-  const groups = [];
-  const sorted = [...items].sort((a, b) => {
-    const aRange = rangeFn(a);
-    const bRange = rangeFn(b);
-    return aRange.start - bRange.start || aRange.end - bRange.end;
-  });
-
-  let current = [];
-  let currentEnd = -1;
-  for (const item of sorted) {
-    const range = rangeFn(item);
-    if (!current.length || range.start < currentEnd) {
-      current.push(item);
-      currentEnd = current.length === 1 ? range.end : Math.max(currentEnd, range.end);
-    } else {
-      groups.push(current);
-      current = [item];
-      currentEnd = range.end;
-    }
-  }
-  if (current.length) groups.push(current);
-  return groups;
-}
-
-// Weist jedem Eintrag innerhalb seiner Ueberlappungs-Gruppe eine Spalte zu.
-// `keyFn` bestimmt den Map-Schluessel: Termine haben eine stabile `id`, aber
-// Schichtplan-Eintraege nicht zwingend (Muster-Eintraege tragen nur
-// pattern_id+position) - und zwei Eintraege koennen legitim denselben Schichttyp
-// und dieselbe Zeit an einem Tag teilen (Muster + Extra-Schicht). Deshalb liefert
-// layoutScheduleBlocks() unten das Eintrags-Objekt selbst als Schluessel: jede
-// sichtbare Instanz bekommt ihren eigenen Platz, auch bei inhaltsgleichen Werten.
-function assignLanes(items, rangeFn, keyFn) {
-  const layout = new Map();
-  for (const group of overlapGroups(items, rangeFn)) {
-    const columns = [];
-    const placements = [];
-    for (const item of group) {
-      const range = rangeFn(item);
-      let colIndex = columns.findIndex((end) => end <= range.start);
-      if (colIndex === -1) {
-        colIndex = columns.length;
-        columns.push(range.end);
-      } else {
-        columns[colIndex] = range.end;
-      }
-      placements.push({ item, colIndex });
-    }
-    const totalCols = Math.max(columns.length, 1);
-    for (const placement of placements) {
-      layout.set(keyFn(placement.item), {
-        colIndex: placement.colIndex,
-        totalCols,
-      });
-    }
-  }
-  return layout;
-}
-
 // `dayStr` reicht den gerenderten Tag bis in die Spanne durch: ein Termin über
 // Mitternacht belegt in jeder Spalte nur seinen Anteil und zieht die
 // Überlappungs-Gruppe des Nachbartags nicht auf (#1313).
@@ -4821,13 +4759,25 @@ function assignLanes(items, rangeFn, keyFn) {
 // schrieb der zweite Platz den ersten still tot, und der Schwanz wurde in voller
 // Breite ueber den Termin gelegt, mit dem er sich die Spalte teilen muesste.
 // Dieselbe Loesung wie in layoutScheduleBlocks() unten (#1043).
+//
+// WER NEBEN WEM STEHT, entscheidet die Person, nicht die Ankunft (#1633):
+// assignLanesByPerson() gibt jeder Person der Gruppe ihre Spalte, in der
+// Reihenfolge der Mitgliederliste. Der Rang wird hier nur GELESEN - der Index in
+// `state.users`, so wie loadUsers() die Liste haelt. Wer die Liste anders reiht,
+// reiht damit auch die Spalten; hier wird nichts sortiert. Die Personen eines
+// Termins sind `assigned_users`, dieselbe Quelle wie Personenfilter und Farbe.
 function layoutOverlaps(events, dayStr = null) {
-  return assignLanes(events, (ev) => timeRangeForEvent(ev, dayStr), (ev) => ev);
+  return assignLanesByPerson(events, {
+    rangeFn: (ev) => timeRangeForEvent(ev, dayStr),
+    peopleFn: (ev) => (ev.assigned_users ?? []).map((u) => u.id),
+    rank: memberRank(state.users),
+  });
 }
 
-// Schichtplan-Gegenstueck zu layoutOverlaps(): gleiche Spalten-Arithmetik, aber
-// ueber scheduleBlockTimeRange() (Zeiten aus shift_type statt aus start/end_datetime)
-// und mit dem Eintrags-Objekt selbst als Schluessel statt einer ID (siehe assignLanes).
+// Schichtplan-Gegenstueck zu layoutOverlaps(): dieselbe Gruppenbildung, aber
+// ueber scheduleBlockTimeRange() (Zeiten aus shift_type statt aus start/end_datetime),
+// mit dem Eintrags-Objekt selbst als Schluessel statt einer ID und NACH ZEIT
+// gepackt statt nach Person (siehe assignLanes in utils/overlap-lanes.js).
 function layoutScheduleBlocks(entries) {
   return assignLanes(entries, scheduleBlockTimeRange, (entry) => entry);
 }
