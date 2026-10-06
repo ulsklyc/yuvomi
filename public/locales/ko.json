@@ -3899,6 +3899,26 @@
             "home": "집",
             "general": "일반"
         },
+        "recurring": {
+            "empty": "반복 지출 없음.",
+            "add": "반복 지출 추가",
+            "edit": "반복 지출 편집",
+            "nextDate": "다음 날짜",
+            "paused": "일시 중지됨",
+            "pause": "일시 중지",
+            "resume": "재개",
+            "reason": {
+                "split_invalid": "이 분할은 기록할 수 없습니다.",
+                "not_a_member": "지불자 또는 참여자가 더 이상 그룹에 없습니다."
+            },
+            "missedQuestion": "일시 중지 중에 지나간 날짜가 있습니다",
+            "missedSkip": "{{date}}부터 계속, 지난 날짜는 기록하지 않음",
+            "missedBook": "{{date}}부터 놓친 날짜 기록",
+            "deleteConfirm": "이 반복 지출을 삭제하시겠습니까?",
+            "deleteConfirmDetail": "새 지출이 더 이상 생성되지 않습니다. 이미 기록된 지출은 유지됩니다.",
+            "show": "보기",
+            "editHint": "변경 사항은 다음 날짜부터 적용됩니다. 이미 기록된 지출은 그대로 유지됩니다."
+        },
         "activityType": {
             "group_created": "그룹 생성됨",
             "group_updated": "그룹 업데이트됨",
@@ -3917,6 +3937,8 @@
             "recurring_auto_paused": "반복 지출 자동 일시중지됨: 기록할 수 없음",
             "recurring_resumed": "반복 지출 재개됨",
             "recurring_generated": "반복 지출 생성됨",
+            "recurring_edited": "반복 지출 편집됨",
+            "recurring_deleted": "반복 지출 삭제됨",
             "payment_reversed": "결제 취소됨",
             "ledger_restored": "기록 복원됨",
             "ledger_removed": "기록 삭제됨"

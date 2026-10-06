@@ -3899,6 +3899,26 @@
             "home": "Maison",
             "general": "Général"
         },
+        "recurring": {
+            "empty": "Aucune dépense récurrente.",
+            "add": "Ajouter une dépense récurrente",
+            "edit": "Modifier la dépense récurrente",
+            "nextDate": "Prochaine échéance",
+            "paused": "En pause",
+            "pause": "Suspendre",
+            "resume": "Reprendre",
+            "reason": {
+                "split_invalid": "La répartition ne peut pas être enregistrée.",
+                "not_a_member": "Le payeur ou un participant ne fait plus partie du groupe."
+            },
+            "missedQuestion": "Des échéances ont été manquées pendant la pause",
+            "missedSkip": "Reprendre à partir du {{date}}, sans rattrapage",
+            "missedBook": "Enregistrer les échéances manquées depuis le {{date}}",
+            "deleteConfirm": "Supprimer cette dépense récurrente ?",
+            "deleteConfirmDetail": "Aucune nouvelle dépense ne sera créée. Les dépenses déjà enregistrées sont conservées.",
+            "show": "Afficher",
+            "editHint": "Les modifications s'appliquent à partir de la prochaine échéance. Les dépenses déjà enregistrées restent inchangées."
+        },
         "activityType": {
             "group_created": "Groupe créé",
             "group_updated": "Groupe mis à jour",
@@ -3917,6 +3937,8 @@
             "recurring_auto_paused": "Dépense récurrente suspendue automatiquement : elle n'a pas pu être enregistrée",
             "recurring_resumed": "Dépense récurrente reprise",
             "recurring_generated": "Dépense récurrente générée",
+            "recurring_edited": "Dépense récurrente modifiée",
+            "recurring_deleted": "Dépense récurrente supprimée",
             "payment_reversed": "Paiement annulé",
             "ledger_restored": "Écriture rétablie",
             "ledger_removed": "Écriture supprimée"

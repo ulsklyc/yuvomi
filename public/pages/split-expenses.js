@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, selectModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
 import { t, formatDate, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
@@ -32,6 +32,10 @@ let state = {
   memberCandidates: [],
   activeGroupId: null,
   expenses: [],
+  // Wiederkehrende Ausgaben der aktiven Gruppe (#1647), wie der Server sie
+  // dieser Anfrage zeigt: samt `can_edit`, `blocked_reason` und - pausiert -
+  // `missed_count` / `resume_date`.
+  recurring: [],
   balances: { balances: [], simplified_debts: [] },
   activity: [],
   // Verlauf seitenweise (#1309): der Cursor der naechsten Seite, wie ihn der
@@ -328,6 +332,7 @@ async function loadGroupData() {
   state.activityLoadingMore = false;
   if (!state.activeGroupId) {
     state.expenses = [];
+    state.recurring = [];
     state.balances = { balances: [], simplified_debts: [] };
     state.activity = [];
     state.activityCursor = null;
@@ -342,11 +347,12 @@ async function loadGroupData() {
     : {};
   const params = new URLSearchParams();
   if (state.category) params.set('category', state.category);
-  const [expenses, balances, activity, groupMembers] = await Promise.all([
+  const [expenses, balances, activity, groupMembers, recurring] = await Promise.all([
     api.get(`/split-expenses/groups/${groupId}/expenses?${params.toString()}`),
     api.get(`/split-expenses/groups/${groupId}/balances`),
     fetchActivity(groupId, activityRequest),
     api.get(`/split-expenses/groups/${groupId}/members`),
+    api.get(`/split-expenses/groups/${groupId}/recurring`),
   ]);
   // Ein spaeteres Laden hat inzwischen begonnen: dessen Stand gilt, nicht dieser.
   if (generation !== _activityGeneration) return;
@@ -356,6 +362,7 @@ async function loadGroupData() {
   state.activityCursor = activity.cursor;
   state.activityGroupId = groupId;
   state.groupMembers = groupMembers.data || [];
+  state.recurring = recurring?.data || [];
 }
 
 /**
@@ -707,6 +714,12 @@ function renderMain() {
       </section>
       <section class="split-section">
         <div class="split-section-head">
+          <${SectionTag} class="split-section-title u-section-title">${t('budget.recurringLabel')}</${SectionTag}>
+        </div>
+        <div id="split-recurring-list">${renderRecurring(archived || ro)}</div>
+      </section>
+      <section class="split-section">
+        <div class="split-section-head">
           <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.activity')}</${SectionTag}>
         </div>
         <div class="split-activity">${renderActivity()}</div>
@@ -734,6 +747,7 @@ function renderMain() {
     if (btn.dataset.expenseView) openExpenseReadView(expense);
     else openExpenseModal(expense);
   });
+  main.querySelector('#split-recurring-list')?.addEventListener('click', onRecurringClick);
   stagger(main.querySelectorAll('.split-expense, .split-debt, .split-activity-item'), { host: main });
 }
 
@@ -832,6 +846,132 @@ function renderExpenses(asList = false) {
   }).join('')}</div>`;
 }
 
+/** Der Rhythmus einer Serie in Worten - die Intervall-Namen des Budgets. */
+function frequencyLabel(frequency) {
+  return t(`budget.interval${frequency.charAt(0).toUpperCase()}${frequency.slice(1)}`);
+}
+
+/** Darf an dieser Serie gehandelt werden: Modulrecht, kein Archiv, und die Regel des Servers. */
+function mayActOnRecurring(recurring) {
+  return !readOnly() && !isArchivedView() && Boolean(recurring?.can_edit);
+}
+
+/**
+ * Wiederkehrende Ausgaben der Gruppe (#1647). Bis hierher zeigte die App sie
+ * nirgends: eine vom Buchungslauf pausierte Serie stand nur im Verlauf, und
+ * fortsetzen, aendern oder loeschen liess sie sich allein ueber die API.
+ *
+ * ZUSTAND BLEIBT, HANDLUNG GEHT (Nur-lesen-Regel): Titel, Betrag, Rhythmus,
+ * naechster Termin, "Pausiert" und der Grund, warum eine Serie nicht bucht,
+ * stehen bei jedem Recht und im Archiv. Bearbeiten (die Zeile), Pausieren /
+ * Fortsetzen (der Knopf daneben) und Anlegen (der Knopf darunter) gibt es nur
+ * mit Schreibrecht ausserhalb des Archivs - und die ersten beiden nur an einer
+ * Serie, fuer die der Server `can_edit` meldet (Verwalter oder wer sie angelegt
+ * hat). Sonst oeffnet die Zeile die Leseansicht.
+ *
+ * Der Grund (`blocked_reason`) ist am heutigen Stand gemessen: er steht auch an
+ * einer laufenden Serie, die der naechste Lauf pausieren wuerde, und faellt,
+ * sobald eine Bearbeitung sie repariert hat.
+ */
+function renderRecurring(asList = false) {
+  const add = asList ? '' : `
+    <button type="button" class="btn btn--secondary split-recurring-add" data-recurring-add>
+      <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>${esc(t('splitExpenses.recurring.add'))}
+    </button>`;
+  if (!state.recurring.length) return `<div class="split-muted">${t('splitExpenses.recurring.empty')}</div>${add}`;
+  const rows = state.recurring.map((recurring) => {
+    const paused = Boolean(recurring.paused_at);
+    const when = paused
+      ? `<span class="split-recurring__state">${esc(t('splitExpenses.recurring.paused'))}</span>`
+      : `<span>${esc(`${t('splitExpenses.recurring.nextDate')}: ${formatDate(recurring.next_run_date)}`)}</span>`;
+    const reason = recurring.blocked_reason
+      ? `<span class="split-recurring__reason">${esc(t(`splitExpenses.recurring.reason.${recurring.blocked_reason}`))}</span>`
+      : '';
+    const body = `
+      <div class="split-expense__icon"><i data-lucide="${categoryIcon(recurring.category)}" aria-hidden="true"></i></div>
+      <div class="split-expense__body">
+        <strong>${esc(recurring.title)}</strong>
+        <span>${esc(frequencyLabel(recurring.frequency))}</span>
+        ${when}
+        ${reason}
+      </div>
+      <div class="split-expense__amount">${money(recurring.amount, recurring.currency)}</div>
+    `;
+    const acts = !asList && recurring.can_edit;
+    const toggleLabel = t(paused ? 'splitExpenses.recurring.resume' : 'splitExpenses.recurring.pause');
+    return `
+      <div class="split-recurring-row${paused ? ' split-recurring-row--paused' : ''}">
+        ${acts
+    ? `<button type="button" class="split-expense" data-recurring-id="${recurring.id}" aria-label="${esc(recurring.title)} - ${t('splitExpenses.recurring.edit')}">${body}</button>
+        <button type="button" class="btn btn--secondary btn--icon split-recurring-toggle" data-recurring-toggle="${recurring.id}" aria-label="${esc(`${recurring.title} - ${toggleLabel}`)}" title="${esc(toggleLabel)}">
+          <i data-lucide="${paused ? 'play' : 'pause'}" class="icon-md" aria-hidden="true"></i>
+        </button>`
+    : `<button type="button" class="split-expense" data-recurring-view="${recurring.id}">${body}</button>`}
+      </div>`;
+  }).join('');
+  return `<div class="row-carrier">${rows}</div>${add}`;
+}
+
+/** Delegierter Klick in der Serienliste. */
+function onRecurringClick(e) {
+  if (e.target.closest('[data-recurring-add]')) return openRecurringModal();
+  const toggle = e.target.closest('[data-recurring-toggle]');
+  if (toggle) return toggleRecurring(Number(toggle.dataset.recurringToggle));
+  const row = e.target.closest('[data-recurring-view], [data-recurring-id]');
+  if (!row) return undefined;
+  const recurring = state.recurring.find((item) => item.id === Number(row.dataset.recurringView ?? row.dataset.recurringId));
+  if (!recurring) return undefined;
+  // openRecurringModal() verzweigt selbst in die Leseansicht, wenn hier nicht
+  // gehandelt werden darf - der Riegel haengt nicht am Markup.
+  return openRecurringModal(recurring);
+}
+
+/** Vom Verlaufseintrag "automatisch pausiert" zur Zeile der Serie. */
+function jumpToRecurring(id) {
+  const row = _container?.querySelector(`[data-recurring-id="${id}"], [data-recurring-view="${id}"]`);
+  if (!row) return;
+  row.scrollIntoView?.({ block: 'center' });
+  row.focus?.();
+}
+
+// Ein zweiter Klick, waehrend der Umschalter unterwegs ist, tut nichts: die
+// Route ist ein Umschalter, zwei Aufrufe hintereinander hoeben sich auf.
+let _recurringToggleBusy = false;
+
+/**
+ * Pausieren oder Fortsetzen (#1647). Fortsetzen stellt EINE Frage, und nur,
+ * wenn waehrend der Pause Termine faellig gewesen waeren: ab dem naechsten
+ * Termin weiter (vorgewaehlt, die Vorgabe des Servers) oder die versaeumten
+ * nachbuchen. Beide Antworten nennen ihr Datum - `resume_date` rechnet der
+ * Server mit der Rechnung des Buchungslaufs, hier wird nichts nachgezaehlt.
+ * Abbrechen laesst die Serie pausiert.
+ */
+async function toggleRecurring(id) {
+  const recurring = state.recurring.find((item) => item.id === id);
+  if (!mayActOnRecurring(recurring) || _recurringToggleBusy) return;
+  let body = {};
+  if (recurring.paused_at) {
+    body = { missed: 'skip' };
+    if (recurring.missed_count > 0) {
+      const answer = await selectModal(t('splitExpenses.recurring.missedQuestion'), [
+        { value: 'skip', label: t('splitExpenses.recurring.missedSkip', { date: formatDate(recurring.resume_date) }) },
+        { value: 'book', label: t('splitExpenses.recurring.missedBook', { date: formatDate(recurring.next_run_date) }) },
+      ]);
+      if (answer !== 'skip' && answer !== 'book') return;
+      body = { missed: answer };
+    }
+  }
+  _recurringToggleBusy = true;
+  try {
+    await api.post(`/split-expenses/recurring/${id}/pause`, body);
+  } finally {
+    _recurringToggleBusy = false;
+    await loadGroupData();
+    renderAll();
+    refocusAfterRender();
+  }
+}
+
 /** Die Werte, die Zeile, Knopf und Rueckfrage einer Zahlung nennen (#1309). */
 function paymentParams(settlement) {
   return {
@@ -899,7 +1039,7 @@ function restoredDetail(item) {
  * aeltere Kommentar-Eintraege tragen keine Metadaten, und der Titel benennt
  * die Ausgabe, er behauptet keinen Stand von damals.
  */
-const EXPENSE_ACTIVITY = new Set(['expense_created', 'expense_edited', 'expense_deleted', 'comment_added', 'recurring_created', 'recurring_generated', 'recurring_auto_paused']);
+const EXPENSE_ACTIVITY = new Set(['expense_created', 'expense_edited', 'expense_deleted', 'comment_added', 'recurring_created', 'recurring_generated', 'recurring_auto_paused', 'recurring_edited', 'recurring_deleted']);
 
 function expenseDetail(item) {
   if (!EXPENSE_ACTIVITY.has(item.type)) return '';
@@ -941,9 +1081,18 @@ function activityItemHtml(item, actionable) {
   } else if (expenseGone) {
     reversed = `<span class="split-activity-reversed">${esc(t('splitExpenses.expenseDeleted'))}</span>`;
   }
-  const action = settlement?.can_reverse && !settlement.reversed_at && actionable
+  let action = settlement?.can_reverse && !settlement.reversed_at && actionable
     ? `<button type="button" class="btn btn--secondary split-reverse-payment" data-reverse-settlement="${settlement.id}" aria-label="${esc(t('splitExpenses.reversePaymentLabel', params))}">${esc(t('splitExpenses.reversePayment'))}</button>`
     : '';
+  // "Automatisch pausiert" fuehrt zu seiner Serie (#1647): dort steht der
+  // Grund, und wer darf, repariert sie. Hinsehen ist Lesen - der Knopf steht
+  // bei jedem Recht und im Archiv, aber nur, solange es die Serie noch gibt.
+  const pausedSeries = item.type === 'recurring_auto_paused' && item.entity_type === 'recurring_expense'
+    ? state.recurring.find((r) => r.id === Number(item.entity_id))
+    : null;
+  if (pausedSeries) {
+    action = `<button type="button" class="btn btn--secondary split-reverse-payment" data-recurring-jump="${pausedSeries.id}" aria-label="${esc(`${pausedSeries.title} - ${t('splitExpenses.recurring.show')}`)}">${esc(t('splitExpenses.recurring.show'))}</button>`;
+  }
   return `
     <div class="split-activity-item${settlement?.reversed_at || expenseGone ? ' split-activity-item--reversed' : ''}">
       <span class="split-activity-dot"></span>
@@ -976,6 +1125,8 @@ function renderActivityBox({ keepFocus = false } = {}) {
 /** Delegierter Klick im Verlauf: "Mehr laden" liest, der einzige Schreibweg dort ist das Storno. */
 function onActivityClick(e) {
   if (e.target.closest('[data-activity-more]')) return loadMoreActivity();
+  const jump = e.target.closest('[data-recurring-jump]');
+  if (jump) return jumpToRecurring(Number(jump.dataset.recurringJump));
   const btn = e.target.closest('[data-reverse-settlement]');
   if (!btn) return undefined;
   return reverseSettlement(Number(btn.dataset.reverseSettlement));
@@ -1330,7 +1481,7 @@ function validateSplitForm(panel, { reveal = false } = {}) {
   }
   const hint = panel.querySelector('#split-method-hint');
   if (hint) hint.textContent = message;
-  const save = panel.querySelector('#split-save-expense');
+  const save = panel.querySelector('#split-save-expense') || panel.querySelector('#split-save-recurring');
   if (save) save.disabled = !valid;
   return valid;
 }
@@ -1674,22 +1825,7 @@ function openExpenseModal(expense = null, prefill = null) {
         }),
       });
       panel.querySelector('#split-cancel-expense')?.addEventListener('click', () => closeModal());
-      panel.querySelector('[name="split_method"]')?.addEventListener('change', () => updateSplitInputs(panel));
-      panel.querySelector('[name="currency"]')?.addEventListener('change', () => updateSplitInputs(panel));
-      panel.querySelector('#split-expense-form')?.addEventListener('input', () => validateSplitForm(panel));
-      // Der Grund fuer einen gesperrten Betrag erscheint beim Verlassen des
-      // Feldes, nicht bei jedem Tastendruck (syncAmountReason).
-      panel.querySelector('[name="amount"]')?.addEventListener('change', () => validateSplitForm(panel, { reveal: true }));
-      panel.querySelectorAll('input[name="participants"]').forEach((input) => {
-        const row = input.closest('.split-participant-row');
-        const valueInput = row?.querySelector('.split-split-value');
-        if (valueInput) valueInput.disabled = !input.checked;
-        input.addEventListener('change', () => {
-          if (valueInput) valueInput.disabled = !input.checked;
-          validateSplitForm(panel);
-        });
-      });
-      updateSplitInputs(panel);
+      wireSplitFields(panel, '#split-expense-form');
       panel.querySelector('#split-delete-expense')?.addEventListener('click', async () => {
         if (readOnly()) return;
         // confirmOverModal statt confirmModal: das Ausgaben-Formular trägt
@@ -1715,19 +1851,8 @@ function openExpenseModal(expense = null, prefill = null) {
         const data = Object.fromEntries(new FormData(form));
         data.amount = decimalString(data.amount);
         const expenseCurrency = form.querySelector('[name="currency"]')?.value || group.default_currency;
-        if (rejectSplitAmount(form.querySelector('[name="amount"]'), expenseCurrency,
-          { original: isEdit ? expense.amount : null, originalCurrency: isEdit ? expense.currency : null, required: true })) return;
-        // Auch die Genau-Beträge: sie sind Geld in derselben Währung. Jeder
-        // Anteil eines angehakten Mitglieds muss groesser als 0 sein, auch wenn
-        // die Summe stimmt ("-5 und 15"): der Server lehnt 0 und negative
-        // Anteile ab (parseMoneyToMinor), und die Antwort kaeme englisch und
-        // ortlos zurueck. Wer nichts traegt, wird abgehakt.
-        if (form.querySelector('[name="split_method"]')?.value === 'exact') {
-          for (const field of form.querySelectorAll('.split-split-value')) {
-            if (field.hidden || field.disabled) continue;
-            if (rejectSplitAmount(field, expenseCurrency, { required: true })) return;
-          }
-        }
+        if (rejectSplitAmounts(form, expenseCurrency,
+          { original: isEdit ? expense.amount : null, originalCurrency: isEdit ? expense.currency : null })) return;
         const { participants, splits } = collectSplitPayload(form);
         const payload = { ...data, participants, splits };
         // commit() lädt wartende Dateien erst jetzt hoch: ein abgebrochenes
@@ -1737,6 +1862,226 @@ function openExpenseModal(expense = null, prefill = null) {
         else await api.post(`/split-expenses/groups/${state.activeGroupId}/expenses`, payload);
         closeModal({ force: true });
         await refreshDashboard();
+        await loadGroupData();
+        renderAll();
+        refocusAfterRender();
+      });
+    },
+  });
+}
+
+/**
+ * Die Verdrahtung der Felder, die Ausgabe und Serie teilen: Aufteilungsart,
+ * Waehrung, Betrag und die Beteiligten mit ihrem Wert. EINE Fassung fuer beide
+ * Dialoge (#1647) - die Serie bekommt dieselbe Pruefung beim Tippen wie die
+ * Ausgabe, statt einer Abschrift, die ihr nachlaeuft.
+ */
+function wireSplitFields(panel, formSelector) {
+  panel.querySelector('[name="split_method"]')?.addEventListener('change', () => updateSplitInputs(panel));
+  panel.querySelector('[name="currency"]')?.addEventListener('change', () => updateSplitInputs(panel));
+  panel.querySelector(formSelector)?.addEventListener('input', () => validateSplitForm(panel));
+  // Der Grund fuer einen gesperrten Betrag erscheint beim Verlassen des
+  // Feldes, nicht bei jedem Tastendruck (syncAmountReason).
+  panel.querySelector('[name="amount"]')?.addEventListener('change', () => validateSplitForm(panel, { reveal: true }));
+  panel.querySelectorAll('input[name="participants"]').forEach((input) => {
+    const row = input.closest('.split-participant-row');
+    const valueInput = row?.querySelector('.split-split-value');
+    if (valueInput) valueInput.disabled = !input.checked;
+    input.addEventListener('change', () => {
+      if (valueInput) valueInput.disabled = !input.checked;
+      validateSplitForm(panel);
+    });
+  });
+  updateSplitInputs(panel);
+}
+
+/**
+ * Die Betraege eines Formulars vor dem Senden: der Betrag selbst und, bei
+ * "exakt", jeder Anteil. Die Genau-Betraege sind Geld in derselben Waehrung.
+ * Jeder Anteil eines angehakten Mitglieds muss groesser als 0 sein, auch wenn
+ * die Summe stimmt ("-5 und 15"): der Server lehnt 0 und negative Anteile ab
+ * (parseMoneyToMinor), und die Antwort kaeme englisch und ortlos zurueck. Wer
+ * nichts traegt, wird abgehakt.
+ *
+ * @returns {boolean} true, wenn abgewiesen wurde (der Aufrufer bricht dann ab)
+ */
+function rejectSplitAmounts(form, currency, { original = null, originalCurrency = null } = {}) {
+  if (rejectSplitAmount(form.querySelector('[name="amount"]'), currency, { original, originalCurrency, required: true })) return true;
+  if (form.querySelector('[name="split_method"]')?.value !== 'exact') return false;
+  for (const field of form.querySelectorAll('.split-split-value')) {
+    if (field.hidden || field.disabled) continue;
+    if (rejectSplitAmount(field, currency, { required: true })) return true;
+  }
+  return false;
+}
+
+/**
+ * Die gespeicherte Aufteilung einer Serie als Feldwerte. Anders als eine
+ * Ausgabe (`deriveSplitValues` rechnet aus gebuchten Anteilen zurueck) bewahrt
+ * eine Serie ihre EINGABE auf - Betrag, Prozent oder Anteile je Person -, also
+ * wird nichts rekonstruiert, nur in die Schreibweise der Region gesetzt.
+ */
+function recurringSplitValues(recurring) {
+  const method = recurring.split_method;
+  const values = {};
+  for (const split of recurring.splits || []) {
+    if (method === 'exact' && split.amount != null) values[split.user_id] = amountToInput(split.amount, recurring.currency);
+    else if (method === 'percentage' && split.percentage != null) {
+      const pct = Number(split.percentage);
+      values[split.user_id] = Number.isFinite(pct) ? toStoredNumber(pct) : String(split.percentage);
+    } else if (method === 'shares' && split.shares != null) values[split.user_id] = String(split.shares);
+  }
+  return values;
+}
+
+/** Zustand einer Serie in Worten: pausiert, und warum sie nicht bucht. Leer, wenn sie einfach laeuft. */
+function recurringStateText(recurring) {
+  return [
+    recurring.paused_at ? t('splitExpenses.recurring.paused') : '',
+    recurring.blocked_reason ? t(`splitExpenses.recurring.reason.${recurring.blocked_reason}`) : '',
+  ].filter(Boolean).join(' · ');
+}
+
+/**
+ * Die Zeilen der Leseansicht einer Serie - was der Bearbeiten-Dialog zeigt,
+ * ohne Felder. Die Aufteilung steht als Eingabe da, wie die Serie sie fuehrt:
+ * bei "gleich" nur die Namen, sonst Name und Wert.
+ */
+function recurringReadSections(recurring) {
+  const method = recurring.split_method || 'equal';
+  const names = new Map(state.groupMembers.map((m) => [Number(m.id ?? m.user_id), m.display_name]));
+  const values = recurringSplitValues(recurring);
+  const people = (recurring.participants || [])
+    .map((id) => [names.get(Number(id)) || '', values[id]])
+    .map(([name, value]) => (value != null && value !== '' ? `${name}: ${value}` : name))
+    .filter(Boolean)
+    .join('\n');
+  return [
+    { icon: 'banknote', label: t('splitExpenses.amount'), value: money(recurring.amount, recurring.currency) },
+    { icon: 'user', label: t('splitExpenses.paidBy'), value: recurring.payer_name || '' },
+    { icon: 'repeat', label: t('budget.recurringIntervalLabel'), value: frequencyLabel(recurring.frequency) },
+    { icon: 'calendar', label: t('splitExpenses.recurring.nextDate'), value: recurring.paused_at ? '' : formatDate(recurring.next_run_date) },
+    { icon: 'circle-pause', label: t('splitExpenses.statusLabel'), value: recurringStateText(recurring) },
+    { icon: 'split', label: t('splitExpenses.splitMethod'),
+      value: t(`splitExpenses.split${method.charAt(0).toUpperCase()}${method.slice(1)}`) },
+    { icon: 'users', label: t('splitExpenses.participants'), value: people, multiline: true },
+    { icon: 'sticky-note', label: t('splitExpenses.notes'), value: recurring.description || '', multiline: true },
+  ];
+}
+
+function openRecurringReadView(recurring) {
+  return openDetailView({
+    title: recurring.title,
+    accentColor: 'var(--module-budget)',
+    size: 'sm',
+    sections: recurringReadSections(recurring),
+  });
+}
+
+/**
+ * Wiederkehrende Ausgabe anlegen oder bearbeiten (#1647) - ein Dialog fuer
+ * beides, mit den Feldern der Ausgabe und dazu Rhythmus und naechstem Termin.
+ * Belege gibt es hier nicht: sie gehoeren zur einzelnen Buchung.
+ *
+ * Der Riegel steht VOR jeder Vorbereitung, wie in openExpenseModal(): ohne
+ * Schreibrecht, im Archiv oder an einer Serie ohne `can_edit` geht eine
+ * bestehende Serie als Leseansicht auf, und der Anlegeweg entfaellt.
+ *
+ * Geprueft wird am Server mit der Regel des Anlegens (`parseRecurringBody`);
+ * hier laeuft dieselbe Formularpruefung wie bei der Ausgabe (wireSplitFields),
+ * damit die Ablehnung am Feld steht statt englisch in einer Meldung.
+ */
+function openRecurringModal(recurring = null) {
+  const isEdit = Boolean(recurring && recurring.id);
+  if (isEdit ? !mayActOnRecurring(recurring) : (readOnly() || isArchivedView())) {
+    if (isEdit) openRecurringReadView(recurring);
+    return;
+  }
+  const group = state.groups.find((g) => g.id === state.activeGroupId);
+  if (!group) return;
+  const method = isEdit ? (recurring.split_method || 'equal') : (group.default_split_method || 'equal');
+  const selectedIds = isEdit ? (recurring.participants || []) : null;
+  const splitValues = isEdit ? recurringSplitValues(recurring) : defaultSplitValues(group);
+  const currency = recurring?.currency || group.default_currency;
+  const frequency = recurring?.frequency || 'monthly';
+  const stateText = isEdit ? recurringStateText(recurring) : '';
+  const option = (value, label, selected) => `<option value="${value}" ${value === selected ? 'selected' : ''}>${label}</option>`;
+  openSharedModal({
+    title: isEdit ? t('splitExpenses.recurring.edit') : t('splitExpenses.recurring.add'),
+    content: `
+      <form id="split-recurring-form" class="split-form">
+        ${stateText ? `<p class="form-hint field-hint--warn" role="status"><i data-lucide="circle-pause" aria-hidden="true"></i><span>${esc(stateText)}</span></p>` : ''}
+        <label>${t('splitExpenses.titleLabel')}<input class="input" name="title" required maxlength="200" value="${esc(recurring?.title || '')}"></label>
+        <div class="split-form-row">
+          <label>${t('splitExpenses.amount')}<input class="input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(currency)}" required aria-describedby="split-amount-reason" value="${esc(amountToInput(recurring?.amount || '', currency))}"></label>
+          <label>${t('splitExpenses.paidBy')}<select class="input" name="payer_id">${memberOptions(isEdit ? recurring.payer_id : state.user?.id)}</select></label>
+        </div>
+        <p class="form-hint form-hint--danger" id="split-amount-reason" role="status" hidden></p>
+        <div class="split-form-row">
+          <label>${t('splitExpenses.currency')}<select class="input" name="currency">${state.meta.currencies.map((c) => option(c, c, currency)).join('')}</select></label>
+          <label>${t('budget.recurringIntervalLabel')}<select class="input" name="frequency">
+            ${['weekly', 'monthly', 'yearly'].map((f) => option(f, frequencyLabel(f), frequency)).join('')}
+          </select></label>
+        </div>
+        <label>${t('splitExpenses.recurring.nextDate')}<yuvomi-datepicker name="next_run_date" type="date" value="${esc(recurring?.next_run_date || todayKey())}"></yuvomi-datepicker></label>
+        <label>${t('splitExpenses.splitMethod')}<select class="input" name="split_method">
+          ${option('equal', t('splitExpenses.splitEqual'), method)}
+          ${option('percentage', t('splitExpenses.splitPercentage'), method)}
+          ${option('exact', t('splitExpenses.splitExact'), method)}
+          ${option('shares', t('splitExpenses.splitShares'), method)}
+        </select></label>
+        <p class="form-hint" id="split-method-hint">${t(`splitExpenses.splitHint.${method}`)}</p>
+        <fieldset class="split-participants"><legend>${t('splitExpenses.participants')}</legend>${groupMemberCheckboxes(selectedIds, splitValues)}</fieldset>
+        <label>${t('splitExpenses.notes')}<textarea class="input" name="description" rows="3" maxlength="5000">${esc(recurring?.description || '')}</textarea></label>
+        ${isEdit ? `<p class="form-hint">${t('splitExpenses.recurring.editHint')}</p>` : ''}
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          ${isEdit ? `<button class="btn btn--danger-outline" type="button" id="split-delete-recurring" style="margin-inline-end:auto">
+            <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
+          </button>` : ''}
+          <div class="split-form__footer-actions">
+            <button class="btn btn--secondary" type="button" id="split-cancel-recurring">${t('common.cancel')}</button>
+            <button class="btn btn--primary" type="submit" id="split-save-recurring">${t('common.save')}</button>
+          </div>
+        </div>
+      </form>
+    `,
+    onSave(panel) {
+      panel.querySelector('#split-cancel-recurring')?.addEventListener('click', () => closeModal());
+      wireSplitFields(panel, '#split-recurring-form');
+      panel.querySelector('#split-delete-recurring')?.addEventListener('click', async () => {
+        if (readOnly()) return;
+        if (!mayActOnRecurring(recurring)) return;
+        const confirmed = await confirmOverModal(t('splitExpenses.recurring.deleteConfirm'), {
+          danger: true,
+          confirmLabel: t('common.delete'),
+          detail: t('splitExpenses.recurring.deleteConfirmDetail'),
+        });
+        if (!confirmed) return;
+        await api.delete(`/split-expenses/recurring/${recurring.id}`);
+        await loadGroupData();
+        renderAll();
+        refocusAfterRender();
+      });
+      panel.querySelector('#split-recurring-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (readOnly()) return;
+        // Archiv und `can_edit` gehoeren hier dazu: beides kann sich aendern,
+        // waehrend der Dialog offen steht.
+        if (isArchivedView() || (isEdit && !mayActOnRecurring(recurring))) return;
+        if (!validateSplitForm(panel)) return;
+        const form = panel.querySelector('#split-recurring-form');
+        const data = Object.fromEntries(new FormData(form));
+        data.amount = decimalString(data.amount);
+        const chosenCurrency = form.querySelector('[name="currency"]')?.value || group.default_currency;
+        if (rejectSplitAmounts(form, chosenCurrency,
+          { original: isEdit ? recurring.amount : null, originalCurrency: isEdit ? recurring.currency : null })) return;
+        const { participants, splits } = collectSplitPayload(form);
+        // Die Kategorie hat im Dialog kein Feld (wie bei der Ausgabe) - sie
+        // wird durchgereicht, sonst fiele sie beim Speichern auf "Allgemein".
+        const payload = { ...data, participants, splits, ...(isEdit && { category: recurring.category }) };
+        if (isEdit) await api.put(`/split-expenses/recurring/${recurring.id}`, payload);
+        else await api.post(`/split-expenses/groups/${state.activeGroupId}/recurring`, payload);
+        closeModal({ force: true });
         await loadGroupData();
         renderAll();
         refocusAfterRender();
@@ -1943,6 +2288,8 @@ export const __test = {
   // Betragseingabe (#1607): Formularpruefung und die beiden Speicherwege
   // (test-split-amount-input.js).
   validateSplitForm, updateGroupDefaults, openSettlementModal,
+  // Wiederkehrende Ausgaben (#1647, test-split-recurring-ui.js).
+  renderRecurring, onRecurringClick, toggleRecurring, openRecurringModal, recurringReadSections, recurringSplitValues,
   renderMainForTest(container) { _container = container; renderMain(); },
   renderGroupsForTest(container) { _container = container; renderGroups(); },
   // R10 L11: die Gruppenzahl steht am Kopf der Liste (test-split-activity-ui.js).

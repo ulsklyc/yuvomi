@@ -3899,6 +3899,26 @@
             "home": "家",
             "general": "一般"
         },
+        "recurring": {
+            "empty": "定期費用はありません。",
+            "add": "定期費用を追加",
+            "edit": "定期費用を編集",
+            "nextDate": "次回の日付",
+            "paused": "一時停止中",
+            "pause": "一時停止",
+            "resume": "再開",
+            "reason": {
+                "split_invalid": "この分割は記帳できません。",
+                "not_a_member": "支払者または参加者がグループにいません。"
+            },
+            "missedQuestion": "停止中に過ぎた日付があります",
+            "missedSkip": "{{date}}から再開し、過去分は記帳しない",
+            "missedBook": "{{date}}以降の未記帳分を記帳する",
+            "deleteConfirm": "この定期費用を削除しますか？",
+            "deleteConfirmDetail": "新しい費用は作成されなくなります。記帳済みの費用は残ります。",
+            "show": "表示",
+            "editHint": "変更は次回の日付から適用されます。記帳済みの費用は変わりません。"
+        },
         "activityType": {
             "group_created": "グループを作成",
             "group_updated": "グループを更新",
@@ -3917,6 +3937,8 @@
             "recurring_auto_paused": "定期費用を自動で一時停止: 記帳できませんでした",
             "recurring_resumed": "定期費用を再開",
             "recurring_generated": "定期費用を生成",
+            "recurring_edited": "定期費用を編集",
+            "recurring_deleted": "定期費用を削除",
             "payment_reversed": "支払いを取り消し",
             "ledger_restored": "記帳を復元",
             "ledger_removed": "記帳を削除"

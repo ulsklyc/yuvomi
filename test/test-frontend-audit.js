@@ -19573,9 +19573,11 @@ test('R16: im Budget steht jeder Abschnittstitel auf der Buehne, die Zeilen lieg
     const flaeche = subsCss.filter((rule) => selectorsOf(rule).includes(sel) && /background(?:-color)?:|box-shadow:|padding:/.test(rule.body));
     assert.deepStrictEqual(flaeche.map((rule) => rule.selector.trim()), [], `${sel} traegt keine Flaeche mehr - der Titel stuende sonst wieder darin`);
   }
-  // Aufteilung: drei Abschnitte, Titel ueber dem Traeger.
+  // Aufteilung: vier Abschnitte (seit #1647 mit den wiederkehrenden Ausgaben),
+  // Titel ueber dem Traeger.
   assert.doesNotMatch(split, /split-card\b/, 'die Karte mit Titel darin ist entfallen');
-  assert.equal((split.match(/class="split-section-title u-section-title"/g) ?? []).length, 3);
+  assert.equal((split.match(/class="split-section-title u-section-title"/g) ?? []).length, 4);
+  assert.match(split, /return `<div class="row-carrier">\$\{rows\}<\/div>\$\{add\}`;/, 'Serien im Traeger');
   assert.match(split, /return `<div class="row-carrier">\$\{debts\.map/, 'Salden im Traeger');
   assert.match(split, /return `<div class="row-carrier">\$\{state\.expenses\.map/, 'Ausgaben im Traeger');
   assert.match(split, /class="split-activity-list row-carrier"/, 'Verlauf im Traeger');

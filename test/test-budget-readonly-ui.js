@@ -979,11 +979,13 @@ test('der Riegel sitzt an BEIDEN Enden: jedes Speichern im offenen Dialog fragt 
     ['umbenennen', /'\[data-act="save"\]'\)\.forEach\(\(button\) => \{\n\s*button\.addEventListener\('click', async \(\) => \{\n\s*if \(readOnly\(\)\) return;/],
     ['loeschen', /'\[data-act="delete"\]'\)\.forEach\(\(button\) => \{\n\s*button\.addEventListener\('click', async \(\) => \{\n\s*if \(readOnly\(\)\) return;/],
   ]) assert.match(ABOS_CODE, re, `Abo-Metadaten: ${name} fragt nicht`);
-  // Geteilte Ausgaben: fuenf Formulare und das Loeschen einer Ausgabe.
+  // Geteilte Ausgaben: sechs Formulare (seit #1647 mit dem der Serie) und das
+  // Loeschen einer Ausgabe und einer Serie.
   const submits = [...SPLIT_CODE.matchAll(/addEventListener\('submit', async \(e\) => \{\n\s*e\.preventDefault\(\);\n\s*(.*)\n/g)];
-  assert.equal(submits.length, 5, `fuenf Formulare erwartet, ${submits.length} gefunden`);
+  assert.equal(submits.length, 6, `sechs Formulare erwartet, ${submits.length} gefunden`);
   for (const m of submits) assert.equal(m[1], 'if (readOnly()) return;');
   assert.match(SPLIT_CODE, /'#split-delete-expense'\)\?\.addEventListener\('click', async \(\) => \{\n\s*if \(readOnly\(\)\) return;/);
+  assert.match(SPLIT_CODE, /'#split-delete-recurring'\)\?\.addEventListener\('click', async \(\) => \{\n\s*if \(readOnly\(\)\) return;/);
 });
 
 // -------------------------------------------------------------------------

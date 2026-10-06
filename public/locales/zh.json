@@ -3899,6 +3899,26 @@
             "home": "家居",
             "general": "通用"
         },
+        "recurring": {
+            "empty": "没有定期支出。",
+            "add": "添加定期支出",
+            "edit": "编辑定期支出",
+            "nextDate": "下次日期",
+            "paused": "已暂停",
+            "pause": "暂停",
+            "resume": "恢复",
+            "reason": {
+                "split_invalid": "此分摊无法入账。",
+                "not_a_member": "付款人或某位参与者已不在群组中。"
+            },
+            "missedQuestion": "暂停期间错过了一些日期",
+            "missedSkip": "从 {{date}} 起继续，不补记",
+            "missedBook": "补记自 {{date}} 起错过的日期",
+            "deleteConfirm": "删除此定期支出？",
+            "deleteConfirmDetail": "不会再创建新的支出。已入账的支出会保留。",
+            "show": "显示",
+            "editHint": "更改自下次日期起生效。已入账的支出保持不变。"
+        },
         "activityType": {
             "group_created": "群组已创建",
             "group_updated": "群组已更新",
@@ -3917,6 +3937,8 @@
             "recurring_auto_paused": "定期支出已自动暂停：无法记账",
             "recurring_resumed": "定期支出已恢复",
             "recurring_generated": "定期支出已生成",
+            "recurring_edited": "定期支出已编辑",
+            "recurring_deleted": "定期支出已删除",
             "payment_reversed": "付款已冲销",
             "ledger_restored": "记账已恢复",
             "ledger_removed": "记账已删除"

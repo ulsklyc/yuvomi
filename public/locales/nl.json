@@ -3899,6 +3899,26 @@
             "home": "Thuis",
             "general": "Algemeen"
         },
+        "recurring": {
+            "empty": "Geen terugkerende uitgaven.",
+            "add": "Terugkerende uitgave toevoegen",
+            "edit": "Terugkerende uitgave bewerken",
+            "nextDate": "Volgende datum",
+            "paused": "Gepauzeerd",
+            "pause": "Pauzeren",
+            "resume": "Hervatten",
+            "reason": {
+                "split_invalid": "De verdeling kan niet worden geboekt.",
+                "not_a_member": "De betaler of een deelnemer zit niet meer in de groep."
+            },
+            "missedQuestion": "Tijdens de pauze zijn datums gemist",
+            "missedSkip": "Doorgaan vanaf {{date}}, niets naboeken",
+            "missedBook": "Gemiste datums vanaf {{date}} naboeken",
+            "deleteConfirm": "Deze terugkerende uitgave verwijderen?",
+            "deleteConfirmDetail": "Er worden geen nieuwe uitgaven meer aangemaakt. Al geboekte uitgaven blijven behouden.",
+            "show": "Tonen",
+            "editHint": "Wijzigingen gelden vanaf de volgende datum. Al geboekte uitgaven blijven ongewijzigd."
+        },
         "activityType": {
             "group_created": "Groep aangemaakt",
             "group_updated": "Groep bijgewerkt",
@@ -3917,6 +3937,8 @@
             "recurring_auto_paused": "Terugkerende uitgave automatisch gepauzeerd: kon niet worden geboekt",
             "recurring_resumed": "Terugkerende uitgave hervat",
             "recurring_generated": "Terugkerende uitgave gegenereerd",
+            "recurring_edited": "Terugkerende uitgave bewerkt",
+            "recurring_deleted": "Terugkerende uitgave verwijderd",
             "payment_reversed": "Betaling tegengeboekt",
             "ledger_restored": "Boeking hersteld",
             "ledger_removed": "Boeking verwijderd"

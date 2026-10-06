@@ -3899,6 +3899,26 @@
             "home": "Casa",
             "general": "Geral"
         },
+        "recurring": {
+            "empty": "Nenhuma despesa recorrente.",
+            "add": "Adicionar despesa recorrente",
+            "edit": "Editar despesa recorrente",
+            "nextDate": "Próxima data",
+            "paused": "Pausado",
+            "pause": "Pausar",
+            "resume": "Retomar",
+            "reason": {
+                "split_invalid": "A divisão não pode ser lançada.",
+                "not_a_member": "O pagador ou um participante não está mais no grupo."
+            },
+            "missedQuestion": "Algumas datas passaram durante a pausa",
+            "missedSkip": "Continuar a partir de {{date}}, sem lançar o que passou",
+            "missedBook": "Lançar as datas perdidas a partir de {{date}}",
+            "deleteConfirm": "Excluir esta despesa recorrente?",
+            "deleteConfirmDetail": "Nenhuma nova despesa será criada. As despesas já lançadas são mantidas.",
+            "show": "Mostrar",
+            "editHint": "As alterações valem a partir da próxima data. As despesas já lançadas não mudam."
+        },
         "activityType": {
             "group_created": "Grupo criado",
             "group_updated": "Grupo atualizado",
@@ -3917,6 +3937,8 @@
             "recurring_auto_paused": "Despesa recorrente pausada automaticamente: não foi possível lançá-la",
             "recurring_resumed": "Despesa recorrente retomada",
             "recurring_generated": "Despesa recorrente gerada",
+            "recurring_edited": "Despesa recorrente editada",
+            "recurring_deleted": "Despesa recorrente excluída",
             "payment_reversed": "Pagamento estornado",
             "ledger_restored": "Livro-caixa restaurado",
             "ledger_removed": "Lançamento removido"

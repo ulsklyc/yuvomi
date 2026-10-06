@@ -3899,6 +3899,26 @@
             "home": "Bahay",
             "general": "Pangkalahatan"
         },
+        "recurring": {
+            "empty": "Walang paulit-ulit na gastos.",
+            "add": "Magdagdag ng paulit-ulit na gastos",
+            "edit": "I-edit ang paulit-ulit na gastos",
+            "nextDate": "Susunod na petsa",
+            "paused": "Naka-pause",
+            "pause": "I-pause",
+            "resume": "Ipagpatuloy",
+            "reason": {
+                "split_invalid": "Hindi maitatala ang hatian.",
+                "not_a_member": "Wala na sa grupo ang nagbayad o ang isang kalahok."
+            },
+            "missedQuestion": "May mga petsang nalampasan habang naka-pause",
+            "missedSkip": "Ituloy mula {{date}}, huwag itala ang nakaraan",
+            "missedBook": "Itala ang mga nalampasang petsa mula {{date}}",
+            "deleteConfirm": "Tanggalin ang paulit-ulit na gastos na ito?",
+            "deleteConfirmDetail": "Wala nang bagong gastos na malilikha. Mananatili ang mga gastos na naitala na.",
+            "show": "Ipakita",
+            "editHint": "Magkakabisa ang mga pagbabago mula sa susunod na petsa. Hindi magbabago ang mga gastos na naitala na."
+        },
         "activityType": {
             "group_created": "Nagawa ang grupo",
             "group_updated": "Na-update ang grupo",
@@ -3917,6 +3937,8 @@
             "recurring_auto_paused": "Awtomatikong napahinto ang paulit-ulit na gastos: hindi ito maitala",
             "recurring_resumed": "Naipagpatuloy ang paulit-ulit na gastos",
             "recurring_generated": "Nabuo ang paulit-ulit na gastos",
+            "recurring_edited": "Na-edit ang paulit-ulit na gastos",
+            "recurring_deleted": "Natanggal ang paulit-ulit na gastos",
             "payment_reversed": "Binawi ang bayad",
             "ledger_restored": "Naibalik ang tala",
             "ledger_removed": "Inalis ang tala"

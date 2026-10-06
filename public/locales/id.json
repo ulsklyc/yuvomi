@@ -3899,6 +3899,26 @@
             "home": "Rumah",
             "general": "Umum"
         },
+        "recurring": {
+            "empty": "Tidak ada pengeluaran berulang.",
+            "add": "Tambah pengeluaran berulang",
+            "edit": "Edit pengeluaran berulang",
+            "nextDate": "Tanggal berikutnya",
+            "paused": "Dijeda",
+            "pause": "Jeda",
+            "resume": "Lanjutkan",
+            "reason": {
+                "split_invalid": "Pembagian tidak dapat dibukukan.",
+                "not_a_member": "Pembayar atau salah satu peserta sudah tidak ada di grup."
+            },
+            "missedQuestion": "Ada tanggal yang terlewat selama jeda",
+            "missedSkip": "Lanjutkan mulai {{date}}, tanpa membukukan yang terlewat",
+            "missedBook": "Bukukan tanggal yang terlewat mulai {{date}}",
+            "deleteConfirm": "Hapus pengeluaran berulang ini?",
+            "deleteConfirmDetail": "Tidak ada pengeluaran baru yang dibuat. Pengeluaran yang sudah dibukukan tetap ada.",
+            "show": "Tampilkan",
+            "editHint": "Perubahan berlaku mulai tanggal berikutnya. Pengeluaran yang sudah dibukukan tidak berubah."
+        },
         "activityType": {
             "group_created": "Grup dibuat",
             "group_updated": "Grup diperbarui",
@@ -3917,6 +3937,8 @@
             "recurring_auto_paused": "Pengeluaran berulang dijeda otomatis: tidak dapat dicatat",
             "recurring_resumed": "Pengeluaran berulang dilanjutkan",
             "recurring_generated": "Pengeluaran berulang dihasilkan",
+            "recurring_edited": "Pengeluaran berulang diubah",
+            "recurring_deleted": "Pengeluaran berulang dihapus",
             "payment_reversed": "Pembayaran dibatalkan",
             "ledger_restored": "Pembukuan dipulihkan",
             "ledger_removed": "Pembukuan dihapus"

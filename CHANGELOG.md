@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Recurring shared expenses have a place in the app: a group lists them, and they can be
+  created, edited, paused, resumed and deleted there** (#1647). Until now the app showed a
+  recurring expense nowhere. One that the hourly run had paused because it could not be booked
+  appeared as a line in the group's activity and could only be resumed, changed or removed
+  through the API. Each group now has a "Recurring" section between its expenses and its
+  activity, with title, amount, rhythm and next date. A paused one says so, and one that cannot
+  be booked says why in plain words - its split no longer adds up, or the payer or a participant
+  has left the group - also before the run pauses it. Tapping one opens the same form as an
+  expense, with rhythm and next date; expenses already booked keep their values, the next date
+  carries the new ones. Deleting stops future dates and leaves every booked expense, share and
+  balance alone. Resuming asks one question, and only when dates fell due during the pause:
+  continue from the next date (preselected) or book the missed ones. The activity entry "paused
+  automatically" leads to the recurring expense. Editing, pausing, resuming and deleting follow
+  the rule of an expense - the group's owner or admins and whoever created it; everyone else,
+  anyone with read access to the budget, and an archived group see the list and a read view
+  without actions. A recurring expense on the 31st keeps the 31st when it is edited while
+  standing on a shorter month's last day; changing its date or rhythm sets the day anew. For API
+  clients: `PUT` and `DELETE /api/v1/split-expenses/recurring/{id}`, the first through the same
+  check as creating one; `GET /api/v1/split-expenses/groups/{id}/recurring` additionally returns
+  `payer_name`, `participants`, `splits`, `blocked_reason`, `can_edit`, `missed_count` and
+  `resume_date`; activity types `recurring_edited` and `recurring_deleted`. No migration.
+
 - **A meal can name the member who cooks it, and the week plan and the overview show who that
   is** (#1679, from D#1661, asked by @matejhermanek for a shared flat that plans who cooks which
   meal). A planned meal carried a date, a type, a title, notes and a recipe, and the only person on it was whoever
