@@ -216,6 +216,15 @@ deletions cannot be learned at all. Tracked as #1002.
   [DECISIONS.md](DECISIONS.md)), and a fingerprint in the notes field, because `description` is a
   mirrored field and would travel as visible text with every edit. *Opens with:* a return path that
   knows which calendar an event came from.
+- **A training log** (#1733) - exercises with sets and repetitions, weights over time, saved
+  routines such as "Push day" - is *not here*. Yuvomi coordinates what several people in one home
+  have to settle together; a training log is one person's tool, with a data model as large as one
+  of the bigger modules and no tie to anything the family shares, and dedicated apps do it well.
+  What fits today is everything around the log: the gym slot as a recurring calendar event or
+  task, the session itself as a Health activity (type, duration, intensity, a note), and body
+  weight under Health. The full log is a third-party module, with a page of its own in the app
+  and its state in a separate service beside Yuvomi rather than in `yuvomi.db`
+  ([MODULES.md](../MODULES.md)).
 
 ---
 
