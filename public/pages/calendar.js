@@ -3551,13 +3551,41 @@ function wireMonthList(view, list) {
 }
 
 /**
- * Ein Drehen ueber die 640er-Schwelle wechselt die Fassung des Monats (geteilt
- * oder Raster) - neu zeichnen, sonst stuende am Desktop die Telefonliste.
+ * Ein Drehen ueber die 640er-Schwelle wechselt die Fassung der Ansicht - neu
+ * zeichnen, sonst steht am Desktop die Telefonfassung und umgekehrt.
+ *
+ * DER MONAT wechselt zwischen geteilt und Raster; seine Daten sind dieselben.
+ *
+ * DIE WOCHE ist am Telefon ein 3-Tage-Fenster um den Cursor und am Desktop die
+ * ganze Woche (renderWeekView) - und ALLES um sie herum folgt derselben Query:
+ * das Ladefenster (getRangeForView), das Label (Tagesspanne statt KW) und die
+ * Schrittweite der Pfeile. Bis #1504 zeichnete nur der Monat neu. Gemessen:
+ * 1280 -> 390 liess sieben Spalten zu je 49px unter "KW 41" stehen, 390 -> 1280
+ * drei Spalten zu je 311px unter "05.10. - 07.10.2026". Und weil loadRange()
+ * eine Antwort nur anwendet, wenn ihr Fenster noch das aktuelle ist, fiel eine
+ * Antwort, die waehrend des Drehens unterwegs war, ersatzlos weg, sobald das
+ * Fenster der anderen Fassung ein anderes ist (Cursor am Wochenrand) - deshalb
+ * erst nachladen, dann zeichnen.
+ *
+ * DER TAG behaelt Raster und Daten, nur sein Label nennt den Wochentag am
+ * Telefon kurz.
+ *
  * Die MediaQueryList haelt eine Variable auf Modulebene (wie in meals.js),
  * sonst darf die Engine sie einsammeln; angehaengt wird in bindPageListeners().
  */
-function onMonthSplitQueryChange() {
-  if (_container?.isConnected && state.view === 'month' && !searchActive) renderView();
+async function onPhoneQueryChange() {
+  if (!_container?.isConnected || searchActive) return;
+  if (state.view === 'month') { renderView(); return; }
+  if (state.view === 'day') { updateLabel(); return; }
+  if (state.view !== 'week') return;
+  await reloadForView();
+  // Waehrend des Ladens kann die Seite verlassen oder die Suche geoeffnet
+  // worden sein; ein Ansichtswechsel zeichnet selbst, hier steht dann schlicht
+  // der aktuelle Zustand.
+  if (!_container?.isConnected || searchActive) return;
+  updateLabel();
+  syncPeriodArrows();
+  renderView();
 }
 let _monthSplitQuery = null;
 
@@ -3574,7 +3602,7 @@ function bindPageListeners() {
   _pageListenersBound = true;
   document.addEventListener?.('yuvomi:calendar-command', onCalendarCommand);
   _monthSplitQuery = window.matchMedia?.(MOBILE_MEDIA_QUERY) ?? null;
-  _monthSplitQuery?.addEventListener?.('change', onMonthSplitQueryChange);
+  _monthSplitQuery?.addEventListener?.('change', onPhoneQueryChange);
 }
 
 /**
@@ -5988,6 +6016,9 @@ async function openFoundEvent(ev) {
 }
 
 export const __test = {
+  // #1504: der Wechsel ueber die Telefonschwelle, gemessen am echten Renderer.
+  onPhoneQueryChange,
+  setContainerForTest(container) { _container = container; },
   // test:initials: die Scheibe einer Person im Filterblatt.
   personFilterRowsHtml,
   playViewSwap,

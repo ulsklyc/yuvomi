@@ -233,6 +233,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Calendar: the week follows the screen when it crosses the phone width.** On a phone the week
+  is a window of three days around the selected day, on a wider screen the whole week, and the
+  label, the arrows and the loaded range follow the same threshold. Only the month was redrawn
+  when the width crossed it. Rotating a tablet or resizing the window from 1280px to 390px left
+  seven columns of 49px each under "CW 41"; the other way round, three columns of 311px each
+  under "05.10. - 07.10.2026", with arrows that still stepped by three days. The week is now
+  rebuilt on that change, its range reloaded first when the other form shows a day that was not
+  loaded (the selected day at the edge of the week), and the day view switches between the long
+  and the short weekday in its label (#1504).
 - **Phones: the tab you are on stays inside the tab strip.** A tab strip that does not fit the
   screen scrolls, and it snaps to the start of a tab. Opening a tab that lay past the edge moved
   the strip by exactly the missing pixels, and the snapping then pulled it back to the nearest
