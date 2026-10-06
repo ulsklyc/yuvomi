@@ -1712,6 +1712,126 @@ test('GET /groups/:id/recurring: eine pausierte Serie nennt, was Fortsetzen uebe
   });
 });
 
+// --------------------------------------------------------------------------
+// Nacharbeit aus dem Review von #1744.
+// --------------------------------------------------------------------------
+const lauf = (bis) => serienLauf(bis);
+const unveraendert = (zeile) => { const { updated_at, ...rest } = zeile; return rest; };
+
+test('PUT /recurring/:id: ein schon gebuchter Termin laesst sich nicht noch einmal ausloesen', async () => {
+  const gid = await serienGruppe('Bearbeiten-Doppelbuchung');
+  const id = await serieIn(gid);
+  // Der Dialog steht offen und zeigt den 10.03.; inzwischen bucht der Lauf.
+  assert.deepEqual(lauf('2026-03-10'), { generated: 1, paused: 0, failed: 0 });
+  assert.equal(serienZeile(id).next_run_date, '2026-04-10');
+  const vorher = serienZeile(id);
+
+  const alt = await call('PUT', `/recurring/${id}`, { actor: alsOwner, body: { ...GUELTIG, title: 'Nur der Titel', next_run_date: '2026-03-10' } });
+  assert.equal(alt.status, 400, JSON.stringify(alt.body));
+  assert.equal(alt.body.reason, 'next_run_not_after_last_booking');
+  assert.equal(alt.body.last_booked, '2026-03-10');
+  assert.deepEqual(serienZeile(id), vorher, 'nichts geschrieben, auch der Titel nicht');
+  assert.deepEqual(lauf('2026-03-31'), { generated: 0, paused: 0, failed: 0 });
+  assert.equal(gebucht(id), 1, 'der 10.03. ist genau einmal gebucht');
+
+  // Auch ein frueherer Tag und auch dann, wenn die Buchung inzwischen geloescht ist.
+  const ausgabe = db.prepare('SELECT id FROM expenses WHERE recurring_rule_id = ?').get(id).id;
+  assert.equal((await call('DELETE', `/expenses/${ausgabe}`, { actor: alsOwner })).status, 200);
+  for (const datum of ['2026-03-10', '2026-02-01']) {
+    assert.equal((await call('PUT', `/recurring/${id}`, { actor: alsOwner, body: { next_run_date: datum } })).body.reason, 'next_run_not_after_last_booking', datum);
+  }
+  // Der Tag danach ist frei, und derselbe Termin wie jetzt ist keine Verlegung.
+  assert.equal((await call('PUT', `/recurring/${id}`, { actor: alsOwner, body: { next_run_date: '2026-04-10' } })).status, 200);
+  const frei = await call('PUT', `/recurring/${id}`, { actor: alsOwner, body: { next_run_date: '2026-03-11' } });
+  assert.equal(frei.status, 200, JSON.stringify(frei.body));
+  assert.equal(frei.body.data.next_run_date, '2026-03-11');
+  // Die Grenze gilt dem Termin, den ein Aufruf SETZT: steht die Serie schon auf
+  // einem solchen Tag (die Buchung wurde nachtraeglich umdatiert), bleibt jede
+  // andere Bearbeitung moeglich.
+  db.prepare("UPDATE expenses SET expense_date = '2026-03-11' WHERE recurring_rule_id = ?").run(id);
+  const titel = await call('PUT', `/recurring/${id}`, { actor: alsOwner, body: { title: 'Titel geht', next_run_date: '2026-03-11' } });
+  assert.equal(titel.status, 200, JSON.stringify(titel.body));
+  // Eine Serie ohne Buchung hat keine Grenze.
+  const neu = await serieIn(gid, { title: 'Ohne Buchung' });
+  assert.equal((await call('PUT', `/recurring/${neu}`, { actor: alsOwner, body: { next_run_date: '2026-01-05' } })).status, 200);
+});
+
+test('PUT /recurring/:id ist ein Teil-Update: jedes weggelassene Feld bleibt stehen', async () => {
+  const gid = await serienGruppe('Bearbeiten-Felder');
+  const anlage = {
+    title: 'Internet', description: 'Vertrag bis 2027', amount: '30.00', currency: 'EUR', category: 'utilities', frequency: 'yearly', next_run_date: '2026-05-31',
+    payer_id: MGR, split_method: 'shares', participants: [OWNER, MGR], splits: [{ user_id: OWNER, shares: 2 }, { user_id: MGR, shares: 1 }],
+  };
+  const id = (await call('POST', `/groups/${gid}/recurring`, { actor: alsOwner, body: anlage })).body.data.id;
+  const start = unveraendert(serienZeile(id));
+  const aenderungen = {
+    title: [{ title: 'Glasfaser' }, { title: 'Glasfaser' }],
+    amount: [{ amount: '45.00' }, { amount_minor: 4500 }],
+    description: [{ description: 'neu' }, { description: 'neu' }],
+    'description: null leert': [{ description: null }, { description: null }],
+    'description: "" leert': [{ description: '' }, { description: null }],
+    category: [{ category: 'rent' }, { category: 'rent' }],
+    payer_id: [{ payer_id: OWNER }, { payer_id: OWNER }],
+    frequency: [{ frequency: 'monthly' }, { frequency: 'monthly', anchor_day: 31 }],
+    next_run_date: [{ next_run_date: '2026-06-15' }, { next_run_date: '2026-06-15', anchor_day: 15 }],
+    participants: [{ participants: [OWNER, MGR, MEM], splits: [{ user_id: OWNER, shares: 1 }, { user_id: MGR, shares: 1 }, { user_id: MEM, shares: 1 }] },
+      { split_snapshot: JSON.stringify({ participants: [OWNER, MGR, MEM], splits: [{ user_id: OWNER, shares: 1 }, { user_id: MGR, shares: 1 }, { user_id: MEM, shares: 1 }] }) }],
+    split_method: [{ split_method: 'equal' }, { split_method: 'equal', split_snapshot: JSON.stringify({ participants: [OWNER, MGR], splits: [] }) }],
+    'leerer Koerper': [{}, {}],
+  };
+  for (const [name, [body, erwartet]] of Object.entries(aenderungen)) {
+    db.prepare(`UPDATE recurring_expenses SET title = @title, description = @description, amount_minor = @amount_minor, currency = @currency, payer_id = @payer_id,
+      category = @category, split_method = @split_method, split_snapshot = @split_snapshot, frequency = @frequency, next_run_date = @next_run_date, anchor_day = @anchor_day WHERE id = @id`)
+      .run({ ...start, group_id: undefined, paused_at: undefined, created_by: undefined, created_at: undefined });
+    const r = await call('PUT', `/recurring/${id}`, { actor: alsOwner, body });
+    assert.equal(r.status, 200, `${name}: ${JSON.stringify(r.body)}`);
+    assert.deepEqual(unveraendert(serienZeile(id)), { ...start, ...erwartet }, name);
+  }
+});
+
+test('PUT /recurring/:id ohne `currency`: Waehrung und Betrag der Serie bleiben', async () => {
+  const gid = await serienGruppe('Bearbeiten-Waehrung');
+  const id = await serieIn(gid, { amount: '900', currency: 'JPY' });
+  const r = await call('PUT', `/recurring/${id}`, { actor: alsOwner, body: { title: 'Yen' } });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.deepEqual([serienZeile(id).currency, serienZeile(id).amount_minor], ['JPY', 900]);
+  // Der neue Betrag wird im Raster der Serie gelesen, nicht in dem der Gruppe (EUR).
+  assert.equal((await call('PUT', `/recurring/${id}`, { actor: alsOwner, body: { amount: '12.50' } })).status, 400, 'JPY kennt keine Nachkommastellen');
+  assert.equal((await call('PUT', `/recurring/${id}`, { actor: alsOwner, body: { amount: '1200' } })).body.data.amount_minor, 1200);
+});
+
+test('Altform des Snapshots (Liste fertiger Anteile): die Beteiligten bleiben, GET nennt sie, PUT schreibt die lesbare Form', async () => {
+  const gid = await serienGruppe('Bearbeiten-Altform');
+  const id = await serieIn(gid, { participants: [OWNER, MEM] });
+  db.prepare('UPDATE recurring_expenses SET split_snapshot = ? WHERE id = ?')
+    .run(JSON.stringify([{ user_id: OWNER, amount_minor: 450 }, { user_id: MEM, amount_minor: 450 }]), id);
+  const gezeigt = (await serienListe(gid)).find((row) => row.id === id);
+  assert.equal(gezeigt.blocked_reason, 'split_invalid', 'der Lauf liest diese Form nicht');
+  assert.deepEqual(gezeigt.participants, [OWNER, MEM]);
+  const r = await call('PUT', `/recurring/${id}`, { actor: alsOwner, body: { title: 'Repariert' } });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.deepEqual(JSON.parse(serienZeile(id).split_snapshot), { participants: [OWNER, MEM], splits: [] }, 'nicht der Zahler allein');
+  assert.equal(r.body.data.blocked_reason, null);
+});
+
+test('GET /groups/:id/recurring: ausserhalb der Gruppe 404 - Aussenstehender und Gast einer anderen Gruppe', async () => {
+  const gid = await serienGruppe('Serien-Lesen');
+  await serieIn(gid, { title: 'Geheim' });
+  for (const [name, wer] of [['Aussenstehender', { id: OUTSIDER, role: 'member' }], ['Gast einer anderen Gruppe', { id: GUEST_ID, role: 'member' }]]) {
+    const r = await call('GET', `/groups/${gid}/recurring`, { actor: wer });
+    assert.equal(r.status, 404, name);
+    assert.equal(JSON.stringify(r.body).includes('Geheim'), false, name);
+  }
+  assert.equal((await call('GET', `/groups/${gid}/recurring`, { actor: { id: MEM, role: 'member' } })).status, 200, 'ein Mitglied liest');
+});
+
+test('unbookableReason: ein Fehler, der kein "unbuchbar" ist, wird weitergeworfen statt zum Grund erklaert', async () => {
+  const { unbookableReason } = await import('../server/services/split-expenses-scheduler.js');
+  const zeile = { group_id: 1, payer_id: 1, amount_minor: 900, currency: 'EUR', split_method: 'equal', split_snapshot: JSON.stringify({ participants: [1], splits: [] }) };
+  const kaputt = { prepare() { throw new TypeError('nicht die Serie'); } };
+  assert.throws(() => unbookableReason(kaputt, zeile), TypeError);
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

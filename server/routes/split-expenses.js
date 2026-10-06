@@ -222,6 +222,9 @@ function sendRefusal(res, err) {
     error: err.message,
     code: err.status,
     ...(err.reason && { reason: err.reason }),
+    // Was die Oberflaeche zum Grund braucht, um ihren Satz zu schreiben (etwa
+    // `last_booked` zu `next_run_not_after_last_booking`).
+    ...(err.extra || {}),
   });
 }
 
@@ -1476,17 +1479,40 @@ const RECURRING_SELECT = `
  *   Termin es landet - dieselbe Rechnung, die die Pause-Route faehrt.
  */
 function recurringForViewer(row, req, manages, today) {
-  let snapshot = null;
-  try { snapshot = JSON.parse(row.split_snapshot || '{}'); } catch { /* blocked_reason sagt es */ }
+  const stored = storedSplitInput(row);
   const resume = row.paused_at ? nextRunNotBefore(row.next_run_date, row.frequency, today, row.anchor_day) : null;
   return {
     ...decorateMoney(row),
-    participants: Array.isArray(snapshot?.participants) ? snapshot.participants : [],
-    splits: Array.isArray(snapshot?.splits) ? snapshot.splits : [],
+    participants: stored.participants ?? [],
+    splits: stored.splits,
     blocked_reason: unbookableReason(db.get(), row),
     can_edit: mayChangeGroupRecord(row, req, manages),
     missed_count: resume ? resume.skipped : 0,
     resume_date: resume ? resume.date : null,
+  };
+}
+
+/**
+ * Die gespeicherte Aufteilung einer Serie als Eingabe: Beteiligte und Wert je
+ * Person. EINE Lesart fuer die Liste und fuer das Bearbeiten - der Dialog zeigt
+ * die Beteiligten, die ein PUT ohne `participants` stehen laesst.
+ *
+ * Gelesen wird auch die Altform, eine Liste fertiger Anteile
+ * (`[{ user_id, amount_minor }]`, so stand es im Demo-Seed): ihre Personen SIND
+ * die Beteiligten. Der Buchungslauf liest sie nicht (`split_invalid`), aber
+ * fiele sie hier auf "niemand", truege nach dem ersten Speichern der Zahler
+ * allein alles. `participants: null` heisst: nicht lesbar.
+ */
+function storedSplitInput(row) {
+  let snapshot = null;
+  try { snapshot = JSON.parse(row.split_snapshot || '{}'); } catch { /* unlesbar */ }
+  if (Array.isArray(snapshot)) {
+    const ids = snapshot.map((entry) => Number(entry?.user_id)).filter((id) => Number.isInteger(id) && id > 0);
+    return { participants: ids.length ? [...new Set(ids)] : null, splits: [] };
+  }
+  return {
+    participants: Array.isArray(snapshot?.participants) ? snapshot.participants : null,
+    splits: Array.isArray(snapshot?.splits) ? snapshot.splits : [],
   };
 }
 
@@ -1571,48 +1597,84 @@ router.post('/groups/:id/recurring', (req, res) => {
  * (`parseRecurringBody`) - eine Serie laesst sich nicht in einen Zustand
  * bearbeiten, den das Anlegen abgewiesen haette.
  *
+ * EIN TEIL-UPDATE, DURCHGEHEND. Jedes Feld, das der Aufruf weglaesst, bleibt,
+ * wie es ist - auch Aufteilungsart, `splits`, Kategorie und Notiz. Geprueft
+ * wird trotzdem die GANZE Serie: der Aufruf wird ueber die gespeicherte Zeile
+ * gelegt, und diese Fassung laeuft durch die Pruefung des Anlegens. Wer nur den
+ * Betrag einer exakt geteilten Serie aendert, bekommt deshalb 400 (die Anteile
+ * ergeben ihn nicht mehr), statt einer Serie, die der Lauf pausiert. Die Notiz
+ * leert, wer `description` ausdruecklich als `null` oder "" schickt.
+ *
  * Bereits gebuchte Ausgaben bleiben, wie sie sind: der Lauf kopiert die Serie
  * in jede Buchung, es gibt keinen Verweis zurueck, dem eine Aenderung folgte.
  *
- * `next_run_date`, `frequency`, `payer_id` und `participants` duerfen fehlen
- * und bleiben dann stehen - ein fehlendes Datum fiele sonst durch
- * `parseExpenseBody` still auf heute. Titel, Betrag und (ausser bei `equal`)
- * `splits` gehoeren zu jedem Aufruf wie beim Bearbeiten einer Ausgabe.
+ * EIN GEBUCHTER TERMIN WIRD NICHT NOCH EINMAL AUSGELOEST. Ein Termin, den der
+ * Aufruf SETZT (er weicht vom gespeicherten ab), muss nach der letzten Buchung
+ * der Serie liegen - dem spaetesten `expense_date` ihrer Ausgaben, geloeschte
+ * eingeschlossen: der Lauf hat diesen Tag gebucht, ob die Buchung noch steht
+ * oder nicht. Sonst reichte ein Dialog, der vor dem letzten Lauf geoeffnet
+ * wurde und seinen alten Termin zurueckschickt, um denselben Tag ein zweites
+ * Mal zu buchen. Antwort 400 mit `reason: "next_run_not_after_last_booking"`
+ * und `last_booked`; den Satz dazu schreibt die Oberflaeche.
  *
  * Der Ankertag folgt dem Datum nur, wenn sich Datum oder Rhythmus AENDERN: eine
  * Serie am 31. steht im Februar auf dem 28., und ein Speichern, das nur den
- * Titel aendert, schickt diesen 28. unveraendert zurueck - daraus den Anker zu
- * lesen, liesse sie fuer immer auf dem 28. (#1721).
+ * Titel aendert, liesse sie sonst fuer immer auf dem 28. (#1721).
  *
  * `paused_at` bleibt: wer eine automatisch pausierte Serie repariert, setzt sie
  * danach selbst fort und entscheidet dabei ueber die versaeumten Termine.
+ *
+ * Lesen, Pruefen und Schreiben stehen in EINER Transaktion, der Handler laeuft
+ * ohne await: gemessen wird an der Zeile und der letzten Buchung, die auch
+ * geschrieben werden.
  */
 router.put('/recurring/:id', (req, res) => {
   try {
-    const existing = loadRecurring(Number(req.params.id), req);
-    if (!existing) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
-    if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    let stored = null;
-    try { stored = JSON.parse(existing.split_snapshot || '{}'); } catch { /* dann muss der Aufruf die Beteiligten nennen */ }
-    const body = {
-      ...req.body,
-      next_run_date: req.body.next_run_date || existing.next_run_date,
-      frequency: req.body.frequency || existing.frequency,
-      participants: Array.isArray(req.body.participants) ? req.body.participants : stored?.participants,
-    };
-    const { parsed, frequency, payerId, snapshot } = parseRecurringBody(body, existing.group_id, existing.currency, existing.payer_id);
-    const moved = parsed.expenseDate !== existing.next_run_date || frequency !== existing.frequency;
-    const anchorDay = moved ? Number(parsed.expenseDate.slice(8, 10)) : existing.anchor_day;
+    const id = Number(req.params.id);
+    const sent = req.body && typeof req.body === 'object' ? req.body : {};
+    const given = (key) => sent[key] !== undefined;
     db.transaction(() => {
+      const existing = loadRecurring(id, req);
+      if (!existing) throw new Refusal(404, 'Recurring expense not found.');
+      if (!mayChangeGroupRecord(existing, req)) throw new Refusal(403, 'Not authorized.');
+      const stored = storedSplitInput(existing);
+      const body = {
+        title: sent.title ?? existing.title,
+        amount: sent.amount ?? minorToDecimal(existing.amount_minor, existing.currency),
+        // Ohne `currency` gilt die der Serie - ueber den Rueckfall des Parsers
+        // unten, nicht die Standardwaehrung der Gruppe.
+        currency: sent.currency,
+        description: given('description') ? sent.description : existing.description,
+        split_method: sent.split_method ?? existing.split_method,
+        payer_id: sent.payer_id,
+        frequency: sent.frequency || existing.frequency,
+        next_run_date: sent.next_run_date || existing.next_run_date,
+        participants: Array.isArray(sent.participants) ? sent.participants : (stored.participants ?? undefined),
+        splits: Array.isArray(sent.splits) ? sent.splits : stored.splits,
+      };
+      const { parsed, frequency, payerId, snapshot } = parseRecurringBody(body, existing.group_id, existing.currency, existing.payer_id);
+      // Die Kategorie laeuft nicht durch die Rueckfall-Regel des Parsers
+      // ("unbekannt = general"), wenn der Aufruf sie gar nicht nennt.
+      const category = given('category') && sent.category !== null ? (CATEGORIES.includes(sent.category) ? sent.category : 'general') : existing.category;
+      const dateMoved = parsed.expenseDate !== existing.next_run_date;
+      if (dateMoved) {
+        const lastBooked = db.get().prepare('SELECT MAX(expense_date) AS date FROM expenses WHERE recurring_rule_id = ?').get(existing.id)?.date || null;
+        if (lastBooked && parsed.expenseDate <= lastBooked) {
+          const refusal = new Refusal(400, `next_run_date must be after the last booked date (${lastBooked}).`, 'next_run_not_after_last_booking');
+          refusal.extra = { last_booked: lastBooked };
+          throw refusal;
+        }
+      }
+      const anchorDay = dateMoved || frequency !== existing.frequency ? Number(parsed.expenseDate.slice(8, 10)) : existing.anchor_day;
       db.get().prepare(`
         UPDATE recurring_expenses
         SET title = ?, description = ?, amount_minor = ?, currency = ?, payer_id = ?, category = ?,
             split_method = ?, split_snapshot = ?, frequency = ?, next_run_date = ?, anchor_day = ?
         WHERE id = ?
-      `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, parsed.category, parsed.method, JSON.stringify(snapshot), frequency, parsed.expenseDate, anchorDay, existing.id);
+      `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, category, parsed.method, JSON.stringify(snapshot), frequency, parsed.expenseDate, anchorDay, existing.id);
       activity(existing.group_id, userId(req), 'recurring_edited', 'recurring_expense', existing.id, expenseSnapshot(parsed.title, parsed.amountMinor, parsed.currency));
     });
-    res.json({ data: recurringResponse(existing.id, req) });
+    res.json({ data: recurringResponse(id, req) });
   } catch (err) {
     if (err instanceof Refusal) return sendRefusal(res, err);
     log.error('PUT /recurring/:id error:', err);
