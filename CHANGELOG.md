@@ -285,6 +285,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the preview and in the browser's own viewer. The three demo images are still placeholders.
   Only a database filled by `scripts/seed-demo.js` is affected.
 
+- **The reminder-list settings have one name: "Reminder sync"** (#1524). The section under
+  Settings, Tasks was headed "Show/hide reminder lists", while the settings search and the link
+  from the task defaults called it "Reminder sync" - whoever searched for the one found the
+  other. The heading now carries the name the search and the links use. It is also the name
+  that says what the section does: its switches decide which CalDAV lists the household syncs
+  and whether a list feeds Tasks or Shopping, nothing in it merely hides a list.
+
+- **Wording: waste colours are named after what they show, and two stale sentences are gone**
+  (#1507). In the waste type dialog the swatch called "Violet" was fuchsia and the one called
+  "Teal" was emerald; both now carry those names, which is what a screen reader announces. The
+  hint above the module order under Settings, Navigation listed groups that no longer exist
+  ("Overview, Plan, Home") and now simply says the modules are sorted within their group. In
+  German, the empty waste page read "Papier -, um".
+
 - **An avatar never shows more than one character per name part** (#1464). A name starting
   with "ß" put three letters on the disc ("ßeta Schmidt" showed "SSS"), because writing a
   letter in capitals can turn it into two; the same went for the ligatures "ﬁ" and "ﬂ". The
@@ -470,6 +484,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   key, so a client that compared the `error` text should switch to it. Where a sentence lists
   the allowed category keys, the keys of the built-in income categories are still German
   words - they are stored keys, not wording. Other modules are unchanged (#1668).
+
+- **Three layout points from a Korean household: a long title stays on its card, hints wrap
+  at word boundaries, and the chart's amounts are no longer cut off** (#1607, reported by
+  @soonJ817). On the task board, a title without spaces - a web address, one very long
+  word - ran out of its card and across the neighbouring columns; it now wraps inside the
+  card. In the Korean interface, hints and descriptions broke between any two syllables and
+  left a single one on the next line ("선택합니 / 다."); Korean now wraps between words, as
+  it is written, and the other languages wrap as before. In the Budget statistics, the
+  amounts along the left edge of the chart lost their beginning once they got long -
+  "₩6,000,000" was cut off at its currency sign, on a phone and on a desktop alike. The
+  chart now measures its amounts and leaves them the room they need, whatever the currency
+  and region; a chart with short amounts looks exactly as before.
 
 ## [2.73.0] - 2026-10-04
 

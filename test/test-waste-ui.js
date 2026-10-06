@@ -493,6 +493,67 @@ test('WASTE_TYPE_COLORS: jede Preset-Farbe liegt im Raster', () => {
   }
 });
 
+/**
+ * DER FARBNAME NENNT DEN FARBTON (#1507).
+ *
+ * Die Swatches tragen ihren Namen als `aria-label` und `title` - wer die Farbe
+ * nicht sieht, hat nur ihn. Nach dem Wechsel auf die geteilte Palette hiess
+ * #D946EF (Fuchsia, Farbton 292) weiter "Violett" und #059669 (Smaragd, 161)
+ * weiter "Tuerkis": die Hex-Werte waren gewandert, die Namen nicht.
+ *
+ * Gemessen wird der Farbton des Hex-Werts gegen den Sektor, den der
+ * Schluesselname behauptet. Die Sektoren sind grob und ueberlappen nicht; sie
+ * sollen einen vertauschten Namen fangen, keine Nuance.
+ */
+const HUE_SECTORS = {
+  colorRed: [345, 15],
+  colorOrange: [15, 28],
+  colorOcher: [28, 50],
+  colorGreen: [90, 150],
+  colorEmerald: [150, 170],
+  colorTeal: [170, 185],
+  colorCyan: [185, 200],
+  colorBlue: [200, 250],
+  colorViolet: [250, 280],
+  colorFuchsia: [280, 310],
+  colorMagenta: [310, 345],
+};
+
+function hueAndSaturation(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  let hue = 0;
+  if (delta > 0) {
+    if (max === r) hue = ((g - b) / delta) % 6;
+    else if (max === g) hue = (b - r) / delta + 2;
+    else hue = (r - g) / delta + 4;
+    hue = (hue * 60 + 360) % 360;
+  }
+  return { hue, saturation: max === 0 ? 0 : delta / max };
+}
+
+test('WASTE_TYPE_COLOR_NAMES: jeder Farbname liegt im Farbton seines Hex-Werts (#1507)', () => {
+  const pairs = [...WASTE_CODE.matchAll(/'(#[0-9A-F]{6})':\s*t\('waste\.(color\w+)'\)/g)].map((m) => [m[1], m[2]]);
+  assert.equal(pairs.length, WASTE_TYPE_COLORS.length, 'nicht jede Palettenfarbe hat einen Namen');
+  assert.deepEqual(pairs.map(([hex]) => hex).sort(), [...WASTE_TYPE_COLORS].sort());
+  const failures = [];
+  for (const [hex, key] of pairs) {
+    const { hue, saturation } = hueAndSaturation(hex);
+    if (key === 'colorGray') {
+      if (saturation > 0.2) failures.push(`${hex} heisst ${key}, ist aber bunt (Saettigung ${saturation.toFixed(2)})`);
+      continue;
+    }
+    const sector = HUE_SECTORS[key];
+    assert.ok(sector, `${key}: kein Farbton-Sektor hinterlegt`);
+    const [from, to] = sector;
+    const inside = from < to ? hue >= from && hue < to : hue >= from || hue < to;
+    if (!inside) failures.push(`${hex} heisst ${key}, liegt aber bei Farbton ${Math.round(hue)}`);
+  }
+  assert.deepEqual(failures, []);
+});
+
 test('WASTE_TYPE_COLORS: eine kuratierte Auswahl ohne Dubletten und ohne Extremwerte', () => {
   assert.equal(new Set(WASTE_TYPE_COLORS).size, WASTE_TYPE_COLORS.length, 'keine doppelten Farben');
   assert.ok(WASTE_TYPE_COLORS.length >= 8, 'zu wenig Auswahl ist auch keine');

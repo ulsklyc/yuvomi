@@ -46,6 +46,12 @@ import { esc } from '/utils/html.js';
  */
 export const CHART = Object.freeze({ W: 600, H: 200, PAD_L: 56, PAD_R: 12, PAD_T: 14, PAD_B: 26 });
 
+/** Abstand zwischen dem rechten Ende eines Y-Werts und der Plotkante, in
+ *  viewBox-Einheiten. Die Werte stehen rechtsbuendig bei PAD_L - AXIS_GAP;
+ *  `.chart-host` (panel.css) rechnet mit derselben Zahl, test-chart-gutter.js
+ *  haelt beide Stellen gleich. */
+export const AXIS_GAP = 6;
+
 /** Die vier Plotgrenzen im viewBox-Koordinatensystem.
  *  `geo` ist eine andere Flaeche mit DENSELBEN Raendern (`{ ...CHART, H }`),
  *  etwa das hoehere Diagramm im mobilen Vitalwerte-Blatt (health.js). */
@@ -93,9 +99,52 @@ export function chartGridMarkup(min, max, formatTick, geo = CHART, steps = 4) {
     // Datum darunter. Gilt fuer jedes Diagramm dieser Geometrie (Budget-Verlauf
     // und die Kurven der Gesundheit).
     const base = k === steps ? ' dy="-0.6em"' : '';
-    out.push(`<text x="${PAD_L - 6}" y="${gy.toFixed(1)}" class="chart__axis chart__axis--y" text-anchor="end"${base}>${esc(formatTick(val, wholeTicks))}</text>`);
+    out.push(`<text x="${PAD_L - AXIS_GAP}" y="${gy.toFixed(1)}" class="chart__axis chart__axis--y" text-anchor="end"${base}>${esc(formatTick(val, wholeTicks))}</text>`);
   }
   return out.join('');
+}
+
+/**
+ * DER GUTTER FOLGT DEM BREITESTEN ACHSENWERT (#1607).
+ *
+ * `--chart-inset` (panel.css) haelt dem Gutter eine Mindestbreite frei, und die
+ * war eine feste Zahl: var(--space-16), bemessen an "5.550 €". Die Achsenschrift
+ * ist aber fest 12px, und wie breit ein Wert darin steht, entscheiden Region
+ * und Waehrung des Haushalts. Gemessen in koreanischer Region mit Won:
+ * "₩6,000,000" ist 67px breit und stand bei 375px Fensterbreite 6px, bei 1280px
+ * 13px links ausserhalb seines Scrollports - ohne Waehrungszeichen und ohne den
+ * Anfang der Zahl. Eine groessere feste Zahl haette denselben Fehler eine
+ * Groessenordnung weiter wieder ("CHF 125'000'000" ist 100px breit) und naehme
+ * jedem Diagramm mit kurzen Werten die Breite; eine Kurzschreibweise traegt
+ * auch nicht ueberall ("1,25 Mio. €" ist 62px breit, "600.000 €" hat gar keine).
+ *
+ * Deshalb wird gemessen statt geschaetzt: die Breite des breitesten Werts der
+ * Werteachse geht als `--chart-label-width` an das Elternelement des SVG, und
+ * `.chart-host` (panel.css) rechnet das Polster daraus. Das Elternelement, weil
+ * dort auch steht, was UEBER der Flaeche liegt und gegen dieselbe Zeichenbreite
+ * rechnet (die Punkte des Budget-Verlaufs). Einmal je Aufbau genuegt: die
+ * Schrift skaliert nicht mit, die Breite eines Werts haengt also nicht an der
+ * des Fensters.
+ *
+ * NACH dem Einsetzen ins Dokument aufrufen: ein Wert, der nicht im Bild steht,
+ * hat keine Breite, und dann bleibt es bei der Mindestbreite. Ein Diagramm ohne
+ * diesen Aufruf verliert nichts - es behaelt den Gutter, den es hatte.
+ *
+ * @param {ParentNode} root  enthaelt die eben eingesetzten `svg.chart`
+ */
+export function fitChartGutter(root) {
+  if (!root || typeof root.querySelectorAll !== 'function') return;
+  const widest = new Map();
+  for (const label of root.querySelectorAll('svg.chart .chart__axis--y')) {
+    const host = label.closest('svg.chart')?.parentElement;
+    if (!host) continue;
+    widest.set(host, Math.max(widest.get(host) ?? 0, label.getBoundingClientRect().width));
+  }
+  for (const [host, width] of widest) {
+    if (!(width > 0)) continue;
+    host.classList.add('chart-host');
+    host.style.setProperty('--chart-label-width', `${Math.ceil(width)}px`);
+  }
 }
 
 /**
