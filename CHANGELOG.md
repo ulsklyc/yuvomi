@@ -445,6 +445,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the allowed category keys, the keys of the built-in income categories are still German
   words - they are stored keys, not wording. Other modules are unchanged (#1668).
 
+- **Three layout points from a Korean household: a long title stays on its card, hints wrap
+  at word boundaries, and the chart's amounts are no longer cut off** (#1607, reported by
+  @soonJ817). On the task board, a title without spaces - a web address, one very long
+  word - ran out of its card and across the neighbouring columns; it now wraps inside the
+  card. In the Korean interface, hints and descriptions broke between any two syllables and
+  left a single one on the next line ("선택합니 / 다."); Korean now wraps between words, as
+  it is written, and the other languages wrap as before. In the Budget statistics, the
+  amounts along the left edge of the chart lost their beginning once they got long -
+  "₩6,000,000" was cut off at its currency sign, on a phone and on a desktop alike. The
+  chart now measures its amounts and leaves them the room they need, whatever the currency
+  and region; a chart with short amounts looks exactly as before.
+
 ## [2.73.0] - 2026-10-04
 
 ### Fixed
