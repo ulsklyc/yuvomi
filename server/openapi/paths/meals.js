@@ -7,7 +7,7 @@ const COOK_PROPERTY = {
   description: 'The household member who cooks this meal, or `null` for nobody. The id is a positive integer; an empty string, a fraction or any other form is refused with 400. Only a household member can be chosen: housekeeping staff, split-expense guests, wall tablets and deactivated accounts are refused with 400, and an id that belongs to no account gets the same answer. A cook that is already stored on the meal stays valid; for `scope=series` that is the cook stored on the series.',
 };
 
-const COOK_READ_NOTE = 'A meal carries its cook next to `created_by`: `cook_user_id` (or `null`), `cook_name` and `cook_color`. The picture of the cook is not repeated on every meal; it is on the member (`GET /api/v1/family/members`). A meal of a weekly series also names the cook stored on the series as `recurrence_cook_user_id`, which can differ from its own.';
+const COOK_READ_NOTE = 'A meal carries its cook next to `created_by`: `cook_user_id` (or `null`), `cook_name` and `cook_color`. The picture of the cook is not repeated on every meal; it is on the member (`GET /api/v1/family/members`; a scoped token needs `family:read` for it, `meals:read` alone is refused there with 403). A meal of a weekly series also names the cook stored on the series as `recurrence_cook_user_id`, which can differ from its own.';
 
 // Anlegen und Bearbeiten nehmen dieselben Felder; nur was Pflicht ist und was
 // die Serie betrifft, unterscheidet sie. `repeat_weekly` gibt es nur beim

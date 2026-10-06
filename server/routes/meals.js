@@ -618,9 +618,9 @@ router.put('/:id', (req, res) => {
       // waere fuer die Vorlage und alle anderen Mahlzeiten eine NEUE Wahl - und
       // kaeme ueber die Vorlage in jede kuenftige Woche. Die Mahlzeit selbst
       // bleibt mit ihm speicherbar: ohne `scope`, und im Serien-Umfang, solange
-      // der Koch nicht mitgeschickt wird (der Dialog schickt einen unveraendert
-      // gezeigten Nicht-Mitglied-Koch nie zur Serie, public/pages/meals.js
-      // `seriesCookChange()`).
+      // der Koch nicht mitgeschickt wird (der Dialog schickt ihn zur Serie nur,
+      // wenn ihn jemand dort gewaehlt hat - public/pages/meals.js,
+      // `wireCookPicker()`).
       if (vCook.given) {
         const cookError = cookRefusal(vCook.value, [tpl.cook_user_id]);
         if (cookError) return res.status(400).json({ error: cookError, code: 400 });

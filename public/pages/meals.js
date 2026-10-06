@@ -528,11 +528,11 @@ async function loadMembers() {
     const res = await api.get('/family/members');
     state.members = Array.isArray(res.data) ? res.data : [];
   } catch (err) {
-    // NICHT AUF `[]` ZURUECKFALLEN: eine leere Liste behauptet "es gibt keine
-    // Mitglieder", und der Dialog boete dann nur noch "Niemand" an, ohne dass
-    // irgendwo stuende, warum. Der Fehler geht in die Konsole wie der von
-    // loadWeek(), und eine schon geladene Liste bleibt stehen - Mitglieder
-    // aendern sich seltener, als ein Abruf scheitert.
+    // NICHT STILL: der Fehler geht in die Konsole wie der von loadWeek(), und
+    // eine schon geladene Liste bleibt stehen - Mitglieder aendern sich
+    // seltener, als ein Abruf scheitert. Scheitert schon der ERSTE Abruf, ist
+    // die Liste weiter leer; dann holt der Dialog sie beim Oeffnen nach
+    // (openMealModal() -> refreshCookPicker()).
     console.error('[Meals] loadMembers Fehler:', err);
   }
 }
@@ -1993,9 +1993,18 @@ function openMealModal(opts) {
     if (opts?.mode === 'edit' && opts.meal) openMealReadModal(opts.meal);
     return;
   }
-  state.modal = opts;
+  // `cookTouched`: hat jemand in DIESEM Dialog den Koch gewaehlt? Siehe
+  // wireCookPicker() - mit jedem Oeffnen wieder false.
+  state.modal = { ...opts, cookTouched: false };
   const { mode, date, mealType, meal } = opts;
   const isEdit = mode === 'edit';
+
+  // Scheiterte der Abruf der Mitglieder beim Laden der Seite, ist die Liste
+  // leer und die Auswahl boete nur "Niemand" an. Ein Haushalt ohne Mitglieder
+  // gibt es nicht - eine leere Liste heisst hier immer "nicht geladen". Der
+  // Dialog geht sofort auf und bekommt seine Auswahl nachgereicht
+  // (refreshCookPicker()); `state.members` bleibt die eine Buchfuehrung.
+  const membersMissing = state.members.length === 0;
 
   const content = buildModalContent(opts);
 
@@ -2190,11 +2199,14 @@ function openMealModal(opts) {
       });
       editScopeSelect?.addEventListener('change', () => {
         repeatUntilGroup.hidden = editScopeSelect.value !== 'series';
+        showCookForScope(panel, meal);
       });
 
-      // Eine Mahlzeit hat EINEN Koch: dieselbe Auswahl wie bei den Zustaendigen
-      // einer Aufgabe, aber eine neue Wahl loest die vorige ab (#1679).
-      bindUserMultiSelect(panel, COOK_INPUT, { single: true });
+      wireCookPicker(panel);
+      if (membersMissing) {
+        refreshCookPicker(panel, isEdit ? meal : null)
+          .catch((err) => console.error('[Meals] refreshCookPicker Fehler:', err));
+      }
 
       panel.querySelector('#modal-cancel').addEventListener('click', closeModal);
       /* EIN ABGEBROCHENES SERIEN-LOESCHEN NAHM DEN EDITOR MIT (Codex an #1485):
@@ -2252,34 +2264,70 @@ function selectedCookId(overlay) {
 }
 
 /**
- * Geht der im Dialog gewaehlte Koch beim Speichern der GANZEN SERIE mit (#1679)?
+ * Verdrahtet die Koch-Auswahl des Dialogs.
  *
- * Der Server schreibt einen mitgeschickten Koch auf die Vorlage und auf JEDE
- * Mahlzeit der Serie; ein fehlendes Feld laesst alle, wie sie sind. Der Dialog
- * zeigt den Koch DIESER Mahlzeit, gespeichert wird aber die Serie - also
- * zaehlen zwei gespeicherte Staende, nicht einer:
+ * Eine Mahlzeit hat EINEN Koch: dieselbe Auswahl wie bei den Zustaendigen einer
+ * Aufgabe, aber eine neue Wahl loest die vorige ab (#1679).
  *
- *   - gegen die MAHLZEIT geaendert: der Nutzer hat gewaehlt, das geht immer mit;
- *   - gegen die VORLAGE verschieden (`recurrence_cook_user_id`): die Serie hat
- *     den gezeigten Koch nicht. Vorlage Anna, diese Mahlzeit einzeln Ben, "ganze
- *     Serie" mit Ben gespeichert - der Vergleich allein mit der Mahlzeit hielt
- *     das fuer "unveraendert" und liess die Vorlage still auf Anna.
- *
- * Nur wenn die Wahl BEIDEN gleicht, bleibt das Feld weg: dann aendert eine
- * Titelaenderung an der Serie keinen einzeln gesetzten Koch einer anderen Woche.
- *
- * EINE AUSNAHME beim zweiten Fall: ein unveraendert gezeigter Koch, der kein
- * Mitglied (mehr) ist, steht nur noch als gespeicherter Stand DIESER Mahlzeit
- * in der Auswahl. Fuer die Serie waere er eine neue Wahl, die der Server
- * ablehnt - eine Titelaenderung an der Serie scheiterte dann an einem Koch,
- * den niemand angefasst hat.
+ * DER BERUEHRT-MERKER (`state.modal.cookTouched`). Der Dialog zeigt beim Oeffnen
+ * den Koch DIESER Mahlzeit; "ganze Serie" schreibt einen mitgeschickten Koch
+ * aber auf die Vorlage und auf JEDE Mahlzeit der Serie. Aus den gespeicherten
+ * Staenden laesst sich nicht lesen, ob der gezeigte Koch GEWAEHLT oder nur
+ * GEZEIGT ist: "Ben bewusst fuer die ganze Serie" und "nur den Titel geaendert,
+ * waehrend an dieser Woche Ben steht" ergeben dieselben Werte (Review zu
+ * #1739: eine Titelaenderung machte aus Anna/Ben/Carla dreimal Ben, und von
+ * einer Woche ohne Koch aus leerte sie die ganze Serie samt Vorlage). Also
+ * zaehlt, was der Nutzer GETAN hat: ein `change` an der Auswahl. Das
+ * programmatische Umstellen in showCookForScope() loest kein Ereignis aus und
+ * setzt den Merker nicht.
  */
-function seriesCookChange(meal, chosen) {
-  const stored = meal.cook_user_id ?? null;
-  if (chosen !== stored) return true;
-  const ofSeries = meal.recurrence_cook_user_id ?? null;
-  if (chosen === ofSeries) return false;
-  return chosen === null || state.members.some((member) => member.id === chosen);
+function wireCookPicker(panel) {
+  bindUserMultiSelect(panel, COOK_INPUT, { single: true });
+  panel.querySelector(`.user-ms[data-ms-name="${COOK_INPUT}"]`)?.addEventListener('change', () => {
+    if (state.modal) state.modal.cookTouched = true;
+  });
+}
+
+/**
+ * Der Koch, den die Auswahl im gewaehlten Umfang ZEIGT, solange niemand
+ * gewaehlt hat: bei "nur diese Mahlzeit" der Koch der Mahlzeit, bei "ganze
+ * Serie" der Koch der Vorlage (`recurrence_cook_user_id`). Sonst stuende im
+ * Serien-Umfang ein Name da, den die Serie gar nicht hat.
+ *
+ * NUR, WENN ES DIE PERSON IN DER AUSWAHL GIBT. Ein Koch der Vorlage, der kein
+ * Mitglied (mehr) ist, hat keine Zeile - die Auswahl nennt neben den
+ * Mitgliedern nur den gespeicherten Koch DIESER Mahlzeit. Dann bleibt stehen,
+ * was da stand; gesendet wird ohne Beruehrung ohnehin nichts.
+ *
+ * Eine beruehrte Auswahl bleibt beim Wechsel des Umfangs, wie sie ist. Setzt
+ * `checked` direkt und loest kein `change` aus - siehe wireCookPicker().
+ */
+function showCookForScope(panel, meal) {
+  if (!meal?.recurrence_template_id || state.modal?.cookTouched) return;
+  const scope = panel.querySelector('#modal-edit-scope')?.value || 'single';
+  const shown = (scope === 'series' ? meal.recurrence_cook_user_id : meal.cook_user_id) ?? null;
+  const boxes = [...panel.querySelectorAll(`[data-ms-input="${COOK_INPUT}"]`)];
+  const isNone = (box) => box.classList.contains('user-ms__none');
+  if (shown !== null && !boxes.some((box) => !isNone(box) && Number(box.value) === shown)) return;
+  for (const box of boxes) box.checked = isNone(box) ? shown === null : Number(box.value) === shown;
+}
+
+/**
+ * Reicht dem offenen Dialog die Auswahl nach, wenn die Mitgliederliste beim
+ * Oeffnen leer war (gescheiterter Abruf, siehe loadMembers()). Ersetzt wird nur,
+ * wenn derselbe Dialog noch offen ist und niemand gewaehlt hat - eine Wahl aus
+ * der unvollstaendigen Liste ("Niemand") ueberschriebe das neue Markup sonst.
+ */
+async function refreshCookPicker(panel, meal) {
+  const opened = state.modal;
+  await loadMembers();
+  if (!state.members.length || state.modal !== opened || opened.cookTouched) return;
+  const old = panel.querySelector('.meal-modal__cook');
+  if (!old) return;
+  old.insertAdjacentHTML('afterend', cookPickerHtml(meal));
+  old.remove();
+  wireCookPicker(panel);
+  showCookForScope(panel, meal);
 }
 
 function buildModalContent({ mode, date, mealType, meal, fromSlot = false, recipeId = null }) {
@@ -2531,10 +2579,12 @@ async function saveModal(overlay) {
       if (scope === 'series') {
         // Ganze Serie: Template + alle Instanzen inkl. Zutaten serverseitig aktualisieren.
         //
-        // DER KOCH GEHT MIT, WENN DIE SERIE IHN NOCH NICHT HAT (#1679) - siehe
-        // seriesCookChange().
+        // DER KOCH GEHT NUR MIT, WENN IHN JEMAND IN DIESEM DIALOG GEWAEHLT HAT
+        // (#1679, `cookTouched` - siehe wireCookPicker()). Der Server schreibt
+        // einen mitgeschickten Koch auf die Vorlage und auf JEDE Mahlzeit der
+        // Serie; ein fehlendes Feld laesst alle, wie sie sind.
         const seriesBody = { meal_type, title, notes, recipe_url, recipe_id, ingredients, repeat_until };
-        if (seriesCookChange(meal, cook_user_id)) seriesBody.cook_user_id = cook_user_id;
+        if (state.modal.cookTouched) seriesBody.cook_user_id = cook_user_id;
         await api.put(`/meals/${meal.id}?scope=series`, seriesBody);
       } else {
         // Nur diese Instanz
@@ -2774,6 +2824,7 @@ export const __test = {
   mealCookMarkHtml,
   cookPickerHtml,
   loadMembers,
+  showCookForScope,
 };
 
 // --------------------------------------------------------

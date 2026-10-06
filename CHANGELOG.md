@@ -25,10 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and on today's meal on the overview. On a wall tablet, cooking counts under "Who's up today"
   like a task does. A meal without a cook looks as it did. A repeating meal
   keeps its cook: every meal the series creates starts with it, changing the cook of one meal
-  leaves the series alone, and changing it for the whole series reaches all its meals - also
-  when the meal you save from already carries that cook on its own and only the series does not.
+  leaves the series alone, and choosing one for the whole series reaches all its meals. Saving
+  for the whole series changes the cook only when you picked one in that dialog: a new title for
+  the series leaves every cook where it is, including the ones set for single weeks, and while
+  nothing is picked the dialog shows the cook of the series there, not of the one meal.
   A series whose cook is no longer a household member keeps running; its new meals start
-  without a cook, and the meals that already exist keep the name. The cook
+  without a cook, and the meals that already exist keep the name. Weeks created while the
+  account was deactivated stay without a cook; once it is a member again, the next new week
+  starts with it. The cook
   is a responsibility, not ownership - the plan stays the household's, and who sees or edits a
   meal still depends on the meal plan right alone; with read access the cook is shown and cannot
   be chosen. Only household members can be picked, so housekeeping staff, guests of shared
@@ -40,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   series) and on each assignment of `POST /api/v1/meals/apply-plan`; meals come back with
   `cook_user_id`, `cook_name` and `cook_color`, also in `todayMeals` of the overview (migration
   235); the cook's picture is not repeated on every meal, it is on the member
-  (`GET /api/v1/family/members`). The id is a positive integer or `null`; an empty string or any other
+  (`GET /api/v1/family/members`, which a scoped token reads with `family:read`). The id is a positive integer or `null`; an empty string or any other
   form is refused with 400. A meal of a series also returns `recurrence_cook_user_id`, the cook
   stored on the series.
 
