@@ -90,7 +90,7 @@ router.get('/categories/:categoryKey/subcategories', (req, res) => {
 router.post('/categories', (req, res) => {
   try {
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
-    const vType = oneOf(req.body.type || 'expense', ['expense', 'income'], 'Typ');
+    const vType = oneOf(req.body.type || 'expense', ['expense', 'income'], 'Type');
     const errors = [...refusals('category_name_invalid', [vName]), ...refusals('category_type_invalid', [vType])];
     if (errors.length) return refuse(res, errors);
 
@@ -160,7 +160,7 @@ router.delete('/categories/:key', (req, res) => {
 
 router.patch('/categories/reorder', (req, res) => {
   try {
-    const vType = oneOf(req.body.type || 'expense', ['expense', 'income'], 'Typ');
+    const vType = oneOf(req.body.type || 'expense', ['expense', 'income'], 'Type');
     if (vType.error) return refuse(res, refusals('category_type_invalid', [vType]));
     const order = Array.isArray(req.body.order) ? req.body.order : [];
     const tx = db.get().transaction((keys) => {

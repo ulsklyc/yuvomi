@@ -98,9 +98,9 @@ export function statsHandler(req, res) {
     const range  = req.query.range || 'month';
     const anchor = req.query.anchor || todayLocalDateKey();
     if (!STATS_RANGES.has(range))
-      return res.status(400).json({ error: 'range muss week|month|year sein', code: 400 });
+      return res.status(400).json({ error: 'range must be one of: week, month, year.', code: 400 });
     if (!DATE_RE.test(anchor))
-      return res.status(400).json({ error: 'anchor muss YYYY-MM-DD sein', code: 400 });
+      return res.status(400).json({ error: 'anchor must be in YYYY-MM-DD format.', code: 400 });
 
     res.json({
       data: computeStats(db.get(), { range, anchor },

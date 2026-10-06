@@ -39,7 +39,7 @@ const router = express.Router();
 function intervalCountCheck(value) {
   const n = Number(value);
   if (!Number.isInteger(n) || n < 1 || n > MAX_INTERVAL_COUNT) {
-    return { value: null, error: `Intervall-Anzahl muss zwischen 1 und ${MAX_INTERVAL_COUNT} liegen.` };
+    return { value: null, error: `Interval count must be between 1 and ${MAX_INTERVAL_COUNT}.` };
   }
   return { value: n, error: null };
 }
@@ -63,7 +63,7 @@ router.get('/summary', (req, res) => {
     const month = req.query.month || todayKey(db.get()).slice(0, 7);
 
     if (!MONTH_RE.test(month))
-      return res.status(400).json({ error: 'month muss YYYY-MM sein', code: 400 });
+      return res.status(400).json({ error: 'month must be in YYYY-MM format.', code: 400 });
 
     const from = `${month}-01`;
     const to   = `${month}-31`;
@@ -233,7 +233,7 @@ router.get('/', (req, res) => {
     const loanId = req.query.loan_id ? parseInt(req.query.loan_id, 10) : null;
 
     if (!loanId && !MONTH_RE.test(month))
-      return res.status(400).json({ error: 'month muss YYYY-MM sein', code: 400 });
+      return res.status(400).json({ error: 'month must be in YYYY-MM format.', code: 400 });
 
     if (!loanId) generateRecurringInstances(db.get(), month);
 
@@ -311,7 +311,7 @@ router.get('/', (req, res) => {
 function searchEntries(req, res) {
   const raw = String(Array.isArray(req.query.q) ? req.query.q[0] : req.query.q).trim();
   if (!raw || raw.length > LEDGER_SEARCH_MAX_LENGTH) {
-    return res.status(400).json({ error: `q muss 1-${LEDGER_SEARCH_MAX_LENGTH} Zeichen haben`, code: 400 });
+    return res.status(400).json({ error: `q must be 1-${LEDGER_SEARCH_MAX_LENGTH} characters long.`, code: 400 });
   }
   const needle = foldSearchText(raw);
   let sql = `
@@ -358,13 +358,13 @@ function searchEntries(req, res) {
  */
 router.post('/', (req, res) => {
   try {
-    const vTitle  = str(req.body.title,    'Titel',  { max: MAX_TITLE });
-    const vAmount = num(req.body.amount,  'Betrag', { required: true });
+    const vTitle  = str(req.body.title,    'Title',  { max: MAX_TITLE });
+    const vAmount = num(req.body.amount,  'Amount', { required: true });
     const fallbackCategory = defaultCategory(Number(req.body.amount) < 0 ? 'expense' : 'income');
-    const vCat    = oneOf(req.body.category || fallbackCategory, validCategoryKeys(), 'Kategorie');
-    const vDate   = validateDate(req.body.date,   'Datum',  true);
-    const vRrule  = rrule(req.body.recurrence_rule, 'Wiederholung');
-    const vInterval = oneOf(req.body.recurrence_interval || 'monthly', RECURRENCE_INTERVAL_KEYS, 'Intervall');
+    const vCat    = oneOf(req.body.category || fallbackCategory, validCategoryKeys(), 'Category');
+    const vDate   = validateDate(req.body.date,   'Date',  true);
+    const vRrule  = rrule(req.body.recurrence_rule, 'recurrence_rule');
+    const vInterval = oneOf(req.body.recurrence_interval || 'monthly', RECURRENCE_INTERVAL_KEYS, 'Interval');
     const vCount = req.body.recurrence_interval_count !== undefined
       ? intervalCountCheck(req.body.recurrence_interval_count)
       : { value: 1, error: null };
@@ -477,11 +477,11 @@ router.put('/:id/series', (req, res) => {
     };
 
     const checks = [];
-    if (req.body.title    !== undefined) checks.push(['entry_title_invalid', str(req.body.title,    'Titel',  { max: MAX_TITLE, required: false })]);
-    if (req.body.amount   !== undefined) checks.push(['entry_amount_invalid', num(req.body.amount,   'Betrag')]);
-    if (req.body.category !== undefined) checks.push(['entry_category_invalid', oneOf(req.body.category, validCategoryKeys(), 'Kategorie')]);
-    if (req.body.recurrence_rule !== undefined) checks.push(['entry_recurrence_invalid', rrule(req.body.recurrence_rule, 'Wiederholung')]);
-    if (req.body.recurrence_interval !== undefined) checks.push(['entry_recurrence_invalid', oneOf(req.body.recurrence_interval, RECURRENCE_INTERVAL_KEYS, 'Intervall')]);
+    if (req.body.title    !== undefined) checks.push(['entry_title_invalid', str(req.body.title,    'Title',  { max: MAX_TITLE, required: false })]);
+    if (req.body.amount   !== undefined) checks.push(['entry_amount_invalid', num(req.body.amount,   'Amount')]);
+    if (req.body.category !== undefined) checks.push(['entry_category_invalid', oneOf(req.body.category, validCategoryKeys(), 'Category')]);
+    if (req.body.recurrence_rule !== undefined) checks.push(['entry_recurrence_invalid', rrule(req.body.recurrence_rule, 'recurrence_rule')]);
+    if (req.body.recurrence_interval !== undefined) checks.push(['entry_recurrence_invalid', oneOf(req.body.recurrence_interval, RECURRENCE_INTERVAL_KEYS, 'Interval')]);
     if (req.body.recurrence_interval_count !== undefined) checks.push(['entry_interval_count_invalid', intervalCountCheck(req.body.recurrence_interval_count)]);
     if (req.body.start_date !== undefined) checks.push(['entry_start_date_invalid', validateDate(req.body.start_date, 'start_date', true)]);
     const errors = checks.flatMap(([reason, result]) => refusals(reason, [result]));
@@ -846,12 +846,12 @@ router.put('/:id', (req, res) => {
     if (!mayEdit(req, entry)) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
 
     const checks = [];
-    if (req.body.title    !== undefined) checks.push(['entry_title_invalid', str(req.body.title,    'Titel',  { max: MAX_TITLE, required: false })]);
-    if (req.body.amount   !== undefined) checks.push(['entry_amount_invalid', num(req.body.amount,   'Betrag')]);
-    if (req.body.category !== undefined) checks.push(['entry_category_invalid', oneOf(req.body.category, validCategoryKeys(), 'Kategorie')]);
-    if (req.body.date     !== undefined) checks.push(['entry_date_invalid', validateDate(req.body.date,    'Datum')]);
-    if (req.body.recurrence_rule !== undefined) checks.push(['entry_recurrence_invalid', rrule(req.body.recurrence_rule, 'Wiederholung')]);
-    if (req.body.recurrence_interval !== undefined) checks.push(['entry_recurrence_invalid', oneOf(req.body.recurrence_interval, RECURRENCE_INTERVAL_KEYS, 'Intervall')]);
+    if (req.body.title    !== undefined) checks.push(['entry_title_invalid', str(req.body.title,    'Title',  { max: MAX_TITLE, required: false })]);
+    if (req.body.amount   !== undefined) checks.push(['entry_amount_invalid', num(req.body.amount,   'Amount')]);
+    if (req.body.category !== undefined) checks.push(['entry_category_invalid', oneOf(req.body.category, validCategoryKeys(), 'Category')]);
+    if (req.body.date     !== undefined) checks.push(['entry_date_invalid', validateDate(req.body.date,    'Date')]);
+    if (req.body.recurrence_rule !== undefined) checks.push(['entry_recurrence_invalid', rrule(req.body.recurrence_rule, 'recurrence_rule')]);
+    if (req.body.recurrence_interval !== undefined) checks.push(['entry_recurrence_invalid', oneOf(req.body.recurrence_interval, RECURRENCE_INTERVAL_KEYS, 'Interval')]);
     if (req.body.recurrence_interval_count !== undefined) checks.push(['entry_interval_count_invalid', intervalCountCheck(req.body.recurrence_interval_count)]);
     const errors = checks.flatMap(([reason, result]) => refusals(reason, [result]));
     if (errors.length) return refuse(res, errors);
@@ -1078,8 +1078,8 @@ router.patch('/:id/confirm', (req, res) => {
     }
 
     const errors = [];
-    if (req.body.amount !== undefined) errors.push(...refusals('entry_amount_invalid', [num(req.body.amount, 'Betrag')]));
-    if (req.body.date   !== undefined) errors.push(...refusals('entry_date_invalid', [validateDate(req.body.date, 'Datum')]));
+    if (req.body.amount !== undefined) errors.push(...refusals('entry_amount_invalid', [num(req.body.amount, 'Amount')]));
+    if (req.body.date   !== undefined) errors.push(...refusals('entry_date_invalid', [validateDate(req.body.date, 'Date')]));
     if (errors.length) return refuse(res, errors);
 
     // Das Vorzeichen bleibt: eine erwartete Ausgabe wird beim Abbuchen nicht zur

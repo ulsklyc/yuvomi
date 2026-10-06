@@ -261,7 +261,7 @@ test('PUT /:id: half_year ist kein Intervall mehr → 400', async () => {
   const id = insertEntry({ title: 'legacy', amount: -50, category: 'food', date: '2033-05-11' });
   const r = await call('PUT', `/${id}`, { body: { is_recurring: true, recurrence_interval: 'half_year' } });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Intervall/);
+  assert.match(r.body.error, /^Interval /);
 });
 
 test('POST: Intervall-Anzahl ausserhalb von [1, 99] → 400', async () => {
@@ -288,7 +288,7 @@ test('PUT /:id: ungültiger Betrag → 400', async () => {
   const id = insertEntry({ title: 'amt', amount: -5, category: 'food', date: '2033-05-20' });
   const r = await call('PUT', `/${id}`, { body: { amount: 'viel' } });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Betrag/);
+  assert.match(r.body.error, /^Amount /);
 });
 
 test('PUT /:id: unbekanntes Konto → 400', async () => {
@@ -511,7 +511,7 @@ test('PUT /:id/series: ungültiger Betrag → 400', async () => {
   const parent = insertEntry({ title: 's-amt', amount: -5, category: 'food', date: '2035-01-20', is_recurring: 1 });
   const r = await call('PUT', `/${parent}/series`, { body: { amount: 'nope' } });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Betrag/);
+  assert.match(r.body.error, /^Amount /);
 });
 
 test('PUT /:id/series: virtuelles Budget glättet den Serien-Jahresbetrag', async () => {
@@ -1474,61 +1474,65 @@ test('#1585: Rhythmuswechsel ueber PUT /:id an der ersten Buchung - Vergangenhei
 // zugesagte Antwort der API und bleibt Wort fuer Wort - mit einer Ausnahme:
 // validateAccountRef antwortete deutsch ("Konto nicht gefunden."), das war ein
 // Fehler und heisst jetzt "Account not found.".
+// Nachtrag: die deutschen Feldnamen und Saetze, die diese Tabelle damals
+// woertlich festhielt ("Titel is required.", "Intervall-Anzahl muss ..."), sind
+// seither englisch; Status und `reason` jeder Zeile sind dieselben geblieben.
+// Dass keiner zurueckkommt, haelt test:budget-error-language.
 test('#1668: jede Absage von Buchung, Serie, Konto, Kategorie und Rate nennt ihren Grund, der Satz bleibt', async () => {
   setMode('shared');
   const ADM = { id: ADMIN, role: 'admin' };
   const EXPECTED = {
-    'e-title': { status: 400, reason: 'entry_title_invalid', error: 'Titel is required.' },
-    'e-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Betrag is required.' },
-    'e-category': { status: 400, reason: 'entry_category_invalid', error: 'Kategorie must be one of: Erwerbseinkommen, Geschenke & Transfers, Kapitalerträge, Sonstiges Einkommen, Sozialleistungen, education, financial_other, food, housing, leisure, personal_health, shopping_clothing, subscriptions, transport.' },
-    'e-date': { status: 400, reason: 'entry_date_invalid', error: 'Datum must be in YYYY-MM-DD format.' },
-    'e-interval': { status: 400, reason: 'entry_recurrence_invalid', error: 'Intervall must be one of: weekly, monthly, yearly.' },
-    'e-count': { status: 400, reason: 'entry_interval_count_invalid', error: 'Intervall-Anzahl muss zwischen 1 und 99 liegen.' },
+    'e-title': { status: 400, reason: 'entry_title_invalid', error: 'Title is required.' },
+    'e-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Amount is required.' },
+    'e-category': { status: 400, reason: 'entry_category_invalid', error: 'Category must be one of: Erwerbseinkommen, Geschenke & Transfers, Kapitalerträge, Sonstiges Einkommen, Sozialleistungen, education, financial_other, food, housing, leisure, personal_health, shopping_clothing, subscriptions, transport.' },
+    'e-date': { status: 400, reason: 'entry_date_invalid', error: 'Date must be in YYYY-MM-DD format.' },
+    'e-interval': { status: 400, reason: 'entry_recurrence_invalid', error: 'Interval must be one of: weekly, monthly, yearly.' },
+    'e-count': { status: 400, reason: 'entry_interval_count_invalid', error: 'Interval count must be between 1 and 99.' },
     'e-sub': { status: 400, reason: 'entry_subcategory_invalid', error: 'Invalid subcategory.' },
     'e-account': { status: 400, reason: 'entry_account_invalid', error: 'Account not found.' },
     'e-account-nan': { status: 400, reason: 'entry_account_invalid', error: 'account_id must be a valid account id.' },
-    'e-two': { status: 400, reason: 'entry_title_invalid', error: 'Titel is required. Betrag is required. Datum must be in YYYY-MM-DD format.' },
-    'p-title': { status: 400, reason: 'entry_title_invalid', error: 'Titel may be at most 200 characters long.' },
-    'p-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Betrag must be a valid number.' },
-    'p-category': { status: 400, reason: 'entry_category_invalid', error: 'Kategorie must be one of: Erwerbseinkommen, Geschenke & Transfers, Kapitalerträge, Sonstiges Einkommen, Sozialleistungen, education, financial_other, food, housing, leisure, personal_health, shopping_clothing, subscriptions, transport.' },
-    'p-date': { status: 400, reason: 'entry_date_invalid', error: 'Datum must be in YYYY-MM-DD format.' },
-    'p-interval': { status: 400, reason: 'entry_recurrence_invalid', error: 'Intervall must be one of: weekly, monthly, yearly.' },
-    'p-count': { status: 400, reason: 'entry_interval_count_invalid', error: 'Intervall-Anzahl muss zwischen 1 und 99 liegen.' },
+    'e-two': { status: 400, reason: 'entry_title_invalid', error: 'Title is required. Amount is required. Date must be in YYYY-MM-DD format.' },
+    'p-title': { status: 400, reason: 'entry_title_invalid', error: 'Title may be at most 200 characters long.' },
+    'p-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Amount must be a valid number.' },
+    'p-category': { status: 400, reason: 'entry_category_invalid', error: 'Category must be one of: Erwerbseinkommen, Geschenke & Transfers, Kapitalerträge, Sonstiges Einkommen, Sozialleistungen, education, financial_other, food, housing, leisure, personal_health, shopping_clothing, subscriptions, transport.' },
+    'p-date': { status: 400, reason: 'entry_date_invalid', error: 'Date must be in YYYY-MM-DD format.' },
+    'p-interval': { status: 400, reason: 'entry_recurrence_invalid', error: 'Interval must be one of: weekly, monthly, yearly.' },
+    'p-count': { status: 400, reason: 'entry_interval_count_invalid', error: 'Interval count must be between 1 and 99.' },
     'p-sub': { status: 400, reason: 'entry_subcategory_invalid', error: 'Invalid subcategory.' },
     'p-account': { status: 400, reason: 'entry_account_invalid', error: 'Account not found.' },
     's-notrec': { status: 400, reason: 'entry_not_recurring', error: 'Not a recurring entry.' },
     'sd-notrec': { status: 400, reason: 'entry_not_recurring', error: 'Not a recurring entry.' },
     'c-booked': { status: 400, reason: 'entry_already_booked', error: 'Entry is already booked.' },
-    's-title': { status: 400, reason: 'entry_title_invalid', error: 'Titel may be at most 200 characters long.' },
-    's-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Betrag must be a valid number.' },
-    's-category': { status: 400, reason: 'entry_category_invalid', error: 'Kategorie must be one of: Erwerbseinkommen, Geschenke & Transfers, Kapitalerträge, Sonstiges Einkommen, Sozialleistungen, education, financial_other, food, housing, leisure, personal_health, shopping_clothing, subscriptions, transport.' },
-    's-interval': { status: 400, reason: 'entry_recurrence_invalid', error: 'Intervall must be one of: weekly, monthly, yearly.' },
-    's-count': { status: 400, reason: 'entry_interval_count_invalid', error: 'Intervall-Anzahl muss zwischen 1 und 99 liegen.' },
+    's-title': { status: 400, reason: 'entry_title_invalid', error: 'Title may be at most 200 characters long.' },
+    's-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Amount must be a valid number.' },
+    's-category': { status: 400, reason: 'entry_category_invalid', error: 'Category must be one of: Erwerbseinkommen, Geschenke & Transfers, Kapitalerträge, Sonstiges Einkommen, Sozialleistungen, education, financial_other, food, housing, leisure, personal_health, shopping_clothing, subscriptions, transport.' },
+    's-interval': { status: 400, reason: 'entry_recurrence_invalid', error: 'Interval must be one of: weekly, monthly, yearly.' },
+    's-count': { status: 400, reason: 'entry_interval_count_invalid', error: 'Interval count must be between 1 and 99.' },
     's-start': { status: 400, reason: 'entry_start_date_invalid', error: 'start_date must be in YYYY-MM-DD format.' },
     's-end': { status: 400, reason: 'series_end_refused', error: 'A series edit cannot end the series. To end it, set is_recurring to false on its first entry (PUT /budget/:id) or delete it (DELETE /budget/:id/series).' },
     's-account': { status: 400, reason: 'entry_account_invalid', error: 'Account not found.' },
     's-early': { status: 400, reason: 'series_start_too_early', error: 'The start day of a series cannot lie in a month before its first entry once that entry is booked.' },
-    'c-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Betrag must be a valid number.' },
-    'c-date': { status: 400, reason: 'entry_date_invalid', error: 'Datum must be in YYYY-MM-DD format.' },
+    'c-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Amount must be a valid number.' },
+    'c-date': { status: 400, reason: 'entry_date_invalid', error: 'Date must be in YYYY-MM-DD format.' },
     'a-name': { status: 400, reason: 'account_name_invalid', error: 'Name is required.' },
-    'a-type': { status: 400, reason: 'account_type_invalid', error: 'Kontotyp must be one of: checking, savings, cash, credit, investment, other.' },
-    'a-balance': { status: 400, reason: 'account_balance_invalid', error: 'Startsaldo must be a valid number.' },
-    'a-color': { status: 400, reason: 'account_color_invalid', error: 'Farbe must be a valid HEX color (#RRGGBB).' },
+    'a-type': { status: 400, reason: 'account_type_invalid', error: 'Account type must be one of: checking, savings, cash, credit, investment, other.' },
+    'a-balance': { status: 400, reason: 'account_balance_invalid', error: 'Starting balance must be a valid number.' },
+    'a-color': { status: 400, reason: 'account_color_invalid', error: 'Color must be a valid HEX color (#RRGGBB).' },
     'a-bank': { status: 400, reason: 'account_credit_bank_invalid', error: 'Bank may be at most 100 characters long.' },
-    'a-limit': { status: 400, reason: 'account_credit_limit_invalid', error: 'Kreditlimit must be a valid number.' },
-    'a-limit-neg': { status: 400, reason: 'account_credit_limit_invalid', error: 'Kreditlimit must not be negative.' },
+    'a-limit': { status: 400, reason: 'account_credit_limit_invalid', error: 'Credit limit must be a valid number.' },
+    'a-limit-neg': { status: 400, reason: 'account_credit_limit_invalid', error: 'Credit limit must not be negative.' },
     'ap-name': { status: 400, reason: 'account_name_invalid', error: 'Name is required.' },
-    'ap-type': { status: 400, reason: 'account_type_invalid', error: 'Kontotyp must be one of: checking, savings, cash, credit, investment, other.' },
-    'ap-balance': { status: 400, reason: 'account_balance_invalid', error: 'Startsaldo must be a valid number.' },
-    'ap-color': { status: 400, reason: 'account_color_invalid', error: 'Farbe must be a valid HEX color (#RRGGBB).' },
+    'ap-type': { status: 400, reason: 'account_type_invalid', error: 'Account type must be one of: checking, savings, cash, credit, investment, other.' },
+    'ap-balance': { status: 400, reason: 'account_balance_invalid', error: 'Starting balance must be a valid number.' },
+    'ap-color': { status: 400, reason: 'account_color_invalid', error: 'Color must be a valid HEX color (#RRGGBB).' },
     'ap-bank': { status: 400, reason: 'account_credit_bank_invalid', error: 'Bank may be at most 100 characters long.' },
-    'ap-limit': { status: 400, reason: 'account_credit_limit_invalid', error: 'Kreditlimit must be a valid number.' },
-    'ap-limit-neg': { status: 400, reason: 'account_credit_limit_invalid', error: 'Kreditlimit must not be negative.' },
+    'ap-limit': { status: 400, reason: 'account_credit_limit_invalid', error: 'Credit limit must be a valid number.' },
+    'ap-limit-neg': { status: 400, reason: 'account_credit_limit_invalid', error: 'Credit limit must not be negative.' },
     'k-name': { status: 400, reason: 'category_name_invalid', error: 'Name is required.' },
-    'k-type': { status: 400, reason: 'category_type_invalid', error: 'Typ must be one of: expense, income.' },
+    'k-type': { status: 400, reason: 'category_type_invalid', error: 'Type must be one of: expense, income.' },
     'k-dup': { status: 409, reason: 'category_exists', error: 'Category already exists.' },
     'kp-name': { status: 400, reason: 'category_name_invalid', error: 'Name is required.' },
-    'kr-type': { status: 400, reason: 'category_type_invalid', error: 'Typ must be one of: expense, income.' },
+    'kr-type': { status: 400, reason: 'category_type_invalid', error: 'Type must be one of: expense, income.' },
     'ks-name': { status: 400, reason: 'subcategory_name_invalid', error: 'Name is required.' },
     'ks-dup': { status: 409, reason: 'subcategory_exists', error: 'Subcategory already exists.' },
     'ksp-name': { status: 400, reason: 'subcategory_name_invalid', error: 'Name is required.' },

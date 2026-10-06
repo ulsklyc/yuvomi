@@ -166,11 +166,11 @@ router.put('/plans/:category', (req, res) => {
     if (!isSavings && !validExpenseCategoryKeys().includes(category))
       return res.status(400).json({ error: 'Invalid category.', code: 400 });
 
-    const vAmount = num(req.body.amount, 'Betrag', { required: true });
+    const vAmount = num(req.body.amount, 'Amount', { required: true });
     const errors  = collectErrors([vAmount]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     if (!(vAmount.value > 0))
-      return res.status(400).json({ error: 'Betrag muss größer als 0 sein.', code: 400 });
+      return res.status(400).json({ error: 'Amount must be greater than zero.', code: 400 });
 
     const amount = cents(vAmount.value);
     db.get().prepare(`
