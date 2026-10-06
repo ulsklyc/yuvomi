@@ -345,6 +345,17 @@ test('Darlehenskarte mit `budget: read` und Faelligkeitstag: das volle Datum ble
   });
 });
 
+test('Darlehenskarte ohne Faelligkeitstag: eine ueberfaellige Rate nennt den Monat, nicht das Buchungsdatum (#1741)', () => {
+  const alt = darlehen({ due_day: null, next_due_month: '2022-01', next_due_date: '2022-01-01' });
+  for (const level of ['read', 'write']) {
+    withAccess({ budget: level }, () => {
+      const html = budget.renderLoanCard(alt);
+      assert.match(html, /budget\.loanNextDue\{"month":"[^"]*2022[^"]*"\}/);
+      assert.doesNotMatch(html, /2022-01-01/, 'der Erste ist eine Buchungskonvention, keine Faelligkeit');
+    });
+  }
+});
+
 test('Keine Darlehen mit `budget: read`: kein Anlegen-CTA und keine Anleitung dazu', () => {
   const vorher = budget.state.loans;
   budget.state.loans = { loans: [], summary: {} };
