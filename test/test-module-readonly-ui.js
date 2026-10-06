@@ -4453,7 +4453,13 @@ test('Dokument-Betrachter: Bearbeiten nur mit Schreibrecht auf die Dokumente', (
   const doc = {
     id: 31, name: 'Pass', category: 'identity', mime_type: 'image/png', file_size: 1200,
     storage_backend: 'local', visibility: 'family', status: 'active',
+    // Seit #1265 fragt der Stift auch die Besitzregel: das Dokument gehoert
+    // der Person, die hier sitzt. Das fremde Dokument faehrt
+    // test-inventory-documents-readonly-ui.js.
+    created_by: 7,
   };
+  const besitzerZuvor = documentsPage.state.currentUserId;
+  documentsPage.state.currentUserId = 7;
   const bearbeiten = /data-action="edit-document"/;
   // Eigenes Mini-DOM: das der Suite baut `test.after` oben ab, und unter
   // Node 22/24 laeuft dieser Hook schon vor einem Test, der erst nach einem
@@ -4469,6 +4475,7 @@ test('Dokument-Betrachter: Bearbeiten nur mit Schreibrecht auf die Dokumente', (
     const [fremd] = mitModal(() => withAccess({ documents: 'write', tasks: 'read' }, () => documentsPage.openDocumentViewer(doc)));
     assert.match(fremd.content, bearbeiten, 'ein FREMDES Modul auf read sperrt es nicht');
   } finally {
+    documentsPage.state.currentUserId = besitzerZuvor;
     abbau();
   }
 });
@@ -4703,7 +4710,11 @@ test('R8 H14: Kontakt-Auswahl ist ein Knopf mit Auswahlkreis und Objektnamen, ke
 
 test('R8 H14: Dokument-Auswahl ist ein Auswahlkreis mit Objektnamen, keine native Checkbox', () => {
   const st = documentsPage.state;
-  const vorher = { mode: st.selectMode, sel: new Set(st.selected) };
+  const vorher = { mode: st.selectMode, sel: new Set(st.selected), ich: st.currentUserId, alle: st.allDocuments };
+  // Seit #1265 traegt nur ein Dokument einen Kreis, das die Person verwalten
+  // darf (Besitzregel): beide Dokumente hier gehoeren ihr.
+  st.currentUserId = 7;
+  st.allDocuments = [{ id: 4, name: 'Mietvertrag.pdf', created_by: 7 }, { id: 5, name: 'x', created_by: 7 }];
   // Eigenes document: die Sammelaktions-Pille sucht ihre Schicht - ohne Shell
   // gibt es keine, und der Test darf nicht vom Rest eines frueheren leben.
   const echtesDocument = globalThis.document;
@@ -4711,12 +4722,12 @@ test('R8 H14: Dokument-Auswahl ist ein Auswahlkreis mit Objektnamen, keine nativ
   try {
     st.selectMode = true;
     st.selected = new Set([4]);
-    const an = documentsPage.renderSelectBox({ id: 4, name: 'Mietvertrag.pdf' });
+    const an = documentsPage.renderSelectBox({ id: 4, name: 'Mietvertrag.pdf', created_by: 7 });
     assert.doesNotMatch(an, /type="checkbox"/);
     assert.match(an, /<button type="button" class="select-circle select-circle--on"/);
     assert.match(an, /data-select-id="4" aria-pressed="true"/);
     assert.match(an, /aria-label="documents\.selectDocument\{&quot;name&quot;:&quot;Mietvertrag\.pdf&quot;\}"/);
-    assert.match(documentsPage.renderSelectBox({ id: 5, name: 'x' }), /aria-pressed="false"/);
+    assert.match(documentsPage.renderSelectBox({ id: 5, name: 'x', created_by: 7 }), /aria-pressed="false"/);
 
     documentsPage.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [] });
     const kreis = schalterKnoten({ 'aria-pressed': 'false' });
@@ -4731,6 +4742,8 @@ test('R8 H14: Dokument-Auswahl ist ein Auswahlkreis mit Objektnamen, keine nativ
   } finally {
     st.selectMode = vorher.mode;
     st.selected = vorher.sel;
+    st.currentUserId = vorher.ich;
+    st.allDocuments = vorher.alle;
     documentsPage.setContainerForTest(null);
     globalThis.document = echtesDocument;
   }

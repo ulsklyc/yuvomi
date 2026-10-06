@@ -440,7 +440,7 @@
     "test:document-guards": "npm run test:document-guards-harness && node --test test/test-document-guards.js && npm run test:fasting-browser && npm run test:toast-dialog-browser && npm run test:dialog-a11y-browser && npm run test:backfill-review-browser && npm run test:budget-series-edit-browser && npm run test:budget-loan-dialogs-browser && npm run test:budget-refusals-browser && npm run test:overlay-history-browser && npm run test:dashboard-surface-browser && npm run test:dashboard-a11y-browser && npm run test:ko-layout-browser",
     "test:shopping-versions": "node --experimental-sqlite --test test/test-shopping-versions.js",
     "test:live-feed": "node --test test/test-live-feed.js",
-    "test:module-readonly-ui": "TZ=Europe/Berlin node --loader ./test/test-browser-loader.mjs --test test/test-module-readonly-ui.js",
+    "test:module-readonly-ui": "TZ=Europe/Berlin node --loader ./test/test-browser-loader.mjs --test test/test-module-readonly-ui.js test/test-inventory-documents-readonly-ui.js",
     "test:budget-readonly-ui": "node --loader ./test/test-browser-loader.mjs --test test/test-budget-readonly-ui.js",
     "test:shopping-readonly-ui": "node --loader ./test/test-browser-loader.mjs --test test/test-shopping-readonly-ui.js",
     "test:read-row": "node --loader ./test/test-browser-loader.mjs --test test/test-read-row.js",

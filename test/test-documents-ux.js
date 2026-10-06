@@ -1375,7 +1375,7 @@ test('ein Dokument ist EIN Tab-Stopp, seine Aktionen bleiben sichtbar und per Pf
   assert.equal((actions.match(/tabindex: '0'/g) || []).length, 1, 'genau ein Einstieg je Dokument');
   assert.equal((actions.match(/tabindex: '-1'/g) || []).length, 2);
   for (const cls of ['document-card__actions', 'document-row__actions']) {
-    assert.match(page, new RegExp(`<div class="${cls}" role="toolbar" aria-label="\\$\\{esc\\(t\\('documents\\.actionsFor', \\{ name: doc\\.name \\}\\)\\)\\}">`));
+    assert.match(page, new RegExp(`<div class="${cls}" role="toolbar" aria-label="\\$\\{esc\\(t\\('documents\\.actionsFor', \\{ name: doc\\.name \\}\\)\\)\\}"(?:\\$\\{readBarAttr\\(doc\\)\\})?>`));
   }
   assert.match(fnBody('renderDocuments', 'visibleFolderRows'), /wireRovingToolbars\(list\)/);
   assert.match(de.documents.actionsFor, /\{\{name\}\}/);
@@ -1498,8 +1498,10 @@ test('kompakte Zeile: kein Auge, die Zeile oeffnet, und das Menue traegt Ansehen
   // Re-Critique P2: mobil blieben dem Titel 153px, weil Auge und Kebab je 48px
   // standen - und ein Tipp auf die Zeile oeffnet ohnehin den Betrachter.
   const compact = [...eachRule(css)].filter((rule) => rule.at.some((a) => /@container list-rows \(max-width: 30rem\)/.test(a)));
-  const hides = compact.find((rule) => rule.selector.split(',').map((x) => x.trim()).includes('.document-row__actions [data-action="view"]'));
-  assert.ok(hides, 'das Auge faellt unter 30rem weg');
+  const hides = compact.find((rule) => rule.selector.split(',').map((x) => x.trim()).includes('.document-row__actions:not([data-read-bar]) [data-action="view"]'));
+  // Seit #1265 nur dort, wo ein Kebab steht: ohne Verwaltungsrecht gibt es
+  // kein Menue, das „Ansehen" fuehren koennte, also bleibt das Auge (`data-read-bar`).
+  assert.ok(hides, 'das Auge faellt unter 30rem weg - ausser in einer Leiste ohne Kebab');
   assert.match(hides.body, /display:\s*none/);
   // Raster und breite Liste behalten es: sonst blendet es keine Regel aus.
   const elsewhere = [...eachRule(css)].filter((rule) => /\[data-action="view"\]/.test(rule.selector)
@@ -1602,8 +1604,9 @@ test('der Betrachter bietet Bearbeiten an, schliesst sich dafuer und gibt den Au
   const viewer = fnBody('openDocumentViewer', 'renderViewerContent');
   const actions = viewer.slice(viewer.indexOf('<span class="document-viewer__actions">'), viewer.indexOf('document-viewer__note'));
   // Die geteilte Zeilenaktion (Runde 5): Name mit Objekt, "<Dokument> bearbeiten".
-  assert.match(actions, /\$\{canEditDocuments\(\) \? `\s*\$\{rowActionHtml\(\{ icon: 'pencil', action: 'edit-document', label: t\('common\.editNamed', \{ name: doc\.name \}\)/);
-  assert.match(page, /function canEditDocuments\(\) \{\s*return !isNavModuleReadOnly\('documents'\);\s*\}/);
+  // Seit #1265 fragt der Stift das DOKUMENT (Modulrecht UND Besitzregel), nicht
+  // nur das Modul; das Verhalten faehrt test-inventory-documents-readonly-ui.js.
+  assert.match(actions, /\$\{mayManage\(doc\) \? `\s*\$\{rowActionHtml\(\{ icon: 'pencil', action: 'edit-document', label: t\('common\.editNamed', \{ name: doc\.name \}\)/);
   // Der Ausloeser des Betrachters wird VOR dem Oeffnen gemerkt; beim Wechsel
   // bekommt er den Fokus zurueck, damit der Bearbeiten-Dialog ihn als seinen
   // Ausloeser merkt (modal.js merkt document.activeElement). Mobil schliesst

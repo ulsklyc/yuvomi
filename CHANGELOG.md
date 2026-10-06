@@ -299,6 +299,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the tiles to their new position, and "+N more today" unfolds in place.
 - **Shopping on a phone: the add field unfolds** instead of pushing the list down in one step.
 
+- **Inventory on a phone: Edit sits at the bottom of the detail sheet** (#1463). The sheet had
+  Delete at the bottom, where the thumb rests, and Edit at the top, out of reach - the
+  riskiest action was the easiest one to hit. Edit is now the main button at the end of the
+  footer and Delete stands back at its start, as in the calendar. Deleting still asks first,
+  and without write access neither button is shown.
+
 - **Deleting a shared expense now leaves a trace instead of rewriting the books.** Until now
   deleting an expense removed its bookings, so the balances changed and nothing showed why. The
   expense now stays in the ledger and a counter-entry cancels it, so balances end up exactly where
@@ -549,6 +555,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   plus and minus buttons. A read-only row has no such buttons, so the date stays visible
   there. Behind the scenes the three read views (birthdays, shopping, pantry) now draw their
   rows with one shared building block instead of three copies.
+
+- **Inventory and Documents with read-only access: no more buttons that end in an error message**
+  (#1265). A member who may only read the Inventory still saw Add, Edit and Delete, "Done" on a
+  due deadline, and the menu that manages locations and categories; a member who may only read
+  Documents still saw Upload, the folder buttons, the menu on every document and "Select
+  multiple". Each of them ended in "no permission". Those controls are now gone for such a
+  member. What the pages show stays and is readable in full: an inventory item opens its
+  details, which now also name a deadline's reminder lead time and its repeat interval, and a
+  document opens in the viewer with preview, download and share, which now also shows its
+  description, who may see it, the reminder lead time and whether it is archived. An empty
+  page only says that it is empty instead of inviting you to add something.
+
+- **Documents: Edit, Move, Archive and Delete are only offered on documents you may change**
+  (#1265). A document can be changed by the person who uploaded it and by an admin. The page
+  did not know that rule: every document that was shared with you carried the full menu, and
+  saving, archiving or deleting somebody else's document ended in "Not authorized" - a deleted
+  one disappeared first and came back a few seconds later. Now the menu, the pencil in the
+  viewer and the selection circle of "Select multiple" appear only on your own documents (on
+  all of them for an admin). Viewing, downloading and sharing stay available on every document
+  you can see, and on a narrow phone a document without a menu keeps its view button.
 
 ## [2.73.0] - 2026-10-04
 

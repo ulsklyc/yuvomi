@@ -1144,7 +1144,13 @@
    * traegt sein Menue dann "Ansehen" (openDocumentMenu), und der Tab-Stopp der
    * Leiste rueckt auf ihn (utils/roving-toolbar.js, repairRovingStops). Raster
    * und breite Liste behalten das Auge. */
-  .document-row__actions [data-action="view"] {
+  /* OHNE KEBAB BLEIBT DAS AUGE (#1265). Wer das Dokument nicht verwalten darf
+   * (`documents: read` oder ein fremdes Dokument), bekommt kein Menue - seine
+   * Eintraege sind alle Handlungen. Dann ist das Auge das eine nachlaufende
+   * Element und der Tab-Stopp der Zeile; die Breite ist dieselbe wie mit dem
+   * Kebab. Als `:not()` an der Regel selbst statt als zweite, spaetere Regel:
+   * so gibt es keinen Gleichstand, den die Reihenfolge entscheiden muesste. */
+  .document-row__actions:not([data-read-bar]) [data-action="view"] {
     display: none;
   }
 }
@@ -1688,6 +1694,15 @@
  * nach UNTEN ueber und der Modal-Rumpf scrollt. Mit `center` lief er nach
  * beiden Seiten und deckte am Telefon den Hinweis ab (gemessen 375x812).
  * `center` davor ist der Rueckfall fuer Browser ohne `safe`. */
+/* Die Leseansicht fuer alle, die das Dokument nicht bearbeiten duerfen
+ * (#1265, viewerDetailsHtml): was sonst nur der Bearbeiten-Dialog zeigt, als
+ * Zeilen der geteilten Lesegrammatik (.detail-row, detail-view.css). Hier nur
+ * der Abstand und die Trennlinie zur Vorschau darunter. */
+.document-viewer__details {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
 .document-viewer__body {
   flex: 1;
   min-height: 0;
