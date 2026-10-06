@@ -682,10 +682,11 @@ test('mit Haushalt: JEDER Aufrufer zeigt fuer Linda LI und fuer Leo LE', async (
   CALLERS['Seitenleiste Kontozeile'] = (name) => {
     const avatar = node();
     const parts = { '.nav-sidebar__account-trigger': node(), '.nav-sidebar__avatar': avatar, '.nav-sidebar__account-name': node() };
+    // Der Nutzer steht im geteilten Zustand des Routers (`routerState`, #1657).
     new Function(
-      'currentUser', 'initials', 'prefersInkText', 't', 'withUpdateHint', 'pendingUpdateVersion', 'document',
+      'routerState', 'initials', 'prefersInkText', 't', 'withUpdateHint', 'pendingUpdateVersion', 'document',
       `${source}\nreturn syncSidebarAccount;`,
-    )({ display_name: name }, initials, () => false, (key) => key, (label) => label, () => null, { querySelector: () => null })(
+    )({ currentUser: { display_name: name } }, initials, () => false, (key) => key, (label) => label, () => null, { querySelector: () => null })(
       { querySelector: (sel) => parts[sel], querySelectorAll: () => [] },
     );
     return `<span>${avatar.textContent}</span>`;
