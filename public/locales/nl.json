@@ -17,6 +17,7 @@
         "moreActions": "Meer acties",
         "moreActionsNamed": "Meer acties voor {{name}}",
         "editNamed": "{{name}} bewerken",
+        "showDetails": "Details weergeven",
         "deleteNamed": "{{name}} verwijderen",
         "removeNamed": "{{name}} weghalen",
         "filters": "Filters",

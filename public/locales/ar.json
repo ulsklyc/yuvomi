@@ -17,6 +17,7 @@
         "moreActions": "إجراءات إضافية",
         "moreActionsNamed": "إجراءات إضافية لـ {{name}}",
         "editNamed": "تعديل {{name}}",
+        "showDetails": "عرض التفاصيل",
         "deleteNamed": "حذف {{name}}",
         "removeNamed": "إزالة {{name}}",
         "filters": "عوامل التصفية",

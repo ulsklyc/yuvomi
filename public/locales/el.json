@@ -17,6 +17,7 @@
         "moreActions": "Περισσότερες ενέργειες",
         "moreActionsNamed": "Περισσότερες ενέργειες για {{name}}",
         "editNamed": "Επεξεργασία {{name}}",
+        "showDetails": "Εμφάνιση λεπτομερειών",
         "deleteNamed": "Διαγραφή {{name}}",
         "removeNamed": "Αφαίρεση {{name}}",
         "filters": "Φίλτρα",

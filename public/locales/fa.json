@@ -17,6 +17,7 @@
         "moreActions": "اقدامات بیشتر",
         "moreActionsNamed": "اقدامات بیشتر برای {{name}}",
         "editNamed": "ویرایش {{name}}",
+        "showDetails": "نمایش جزئیات",
         "deleteNamed": "حذف {{name}}",
         "removeNamed": "برداشتن {{name}}",
         "filters": "فیلترها",

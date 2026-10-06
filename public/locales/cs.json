@@ -17,6 +17,7 @@
         "moreActions": "Více akcí",
         "moreActionsNamed": "Další akce pro {{name}}",
         "editNamed": "Upravit {{name}}",
+        "showDetails": "Zobrazit detaily",
         "deleteNamed": "Smazat {{name}}",
         "removeNamed": "Odebrat {{name}}",
         "filters": "Filtry",

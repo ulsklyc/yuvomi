@@ -299,6 +299,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ("Overview, Plan, Home") and now simply says the modules are sorted within their group. In
   German, the empty waste page read "Papier -, um".
 
+- **Resuming a paused recurring shared expense no longer books every date it missed** (#1647).
+  A recurring expense that was paused for six months and then resumed got six expenses within
+  six hours, one per hourly run, each with its original date. Resuming now skips the missed
+  dates: the series continues at its next date that is not in the past, in its own rhythm, and
+  nothing is booked for the time it was paused. A date that falls on today is still booked.
+  The app has no control for this yet, so it concerns API clients: this changes what
+  `POST /api/v1/split-expenses/recurring/{id}/pause` does by default when it resumes. To get
+  the previous behaviour, send `{ "missed": "book" }`; `"skip"` is the default, and any other
+  value answers 400 with `reason: "invalid_missed"`.
+
 - **An avatar never shows more than one character per name part** (#1464). A name starting
   with "ß" put three letters on the disc ("ßeta Schmidt" showed "SSS"), because writing a
   letter in capitals can turn it into two; the same went for the ligatures "ﬁ" and "ﬂ". The
@@ -496,6 +506,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "₩6,000,000" was cut off at its currency sign, on a phone and on a desktop alike. The
   chart now measures its amounts and leaves them the room they need, whatever the currency
   and region; a chart with short amounts looks exactly as before.
+
+- **With read-only access, a screen reader now says that a row opens its details** (#1682).
+  In the pantry and under Birthdays, a row announced only its content when you may read
+  but not change: with write access it ends on "Edit", and with read access that word was
+  removed and nothing took its place. The row now ends on "Show details". The info button of
+  a shopping item says the same, followed by the item's name. Along with it, in the pantry on
+  a narrow phone: a row with a cart button hid its best-before date to make room for the
+  plus and minus buttons. A read-only row has no such buttons, so the date stays visible
+  there. Behind the scenes the three read views (birthdays, shopping, pantry) now draw their
+  rows with one shared building block instead of three copies.
 
 ## [2.73.0] - 2026-10-04
 

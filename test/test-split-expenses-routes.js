@@ -1253,7 +1253,9 @@ test('Buchungslauf: wer die Gruppe verlassen hat, wird nicht mehr gebucht - die 
 
   // Wieder aufgenommen und fortgesetzt, bucht die Serie wieder.
   assert.equal((await call('POST', `/groups/${gid}/members`, { actor: { id: OWNER, role: 'member' }, body: { user_id: MGR, role: 'guest' } })).status, 201);
-  assert.equal((await call('POST', `/recurring/${beteiligt}/pause`, { actor: { id: OWNER, role: 'member' } })).body.data.paused_at, null);
+  // `missed: 'book'`: der Termin vom 10.03. liegt fuer die echte Uhr in der
+  // Vergangenheit, und ohne die Angabe ueberspringt Fortsetzen ihn (#1647).
+  assert.equal((await call('POST', `/recurring/${beteiligt}/pause`, { actor: { id: OWNER, role: 'member' }, body: { missed: 'book' } })).body.data.paused_at, null);
   assert.deepEqual(serienLauf('2026-03-10'), { generated: 1, paused: 0, failed: 0 });
   assert.equal(gebucht(beteiligt), 1);
 });
@@ -1294,6 +1296,189 @@ test('Buchungslauf: ein Programmierfehler pausiert keine Serie und haelt die nae
   // Ohne den Fehler holt der naechste Lauf sie nach.
   assert.deepEqual(serienLauf('2026-03-10'), { generated: 1, paused: 0, failed: 0 });
   assert.equal(gebucht(trifft), 1);
+});
+
+// --------------------------------------------------------------------------
+// Fortsetzen ueberspringt versaeumte Termine (#1647). Bis hierher loeschte der
+// Umschalter nur `paused_at`; `next_run_date` blieb stehen, und der stuendliche
+// Lauf buchte je Lauf einen versaeumten Termin mit Originaldatum nach.
+//
+// Die Uhr steht je Fall fest (nur `Date`, Timer laufen echt weiter, sonst
+// haengt fetch), und die Zone des Haushalts ist gesetzt statt geerbt: "heute"
+// der Route und "heute" des Laufs kommen beide aus `todayKey(db)`.
+// --------------------------------------------------------------------------
+const { nextRunNotBefore } = await import('../server/services/split-expenses-scheduler.js');
+const { todayKey: haushaltsTag } = await import('../server/utils/timezone.js');
+const setzeZone = (zone) => db.prepare("INSERT INTO sync_config (key, value) VALUES ('household_timezone', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(zone);
+async function zurZeit(t, iso, zone, fn) {
+  const vorher = db.prepare("SELECT value FROM sync_config WHERE key = 'household_timezone'").get()?.value;
+  setzeZone(zone);
+  t.mock.timers.enable({ apis: ['Date'], now: new Date(iso) });
+  try {
+    return await fn();
+  } finally {
+    t.mock.timers.reset();
+    if (vorher) setzeZone(vorher);
+    else db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run();
+  }
+}
+const pausiert = async (gid, extra) => {
+  const id = await serieIn(gid, extra);
+  assert.ok((await call('POST', `/recurring/${id}/pause`, { actor: { id: OWNER, role: 'member' } })).body.data.paused_at, 'pausiert');
+  return id;
+};
+const setzeFort = (id, body) => call('POST', `/recurring/${id}/pause`, { actor: { id: OWNER, role: 'member' }, body });
+const fortgesetzt = (id) => db.prepare("SELECT metadata FROM expense_activity WHERE type = 'recurring_resumed' AND entity_id = ? ORDER BY id").all(id).map((r) => JSON.parse(r.metadata));
+// Der Lauf, wie der Scheduler ihn faehrt: ohne Argument, "heute" aus der Zone.
+const stuendlich = (mal) => { let n = 0; for (let i = 0; i < mal; i += 1) n += serienLauf().generated; return n; };
+
+test('Fortsetzen: sechs versaeumte Monate werden uebersprungen, kein Lauf bucht die Vergangenheit', async (t) => {
+  const gid = await serienGruppe('Fortsetzen-Sechs');
+  // Faellig am 10. jedes Monats, pausiert seit Maerz, "heute" ist der 20.08.
+  const id = await pausiert(gid, { next_run_date: '2026-03-10' });
+  await zurZeit(t, '2026-08-20T10:00:00Z', 'Europe/Berlin', async () => {
+    const r = await setzeFort(id);
+    assert.equal(r.status, 200);
+    assert.equal(r.body.data.paused_at, null);
+    assert.equal(r.body.data.next_run_date, '2026-09-10', 'naechster Termin im Raster, nicht vergangen');
+    assert.ok(r.body.data.next_run_date >= haushaltsTag(db));
+    assert.equal(stuendlich(8), 0, 'acht Laeufe buchen nichts fuer die Vergangenheit');
+    assert.equal(gebucht(id), 0);
+    assert.deepEqual(serienStand(id), { next_run_date: '2026-09-10', paused_at: null });
+    // 10.03. bis 10.08. sind sechs Termine.
+    assert.deepEqual(fortgesetzt(id), [{ skipped: 6 }]);
+  });
+  // Am naechsten Termin bucht die Serie wieder, genau einmal und mit diesem Datum.
+  await zurZeit(t, '2026-09-10T10:00:00Z', 'Europe/Berlin', async () => {
+    assert.equal(stuendlich(3), 1);
+    assert.deepEqual(db.prepare('SELECT expense_date FROM expenses WHERE recurring_rule_id = ?').all(id), [{ expense_date: '2026-09-10' }]);
+  });
+});
+
+test('Fortsetzen mit missed: "book" laesst den Termin stehen, der Lauf holt jeden versaeumten nach', async (t) => {
+  const gid = await serienGruppe('Fortsetzen-Book');
+  const id = await pausiert(gid, { next_run_date: '2026-03-10' });
+  await zurZeit(t, '2026-08-20T10:00:00Z', 'Europe/Berlin', async () => {
+    const r = await setzeFort(id, { missed: 'book' });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.data.next_run_date, '2026-03-10');
+    assert.deepEqual(fortgesetzt(id), [{}]);
+    assert.equal(stuendlich(8), 6, 'je Lauf ein Termin, bis keiner mehr faellig ist');
+    assert.deepEqual(
+      db.prepare('SELECT expense_date FROM expenses WHERE recurring_rule_id = ? ORDER BY expense_date').all(id).map((e) => e.expense_date),
+      ['2026-03-10', '2026-04-10', '2026-05-10', '2026-06-10', '2026-07-10', '2026-08-10'],
+    );
+    assert.equal(serienStand(id).next_run_date, '2026-09-10');
+  });
+});
+
+test('Fortsetzen mit missed: "skip" ist die Vorgabe beim Namen genannt', async (t) => {
+  const gid = await serienGruppe('Fortsetzen-Skip');
+  const id = await pausiert(gid, { next_run_date: '2026-03-10' });
+  await zurZeit(t, '2026-08-20T10:00:00Z', 'Europe/Berlin', async () => {
+    assert.equal((await setzeFort(id, { missed: 'skip' })).body.data.next_run_date, '2026-09-10');
+  });
+});
+
+test('Fortsetzen: ist nichts versaeumt, bleibt der Termin, und ein Termin von heute wird gebucht', async (t) => {
+  const gid = await serienGruppe('Fortsetzen-Nichts');
+  const kuenftig = await pausiert(gid, { title: 'Kuenftig', next_run_date: '2026-09-10' });
+  const heute = await pausiert(gid, { title: 'Heute', next_run_date: '2026-08-20' });
+  await zurZeit(t, '2026-08-20T10:00:00Z', 'Europe/Berlin', async () => {
+    assert.equal((await setzeFort(kuenftig)).body.data.next_run_date, '2026-09-10');
+    assert.equal((await setzeFort(heute)).body.data.next_run_date, '2026-08-20');
+    assert.deepEqual(fortgesetzt(kuenftig), [{}]);
+    assert.deepEqual(fortgesetzt(heute), [{}]);
+    // Der heutige Termin ist faellig, nicht versaeumt.
+    assert.equal(stuendlich(2), 1);
+    assert.equal(gebucht(heute), 1);
+    assert.equal(gebucht(kuenftig), 0);
+  });
+});
+
+// Das Raster einer Serie ist das, was der LAUF gebucht haette. Eine Monatsserie
+// am 31. laeuft in addInterval ueber (31.01. -> 03.03.) und bleibt danach am 3.
+// Eine zweite Rechnung "Starttag + n Monate" laege daneben, deshalb wird hier
+// gegen den Lauf selbst gemessen: eine Zwillingsserie, nie pausiert, Tag fuer
+// Tag gebucht - wo sie am Ende steht, muss die fortgesetzte auch stehen.
+test('Fortsetzen: eine Monatsserie am 31. landet dort, wo der Lauf sie hingezaehlt haette', async (t) => {
+  for (const [frequency, start, jetzt] of [
+    ['monthly', '2026-01-31', '2026-08-20T10:00:00Z'],
+    ['monthly', '2025-10-31', '2026-08-20T10:00:00Z'],
+    ['monthly', '2026-03-10', '2026-08-10T10:00:00Z'],
+    ['weekly', '2026-02-27', '2026-08-20T10:00:00Z'],
+    ['yearly', '2020-02-29', '2026-08-20T10:00:00Z'],
+  ]) {
+    const gid = await serienGruppe(`Fortsetzen-Raster-${frequency}-${start}`);
+    const zwilling = await serieIn(gid, { title: 'Zwilling', frequency, next_run_date: start });
+    const id = await pausiert(gid, { title: 'Pausiert', frequency, next_run_date: start });
+    await zurZeit(t, jetzt, 'Europe/Berlin', async () => {
+      const gestern = new Date(Date.parse(`${haushaltsTag(db)}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
+      // Der Zwilling bucht alles bis gestern; sein naechster Termin ist der
+      // erste, der nicht vergangen ist.
+      let runden = 0;
+      while (serienLauf(gestern).generated) runden += 1;
+      const r = await setzeFort(id);
+      assert.equal(r.body.data.next_run_date, serienStand(zwilling).next_run_date, `${frequency} ab ${start}`);
+      assert.ok(r.body.data.next_run_date >= haushaltsTag(db), `${frequency} ab ${start}: nicht vergangen`);
+      assert.deepEqual(fortgesetzt(id), [runden ? { skipped: runden } : {}], `${frequency} ab ${start}: Zahl der Termine`);
+      assert.equal(gebucht(id), 0);
+    });
+  }
+  // Festgehalten, damit sichtbar bleibt, WAS das Raster am 31. ist.
+  assert.deepEqual(nextRunNotBefore('2026-01-31', 'monthly', '2026-08-20'), { date: '2026-09-03', skipped: 7 });
+});
+
+// "Heute" ist der Tag des Haushalts. Beide Faelle liegen so, dass der UTC-Tag
+// die andere Antwort gaebe: einmal ist der Haushalt noch am Vortag (Termin von
+// heute bleibt und wird gebucht), einmal schon am Folgetag (Termin ist vorbei).
+test('Fortsetzen misst am Tag des Haushalts, nicht am UTC-Tag', async (t) => {
+  const gid = await serienGruppe('Fortsetzen-Zone');
+  const west = await pausiert(gid, { title: 'West', next_run_date: '2026-03-15' });
+  const ost = await pausiert(gid, { title: 'Ost', next_run_date: '2026-03-15' });
+  // 16.07. 03:00 UTC ist in Los Angeles der 15.07., 20:00: der Termin ist heute.
+  await zurZeit(t, '2026-07-16T03:00:00Z', 'America/Los_Angeles', async () => {
+    assert.equal(haushaltsTag(db), '2026-07-15');
+    assert.equal((await setzeFort(west)).body.data.next_run_date, '2026-07-15');
+    assert.deepEqual(fortgesetzt(west), [{ skipped: 4 }]);
+    assert.equal(stuendlich(2), 1);
+    assert.deepEqual(db.prepare('SELECT expense_date FROM expenses WHERE recurring_rule_id = ?').all(west), [{ expense_date: '2026-07-15' }]);
+  });
+  db.prepare('UPDATE recurring_expenses SET paused_at = ? WHERE id = ?').run('2026-01-01T00:00:00Z', west);
+  // 15.07. 20:00 UTC ist auf Kiritimati der 16.07., 10:00: der Termin ist vorbei.
+  await zurZeit(t, '2026-07-15T20:00:00Z', 'Pacific/Kiritimati', async () => {
+    assert.equal(haushaltsTag(db), '2026-07-16');
+    assert.equal((await setzeFort(ost)).body.data.next_run_date, '2026-08-15');
+    assert.deepEqual(fortgesetzt(ost), [{ skipped: 5 }]);
+    assert.equal(stuendlich(2), 0);
+    assert.equal(gebucht(ost), 0);
+  });
+});
+
+test('Fortsetzen: unbekannter Wert fuer missed -> 400 mit reason, nichts aendert sich', async (t) => {
+  const gid = await serienGruppe('Fortsetzen-400');
+  const id = await pausiert(gid, { next_run_date: '2026-03-10' });
+  const vorher = serienStand(id);
+  await zurZeit(t, '2026-08-20T10:00:00Z', 'Europe/Berlin', async () => {
+    for (const missed of ['all', '', 0, true, ['book'], { book: 1 }, 'BOOK']) {
+      const r = await setzeFort(id, { missed });
+      assert.equal(r.status, 400, JSON.stringify(missed));
+      assert.deepEqual(r.body, { error: 'missed must be "skip" or "book".', code: 400, reason: 'invalid_missed' });
+    }
+    assert.deepEqual(serienStand(id), vorher, 'weiter pausiert, Termin unveraendert');
+    assert.deepEqual(fortgesetzt(id), []);
+    // `null` ist "keine Angabe", wie ein fehlendes Feld.
+    assert.equal((await setzeFort(id, { missed: null })).body.data.next_run_date, '2026-09-10');
+    // Die Serie laeuft jetzt wieder, der naechste Aufruf wuerde pausieren. Der
+    // Wert wird bei JEDEM Aufruf geprueft, nicht nur beim Fortsetzen: ein
+    // Umschalter weiss nicht, was der Aufrufer meinte, und eine Eingabe, die
+    // beim Fortsetzen abgelehnt wird, soll beim Pausieren nicht still durchgehen.
+    const laufend = serienStand(id);
+    const r = await setzeFort(id, { missed: 'all' });
+    assert.equal(r.status, 400);
+    assert.equal(r.body.reason, 'invalid_missed');
+    assert.deepEqual(serienStand(id), laufend, 'nicht pausiert');
+  });
 });
 
 test('teardown: Server schließen', async () => {

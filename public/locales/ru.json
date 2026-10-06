@@ -17,6 +17,7 @@
         "moreActions": "Другие действия",
         "moreActionsNamed": "Другие действия для {{name}}",
         "editNamed": "Изменить {{name}}",
+        "showDetails": "Показать детали",
         "deleteNamed": "Удалить {{name}}",
         "removeNamed": "Убрать {{name}}",
         "filters": "Фильтры",

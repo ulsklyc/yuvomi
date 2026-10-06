@@ -17,6 +17,7 @@
         "moreActions": "Diğer işlemler",
         "moreActionsNamed": "{{name}} için diğer işlemler",
         "editNamed": "{{name}} düzenle",
+        "showDetails": "Ayrıntıları göster",
         "deleteNamed": "{{name}} sil",
         "removeNamed": "{{name}} kaldır",
         "filters": "Filtreler",

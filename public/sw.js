@@ -208,6 +208,7 @@ const APP_SHELL = [
   '/utils/quick-link-url.js',
   '/utils/pwa-install.js',
   '/utils/recipe-meal-types.js',
+  '/utils/read-row.js',
   '/utils/recipe-thumb.js',
   '/utils/recipe-to-meal.js',
   '/utils/recurrence-scope.js',
