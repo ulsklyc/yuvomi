@@ -5550,7 +5550,12 @@
             "ledgerCredit": "افزایش",
             "ledgerDebit": "کسر",
             "confirmReject": "این درخواست رد شود؟ چیزی ثبت نمی‌شود.",
-            "confirmCancel": "این درخواست پس گرفته شود؟"
+            "confirmCancel": "این درخواست پس گرفته شود؟",
+            "openAccount": "باز کردن حساب",
+            "closeAccount": "بستن حساب",
+            "confirmCloseAccount": "حساب {{name}} بسته شود؟",
+            "closeAccountDetail": "سابقه حفظ می‌شود. حسابی که دوباره باز شود با ارزی شروع می‌شود که خانواده در آن زمان استفاده می‌کند.",
+            "accountNotEmpty": "حساب فقط وقتی بسته می‌شود که موجودی، برنامه و درخواست باز نداشته باشد."
         }
     },
     "datepicker": {

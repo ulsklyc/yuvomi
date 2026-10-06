@@ -5550,7 +5550,12 @@
             "ledgerCredit": "Khoản cộng",
             "ledgerDebit": "Khoản trừ",
             "confirmReject": "Từ chối yêu cầu này? Không có gì được ghi sổ.",
-            "confirmCancel": "Thu hồi yêu cầu này?"
+            "confirmCancel": "Thu hồi yêu cầu này?",
+            "openAccount": "Mở tài khoản",
+            "closeAccount": "Đóng tài khoản",
+            "confirmCloseAccount": "Đóng tài khoản của {{name}}?",
+            "closeAccountDetail": "Lịch sử được giữ lại. Tài khoản mở lại sẽ bắt đầu bằng loại tiền mà gia đình dùng lúc đó.",
+            "accountNotEmpty": "Chỉ có thể đóng tài khoản khi không còn số dư, kế hoạch hay yêu cầu đang mở."
         }
     },
     "datepicker": {

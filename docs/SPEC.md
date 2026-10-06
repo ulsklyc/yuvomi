@@ -528,28 +528,32 @@ entry 6). A payout creates no budget entry.
   in `server/services/rewards.js`): the standings, `/rewards/participants`, the Overview tile and its
   "recently earned" list, the cover check of a redemption and the net of a task all read points only.
   `GET /rewards/ledger` is the points history and carries no money row.
-- **An account has exactly one currency.** It is the household currency (`sync_config.currency`,
-  read through `server/utils/household-currency.js`) of the day the account was opened, and it
-  stands on every money entry, every money request and the plan, as split expenses do it. A later
-  change of the household currency leaves the account alone: balance, plan and open requests keep
-  reading and booking in the account's currency, 1.00 EUR does not become 100 yen, and a new
-  account opened afterwards takes the new currency. Which currency an account has is read from what
-  still holds on it, in this order: the plan, an open money request, and - if the balance is not
-  zero - the latest money entry (`accountCurrency()` in `server/services/reward-money.js`). If none
-  of them holds, the account is **empty** and takes the household currency again the next time it
-  is opened; the old rows keep their code and sum to zero in it, so the one sum over all money rows
-  stays the balance. An account with a balance never changes currency - converting would mean
-  inventing a rate. The CHECKs tie the column to the unit; that an account stays with ONE currency
-  is checked by the write layer inside the transaction of every booking (`postMoney()`), and a
-  booking, request or plan that names another code is refused with `currency_mismatch`. Every money
-  object in the API carries `currency` and `minor_unit`, and the page formats and parses from those.
+- **An account is a row, and the row carries its one currency.** `reward_money_accounts` below says
+  that a member has a pocket money account and in which currency: the household currency
+  (`sync_config.currency`, read through `server/utils/household-currency.js`) of the day it was
+  opened. Administrators open one explicitly (`POST /rewards/money/accounts`, no plan and no entry
+  needed), and a first plan or a first credit opens it along the way. A later change of the
+  household currency leaves the account alone: balance, plan and open requests keep reading and
+  booking in the account's currency, 1.00 EUR does not become 100 yen, and an account opened
+  afterwards takes the new currency. **The currency changes only by closing and reopening**, and
+  only an empty account can be closed (no plan, balance zero, no open request -
+  `isMoneyAccountEmpty()` in `server/services/reward-money.js`); an account with a balance never
+  changes, because converting would mean inventing a rate. The code also stands on every money
+  entry, every money request and the plan, as split expenses do it, so a row says what it is in
+  even after its account was closed and reopened in another currency; the old rows sum to zero in
+  their code, which keeps the one sum over all money rows the balance. The CHECKs tie that column
+  to the unit; that a row carries the currency of ITS account is checked by the write layer inside
+  the transaction of every booking (`postMoney()`), and a booking, request or plan that names
+  another code is refused with `currency_mismatch`. Every money object in the API carries
+  `currency` and `minor_unit`, and the page formats and parses from those.
 - **No new ledger `type`.** Changing the `CHECK` on `type` means rebuilding the table, and a rebuild
   drops its five indexes. A scheduled credit is a `bonus`, a payout a `redeem`, a parent's booking a
   `bonus` or an `adjust`, each with `unit = 'money'`. Both columns come by `ALTER TABLE ADD COLUMN`.
-- **Who has an account.** Whoever has a plan row or a money row, independent of
-  `reward_participants`: a household can give pocket money without running the points system, and the
-  other way round. Parents open it, with the first plan or the first booking; only household members
-  can have one.
+- **Who has an account.** Whoever has a row in `reward_money_accounts`, independent of
+  `reward_participants`: a household can give pocket money without running the points system, and
+  the other way round. Parents open it; only household members can have one, and none is opened for
+  a deactivated member. The child sees an opened account at once, with balance zero, and can file
+  a deposit request on it.
 - **Who sees it.** The child and the administrators - not the siblings, not the wall tablet. That is
   narrower than points, which everybody with the module sees, so the rule sits in every read query
   and not in the client: `moneyVisibleSql()` in `server/services/reward-money.js` is the one WHERE
@@ -597,7 +601,15 @@ entry 6). A payout creates no budget entry.
   list. A reactivated account is a member's account again; its plan stays paused until an
   administrator resumes it, and what was cancelled stays cancelled. For removal this means: money
   entries are a trace, so an account that has any is deactivated rather than deleted; a plan alone
-  is a setting and goes with the account.
+  is a setting and goes with the account, and so does an account row that was opened and never used.
+
+**Reward Money Accounts** - one row per member who has a pocket money account (#1734).
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| user_id | INTEGER | FK → Users (CASCADE delete), NOT NULL, UNIQUE |
+| currency | TEXT | NOT NULL - ISO 4217 code, set when the account is opened and never changed |
+| created_by | INTEGER | FK → Users (SET NULL) |
 
 **Reward Allowances** - the pocket money plan, one row per member (#1734).
 
@@ -5363,7 +5375,9 @@ gone. The data model, including why the balance is always derived from the ledge
   currency (which is not necessarily the one the household uses today) and the plan in one sentence ("5.00 per week · next credit: 9 October"); tapping it opens
   the money history. The child's own row offers **Withdraw** and **Pay in**, both of which file a
   request and say so in the dialog; an administrator's rows offer **Book** (credit or debit) and the
-  plan, and "Set up pocket money" opens an account for a member who has none. Money requests stand
+  plan. "Set up pocket money" opens an account for a member who has none - an account alone, no plan
+  and no amount needed; the plan is added from the row afterwards. An empty account (no plan,
+  balance zero, nothing open) carries a close action, and the server decides what counts as empty. Money requests stand
   in the same pending list as reward requests, with the amount as money and the balance next to it
   for whoever decides. The account of a deactivated child with money left stays in the
   administrators' list with the "Former" badge and one action, deducting; it has no plan dialog and

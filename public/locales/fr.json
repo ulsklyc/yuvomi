@@ -5550,7 +5550,12 @@
             "ledgerCredit": "Versement",
             "ledgerDebit": "Déduction",
             "confirmReject": "Refuser cette demande ? Rien n'est enregistré.",
-            "confirmCancel": "Annuler cette demande ?"
+            "confirmCancel": "Annuler cette demande ?",
+            "openAccount": "Ouvrir le compte",
+            "closeAccount": "Fermer le compte",
+            "confirmCloseAccount": "Fermer le compte de {{name}} ?",
+            "closeAccountDetail": "L'historique est conservé. Un compte rouvert démarre dans la devise que le foyer utilise à ce moment-là.",
+            "accountNotEmpty": "Le compte ne peut être fermé que s'il n'a plus de solde, de plan ni de demande en attente."
         }
     },
     "datepicker": {

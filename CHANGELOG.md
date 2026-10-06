@@ -27,16 +27,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   household that has switched approval off for rewards. Due dates missed while the server was off
   are booked afterwards, each exactly once; a paused plan books nothing and does not catch up when
   it is resumed; the plan of a deactivated account is paused. A monthly plan on the 31st pays on
-  the last day of a shorter month and returns to the 31st. An account keeps the currency the
+  the last day of a shorter month and returns to the 31st. Parents open an account for a
+  member - no plan and no amount needed, the child then sees it with a balance of zero and can ask
+  to pay in - and can close it again once it is empty. An account keeps the currency the
   household used on the day it was opened, written on every entry: if the household later switches
   its currency, an existing balance, its plan and its open requests stay what they were (1.00 EUR
-  does not turn into 100 yen), a new account takes the new currency, and so does an account that
-  was emptied in the meantime. When a child's account is deactivated, its open requests are
+  does not turn into 100 yen), a new account takes the new currency, and an emptied one does
+  after it was closed and opened again. When a child's account is deactivated, its open requests are
   cancelled and its plan paused; what is left on it stays visible to the administrators, marked as
   former, and can only be paid out. No interest, no
   savings goals, no second currency per child. With read access to Rewards the balance stays
   visible and the requests are gone, as with redeeming. For API clients: `GET /api/v1/rewards/money`,
   `GET /api/v1/rewards/money/ledger`, `POST /api/v1/rewards/money/entries`,
+  `POST /api/v1/rewards/money/accounts`, `DELETE /api/v1/rewards/money/accounts/{userId}`,
   `PUT`/`DELETE /api/v1/rewards/money/plans/{userId}`; a request is `POST /api/v1/rewards/redemptions`
   with `kind: "withdrawal"` or `"deposit"` and a decimal-string `amount`, and rows of
   `GET /api/v1/rewards/redemptions` now carry `kind`. Existing fields keep their meaning: that list

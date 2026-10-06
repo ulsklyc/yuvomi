@@ -5550,7 +5550,12 @@
             "ledgerCredit": "Godskriving",
             "ledgerDebit": "Trekk",
             "confirmReject": "Avslå denne forespørselen? Ingenting bokføres.",
-            "confirmCancel": "Trekke tilbake denne forespørselen?"
+            "confirmCancel": "Trekke tilbake denne forespørselen?",
+            "openAccount": "Åpne konto",
+            "closeAccount": "Lukk konto",
+            "confirmCloseAccount": "Lukke kontoen til {{name}}?",
+            "closeAccountDetail": "Historikken beholdes. En konto som åpnes på nytt, starter i valutaen husholdningen bruker da.",
+            "accountNotEmpty": "Kontoen kan først lukkes når den ikke har saldo, plan eller åpne forespørsler."
         }
     },
     "datepicker": {

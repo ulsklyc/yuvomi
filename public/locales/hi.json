@@ -5550,7 +5550,12 @@
             "ledgerCredit": "जोड़",
             "ledgerDebit": "कटौती",
             "confirmReject": "यह अनुरोध अस्वीकार करें? कुछ भी दर्ज नहीं होगा।",
-            "confirmCancel": "यह अनुरोध वापस लें?"
+            "confirmCancel": "यह अनुरोध वापस लें?",
+            "openAccount": "खाता खोलें",
+            "closeAccount": "खाता बंद करें",
+            "confirmCloseAccount": "{{name}} का खाता बंद करें?",
+            "closeAccountDetail": "इतिहास बना रहता है। दोबारा खोला गया खाता उस मुद्रा में शुरू होता है जो घर उस समय इस्तेमाल करता है।",
+            "accountNotEmpty": "खाता तभी बंद हो सकता है जब उसमें कोई शेष, योजना या खुला अनुरोध न हो।"
         }
     },
     "datepicker": {

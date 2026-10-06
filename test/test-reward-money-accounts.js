@@ -125,6 +125,7 @@ test('eine Buchung, eine Anfrage oder ein Plan mit fremdem Waehrungscode ist ein
     // Auch die Schreibschicht selbst sagt nein, in der Transaktion der Buchung.
     assert.throws(() => money.postMoney(db, { userId: kid.id, delta: 500, type: 'bonus', currency: 'JPY' }), (err) => err.reason === 'currency_mismatch');
     assert.throws(() => money.postMoney(db, { userId: kid.id, delta: 500, type: 'bonus' }), (err) => err.reason === 'currency_mismatch', 'und ohne Code erst recht');
+    assert.equal(db.prepare('SELECT currency FROM reward_money_accounts WHERE user_id = ?').get(kid.id).currency, 'EUR', 'die Waehrung des Kontos ist eine Spalte');
     assert.throws(() => money.savePlan(db, kid.id, { amountMinor: 500, frequency: 'weekly', anchorDay: 1, currency: 'JPY' }, { today: '2026-10-07' }), (err) => err.reason === 'currency_mismatch');
     assert.equal(rows(), before[0]);
     assert.ok(moneyRows(kid.id).every((r) => r.currency === 'EUR'), 'das Konto hat genau eine Waehrung');
@@ -133,41 +134,133 @@ test('eine Buchung, eine Anfrage oder ein Plan mit fremdem Waehrungscode ist ein
   }
 });
 
-test('ein leeres Konto (Saldo null, kein Plan, nichts offen) nimmt beim naechsten Eroeffnen die Waehrung des Haushalts', async () => {
+test('die Waehrung wechselt nur ueber Schliessen und neu Eroeffnen - und schliessen laesst sich nur ein leeres Konto', async () => {
   const kid = await member('leerkind');
   await admin('POST', '/rewards/money/entries', { user_id: kid.id, amount: '3.00', direction: 'credit' });
+  const close = () => admin('DELETE', `/rewards/money/accounts/${kid.id}`);
+  const accountOf = async (call) => (await call('GET', '/rewards/money')).body.data.accounts.find((a) => a.id === kid.id);
   try {
     setHouseholdCurrency('JPY');
-    assert.equal(money.accountCurrency(db, kid.id), 'EUR', 'mit Guthaben: EUR');
+    assert.equal(money.accountCurrency(db, kid.id), 'EUR');
 
-    // Saldo null, aber ein Plan: das Konto gilt weiter.
+    // Guthaben: nicht schliessbar.
+    assert.equal((await accountOf(admin)).closable, false);
+    let res = await close();
+    assert.deepEqual([res.status, res.body.reason], [409, 'money_account_not_empty']);
+
+    // Saldo null, aber ein Plan: nicht schliessbar - und das Konto bleibt EUR.
     await admin('POST', '/rewards/money/entries', { user_id: kid.id, amount: '3.00', direction: 'debit' });
     assert.equal(moneyOf(kid.id), 0);
-    assert.equal(money.accountCurrency(db, kid.id), null, 'ohne Plan, ohne Offenes, Saldo null: leer');
-    money.savePlan(db, kid.id, { amountMinor: 100, frequency: 'weekly', anchorDay: 5, paused: true, currency: 'JPY' }, { today: '2026-10-07' });
-    assert.equal(money.accountCurrency(db, kid.id), 'JPY', 'der neue Plan eroeffnet in der Haushaltswaehrung von heute');
-    db.prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(kid.id);
+    assert.equal((await admin('PUT', `/rewards/money/plans/${kid.id}`, { amount: '1.00', frequency: 'weekly', anchor_day: 1, paused: true })).body.data.plan.currency, 'EUR');
+    res = await close();
+    assert.deepEqual([res.status, res.body.reason], [409, 'money_account_not_empty'], 'ein Plan haengt noch daran');
+    assert.equal((await admin('DELETE', `/rewards/money/plans/${kid.id}`)).status, 200);
 
-    // Saldo null, aber eine offene Anfrage in EUR: bleibt EUR.
-    db.prepare("INSERT INTO reward_redemptions (user_id, kind, currency, reward_name, cost, status) VALUES (?, 'deposit', 'EUR', 'deposit', 100, 'pending')").run(kid.id);
-    assert.equal(money.accountCurrency(db, kid.id), 'EUR', 'eine offene Anfrage haelt die Waehrung');
-    assert.equal((await admin('POST', '/rewards/money/entries', { user_id: kid.id, amount: '500', direction: 'credit', currency: 'JPY' })).body.reason, 'currency_mismatch');
-    db.prepare("UPDATE reward_redemptions SET status = 'cancelled' WHERE user_id = ?").run(kid.id);
+    // Saldo null, kein Plan, aber eine offene Anfrage: nicht schliessbar.
+    const open = await kid.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '1.00' });
+    assert.deepEqual([open.status, open.body.data.currency], [201, 'EUR'], 'ein leeres Konto behaelt seine Waehrung, solange es besteht');
+    res = await close();
+    assert.deepEqual([res.status, res.body.reason], [409, 'money_account_not_empty'], 'eine Anfrage ist noch offen');
+    assert.equal(money.accountCurrency(db, kid.id), 'EUR', 'nichts davon hat das Konto angefasst');
+    await kid.call('PATCH', `/rewards/redemptions/${open.body.data.id}`, { action: 'cancel' });
 
-    // Jetzt leer: die naechste Buchung eroeffnet in Yen.
-    const shown = (await kid.call('GET', '/rewards/money')).body.data.accounts[0];
-    assert.deepEqual([shown.currency, shown.minor_unit, shown.balance_minor], ['JPY', 0, 0], 'das leere Konto zeigt, worin es als Naechstes rechnet');
-    const reopened = await admin('POST', '/rewards/money/entries', { user_id: kid.id, amount: '500', direction: 'credit' });
-    assert.deepEqual([reopened.body.data.currency, reopened.body.data.balance_minor], ['JPY', 500]);
+    // Jetzt leer: der Server sagt es, und das Schliessen geht - nur fuer Admins.
+    const empty = await accountOf(kid.call);
+    assert.deepEqual([empty.balance_minor, empty.currency, empty.closable], [0, 'EUR', true]);
+    assert.equal((await kid.call('DELETE', `/rewards/money/accounts/${kid.id}`)).status, 403, 'das Kind schliesst sein Konto nicht selbst');
+    assert.equal((await leo.call('DELETE', `/rewards/money/accounts/${kid.id}`)).status, 403);
+    assert.equal(money.accountCurrency(db, kid.id), 'EUR');
+    assert.equal((await close()).status, 200);
+    assert.equal((await close()).status, 404, 'ein geschlossenes Konto gibt es nicht mehr');
+    assert.equal(await accountOf(kid.call), undefined, 'das Kind hat kein Konto mehr');
+    assert.equal((await kid.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '1' })).body.reason, 'no_money_account');
+    assert.ok((await admin('GET', '/rewards/money')).body.data.candidates.some((c) => c.id === kid.id), 'und steht wieder zur Wahl');
+    assert.equal(moneyRows(kid.id).length, 2, 'der Verlauf bleibt');
+
+    // Neu eroeffnet: in der Waehrung, die der Haushalt jetzt fuehrt.
+    const reopened = await admin('POST', '/rewards/money/accounts', { user_id: kid.id });
+    assert.deepEqual([reopened.status, reopened.body.data.currency, reopened.body.data.minor_unit, reopened.body.data.balance_minor], [201, 'JPY', 0, 0]);
+    await admin('POST', '/rewards/money/entries', { user_id: kid.id, amount: '500', direction: 'credit' });
     assert.deepEqual(moneyRows(kid.id).map((r) => [r.delta, r.currency]), [[300, 'EUR'], [-300, 'EUR'], [500, 'JPY']],
       'die alten Zeilen behalten ihren Code und summieren sich in ihm zu null');
-    assert.equal((await admin('POST', '/rewards/money/entries', { user_id: kid.id, amount: '1.00', direction: 'credit', currency: 'EUR' })).body.reason, 'currency_mismatch',
-      'und zurueck geht es nicht, solange Yen darauf liegen');
+    assert.equal(moneyOf(kid.id), 500);
+    assert.equal((await admin('POST', '/rewards/money/entries', { user_id: kid.id, amount: '1.00', direction: 'credit', currency: 'EUR' })).body.reason, 'currency_mismatch');
     const history = (await kid.call('GET', '/rewards/money/ledger')).body.data;
-    assert.deepEqual(history.map((r) => [r.currency, r.minor_unit]).sort(), [['EUR', 2], ['EUR', 2], ['JPY', 0]]);
+    assert.deepEqual(history.map((r) => [r.currency, r.minor_unit]).sort(), [['EUR', 2], ['EUR', 2], ['JPY', 0]], 'jede Zeile nennt, worin sie steht');
   } finally {
     setHouseholdCurrency(null);
   }
+});
+
+test('ein Konto eroeffnen ohne Plan: Sache der Admins, nur fuer Mitglieder, und das Kind sieht es mit Saldo null', async () => {
+  const kid = await member('neukonto');
+  const open = (call, body) => call('POST', '/rewards/money/accounts', body);
+  const hasAccount = () => money.hasMoneyAccount(db, kid.id);
+
+  // Nur Admins.
+  assert.equal((await open(kid.call, { user_id: kid.id })).status, 403, 'ein Kind eroeffnet sich kein Konto');
+  assert.equal((await open(leo.call, { user_id: kid.id })).status, 403);
+  assert.equal(hasAccount(), false);
+  assert.deepEqual((await kid.call('GET', '/rewards/money')).body.data.accounts, []);
+
+  // Nur Haushaltsmitglieder, und nur Konten, die es gibt.
+  const guest = freshKid();
+  db.prepare('INSERT INTO split_expense_guest_users(user_id) VALUES (?)').run(guest);
+  assert.equal((await open(admin, { user_id: guest })).status, 400);
+  assert.equal(money.hasMoneyAccount(db, guest), false);
+  const former = freshKid();
+  db.prepare("UPDATE users SET deactivated_at = '2026-10-07T00:00:00Z' WHERE id = ?").run(former);
+  const refused = await open(admin, { user_id: former });
+  assert.deepEqual([refused.status, refused.body.reason], [409, 'account_deactivated'], 'fuer ein ehemaliges Kind wird nichts eroeffnet');
+  assert.equal(money.hasMoneyAccount(db, former), false);
+  assert.equal((await open(admin, { user_id: 99999999 })).status, 404);
+  assert.equal((await open(admin, {})).status, 404);
+  assert.equal((await open(admin, { user_id: kid.id, currency: 'JPY' })).body.reason, 'currency_mismatch', 'ein neues Konto steht in der Haushaltswaehrung');
+  assert.equal(hasAccount(), false, 'und der abgewiesene Versuch hat nichts angelegt');
+
+  // Eroeffnet: ohne Plan, ohne Buchung.
+  const opened = await open(admin, { user_id: kid.id });
+  assert.equal(opened.status, 201);
+  assert.deepEqual(opened.body.data, { user_id: kid.id, balance_minor: 0, currency: 'EUR', minor_unit: 2, plan: null });
+  assert.equal(planOf(kid.id), undefined);
+  assert.equal(moneyRows(kid.id).length, 0);
+  const again = await open(admin, { user_id: kid.id });
+  assert.deepEqual([again.status, again.body.reason], [409, 'money_account_exists']);
+
+  // Das Kind sieht es und kann anfragen; die Geschwister sehen es nicht.
+  const mine = (await kid.call('GET', '/rewards/money')).body.data.accounts;
+  assert.deepEqual(mine.map((a) => [a.id, a.balance_minor, a.plan, a.former, a.closable]), [[kid.id, 0, null, false, true]]);
+  assert.ok(!(await leo.call('GET', '/rewards/money')).body.data.accounts.some((a) => a.id === kid.id));
+  assert.deepEqual((await display('GET', '/rewards/money')).body.data.accounts, []);
+  assert.ok(!(await admin('GET', '/rewards/money')).body.data.candidates.some((c) => c.id === kid.id));
+  const dep = await kid.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '2.50' });
+  assert.equal(dep.status, 201, 'auf ein leeres Konto laesst sich eine Einzahlung anfragen');
+  assert.equal((await admin('PATCH', `/rewards/redemptions/${dep.body.data.id}`, { action: 'fulfill' })).status, 200);
+  assert.equal(moneyOf(kid.id), 250);
+
+  // Plan und erste Gutschrift eroeffnen weiterhin mit.
+  const viaPlan = await member('viaplan');
+  assert.equal((await admin('PUT', `/rewards/money/plans/${viaPlan.id}`, { amount: '1.00', frequency: 'weekly', anchor_day: 1, paused: true })).status, 200);
+  assert.equal(money.accountCurrency(db, viaPlan.id), 'EUR');
+  const viaCredit = await member('viacredit');
+  assert.equal((await admin('POST', '/rewards/money/entries', { user_id: viaCredit.id, amount: '1.00', direction: 'credit' })).status, 201);
+  assert.equal(money.accountCurrency(db, viaCredit.id), 'EUR');
+  // Ein Abzug eroeffnet nichts.
+  const viaDebit = await member('viadebit');
+  assert.equal((await admin('POST', '/rewards/money/entries', { user_id: viaDebit.id, amount: '1.00', direction: 'debit' })).status, 400);
+  assert.equal(money.hasMoneyAccount(db, viaDebit.id), false);
+  // Die Schreibschicht bucht nicht ohne Konto.
+  assert.throws(() => money.postMoney(db, { userId: viaDebit.id, delta: 100, type: 'bonus', currency: 'EUR' }), (err) => err.reason === 'no_money_account');
+  db.prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(viaPlan.id);
+});
+
+test('ein eroeffnetes, nie benutztes Konto haelt das Loeschen eines Kindes nicht auf', async () => {
+  const { removeUser, userTraces } = await import('../server/services/user-removal.js');
+  const kid = freshKid();
+  assert.equal((await admin('POST', '/rewards/money/accounts', { user_id: kid })).status, 201);
+  assert.deepEqual(userTraces(db, kid), []);
+  assert.equal(removeUser(db, kid).outcome, 'deleted');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM reward_money_accounts WHERE user_id = ?').get(kid).n, 0, 'die Kontozeile geht per CASCADE mit');
 });
 
 // ==========================================================================

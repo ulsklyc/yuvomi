@@ -10365,15 +10365,25 @@ const MIGRATIONS = [
     // Geld steht in ganzen kleinsten Einheiten (Cent) MIT SEINEM WAEHRUNGSCODE,
     // wie `amount_minor` und `currency` der geteilten Ausgaben.
     //
-    // `currency` STEHT AN JEDER GELDZEILE, AN JEDER GELD-ANFRAGE UND AM PLAN.
-    // Ein Konto hat genau EINE Waehrung: die Haushaltswaehrung des Tages, an
-    // dem es eroeffnet wurde. Wechselt der Haushalt seine Waehrung spaeter,
-    // bleibt das Konto, wie es ist - 1,00 EUR werden nicht zu 100 Yen. Die
-    // CHECKs binden die Spalte an die Einheit: eine Geldzeile ohne Code und
-    // eine Punktezeile mit Code lehnt das Schema ab (bei der Anfrage dasselbe
-    // ueber `kind`). DASS ein Konto bei EINER Waehrung bleibt, kann ein CHECK
-    // nicht sagen - das prueft die Schreibschicht in der Transaktion jeder
-    // Buchung (`postMoney()` in server/services/reward-money.js).
+    // `reward_money_accounts` IST DAS KONTO: eine Zeile je Person, und sie
+    // traegt die WAEHRUNG - die Haushaltswaehrung des Tages, an dem die Eltern
+    // es eroeffnet haben. "Hat ein Konto" ist damit eine Zeile und keine
+    // Ableitung aus Plan oder Buchungen, ein Konto kann ohne Plan und ohne
+    // Geld bestehen, und "ein Konto hat genau EINE Waehrung" ist eine Spalte.
+    // Wechselt der Haushalt seine Waehrung spaeter, bleibt das Konto, wie es
+    // ist - 1,00 EUR werden nicht zu 100 Yen. Ein LEERES Konto (kein Plan,
+    // Saldo null, nichts offen) laesst sich schliessen; ein neu eroeffnetes
+    // nimmt die Waehrung von dann.
+    //
+    // `currency` STEHT ZUSAETZLICH AN JEDER GELDZEILE, AN JEDER GELD-ANFRAGE
+    // UND AM PLAN: eine Zeile sagt selbst, worin ihr Betrag steht, auch
+    // nachdem ihr Konto geschlossen und in anderer Waehrung neu eroeffnet
+    // wurde. Die CHECKs binden die Spalte an die Einheit: eine Geldzeile ohne
+    // Code und eine Punktezeile mit Code lehnt das Schema ab (bei der Anfrage
+    // dasselbe ueber `kind`). DASS eine Zeile die Waehrung IHRES Kontos
+    // traegt, kann ein CHECK nicht sagen - das prueft die Schreibschicht in
+    // der Transaktion jeder Buchung (`postMoney()` in
+    // server/services/reward-money.js).
     //
     // KEIN NEUER `type`: der CHECK auf `type` liesse sich nur per Rebuild
     // aendern. Eine Gutschrift nach Plan ist ein `bonus` mit unit 'money',
@@ -10419,6 +10429,15 @@ const MIGRATIONS = [
         CHECK(kind IN ('reward', 'withdrawal', 'deposit'));
       ALTER TABLE reward_redemptions ADD COLUMN currency TEXT
         CHECK((kind = 'reward') = (currency IS NULL));
+
+      CREATE TABLE reward_money_accounts (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        currency   TEXT    NOT NULL,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
 
       CREATE TABLE reward_allowances (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,

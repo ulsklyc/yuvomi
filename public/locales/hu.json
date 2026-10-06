@@ -5550,7 +5550,12 @@
             "ledgerCredit": "Jóváírás",
             "ledgerDebit": "Levonás",
             "confirmReject": "Elutasítod ezt a kérést? Semmi sem könyvelődik.",
-            "confirmCancel": "Visszavonod ezt a kérést?"
+            "confirmCancel": "Visszavonod ezt a kérést?",
+            "openAccount": "Számla megnyitása",
+            "closeAccount": "Számla lezárása",
+            "confirmCloseAccount": "Lezárod {{name}} számláját?",
+            "closeAccountDetail": "Az előzmények megmaradnak. Az újra megnyitott számla abban a pénznemben indul, amelyet a háztartás akkor használ.",
+            "accountNotEmpty": "A számla csak akkor zárható le, ha nincs rajta egyenleg, terv vagy nyitott kérés."
         }
     },
     "datepicker": {

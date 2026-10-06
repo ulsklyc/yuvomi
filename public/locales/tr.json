@@ -5550,7 +5550,12 @@
             "ledgerCredit": "Alacak",
             "ledgerDebit": "Kesinti",
             "confirmReject": "Bu istek reddedilsin mi? Hiçbir şey kaydedilmez.",
-            "confirmCancel": "Bu istek geri çekilsin mi?"
+            "confirmCancel": "Bu istek geri çekilsin mi?",
+            "openAccount": "Hesap aç",
+            "closeAccount": "Hesabı kapat",
+            "confirmCloseAccount": "{{name}} için hesap kapatılsın mı?",
+            "closeAccountDetail": "Geçmiş korunur. Yeniden açılan hesap, evin o sırada kullandığı para biriminde başlar.",
+            "accountNotEmpty": "Hesap ancak bakiyesi, planı ve açık isteği kalmadığında kapatılabilir."
         }
     },
     "datepicker": {

@@ -5682,7 +5682,12 @@
             "ledgerCredit": "Připsání",
             "ledgerDebit": "Odečtení",
             "confirmReject": "Zamítnout tuto žádost? Nic se nezaúčtuje.",
-            "confirmCancel": "Vzít tuto žádost zpět?"
+            "confirmCancel": "Vzít tuto žádost zpět?",
+            "openAccount": "Otevřít účet",
+            "closeAccount": "Zavřít účet",
+            "confirmCloseAccount": "Zavřít účet uživatele {{name}}?",
+            "closeAccountDetail": "Historie zůstane. Znovu otevřený účet začne v měně, kterou domácnost v tu chvíli používá.",
+            "accountNotEmpty": "Účet lze zavřít až tehdy, když na něm není zůstatek, plán ani otevřená žádost."
         }
     },
     "datepicker": {

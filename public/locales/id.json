@@ -5550,7 +5550,12 @@
             "ledgerCredit": "Kredit",
             "ledgerDebit": "Pengurangan",
             "confirmReject": "Tolak permintaan ini? Tidak ada yang dicatat.",
-            "confirmCancel": "Batalkan permintaan ini?"
+            "confirmCancel": "Batalkan permintaan ini?",
+            "openAccount": "Buka rekening",
+            "closeAccount": "Tutup rekening",
+            "confirmCloseAccount": "Tutup rekening {{name}}?",
+            "closeAccountDetail": "Riwayat tetap disimpan. Rekening yang dibuka lagi dimulai dalam mata uang yang dipakai rumah tangga saat itu.",
+            "accountNotEmpty": "Rekening baru bisa ditutup jika tidak ada saldo, rencana, atau permintaan terbuka."
         }
     },
     "datepicker": {

@@ -1474,6 +1474,15 @@ const MIGRATIONS_SQL = {
     ALTER TABLE reward_redemptions ADD COLUMN currency TEXT
       CHECK((kind = 'reward') = (currency IS NULL));
 
+    CREATE TABLE reward_money_accounts (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      currency   TEXT    NOT NULL,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      updated_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+
     CREATE TABLE reward_allowances (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id       INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,

@@ -5550,7 +5550,12 @@
             "ledgerCredit": "Abono",
             "ledgerDebit": "Descuento",
             "confirmReject": "¿Rechazar esta solicitud? No se anota nada.",
-            "confirmCancel": "¿Retirar esta solicitud?"
+            "confirmCancel": "¿Retirar esta solicitud?",
+            "openAccount": "Abrir cuenta",
+            "closeAccount": "Cerrar cuenta",
+            "confirmCloseAccount": "¿Cerrar la cuenta de {{name}}?",
+            "closeAccountDetail": "El historial se conserva. Una cuenta abierta de nuevo empieza en la moneda que el hogar use entonces.",
+            "accountNotEmpty": "La cuenta solo se puede cerrar cuando no tenga saldo, plan ni solicitudes abiertas."
         }
     },
     "datepicker": {

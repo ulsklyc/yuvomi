@@ -5695,7 +5695,12 @@
             "ledgerCredit": "Crédito",
             "ledgerDebit": "Desconto",
             "confirmReject": "Recusar este pedido? Nada é lançado.",
-            "confirmCancel": "Cancelar este pedido?"
+            "confirmCancel": "Cancelar este pedido?",
+            "openAccount": "Abrir conta",
+            "closeAccount": "Fechar conta",
+            "confirmCloseAccount": "Fechar a conta de {{name}}?",
+            "closeAccountDetail": "O histórico é mantido. Uma conta aberta de novo começa na moeda que a casa usar nesse momento.",
+            "accountNotEmpty": "A conta só pode ser fechada quando não tiver saldo, plano nem pedidos em aberto."
         }
     },
     "schedule": {

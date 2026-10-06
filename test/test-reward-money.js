@@ -1043,6 +1043,10 @@ test('die Migration auf Bestand: jede Zeile ist Punkte, die Salden stehen, die f
   // Die Waehrung haengt an der Einheit: Bestand (Punkte) traegt keine, Geld immer eine.
   assert.equal(conn.prepare('SELECT COUNT(*) AS n FROM reward_ledger WHERE currency IS NOT NULL').get().n, 0);
   assert.equal(conn.prepare('SELECT COUNT(*) AS n FROM reward_redemptions WHERE currency IS NOT NULL').get().n, 0);
+  // Das Konto: eine Zeile je Person, mit Waehrung.
+  conn.exec("INSERT INTO reward_money_accounts (user_id, currency) VALUES (1, 'EUR')");
+  assert.throws(() => conn.exec("INSERT INTO reward_money_accounts (user_id, currency) VALUES (1, 'JPY')"), /UNIQUE/, 'ein Konto je Person');
+  assert.throws(() => conn.exec('INSERT INTO reward_money_accounts (user_id) VALUES (2)'), /NOT NULL/, 'kein Konto ohne Waehrung');
   conn.exec("INSERT INTO reward_ledger (user_id, delta, type, unit, currency) VALUES (1, 100, 'bonus', 'money', 'EUR')");
   assert.throws(() => conn.exec("INSERT INTO reward_ledger (user_id, delta, type, unit) VALUES (1, 100, 'bonus', 'money')"), /CHECK/, 'Geld ohne Code');
   assert.throws(() => conn.exec("INSERT INTO reward_ledger (user_id, delta, type, currency) VALUES (1, 100, 'bonus', 'EUR')"), /CHECK/, 'Punkte mit Code');
@@ -1059,6 +1063,7 @@ test('die laufende Datenbank traegt dasselbe: Spalten, Index, Plan-Tabelle', () 
   assert.ok(cols('reward_redemptions').includes('currency') && cols('reward_allowances').includes('currency'));
   assert.ok(cols('reward_redemptions').includes('kind'));
   assert.ok(cols('reward_allowances').includes('anchor_day'));
+  assert.deepEqual(cols('reward_money_accounts'), ['id', 'user_id', 'currency', 'created_by', 'created_at', 'updated_at']);
   const names = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'reward_ledger'").all().map((r) => r.name);
   for (const name of ['idx_reward_ledger_user', 'idx_reward_ledger_redemption', 'idx_reward_ledger_task', 'idx_reward_ledger_series', 'idx_reward_ledger_reverses', 'uniq_reward_allowance_credit']) {
     assert.ok(names.includes(name), name);

@@ -5550,7 +5550,12 @@
             "ledgerCredit": "Dagdag",
             "ledgerDebit": "Bawas",
             "confirmReject": "Tanggihan ang kahilingang ito? Walang itatala.",
-            "confirmCancel": "Bawiin ang kahilingang ito?"
+            "confirmCancel": "Bawiin ang kahilingang ito?",
+            "openAccount": "Magbukas ng account",
+            "closeAccount": "Isara ang account",
+            "confirmCloseAccount": "Isara ang account ni {{name}}?",
+            "closeAccountDetail": "Mananatili ang kasaysayan. Ang account na muling bubuksan ay magsisimula sa currency na gamit ng sambahayan sa panahong iyon.",
+            "accountNotEmpty": "Maisasara lang ang account kapag wala na itong balanse, plano, o bukas na kahilingan."
         }
     },
     "datepicker": {

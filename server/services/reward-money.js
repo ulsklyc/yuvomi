@@ -137,38 +137,66 @@ export function moneyCurrency(d) {
 }
 
 /*
- * EIN KONTO HAT GENAU EINE WAEHRUNG, UND SIE STEHT AN SEINEN ZEILEN (#1734).
+ * EIN KONTO IST EINE ZEILE, UND SIE TRAEGT SEINE EINE WAEHRUNG (#1734).
  *
- * Die erste Fassung fuehrte keinen Code: wechselte der Haushalt von EUR auf
- * JPY, wurden aus 1,00 EUR (100 kleinste Einheiten) hundert Yen. Jetzt traegt
- * jede Geldzeile, jede Geld-Anfrage und der Plan ihren Code, wie die geteilten
- * Ausgaben. Festgelegt wird er beim EROEFFNEN - die Haushaltswaehrung jenes
- * Tages -, und ein spaeterer Wechsel des Haushalts laesst das Konto, wie es ist.
+ * `reward_money_accounts` haelt je Person fest, DASS sie ein Taschengeldkonto
+ * hat und in welcher Waehrung: der Haushaltswaehrung des Tages, an dem es
+ * eroeffnet wurde. Ein spaeterer Wechsel des Haushalts laesst das Konto, wie
+ * es ist - aus 1,00 EUR (100 kleinste Einheiten) werden keine hundert Yen.
  *
- * WELCHE WAEHRUNG EIN KONTO HAT, sagt, was an ihm noch gilt, in dieser Folge:
- *   1. der Plan;
- *   2. eine offene Geld-Anfrage;
- *   3. das Guthaben: ist der Saldo nicht null, die juengste Geldzeile.
- * Gilt nichts davon - kein Plan, nichts offen, Saldo null -, ist das Konto
- * LEER und hat keine Waehrung (`null`). Das naechste Eroeffnen nimmt dann die
- * heutige Haushaltswaehrung. Die alten Zeilen behalten ihren Code und summieren
- * sich in ihm zu null; deshalb bleibt die eine Summe ueber alle Geldzeilen der
- * Saldo, auch ueber einen solchen Neuanfang hinweg. Ein Konto MIT Guthaben
- * wechselt nie: umrechnen hiesse einen Kurs erfinden.
+ * Bis zu dieser Zeile war beides eine Ableitung: "hat ein Konto" hiess "hat
+ * einen Plan oder eine Geldbuchung", und die Waehrung kam aus dem Plan, sonst
+ * aus einer offenen Anfrage, sonst aus der juengsten Buchung. Ein Konto ohne
+ * Plan und ohne Geld gab es damit nicht - in der Oberflaeche entstand eines
+ * nur ueber einen (notfalls pausierten) Plan.
+ *
+ * DIE WAEHRUNG WECHSELT NUR UEBER SCHLIESSEN UND NEU EROEFFNEN, und schliessen
+ * laesst sich nur ein LEERES Konto (`isMoneyAccountEmpty()`): kein Plan, Saldo
+ * null, nichts offen. Ein Konto mit Guthaben wechselt nie - umrechnen hiesse
+ * einen Kurs erfinden. Die alten Buchungen bleiben mit ihrem Code stehen und
+ * summieren sich in ihm zu null; deshalb bleibt die eine Summe ueber alle
+ * Geldzeilen der Saldo, auch ueber einen Neuanfang hinweg.
  */
 export function accountCurrency(d, userId) {
-  const plan = d.prepare('SELECT currency FROM reward_allowances WHERE user_id = ?').get(userId);
-  if (plan) return plan.currency;
-  const open = d.prepare(`
-    SELECT currency FROM reward_redemptions
-    WHERE user_id = ? AND status = 'pending' AND kind != 'reward' ORDER BY id DESC LIMIT 1
-  `).get(userId);
-  if (open) return open.currency;
-  if (ledgerBalance(d, userId, 'money') === 0) return null;
-  return d.prepare("SELECT currency FROM reward_ledger WHERE user_id = ? AND unit = 'money' ORDER BY id DESC LIMIT 1").get(userId)?.currency ?? null;
+  return d.prepare('SELECT currency FROM reward_money_accounts WHERE user_id = ?').get(userId)?.currency ?? null;
 }
 
-/** Waehrung und Nachkommastellen, in denen DIESES Konto rechnet (ein leeres: die des Haushalts). */
+/** Kein Plan, kein Guthaben, keine offene Anfrage: an diesem Konto haengt nichts mehr. */
+export function isMoneyAccountEmpty(d, userId) {
+  if (d.prepare('SELECT 1 AS yes FROM reward_allowances WHERE user_id = ?').get(userId)) return false;
+  if (ledgerBalance(d, userId, 'money') !== 0) return false;
+  return !d.prepare("SELECT 1 AS yes FROM reward_redemptions WHERE user_id = ? AND status = 'pending' AND kind != 'reward'").get(userId);
+}
+
+/**
+ * Das Konto dieser Person - angelegt, falls es noch keines gibt, in der
+ * Haushaltswaehrung von jetzt. Laeuft in der Transaktion des Aufrufers: der
+ * erste Plan und die erste Gutschrift der Eltern eroeffnen das Konto mit.
+ * @returns {{ currency: string, created: boolean }}
+ */
+export function ensureMoneyAccount(d, userId, actorId = null) {
+  const existing = accountCurrency(d, userId);
+  if (existing) return { currency: existing, created: false };
+  const currency = householdCurrency(d);
+  d.prepare('INSERT INTO reward_money_accounts (user_id, currency, created_by) VALUES (?, ?, ?)').run(userId, currency, actorId);
+  return { currency, created: true };
+}
+
+/**
+ * Ein leeres Konto schliessen. Die Buchungen und entschiedenen Anfragen
+ * bleiben als Verlauf stehen; nur die Kontozeile geht.
+ * @returns {'closed'|'not_found'|'not_empty'}
+ */
+export function closeMoneyAccount(d, userId) {
+  return d.transaction(() => {
+    if (!accountCurrency(d, userId)) return 'not_found';
+    if (!isMoneyAccountEmpty(d, userId)) return 'not_empty';
+    d.prepare('DELETE FROM reward_money_accounts WHERE user_id = ?').run(userId);
+    return 'closed';
+  })();
+}
+
+/** Waehrung und Nachkommastellen, in denen DIESES Konto rechnet (gibt es noch keines: die des Haushalts, in der es eroeffnet wuerde). */
 export function moneyCurrencyOf(d, userId) {
   return currencyView(accountCurrency(d, userId) ?? householdCurrency(d));
 }
@@ -195,8 +223,10 @@ export function resolveMoneyCurrency(d, userId, requested = undefined) {
  */
 export function postMoney(d, { userId, delta, type, reason = null, redemptionId = null, createdBy = null, currency }) {
   const account = accountCurrency(d, userId);
-  if (typeof currency !== 'string' || (account && account !== currency)) {
-    throw inputError(`This pocket money account is kept in ${account ?? 'another currency'}.`, 'currency_mismatch');
+  // Ohne Konto keine Geldzeile: wer bucht, hat es vorher eroeffnet (`ensureMoneyAccount`).
+  if (!account) throw inputError('This person has no pocket money account.', 'no_money_account');
+  if (account !== currency) {
+    throw inputError(`This pocket money account is kept in ${account}.`, 'currency_mismatch');
   }
   return postLedger(d, { userId, delta, type, reason, redemptionId, createdBy, unit: 'money', currency });
 }
@@ -238,19 +268,13 @@ export function moneyBalance(d, userId) {
   return ledgerBalance(d, userId, 'money');
 }
 
-const HAS_ACCOUNT_SQL = (userCol) => `(
-  EXISTS (SELECT 1 FROM reward_allowances acc_a WHERE acc_a.user_id = ${userCol})
-  OR EXISTS (SELECT 1 FROM reward_ledger acc_l WHERE acc_l.user_id = ${userCol} AND acc_l.unit = 'money')
-)`;
+const HAS_ACCOUNT_SQL = (userCol) => `EXISTS (SELECT 1 FROM reward_money_accounts acc WHERE acc.user_id = ${userCol})`;
 
 /**
- * Hat diese Person ein Taschengeldkonto?
- *
- * EIN KONTO IST KEINE ZEILE, SONDERN EINE FOLGE: wer einen Plan oder eine
- * Geldbuchung hat, hat eins - unabhaengig von `reward_participants`. Ein
- * Haushalt kann Taschengeld fuehren, ohne das Punktesystem zu betreiben, und
- * umgekehrt. Eroeffnet wird es von den Eltern: mit dem ersten Plan oder der
- * ersten Buchung.
+ * Hat diese Person ein Taschengeldkonto? Die Kontozeile sagt es - unabhaengig
+ * von `reward_participants`: ein Haushalt kann Taschengeld fuehren, ohne das
+ * Punktesystem zu betreiben, und umgekehrt. Eroeffnet wird es von den Eltern:
+ * ausdruecklich, oder mit dem ersten Plan oder der ersten Gutschrift.
  */
 export function hasMoneyAccount(d, userId) {
   if (!userId) return false;
@@ -343,6 +367,9 @@ export function listMoneyAccounts(d, reader) {
     former,
     ...moneyCurrencyOf(d, row.id),
     plan: planView(plan.get(row.id)),
+    // Ob sich das Konto schliessen laesst, sagt der Server: dieselbe Frage,
+    // die DELETE /money/accounts/:userId stellt.
+    closable: accountCurrency(d, row.id) != null && isMoneyAccountEmpty(d, row.id),
   });
   return [...members.map(view(false)), ...listFormerMoneyAccounts(d, reader).map(view(true))];
 }
@@ -485,8 +512,9 @@ export function savePlan(d, userId, input, { actorId = null, today = todayKey(d)
     if (before && before.paused_at == null && before.next_run_date <= today) creditPlan(d, before, today);
     const existing = d.prepare('SELECT * FROM reward_allowances WHERE user_id = ?').get(userId);
     // DIE WAEHRUNG DES PLANS IST DIE DES KONTOS, geprueft hier in der
-    // Transaktion: ein bestehender Plan behaelt seinen Code fuer immer, ein
-    // neuer nimmt den des Kontos - oder, ist es leer, den des Haushalts heute.
+    // Transaktion. Gibt es noch kein Konto, eroeffnet der Plan es mit - in der
+    // Haushaltswaehrung von heute.
+    ensureMoneyAccount(d, userId, actorId);
     const { currency } = resolveMoneyCurrency(d, userId, input.currency);
     input = { ...input, paused: input.paused ?? (existing ? existing.paused_at != null : false) };
     const rasterChanged = !existing

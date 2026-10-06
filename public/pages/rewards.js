@@ -1411,6 +1411,9 @@ function renderMoneyRow(account) {
             <i data-lucide="banknote" aria-hidden="true"></i>${esc(t('rewards.money.book'))}
           </button>
           ${rowActionHtml({ icon: 'calendar-clock', label: `${t('rewards.money.planTitle')}: ${account.display_name}`, attrs: { 'data-money-plan': account.id } })}
+          ${/* Schliessen nur, wo der Server sagt, dass nichts mehr daran haengt
+                (kein Plan, Saldo null, nichts offen) - sonst wiese er es ab. */ ''}
+          ${account.closable ? rowActionHtml({ icon: 'x', label: `${t('rewards.money.closeAccount')}: ${account.display_name}`, attrs: { 'data-money-close': account.id } }) : ''}
         </div>`
     : (mine && !account.former && !readOnly()) ? `
         <div class="rw-standing__actions">
@@ -1460,7 +1463,10 @@ function renderMoneySection() {
 }
 
 function wireMoney(el) {
-  el.querySelector('.rw-money-setup')?.addEventListener('click', () => openMoneyPlanModal(null));
+  el.querySelector('.rw-money-setup')?.addEventListener('click', () => openMoneyAccountModal());
+  el.querySelectorAll('[data-money-close]').forEach((btn) => {
+    btn.addEventListener('click', () => closeMoneyAccount(moneyAccount(Number(btn.dataset.moneyClose))));
+  });
   el.querySelectorAll('[data-money-member]').forEach((btn) => {
     btn.addEventListener('click', () => openMoneyDetail(Number(btn.dataset.moneyMember)));
   });
@@ -1667,32 +1673,24 @@ function weekdayOptions(selected) {
  * aus den Mitgliedern, die noch keins haben. */
 function openMoneyPlanModal(memberId) {
   if (readOnly() || !isAdmin()) return;
-  const account = memberId != null ? moneyAccount(memberId) : null;
-  const candidates = state.money?.candidates || [];
-  if (!account && !candidates.length) return;
+  // Ein Plan gehoert zu einem Konto, das es gibt: eroeffnet wird es ueber
+  // "Konto eroeffnen" (`openMoneyAccountModal`), nicht mehr ueber diesen Dialog.
+  const account = moneyAccount(memberId);
   // Ein ehemaliges Konto behaelt seinen Plan pausiert - kein Dialog dafuer.
-  if (account?.former) return;
-  const plan = account?.plan || null;
+  if (!account || account.former) return;
+  const plan = account.plan || null;
   // In welcher Waehrung dieser Plan rechnet: in seiner eigenen, sonst in der
-  // des Kontos, und fuer ein Konto, das es noch nicht gibt, in der des Haushalts.
-  const planCtx = plan || account || undefined;
+  // des Kontos.
+  const planCtx = plan || account;
   const frequency = plan?.frequency || 'weekly';
   const weekday = plan?.frequency === 'weekly' ? plan.anchor_day : 1;
   const monthDay = plan?.frequency === 'monthly' ? plan.anchor_day : 1;
-  const memberField = account ? '' : `
-        <div class="form-group">
-          <label class="label" for="rw-plan-member">${esc(t('rewards.member'))}</label>
-          <select class="input" id="rw-plan-member">
-            ${candidates.map((m) => `<option value="${m.id}">${esc(m.display_name)}</option>`).join('')}
-          </select>
-        </div>`;
   const days = Array.from({ length: 31 }, (_, i) => i + 1)
     .map((day) => `<option value="${day}" ${day === monthDay ? 'selected' : ''}>${day}</option>`).join('');
   openModal({
-    title: account ? `${t('rewards.money.planTitle')} · ${account.display_name}` : t('rewards.money.setUp'),
+    title: `${t('rewards.money.planTitle')} · ${account.display_name}`,
     content: `
       <form id="rw-plan-form" novalidate>
-        ${memberField}
         ${moneyAmountField('rw-money-amount', plan ? minorToAmountInput(plan.amount_minor, plan) : '', planCtx)}
         <div class="form-group">
           <label class="label" for="rw-plan-frequency">${esc(t('rewards.money.frequency'))}</label>
@@ -1747,10 +1745,9 @@ function openMoneyPlanModal(memberId) {
         const amount = readMoneyAmount(panel.querySelector('#rw-money-amount'), errEl, planCtx);
         if (amount == null) return;
         const weekly = freqEl.value === 'weekly';
-        const target = account ? account.id : Number(panel.querySelector('#rw-plan-member').value);
         submit.disabled = true;
         try {
-          await api.put(`/rewards/money/plans/${target}`, {
+          await api.put(`/rewards/money/plans/${account.id}`, {
             amount,
             frequency: freqEl.value,
             anchor_day: Number(panel.querySelector(weekly ? '#rw-plan-weekday' : '#rw-plan-monthday').value),
@@ -1766,6 +1763,72 @@ function openMoneyPlanModal(memberId) {
       });
     },
   });
+}
+
+/* KONTO EROEFFNEN - ohne Plan und ohne Buchung. Bis hierher entstand ein Konto
+ * in der Oberflaeche nur ueber einen Plan (notfalls einen pausierten). Jetzt
+ * waehlen die Eltern ein Mitglied, das noch keines hat; das Kind sieht sein
+ * Konto danach mit Saldo null und kann eine Einzahlung anfragen. Plan und
+ * Buchung haengen danach an der Zeile. */
+function openMoneyAccountModal() {
+  if (readOnly() || !isAdmin()) return;
+  const candidates = state.money?.candidates || [];
+  if (!candidates.length) return;
+  openModal({
+    title: t('rewards.money.setUp'),
+    content: `
+      <form id="rw-account-form" novalidate>
+        <div class="form-group">
+          <label class="label" for="rw-account-member">${esc(t('rewards.member'))}</label>
+          <select class="input" id="rw-account-member">
+            ${candidates.map((m) => `<option value="${m.id}">${esc(m.display_name)}</option>`).join('')}
+          </select>
+        </div>
+        <div id="rw-money-error" class="form-error" role="alert" hidden></div>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="submit" class="btn btn--primary" id="rw-money-submit">${esc(t('rewards.money.openAccount'))}</button>
+        </div>
+      </form>`,
+    onSave: (panel) => {
+      const errEl = panel.querySelector('#rw-money-error');
+      const submit = panel.querySelector('#rw-money-submit');
+      panel.querySelector('#rw-account-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errEl.hidden = true;
+        submit.disabled = true;
+        try {
+          await api.post('/rewards/money/accounts', { user_id: Number(panel.querySelector('#rw-account-member').value) });
+          await closeModal({ force: true });
+          toast(t('rewards.toastSaved'));
+          await refreshActiveTab();
+          refocusAfterRender();
+        } catch (err) {
+          errEl.textContent = err?.message || t('common.error'); errEl.hidden = false; submit.disabled = false;
+        }
+      });
+    },
+  });
+}
+
+/* KONTO SCHLIESSEN. Nur ein leeres Konto traegt den Knopf; ob es leer ist, hat
+ * der Server gesagt (`closable`) und prueft er beim Schliessen noch einmal -
+ * dazwischen kann eine Anfrage eingegangen sein. Kein `danger`: der Verlauf
+ * bleibt, und das Konto laesst sich neu eroeffnen. */
+async function closeMoneyAccount(account) {
+  if (readOnly() || !isAdmin() || !account) return;
+  const ok = await confirmModal(t('rewards.money.confirmCloseAccount', { name: account.display_name }),
+    { confirmLabel: t('rewards.money.closeAccount'), detail: t('rewards.money.closeAccountDetail') });
+  if (!ok) return;
+  try {
+    await api.delete(`/rewards/money/accounts/${account.id}`);
+    toast(t('rewards.toastSaved'), 'default');
+  } catch (err) {
+    await confirmModal(err?.data?.reason === 'money_account_not_empty'
+      ? t('rewards.money.accountNotEmpty') : (err?.message || t('common.error')),
+    { confirmLabel: t('rewards.gotIt') });
+  }
+  await refreshActiveTab();
+  refocusAfterRender();
 }
 
 /* PLAN BEENDEN. Die Rueckfrage hat das Formular schon geschlossen, wenn dieser
@@ -1870,6 +1933,7 @@ export const __test = {
   // #1734: Taschengeld.
   renderMoneySection, renderMoneyRow, moneyLedgerRowHtml, moneyRowKind, moneyPlanLine, fmtMoney,
   minorToAmountInput, moneyAmountProblem, decimalToMinor, removeMoneyPlan, decideRedemption, openMoneyPlanModal, openMoneyBookModal,
+  openMoneyAccountModal, closeMoneyAccount,
 };
 
 export async function render(container, { user } = {}) {

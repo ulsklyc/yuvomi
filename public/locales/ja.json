@@ -5550,7 +5550,12 @@
             "ledgerCredit": "入金",
             "ledgerDebit": "差し引き",
             "confirmReject": "このリクエストを却下しますか？何も記帳されません。",
-            "confirmCancel": "このリクエストを取り下げますか？"
+            "confirmCancel": "このリクエストを取り下げますか？",
+            "openAccount": "口座を開く",
+            "closeAccount": "口座を閉じる",
+            "confirmCloseAccount": "{{name}}の口座を閉じますか？",
+            "closeAccountDetail": "履歴は残ります。開き直した口座は、そのとき世帯で使っている通貨で始まります。",
+            "accountNotEmpty": "残高、プラン、保留中のリクエストがなくなるまで口座は閉じられません。"
         }
     },
     "datepicker": {

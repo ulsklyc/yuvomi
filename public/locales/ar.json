@@ -5943,7 +5943,12 @@
             "ledgerCredit": "إضافة",
             "ledgerDebit": "خصم",
             "confirmReject": "رفض هذا الطلب؟ لن يُسجَّل شيء.",
-            "confirmCancel": "سحب هذا الطلب؟"
+            "confirmCancel": "سحب هذا الطلب؟",
+            "openAccount": "فتح حساب",
+            "closeAccount": "إغلاق الحساب",
+            "confirmCloseAccount": "إغلاق حساب {{name}}؟",
+            "closeAccountDetail": "يبقى السجل. الحساب الذي يُفتح من جديد يبدأ بالعملة التي تستخدمها الأسرة حينها.",
+            "accountNotEmpty": "لا يمكن إغلاق الحساب إلا إذا لم يبقَ فيه رصيد ولا خطة ولا طلب مفتوح."
         }
     },
     "datepicker": {

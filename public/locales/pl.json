@@ -5812,7 +5812,12 @@
             "ledgerCredit": "Uznanie",
             "ledgerDebit": "Potrącenie",
             "confirmReject": "Odrzucić tę prośbę? Nic nie zostanie zaksięgowane.",
-            "confirmCancel": "Wycofać tę prośbę?"
+            "confirmCancel": "Wycofać tę prośbę?",
+            "openAccount": "Otwórz konto",
+            "closeAccount": "Zamknij konto",
+            "confirmCloseAccount": "Zamknąć konto {{name}}?",
+            "closeAccountDetail": "Historia pozostaje. Konto otwarte ponownie zaczyna w walucie, której dom będzie wtedy używać.",
+            "accountNotEmpty": "Konto można zamknąć dopiero wtedy, gdy nie ma na nim salda, planu ani otwartych próśb."
         }
     },
     "datepicker": {

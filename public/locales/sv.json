@@ -5550,7 +5550,12 @@
             "ledgerCredit": "Gottskrivning",
             "ledgerDebit": "Avdrag",
             "confirmReject": "Avslå den här förfrågan? Inget bokförs.",
-            "confirmCancel": "Dra tillbaka den här förfrågan?"
+            "confirmCancel": "Dra tillbaka den här förfrågan?",
+            "openAccount": "Öppna konto",
+            "closeAccount": "Stäng konto",
+            "confirmCloseAccount": "Stänga kontot för {{name}}?",
+            "closeAccountDetail": "Historiken finns kvar. Ett konto som öppnas på nytt börjar i den valuta hushållet använder då.",
+            "accountNotEmpty": "Kontot kan stängas först när det inte har något saldo, ingen plan och ingen öppen förfrågan."
         }
     },
     "datepicker": {

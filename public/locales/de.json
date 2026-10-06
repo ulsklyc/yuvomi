@@ -5550,7 +5550,12 @@
             "ledgerCredit": "Gutschrift",
             "ledgerDebit": "Abzug",
             "confirmReject": "Diese Anfrage ablehnen? Es wird nichts gebucht.",
-            "confirmCancel": "Diese Anfrage zurückziehen?"
+            "confirmCancel": "Diese Anfrage zurückziehen?",
+            "openAccount": "Konto eröffnen",
+            "closeAccount": "Konto schließen",
+            "confirmCloseAccount": "Konto von {{name}} schließen?",
+            "closeAccountDetail": "Der Verlauf bleibt erhalten. Ein neu eröffnetes Konto beginnt in der Währung, die der Haushalt dann führt.",
+            "accountNotEmpty": "Das Konto lässt sich erst schließen, wenn kein Guthaben, kein Plan und keine offene Anfrage mehr daran hängen."
         }
     },
     "datepicker": {

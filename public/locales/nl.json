@@ -5550,7 +5550,12 @@
             "ledgerCredit": "Bijschrijving",
             "ledgerDebit": "Afschrijving",
             "confirmReject": "Dit verzoek afwijzen? Er wordt niets geboekt.",
-            "confirmCancel": "Dit verzoek intrekken?"
+            "confirmCancel": "Dit verzoek intrekken?",
+            "openAccount": "Rekening openen",
+            "closeAccount": "Rekening sluiten",
+            "confirmCloseAccount": "Rekening van {{name}} sluiten?",
+            "closeAccountDetail": "De geschiedenis blijft bewaard. Een opnieuw geopende rekening begint in de valuta die het huishouden dan gebruikt.",
+            "accountNotEmpty": "De rekening kan pas worden gesloten als er geen saldo, geen plan en geen open verzoek meer aan hangt."
         }
     },
     "datepicker": {

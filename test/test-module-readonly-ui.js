@@ -759,11 +759,19 @@ function mitTaschengeld(fn, { role = 'member', me = 3, former = false } = {}) {
     candidates: role === 'admin' ? [{ id: 4, display_name: 'Leo' }] : [],
   };
   rewards.state.redemptions = [{ id: 31, user_id: 3, user_name: 'Emma', kind: 'withdrawal', reward_name: 'withdrawal', cost: 421, ...EUR, user_balance: 7731, status: 'pending' }];
+  // Wie bei withAccess oben: ein `finally` um ein Promise feuert am ersten
+  // `await`. Ein async Aufrufer bekaeme den Zustand mitten im Test weggeraeumt.
+  const restore = () => Object.assign(rewards.state, vorher);
+  let result;
   try {
-    return fn();
-  } finally {
-    Object.assign(rewards.state, vorher);
+    result = fn();
+  } catch (err) {
+    restore();
+    throw err;
   }
+  if (typeof result?.then === 'function') return result.finally(restore);
+  restore();
+  return result;
 }
 
 test('Taschengeld mit `rewards: read`: der Stand bleibt, Abheben und Einzahlen verschwinden', () => {
@@ -848,6 +856,61 @@ test('Taschengeld: ein ehemaliges Konto traegt das Zeichen und genau eine Handlu
       assert.match(dialoge[0].content, /value="credit"/);
       assert.doesNotMatch(rewards.renderMoneySection(), /settings\.memberFormerBadge/);
     }), { role: 'admin', me: 1 });
+  } finally {
+    globalThis.__openModal = vorher;
+  }
+});
+
+test('Taschengeld: Konto eroeffnen ist ein eigener Dialog, und schliessen laesst sich nur, was der Server leer nennt', async () => {
+  const vorher = globalThis.__openModal;
+  const dialoge = [];
+  globalThis.__openModal = (options) => { dialoge.push(options); };
+  try {
+    await mitTaschengeld(async () => {
+      withAccess({ rewards: 'write' }, () => {
+        // Eroeffnen: die Mitglieder ohne Konto, kein Betrag, kein Plan.
+        rewards.openMoneyAccountModal();
+        assert.equal(dialoge.length, 1);
+        assert.match(dialoge[0].content, /id="rw-account-member"/);
+        assert.match(dialoge[0].content, /<option value="4">Leo<\/option>/);
+        assert.match(dialoge[0].content, /rewards\.money\.openAccount/);
+        assert.doesNotMatch(dialoge[0].content, /rw-money-amount|rw-plan-frequency/, 'ein Konto braucht weder Betrag noch Plan');
+
+        // Schliessen: nur am leeren Konto.
+        assert.doesNotMatch(rewards.renderMoneySection(), /data-money-close/, 'mit Guthaben und Plan: kein Schliessen');
+        rewards.state.money.accounts[0] = { ...rewards.state.money.accounts[0], balance_minor: 0, plan: null, closable: true };
+        assert.match(rewards.renderMoneySection(), /data-money-close="3"/);
+      });
+      withAccess({ rewards: 'read' }, () => {
+        assert.doesNotMatch(rewards.renderMoneySection(), /data-money-close|rw-money-setup/, 'nur-lesen: weder eroeffnen noch schliessen');
+        dialoge.length = 0;
+        rewards.openMoneyAccountModal();
+        assert.equal(dialoge.length, 0);
+      });
+
+      // Zwischen Anzeige und Klick ging eine Anfrage ein: der Server weist ab,
+      // die Seite sagt es in ihrer Sprache und laedt neu.
+      await withAccess({ rewards: 'write' }, () => mitSeitenSonde(async (sonde) => {
+        globalThis.__apiStub = { delete: async () => { throw Object.assign(new Error('Only an empty account can be closed'), { data: { reason: 'money_account_not_empty' } }); } };
+        await assert.doesNotReject(rewards.closeMoneyAccount(rewards.state.money.accounts[0]));
+        assert.equal(sonde.gefragt.length, 2, 'die Rueckfrage und die Absage');
+        assert.match(sonde.gefragt[0], /rewards\.money\.confirmCloseAccount/);
+        assert.match(sonde.gefragt[1], /rewards\.money\.accountNotEmpty/);
+        assert.equal(sonde.reloads, 1);
+        const calls = [];
+        globalThis.__apiStub = { delete: async (path) => { calls.push(path); return { ok: true }; } };
+        await rewards.closeMoneyAccount(rewards.state.money.accounts[0]);
+        assert.deepEqual(calls, ['/rewards/money/accounts/3']);
+      }));
+    }, { role: 'admin', me: 1 });
+    // Das Kind selbst schliesst nichts und eroeffnet nichts.
+    mitTaschengeld(() => withAccess({ rewards: 'write' }, () => {
+      rewards.state.money.accounts[0] = { ...rewards.state.money.accounts[0], balance_minor: 0, plan: null, closable: true };
+      assert.doesNotMatch(rewards.renderMoneySection(), /data-money-close|rw-money-setup/);
+      dialoge.length = 0;
+      rewards.openMoneyAccountModal();
+      assert.equal(dialoge.length, 0);
+    }));
   } finally {
     globalThis.__openModal = vorher;
   }

@@ -148,9 +148,13 @@ export async function rewardMoneyHousehold(name) {
     if (enrolled) db.prepare('INSERT INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(id);
     return id;
   }
-  const sqlMoney = (id, delta, type = 'bonus', currency = 'EUR') => db.prepare(
-    "INSERT INTO reward_ledger (user_id, delta, type, unit, currency) VALUES (?, ?, ?, 'money', ?)",
-  ).run(id, delta, type, currency);
+  // Eine Geldzeile von Hand - samt der Kontozeile, ohne die es kein Konto gibt.
+  const sqlMoney = (id, delta, type = 'bonus', currency = 'EUR') => {
+    db.prepare('INSERT OR IGNORE INTO reward_money_accounts (user_id, currency) VALUES (?, ?)').run(id, currency);
+    return db.prepare(
+      "INSERT INTO reward_ledger (user_id, delta, type, unit, currency) VALUES (?, ?, ?, 'money', ?)",
+    ).run(id, delta, type, currency);
+  };
 
   return {
     BASE, dbmod, db, rewards, money, todayKey, shiftDateKey, parseDateKey, withToken, admin, ADMIN_ID, member, emma, leo, mia, display, DISPLAY_ID, EMMA_START, LEO_START, credit, moneyOf, pointsOf, moneyRows, freshKid, sqlMoney,

@@ -11,7 +11,7 @@ import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { getBalance, isEnrolled, ledgerBalanceSql, postLedger, CATALOG_SELECT, activeCatalog } from '../services/rewards.js';
 import {
-  MONEY_KINDS, closeFormerMoney, creditFits, hasMoneyAccount, isFormerMoneyAccount,
+  MONEY_KINDS, closeFormerMoney, closeMoneyAccount, creditFits, ensureMoneyAccount, hasMoneyAccount, isFormerMoneyAccount,
   listMoneyAccounts, listMoneyCandidates, listMoneyLedger,
   moneyBalance, moneyCurrency, moneyParams, moneyReader, moneyVisibleSql,
   parseMoneyAmount, postMoney, readOptionalText, readPlanInput, resolveMoneyCurrency, savePlan,
@@ -891,6 +891,8 @@ router.post('/money/entries', requireAdmin, (req, res) => {
       return res.status(400).json({ error: 'amount is too large.', code: 400 });
     const insufficient = d.transaction(() => {
       if (direction === 'debit' && moneyBalance(d, userId) < amount) return true;
+      // Die erste Gutschrift der Eltern eroeffnet das Konto mit.
+      if (direction === 'credit') ensureMoneyAccount(d, userId, actingUser(req));
       postMoney(d, {
         userId, delta: direction === 'credit' ? amount : -amount, type: direction === 'credit' ? 'bonus' : 'adjust',
         reason, createdBy: actingUser(req), currency,
@@ -901,6 +903,66 @@ router.post('/money/entries', requireAdmin, (req, res) => {
     res.status(201).json({ data: { user_id: userId, balance_minor: moneyBalance(d, userId), currency, minor_unit: minorUnit(currency) } });
   } catch (err) {
     log.error('POST /money/entries error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// POST /money/accounts - ein Konto eroeffnen, ohne Plan und ohne Buchung (Admin).
+// In der Haushaltswaehrung von jetzt; das Kind sieht es danach (Saldo null) und
+// kann anfragen. Nur Haushaltsmitglieder - ein ehemaliges Konto wird nicht
+// eroeffnet, nur noch ausgezahlt.
+router.post('/money/accounts', requireAdmin, (req, res) => {
+  try {
+    const d = db.get();
+    const userId = toInt(req.body?.user_id);
+    if (!Number.isFinite(userId) || !d.prepare('SELECT id FROM users WHERE id = ?').get(userId))
+      return res.status(404).json({ error: 'User not found.', code: 404 });
+    if (!isHouseholdMember(userId, { db: d })) {
+      if (isFormerMoneyAccount(d, userId)) {
+        return res.status(409).json({
+          error: 'This account is deactivated; no pocket money account can be opened for it.', code: 409, reason: 'account_deactivated',
+        });
+      }
+      return res.status(400).json({ error: 'Only household members can have pocket money.', code: 400 });
+    }
+    let opened;
+    try {
+      opened = d.transaction(() => {
+        const account = ensureMoneyAccount(d, userId, actingUser(req));
+        // Ein mitgeschickter Code muss der des Kontos sein - bei einem neuen
+        // also die Haushaltswaehrung. Sonst rollt die Transaktion zurueck.
+        if (account.created) resolveMoneyCurrency(d, userId, req.body?.currency);
+        return account;
+      })();
+    } catch (err) {
+      if (err?.name === 'SplitInputError') return moneyInputRefusal(res, err);
+      throw err;
+    }
+    if (!opened.created) {
+      return res.status(409).json({ error: 'This person already has a pocket money account.', code: 409, reason: 'money_account_exists' });
+    }
+    res.status(201).json({ data: { user_id: userId, balance_minor: 0, currency: opened.currency, minor_unit: minorUnit(opened.currency), plan: null } });
+  } catch (err) {
+    log.error('POST /money/accounts error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// DELETE /money/accounts/:userId - ein LEERES Konto schliessen (Admin): kein
+// Plan, Saldo null, keine offene Anfrage. Der Verlauf bleibt.
+router.delete('/money/accounts/:userId', requireAdmin, (req, res) => {
+  try {
+    const outcome = closeMoneyAccount(db.get(), toInt(req.params.userId));
+    if (outcome === 'not_found') return res.status(404).json({ error: 'Account not found.', code: 404 });
+    if (outcome === 'not_empty') {
+      return res.status(409).json({
+        error: 'Only an empty account can be closed: no balance, no plan, no open request.',
+        code: 409, reason: 'money_account_not_empty',
+      });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    log.error('DELETE /money/accounts/:userId error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

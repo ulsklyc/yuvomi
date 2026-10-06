@@ -5550,7 +5550,12 @@
             "ledgerCredit": "Crédito",
             "ledgerDebit": "Desconto",
             "confirmReject": "Recusar este pedido? Nada é registado.",
-            "confirmCancel": "Retirar este pedido?"
+            "confirmCancel": "Retirar este pedido?",
+            "openAccount": "Abrir conta",
+            "closeAccount": "Fechar conta",
+            "confirmCloseAccount": "Fechar a conta de {{name}}?",
+            "closeAccountDetail": "O histórico mantém-se. Uma conta aberta de novo começa na moeda que o agregado usar nessa altura.",
+            "accountNotEmpty": "A conta só pode ser fechada quando não tiver saldo, plano nem pedidos em aberto."
         }
     },
     "datepicker": {

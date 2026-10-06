@@ -5550,7 +5550,12 @@
             "ledgerCredit": "入账",
             "ledgerDebit": "扣款",
             "confirmReject": "拒绝这个请求？不会记任何账。",
-            "confirmCancel": "撤回这个请求？"
+            "confirmCancel": "撤回这个请求？",
+            "openAccount": "开设账户",
+            "closeAccount": "关闭账户",
+            "confirmCloseAccount": "关闭 {{name}} 的账户？",
+            "closeAccountDetail": "记录会保留。重新开设的账户会以家庭当时使用的货币开始。",
+            "accountNotEmpty": "只有在没有余额、计划和待处理请求时才能关闭账户。"
         }
     },
     "datepicker": {

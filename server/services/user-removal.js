@@ -120,6 +120,8 @@ export const PRIVATE_USER_COLUMNS = new Set([
   // Buchung bleibt loeschbar, der Plan geht per CASCADE mit. Die BUCHUNGEN
   // (`reward_ledger`) sind die Spur und bleiben es.
   'reward_allowances.user_id',
+  // Dasselbe gilt fuer die Kontozeile: ein eroeffnetes, nie benutztes Konto.
+  'reward_money_accounts.user_id',
   'note_categories.owner_user_id',
   'expense_group_members.user_id',
 ]);

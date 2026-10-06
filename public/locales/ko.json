@@ -5550,7 +5550,12 @@
             "ledgerCredit": "입금 기록",
             "ledgerDebit": "차감",
             "confirmReject": "이 요청을 거절할까요? 아무것도 기록되지 않습니다.",
-            "confirmCancel": "이 요청을 철회할까요?"
+            "confirmCancel": "이 요청을 철회할까요?",
+            "openAccount": "계좌 열기",
+            "closeAccount": "계좌 닫기",
+            "confirmCloseAccount": "{{name}}의 계좌를 닫을까요?",
+            "closeAccountDetail": "기록은 그대로 남습니다. 다시 여는 계좌는 그때 가구가 쓰는 통화로 시작합니다.",
+            "accountNotEmpty": "잔액, 계획, 열린 요청이 모두 없어야 계좌를 닫을 수 있습니다."
         }
     },
     "datepicker": {

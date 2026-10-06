@@ -5550,7 +5550,12 @@
             "ledgerCredit": "Accredito",
             "ledgerDebit": "Detrazione",
             "confirmReject": "Rifiutare questa richiesta? Non viene registrato nulla.",
-            "confirmCancel": "Ritirare questa richiesta?"
+            "confirmCancel": "Ritirare questa richiesta?",
+            "openAccount": "Apri conto",
+            "closeAccount": "Chiudi conto",
+            "confirmCloseAccount": "Chiudere il conto di {{name}}?",
+            "closeAccountDetail": "La cronologia resta. Un conto riaperto parte nella valuta che la famiglia usa in quel momento.",
+            "accountNotEmpty": "Il conto si può chiudere solo quando non ha più saldo, piano né richieste aperte."
         }
     },
     "datepicker": {
