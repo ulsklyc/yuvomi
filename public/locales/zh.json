@@ -510,6 +510,8 @@
         "bulkDeleteConfirm": "永久删除 {{count}} 个任务？",
         "bulkDeleteAsk": "删除 {{count}} 个任务？",
         "bulkDeleteAsk_one": "删除 {{count}} 个任务？",
+        "bulkDeleteLabel": "删除 {{count}} 个任务",
+        "bulkDeleteLabel_one": "删除 {{count}} 个任务",
         "bulkDeleted": "任务已删除。",
         "bulkMarkDone": "已完成",
         "bulkMarkOpen": "待处理",

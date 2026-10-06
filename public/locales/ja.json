@@ -510,6 +510,8 @@
         "bulkDeleteConfirm": "{{count}} 件のタスクを完全に削除しますか？",
         "bulkDeleteAsk": "{{count}} 件のタスクを削除しますか？",
         "bulkDeleteAsk_one": "{{count}} 件のタスクを削除しますか？",
+        "bulkDeleteLabel": "{{count}} 件のタスクを削除",
+        "bulkDeleteLabel_one": "{{count}} 件のタスクを削除",
         "bulkDeleted": "タスクを削除しました。",
         "bulkMarkDone": "完了",
         "bulkMarkOpen": "未着手",

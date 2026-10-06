@@ -471,6 +471,8 @@
         "bulkDeleteConfirm": "{{count}} taken definitief verwijderen?",
         "bulkDeleteAsk": "{{count}} taken verwijderen?",
         "bulkDeleteAsk_one": "{{count}} taak verwijderen?",
+        "bulkDeleteLabel": "{{count}} taken verwijderen",
+        "bulkDeleteLabel_one": "{{count}} taak verwijderen",
         "bulkStatusChanged": "Status gewijzigd.",
         "bulkArchived": "Taken gearchiveerd.",
         "bulkDeleted": "Taken verwijderd.",

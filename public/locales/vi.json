@@ -471,6 +471,8 @@
         "bulkDeleteConfirm": "Xóa vĩnh viễn {{count}} nhiệm vụ?",
         "bulkDeleteAsk": "Xóa {{count}} nhiệm vụ?",
         "bulkDeleteAsk_one": "Xóa {{count}} nhiệm vụ?",
+        "bulkDeleteLabel": "Xóa {{count}} nhiệm vụ",
+        "bulkDeleteLabel_one": "Xóa {{count}} nhiệm vụ",
         "bulkStatusChanged": "Trạng thái đã được thay đổi.",
         "bulkArchived": "Các nhiệm vụ đã được lưu trữ.",
         "bulkDeleted": "Các nhiệm vụ đã bị xóa.",

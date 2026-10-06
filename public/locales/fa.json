@@ -522,6 +522,8 @@
         "bulkDeleteConfirm": "{{count}} کار برای همیشه حذف شود؟",
         "bulkDeleteAsk": "{{count}} کار حذف شود؟",
         "bulkDeleteAsk_one": "{{count}} کار حذف شود؟",
+        "bulkDeleteLabel": "حذف {{count}} کار",
+        "bulkDeleteLabel_one": "حذف {{count}} کار",
         "bulkStatusChanged": "وضعیت تغییر کرد.",
         "bulkArchived": "کارها بایگانی شدند.",
         "bulkDeleted": "کارها حذف شدند.",

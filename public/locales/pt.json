@@ -510,6 +510,8 @@
         "bulkDeleteConfirm": "Excluir {{count}} tarefas permanentemente?",
         "bulkDeleteAsk": "Excluir {{count}} tarefas?",
         "bulkDeleteAsk_one": "Excluir {{count}} tarefa?",
+        "bulkDeleteLabel": "Excluir {{count}} tarefas",
+        "bulkDeleteLabel_one": "Excluir {{count}} tarefa",
         "bulkDeleted": "Tarefas excluídas.",
         "bulkMarkDone": "Concluído",
         "bulkMarkOpen": "Aberto",

@@ -510,6 +510,8 @@
         "bulkDeleteConfirm": "Eliminare definitivamente {{count}} attività?",
         "bulkDeleteAsk": "Eliminare {{count}} attività?",
         "bulkDeleteAsk_one": "Eliminare {{count}} attività?",
+        "bulkDeleteLabel": "Elimina {{count}} attività",
+        "bulkDeleteLabel_one": "Elimina {{count}} attività",
         "bulkDeleted": "Attività eliminate.",
         "bulkMarkDone": "Segna come completate",
         "bulkMarkOpen": "Segna come aperte",

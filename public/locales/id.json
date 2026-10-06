@@ -522,6 +522,8 @@
         "bulkDeleteConfirm": "Hapus {{count}} tugas secara permanen?",
         "bulkDeleteAsk": "Hapus {{count}} tugas?",
         "bulkDeleteAsk_one": "Hapus {{count}} tugas?",
+        "bulkDeleteLabel": "Hapus {{count}} tugas",
+        "bulkDeleteLabel_one": "Hapus {{count}} tugas",
         "bulkStatusChanged": "Status diubah.",
         "bulkArchived": "Tugas diarsipkan.",
         "bulkDeleted": "Tugas dihapus.",

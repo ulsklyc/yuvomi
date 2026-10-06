@@ -510,6 +510,8 @@
         "bulkDeleteConfirm": "Supprimer définitivement {{count}} tâches ?",
         "bulkDeleteAsk": "Supprimer {{count}} tâches ?",
         "bulkDeleteAsk_one": "Supprimer {{count}} tâche ?",
+        "bulkDeleteLabel": "Supprimer {{count}} tâches",
+        "bulkDeleteLabel_one": "Supprimer {{count}} tâche",
         "bulkDeleted": "Tâches supprimées.",
         "bulkMarkDone": "Terminé",
         "bulkMarkOpen": "Ouvert",
