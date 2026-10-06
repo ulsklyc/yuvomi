@@ -162,3 +162,38 @@ test('jede Such-Option einer Leaf wird auf genau dieser Leaf gerendert', () => {
   assert.ok(seen >= 60, `nur ${seen} Such-Optionen gefunden - liest der Test die Registry noch?`);
   assert.deepEqual(failures, []);
 });
+
+/**
+ * EIN ABSCHNITT, EIN NAME (#1524).
+ *
+ * Der Abschnitt fuer die Erinnerungslisten hiess auf dem Blatt
+ * "Erinnerungslisten anzeigen/ausblenden", in der Einstellungssuche und im
+ * Link aus den Aufgaben-Vorgaben aber "Erinnerungs-Synchronisation": wer nach
+ * dem einen suchte, fand den anderen. Die Ueberschrift nimmt deshalb den
+ * Schluessel der Registry, statt einen eigenen zu fuehren, und jeder Link in
+ * den Abschnitt ebenso.
+ *
+ * Bewusst nur dieser eine Abschnitt: die Schwester `sync-calendar` titelt mit
+ * dem Produktnamen des Protokolls ("CalDAV") unter einem Registry-Namen, der
+ * auch Google und Outlook meint - das ist eine andere Frage als zwei Namen
+ * fuer dasselbe.
+ */
+test('der Erinnerungs-Abschnitt traegt auf dem Blatt den Namen aus Suche und Links (#1524)', () => {
+  const section = SETTINGS_SECTIONS.find((entry) => entry.id === 'sync-reminders');
+  assert.ok(section, 'Abschnitt sync-reminders fehlt in der Registry');
+  assert.equal(typeof translate(section.labelKey), 'string', `${section.labelKey} fehlt in de.json`);
+
+  const source = readFileSync(sectionSourcePath(section), 'utf8');
+  const headings = [...source.matchAll(/class="settings-section__title">\$\{t\('([\w.]+)'\)\}/g)].map((m) => m[1]);
+  assert.deepEqual(headings, [section.labelKey],
+    'die Abschnittsueberschrift nennt einen anderen Schluessel als die Registry');
+
+  const tasks = readFileSync(new URL('../public/settings/pages/personal-tasks.js', import.meta.url), 'utf8');
+  const link = tasks.match(/id="tasks-sync-reminders-link">\$\{t\('([\w.]+)'\)\}/);
+  assert.ok(link, 'der Link aus den Aufgaben-Vorgaben ist nicht mehr auffindbar');
+  assert.equal(link[1], section.labelKey, 'der Link nennt den Abschnitt anders als die Registry');
+
+  // Der alte Bildschirmname darf nicht als zweiter Name zurueckkommen.
+  assert.equal(translate('settings.caldavRemindersToggle'), undefined,
+    'settings.caldavRemindersToggle ist wieder da - ein zweiter Name fuer denselben Abschnitt');
+});
