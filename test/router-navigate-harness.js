@@ -1,32 +1,23 @@
 /**
- * Testhelfer: `navigate()` aus public/router.js als Programm (#1640)
+ * Testhelfer: `navigate()` des Routers als Programm (#1640, #1657)
  *
  * router.js haengt am Browser und laesst sich nicht importieren: beim Laden
  * registriert es Listener an `window` und zieht die halbe App nach. Bis #1640
  * hielt deshalb nur die REIHENFOLGE im Quelltext fest, was `navigate()` tut.
  *
- * Dieser Helfer fuehrt den ECHTEN Text von `unknownDetourFor()` und
- * `navigate()` aus - keine Kopie, kein Nachbau. Er schneidet beide aus
- * router.js und stellt ihnen eine Umgebung hin, in der jeder freie Name ein
- * Feld ist: der Zustand des Routers (`currentUser`, `isNavigating`, ...) als
- * les- und schreibbare Felder, alles andere als Attrappe, die mitschreibt.
- * Die Entscheidungen selbst (`unknownPathDetour`, `publicPathDetour`,
+ * Seit #1657 steht `navigate()` in public/utils/router-navigate.js und wird
+ * hier importiert wie jedes andere Modul: `createNavigate(state, deps)` bekommt
+ * den Zustand des Routers (`currentUser`, `isNavigating`, ...) als les- und
+ * schreibbare Felder und alles andere als Attrappe, die mitschreibt. Die
+ * Entscheidungen selbst (`unknownPathDetour`, `publicPathDetour`,
  * `detourPaths`) sind die echten aus utils/unknown-route.js.
  *
- * Ein Name, den `navigate()` neu benutzt und den es hier nicht gibt, wirft
- * einen ReferenceError: der Helfer veraltet laut, nicht still.
+ * Die Namen unten sind der Vertrag des Moduls (NAVIGATE_STATE, NAVIGATE_DEPS).
+ * Fehlt hier einer, wirft createNavigate() beim Erzeugen: der Helfer veraltet
+ * laut, nicht still.
  */
-import { readFileSync } from 'node:fs';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '../public/utils/unknown-route.js';
-
-const routerSrc = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
-
-function navigateSource() {
-  const start = routerSrc.indexOf('function unknownDetourFor(');
-  const end = routerSrc.indexOf('async function syncPreferencesOnce(');
-  if (start < 0 || end < start) throw new Error('navigate() in router.js nicht gefunden');
-  return routerSrc.slice(start, end);
-}
+import { createNavigate } from '../public/utils/router-navigate.js';
 
 /** Routen wie in der Tabelle des Routers: Pfad, Anmeldepflicht, Modul. */
 export const HARNESS_ROUTES = Object.freeze([
@@ -99,8 +90,6 @@ export function createNavigateHarness({
     },
     window: {},
     document: { querySelector: () => null, getElementById: () => null },
-    console,
-    URLSearchParams,
     // ── Verlassen-Schutz ──
     hasLeaveGuard: () => Boolean(leaveGuard),
     mayLeave: async (path) => { log.leaveAsked.push(path); return leaveGuard(); },
@@ -146,12 +135,9 @@ export function createNavigateHarness({
     t: (key) => key,
   };
 
-  // `with` gibt es nur ausserhalb des Strict-Modus - `new Function` ist das.
-  // eslint-disable-next-line no-new-func
-  const navigate = new Function('env', `with (env) { return (function () {
-    ${navigateSource()}
-    return navigate;
-  }()); }`)(env);
+  // EIN Objekt fuer beides, wie bisher: die Tests lesen den Zustand an `env`
+  // (`env.isNavigating`), und die Attrappen oben schreiben ihn dort.
+  const navigate = createNavigate(env, env);
 
   return { navigate, env, log, setShell: (value) => { shell = value; } };
 }

@@ -12,8 +12,9 @@
  * fällt der Nutzer durch und landet auf einer erlaubten Seite.
  *
  * Seit #1640 laeuft die Weiche als Programm: test/router-navigate-harness.js
- * fuehrt den echten Text von navigate() aus. Die Weiche startet dabei kein
- * zweites navigate() mehr - die laufende Navigation wechselt selbst auf
+ * fuehrt das echte navigate() aus (seit #1657 als importiertes Modul). Die
+ * Weiche startet dabei kein zweites navigate() mehr - die laufende Navigation
+ * wechselt selbst auf
  * '/budget', haelt ihre Sperre bis zum Ende und ersetzt beim Kaltstart den
  * Eintrag der Adresse, von der sie wegfuehrt. Das Rechte-Verhalten darunter
  * prueft weiter der echte public/permissions.js-Store.

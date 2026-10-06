@@ -344,10 +344,11 @@ test('Kontozeile der Seitenleiste (router.js)', () => {
     '.nav-sidebar__account-trigger': node(), '.nav-sidebar__avatar': avatar, '.nav-sidebar__account-name': node(),
   };
   const root = { querySelector: (sel) => parts[sel], querySelectorAll: () => [] };
+  // Der Nutzer steht im geteilten Zustand des Routers (`routerState`, #1657).
   const run = (currentUser) => new Function(
-    'currentUser', 'initials', 'prefersInkText', 't', 'withUpdateHint', 'pendingUpdateVersion', 'document',
+    'routerState', 'initials', 'prefersInkText', 't', 'withUpdateHint', 'pendingUpdateVersion', 'document',
     `${source}\nreturn syncSidebarAccount;`,
-  )(currentUser, initials, () => false, (key) => key, (label) => label, () => null, { querySelector: () => null })(root);
+  )({ currentUser }, initials, () => false, (key) => key, (label) => label, () => null, { querySelector: () => null })(root);
 
   run({ display_name: MINSU });
   assert.equal(avatar.textContent, '민수');
