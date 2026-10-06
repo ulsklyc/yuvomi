@@ -83,10 +83,10 @@ dashboard (#885), calendar names instead of "event" (#988), themes from design-t
   always visible, shipped in v2.60.0 that way on purpose (#915). Colours first for themes,
   fonts as a separate feature (#972). The display account (#913) may act, but only for a
   person chosen on the device and only to tick off tasks and request redemptions; it signs in
-  as a device an admin pairs, never with a password.
-- **Open.** Configurable widgets on the wall, the expensive half of #915; the display account
-  in three steps: one member predicate (#1207), the paired display on top of it (#1208), and its
-  two actions (#1209), which also need "who did it" on tasks (#1205).
+  as a device an admin pairs, never with a password. It shipped in three steps: one member
+  predicate in v2.67.0 (#1207), then in v2.68.0 the paired display on top of it (#1208) and its
+  two actions (#1209), with "who did it" on tasks (#1205).
+- **Open.** Configurable widgets on the wall, the expensive half of #915.
 
 ## A different week
 
