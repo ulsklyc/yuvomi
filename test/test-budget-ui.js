@@ -4335,6 +4335,38 @@ test('#1631: ohne Faelligkeitstag faellt "Als bezahlt markieren" auf den Tag des
   });
 });
 
+// #1741: ohne Faelligkeitstag nennt der Server fuer eine Rate, deren Monat vorbei
+// ist, den Ersten dieses Monats. Das ist das Buchungsdatum, keine Faelligkeit.
+const altDarlehen = (over = {}) => tagesDarlehen({
+  due_day: null, next_due_month: '2022-01', next_due_date: '2022-01-01', ...over,
+});
+
+test('#1741: die Karte nennt fuer eine ueberfaellige Rate ohne Faelligkeitstag weiter den Monat', () => {
+  assert.equal(budgetUi.loanNextDueLabel(altDarlehen()), 'Januar 2022');
+  const html = budgetUi.renderLoanCard(altDarlehen());
+  assert.match(html, /<span>budget\.loanNextDue\{"month":"Januar 2022"\}<\/span>/);
+  assert.doesNotMatch(html, /2022-01-01/, 'das Buchungsdatum steht nirgends auf der Karte');
+  // Eine Antwort ohne das Feld due_day (alter Cache) behauptet keinen Faelligkeitstag.
+  const { due_day: _weg, ...ohneFeld } = altDarlehen();
+  assert.equal(budgetUi.loanNextDueLabel(ohneFeld), 'Januar 2022');
+  // Mit Faelligkeitstag bleibt das volle Datum, auch fuer eine alte Rate.
+  assert.equal(budgetUi.loanNextDueLabel(altDarlehen({ due_day: 5, next_due_date: '2022-01-05' })), '2022-01-05');
+});
+
+test('#1741: "Als bezahlt markieren" bucht die ueberfaellige Rate ohne Faelligkeitstag auf das Datum des Servers', async () => {
+  await seiteAm('2026-10-06T10:00:00Z', 'Europe/Berlin', async () => {
+    assert.equal(todayKey(), '2026-10-06');
+    assert.equal(budgetUi.loanPaymentDate(altDarlehen()), '2022-01-01');
+    const { posts, toasts } = await markiere(altDarlehen());
+    assert.deepEqual(posts, [['/budget/loans/7/payments', { installment_number: 1, amount: 100, paid_date: '2022-01-01' }]]);
+    assert.equal(toasts[0][0], 'budget.loanPaymentAddedOnToast{"date":"2022-01-01"}', 'die Bestaetigung nennt das gebuchte Datum');
+    // Die Seite entscheidet nicht selbst, ob ein Monat vorbei ist: ohne Datum vom
+    // Server (Rate des laufenden Monats) bleibt es bei heute.
+    const laufend = altDarlehen({ next_due_month: '2026-10', next_due_date: null });
+    assert.equal((await markiere(laufend)).posts[0][1].paid_date, '2026-10-06');
+  });
+});
+
 /** Ein Darlehens-Dialog aus Feldwerten - nur was saveLoanFromPanel() liest. */
 function darlehensPanel(werte) {
   const felder = Object.fromEntries(Object.entries(werte).map(([id, value]) => [
