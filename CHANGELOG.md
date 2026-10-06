@@ -396,9 +396,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every 400 and 409 of the write routes for entries, series, accounts, categories and loans
   now carries a `reason` next to `error`, three of them with `max` (the limit the refusal is
   about); budget plans are unchanged. A refused `POST /api/v1/budget/loans/preview` says why
-  (`reason`, `max`). The `error` texts are unchanged, with one correction: an unknown
-  `account_id` was answered in German and now reads "Account not found." or "account_id must
-  be a valid account id.".
+  (`reason`, `max`). An unknown `account_id` was answered in German and now reads "Account
+  not found." or "account_id must be a valid account id."; the other German `error` sentences
+  of the budget routes are the next entry.
 
 - **Budget API: the `error` sentences are English throughout.** For API clients only - the app
   does not show these sentences, it reads `reason`. Some refusals of the budget routes were
