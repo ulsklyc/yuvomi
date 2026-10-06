@@ -112,8 +112,10 @@ this list.
 - Recurring tasks with rotating assignees, built properly rather than worked around (#842).
 - An owner on a calendar connection, so a member's own calendar can stay theirs (#739).
 - Google contacts over CardDAV, a different shape from the calendar one (#843).
-- OIDC identity looked up by `(provider, sub)` rather than `sub` alone, on its own merits and
-  independent of multi-provider configuration (#848).
+- Several OIDC providers from one file: a path variable names a provider file, each provider
+  gets a short name chosen by the operator, and identity is looked up by that name plus `sub`
+  rather than by `sub` alone. The four existing variables stay and become the first provider.
+  The shape is settled, the work is not scheduled (#848).
 - Show the time during the photo screensaver, following the wall mode's own clock settings rather
   than gaining a switch of its own (#885).
 - Full-bleed screensaver photos as an opt-in, with `contain` staying the default, because `cover`
