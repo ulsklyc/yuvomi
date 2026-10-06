@@ -7,6 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { eachRule } from './css-rules.js';
 
 // /i18n.js wird durch test-browser-loader.mjs gemockt (--loader Flag)
@@ -1731,7 +1732,7 @@ const DELETE_BUTTON = /class="[^"]*\bbtn--danger-(?:outline|ghost)\b|data-footer
 test('A2 P1-2: in jedem Dialogfuss steht Loeschen am Anfang, Abbrechen und Primaer am Ende', async () => {
   const { readdirSync, statSync } = await import('node:fs');
   const { join, relative } = await import('node:path');
-  const root = new URL('..', import.meta.url).pathname;
+  const root = fileURLToPath(new URL('..', import.meta.url));
   const files = [];
   const walk = (dir) => {
     for (const name of readdirSync(dir)) {

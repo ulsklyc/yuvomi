@@ -5,6 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, globSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { eachRule } from './css-rules.js';
 
 // Minimales Window/Navigator-Mock für Node
@@ -162,7 +163,7 @@ test('stagger: ein neuer Traeger (Seite neu aufgebaut) blendet wieder ein', () =
  */
 test('stagger: jeder Aufruf in public/ nennt seinen Listentraeger (host)', () => {
   const offenders = [];
-  for (const file of globSync('public/**/*.js', { cwd: new URL('..', import.meta.url).pathname })) {
+  for (const file of globSync('public/**/*.js', { cwd: fileURLToPath(new URL('..', import.meta.url)) })) {
     if (file.includes('vendor') || file.endsWith('utils/ux.js')) continue;
     const src = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     for (const m of src.matchAll(/\bstagger\(/g)) {

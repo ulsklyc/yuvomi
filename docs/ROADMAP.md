@@ -55,9 +55,9 @@ notify A and B" (#963).
   rule with conditions: no rule store, no condition language, no new place above the modules
   (#963). Event-driven notification follows the one path that exists for it, the @mention in
   a task comment, which checks visibility per recipient before it sends (#800).
-- **Open.** Which events beyond "task completed" and "medication due"; the VALARM export;
-  notifying somebody other than the assignee, which needs an assignment relationship to hang
-  from and is separate work (#963).
+- **Open.** Which events beyond "task completed" and "medication due"; the VALARM export
+  (#1707); notifying somebody other than the assignee, which needs an assignment relationship to
+  hang from and is separate work (#963).
 
 ## Writing back where today only reads
 
@@ -83,10 +83,10 @@ dashboard (#885), calendar names instead of "event" (#988), themes from design-t
   always visible, shipped in v2.60.0 that way on purpose (#915). Colours first for themes,
   fonts as a separate feature (#972). The display account (#913) may act, but only for a
   person chosen on the device and only to tick off tasks and request redemptions; it signs in
-  as a device an admin pairs, never with a password.
-- **Open.** Configurable widgets on the wall, the expensive half of #915; the display account
-  in three steps: one member predicate (#1207), the paired display on top of it (#1208), and its
-  two actions (#1209), which also need "who did it" on tasks (#1205).
+  as a device an admin pairs, never with a password. It shipped in three steps: one member
+  predicate in v2.67.0 (#1207), then in v2.68.0 the paired display on top of it (#1208) and its
+  two actions (#1209), with "who did it" on tasks (#1205).
+- **Open.** Configurable widgets on the wall, the expensive half of #915.
 
 ## A different week
 
@@ -107,17 +107,15 @@ Things the maintainer has called worth doing in a thread, without a ticket. Each
 where the shape was discussed; when one becomes an issue it moves to the tracker and leaves
 this list.
 
-- Move an item between shopping lists, inside the existing dialog (#998).
-- Housekeeping without billing: a rate type "not tracked", so a live-in helper on a salary does
-  not need a fake day rate (#787).
 - Goals: define a target and see progress first, the version that links to everything later
   (#777).
 - Recurring tasks with rotating assignees, built properly rather than worked around (#842).
 - An owner on a calendar connection, so a member's own calendar can stay theirs (#739).
 - Google contacts over CardDAV, a different shape from the calendar one (#843).
-- OIDC identity looked up by `(provider, sub)` rather than `sub` alone, on its own merits and
-  independent of multi-provider configuration (#848).
-- Loan payoff across several loans, in instalments rather than in principle (#935).
+- Several OIDC providers from one file: a path variable names a provider file, each provider
+  gets a short name chosen by the operator, and identity is looked up by that name plus `sub`
+  rather than by `sub` alone. The four existing variables stay and become the first provider.
+  The shape is settled, the work is not scheduled (#848).
 - Show the time during the photo screensaver, following the wall mode's own clock settings rather
   than gaining a switch of its own (#885).
 - Full-bleed screensaver photos as an opt-in, with `contain` staying the default, because `cover`
@@ -129,8 +127,6 @@ this list.
   low again after one tap (#1077).
 - A picture on a reward, kept with the redemption the way its name and symbol already are, so old
   redemptions do not start showing the wrong thing (#1118).
-- A chosen goal per child in the rewards progress, rather than the bar always aiming at the cheapest
-  reward they cannot yet afford (#1118).
 - Themes: the font half, after the colour half has shipped (#972).
 - A module index for third-party modules, the one open request in #746.
 

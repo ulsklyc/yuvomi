@@ -24,11 +24,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { withoutBlockComments } from './source-text.js';
 import { calendarObjectUrlFilter, withCalendarObjectUrlFilter } from '../server/utils/caldav-client.js';
 import { parseICS } from '../server/services/ics-parser.js';
 
-const SERVER_DIR = new URL('../server/', import.meta.url).pathname;
+const SERVER_DIR = fileURLToPath(new URL('../server/', import.meta.url));
 const OWNER = 'utils/caldav-client.js';
 
 function jsFilesUnder(dir, prefix = '') {
