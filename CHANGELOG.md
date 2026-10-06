@@ -259,6 +259,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The PDFs in the demo data are real PDFs** (#1511). The demo documents carried a line of
+  placeholder text under a `.pdf` name, so the built-in preview could not open them and
+  every screenshot of an opened document showed an error. Each one is now a one-page PDF with
+  the title and description of its entry, in the language the demo was seeded in, and it opens
+  in the preview and in the browser's own viewer. The three demo images are still placeholders.
+  Only a database filled by `scripts/seed-demo.js` is affected.
+
 - **The reminder-list settings have one name: "Reminder sync"** (#1524). The section under
   Settings, Tasks was headed "Show/hide reminder lists", while the settings search and the link
   from the task defaults called it "Reminder sync" - whoever searched for the one found the

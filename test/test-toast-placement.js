@@ -24,6 +24,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chooseToastPlacement, persistentToastMustYield, placeToastStack } from '../public/utils/toast-placement.js';
 import { PERSISTENT_TOAST_SELECTOR } from '../public/utils/toast-surface.js';
 import { eachRule } from './css-rules.js';
@@ -324,7 +325,7 @@ const MODAL_PANEL_ZONE = /modal-panel__header|modal-panel__footer|modal-actions/
 // durch (Re-Kritik 2026-09-28, E2) und zaehlte sonst als zweiter Dialog.
 const DIALOG_ROLE = /(?<!\[)role="dialog"|setAttribute\(\s*'role'\s*,\s*'dialog'\s*\)/g;
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
