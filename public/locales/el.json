@@ -324,6 +324,8 @@
         "optionsFor": "Επιλογές για {{widget}}",
         "optionCalendarScope": "Ποια ραντεβού;",
         "optionCalendarAll": "Όλα τα ραντεβού",
+        "optionCalendarLimit": "Πόσα ραντεβού;",
+        "optionCalendarLimitHint": "Ισχύει για τη λίστα. Στο μέγεθος «{{size}}» το πλακίδιο δείχνει αντί γι' αυτήν την εβδομάδα.",
         "optionTaskCategories": "Ποιες κατηγορίες;",
         "optionTaskCategoriesHint": "Χωρίς επιλογή η επισκόπηση δείχνει όλες τις κατηγορίες.",
         "optionTaskCategoriesEmpty": "Δεν υπάρχουν ακόμα κατηγορίες.",

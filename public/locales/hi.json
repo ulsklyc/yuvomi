@@ -324,6 +324,8 @@
         "optionsFor": "{{widget}} के विकल्प",
         "optionCalendarScope": "कौन-से कार्यक्रम?",
         "optionCalendarAll": "सभी कार्यक्रम",
+        "optionCalendarLimit": "कितने कार्यक्रम?",
+        "optionCalendarLimitHint": "यह सूची पर लागू होता है। “{{size}}” आकार में टाइल इसकी जगह सप्ताह दिखाती है।",
         "optionTaskCategories": "कौन-सी श्रेणियाँ?",
         "optionTaskCategoriesHint": "कुछ न चुनने पर डैशबोर्ड सभी श्रेणियाँ दिखाता है।",
         "optionTaskCategoriesEmpty": "अभी कोई श्रेणी नहीं है।",

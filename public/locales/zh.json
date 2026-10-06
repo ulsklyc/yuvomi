@@ -324,6 +324,8 @@
         "optionsFor": "{{widget}}选项",
         "optionCalendarScope": "显示哪些日程？",
         "optionCalendarAll": "全部日程",
+        "optionCalendarLimit": "显示多少个日程？",
+        "optionCalendarLimitHint": "适用于列表。在“{{size}}”尺寸下，卡片改为显示一周。",
         "optionTaskCategories": "显示哪些分类？",
         "optionTaskCategoriesHint": "未选择时，概览显示所有分类。",
         "optionTaskCategoriesEmpty": "还没有分类。",

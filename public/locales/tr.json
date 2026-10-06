@@ -324,6 +324,8 @@
         "optionsFor": "{{widget}} seçenekleri",
         "optionCalendarScope": "Hangi randevular?",
         "optionCalendarAll": "Tüm randevular",
+        "optionCalendarLimit": "Kaç randevu?",
+        "optionCalendarLimitHint": "Liste için geçerlidir. “{{size}}” boyutunda kart bunun yerine haftayı gösterir.",
         "optionTaskCategories": "Hangi kategoriler?",
         "optionTaskCategoriesHint": "Seçim yapılmazsa genel bakış tüm kategorileri gösterir.",
         "optionTaskCategoriesEmpty": "Henüz kategori yok.",

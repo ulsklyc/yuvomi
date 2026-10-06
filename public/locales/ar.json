@@ -414,6 +414,8 @@
         "optionsFor": "خيارات {{widget}}",
         "optionCalendarScope": "أي المواعيد؟",
         "optionCalendarAll": "كل المواعيد",
+        "optionCalendarLimit": "كم عدد المواعيد؟",
+        "optionCalendarLimitHint": "ينطبق على القائمة. في الحجم «{{size}}» تعرض البطاقة الأسبوع بدلاً من ذلك.",
         "optionTaskCategories": "أي الفئات؟",
         "optionTaskCategoriesHint": "بدون اختيار تعرض اللوحة كل الفئات.",
         "optionTaskCategoriesEmpty": "لا توجد فئات بعد.",

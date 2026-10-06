@@ -30,6 +30,7 @@ import { getOccurrences as getWasteOccurrences } from '../services/waste-store.j
 import { scheduleData } from '../services/schedule.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { activeCatalog } from '../services/rewards.js';
+import { clampEventLimit } from '../../public/utils/dashboard-event-limit.js';
 
 const log = createLogger('Dashboard');
 
@@ -208,7 +209,7 @@ const router = express.Router();
  * so bricht ein fehlerhaftes Widget nicht das gesamte Dashboard.
  *
  * Response: {
- *   upcomingEvents: CalendarEvent[],   // Nächste 5 Termine
+ *   upcomingEvents: CalendarEvent[],   // Nächste 5 Termine (`events_limit`: 8 oder 12)
  *   familyEvents:   CalendarEvent[],   // Termine je Mitglied fuer die Familienkarte (#1449)
  *   weekEvents:     WeekEvent[],       // Termine, die die Woche ab heute berühren (schlank)
  *   urgentTasks:    Task[],            // High/Urgent mit Fälligkeit ≤ 48h
@@ -289,6 +290,10 @@ router.get('/', (req, res) => {
   // Den Haushaltsschalter (#1660) kennt der geteilte Leser selbst: sind die
   // Geburtstage abgeschaltet, laufen sie nicht mit, was immer hier steht.
   const includeBirthdays = req.query.events_birthdays !== 'hide';
+  // Wie viele Kommende die Kachel listet (#1680): 5, 8 oder 12 aus einer
+  // Allowlist, die der Browser mit dieser Route teilt. Alles andere - fehlend,
+  // leer, `7`, `500`, `abc`, doppelt angegeben - ist die Vorgabe fuenf.
+  const eventsLimit = clampEventLimit(req.query.events_limit);
 
   const now = new Date();
 
@@ -350,16 +355,16 @@ router.get('/', (req, res) => {
   const birthdaysLeftOut = denied.has('calendar') || birthdaysSwitchedOff(d);
   if (birthdaysLeftOut) Object.assign(result, emptyBirthdays());
 
-  // Anstehende Termine (nächste 5, ab jetzt).
+  // Anstehende Termine (nächste 5, 8 oder 12, ab jetzt).
   // Geteilte Logik mit /calendar/upcoming: expandiert wiederkehrende Serien,
   // sodass auch Termine erscheinen, deren Master-Start in der Vergangenheit liegt.
   if (allows('calendar')) try {
-    // Der Deckel von fuenf zaehlt nur, was noch kommt (#1449); beendete Termine
+    // Der Deckel (fuenf, auf Wunsch 8 oder 12, #1680) zaehlt nur, was noch kommt (#1449); beendete Termine
     // von heute kommen ausserhalb mit - die Kachel zeigt sie zurueckgetreten,
     // das Heute-Blatt laesst sie weg. Welche beendet sind, entscheidet der
     // Browser an der Uhr: ein Termin endet auch zwischen zwei Abrufen.
     result.upcomingEvents = serializeEvents(getUpcomingEvents(d, {
-      userId, limit: 5, fromToday: true, assignedTo: eventsAssignedTo, includeBirthdays,
+      userId, limit: eventsLimit, fromToday: true, assignedTo: eventsAssignedTo, includeBirthdays,
       keepEndedToday: ENDED_TODAY_POOL,
     }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminUser(req) });
   } catch (err) {

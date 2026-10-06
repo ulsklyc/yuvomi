@@ -384,6 +384,8 @@
         "optionsFor": "Параметры: {{widget}}",
         "optionCalendarScope": "Какие события?",
         "optionCalendarAll": "Все события",
+        "optionCalendarLimit": "Сколько событий?",
+        "optionCalendarLimitHint": "Действует для списка. В размере «{{size}}» карточка вместо него показывает неделю.",
         "optionTaskCategories": "Какие категории?",
         "optionTaskCategoriesHint": "Без выбора обзор показывает все категории.",
         "optionTaskCategoriesEmpty": "Категорий пока нет.",

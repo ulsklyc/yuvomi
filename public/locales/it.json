@@ -324,6 +324,8 @@
         "optionsFor": "Opzioni per {{widget}}",
         "optionCalendarScope": "Quali appuntamenti?",
         "optionCalendarAll": "Tutti gli appuntamenti",
+        "optionCalendarLimit": "Quanti appuntamenti?",
+        "optionCalendarLimitHint": "Vale per l'elenco. Nella dimensione «{{size}}» la scheda mostra invece la settimana.",
         "optionTaskCategories": "Quali categorie?",
         "optionTaskCategoriesHint": "Senza selezione la panoramica mostra tutte le categorie.",
         "optionTaskCategoriesEmpty": "Non ci sono ancora categorie.",

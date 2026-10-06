@@ -3,7 +3,7 @@
  * Zweck: Der Standard-Satz der Dashboard-Widgets und die reine Logik darauf -
  *        Normalisieren eines gespeicherten Layouts, Vergleich zweier
  *        Konfigurationen, Nachrechnen des dicht gepackten Rasters.
- * Abhängigkeiten: keine
+ * Abhängigkeiten: nur utils/dashboard-event-limit.js (rein, ohne eigene Importe)
  *
  * WARUM ALS UTIL UND NICHT IN dashboard.js: `normalizeDashboardConfig` traegt
  * eine Zusicherung (siehe unten an WIDGET_IDS) und war bis 2026-08-13 durch
@@ -14,12 +14,16 @@
  * Tür, die für Ansichts-Renderer gebaut ist und deren Inhalt sich nach dem
  * Bedarf der Tests richtet. Eine Regel, an der ein Bestandslayout hängt, gehört
  * hinter eine echte Modulgrenze.
- * Diese Datei hat deshalb bewusst keine Importe: sie ist die Teilmenge, die
- * ohne DOM, ohne `window.yuvomi` und ohne Haushaltskontext entscheidbar ist.
+ * Diese Datei hat deshalb bewusst keine Importe ausser einer reinen Schwester
+ * (die Stufen der Kalender-Kachel, #1680, die auch die Route liest): sie ist
+ * die Teilmenge, die ohne DOM, ohne `window.yuvomi` und ohne Haushaltskontext
+ * entscheidbar ist.
  * Was an `isSoloHousehold()` oder den Modul-Schaltern hängt
  * (`isWidgetModuleEnabled`), bleibt drüben in der Seite.
  * Guards: test/test-dashboard.js, Abschnitt „Widget-Konfiguration".
  */
+
+import { EVENT_LIMIT_DEFAULT, clampEventLimit } from './dashboard-event-limit.js';
 
 // Reihenfolge = Standard-Layout. Die primären Inhalte (tasks, calendar) führen,
 // damit sie beim Wieder-Einblenden oben stehen; das einzige passive Widget
@@ -433,8 +437,39 @@ export function dashboardQuery(config) {
   // zustand der Route, und ein Parameter, der ihn wiederholt, stuende in jeder
   // Anfrage - dieselbe Regel, nach der `scope: 'all'` nicht gespeichert wird.
   if (optionsOf('calendar').birthdays === 'hide') params.set('events_birthdays', 'hide');
+  // Die Stufe reist geklemmt und nur, wenn sie nicht die Vorgabe ist (#1680):
+  // ein gespeicherter Fremdwert ergibt hier dieselbe Anfrage wie gar keiner.
+  const eventLimit = clampEventLimit(optionsOf('calendar').limit);
+  if (eventLimit !== EVENT_LIMIT_DEFAULT) params.set('events_limit', String(eventLimit));
   for (const key of optionsOf('tasks').categories ?? []) params.append('tasks_category', key);
   for (const id of optionsOf('notes').categories ?? []) params.append('notes_category', String(id));
   const query = params.toString();
   return query ? `/dashboard?${query}` : '/dashboard';
+}
+
+/* WELCHE PARAMETER DIE ZAHLEN DER ANTWORT UNBERUEHRT LASSEN (#1680).
+ *
+ * Die Navigations-Badges und Modulkacheln nehmen die `/dashboard`-Antwort der
+ * Seite nur an, wenn sie ungefiltert ist (router.js, `primeModuleCountsFrom`):
+ * `tasks_category` aendert `openTaskCount`, und eine eingeschraenkte Zahl ist
+ * eine andere Zahl. `events_limit` schraenkt nichts ein - es verlaengert eine
+ * Liste, die in keine Zahl eingeht. Ohne diese Ausnahme galt jede Antwort mit
+ * gewaehlter Stufe als gefiltert, und der Router holte anderthalb Sekunden
+ * spaeter dieselbe Aggregation ein zweites Mal, bei jedem Kaltstart.
+ *
+ * ALLOWLIST: was hier nicht steht, gilt als Filter. Ein neuer Parameter kostet
+ * so hoechstens den zweiten Abruf, nie eine falsche Zahl. `events_scope` und
+ * `events_birthdays` stehen bewusst nicht hier - sie waren vor #1680 schon
+ * „gefiltert", und ob sie es bleiben, ist nicht Sache dieser Aenderung. */
+const COUNT_NEUTRAL_PARAMS = new Set(['events_limit']);
+
+/**
+ * @param {string} query Pfad der Uebersichts-Abfrage ('/dashboard' oder '/dashboard?…')
+ * @returns {boolean} true, wenn die Antwort darauf andere Zahlen tragen kann als die ungefilterte
+ */
+export function dashboardQueryFiltersCounts(query) {
+  const text = String(query ?? '');
+  const at = text.indexOf('?');
+  if (at === -1) return false;
+  return [...new URLSearchParams(text.slice(at + 1)).keys()].some((key) => !COUNT_NEUTRAL_PARAMS.has(key));
 }

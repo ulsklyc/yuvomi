@@ -287,6 +287,8 @@
         "optionsFor": "Opções de {{widget}}",
         "optionCalendarScope": "Quais eventos?",
         "optionCalendarAll": "Todos os eventos",
+        "optionCalendarLimit": "Quantos eventos?",
+        "optionCalendarLimitHint": "Vale para a lista. No tamanho “{{size}}”, o cartão mostra a semana no lugar dela.",
         "optionTaskCategories": "Quais categorias?",
         "optionTaskCategoriesHint": "Sem seleção, a visão geral mostra todas as categorias.",
         "optionTaskCategoriesEmpty": "Ainda não há categorias.",

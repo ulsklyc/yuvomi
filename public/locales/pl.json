@@ -398,6 +398,8 @@
         "optionsFor": "Opcje: {{widget}}",
         "optionCalendarScope": "Które terminy?",
         "optionCalendarAll": "Wszystkie terminy",
+        "optionCalendarLimit": "Ile terminów?",
+        "optionCalendarLimitHint": "Dotyczy listy. W rozmiarze „{{size}}” kafel pokazuje zamiast niej tydzień.",
         "optionTaskCategories": "Które kategorie?",
         "optionTaskCategoriesHint": "Bez wyboru przegląd pokazuje wszystkie kategorie.",
         "optionTaskCategoriesEmpty": "Nie ma jeszcze kategorii.",

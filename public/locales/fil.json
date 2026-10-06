@@ -338,6 +338,8 @@
         "optionsFor": "Mga opsyon para sa {{widget}}",
         "optionCalendarScope": "Aling mga appointment?",
         "optionCalendarAll": "Lahat ng appointment",
+        "optionCalendarLimit": "Ilang appointment?",
+        "optionCalendarLimitHint": "Para ito sa listahan. Sa laking “{{size}}”, ang linggo ang ipinapakita ng tile.",
         "optionTaskCategories": "Aling mga kategorya?",
         "optionTaskCategoriesHint": "Kapag walang napili, ipinapakita ng overview ang lahat ng kategorya.",
         "optionTaskCategoriesEmpty": "Wala pang kategorya.",

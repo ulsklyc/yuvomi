@@ -338,6 +338,8 @@
         "optionsFor": "گزینه‌های {{widget}}",
         "optionCalendarScope": "کدام قرارها؟",
         "optionCalendarAll": "همه قرارها",
+        "optionCalendarLimit": "چند قرار؟",
+        "optionCalendarLimitHint": "برای فهرست اعمال می‌شود. در اندازهٔ «{{size}}» کارت به‌جای آن هفته را نشان می‌دهد.",
         "optionTaskCategories": "کدام دسته‌ها؟",
         "optionTaskCategoriesHint": "بدون انتخاب، نمای کلی همه دسته‌ها را نشان می‌دهد.",
         "optionTaskCategoriesEmpty": "هنوز دسته‌ای وجود ندارد.",
