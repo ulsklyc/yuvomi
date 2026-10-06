@@ -1910,6 +1910,7 @@
         "removeMemberNamed": "Remover {{name}}",
         "memberDeactivatedToast": "Conta de {{name}} desativada. Os registros são mantidos.",
         "memberFormerBadge": "Ex-membro",
+        "memberOrderHint": "Esta ordem vale para toda a casa: o calendário, a grade de horários e todas as listas de pessoas a seguem. Para alterá-la, arraste uma alça ou coloque o foco nela e pressione as teclas de seta. Os novos membros ficam depois, ordenados por nome.",
         "logout": "Sair",
         "logoutConfirm": "Sair deste dispositivo?",
         "synchronizing": "Sincronizando…",

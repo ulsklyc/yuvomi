@@ -1910,6 +1910,7 @@
         "removeMemberNamed": "移除 {{name}}",
         "memberDeactivatedToast": "{{name}} 已停用。相关条目已保留。",
         "memberFormerBadge": "前成员",
+        "memberOrderHint": "此顺序适用于整个家庭：日历、课程表和每个人员列表都遵循它。要更改顺序，请拖动手柄，或聚焦手柄后按方向键。新成员排在其后，按姓名排序。",
         "logout": "退出登录",
         "logoutConfirm": "从此设备退出登录？",
         "synchronizing": "同步中…",

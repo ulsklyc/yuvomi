@@ -24,7 +24,7 @@ import rateLimit from 'express-rate-limit';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { requireAdmin } from '../middleware/require-admin.js';
-import { householdMemberSql } from '../services/household-members.js';
+import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
 import { resolvePermissions } from '../permissions.js';
 import { isEnrolled } from '../services/rewards.js';
 import { CURRENT_ONBOARDING_VERSION, LEGACY_SESSION_COOKIE, SESSION_COOKIE } from '../auth.js';
@@ -189,10 +189,11 @@ peopleRouter.get('/people', (req, res) => {
     }
     const d = db.get();
     const rows = d.prepare(`
-      SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.role, u.family_role
+      SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.role, u.family_role,
+             ${memberPositionSql('u')} AS sort_order
       FROM users u
       WHERE ${householdMemberSql('u')}
-      ORDER BY u.display_name COLLATE NOCASE ASC
+      ORDER BY ${memberOrderSql('u')}
     `).all();
     const data = rows.map((row) => {
       const { admin, modules } = resolvePermissions(d, row);

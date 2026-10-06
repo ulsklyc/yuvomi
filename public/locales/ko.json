@@ -1968,6 +1968,7 @@
         "removeMemberNamed": "{{name}} 계정 제거",
         "memberDeactivatedToast": "{{name}} 계정이 비활성화되었습니다. 항목은 유지됩니다.",
         "memberFormerBadge": "이전 구성원",
+        "memberOrderHint": "이 순서는 가구 전체에 적용되며 캘린더, 시간표, 모든 구성원 목록이 이 순서를 따릅니다. 변경하려면 핸들을 드래그하거나 핸들에 포커스를 두고 화살표 키를 누르세요. 새 구성원은 그 뒤에 이름순으로 표시됩니다.",
         "logout": "로그아웃",
         "logoutConfirm": "이 기기에서 로그아웃하시겠습니까?",
         "synchronizing": "동기화 중…",

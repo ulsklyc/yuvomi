@@ -50,7 +50,7 @@ const { default: permissionsRouter } = await import('../server/routes/permission
 const { default: documentsRouter } = await import('../server/routes/documents.js');
 const { householdOverview } = await import('../server/services/two-factor.js');
 const { listEmailableMembers } = await import('../server/services/member-email.js');
-const { householdMemberSql, isHouseholdMember } = await import('../server/services/household-members.js');
+const { householdMemberSql, isHouseholdMember, memberOrderSql } = await import('../server/services/household-members.js');
 const { pushService } = await import('../server/services/push.js');
 const { hashPassword } = await import('../server/utils/password.js');
 
@@ -218,7 +218,7 @@ test('members only: GET /family/members (the source of the pickers)', async () =
 test('accounts: the 2FA overview lists every account', async () => {
   // Der zweite Faktor schuetzt Konten, nicht Mitgliedschaft (Entscheidung
   // vom 15.09.2026, #1207): die Admin-Uebersicht listet deshalb jedes Konto.
-  assert.deepEqual(idsOf(householdOverview(db), 'user_id'), EVERYONE);
+  assert.deepEqual(idsOf(householdOverview(db, memberOrderSql('u')), 'user_id'), EVERYONE);
   const r = await call('GET', '/auth/2fa/overview');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.data, 'user_id'), EVERYONE);

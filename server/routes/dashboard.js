@@ -18,7 +18,7 @@ import { resolveBudgetMode } from '../services/budget-visibility.js';
 import { hiddenModulesFor } from '../permissions.js';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
 import { documentViewer } from '../services/document-links.js';
-import { householdMemberSql } from '../services/household-members.js';
+import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
 import { FastingError, getFastingDashboardState } from '../services/fasting.js';
 import { openBalancesForUser } from '../services/split-expenses.js';
 import { NUTRIENT_KEYS, nutritionSummaryFor } from '../services/health-nutrition.js';
@@ -596,9 +596,9 @@ router.get('/', (req, res) => {
   // Alle User (für Avatar-Farben in Widgets)
   try {
     result.users = d.prepare(
-      `SELECT id, display_name, avatar_color, avatar_data FROM users u
+      `SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, ${memberPositionSql('u')} AS sort_order FROM users u
        WHERE ${householdMemberSql('u')}
-       ORDER BY display_name`
+       ORDER BY ${memberOrderSql('u')}`
     ).all();
   } catch (err) {
     result.users = [];
@@ -837,11 +837,12 @@ router.get('/', (req, res) => {
     const MEMBER_FILTER = householdMemberSql('u');
     const members = d.prepare(`
       SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
+             ${memberPositionSql('u')} AS sort_order,
              COALESCE((SELECT SUM(delta) FROM reward_ledger l WHERE l.user_id = u.id), 0) AS balance
       FROM users u
       JOIN reward_participants rp ON rp.user_id = u.id AND rp.enabled = 1
       WHERE ${MEMBER_FILTER}
-      ORDER BY u.display_name COLLATE NOCASE ASC, u.id ASC
+      ORDER BY ${memberOrderSql('u')}
     `).all();
     const approver = isAdminRequest(req);
     const own = members.find((m) => m.id === Number(userId));

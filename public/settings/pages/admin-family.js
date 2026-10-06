@@ -9,6 +9,9 @@ import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { AVATAR_COLORS } from '/utils/color.js';
+import { sortMembers } from '/utils/member-order.js';
+import { makeSortable } from '/utils/sortable.js';
+import { vibrate } from '/utils/ux.js';
 import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
 import { createRetryState, toggleRowHtml } from '/settings/components.js';
 import {
@@ -144,7 +147,25 @@ function bindAvatarPicker(container, prefix) {
   });
 }
 
-function memberHtml(u, currentUserId) {
+function memberHtml(u, currentUserId, { orderable = false, aligned = false } = {}) {
+  // Der Griff der Haushaltsreihenfolge (#1644). Ein BUTTON wie in der
+  // Einkaufsliste: er traegt den Tastaturpfad selbst (Pfeiltasten bei Fokus),
+  // statt ein Auf/Ab-Paar neben Bearbeiten und Entfernen zu stellen. Nur an
+  // Zeilen, die eine Position haben koennen - Hauspersonal, Gaeste und
+  // Ehemalige stehen in dieser Verwaltung, aber nicht in der Reihenfolge.
+  const handle = orderable ? `
+      <button type="button" class="row-action settings-member__drag" data-member-handle="${u.id}"
+              aria-label="${esc(t('shopping.reorderHandle', { name: u.display_name }))}"
+              title="${esc(t('shopping.reorderHandleHint'))}">
+        <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
+      </button>`
+    // Eine Zeile ohne Position (Personal, Gast, ehemalig) haelt den Platz des
+    // Griffs frei, solange die Liste Griffe zeigt - sonst stuende ihr Avatar
+    // links neben der Flucht der anderen. Ein leerer Platz, kein toter Knopf.
+    : aligned ? `
+      <span class="row-action settings-member__drag settings-member__drag--none" aria-hidden="true">
+        <i data-lucide="grip-vertical" class="icon-md"></i>
+      </span>` : '';
   // Konten der Haushaltshilfe sind keine Familienmitglieder: sie tragen das
   // Personal-Label statt einer Familienrolle (Audit A2-25e).
   const familyRole = u.is_worker ? t('housekeeping.staff') : familyRoleLabel(u.family_role);
@@ -172,10 +193,10 @@ function memberHtml(u, currentUserId) {
         <i data-lucide="edit-2" class="icon-md" aria-hidden="true"></i>
       </button>`;
   return `
-    <li class="settings-member${former ? ' settings-member--former' : ''}" data-id="${u.id}">
+    <li class="settings-member${former ? ' settings-member--former' : ''}${orderable ? ' settings-member--orderable' : ''}" data-id="${u.id}">${handle}
       ${avatarHtml(u, 'settings-avatar settings-avatar--sm')}
       <div class="settings-member__info">
-        <span class="settings-member__name">${esc(u.display_name)}</span>
+        <span class="settings-member__name" data-member-name>${esc(u.display_name)}</span>
         <span class="settings-member__meta">@${esc(u.username)} · ${esc(familyRole)}${systemRole}${formerBadge}</span>
         ${profileMeta ? `<span class="settings-member__meta">${profileMeta}</span>` : ''}
       </div>${editBtn}${deleteBtn}
@@ -323,6 +344,8 @@ function renderPage(container) {
       <h2 class="settings-section__title">${t('settings.sectionFamily')}</h2>
       <div class="settings-card" id="members-card">
         <ul class="settings-members row-divided" id="members-list"></ul>
+        <p class="form-hint" id="members-order-hint" hidden>${t('settings.memberOrderHint')}</p>
+        <div class="sr-only" role="status" aria-live="polite" id="members-order-announce"></div>
         <button class="btn btn--secondary settings-add-btn" id="add-member-btn" hidden>${t('settings.addMember')}</button>
       </div>
 
@@ -370,19 +393,226 @@ function listNotice(content) {
   return item;
 }
 
-function renderMemberList(container, users, currentUserId) {
+/** Die Zeilen in der Folge, in der die Liste sie zeigt: Aktive, dann Ehemalige, je in der Haushaltsreihenfolge. */
+function orderedMembers(users) {
+  return [...sortMembers(users.filter((u) => !u.deactivated_at)), ...sortMembers(users.filter((u) => u.deactivated_at))];
+}
+
+/**
+ * Welche Zeilen lassen sich ordnen? (#1644)
+ *
+ * Nur ein Administrator ordnet, und nur Haushaltsmitglieder haben eine
+ * Position - `is_household_member` kommt vom Server und ist dieselbe Menge,
+ * die `PATCH /family/members/reorder` annimmt. Ein einzelnes Mitglied hat
+ * keine Reihenfolge: dann gibt es keinen Griff, statt eine folgenlose
+ * Handlung anzubieten.
+ */
+function orderableIds(users, currentUser) {
+  if (currentUser?.role !== 'admin') return [];
+  const ids = users.filter((u) => u.is_household_member && !u.deactivated_at).map((u) => u.id);
+  return ids.length > 1 ? ids : [];
+}
+
+/** Die id-Folge nach einem Schritt um einen Platz; unveraendert, wenn es dort nicht weitergeht. */
+function movedOrder(ids, id, delta) {
+  const from = ids.indexOf(id);
+  const to = from + delta;
+  if (from === -1 || to < 0 || to >= ids.length) return ids;
+  const next = [...ids];
+  next.splice(from, 1);
+  next.splice(to, 0, id);
+  return next;
+}
+
+function renderMemberList(container, users, currentUserId, currentUser = null) {
   const list = container.querySelector('#members-list');
   if (!list) return;
   list.replaceChildren();
+  const canOrder = new Set(orderableIds(users, currentUser));
+  const hint = container.querySelector('#members-order-hint');
+  if (hint) hint.hidden = canOrder.size === 0;
   if (!users.length) {
     list.appendChild(listNotice(t('settings.familyEmpty')));
   } else {
-    // Ehemalige ans Ende, sonst in der Reihenfolge der Liste (der Server
-    // liefert sie schon so; nach einem Deaktivieren hier stimmt es ebenfalls).
-    const ordered = [...users.filter((u) => !u.deactivated_at), ...users.filter((u) => u.deactivated_at)];
-    list.insertAdjacentHTML('beforeend', ordered.map((u) => memberHtml(u, currentUserId)).join(''));
+    // Ehemalige ans Ende, davor und darin die Haushaltsreihenfolge (#1644).
+    // Der Server liefert die Liste schon so; sortiert wird hier, weil sie
+    // zwischen zwei Abrufen lokal weiterlebt - ein eben angelegtes Mitglied
+    // haengt am Ende des Arrays und gehoert ins Alphabet der Unplatzierten.
+    const ordered = orderedMembers(users);
+    list.insertAdjacentHTML('beforeend', ordered.map((u) => memberHtml(u, currentUserId, { orderable: canOrder.has(u.id), aligned: canOrder.size > 0 })).join(''));
   }
   window.lucide?.createIcons({ el: list });
+}
+
+// --------------------------------------------------------
+// Haushaltsreihenfolge: Ziehen und Pfeiltasten (#1644)
+// --------------------------------------------------------
+
+/** Die laufende Sortable-Instanz der Mitgliederliste; ein Neuaufbau raeumt sie ab. */
+let memberSortable = null;
+/** Was der delegierte Tastaturpfad braucht - je Aufbau der Liste neu gesetzt. */
+let memberOrderCtx = null;
+/** Laufende Sicherung: `{ again }`, solange eine Anfrage unterwegs ist. */
+let memberOrderRun = null;
+
+function orderableRows(list) {
+  return [...list.querySelectorAll(':scope > .settings-member--orderable')];
+}
+
+/** Position und Gesamtzahl in die Griff-Beschriftung: die einzige Rueckmeldung am fokussierten Griff. */
+function refreshMemberHandles(list) {
+  const rows = orderableRows(list);
+  rows.forEach((row, idx) => {
+    const name = row.querySelector('[data-member-name]')?.textContent?.trim() ?? '';
+    row.querySelector('.settings-member__drag')?.setAttribute('aria-label',
+      `${t('shopping.reorderHandle', { name })}, ${t('shopping.reorderPosition', { index: idx + 1, total: rows.length })}`);
+  });
+}
+
+function announceMemberMove(container, row) {
+  const el = container.querySelector('#members-order-announce');
+  const list = row?.parentElement;
+  if (!el || !list) return;
+  const rows = orderableRows(list);
+  const idx = rows.indexOf(row);
+  if (idx === -1) return;
+  // Derselbe Satz wie im Kategorie-Manager und in der Einkaufsliste - eine
+  // zweite Fassung derselben Aussage waeren 26 Uebersetzungen mehr.
+  el.textContent = t('category.reorderAnnounce', {
+    name: row.querySelector('[data-member-name]')?.textContent?.trim() ?? '',
+    position: idx + 1,
+    total: rows.length,
+  });
+}
+
+/** Liste neu zeichnen und alles daran wieder verdrahten; der Fokus kehrt zum Griff von `focusId` zurueck. */
+function repaintMembers(container, currentUser, users, focusId = null) {
+  renderMemberList(container, users, currentUser?.id, currentUser);
+  bindDeleteButtons(container, currentUser, users);
+  bindEditButtons(container, currentUser, users);
+  wireMemberOrder(container, currentUser, users);
+  if (focusId != null) container.querySelector(`[data-member-handle="${Number(focusId)}"]`)?.focus();
+}
+
+/**
+ * Einen Sicherungslauf: liest die Reihenfolge JETZT aus dem DOM und schickt
+ * die vollstaendige Liste - die Route nimmt nur alle Mitglieder zusammen.
+ */
+async function sendMemberOrder(container, currentUser, users) {
+  const list = container.querySelector('#members-list');
+  if (!list) return true;
+  const order = orderableRows(list).map((row) => Number(row.dataset.id)).filter(Number.isInteger);
+  try {
+    const res = await api.patch('/family/members/reorder', { order });
+    // Die Positionen aus der Antwort in den lokalen Stand: die Liste lebt
+    // zwischen zwei Abrufen weiter, und die naechste Zeichnung sortiert danach.
+    const positions = new Map((res?.data ?? []).map((member) => [member.id, member.sort_order ?? null]));
+    users.forEach((u, idx) => {
+      if (positions.has(u.id)) users[idx] = { ...u, sort_order: positions.get(u.id) };
+    });
+    return true;
+  } catch {
+    // Der Satz der App und nicht der englische der API: was nicht geklappt
+    // hat, ist hier immer dasselbe. Die Liste geht auf den Stand von vorher.
+    window.yuvomi?.showToast(t('quickLinks.orderError'), 'danger');
+    return false;
+  }
+}
+
+/**
+ * Die neue Reihenfolge sichern - der EINE Weg fuer Ziehen und Pfeiltasten,
+ * beide haben das DOM vorher schon umgestellt.
+ *
+ * IMMER NUR EINE LAUFENDE ANFRAGE. Zwei schnell gedrueckte Pfeiltasten
+ * schickten sonst zwei PATCHes parallel, und es entschiede die Ankunft beim
+ * Server statt die Bedienung. Weitere Zuege waehrend eines Laufs werden zu
+ * EINER Nachfolge: die liest die dann aktuelle Reihenfolge.
+ */
+function persistMemberOrder(container, currentUser, users, movedRow) {
+  const list = container.querySelector('#members-list');
+  if (!list) return;
+  refreshMemberHandles(list);
+  announceMemberMove(container, movedRow);
+  if (memberOrderRun) { memberOrderRun.again = true; return; }
+
+  const run = { again: false };
+  memberOrderRun = run;
+  (async () => {
+    let ok = true;
+    try {
+      do {
+        run.again = false;
+        ok = await sendMemberOrder(container, currentUser, users);
+      } while (run.again && ok);
+    } finally {
+      memberOrderRun = null;
+    }
+    // Der Griff, auf dem der Fokus JETZT steht, bekommt ihn nach dem
+    // Neuzeichnen zurueck - mitten in einer Tastaturbedienung waere ein
+    // verlorener Fokus das Ende der Bedienkette.
+    const focused = Number(document.activeElement?.dataset?.memberHandle) || null;
+    const shown = [...list.querySelectorAll(':scope > .settings-member')].map((row) => Number(row.dataset.id));
+    const wanted = orderedMembers(users).map((u) => u.id);
+    // Nach einem Fehler zurueck auf den gespeicherten Stand. Nach einem Erfolg
+    // nur, wenn die Liste anders dasteht als sie sortiert stuende: beim ersten
+    // Ordnen ruecken Konten ohne Position (Hauspersonal) hinter die Mitglieder.
+    if (!ok || shown.join(',') !== wanted.join(',')) repaintMembers(container, currentUser, users, focused);
+  })();
+}
+
+/** Verschiebt eine Zeile um einen Platz unter den ordenbaren und haelt den Fokus auf ihrem Griff. */
+function moveMemberRow(row, delta, ctx) {
+  const list = row?.parentElement;
+  if (!list) return;
+  const rows = orderableRows(list);
+  const ids = rows.map((r) => Number(r.dataset.id));
+  const id = Number(row.dataset.id);
+  const next = movedOrder(ids, id, delta);
+  if (next === ids) return;
+  const target = rows[ids.indexOf(id) + delta];
+  if (delta < 0) list.insertBefore(row, target);
+  else list.insertBefore(row, target.nextSibling);
+  vibrate(15);
+  row.querySelector('.settings-member__drag')?.focus();
+  persistMemberOrder(ctx.container, ctx.currentUser, ctx.users, row);
+}
+
+/**
+ * Verdrahtet Ziehen und Pfeiltasten an der Mitgliederliste.
+ *
+ * Wer nicht ordnen darf, bekommt weder Griff noch Sortable noch Tastaturpfad:
+ * die Reihenfolge bleibt sichtbar, die Handlung entfaellt (Nur-lesen-Regel).
+ */
+function wireMemberOrder(container, currentUser, users) {
+  const list = container.querySelector('#members-list');
+  if (!list) return;
+  try { memberSortable?.destroy?.(); } catch { /* schon abgeraeumt */ }
+  memberSortable = null;
+  memberOrderCtx = { container, currentUser, users };
+  if (!orderableIds(users, currentUser).length) return;
+  refreshMemberHandles(list);
+
+  makeSortable(list, {
+    handle: '.settings-member__drag',
+    draggable: '.settings-member--orderable',
+    onEnd: (evt) => persistMemberOrder(container, currentUser, users, evt?.item),
+  }).then((instance) => {
+    // Die Liste kann waehrend des lazy Imports neu gebaut worden sein.
+    if (instance && memberOrderCtx?.users === users && list.isConnected) memberSortable = instance;
+    else instance?.destroy?.();
+  }).catch(() => { /* ohne SortableJS bleibt der Tastaturpfad */ });
+
+  // Tastaturpfad, delegiert und einmal je Listenelement: `renderMemberList`
+  // tauscht nur den Inhalt, ein Listener je Aufbau haette sich gestapelt.
+  if (list.dataset.orderWired) return;
+  list.dataset.orderWired = '1';
+  list.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    const handle = e.target.closest?.('.settings-member__drag');
+    if (!handle || !memberOrderCtx) return;
+    e.preventDefault();
+    moveMemberRow(handle.closest('.settings-member'), e.key === 'ArrowUp' ? -1 : 1, memberOrderCtx);
+  });
 }
 
 function inviteHtml(invite) {
@@ -651,9 +881,7 @@ function bindDeleteButtons(container, currentUser, users) {
           if (idx !== -1) users.splice(idx, 1);
           window.yuvomi?.showToast(t('settings.memberDeletedToast', { name }), 'default');
         }
-        renderMemberList(container, users, currentUser?.id);
-        bindDeleteButtons(container, currentUser, users);
-        bindEditButtons(container, currentUser, users);
+        repaintMembers(container, currentUser, users);
         // Der Knopf, an den der Dialog den Fokus zurueckgibt, ist eben
         // weggerendert worden.
         refocusAfterRender();
@@ -874,9 +1102,7 @@ async function openEditMemberModal(member, currentUser, users, container) {
           if (currentUser?.id === member.id) Object.assign(currentUser, res.user);
           closeModal({ force: true });
           window.yuvomi?.showToast(t('settings.memberUpdatedToast', { name: res.user.display_name }), 'success');
-          renderMemberList(container, users, currentUser?.id);
-          bindDeleteButtons(container, currentUser, users);
-          bindEditButtons(container, currentUser, users);
+          repaintMembers(container, currentUser, users);
         } catch (err) {
           showError(errorEl, err.message ?? t('common.errorGeneric'));
         } finally {
@@ -956,9 +1182,7 @@ function openAddMemberModal(container, currentUser, users) {
         try {
           const res = await auth.createUser(data);
           users.push(res.user);
-          renderMemberList(container, users, currentUser?.id);
-          bindDeleteButtons(container, currentUser, users);
-          bindEditButtons(container, currentUser, users);
+          repaintMembers(container, currentUser, users);
           // Der Dialog gibt den Fokus beim Schliessen an "Mitglied hinzufuegen"
           // zurueck (modal.js) - kein Fall auf BODY wie beim Inline-Formular.
           closeModal({ force: true });
@@ -1002,8 +1226,9 @@ async function loadMembers(container, currentUser) {
     return;
   }
 
-  renderMemberList(container, users, currentUser?.id);
+  renderMemberList(container, users, currentUser?.id, currentUser);
   bindEvents(container, currentUser, users);
+  wireMemberOrder(container, currentUser, users);
   window.lucide?.createIcons({ el: container });
 }
 
@@ -1090,4 +1315,4 @@ export async function render(container, { user } = {}) {
 
 // Der Avatar als Programm (test:initials): welche Zeichen ohne Bild auf der
 // Scheibe stehen.
-export const __test = { avatarHtml };
+export const __test = { avatarHtml, memberHtml, orderableIds, movedOrder, orderedMembers, wireMemberOrder, renderMemberList };

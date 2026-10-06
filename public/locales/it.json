@@ -1910,6 +1910,7 @@
         "removeMemberNamed": "Rimuovi {{name}}",
         "memberDeactivatedToast": "Account di {{name}} disattivato. Le voci restano.",
         "memberFormerBadge": "Ex membro",
+        "memberOrderHint": "Questo ordine vale per tutta la famiglia: il calendario, l'orario e ogni elenco di persone lo seguono. Per cambiarlo trascina una maniglia oppure selezionala e premi i tasti freccia. I nuovi membri vengono dopo, ordinati per nome.",
         "logout": "Esci",
         "logoutConfirm": "Disconnettersi da questo dispositivo?",
         "synchronizing": "Sincronizzazione…",

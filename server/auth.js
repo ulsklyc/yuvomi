@@ -20,6 +20,7 @@ import { createLogger } from './logger.js';
 import { memberEmail } from './services/member-email.js';
 import {
   accessScopeSql, activeAccountSql, deactivatedAtColumnSql, householdMemberSql, isActiveAccount,
+  memberOrderSql, memberPositionSql,
 } from './services/household-members.js';
 import { RemovalRefused, removeUser } from './services/user-removal.js';
 import {
@@ -195,6 +196,8 @@ const USER_PUBLIC_COLUMNS = `
   changelog_seen_latest,
   ${accessScopeSql('users')} AS access_scope,
   ${deactivatedAtColumnSql('users')},
+  ${memberPositionSql('users')} AS sort_order,
+  ${householdMemberSql('users')} AS is_household_member,
   created_at,
   (SELECT phone FROM contacts WHERE contacts.family_user_id = users.id LIMIT 1) AS phone,
   (SELECT email FROM contacts WHERE contacts.family_user_id = users.id LIMIT 1) AS email,
@@ -601,6 +604,17 @@ function publicUser(row) {
     // Zeile bleibt, damit Urheberschaft und Salden bleiben; die Oberflaeche
     // markiert sie, statt sie zu verbergen.
     deactivated_at: row.deactivated_at ?? null,
+    // Position in der Haushaltsreihenfolge (#1644), `null` fuer ein nicht
+    // platziertes Mitglied und fuer jedes Konto, das kein Mitglied ist. Kommt
+    // aus `memberPositionSql()` und nie als rohe Spalte: der Vergleich im
+    // Browser (public/utils/member-order.js) liest dieses Feld.
+    sort_order: row.sort_order ?? null,
+    // Ob dieses Konto ein Haushaltsmitglied ist - die Menge, die
+    // `/family/members` zeigt und die allein eine Position haben kann. Die
+    // Familien-Einstellungen ordnen genau diese Zeilen; `sort_order: null`
+    // sagt es nicht, das traegt auch ein unplatziertes Mitglied. Unbedingt,
+    // weil auch die Antworten auf Anlegen und Aendern in dieser Liste landen.
+    is_household_member: Boolean(row.is_household_member),
     // Ob DIESES Konto den Onboarding-Rundgang noch braucht - jede Abfrage
     // ueber USER_PUBLIC_COLUMNS traegt die Spalte, daher hier unbedingt statt
     // ueber die `!== undefined`-Bedingung der beiden Felder darunter.
@@ -2952,7 +2966,7 @@ router.post('/2fa/recovery-codes', requireAuth, csrfMiddleware, twoFactorLimiter
  */
 router.get('/2fa/overview', requireAuth, requireAdmin, (_req, res) => {
   try {
-    res.json({ data: twoFactor.householdOverview(db.get()), required: twoFactor.isRequiredForHousehold(db.get()) });
+    res.json({ data: twoFactor.householdOverview(db.get(), memberOrderSql('u')), required: twoFactor.isRequiredForHousehold(db.get()) });
   } catch (err) {
     log.error('2FA overview error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -3023,6 +3037,12 @@ router.get('/users', requireAuth, (req, res) => {
     // - den Zustaendigen einer alten Aufgabe, den Ersteller eines Termins -,
     // und die Verwaltung muss sehen, wen sie deaktiviert hat. Auswaehlen laesst
     // sich ein Ehemaliger nirgends: jede Auswahl liest `/family/members`.
+    //
+    // INNERHALB DER AKTIVEN GILT DIE HAUSHALTSREIHENFOLGE (#1644). Stundenplan,
+    // Uebersicht und Kalender lesen ihre Personen aus dieser Liste; sortierte
+    // sie nach dem Namen, stuenden dieselben fuenf Menschen dort anders als in
+    // jeder Auswahl. Personal und Gaeste haben keine Position und stehen mit
+    // den unplatzierten Mitgliedern im Alphabet.
     const users = isAdmin
       ? db.get().prepare(`
           SELECT ${USER_PUBLIC_COLUMNS},
@@ -3030,14 +3050,14 @@ router.get('/users', requireAuth, (req, res) => {
                  (password_hash = ?) AS sso_only
           FROM users
           WHERE NOT EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = users.id)
-          ORDER BY ${activeAccountSql('users')} DESC, display_name
+          ORDER BY ${activeAccountSql('users')} DESC, ${memberOrderSql('users')}
         `).all(OIDC_PASSWORD_SENTINEL)
       : db.get().prepare(`
           SELECT ${USER_PUBLIC_COLUMNS},
                  EXISTS(SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = users.id) AS is_worker
           FROM users
           WHERE NOT EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = users.id)
-          ORDER BY ${activeAccountSql('users')} DESC, display_name
+          ORDER BY ${activeAccountSql('users')} DESC, ${memberOrderSql('users')}
         `).all();
     res.json({ data: users.map(publicUser) });
   } catch (err) {
@@ -3068,7 +3088,7 @@ router.get('/api-tokens', requireAuth, requireAdmin, (req, res) => {
       WHERE ${accessScopeSql('u')} = 'family'
         -- Kein Token fuer einen Ehemaligen (#1381): POST weist ihn ebenfalls ab.
         AND ${activeAccountSql('u')}
-      ORDER BY u.display_name
+      ORDER BY ${memberOrderSql('u')}
     `).all();
     res.json({ data: rows.map(publicApiToken), subjects });
   } catch (err) {

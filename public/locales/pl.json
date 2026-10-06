@@ -2122,6 +2122,7 @@
         "removeMemberNamed": "Usuń konto {{name}}",
         "memberDeactivatedToast": "Konto {{name}} zostało dezaktywowane. Wpisy pozostają.",
         "memberFormerBadge": "Były członek",
+        "memberOrderHint": "Ta kolejność obowiązuje w całym gospodarstwie domowym: kalendarz, plan zajęć i każda lista osób są z nią zgodne. Aby ją zmienić, przeciągnij uchwyt albo ustaw na nim fokus i naciśnij klawisze strzałek. Nowi członkowie pojawiają się za nią, posortowani według imienia.",
         "logout": "Wyloguj",
         "logoutConfirm": "Wylogować się z tego urządzenia?",
         "synchronizing": "Synchronizowanie…",

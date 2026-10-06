@@ -8,6 +8,7 @@ import { initials } from '/utils/initials.js';
 import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, advancedSection, refocusAfterRender, reportFieldError } from '/components/modal.js';
 import { makeSortable } from '/utils/sortable.js';
+import { memberRanks, memberRankOf } from '/utils/member-order.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
 import { rowActionHtml } from '/utils/row-action.js';
@@ -90,8 +91,13 @@ function saveOverviewViewMode(mode) {
  */
 function normalizeOverviewSelection(rawIds, eligibleIds) {
   if (!Array.isArray(rawIds)) return [];
-  const eligible = new Set(eligibleIds);
-  return rawIds.filter((id) => eligible.has(id));
+  // IN DER REIHENFOLGE DER WAEHLBAREN, NICHT DER GESPEICHERTEN (#1644). Die
+  // Spuren stehen in der Haushaltsreihenfolge, in der `eligibleIds` vom Server
+  // kommt. Die gespeicherte Folge war die des Auswahlfelds beim letzten
+  // Antippen - nach einem Umordnen der Familie haette sie die alte Ordnung
+  // gehalten, bis jemand ein Haekchen anfasst.
+  const chosen = new Set(rawIds);
+  return [...eligibleIds].filter((id) => chosen.has(id));
 }
 
 function loadSavedOverviewSelection() {
@@ -1051,9 +1057,21 @@ function sameFieldValues(a = {}, b = {}) {
   return keysA.every((key) => a[key] === b[key]);
 }
 
+/**
+ * Vergleich fuer Zeilen, die an einer Person haengen: Haushaltsreihenfolge
+ * (#1644), bei Gleichstand die user_id. `state.users` ist das Kontenverzeichnis
+ * und traegt die Position; wer dort fehlt, steht am Ende. Die user_id bleibt
+ * als letzter Schluessel, damit die Zeilen EINER Person zusammenstehen - das
+ * Verschmelzen aufeinanderfolgender Tage darunter verlaesst sich darauf.
+ */
+function byPersonThenDate(people = state.users) {
+  const ranks = memberRanks(people);
+  return (a, b) => memberRankOf(ranks, a.user_id) - memberRankOf(ranks, b.user_id)
+    || Number(a.user_id) - Number(b.user_id) || a.date_key.localeCompare(b.date_key);
+}
+
 function overrideGroups(overrides = state.overrides) {
-  const sorted = [...overrides].sort((a, b) =>
-    Number(a.user_id) - Number(b.user_id) || a.date_key.localeCompare(b.date_key));
+  const sorted = [...overrides].sort(byPersonThenDate());
   const groups = [];
   for (const row of sorted) {
     const last = groups[groups.length - 1];
@@ -1152,8 +1170,7 @@ function emptyExtraShiftsState() {
 // Parameter mit state-Default wie overrideGroups(): so laesst sich das
 // Verschmelzen behavioral testen, ohne state von aussen zu beschreiben.
 function extraGroups(extras = state.extras) {
-  const sorted = [...extras].sort((a, b) =>
-    Number(a.user_id) - Number(b.user_id) || a.date_key.localeCompare(b.date_key));
+  const sorted = [...extras].sort(byPersonThenDate());
   const groups = [];
   for (const row of sorted) {
     const last = groups[groups.length - 1];
@@ -1483,10 +1500,10 @@ function renderToday() {
 //
 // Feste Spur je Person, nie nach Aktivitaet umsortiert. Die Reihenfolge kommt
 // unveraendert aus `getSelectedUserIds()` (DOM-Reihenfolge des Multi-Select-
-// Widgets, alphabetisch nach display_name) - NICHT aus der Klickreihenfolge,
+// Widgets, also die Haushaltsreihenfolge aus #1644) - NICHT aus der Klickreihenfolge,
 // wie ein frueherer Stand dieses Kommentars behauptete (Review-Fund
 // 2026-09-05, #1022). Das ist das richtige Verhalten, nur die Beschreibung
-// war falsch: alphabetisch bleibt stabil ueber jede Auswahlaenderung hinweg,
+// war falsch: die Haushaltsreihenfolge bleibt stabil ueber jede Auswahlaenderung hinweg,
 // eine Klickreihenfolge wuerde sich bei jedem Abwaehlen/Neuwaehlen verschieben.
 // Der ganze Sinn der Ansicht ist, dass "Kind 2s Spalte" jeden Tag an
 // derselben Stelle steht, damit das Auge sie ueber eine Woche verfolgen kann;

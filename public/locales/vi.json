@@ -1927,6 +1927,7 @@
         "removeMemberNamed": "Gỡ {{name}}",
         "memberDeactivatedToast": "Đã vô hiệu hóa {{name}}. Các mục vẫn được giữ lại.",
         "memberFormerBadge": "Thành viên cũ",
+        "memberOrderHint": "Thứ tự này áp dụng cho cả gia đình: lịch, thời khóa biểu và mọi danh sách người đều theo thứ tự này. Để thay đổi, hãy kéo tay nắm hoặc đặt tiêu điểm vào đó rồi nhấn các phím mũi tên. Thành viên mới xếp sau, theo tên.",
         "logout": "Đăng xuất",
         "logoutConfirm": "Đăng xuất khỏi thiết bị này?",
         "synchronizing": "Đang đồng bộ…",

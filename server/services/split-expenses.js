@@ -277,7 +277,14 @@ function simplifyDebts(balanceRows) {
  * hat Migration v227 einmal entfernt; neue entstehen seit v225 nicht mehr,
  * weil jede Zeile `expenses.created_by` traegt und mit ihrer Ausgabe faellt.
  */
-function groupBalanceRows(database, groupId) {
+function groupBalanceRows(database, groupId, memberOrder = 'u.display_name COLLATE NOCASE ASC') {
+  // DIE PERSONENFOLGE JE WAEHRUNG WIRD GEREICHT (#1644): die Route der
+  // Ausgleichs-Ansicht zeigt diese Zeilen als Liste und gibt `memberOrderSql('u')`
+  // herein. Dieses Modul importiert `server/db.js` bewusst nicht und damit auch
+  // nicht household-members.js. Der Standardwert gilt fuer Aufrufer, die die
+  // Zeilen nur verrechnen (`openBalancesForUser()`, Tests): `simplifyDebts()`
+  // sortiert Schuldner und Glaeubiger selbst nach user_id, die Folge hier
+  // entscheidet also nie, wer wem zahlt - nur, wie `balances[]` dasteht.
   return database.prepare(`
     SELECT l.currency, l.user_id, u.display_name, SUM(l.amount_minor) AS net_minor
     FROM expense_ledger_entries l
@@ -285,7 +292,7 @@ function groupBalanceRows(database, groupId) {
     WHERE l.group_id = ?
     GROUP BY l.currency, l.user_id
     HAVING net_minor != 0
-    ORDER BY l.currency ASC, u.display_name COLLATE NOCASE ASC
+    ORDER BY l.currency ASC, ${memberOrder}
   `).all(groupId);
 }
 

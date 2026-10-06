@@ -11,6 +11,7 @@ import { todaySheetContext, collectSourceRows, composeTodaySheet, codaAllowed, s
 import { t, formatDate, formatDayMonth, formatTime, timeSuffix, getLocale, getNumberFormat } from '/i18n.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
+import { compareMembers, sortMembers } from '/utils/member-order.js';
 import { buildWeekStrip } from '/utils/week-strip.js';
 import { relativeDateLabel, housekeepingSinceLabel } from '/utils/day-label.js';
 import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
@@ -2678,9 +2679,11 @@ function renderRewardsSelf(me, rewards, spans) {
 }
 
 function renderRewardsFamily(members, rewards, spans) {
-  // Nach Namen, nicht nach Punkten: eine Reihenfolge nach Stand WAERE die
-  // Rangliste, nur ohne Ziffern.
-  const sorted = [...members].sort((a, b) => String(a.display_name).localeCompare(String(b.display_name), getLocale()));
+  // In der Haushaltsreihenfolge (#1644), nicht nach Punkten: eine Reihenfolge
+  // nach Stand WAERE die Rangliste, nur ohne Ziffern. Der Server liefert die
+  // Liste schon so; sortiert wird hier trotzdem, weil die Zusage dieser Kachel
+  // ("nie nach Stand") nicht an der Abfrage einer anderen Datei haengen soll.
+  const sorted = sortMembers(members);
   const cap = spans.rows >= 2 ? REWARD_MEMBERS_TALL : REWARD_MEMBERS_SHORT;
   const shown = sorted.slice(0, cap);
   const rows = shown.map((m) => `
@@ -5346,7 +5349,8 @@ function renderWallWho(data, model) {
 
   const onDuty = users
     .filter((u) => counts.has(u.id))
-    .sort((a, b) => (counts.get(b.id) - counts.get(a.id)) || String(a.display_name).localeCompare(String(b.display_name)));
+    // Wer am meisten zu tun hat, zuerst; bei Gleichstand die Haushaltsreihenfolge (#1644).
+    .sort((a, b) => (counts.get(b.id) - counts.get(a.id)) || compareMembers(a, b));
 
   const shown = onDuty.slice(0, WALL_WHO_CAP);
   const body = shown.length

@@ -1968,6 +1968,7 @@
         "removeMemberNamed": "Alisin si {{name}}",
         "memberDeactivatedToast": "Na-deactivate si {{name}}. Nananatili ang mga entry.",
         "memberFormerBadge": "Dating miyembro",
+        "memberOrderHint": "Ang pagkakasunod-sunod na ito ay para sa buong sambahayan: sinusunod ito ng kalendaryo, ng iskedyul, at ng bawat listahan ng mga tao. Para baguhin, i-drag ang hawakan o i-focus ito at pindutin ang mga arrow key. Ang mga bagong miyembro ay kasunod nito, nakaayos ayon sa pangalan.",
         "logout": "Mag-log out",
         "logoutConfirm": "Mag-log out sa device na ito?",
         "synchronizing": "Nagsi-sync…",

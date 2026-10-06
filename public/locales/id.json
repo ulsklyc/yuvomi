@@ -1968,6 +1968,7 @@
         "removeMemberNamed": "Keluarkan {{name}}",
         "memberDeactivatedToast": "{{name}} dinonaktifkan. Entri tetap disimpan.",
         "memberFormerBadge": "Mantan anggota",
+        "memberOrderHint": "Urutan ini berlaku untuk seluruh rumah tangga: kalender, jadwal, dan setiap daftar orang mengikutinya. Untuk mengubahnya, seret gagangnya atau fokuskan lalu tekan tombol panah. Anggota baru berada setelahnya, diurutkan menurut nama.",
         "logout": "Keluar",
         "logoutConfirm": "Keluar dari perangkat ini?",
         "synchronizing": "Menyinkronkan…",

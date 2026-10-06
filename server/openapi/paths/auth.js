@@ -443,6 +443,8 @@ export function authPaths() {
           + 'It is not a picker source: pickers read `GET /api/v1/family/members`. '
           + 'A deactivated account (see `DELETE /api/v1/auth/users/{id}`) stays in this list, sorted after the active ones, '
           + 'with `deactivated_at` set to the moment it was deactivated; the field is `null` for an active account. '
+          + 'Within the active and within the deactivated accounts the list follows the household member order (see `GET /api/v1/family/members`): '
+          + '`sort_order` is the position of a household member, `null` for an unplaced member and for every account that is no household member; `is_household_member` tells the two apart. '
           + 'Administrators additionally get sso_only per member; how someone else signs in is not a detail every '
           + 'member needs, for the same reason the 2FA overview is a separate admin endpoint.',
       }),

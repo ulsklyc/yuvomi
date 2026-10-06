@@ -39,6 +39,7 @@ import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { withChosenPeople } from '/utils/people-picker.js';
+import { compareMembers, memberRanks, memberRankOf } from '/utils/member-order.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 
@@ -1712,7 +1713,7 @@ function renderCategoryBars(byCategory) {
  * niemand kuemmert, ist die interessanteste Zeile der Ansicht, aber nicht die
  * erste, die jemand sucht.
  */
-function groupEntriesByResponsible(entries) {
+function groupEntriesByResponsible(entries, members = state.members) {
   const groups = new Map();
   const unassigned = [];
   for (const e of entries) {
@@ -1723,8 +1724,12 @@ function groupEntriesByResponsible(entries) {
       groups.get(person.id).entries.push(e);
     }
   }
+  // In der Haushaltsreihenfolge (#1644). Die Person an einer Buchung traegt
+  // keine Position, die Mitgliederliste schon - der Rang kommt deshalb von
+  // dort. Wer nicht (mehr) Mitglied ist, steht hinter den Mitgliedern, nach Name.
+  const ranks = memberRanks(members);
   const ordered = [...groups.values()].sort((a, b) =>
-    String(a.person.display_name ?? '').localeCompare(String(b.person.display_name ?? '')));
+    memberRankOf(ranks, a.person.id) - memberRankOf(ranks, b.person.id) || compareMembers(a.person, b.person));
   if (unassigned.length) ordered.push({ person: null, entries: unassigned });
   return ordered;
 }
