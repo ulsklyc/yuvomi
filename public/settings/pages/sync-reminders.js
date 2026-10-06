@@ -56,7 +56,7 @@ function renderPage(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">
-      <h2 class="settings-section__title">${t('settings.caldavRemindersToggle')}</h2>
+      <h2 class="settings-section__title">${t('settings.pageSyncReminders')}</h2>
       <div class="settings-card">
         <p class="settings-card-description">${t('settings.caldavRemindersHint')}</p>
         <div class="settings-form-actions">
