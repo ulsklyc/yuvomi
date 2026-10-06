@@ -1469,6 +1469,15 @@ test('Fortsetzen: unbekannter Wert fuer missed -> 400 mit reason, nichts aendert
     assert.deepEqual(fortgesetzt(id), []);
     // `null` ist "keine Angabe", wie ein fehlendes Feld.
     assert.equal((await setzeFort(id, { missed: null })).body.data.next_run_date, '2026-09-10');
+    // Die Serie laeuft jetzt wieder, der naechste Aufruf wuerde pausieren. Der
+    // Wert wird bei JEDEM Aufruf geprueft, nicht nur beim Fortsetzen: ein
+    // Umschalter weiss nicht, was der Aufrufer meinte, und eine Eingabe, die
+    // beim Fortsetzen abgelehnt wird, soll beim Pausieren nicht still durchgehen.
+    const laufend = serienStand(id);
+    const r = await setzeFort(id, { missed: 'all' });
+    assert.equal(r.status, 400);
+    assert.equal(r.body.reason, 'invalid_missed');
+    assert.deepEqual(serienStand(id), laufend, 'nicht pausiert');
   });
 });
 
