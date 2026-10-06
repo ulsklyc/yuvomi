@@ -404,6 +404,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the dialog shows - quantity, location, category, best-before date, minimum stock and note.
   The cart button stays for members who may write to the shopping list.
 
+- **The budget shows the whole list again when you come back to it** (#1593). Tapping a
+  person's avatar on an entry narrows the list to what that person is responsible for. That
+  filter survived leaving the budget: you opened another page, came back, and still saw only
+  those entries. It now falls back when the budget is opened, like the account filter and the
+  loan filters always did. Within the budget it stays as it was, also across months.
+
+- **The budget page answers a refused action in your language, at the field it is about**
+  (#1668). Outside the loan dialog the page still showed whatever the server answered - in
+  English, or for an account that no longer exists in German ("Konto nicht gefunden.") - as a
+  toast, in every language. Saving an entry, a series or an account, booking an expected
+  entry, adding a category, ticking off or deleting an installment, and deleting an entry, a
+  series, an account or a loan now say it in the app's own sentence. Where the refusal is
+  about one field of an open dialog, the sentence stands at that field: an account that was
+  deleted in the meantime at "Account", an amount above what is left of a loan at "Amount".
+  The loan dialog got more precise as well: a loan that would run too long says so, with the
+  limit of 600 months, instead of "does not amortize" - in the preview and on saving; 361
+  installments are answered with the allowed range of 1 to 360; too many installments
+  already paid names how many the loan has; and title, notes, currency and account each have
+  a sentence of their own instead of the general "could not be saved". For API clients:
+  every 400 and 409 of the write routes for entries, series, accounts, categories and loans
+  now carries a `reason` next to `error`, three of them with `max` (the limit the refusal is
+  about); budget plans are unchanged. A refused `POST /api/v1/budget/loans/preview` says why
+  (`reason`, `max`). The `error` texts are unchanged, with one correction: an unknown
+  `account_id` was answered in German and now reads "Account not found." or "account_id must
+  be a valid account id.".
+
 ## [2.73.0] - 2026-10-04
 
 ### Fixed

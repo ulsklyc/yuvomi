@@ -1058,15 +1058,48 @@ export function entryWithLoanMeta(id) {
 export const ACCOUNT_TYPE_KEYS = ['checking', 'savings', 'cash', 'credit', 'investment', 'other'];
 
 /**
+ * Eine Absage mit ihrem Grund (#1656, #1668).
+ *
+ * Der Satz bleibt, wie er war - er ist die zugesagte Antwort der API. Der Grund
+ * kommt dazu, damit die Seite die Absage am Feld und in der Sprache der
+ * Oberflaeche zeigen kann, statt den Satz des Servers durchzureichen. Wer hier
+ * einen Grund ergaenzt, ordnet ihn in `LOAN_REFUSALS` bzw. `BUDGET_REFUSALS`
+ * (public/pages/budget.js) ein; test:budget-ui haelt die Listen deckungsgleich.
+ *
+ * `extra` traegt, was der Satz der Oberflaeche nennen soll und nur der Server
+ * weiss - heute `max` (die Grenze, an der die Absage haengt).
+ */
+export const refusal = (reason, error, extra = {}) => ({ ...extra, reason, error });
+
+/** Die Fehler allgemeiner Validatoren (str/num/date/oneOf) unter einem Grund. */
+export const refusals = (reason, results) => results
+  .filter((result) => result.error)
+  .map((result) => refusal(reason, result.error));
+
+/**
+ * Absage aus einer Liste: alle Saetze wie bisher in `error`, Grund (und `max`)
+ * der ERSTEN in `reason` - ein Dialog zeigt ohnehin ein Feld nach dem anderen.
+ */
+export function refuse(res, errors, status = 400) {
+  const [first] = errors;
+  return res.status(status).json({
+    error: errors.map((e) => e.error).join(' '),
+    code: status,
+    reason: first.reason,
+    ...(first.max !== undefined ? { max: first.max } : {}),
+  });
+}
+
+/**
  * Prüft eine optionale Konto-Zuordnung aus dem Request.
  * @returns {{ value: number|null }|{ error: string }} value=null ⇒ keinem Konto zugeordnet.
  */
 export function validateAccountRef(raw) {
   if (raw === undefined || raw === null || raw === '') return { value: null };
   const id = Number(raw);
-  if (!Number.isInteger(id) || id <= 0) return { error: 'account_id muss eine gültige Konto-ID sein.' };
+  if (!Number.isInteger(id) || id <= 0) return { error: 'account_id must be a valid account id.' };
   const row = db.get().prepare('SELECT id FROM budget_accounts WHERE id = ?').get(id);
-  if (!row) return { error: 'Konto nicht gefunden.' };
+  if (!row) return { error: 'Account not found.' };
   return { value: id };
 }
 

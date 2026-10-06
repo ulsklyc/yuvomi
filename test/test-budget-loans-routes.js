@@ -1014,13 +1014,13 @@ test('#1656: jede Absage des Darlehens-Formulars traegt ihren Grund, der Satz bl
     [{ ...base, start_month: undefined }, 'loan_start_month_invalid', 'Start month is required.'],
     [{ ...base, total_amount: 0 }, 'loan_amount_invalid', 'Amount must be greater than zero.'],
     [{ ...base, total_amount: undefined }, 'loan_amount_invalid', 'Amount is required.'],
-    [{ ...base, installment_count: 361 }, 'loan_installments_invalid', 'Installment count must be between 1 and 360.'],
+    [{ ...base, installment_count: 361 }, 'loan_installments_invalid', 'Installment count must be between 1 and 360.', { max: 360 }],
     [{ ...base, paid_installments: -1 }, 'loan_paid_installments_invalid', 'Paid installments must be zero or a positive number.'],
-    [{ ...base, paid_installments: 13 }, 'loan_paid_installments_exceed', 'Paid installments cannot exceed the installment count.'],
+    [{ ...base, paid_installments: 13 }, 'loan_paid_installments_exceed', 'Paid installments cannot exceed the installment count.', { max: 12 }],
     [{ ...base, direction: 'sideways' }, 'loan_direction_invalid', 'Direction must be either lent or borrowed.'],
     [{ ...base, currency: 'US' }, 'loan_currency_invalid', 'Currency must be a three-letter ISO code.'],
     [{ ...base, currency: 'USD', exchange_rate: 0 }, 'loan_exchange_rate_invalid', 'Exchange rate must be greater than zero.'],
-    [{ ...base, account_id: 987654 }, 'loan_account_invalid', 'Konto nicht gefunden.'],
+    [{ ...base, account_id: 987654 }, 'loan_account_invalid', 'Account not found.'],
     [{ ...interest, principal: 0 }, 'loan_principal_invalid', 'Principal must be greater than zero.'],
     [{ ...interest, fixed_rate: 101 }, 'loan_rate_invalid', 'Fixed rate must be between 0 and 100.'],
     [{ ...interest, initial_repayment_rate: 0 }, 'loan_repayment_invalid', 'Initial repayment rate must be greater than 0 and at most 100.'],
@@ -1028,13 +1028,30 @@ test('#1656: jede Absage des Darlehens-Formulars traegt ihren Grund, der Satz bl
     [{ ...twoPhase, followup_rate: 101 }, 'loan_followup_rate_invalid', 'Follow-up rate must be between 0 and 100.'],
     [{ ...twoPhase, principal: 100000, fixed_rate: 1, initial_repayment_rate: 1, fixed_period_months: 12, followup_rate: 20 },
       'loan_not_amortizing', 'The monthly rate does not cover the interest; the loan never amortizes.'],
-    // Mit Zins zaehlt die abgeleitete Laufzeit - dieselbe Zahl wie in der Vorschau.
-    [{ ...interest, paid_installments: 100000 }, 'loan_paid_installments_exceed', 'Paid installments cannot exceed the installment count.'],
+    // #1668: laeuft zu lange - mit der Grenze, damit der Dialog sie nennen kann.
+    [{ ...interest, fixed_rate: 5, initial_repayment_rate: 0.01 }, 'loan_term_too_long', 'The resulting term exceeds the supported maximum.', { max: 600 }],
   ];
-  for (const [body, reason, error] of cases) {
+  // #1668: `max` ist die Grenze, an der die Absage haengt (360 Raten, 600 Monate,
+  // die Raten des Darlehens). Sie kommt dazu, der Satz bleibt.
+  for (const [body, reason, error, extra = {}] of cases) {
     const r = await call('POST', '/loans', { as: AA, body });
-    assert.deepEqual(r.body, { error, code: 400, reason }, `POST ${reason}`);
+    assert.deepEqual(r.body, { error, code: 400, reason, ...extra }, `POST ${reason}`);
   }
+  // Mit Zins zaehlt die abgeleitete Laufzeit - dieselbe Zahl wie in der Vorschau.
+  const preview = await call('POST', '/loans/preview', { as: AA, body: interest });
+  const term = preview.body.data.total_months;
+  assert.ok(Number.isInteger(term) && term > 12, `Vorbedingung: die Vorschau nennt eine Laufzeit (${term})`);
+  const beyond = await call('POST', '/loans', { as: AA, body: { ...interest, paid_installments: 100000 } });
+  assert.deepEqual(beyond.body, {
+    error: 'Paid installments cannot exceed the installment count.', code: 400, reason: 'loan_paid_installments_exceed', max: term,
+  });
+  // Die Vorschau sagt, WARUM sie nichts rechnet - derselbe Grund wie beim Speichern.
+  const tooLong = await call('POST', '/loans/preview', { as: AA, body: { ...interest, fixed_rate: 5, initial_repayment_rate: 0.01 } });
+  assert.deepEqual(tooLong.body, { data: { ok: false, reason: 'loan_term_too_long', max: 600 } });
+  const never = await call('POST', '/loans/preview', {
+    as: AA, body: { ...twoPhase, principal: 100000, fixed_rate: 1, initial_repayment_rate: 1, fixed_period_months: 12, followup_rate: 20 },
+  });
+  assert.deepEqual(never.body, { data: { ok: false, reason: 'loan_not_amortizing' } });
 
   // Mehrere Absagen: alle Saetze wie bisher, der Grund der ersten.
   const both = await call('POST', '/loans', { as: AA, body: { ...base, installment_count: 0, paid_installments: -1 } });
@@ -1042,6 +1059,7 @@ test('#1656: jede Absage des Darlehens-Formulars traegt ihren Grund, der Satz bl
     error: 'Installment count must be between 1 and 360. Paid installments must be zero or a positive number.',
     code: 400,
     reason: 'loan_installments_invalid',
+    max: 360,
   });
 
   // Bearbeiten: beide Wege (mit und ohne interest_mode).
@@ -1052,15 +1070,15 @@ test('#1656: jede Absage des Darlehens-Formulars traegt ihren Grund, der Satz bl
     [{ ...base, interest_mode: 'none', installment_count: 2 }, 'loan_term_below_paid', 'The resulting term is shorter than the already paid installments.'],
     [{ installment_count: 2 }, 'loan_term_below_paid', 'Installment count cannot be lower than paid installments.'],
     [{ ...base, interest_mode: 'compound' }, 'loan_interest_mode_invalid', 'Interest mode is invalid.'],
-    [{ ...base, interest_mode: 'none', installment_count: 361 }, 'loan_installments_invalid', 'Installment count must be between 1 and 360.'],
-    [{ installment_count: 361 }, 'loan_installments_invalid', 'Installment count must be between 1 and 360.'],
+    [{ ...base, interest_mode: 'none', installment_count: 361 }, 'loan_installments_invalid', 'Installment count must be between 1 and 360.', { max: 360 }],
+    [{ installment_count: 361 }, 'loan_installments_invalid', 'Installment count must be between 1 and 360.', { max: 360 }],
     [{ total_amount: -5 }, 'loan_amount_invalid', 'Amount must be greater than zero.'],
     [{ direction: 'sideways' }, 'loan_direction_invalid', 'Direction must be either lent or borrowed.'],
-    [{ account_id: 987654 }, 'loan_account_invalid', 'Konto nicht gefunden.'],
+    [{ account_id: 987654 }, 'loan_account_invalid', 'Account not found.'],
   ];
-  for (const [body, reason, error] of puts) {
+  for (const [body, reason, error, extra = {}] of puts) {
     const r = await call('PUT', `/loans/${id}`, { as: AA, body });
-    assert.deepEqual(r.body, { error, code: 400, reason }, `PUT ${reason}`);
+    assert.deepEqual(r.body, { error, code: 400, reason, ...extra }, `PUT ${reason}`);
   }
   const withInterest = await call('POST', '/loans', { as: AA, body: interest });
   assert.equal(withInterest.status, 201);

@@ -1621,11 +1621,51 @@ test('der „Nur Ausgaben"-Umschalter nutzt Tokens, keine Farbliterale', () => {
 test('Filterzustand überlebt den Modulwechsel nicht', () => {
   // `state` ist ein Modul-Singleton: ohne Reset zeigt das Budget beim nächsten
   // Besuch noch den Kontoauszug von damals.
+  //
+  // #1593: Dieser Test las bis dahin nur den Quelltext von render() nach vier
+  // Zuweisungen ab - und war gruen, waehrend der Zustaendigen-Filter den
+  // Seitenwechsel ueberlebte (gemessen: 23 Buchungen, Filter gesetzt, Seite
+  // verlassen und zurueck, 1 Buchung). Jetzt laeuft der Reset als Programm, und
+  // die Liste der Filter kommt aus dem Zustand selbst: ein neuer Filter, den
+  // der Reset nicht kennt, faellt hier auf.
+  const dirty = {
+    accountFilterId: 7, responsibleFilterId: 3, responsibleFilterCachedName: 'Clara',
+    loanFilterId: 9, loanStatusFilter: 'paid', accountsShowArchived: true,
+  };
+  const target = { ...dirty, activeTab: 'loans', month: '2026-03', groupByResponsible: true };
+  budgetUi.resetSessionFilters(target);
+  assert.deepEqual(target, {
+    accountFilterId: null, responsibleFilterId: null, responsibleFilterCachedName: '',
+    loanFilterId: null, loanStatusFilter: 'active', accountsShowArchived: false,
+    // Bleibt bewusst: der Reiter, der Monat (render setzt ihn selbst) und die
+    // Gruppierung, die eine gespeicherte Anzeige-Einstellung ist.
+    activeTab: 'loans', month: '2026-03', groupByResponsible: true,
+  });
+  // Die Liste wird danach wieder ganz gezeigt - gemessen an der Funktion, die
+  // die Buchungen fuer die Liste auswaehlt.
+  const entries = [
+    { id: 1, responsible_users: [{ id: 3, display_name: 'Clara' }] },
+    { id: 2, responsible_users: [] },
+  ];
+  const before = { ...budgetUi.state };
+  try {
+    Object.assign(budgetUi.state, { entries, responsibleFilterId: 3, responsibleFilterCachedName: 'Clara' });
+    assert.deepEqual(budgetUi.visibleEntries().map((e) => e.id), [1], 'Vorbedingung: der Filter kuerzt die Liste');
+    budgetUi.resetSessionFilters(budgetUi.state);
+    assert.deepEqual(budgetUi.visibleEntries().map((e) => e.id), [1, 2]);
+  } finally { Object.assign(budgetUi.state, before); }
+  // Jeder Filter des Zustands ist gefuehrt: was im Zustand "Filter" heisst,
+  // setzt der Reset zurueck.
+  const inState = Object.keys(budgetUi.state).filter((key) => /Filter/.test(key));
+  assert.ok(inState.length >= 4, `Vorbedingung: Filter im Zustand gefunden (${inState})`);
+  const probe = Object.fromEntries(inState.map((key) => [key, 'gesetzt']));
+  budgetUi.resetSessionFilters(probe);
+  assert.deepEqual(inState.filter((key) => probe[key] === 'gesetzt'), [], 'ein Filter ueberlebt das Betreten der Seite');
+  // Und render() ruft ihn, bevor es zum ersten Mal wartet.
   const enter = budget.match(/export async function render\([\s\S]*?renderBody\(\);/);
   assert.ok(enter);
-  for (const field of ['accountFilterId', 'loanFilterId', 'loanStatusFilter', 'accountsShowArchived']) {
-    assert.match(enter[0], new RegExp(`state\\.${field} = `), `${field} wird beim Betreten nicht zurückgesetzt`);
-  }
+  const call = enter[0].indexOf('resetSessionFilters(state);');
+  assert.ok(call !== -1 && call < enter[0].indexOf('await '), 'render() setzt die Filter nicht zurueck, bevor es wartet');
 });
 
 test('der Konto-Drilldown verliert den Fokus nicht', () => {
@@ -3642,7 +3682,11 @@ test('#1656: eine Absage des Darlehens-Dialogs wird nie zum Satz des Servers', (
 
 test('#1656: jeder Grund des Servers ist eingeordnet, jedes Feld gibt es, jeder Satz steht in jeder Sprache', () => {
   const server = read('../server/routes/budget/loans.js');
-  const atServer = new Set([...server.matchAll(/\brefusals?\('(loan_[a-z_]+)'/g)].map((m) => m[1]));
+  // Bis zu den Raten: was danach kommt (Rate abhaken), ist kein Formular und
+  // steht seit #1668 in BUDGET_REFUSALS.
+  const formPart = server.slice(0, server.indexOf("router.post('/loans/:id/payments'"));
+  assert.ok(formPart.length > 1000, 'Vorbedingung: der Teil vor den Raten wurde gefunden');
+  const atServer = new Set([...formPart.matchAll(/\brefusals?\('(loan_[a-z_]+)'/g)].map((m) => m[1]));
   assert.ok(atServer.size >= 20, `zu wenige Gruende gelesen (${atServer.size}) - das Muster greift nicht mehr`);
   const known = new Set(budgetUi.LOAN_REFUSALS.keys());
   assert.deepEqual([...atServer].filter((r) => !known.has(r)), [], 'ein Grund des Servers ohne Feld und Satz im Dialog');
@@ -3661,8 +3705,9 @@ test('#1656: jeder Grund des Servers ist eingeordnet, jedes Feld gibt es, jeder 
   const locales = files.map((name) => [name, JSON.parse(readFileSync(new URL(name, dir), 'utf8'))]);
   const NEW = new Set(['budget.loanPaidInstallmentsInvalid', 'budget.loanPaidInstallmentsTooMany', 'budget.loanTermBelowPaid', 'budget.loanSaveFailed']);
   const keys = new Set();
-  for (const [reason, [fields, key]] of budgetUi.LOAN_REFUSALS) {
+  for (const [reason, [fields, key, keyWithMax]] of budgetUi.LOAN_REFUSALS) {
     keys.add(key);
+    if (keyWithMax) keys.add(keyWithMax);
     for (const selector of (fields ?? '').split(',').map((s) => s.trim()).filter(Boolean)) {
       assert.match(selector, /^#lm-[a-z-]+$/, `${reason}: ${selector}`);
       // #lm-account gibt es nur, wenn ein Konto angelegt ist.
@@ -3695,6 +3740,303 @@ test('#1656: die Textfelder des Darlehens lassen nicht mehr zu, als der Server a
     const tag = html.match(new RegExp(`<(?:input|textarea)[^>]*id="${id}"[^>]*>`))?.[0] ?? '';
     assert.match(tag, new RegExp(`maxlength="${max}"`), `${id}: ${tag}`);
   }
+});
+
+// ─── #1668: die uebrigen Saetze des Servers, und genauere im Darlehens-Dialog ─
+// Nach #1656 zeigte nur der Darlehens-Dialog seine Absagen uebersetzt und am
+// Feld. 13 weitere Stellen dieser Seite schrieben `err.data.error` in einen
+// Toast - englisch oder, fuer das Konto, deutsch. Und vier Saetze des Dialogs
+// waren ungenau: "tilgt nicht" fuer ein Darlehen, das zu lange laeuft, "Anzahl
+// eingeben" fuer 361 Raten, "zu viele" ohne Zahl, und der allgemeine Satz an
+// Titel, Notizen, Waehrung und Konto.
+
+const SERVER_SENTENCE = 'A sentence this client has never seen.';
+
+function withOnline(fn) {
+  const before = globalThis.navigator;
+  Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
+  try { return fn(); } finally {
+    Object.defineProperty(globalThis, 'navigator', { value: before, configurable: true, writable: true });
+  }
+}
+
+test('#1668: der Darlehens-Dialog nennt die Grenze und hat fuer jedes Feld einen eigenen Satz', () => withOnline(() => {
+  const refusal = (reason, extra = {}) => ({ status: 400, message: SERVER_SENTENCE, data: { error: SERVER_SENTENCE, code: 400, reason, ...extra } });
+  for (const [reason, extra, fields, message] of [
+    // Laeuft zu lange: ein eigener Satz mit der Grenze, nicht mehr "tilgt nicht".
+    ['loan_term_too_long', { max: 600 }, '#lm-initial-repayment', 'budget.loanTermTooLong{"max":600}'],
+    ['loan_not_amortizing', {}, '#lm-initial-repayment', 'budget.loanPreviewInvalid'],
+    // 361 Raten: der Satz nennt 360.
+    ['loan_installments_invalid', { max: 360 }, '#lm-installments', 'budget.loanInstallmentsRange{"max":360}'],
+    // Zu viele gezahlte Raten: mit dem Maximum, wo der Server es kennt.
+    ['loan_paid_installments_exceed', { max: 12 }, '#lm-paid', 'budget.loanPaidInstallmentsMax{"max":12}'],
+    ['loan_paid_installments_exceed', { max: 0 }, '#lm-paid', 'budget.loanPaidInstallmentsMax{"max":0}'],
+    // Ohne (lesbare) Grenze bleibt der Satz ohne Zahl - nie "undefined" oder "NaN".
+    ['loan_paid_installments_exceed', {}, '#lm-paid', 'budget.loanPaidInstallmentsTooMany'],
+    ['loan_paid_installments_exceed', { max: '12' }, '#lm-paid', 'budget.loanPaidInstallmentsTooMany'],
+    ['loan_paid_installments_exceed', { max: -1 }, '#lm-paid', 'budget.loanPaidInstallmentsTooMany'],
+    ['loan_paid_installments_exceed', { max: 1.5 }, '#lm-paid', 'budget.loanPaidInstallmentsTooMany'],
+    ['loan_installments_invalid', { max: null }, '#lm-installments', 'budget.loanInstallmentsRequired'],
+    ['loan_term_too_long', {}, '#lm-initial-repayment', 'budget.loanPreviewInvalid'],
+    // Ein Satz ohne Grenze nimmt keine an, auch wenn eine mitkommt.
+    ['loan_not_amortizing', { max: 600 }, '#lm-initial-repayment', 'budget.loanPreviewInvalid'],
+    // Eigene Saetze statt des allgemeinen.
+    ['loan_title_invalid', {}, '#lm-title', 'budget.loanTitleInvalid'],
+    ['loan_notes_invalid', {}, '#lm-notes', 'budget.loanNotesInvalid'],
+    ['loan_currency_invalid', {}, '#lm-currency', 'budget.loanCurrencyInvalid'],
+    ['loan_account_invalid', {}, '#lm-account', 'budget.accountNotFound'],
+  ]) {
+    assert.deepEqual(budgetUi.loanSaveError(refusal(reason, extra)), { fields, message }, `${reason} ${JSON.stringify(extra)}`);
+  }
+  // Kein Feld des Formulars traegt mehr den allgemeinen Satz.
+  for (const [reason, [fields, key]] of budgetUi.LOAN_REFUSALS) {
+    if (fields) assert.notEqual(key, 'budget.loanSaveFailed', `${reason}: der allgemeine Satz steht an ${fields}`);
+  }
+}));
+
+test('#1668: eine Absage der Budget-Seite wird nie zum Satz des Servers', () => withOnline(() => {
+  const at = (status, reason, extra = {}) => ({ status, message: SERVER_SENTENCE, data: { error: SERVER_SENTENCE, code: status, reason, ...extra } });
+  // Jeder gefuehrte Grund: sein Feld, sein Satz - an einer 400 und an einer 409.
+  assert.ok(budgetUi.BUDGET_REFUSALS.size >= 30, `Vorbedingung: die Liste ist gefuellt (${budgetUi.BUDGET_REFUSALS.size})`);
+  for (const [reason, [fields, key]] of budgetUi.BUDGET_REFUSALS) {
+    for (const status of [400, 409]) {
+      const got = budgetUi.budgetError(at(status, reason));
+      assert.deepEqual(got, { fields, message: key }, `${reason} an ${status}`);
+      assert.notEqual(got.message, SERVER_SENTENCE);
+    }
+  }
+  // Einzeln gepinnt, was der Auftrag nennt: Feld und Satz je Grund.
+  for (const [reason, fields, key] of [
+    ['entry_account_invalid', '#bm-account', 'budget.accountNotFound'],
+    ['entry_amount_invalid', '#bm-amount, #cb-amount', 'budget.validAmountRequired'],
+    ['entry_amount_exceeds_loan', '#bm-amount', 'budget.amountExceedsLoanRemaining'],
+    ['entry_date_invalid', '#bm-date, #cb-date', 'calendar.invalidDate'],
+    ['entry_subcategory_invalid', '#bm-subcategory', 'budget.subcategoryRequired'],
+    ['series_start_too_early', '#bm-date', 'budget.seriesStartTooEarly'],
+    ['entry_responsible_invalid', null, 'budget.responsibleNotMember'],
+    ['account_name_invalid', '#am-name', 'common.titleRequired'],
+    ['account_credit_limit_invalid', '#am-credit-limit', 'budget.validAmountRequired'],
+    ['category_exists', null, 'category.errorExists'],
+    ['subcategory_exists', null, 'category.errorSubExists'],
+    ['loan_settled', null, 'budget.loanAlreadyPaid'],
+    ['loan_installment_paid', null, 'budget.loanInstallmentAlreadyPaid'],
+    ['loan_payment_amount_exceeds', null, 'budget.amountExceedsLoanRemaining'],
+  ]) {
+    assert.deepEqual(budgetUi.budgetError(at(400, reason)), { fields, message: key }, reason);
+  }
+  // Kein, ein unbekannter oder ein boesartiger Grund: der allgemeine Satz der
+  // Stelle - beim Speichern der eine, sonst der andere.
+  for (const reason of [undefined, null, '', 'some_future_reason', '__proto__', 'constructor', 'toString', 7]) {
+    for (const status of [400, 409]) {
+      assert.deepEqual(budgetUi.budgetError(at(status, reason)), { fields: null, message: 'common.errorOccurred' }, String(reason));
+      assert.deepEqual(
+        budgetUi.budgetError(at(status, reason), 'budget.saveFailed'), { fields: null, message: 'budget.saveFailed' }, String(reason),
+      );
+    }
+  }
+  // Ein Grund des Darlehens-Formulars gehoert dem Dialog, nicht dieser Liste.
+  assert.deepEqual(budgetUi.budgetError(at(400, 'loan_title_invalid')), { fields: null, message: 'common.errorOccurred' });
+  // Andere Antworten: der Satz der App, wo sie einen hat - sonst der allgemeine.
+  for (const [err, key] of [
+    [{ status: 403, message: SERVER_SENTENCE, data: { error: SERVER_SENTENCE } }, 'common.errorNoPermission'],
+    [{ status: 403, data: { error: SERVER_SENTENCE, reason: 'module_read_only' } }, 'settings.permReadOnlyBanner'],
+    [{ status: 404, message: SERVER_SENTENCE, data: { error: SERVER_SENTENCE } }, 'common.errorNotFound'],
+    [{ status: 500, message: SERVER_SENTENCE, data: { error: SERVER_SENTENCE } }, 'common.errorServer'],
+    [{ status: 0, message: SERVER_SENTENCE }, 'common.errorOfflineMutation'],
+    [{ status: 429, message: SERVER_SENTENCE, data: { error: SERVER_SENTENCE } }, 'common.errorOccurred'],
+    [{ message: SERVER_SENTENCE }, 'common.errorOccurred'],
+    [new TypeError(SERVER_SENTENCE), 'common.errorOccurred'],
+    [undefined, 'common.errorOccurred'],
+  ]) {
+    assert.deepEqual(budgetUi.budgetError(err), { fields: null, message: key }, JSON.stringify(err));
+  }
+  // Ein Grund zaehlt nur an einer Absage, nicht an einem Serverfehler.
+  assert.deepEqual(budgetUi.budgetError(at(500, 'entry_account_invalid')), { fields: null, message: 'common.errorServer' });
+}));
+
+test('#1668: die Absage steht am Feld des offenen Dialogs, sonst im Toast', () => withOnline(() => {
+  const toasts = [];
+  const marks = [];
+  const yuvomi = global.window.yuvomi;
+  global.window.yuvomi = { ...yuvomi, showToast: (...args) => toasts.push(args) };
+  globalThis.__reportFieldError = (input, message) => marks.push([input.id, message]);
+  const field = (id, { hidden = false, isConnected = true } = {}) => ({ id, isConnected, closest: (sel) => (sel === '[hidden]' && hidden ? {} : null) });
+  const panelWith = (fields) => ({
+    querySelectorAll: (selector) => selector.split(',').map((s) => s.trim().slice(1)).map((id) => fields[id]).filter(Boolean),
+  });
+  const refusal = (reason, status = 400) => ({ status, message: SERVER_SENTENCE, data: { error: SERVER_SENTENCE, code: status, reason } });
+  const shown = (fn) => { toasts.length = 0; marks.length = 0; fn(); return { toasts: [...toasts], marks: [...marks] }; };
+  try {
+    // Buchungsdialog: das Konto gibt es nicht mehr -> am Konto-Feld, kein Toast.
+    const entryPanel = panelWith({ 'bm-account': field('bm-account'), 'bm-amount': field('bm-amount'), 'bm-date': field('bm-date') });
+    assert.deepEqual(
+      shown(() => budgetUi.showBudgetError(refusal('entry_account_invalid'), { panel: entryPanel, fallback: 'budget.saveFailed' })),
+      { toasts: [], marks: [['bm-account', 'budget.accountNotFound']] },
+    );
+    // Derselbe Grund in zwei Dialogen: gezeigt wird am Feld, das der offene hat.
+    assert.deepEqual(
+      shown(() => budgetUi.showBudgetError(refusal('entry_amount_invalid'), { panel: entryPanel })),
+      { toasts: [], marks: [['bm-amount', 'budget.validAmountRequired']] },
+    );
+    const confirmPanel = panelWith({ 'cb-amount': field('cb-amount'), 'cb-date': field('cb-date') });
+    assert.deepEqual(
+      shown(() => budgetUi.showBudgetError(refusal('entry_amount_invalid'), { panel: confirmPanel })),
+      { toasts: [], marks: [['cb-amount', 'budget.validAmountRequired']] },
+    );
+    // Kontodialog.
+    const accountPanel = panelWith({ 'am-name': field('am-name'), 'am-credit-limit': field('am-credit-limit', { hidden: true }) });
+    assert.deepEqual(
+      shown(() => budgetUi.showBudgetError(refusal('account_name_invalid'), { panel: accountPanel })),
+      { toasts: [], marks: [['am-name', 'common.titleRequired']] },
+    );
+    // Ein verstecktes Feld (Kreditlimit bei einem Girokonto) kann nichts zeigen: Toast.
+    assert.deepEqual(
+      shown(() => budgetUi.showBudgetError(refusal('account_credit_limit_invalid'), { panel: accountPanel })),
+      { toasts: [['budget.validAmountRequired', 'danger']], marks: [] },
+    );
+    // Ebenso ein Feld, dessen Dialog inzwischen zu ist.
+    const closed = panelWith({ 'bm-account': field('bm-account', { isConnected: false }) });
+    assert.deepEqual(
+      shown(() => budgetUi.showBudgetError(refusal('entry_account_invalid'), { panel: closed })),
+      { toasts: [['budget.accountNotFound', 'danger']], marks: [] },
+    );
+    // Ohne Dialog (Rate abhaken, Loeschen): immer der Toast, mit dem Satz der App.
+    assert.deepEqual(
+      shown(() => budgetUi.showBudgetError(refusal('loan_installment_paid', 409))),
+      { toasts: [['budget.loanInstallmentAlreadyPaid', 'danger']], marks: [] },
+    );
+    assert.deepEqual(
+      shown(() => budgetUi.showBudgetError(refusal('entry_account_invalid'))),
+      { toasts: [['budget.accountNotFound', 'danger']], marks: [] },
+    );
+    // Ein Grund ohne Feld bleibt auch im Dialog ein Toast.
+    assert.deepEqual(
+      shown(() => budgetUi.showBudgetError(refusal('entry_responsible_invalid'), { panel: entryPanel })),
+      { toasts: [['budget.responsibleNotMember', 'danger']], marks: [] },
+    );
+    // Nichts davon ist der Satz des Servers.
+    for (const reason of [...budgetUi.BUDGET_REFUSALS.keys(), 'unknown_reason', undefined]) {
+      const out = shown(() => budgetUi.showBudgetError(refusal(reason), { panel: entryPanel }));
+      const texts = [...out.toasts.map((t) => t[0]), ...out.marks.map((m) => m[1])];
+      assert.equal(texts.length, 1, String(reason));
+      assert.notEqual(texts[0], SERVER_SENTENCE, String(reason));
+    }
+  } finally {
+    global.window.yuvomi = yuvomi;
+    delete globalThis.__reportFieldError;
+  }
+}));
+
+/** Jeder Grund, den eine Datei des Servers einer Absage mitgibt. */
+function serverReasons(file) {
+  const src = read(`../server/routes/budget/${file}`);
+  return new Set([
+    // refusal('x', ...), refusals('x', ...) - auch ueber einen Zeilenumbruch.
+    ...[...src.matchAll(/\brefusals?\(\s*'([a-z]+(?:_[a-z]+)+)'/g)].map((m) => m[1]),
+    // ['x', str(...)] - die Pruefungen, die eine Route nur bei gesetztem Feld faehrt.
+    ...[...src.matchAll(/\['([a-z]+(?:_[a-z]+)+)', (?:str|num|oneOf|rrule|validateDate|validateColor|intervalCountCheck)\(/g)].map((m) => m[1]),
+    // reason: 'x' an einer ausgeschriebenen Antwort.
+    ...[...src.matchAll(/\breason: '([a-z]+(?:_[a-z]+)+)'/g)].map((m) => m[1]),
+  ]);
+}
+
+test('#1668: jeder Grund der Budget-Routen ist eingeordnet, jedes Feld gibt es, jeder Satz steht in jeder Sprache', () => {
+  const atServer = new Set(['entries.js', 'accounts.js', 'categories.js', 'loans.js'].flatMap((file) => [...serverReasons(file)]));
+  assert.ok(atServer.size >= 55, `zu wenige Gruende gelesen (${atServer.size}) - das Muster greift nicht mehr`);
+  for (const probe of ['entry_account_invalid', 'series_end_refused', 'series_start_too_early', 'entry_start_date_invalid', 'account_credit_limit_invalid', 'loan_settled', 'category_exists']) {
+    assert.ok(atServer.has(probe), `Vorbedingung: der Leser sieht ${probe}`);
+  }
+  // Wer welchen Grund liest: der Darlehens-Dialog seine, die Verwaltung der
+  // Kategorien ihre (category-manager.js), alles andere diese Seite.
+  const loanForm = new Set(budgetUi.LOAN_REFUSALS.keys());
+  const READ_BY_CATEGORY_MANAGER = ['category_in_use', 'category_last', 'subcategory_in_use', 'subcategory_last'];
+  const manager = read('../public/components/category-manager.js');
+  for (const reason of READ_BY_CATEGORY_MANAGER) {
+    assert.ok(atServer.has(reason), `${reason} schickt der Server nicht mehr`);
+    assert.ok(manager.includes(`'${reason}'`), `${reason} liest die Kategorien-Verwaltung nicht mehr`);
+  }
+  const elsewhere = new Set([...loanForm, ...READ_BY_CATEGORY_MANAGER]);
+  const known = new Set(budgetUi.BUDGET_REFUSALS.keys());
+  assert.deepEqual(
+    [...atServer].filter((r) => !known.has(r) && !elsewhere.has(r)), [],
+    'ein Grund des Servers ohne Feld und Satz auf der Seite',
+  );
+  assert.deepEqual([...known].filter((r) => !atServer.has(r)), [], 'die Seite fuehrt einen Grund, den der Server nicht mehr schickt');
+  assert.deepEqual([...known].filter((r) => loanForm.has(r)), [], 'ein Grund steht in beiden Listen');
+
+  // Keine Absage der Schreibrouten geht am Grund vorbei. Uebrig bleiben die
+  // Lesewege (month, q, range, anchor) - die fragt kein Dialog.
+  for (const [file, allowed] of [['entries.js', 3], ['accounts.js', 0], ['categories.js', 0], ['loans.js', 0]]) {
+    const src = read(`../server/routes/budget/${file}`);
+    const bare = [...src.matchAll(/status\((400|409)\)\.json\(\{(?:(?!\}\);)[\s\S])*?\}\)/g)].filter((m) => !/reason:/.test(m[0]));
+    assert.equal(bare.length, allowed, `${file}: ${bare.map((m) => m[0].slice(0, 70)).join(' | ')}`);
+  }
+
+  // Jedes genannte Feld steht in einem Dialog der Seite.
+  for (const [reason, [fields]] of budgetUi.BUDGET_REFUSALS) {
+    for (const selector of (fields ?? '').split(',').map((part) => part.trim()).filter(Boolean)) {
+      assert.match(selector, /^#(bm|am|cb)-[a-z-]+$/, `${reason}: ${selector}`);
+      assert.ok(budget.includes(`id="${selector.slice(1)}"`), `${reason}: das Feld ${selector} steht in keinem Dialog`);
+    }
+  }
+
+  // Jeder Satz steht in jeder Sprache; die neuen ohne Gedankenstrich, nicht
+  // deutsch und nicht englisch in einer dritten Sprache, mit ihrem Platzhalter.
+  const dir = new URL('../public/locales/', import.meta.url);
+  const files = readdirSync(dir).filter((name) => name.endsWith('.json'));
+  assert.ok(files.length >= 26, `zu wenige Sprachdateien gelesen (${files.length})`);
+  const locales = files.map((name) => [name, JSON.parse(readFileSync(new URL(name, dir), 'utf8'))]);
+  const NEW = new Map([
+    ['budget.loanTermTooLong', true], ['budget.loanInstallmentsRange', true], ['budget.loanPaidInstallmentsMax', true],
+    ['budget.loanTitleInvalid', false], ['budget.loanNotesInvalid', false], ['budget.loanCurrencyInvalid', false],
+    ['budget.accountNotFound', false], ['budget.saveFailed', false], ['budget.loanAlreadyPaid', false],
+    ['budget.loanInstallmentAlreadyPaid', false], ['budget.amountExceedsLoanRemaining', false],
+    ['budget.responsibleNotMember', false], ['budget.seriesStartTooEarly', false],
+  ]);
+  const keys = new Set(['common.errorOccurred', ...NEW.keys()]);
+  for (const list of [budgetUi.BUDGET_REFUSALS, budgetUi.LOAN_REFUSALS]) {
+    for (const [, [, key, keyWithMax]] of list) { keys.add(key); if (keyWithMax) keys.add(keyWithMax); }
+  }
+  // Jeder neue Satz wird auch gebraucht - sonst stuende er nur in den Dateien.
+  for (const key of NEW.keys()) assert.ok(budget.includes(`'${key}'`), `${key} benutzt die Seite nicht`);
+  for (const key of keys) {
+    const seen = new Map();
+    for (const [name, data] of locales) {
+      const text = key.split('.').reduce((node, part) => node?.[part], data);
+      assert.ok(typeof text === 'string' && text.trim().length > 0, `${name}: ${key} fehlt`);
+      if (!NEW.has(key)) continue;
+      assert.doesNotMatch(text, /[\u2013\u2014]/, `${name}: ${key} traegt einen Gedankenstrich`);
+      // Die Grenze ist ein Platzhalter, keine feste Zahl im Text.
+      assert.equal(text.includes('{{max}}'), NEW.get(key), `${name}: ${key} und {{max}}`);
+      assert.doesNotMatch(text, /360|600/, `${name}: ${key} nennt die Grenze fest`);
+      seen.set(name, text);
+    }
+    for (const [name, text] of seen) {
+      if (name === 'de.json' || name === 'en.json') continue;
+      assert.notEqual(text, seen.get('de.json'), `${name}: ${key} ist der deutsche Satz`);
+      assert.notEqual(text, seen.get('en.json'), `${name}: ${key} ist der englische Satz`);
+    }
+  }
+});
+
+test('#1668: keine Stelle der Budget-Seite schreibt den Satz des Servers in einen Toast', () => {
+  // Ohne Kommentare: die Erklaerung, was hier frueher stand, darf es nennen.
+  const code = budget.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.doesNotMatch(code, /showToast\([^;]*err(?:or)?\??\.(?:data\??\.error|message)/, 'ein Toast zeigt den Text des Fehlers');
+  assert.doesNotMatch(code, /err(?:or)?\??\.data\??\.error/, 'die Seite liest den Satz des Servers');
+  // Die 13 Stellen von damals und der Verbuchen-Dialog laufen ueber eine Funktion.
+  const calls = [...code.matchAll(/(?<!function )\bshowBudgetError\(err\b/g)].length;
+  assert.equal(calls, 14, `showBudgetError(err, ...) steht ${calls}x`);
+  // Die drei Dialoge geben sich selbst mit, damit die Absage am Feld landet.
+  assert.equal([...code.matchAll(/showBudgetError\(err, \{ panel, fallback: BUDGET_SAVE_FAILED \}\)/g)].length, 3);
+});
+
+test('#1668: der Dialog nennt beim Pruefen am Feld, wie viele Raten das Darlehen hat', () => {
+  const save = budget.slice(budget.indexOf('async function saveLoanFromPanel('), budget.indexOf('function openLoanModal('));
+  assert.ok(save.length > 1000, 'Vorbedingung: saveLoanFromPanel gefunden');
+  assert.match(save, /t\('budget\.loanPaidInstallmentsMax', \{ max: installment_count \}\)/, 'ohne Zins: die Ratenanzahl des Formulars');
+  assert.match(save, /t\('budget\.loanPaidInstallmentsMax', \{ max: term \}\)/, 'mit Zins: die Laufzeit aus der Vorschau');
+  assert.doesNotMatch(save, /loanPaidInstallmentsTooMany/, 'eine Pruefung am Feld sagt noch "zu viele" ohne Zahl');
 });
 
 /* R16 (Critique 2026-10-05, P1 mobil): TITEL UND ZEITRAUM TEILEN SICH ZEILE 1.
