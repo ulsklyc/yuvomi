@@ -13,6 +13,9 @@ import { REFUSAL_MESSAGES } from '/utils/friendly-error.js';
 
 const API_BASE = '/api/v1';
 
+/** Der Grund, mit dem `server/middleware/csrf.js` ein ungueltiges Token ablehnt. */
+const CSRF_INVALID_REASON = 'csrf_invalid';
+
 /** In-Memory CSRF-Token (zuverlaessiger als document.cookie auf iOS Safari/PWA). */
 let _csrfToken = '';
 
@@ -75,9 +78,20 @@ async function apiFetch(path, options = {}, _retried = false) {
     // Für beide: fall-through zum generischen !response.ok-Handler unten.
   }
 
+  // Der Rumpf wird VOR der Wiederholung gelesen: ob sie sich lohnt, steht im `reason`.
+  const data = await response.json().catch(() => null);
+
   // CSRF-Token-Desync (haeufig nach iOS-PWA-Resume): einmal GET /auth/me
   // ausfuehren um den CSRF-Token zu erneuern, dann den Request wiederholen.
-  if (response.status === 403 && stateChanging && !_retried) {
+  //
+  // Nur, wenn die Absage das Token meint oder es offen laesst (#1669). Der
+  // Server nennt es immer `csrf_invalid` (middleware/csrf.js, die einzige
+  // Stelle, die das Token prueft). Eine 403 OHNE `reason` bleibt aus Vorsicht
+  // dabei: sie kann von etwas vor der App stammen (Proxy), das seinen Grund
+  // nicht nennt. Jeder andere Grund (gesperrte Aufgabe, fehlendes Recht) ist
+  // mit frischem Token dieselbe Absage - sie ging bis dahin zweimal an den Server.
+  const tokenMayBeStale = !data?.reason || data.reason === CSRF_INVALID_REASON;
+  if (response.status === 403 && stateChanging && !_retried && tokenMayBeStale) {
     // Token aus der 403-Antwort selbst extrahieren (Server liefert den
     // korrekten Token im Header mit, auch bei Fehlschlag)
     const errorCsrf = response.headers.get('X-CSRF-Token');
@@ -99,8 +113,6 @@ async function apiFetch(path, options = {}, _retried = false) {
   // CSRF-Token aus Response-Header extrahieren (wird bei jeder API-Antwort mitgeliefert)
   const csrfHeader = response.headers.get('X-CSRF-Token');
   if (csrfHeader) _csrfToken = csrfHeader;
-
-  const data = await response.json().catch(() => null);
 
   // Fallback: CSRF-Token aus Response-Body (fuer /auth/me und /auth/login)
   if (data?.csrfToken) _csrfToken = data.csrfToken;

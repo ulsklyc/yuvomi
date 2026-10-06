@@ -202,6 +202,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A refused change is sent to the server once, not twice.** When the server turned a change
+  down with a reason - a locked task, a read-only module, a recipe managed elsewhere - the app
+  sent the same request a second time before showing the message. The repeat exists to recover
+  from an expired security token, and it ran for every refusal. It now runs only when the
+  server names the token as the reason, or names no reason at all; a refusal with any other
+  reason is shown straight away. Nothing was saved twice, since the second attempt was refused
+  as well, but each such refusal cost a second round trip (#1669).
 - **A failed single sign-on says why in the log.** When the identity provider turned the token
   request down, the server log showed only "server responded with an error in the response
   body" and a stack trace - the same line for a wrong client secret, a mismatched redirect URI
