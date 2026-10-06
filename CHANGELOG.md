@@ -338,6 +338,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reasons stays on 1 March. If a month is missing in your group, add that expense by hand.
   Shared expenses only: subscriptions and tasks keep their own rules. For API clients:
   recurring expenses carry `anchor_day` (migration 234).
+
 - **Meal plan and recipes with read-only access: no more buttons that end in an error message**
   (#1265). A member who may only read the Kitchen still saw every control on both tabs: the plus
   buttons and the empty slots, the edit dialog with Save and Delete, the bin on a meal, the drag
