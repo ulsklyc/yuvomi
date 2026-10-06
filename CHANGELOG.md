@@ -231,6 +231,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the tiles to their new position, and "+N more today" unfolds in place.
 - **Shopping on a phone: the add field unfolds** instead of pushing the list down in one step.
 
+- **Deleting a shared expense now leaves a trace instead of rewriting the books.** Until now
+  deleting an expense removed its bookings, so the balances changed and nothing showed why. The
+  expense now stays in the ledger and a counter-entry cancels it, so balances end up exactly where
+  they would be without it, the same way a reversed payment works. The activity names the deleted
+  expense with its title and amount, and the entry that added it is struck through and marked
+  "Deleted" at every access level. A payment recorded against the expense stays as it is: payments
+  are not tied to single expenses, so after the delete the balances show what was paid too much.
+  An expense in another currency is cancelled in the currency it was booked in. Expenses deleted
+  before this change keep their balances; only their trace is missing. (#1382)
+
 ### Fixed
 
 - **Documents: Esc closes the viewer again when the PDF took the focus by itself.** Opened by

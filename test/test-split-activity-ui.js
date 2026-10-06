@@ -305,6 +305,49 @@ test('Datum: der Tag in der Haushaltszone, nicht der UTC-Tag', () => {
   }
 });
 
+test('geloeschte Ausgabe (#1382): Zeichen am Anlege-Eintrag, Loesch-Eintrag nennt sie ohne Zeichen', () => {
+  const vorher = { ...split.state };
+  const ausgabe = (extra = {}) => ({ id: 9, deleted_at: null, ...extra });
+  // Titel und Betrag stehen seit #1607 in den Metadaten des Eintrags.
+  const metadata = { title: 'Einkauf', amount_minor: 3000, amount: '30.00', currency: 'EUR' };
+  const zeichne = (activity, modus = 'write') => {
+    Object.assign(split.state, { activity, activityCursor: null, groupStatus: 'active' });
+    return withAccess({ budget: modus }, () => split.renderActivity());
+  };
+  try {
+    // Aktiv: die Zeile nennt die Ausgabe, kein Zeichen, nicht durchgestrichen.
+    const aktiv = zeichne([eintrag(1, { entity_id: 9, metadata, expense: ausgabe() })]);
+    const detail = /<span class="split-activity-payment">Einkauf · 30,00\s€<\/span>/;
+    assert.match(aktiv, detail);
+    assert.doesNotMatch(aktiv, /split-activity-item--reversed|split-activity-reversed/);
+
+    // Geloescht: bei jedem Recht das Zeichen und die durchgestrichene Zeile.
+    const weg = ausgabe({ deleted_at: '2026-09-21T08:00:00Z' });
+    for (const modus of ['write', 'read']) {
+      const html = zeichne([
+        eintrag(2, { type: 'expense_deleted', entity_id: 9, metadata, expense: weg }),
+        eintrag(1, { entity_id: 9, metadata, expense: weg }),
+      ], modus);
+      const [loeschung, anlage] = html.split('<div class="split-activity-item').slice(1);
+      assert.match(anlage, /^ split-activity-item--reversed"/, modus);
+      assert.match(anlage, /<span class="split-activity-reversed">splitExpenses\.expenseDeleted<\/span>/, modus);
+      assert.match(loeschung, /^"/, `${modus}: der Loesch-Eintrag ist nicht durchgestrichen`);
+      assert.match(loeschung, detail, modus);
+      assert.doesNotMatch(loeschung, /split-activity-reversed/, modus);
+      assert.doesNotMatch(html, /data-reverse-settlement/, `${modus}: keine Handlung`);
+    }
+
+    // Eine Serienbuchung legt ihre Ausgabe ohne `expense_created` an: ihr
+    // Eintrag traegt das Zeichen und muss deshalb sagen, welche Ausgabe.
+    const serie = zeichne([eintrag(3, { type: 'recurring_generated', entity_id: 9, metadata: { recurring_expense_id: 4, title: 'Miete' }, expense: weg })]);
+    assert.match(serie, /<span class="split-activity-payment">Miete<\/span>/);
+    assert.match(serie, /split-activity-item--reversed"/);
+    assert.match(serie, /<span class="split-activity-reversed">splitExpenses\.expenseDeleted<\/span>/);
+  } finally {
+    Object.assign(split.state, vorher);
+  }
+});
+
 // Migration v226 schreibt 'ledger_restored' ohne Akteur (#1382): der Eintrag
 // traegt den uebersetzten Typ und "System" statt eines Namens - und der Key
 // steht in jeder Sprache, sonst zeigte die Seite den rohen Key.

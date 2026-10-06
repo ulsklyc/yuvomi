@@ -149,7 +149,7 @@ export function splitexpensesPaths() {
     '/api/v1/split-expenses/groups/{id}/activity': {
       get: op({
         summary: 'Get group activity feed',
-        description: 'Newest first (`created_at` descending, `id` ascending within the same second). Page through every entry with the cursor: pass `before_at` and `before_id` from `pagination.next_cursor` of the previous page; entries added meanwhile appear at the top and shift nothing. Without a cursor the endpoint behaves as before (`limit`, `offset`). `pagination.next_cursor` is null when `has_more` is false. Cursor and a non-zero `offset` together answer 400. Entries of type `payment_registered` carry a `settlement` object: payer, payee, amount, `reversed_at` (null while active) and `can_reverse` for the caller. Entries of type `ledger_restored` (migration v226) and `ledger_removed` (migration v227), both without an actor, carry `metadata.title`, `metadata.amount_minor`, `metadata.currency` and the decimal `metadata.amount` (ISO 4217 minor units).',
+        description: 'Newest first (`created_at` descending, `id` ascending within the same second). Page through every entry with the cursor: pass `before_at` and `before_id` from `pagination.next_cursor` of the previous page; entries added meanwhile appear at the top and shift nothing. Without a cursor the endpoint behaves as before (`limit`, `offset`). `pagination.next_cursor` is null when `has_more` is false. Cursor and a non-zero `offset` together answer 400. Entries of type `payment_registered` carry a `settlement` object: payer, payee, amount, `reversed_at` (null while active) and `can_reverse` for the caller. Entries of type `ledger_restored` (migration v226) and `ledger_removed` (migration v227), both without an actor, carry `metadata.title`, `metadata.amount_minor`, `metadata.currency` and the decimal `metadata.amount` (ISO 4217 minor units). Entries of type `expense_created`, `recurring_generated` and `expense_deleted` carry an `expense` object with `id` and `deleted_at` (null while active); title and amount are in `metadata`, as they were when the entry was written.',
         tag: 'SplitExpenses',
         params: [
           idParam(),
@@ -176,7 +176,13 @@ export function splitexpensesPaths() {
     },
     '/api/v1/split-expenses/expenses/{id}': {
       put: op({ summary: 'Update expense (`attachment_document_ids` replaces the receipt links; omit the field to leave them untouched)', tag: 'SplitExpenses', params: [idParam()], description: `${AMOUNT_NOTE} ${EXACT_SPLIT_NOTE} ${DOCUMENT_LINKS_READ_NOTE}`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
-      delete: op({ summary: 'Delete expense', tag: 'SplitExpenses', params: [idParam()], stateChanging: true }),
+      delete: op({
+        summary: 'Delete expense',
+        tag: 'SplitExpenses',
+        description: 'Marks the expense deleted and books an exact counter-entry (`expense_reversal`) for every ledger row it booked, in the currency it was booked in, so balances end up where they would be without it. The original ledger rows stay; each counter-entry carries the `created_by` of the row it cancels, and who deleted is the actor of the `expense_deleted` activity entry. Settlements are not tied to expenses and stay untouched. Allowed for group owners/admins and for whoever created the expense, with write access to the `budget` module. A second delete answers 404; the activity feed records `expense_deleted`.',
+        params: [idParam()],
+        stateChanging: true,
+      }),
     },
     '/api/v1/split-expenses/expenses/{id}/comments': {
       post: op({ summary: 'Add expense comment', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),

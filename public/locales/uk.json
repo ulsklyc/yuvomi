@@ -4166,7 +4166,8 @@
         "reversePaymentLabel": "Сторнувати платіж {{payer}} для {{payee}} на {{amount}}",
         "reversePaymentConfirm": "Сторнувати цей платіж?",
         "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Зворотний запис скасовує платіж, і баланси повертаються до попередніх. Платіж залишається в активності з позначкою «сторновано».",
-        "loadMoreActivity": "Завантажити ще"
+        "loadMoreActivity": "Завантажити ще",
+        "expenseDeleted": "Видалено"
     },
     "wmo": {
         "0": "Ясне небо",

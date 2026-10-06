@@ -124,10 +124,16 @@ const LOST_REMAINDER = await expense({ title: 'Rest-Cent' });
 const LOST_FX = await expense({ title: 'Urlaub', amount: '20.00', currency: 'USD', converted_amount: '18.50', converted_currency: 'EUR', participants: [OWN.id, PAY.id] });
 // Bleibt vollstaendig - die Migration darf sie nicht anfassen.
 const KEPT = await expense({ title: 'Brot', amount: '4.00' });
-// Geloescht: ihre Zeilen sind absichtlich weg, und das muss so bleiben.
+// Geloescht nach altem Muster (vor #1382): das Loeschen nahm die Zeilen, sie
+// sind absichtlich weg, und das muss so bleiben. Die Route bucht heute eine
+// Gegenbuchung - der alte Stand wird deshalb von Hand nachgestellt.
 const DELETED = await expense({ title: 'Storniert', amount: '6.00' });
 assert.equal((await AUT.call('DELETE', `/split-expenses/expenses/${DELETED}`)).status, 200);
 assert.equal(db.prepare('SELECT status FROM expenses WHERE id = ?').get(DELETED).status, 'deleted');
+db.prepare("DELETE FROM expense_ledger_entries WHERE source_type IN ('expense', 'expense_reversal') AND source_id = ?").run(DELETED);
+// Geloescht nach neuem Muster (#1382): Buchung und Gegenbuchung stehen beide.
+const REVERSED = await expense({ title: 'Aufgehoben', amount: '6.00' });
+assert.equal((await AUT.call('DELETE', `/split-expenses/expenses/${REVERSED}`)).status, 200);
 // Eine Zahlung - Settlement-Zeilen gehoeren nicht zum Neuaufbau.
 const settled = await PAY.call('POST', `/split-expenses/groups/${GROUP}/settlements`, { payer_id: PAY.id, payee_id: OWN.id, amount: '2.00', currency: 'EUR' });
 assert.equal(settled.status, 201);
@@ -138,6 +144,7 @@ assert.equal(EXPECTED[LOST_FX].length, 3, 'Fixture: Zahler + zwei Anteile');
 assert.ok(EXPECTED[LOST_FX].every((row) => row.currency === 'EUR'), 'Fixture: in converted_currency gebucht');
 assert.ok(EXPECTED[LOST_FX].some((row) => row.amount_minor === 1850), 'Fixture: umgerechneter Betrag');
 const KEPT_IDS = rowIds(KEPT);
+const REVERSED_IDS = rowIds(REVERSED);
 const BALANCES = await balances();
 
 // Der Stand, den der alte PUT hinterliess: Zeilen mit dem Bearbeiter gestempelt.
@@ -169,6 +176,8 @@ test('Migration baut die verlorenen Zeilen so auf, wie die Route sie gebucht hat
 test('vollstaendige und geloeschte Ausgaben bleiben unberuehrt', () => {
   assert.deepEqual(rowIds(KEPT), KEPT_IDS, 'vollstaendige Ausgabe: dieselben Zeilen, keine neuen');
   assert.equal(bookedRows(DELETED).length, 0, 'geloeschte Ausgabe bekommt keine Zeilen');
+  assert.ok(REVERSED_IDS.length > 0, 'Fixture: die aufgehobene Ausgabe hat Zeilen');
+  assert.deepEqual(rowIds(REVERSED), REVERSED_IDS, 'aufgehobene Ausgabe: dieselben Zeilen, keine neuen');
 });
 
 test('der Verlauf der Gruppe nennt jede wiederhergestellte Ausgabe genau einmal', async () => {

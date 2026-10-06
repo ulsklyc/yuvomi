@@ -899,7 +899,7 @@ function restoredDetail(item) {
  * aeltere Kommentar-Eintraege tragen keine Metadaten, und der Titel benennt
  * die Ausgabe, er behauptet keinen Stand von damals.
  */
-const EXPENSE_ACTIVITY = new Set(['expense_created', 'expense_edited', 'expense_deleted', 'comment_added', 'recurring_created', 'recurring_auto_paused']);
+const EXPENSE_ACTIVITY = new Set(['expense_created', 'expense_edited', 'expense_deleted', 'comment_added', 'recurring_created', 'recurring_generated', 'recurring_auto_paused']);
 
 function expenseDetail(item) {
   if (!EXPENSE_ACTIVITY.has(item.type)) return '';
@@ -925,17 +925,27 @@ function expenseDetail(item) {
 function activityItemHtml(item, actionable) {
   const settlement = item.settlement;
   const params = settlement ? paymentParams(settlement) : null;
+  // Eine geloeschte Ausgabe (#1382) bleibt im Verlauf lesbar: der Eintrag, der
+  // sie angelegt hat, traegt „Geloescht" als Zeichen und ist durchgestrichen -
+  // wie eine stornierte Zahlung. Der Loesch-Eintrag selbst nennt nur, was
+  // geloescht wurde; sein Typ sagt den Rest. Titel und Betrag kommen wie bei
+  // jedem Ausgaben-Eintrag aus den Metadaten (`expenseDetail`), `item.expense`
+  // sagt nur, ob es die Ausgabe noch gibt.
+  const expenseGone = Boolean(item.expense?.deleted_at) && item.type !== 'expense_deleted';
   const detail = settlement
     ? `<span class="split-activity-payment">${esc(t('splitExpenses.paymentDetail', params))}</span>`
     : restoredDetail(item) || expenseDetail(item);
-  const reversed = settlement?.reversed_at
-    ? `<span class="split-activity-reversed">${esc(t('splitExpenses.paymentReversed'))}</span>`
-    : '';
+  let reversed = '';
+  if (settlement?.reversed_at) {
+    reversed = `<span class="split-activity-reversed">${esc(t('splitExpenses.paymentReversed'))}</span>`;
+  } else if (expenseGone) {
+    reversed = `<span class="split-activity-reversed">${esc(t('splitExpenses.expenseDeleted'))}</span>`;
+  }
   const action = settlement?.can_reverse && !settlement.reversed_at && actionable
     ? `<button type="button" class="btn btn--secondary split-reverse-payment" data-reverse-settlement="${settlement.id}" aria-label="${esc(t('splitExpenses.reversePaymentLabel', params))}">${esc(t('splitExpenses.reversePayment'))}</button>`
     : '';
   return `
-    <div class="split-activity-item${settlement?.reversed_at ? ' split-activity-item--reversed' : ''}">
+    <div class="split-activity-item${settlement?.reversed_at || expenseGone ? ' split-activity-item--reversed' : ''}">
       <span class="split-activity-dot"></span>
       <div>
         <strong>${esc(t(`splitExpenses.activityType.${item.type}`))}</strong>
