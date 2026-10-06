@@ -27,6 +27,9 @@ import { recipeThumbHtml, wireRecipeThumbs } from '/utils/recipe-thumb.js';
 import { toDecimalString, breaksOffAtSeparator, toStoredNumber } from '/utils/money.js';
 import { mayWritePath } from '/utils/module-access.js';
 import { readRowHtml, readRowHintHtml } from '/utils/read-row.js';
+import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
+import { withChosenPeople } from '/utils/people-picker.js';
+import { isSoloHousehold } from '/utils/household.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -61,6 +64,7 @@ let state = {
   recipes:          [],
   lists:            [],     // Einkaufslisten für Transfer-Dropdown
   categories:       [],     // Einkaufskategorien für Zutaten
+  members:          [],     // Haushaltsmitglieder für die Koch-Auswahl (#1679)
   modal:            null,
   visibleMealTypes: ['breakfast', 'lunch', 'dinner', 'snack'],
   /** Gefangener Fehler des letzten Wochen-Ladevorgangs, sonst null.
@@ -507,6 +511,54 @@ async function loadRecipes() {
   }
 }
 
+/**
+ * Wer als Koch waehlbar ist (#1679): die Haushaltsmitglieder, wie
+ * `/family/members` sie durch das eine Mitglieder-Praedikat liefert - ohne
+ * Hauspersonal, Gaeste und Wandtabletts (docs/DECISIONS.md, Eintrag 4). Die
+ * Route lehnt genau die ab, die hier fehlen. Bei `read` gibt es keine Wahl,
+ * also auch keine Liste: die Leseansicht zeigt den Koch aus der Mahlzeit.
+ */
+async function loadMembers() {
+  if (readOnly()) {
+    state.members = [];
+    return;
+  }
+  try {
+    const res = await api.get('/family/members');
+    state.members = Array.isArray(res.data) ? res.data : [];
+  } catch {
+    state.members = [];
+  }
+}
+
+/**
+ * Der Koch einer Mahlzeit als Person, wie `renderAvatarStack()` und
+ * `withChosenPeople()` sie lesen - oder null. Die Leseabfragen liefern ihn
+ * flach neben der Mahlzeit (`cook_user_id`, `cook_name`, `cook_color`,
+ * `cook_avatar`), im Planer wie in der Uebersicht.
+ */
+function mealCook(meal) {
+  if (!meal?.cook_user_id) return null;
+  return {
+    id: meal.cook_user_id,
+    display_name: meal.cook_name ?? '',
+    color: meal.cook_color ?? null,
+    avatar_data: meal.cook_avatar ?? null,
+  };
+}
+
+/**
+ * Das Zeichen "wer kocht" an einer Mahlzeit: der Avatar, dazu der Name fuer
+ * Screenreader - die Scheibe traegt ihn sonst nur als `title`, und in einem
+ * Knopf waeren zwei Initialen sein ganzer Beitrag zum Namen. Ohne Koch nichts:
+ * eine Mahlzeit ohne Koch sieht aus wie bisher.
+ */
+function mealCookMarkHtml(meal, { size = 20 } = {}) {
+  const cook = mealCook(meal);
+  if (!cook) return '';
+  return `<span class="meal-card__cook">${renderAvatarStack([cook], { size, maxVisible: 1 })}<span class="sr-only">${esc(t('meals.cookNamed', { name: cook.display_name }))}</span></span>`;
+}
+
 async function loadPreferences() {
   try {
     const res = await api.get('/preferences');
@@ -689,7 +741,7 @@ export async function render(container, { user }) {
   state.currentWeek = monday;
   syncTodayButton();
 
-  await Promise.all([loadWeek(monday), loadLists(), loadPreferences(), loadCategories(), loadRecipes()]);
+  await Promise.all([loadWeek(monday), loadLists(), loadPreferences(), loadCategories(), loadRecipes(), loadMembers()]);
   renderWeekGrid();
   renderRecipeSidebar();
   wireNav();
@@ -1137,6 +1189,13 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
     // Einkaufs-Recht (#1290). Ohne eines davon endete der Knopf im 403.
     const canTransfer  = (recipeCount > 0 || (ownCount > 0 && ingDone < ownCount))
       && mayTransferMealToShopping(meal.id);
+    // WER KOCHT, STEHT IN DER META-ZEILE, NICHT IM TITEL (#1679). Der Titel ist
+    // an jeder Breite der knappste Platz der Karte - 148px am Board, eine
+    // Zeile neben Griff und Aktionen am Telefon - und jedes Zeichen dort kostet
+    // ihn Buchstaben. Die Zeile darunter traegt schon die Zutatenzahl und hat
+    // Luft; der Avatar steht davor. Bei `read` bleibt er stehen: er ist
+    // Zustand, keine Handlung (Regel 2).
+    const cookMark = mealCookMarkHtml(meal);
     const recurrenceBadge = meal.recurrence_template_id
       ? `<span class="meal-card__recurrence" aria-label="${t('meals.recurrenceBadge')}"><i data-lucide="repeat-2" class="icon-sm" aria-hidden="true"></i></span>`
       : '';
@@ -1175,8 +1234,8 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
             className: 'meal-card__thumb',
           }) : ''}
           <span class="meal-card__title"><span class="meal-card__type">${esc(type.label)}</span><span class="meal-card__title-text">${esc(meal.title)}</span>${recurrenceBadge}</span>
-          ${ingLabel ? `<span class="meal-card__meta">
-            <span class="meal-card__ingredients-count">${ingLabel}${esc(ingDoneLabel)}</span>
+          ${ingLabel || cookMark ? `<span class="meal-card__meta">
+            ${cookMark}${ingLabel ? `<span class="meal-card__ingredients-count">${ingLabel}${esc(ingDoneLabel)}</span>` : ''}
           </span>` : ''}${ro ? readRowHintHtml() : ''}
         </button>
         ${ro ? '' : `<span class="meal-card__drag" role="img"
@@ -1881,11 +1940,18 @@ function mealReadHtml(meal) {
   const link = /^https?:\/\//i.test(url)
     ? `<a class="meal-read__link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>`
     : esc(url);
+  // Der Koch als Wert (#1679): Avatar und Name, keine Auswahl. Der Avatar ist
+  // hier Schmuck neben dem ausgeschriebenen Namen und fuer Screenreader stumm.
+  const cook = mealCook(meal);
+  const cookHtml = cook
+    ? `<span class="meal-read__cook"><span aria-hidden="true">${renderAvatarStack([cook], { size: 24, maxVisible: 1 })}</span><span>${esc(cook.display_name)}</span></span>`
+    : null;
   return `
     <div class="meal-read detail-view" data-view="read" data-meal-id="${esc(String(meal.id))}">
       <div class="detail-view__rows">
         ${readRowHtml({ icon: 'calendar', label: t('meals.dateLabel'), value: meal.date ? formatDate(meal.date) : '' })}
         ${readRowHtml({ icon: 'utensils', label: t('meals.mealTypeLabel'), value: typeLabel })}
+        ${cookHtml ? readRowHtml({ icon: 'cooking-pot', label: t('meals.cookLabel'), valueHtml: cookHtml }) : ''}
         ${readRowHtml({ icon: 'list', label: t('meals.ingredientsLabel'), value: ingredients, multiline: true })}
         ${readRowHtml({ icon: 'chef-hat', label: t('meals.savedRecipeLabel'), value: recipe?.title ?? '' })}
         ${readRowHtml({ icon: 'align-left', label: t('meals.notesLabel'), value: meal.notes || '', multiline: true })}
@@ -2116,6 +2182,10 @@ function openMealModal(opts) {
         repeatUntilGroup.hidden = editScopeSelect.value !== 'series';
       });
 
+      // Eine Mahlzeit hat EINEN Koch: dieselbe Auswahl wie bei den Zustaendigen
+      // einer Aufgabe, aber eine neue Wahl loest die vorige ab (#1679).
+      bindUserMultiSelect(panel, COOK_INPUT, { single: true });
+
       panel.querySelector('#modal-cancel').addEventListener('click', closeModal);
       /* EIN ABGEBROCHENES SERIEN-LOESCHEN NAHM DEN EDITOR MIT (Codex an #1485):
        * der Knopf schloss den Dialog, bevor deleteMeal() nach dem Umfang
@@ -2136,6 +2206,39 @@ function openMealModal(opts) {
       wireBlurValidation(panel);
     },
   });
+}
+
+/** Name des Koch-Wahlfelds im Mahlzeit-Dialog (`data-ms-name`). */
+const COOK_INPUT = 'meal_cook';
+
+/**
+ * Die Koch-Auswahl des Dialogs (#1679): die Personenauswahl des
+ * Aufgabendialogs, auf eine Person begrenzt (`bindUserMultiSelect(..., {
+ * single })` in openMealModal).
+ *
+ * WER SCHON KOCHT, STEHT IN DER AUSWAHL, auch wenn er kein Mitglied (mehr) ist
+ * - `withChosenPeople()`. Fehlte er, bekaeme er kein Haekchen, und das naechste
+ * Speichern naehme ihn still heraus, obwohl der Server einen gespeicherten Koch
+ * ausdruecklich weiter annimmt.
+ *
+ * IM SOLO-HAUSHALT VERBORGEN, NICHT ENTFERNT (utils/household.js): eine Reihe
+ * aus der Nutzerin selbst und "Niemand" fragt nach etwas mit einer einzigen
+ * Antwort. Das Feld bleibt im DOM und behaelt seinen Wert, der Absende-Pfad
+ * liest es unveraendert - dieselbe Regel wie "Zugewiesen an" bei den Aufgaben.
+ */
+function cookPickerHtml(meal) {
+  const cook = mealCook(meal);
+  const people = withChosenPeople(state.members, cook ? [cook] : []);
+  const hidden = isSoloHousehold() && people.length <= 1;
+  return `
+    <div class="form-group meal-modal__cook"${hidden ? ' hidden' : ''}>
+      ${renderUserMultiSelect(people, cook ? [cook.id] : [], COOK_INPUT, 'meals.cookLabel')}
+    </div>`;
+}
+
+/** Die im Dialog gewaehlte Koch-id oder null ("Niemand"). */
+function selectedCookId(overlay) {
+  return getSelectedUserIds(overlay, COOK_INPUT)[0] ?? null;
 }
 
 function buildModalContent({ mode, date, mealType, meal, fromSlot = false, recipeId = null }) {
@@ -2277,6 +2380,7 @@ function buildModalContent({ mode, date, mealType, meal, fromSlot = false, recip
   // Slot (FAB, Kurzbefehl) bleibt "erst wann, dann was".
   return `
     ${fromSlot && !isEdit ? nameHtml + whenHtml : whenHtml + nameHtml}
+    ${cookPickerHtml(isEdit ? meal : null)}
 
     <div class="form-group">
       <label class="form-label">${t('meals.ingredientsLabel')}</label>
@@ -2336,6 +2440,7 @@ async function saveModal(overlay) {
   const notes     = overlay.querySelector('#modal-notes').value.trim() || null;
   const recipe_url = overlay.querySelector('#modal-recipe-url').value.trim() || null;
   const recipe_id = overlay.querySelector('#modal-recipe-id')?.value || null;
+  const cook_user_id = selectedCookId(overlay);
   const repeat_weekly = state.modal?.mode === 'create'
     ? Boolean(overlay.querySelector('#modal-repeat-weekly')?.checked)
     : false;
@@ -2379,15 +2484,24 @@ async function saveModal(overlay) {
     const { mode, meal } = state.modal;
 
     if (mode === 'create') {
-      const res     = await api.post('/meals', { date, meal_type, title, notes, recipe_url, recipe_id, ingredients, repeat_weekly, repeat_until });
+      const res     = await api.post('/meals', { date, meal_type, title, notes, recipe_url, recipe_id, cook_user_id, ingredients, repeat_weekly, repeat_until });
       state.meals.push(res.data);
     } else {
       if (scope === 'series') {
         // Ganze Serie: Template + alle Instanzen inkl. Zutaten serverseitig aktualisieren.
-        await api.put(`/meals/${meal.id}?scope=series`, { meal_type, title, notes, recipe_url, recipe_id, ingredients, repeat_until });
+        //
+        // DER KOCH GEHT NUR MIT, WENN ER IM DIALOG GEAENDERT WURDE (#1679). Der
+        // Server schreibt einen mitgeschickten Koch auf die Vorlage und auf
+        // JEDE Mahlzeit der Serie; ein fehlendes Feld laesst alle, wie sie
+        // sind. Der Dialog zeigt den Koch DIESER Mahlzeit - schickte er ihn
+        // immer mit, ueberschriebe eine Titelaenderung an der Serie still jede
+        // einzeln getroffene Wahl ("diese Woche kocht Ben") mit ihm.
+        const seriesBody = { meal_type, title, notes, recipe_url, recipe_id, ingredients, repeat_until };
+        if (cook_user_id !== (meal.cook_user_id ?? null)) seriesBody.cook_user_id = cook_user_id;
+        await api.put(`/meals/${meal.id}?scope=series`, seriesBody);
       } else {
         // Nur diese Instanz
-        await api.put(`/meals/${meal.id}`, { date, meal_type, title, notes, recipe_url, recipe_id });
+        await api.put(`/meals/${meal.id}`, { date, meal_type, title, notes, recipe_url, recipe_id, cook_user_id });
 
         // Zutaten synchronisieren
         const existingIds = new Set((meal.ingredients ?? []).map((i) => i.id));
@@ -2617,6 +2731,12 @@ export const __test = {
   renderRecipeSidebar,
   wireRecipeSidebar,
   mealTitleSuggestions,
+  // #1679: der Koch einer Mahlzeit - Zeichen an der Karte, Auswahl im Dialog,
+  // Wert in der Leseansicht und der Absende-Pfad (test-meals-cook.js).
+  mealCook,
+  mealCookMarkHtml,
+  cookPickerHtml,
+  loadMembers,
 };
 
 // --------------------------------------------------------

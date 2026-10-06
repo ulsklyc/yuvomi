@@ -926,6 +926,8 @@
         "deletedToast": "Прийом їжі видалено.",
         "recurrenceLabel": "Повторювати щотижня",
         "recurrenceWeekly": "Щотижня",
+        "cookLabel": "Готує",
+        "cookNamed": "Готує: {{name}}",
         "recurrenceHint": "Yuvomi автоматично додає цю страву в той самий день тижня в наступних тижнях.",
         "recurrenceUntilLabel": "Повторювати до",
         "recurrenceUntilHint": "Залиште порожнім для безстрокового повторення.",

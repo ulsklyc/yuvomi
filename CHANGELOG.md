@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A meal can name the member who cooks it, and the week plan and the overview show who that
+  is** (#1679, from D#1661, asked by @matejhermanek for a shared flat that plans who cooks which
+  meal). A planned meal carried a date, a type, a title, notes and a recipe, and the only person on it was whoever
+  entered it. The meal dialog now offers the household members in the same person picker the task
+  dialog uses, limited to one person; the cook's avatar then stands on the meal in the week plan
+  and on today's meal on the overview. A meal without a cook looks as it did. A repeating meal
+  keeps its cook: every meal the series creates starts with it, changing the cook of one meal
+  leaves the series alone, and changing it for the whole series reaches all its meals. The cook
+  is a responsibility, not ownership - the plan stays the household's, and who sees or edits a
+  meal still depends on the meal plan right alone; with read access the cook is shown and cannot
+  be chosen. Only household members can be picked, so housekeeping staff, guests of shared
+  expenses and wall tablets are not offered, while a meal that already carries such a cook still
+  saves. An account that cooks a meal is deactivated rather than deleted when it is removed, like
+  an account a task is assigned to, and the meal keeps the name. One cook per meal; meals in the
+  calendar, a reminder for the cook and a view per person are not part of this. For API clients:
+  `cook_user_id` on `POST /api/v1/meals`, `PUT /api/v1/meals/{id}` (with `?scope=series` for the
+  series) and on each assignment of `POST /api/v1/meals/apply-plan`; meals come back with
+  `cook_user_id`, `cook_name`, `cook_color` and `cook_avatar`, also in `todayMeals` of the
+  overview (migration 235).
+
 - **A household can put its members in an order of its own, and every list of people follows it**
   (#1644, from D#1605, asked by @ChaCha500). Until now members were listed alphabetically
   everywhere, so "parents first" or "oldest first" was not possible. Under Settings, Family, an

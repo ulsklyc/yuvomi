@@ -1048,6 +1048,22 @@ const MEAL_SORT_TIME = { breakfast: '08:00', lunch: '12:30', snack: '15:30', din
  * dann heute Fälliges ohne Uhrzeit (00:02). upcomingEvents liefert nur „ab
  * jetzt" - Vergangenes verschwindet also von selbst aus dem Programm.
  */
+/**
+ * Der Koch einer Mahlzeit als Person (#1679) - oder null. `todayMeals` traegt
+ * ihn flach neben der Mahlzeit (`cook_user_id`, `cook_name`, `cook_color`,
+ * `cook_avatar`); Avatar-Stapel und Ueberlappungszeichen lesen eine Person mit
+ * `display_name`, `color` und `avatar_data`.
+ */
+function mealCookPerson(meal) {
+  if (!meal?.cook_user_id) return null;
+  return {
+    id: meal.cook_user_id,
+    display_name: meal.cook_name ?? '',
+    color: meal.cook_color ?? null,
+    avatar_data: meal.cook_avatar ?? null,
+  };
+}
+
 function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, includeMeals = true, now = new Date() } = {}) {
   const highlights = buildTodayHighlights(data);
   const todayKey = zonedDateKey(now);
@@ -1128,7 +1144,10 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
       icon: MEAL_ICONS[highlights.mealType] ?? 'utensils',
       tone: 'dinner',
       route: '/meals',
-      who: null,
+      // Wer kocht (#1679): dasselbe Ueberlappungszeichen wie bei Termin und
+      // Aufgabe - "wen geht es an" ist bei einer Mahlzeit der Koch. Ohne Koch
+      // bleibt die Zeile, wie sie war.
+      who: mealCookPerson(highlights.meal),
       priority: 80,
       open: false,
     });
@@ -1617,11 +1636,20 @@ function renderTodayMeals(meals, visibleMealTypes = MEAL_ORDER) {
   const safeMeals = Array.isArray(meals) ? meals : [];
   const slots = normalizeVisibleMealTypes(visibleMealTypes).map((type) => {
     const meal = safeMeals.find((m) => m.meal_type === type);
+    // WER KOCHT (#1679): der Avatar steht in der Kopfzeile des Slots, vor dem
+    // Symbol der Mahlzeitenart - dort ist neben dem kurzen Typ-Label Platz,
+    // waehrend der Titel darunter seine zwei Zeilen fuer das Gericht braucht.
+    // Der Name geht als sr-only-Satz mit: die Scheibe traegt ihn sonst nur als
+    // `title`. Ohne Koch steht nichts da, der Slot sieht aus wie bisher.
+    const cook = mealCookPerson(meal);
+    const cookMark = cook
+      ? `<span class="meal-slot__cook">${renderAvatarStack([cook], { size: 20, maxVisible: 1 })}<span class="sr-only">${esc(t('meals.cookNamed', { name: cook.display_name }))}</span></span>`
+      : '';
     return `
       <div class="meal-slot ${meal ? 'meal-slot--filled' : ''}" data-type="${type}" data-route="/meals" role="button" tabindex="0">
         <div class="meal-slot__header">
           <span class="meal-slot__type">${mealLabels[type]}</span>
-          <i data-lucide="${MEAL_ICONS[type]}" class="meal-slot__icon" aria-hidden="true"></i>
+          ${cookMark}<i data-lucide="${MEAL_ICONS[type]}" class="meal-slot__icon" aria-hidden="true"></i>
         </div>
         <div class="meal-slot__title${meal ? '' : ' meal-slot__title--empty'}">${meal
           // NUR MIT BILD, anders als im Planer (#1059). Der Slot traegt oben

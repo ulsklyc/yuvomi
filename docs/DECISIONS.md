@@ -236,7 +236,8 @@ in this schema points at `users.id`, and a second table would make every new fea
   because the second factor protects accounts, not membership.
 - Choosing follows listing (#1007, all or nothing): the routes that take people for these
   lists - task assignees, calendar attendees, budget responsibles, schedule owners, reward
-  enrolment, the default assignee of a synced calendar and the Outlook account owner - refuse a
+  enrolment, the default assignee of a synced calendar, the Outlook account owner and the cook
+  of a meal or of a repeating meal (#1679) - refuse a
   newly chosen non-member through `newNonMembers()`, while a reference already stored stays
   valid, so an old record keeps its staff member or guest and still saves. Split expenses are
   the one place guests belong: the candidates are members plus the guests of that group, and

@@ -812,6 +812,8 @@
         "deletedToast": "وعده حذف شد.",
         "recurrenceLabel": "تکرار هفتگی",
         "recurrenceWeekly": "هفتگی",
+        "cookLabel": "آشپز",
+        "cookNamed": "آشپز: {{name}}",
         "recurrenceHint": "Yuvomi این وعده را در هفته‌های آینده به‌طور خودکار در همان روز هفته اضافه می‌کند.",
         "recurrenceUntilLabel": "تکرار تا",
         "recurrenceUntilHint": "برای تکرار نامحدود خالی بگذارید.",

@@ -30,6 +30,7 @@ import { getOccurrences as getWasteOccurrences } from '../services/waste-store.j
 import { scheduleData } from '../services/schedule.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { activeCatalog } from '../services/rewards.js';
+import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL } from '../services/meal-cook.js';
 import { clampEventLimit } from '../../public/utils/dashboard-event-limit.js';
 
 const log = createLogger('Dashboard');
@@ -502,9 +503,12 @@ router.get('/', (req, res) => {
              -- entscheidet die Kachel ohne Nachfrage - eigenes zuerst, sonst das
              -- des Providers.
              r.provider_has_image AS recipe_has_image,
-             (r.image_data IS NOT NULL) AS recipe_has_own_image
+             (r.image_data IS NOT NULL) AS recipe_has_own_image,
+             -- Wer kocht (#1679): Name, Farbe und Bild neben der Mahlzeit, aus
+             -- derselben Quelle wie im Planer.${MEAL_COOK_COLUMNS_SQL}
       FROM meals m
       LEFT JOIN recipes r ON r.id = m.recipe_id
+      ${MEAL_COOK_JOIN_SQL}
       WHERE m.date = ?
         AND m.meal_type IN (${placeholders})
       ORDER BY

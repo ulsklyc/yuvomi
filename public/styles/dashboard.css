@@ -967,6 +967,25 @@
   color: var(--slot-color, var(--color-accent));
 }
 
+/* Wer kocht (#1679). Der Kopf verteilt Label und Symbol mit space-between;
+ * der Avatar gehoert ans Ende neben das Symbol, nicht in die Mitte - die
+ * automatische Marge nimmt den freien Platz vor ihm. Schrumpfen darf nur das
+ * Label (es ellipsiert), nie die Scheibe. */
+.meal-slot__cook {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  margin-inline-start: auto;
+  /* Die Scheibe traegt schon einen Rand in der Flaechenfarbe: mit dem vollen
+   * Kopf-Abstand stuende sie sichtbar weiter vom Symbol weg als das Label von
+   * ihr, und das Label verloere im schmalen Slot (155px am Telefon) die
+   * Breite, die "Abendessen" braucht. Die halbe Luecke geht an das Label. */
+  margin-inline-end: calc(-1 * var(--space-1));
+  /* Die Scheibe ist einen Pixel hoeher als die Label-Zeile; ohne den Ausgleich
+   * stuende der Titel eines Slots mit Koch tiefer als der seines Nachbarn. */
+  margin-block: calc(-1 * var(--space-px));
+}
+
 .meal-slot__type {
   /* Kategorielabel eine Stufe kleiner als das Gericht (12px), damit „Frühstück"
    * und der Gerichtname sich in der Hierarchie trennen (Critique Minor). */

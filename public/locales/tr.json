@@ -798,6 +798,8 @@
         "deletedToast": "Öğün silindi.",
         "recurrenceLabel": "Haftalık tekrarla",
         "recurrenceWeekly": "Haftalık",
+        "cookLabel": "Yemeği yapan",
+        "cookNamed": "Yemeği yapan: {{name}}",
         "recurrenceHint": "Yuvomi bu öğünü gelecek haftalarda aynı hafta gününde otomatik olarak ekler.",
         "recurrenceUntilLabel": "Şu tarihe kadar tekrarla",
         "recurrenceUntilHint": "Sınırsız tekrar için boş bırakın.",

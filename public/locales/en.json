@@ -798,6 +798,8 @@
         "deletedToast": "Meal deleted.",
         "recurrenceLabel": "Repeat weekly",
         "recurrenceWeekly": "Weekly",
+        "cookLabel": "Cook",
+        "cookNamed": "Cook: {{name}}",
         "recurrenceHint": "Yuvomi automatically adds this meal on the same weekday in future weeks.",
         "recurrenceUntilLabel": "Repeat until",
         "recurrenceUntilHint": "Leave empty to repeat indefinitely.",

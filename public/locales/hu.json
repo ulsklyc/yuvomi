@@ -798,6 +798,8 @@
         "deletedToast": "Étkezés törölve.",
         "recurrenceLabel": "Ismétlés hetente",
         "recurrenceWeekly": "Hetente",
+        "cookLabel": "Ki főz",
+        "cookNamed": "Főz: {{name}}",
         "recurrenceHint": "A Yuvomi a következő hetekben automatikusan létrehozza ezt az ételt ugyanazon a hétköznapon.",
         "recurrenceUntilLabel": "Ismétlés eddig",
         "recurrenceUntilHint": "Hagyd üresen a végtelen ismétléshez.",

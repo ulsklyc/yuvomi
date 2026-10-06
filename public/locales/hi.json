@@ -798,6 +798,8 @@
         "deletedToast": "भोजन हटाया गया।",
         "recurrenceLabel": "हर सप्ताह दोहराएं",
         "recurrenceWeekly": "साप्ताहिक",
+        "cookLabel": "खाना कौन बनाएगा",
+        "cookNamed": "खाना बनाएंगे: {{name}}",
         "recurrenceHint": "Yuvomi आने वाले सप्ताहों में इसी सप्ताह-दिन पर यह भोजन अपने आप जोड़ता है।",
         "recurrenceUntilLabel": "इस तारीख तक दोहराएँ",
         "recurrenceUntilHint": "असीमित दोहराव के लिए खाली छोड़ें।",

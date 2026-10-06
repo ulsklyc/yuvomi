@@ -940,6 +940,8 @@
         "deletedToast": "Posiłek usunięty.",
         "recurrenceLabel": "Powtarzaj co tydzień",
         "recurrenceWeekly": "Co tydzień",
+        "cookLabel": "Gotuje",
+        "cookNamed": "Gotuje: {{name}}",
         "recurrenceHint": "Yuvomi automatycznie dodaje ten posiłek w ten sam dzień tygodnia w kolejnych tygodniach.",
         "recurrenceUntilLabel": "Powtarzaj do",
         "recurrenceUntilHint": "Pozostaw puste, aby powtarzać bez końca.",

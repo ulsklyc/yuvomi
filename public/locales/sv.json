@@ -798,6 +798,8 @@
         "deletedToast": "Måltid borttagen.",
         "recurrenceLabel": "Upprepa varje vecka",
         "recurrenceWeekly": "Varje vecka",
+        "cookLabel": "Lagar maten",
+        "cookNamed": "Lagar maten: {{name}}",
         "recurrenceHint": "Yuvomi lägger automatiskt till den här måltiden samma veckodag kommande veckor.",
         "recurrenceUntilLabel": "Upprepa till",
         "recurrenceUntilHint": "Lämna tomt för att upprepa utan slut.",

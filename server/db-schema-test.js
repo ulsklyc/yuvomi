@@ -1447,6 +1447,13 @@ const MIGRATIONS_SQL = {
   232: `
     ALTER TABLE users ADD COLUMN sort_order INTEGER;
   `,
+  // v235 (#1679): der Koch einer Mahlzeit und einer Wochenserie. Die
+  // Meals-Routen und die Uebersicht lesen die Spalte, also braucht sie jede
+  // Suite, die deren Abfragen gegen dieses Schema faehrt.
+  235: `
+    ALTER TABLE meals ADD COLUMN cook_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    ALTER TABLE meal_recurrence_templates ADD COLUMN cook_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+  `,
 };
 
 export { MIGRATIONS_SQL };

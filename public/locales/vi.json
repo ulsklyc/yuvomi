@@ -798,6 +798,8 @@
         "deletedToast": "Đã xóa bữa ăn.",
         "recurrenceLabel": "Lặp lại hằng tuần",
         "recurrenceWeekly": "Hằng tuần",
+        "cookLabel": "Người nấu",
+        "cookNamed": "Người nấu: {{name}}",
         "recurrenceHint": "Yuvomi tự động thêm bữa ăn này vào cùng thứ trong các tuần sau.",
         "recurrenceUntilLabel": "Lặp lại đến",
         "recurrenceUntilHint": "Để trống để lặp lại vô thời hạn.",

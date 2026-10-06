@@ -581,6 +581,15 @@
   text-align: left;
 }
 
+/* Wer kocht (#1679): der Avatar steht in der Meta-Zeile vor der Zutatenzahl,
+ * nicht im Titel - der Titel ist an jeder Breite der knappste Platz der Karte.
+ * `flex: none`, damit die Scheibe neben einer langen Zutatenzahl rund bleibt. */
+.meal-card__cook {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
 .meal-card__ingredients-count {
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
@@ -1146,6 +1155,14 @@
 }
 
 .meal-read__link:hover { text-decoration: underline; }
+
+/* Der Koch in der Leseansicht (#1679): Avatar und Name in einer Zeile. */
+.meal-read__cook {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
 
 /* Leere Slots tragen keinen „Kein Essen geplant"-Text mehr (Rauschen auf dem
  * Planer-Raster) — nur noch Typ-Label + Plus-Affordanz. */

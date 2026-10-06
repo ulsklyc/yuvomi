@@ -812,6 +812,8 @@
         "deletedToast": "Mahlzeit gelöscht.",
         "recurrenceLabel": "Wöchentlich wiederholen",
         "recurrenceWeekly": "Wöchentlich",
+        "cookLabel": "Kocht",
+        "cookNamed": "Kocht: {{name}}",
         "recurrenceHint": "Yuvomi legt diese Mahlzeit in zukünftigen Wochen automatisch am gleichen Wochentag an.",
         "recurrenceUntilLabel": "Wiederholen bis",
         "recurrenceUntilHint": "Leer lassen, damit die Serie unbegrenzt läuft.",

@@ -798,6 +798,8 @@
         "deletedToast": "食事を削除しました。",
         "recurrenceLabel": "毎週繰り返す",
         "recurrenceWeekly": "毎週",
+        "cookLabel": "料理担当",
+        "cookNamed": "料理担当: {{name}}",
         "recurrenceHint": "Yuvomi は今後の週でも同じ曜日にこの食事を自動で追加します。",
         "recurrenceUntilLabel": "繰り返しの終了日",
         "recurrenceUntilHint": "無期限に繰り返す場合は空のままにします。",

@@ -798,6 +798,8 @@
         "deletedToast": "Pasto eliminato.",
         "recurrenceLabel": "Ripeti ogni settimana",
         "recurrenceWeekly": "Settimanale",
+        "cookLabel": "Chi cucina",
+        "cookNamed": "Cucina: {{name}}",
         "recurrenceHint": "Yuvomi aggiunge automaticamente questo pasto nello stesso giorno della settimana nelle settimane future.",
         "recurrenceUntilLabel": "Ripeti fino al",
         "recurrenceUntilHint": "Lascia vuoto per ripetere all'infinito.",

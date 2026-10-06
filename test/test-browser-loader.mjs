@@ -347,8 +347,12 @@ const STUBS = {
     // Suiten, die einen Formular-Handler mit gewaehlten Personen FAHREN, setzen
     // globalThis.__getSelectedUserIds; ohne das bleibt es bei niemandem.
     export const getSelectedUserIds = (...args) => globalThis.__getSelectedUserIds?.(...args) ?? [];
-    export const bindUserMultiSelect = () => {};
-    export const renderAvatarStack = () => '';
+    // Wie die beiden Haken darueber: Suiten, die das Avatar-Markup pruefen oder
+    // die Auswahl-Logik fahren (der Koch einer Mahlzeit, #1679), setzen
+    // globalThis.__renderAvatarStack bzw. globalThis.__bindUserMultiSelect auf
+    // die echte Komponente. Ohne das bleibt es beim leeren Markup wie bisher.
+    export const bindUserMultiSelect = (...args) => globalThis.__bindUserMultiSelect?.(...args);
+    export const renderAvatarStack = (...args) => globalThis.__renderAvatarStack?.(...args) ?? '';
   `,
   '/utils/shopping-categories.js': `
     export const DEFAULT_CATEGORY_NAME = 'Sonstiges';

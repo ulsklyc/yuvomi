@@ -798,6 +798,8 @@
         "deletedToast": "Refeição excluída.",
         "recurrenceLabel": "Repetir semanalmente",
         "recurrenceWeekly": "Semanalmente",
+        "cookLabel": "Quem cozinha",
+        "cookNamed": "Cozinha: {{name}}",
         "recurrenceHint": "O Yuvomi adiciona automaticamente esta refeição no mesmo dia da semana nas semanas futuras.",
         "recurrenceUntilLabel": "Repetir até",
         "recurrenceUntilHint": "Deixe vazio para repetir indefinidamente.",

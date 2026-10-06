@@ -135,22 +135,37 @@ export function getSelectedUserIds(container, inputName) {
  * Bindet die Checkbox-Logik:
  * - "Niemand" deselektiert alle anderen
  * - Andere Auswahl deselektiert "Niemand"
+ * - `single`: hoechstens EINE Person. Eine neue Wahl loest die vorige ab, und
+ *   wer die gewaehlte Person abwaehlt, landet wieder bei "Niemand" - sonst
+ *   stuende die Reihe ohne jede Markierung da. Fuer Felder, die genau eine
+ *   Person tragen (der Koch einer Mahlzeit, #1679): dieselbe Auswahl wie bei
+ *   den Zustaendigen einer Aufgabe, nur dass der Server eine einzige id
+ *   erwartet. Das Markup bleibt dasselbe; `getSelectedUserIds()` liefert dann
+ *   null oder eine id.
  * @param {Element} container
  * @param {string}  inputName
+ * @param {{ single?: boolean }} [options]
  */
-export function bindUserMultiSelect(container, inputName) {
+export function bindUserMultiSelect(container, inputName, { single = false } = {}) {
   const widget = container.querySelector(`.user-ms[data-ms-name="${CSS.escape(inputName)}"]`);
   if (!widget) return;
 
   widget.addEventListener('change', (e) => {
     const cb = e.target;
     if (!cb.matches('.user-ms__checkbox')) return;
+    const none = widget.querySelector('.user-ms__none');
 
     if (cb.classList.contains('user-ms__none') && cb.checked) {
       widget.querySelectorAll('.user-ms__checkbox:not(.user-ms__none)').forEach((c) => { c.checked = false; });
     } else if (!cb.classList.contains('user-ms__none') && cb.checked) {
-      const none = widget.querySelector('.user-ms__none');
       if (none) none.checked = false;
+      if (single) {
+        widget.querySelectorAll('.user-ms__checkbox:not(.user-ms__none)').forEach((c) => {
+          if (c !== cb) c.checked = false;
+        });
+      }
+    } else if (single && none && !widget.querySelector('.user-ms__checkbox:checked')) {
+      none.checked = true;
     }
   });
 }
