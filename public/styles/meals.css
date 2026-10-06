@@ -1136,13 +1136,13 @@
   font-size: var(--text-sm);
 }
 
-/* Der Rezept-Link in der Leseansicht einer Mahlzeit (`meals: read`, #1265) -
- * dieselbe Form wie `.item-details__link` im Einkauf, der dort dieselbe Zeile
- * traegt. Ihn zu oeffnen ist Lesen, also bleibt er ein Link. */
+/* Der Rezept-Link in der Leseansicht einer Mahlzeit (`meals: read`, #1265).
+ * Ihn zu oeffnen ist Lesen, also bleibt er ein Link - in der Akzentfarbe wie
+ * `.item-details__link` im Einkauf. Den Umbruch einer langen Adresse traegt
+ * die Zeile selbst (`.detail-row__value`, overflow-wrap: anywhere). */
 .meal-read__link {
   color: var(--module-accent, var(--color-accent));
   text-decoration: none;
-  word-break: break-all;
 }
 
 .meal-read__link:hover { text-decoration: underline; }
