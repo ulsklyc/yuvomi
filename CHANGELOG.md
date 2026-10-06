@@ -340,6 +340,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the dialog shows - quantity, location, category, best-before date, minimum stock and note.
   The cart button stays for members who may write to the shopping list.
 
+- **The budget shows the whole list again when you come back to it** (#1593). Tapping a
+  person's avatar on an entry narrows the list to what that person is responsible for. That
+  filter survived leaving the budget: you opened another page, came back, and still saw only
+  those entries. It now falls back when the budget is opened, like the account filter and the
+  loan filters always did. Within the budget it stays as it was, also across months.
+
 ## [2.73.0] - 2026-10-04
 
 ### Fixed

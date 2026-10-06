@@ -706,6 +706,21 @@ function syncCurrentButton(root = _container) {
   syncPeriodReset(root, { reset: '#budget-today', isCurrent, prev: '#budget-prev', next: '#budget-next' });
 }
 
+/**
+ * Setzt zurueck, was an eine Sitzung mit dem Modul gebunden ist - beim Betreten
+ * der Seite. Der Zustaendigen-Filter fehlte hier (#1593): er ueberlebte den
+ * Seitenwechsel, und wer zurueckkam, sah eine gekuerzte Liste. Mit ihm faellt
+ * der gemerkte Name, sonst beschriftete er den naechsten Chip.
+ */
+function resetSessionFilters(target) {
+  target.accountFilterId = null;
+  target.responsibleFilterId = null;
+  target.responsibleFilterCachedName = '';
+  target.loanFilterId = null;
+  target.loanStatusFilter = 'active';
+  target.accountsShowArchived = false;
+}
+
 export async function render(container, { user }) {
   _container = container;
   _user = user;
@@ -714,10 +729,7 @@ export async function render(container, { user }) {
   // aber an eine Sitzung mit dem Modul gebunden: sonst zeigt das Budget nach
   // einer Woche noch den Kontoauszug von damals — beim Darlehens-Statusfilter
   // sogar ohne sichtbaren Hinweis. Der aktive Tab bleibt bewusst erhalten.
-  state.accountFilterId = null;
-  state.loanFilterId = null;
-  state.loanStatusFilter = 'active';
-  state.accountsShowArchived = false;
+  resetSessionFilters(state);
   // Sprungziel von aussen (Dashboard-Kachel „Ausgleich offen"): ?tab= waehlt
   // den Reiter. Ohne Parameter bleibt der zuletzt aktive, wie bisher.
   const tabFromUrl = tabFromQuery(window.location.search);
@@ -4855,6 +4867,9 @@ export const __test = {
   // #1656: Absage des Servers -> Feld und Satz.
   LOAN_REFUSALS,
   loanSaveError,
+  // #1593: was beim Betreten der Seite zurueckfaellt.
+  resetSessionFilters,
+  visibleEntries,
   // #1546: was "alle kuenftigen" aus einem Vorkommen an die Serie schickt.
   occurrenceSeriesBody,
   // #1035: dasselbe von der ersten Buchung aus - mit Rhythmus, Werte nur geaendert.

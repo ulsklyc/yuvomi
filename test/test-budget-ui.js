@@ -1621,11 +1621,51 @@ test('der „Nur Ausgaben"-Umschalter nutzt Tokens, keine Farbliterale', () => {
 test('Filterzustand überlebt den Modulwechsel nicht', () => {
   // `state` ist ein Modul-Singleton: ohne Reset zeigt das Budget beim nächsten
   // Besuch noch den Kontoauszug von damals.
+  //
+  // #1593: Dieser Test las bis dahin nur den Quelltext von render() nach vier
+  // Zuweisungen ab - und war gruen, waehrend der Zustaendigen-Filter den
+  // Seitenwechsel ueberlebte (gemessen: 23 Buchungen, Filter gesetzt, Seite
+  // verlassen und zurueck, 1 Buchung). Jetzt laeuft der Reset als Programm, und
+  // die Liste der Filter kommt aus dem Zustand selbst: ein neuer Filter, den
+  // der Reset nicht kennt, faellt hier auf.
+  const dirty = {
+    accountFilterId: 7, responsibleFilterId: 3, responsibleFilterCachedName: 'Clara',
+    loanFilterId: 9, loanStatusFilter: 'paid', accountsShowArchived: true,
+  };
+  const target = { ...dirty, activeTab: 'loans', month: '2026-03', groupByResponsible: true };
+  budgetUi.resetSessionFilters(target);
+  assert.deepEqual(target, {
+    accountFilterId: null, responsibleFilterId: null, responsibleFilterCachedName: '',
+    loanFilterId: null, loanStatusFilter: 'active', accountsShowArchived: false,
+    // Bleibt bewusst: der Reiter, der Monat (render setzt ihn selbst) und die
+    // Gruppierung, die eine gespeicherte Anzeige-Einstellung ist.
+    activeTab: 'loans', month: '2026-03', groupByResponsible: true,
+  });
+  // Die Liste wird danach wieder ganz gezeigt - gemessen an der Funktion, die
+  // die Buchungen fuer die Liste auswaehlt.
+  const entries = [
+    { id: 1, responsible_users: [{ id: 3, display_name: 'Clara' }] },
+    { id: 2, responsible_users: [] },
+  ];
+  const before = { ...budgetUi.state };
+  try {
+    Object.assign(budgetUi.state, { entries, responsibleFilterId: 3, responsibleFilterCachedName: 'Clara' });
+    assert.deepEqual(budgetUi.visibleEntries().map((e) => e.id), [1], 'Vorbedingung: der Filter kuerzt die Liste');
+    budgetUi.resetSessionFilters(budgetUi.state);
+    assert.deepEqual(budgetUi.visibleEntries().map((e) => e.id), [1, 2]);
+  } finally { Object.assign(budgetUi.state, before); }
+  // Jeder Filter des Zustands ist gefuehrt: was im Zustand "Filter" heisst,
+  // setzt der Reset zurueck.
+  const inState = Object.keys(budgetUi.state).filter((key) => /Filter/.test(key));
+  assert.ok(inState.length >= 4, `Vorbedingung: Filter im Zustand gefunden (${inState})`);
+  const probe = Object.fromEntries(inState.map((key) => [key, 'gesetzt']));
+  budgetUi.resetSessionFilters(probe);
+  assert.deepEqual(inState.filter((key) => probe[key] === 'gesetzt'), [], 'ein Filter ueberlebt das Betreten der Seite');
+  // Und render() ruft ihn, bevor es zum ersten Mal wartet.
   const enter = budget.match(/export async function render\([\s\S]*?renderBody\(\);/);
   assert.ok(enter);
-  for (const field of ['accountFilterId', 'loanFilterId', 'loanStatusFilter', 'accountsShowArchived']) {
-    assert.match(enter[0], new RegExp(`state\\.${field} = `), `${field} wird beim Betreten nicht zurückgesetzt`);
-  }
+  const call = enter[0].indexOf('resetSessionFilters(state);');
+  assert.ok(call !== -1 && call < enter[0].indexOf('await '), 'render() setzt die Filter nicht zurueck, bevor es wartet');
 });
 
 test('der Konto-Drilldown verliert den Fokus nicht', () => {
