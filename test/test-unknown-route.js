@@ -8,8 +8,9 @@
  *
  * router.js ist browser-gekoppelt und nicht importierbar. Die Entscheidung und
  * ihre Wirkung stehen deshalb in `public/utils/unknown-route.js` und laufen
- * hier als Programm. Seit #1640 laeuft auch `navigate()` selbst: der Helfer
- * test/router-navigate-harness.js fuehrt den echten Text der Funktion aus, und
+ * hier als Programm. Seit #1640 laeuft auch `navigate()` selbst, seit #1657
+ * als importiertes Modul (public/utils/router-navigate.js): der Helfer
+ * test/router-navigate-harness.js gibt ihm aufzeichnende Stellvertreter, und
  * der Teil "navigate() als Programm" misst, wo eine Navigation ENDET. Der
  * aeltere Verdrahtungsteil am Quelltext bleibt daneben stehen.
  *
@@ -21,7 +22,11 @@ import { readFileSync } from 'node:fs';
 import { createNavigateHarness, HARNESS_ROUTES } from './router-navigate-harness.js';
 
 const load = () => import('../public/utils/unknown-route.js');
-const routerSrc = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+// navigate() steht seit #1657 in einem eigenen Modul. Der Verdrahtungsteil liest
+// BEIDE Dateien als einen Text: "genau ein Aufrufer" und "Hinweis genau einmal"
+// gelten ueber den Router samt Modul, nicht nur ueber die Datei, die uebrig blieb.
+const navigateSrc = readFileSync(new URL('../public/utils/router-navigate.js', import.meta.url), 'utf8');
+const routerSrc = `${readFileSync(new URL('../public/router.js', import.meta.url), 'utf8')}\n${navigateSrc}`;
 
 const KNOWN = [
   '/login', '/setup', '/pair', '/', '/tasks', '/budget', '/health', '/health/vitals',
@@ -213,10 +218,10 @@ test('nur ein Schraegstrich zu viel: Query und Hash bleiben (Review #1638)', asy
 // der die Befunde aus dem Review zu #1638 hingen.
 
 function navigateBody() {
-  const start = routerSrc.indexOf('async function navigate(');
-  const end = routerSrc.indexOf('async function syncPreferencesOnce(');
+  const start = navigateSrc.indexOf('async function navigate(');
+  const end = navigateSrc.indexOf('\n  return navigate;\n', start);
   assert.ok(start > 0 && end > start, 'navigate() nicht gefunden');
-  return routerSrc.slice(start, end);
+  return navigateSrc.slice(start, end);
 }
 const count = (haystack, needle) => haystack.split(needle).length - 1;
 
@@ -303,7 +308,7 @@ test('unknownDetourFor() liest allRoutes() und hat genau einen Aufrufer je Entsc
 });
 
 // ─── navigate() als Programm (#1640) ────────────────────────────────────────
-// Der echte Text von navigate() in der Umgebung aus router-navigate-harness.js.
+// Das echte navigate() mit den Stellvertretern aus router-navigate-harness.js.
 // Gemessen wird, was aussen ankommt: welche Seite gezeichnet wird, was in der
 // History steht, ob der Hinweis eine Flaeche fand.
 

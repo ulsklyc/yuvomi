@@ -2982,7 +2982,10 @@ test('SPA navigation can move focus to main content after route changes', () => 
 
   assert.match(source, /main\.tabIndex\s*=\s*-1/);
   assert.match(source, /function\s+focusMainContentAfterNavigation/);
-  assert.match(source, /focusMainContentAfterNavigation\(basePath/);
+  // Der Aufruf steht seit #1657 in navigate() im eigenen Modul; der Router
+  // reicht die Funktion als Abhaengigkeit hinein.
+  assert.match(source, /createNavigate\(routerState, \{[^}]*\bfocusMainContentAfterNavigation\b[^}]*\}\)/);
+  assert.match(read('../public/utils/router-navigate.js'), /focusMainContentAfterNavigation\(basePath/);
 });
 
 test('bottom navigation labels are constrained against localized overflow', () => {
@@ -17912,9 +17915,9 @@ test('router: ein AbortController je Seitenaufbau, abgebrochen vor dem naechsten
   assert.ok(abortAt > 0 && createAt > abortAt && renderAt > createAt,
     'renderPage() muss den vorigen Controller abbrechen und einen neuen anlegen, BEVOR es render() ruft');
   // Beide Kontext-Fassungen tragen das Signal - Kernseiten und Erweiterungen.
-  assert.match(renderPage, /\{ user: currentUser, signal: _pageController\.signal \}/,
+  assert.match(renderPage, /\{ user: routerState\.currentUser, signal: _pageController\.signal \}/,
     'Kern-Kontext ohne Router-Signal');
-  assert.match(renderPage, /\{ user: currentUser, page: \{ \.\.\.route\.thirdPartyModule\.page \}, signal: _pageController\.signal \}/,
+  assert.match(renderPage, /\{ user: routerState\.currentUser, page: \{ \.\.\.route\.thirdPartyModule\.page \}, signal: _pageController\.signal \}/,
     'Erweiterungs-Kontext ohne Router-Signal');
 });
 

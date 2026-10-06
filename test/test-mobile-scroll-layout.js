@@ -210,8 +210,10 @@ test('the router resets the surviving scrollport on every navigation', () => {
     /if \(scrollTarget > 0\) content\.scrollTop = scrollTarget;/,
     'die Wiederherstellung bei popstate gehört hinter das await auf den Render',
   );
+  // navigate() steht seit #1657 in utils/router-navigate.js - dort faellt die
+  // Entscheidung ueber das Scrollziel, renderPage() im Router setzt es um.
   assert.match(
-    routerJs,
+    readFileSync(new URL('../public/utils/router-navigate.js', import.meta.url), 'utf8'),
     /scrollPositionFor\(basePath, \{ restore: !pushState \}\)/,
     'die Richtung kommt aus pushState, nicht aus getDirection() - das ist die '
     + 'Slide-Richtung nach ROUTE_ORDER und auch bei Vorwärts-Taps oft "left"',
