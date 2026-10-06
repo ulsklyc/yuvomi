@@ -1530,7 +1530,6 @@
         "loanAddedToast": "وام افزوده شد",
         "loanSavedToast": "وام ذخیره شد",
         "loanDeletedToast": "وام حذف شد",
-        "loanPaymentAddedToast": "پرداخت ثبت شد",
         "loanPaymentTitle": "بازپرداخت وام: {{borrower}}",
         "typeLoan": "وام",
         "tabsLabel": "بخش‌های بودجه",

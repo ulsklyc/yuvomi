@@ -1662,7 +1662,6 @@
         "loanAddedToast": "Позику додано",
         "loanSavedToast": "Позику збережено",
         "loanDeletedToast": "Позику видалено",
-        "loanPaymentAddedToast": "Платіж записано",
         "loanPaymentTitle": "Платіж за позикою: {{borrower}}",
         "typeLoan": "Позика",
         "tabsLabel": "Розділи бюджету",

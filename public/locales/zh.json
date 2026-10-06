@@ -1516,7 +1516,6 @@
         "loanAddedToast": "借款已添加",
         "loanSavedToast": "借款已保存",
         "loanDeletedToast": "借款已删除",
-        "loanPaymentAddedToast": "还款已记录",
         "loanPaymentTitle": "借款还款：{{borrower}}",
         "typeLoan": "借款",
         "tabsLabel": "预算分区",

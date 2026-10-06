@@ -1516,7 +1516,6 @@
         "loanAddedToast": "Hitel hozzáadva",
         "loanSavedToast": "Hitel mentve",
         "loanDeletedToast": "Hitel törölve",
-        "loanPaymentAddedToast": "Fizetés rögzítve",
         "loanPaymentTitle": "Hitel visszafizetés: {{borrower}}",
         "typeLoan": "Hitel",
         "tabsLabel": "Költségvetési szakaszok",

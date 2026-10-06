@@ -1530,7 +1530,6 @@
         "loanAddedToast": "Darlehen hinzugefügt",
         "loanSavedToast": "Darlehen gespeichert",
         "loanDeletedToast": "Darlehen gelöscht",
-        "loanPaymentAddedToast": "Zahlung erfasst",
         "loanPaymentTitle": "Darlehensrückzahlung: {{borrower}}",
         "typeLoan": "Darlehen",
         "tabsLabel": "Budgetbereiche",

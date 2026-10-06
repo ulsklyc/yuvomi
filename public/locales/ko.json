@@ -1530,7 +1530,6 @@
         "loanAddedToast": "대출이 추가되었습니다",
         "loanSavedToast": "대출이 저장되었습니다",
         "loanDeletedToast": "대출이 삭제되었습니다",
-        "loanPaymentAddedToast": "결제가 기록되었습니다",
         "loanPaymentTitle": "대출 상환: {{borrower}}",
         "typeLoan": "대출",
         "tabsLabel": "예산 영역",

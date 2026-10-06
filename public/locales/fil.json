@@ -1530,7 +1530,6 @@
         "loanAddedToast": "Naidagdag ang utang",
         "loanSavedToast": "Na-save ang utang",
         "loanDeletedToast": "Natanggal ang utang",
-        "loanPaymentAddedToast": "Naitala ang bayad",
         "loanPaymentTitle": "Bayad sa utang: {{borrower}}",
         "typeLoan": "Utang",
         "tabsLabel": "Mga bahagi ng badyet",

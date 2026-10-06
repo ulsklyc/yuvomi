@@ -1662,7 +1662,6 @@
         "loanAddedToast": "Займ добавлен",
         "loanSavedToast": "Займ сохранён",
         "loanDeletedToast": "Займ удалён",
-        "loanPaymentAddedToast": "Платёж записан",
         "loanPaymentTitle": "Платеж по займу: {{borrower}}",
         "typeLoan": "Займ",
         "tabsLabel": "Разделы бюджета",

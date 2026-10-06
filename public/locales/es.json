@@ -1516,7 +1516,6 @@
         "loanAddedToast": "Préstamo añadido",
         "loanSavedToast": "Préstamo guardado",
         "loanDeletedToast": "Préstamo eliminado",
-        "loanPaymentAddedToast": "Pago registrado",
         "loanPaymentTitle": "Pago del préstamo: {{borrower}}",
         "typeLoan": "Préstamo",
         "tabsLabel": "Secciones del presupuesto",

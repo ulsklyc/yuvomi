@@ -1589,7 +1589,6 @@
         "loanAddedToast": "Půjčka přidána",
         "loanSavedToast": "Půjčka uložena",
         "loanDeletedToast": "Půjčka smazána",
-        "loanPaymentAddedToast": "Platba zaznamenána",
         "loanPaymentTitle": "Splátka půjčky: {{borrower}}",
         "typeLoan": "Půjčka",
         "tabsLabel": "Oblasti rozpočtu",

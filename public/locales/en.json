@@ -1516,7 +1516,6 @@
         "loanAddedToast": "Loan added",
         "loanSavedToast": "Loan saved",
         "loanDeletedToast": "Loan deleted",
-        "loanPaymentAddedToast": "Payment recorded",
         "loanPaymentTitle": "Loan repayment: {{borrower}}",
         "typeLoan": "Loan",
         "tabsLabel": "Budget sections",

@@ -1516,7 +1516,6 @@
         "loanAddedToast": "Το δάνειο προστέθηκε",
         "loanSavedToast": "Το δάνειο αποθηκεύτηκε",
         "loanDeletedToast": "Το δάνειο διαγράφηκε",
-        "loanPaymentAddedToast": "Η πληρωμή καταγράφηκε",
         "loanPaymentTitle": "Πληρωμή δανείου: {{borrower}}",
         "typeLoan": "Δάνειο",
         "tabsLabel": "Ενότητες προϋπολογισμού",

@@ -1676,7 +1676,6 @@
         "loanAddedToast": "Pożyczka dodana",
         "loanSavedToast": "Pożyczka zapisana",
         "loanDeletedToast": "Pożyczka usunięta",
-        "loanPaymentAddedToast": "Płatność zarejestrowana",
         "loanPaymentTitle": "Spłata pożyczki: {{borrower}}",
         "typeLoan": "Pożyczka",
         "tabsLabel": "Sekcje budżetu",

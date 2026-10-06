@@ -1516,7 +1516,6 @@
         "loanAddedToast": "Khoản vay đã thêm",
         "loanSavedToast": "Khoản vay đã lưu",
         "loanDeletedToast": "Khoản vay đã xóa",
-        "loanPaymentAddedToast": "Đã ghi nhận thanh toán",
         "loanPaymentTitle": "Trả nợ khoản vay: {{borrower}}",
         "typeLoan": "Khoản vay",
         "tabsLabel": "Các phần ngân sách",

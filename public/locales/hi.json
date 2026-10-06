@@ -1516,7 +1516,6 @@
         "loanAddedToast": "उधार जोड़ा गया",
         "loanSavedToast": "उधार सहेजा गया",
         "loanDeletedToast": "उधार हटाया गया",
-        "loanPaymentAddedToast": "भुगतान दर्ज किया गया",
         "loanPaymentTitle": "ऋण भुगतान: {{borrower}}",
         "typeLoan": "उधार",
         "tabsLabel": "बजट अनुभाग",

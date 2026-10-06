@@ -1516,7 +1516,6 @@
         "loanAddedToast": "Lån tillagt",
         "loanSavedToast": "Lån sparat",
         "loanDeletedToast": "Lån borttaget",
-        "loanPaymentAddedToast": "Betalning registrerad",
         "loanPaymentTitle": "Låneåterbetalning: {{borrower}}",
         "typeLoan": "Lån",
         "tabsLabel": "Budgetsektioner",

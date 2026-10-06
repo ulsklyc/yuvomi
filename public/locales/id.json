@@ -1530,7 +1530,6 @@
         "loanAddedToast": "Pinjaman ditambahkan",
         "loanSavedToast": "Pinjaman disimpan",
         "loanDeletedToast": "Pinjaman dihapus",
-        "loanPaymentAddedToast": "Pembayaran dicatat",
         "loanPaymentTitle": "Pelunasan pinjaman: {{borrower}}",
         "typeLoan": "Pinjaman",
         "tabsLabel": "Area anggaran",

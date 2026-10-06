@@ -1516,7 +1516,6 @@
         "loanAddedToast": "Borç eklendi",
         "loanSavedToast": "Borç kaydedildi",
         "loanDeletedToast": "Borç silindi",
-        "loanPaymentAddedToast": "Ödeme kaydedildi",
         "loanPaymentTitle": "Kredi geri ödemesi: {{borrower}}",
         "typeLoan": "Borç",
         "tabsLabel": "Bütçe bölümleri",

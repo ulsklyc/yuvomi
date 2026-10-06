@@ -1516,7 +1516,6 @@
         "loanAddedToast": "Lening toegevoegd",
         "loanSavedToast": "Lening opgeslagen",
         "loanDeletedToast": "Lening verwijderd",
-        "loanPaymentAddedToast": "Betaling vastgelegd",
         "loanPaymentTitle": "Leningaflossing: {{borrower}}",
         "typeLoan": "Lening",
         "tabsLabel": "Budgetsecties",

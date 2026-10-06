@@ -1516,7 +1516,6 @@
         "loanAddedToast": "貸付を追加しました",
         "loanSavedToast": "貸付を保存しました",
         "loanDeletedToast": "貸付を削除しました",
-        "loanPaymentAddedToast": "返済を記録しました",
         "loanPaymentTitle": "ローン返済: {{borrower}}",
         "typeLoan": "貸付",
         "tabsLabel": "予算セクション",

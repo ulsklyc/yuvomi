@@ -1735,7 +1735,6 @@
         "loanAddedToast": "تمت إضافة القرض",
         "loanSavedToast": "تم حفظ القرض",
         "loanDeletedToast": "تم حذف القرض",
-        "loanPaymentAddedToast": "تم تسجيل الدفع",
         "loanPaymentTitle": "سداد القرض: {{borrower}}",
         "typeLoan": "قرض",
         "tabsLabel": "أقسام الميزانية",
