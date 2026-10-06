@@ -3942,7 +3942,8 @@
         "reversePaymentLabel": "Revers betaling fra {{payer}} til {{payee}} på {{amount}}",
         "reversePaymentConfirm": "Revers denne betalingen?",
         "reversePaymentConfirmDetail": "{{payer}} til {{payee}}, {{amount}}. En motpost kansellerer betalingen og saldoene går tilbake til det de var. Betalingen blir værende i aktiviteten, markert som reversert.",
-        "loadMoreActivity": "Last mer"
+        "loadMoreActivity": "Last mer",
+        "expenseDeleted": "Slettet"
     },
     "wmo": {
         "0": "Skyfri",

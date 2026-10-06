@@ -3942,7 +3942,8 @@
         "reversePaymentLabel": "Reembolsar o pagamento de {{payer}} para {{payee}} de {{amount}}",
         "reversePaymentConfirm": "Reembolsar este pagamento?",
         "reversePaymentConfirmDetail": "{{payer}} para {{payee}}, {{amount}}. Um reembolso anula o pagamento e os saldos voltam ao que eram. O pagamento continua na atividade, marcado como reembolsado.",
-        "loadMoreActivity": "Carregar mais"
+        "loadMoreActivity": "Carregar mais",
+        "expenseDeleted": "Excluída"
     },
     "wmo": {
         "0": "Céu limpo",
