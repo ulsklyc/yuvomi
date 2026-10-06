@@ -1397,10 +1397,12 @@ test('Fortsetzen: ist nichts versaeumt, bleibt der Termin, und ein Termin von he
 });
 
 // Das Raster einer Serie ist das, was der LAUF gebucht haette. Eine Monatsserie
-// am 31. laeuft in addInterval ueber (31.01. -> 03.03.) und bleibt danach am 3.
-// Eine zweite Rechnung "Starttag + n Monate" laege daneben, deshalb wird hier
-// gegen den Lauf selbst gemessen: eine Zwillingsserie, nie pausiert, Tag fuer
-// Tag gebucht - wo sie am Ende steht, muss die fortgesetzte auch stehen.
+// am 31. klemmt in kuerzeren Monaten aufs Monatsende und kehrt auf ihren
+// Ankertag zurueck (#1721: 31.01. -> 28.02. -> 31.03.; vorher lief sie auf den
+// 03.03. ueber und blieb dort). Gemessen wird gegen den Lauf selbst statt gegen
+// eine zweite Rechnung: eine Zwillingsserie, nie pausiert, Tag fuer Tag
+// gebucht - wo sie am Ende steht, muss die fortgesetzte auch stehen. Wo das
+// Raster selbst liegt, haelt test:split-recurring-anchor.
 test('Fortsetzen: eine Monatsserie am 31. landet dort, wo der Lauf sie hingezaehlt haette', async (t) => {
   for (const [frequency, start, jetzt] of [
     ['monthly', '2026-01-31', '2026-08-20T10:00:00Z'],
@@ -1426,7 +1428,9 @@ test('Fortsetzen: eine Monatsserie am 31. landet dort, wo der Lauf sie hingezaeh
     });
   }
   // Festgehalten, damit sichtbar bleibt, WAS das Raster am 31. ist.
-  assert.deepEqual(nextRunNotBefore('2026-01-31', 'monthly', '2026-08-20'), { date: '2026-09-03', skipped: 7 });
+  assert.deepEqual(nextRunNotBefore('2026-01-31', 'monthly', '2026-08-20', 31), { date: '2026-08-31', skipped: 7 });
+  // Ohne Anker klemmt die Serie und bleibt am 28. - kein Monat faellt aus.
+  assert.deepEqual(nextRunNotBefore('2026-01-31', 'monthly', '2026-08-20'), { date: '2026-08-28', skipped: 7 });
 });
 
 // "Heute" ist der Tag des Haushalts. Beide Faelle liegen so, dass der UTC-Tag
