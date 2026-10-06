@@ -329,6 +329,118 @@ test('beim Deaktivieren enden alle fuenf Abo-Adressen - und es gibt keine sechst
 });
 
 // --------------------------------------------------------------------------
+// Das Inventar: jede Spalte, die ein Geheimnis traegt
+// --------------------------------------------------------------------------
+
+/**
+ * Jede Spalte des Schemas, deren Name nach einem Geheimnis aussieht, und was
+ * beim DEAKTIVIEREN eines Kontos mit ihr geschieht. Die Liste ist das Inventar
+ * hinter `deactivate()` in server/services/user-removal.js: eine NEUE solche
+ * Spalte ist rot, bis hier steht, ob sie ein Weg hinein ist - sonst waechst
+ * das Schema an der Stelle vorbei, an der Zugaenge enden.
+ *
+ *   ended    - endet in der Transaktion (das Verhalten misst test:user-deactivation)
+ *   kept     - bleibt, und kein Weg wertet sie fuer ein deaktiviertes Konto aus
+ *   household- gehoert dem Haushalt, nicht dem Konto; oeffnet nichts in Yuvomi
+ *   no-secret- heisst nur so
+ */
+const SECRET_COLUMNS = {
+  'users.password_hash': 'kept: nur POST /auth/login (canSignIn) und PATCH /auth/me/password (requireAuth) lesen ihn',
+  'users.oidc_sub': 'kept: der SSO-Rueckweg muss das Konto finden, um es abzuweisen statt ein neues anzulegen',
+  'users.calendar_feed_token': 'ended: auf NULL gesetzt',
+  'users.inventory_deadlines_feed_token': 'ended: auf NULL gesetzt',
+  'users.cycle_feed_token': 'ended: auf NULL gesetzt',
+  'users.schedule_feed_token': 'ended: auf NULL gesetzt',
+  'users.waste_feed_token': 'ended: auf NULL gesetzt',
+  'api_tokens.token_hash': 'ended: revoked_at fuer Subjekt UND Aussteller',
+  'api_tokens.token_prefix': 'no-secret: Anzeigehilfe zum Token darueber',
+  'password_resets.token_hash': 'ended: geloescht',
+  'invites.token_hash': 'ended: offene Einladungen des Kontos widerrufen',
+  'push_subscriptions.p256dh': 'ended: geloescht',
+  'push_subscriptions.auth': 'ended: geloescht',
+  'notification_channels.secret_json': 'ended: eigene Kanaele geloescht; Haushaltskanaele gehoeren dem Haushalt',
+  'user_totp.secret': 'kept: nur /auth/2fa/verify (canSignIn vor der Pruefung) und 2FA-Routen hinter requireAuth',
+  'user_recovery_codes.code_hash': 'ended: geloescht',
+  'display_pairing_codes.code_hash': 'ended: offene Codes des Kontos verbraucht (auch beim Loeschen)',
+  'display_devices.token_hash': 'kept: das Geheimnis hat nur das gekoppelte Geraet, nie der Aussteller des Codes',
+  'outlook_accounts.access_token': 'household: Zugang zu Microsoft; das Konto verliert nur seinen Eigentuemer',
+  'outlook_accounts.refresh_token': 'household: wie access_token',
+  'outlook_accounts.token_expiry': 'no-secret: Ablaufzeit',
+  'caldav_accounts.password': 'household: Zugang zu einem fremden Kalenderdienst',
+  'carddav_accounts.password': 'household: Zugang zu einem fremden Adressbuchdienst',
+  'dms_accounts.api_token': 'household: Zugang zu einem fremden Dokumentendienst',
+  'recipe_provider_accounts.api_token': 'household: Zugang zu einem fremden Rezeptdienst',
+  'google_calendar_selection.sync_token': 'no-secret: Fortschrittsmarke des Abgleichs',
+};
+
+test('jede Spalte, die ein Geheimnis traegt, steht im Inventar - und keine darin ist erfunden', () => {
+  const looksSecret = /token|secret|password|code_hash|p256dh|^auth$|^oidc_sub$/i;
+  const found = [];
+  for (const name of ALL_TABLES) {
+    if (name.startsWith('search_index')) continue;
+    for (const info of db.prepare(`PRAGMA table_info("${name}")`).all()) {
+      if (looksSecret.test(info.name)) found.push(`${name}.${info.name}`);
+    }
+  }
+  const unknown = found.filter((key) => !(key in SECRET_COLUMNS));
+  assert.deepEqual(unknown, [],
+    'neue Spalte mit Geheimnis: in deactivate() (server/services/user-removal.js) entscheiden, ob sie endet, und hier eintragen');
+  const gone = Object.keys(SECRET_COLUMNS).filter((key) => !found.includes(key));
+  assert.deepEqual(gone, [], 'Eintrag ohne Spalte - entfernen');
+  for (const [key, fate] of Object.entries(SECRET_COLUMNS)) {
+    assert.match(fate, /^(ended|kept|household|no-secret): .{8,}/, `${key} braucht ein Urteil mit Grund`);
+  }
+});
+
+test('was beim Deaktivieren als "ended" gilt, ist danach wirklich weg', () => {
+  const id = addUser('Inventar');
+  const other = addUser('Inventar Nachbar');
+  const display = addUser('Inventar Tablett');
+  fabricate(() => {
+    insertRow('quick_links', 'created_by', id);
+    db.prepare(`UPDATE users SET ${FEED_TOKEN_COLUMNS.map((c) => `${c} = '${c}-${id}'`).join(', ')}, oidc_sub = 'sub-${id}' WHERE id = ?`).run(id);
+    insertRow('api_tokens', 'subject_user_id', id);
+    insertRow('api_tokens', 'created_by', id, { subject_user_id: other });
+    insertRow('password_resets', 'user_id', id);
+    insertRow('invites', 'created_by', id, { expires_at: Date.now() + 3_600_000 });
+    insertRow('push_subscriptions', 'user_id', id);
+    insertRow('notification_channels', 'user_id', id);
+    insertRow('user_totp', 'user_id', id);
+    insertRow('user_recovery_codes', 'user_id', id);
+    insertRow('display_pairing_codes', 'created_by', id, { user_id: display, expires_at: '2999-01-01T00:00:00Z' });
+    insertRow('display_devices', 'user_id', display);
+  });
+  addSession(id);
+  db.prepare('INSERT INTO sessions (sid, sess, expired_at) VALUES (?, ?, ?)')
+    .run(`pending-${id}`, JSON.stringify({ pendingTwoFactor: { userId: id } }), Date.now() + 60_000);
+  db.prepare('INSERT INTO sessions (sid, sess, expired_at) VALUES (?, ?, ?)')
+    .run(`linking-${id}`, JSON.stringify({ userId: id, oidc: { linkUserId: id } }), Date.now() + 60_000);
+  const hashBefore = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(id).password_hash;
+
+  assert.equal(removeUser(db, id).outcome, 'deactivated');
+  const n = (sql, ...args) => db.prepare(sql).get(...args).n;
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+  for (const column of FEED_TOKEN_COLUMNS) assert.equal(user[column], null, column);
+  assert.equal(n('SELECT COUNT(*) AS n FROM api_tokens WHERE (subject_user_id = ? OR created_by = ?) AND revoked_at IS NULL', id, id), 0);
+  assert.equal(n('SELECT COUNT(*) AS n FROM api_tokens WHERE subject_user_id = ? OR created_by = ?', id, id), 2, 'widerrufen, nicht geloescht');
+  assert.equal(n('SELECT COUNT(*) AS n FROM password_resets WHERE user_id = ?', id), 0);
+  assert.equal(n('SELECT COUNT(*) AS n FROM invites WHERE created_by = ? AND revoked_at IS NULL', id), 0);
+  assert.equal(n('SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id = ?', id), 0);
+  assert.equal(n('SELECT COUNT(*) AS n FROM notification_channels WHERE user_id = ?', id), 0);
+  assert.equal(n('SELECT COUNT(*) AS n FROM user_recovery_codes WHERE user_id = ?', id), 0);
+  assert.equal(n('SELECT COUNT(*) AS n FROM display_pairing_codes WHERE created_by = ? AND used_at IS NULL', id), 0);
+  assert.equal(n('SELECT COUNT(*) AS n FROM sessions WHERE sid IN (?, ?)', `pending-${id}`, `linking-${id}`), 0,
+    'auch die Sitzungen, die das Konto nur im Wartezustand oder im Verknuepfungs-Lauf nennen');
+  assert.equal(sessionsOf(id), 0);
+  // kept:
+  assert.equal(user.password_hash, hashBefore);
+  assert.equal(user.oidc_sub, `sub-${id}`);
+  assert.equal(n('SELECT COUNT(*) AS n FROM user_totp WHERE user_id = ?', id), 1);
+  assert.equal(n('SELECT COUNT(*) AS n FROM display_devices WHERE user_id = ? AND revoked_at IS NULL', display), 1,
+    'das gekoppelte Geraet eines Tabletts bleibt');
+});
+
+// --------------------------------------------------------------------------
 // 5: die Spalte hat genau ein Zuhause
 // --------------------------------------------------------------------------
 

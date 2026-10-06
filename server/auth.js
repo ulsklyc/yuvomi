@@ -2377,10 +2377,13 @@ router.get('/oidc/callback', refuseWhileRestoring, async (req, res) => {
     // begann, und der linkUserId stammt aus derselben signierten Session wie
     // der state.
     if (stored.linkUserId) {
-      const result = linkOidcAccount(db.get(), stored.linkUserId, {
-        sub: claims.sub,
-        iss: claims.iss,
-      });
+      // Der Lauf begann angemeldet; bis zum Rueckweg kann das Konto deaktiviert
+      // worden sein (#1381). Ein Konto, das sich nicht anmelden darf, bekommt
+      // keine neue Bindung - `user_gone` ist dieselbe Antwort wie fuer ein
+      // Konto, das es nicht mehr gibt.
+      const result = canSignIn(db.get(), stored.linkUserId)
+        ? linkOidcAccount(db.get(), stored.linkUserId, { sub: claims.sub, iss: claims.iss })
+        : { ok: false, reason: 'user_gone' };
       if (!result.ok) {
         log.warn(`OIDC link rejected for user ${stored.linkUserId}: ${result.reason}`);
       }

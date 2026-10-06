@@ -3,8 +3,7 @@
  * Zweck: Die eine Entscheidung hinter `DELETE /api/v1/auth/users/:id`. Wer
  *        Spuren in geteilten Daten hinterlassen hat, wird deaktiviert; nur wer
  *        nichts Geteiltes hinterlaesst, wird wirklich geloescht.
- * Abhaengigkeiten: account-state (das Aktiv-Praedikat), birthdays (die
- *        Artefakte eines Mitglieds-Geburtstags)
+ * Abhaengigkeiten: birthdays (die Artefakte eines Mitglieds-Geburtstags)
  *
  * WARUM NICHT EINFACH `DELETE FROM users`. Bis hierher entschieden die
  * Fremdschluessel, was mit allem geschieht, was ein Konto angefasst hat, und
@@ -48,7 +47,6 @@
  * mit `created_by`, die offenen Einladungen und die offenen Kopplungscodes des
  * Kontos.
  */
-import { activeAccountSql } from './account-state.js';
 import { deleteBirthdayArtifacts } from './birthdays.js';
 
 /**
@@ -197,13 +195,25 @@ export class RemovalRefused extends Error {
  * Beendet JEDE Sitzung dieses Kontos. Die Zeilen tragen die Konto-Id nur im
  * JSON der Sitzung, deshalb der Lauf ueber alle - wie `invalidateUserSessions`
  * in server/auth.js, nur ohne Ausnahme und auf der uebergebenen Verbindung.
+ *
+ * DREI STELLEN, AN DENEN EINE SITZUNG EIN KONTO NENNT (server/auth.js), nicht
+ * nur die angemeldete:
+ *   - `userId`: die angemeldete Sitzung;
+ *   - `pendingTwoFactor.userId`: das Passwort stimmte, der Code steht aus;
+ *   - `oidc.linkUserId`: ein laufender Verknuepfungs-Lauf zum Anbieter.
+ * Die beiden halbfertigen fragen beim Einloesen selbst nach (`canSignIn()` in
+ * `/2fa/verify` und im Verknuepfungszweig des Callbacks); hier enden sie
+ * trotzdem, damit nach dem Entfernen keine Zeile mehr auf das Konto zeigt.
+ * Eine Display-Sitzung traegt keine Konto-Id: sie ist eine leere Sitzung fuer
+ * den CSRF-Token, das Geraet weist sich mit seinem eigenen Cookie aus.
  */
 function endSessions(database, userId) {
   const drop = database.prepare('DELETE FROM sessions WHERE sid = ?');
   for (const row of database.prepare('SELECT sid, sess FROM sessions').all()) {
-    let owner = null;
-    try { owner = JSON.parse(row.sess)?.userId ?? null; } catch { /* kaputte Zeile: gehoert niemandem */ }
-    if (owner === userId) drop.run(row.sid);
+    let sess = null;
+    try { sess = JSON.parse(row.sess); } catch { /* kaputte Zeile: gehoert niemandem */ }
+    const owners = [sess?.userId, sess?.pendingTwoFactor?.userId, sess?.oidc?.linkUserId];
+    if (owners.includes(userId)) drop.run(row.sid);
   }
 }
 
@@ -243,8 +253,11 @@ function deactivate(database, userId) {
   // Die Zeile bleibt, der Zugang nicht. Die Rolle faellt auf `member`: ein
   // Ehemaliger ist kein Administrator, und keine Zaehlung von Administratoren
   // soll sich darauf verlassen muessen, dass sie nach "aktiv" fragt.
+  // Der Zeitpunkt des ERSTEN Mals bleibt; die Rolle faellt bei jedem Lauf.
+  // Ein schon deaktiviertes Konto geht denselben Weg noch einmal, damit
+  // Material, das danach entstand, ebenfalls endet.
   database.prepare(`
-    UPDATE users SET deactivated_at = ?, role = 'member' WHERE id = ? AND ${activeAccountSql('users')}
+    UPDATE users SET deactivated_at = COALESCE(deactivated_at, ?), role = 'member' WHERE id = ?
   `).run(now, userId);
 
   // ZUGANGSMATERIAL ENDET SOFORT.
@@ -274,6 +287,29 @@ function deactivate(database, userId) {
   `).run(userId);
   database.prepare('DELETE FROM password_resets WHERE user_id = ?').run(userId);
   database.prepare('DELETE FROM idempotency_keys WHERE user_id = ?').run(userId);
+  // Wiederherstellungscodes sind Einmal-Geheimnisse auf Papier, die den zweiten
+  // Faktor ERSETZEN. Sie enden; wer je zurueckkaeme, stellt neue aus.
+  database.prepare('DELETE FROM user_recovery_codes WHERE user_id = ?').run(userId);
+  //
+  // WAS BEWUSST STEHEN BLEIBT, UND WARUM ES KEIN WEG HINEIN IST:
+  //   - `users.password_hash`: ausgewertet nur in `POST /auth/login` (dahinter
+  //     `canSignIn()`) und in `PATCH /auth/me/password` (hinter `requireAuth`).
+  //     Den Hash zu ueberschreiben hiesse, ein spaeteres Reaktivieren heute
+  //     schon zu entscheiden - das ist offen (#1381).
+  //   - `user_totp.secret`: ausgewertet nur in `/auth/2fa/verify` (fragt
+  //     `canSignIn()` vor der Pruefung) und in den 2FA-Routen hinter
+  //     `requireAuth`. Ohne Sitzung und ohne Wartezustand fragt niemand danach.
+  //   - `users.oidc_sub`/`oidc_provider`: muss bleiben. Der SSO-Rueckweg findet
+  //     das Konto ueber den `sub` und weist es ab; ohne die Bindung legte er
+  //     derselben Person ein NEUES Konto an (`findOrCreateOidcUser`).
+  //   - Geraete eines Wandtabletts (`display_devices.token_hash`): siehe
+  //     `endPairingCodes()` - das Geheimnis hat nur das Geraet.
+  //   - Zugangsdaten des HAUSHALTS zu fremden Diensten (CalDAV/CardDAV, DMS,
+  //     Outlook, Rezept-Anbieter, Haushaltskanaele): sie oeffnen nichts in
+  //     Yuvomi und gehoeren nicht dem Konto. Das Outlook-Konto verliert unten
+  //     seinen Eigentuemer.
+  // `npm run test:user-traces-guard` haelt die Liste der Spalten fest, die ein
+  // Geheimnis tragen: eine neue ist rot, bis hier steht, was mit ihr geschieht.
   // Wer nicht mehr im Haushalt ist, betreut niemanden mehr. Dass ANDERE dieses
   // Konto betreuen, bleibt: dessen Daten stehen noch, und die Betreuenden sind
   // die, die sie noch lesen koennen.

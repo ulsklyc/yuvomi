@@ -58,7 +58,7 @@ links made the delete fail with a bare 500. The rule now lives in
   whoever issues it, so a token a former administrator issued for another account is a secret
   in their hand), open invitations it created are revoked and open display pairing codes it
   issued are spent (a device already paired stays: its secret only ever went to that device,
-  and `display_devices` does not record who paired it), the five feed tokens are cleared, password reset tokens,
+  and `display_devices` does not record who paired it), the five feed tokens are cleared, password reset tokens, two-factor recovery codes,
   idempotency keys, push subscriptions, personal notification channels, reminders not yet delivered
   and care grants held as caregiver are removed, `outlook_accounts.owner_user_id` and the default
   assignee of synced calendars are cleared. `oidc_sub` stays bound, so the SSO callback finds the
@@ -66,6 +66,16 @@ links made the delete fail with a bare 500. The rule now lives in
 - **Without traces it is deleted** as before, and two references without a foreign key that used
   to stay behind go with it: the per-account settings in `sync_config` (`<key>:user:<id>`) and the
   account's rows in `access_permissions`.
+- **What stays on purpose, and why it is no way in:** `password_hash` (read only by
+  `POST /auth/login`, behind `canSignIn()`, and by `PATCH /auth/me/password`, behind `requireAuth`),
+  `user_totp.secret` (read only by `/auth/2fa/verify`, which asks `canSignIn()` before it checks a
+  code, and by routes behind `requireAuth`), the OIDC binding (see above) and
+  `display_devices.token_hash` (the secret only ever went to the paired device). Sessions that name
+  the account without being signed in end as well: a pending second factor
+  (`pendingTwoFactor.userId`) and a running SSO link (`oidc.linkUserId`). Removing an account that
+  is already deactivated runs the same steps again, so material that appeared later ends too.
+  `test:user-traces-guard` keeps an inventory of every column that carries a secret; a new one is
+  red until it says what deactivating does with it.
 - **Private data stays** on deactivation (health, cycle, private notes, shift plans, the person's
   own contact and birthday). Removing it, bringing an account back and anonymising are not built.
 

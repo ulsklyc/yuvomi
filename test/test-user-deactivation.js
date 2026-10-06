@@ -531,31 +531,96 @@ test('zweiter Faktor: wer zwischen Passwort und Code deaktiviert wird, kommt nic
   const u = await member('Zwei Faktor');
   db.prepare("INSERT INTO user_totp (user_id, secret, confirmed_at) VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))")
     .run(u.id, generateSecret());
+  const addCode = (code) => db.prepare('INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (?, ?)').run(u.id, hashRecoveryCode(code));
   const codes = ['RECOVERYCODEEINS', 'RECOVERYCODEZWEI'];
-  for (const code of codes) {
-    db.prepare('INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (?, ?)').run(u.id, hashRecoveryCode(code));
-  }
-  const verify = async (code) => {
+  codes.forEach(addCode);
+  const begin = async () => {
     const first = await loginRaw(u.username, u.password);
     assert.equal(first.status, 200);
     assert.equal((await first.json()).twoFactorRequired, true, 'Vorbedingung: das Passwort stimmt, der Code steht aus');
-    const cookie = cookiesOf(first);
-    return { cookie, send: () => fetch(`${BASE}/api/v1/auth/2fa/verify`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', cookie }, body: JSON.stringify({ code }),
-    }) };
+    return cookiesOf(first);
   };
-  const control = await verify(codes[0]);
-  assert.equal((await control.send()).status, 200, 'Vorbedingung: ein Wiederherstellungscode oeffnet die Sitzung');
+  const verify = (cookie, code) => fetch(`${BASE}/api/v1/auth/2fa/verify`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', cookie }, body: JSON.stringify({ code }),
+  });
+  assert.equal((await verify(await begin(), codes[0])).status, 200, 'Vorbedingung: ein Wiederherstellungscode oeffnet die Sitzung');
 
-  const pending = await verify(codes[1]);
+  const cookie = await begin();
+  const waiting = db.prepare('SELECT * FROM sessions').all()
+    .filter((r) => JSON.parse(r.sess).pendingTwoFactor?.userId === u.id);
+  assert.equal(waiting.length, 1, 'Vorbedingung: eine Sitzung wartet auf den Code');
+
   await deactivate(u);
-  const res = await pending.send();
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE sid = ?').get(waiting[0].sid).n, 0,
+    'auch die wartende Sitzung endet, obwohl sie kein `userId` traegt');
+  assert.equal(count('SELECT COUNT(*) AS n FROM user_recovery_codes WHERE user_id = ?', u.id), 0, 'die Wiederherstellungscodes sind geloescht');
+  assert.equal((await verify(cookie, codes[1])).status, 401, 'kein wartender Zustand mehr');
+
+  // Auch wenn die wartende Sitzung und ein Code noch dastehen: der Schritt
+  // fragt selbst, und zwar BEVOR er einen Code verbraucht.
+  const columns = Object.keys(waiting[0]);
+  db.prepare(`INSERT INTO sessions (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`)
+    .run(...columns.map((c) => waiting[0][c]));
+  addCode(codes[1]);
+  const res = await verify(cookie, codes[1]);
   assert.equal(res.status, 403);
   assert.equal((await res.json()).reason, 'account_cannot_sign_in');
   assert.equal(sessionsOf(u.id), 0);
-  assert.equal((await fetch(`${BASE}/api/v1/auth/me`, { headers: { cookie: cookiesOf(res, pending.cookie) } })).status, 401);
+  assert.equal((await fetch(`${BASE}/api/v1/auth/me`, { headers: { cookie: cookiesOf(res, cookie) } })).status, 401);
   assert.equal(count('SELECT COUNT(*) AS n FROM user_recovery_codes WHERE user_id = ? AND used_at IS NULL', u.id), 1,
     'der Code ist nicht verbraucht');
+  // Was bewusst bleibt: Passwort-Hash, TOTP-Geheimnis. Kein Weg wertet sie aus.
+  assert.ok(row(u.id).password_hash.length > 20);
+  assert.equal(count('SELECT COUNT(*) AS n FROM user_totp WHERE user_id = ?', u.id), 1);
+});
+
+test('SSO-Verknuepfung: ein laufender Verknuepfungs-Lauf bindet einem Ehemaligen nichts mehr', async () => {
+  const u = await member('Verknuepfer');
+  const started = await u.call('POST', '/auth/oidc/link/start');
+  assert.equal(started.status, 200);
+  const linking = db.prepare('SELECT * FROM sessions').all()
+    .filter((r) => JSON.parse(r.sess).oidc?.linkUserId === u.id);
+  assert.equal(linking.length, 1, 'Vorbedingung: die Sitzung traegt den Lauf');
+
+  await deactivate(u);
+  assert.equal(sessionsOf(u.id), 0);
+  // Auch wenn die Sitzung samt Lauf wieder dasteht (ein Request, der sie
+  // zurueckschrieb): der Rueckweg bindet nichts.
+  const columns = Object.keys(linking[0]);
+  db.prepare(`INSERT INTO sessions (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`)
+    .run(...columns.map((c) => linking[0][c]));
+  idp = { claims: { iss: process.env.OIDC_ISSUER, sub: 'sub-late-link' }, userinfo: { sub: 'sub-late-link' } };
+  const callback = await fetch(`${BASE}/api/v1/auth/oidc/callback?code=test-code&state=test-state`, {
+    redirect: 'manual', headers: { cookie: u.session.cookie },
+  });
+  assert.equal(callback.headers.get('location'), '/settings/personal/account?oidc_link_error=user_gone');
+  assert.equal(row(u.id).oidc_sub, null, 'keine neue Bindung');
+  assert.equal(count("SELECT COUNT(*) AS n FROM users WHERE oidc_sub = 'sub-late-link'"), 0);
+});
+
+test('ein schon deaktiviertes Konto wird beim erneuten Entfernen wieder abgeraeumt', async () => {
+  // Material, das NACH dem Deaktivieren entstand (Sicherung, ein spaeterer
+  // Fehler): das zweite Entfernen laeuft denselben Weg noch einmal.
+  const u = await member('Nachzuegler');
+  const t = await admin('POST', '/auth/api-tokens', { name: 'nachzuegler', subject_user_id: u.id });
+  assert.equal(t.status, 201);
+  await deactivate(u);
+  db.prepare('UPDATE api_tokens SET revoked_at = NULL WHERE subject_user_id = ?').run(u.id);
+  db.prepare("UPDATE users SET calendar_feed_token = 'spaeter-token', role = 'admin' WHERE id = ?").run(u.id);
+  db.prepare("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (?, 'https://push.example/nach', 'k', 'a')").run(u.id);
+  db.prepare('INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (?, ?)').run(u.id, hashRecoveryCode('NACHZUEGLERCODE'));
+  db.prepare('INSERT INTO sessions (sid, sess, expired_at) VALUES (?, ?, ?)')
+    .run(`late-${u.id}`, JSON.stringify({ cookie: {}, userId: u.id, role: 'member' }), Date.now() + 60_000);
+  const at = row(u.id).deactivated_at;
+
+  const again = await remove(u);
+  assert.equal(again.body.outcome, 'deactivated');
+  assert.equal(row(u.id).deactivated_at, at, 'der erste Zeitpunkt bleibt');
+  assert.equal(row(u.id).calendar_feed_token, null);
+  assert.equal(count('SELECT COUNT(*) AS n FROM api_tokens WHERE subject_user_id = ? AND revoked_at IS NULL', u.id), 0);
+  assert.equal(count('SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id = ?', u.id), 0);
+  assert.equal(count('SELECT COUNT(*) AS n FROM user_recovery_codes WHERE user_id = ?', u.id), 0);
+  assert.equal(sessionsOf(u.id), 0);
 });
 
 test('API-Token, auch wenn seine Zeile nicht widerrufen ist: 401', async () => {

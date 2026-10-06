@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Invitation links and wall tablet pairing codes they created and nobody has used yet stop
   working; a tablet that is already paired stays. Their calendar feed addresses stop working,
   a wall tablet can no longer tick off anything in their name, password reset links are
-  dropped and no new ones are sent. They get no more push messages, mails or reminders. An
+  dropped and no new ones are sent, and their two-factor recovery codes are deleted. They get no more push messages, mails or reminders. An
   administrator who is deactivated stops being one, and the last administrator still cannot
   be removed.
   **Private data stays where it is.** Health and cycle records, private notes, shift plans and
