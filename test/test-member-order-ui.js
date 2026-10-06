@@ -123,6 +123,25 @@ test('movedOrder: one step up or down, and the same array back at an edge', () =
   assert.deepEqual(ids, [5, 6, 7], 'die Eingabe bleibt unveraendert');
 });
 
+test('timetable: patterns, overrides and extra shifts are grouped in the household order, not by user id', async () => {
+  const { __test: schedule } = await import('../public/pages/schedule.js');
+  const state = schedule.scheduleState();
+  const saved = state.users;
+  // Person 9 steht im Haushalt vor Person 2.
+  state.users = [{ id: 9, display_name: 'Zoe', sort_order: 1 }, { id: 2, display_name: 'Anna', sort_order: 2 }];
+  try {
+    const patterns = [{ id: 1, user_id: 2, valid_from: '2026-02-01' }, { id: 2, user_id: 9, valid_from: '2026-03-01' }, { id: 3, user_id: 9, valid_from: '2026-01-01' }];
+    assert.deepEqual(schedule.patternsInMemberOrder(patterns).map((p) => p.id), [2, 3, 1], 'Zoe zuerst, je Person in Serverfolge');
+    const overrides = [
+      { id: 1, user_id: 2, date_key: '2026-10-05', shift_type_id: 1 },
+      { id: 2, user_id: 9, date_key: '2026-10-07', shift_type_id: 1 },
+    ];
+    assert.deepEqual(schedule.overrideGroups(overrides).map((g) => Number(g.user_id)), [9, 2]);
+  } finally {
+    state.users = saved;
+  }
+});
+
 test('wiring: drag and arrow keys share one persistence path, and the route takes the full list', () => {
   const source = readFileSync(path.join(ROOT, 'public/settings/pages/admin-family.js'), 'utf8');
   assert.match(source, /onEnd: \(evt\) => persistMemberOrder\(container, currentUser, users, evt\?\.item\)/);

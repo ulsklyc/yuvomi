@@ -1070,6 +1070,17 @@ function byPersonThenDate(people = state.users) {
     || Number(a.user_id) - Number(b.user_id) || a.date_key.localeCompare(b.date_key);
 }
 
+/**
+ * Die Muster in der Haushaltsreihenfolge ihrer Personen (#1644). Der Server
+ * liefert sie nach user_id und darin das juengste zuerst; `sort` ist stabil,
+ * die Folge je Person bleibt also, wie sie kam.
+ */
+function patternsInMemberOrder(patterns = state.patterns, people = state.users) {
+  const ranks = memberRanks(people);
+  return [...patterns].sort((a, b) => memberRankOf(ranks, a.user_id) - memberRankOf(ranks, b.user_id)
+    || Number(a.user_id) - Number(b.user_id));
+}
+
 function overrideGroups(overrides = state.overrides) {
   const sorted = [...overrides].sort(byPersonThenDate());
   const groups = [];
@@ -1341,7 +1352,7 @@ function planningPanel() {
   if (planningNeedsShiftTypes()) {
     return '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + emptyPlanningNeedsTypesState() + '</section>';
   }
-  return '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + (state.patterns.length ? state.patterns.map(patternCard).join('') : emptyPatternState()) + '</section>'
+  return '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + (state.patterns.length ? patternsInMemberOrder().map(patternCard).join('') : emptyPatternState()) + '</section>'
         // App-weite UX-Durchsicht 2026-09-12 (Batch 4, "bis zu vier
         // konkurrierende Anlege-Wege"): Override/Extra trugen bisher JE EINEN
         // Anlege-Knopf im Abschnittskopf, IMMER sichtbar - zusaetzlich zur
@@ -3113,4 +3124,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
