@@ -3917,7 +3917,8 @@
             "deleteConfirm": "删除此定期支出？",
             "deleteConfirmDetail": "不会再创建新的支出。已入账的支出会保留。",
             "show": "显示",
-            "editHint": "更改自下次日期起生效。已入账的支出保持不变。"
+            "editHint": "更改自下次日期起生效。已入账的支出保持不变。",
+            "dateBooked": "{{date}} 及之前的日期已入账。下次日期必须晚于该日期。"
         },
         "activityType": {
             "group_created": "群组已创建",

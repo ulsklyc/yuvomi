@@ -3917,7 +3917,8 @@
             "deleteConfirm": "Supprimer cette dépense récurrente ?",
             "deleteConfirmDetail": "Aucune nouvelle dépense ne sera créée. Les dépenses déjà enregistrées sont conservées.",
             "show": "Afficher",
-            "editHint": "Les modifications s'appliquent à partir de la prochaine échéance. Les dépenses déjà enregistrées restent inchangées."
+            "editHint": "Les modifications s'appliquent à partir de la prochaine échéance. Les dépenses déjà enregistrées restent inchangées.",
+            "dateBooked": "Les échéances jusqu'au {{date}} sont déjà enregistrées. La prochaine échéance doit être postérieure."
         },
         "activityType": {
             "group_created": "Groupe créé",

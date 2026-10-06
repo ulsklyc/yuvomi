@@ -3917,7 +3917,8 @@
             "deleteConfirm": "Eliminare questa spesa ricorrente?",
             "deleteConfirmDetail": "Non verranno create nuove spese. Le spese già registrate restano.",
             "show": "Mostra",
-            "editHint": "Le modifiche valgono dalla prossima scadenza. Le spese già registrate restano invariate."
+            "editHint": "Le modifiche valgono dalla prossima scadenza. Le spese già registrate restano invariate.",
+            "dateBooked": "Le scadenze fino al {{date}} sono già registrate. La prossima scadenza deve essere successiva."
         },
         "activityType": {
             "group_created": "Gruppo creato",

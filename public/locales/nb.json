@@ -3917,7 +3917,8 @@
             "deleteConfirm": "Slette denne gjentakende utgiften?",
             "deleteConfirmDetail": "Det opprettes ingen nye utgifter. Utgifter som allerede er bokført, beholdes.",
             "show": "Vis",
-            "editHint": "Endringer gjelder fra neste dato. Utgifter som allerede er bokført, forblir uendret."
+            "editHint": "Endringer gjelder fra neste dato. Utgifter som allerede er bokført, forblir uendret.",
+            "dateBooked": "Datoer til og med {{date}} er allerede bokført. Neste dato må være senere."
         },
         "activityType": {
             "group_created": "Gruppe opprettet",

@@ -3917,7 +3917,8 @@
             "deleteConfirm": "Tanggalin ang paulit-ulit na gastos na ito?",
             "deleteConfirmDetail": "Wala nang bagong gastos na malilikha. Mananatili ang mga gastos na naitala na.",
             "show": "Ipakita",
-            "editHint": "Magkakabisa ang mga pagbabago mula sa susunod na petsa. Hindi magbabago ang mga gastos na naitala na."
+            "editHint": "Magkakabisa ang mga pagbabago mula sa susunod na petsa. Hindi magbabago ang mga gastos na naitala na.",
+            "dateBooked": "Naitala na ang mga petsa hanggang {{date}}. Dapat mas huli ang susunod na petsa."
         },
         "activityType": {
             "group_created": "Nagawa ang grupo",

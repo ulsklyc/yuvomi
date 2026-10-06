@@ -74,12 +74,12 @@ async function buehne({ recurring = [MIETE, STROM, FREMD], modus = 'write', arch
     activity, activityCursor: null, activityGroupId: 2, activityLoadingMore: false,
     recurring,
   });
-  const spur = { gesendet: [], fragen: [], dialoge: [], leseansichten: [], rueckfragen: [] };
+  const spur = { gesendet: [], gets: [], fragen: [], dialoge: [], leseansichten: [], rueckfragen: [], gemeldet: [], geschlossen: 0 };
   // Der Seitencontainer, in den das Neuzeichnen nach einem Schreibweg laeuft.
   _stumm = container ?? { querySelector: () => leer };
   split.renderMainForTest(_stumm);
   globalThis.__apiStub = {
-    get: async (pfad) => (pfad.endsWith('/recurring') ? { data: split.state.recurring } : { data: [] }),
+    get: async (pfad) => { spur.gets.push(pfad); return pfad.endsWith('/recurring') ? { data: spur.server ?? split.state.recurring } : { data: [] }; },
     post: async (pfad, daten) => { spur.gesendet.push(['POST', pfad, daten]); return { data: {} }; },
     put: async (pfad, daten) => { spur.gesendet.push(['PUT', pfad, daten]); return { data: {} }; },
     delete: async (pfad) => { spur.gesendet.push(['DELETE', pfad]); return { data: { ok: true } }; },
@@ -89,6 +89,8 @@ async function buehne({ recurring = [MIETE, STROM, FREMD], modus = 'write', arch
     return typeof auswahl === 'function' ? auswahl(optionen) : auswahl ?? null;
   };
   globalThis.__openModal = (opts) => { spur.dialoge.push(opts); };
+  globalThis.__closeModal = () => { spur.geschlossen += 1; };
+  globalThis.__reportFieldError = (input, text) => { spur.gemeldet.push({ input, text }); };
   globalThis.__openDetailView = (opts) => { spur.leseansichten.push(opts); };
   globalThis.__confirmOverModal = async (frage, opts) => { spur.rueckfragen.push({ frage, opts }); return bestaetigt; };
   setPermissions({ admin: false, modules: { budget: modus }, widgets: {}, capabilities: {} });
@@ -96,7 +98,7 @@ async function buehne({ recurring = [MIETE, STROM, FREMD], modus = 'write', arch
     return await fn(spur);
   } finally {
     clearPermissions();
-    for (const name of ['__apiStub', '__selectModal', '__openModal', '__openDetailView', '__confirmOverModal']) delete globalThis[name];
+    for (const name of ['__apiStub', '__selectModal', '__openModal', '__openDetailView', '__confirmOverModal', '__closeModal', '__reportFieldError']) delete globalThis[name];
     Object.assign(split.state, vorher);
   }
 }
@@ -190,6 +192,14 @@ test('Der Titel einer Serie ist Nutzereingabe und geht durch esc()', async () =>
     const html = hauptteil();
     assert.doesNotMatch(html, /<img/);
     assert.match(html, /&lt;img src=x onerror=1&gt;&quot;/);
+    // Auch in den Namen der beiden Knoepfe: ein Anfuehrungszeichen im Titel
+    // schloesse sonst das Attribut.
+    assert.match(html, /data-recurring-id="20" aria-label="&lt;img src=x onerror=1&gt;&quot; - splitExpenses\.recurring\.edit"/);
+    assert.match(html, /data-recurring-toggle="20" aria-label="&lt;img src=x onerror=1&gt;&quot; - splitExpenses\.recurring\.pause"/);
+  });
+  const boese = serie(21, { title: 'a"b<i>', paused_at: '2026-08-01T00:00:00Z' });
+  await buehne({ recurring: [boese], activity: [{ id: 71, type: 'recurring_auto_paused', entity_type: 'recurring_expense', entity_id: 21, created_at: '2026-09-10T03:00:00Z', metadata: { title: 'a"b<i>' } }] }, () => {
+    assert.match(split.renderActivity(), /data-recurring-jump="21" aria-label="a&quot;b&lt;i&gt; - splitExpenses\.recurring\.show"/);
   });
 });
 
@@ -270,6 +280,26 @@ test('Pausieren fragt nichts und sendet den Umschalter', async () => {
   });
 });
 
+test('Nach dem Umschalten wird die Liste neu geladen: die Zeile zeigt, was der Server jetzt sagt', async () => {
+  await buehne({}, async (spur) => {
+    // Der Server antwortet nach dem Pausieren mit der pausierten Serie.
+    spur.server = [{ ...MIETE, paused_at: '2026-10-06T10:00:00Z' }];
+    await split.toggleRecurring(11);
+    assert.equal(spur.gesendet.length, 1);
+    assert.ok(spur.gets.includes('/split-expenses/groups/2/recurring'), 'die Serien werden neu geholt');
+    assert.equal(split.state.recurring.length, 1);
+    assert.ok(split.state.recurring[0].paused_at, 'der Stand der Seite ist der des Servers');
+    assert.match(split.renderRecurring(), /data-recurring-toggle="11" aria-label="Miete - splitExpenses\.recurring\.resume"/, 'ein zweiter Klick wuerde fortsetzen, nicht noch einmal pausieren');
+  });
+  // Auch wenn der Aufruf scheitert (jemand war schneller): der Schirm zeigt danach den wirklichen Stand.
+  await buehne({}, async (spur) => {
+    spur.server = [];
+    globalThis.__apiStub.post = async () => { throw new Error('409'); };
+    await assert.rejects(split.toggleRecurring(11));
+    assert.deepEqual(split.state.recurring, []);
+  });
+});
+
 test('Fortsetzen ohne versaeumte Termine fragt nichts und ueberspringt (Vorgabe)', async () => {
   await buehne({ recurring: [serie(12, { paused_at: '2026-08-01T00:00:00Z', missed_count: 0, resume_date: '2026-11-01' })] }, async (spur) => {
     await split.toggleRecurring(12);
@@ -341,11 +371,15 @@ function knoten(extra = {}) {
   };
 }
 
-/** Das Serienformular als Selektor -> Knoten; `werte` ist, was `new FormData(form)` liefern wuerde. */
-function formular({ werte, method = 'equal', teilnehmer = { 1: '', 3: '' } }) {
+/**
+ * Das Serienformular als Selektor -> Knoten, vorbelegt wie der Dialog eine Serie
+ * zeigt (`gezeigt`) oder leer fuer eine neue. Die Felder sind veraenderlich:
+ * `setze` schreibt wie eine Eingabe, `new FormData(form)` liest den Stand von
+ * JETZT. `haken[id].checked = false` hakt eine Person ab.
+ */
+function formular(werte, { method = 'equal', teilnehmer = { 1: '', 3: '' }, abgehakt = [] } = {}) {
+  const namen = ['title', 'amount', 'currency', 'payer_id', 'frequency', 'next_run_date', 'description'];
   const felder = {
-    '[name="amount"]': knoten({ value: werte.amount }),
-    '[name="currency"]': knoten({ value: werte.currency }),
     '[name="split_method"]': knoten({ value: method }),
     '#split-method-hint': knoten(),
     '#split-amount-reason': knoten({ hidden: true }),
@@ -353,7 +387,8 @@ function formular({ werte, method = 'equal', teilnehmer = { 1: '', 3: '' } }) {
     '#split-cancel-recurring': knoten(),
     '#split-delete-recurring': knoten(),
   };
-  const haken = Object.keys(teilnehmer).map((id) => knoten({ value: id }));
+  for (const name of namen) felder[`[name="${name}"]`] = knoten({ value: werte[name] ?? '' });
+  const haken = Object.fromEntries(Object.keys(teilnehmer).map((id) => [id, knoten({ value: id, checked: !abgehakt.includes(Number(id)) })]));
   const felderJePerson = Object.entries(teilnehmer).map(([id, wert]) => {
     const feld = knoten({ value: wert });
     felder[`[name="split_value_${id}"]`] = feld;
@@ -363,13 +398,29 @@ function formular({ werte, method = 'equal', teilnehmer = { 1: '', 3: '' } }) {
     ...knoten(),
     querySelector: (sel) => (sel === '#split-recurring-form' ? panel : felder[sel] ?? null),
     querySelectorAll: (sel) => {
-      if (sel === 'input[name="participants"]:checked' || sel === 'input[name="participants"]') return haken;
+      if (sel === 'input[name="participants"]:checked') return Object.values(haken).filter((h) => h.checked);
+      if (sel === 'input[name="participants"]') return Object.values(haken);
       if (sel === '.split-split-value') return felderJePerson;
       return [];
     },
-    formDaten: () => ({ ...werte, split_method: method }),
+    formDaten: () => Object.fromEntries([...namen, 'split_method'].map((name) => [name, felder[`[name="${name}"]`].value])),
   };
-  return { panel, felder };
+  const setze = (name, wert) => { felder[`[name="${name}"]`].value = wert; };
+  return { panel, felder, haken, setze };
+}
+
+/** Was der Dialog fuer diese Serie in seine Felder schreibt (Region de). */
+const gezeigt = (r) => ({
+  title: r.title, amount: String(r.amount).replace('.', ','), currency: r.currency, payer_id: String(r.payer_id),
+  frequency: r.frequency, next_run_date: r.next_run_date, description: r.description || '',
+});
+
+/** Oeffnet den Dialog der Serie, verdrahtet ihn mit einem Formular in ihrem gezeigten Stand. */
+function offenerDialog(spur, r, optionen) {
+  split.openRecurringModal(r);
+  const f = formular(r ? gezeigt(r) : { title: '', amount: '', currency: 'EUR', payer_id: '1', frequency: 'monthly', next_run_date: '2026-10-06', description: '' }, optionen);
+  spur.dialoge.at(-1).onSave(f.panel);
+  return f;
 }
 
 globalThis.FormData = class {
@@ -412,56 +463,212 @@ test('Der Dialog nennt den Zustand einer pausierten Serie; ein neuer hat weder Z
   });
 });
 
-test('Speichern einer bestehenden Serie sendet PUT mit Beteiligten, Aufteilung und der unveraenderten Kategorie', async () => {
+test('Bearbeiten sendet NUR, was geaendert wurde: wer den Titel aendert, schickt weder Termin noch Rhythmus', async () => {
   await buehne({}, async (spur) => {
-    split.openRecurringModal(MIETE);
-    const { panel } = formular({
-      werte: { title: 'Miete neu', amount: '950,00', currency: 'EUR', payer_id: '3', frequency: 'monthly', next_run_date: '2026-12-01', description: '' },
-      method: 'shares', teilnehmer: { 1: '2', 3: '1' },
-    });
-    spur.dialoge[0].onSave(panel);
+    const { panel, setze } = offenerDialog(spur, MIETE);
+    // Der Dialog steht offen; inzwischen bucht der Lauf und rueckt die Serie weiter.
+    split.state.recurring = [{ ...MIETE, next_run_date: '2026-12-01' }];
+    setze('title', 'Miete neu');
     await panel.feuere('submit');
-    assert.equal(spur.gesendet.length, 1);
-    const [methode, pfad, daten] = spur.gesendet[0];
-    assert.deepEqual([methode, pfad], ['PUT', '/split-expenses/recurring/11']);
-    assert.deepEqual(daten, {
-      title: 'Miete neu', amount: '950.00', currency: 'EUR', payer_id: '3', frequency: 'monthly', next_run_date: '2026-12-01', description: '',
-      split_method: 'shares', participants: [1, 3], splits: [{ user_id: 1, shares: 2 }, { user_id: 3, shares: 1 }], category: 'rent',
-    });
+    assert.deepEqual(spur.gesendet, [['PUT', '/split-expenses/recurring/11', { title: 'Miete neu' }]],
+      'kein next_run_date: der gezeigte 01.11. ginge sonst als Verlegung zurueck');
+    assert.equal(spur.geschlossen, 1);
   });
 });
 
-test('Speichern einer neuen Serie sendet POST an die Gruppe; ein unbrauchbarer Betrag sendet nichts', async () => {
+test('Bearbeiten: je Feld nur dieses Feld - und was zusammen gilt, reist zusammen', async () => {
+  const anteile = serie(50, { split_method: 'shares', splits: [{ user_id: 1, shares: 2 }, { user_id: 3, shares: 1 }] });
+  const faelle = [
+    ['Termin', (f) => f.setze('next_run_date', '2026-12-15'), { next_run_date: '2026-12-15' }],
+    ['Rhythmus', (f) => f.setze('frequency', 'yearly'), { frequency: 'yearly' }],
+    ['Zahler', (f) => f.setze('payer_id', '3'), { payer_id: '3' }],
+    ['Notiz', (f) => f.setze('description', 'neu'), { description: 'neu' }],
+    ['Betrag reist mit Waehrung', (f) => f.setze('amount', '950,00'), { amount: '950.00', currency: 'EUR' }],
+    ['Waehrung reist mit Betrag', (f) => f.setze('currency', 'JPY'), { amount: '900.00', currency: 'JPY' }],
+    ['Anteil', (f) => { f.felder['[name="split_value_3"]'].value = '4'; },
+      { split_method: 'shares', participants: [1, 3], splits: [{ user_id: 1, shares: 2 }, { user_id: 3, shares: 4 }] }],
+    ['abgehakt', (f) => { f.haken[3].checked = false; }, { split_method: 'shares', participants: [1], splits: [{ user_id: 1, shares: 2 }] }],
+    ['Aufteilungsart', (f) => f.setze('split_method', 'equal'), { split_method: 'equal', participants: [1, 3], splits: [] }],
+  ];
+  for (const [name, aendere, erwartet] of faelle) {
+    await buehne({ recurring: [anteile] }, async (spur) => {
+      const f = offenerDialog(spur, anteile, { method: 'shares', teilnehmer: { 1: '2', 3: '1' } });
+      aendere(f);
+      // JPY kennt keine Nachkommastellen: der Bestandsbetrag bleibt speicherbar, der Server urteilt.
+      await f.panel.feuere('submit');
+      if (name === 'Waehrung reist mit Betrag') { assert.equal(spur.gesendet.length, 0, 'der Betrag passt nicht ins Raster von JPY'); return; }
+      assert.deepEqual(spur.gesendet, [['PUT', '/split-expenses/recurring/50', erwartet]], name);
+    });
+  }
+});
+
+test('Bearbeiten ohne Aenderung sendet nichts und schliesst', async () => {
   await buehne({}, async (spur) => {
-    split.openRecurringModal();
-    const { panel } = formular({ werte: { title: 'Strom', amount: '30', currency: 'EUR', payer_id: '1', frequency: 'weekly', next_run_date: '2026-11-05', description: '' } });
-    spur.dialoge[0].onSave(panel);
-    await panel.feuere('submit');
-    assert.deepEqual(spur.gesendet.map(([m, p]) => [m, p]), [['POST', '/split-expenses/groups/2/recurring']]);
-    assert.deepEqual(spur.gesendet[0][2].participants, [1, 3]);
-    assert.equal('category' in spur.gesendet[0][2], false, 'eine neue Serie nennt keine Kategorie');
-  });
-  await buehne({}, async (spur) => {
-    split.openRecurringModal();
-    const { panel } = formular({ werte: { title: 'Strom', amount: '0', currency: 'EUR', payer_id: '1', frequency: 'weekly', next_run_date: '2026-11-05', description: '' } });
-    spur.dialoge[0].onSave(panel);
+    const { panel } = offenerDialog(spur, MIETE);
     await panel.feuere('submit');
     assert.deepEqual(spur.gesendet, []);
+    assert.equal(spur.geschlossen, 1);
+  });
+});
+
+test('Wer die Gruppe verlassen hat, hat kein Haekchen mehr: Speichern schreibt die Beteiligten, die der Dialog zeigt', async () => {
+  const mitEhemaligem = serie(51, { participants: [1, 3, 99], blocked_reason: 'not_a_member' });
+  await buehne({ recurring: [mitEhemaligem] }, async (spur) => {
+    const { panel, setze } = offenerDialog(spur, mitEhemaligem);
+    setze('title', 'Repariert');
+    await panel.feuere('submit');
+    assert.deepEqual(spur.gesendet[0][2], { title: 'Repariert', split_method: 'equal', participants: [1, 3], splits: [] });
+  });
+});
+
+test('Ein ausgetretener Zahler bleibt vorbelegt und gekennzeichnet; gespeichert wird erst mit einem anderen', async () => {
+  const zahlerWeg = serie(52, { payer_id: 9, payer_name: 'Zoe <b>', blocked_reason: 'not_a_member' });
+  await buehne({ recurring: [zahlerWeg] }, async (spur) => {
+    const { panel, felder, setze } = offenerDialog(spur, zahlerWeg);
+    const auswahl = spur.dialoge[0].content.match(/<select class="input" name="payer_id">([\s\S]*?)<\/select>/)[1];
+    assert.match(auswahl, /^<option value="9" selected>Zoe &lt;b&gt; \(settings\.memberFormerBadge\)<\/option>/, 'er steht zuerst und ist gewaehlt');
+    assert.equal((auswahl.match(/ selected/g) ?? []).length, 1, 'kein Mitglied ist daneben vorgewaehlt');
+
+    setze('title', 'Nur der Titel');
+    await panel.feuere('submit');
+    assert.deepEqual(spur.gesendet, [], 'kein stiller Zahlerwechsel, und kein Aufruf, den der Server englisch abwiese');
+    assert.deepEqual(spur.gemeldet.map((m) => [m.input === felder['[name="payer_id"]'], m.text]), [[true, 'splitExpenses.recurring.reason.not_a_member']]);
+    assert.equal(spur.geschlossen, 0);
+
+    setze('payer_id', '3');
+    await panel.feuere('submit');
+    assert.deepEqual(spur.gesendet, [['PUT', '/split-expenses/recurring/52', { title: 'Nur der Titel', payer_id: '3' }]]);
+  });
+  // Ein Zahler, der Mitglied ist, bekommt keine zweite Option.
+  await buehne({}, (spur) => {
+    split.openRecurringModal(MIETE);
+    assert.doesNotMatch(spur.dialoge[0].content, /memberFormerBadge/);
+  });
+});
+
+test('Der Server weist einen schon gebuchten Termin ab: der Satz steht am Datumsfeld, der Dialog bleibt offen', async () => {
+  await buehne({}, async (spur) => {
+    const { panel, felder, setze } = offenerDialog(spur, MIETE);
+    globalThis.__apiStub.put = async () => {
+      throw Object.assign(new Error('next_run_date must be after the last booked date (2026-11-01).'),
+        { status: 400, data: { reason: 'next_run_not_after_last_booking', last_booked: '2026-11-01' } });
+    };
+    setze('next_run_date', '2026-10-15');
+    await panel.feuere('submit');
+    assert.deepEqual(spur.gemeldet.map((m) => [m.input === felder['[name="next_run_date"]'], m.text]),
+      [[true, 'splitExpenses.recurring.dateBooked{"date":"2026-11-01"}']]);
+    assert.equal(spur.geschlossen, 0, 'der Dialog bleibt, die Eingabe auch');
+    // Danach laesst sich wieder speichern (der Riegel gegen Doppelabsenden ist frei).
+    globalThis.__apiStub.put = async (pfad, daten) => { spur.gesendet.push(['PUT', pfad, daten]); return { data: {} }; };
+    setze('next_run_date', '2026-11-15');
+    await panel.feuere('submit');
+    assert.equal(spur.gesendet.length, 1);
+  });
+  // Jede andere Absage geht weiter an die globale Meldung.
+  await buehne({}, async (spur) => {
+    const { panel, setze } = offenerDialog(spur, MIETE);
+    globalThis.__apiStub.put = async () => { throw Object.assign(new Error('All participants must be group members.'), { status: 400, data: {} }); };
+    setze('title', 'x');
+    await assert.rejects(panel.feuere('submit'), /group members/);
+    assert.deepEqual(spur.gemeldet, []);
+  });
+});
+
+test('Speichern einer neuen Serie sendet POST mit allen Feldern der Route; ein unbrauchbarer Betrag sendet nichts', async () => {
+  await buehne({}, async (spur) => {
+    const { panel, setze } = offenerDialog(spur, null);
+    setze('title', 'Strom'); setze('amount', '30'); setze('frequency', 'weekly'); setze('next_run_date', '2026-11-05');
+    await panel.feuere('submit');
+    assert.deepEqual(spur.gesendet, [['POST', '/split-expenses/groups/2/recurring', {
+      title: 'Strom', amount: '30', currency: 'EUR', payer_id: '1', frequency: 'weekly', next_run_date: '2026-11-05',
+      split_method: 'equal', description: '', participants: [1, 3], splits: [],
+    }]]);
+  });
+  await buehne({}, async (spur) => {
+    const { panel, setze } = offenerDialog(spur, null);
+    setze('title', 'Strom'); setze('amount', '0');
+    await panel.feuere('submit');
+    assert.deepEqual(spur.gesendet, []);
+  });
+});
+
+test('Zweimal Enter legt EINE Serie an', async () => {
+  await buehne({}, async (spur) => {
+    const { panel, setze } = offenerDialog(spur, null);
+    setze('title', 'Strom'); setze('amount', '30');
+    const offen = [];
+    globalThis.__apiStub.post = (pfad, daten) => { spur.gesendet.push(['POST', pfad, daten]); return new Promise((r) => { offen.push(r); }); };
+    const erster = panel.feuere('submit');
+    const zweiter = panel.feuere('submit');
+    await new Promise((r) => { setImmediate(r); });
+    const waehrenddessen = spur.gesendet.length;
+    for (const loese of offen) loese({ data: {} });
+    await Promise.all([erster, zweiter]);
+    assert.equal(waehrenddessen, 1);
+    assert.equal(spur.gesendet.length, 1);
   });
 });
 
 test('Loeschen fragt nach und sendet DELETE; "Abbrechen" sendet nichts', async () => {
   for (const bestaetigt of [true, false]) {
     await buehne({ bestaetigt }, async (spur) => {
-      split.openRecurringModal(MIETE);
-      const { panel, felder } = formular({ werte: { title: 'Miete', amount: '900,00', currency: 'EUR' } });
-      spur.dialoge[0].onSave(panel);
+      const { felder } = offenerDialog(spur, MIETE);
       await felder['#split-delete-recurring'].feuere('click');
       assert.equal(spur.rueckfragen.length, 1);
       assert.equal(spur.rueckfragen[0].frage, 'splitExpenses.recurring.deleteConfirm');
       assert.equal(spur.rueckfragen[0].opts.danger, true);
       assert.equal(spur.rueckfragen[0].opts.detail, 'splitExpenses.recurring.deleteConfirmDetail');
       assert.deepEqual(spur.gesendet, bestaetigt ? [['DELETE', '/split-expenses/recurring/11']] : []);
+    });
+  }
+});
+
+// Der Riegel am ANDEREN Ende: der Dialog steht offen, und was ihn erlaubt hat,
+// faellt weg. Speichern und Loeschen fragen die Serie, wie sie JETZT in der
+// Liste steht - nicht die von beim Oeffnen.
+const wegfall = {
+  'das Recht faellt auf read': () => setPermissions({ admin: false, modules: { budget: 'read' }, widgets: {}, capabilities: {} }),
+  'die Gruppe wird archiviert': () => { split.state.groupStatus = 'archived'; },
+  'can_edit faellt (die Liste wurde neu geladen)': () => { split.state.recurring = [{ ...MIETE, can_edit: false }]; },
+  'die Serie ist inzwischen geloescht': () => { split.state.recurring = []; },
+};
+
+test('Offener Dialog, Recht faellt weg: Speichern sendet nichts', async () => {
+  for (const [name, faelle] of Object.entries(wegfall)) {
+    await buehne({}, async (spur) => {
+      const { panel, setze } = offenerDialog(spur, MIETE);
+      setze('title', 'Zu spaet');
+      faelle();
+      await panel.feuere('submit');
+      assert.deepEqual(spur.gesendet, [], name);
+      assert.equal(spur.geschlossen, 0, name);
+    });
+  }
+  // Der Dialog einer NEUEN Serie: Recht und Archiv.
+  for (const name of ['das Recht faellt auf read', 'die Gruppe wird archiviert']) {
+    await buehne({}, async (spur) => {
+      const { panel, setze } = offenerDialog(spur, null);
+      setze('title', 'Strom'); setze('amount', '30');
+      wegfall[name]();
+      await panel.feuere('submit');
+      assert.deepEqual(spur.gesendet, [], `neu: ${name}`);
+    });
+  }
+});
+
+test('Offener Dialog, Recht faellt weg: Loeschen fragt nicht einmal und sendet nichts - auch nicht, wenn es waehrend der Rueckfrage faellt', async () => {
+  for (const [name, faelle] of Object.entries(wegfall)) {
+    await buehne({}, async (spur) => {
+      const { felder } = offenerDialog(spur, MIETE);
+      faelle();
+      await felder['#split-delete-recurring'].feuere('click');
+      assert.deepEqual([spur.rueckfragen.length, spur.gesendet.length], [0, 0], name);
+    });
+    await buehne({}, async (spur) => {
+      const { felder } = offenerDialog(spur, MIETE);
+      globalThis.__confirmOverModal = async () => { faelle(); return true; };
+      await felder['#split-delete-recurring'].feuere('click');
+      assert.deepEqual(spur.gesendet, [], `waehrend der Rueckfrage: ${name}`);
     });
   }
 });

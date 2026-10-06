@@ -3917,7 +3917,8 @@
             "deleteConfirm": "Delete this recurring expense?",
             "deleteConfirmDetail": "No new expenses will be created. Expenses already booked are kept.",
             "show": "Show",
-            "editHint": "Changes apply from the next date. Expenses already booked stay as they are."
+            "editHint": "Changes apply from the next date. Expenses already booked stay as they are.",
+            "dateBooked": "Dates up to {{date}} are already booked. The next date must be later."
         },
         "activityType": {
             "group_created": "Group created",

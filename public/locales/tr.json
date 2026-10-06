@@ -3917,7 +3917,8 @@
             "deleteConfirm": "Bu tekrarlanan gider silinsin mi?",
             "deleteConfirmDetail": "Artık yeni gider oluşturulmaz. Kaydedilmiş giderler kalır.",
             "show": "Göster",
-            "editHint": "Değişiklikler sonraki tarihten itibaren geçerlidir. Kaydedilmiş giderler değişmez."
+            "editHint": "Değişiklikler sonraki tarihten itibaren geçerlidir. Kaydedilmiş giderler değişmez.",
+            "dateBooked": "{{date}} tarihine kadar olanlar zaten kaydedildi. Sonraki tarih daha ileri olmalı."
         },
         "activityType": {
             "group_created": "Grup oluşturuldu",

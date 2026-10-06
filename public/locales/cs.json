@@ -3554,7 +3554,8 @@
             "deleteConfirm": "Smazat tento opakující se výdaj?",
             "deleteConfirmDetail": "Nové výdaje už nevzniknou. Již zaúčtované výdaje zůstanou zachovány.",
             "show": "Zobrazit",
-            "editHint": "Změny platí od dalšího termínu. Již zaúčtované výdaje zůstávají beze změny."
+            "editHint": "Změny platí od dalšího termínu. Již zaúčtované výdaje zůstávají beze změny.",
+            "dateBooked": "Termíny do {{date}} jsou již zaúčtovány. Další termín musí být pozdější."
         },
         "activityType": {
             "group_created": "Skupina vytvořena",

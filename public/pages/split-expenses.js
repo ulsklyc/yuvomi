@@ -2005,6 +2005,16 @@ function openRecurringModal(recurring = null) {
   const currency = recurring?.currency || group.default_currency;
   const frequency = recurring?.frequency || 'monthly';
   const stateText = isEdit ? recurringStateText(recurring) : '';
+  // Ein Zahler, der die Gruppe verlassen hat, steht nicht unter den
+  // Mitgliedern. Ohne eigene Option zeigte das Feld das ERSTE Mitglied, und ein
+  // Speichern, das nur den Titel meint, wechselte still den Zahler. Er bleibt
+  // deshalb vorbelegt und gekennzeichnet, bis jemand bewusst einen anderen
+  // waehlt - speichern laesst sich die Serie mit ihm nicht (siehe submit).
+  const formerPayerId = isEdit && !state.groupMembers.some((m) => Number(m.id ?? m.user_id) === Number(recurring.payer_id))
+    ? Number(recurring.payer_id)
+    : null;
+  const formerPayer = formerPayerId == null ? ''
+    : `<option value="${formerPayerId}" selected>${esc(`${recurring.payer_name || ''} (${t('settings.memberFormerBadge')})`)}</option>`;
   const option = (value, label, selected) => `<option value="${value}" ${value === selected ? 'selected' : ''}>${label}</option>`;
   openSharedModal({
     title: isEdit ? t('splitExpenses.recurring.edit') : t('splitExpenses.recurring.add'),
@@ -2014,7 +2024,7 @@ function openRecurringModal(recurring = null) {
         <label>${t('splitExpenses.titleLabel')}<input class="input" name="title" required maxlength="200" value="${esc(recurring?.title || '')}"></label>
         <div class="split-form-row">
           <label>${t('splitExpenses.amount')}<input class="input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(currency)}" required aria-describedby="split-amount-reason" value="${esc(amountToInput(recurring?.amount || '', currency))}"></label>
-          <label>${t('splitExpenses.paidBy')}<select class="input" name="payer_id">${memberOptions(isEdit ? recurring.payer_id : state.user?.id)}</select></label>
+          <label>${t('splitExpenses.paidBy')}<select class="input" name="payer_id">${formerPayer}${memberOptions(isEdit ? recurring.payer_id : state.user?.id)}</select></label>
         </div>
         <p class="form-hint form-hint--danger" id="split-amount-reason" role="status" hidden></p>
         <div class="split-form-row">
@@ -2048,39 +2058,74 @@ function openRecurringModal(recurring = null) {
     onSave(panel) {
       panel.querySelector('#split-cancel-recurring')?.addEventListener('click', () => closeModal());
       wireSplitFields(panel, '#split-recurring-form');
+      const form = panel.querySelector('#split-recurring-form');
+      // Was der Dialog beim Oeffnen ZEIGT. Gesendet wird beim Bearbeiten nur,
+      // was davon abweicht (changedRecurringFields).
+      const shown = isEdit && form ? readRecurringForm(form) : null;
+      // Rechte und Archiv koennen sich aendern, waehrend der Dialog offen
+      // steht, und die Liste wird dabei neu geladen: gefragt wird deshalb die
+      // Serie, wie sie JETZT in der Liste steht, nicht die von beim Oeffnen.
+      const mayStillAct = () => (isEdit
+        ? mayActOnRecurring(state.recurring.find((item) => item.id === recurring.id))
+        : !readOnly() && !isArchivedView());
+      // Ein zweites Absenden, waehrend das erste unterwegs ist (zweimal Enter),
+      // legte eine zweite Serie an.
+      let busy = false;
       panel.querySelector('#split-delete-recurring')?.addEventListener('click', async () => {
         if (readOnly()) return;
-        if (!mayActOnRecurring(recurring)) return;
+        if (!mayStillAct() || busy) return;
         const confirmed = await confirmOverModal(t('splitExpenses.recurring.deleteConfirm'), {
           danger: true,
           confirmLabel: t('common.delete'),
           detail: t('splitExpenses.recurring.deleteConfirmDetail'),
         });
-        if (!confirmed) return;
-        await api.delete(`/split-expenses/recurring/${recurring.id}`);
+        if (!confirmed || !mayStillAct() || busy) return;
+        busy = true;
+        try {
+          await api.delete(`/split-expenses/recurring/${recurring.id}`);
+        } finally {
+          busy = false;
+        }
         await loadGroupData();
         renderAll();
         refocusAfterRender();
       });
-      panel.querySelector('#split-recurring-form')?.addEventListener('submit', async (e) => {
+      form?.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (readOnly()) return;
-        // Archiv und `can_edit` gehoeren hier dazu: beides kann sich aendern,
-        // waehrend der Dialog offen steht.
-        if (isArchivedView() || (isEdit && !mayActOnRecurring(recurring))) return;
+        if (!mayStillAct() || busy) return;
         if (!validateSplitForm(panel)) return;
-        const form = panel.querySelector('#split-recurring-form');
-        const data = Object.fromEntries(new FormData(form));
-        data.amount = decimalString(data.amount);
         const chosenCurrency = form.querySelector('[name="currency"]')?.value || group.default_currency;
         if (rejectSplitAmounts(form, chosenCurrency,
           { original: isEdit ? recurring.amount : null, originalCurrency: isEdit ? recurring.currency : null })) return;
-        const { participants, splits } = collectSplitPayload(form);
-        // Die Kategorie hat im Dialog kein Feld (wie bei der Ausgabe) - sie
-        // wird durchgereicht, sonst fiele sie beim Speichern auf "Allgemein".
-        const payload = { ...data, participants, splits, ...(isEdit && { category: recurring.category }) };
-        if (isEdit) await api.put(`/split-expenses/recurring/${recurring.id}`, payload);
-        else await api.post(`/split-expenses/groups/${state.activeGroupId}/recurring`, payload);
+        const now = readRecurringForm(form);
+        // Der ausgetretene Zahler steht noch im Feld: der Server wiese die
+        // Serie ab (die ganze Serie wird geprueft), und zwar englisch und
+        // ortlos. Der Grund steht deshalb hier, am Feld, das ihn behebt.
+        if (formerPayerId != null && Number(now.payer_id) === formerPayerId) {
+          reportFieldError(form.querySelector('[name="payer_id"]'), t('splitExpenses.recurring.reason.not_a_member'));
+          return;
+        }
+        const payload = isEdit ? changedRecurringFields(shown, now, recurring) : now;
+        busy = true;
+        try {
+          // Nichts geaendert: kein Aufruf, kein Verlaufseintrag "bearbeitet".
+          if (isEdit && Object.keys(payload).length === 0) { /* nur schliessen */ }
+          else if (isEdit) await api.put(`/split-expenses/recurring/${recurring.id}`, payload);
+          else await api.post(`/split-expenses/groups/${state.activeGroupId}/recurring`, payload);
+        } catch (err) {
+          // Der Termin liegt nicht nach der letzten Buchung (der Server haelt
+          // einen gebuchten Tag fest): der Satz dazu steht am Datumsfeld, der
+          // Dialog bleibt offen.
+          if (err?.data?.reason === 'next_run_not_after_last_booking') {
+            reportFieldError(form.querySelector('[name="next_run_date"]'),
+              t('splitExpenses.recurring.dateBooked', { date: formatDate(err.data.last_booked) }));
+            return;
+          }
+          throw err;
+        } finally {
+          busy = false;
+        }
         closeModal({ force: true });
         await loadGroupData();
         renderAll();
@@ -2088,6 +2133,63 @@ function openRecurringModal(recurring = null) {
       });
     },
   });
+}
+
+/** Das Serienformular als Aufruf-Koerper: nur die Felder der Route, in ihrer Schreibweise. */
+function readRecurringForm(form) {
+  const data = Object.fromEntries(new FormData(form));
+  const { participants, splits } = collectSplitPayload(form);
+  return {
+    title: String(data.title ?? ''),
+    amount: decimalString(data.amount),
+    currency: data.currency,
+    payer_id: data.payer_id,
+    frequency: data.frequency,
+    next_run_date: data.next_run_date,
+    split_method: data.split_method || 'equal',
+    description: String(data.description ?? ''),
+    participants,
+    splits,
+  };
+}
+
+/**
+ * Was ein Bearbeiten sendet: NUR, was der Nutzer gegenueber dem beim Oeffnen
+ * gezeigten Stand geaendert hat. Der Server laesst jedes weggelassene Feld
+ * stehen (PUT /recurring/:id ist ein Teil-Update).
+ *
+ * Der Grund ist der Termin: der Dialog zeigt `next_run_date` vom Laden der
+ * Liste. Bucht der Lauf inzwischen und rueckt die Serie weiter, schickte ein
+ * Speichern, das nur den Titel meint, den alten Termin zurueck - eine
+ * Verlegung, die niemand wollte, auf einen Tag, der schon gebucht ist. Dasselbe
+ * gilt fuer jedes andere Feld, das ein Zweiter inzwischen geaendert hat.
+ *
+ * Zusammen reisen, was nur zusammen gilt: Betrag und Waehrung (der Betrag wird
+ * im Raster seiner Waehrung gelesen), und Aufteilungsart, Beteiligte und Werte.
+ *
+ * Die Beteiligten messen sich an der GESPEICHERTEN Serie, nicht am Formular:
+ * wer die Gruppe verlassen hat, hat dort kein Haekchen mehr. Der Dialog zeigt
+ * die Serie dann schon ohne ihn, und Speichern schreibt, was er zeigt - das ist
+ * die Reparatur einer Serie, die deshalb nicht bucht.
+ */
+function changedRecurringFields(shown, now, recurring) {
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const ids = (list) => (list || []).map(Number).sort((a, b) => a - b);
+  const out = {};
+  for (const key of ['title', 'payer_id', 'frequency', 'next_run_date', 'description']) {
+    if (!same(shown[key], now[key])) out[key] = now[key];
+  }
+  if (!same(shown.amount, now.amount) || !same(shown.currency, now.currency)) {
+    out.amount = now.amount;
+    out.currency = now.currency;
+  }
+  if (!same(shown.split_method, now.split_method) || !same(shown.splits, now.splits)
+    || !same(ids(recurring.participants), ids(now.participants))) {
+    out.split_method = now.split_method;
+    out.participants = now.participants;
+    out.splits = now.splits;
+  }
+  return out;
 }
 
 function openSettlementModal() {
@@ -2289,7 +2391,7 @@ export const __test = {
   // (test-split-amount-input.js).
   validateSplitForm, updateGroupDefaults, openSettlementModal,
   // Wiederkehrende Ausgaben (#1647, test-split-recurring-ui.js).
-  renderRecurring, onRecurringClick, toggleRecurring, openRecurringModal, recurringReadSections, recurringSplitValues,
+  renderRecurring, onRecurringClick, toggleRecurring, openRecurringModal, recurringReadSections, recurringSplitValues, changedRecurringFields,
   renderMainForTest(container) { _container = container; renderMain(); },
   renderGroupsForTest(container) { _container = container; renderGroups(); },
   // R10 L11: die Gruppenzahl steht am Kopf der Liste (test-split-activity-ui.js).

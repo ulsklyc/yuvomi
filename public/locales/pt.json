@@ -3917,7 +3917,8 @@
             "deleteConfirm": "Excluir esta despesa recorrente?",
             "deleteConfirmDetail": "Não serão criadas novas despesas. As despesas já registadas mantêm-se.",
             "show": "Mostrar",
-            "editHint": "As alterações aplicam-se a partir da próxima data. As despesas já registadas não mudam."
+            "editHint": "As alterações aplicam-se a partir da próxima data. As despesas já registadas não mudam.",
+            "dateBooked": "As datas até {{date}} já foram registadas. A próxima data tem de ser posterior."
         },
         "activityType": {
             "group_created": "Grupo criado",

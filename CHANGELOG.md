@@ -25,9 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the rule of an expense - the group's owner or admins and whoever created it; everyone else,
   anyone with read access to the budget, and an archived group see the list and a read view
   without actions. A recurring expense on the 31st keeps the 31st when it is edited while
-  standing on a shorter month's last day; changing its date or rhythm sets the day anew. For API
-  clients: `PUT` and `DELETE /api/v1/split-expenses/recurring/{id}`, the first through the same
-  check as creating one; `GET /api/v1/split-expenses/groups/{id}/recurring` additionally returns
+  standing on a shorter month's last day; changing its date or rhythm sets the day anew. A date
+  that was already booked cannot be booked a second time by moving the next date back onto it.
+  For API clients: `PUT` and `DELETE /api/v1/split-expenses/recurring/{id}`; the `PUT` is a
+  partial update (omitted fields stay), checks the result like creating one, and answers a
+  `next_run_date` that is not after the last booking with `400` and
+  `reason: "next_run_not_after_last_booking"`; `GET /api/v1/split-expenses/groups/{id}/recurring` additionally returns
   `payer_name`, `participants`, `splits`, `blocked_reason`, `can_edit`, `missed_count` and
   `resume_date`; activity types `recurring_edited` and `recurring_deleted`. No migration.
 

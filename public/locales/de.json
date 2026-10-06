@@ -3917,7 +3917,8 @@
             "deleteConfirm": "Diese wiederkehrende Ausgabe löschen?",
             "deleteConfirmDetail": "Es entstehen keine neuen Ausgaben mehr. Bereits gebuchte Ausgaben bleiben erhalten.",
             "show": "Anzeigen",
-            "editHint": "Änderungen gelten ab dem nächsten Termin. Bereits gebuchte Ausgaben bleiben unverändert."
+            "editHint": "Änderungen gelten ab dem nächsten Termin. Bereits gebuchte Ausgaben bleiben unverändert.",
+            "dateBooked": "Bis {{date}} ist bereits gebucht. Der nächste Termin muss danach liegen."
         },
         "activityType": {
             "group_created": "Gruppe erstellt",

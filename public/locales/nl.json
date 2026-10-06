@@ -3917,7 +3917,8 @@
             "deleteConfirm": "Deze terugkerende uitgave verwijderen?",
             "deleteConfirmDetail": "Er worden geen nieuwe uitgaven meer aangemaakt. Al geboekte uitgaven blijven behouden.",
             "show": "Tonen",
-            "editHint": "Wijzigingen gelden vanaf de volgende datum. Al geboekte uitgaven blijven ongewijzigd."
+            "editHint": "Wijzigingen gelden vanaf de volgende datum. Al geboekte uitgaven blijven ongewijzigd.",
+            "dateBooked": "Datums tot en met {{date}} zijn al geboekt. De volgende datum moet later zijn."
         },
         "activityType": {
             "group_created": "Groep aangemaakt",

@@ -3917,7 +3917,8 @@
             "deleteConfirm": "Törli ezt az ismétlődő költséget?",
             "deleteConfirmDetail": "Új költség nem jön létre. A már lekönyvelt költségek megmaradnak.",
             "show": "Megjelenítés",
-            "editHint": "A módosítások a következő időponttól érvényesek. A már lekönyvelt költségek változatlanok maradnak."
+            "editHint": "A módosítások a következő időponttól érvényesek. A már lekönyvelt költségek változatlanok maradnak.",
+            "dateBooked": "A(z) {{date}} dátumig már megtörtént a könyvelés. A következő időpontnak későbbinek kell lennie."
         },
         "activityType": {
             "group_created": "Csoport létrehozva",

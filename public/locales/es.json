@@ -3917,7 +3917,8 @@
             "deleteConfirm": "¿Eliminar este gasto recurrente?",
             "deleteConfirmDetail": "No se crearán más gastos. Los gastos ya registrados se conservan.",
             "show": "Mostrar",
-            "editHint": "Los cambios se aplican a partir de la próxima fecha. Los gastos ya registrados no cambian."
+            "editHint": "Los cambios se aplican a partir de la próxima fecha. Los gastos ya registrados no cambian.",
+            "dateBooked": "Las fechas hasta el {{date}} ya están registradas. La próxima fecha debe ser posterior."
         },
         "activityType": {
             "group_created": "Grupo creado",

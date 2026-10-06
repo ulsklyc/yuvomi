@@ -3917,7 +3917,8 @@
             "deleteConfirm": "Xóa chi phí định kỳ này?",
             "deleteConfirmDetail": "Sẽ không tạo thêm chi phí mới. Các chi phí đã ghi nhận được giữ lại.",
             "show": "Hiển thị",
-            "editHint": "Thay đổi áp dụng từ ngày tiếp theo. Các chi phí đã ghi nhận không thay đổi."
+            "editHint": "Thay đổi áp dụng từ ngày tiếp theo. Các chi phí đã ghi nhận không thay đổi.",
+            "dateBooked": "Các ngày đến {{date}} đã được ghi nhận. Ngày tiếp theo phải sau đó."
         },
         "activityType": {
             "group_created": "Nhóm đã tạo",

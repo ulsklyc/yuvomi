@@ -3917,7 +3917,8 @@
             "deleteConfirm": "Hapus pengeluaran berulang ini?",
             "deleteConfirmDetail": "Tidak ada pengeluaran baru yang dibuat. Pengeluaran yang sudah dibukukan tetap ada.",
             "show": "Tampilkan",
-            "editHint": "Perubahan berlaku mulai tanggal berikutnya. Pengeluaran yang sudah dibukukan tidak berubah."
+            "editHint": "Perubahan berlaku mulai tanggal berikutnya. Pengeluaran yang sudah dibukukan tidak berubah.",
+            "dateBooked": "Tanggal hingga {{date}} sudah dibukukan. Tanggal berikutnya harus setelah itu."
         },
         "activityType": {
             "group_created": "Grup dibuat",

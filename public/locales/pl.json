@@ -4139,7 +4139,8 @@
             "deleteConfirm": "Usunąć ten cykliczny wydatek?",
             "deleteConfirmDetail": "Nowe wydatki nie będą już tworzone. Zaksięgowane wydatki pozostaną.",
             "show": "Pokaż",
-            "editHint": "Zmiany obowiązują od następnego terminu. Zaksięgowane wydatki pozostają bez zmian."
+            "editHint": "Zmiany obowiązują od następnego terminu. Zaksięgowane wydatki pozostają bez zmian.",
+            "dateBooked": "Terminy do {{date}} są już zaksięgowane. Następny termin musi być późniejszy."
         },
         "activityType": {
             "group_created": "Grupa utworzona",

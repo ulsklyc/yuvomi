@@ -3917,7 +3917,8 @@
             "deleteConfirm": "Ta bort denna återkommande utgift?",
             "deleteConfirmDetail": "Inga nya utgifter skapas. Redan bokförda utgifter finns kvar.",
             "show": "Visa",
-            "editHint": "Ändringar gäller från nästa datum. Redan bokförda utgifter förblir oförändrade."
+            "editHint": "Ändringar gäller från nästa datum. Redan bokförda utgifter förblir oförändrade.",
+            "dateBooked": "Datum till och med {{date}} är redan bokförda. Nästa datum måste vara senare."
         },
         "activityType": {
             "group_created": "Grupp skapad",
