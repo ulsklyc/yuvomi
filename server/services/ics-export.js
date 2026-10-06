@@ -12,6 +12,7 @@ import {
 import { formatWall, vtimezoneFor } from '../utils/vtimezone.js';
 import { outboundDateRange } from './outbound-dtstart.js';
 import { rruleLine } from './recurrence.js';
+import { activeAccountSql } from './account-state.js';
 import { icsSubscriptionVisibleWhere } from './visibility.js';
 import { birthdaysSwitchedOff, notBirthdayEventSql } from './household-modules.js';
 import {
@@ -427,7 +428,7 @@ function clearFeedToken(conn, userId) {
 function findUserIdByFeedToken(conn, token) {
   if (!token) return null;
   const candidate = Buffer.from(token, 'utf8');
-  for (const row of conn.prepare(`SELECT id, calendar_feed_token AS t FROM users WHERE calendar_feed_token IS NOT NULL`).all()) {
+  for (const row of conn.prepare(`SELECT id, calendar_feed_token AS t FROM users WHERE calendar_feed_token IS NOT NULL AND ${activeAccountSql('users')}`).all()) {
     const stored = Buffer.from(row.t, 'utf8');
     if (stored.length === candidate.length && timingSafeEqual(stored, candidate)) return row.id;
   }

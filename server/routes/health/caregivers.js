@@ -13,6 +13,7 @@ import * as db from '../../db.js';
 import { requireAdmin } from '../../middleware/require-admin.js';
 import { log, viewerId, caredForIds } from './helpers.js';
 import { syncPreventionRemindersForSubject } from '../../services/prevention-reminders.js';
+import { isActiveAccount } from '../../services/household-members.js';
 
 const router = express.Router();
 
@@ -82,6 +83,34 @@ router.put('/caregivers/:subjectId', requireAdmin, (req, res) => {
       ).all(...ids);
       if (found.length !== ids.length) {
         return res.status(400).json({ error: 'Unbekannte Person in caregiver_ids.', code: 400 });
+      }
+      // Ein ehemaliges Konto betreut niemanden NEU (#1381). Das Deaktivieren
+      // nimmt ihm seine Betreuungen; ohne diese Zeile liesse sich die naechste
+      // gleich wieder eintragen, fuer ein Konto, das nie mehr hereinkommt.
+      const stored = new Set(db.get()
+        .prepare('SELECT caregiver_id FROM health_care_grants WHERE subject_id = ?').all(subjectId)
+        .map((row) => row.caregiver_id));
+      const former = ids.filter((id) => !stored.has(id) && !isActiveAccount(id, { db: db.get() }));
+      if (former.length) {
+        return res.status(400).json({
+          error: `A deactivated account cannot be a caregiver - user ${former.join(', ')}.`,
+          code: 400,
+          reason: 'account_deactivated',
+        });
+      }
+      // UND NIEMAND BEKOMMT NEU ZUGRIFF AUF DIE DATEN EINES EHEMALIGEN. Dessen
+      // Gesundheitsdaten bleiben beim Deaktivieren stehen, und eine Betreuung
+      // macht sie lesbar und schreibbar. Wer schon betreut, behaelt das (die
+      // Liste laesst sich auch kuerzen und leeren); eine NEUE Betreuung waere
+      // ein neuer Leser fuer Daten, deren Eigentuemer nicht mehr widersprechen
+      // kann. Was mit diesen Daten geschieht, ist offen (#1381).
+      const added = ids.filter((id) => !stored.has(id));
+      if (added.length && !isActiveAccount(subjectId, { db: db.get() })) {
+        return res.status(400).json({
+          error: 'A deactivated account cannot get new caregivers.',
+          code: 400,
+          reason: 'account_deactivated',
+        });
       }
     }
 

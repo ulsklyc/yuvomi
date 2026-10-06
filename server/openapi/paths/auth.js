@@ -32,6 +32,7 @@ export function authPaths() {
             content: { 'application/json': { schema: { $ref: '#/components/schemas/LoginResponse' } } },
           },
           401: { description: 'Invalid code, or no pending sign-in' },
+          403: { description: 'The account may no longer sign in, for example because it was deactivated in the meantime (`reason: "account_cannot_sign_in"`). No recovery code is spent.' },
           429: { description: 'Too many attempts' },
         },
       }),
@@ -438,7 +439,10 @@ export function authPaths() {
       get: op({
         summary: 'List family users',
         tag: 'Auth',
-        description: 'Authenticated endpoint used for assignment pickers. Returns public user fields for all family members. '
+        description: 'Lists every account except wall displays: user administration, and the way clients name a person a record already stores. '
+          + 'It is not a picker source: pickers read `GET /api/v1/family/members`. '
+          + 'A deactivated account (see `DELETE /api/v1/auth/users/{id}`) stays in this list, sorted after the active ones, '
+          + 'with `deactivated_at` set to the moment it was deactivated; the field is `null` for an active account. '
           + 'Administrators additionally get sso_only per member; how someone else signs in is not a detail every '
           + 'member needs, for the same reason the 2FA overview is a separate admin endpoint.',
       }),
@@ -467,11 +471,59 @@ export function authPaths() {
         requestBody: jsonBody('#/components/schemas/UserUpdateRequest'),
       }),
       delete: op({
-        summary: 'Delete user',
+        summary: 'Remove user (deactivate or delete)',
+        description: 'Removes an account. What that means depends on what the account leaves behind. '
+          + 'An account with traces in shared data is DEACTIVATED: the row stays, so records keep their author, assignee and balances, '
+          + 'and the answer carries `outcome: "deactivated"`. A trace is any row that references the account outside its own private data, '
+          + 'for example a task, event, note or document it created, an assignment, a shared expense it paid, took part in or recorded, a quick link, or reward points. '
+          + 'An account without traces is deleted as before (`outcome: "deleted"`), together with its private data. '
+          + 'Deactivating ends every way in at once and in one transaction: sessions are ended, API tokens acting as the account or issued by it are revoked, open invitations and display pairing codes it created stop working, '
+          + 'calendar feed addresses stop working, password and SSO sign-in are refused, pending password reset links are dropped, '
+          + 'and push subscriptions, personal notification channels and pending reminders are removed. The role falls back to member. '
+          + 'Private data of the account (health, cycle, private notes, shift plans, its contact card and birthday) is kept. '
+          + 'A deactivated account is no household member any more: it is missing from `GET /api/v1/family/members` and cannot be newly chosen as assignee, attendee or group member, '
+          + 'while references already stored stay valid. `traces` lists the referencing columns with their row counts. '
+          + 'Refused with 400 and a `reason`: `own_account` (the caller\'s own account), `last_admin`, `last_sso_admin`. '
+          + 'Wall displays are managed under `/api/v1/displays` and answer 404 here.',
         tag: 'Auth',
         admin: true,
         stateChanging: true,
         params: [idParam('id', 'User ID')],
+        responses: {
+          200: {
+            description: 'Account deactivated or deleted',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['ok', 'outcome', 'traces'],
+                  properties: {
+                    ok: { type: 'boolean', enum: [true] },
+                    outcome: { type: 'string', enum: ['deactivated', 'deleted'] },
+                    traces: {
+                      type: 'array',
+                      description: 'Columns that reference the account from shared data. Empty when the account was deleted.',
+                      items: {
+                        type: 'object',
+                        required: ['table', 'column', 'rows'],
+                        properties: {
+                          table: { type: 'string' },
+                          column: { type: 'string' },
+                          rows: { type: 'integer', minimum: 1 },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'User not found' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
     '/api/v1/auth/api-tokens': {

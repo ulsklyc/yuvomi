@@ -6,6 +6,7 @@
 import webpushDefault from 'web-push';
 import * as dbModule from '../db.js';
 import { createLogger } from '../logger.js';
+import { isActiveAccount } from './household-members.js';
 
 const log = createLogger('Push');
 
@@ -145,6 +146,11 @@ export function createPushService({ db, webpush = webpushDefault } = {}) {
   }
 
   async function sendPushToUser(userId, payload) {
+    // DER EINE ENGPASS FUER WEB PUSH: Erinnerungen, die Zuweisung einer Aufgabe
+    // und die Medikamenten-Meldung enden alle hier. Ein ehemaliges Konto
+    // bekommt nichts mehr (#1381) - auch nicht ueber ein Abo, das nach dem
+    // Deaktivieren noch dasteht. Synchron vor dem ersten `await`.
+    if (!isActiveAccount(userId, { db: getDb() })) return 0;
     const { subject } = ensureVapid();
     const subs = getDb().prepare('SELECT * FROM push_subscriptions WHERE user_id = ?').all(userId);
     let sent = 0;

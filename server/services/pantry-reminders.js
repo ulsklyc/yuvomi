@@ -23,6 +23,7 @@ import { todayKey } from '../utils/timezone.js';
 import { resolvePermissions } from '../permissions.js';
 import { createLogger } from '../logger.js';
 import { householdDisabledModules } from './household-modules.js';
+import { activeAccountSql } from './account-state.js';
 
 const log = createLogger('PantryReminders');
 
@@ -315,7 +316,8 @@ export function resolvePantryAccess(database) {
  * und die bündelt resolvePantryAccess().
  */
 function usersWithPantry(database) {
-  const users = database.prepare('SELECT id, role, family_role FROM users').all();
+  // Ohne Ehemalige (#1381): ein deaktiviertes Konto bekommt nichts mehr zugestellt.
+  const users = database.prepare(`SELECT id, role, family_role FROM users WHERE ${activeAccountSql('users')}`).all();
   const allowed = new Set();
   for (const user of users) {
     if (resolvePermissions(database, user).modules.pantry !== 'none') allowed.add(user.id);

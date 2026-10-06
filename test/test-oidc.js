@@ -145,7 +145,7 @@ function buildOidcTestDb() {
   db.exec('PRAGMA foreign_keys = ON;');
   // Minimales Schema für findOrCreateOidcUser-Tests
   db.exec(`
-    CREATE TABLE users (
+    CREATE TABLE users (deactivated_at TEXT, 
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       username      TEXT UNIQUE NOT NULL,
       display_name  TEXT NOT NULL,

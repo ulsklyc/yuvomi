@@ -176,7 +176,7 @@ function makeDb() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(`
-    CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
+    CREATE TABLE users (deactivated_at TEXT, id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL DEFAULT 'x', oidc_sub TEXT, role TEXT NOT NULL DEFAULT 'member');
     CREATE TABLE password_resets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -637,7 +637,7 @@ test('ohne einen einzigen Gast lautet sie nein', () => {
 
 test('ein Schema ohne die Tabelle sperrt niemanden aus, es hat nur keine Gaeste', () => {
   const db = new DatabaseSync(':memory:');
-  db.exec('CREATE TABLE users (id INTEGER PRIMARY KEY)');
+  db.exec('CREATE TABLE users (deactivated_at TEXT, id INTEGER PRIMARY KEY)');
   assert.equal(hasSplitExpenseGuests(db), false);
 });
 

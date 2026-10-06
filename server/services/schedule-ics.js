@@ -14,6 +14,7 @@ import { randomBytes } from 'node:crypto';
 import { createLogger } from '../logger.js';
 import { escapeICSText, foldLine, resolveFeedZone, stampProp } from './ics-export.js';
 import { scheduleData } from './schedule.js';
+import { activeAccountSql } from './account-state.js';
 import { todayKey, shiftDateKey, householdTimeZone } from '../utils/timezone.js';
 import { vtimezoneFor } from '../utils/vtimezone.js';
 
@@ -159,7 +160,7 @@ function clearFeedToken(conn, userId) {
 // hier also gleich zweifach - Zugang UND Umfang.
 function findUserIdByFeedToken(conn, token) {
   if (!token) return null;
-  const row = conn.prepare('SELECT id FROM users WHERE schedule_feed_token = ?').get(token);
+  const row = conn.prepare(`SELECT id FROM users WHERE schedule_feed_token = ? AND ${activeAccountSql('users')}`).get(token);
   return row?.id ?? null;
 }
 

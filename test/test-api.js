@@ -417,6 +417,148 @@ test('csrf_invalid bei einem Schreibzugriff: einmal wiederholt, erst dann der Sa
   assert.equal(calls, 3, 'PUT, /auth/me, PUT - und kein vierter Versuch');
 });
 
+// ─── #1669: nur eine Absage wegen des Tokens wird wiederholt ────────────────
+// Bis dahin ging JEDE 403 auf einen Schreibzugriff ein zweites Mal an den
+// Server - auch die gesperrte Aufgabe und das fehlende Recht, an denen ein
+// frisches Token nichts aendert. Gemessen wird die Zahl der Anfragen.
+
+/** Zaehlt die Anfragen und merkt sich das Token, das jede mitbrachte. */
+function countingFetch(respond) {
+  const seen = [];
+  _mockFetch = (url, init = {}) => {
+    seen.push({ url: String(url), method: init.method ?? 'GET', token: init.headers?.['X-CSRF-Token'] });
+    return respond(String(url), seen.length);
+  };
+  return seen;
+}
+
+test('403 mit einem Grund, der nichts mit dem Token zu tun hat: genau EINE Anfrage', async () => {
+  for (const [reason, serverText] of [
+    ['task_locked', 'This task is locked; only its creator and administrators can change it.'],
+    ['module_read_only', 'You have read-only access to this module.'],
+    ['cross_module_access', 'Write access to the shopping list is required.'],
+    ['not_authorized', 'Du darfst diese Terminserie nicht bearbeiten.'],
+    ['some_future_reason', 'A sentence this client has never seen.'],
+  ]) {
+    // Mit Token im Kopf der Absage (so antwortet der Server hinter der
+    // CSRF-Pruefung) und ohne (eine Sperre davor) - beide Wege der Wiederholung.
+    for (const headers of [{ 'X-CSRF-Token': 'fresh' }, {}]) {
+      for (const verb of ['post', 'put', 'patch', 'delete']) {
+        setup();
+        const seen = countingFetch(() => mockResponse(403, { error: serverText, code: 403, reason }, headers));
+        await assert.rejects(
+          () => (verb === 'delete' ? api.delete('/tasks/1') : api[verb]('/tasks/1', { title: 'x' })),
+          (err) => err.status === 403 && err.data.reason === reason,
+        );
+        assert.deepEqual(
+          seen.map((r) => `${r.method} ${r.url}`), [`${verb.toUpperCase()} /api/v1/tasks/1`],
+          `${reason} (${verb}, ${headers['X-CSRF-Token'] ? 'mit' : 'ohne'} Token im Kopf): eine Anfrage, keine Wiederholung, kein /auth/me`,
+        );
+      }
+    }
+  }
+});
+
+test('403 mit fremdem Grund: das Token aus dem Kopf der Absage gilt trotzdem fuer die naechste Anfrage', async () => {
+  setup();
+  let seen = countingFetch(() => mockResponse(403, { error: 'locked', code: 403, reason: 'task_locked' }, { 'X-CSRF-Token': 'token-from-refusal' }));
+  await assert.rejects(() => api.put('/tasks/1', { title: 'x' }), (err) => err.status === 403);
+  assert.equal(seen.length, 1);
+  seen = countingFetch(() => mockResponse(200, { data: {} }));
+  await api.put('/tasks/2', { title: 'y' });
+  assert.equal(seen[0].token, 'token-from-refusal');
+});
+
+test('csrf_invalid mit Token im Kopf der Absage: zwei Anfragen, die zweite mit dem neuen Token', async () => {
+  setup();
+  const seen = countingFetch((url, n) => (n === 1
+    ? mockResponse(403, { error: 'Invalid CSRF token.', code: 403, reason: 'csrf_invalid' }, { 'X-CSRF-Token': 'renewed' })
+    : mockResponse(200, { data: { id: 1 } })));
+  const result = await api.put('/tasks/1', { title: 'x' });
+  assert.deepEqual(result, { data: { id: 1 } });
+  assert.deepEqual(seen.map((r) => `${r.method} ${r.url}`), ['PUT /api/v1/tasks/1', 'PUT /api/v1/tasks/1']);
+  assert.equal(seen[1].token, 'renewed', 'die Wiederholung traegt das erneuerte Token');
+});
+
+test('csrf_invalid ohne Token im Kopf: PUT, /auth/me, PUT mit dem Token von dort', async () => {
+  setup();
+  const seen = countingFetch((url, n) => {
+    if (url.endsWith('/auth/me')) return mockResponse(200, { user: { id: 1 }, csrfToken: 'from-me' });
+    return n === 1
+      ? mockResponse(403, { error: 'Invalid CSRF token.', code: 403, reason: 'csrf_invalid' })
+      : mockResponse(200, { data: { id: 1 } });
+  });
+  await api.put('/tasks/1', { title: 'x' });
+  assert.deepEqual(seen.map((r) => `${r.method} ${r.url}`), ['PUT /api/v1/tasks/1', 'GET /api/v1/auth/me', 'PUT /api/v1/tasks/1']);
+  assert.equal(seen[2].token, 'from-me');
+});
+
+test('die Absage der echten CSRF-Middleware loest die Wiederholung aus', async () => {
+  // Der Grund steht im Client als Konstante. Hier laeuft die Middleware selbst
+  // und ihr Rumpf geht durch api.js - benennt der Server den Grund um, sind es
+  // nicht mehr zwei Anfragen.
+  const { csrfMiddleware } = await import('../server/middleware/csrf.js');
+  const refuse = (headerToken) => {
+    const out = { headers: {} };
+    const res = {
+      cookie() {},
+      setHeader(name, value) { out.headers[name] = value; },
+      status(code) { out.status = code; return this; },
+      json(body) { out.body = body; return this; },
+    };
+    let passed = false;
+    csrfMiddleware(
+      { method: 'PUT', headers: { 'x-csrf-token': headerToken }, session: { csrfToken: 'a'.repeat(64) } },
+      res, () => { passed = true; },
+    );
+    return { ...out, passed };
+  };
+  assert.equal(refuse('a'.repeat(64)).passed, true, 'das richtige Token kommt durch - sonst misst der Fall nichts');
+  const refusal = refuse('b'.repeat(64));
+  assert.equal(refusal.status, 403);
+  assert.equal(typeof refusal.body.reason, 'string');
+
+  setup();
+  const seen = countingFetch((url, n) => (n === 1
+    ? mockResponse(refusal.status, refusal.body, refusal.headers)
+    : mockResponse(200, { data: { id: 1 } })));
+  await api.put('/tasks/1', { title: 'x' });
+  assert.equal(seen.length, 2, 'Absage der Middleware, dann die Wiederholung');
+  assert.equal(seen[1].token, 'a'.repeat(64), 'mit dem Token aus dem Kopf der Absage');
+});
+
+test('403 ohne Grund bleibt wiederholt: ohne lesbaren Rumpf, mit leerem oder fehlendem reason', async () => {
+  // Kein Grund heisst: die Absage kann von einem Proxy oder einer Sperre
+  // stammen, die das Token meint, es aber nicht sagt.
+  const unreadable = () => Promise.resolve({
+    status: 403, ok: false, headers: { get: (name) => (name === 'X-CSRF-Token' ? 'fresh' : null) },
+    json: () => Promise.reject(new SyntaxError('Unexpected token <')),
+  });
+  for (const [label, respond] of [
+    ['HTML-Rumpf', unreadable],
+    ['kein reason', () => mockResponse(403, { error: 'Not authorized.', code: 403 }, { 'X-CSRF-Token': 'fresh' })],
+    ['reason null', () => mockResponse(403, { error: 'Not authorized.', code: 403, reason: null }, { 'X-CSRF-Token': 'fresh' })],
+    ['reason leer', () => mockResponse(403, { error: 'Not authorized.', code: 403, reason: '' }, { 'X-CSRF-Token': 'fresh' })],
+  ]) {
+    setup();
+    const seen = countingFetch(respond);
+    await assert.rejects(() => api.post('/tasks', { title: 'x' }), (err) => err.status === 403);
+    assert.equal(seen.length, 2, `${label}: einmal wiederholt`);
+  }
+});
+
+test('403 auf einen Lesezugriff: nie wiederholt, mit welchem Grund auch immer', async () => {
+  for (const body of [
+    { error: 'Invalid CSRF token.', code: 403, reason: 'csrf_invalid' },
+    { error: 'Not authorized.', code: 403 },
+  ]) {
+    setup();
+    const seen = countingFetch(() => mockResponse(403, body, { 'X-CSRF-Token': 'fresh' }));
+    await assert.rejects(() => api.get('/tasks'), (err) => err.status === 403);
+    assert.equal(seen.length, 1);
+  }
+});
+
 // ─── #1607: jede andere Absage ohne Grund ───────────────────────────────────
 // Rund 110 Routen antworten auf fehlende Berechtigung mit einem englischen
 // Satz ("Not authorized.", "Admin access required."), ein paar mit einem
@@ -619,9 +761,132 @@ const REASONS_WITHOUT_SENTENCE = new Set([
   // Die Oberflaeche bietet das Loeschen dort nicht an; der Servertext ist deutsch.
   'family_member_contact',
   'FASTING_CAPABILITY_REQUIRED', 'FASTING_SUBJECT_FORBIDDEN', 'FASTING_ACK_FORBIDDEN', 'FASTING_SETTINGS_FORBIDDEN',
+  // Fremde Terminserie (Einzelausnahme): der Grund reist als `reason: error.code`
+  // durch eine Variable und fehlte dem Leser bis #1669. Der Servertext ist deutsch.
+  'not_authorized',
 ]);
 
-/** Jeder literale `reason` im Server, der an einer 403 haengt. */
+// ─── #1669: ein Grund, der durch eine Variable gereicht wird ────────────────
+// Der Leser unten sieht nur `reason: 'x'`. `reason: error.code` sah er nicht -
+// und damit auch nicht, dass `not_authorized` an einer 403 haengt. Aufloesen
+// laesst sich eine Variable aus dem Quelltext nicht ehrlich; also ist jede
+// solche Stelle hier VON HAND gefuehrt: Datei und Ausdruck, wie oft er dort
+// steht, und welche Gruende ueber sie an einer 403 ankommen koennen (`at403`,
+// je mit der Datei, in der das Literal steht). Eine neue Stelle, eine weitere
+// Wiederholung oder eine verschwundene macht den Test rot. Was er NICHT prueft:
+// dass `at403` vollstaendig ist - das ist die Zusage dessen, der die Zeile schreibt.
+const REASONS_PASSED_THROUGH = new Map([
+  ['routes/calendar/crud.js: error.code', { sites: 1, at403: [['not_authorized', 'services/calendar-occurrence-overrides.js']],
+    why: 'sendCalendarOccurrenceError: 403 nur bei not_authorized, sonst 400/404/409' }],
+  ['routes/calendar/crud.js: eligibility.reason', { sites: 1, at403: [], why: 'feste 400' }],
+  ['services/calendar-occurrence-overrides.js: eligible ? null : \'ineligible_series\'', { sites: 1, at403: [],
+    why: 'keine Antwort; wird zu error.code und reist mit 400' }],
+  ['routes/tasks.js: actor.reason', { sites: 1, at403: [['acting_person_no_access', 'services/display-acting.js']],
+    why: 'displayActingPerson: 400 ohne Grund oder 403 mit diesem' }],
+  ['routes/rewards.js: actor.reason', { sites: 1, at403: [['acting_person_no_access', 'services/display-acting.js']],
+    why: 'displayActingPerson, wie in tasks.js' }],
+  ['routes/health/fasting.js: error.reason', { sites: 1, at403: [
+    ['FASTING_CAPABILITY_REQUIRED', 'services/fasting.js'], ['FASTING_SUBJECT_FORBIDDEN', 'services/fasting.js'],
+    ['FASTING_ACK_FORBIDDEN', 'services/fasting.js'], ['FASTING_SETTINGS_FORBIDDEN', 'services/fasting.js'],
+  ], why: 'FastingError: jeder Grund aus fail(403, ...)' }],
+  ['routes/health/visibility-defaults.js: error.reason', { sites: 1, at403: [['FASTING_CAPABILITY_REQUIRED', 'services/fasting.js']],
+    why: 'requireFastingCapability wirft nur diesen' }],
+  ['routes/split-expenses.js: err.reason', { sites: 1, at403: [],
+    why: 'Refusal: ein Grund nur an 409 (email_in_use); die 403 dort tragen keinen' }],
+  ['auth.js: err.code', { sites: 1, at403: [], why: 'feste 409 (2FA)' }],
+  ['routes/notes.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
+  ['routes/tasks.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
+  ['routes/backup.js: err.reason', { sites: 1, at403: [], why: 'Restore: 409, 503 oder 400' }],
+  ['routes/budget/loans.js: errors[0].reason', { sites: 1, at403: [], why: 'feste 400' }],
+  ['services/document-deletion-lock.js: err.reason', { sites: 1, at403: [], why: 'feste 409' }],
+  ['middleware/error-handler.js: err.reason', { sites: 1, at403: [], why: 'feste 503' }],
+  ['middleware/restore-gate.js: RESTORE_IN_PROGRESS_REASON', { sites: 1, at403: [], why: '503 oder 409' }],
+  ['routes/weather.js: WEATHER_REASON.NOT_CONFIGURED', { sites: 1, at403: [], why: 'Antwort 200 ohne Daten' }],
+  ['routes/weather.js: WEATHER_REASON.UPSTREAM_ERROR', { sites: 3, at403: [], why: 'Antwort 200 ohne Daten' }],
+  ['routes/rewards.js: item.name', { sites: 1, at403: [], why: 'Buchungstext im Punktekonto, keine Antwort' }],
+  ['routes/rewards.js: row.reward_name', { sites: 1, at403: [], why: 'Buchungstext im Punktekonto, keine Antwort' }],
+  ['services/ics-parser.js: !uid ? \'missing UID\' : \'missing or unparsable DTSTART\'', { sites: 1, at403: [],
+    why: 'onSkip fuers Log, keine Antwort' }],
+]);
+
+/**
+ * Jede Stelle im Server, an der `reason` KEIN Literal bekommt: `reason: <Ausdruck>`
+ * und die Kurzform `{ ..., reason }` in einer Zeile, die eine Antwort baut.
+ * @returns {Map<string, number>} "Datei: Ausdruck" -> Anzahl
+ */
+function nonLiteralReasonSites(root = serverRoot, source = null) {
+  const sites = new Map();
+  const note = (key) => sites.set(key, (sites.get(key) ?? 0) + 1);
+  const scan = (rel, src) => {
+    for (const line of src.split('\n')) {
+      if (/^\s*(\/\/|\/?\*)/.test(line)) continue;
+      for (const m of line.matchAll(/\breason: (?!'[A-Za-z_]+')/g)) {
+        note(`${rel}: ${reasonExpression(line.slice(m.index + m[0].length))}`);
+      }
+      // Die Kurzform traegt immer eine Variable. Gezaehlt nur, wo die Zeile eine
+      // Antwort baut - sonst faende sie jede Destrukturierung und jede SQL-Spalte.
+      if (/[{,]\s*reason\s*[,}]/.test(line) && /\.json\(|\bcode:/.test(line)) note(`${rel}: reason (Kurzform)`);
+    }
+  };
+  if (source) { scan(source.rel, source.src); return sites; }
+  (function walk(dir, rel) {
+    for (const name of readdirSync(dir)) {
+      if (rel === '' && name === 'openapi') continue;
+      const url = new URL(name, dir);
+      if (statSync(url).isDirectory()) { walk(new URL(`${name}/`, dir), `${rel}${name}/`); continue; }
+      if (name.endsWith('.js')) scan(`${rel}${name}`, readFileSync(url, 'utf8'));
+    }
+  }(root, ''));
+  return sites;
+}
+
+/** Der Ausdruck hinter `reason: ` bis zum Komma oder zur Klammer, die das Feld beendet. */
+function reasonExpression(rest) {
+  let depth = 0;
+  let quote = null;
+  for (let i = 0; i < rest.length; i += 1) {
+    const c = rest[i];
+    if (quote) { if (c === quote) quote = null; continue; }
+    if (c === "'" || c === '"' || c === '`') { quote = c; continue; }
+    if (c === '(' || c === '[' || c === '{') depth += 1;
+    else if (c === ')' || c === ']' || c === '}') { if (depth === 0) return rest.slice(0, i).trim(); depth -= 1; }
+    else if (c === ',' && depth === 0) return rest.slice(0, i).trim();
+  }
+  return rest.trim();
+}
+
+test('jede Stelle, die einen reason durch eine Variable reicht, ist gefuehrt', () => {
+  const found = nonLiteralReasonSites();
+  assert.ok(found.size >= 15, `zu wenige Stellen gelesen (${found.size}) - das Muster greift nicht mehr`);
+  const expected = new Map([...REASONS_PASSED_THROUGH].map(([key, { sites }]) => [key, sites]));
+  const show = (map) => [...map].map(([key, n]) => `${key} (${n}x)`).sort();
+  assert.deepEqual(
+    show(found), show(expected),
+    'ein reason wird durch eine Variable gereicht, und die Stelle ist nicht gefuehrt (oder gefuehrt und nicht mehr da): '
+    + 'entweder ein Literal schreiben, oder die Stelle in REASONS_PASSED_THROUGH eintragen - mit jedem Grund, der dort an einer 403 ankommen kann',
+  );
+  for (const [key, { at403, why }] of REASONS_PASSED_THROUGH) {
+    assert.ok(typeof why === 'string' && why.length > 0, `${key}: ohne Begruendung`);
+    for (const [reason, file] of at403) {
+      assert.ok(serverSource(file).includes(`'${reason}'`), `${key}: '${reason}' steht nicht mehr in server/${file}`);
+    }
+  }
+});
+
+test('der Leser fuer gereichte Gruende sieht, was er sehen soll', () => {
+  const read = (src) => [...nonLiteralReasonSites(serverRoot, { rel: 'x.js', src })].map(([key, n]) => `${key} (${n}x)`);
+  assert.deepEqual(read("res.status(403).json({ error: 'No.', code: 403, reason: 'task_locked' });"), []);
+  assert.deepEqual(read('res.status(403).json({ error: e.message, code: 403, reason: e.code });'), ['x.js: e.code (1x)']);
+  assert.deepEqual(read('    ...(e.conflict ? { conflict: e.conflict } : { reason: e.code }),'), ['x.js: e.code (1x)']);
+  assert.deepEqual(read('res.status(403).json({ error, code: 403, reason });'), ['x.js: reason (Kurzform) (1x)']);
+  assert.deepEqual(read("  reason: ok ? null : 'a_b',"), ["x.js: ok ? null : 'a_b' (1x)"]);
+  assert.deepEqual(read('reason: `tpl_${x}`,'), ['x.js: `tpl_${x}` (1x)']);
+  assert.deepEqual(read('reason: pick(a, b),\nreason: pick(a, b) };'), ['x.js: pick(a, b) (2x)']);
+  // Kommentare, SQL-Spalten und Destrukturierung sind keine Stellen.
+  assert.deepEqual(read(' * Response: 409 { code: 409, reason }\n// reason: x\nconst { ok, reason } = f();\nSELECT delta, reason, at FROM l'), []);
+});
+
+/** Jeder `reason` im Server, der an einer 403 haengt: die literalen und die gefuehrten gereichten. */
 function refusalReasonsAtTheServer() {
   const reasons = new Map();
   const note = (reason, where) => { if (!reasons.has(reason)) reasons.set(reason, where); };
@@ -647,6 +912,10 @@ function refusalReasonsAtTheServer() {
       for (const m of src.matchAll(/\breason = '([A-Z_]+)'[^\n]*\n[^\n]*\bfail\(403, reason\b/g)) note(m[1], `${rel}${name}`);
     }
   }(serverRoot, ''));
+  // Was durch eine Variable an eine 403 kommt, steht in REASONS_PASSED_THROUGH (#1669).
+  for (const [key, { at403 }] of REASONS_PASSED_THROUGH) {
+    for (const [reason] of at403) note(reason, key);
+  }
   return reasons;
 }
 

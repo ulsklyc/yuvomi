@@ -18,7 +18,7 @@ function makeDb({ withNotificationTables = true } = {}) {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(`
-    CREATE TABLE users (
+    CREATE TABLE users (deactivated_at TEXT, 
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
       role TEXT NOT NULL DEFAULT 'member',

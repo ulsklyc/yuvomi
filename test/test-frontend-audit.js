@@ -11719,7 +11719,7 @@ test('kein Nutzer des Category-Managers verschluckt den Fehler seiner Auffrischu
 // zurueckgespielten Backup ist das keine zulaessige Antwort.
 test('die schwersten Settings-Dialoge bleiben als gefaehrlich markiert', () => {
   const dialoge = [
-    ['admin-family.js', 'settings.deleteMemberConfirm', 'settings.deleteMemberConfirmDetail'],
+    ['admin-family.js', 'settings.removeMemberConfirm', 'settings.removeMemberConfirmDetail'],
     ['admin-family.js', 'settings.invites.revokeConfirm', 'settings.invites.revokeConfirmDetail'],
     ['admin-api.js', 'settings.apiTokenRevokeConfirm', 'settings.apiTokenRevokeDetail'],
     ['admin-permissions.js', 'settings.permResetConfirm', 'settings.permResetConfirmDetail'],

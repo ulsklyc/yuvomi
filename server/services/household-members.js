@@ -31,8 +31,21 @@
  * - mit dem GESPEICHERTEN Stand daneben: ein Verweis, der schon besteht, bleibt
  * gueltig, damit ein alter Datensatz mit Personal oder Gast weiter speicherbar
  * ist und niemand still aus ihm verschwindet.
+ *
+ * EIN EHEMALIGES KONTO IST KEIN MITGLIED MEHR (#1381). Wer Spuren in geteilten
+ * Daten hinterlassen hat, wird deaktiviert statt geloescht: die Zeile bleibt,
+ * damit Urheberschaft und Salden bleiben. `activeAccountSql()` ist die EINE
+ * Bedingung dazu (der SQL-Text steht in account-state.js, ohne Datenbank-Import,
+ * und wird hier weitergereicht), und `householdMemberSql()` schliesst sie ein -
+ * damit faellt ein Ehemaliger aus jeder Auswahl, waehrend der gespeicherte
+ * Verweis (Zustaendiger, Teilnehmer, Ersteller) seinen Namen behaelt. "Ehemalig" und "ohne Login" bleiben zwei Tatsachen: Hauspersonal ist
+ * aktiv und meldet sich trotzdem nie an.
  */
 import * as dbModule from '../db.js';
+import { activeAccountSql, deactivatedAtColumnSql } from './account-state.js';
+
+// Weitergereicht: wer eine Verbindung hat, fragt dieses Modul (siehe account-state.js).
+export { activeAccountSql, deactivatedAtColumnSql };
 
 const ALIAS = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -41,6 +54,17 @@ function checkedAlias(alias) {
     throw new TypeError(`household-members: invalid table alias ${JSON.stringify(alias)}`);
   }
   return alias;
+}
+
+/**
+ * Ist dieses Konto aktiv? Die Einzelfrage zu `activeAccountSql()`.
+ *
+ * Ein Konto, das es nicht gibt, ist NICHT aktiv: wer hier fragt, will wissen,
+ * ob er diesem Konto etwas geben darf (eine Sitzung, eine Mail, einen Push).
+ */
+export function isActiveAccount(userId, { db } = {}) {
+  const database = db || dbModule.get();
+  return Boolean(database.prepare(`SELECT 1 FROM users u WHERE u.id = ? AND ${activeAccountSql('u')}`).get(userId));
 }
 
 /**
@@ -61,7 +85,10 @@ export function householdMemberSql(alias, ...rest) {
     throw new TypeError('household-members: householdMemberSql() takes no options - every list of members is strict (#1207)');
   }
   const a = checkedAlias(alias);
-  return `(NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = ${a}.id)`
+  // Ein Ehemaliger ist kein Mitglied mehr (#1381): die Zeile bleibt fuer
+  // Urheberschaft und Salden, aus jeder Auswahl faellt sie hier heraus.
+  return `(${activeAccountSql(a)}`
+    + ` AND NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = ${a}.id)`
     + ` AND NOT EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = ${a}.id)`
     // Ein Wandtablett ist kein Familienmitglied (#913, #1208). Es steht hier
     // neben Personal und Gaesten, weil es dieselbe Art Ausnahme ist: eine
@@ -143,9 +170,12 @@ export function newNonMembers(userIds, { stored = [], guestsAllowed = false, db 
   const exists = database.prepare('SELECT 1 FROM users WHERE id = ?');
   const member = database.prepare(`SELECT 1 FROM users u WHERE u.id = ? AND ${householdMemberSql('u')}`);
   const scope = database.prepare(`SELECT ${accessScopeSql('u')} AS scope FROM users u WHERE u.id = ?`);
+  const active = database.prepare(`SELECT 1 FROM users u WHERE u.id = ? AND ${activeAccountSql('u')}`);
   return [...new Set([...userIds].map(Number))]
     .filter((id) => Number.isInteger(id) && !keep.has(id) && exists.get(id) && !member.get(id))
-    .filter((id) => !(guestsAllowed && scope.get(id)?.scope === 'split_guest'));
+    // Ein Gast ist nur dort erlaubt, wo Gaeste hingehoeren - und nur ein
+    // aktiver: ein deaktivierter Gast kommt nicht NEU in eine Gruppe (#1381).
+    .filter((id) => !(guestsAllowed && scope.get(id)?.scope === 'split_guest' && active.get(id)));
 }
 
 /** Die eine Meldung dazu - jede Route sagt dasselbe, damit ein Client einen Grund hat. */

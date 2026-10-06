@@ -20,7 +20,7 @@ import {
 } from '../services/split-expenses.js';
 import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
 import { syncBirthdayArtifacts } from '../services/birthdays.js';
-import { householdMemberSql, newNonMembers, staffMessage } from '../services/household-members.js';
+import { activeAccountSql, householdMemberSql, newNonMembers, staffMessage } from '../services/household-members.js';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts } from '../services/contact-identity.js';
 import { todayKey } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../permissions.js';
@@ -1527,6 +1527,8 @@ router.get('/search', (req, res) => {
       JOIN expense_group_members mine ON mine.group_id = gm.group_id AND mine.user_id = @uid
       WHERE (@q = '' OR u.display_name LIKE '%' || @q || '%' OR u.username LIKE '%' || @q || '%')
         AND (@isGuest = 0 OR gm.group_id = @restrictedGroupId)
+        -- Ehemalige bleiben in Buchungen und Salden stehen, die Suche bietet sie nicht an (#1381).
+        AND ${activeAccountSql('u')}
       ORDER BY u.display_name COLLATE NOCASE ASC LIMIT 10
     `).all({ uid, q, restrictedGroupId, isGuest });
     res.json({ data: { groups, expenses: expensesSerialized, people } });

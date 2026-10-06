@@ -26,6 +26,7 @@ import {
 } from '../utils/totp.js';
 import { qrToDataUrl } from '../utils/qrcode.js';
 import { createLogger } from '../logger.js';
+import { activeAccountSql } from './account-state.js';
 
 const log = createLogger('2fa');
 
@@ -289,6 +290,8 @@ export function householdOverview(db) {
            (t.confirmed_at IS NOT NULL)  AS enabled
       FROM users u
       LEFT JOIN user_totp t ON t.user_id = u.id
+     -- Ein Ehemaliger hat keinen Zugang mehr, den ein zweiter Faktor schuetzte (#1381).
+     WHERE ${activeAccountSql('u')}
      ORDER BY u.display_name
   `).all().map((row) => ({ ...row, enabled: row.enabled === 1 }));
 }

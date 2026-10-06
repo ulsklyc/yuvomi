@@ -35,6 +35,63 @@ Every table: `id INTEGER PRIMARY KEY`, `created_at TEXT`, `updated_at TEXT` (ISO
 | schedule_overtime_enabled | INTEGER | Nullable (migration v208) - `NULL`/1 = overtime tracking on, 0 = off |
 | waste_feed_token | TEXT | Nullable (migration v205) - secret token of this member's Waste pickup ICS feed. Partial UNIQUE index WHERE NOT NULL |
 | waste_feed_type_ids | TEXT | Nullable (migration v205) - JSON array of `waste_types.id` for that feed; `NULL` = every active type |
+| deactivated_at | TEXT | Nullable (migration v231, #1381) - ISO 8601 moment the account was deactivated; `NULL` = active. See "Removing an account" below |
+
+**Removing an account: deactivate or delete (v231, #1381).** `DELETE /api/v1/auth/users/:id` used
+to run `DELETE FROM users` and let the foreign keys decide. For shared data that was wrong in two
+opposite ways: `created_by ... ON DELETE CASCADE` took a person's appointments, notes, documents and
+the payments they had recorded for others with them (changing other members' balances silently),
+while `ON DELETE RESTRICT` on the participant columns of shared expenses and `NO ACTION` on quick
+links made the delete fail with a bare 500. The rule now lives in
+`server/services/user-removal.js`:
+
+- **A trace** is any row in a foreign-key column on `users(id)` that is not listed in
+  `PRIVATE_USER_COLUMNS`. The columns are read at runtime from `PRAGMA foreign_key_list`, so a new
+  column counts as shared without anybody doing anything; a forgotten entry costs an account that
+  stays, never data that disappears. `SET NULL` references count as well (assigned to, done by).
+  A row that leaves anyway as the account's own private row is no trace through its other columns:
+  somebody who logged their own fast leaves nothing shared, a caregiver who logged it for a child
+  does.
+- **With traces the account is deactivated**: `deactivated_at` is set, `role` falls to `member`,
+  the row stays. In the same synchronous transaction every way in ends: sessions are deleted, API
+  tokens whose subject or issuer is the account are revoked (the plain token is shown once, to
+  whoever issues it, so a token a former administrator issued for another account is a secret
+  in their hand), open invitations it created are revoked and open display pairing codes it
+  issued are spent (a device already paired stays: its secret only ever went to that device,
+  and `display_devices` does not record who paired it), the five feed tokens are cleared, password reset tokens, two-factor recovery codes,
+  idempotency keys, push subscriptions, personal notification channels, reminders not yet delivered
+  and care grants held as caregiver are removed, `outlook_accounts.owner_user_id` and the default
+  assignee of synced calendars are cleared. `oidc_sub` stays bound, so the SSO callback finds the
+  account and refuses it instead of creating a replacement.
+- **Without traces it is deleted** as before, and two references without a foreign key that used
+  to stay behind go with it: the per-account settings in `sync_config` (`<key>:user:<id>`) and the
+  account's rows in `access_permissions`.
+- **What stays on purpose, and why it is no way in:** `password_hash` (read only by
+  `POST /auth/login`, behind `canSignIn()`, and by `PATCH /auth/me/password`, behind `requireAuth`),
+  `user_totp.secret` (read only by `/auth/2fa/verify`, which asks `canSignIn()` before it checks a
+  code, and by routes behind `requireAuth`), the OIDC binding (see above) and
+  `display_devices.token_hash` (the secret only ever went to the paired device). Sessions that name
+  the account without being signed in end as well: a pending second factor
+  (`pendingTwoFactor.userId`) and a running SSO link (`oidc.linkUserId`). Removing an account that
+  is already deactivated runs the same steps again, so material that appeared later ends too.
+  `test:user-traces-guard` keeps an inventory of every column that carries a secret; a new one is
+  red until it says what deactivating does with it.
+- **Private data stays** on deactivation (health, cycle, private notes, shift plans, the person's
+  own contact and birthday). Removing it, bringing an account back and anonymising are not built.
+
+The state has one predicate: `activeAccountSql()` (its SQL text in `server/services/account-state.js`,
+without a database import, handed on by `server/services/household-members.js`).
+`householdMemberSql()` includes it, so a deactivated account drops out of every list of members and
+out of `newNonMembers()` for newly chosen people, while a stored reference keeps its name and stays
+saveable. `canSignIn()` asks it for password login, the OIDC callback, email linking and the second
+factor (`POST /auth/2fa/verify` asks before it spends a recovery code); `requireAuth` asks it per
+request for sessions (a session whose account is deactivated or no longer exists is refused) and through the token join for API tokens, for subject and issuer alike;
+the feed token lookups, `sendPushToUser()`, `memberEmail()` and the due-reminder query ask it too.
+`GET /api/v1/auth/users` keeps listing deactivated accounts, after the active ones, with
+`deactivated_at`. The response of the delete route stays `200 { ok: true }` and adds
+`outcome: 'deactivated' | 'deleted'` and `traces: [{ table, column, rows }]`.
+`npm run test:user-traces-guard` holds the private list against the real schema;
+`npm run test:user-deactivation` measures every way in against the running server.
 
 **The onboarding walkthrough is remembered per account, not per browser (v2.52.0).** The marker used
 to live only in `localStorage`, so a new device or a private window showed the walkthrough again to
@@ -5234,7 +5291,7 @@ User management and app configuration. Logged-in users only.
 
 - **Jump marks:** a sheet with more than three sections opens with one scrolling row of links to its sections (`settingsSheetJumpTargets()`; the target is the existing `?section=<id>`, the focus lands on the section heading, the address follows). On a phone the sheet description is clamped to two lines.
 - **Profile (Settings → Account → Account):** one **Profile** card holds picture, display name, avatar colour and the account's own username (read-only - it cannot be changed), with phone, email and birthday grouped below it as **Contact details**; a sibling card changes the password
-- **User management (admin):** create new users, edit/delete existing users, assign roles (admin/member). Since v1.75.0 an **Invitations** panel sits below the member list: it creates invite links, shows the pending ones with their expiry date, and revokes them (see "Invitations" below)
+- **User management (admin):** create new users, edit existing users, remove them (an account with traces in shared data is deactivated and stays in the list marked "Former member", one without is deleted - see [Users](#users), #1381), assign roles (admin/member). Since v1.75.0 an **Invitations** panel sits below the member list: it creates invite links, shows the pending ones with their expiry date, and revokes them (see "Invitations" below)
 - **Roles and permissions (admin, Settings → Household → Roles and permissions, #467):** granular, backend-enforced access control per **family role** (the default) and per **member** (an override that wins over the role). Each module is set to `No access`, `Read only`, or `Full`, and each dashboard widget to `Available` or `Blocked`; widgets inherit their module's lock and can also be blocked on their own (e.g. hiding the cycle widget for some members without disabling Health). Configuration is **sparse** - only deviations from the default (full access) are stored, so unset roles/members keep full access and existing installs are unchanged. **Admins always bypass** the system (no self-lockout). Enforcement is **server-side** - the same scope layer that guards API tokens returns 403 on a disallowed module/method; the client mirrors it by hiding blocked modules from navigation and the dashboard, and a **read-only module** hides its create affordance (the FAB) and shows an explanatory banner. **Aggregating endpoints filter their own payload**, because the path-based guard cannot cover them. It resolves a request path to a module via `moduleForPath()`, and an endpoint that serves a dozen modules resolves to its own name: `dashboard` and `search` are scope modules but not permission modules, so they are never in the access map, and `kitchen` is not even a scope module - all three are waved through whatever is blocked. Each therefore filters itself, before the queries run, driven by one table naming which part of the answer belongs to which module:
 
 | Endpoint | Table | What a blocked module yields |

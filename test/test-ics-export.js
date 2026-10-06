@@ -11,7 +11,7 @@ function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion failed
 
 const db = new DatabaseSync(':memory:');
 db.exec('PRAGMA foreign_keys = ON;');
-db.exec(`CREATE TABLE users (
+db.exec(`CREATE TABLE users (deactivated_at TEXT, 
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL,
   password_hash TEXT NOT NULL, avatar_color TEXT NOT NULL DEFAULT '#007AFF',
@@ -57,7 +57,7 @@ import { buildFeed, escapeICSText, foldLine } from '../server/services/ics-expor
 // Frische DB mit calendar_events + ics_subscriptions
 const d2 = new DatabaseSync(':memory:');
 d2.exec('PRAGMA foreign_keys = ON;');
-d2.exec(`CREATE TABLE users (
+d2.exec(`CREATE TABLE users (deactivated_at TEXT, 
   id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
   display_name TEXT NOT NULL, password_hash TEXT NOT NULL,
   avatar_color TEXT NOT NULL DEFAULT '#007AFF', avatar_data BLOB,

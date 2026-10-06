@@ -5,6 +5,7 @@
  */
 import { createLogger } from '../logger.js';
 import * as dbModule from '../db.js';
+import { activeAccountSql } from './account-state.js';
 import { pushService as defaultPushService } from './push.js';
 import { createNotificationChannelStore } from './notification-channels.js';
 import { gotifyProvider } from './notification-providers/gotify.js';
@@ -418,7 +419,8 @@ export async function processDueNotifications({
   const nowIso = iso(now);
   const store = channelStore || createNotificationChannelStore({ db: activeDb });
 
-  const users = activeDb.prepare('SELECT id FROM users').all();
+  // Ohne Ehemalige (#1381): ihre Erinnerungen legt kein Abgleich neu an.
+  const users = activeDb.prepare(`SELECT id FROM users WHERE ${activeAccountSql('users')}`).all();
   for (const user of users) {
     try {
       syncAllBirthdayReminders(activeDb, user.id, now);
@@ -584,6 +586,12 @@ export async function processDueNotifications({
       -- der Empfaenger ihr Ziel wieder sieht. Der Filter steht in der Abfrage
       -- und damit vor Push UND Kanaelen.
       AND ${reminderTargetVisibleSql(activeDb, 'r')}
+      -- NICHTS GEHT AN EIN EHEMALIGES KONTO (#1381). Das Deaktivieren loescht
+      -- die offenen Erinnerungen, Push-Abos und eigenen Kanaele des Kontos;
+      -- einer der Abgleiche oben kann eine Zeile aber neu anlegen, und fuer
+      -- eine oeffentliche Zeile kaeme sonst auch der Haushaltskanal in Frage.
+      -- Der Filter steht in der Abfrage und damit vor Push UND Kanaelen.
+      AND EXISTS (SELECT 1 FROM users recipient WHERE recipient.id = r.created_by AND ${activeAccountSql('recipient')})
     ORDER BY r.remind_at ASC
   `).all(remindAtCompareKey(nowIso));
 

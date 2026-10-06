@@ -1560,6 +1560,12 @@
   margin-top: 1px;
 }
 
+/* Ein ehemaliges Konto (#1381) tritt zurueck, bleibt aber lesbar: der Name in
+ * der Sekundaerfarbe, die Marke steht als Text in der Meta-Zeile. */
+.settings-member--former .settings-member__name {
+  color: var(--color-text-secondary);
+}
+
 /* Anlegen ist ein ruhiger Knopf unter der Liste, kein violetter Balken ueber
  * die volle Breite (R14, A7 P2-4); das Formular kommt als Blatt-Dialog. */
 .settings-add-btn {

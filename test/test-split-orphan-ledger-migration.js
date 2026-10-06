@@ -126,7 +126,11 @@ assert.notDeepEqual(await balances(), BALANCES, 'Fixture: die Ausgabe bewegt die
 // gestempelt. Dann das Konto der Autorin loeschen - die Kaskade nimmt die
 // Ausgabe, die Zeilen haengen am Bearbeiter und bleiben.
 db.prepare("UPDATE expense_ledger_entries SET created_by = ? WHERE source_type = 'expense' AND source_id = ?").run(ED.id, LOST);
-assert.equal((await adminCall('DELETE', `/auth/users/${AUT.id}`)).status, 200);
+// Direkt in der Datenbank, nicht ueber die Route: seit #1381 deaktiviert
+// `DELETE /auth/users/:id` ein Konto, das eine Ausgabe angelegt hat, statt es
+// zu loeschen - die Waise, die v227 entfernt, entsteht dort nicht mehr.
+// Bestandsdatenbanken tragen sie trotzdem, und die Kaskade ist unveraendert.
+assert.equal(db.prepare('DELETE FROM users WHERE id = ?').run(AUT.id).changes, 1);
 assert.equal(db.prepare('SELECT COUNT(*) AS n FROM expenses WHERE id = ?').get(LOST).n, 0, 'Fixture: Ausgabe ist weg');
 assert.equal(ledgerOf(LOST).length, 3, 'Fixture: Zahler + zwei Anteile sind geblieben');
 

@@ -17,7 +17,7 @@ function makeDb() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(`
-    CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
+    CREATE TABLE users (deactivated_at TEXT, id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
       role TEXT NOT NULL DEFAULT 'member', family_role TEXT, schedule_reminder_offset_minutes INTEGER,
       -- D6: der Subjekt-Name auf der geerbten Vorsorge-Erinnerung
       -- kommt aus users.display_name.
