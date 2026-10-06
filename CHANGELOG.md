@@ -56,6 +56,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Overlapping events in the day and week view are placed by person, not by start time**
+  (D#1605, #1633). Events at the same time used to be packed by the clock alone: whoever
+  started first stood on the left, so the same person could be left at nine and right at
+  eleven, and two events with the same start and end could swap places from one load to the
+  next. Now every person in a group of overlapping events gets a column of their own, in the
+  order in which the household's members are listed - the order of the people filter. An event with several people stands where the first of them in
+  that order stands; events of people who are not household members follow after the members,
+  and an event with nobody assigned comes last. Two events of the same person at the same
+  time stand next to each other. Nothing is reserved: an event that overlaps nothing keeps
+  the full width, and a person who is not part of a group takes no room in it. The price is
+  width in a chain: with 9:00-10:00, 9:30-11:00 and 10:30-12:00 for three people, the third
+  used to take the place the first had left and the group was two columns wide; now it is
+  three, because the third may not stand in the first one's column, and a longer chain of
+  different people grows by a column per person. Schedule blocks, the all-day row, the month
+  and the agenda are unchanged.
+
 - **Two people with the same initials no longer look the same** (#1464). Linda Johnson and Leo
   Johnson both showed "LJ" on their avatars, in the people picker, in avatar stacks and on the
   overview, and colour was the only difference. Whoever shares their initials with somebody
