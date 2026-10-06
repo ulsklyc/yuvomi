@@ -16,7 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dialog uses, limited to one person; the cook's avatar then stands on the meal in the week plan
   and on today's meal on the overview. A meal without a cook looks as it did. A repeating meal
   keeps its cook: every meal the series creates starts with it, changing the cook of one meal
-  leaves the series alone, and changing it for the whole series reaches all its meals. The cook
+  leaves the series alone, and changing it for the whole series reaches all its meals - also
+  when the meal you save from already carries that cook on its own and only the series does not.
+  A series whose cook is no longer a household member keeps running; its new meals start
+  without a cook, and the meals that already exist keep the name. The cook
   is a responsibility, not ownership - the plan stays the household's, and who sees or edits a
   meal still depends on the meal plan right alone; with read access the cook is shown and cannot
   be chosen. Only household members can be picked, so housekeeping staff, guests of shared
@@ -27,7 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cook_user_id` on `POST /api/v1/meals`, `PUT /api/v1/meals/{id}` (with `?scope=series` for the
   series) and on each assignment of `POST /api/v1/meals/apply-plan`; meals come back with
   `cook_user_id`, `cook_name`, `cook_color` and `cook_avatar`, also in `todayMeals` of the
-  overview (migration 235).
+  overview (migration 235). The id is a positive integer or `null`; an empty string or any other
+  form is refused with 400. A meal of a series also returns `recurrence_cook_user_id`, the cook
+  stored on the series.
 
 - **A household can put its members in an order of its own, and every list of people follows it**
   (#1644, from D#1605, asked by @ChaCha500). Until now members were listed alphabetically
@@ -346,6 +351,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before this change keep their balances; only their trace is missing. (#1382)
 
 ### Fixed
+
+- **The API description of `PUT /api/v1/meals/{id}` names the two fields a series edit reads**
+  (follow-up to #1679). With `?scope=series` the route has long taken `repeat_until` (the end of
+  the series; an empty string removes it) and `ingredients` (replacing those of the series and of
+  all its meals), but the OpenAPI document listed them for creating a meal only. Both are now
+  described for the update as well, with the note that they are read in a series edit alone.
 
 - **Holiday countries and regions are named in your language, and the delete button of the task
   selection is no longer announced as a question** (#1723). Under Settings, Calendar, the list of

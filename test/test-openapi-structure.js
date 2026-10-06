@@ -64,6 +64,25 @@ test('meals apply-plan describes what the route does: additive without replace_e
   assert.ok(!post.responses[200]);
   assert.ok(post.responses[400]);
 });
+test('meals PUT documents the series fields the route reads: repeat_until and ingredients, never repeat_weekly', () => {
+  // PUT /:id?scope=series (server/routes/meals.js) liest `repeat_until` und
+  // `ingredients`; der Body nannte beide nur fuer POST. `repeat_weekly` liest
+  // PUT nie - eine Mahlzeit wird nicht nachtraeglich zur Serie.
+  const spec = buildOpenApiSpec({});
+  const props = (op) => op.requestBody.content['application/json'].schema.properties;
+  const put = props(spec.paths['/api/v1/meals/{id}'].put);
+  const post = props(spec.paths['/api/v1/meals'].post);
+  for (const field of ['repeat_until', 'ingredients']) {
+    assert.ok(put[field], `PUT nennt ${field}`);
+    assert.match(put[field].description, /scope=series/, `PUT: ${field} gilt nur im Serien-Umfang`);
+    assert.ok(post[field], `POST nennt ${field}`);
+  }
+  assert.equal(put.ingredients.type, 'array');
+  assert.ok(post.repeat_weekly, 'POST legt die Serie an');
+  assert.equal(put.repeat_weekly, undefined, 'PUT nicht');
+  assert.ok(put.cook_user_id && post.cook_user_id);
+});
+
 test('meals apply-plan documents skip_occupied and the skipped answer (Discussion #1380)', () => {
   // Die Route legt mit skip_occupied nur in vorher leere Slots an und nennt
   // die uebrigen in `skipped`; das Verhalten halten die Tests in test:meals-routes.

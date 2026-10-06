@@ -269,6 +269,47 @@ test('Leseansicht bei `read`: der Koch steht als Wert da - mit Avatar und Namen,
   assert.match(editor.content, /class="user-ms" data-ms-name="meal_cook"/);
 });
 
+// Die Wochenkarte und die Uebersicht messen `esc()` am Namen je selbst; die
+// Leseansicht schreibt ihn an einer DRITTEN Stelle aus, und zwar als sichtbaren
+// Text. Ohne `esc()` dort blieb jeder der beiden anderen Tests gruen.
+test('Leseansicht bei `read`: der Name des Kochs laeuft durch esc()', async () => {
+  const meal = mitBen({ cook_name: 'Ben"><img src=x onerror=alert(1)>&<b>' });
+  const [lesend] = await withAccess(LESEN, () => mitPlan({ meals: [meal] }, () => modalMitschnitt(
+    () => meals.openMealModal({ mode: 'edit', meal, date: meal.date, mealType: meal.meal_type }),
+  )));
+  assert.match(lesend.content, /data-view="read"/, 'Vorbedingung: es ist die Leseansicht');
+  const zeile = abschnitt(lesend.content, 'class="meal-read__cook"', 'data-lucide="list"');
+  assert.ok(zeile, 'Vorbedingung: die Koch-Zeile ist da');
+  assert.ok(zeile.includes('<span>Ben&quot;&gt;&lt;img src=x onerror=alert(1)&gt;&amp;&lt;b&gt;</span>'),
+    'der ausgeschriebene Name steht escaped da');
+  assert.doesNotMatch(lesend.content, /<img src=x|<b>/, 'und nirgends im Dialog roh');
+});
+
+// Ein Abruf, der scheitert, ist kein Haushalt ohne Mitglieder. Der leere
+// Fallback behauptete genau das - der Dialog bot nur noch "Niemand" an, und
+// nichts sagte, warum.
+test('loadMembers: ein gescheiterter Abruf wird gemeldet und loescht die geladene Liste nicht', async () => {
+  const gemeldet = [];
+  const zuvorError = console.error;
+  const zuvorStub = globalThis.__apiStub;
+  console.error = (...args) => { gemeldet.push(args); };
+  const fehler = Object.assign(new Error('Netz weg'), { status: 503 });
+  globalThis.__apiStub = { get: async () => { throw fehler; } };
+  let members;
+  try {
+    members = await withAccess(SCHREIBEN, () => mitPlan({ members: MITGLIEDER }, async () => {
+      await meals.loadMembers();
+      return meals.state.members;
+    }));
+  } finally {
+    console.error = zuvorError;
+    globalThis.__apiStub = zuvorStub;
+  }
+  assert.equal(gemeldet.length, 1, 'der Fehler wird nicht still geschluckt');
+  assert.ok(gemeldet[0].includes(fehler), 'gemeldet wird der Fehler selbst');
+  assert.deepEqual(members, MITGLIEDER, 'die schon geladene Liste bleibt - kein "es gibt keine Mitglieder"');
+});
+
 test('bei `read` wird die Mitgliederliste gar nicht erst geladen; mit Schreibrecht kommt sie aus /family/members', async () => {
   const laden = (modules) => withAccess(modules, () => mitPlan({ members: [{ id: 99 }] }, async () => {
     const liste = await aufrufe(() => meals.loadMembers(), { 'GET /family/members': { data: MITGLIEDER } });
@@ -490,7 +531,8 @@ test('Speichern: nur diese Mahlzeit - der Koch geht immer mit, auch als null', a
 });
 
 test('Speichern mit Serien-Umfang: der Koch geht nur mit, wenn er im Dialog geaendert wurde', async () => {
-  const meal = mitBen({ recurrence_template_id: 4, ingredients: [] });
+  // Die Serie hat denselben Koch wie diese Mahlzeit: der Normalfall.
+  const meal = mitBen({ recurrence_template_id: 4, recurrence_cook_user_id: 2, ingredients: [] });
 
   const [unveraendert] = await speichern({ modal: { mode: 'edit', meal }, form: formular({ koch: 2, scope: 'series', titel: 'Neuer Titel' }) });
   assert.equal(`${unveraendert.method} ${unveraendert.path}`, 'PUT /meals/11?scope=series');
@@ -509,6 +551,60 @@ test('Speichern mit Serien-Umfang: der Koch geht nur mit, wenn er im Dialog geae
   const ohne = mahlzeit({ recurrence_template_id: 4, ingredients: [] });
   const [still] = await speichern({ modal: { mode: 'edit', meal: ohne }, form: formular({ scope: 'series' }) });
   assert.ok(!('cook_user_id' in still.body));
+});
+
+// Der Dialog zeigt den Koch DIESER Mahlzeit, "ganze Serie" speichert aber die
+// Vorlage. Verglichen wurde nur mit der Mahlzeit: Vorlage Anna, diese Mahlzeit
+// einzeln Ben, mit Ben fuer die ganze Serie gespeichert - das galt als
+// "unveraendert", und die Vorlage blieb still auf Anna (Review zu #1737).
+test('Speichern mit Serien-Umfang: weicht die Mahlzeit von der Serie ab, bekommt die Serie den gewaehlten Koch', async () => {
+  const serienBody = async (meal, form, members) => {
+    const liste = await withAccess(SCHREIBEN, () => mitPlan({ meals: [meal], ...(members ? { members } : {}) }, () => {
+      meals.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [] });
+      return aufrufe(async () => {
+        meals.state.modal = { mode: 'edit', meal };
+        await meals.saveModal(form);
+      });
+    }));
+    const [put, ...mehr] = liste.filter((a) => a.method !== 'GET');
+    assert.ok(put && !mehr.length, 'genau ein Schreibaufruf');
+    assert.equal(`${put.method} ${put.path}`, 'PUT /meals/11?scope=series');
+    return put.body;
+  };
+
+  // Vorlage Anna (1), diese Mahlzeit Ben (2), gespeichert wird Ben.
+  const abweichend = mitBen({ recurrence_template_id: 4, recurrence_cook_user_id: 1, ingredients: [] });
+  const mitBenGespeichert = await serienBody(abweichend, formular({ koch: 2, scope: 'series' }));
+  assert.ok('cook_user_id' in mitBenGespeichert, 'der Koch geht mit, obwohl er an der Mahlzeit schon steht');
+  assert.equal(mitBenGespeichert.cook_user_id, 2, 'die Serie bekommt Ben');
+
+  // Die Serie hat KEINEN Koch, diese Mahlzeit einzeln Ben.
+  const serieOhne = mitBen({ recurrence_template_id: 4, recurrence_cook_user_id: null, ingredients: [] });
+  assert.equal((await serienBody(serieOhne, formular({ koch: 2, scope: 'series' }))).cook_user_id, 2);
+
+  // Umgekehrt: die Serie hat Anna, diese Mahlzeit einzeln niemanden, gespeichert wird "Niemand".
+  const einzelnOhne = mahlzeit({ recurrence_template_id: 4, recurrence_cook_user_id: 1, ingredients: [] });
+  const geleert = await serienBody(einzelnOhne, formular({ scope: 'series' }));
+  assert.ok('cook_user_id' in geleert, '"Niemand" fuer die ganze Serie ist eine Angabe');
+  assert.equal(geleert.cook_user_id, null);
+
+  // Zurueck auf den Koch der Serie gewaehlt: gegen die MAHLZEIT geaendert, also geht es mit -
+  // der Vergleich allein mit der Vorlage liesse diese Mahlzeit still auf Ben.
+  assert.equal((await serienBody(abweichend, formular({ koch: 1, scope: 'series' }))).cook_user_id, 1);
+
+  // Ausnahme: der unveraendert gezeigte Koch ist kein Mitglied (mehr) und steht
+  // nur als gespeicherter Stand dieser Mahlzeit in der Auswahl. Fuer die Serie
+  // waere er eine neue Wahl, die der Server ablehnt - eine Titelaenderung an
+  // der Serie darf nicht an einem Koch scheitern, den niemand angefasst hat.
+  const ehemalig = mahlzeit({ recurrence_template_id: 4, recurrence_cook_user_id: 1, cook_user_id: 7, cook_name: 'Ehemalig', ingredients: [] });
+  const titel = await serienBody(ehemalig, formular({ koch: 7, scope: 'series', titel: 'Neuer Titel' }));
+  assert.equal(titel.title, 'Neuer Titel');
+  assert.ok(!('cook_user_id' in titel), 'ein Nicht-Mitglied wird nicht unangefasst zum Koch der Serie');
+
+  // Und "nur diese Mahlzeit" bleibt, wie es war: der Koch geht immer mit.
+  const [einzeln] = await speichern({ modal: { mode: 'edit', meal: abweichend }, form: formular({ koch: 2 }) });
+  assert.equal(einzeln.path, '/meals/11');
+  assert.equal(einzeln.body.cook_user_id, 2);
 });
 
 // -------------------------------------------------------------------------

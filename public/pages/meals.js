@@ -526,8 +526,13 @@ async function loadMembers() {
   try {
     const res = await api.get('/family/members');
     state.members = Array.isArray(res.data) ? res.data : [];
-  } catch {
-    state.members = [];
+  } catch (err) {
+    // NICHT AUF `[]` ZURUECKFALLEN: eine leere Liste behauptet "es gibt keine
+    // Mitglieder", und der Dialog boete dann nur noch "Niemand" an, ohne dass
+    // irgendwo stuende, warum. Der Fehler geht in die Konsole wie der von
+    // loadWeek(), und eine schon geladene Liste bleibt stehen - Mitglieder
+    // aendern sich seltener, als ein Abruf scheitert.
+    console.error('[Meals] loadMembers Fehler:', err);
   }
 }
 
@@ -2241,6 +2246,37 @@ function selectedCookId(overlay) {
   return getSelectedUserIds(overlay, COOK_INPUT)[0] ?? null;
 }
 
+/**
+ * Geht der im Dialog gewaehlte Koch beim Speichern der GANZEN SERIE mit (#1679)?
+ *
+ * Der Server schreibt einen mitgeschickten Koch auf die Vorlage und auf JEDE
+ * Mahlzeit der Serie; ein fehlendes Feld laesst alle, wie sie sind. Der Dialog
+ * zeigt den Koch DIESER Mahlzeit, gespeichert wird aber die Serie - also
+ * zaehlen zwei gespeicherte Staende, nicht einer:
+ *
+ *   - gegen die MAHLZEIT geaendert: der Nutzer hat gewaehlt, das geht immer mit;
+ *   - gegen die VORLAGE verschieden (`recurrence_cook_user_id`): die Serie hat
+ *     den gezeigten Koch nicht. Vorlage Anna, diese Mahlzeit einzeln Ben, "ganze
+ *     Serie" mit Ben gespeichert - der Vergleich allein mit der Mahlzeit hielt
+ *     das fuer "unveraendert" und liess die Vorlage still auf Anna.
+ *
+ * Nur wenn die Wahl BEIDEN gleicht, bleibt das Feld weg: dann aendert eine
+ * Titelaenderung an der Serie keinen einzeln gesetzten Koch einer anderen Woche.
+ *
+ * EINE AUSNAHME beim zweiten Fall: ein unveraendert gezeigter Koch, der kein
+ * Mitglied (mehr) ist, steht nur noch als gespeicherter Stand DIESER Mahlzeit
+ * in der Auswahl. Fuer die Serie waere er eine neue Wahl, die der Server
+ * ablehnt - eine Titelaenderung an der Serie scheiterte dann an einem Koch,
+ * den niemand angefasst hat.
+ */
+function seriesCookChange(meal, chosen) {
+  const stored = meal.cook_user_id ?? null;
+  if (chosen !== stored) return true;
+  const ofSeries = meal.recurrence_cook_user_id ?? null;
+  if (chosen === ofSeries) return false;
+  return chosen === null || state.members.some((member) => member.id === chosen);
+}
+
 function buildModalContent({ mode, date, mealType, meal, fromSlot = false, recipeId = null }) {
   const isEdit   = mode === 'edit';
   const isRecurring = isEdit && meal.recurrence_template_id;
@@ -2490,14 +2526,10 @@ async function saveModal(overlay) {
       if (scope === 'series') {
         // Ganze Serie: Template + alle Instanzen inkl. Zutaten serverseitig aktualisieren.
         //
-        // DER KOCH GEHT NUR MIT, WENN ER IM DIALOG GEAENDERT WURDE (#1679). Der
-        // Server schreibt einen mitgeschickten Koch auf die Vorlage und auf
-        // JEDE Mahlzeit der Serie; ein fehlendes Feld laesst alle, wie sie
-        // sind. Der Dialog zeigt den Koch DIESER Mahlzeit - schickte er ihn
-        // immer mit, ueberschriebe eine Titelaenderung an der Serie still jede
-        // einzeln getroffene Wahl ("diese Woche kocht Ben") mit ihm.
+        // DER KOCH GEHT MIT, WENN DIE SERIE IHN NOCH NICHT HAT (#1679) - siehe
+        // seriesCookChange().
         const seriesBody = { meal_type, title, notes, recipe_url, recipe_id, ingredients, repeat_until };
-        if (cook_user_id !== (meal.cook_user_id ?? null)) seriesBody.cook_user_id = cook_user_id;
+        if (seriesCookChange(meal, cook_user_id)) seriesBody.cook_user_id = cook_user_id;
         await api.put(`/meals/${meal.id}?scope=series`, seriesBody);
       } else {
         // Nur diese Instanz
