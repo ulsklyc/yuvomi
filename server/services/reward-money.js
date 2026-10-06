@@ -360,11 +360,11 @@ function listFormerMoneyAccounts(d, reader) {
   const balance = ledgerBalanceSql('money', 'u.id');
   return d.prepare(`
     SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
-           NULL AS sort_order,
+           ${memberPositionSql('u')} AS sort_order,
            ${balance} AS balance_minor
     FROM users u
     WHERE NOT ${activeAccountSql('u')} AND ${balance} > 0
-    ORDER BY u.display_name COLLATE NOCASE ASC, u.id ASC
+    ORDER BY ${memberOrderSql('u')}
   `).all();
 }
 
