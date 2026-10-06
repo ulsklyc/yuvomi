@@ -24,6 +24,10 @@ import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { renderPageColumns } from '/utils/page-layout.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { isRedeemable, nextRewardGoal } from '/utils/reward-goal.js';
+import {
+  formatMoney, amountPlaceholder, amountExample, amountInputProblem, centsToAmountInput,
+  currencyFractionDigits, smallestUnitLabel, toDecimalString,
+} from '/utils/money.js';
 
 const TABS = ['overview', 'catalog', 'ledger'];
 
@@ -40,6 +44,8 @@ let state = {
   prevBalances: new Map(), // für Count-up: Salden vor dem letzten Neuladen
   /** Fuer wen dieses Wandtablett einloesen darf (#1209) - leer fuer jeden Menschen. */
   displayPeople: [],
+  /** Taschengeld (#1734): { currency, minor_unit, accounts, candidates }; null = unbekannt. */
+  money: null,
 };
 
 function prefersReducedMotion() {
@@ -205,6 +211,21 @@ async function loadOverview() {
   }
 }
 
+/* TASCHENGELD (#1734). Die Antwort ist schon gefiltert: ein Kind bekommt
+ * hoechstens sein eigenes Konto, Eltern alle, ein Wandtablett keins. Die Seite
+ * zeigt, was ankommt, und filtert nichts nach - was ein Geschwisterkind nicht
+ * sehen soll, geht gar nicht erst ueber die Leitung. Am Tablett wird nicht
+ * einmal gefragt. Scheitert die Abfrage, bleibt `null` und der Abschnitt
+ * entfaellt: eine leere Liste hiesse "es gibt kein Taschengeld". */
+async function loadMoney() {
+  if (actingAsDisplay()) { state.money = null; return; }
+  try {
+    state.money = (await api.get('/rewards/money')).data;
+  } catch {
+    state.money = null;
+  }
+}
+
 async function loadCatalog() {
   const res = await api.get(`/rewards/catalog${isAdmin() ? '?all=1' : ''}`);
   state.catalog = res.data || [];
@@ -342,7 +363,7 @@ async function renderCurrentTab(container, { direction = null } = {}) {
   }
   const tab = state.tab;
   try {
-    if (tab === 'overview') await Promise.all([loadOverview(), loadRecentLedger()]);
+    if (tab === 'overview') await Promise.all([loadOverview(), loadRecentLedger(), loadMoney()]);
     else if (tab === 'catalog') await Promise.all([loadCatalog(), loadOverview()]);
     else await Promise.all([loadLedger(), loadOverview()]);
     if (seq !== renderSeq) return;
@@ -508,13 +529,24 @@ function renderPendingPanel() {
       ? `<p class="rw-pending__meta">${esc(t('rewards.pendingBalanceBelowZero', { points: fmtPoints(bal) }))}</p>`
       : '';
   };
+  /* EINE GELD-ANFRAGE STEHT IN DERSELBEN LISTE (#1734): Abhebung oder
+   * Einzahlung, mit Betrag statt Punkten. Wer entscheidet, liest daneben das
+   * Guthaben - die Freigabe ist der Moment, in dem das Bargeld den Besitzer
+   * wechselt. */
+  const title = (r) => (isMoneyRequest(r)
+    ? esc(t(r.kind === 'deposit' ? 'rewards.money.ledgerDeposit' : 'rewards.money.ledgerWithdrawal'))
+    : `${esc(r.reward_icon ? `${r.reward_icon} ` : '')}${esc(r.reward_name)}`);
+  const amount = (r) => (isMoneyRequest(r) ? fmtMoney(r.cost) : pointsLabel(r.cost));
+  const moneyBalance = (r) => (isMoneyRequest(r) && isAdmin() && r.user_balance != null
+    ? `<p class="rw-pending__meta">${esc(t('rewards.money.title'))}: ${esc(fmtMoney(r.user_balance))}</p>`
+    : '');
   const rows = state.redemptions.map((r) => `
     <li class="rw-pending" data-redemption="${r.id}">
       ${avatar(r, 32)}
       <div class="rw-pending__text">
-        <p class="rw-pending__title">${esc(r.reward_icon ? `${r.reward_icon} ` : '')}${esc(r.reward_name)}</p>
-        <p class="rw-pending__meta">${esc(isAdmin() ? r.user_name : '')}${isAdmin() ? ' · ' : ''}${esc(pointsLabel(r.cost))}${r.note ? ` · „${esc(r.note)}“` : ''}</p>
-        ${belowZero(r)}
+        <p class="rw-pending__title">${title(r)}</p>
+        <p class="rw-pending__meta">${esc(isAdmin() ? r.user_name : '')}${isAdmin() ? ' · ' : ''}${esc(amount(r))}${r.note ? ` · „${esc(r.note)}“` : ''}</p>
+        ${isMoneyRequest(r) ? moneyBalance(r) : belowZero(r)}
       </div>
       ${/* DIE LISTE BLEIBT, DIE KNOEPFE GEHEN. Dass eine Anfrage offen ist, ist
             eine Auskunft und gehoert auch dem, der sie nicht entscheiden darf -
@@ -559,7 +591,7 @@ function renderOverview(el) {
      * selbst (Liste bleibt, Knoepfe gehen). */
     el.insertAdjacentHTML('beforeend',
       `<div class="rewards-content__inner">${renderPageColumns({
-        main: `${renderPendingPanel()}${emptyState('trophy', t('rewards.emptyOverviewTitle'), isAdmin() ? t('rewards.emptyOverviewAdmin') : t('rewards.emptyOverviewMember'), action)}`,
+        main: `${renderPendingPanel()}${renderMoneySection()}${emptyState('trophy', t('rewards.emptyOverviewTitle'), isAdmin() ? t('rewards.emptyOverviewAdmin') : t('rewards.emptyOverviewMember'), action)}`,
         rail: renderRecentLedger(),
       })}</div>`);
     wireOverview(el);
@@ -576,6 +608,7 @@ function renderOverview(el) {
         main: `
       ${renderSetupHints()}
       ${renderPendingPanel()}
+      ${renderMoneySection()}
       <section class="rw-section">
         <div class="rw-section__head">
           <h2 class="rw-section__title u-section-title">${esc(t('rewards.standings'))}</h2>
@@ -608,6 +641,7 @@ function wireOverview(el) {
   el.querySelectorAll('[data-setup]').forEach((btn) => {
     btn.addEventListener('click', () => handleSetupStep(btn.dataset.setup));
   });
+  wireMoney(el);
 }
 
 function handleSetupStep(action) {
@@ -952,7 +986,16 @@ async function openRedeemModal(memberId, presetItemId = null) {
 async function decideRedemption(id, action, btn) {
   if (readOnly()) return;
   const gefragt = action === 'reject' || action === 'cancel';
-  if (gefragt) {
+  // Eine Geld-Anfrage hat nichts reserviert (#1734): der Satz "die Punkte
+  // werden zurueckgebucht" waere bei ihr falsch.
+  const geld = isMoneyRequest(state.redemptions.find((r) => r.id === id));
+  if (gefragt && geld) {
+    const ok = await confirmModal(
+      action === 'reject' ? t('rewards.money.confirmReject') : t('rewards.money.confirmCancel'),
+      { confirmLabel: action === 'reject' ? t('rewards.reject') : t('common.cancel') },
+    );
+    if (!ok) return;
+  } else if (gefragt) {
     // Kein `danger`: der Server bucht die reservierten Punkte per `reversal`
     // zurück (routes/rewards.js), es geht also kein Guthaben verloren. Die
     // Anfrage bleibt als entschieden stehen und lässt sich neu stellen, solange
@@ -989,8 +1032,12 @@ async function decideRedemption(id, action, btn) {
     // kennt. Die Liste muss danach neu geladen werden - sonst stuende die
     // Anfrage hier weiter als offen, obwohl sie es nicht mehr ist.
     const vergriffen = err?.data?.reason === 'out_of_stock';
-    await confirmModal(vergriffen ? t('rewards.outOfStock') : (err?.message || t('common.error')),
-      { confirmLabel: t('rewards.gotIt') });
+    // Reicht das Guthaben bei der Freigabe nicht mehr, bleibt die Anfrage
+    // offen (#1734) - gebucht ist nichts, neu zu laden gibt es nichts.
+    const ohneDeckung = err?.data?.reason === 'insufficient_funds';
+    await confirmModal(vergriffen ? t('rewards.outOfStock')
+      : ohneDeckung ? t('rewards.money.insufficientOnApprove') : (err?.message || t('common.error')),
+    { confirmLabel: t('rewards.gotIt') });
     if (vergriffen) {
       await refreshActiveTab();
       refocusAfterRender();
@@ -1245,6 +1292,464 @@ async function openMemberDetail(memberId) {
 }
 
 // --------------------------------------------------------
+// Taschengeld (#1734)
+// --------------------------------------------------------
+
+/*
+ * EIN GELD-SALDO JE KIND, GETRENNT VON DEN PUNKTEN. Es gibt keinen Umtausch,
+ * und der Abschnitt steht deshalb als eigener ueber den Punktestaenden: zwei
+ * Zahlen, die nichts miteinander zu tun haben, in zwei Listen.
+ *
+ * WER HIER WAS SIEHT, ENTSCHEIDET DER SERVER (`moneyVisibleSql()` in
+ * server/services/reward-money.js): das Kind sein Konto, Eltern alle. Diese
+ * Seite haelt nur die HANDLUNGEN zurueck - bei `rewards: read` bleibt der Stand
+ * stehen und die Knoepfe gehen, wie ueberall im Modul.
+ */
+
+function isMoneyRequest(row) {
+  return !!row && row.kind != null && row.kind !== 'reward';
+}
+
+function moneyCurrencyCode() {
+  return state.money?.currency || 'EUR';
+}
+
+/** Kleinste Einheiten als Betrag in der Haushaltswaehrung ("77,31 EUR"). */
+function fmtMoney(minor) {
+  const currency = moneyCurrencyCode();
+  const digits = Number.isInteger(state.money?.minor_unit) ? state.money.minor_unit : currencyFractionDigits(currency);
+  return formatMoney(Number(minor || 0) / 10 ** digits, currency);
+}
+
+function moneyAccounts() {
+  return state.money?.accounts || [];
+}
+
+function moneyAccount(userId) {
+  return moneyAccounts().find((a) => a.id === userId) || null;
+}
+
+/** Der Plan in einem Satz - oder dass es keinen gibt. */
+function moneyPlanLine(plan) {
+  if (!plan) return t('rewards.money.noPlan');
+  const amount = fmtMoney(plan.amount_minor);
+  const rhythm = t(plan.frequency === 'weekly' ? 'rewards.money.planWeekly' : 'rewards.money.planMonthly', { amount });
+  if (plan.paused) return `${rhythm} · ${t('rewards.money.planPaused')}`;
+  return `${rhythm} · ${t('rewards.money.nextCredit', { date: formatDate(plan.next_run_date) })}`;
+}
+
+function renderMoneyRow(account) {
+  const mine = account.id === state.overview?.me;
+  const manage = isAdmin() && !readOnly();
+  // Eltern buchen direkt und pflegen den Plan; das Kind stellt Anfragen. Wer
+  // beides waere (ein Elternteil mit eigenem Konto), bucht.
+  const actions = manage ? `
+        <div class="rw-standing__actions">
+          <button class="btn btn--secondary btn--sm" type="button" data-money-book="${account.id}">
+            <i data-lucide="banknote" aria-hidden="true"></i>${esc(t('rewards.money.book'))}
+          </button>
+          ${rowActionHtml({ icon: 'calendar-clock', label: `${t('rewards.money.planTitle')}: ${account.display_name}`, attrs: { 'data-money-plan': account.id } })}
+        </div>`
+    : (mine && !readOnly()) ? `
+        <div class="rw-standing__actions">
+          <button class="btn btn--secondary btn--sm" type="button" data-money-request="withdrawal" data-member="${account.id}"
+                  ${account.balance_minor > 0 ? '' : 'disabled'}>
+            <i data-lucide="arrow-up-from-line" aria-hidden="true"></i>${esc(t('rewards.money.withdraw'))}
+          </button>
+          <button class="btn btn--ghost btn--sm" type="button" data-money-request="deposit" data-member="${account.id}">
+            <i data-lucide="arrow-down-to-line" aria-hidden="true"></i>${esc(t('rewards.money.deposit'))}
+          </button>
+        </div>` : '';
+  return `
+    <li class="list-row rw-standing rw-money">
+      <button class="rw-standing__id" type="button" data-money-member="${account.id}"
+              aria-label="${esc(`${account.display_name}, ${fmtMoney(account.balance_minor)}. ${t('rewards.openDetails')}`)}">
+        ${avatar(account, 40)}
+        <span class="rw-standing__idtext">
+          <span class="rw-standing__name">${esc(account.display_name)}</span>
+          <span class="rw-standing__points"><strong>${esc(fmtMoney(account.balance_minor))}</strong></span>
+        </span>
+      </button>
+      <div class="rw-standing__progress">
+        <p class="rw-progress__label${account.plan && !account.plan.paused ? '' : ' rw-progress__label--muted'}">${esc(moneyPlanLine(account.plan))}</p>
+      </div>
+      ${actions}
+    </li>`;
+}
+
+function renderMoneySection() {
+  if (!state.money) return '';
+  const accounts = moneyAccounts();
+  const manage = isAdmin() && !readOnly();
+  const canOpen = manage && (state.money.candidates || []).length > 0;
+  // Ohne Konto und ohne die Moeglichkeit, eines zu eroeffnen, gibt es nichts
+  // zu zeigen - auch keine Ueberschrift ueber einer leeren Liste.
+  if (!accounts.length && !canOpen) return '';
+  const setUp = canOpen ? `
+          <button class="btn btn--ghost btn--sm rw-money-setup" type="button"><i data-lucide="piggy-bank" aria-hidden="true"></i>${esc(t('rewards.money.setUp'))}</button>` : '';
+  return `
+      <section class="rw-section rw-money-section">
+        <div class="rw-section__head">
+          <h2 class="rw-section__title u-section-title">${esc(t('rewards.money.title'))}</h2>
+          ${setUp}
+        </div>
+        ${accounts.length ? `<ul class="row-carrier rw-standings">${accounts.map(renderMoneyRow).join('')}</ul>` : ''}
+      </section>`;
+}
+
+function wireMoney(el) {
+  el.querySelector('.rw-money-setup')?.addEventListener('click', () => openMoneyPlanModal(null));
+  el.querySelectorAll('[data-money-member]').forEach((btn) => {
+    btn.addEventListener('click', () => openMoneyDetail(Number(btn.dataset.moneyMember)));
+  });
+  el.querySelectorAll('[data-money-request]').forEach((btn) => {
+    btn.addEventListener('click', () => openMoneyRequestModal(btn.dataset.moneyRequest, Number(btn.dataset.member)));
+  });
+  el.querySelectorAll('[data-money-book]').forEach((btn) => {
+    btn.addEventListener('click', () => openMoneyBookModal(Number(btn.dataset.moneyBook)));
+  });
+  el.querySelectorAll('[data-money-plan]').forEach((btn) => {
+    btn.addEventListener('click', () => openMoneyPlanModal(Number(btn.dataset.moneyPlan)));
+  });
+}
+
+/** Der Satz zu einem Grund aus amountInputProblem() - dieselben Texte wie in den geteilten Ausgaben. */
+function moneyAmountProblemText(problem, currency) {
+  if (problem === 'grouped') return t('common.amountGrouped', { example: amountExample(currency) });
+  if (problem === 'invalid') return t('common.amountInvalid', { example: amountExample(currency) });
+  if (problem === 'notPositive') return t('common.amountNotPositive');
+  return t('common.amountPrecisionRequired', { currency, step: smallestUnitLabel(currency) });
+}
+
+/**
+ * Liest das Betragsfeld. Gibt den Dezimaltext zurueck, den der Server
+ * erwartet ("12.50"), oder `null` - dann steht der Grund schon im Fehlerfeld.
+ */
+function readMoneyAmount(input, errEl) {
+  const currency = moneyCurrencyCode();
+  const problem = amountInputProblem(input.value, currency, { required: true });
+  if (problem) {
+    errEl.textContent = moneyAmountProblemText(problem, currency);
+    errEl.hidden = false;
+    input.setAttribute('aria-invalid', 'true');
+    return null;
+  }
+  input.removeAttribute('aria-invalid');
+  return toDecimalString(input.value);
+}
+
+function moneyAmountField(id, value = '') {
+  return `
+        <div class="form-group">
+          <label class="label" for="${id}">${esc(t('rewards.money.amount'))} (${esc(moneyCurrencyCode())})${REQUIRED_MARK}</label>
+          <input class="input" id="${id}" inputmode="decimal" autocomplete="off" required
+                 value="${esc(value)}" placeholder="${esc(amountPlaceholder(moneyCurrencyCode()))}">
+        </div>`;
+}
+
+/** Der Betrag eines Dezimaltexts in kleinsten Einheiten - nur fuer den Vergleich mit dem Guthaben. */
+function decimalToMinor(decimal) {
+  const digits = Number.isInteger(state.money?.minor_unit) ? state.money.minor_unit : currencyFractionDigits(moneyCurrencyCode());
+  return Math.round(Number(decimal) * 10 ** digits);
+}
+
+/* ABHEBEN ODER EINZAHLEN: EINE ANFRAGE, KEINE BUCHUNG. Sie geht ueber
+ * denselben Weg wie das Einloesen einer Praemie (`POST /rewards/redemptions`)
+ * und wartet immer auf die Eltern. Der Dialog sagt das, bevor das Kind tippt -
+ * sonst sieht ein unveraendertes Guthaben nach dem Absenden wie ein Fehler aus. */
+function openMoneyRequestModal(kind, memberId) {
+  if (readOnly()) return;
+  const account = moneyAccount(memberId);
+  if (!account) return;
+  const withdrawal = kind === 'withdrawal';
+  openModal({
+    title: t(withdrawal ? 'rewards.money.withdraw' : 'rewards.money.deposit'),
+    content: `
+      <form id="rw-money-request-form" novalidate>
+        <div class="rw-redeem-summary">
+          <div class="rw-redeem-summary__row"><span>${esc(t('rewards.money.title'))}</span><strong>${esc(fmtMoney(account.balance_minor))}</strong></div>
+        </div>
+        ${moneyAmountField('rw-money-amount')}
+        <div class="form-group">
+          <label class="label" for="rw-money-note">${esc(t('rewards.noteOptional'))}</label>
+          <input class="input" id="rw-money-note" maxlength="500">
+        </div>
+        <p class="rw-hint">${esc(t('rewards.money.requestHint'))}</p>
+        <div id="rw-money-error" class="form-error" role="alert" hidden></div>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="submit" class="btn btn--primary" id="rw-money-submit">${esc(t('rewards.requestAction'))}</button>
+        </div>
+      </form>`,
+    onSave: (panel) => {
+      const errEl = panel.querySelector('#rw-money-error');
+      const submit = panel.querySelector('#rw-money-submit');
+      const input = panel.querySelector('#rw-money-amount');
+      panel.querySelector('#rw-money-request-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errEl.hidden = true;
+        const amount = readMoneyAmount(input, errEl);
+        if (amount == null) return;
+        // Der Server prueft die Deckung (zweimal); hier steht nur der fruehe Satz.
+        if (withdrawal && decimalToMinor(amount) > account.balance_minor) {
+          errEl.textContent = t('rewards.money.insufficient'); errEl.hidden = false; return;
+        }
+        submit.disabled = true;
+        try {
+          await api.post('/rewards/redemptions', {
+            kind, amount, note: panel.querySelector('#rw-money-note').value.trim() || undefined,
+          });
+          await closeModal({ force: true });
+          toast(t('rewards.toastRequested'));
+          await refreshActiveTab();
+          refocusAfterRender();
+        } catch (err) {
+          errEl.textContent = err?.data?.reason === 'insufficient_funds'
+            ? t('rewards.money.insufficient') : (err?.message || t('common.error'));
+          errEl.hidden = false;
+          submit.disabled = false;
+        }
+      });
+    },
+  });
+}
+
+/* ELTERN BUCHEN DIREKT, in beide Richtungen - ohne Anfrage. */
+function openMoneyBookModal(memberId) {
+  if (readOnly() || !isAdmin()) return;
+  const account = moneyAccount(memberId);
+  if (!account) return;
+  openModal({
+    title: `${t('rewards.money.book')} · ${account.display_name}`,
+    content: `
+      <form id="rw-money-book-form" novalidate>
+        <div class="rw-redeem-summary">
+          <div class="rw-redeem-summary__row"><span>${esc(t('rewards.money.title'))}</span><strong>${esc(fmtMoney(account.balance_minor))}</strong></div>
+        </div>
+        <div class="form-group">
+          <label class="label" for="rw-money-direction">${esc(t('rewards.money.book'))}</label>
+          <select class="input" id="rw-money-direction">
+            <option value="credit">${esc(t('rewards.money.credit'))}</option>
+            <option value="debit">${esc(t('rewards.money.debit'))}</option>
+          </select>
+        </div>
+        ${moneyAmountField('rw-money-amount')}
+        <div class="form-group">
+          <label class="label" for="rw-money-reason">${esc(t('rewards.reasonOptional'))}</label>
+          <input class="input" id="rw-money-reason" maxlength="200">
+        </div>
+        <div id="rw-money-error" class="form-error" role="alert" hidden></div>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="submit" class="btn btn--primary" id="rw-money-submit">${esc(t('common.save'))}</button>
+        </div>
+      </form>`,
+    onSave: (panel) => {
+      const errEl = panel.querySelector('#rw-money-error');
+      const submit = panel.querySelector('#rw-money-submit');
+      const input = panel.querySelector('#rw-money-amount');
+      panel.querySelector('#rw-money-book-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errEl.hidden = true;
+        const amount = readMoneyAmount(input, errEl);
+        if (amount == null) return;
+        submit.disabled = true;
+        try {
+          await api.post('/rewards/money/entries', {
+            user_id: account.id, amount,
+            direction: panel.querySelector('#rw-money-direction').value,
+            reason: panel.querySelector('#rw-money-reason').value.trim() || undefined,
+          });
+          await closeModal({ force: true });
+          toast(t('rewards.toastSaved'));
+          await refreshActiveTab();
+          refocusAfterRender();
+        } catch (err) {
+          errEl.textContent = err?.data?.reason === 'insufficient_funds'
+            ? t('rewards.money.insufficient') : (err?.message || t('common.error'));
+          errEl.hidden = false;
+          submit.disabled = false;
+        }
+      });
+    },
+  });
+}
+
+/** Wochentagsnamen in der Sprache der Oberflaeche, 1 = Montag bis 7 = Sonntag. */
+function weekdayOptions(selected) {
+  const names = new Intl.DateTimeFormat(getLocale(), { weekday: 'long', timeZone: 'UTC' });
+  // Der 1. Januar 2024 war ein Montag.
+  return [1, 2, 3, 4, 5, 6, 7].map((day) => {
+    const label = names.format(new Date(Date.UTC(2024, 0, day)));
+    return `<option value="${day}" ${day === selected ? 'selected' : ''}>${esc(label)}</option>`;
+  }).join('');
+}
+
+/* DER PLAN: Betrag, Rhythmus und der Tag, den die Eltern waehlen. Ohne
+ * `memberId` eroeffnet der Dialog ein Konto - dann steht die Person zur Wahl,
+ * aus den Mitgliedern, die noch keins haben. */
+function openMoneyPlanModal(memberId) {
+  if (readOnly() || !isAdmin()) return;
+  const account = memberId != null ? moneyAccount(memberId) : null;
+  const candidates = state.money?.candidates || [];
+  if (!account && !candidates.length) return;
+  const plan = account?.plan || null;
+  const currency = moneyCurrencyCode();
+  const frequency = plan?.frequency || 'weekly';
+  const weekday = plan?.frequency === 'weekly' ? plan.anchor_day : 1;
+  const monthDay = plan?.frequency === 'monthly' ? plan.anchor_day : 1;
+  const memberField = account ? '' : `
+        <div class="form-group">
+          <label class="label" for="rw-plan-member">${esc(t('rewards.member'))}</label>
+          <select class="input" id="rw-plan-member">
+            ${candidates.map((m) => `<option value="${m.id}">${esc(m.display_name)}</option>`).join('')}
+          </select>
+        </div>`;
+  const days = Array.from({ length: 31 }, (_, i) => i + 1)
+    .map((day) => `<option value="${day}" ${day === monthDay ? 'selected' : ''}>${day}</option>`).join('');
+  openModal({
+    title: account ? `${t('rewards.money.planTitle')} · ${account.display_name}` : t('rewards.money.setUp'),
+    content: `
+      <form id="rw-plan-form" novalidate>
+        ${memberField}
+        ${moneyAmountField('rw-money-amount', plan ? centsToAmountInput(plan.amount_minor, currency) : '')}
+        <div class="form-group">
+          <label class="label" for="rw-plan-frequency">${esc(t('rewards.money.frequency'))}</label>
+          <select class="input" id="rw-plan-frequency">
+            <option value="weekly" ${frequency === 'weekly' ? 'selected' : ''}>${esc(t('rewards.money.weekly'))}</option>
+            <option value="monthly" ${frequency === 'monthly' ? 'selected' : ''}>${esc(t('rewards.money.monthly'))}</option>
+          </select>
+        </div>
+        <div class="form-group" id="rw-plan-weekday-group">
+          <label class="label" for="rw-plan-weekday">${esc(t('rewards.money.weekday'))}</label>
+          <select class="input" id="rw-plan-weekday">${weekdayOptions(weekday)}</select>
+        </div>
+        <div class="form-group" id="rw-plan-monthday-group">
+          <label class="label" for="rw-plan-monthday">${esc(t('rewards.money.dayOfMonth'))}</label>
+          <select class="input" id="rw-plan-monthday">${days}</select>
+          <p class="rw-hint">${esc(t('rewards.money.dayOfMonthHint'))}</p>
+        </div>
+        <label class="rw-switch">
+          <input type="checkbox" id="rw-plan-paused" ${plan?.paused ? 'checked' : ''}>
+          <span>${esc(t('rewards.money.pausePlan'))}</span>
+        </label>
+        <div id="rw-money-error" class="form-error" role="alert" hidden></div>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          ${plan ? `<button type="button" class="btn btn--ghost" id="rw-plan-remove">${esc(t('rewards.money.removePlan'))}</button>` : ''}
+          <button type="submit" class="btn btn--primary" id="rw-money-submit">${esc(t('common.save'))}</button>
+        </div>
+      </form>`,
+    onSave: (panel) => {
+      const errEl = panel.querySelector('#rw-money-error');
+      const submit = panel.querySelector('#rw-money-submit');
+      const freqEl = panel.querySelector('#rw-plan-frequency');
+      const syncAnchor = () => {
+        const weekly = freqEl.value === 'weekly';
+        panel.querySelector('#rw-plan-weekday-group').hidden = !weekly;
+        panel.querySelector('#rw-plan-monthday-group').hidden = weekly;
+      };
+      freqEl.addEventListener('change', syncAnchor);
+      syncAnchor();
+
+      // Kein `danger`: der Plan laesst sich neu anlegen, Guthaben und Verlauf
+      // bleiben. Rot behauptete eine Endgueltigkeit, die das Beenden nicht hat.
+      panel.querySelector('#rw-plan-remove')?.addEventListener('click', async () => {
+        const ok = await confirmOverModal(t('rewards.money.confirmRemovePlan', { name: account.display_name }),
+          { confirmLabel: t('rewards.money.removePlan'), detail: t('rewards.money.removePlanDetail') });
+        if (!ok) return;
+        await api.delete(`/rewards/money/plans/${account.id}`);
+        toast(t('rewards.toastSaved'), 'default');
+        await refreshActiveTab();
+        refocusAfterRender();
+      });
+
+      panel.querySelector('#rw-plan-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errEl.hidden = true;
+        const amount = readMoneyAmount(panel.querySelector('#rw-money-amount'), errEl);
+        if (amount == null) return;
+        const weekly = freqEl.value === 'weekly';
+        const target = account ? account.id : Number(panel.querySelector('#rw-plan-member').value);
+        submit.disabled = true;
+        try {
+          await api.put(`/rewards/money/plans/${target}`, {
+            amount,
+            frequency: freqEl.value,
+            anchor_day: Number(panel.querySelector(weekly ? '#rw-plan-weekday' : '#rw-plan-monthday').value),
+            paused: panel.querySelector('#rw-plan-paused').checked,
+          });
+          await closeModal({ force: true });
+          toast(t('rewards.toastSaved'));
+          await refreshActiveTab();
+          refocusAfterRender();
+        } catch (err) {
+          errEl.textContent = err?.message || t('common.error'); errEl.hidden = false; submit.disabled = false;
+        }
+      });
+    },
+  });
+}
+
+const MONEY_LEDGER_ICON = {
+  allowance: 'calendar-clock', deposit: 'arrow-down-to-line', withdrawal: 'arrow-up-from-line',
+  credit: 'banknote', debit: 'sliders-horizontal',
+};
+
+/** Was eine Geldbuchung war - aus ihren Feldern gelesen, nicht aus einem Freitext. */
+function moneyRowKind(row) {
+  if (row.allowance_date) return 'allowance';
+  if (row.request_kind === 'deposit') return 'deposit';
+  if (row.request_kind === 'withdrawal' || row.type === 'redeem') return 'withdrawal';
+  return row.delta >= 0 ? 'credit' : 'debit';
+}
+
+function moneyRowLabel(kind) {
+  if (kind === 'allowance') return t('rewards.money.title');
+  if (kind === 'deposit') return t('rewards.money.ledgerDeposit');
+  if (kind === 'withdrawal') return t('rewards.money.ledgerWithdrawal');
+  return t(kind === 'credit' ? 'rewards.money.ledgerCredit' : 'rewards.money.ledgerDebit');
+}
+
+function moneyLedgerRowHtml(row) {
+  const kind = moneyRowKind(row);
+  const positive = row.delta > 0;
+  // Eine Gutschrift nach Plan nennt den Termin, fuer den sie gilt - nachgebucht
+  // traegt sie sonst nur den Tag, an dem der Server wieder lief.
+  const when = formatDate(kind === 'allowance' ? row.allowance_date : row.created_at);
+  return `<li class="list-row rw-ledger-row rw-ledger-row--compact">
+      <span class="rw-ledger-row__icon rw-ledger-row__icon--${positive ? 'bonus' : 'redeem'}"><i data-lucide="${MONEY_LEDGER_ICON[kind]}" aria-hidden="true"></i></span>
+      <div class="list-row__main">
+        <p class="list-row__name rw-ledger-row__reason">${esc(moneyRowLabel(kind))}</p>
+        <p class="list-row__meta rw-ledger-row__meta">${esc(when)}${row.reason ? ` · ${esc(row.reason)}` : ''}</p>
+      </div>
+      <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${esc(fmtMoney(Math.abs(row.delta)))}</span>
+    </li>`;
+}
+
+async function openMoneyDetail(memberId) {
+  const account = moneyAccount(memberId);
+  if (!account) return;
+  let ledger = [];
+  try {
+    ledger = (await api.get(`/rewards/money/ledger?user_id=${memberId}&limit=20`)).data || [];
+  } catch { /* Historie optional */ }
+  const rows = ledger.length
+    ? ledger.map(moneyLedgerRowHtml).join('')
+    : `<li class="list-row rw-ledger-row rw-ledger-row--compact"><p class="list-row__meta rw-ledger-row__meta">${esc(t('rewards.emptyLedgerTitle'))}</p></li>`;
+  openModal({
+    title: `${t('rewards.money.title')} · ${account.display_name}`,
+    content: `
+      <div class="rw-detail-head">
+        ${avatar(account, 52)}
+        <div>
+          <p class="rw-detail-points"><strong>${esc(fmtMoney(account.balance_minor))}</strong></p>
+          <p class="rw-detail-hint">${esc(moneyPlanLine(account.plan))}</p>
+        </div>
+      </div>
+      <ul class="rw-ledger rw-ledger--compact row-divided">${rows}</ul>`,
+    onSave: (panel) => icons(panel),
+  });
+}
+
+// --------------------------------------------------------
 // Refresh + Entry
 // --------------------------------------------------------
 
@@ -1265,6 +1770,8 @@ export const __test = {
   renderCatalog, renderLedger, renderOverview, handleSetupStep,
   // #1607: der Verlaufssatz einer Gegenbuchung.
   ledgerReason,
+  // #1734: Taschengeld.
+  renderMoneySection, renderMoneyRow, moneyLedgerRowHtml, moneyRowKind, moneyPlanLine, fmtMoney,
 };
 
 export async function render(container, { user } = {}) {

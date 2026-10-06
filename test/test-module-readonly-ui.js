@@ -742,6 +742,114 @@ test('Ersteinrichtung mit `rewards: read`: keine Aufforderung, die ins 403 führ
   });
 });
 
+// Taschengeld (#1734): der Geld-Saldo ist ein Zustand, Abheben/Einzahlen/
+// Buchen/Plan sind Handlungen. WER ein Konto sieht, entscheidet der Server -
+// hier steht nur, was die Seite aus der Antwort macht.
+function mitTaschengeld(fn, { role = 'member', me = 3 } = {}) {
+  const vorher = { overview: rewards.state.overview, user: rewards.state.user, money: rewards.state.money, redemptions: rewards.state.redemptions };
+  rewards.state.user = { role };
+  rewards.state.overview = { me, balances: [] };
+  rewards.state.money = {
+    currency: 'EUR', minor_unit: 2,
+    accounts: [{ id: 3, display_name: 'Emma', balance_minor: 7731, plan: { amount_minor: 500, frequency: 'weekly', anchor_day: 5, next_run_date: '2026-10-09', paused: false } }],
+    candidates: role === 'admin' ? [{ id: 4, display_name: 'Leo' }] : [],
+  };
+  rewards.state.redemptions = [{ id: 31, user_id: 3, user_name: 'Emma', kind: 'withdrawal', reward_name: 'withdrawal', cost: 421, user_balance: 7731, status: 'pending' }];
+  try {
+    return fn();
+  } finally {
+    Object.assign(rewards.state, vorher);
+  }
+}
+
+test('Taschengeld mit `rewards: read`: der Stand bleibt, Abheben und Einzahlen verschwinden', () => {
+  mitTaschengeld(() => {
+    withAccess({ rewards: 'write' }, () => {
+      const html = rewards.renderMoneySection();
+      assert.match(html, /data-money-request="withdrawal"/);
+      assert.match(html, /data-money-request="deposit"/);
+      assert.doesNotMatch(html, /data-money-book|data-money-plan|rw-money-setup/, 'ein Kind bucht nicht und plant nicht');
+    });
+    withAccess({ rewards: 'read' }, () => {
+      const html = rewards.renderMoneySection();
+      assert.doesNotMatch(html, /data-money-request=/, 'der POST endete im 403 - wie beim Einloesen');
+      assert.doesNotMatch(html, /rw-standing__actions/, 'der leere Behaelter geht mit');
+      assert.match(html, /Emma/);
+      assert.match(html, /77[.,]31/, 'der Saldo bleibt lesbar');
+      assert.match(html, /rewards\.money\.planWeekly/, 'und der Plan auch');
+      assert.match(html, /data-money-member="3"/, 'der Weg in den Verlauf bleibt');
+    });
+  });
+});
+
+test('Taschengeld: das eigene Konto traegt die Anfrage-Knoepfe, ein fremdes nie', () => {
+  // Der Server schickt einem Kind kein fremdes Konto. Kaeme doch eines an,
+  // haengt an ihm trotzdem kein Knopf: die Anfrage gilt immer der eigenen Person.
+  mitTaschengeld(() => {
+    withAccess({ rewards: 'write' }, () => {
+      assert.doesNotMatch(rewards.renderMoneySection(), /data-money-request=|data-money-book=/);
+    });
+  }, { me: 9 });
+});
+
+test('Taschengeld fuer Eltern: buchen, planen, einrichten - und mit `rewards: read` nichts davon', () => {
+  mitTaschengeld(() => {
+    withAccess({ rewards: 'write' }, () => {
+      const html = rewards.renderMoneySection();
+      assert.match(html, /data-money-book="3"/);
+      assert.match(html, /data-money-plan="3"/);
+      assert.match(html, /rw-money-setup/, 'Leo hat noch kein Konto');
+      assert.doesNotMatch(html, /data-money-request=/, 'Eltern buchen direkt, sie stellen keine Anfrage');
+    });
+    withAccess({ rewards: 'read' }, () => {
+      const html = rewards.renderMoneySection();
+      assert.doesNotMatch(html, /data-money-book|data-money-plan|rw-money-setup/);
+      assert.match(html, /77[.,]31/);
+    });
+  }, { role: 'admin', me: 1 });
+});
+
+test('Taschengeld: ohne Antwort oder ohne Konto steht kein leerer Abschnitt da', () => {
+  mitTaschengeld(() => {
+    withAccess({ rewards: 'write' }, () => {
+      rewards.state.money = null;
+      assert.equal(rewards.renderMoneySection(), '', 'ohne Antwort: kein Abschnitt (auch am Wandtablett)');
+      rewards.state.money = { currency: 'EUR', minor_unit: 2, accounts: [], candidates: [] };
+      assert.equal(rewards.renderMoneySection(), '', 'ein Kind ohne Konto sieht keine Ueberschrift ueber nichts');
+    });
+  });
+});
+
+test('eine Geld-Anfrage in der Liste: Betrag in Geld, nicht in Punkten - und nur-lesen ohne Entscheidung', () => {
+  mitTaschengeld(() => {
+    withAccess({ rewards: 'write' }, () => {
+      const html = rewards.renderPendingPanel();
+      assert.match(html, /rewards\.money\.ledgerWithdrawal/, 'der Titel ist die Art der Anfrage, nicht der Marker aus der Datenbank');
+      assert.match(html, /4[.,]21/);
+      assert.doesNotMatch(html, /rewards\.pointsUnit/, '421 Cent sind keine 421 Punkte');
+      assert.match(html, /77[.,]31/, 'wer entscheidet, liest das Guthaben daneben');
+      assert.match(html, /data-decide="fulfill"/);
+    });
+    withAccess({ rewards: 'read' }, () => {
+      assert.doesNotMatch(rewards.renderPendingPanel(), /data-decide=/);
+    });
+  }, { role: 'admin', me: 1 });
+});
+
+test('Geldbuchungen im Verlauf: was sie waren, steht in ihren Feldern', () => {
+  mitTaschengeld(() => {
+    assert.equal(rewards.moneyRowKind({ delta: 500, type: 'bonus', allowance_date: '2026-10-09' }), 'allowance');
+    assert.equal(rewards.moneyRowKind({ delta: 2000, type: 'bonus', request_kind: 'deposit' }), 'deposit');
+    assert.equal(rewards.moneyRowKind({ delta: -1234, type: 'redeem', request_kind: 'withdrawal' }), 'withdrawal');
+    assert.equal(rewards.moneyRowKind({ delta: 300, type: 'bonus' }), 'credit');
+    assert.equal(rewards.moneyRowKind({ delta: -300, type: 'adjust' }), 'debit');
+    const html = rewards.moneyLedgerRowHtml({ delta: -1234, type: 'redeem', request_kind: 'withdrawal', reason: '<b>Kino</b>', created_at: '2026-10-06T10:00:00Z' });
+    assert.match(html, /12[.,]34/);
+    assert.match(html, /rw-delta--neg/);
+    assert.doesNotMatch(html, /<b>Kino<\/b>/, 'die Notiz des Kindes laeuft durch esc()');
+  });
+});
+
 // -------------------------------------------------------------------------
 // Kalender
 //
