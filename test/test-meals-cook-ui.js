@@ -234,8 +234,10 @@ test('Uebersicht: der Name des Kochs laeuft durch esc()', () => {
   const html = dashboard.renderTodayMeals([
     { meal_type: 'lunch', title: 'Suppe', cook_user_id: 2, cook_name: '"><script>x</script>', cook_color: '#34C759' },
   ], ['lunch']);
-  assert.doesNotMatch(html, /<script>/);
-  assert.match(html, /&lt;script&gt;/);
+  // Als Teilstring geprueft, nicht per Regex: gesucht ist genau die Zeichenfolge
+  // aus dem Namen oben, kein Filter fuer Markup.
+  assert.ok(!html.includes('<script'), 'kein rohes Markup aus dem Namen');
+  assert.ok(html.includes('&quot;&gt;&lt;script&gt;x&lt;/script&gt;'), 'der Name steht escaped da');
 });
 
 // -------------------------------------------------------------------------
