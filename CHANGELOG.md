@@ -324,12 +324,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that was skipped is not booked afterwards.** The evidence is the first expense the series
   booked: if it lies on the 29th, 30th or 31st and the next date sits on the 1st, 2nd or 3rd
   where the overflow left it, the next date moves to that day (or the last day) of the same
-  month. A series that was really created on the 1st to 3rd stays there, and so does one whose
-  first expense has been deleted, because nothing shows where it started. If the series already
-  has an expense in that month, the date stays and the series returns with the following
-  booking. If a month is missing in your group, add that expense by hand. Shared expenses only:
-  subscriptions and tasks keep their own rules. For API clients: recurring expenses carry
-  `anchor_day` (migration 234).
+  month. If the skipped month is still ahead at the time of the update - the series booked on
+  31 October and waits for 1 December, and it is 10 November - the date moves into that month
+  instead (30 November), so it is not left empty; that is a date in the future, not a booking
+  made up afterwards. A series that was really created on the 1st to 3rd stays there. So does
+  one whose first expense has been deleted or was ever edited, because then nothing shows
+  reliably where the series started: an edit can have changed the date, and the app does not
+  record what an edit changed, so an edit of the title alone counts as well. Two more cases
+  keep the date where it is. If the series already has an expense in that month, the series
+  returns with the following booking. And no date is ever moved into the past, where the next
+  run would book it at once: a paused series whose date already lies behind returns when it is
+  resumed. A yearly series that stands on 1 March and cannot be moved back for one of these
+  reasons stays on 1 March. If a month is missing in your group, add that expense by hand.
+  Shared expenses only: subscriptions and tasks keep their own rules. For API clients:
+  recurring expenses carry `anchor_day` (migration 234).
 
 - **The PDFs in the demo data are real PDFs** (#1511). The demo documents carried a line of
   placeholder text under a `.pdf` name, so the built-in preview could not open them and

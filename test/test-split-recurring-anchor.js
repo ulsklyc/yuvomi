@@ -196,6 +196,23 @@ test('Lauf: ohne Anker klemmt der Schritt, ohne einen Monat auszulassen', async 
   assert.deepEqual(laufe(angelegt.id, 4, '2026-12-31'), ['2026-01-31', '2026-02-28', '2026-03-28', '2026-04-28']);
 });
 
+// Ein Termin in Datumsform, der kein Datum ist. Die Route laesst ihn nicht
+// herein, aber eine Zeile aus einem Import oder von Hand kann ihn tragen. Vor
+// #1721 las der Schritt ihn wie `new Date()` es tut (31.02. = 03.03.) und
+// rueckte weiter; ein Schritt, der daran wirft, liesse den Lauf an dieser Serie
+// stuendlich scheitern, ohne sie je zu pausieren.
+test('Lauf: ein Termin wie 2026-02-31 wird gebucht und rueckt weiter, statt stuendlich zu scheitern', async () => {
+  const gid = await gruppe('Lauf-kaputtes-Datum');
+  const angelegt = await serie(gid, { next_run_date: '2026-01-31' });
+  db.prepare("UPDATE recurring_expenses SET next_run_date = '2026-02-31' WHERE id = ?").run(angelegt.id);
+  assert.deepEqual(processDueRecurringExpenses('2026-03-05'), { generated: 1, paused: 0, failed: 0 });
+  assert.equal(stand(angelegt.id).next_run_date, '2026-04-30', 'vom 03.03. aus einen Monat weiter, auf den Anker gehoben');
+  assert.deepEqual(processDueRecurringExpenses('2026-03-05'), { generated: 0, paused: 0, failed: 0 });
+  // Dasselbe durch das Fortsetzen: gezaehlt, nicht stehen geblieben.
+  assert.deepEqual(nextRunNotBefore('2026-02-31', 'monthly', '2026-05-15', 31), { date: '2026-05-31', skipped: 2 });
+  assert.deepEqual(nextRunNotBefore('2026-02-31', 'weekly', '2026-03-05'), { date: '2026-03-10', skipped: 1 });
+});
+
 // --------------------------------------------------------------------------
 // nextRunNotBefore(): dieselbe Rechnung wie der Lauf. Ein Schritt ist "der
 // erste Termin, der nicht vor dem Tag nach dem Termin liegt".
@@ -272,11 +289,21 @@ function bestand(zone = 'Europe/Berlin') {
       VALUES (?, ?, 90000, 'EUR', ?, '{}', ?, ?, ?, ?)
     `).run(group, title, user, frequency, nextRunDate, pausedAt, user).lastInsertRowid;
     for (const eintrag of gebucht) {
-      const { date, deleted = false } = typeof eintrag === 'string' ? { date: eintrag } : eintrag;
-      old.prepare(`
-        INSERT INTO expenses (group_id, title, amount_minor, currency, converted_amount_minor, converted_currency, payer_id, expense_date, recurring_rule_id, status, deleted_at, created_by)
-        VALUES (?, ?, 90000, 'EUR', 90000, 'EUR', ?, ?, ?, ?, ?, ?)
-      `).run(group, title, user, date, id, deleted ? 'deleted' : 'active', deleted ? '2026-02-01T00:00:00Z' : null, user);
+      // `edited`: die Spur, die eine Bearbeitung hinterlaesst - 'activity' (der
+      // Verlaufseintrag, den PUT /expenses/:id schreibt), 'updated' (der
+      // updated_at-Trigger) oder 'both', wie die App es tut.
+      const { date, deleted = false, edited = null } = typeof eintrag === 'string' ? { date: eintrag } : eintrag;
+      const created = '2026-01-01T08:00:00Z';
+      const updated = edited === 'updated' || edited === 'both' ? '2026-01-05T09:00:00Z' : created;
+      const expenseId = old.prepare(`
+        INSERT INTO expenses (group_id, title, amount_minor, currency, converted_amount_minor, converted_currency, payer_id, expense_date, recurring_rule_id, status, deleted_at, created_by, created_at, updated_at)
+        VALUES (?, ?, 90000, 'EUR', 90000, 'EUR', ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(group, title, user, date, id, deleted ? 'deleted' : 'active', deleted ? '2026-02-01T00:00:00Z' : null, user, created, updated).lastInsertRowid;
+      // Jede Buchung traegt den Eintrag des Laufs; er ist KEINE Bearbeitung.
+      old.prepare("INSERT INTO expense_activity (group_id, actor_id, type, entity_type, entity_id, metadata) VALUES (?, ?, 'recurring_generated', 'expense', ?, '{}')").run(group, user, expenseId);
+      if (edited === 'activity' || edited === 'both') {
+        old.prepare("INSERT INTO expense_activity (group_id, actor_id, type, entity_type, entity_id, metadata) VALUES (?, ?, 'expense_edited', 'expense', ?, '{}')").run(group, user, expenseId);
+      }
     }
     return id;
   };
@@ -429,6 +456,125 @@ test('Migration 234 (d): gaebe das Zurueckstellen eine zweite Buchung im Monat, 
   } finally { old.close(); }
 });
 
+// Die Riegel von (d), jeder fuer sich. Ein Gegenstueck je Fall, das NUR im
+// genannten Merkmal abweicht und zurueckgestellt wird - sonst hielte der Fall
+// auch, wenn die Migration gar nichts taete.
+test('Migration 234 (d): auch eine geloeschte Buchung des Monats zaehlt - der Monat hatte seine Buchung', (t) => {
+  const { old, addSerie, lies } = bestand();
+  try {
+    const d31 = gedriftet('2026-01-31', '2026-10-06');
+    const geloescht = addSerie('Geloescht im November', 'monthly', d31.next, [...d31.gebucht, { date: '2026-11-01', deleted: true }]);
+    migriere(t, old, '2026-10-06T10:00:00Z');
+    assert.deepEqual(lies(geloescht), { next_run_date: '2026-11-03', anchor_day: 31 });
+  } finally { old.close(); }
+});
+
+test('Migration 234 (d): eine Buchung NACH dem neuen Termin, in einem anderen Monat, haelt ihn ebenfalls', (t) => {
+  const { old, addSerie, lies } = bestand();
+  try {
+    const d31 = gedriftet('2026-01-31', '2026-10-06');
+    // Von Hand in den Dezember datiert: der neue Termin (30.11.) laege VOR der
+    // letzten Buchung der Serie.
+    const spaeter = addSerie('Spaeter', 'monthly', d31.next, [...d31.gebucht.slice(0, -1), '2026-12-05']);
+    migriere(t, old, '2026-10-06T10:00:00Z');
+    assert.deepEqual(lies(spaeter), { next_run_date: '2026-11-03', anchor_day: 31 });
+  } finally { old.close(); }
+});
+
+// Die ERSTE Ausgabe ist die mit der kleinsten id - die, die der Lauf zuerst
+// geschrieben hat - nicht die mit dem aeltesten Datum. Hier ist die erste
+// Buchung weg, und eine spaetere wurde auf einen 31. zurueckdatiert: nach
+// Datum sortiert saehe das wie ein Beleg aus.
+test('Migration 234 (c): die erste Ausgabe ist die mit der kleinsten id, nicht die mit dem aeltesten Datum', (t) => {
+  const { old, addSerie, lies } = bestand();
+  try {
+    const d31 = gedriftet('2026-01-31', '2026-10-06');
+    const id = addSerie('Nach id', 'monthly', d31.next, [...d31.gebucht.slice(1), '2026-01-31']);
+    // Die Gegenrichtung: erste nach id am 31., eine spaetere traegt ein
+    // aelteres Datum am 3. - der Beleg gilt.
+    const beleg = addSerie('Beleg nach id', 'monthly', d31.next, [...d31.gebucht, '2025-12-03']);
+    migriere(t, old, '2026-10-06T10:00:00Z');
+    assert.deepEqual(lies(id), { next_run_date: '2026-11-03', anchor_day: 3 });
+    assert.deepEqual(lies(beleg), { next_run_date: '2026-11-30', anchor_day: 31 });
+  } finally { old.close(); }
+});
+
+// --------------------------------------------------------------------------
+// Der Beleg muss EINDEUTIG sein. PUT /expenses/:id kann das Datum einer
+// Serienbuchung aendern: eine Serie, die wirklich am 01.06. angelegt und deren
+// erste Ausgabe auf den 31.05. umdatiert wurde, sieht aus wie eine Drift. Eine
+// bearbeitete erste Ausgabe ist deshalb kein Beleg. Zwei Spuren, jede fuer
+// sich hinreichend: der Verlaufseintrag `expense_edited` und ein `updated_at`,
+// das nicht mehr `created_at` ist.
+// --------------------------------------------------------------------------
+test('Migration 234: eine bearbeitete erste Ausgabe ist kein Beleg - die Serie bleibt unangetastet', (t) => {
+  const { old, addSerie, lies } = bestand();
+  try {
+    const rest = ['2026-07-01', '2026-08-01', '2026-09-01', '2026-10-01'];
+    const faelle = Object.fromEntries(['both', 'activity', 'updated'].map((edited) => [
+      edited, addSerie(`Am 1. (${edited})`, 'monthly', '2026-11-01', [{ date: '2026-05-31', edited }, ...rest]),
+    ]));
+    // Derselbe Datensatz ohne Spur einer Bearbeitung: das IST die Drift und
+    // wird repariert. Und: eine bearbeitete SPAETERE Ausgabe nimmt der ersten
+    // nichts.
+    const unbearbeitet = addSerie('Drift', 'monthly', '2026-11-01', ['2026-05-31', ...rest]);
+    const spaetereBearbeitet = addSerie('Drift, spaeter bearbeitet', 'monthly', '2026-11-01', ['2026-05-31', { date: '2026-07-01', edited: 'both' }, ...rest.slice(1)]);
+    migriere(t, old, '2026-10-06T10:00:00Z');
+    for (const [edited, id] of Object.entries(faelle)) {
+      assert.deepEqual(lies(id), { next_run_date: '2026-11-01', anchor_day: 1 }, edited);
+    }
+    assert.deepEqual(lies(unbearbeitet), { next_run_date: '2026-11-30', anchor_day: 31 });
+    assert.deepEqual(lies(spaetereBearbeitet), { next_run_date: '2026-11-30', anchor_day: 31 });
+  } finally { old.close(); }
+});
+
+// --------------------------------------------------------------------------
+// Der ausgelassene Monat liegt noch VOR uns. Die Serie hat am 31.10. gebucht,
+// der Termin steht am 01.12., und die Migration laeuft am 10.11.: der November
+// ist noch zu haben. Dann geht der Termin in den Monat NACH der letzten
+// Buchung, nicht in den Monat des gedrifteten Termins - sonst bliebe der
+// November ohne Not leer. Kein Nachbuchen: der Termin liegt in der Zukunft.
+// --------------------------------------------------------------------------
+test('Migration 234: liegt der ausgelassene Monat noch vor uns, bekommt er seinen Termin', (t) => {
+  const { old, addSerie, lies } = bestand();
+  try {
+    const november = addSerie('Miete', 'monthly', '2026-12-01', ['2026-08-31', '2026-10-01', '2026-10-31']);
+    // Der Kandidat liegt am Tag der Migration selbst: heute ist nicht vergangen.
+    const heute = addSerie('Heute', 'monthly', '2026-12-02', ['2026-10-30']);
+    migriere(t, old, '2026-11-10T10:00:00Z');
+    assert.deepEqual(lies(november), { next_run_date: '2026-11-30', anchor_day: 31 });
+    assert.deepEqual(lies(heute), { next_run_date: '2026-11-30', anchor_day: 30 });
+    assert.equal(old.prepare('SELECT COUNT(*) AS n FROM expenses').get().n, 4, 'keine Ausgabe entsteht');
+  } finally { old.close(); }
+});
+
+test('Migration 234: der ausgelassene Februar liegt noch vor uns', (t) => {
+  const { old, addSerie, lies } = bestand();
+  try {
+    const id = addSerie('Miete', 'monthly', '2026-03-03', ['2026-01-31']);
+    migriere(t, old, '2026-02-10T10:00:00Z');
+    assert.deepEqual(lies(id), { next_run_date: '2026-02-28', anchor_day: 31 });
+  } finally { old.close(); }
+});
+
+test('Migration 234: ist der ausgelassene Monat schon vorbei, gilt der Monat des gedrifteten Termins', (t) => {
+  const { old, addSerie, lies } = bestand();
+  try {
+    // Am 30.11. gemessen ist der Kandidat (30.11.) heute und gilt noch ...
+    const amLetzten = addSerie('Am letzten Tag', 'monthly', '2026-12-01', ['2026-10-31']);
+    migriere(t, old, '2026-11-30T10:00:00Z');
+    assert.deepEqual(lies(amLetzten), { next_run_date: '2026-11-30', anchor_day: 31 });
+  } finally { old.close(); }
+  const zweite = bestand();
+  try {
+    // ... einen Tag spaeter ist er vergangen: der November bleibt leer, der
+    // Termin geht auf den 31.12. - nachgebucht wird nicht.
+    const vorbei = zweite.addSerie('Vorbei', 'monthly', '2026-12-01', ['2026-10-31'], { pausedAt: '2026-11-15T00:00:00Z' });
+    migriere(t, zweite.old, '2026-12-01T10:00:00Z');
+    assert.deepEqual(zweite.lies(vorbei), { next_run_date: '2026-12-31', anchor_day: 31 });
+  } finally { zweite.old.close(); }
+});
+
 test('Migration 234: eine Jahresserie vom 29.02. kehrt vom 01.03. zurueck', (t) => {
   const { old, addSerie, lies } = bestand();
   try {
@@ -442,6 +588,18 @@ test('Migration 234: eine Jahresserie vom 29.02. kehrt vom 01.03. zurueck', (t) 
     assert.deepEqual(lies(echtErster), { next_run_date: '2027-03-01', anchor_day: 1 });
     assert.deepEqual(lies(anderswo), { next_run_date: '2027-03-01', anchor_day: 1 });
     assert.equal(nextRunNotBefore('2027-02-28', 'yearly', '2027-03-01', 29).date, '2028-02-29');
+  } finally { old.close(); }
+});
+
+// Die Periode einer Jahresserie ist das JAHR: eine Buchung im Januar 2027
+// (von Hand datiert) heisst, 2027 hat seine Buchung - auch wenn sie in einem
+// anderen Monat liegt als der neue Termin.
+test('Migration 234: eine Jahresserie, die im Zieljahr schon gebucht hat, bleibt unberuehrt', (t) => {
+  const { old, addSerie, lies } = bestand();
+  try {
+    const id = addSerie('Versicherung', 'yearly', '2027-03-01', ['2024-02-29', '2025-03-01', '2027-01-15']);
+    migriere(t, old, '2026-10-06T10:00:00Z');
+    assert.deepEqual(lies(id), { next_run_date: '2027-03-01', anchor_day: 1 });
   } finally { old.close(); }
 });
 

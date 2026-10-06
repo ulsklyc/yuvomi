@@ -29,7 +29,7 @@ import { setRestoreRunning, activeWriters, restoreWaitTimeoutMs, waitUntilIdle }
 import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
 import { todayKey } from './utils/timezone.js';
-import { liftToAnchorDay } from './utils/interval-date.js';
+import { addMonthsClamped, liftToAnchorDay } from './utils/interval-date.js';
 
 const log = createLogger('DB');
 
@@ -10197,15 +10197,37 @@ const MIGRATIONS = [
     //     konnte (29 -> 1; 30 -> 1, 2; 31 -> 1, 2, 3);
     //   - jaehrlich: jene Ausgabe an einem 29.02. liegt und der Termin heute an
     //     einem 01.03.;
-    //   - und die Ausgabe vor dem Termin liegt und nicht geloescht ist.
+    //   - und die Ausgabe vor dem Termin liegt, nicht geloescht ist und NIE
+    //     BEARBEITET wurde.
     // Ist die erste Ausgabe geloescht (die App markiert sie nur) oder ganz weg
     // (dann ist die "erste" eine spaetere, schon gedriftete), gibt es keinen
     // Beleg und keine Reparatur. Woechentliche Serien driften nicht.
     //
-    // Dann: Anker = Tag jener Ausgabe, und der Termin geht im SELBEN Monat
-    // (jaehrlich: im Februar desselben Jahres) auf den Anker, geklemmt aufs
-    // Monatsende. Der ausgelassene Monat wird NICHT nachgebucht - die Migration
-    // schreibt keine Ausgabe.
+    // BEARBEITET: `PUT /expenses/:id` kann das Datum einer Serienbuchung
+    // aendern. Eine Serie, die wirklich am 01.06. angelegt und deren erste
+    // Ausgabe auf den 31.05. umdatiert wurde, saehe aus wie eine Drift. Zwei
+    // Spuren, jede fuer sich genug: der Verlaufseintrag `expense_edited`, den
+    // die Route seit dem ersten Tag der geteilten Ausgaben in derselben
+    // Transaktion schreibt (und den nichts loescht ausser der Gruppe selbst),
+    // und `updated_at <> created_at` - der Trigger bewegt es bei jedem UPDATE,
+    // sieht aber eine Bearbeitung in der Sekunde des Anlegens nicht. Beide,
+    // weil eine echte Drift, die stehen bleibt, der kleinere Schaden ist als
+    // eine echte Serie, die verstellt wird. WAS die Bearbeitung geaendert hat
+    // (nur den Titel?), steht nirgends: jede zaehlt.
+    //
+    // Dann: Anker = Tag jener Ausgabe, und der Termin geht auf den Anker,
+    // geklemmt aufs Monatsende - und zwar
+    //   - in den Monat NACH der letzten Buchung der Serie, wenn der Termin dort
+    //     nicht vergangen ist und vor dem gedrifteten liegt. Das ist der
+    //     ausgelassene Monat, solange er noch vor uns liegt (letzte Buchung
+    //     31.10., Termin 01.12., Migration am 10.11. -> 30.11.);
+    //   - sonst in den Monat des gedrifteten Termins (jaehrlich: in den Februar
+    //     desselben Jahres), mit den zwei Riegeln unten.
+    // Jaehrlich gibt es den ersten Weg nicht: der Ueberlauf vom 29.02. auf den
+    // 01.03. laesst kein Jahr aus, das Folgejahr der letzten Buchung IST das
+    // Jahr des gedrifteten Termins.
+    // Nachgebucht wird in keinem Fall - die Migration schreibt keine Ausgabe,
+    // und kein Termin, den sie setzt, liegt vor heute.
     //
     // ZWEI RIEGEL, an denen der Termin stehen bleibt:
     //   - die Serie hat in diesem Monat (jaehrlich: Jahr) schon gebucht, oder
@@ -10235,7 +10257,13 @@ const MIGRATIONS = [
 
       const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
       const today = todayKey(db);
-      const firstBooked = db.prepare('SELECT expense_date, status FROM expenses WHERE recurring_rule_id = ? ORDER BY id ASC LIMIT 1');
+      const firstBooked = db.prepare(`
+        SELECT e.expense_date, e.status,
+               (e.updated_at IS NOT e.created_at
+                OR EXISTS (SELECT 1 FROM expense_activity a
+                           WHERE a.type = 'expense_edited' AND a.entity_type = 'expense' AND a.entity_id = e.id)) AS edited
+        FROM expenses e WHERE e.recurring_rule_id = ? ORDER BY e.id ASC LIMIT 1
+      `);
       const lastBooked = db.prepare('SELECT MAX(expense_date) AS date FROM expenses WHERE recurring_rule_id = ?');
       const setAnchor = db.prepare('UPDATE recurring_expenses SET anchor_day = ? WHERE id = ?');
       const setBack = db.prepare('UPDATE recurring_expenses SET anchor_day = ?, next_run_date = ? WHERE id = ?');
@@ -10246,7 +10274,7 @@ const MIGRATIONS = [
       for (const row of series) {
         const next = DATE.exec(row.next_run_date);
         const first = firstBooked.get(row.id);
-        const booked = first && first.status !== 'deleted' ? DATE.exec(first.expense_date) : null;
+        const booked = first && first.status !== 'deleted' && !first.edited ? DATE.exec(first.expense_date) : null;
         if (!next || !booked || !(first.expense_date < row.next_run_date)) continue;
 
         const [, nextYear, nextMonth] = next;
@@ -10268,6 +10296,22 @@ const MIGRATIONS = [
         } catch { continue; }
         const period = yearly ? 4 : 7;
         const last = lastBooked.get(row.id).date;
+
+        // Der ausgelassene Monat liegt noch vor uns: der Monat NACH der
+        // letzten Buchung, sofern sein Termin nicht vergangen ist und vor dem
+        // gedrifteten liegt. `last` ist das spaeteste Datum der Serie, der
+        // Monat danach hat also keine Buchung von ihr.
+        if (!yearly) {
+          let ahead = null;
+          try {
+            ahead = liftToAnchorDay(addMonthsClamped(`${last.slice(0, 7)}-01`, 1), bookedDay);
+          } catch { /* letzte Buchung ohne lesbares Datum: weiter mit dem Monat des Termins */ }
+          if (ahead && ahead >= today && ahead < row.next_run_date) {
+            setBack.run(bookedDay, ahead, row.id);
+            continue;
+          }
+        }
+
         const alreadyBooked = last >= target || last.slice(0, period) === target.slice(0, period);
         if (alreadyBooked || target < today) {
           if (!yearly) setAnchor.run(bookedDay, row.id);

@@ -26,10 +26,18 @@ const log = createLogger('SplitExpenseScheduler');
 //
 // Ohne Anker (NULL) klemmt der Schritt nur. Woechentlich sind es sieben Tage,
 // der Anker spielt dort nicht mit.
+//
+// Ein Termin in Datumsform, der kein Datum ist ("2026-02-31"), wird gelesen wie
+// vor #1721: als der Tag, auf den `Date` ihn ueberlaufen laesst (03.03.). Die
+// Route laesst so etwas nicht herein, aber die geteilten Helfer werfen daran,
+// und ein Schritt, der wirft, liesse den Lauf an dieser Serie stuendlich
+// scheitern, ohne sie je zu pausieren. Was auch `Date` nicht liest
+// ("2026-13-01"), wirft hier wie zuvor.
 function addInterval(dateText, frequency, anchorDay = null) {
-  if (frequency === 'monthly') return liftToAnchorDay(addMonthsClamped(dateText, 1), anchorDay);
-  if (frequency === 'yearly') return liftToAnchorDay(addYearsClamped(dateText, 1), anchorDay);
-  const date = parseDateKey(dateText);
+  const from = dateKey(new Date(`${dateText}T00:00:00Z`));
+  if (frequency === 'monthly') return liftToAnchorDay(addMonthsClamped(from, 1), anchorDay);
+  if (frequency === 'yearly') return liftToAnchorDay(addYearsClamped(from, 1), anchorDay);
+  const date = parseDateKey(from);
   if (frequency === 'weekly') date.setUTCDate(date.getUTCDate() + 7);
   return dateKey(date);
 }
@@ -54,7 +62,7 @@ function nextRunNotBefore(dateText, frequency, today, anchorDay = null) {
   let skipped = 0;
   while (date < today) {
     let next;
-    // "2026-02-31" hat die Form eines Datums und ist keins.
+    // "2026-13-01" hat die Form eines Datums und ist keins.
     try { next = addInterval(date, frequency, anchorDay); } catch { break; }
     if (!(next > date)) break;
     date = next;
