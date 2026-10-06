@@ -1170,8 +1170,8 @@ insertExpenseComment.run(dinnerExpenseId, alexId,  L('Agreed. Next time we book 
 // Wiederkehrende geteilte Ausgabe: der Mietanteil läuft monatlich weiter.
 db.prepare(`
   INSERT INTO recurring_expenses (group_id, title, description, amount_minor, currency, payer_id, category,
-                                  split_method, split_snapshot, frequency, next_run_date, created_by)
-  VALUES (?, ?, ?, ?, 'EUR', ?, 'housing', 'equal', ?, 'monthly', ?, ?)
+                                  split_method, split_snapshot, frequency, next_run_date, anchor_day, created_by)
+  VALUES (?, ?, ?, ?, 'EUR', ?, 'housing', 'equal', ?, 'monthly', ?, 1, ?)
 `).run(
   houseGroup, L('Rent share', 'Mietanteil'), L('Split 50/50 each month', 'Jeden Monat hälftig geteilt'),
   145000, alexId,
