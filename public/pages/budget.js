@@ -2763,9 +2763,13 @@ function loanInterestMeta(it, loan) {
  * Darlehen einen Faelligkeitstag hat (der Server liefert `next_due_date`, schon
  * auf den letzten Tag kuerzerer Monate geklemmt), sonst wie bisher der Monat.
  * Ein getilgtes Darlehen hat keine naechste Rate.
+ *
+ * Der Faelligkeitstag entscheidet, nicht das Datum (#1741): ohne Tag nennt der
+ * Server fuer eine ueberfaellige Rate den Ersten ihres Monats. Das ist das
+ * Datum, auf das gebucht wird, keine Faelligkeit - die Karte bleibt beim Monat.
  */
 function loanNextDueLabel(loan) {
-  if (loan.next_due_date) return formatDate(loan.next_due_date);
+  if (loan.due_day != null && loan.next_due_date) return formatDate(loan.next_due_date);
   return loan.next_due_month ? formatMonthLabel(loan.next_due_month) : t('budget.loanPaidStatus');
 }
 
@@ -2774,9 +2778,12 @@ function loanNextDueLabel(loan) {
  *
  * Mit Faelligkeitstag der Tag IM MONAT, IN DEM DIE RATE FAELLIG IST - egal, ob
  * frueh oder spaet getippt wird: am 2. November fuer den 27. Oktober landet die
- * Buchung im Oktober. Ohne Faelligkeitstag bleibt es bei heute, und heute ist
- * der Tag des Haushalts (`todayKey()`), nicht der des Geraets. Der Server
- * rechnet das Datum, die Seite reicht es nur durch.
+ * Buchung im Oktober. Ohne Faelligkeitstag der Erste des Faelligkeitsmonats,
+ * wenn dieser schon vorbei ist (#1741: eine nachgetragene Rate von 2022 gehoert
+ * nicht in den Monat des Tippens); fuer die Rate des laufenden Monats liefert
+ * der Server kein Datum, und es bleibt bei heute - dem Tag des Haushalts
+ * (`todayKey()`), nicht dem des Geraets. Der Server rechnet das Datum, auch die
+ * Frage "ist der Monat vorbei", die Seite reicht es nur durch.
  *
  * @returns {string} YYYY-MM-DD
  */

@@ -10,6 +10,7 @@ import { str, num, date as validateDate, month as validateMonth, MAX_TITLE, MAX_
 import { normalizeObjectVisibility } from '../../services/budget-visibility.js';
 import { computeLoanSchedule, MAX_LOAN_MONTHS } from '../../services/loan-amortization.js';
 import { translate, resolveHouseholdLocale } from '../../utils/i18n.js';
+import { todayKey } from '../../utils/timezone.js';
 import {
   budgetFilter, mayEdit, getBudgetMode, loanSummaryRow, loadLoan, refreshLoanStatus, cents,
   budgetCurrency, toBudgetAmount, CURRENCY_RE, validateAccountRef, addMonths,
@@ -214,6 +215,7 @@ router.get('/loans', (req, res) => {
     // Sichtbarkeit (#476/#505): Loans folgen dem Modus, ohne Mein/Haushalt-Scope.
     const filter = budgetFilter(req, 'l', { scoped: false });
     const base = budgetCurrency();
+    const today = todayKey(db.get());
     const loans = db.get().prepare(`
       SELECT l.*, u.display_name AS creator_name
       FROM budget_loans l
@@ -222,7 +224,7 @@ router.get('/loans', (req, res) => {
       ORDER BY CASE l.status WHEN 'active' THEN 0 ELSE 1 END,
                l.start_month ASC,
                l.created_at DESC
-    `).all(...filter.params).map((loan) => loanSummaryRow(loan, base));
+    `).all(...filter.params).map((loan) => loanSummaryRow(loan, base, today));
     const active = loans.filter((loan) => loan.status === 'active');
     // Währung je Darlehen (#582): Die Summenkarte ist die einzige Stelle, die über
     // mehrere Darlehen hinweg addiert - sie muss deshalb in EINER Währung rechnen.

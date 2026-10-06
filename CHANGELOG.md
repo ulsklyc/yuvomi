@@ -120,8 +120,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   means 5. "Set as household default" now shows the result at once when a tile option changed
   what the overview asks for; until now the tile kept its old list until the next refresh.
 
-- **A loan can carry a due day, and "Mark paid" dates the installment on it** (#1631, D#1481, asked
-  by @iHatim1). A loan knew the month an installment is due but no day, so "Mark paid" dated the
+- **A loan can carry a due day, and "Mark paid" dates the installment on it** (#1631, #1741,
+  D#1481, asked by @iHatim1). A loan knew the month an installment is due but no day, so "Mark paid" dated the
   entry on the day you tapped it: with a debit on the 27th, marking it on the 25th put it two days
   early, and marking it on 2 November put October's installment into November's budget. The loan
   dialog now has an optional "Due day" field, 1 to 31. With it set, the installment is dated on that
@@ -129,13 +129,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its last day (the 31st becomes 30 April, or 28 or 29 February). The confirmation names the date
   that was used, because the entry is booked without a dialog, and the loan card shows the full
   date of the next installment instead of only the month. "Installments already paid" on a new
-  loan use the day as well. Nothing changes for a loan without a due day, and nothing that is
-  already booked is moved: setting or changing the day later leaves existing installments and
-  their budget entries where they are. Marking early books an entry dated a few days ahead; it
+  loan use the day as well. A loan without a due day keeps today's date for the installment of
+  the current month, and its card keeps naming the month. An installment whose month is already
+  over is dated on the 1st of that month instead of today (#1741, D#1021, reported by @mamo79):
+  catching up a loan that started in 2022 used to put every past installment, and its budget
+  entry, into the month you tapped in. The 1st is what "Installments already paid" already uses
+  for such a loan. Nothing that is already booked is moved: setting or changing the day later
+  leaves existing installments and their budget entries where they are. Marking early books an entry dated a few days ahead; it
   counts in that month's totals at once and in the account's current balance from its date on. For
   API clients: loans accept and return `due_day`, and return `next_due_date` next to
-  `next_due_month` (`null` without a due day). `POST /api/v1/budget/loans/{id}/payments` is
-  unchanged, `paid_date` stays required and is stored as sent.
+  `next_due_month`. Without a due day it is the 1st of `next_due_month` once that month lies
+  before the household's current month, and `null` otherwise.
+  `POST /api/v1/budget/loans/{id}/payments` is unchanged, `paid_date` stays required and is
+  stored as sent.
 
 ### Changed
 

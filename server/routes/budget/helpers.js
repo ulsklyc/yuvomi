@@ -718,6 +718,33 @@ export function dueDateInMonth(ym, dueDay) {
   return `${match[1]}-${match[2]}-${String(Math.min(dueDay, lastDay)).padStart(2, '0')}`;
 }
 
+/**
+ * Das Datum, das ein Darlehen fuer seine naechste Rate nennt (`next_due_date`).
+ *
+ * Mit Faelligkeitstag ist es dieser Tag im Faelligkeitsmonat (#1631) - keine
+ * Frage an die Uhr. Ohne Faelligkeitstag kennt das Darlehen nur den Monat, und
+ * dann entscheidet der Monat des Haushalts (#1741):
+ *   - liegt der Faelligkeitsmonat VOR dem laufenden, ist es dessen Erster. Wer
+ *     ein Darlehen von 2022 nachtraegt, bucht die Raten sonst alle in den Monat
+ *     des Tippens. Der Erste ist die Konvention, die "bereits gezahlte Raten"
+ *     (`seedPaidInstallments`) ohne Faelligkeitstag schon benutzen - eine
+ *     Buchungskonvention, keine Faelligkeit: die Karte nennt weiter den Monat.
+ *   - sonst (laufender oder kuenftiger Monat) null, und "Als bezahlt markieren"
+ *     bleibt bei heute.
+ *
+ * @param {string} ym       Faelligkeitsmonat "YYYY-MM"
+ * @param {unknown} dueDay  1 bis 31 oder kein Faelligkeitstag
+ * @param {string} today    Tagesschluessel des Haushalts (`todayKey(db)`), nie der UTC-Tag
+ * @returns {string|null}   "YYYY-MM-DD" oder null
+ */
+export function nextInstallmentDate(ym, dueDay, today) {
+  const onDueDay = dueDateInMonth(ym, dueDay);
+  if (onDueDay) return onDueDay;
+  if (dueDay != null) return null;
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(ym ?? ''))) return null;
+  return ym < String(today ?? '').slice(0, 7) ? `${ym}-01` : null;
+}
+
 export function cents(value) {
   return Math.round(Number(value || 0) * 100) / 100;
 }
@@ -782,7 +809,13 @@ export function bookingFor(direction) {
   return REPAYMENT_BOOKING[direction] || REPAYMENT_BOOKING.lent;
 }
 
-export function loanSummaryRow(loan, baseCurrency = budgetCurrency()) {
+/**
+ * @param {object} loan
+ * @param {string} [baseCurrency]
+ * @param {string} [today]  Tagesschluessel des Haushalts; die Liste reicht ihn
+ *                          einmal durch, statt ihn je Darlehen neu zu lesen.
+ */
+export function loanSummaryRow(loan, baseCurrency = budgetCurrency(), today = todayKey(db.get())) {
   const payments = db.get().prepare(`
     SELECT p.*, u.display_name AS creator_name,
            b.title AS entry_title,
@@ -849,10 +882,11 @@ export function loanSummaryRow(loan, baseCurrency = budgetCurrency()) {
     is_settled: settled,
     next_installment_number: !settled ? paidInstallments + 1 : null,
     next_due_month: nextDueMonth,
-    // Der Tag dazu (#1631), wenn das Darlehen einen nennt - sonst null, und
+    // Der Tag dazu (#1631), wenn das Darlehen einen nennt. Ohne Faelligkeitstag
+    // der Erste des Monats, sobald dieser vorbei ist (#1741), sonst null, und
     // "Als bezahlt markieren" bleibt bei heute. Die Oberflaeche reicht den Wert
-    // als paid_date durch, statt selbst zu klemmen.
-    next_due_date: nextDueMonth ? dueDateInMonth(nextDueMonth, loan.due_day) : null,
+    // als paid_date durch, statt selbst zu rechnen.
+    next_due_date: nextDueMonth ? nextInstallmentDate(nextDueMonth, loan.due_day, today) : null,
     interest,
     payments,
   };
