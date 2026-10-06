@@ -244,7 +244,12 @@ test('Autocomplete: das Namensfeld ist eine ARIA-1.2-Combobox', () => {
 test('Autocomplete: Rezepttreffer per Tastatur waehlen setzt Rezept, Zutaten und recipe_id', async () => {
   const restore = installDocument();
   const savedRecipes = meals.state.recipes;
+  const savedMembers = meals.state.members;
   meals.state.recipes = [PIZZA, PORRIDGE];
+  // Die Mitglieder sind geladen: mit leerer Liste holt der Dialog sie beim
+  // Oeffnen nach (#1679), und der Stub unten beantwortet JEDEN GET mit
+  // Titelvorschlaegen - die kaemen sonst als "Mitglieder" in die Koch-Auswahl.
+  meals.state.members = [{ id: 1, display_name: 'Anna', avatar_color: '#FF9500', avatar_data: null }];
   const zuvorModal = globalThis.__openModal;
   const zuvorApi = globalThis.__apiStub;
   let opened = null;
@@ -309,6 +314,7 @@ test('Autocomplete: Rezepttreffer per Tastatur waehlen setzt Rezept, Zutaten und
     globalThis.__openModal = zuvorModal;
     globalThis.__apiStub = zuvorApi;
     meals.state.recipes = savedRecipes;
+    meals.state.members = savedMembers;
     meals.state.modal = null;
     restore();
   }

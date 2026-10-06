@@ -11,7 +11,7 @@ import { str, oneOf, date, num, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT, D
 import { addDays, mealWeekday, datesForTemplateInRange } from '../services/meal-recurrence.js';
 import { todayKey } from '../utils/timezone.js';
 import { mayWriteModule } from '../permissions.js';
-import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL, cookField, cookRefusal } from '../services/meal-cook.js';
+import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL, cookField, cookForNewOccurrence, cookRefusal } from '../services/meal-cook.js';
 
 const log = createLogger('Meals');
 
@@ -69,7 +69,8 @@ function sanitizedIngredients(ingredients) {
 function loadMealWithIngredients(id) {
   const meal = db.get().prepare(`
     SELECT m.*, u.display_name AS creator_name, u.avatar_color AS creator_color,
-           mrt.end_date AS recurrence_end_date,${MEAL_COOK_COLUMNS_SQL}
+           mrt.end_date AS recurrence_end_date,
+           mrt.cook_user_id AS recurrence_cook_user_id,${MEAL_COOK_COLUMNS_SQL}
     FROM meals m
     LEFT JOIN users u ON u.id = m.created_by
     ${MEAL_COOK_JOIN_SQL}
@@ -178,15 +179,22 @@ function materializeRecurringMeals(from, to) {
     // Der Koch der Serie geht mit (#1679): die Vorlage traegt ihn, und jede
     // Mahlzeit, die aus ihr entsteht, beginnt mit ihm. Ohne die Spalte hier
     // stuende er nur an dem einen Termin, an dem die Serie angelegt wurde.
+    // NIE UNGEPRUEFT: was hier entsteht, ist eine NEUE Mahlzeit, und die
+    // bekommt keinen Koch, den POST und PUT heute ablehnten - ein inzwischen
+    // deaktiviertes Konto stuende sonst in jeder kuenftigen Woche neu im Plan.
+    // `cookForNewOccurrence()` fragt dasselbe Praedikat wie die Schreibrouten;
+    // die Vorlage selbst und die schon bestehenden Mahlzeiten bleiben unberuehrt.
     const insertMeal = db.get().prepare(`
       INSERT INTO meals (date, meal_type, title, notes, recipe_url, recipe_id, recurrence_template_id, cook_user_id, created_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const ingredientsByTemplate = new Map();
+    const cookByTemplate = new Map();
     for (const { template, date } of pending) {
       if (!ingredientsByTemplate.has(template.id)) {
         ingredientsByTemplate.set(template.id, templateIngredients.all(template.id));
+        cookByTemplate.set(template.id, cookForNewOccurrence(template.cook_user_id));
       }
       const result = insertMeal.run(
         date,
@@ -196,7 +204,7 @@ function materializeRecurringMeals(from, to) {
         template.recipe_url,
         template.recipe_id,
         template.id,
-        template.cook_user_id ?? null,
+        cookByTemplate.get(template.id),
         template.created_by
       );
       insertMealIngredients(result.lastInsertRowid, ingredientsByTemplate.get(template.id));
@@ -247,7 +255,7 @@ router.get('/suggestions', (req, res) => {
  * Response: { data: Meal[], weekStart: string, weekEnd: string }
  *
  * Meal: { id, date, meal_type, title, notes, created_by, cook_user_id, cook_name,
- *         cook_color, cook_avatar, ingredients: Ingredient[] }
+ *         cook_color, recurrence_cook_user_id, ingredients: Ingredient[] }
  * Ingredient: { id, meal_id, name, quantity, on_shopping_list }
  */
 router.get('/', (req, res) => {
@@ -264,9 +272,15 @@ router.get('/', (req, res) => {
     // recurrence_end_date kommt aus der Vorlage mit: die Oberfläche zeigt im
     // Bearbeiten-Dialog, bis wann die Serie läuft, und muss dafür nicht pro Karte
     // nachfragen. NULL heißt unbegrenzt.
+    // recurrence_cook_user_id ebenso (#1679): der Koch der SERIE neben dem
+    // dieser Mahlzeit. Der Dialog braucht beide, um beim Speichern der ganzen
+    // Serie zu wissen, ob die Serie den gezeigten Koch schon hat. NULL heisst
+    // "die Serie hat keinen Koch" oder "keine Serie" - `recurrence_template_id`
+    // sagt, welches von beiden.
     const meals = db.get().prepare(`
       SELECT m.*, u.display_name AS creator_name, u.avatar_color AS creator_color,
-             mrt.end_date AS recurrence_end_date,${MEAL_COOK_COLUMNS_SQL},
+             mrt.end_date AS recurrence_end_date,
+           mrt.cook_user_id AS recurrence_cook_user_id,${MEAL_COOK_COLUMNS_SQL},
              -- Hat das verknuepfte Rezept ein Bild (#1059)? Der Planer stellt
              -- damit den Platzhalter ODER das Vorschaubild, ohne je Karte
              -- nachzufragen - und ohne einen Request, der fuer ein bildloses
@@ -604,7 +618,9 @@ router.put('/:id', (req, res) => {
       // waere fuer die Vorlage und alle anderen Mahlzeiten eine NEUE Wahl - und
       // kaeme ueber die Vorlage in jede kuenftige Woche. Die Mahlzeit selbst
       // bleibt mit ihm speicherbar: ohne `scope`, und im Serien-Umfang, solange
-      // der Koch nicht mitgeschickt wird (der Dialog schickt ihn nur geaendert).
+      // der Koch nicht mitgeschickt wird (der Dialog schickt ihn zur Serie nur,
+      // wenn ihn jemand dort gewaehlt hat - public/pages/meals.js,
+      // `wireCookPicker()`).
       if (vCook.given) {
         const cookError = cookRefusal(vCook.value, [tpl.cook_user_id]);
         if (cookError) return res.status(400).json({ error: cookError, code: 400 });

@@ -16,8 +16,8 @@ import { newNonMembers, nonMemberMessage } from './household-members.js';
 
 /**
  * Der Koch einer Mahlzeit (#1679), wie ihn die Leseabfragen neben `created_by`
- * herausgeben: `cook_user_id` steht schon in `m.*`, dazu Name, Farbe und Bild
- * der Person. EIN Ausdruck fuer jede Abfrage, die Mahlzeiten liest - hier und
+ * herausgeben: `cook_user_id` steht schon in `m.*`, dazu Name und Farbe der
+ * Person. EIN Ausdruck fuer jede Abfrage, die Mahlzeiten liest - hier und
  * in der Uebersicht (server/routes/dashboard.js) -, mit dem Join daneben. Die
  * Mahlzeit steht in beiden Abfragen unter dem Alias `m`.
  *
@@ -26,9 +26,16 @@ import { newNonMembers, nonMemberMessage } from './household-members.js';
  * der inzwischen ehemalig ist, behaelt seinen Namen an der Mahlzeit, so wie der
  * Zustaendige einer Aufgabe; wer NEU waehlbar ist, entscheidet `cookRefusal()`.
  */
+/*
+ * DAS BILD GEHT NICHT MIT. `users.avatar_data` ist eine Data-URL bis in die
+ * Hunderte Kilobyte; an jeder Mahlzeit haengend kaeme dasselbe Bild in einem
+ * Wochenabruf so oft, wie die Person kocht - 21 Mahlzeiten, 21-mal. Name und
+ * Farbe reichen fuer die Initialen-Scheibe; das Bild holt die Oberflaeche
+ * einmal je Person aus der Mitgliederliste, die sie ohnehin laedt
+ * (`/family/members` im Planer, `users` in der Antwort von `/dashboard`).
+ */
 export const MEAL_COOK_COLUMNS_SQL = `
-           cook.display_name AS cook_name, cook.avatar_color AS cook_color,
-           cook.avatar_data AS cook_avatar`;
+           cook.display_name AS cook_name, cook.avatar_color AS cook_color`;
 export const MEAL_COOK_JOIN_SQL = 'LEFT JOIN users cook ON cook.id = m.cook_user_id';
 
 /**
@@ -36,18 +43,25 @@ export const MEAL_COOK_JOIN_SQL = 'LEFT JOIN users cook ON cook.id = m.cook_user
  *
  * DREI ZUSTAENDE, UND DER UNTERSCHIED TRAEGT: fehlt das Feld, ist der Koch
  * "nicht angefasst" (`given: false`) - ein Client, der nur das Datum schickt
- * (Verschieben per Ziehen), darf ihn nicht loeschen. `null` oder ein leerer
- * String heisst ausdruecklich "niemand". Alles andere muss eine positive ganze
- * Zahl sein; eine Liste ist es nie, eine Mahlzeit hat EINEN Koch.
+ * (Verschieben per Ziehen), darf ihn nicht loeschen. `null` heisst
+ * ausdruecklich "niemand". Alles andere muss eine positive ganze Zahl sein;
+ * eine Liste ist es nie, eine Mahlzeit hat EINEN Koch.
+ *
+ * STRENG AN DER FORM, NICHT AN `Number()`: `Number()` liest "", " " und `false`
+ * als 0, `true` als 1, "1e1" als 10 und "0x1" als 1 - ein Tippfehler oder ein
+ * leeres Formularfeld wuerde so zu einer id oder zu "niemand". Angenommen wird
+ * eine Zahl, die eine positive ganze Zahl IST, oder dieselbe als reine
+ * Ziffernfolge ohne Rand und ohne fuehrende Null ("12", wie ein Formular sie
+ * schickt). Der leere String ist kein "niemand": dafuer gibt es `null`.
  *
  * @returns {{ given: boolean, value: number|null, error: string|null }}
  */
 export function cookField(raw) {
   if (raw === undefined) return { given: false, value: null, error: null };
-  if (raw === null || raw === '') return { given: true, value: null, error: null };
+  if (raw === null) return { given: true, value: null, error: null };
   const id = typeof raw === 'number'
     ? raw
-    : (typeof raw === 'string' && /^[0-9]+$/.test(raw.trim()) ? Number(raw.trim()) : NaN);
+    : (typeof raw === 'string' && /^[1-9][0-9]*$/.test(raw) ? Number(raw) : NaN);
   if (!Number.isSafeInteger(id) || id <= 0) {
     return { given: true, value: null, error: 'Koch muss die ID eines Haushaltsmitglieds sein.' };
   }
@@ -82,4 +96,25 @@ export function cookRefusal(cookId, stored = [], { db: database } = {}) {
   if (!conn.prepare('SELECT 1 FROM users WHERE id = ?').get(cookId)) return nonMemberMessage([cookId]);
   const strangers = newNonMembers([cookId], { stored: kept, db: conn });
   return strangers.length ? nonMemberMessage(strangers) : null;
+}
+
+/**
+ * Der Koch, mit dem eine NEUE Mahlzeit aus einer Serie entsteht: der Koch der
+ * Vorlage - oder niemand, wenn die Schreibroute ihn heute als neue Wahl
+ * ablehnte.
+ *
+ * DIESELBE FRAGE WIE BEIM SCHREIBEN, DURCH DASSELBE PRAEDIKAT (`cookRefusal()`
+ * ohne gespeicherten Stand): das Materialisieren legt eine Zeile an, die es
+ * vorher nicht gab, und fuer die gibt es keinen "schon gespeicherten" Koch.
+ * Ohne diese Frage truege jede kuenftige Woche weiter ein ehemaliges Mitglied
+ * ein, das POST und PUT an derselben Stelle ablehnen. Die Vorlage bleibt, wie
+ * sie ist, und bestehende Mahlzeiten behalten ihren Koch mit Namen (#1381):
+ * wird das Konto wieder Mitglied, kocht es die naechste neue Woche wieder.
+ *
+ * Liest nur, synchron.
+ */
+export function cookForNewOccurrence(templateCookId, { db: database } = {}) {
+  if (templateCookId === null || templateCookId === undefined) return null;
+  const id = Number(templateCookId);
+  return cookRefusal(id, [], { db: database }) === null ? id : null;
 }
