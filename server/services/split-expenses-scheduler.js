@@ -101,7 +101,11 @@ function readSnapshot(recurring) {
   return snapshot;
 }
 
-function generateRecurringExpense(database, recurring) {
+// Die Anteile, die diese Serie HEUTE buchen wuerde - oder der Wurf, der sagt,
+// warum nicht. Die EINE Rechnung fuer den Buchungslauf und fuer die Frage der
+// Liste, ob eine Serie buchbar ist (`unbookableReason`, #1647): eine zweite
+// Pruefung daneben zeigte "buchbar" an, waehrend der Lauf pausiert.
+function resolveRecurringSplits(database, recurring) {
   const snapshot = readSnapshot(recurring);
   const participants = Array.isArray(snapshot.participants) ? snapshot.participants : [recurring.payer_id];
   const splits = buildSplits({
@@ -118,6 +122,11 @@ function generateRecurringExpense(database, recurring) {
   // Beteiligten ueberhaupt IDs sind.
   const refusal = membershipRefusal(database, recurring.group_id, recurring.payer_id, splits.map((split) => split.user_id));
   if (refusal) throw new RecurringNotBookable('not_a_member', refusal);
+  return splits;
+}
+
+function generateRecurringExpense(database, recurring) {
+  const splits = resolveRecurringSplits(database, recurring);
   const expenseId = database.prepare(`
     INSERT INTO expenses
       (group_id, title, description, amount_minor, currency, converted_amount_minor, converted_currency,
@@ -165,6 +174,22 @@ function pauseReason(err) {
   if (err instanceof RecurringNotBookable) return err.reason;
   if (err instanceof SplitInputError) return 'split_invalid';
   return null;
+}
+
+// Warum der Lauf diese Serie am naechsten Termin pausieren wuerde, oder null.
+// Derselbe Grund, den `recurring_auto_paused` in den Verlauf schreibt - hier
+// aber am HEUTIGEN Stand gemessen: nach einer Bearbeitung, die die Aufteilung
+// repariert, ist er weg, auch wenn die Serie noch pausiert ist. Ein Fehler, der
+// kein "unbuchbar" ist, wird weitergeworfen wie im Lauf.
+function unbookableReason(database, recurring) {
+  try {
+    resolveRecurringSplits(database, recurring);
+    return null;
+  } catch (err) {
+    const reason = pauseReason(err);
+    if (!reason) throw err;
+    return reason;
+  }
 }
 
 // Pausiert die Serie und schreibt den Grund in den Verlauf der Gruppe - die App
@@ -237,4 +262,4 @@ function startScheduler() {
   }, 60 * 60 * 1000).unref();
 }
 
-export { generateRecurringExpense, nextRunNotBefore, processDueRecurringExpenses, startScheduler };
+export { generateRecurringExpense, nextRunNotBefore, processDueRecurringExpenses, startScheduler, unbookableReason };

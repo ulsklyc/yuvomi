@@ -18,7 +18,7 @@ import { sendDocumentDeletionConflict } from '../services/document-deletion-lock
 import {
   buildSplits, decorateMoney, groupBalanceRows, insertExpenseLedger, membershipRefusal, minorToDecimal, parseMoneyToMinor, simplifyDebts, splitSnapshot,
 } from '../services/split-expenses.js';
-import { nextRunNotBefore } from '../services/split-expenses-scheduler.js';
+import { nextRunNotBefore, unbookableReason } from '../services/split-expenses-scheduler.js';
 import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
 import { syncBirthdayArtifacts } from '../services/birthdays.js';
 import {
@@ -1329,7 +1329,7 @@ function activityCursor(query) {
 }
 
 // Typen, deren Metadaten einen Betrag in Minor-Units festhalten.
-const AMOUNT_SNAPSHOT_ACTIVITY = new Set(['ledger_restored', 'ledger_removed', 'expense_created', 'expense_edited', 'expense_deleted']);
+const AMOUNT_SNAPSHOT_ACTIVITY = new Set(['ledger_restored', 'ledger_removed', 'expense_created', 'expense_edited', 'expense_deleted', 'recurring_edited', 'recurring_deleted']);
 
 router.get('/groups/:id/activity', (req, res) => {
   try {
@@ -1451,12 +1451,87 @@ function attachExpenseState(rows, groupId) {
   }
 }
 
+const RECURRING_SELECT = `
+  SELECT r.*, u.display_name AS payer_name
+  FROM recurring_expenses r
+  LEFT JOIN users u ON u.id = r.payer_id
+`;
+
+/**
+ * Eine Serie, wie sie dieser Anfrage gezeigt wird (#1647). Neben der Zeile:
+ *
+ * - `participants` / `splits`: die gespeicherte Aufteilung als EINGABE (wie sie
+ *   `splitSnapshot` beim Anlegen abgelegt hat), damit ein Bearbeiten-Dialog sie
+ *   vorbelegen kann, ohne `split_snapshot` selbst zu lesen. Ein Snapshot, der
+ *   kein JSON ist, gibt leere Listen - der Grund steht dann in `blocked_reason`.
+ * - `blocked_reason`: warum der Buchungslauf sie am naechsten Termin pausieren
+ *   wuerde (`split_invalid`, `not_a_member`) oder null. Am heutigen Stand
+ *   gemessen, mit der Rechnung des Laufs (`unbookableReason`).
+ * - `can_edit`: ob DIESER Nutzer sie aendern, loeschen, pausieren und
+ *   fortsetzen darf - die Regel der Ausgaben (`mayChangeGroupRecord`). Vom
+ *   Server, damit die Oberflaeche sie nicht nachbaut; das Modulrecht fragt sie
+ *   selbst.
+ * - `missed_count` / `resume_date`: nur an einer pausierten Serie. Wie viele
+ *   Termine ein Fortsetzen ohne `missed: "book"` ueberspringt und auf welchem
+ *   Termin es landet - dieselbe Rechnung, die die Pause-Route faehrt.
+ */
+function recurringForViewer(row, req, manages, today) {
+  let snapshot = null;
+  try { snapshot = JSON.parse(row.split_snapshot || '{}'); } catch { /* blocked_reason sagt es */ }
+  const resume = row.paused_at ? nextRunNotBefore(row.next_run_date, row.frequency, today, row.anchor_day) : null;
+  return {
+    ...decorateMoney(row),
+    participants: Array.isArray(snapshot?.participants) ? snapshot.participants : [],
+    splits: Array.isArray(snapshot?.splits) ? snapshot.splits : [],
+    blocked_reason: unbookableReason(db.get(), row),
+    can_edit: mayChangeGroupRecord(row, req, manages),
+    missed_count: resume ? resume.skipped : 0,
+    resume_date: resume ? resume.date : null,
+  };
+}
+
+function recurringResponse(id, req) {
+  const row = db.get().prepare(`${RECURRING_SELECT} WHERE r.id = ?`).get(id);
+  return recurringForViewer(row, req, canManageGroup(row.group_id, req), todayKey(db.get()));
+}
+
+/**
+ * Die Pruefung einer Serie - EINE fuer Anlegen und Bearbeiten (#1647): Titel,
+ * Betrag und Datum wie bei einer Ausgabe, der Rhythmus, die Mitgliedschaft von
+ * Zahler und Beteiligten, und die Aufteilung durch `splitSnapshot`. Was hier
+ * nicht wirft, bucht der Lauf mit denselben Werten.
+ */
+function parseRecurringBody(body, groupId, fallbackCurrency, fallbackPayerId) {
+  const parsed = parseExpenseBody({ ...body, expense_date: body.next_run_date }, fallbackCurrency);
+  const frequency = FREQUENCIES.includes(body.frequency) ? body.frequency : null;
+  if (!frequency) throw new Refusal(400, 'Invalid frequency.');
+  const payerId = Number(body.payer_id || fallbackPayerId);
+  const participants = Array.isArray(body.participants) ? body.participants : [payerId];
+  const refusal = membershipRefusal(db.get(), groupId, payerId, participants);
+  if (refusal) throw new Refusal(400, refusal);
+  // Dieselbe Pruefung wie bei einer Ausgabe, hier VOR dem ersten Termin: der
+  // Buchungslauf rechnet den Snapshot spaeter ohne Nutzer vor dem Bildschirm
+  // durch, und eine Serie, die dort wirft, haelt den ganzen Lauf an.
+  // Gespeichert wird die gepruefte Fassung, nicht der Request.
+  const snapshot = splitSnapshot({ method: parsed.method, amountMinor: parsed.amountMinor, currency: parsed.currency, participants, splits: body.splits });
+  return { parsed, frequency, payerId, snapshot };
+}
+
+/** Eine Serie samt Zugang: null, wenn es sie nicht gibt oder die Gruppe dem Aufrufer verschlossen ist. */
+function loadRecurring(id, req) {
+  const row = db.get().prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(id);
+  if (!row || !requireGroupAccess(row.group_id, req)) return null;
+  return row;
+}
+
 router.get('/groups/:id/recurring', (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    const rows = db.get().prepare('SELECT * FROM recurring_expenses WHERE group_id = ? ORDER BY paused_at IS NOT NULL ASC, next_run_date ASC').all(groupId)
-      .map((row) => decorateMoney(row));
+    const manages = canManageGroup(groupId, req);
+    const today = todayKey(db.get());
+    const rows = db.get().prepare(`${RECURRING_SELECT} WHERE r.group_id = ? ORDER BY r.paused_at IS NOT NULL ASC, r.next_run_date ASC, r.id ASC`).all(groupId)
+      .map((row) => recurringForViewer(row, req, manages, today));
     res.json({ data: rows });
   } catch (err) {
     log.error('GET /groups/:id/recurring error:', err);
@@ -1469,24 +1544,12 @@ router.post('/groups/:id/recurring', (req, res) => {
     const groupId = Number(req.params.id);
     const group = requireGroupAccess(groupId, req);
     if (!group) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    const parsed = parseExpenseBody({ ...req.body, expense_date: req.body.next_run_date }, group.default_currency);
-    const frequency = FREQUENCIES.includes(req.body.frequency) ? req.body.frequency : null;
-    if (!frequency) return res.status(400).json({ error: 'Invalid frequency.', code: 400 });
-    const payerId = Number(req.body.payer_id || userId(req));
-    const participants = Array.isArray(req.body.participants) ? req.body.participants : [payerId];
-    const refusal = membershipRefusal(db.get(), groupId, payerId, participants);
-    if (refusal) return res.status(400).json({ error: refusal, code: 400 });
-    // Dieselbe Pruefung wie bei einer Ausgabe, hier VOR dem ersten Termin: der
-    // Buchungslauf rechnet den Snapshot spaeter ohne Nutzer vor dem Bildschirm
-    // durch, und eine Serie, die dort wirft, haelt den ganzen Lauf an.
-    // Gespeichert wird die gepruefte Fassung, nicht der Request.
-    const snapshot = splitSnapshot({ method: parsed.method, amountMinor: parsed.amountMinor, currency: parsed.currency, participants, splits: req.body.splits });
+    const { parsed, frequency, payerId, snapshot } = parseRecurringBody(req.body, groupId, group.default_currency, userId(req));
     // Der Ankertag (#1721): der Tag des ersten Termins ist der Tag, fuer den
     // die Serie gedacht ist. Der Lauf klemmt in kuerzeren Monaten aufs
     // Monatsende und hebt danach wieder auf diesen Tag (31 -> 28/29 -> 31).
-    // Gesetzt wird er hier und nirgends sonst: keine Route aendert das Datum
-    // einer Serie, und das Fortsetzen zaehlt nur weiter. Eine Route, die einem
-    // Nutzer das Datum in die Hand gibt, muss den Anker mitsetzen.
+    // Gesetzt wird er hier und beim Bearbeiten (PUT /recurring/:id), sobald
+    // dort Datum oder Rhythmus wechseln; das Fortsetzen zaehlt nur weiter.
     const anchorDay = Number(parsed.expenseDate.slice(8, 10));
     const result = db.get().prepare(`
       INSERT INTO recurring_expenses
@@ -1494,11 +1557,91 @@ router.post('/groups/:id/recurring', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, parsed.category, parsed.method, JSON.stringify(snapshot), frequency, parsed.expenseDate, anchorDay, userId(req));
     activity(groupId, userId(req), 'recurring_created', 'recurring_expense', result.lastInsertRowid, { title: parsed.title, frequency });
-    const row = db.get().prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ data: decorateMoney(row) });
+    res.status(201).json({ data: recurringResponse(result.lastInsertRowid, req) });
   } catch (err) {
+    if (err instanceof Refusal) return sendRefusal(res, err);
     log.error('POST /groups/:id/recurring error:', err);
     res.status(400).json({ error: err.message || 'Invalid recurring expense.', code: 400 });
+  }
+});
+
+/**
+ * Bearbeiten einer Serie (#1647). Wer darf: die Regel der Ausgaben
+ * (`mayChangeGroupRecord`, wie Pausieren). Was gilt: die Pruefung des Anlegens
+ * (`parseRecurringBody`) - eine Serie laesst sich nicht in einen Zustand
+ * bearbeiten, den das Anlegen abgewiesen haette.
+ *
+ * Bereits gebuchte Ausgaben bleiben, wie sie sind: der Lauf kopiert die Serie
+ * in jede Buchung, es gibt keinen Verweis zurueck, dem eine Aenderung folgte.
+ *
+ * `next_run_date`, `frequency`, `payer_id` und `participants` duerfen fehlen
+ * und bleiben dann stehen - ein fehlendes Datum fiele sonst durch
+ * `parseExpenseBody` still auf heute. Titel, Betrag und (ausser bei `equal`)
+ * `splits` gehoeren zu jedem Aufruf wie beim Bearbeiten einer Ausgabe.
+ *
+ * Der Ankertag folgt dem Datum nur, wenn sich Datum oder Rhythmus AENDERN: eine
+ * Serie am 31. steht im Februar auf dem 28., und ein Speichern, das nur den
+ * Titel aendert, schickt diesen 28. unveraendert zurueck - daraus den Anker zu
+ * lesen, liesse sie fuer immer auf dem 28. (#1721).
+ *
+ * `paused_at` bleibt: wer eine automatisch pausierte Serie repariert, setzt sie
+ * danach selbst fort und entscheidet dabei ueber die versaeumten Termine.
+ */
+router.put('/recurring/:id', (req, res) => {
+  try {
+    const existing = loadRecurring(Number(req.params.id), req);
+    if (!existing) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
+    if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    let stored = null;
+    try { stored = JSON.parse(existing.split_snapshot || '{}'); } catch { /* dann muss der Aufruf die Beteiligten nennen */ }
+    const body = {
+      ...req.body,
+      next_run_date: req.body.next_run_date || existing.next_run_date,
+      frequency: req.body.frequency || existing.frequency,
+      participants: Array.isArray(req.body.participants) ? req.body.participants : stored?.participants,
+    };
+    const { parsed, frequency, payerId, snapshot } = parseRecurringBody(body, existing.group_id, existing.currency, existing.payer_id);
+    const moved = parsed.expenseDate !== existing.next_run_date || frequency !== existing.frequency;
+    const anchorDay = moved ? Number(parsed.expenseDate.slice(8, 10)) : existing.anchor_day;
+    db.transaction(() => {
+      db.get().prepare(`
+        UPDATE recurring_expenses
+        SET title = ?, description = ?, amount_minor = ?, currency = ?, payer_id = ?, category = ?,
+            split_method = ?, split_snapshot = ?, frequency = ?, next_run_date = ?, anchor_day = ?
+        WHERE id = ?
+      `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, parsed.category, parsed.method, JSON.stringify(snapshot), frequency, parsed.expenseDate, anchorDay, existing.id);
+      activity(existing.group_id, userId(req), 'recurring_edited', 'recurring_expense', existing.id, expenseSnapshot(parsed.title, parsed.amountMinor, parsed.currency));
+    });
+    res.json({ data: recurringResponse(existing.id, req) });
+  } catch (err) {
+    if (err instanceof Refusal) return sendRefusal(res, err);
+    log.error('PUT /recurring/:id error:', err);
+    res.status(400).json({ error: err.message || 'Invalid recurring expense.', code: 400 });
+  }
+});
+
+/**
+ * Loeschen einer Serie (#1647): die Zeile faellt, kuenftige Termine entstehen
+ * nicht mehr. Was der Lauf schon gebucht hat, bleibt unberuehrt - Ausgaben,
+ * Anteile, Ledger und Salden. `expenses.recurring_rule_id` der gebuchten
+ * Ausgaben bleibt stehen (kein Fremdschluessel, und `recurring_expenses.id` ist
+ * AUTOINCREMENT, die Nummer wird nie neu vergeben): sie sagen weiter, dass sie
+ * aus einer Serie stammen. Titel und Betrag haelt der Verlaufseintrag fest, die
+ * Zeile gibt es danach nicht mehr.
+ */
+router.delete('/recurring/:id', (req, res) => {
+  try {
+    const existing = loadRecurring(Number(req.params.id), req);
+    if (!existing) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
+    if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    db.transaction(() => {
+      db.get().prepare('DELETE FROM recurring_expenses WHERE id = ?').run(existing.id);
+      activity(existing.group_id, userId(req), 'recurring_deleted', 'recurring_expense', existing.id, expenseSnapshot(existing.title, existing.amount_minor, existing.currency));
+    });
+    res.json({ data: { ok: true } });
+  } catch (err) {
+    log.error('DELETE /recurring/:id error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -1509,9 +1652,9 @@ const MISSED_MODES = ['skip', 'book'];
 router.post('/recurring/:id/pause', (req, res) => {
   try {
     const id = Number(req.params.id);
-    const row = db.get().prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(id);
-    if (!row || !requireGroupAccess(row.group_id, req)) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
-    if (!canManageGroup(row.group_id, req) && row.created_by !== userId(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    const row = loadRecurring(id, req);
+    if (!row) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
+    if (!mayChangeGroupRecord(row, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const missed = req.body?.missed ?? 'skip';
     if (!MISSED_MODES.includes(missed)) {
       return res.status(400).json({ error: 'missed must be "skip" or "book".', code: 400, reason: 'invalid_missed' });
@@ -1539,10 +1682,10 @@ router.post('/recurring/:id/pause', (req, res) => {
         database.prepare('UPDATE recurring_expenses SET paused_at = NULL, next_run_date = ? WHERE id = ?').run(next.date, id);
         activity(current.group_id, userId(req), 'recurring_resumed', 'recurring_expense', id, next.skipped ? { skipped: next.skipped } : {});
       }
-      return database.prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(id);
+      return true;
     })();
     if (!updated) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
-    res.json({ data: decorateMoney(updated) });
+    res.json({ data: recurringResponse(id, req) });
   } catch (err) {
     log.error('POST /recurring/:id/pause error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
