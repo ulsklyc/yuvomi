@@ -1328,7 +1328,7 @@ export const schemas = {
         },
         ExtensionModuleInstall: {
           type: ['object', 'null'],
-          description: 'How the module was installed from Settings (read from `.yuvomi-install.json` in its folder). null when the folder was copied onto the server by hand. Only present in the admin listing (`GET /api/v1/modules?admin=1` by an admin) and in install responses.',
+          description: 'How the module was installed from Settings (read from `.yuvomi-install.json` in its folder) and whether an admin has approved it since. null when the folder was copied onto the server by hand. Only present in the admin listing (`GET /api/v1/modules?admin=1` by an admin) and in install responses.',
           properties: {
             source: { type: 'string', enum: ['zip', 'github'] },
             url: { type: ['string', 'null'], description: 'GitHub repository URL.' },
@@ -1336,8 +1336,10 @@ export const schemas = {
             commit: { type: ['string', 'null'], description: 'Commit SHA of the GitHub archive, when known.' },
             path: { type: ['string', 'null'], description: 'Folder inside the archive the module came from.' },
             installedAt: { type: ['string', 'null'], format: 'date-time' },
+            approved: { type: 'boolean', description: 'False after every install and replace; true once an admin enabled the module from a browser session. While false the module is disabled whatever the household switch says, so a restored or fresh database cannot turn on code nobody looked at. Stored in the module folder.' },
+            installedByName: { type: ['string', 'null'], description: 'Display name of the admin who installed it, resolved from the user id in the record; null when that account no longer exists. Only in the admin listing.' },
           },
-          required: ['source'],
+          required: ['source', 'approved'],
         },
         ModuleInstallInfoResponse: {
           type: 'object',
@@ -1346,10 +1348,11 @@ export const schemas = {
               type: 'object',
               properties: {
                 writable: { type: 'boolean', description: 'False when the modules folder is read-only; installs then answer 503.' },
-                persistent: { type: ['boolean', 'null'], description: 'Best-effort guess whether the modules folder survives an update of the server. False when Yuvomi runs in a container and the folder is not on a volume or bind mount (installed modules would be lost with the next image update); null when it cannot be determined. Installs still work when false.' },
+                persistent: { type: ['boolean', 'null'], description: 'Best-effort guess whether the modules folder survives an update of the server. False when Yuvomi runs in a container and the folder is not on a volume or bind mount (installed modules would be lost with the next image update); null when it cannot be determined. The routes still answer when false; the Settings page then shows the manual way, like for a read-only folder.' },
+                webInstall: { type: 'boolean', description: 'Whether the operator switched installing from Settings on (`MODULES_ALLOW_WEB_INSTALL=true`). False by default; the install and delete routes then answer 403 `module_web_install_disabled`.' },
                 maxZipMb: { type: 'integer', description: 'Archive size limit in MB.' },
               },
-              required: ['writable', 'persistent', 'maxZipMb'],
+              required: ['writable', 'persistent', 'webInstall', 'maxZipMb'],
             },
           },
           required: ['data'],
@@ -1370,10 +1373,9 @@ export const schemas = {
             data: { $ref: '#/components/schemas/ExtensionModule' },
             replaced: { type: 'boolean', description: 'True when an installed module with the same id was replaced.' },
             skipped: { type: 'array', items: { type: 'string' }, description: 'Files in the module folder that were not copied (not a web asset type, or a dotfile).' },
-            disabledForReview: { type: 'boolean', description: 'True when a replace left the module disabled so the new code can be reviewed before it is enabled again. Always present; false for a fresh install (which is disabled anyway) and for a GitHub update from the same repository and folder (which keeps its enabled state).' },
-            disabledReason: { type: ['string', 'null'], enum: ['source_changed', 'zip_replace', null], description: '`source_changed`: the replace came from a different source than the installed module (another repository or folder, GitHub instead of ZIP or the other way round, or a module without install metadata). `zip_replace`: every replace from a ZIP is disabled for review, since an upload has no origin that can be checked. null when `disabledForReview` is false.' },
           },
-          required: ['data', 'replaced', 'skipped', 'disabledForReview', 'disabledReason'],
+          description: 'The module is disabled either way, after a fresh install and after a replace: `data.install.approved` is false until an admin enables it from a browser session.',
+          required: ['data', 'replaced', 'skipped'],
         },
         ModuleInstallError: {
           type: 'object',
@@ -1393,11 +1395,9 @@ export const schemas = {
             },
             incoming: {
               type: 'object',
-              description: 'With `exists`: the module in the archive.',
+              description: 'With `exists`: the module in the archive. A replace (retry with overwrite) always leaves the module disabled until it is approved again.',
               properties: { id: { type: 'string' }, name: { type: 'string' }, version: { type: 'string' } },
             },
-            sourceChanged: { type: 'boolean', description: 'With `exists`: whether a replace would come from a different source than the installed module.' },
-            replaceDisabledReason: { type: ['string', 'null'], enum: ['source_changed', 'zip_replace', null], description: 'With `exists`: why a replace would leave the module disabled for review (see `disabledReason` of the install response), or null when it would keep its enabled state.' },
             candidates: {
               type: 'array',
               description: 'With `multiple`: the modules found in the archive.',

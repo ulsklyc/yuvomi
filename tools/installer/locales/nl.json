@@ -168,7 +168,9 @@
     "sectionPrivateNetwork": "Toegang tot je thuisnetwerk",
     "privateNetworkHint": "Yuvomi weigert standaard verbindingen naar adressen in je eigen netwerk, wat beschermt tegen een server die verleid wordt interne diensten te benaderen. Sta toe wat je thuis echt draait.",
     "authPasswordLogin": "Aanmelden met gebruikersnaam en wachtwoord behouden",
-    "authPasswordLoginHint": "Uitschakelen maakt SSO de enige manier om binnen te komen: het aanmeldformulier en het herstellen van het wachtwoord verdwijnen. Is de provider onbereikbaar, dan loopt de weg terug via het .env-bestand en een herstart."
+    "authPasswordLoginHint": "Uitschakelen maakt SSO de enige manier om binnen te komen: het aanmeldformulier en het herstellen van het wachtwoord verdwijnen. Is de provider onbereikbaar, dan loopt de weg terug via het .env-bestand en een herstart.",
+    "moduleWebInstall": "Modules installeren vanuit Instellingen toestaan",
+    "moduleWebInstallHint": "Laat een beheerder modules van derden via de webinterface (ZIP-upload of GitHub-URL) op de server zetten, zonder bestandstoegang. Geïnstalleerde modules blijven uit totdat een beheerder ze goedkeurt. Uit: modules worden met de hand naar de modulemap gekopieerd."
   },
   "review": {
     "title": "Controleren",
@@ -210,7 +212,8 @@
     "privateNetworkWaste": "Afvalophaal",
     "privateNetworkWebdav": "WebDAV-documenten",
     "baseUrl": "Openbaar adres",
-    "outlook": "Outlook-agenda"
+    "outlook": "Outlook-agenda",
+    "moduleWebInstall": "Modules installeren vanuit Instellingen"
   },
   "docker": {
     "title": "Yuvomi wordt gestart",

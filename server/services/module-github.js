@@ -349,7 +349,8 @@ export function createGithubInstaller({
     }
 
     // One normalization for both sources, so the path stored in the install
-    // metadata (and compared on the next replace) has a single spelling.
+    // record (shown under Details, offered again on the next replace) has a
+    // single spelling.
     let subPath = null;
     if (explicitPath || urlPath) {
       subPath = normalizeSubPath(explicitPath ? pathOverride : urlPath);

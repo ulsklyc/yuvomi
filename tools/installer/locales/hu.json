@@ -130,7 +130,8 @@
     "privateNetworkWaste": "Hulladékgyűjtés",
     "privateNetworkWebdav": "WebDAV-dokumentumok",
     "baseUrl": "Nyilvános cím",
-    "outlook": "Outlook naptár"
+    "outlook": "Outlook naptár",
+    "moduleWebInstall": "Modulok telepítése a Beállításokból"
   },
   "docker": {
     "title": "Yuvomi indítása",
@@ -276,7 +277,9 @@
     "sectionPrivateNetwork": "Hozzáférés az otthoni hálózatodhoz",
     "privateNetworkHint": "A Yuvomi alapértelmezés szerint elutasítja a saját hálózatod címeire irányuló kapcsolatokat, ami megvédi attól, hogy a kiszolgálót belső szolgáltatások elérésére vegyék rá. Engedélyezd, amit valóban futtatsz otthon.",
     "authPasswordLogin": "A felhasználónévvel és jelszóval való belépés megtartása",
-    "authPasswordLoginHint": "Kikapcsolásával az SSO lesz az egyetlen út befelé: a bejelentkezési űrlap és a jelszó-visszaállítás eltűnik. Ha a szolgáltató elérhetetlenné válik, a visszaút a .env fájl szerkesztése és egy újraindítás."
+    "authPasswordLoginHint": "Kikapcsolásával az SSO lesz az egyetlen út befelé: a bejelentkezési űrlap és a jelszó-visszaállítás eltűnik. Ha a szolgáltató elérhetetlenné válik, a visszaút a .env fájl szerkesztése és egy újraindítás.",
+    "moduleWebInstall": "Modulok telepítésének engedélyezése a Beállításokból",
+    "moduleWebInstallHint": "Lehetővé teszi, hogy egy rendszergazda fájlhozzáférés nélkül, a webes felületről (ZIP feltöltés vagy GitHub URL) helyezzen harmadik féltől származó modulokat a szerverre. A telepített modulok kikapcsolva maradnak, amíg egy rendszergazda jóvá nem hagyja őket. Kikapcsolva: a modulokat kézzel kell a modulmappába másolni."
   },
   "welcome": {
     "title": "Hogyan szeretnéd beállítani a Yuvomi-t?",

@@ -130,7 +130,8 @@
     "privateNetworkWaste": "Thu gom rác",
     "privateNetworkWebdav": "Tài liệu WebDAV",
     "baseUrl": "Địa chỉ công khai",
-    "outlook": "Lịch Outlook"
+    "outlook": "Lịch Outlook",
+    "moduleWebInstall": "Cài đặt mô-đun từ Cài đặt"
   },
   "docker": {
     "title": "Đang khởi động Yuvomi",
@@ -276,7 +277,9 @@
     "sectionPrivateNetwork": "Truy cập mạng gia đình",
     "privateNetworkHint": "Theo mặc định, Yuvomi từ chối kết nối tới các địa chỉ trong mạng của bạn, giúp tránh việc máy chủ bị lừa truy cập dịch vụ nội bộ. Hãy bật những gì bạn thực sự chạy tại nhà.",
     "authPasswordLogin": "Giữ đăng nhập bằng tên người dùng và mật khẩu",
-    "authPasswordLoginHint": "Tắt tùy chọn này khiến SSO là lối vào duy nhất: biểu mẫu đăng nhập và đặt lại mật khẩu sẽ biến mất. Nếu nhà cung cấp không truy cập được, đường quay lại là sửa tệp .env và khởi động lại."
+    "authPasswordLoginHint": "Tắt tùy chọn này khiến SSO là lối vào duy nhất: biểu mẫu đăng nhập và đặt lại mật khẩu sẽ biến mất. Nếu nhà cung cấp không truy cập được, đường quay lại là sửa tệp .env và khởi động lại.",
+    "moduleWebInstall": "Cho phép cài đặt mô-đun từ Cài đặt",
+    "moduleWebInstallHint": "Cho phép quản trị viên đưa mô-đun của bên thứ ba lên máy chủ từ giao diện web (tải lên ZIP hoặc URL GitHub) mà không cần quyền truy cập tệp. Mô-đun đã cài vẫn tắt cho đến khi quản trị viên phê duyệt. Tắt: mô-đun được sao chép thủ công vào thư mục mô-đun."
   },
   "welcome": {
     "title": "Bạn muốn thiết lập Yuvomi như thế nào?",

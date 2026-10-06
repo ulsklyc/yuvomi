@@ -4,13 +4,18 @@
  *          or delete it - the server half of Settings → Modules → Add custom module.
  * Dependencies: node:fs/promises, server/services/zip-reader.js, server/services/modules.js
  *
- * TRUST MODEL. A module is same-origin JavaScript that runs with the session of every
- * member who opens it. Installing one here is the same act as copying a folder onto
- * the server - which is why the route is admin-only and why a NEW module always
- * lands disabled: the admin has to look at it in Active modules and switch it on.
- * The same holds for a replace from a ZIP or from another source than before
- * (replaceDisabledReason); only a GitHub update from the same repository and
- * folder keeps the switch.
+ * TRUST MODEL (DECISIONS.md, 12). A module is same-origin JavaScript that runs with
+ * the session of every member who opens it. Until this feature, putting such script
+ * on the server took filesystem access; with it, a foothold in an admin's browser
+ * session is enough, and what it writes outlives the session, a password change and
+ * a revoked token. No design closes that, so the feature is the OPERATOR'S choice:
+ * off unless MODULES_ALLOW_WEB_INSTALL is set (isWebInstallEnabled). With it on, the
+ * routes are admin-only and session-only, and every install and every replace
+ * lands DISABLED: the install record in the folder says `approved: false` until an
+ * admin switches the module on in a browser session (modules.js setModuleEnabled).
+ * The record travels with the folder, so a restored or fresh database cannot turn
+ * on what nobody looked at. The web interface deletes only folders that carry such
+ * a record; a hand-copied folder is the operator's and stays.
  * Nothing from the archive is ever executed on the server; it is only written to disk
  * and validated as data by the same code the loader uses.
  *
@@ -26,7 +31,8 @@ import { constants as fsConstants } from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { createLogger } from '../logger.js';
-import { readZipArchive, ZipError, ZIP_LIMITS } from './zip-reader.js';
+import { readPrivateNetworkOptIn } from '../utils/ssrf.js';
+import { readZipArchive, ZipError, ZIP_LIMITS, isWindowsReservedName } from './zip-reader.js';
 import { MODULE_ID_RE } from './module-capabilities.js';
 import {
   MODULES_DIR,
@@ -35,7 +41,6 @@ import {
   loadModuleDir,
   readInstallMeta,
   setModuleDisabledFlag,
-  isModuleDisabled,
 } from './modules.js';
 
 const log = createLogger('ModuleInstall');
@@ -46,6 +51,26 @@ export const MAX_ZIP_MB = MAX_ZIP_BYTES / (1024 * 1024);
 const MAX_MANIFEST_BYTES = 64 * 1024;
 const MAX_CANDIDATE_DEPTH = 6;
 const STALE_STAGING_MS = 60 * 60 * 1000;
+
+// ── The switch ──────────────────────────────────────────────────────────────
+// Read once at startup, like every other operator flag, and parsed by the rule
+// the private-network opt-ins use: exactly `true` or `1` opens it, anything
+// else (unset included) keeps it shut. Not a runtime read: the operator sets it
+// in .env, the Unraid template or the Portainer stack, and a value that could
+// change under a running server would be a second switch nobody documented.
+export const WEB_INSTALL_ENV = 'MODULES_ALLOW_WEB_INSTALL';
+let webInstallEnabled = readPrivateNetworkOptIn(WEB_INSTALL_ENV);
+
+/** Whether the operator opened installing and deleting modules from Settings. */
+export function isWebInstallEnabled() {
+  return webInstallEnabled;
+}
+
+export function __setWebInstallEnabledForTests(value) {
+  const previous = webInstallEnabled;
+  webInstallEnabled = Boolean(value);
+  return () => { webInstallEnabled = previous; };
+}
 
 // What a browser module can legitimately consist of. Everything else (shell
 // scripts, binaries, server code in other languages, dotfiles) is skipped and
@@ -78,9 +103,13 @@ const REASON_STATUS = {
   // 400 on delete (the id names something that is not a module folder); an
   // install that runs into the same thing answers 409, see installFilesUnlocked.
   not_a_module: 400,
-  module_session_required: 403,
+  // The two 403s of this feature (the switch, the browser session) are sent by
+  // the route before anything here runs; they are not InstallError reasons.
   exists: 409,
   busy: 409,
+  // Delete: the folder has no install record, so the web did not put it there
+  // and will not take it away (deleteModule).
+  not_web_installed: 409,
   too_large: 413,
   too_many_entries: 413,
   bomb: 413,
@@ -345,6 +374,14 @@ export function locateModule(files, { path: subPath } = {}) {
     const depth = relDir ? relDir.split('/').length : 0;
     if (depth > MAX_CANDIDATE_DEPTH) continue;
     if ((dir ? dir.split('/') : []).some(isIgnoredSegment)) continue;
+    // The size limit applies to every candidate, not only to the chosen one:
+    // multipleError() parses each candidate for its name and version, and a
+    // 10 MB module.json (the per-file limit) would be parsed for a question
+    // the admin has not even been asked yet. Refused, not skipped: an archive
+    // with such a file in a module folder is not one to pick from.
+    if (f.data.length > MAX_MANIFEST_BYTES) {
+      throw new InstallError('bad_manifest', `module.json is larger than 64 KiB: ${relDir || '(archive root)'}`);
+    }
     candidates.push({ dir, relDir, file: f });
   }
 
@@ -441,6 +478,14 @@ function readManifest(file) {
     throw new InstallError('bad_manifest',
       'module.json must define an id of 3 to 64 lowercase letters, digits and hyphens.');
   }
+  // The id becomes the folder name under modules/. MODULE_ID_RE lets `con`,
+  // `nul`, `aux`, `prn`, `com1`-`com9` and `lpt1`-`lpt9` through, which the
+  // archive reader refuses for every entry; the same list applies to the one
+  // name the installer itself creates. An id has no dot, so the whole id is
+  // the name.
+  if (isWindowsReservedName(raw.id)) {
+    throw new InstallError('bad_manifest', `module.json id "${raw.id}" is a reserved device name on Windows.`);
+  }
   return raw;
 }
 
@@ -453,41 +498,6 @@ async function readExistingManifest(target) {
   } catch {
     return { name: '', version: '' };
   }
-}
-
-/**
- * Whether a replace keeps coming from the same place. Same place = same GitHub
- * repository and folder, or ZIP again. Anything else (another repo, GitHub ->
- * ZIP, a hand-copied module without metadata) means the code the admin once
- * reviewed and switched on is not what arrives now - see replaceDisabledReason.
- */
-export function isSameInstallSource(existing, incoming) {
-  if (!existing || typeof existing !== 'object' || !incoming) return false;
-  if (incoming.source === 'zip') return existing.source === 'zip';
-  if (incoming.source !== 'github' || existing.source !== 'github') return false;
-  // GitHub owner and repo names are case-insensitive; the path is not.
-  const url = (v) => String(v || '').trim().replace(/\/+$/, '').toLowerCase();
-  return url(existing.url) === url(incoming.url) && (existing.path || '') === (incoming.path || '');
-}
-
-/**
- * Why a replace switches the module off for review, or null when it keeps
- * the switch as it was.
- *
- * - 'source_changed': another repository or folder, GitHub <-> ZIP, or over a
- *   hand-copied module with no record. Trusting a module from one place is no
- *   reason to trust what arrives under the same id from another.
- * - 'zip_replace': ZIP over ZIP. "Same source" means nothing for a ZIP - two
- *   uploads share no origin anyone can check, so every ZIP replace is new code
- *   and goes through review like a fresh install.
- *
- * Only a GitHub replace from the same repository and folder keeps the switch:
- * that is an update along a line the admin chose when they enabled it.
- */
-export function replaceDisabledReason(existing, incoming) {
-  if (!isSameInstallSource(existing, incoming)) return 'source_changed';
-  if (incoming.source === 'zip') return 'zip_replace';
-  return null;
 }
 
 async function lstatOrNull(p) {
@@ -564,8 +574,9 @@ async function writeStaged(stageDir, keep, meta) {
  * @param {'zip'|'github'} opts.source
  * @param {number}  [opts.userId]
  * @param {object}  [opts.meta]      { url, ref, commit } for GitHub installs
- * @returns {Promise<{ module: object, replaced: boolean, skipped: string[], disabledForReview: boolean,
- *   disabledReason: 'source_changed'|'zip_replace'|null }>}
+ * @returns {Promise<{ module: object, replaced: boolean, skipped: string[] }>}
+ *   The module is disabled either way: a fresh install and a replace both
+ *   write `approved: false` into the install record (see TRUST MODEL).
  */
 export async function installFilesUnlocked(files, opts = {}) {
   await assertWritable();
@@ -584,6 +595,13 @@ export async function installFilesUnlocked(files, opts = {}) {
     ...(located.relDir ? { path: located.relDir } : {}),
     installedAt: new Date().toISOString(),
     installedBy: opts.userId ?? null,
+    // The review state, in the folder. Every install and every replace starts
+    // here, whatever the module's switch said before: a replace from "the
+    // same" GitHub repository is a branch that moved, a tag that was re-pointed
+    // or an owner name that changed hands, and none of that is the code the
+    // admin once looked at. Only setModuleEnabled() in a browser session
+    // turns it to true.
+    approved: false,
   };
 
   const stagingRoot = path.join(MODULES_DIR, `.install-${randomBytes(8).toString('hex')}`);
@@ -602,7 +620,6 @@ export async function installFilesUnlocked(files, opts = {}) {
     const target = path.join(MODULES_DIR, id);
     const existing = await lstatOrNull(target);
     let replaced = false;
-    let disabledReason = null;
     if (existing) {
       // No `existing` in this body on purpose: the UI offers "replace" whenever
       // it sees one, and replacing a link or a file is refused anyway.
@@ -610,73 +627,49 @@ export async function installFilesUnlocked(files, opts = {}) {
         throw new InstallError('not_a_module',
           `modules/${id} exists but is not a regular module folder. Remove it on the server first.`, {}, 409);
       }
-      const existingInstall = await readInstallMeta(target);
-      const sourceChanged = !isSameInstallSource(existingInstall, meta);
-      const reviewReason = replaceDisabledReason(existingInstall, meta);
       if (!opts.overwrite) {
         const current = await readExistingManifest(target);
         throw new InstallError('exists', `A module with the id "${id}" is already installed.`, {
-          existing: { id, name: current.name, version: current.version, install: existingInstall },
+          existing: { id, name: current.name, version: current.version, install: await readInstallMeta(target) },
           incoming: {
             id,
             name: typeof rawManifest.name === 'string' ? rawManifest.name.slice(0, 80) : '',
             version: typeof rawManifest.version === 'string' ? rawManifest.version.slice(0, 40) : '',
           },
-          sourceChanged,
-          // What the replace would do to the switch, so the question can say it.
-          replaceDisabledReason: reviewReason,
         });
       }
-      // See replaceDisabledReason: new code under a trusted id goes back to
-      // disabled like a fresh install - otherwise "replace" would be a way to
-      // skip the review step. Switched off BEFORE the swap, so the new files
-      // are never served while still enabled.
-      const wasDisabled = isModuleDisabled(id);
-      const disableNow = Boolean(reviewReason) && !wasDisabled;
-      if (disableNow) setModuleDisabledFlag(id, true);
+      // The staged folder already carries `approved: false`, so the moment the
+      // rename lands the new code is off - no switch to flip before the swap,
+      // and nothing to put back when the swap fails and the old folder returns
+      // with its own record.
       const backup = path.join(MODULES_DIR, `.backup-${id}-${Date.now()}`);
+      await fsOps.rename(target, backup);
       try {
-        await fsOps.rename(target, backup);
-        try {
-          await fsOps.rename(stageDir, target);
-        } catch (err) {
-          try {
-            await fsOps.rename(backup, target);
-          } catch (restoreErr) {
-            log.error(`Restoring modules/${id} from ${path.basename(backup)} failed - restore it by hand:`, restoreErr);
-          }
-          throw err;
-        }
+        await fsOps.rename(stageDir, target);
       } catch (err) {
-        if (disableNow) setModuleDisabledFlag(id, false);
+        try {
+          await fsOps.rename(backup, target);
+        } catch (restoreErr) {
+          log.error(`Restoring modules/${id} from ${path.basename(backup)} failed - restore it by hand:`, restoreErr);
+        }
         throw err;
       }
       await fs.rm(backup, { recursive: true, force: true }).catch((err) => {
         log.warn(`Could not remove backup folder ${path.basename(backup)}:`, err?.message);
       });
       replaced = true;
-      // Reported even when the module was already off: the answer says the
-      // new code waits for review, which holds either way.
-      disabledReason = reviewReason;
     } else {
-      // Disabled BEFORE the folder appears: there is no moment in which the
-      // new module is already served to members.
-      const wasDisabled = isModuleDisabled(id);
-      setModuleDisabledFlag(id, true);
-      try {
-        await fsOps.rename(stageDir, target);
-      } catch (err) {
-        if (!wasDisabled) setModuleDisabledFlag(id, false);
-        throw err;
-      }
+      // Off before the folder appears: the record inside says so. There is no
+      // moment in which the new module is already served to members.
+      await fsOps.rename(stageDir, target);
     }
 
     const modules = await listModules({ admin: true });
     const module = modules.find((m) => m.id === id) || null;
     log.info(`Module ${replaced ? 'replaced' : 'installed'}: id=${id} version=${validated.manifest.version || '-'} `
       + `source=${meta.source}${meta.url ? ` url=${meta.url}` : ''}${meta.ref ? ` ref=${meta.ref}` : ''} `
-      + `by user ${opts.userId ?? '?'}${disabledReason ? ` (disabled for review: ${disabledReason})` : ''}`);
-    return { module, replaced, skipped, disabledForReview: Boolean(disabledReason), disabledReason };
+      + `by user ${opts.userId ?? '?'} (disabled until approved)`);
+    return { module, replaced, skipped };
   } finally {
     await fs.rm(stagingRoot, { recursive: true, force: true }).catch(() => {});
   }
@@ -711,9 +704,10 @@ export function installFromZip(buffer, opts = {}) {
 }
 
 /**
- * Deletes an installed module folder. Leaves `ext:<id>` permission rows and
- * dashboard widget configs alone: both already tolerate unknown modules, and
- * keeping them means a reinstall of the same id comes back with its settings.
+ * Deletes a module folder that the web interface installed. Leaves `ext:<id>`
+ * permission rows and dashboard widget configs alone: both already tolerate
+ * unknown modules, and keeping them means a reinstall of the same id comes
+ * back with its settings.
  */
 export function deleteModule(id, { userId } = {}) {
   return withInstallLock(async () => {
@@ -730,7 +724,17 @@ export function deleteModule(id, { userId } = {}) {
       throw new InstallError('not_a_module',
         `modules/${id} is not a regular folder (for example a symbolic link). Remove it on the server.`);
     }
+    // Only what the web put there. A hand-copied folder can be a working
+    // checkout with uncommitted work, and `rm -r` has no undo; the symlink
+    // rule above covers only the linked case. Without the record the folder is
+    // the operator's, and the page shows no delete button for it.
+    if (!(await readInstallMeta(target))) {
+      throw new InstallError('not_web_installed',
+        `modules/${id} was not installed from Settings. Remove the folder on the server.`);
+    }
     await fs.rm(target, { recursive: true, force: true });
+    // The household switch is cleared so that a later reinstall of the same id
+    // is judged by its own record, not by a stale entry.
     setModuleDisabledFlag(id, false);
     await listModules({ admin: true });
     log.info(`Module deleted: id=${id} by user ${userId ?? '?'}`);

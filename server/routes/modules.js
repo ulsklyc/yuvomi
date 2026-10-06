@@ -1,7 +1,9 @@
 /**
  * Module: Third-party modules API
  * Purpose: Authenticated discovery, admin toggles, protected module asset delivery,
- *          and admin-only install/delete from Settings (ZIP upload or GitHub URL).
+ *          and admin-only install/delete from Settings (ZIP upload or GitHub URL) -
+ *          the latter only where the operator set MODULES_ALLOW_WEB_INSTALL, and
+ *          enabling a module only from a browser session (DECISIONS.md, 12).
  * Dependencies: express, express-rate-limit, server/services/modules.js,
  *               server/services/module-install.js, server/services/module-github.js
  */
@@ -16,10 +18,12 @@ import { MODULES_DIR, listModules, resolveAssetPath, setModuleEnabled } from '..
 import {
   InstallError,
   MAX_ZIP_MB,
+  WEB_INSTALL_ENV,
   deleteModule,
   installFilesUnlocked,
   installFromZip,
   isPersistent,
+  isWebInstallEnabled,
   isWritable,
   unpackArchive,
   withInstallLock,
@@ -56,22 +60,45 @@ const installLimiter = rateLimit({
 });
 
 /**
- * Install and delete only from a signed-in browser session.
+ * The operator's switch (DECISIONS.md, 12): installing and deleting from
+ * Settings exist only where MODULES_ALLOW_WEB_INSTALL is set. First in the
+ * chain and before the body is read, so a shut installation never takes the
+ * 20 MB upload it would then refuse. GET /install/info stays open and reports
+ * `webInstall: false`, which is how the page learns to show the manual way.
+ */
+function requireWebInstall(_req, res, next) {
+  if (isWebInstallEnabled()) return next();
+  return res.status(403).json({
+    error: `Installing modules from Settings is switched off on this server. The operator can turn it on with ${WEB_INSTALL_ENV}=true.`,
+    code: 403,
+    reason: 'module_web_install_disabled',
+  });
+}
+
+/**
+ * Install, delete and ENABLE only from a signed-in browser session.
  *
  * Installing a module puts same-origin JavaScript in front of every member;
- * deleting one is irreversible. An admin API token is a long-lived secret that
- * lives in scripts, CI and MCP clients (the MCP bridge calls this API with the
- * client's token), and a leaked one should not be able to plant code in the
- * household. The browser path also carries CSRF protection and 2FA at sign-in.
- * Checked before the body is read, so a refused request never uploads 20 MB.
+ * enabling one is the step that makes it live, and deleting one is
+ * irreversible. An admin API token is a long-lived secret that lives in
+ * scripts, CI and MCP clients (the MCP bridge calls this API with the client's
+ * token), and a leaked one should not be able to plant code in the household
+ * or switch planted code on. The browser path also carries CSRF protection and
+ * 2FA at sign-in. Checked before the body is read, so a refused request never
+ * uploads 20 MB. Disabling by token stays allowed: taking code away is the
+ * safe direction.
  */
-function requireBrowserSession(req, res, next) {
-  if (req.authMethod === 'session') return next();
+function sessionRefusal(res, what) {
   return res.status(403).json({
-    error: 'Installing or deleting modules is only possible from a signed-in browser session, not with an API token.',
+    error: `${what} is only possible from a signed-in browser session, not with an API token.`,
     code: 403,
     reason: 'module_session_required',
   });
+}
+
+function requireBrowserSession(req, res, next) {
+  if (req.authMethod === 'session') return next();
+  return sessionRefusal(res, 'Installing or deleting modules');
 }
 
 const zipBodyParser = express.raw({
@@ -129,29 +156,24 @@ function pathOption(value) {
   return typeof value === 'string' ? value : undefined;
 }
 
+// The module arrives disabled either way (`data.install.approved` is false);
+// there is no field for it because there is no case in which it is not so.
 function installBody(result) {
-  return {
-    data: result.module,
-    replaced: result.replaced,
-    skipped: result.skipped,
-    // Always present, so a client never has to tell "false" from "missing".
-    disabledForReview: Boolean(result.disabledForReview),
-    disabledReason: result.disabledReason ?? null,
-  };
+  return { data: result.module, replaced: result.replaced, skipped: result.skipped };
 }
 
 // Static /install/* paths before any /:id route.
 router.get('/install/info', requireAdmin, async (_req, res) => {
   try {
     const [writable, persistent] = await Promise.all([isWritable(), isPersistent()]);
-    res.json({ data: { writable, persistent, maxZipMb: MAX_ZIP_MB } });
+    res.json({ data: { writable, persistent, webInstall: isWebInstallEnabled(), maxZipMb: MAX_ZIP_MB } });
   } catch (err) {
     log.error('Module install info failed:', err);
     res.status(500).json({ error: 'Module install info failed.', code: 500 });
   }
 });
 
-router.post('/install/zip', requireAdmin, requireBrowserSession, installLimiter, parseZipBody, async (req, res) => {
+router.post('/install/zip', requireAdmin, requireWebInstall, requireBrowserSession, installLimiter, parseZipBody, async (req, res) => {
   try {
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
       throw new InstallError('not_zip', 'Send the module ZIP file as the request body with Content-Type application/zip.');
@@ -167,7 +189,7 @@ router.post('/install/zip', requireAdmin, requireBrowserSession, installLimiter,
   }
 });
 
-router.post('/install/github', requireAdmin, requireBrowserSession, installLimiter, async (req, res) => {
+router.post('/install/github', requireAdmin, requireWebInstall, requireBrowserSession, installLimiter, async (req, res) => {
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     if (typeof body.url !== 'string' || !body.url.trim()) {
@@ -213,6 +235,12 @@ router.patch('/:id', requireAdmin, async (req, res) => {
     if (typeof req.body?.enabled !== 'boolean') {
       return res.status(400).json({ error: 'enabled must be a boolean.', code: 400 });
     }
+    // Only the ON direction needs the session: it is the approval that makes
+    // installed code live (see requireBrowserSession). Not a middleware, because
+    // the direction is in the body.
+    if (req.body.enabled && req.authMethod !== 'session') {
+      return sessionRefusal(res, 'Enabling a module');
+    }
     const module = await setModuleEnabled(req.params.id, req.body.enabled);
     res.json({ data: module });
   } catch (err) {
@@ -222,7 +250,7 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   }
 });
 
-router.delete('/:id', requireAdmin, requireBrowserSession, async (req, res) => {
+router.delete('/:id', requireAdmin, requireWebInstall, requireBrowserSession, async (req, res) => {
   try {
     const result = await deleteModule(req.params.id, { userId: req.authUserId });
     res.json({ data: result });

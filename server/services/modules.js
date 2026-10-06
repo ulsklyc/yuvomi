@@ -266,14 +266,27 @@ async function pathExists(filePath) {
 }
 
 // Wer ein Modul ueber die Einstellungen installiert hat, legt diese Datei in den
-// Modulordner (server/services/module-install.js). Sie ist Information fuer den
-// Admin (Quelle, Zeitpunkt), keine Konfiguration: fehlt sie oder ist sie kaputt,
-// laedt das Modul trotzdem - es wurde dann eben von Hand kopiert.
+// Modulordner (server/services/module-install.js). Sie nennt Quelle und
+// Zeitpunkt - und sie traegt den PRUEFSTAND des Moduls (DECISIONS.md, 12):
+// `approved: false` schreibt jede Installation und jedes Ersetzen, `true` setzt
+// erst ein Admin aus einer Browser-Sitzung (setModuleEnabled). Der Stand wohnt
+// in der Datei und nicht in der Datenbank, weil kein Backup `modules/` enthaelt:
+// eine zurueckgespielte Datenbank oder eine frische ueber einem behaltenen
+// Modulordner darf kein Modul einschalten, das nie jemand angesehen hat.
+// Fehlt die Datei, laedt das Modul wie bisher - es wurde dann eben von Hand
+// kopiert, und dafuer gilt allein die Sperrliste. Ist sie DA, aber nicht
+// lesbar (abgeschnitten, von Hand verdorben), gilt das Gegenteil: die Datei
+// sagt "hier hat die Oberflaeche installiert", und was sie nicht freigibt,
+// bleibt aus - als Fehler, damit der Admin sieht, warum der Schalter fehlt.
 export const INSTALL_META_FILE = '.yuvomi-install.json';
 const INSTALL_META_MAX_BYTES = 4096;
 const INSTALL_SOURCES = new Set(['zip', 'github']);
 
-export async function readInstallMeta(basePath) {
+/**
+ * Die geprueften Felder der Datei, samt `installedBy` (Nutzer-Id). Fuer den
+ * Service; eine Antwort bekommt die Form aus readInstallMeta().
+ */
+export async function readInstallRecord(basePath) {
   try {
     const file = path.join(basePath, INSTALL_META_FILE);
     const stat = await fs.lstat(file);
@@ -281,10 +294,6 @@ export async function readInstallMeta(basePath) {
     const raw = JSON.parse(await fs.readFile(file, 'utf8'));
     if (!raw || typeof raw !== 'object' || !INSTALL_SOURCES.has(raw.source)) return null;
     const str = (v, max) => (typeof v === 'string' && v ? v.slice(0, max) : null);
-    // installedBy bleibt draussen: wer installiert hat, steht im Log, keine
-    // Antwort braucht es. Der Rest geht nur an Admins - listModules() nimmt
-    // `install` aus der Liste fuer alle anderen heraus (Quelle und Commit
-    // sagen einem Mitglied nichts, einem Angreifer aber, woher der Code kommt).
     return {
       source: raw.source,
       url: str(raw.url, 500),
@@ -292,10 +301,59 @@ export async function readInstallMeta(basePath) {
       commit: str(raw.commit, 64),
       path: str(raw.path, 500),
       installedAt: str(raw.installedAt, 40),
+      // Nur das Literal `true` zaehlt: eine Datei, die das Feld nicht kennt
+      // (oder "true" als Text traegt), ist nicht freigegeben.
+      approved: raw.approved === true,
+      installedBy: Number.isInteger(raw.installedBy) ? raw.installedBy : null,
     };
   } catch {
     return null;
   }
+}
+
+/**
+ * Die Form fuer Antworten. installedBy bleibt draussen: die Admin-Liste zeigt
+ * stattdessen den Namen (installedByName, siehe readModule). Der Rest geht nur
+ * an Admins - listModules() nimmt `install` aus der Liste fuer alle anderen
+ * heraus (Quelle und Commit sagen einem Mitglied nichts, einem Angreifer aber,
+ * woher der Code kommt).
+ */
+export async function readInstallMeta(basePath) {
+  const record = await readInstallRecord(basePath);
+  if (!record) return null;
+  // eslint-disable-next-line no-unused-vars
+  const { installedBy, ...meta } = record;
+  return meta;
+}
+
+/**
+ * Schreibt `approved` in die Datei um, atomar (Temp-Datei + rename), damit
+ * ein Absturz mittendrin nie eine halbe Datei hinterlaesst, die readInstallRecord()
+ * als "kaputt" liest - das Modul liefe dann als von Hand kopiert. Alle anderen
+ * Felder bleiben, wie die Installation sie geschrieben hat.
+ */
+export async function writeInstallApproval(basePath, approved) {
+  const file = path.join(basePath, INSTALL_META_FILE);
+  const raw = JSON.parse(await fs.readFile(file, 'utf8'));
+  if (!raw || typeof raw !== 'object') throw new Error('install record is not an object.');
+  raw.approved = approved === true;
+  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(raw, null, 2), { flag: 'wx', mode: 0o644 });
+  try {
+    await fs.rename(tmp, file);
+  } catch (err) {
+    await fs.rm(tmp, { force: true }).catch(() => {});
+    throw err;
+  }
+}
+
+// Der Name zum installedBy der Datei, fuer die Details der Admin-Liste. null
+// fuer ein geloeschtes Konto (die Seite sagt dann "ein frueheres Mitglied")
+// und fuer eine Datei ohne Id.
+function installedByName(userId) {
+  if (!Number.isInteger(userId)) return null;
+  const row = db.get().prepare('SELECT display_name FROM users WHERE id = ?').get(userId);
+  return row?.display_name || null;
 }
 
 /**
@@ -334,19 +392,37 @@ export async function loadModuleDir(basePath, folderName) {
   return { manifest, capabilities, i18n };
 }
 
-async function readModule(folderName, disabledSet) {
+async function readModule(folderName, disabledSet, { withInstaller = false } = {}) {
   const basePath = path.join(MODULES_DIR, folderName);
   let install = null;
   try {
+    const recordPresent = await fs.lstat(path.join(basePath, INSTALL_META_FILE))
+      .then((stat) => stat.isFile(), () => false);
     const stat = await fs.stat(basePath);
     if (!stat.isDirectory()) return null;
-    // Kosten je Modul und Listenaufruf: ein lstat und hoechstens 4 KiB lesen -
-    // neben module.json, Entry und Locales, die listModules() ohnehin jedes Mal
-    // neu liest. Ein Cache lohnte die Frage nach seiner Gueltigkeit nicht (jede
-    // Installation schreibt die Datei neu, ein Betreiber kann sie loeschen).
-    install = await readInstallMeta(basePath);
+    // Kosten je Modul und Listenaufruf: ein lstat, hoechstens 4 KiB lesen und
+    // eine Zeile aus `users` - neben module.json, Entry und Locales, die
+    // listModules() ohnehin jedes Mal neu liest. Ein Cache lohnte die Frage
+    // nach seiner Gueltigkeit nicht (jede Installation schreibt die Datei neu,
+    // ein Betreiber kann sie loeschen).
+    const record = await readInstallRecord(basePath);
+    if (recordPresent && !record) {
+      throw new Error(`${INSTALL_META_FILE} is present but unreadable; fix or remove it on the server.`);
+    }
+    if (record) {
+      // eslint-disable-next-line no-unused-vars
+      const { installedBy, ...meta } = record;
+      // Den Namen schlaegt nur die Admin-Liste nach: fuer jede Asset-Antwort
+      // (resolveAssetPath) waere das eine Zeile aus `users` je Modul, und das
+      // Mitglied bekommt `install` ohnehin nicht zu sehen.
+      install = { ...meta, installedByName: withInstaller ? installedByName(installedBy) : null };
+    }
     const { manifest, capabilities, i18n } = await loadModuleDir(basePath, folderName);
-    const enabled = !disabledSet.has(manifest.id);
+    // Ein Modul mit Installationsdatei ist aus, bis die Datei die Freigabe
+    // traegt - was auch immer die Sperrliste sagt (sie kann aus einem Backup
+    // von vor der Installation stammen). Danach, und fuer einen von Hand
+    // kopierten Ordner von Anfang an, entscheidet die Sperrliste allein.
+    const enabled = (record ? record.approved : true) && !disabledSet.has(manifest.id);
     return {
       ...manifest,
       i18n,
@@ -406,7 +482,7 @@ async function listModules({ admin = false } = {}) {
   // `.git` oder `.DS_Store` eines Betreibers gehoert ebenso wenig in die Liste.
   const modules = (await Promise.all(entries
     .filter((entry) => !entry.startsWith('.'))
-    .map((entry) => readModule(entry, disabledSet))))
+    .map((entry) => readModule(entry, disabledSet, { withInstaller: admin }))))
     .filter(Boolean)
     .sort((a, b) => (a.menu?.order ?? 1000) - (b.menu?.order ?? 1000) || a.name.localeCompare(b.name));
 
@@ -439,6 +515,15 @@ async function setModuleEnabled(id, enabled) {
     throw err;
   }
 
+  // Einschalten ist die Freigabe: ein installiertes Modul bekommt sie in seine
+  // Datei geschrieben, BEVOR die Sperrliste faellt - scheitert das Schreiben,
+  // bleibt es aus. Ausschalten laesst die Freigabe stehen und nimmt nur die
+  // Sperrliste: wer ein geprueftes Modul spaeter wieder einschaltet, prueft
+  // nicht neu. Erst eine Installation oder ein Ersetzen setzt die Freigabe
+  // zurueck (module-install.js).
+  if (enabled && target.install && !target.install.approved) {
+    await writeInstallApproval(path.join(MODULES_DIR, id), true);
+  }
   const disabled = new Set(parseDisabledModules());
   if (enabled) disabled.delete(id);
   else disabled.add(id);
@@ -447,11 +532,13 @@ async function setModuleEnabled(id, enabled) {
 }
 
 /**
- * Setzt nur den gespeicherten Schalter, ohne das Modul zu laden. Fuer die
- * Installation: ein neues Modul landet AUSGESCHALTET, bevor sein Ordner an
- * seinen Platz rueckt - es gibt keinen Moment, in dem fremder Code schon
- * ausgeliefert wuerde. setModuleEnabled() taugt dafuer nicht, es verlangt ein
- * bereits ladbares Modul.
+ * Setzt nur den gespeicherten Schalter, ohne das Modul zu laden. Fuer das
+ * Loeschen (module-install.js): der Ordner ist dann schon weg, und
+ * setModuleEnabled() verlangt ein ladbares Modul. Dass ein NEUES Modul aus
+ * landet, besorgt nicht mehr die Sperrliste, sondern `approved: false` in
+ * seiner Installationsdatei - die liegt im Staging-Ordner, bevor er an seinen
+ * Platz rueckt, es gibt also keinen Moment, in dem fremder Code schon
+ * ausgeliefert wuerde.
  */
 function setModuleDisabledFlag(id, disabled) {
   if (!ID_RE.test(String(id || ''))) return;

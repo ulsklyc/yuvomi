@@ -40,14 +40,20 @@ const REASON_KEYS = Object.freeze({
   busy: 'settings.installModuleErrorBusy',
   not_writable: 'settings.installModuleErrorNotWritable',
   not_a_module: 'settings.installModuleErrorNotAModule',
-  // Die einzige 403 dieser Routen: test:api fuehrt sie als Grund, den diese
-  // Datei liest (REASONS_READ_BY_A_PAGE), und sucht ihn hier in Anfuehrungszeichen.
+  // Die beiden 403 dieser Routen: test:api fuehrt sie als Gruende, die diese
+  // Datei liest (REASONS_READ_BY_A_PAGE), und sucht sie hier in Anfuehrungszeichen.
+  // `module_web_install_disabled`: der Betreiber hat MODULES_ALLOW_WEB_INSTALL
+  // nicht gesetzt - das Blatt zeigt dann gar keine Knoepfe (installPageStatus);
+  // der Satz faengt eine Seite, die vor dem Umschalten geladen wurde.
   'module_session_required':'settings.installModuleErrorSessionRequired',
+  'module_web_install_disabled':'settings.installModuleErrorWebInstallDisabled',
   // Nur beim Loeschen (modules-active.js nutzt dieselbe Abbildung). `bad_id`
-  // bietet die Seite gar nicht erst an (isDeletableModuleId); kommt es doch,
-  // etwa von einer aelteren offenen Seite, soll es lesbar sein.
+  // und `not_web_installed` bietet die Seite gar nicht erst an
+  // (isDeletableModule); kommen sie doch, etwa von einer aelteren offenen
+  // Seite, sollen sie lesbar sein.
   not_found: 'settings.moduleDeleteErrorNotFound',
   bad_id: 'settings.moduleDeleteErrorBadId',
+  not_web_installed: 'settings.moduleDeleteErrorNotWebInstalled',
 });
 
 /**

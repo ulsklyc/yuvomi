@@ -130,7 +130,8 @@
     "privateNetworkWaste": "Recolha de resíduos",
     "privateNetworkWebdav": "Documentos WebDAV",
     "baseUrl": "Endereço público",
-    "outlook": "Calendário Outlook"
+    "outlook": "Calendário Outlook",
+    "moduleWebInstall": "Instalar módulos a partir das Definições"
   },
   "docker": {
     "title": "Iniciando o Yuvomi",
@@ -276,7 +277,9 @@
     "sectionPrivateNetwork": "Acesso à sua rede doméstica",
     "privateNetworkHint": "Por padrão, o Yuvomi recusa conexões para endereços na sua própria rede, o que protege contra um servidor ser induzido a alcançar serviços internos. Ative o que você realmente executa em casa.",
     "authPasswordLogin": "Manter o início de sessão com nome de utilizador e senha",
-    "authPasswordLoginHint": "Desativá-lo torna o SSO a única forma de entrar: o formulário de início de sessão e a reposição da senha desaparecem. Se o fornecedor ficar inacessível, o caminho de volta é editar o ficheiro .env e reiniciar."
+    "authPasswordLoginHint": "Desativá-lo torna o SSO a única forma de entrar: o formulário de início de sessão e a reposição da senha desaparecem. Se o fornecedor ficar inacessível, o caminho de volta é editar o ficheiro .env e reiniciar.",
+    "moduleWebInstall": "Permitir instalar módulos a partir das Definições",
+    "moduleWebInstallHint": "Permite a um administrador colocar módulos de terceiros no servidor a partir da interface web (envio de ZIP ou URL do GitHub) sem acesso aos ficheiros. Os módulos instalados ficam desligados até um administrador os aprovar. Desligado: os módulos são copiados à mão para a pasta de módulos."
   },
   "welcome": {
     "title": "Como queres configurar o Yuvomi?",

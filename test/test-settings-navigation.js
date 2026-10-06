@@ -3815,6 +3815,10 @@ test('Eigenes Modul hinzufuegen: adminOnly, am Ende, Fehler je reason lokalisier
     ['ref_not_found', 'installModuleErrorRefNotFound'],
     ['not_a_module', 'installModuleErrorNotAModule'],
     ['module_session_required', 'installModuleErrorSessionRequired'],
+    // Review Runde 3: der Schalter des Betreibers (403) und das Loeschen eines
+    // von Hand kopierten Ordners (409) haben ihren eigenen Satz.
+    ['module_web_install_disabled', 'installModuleErrorWebInstallDisabled'],
+    ['not_web_installed', 'moduleDeleteErrorNotWebInstalled'],
     ['unsupported_encoding', 'installModuleErrorUnsupportedEncoding'],
     ['not_found', 'moduleDeleteErrorNotFound'],
     ['bad_id', 'moduleDeleteErrorBadId'],
@@ -3880,35 +3884,52 @@ test('Eigenes Modul: Fokus, veraltete Kandidaten, ein Fehler, Persistenz-Hinweis
 
   // Verhalten statt Quelltext: die reinen Helfer der Seite (Review Runde 2).
   const {
-    successStatus, replaceConfirmText, candidateInstallOptions, warnsNotPersistent,
+    successStatus, replaceConfirmText, candidateInstallOptions, installPageStatus,
   } = await import('/settings/pages/modules-install.js');
-  assert.equal(warnsNotPersistent({ persistent: false }), true);
-  assert.equal(warnsNotPersistent({ persistent: null }), false, 'unbekannt bleibt still');
-  assert.equal(warnsNotPersistent({ persistent: true }), false);
-  assert.equal(warnsNotPersistent(undefined), false);
 
-  // Erfolg: ob und warum das Modul zur Pruefung aus ist.
-  assert.equal(successStatus({ replaced: false, disabledForReview: false, disabledReason: null }), 'settings.installModuleSuccessDisabled');
-  assert.equal(successStatus({ replaced: true, disabledForReview: false, disabledReason: null }), 'settings.installModuleSuccessReplaced');
-  assert.equal(successStatus({ replaced: true, disabledForReview: true, disabledReason: 'zip_replace' }), 'settings.installModuleSuccessZipReplace');
-  assert.equal(successStatus({ replaced: true, disabledForReview: true, disabledReason: 'source_changed' }), 'settings.installModuleSuccessSourceChanged');
+  // Review Runde 3: drei Gruende, keine Knoepfe zu zeigen, in der Reihenfolge
+  // ihrer Haerte - schreibgeschuetzt vor Schalter aus vor nicht dauerhaft.
+  // Nur ein sicheres `false` zaehlt; `null`/fehlend heisst "unbekannt".
+  assert.equal(installPageStatus({ writable: true, persistent: true, webInstall: true }), null);
+  assert.equal(installPageStatus({ writable: true, persistent: null, webInstall: true }), null, 'unbekannt bleibt still');
+  assert.equal(installPageStatus({ writable: true, persistent: true }), null, 'ein aelterer Server ohne webInstall');
+  assert.equal(installPageStatus(undefined), null);
+  assert.equal(installPageStatus({ writable: false, persistent: true, webInstall: true }), 'not_writable');
+  assert.equal(installPageStatus({ writable: true, persistent: true, webInstall: false }), 'web_install_off',
+    'MODULES_ALLOW_WEB_INSTALL nicht gesetzt: der Weg von Hand, wie schreibgeschuetzt');
+  assert.equal(installPageStatus({ writable: true, persistent: false, webInstall: true }), 'not_persistent',
+    'Umbrel / Container ohne Volume: kein Hinweis mehr ueber den Knoepfen, sondern keine Knoepfe');
+  assert.equal(installPageStatus({ writable: false, persistent: false, webInstall: false }), 'not_writable',
+    'schreibgeschuetzt hilft auch der Schalter nicht');
+  assert.equal(installPageStatus({ writable: true, persistent: false, webInstall: false }), 'web_install_off',
+    'der Schalter erklaert mehr als das fehlende Volume');
 
-  // Rueckfrage bei 409 exists: das Detail sagt vorher, was das Ersetzen tut.
+  // Erfolg: das Modul ist aus - neu installiert oder ersetzt, denn jedes
+  // Ersetzen nimmt die Freigabe zurueck (kein disabledForReview mehr).
+  assert.equal(successStatus({ replaced: false }), 'settings.installModuleSuccessDisabled');
+  assert.equal(successStatus({ replaced: true }), 'settings.installModuleSuccessReplaced');
+  assert.equal(successStatus({ replaced: true, disabledForReview: false, disabledReason: null }),
+    'settings.installModuleSuccessReplaced', 'ein aelterer Server mit den alten Feldern aendert nichts');
+  assert.equal(successStatus(undefined), 'settings.installModuleSuccessDisabled');
+
+  // Rueckfrage bei 409 exists: das Detail sagt vorher, was das Ersetzen tut -
+  // immer dasselbe, denn jedes Ersetzen schaltet aus.
   const ask = replaceConfirmText({
     existing: { id: 'demo', name: 'Demo', version: '1.0.0' },
     incoming: { id: 'demo', version: '2.0.0' },
-    sourceChanged: false,
-    replaceDisabledReason: 'zip_replace',
   });
   assert.match(ask.question, /^settings\.installModuleReplaceConfirm\{"name":"Demo","from":"1\.0\.0","to":"2\.0\.0"\}$/);
-  assert.equal(ask.detail, 'settings.installModuleReplaceDetailZip');
-  assert.equal(replaceConfirmText({ existing: { id: 'demo' }, replaceDisabledReason: 'source_changed' }).detail,
-    'settings.installModuleReplaceDetailSourceChanged');
-  assert.equal(replaceConfirmText({ existing: { id: 'demo' }, replaceDisabledReason: null }).detail,
-    'settings.installModuleReplaceDetail', 'GitHub-Update aus derselben Quelle: der Schalter bleibt');
-  assert.equal(replaceConfirmText({ existing: { id: 'demo' }, sourceChanged: true }).detail,
-    'settings.installModuleReplaceDetailSourceChanged', 'ein Server ohne replaceDisabledReason: sourceChanged reicht');
+  assert.equal(ask.detail, 'settings.installModuleReplaceDetail');
+  assert.equal(replaceConfirmText({ existing: { id: 'demo' }, sourceChanged: true, replaceDisabledReason: 'zip_replace' }).detail,
+    'settings.installModuleReplaceDetail', 'die alten Felder eines aelteren Servers aendern das Detail nicht');
   assert.match(replaceConfirmText({ existing: { id: 'demo' } }).question, /"name":"demo".*"from":"settings\.installModuleVersionUnknown".*"to":"settings\.installModuleVersionNew"/);
+  // Die alten Varianten sind weg - samt Schluesseln, sonst stuende ein Satz in
+  // 26 Sprachen, den niemand mehr liest.
+  const installFlat = installSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  for (const gone of ['disabledForReview', 'disabledReason', 'replaceDisabledReason', 'sourceChanged',
+    'SuccessZipReplace', 'SuccessSourceChanged', 'ReplaceDetailZip', 'ReplaceDetailSourceChanged']) {
+    assert.equal(installFlat.includes(gone), false, `modules-install.js liest noch '${gone}'`);
+  }
 
   // Kandidat waehlen: der Pfad kommt an, '' (Wurzel) eingeschlossen, die
   // uebrigen Optionen (overwrite) bleiben.
@@ -3920,10 +3941,62 @@ test('Eigenes Modul: Fokus, veraltete Kandidaten, ein Fehler, Persistenz-Hinweis
   assert.doesNotMatch(activeSrc, /moduleDetailError/, 'der Fehler steht in der Zeile, nicht noch einmal in den Details');
 
   // Loeschen nur fuer Kennungen, die DELETE auch annimmt (sonst 400 bad_id).
-  const { isDeletableModuleId } = await import('/settings/pages/modules-active.js');
+  const { isDeletableModuleId, isDeletableModule, installedByText } = await import('/settings/pages/modules-active.js');
   assert.equal(isDeletableModuleId('solar-panel'), true);
   for (const bad of ['Bad_ID', 'ab', '-lead', 'trail-', 'a'.repeat(65), '', null, undefined]) {
     assert.equal(isDeletableModuleId(bad), false, String(bad));
   }
   assert.equal(isDeletableModuleId('a'.repeat(64)), true);
+
+  // Review Runde 3: ... UND nur fuer Module mit Installationsdatensatz. Einen
+  // von Hand kopierten Ordner lehnt DELETE mit 409 not_web_installed ab - also
+  // kein Knopf, die Details sagen "Auf den Server kopiert".
+  const record = { source: 'zip', installedAt: '2026-10-02T09:15:00.000Z' };
+  assert.equal(isDeletableModule({ id: 'solar-panel', install: record }), true);
+  assert.equal(isDeletableModule({ id: 'solar-panel' }), false, 'ohne Datensatz: von Hand kopiert');
+  assert.equal(isDeletableModule({ id: 'solar-panel', install: null }), false);
+  assert.equal(isDeletableModule({ id: 'solar-panel', install: 'yes' }), false, 'ein Datensatz ist ein Objekt');
+  assert.equal(isDeletableModule({ id: 'Bad_ID', install: record }), false, 'die Kennung zaehlt weiterhin');
+  assert.equal(isDeletableModule(null), false);
+  // Und die Zeile nimmt genau diese Entscheidung, nicht die Kennung allein.
+  const activeFlat = activeSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  assert.match(activeFlat, /deletable: isDeletableModule\(module\)/, 'buildRows entscheidet je Modul');
+  assert.match(activeFlat, /row\.type === 'third-party' && row\.deletable === true/, 'rowHtml fragt nur die Entscheidung');
+
+  // Details "Installiert von": der Name aus der Admin-Liste; null ist ein
+  // geloeschtes Konto; fehlt das Feld (aelterer Server, kein Datensatz), keine Zeile.
+  assert.equal(installedByText({ ...record, installedByName: 'Anna' }), 'Anna');
+  assert.equal(installedByText({ ...record, installedByName: '  Anna  ' }), 'Anna');
+  assert.equal(installedByText({ ...record, installedByName: null }), 'settings.moduleDetailFormerMember');
+  assert.equal(installedByText({ ...record, installedByName: '' }), 'settings.moduleDetailFormerMember', 'ein leerer Name ist kein Name');
+  assert.equal(installedByText(record), null, 'ohne das Feld keine Zeile');
+  assert.equal(installedByText(null), null);
+  assert.match(activeFlat, /installedBy \? \{ label: t\('settings\.moduleDetailInstalledBy'\), value: installedBy \} : null/);
+});
+
+// Review Runde 3 (N4): die Dateigroesse kommt aus dem Locale-Formatter, nicht
+// aus toFixed(1) + " MB" - Ziffern aus der Region, das Wort aus der Sprache.
+test('Eigenes Modul: die Dateigroesse folgt der Locale', async () => {
+  const { formatSize } = await import('/settings/pages/modules-install.js');
+  const prev = { locale: globalThis.__locale, format: globalThis.__formatLocale };
+  try {
+    globalThis.__locale = 'en';
+    globalThis.__formatLocale = 'en-US';
+    assert.equal(formatSize(1.5 * 1024 * 1024), '1.5 MB');
+    assert.equal(formatSize(300 * 1024), '300 kB');
+    assert.equal(formatSize(10), '1 kB', 'nie "0 kB" fuer eine Datei, die da ist');
+    assert.equal(formatSize(1024 * 1024), '1 MB', 'keine erzwungene Nachkommastelle');
+    globalThis.__locale = 'de';
+    globalThis.__formatLocale = 'de-DE';
+    assert.equal(formatSize(1.5 * 1024 * 1024), '1,5 MB');
+    assert.equal(formatSize(2.5 * 1024 * 1024 * 1024), new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 }).format(2560) + ' MB',
+      'Tausendertrenner der Region');
+    assert.equal(formatSize(300 * 1024), '300 kB');
+  } finally {
+    globalThis.__locale = prev.locale;
+    globalThis.__formatLocale = prev.format;
+  }
+  // Kein von Hand gebautes Kuerzel mehr.
+  const src = await readFile(new URL('../public/settings/pages/modules-install.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, ''), /toFixed\(|['`] ?MB['`]|['`] ?KB['`]/);
 });

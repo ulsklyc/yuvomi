@@ -6,7 +6,10 @@
  * einen Ordner nach `modules/` zu kopieren, nur ohne Shell-Zugang. Deshalb
  * steht der Sicherheitshinweis VOR den beiden Wegen, und ein neues Modul kommt
  * ausgeschaltet an - eingeschaltet wird es in "Aktive Module", wo der Admin
- * es vorher ansehen kann.
+ * es vorher ansehen kann. Der ganze Weg ist eine Entscheidung des Betreibers
+ * (`MODULES_ALLOW_WEB_INSTALL`, Review zu PR #1671): ohne den Schalter zeigt
+ * das Blatt nur den Weg von Hand, genau wie bei einem schreibgeschuetzten oder
+ * nicht dauerhaften Modulordner (`installPageStatus`).
  *
  * Zwei Wege, ein Ablauf (`runInstall`): GitHub-Adresse oder ZIP-Datei. Die
  * Antworten des Servers, die eine Rueckfrage brauchen, laufen hier wieder in
@@ -16,7 +19,7 @@
  */
 
 import { api } from '/api.js';
-import { t } from '/i18n.js';
+import { formatUnit, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { confirmModal } from '/components/modal.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
@@ -53,10 +56,15 @@ export function installQuery({ overwrite = false, path = null } = {}) {
   return query ? `?${query}` : '';
 }
 
-function formatSize(bytes) {
+/**
+ * Groesse der gewaehlten Datei, Zahl und Einheit aus der Locale (formatUnit:
+ * das Wort aus der UI-Sprache, die Ziffern aus der Region). Ein von Hand
+ * gebautes "1.5 MB" ging an beidem vorbei (Review zu PR #1671).
+ */
+export function formatSize(bytes) {
   const size = Number(bytes) || 0;
-  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-  return `${Math.max(1, Math.round(size / 1024))} KB`;
+  if (size >= 1024 * 1024) return formatUnit(size / (1024 * 1024), 'megabyte', { maximumFractionDigits: 1 });
+  return formatUnit(Math.max(1, Math.round(size / 1024)), 'kilobyte', { maximumFractionDigits: 0 });
 }
 
 function moduleWithVersion(name, version) {
@@ -143,22 +151,49 @@ function noticeElement() {
 }
 
 /**
- * Der Modulordner liegt im Container selbst statt auf einem Volume: Installieren
- * klappt, das Modul ist nach dem naechsten Update aber weg. Nur ein Hinweis,
- * kein Riegel - ein Test oder ein Haushalt, der nach Updates neu installiert,
- * kommt weiter (module-install.js, isPersistent).
+ * Warum das Blatt keine Installationswege zeigt, oder null, wenn es sie zeigt.
+ * Drei Faelle, ein Bild (der "Weg von Hand" mit Link auf MODULES.md):
+ *  - 'not_writable': der Modulordner ist schreibgeschuetzt (:ro-Mount);
+ *  - 'web_install_off': der Betreiber hat `MODULES_ALLOW_WEB_INSTALL` nicht
+ *    gesetzt - der Server lehnt jede Installation mit 403 ab, Knoepfe, die nur
+ *    scheitern koennen, gibt es nicht;
+ *  - 'not_persistent': der Ordner liegt im Container statt auf einem Volume,
+ *    ein installiertes Modul waere nach dem naechsten Update weg (Umbrel,
+ *    Container ohne Volume). Frueher nur ein Hinweis ueber den Knoepfen; seit
+ *    dem Review zu PR #1671 wie schreibgeschuetzt.
+ * Die Reihenfolge ist die Haerte: ein :ro-Mount hilft auch der Schalter nicht,
+ * und ein Schalter, der aus ist, erklaert mehr als ein fehlendes Volume. Nur
+ * ein sicheres `false` zaehlt; `null` heisst "unbekannt" und bleibt still.
+ * @returns {'not_writable'|'web_install_off'|'not_persistent'|null}
  */
-function notPersistentElement() {
-  return createStatusSummary({
-    title: t('settings.installModuleNotPersistentTitle'),
-    status: t('settings.installModuleNotPersistentText'),
-    details: [t('settings.installModuleNotPersistentHint')],
-    tone: 'warning',
-    level: 2,
-  });
+export function installPageStatus(info) {
+  if (info?.writable === false) return 'not_writable';
+  if (info?.webInstall === false) return 'web_install_off';
+  if (info?.persistent === false) return 'not_persistent';
+  return null;
 }
 
-function notWritableElement() {
+const STATUS_KEYS = Object.freeze({
+  not_writable: {
+    title: 'settings.installModuleNotWritableTitle',
+    status: 'settings.installModuleNotWritableText',
+    hint: 'settings.installModuleNotWritableHint',
+  },
+  web_install_off: {
+    title: 'settings.installModuleWebInstallOffTitle',
+    status: 'settings.installModuleWebInstallOffText',
+    hint: 'settings.installModuleWebInstallOffHint',
+  },
+  not_persistent: {
+    title: 'settings.installModuleNotWritableTitle',
+    status: 'settings.installModuleNotPersistentText',
+    hint: 'settings.installModuleNotPersistentHint',
+  },
+});
+
+/** Der Weg von Hand: Ueberschrift, Grund, Hinweis und der Link auf MODULES.md. */
+function manualWayElement(status) {
+  const keys = STATUS_KEYS[status];
   const link = document.createElement('a');
   link.className = 'btn btn--secondary';
   link.href = MODULES_GUIDE_URL;
@@ -166,9 +201,9 @@ function notWritableElement() {
   link.rel = 'noopener noreferrer';
   link.textContent = t('settings.installModuleManualLink');
   return createStatusSummary({
-    title: t('settings.installModuleNotWritableTitle'),
-    status: t('settings.installModuleNotWritableText'),
-    details: [t('settings.installModuleNotWritableHint')],
+    title: t(keys.title),
+    status: t(keys.status),
+    details: [t(keys.hint)],
     tone: 'warning',
     level: 2,
     action: link,
@@ -224,17 +259,13 @@ function setBusy(card, busy, button = card.button) {
 }
 
 /**
- * Der Satz unter "installiert": ob das Modul aus ist und warum. Ein Ersetzen aus
- * einer ZIP-Datei oder aus einer anderen Quelle schaltet es zur Pruefung aus
- * (module-install.js, replaceDisabledReason) - das muss hier stehen, sonst
- * sucht der Admin, warum sein Modul ploetzlich fehlt.
+ * Der Satz unter "installiert": das Modul ist aus. Neu installiert ODER
+ * ersetzt - jedes Ersetzen nimmt die Freigabe zurueck (module-install.js
+ * schreibt `approved: false` in den Installationsdatensatz, Review zu PR
+ * #1671), und das muss hier stehen, sonst sucht der Admin, warum sein Modul
+ * ploetzlich fehlt.
  */
 export function successStatus(response) {
-  if (response?.disabledForReview) {
-    return response.disabledReason === 'zip_replace'
-      ? t('settings.installModuleSuccessZipReplace')
-      : t('settings.installModuleSuccessSourceChanged');
-  }
   return response?.replaced
     ? t('settings.installModuleSuccessReplaced')
     : t('settings.installModuleSuccessDisabled');
@@ -242,36 +273,25 @@ export function successStatus(response) {
 
 /**
  * Frage und Detail fuer 409 `exists`. Das Detail sagt vorher, was der Server
- * nachher tut: ein Ersetzen, das zur Pruefung ausschaltet, darf nicht wie ein
- * harmloses Update klingen.
+ * nachher tut: ein Ersetzen schaltet das Modul aus, bis der Admin es wieder
+ * freigibt - es darf nicht wie ein harmloses Update klingen.
  * @returns {{ question: string, detail: string }}
  */
 export function replaceConfirmText(data = {}) {
   const existing = data.existing ?? {};
-  const reason = data.replaceDisabledReason
-    // Ein Server ohne das Feld kennt nur die Quelle als Grund.
-    ?? (data.sourceChanged ? 'source_changed' : null);
-  let detail = t('settings.installModuleReplaceDetail');
-  if (reason === 'zip_replace') detail = t('settings.installModuleReplaceDetailZip');
-  else if (reason) detail = t('settings.installModuleReplaceDetailSourceChanged');
   return {
     question: t('settings.installModuleReplaceConfirm', {
       name: existing.name || existing.id || '',
       from: existing.version || t('settings.installModuleVersionUnknown'),
       to: data.incoming?.version || t('settings.installModuleVersionNew'),
     }),
-    detail,
+    detail: t('settings.installModuleReplaceDetail'),
   };
 }
 
 /** Optionen fuer den zweiten Versuch mit dem gewaehlten Kandidaten; '' ist die Wurzel. */
 export function candidateInstallOptions(options, candidate) {
   return { ...options, path: String(candidate?.path ?? '') };
-}
-
-/** Nur ein sicheres false warnt; `null` heisst "unbekannt" und bleibt still. */
-export function warnsNotPersistent(info) {
-  return info?.persistent === false;
 }
 
 function successElement(response) {
@@ -530,20 +550,18 @@ export async function render(container) {
     return;
   }
 
-  // Schreibgeschuetzter Modulordner (read-only Mount): keine Knoepfe, die nur
-  // scheitern koennen - stattdessen der Weg von Hand. Umbrel ist NICHT dieser
-  // Fall: dort ist der Ordner beschreibbar, aber nicht dauerhaft (siehe unten).
-  if (info.writable === false) {
-    container.appendChild(notWritableElement());
+  // Schreibgeschuetzt, Schalter aus oder nicht dauerhaft: keine Knoepfe, die
+  // nur scheitern koennen oder deren Ergebnis das naechste Update loescht -
+  // stattdessen der Weg von Hand (installPageStatus).
+  const status = installPageStatus(info);
+  if (status) {
+    container.appendChild(manualWayElement(status));
     return;
   }
 
   const maxZipMb = Number(info.maxZipMb) > 0 ? Number(info.maxZipMb) : DEFAULT_MAX_ZIP_MB;
   container.insertAdjacentHTML('beforeend', pageHtml(maxZipMb));
-  const notice = noticeElement();
-  container.querySelector('#module-install-notice')?.replaceWith(notice);
-  // Unter dem Sicherheitshinweis, vor den beiden Wegen.
-  if (warnsNotPersistent(info)) notice.after(notPersistentElement());
+  container.querySelector('#module-install-notice')?.replaceWith(noticeElement());
   bindGithubCard(container.querySelector('[data-install-card="github"]'));
   bindZipCard(container.querySelector('[data-install-card="zip"]'), maxZipMb);
   window.lucide?.createIcons({ el: container });

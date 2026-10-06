@@ -7,11 +7,11 @@
  *            (422 + candidates, dann path), path_not_found, no_manifest
  *          - Manifest-Fehler (entry fehlt, id ungueltig, manifestVersion 2)
  *          - nicht erlaubte Dateien werden uebersprungen und gemeldet
- *          - neu installiert = AUSGESCHALTET, Assets 404 bis zum Einschalten; nur ein GitHub-Update aus derselben
- *            Quelle behaelt den Zustand;
+ *          - neu installiert = AUSGESCHALTET (approved:false in der Installationsdatei), Assets 404
+ *            bis zum Einschalten; JEDES Ersetzen kommt aus an, auch aus demselben Repo;
  *            Ersetzen ohne overwrite → 409 exists (+ installierte Version)
  *          - Rollback, wenn der Tausch scheitert (simuliert)
- *          - Loeschen (+404, Symlink verweigert, ungueltige id)
+ *          - Loeschen (+404, Symlink verweigert, ungueltige id, ohne Installationsdatei 409)
  *          - Punkt-Ordner tauchen nicht in listModules auf; `.yuvomi-install.json`
  *            erscheint als `install` und wird von der Asset-Route NICHT ausgeliefert
  *          - nicht beschreibbar → 503 (simuliert ueber den access-Hook: chmod auf
@@ -27,15 +27,22 @@
  *            multiple, install nur in der Admin-Liste, 415 bei fremdem
  *            Content-Encoding, nicht schreibbarer Name → unsafe_path,
  *            Persistenz-Erkennung (isPersistent) ueber injizierte /proc-Dateien
- *          - Runde 2: jedes ZIP-Ersetzen und jede andere Quelle schaltet zur
- *            Pruefung aus (disabledForReview/disabledReason), Ref-Probe nur per
- *            SHA, 409/422 zaehlen nicht zum Limit, releases/latest ohne
- *            brauchbaren Tag → Fehler, Tiefe unter dem Oberordner, verschachtelte
- *            Module werden nicht mitkopiert
+ *          - Runde 2: Ref-Probe nur per SHA, 409/422 zaehlen nicht zum Limit,
+ *            releases/latest ohne brauchbaren Tag → Fehler, Tiefe unter dem
+ *            Oberordner, verschachtelte Module werden nicht mitkopiert
+ *          - Runde 3 (DECISIONS.md 12): der Schalter MODULES_ALLOW_WEB_INSTALL
+ *            (aus → 403 module_web_install_disabled vor dem Body, info.webInstall),
+ *            die Freigabe in der Installationsdatei (Datei da, Datenbank leer →
+ *            aus; Einschalten schreibt approved:true; Ersetzen setzt sie zurueck),
+ *            Einschalten nur per Sitzung (Token → 403), Ausschalten per Token,
+ *            Loeschen nur mit Installationsdatei (409 not_web_installed),
+ *            Archiv mit zu tiefen Pfaden → 400, Kandidaten-Manifest ueber 64 KiB,
+ *            reservierte Windows-Namen als id, installedByName in der Admin-Liste
  *
  *        Kein Netz: der GitHub-Transport ist ein Fake (__setGithubRequestForTests /
  *        createGithubInstaller({ request })). MODULES_DIR zeigt auf einen
- *        Temp-Ordner, die DB ist In-Memory.
+ *        Temp-Ordner, die DB ist In-Memory. Der Schalter steht fuer die Suite auf
+ *        true (vor dem Import gesetzt); der Aus-Fall nimmt den Test-Hook.
  * Ausführen: node --experimental-sqlite --test test/test-module-install.js
  */
 
@@ -52,15 +59,19 @@ fs.mkdirSync(MODULES_DIR, { recursive: true });
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.DB_PATH = ':memory:';
 process.env.MODULES_DIR = MODULES_DIR;
+// Der Schalter wird beim Laden gelesen, wie jedes andere Betreiber-Flag.
+process.env.MODULES_ALLOW_WEB_INSTALL = 'true';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 
+const dbmod = await import('../server/db.js');
 const modulesSvc = await import('../server/services/modules.js');
 const install = await import('../server/services/module-install.js');
 const github = await import('../server/services/module-github.js');
 const { default: modulesRouter } = await import('../server/routes/modules.js');
+const db = dbmod.get();
 
 // ── Kleiner ZIP-Schreiber (deflate) ─────────────────────────────────────────
 // Die boesartigen Archive prueft test-zip-reader.js; hier genuegen gueltige.
@@ -121,6 +132,10 @@ function moduleFiles(id, { version = '1.0.0', prefix = '', extra = {}, manifest 
 
 const dirExists = (p) => fs.existsSync(p) && fs.statSync(p).isDirectory();
 const stagingLeftovers = () => fs.readdirSync(MODULES_DIR).filter((n) => n.startsWith('.install-') || n.startsWith('.backup-'));
+const recordOf = (id) => JSON.parse(fs.readFileSync(path.join(MODULES_DIR, id, '.yuvomi-install.json'), 'utf8'));
+// "Datenbank zurueckgespielt": die Sperrliste ist weg.
+const clearDisabledConfig = () => db.prepare("DELETE FROM sync_config WHERE key = 'third_party_disabled_modules'").run();
+const adminListed = async (id) => (await modulesSvc.listModules({ admin: true })).find((m) => m.id === id);
 
 // ── App mit injizierter Auth ────────────────────────────────────────────────
 // Jede Admin-Anfrage bekommt eine eigene Nutzer-Id: das Install-Limit zaehlt
@@ -182,9 +197,12 @@ test('ZIP mit Modul an der Wurzel: installiert, AUSGESCHALTET, mit install-Metad
   assert.deepEqual(r.body.skipped, []);
   assert.equal(r.body.data.install.source, 'zip');
   assert.match(r.body.data.install.installedAt, /^\d{4}-\d{2}-\d{2}T/);
-  assert.equal(r.body.data.install.installedBy, undefined, 'wer installiert hat, steht nicht in der Antwort');
+  assert.equal(r.body.data.install.installedBy, undefined, 'wer installiert hat, steht nicht als Id in der Antwort');
+  assert.equal(r.body.data.install.approved, false, 'die Freigabe fehlt noch');
+  assert.deepEqual(Object.keys(r.body).sort(), ['data', 'replaced', 'skipped'], 'kein disabledForReview mehr: aus ist immer');
   assert.ok(fs.existsSync(path.join(MODULES_DIR, 'root-mod', 'lib', 'util.mjs')));
-  assert.ok(fs.existsSync(path.join(MODULES_DIR, 'root-mod', '.yuvomi-install.json')));
+  assert.equal(recordOf('root-mod').approved, false, 'approved:false steht in der Datei im Ordner');
+  assert.equal(modulesSvc.isModuleDisabled('root-mod'), false, 'die Sperrliste wird dafuer nicht mehr gebraucht');
   assert.deepEqual(stagingLeftovers(), [], 'kein Staging-Ordner bleibt liegen');
   // Nutzer sehen es nicht, solange es aus ist.
   const list = await call('GET', '/', { actor: MEM });
@@ -202,12 +220,29 @@ test('ein frisch installiertes Modul liefert seinen Einstieg erst nach dem Einsc
 
   const on = await call('PATCH', '/gate-mod', { json: { enabled: true } });
   assert.equal(on.status, 200, JSON.stringify(on.body));
+  assert.equal(on.body.data.install.approved, true, 'einschalten ist die Freigabe');
+  assert.equal(recordOf('gate-mod').approved, true, 'und sie steht in der Datei');
   const after = await call('GET', '/assets/gate-mod/index.js', { actor: MEM });
   assert.equal(after.status, 200);
   assert.match(after.buf.toString('utf8'), /id: 'gate-mod'/);
 
   await call('PATCH', '/gate-mod', { json: { enabled: false } });
   assert.equal((await call('GET', '/assets/gate-mod/index.js', { actor: MEM })).status, 404, 'wieder aus: wieder 404');
+  assert.equal(recordOf('gate-mod').approved, true, 'ausschalten nimmt die Freigabe nicht zurueck');
+});
+
+// Die Freigabe reist mit dem Ordner: ein Backup enthaelt modules/ nicht, und
+// eine zurueckgespielte Datenbank darf nichts einschalten, was nie jemand
+// angesehen hat - und nichts ausschalten, was freigegeben war.
+test('Installationsdatei ueber leerer Datenbank: nicht freigegeben bleibt aus, freigegeben bleibt an', async () => {
+  assert.equal((await postZip(makeZip(moduleFiles('restore-mod')))).status, 201);
+  clearDisabledConfig();
+  assert.equal((await adminListed('restore-mod')).enabled, false, 'leere Sperrliste, Datei sagt nein');
+  assert.equal((await call('GET', '/assets/restore-mod/index.js', { actor: MEM })).status, 404);
+  await modulesSvc.setModuleEnabled('restore-mod', true);
+  clearDisabledConfig();
+  assert.equal((await adminListed('restore-mod')).enabled, true, 'die Freigabe aus der Datei ueberlebt die Datenbank');
+  assert.equal((await adminListed('restore-mod')).install.approved, true);
 });
 
 test('ZIP mit GitHub-Oberordner: der eine gemeinsame Ordner wird abgestreift', async () => {
@@ -337,40 +372,40 @@ test('Ersetzen ohne overwrite → 409 exists mit installiertem und neuem Modul',
   assert.deepEqual(existing, { id: 'replace-mod', name: 'Mod replace-mod', version: '1.0.0' });
   assert.equal(existingInstall.source, 'zip');
   assert.equal(existingInstall.installedBy, undefined);
+  assert.equal(existingInstall.approved, false);
   assert.deepEqual(r.body.incoming, { id: 'replace-mod', name: 'Mod replace-mod', version: '2.0.0' });
-  assert.equal(r.body.sourceChanged, false, 'ZIP ueber ZIP ist dieselbe Quelle');
-  assert.equal(r.body.replaceDisabledReason, 'zip_replace', 'die Frage weiss vorher, dass das Ersetzen ausschaltet');
+  assert.ok(!('sourceChanged' in r.body) && !('replaceDisabledReason' in r.body),
+    'keine Quellen-Frage mehr: jedes Ersetzen kommt aus an');
 });
 
-// Runde 2 (R3): JEDES Ersetzen aus einer ZIP-Datei schaltet zur Pruefung aus.
-// Zwei Uploads haben keine pruefbare gemeinsame Herkunft.
-test('ZIP-Ersetzen schaltet ein eingeschaltetes Modul zur Pruefung aus', async () => {
+// Runde 3: JEDES Ersetzen setzt die Freigabe zurueck - auch aus derselben
+// Quelle (siehe den GitHub-Test weiter unten). Ein Zweig bewegt sich, ein Tag
+// wird umgehaengt, ein Besitzername wechselt: nichts davon ist der Code, den
+// der Admin einmal angesehen hat.
+test('ZIP-Ersetzen schaltet ein eingeschaltetes Modul wieder aus (approved:false)', async () => {
   await modulesSvc.setModuleEnabled('replace-mod', true);
+  assert.equal(recordOf('replace-mod').approved, true);
   const r = await postZip(makeZip(moduleFiles('replace-mod', { version: '2.0.0' })), '?overwrite=1');
   assert.equal(r.status, 201, JSON.stringify(r.body));
   assert.equal(r.body.replaced, true);
   assert.equal(r.body.data.version, '2.0.0');
-  assert.equal(r.body.data.enabled, false, 'neuer Code aus einer ZIP-Datei startet aus');
-  assert.equal(r.body.disabledForReview, true);
-  assert.equal(r.body.disabledReason, 'zip_replace');
+  assert.equal(r.body.data.enabled, false, 'neuer Code unter vertrauter Kennung startet aus');
+  assert.equal(r.body.data.install.approved, false);
+  assert.equal(recordOf('replace-mod').approved, false, 'die neue Datei traegt keine Freigabe');
+  assert.deepEqual(Object.keys(r.body).sort(), ['data', 'replaced', 'skipped']);
   assert.deepEqual(stagingLeftovers(), [], 'Sicherung wird nach Erfolg entfernt');
+  // Die leere Sperrliste aendert daran nichts.
+  clearDisabledConfig();
+  assert.equal((await adminListed('replace-mod')).enabled, false);
 });
 
-test('ZIP-Ersetzen eines ausgeschalteten Moduls: bleibt aus, Antwort sagt es trotzdem', async () => {
+test('ZIP-Ersetzen eines ausgeschalteten Moduls: bleibt aus', async () => {
+  await modulesSvc.setModuleEnabled('replace-mod', true);
   await modulesSvc.setModuleEnabled('replace-mod', false);
   const r = await postZip(makeZip(moduleFiles('replace-mod', { version: '3.0.0' })), '?overwrite=1');
   assert.equal(r.status, 201);
   assert.equal(r.body.data.enabled, false);
-  assert.equal(r.body.disabledForReview, true, 'der neue Code wartet auf Pruefung, egal wie es vorher stand');
-  assert.equal(r.body.disabledReason, 'zip_replace');
-});
-
-test('neue Installation: disabledForReview ist immer da und false, disabledReason null', async () => {
-  const r = await postZip(makeZip(moduleFiles('fresh-flag-mod')));
-  assert.equal(r.status, 201);
-  assert.equal(r.body.disabledForReview, false);
-  assert.equal(r.body.disabledReason, null);
-  assert.ok(!('disabledBecauseSourceChanged' in r.body), 'der alte Name ist weg');
+  assert.equal(r.body.data.install.approved, false, 'der neue Code wartet auf die Freigabe, egal wie es vorher stand');
 });
 
 test('Rollback: scheitert der Tausch, steht das alte Modul wieder da', async () => {
@@ -471,6 +506,10 @@ test('die Asset-Route liefert keine Punktdateien aus, normale Assets weiter', as
 
 test('DELETE /:id loescht Ordner und Disabled-Eintrag; danach 404', async () => {
   await postZip(makeZip(moduleFiles('delete-mod')));
+  // Freigegeben und dann vom Haushalt ausgeschaltet: der Eintrag in der
+  // Sperrliste darf eine spaetere Neuinstallation nicht ueberleben.
+  await modulesSvc.setModuleEnabled('delete-mod', true);
+  await modulesSvc.setModuleEnabled('delete-mod', false);
   assert.equal(modulesSvc.isModuleDisabled('delete-mod'), true);
   const r = await call('DELETE', '/delete-mod');
   assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -504,6 +543,34 @@ test('DELETE /:id: ungueltige id → 400, Symlink wird verweigert', async (t) =>
   fs.unlinkSync(link);
 });
 
+// Runde 3: die Weboberflaeche nimmt nur weg, was sie hingelegt hat. Ein von
+// Hand kopierter Ordner kann ein Arbeitsstand mit nicht eingecheckten
+// Aenderungen sein, und `rm -r` hat kein Zurueck.
+test('DELETE /:id ohne Installationsdatei → 409 not_web_installed, der Ordner bleibt', async () => {
+  const dir = path.join(MODULES_DIR, 'hand-copied-mod');
+  fs.mkdirSync(path.join(dir, 'work'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'module.json'), JSON.stringify({ id: 'hand-copied-mod', entry: 'index.js' }));
+  fs.writeFileSync(path.join(dir, 'index.js'), '');
+  fs.writeFileSync(path.join(dir, 'work', 'uncommitted.js'), 'precious');
+  const r = await call('DELETE', '/hand-copied-mod');
+  assert.equal(r.status, 409, JSON.stringify(r.body));
+  assert.equal(r.body.reason, 'not_web_installed');
+  assert.equal(r.body.code, 409);
+  assert.equal(fs.readFileSync(path.join(dir, 'work', 'uncommitted.js'), 'utf8'), 'precious');
+  // Eine kaputte Datei zaehlt wie keine: der Leser gibt null, und null heisst
+  // "nicht von hier".
+  fs.writeFileSync(path.join(dir, '.yuvomi-install.json'), '{ kaputt');
+  assert.equal((await call('DELETE', '/hand-copied-mod')).body.reason, 'not_web_installed');
+  // Ein Ersetzen aus den Einstellungen legt die Datei an - danach darf die
+  // Weboberflaeche den Ordner auch wieder entfernen.
+  fs.rmSync(path.join(dir, '.yuvomi-install.json'));
+  const replaced = await postZip(makeZip(moduleFiles('hand-copied-mod')), '?overwrite=1');
+  assert.equal(replaced.status, 201, JSON.stringify(replaced.body));
+  assert.ok(!fs.existsSync(path.join(dir, 'work')), 'der alte Inhalt ist durch das Ersetzen weg (der Admin hat es bestaetigt)');
+  assert.equal((await call('DELETE', '/hand-copied-mod')).status, 200);
+  assert.ok(!fs.existsSync(dir));
+});
+
 // ── Schreibbarkeit, Sperre, Gates, Grenzen ──────────────────────────────────
 
 test('nicht beschreibbar → info.writable=false und 503 not_writable', async () => {
@@ -514,7 +581,7 @@ test('nicht beschreibbar → info.writable=false und 503 not_writable', async ()
     const info = await call('GET', '/install/info');
     assert.equal(info.status, 200);
     const { persistent, ...rest } = info.body.data;
-    assert.deepEqual(rest, { writable: false, maxZipMb: 20 });
+    assert.deepEqual(rest, { writable: false, webInstall: true, maxZipMb: 20 });
     // Der Wert selbst haengt vom Rechner ab (Container oder nicht); die Logik
     // pruefen die isPersistent-Tests am Ende mit injizierten /proc-Dateien.
     assert.ok([true, false, null].includes(persistent));
@@ -817,6 +884,10 @@ test('POST /install/github Ende-zu-Ende: Redirect auf codeload, Pfad aus tree-UR
     assert.deepEqual(r.body.data.install, {
       source: 'github', url: 'https://github.com/o/r', ref: 'main', commit: sha, path: 'plugins/gh',
       installedAt: r.body.data.install.installedAt,
+      approved: false,
+      // Die Test-App vergibt Nutzer-Ids ohne Konto dahinter: wie ein
+      // geloeschtes Konto, der Name ist null.
+      installedByName: null,
     });
     // Ohne path: zwei Module im Repo → 422 mit Kandidaten.
     const t2 = fakeTransport({
@@ -834,15 +905,16 @@ test('POST /install/github Ende-zu-Ende: Redirect auf codeload, Pfad aus tree-UR
     assert.equal(exists.body.existing.version, '0.3.0');
     assert.equal(exists.body.existing.install.url, 'https://github.com/o/r');
     assert.equal(exists.body.existing.install.path, 'plugins/gh');
-    assert.equal(exists.body.sourceChanged, false, 'dasselbe Repo, derselbe Ordner');
-    assert.equal(exists.body.replaceDisabledReason, null, 'ein Update aus derselben Quelle behaelt den Schalter');
     await modulesSvc.setModuleEnabled('gh-mod', true);
+    assert.equal(recordOf('gh-mod').approved, true);
     const replaced = await call('POST', '/install/github', { json: { url: 'o/r', path: 'plugins/gh', overwrite: true } });
     assert.equal(replaced.status, 201);
     assert.equal(replaced.body.replaced, true);
-    assert.equal(replaced.body.data.enabled, true, 'Update aus derselben Quelle behaelt den Schalter');
-    assert.equal(replaced.body.disabledForReview, false);
-    assert.equal(replaced.body.disabledReason, null);
+    // Runde 3: auch dasselbe Repo und derselbe Ordner sind kein Grund, den
+    // Schalter zu behalten - der Zweig ist ein beweglicher Zeiger.
+    assert.equal(replaced.body.data.enabled, false, 'ein Update aus derselben Quelle kommt aus an');
+    assert.equal(replaced.body.data.install.approved, false);
+    assert.equal(recordOf('gh-mod').approved, false);
     // Der andere Kandidat ist ein eigenes Modul mit eigener Kennung: neu.
     const other = await call('POST', '/install/github', { json: { url: 'o/r', path: 'plugins/other' } });
     assert.equal(other.status, 201, 'gh-other ist eine andere Kennung, also neu');
@@ -907,12 +979,90 @@ test('nur aus einer Browser-Sitzung: Token und Display → 403 module_session_re
   for (let i = 0; i < 11; i += 1) await call('POST', '/install/zip', { actor: tokenAdmin, raw: 'x', contentType: 'text/plain' });
   const browser = await call('POST', '/install/zip', { actor: { id: 7777, role: 'admin' }, raw: 'x', contentType: 'text/plain' });
   assert.equal(browser.status, 400, 'derselbe Nutzer im Browser ist nicht gedrosselt');
-  // Lesen und Schalten bleiben fuer Tokens offen.
+  // Lesen bleibt fuer Tokens offen.
   assert.equal((await call('GET', '/install/info', { actor: tokenAdmin })).status, 200);
 });
 
-test('Ersetzen aus einer anderen Quelle schaltet das Modul wieder aus', async () => {
-  // Erst per ZIP, eingeschaltet.
+// Runde 3: Einschalten ist der Schritt, der installierten Code scharf macht,
+// und darf nicht schwaecher gesichert sein als das Ablegen. Ausschalten nimmt
+// Code weg - die sichere Richtung bleibt dem Token.
+test('PATCH enabled:true nur per Sitzung (Token → 403 module_session_required); enabled:false per Token geht', async () => {
+  assert.equal((await postZip(makeZip(moduleFiles('switch-mod')))).status, 201);
+  const token = { id: 7778, role: 'admin', method: 'api_token' };
+  const refused = await call('PATCH', '/switch-mod', { actor: token, json: { enabled: true } });
+  assert.equal(refused.status, 403, JSON.stringify(refused.body));
+  assert.equal(refused.body.reason, 'module_session_required');
+  assert.equal(refused.body.code, 403);
+  assert.equal(recordOf('switch-mod').approved, false, 'nichts freigegeben');
+  assert.equal((await adminListed('switch-mod')).enabled, false);
+  const display = await call('PATCH', '/switch-mod', { actor: { ...token, method: 'display' }, json: { enabled: true } });
+  assert.equal(display.body.reason, 'module_session_required');
+
+  const session = await call('PATCH', '/switch-mod', { json: { enabled: true } });
+  assert.equal(session.status, 200, JSON.stringify(session.body));
+  assert.equal(session.body.data.enabled, true);
+  assert.equal(recordOf('switch-mod').approved, true);
+
+  const off = await call('PATCH', '/switch-mod', { actor: token, json: { enabled: false } });
+  assert.equal(off.status, 200, 'ausschalten per Token bleibt erlaubt');
+  assert.equal(off.body.data.enabled, false);
+  assert.equal(recordOf('switch-mod').approved, true, 'und laesst die Freigabe stehen');
+  // Ein ungueltiger Body wird weiter vor der Sitzungsfrage abgewiesen.
+  assert.equal((await call('PATCH', '/switch-mod', { actor: token, json: { enabled: 'yes' } })).status, 400);
+});
+
+// Runde 3: der Schalter des Betreibers. Aus heisst: die Routen gibt es nicht,
+// und die Seite zeigt den Weg von Hand wie bei einem schreibgeschuetzten Ordner.
+test('MODULES_ALLOW_WEB_INSTALL aus → 403 module_web_install_disabled vor dem Body; info.webInstall=false', async () => {
+  const restore = install.__setWebInstallEnabledForTests(false);
+  try {
+    const info = await call('GET', '/install/info');
+    assert.equal(info.status, 200);
+    assert.equal(info.body.data.webInstall, false);
+    assert.equal(info.body.data.writable, true, 'die anderen Felder bleiben, wie sie sind');
+    assert.equal(info.body.data.maxZipMb, 20);
+    // Ein Body, der sonst 400 not_zip gaebe, kommt gar nicht erst an den Parser.
+    const zip = await call('POST', '/install/zip', { raw: 'x', contentType: 'text/plain' });
+    assert.equal(zip.status, 403, JSON.stringify(zip.body));
+    assert.equal(zip.body.reason, 'module_web_install_disabled');
+    assert.equal(zip.body.code, 403);
+    assert.match(zip.body.error, /MODULES_ALLOW_WEB_INSTALL=true/, 'die Antwort nennt den Schalter');
+    const real = await postZip(makeZip(moduleFiles('shut-mod')));
+    assert.equal(real.body.reason, 'module_web_install_disabled');
+    assert.ok(!fs.existsSync(path.join(MODULES_DIR, 'shut-mod')));
+    const gh = await call('POST', '/install/github', { json: { url: 'o/r' } });
+    assert.equal(gh.status, 403);
+    assert.equal(gh.body.reason, 'module_web_install_disabled');
+    const del = await call('DELETE', '/switch-mod');
+    assert.equal(del.status, 403);
+    assert.equal(del.body.reason, 'module_web_install_disabled');
+    assert.ok(fs.existsSync(path.join(MODULES_DIR, 'switch-mod')), 'nichts geloescht');
+    // Vor der Sitzungsfrage und vor dem Limiter: ein Token bekommt denselben
+    // Grund, und abgewiesene Anfragen verbrauchen das Install-Limit nicht.
+    const token = { id: 7779, role: 'admin', method: 'api_token' };
+    assert.equal((await call('POST', '/install/github', { actor: token, json: { url: 'o/r' } })).body.reason, 'module_web_install_disabled');
+    const same = { id: 7780, role: 'admin' };
+    for (let i = 0; i < 11; i += 1) assert.equal((await call('POST', '/install/zip', { actor: same, raw: 'x', contentType: 'text/plain' })).status, 403);
+    // Liste und Schalten bleiben, wie sie sind: die Module selbst gibt es weiter.
+    assert.ok((await call('GET', '/?admin=1')).body.data.some((m) => m.id === 'switch-mod'));
+    assert.equal((await call('PATCH', '/switch-mod', { json: { enabled: true } })).status, 200);
+    assert.equal((await call('PATCH', '/switch-mod', { json: { enabled: false } })).status, 200);
+  } finally {
+    restore();
+  }
+  assert.equal((await call('POST', '/install/zip', { actor: { id: 7780, role: 'admin' }, raw: 'x', contentType: 'text/plain' })).status, 400,
+    'wieder an: derselbe Nutzer ist nicht gedrosselt, und der Body wird gelesen');
+  assert.equal((await call('GET', '/install/info')).body.data.webInstall, true);
+  // Der Name, den .env.example, Template und Installer fuehren; der Parser
+  // (nur exakt true/1) ist der der Heimnetz-Schalter, test-ssrf.js prueft ihn.
+  assert.equal(install.WEB_INSTALL_ENV, 'MODULES_ALLOW_WEB_INSTALL');
+});
+
+// Runde 3: jedes Ersetzen kommt aus an, gleich woher. Die Herkunft wird nicht
+// mehr verglichen - eine "gleiche" GitHub-Quelle war ein Repo-Name, hinter dem
+// ein Zweig, ein umgehaengter Tag oder ein neu vergebener Besitzername stehen
+// kann.
+test('Ersetzen aus jeder Quelle setzt die Freigabe zurueck: ZIP→GitHub, gleiches Repo, anderes Repo, GitHub→ZIP, von Hand', async () => {
   assert.equal((await postZip(makeZip(moduleFiles('src-mod', { version: '1.0.0' })))).status, 201);
   await modulesSvc.setModuleEnabled('src-mod', true);
   const ghZip = makeZip(moduleFiles('src-mod', { prefix: 'o-src-1/', version: '2.0.0' }));
@@ -922,53 +1072,49 @@ test('Ersetzen aus einer anderen Quelle schaltet das Modul wieder aus', async ()
   try {
     const ask = await call('POST', '/install/github', { json: { url: 'o/src', ref: 'main' } });
     assert.equal(ask.status, 409);
-    assert.equal(ask.body.sourceChanged, true, 'ZIP → GitHub ist eine andere Quelle');
-    assert.equal(ask.body.replaceDisabledReason, 'source_changed');
+    assert.equal(ask.body.existing.install.approved, true, 'die Frage zeigt den freigegebenen Stand');
     const r = await call('POST', '/install/github', { json: { url: 'o/src', ref: 'main', overwrite: true } });
     assert.equal(r.status, 201, JSON.stringify(r.body));
     assert.equal(r.body.replaced, true);
-    assert.equal(r.body.disabledForReview, true);
-    assert.equal(r.body.disabledReason, 'source_changed');
-    assert.equal(r.body.data.enabled, false, 'neuer Code unter vertrauter Kennung startet aus');
-    // Dasselbe Repo noch einmal: gleiche Quelle, der (jetzt ausgeschaltete)
-    // Zustand bleibt, und es ist kein "wegen Quelle ausgeschaltet".
+    assert.equal(r.body.data.enabled, false, 'ZIP → GitHub: aus');
+    assert.equal(r.body.data.install.approved, false);
+    // Dasselbe Repo noch einmal, nur anders geschrieben: trotzdem aus.
     await modulesSvc.setModuleEnabled('src-mod', true);
     const again = await call('POST', '/install/github', { json: { url: 'https://github.com/O/SRC', ref: 'main', overwrite: true } });
     assert.equal(again.status, 201);
-    assert.equal(again.body.disabledForReview, false, 'Gross/Klein im Repo-Namen ist dieselbe Quelle');
-    assert.equal(again.body.data.enabled, true);
-    // Ein anderes Repo unter derselben Kennung: GitHub → GitHub, aber andere Quelle.
+    assert.equal(again.body.data.enabled, false, 'dasselbe Repo ist kein Grund, den Schalter zu behalten');
+    assert.equal(recordOf('src-mod').approved, false);
+    // Ein anderes Repo unter derselben Kennung.
+    await modulesSvc.setModuleEnabled('src-mod', true);
     const other = await call('POST', '/install/github', { json: { url: 'o/fork', ref: 'main', overwrite: true } });
     assert.equal(other.status, 201, JSON.stringify(other.body));
-    assert.equal(other.body.disabledForReview, true);
-    assert.equal(other.body.disabledReason, 'source_changed');
     assert.equal(other.body.data.enabled, false, 'ein anderes Repo ist neuer Code');
   } finally {
     github.__setGithubRequestForTests(null);
   }
-  // Ein bereits ausgeschaltetes Modul: Quelle wechselt, es bleibt aus, und die
-  // Antwort nennt den Grund trotzdem - der neue Code wartet auf Pruefung.
-  await modulesSvc.setModuleEnabled('src-mod', false);
+  // GitHub → ZIP, aus einem bereits ausgeschalteten Stand: bleibt aus.
   const off = await postZip(makeZip(moduleFiles('src-mod', { version: '3.0.0' })), '?overwrite=1');
-  assert.equal(off.body.disabledForReview, true);
-  assert.equal(off.body.disabledReason, 'source_changed', 'GitHub → ZIP: die Quelle geht vor');
   assert.equal(off.body.data.enabled, false);
+  assert.equal(off.body.data.install.source, 'zip');
+  assert.equal(off.body.data.install.approved, false);
 
-  // Von Hand kopiert (keine Metadaten) → jede Installation darueber ist eine
-  // andere Quelle.
+  // Von Hand kopiert (keine Datei, eingeschaltet ueber die leere Sperrliste):
+  // nach dem Ersetzen gibt es eine Datei, und sie sagt aus.
   const dir = path.join(MODULES_DIR, 'hand-mod');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'module.json'), JSON.stringify({ id: 'hand-mod', entry: 'index.js' }));
   fs.writeFileSync(path.join(dir, 'index.js'), '');
-  await modulesSvc.setModuleEnabled('hand-mod', true);
+  assert.equal((await adminListed('hand-mod')).enabled, true, 'von Hand kopiert: an wie bisher');
   const hand = await postZip(makeZip(moduleFiles('hand-mod')), '?overwrite=1');
-  assert.equal(hand.body.disabledForReview, true);
-  assert.equal(hand.body.disabledReason, 'source_changed');
+  assert.equal(hand.status, 201, JSON.stringify(hand.body));
   assert.equal(hand.body.data.enabled, false);
+  assert.equal(hand.body.data.install.approved, false);
 
-  // Scheitert der Tausch, kommt auch der Schalter zurueck.
-  await modulesSvc.setModuleEnabled('hand-mod', true);
+  // Scheitert der Tausch, steht der alte Ordner samt seinem alten Stand wieder
+  // da: hier ohne Datei, also an - ohne dass jemand einen Schalter zurueckdrehen
+  // musste.
   fs.rmSync(path.join(dir, '.yuvomi-install.json'));
+  assert.equal((await adminListed('hand-mod')).enabled, true);
   const restore = install.__setInstallFsOpsForTests({
     rename: async (from, to) => {
       if (path.basename(path.dirname(from)).startsWith('.install-')) throw Object.assign(new Error('simulated EIO'), { code: 'EIO' });
@@ -980,17 +1126,9 @@ test('Ersetzen aus einer anderen Quelle schaltet das Modul wieder aus', async ()
   } finally {
     restore();
   }
-  assert.equal(modulesSvc.isModuleDisabled('hand-mod'), false, 'der alte Schalter steht wieder');
-});
-
-test('isSameInstallSource: Tabelle', () => {
-  const same = install.isSameInstallSource;
-  assert.equal(same({ source: 'zip' }, { source: 'zip' }), true);
-  assert.equal(same(null, { source: 'zip' }), false, 'ohne Metadaten: unbekannte Herkunft');
-  assert.equal(same({ source: 'github', url: 'https://github.com/o/r' }, { source: 'zip' }), false);
-  assert.equal(same({ source: 'github', url: 'https://github.com/o/r', path: null }, { source: 'github', url: 'https://github.com/O/r/' }), true);
-  assert.equal(same({ source: 'github', url: 'https://github.com/o/r', path: 'a' }, { source: 'github', url: 'https://github.com/o/r', path: 'b' }), false);
-  assert.equal(same({ source: 'github', url: 'https://github.com/o/r' }, { source: 'github', url: 'https://github.com/o/other' }), false);
+  assert.ok(!fs.existsSync(path.join(dir, '.yuvomi-install.json')), 'der alte Ordner ist zurueck, ohne Datei');
+  assert.equal((await adminListed('hand-mod')).enabled, true, 'und damit an wie vorher');
+  assert.equal(modulesSvc.isModuleDisabled('hand-mod'), false);
 });
 
 test('path="" waehlt das Modul an der Wurzel, neben einem verschachtelten (ZIP und GitHub)', async () => {
@@ -1151,16 +1289,6 @@ test('parseMountinfo: Mountpunkt und Dateisystemtyp, optionale Felder, Escapes',
 
 // ── Review Runde 2 ──────────────────────────────────────────────────────────
 
-test('replaceDisabledReason: Tabelle (R3)', () => {
-  const why = install.replaceDisabledReason;
-  const gh = { source: 'github', url: 'https://github.com/o/r', path: 'mods/a' };
-  assert.equal(why(gh, { ...gh, url: 'https://github.com/O/R/' }), null, 'dasselbe Repo und derselbe Ordner behalten den Schalter');
-  assert.equal(why(gh, { ...gh, path: 'mods/b' }), 'source_changed');
-  assert.equal(why(gh, { source: 'zip' }), 'source_changed', 'GitHub → ZIP: die Quelle geht vor');
-  assert.equal(why({ source: 'zip' }, { source: 'zip' }), 'zip_replace', 'ZIP ueber ZIP ist nie "dasselbe"');
-  assert.equal(why(null, gh), 'source_changed', 'von Hand kopiert');
-});
-
 test('tree-URL: die Ref-Probe fragt nur nach der SHA und liest keinen Rumpf (R1)', async () => {
   const huge = Buffer.alloc(4 * 1024 * 1024, 0x61);
   const sha = Buffer.from('f'.repeat(40));
@@ -1250,4 +1378,97 @@ test('Install-Limit: 409 exists und 422 multiple zaehlen nicht, Fehlversuche sch
   const limited = await call('POST', '/install/zip', { actor: same, raw: again });
   assert.equal(limited.status, 429, 'Fehlversuche (400) zaehlen weiter');
   assert.equal(limited.body.reason, 'install_rate_limited');
+});
+
+// ── Review Runde 3 ──────────────────────────────────────────────────────────
+
+test('Archiv mit Pfaden tiefer als 16 Ordner → 400 unsafe_path, ueber ZIP und GitHub', async () => {
+  // Nicht die 2000 x 510 des Reviews (die misst test-zip-reader.js), nur die
+  // Form: ein Modul, dessen Datei ein Ordner zu tief liegt.
+  const deep = `${Array.from({ length: 16 }, (_, i) => `d${i}`).join('/')}/x.js`;
+  const r = await postZip(makeZip(moduleFiles('deep-mod', { extra: { [deep]: '' } })));
+  assert.equal(r.status, 400, JSON.stringify(r.body));
+  assert.equal(r.body.reason, 'unsafe_path');
+  assert.match(r.body.error, /16 folders deep/);
+  assert.ok(!fs.existsSync(path.join(MODULES_DIR, 'deep-mod')));
+  const okDepth = `${Array.from({ length: 15 }, (_, i) => `d${i}`).join('/')}/x.js`;
+  assert.equal((await postZip(makeZip(moduleFiles('deep-ok-mod', { extra: { [okDepth]: '' } })))).status, 201, '16 Segmente sind erlaubt');
+  github.__setGithubRequestForTests(async (url) => (url.endsWith('/zipball/main')
+    ? fakeResponse(200, { body: makeZip(moduleFiles('deep-gh-mod', { prefix: 'o-r-1/', extra: { [deep]: '' } })) })
+    : fakeResponse(404)));
+  try {
+    const gh = await call('POST', '/install/github', { json: { url: 'o/deep', ref: 'main' } });
+    assert.equal(gh.status, 400);
+    assert.equal(gh.body.reason, 'unsafe_path');
+  } finally {
+    github.__setGithubRequestForTests(null);
+  }
+});
+
+test('ein Kandidaten-module.json ueber 64 KiB → 400 bad_manifest mit Pfad, ohne dass es geparst wird (S2)', async () => {
+  // Gueltiges JSON, aber zu gross: wuerde es geparst, kaeme 422 multiple mit
+  // Name und Version heraus.
+  const big = JSON.stringify({ id: 'big-cand', name: 'Big', entry: 'index.js', pad: 'x'.repeat(70 * 1024) });
+  const zip = makeZip({
+    ...moduleFiles('small-cand', { prefix: 'r/mods/a/' }),
+    'r/mods/b/module.json': big,
+    'r/mods/b/index.js': '',
+  });
+  const r = await postZip(zip);
+  assert.equal(r.status, 400, JSON.stringify(r.body).slice(0, 200));
+  assert.equal(r.body.reason, 'bad_manifest');
+  assert.match(r.body.error, /64 KiB: mods\/b/, 'die Antwort nennt den Ordner');
+  assert.equal(r.body.candidates, undefined);
+  // Auch wenn ein anderer Kandidat ausdruecklich gewaehlt wird: das Archiv
+  // ist keines, aus dem man waehlt.
+  assert.equal((await postZip(zip, '?path=mods/a')).body.reason, 'bad_manifest');
+  // Ein einzelner zu grosser Kandidat an der Wurzel nennt die Wurzel.
+  const root = await postZip(makeZip({ 'module.json': big, 'index.js': '' }));
+  assert.equal(root.body.reason, 'bad_manifest');
+  assert.match(root.body.error, /archive root/);
+  // Ein ignorierter Ordner (node_modules, Punkt, zu tief) zaehlt nicht.
+  const ignored = await postZip(makeZip({
+    ...moduleFiles('ign-cand'),
+    'node_modules/dep/module.json': big,
+    '.github/module.json': big,
+  }));
+  assert.equal(ignored.status, 201, JSON.stringify(ignored.body).slice(0, 200));
+});
+
+test('reservierte Windows-Geraetenamen als id → 400 bad_manifest (N1)', async () => {
+  for (const id of ['con', 'nul', 'aux', 'prn', 'com1', 'lpt9']) {
+    const r = await postZip(makeZip(moduleFiles(id)));
+    assert.equal(r.status, 400, `${id}: ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.reason, 'bad_manifest', id);
+    assert.match(r.body.error, /reserved device name/);
+    assert.ok(!fs.existsSync(path.join(MODULES_DIR, id)));
+  }
+  // Nur exakte Namen: console, com10 und ein Praefix sind gewoehnliche ids.
+  for (const id of ['console', 'com10', 'con-mod']) {
+    assert.equal((await postZip(makeZip(moduleFiles(id)))).status, 201, id);
+  }
+});
+
+test('Admin-Liste nennt, wer installiert hat (installedByName); geloeschtes Konto → null (N3)', async () => {
+  const { lastInsertRowid } = db.prepare(
+    "INSERT INTO users (username, display_name, password_hash, role) VALUES ('mia', 'Mia Admin', 'x', 'admin')",
+  ).run();
+  const mia = { id: Number(lastInsertRowid), role: 'admin' };
+  const r = await call('POST', '/install/zip', { actor: mia, raw: makeZip(moduleFiles('who-mod')) });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal(r.body.data.install.installedByName, 'Mia Admin');
+  assert.equal(r.body.data.install.installedBy, undefined, 'die Id selbst bleibt in der Datei');
+  assert.equal(recordOf('who-mod').installedBy, mia.id);
+  const listed = (await call('GET', '/?admin=1')).body.data.find((m) => m.id === 'who-mod');
+  assert.equal(listed.install.installedByName, 'Mia Admin');
+  // Mitglieder sehen weiter kein install-Objekt.
+  await modulesSvc.setModuleEnabled('who-mod', true);
+  assert.ok(!('install' in (await call('GET', '/', { actor: MEM })).body.data.find((m) => m.id === 'who-mod')));
+  // Konto geloescht: der Name ist weg, die Datei bleibt, die Antwort sagt null.
+  db.prepare('DELETE FROM users WHERE id = ?').run(mia.id);
+  assert.equal((await adminListed('who-mod')).install.installedByName, null);
+  // Eine Installation ohne Nutzer-Id (installedBy null): ebenfalls null.
+  const anon = await install.installFromZip(makeZip(moduleFiles('anon-mod')));
+  assert.equal(anon.module.install.installedByName, null);
+  assert.equal(recordOf('anon-mod').installedBy, null);
 });

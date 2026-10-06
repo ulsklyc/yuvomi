@@ -505,6 +505,14 @@ test('x-mcp-exclude: Modul-Installation und -Loeschen sind ueber MCP weder gelis
   }
   const described = await toolCall('get_api_operation', { operation_key: 'delete_modules_by_id' });
   assert.equal(described.result.isError, true);
+
+  // Das Ein-/Ausschalten bleibt gelistet, weil Ausschalten per Token nuetzlich
+  // ist; dass Einschalten eine Sitzung braucht (Runde 3 von #1671), steht in
+  // der Beschreibung, die der Assistent liest - sonst plant er den Schritt.
+  const patch = parseContent(await toolCall('get_api_operation', { operation_key: 'patch_modules_by_id' }));
+  assert.match(patch.description, /browser session/);
+  assert.match(patch.description, /module_session_required/);
+  assert.match(patch.description, /Disabling .* token/);
 });
 
 // ── OpenAPI-Brücke: call_api_operation (Loopback via gemocktem fetch) ─────────

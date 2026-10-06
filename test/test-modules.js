@@ -150,6 +150,9 @@ app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
   req.session = { userId: actor.id, role: actor.role };
+  // Wie requireAuth fuer den Browser: Einschalten (PATCH enabled:true) verlangt
+  // seit #1671 eine Sitzung; die Token-Seite prueft test-module-install.js.
+  req.authMethod = 'session';
   next();
 });
 app.use(express.json());
@@ -499,6 +502,113 @@ test('listModules: fehlende widget entry datei → error status', async () => {
   const bad = mods.find((m) => m.id === 'bad-cap-mod');
   assert.equal(bad.status, 'error');
   assert.match(bad.error, /does not exist/i);
+});
+
+// ── Die Freigabe wohnt in der Installationsdatei (#1671, DECISIONS.md 12) ────────
+// Kein Backup enthaelt modules/. Eine zurueckgespielte oder frische Datenbank
+// darf kein Modul einschalten, das installiert und nie angesehen wurde - also
+// entscheidet die Datei im Ordner, nicht die Sperrliste in sync_config.
+const installRecord = (overrides = {}) => JSON.stringify({
+  source: 'zip', installedAt: '2026-10-06T10:00:00.000Z', installedBy: 1, approved: false, ...overrides,
+});
+const clearDisabledConfig = () => db.prepare("DELETE FROM sync_config WHERE key = 'third_party_disabled_modules'").run();
+const find = async (id) => (await svc.listModules({ admin: true })).find((m) => m.id === id);
+
+test('Installationsdatei ohne Freigabe + leere Datenbank → aus; ohne Datei entscheidet die Sperrliste', async () => {
+  writeModule('record-mod', { id: 'record-mod', entry: 'index.js' },
+    { 'index.js': '', '.yuvomi-install.json': installRecord() });
+  clearDisabledConfig();
+  const m = await find('record-mod');
+  assert.equal(m.enabled, false, 'die Datei sagt nicht freigegeben - die leere Sperrliste zaehlt nicht');
+  assert.equal(m.status, 'disabled');
+  assert.equal(m.install.approved, false);
+  assert.equal(m.install.installedBy, undefined, 'die Nutzer-Id bleibt in der Datei');
+  // Nur das Literal true ist eine Freigabe.
+  fs.writeFileSync(path.join(MODULES_DIR, 'record-mod', '.yuvomi-install.json'), installRecord({ approved: 'true' }));
+  assert.equal((await find('record-mod')).enabled, false, '"true" als Text ist keine Freigabe');
+  fs.writeFileSync(path.join(MODULES_DIR, 'record-mod', '.yuvomi-install.json'), installRecord({ approved: 1 }));
+  assert.equal((await find('record-mod')).enabled, false, '1 ist keine Freigabe');
+  // Von Hand kopiert (keine Datei): wie bisher, an bei leerer Sperrliste.
+  fs.rmSync(path.join(MODULES_DIR, 'record-mod', '.yuvomi-install.json'));
+  assert.equal((await find('record-mod')).enabled, true);
+  assert.equal((await find('record-mod')).install, null);
+});
+// Eine Datei, die DA ist, aber nicht lesbar (abgeschnitten, von Hand verdorben,
+// zu gross), darf das Modul nicht als "von Hand kopiert" durchwinken: sie sagt,
+// dass hier die Oberflaeche installiert hat, und was sie nicht freigibt, bleibt
+// aus. Als Fehler, nicht als bloss "aus" - der Admin soll sehen, warum der
+// Schalter fehlt, und die Datei auf dem Server richten oder den Ordner entfernen.
+test('Installationsdatei vorhanden, aber unlesbar → aus und als Fehler gemeldet, nie an', async () => {
+  writeModule('broken-record', { id: 'broken-record', entry: 'index.js' }, { 'index.js': '' });
+  clearDisabledConfig();
+  const file = path.join(MODULES_DIR, 'broken-record', '.yuvomi-install.json');
+  for (const [label, content] of [
+    ['abgeschnitten', installRecord().slice(0, 20)],
+    ['kein Objekt', '[]'],
+    ['unbekannte Quelle', installRecord({ source: 'ftp' })],
+    ['zu gross', JSON.stringify({ source: 'zip', approved: true, pad: 'x'.repeat(5000) })],
+  ]) {
+    fs.writeFileSync(file, content);
+    const m = await find('broken-record');
+    assert.equal(m.enabled, false, `${label}: laeuft trotz unlesbarer Datei`);
+    assert.equal(m.status, 'error', `${label}: nicht als Fehler gemeldet`);
+    assert.match(m.error, /.yuvomi-install.json/, `${label}: der Fehler nennt die Datei nicht`);
+  }
+  // Gegenprobe: dieselbe Datei lesbar und freigegeben → an.
+  fs.writeFileSync(file, installRecord({ approved: true }));
+  assert.equal((await find('broken-record')).enabled, true);
+});
+
+test('Einschalten schreibt die Freigabe in die Datei; eine leere Datenbank danach laesst das Modul an', async () => {
+  const file = path.join(MODULES_DIR, 'record-mod', '.yuvomi-install.json');
+  fs.writeFileSync(file, installRecord());
+  assert.equal((await find('record-mod')).enabled, false);
+  const on = await call('PATCH', '/record-mod', { actor: ADM, body: { enabled: true } });
+  assert.equal(on.status, 200, JSON.stringify(on.body));
+  assert.equal(on.body.data.enabled, true);
+  assert.equal(on.body.data.install.approved, true);
+  const written = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(written.approved, true, 'die Freigabe steht in der Datei');
+  assert.equal(written.installedBy, 1, 'die anderen Felder bleiben, wie die Installation sie schrieb');
+  assert.equal(written.source, 'zip');
+  assert.ok(!fs.readdirSync(path.join(MODULES_DIR, 'record-mod')).some((n) => n.endsWith('.tmp')), 'keine Temp-Datei bleibt liegen');
+  // Datenbank "zurueckgespielt": die Sperrliste ist weg - das Modul bleibt an.
+  clearDisabledConfig();
+  assert.equal((await find('record-mod')).enabled, true, 'die Freigabe ueberlebt die Datenbank');
+  // Ausschalten nimmt nur die Sperrliste, die Freigabe bleibt; wieder
+  // einschalten prueft nicht neu.
+  const off = await call('PATCH', '/record-mod', { actor: ADM, body: { enabled: false } });
+  assert.equal(off.body.data.enabled, false);
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).approved, true, 'ausschalten ist keine Rueckgabe der Freigabe');
+  assert.deepEqual(disabledConfig(), ['record-mod']);
+  assert.equal((await call('PATCH', '/record-mod', { actor: ADM, body: { enabled: true } })).body.data.enabled, true);
+  assert.deepEqual(disabledConfig(), []);
+  fs.rmSync(path.join(MODULES_DIR, 'record-mod'), { recursive: true, force: true });
+});
+
+test('readInstallRecord/readInstallMeta/writeInstallApproval: Felder, Grenzen, Atomaritaet', async () => {
+  const dir = path.join(MODULES_DIR, 'rec-api-mod');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, '.yuvomi-install.json');
+  fs.writeFileSync(file, installRecord({ installedBy: 42, url: 'https://github.com/o/r', extra: 'ignored' }));
+  const record = await svc.readInstallRecord(dir);
+  assert.deepEqual(record, {
+    source: 'zip', url: 'https://github.com/o/r', ref: null, commit: null, path: null,
+    installedAt: '2026-10-06T10:00:00.000Z', approved: false, installedBy: 42,
+  });
+  const meta = await svc.readInstallMeta(dir);
+  assert.equal(meta.installedBy, undefined, 'die Antwortform traegt keine Nutzer-Id');
+  assert.equal(meta.approved, false);
+  // Eine Nutzer-Id, die keine Zahl ist, wird null - nie ein String in der Abfrage.
+  fs.writeFileSync(file, installRecord({ installedBy: '42' }));
+  assert.equal((await svc.readInstallRecord(dir)).installedBy, null);
+  await svc.writeInstallApproval(dir, true);
+  const after = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(after.approved, true);
+  assert.equal(after.installedBy, '42', 'die Datei wird umgeschrieben, nicht neu erfunden');
+  assert.deepEqual(fs.readdirSync(dir), ['.yuvomi-install.json'], 'die Temp-Datei ist nach dem rename weg');
+  await assert.rejects(svc.writeInstallApproval(path.join(MODULES_DIR, 'nope-mod'), true), 'ohne Datei kein Umschreiben');
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 // Die Seitenerklaerung (`page.composition`, `page.width`) ist seit #929 Teil

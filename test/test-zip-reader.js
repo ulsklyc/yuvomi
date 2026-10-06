@@ -16,7 +16,9 @@
  *        Symlink und Sonderdateien, Verschluesselung, Methode 12, CRC, ZIP64,
  *        Mehrteiler, Duplikate (exakt, Gross/Klein, NFC) und Datei/Ordner-
  *        Konflikt, Eintragszahl, Bomben (Verhaeltnis, Summe, gelogene Groesse),
- *        ueberlappende Eintraege, Signaturfehler, kein ZIP.
+ *        ueberlappende Eintraege, Signaturfehler, kein ZIP, Pfadtiefe (Runde 3:
+ *        das 4-MB-Archiv mit 2000 x 510 Segmenten, das die Praefixmenge auf
+ *        eine Million Schluessel trieb, wird in Millisekunden abgewiesen).
  * Ausführen: node --test test/test-zip-reader.js
  */
 
@@ -24,7 +26,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import zlib from 'node:zlib';
 import { randomBytes } from 'node:crypto';
-import { readZip, readZipArchive, ZipError, validateEntryName } from '../server/services/zip-reader.js';
+import { readZip, readZipArchive, ZipError, ZIP_LIMITS, validateEntryName, isWindowsReservedName } from '../server/services/zip-reader.js';
 
 // ── Minimaler ZIP-Schreiber ──────────────────────────────────────────────────
 // Jedes Feld laesst sich ueberschreiben, damit ein Test genau EINE Eigenschaft
@@ -218,6 +220,57 @@ test('validateEntryName normalisiert Backslashes und erkennt Ordner', () => {
   assert.deepEqual(validateEntryName('CONSOLE.js'), { path: 'CONSOLE.js', isDir: false }, 'nur exakte Geraetenamen');
   assert.deepEqual(validateEntryName('a~b.js'), { path: 'a~b.js', isDir: false }, 'eine Tilde ohne Ziffer ist kein 8.3-Alias');
   assert.deepEqual(validateEntryName('COM10.js'), { path: 'COM10.js', isDir: false });
+});
+
+test('isWindowsReservedName: dieselbe Liste fuer Eintraege und fuer die Modul-id', () => {
+  for (const name of ['con', 'CON', 'nul', 'aux', 'prn', 'com1', 'LPT9', 'con.js', 'conin$', 'COM¹']) {
+    assert.equal(isWindowsReservedName(name), true, name);
+  }
+  for (const name of ['console', 'com10', 'con-mod', 'nul2', 'a', '']) {
+    assert.equal(isWindowsReservedName(name), false, name);
+  }
+});
+
+// ── Runde 3 der Review: Pfadtiefe ───────────────────────────────────────────
+// Jede Grenze in ZIP_LIMITS zaehlte Bytes an Inhalt; die Praefixmenge der
+// Duplikatpruefung waechst aber mit der Zahl der ORDNER je Name. Ein Name darf
+// 1024 Zeichen lang sein, das sind rund 510 einbuchstabige Ordner; 2000 solche
+// Eintraege (die Eintragsgrenze, etwa 4 MB Archiv) machten 1.020.000
+// Schluessel, 570 MB Heap und 5 s blockierte Ereignisschleife - und das Archiv
+// kam durch jede andere Grenze.
+
+test('mehr als 16 Ordner je Name → unsafe_path, 16 sind erlaubt', () => {
+  assert.equal(ZIP_LIMITS.maxDepth, 16);
+  const seventeen = `${Array.from({ length: 17 }, (_, i) => `d${i}`).join('/')}/x.js`;
+  rejectsWith('unsafe_path', makeZip([{ name: seventeen, data: 'x' }]));
+  assert.throws(() => validateEntryName(seventeen), (e) => e.code === 'unsafe_path' && /16 folders deep/.test(e.message));
+  const sixteen = `${Array.from({ length: 15 }, (_, i) => `d${i}`).join('/')}/x.js`;
+  assert.equal(readZip(makeZip([{ name: sixteen, data: 'x' }])).length, 1, '16 Segmente (15 Ordner + Datei) gehen durch');
+  // Ein Ordnereintrag zaehlt seine Segmente ohne den Schlussstrich.
+  assert.deepEqual(validateEntryName(`${Array.from({ length: 16 }, (_, i) => `d${i}`).join('/')}/`).isDir, true);
+  assert.throws(() => validateEntryName(`${Array.from({ length: 17 }, (_, i) => `d${i}`).join('/')}/`), (e) => e.code === 'unsafe_path');
+});
+
+test('das Archiv aus der Review (2000 Eintraege x 510 Segmente, 4 MB) wird in unter 100 ms abgewiesen, ohne Praefixmenge', () => {
+  // Erstes Segment je Eintrag verschieden (sonst Duplikate), danach "a/" -
+  // zwei Zeichen je Ordner, 1023 Zeichen je Name, unter der Laengengrenze.
+  const entries = Array.from({ length: 2000 }, (_, i) => ({
+    name: [i.toString(36).padStart(2, '0'), ...Array.from({ length: 508 }, () => 'a'), 'f.js'].join('/'),
+    data: 'x',
+    method: 0,
+  }));
+  const zip = makeZip(entries);
+  assert.ok(zip.length > 3 * 1024 * 1024 && zip.length < ZIP_LIMITS.maxCompressed, `${zip.length} Bytes: das Archiv selbst ist unauffaellig`);
+  const heapBefore = process.memoryUsage().heapUsed;
+  const started = process.hrtime.bigint();
+  rejectsWith('unsafe_path', zip);
+  const ms = Number(process.hrtime.bigint() - started) / 1e6;
+  const heapGrowth = (process.memoryUsage().heapUsed - heapBefore) / (1024 * 1024);
+  // Vor der Grenze: 5400 ms und +569 MB. Die Grenzen hier sind weit, damit ein
+  // langsamer CI-Laeufer nicht rot wird; die Praefixmenge allein laege um das
+  // Hundertfache darueber.
+  assert.ok(ms < 100, `abgewiesen nach ${ms.toFixed(1)} ms - der erste Eintrag muss reichen`);
+  assert.ok(heapGrowth < 64, `Heap wuchs um ${heapGrowth.toFixed(1)} MB - die Praefixmenge wurde gebaut`);
 });
 
 test('Nicht-ASCII-Name ohne UTF-8-Flag → unsafe_path; mit Flag ok', () => {

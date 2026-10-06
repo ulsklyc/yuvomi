@@ -50,7 +50,10 @@ import { installErrorText } from '/settings/module-install-errors.js';
  * EIN DRITTMODUL WIRD HIER GEPRUEFT, BEVOR ES ANGEHT. Seit Module aus den
  * Einstellungen installiert werden (modules-install.js), kommen sie
  * ausgeschaltet an; ihre Zeile traegt deshalb Details (Kennung, Version,
- * Quelle, Installationszeitpunkt, Ordner) und einen Loeschen-Knopf.
+ * Quelle, Installationszeitpunkt, wer installiert hat, Ordner) und - nur bei
+ * einem Modul, das die Oberflaeche selbst installiert hat - einen
+ * Loeschen-Knopf. Einen von Hand kopierten Ordner loescht der Server nicht
+ * (Review zu PR #1671: er kann ein Checkout mit offener Arbeit sein).
  */
 
 const INSTALL_MODULE_PATH = '/settings/modules/install';
@@ -61,9 +64,25 @@ const INSTALL_MODULE_PATH = '/settings/modules/install';
 // der nur scheitern kann, wird gar nicht erst angeboten.
 const DELETABLE_MODULE_ID_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 
-/** Ob die Zeile eines Drittmoduls einen Loeschen-Knopf bekommt. */
+/** Ob die Kennung eine ist, die DELETE ueberhaupt annimmt (sonst 400 bad_id). */
 export function isDeletableModuleId(id) {
   return typeof id === 'string' && DELETABLE_MODULE_ID_RE.test(id);
+}
+
+/** Ob ein Modul einen Installationsdatensatz (`.yuvomi-install.json`) traegt. */
+function hasInstallRecord(module) {
+  return Boolean(module?.install) && typeof module.install === 'object';
+}
+
+/**
+ * Ob die Zeile eines Drittmoduls einen Loeschen-Knopf bekommt: eine gueltige
+ * Kennung UND ein Installationsdatensatz. Die Oberflaeche loescht nur, was
+ * sie selbst installiert hat; einen von Hand kopierten Ordner lehnt DELETE
+ * mit 409 `not_web_installed` ab, und einen Knopf, der nur scheitern kann,
+ * gibt es nicht. Die Details sagen stattdessen "Auf den Server kopiert".
+ */
+export function isDeletableModule(module) {
+  return isDeletableModuleId(module?.id) && hasInstallRecord(module);
 }
 
 /** Zeilen in derselben Reihenfolge und Gruppierung wie die Navigation - nur ohne Sortierung. */
@@ -114,6 +133,7 @@ function buildRows(preferences, thirdPartyModules) {
       toggleDisabled: module.status === 'error',
       hasError: module.status === 'error',
       accent: module.accent,
+      deletable: isDeletableModule(module),
     });
   }
 
@@ -171,8 +191,10 @@ function rowHtml(row) {
   })).join('')}
     </div>` : '';
 
-  // Loeschen gibt es nur fuer Drittmodule: eingebaute sind Teil der App.
-  const deletable = row.type === 'third-party' && isDeletableModuleId(row.id);
+  // Loeschen gibt es nur fuer Drittmodule, die von hier aus installiert wurden
+  // (isDeletableModule): eingebaute sind Teil der App, von Hand kopierte
+  // gehoeren dem Server.
+  const deletable = row.type === 'third-party' && row.deletable === true;
   const deleteAction = deletable ? rowActionHtml({
     icon: 'trash-2',
     label: t('common.deleteNamed', { name: row.label }),
@@ -216,6 +238,21 @@ function installedAtText(install) {
   return `${formatDate(date)} ${formatTime(date)}`.trim();
 }
 
+/**
+ * Wer installiert hat - die Spur, die eine Logrotation ueberlebt (Review zu
+ * PR #1671). Der Datensatz traegt die Nutzer-Id; der Server loest sie in der
+ * Admin-Liste zu `installedByName` auf: ein Name, `null` fuer ein geloeschtes
+ * Konto ("Ein ehemaliges Mitglied"). Fehlt das Feld ganz (aelterer Server,
+ * kein Datensatz), gibt es keine Zeile.
+ * @returns {string|null}
+ */
+export function installedByText(install) {
+  if (!install || typeof install !== 'object' || install.installedByName === undefined) return null;
+  if (install.installedByName === null) return t('settings.moduleDetailFormerMember');
+  const name = String(install.installedByName).trim();
+  return name || t('settings.moduleDetailFormerMember');
+}
+
 /** Woher ein Drittmodul kommt: GitHub-Adresse, ZIP-Upload oder von Hand kopiert. */
 export function moduleSourceText(install) {
   if (!install || typeof install !== 'object') return t('settings.moduleSourceManual');
@@ -242,12 +279,14 @@ export function moduleSourceText(install) {
  */
 function moduleDetailsElement(module) {
   const install = module.install && typeof module.install === 'object' ? module.install : null;
+  const installedBy = installedByText(install);
   const content = createInfoList([
     { label: t('settings.moduleDetailId'), value: module.id, code: true },
     { label: t('settings.moduleDetailVersion'), value: module.version || t('settings.moduleDetailUnknown') },
     module.description ? { label: t('settings.moduleDetailDescription'), value: module.description } : null,
     { label: t('settings.moduleDetailSource'), value: moduleSourceText(install) },
     install ? { label: t('settings.moduleDetailInstalledAt'), value: installedAtText(install) } : null,
+    installedBy ? { label: t('settings.moduleDetailInstalledBy'), value: installedBy } : null,
     { label: t('settings.moduleDetailFolder'), value: `modules/${module.id}`, code: true },
     // Kein Fehler-Eintrag hier: die Zeile selbst zeigt ihn schon als Alert, und
     // ein zweites Mal im aufgeklappten Detail las ein Screenreader ihn doppelt.
@@ -451,8 +490,9 @@ async function deleteThirdPartyModule(container, user, button) {
     await api.delete(`/modules/${encodeURIComponent(id)}`);
   } catch (error) {
     release();
-    // Dieselbe Abbildung wie beim Installieren: not_found, not_a_module und
-    // module_session_required sagen dem Admin etwas, der Servertext nur auf Englisch.
+    // Dieselbe Abbildung wie beim Installieren: not_found, not_a_module,
+    // not_web_installed, module_session_required und module_web_install_disabled
+    // sagen dem Admin etwas, der Servertext nur auf Englisch.
     window.yuvomi?.showToast(error?.data?.reason ? installErrorText(error) : (error?.message || t('common.errorGeneric')), 'danger');
     return;
   }

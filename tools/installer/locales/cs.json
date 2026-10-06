@@ -168,7 +168,9 @@
     "sectionPrivateNetwork": "Přístup do domácí sítě",
     "privateNetworkHint": "Yuvomi ve výchozím nastavení odmítá spojení na adresy ve tvé síti, což chrání před tím, aby byl server přiměn k oslovení interních služeb. Povol to, co doma opravdu provozuješ.",
     "authPasswordLogin": "Zachovat přihlášení uživatelským jménem a heslem",
-    "authPasswordLoginHint": "Vypnutím se SSO stane jedinou cestou dovnitř: přihlašovací formulář i obnova hesla zmizí. Pokud je poskytovatel nedostupný, cesta zpět vede přes úpravu souboru .env a restart."
+    "authPasswordLoginHint": "Vypnutím se SSO stane jedinou cestou dovnitř: přihlašovací formulář i obnova hesla zmizí. Pokud je poskytovatel nedostupný, cesta zpět vede přes úpravu souboru .env a restart.",
+    "moduleWebInstall": "Povolit instalaci modulů z Nastavení",
+    "moduleWebInstallHint": "Umožní správci umístit moduly třetích stran na server z webového rozhraní (nahrání ZIP nebo adresa GitHub) bez přístupu k souborům. Nainstalované moduly zůstávají vypnuté, dokud je správce neschválí. Vypnuto: moduly se kopírují do složky modulů ručně."
   },
   "review": {
     "title": "Přehled",
@@ -210,7 +212,8 @@
     "privateNetworkWaste": "Svoz odpadu",
     "privateNetworkWebdav": "Dokumenty WebDAV",
     "baseUrl": "Veřejná adresa",
-    "outlook": "Kalendář Outlook"
+    "outlook": "Kalendář Outlook",
+    "moduleWebInstall": "Instalace modulů z Nastavení"
   },
   "docker": {
     "title": "Spouštění Yuvomi",

@@ -36,6 +36,13 @@ export const ZIP_LIMITS = Object.freeze({
   // to compress well (an empty JSON array, a license text) never trips it.
   maxRatio: 200,
   ratioThreshold: 1 * MiB,
+  // Folders per entry name. Every limit above counts bytes of content; this one
+  // bounds the work the NAME causes. The duplicate check below collects every
+  // folder prefix of every entry in a Set, and a 1024-character name holds about
+  // 510 one-letter folders: 2000 such names (the entry limit, 4 MB of archive)
+  // made 1,020,000 keys, 570 MB of heap and 5 s of blocked event loop. A module
+  // sits two or three folders deep; sixteen is more than any real one needs.
+  maxDepth: 16,
 });
 
 const SIG_LOCAL = 0x04034b50;
@@ -66,6 +73,15 @@ const WINDOWS_ILLEGAL_CHARS = /[<>"|?*]/;
 // `LONGFI~1.JS` is the 8.3 short-name alias of some other file on NTFS: writing
 // it can land on a file the validator saw under its long name.
 const SHORT_NAME_ALIAS = /~\d/;
+
+/**
+ * Whether `name` (one path segment, extension included or not) is a device
+ * name Windows resolves in every folder. Shared with the installer, where a
+ * module id becomes a folder name under modules/ and the same list applies.
+ */
+export function isWindowsReservedName(name) {
+  return WINDOWS_RESERVED.test(String(name).split('.')[0]);
+}
 
 export class ZipError extends Error {
   constructor(code, message) {
@@ -180,13 +196,17 @@ export function validateEntryName(rawName) {
   const isDir = name.endsWith('/');
   const body = isDir ? name.slice(0, -1) : name;
   const segments = body.split('/');
+  // Before the per-segment checks and long before the prefix set in
+  // readZipArchive: a name this deep is refused at the first entry that
+  // carries one, with nothing allocated for it.
+  if (segments.length > ZIP_LIMITS.maxDepth) throw unsafe(`more than ${ZIP_LIMITS.maxDepth} folders deep`);
   for (const seg of segments) {
     if (seg === '' || seg === '.' || seg === '..') throw unsafe('empty or relative segment');
     if (seg.length > 255) throw unsafe('segment too long');
     // Windows strips a trailing dot or space, so `index.js.` would silently land
     // on `index.js` - a second name for a file the validator already saw.
     if (/[. ]$/.test(seg)) throw unsafe('trailing dot or space');
-    if (WINDOWS_RESERVED.test(seg.split('.')[0])) throw unsafe('reserved device name');
+    if (isWindowsReservedName(seg)) throw unsafe('reserved device name');
     if (SHORT_NAME_ALIAS.test(seg)) throw unsafe('8.3 short-name alias');
   }
   return { path: body, isDir };
@@ -328,12 +348,18 @@ export function readZipArchive(buffer, limits = {}) {
     if (dirKeys.has(k)) throw new ZipError('duplicate', `A path is both a file and a folder: ${e.name}`);
     fileKeys.add(k);
   }
+  // validateEntryName capped the depth, so the set holds at most
+  // entries × maxDepth keys. The bound is checked again here as the loop runs:
+  // should the cap ever be loosened, the loop stops at the bound instead of
+  // growing the set until the process dies.
+  const maxPrefixes = entries.length * lim.maxDepth;
   for (const e of entries) {
     const parts = key(e.name).split('/');
     for (let i = 1; i < parts.length; i += 1) {
       const prefix = parts.slice(0, i).join('/');
       if (fileKeys.has(prefix)) throw new ZipError('duplicate', `A path is both a file and a folder: ${prefix}`);
       dirKeys.add(prefix);
+      if (dirKeys.size > maxPrefixes) throw new ZipError('unsafe_path', 'The archive has too many nested folders.');
     }
   }
 
@@ -368,6 +394,13 @@ export function readZipArchive(buffer, limits = {}) {
     }
   }
 
+  // Inflate and the CRC run synchronously on the event loop, on purpose. The
+  // work is bounded by the limits above: at most maxTotal (50 MiB) of output,
+  // which inflateRawSync and zlib.crc32 handle in well under a second on a
+  // small server, and the route behind it is admin-only, session-only and
+  // limited to ten installs per ten minutes. A worker thread or a streaming
+  // inflate would buy little against that and cost a second code path for
+  // every error above. Measured and left as is in the review of #1671.
   const files = [];
   for (const e of entries) {
     if (e.isDir) continue;

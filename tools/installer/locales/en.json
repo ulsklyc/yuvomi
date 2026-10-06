@@ -130,7 +130,8 @@
     "privateNetworkWaste": "Waste collection",
     "privateNetworkWebdav": "WebDAV documents",
     "baseUrl": "Public address",
-    "outlook": "Outlook Calendar"
+    "outlook": "Outlook Calendar",
+    "moduleWebInstall": "Install modules from Settings"
   },
   "docker": {
     "title": "Starting Yuvomi",
@@ -276,7 +277,9 @@
     "sectionPrivateNetwork": "Access to your home network",
     "privateNetworkHint": "Yuvomi refuses connections to addresses on your own network by default, which protects against a server being tricked into reaching internal services. Enable what you actually run at home.",
     "authPasswordLogin": "Keep the username and password login",
-    "authPasswordLoginHint": "Turning this off makes SSO the only way in: the login form and password reset disappear. It takes effect once at least one account is linked to your provider, so a fresh install can still create its first admin. If your provider becomes unreachable, the way back is editing the .env file and restarting."
+    "authPasswordLoginHint": "Turning this off makes SSO the only way in: the login form and password reset disappear. It takes effect once at least one account is linked to your provider, so a fresh install can still create its first admin. If your provider becomes unreachable, the way back is editing the .env file and restarting.",
+    "moduleWebInstall": "Allow installing modules from Settings",
+    "moduleWebInstallHint": "Lets an admin put third-party modules on the server from the web interface (ZIP upload or GitHub URL) without any file access. Installed modules stay off until an admin approves them. Off: modules are copied into the modules folder by hand."
   },
   "welcome": {
     "title": "How would you like to set up Yuvomi?",
