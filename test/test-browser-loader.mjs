@@ -182,7 +182,13 @@ const STUBS = {
     export const askOverModal = async (ask) => (
       typeof globalThis.__askOverModal === 'function' ? globalThis.__askOverModal(ask) : ask()
     );
-    export const selectModal = async () => null;
+    // Ohne Stub bricht die Auswahl ab (null) - dann sendet KEIN Aufrufer etwas,
+    // auch mit Schreibrecht nicht. Wer den Weg hinter der Auswahl messen will
+    // (Ordner oder Dokumente verschieben), setzt globalThis.__selectModal und
+    // bekommt Titel und Optionen - dasselbe Muster wie __promptModal.
+    export const selectModal = async (...args) => (
+      typeof globalThis.__selectModal === 'function' ? globalThis.__selectModal(...args) : null
+    );
     // Wer wissen will, OB ein Abschnitt aufgeklappt aufgeht, setzt
     // globalThis.__advancedSection und bekommt Inhalt UND Optionen - die
     // Entscheidung trifft der Aufrufer, und hier kaeme sie sonst nie an.

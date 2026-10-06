@@ -39,7 +39,7 @@ globalThis.customElements = globalThis.customElements ?? { define() {}, get() {}
 globalThis.CSS = globalThis.CSS ?? { escape: (value) => String(value) };
 globalThis.localStorage = globalThis.localStorage ?? { getItem: () => null, setItem() {}, removeItem() {}, clear() {} };
 
-const { installMiniDom } = await import('./mini-dom.js');
+const { installMiniDom, MiniElement } = await import('./mini-dom.js');
 installMiniDom();
 globalThis.window.yuvomi = { showToast() {}, ...globalThis.window.yuvomi };
 globalThis.window.matchMedia = globalThis.window.matchMedia
@@ -51,7 +51,7 @@ if (!globalThis.navigator?.pdfViewerEnabled) {
 
 const { setPermissions, clearPermissions } = await import('../public/permissions.js');
 const { __test: inventory } = await import('../public/pages/inventory.js');
-const { __test: documents } = await import('../public/pages/documents.js');
+const { __test: documents, render: renderDocuments } = await import('../public/pages/documents.js');
 
 async function withAccess(modules, fn, { admin = false } = {}) {
   setPermissions({ admin, modules, widgets: {}, capabilities: {} });
@@ -65,12 +65,17 @@ async function withAccess(modules, fn, { admin = false } = {}) {
 const LESEN = { inventory: 'read', documents: 'read', budget: 'read' };
 const SCHREIBEN = { inventory: 'write', documents: 'write', budget: 'write' };
 
-/** Jeden API-Aufruf mitschreiben, statt ihn zu senden. */
-async function aufrufe(fn, antworten = {}) {
+/**
+ * Jeden API-Aufruf mitschreiben, statt ihn zu senden. Wer wissen muss, WAS
+ * hinausging (ein `PUT` auf denselben Pfad ist Umbenennen ODER Verschieben),
+ * gibt `inhalte` mit und bekommt dort `[Aufruf, Rumpf]` je Schreibanfrage.
+ */
+async function aufrufe(fn, antworten = {}, inhalte = null) {
   const liste = [];
   const zuvor = globalThis.__apiStub;
-  const merke = (method) => async (path) => {
+  const merke = (method) => async (path, body) => {
     liste.push(`${method} ${path}`);
+    if (inhalte && method !== 'GET') inhalte.push([`${method} ${path}`, body]);
     return antworten[`${method} ${path}`] ?? { data: [] };
   };
   globalThis.__apiStub = {
@@ -122,6 +127,107 @@ async function undoMitschnitt(fn) {
 function knoten(el, tag) {
   if (!el || !el.childNodes) return [];
   return [...(el.tagName === tag ? [el] : []), ...el.childNodes.flatMap((kind) => knoten(kind, tag))];
+}
+
+/**
+ * Dem Mini-DOM fuer die Dauer von `fn` geben, was es bewusst nicht hat und was
+ * zwei Wege hier brauchen: `classList` (die Sammel-Pille faerbt ihre
+ * Loeschen-Kapsel) und die Popover-Methoden (das Ordner-Menue). Liefert alles,
+ * was in der Zeit gebaut wurde - ein Menue, das NICHT aufgeht, ist darin nicht
+ * zu finden.
+ */
+async function mitElementen(fn) {
+  const gebaut = [];
+  const bauen = globalThis.document.createElement;
+  const koerper = globalThis.document.body.childNodes.length;
+  globalThis.document.createElement = (tag) => {
+    const el = new MiniElement(tag);
+    const klassen = () => el.className.split(' ').filter(Boolean);
+    el.classList = {
+      add: (...namen) => { el.className = [...new Set([...klassen(), ...namen])].join(' '); },
+      remove: (...namen) => { el.className = klassen().filter((k) => !namen.includes(k)).join(' '); },
+      contains: (name) => klassen().includes(name),
+      toggle() {},
+    };
+    Object.assign(el, { showPopover() {}, hidePopover() {}, remove() {}, focus() {}, offsetWidth: 0, offsetHeight: 0 });
+    gebaut.push(el);
+    return el;
+  };
+  try {
+    await fn();
+  } finally {
+    globalThis.document.createElement = bauen;
+    globalThis.document.body.childNodes.length = koerper;
+  }
+  return gebaut;
+}
+
+/**
+ * Eine Seite, die sich merkt, was in sie gezeichnet wird - gerade genug, damit
+ * `render()` und die Zeichner der Dokumente an ihr laufen.
+ *
+ * SIE ERFINDET NICHTS: einen Traeger gibt es nur, wenn seine `id` im
+ * gezeichneten Seitenmarkup steht, und einen Menue-Eintrag nur, wenn das Markup
+ * sein Attribut traegt. Ein Knopf, den die Seite bei `read` weglaesst, ist
+ * damit auch hier nicht zu finden.
+ */
+function seite(vorab = '') {
+  let html = vorab;
+  const traeger = new Map();
+  const eintraege = new Map();
+  const menue = {
+    addEventListener() {},
+    querySelectorAll: () => [],
+    querySelector(selektor) {
+      if (!html.includes(selektor.replace(/^\[|\]$/g, ''))) return null;
+      if (!eintraege.has(selektor)) eintraege.set(selektor, { hidden: false, disabled: false, querySelector: () => null });
+      return eintraege.get(selektor);
+    },
+  };
+  const gezeichnet = (id) => {
+    if (!traeger.has(id)) traeger.set(id, new MiniElement('div'));
+    return traeger.get(id);
+  };
+  const BEKANNT = ['documents-list', 'documents-folder-browser', 'documents-tools-menu'];
+  return {
+    isConnected: true,
+    dataset: {},
+    addEventListener() {},
+    replaceChildren() { html = ''; },
+    insertAdjacentHTML(_position, markup) { html += markup; },
+    querySelectorAll: () => [],
+    querySelector(selektor) {
+      const id = /^#([\w-]+)$/.exec(selektor)?.[1];
+      if (!BEKANNT.includes(id) || !html.includes(`id="${id}"`)) return null;
+      return id === 'documents-tools-menu' ? menue : gezeichnet(id);
+    },
+    get html() { return html; },
+    liste: () => gezeichnet('documents-list').innerHTML,
+    ordner: () => gezeichnet('documents-folder-browser').innerHTML,
+    eintrag: (selektor) => menue.querySelector(selektor),
+  };
+}
+
+/**
+ * Ein Formular aus lauter Feldern: jede Anfrage nach einem Feld bekommt eines,
+ * mit dem Wert aus `werte` oder leer. Die Speicher-Handler lesen nur `.value`
+ * (und `.files`), also traegt das den ganzen Weg bis zur Anfrage.
+ */
+function felder(werte = {}) {
+  const gemerkt = new Map();
+  return {
+    querySelectorAll: () => [],
+    querySelector(selektor) {
+      if (!gemerkt.has(selektor)) {
+        const wert = werte[selektor];
+        gemerkt.set(selektor, {
+          value: typeof wert === 'string' ? wert : '', files: Array.isArray(wert) ? wert : [],
+          disabled: false, hidden: false, textContent: '',
+        });
+      }
+      return gemerkt.get(selektor);
+    },
+  };
 }
 
 /** Alle Zeilen (`rows`) einer Detailansicht, Gruppen aufgeloest. */
@@ -225,6 +331,23 @@ test('Inventar bei `read`: kein Schreibweg oeffnet ein Formular oder sendet etwa
   const voll = await withAccess(SCHREIBEN, () => aufrufe(async () => { volleModale = await inventarSchreibwege(); }));
   assert.equal(volleModale.length, 5, 'Gegenfall: zwei Formulare, zwei Verwaltungen, die Abschluss-Karte');
   assert.deepEqual(schreibend(voll), ['DELETE /inventory/items/42'], 'Gegenfall: Loeschen geht raus');
+});
+
+test('Inventar bei `read`: der direkte Aufruf des Speicherns sendet nichts', async () => {
+  // Der Riegel in openItemModal() haelt das Formular zu - aber ein Formular,
+  // das schon offen stand, als das Recht fiel, ruft saveItem() trotzdem.
+  const formular = () => felder({
+    '#inv-name': 'Fernseher', '#inv-category': 'electronics', '#inv-status': 'active', '#inv-condition': 'good',
+  });
+  const speichere = (modules, mode) => withAccess(modules, () => aufrufe(
+    () => inventory.saveItem(formular(), mode, mode === 'edit' ? gegenstand() : null, null, null, null),
+  ));
+
+  assert.deepEqual(schreibend(await speichere(LESEN, 'edit')), [], 'read: Bearbeiten speichert nicht');
+  assert.deepEqual(schreibend(await speichere(LESEN, 'create')), [], 'read: Anlegen speichert nicht');
+
+  assert.deepEqual(schreibend(await speichere(SCHREIBEN, 'edit')), ['PUT /inventory/items/42'], 'Gegenfall: Bearbeiten geht raus');
+  assert.deepEqual(schreibend(await speichere(SCHREIBEN, 'create')), ['POST /inventory/items'], 'Gegenfall: Anlegen geht raus');
 });
 
 // -------------------------------------------------------------------------
@@ -440,4 +563,232 @@ test('Dokumente: die Mehrfachauswahl nimmt nur, was die Person verwalten darf', 
   assert.match(ergebnis.kreisEigen, /data-select-id="10"/, 'Gegenfall: das eigene schon');
   assert.deepEqual(ergebnis.nachTipp, [], 'die fremde Karte laesst sich nicht auswaehlen');
   assert.deepEqual(ergebnis.gewaehlt, [10], 'Verschieben, Archivieren und Loeschen bekommen nur das eigene');
+});
+
+// -------------------------------------------------------------------------
+// Dokumente: die Seite als Ganzes (`render()`), Ordner, Sammelauswahl, Speichern
+// -------------------------------------------------------------------------
+
+const ORDNER = [
+  { id: 3, name: 'Wohnung', parent_id: null },
+  { id: 5, name: 'Archiv', parent_id: null },
+  { id: 6, name: 'Keller', parent_id: 3 },
+];
+
+/**
+ * Die Dokumentenseite wirklich zeichnen: `render()` mit seinem Kontext, die
+ * Daten aus den Antworten des Servers. `currentUserId` steht vorher auf null -
+ * wer die Person ist, darf allein aus `context.user` kommen.
+ */
+async function mitSeite({ user, docs = [dokument(), eigenes()] } = {}, fn) {
+  return mitDokumenten({ currentUserId: null, allDocuments: [], documents: [] }, async () => {
+    const s = seite();
+    const ende = new AbortController();
+    try {
+      await aufrufe(() => renderDocuments(s, { user, signal: ende.signal }), {
+        'GET /documents?status=active': { data: docs },
+        'GET /documents/folders': { data: ORDNER },
+        'GET /family/members': { data: [{ id: ICH, display_name: 'Mira' }, { id: ANDERE, display_name: 'Jonas' }] },
+        'GET /documents/meta/options': { data: { is_admin: false } },
+      });
+      return await fn(s);
+    } finally {
+      ende.abort();
+    }
+  });
+}
+
+/** Der Abschnitt eines Dokuments in der gezeichneten Liste. */
+function artikel(html, id) {
+  return html.split('<article').find((teil) => new RegExp(`data-id="${id}"`).test(teil.split('>')[0])) ?? null;
+}
+
+test('Dokumente: `render()` nimmt die Person aus dem Kontext - das eigene Dokument traegt Kebab, Stift und Auswahl, das fremde nicht', async () => {
+  const stift = async (doc) => {
+    const [opts] = await modalMitschnitt(() => documents.runDocumentAction('view', doc));
+    return /data-action="edit-document"/.test(opts.content);
+  };
+  const zeichne = (user) => withAccess(SCHREIBEN, () => mitSeite({ user }, async (s) => {
+    const liste = s.liste();
+    const stifte = { 9: await stift(dokument()), 10: await stift(eigenes()) };
+    documents.enterSelectMode();
+    return { liste, stifte, auswahl: s.liste(), person: documents.state.currentUserId };
+  }));
+
+  const ich = await zeichne({ id: ICH });
+  assert.equal(ich.person, ICH);
+  assert.ok(artikel(ich.liste, 9) && artikel(ich.liste, 10), 'beide Dokumente stehen in der Liste');
+  assert.equal(hatKebab(artikel(ich.liste, 10)), true, 'das eigene Dokument traegt den Kebab');
+  assert.doesNotMatch(artikel(ich.liste, 10), /data-read-bar/);
+  assert.equal(hatKebab(artikel(ich.liste, 9)), false, 'das fremde nicht');
+  assert.match(artikel(ich.liste, 9), /data-read-bar/);
+  assert.match(artikel(ich.liste, 9), /data-action="view"/, 'Ansehen bleibt auch am fremden');
+  assert.deepEqual(ich.stifte, { 9: false, 10: true }, 'der Stift im Betrachter folgt derselben Regel');
+  assert.match(artikel(ich.auswahl, 10), /data-select-id="10"/, 'in der Auswahl traegt das eigene den Kreis');
+  assert.doesNotMatch(artikel(ich.auswahl, 9), /data-select-id/, 'das fremde nicht');
+
+  // Gegenfall: dieselben zwei Dokumente, die andere Person - alles kehrt sich um.
+  // Bliebe ein Rest von vorher stehen, statt dass der Kontext gilt, fiele es hier auf.
+  const andere = await zeichne({ id: ANDERE });
+  assert.equal(hatKebab(artikel(andere.liste, 9)), true, 'Gegenfall: der anderen Person gehoert das andere Dokument');
+  assert.equal(hatKebab(artikel(andere.liste, 10)), false);
+  assert.deepEqual(andere.stifte, { 9: true, 10: false });
+  assert.match(artikel(andere.auswahl, 9), /data-select-id="9"/);
+  assert.doesNotMatch(artikel(andere.auswahl, 10), /data-select-id/);
+
+  const niemand = await zeichne(undefined);
+  assert.equal(niemand.person, null, 'ohne Person im Kontext gehoert einem nichts');
+  assert.equal(hatKebab(artikel(niemand.liste, 9)) || hatKebab(artikel(niemand.liste, 10)), false);
+});
+
+test('Dokumente bei `read`: die Ordnerleiste traegt weder „+" noch Kebab, und das Ordner-Menue geht nicht auf', async () => {
+  const anker = () => {
+    const attribute = {};
+    return {
+      attribute, isConnected: false, focus() {},
+      setAttribute(name, wert) { attribute[name] = wert; },
+      getBoundingClientRect: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+    };
+  };
+  const zeichne = (modules) => withAccess(modules, () => mitSeite({ user: { id: ICH } }, async (s) => {
+    const knopf = anker();
+    const gebaut = await mitElementen(() => documents.openFolderMenu(ORDNER[0], knopf));
+    const menues = gebaut.filter((el) => el.getAttribute('popover') !== null);
+    return { kopf: s.html, ordner: s.ordner(), menues: menues.map((el) => el.innerHTML), knopf: knopf.attribute };
+  }));
+
+  const lesen = await zeichne(LESEN);
+  assert.match(lesen.ordner, /data-folder-select="3"[\s\S]*Wohnung/, 'die Ordner selbst bleiben - und waehlbar');
+  assert.doesNotMatch(lesen.kopf, /id="documents-folder-add"/, 'kein „+": Ordner anlegen ist Schreiben');
+  assert.doesNotMatch(lesen.ordner, /data-folder-menu/, 'kein Kebab an einer Ordnerzeile');
+  assert.deepEqual(lesen.menues, [], 'und der Handler oeffnet das Menue nicht');
+  assert.deepEqual(lesen.knopf, {}, 'der Ausloeser meldet auch kein offenes Menue');
+
+  const voll = await zeichne(SCHREIBEN);
+  assert.match(voll.kopf, /id="documents-folder-add"/, 'Gegenfall: das „+" steht da');
+  assert.deepEqual([...voll.ordner.matchAll(/data-folder-menu="(\d+)"/g)].map((m) => m[1]), ['3', '5'],
+    'Gegenfall: jede sichtbare Ordnerzeile traegt ihren Kebab (Keller liegt zugeklappt unter Wohnung)');
+  assert.equal(voll.menues.length, 1, 'Gegenfall: das Menue geht auf');
+  assert.deepEqual([...voll.menues[0].matchAll(/data-menu-action="([a-z]+)"/g)].map((m) => m[1]),
+    ['subfolder', 'rename', 'move', 'delete'], 'mit seinen vier Schreib-Eintraegen');
+  assert.equal(voll.knopf['aria-expanded'], 'true');
+});
+
+test('Dokumente bei `read`: ein Ordner zieht nicht um - mit Schreibrecht geht genau der Umzug raus', async () => {
+  // Der Stub der Ladehilfe bricht die Auswahl ab; dann sendet moveFolder() auch
+  // mit Schreibrecht nichts, und ein Test ohne Antwort misst den Riegel nicht.
+  const ziehe = (modules, antwort) => withAccess(modules, () => mitDokumenten({ folders: ORDNER }, async () => {
+    const fragen = [];
+    const inhalte = [];
+    const offen = new Set(documents.state.expanded);
+    try {
+      await mitStub('__selectModal', async (titel, optionen) => { fragen.push(optionen.map((o) => o.value)); return antwort; },
+        () => aufrufe(() => documents.moveFolder(ORDNER[0]), {}, inhalte));
+    } finally {
+      for (const id of documents.state.expanded) if (!offen.has(id)) documents.state.expanded.delete(id);
+    }
+    return { fragen, inhalte };
+  }));
+
+  assert.deepEqual(await ziehe(LESEN, '5'), { fragen: [], inhalte: [] }, 'read: keine Auswahl, keine Anfrage');
+
+  const voll = await ziehe(SCHREIBEN, '5');
+  assert.deepEqual(voll.fragen, [['', '5']], 'Gegenfall: die Auswahl fragt - ohne den Ordner selbst und seinen Teilbaum');
+  assert.deepEqual(voll.inhalte, [['PUT /documents/folders/3', { parent_id: 5 }]], 'Gegenfall: genau der Umzug geht raus');
+
+  const wurzel = await ziehe(SCHREIBEN, '');
+  assert.deepEqual(wurzel.inhalte, [['PUT /documents/folders/3', { parent_id: null }]], 'die oberste Ebene ist `null`, kein Abbruch');
+
+  assert.deepEqual((await ziehe(SCHREIBEN, null)).inhalte, [], 'eine abgebrochene Auswahl sendet nichts');
+});
+
+test('Dokumente: „Alle auswaehlen" nimmt nur Verwaltbares, und die Pille nennt diese Zahl', async () => {
+  const drei = [dokument(), eigenes(), eigenes({ id: 11, name: 'Impfpass' })];
+  const waehle = (opts) => withAccess(SCHREIBEN, () => mitDokumenten({ selectMode: true, allDocuments: drei }, async () => {
+    const s = seite('<div id="documents-list"></div>');
+    const pille = new MiniElement('div');
+    const finde = globalThis.document.getElementById;
+    documents.setContainerForTest(s);
+    globalThis.document.getElementById = (id) => (id === 'bulk-pill-layer' ? pille : null);
+    try {
+      let alle;
+      await mitElementen(() => {
+        documents.toggleSelectAll();
+        alle = { gewaehlt: [...documents.state.selected].sort((a, b) => a - b), pille: pille.textContent, liste: s.liste() };
+        documents.toggleSelectAll();
+      });
+      return { ...alle, danach: [...documents.state.selected], pilleDanach: pille.textContent };
+    } finally {
+      globalThis.document.getElementById = finde;
+    }
+  }), opts);
+
+  const mitglied = await waehle();
+  assert.deepEqual(mitglied.gewaehlt, [10, 11], 'das fremde Dokument bleibt aussen vor');
+  assert.match(mitglied.pille, /documents\.selectCount\{"count":2\}/, 'und die Pille zaehlt, was die Sammelaktion wirklich bekommt');
+  assert.match(artikel(mitglied.liste, 10), /data-select-id="10" aria-pressed="true"/);
+  assert.match(artikel(mitglied.liste, 11), /data-select-id="11" aria-pressed="true"/);
+  assert.doesNotMatch(artikel(mitglied.liste, 9), /data-select-id/);
+  assert.deepEqual(mitglied.danach, [], 'der zweite Griff nimmt die Auswahl zurueck');
+  assert.match(mitglied.pilleDanach, /documents\.selectCount\{"count":0\}/);
+
+  const admin = await waehle({ admin: true });
+  assert.deepEqual(admin.gewaehlt, [9, 10, 11], 'Gegenfall: ein Admin verwaltet alle drei');
+  assert.match(admin.pille, /documents\.selectCount\{"count":3\}/);
+});
+
+test('Dokumente: „Mehrere auswaehlen" ist verborgen, wenn der Person nichts gehoert', async () => {
+  const EINSTIEG = '[data-action="enter-select"]';
+  const TRENNER = '[data-select-separator]';
+  const zeichne = (docs, opts) => withAccess(SCHREIBEN, () => mitSeite({ user: { id: ICH }, docs }, (s) => {
+    const vorher = { einstieg: s.eintrag(EINSTIEG)?.hidden, trenner: s.eintrag(TRENNER)?.hidden };
+    documents.enterSelectMode();
+    return { ...vorher, inAuswahl: s.eintrag(EINSTIEG)?.hidden };
+  }), opts);
+
+  const nurFremde = await zeichne([dokument(), dokument({ id: 12, name: 'Police' })]);
+  assert.deepEqual({ einstieg: nurFremde.einstieg, trenner: nurFremde.trenner }, { einstieg: true, trenner: true },
+    'nichts Eigenes: kein Einstieg in die Auswahl, und kein Trennstrich ueber einer leeren Gruppe');
+
+  const einEigenes = await zeichne([dokument(), eigenes()]);
+  assert.deepEqual({ einstieg: einEigenes.einstieg, trenner: einEigenes.trenner }, { einstieg: false, trenner: false },
+    'Gegenfall: ein eigenes Dokument genuegt');
+  assert.equal(einEigenes.inAuswahl, false, 'waehrend der Auswahl bleibt der Eintrag stehen (er ist dann gesperrt)');
+
+  const admin = await zeichne([dokument()], { admin: true });
+  assert.equal(admin.einstieg, false, 'Gegenfall: einem Admin gehoert die Verwaltung aller');
+});
+
+test('Dokumente: der direkte Aufruf des Speicherns sendet nichts ohne Verwaltungsrecht', async () => {
+  // openDocumentModal() haelt den Dialog zu - aber ein Dialog, der schon offen
+  // stand, als das Recht fiel, schickt sein Formular trotzdem an saveDocument().
+  const speichere = (modules, doc, werte = {}) => withAccess(modules, () => mitDokumenten({}, async () => {
+    const formular = felder({
+      '#document-name': 'Neuer Name', '#document-category': 'home', '#document-visibility': 'family',
+      '#document-status': 'active', ...werte,
+    });
+    const inhalte = [];
+    let verhindert = 0;
+    const ereignis = { target: formular, preventDefault() { verhindert += 1; } };
+    await aufrufe(() => documents.saveDocument(ereignis, doc, felder()), {}, inhalte);
+    return { gesendet: inhalte.map(([was, rumpf]) => [was, rumpf.name]), verhindert, fehler: formular.querySelector('#document-error').textContent };
+  }));
+  // Das Hochladen liest die Datei ueber FileReader; den gibt es in Node nicht.
+  class Leser {
+    readAsDataURL() { this.result = 'data:application/pdf;base64,AA=='; queueMicrotask(() => this.onload()); }
+  }
+  const datei = { '#document-file': [{ name: 'scan.pdf', size: 10 }] };
+  const ladeHoch = (modules) => mitStub('FileReader', Leser, () => speichere(modules, null, datei));
+
+  const lesen = await speichere(LESEN, eigenes());
+  assert.deepEqual(lesen.gesendet, [], 'read: auch am eigenen Dokument wird nichts gespeichert');
+  assert.equal(lesen.verhindert, 1, 'und das Formular laedt die Seite nicht neu');
+  assert.deepEqual((await speichere(SCHREIBEN, dokument())).gesendet, [], 'write, fremdes Dokument: nichts');
+  assert.deepEqual((await ladeHoch(LESEN)).gesendet, [], 'read: Hochladen sendet nichts');
+
+  assert.deepEqual((await speichere(SCHREIBEN, eigenes())).gesendet, [['PUT /documents/10', 'Neuer Name']],
+    'Gegenfall: am eigenen Dokument geht die Aenderung raus');
+  const hoch = await ladeHoch(SCHREIBEN);
+  assert.equal(hoch.fehler, '', 'Gegenfall: das Hochladen laeuft ohne Fehler durch');
+  assert.deepEqual(hoch.gesendet, [['POST /documents', 'Neuer Name']], 'Gegenfall: Hochladen geht raus');
 });

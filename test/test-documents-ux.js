@@ -1375,7 +1375,7 @@ test('ein Dokument ist EIN Tab-Stopp, seine Aktionen bleiben sichtbar und per Pf
   assert.equal((actions.match(/tabindex: '0'/g) || []).length, 1, 'genau ein Einstieg je Dokument');
   assert.equal((actions.match(/tabindex: '-1'/g) || []).length, 2);
   for (const cls of ['document-card__actions', 'document-row__actions']) {
-    assert.match(page, new RegExp(`<div class="${cls}" role="toolbar" aria-label="\\$\\{esc\\(t\\('documents\\.actionsFor', \\{ name: doc\\.name \\}\\)\\)\\}"(?:\\$\\{readBarAttr\\(doc\\)\\})?>`));
+    assert.match(page, new RegExp(`<div class="${cls}" role="toolbar" aria-label="\\$\\{esc\\(t\\('documents\\.actionsFor', \\{ name: doc\\.name \\}\\)\\)\\}"\\$\\{readBarAttr\\(doc\\)\\}>`));
   }
   assert.match(fnBody('renderDocuments', 'visibleFolderRows'), /wireRovingToolbars\(list\)/);
   assert.match(de.documents.actionsFor, /\{\{name\}\}/);

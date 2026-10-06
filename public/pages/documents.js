@@ -2335,7 +2335,7 @@ export const __test = {
   documentsToolsMenuHtml, runDocumentAction, deleteDocuments,
   openDocumentModal, openFolderModal, openFolderMenu, openDocumentMenu,
   renameFolder, moveFolder, deleteFolder, enterSelectMode, toggleSelectAll,
-  archiveSelected, moveSelected, selectedDocuments, viewerDetailsHtml,
+  archiveSelected, moveSelected, selectedDocuments, viewerDetailsHtml, saveDocument,
 };
 
 function openDocumentModal(doc = null) {
