@@ -24,6 +24,7 @@
 import { randomBytes } from 'node:crypto';
 import { resolveHouseholdFormats, translate } from '../utils/i18n.js';
 import { escapeICSText, foldLine } from './ics-export.js';
+import { activeAccountSql } from './account-state.js';
 import { projectFutureCycles, suppressesFertility } from '../../public/utils/health-cycle.js';
 import { todayKey } from '../utils/timezone.js';
 
@@ -163,7 +164,7 @@ function clearFeedToken(conn, userId) {
 // Feed-Inhalt filtert also auf ihn, nicht nur der Zugang.
 function findUserIdByFeedToken(conn, token) {
   if (!token) return null;
-  const row = conn.prepare(`SELECT id FROM users WHERE cycle_feed_token = ?`).get(token);
+  const row = conn.prepare(`SELECT id FROM users WHERE cycle_feed_token = ? AND ${activeAccountSql('users')}`).get(token);
   return row?.id ?? null;
 }
 

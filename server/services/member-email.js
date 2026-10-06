@@ -33,7 +33,7 @@
  * zurueck in sein eigenes Konto. Die beiden Fragen bleiben deshalb getrennt.
  */
 import * as dbModule from '../db.js';
-import { householdMemberSql } from './household-members.js';
+import { activeAccountSql, householdMemberSql } from './household-members.js';
 
 /**
  * Genau EINE Adresse, oder gar keine.
@@ -76,6 +76,9 @@ export function memberEmail(userId, { db } = {}) {
   const row = database.prepare(`
     SELECT email FROM contacts
     WHERE family_user_id = ? AND email IS NOT NULL AND email != ''
+      -- An ein ehemaliges Konto geht keine Mail mehr (#1381): kein Reset-Link,
+      -- keine Einkaufsliste. Die Karteikarte selbst bleibt stehen.
+      AND EXISTS (SELECT 1 FROM users account WHERE account.id = contacts.family_user_id AND ${activeAccountSql('account')})
     LIMIT 1
   `).get(userId);
   return singleAddress(row?.email);

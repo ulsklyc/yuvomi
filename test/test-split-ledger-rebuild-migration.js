@@ -145,7 +145,11 @@ const BALANCES = await balances();
 for (const id of [LOST_REMAINDER, LOST_FX]) {
   db.prepare("UPDATE expense_ledger_entries SET created_by = ? WHERE source_type = 'expense' AND source_id = ?").run(ED.id, id);
 }
-assert.equal((await adminCall('DELETE', `/auth/users/${ED.id}`)).status, 200);
+// Direkt in der Datenbank, nicht ueber die Route: seit #1381 deaktiviert
+// `DELETE /auth/users/:id` ein Konto mit Ledger-Zeilen, statt es zu loeschen -
+// der Stand, den v226 repariert, entsteht dort nicht mehr. Bestandsdatenbanken
+// tragen ihn trotzdem, und die Kaskade selbst ist unveraendert.
+assert.equal(db.prepare('DELETE FROM users WHERE id = ?').run(ED.id).changes, 1);
 assert.equal(bookedRows(LOST_REMAINDER).length, 0, 'Fixture: Kaskade hat die Zeilen genommen');
 assert.equal(bookedRows(LOST_FX).length, 0);
 assert.equal(db.prepare('SELECT status FROM expenses WHERE id = ?').get(LOST_REMAINDER).status, 'active', 'Fixture: Ausgabe weiter aktiv');

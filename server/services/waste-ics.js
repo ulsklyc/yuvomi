@@ -22,6 +22,7 @@
 
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import * as store from './waste-store.js';
+import { activeAccountSql } from './account-state.js';
 import { resolveHouseholdFormats, translate } from '../utils/i18n.js';
 import { escapeICSText, foldLine } from './ics-export.js';
 import { todayKey, shiftDateKey } from '../utils/timezone.js';
@@ -123,7 +124,7 @@ function clearFeedToken(conn, userId) {
 function findUserIdByFeedToken(conn, token) {
   if (!token) return null;
   const candidate = Buffer.from(token, 'utf8');
-  for (const row of conn.prepare(`SELECT id, waste_feed_token AS t FROM users WHERE waste_feed_token IS NOT NULL`).all()) {
+  for (const row of conn.prepare(`SELECT id, waste_feed_token AS t FROM users WHERE waste_feed_token IS NOT NULL AND ${activeAccountSql('users')}`).all()) {
     const stored = Buffer.from(row.t, 'utf8');
     if (stored.length === candidate.length && timingSafeEqual(stored, candidate)) return row.id;
   }

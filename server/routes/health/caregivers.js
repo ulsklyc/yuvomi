@@ -13,6 +13,7 @@ import * as db from '../../db.js';
 import { requireAdmin } from '../../middleware/require-admin.js';
 import { log, viewerId, caredForIds } from './helpers.js';
 import { syncPreventionRemindersForSubject } from '../../services/prevention-reminders.js';
+import { isActiveAccount } from '../../services/household-members.js';
 
 const router = express.Router();
 
@@ -82,6 +83,20 @@ router.put('/caregivers/:subjectId', requireAdmin, (req, res) => {
       ).all(...ids);
       if (found.length !== ids.length) {
         return res.status(400).json({ error: 'Unbekannte Person in caregiver_ids.', code: 400 });
+      }
+      // Ein ehemaliges Konto betreut niemanden NEU (#1381). Das Deaktivieren
+      // nimmt ihm seine Betreuungen; ohne diese Zeile liesse sich die naechste
+      // gleich wieder eintragen, fuer ein Konto, das nie mehr hereinkommt.
+      const stored = new Set(db.get()
+        .prepare('SELECT caregiver_id FROM health_care_grants WHERE subject_id = ?').all(subjectId)
+        .map((row) => row.caregiver_id));
+      const former = ids.filter((id) => !stored.has(id) && !isActiveAccount(id, { db: db.get() }));
+      if (former.length) {
+        return res.status(400).json({
+          error: `A deactivated account cannot be a caregiver - user ${former.join(', ')}.`,
+          code: 400,
+          reason: 'account_deactivated',
+        });
       }
     }
 

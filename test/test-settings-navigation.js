@@ -2843,7 +2843,9 @@ test('R14: Familie legt im Blatt-Dialog an, Fuss [Abbrechen][Primaer], Zeilen mi
   assert.match(src, /content: addInviteFormHtml\(\)/);
   assert.match(src, /<ul class="settings-members row-divided" id="members-list">/, 'Haarlinien zwischen den Mitgliedern');
   assert.doesNotMatch(src, /btn--primary settings-add-btn/, 'kein violetter Balken ueber die volle Breite');
-  assert.match(src, /t\('common\.deleteNamed', \{ name: u\.display_name \}\)/, 'der Loeschknopf nennt sein Objekt');
+  // Seit #1381 heisst der Knopf "entfernen", nicht "loeschen": ein Konto mit
+  // Spuren in geteilten Daten wird deaktiviert. Sein Objekt nennt er weiter.
+  assert.match(src, /t\('settings\.removeMemberNamed', \{ name: u\.display_name \}\)/, 'der Entfernen-Knopf nennt sein Objekt');
   assert.match(src, /t\('common\.editNamed', \{ name: u\.display_name \}\)/);
   const editFoot = src.slice(src.indexOf('id="edit-member-error"'), src.indexOf("settings.saveMember')}</button>"));
   assert.match(editFoot, /modal-panel__footer/, 'auch Bearbeiten traegt den Kanon-Fuss');

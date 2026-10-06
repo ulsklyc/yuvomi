@@ -15,7 +15,7 @@ function makeDb() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(`
-    CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
+    CREATE TABLE users (deactivated_at TEXT, id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL DEFAULT 'x');
     CREATE TABLE password_resets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

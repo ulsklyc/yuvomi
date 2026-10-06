@@ -272,8 +272,11 @@ test('Konto der STORNIERENDEN Person geloescht: Zahlung bleibt storniert, Salden
   const eintrag = db.prepare("SELECT actor_id FROM expense_activity WHERE type = 'payment_reversed' AND entity_type = 'settlement' AND entity_id = ?").get(s);
   assert.equal(eintrag.actor_id, M2.id, 'wer storniert hat, steht im Verlauf');
 
+  // Seit #1381 wird Mara deaktiviert (sie steht im Verlauf); die Zusicherung
+  // ueber die Salden gilt in beiden Faellen.
   const del = await adminCall('DELETE', `/auth/users/${M2.id}`);
   assert.equal(del.status, 200);
+  assert.equal(del.body.outcome, 'deactivated');
   assert.deepEqual(await balances(), base, 'die stornierte Zahlung zaehlt nicht wieder');
   assert.match(String(await reversedAt(s)), /^\d{4}-\d{2}-\d{2}T/, 'bleibt storniert');
   const again = await reverse(OWN, s);
@@ -287,7 +290,13 @@ test('Konto der STORNIERENDEN Person geloescht: Zahlung bleibt storniert, Salden
   assert.deepEqual(reversed.map((row) => row.created_by), booked.map((row) => row.created_by), 'Gegenbuchung traegt den Autor der Originalzeile');
 });
 
-test('Konto der ERFASSENDEN Person geloescht: Buchung und Gegenbuchung fallen gemeinsam', async () => {
+// BIS #1381 STAND HIER DAS GEGENTEIL: das Konto der erfassenden Person liess
+// sich loeschen, und Zahlung, Buchung und Gegenbuchung fielen per CASCADE
+// gemeinsam. "Gemeinsam" war die Zusicherung, weil eine halbe Kaskade die
+// Salden verschoben haette - aber auch die ganze nahm dem Haushalt eine
+// Zahlung, die es gegeben hat. Jetzt wird das Konto deaktiviert, und alles
+// bleibt stehen.
+test('Konto der ERFASSENDEN Person entfernt: deaktiviert, Zahlung, Buchung und Gegenbuchung bleiben', async () => {
   const RC = await member('recorder', 'Rolf');
   assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: RC.id, role: 'guest' })).status, 201);
   const base = await balances();
@@ -295,14 +304,17 @@ test('Konto der ERFASSENDEN Person geloescht: Buchung und Gegenbuchung fallen ge
   assert.equal((await reverse(MGR, s)).status, 200);
   assert.deepEqual(await balances(), base);
 
-  // Rolf ist weder Zahler noch Empfaenger - kein RESTRICT haelt das Loeschen
-  // auf. Die Zahlung selbst haengt per `settlements.created_by` CASCADE an ihm.
+  // Rolf ist weder Zahler noch Empfaenger - kein RESTRICT hielte ein Loeschen
+  // auf, und die Zahlung haengt per `settlements.created_by` CASCADE an ihm.
+  // Genau deshalb ist sie eine Spur.
   const del = await adminCall('DELETE', `/auth/users/${RC.id}`);
   assert.equal(del.status, 200);
-  assert.deepEqual(await balances(), base, 'Salden wie vor der Zahlung');
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM settlements WHERE id = ?').get(s).n, 0);
-  assert.equal(ledger(s, 'settlement').length, 0);
-  assert.equal(ledger(s, 'settlement_reversal').length, 0, 'keine Gegenbuchung ohne Partner');
+  assert.equal(del.body.outcome, 'deactivated');
+  assert.deepEqual(await balances(), base, 'Salden unveraendert');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM settlements WHERE id = ?').get(s).n, 1, 'die Zahlung bleibt');
+  assert.match(String(await reversedAt(s)), /^\d{4}-\d{2}-\d{2}T/, 'und bleibt storniert');
+  assert.equal(ledger(s, 'settlement').length, 2, 'die Buchung bleibt');
+  assert.equal(ledger(s, 'settlement_reversal').length, 2, 'die Gegenbuchung bleibt');
 });
 
 // Dieselbe Klasse an einer Ausgabe: das Bearbeiten schreibt ihre Ledger-Zeilen
@@ -334,6 +346,7 @@ test('Konto der BEARBEITENDEN Person geloescht: die Ausgabe zaehlt weiter in den
 
   const del = await adminCall('DELETE', `/auth/users/${M3.id}`);
   assert.equal(del.status, 200);
+  assert.equal(del.body.outcome, 'deactivated', 'seit #1381: wer im Verlauf steht, wird deaktiviert');
   assert.equal(db.prepare('SELECT status FROM expenses WHERE id = ?').get(eid).status, 'active');
   assert.deepEqual(await balances(), afterEdit, 'die Ausgabe zaehlt weiter');
   const rows = ledger(eid, 'expense');

@@ -1435,6 +1435,12 @@ const MIGRATIONS_SQL = {
     CREATE INDEX idx_health_nutrition_entries_user_date
       ON health_nutrition_entries(user_id, consumed_at);
   `,
+  // v231 (#1381): ein deaktiviertes Konto behaelt seine Zeile. Das
+  // Mitglieder-Praedikat liest die Spalte, also braucht sie jede Suite, die
+  // `householdMemberSql()` gegen ein handgebautes Schema faehrt.
+  231: `
+    ALTER TABLE users ADD COLUMN deactivated_at TEXT;
+  `,
 };
 
 export { MIGRATIONS_SQL };

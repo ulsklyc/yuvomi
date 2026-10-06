@@ -30,6 +30,7 @@ import { resolvePermissions } from '../permissions.js';
 import { createLogger } from '../logger.js';
 import { householdDisabledModules } from './household-modules.js';
 import { scheduleData } from './schedule.js';
+import { activeAccountSql } from './account-state.js';
 
 const log = createLogger('ScheduleReminders');
 
@@ -290,6 +291,8 @@ function isoNow(now) {
 export function syncAllScheduleReminders(database, now = new Date()) {
   const users = database.prepare(`
     SELECT id FROM users WHERE schedule_reminder_offset_minutes IS NOT NULL
+      -- Ohne Ehemalige (#1381): ein deaktiviertes Konto bekommt nichts mehr zugestellt.
+      AND ${activeAccountSql('users')}
   `).all();
   // Bereits abgeschaltete Konten koennen trotzdem noch Anker/Erinnerungen von
   // einer frueheren Einstellung tragen (Modul zwischenzeitlich gesperrt,

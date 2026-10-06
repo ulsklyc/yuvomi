@@ -37,6 +37,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Removing a member no longer takes their entries with it** (#1381). Deleting someone under
+  Settings, Family used to delete everything that person had created as well - appointments,
+  tasks, notes, documents, and payments they had recorded for others, which silently changed
+  everybody else's balances in shared expenses. And anyone who had taken part in a shared
+  expense, or had ever added a quick link, could not be removed at all: the app answered with
+  "Internal server error". Now it depends on what the person leaves behind. If anything shared
+  still refers to them, the account is **deactivated** instead of deleted: every entry stays and
+  keeps their name, balances stay as they are, and the person stands at the end of the list
+  marked "Former member". If nothing shared refers to them, the account is deleted as before.
+  The dialog says both, and the message afterwards tells you which one happened.
+  **Access ends at once.** A deactivated person is signed out everywhere and cannot sign in
+  again, neither with a password nor through single sign-on, which recognises the account and
+  turns it away instead of creating a second one. API tokens acting as that person are revoked, their calendar feed
+  addresses stop working, a wall tablet can no longer tick off anything in their name, password
+  reset links are dropped and no new ones are sent. They get no more push messages, mails or
+  reminders. An administrator who is deactivated stops being one, and the last administrator
+  still cannot be removed.
+  **Private data stays where it is.** Health and cycle records, private notes, shift plans and
+  the person's own contact card and birthday are kept when an account is deactivated; nobody
+  can sign in to read them, and people who look after that person keep the access they had.
+  Removing that data is not part of this change. A deactivated person can no longer be picked
+  as assignee, attendee or group member, while everything they were already part of keeps
+  them. Bringing an account back is not possible yet. For API clients:
+  `DELETE /api/v1/auth/users/{id}` still answers `200 { "ok": true }` and now adds
+  `outcome` (`"deactivated"` or `"deleted"`) and `traces`; `GET /api/v1/auth/users` carries
+  `deactivated_at` per account.
+
 - **Housekeeping chores work like every other list.** A chore row carried a pencil and a bin
   side by side, 4px apart; the pencil opened the same dialog as a tap on the row, and on a
   phone the name was left with 198 of 358px. The row now opens the dialog when tapped, "Delete"

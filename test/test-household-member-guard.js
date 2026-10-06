@@ -94,69 +94,82 @@ const PREDICATE_EXPORT = 'householdMemberSql';
  * Listen + Grund. Neue Eintraege nur mit einem Grund, der erklaert, warum
  * Personal, Gaeste und Display-Konten dort hingehoeren.
  */
+/**
+ * `deactivated` sagt je Eintrag, was die Stelle mit einem EHEMALIGEN Konto tut
+ * (#1381). Wer bewusst jedes Konto sieht, sieht damit noch lange keinen
+ * Ehemaligen: ein deaktiviertes Konto bekommt keine Rechte, kein Token, keine
+ * Zustellung und keinen Platz in einer Uebersicht mehr.
+ *   - 'excluded':   die Abfrage traegt `activeAccountSql()` - der Test unten
+ *                   liest das an der Fundstelle nach;
+ *   - 'shown':      die Stelle braucht den Ehemaligen (Kontenverwaltung, die
+ *                   ihn markiert; Anmeldung, die ihn finden muss, um ihn
+ *                   abzuweisen statt ein Ersatzkonto anzulegen);
+ *   - 'unaffected': die Frage stellt sich dort nicht.
+ * Ein neuer Eintrag ohne das Feld ist rot.
+ */
 const ALLOWLIST = [
   {
-    file: 'server/auth.js', site: 'othersCanRead', lists: 1,
+    file: 'server/auth.js', site: 'othersCanRead', lists: 1, deactivated: 'excluded',
     reason: 'Protective controls, not a list of people: visibility, lock and shares must stay while any other account can read a module, housekeeping staff included. Shows no one; returns module keys only.',
   },
   {
-    file: 'server/auth.js', site: 'GET /users', lists: 2,
+    file: 'server/auth.js', site: 'GET /users', lists: 2, deactivated: 'shown',
     reason: 'User administration: lists every account and flags staff (is_worker) and guests (access_scope). No picker reads it since #1207; the calendar and schedule pages use it only to name people a record already stores.',
   },
   {
-    file: 'server/auth.js', site: 'GET /api-tokens', lists: 1,
+    file: 'server/auth.js', site: 'GET /api-tokens', lists: 1, deactivated: 'excluded',
     reason: 'API token subjects for admins: a token is issued for an account, staff included; guests are left out through access_scope because POST /api-tokens rejects them.',
   },
   {
-    file: 'server/routes/displays.js', site: 'GET /', lists: 1,
+    file: 'server/routes/displays.js', site: 'GET /', lists: 1, deactivated: 'unaffected',
     reason: 'The exact counterpart of the predicate: this admin list shows the wall displays, which are precisely the accounts the predicate excludes (#1208). Filtering it through the predicate would always return nothing. Admin only, and it shows no household member.',
   },
   {
-    file: 'server/services/two-factor.js', site: 'householdOverview', lists: 1,
+    file: 'server/services/two-factor.js', site: 'householdOverview', lists: 1, deactivated: 'excluded',
     reason: 'Two-factor overview for admins: the second factor protects accounts, not membership, so the overview lists every account.',
   },
   {
-    file: 'server/utils/email-match.js', site: 'accountIdsByEmail', lists: 1,
+    file: 'server/utils/email-match.js', site: 'accountIdsByEmail', lists: 1, deactivated: 'shown',
     reason: 'Sign-in and password reset: finds the one account that carries an address, whichever kind it is (SSO linking, the SSO-only clash check, forgot-password). Shows no one; returns account ids only.',
   },
   {
-    file: 'server/routes/permissions.js', site: 'GET /catalog', lists: 1,
+    file: 'server/routes/permissions.js', site: 'GET /catalog', lists: 1, deactivated: 'excluded',
     reason: 'Permission matrix for admins: rights are set per account, staff and guests included.',
   },
   {
-    file: 'server/routes/split-expenses.js', site: 'GET /search', lists: 1,
+    file: 'server/routes/split-expenses.js', site: 'GET /search', lists: 1, deactivated: 'excluded',
     reason: 'Scoped by shared expense groups, not by household: guests are legitimate co-members there.',
   },
   {
-    file: 'server/services/pantry-reminders.js', site: 'usersWithPantry', lists: 1,
+    file: 'server/services/pantry-reminders.js', site: 'usersWithPantry', lists: 1, deactivated: 'excluded',
     reason: 'Background job per account: resolves who may receive pantry reminders, shows no one.',
   },
   {
-    file: 'server/services/notifications.js', site: 'processDueNotifications', lists: 1,
+    file: 'server/services/notifications.js', site: 'processDueNotifications', lists: 1, deactivated: 'excluded',
     reason: 'Background job per account: syncs each account\'s own birthday reminders, shows no one.',
   },
   {
-    file: 'server/services/schedule.js', site: 'scheduleData', lists: 1,
+    file: 'server/services/schedule.js', site: 'scheduleData', lists: 1, deactivated: 'excluded',
     reason: 'Schedule entries per account: staff have schedules of their own (#787).',
   },
   {
-    file: 'server/services/schedule-reminders.js', site: 'syncAllScheduleReminders', lists: 1,
+    file: 'server/services/schedule-reminders.js', site: 'syncAllScheduleReminders', lists: 1, deactivated: 'excluded',
     reason: 'Background job per account that opted into shift reminders, shows no one.',
   },
   {
-    file: 'server/services/ics-export.js', site: 'findUserIdByFeedToken', lists: 1,
+    file: 'server/services/ics-export.js', site: 'findUserIdByFeedToken', lists: 1, deactivated: 'excluded',
     reason: 'Feed token lookup: compares a presented token against every stored one in constant time, shows no one.',
   },
   {
-    file: 'server/services/waste-ics.js', site: 'findUserIdByFeedToken', lists: 1,
+    file: 'server/services/waste-ics.js', site: 'findUserIdByFeedToken', lists: 1, deactivated: 'excluded',
     reason: 'Feed token lookup: compares a presented token against every stored one in constant time, shows no one.',
   },
   {
-    file: 'server/services/waste-store.js', site: 'pruneFeedTypeSelections', lists: 1,
+    file: 'server/services/waste-store.js', site: 'pruneFeedTypeSelections', lists: 1, deactivated: 'unaffected',
     reason: 'Cleanup per account: drops a deleted waste type from every feed selection, shows no one.',
   },
   {
-    file: 'server/routes/health/caregivers.js', site: 'PUT /caregivers/:subjectId', lists: 1,
+    file: 'server/routes/health/caregivers.js', site: 'PUT /caregivers/:subjectId', lists: 1, deactivated: 'unaffected',
     reason: 'Existence check for the ids the request names, not a list offered to anyone.',
   },
 ];
@@ -1041,6 +1054,31 @@ test('every list of people in server/ goes through the household member predicat
   }
   for (const [key] of allowed) {
     if (!grouped.has(key)) problems.push(`${key}: allowlist entry matches no unfiltered list any more - remove it.`);
+  }
+  assert.deepEqual(problems, []);
+});
+
+test('every allowlisted list says what it does with a deactivated account, and does it (#1381)', () => {
+  const findings = serverFiles().flatMap((file) => unfilteredPeopleLists(readFileSync(join(ROOT, file), 'utf8'), file));
+  const allowed = new Map(ALLOWLIST.map((entry) => [`${entry.file} :: ${entry.site}`, entry]));
+  const problems = [];
+  for (const entry of ALLOWLIST) {
+    if (!['excluded', 'shown', 'unaffected'].includes(entry.deactivated)) {
+      problems.push(`${entry.file} :: ${entry.site}: needs deactivated: 'excluded' | 'shown' | 'unaffected'.`);
+    }
+  }
+  for (const finding of findings) {
+    const entry = allowed.get(`${finding.file} :: ${finding.site}`);
+    if (!entry) continue;
+    // Die Abfrage, wie sie dasteht: von der Fundzeile bis zum Ende des Statements.
+    const statement = readFileSync(join(ROOT, finding.file), 'utf8').split('\n').slice(finding.line - 1, finding.line + 12).join('\n');
+    const filters = /\$\{activeAccountSql\('[A-Za-z_]+'\)\}/.test(statement);
+    if (entry.deactivated === 'excluded' && !filters) {
+      problems.push(`${finding.file} :: ${finding.site} (line ${finding.line}): declared 'excluded', but the query does not carry activeAccountSql().`);
+    }
+    if (entry.deactivated === 'unaffected' && filters) {
+      problems.push(`${finding.file} :: ${finding.site} (line ${finding.line}): carries activeAccountSql() - declare it 'excluded'.`);
+    }
   }
   assert.deepEqual(problems, []);
 });
