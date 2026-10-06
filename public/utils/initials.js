@@ -255,16 +255,7 @@ function variantsOf(parsed) {
 /** Der Schluessel, unter dem ein Name im Haushalt steht: ohne Rand- und Doppel-Leerraum. */
 const keyOf = (name) => String(name ?? '').trim().split(/\s+/u).filter(Boolean).join(' ');
 
-/**
- * Die Zeichen fuer jeden Namen einer Liste, so dass sich zwei Personen mit
- * gleichen Initialen unterscheiden. Regel: siehe Dateikopf, "Gleiche Initialen
- * im Haushalt". Das Ergebnis haengt nur an der MENGE der Namen, nicht an ihrer
- * Reihenfolge.
- *
- * @param {Array<string|null|undefined>} names
- * @returns {Map<string, string>} Name (ohne ueberzaehligen Leerraum) -> Zeichen
- */
-export function resolveInitials(names) {
+function resolve(names) {
   const keys = [...new Set((Array.isArray(names) ? names : []).map(keyOf).filter(Boolean))].sort();
   const people = keys.map((key) => {
     const parsed = parse(key);
@@ -294,10 +285,74 @@ export function resolveInitials(names) {
       taken.add(free);
     }
   }
-  return result;
+  return { result, groups: [...groups.values()] };
+}
+
+/**
+ * Die Zeichen fuer jeden Namen einer Liste, so dass sich zwei Personen mit
+ * gleichen Initialen unterscheiden. Regel: siehe Dateikopf, "Gleiche Initialen
+ * im Haushalt". Das Ergebnis haengt nur an der MENGE der Namen, nicht an ihrer
+ * Reihenfolge.
+ *
+ * @param {Array<string|null|undefined>} names
+ * @returns {Map<string, string>} Name (ohne ueberzaehligen Leerraum) -> Zeichen
+ */
+export function resolveInitials(names) {
+  return resolve(names).result;
+}
+
+const isWidePair = (chars) => chars.length === 2 && chars.every((char) => FULL_WIDTH.test(char));
+
+/**
+ * Die Zeichen fuer die KLEINE Scheibe, fuer alle, die in einer Kollisionsgruppe
+ * stehen und zwei Geviert-Zeichen tragen: je Person EINES ihrer beiden, und in
+ * der Gruppe jedes nur einmal.
+ *
+ * WARUM NICHT EINFACH "DAS LETZTE" ODER "DAS ERSTE". Die kleine Scheibe nimmt
+ * sonst das letzte Zeichen (siehe `compactInitials`). In einer Gruppe ist aber
+ * mal das eine, mal das andere das gemeinsame: nach Regel 2 und 3 unterscheidet
+ * das erste (김수, 박수), nach der Wortregel das letzte (김진, 김아 - Review zu
+ * #1690: die erste Fassung nahm unbedingt das erste). Darum: unterscheidet
+ * das letzte Zeichen alle, nehmen es alle; sonst das erste, wenn das alle
+ * unterscheidet. Reicht keine Seite fuer sich (ab drei Personen), nimmt jede
+ * in Namensfolge ihr letztes Zeichen und, ist das schon vergeben, ihr erstes.
+ * `test:initials` haelt an einer Namensmenge, dass damit jede Gruppe
+ * unterschieden ist, in der es ueberhaupt eine solche Zuordnung gibt.
+ *
+ * Wer NICHT in einer Kollisionsgruppe steht, kommt hier nicht vor: 민수 und
+ * 지수 zeigen beide 수, wie vor dieser Regel.
+ *
+ * @param {Array<{ key: string, full: string }>} group  in Namensfolge
+ * @returns {Map<string, string>} Name -> Zeichen
+ */
+function compactGroup(group) {
+  const people = group
+    .map((person) => ({ key: person.key, chars: graphemes(person.full) }))
+    .filter((person) => isWidePair(person.chars))
+    // Das letzte Zeichen zuerst: es ist die Regel der kleinen Scheibe.
+    .map((person) => ({ key: person.key, options: [person.chars[1], person.chars[0]] }));
+
+  // Unterscheidet EINE Seite alle, nehmen alle diese Seite - 김 und 박 statt
+  // 김 und 수.
+  for (const side of [0, 1]) {
+    const chars = people.map((person) => person.options[side]);
+    if (new Set(chars).size === chars.length) return new Map(people.map((person, i) => [person.key, chars[i]]));
+  }
+
+  // Keine Seite reicht fuer sich (김수, 민수, 민아): in Namensfolge nimmt jede
+  // ihr letztes Zeichen, und ist das in der Gruppe schon vergeben, ihr erstes.
+  const taken = new Set();
+  const out = new Map();
+  for (const person of people) {
+    const char = person.options.find((option) => !taken.has(option)) ?? person.options[0];
+    taken.add(char);
+    out.set(person.key, char);
+  }
+  return out;
 }
 
 let roster = null;
+let compactRoster = null;
 
 /**
  * Uebernimmt die Namen aller Konten aus einer Auth-Antwort (`initialsRoster`).
@@ -311,12 +366,20 @@ let roster = null;
  */
 export function setInitialsRoster(names) {
   if (!Array.isArray(names)) return;
-  roster = resolveInitials(names);
+  const { result, groups } = resolve(names);
+  roster = result;
+  compactRoster = new Map();
+  for (const group of groups) {
+    if (group.length < 2) continue;
+    const shown = compactGroup(group.map((person) => ({ key: person.key, full: result.get(person.key) })));
+    for (const [key, char] of shown) compactRoster.set(key, char);
+  }
 }
 
 /** Setzt den Haushalt beim Abmelden zurueck - der naechste Nutzer hat seinen eigenen. */
 export function clearInitialsRoster() {
   roster = null;
+  compactRoster = null;
 }
 
 /**
@@ -356,10 +419,7 @@ export function initials(name, fallback = '') {
 export function compactInitials(name, fallback = '') {
   const full = initials(name, fallback);
   const chars = graphemes(full);
-  if (chars.length < 2 || !chars.every((char) => FULL_WIDTH.test(char))) return full;
-  // Eine Ausweichform (김수 neben 박수) unterscheidet sich im ERSTEN Zeichen -
-  // das letzte ist gerade das gemeinsame.
-  const parsed = parse(name);
-  if (parsed && full !== baseOf(parsed)) return chars[0];
-  return chars[chars.length - 1];
+  if (!isWidePair(chars)) return full;
+  // In einer Kollisionsgruppe das Zeichen, das dort unterscheidet (compactGroup).
+  return compactRoster?.get(keyOf(name)) ?? chars[1];
 }

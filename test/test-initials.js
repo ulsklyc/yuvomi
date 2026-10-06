@@ -709,3 +709,97 @@ test('mit Haushalt: JEDER Aufrufer zeigt fuer Linda LI und fuer Leo LE', async (
     clearInitialsRoster();
   }
 });
+
+// --------------------------------------------------------
+// 5. Die kleine Scheibe in einer Kollisionsgruppe (Review zu #1690)
+// --------------------------------------------------------
+
+const compactOf = (names) => {
+  try {
+    setInitialsRoster(names);
+    return Object.fromEntries(names.map((name) => [name, compactInitials(name)]));
+  } finally {
+    clearInitialsRoster();
+  }
+};
+
+test('die kleine Scheibe unterscheidet in einer Kollisionsgruppe - am Zeichen, das verschieden ist', () => {
+  // Wortregel mit drei Woertern: die Ausweichform ist 김진 / 김아, das ERSTE
+  // Zeichen ist das gemeinsame. Die erste Fassung nahm es unbedingt.
+  assert.deepEqual(compactOf(['김 민 수진', '김 민 수아']), { '김 민 수진': '진', '김 민 수아': '아' });
+  // Ein Wort aus zwei Emoji: beide tragen 😀, die Ausweichform haengt das zweite an.
+  assert.deepEqual(compactOf(['😀😺', '😀🐶']), { '😀😺': '😺', '😀🐶': '🐶' });
+  // Dasselbe als zwei Woerter ist keine Kollision (😀😺 und 😀🐶 sind schon
+  // verschieden) und folgt der Regel der kleinen Scheibe: das letzte Zeichen.
+  assert.deepEqual(compactOf(['😀 😺', '😀 🐶']), { '😀 😺': '😺', '😀 🐶': '🐶' });
+  // Namen nach Regel 2 und 3: dort unterscheidet das ERSTE Zeichen.
+  assert.deepEqual(compactOf(['김민수', '박민수']), { 김민수: '김', 박민수: '박' });
+  assert.deepEqual(compactOf(['田中 太郎', '山田太郎']), { '田中 太郎': '田', 山田太郎: '山' });
+  // Keines der beiden Zeichen unterscheidet fuer sich allein alle drei: jede
+  // bekommt eines, das in der Gruppe sonst niemand zeigt.
+  const mixed = ['김민수', '민 가 수', '민 가 수아'];
+  assert.deepEqual(resolved(mixed), { 김민수: '김수', '민 가 수': '민수', '민 가 수아': '민아' }, 'Vorbedingung: 수, 수, 아 und 김, 민, 민');
+  const three = compactOf(mixed);
+  assert.equal(new Set(Object.values(three)).size, 3, JSON.stringify(three));
+  assert.equal(three['민 가 수아'], '아', 'wer mit dem letzten Zeichen auskommt, behaelt es');
+  // DER BEKANNTE REST, keine Kollision der Initialen: 민수 und 지수 sind
+  // verschieden, die kleine Scheibe zeigt von beiden das letzte Zeichen
+  // (Regel aus #1637). Nur eine Kollisionsgruppe wird aufgeloest.
+  assert.deepEqual(compactOf(['김민수', '이지수']), { 김민수: '수', 이지수: '수' });
+});
+
+test('die kleine Scheibe: jede aufloesbare Kollisionsgruppe ist auch dort aufgeloest', () => {
+  const POOL = [
+    '김민수', '박민수', '이민수', '김 민수', '김 민 수진', '김 민 수아', '박 민 수진', '김 가 나다', '김 가 나라', '박가나',
+    '田中太郎', '山田太郎', '田中 太郎', '😀😺', '😀🐶', '😀', '😀 😺', '🐶😀', '이지수', '민수', LINDA, LEO, '김 Smith', '김 Sato', '민 가 수', '민 가 수아',
+  ];
+  const wide = (text) => {
+    const chars = graphemes(text);
+    return chars.length === 2 && chars.every((char) => compactInitials(char) === char && compactInitials(`${char} ${char}`) === char);
+  };
+  // Gibt es eine Zuordnung "je Person eines ihrer Zeichen", bei der alle
+  // verschieden sind? Ausprobiert, nicht berechnet.
+  const solvable = (fulls) => {
+    const walk = (i, used) => i === fulls.length
+      || graphemes(fulls[i]).some((char) => !used.has(char) && walk(i + 1, new Set([...used, char])));
+    return walk(0, new Set());
+  };
+
+  let groups = 0;
+  let changed = 0;
+  let neitherSide = 0;
+  const subsets = [];
+  for (let a = 0; a < POOL.length; a += 1) {
+    for (let b = a + 1; b < POOL.length; b += 1) {
+      subsets.push([POOL[a], POOL[b]]);
+      for (let c = b + 1; c < POOL.length; c += 1) subsets.push([POOL[a], POOL[b], POOL[c]]);
+    }
+  }
+  for (const names of subsets) {
+    const base = Object.fromEntries(names.map((name) => [name, initials(name)]));
+    const full = resolved(names);
+    const key = (name) => name.trim().split(/\s+/u).join(' ');
+    const compact = compactOf(names);
+    const byBase = new Map();
+    for (const name of names) byBase.set(base[name], [...(byBase.get(base[name]) ?? []), name]);
+    for (const group of byBase.values()) {
+      if (group.length < 2) {
+        // Ohne Kollision bleibt die Regel der kleinen Scheibe.
+        assert.equal(compact[group[0]], compactInitials(group[0]), `${names.join(', ')}: ${group[0]} ohne Kollision`);
+        continue;
+      }
+      const fulls = group.map((name) => full[key(name)]);
+      const allWide = fulls.every(wide);
+      if (!allWide || new Set(fulls).size !== fulls.length || !solvable(fulls)) continue;
+      groups += 1;
+      const shown = group.map((name) => compact[name]);
+      if (group.some((name, i) => shown[i] !== graphemes(fulls[i])[1])) changed += 1;
+      if ([0, 1].every((side) => new Set(fulls.map((text) => graphemes(text)[side])).size < fulls.length)) neitherSide += 1;
+      assert.equal(new Set(shown).size, shown.length, `${names.join(', ')}: ${JSON.stringify(fulls)} -> ${JSON.stringify(shown)}`);
+      group.forEach((name, i) => assert.ok(graphemes(fulls[i]).includes(shown[i]), `${name}: ${shown[i]} ist eines der Zeichen aus ${fulls[i]}`));
+    }
+  }
+  assert.ok(groups > 50, `der Lauf sieht aufloesbare Gruppen (${groups})`);
+  assert.ok(changed > 10, `und darunter solche, in denen das letzte Zeichen nicht reicht (${changed})`);
+  assert.ok(neitherSide > 0, `und solche, in denen keine Seite fuer sich alle unterscheidet (${neitherSide})`);
+});
