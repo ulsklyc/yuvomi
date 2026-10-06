@@ -3912,8 +3912,10 @@
                 "not_a_member": "A fizető vagy az egyik résztvevő már nem tagja a csoportnak."
             },
             "missedQuestion": "A szünet alatt időpontok maradtak ki",
-            "missedSkip": "Folytatás {{date}} dátumtól, utólagos könyvelés nélkül",
-            "missedBook": "A kimaradt időpontok könyvelése {{date}} dátumtól",
+            "missedSkip": "Folytatás ettől: {{date}}",
+            "missedBook": "Utólagos könyvelés ettől: {{date}}",
+            "missedDetail": "{{date}} óta {{count}} időpont maradt ki.",
+            "missedDetail_one": "{{date}} óta {{count}} időpont maradt ki.",
             "deleteConfirm": "Törli ezt az ismétlődő költséget?",
             "deleteConfirmDetail": "Új költség nem jön létre. A már lekönyvelt költségek megmaradnak.",
             "show": "Megjelenítés",

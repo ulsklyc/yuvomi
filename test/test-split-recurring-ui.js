@@ -74,7 +74,7 @@ async function buehne({ recurring = [MIETE, STROM, FREMD], modus = 'write', arch
     activity, activityCursor: null, activityGroupId: 2, activityLoadingMore: false,
     recurring,
   });
-  const spur = { gesendet: [], gets: [], fragen: [], dialoge: [], leseansichten: [], rueckfragen: [], gemeldet: [], geschlossen: 0 };
+  const spur = { gesendet: [], gets: [], auswahldialoge: [], fragen: [], dialoge: [], leseansichten: [], rueckfragen: [], gemeldet: [], geschlossen: 0 };
   // Der Seitencontainer, in den das Neuzeichnen nach einem Schreibweg laeuft.
   _stumm = container ?? { querySelector: () => leer };
   split.renderMainForTest(_stumm);
@@ -84,11 +84,33 @@ async function buehne({ recurring = [MIETE, STROM, FREMD], modus = 'write', arch
     put: async (pfad, daten) => { spur.gesendet.push(['PUT', pfad, daten]); return { data: {} }; },
     delete: async (pfad) => { spur.gesendet.push(['DELETE', pfad]); return { data: { ok: true } }; },
   };
-  globalThis.__selectModal = async (titel, optionen) => {
-    spur.fragen.push({ titel, optionen });
-    return typeof auswahl === 'function' ? auswahl(optionen) : auswahl ?? null;
+  // Der geteilte Auswahldialog ist hier nicht mehr im Spiel - meldet er sich
+  // doch, soll der Fall rot werden statt still "abgebrochen" zu lesen.
+  globalThis.__selectModal = async (titel) => { spur.auswahldialoge.push(titel); return null; };
+  globalThis.__openModal = (opts) => {
+    // Die Frage beim Fortsetzen ist ein eigener Dialog: seine Knoepfe kommen aus
+    // dem gezeichneten Markup, und `auswahl` sagt, welcher Ausgang genommen wird
+    // ('skip' | 'book' = dieser Knopf, 'abbrechen' = der Abbrechen-Knopf,
+    // 'schliessen' = X/Escape/Overlay ueber onClose). Ohne `auswahl` bleibt sie offen.
+    if (opts.title !== 'splitExpenses.recurring.missedQuestion') { spur.dialoge.push(opts); return; }
+    const entschaerft = (text) => text.replace(/&quot;/g, '"');
+    const knoepfe = [...opts.content.matchAll(/<button type="button" class="([^"]*)" data-resume="(\w+)">([^<]*)<\/button>/g)]
+      .map(([, klasse, wert, text]) => ({ klasse, wert, text: entschaerft(text) }));
+    const frage = {
+      titel: opts.title, knoepfe, pointerDeadTime: opts.pointerDeadTime,
+      satz: entschaerft(opts.content.match(/<p class="modal-confirm__detail" id="split-resume-detail">([^<]*)<\/p>/)?.[1] ?? ''),
+      abbrechen: /<button type="button" class="btn btn--secondary" id="split-resume-cancel">common\.cancel<\/button>/.test(opts.content),
+      markup: opts.content,
+    };
+    spur.fragen.push(frage);
+    const klick = {};
+    const knoten = (dataset = {}) => ({ dataset, addEventListener(typ, fn) { klick[dataset.resume ?? 'abbrechen'] = fn; } });
+    const tasten = knoepfe.map((k) => knoten({ resume: k.wert }));
+    const abbrechen = knoten();
+    opts.onSave({ querySelectorAll: (sel) => (sel === '[data-resume]' ? tasten : []), querySelector: (sel) => (sel === '#split-resume-cancel' ? abbrechen : null) });
+    frage.antworte = (wie) => (wie === 'schliessen' ? opts.onClose() : klick[wie]());
+    if (auswahl) frage.antworte(auswahl);
   };
-  globalThis.__openModal = (opts) => { spur.dialoge.push(opts); };
   globalThis.__closeModal = () => { spur.geschlossen += 1; };
   globalThis.__reportFieldError = (input, text) => { spur.gemeldet.push({ input, text }); };
   globalThis.__openDetailView = (opts) => { spur.leseansichten.push(opts); };
@@ -300,38 +322,82 @@ test('Nach dem Umschalten wird die Liste neu geladen: die Zeile zeigt, was der S
   });
 });
 
+test('Nach dem Umschalten liegt der Fokus auf dem neu gezeichneten Umschalter dieser Serie', async () => {
+  const knopf = { fokus: 0, focus() { this.fokus += 1; } };
+  const gesucht = [];
+  const container = { querySelector: (sel) => { gesucht.push(sel); return sel === '[data-recurring-toggle="11"]' ? knopf : leer; } };
+  await buehne({ container }, async () => {
+    await split.toggleRecurring(11);
+    assert.ok(gesucht.includes('[data-recurring-toggle="11"]'));
+    assert.equal(knopf.fokus, 1);
+  });
+});
+
 test('Fortsetzen ohne versaeumte Termine fragt nichts und ueberspringt (Vorgabe)', async () => {
-  await buehne({ recurring: [serie(12, { paused_at: '2026-08-01T00:00:00Z', missed_count: 0, resume_date: '2026-11-01' })] }, async (spur) => {
+  // `auswahl: 'book'`: kaeme die Frage hier doch, wuerde sie beantwortet und der
+  // Fall rot - statt an einem offenen Dialog zu haengen.
+  await buehne({ auswahl: 'book', recurring: [serie(12, { paused_at: '2026-08-01T00:00:00Z', missed_count: 0, resume_date: '2026-11-01' })] }, async (spur) => {
     await split.toggleRecurring(12);
     assert.deepEqual(spur.fragen, []);
     assert.deepEqual(spur.gesendet, [['POST', '/split-expenses/recurring/12/pause', { missed: 'skip' }]]);
   });
 });
 
-test('Fortsetzen mit versaeumten Terminen stellt EINE Frage: weiter ab dem naechsten Termin steht zuerst', async () => {
-  await buehne({ auswahl: (optionen) => optionen[0].value }, async (spur) => {
+test('Fortsetzen mit versaeumten Terminen stellt EINE Frage: ein Satz, zwei beschriftete Knoepfe, weiter ab dem naechsten Termin zuerst und als Hauptknopf', async () => {
+  await buehne({ auswahl: 'skip' }, async (spur) => {
     await split.onRecurringClick(klickAus(hauptteil(), 'data-recurring-toggle="12"'));
     assert.equal(spur.fragen.length, 1);
-    assert.equal(spur.fragen[0].titel, 'splitExpenses.recurring.missedQuestion');
-    assert.deepEqual(spur.fragen[0].optionen, [
+    const frage = spur.fragen[0];
+    assert.equal(frage.titel, 'splitExpenses.recurring.missedQuestion');
+    // Wie viele seit wann - die Zahl geht als ZAHL an t(), sonst greift der Plural nicht.
+    assert.equal(frage.satz, 'splitExpenses.recurring.missedDetail{"count":2,"date":"2026-09-10"}');
+    assert.deepEqual(frage.knoepfe, [
       // Das Datum des Servers (`resume_date`), nicht ein hier nachgezaehltes.
-      { value: 'skip', label: 'splitExpenses.recurring.missedSkip{"date":"2026-11-10"}' },
-      { value: 'book', label: 'splitExpenses.recurring.missedBook{"date":"2026-09-10"}' },
+      { klasse: 'btn btn--primary', wert: 'skip', text: 'splitExpenses.recurring.missedSkip{"date":"2026-11-10"}' },
+      { klasse: 'btn btn--secondary', wert: 'book', text: 'splitExpenses.recurring.missedBook{"date":"2026-09-10"}' },
     ]);
+    assert.equal(frage.abbrechen, true, 'ein Ausgang ohne Wirkung');
+    assert.equal(frage.pointerDeadTime, true, 'eine Rueckfrage: ein Doppeltipp auf den Umschalter beantwortet sie nicht gleich mit');
+    assert.match(frage.markup, /class="modal-actions modal-actions--stack split-resume-choices" role="group" aria-labelledby="split-resume-detail"/);
+    assert.deepEqual(spur.auswahldialoge, [], 'nicht der Auswahldialog mit "Speichern"');
     assert.deepEqual(spur.gesendet, [['POST', '/split-expenses/recurring/12/pause', { missed: 'skip' }]]);
   });
 });
 
-test('Fortsetzen: "nachbuchen" sendet missed: book, Abbrechen sendet nichts', async () => {
+test('Fortsetzen: nachgebucht wird nur ueber den zweiten Knopf; Abbrechen und Schliessen senden nichts', async () => {
   await buehne({ auswahl: 'book' }, async (spur) => {
     await split.toggleRecurring(12);
     assert.deepEqual(spur.gesendet, [['POST', '/split-expenses/recurring/12/pause', { missed: 'book' }]]);
   });
-  await buehne({ auswahl: null }, async (spur) => {
-    await split.toggleRecurring(12);
-    assert.equal(spur.fragen.length, 1);
-    assert.deepEqual(spur.gesendet, [], 'die Serie bleibt pausiert');
+  for (const ausgang of ['abbrechen', 'schliessen']) {
+    await buehne({ auswahl: ausgang }, async (spur) => {
+      await split.toggleRecurring(12);
+      assert.equal(spur.fragen.length, 1, ausgang);
+      assert.deepEqual(spur.gesendet, [], `${ausgang}: die Serie bleibt pausiert`);
+      assert.deepEqual(spur.gets, [], `${ausgang}: es gibt nichts neu zu laden`);
+    });
+  }
+});
+
+test('Die Frage wartet auf eine Antwort: ohne sie geht nichts hinaus, und eine zweite Antwort zaehlt nicht', async () => {
+  await buehne({}, async (spur) => {
+    const laeuft = split.toggleRecurring(12);
+    await new Promise((r) => { setImmediate(r); });
+    assert.deepEqual(spur.gesendet, [], 'offen: noch nichts gesendet');
+    spur.fragen[0].antworte('skip');
+    spur.fragen[0].antworte('book');
+    await laeuft;
+    assert.deepEqual(spur.gesendet, [['POST', '/split-expenses/recurring/12/pause', { missed: 'skip' }]]);
   });
+});
+
+test('Der Satz der Frage nennt die Zahl in der Einzahl und der Mehrzahl', async () => {
+  for (const anzahl of [1, 6]) {
+    await buehne({ recurring: [{ ...STROM, missed_count: anzahl }], auswahl: 'abbrechen' }, async (spur) => {
+      await split.toggleRecurring(12);
+      assert.equal(spur.fragen[0].satz, `splitExpenses.recurring.missedDetail{"count":${anzahl},"date":"2026-09-10"}`);
+    });
+  }
 });
 
 test('Ein zweiter Klick, waehrend der Umschalter unterwegs ist, sendet nicht noch einmal', async () => {

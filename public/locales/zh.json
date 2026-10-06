@@ -3912,8 +3912,10 @@
                 "not_a_member": "付款人或某位参与者已不在群组中。"
             },
             "missedQuestion": "暂停期间错过了一些日期",
-            "missedSkip": "从 {{date}} 起继续，不补记",
-            "missedBook": "补记自 {{date}} 起错过的日期",
+            "missedSkip": "从 {{date}} 起继续",
+            "missedBook": "补记自 {{date}} 起的日期",
+            "missedDetail": "自 {{date}} 起已错过 {{count}} 个日期。",
+            "missedDetail_one": "自 {{date}} 起已错过 {{count}} 个日期。",
             "deleteConfirm": "删除此定期支出？",
             "deleteConfirmDetail": "不会再创建新的支出。已入账的支出会保留。",
             "show": "显示",

@@ -3912,8 +3912,10 @@
                 "not_a_member": "Chi paga o un partecipante non fa più parte del gruppo."
             },
             "missedQuestion": "Durante la pausa sono state saltate delle scadenze",
-            "missedSkip": "Riprendi dal {{date}}, senza recuperare il passato",
-            "missedBook": "Registra le scadenze saltate dal {{date}}",
+            "missedSkip": "Riprendi dal {{date}}",
+            "missedBook": "Recupera dal {{date}}",
+            "missedDetail": "Dal {{date}} sono state saltate {{count}} scadenze.",
+            "missedDetail_one": "Dal {{date}} è stata saltata {{count}} scadenza.",
             "deleteConfirm": "Eliminare questa spesa ricorrente?",
             "deleteConfirmDetail": "Non verranno create nuove spese. Le spese già registrate restano.",
             "show": "Mostra",

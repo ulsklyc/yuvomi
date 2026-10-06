@@ -3912,8 +3912,10 @@
                 "not_a_member": "Ödeyen veya bir katılımcı artık grupta değil."
             },
             "missedQuestion": "Duraklatma sırasında bazı tarihler geçti",
-            "missedSkip": "{{date}} tarihinden devam et, geçmişi kaydetme",
-            "missedBook": "{{date}} tarihinden itibaren kaçan tarihleri kaydet",
+            "missedSkip": "{{date}} tarihinden devam et",
+            "missedBook": "{{date}} tarihinden itibaren kaçanları kaydet",
+            "missedDetail": "{{date}} tarihinden beri {{count}} tarih kaçırıldı.",
+            "missedDetail_one": "{{date}} tarihinden beri {{count}} tarih kaçırıldı.",
             "deleteConfirm": "Bu tekrarlanan gider silinsin mi?",
             "deleteConfirmDetail": "Artık yeni gider oluşturulmaz. Kaydedilmiş giderler kalır.",
             "show": "Göster",

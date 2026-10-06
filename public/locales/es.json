@@ -3912,8 +3912,10 @@
                 "not_a_member": "El pagador o algún participante ya no está en el grupo."
             },
             "missedQuestion": "Durante la pausa se pasaron fechas",
-            "missedSkip": "Continuar desde el {{date}}, sin registrar lo pasado",
-            "missedBook": "Registrar las fechas pasadas desde el {{date}}",
+            "missedSkip": "Continuar desde el {{date}}",
+            "missedBook": "Registrar desde el {{date}}",
+            "missedDetail": "Desde el {{date}} se han pasado {{count}} fechas.",
+            "missedDetail_one": "Desde el {{date}} se ha pasado {{count}} fecha.",
             "deleteConfirm": "¿Eliminar este gasto recurrente?",
             "deleteConfirmDetail": "No se crearán más gastos. Los gastos ya registrados se conservan.",
             "show": "Mostrar",

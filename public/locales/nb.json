@@ -3912,8 +3912,10 @@
                 "not_a_member": "Betaleren eller en deltaker er ikke lenger med i gruppen."
             },
             "missedQuestion": "Datoer gikk tapt under pausen",
-            "missedSkip": "Fortsett fra {{date}}, uten å bokføre det som er passert",
-            "missedBook": "Bokfør de tapte datoene fra {{date}}",
+            "missedSkip": "Fortsett fra {{date}}",
+            "missedBook": "Bokfør tapte datoer fra {{date}}",
+            "missedDetail": "{{count}} datoer er gått tapt siden {{date}}.",
+            "missedDetail_one": "{{count}} dato er gått tapt siden {{date}}.",
             "deleteConfirm": "Slette denne gjentakende utgiften?",
             "deleteConfirmDetail": "Det opprettes ingen nye utgifter. Utgifter som allerede er bokført, beholdes.",
             "show": "Vis",

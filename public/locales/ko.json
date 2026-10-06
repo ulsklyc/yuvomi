@@ -3912,8 +3912,10 @@
                 "not_a_member": "지불자 또는 참여자가 더 이상 그룹에 없습니다."
             },
             "missedQuestion": "일시 중지 중에 지나간 날짜가 있습니다",
-            "missedSkip": "{{date}}부터 계속, 지난 날짜는 기록하지 않음",
+            "missedSkip": "{{date}}부터 계속",
             "missedBook": "{{date}}부터 놓친 날짜 기록",
+            "missedDetail": "{{date}} 이후 {{count}}회를 놓쳤습니다.",
+            "missedDetail_one": "{{date}} 이후 {{count}}회를 놓쳤습니다.",
             "deleteConfirm": "이 반복 지출을 삭제하시겠습니까?",
             "deleteConfirmDetail": "새 지출이 더 이상 생성되지 않습니다. 이미 기록된 지출은 유지됩니다.",
             "show": "보기",

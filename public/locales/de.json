@@ -3912,8 +3912,10 @@
                 "not_a_member": "Zahler oder Teilnehmende gehören nicht mehr zur Gruppe."
             },
             "missedQuestion": "Während der Pause wurden Termine versäumt",
-            "missedSkip": "Ab {{date}} fortsetzen, nichts nachbuchen",
-            "missedBook": "Versäumte Termine ab {{date}} nachbuchen",
+            "missedSkip": "Ab {{date}} fortsetzen",
+            "missedBook": "Ab {{date}} nachbuchen",
+            "missedDetail": "Seit dem {{date}} wurden {{count}} Termine versäumt.",
+            "missedDetail_one": "Seit dem {{date}} wurde {{count}} Termin versäumt.",
             "deleteConfirm": "Diese wiederkehrende Ausgabe löschen?",
             "deleteConfirmDetail": "Es entstehen keine neuen Ausgaben mehr. Bereits gebuchte Ausgaben bleiben erhalten.",
             "show": "Anzeigen",

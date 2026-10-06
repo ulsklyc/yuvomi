@@ -3912,8 +3912,10 @@
                 "not_a_member": "Le payeur ou un participant ne fait plus partie du groupe."
             },
             "missedQuestion": "Des échéances ont été manquées pendant la pause",
-            "missedSkip": "Reprendre à partir du {{date}}, sans rattrapage",
-            "missedBook": "Enregistrer les échéances manquées depuis le {{date}}",
+            "missedSkip": "Reprendre à partir du {{date}}",
+            "missedBook": "Rattraper depuis le {{date}}",
+            "missedDetail": "{{count}} échéances ont été manquées depuis le {{date}}.",
+            "missedDetail_one": "{{count}} échéance a été manquée depuis le {{date}}.",
             "deleteConfirm": "Supprimer cette dépense récurrente ?",
             "deleteConfirmDetail": "Aucune nouvelle dépense ne sera créée. Les dépenses déjà enregistrées sont conservées.",
             "show": "Afficher",

@@ -3912,8 +3912,10 @@
                 "not_a_member": "支払者または参加者がグループにいません。"
             },
             "missedQuestion": "停止中に過ぎた日付があります",
-            "missedSkip": "{{date}}から再開し、過去分は記帳しない",
-            "missedBook": "{{date}}以降の未記帳分を記帳する",
+            "missedSkip": "{{date}}から再開",
+            "missedBook": "{{date}}以降の分を記帳",
+            "missedDetail": "{{date}}以降、{{count}}回分が未記帳です。",
+            "missedDetail_one": "{{date}}以降、{{count}}回分が未記帳です。",
             "deleteConfirm": "この定期費用を削除しますか？",
             "deleteConfirmDetail": "新しい費用は作成されなくなります。記帳済みの費用は残ります。",
             "show": "表示",

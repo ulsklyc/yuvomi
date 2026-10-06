@@ -3912,8 +3912,10 @@
                 "not_a_member": "Wala na sa grupo ang nagbayad o ang isang kalahok."
             },
             "missedQuestion": "May mga petsang nalampasan habang naka-pause",
-            "missedSkip": "Ituloy mula {{date}}, huwag itala ang nakaraan",
-            "missedBook": "Itala ang mga nalampasang petsa mula {{date}}",
+            "missedSkip": "Ituloy mula {{date}}",
+            "missedBook": "Itala ang nalampasan mula {{date}}",
+            "missedDetail": "{{count}} petsa ang nalampasan mula {{date}}.",
+            "missedDetail_one": "{{count}} petsa ang nalampasan mula {{date}}.",
             "deleteConfirm": "Tanggalin ang paulit-ulit na gastos na ito?",
             "deleteConfirmDetail": "Wala nang bagong gastos na malilikha. Mananatili ang mga gastos na naitala na.",
             "show": "Ipakita",

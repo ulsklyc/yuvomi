@@ -3912,8 +3912,10 @@
                 "not_a_member": "De betaler of een deelnemer zit niet meer in de groep."
             },
             "missedQuestion": "Tijdens de pauze zijn datums gemist",
-            "missedSkip": "Doorgaan vanaf {{date}}, niets naboeken",
-            "missedBook": "Gemiste datums vanaf {{date}} naboeken",
+            "missedSkip": "Doorgaan vanaf {{date}}",
+            "missedBook": "Naboeken vanaf {{date}}",
+            "missedDetail": "Sinds {{date}} zijn {{count}} datums gemist.",
+            "missedDetail_one": "Sinds {{date}} is {{count}} datum gemist.",
             "deleteConfirm": "Deze terugkerende uitgave verwijderen?",
             "deleteConfirmDetail": "Er worden geen nieuwe uitgaven meer aangemaakt. Al geboekte uitgaven blijven behouden.",
             "show": "Tonen",

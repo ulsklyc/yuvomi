@@ -3912,8 +3912,10 @@
                 "not_a_member": "Betalaren eller en deltagare är inte längre med i gruppen."
             },
             "missedQuestion": "Datum passerade under pausen",
-            "missedSkip": "Fortsätt från {{date}}, bokför inget i efterhand",
+            "missedSkip": "Fortsätt från {{date}}",
             "missedBook": "Bokför missade datum från {{date}}",
+            "missedDetail": "{{count}} datum har missats sedan {{date}}.",
+            "missedDetail_one": "{{count}} datum har missats sedan {{date}}.",
             "deleteConfirm": "Ta bort denna återkommande utgift?",
             "deleteConfirmDetail": "Inga nya utgifter skapas. Redan bokförda utgifter finns kvar.",
             "show": "Visa",

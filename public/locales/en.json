@@ -3912,8 +3912,10 @@
                 "not_a_member": "The payer or a participant is no longer in the group."
             },
             "missedQuestion": "Dates were missed during the pause",
-            "missedSkip": "Continue from {{date}}, book nothing for the past",
-            "missedBook": "Book the missed dates from {{date}}",
+            "missedSkip": "Continue from {{date}}",
+            "missedBook": "Book missed dates from {{date}}",
+            "missedDetail": "{{count}} dates have been missed since {{date}}.",
+            "missedDetail_one": "{{count}} date has been missed since {{date}}.",
             "deleteConfirm": "Delete this recurring expense?",
             "deleteConfirmDetail": "No new expenses will be created. Expenses already booked are kept.",
             "show": "Show",

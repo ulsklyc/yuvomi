@@ -3912,8 +3912,10 @@
                 "not_a_member": "Pembayar atau salah satu peserta sudah tidak ada di grup."
             },
             "missedQuestion": "Ada tanggal yang terlewat selama jeda",
-            "missedSkip": "Lanjutkan mulai {{date}}, tanpa membukukan yang terlewat",
-            "missedBook": "Bukukan tanggal yang terlewat mulai {{date}}",
+            "missedSkip": "Lanjutkan mulai {{date}}",
+            "missedBook": "Bukukan yang terlewat mulai {{date}}",
+            "missedDetail": "{{count}} tanggal terlewat sejak {{date}}.",
+            "missedDetail_one": "{{count}} tanggal terlewat sejak {{date}}.",
             "deleteConfirm": "Hapus pengeluaran berulang ini?",
             "deleteConfirmDetail": "Tidak ada pengeluaran baru yang dibuat. Pengeluaran yang sudah dibukukan tetap ada.",
             "show": "Tampilkan",

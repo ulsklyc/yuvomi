@@ -3912,8 +3912,10 @@
                 "not_a_member": "O pagador ou um participante já não está no grupo."
             },
             "missedQuestion": "Algumas datas passaram durante a pausa",
-            "missedSkip": "Continuar a partir de {{date}}, sem registar o que passou",
-            "missedBook": "Registar as datas em falta a partir de {{date}}",
+            "missedSkip": "Continuar a partir de {{date}}",
+            "missedBook": "Registar as datas em falta desde {{date}}",
+            "missedDetail": "{{count}} datas ficaram por registar desde {{date}}.",
+            "missedDetail_one": "{{count}} data ficou por registar desde {{date}}.",
             "deleteConfirm": "Excluir esta despesa recorrente?",
             "deleteConfirmDetail": "Não serão criadas novas despesas. As despesas já registadas mantêm-se.",
             "show": "Mostrar",

@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, selectModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, refocusAfterRender, whenModalClosed } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
 import { t, formatDate, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
@@ -939,11 +939,62 @@ function jumpToRecurring(id) {
 let _recurringToggleBusy = false;
 
 /**
+ * DIE FRAGE BEIM FORTSETZEN - ein eigener Dialog mit zwei beschrifteten
+ * Antworten, in der Bauart der Reichweiten-Frage des Kalenders
+ * (`recurringScopeChoice`): gestapelte Knoepfe, darunter "Abbrechen".
+ *
+ * Zuerst war es der geteilte Auswahldialog. Dessen Bestaetigen-Knopf heisst
+ * "Speichern", was hier nichts sagt, und das Select kuerzte die laengere
+ * Antwort im schmalen Dialog. Jetzt nennt ein Satz, wie viele Termine seit
+ * wann versaeumt wurden, und jeder Knopf sagt selbst, was er tut und ab
+ * welchem Tag - der Text bricht um, statt gekuerzt zu werden.
+ *
+ * "Ab <naechster Termin> fortsetzen" steht zuerst und ist der Hauptknopf: es
+ * ist die Vorgabe des Servers (`missed: skip`). Beide Daten kommen vom Server
+ * (`resume_date` rechnet er mit der Rechnung des Buchungslaufs).
+ *
+ * Loest zu 'skip' | 'book' | null. Escape, X, Overlay und "Abbrechen" liefern
+ * null - die Serie bleibt dann pausiert.
+ */
+function recurringResumeChoice(recurring) {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (value) => {
+      if (resolved) return;
+      resolved = true;
+      closeModal({ force: true });
+      resolve(value);
+    };
+    const detail = t('splitExpenses.recurring.missedDetail', { count: recurring.missed_count, date: formatDate(recurring.next_run_date) });
+    openSharedModal({
+      pointerDeadTime: true,
+      title: t('splitExpenses.recurring.missedQuestion'),
+      size: 'sm',
+      content: `
+        <p class="modal-confirm__detail" id="split-resume-detail">${esc(detail)}</p>
+        <div class="modal-actions modal-actions--stack">
+          <div class="modal-actions modal-actions--stack split-resume-choices" role="group" aria-labelledby="split-resume-detail">
+            <button type="button" class="btn btn--primary" data-resume="skip">${esc(t('splitExpenses.recurring.missedSkip', { date: formatDate(recurring.resume_date) }))}</button>
+            <button type="button" class="btn btn--secondary" data-resume="book">${esc(t('splitExpenses.recurring.missedBook', { date: formatDate(recurring.next_run_date) }))}</button>
+          </div>
+          <button type="button" class="btn btn--secondary" id="split-resume-cancel">${esc(t('common.cancel'))}</button>
+        </div>`,
+      onClose: () => finish(null),
+      onSave(panel) {
+        for (const button of panel.querySelectorAll('[data-resume]')) {
+          button.addEventListener('click', () => finish(button.dataset.resume));
+        }
+        panel.querySelector('#split-resume-cancel')?.addEventListener('click', () => finish(null));
+      },
+    });
+  });
+}
+
+/**
  * Pausieren oder Fortsetzen (#1647). Fortsetzen stellt EINE Frage, und nur,
- * wenn waehrend der Pause Termine faellig gewesen waeren: ab dem naechsten
- * Termin weiter (vorgewaehlt, die Vorgabe des Servers) oder die versaeumten
- * nachbuchen. Beide Antworten nennen ihr Datum - `resume_date` rechnet der
- * Server mit der Rechnung des Buchungslaufs, hier wird nichts nachgezaehlt.
+ * wenn waehrend der Pause Termine faellig gewesen waeren
+ * (`recurringResumeChoice`): ab dem naechsten Termin weiter oder die
+ * versaeumten nachbuchen. Ohne versaeumte Termine setzt der Knopf direkt fort.
  * Abbrechen laesst die Serie pausiert.
  */
 async function toggleRecurring(id) {
@@ -953,12 +1004,13 @@ async function toggleRecurring(id) {
   if (recurring.paused_at) {
     body = { missed: 'skip' };
     if (recurring.missed_count > 0) {
-      const answer = await selectModal(t('splitExpenses.recurring.missedQuestion'), [
-        { value: 'skip', label: t('splitExpenses.recurring.missedSkip', { date: formatDate(recurring.resume_date) }) },
-        { value: 'book', label: t('splitExpenses.recurring.missedBook', { date: formatDate(recurring.next_run_date) }) },
-      ]);
+      const answer = await recurringResumeChoice(recurring);
       if (answer !== 'skip' && answer !== 'book') return;
       body = { missed: answer };
+      // Erst wenn die Frage ganz zu ist (mobil laeuft eine Animation): ihr
+      // Schliessen gibt den Fokus an den Umschalter zurueck, und der wird
+      // unten neu gezeichnet.
+      await whenModalClosed();
     }
   }
   _recurringToggleBusy = true;
@@ -968,7 +1020,11 @@ async function toggleRecurring(id) {
     _recurringToggleBusy = false;
     await loadGroupData();
     renderAll();
-    refocusAfterRender();
+    // Der Umschalter ist ein neuer Knopf (Pausieren wurde zu Fortsetzen oder
+    // umgekehrt). Wer ihn bedient hat, behaelt ihn unter dem Finger bzw. dem
+    // Tastaturfokus, statt auf den Seitenanfang zu fallen. Hier schliesst kein
+    // Dialog, also greift der Merker von refocusAfterRender() nicht.
+    _container?.querySelector(`[data-recurring-toggle="${id}"]`)?.focus?.();
   }
 }
 

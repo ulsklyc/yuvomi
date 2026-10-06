@@ -3912,8 +3912,10 @@
                 "not_a_member": "Người trả hoặc một người tham gia không còn trong nhóm."
             },
             "missedQuestion": "Một số ngày đã bị bỏ lỡ trong lúc tạm dừng",
-            "missedSkip": "Tiếp tục từ {{date}}, không ghi bù",
-            "missedBook": "Ghi bù các ngày đã bỏ lỡ từ {{date}}",
+            "missedSkip": "Tiếp tục từ {{date}}",
+            "missedBook": "Ghi bù từ {{date}}",
+            "missedDetail": "Đã bỏ lỡ {{count}} ngày kể từ {{date}}.",
+            "missedDetail_one": "Đã bỏ lỡ {{count}} ngày kể từ {{date}}.",
             "deleteConfirm": "Xóa chi phí định kỳ này?",
             "deleteConfirmDetail": "Sẽ không tạo thêm chi phí mới. Các chi phí đã ghi nhận được giữ lại.",
             "show": "Hiển thị",

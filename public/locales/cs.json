@@ -3549,8 +3549,11 @@
                 "not_a_member": "Plátce nebo některý účastník už není ve skupině."
             },
             "missedQuestion": "Během pozastavení uplynuly některé termíny",
-            "missedSkip": "Pokračovat od {{date}}, nic nedoúčtovat",
-            "missedBook": "Doúčtovat zmeškané termíny od {{date}}",
+            "missedSkip": "Pokračovat od {{date}}",
+            "missedBook": "Doúčtovat od {{date}}",
+            "missedDetail": "Od {{date}} bylo zmeškáno {{count}} termínů.",
+            "missedDetail_one": "Od {{date}} byl zmeškán {{count}} termín.",
+            "missedDetail_few": "Od {{date}} byly zmeškány {{count}} termíny.",
             "deleteConfirm": "Smazat tento opakující se výdaj?",
             "deleteConfirmDetail": "Nové výdaje už nevzniknou. Již zaúčtované výdaje zůstanou zachovány.",
             "show": "Zobrazit",

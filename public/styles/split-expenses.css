@@ -540,6 +540,14 @@ button.split-expense:hover {
   margin-inline-end: var(--space-3);
 }
 
+/* Die Frage beim Fortsetzen (#1647): zwei Antworten, jede mit ihrem Datum im
+ * Text. Ein Knopf kuerzt sonst nicht und bricht nicht um - hier muss die ganze
+ * Antwort lesbar sein, auch bei 375px, also bricht sie um. */
+.split-resume-choices .btn {
+  white-space: normal;
+  text-align: center;
+}
+
 .split-expense__body span.split-recurring__reason {
   color: var(--color-warning);
 }
