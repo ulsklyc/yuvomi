@@ -233,6 +233,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Phones: the tab you are on stays inside the tab strip.** A tab strip that does not fit the
+  screen scrolls, and it snaps to the start of a tab. Opening a tab that lay past the edge moved
+  the strip by exactly the missing pixels, and the snapping then pulled it back to the nearest
+  snap point, which could be the one behind it. Budget "Loans" at 390px stood at 327-404 in a
+  strip that ends at 374, 30px outside and without the strip having moved at all; the same at
+  320px (subscriptions, 21px), 360px (reports, 8px) and 414px (loans 6px, reports 20px), on a tap
+  as well as after a reload. At 375px it happened to work, which is why it looked fixed. The
+  strip now moves to the first snap point at which the tab fits with its padding, so there is
+  nothing left to pull back, and it does so in right-to-left languages too (#1504).
 - **A refused change is sent to the server once, not twice.** When the server turned a change
   down with a reason - a locked task, a read-only module, a recipe managed elsewhere - the app
   sent the same request a second time before showing the message. The repeat exists to recover

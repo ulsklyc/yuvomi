@@ -144,3 +144,113 @@ test('onChange carries the direction of the switch in tab order', () => {
     ['not-in-the-bar', 0],
   ]);
 });
+
+// ---------------------------------------------------------------------------
+// #1504: der aktive Reiter liegt im sichtbaren Bereich der Leiste - auch wenn
+// die Leiste einrastet.
+//
+// Gemessen im Browser (Budget, de, 390px): "Kredite" stand bei 327-404, die
+// Leiste endet bei 374, scrollLeft blieb 0. scrollTabIntoView schob um die
+// fehlenden 30px, und `scroll-snap-type: x proximity` mit `snap-align: start`
+// zog die Leiste auf den naechsten Rastpunkt zurueck - der lag bei 0. Dasselbe
+// bei 320 (Abos, 21px), 360 (Berichte, 8px) und 414 (Kredite 6px, Berichte
+// 20px); bei 375 traf der Rastpunkt zufaellig.
+//
+// Der Stub modelliert deshalb genau das, was die Regel bricht: eine Leiste,
+// deren scrollLeft nach JEDEM Setzen auf den naechsten Rastpunkt springt (die
+// strengste Fassung von Einrasten - haelt der aktive Reiter dort, haelt er bei
+// `proximity` erst recht). Die Reiterbreiten sind die gemessenen.
+// ---------------------------------------------------------------------------
+const BUDGET_TABS = [
+  ['budget', 0, 82], ['accounts', 85, 148], ['plan', 151, 196], ['subscriptions', 199, 309],
+  ['loans', 311, 388], ['reports', 391, 463], ['split-expenses', 465, 551],
+];
+const STRIP_LEFT = 16;
+const PAD = 24;
+
+function makeSnappingStrip({ width, rtl = false, snap = true }) {
+  const scrollWidth = BUDGET_TABS.at(-1)[2];
+  const max = Math.max(0, scrollWidth - width);
+  const clamp = (v) => Math.min(max, Math.max(0, v));
+  const snapPoints = BUDGET_TABS.map(([, start]) => clamp(start - PAD));
+  let pos = 0; // logische Scroll-Lage, 0 am Anfang der Leiste
+  const container = el('div');
+  container.clientWidth = width;
+  container.scrollWidth = scrollWidth;
+  container.getBoundingClientRect = () => ({ left: STRIP_LEFT, right: STRIP_LEFT + width, top: 0, bottom: 44 });
+  Object.defineProperty(container, 'scrollLeft', {
+    get: () => (rtl ? -pos : pos),
+    set: (value) => {
+      let next = clamp(rtl ? -value : value);
+      if (snap) next = snapPoints.reduce((best, p) => (Math.abs(p - next) < Math.abs(best - next) ? p : best), snapPoints[0]);
+      pos = next;
+    },
+  });
+  const buttons = BUDGET_TABS.map(([id, start, end]) => {
+    const b = el('button', { tabId: id });
+    b.getBoundingClientRect = () => (rtl
+      ? { left: STRIP_LEFT + width - end + pos, right: STRIP_LEFT + width - start + pos, top: 0, bottom: 44 }
+      : { left: STRIP_LEFT + start - pos, right: STRIP_LEFT + end - pos, top: 0, bottom: 44 });
+    return b;
+  });
+  container.querySelectorAll = (sel) => (sel === '[data-tab-id]' ? buttons : []);
+  global.getComputedStyle = (node) => (node === container
+    ? { direction: rtl ? 'rtl' : 'ltr', scrollSnapType: snap ? 'x proximity' : 'none', scrollPaddingInlineStart: `${PAD}px`, scrollPaddingInlineEnd: `${PAD}px` }
+    : { scrollSnapAlign: snap ? 'start' : 'none' });
+  /** Wie viele Pixel des Reiters ausserhalb der Leiste liegen. */
+  const cut = (id) => {
+    const r = buttons.find((b) => b.dataset.tabId === id).getBoundingClientRect();
+    return Math.max(0, STRIP_LEFT - r.left) + Math.max(0, r.right - (STRIP_LEFT + width));
+  };
+  return { container, buttons, cut };
+}
+
+// Leistenbreiten = Viewport minus 2 x 16px Seitenrand: 320, 360, 375, 390, 414.
+const STRIP_WIDTHS = [288, 328, 343, 358, 382];
+
+for (const rtl of [false, true]) {
+  const label = rtl ? 'rtl' : 'ltr';
+
+  test(`#1504 (${label}): a snapping strip opened on any tab shows that tab completely`, () => {
+    const hidden = [];
+    for (const width of STRIP_WIDTHS) {
+      for (const [id] of BUDGET_TABS) {
+        const { container, buttons, cut } = makeSnappingStrip({ width, rtl });
+        global.document = { activeElement: buttons[0] };
+        wireTablist(container, { activeId: id });
+        if (cut(id) > 0.5) hidden.push(`${width}px ${id}: ${Math.round(cut(id))}px outside`);
+      }
+    }
+    assert.deepEqual(hidden, [], 'a reload or deep link must not leave the active tab outside the strip');
+  });
+
+  test(`#1504 (${label}): switching between any two tabs of a snapping strip shows the new one completely`, () => {
+    const hidden = [];
+    for (const width of STRIP_WIDTHS) {
+      for (const [from] of BUDGET_TABS) {
+        for (const [to] of BUDGET_TABS) {
+          if (from === to) continue;
+          const { container, buttons, cut } = makeSnappingStrip({ width, rtl });
+          global.document = { activeElement: buttons[0] };
+          const handle = wireTablist(container, { activeId: from });
+          handle.setActive(to);
+          if (cut(to) > 0.5) hidden.push(`${width}px ${from} -> ${to}: ${Math.round(cut(to))}px outside`);
+        }
+      }
+    }
+    assert.deepEqual(hidden, []);
+  });
+
+  test(`#1504 (${label}): a strip without snapping still brings the tab in, and leaves a visible one alone`, () => {
+    const { container, buttons, cut } = makeSnappingStrip({ width: 358, rtl, snap: false });
+    global.document = { activeElement: buttons[0] };
+    const handle = wireTablist(container, { activeId: 'budget' });
+    assert.equal(Math.abs(container.scrollLeft), 0, 'a visible tab must not move the strip');
+    handle.setActive('accounts');
+    assert.equal(Math.abs(container.scrollLeft), 0, 'a visible tab must not move the strip');
+    handle.setActive('loans');
+    assert.ok(cut('loans') <= 0.5, 'the tab is inside the strip');
+    handle.setActive('budget');
+    assert.equal(Math.abs(container.scrollLeft), 0, 'going back to the first tab returns to the start');
+  });
+}
