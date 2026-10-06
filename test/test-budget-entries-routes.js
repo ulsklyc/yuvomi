@@ -204,7 +204,8 @@ test('POST /: ungültige Subkategorie → 400', async () => {
 test('POST /: unbekanntes Konto → 400', async () => {
   const r = await call('POST', '/', { body: { title: 'x', amount: -5, category: 'food', date: '2033-01-11', account_id: 999999 } });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Konto/);
+  // Englisch wie jeder Satz des Servers - bis #1668 stand hier "Konto nicht gefunden.".
+  assert.equal(r.body.error, 'Account not found.');
 });
 
 test('POST /: virtuelles Budget glättet den Jahresbetrag auf den Monatsanteil', async () => {
@@ -294,7 +295,8 @@ test('PUT /:id: unbekanntes Konto → 400', async () => {
   const id = insertEntry({ title: 'acc-bad', amount: -5, category: 'food', date: '2033-05-21' });
   const r = await call('PUT', `/${id}`, { body: { account_id: 888888 } });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Konto/);
+  // Englisch wie jeder Satz des Servers - bis #1668 stand hier "Konto nicht gefunden.".
+  assert.equal(r.body.error, 'Account not found.');
 });
 
 test('PUT /:id: Sichtbarkeit umschalten (owner_id bleibt fix)', async () => {
@@ -589,7 +591,8 @@ test('PUT /:id/series: unbekanntes Konto → 400', async () => {
   const parent = insertEntry({ title: 's-badacc', amount: -20, category: 'food', date: '2035-04-10', is_recurring: 1 });
   const r = await call('PUT', `/${parent}/series`, { body: { account_id: 999999 } });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Konto/);
+  // Englisch wie jeder Satz des Servers - bis #1668 stand hier "Konto nicht gefunden.".
+  assert.equal(r.body.error, 'Account not found.');
   assert.equal(db.prepare('SELECT title FROM budget_entries WHERE id = ?').get(parent).title, 's-badacc',
     'die abgelehnte Anfrage darf nichts anderes geschrieben haben');
 });
@@ -1462,4 +1465,190 @@ test('#1585: Rhythmuswechsel ueber PUT /:id an der ersten Buchung - Vergangenhei
   for (const d of aug) {
     assert.equal(new Date(`${d}T00:00:00Z`).getUTCDay(), 3, `${d}: nur Mittwoche wie der Starttag, kein Rest des alten Rasters`);
   }
+});
+
+// --- #1668: jede Absage der Budget-Routen traegt ihren Grund -----------------
+// Die Seite schrieb an 13 Stellen den Satz des Servers in einen Toast. Damit sie
+// stattdessen ihren eigenen Satz am richtigen Feld zeigen kann, nennt jede 400
+// und 409 der Schreibrouten einen `reason`. Der Satz in `error` ist die
+// zugesagte Antwort der API und bleibt Wort fuer Wort - mit einer Ausnahme:
+// validateAccountRef antwortete deutsch ("Konto nicht gefunden."), das war ein
+// Fehler und heisst jetzt "Account not found.".
+test('#1668: jede Absage von Buchung, Serie, Konto, Kategorie und Rate nennt ihren Grund, der Satz bleibt', async () => {
+  setMode('shared');
+  const ADM = { id: ADMIN, role: 'admin' };
+  const EXPECTED = {
+    'e-title': { status: 400, reason: 'entry_title_invalid', error: 'Titel is required.' },
+    'e-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Betrag is required.' },
+    'e-category': { status: 400, reason: 'entry_category_invalid', error: 'Kategorie must be one of: Erwerbseinkommen, Geschenke & Transfers, Kapitalerträge, Sonstiges Einkommen, Sozialleistungen, education, financial_other, food, housing, leisure, personal_health, shopping_clothing, subscriptions, transport.' },
+    'e-date': { status: 400, reason: 'entry_date_invalid', error: 'Datum must be in YYYY-MM-DD format.' },
+    'e-interval': { status: 400, reason: 'entry_recurrence_invalid', error: 'Intervall must be one of: weekly, monthly, yearly.' },
+    'e-count': { status: 400, reason: 'entry_interval_count_invalid', error: 'Intervall-Anzahl muss zwischen 1 und 99 liegen.' },
+    'e-sub': { status: 400, reason: 'entry_subcategory_invalid', error: 'Invalid subcategory.' },
+    'e-account': { status: 400, reason: 'entry_account_invalid', error: 'Account not found.' },
+    'e-account-nan': { status: 400, reason: 'entry_account_invalid', error: 'account_id must be a valid account id.' },
+    'e-two': { status: 400, reason: 'entry_title_invalid', error: 'Titel is required. Betrag is required. Datum must be in YYYY-MM-DD format.' },
+    'p-title': { status: 400, reason: 'entry_title_invalid', error: 'Titel may be at most 200 characters long.' },
+    'p-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Betrag must be a valid number.' },
+    'p-category': { status: 400, reason: 'entry_category_invalid', error: 'Kategorie must be one of: Erwerbseinkommen, Geschenke & Transfers, Kapitalerträge, Sonstiges Einkommen, Sozialleistungen, education, financial_other, food, housing, leisure, personal_health, shopping_clothing, subscriptions, transport.' },
+    'p-date': { status: 400, reason: 'entry_date_invalid', error: 'Datum must be in YYYY-MM-DD format.' },
+    'p-interval': { status: 400, reason: 'entry_recurrence_invalid', error: 'Intervall must be one of: weekly, monthly, yearly.' },
+    'p-count': { status: 400, reason: 'entry_interval_count_invalid', error: 'Intervall-Anzahl muss zwischen 1 und 99 liegen.' },
+    'p-sub': { status: 400, reason: 'entry_subcategory_invalid', error: 'Invalid subcategory.' },
+    'p-account': { status: 400, reason: 'entry_account_invalid', error: 'Account not found.' },
+    's-notrec': { status: 400, reason: 'entry_not_recurring', error: 'Not a recurring entry.' },
+    'sd-notrec': { status: 400, reason: 'entry_not_recurring', error: 'Not a recurring entry.' },
+    'c-booked': { status: 400, reason: 'entry_already_booked', error: 'Entry is already booked.' },
+    's-title': { status: 400, reason: 'entry_title_invalid', error: 'Titel may be at most 200 characters long.' },
+    's-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Betrag must be a valid number.' },
+    's-category': { status: 400, reason: 'entry_category_invalid', error: 'Kategorie must be one of: Erwerbseinkommen, Geschenke & Transfers, Kapitalerträge, Sonstiges Einkommen, Sozialleistungen, education, financial_other, food, housing, leisure, personal_health, shopping_clothing, subscriptions, transport.' },
+    's-interval': { status: 400, reason: 'entry_recurrence_invalid', error: 'Intervall must be one of: weekly, monthly, yearly.' },
+    's-count': { status: 400, reason: 'entry_interval_count_invalid', error: 'Intervall-Anzahl muss zwischen 1 und 99 liegen.' },
+    's-start': { status: 400, reason: 'entry_start_date_invalid', error: 'start_date must be in YYYY-MM-DD format.' },
+    's-end': { status: 400, reason: 'series_end_refused', error: 'A series edit cannot end the series. To end it, set is_recurring to false on its first entry (PUT /budget/:id) or delete it (DELETE /budget/:id/series).' },
+    's-account': { status: 400, reason: 'entry_account_invalid', error: 'Account not found.' },
+    's-early': { status: 400, reason: 'series_start_too_early', error: 'The start day of a series cannot lie in a month before its first entry once that entry is booked.' },
+    'c-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Betrag must be a valid number.' },
+    'c-date': { status: 400, reason: 'entry_date_invalid', error: 'Datum must be in YYYY-MM-DD format.' },
+    'a-name': { status: 400, reason: 'account_name_invalid', error: 'Name is required.' },
+    'a-type': { status: 400, reason: 'account_type_invalid', error: 'Kontotyp must be one of: checking, savings, cash, credit, investment, other.' },
+    'a-balance': { status: 400, reason: 'account_balance_invalid', error: 'Startsaldo must be a valid number.' },
+    'a-color': { status: 400, reason: 'account_color_invalid', error: 'Farbe must be a valid HEX color (#RRGGBB).' },
+    'a-bank': { status: 400, reason: 'account_credit_bank_invalid', error: 'Bank may be at most 100 characters long.' },
+    'a-limit': { status: 400, reason: 'account_credit_limit_invalid', error: 'Kreditlimit must be a valid number.' },
+    'a-limit-neg': { status: 400, reason: 'account_credit_limit_invalid', error: 'Kreditlimit must not be negative.' },
+    'ap-name': { status: 400, reason: 'account_name_invalid', error: 'Name is required.' },
+    'ap-type': { status: 400, reason: 'account_type_invalid', error: 'Kontotyp must be one of: checking, savings, cash, credit, investment, other.' },
+    'ap-balance': { status: 400, reason: 'account_balance_invalid', error: 'Startsaldo must be a valid number.' },
+    'ap-color': { status: 400, reason: 'account_color_invalid', error: 'Farbe must be a valid HEX color (#RRGGBB).' },
+    'ap-bank': { status: 400, reason: 'account_credit_bank_invalid', error: 'Bank may be at most 100 characters long.' },
+    'ap-limit': { status: 400, reason: 'account_credit_limit_invalid', error: 'Kreditlimit must be a valid number.' },
+    'ap-limit-neg': { status: 400, reason: 'account_credit_limit_invalid', error: 'Kreditlimit must not be negative.' },
+    'k-name': { status: 400, reason: 'category_name_invalid', error: 'Name is required.' },
+    'k-type': { status: 400, reason: 'category_type_invalid', error: 'Typ must be one of: expense, income.' },
+    'k-dup': { status: 409, reason: 'category_exists', error: 'Category already exists.' },
+    'kp-name': { status: 400, reason: 'category_name_invalid', error: 'Name is required.' },
+    'kr-type': { status: 400, reason: 'category_type_invalid', error: 'Typ must be one of: expense, income.' },
+    'ks-name': { status: 400, reason: 'subcategory_name_invalid', error: 'Name is required.' },
+    'ks-dup': { status: 409, reason: 'subcategory_exists', error: 'Subcategory already exists.' },
+    'ksp-name': { status: 400, reason: 'subcategory_name_invalid', error: 'Name is required.' },
+    'l-amount': { status: 400, reason: 'loan_payment_amount_invalid', error: 'Amount must be a valid number.' },
+    'l-date': { status: 400, reason: 'loan_payment_date_invalid', error: 'Paid date must be in YYYY-MM-DD format.' },
+    'l-number': { status: 400, reason: 'loan_payment_installment_invalid', error: 'Installment number is invalid.' },
+    'l-zero': { status: 400, reason: 'loan_payment_amount_invalid', error: 'Amount must be greater than zero.' },
+    'l-exceeds': { status: 400, reason: 'loan_payment_amount_exceeds', error: 'Amount cannot be greater than the remaining loan amount.' },
+    'l-three': { status: 400, reason: 'loan_payment_date_invalid', error: 'Paid date must be in YYYY-MM-DD format. Installment number is invalid. Amount cannot be greater than the remaining loan amount.' },
+    'l-paid': { status: 409, reason: 'loan_installment_paid', error: 'Installment already paid.' },
+    'p-loan-zero': { status: 400, reason: 'entry_amount_invalid', error: 'Amount must be greater than zero.' },
+    'p-loan-exceeds': { status: 400, reason: 'entry_amount_exceeds_loan', error: 'Amount cannot be greater than the remaining loan amount.' },
+    'l-settled': { status: 409, reason: 'loan_settled', error: 'Loan is already paid.' },
+  };
+  const seen = [];
+  const run = async (label, method, route, body) => {
+    const r = await call(method, route, { as: ADM, body });
+    const want = EXPECTED[label];
+    assert.ok(want, `Vorbedingung: ${label} ist gefuehrt`);
+    assert.deepEqual(
+      { status: r.status, body: r.body },
+      { status: want.status, body: { error: want.error, code: want.status, reason: want.reason } },
+      `${label}: ${method} ${route}`,
+    );
+    seen.push(label);
+    return r;
+  };
+  const ok = { title: 'T', amount: -5, date: '2030-01-10' };
+  const long = 'x'.repeat(300);
+  await run('e-title', 'POST', '/', { amount: -5, date: '2030-01-10' });
+  await run('e-amount', 'POST', '/', { title: 'T', date: '2030-01-10' });
+  await run('e-category', 'POST', '/', { ...ok, category: 'nope' });
+  await run('e-date', 'POST', '/', { ...ok, date: 'nope' });
+  await run('e-interval', 'POST', '/', { ...ok, is_recurring: 1, recurrence_interval: 'hourly' });
+  await run('e-count', 'POST', '/', { ...ok, is_recurring: 1, recurrence_interval_count: 0 });
+  await run('e-sub', 'POST', '/', { ...ok, subcategory: 'nope' });
+  await run('e-account', 'POST', '/', { ...ok, account_id: 987654 });
+  await run('e-account-nan', 'POST', '/', { ...ok, account_id: 'abc' });
+  await run('e-two', 'POST', '/', { date: 'nope' });
+  const made = await call('POST', '/', { as: ADM, body: ok }); const id = made.body.data.id;
+  await run('p-title', 'PUT', `/${id}`, { title: long });
+  await run('p-amount', 'PUT', `/${id}`, { amount: 'abc' });
+  await run('p-category', 'PUT', `/${id}`, { category: 'nope' });
+  await run('p-date', 'PUT', `/${id}`, { date: 'nope' });
+  await run('p-interval', 'PUT', `/${id}`, { recurrence_interval: 'hourly' });
+  await run('p-count', 'PUT', `/${id}`, { recurrence_interval_count: 0 });
+  await run('p-sub', 'PUT', `/${id}`, { subcategory: 'nope' });
+  await run('p-account', 'PUT', `/${id}`, { account_id: 987654 });
+  await run('s-notrec', 'PUT', `/${id}/series`, { title: 'X' });
+  await run('sd-notrec', 'DELETE', `/${id}/series`);
+  await run('c-booked', 'PATCH', `/${id}/confirm`, {});
+  const rec = await call('POST', '/', { as: ADM, body: { ...ok, is_recurring: 1, recurrence_interval: 'monthly' } }); const rid = rec.body.data.id;
+  await run('s-title', 'PUT', `/${rid}/series`, { title: long });
+  await run('s-amount', 'PUT', `/${rid}/series`, { amount: 'abc' });
+  await run('s-category', 'PUT', `/${rid}/series`, { category: 'nope' });
+  await run('s-interval', 'PUT', `/${rid}/series`, { recurrence_interval: 'hourly' });
+  await run('s-count', 'PUT', `/${rid}/series`, { recurrence_interval_count: 0 });
+  await run('s-start', 'PUT', `/${rid}/series`, { start_date: 'nope' });
+  await run('s-end', 'PUT', `/${rid}/series`, { is_recurring: false });
+  await run('s-account', 'PUT', `/${rid}/series`, { account_id: 987654 });
+  const old = await call('POST', '/', { as: ADM, body: { ...ok, date: '2020-06-15', is_recurring: 1, recurrence_interval: 'monthly' } });
+  await run('s-early', 'PUT', `/${old.body.data.id}/series`, { start_date: '2020-05-01' });
+  const pend = db.prepare("INSERT INTO budget_entries (title, amount, category, subcategory, date, is_pending, created_by, owner_id, visibility) VALUES ('P', -5, 'food', '', '2030-01-10', 1, ?, ?, 'shared')").run(ADMIN, ADMIN).lastInsertRowid;
+  await run('c-amount', 'PATCH', `/${pend}/confirm`, { amount: 'abc' });
+  await run('c-date', 'PATCH', `/${pend}/confirm`, { date: 'nope' });
+  // Konten
+  await run('a-name', 'POST', '/accounts', {});
+  await run('a-type', 'POST', '/accounts', { name: 'N', type: 'nope' });
+  await run('a-balance', 'POST', '/accounts', { name: 'N', starting_balance: 'abc' });
+  await run('a-color', 'POST', '/accounts', { name: 'N', color: 'nope' });
+  await run('a-bank', 'POST', '/accounts', { name: 'N', credit_bank: long });
+  await run('a-limit', 'POST', '/accounts', { name: 'N', credit_limit: 'abc' });
+  await run('a-limit-neg', 'POST', '/accounts', { name: 'N', credit_limit: -1 });
+  const acc = await call('POST', '/accounts', { as: ADM, body: { name: 'Giro' } }); const aid = acc.body.data.id;
+  await run('ap-name', 'PUT', `/accounts/${aid}`, { name: '' });
+  await run('ap-type', 'PUT', `/accounts/${aid}`, { type: 'nope' });
+  await run('ap-balance', 'PUT', `/accounts/${aid}`, { starting_balance: 'abc' });
+  await run('ap-color', 'PUT', `/accounts/${aid}`, { color: 'nope' });
+  await run('ap-bank', 'PUT', `/accounts/${aid}`, { credit_bank: long });
+  await run('ap-limit', 'PUT', `/accounts/${aid}`, { credit_limit: 'abc' });
+  await run('ap-limit-neg', 'PUT', `/accounts/${aid}`, { credit_limit: -1 });
+  // Kategorien
+  await run('k-name', 'POST', '/categories', {});
+  await run('k-type', 'POST', '/categories', { name: 'Neu', type: 'nope' });
+  const cat = await call('POST', '/categories', { as: ADM, body: { name: 'Probe1668' } }); const key = cat.body.data.key;
+  await run('k-dup', 'POST', '/categories', { name: 'probe1668' });
+  await run('kp-name', 'PUT', `/categories/${key}`, { name: '' });
+  await run('kr-type', 'PATCH', '/categories/reorder', { type: 'nope', order: [] });
+  await run('ks-name', 'POST', `/categories/${key}/subcategories`, {});
+  const sub = await call('POST', `/categories/${key}/subcategories`, { as: ADM, body: { name: 'Unter1668' } });
+  await run('ks-dup', 'POST', `/categories/${key}/subcategories`, { name: 'unter1668' });
+  await run('ksp-name', 'PUT', `/categories/${key}/subcategories/${sub.body.data.key}`, { name: '' });
+  // Raten
+  const loan = await call('POST', '/loans', { as: ADM, body: { borrower: 'R', title: 'R', total_amount: 1200, installment_count: 12, start_month: '2026-01' } });
+  const lid = loan.body.data.id;
+  await run('l-amount', 'POST', `/loans/${lid}/payments`, { amount: 'abc', paid_date: '2026-01-05' });
+  await run('l-date', 'POST', `/loans/${lid}/payments`, { amount: 100, paid_date: 'nope' });
+  await run('l-number', 'POST', `/loans/${lid}/payments`, { installment_number: 99, amount: 100, paid_date: '2026-01-05' });
+  await run('l-zero', 'POST', `/loans/${lid}/payments`, { amount: 0, paid_date: '2026-01-05' });
+  await run('l-exceeds', 'POST', `/loans/${lid}/payments`, { amount: 99999, paid_date: '2026-01-05' });
+  await run('l-three', 'POST', `/loans/${lid}/payments`, { installment_number: 99, amount: 99999, paid_date: 'nope' });
+  const pay = await call('POST', `/loans/${lid}/payments`, { as: ADM, body: { installment_number: 1, amount: 100, paid_date: '2026-01-05' } });
+  await run('l-paid', 'POST', `/loans/${lid}/payments`, { installment_number: 1, amount: 100, paid_date: '2026-01-05' });
+  const eid = pay.body.data?.payment?.budget_entry_id ?? db.prepare('SELECT budget_entry_id FROM budget_loan_payments WHERE loan_id = ?').get(lid).budget_entry_id;
+  await run('p-loan-zero', 'PUT', `/${eid}`, { amount: 0 });
+  await run('p-loan-exceeds', 'PUT', `/${eid}`, { amount: 99999 });
+  const done = await call('POST', '/loans', { as: ADM, body: { borrower: 'S', title: 'S', total_amount: 100, installment_count: 1, start_month: '2026-01', paid_installments: 1 } });
+  await run('l-settled', 'POST', `/loans/${done.body.data.id}/payments`, { amount: 10, paid_date: '2026-01-05' });
+
+  // Zustaendig kann nur sein, wer zum Haushalt gehoert (#1207) - ein Gast der
+  // geteilten Ausgaben nicht.
+  const guest = db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('gast1668','Gast','x','member')").run().lastInsertRowid;
+  db.prepare('INSERT INTO split_expense_guest_users (user_id) VALUES (?)').run(guest);
+  for (const [method, route, extra] of [['POST', '/', ok], ['PUT', `/${id}`, {}], ['PUT', `/${rid}/series`, {}]]) {
+    const r = await call(method, route, { as: ADM, body: { ...extra, responsible_user_ids: [guest] } });
+    assert.deepEqual(r.body, {
+      error: `Only household members can be chosen here - user ${guest} is not a household member.`,
+      code: 400,
+      reason: 'entry_responsible_invalid',
+    }, `${method} ${route}`);
+  }
+  assert.deepEqual(seen.sort(), Object.keys(EXPECTED).sort(), 'jeder gefuehrte Fall wurde gefahren');
 });

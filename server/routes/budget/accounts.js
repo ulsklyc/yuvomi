@@ -6,8 +6,10 @@
 import express from 'express';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
-import { str, oneOf, num, color as validateColor, collectErrors, MAX_SHORT } from '../../middleware/validate.js';
-import { budgetFilter, listAccounts, ACCOUNT_TYPE_KEYS, nextAccountSortOrder, cents } from './helpers.js';
+import { str, oneOf, num, color as validateColor, MAX_SHORT } from '../../middleware/validate.js';
+import {
+  budgetFilter, listAccounts, ACCOUNT_TYPE_KEYS, nextAccountSortOrder, cents, refusal, refusals, refuse,
+} from './helpers.js';
 
 const log = createLogger('Budget');
 const router = express.Router();
@@ -48,10 +50,17 @@ router.post('/accounts', (req, res) => {
       ? { value: null, error: null }
       : str(req.body.credit_bank, 'Bank', { max: MAX_SHORT });
     const vLimit   = num(req.body.credit_limit, 'Kreditlimit', { required: false });
-    const errors   = collectErrors([vName, vType, vBalance, vColor, vBank, vLimit]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    const errors   = [
+      ...refusals('account_name_invalid', [vName]),
+      ...refusals('account_type_invalid', [vType]),
+      ...refusals('account_balance_invalid', [vBalance]),
+      ...refusals('account_color_invalid', [vColor]),
+      ...refusals('account_credit_bank_invalid', [vBank]),
+      ...refusals('account_credit_limit_invalid', [vLimit]),
+    ];
+    if (errors.length) return refuse(res, errors);
     if (vLimit.value !== null && vLimit.value < 0) {
-      return res.status(400).json({ error: 'Kreditlimit must not be negative.', code: 400 });
+      return refuse(res, [refusal('account_credit_limit_invalid', 'Kreditlimit must not be negative.')]);
     }
 
     const currency = req.body.currency ? str(req.body.currency, 'Währung', { max: 8 }).value : null;
@@ -88,14 +97,14 @@ router.put('/accounts/:id', (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Account not found', code: 404 });
 
     const checks = [];
-    if (req.body.name !== undefined) checks.push(str(req.body.name, 'Name', { max: MAX_SHORT }));
-    if (req.body.type !== undefined) checks.push(oneOf(req.body.type, ACCOUNT_TYPE_KEYS, 'Kontotyp'));
-    if (req.body.starting_balance !== undefined) checks.push(num(req.body.starting_balance, 'Startsaldo'));
-    if (req.body.color !== undefined) checks.push(validateColor(req.body.color, 'Farbe', { allowTokens: true }));
-    if (req.body.credit_bank) checks.push(str(req.body.credit_bank, 'Bank', { max: MAX_SHORT }));
-    if (req.body.credit_limit !== undefined) checks.push(num(req.body.credit_limit, 'Kreditlimit', { required: false }));
-    const errors = collectErrors(checks);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    if (req.body.name !== undefined) checks.push(['account_name_invalid', str(req.body.name, 'Name', { max: MAX_SHORT })]);
+    if (req.body.type !== undefined) checks.push(['account_type_invalid', oneOf(req.body.type, ACCOUNT_TYPE_KEYS, 'Kontotyp')]);
+    if (req.body.starting_balance !== undefined) checks.push(['account_balance_invalid', num(req.body.starting_balance, 'Startsaldo')]);
+    if (req.body.color !== undefined) checks.push(['account_color_invalid', validateColor(req.body.color, 'Farbe', { allowTokens: true })]);
+    if (req.body.credit_bank) checks.push(['account_credit_bank_invalid', str(req.body.credit_bank, 'Bank', { max: MAX_SHORT })]);
+    if (req.body.credit_limit !== undefined) checks.push(['account_credit_limit_invalid', num(req.body.credit_limit, 'Kreditlimit', { required: false })]);
+    const errors = checks.flatMap(([reason, result]) => refusals(reason, [result]));
+    if (errors.length) return refuse(res, errors);
 
     const currency = req.body.currency !== undefined
       ? (req.body.currency ? str(req.body.currency, 'Währung', { max: 8 }).value : null)
@@ -113,7 +122,7 @@ router.put('/accounts/:id', (req, res) => {
       ? (req.body.credit_limit === '' || req.body.credit_limit === null ? null : cents(req.body.credit_limit))
       : existing.credit_limit;
     if (creditLimit !== null && creditLimit < 0) {
-      return res.status(400).json({ error: 'Kreditlimit must not be negative.', code: 400 });
+      return refuse(res, [refusal('account_credit_limit_invalid', 'Kreditlimit must not be negative.')]);
     }
 
     db.get().prepare(`

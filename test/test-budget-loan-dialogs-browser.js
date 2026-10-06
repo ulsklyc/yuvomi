@@ -201,7 +201,7 @@ for (const entry of Object.keys(ENTRIES)) {
 // englischer Satz in einem Toast - an keinem Feld, in jeder Sprache gleich.
 
 /** Der Satz der Oberflaeche zu einem Schluessel, aus der Seite selbst gelesen. */
-const sentence = (page, key) => page.evaluate(async (k) => (await import('/i18n.js')).t(k), key);
+const sentence = (page, key, values) => page.evaluate(async (k, v) => (await import('/i18n.js')).t(k, v), key, values);
 
 /** Faengt die Toasts der Seite ab; die Sonde hat keinen Router, der sie zeigte. */
 const captureToasts = (page) => page.evaluate(() => {
@@ -254,7 +254,8 @@ for (const entry of Object.keys(ENTRIES)) {
       await new Promise((resolve) => setTimeout(resolve, 600));
       const refused = await fieldState(page, '#lm-paid');
       const posts = loanPosts().length;
-      const expected = await sentence(page, 'budget.loanPaidInstallmentsTooMany');
+      // #1668: der Satz nennt, wie viele Raten das Darlehen hat.
+      const expected = await sentence(page, 'budget.loanPaidInstallmentsMax', { max: 12 });
 
       // Eine korrigierte Zahl nimmt die Markierung weg, und das Speichern geht durch.
       await setValue(page, '#lm-paid', '12');
@@ -268,7 +269,8 @@ for (const entry of Object.keys(ENTRIES)) {
     assert.equal(seen.refused.invalid, 'true', 'das Feld ist markiert');
     assert.equal(seen.refused.focused, true, 'und hat den Fokus');
     assert.equal(seen.refused.message, seen.expected, 'mit dem Satz der Oberflaeche');
-    assert.notEqual(seen.expected, 'budget.loanPaidInstallmentsTooMany', 'Vorbedingung: der Schluessel ist uebersetzt');
+    assert.notEqual(seen.expected, 'budget.loanPaidInstallmentsMax', 'Vorbedingung: der Schluessel ist uebersetzt');
+    assert.match(seen.expected, /\b12\b/, 'der Satz nennt das Maximum (#1668)');
     assert.deepEqual(seen.refused.toasts, [], 'kein Toast neben dem Feld');
     assert.equal(seen.corrected.invalid, 'false', 'die Korrektur nimmt die Markierung weg');
     assert.equal(loanPosts().length, 1, 'danach genau ein Darlehen');
@@ -315,8 +317,18 @@ for (const entry of Object.keys(ENTRIES)) {
       await new Promise((resolve) => setTimeout(resolve, 900));
       const state = await fieldState(page, '#lm-paid');
       const button = await page.$eval(saveSelector, (el) => ({ disabled: el.disabled, text: el.textContent.trim() }));
-      return { state, button, expected: await sentence(page, 'budget.loanPaidInstallmentsTooMany') };
+      // #1668: der Satz nennt die Laufzeit, die der Server fuer diese Werte ableitet.
+      const months = await page.evaluate(async () => {
+        const res = await fetch('/api/v1/budget/loans/preview', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ interest_mode: 'fixed', principal: 10000, fixed_rate: 2, initial_repayment_rate: 50 }),
+        });
+        return (await res.json()).data.total_months;
+      });
+      return { state, button, months, expected: await sentence(page, 'budget.loanPaidInstallmentsMax', { max: months }) };
     });
+    assert.ok(Number.isInteger(seen.months) && seen.months > 1 && seen.months < 300, `Vorbedingung: die Laufzeit (${seen.months})`);
+    assert.ok(seen.expected.includes(String(seen.months)), 'der Satz nennt die Laufzeit (#1668)');
     const term = writes.filter((w) => w.path === '/budget/loans/preview').length;
     assert.ok(term >= 1, 'die Laufzeit kommt vom Server (Vorschau), nicht aus einer zweiten Formel');
     assert.equal(loanPosts().length, 0, 'kein POST auf /budget/loans');
@@ -340,12 +352,14 @@ for (const entry of Object.keys(ENTRIES)) {
       await waitInvalid(page, '#lm-installments');
       return {
         state: await fieldState(page, '#lm-installments'),
-        expected: await sentence(page, 'budget.loanInstallmentsRequired'),
+        // #1668: der Satz nennt die Grenze, die der Server mitschickt.
+        expected: await sentence(page, 'budget.loanInstallmentsRange', { max: 360 }),
       };
     });
     assert.equal(loanPosts().length, 1, 'Vorbedingung: die Anfrage ging an den echten Router');
     assert.equal(seen.state.open, true, 'der Dialog bleibt offen');
     assert.equal(seen.state.message, seen.expected);
+    assert.match(seen.state.message, /\b360\b/, 'der Satz nennt die Grenze (#1668)');
     assert.doesNotMatch(seen.state.message, /Installment count must be/, 'nicht der Satz der API');
     assert.deepEqual(seen.state.toasts, [], 'kein Toast mit dem Servertext');
   });
@@ -385,3 +399,106 @@ for (const entry of Object.keys(ENTRIES)) {
     assert.equal(broken.state.open, true);
   });
 }
+
+// ─── #1668: genauere Saetze im Darlehens-Dialog ─────────────────────────────
+// Vier Saetze waren ungenau: "tilgt nicht" fuer ein Darlehen, das zu lange
+// laeuft, "Anzahl eingeben" fuer 361 Raten (oben), "zu viele" ohne Zahl (oben),
+// und der allgemeine Satz des Dialogs an Titel, Notizen, Waehrung und Konto.
+
+for (const entry of Object.keys(ENTRIES)) {
+  test(`${entry}: ein Darlehen, das zu lange liefe, sagt das - in der Vorschau und beim Speichern`, async () => {
+    writes.length = 0;
+    const seen = await withLoanDialog(entry, async (page, saveSelector) => {
+      await captureToasts(page);
+      await setValue(page, '#lm-borrower', `Lang ${entry}`);
+      await setValue(page, '#lm-interest-mode', 'fixed', 'change');
+      await setValue(page, '#lm-principal', '100000');
+      await setValue(page, '#lm-fixed-rate', '5');
+      // 0,01 % Anfangstilgung: die Rate deckt die Zinsen, aber das Darlehen
+      // liefe laenger, als gerechnet wird.
+      await setValue(page, '#lm-initial-repayment', '0.01');
+      await page.waitForFunction(() => document.querySelector('#lm-interest-preview')?.textContent.trim().length > 0, { timeout: 5000 });
+      const preview = await page.$eval('#lm-interest-preview', (el) => el.textContent.trim());
+      await page.click(saveSelector);
+      await waitInvalid(page, '#lm-initial-repayment');
+      return {
+        preview,
+        state: await fieldState(page, '#lm-initial-repayment'),
+        expected: await sentence(page, 'budget.loanTermTooLong', { max: 600 }),
+        notAmortizing: await sentence(page, 'budget.loanPreviewInvalid'),
+      };
+    });
+    assert.equal(loanPosts().length, 1, 'Vorbedingung: die Anfrage ging an den echten Router');
+    assert.match(seen.expected, /\b600\b/, 'Vorbedingung: der Satz nennt die Grenze');
+    assert.notEqual(seen.expected, seen.notAmortizing, 'Vorbedingung: zwei Saetze fuer zwei Faelle');
+    assert.equal(seen.state.message, seen.expected, 'beim Speichern: der eigene Satz, am Feld der Tilgung');
+    assert.equal(seen.preview, seen.expected, 'die Vorschau sagt denselben Satz');
+    assert.equal(seen.state.open, true);
+    assert.deepEqual(seen.state.toasts, []);
+  });
+
+  test(`${entry}: Titel, Notizen, Waehrung und Konto haben je einen eigenen Satz an ihrem Feld`, async () => {
+    const raw = 'A sentence this client has never seen.';
+    const run = (reason, selector, prepare = async () => {}) => withLoanDialog(entry, async (page, saveSelector) => {
+      await captureToasts(page);
+      await answerSaveWith(page, 400, { error: raw, code: 400, reason });
+      await setValue(page, '#lm-borrower', `Satz ${entry}`);
+      await setValue(page, '#lm-amount', '1200');
+      await setValue(page, '#lm-installments', '12');
+      await prepare(page);
+      await page.click(saveSelector);
+      await waitInvalid(page, selector);
+      return {
+        state: await fieldState(page, selector),
+        general: await sentence(page, 'budget.loanSaveFailed'),
+      };
+    });
+    const sentences = new Set();
+    for (const [reason, selector, key] of [
+      ['loan_title_invalid', '#lm-title', 'budget.loanTitleInvalid'],
+      ['loan_notes_invalid', '#lm-notes', 'budget.loanNotesInvalid'],
+      ['loan_currency_invalid', '#lm-currency', 'budget.loanCurrencyInvalid'],
+    ]) {
+      const seen = await run(reason, selector);
+      const expected = await withLoanDialog(entry, (page) => sentence(page, key));
+      assert.notEqual(expected, key, `Vorbedingung: ${key} ist uebersetzt`);
+      assert.equal(seen.state.message, expected, `${reason}: der eigene Satz an ${selector}`);
+      assert.notEqual(seen.state.message, seen.general, `${reason}: nicht mehr der allgemeine Satz`);
+      assert.notEqual(seen.state.message, raw, `${reason}: nicht der Satz des Servers`);
+      assert.deepEqual(seen.state.toasts, [], `${reason}: kein Toast neben dem Feld`);
+      sentences.add(seen.state.message);
+    }
+    assert.equal(sentences.size, 3, 'drei Felder, drei Saetze');
+  });
+}
+
+test('das Konto eines Darlehens, das es nicht mehr gibt: der Satz steht am Konto-Feld', async () => {
+  // Echte Absage des echten Routers: das Konto wird geloescht, waehrend der
+  // Dialog offen ist. Bis #1668 kam hier "Konto nicht gefunden." - deutsch, vom
+  // Server, mit dem allgemeinen Satz des Dialogs am Feld.
+  const account = db.prepare("INSERT INTO budget_accounts (name, type, starting_balance, created_by) VALUES ('Weg1668', 'checking', 0, ?)").run(A).lastInsertRowid;
+  try {
+    const seen = await withLoanDialog('loansTab', async (page, saveSelector) => {
+      await captureToasts(page);
+      await setValue(page, '#lm-borrower', 'Konto weg');
+      await setValue(page, '#lm-amount', '1200');
+      await setValue(page, '#lm-installments', '12');
+      await setValue(page, '#lm-account', String(account), 'change');
+      await page.evaluate((id) => fetch(`/api/v1/budget/accounts/${id}`, { method: 'DELETE' }), account);
+      await page.click(saveSelector);
+      await waitInvalid(page, '#lm-account');
+      return {
+        state: await fieldState(page, '#lm-account'),
+        expected: await sentence(page, 'budget.accountNotFound'),
+        general: await sentence(page, 'budget.loanSaveFailed'),
+      };
+    });
+    assert.equal(seen.state.message, seen.expected);
+    assert.notEqual(seen.state.message, seen.general);
+    assert.doesNotMatch(seen.state.message, /Konto nicht gefunden|Account not found/, 'nicht der Satz des Servers');
+    assert.deepEqual(seen.state.toasts, []);
+    assert.equal(seen.state.open, true);
+  } finally {
+    db.prepare('DELETE FROM budget_accounts WHERE id = ?').run(account);
+  }
+});

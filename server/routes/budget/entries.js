@@ -6,7 +6,7 @@
 import express from 'express';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
-import { str, oneOf, date as validateDate, num, rrule, collectErrors, MAX_TITLE, MONTH_RE } from '../../middleware/validate.js';
+import { str, oneOf, date as validateDate, num, rrule, MAX_TITLE, MONTH_RE } from '../../middleware/validate.js';
 import { normalizeBudgetVisibility, BUDGET_MASKED_CATEGORY } from '../../services/budget-visibility.js';
 import { todayKey } from '../../utils/timezone.js';
 import { foldSearchText } from '../../services/search.js';
@@ -22,6 +22,7 @@ import {
   entryWithLoanMeta, refreshLoanStatus, fromBudgetAmount, bookingFor,
   RESPONSIBLE_USERS_SQL, replaceResponsibles, withResponsibles, responsibleNonMembers,
   replaceSeriesResponsibles, seedSeriesResponsibles, materializeSeriesStart, freezeSeriesPast,
+  refusal, refusals, refuse,
 } from './helpers.js';
 import { nonMemberMessage } from '../../services/household-members.js';
 
@@ -367,18 +368,25 @@ router.post('/', (req, res) => {
     const vCount = req.body.recurrence_interval_count !== undefined
       ? intervalCountCheck(req.body.recurrence_interval_count)
       : { value: 1, error: null };
-    const errors  = collectErrors([vTitle, vAmount, vCat, vDate, vRrule, vInterval, vCount]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    const errors  = [
+      ...refusals('entry_title_invalid', [vTitle]),
+      ...refusals('entry_amount_invalid', [vAmount]),
+      ...refusals('entry_category_invalid', [vCat]),
+      ...refusals('entry_date_invalid', [vDate]),
+      ...refusals('entry_recurrence_invalid', [vRrule, vInterval]),
+      ...refusals('entry_interval_count_invalid', [vCount]),
+    ];
+    if (errors.length) return refuse(res, errors);
     const subcategory = validateSubcategory(vCat.value, req.body.subcategory);
     if (subcategory === null) {
-      return res.status(400).json({ error: 'Invalid subcategory.', code: 400 });
+      return refuse(res, [refusal('entry_subcategory_invalid', 'Invalid subcategory.')]);
     }
 
     const accountRef = validateAccountRef(req.body.account_id);
-    if (accountRef.error) return res.status(400).json({ error: accountRef.error, code: 400 });
+    if (accountRef.error) return refuse(res, [refusal('entry_account_invalid', accountRef.error)]);
     // Zustaendig nur Haushaltsmitglieder (#1207).
     const strangers = responsibleNonMembers(null, req.body.responsible_user_ids);
-    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
+    if (strangers.length) return refuse(res, [refusal('entry_responsible_invalid', nonMemberMessage(strangers))]);
 
     // Intervall + virtuelles Budget nur für wiederkehrende Einträge.
     const isRecurring = req.body.is_recurring ? 1 : 0;
@@ -451,7 +459,7 @@ router.put('/:id/series', (req, res) => {
     if (!mayEdit(req, entry)) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
 
     const parentId = entry.recurrence_parent_id ?? (entry.is_recurring ? entry.id : null);
-    if (!parentId) return res.status(400).json({ error: 'Not a recurring entry.', code: 400 });
+    if (!parentId) return refuse(res, [refusal('entry_not_recurring', 'Not a recurring entry.')]);
 
     const parent = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(parentId);
     if (!parent) return res.status(404).json({ error: 'Series parent not found', code: 404 });
@@ -469,15 +477,15 @@ router.put('/:id/series', (req, res) => {
     };
 
     const checks = [];
-    if (req.body.title    !== undefined) checks.push(str(req.body.title,    'Titel',  { max: MAX_TITLE, required: false }));
-    if (req.body.amount   !== undefined) checks.push(num(req.body.amount,   'Betrag'));
-    if (req.body.category !== undefined) checks.push(oneOf(req.body.category, validCategoryKeys(), 'Kategorie'));
-    if (req.body.recurrence_rule !== undefined) checks.push(rrule(req.body.recurrence_rule, 'Wiederholung'));
-    if (req.body.recurrence_interval !== undefined) checks.push(oneOf(req.body.recurrence_interval, RECURRENCE_INTERVAL_KEYS, 'Intervall'));
-    if (req.body.recurrence_interval_count !== undefined) checks.push(intervalCountCheck(req.body.recurrence_interval_count));
-    if (req.body.start_date !== undefined) checks.push(validateDate(req.body.start_date, 'start_date', true));
-    const errors = collectErrors(checks);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    if (req.body.title    !== undefined) checks.push(['entry_title_invalid', str(req.body.title,    'Titel',  { max: MAX_TITLE, required: false })]);
+    if (req.body.amount   !== undefined) checks.push(['entry_amount_invalid', num(req.body.amount,   'Betrag')]);
+    if (req.body.category !== undefined) checks.push(['entry_category_invalid', oneOf(req.body.category, validCategoryKeys(), 'Kategorie')]);
+    if (req.body.recurrence_rule !== undefined) checks.push(['entry_recurrence_invalid', rrule(req.body.recurrence_rule, 'Wiederholung')]);
+    if (req.body.recurrence_interval !== undefined) checks.push(['entry_recurrence_invalid', oneOf(req.body.recurrence_interval, RECURRENCE_INTERVAL_KEYS, 'Intervall')]);
+    if (req.body.recurrence_interval_count !== undefined) checks.push(['entry_interval_count_invalid', intervalCountCheck(req.body.recurrence_interval_count)]);
+    if (req.body.start_date !== undefined) checks.push(['entry_start_date_invalid', validateDate(req.body.start_date, 'start_date', true)]);
+    const errors = checks.flatMap(([reason, result]) => refusals(reason, [result]));
+    if (errors.length) return refuse(res, errors);
     // EINE SERIEN-AENDERUNG BEENDET DIE SERIE NICHT (#1546).
     //
     // `is_recurring: false` hiess hier "Serie beenden, jedes Vorkommen ab heute
@@ -495,15 +503,15 @@ router.put('/:id/series', (req, res) => {
     // PUT /budget/:id mit is_recurring: false an der ersten Buchung (so beendet
     // der Dialog eine Serie) oder DELETE /budget/:id/series.
     if (req.body.is_recurring !== undefined && !req.body.is_recurring) {
-      return res.status(400).json({
-        error: 'A series edit cannot end the series. To end it, set is_recurring to false on its first entry (PUT /budget/:id) or delete it (DELETE /budget/:id/series).',
-        code: 400,
-      });
+      return refuse(res, [refusal(
+        'series_end_refused',
+        'A series edit cannot end the series. To end it, set is_recurring to false on its first entry (PUT /budget/:id) or delete it (DELETE /budget/:id/series).',
+      )]);
     }
     // Neu nur Haushaltsmitglieder (#1207), gegen den Stand der Serie - ihrer
     // Definition, nicht ihrer ersten Buchung (#1035).
     const strangers = responsibleNonMembers(parentId, req.body.responsible_user_ids, { series: true });
-    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
+    if (strangers.length) return refuse(res, [refusal('entry_responsible_invalid', nonMemberMessage(strangers))]);
 
     const { title, amount, category, subcategory: requestedSubcategory, is_recurring, recurrence_rule } = req.body;
     const finalTitle    = title     !== undefined ? title.trim()                        : base.title;
@@ -570,7 +578,7 @@ router.put('/:id/series', (req, res) => {
     let accountValue = null;
     if (accountProvided) {
       const accountRef = validateAccountRef(req.body.account_id);
-      if (accountRef.error) return res.status(400).json({ error: accountRef.error, code: 400 });
+      if (accountRef.error) return refuse(res, [refusal('entry_account_invalid', accountRef.error)]);
       accountValue = accountRef.value;
     }
 
@@ -617,10 +625,10 @@ router.put('/:id/series', (req, res) => {
     // ("ab jetzt am 4. statt am 5."); liegt die erste Buchung noch vor uns,
     // zieht sie ohnehin mit.
     if (startChanged && !anchorAhead && finalStart.slice(0, 7) < parent.date.slice(0, 7)) {
-      return res.status(400).json({
-        error: 'The start day of a series cannot lie in a month before its first entry once that entry is booked.',
-        code: 400,
-      });
+      return refuse(res, [refusal(
+        'series_start_too_early',
+        'The start day of a series cannot lie in a month before its first entry once that entry is booked.',
+      )]);
     }
 
     // Verschieben sich die Termine (Rhythmus oder Starttag)? Dann gilt ab heute
@@ -810,7 +818,7 @@ router.delete('/:id/series', (req, res) => {
     if (!mayEdit(req, entry)) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
 
     const parentId = entry.recurrence_parent_id ?? (entry.is_recurring ? entry.id : null);
-    if (!parentId) return res.status(400).json({ error: 'Not a recurring entry.', code: 400 });
+    if (!parentId) return refuse(res, [refusal('entry_not_recurring', 'Not a recurring entry.')]);
 
     db.get().transaction(() => {
       db.get().prepare('DELETE FROM budget_entries WHERE recurrence_parent_id = ?').run(parentId);
@@ -838,18 +846,18 @@ router.put('/:id', (req, res) => {
     if (!mayEdit(req, entry)) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
 
     const checks = [];
-    if (req.body.title    !== undefined) checks.push(str(req.body.title,    'Titel',  { max: MAX_TITLE, required: false }));
-    if (req.body.amount   !== undefined) checks.push(num(req.body.amount,   'Betrag'));
-    if (req.body.category !== undefined) checks.push(oneOf(req.body.category, validCategoryKeys(), 'Kategorie'));
-    if (req.body.date     !== undefined) checks.push(validateDate(req.body.date,    'Datum'));
-    if (req.body.recurrence_rule !== undefined) checks.push(rrule(req.body.recurrence_rule, 'Wiederholung'));
-    if (req.body.recurrence_interval !== undefined) checks.push(oneOf(req.body.recurrence_interval, RECURRENCE_INTERVAL_KEYS, 'Intervall'));
-    if (req.body.recurrence_interval_count !== undefined) checks.push(intervalCountCheck(req.body.recurrence_interval_count));
-    const errors = collectErrors(checks);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    if (req.body.title    !== undefined) checks.push(['entry_title_invalid', str(req.body.title,    'Titel',  { max: MAX_TITLE, required: false })]);
+    if (req.body.amount   !== undefined) checks.push(['entry_amount_invalid', num(req.body.amount,   'Betrag')]);
+    if (req.body.category !== undefined) checks.push(['entry_category_invalid', oneOf(req.body.category, validCategoryKeys(), 'Kategorie')]);
+    if (req.body.date     !== undefined) checks.push(['entry_date_invalid', validateDate(req.body.date,    'Datum')]);
+    if (req.body.recurrence_rule !== undefined) checks.push(['entry_recurrence_invalid', rrule(req.body.recurrence_rule, 'Wiederholung')]);
+    if (req.body.recurrence_interval !== undefined) checks.push(['entry_recurrence_invalid', oneOf(req.body.recurrence_interval, RECURRENCE_INTERVAL_KEYS, 'Intervall')]);
+    if (req.body.recurrence_interval_count !== undefined) checks.push(['entry_interval_count_invalid', intervalCountCheck(req.body.recurrence_interval_count)]);
+    const errors = checks.flatMap(([reason, result]) => refusals(reason, [result]));
+    if (errors.length) return refuse(res, errors);
     // Neu nur Haushaltsmitglieder (#1207); wer schon zustaendig ist, bleibt es.
     const strangers = responsibleNonMembers(id, req.body.responsible_user_ids);
-    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
+    if (strangers.length) return refuse(res, [refusal('entry_responsible_invalid', nonMemberMessage(strangers))]);
     const { title, amount, category, subcategory: requestedSubcategory, date, is_recurring, recurrence_rule } = req.body;
     const linkedPayment = db.get().prepare(`
       SELECT * FROM budget_loan_payments WHERE budget_entry_id = ?
@@ -875,7 +883,7 @@ router.put('/:id', (req, res) => {
       : null;
     if (linkedPayment && amount !== undefined) {
       if (!(linkedPaymentAmount > 0)) {
-        return res.status(400).json({ error: 'Amount must be greater than zero.', code: 400 });
+        return refuse(res, [refusal('entry_amount_invalid', 'Amount must be greater than zero.')]);
       }
       const otherPaid = db.get().prepare(`
         SELECT COALESCE(SUM(amount), 0) AS total
@@ -883,7 +891,7 @@ router.put('/:id', (req, res) => {
         WHERE loan_id = ? AND id != ?
       `).get(linkedPayment.loan_id, linkedPayment.id).total;
       if (linkedPaymentAmount - (Number(linkedLoan?.total_amount || 0) - Number(otherPaid || 0)) > 0.005) {
-        return res.status(400).json({ error: 'Amount cannot be greater than the remaining loan amount.', code: 400 });
+        return refuse(res, [refusal('entry_amount_exceeds_loan', 'Amount cannot be greater than the remaining loan amount.')]);
       }
     }
     const nextCategory = category ?? entry.category;
@@ -891,7 +899,7 @@ router.put('/:id', (req, res) => {
       ? validateSubcategory(nextCategory, requestedSubcategory ?? entry.subcategory)
       : undefined;
     if (subcategory === null) {
-      return res.status(400).json({ error: 'Invalid subcategory.', code: 400 });
+      return refuse(res, [refusal('entry_subcategory_invalid', 'Invalid subcategory.')]);
     }
 
     // Konto-Zuordnung: undefined ⇒ unverändert; null/'' ⇒ Zuordnung entfernen; id ⇒ setzen.
@@ -899,7 +907,7 @@ router.put('/:id', (req, res) => {
     let accountValue = null;
     if (accountProvided) {
       const accountRef = validateAccountRef(req.body.account_id);
-      if (accountRef.error) return res.status(400).json({ error: accountRef.error, code: 400 });
+      if (accountRef.error) return refuse(res, [refusal('entry_account_invalid', accountRef.error)]);
       accountValue = accountRef.value;
     }
 
@@ -1066,14 +1074,13 @@ router.patch('/:id/confirm', (req, res) => {
     if (!entry) return res.status(404).json({ error: 'Entry not found', code: 404 });
     if (!mayEdit(req, entry)) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
     if (!entry.is_pending) {
-      return res.status(400).json({ error: 'Entry is already booked.', code: 400 });
+      return refuse(res, [refusal('entry_already_booked', 'Entry is already booked.')]);
     }
 
-    const checks = [];
-    if (req.body.amount !== undefined) checks.push(num(req.body.amount, 'Betrag'));
-    if (req.body.date   !== undefined) checks.push(validateDate(req.body.date, 'Datum'));
-    const errors = collectErrors(checks);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    const errors = [];
+    if (req.body.amount !== undefined) errors.push(...refusals('entry_amount_invalid', [num(req.body.amount, 'Betrag')]));
+    if (req.body.date   !== undefined) errors.push(...refusals('entry_date_invalid', [validateDate(req.body.date, 'Datum')]));
+    if (errors.length) return refuse(res, errors);
 
     // Das Vorzeichen bleibt: eine erwartete Ausgabe wird beim Abbuchen nicht zur
     // Einnahme, auch wenn jemand den Betrag ohne Minus einträgt.

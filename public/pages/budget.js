@@ -2205,7 +2205,7 @@ function openAccountModal(account = null) {
           refocusAfterRender();
           window.yuvomi?.showToast(nextArchived ? t('budget.accountArchivedToast') : t('budget.accountRestoredToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          showBudgetError(err);
         }
       });
 
@@ -2226,7 +2226,7 @@ function openAccountModal(account = null) {
           refocusAfterRender();
           window.yuvomi?.showToast(t('budget.accountDeletedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          showBudgetError(err);
         }
       });
 
@@ -2277,7 +2277,7 @@ function openAccountModal(account = null) {
         } catch (err) {
           saveBtn.disabled = false;
           saveBtn.textContent = isEdit ? t('common.save') : t('common.add');
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          showBudgetError(err, { panel, fallback: BUDGET_SAVE_FAILED });
         }
       });
     },
@@ -2588,7 +2588,7 @@ async function openLoanPaymentEntry(loanId, paymentId) {
     }
     openBudgetModal({ mode: 'edit', entry });
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    showBudgetError(err);
   }
 }
 
@@ -3380,7 +3380,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
           updateCategoryOptions(res.data.key);
           window.yuvomi?.showToast(t('budget.categoryAddedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          showBudgetError(err, { fallback: BUDGET_SAVE_FAILED });
         }
       };
 
@@ -3400,7 +3400,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
           updateSubcategoryOptions(res.data.key);
           window.yuvomi?.showToast(t('budget.subcategoryAddedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          showBudgetError(err, { fallback: BUDGET_SAVE_FAILED });
         }
       };
 
@@ -3626,7 +3626,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
             window.yuvomi?.showToast(t('budget.savedToast'), 'success');
           }
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          showBudgetError(err, { panel, fallback: BUDGET_SAVE_FAILED });
           saveBtn.disabled    = false;
           saveBtn.textContent = isEdit ? t('common.save') : t('common.add');
         }
@@ -3957,7 +3957,12 @@ function wireLoanInterestFields(panel, { onTerm = () => {} } = {}) {
       try {
         const { data } = await api.post('/budget/loans/preview', body);
         if (seq !== request) return;
-        if (!data?.ok) { preview.textContent = t('budget.loanPreviewInvalid'); return; }
+        if (!data?.ok) {
+          // Zwei Faelle, zwei Saetze (#1668): die Rate deckt die Zinsen nicht,
+          // oder das Darlehen liefe laenger, als gerechnet wird.
+          preview.textContent = refusalText(LOAN_REFUSALS.get(data?.reason) ?? [null, 'budget.loanPreviewInvalid'], data?.max);
+          return;
+        }
         onTerm(Number.isInteger(data.total_months) && data.total_months >= 1 ? data.total_months : null);
         // Die Vorschau rechnet in der im Dialog gewählten Darlehenswährung (#582) -
         // die Kreditsumme darüber wird ja ebenfalls in dieser Währung eingegeben.
@@ -4137,28 +4142,33 @@ const LOAN_SAVE_FAILED = 'budget.loanSaveFailed';
  * Mehrere Felder = das erste, das gerade sichtbar ist (ohne Zins die
  * Ratenanzahl, mit Zins die Tilgung). `null` = kein Feld, der Satz kommt als
  * Toast. Eine Map, damit ein Grund wie `__proto__` nichts findet.
+ *
+ * Ein dritter Eintrag ist der Satz, der die Grenze nennt (#1668): er gilt,
+ * wenn die Absage sie als `max` mitbringt - 360 Raten, 600 Monate Laufzeit
+ * oder die Raten, die das Darlehen hat. Die Zahl kommt vom Server, damit sie
+ * hier nicht ein zweites Mal steht.
  * test:budget-ui haelt die Liste deckungsgleich mit den Gruenden des Servers.
  */
 const LOAN_REFUSALS = new Map([
-  ['loan_title_invalid', ['#lm-title', LOAN_SAVE_FAILED]],
+  ['loan_title_invalid', ['#lm-title', 'budget.loanTitleInvalid']],
   ['loan_borrower_invalid', ['#lm-borrower', 'budget.loanBorrowerRequired']],
   ['loan_start_month_invalid', ['#lm-start', 'budget.loanStartMonthRequired']],
-  ['loan_notes_invalid', ['#lm-notes', LOAN_SAVE_FAILED]],
+  ['loan_notes_invalid', ['#lm-notes', 'budget.loanNotesInvalid']],
   ['loan_amount_invalid', ['#lm-amount', 'budget.validAmountRequired']],
-  ['loan_installments_invalid', ['#lm-installments', 'budget.loanInstallmentsRequired']],
+  ['loan_installments_invalid', ['#lm-installments', 'budget.loanInstallmentsRequired', 'budget.loanInstallmentsRange']],
   ['loan_principal_invalid', ['#lm-principal', 'budget.loanPrincipalRequired']],
   ['loan_rate_invalid', ['#lm-fixed-rate', 'budget.loanRateRequired']],
   ['loan_repayment_invalid', ['#lm-initial-repayment', 'budget.loanRepaymentRequired']],
   ['loan_fixed_period_invalid', ['#lm-fixed-period', 'budget.loanFixedPeriodRequired']],
   ['loan_followup_rate_invalid', ['#lm-followup-rate', 'budget.loanRateRequired']],
-  // Derselbe Satz, den die Vorschau unter den Zinsfeldern fuer beide Faelle zeigt.
+  // Dieselben zwei Saetze, die die Vorschau unter den Zinsfeldern zeigt.
   ['loan_not_amortizing', ['#lm-initial-repayment', 'budget.loanPreviewInvalid']],
-  ['loan_term_too_long', ['#lm-initial-repayment', 'budget.loanPreviewInvalid']],
-  ['loan_currency_invalid', ['#lm-currency', LOAN_SAVE_FAILED]],
+  ['loan_term_too_long', ['#lm-initial-repayment', 'budget.loanPreviewInvalid', 'budget.loanTermTooLong']],
+  ['loan_currency_invalid', ['#lm-currency', 'budget.loanCurrencyInvalid']],
   ['loan_exchange_rate_invalid', ['#lm-exchange-rate', 'budget.loanExchangeRateRequired']],
-  ['loan_account_invalid', ['#lm-account', LOAN_SAVE_FAILED]],
+  ['loan_account_invalid', ['#lm-account', 'budget.accountNotFound']],
   ['loan_paid_installments_invalid', ['#lm-paid', 'budget.loanPaidInstallmentsInvalid']],
-  ['loan_paid_installments_exceed', ['#lm-paid', 'budget.loanPaidInstallmentsTooMany']],
+  ['loan_paid_installments_exceed', ['#lm-paid', 'budget.loanPaidInstallmentsTooMany', 'budget.loanPaidInstallmentsMax']],
   ['loan_term_below_paid', ['#lm-installments, #lm-initial-repayment', 'budget.loanTermBelowPaid']],
   // Aus dem Dialog nicht erreichbar (er schickt nur gueltige Werte) - ohne Feld.
   ['loan_direction_invalid', [null, LOAN_SAVE_FAILED]],
@@ -4175,23 +4185,148 @@ const LOAN_REFUSALS = new Map([
  * @returns {{ fields: string|null, message: string }}
  */
 function loanSaveError(err) {
+  return refusalSentence(err, { refusals: LOAN_REFUSALS, statuses: [400], fallback: LOAN_SAVE_FAILED });
+}
+
+/**
+ * Die Grenze, die eine Absage nennt - nur eine ganze Zahl ab 0 wird zum Satz.
+ * @returns {number|null}
+ */
+function refusalMax(value) {
+  return Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+/**
+ * Der Satz zu einem Eintrag aus LOAN_REFUSALS/BUDGET_REFUSALS: mit Grenze, wo
+ * der Eintrag einen Satz dafuer hat und die Grenze bekannt ist.
+ */
+function refusalText([, key, keyWithMax], max) {
+  const limit = refusalMax(max);
+  return keyWithMax && limit !== null ? t(keyWithMax, { max: limit }) : t(key);
+}
+
+/**
+ * Fehler -> Feld und Satz, fuer den Darlehens-Dialog und den Rest der Seite
+ * (#1656, #1668). Nie der Satz des Servers: eine Absage (`statuses`) bekommt
+ * den Satz ihres Grundes oder `fallback`, alles andere den Satz der App.
+ *
+ * @param {unknown} err
+ * @param {{ refusals: Map<string, Array>, statuses: number[], fallback: string }} options
+ * @returns {{ fields: string|null, message: string }}
+ */
+function refusalSentence(err, { refusals, statuses, fallback }) {
   const status = err?.status;
-  if (status === 400) {
-    const [fields, key] = LOAN_REFUSALS.get(err.data?.reason) ?? [null, LOAN_SAVE_FAILED];
-    return { fields, message: t(key) };
+  if (statuses.includes(status)) {
+    const entry = refusals.get(err.data?.reason);
+    return entry
+      ? { fields: entry[0], message: refusalText(entry, err.data?.max) }
+      : { fields: null, message: t(fallback) };
   }
   // friendlyError reicht bei einem Status ohne eigenen Satz den Text des Servers
   // durch - hier nur dort fragen, wo es einen Satz hat.
   const known = status === 0 || status === 403 || status === 404 || status >= 500 || !navigator.onLine;
-  return { fields: null, message: known ? friendlyError(err) : t(LOAN_SAVE_FAILED) };
+  return { fields: null, message: known ? friendlyError(err) : t(fallback) };
+}
+
+const BUDGET_FAILED = 'common.errorOccurred';
+const BUDGET_SAVE_FAILED = 'budget.saveFailed';
+
+/**
+ * Absage der uebrigen Budget-Routen -> Feld und Satz (#1668).
+ *
+ * Dieselbe Mechanik wie LOAN_REFUSALS, fuer alles ausserhalb des
+ * Darlehens-Formulars: Buchung, Serie, Konto, Kategorie, Rate. Bis dahin
+ * schrieben 13 Stellen dieser Seite `err.data.error` in einen Toast - den Satz
+ * des Servers, englisch oder deutsch, in jeder Sprache.
+ *
+ * Ein Grund kann in mehreren Dialogen ankommen (der Betrag einer Buchung beim
+ * Bearbeiten und beim Verbuchen): die Felder aller Dialoge stehen nebeneinander,
+ * gezeigt wird am ersten, das der offene Dialog hat. `null` oder kein Dialog =
+ * Toast. Was aus der Oberflaeche nicht erreichbar ist (sie schickt nur gueltige
+ * Werte), bekommt den allgemeinen Satz. test:budget-ui haelt die Liste
+ * deckungsgleich mit den Gruenden des Servers.
+ */
+const BUDGET_REFUSALS = new Map([
+  // Buchung und Serie (server/routes/budget/entries.js)
+  ['entry_title_invalid', ['#bm-title', 'common.titleRequired']],
+  ['entry_amount_invalid', ['#bm-amount, #cb-amount', 'budget.validAmountRequired']],
+  ['entry_amount_exceeds_loan', ['#bm-amount', 'budget.amountExceedsLoanRemaining']],
+  ['entry_category_invalid', ['#bm-category', 'budget.categoryRequired']],
+  ['entry_subcategory_invalid', ['#bm-subcategory', 'budget.subcategoryRequired']],
+  ['entry_date_invalid', ['#bm-date, #cb-date', 'calendar.invalidDate']],
+  ['entry_start_date_invalid', ['#bm-date', 'calendar.invalidDate']],
+  ['entry_account_invalid', ['#bm-account', 'budget.accountNotFound']],
+  ['entry_responsible_invalid', [null, 'budget.responsibleNotMember']],
+  ['series_start_too_early', ['#bm-date', 'budget.seriesStartTooEarly']],
+  ['entry_recurrence_invalid', ['#bm-interval', BUDGET_SAVE_FAILED]],
+  ['entry_interval_count_invalid', ['#bm-interval-count', BUDGET_SAVE_FAILED]],
+  ['series_end_refused', [null, BUDGET_SAVE_FAILED]],
+  ['entry_not_recurring', [null, BUDGET_FAILED]],
+  ['entry_already_booked', [null, BUDGET_FAILED]],
+  // Konto (accounts.js)
+  ['account_name_invalid', ['#am-name', 'common.titleRequired']],
+  ['account_balance_invalid', ['#am-balance', 'budget.validAmountRequired']],
+  ['account_credit_limit_invalid', ['#am-credit-limit', 'budget.validAmountRequired']],
+  ['account_credit_bank_invalid', ['#am-credit-bank', BUDGET_SAVE_FAILED]],
+  ['account_type_invalid', ['#am-type', BUDGET_SAVE_FAILED]],
+  ['account_color_invalid', [null, BUDGET_SAVE_FAILED]],
+  // Kategorie aus dem Buchungsdialog (categories.js) - die Saetze der Verwaltung.
+  ['category_name_invalid', [null, 'common.nameRequired']],
+  ['subcategory_name_invalid', [null, 'common.nameRequired']],
+  ['category_type_invalid', [null, BUDGET_SAVE_FAILED]],
+  ['category_exists', [null, 'category.errorExists']],
+  ['subcategory_exists', [null, 'category.errorSubExists']],
+  // Rate eines Darlehens (loans.js, ausserhalb des Formulars)
+  ['loan_settled', [null, 'budget.loanAlreadyPaid']],
+  ['loan_installment_paid', [null, 'budget.loanInstallmentAlreadyPaid']],
+  ['loan_payment_amount_invalid', [null, 'budget.validAmountRequired']],
+  ['loan_payment_amount_exceeds', [null, 'budget.amountExceedsLoanRemaining']],
+  ['loan_payment_date_invalid', [null, 'calendar.invalidDate']],
+  ['loan_payment_installment_invalid', [null, BUDGET_FAILED]],
+]);
+
+/**
+ * Was die Budget-Seite zu einem fehlgeschlagenen Aufruf sagt (#1668). Ein Grund
+ * zaehlt an einer 400 und an einer 409 (Kategorie gibt es schon, Rate schon
+ * bezahlt).
+ *
+ * @param {unknown} err
+ * @param {string} [fallback] - Satz fuer eine Absage ohne bekannten Grund
+ * @returns {{ fields: string|null, message: string }}
+ */
+function budgetError(err, fallback = BUDGET_FAILED) {
+  return refusalSentence(err, { refusals: BUDGET_REFUSALS, statuses: [400, 409], fallback });
+}
+
+/**
+ * Das erste der genannten Felder, das der Dialog hat und das sichtbar ist. Ein
+ * Feld, das nicht mehr im Dokument haengt (der Dialog ist inzwischen zu), zaehlt
+ * nicht - die Meldung daran saehe niemand.
+ */
+function refusalField(panel, fields) {
+  if (!panel || !fields) return null;
+  return [...panel.querySelectorAll(fields)]
+    .find((el) => el.isConnected !== false && !el.closest('[hidden]')) ?? null;
+}
+
+/**
+ * Zeigt den Fehler am Feld des offenen Dialogs, wenn die Absage eines nennt -
+ * sonst als Toast.
+ *
+ * @param {unknown} err
+ * @param {{ panel?: Element|null, fallback?: string }} [options]
+ */
+function showBudgetError(err, { panel = null, fallback = BUDGET_FAILED } = {}) {
+  const { fields, message } = budgetError(err, fallback);
+  const input = refusalField(panel, fields);
+  if (input) reportFieldError(input, message);
+  else window.yuvomi?.showToast(message, 'danger');
 }
 
 /** Zeigt die Absage am Feld, wenn es eines gibt und es sichtbar ist - sonst als Toast. */
 function showLoanSaveError(panel, err) {
   const { fields, message } = loanSaveError(err);
-  const input = fields
-    ? [...panel.querySelectorAll(fields)].find((el) => !el.closest('[hidden]'))
-    : null;
+  const input = refusalField(panel, fields);
   if (input) reportFieldError(input, message);
   else window.yuvomi?.showToast(message, 'danger');
 }
@@ -4286,7 +4421,7 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
     const paid = readPaidInstallments(panel);
     if (paid.invalid) return;
     if (paid.value !== null && paid.value > installment_count) {
-      reportFieldError(panel.querySelector('#lm-paid'), t('budget.loanPaidInstallmentsTooMany'));
+      reportFieldError(panel.querySelector('#lm-paid'), t('budget.loanPaidInstallmentsMax', { max: installment_count }));
       return;
     }
     body = { borrower, title, start_month, notes, interest_mode: 'none', total_amount, installment_count };
@@ -4349,7 +4484,7 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
     if (term !== null && body.paid_installments > term) {
       saveBtn.disabled = false;
       saveBtn.textContent = saveLabel;
-      reportFieldError(panel.querySelector('#lm-paid'), t('budget.loanPaidInstallmentsTooMany'));
+      reportFieldError(panel.querySelector('#lm-paid'), t('budget.loanPaidInstallmentsMax', { max: term }));
       return;
     }
   }
@@ -4425,14 +4560,14 @@ async function markLoanPayment(id) {
           await loadMonth(state.month);
           renderBody();
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          showBudgetError(err);
         }
       });
     } else {
       window.yuvomi?.showToast(t('budget.loanPaymentAddedToast'), 'success');
     }
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    showBudgetError(err);
   }
 }
 
@@ -4455,7 +4590,7 @@ async function deleteLoan(id) {
     restore: (err) => {
       state.loans.loans = [...state.loans.loans, loan];
       renderBody();
-      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      if (err) showBudgetError(err);
     },
   });
 }
@@ -4483,7 +4618,7 @@ async function deleteLoanPayment(loanId, paymentId) {
         loan.payments = [...(loan.payments || []), payment];
         renderBody();
       }
-      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      if (err) showBudgetError(err);
     },
   });
 }
@@ -4548,7 +4683,7 @@ async function openConfirmBookingModal(id) {
           refocusAfterRender();
           window.yuvomi?.showToast(t('budget.confirmSaved'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
+          showBudgetError(err, { panel, fallback: BUDGET_SAVE_FAILED });
         }
       });
     },
@@ -4669,7 +4804,7 @@ async function deleteEntry(id) {
         back = true;
       }
       if (back) renderBody();
-      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      if (err) showBudgetError(err);
     },
   });
 }
@@ -4850,7 +4985,7 @@ async function deleteEntrySeries(id) {
     restore: async (err) => {
       await loadMonth(state.month);
       renderBody();
-      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      if (err) showBudgetError(err);
     },
   });
 }
@@ -4870,6 +5005,10 @@ export const __test = {
   // #1593: was beim Betreten der Seite zurueckfaellt.
   resetSessionFilters,
   visibleEntries,
+  // #1668: dasselbe fuer den Rest der Seite.
+  BUDGET_REFUSALS,
+  budgetError,
+  showBudgetError,
   // #1546: was "alle kuenftigen" aus einem Vorkommen an die Serie schickt.
   occurrenceSeriesBody,
   // #1035: dasselbe von der ersten Buchung aus - mit Rhythmus, Werte nur geaendert.

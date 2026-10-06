@@ -6,11 +6,11 @@
 import express from 'express';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
-import { str, oneOf, collectErrors, MAX_SHORT } from '../../middleware/validate.js';
+import { str, oneOf, MAX_SHORT } from '../../middleware/validate.js';
 import {
   loadBudgetMeta, normalizeLang, localizedCategory, localizedSubcategory,
   uniqueKey, categoryInUseCount, subcategoryInUseCount,
-  categoryCountByType, subcategoryCountForCategory,
+  categoryCountByType, subcategoryCountForCategory, refusals, refuse,
 } from './helpers.js';
 
 const log = createLogger('Budget');
@@ -91,8 +91,8 @@ router.post('/categories', (req, res) => {
   try {
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
     const vType = oneOf(req.body.type || 'expense', ['expense', 'income'], 'Typ');
-    const errors = collectErrors([vName, vType]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    const errors = [...refusals('category_name_invalid', [vName]), ...refusals('category_type_invalid', [vType])];
+    if (errors.length) return refuse(res, errors);
 
     const conflict = db.get().prepare(`
       SELECT key FROM budget_categories WHERE type = ? AND name = ? COLLATE NOCASE
@@ -122,7 +122,7 @@ router.put('/categories/:key', (req, res) => {
     if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404 });
 
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
-    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+    if (vName.error) return refuse(res, refusals('category_name_invalid', [vName]));
 
     const conflict = db.get().prepare(`
       SELECT key FROM budget_categories WHERE type = ? AND name = ? COLLATE NOCASE AND key != ?
@@ -161,7 +161,7 @@ router.delete('/categories/:key', (req, res) => {
 router.patch('/categories/reorder', (req, res) => {
   try {
     const vType = oneOf(req.body.type || 'expense', ['expense', 'income'], 'Typ');
-    if (vType.error) return res.status(400).json({ error: vType.error, code: 400 });
+    if (vType.error) return refuse(res, refusals('category_type_invalid', [vType]));
     const order = Array.isArray(req.body.order) ? req.body.order : [];
     const tx = db.get().transaction((keys) => {
       keys.forEach((key, i) => {
@@ -184,7 +184,7 @@ router.post('/categories/:categoryKey/subcategories', (req, res) => {
     if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404 });
 
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
-    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+    if (vName.error) return refuse(res, refusals('subcategory_name_invalid', [vName]));
 
     const conflict = db.get().prepare(`
       SELECT key FROM budget_subcategories WHERE category_key = ? AND name = ? COLLATE NOCASE
@@ -216,7 +216,7 @@ router.put('/categories/:key/subcategories/:subKey', (req, res) => {
     if (!sub) return res.status(404).json({ error: 'Subcategory not found.', code: 404 });
 
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
-    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+    if (vName.error) return refuse(res, refusals('subcategory_name_invalid', [vName]));
 
     const conflict = db.get().prepare(`
       SELECT key FROM budget_subcategories WHERE category_key = ? AND name = ? COLLATE NOCASE AND key != ?

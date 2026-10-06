@@ -797,7 +797,11 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/notes.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
   ['routes/tasks.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
   ['routes/backup.js: err.reason', { sites: 1, at403: [], why: 'Restore: 409, 503 oder 400' }],
-  ['routes/budget/loans.js: errors[0].reason', { sites: 1, at403: [], why: 'feste 400' }],
+  // refuse() (#1656, #1668): die eine Stelle, ueber die jede Absage der
+  // Budget-Routen ihren Grund bekommt. Ihr Status ist 400 oder, an zwei
+  // Stellen ausgeschrieben, 409 - eine 403 baut sie nie.
+  ['routes/budget/helpers.js: first.reason', { sites: 1, at403: [], why: '400 oder 409' }],
+  ['routes/budget/loans.js: derived.reason', { sites: 1, at403: [], why: 'Vorschau: 200 mit ok: false' }],
   ['services/document-deletion-lock.js: err.reason', { sites: 1, at403: [], why: 'feste 409' }],
   ['middleware/error-handler.js: err.reason', { sites: 1, at403: [], why: 'feste 503' }],
   ['middleware/restore-gate.js: RESTORE_IN_PROGRESS_REASON', { sites: 1, at403: [], why: '503 oder 409' }],
