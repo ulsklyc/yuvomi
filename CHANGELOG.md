@@ -233,6 +233,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Settings: the sheet you are on is visible in the sidebar, not hidden under its search.** The
+  sidebar scrolls on its own and its search field stays at the top while it does. When the open
+  sheet lay above the visible part - after Back, from the command palette, from a link - the
+  sidebar scrolled it to its very top edge, exactly where the search sits: at 1280x700 the active
+  entry stood at 32-72 under a search at 32-100, all 40px of it covered. An entry half behind
+  the search was not moved at all. The sidebar now brings the entry to just below the search
+  (#1509).
 - **Calendar: the week follows the screen when it crosses the phone width.** On a phone the week
   is a window of three days around the selected day, on a wider screen the whole week, and the
   label, the arrows and the loaded range follow the same threshold. Only the month was redrawn
