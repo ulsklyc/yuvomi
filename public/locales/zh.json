@@ -795,6 +795,7 @@
         "recipeScaleLabel": "调整食材用量",
         "deletedToast": "已删除该餐。",
         "recurrenceLabel": "每周重复",
+        "recurrenceWeekly": "每周",
         "recurrenceHint": "Yuvomi 会在未来每周的同一天自动添加这顿餐食。",
         "recurrenceUntilLabel": "重复至",
         "recurrenceUntilHint": "留空表示无限重复。",

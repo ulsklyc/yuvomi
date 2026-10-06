@@ -809,6 +809,7 @@
         "recipeScaleLabel": "I-scale ang mga sangkap",
         "deletedToast": "Natanggal na ang pagkain.",
         "recurrenceLabel": "Ulitin lingguhan",
+        "recurrenceWeekly": "Lingguhan",
         "recurrenceHint": "Awtomatikong idinaragdag ng Yuvomi ang pagkaing ito sa parehong araw ng linggo sa mga susunod na linggo.",
         "recurrenceUntilLabel": "Ulitin hanggang",
         "recurrenceUntilHint": "Iwanang blangko para umulit nang walang hanggan.",

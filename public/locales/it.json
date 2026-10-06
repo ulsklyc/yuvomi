@@ -795,6 +795,7 @@
         "recipeScaleLabel": "Scala ingredienti",
         "deletedToast": "Pasto eliminato.",
         "recurrenceLabel": "Ripeti ogni settimana",
+        "recurrenceWeekly": "Settimanale",
         "recurrenceHint": "Yuvomi aggiunge automaticamente questo pasto nello stesso giorno della settimana nelle settimane future.",
         "recurrenceUntilLabel": "Ripeti fino al",
         "recurrenceUntilHint": "Lascia vuoto per ripetere all'infinito.",

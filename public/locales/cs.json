@@ -858,6 +858,7 @@
         "recipeScaleLabel": "Upravit množství ingrediencí",
         "deletedToast": "Jídlo odstraněno.",
         "recurrenceLabel": "Opakovat každý týden",
+        "recurrenceWeekly": "Týdně",
         "recurrenceHint": "Yuvomi tuto večeři nebo jídlo automaticky vytvoří ve stejný den v dalších týdnech.",
         "recurrenceUntilLabel": "Opakovat do",
         "recurrenceUntilHint": "Nechte prázdné pro opakování bez konce.",

@@ -454,44 +454,32 @@ async function onSplitClick(e, list) {
   // Knoten, der einen Rechtewechsel ueberlebt hat.
   if (readOnly() && !READ_SAFE_ACTIONS.has(actionBtn.dataset.action)) return;
 
+  const run = SPLIT_ACTIONS[actionBtn.dataset.action];
+  if (!run) return;
+
   const recipeId = Number(actionBtn.dataset.id);
   const recipe = state.recipes.find((r) => r.id === recipeId);
   if (!recipe) return;
 
-  if (actionBtn.dataset.action === 'edit') {
-    openRecipeModal('edit', recipe);
-    return;
-  }
-
-  if (actionBtn.dataset.action === 'match-ingredient') {
-    await openPantryMatchModal(recipe, actionBtn.dataset.ingredient);
-    return;
-  }
-
-  if (actionBtn.dataset.action === 'match-ingredients') {
-    await openPantryBulkMatchModal(recipe);
-    return;
-  }
-
-  if (actionBtn.dataset.action === 'delete') {
-    await removeRecipe(recipe);
-    return;
-  }
-
-  if (actionBtn.dataset.action === 'duplicate') {
-    await duplicateRecipe(recipe);
-    return;
-  }
-
-  if (actionBtn.dataset.action === 'to-shopping') {
-    await transferRecipe(recipe, actionBtn);
-    return;
-  }
-
-  if (actionBtn.dataset.action === 'add-to-meals') {
-    await planRecipe(recipe, actionBtn);
-  }
+  await run(recipe, actionBtn);
 }
+
+/**
+ * Was eine `data-action` der Seite TUT - eine Tabelle statt einer Kette aus
+ * `if`, damit der Riegel davor (`READ_SAFE_ACTIONS` in onSplitClick) an EINER
+ * Stelle ueber alle Eintraege urteilt, auch ueber einen, der morgen dazukommt
+ * und noch keinen eigenen Riegel traegt. `toggle-detail` fehlt hier: der
+ * Hauptknopf der Zeile ist vorher abgezweigt.
+ */
+const SPLIT_ACTIONS = {
+  edit: (recipe) => openRecipeModal('edit', recipe),
+  'match-ingredient': (recipe, btn) => openPantryMatchModal(recipe, btn.dataset.ingredient),
+  'match-ingredients': (recipe) => openPantryBulkMatchModal(recipe),
+  delete: (recipe) => removeRecipe(recipe),
+  duplicate: (recipe) => duplicateRecipe(recipe),
+  'to-shopping': (recipe, btn) => transferRecipe(recipe, btn),
+  'add-to-meals': (recipe, btn) => planRecipe(recipe, btn),
+};
 
 // Mehrwege-Filter (Alle/Nativ/pro Provider) als Trigger + Popover-Menü im
 // __actions-Slot, dieselbe Behandlung wie „Lagerorte verwalten" im Vorrat -
@@ -1997,6 +1985,7 @@ export const __test = {
   // #1265: Nur-lesen in den Rezepten - Zeile, Detail, Positivliste und jeder
   // Schreibweg als Programm (test-kitchen-readonly-ui.js).
   READ_SAFE_ACTIONS,
+  SPLIT_ACTIONS,
   fabEl,
   emptyListOptions,
   buildRecipeList,

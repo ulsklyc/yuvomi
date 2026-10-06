@@ -1275,17 +1275,27 @@ function wireGrid(grid) {
   // jedem Wochenwechsel erneut, ersetzt aber nur die Kinder (replaceChildren) —
   // ohne Guard akkumulierten click/keydown/pointerdown-Listener und feuerten
   // add-/delete-/transfer-meal mehrfach (Muster wie shopping.js#wireListContentEvents).
-  if (grid.dataset.eventsWired) return;
-  grid.dataset.eventsWired = 'true';
-
-  grid.addEventListener('click', onGridClick);
+  if (!grid.dataset.eventsWired) {
+    grid.dataset.eventsWired = 'true';
+    grid.addEventListener('click', onGridClick);
+  }
 
   // Regel 3 in utils/module-access.js: Ziehen hat kein Markup, das man
   // wegnehmen koennte - bei `read` bleibt die VERDRAHTUNG aus, fuer das Rezept
-  // aus der Spalte (dragover/drop) wie fuer die Karte (wireDragDrop). Ein
-  // Riegel erst im Ende-Handler kaeme zu spaet: dann haette die Karte schon
-  // einen Geist und der Platz seinen Zielrahmen.
-  if (readOnly()) return;
+  // aus der Spalte (dragover/drop) wie fuer die Karte (wireDragDrop).
+  //
+  // EIN EIGENER MERKER, NACH DER RECHTEFRAGE GESETZT. Die Rechte koennen im
+  // Lauf einer Sitzung wechseln (jedes `/auth/me` schreibt den Store neu,
+  // api.js), und alles andere auf dieser Seite fragt je Zeichnen. Hing das
+  // Ziehen am Merker des Klicks, blieb ein Gitter, das zuerst bei `read`
+  // gezeichnet wurde, bis zum Seitenwechsel ohne Ziehen. So zieht das naechste
+  // Zeichnen nach. Die Gegenrichtung - verdrahtet, dann faellt das Recht weg -
+  // fangen die drei Handler selbst am ANFANG der Geste (onGridDragOver,
+  // onGridDrop, `pointerdown` in wireDragDrop): ein Riegel erst im Ende-Handler
+  // kaeme zu spaet, dann haette die Karte schon einen Geist und der Platz
+  // seinen Zielrahmen.
+  if (readOnly() || grid.dataset.dragWired) return;
+  grid.dataset.dragWired = 'true';
 
   grid.addEventListener('dragover', onGridDragOver);
   grid.addEventListener('drop', onGridDrop);
@@ -1353,7 +1363,7 @@ async function onGridClick(e) {
 }
 
 function onGridDragOver(e) {
-  if (!_dragRecipeId) return;
+  if (!_dragRecipeId || readOnly()) return;
   const slot = e.target.closest('.meal-slot');
   if (!slot) return;
   const recipe = state.recipes.find((entry) => entry.id === _dragRecipeId);
@@ -1366,6 +1376,7 @@ function onGridDragOver(e) {
 }
 
 async function onGridDrop(e) {
+  if (readOnly()) { _dragRecipeId = null; return; }
   if (!_dragRecipeId) return;
   const slot = e.target.closest('.meal-slot');
   const recipeId = _dragRecipeId;
@@ -1539,6 +1550,9 @@ function wireDragDrop(grid) {
   let dragging = null; // { mealId, sourceDate, sourceType, ghost, startX, startY }
 
   grid.addEventListener('pointerdown', (e) => {
+    // Am ANFANG der Geste (siehe wireGrid): verdrahtet wurde mit Schreibrecht,
+    // inzwischen kann es fehlen.
+    if (readOnly()) return;
     const card = e.target.closest('.meal-card');
     if (!card) return;
     // Die Aktionsleiste ist kein Drag-Griff. Hier standen drei Aktionen
@@ -1848,6 +1862,13 @@ function formatScaledQuantity(value) {
  * das Serien-Ende stehen NUR im Editor, die Karte zeigt sie nie. Der Link
  * bleibt ein Link: ihn zu oeffnen ist Lesen. „Zutaten skalieren" fehlt, es ist
  * ein Werkzeug des Formulars und kein Wert der Mahlzeit.
+ *
+ * DIE WIEDERHOLUNG HAT EIN EIGENES ZUSTANDSWORT (`meals.recurrenceWeekly`,
+ * „Woechentlich"). Die Beschriftung des Schalters im Formular
+ * (`meals.recurrenceLabel`, „Woechentlich wiederholen") ist in jeder Sprache
+ * ein Imperativ - als Wert einer Leseansicht waere das eine Aufforderung. Eine
+ * Serie kennt nur diesen einen Rhythmus (`repeat_weekly` in
+ * server/routes/meals.js); kommt ein zweiter dazu, braucht er sein eigenes Wort.
  */
 function mealReadHtml(meal) {
   const typeLabel = MEAL_TYPES().find((mt) => mt.key === meal.meal_type)?.label ?? '';
@@ -1869,7 +1890,7 @@ function mealReadHtml(meal) {
         ${readRowHtml({ icon: 'chef-hat', label: t('meals.savedRecipeLabel'), value: recipe?.title ?? '' })}
         ${readRowHtml({ icon: 'align-left', label: t('meals.notesLabel'), value: meal.notes || '', multiline: true })}
         ${readRowHtml({ icon: 'link', label: t('meals.recipeUrlLabel'), valueHtml: link })}
-        ${readRowHtml({ icon: 'repeat-2', label: t('meals.recurrenceBadge'), value: meal.recurrence_template_id ? t('meals.recurrenceLabel') : '' })}
+        ${readRowHtml({ icon: 'repeat-2', label: t('meals.recurrenceBadge'), value: meal.recurrence_template_id ? t('meals.recurrenceWeekly') : '' })}
         ${readRowHtml({ icon: 'calendar-range', label: t('meals.recurrenceUntilLabel'), value: meal.recurrence_template_id && meal.recurrence_end_date ? formatDate(meal.recurrence_end_date) : '' })}
       </div>
     </div>`;

@@ -795,6 +795,7 @@
         "recipeScaleLabel": "Ajuster les ingrédients",
         "deletedToast": "Repas supprimé.",
         "recurrenceLabel": "Répéter chaque semaine",
+        "recurrenceWeekly": "Hebdomadaire",
         "recurrenceHint": "Yuvomi ajoute automatiquement ce repas le même jour de la semaine dans les semaines à venir.",
         "recurrenceUntilLabel": "Répéter jusqu'au",
         "recurrenceUntilHint": "Laisser vide pour répéter indéfiniment.",

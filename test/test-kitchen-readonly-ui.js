@@ -137,12 +137,40 @@ function aktionenImBaum(el) {
   return [...eigene, ...roh, ...(el.childNodes ?? []).flatMap(aktionenImBaum)];
 }
 
-/** Ein Knoten, der JEDEN Listener-Typ sammelt (der Mini-DOM merkt sich nur den letzten). */
+/** Ein Knoten, der JEDEN Listener sammelt (der Mini-DOM merkt sich nur den letzten Typ). */
 function mitLauschern(el) {
   el.gehoert = [];
-  el.addEventListener = (typ) => { el.gehoert.push(typ); };
+  el.handler = {};
+  el.addEventListener = (typ, fn) => { el.gehoert.push(typ); (el.handler[typ] ??= []).push(fn); };
   return el;
 }
+
+/**
+ * Das Panel eines offenen Dialogs: jeder Selektor liefert einen Knoten, der
+ * seine Listener sammelt, damit ein Test den Knopf NACH dem Oeffnen druecken
+ * kann. `werte[sel] === null` heisst: diesen Knoten gibt es nicht.
+ */
+function dialogPanel(werte = {}, alle = {}) {
+  const knoten = {};
+  const mk = (sel) => (knoten[sel] ??= {
+    value: werte[sel] ?? '', checked: false, disabled: false, hidden: false, dataset: {}, style: {}, handler: {},
+    addEventListener(typ, fn) { (this.handler[typ] ??= []).push(fn); },
+    setAttribute() {}, removeAttribute() {}, replaceChildren() {}, insertAdjacentHTML() {}, appendChild() {},
+    querySelector: () => null, querySelectorAll: () => [], focus() {}, classList: { toggle() {}, add() {}, remove() {} },
+  });
+  return {
+    dataset: {},
+    querySelector: (sel) => (werte[sel] === null ? null : mk(sel)),
+    querySelectorAll: (sel) => alle[sel] ?? [],
+    async druecken(sel, typ = 'click') {
+      const ziel = knoten[sel];
+      assert.ok(ziel?.handler[typ]?.length, `am Knoten ${sel} haengt kein ${typ} - der Aufbau des Tests ist kaputt`);
+      for (const fn of ziel.handler[typ]) await fn({ currentTarget: ziel, target: ziel, preventDefault() {}, stopPropagation() {} });
+    },
+  };
+}
+
+const rechte = (modules) => setPermissions({ admin: false, modules, widgets: {}, capabilities: {} });
 
 /** Ein Klick, dessen Ziel einen Knopf mit dieser Aktion findet. */
 function klick(action, daten = {}) {
@@ -286,7 +314,9 @@ test('Essensplan bei `read`: die Leseansicht zeigt alles, was der Editor zeigt',
   assert.match(html, /Linsen nach Oma/, 'das gespeicherte Rezept beim Namen');
   assert.match(html, /Mit Zitrone abschmecken/);
   assert.match(html, /<a class="meal-read__link" href="https:\/\/example\.org\/linsen" target="_blank" rel="noopener noreferrer">/);
-  assert.match(html, /meals\.recurrenceLabel/, 'die Wiederholung als Wert');
+  assert.match(html, /detail-row__value">meals\.recurrenceWeekly</, 'die Wiederholung als ZUSTAND');
+  assert.doesNotMatch(html, /meals\.recurrenceLabel/,
+    'die Beschriftung des Schalters ist ein Imperativ („Woechentlich wiederholen") - in einer Leseansicht eine Aufforderung');
   assert.match(html, /2026-12-30/, 'und ihr Ende');
   assert.equal((html.match(/class="detail-row[ "]/g) ?? []).length, 8);
   assert.doesNotMatch(html, /<input|<select|<textarea|<button|form-input|modal-save|modal-delete/,
@@ -400,6 +430,90 @@ test('Essensplan bei `read`: Loeschen blendet nichts aus und oeffnet kein Rueckg
     assert.deepEqual(await loeschen(LESEN, weg), { fenster: 0, ausgeblendet: false }, name);
     assert.deepEqual(await loeschen(SCHREIBEN, weg), { fenster: 1, ausgeblendet: true }, `Gegenfall ${name}`);
   }
+});
+
+test('Essensplan: der offene Editor speichert nichts mehr, wenn das Recht inzwischen fehlt', async () => {
+  // Der Dialog geht mit Schreibrecht auf; danach wechselt das Recht (jedes
+  // `/auth/me` schreibt den Rechte-Store neu), und erst dann faellt der Klick.
+  const fahren = (danach) => mitPlan({}, async () => {
+    meals.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [] });
+    const panel = dialogPanel({ '#modal-title': 'Suppe', '#transfer-missing': null, '#modal-delete': null, '#modal-date': '2026-10-07', '#modal-type': 'lunch' });
+    try {
+      rechte(SCHREIBEN);
+      const [dialog] = await modalMitschnitt(() => meals.openMealModal({ mode: 'create', date: '2026-10-07', mealType: 'lunch' }));
+      dialog.onSave(panel);
+      rechte(danach);
+      return schreibend(await aufrufe(async () => {
+        await panel.druecken('#modal-save-as-recipe');
+        await panel.druecken('#modal-save');
+      }, { 'POST /recipes': { data: { id: 30, title: 'Suppe', source: 'native' } }, 'POST /meals': { data: mahlzeit({ id: 12 }) } }));
+    } finally {
+      clearPermissions();
+    }
+  });
+  assert.deepEqual(await fahren(LESEN), [], '„Als Rezept speichern" und „Hinzufuegen" schicken bei `read` nichts');
+  assert.deepEqual(await fahren(SCHREIBEN), ['POST /recipes', 'POST /meals'], 'Gegenfall: mit Schreibrecht gehen beide raus');
+});
+
+test('Essensplan: die Zieh-Verdrahtung folgt einem Rechtewechsel in beide Richtungen', async () => {
+  await mitPlan({ recipes: [{ id: 21, title: 'Linsen nach Oma', source: 'native', meal_types: ['lunch'], ingredients: [] }] }, async () => {
+    try {
+      // (1) Zuerst bei `read` gezeichnet, dann kommt das Schreibrecht: das naechste Zeichnen verdrahtet nach.
+      rechte(LESEN);
+      const grid = mitLauschern(new MiniElement('div'));
+      const seite = { querySelector: (sel) => (sel === '#week-grid' ? grid : null), querySelectorAll: () => [] };
+      meals.renderWeekGridForTest(seite);
+      assert.deepEqual(grid.gehoert, ['click']);
+      rechte(SCHREIBEN);
+      meals.renderWeekGridForTest(seite);
+      for (const typ of ['dragover', 'drop', 'pointerdown']) {
+        assert.ok(grid.gehoert.includes(typ), `${typ} fehlt nach dem Rechtewechsel - das Gitter bliebe bis zum Seitenwechsel ohne Ziehen`);
+      }
+      const einmal = [...grid.gehoert];
+      meals.renderWeekGridForTest(seite);
+      assert.deepEqual(grid.gehoert, einmal, 'ein weiteres Zeichnen verdrahtet nichts doppelt');
+
+      // (2) Mit Schreibrecht verdrahtet, dann faellt es weg: die Geste beginnt gar nicht erst.
+      const karte = () => {
+        const slot = { dataset: { date: '2026-10-07', type: 'lunch' }, classList: { add() {}, remove() {} } };
+        const k = { gefangen: 0, dataset: { mealId: '11' }, offsetWidth: 10, offsetHeight: 10, style: {},
+          closest: (sel) => (sel === '.meal-slot' ? slot : null), querySelector: () => null,
+          setPointerCapture() { k.gefangen += 1; }, addEventListener() {},
+          cloneNode: () => ({ classList: { add() {} }, style: {}, remove() {} }) };
+        return k;
+      };
+      const zeigerRunter = (k) => {
+        let verhindert = 0;
+        grid.handler.pointerdown[0]({ pointerType: 'mouse', pointerId: 1, clientX: 5, clientY: 5,
+          target: { closest: (sel) => (sel === '.meal-card' ? k : null) }, preventDefault() { verhindert += 1; } });
+        return { gefangen: k.gefangen, verhindert };
+      };
+      rechte(LESEN);
+      assert.deepEqual(zeigerRunter(karte()), { gefangen: 0, verhindert: 0 },
+        'bei `read` faengt die Karte den Zeiger nicht - kein Geist, kein Zielrahmen');
+      rechte(SCHREIBEN);
+      assert.deepEqual(zeigerRunter(karte()), { gefangen: 1, verhindert: 1 }, 'Gegenfall: mit Schreibrecht beginnt das Ziehen');
+
+      // Dasselbe fuer das Rezept aus der Spalte: es wird gezogen, das Recht faellt weg, der Platz nimmt es nicht an.
+      const spalte = mitLauschern(new MiniElement('aside'));
+      meals.setContainerForTest({ querySelector: (sel) => (sel === '#recipe-sidebar' ? spalte : null), querySelectorAll: () => [] });
+      meals.wireRecipeSidebar();
+      spalte.handler.dragstart[0]({ dataTransfer: { setData() {} },
+        target: { closest: () => ({ dataset: { recipeId: '21' }, classList: { add() {}, remove() {} } }) } });
+      const ueberDemPlatz = () => {
+        let verhindert = 0;
+        const platz = { dataset: { date: '2026-10-08', type: 'lunch' }, classList: { add() {}, remove() {} } };
+        grid.handler.dragover[0]({ target: { closest: () => platz }, preventDefault() { verhindert += 1; } });
+        return verhindert;
+      };
+      rechte(LESEN);
+      assert.equal(ueberDemPlatz(), 0, 'bei `read` meldet sich der Platz nicht als Ablage');
+      rechte(SCHREIBEN);
+      assert.equal(ueberDemPlatz(), 1, 'Gegenfall');
+    } finally {
+      clearPermissions();
+    }
+  });
 });
 
 test('CSS: der leere Platz ohne Handlung bekommt unter dem Zeiger keine Kante', () => {
@@ -579,6 +693,73 @@ test('Rezepte bei `read`: der delegierte Handler laesst nur die Positivliste dur
   assert.equal((await fahren(SCHREIBEN, 'add-to-meals')).dialoge, 1);
   assert.deepEqual((await fahren(SCHREIBEN, 'match-ingredient', { ingredient: 'Mehl' })), { liste: ['GET /pantry'], dialoge: 1, fenster: 0 });
   assert.deepEqual((await fahren(SCHREIBEN, 'match-ingredients')), { liste: ['GET /pantry'], dialoge: 1, fenster: 0 });
+});
+
+test('Rezepte bei `read`: eine Aktion, die morgen dazukommt, ist zu, bis sie auf der Positivliste steht', async () => {
+  // Jede heutige Aktion traegt ihren eigenen Riegel; der Riegel des Verteilers
+  // ist deshalb nur an einer Aktion zu sehen, die KEINEN hat - also an einer
+  // neuen. Sie wird fuer die Dauer des Tests in den Verteiler gehaengt.
+  let gelaufen = 0;
+  recipes.SPLIT_ACTIONS['aktion-von-morgen'] = () => { gelaufen += 1; };
+  const druecken = (modules) => withAccess(modules, () => mitRezepten([rezept()],
+    () => recipes.onSplitClick(klick('aktion-von-morgen', { id: '21' }), { contains: () => false })));
+  try {
+    await druecken(LESEN);
+    assert.equal(gelaufen, 0, 'bei `read` laeuft sie nicht - die Positivliste nennt sie nicht');
+    await druecken(SCHREIBEN);
+    assert.equal(gelaufen, 1, 'Gegenfall: mit Schreibrecht laeuft sie');
+    // Und was die Liste nennt, kommt bei `read` durch.
+    assert.ok(Object.keys(recipes.SPLIT_ACTIONS).includes('to-shopping') && recipes.READ_SAFE_ACTIONS.has('to-shopping'));
+  } finally {
+    delete recipes.SPLIT_ACTIONS['aktion-von-morgen'];
+  }
+});
+
+test('Rezepte: die offenen Dialoge speichern nichts mehr, wenn das Recht inzwischen fehlt', async () => {
+  const VORRAT = { 'GET /pantry': { data: [{ id: 3, name: 'Weizenmehl 405' }] },
+    'PUT /recipes/21/ingredient-match': { data: { pantry_item_id: 3, pantry_item_name: 'Weizenmehl 405' } } };
+  const dialoge = {
+    'Zuordnen': {
+      oeffnen: () => recipes.openPantryMatchModal(rezept(), 'Mehl'),
+      panel: () => dialogPanel({ '#pantry-match-select': '3' }), knopf: '#pantry-match-save',
+      erwartet: ['PUT /recipes/21/ingredient-match'],
+    },
+    'Sammel-Zuordnen': {
+      oeffnen: () => recipes.openPantryBulkMatchModal(rezept()),
+      panel: () => dialogPanel({}, { 'select[data-ingredient-index]': [{ value: '3', dataset: { ingredientIndex: '0' } }] }),
+      knopf: '#pantry-bulk-match-save', erwartet: ['PUT /recipes/21/ingredient-match'],
+    },
+    'In den Essensplan': {
+      oeffnen: () => recipes.planRecipe(rezept(), null),
+      panel: () => dialogPanel({ '#plan-date': '2026-10-08', '#plan-type': 'dinner' }), knopf: '#plan-confirm',
+      erwartet: ['POST /meals'],
+    },
+    'Rezept bearbeiten': {
+      oeffnen: () => recipes.openRecipeModal('edit', rezept()),
+      panel: () => dialogPanel({ '#recipe-title': 'Pfannkuchen' }, { '#recipe-meal-types [data-meal-type]': [], '.ingredient-row': [] }),
+      knopf: '#recipe-save', erwartet: ['PUT /recipes/21'],
+    },
+  };
+  for (const [name, d] of Object.entries(dialoge)) {
+    const fahren = (danach) => mitRezepten([rezept()], async () => {
+      const panel = d.panel();
+      try {
+        rechte(SCHREIBEN);
+        let dialog;
+        await aufrufe(async () => { [dialog] = await modalMitschnitt(d.oeffnen); }, VORRAT);
+        assert.ok(dialog, `${name}: mit Schreibrecht geht der Dialog auf`);
+        dialog.onSave(panel);
+        rechte(danach);
+        return schreibend(await aufrufe(() => panel.druecken(d.knopf),
+          { ...VORRAT, 'PUT /recipes/21': { data: rezept() }, 'POST /meals': { data: {} } }));
+      } finally {
+        clearPermissions();
+      }
+    });
+    assert.deepEqual(await fahren(LESEN), [], `${name}: nach dem Rechtewechsel schickt der offene Dialog nichts`);
+    assert.deepEqual(await fahren(LESEN_MIT_VORRAT), [], `${name}: auch nicht mit dem Vorratsrecht allein`);
+    assert.deepEqual(await fahren(SCHREIBEN), d.erwartet, `Gegenfall ${name}`);
+  }
 });
 
 test('Rezepte bei `read`: kein Schreibweg schickt eine Anfrage, auch nicht direkt gerufen', async () => {

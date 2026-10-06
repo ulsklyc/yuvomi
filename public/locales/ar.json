@@ -984,6 +984,7 @@
         "recipeScaleLabel": "تعديل مقادير المكونات",
         "deletedToast": "تم حذف الوجبة.",
         "recurrenceLabel": "كرر أسبوعياً",
+        "recurrenceWeekly": "أسبوعيًا",
         "recurrenceHint": "ينشئ Yuvomi هذه الوجبة تلقائياً في نفس يوم الأسبوع في الأسابيع القادمة.",
         "recurrenceUntilLabel": "التكرار حتى",
         "recurrenceUntilHint": "اتركه فارغًا للتكرار بلا نهاية.",

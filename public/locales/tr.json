@@ -795,6 +795,7 @@
         "recipeScaleLabel": "Malzemeleri ölçekle",
         "deletedToast": "Öğün silindi.",
         "recurrenceLabel": "Haftalık tekrarla",
+        "recurrenceWeekly": "Haftalık",
         "recurrenceHint": "Yuvomi bu öğünü gelecek haftalarda aynı hafta gününde otomatik olarak ekler.",
         "recurrenceUntilLabel": "Şu tarihe kadar tekrarla",
         "recurrenceUntilHint": "Sınırsız tekrar için boş bırakın.",

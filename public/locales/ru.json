@@ -921,6 +921,7 @@
         "recipeScaleLabel": "Пересчитать ингредиенты",
         "deletedToast": "Приём пищи удалён.",
         "recurrenceLabel": "Повторять каждую неделю",
+        "recurrenceWeekly": "Еженедельно",
         "recurrenceHint": "Yuvomi автоматически добавляет это блюдо в тот же день недели в следующих неделях.",
         "recurrenceUntilLabel": "Повторять до",
         "recurrenceUntilHint": "Оставьте пустым для бессрочного повтора.",
