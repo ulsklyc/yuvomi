@@ -32,6 +32,7 @@ export function authPaths() {
             content: { 'application/json': { schema: { $ref: '#/components/schemas/LoginResponse' } } },
           },
           401: { description: 'Invalid code, or no pending sign-in' },
+          403: { description: 'The account may no longer sign in, for example because it was deactivated in the meantime (`reason: "account_cannot_sign_in"`). No recovery code is spent.' },
           429: { description: 'Too many attempts' },
         },
       }),
@@ -476,7 +477,7 @@ export function authPaths() {
           + 'and the answer carries `outcome: "deactivated"`. A trace is any row that references the account outside its own private data, '
           + 'for example a task, event, note or document it created, an assignment, a shared expense it paid, took part in or recorded, a quick link, or reward points. '
           + 'An account without traces is deleted as before (`outcome: "deleted"`), together with its private data. '
-          + 'Deactivating ends every way in at once and in one transaction: sessions are ended, API tokens acting as the account are revoked, '
+          + 'Deactivating ends every way in at once and in one transaction: sessions are ended, API tokens acting as the account or issued by it are revoked, open invitations and display pairing codes it created stop working, '
           + 'calendar feed addresses stop working, password and SSO sign-in are refused, pending password reset links are dropped, '
           + 'and push subscriptions, personal notification channels and pending reminders are removed. The role falls back to member. '
           + 'Private data of the account (health, cycle, private notes, shift plans, its contact card and birthday) is kept. '

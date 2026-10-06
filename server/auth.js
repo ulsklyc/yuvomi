@@ -850,10 +850,13 @@ function authenticateApiToken(req) {
       -- MEHR (#1381). Das Deaktivieren widerruft die Tokens des Kontos in
       -- derselben Transaktion; diese Zeile haelt, was der Widerruf verspricht,
       -- auch fuer eine Token-Zeile, die danach entsteht oder aus einer
-      -- Sicherung zurueckkommt. Der AUSSTELLER darf ehemalig sein: sein Token
-      -- fuer ein anderes Konto handelt als dieses andere Konto.
+      -- Sicherung zurueckkommt.
       AND ${activeAccountSql('subject')}
     JOIN users creator ON creator.id = t.created_by
+      -- Dasselbe fuer den AUSSTELLER: den Klartext eines Tokens sieht nur er,
+      -- also ist ein Token eines Ehemaligen ein Geheimnis in seiner Hand, auch
+      -- wenn es als ein anderes Konto handelt.
+      AND ${activeAccountSql('creator')}
     WHERE t.token_hash = ?
       AND ${apiTokenUsableSql('t')}
   `).get(tokenHash);
@@ -2726,6 +2729,15 @@ router.post('/2fa/verify', twoFactorLimiter, async (req, res) => {
     const pending = consumePendingTwoFactor(req);
     if (!pending) {
       return res.status(401).json({ error: 'No pending sign-in.', code: 401 });
+    }
+
+    // Zwischen Passwort und Code kann das Konto deaktiviert worden sein
+    // (#1381). `setupAuthSession` wiese es ohnehin ab - aber erst NACH der
+    // Pruefung, die einen Wiederherstellungscode verbraucht, und als 500.
+    // Hier ist es dieselbe Absage wie beim Passwort, vor jedem Verbrauch.
+    if (!canSignIn(db.get(), pending.userId)) {
+      delete req.session.pendingTwoFactor;
+      return res.status(403).json({ error: 'This account cannot sign in.', code: 403, reason: 'account_cannot_sign_in' });
     }
 
     const code = String(req.body?.code || '');

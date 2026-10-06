@@ -49,11 +49,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The dialog says both, and the message afterwards tells you which one happened.
   **Access ends at once.** A deactivated person is signed out everywhere and cannot sign in
   again, neither with a password nor through single sign-on, which recognises the account and
-  turns it away instead of creating a second one. API tokens acting as that person are revoked, their calendar feed
-  addresses stop working, a wall tablet can no longer tick off anything in their name, password
-  reset links are dropped and no new ones are sent. They get no more push messages, mails or
-  reminders. An administrator who is deactivated stops being one, and the last administrator
-  still cannot be removed.
+  turns it away instead of creating a second one. API tokens acting as that person are
+  revoked, and so are tokens they issued for somebody else, because only the person who
+  issues a token ever sees it - issue those again if an integration still needs them.
+  Invitation links and wall tablet pairing codes they created and nobody has used yet stop
+  working; a tablet that is already paired stays. Their calendar feed addresses stop working,
+  a wall tablet can no longer tick off anything in their name, password reset links are
+  dropped and no new ones are sent. They get no more push messages, mails or reminders. An
+  administrator who is deactivated stops being one, and the last administrator still cannot
+  be removed.
   **Private data stays where it is.** Health and cycle records, private notes, shift plans and
   the person's own contact card and birthday are kept when an account is deactivated; nobody
   can sign in to read them, and people who look after that person keep the access they had.

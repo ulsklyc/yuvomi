@@ -61,6 +61,13 @@ mock.module('openid-client', {
   },
 });
 
+const realFetch = globalThis.fetch;
+let apiRequests = 0;
+globalThis.fetch = (url, ...rest) => {
+  if (String(url).includes('/api/')) apiRequests += 1;
+  return realFetch(url, ...rest);
+};
+
 const { baseUrl: BASE } = await startTestServer({
   name: 'user-deactivation',
   env: { SESSION_SECRET: 'test-user-deactivation-secret-32chars', RATE_LIMIT_MAX_ATTEMPTS: '500' },
@@ -72,6 +79,7 @@ const { passwordResetService } = await import('../server/services/password-reset
 const { createPushService } = await import('../server/services/push.js');
 const { processDueNotifications } = await import('../server/services/notifications.js');
 const { memberEmail } = await import('../server/services/member-email.js');
+const { generateSecret, hashRecoveryCode } = await import('../server/utils/totp.js');
 
 // --------------------------------------------------------------------------
 // Werkzeug
@@ -89,8 +97,10 @@ async function login(username, password) {
   const res = await loginRaw(username, password);
   assert.equal(res.status, 200, `login ${username}`);
   const cookie = cookieHeader(res.headers.get('set-cookie'));
-  const me = await (await fetch(`${BASE}/api/v1/auth/me`, { headers: { Cookie: cookie } })).json();
-  return { cookie, csrfToken: me.csrfToken };
+  // Der CSRF-Token steht schon in der Login-Antwort. Kein zusaetzliches
+  // `/auth/me` je Anmeldung: die Suite legt rund fuenfzig Konten an, und der
+  // allgemeine API-Limiter (300 Anfragen je Minute und Adresse) zaehlt jede.
+  return { cookie, csrfToken: (await res.json()).csrfToken };
 }
 
 function as(session) {
@@ -130,10 +140,14 @@ const remove = (user) => admin('DELETE', `/auth/users/${user.id}`);
 const row = (id) => db.prepare('SELECT * FROM users WHERE id = ?').get(id);
 const count = (sql, ...args) => db.prepare(sql).get(...args).n;
 
-/** Legt einen Quick-Link an: die kleinste Spur, die ein Konto hinterlassen kann. */
+/**
+ * Hinterlaesst eine Spur: eine angelegte Aufgabe (`tasks.created_by`). Kein
+ * Quick-Link - deren Zahl ist je Haushalt gedeckelt, und diese Suite
+ * deaktiviert mehr Konten, als der Deckel Kacheln zulaesst.
+ */
 async function leaveTrace(user) {
-  const r = await user.call('POST', '/quick-links', { name: `Link von ${user.name}`, url: 'https://example.com/' });
-  assert.equal(r.status, 201, 'Vorbedingung: Quick-Link angelegt');
+  const r = await user.call('POST', '/tasks', { title: `Aufgabe von ${user.name}` });
+  assert.equal(r.status, 201, 'Vorbedingung: Aufgabe angelegt');
   return r.body.data.id;
 }
 
@@ -207,7 +221,9 @@ test('nur private Daten sind keine Spur: eigene Gesundheitsdaten, eigener Schich
 
 test('ein Quick-Link genuegt: 200 und deaktiviert statt 500 (NO ACTION)', async () => {
   const u = await member('Quick-Link');
-  const link = await leaveTrace(u);
+  const created = await u.call('POST', '/quick-links', { name: 'Mein Link', url: 'https://example.com/' });
+  assert.equal(created.status, 201, 'Vorbedingung: Quick-Link angelegt');
+  const link = created.body.data.id;
   const r = await remove(u);
   assert.equal(r.status, 200, 'vorher: 500 Internal server error');
   assert.equal(r.body.ok, true);
@@ -392,6 +408,15 @@ test('bestehende Sitzung, auch wenn ihre Zeile noch dasteht: 401', async () => {
   assert.equal((await u.call('GET', '/auth/me')).status, 401);
   assert.equal((await u.call('GET', '/tasks')).status, 401);
   assert.equal((await u.call('POST', '/tasks', { title: 'von einem Ehemaligen' })).status, 401);
+  // Und keine der Routen, die ein Abo-Token ausstellen, laesst sich damit
+  // erreichen: die geloeschten Adressen entstehen nicht neu.
+  for (const path of ['/calendar/feed', '/schedule/feed', '/inventory/deadlines-feed', '/health/cycle/feed', '/waste/feed']) {
+    assert.equal((await u.call('GET', path)).status, 401, path);
+    assert.equal((await u.call('POST', `${path}/regenerate`)).status, 401, `${path}/regenerate`);
+  }
+  for (const column of ['calendar_feed_token', 'inventory_deadlines_feed_token', 'cycle_feed_token', 'schedule_feed_token', 'waste_feed_token']) {
+    assert.equal(row(u.id)[column], null, column);
+  }
 });
 
 test('SSO per sub: abgewiesen, und es entsteht kein Ersatzkonto', async () => {
@@ -424,7 +449,7 @@ test('SSO per verifizierter Adresse: abgewiesen, nicht verknuepft, kein Ersatzko
   assert.equal(count('SELECT COUNT(*) AS n FROM users'), users, 'kein Ersatzkonto');
 });
 
-test('API-Token als Subjekt: 401, widerrufen; ein Token, das er fuer ANDERE ausstellte, laeuft weiter', async () => {
+test('API-Token: 401 und widerrufen - als Subjekt UND als Aussteller fuer ein anderes Konto', async () => {
   const u = await member('Token');
   db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(u.id);
   const uAdmin = as(await login(u.username, u.password));
@@ -443,7 +468,94 @@ test('API-Token als Subjekt: 401, widerrufen; ein Token, das er fuer ANDERE auss
   assert.equal((await as({ token: fromAdmin.body.token })('GET', '/tasks')).status, 401);
   assert.equal(count('SELECT COUNT(*) AS n FROM api_tokens WHERE subject_user_id = ? AND revoked_at IS NULL', u.id), 0, 'widerrufen, nicht geloescht');
   assert.equal(count('SELECT COUNT(*) AS n FROM api_tokens WHERE subject_user_id = ?', u.id), 2);
-  assert.equal((await as({ token: forOther.body.token })('GET', '/tasks')).status, 200, 'handelt als das andere Konto und laeuft weiter');
+  // Den Klartext eines Tokens sieht nur sein Aussteller. Das Token fuer das
+  // andere Konto ist ein Geheimnis in der Hand des Ehemaligen, das als jemand
+  // anderes handelt - es endet mit.
+  assert.equal((await as({ token: forOther.body.token })('GET', '/tasks')).status, 401, 'das fuer ein anderes Konto ausgestellte Token gilt nicht mehr');
+  assert.equal(count('SELECT COUNT(*) AS n FROM api_tokens WHERE created_by = ? AND revoked_at IS NULL', u.id), 0);
+  assert.equal(count('SELECT COUNT(*) AS n FROM api_tokens WHERE created_by = ?', u.id), 2, 'widerrufen, nicht geloescht');
+  // Auch wenn die Zeile nicht mehr widerrufen ist (Sicherung): die Anmeldung
+  // fragt den Aussteller selbst.
+  db.prepare('UPDATE api_tokens SET revoked_at = NULL WHERE created_by = ? AND subject_user_id = ?').run(u.id, other.id);
+  assert.equal((await as({ token: forOther.body.token })('GET', '/tasks')).status, 401, 'auch unwiderrufen gilt es nicht');
+  // Ein Token, das ein ANDERER fuer ein drittes Konto ausgestellt hat, bleibt.
+  const untouched = await admin('POST', '/auth/api-tokens', { name: 'unbeteiligt', subject_user_id: other.id });
+  assert.equal((await as({ token: untouched.body.token })('GET', '/tasks')).status, 200);
+});
+
+test('offene Einladungen des Kontos enden: mit dem eigenen Link legt sich niemand ein neues Konto an', async () => {
+  const u = await member('Einlader');
+  db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(u.id);
+  const uAdmin = as(await login(u.username, u.password));
+  const open = await uAdmin('POST', '/auth/invites', { username: 'eingeladen-eins', role: 'admin' });
+  const redeemed = await uAdmin('POST', '/auth/invites', { username: 'eingeladen-zwei' });
+  const foreign = await admin('POST', '/auth/invites', { username: 'eingeladen-drei' });
+  for (const i of [open, redeemed, foreign]) assert.equal(i.status, 201);
+  const accept = (token, password = 'einladung-pass-123') => fetch(`${BASE}/api/v1/auth/invites/accept`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, password }),
+  });
+  const first = await accept(redeemed.body.data.token);
+  assert.equal(first.status, 201, `Vorbedingung: eine Einladung laesst sich einloesen (${JSON.stringify(await first.json())})`);
+
+  const r = await remove(u);
+  assert.equal(r.body.outcome, 'deactivated', 'eine Einladung ist eine Spur');
+  const users = count('SELECT COUNT(*) AS n FROM users');
+  const res = await accept(open.body.data.token);
+  assert.equal(res.status, 400);
+  assert.deepEqual(await res.json(), { error: 'Invalid or expired token.', code: 400 });
+  assert.equal(count('SELECT COUNT(*) AS n FROM users'), users, 'kein neues Konto');
+  const rows = db.prepare('SELECT accepted_at, revoked_at FROM invites WHERE created_by = ? ORDER BY id').all(u.id);
+  assert.equal(rows.length, 2);
+  assert.ok(rows[0].revoked_at && !rows[0].accepted_at, 'die offene ist widerrufen');
+  assert.ok(rows[1].accepted_at && !rows[1].revoked_at, 'die eingeloeste bleibt, wie sie ist');
+  assert.equal((await accept(foreign.body.data.token)).status, 201, 'die Einladung eines anderen bleibt einloesbar');
+});
+
+test('eine Einladung mit dem Benutzernamen eines Ehemaligen uebernimmt dessen Konto nicht', async () => {
+  const u = await member('Namensvetter');
+  await deactivate(u);
+  const invite = await admin('POST', '/auth/invites', {});
+  assert.equal(invite.status, 201);
+  const users = count('SELECT COUNT(*) AS n FROM users');
+  const res = await fetch(`${BASE}/api/v1/auth/invites/accept`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: invite.body.data.token, username: u.username, display_name: 'Neu', password: 'neues-passwort-123' }),
+  });
+  assert.equal(res.status, 409, 'der Benutzername bleibt vergeben');
+  assert.equal(count('SELECT COUNT(*) AS n FROM users'), users);
+  assert.match(row(u.id).deactivated_at, /^\d{4}-/, 'das alte Konto bleibt deaktiviert');
+  assert.equal((await loginRaw(u.username, 'neues-passwort-123')).status, 401);
+});
+
+test('zweiter Faktor: wer zwischen Passwort und Code deaktiviert wird, kommt nicht mehr hinein', async () => {
+  const u = await member('Zwei Faktor');
+  db.prepare("INSERT INTO user_totp (user_id, secret, confirmed_at) VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))")
+    .run(u.id, generateSecret());
+  const codes = ['RECOVERYCODEEINS', 'RECOVERYCODEZWEI'];
+  for (const code of codes) {
+    db.prepare('INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (?, ?)').run(u.id, hashRecoveryCode(code));
+  }
+  const verify = async (code) => {
+    const first = await loginRaw(u.username, u.password);
+    assert.equal(first.status, 200);
+    assert.equal((await first.json()).twoFactorRequired, true, 'Vorbedingung: das Passwort stimmt, der Code steht aus');
+    const cookie = cookiesOf(first);
+    return { cookie, send: () => fetch(`${BASE}/api/v1/auth/2fa/verify`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', cookie }, body: JSON.stringify({ code }),
+    }) };
+  };
+  const control = await verify(codes[0]);
+  assert.equal((await control.send()).status, 200, 'Vorbedingung: ein Wiederherstellungscode oeffnet die Sitzung');
+
+  const pending = await verify(codes[1]);
+  await deactivate(u);
+  const res = await pending.send();
+  assert.equal(res.status, 403);
+  assert.equal((await res.json()).reason, 'account_cannot_sign_in');
+  assert.equal(sessionsOf(u.id), 0);
+  assert.equal((await fetch(`${BASE}/api/v1/auth/me`, { headers: { cookie: cookiesOf(res, pending.cookie) } })).status, 401);
+  assert.equal(count('SELECT COUNT(*) AS n FROM user_recovery_codes WHERE user_id = ? AND used_at IS NULL', u.id), 1,
+    'der Code ist nicht verbraucht');
 });
 
 test('API-Token, auch wenn seine Zeile nicht widerrufen ist: 401', async () => {
@@ -550,6 +662,44 @@ test('Wandtablett: niemand hakt mehr als ein Ehemaliger ab, und die Personenausw
   assert.ok(!(await display('GET', '/displays/people')).body.data.some((p) => p.id === u.id));
   // Der gespeicherte Verweis bleibt: die erste Aufgabe weiss weiter, wer sie erledigt hat.
   assert.equal(count('SELECT COUNT(*) AS n FROM task_completions WHERE task_id = ? AND done_by_user_id = ?', first, u.id), 1);
+});
+
+async function pairWith(code) {
+  return fetch(`${BASE}/api/v1/displays/pair`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }),
+  });
+}
+
+for (const outcome of ['deactivated', 'deleted']) {
+  test(`Kopplungscode (${outcome}): ein offener Code des Kontos koppelt kein Geraet mehr, das Tablett an der Wand bleibt`, async () => {
+    const u = await member(`Koppler ${outcome}`);
+    db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(u.id);
+    const uAdmin = as(await login(u.username, u.password));
+    const second = await admin('POST', '/displays', { display_name: `Flur ${outcome}` });
+    assert.equal(second.status, 201);
+    const code = await uAdmin('POST', `/displays/${second.body.data.id}/pairing-code`, {});
+    assert.equal(code.status, 201);
+    if (outcome === 'deactivated') await leaveTrace(u);
+    const devices = count('SELECT COUNT(*) AS n FROM display_devices');
+
+    const r = await remove(u);
+    assert.equal(r.body.outcome, outcome);
+    const res = await pairWith(code.body.data.code);
+    assert.ok(res.status >= 400, `der Code des Ehemaligen koppelt nichts mehr (Status ${res.status})`);
+    assert.equal(res.headers.get('set-cookie')?.includes(DISPLAY_COOKIE) ?? false, false);
+    assert.equal(count('SELECT COUNT(*) AS n FROM display_devices'), devices, 'kein neues Geraet');
+    // Das schon gekoppelte Tablett haengt nicht an dem, der es eingerichtet hat.
+    assert.equal((await display('GET', '/displays/people')).status, 200);
+    // Und ein neuer Code eines aktiven Administrators koppelt weiter.
+    const fresh = await admin('POST', `/displays/${second.body.data.id}/pairing-code`, {});
+    assert.equal((await pairWith(fresh.body.data.code)).status, 201);
+  });
+}
+
+test('ein Wandtablett laesst sich hier nicht entfernen, und seine Kopplung bleibt', async () => {
+  const r = await admin('DELETE', `/auth/users/${createdDisplay.body.data.id}`);
+  assert.equal(r.status, 404);
+  assert.equal((await display('GET', '/displays/people')).status, 200);
 });
 
 // --------------------------------------------------------------------------
@@ -773,4 +923,11 @@ test('scheitert das Deaktivieren, bleibt ALLES, wie es war - auch die Sitzung', 
   assert.equal((await remove(u)).body.outcome, 'deactivated');
   assert.equal(sessionsOf(u.id), 0);
   assert.equal(db.prepare("SELECT default_assignee_user_id AS v FROM external_calendars WHERE external_id = 'x-atomar'").get().v, null);
+});
+
+// Der allgemeine API-Limiter laesst 300 Anfragen je Minute und Adresse zu, und
+// diese Suite laeuft in weniger als einer Minute. Wer sie erweitert, soll das
+// hier erfahren und nicht als 429 in irgendeinem Test weiter oben.
+test('die Suite bleibt unter dem API-Limit von 300 Anfragen', () => {
+  assert.ok(apiRequests < 280, `${apiRequests} Anfragen an /api/ - Tests in eine zweite Suite auslagern`);
 });

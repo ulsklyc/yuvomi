@@ -39,6 +39,14 @@
  * nicht bei jedem Request nach dem Passwort, also waere ein Konto, das zwar
  * deaktiviert ist, dessen Sitzungen aber noch stehen, bis zu deren Ablauf
  * weiter drin.
+ *
+ * ZUGANGSMATERIAL IST AUCH, WAS DAS KONTO AUSGESTELLT HAT. Ein API-Token zeigt
+ * seinen Klartext genau einmal dem Aussteller, ein Einladungslink und ein
+ * Kopplungscode ebenso. Was davon noch gilt, waere ein Weg zurueck fuer
+ * jemanden, der gerade entfernt wurde - als ein anderes Konto, als ein neues
+ * Konto oder als Wandtablett. Deshalb enden beim Deaktivieren auch die Tokens
+ * mit `created_by`, die offenen Einladungen und die offenen Kopplungscodes des
+ * Kontos.
  */
 import { activeAccountSql } from './account-state.js';
 import { deleteBirthdayArtifacts } from './birthdays.js';
@@ -206,8 +214,31 @@ function clearDefaultAssignee(database, userId) {
   database.prepare('UPDATE external_calendars SET default_assignee_user_id = NULL WHERE default_assignee_user_id = ?').run(userId);
 }
 
+/**
+ * Offene Kopplungscodes, die das Konto ausgestellt hat, sind verbraucht: den
+ * Code sieht nur, wer ihn anfordert, und mit ihm koppelte er noch ein eigenes
+ * Geraet als Wandtablett. Verbraucht, wie `issuePairingCode()` einen alten Code
+ * entwertet. Gilt fuer BEIDE Ausgaenge - `created_by` ist SET NULL, der Code
+ * ueberlebte also auch das Loeschen.
+ *
+ * SCHON GEKOPPELTE GERAETE BLEIBEN: ihr Geheimnis steht nur im Cookie des
+ * Geraets, das den Code eingeloest hat (`POST /displays/pair`), nie in einer
+ * Antwort an den Aussteller, und `display_devices` haelt nicht fest, wer
+ * gekoppelt hat. Ein Tablett an der Wand zu widerrufen, weil der Mensch geht,
+ * der es einst eingerichtet hat, waere der falsche Schluss.
+ */
+function endPairingCodes(database, userId, now) {
+  database.prepare(`
+    UPDATE display_pairing_codes SET used_at = ? WHERE created_by = ? AND used_at IS NULL
+  `).run(now, userId);
+}
+
+function isoNow() {
+  return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
 function deactivate(database, userId) {
-  const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const now = isoNow();
 
   // Die Zeile bleibt, der Zugang nicht. Die Rolle faellt auf `member`: ein
   // Ehemaliger ist kein Administrator, und keine Zaehlung von Administratoren
@@ -218,13 +249,26 @@ function deactivate(database, userId) {
 
   // ZUGANGSMATERIAL ENDET SOFORT.
   endSessions(database, userId);
-  // Tokens, die FUER dieses Konto handeln. Ein Token, das es fuer ein ANDERES
-  // Konto ausgestellt hat, laeuft weiter: es handelt als dieses andere Konto.
-  // Widerrufen statt geloescht - die Zeile ist die Spur, dass es das Token gab.
+  // Tokens, die FUER dieses Konto handeln - und Tokens, die es AUSGESTELLT hat,
+  // auch fuer ein anderes Konto. Den Klartext eines Tokens sieht genau einmal
+  // der Aussteller (`POST /auth/api-tokens` gibt ihn in der Antwort zurueck):
+  // ein ehemaliger Administrator hielte sonst weiter ein gueltiges Geheimnis,
+  // das als fremdes Konto handelt. Wer das Token noch braucht, stellt es neu
+  // aus. Widerrufen statt geloescht - die Zeile ist die Spur, dass es das
+  // Token gab.
   database.prepare(`
     UPDATE api_tokens SET revoked_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-     WHERE revoked_at IS NULL AND COALESCE(subject_user_id, created_by) = ?
-  `).run(userId);
+     WHERE revoked_at IS NULL AND (COALESCE(subject_user_id, created_by) = ? OR created_by = ?)
+  `).run(userId, userId);
+  // Offene Einladungen, die das Konto erstellt hat: den Link kennt der
+  // Ersteller, und mit ihm legte sich ein Ehemaliger selbst ein neues Konto an
+  // - mit der Rolle, die er in die Einladung geschrieben hat. Widerrufen, wie
+  // `inviteService.revoke()` es ausdrueckt; eingeloeste bleiben die Spur, wer
+  // wen eingeladen hat.
+  database.prepare(`
+    UPDATE invites SET revoked_at = ? WHERE created_by = ? AND accepted_at IS NULL AND revoked_at IS NULL
+  `).run(now, userId);
+  endPairingCodes(database, userId, now);
   database.prepare(`
     UPDATE users SET ${FEED_TOKEN_COLUMNS.map((column) => `${column} = NULL`).join(', ')} WHERE id = ?
   `).run(userId);
@@ -272,6 +316,7 @@ function hardDelete(database, userId) {
   // die niemand mehr sieht und niemand mehr entfernt.
   database.prepare("DELETE FROM sync_config WHERE key LIKE '%:user:' || ?").run(String(userId));
   database.prepare("DELETE FROM access_permissions WHERE subject_type = 'user' AND subject_id = ?").run(String(userId));
+  endPairingCodes(database, userId, isoNow());
   endSessions(database, userId);
   database.prepare('DELETE FROM users WHERE id = ?').run(userId);
 }

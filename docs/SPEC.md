@@ -54,8 +54,11 @@ links made the delete fail with a bare 500. The rule now lives in
   does.
 - **With traces the account is deactivated**: `deactivated_at` is set, `role` falls to `member`,
   the row stays. In the same synchronous transaction every way in ends: sessions are deleted, API
-  tokens whose subject is the account are revoked (tokens it issued for another account keep
-  working, they act as that account), the five feed tokens are cleared, password reset tokens,
+  tokens whose subject or issuer is the account are revoked (the plain token is shown once, to
+  whoever issues it, so a token a former administrator issued for another account is a secret
+  in their hand), open invitations it created are revoked and open display pairing codes it
+  issued are spent (a device already paired stays: its secret only ever went to that device,
+  and `display_devices` does not record who paired it), the five feed tokens are cleared, password reset tokens,
   idempotency keys, push subscriptions, personal notification channels, reminders not yet delivered
   and care grants held as caregiver are removed, `outlook_accounts.owner_user_id` and the default
   assignee of synced calendars are cleared. `oidc_sub` stays bound, so the SSO callback finds the
@@ -71,7 +74,8 @@ without a database import, handed on by `server/services/household-members.js`).
 `householdMemberSql()` includes it, so a deactivated account drops out of every list of members and
 out of `newNonMembers()` for newly chosen people, while a stored reference keeps its name and stays
 saveable. `canSignIn()` asks it for password login, the OIDC callback, email linking and the second
-factor; `requireAuth` asks it per request for sessions and through the token join for API tokens;
+factor (`POST /auth/2fa/verify` asks before it spends a recovery code); `requireAuth` asks it per
+request for sessions and through the token join for API tokens, for subject and issuer alike;
 the feed token lookups, `sendPushToUser()`, `memberEmail()` and the due-reminder query ask it too.
 `GET /api/v1/auth/users` keeps listing deactivated accounts, after the active ones, with
 `deactivated_at`. The response of the delete route stays `200 { ok: true }` and adds
