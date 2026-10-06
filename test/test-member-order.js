@@ -169,7 +169,9 @@ test('migration 232 on an existing database (v231): runs, adds the column, leave
     old.prepare("UPDATE users SET deactivated_at = '2026-10-01T10:00:00Z' WHERE id = ?").run(idOf.Ehemalig);
     const before = old.prepare('SELECT id, username, display_name, deactivated_at FROM users ORDER BY id').all();
 
-    dbmod.migrate(old, dbmod.MIGRATIONS);
+    // Nur bis 232: jede spaetere Migration haengt hinten an, und ein Lauf ueber
+    // die ganze Liste liesse diesen Test mit der naechsten Nummer rot werden.
+    dbmod.migrate(old, dbmod.MIGRATIONS.filter((m) => m.version <= 232));
 
     assert.equal(old.prepare('SELECT MAX(version) AS v FROM schema_migrations').get().v, 232);
     const column = old.prepare('PRAGMA table_info(users)').all().find((c) => c.name === 'sort_order');
