@@ -34,7 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GET /api/v1/rewards/money/ledger`, `POST /api/v1/rewards/money/entries`,
   `PUT`/`DELETE /api/v1/rewards/money/plans/{userId}`; a request is `POST /api/v1/rewards/redemptions`
   with `kind: "withdrawal"` or `"deposit"` and a decimal-string `amount`, and rows of
-  `GET /api/v1/rewards/redemptions` now carry `kind`. `GET /api/v1/rewards/ledger` stays the points
+  `GET /api/v1/rewards/redemptions` now carry `kind`. Existing fields keep their meaning: that list
+  answers reward requests only unless `?kind=money`, `withdrawal`, `deposit` or `all` asks for more,
+  `pendingCount` and the tile's `pending` still count reward requests, with money requests next to
+  them in `moneyPendingCount` and `moneyPending`, and `GET /api/v1/rewards/ledger` stays the points
   history (migration 236).
 
 - **The Singapore dollar is a currency a household can pick, and Singapore is a region** (#1697,

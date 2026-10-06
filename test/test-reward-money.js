@@ -324,32 +324,53 @@ test('GET /rewards/ledger: der Punkte-Verlauf fuehrt keine Geldzeile - fuer niem
 });
 
 test('eine offene Geld-Anfrage: Liste, Zaehler und Uebersicht verraten sie dem Geschwisterkind nicht', async () => {
-  const pendingBefore = (await leo.call('GET', '/rewards/overview')).body.data.pendingCount;
-  const dashBefore = (await leo.call('GET', '/dashboard')).body.rewards.pending;
-  const adminBefore = (await admin('GET', '/rewards/overview')).body.data.pendingCount;
+  const overviewOf = async (call) => (await call('GET', '/rewards/overview')).body.data;
+  const tileOf = async (call) => (await call('GET', '/dashboard')).body.rewards;
+  const leoBefore = await overviewOf(leo.call);
+  const leoTileBefore = await tileOf(leo.call);
+  const adminBefore = await overviewOf(admin);
+  const adminTileBefore = await tileOf(admin);
+  const emmaBefore = await overviewOf(emma.call);
+  const emmaTileBefore = await tileOf(emma.call);
 
   const filed = await emma.call('POST', '/rewards/redemptions', { kind: 'withdrawal', amount: '4.21', note: 'Kino-geheim' });
   assert.equal(filed.status, 201);
   const id = filed.body.data.id;
 
   // Leo: nichts.
-  const leoList = (await leo.call('GET', '/rewards/redemptions')).body.data;
-  assert.ok(!leoList.some((r) => r.id === id));
-  assert.equal((await leo.call('GET', '/rewards/overview')).body.data.pendingCount, pendingBefore, 'der Zaehler der Seite bleibt');
+  for (const query of ['', '?kind=all', '?kind=money', '?kind=withdrawal', '?status=pending&kind=all']) {
+    const leoList = (await leo.call('GET', `/rewards/redemptions${query}`)).body.data;
+    assert.ok(!leoList.some((r) => r.id === id), `Leo, ${query || 'ohne kind'}`);
+  }
+  const leoAfter = await overviewOf(leo.call);
+  assert.equal(leoAfter.pendingCount, leoBefore.pendingCount, 'der Zaehler der Seite bleibt');
+  assert.equal(leoAfter.moneyPendingCount, leoBefore.moneyPendingCount, 'und der fuer Geld auch');
   const leoDash = await leo.call('GET', '/dashboard');
-  assert.equal(leoDash.body.rewards.pending, dashBefore, 'der Zaehler der Kachel bleibt');
+  assert.equal(leoDash.body.rewards.pending, leoTileBefore.pending, 'der Zaehler der Kachel bleibt');
+  assert.equal(leoDash.body.rewards.moneyPending, leoTileBefore.moneyPending);
   assert.ok(!JSON.stringify(leoDash.body).includes('Kino-geheim'));
   assert.ok(!JSON.stringify(leoDash.body.rewards).includes(String(moneyOf(emma.id))), 'kein Geld-Saldo in der Uebersicht');
 
   // Emma und die Eltern: da.
-  const emmaRow = (await emma.call('GET', '/rewards/redemptions')).body.data.find((r) => r.id === id);
+  const emmaRow = (await emma.call('GET', '/rewards/redemptions?kind=all')).body.data.find((r) => r.id === id);
   assert.equal(emmaRow.kind, 'withdrawal');
   assert.equal(emmaRow.cost, 421);
   assert.equal(emmaRow.user_balance, moneyOf(emma.id), 'user_balance einer Geld-Anfrage ist der Geld-Saldo');
-  const adminRow = (await admin('GET', '/rewards/redemptions?status=pending')).body.data.find((r) => r.id === id);
+  const adminRow = (await admin('GET', '/rewards/redemptions?status=pending&kind=money')).body.data.find((r) => r.id === id);
   assert.equal(adminRow.note, 'Kino-geheim');
-  assert.equal((await admin('GET', '/rewards/overview')).body.data.pendingCount, adminBefore + 1);
-  assert.equal((await emma.call('GET', '/rewards/overview')).body.data.pendingCount, pendingBefore + 1, 'die eigene zaehlt fuer Emma mit');
+  // Die alten Felder zaehlen weiter nur Praemien; Geld steht daneben.
+  const adminAfter = await overviewOf(admin);
+  assert.equal(adminAfter.pendingCount, adminBefore.pendingCount, '`pendingCount` bleibt die Zahl der Praemien-Anfragen');
+  assert.equal(adminAfter.moneyPendingCount, adminBefore.moneyPendingCount + 1);
+  const emmaAfter = await overviewOf(emma.call);
+  assert.equal(emmaAfter.pendingCount, emmaBefore.pendingCount);
+  assert.equal(emmaAfter.moneyPendingCount, emmaBefore.moneyPendingCount + 1, 'die eigene zaehlt fuer Emma mit');
+  const adminTile = await tileOf(admin);
+  assert.equal(adminTile.pending, adminTileBefore.pending, 'auch `pending` der Kachel bleibt bei den Praemien');
+  assert.equal(adminTile.moneyPending, adminTileBefore.moneyPending + 1);
+  const emmaTile = await tileOf(emma.call);
+  assert.equal(emmaTile.pending, emmaTileBefore.pending);
+  assert.equal(emmaTile.moneyPending, emmaTileBefore.moneyPending + 1);
 
   // Auch die Eltern-Kachel fuehrt kein Geld.
   assert.ok(!JSON.stringify((await admin('GET', '/dashboard')).body.rewards).includes(String(moneyOf(emma.id))));
@@ -371,14 +392,18 @@ test('das Wandtablett liest kein Geld - auch keines, das an seinem eigenen Konto
   assert.deepEqual(accounts.body.data.candidates, []);
   assert.deepEqual((await display('GET', '/rewards/money/ledger')).body.data, [], 'keine Geldbuchung, auch nicht die "eigene"');
   assert.deepEqual((await display('GET', `/rewards/money/ledger?user_id=${emma.id}`)).body.data, []);
-  const requests = (await display('GET', '/rewards/redemptions')).body.data;
-  assert.ok(!requests.some((r) => r.kind !== 'reward'), 'keine Geld-Anfrage in der Liste des Tabletts');
+  for (const query of ['', '?kind=all', '?kind=money', '?kind=deposit']) {
+    const requests = (await display('GET', `/rewards/redemptions${query}`)).body.data;
+    assert.ok(!requests.some((r) => r.kind !== 'reward'), `keine Geld-Anfrage in der Liste des Tabletts (${query || 'ohne kind'})`);
+  }
   const overview = (await display('GET', '/rewards/overview')).body.data;
   const visiblePoints = db.prepare("SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending' AND kind = 'reward'").get().n;
   assert.equal(overview.pendingCount, visiblePoints, 'der Zaehler nennt nur Praemien-Anfragen');
+  assert.equal(overview.moneyPendingCount, 0, 'und der fuer Geld ist am Tablett null');
   const dash = await display('GET', '/dashboard');
   assert.equal(dash.status, 200);
   assert.equal(dash.body.rewards.pending, 0);
+  assert.equal(dash.body.rewards.moneyPending, 0);
   for (const secret of [String(moneyOf(emma.id)), String(moneyOf(leo.id)), '4242', '4243']) {
     assert.ok(!JSON.stringify(dash.body.rewards).includes(secret), `die Uebersicht des Tabletts nennt ${secret} nicht`);
   }
@@ -459,7 +484,7 @@ test('ein Geschwisterkind mit `rewards: read` und ein Token ohne Belohnungs-Scop
   const peeker = await member('peeker');
   assert.equal((await admin('PUT', `/permissions/user/${peeker.id}`, { modules: { rewards: 'read' } })).status, 200);
   let all = '';
-  for (const path of ['/rewards/money', '/rewards/money/ledger', `/rewards/money/ledger?user_id=${emma.id}`, '/rewards/redemptions', '/rewards/redemptions?status=pending', '/rewards/ledger?limit=500', '/rewards/overview', '/dashboard']) {
+  for (const path of ['/rewards/money', '/rewards/money/ledger', `/rewards/money/ledger?user_id=${emma.id}`, '/rewards/redemptions', '/rewards/redemptions?kind=all', '/rewards/redemptions?status=pending&kind=money', '/rewards/ledger?limit=500', '/rewards/overview', '/dashboard']) {
     const res = await peeker.call('GET', path);
     assert.equal(res.status, 200, path);
     all += JSON.stringify(res.body);
@@ -640,7 +665,7 @@ test('ein Betrag ist ein Dezimaltext in ganzen kleinsten Einheiten der Haushalts
     // EUR: zwei Stellen.
     assert.equal(money.parseMoneyAmount(db, '5.00'), 500);
     assert.equal(money.parseMoneyAmount(db, '5'), 500);
-    for (const bad of [5, '5.001', '0', '-1.00', 'abc', '', '1,50', '1000000.01']) {
+    for (const bad of [5, '5.001', '0', '-1.00', 'abc', '', '1,50']) {
       const res = await emma.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: bad });
       assert.equal(res.status, 400, `${JSON.stringify(bad)} wird abgewiesen`);
     }
@@ -701,7 +726,9 @@ for (const year of [2027, 2028]) {
     test(`monatlich am ${anchor}., zwoelf Termine ab Januar ${year}: Ankertag oder Monatsletzter, und der Tag kommt zurueck`, () => {
       const kid = freshKid();
       const start = `${year}-01-${anchor}`;
-      money.savePlan(db, kid, { amountMinor: 500, frequency: 'monthly', anchorDay: anchor, paused: false }, { today: start });
+      // Angelegt am Vortag: faellt der erste Termin auf den Tag des Anlegens,
+      // bucht savePlan() ihn gleich mit.
+      money.savePlan(db, kid, { amountMinor: 500, frequency: 'monthly', anchorDay: anchor, paused: false }, { today: `${year}-01-${anchor - 1}` });
       assert.equal(planOf(kid).next_run_date, start);
       const result = money.creditDueAllowances(db, { today: `${year}-12-31` });
       assert.equal(result.credited, 12);
@@ -795,8 +822,12 @@ test('nur der Betrag geaendert: der Termin bleibt; Rhythmus oder Ankertag geaend
   const kid = freshKid();
   money.savePlan(db, kid, { amountMinor: 300, frequency: 'monthly', anchorDay: 20, paused: false }, { today: '2026-10-06' });
   assert.equal(planOf(kid).next_run_date, '2026-10-20');
+  money.savePlan(db, kid, { amountMinor: 350, frequency: 'monthly', anchorDay: 20, paused: false }, { today: '2026-10-10' });
+  assert.equal(planOf(kid).next_run_date, '2026-10-20', 'vor dem Termin: er bleibt');
   money.savePlan(db, kid, { amountMinor: 400, frequency: 'monthly', anchorDay: 20, paused: false }, { today: '2026-10-25' });
-  assert.equal(planOf(kid).next_run_date, '2026-10-20', 'ein faelliger Termin geht durch eine Betragsaenderung nicht verloren');
+  assert.deepEqual(credits(kid).map((c) => [c.allowance_date, c.delta]), [['2026-10-20', 350]],
+    'ein faelliger Termin geht durch eine Betragsaenderung nicht verloren - und er traegt den alten Betrag');
+  assert.equal(planOf(kid).next_run_date, '2026-11-20');
   assert.equal(planOf(kid).amount_minor, 400);
   money.savePlan(db, kid, { amountMinor: 400, frequency: 'monthly', anchorDay: 28, paused: false }, { today: '2026-10-25' });
   assert.equal(planOf(kid).next_run_date, '2026-10-28');
@@ -807,7 +838,7 @@ test('ein deaktiviertes Konto sammelt nicht weiter: der Plan wird pausiert statt
   const kid = freshKid();
   const sibling = freshKid();
   for (const id of [kid, sibling]) {
-    money.savePlan(db, id, { amountMinor: 500, frequency: 'weekly', anchorDay: 2, paused: false }, { today: '2026-10-06' });
+    money.savePlan(db, id, { amountMinor: 500, frequency: 'weekly', anchorDay: 2, paused: false }, { today: '2026-10-05' });
   }
   db.prepare("UPDATE users SET deactivated_at = '2026-10-05T00:00:00Z' WHERE id = ?").run(kid);
 
@@ -824,7 +855,7 @@ test('"heute" ist der Tag des Haushalts, nicht der UTC-Tag', () => {
   const now = new Date('2026-03-10T05:00:00Z');
   const kid = freshKid();
   try {
-    money.savePlan(db, kid, { amountMinor: 500, frequency: 'weekly', anchorDay: 2, paused: false }, { today: '2026-03-10' });
+    money.savePlan(db, kid, { amountMinor: 500, frequency: 'weekly', anchorDay: 2, paused: false }, { today: '2026-03-09' });
     assert.equal(planOf(kid).next_run_date, '2026-03-10');
 
     // UTC-11: dort ist noch der 9. Maerz.
@@ -891,6 +922,180 @@ test('PUT /rewards/money/plans: anlegen, lesen, pruefen, beenden - und der Plan 
   const history = (await mia.call('GET', '/rewards/money/ledger')).body.data;
   assert.equal(history[0].allowance_date, today);
   assert.equal(history[0].actor_name, null, 'die Gutschrift nach Plan hat niemand gebucht');
+});
+
+// ==========================================================================
+// Nacharbeit aus dem Review zu #1745
+// ==========================================================================
+
+test('GET /rewards/redemptions ohne `kind` bleibt, was es war: Praemien - Geld nur auf ausdrueckliche Nachfrage', async () => {
+  const w = await emma.call('POST', '/rewards/redemptions', { kind: 'withdrawal', amount: '1.31' });
+  const dep = await emma.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '1.32' });
+  const ids = (rows) => rows.map((r) => r.id);
+  for (const [name, call] of [['Admin', admin], ['Emma', emma.call]]) {
+    const plain = (await call('GET', '/rewards/redemptions')).body.data;
+    assert.ok(plain.every((r) => r.kind === 'reward'), `${name}: ohne kind keine Geld-Zeile - ein Client, der cost als Punkte summiert, zaehlt keine Cent`);
+    const statusOnly = (await call('GET', '/rewards/redemptions?status=pending')).body.data;
+    assert.ok(statusOnly.every((r) => r.kind === 'reward'), `${name}: auch mit status`);
+    assert.ok((await call('GET', '/rewards/redemptions?kind=reward')).body.data.every((r) => r.kind === 'reward'));
+
+    const moneyOnly = (await call('GET', '/rewards/redemptions?kind=money')).body.data;
+    assert.ok(moneyOnly.length >= 2 && moneyOnly.every((r) => r.kind !== 'reward'), `${name}: kind=money`);
+    assert.ok(ids(moneyOnly).includes(w.body.data.id) && ids(moneyOnly).includes(dep.body.data.id));
+    const wOnly = (await call('GET', '/rewards/redemptions?kind=withdrawal')).body.data;
+    assert.ok(wOnly.every((r) => r.kind === 'withdrawal') && ids(wOnly).includes(w.body.data.id));
+    const dOnly = (await call('GET', '/rewards/redemptions?kind=deposit')).body.data;
+    assert.ok(dOnly.every((r) => r.kind === 'deposit') && ids(dOnly).includes(dep.body.data.id));
+    const all = (await call('GET', '/rewards/redemptions?kind=all')).body.data;
+    assert.equal(all.length, plain.length + moneyOnly.length, `${name}: all = Praemien + Geld`);
+    assert.equal((await call('GET', '/rewards/redemptions?kind=alles')).status, 400, 'ein unbekannter Wert ist kein stilles "alles"');
+  }
+  for (const r of [w, dep]) await emma.call('PATCH', `/rewards/redemptions/${r.body.data.id}`, { action: 'cancel' });
+});
+
+test('Betrag, Notiz und Grund sind Texte: ein Array oder ein Objekt ist ein Eingabefehler', async () => {
+  const requests = () => db.prepare('SELECT COUNT(*) AS n FROM reward_redemptions WHERE user_id = ?').get(emma.id).n;
+  const rows = () => moneyRows(emma.id).length;
+  const before = [requests(), rows()];
+  for (const amount of [['5'], { v: '5' }, true, null, 5]) {
+    assert.equal((await emma.call('POST', '/rewards/redemptions', { kind: 'deposit', amount })).status, 400, `amount ${JSON.stringify(amount)}`);
+    assert.equal((await admin('POST', '/rewards/money/entries', { user_id: emma.id, amount, direction: 'credit' })).status, 400);
+  }
+  for (const text of [{ x: 1 }, ['a'], 7, true]) {
+    assert.equal((await emma.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '5.00', note: text })).status, 400, `note ${JSON.stringify(text)}`);
+    assert.equal((await admin('POST', '/rewards/money/entries', { user_id: emma.id, amount: '5.00', direction: 'credit', reason: text })).status, 400, `reason ${JSON.stringify(text)}`);
+  }
+  assert.deepEqual([requests(), rows()], before, 'nichts davon wurde gespeichert');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM reward_redemptions WHERE note LIKE '%object Object%'").get().n, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM reward_ledger WHERE reason LIKE '%object Object%'").get().n, 0);
+  // `null` als Notiz heisst weiter "keine".
+  const ok = await emma.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '5.00', note: null });
+  assert.equal(ok.status, 201);
+  await emma.call('PATCH', `/rewards/redemptions/${ok.body.data.id}`, { action: 'cancel' });
+});
+
+test('die Obergrenze haengt nicht an der Waehrung: zwei Millionen Rupiah sind ein Geburtstagsgeld', async () => {
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('currency', 'IDR')").run();
+  const kid = await member('rupiah');
+  try {
+    assert.equal((await admin('POST', '/rewards/money/entries', { user_id: kid.id, amount: '50000000', direction: 'credit' })).status, 201, '50 Millionen Rp von den Eltern');
+    const gift = await kid.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '2000000' });
+    assert.equal(gift.status, 201, 'zwei Millionen Rp als Einzahlung');
+    assert.equal(gift.body.data.cost, 200_000_000, 'IDR rechnet nach ISO 4217 mit zwei Stellen');
+    assert.equal((await admin('PATCH', `/rewards/redemptions/${gift.body.data.id}`, { action: 'fulfill' })).status, 200);
+    assert.equal(moneyOf(kid.id), 5_200_000_000);
+    assert.equal((await admin('PUT', `/rewards/money/plans/${kid.id}`, { amount: '150000', frequency: 'monthly', anchor_day: 1, paused: true })).status, 200);
+
+    // Es gibt weiter eine Grenze, und sie ist eine der Rechnung.
+    assert.equal(money.parseMoneyAmount(db, '10000000000'), money.MAX_MONEY_MINOR);
+    assert.throws(() => money.parseMoneyAmount(db, '10000000000.01'), /too large/);
+    assert.equal((await kid.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '10000000000.01' })).status, 400);
+    assert.ok(money.MAX_MONEY_MINOR * 5200 < Number.MAX_SAFE_INTEGER, 'hundert Jahre Wochenplan am Deckel bleiben exakt');
+  } finally {
+    db.prepare("DELETE FROM sync_config WHERE key = 'currency'").run();
+  }
+});
+
+test('eine Gutschrift, nach der der Saldo keine exakte Zahl mehr waere, wird nicht gebucht', async () => {
+  const kid = await member('kroesus');
+  const nearMax = Number.MAX_SAFE_INTEGER - 100;
+  sqlMoney(kid.id, nearMax);
+  assert.equal((await admin('POST', '/rewards/money/entries', { user_id: kid.id, amount: '1.01', direction: 'credit' })).status, 400);
+  assert.equal((await admin('POST', '/rewards/money/entries', { user_id: kid.id, amount: '1.00', direction: 'credit' })).status, 201, 'genau bis zur Grenze geht es');
+  assert.equal(moneyOf(kid.id), Number.MAX_SAFE_INTEGER);
+
+  const dep = await kid.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '0.01' });
+  const refused = await admin('PATCH', `/rewards/redemptions/${dep.body.data.id}`, { action: 'fulfill' });
+  assert.equal(refused.status, 409);
+  assert.equal(refused.body.reason, 'balance_too_large');
+  assert.equal(refused.body.data.status, 'pending');
+
+  money.savePlan(db, kid.id, { amountMinor: 1, frequency: 'weekly', anchorDay: 2, paused: false }, { today: '2026-10-06' });
+  assert.equal(moneyOf(kid.id), Number.MAX_SAFE_INTEGER, 'auch der Plan bucht nicht darueber hinaus');
+  assert.equal(planOf(kid.id).next_run_date, '2026-10-06', 'und bleibt auf seinem Termin stehen');
+  db.prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(kid.id);
+  db.prepare('DELETE FROM reward_ledger WHERE user_id = ?').run(kid.id);
+});
+
+test('ein Kind mit nur einem Plan bleibt loeschbar; erst eine Buchung ist eine Spur', async () => {
+  const { removeUser, userTraces } = await import('../server/services/user-removal.js');
+  const planOnly = freshKid();
+  money.savePlan(db, planOnly, { amountMinor: 500, frequency: 'weekly', anchorDay: 5, paused: true }, { today: '2026-10-06' });
+  assert.deepEqual(userTraces(db, planOnly), [], 'ein Plan ist eine Einstellung am Konto, keine Spur');
+  assert.equal(removeUser(db, planOnly).outcome, 'deleted');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get(planOnly).n, 0);
+  assert.equal(planOf(planOnly), undefined, 'der Plan geht per CASCADE mit');
+
+  const withMoney = freshKid();
+  money.savePlan(db, withMoney, { amountMinor: 500, frequency: 'weekly', anchorDay: 5, paused: true }, { today: '2026-10-06' });
+  sqlMoney(withMoney, 500);
+  assert.equal(removeUser(db, withMoney).outcome, 'deactivated', 'Geld, das gebucht ist, geht nicht mit einem Klick verloren');
+  assert.equal(moneyOf(withMoney), 500);
+  db.prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(withMoney);
+});
+
+test('eine Planaenderung bucht die ausstehenden Termine zuerst - mit dem alten Betrag, und keiner faellt weg', () => {
+  const kid = freshKid();
+  // Dienstags 1,00 seit dem 1. September; der Server lief seither nicht.
+  money.savePlan(db, kid, { amountMinor: 100, frequency: 'weekly', anchorDay: 2, paused: false }, { today: '2026-08-31' });
+  assert.equal(planOf(kid).next_run_date, '2026-09-01');
+
+  // Am 6. Oktober stellen die Eltern auf freitags 50,00 um.
+  const saved = money.savePlan(db, kid, { amountMinor: 5_000, frequency: 'weekly', anchorDay: 5 }, { today: '2026-10-06' });
+  assert.deepEqual(credits(kid), ['2026-09-01', '2026-09-08', '2026-09-15', '2026-09-22', '2026-09-29', '2026-10-06']
+    .map((allowance_date) => ({ allowance_date, delta: 100, type: 'bonus', unit: 'money' })),
+  'sechs Termine, jeder mit dem Betrag, der an ihm galt');
+  assert.equal(moneyOf(kid), 600);
+  assert.equal(saved.next_run_date, '2026-10-09', 'der neue Plan beginnt am naechsten Freitag');
+  assert.equal(saved.amount_minor, 5_000);
+
+  // Nur der Betrag: dasselbe - erst buchen, dann aendern.
+  db.prepare("UPDATE reward_allowances SET next_run_date = '2026-10-09' WHERE user_id = ?").run(kid);
+  money.savePlan(db, kid, { amountMinor: 7_000, frequency: 'weekly', anchorDay: 5 }, { today: '2026-10-23' });
+  assert.deepEqual(credits(kid).slice(6).map((c) => [c.allowance_date, c.delta]),
+    [['2026-10-09', 5_000], ['2026-10-16', 5_000], ['2026-10-23', 5_000]]);
+  assert.equal(planOf(kid).next_run_date, '2026-10-30');
+  db.prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(kid);
+});
+
+test('PUT ohne `paused` laesst einen pausierten Plan pausiert', async () => {
+  const kid = await member('pausenkind');
+  const body = { amount: '5.00', frequency: 'monthly', anchor_day: 15 };
+  assert.equal((await admin('PUT', `/rewards/money/plans/${kid.id}`, { ...body, paused: true })).body.data.plan.paused, true);
+  const amountOnly = await admin('PUT', `/rewards/money/plans/${kid.id}`, { ...body, amount: '6.00' });
+  assert.equal(amountOnly.status, 200);
+  assert.equal(amountOnly.body.data.plan.paused, true, 'das fehlende Feld setzt den Plan nicht fort');
+  assert.equal(amountOnly.body.data.plan.amount_minor, 600);
+  assert.ok(planOf(kid.id).paused_at);
+  assert.equal((await admin('PUT', `/rewards/money/plans/${kid.id}`, { ...body, paused: false })).body.data.plan.paused, false, 'ausdruecklich false setzt fort');
+  assert.equal((await admin('PUT', `/rewards/money/plans/${kid.id}`, body)).body.data.plan.paused, false, 'und ohne Feld bleibt auch das');
+  // Service: dasselbe ohne die Route.
+  const fresh = freshKid();
+  assert.equal(money.savePlan(db, fresh, { amountMinor: 100, frequency: 'weekly', anchorDay: 1 }, { today: '2026-10-06' }).paused, false, 'ein neuer Plan ohne Angabe laeuft');
+  db.prepare('DELETE FROM reward_allowances WHERE user_id IN (?, ?)').run(kid.id, fresh);
+});
+
+test('nur Haushaltsmitglieder: ein deaktiviertes Konto steht in keiner Kontenliste, und fuer einen Gast stellt niemand eine Anfrage', async () => {
+  const gone = freshKid();
+  sqlMoney(gone, 4_321);
+  assert.ok((await admin('GET', '/rewards/money')).body.data.accounts.some((a) => a.id === gone), 'Vorbedingung: mit Geld steht das Konto in der Liste');
+  db.prepare("UPDATE users SET deactivated_at = '2026-10-05T00:00:00Z' WHERE id = ?").run(gone);
+  const listed = (await admin('GET', '/rewards/money')).body.data;
+  assert.ok(!listed.accounts.some((a) => a.id === gone), 'deaktiviert: nicht mehr in der Liste');
+  assert.ok(!listed.candidates.some((c) => c.id === gone), 'und auch kein Kandidat');
+  assert.equal(moneyOf(gone), 4_321, 'die Buchungen bleiben');
+
+  // Ein Gast der geteilten Ausgaben mit einer (von Hand angelegten) Geldzeile:
+  // "hat ein Konto" allein darf nicht reichen.
+  const guest = freshKid();
+  db.prepare('INSERT INTO split_expense_guest_users(user_id) VALUES (?)').run(guest);
+  sqlMoney(guest, 1_000);
+  assert.equal(money.hasMoneyAccount(db, guest), true, 'Vorbedingung: die Kontopruefung allein liesse ihn durch');
+  const before = db.prepare('SELECT COUNT(*) AS n FROM reward_redemptions WHERE user_id = ?').get(guest).n;
+  const res = await admin('POST', '/rewards/redemptions', { kind: 'withdrawal', amount: '1.00', user_id: guest });
+  assert.equal(res.status, 400);
+  assert.equal(res.body.reason, 'no_money_account');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM reward_redemptions WHERE user_id = ?').get(guest).n, before);
 });
 
 // ==========================================================================

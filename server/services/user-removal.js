@@ -114,6 +114,11 @@ export const PRIVATE_USER_COLUMNS = new Set([
   'waste_reminder_entries.user_id',
   // Teilnahme und Einordnung, die nur das Konto selbst betreffen.
   'reward_participants.user_id',
+  // Der Taschengeld-PLAN (#1734) ist eine Einstellung am Konto wie die Teilnahme
+  // darueber, keine Spur: ein Kind mit nur einem Plan und ohne eine einzige
+  // Buchung bleibt loeschbar, der Plan geht per CASCADE mit. Die BUCHUNGEN
+  // (`reward_ledger`) sind die Spur und bleiben es.
+  'reward_allowances.user_id',
   'note_categories.owner_user_id',
   'expense_group_members.user_id',
 ]);

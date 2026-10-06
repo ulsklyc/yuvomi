@@ -35,8 +35,32 @@ import { todayKey } from '../utils/timezone.js';
 export const MONEY_KINDS = Object.freeze(['withdrawal', 'deposit']);
 export const ALLOWANCE_FREQUENCIES = Object.freeze(['weekly', 'monthly']);
 
-/** Obergrenze eines einzelnen Betrags, in kleinsten Einheiten. */
-export const MAX_MONEY_MINOR = 100_000_000;
+/*
+ * DIE OBERGRENZE EINES BETRAGS HAENGT NICHT AN EINER WAEHRUNG. Die erste
+ * Fassung trug 100 000 000 kleinste Einheiten - in EUR eine Million, in IDR
+ * oder IRR eine Million Rupiah bzw. Rial, also weniger als ein Geburtstagsgeld
+ * (Review zu #1745). Eine Zahl, die fuer jede waehlbare Waehrung reicht, ist
+ * keine Aussage ueber Taschengeld mehr, sondern nur noch ueber die Rechnung:
+ * `parseMoneyToMinor()` laesst wie bei den geteilten Ausgaben alles bis
+ * Number.MAX_SAFE_INTEGER durch, und HIER kommt dazu, was dort keine Rolle
+ * spielt - es wird SUMMIERT. Der einzelne Betrag ist deshalb auf 10^12
+ * gedeckelt (zehn Milliarden bei zwei Stellen), und jede Gutschrift prueft in
+ * ihrer Transaktion, dass der Saldo danach noch eine exakte Zahl ist
+ * (`creditFits()`).
+ */
+export const MAX_MONEY_MINOR = 1_000_000_000_000;
+
+/** Bleibt der Saldo nach dieser Gutschrift eine exakt darstellbare Zahl? */
+export function creditFits(d, userId, amountMinor) {
+  return ledgerBalance(d, userId, 'money') + amountMinor <= Number.MAX_SAFE_INTEGER;
+}
+
+/** Ein Fehler in der Form, die die Routen als 400 weiterreichen. */
+function inputError(message) {
+  const err = new Error(message);
+  err.name = 'SplitInputError';
+  return err;
+}
 
 /** Wie viele versaeumte Termine ein Lauf je Plan hoechstens nachbucht. */
 const MAX_CATCH_UP_STEPS = 520;
@@ -112,14 +136,24 @@ export function moneyCurrency(d) {
  * `SplitInputError` mit einem Satz, den die Route als 400 weiterreicht.
  */
 export function parseMoneyAmount(d, value, field = 'amount') {
+  // NUR EIN TEXT. `parseMoneyToMinor()` zwingt alles andere durch String():
+  // aus `["5"]` wurde "5" und damit ein gueltiger Betrag (Review zu #1745).
+  if (typeof value !== 'string') throw inputError(`${field} must be sent as a decimal string.`);
   const { currency } = moneyCurrency(d);
   const minor = parseMoneyToMinor(value, currency, field);
-  if (minor > MAX_MONEY_MINOR) {
-    const err = new Error(`${field} is too large.`);
-    err.name = 'SplitInputError';
-    throw err;
-  }
+  if (minor > MAX_MONEY_MINOR) throw inputError(`${field} is too large.`);
   return minor;
+}
+
+/**
+ * Ein optionaler Freitext (Notiz, Grund) aus dem Request: fehlt er, ist er
+ * `null`; ist er kein Text, ist das ein Eingabefehler. Ohne die Pruefung stand
+ * ein gesendetes Objekt als "[object Object]" im Verlauf.
+ */
+export function readOptionalText(value, field, max) {
+  if (value == null) return null;
+  if (typeof value !== 'string') throw inputError(`${field} must be a string.`);
+  return value.trim().slice(0, max) || null;
 }
 
 // --------------------------------------------------------
@@ -260,7 +294,8 @@ export function readPlanInput(d, body) {
     throw err;
   }
   if (body?.paused !== undefined && typeof body.paused !== 'boolean') return { error: 'paused must be a boolean.' };
-  return { frequency, anchorDay, amountMinor, paused: body?.paused === true };
+  // `undefined` heisst "nicht angefasst": der gespeicherte Zustand bleibt.
+  return { frequency, anchorDay, amountMinor, paused: body?.paused };
 }
 
 /**
@@ -274,10 +309,27 @@ export function readPlanInput(d, body) {
  *    nachgebucht (wie beim Fortsetzen einer Serie, #1714) - pausiert haben die
  *    Eltern mit Absicht, ein ausgeschalteter Server ist der andere Fall;
  *  - sonst (nur der Betrag): der Termin bleibt.
+ *
+ * WAS FAELLIG IST, WIRD VOR DER AENDERUNG GEBUCHT - MIT DEM ALTEN PLAN.
+ * Zwischen zwei stuendlichen Laeufen (oder nach Tagen ohne Server) stehen
+ * Termine aus, die dem Kind nach dem Plan zustehen, der an ihnen galt. Die
+ * erste Fassung speicherte zuerst: ein geaenderter Wochentag rechnete den
+ * Termin neu ab heute und liess fuenf ausstehende Wochen fallen, ein von 1,00
+ * auf 50,00 geaenderter Betrag buchte alle fuenf mit 50,00 (Review zu #1745).
+ * Buchen und Speichern liegen in EINER Transaktion.
+ *
+ * FEHLT `paused`, BLEIBT DER GESPEICHERTE ZUSTAND. Ein Client, der nur den
+ * Betrag schickt, setzte sonst einen pausierten Plan fort.
+ *
+ * Faellt der erste Termin des neuen Plans auf heute, wird er in derselben
+ * Transaktion gebucht - idempotent wie der Lauf.
  */
 export function savePlan(d, userId, input, { actorId = null, today = todayKey(d) } = {}) {
   return d.transaction(() => {
+    const before = d.prepare('SELECT * FROM reward_allowances WHERE user_id = ?').get(userId);
+    if (before && before.paused_at == null && before.next_run_date <= today) creditPlan(d, before, today);
     const existing = d.prepare('SELECT * FROM reward_allowances WHERE user_id = ?').get(userId);
+    input = { ...input, paused: input.paused ?? (existing ? existing.paused_at != null : false) };
     const rasterChanged = !existing
       || existing.frequency !== input.frequency || existing.anchor_day !== input.anchorDay;
     let nextRun;
@@ -301,6 +353,8 @@ export function savePlan(d, userId, input, { actorId = null, today = todayKey(d)
         WHERE user_id = ?
       `).run(input.amountMinor, input.frequency, input.anchorDay, nextRun, input.paused ? 1 : 0, userId);
     }
+    const saved = d.prepare('SELECT * FROM reward_allowances WHERE user_id = ?').get(userId);
+    if (saved.paused_at == null && saved.next_run_date <= today) creditPlan(d, saved, today);
     return planView(d.prepare('SELECT * FROM reward_allowances WHERE user_id = ?').get(userId));
   })();
 }
@@ -353,6 +407,9 @@ function creditPlan(d, plan, today) {
   let date = plan.next_run_date;
   let credited = 0;
   for (let step = 0; step < MAX_CATCH_UP_STEPS && date <= today; step += 1) {
+    // Ein Saldo jenseits der exakten Zahlen ist keiner mehr: der Plan bleibt
+    // auf diesem Termin stehen, statt eine Summe zu bauen, die niemand lesen kann.
+    if (!creditFits(d, plan.user_id, plan.amount_minor)) break;
     credited += credit.run(plan.user_id, plan.amount_minor, date).changes;
     const next = addInterval(date, plan.frequency, anchor);
     // Ein Schritt, der nicht vorrueckt, liefe sonst bis zur Obergrenze im Kreis.

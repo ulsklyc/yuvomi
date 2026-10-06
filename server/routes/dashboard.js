@@ -855,17 +855,20 @@ router.get('/', (req, res) => {
     // Dieselben Personen wie die Liste darueber (#1207): eine alte
     // Einschreibung von Personal oder Gast bleibt stehen, zaehlt aber nicht.
     const participantCount = members.length;
-    // GELD-ANFRAGEN (#1734) ZAEHLEN HIER MIT, UND DIE BEIDEN ZWEIGE SIND SCHON
-    // DIE REGEL: wer freigibt, ist Admin und darf jede lesen; wer selbst
-    // sammelt, zaehlt nur die eigenen (`user_id = ?`). Die Sicht `family`
-    // (Wandtablett, Grosseltern) bekommt 0. Ein Geschwisterkind erfaehrt so
-    // nicht, dass jemand Geld abheben will. Geld selbst zeigt die Kachel
-    // nicht - weder Saldo noch Buchung.
-    const pending = view === 'approver'
-      ? d.prepare("SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending'").get().n
+    // `pending` BLEIBT DIE ZAHL DER PRAEMIEN-ANFRAGEN. Geld-Anfragen (#1734)
+    // stehen daneben in `moneyPending`, damit ein Client, der das alte Feld
+    // liest, nichts anderes darin findet. Wer was zaehlt, sagen die Zweige: wer
+    // freigibt, ist Admin und darf jede lesen; wer selbst sammelt, zaehlt nur
+    // die eigenen; die Sicht `family` (Wandtablett, Grosseltern) bekommt 0. Ein
+    // Geschwisterkind erfaehrt so nicht, dass jemand Geld abheben will. Geld
+    // selbst zeigt die Kachel nicht - weder Saldo noch Buchung.
+    const countPending = (kindSql) => (view === 'approver'
+      ? d.prepare(`SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending' AND ${kindSql}`).get().n
       : view === 'self'
-        ? d.prepare("SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending' AND user_id = ?").get(userId).n
-        : 0;
+        ? d.prepare(`SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending' AND user_id = ? AND ${kindSql}`).get(userId).n
+        : 0);
+    const pending = countPending("kind = 'reward'");
+    const moneyPending = countPending("kind != 'reward'");
     // Wer selbst sammelt, sieht seine letzten Gutschriften - verdient oder
     // geschenkt. Einloesungen und Rueckbuchungen sind kein "verdient".
     //
@@ -887,10 +890,10 @@ router.get('/', (req, res) => {
         `).all(userId)
       : [];
     const catalog = activeCatalog(d).map((c) => ({ id: c.id, name: c.name, cost: c.cost, remaining: c.remaining }));
-    result.rewards = { view, me: userId, standings, participantCount, pending, catalog, recent: ownRecent };
+    result.rewards = { view, me: userId, standings, participantCount, pending, moneyPending, catalog, recent: ownRecent };
   } catch (err) {
     log.error('rewards error:', err.message);
-    result.rewards = { view: null, standings: [], participantCount: 0, pending: 0, catalog: [], recent: [] };
+    result.rewards = { view: null, standings: [], participantCount: 0, pending: 0, moneyPending: 0, catalog: [], recent: [] };
   }
 
   // Gesundheit: heute fällige Dosen der EIGENEN Medikamente (private wie familiensichtbare)

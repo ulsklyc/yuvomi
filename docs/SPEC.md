@@ -541,8 +541,13 @@ entry 6). A payout creates no budget entry.
   `GET /rewards/redemptions`, the pending count of `GET /rewards/overview` and the single row
   `PATCH /rewards/redemptions/{id}` reads - somebody else's money request answers 404 there, like
   an id that does not exist, instead of confirming itself through 403 or 409. A scoped API token
-  falls under it through its subject and role. The Overview tile carries no money at all; its
-  pending count is every request for an approver and the own ones for a child.
+  falls under it through its subject and role. The Overview tile carries no money at all.
+- **Fields that existed keep their meaning.** `GET /rewards/redemptions` without `kind` answers
+  reward requests only, as before; money requests come with `?kind=money`, `withdrawal`, `deposit`
+  or `all`. `pendingCount` of the overview and `pending` of the Overview tile stay the count of
+  reward requests; money requests are counted next to them in `moneyPendingCount` and
+  `moneyPending` (every one for an approver, the own ones for a child, none otherwise). The page,
+  the tile, the Today sheet and the navigation badge add the two.
 - **Requests.** Withdrawal and deposit use the redemption mechanism (`POST /rewards/redemptions`
   with `kind`, decided through `PATCH /rewards/redemptions/{id}`), with one difference: **nothing is
   booked when the request is filed.** The confirmation is the moment the cash changes hands, so the
@@ -561,7 +566,10 @@ entry 6). A payout creates no budget entry.
   shortly after start) books every due date up to today in the household timezone. **Missed dates
   are booked afterwards**, each with the date it was due as `allowance_date`; the unique index over
   member and date is the idempotence, so a run that fires twice, or a plan deleted and created again
-  on the same day, books once. A paused plan books nothing and **skips** its missed dates when it is
+  on the same day, books once. Changing a plan books what is due first, with the plan as it was, in
+  the same transaction - a new amount or anchor day never reaches back; leaving `paused` out keeps
+  the stored state. A single amount is capped at 10^12 minor units whatever the currency, and a
+  credit that would take the balance past the exact integers is refused. A paused plan books nothing and **skips** its missed dates when it is
   resumed. A plan whose member is no longer part of the household (deactivated account) is paused
   instead of credited.
 
@@ -5332,7 +5340,10 @@ gone. The data model, including why the balance is always derived from the ledge
   in the same pending list as reward requests, with the amount as money and the balance next to it
   for whoever decides. With `rewards: read` the balance, the plan and the open requests stay and
   every one of these actions goes. Amounts are typed in the region's notation and checked by the
-  shared money helpers (`public/utils/money.js`).
+  shared money helpers (`public/utils/money.js`); how many decimals an amount has comes from the
+  server's `minor_unit` (ISO 4217), never from `Intl`, whose display convention shows HUF, IDR, COP,
+  IRR and PYG without the two decimals they are stored with. A plan row belongs to the account and
+  goes with it; money entries are a trace, so an account that has any is deactivated, not deleted.
 - **Context FAB:** creates a reward on the Catalog tab and grants a bonus on the Ledger tab, both
   admin-only; on the Overview tab, and for members, it is hidden — the module's create actions are
   parent actions.

@@ -134,7 +134,7 @@ export const TODAY_SHEET_SOURCES = [
     widget: 'rewards',
     collect(data) {
       if (data?.rewards?.view !== 'approver') return [];
-      const pending = Number(data?.rewards?.pending) || 0;
+      const pending = (Number(data?.rewards?.pending) || 0) + (Number(data?.rewards?.moneyPending) || 0);
       if (!pending) return [];
       return [{
         kind: 'approval',

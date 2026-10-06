@@ -203,7 +203,7 @@ export function moduleCountsFrom(data, { isAdmin = false, shoppingVisible = fals
      * keine, warb das Badge mit Arbeit, hinter der nichts stand (Codex-Review
      * zu PR #754). Eine mitgliedseigene Zahl gaebe es nur mit einem neuen Feld
      * in der Nutzlast; bis dahin ist keine Zahl richtiger als eine falsche. */
-    rewards: isAdmin ? (data?.rewards?.pending ?? 0) : 0,
+    rewards: isAdmin ? (Number(data?.rewards?.pending) || 0) + (Number(data?.rewards?.moneyPending) || 0) : 0,
     health: openDoses,
   };
   /* Die Küche ist im mobilen Menü EIN Ziel für vier Module; was dort wartet,

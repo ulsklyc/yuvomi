@@ -169,6 +169,38 @@ test('Eltern: alle Kinder ohne Platzierungsnummer, nach Namen, dazu die offenen 
   assert.equal(bars.length, 2, 'je Kind ein Fortschritt zum Ziel');
 });
 
+test('offene Geld-Anfragen (#1734) zaehlen im Hinweis mit, obwohl der Server sie getrennt fuehrt', () => {
+  // `pending` bleibt in der Antwort die Zahl der Praemien-Anfragen (zugesagte
+  // API), `moneyPending` steht daneben. Die Kachel sagt, wie viele warten.
+  const eltern = renderRewardsWidget({
+    view: 'approver', me: 1, standings: [leo(60), emma(30)], catalog: [KINO], pending: 2, moneyPending: 3,
+  }, '1x2');
+  assert.match(eltern, /dashboard\.rewardsPending\{"count":5\}/);
+  const nurGeld = renderRewardsWidget({
+    view: 'approver', me: 1, standings: [leo(60), emma(30)], catalog: [KINO], pending: 0, moneyPending: 1,
+  }, '1x2');
+  assert.match(nurGeld, /dashboard\.rewardsPending\{"count":1\}/, 'eine Abhebung allein ist ein Grund, hinzusehen');
+  const kind = renderRewardsWidget({
+    view: 'self', me: 7, standings: [emma(30)], catalog: [KINO], pending: 0, moneyPending: 1, recent: [],
+  }, '1x2');
+  assert.match(kind, /dashboard\.rewardsOwnPending\{"count":1\}/);
+  const wand = renderRewardsWidget({
+    view: 'family', me: 99, standings: [emma(30), leo(60)], catalog: [KINO], pending: 0, moneyPending: 4,
+  }, '1x2');
+  assert.doesNotMatch(wand, /rewardsPending/, 'und wer nicht freigibt, bekommt auch dafuer keinen Zaehler');
+});
+
+test('das Heute-Blatt nennt offene Geld-Anfragen mit, und weiter nur fuer den, der freigibt', async () => {
+  const { TODAY_SHEET_SOURCES } = await import('../public/utils/today-sheet.js');
+  const approvals = TODAY_SHEET_SOURCES.find((source) => source.id === 'approvals');
+  assert.ok(approvals, 'die Quelle der Freigaben');
+  const title = (rewards) => approvals.collect({ rewards })[0]?.title.replace(/&quot;/g, '"');
+  assert.match(title({ view: 'approver', pending: 1, moneyPending: 2 }), /"count":3/);
+  assert.match(title({ view: 'approver', pending: 0, moneyPending: 1 }), /"count":1/);
+  assert.equal(title({ view: 'approver', pending: 0, moneyPending: 0 }), undefined);
+  assert.equal(title({ view: 'self', pending: 0, moneyPending: 2 }), undefined, 'die eigene Bitte eines Kindes ist keine Freigabe');
+});
+
 test('Familie (Wand, Grosseltern): alle Kinder, aber kein Freigabe-Hinweis', () => {
   const html = renderRewardsWidget({
     view: 'family', me: 99, standings: [emma(30), leo(60)], catalog: [KINO], pending: 3,
