@@ -259,6 +259,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Resuming a paused recurring shared expense no longer books every date it missed** (#1647).
+  A recurring expense that was paused for six months and then resumed got six expenses within
+  six hours, one per hourly run, each with its original date. Resuming now skips the missed
+  dates: the series continues at its next date that is not in the past, in its own rhythm, and
+  nothing is booked for the time it was paused. A date that falls on today is still booked.
+  The app has no control for this yet, so it concerns API clients: this changes what
+  `POST /api/v1/split-expenses/recurring/{id}/pause` does by default when it resumes. To get
+  the previous behaviour, send `{ "missed": "book" }`; `"skip"` is the default, and any other
+  value answers 400 with `reason: "invalid_missed"`.
+
 - **An avatar never shows more than one character per name part** (#1464). A name starting
   with "ß" put three letters on the disc ("ßeta Schmidt" showed "SSS"), because writing a
   letter in capitals can turn it into two; the same went for the ligatures "ﬁ" and "ﬂ". The
