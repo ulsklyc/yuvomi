@@ -660,7 +660,17 @@ router.patch('/redemptions/:id', (req, res) => {
     const d = db.get();
     const me = actingUser(req);
     const action = req.body?.action;
-    const row = d.prepare('SELECT * FROM reward_redemptions WHERE id = ?').get(toInt(req.params.id));
+    // EINE GELD-ANFRAGE, DIE DER FRAGENDE NICHT LESEN DARF, GIBT ES FUER IHN
+    // NICHT (#1734). Ohne das Praedikat an DIESER Abfrage antwortete die Route
+    // einem Geschwisterkind auf die Kennung einer fremden Geld-Anfrage mit 403
+    // (offen) oder 409 (entschieden) statt mit 404 - die Liste verschwieg die
+    // Anfrage, der Einzelpfad bestaetigte sie samt Zustand. Es ist dasselbe
+    // Fragment wie an der Liste, nicht eine zweite Regel.
+    const reader = moneyReader(req);
+    const row = d.prepare(`
+      SELECT r.* FROM reward_redemptions r
+      WHERE r.id = @id AND (r.kind = 'reward' OR ${moneyVisibleSql(reader, 'r.user_id')})
+    `).get({ id: toInt(req.params.id), ...moneyParams(reader) });
     if (!row) return res.status(404).json({ error: 'Redemption not found.', code: 404 });
     if (row.status !== 'pending')
       return res.status(409).json({ error: 'Redemption already decided.', code: 409 });

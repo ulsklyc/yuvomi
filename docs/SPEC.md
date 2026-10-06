@@ -538,7 +538,9 @@ entry 6). A payout creates no budget entry.
   narrower than points, which everybody with the module sees, so the rule sits in every read query
   and not in the client: `moneyVisibleSql()` in `server/services/reward-money.js` is the one WHERE
   fragment behind `GET /rewards/money`, `GET /rewards/money/ledger`, the money rows of
-  `GET /rewards/redemptions` and the pending count of `GET /rewards/overview`. A scoped API token
+  `GET /rewards/redemptions`, the pending count of `GET /rewards/overview` and the single row
+  `PATCH /rewards/redemptions/{id}` reads - somebody else's money request answers 404 there, like
+  an id that does not exist, instead of confirming itself through 403 or 409. A scoped API token
   falls under it through its subject and role. The Overview tile carries no money at all; its
   pending count is every request for an approver and the own ones for a child.
 - **Requests.** Withdrawal and deposit use the redemption mechanism (`POST /rewards/redemptions`

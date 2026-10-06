@@ -417,6 +417,67 @@ test('ein gescoptes API-Token faellt unter dieselbe Regel: sein Subjekt sieht si
   assert.equal((await emmaToken('POST', '/rewards/redemptions', { kind: 'withdrawal', amount: '1.00' })).status, 403);
 });
 
+test('der Einzelpfad verraet nicht, was die Liste verschweigt: eine fremde Geld-Anfrage ist 404, offen wie entschieden', async () => {
+  const open = await emma.call('POST', '/rewards/redemptions', { kind: 'withdrawal', amount: '1.11' });
+  const decided = await emma.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '1.12' });
+  assert.equal((await emma.call('PATCH', `/rewards/redemptions/${decided.body.data.id}`, { action: 'cancel' })).status, 200);
+  const missing = await leo.call('PATCH', '/rewards/redemptions/99999999', { action: 'cancel' });
+  assert.equal(missing.status, 404);
+
+  for (const [label, id] of [['offen', open.body.data.id], ['entschieden', decided.body.data.id]]) {
+    for (const action of ['cancel', 'fulfill', 'reject', 'unsinn']) {
+      const res = await leo.call('PATCH', `/rewards/redemptions/${id}`, { action });
+      assert.equal(res.status, 404, `${label}/${action}: wie eine Kennung, die es nicht gibt`);
+      assert.deepEqual(res.body, missing.body, 'und mit genau derselben Antwort');
+    }
+  }
+  assert.equal(db.prepare('SELECT status FROM reward_redemptions WHERE id = ?').get(open.body.data.id).status, 'pending');
+
+  // Emma selbst und die Eltern erreichen sie weiter.
+  assert.equal((await admin('PATCH', `/rewards/redemptions/${decided.body.data.id}`, { action: 'fulfill' })).status, 409);
+  assert.equal((await emma.call('PATCH', `/rewards/redemptions/${open.body.data.id}`, { action: 'cancel' })).status, 200);
+});
+
+test('eine Anfrage "fuer" das Geschwisterkind gilt der eigenen Person - auch die Absage misst nur den eigenen Saldo', async () => {
+  // Leo hat weniger als Emma. Zaehlte `user_id` fuer ihn, verriete die Antwort,
+  // ob EMMAS Guthaben den Betrag deckt.
+  const amount = ((moneyOf(leo.id) + 1) / 100).toFixed(2);
+  assert.ok(moneyOf(emma.id) > moneyOf(leo.id) + 1, 'die Probe braucht einen Betrag, den nur Emma decken koennte');
+  const before = db.prepare('SELECT COUNT(*) AS n FROM reward_redemptions WHERE user_id = ?').get(emma.id).n;
+  const res = await leo.call('POST', '/rewards/redemptions', { kind: 'withdrawal', amount, user_id: emma.id });
+  assert.equal(res.status, 400);
+  assert.equal(res.body.reason, 'insufficient_funds', 'gemessen an Leos Guthaben');
+  const small = await leo.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '0.50', user_id: emma.id });
+  assert.equal(small.status, 201);
+  assert.equal(small.body.data.user_id, leo.id, 'die Anfrage gehoert Leo');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM reward_redemptions WHERE user_id = ?').get(emma.id).n, before);
+  await leo.call('PATCH', `/rewards/redemptions/${small.body.data.id}`, { action: 'cancel' });
+});
+
+test('ein Geschwisterkind mit `rewards: read` und ein Token ohne Belohnungs-Scope lesen ebenfalls nichts', async () => {
+  const open = await emma.call('POST', '/rewards/redemptions', { kind: 'withdrawal', amount: '2.22', note: 'nur-fuer-Eltern' });
+  const peeker = await member('peeker');
+  assert.equal((await admin('PUT', `/permissions/user/${peeker.id}`, { modules: { rewards: 'read' } })).status, 200);
+  let all = '';
+  for (const path of ['/rewards/money', '/rewards/money/ledger', `/rewards/money/ledger?user_id=${emma.id}`, '/rewards/redemptions', '/rewards/redemptions?status=pending', '/rewards/ledger?limit=500', '/rewards/overview', '/dashboard']) {
+    const res = await peeker.call('GET', path);
+    assert.equal(res.status, 200, path);
+    all += JSON.stringify(res.body);
+  }
+  for (const secret of ['nur-fuer-Eltern', 'Startguthaben-Emma', 'Startguthaben-Leo', '"withdrawal"', '"deposit"', String(moneyOf(emma.id)), String(moneyOf(leo.id))]) {
+    assert.ok(!all.includes(secret), `${secret} steht in keiner Antwort`);
+  }
+  assert.equal((await peeker.call('PATCH', `/rewards/redemptions/${open.body.data.id}`, { action: 'cancel' })).status, 403, 'nur-lesen: das Modul-Gate steht davor');
+
+  const minted = await admin('POST', '/auth/api-tokens', { name: 'Nur Aufgaben', subject_user_id: emma.id, scopes: ['tasks:read'] });
+  assert.equal(minted.status, 201);
+  const noScope = withToken(minted.body.token);
+  for (const path of ['/rewards/money', '/rewards/money/ledger', '/rewards/redemptions', '/rewards/overview']) {
+    assert.equal((await noScope('GET', path)).status, 403, `${path}: ohne Scope kein Zugriff, auch nicht auf das eigene Geld`);
+  }
+  await emma.call('PATCH', `/rewards/redemptions/${open.body.data.id}`, { action: 'cancel' });
+});
+
 test('Buchen und Planen ist Sache der Admins', async () => {
   const before = moneyRows(emma.id).length;
   assert.equal((await emma.call('POST', '/rewards/money/entries', { user_id: emma.id, amount: '50.00', direction: 'credit' })).status, 403);
@@ -456,8 +517,8 @@ test('Abhebung: freier Betrag, beim Stellen nichts gebucht, erst die Freigabe bu
 
   const id = filed.body.data.id;
   assert.equal((await emma.call('PATCH', `/rewards/redemptions/${id}`, { action: 'fulfill' })).status, 403, 'das Kind gibt nicht selbst frei');
-  assert.equal((await leo.call('PATCH', `/rewards/redemptions/${id}`, { action: 'fulfill' })).status, 403);
-  assert.equal((await leo.call('PATCH', `/rewards/redemptions/${id}`, { action: 'cancel' })).status, 403, 'und Leo zieht Emmas Anfrage nicht zurueck');
+  assert.equal((await leo.call('PATCH', `/rewards/redemptions/${id}`, { action: 'fulfill' })).status, 404, 'fuer Leo gibt es die Anfrage nicht');
+  assert.equal((await leo.call('PATCH', `/rewards/redemptions/${id}`, { action: 'cancel' })).status, 404, 'und er zieht sie nicht zurueck');
   assert.equal(moneyOf(emma.id), start);
 
   const points = pointsOf(emma.id);
