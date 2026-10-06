@@ -597,11 +597,16 @@ router.put('/:id', (req, res) => {
       // haben. Die Inhaltsfelder darueber fallen ohne Angabe auf die Vorlage
       // zurueck; fuer den Koch waere das ein stilles Ueberschreiben jeder
       // einzeln getroffenen Wahl bei einer blossen Titelaenderung.
-      // Gueltig bleibt, wer an der Vorlage ODER an dieser Mahlzeit schon steht:
-      // der Dialog zeigt den Koch der Mahlzeit, und die soll sich mit ihm
-      // weiter speichern lassen.
+      // GESPEICHERT IST HIER DER KOCH DER VORLAGE, NICHT DER DIESER MAHLZEIT.
+      // Der Aufruf schreibt auf die Vorlage und auf JEDE Mahlzeit der Serie;
+      // "schon gespeichert" gilt deshalb nur fuer den Datensatz, der die Serie
+      // ist. Ein Nicht-Mitglied, das allein an dieser einen Mahlzeit steht,
+      // waere fuer die Vorlage und alle anderen Mahlzeiten eine NEUE Wahl - und
+      // kaeme ueber die Vorlage in jede kuenftige Woche. Die Mahlzeit selbst
+      // bleibt mit ihm speicherbar: ohne `scope`, und im Serien-Umfang, solange
+      // der Koch nicht mitgeschickt wird (der Dialog schickt ihn nur geaendert).
       if (vCook.given) {
-        const cookError = cookRefusal(vCook.value, [tpl.cook_user_id, meal.cook_user_id]);
+        const cookError = cookRefusal(vCook.value, [tpl.cook_user_id]);
         if (cookError) return res.status(400).json({ error: cookError, code: 400 });
       }
 

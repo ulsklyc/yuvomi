@@ -375,7 +375,7 @@ for (const [art, userId] of Object.entries(NON_MEMBERS)) {
   });
 }
 
-test('gespeicherter Koch einer Serie: scope=series nimmt den Koch der Vorlage und den der bearbeiteten Mahlzeit weiter an', async () => {
+test('gespeicherter Koch einer Serie: scope=series nimmt den Koch der VORLAGE weiter an - der Koch einer einzelnen Mahlzeit ist fuer die Serie eine neue Wahl', async () => {
   const first = (await createMeal({ date: '2047-03-04', title: 'Serie mit Altbestand', repeat_weekly: true, cook_user_id: BEN })).body.data;
   const tpl = first.recurrence_template_id;
   db.prepare('UPDATE meal_recurrence_templates SET cook_user_id = ? WHERE id = ?').run(CLARA, tpl);
@@ -384,13 +384,29 @@ test('gespeicherter Koch einer Serie: scope=series nimmt den Koch der Vorlage un
   assert.equal(vonDerVorlage.status, 200, 'der Koch der Vorlage ist gespeicherter Stand');
   assert.equal(cookOf(first.id), CLARA);
 
+  // Ein Nicht-Mitglied steht nur an EINER Mahlzeit der Serie (Altbestand). Der
+  // Serien-Umfang schriebe es auf die Vorlage und auf alle anderen Mahlzeiten -
+  // dort stand es nie, also ist es dort eine neue Wahl.
+  const second = (await weekOf(addDays('2047-03-04', 7))).find((m) => m.recurrence_template_id === tpl);
   db.prepare('UPDATE meal_recurrence_templates SET cook_user_id = ? WHERE id = ?').run(BEN, tpl);
   storeCook(first.id, DORA);
-  const vonDerMahlzeit = await call('PUT', `/${first.id}?scope=series`, { cook_user_id: DORA });
-  assert.equal(vonDerMahlzeit.status, 200, 'der Koch der bearbeiteten Mahlzeit ebenso');
+  storeCook(second.id, BEN);
+  const vonDerMahlzeit = await call('PUT', `/${first.id}?scope=series`, { cook_user_id: DORA, title: 'Umbenannt' });
+  assert.equal(vonDerMahlzeit.status, 400, 'der Koch EINER Mahlzeit macht ihn nicht zum gespeicherten Koch der Serie');
+  assert.match(vonDerMahlzeit.body.error, /not a household member/);
+  assert.equal(templateCook(tpl), BEN, 'die Vorlage bekommt ihn nicht');
+  assert.equal(cookOf(second.id), BEN, 'die andere Mahlzeit der Serie nicht');
+  assert.equal(cookOf(first.id), DORA, 'und an seiner Mahlzeit bleibt er stehen');
+
+  // Die Mahlzeit bleibt mit ihm speicherbar: fuer sich allein, und im
+  // Serien-Umfang, solange der Koch nicht mitgeschickt wird.
+  assert.equal((await call('PUT', `/${first.id}`, { cook_user_id: DORA, notes: 'einzeln' })).status, 200);
+  assert.equal((await call('PUT', `/${first.id}?scope=series`, { title: 'Serie, umbenannt' })).status, 200);
+  assert.equal(cookOf(first.id), DORA);
+  assert.equal(templateCook(tpl), BEN);
 
   const fremd = await call('PUT', `/${first.id}?scope=series`, { cook_user_id: WAND });
-  assert.equal(fremd.status, 400, 'wer an keinem von beiden steht, ist eine neue Wahl');
+  assert.equal(fremd.status, 400, 'wer nirgends steht, ist erst recht eine neue Wahl');
 });
 
 test('ungueltige und unbekannte Angaben: 400 statt Fremdschluessel-Fehler, nichts geschrieben', async () => {
@@ -409,8 +425,22 @@ test('ungueltige und unbekannte Angaben: 400 statt Fremdschluessel-Fehler, nicht
   }
   const unbekannt = await createMeal({ date: '2035-02-06', cook_user_id: 999999 });
   assert.equal(unbekannt.status, 400);
-  assert.match(unbekannt.body.error, /Koch nicht gefunden/);
   assert.equal((await call('PUT', `/${meal.id}`, { cook_user_id: 999999 })).status, 400);
+
+  // KEINE AUSKUNFT UEBER KONTEN: "gibt es nicht" und "gibt es, ist aber kein
+  // Mitglied" bekommen dieselbe Antwort - Status, Felder und Wortlaut bis auf
+  // die id, die der Aufrufer selbst geschickt hat. Und keine Antwort nennt
+  // Name, Art oder Bild des abgelehnten Kontos.
+  const gleich = (r, id) => ({ status: r.status, keys: Object.keys(r.body).sort(), error: r.body.error.replaceAll(String(id), '<id>'), code: r.body.code });
+  for (const [art, userId] of Object.entries(NON_MEMBERS)) {
+    const abgelehnt = await createMeal({ date: '2035-02-06', cook_user_id: userId });
+    assert.deepEqual(gleich(abgelehnt, userId), gleich(unbekannt, 999999), `POST: ${art} gegen ein Konto, das es nicht gibt`);
+    const beimAendern = await call('PUT', `/${meal.id}`, { cook_user_id: userId });
+    assert.deepEqual(gleich(beimAendern, userId), gleich(await call('PUT', `/${meal.id}`, { cook_user_id: 999999 }), 999999), `PUT: ${art}`);
+    const text = JSON.stringify(abgelehnt.body) + JSON.stringify(beimAendern.body);
+    assert.doesNotMatch(text, /Clara|Dora|Kuechentablett|cook_name|cook_avatar|display_name|staff|guest|display|Hauspersonal|Gast/i,
+      `${art}: die Absage nennt nur die id`);
+  }
 
   assert.equal(db.prepare('SELECT COUNT(*) AS c FROM meals').get().c, before);
   assert.equal(cookOf(meal.id), BEN);

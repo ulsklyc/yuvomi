@@ -4,7 +4,7 @@ import { op, jsonBody, idParam } from '../helpers.js';
 // annimmt - anlegen, bearbeiten, apply-plan.
 const COOK_PROPERTY = {
   type: ['integer', 'null'],
-  description: 'The household member who cooks this meal, or `null` for nobody. Only a household member can be chosen: housekeeping staff, split-expense guests, wall tablets and deactivated accounts are refused with 400, and so is an id that belongs to no account. A cook that is already stored on the meal stays valid.',
+  description: 'The household member who cooks this meal, or `null` for nobody. Only a household member can be chosen: housekeeping staff, split-expense guests, wall tablets and deactivated accounts are refused with 400, and an id that belongs to no account gets the same answer. A cook that is already stored on the meal stays valid; for `scope=series` that is the cook stored on the series.',
 };
 
 const COOK_READ_NOTE = 'A meal carries its cook next to `created_by`: `cook_user_id` (or `null`), `cook_name`, `cook_color` and `cook_avatar`.';

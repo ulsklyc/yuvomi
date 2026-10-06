@@ -66,7 +66,11 @@ export function cookField(raw) {
  *
  * Ein Konto, das es nicht gibt, meldet `newNonMembers()` mit Absicht nicht -
  * hier bekaeme es sonst der Fremdschluessel zu fassen und die Route antwortete
- * mit 500. Die eigene Antwort dieser Route ist dieselbe wie beim Rezept: 400.
+ * mit 500. Es bekommt DIESELBE Antwort wie ein Konto, das kein Mitglied ist,
+ * im Wortlaut und im Status: "gibt es nicht" gegen "gibt es, ist aber Personal,
+ * Gast oder Wandtablett" zu unterscheiden, gaebe ueber Konten Auskunft, nach
+ * denen niemand gefragt hat. Die Meldung nennt nur die id, die der Aufrufer
+ * selbst geschickt hat - nie Name, Art oder Bild.
  *
  * Liest nur, synchron; der Aufrufer schreibt ohne `await` dazwischen.
  */
@@ -75,7 +79,7 @@ export function cookRefusal(cookId, stored = [], { db: database } = {}) {
   const kept = stored.filter((id) => id !== null && id !== undefined).map(Number);
   if (kept.includes(cookId)) return null;
   const conn = database || dbModule.get();
-  if (!conn.prepare('SELECT 1 FROM users WHERE id = ?').get(cookId)) return 'Koch nicht gefunden.';
+  if (!conn.prepare('SELECT 1 FROM users WHERE id = ?').get(cookId)) return nonMemberMessage([cookId]);
   const strangers = newNonMembers([cookId], { stored: kept, db: conn });
   return strangers.length ? nonMemberMessage(strangers) : null;
 }
