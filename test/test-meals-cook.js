@@ -39,6 +39,7 @@ const { default: dashboardRouter } = await import('../server/routes/dashboard.js
 const { addDays } = await import('../server/services/meal-recurrence.js');
 const { todayKey } = await import('../server/utils/timezone.js');
 const { removeUser } = await import('../server/services/user-removal.js');
+const { cookField } = await import('../server/services/meal-cook.js');
 // Legt die `sessions`-Tabelle an: das Deaktivieren eines Kontos beendet seine
 // Sitzungen in derselben Transaktion (server/services/user-removal.js).
 await import('../server/auth.js');
@@ -132,14 +133,14 @@ test('Migration 235: beide Spalten, nullable, auf users(id) mit ON DELETE SET NU
 // Speichern und Lesen
 // --------------------------------------------------------------------------
 
-test('POST /: der Koch wird gespeichert und kommt mit Name, Farbe und Bild zurueck', async () => {
+test('POST /: der Koch wird gespeichert und kommt mit Name und Farbe zurueck - ohne sein Bild', async () => {
   db.prepare("UPDATE users SET avatar_data = 'data:image/png;base64,QkVO' WHERE id = ?").run(BEN);
   const r = await createMeal({ cook_user_id: BEN });
   assert.equal(r.status, 201);
   assert.equal(r.body.data.cook_user_id, BEN);
   assert.equal(r.body.data.cook_name, 'Ben');
   assert.equal(r.body.data.cook_color, '#34C759');
-  assert.equal(r.body.data.cook_avatar, 'data:image/png;base64,QkVO');
+  assert.ok(!('cook_avatar' in r.body.data), 'das Bild haengt nicht an der Mahlzeit');
   assert.equal(r.body.data.created_by, ANNA, 'wer eintraegt, bleibt eine eigene Angabe neben dem Koch');
   assert.equal(cookOf(r.body.data.id), BEN);
 });
@@ -200,7 +201,9 @@ test('Uebersicht: die Mahlzeit von heute traegt ihren Koch', async () => {
     assert.equal(meal.cook_user_id, BEN);
     assert.equal(meal.cook_name, 'Ben');
     assert.equal(meal.cook_color, '#34C759');
-    assert.equal(meal.cook_avatar, 'data:image/png;base64,QkVO');
+    assert.ok(!('cook_avatar' in meal), 'das Bild haengt nicht an der Mahlzeit');
+    assert.equal(r.body.users.find((u) => u.id === BEN).avatar_data, 'data:image/png;base64,QkVO',
+      'es steht einmal in `users` derselben Antwort - von dort nimmt es die Oberflaeche, auch am Wandtablett');
   } finally {
     db.prepare('DELETE FROM meals WHERE id = ?').run(id);
   }
@@ -445,9 +448,82 @@ test('ungueltige und unbekannte Angaben: 400 statt Fremdschluessel-Fehler, nicht
   assert.equal(db.prepare('SELECT COUNT(*) AS c FROM meals').get().c, before);
   assert.equal(cookOf(meal.id), BEN);
 
-  // Positivkontrolle: die id als Ziffernfolge und der leere String ("niemand") gelten.
+  // Positivkontrolle: die id als Ziffernfolge und `null` ("niemand") gelten.
   assert.equal((await call('PUT', `/${meal.id}`, { cook_user_id: String(ANNA) })).body.data.cook_user_id, ANNA);
-  assert.equal((await call('PUT', `/${meal.id}`, { cook_user_id: '' })).body.data.cook_user_id, null);
+  assert.equal((await call('PUT', `/${meal.id}`, { cook_user_id: null })).body.data.cook_user_id, null);
+});
+
+// `Number()` liest "", " " und false als 0, true als 1, "1e1" als 10 und "0x1"
+// als 1. Wer die Form an `Number()` prueft, nimmt einen Tippfehler als id an -
+// und zwar als eine, die es geben kann: die Werte unten treffen mit ANNA (1)
+// und einem zehnten Konto echte Mitglieder.
+test('cookField: nur eine positive ganze Zahl oder null - nichts, was erst `Number()` zu einer id macht', async () => {
+  const feld = (wert) => cookField(wert);
+  assert.deepEqual(feld(undefined), { given: false, value: null, error: null }, 'fehlt das Feld, ist der Koch nicht angefasst');
+  assert.deepEqual(feld(null), { given: true, value: null, error: null }, '`null` heisst niemand');
+  assert.deepEqual(feld(7), { given: true, value: 7, error: null });
+  assert.deepEqual(feld('7'), { given: true, value: 7, error: null }, 'die reine Ziffernfolge eines Formulars');
+  assert.deepEqual(feld('120'), { given: true, value: 120, error: null }, 'eine Null IN der Zahl ist keine fuehrende');
+
+  const ZEHN = [];
+  while (ZEHN.length === 0 || ZEHN.at(-1) < 10) ZEHN.push(addUser(`fueller${ZEHN.length}`, `Fueller ${ZEHN.length}`));
+  assert.ok(db.prepare('SELECT 1 FROM users WHERE id IN (1, 10)').all().length === 2,
+    'Vorbedingung: die Konten 1 und 10 gibt es - ein durchgerutschter Wert braechte ein 200, kein 400 aus anderem Grund');
+
+  const meal = (await createMeal({ date: '2035-04-02', cook_user_id: BEN })).body.data;
+  const before = db.prepare('SELECT COUNT(*) AS c FROM meals').get().c;
+  const KEINE_ID = ['', ' ', '\t', '1e1', '0x1', '0b1', '1.0', '+1', '-1', ' 1', '1 ', '01', '0', '١', true, false,
+    Number.MAX_SAFE_INTEGER + 1, 1e21, '9007199254740993'];
+  for (const wert of KEINE_ID) {
+    const name = JSON.stringify(wert);
+    assert.deepEqual(feld(wert), { given: true, value: null, error: 'Koch muss die ID eines Haushaltsmitglieds sein.' }, `cookField(${name})`);
+    const angelegt = await createMeal({ date: '2035-04-03', cook_user_id: wert });
+    assert.equal(angelegt.status, 400, `POST mit ${name}`);
+    assert.match(angelegt.body.error, /Koch muss die ID eines Haushaltsmitglieds sein/, `POST mit ${name}`);
+    assert.equal((await call('PUT', `/${meal.id}`, { cook_user_id: wert })).status, 400, `PUT mit ${name}`);
+    assert.equal((await call('POST', '/apply-plan', { assignments: [{ date: '2035-04-03', meal_type: 'lunch', title: 'X', cook_user_id: wert }] })).status,
+      400, `apply-plan mit ${name}`);
+  }
+  assert.equal(db.prepare('SELECT COUNT(*) AS c FROM meals').get().c, before, 'nichts geschrieben');
+  assert.equal(cookOf(meal.id), BEN, 'und der Koch steht noch');
+});
+
+// Die eigene Antwort auf ein Konto, das es nicht gibt, steht in `cookRefusal()`
+// und gilt an JEDER Stelle, die es ruft. POST und PUT misst der Test darueber;
+// der Serien-Umfang und apply-plan rufen es an eigenen Stellen. Faellt der
+// Aufruf dort weg, faengt den Wert nur noch der Fremdschluessel - mit 500.
+test('ein Konto, das es nicht gibt: scope=series und apply-plan antworten mit demselben 400 wie POST, nichts geschrieben', async () => {
+  const start = '2049-06-01';
+  const first = (await createMeal({ date: start, title: 'Serie fuer Unbekannt', repeat_weekly: true, cook_user_id: BEN })).body.data;
+  const tpl = first.recurrence_template_id;
+  const vergleich = await createMeal({ date: '2035-05-01', cook_user_id: 999999 });
+  assert.equal(vergleich.status, 400, 'Vorbedingung: POST lehnt das unbekannte Konto ab');
+  const before = db.prepare('SELECT COUNT(*) AS c FROM meals').get().c;
+
+  const serie = await call('PUT', `/${first.id}?scope=series`, { title: 'Umbenannt', cook_user_id: 999999 });
+  assert.equal(serie.status, 400, 'scope=series');
+  assert.deepEqual(serie.body, vergleich.body, 'scope=series: derselbe Wortlaut wie POST');
+  assert.equal(templateCook(tpl), BEN, 'die Vorlage behaelt ihren Koch');
+  assert.equal(cookOf(first.id), BEN);
+  assert.equal(db.prepare('SELECT title FROM meals WHERE id = ?').get(first.id).title, 'Serie fuer Unbekannt',
+    'und der Rest des Aufrufs ist auch nicht geschrieben');
+
+  for (const modus of [{}, { replace_existing: true }, { skip_occupied: true }]) {
+    const plan = await call('POST', '/apply-plan', {
+      ...modus,
+      assignments: [
+        { date: '2035-05-02', meal_type: 'lunch', title: 'Mit Ben', cook_user_id: BEN },
+        { date: '2035-05-02', meal_type: 'dinner', title: 'Mit Unbekannt', cook_user_id: 999999 },
+      ],
+    });
+    assert.equal(plan.status, 400, `apply-plan ${JSON.stringify(modus)}`);
+    assert.deepEqual(plan.body, vergleich.body, `apply-plan ${JSON.stringify(modus)}: derselbe Wortlaut wie POST`);
+  }
+  assert.equal(db.prepare('SELECT COUNT(*) AS c FROM meals').get().c, before, 'keine Mahlzeit entstanden, auch nicht die gueltige daneben');
+
+  // Positivkontrolle: derselbe Aufruf mit einem Mitglied geht durch.
+  assert.equal((await call('PUT', `/${first.id}?scope=series`, { title: 'Umbenannt', cook_user_id: ANNA })).status, 200);
+  assert.equal(templateCook(tpl), ANNA);
 });
 
 // --------------------------------------------------------------------------
@@ -493,4 +569,110 @@ test('das Konto des Kochs wird entfernt: es wird deaktiviert, die Mahlzeit behae
     'und die Mahlzeit laesst sich mit ihm weiter speichern');
   assert.equal((await createMeal({ date: '2037-03-03', cook_user_id: EX })).status, 400,
     'als neue Wahl ist ein ehemaliges Konto kein Haushaltsmitglied mehr');
+});
+
+// Das Materialisieren legt NEUE Mahlzeiten an. Kopierte es den Koch der Vorlage
+// ungeprueft, stuende ein deaktiviertes Konto in jeder kuenftigen Woche neu im
+// Plan, waehrend POST und PUT genau diesen Koch ablehnen (Review zu #1737).
+test('Serie eines entfernten Kochs: was NEU aus ihr entsteht, hat keinen Koch - Bestand und Vorlage behalten ihn', async () => {
+  const EX = addUser('exserie', 'Exserienkoch');
+  const start = '2050-06-06';
+  const first = (await createMeal({ date: start, title: 'Serie des Exkochs', repeat_weekly: true, cook_user_id: EX })).body.data;
+  const tpl = first.recurrence_template_id;
+  const second = (await weekOf(addDays(start, 7))).find((m) => m.recurrence_template_id === tpl);
+  assert.equal(second.cook_user_id, EX, 'Vorbedingung: solange das Konto Mitglied ist, entsteht die Mahlzeit mit ihm');
+
+  assert.equal(removeUser(db, EX).outcome, 'deactivated');
+  assert.equal((await createMeal({ date: '2037-04-01', cook_user_id: EX })).status, 400,
+    'Vorbedingung: die Schreibroute lehnt ihn als neue Wahl ab');
+
+  const third = (await weekOf(addDays(start, 14))).find((m) => m.recurrence_template_id === tpl);
+  assert.ok(third, 'die Serie laeuft weiter');
+  assert.equal(third.title, 'Serie des Exkochs');
+  assert.equal(third.cook_user_id, null, 'die neu entstandene Mahlzeit traegt das ehemalige Mitglied nicht');
+  assert.equal(third.cook_name, null);
+  assert.equal(cookOf(third.id), null, 'auch in der Zeile');
+
+  assert.equal(cookOf(first.id), EX, 'die bestehenden Mahlzeiten behalten ihn (#1381)');
+  assert.equal(cookOf(second.id), EX);
+  assert.equal((await weekOf(addDays(start, 7))).find((m) => m.id === second.id).cook_name, 'Exserienkoch', 'mit Namen');
+  assert.equal(templateCook(tpl), EX, 'die Vorlage wird nicht still umgeschrieben');
+
+  // Dieselbe Frage fuer jede Art Nicht-Mitglied, die als Altbestand an einer
+  // Vorlage stehen kann - und die Gegenprobe mit einem Mitglied daneben.
+  for (const [art, userId] of Object.entries({ ...NON_MEMBERS, Mitglied: BEN })) {
+    db.prepare('UPDATE meal_recurrence_templates SET cook_user_id = ? WHERE id = ?').run(userId, tpl);
+    const woche = addDays(start, 7 * (3 + Object.keys(NON_MEMBERS).concat('Mitglied').indexOf(art)));
+    const neu = (await weekOf(woche)).find((m) => m.recurrence_template_id === tpl);
+    assert.ok(neu, `${art}: die Woche hat ihr Vorkommen`);
+    assert.equal(neu.cook_user_id, art === 'Mitglied' ? BEN : null, `${art} an der Vorlage`);
+  }
+});
+
+// Was der Dialog braucht, um "ganze Serie" richtig zu speichern: den Koch der
+// SERIE neben dem dieser Mahlzeit.
+test('GET / und jede Antwort eines Schreibwegs nennen den Koch der Serie als `recurrence_cook_user_id`', async () => {
+  const start = '2051-06-05';
+  const first = (await createMeal({ date: start, title: 'Serie mit zwei Koechen', repeat_weekly: true, cook_user_id: ANNA })).body.data;
+  const tpl = first.recurrence_template_id;
+  assert.equal(first.recurrence_cook_user_id, ANNA, 'schon in der Antwort auf POST');
+  const second = (await weekOf(addDays(start, 7))).find((m) => m.recurrence_template_id === tpl);
+
+  const einzeln = await call('PUT', `/${second.id}`, { cook_user_id: BEN });
+  assert.equal(einzeln.body.data.cook_user_id, BEN);
+  assert.equal(einzeln.body.data.recurrence_cook_user_id, ANNA, 'die Mahlzeit weicht ab, die Serie nicht');
+  const gelesen = (await weekOf(addDays(start, 7))).find((m) => m.id === second.id);
+  assert.equal(gelesen.cook_user_id, BEN);
+  assert.equal(gelesen.recurrence_cook_user_id, ANNA);
+
+  // Der Fall aus dem Review, am Server: Vorlage Anna, diese Mahlzeit Ben, die
+  // ganze Serie wird mit Ben gespeichert.
+  const serie = await call('PUT', `/${second.id}?scope=series`, { cook_user_id: BEN });
+  assert.equal(serie.status, 200);
+  assert.equal(serie.body.data.recurrence_cook_user_id, BEN);
+  assert.equal(templateCook(tpl), BEN, 'die Vorlage hat den gewaehlten Koch');
+  assert.equal(cookOf(first.id), BEN);
+
+  const ohneSerie = (await createMeal({ date: '2035-06-01', cook_user_id: BEN })).body.data;
+  assert.equal(ohneSerie.recurrence_cook_user_id, null, 'ohne Serie gibt es keinen Serienkoch');
+});
+
+// `users.avatar_data` ist eine Data-URL bis in die Hunderte Kilobyte. An jeder
+// Mahlzeit haengend kam dasselbe Bild in EINEM Wochenabruf so oft, wie die
+// Person kocht: 21 Mahlzeiten, 21-mal (Review zu #1737).
+test('das Bild des Kochs haengt an keiner Mahlzeit: eine volle Woche wiegt nicht 21 Profilbilder', async () => {
+  const BILD = `data:image/png;base64,${'QUJD'.repeat(50_000)}`; // 200 KB
+  const KOCH = addUser('bildkoch', 'Bildkoch');
+  db.prepare('UPDATE users SET avatar_data = ? WHERE id = ?').run(BILD, KOCH);
+  const montag = '2052-01-01'; // ein Montag
+  assert.equal(new Date(`${montag}T00:00:00Z`).getUTCDay(), 1, 'Vorbedingung: die Woche beginnt hier');
+
+  const plan = [];
+  for (let tag = 0; tag < 7; tag += 1) {
+    for (const meal_type of ['breakfast', 'lunch', 'dinner']) {
+      plan.push({ date: addDays(montag, tag), meal_type, title: `${meal_type} ${tag}`, cook_user_id: KOCH });
+    }
+  }
+  const angelegt = await call('POST', '/apply-plan', { assignments: plan });
+  assert.equal(angelegt.status, 201);
+  assert.equal(angelegt.body.data.length, 21);
+
+  const res = await fetch(`${baseUrl}/?week=${montag}`);
+  const text = await res.text();
+  // Die Serien der Tests darueber laufen ohne Ende und stehen auch in dieser
+  // Woche; gemessen werden die 21 Mahlzeiten dieses Kochs, gewogen wird alles.
+  const woche = JSON.parse(text).data.filter((meal) => meal.cook_user_id === KOCH);
+  assert.equal(woche.length, 21, 'Vorbedingung: die ganze Woche ist gelesen');
+  for (const meal of woche) {
+    assert.equal(meal.cook_name, 'Bildkoch', 'Name und Farbe fuer die Initialen-Scheibe bleiben');
+    assert.equal(meal.cook_color, '#34C759');
+    assert.ok(!('cook_avatar' in meal), 'kein Bildfeld an der Mahlzeit');
+  }
+  assert.ok(!text.includes('QUJDQUJD'), 'und das Bild steht unter keinem anderen Namen in der Antwort');
+  assert.ok(text.length < BILD.length / 4, `die Woche wiegt ${text.length} Zeichen - weniger als ein Viertel EINES Bildes (${BILD.length})`);
+
+  // Dieselbe Frage an jede andere Antwort, die eine Mahlzeit herausgibt.
+  const einzeln = JSON.stringify((await call('PUT', `/${woche[0].id}`, { title: 'Umbenannt' })).body)
+    + JSON.stringify(angelegt.body);
+  assert.ok(!einzeln.includes('QUJDQUJD') && !einzeln.includes('cook_avatar'), 'auch PUT und apply-plan tragen es nicht');
 });

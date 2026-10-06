@@ -47,6 +47,7 @@ globalThis.__bindUserMultiSelect = picker.bindUserMultiSelect;
 
 const { setPermissions, clearPermissions } = await import('../public/permissions.js');
 const { setHouseholdSize, clearHouseholdSize } = await import('../public/utils/household.js');
+const { toLocalDateKey } = await import('../public/utils/date.js');
 const { __test: meals } = await import('../public/pages/meals.js');
 const { __test: dashboard } = await import('../public/pages/dashboard.js');
 
@@ -70,7 +71,7 @@ const MITTAG = { key: 'lunch', label: 'Mittag' };
 const mahlzeit = (over = {}) => ({
   id: 11, title: 'Linsensuppe', date: '2026-10-07', meal_type: 'lunch', recipe_id: null,
   recipe_url: null, notes: null, recurrence_template_id: null, recurrence_end_date: null,
-  cook_user_id: null, cook_name: null, cook_color: null, cook_avatar: null,
+  cook_user_id: null, cook_name: null, cook_color: null,
   ingredients: [{ id: 1, name: 'Linsen', quantity: '200 g', category: 'Vorrat', on_shopping_list: 0 }],
   ...over,
 });
@@ -169,8 +170,25 @@ test('Wochenansicht: ein Koch ohne Zutaten bekommt seine eigene Meta-Zeile; ein 
   assert.match(meta, /meal-card__cook/);
   assert.doesNotMatch(meta, /meal-card__ingredients-count/);
 
-  const mitBild = await withAccess(SCHREIBEN, () => kachel(mitBen({ cook_avatar: 'data:image/png;base64,QkVO' })));
-  assert.match(mitBild, /<img src="data:image\/png;base64,QkVO" alt="Ben"/);
+  // DAS BILD KOMMT AUS DER MITGLIEDERLISTE, nicht aus der Mahlzeit: der Server
+  // haengt es nicht mehr an jede Zeile der Woche. Die Mahlzeit nennt nur die id.
+  const BEN_MIT_BILD = { ...BEN, avatar_data: 'data:image/png;base64,QkVO' };
+  const karte = (modules, members) => withAccess(modules, () => mitPlan({ members }, () => kachel(mitBen())));
+  const mitBild = await karte(SCHREIBEN, [ANNA, BEN_MIT_BILD]);
+  assert.match(mitBild, /<img src="data:image\/png;base64,QkVO" alt="Ben"/, 'das Profilbild des Mitglieds steht an der Karte');
+  assert.match(abschnitt(mitBild, 'class="meal-card__cook"', '</button>'), /<img src="data:image\/png;base64,QkVO"/, 'und zwar am Koch-Zeichen');
+  assert.match(await karte(LESEN, [ANNA, BEN_MIT_BILD]), /<img src="data:image\/png;base64,QkVO" alt="Ben"/, 'auch bei `read`');
+
+  // Ohne Bild am Mitglied, und fuer einen Koch, der in der Liste nicht steht
+  // (ehemalig, Hauspersonal): die Initialen auf seiner Farbe, kein leeres Bild.
+  for (const members of [MITGLIEDER, [ANNA], []]) {
+    const ohneBild = await karte(SCHREIBEN, members);
+    assert.match(ohneBild, /class="meal-card__cook"/, 'das Zeichen bleibt');
+    assert.doesNotMatch(ohneBild, /<img src="data:/, 'kein Bild');
+    assert.match(ohneBild, /background-color:#34C759/, 'die Farbe aus der Mahlzeit');
+  }
+  // Ein Bildfeld an der Mahlzeit selbst liest niemand mehr.
+  assert.doesNotMatch(await withAccess(SCHREIBEN, () => mitPlan({}, () => kachel(mitBen({ cook_avatar: 'data:image/png;base64,QUxU' })))), /QUxU/);
 });
 
 test('Wochenansicht: der Name des Kochs laeuft durch esc()', async () => {
@@ -192,7 +210,7 @@ test('Wochenansicht bei `read`: der Koch bleibt als Zeichen an der Karte', async
 
 test('Uebersicht: der Slot einer Mahlzeit mit Koch traegt den Avatar in der Kopfzeile, vor dem Symbol der Mahlzeitenart', () => {
   const html = dashboard.renderTodayMeals([
-    { meal_type: 'lunch', title: 'Linsensuppe', cook_user_id: 2, cook_name: 'Ben', cook_color: '#34C759', cook_avatar: null },
+    { meal_type: 'lunch', title: 'Linsensuppe', cook_user_id: 2, cook_name: 'Ben', cook_color: '#34C759' },
     { meal_type: 'dinner', title: 'Pasta', cook_user_id: null, cook_name: null },
   ], ['lunch', 'dinner']);
 
@@ -215,19 +233,109 @@ test('Uebersicht, Heute-Blatt: die Zeile der Mahlzeit traegt den Koch als ihre P
   // Alle drei Mahlzeitenarten, damit die Auswahl "was steht als Naechstes an"
   // zu jeder Uhrzeit eine Mahlzeit findet - der Test haengt nicht an der Uhr.
   const heute = (over) => ['breakfast', 'lunch', 'dinner'].map((meal_type, i) => ({
-    id: 30 + i, meal_type, title: `Gericht ${i}`, cook_user_id: null, cook_name: null, cook_color: null, cook_avatar: null, ...over,
+    id: 30 + i, meal_type, title: `Gericht ${i}`, cook_user_id: null, cook_name: null, cook_color: null, ...over,
   }));
-  const zeile = (todayMeals) => dashboard.buildTodayProgram({ todayMeals }, { includeTasks: false, includeCalendar: false })
+  const zeile = (todayMeals, users) => dashboard.buildTodayProgram({ todayMeals, users }, { includeTasks: false, includeCalendar: false })
     .rows.find((row) => row.kind === 'meal');
 
-  const mit = zeile(heute({ cook_user_id: 2, cook_name: 'Ben', cook_color: '#34C759', cook_avatar: 'data:image/png;base64,QkVO' }));
+  // Das Bild steht in `users` derselben Dashboard-Antwort, nicht an der Mahlzeit.
+  const USERS = [{ id: 1, display_name: 'Anna', avatar_color: '#FF9500', avatar_data: null },
+    { id: 2, display_name: 'Ben', avatar_color: '#34C759', avatar_data: 'data:image/png;base64,QkVO' }];
+  const mit = zeile(heute({ cook_user_id: 2, cook_name: 'Ben', cook_color: '#34C759' }), USERS);
   assert.ok(mit, 'Vorbedingung: das Heute-Blatt hat seine Mahlzeit-Zeile');
   assert.deepEqual(mit.who, { id: 2, display_name: 'Ben', color: '#34C759', avatar_data: 'data:image/png;base64,QkVO' },
     'wen die Zeile angeht, ist der Koch - das Ueberlappungszeichen liest genau diese Person');
+  assert.equal(zeile(heute({ cook_user_id: 2, cook_name: 'Ben', cook_color: '#34C759' })).who.avatar_data, null,
+    'ohne `users` (oder fuer einen Koch, der dort nicht steht) bleiben die Initialen');
+
+  // Die Kachel "Heute essen" nimmt denselben Weg.
+  const slot = (users) => dashboard.renderTodayMeals(
+    [{ meal_type: 'lunch', title: 'Suppe', cook_user_id: 2, cook_name: 'Ben', cook_color: '#34C759' }], ['lunch'], users);
+  assert.match(abschnitt(slot(USERS), 'class="meal-slot__cook"', 'meal-slot__icon'), /<img src="data:image\/png;base64,QkVO" alt="Ben"/,
+    'das Profilbild im Kopf des Slots');
+  assert.doesNotMatch(slot([USERS[0]]), /<img src="data:/, 'ohne Eintrag in `users` kein Bild');
+  assert.match(slot(undefined), /class="meal-slot__cook"/, 'und ohne Liste bleibt das Zeichen');
 
   const ohne = zeile(heute());
   assert.ok(ohne, 'Vorbedingung');
   assert.equal(ohne.who, null, 'ohne Koch bleibt die Zeile, wie sie war');
+});
+
+// renderTodayMeals() nimmt die Liste als Argument - ob die Kachel sie auch
+// BEKOMMT, entscheidet der eine Aufruf in renderDashboardLayout(). Fehlte
+// `data.users` dort, blieben alle Tests darueber gruen und die Kachel zeigte
+// fuer jeden Koch nur noch Initialen (Review zu #1739).
+test('Uebersicht: die Mahlzeiten-Kachel bekommt `users` der Dashboard-Antwort - das Profilbild des Kochs steht im Slot', () => {
+  const USERS = [{ id: 1, display_name: 'Anna', avatar_color: '#FF9500', avatar_data: null },
+    { id: 2, display_name: 'Ben', avatar_color: '#34C759', avatar_data: 'data:image/png;base64,QkVO' }];
+  const todayMeals = [{ id: 31, meal_type: 'lunch', title: 'Suppe', cook_user_id: 2, cook_name: 'Ben', cook_color: '#34C759' }];
+  const kachel = (data) => {
+    const zuvor = globalThis.window.yuvomi;
+    globalThis.window.yuvomi = null;
+    try {
+      return dashboard.renderDashboardLayout([{ id: 'meals', visible: true, size: '2x1' }], data, null, 'EUR', { visibleMealTypes: ['lunch'] });
+    } finally {
+      globalThis.window.yuvomi = zuvor;
+    }
+  };
+  const slot = (html) => abschnitt(html, 'class="meal-slot__cook"', 'meal-slot__icon');
+
+  const mit = kachel({ todayMeals, users: USERS });
+  assert.match(mit, /data-type="lunch"/, 'Vorbedingung: die Kachel ist gezeichnet');
+  assert.match(slot(mit), /<img src="data:image\/png;base64,QkVO" alt="Ben"/, 'das Bild aus `users` steht am Koch-Zeichen');
+
+  // Gegenfall: ohne `users` (oder ohne Bild dort) die Initialen auf der Farbe.
+  const ohne = kachel({ todayMeals });
+  assert.ok(slot(ohne), 'das Zeichen bleibt');
+  assert.doesNotMatch(ohne, /<img src="data:/);
+});
+
+// Entschieden zu #1737: Kochen ist eine Zustaendigkeit wie eine Aufgabe, also
+// zaehlt der Koch am Wandtablett unter "Wer heute dran ist" mit. Der Abschnitt
+// zaehlt `who` ueber alle Zeilen des Tages; faellt `who` an der Mahlzeit-Zeile
+// weg, verschwindet, wer heute NUR kocht, ohne dass sonst etwas rot wuerde.
+test('Wandtablett, "Wer heute dran ist": der Koch der heutigen Mahlzeit zaehlt mit', () => {
+  const heute = (over) => ['breakfast', 'lunch', 'dinner'].map((meal_type, i) => ({
+    id: 30 + i, meal_type, title: `Gericht ${i}`, cook_user_id: null, cook_name: null, cook_color: null, ...over,
+  }));
+  const ANNA_WAND = { id: 1, display_name: 'Anna Beispiel', avatar_color: '#FF9500', avatar_data: null };
+  const BEN_WAND = { id: 2, display_name: 'Ben Beispiel', avatar_color: '#34C759', avatar_data: null };
+  const wer = (todayMeals, urgentTasks = []) => {
+    // Ohne App-Huelle, wie test-dashboard.js die Wand rendert: `window.yuvomi`
+    // traegt hier nur den Toast-Stub, keine Modul-Abfrage.
+    const zuvor = globalThis.window.yuvomi;
+    globalThis.window.yuvomi = null;
+    try {
+      const html = dashboard.renderWallSurface({ todayMeals, urgentTasks, users: [ANNA_WAND, BEN_WAND] }, null, {});
+      return abschnitt(html, 'class="wall__who"', '</section>');
+    } finally {
+      globalThis.window.yuvomi = zuvor;
+    }
+  };
+  const mitglieder = (html) => [...html.matchAll(/<span aria-hidden="true">(\d+)<\/span>[\s\S]*?<span class="wall-who__name">([^<]*)<\/span>/g)]
+    .map((m) => `${m[2]}:${m[1]}`);
+
+  setHouseholdSize(2);
+  try {
+    const nurKoch = wer(heute({ cook_user_id: 2, cook_name: 'Ben Beispiel', cook_color: '#34C759' }));
+    assert.ok(nurKoch, 'Vorbedingung: der Abschnitt ist gebaut');
+    assert.deepEqual(mitglieder(nurKoch), ['Ben:1'], 'wer heute nur kocht, ist heute dran - mit einer Sache');
+    assert.doesNotMatch(nurKoch, /wall-who__none/);
+
+    // Kochen zaehlt NEBEN einer Aufgabe, nicht statt ihrer.
+    const aufgabe = { id: 5, title: 'Muell', status: 'open', due_date: toLocalDateKey(new Date()), due_time: '08:00', assigned_users: [{ id: 2, display_name: 'Ben Beispiel', color: '#34C759' }] };
+    const beides = wer(heute({ cook_user_id: 2, cook_name: 'Ben Beispiel', cook_color: '#34C759' }), [aufgabe]);
+    const ohneKochen = wer(heute(), [aufgabe]);
+    assert.deepEqual(mitglieder(ohneKochen), ['Ben:1'], 'Vorbedingung: die Aufgabe allein zaehlt eins');
+    assert.deepEqual(mitglieder(beides), ['Ben:2'], 'Aufgabe und Kochen sind zwei Dinge');
+
+    // Gegenfall: ohne Koch ist niemand dran.
+    const niemand = wer(heute());
+    assert.match(niemand, /wall-who__none/, 'eine Mahlzeit ohne Koch setzt niemanden auf die Liste');
+    assert.deepEqual(mitglieder(niemand), []);
+  } finally {
+    clearHouseholdSize();
+  }
 });
 
 test('Uebersicht: der Name des Kochs laeuft durch esc()', () => {
@@ -269,15 +377,58 @@ test('Leseansicht bei `read`: der Koch steht als Wert da - mit Avatar und Namen,
   assert.match(editor.content, /class="user-ms" data-ms-name="meal_cook"/);
 });
 
-test('bei `read` wird die Mitgliederliste gar nicht erst geladen; mit Schreibrecht kommt sie aus /family/members', async () => {
+// Die Wochenkarte und die Uebersicht messen `esc()` am Namen je selbst; die
+// Leseansicht schreibt ihn an einer DRITTEN Stelle aus, und zwar als sichtbaren
+// Text. Ohne `esc()` dort blieb jeder der beiden anderen Tests gruen.
+test('Leseansicht bei `read`: der Name des Kochs laeuft durch esc()', async () => {
+  const meal = mitBen({ cook_name: 'Ben"><img src=x onerror=alert(1)>&<b>' });
+  const [lesend] = await withAccess(LESEN, () => mitPlan({ meals: [meal] }, () => modalMitschnitt(
+    () => meals.openMealModal({ mode: 'edit', meal, date: meal.date, mealType: meal.meal_type }),
+  )));
+  assert.match(lesend.content, /data-view="read"/, 'Vorbedingung: es ist die Leseansicht');
+  const zeile = abschnitt(lesend.content, 'class="meal-read__cook"', 'data-lucide="list"');
+  assert.ok(zeile, 'Vorbedingung: die Koch-Zeile ist da');
+  assert.ok(zeile.includes('<span>Ben&quot;&gt;&lt;img src=x onerror=alert(1)&gt;&amp;&lt;b&gt;</span>'),
+    'der ausgeschriebene Name steht escaped da');
+  assert.doesNotMatch(lesend.content, /<img src=x|<b>/, 'und nirgends im Dialog roh');
+});
+
+// Ein Abruf, der scheitert, ist kein Haushalt ohne Mitglieder. Der leere
+// Fallback behauptete genau das - der Dialog bot nur noch "Niemand" an, und
+// nichts sagte, warum.
+test('loadMembers: ein gescheiterter Abruf wird gemeldet und loescht die geladene Liste nicht', async () => {
+  const gemeldet = [];
+  const zuvorError = console.error;
+  const zuvorStub = globalThis.__apiStub;
+  console.error = (...args) => { gemeldet.push(args); };
+  const fehler = Object.assign(new Error('Netz weg'), { status: 503 });
+  globalThis.__apiStub = { get: async () => { throw fehler; } };
+  let members;
+  try {
+    members = await withAccess(SCHREIBEN, () => mitPlan({ members: MITGLIEDER }, async () => {
+      await meals.loadMembers();
+      return meals.state.members;
+    }));
+  } finally {
+    console.error = zuvorError;
+    globalThis.__apiStub = zuvorStub;
+  }
+  assert.equal(gemeldet.length, 1, 'der Fehler wird nicht still geschluckt');
+  assert.ok(gemeldet[0].includes(fehler), 'gemeldet wird der Fehler selbst');
+  assert.deepEqual(members, MITGLIEDER, 'die schon geladene Liste bleibt - kein "es gibt keine Mitglieder"');
+});
+
+test('die Mitgliederliste kommt aus /family/members - auch bei `read`, wo sie das Bild des Kochs traegt', async () => {
   const laden = (modules) => withAccess(modules, () => mitPlan({ members: [{ id: 99 }] }, async () => {
     const liste = await aufrufe(() => meals.loadMembers(), { 'GET /family/members': { data: MITGLIEDER } });
     return { pfade: liste.map((a) => `${a.method} ${a.path}`), members: meals.state.members };
   }));
 
+  // Bei `read` gibt es keine Wahl (die Leseansicht hat keine Auswahl), die
+  // Liste traegt aber das Profilbild, das nicht mehr an jeder Mahlzeit haengt.
   const lesend = await laden(LESEN);
-  assert.deepEqual(lesend.pfade, [], 'ohne Wahl keine Liste');
-  assert.deepEqual(lesend.members, []);
+  assert.deepEqual(lesend.pfade, ['GET /family/members'], 'EIN Abruf fuer die ganze Seite, keiner je Mahlzeit');
+  assert.deepEqual(lesend.members, MITGLIEDER);
 
   const schreibend = await laden(SCHREIBEN);
   assert.deepEqual(schreibend.pfade, ['GET /family/members'], 'die eine Mitgliederliste (householdMemberSql)');
@@ -489,26 +640,47 @@ test('Speichern: nur diese Mahlzeit - der Koch geht immer mit, auch als null', a
   assert.equal(entfernt.body.cook_user_id, null, 'den Koch herauszunehmen ist eine Angabe, kein fehlendes Feld');
 });
 
-test('Speichern mit Serien-Umfang: der Koch geht nur mit, wenn er im Dialog geaendert wurde', async () => {
-  const meal = mitBen({ recurrence_template_id: 4, ingredients: [] });
+// Die Senderegel fuer "ganze Serie", am Absendeweg allein: der Koch geht NUR
+// mit, wenn ihn jemand in diesem Dialog gewaehlt hat (`cookTouched`). Welcher
+// Koch an der Mahlzeit oder an der Vorlage steht, spielt keine Rolle - aus den
+// gespeicherten Staenden laesst sich "gewaehlt" nicht von "gezeigt"
+// unterscheiden. Klick, Umfang-Wechsel und der Endzustand je Woche ueber den
+// echten Router stehen in test-meals-cook-series.js.
+test('Speichern mit Serien-Umfang: der Koch geht nur mit, wenn er in diesem Dialog gewaehlt wurde', async () => {
+  const serienBody = async (meal, form, cookTouched) => {
+    const [put, ...mehr] = await speichern({ modal: { mode: 'edit', meal, ...(cookTouched === undefined ? {} : { cookTouched }) }, form });
+    assert.ok(put && !mehr.length, 'genau ein Schreibaufruf');
+    assert.equal(`${put.method} ${put.path}`, 'PUT /meals/11?scope=series');
+    return put.body;
+  };
+  const gleich = mitBen({ recurrence_template_id: 4, recurrence_cook_user_id: 2, ingredients: [] });
+  const abweichend = mitBen({ recurrence_template_id: 4, recurrence_cook_user_id: 1, ingredients: [] });
+  const ohne = mahlzeit({ recurrence_template_id: 4, recurrence_cook_user_id: 1, ingredients: [] });
 
-  const [unveraendert] = await speichern({ modal: { mode: 'edit', meal }, form: formular({ koch: 2, scope: 'series', titel: 'Neuer Titel' }) });
-  assert.equal(`${unveraendert.method} ${unveraendert.path}`, 'PUT /meals/11?scope=series');
-  assert.equal(unveraendert.body.title, 'Neuer Titel', 'Vorbedingung: die Serienaenderung geht raus');
-  assert.ok(!('cook_user_id' in unveraendert.body),
-    'eine Titelaenderung an der Serie ueberschreibt nicht jede einzeln getroffene Koch-Wahl');
+  // Unberuehrt: nichts geht mit - gleich, welcher Stand wovon abweicht.
+  for (const [fall, meal, koch] of [
+    ['Mahlzeit und Vorlage gleich', gleich, 2],
+    ['Mahlzeit weicht von der Vorlage ab', abweichend, 2],
+    ['Mahlzeit ohne Koch, Vorlage mit', ohne, null],
+    ['die Auswahl zeigt den Koch der Vorlage', abweichend, 1],
+  ]) {
+    for (const merker of [false, undefined]) {
+      const body = await serienBody(meal, formular({ koch, scope: 'series', titel: 'Neuer Titel' }), merker);
+      assert.equal(body.title, 'Neuer Titel', `${fall}: Vorbedingung, die Serienaenderung geht raus`);
+      assert.ok(!('cook_user_id' in body), `${fall} (cookTouched ${merker}): kein Koch im Body`);
+    }
+  }
 
-  const [gewechselt] = await speichern({ modal: { mode: 'edit', meal }, form: formular({ koch: 1, scope: 'series' }) });
-  assert.equal(gewechselt.path, '/meals/11?scope=series');
-  assert.equal(gewechselt.body.cook_user_id, 1, 'ein geaenderter Koch erreicht die Serie');
+  // Beruehrt: es geht mit, was gewaehlt ist - auch wenn es keinem Stand widerspricht.
+  assert.equal((await serienBody(gleich, formular({ koch: 2, scope: 'series' }), true)).cook_user_id, 2, 'derselbe Koch, bewusst fuer alle');
+  assert.equal((await serienBody(abweichend, formular({ koch: 1, scope: 'series' }), true)).cook_user_id, 1);
+  const geleert = await serienBody(gleich, formular({ scope: 'series' }), true);
+  assert.ok('cook_user_id' in geleert && geleert.cook_user_id === null, '"Niemand" ist eine Angabe');
 
-  const [entfernt] = await speichern({ modal: { mode: 'edit', meal }, form: formular({ scope: 'series' }) });
-  assert.equal(entfernt.body.cook_user_id, null, 'auch "Niemand" ist eine Aenderung');
-
-  // Eine Serien-Mahlzeit ohne Koch, unveraendert gespeichert: nichts geht mit.
-  const ohne = mahlzeit({ recurrence_template_id: 4, ingredients: [] });
-  const [still] = await speichern({ modal: { mode: 'edit', meal: ohne }, form: formular({ scope: 'series' }) });
-  assert.ok(!('cook_user_id' in still.body));
+  // "Nur diese Mahlzeit" bleibt, wie es war: der Koch geht immer mit, beruehrt oder nicht.
+  const [einzeln] = await speichern({ modal: { mode: 'edit', meal: abweichend }, form: formular({ koch: 2 }) });
+  assert.equal(einzeln.path, '/meals/11');
+  assert.equal(einzeln.body.cook_user_id, 2);
 });
 
 // -------------------------------------------------------------------------

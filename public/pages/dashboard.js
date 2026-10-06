@@ -1050,17 +1050,22 @@ const MEAL_SORT_TIME = { breakfast: '08:00', lunch: '12:30', snack: '15:30', din
  */
 /**
  * Der Koch einer Mahlzeit als Person (#1679) - oder null. `todayMeals` traegt
- * ihn flach neben der Mahlzeit (`cook_user_id`, `cook_name`, `cook_color`,
- * `cook_avatar`); Avatar-Stapel und Ueberlappungszeichen lesen eine Person mit
- * `display_name`, `color` und `avatar_data`.
+ * ihn flach neben der Mahlzeit (`cook_user_id`, `cook_name`, `cook_color`);
+ * Avatar-Stapel und Ueberlappungszeichen lesen eine Person mit `display_name`,
+ * `color` und `avatar_data`.
+ *
+ * DAS BILD KOMMT AUS `users` DER DASHBOARD-ANTWORT, nicht aus der Mahlzeit:
+ * dieselbe Liste, aus der "Wer heute dran ist" seine Gesichter nimmt - sie
+ * geht mit jeder Antwort von `/dashboard` mit, auch an ein Wandtablett. Ein
+ * Koch, der kein Mitglied (mehr) ist, steht dort nicht und zeigt Initialen.
  */
-function mealCookPerson(meal) {
+function mealCookPerson(meal, users) {
   if (!meal?.cook_user_id) return null;
   return {
     id: meal.cook_user_id,
     display_name: meal.cook_name ?? '',
     color: meal.cook_color ?? null,
-    avatar_data: meal.cook_avatar ?? null,
+    avatar_data: (Array.isArray(users) ? users : []).find((user) => user.id === meal.cook_user_id)?.avatar_data ?? null,
   };
 }
 
@@ -1147,7 +1152,7 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
       // Wer kocht (#1679): dasselbe Ueberlappungszeichen wie bei Termin und
       // Aufgabe - "wen geht es an" ist bei einer Mahlzeit der Koch. Ohne Koch
       // bleibt die Zeile, wie sie war.
-      who: mealCookPerson(highlights.meal),
+      who: mealCookPerson(highlights.meal, data?.users),
       priority: 80,
       open: false,
     });
@@ -1631,7 +1636,7 @@ function renderCountdowns(allItems, size, total = null) {
   </div>`;
 }
 
-function renderTodayMeals(meals, visibleMealTypes = MEAL_ORDER) {
+function renderTodayMeals(meals, visibleMealTypes = MEAL_ORDER, users = []) {
   const mealLabels = MEAL_LABELS();
   const safeMeals = Array.isArray(meals) ? meals : [];
   const slots = normalizeVisibleMealTypes(visibleMealTypes).map((type) => {
@@ -1641,7 +1646,7 @@ function renderTodayMeals(meals, visibleMealTypes = MEAL_ORDER) {
     // waehrend der Titel darunter seine zwei Zeilen fuer das Gericht braucht.
     // Der Name geht als sr-only-Satz mit: die Scheibe traegt ihn sonst nur als
     // `title`. Ohne Koch steht nichts da, der Slot sieht aus wie bisher.
-    const cook = mealCookPerson(meal);
+    const cook = mealCookPerson(meal, users);
     const cookMark = cook
       ? `<span class="meal-slot__cook">${renderAvatarStack([cook], { size: 20, maxVisible: 1 })}<span class="sr-only">${esc(t('meals.cookNamed', { name: cook.display_name }))}</span></span>`
       : '';
@@ -4632,7 +4637,7 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     waste: (size) => renderWasteWidget(data.waste, size),
     pantry: (size) => renderPantryWidget(data.pantryExpiring, size),
     family: () => renderFamilyWidget(data.users ?? [], data, { manageHref: familyManage }),
-    meals: () => renderTodayMeals(data.todayMeals ?? [], visibleMealTypes),
+    meals: () => renderTodayMeals(data.todayMeals ?? [], visibleMealTypes, data.users),
     notes: (size) => renderPinnedNotes(data.pinnedNotes ?? [], size, data.notesTotal),
     shopping: () => renderShoppingLists(data.shoppingLists ?? [], data.shoppingOpenCount, data.shoppingOpenLists),
     // Hier ankommen heisst eingerichtet (`isWidgetModuleEnabled`); fehlt das
