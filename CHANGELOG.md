@@ -259,6 +259,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The PDFs in the demo data are real PDFs** (#1511). The demo documents carried a line of
+  placeholder text under a `.pdf` name, so the built-in preview could not open them and
+  every screenshot of an opened document showed an error. Each one is now a one-page PDF with
+  the title and description of its entry, in the language the demo was seeded in, and it opens
+  in the preview and in the browser's own viewer. The three demo images are still placeholders.
+  Only a database filled by `scripts/seed-demo.js` is affected.
+
 - **Resuming a paused recurring shared expense no longer books every date it missed** (#1647).
   A recurring expense that was paused for six months and then resumed got six expenses within
   six hours, one per hourly run, each with its original date. Resuming now skips the missed

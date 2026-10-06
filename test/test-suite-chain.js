@@ -480,6 +480,66 @@ test('der Loopback-Leser urteilt ueber den Aufruf, nicht ueber eine Schreibweise
   assert.deepEqual(verdicts('const l = server.listen.bind(server); l(0);'), []);
 });
 
+/* EIN PFAD FUER DAS BETRIEBSSYSTEM KOMMT AUS fileURLToPath(), NICHT AUS .pathname.
+ *
+ * Der `.pathname` einer aus `import.meta.url` gebauten URL ist unter Windows
+ * `/C:/Users/...`; readdirSync, readFileSync, globSync und `node --check` loesen
+ * das gegen das aktuelle Laufwerk auf und landen bei `C:C:Users...`.
+ * Gemessen am 2026-10-06 auf Windows 11: fuenf Suiten, vier davon rot - sechs
+ * Tests mit ENOENT, dazu der ESM-Syntax-Guard, der alle 239 Dateien unter
+ * public/ als kaputt listete - und eine still gruen: `globSync` fand unter dem
+ * falschen cwd 0 statt 240 Dateien und prueft damit nichts. Unter Linux mit
+ * ASCII-Pfad liefern beide denselben String, deshalb sah CI nichts; ein
+ * Leerzeichen oder Umlaut im Pfad bleibt in `.pathname` prozentkodiert und
+ * faellt dann auch dort. `fileURLToPath` dekodiert und gibt den nativen Pfad.
+ *
+ * Der Guard liest das Muster an der Quelle: eine aus import.meta.url gebaute
+ * URL, deren `.pathname` direkt abgegriffen wird. `url.pathname` auf einer
+ * Variablen bleibt erlaubt - als Label (`split('/public/')`) oder fuer HTTP ist
+ * es richtig, und die Lesezugriffe daneben nehmen die URL selbst. */
+const FILE_URL_PATHNAME = /new URL\([^()]*import\.meta\.url\)\.pathname/g;
+
+test('keine Suite reicht dem Betriebssystem den .pathname einer file-URL', () => {
+  const root = new URL('../test/', import.meta.url);
+  const offenders = jsFilesBelow(root).flatMap((url) => {
+    const src = readFileSync(url, 'utf8');
+    return [...src.matchAll(FILE_URL_PATHNAME)]
+      .map((m) => `${url.href.slice(root.href.length)}:${src.slice(0, m.index).split('\n').length}`);
+  });
+  assert.deepEqual(
+    offenders,
+    [],
+    `fileURLToPath(new URL(...)) statt .pathname - sonst ENOENT unter Windows: ${offenders.join(', ')}`,
+  );
+});
+
+test('der pathname-Leser trifft die fuenf Formen und laesst Label und HTTP in Ruhe', () => {
+  const hits = (src) => [...src.matchAll(FILE_URL_PATHNAME)].length;
+  // Die Proben werden zusammengesetzt, damit diese Datei das Muster nicht
+  // selbst traegt - sonst meldete der Guard oben seine eigenen Beispiele.
+  const url = (arg) => `new URL(${arg}, import.meta.url)`;
+  const PATHNAME = '.' + 'pathname';
+  // Rot: die Formen der fuenf Zeilen, die am 2026-10-06 im Baum standen.
+  for (const src of [
+    `const SERVER_DIR = ${url("'../server/'")}${PATHNAME};`,
+    `execFileSync(process.execPath, ['--check', ${url('file')}${PATHNAME}]);`,
+    `const root = ${url("'..'")}${PATHNAME};`,
+    `globSync('public/**/*.js', { cwd: ${url("'..'")}${PATHNAME} })`,
+  ]) assert.equal(hits(src), 1, src);
+  // Gruen: ein Label auf einer Variablen, ein Lesezugriff ueber die URL selbst, HTTP.
+  for (const src of [
+    `const label = url${PATHNAME}.split('/public/')[1];`,
+    `readFileSync(${url('file')}, 'utf8')`,
+    `new URL(req.url())${PATHNAME}`,
+    'const { pathname } = location;',
+  ]) assert.equal(hits(src), 0, src);
+  // BEKANNTE GRENZE, festgenagelt statt verschwiegen: ein geklammertes erstes
+  // Argument oder ein Zeilenumbruch vor `.pathname` sieht der Leser nicht.
+  // Wird er klueger, werden diese Faelle rot und gehoeren nach oben.
+  assert.equal(hits(`${url('join(a, b)')}${PATHNAME}`), 0);
+  assert.equal(hits(`${url("'..'")}\n  ${PATHNAME}`), 0);
+});
+
 /* EINE SUITE, DIE NIRGENDS BESCHRIEBEN IST, HAELT EINE INVARIANTE, DIE NIEMAND KENNT.
  *
  * `docs/test-suites.md` ist die eine Stelle, an der steht, welche Suite welche
