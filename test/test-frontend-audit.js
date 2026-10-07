@@ -20036,21 +20036,21 @@ function openThing(item) {
     title: t('rewards.addReward'),
     content: \`<form id="f">
       <div class="modal-panel__footer">
-        <button type="submit" class="btn btn--primary">\${isEdit ? esc(t('common.save')) : esc(t('common.create'))}</button>
+        <button type="submit" class="btn btn--primary">\${isEdit ? esc(t('common.save')) : esc(t('tasks.emptyAction'))}</button>
       </div>
     </form>\`,
   });
 }`;
   assert.deepEqual(submitOutsideFooter(footer), [], 'der Knopf im Fuss ist kein Fund');
   assert.deepEqual(footerWithoutCancel(footer), [3], 'ein Fuss ohne Abbrechen wird gefunden');
-  assert.deepEqual(saveBranchPartners(footer), ['common.create']);
-  assert.deepEqual(foreignCreateVerbs(footer, deValueOf), ['common.create=Erstellen']);
+  assert.deepEqual(saveBranchPartners(footer), ['tasks.emptyAction']);
+  assert.deepEqual(foreignCreateVerbs(footer, deValueOf), ['tasks.emptyAction=Aufgabe erstellen']);
   // Ein Kommentar macht nichts gruen: der Aufrufer schneidet ihn vorher.
   const commented = withoutCommentsKeepingLines(footer.replace('<form id="f">', '<form id="f">\n      <!-- <button data-action="close-modal"> -->'));
   assert.deepEqual(footerWithoutCancel(commented), [3]);
   const good = footer
     .replace('<button type="submit"', '<button type="button" class="btn btn--secondary" data-action="close-modal">${t(\'common.cancel\')}</button>\n        <button type="submit"')
-    .replace("t('common.create')", "t('common.add')");
+    .replace("t('tasks.emptyAction')", "t('common.add')");
   assert.deepEqual(footerWithoutCancel(good), []);
   assert.deepEqual(saveBranchPartners(good), []);
   assert.deepEqual(foreignCreateVerbs(good, deValueOf), []);
