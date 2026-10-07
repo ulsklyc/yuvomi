@@ -809,8 +809,8 @@ test('Geteilte Ausgaben: Kopfknopf und Gruppe-Anlegen haengen am Recht', () => {
 // -------------------------------------------------------------------------
 
 test('READ_SAFE_ACTIONS ist eine Positivliste und enthaelt nur lesende Aktionen', () => {
-  assert.deepEqual([...budget.READ_SAFE_ACTIONS], ['loan-filter'],
-    'der Raten-Filter ist die einzige lesende `data-action` dieser Seite');
+  assert.deepEqual([...budget.READ_SAFE_ACTIONS], ['loan-filter', 'toggle-planned'],
+    'der Raten-Filter und der Aufklapper von "Geplant" (R17/E4) sind die lesenden `data-action` dieser Seite');
   const alle = new Set([...BUDGET_CODE.matchAll(/data-action="([a-z-]+)"/g)].map((m) => m[1]));
   // Untergrenze nur als Blindheits-Probe: seit R14 P8 stehen Loeschen und
   // Bearbeiten in den Blaettern, die Seite traegt 7 Aktionsnamen.

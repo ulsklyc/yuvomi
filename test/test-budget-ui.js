@@ -4478,3 +4478,119 @@ test('#1631: die neuen Saetze stehen in jeder Sprache, uebersetzt und mit ihrem 
     }
   }
 });
+
+// ---------------------------------------------------------------------------
+// Entscheidung R17 (E4): die Uebersicht zeigt "Geplant · n" und "Gebucht"
+// ---------------------------------------------------------------------------
+
+/* Im laufenden Monat standen die Zeilen mit einem Datum nach heute oben in der
+ * EINEN absteigenden Liste: 11 von 23 in der Demo, die erste gebuchte Buchung
+ * bei y=878 von 800 (1280x800), keine einzige Tatsache im ersten Bild. */
+test('R17/E4: splitLedger trennt Geplantes von Gebuchtem und stellt das Naechste nach vorn', () => {
+  const heute = '2026-10-07';
+  const rows = [
+    zeile({ id: 1, date: '2026-10-19' }),
+    zeile({ id: 2, date: '2026-10-08' }),
+    zeile({ id: 3, date: '2026-10-07' }),
+    zeile({ id: 4, date: '2026-10-05', is_pending: 1 }),
+    zeile({ id: 5, date: '2026-10-01' }),
+  ];
+  const { planned, booked } = budgetUi.splitLedger(rows, heute);
+  assert.deepEqual(planned.map((e) => e.id), [4, 2, 1], 'geplant: Datum nach heute ODER noch erwartet - aufsteigend, das Naechste zuerst');
+  assert.deepEqual(booked.map((e) => e.id), [3, 5], 'gebucht: der Rest in der Reihenfolge der Liste; heute zaehlt als passiert');
+  assert.deepEqual(rows.map((e) => e.id), [1, 2, 3, 4, 5], 'die Eingabe bleibt unveraendert');
+});
+
+test('R17/E4: zwei Abschnitte mit Titel, "Geplant" eingeklappt auf drei Zeilen', () => {
+  const vorher = { ...budgetUi.state };
+  const geplant = [6, 5, 4, 3, 2].map((tag) => zeile({ id: 100 + tag, title: `Serie ${tag}`, date: `2999-01-0${tag}` }));
+  const gebucht = [zeile({ id: 1, title: 'Einkauf', date: '2000-01-03' }), zeile({ id: 2, title: 'Miete', date: '2000-01-01' })];
+  try {
+    Object.assign(budgetUi.state, {
+      month: '2000-01', entries: [...geplant, ...gebucht], responsibleFilterId: null, groupByResponsible: false,
+      ledgerQuery: '', ledgerResults: null, plannedExpandedMonth: null,
+    });
+    const html = budgetUi.renderEntries();
+    const abschnitte = [...html.matchAll(/<section class="budget-ledger-section ([^"]*)"/g)].map((m) => m[1].trim());
+    assert.deepEqual(abschnitte, ['budget-ledger-section--planned', 'budget-ledger-section--booked'], 'erst Geplant, dann Gebucht');
+    assert.match(html, /<h3 class="u-section-title budget-ledger-section__title" id="budget-planned-title">budget\.plannedTitle <span class="budget-ledger-section__count">· 5<\/span><\/h3>/);
+    assert.match(html, /<h3 class="u-section-title budget-ledger-section__title" id="budget-booked-title">budget\.bookedTitle<\/h3>/);
+
+    const [planned, booked] = html.split('budget-ledger-section--booked');
+    const reihen = [...planned.matchAll(/class="list-row budget-entry([^"]*)" data-id="(\d+)"/g)];
+    assert.deepEqual(reihen.map((m) => Number(m[2])), [102, 103, 104, 105, 106], 'das Naechste zuerst');
+    assert.deepEqual(reihen.map((m) => /budget-entry--more/.test(m[1])), [false, false, false, true, true],
+      `die ersten ${budgetUi.PLANNED_PREVIEW_ROWS} stehen, der Rest wartet hinter dem Knopf`);
+    assert.match(planned, /data-action="toggle-planned"\s+aria-expanded="false" aria-controls="budget-planned-rows"/);
+    assert.match(planned, /budget\.showAllPlanned\{&quot;count&quot;:5\}/, 'der Knopf nennt, wie viele es sind');
+    assert.deepEqual([...booked.matchAll(/data-id="(\d+)"/g)].map((m) => Number(m[1])), [1, 2], 'Gebucht in der Reihenfolge der Liste');
+    assert.doesNotMatch(booked, /budget-entry--more|toggle-planned/);
+
+    // Aufgeklappt gilt fuer DIESEN Monat, nicht fuer den naechsten.
+    budgetUi.state.plannedExpandedMonth = '2000-01';
+    assert.match(budgetUi.renderEntries(), /budget-ledger-section--planned is-expanded"[\s\S]*aria-expanded="true"/);
+    budgetUi.state.plannedExpandedMonth = '1999-12';
+    assert.doesNotMatch(budgetUi.renderEntries(), /is-expanded/);
+
+    // Drei oder weniger: kein Knopf, nichts versteckt.
+    budgetUi.state.entries = [...geplant.slice(0, 3), ...gebucht];
+    const wenig = budgetUi.renderEntries();
+    assert.doesNotMatch(wenig, /toggle-planned|budget-entry--more/);
+
+    // Ohne Geplantes bleibt es EINE Liste ohne Zwischentitel.
+    budgetUi.state.entries = gebucht;
+    assert.doesNotMatch(budgetUi.renderEntries(), /budget-ledger-section/, 'vergangener Monat: kein einzelner Abschnitt "Gebucht"');
+  } finally { Object.assign(budgetUi.state, vorher); }
+
+  // Ein Prognose-Monat ist ganz geplant: dort sagt es der Titel der Bilanz.
+  try {
+    Object.assign(budgetUi.state, { month: '2999-01', entries: geplant, responsibleFilterId: null, groupByResponsible: false, ledgerQuery: '', ledgerResults: null });
+    assert.doesNotMatch(budgetUi.renderEntries(), /budget-ledger-section/);
+  } finally { Object.assign(budgetUi.state, vorher); }
+});
+
+test('R17/E4: der Aufklapper schaltet ohne Neuaufbau, auch bei Nur-lesen; geplante Betraege stehen sekundaer', () => {
+  const klassen = new Set(['budget-ledger-section', 'budget-ledger-section--planned']);
+  const label = { textContent: '' };
+  const section = {
+    classList: { contains: (c) => klassen.has(c), toggle: (c, an) => (an ? klassen.add(c) : klassen.delete(c)) },
+    querySelectorAll: () => ({ length: 7 }),
+  };
+  const attrs = {};
+  const knopf = {
+    closest: (sel) => (sel === '.budget-ledger-section--planned' ? section : null),
+    setAttribute: (k, v) => { attrs[k] = v; },
+    querySelector: () => label,
+  };
+  const vorher = { ...budgetUi.state };
+  try {
+    Object.assign(budgetUi.state, { month: '2000-01', plannedExpandedMonth: null });
+    budgetUi.togglePlanned(knopf);
+    assert.ok(klassen.has('is-expanded'));
+    assert.equal(attrs['aria-expanded'], 'true');
+    assert.equal(label.textContent, 'budget.showFewerCategories');
+    assert.equal(budgetUi.state.plannedExpandedMonth, '2000-01', 'der Zustand haengt am Monat');
+    budgetUi.togglePlanned(knopf);
+    assert.ok(!klassen.has('is-expanded'));
+    assert.equal(attrs['aria-expanded'], 'false');
+    assert.equal(label.textContent, 'budget.showAllPlanned{"count":7}');
+    assert.equal(budgetUi.state.plannedExpandedMonth, null);
+  } finally { Object.assign(budgetUi.state, vorher); }
+
+  assert.match(budget, /const READ_SAFE_ACTIONS = new Set\(\['loan-filter', 'toggle-planned'\]\)/, 'aufklappen liest nur');
+  assert.match(budget, /closest\('\[data-action="toggle-planned"\]'\);\s*\n\s*if \(plannedBtn\) \{ togglePlanned\(plannedBtn\); return; \}/,
+    'der Klick laeuft ueber die Delegation der Liste');
+
+  const rules = [...eachRule(budgetCss)];
+  const regel = (sel) => rules.find((r) => r.selector.trim() === sel);
+  assert.match(regel('.budget-ledger-section--planned:not(.is-expanded) .budget-entry--more')?.body ?? '', /display:\s*none/);
+  assert.match(regel('.budget-ledger-section--planned .budget-entry__amount')?.body ?? '', /color:\s*var\(--color-text-secondary\)/,
+    'ein geplanter Betrag ist noch keine Tatsache');
+  // Die Huelle gibt Flaeche und Trennlinien an die Abschnitte ab - der Titel
+  // steht auf der Buehne, nicht in einer Karte.
+  assert.match(regel('.budget-list:has(> .budget-ledger-section)')?.body ?? '', /background:\s*none[\s\S]*box-shadow:\s*none/);
+  assert.match(regel('.budget-ledger-section__rows')?.body ?? '', /box-shadow:\s*var\(--shadow-sm\)/);
+  // Listenbewegung und Monats-Wisch (R17, Schritt 2) haengen an diesen beiden.
+  assert.match(budget, /const BUDGET_ENTRY = '#budget-list \.budget-entry\[data-id\]';/);
+  assert.match(budget, /class="budget-list" id="budget-list"/);
+});

@@ -308,6 +308,10 @@ const PLURAL_EXCEPTIONS = {
   // --- n=1 am Aufrufer ausgeschlossen ------------------------------------
   // subscriptions.js:135 - `cycle_interval === 1 ? t(key) : t('everyCycle', …)`.
   'subscriptions.everyCycle': 'GUARDED',
+  // budget.js, ledgerSectionsHtml() - der Knopf entsteht nur bei
+  // `planned.length - PLANNED_PREVIEW_ROWS > 0`, also ab vier Zeilen; die Zahl
+  // steht in Klammern hinter dem Satz ("Alle anzeigen (11)").
+  'budget.showAllPlanned': 'GUARDED',
   // personal-calendar.js:214 - der Wert ist die Konstante MAX_DEFAULT_REMINDERS.
   'settings.calendarDefaultRemindersMax': 'GUARDED',
   // subscriptions.js:150-154 - dueLabel() faengt d<0, d===0 und d===1 vorher ab,

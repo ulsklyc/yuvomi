@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Budget: what is planned and what is booked stand apart.** In the running month the overview
+  listed everything by date, latest first - so the entries that had not happened yet stood on top,
+  and on a full month the first real booking sat below the fold. The list now has two sections:
+  "Planned · n" with the next three entries (the rest behind "Show all"), their amounts in a
+  quieter colour, and "Booked" below it. An expected booking that still waits for its tick counts
+  as planned. A past month, a future month and search results keep their single list.
+
 - **Waste: the main button adds the recurring date.** It used to add a one-off pickup, the rarest
   thing you do there, while the date the module is about - "every other Friday" - sat in the
   three-dot menu of a waste type. The button now reads "Schedule" and opens that dialog, with the

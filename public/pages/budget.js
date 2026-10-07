@@ -247,6 +247,7 @@ let state = {
   scope:       'mine',        // Ansichts-Filter im personal-Modus: 'mine' | 'household'
   expensesOnly: false,        // Anzeige „Nur Ausgaben" (#504): Einnahmen+Saldo ausblenden
   categoriesExpanded: false,  // Kategorie-Diagramm einspaltig ganz aufgeklappt (sonst Top 3)
+  plannedExpandedMonth: null, // Monat, in dem "Geplant" ganz aufgeklappt ist (sonst die naechsten 3); gilt nur fuer DIESEN Monat
   balanceExpanded: false,     // mobil: Bilanz-Karten unter der Kopfzeile aufgeklappt (balanceGlanceHtml)
   loansExpanded: false,       // mobil: Darlehens-Karten unter der Glance-Zeile aufgeklappt (metricGlanceHtml)
   meta:        { expenseCategories: [], incomeCategories: [], subcategories: {} },
@@ -374,7 +375,7 @@ function readOnly() {
 
 // Jede `data-action` dieser Seite, die NICHT schreibt. Eine Positivliste,
 // damit eine morgen ergaenzte Schreib-Aktion standardmaessig gesperrt ist.
-const READ_SAFE_ACTIONS = new Set(['loan-filter']);
+const READ_SAFE_ACTIONS = new Set(['loan-filter', 'toggle-planned']);
 
 // Die schreibenden Bedienhaken OHNE `data-action` - Konten, Leerzustaende und
 // der Kategorie-Verwalter sind einzeln verdrahtet, nicht ueber einen Verteiler.
@@ -1392,6 +1393,9 @@ function renderBody() {
     const confirmBtn = e.target.closest('[data-action="confirm"]');
     if (confirmBtn) { await openConfirmBookingModal(parseInt(confirmBtn.dataset.id, 10)); return; }
 
+    const plannedBtn = e.target.closest('[data-action="toggle-planned"]');
+    if (plannedBtn) { togglePlanned(plannedBtn); return; }
+
     // Ein Klick auf die Avatare filtert auf diese Person (#1057) - dieselbe
     // Geste wie der Konto-Drilldown, und sie braucht kein eigenes Bedienelement
     // in einer Kopfzeile, die schon voll ist.
@@ -1841,7 +1845,103 @@ function renderEntries() {
       </div>`).join('');
   }
 
-  return entryRows(rows);
+  return ledgerSectionsHtml(rows);
+}
+
+/* Wie viele geplante Zeilen eingeklappt stehen. */
+const PLANNED_PREVIEW_ROWS = 3;
+
+/**
+ * Pure: teilt die Buchungen eines Monats in GEPLANT und GEBUCHT (Entscheidung
+ * R17, E4).
+ *
+ * Geplant ist, was noch keine Tatsache ist: eine Zeile mit einem Datum nach
+ * heute (isUpcomingEntry() - meist eine Serie, die der Server fuer den Monat
+ * schon angelegt hat) und eine erwartete Buchung, die noch niemand verbucht
+ * hat (`is_pending`, #637). Gebucht ist der Rest, in der Reihenfolge der Liste.
+ *
+ * GEPLANT STEHT AUFSTEIGEND, das Naechste zuerst: der Abschnitt zeigt
+ * eingeklappt nur drei Zeilen, und das sollen die sein, die als Naechstes
+ * kommen - nicht die vom Monatsende, mit denen die absteigende Liste begann.
+ * Eine erwartete Buchung mit einem Datum von gestern steht damit ganz vorn:
+ * sie wartet auf ihr Haekchen. Stabil sortiert; `today` als Parameter, damit
+ * ein Test den Tag festnagelt.
+ */
+function splitLedger(rows, today = todayKey()) {
+  const planned = [];
+  const booked = [];
+  for (const entry of rows) {
+    if (entry.is_pending || entry.date > today) planned.push(entry);
+    else booked.push(entry);
+  }
+  planned.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  return { planned, booked };
+}
+
+function plannedToggleLabel(expanded, count) {
+  return expanded ? t('budget.showFewerCategories') : t('budget.showAllPlanned', { count });
+}
+
+/**
+ * Die Liste der Uebersicht als zwei Abschnitte: "Geplant · n" und "Gebucht".
+ *
+ * Bis R17 EINE absteigende Liste: im laufenden Monat standen die Zeilen mit
+ * einem Datum nach heute oben - 11 von 23 in der Demo, die erste gebuchte
+ * Buchung bei y=878 von 800 (1280x800) und y=990 von 844 (390). Das erste Bild
+ * eines Haushaltsbuchs zeigte keine einzige Tatsache, und der Unterschied zur
+ * Prognose war ein Ring statt eines Punkts.
+ *
+ * OHNE GEPLANTE ZEILE BLEIBT ES EINE LISTE OHNE ZWISCHENTITEL (vergangener
+ * Monat, Kontoauszug ohne Ausstehendes): ein einzelner Abschnitt "Gebucht"
+ * unter dem Titel der Liste saegte nur eine Zeile ab. Ein Prognose-Monat ist
+ * ganz geplant - dort sagt es der Titel der Bilanz (isForecastMonth()), und
+ * der Abschnitt klappte 20 von 23 Zeilen weg.
+ *
+ * Der Aufklapp-Zustand gilt fuer den Monat, in dem er gesetzt wurde
+ * (`plannedExpandedMonth`), und wird nicht gespeichert.
+ */
+function ledgerSectionsHtml(rows) {
+  if (isForecastMonth(state.month)) return entryRows(rows);
+  const { planned, booked } = splitLedger(rows);
+  if (!planned.length) return entryRows(rows);
+  const expanded = state.plannedExpandedMonth === state.month;
+  const more = planned.length - PLANNED_PREVIEW_ROWS;
+  const toggle = more > 0 ? `
+        <button type="button" class="budget-planned-toggle" data-action="toggle-planned"
+                aria-expanded="${expanded ? 'true' : 'false'}" aria-controls="budget-planned-rows">
+          <i data-lucide="chevron-down" class="icon-sm budget-planned-toggle__icon" aria-hidden="true"></i>
+          <span class="budget-planned-toggle__label">${esc(plannedToggleLabel(expanded, planned.length))}</span>
+        </button>` : '';
+  return `
+      <section class="budget-ledger-section budget-ledger-section--planned${expanded ? ' is-expanded' : ''}" aria-labelledby="budget-planned-title">
+        <h3 class="u-section-title budget-ledger-section__title" id="budget-planned-title">${esc(t('budget.plannedTitle'))} <span class="budget-ledger-section__count">· ${planned.length}</span></h3>
+        <div class="budget-ledger-section__rows" id="budget-planned-rows">
+          ${entryRows(planned.slice(0, PLANNED_PREVIEW_ROWS))}
+          ${entryRows(planned.slice(PLANNED_PREVIEW_ROWS), { rowClass: 'budget-entry--more' })}${toggle}
+        </div>
+      </section>
+      ${booked.length ? `
+      <section class="budget-ledger-section budget-ledger-section--booked" aria-labelledby="budget-booked-title">
+        <h3 class="u-section-title budget-ledger-section__title" id="budget-booked-title">${esc(t('budget.bookedTitle'))}</h3>
+        <div class="budget-ledger-section__rows">
+          ${entryRows(booked)}
+        </div>
+      </section>` : ''}`;
+}
+
+/* Auf- und Zuklappen ohne Neuaufbau (wie toggleCategoryChart()): der Knopf
+ * behaelt Fokus und Position, nur Klasse, aria-expanded und Beschriftung
+ * ziehen nach. */
+function togglePlanned(button) {
+  const section = button.closest('.budget-ledger-section--planned');
+  if (!section) return;
+  const expanded = !section.classList.contains('is-expanded');
+  state.plannedExpandedMonth = expanded ? state.month : null;
+  section.classList.toggle('is-expanded', expanded);
+  button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  const label = button.querySelector('.budget-planned-toggle__label');
+  const count = section.querySelectorAll('.budget-entry').length;
+  if (label) label.textContent = plannedToggleLabel(expanded, count);
 }
 
 /**
@@ -1863,7 +1963,7 @@ function statementCreditLimitHtml() {
 }
 
 /** Die Buchungszeilen selbst - einmal gebaut, von Liste und Gruppen benutzt. */
-function entryRows(list, { fullDate = false } = {}) {
+function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
   const ro = readOnly();
   // In einem Prognose-Monat liegt JEDE Zeile nach heute - dort sagt es der
   // Titel der Bilanz, und ein Symbol in jeder Metazeile waere Wiederholung.
@@ -1991,7 +2091,7 @@ function entryRows(list, { fullDate = false } = {}) {
           ${confirmBtn}`;
 
     return `
-      <div class="list-row budget-entry${pending ? ' budget-entry--pending' : ''}${upcoming ? ' budget-entry--upcoming' : ''}${masked ? ' budget-entry--masked' : ''}" ${rowInteraction}>
+      <div class="list-row budget-entry${pending ? ' budget-entry--pending' : ''}${upcoming ? ' budget-entry--upcoming' : ''}${masked ? ' budget-entry--masked' : ''}${rowClass ? ` ${rowClass}` : ''}" ${rowInteraction}>
         <div class="budget-entry__indicator ${indClass}"></div>
         <div class="list-row__main">
           ${titleCell}
@@ -5181,6 +5281,8 @@ export const __test = {
   WRITE_HOOKS,
   readOnlyLatch,
   renderEntries,
+  // R17/E4: die Liste der Uebersicht als "Geplant" und "Gebucht".
+  splitLedger, ledgerSectionsHtml, togglePlanned, PLANNED_PREVIEW_ROWS,
   renderAccountsPage,
   renderLoansPage,
   renderLoanCard,

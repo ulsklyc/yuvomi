@@ -1850,6 +1850,105 @@
   border-top: 1px solid var(--color-border-subtle);
 }
 
+/* GEPLANT UND GEBUCHT SIND ZWEI ABSCHNITTE (Entscheidung R17, E4).
+ *
+ * Im laufenden Monat standen die Zeilen mit einem Datum nach heute oben in der
+ * EINEN Liste - 11 von 23 in der Demo, die erste gebuchte Buchung bei y=878 von
+ * 800. Jetzt traegt jeder Abschnitt seinen Titel AUF DER BUEHNE und seinen
+ * eigenen Zeilentraeger; `#budget-list` ist dann nur noch die Huelle und gibt
+ * Flaeche, Schatten und Trennlinien an die Abschnitte ab (`:has()`, damit die
+ * Liste ohne geplante Zeile - vergangener Monat, Suche, Gruppierung - bleibt,
+ * was sie war). */
+.budget-list:has(> .budget-ledger-section) {
+  overflow: visible;
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.budget-list:has(> .budget-ledger-section) > * + * {
+  border-top: 0;
+}
+
+.budget-ledger-section + .budget-ledger-section {
+  margin-top: var(--space-5);
+}
+
+.budget-ledger-section__title {
+  margin: 0 0 var(--space-2);
+}
+
+/* Die Zahl gehoert zum Titel, traegt aber nicht sein Gewicht: sie zaehlt, sie
+ * benennt nicht. */
+.budget-ledger-section__count {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-regular);
+}
+
+/* Dieselbe Traegerform wie `.budget-list` darueber. */
+.budget-ledger-section__rows {
+  overflow: clip;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.budget-ledger-section__rows > * + * {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* EINGEKLAPPT DIE NAECHSTEN DREI: was danach kommt, steht hinter dem Knopf am
+ * Fuss des Traegers. Aus dem Fluss per `display`, nicht per Hoehe - eine
+ * versteckte Zeile ist kein Tab-Stopp. */
+.budget-ledger-section--planned:not(.is-expanded) .budget-entry--more {
+  display: none;
+}
+
+/* Ein geplanter Betrag ist noch keine Tatsache: er steht in der Sekundaerfarbe,
+ * auch eine Einnahme - Gruen bleibt dem, was eingegangen ist. Das Vorzeichen
+ * am Betrag sagt die Richtung weiter. */
+.budget-ledger-section--planned .budget-entry__amount {
+  color: var(--color-text-secondary);
+}
+
+.budget-planned-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--target-base);
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  background: none;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.budget-planned-toggle:hover {
+  background-color: var(--color-surface-hover);
+}
+
+.budget-planned-toggle__icon {
+  flex: 0 0 auto;
+  transition: transform var(--transition-fast);
+}
+
+.budget-planned-toggle[aria-expanded="true"] .budget-planned-toggle__icon {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .budget-planned-toggle,
+  .budget-planned-toggle__icon {
+    transition: none;
+  }
+}
+
 /* Das Budget-Panel ist der Scrollport der Uebersicht und gehoert wie --loans
  * in die Gruppe der duennen Modul-Scrollbars. */
 .budget-loans__list,
