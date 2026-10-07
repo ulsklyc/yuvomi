@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throttled phone (4x CPU, "Fast 4G"), three runs each: the overview asked for its data after
   747-775 ms instead of 1297-1333 ms, and the greeting appeared after 980-1007 ms instead of
   1535-1576 ms.
+- **Health loads in three steps instead of six.** The overview asked for vitals and medication,
+  then for the cycle history, then for the cycle settings, each only after the previous answer
+  had arrived. These now go out together; who may see what is decided as before. Measured on the
+  same throttled phone: the last answer arrived 747 ms after the first health request instead of
+  1119 ms.
 
 ### Fixed
 

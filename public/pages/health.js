@@ -5777,10 +5777,20 @@ async function mountOverview() {
     areaLoadingMarkup('overview', 'list'));
 
   try {
-    await loadHealthMembers(overview, healthUser);
     const today = todayKey();
     overview.exportRange = { from: addLocalDays(today, -(OVERVIEW_EXPORT_DAYS - 1)), to: today };
-    await loadOverview();
+    // EINE WELLE STATT ZWEI (Critique R18). Die Mitgliederliste bestimmt die
+    // gezeigte Person nur, wenn noch keine feststeht und auch die eigene nicht
+    // bekannt ist (loadHealthMembers). Sonst haengt loadOverview() nicht an ihr -
+    // die Person steht dann hier schon fest, und beide laufen gleichzeitig.
+    const person = overview.personId ?? overview.meId;
+    if (person) {
+      overview.personId = person;
+      await Promise.all([loadHealthMembers(overview, healthUser), loadOverview()]);
+    } else {
+      await loadHealthMembers(overview, healthUser);
+      await loadOverview();
+    }
     overview.error = false;
   } catch (err) {
     console.error('[Health] overview mount error:', err);
@@ -5792,14 +5802,6 @@ async function mountOverview() {
 
 async function loadOverview() {
   const query = overview.personId ? `?user_id=${encodeURIComponent(overview.personId)}` : '';
-  const [vRes, mRes] = await Promise.all([
-    api.get(`/health/vitals${query}`),
-    api.get(`/health/medications${query}`),
-  ]);
-  overview.vitals = vRes.data || [];
-  overview.meds = mRes.data || [];
-  overview.schedulesByMed = {};
-  overview.logsByMed = {};
 
   // Nur laden, wenn der Zyklus-Tab fuer DIESEN Betrachter ueberhaupt
   // erreichbar waere (cycleEnabled, siehe Dateikopf) - sonst zwei zusaetzliche
@@ -5807,24 +5809,32 @@ async function loadOverview() {
   // Einstellungen (privat) nur in der eigenen Ansicht, exakt wie loadCycle()
   // im Zyklus-Tab selbst - fuer eine fremde Person bleibt es bei der aus
   // ihrer Perioden-Historie abgeleiteten Standardvorhersage.
-  if (cycleEnabled) {
-    const [cpRes, clRes] = await Promise.all([
-      api.get(`/health/cycle/periods${query}`),
-      api.get(`/health/cycle/logs${query}`),
-    ]);
-    overview.cyclePeriods = cpRes.data || [];
-    overview.cycleLogs = clRes.data || [];
-    if (overview.personId === overview.meId) {
-      try { overview.cycleSettings = (await api.get('/health/cycle/settings')).data || {}; }
-      catch { overview.cycleSettings = {}; }
-    } else {
-      overview.cycleSettings = null;
-    }
-  } else {
-    overview.cyclePeriods = [];
-    overview.cycleLogs = [];
-    overview.cycleSettings = null;
-  }
+  const ownView = overview.personId === overview.meId;
+  const empty = { data: [] };
+
+  // EINE WELLE (Critique R18). Vitalwerte, Medikamente und die drei
+  // Zyklus-Abrufe haengen nicht voneinander ab, liefen aber in drei Wellen
+  // hintereinander (gemessen am gedrosselten Telefon: 1698, 1880, 2055 ms nach
+  // dem Start, je rund 175 ms Rundreise). WER was laden darf, entscheidet
+  // weiter dieselbe Regel wie oben - sie waehlt nur noch, welche Abrufe in der
+  // Welle stehen. Ein Fehler bei den Einstellungen bleibt folgenlos (leere
+  // Einstellungen), jeder andere bricht das Laden ab wie vorher.
+  const [vRes, mRes, cpRes, clRes, cycleSettings] = await Promise.all([
+    api.get(`/health/vitals${query}`),
+    api.get(`/health/medications${query}`),
+    cycleEnabled ? api.get(`/health/cycle/periods${query}`) : empty,
+    cycleEnabled ? api.get(`/health/cycle/logs${query}`) : empty,
+    cycleEnabled && ownView
+      ? api.get('/health/cycle/settings').then((res) => res.data || {}, () => ({}))
+      : null,
+  ]);
+  overview.vitals = vRes.data || [];
+  overview.meds = mRes.data || [];
+  overview.schedulesByMed = {};
+  overview.logsByMed = {};
+  overview.cyclePeriods = cpRes.data || [];
+  overview.cycleLogs = clRes.data || [];
+  overview.cycleSettings = cycleSettings;
 
   const today = todayKey();
   await Promise.all(overview.meds.map(async (m) => {

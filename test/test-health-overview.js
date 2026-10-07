@@ -180,3 +180,116 @@ test('R17: schmal bekommt der Medikamentenname die Zeile, die Aktionen stehen da
   const flat = [...eachRule(css)].filter((r) => r.at.length === 0 && r.selector.trim() === '.health-dose');
   for (const r of flat) assert.doesNotMatch(r.body, /flex-wrap/, 'ausserhalb der schmalen Stufe bricht die Dosiszeile nicht um');
 });
+
+// --------------------------------------------------------
+// Ladewellen der Uebersicht (Critique R18)
+//
+// Gemessen am gedrosselten Telefon lud die Uebersicht in sechs Wellen:
+// Mitglieder, dann Vitalwerte + Medikamente, dann Zyklus-Perioden + -Logs, dann
+// Zyklus-Einstellungen, dann je Medikament Plaene + Logs. Was nicht voneinander
+// abhaengt, steht jetzt in EINER Welle. loadOverview() laeuft hier als PROGRAMM:
+// sein Quelltext aus health.js, mit einer `api`, die erst antwortet, wenn der
+// Test es sagt - so ist sichtbar, welche Abrufe gleichzeitig offen sind.
+// --------------------------------------------------------
+
+async function loadOverviewHarness({ cycleEnabled, personId, meId, meds = [] }) {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const start = src.indexOf('async function loadOverview() {');
+  const end = src.indexOf('\nfunction overviewAllSchedules()');
+  assert.ok(start > 0 && end > start, 'loadOverview() nicht gefunden');
+  const body = src.slice(start, end);
+
+  const open = [];
+  const api = {
+    get: (path) => new Promise((resolve, reject) => { open.push({ path, resolve, reject }); }),
+  };
+  const overview = { personId, meId, vitals: null, meds: null, cyclePeriods: null, cycleLogs: null, cycleSettings: undefined };
+  const AsyncFunction = (async () => {}).constructor;
+  const run = new AsyncFunction(
+    'overview', 'api', 'cycleEnabled', 'todayKey', 'addLocalDays', 'medLogWindowDays', 'OVERVIEW_ADHERENCE_DAYS',
+    `${body}\nreturn loadOverview();`,
+  );
+  const done = run(overview, api, cycleEnabled, () => '2026-10-07', (key) => key, () => 30, 30);
+  // Eine Welle = alles, was offen ist, sobald der Code nicht mehr weiterkommt.
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+  const answer = (pick) => {
+    for (const req of open.splice(0)) {
+      if (req.path.includes('/medications?') || req.path === '/health/medications') req.resolve({ data: meds });
+      else if (pick) pick(req);
+      else req.resolve({ data: req.path === '/health/cycle/settings' ? {} : [] });
+    }
+  };
+  // FRIST IM TEST SELBST: braucht der Code mehr Wellen, als der Fall
+  // beantwortet (der Stand vor R18), bliebe `done` fuer immer offen und die
+  // Suite hinge, statt rot zu werden.
+  const finished = () => {
+    let timer;
+    const late = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`loadOverview() wartet noch auf: ${paths(open).join(', ')}`)), 500);
+    });
+    return Promise.race([done, late]).finally(() => clearTimeout(timer));
+  };
+  return { open, overview, done, finished, settle, answer };
+}
+
+const paths = (open) => open.map((req) => req.path.replace(/\?.*$/, '')).sort();
+
+test('overview: vitals, medications and all three cycle requests are one wave', async () => {
+  const h = await loadOverviewHarness({ cycleEnabled: true, personId: 4, meId: 4, meds: [{ id: 9 }] });
+  await h.settle();
+
+  assert.deepEqual(paths(h.open), [
+    '/health/cycle/logs', '/health/cycle/periods', '/health/cycle/settings',
+    '/health/medications', '/health/vitals',
+  ], 'fuenf Abrufe gleichzeitig offen, keiner wartet auf einen anderen');
+
+  h.answer();
+  await h.settle();
+  assert.deepEqual(paths(h.open), ['/health/medications/9/logs', '/health/medications/9/schedules'],
+    'erst die zweite Welle haengt an der Medikamentenliste');
+  h.answer();
+  await h.finished();
+  assert.deepEqual(h.overview.cycleSettings, {});
+});
+
+test('overview: the cycle rule still decides what is requested at all', async () => {
+  const off = await loadOverviewHarness({ cycleEnabled: false, personId: 4, meId: 4 });
+  await off.settle();
+  assert.deepEqual(paths(off.open), ['/health/medications', '/health/vitals'], 'Zyklus abgewaehlt: kein Zyklus-Abruf');
+  off.answer();
+  await off.finished();
+  assert.deepEqual([off.overview.cyclePeriods, off.overview.cycleLogs, off.overview.cycleSettings], [[], [], null]);
+
+  const other = await loadOverviewHarness({ cycleEnabled: true, personId: 5, meId: 4 });
+  await other.settle();
+  assert.deepEqual(paths(other.open), ['/health/cycle/logs', '/health/cycle/periods', '/health/medications', '/health/vitals'],
+    'fremde Person: die privaten Einstellungen werden nicht angefragt');
+  assert.ok(other.open.every((req) => req.path.endsWith('?user_id=5')));
+  other.answer();
+  await other.finished();
+  assert.equal(other.overview.cycleSettings, null);
+});
+
+test('overview: failing cycle settings stay harmless, any other failure aborts the load', async () => {
+  const soft = await loadOverviewHarness({ cycleEnabled: true, personId: 4, meId: 4 });
+  await soft.settle();
+  soft.answer((req) => (req.path === '/health/cycle/settings' ? req.reject(new Error('500')) : req.resolve({ data: [] })));
+  await soft.finished();
+  assert.deepEqual(soft.overview.cycleSettings, {});
+
+  const hard = await loadOverviewHarness({ cycleEnabled: true, personId: 4, meId: 4 });
+  await hard.settle();
+  hard.answer((req) => (req.path.startsWith('/health/cycle/periods') ? req.reject(new Error('403')) : req.resolve({ data: [] })));
+  await assert.rejects(hard.finished(), /403/);
+});
+
+test('overview: members and data load side by side once the person is known', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const mount = src.slice(src.indexOf('async function mountOverview() {'), src.indexOf('async function loadOverview() {'));
+  assert.match(mount, /const person = overview\.personId \?\? overview\.meId;/);
+  assert.match(mount, /await Promise\.all\(\[loadHealthMembers\(overview, healthUser\), loadOverview\(\)\]\);/);
+  assert.match(mount, /\} else \{\s*await loadHealthMembers\(overview, healthUser\);\s*await loadOverview\(\);/,
+    'ohne bekannte Person bestimmt weiter die Mitgliederliste, wer gezeigt wird');
+});
