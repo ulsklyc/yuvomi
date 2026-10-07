@@ -505,6 +505,15 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: var(--space-3);
+  /* Die Reihe meldet sich als `metric-grid` (wie die Vitalreihe der Uebersicht
+   * weiter unten): die Kompaktstufe des Werts haengt an der Breite der REIHE
+   * (panel.css). Ohne sie stand der Wert auf dem Telefon in 28px, und
+   * "116/74 mmHg" brach in der 173px-Kachel unter den Wert - mit ihr steht er
+   * dort in 20px, Wert und Einheit auf einer Grundlinie (Critique R18). */
+  container: metric-grid / inline-size;
+  /* Hoehe der Trendzeile im Rueckfall ohne Subgrid (panel.css `.metric-rows`):
+   * die der Trendlinie (`.metric-card__spark`). */
+  --metric-spark-row: 22px;
 }
 
 /* Die Kachel selbst ist seit Block 2 die geteilte Kennzahlkarte:

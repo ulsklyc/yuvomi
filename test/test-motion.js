@@ -1296,7 +1296,8 @@ test('Diagramme: Kurven und Ring der Berichte zeichnen sich einmal ein (drawChar
   assert.match(stats, /import \{ growBars, drawChartOnce \} from '\/utils\/ux\.js';/);
   // Die Kurven stehen in EINER Gruppe - an ihr haengt der Beschnitt, Raster und Achse bleiben stehen.
   // Seit R17 (Zukunft punktiert) stehen bis zu vier Linien in der Gruppe - alle zeichnen sich mit ein.
-  assert.match(stats, /<g class="budget-stats__lines">\s*<polyline[\s\S]{0,400}<polyline[\s\S]{0,900}<\/g>/);
+  // Seit R18 dazu die Flaeche unter den Einnahmen und der Punkt mit Wert - auch sie in der Gruppe.
+  assert.match(stats, /<g class="budget-stats__lines">\s*<polygon[\s\S]{0,200}<polyline[\s\S]{0,400}<polyline[\s\S]{0,1400}<\/g>/);
   assert.match(stats, /drawChartOnce\('budget-stats-trend', \{ lines: host\.querySelector\('\.budget-stats__lines'\) \}\);/);
   assert.match(stats, /drawChartOnce\('budget-stats-donut', \{ arcs: host\.querySelectorAll\('\.budget-stats__donut circle'\) \}\);/);
   // Das Ringsegment traegt "Laenge Umfang" - daraus liest der Helfer den Startwert.

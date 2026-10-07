@@ -714,7 +714,8 @@ test('die Trendkurve beschriftet Skala und Zeitraum - IM Bild', () => {
   assert.match(stats, /chartGridMarkup\(0, axis\.max,/, 'die Werteachse kommt aus der geteilten Geometrie');
   // Seit C4 (Re-Critique 2026-09-27) auf runder Skala: Gitter und Kurve lesen
   // DIESELBE gerundete Obergrenze, sonst stuende die Kurve neben ihrer Achse.
-  assert.match(stats, /const axis = niceDomain\(0, max, \{ integer: true \}\);/);
+  // Seit R18 auf der ruhigen Skala (drei Linien, `calmAxis`) - weiter EINE Obergrenze fuer beide.
+  assert.match(stats, /const axis = calmAxis\(max\);/);
   // Seit R17 mit der Geometrie der Flaeche (mobil hoeher): Raster und Kurve teilen auch sie.
   assert.match(stats, /chartY\(v, 0, axis\.max, geo\)/);
   assert.match(stats, /chartGridMarkup\(0, axis\.max, [^;]*, geo, axis\.steps\)/);
@@ -1566,7 +1567,10 @@ test('Abschnittstitel aller Budget-Panels sind h2 in EINEM Stil', () => {
   const section = blockOf('.u-section-title');
   assert.ok(section.selector.split(',').map((x) => x.trim()).includes('.panel-head__title'),
     '.panel-head__title gehört zur Bereichs-Überschrift, nicht zum Versal-Label');
-  const eyebrow = blockOf('.metric-card__label');
+  // Anker des Versal-Blocks ist der Gruppenkopf der Kategorieliste: das
+  // Kennzahl-Label steht seit R18 in Satzschreibung (panel.css) und nicht mehr dort.
+  const eyebrow = blockOf('.budget-chart-block__title');
+  assert.equal(blockOf('.metric-card__label'), undefined, 'das Kennzahl-Label ist kein Versal-Mikro-Label mehr');
   assert.ok(!eyebrow.selector.split(',').map((x) => x.trim()).includes('.panel-head__title'),
     '.panel-head__title steht noch im Versal-Block');
 });
@@ -2361,7 +2365,7 @@ test('Uebersicht mobil: EINE Kopfzeile, Karten und Diagramm eingeklappt, das Hau
     summary: { ...summe, byCategory: [{ category: 'housing', income: 0, expenses: -950, total: -950 }] },
   });
   const aside = html.indexOf('<div class="budget-overview__aside">');
-  const glance = html.indexOf('<div class="row-carrier budget-glance">');
+  const glance = html.indexOf('<div class="row-carrier budget-glance');
   const details = html.indexOf('<div class="budget-balance-details" id="budget-balance-details">');
   assert.ok(aside >= 0 && glance > aside && details > glance, 'Traeger vorn in der Seitenleiste, dahinter der Bilanz-Bereich');
   const inDetails = html.slice(details, html.indexOf('budget-pending-note') >= 0 ? html.indexOf('budget-pending-note') : html.indexOf('budget-chart-section'));
@@ -2548,7 +2552,7 @@ const summe = { income: 3000, expenses: -950, balance: 2050, byCategory: [], pen
 test('Zukunftsmonat: die Bilanz heisst Prognose, der Saldo verliert den Ton der Tatsache', () => {
   const zukunft = uebersicht({ month: monthKey(1), entries: [zeile({ date: `${monthKey(1)}-01` })], summary: summe });
   assert.match(zukunft, /id="budget-summary-title">budget\.summaryTitleForecast</, 'der Titel sagt es als Text');
-  assert.match(zukunft, /class="metric-card metric-card--forecast"/);
+  assert.match(zukunft, /class="metric-card metric-card--forecast metric-card--lead"/); // seit R18 fuehrt der Saldo
   assert.doesNotMatch(zukunft, /metric-card--balance-positive/, 'kein gruener Saldo fuer Geld, das nicht geflossen ist');
   const jetzt = uebersicht({ month: monthKey(0), entries: [zeile()], summary: summe });
   assert.match(jetzt, /id="budget-summary-title">budget\.summaryTitle</);
@@ -2760,8 +2764,10 @@ test('R16: der Anteilsring ist der Kopf der Kategorieliste - keine leere Leiste,
   assert.doesNotMatch(wide('.budget-stats__aside'), /position:\s*sticky|span 2/, 'keine Leiste ueber beide Zeilen');
   assert.match(wide('.budget-stats__main--wide'), /grid-column:\s*1\s*\/\s*-1/, 'die Balken nehmen die ganze Bahn');
   assert.match(wide('.budget-stats__main--wide .budget-chart-section'), /max-width:\s*none/);
-  // Der Satz zum Ring steht sichtbar daneben, nicht nur im Baum.
-  assert.match(stats, /<p class="budget-stats__donut-note">\$\{view\.ctx\.esc\(summary\)\}<\/p>/);
+  // Der Satz zum Ring stand seit R16 sichtbar daneben. Seit R18 traegt der Ring
+  // seine Summe in der Mitte, der Satz ist wieder die zugaengliche Beschreibung
+  // (eigener Test unten: "R18: der Ring traegt seine Summe").
+  assert.match(stats, /<p class="sr-only">\$\{view\.ctx\.esc\(summary\)\}<\/p>\s*<div class="budget-stats__card budget-stats__donut-wrap">/);
   // Die Marke erscheint erst auf Zeigen, Tippen oder Tastatur.
   assert.match(stats, /show\(initial, \{ mark: false \}\);/);
   assert.match(stats, /classList\.toggle\('is-active', mark && i === index\)/);
@@ -3269,7 +3275,7 @@ const { __test: abosGlance } = await import('../public/pages/subscriptions.js');
 const { __test: splitGlance } = await import('../public/pages/split-expenses.js');
 
 function glanceVorDetails(html, id, controls) {
-  const glance = html.indexOf('<div class="row-carrier budget-glance">');
+  const glance = html.indexOf('<div class="row-carrier budget-glance');
   const button = html.match(new RegExp(`<button type="button" class="budget-glance__row budget-glance__balance" id="${id}"\\s*aria-expanded="false" aria-controls="${controls}">`));
   const details = html.search(new RegExp(`class="[^"]*\\bbudget-glance-details\\b[^"]*"[^>]*id="${controls}"|id="${controls}"[^>]*class="[^"]*\\bbudget-glance-details\\b`));
   assert.ok(glance >= 0, `${id}: kein Zeilentraeger`);
@@ -3301,7 +3307,7 @@ test('Abos, Darlehen, Aufteilung mobil: EINE Glance-Zeile, die Karten klappen au
   let abos;
   try { abos = abosGlance.renderSummary(); } finally { abosGlance.state.summary = abosVorher; }
   const abosRest = glanceVorDetails(abos, 'subscriptions-glance-more', 'subscriptions-summary-details');
-  assert.match(abosRest, /class="metric-grid metric-grid--quad/, 'Abos: die vier Karten im aufklappbaren Bereich');
+  assert.match(abosRest, /class="metric-grid metric-grid--led metric-grid--quad/, 'Abos: die vier Karten im aufklappbaren Bereich');
   assert.match(abos, /budget-glance__label">subscriptions\.monthlyCost</, 'Leitwert sind die Monatskosten');
 
   const summary = { html: '' };
@@ -3351,7 +3357,7 @@ test('Abo-Kennzahlen ohne Monatsbudget: keine Karte „Monatsbudget 0", drei Kar
     assert.match(ohne, /subscriptions\.unlimited/);
     assert.equal(karten(ohne), 3);
     assert.doesNotMatch(ohne, /metric-grid--quad/, 'drei Karten in einer Vierer-Reihe liessen eine Leerzelle');
-    assert.match(ohne, /class="metric-grid budget-glance-details/, 'der aufklappbare Bereich bleibt derselbe');
+    assert.match(ohne, /class="metric-grid metric-grid--led budget-glance-details/, 'der aufklappbare Bereich bleibt derselbe');
 
     abosGlance.state.summary = { active_count: 1, monthly_total: 12.99, monthly_budget: 50, remaining_budget: 37.01, base_currency: 'EUR' };
     const mit = abosGlance.renderSummary();
@@ -4787,7 +4793,7 @@ test('R17: die Kurve teilt sich am heutigen Tag - nur wenn der Zeitraum eine Zuk
   const fn = stats.slice(stats.indexOf('function renderTrendChart()'), stats.indexOf('/** Die Flaeche des Verlaufs'));
   assert.match(fn, /futureStartIndex\(s\.map\(\(p\) => p\.period\), todayKey\(\)\)/, 'heute ist der Tag der Haushaltszone (todayKey)');
   assert.match(fn, /cumulative \? futureStartIndex/, 'nur die aufsummierte Tageskurve - das Jahr vergleicht Monate');
-  assert.equal(fn.match(/class="budget-stats__future"/g)?.length, 2, 'beide Serien laufen ab heute punktiert weiter');
+  assert.equal(fn.match(/class="budget-stats__line budget-stats__line--(?:income|expense) budget-stats__future"/g)?.length, 2, 'beide Serien laufen ab heute punktiert weiter');
   assert.match(fn, /points\(incomes, 0, lastPast\)[\s\S]*points\(expenses, 0, lastPast\)/, 'die gebuchte Kurve endet heute');
   assert.match(fn, /points\(incomes, todayIndex\)/, 'die Zukunft beginnt am selben Punkt - keine Luecke in der Linie');
   assert.match(fn, /todayMarkerMarkup\(/);
@@ -4813,7 +4819,8 @@ test('R17: mobil rechnet der Verlauf auf einer hoeheren Flaeche (mindestens 160p
   assert.match(fn, /viewBox="0 0 \$\{W\} \$\{H\}"\$\{ratio\}/);
   assert.doesNotMatch(fn.replace(/H === CHART\.H/g, ''), /CHART\.(W|H)|chartX\(i, s\.length\)|chartXLabelsMarkup\([^;]*\)\)\)\}/,
     'Kurve, Raster, Achse und Punkte rechnen mit derselben Geometrie');
-  assert.match(fn, /chartXLabelsMarkup\(s\.map\(\(p\) => periodLabel\(p\.period\)\), geo\)/);
+  // Seit R18 kurze Achsenlabels (`axisLabels`) - weiter in der Geometrie der Flaeche.
+  assert.match(fn, /chartXLabelsMarkup\(axisLabels\(s\.map\(\(p\) => p\.period\)\), geo\)/);
   assert.match(fn, /chartX\(i, s\.length, geo\) \/ geo\.W/, 'auch die Ablesepunkte');
 });
 
@@ -4920,5 +4927,222 @@ test('#1775: eine ueberholte Statistik-Antwort ueberschreibt den neueren Zeitrau
   } finally {
     Object.assign(view, saved);
     globalThis.__apiStub = savedStub;
+  }
+});
+
+/* EINE LEITZAHL JE GELD-REITER (Critique R18, 2026-10-07). Gemessen 390x844:
+ * das groesste Element jedes Geld-Bildschirms war das Wort "Budget" (34px), der
+ * Saldo stand in 18px. Jetzt fuehrt je Reiter EINE Zahl auf einer Display-Stufe:
+ * Saldo, Nettovermoegen, Restschuld, Monatskosten. Die Stufe folgt der Laenge,
+ * damit "175.444,93 €" und "CHF 175'444.93" bei 390px nicht umbrechen (im
+ * Browser gemessen: 252 bzw. 251px Textende vor dem Pfeil bei 346px). */
+test('R18: je Geld-Reiter fuehrt EINE Zahl, mobil in der Kurzzeile und in der Kennzahl-Reihe', async () => {
+  const { leadStep, leadCardClass } = await import('../public/utils/metric-card.js');
+  const { glanceLeadClass, metricGlanceHtml } = await import('../public/utils/metric-glance.js');
+  // Die Stufe folgt der Zeichenzahl des fertigen Werts.
+  assert.equal(leadStep('2.503,89 €'), '');
+  assert.equal(leadStep('175.444,93 €'), 'long');
+  assert.equal(leadStep('-175.444,93 €'), 'long');
+  assert.equal(leadStep('CHF 175’444.93'), 'xlong');
+  assert.equal(leadStep('MX$ 175,444,933.00'), 'xxlong');
+  assert.equal(leadCardClass('175.444,93 €'), 'metric-card--lead metric-card--lead-long');
+  assert.equal(glanceLeadClass('2.503,89 €'), 'budget-glance--lead');
+  // Ohne `lead` bleibt die Kurzzeile, wie sie war (Inventar, Haushaltshilfe, Aufteilung).
+  assert.match(metricGlanceHtml({ label: 'a', value: '3' }), /<div class="row-carrier budget-glance">/);
+  assert.match(metricGlanceHtml({ label: 'a', value: '175.444,93 €', lead: true }),
+    /<div class="row-carrier budget-glance budget-glance--lead budget-glance--lead-long">/);
+
+  // Uebersicht: Saldo fuehrt - in der Kurzzeile und als Karte; die Reihe weiss es.
+  const html = uebersicht({ month: monthKey(0), entries: [zeile()], summary: summe });
+  assert.match(html, /<div class="row-carrier budget-glance budget-glance--lead[^"]*">\s*<button[^>]*id="budget-balance-more"/);
+  assert.match(html, /<div class="metric-grid metric-grid--led">/);
+  const leads = html.match(/class="metric-card [^"]*metric-card--lead\b[^"]*"/g) ?? [];
+  assert.equal(leads.length, 1, 'genau EINE Karte fuehrt');
+  assert.match(leads[0], /metric-card--balance-/, 'und es ist der Saldo');
+  // "Nur Ausgaben": eine einzige Karte, niemand tritt zurueck.
+  const nur = uebersicht({ month: monthKey(0), entries: [zeile()], summary: summe, expensesOnly: true });
+  assert.doesNotMatch(nur, /metric-grid--led/);
+
+  // Darlehen und Abos.
+  const vorher = { loans: budgetUi.state.loans };
+  try {
+    budgetUi.state.loans = {
+      loans: [{ id: 1, status: 'active' }],
+      summary: { active_count: 2, remaining_principal: 175444.93, has_interest: true, remaining_installments: 12, paid_amount: 500 },
+    };
+    const loans = budgetUi.renderLoansPage();
+    assert.match(loans, /budget-glance--lead budget-glance--lead-long">/, 'Darlehen: die Restschuld fuehrt die Kurzzeile');
+    assert.match(loans, /class="metric-grid metric-grid--led budget-glance-details[^"]*" id="budget-loans-details">\s*<div class="metric-card metric-card--lead metric-card--lead-long">\s*<div class="metric-card__label">budget\.loanRemainingPrincipal/);
+  } finally {
+    budgetUi.state.loans = vorher.loans;
+  }
+  const abosVorher = abosGlance.state.summary;
+  try {
+    abosGlance.state.summary = { active_count: 2, monthly_total: 40, monthly_budget: 100, remaining_budget: 60, base_currency: 'EUR' };
+    const abos = abosGlance.renderSummary();
+    assert.match(abos, /budget-glance--lead">/, 'Abos: die Monatskosten fuehren die Kurzzeile');
+    assert.match(abos, /<article class="metric-card metric-card--lead">\s*<div class="metric-card__label">subscriptions\.monthlyCost/);
+    assert.equal((abos.match(/metric-card--lead\b/g) ?? []).length, 1);
+  } finally {
+    abosGlance.state.summary = abosVorher;
+  }
+
+  // CSS: die Stufen kommen aus Tokens und clamp(), nie als Literal; der Wert
+  // bricht nicht um; die Nebenwerte stehen unter der Zahl.
+  const rules = [...eachRule(read('../public/styles/panel.css'))];
+  const rule = (sel) => rules.find((r) => r.at.length === 0 && r.selector.trim() === sel);
+  const size = (sel) => /font-size:\s*([^;]+);?\s*(?:[a-z-]+:|$)/.exec(rule(sel)?.body.replace(/\/\*[\s\S]*?\*\//g, '') ?? '')?.[1].trim();
+  assert.equal(size('.budget-glance--lead .budget-glance__value'), 'clamp(var(--text-3xl), 11vw, var(--text-5xl))');
+  assert.equal(size('.budget-glance--lead-long .budget-glance__value'), 'clamp(var(--text-3xl), 9vw, var(--text-4xl))');
+  assert.equal(size('.budget-glance--lead-xlong .budget-glance__value'), 'clamp(var(--text-2xl), 7.5vw, var(--text-3xl))');
+  assert.match(rule('.budget-glance__value').body, /white-space:\s*nowrap/, 'ein Betrag ueber zwei Zeilen ist keine Kennzahl');
+  assert.match(rule('.budget-glance--lead .budget-glance__flows').body, /flex:\s*1 0 100%/, 'die Nebenwerte bekommen ihre eigene Zeile');
+  // In der Reihe treten die anderen zurueck - in jeder Stufe der Leiter.
+  const quiet = rules.filter((r) => r.selector.trim() === '.metric-grid--led > .metric-card:not(.metric-card--lead) > .metric-card__value');
+  assert.equal(quiet.length, 3, 'Grundregel plus die zwei Container-Stufen');
+  assert.match(quiet[0].body, /font-weight:\s*var\(--font-weight-semibold\)/);
+  // In der Seitenspalte steigt die Leitzahl: die Spalte sagt es mit dem leeren
+  // `--metric-rail`, EINE Regel in panel.css setzt ihn vor die Stufe. Ohne ihn
+  // ist `--_metric-lead` ungueltig und die Stufenleiter der Reihe greift.
+  const panelCss = read('../public/styles/panel.css');
+  const lead = rules.filter((r) => r.selector.trim() === '.metric-card--lead > .metric-card__value');
+  assert.equal(lead.length, 3, 'Grundregel plus die zwei Container-Stufen, wie die Stufenleiter');
+  for (const r of lead) {
+    assert.ok(r.at.some((a) => /@supports\s*\(width:\s*1cqi\)/.test(a)), 'nur wo es Container-Einheiten gibt');
+    assert.match(r.body, /font-size:\s*var\(--_metric-lead, var\(--metric-value-size, var\(--text-(?:3xl|2xl|xl)\)\)\)/);
+  }
+  assert.match(lead[0].body, /--_metric-lead:\s*var\(--metric-rail\) var\(--metric-lead-size\)/);
+  assert.match(rule('.metric-card--lead').body, /--metric-lead-size:\s*clamp\(var\(--text-3xl\), 13cqi, var\(--text-5xl\)\)/);
+  assert.match(rule('.metric-card--lead-long').body, /--metric-lead-size:\s*clamp\(var\(--text-3xl\), 11cqi, var\(--text-4xl\)\)/);
+  const railOn = /--metric-rail:\s*;/;
+  assert.match(rule('.metric-grid--rail').body + panelCss.match(/\.metric-grid--rail \{[^}]*--metric-rail[^}]*\}/)?.[0], railOn);
+  for (const sel of ['.budget-overview__aside .metric-grid--led', '.budget-loans > .metric-grid--led']) {
+    const r = [...eachRule(budgetCss)].find((x) => x.selector.trim() === sel);
+    assert(r && railOn.test(r.body), `${sel}: die Spalte meldet sich als Spalte`);
+    assert.match(r.body, /--metric-quiet-size:\s*var\(--text-2xl\)/, `${sel}: die anderen stehen in Title 2`);
+  }
+});
+
+/* EINE DIAGRAMMSPRACHE (Critique R18, 2026-10-07). Gesehen: der Budget-Verlauf
+ * ohne Flaeche, mit drei Strichmustern (durchgezogen, gestrichelt, punktiert),
+ * "Heute" bei 390px durchgestrichen, dreimal das volle Datum unter einem Kopf,
+ * der den Monat nennt, bis zu sieben Gitterlinien, der Ring mit leerer Mitte
+ * neben einem Satz. */
+test('R18 Verlauf: drei Gitterlinien, kurze Zeitachse, EIN Strichmuster, Punkt mit Wert, "Heute" ueber der Flaeche', async () => {
+  const { __test: st } = await import('../public/pages/budget-stats.js');
+  // Ruhige Achse: Grundlinie, Mitte, Obergrenze - mit Luft ueber dem Spitzenwert.
+  for (const max of [1, 7, 42, 950, 5550, 6000, 24503, 175444.93, 6000000]) {
+    const axis = st.calmAxis(max);
+    assert.equal(axis.steps, 2, `${max}: drei Linien heisst zwei Schritte`);
+    assert.equal(axis.max, axis.step * 2);
+    assert.ok(Number.isInteger(axis.step), `${max}: die Geldachse beschriftet ohne Nachkommastellen (${axis.step})`);
+    assert.ok(axis.max >= max * 1.15 - 1e-6, `${max}: 15 % Luft fuer den Wert am hoechsten Punkt (${axis.max})`);
+    assert.ok(axis.max <= Math.max(4, max * 1.75), `${max}: die Kurve fuellt die Flaeche (${axis.max})`);
+  }
+  assert.deepEqual(st.calmAxis(5550), { max: 7000, step: 3500, steps: 2 });
+
+  // Zeitachse: der Tag allein, in der Schreibweise der Sprache; ueber eine
+  // Monatsgrenze mit Monat; im Jahr der Monatsname ohne Jahr.
+  assert.deepEqual(st.axisLabels(['2026-10-01', '2026-10-16', '2026-10-31']), ['1.', '16.', '31.'], 'de: Ordnungszahl mit Punkt, kein Jahr');
+  assert.deepEqual(st.axisLabels(['2026-09-28', '2026-10-04']), ['28.9.', '4.10.'], 'eine Woche ueber die Monatsgrenze nennt den Monat');
+  const year = st.axisLabels(['2026-01', '2026-06', '2026-12']);
+  assert.equal(year.length, 3);
+  for (const label of year) assert.doesNotMatch(label, /\d{2,4}/, `"${label}": kein Jahr unter einem Kopf, der es nennt`);
+  assert.match(st.axisLabels(['2025-12', '2026-01'])[0], /25/, 'zwei Jahre: dann gehoert das Jahr dazu');
+  assert.deepEqual(st.axisLabels([]), []);
+
+  // "Heute" sitzt mittig ueber der Marke, an den Raendern buendig.
+  const geo = st.TREND_CHART_NARROW;
+  assert.equal(st.todayAnchor(300, geo), 'middle');
+  assert.equal(st.todayAnchor(geo.PAD_L + 5, geo), 'start');
+  assert.equal(st.todayAnchor(geo.W - geo.PAD_R - 5, geo), 'end');
+  const marker = stats.slice(stats.indexOf('function todayMarkerMarkup('), stats.indexOf('/** An den Raendern steht das Wort'));
+  assert.match(marker, /class="chart__axis budget-stats__today-label" x="\$\{x\.toFixed\(1\)\}" y="\$\{top\}" dy="-0\.5em"/,
+    'das Wort steht eine halbe Schrifthoehe UEBER der obersten Linie');
+  assert.doesNotMatch(marker, /dominant-baseline="hanging"/, 'haengend an der Oberkante lag es auf der obersten Gitterlinie');
+
+  // Die Werte der beiden Punkte stossen nie aneinander und nie in die Achsenzeile.
+  assert.deepEqual(st.markLabelPlan(5550, 2234, 7000), { income: 'above', expenses: 'below' });
+  assert.deepEqual(st.markLabelPlan(1500, 4000, 7000), { income: 'below', expenses: 'above' }, 'die hoehere Serie steht oben, welche es auch ist');
+  assert.deepEqual(st.markLabelPlan(5050, 100, 7000), { income: 'above', expenses: 'above' }, 'nah an der Grundlinie: der Wert weicht nach oben aus');
+  assert.deepEqual(st.markLabelPlan(300, 100, 7000), { income: 'above', expenses: null }, 'kein Platz: ein Wert genuegt, Legende und Ableselinie nennen den anderen');
+
+  // Markup: Flaeche unter den Einnahmen, Farbe ueber die Klasse, keine Strichelung im Markup.
+  const fn = stats.slice(stats.indexOf('function renderTrendChart()'), stats.indexOf('/** Die Flaeche des Verlaufs'));
+  assert.match(fn, /<polygon class="budget-stats__area" fill="url\(#budget-stats-area\)" points="\$\{areaPoints\}" \/>/);
+  assert.match(fn, /<linearGradient id="budget-stats-area" x1="0" y1="0" x2="0" y2="1">/);
+  assert.doesNotMatch(fn, /stroke-dasharray=|stroke="var\(/, 'Strichmuster und Farbe stehen im Stylesheet, nicht im Markup');
+  assert.match(fn, /\$\{markMarkup\(\{ x: chartX\(markIndex, s\.length, geo\)/, 'der Punkt mit Wert steht in der Gruppe, die sich einzeichnet');
+  assert.ok(fn.indexOf('markMarkup(') < fn.indexOf('</g>'), 'IN der Gruppe');
+  assert.match(fn, /<p class="sr-only">\$\{view\.ctx\.esc\(summary\)\}<\/p>/, 'die Zusammenfassung fuer Screenreader bleibt');
+  assert.match(fn, /<div class="budget-stats__card">\s*<div class="budget-stats__trend-wrap">/, 'das Diagramm steht auf einem Traeger');
+
+  const rules = [...eachRule(budgetCss)];
+  const body = (sel) => rules.filter((r) => r.selector.trim() === sel).map((r) => r.body).join(';');
+  // EIN Strichmuster: nur die Zukunft traegt eines.
+  const dashed = rules.filter((r) => /budget-stats__/.test(r.selector) && /stroke-dasharray:/.test(r.body)).map((r) => r.selector.trim());
+  assert.deepEqual(dashed, ['.budget-stats__future'], 'gestrichelt heisst im Diagramm nur: kommt noch');
+  assert.doesNotMatch(body('.budget-stats__swatch--expense'), /dashed/, 'auch die Legende strichelt die Ausgaben nicht mehr');
+  assert.match(body('.budget-stats__line'), /stroke-linejoin:\s*round/);
+  assert.match(body('.budget-stats__line'), /stroke-linecap:\s*round/);
+  assert.match(body('.budget-stats__line--income'), /stroke:\s*var\(--color-success\)/);
+  assert.match(body('.budget-stats__line--expense'), /stroke:\s*var\(--color-text-secondary\)/);
+  assert.match(body('.budget-stats__area-to'), /stop-opacity:\s*0\b/, 'die Flaeche laeuft auf 0 aus');
+  assert.match(body('.budget-stats__mark-value'), /fill:\s*var\(--color-text-primary\)/, 'der Wert traegt Textfarbe, nicht die der Serie');
+  assert.match(body('.budget-stats__mark-value'), /paint-order:\s*stroke/, 'ein Hof haelt Gitter und Kurve aus den Ziffern');
+  assert.match(body('.budget-stats__card'), /background:\s*var\(--color-surface\)/);
+  assert.match(body('.budget-stats__card'), /border-radius:\s*var\(--radius-lg\)/);
+  // Grafikkontrast 3:1 gegen den Traeger, in beiden Themes gerechnet.
+  const { contrastRatio } = await import('../public/utils/contrast.js');
+  for (const [name, ink, surface] of [
+    ['Einnahmen hell', '#1E7B35', '#FFFFFF'], ['Einnahmen dunkel', '#30D158', '#2B2825'],
+    ['Ausgaben hell', '#63615B', '#FFFFFF'], ['Ausgaben dunkel', '#B4AEA5', '#2B2825'],
+  ]) {
+    assert.ok(contrastRatio(ink, surface) >= 3, `${name}: ${contrastRatio(ink, surface)}`);
+  }
+  const tokens = read('../public/styles/tokens.css');
+  for (const hex of ['--_color-success:       #1E7B35', '--_color-success:       #30D158', '--_neutral-600: #63615B', '--_neutral-600: #B4AEA5', '--_color-surface:          #2B2825']) {
+    assert.ok(tokens.includes(hex), `die gerechneten Werte sind die der Tokens: ${hex}`);
+  }
+});
+
+test('R18: der Ring traegt seine Summe in der Mitte, der Satz bleibt zugaenglich', () => {
+  const fn = stats.slice(stats.indexOf('function renderDonut()'), stats.indexOf('function renderExport()'));
+  assert.match(fn, /<svg viewBox="0 0 160 160" class="budget-stats__donut" aria-hidden="true">/, 'das Bild bleibt stumm - der Satz spricht');
+  assert.match(fn, /<text class="budget-stats__donut-total"[^>]*text-anchor="middle">\$\{view\.ctx\.esc\(formatMoneyAxis\(total, view\.ctx\.currency\)\)\}<\/text>/);
+  assert.match(fn, /<text class="budget-stats__donut-label"[^>]*>\$\{view\.ctx\.esc\(t\('budget\.statsExpenses'\)\)\}<\/text>/, 'zweite Zeile: was der Ring teilt');
+  assert.match(fn, /<p class="sr-only">\$\{view\.ctx\.esc\(summary\)\}<\/p>/, 'Segmente, groesstes und die genaue Summe stehen weiter im Baum');
+  assert.doesNotMatch(stats, /budget-stats__donut-note/, 'kein sichtbarer Fliesstext mehr neben dem Ring');
+  assert.match(fn, /drawChartOnce\('budget-stats-donut', \{ arcs: host\.querySelectorAll\('\.budget-stats__donut circle'\) \}\)/);
+  const rules = [...eachRule(budgetCss)];
+  const body = (sel) => rules.filter((r) => r.selector.trim() === sel).map((r) => r.body).join(';');
+  assert.match(body('.budget-stats__donut-total'), /font-variant-numeric:\s*tabular-nums/);
+  assert.match(body('.budget-stats__donut-total'), /fill:\s*var\(--color-text-primary\)/);
+  assert.match(body('.budget-stats__donut-wrap'), /justify-content:\s*center/, 'der Ring sitzt mittig auf seinem Traeger, nicht neben Leere');
+  assert.doesNotMatch(budgetCss, /budget-stats__donut-note/);
+});
+
+/* EIN STAND IST KEINE NACHRICHT (Critique R18, 2026-10-07): "Gruen an fast
+ * jedem Kontostand". Gruen bleibt Veraenderungen und Einnahmen vorbehalten. */
+test('R18 Konten: Staende in Textfarbe, nur das Minus ist rot - auch das Nettovermoegen', () => {
+  const rules = [...eachRule(budgetCss)];
+  const colored = rules.filter((r) => /\.budget-account__balance/.test(r.selector) && /(^|[;\s])color:/.test(r.body))
+    .map((r) => `${r.selector.trim()} -> ${/(?:^|[;\s])color:\s*([^;]+)/.exec(r.body)[1].trim()}`);
+  assert.deepEqual(colored, ['.budget-account__balance--negative -> var(--color-danger)'],
+    'ein Kontostand ueber null traegt keine eigene Farbe');
+  const zuvor = { accounts: budgetUi.state.accounts, netWorth: budgetUi.state.netWorth };
+  try {
+    budgetUi.state.accounts = [{ id: 1, name: 'Giro', type: 'checking', current_balance: 10, starting_balance: 0, archived: 0 }];
+    budgetUi.state.netWorth = 25064.21;
+    const plus = budgetUi.renderAccountsPage();
+    assert.match(plus, /budget-glance__value budget-glance__value--neutral">/, 'Kurzzeile: Textfarbe');
+    assert.match(plus, /class="metric-card metric-card--neutral metric-card--lead/, 'Karte: Textfarbe');
+    assert.doesNotMatch(plus, /metric-card--positive|budget-glance__value--positive/);
+    budgetUi.state.netWorth = -12;
+    const minus = budgetUi.renderAccountsPage();
+    assert.match(minus, /budget-glance__value budget-glance__value--negative">/);
+    assert.match(minus, /class="metric-card metric-card--negative metric-card--lead/);
+  } finally {
+    Object.assign(budgetUi.state, zuvor);
   }
 });

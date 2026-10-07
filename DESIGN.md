@@ -1569,7 +1569,7 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 | Ueberschrift ueber Inhalt | **Gruppentitel IN einer Liste** = `.list-group__title` (12px Versalien). **Abschnittstitel einer Flaeche** = `h2.u-section-title` (20px semibold) AUF DER BUEHNE, ueber der Karte oder dem Traeger, Werkzeuge rechts daneben; ohne Icon. Wiederholt er den Namen des offenen Reiters, steht er nur in der Gliederung (`.sr-only`) | list-row.css, typography.css | Titel in der Karte, `div` ohne Ueberschriftenrolle, Icon vor dem Titel |
 | Betrag in Zeile oder Karte | semibold, `tabular-nums`; Ton nur mit Aussage (Zuwachs gruen, Schuld rot, **null neutral**). Fett bleibt der Kennzahl (`.metric-card__value`, Title 1) | `--font-weight-semibold`; `test:budget-ui` | 600 / 700 / 900 je Reiter, Gewicht als Literal oder mit `!important`, "0,00 €" in Erfolgsgruen |
 | Zeitraum blaettern | EINE Reihenfolge im Markup (= Tab-Folge): Pfeil zurueck, Wert, Pfeil vor, DAHINTER der Reset ("Heute"/"Aktuell" - ein Reset, kein Schritt). Die Pfeile nennen ihr OBJEKT ("Vorherige Woche", "Naechster Monat"), der Wert haelt eine feste Breite, damit kein Pfeil wandert. Kalender, Wochenplan, Budget, Berichte der Haushaltshilfe und seit R16 der Schichtplan (dort im Koerper: "Schichtplan" + Stepper passen mobil nicht in eine Kopfzeile). Gleiches gilt seit R17 fuer die Berichte der Haushaltshilfe: "Haushaltshilfe" (ca. 236px) + Stepper (192px) > 358px, und als eigene Kopfzeile schob der Zeitraum die Reiterleiste um 52px nach unten - er steht unter 1024px als Zeile UNTER den Reitern, zwischen Kopf und Inhalt (`#housekeeping-period`); ab 1024px haengt `placeReportPeriod()` denselben Knoten als Center-Slot in die Titelzeile (E16: dort sprang nie etwas, und unter den Reitern scrollte der Monat weg) | `periodStepperHtml()` + `syncPeriodReset()` (utils/period-stepper.js) in Kalender, Essensplan, Budget, Haushaltshilfe/Berichte und Schichtplan/Vergleich; Module behalten ids und Klassen, die Shell haengt an `period-stepper__*`. Der Reset zeigt sich nur neben dem laufenden Zeitraum (`.is-current` + `inert`, Fokus vorher zum Zurueck-Pfeil). **Mobil in der Titelzeile (`--period-inline`, Budget) liegt der Reset durchsichtig UEBER dem Wert:** Tipp aufs Monatslabel springt zurueck, der Wert steht im Modulton, solange man daneben steht; Name und Tab-Stopp bleiben | `< Heute > Wert`, Pfeile namens "Zurueck"/"Weiter", Reihenfolge per CSS-`order` |
-| Kennzahl einer Flaeche | EINE Karte, EIN Wert-Grad: am Desktop `.metric-grid` mit Title 1 (28px) - auch in einer Seitenspalte, die EINE Karte je Zeile stapelt (die Spalte sagt es der Zeile mit `--summary-cards: 1` + `--metric-value-size`); mobil die Kurzzeile, bei einer einzigen Zahl ohne Aufklapper (`metricGlanceHtml()` ohne `controls`) | `.metric-grid`, `.metric-grid--rail`, `.budget-glance*` (panel.css), utils/metric-glance.js | 20px in der Seitenleiste neben 28px in der Zeile, Zweier-Reihe mit 144px-Karten, Karte statt Kurzzeile unter 640px |
+| Kennzahl einer Flaeche | EINE Karte, EIN Wert-Grad: am Desktop `.metric-grid` mit Title 1 (28px) - auch in einer Seitenspalte, die EINE Karte je Zeile stapelt (die Spalte sagt es der Zeile mit `--summary-cards: 1` + `--metric-value-size`); mobil die Kurzzeile, bei einer einzigen Zahl ohne Aufklapper (`metricGlanceHtml()` ohne `controls`). Seit R18 FUEHRT je Geld-Reiter eine Zahl: `lead: true` in der Kurzzeile, `.metric-card--lead` in der Reihe `.metric-grid--led` (Display-Stufe in der Seitenspalte, sonst treten die uebrigen zurueck) | `.metric-grid`, `.metric-grid--rail`, `.budget-glance*` (panel.css), utils/metric-glance.js, utils/metric-card.js | 20px in der Seitenleiste neben 28px in der Zeile, Zweier-Reihe mit 144px-Karten, Karte statt Kurzzeile unter 640px |
 | Reiter-Skelett im Budget (R16) | Kennzahlen (s. o.), dann je Abschnitt `.u-section-title` AUF DER BUEHNE mit den Werkzeugen rechts (`.section-toolbar`), darunter der Zeilentraeger (`.row-carrier`). Karten nur, wo ein OBJEKT eine Karte ist (Darlehen, Gruppe, Konto). Statistik: Verlauf und Anteilsring teilen Zeile 1, die Balken nehmen darunter die Bahn; mobil steht der Ring als Kopf der Kategorieliste | budget.js, subscriptions.js, split-expenses.js, budget-stats.js | Titel in der Karte (`.subscriptions-list-section`, `.split-card`), Kartentitel 17px als Abschnittstitel, Ring in einer Leiste, die unter ihm leer bleibt |
 | Pflichtfeld | der Stern ist EIN Element hinter dem Label: `${REQUIRED_MARK}` (`.required-marker`, aus dem Baum genommen); die Pflicht sagt das Feld (`required`) | utils/html.js | " *" im Locale-Text, handgebauter Span je Seite |
 | Vor der Anmeldung | EIN Kopf mit Marke (`authHeroHtml()`; ueber einer Karte mit eigener h1 als Absatz, `heading: false`), EIN Auge an JEDEM Passwortfeld (`wirePasswordToggle()`), EIN Fehlerfeld (`authErrorHtml()`: `role="alert"` + `tabindex="-1"`, kein `aria-live` daneben) | utils/auth-ui.js; `test:auth-pages-ui` | Marke nur auf der Anmeldung, Auge nur auf zwei von vier Seiten, drei Fehlerfeld-Fassungen |
@@ -3797,6 +3797,44 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   WERT (`trendValence()` in `utils/metric-card.js`). Neun Vitalkarten mit neun identischen
   Modul-Glyphen sagten neunmal, in welchem Modul man steht - das ist die Wetter-Glyphe vor
   v2.21.0, nur an einem geteilten Bauteil.
+- **Do** je Geld-Bildschirm EINE Zahl fuehren lassen (R18): Saldo in der Uebersicht,
+  Nettovermoegen in Konten, Restschuld in Darlehen, Monatskosten in Abos. Mobil traegt sie die
+  Kurzzeile auf einer Display-Stufe (`metricGlanceHtml({ lead: true })`, `.budget-glance--lead`:
+  `clamp()` zwischen Title 1 und `--text-5xl`, die Nebenwerte als EINE ruhige Zeile darunter);
+  in einer Seitenspalte steigt die Karte `.metric-card--lead` auf dieselbe Stufe (die Spalte
+  meldet sich mit `--metric-rail: ;`), in einer Reihe mit mehreren Karten treten die uebrigen
+  eine Stufe zurueck und verlieren das Fett (`.metric-grid--led`). Die Stufe folgt der LAENGE
+  des Werts (`leadStep()` in utils/metric-card.js: bis 10, 13, 17 Zeichen) - "175.444,93 €" und
+  "CHF 175'444.93" brechen bei 390px nicht um. Display-Stufen bleiben Anzeigewerten
+  vorbehalten; eine Ueberschrift endet weiter bei Large Title.
+- **Do** das LABEL einer Kennzahl in Satzschreibung setzen (Caption 1, medium), nicht als
+  gesperrte Versalzeile: es benennt EINEN Wert und wiederholt sich nicht ueber eine Liste, und
+  Versalien mit Sperrung laufen ein Drittel breiter ("SAUERSTOFFSÄTTI-/GUNG" brach in jeder
+  Vitalkachel). Versal bleibt der Gruppenkopf einer Liste (typography.css).
+- **Do** einer Kennzahlkarte mit optionalen Teilen ihre FESTE ANATOMIE geben: Kopf - Wert -
+  Trendlinie - Meta, jede in ihrer Zeile (`.metric-rows` am Raster der Karten, panel.css).
+  Fehlt ein Teil, bleibt seine Zeile leer, statt die naechste hochzuziehen; mit Subgrid teilen
+  die Karten einer Rasterzeile dieselben vier Zeilenhoehen, ohne bleibt der Rueckfall mit
+  festen Zeilen. Wert und Einheit stehen auf einer Grundlinie - dafuer meldet sich das Raster
+  als `metric-grid`-Container.
+- **Do** eine Trendlinie in der Kennzahlkarte im MODULTON zeichnen, 1,5px mit einem Hauch
+  Flaeche darunter (14 % auf 0), den letzten Punkt in Label-Farbe mit Ring in Kartenflaeche
+  (`.metric-card__spark`). Kein Erfolgs- oder Gefahrenton: bei Vitalwerten ist "hoch" je nach
+  Groesse gut oder schlecht. Der Glyph im Kopf bleibt in Label-Farbe - der Modulton steht je
+  Karte an genau einer Stelle. Grafikkontrast 3:1 gegen Karte UND Well rechnen.
+- **Do** eine Zeitreihe in EINER Sprache zeichnen (R18, Referenz: Budget-Verlauf in
+  budget-stats.js): hoechstens drei Gitterlinien (`calmAxis`: Grundlinie, Mitte, Obergrenze mit
+  15 % Luft), runde Stoesse und Kappen, eine Flaeche unter der fuehrenden Serie (Ton auf 0),
+  EIN Strichmuster - durchgezogen ist gewesen, punktiert kommt noch; Serien trennen sich ueber
+  Farbe, Flaeche und den beschrifteten Punkt, nie ueber eine zweite Strichelung. Am heutigen
+  Tag (sonst am letzten Tag mit Daten) steht ein 8px-Punkt mit Wert in TEXTFARBE und Hof in
+  Flaechenfarbe; "Heute" sitzt UEBER der obersten Linie, nie darauf. Die Zeitachse nennt nur,
+  was der Kopf nicht nennt ("1.", "16.", "31." unter "Oktober 2026"). Das Diagramm liegt auf
+  einem Traeger wie die Listen daneben (`.budget-stats__card`). Ein Ring traegt seine Summe in
+  der Mitte (zwei Zeilen, tabellarisch); der beschreibende Satz bleibt als `sr-only` im Baum.
+- **Do** einen STAND in Textfarbe setzen (Kontostand, Nettovermoegen), nur das Minus rot.
+  Gruen bleibt Veraenderungen und Einnahmen vorbehalten: es sagt "es ist mehr geworden", und
+  ein Stand ist weder gut noch schlecht.
 - **Do** die Werkzeug-Leiste eines Modulkopfs in die Bar-Zeile legen
   (`.page-toolbar__bar`): eine eigene, volle Zeile unter Titel, Center und Aktionen, auf
   allen Viewports, scrollend mit Peek-Fade statt buendigem Ende (Werkzeugzeilen-Regel).

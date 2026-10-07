@@ -15,6 +15,7 @@
  * aus. Ab 640px bleibt die Kennzahl-Zeile stehen, die Zeile gibt es nicht.
  */
 import { esc } from '/utils/html.js';
+import { leadStep } from '/utils/metric-card.js';
 
 /**
  * OHNE `controls` IST DIE ZEILE EIN ZEICHEN, KEIN KNOPF (R16 Schritt 2b):
@@ -32,8 +33,11 @@ import { esc } from '/utils/html.js';
  * @param {'neutral'|'positive'|'negative'|'forecast'} [o.tone]
  * @param {{ label: string, amount?: string, tone?: string }[]} [o.flows]
  *        hoechstens zwei Nebenwerte rechts; `amount` optional (z.B. „8 aktiv")
+ * @param {boolean} [o.lead]   die Zahl FUEHRT den Bildschirm (R18): Display-Stufe,
+ *        die Nebenwerte stehen als ruhige Zeile darunter (`glanceLeadClass`)
  */
-export function metricGlanceHtml({ id, controls, expanded, label, value, tone = 'neutral', flows = [] }) {
+export function metricGlanceHtml({ id, controls, expanded, label, value, tone = 'neutral', flows = [], lead: leads = false }) {
+  const carrier = `row-carrier budget-glance${leads ? ` ${glanceLeadClass(value)}` : ''}`;
   const side = flows.filter(Boolean).slice(0, 2);
   const flowsHtml = side.length ? `
         <span class="budget-glance__flows">${side.map((f) => `
@@ -46,18 +50,31 @@ export function metricGlanceHtml({ id, controls, expanded, label, value, tone = 
         </span>${flowsHtml}`;
   if (!controls) {
     return `
-    <div class="row-carrier budget-glance">
+    <div class="${carrier}">
       <div class="budget-glance__row budget-glance__row--static"${id ? ` id="${esc(id)}"` : ''}>${lead}
       </div>
     </div>`;
   }
   return `
-    <div class="row-carrier budget-glance">
+    <div class="${carrier}">
       <button type="button" class="budget-glance__row budget-glance__balance" id="${esc(id)}"
               aria-expanded="${expanded ? 'true' : 'false'}" aria-controls="${esc(controls)}">${lead}
         <i data-lucide="chevron-down" class="icon-sm budget-glance__chevron" aria-hidden="true"></i>
       </button>
     </div>`;
+}
+
+/**
+ * EINE LEITZAHL JE GELD-BILDSCHIRM (Critique R18, 2026-10-07). Mobil war das
+ * groesste Element jedes Budget-Reiters das Wort "Budget" (34px), der Saldo
+ * stand in 18px daneben. Mit dieser Klasse traegt die Zahl der Kurzzeile eine
+ * Display-Stufe und die Nebenwerte ruecken als ruhige Zeile darunter
+ * (panel.css `.budget-glance--lead`). Die Laengenstufe haelt sechsstellige
+ * Betraege und lange Waehrungszeichen bei 390px in einer Zeile.
+ */
+export function glanceLeadClass(value) {
+  const step = leadStep(value);
+  return `budget-glance--lead${step ? ` budget-glance--lead-${step}` : ''}`;
 }
 
 /**

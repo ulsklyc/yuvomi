@@ -1297,7 +1297,7 @@ function renderVitalsShell() {
             data-range="${r}" role="tab" aria-selected="${r === vitals.range}">${esc(t(RANGE_LABELS[r]))}</button>`).join('')}
       </div>
     </div>
-    <div class="health-vitals__cards" id="health-vitals-cards"></div>
+    <div class="health-vitals__cards metric-rows" id="health-vitals-cards"></div>
     <div class="health-vitals__more" id="health-vitals-more"></div>
     <div class="health-vitals__detail" id="health-vitals-detail"></div>
   `);
@@ -1644,12 +1644,22 @@ function sparklineMarkup(points, key, metric) {
   const pts = withVal.map((o, idx) => `${x(idx).toFixed(1)},${y(o.v).toFixed(1)}`).join(' ');
   const lastX = x(n - 1).toFixed(1);
   const lastY = y(withVal[n - 1].v).toFixed(1);
-  // Farbe steht in panel.css am geteilten Bauteil, nicht hier: sie ist eine
-  // Aussage über den WERT und gehört deshalb der Karte, nicht dem Modul.
+  // Farbe steht in panel.css am geteilten Bauteil, nicht hier (R18: Modulton
+  // mit Flaechenverlauf, Begruendung dort). Die Flaeche schliesst die Linie
+  // unten; ihr Verlauf braucht eine Kennung je Metrik, weil mehrere Trendlinien
+  // im selben Dokument stehen. Der letzte Punkt ist eine Linie der Laenge null
+  // mit runder Kappe: ein `<circle>` wurde von `preserveAspectRatio="none"`
+  // zur Ellipse gestreckt (gemessen 100x26 auf 176x22).
+  const fillId = `metric-spark-${String(metric?.type ?? key).replace(/[^a-z0-9_-]/gi, '')}`;
+  const end = `x1="${lastX}" x2="${lastX}" y1="${lastY}" y2="${lastY}" vector-effect="non-scaling-stroke"`;
   return `<svg class="metric-card__spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <defs><linearGradient id="${fillId}" x1="0" y1="0" x2="0" y2="1">
+        <stop class="metric-card__spark-from" offset="0" /><stop class="metric-card__spark-to" offset="1" />
+      </linearGradient></defs>
+      <polygon class="metric-card__spark-area" fill="url(#${fillId})" points="${x(0).toFixed(1)},${H} ${pts} ${lastX},${H}" />
       <polyline points="${pts}" fill="none" stroke-width="1.5"
         stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
-      <circle cx="${lastX}" cy="${lastY}" r="2" vector-effect="non-scaling-stroke" />
+      <line class="metric-card__spark-ring" ${end} /><line class="metric-card__spark-end" ${end} />
     </svg>`;
 }
 
@@ -6271,7 +6281,7 @@ function overviewVitalsMarkup() {
   const cards = entries
     .map(({ metric, series }) => overviewVitalCardMarkup(metric, series, { extra: !core.has(metric.type) }))
     .join('');
-  return `<div class="health-overview__vitals-grid">${cards}</div>`;
+  return `<div class="health-overview__vitals-grid metric-rows">${cards}</div>`;
 }
 
 function overviewVitalCardMarkup(metric, series, { extra = false } = {}) {

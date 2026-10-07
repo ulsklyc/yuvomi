@@ -29,10 +29,10 @@ import { toLocalDateKey, parseLocalDateKey, addLocalDays,
         todayKey} from '/utils/date.js';
 import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountMin, applyAmountFormat, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
-import { trendMarkup } from '/utils/metric-card.js';
+import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { rowActionHtml } from '/utils/row-action.js';
-import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
+import { metricGlanceHtml, wireMetricGlance, glanceLeadClass } from '/utils/metric-glance.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
 import { appendCurrencyOptions } from '/settings/currency.js';
 import '/components/category-manager.js';
@@ -1237,8 +1237,10 @@ function renderBody() {
         ${p ? renderTrend(Math.abs(s.expenses), Math.abs(p.expenses), prevLabel, 'lower') : ''}
       </div>`;
   // Rolle `balance`: hier trägt die Zahl selbst die Richtung.
+  // DER SALDO FUEHRT (Critique R18): eine Display-Stufe in der Seitenleiste,
+  // Einnahmen und Ausgaben eine Stufe leiser (panel.css `.metric-card--lead`).
   const balanceCard = `
-      <div class="metric-card ${balanceTone}">
+      <div class="metric-card ${balanceTone} ${leadCardClass(amountByRole(s.balance, 'balance').text)}">
         <div class="metric-card__label">${t('budget.balance')}</div>
         <div class="metric-card__value">${amountByRole(s.balance, 'balance').text}</div>
         ${p && !balanceNeutral ? renderTrend(s.balance, p.balance, prevLabel, 'higher') : ''}
@@ -1275,7 +1277,7 @@ function renderBody() {
       </button>
     </div>
     <!-- Zusammenfassung -->
-    <div class="metric-grid${expensesOnly ? ' metric-grid--expenses-only' : ''}">
+    <div class="metric-grid${expensesOnly ? ' metric-grid--expenses-only' : ' metric-grid--led'}">
       ${expensesOnly ? expensesCard : incomeCard + expensesCard + balanceCard}
     </div>
     </div>
@@ -1648,7 +1650,7 @@ function balanceGlanceHtml(s, { expensesOnly, forecast, balanceTone }) {
         </span>`;
   const count = s.byCategory?.length ?? 0;
   return `
-    <div class="row-carrier budget-glance">
+    <div class="row-carrier budget-glance ${glanceLeadClass(lead.value)}">
       <button type="button" class="budget-glance__row budget-glance__balance" id="budget-balance-more"
               aria-expanded="${state.balanceExpanded ? 'true' : 'false'}" aria-controls="budget-balance-details">
         <span class="budget-glance__lead">
@@ -2131,6 +2133,9 @@ function renderAccountsPage() {
   // Rollenlogik, dass ein Nettovermögen von exakt 0 vorher als Erfolg grün
   // erschien - null Vermögen ist keine gute Nachricht, sondern gar keine.
   const netWorth = amountByRole(state.netWorth, 'balance', { block: 'metric-card' });
+  // EIN STAND IST KEINE NACHRICHT (R18, budget.css `.budget-account__balance`):
+  // das Nettovermoegen steht in Textfarbe, nur ein Minus traegt Rot.
+  const netWorthTone = Number(state.netWorth) < 0 ? 'negative' : 'neutral';
 
   const archiveToggle = hasArchived ? `
       <button class="budget-accounts__toggle" id="budget-toggle-archived" type="button" aria-pressed="${state.accountsShowArchived}">
@@ -2161,7 +2166,8 @@ function renderAccountsPage() {
     ${metricGlanceHtml({
       label: t('budget.netWorth'),
       value: netWorth.text,
-      tone: Number(state.netWorth) > 0 ? 'positive' : Number(state.netWorth) < 0 ? 'negative' : 'neutral',
+      tone: netWorthTone,
+      lead: true,
     })}
     `;
   // DAS NETTOVERMOEGEN IST EINE LEISTENKARTE NEBEN DEN KONTEN (Critique R17,
@@ -2173,7 +2179,7 @@ function renderAccountsPage() {
   // steht sie ueber den Konten, mobil vertritt sie die Kurzzeile.
   const rail = `
     <div class="metric-grid metric-grid--rail budget-glance-details">
-      <div class="metric-card ${netWorth.className}">
+      <div class="metric-card metric-card--${netWorthTone} ${leadCardClass(netWorth.text)}">
         <div class="metric-card__label">${t('budget.netWorth')}</div>
         <div class="metric-card__value">${netWorth.text}</div>
       </div>
@@ -2482,6 +2488,7 @@ function renderLoansDashboard() {
     expanded: state.loansExpanded,
     label: remainingLabel,
     value: amountByRole(summary.remaining_principal ?? summary.remaining_amount ?? 0, 'total').text,
+    lead: true,
     flows: [
       { label: t('budget.loanRemainingInstallments'), amount: String(summary.remaining_installments ?? 0) },
       { label: t('budget.loanPaidAmount'), amount: amountByRole(summary.paid_amount ?? 0, 'total').text },
@@ -2518,8 +2525,8 @@ function renderLoansDashboard() {
            (fünfte Kartenbauart des Moduls, Critique 2026-07-30, P0). Rolle
            total: die Richtung steht im Label, nicht im Vorzeichen.
            Mobil wartet sie hinter EINER Zeile (metricGlanceHtml, R14 P1). -->
-      <div class="metric-grid budget-glance-details${state.loansExpanded ? ' is-expanded' : ''}" id="budget-loans-details">
-        <div class="metric-card">
+      <div class="metric-grid metric-grid--led budget-glance-details${state.loansExpanded ? ' is-expanded' : ''}" id="budget-loans-details">
+        <div class="metric-card ${leadCardClass(amountByRole(summary.remaining_principal ?? summary.remaining_amount ?? 0, 'total').text)}">
           <div class="metric-card__label">${remainingLabel}</div>
           <div class="metric-card__value">${amountByRole(summary.remaining_principal ?? summary.remaining_amount ?? 0, 'total').text}</div>
         </div>

@@ -6545,3 +6545,30 @@ button.today-cockpit__more--link {
   .nutrition-widget__row { grid-template-columns: minmax(5rem, 8rem) 1fr auto; }
   .nutrition-widget__bar { grid-column: auto; grid-row: auto; }
 }
+
+/* ZAHLEN STEHEN IN GLEICH BREITEN ZIFFERN - auf der ganzen Uebersicht, an EINER
+ * Stelle (Critique R18, 2026-10-07). Gemessen trugen 20 von 62 Textknoten mit
+ * Ziffern `tabular-nums` (im ersten Lauf 19 von 36): der Budgetsaldo ja, die
+ * beiden Betraege darunter nicht; die Uhrzeit des Termins ja, die der
+ * Familienkarte nicht. Untereinander stehende Zeiten, Betraege und Zaehler
+ * springen sonst je nach Ziffernform ("11" ist schmaler als "08").
+ *
+ * Die Liste nennt die Traeger von GELD, ZEIT und ZAEHLERN, `font-variant-numeric`
+ * erbt auf ihre Kinder. Fliesstext mit Zahlen (Notizen) bleibt bei den
+ * Proportionalziffern der Schrift - dort ist eine Zahl ein Wort im Satz.
+ * Guard: test-dashboard-clarity.js haelt die Liste gegen das Markup. */
+.dashboard-overview__date,
+.today-cockpit-card__value,
+.today-cockpit-card__sub,
+.today-cockpit__more,
+.family-member__status,
+.family-widget__footer,
+.budget-widget__savings,
+.budget-widget__flow-item,
+.widget__badge,
+.widget-list-more,
+.birthday-widget-item__meta,
+.birthday-widget-item__age,
+.rewards-widget__footer {
+  font-variant-numeric: tabular-nums;
+}

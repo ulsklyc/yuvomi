@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Each money screen has one number that leads.** On a phone the largest thing on every budget
+  tab was the word "Budget"; the balance stood beside it in small type. Now one figure per tab
+  carries the screen: the balance in the overview, net worth in accounts, the remaining debt in
+  loans, the monthly cost in subscriptions. Income and expenses stand as a quiet line below it.
+  On a desktop the same figure leads its column and the others step back. Long amounts and long
+  currency signs take a smaller size instead of breaking.
+- **The budget trend reads at a glance.** The area under income is tinted, today carries a dot
+  with both values, and what has not happened yet is dotted - for both lines, where expenses
+  used to be dashed as well. "Today" no longer sits on a grid line, the axis says "1.", "16.",
+  "31." instead of three full dates under a header that names the month, and three grid lines
+  replace up to seven. Trend and ring now sit on a card like the lists beside them.
+- **The spending ring shows its total in the middle.** The sentence next to it ("7 segments,
+  largest: ...") is still read out by screen readers.
+- **Account balances are no longer green.** Nearly every balance and the net worth above them
+  were green merely for being above zero. A balance now stands in the text colour and only a
+  negative one is red; green is kept for income and for changes.
+- **Figure tiles line up.** In the vitals row the dates stood at three different heights and
+  "116/74" pushed "mmHg" onto its own line. Label, value, trend line and date now share the same
+  four rows across a row of tiles, value and unit share a baseline, and labels are written
+  normally instead of in spaced capitals, so a long one such as oxygen saturation fits on one line. This holds
+  for every tile of this kind: budget, health, housekeeping, inventory and the overview.
+- **The small trend lines in the vitals tiles are visible.** They were grey hairlines; they now
+  carry the colour of the health area with a soft fill, and the latest reading is marked.
+- **Numbers no longer jump sideways.** On the overview, times, amounts and counters now use
+  digits of equal width everywhere, not only in some tiles.
 - **The app starts faster on a slow connection.** Before the overview asked for its data, the
   start made five requests one after the other, two of them twice. What does not depend on each
   other now runs at the same time, and the second copy is served from the first. Measured on a

@@ -754,3 +754,78 @@ test('R16: die Jahresachse nennt Monate, keine Monatsersten', () => {
   }
   assert.doesNotMatch(svg, /<title>[^<]*2026-0[28]-01/, 'auch der Punkt nennt seinen Monat, nicht dessen ersten Tag');
 });
+
+/* KENNZAHLKARTEN MIT FESTER ANATOMIE (Critique R18, 2026-10-07). Gesehen in der
+ * Vitalreihe: die Datumszeilen auf drei Hoehen (mit Trendlinie, ohne, mit
+ * zweizeiligem Label), "SAUERSTOFFSÄTTI-/GUNG" als gesperrte Versalzeile, die
+ * Einheit unter dem Wert ("116/74" / "mmHg"), graue Haarlinien als Trend. */
+test('R18: die Kennzahlkarte hat vier feste Zeilen - Kopf, Wert, Trendlinie, Meta', async () => {
+  const panel = readFileSync(new URL('../public/styles/panel.css', import.meta.url), 'utf8');
+  const typo = readFileSync(new URL('../public/styles/typography.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(panel)];
+  const body = (sel, at = () => true) => rules.filter((r) => r.selector.split(',').map((s) => s.trim()).includes(sel) && at(r)).map((r) => r.body).join(';');
+  const plain = (r) => r.at.length === 0;
+  // Jeder Teil hat seine Zeile - eine fehlende Trendlinie zieht die Meta-Zeile nicht hoch.
+  assert.match(body('.metric-rows > .metric-card', plain), /grid-template-rows:\s*auto auto minmax\(var\(--metric-spark-row, 0px\), auto\) auto/);
+  for (const [part, row] of [['head', 1], ['body', 2], ['spark', 3], ['meta', 4], ['note', 4]]) {
+    assert.match(body(`.metric-rows > .metric-card > .metric-card__${part}`), new RegExp(`grid-row:\\s*${row}\\b`), `.metric-card__${part} steht in Zeile ${row}`);
+  }
+  // Subgrid: die Karten EINER Rasterzeile teilen sich die vier Zeilenhoehen. Nur als Aufsatz.
+  const sub = (r) => r.at.some((a) => /@supports\s*\(grid-template-rows:\s*subgrid\)/.test(a));
+  assert.match(body('.metric-rows > .metric-card', sub), /grid-row:\s*span 4/);
+  assert.match(body('.metric-rows > .metric-card', sub), /grid-template-rows:\s*subgrid/);
+  assert.doesNotMatch(body('.metric-rows > .metric-card', plain), /subgrid/, 'ohne Subgrid bleibt der Rueckfall mit festen Zeilen');
+  // Beide Vitalraster tragen die Anatomie und melden sich als Reihe (Kompaktstufe des Werts).
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.match(src, /<div class="health-vitals__cards metric-rows" id="health-vitals-cards">/);
+  assert.match(src, /<div class="health-overview__vitals-grid metric-rows">/);
+  const healthRules = [...eachRule(HEALTH_CSS)];
+  for (const grid of ['.health-vitals__cards', '.health-overview__vitals-grid']) {
+    const r = healthRules.find((x) => x.at.length === 0 && x.selector.trim() === grid);
+    assert.match(r.body, /container:\s*metric-grid \/ inline-size/, `${grid}: ohne die Reihe stuende "116/74 mmHg" auf dem Telefon in 28px und braeche um`);
+  }
+  // Das Label: Satzschreibung, eine Zeile hoch gedacht - nicht mehr im Versal-Block.
+  const label = body('.metric-card__label', plain);
+  assert.match(label, /letter-spacing:\s*var\(--tracking-normal\)/);
+  assert.doesNotMatch(label, /text-transform/);
+  const versal = [...eachRule(typo)].find((r) => /text-transform:\s*uppercase/.test(r.body) && /letter-spacing:\s*var\(--tracking-label\)/.test(r.body));
+  assert.ok(versal, 'der Versal-Block steht noch');
+  assert.ok(!versal.selector.split(',').map((s) => s.trim()).includes('.metric-card__label'), 'das Kennzahl-Label steht nicht mehr im Versal-Block');
+  // Wert und Einheit: eine Grundlinie.
+  assert.match(body('.metric-card__body', plain), /align-items:\s*baseline/);
+
+  // Die Karte selbst: Teile in der Reihenfolge der Zeilen.
+  await imBlatt(() => {
+    const weight = vitalMetric('weight');
+    const series = computeVitalSeries([
+      { id: 1, type: 'weight', value_num: 65, measured_at: '2026-09-22T07:00' },
+      { id: 2, type: 'weight', value_num: 66, measured_at: '2026-09-12T07:00' },
+    ], { type: 'weight', range: 'month', anchor: '2026-09-27' });
+    const html = health.cardMarkup(weight, series);
+    const order = ['metric-card__head', 'metric-card__body', 'metric-card__spark', 'metric-card__meta'].map((cls) => html.indexOf(`class="${cls}"`));
+    assert.ok(order.every((at, i) => at > 0 && (i === 0 || at > order[i - 1])), `Kopf, Wert, Trendlinie, Meta: ${order}`);
+    // Trendlinie: Flaeche unter der Linie, Endpunkt als Linie der Laenge null (kein gestreckter Kreis).
+    const spark = html.slice(html.indexOf('<svg class="metric-card__spark"'), html.indexOf('</svg>'));
+    assert.match(spark, /<linearGradient id="metric-spark-weight"/);
+    assert.match(spark, /<polygon class="metric-card__spark-area" fill="url\(#metric-spark-weight\)"/);
+    assert.match(spark, /<line class="metric-card__spark-end" x1="([\d.]+)" x2="\1" y1="([\d.]+)" y2="\2" vector-effect="non-scaling-stroke" \/>/);
+    assert.doesNotMatch(spark, /<circle/, 'preserveAspectRatio="none" streckte den Kreis zur Ellipse');
+    assert.doesNotMatch(spark, /stroke="var\(|fill="var\(/, 'die Farbe steht am geteilten Bauteil, nicht im Markup');
+    assert.match(spark, /aria-hidden="true"/);
+  });
+  // Farbe: Modulton mit Rueckfall, Flaeche laeuft auf 0, Endpunkt in Label-Farbe.
+  assert.match(body('.metric-card__spark', plain), /color:\s*var\(--module-accent, var\(--color-text-secondary\)\)/);
+  assert.match(body('.metric-card__spark-to'), /stop-opacity:\s*0\b/);
+  assert.match(body('.metric-card__spark-end'), /stroke:\s*var\(--color-text-primary\)/);
+  // Grafikkontrast 3:1 der Linie gegen Karte und Well, beide Themes (Gesundheitston).
+  const { contrastRatio } = await import('../public/utils/contrast.js');
+  const tokens = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  for (const [name, ink, surface] of [['hell/Karte', '#9E1E88', '#FFFFFF'], ['hell/Well', '#9E1E88', '#EDEAE3'], ['dunkel/Karte', '#DB60CB', '#2B2825'], ['dunkel/Well', '#DB60CB', '#37332E']]) {
+    assert.ok(contrastRatio(ink, surface) >= 3, `${name}: ${contrastRatio(ink, surface)}`);
+  }
+  for (const hex of ['--_family-health:   #9E1E88', '--_family-health:   #DB60CB']) assert.ok(tokens.includes(hex), hex);
+  // Zeiten, Daten und Betraege unter dem Wert stehen tabellarisch.
+  for (const part of ['note', 'meta', 'trend', 'unit']) {
+    assert.match(body(`.metric-card__${part}`), /font-variant-numeric:\s*tabular-nums/, `.metric-card__${part}`);
+  }
+});

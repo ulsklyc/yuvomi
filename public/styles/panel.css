@@ -286,9 +286,25 @@
   }
 }
 
-/* Größe, Gewicht und Versalsatz kommen aus der geteilten Eyebrow-Klasse in
- * typography.css - hier stehen nur Farbe und Umbruchverhalten. */
+/* SATZSCHREIBUNG, NICHT GESPERRTE VERSALIEN (Critique R18, 2026-10-07).
+ *
+ * Das Label stand in der Versal-Mikro-Label-Liste von typography.css (12px,
+ * semibold, +0,05em, Versalien). Versalien mit Sperrung laufen rund ein
+ * Drittel breiter als dasselbe Wort in Satzschreibung: "SAUERSTOFFSÄTTIGUNG"
+ * mass 168px und brach in jeder Vitalkachel als gesperrte Versalzeile
+ * ("SAUERSTOFFSÄTTI-/GUNG"), "Sauerstoffsättigung" misst 118px und steht in der
+ * 173px-Kachel des Telefons in einer Zeile. Dazu die Bedeutungsfrage der Liste
+ * dort: das Label einer Kennzahl wiederholt sich nicht "mit wechselndem Wert
+ * ueber eine Liste", es benennt EINEN Wert - Apples Kennzahlkacheln (Health,
+ * Wallet) setzen es deshalb in Satzschreibung. Groesse bleibt Caption 1,
+ * Gewicht medium: es fuehrt den Wert an, ohne mit ihm zu konkurrieren.
+ * Gilt fuer JEDEN Nutzer der Karte (Budget, Gesundheit, Haushaltshilfe,
+ * Inventar, Aufteilung, Uebersicht) - alle im Browser angesehen. */
 .metric-card__label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--tracking-normal);
   color: var(--color-text-secondary);
   /* min-width:0 + Umbruch: „Nächstes Fälligkeitsdatum" und die längeren
    * Übersetzungen sprengen sonst die schmalste Spalte der Vierer-Zeile.
@@ -376,6 +392,90 @@
   --metric-value-size: var(--text-3xl);
 }
 
+/* EINE KARTE FUEHRT (Critique R18, 2026-10-07).
+ *
+ * Drei gleich laute Betraege in Title 1 nebeneinander liessen offen, welche
+ * Zahl die Aussage des Reiters ist; mobil war das groesste Element jedes
+ * Geld-Bildschirms das Wort "Budget". Je Reiter traegt jetzt EINE Karte
+ * `.metric-card--lead` (Saldo, Nettovermoegen, Restschuld, Monatskosten), und
+ * ihre Reihe `.metric-grid--led`:
+ *
+ *   - In einer SEITENSPALTE (eine Karte je Zeile, `--metric-value-size`
+ *     gesetzt) steigt die Leitzahl auf eine Display-Stufe. Die Stufe misst an
+ *     der Spalte (cqi gegen `.metric-grid`), nicht am Viewport: 13cqi sind in
+ *     der schmalsten Spalte (300px) 39px, "2.503,89 €" laeuft dort 226px von
+ *     276px. Laengere Werte nennen ihre Stufe als Klasse
+ *     (`leadStep()` in utils/metric-card.js): "175.444,93 €" bei 11cqi = 33px
+ *     -> 247px, "CHF 175'444.93" bei 9cqi = 27px -> 232px.
+ *   - In einer REIHE mit mehreren Karten kann die Leitzahl nicht wachsen (die
+ *     Stufenleiter oben ist an der Kartenbreite gemessen). Dort treten die
+ *     uebrigen eine Stufe zurueck und verlieren das Fett - die Fuehrung
+ *     entsteht durch Ruhe daneben, nicht durch Lautstaerke.
+ *
+ * WER EINE SEITENSPALTE IST, SAGT ES MIT `--metric-rail: ;` - einem leeren
+ * Wert, neben `--metric-value-size` (siehe "Eine Karte je Zeile"). Die Regel
+ * der Leitzahl setzt ihn vor ihre Stufe: ist er leer, gilt die Stufe; ist er
+ * nicht gesetzt, ist die ganze Zeile ungueltig und der Rueckfall dahinter
+ * greift - die Stufenleiter der Reihe. So entscheidet EINE Regel hier, und
+ * kein Modul-Stylesheet setzt einen eigenen Wert-Grad (Guard R16 in
+ * test-frontend-audit). Ohne Container-Einheiten (Chrome < 105, Safari < 16)
+ * gilt die Regel nicht, die Leitzahl bleibt dort auf der Stufenleiter. */
+.metric-card--lead {
+  --metric-lead-size: clamp(var(--text-3xl), 13cqi, var(--text-5xl));
+}
+
+.metric-card--lead-long {
+  --metric-lead-size: clamp(var(--text-3xl), 11cqi, var(--text-4xl));
+}
+
+.metric-card--lead-xlong {
+  --metric-lead-size: clamp(var(--text-2xl), 9cqi, var(--text-3xl));
+}
+
+.metric-card--lead-xxlong {
+  --metric-lead-size: var(--text-2xl);
+}
+
+.metric-grid--rail {
+  --metric-rail: ;
+}
+
+@supports (width: 1cqi) {
+  .metric-card--lead > .metric-card__value {
+    --_metric-lead: var(--metric-rail) var(--metric-lead-size);
+    font-size: var(--_metric-lead, var(--metric-value-size, var(--text-3xl)));
+  }
+
+  @container metric-grid (max-width: 600px) {
+    .metric-card--lead > .metric-card__value {
+      font-size: var(--_metric-lead, var(--metric-value-size, var(--text-2xl)));
+    }
+  }
+
+  @container metric-grid (max-width: 400px) {
+    .metric-card--lead > .metric-card__value {
+      font-size: var(--_metric-lead, var(--metric-value-size, var(--text-xl)));
+    }
+  }
+}
+
+.metric-grid--led > .metric-card:not(.metric-card--lead) > .metric-card__value {
+  font-size: var(--metric-quiet-size, var(--text-2xl));
+  font-weight: var(--font-weight-semibold);
+}
+
+@container metric-grid (max-width: 600px) {
+  .metric-grid--led > .metric-card:not(.metric-card--lead) > .metric-card__value {
+    font-size: var(--metric-quiet-size, var(--text-xl));
+  }
+}
+
+@container metric-grid (max-width: 400px) {
+  .metric-grid--led > .metric-card:not(.metric-card--lead) > .metric-card__value {
+    font-size: var(--metric-quiet-size, var(--text-lg));
+  }
+}
+
 /* UND DIE REIHE BRICHT, STATT IHRE KARTEN ZU ZERQUETSCHEN.
  *
  * „Immer eine volle Zeile" (oben) beantwortete die Frage gegen einen
@@ -423,6 +523,17 @@
 }
 
 .metric-card__note--danger { color: var(--color-danger); }
+
+/* Fussnote, Meta-Zeile, Trend und Einheit tragen Zeiten, Daten und Betraege
+ * ("Im Haus seit 08:30", "+500,00 €", "03.10.") - in gleich breiten Ziffern
+ * wie der Wert ueber ihnen (Critique R18: auf der Uebersicht trugen es 19 von
+ * 36 Zahlenknoten). */
+.metric-card__note,
+.metric-card__meta,
+.metric-card__trend,
+.metric-card__unit {
+  font-variant-numeric: tabular-nums;
+}
 
 /* Fortschritt in der Karte (Monatsbudget der Abos). Der Balken ist der
  * Zweitkanal zur Zahl, nicht ihr Ersatz - über 100% färbt er sich um, statt
@@ -597,6 +708,46 @@
 }
 
 /* --------------------------------------------------------
+ * FESTE ANATOMIE: VIER ZEILEN AUF GEMEINSAMEN GRUNDLINIEN (Critique R18)
+ *
+ * Kopf - Wert - Trendlinie - Meta. Jeder Teil ist optional, und genau das
+ * verschob die Karten gegeneinander: in der Vitalreihe standen die Datumszeilen
+ * auf drei Hoehen (mit Trendlinie, ohne, mit zweizeiligem Label), und eine
+ * Reihe, in der jede Karte ihr Datum woanders fuehrt, liest man Karte fuer
+ * Karte statt als Reihe.
+ *
+ * `.metric-rows` steht am RASTER der Karten. Jeder Teil hat seine feste Zeile
+ * (eine fehlende Trendlinie laesst ihre Zeile leer, statt die Meta-Zeile
+ * hochzuziehen), und wo der Browser Subgrid kann (Chrome 117, Firefox 71,
+ * Safari 16), teilen sich die Karten EINER Rasterzeile dieselben vier
+ * Zeilenhoehen: bricht in einer Karte ein Label oder ein Wert um, waechst die
+ * Zeile fuer alle. Ohne Subgrid bleibt der Rueckfall: dieselben vier Zeilen je
+ * Karte, die Trendzeile mit fester Mindesthoehe (`--metric-spark-row`, vom
+ * Raster gesetzt, das Trendlinien fuehrt) - gleich hoch, solange nichts
+ * umbricht.
+ * -------------------------------------------------------- */
+.metric-rows > .metric-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(var(--metric-spark-row, 0px), auto) auto;
+  align-content: start;
+  row-gap: var(--space-0h);
+}
+
+.metric-rows > .metric-card > .metric-card__head { grid-row: 1; }
+.metric-rows > .metric-card > .metric-card__body { grid-row: 2; }
+.metric-rows > .metric-card > .metric-card__spark { grid-row: 3; align-self: center; }
+.metric-rows > .metric-card > .metric-card__meta,
+.metric-rows > .metric-card > .metric-card__note { grid-row: 4; }
+
+@supports (grid-template-rows: subgrid) {
+  .metric-rows > .metric-card {
+    grid-row: span 4;
+    grid-template-rows: subgrid;
+  }
+}
+
+/* --------------------------------------------------------
  * Die Auswertungsflaeche: Gitter und Achse
  *
  * Gehoeren hierher, weil die Geometrie dahinter geteilt ist (utils/chart.js).
@@ -704,26 +855,49 @@ svg.chart {
  * SIE FÄRBT SICH HIER, NICHT IM MARKUP. Sechs Linien standen als
  * `stroke="var(--module-accent)"` in health.js und sagten sechsmal
  * „Gesundheit" - dieselbe Aussage, die v2.23.0 dem Glyph derselben Karte
- * abgewöhnt hat, nur als Linie. Die Farbe einer Kennzahlkarte gehört ihrem
- * WERT; wo eine Metrik keine Valenz hat (bei Vitalwerten ist „hoch" je nach
- * Größe gut oder schlecht - siehe `deltaMarkup` in health.js), sagt sie nichts
- * und bleibt neutral. Der Endpunkt trägt die Label-Farbe, weil er den aktuellen
- * Wert markiert und nicht den Verlauf dorthin. */
+ * abgewöhnt hat, nur als Linie. Daraus wurde 2026 eine neutrale Haarlinie in
+ * Sekundärtext: „wo eine Metrik keine Valenz hat (bei Vitalwerten ist ‚hoch'
+ * je nach Größe gut oder schlecht), sagt sie nichts und bleibt neutral."
+ *
+ * IM MODULTON, MIT FLÄCHE (Critique R18, 2026-10-07). Die neutrale Linie war
+ * richtig begründet und falsch im Ergebnis: neun graue Haarstriche lasen sich
+ * als Trennlinien, nicht als Verlauf - die Kurve war das Leiseste auf der
+ * Karte, die sie tragen soll. Der Kanon ist inzwischen genauer als die Regel
+ * von damals: Modultöne stehen an Siegel UND DATEN, und eine Trendlinie ist
+ * Daten. Was die alte Begründung schützte, bleibt:
+ *   - KEINE VALENZ. Der Ton ist der des Moduls, nie Erfolg oder Gefahr - die
+ *     Linie behauptet weiter nicht, „hoch" sei gut.
+ *   - RUHE. 1,5px Linie, darunter ein Hauch desselben Tons (14 % auf 0); der
+ *     Glyph im Kopf bleibt in Label-Farbe (`.metric-card__icon`), die Farbe
+ *     steht je Karte an genau EINER Stelle neben dem Wert.
+ *   - KONTRAST. Grafikkontrast 3:1 (WCAG 1.4.11) gegen die Kartenfläche,
+ *     gerechnet mit dem Gesundheitston: hell #9E1E88 auf #FFFFFF 7,01:1, auf
+ *     dem Well #EDEAE3 5,84:1; dunkel #DB60CB auf #2B2825 4,57:1.
+ *     Ohne Modulton (Karte ausserhalb eines Moduls) bleibt Sekundärtext.
+ * Der Endpunkt trägt die Label-Farbe mit einem Ring in Kartenfläche: er
+ * markiert den aktuellen Wert, nicht den Verlauf dorthin. */
 .metric-card__spark {
   width: 100%;
   height: 22px;
   display: block;
   overflow: visible;
-  color: var(--color-text-secondary);
+  color: var(--module-accent, var(--color-text-secondary));
 }
 
 .metric-card__spark polyline {
   stroke: currentColor;
 }
 
-.metric-card__spark circle {
-  fill: var(--color-text-primary);
+.metric-card__spark-from { stop-color: currentColor; stop-opacity: 0.14; }
+.metric-card__spark-to { stop-color: currentColor; stop-opacity: 0; }
+
+.metric-card__spark-ring,
+.metric-card__spark-end {
+  stroke-linecap: round;
 }
+
+.metric-card__spark-ring { stroke: var(--metric-surface, var(--color-surface)); stroke-width: 9; }
+.metric-card__spark-end { stroke: var(--color-text-primary); stroke-width: 6; }
 
 .metric-card__meta {
   display: flex;
@@ -779,6 +953,8 @@ svg.chart {
  * -------------------------------------------------------- */
 .metric-card--inset {
   background-color: var(--color-fill-well);
+  /* Die Fläche, gegen die sich der Endpunkt der Trendlinie absetzt. */
+  --metric-surface: var(--color-fill-well);
   box-shadow: none;
 }
 
@@ -907,6 +1083,64 @@ svg.chart {
  * „Du schuldest"), traegt den Ton der Karte, die er vertritt. */
 .budget-glance__flow--negative .budget-glance__amount {
   color: var(--color-danger);
+}
+
+/* DIE KURZZEILE MIT LEITZAHL (Critique R18, 2026-10-07; `glanceLeadClass()`
+ * in utils/metric-glance.js). Die Zahl steigt von 18px auf eine Display-Stufe
+ * und steht allein in ihrer Zeile; die Nebenwerte ruecken als EINE ruhige
+ * Zeile darunter (sie stehen im Markup vor dem Pfeil, `order` haelt den Pfeil
+ * in der ersten Zeile). Neben der Zahl ist dafuer kein Platz: bei 390px
+ * bleiben nach Polster und Pfeil 298px, "Einnahmen 5.550,00 €" braucht 150.
+ *
+ * Stufen gegen den Viewport, weil die Zeile nur unter 640px existiert und dort
+ * immer die volle Breite traegt (Breite minus 2 x 16px Rand, 2 x 16px Polster,
+ * 28px Pfeil). Fette Systemziffern laufen rund 0,6em je Zeichen:
+ *   kurz  (<= 10 Zeichen, "2.503,89 €")      11vw: 390 -> 43px = 249 von 298px
+ *   long  (<= 13, "175.444,93 €")             9vw: 390 -> 34px = 240px
+ *   xlong (<= 17, "CHF 175'444.93")         7,5vw: 390 -> 28px = 241px
+ *   320px: 35px = 204, 29px = 204, 24px = 206 von 228px.
+ * Im Browser nachgemessen, Guard: test-budget-ui.js. */
+.budget-glance--lead .budget-glance__row {
+  flex-wrap: wrap;
+  row-gap: var(--space-0h);
+}
+
+.budget-glance--lead .budget-glance__lead {
+  flex: 1 1 0;
+}
+
+.budget-glance--lead .budget-glance__value {
+  font-size: clamp(var(--text-3xl), 11vw, var(--text-5xl));
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.budget-glance--lead-long .budget-glance__value {
+  font-size: clamp(var(--text-3xl), 9vw, var(--text-4xl));
+}
+
+.budget-glance--lead-xlong .budget-glance__value {
+  font-size: clamp(var(--text-2xl), 7.5vw, var(--text-3xl));
+}
+
+.budget-glance--lead-xxlong .budget-glance__value {
+  font-size: var(--text-2xl);
+}
+
+.budget-glance--lead .budget-glance__chevron {
+  order: 1;
+  margin-inline-start: auto;
+}
+
+.budget-glance--lead .budget-glance__flows {
+  order: 2;
+  flex: 1 0 100%;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-start;
+  column-gap: var(--space-3);
+  margin-inline-start: 0;
 }
 
 .budget-glance__title {

@@ -778,3 +778,37 @@ test('#1607: der Reiter aus der Kachel ist einer, den das Budget kennt', async (
   const { __test: budget } = await import('../public/pages/budget.js');
   assert.equal(budget.tabFromQuery('?tab=budget'), 'budget');
 });
+
+/* ZAHLEN TABELLARISCH (Critique R18, 2026-10-07). Gemessen trugen auf der
+ * Uebersicht 20 von 62 Textknoten mit Ziffern `tabular-nums`: der Budgetsaldo
+ * ja, die beiden Betraege darunter nicht; die Uhrzeit des Termins ja, die der
+ * Familienkarte nicht. Die Liste nennt die Traeger von Geld, Zeit und Zaehlern
+ * der Uebersicht; jeder muss von EINER tabular-Regel gedeckt sein (eigene
+ * Klasse im letzten Glied, `font-variant-numeric` erbt auf die Kinder) und im
+ * Markup der Uebersicht vorkommen - sonst prueft die Liste Luft. */
+test('R18: Geld, Zeit und Zaehler der Uebersicht stehen in tabular-nums', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+  const tabular = new Set();
+  for (const file of ['dashboard.css', 'panel.css', 'layout.css']) {
+    for (const rule of eachRule(read(`../public/styles/${file}`))) {
+      if (!/font-variant-numeric:\s*tabular-nums/.test(rule.body)) continue;
+      for (const part of rule.selector.split(',')) {
+        const last = part.trim().split(/[\s>+~]+/).pop();
+        for (const cls of last.match(/\.[\w-]+/g) ?? []) tabular.add(cls.slice(1));
+      }
+    }
+  }
+  const source = read('../public/pages/dashboard.js');
+  const carriers = [
+    'dashboard-overview__date', 'today-cockpit-card__value', 'today-cockpit-card__sub', 'today-cockpit__more',
+    'family-member__status', 'family-widget__footer', 'budget-widget__savings', 'budget-widget__flow-item',
+    'widget__badge', 'widget-list-more', 'birthday-widget-item__meta', 'birthday-widget-item__age',
+    'rewards-widget__footer', 'metric-card__value', 'metric-card__note',
+  ];
+  const missing = carriers.filter((cls) => !tabular.has(cls));
+  assert.deepEqual(missing, [], `Zahlentraeger ohne tabular-nums: ${missing.join(', ')}`);
+  const gone = carriers.filter((cls) => !source.includes(cls));
+  assert.deepEqual(gone, [], `nicht mehr im Markup der Uebersicht: ${gone.join(', ')}`);
+});

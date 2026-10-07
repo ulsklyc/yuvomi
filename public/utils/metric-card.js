@@ -55,3 +55,30 @@ export function trendMarkup({ delta, betterWhen = null, text, icon = true }) {
     : '';
   return `<span class="metric-card__trend metric-card__trend--${valence}">${iconHtml}${text}</span>`;
 }
+
+/**
+ * DIE LEITZAHL WAEHLT IHRE STUFE NACH IHRER LAENGE (Critique R18, 2026-10-07).
+ *
+ * Je Geld-Reiter fuehrt EINE Zahl auf einer Display-Stufe. Wie breit sie
+ * laeuft, weiss CSS nicht - die Zeichenzahl schon: "2.503,89 €" (10 Zeichen)
+ * traegt bei 390px die volle Stufe, "175.444,93 €" (12) braucht eine darunter,
+ * "CHF 175'444.93" (14) noch eine. Gemessen in fetten Systemziffern: rund
+ * 0,6em je Zeichen. Die Stufen selbst stehen als clamp() in panel.css
+ * (`--metric-lead-size`); diese Funktion nennt nur die Klasse.
+ *
+ * @param {string} text der fertig formatierte Wert (Klartext)
+ * @returns {''|'long'|'xlong'|'xxlong'}
+ */
+export function leadStep(text) {
+  const n = Array.from(String(text ?? '')).length;
+  if (n <= 10) return '';
+  if (n <= 13) return 'long';
+  if (n <= 17) return 'xlong';
+  return 'xxlong';
+}
+
+/** Klassen der fuehrenden Kennzahlkarte: `metric-card--lead` samt Laengenstufe. */
+export function leadCardClass(text) {
+  const step = leadStep(text);
+  return `metric-card--lead${step ? ` metric-card--lead-${step}` : ''}`;
+}

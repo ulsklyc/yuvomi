@@ -27,6 +27,7 @@ import { openDetailView } from '/components/detail-view.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
+import { leadCardClass } from '/utils/metric-card.js';
 
 // Auslastung, ab der ein Budget „knapp" ist - dieselbe Zahl wie im Plan
 // (budget-plans.js `toneForRatio`), damit beide Tabs dieselbe Grenze ziehen.
@@ -657,10 +658,11 @@ function renderSummary() {
     expanded: state.summaryExpanded,
     label: t('subscriptions.monthlyCost'),
     value: money(used),
+    lead: true,
     flows: [{ label: t('subscriptions.activeCount', { count: summary.active_count }) }, budgetFlow],
   })}
-    <section class="metric-grid${hasBudget ? ' metric-grid--quad' : ''} budget-glance-details${state.summaryExpanded ? ' is-expanded' : ''}" id="subscriptions-summary-details">
-      <article class="metric-card">
+    <section class="metric-grid metric-grid--led${hasBudget ? ' metric-grid--quad' : ''} budget-glance-details${state.summaryExpanded ? ' is-expanded' : ''}" id="subscriptions-summary-details">
+      <article class="metric-card ${leadCardClass(money(used))}">
         <div class="metric-card__label">${t('subscriptions.monthlyCost')}</div>
         <div class="metric-card__value">${money(used)}</div>
         <div class="metric-card__note">${t('subscriptions.activeCount', { count: summary.active_count })}</div>
