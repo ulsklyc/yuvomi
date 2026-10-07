@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Housekeeping tasks: "Due" and "Done this month" stand beside the list.** On a desktop the
+  tasks tab left the side column empty while its two figures were shown only on the overview.
+
 - **Budget statistics read on a desktop and tell today from the rest of the month.** The
   category rows ran across the whole page in 12px - the name on the left, the amount more than
   800px away at the other end of a thin bar. Expenses and income now stand side by side, each

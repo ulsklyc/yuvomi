@@ -1284,8 +1284,9 @@ angedockte Primaerknopf sprang mit (Belohnungen 271/431px). Seitdem gilt:
   (der Abschnittstitel fuehrt in den Reiter Verlauf), Belohnungen/Verlauf die Punktestaende,
   Entsorgung Abfallarten und Quellen neben den Abholungen, Haushaltshilfe/Berichte die
   Kennzahlen (`railFirst`: mobil ueber der Liste, am Desktop daneben), Haushaltshilfe/Haushaltshilfen
-  das Protokoll der gewaehlten Person. Ein Reiter ohne zweiten Inhalt (Haushaltshilfe/Aufgaben)
-  laesst die Spur leer, statt Inhalt zu erfinden.
+  das Protokoll der gewaehlten Person, Haushaltshilfe/Aufgaben seit R17 die zwei Kennzahlen
+  „Faellig" und „Erledigt im Monat" (dieselben wie auf der Uebersicht; unter 640px bleiben sie
+  aus). Ein Reiter ohne zweiten Inhalt laesst die Spur leer, statt Inhalt zu erfinden.
 - Unter der Schwelle steht alles einspaltig in Quelltextreihenfolge auf dem Lesemass.
 
 Gemessen 1280 / 1440: Liste 612 / 720px, Seitenspalte 360 / 412px, Kopfkante 1248 / 1408 in

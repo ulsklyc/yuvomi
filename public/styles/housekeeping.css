@@ -1020,3 +1020,13 @@
     align-items: start;
   }
 }
+
+/* Die Kennzahlen der Aufgaben (housekeeping.js, taskSummaryHtml) bleiben unter
+ * 640px aus (`.budget-glance-details`, panel.css). Dann geht auch ihre Spur:
+ * eine leere Seitenspalte liesse den Zeilenabstand des Rasters als 16px unter
+ * der Liste stehen. 639px ist dieselbe Grenze wie dort, kein neuer Breakpoint. */
+@media (max-width: 639px) {
+  .page-columns__rail:has(> .housekeeping-task-summary) {
+    display: none;
+  }
+}

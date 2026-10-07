@@ -962,6 +962,35 @@ function renderTasks(content) {
   redrawList(content, () => drawTasks(content), { selector: TASK_ROW, keyAttr: 'data-swipe-id' });
 }
 
+/**
+ * DIE SEITENSPALTE DER AUFGABEN (Critique R17). Der Reiter liess sie leer
+ * (1280: 612 von 996px genutzt, 384px frei), obwohl es seine zwei Kennzahlen
+ * gibt: „Faellig" und „Erledigt im Monat" standen nur auf der Uebersicht.
+ * Dieselben Zahlen aus demselben Bestand (`state.dashboard`, nach jedem
+ * Erledigen neu geladen), dieselbe Karte, dieselben Worte.
+ *
+ * Unter 640px bleibt sie aus (`budget-glance-details`, panel.css): dort
+ * stuenden zwei Kacheln als 190px unter der Liste, und die Kurzzeile der
+ * Uebersicht nennt die Faelligen schon. Dazwischen steht sie unter der Liste,
+ * ab der Split-Schwelle daneben (`.page-columns`).
+ */
+function taskSummaryHtml() {
+  const data = state.dashboard || {};
+  const pending = data.pending_tasks ?? 0;
+  const finished = data.finished_tasks_this_month ?? 0;
+  return `
+    <section class="metric-grid budget-glance-details housekeeping-task-summary" aria-label="${esc(t('housekeeping.tasks'))}">
+      <article class="metric-card${pending > 0 ? '' : ' metric-card--empty'}">
+        <div class="metric-card__label">${esc(t('housekeeping.pendingChores'))}</div>
+        <div class="metric-card__value">${esc(pending)}</div>
+      </article>
+      <article class="metric-card${finished > 0 ? '' : ' metric-card--empty'}">
+        <div class="metric-card__label">${esc(t('housekeeping.finishedChores'))}</div>
+        <div class="metric-card__value">${esc(finished)}</div>
+      </article>
+    </section>`;
+}
+
 function drawTasks(content) {
   content.replaceChildren();
   const taskRows = state.tasks.map(taskRowHtml).join('');
@@ -976,6 +1005,7 @@ function drawTasks(content) {
     <section class="housekeeping-task-list row-carrier" aria-label="${esc(t('housekeeping.tasks'))}">
       ${taskRows || empty}
     </section>`,
+    rail: taskSummaryHtml(),
   }));
   if (window.lucide) window.lucide.createIcons({ el: content });
   // Jede Verdrahtung darunter schreibt - bei `read` haengt keine.

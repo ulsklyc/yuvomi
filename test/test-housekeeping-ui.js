@@ -706,7 +706,17 @@ test('Listenreiter am Desktop: Liste im Spaltenraster, Kennzahlen bzw. Protokoll
   // renderTasks() reicht seit R16 an redrawList() weiter; das Markup baut drawTasks().
   const tasks = fn('drawTasks');
   assert.match(tasks, /renderPageColumns\(\{\s*main:[\s\S]*housekeeping-task-list/, 'Aufgaben: die Liste steht in der Listenspalte');
-  assert.doesNotMatch(tasks, /\brail:/, 'Aufgaben: kein zweiter Inhalt, also keine erfundene Seitenspalte');
+  // R17: der Reiter HAT einen zweiten Inhalt - „Faellig" und „Erledigt im Monat"
+  // standen nur auf der Uebersicht, die Spalte daneben blieb leer (384px bei 1280).
+  assert.match(tasks, /\brail: taskSummaryHtml\(\),/, 'Aufgaben: die zwei Kennzahlen stehen in der Seitenspalte');
+  assert.doesNotMatch(tasks, /railFirst/, 'hinter der Liste im DOM: schmal stehen sie darunter, nie davor');
+  const summary = fn('taskSummaryHtml');
+  assert.match(summary, /state\.dashboard/, 'derselbe Bestand wie die Uebersicht (nach jedem Erledigen neu geladen)');
+  assert.match(summary, /class="metric-grid budget-glance-details housekeeping-task-summary"/,
+    'unter 640px bleiben die Kacheln aus - das Telefon bekommt nichts vor oder unter die Liste');
+  assert.match(summary, /t\('housekeeping\.pendingChores'\)[\s\S]*data\.pending_tasks|pending_tasks[\s\S]*t\('housekeeping\.pendingChores'\)/);
+  assert.match(summary, /t\('housekeeping\.finishedChores'\)/, 'dieselben Worte wie auf der Uebersicht');
+  assert.equal(summary.match(/class="metric-card\$\{/g)?.length, 2, 'zwei Karten, keine dritte erfunden');
   const reports = fn('renderReports');
   assert.match(reports, /renderPageColumns\(\{\s*railFirst: true,\s*rail:[\s\S]*metric-grid[\s\S]*main:[\s\S]*housekeeping-reports/,
     'Berichte: Kennzahlen im DOM vor der Liste (mobil darueber), am Desktop in der Seitenspalte');
