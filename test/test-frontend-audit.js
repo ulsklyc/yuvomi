@@ -2826,7 +2826,11 @@ test('mobile navigation uses neutral inactive wells and one active indicator', (
 test('mobile navigation Quiet Precision keeps state feedback stable and accessible', () => {
   const layout = read('../public/styles/layout.css');
   const glass = read('../public/styles/glass.css');
-  const indicatorRule = cssRuleBody(layout, '.nav-bottom__indicator');
+  // Exakt gelesen: seit R18 steht `html.page-swapping .nav-bottom__indicator`
+  // (Uebergangsname) VOR der Regel der Pille, und `cssRuleBody` faende dessen
+  // Rumpf - der Guard gegen die width-Transition darunter waere blind.
+  const indicatorRule = [...eachRule(layout)].find((r) => r.selector.trim() === '.nav-bottom__indicator')?.body ?? '';
+  assert.match(indicatorRule, /position:\s*absolute/, 'Vorbedingung: die Regel der Pille ist gefunden');
   const indicatorSurfaceRule = cssRuleBody(layout, '.nav-bottom__indicator::before');
   const indicatorSurfaceGlass = cssRuleBody(glass, '.nav-bottom__indicator::before');
   const focusRule = cssRuleBody(layout, '.nav-bottom .nav-item:focus-visible');
@@ -2938,8 +2942,13 @@ test('bottom-nav labels wrap to two lines instead of clipping across locales', (
   assert.match(labelRule, /overflow-wrap:\s*anywhere/);
 
   // Die Items-Reihe wächst mit dem Inhalt (min-height statt fixer Höhe).
-  assert.match(cssRuleBody(layout, '.nav-bottom__items'), /min-height:\s*var\(--nav-height-mobile\)/);
-  assert.doesNotMatch(cssRuleBody(layout, '.nav-bottom__items'), /(^|[^-])height:\s*var\(--nav-height-mobile\)/);
+  // Die Regel, deren Selektor GENAU die Kapsel ist: `cssRuleBody` findet auch
+  // das Ende eines laengeren Selektors, und seit R18 steht davor
+  // `html.page-swapping .nav-bottom__items` (der Uebergangsname sitzt am Glas).
+  // Dieselbe Falle wie in test-mobile-scroll-layout.js (G1, 2026-09-28).
+  const itemsRule = [...eachRule(layout)].find((r) => r.selector.trim() === '.nav-bottom__items')?.body ?? '';
+  assert.match(itemsRule, /min-height:\s*var\(--nav-height-mobile\)/);
+  assert.doesNotMatch(itemsRule, /(^|[^-])height:\s*var\(--nav-height-mobile\)/);
 
   // Longest-String-Guard: kein bottom-bar-Nav-Label darf so lang werden, dass
   // selbst zwei Zeilen in einem ~72px-Slot es nicht mehr fassen.

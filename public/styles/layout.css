@@ -126,9 +126,10 @@
  * altem und neuem Inhalt ist damit weg.
  *
  * Was steht, traegt einen Namen und faellt aus dem Wurzelbild heraus:
- *   - `nav-sidebar`, `nav-bottom`: nur das LEBENDE neue Bild, ohne Blende.
- *     Die Pille der Kapsel gleitet seit dem Tipp (updateNav) - ein
- *     eingefrorenes altes Bild darueber waere ihr Geist.
+ *   - `nav-sidebar`, `nav-bottom` (die Kapsel), `nav-bottom-indicator` (ihre
+ *     Pille), `page-fab`: nur das LEBENDE neue Bild, ohne Blende. Die Pille
+ *     gleitet seit dem Tipp (updateNav) - ein eingefrorenes altes Bild
+ *     darueber waere ihr Geist.
  *   - `kitchen-tabs` (kitchen-tabs.css): derselbe Knoten vorher und nachher,
  *     ebenso nur lebend - seine Kapsel gleitet dort zum Ziel.
  *   - `page-toolbar` (per Inline-Stil am ersten Kopf): Kopf steht, sein
@@ -137,7 +138,7 @@
  * Kommt ein Name nur auf EINER Seite vor (Kueche betreten/verlassen), blendet
  * er wie die Wurzel (`:only-child` laesst die Standard-Blende stehen).
  * -------------------------------------------------------- */
-/* Die Namen `nav-sidebar` und `nav-bottom` stehen NUR waehrend des Wechsels:
+/* Die Chrome-Namen stehen NUR waehrend des Wechsels:
  * swapPage setzt `html.page-swapping` vor startViewTransition und nimmt es nach
  * dem letzten Wechsel wieder ab. Dauerhaft gesetzt macht ein Name die Leiste
  * zur Backdrop Root - der `backdrop-filter` der Kapsel `.nav-bottom__items` und
@@ -149,8 +150,35 @@ html.page-swapping .nav-sidebar {
   view-transition-name: nav-sidebar;
 }
 
-html.page-swapping .nav-bottom {
+/* DIE KAPSEL TRAEGT DEN NAMEN SELBST, nicht ihr Elternknoten (Critique R18).
+ * An `.nav-bottom` machte der Name die Zone auch waehrend des Wechsels zur
+ * Backdrop Root: die Kapsel darin verlor fuer die rund 200ms der Blende ihr
+ * Glas, Zeilentext lief scharf durch sie hindurch (Zwischenbild bei 67ms).
+ * Am Glas-Element selbst uebernimmt der Browser dessen `backdrop-filter` an
+ * die Gruppe des Uebergangs - und die blurrt das Wurzelbild darunter. Eine
+ * Engine, die das nicht tut, zeigt die Kapsel wie vorher: kurz ohne Blur.
+ *
+ * Die Pille ist ein GESCHWISTER der Kapsel (misst echte Rects) und laege im
+ * Wurzelbild unter dem Glas - sie bekommt deshalb ihren eigenen Namen und
+ * gleitet wie bisher lebend zum Ziel.
+ *
+ * Jeder Name hat genau EINEN Traeger (test:motion): ein doppelter verwirft
+ * die ganze Transition. */
+html.page-swapping .nav-bottom__items {
   view-transition-name: nav-bottom;
+}
+
+html.page-swapping .nav-bottom__indicator {
+  view-transition-name: nav-bottom-indicator;
+}
+
+/* DER FAB STEHT WIE DER KOPF (R18). Er ist je Seite ein neuer Knoten und
+ * blendete mit der Wurzel - dazu poppte er bei jedem Wechsel neu herein
+ * (`fab-in`, 4 von 4 Messungen). In der Ebene steht hoechstens einer; angedockt
+ * im Kopf (Desktop) gehoert er zum Kopf und traegt keinen eigenen Namen. Hat
+ * nur eine Seite einen, blendet er wie die Wurzel (`:only-child`). */
+html.page-swapping .fab-layer .page-fab {
+  view-transition-name: page-fab;
 }
 
 /* Gedacht war: Tipps gehen waehrend der Blende an das echte Dokument darunter.
@@ -173,18 +201,32 @@ html.page-swapping .nav-bottom {
 ::view-transition-group(page-toolbar),
 ::view-transition-group(nav-sidebar),
 ::view-transition-group(nav-bottom),
+::view-transition-group(nav-bottom-indicator),
+::view-transition-group(page-fab),
 ::view-transition-group(kitchen-tabs) {
   animation: none;
 }
 
+/* Der `backdrop-filter`, den die Gruppe vom Glas-Element uebernimmt, folgt
+ * IHREM Kasten: ohne Rundung blurrte ein Rechteck ueber die Ecken der Kapsel
+ * hinaus (im Zwischenbild gesehen). Kapsel und FAB sind voll gerundet. */
+::view-transition-group(nav-bottom),
+::view-transition-group(page-fab) {
+  border-radius: var(--radius-full);
+}
+
 ::view-transition-old(nav-sidebar):not(:only-child),
 ::view-transition-old(nav-bottom):not(:only-child),
+::view-transition-old(nav-bottom-indicator):not(:only-child),
+::view-transition-old(page-fab):not(:only-child),
 ::view-transition-old(kitchen-tabs):not(:only-child) {
   display: none;
 }
 
 ::view-transition-new(nav-sidebar):not(:only-child),
 ::view-transition-new(nav-bottom):not(:only-child),
+::view-transition-new(nav-bottom-indicator):not(:only-child),
+::view-transition-new(page-fab):not(:only-child),
 ::view-transition-new(kitchen-tabs):not(:only-child) {
   animation: none;
 }
@@ -687,9 +729,10 @@ html.page-swapping .nav-bottom {
   background: transparent;
   display: flex;
   flex-direction: column;
-  /* Kein `view-transition-name` hier: der Name steht nur waehrend des
-   * Seitenwechsels (`html.page-swapping`, Abschnitt Seiten-Uebergang). Dauerhaft
-   * machte er die Zone zur Backdrop Root, und die Kapsel darin blurrte nichts. */
+  /* Kein `view-transition-name` hier - auch nicht waehrend des Seitenwechsels
+   * (R18): er steht dann an der Kapsel selbst (Abschnitt Seiten-Uebergang).
+   * An der Zone machte er sie zur Backdrop Root, und die Kapsel darin blurrte
+   * nichts. */
   /* Der seitliche Rand der ZONE ist auf --space-2 gefallen, als der FAB in die
    * Kapsel zog: sechs Ziele teilen sich jetzt eine Breite, die vorher fuenf
    * trugen, und 8px Rand sehen auf einem 375er-Telefon genauso freistehend aus
@@ -742,7 +785,12 @@ html.page-swapping .nav-bottom {
  * gemessen ueber die Geraetebreiten 320/360/375/390/414 war das der eine Wert,
  * der auf einem 360px-Android den zweizeiligen Umbruch von „Übersicht" gerade
  * noch verhindert. Der Knopf steht durch die Rundung ohnehin frei. */
-.app-shell:has(.fab-layer .page-fab:not([hidden])) .nav-bottom__items {
+/* `html.fab-holding` (router.js, holdFabAcrossSwap): hatte die Vorseite einen
+ * FAB, haelt die Reserve ueber den Wechsel, bis die neue Seite fertig gebaut
+ * ist. Seiten, die ihren FAB erst nach den Daten anlegen, liessen die Reserve
+ * sonst kurz fallen - die Tabs sprangen zweimal um rund 11px (R18). */
+.app-shell:has(.fab-layer .page-fab:not([hidden])) .nav-bottom__items,
+html.fab-holding .nav-bottom__items {
   padding-inline-end: calc(var(--fab-size) + var(--space-1));
 }
 
@@ -2324,6 +2372,15 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 
 /* Long Loop: FAB-Animation nach N Aufrufen deaktivieren */
 html.fab-anim-done .page-fab {
+  animation: none;
+}
+
+/* `fab-in` IST DIE ANKUNFT EINES FAB, NICHT JEDER SEITE (R18). Der Knopf ist
+ * je Seite ein neuer Knoten; die Einfahrt spielte deshalb bei jedem
+ * Tab-Wechsel, obwohl an derselben Stelle eben noch einer stand. Der Router
+ * setzt `fab-steady`, wenn die Vorseite einen FAB hatte (holdFabAcrossSwap) -
+ * beim Kaltstart und nach einer Seite ohne FAB faehrt er weiter ein. */
+html.fab-steady .page-fab {
   animation: none;
 }
 

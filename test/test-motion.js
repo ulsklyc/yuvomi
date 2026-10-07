@@ -1660,3 +1660,113 @@ test('R18: die Zahl der ungeschuetzten :hover-Regeln steigt nicht (Ratchet)', ()
   // Wer aufraeumt, senkt die Zahl mit: ein zu hoher Deckel liesse neue Stellen durch.
   assert.ok(open.length >= UNGUARDED_HOVER_MAX - 3, `nur noch ${open.length} ungeschuetzt - UNGUARDED_HOVER_MAX auf ${open.length} senken`);
 });
+
+// --------------------------------------------------------------------------
+// R18, Bewegung: DAS CHROME STEHT BEIM SEITENWECHSEL (mobil gemessen).
+//
+//  a) Die Kapsel verlor fuer die Dauer der Blende ihr Glas: der Name
+//     `nav-bottom` sass am ELTERNKNOTEN `.nav-bottom`, der damit Backdrop Root
+//     war - der `backdrop-filter` der Kapsel darin sah nur noch Transparenz,
+//     Zeilentext lief scharf durch sie hindurch (Zwischenbild bei 67ms).
+//     Jetzt traegt das GLAS-ELEMENT selbst den Namen: der Browser uebernimmt
+//     dessen `backdrop-filter` an die Gruppe des Uebergangs, und die blurrt
+//     das Wurzelbild darunter. Die Pille daneben bekommt ihren eigenen Namen,
+//     sonst laege sie im Wurzelbild UNTER dem Glas.
+//  b) Der FAB poppte bei JEDEM Tab-Wechsel neu herein (`fab-in`, 4 von 4): er
+//     ist ein neuer Knoten je Seite. Jetzt steht er wie der Kopf (eigener Name
+//     nur fuer die Dauer), und `fab-in` spielt nur, wenn die Vorseite keinen
+//     hatte - also auch beim Kaltstart.
+//  c) Die Tab-Leiste sprang, wenn die Zielseite ihren FAB erst nach den Daten
+//     anlegt: die FAB-Reserve der Kapsel fiel dazwischen weg. Sie haelt jetzt
+//     bis zum Ende des Aufbaus.
+//  d) Das gestaffelte Einblenden der Zeilen lief UNTER der Blende mit - zwei
+//     Einblendungen fuer einen Wechsel. Waehrend `html.page-swapping` staffelt
+//     nichts; die Blende traegt die Zeilen.
+// --------------------------------------------------------------------------
+const namedRules = () => {
+  const out = [];
+  for (const file of allSheets) {
+    for (const rule of eachRule(css(file))) {
+      const name = declValue(rule.body, 'view-transition-name');
+      if (!name || name === 'none') continue;
+      for (const sel of selectorList(rule.selector)) out.push({ file, selector: sel.replace(/\s+/g, ' '), name });
+    }
+  }
+  return out;
+};
+
+test('R18: die Kapsel behaelt ihr Glas - der Name sitzt am Glas-Element, nicht an seinem Elternknoten', () => {
+  const named = namedRules();
+  const byName = (name) => named.filter((r) => r.name === name).map((r) => r.selector);
+  assert.deepEqual(byName('nav-bottom'), ['html.page-swapping .nav-bottom__items'], 'genau EIN Traeger je Name - ein doppelter verwirft die ganze Transition');
+  assert.deepEqual(byName('nav-bottom-indicator'), ['html.page-swapping .nav-bottom__indicator']);
+  assert.deepEqual(byName('page-fab'), ['html.page-swapping .fab-layer .page-fab'], 'nur der schwebende FAB der Ebene: dort steht hoechstens einer');
+  // Das benannte Element IST das Glas (sonst haette die Gruppe nichts zu uebernehmen).
+  const glass = [...glassAncestors().keys()];
+  assert.ok(glass.some((k) => k.endsWith(': .nav-bottom__items')), 'die Kapsel traegt den backdrop-filter selbst');
+  // Jeder Name nur waehrend des Wechsels.
+  for (const r of named.filter((n) => /^(?:nav-|page-fab)/.test(n.name))) assert.match(r.selector, TRANSIENT_GATE, `${r.selector} traegt ${r.name} dauerhaft`);
+
+  // Die Gruppen stehen (kein Gleiten), das alte Bild entfaellt, das neue lebt ohne Blende.
+  const layout = [...eachRule(css('layout.css'))];
+  const rule = (needle) => layout.filter((r) => selectorList(r.selector).some((s) => s.replace(/\s+/g, ' ') === needle));
+  for (const name of ['nav-bottom', 'nav-bottom-indicator', 'page-fab']) {
+    assert.ok(rule(`::view-transition-group(${name})`).some((r) => /animation:\s*none/.test(r.body)), `Gruppe ${name} gleitet`);
+    assert.ok(rule(`::view-transition-old(${name}):not(:only-child)`).some((r) => /display:\s*none/.test(r.body)), `altes Bild von ${name} bleibt als Geist stehen`);
+    assert.ok(rule(`::view-transition-new(${name}):not(:only-child)`).some((r) => /animation:\s*none/.test(r.body)), `neues Bild von ${name} blendet`);
+  }
+  // Der backdrop-filter der Gruppe folgt ihrem Kasten: ohne Radius blurrte ein
+  // Rechteck ueber die Rundung der Kapsel hinaus (im Zwischenbild gesehen).
+  for (const name of ['nav-bottom', 'page-fab']) {
+    assert.ok(rule(`::view-transition-group(${name})`).some((r) => /border-radius:\s*var\(--radius-full\)/.test(r.body)), `Gruppe ${name} ohne Rundung`);
+  }
+  assert.match(ruleBodies('layout.css', '.nav-bottom__items').join(';'), /border-radius:\s*var\(--radius-full\)/, 'die Kapsel selbst ist voll gerundet - sonst passt die Gruppe nicht');
+});
+
+test('R18: der FAB steht ueber den Wechsel, poppt nur ohne Vorgaenger, und seine Reserve haelt bis zum Ende des Aufbaus', () => {
+  const router = stripComments(publicSource('router.js'));
+  const swap = router.slice(router.indexOf('const swap = () => {'), router.indexOf('await swapPage(swap,'));
+  assert.ok(swap.length > 300, 'Vorbedingung: der Tausch-Callback ist gefunden');
+  // VOR dem Abraeumen gefragt - danach gibt es den alten FAB nicht mehr.
+  assert.ok(swap.indexOf('holdFabAcrossSwap(') >= 0 && swap.indexOf('holdFabAcrossSwap(') < swap.indexOf('clearPageFab();'), 'der Vorgaenger wird vor clearPageFab() festgehalten');
+  const hold = router.slice(router.indexOf('function holdFabAcrossSwap('), router.indexOf('function holdFabAcrossSwap(') + 700);
+  assert.match(hold, /classList\.toggle\('fab-steady', /, 'fab-in nur ohne Vorgaenger');
+  assert.match(hold, /classList\.toggle\('fab-holding', /, 'die Reserve der Kapsel haelt');
+  // Losgelassen wird nach dem letzten adoptPageFab() - und auch, wenn der Aufbau scheitert.
+  assert.match(router, /const pageFab = adoptPageFab\(\);\s*releaseFabHold\(\);/);
+  const render = router.slice(router.indexOf('async function renderPage('), router.indexOf('const pageFab = adoptPageFab();'));
+  const tail = router.slice(router.indexOf('const pageFab = adoptPageFab();'));
+  assert.match(tail.slice(0, tail.indexOf('\nasync function ') > 0 ? tail.indexOf('\nasync function ') : 6000), /\} catch \(err\) \{[\s\S]{0,400}releaseFabHold\(\);/, 'ein gescheiterter Aufbau laesst die Reserve nicht stehen');
+  assert.ok(render.length > 0);
+
+  assert.match(ruleBodies('layout.css', 'html.fab-steady .page-fab').join(';'), /animation:\s*none/);
+  const reserve = [...eachRule(css('layout.css'))].find((r) => /padding-inline-end:\s*calc\(var\(--fab-size\)/.test(r.body) && /\.nav-bottom__items/.test(r.selector));
+  assert.ok(reserve, 'die FAB-Reserve der Kapsel fehlt');
+  assert.ok(selectorList(reserve.selector).map((s) => s.replace(/\s+/g, ' ')).includes('html.fab-holding .nav-bottom__items'), 'die Reserve haelt waehrend des Aufbaus');
+  // Kaltstart: die Einfahrt gibt es weiter.
+  assert.match(ruleBodies('layout.css', '.page-fab').join(';'), /animation:\s*fab-in var\(--duration-xl\) var\(--ease-out\) backwards/);
+});
+
+test('R18: stagger startet nicht unter der Seitenblende - und holt es danach nicht nach', async () => {
+  const restore = motionEnv();
+  const classes = new Set(['page-swapping']);
+  globalThis.document.documentElement.classList = { contains: (c) => classes.has(c) };
+  try {
+    const { stagger } = await import('../public/utils/ux.js');
+    const host = motionEl('host');
+    const rows = [motionEl('a'), motionEl('b')];
+    stagger(rows, { host });
+    assert.equal(rows[0].style.opacity, undefined, 'unter der Blende setzt nichts die Zeilen auf 0');
+    assert.equal(rows[0].style.transform, undefined);
+    // Die Blende WAR das Einblenden dieses Aufbaus: ein spaeteres Neuzeichnen staffelt nicht nach.
+    classes.delete('page-swapping');
+    const again = [motionEl('a'), motionEl('b')];
+    stagger(again, { host });
+    assert.equal(again[0].style.opacity, undefined, 'der Merker ist verbraucht');
+    // Ohne Seitenwechsel (Kaltstart, Reiter im Modul) staffelt es wie bisher.
+    const fresh = [motionEl('x')];
+    stagger(fresh, { host: motionEl('anderer') });
+    assert.equal(fresh[0].style.opacity, '0');
+  } finally { restore(); }
+  await new Promise((r) => setTimeout(r, 500));
+});

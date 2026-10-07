@@ -57,6 +57,13 @@ export function stagger(elements, { host = null, delay = 30, duration = duration
     if (staggeredHosts.has(root)) return;
     staggeredHosts.add(root);
   }
+  // NICHT UNTER DER SEITENBLENDE (Critique R18). Solange der Router die Seite
+  // als View Transition ueberblendet (`html.page-swapping`,
+  // utils/view-transition.js), IST die Blende das Einblenden dieses Aufbaus -
+  // gemessen liefen beide uebereinander: die Zeilen fuhren von 8px unten ein,
+  // waehrend die Seite noch blendete. Der Merker oben ist verbraucht, ein
+  // spaeteres Neuzeichnen holt es nicht nach.
+  if (typeof document !== 'undefined' && document.documentElement?.classList?.contains('page-swapping')) return;
   els.forEach((el, i) => {
     const itemDelay = i < max ? i * delay : max * delay;
     el.style.opacity = '0';

@@ -1544,6 +1544,9 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
       // Inhalt weg - er bliebe über der neuen Seite stehen, bis diese adoptiert.
       // Hier und nicht eine Zeile höher: der Scroll-Reset gehört unmittelbar an
       // den Inhaltstausch (Guard in test-mobile-scroll-layout.js).
+      // Vorher festhalten, OB einer stand: der naechste poppt dann nicht neu
+      // herein, und die Kapsel haelt seine Reserve (holdFabAcrossSwap).
+      holdFabAcrossSwap();
       clearPageFab();
       // Dieselbe Begründung, dieselbe Schicht: die Sammelaktions-Pille gehört zur
       // Teilmenge EINER Liste und darf nicht über der nächsten Seite stehen
@@ -1642,6 +1645,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
 
     // FAB Long Loop: Einstiegsanimation nach FAB_SEEN_MAX Views pro Modul deaktivieren
     const pageFab = adoptPageFab();
+    releaseFabHold();
     if (pageFab) {
       // Shortcut-Discoverability (Audit P3): der 'n'-Chord öffnet den FAB — als
       // Tooltip-Titel + aria-keyshortcuts sichtbar bzw. vorlesbar machen.
@@ -1672,6 +1676,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
 
   } catch (err) {
     document.documentElement.classList.remove('navigating');
+    releaseFabHold();
     console.error('[Router] Seiten-Render-Fehler:', err);
     if (route.thirdPartyModule?.id) {
       await disableFailedThirdPartyModule(route.thirdPartyModule.id);
@@ -2389,6 +2394,33 @@ function wirePageToolbars() {
 /** FAB der alten Seite abräumen - zusammen mit deren Inhalt, nicht später. */
 function clearPageFab() {
   document.getElementById('fab-layer')?.replaceChildren();
+}
+
+/**
+ * DER FAB STEHT UEBER DEN SEITENWECHSEL (Critique R18, Bewegung). Der Knopf ist
+ * je Seite ein neuer Knoten - gemessen poppte er deshalb bei JEDEM Tab-Wechsel
+ * neu herein (`fab-in`, 4 von 4), und Seiten, die ihn erst nach den Daten
+ * anlegen, liessen die FAB-Reserve der Kapsel dazwischen fallen: die Tabs
+ * sprangen zweimal um rund 11px.
+ *
+ * Gefragt wird VOR `clearPageFab()` - danach gibt es den Vorgaenger nicht mehr:
+ *   - `fab-steady`: irgendwo stand ein sichtbarer FAB (schwebend oder im Kopf
+ *     angedockt). Der naechste faehrt nicht ein, er steht (layout.css). Gilt,
+ *     bis der naechste Wechsel neu fragt - also auch fuer einen Nachzuegler.
+ *   - `fab-holding`: der FAB schwebte in der Ebene, die Kapsel haelt seine
+ *     Reserve. Faellt mit `releaseFabHold()`, sobald die neue Seite gebaut ist
+ *     und ihre eigene `:has()`-Bedingung wieder die Wahrheit sagt.
+ * Beim Kaltstart steht kein Vorgaenger: beide Klassen fallen, der FAB faehrt ein.
+ */
+function holdFabAcrossSwap() {
+  const root = document.documentElement;
+  const floating = document.querySelector('#fab-layer .page-fab:not([hidden])');
+  root.classList.toggle('fab-steady', Boolean(floating || document.querySelector('#main-content .page-fab:not([hidden])')));
+  root.classList.toggle('fab-holding', Boolean(floating));
+}
+
+function releaseFabHold() {
+  document.documentElement.classList.remove('fab-holding');
 }
 
 const FAB_SEEN_KEY = (module) => `yuvomi:fabSeen:${module}`;
