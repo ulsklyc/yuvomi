@@ -2472,6 +2472,61 @@ button.budget-entry__title {
   }
 }
 
+/* --------------------------------------------------------
+ * Statistik: Kategoriezeilen auf dem Lesemass (Critique R17)
+ *
+ * Die Balken liefen ueber die ganze Bahn: bei 1440 endete der Kategoriename
+ * bei x=436, der Betrag begann bei x=1282, dazwischen ein 830px langer
+ * 8px-Balken - Name und Zahl derselben Zeile standen eine Handbreit
+ * auseinander, in 12px. Ab 960px Modulflaeche stehen Ausgaben und Einnahmen
+ * NEBENEINANDER, jeder Block auf rund 480-550px: der Betrag steht am Ende
+ * seines Balkens. Der Name traegt die Zeilentypo der App (14px, Primaertinte)
+ * statt der Caption - er ist der Inhalt der Zeile, nicht ihre Beschriftung.
+ * Nur in der Statistik: in der Seitenleiste der Uebersicht bleibt die
+ * kompakte Form (dort stapelt die Zeile ohnehin).
+ * -------------------------------------------------------- */
+/* Ab der dreispaltigen Zeile (Name | Balken | Betrag); gestapelt (Telefon)
+ * bleibt die kompakte Form - dort stehen Name und Betrag schon in einer
+ * Zeile beieinander, und 14px kosteten nur Hoehe. */
+@container budget-page (min-width: 480px) {
+  .budget-stats__main--wide .budget-bar-row__label {
+    font-size: var(--text-sm);
+    color: var(--color-text-primary);
+  }
+
+  .budget-stats__main--wide .budget-bar-row__amount {
+    font-size: var(--text-sm);
+  }
+}
+
+@container budget-page (min-width: 960px) {
+  .budget-stats__main--wide .budget-chart {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--budget-column-gap);
+    align-items: start;
+  }
+}
+
+/* Der Verlauf ab heute (budget-stats.js, renderTrendChart): punktiert, also
+ * leiser als die Linie davor - was noch kommt, steht dort nur, soweit es schon eingetragen ist.
+ * Die Serien bleiben an ihrer Farbe erkennbar; der zweite Kanal (solide gegen
+ * gestrichelt) gilt fuer den Teil, der gebucht ist. */
+.budget-stats__future {
+  stroke-dasharray: 1 5;
+  stroke-linecap: round;
+}
+
+.budget-stats__today {
+  stroke: var(--color-text-tertiary);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.budget-stats__today-label {
+  fill: var(--color-text-secondary);
+}
+
 /* Ziel-Marker im Reports-Tab: kleine Tick-Linie auf dem Kategorie-Balken beim
  * geplanten Monatswert (nur bei range='month'). */
 .budget-bar-row__track { position: relative; }

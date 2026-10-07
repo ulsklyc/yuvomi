@@ -1084,6 +1084,9 @@ function renderBody() {
       // sitzt im geteilten Kopf, das Panel wählt nur noch die Auflösung.
       range: state.range,
       anchor: state.reportAnchor,
+      // Der Leerzustand der Statistik legt von dort einen Eintrag an (R17);
+      // bei `read` gibt es die Handlung nicht.
+      onAddEntry: readOnly() ? null : () => openBudgetModal({ mode: 'create' }),
       onRangeChange: (r) => {
         state.range = r;
         // Woche/Monat/Jahr wechselt die Aufloesung: Blende ohne Richtung.

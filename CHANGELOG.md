@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Budget statistics read on a desktop and tell today from the rest of the month.** The
+  category rows ran across the whole page in 12px - the name on the left, the amount more than
+  800px away at the other end of a thin bar. Expenses and income now stand side by side, each
+  amount at the end of its bar, the names in the size of a list row. The running curve is drawn
+  solid up to today and dotted after it, with a "Today" mark, instead of a flat line to the end
+  of the month. On a phone the chart is half as tall again, and an empty period offers to add an
+  entry.
+
 - **Budget accounts: net worth stands beside the accounts.** On a desktop the single figure used
   to fill a whole row above the account grid - one card across the page, mostly empty. It is now
   a card in the side column, like the figures on the overview and on loans, and the accounts

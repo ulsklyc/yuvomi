@@ -1299,8 +1299,10 @@ und Transaktionen links und den drei Kennzahlen rechts (vorher vier Kanten), Kon
 Nettovermoegen als Leistenkarte NEBEN den Konten (R17, E14: `.budget-accounts`, die Karte
 `.metric-grid--rail`; die Konten je Zeile eines auf dem Lesemass - vorher EINE Karte ueber
 981 / 1124px), Aufteilung mit den Ausgaben in der breiten Spalte,
-Statistik mit dem Anteilsring in Zeile 1 neben dem Verlauf, die Kategoriezeilen darunter ueber
-die ganze Bahn (`test:budget-ui`).
+Statistik mit dem Anteilsring in Zeile 1 neben dem Verlauf, darunter Ausgaben und Einnahmen
+NEBENEINANDER (R17: zwei Bloecke je ~480-550px, der Name 14px, der Betrag am Balkenende - vorher
+ein 830px-Balken zwischen Name und Betrag); der Verlauf laeuft ab heute punktiert weiter und
+traegt eine Heute-Marke, mobil rechnet er auf 600x300 (`test:budget-ui`).
 
 **Das vierte Mass ist abgeschafft.** 960px (`data`) war ein Zwischenstand, keine Entscheidung:
 es liess 228px leer, ohne dass die Flaeche etwas trug. Zugeordnet am 2026-09-26:

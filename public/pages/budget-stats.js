@@ -11,7 +11,7 @@ import { growBars, drawChartOnce } from '/utils/ux.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup, niceDomain } from '/utils/chart.js';
 import { formatMoneyAxis, formatSignedAmount } from '/utils/money.js';
-import { addLocalDays } from '/utils/date.js';
+import { addLocalDays, todayKey } from '/utils/date.js';
 import { trendMarkup } from '/utils/metric-card.js';
 
 // Zeitraum und Anker gehören dem Modul (budget.js) und kommen über ctx herein.
@@ -152,11 +152,20 @@ function renderBodyContent(body) {
   const d = view.data;
   if (!d || (d.totals.income === 0 && d.totals.expenses === 0 && !d.series.some((s) => s.income || s.expenses))) {
     body.replaceChildren();
-    mountEmptyState(body, {
+    // EIN LEERZUSTAND MIT HANDLUNG (Critique R17): „Keine Daten im Zeitraum"
+    // endete in einer Sackgasse - der Reiter hat keinen Anlege-Knopf im Kopf.
+    // Wer schreiben darf, legt von hier den Eintrag an, der die Statistik
+    // fuellt (derselbe Dialog und dasselbe Wort wie im Leerzustand der
+    // Uebersicht); bei `read` bleibt die Auskunft.
+    const box = mountEmptyState(body, {
       icon: 'chart-column',
       title: t('budget.statsEmptyTitle'),
       description: t('budget.statsEmptyDescription'),
+      action: typeof view.ctx.onAddEntry === 'function'
+        ? { label: t('budget.emptyAction'), icon: 'plus', attrs: { id: 'budget-stats-empty-add' } }
+        : undefined,
     });
+    box?.querySelector('#budget-stats-empty-add')?.addEventListener('click', () => view.ctx.onAddEntry?.());
     return;
   }
   /* KEINE ZWEITE UEBERSICHT (Critique 2026-09-25). Hier standen dieselben
@@ -432,7 +441,22 @@ function renderTrendChart() {
   // (5.550 / 4.163 / 2.775 / 1.388). `max` bleibt der echte Spitzenwert fuer
   // die Zusammenfassung, die Kurve misst gegen die gerundete Obergrenze.
   const axis = niceDomain(0, max, { integer: true });
-  const points = (arr) => arr.map((v, i) => `${chartX(i, s.length).toFixed(1)},${chartY(v, 0, axis.max).toFixed(1)}`).join(' ');
+  // MOBIL EINE HOEHERE FLAECHE (Critique R17). Die Geometrie skaliert mit der
+  // Breite: 600x200 wurden bei 390px Fenster 324x108 - eine Kurve, die zwischen
+  // zwei Gitterlinien kaum Hub hat. Unter 640px rechnet das Diagramm auf
+  // 600x300 (dieselben Raender, utils/chart.js `geo`) und steht damit bei
+  // mindestens 160px. Entschieden beim Zeichnen, wie die uebrigen Flaechen.
+  const geo = trendGeometry();
+  // HEUTE TEILT DIE KURVE (Critique R17). Aufsummiert lief sie durchgezogen bis
+  // zum Monatsende - ab heute eine waagerechte Linie, die behauptet, es sei
+  // schon gebucht. Bis heute steht die Kurve wie bisher (Einnahmen solide,
+  // Ausgaben gestrichelt), danach punktiert und leiser: was noch kommt, steht
+  // dort nur, soweit es schon eingetragen ist. Eine Marke nennt den Tag.
+  const todayIndex = cumulative ? futureStartIndex(s.map((p) => p.period), todayKey()) : -1;
+  const lastPast = todayIndex >= 0 ? todayIndex : s.length - 1;
+  const points = (arr, from = 0, to = arr.length - 1) => arr
+    .map((v, i) => (i < from || i > to ? null : `${chartX(i, s.length, geo).toFixed(1)},${chartY(v, 0, axis.max, geo).toFixed(1)}`))
+    .filter(Boolean).join(' ');
   const sum = (arr) => arr.reduce((a, b) => a + b, 0);
   const pointKey = cumulative ? 'budget.statsPointLabelCumulative' : 'budget.statsPointLabel';
 
@@ -468,13 +492,17 @@ function renderTrendChart() {
       income: fmtAmount(p.income),
       expenses: fmtAmount(p.expenses),
     });
-    const frac = chartX(i, s.length) / CHART.W;
+    const frac = chartX(i, s.length, geo) / geo.W;
     return `<button type="button" class="budget-stats__point" data-index="${i}"
               style="--point-x:${frac.toFixed(4)};--point-slots:${s.length}"
               tabindex="${i === s.length - 1 ? '0' : '-1'}"
               aria-label="${view.ctx.esc(label)}"></button>`;
   }).join('');
 
+  // `.chart` traegt 600 / 200 als Seitenverhaeltnis (panel.css); die hoehere
+  // Flaeche sagt ihres selbst an (wie die Gesundheits-Diagramme).
+  const { W, H } = geo;
+  const ratio = H === CHART.H ? '' : ` style="aspect-ratio: ${W} / ${H}"`;
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', `
     <div class="budget-chart-section">
@@ -482,14 +510,20 @@ function renderTrendChart() {
       <p class="sr-only">${view.ctx.esc(summary)}</p>
       <div class="budget-stats__trend-wrap">
         <div class="budget-stats__plot">
-          <svg class="chart budget-stats__trend" viewBox="0 0 ${CHART.W} ${CHART.H}" aria-hidden="true">
-            ${chartGridMarkup(0, axis.max, (val) => formatMoneyAxis(val, view.ctx.currency), CHART, axis.steps)}
-            ${chartXLabelsMarkup(s.map((p) => periodLabel(p.period)))}
+          <svg class="chart budget-stats__trend" viewBox="0 0 ${W} ${H}"${ratio} aria-hidden="true">
+            ${chartGridMarkup(0, axis.max, (val) => formatMoneyAxis(val, view.ctx.currency), geo, axis.steps)}
+            ${chartXLabelsMarkup(s.map((p) => periodLabel(p.period)), geo)}
+            ${todayIndex >= 0 ? todayMarkerMarkup(chartX(todayIndex, s.length, geo), geo) : ''}
             <g class="budget-stats__lines">
               <polyline fill="none" stroke="var(--color-success)" stroke-width="2"
-                        vector-effect="non-scaling-stroke" points="${points(incomes)}" />
+                        vector-effect="non-scaling-stroke" points="${points(incomes, 0, lastPast)}" />
               <polyline fill="none" stroke="var(--color-text-secondary)" stroke-width="2" stroke-dasharray="6 4"
-                        vector-effect="non-scaling-stroke" points="${points(expenses)}" />
+                        vector-effect="non-scaling-stroke" points="${points(expenses, 0, lastPast)}" />
+              ${todayIndex >= 0 ? `
+              <polyline class="budget-stats__future" fill="none" stroke="var(--color-success)" stroke-width="2"
+                        vector-effect="non-scaling-stroke" points="${points(incomes, todayIndex)}" />
+              <polyline class="budget-stats__future" fill="none" stroke="var(--color-text-secondary)" stroke-width="2"
+                        vector-effect="non-scaling-stroke" points="${points(expenses, todayIndex)}" />` : ''}
             </g>
           </svg>
           <div class="budget-stats__points" role="group" aria-label="${t('budget.statsPointsLabel')}">${hotspots}</div>
@@ -510,6 +544,42 @@ function renderTrendChart() {
   // Die Kurven zeichnen sich einmal ein, beim ersten Erscheinen - nicht bei
   // jedem Zeitraum (ux.js, drawChartOnce). Raster und Achse stehen.
   drawChartOnce('budget-stats-trend', { lines: host.querySelector('.budget-stats__lines') });
+}
+
+/** Die Flaeche des Verlaufs: mobil hoeher (siehe renderTrendChart). */
+const TREND_CHART_NARROW = Object.freeze({ ...CHART, H: 300 });
+
+function trendGeometry() {
+  return globalThis.window?.matchMedia?.('(max-width: 639px)')?.matches === true ? TREND_CHART_NARROW : CHART;
+}
+
+/**
+ * Der Punkt, an dem die Zukunft beginnt: der Index des letzten Tages bis
+ * heute. `-1`, wenn der Zeitraum keine Zukunft hat (heute ist der letzte Tag
+ * oder liegt dahinter) oder ganz in ihr liegt (heute vor dem ersten Tag) -
+ * dann gibt es nichts zu teilen. Tagesschluessel vergleichen sich als Text.
+ * @param {string[]} periods  'YYYY-MM-DD', aufsteigend
+ * @param {string} today      Tagesschluessel der Haushaltszone (todayKey())
+ */
+function futureStartIndex(periods, today) {
+  if (!periods.length || today < periods[0] || today >= periods[periods.length - 1]) return -1;
+  let index = -1;
+  for (let i = 0; i < periods.length; i += 1) {
+    if (periods[i] <= today) index = i;
+    else break;
+  }
+  return index;
+}
+
+/** Senkrechte Marke am heutigen Tag, das Wort darueber (Achsenschrift). */
+function todayMarkerMarkup(x, geo) {
+  const top = geo.PAD_T;
+  const bottom = geo.H - geo.PAD_B;
+  // Am rechten Rand steht das Wort links der Marke, sonst liefe es aus dem Bild.
+  const nearEnd = x > geo.W - geo.PAD_R - 40;
+  return `
+            <line class="budget-stats__today" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${top}" y2="${bottom}" vector-effect="non-scaling-stroke" />
+            <text class="chart__axis budget-stats__today-label" x="${(x + (nearEnd ? -4 : 4)).toFixed(1)}" y="${top}" text-anchor="${nearEnd ? 'end' : 'start'}" dominant-baseline="hanging">${view.ctx.esc(t('common.today'))}</text>`;
 }
 
 // Bucket-Schlüssel der Serie: 'YYYY-MM' (Monatsraster) oder 'YYYY-MM-DD' (Tage).
@@ -610,4 +680,4 @@ function updatePeriodLabel() {
 }
 
 // Nur fuer Tests: die Farbzuordnung von Balken und Donut (R14 P8).
-export const __test = { categoryColorIndex, DONUT_SEGMENTS };
+export const __test = { categoryColorIndex, DONUT_SEGMENTS, futureStartIndex, TREND_CHART_NARROW };

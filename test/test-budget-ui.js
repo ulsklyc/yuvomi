@@ -699,7 +699,9 @@ test('die Trendkurve beschriftet Skala und Zeitraum - IM Bild', () => {
   // Seit C4 (Re-Critique 2026-09-27) auf runder Skala: Gitter und Kurve lesen
   // DIESELBE gerundete Obergrenze, sonst stuende die Kurve neben ihrer Achse.
   assert.match(stats, /const axis = niceDomain\(0, max, \{ integer: true \}\);/);
-  assert.match(stats, /chartY\(v, 0, axis\.max\)/);
+  // Seit R17 mit der Geometrie der Flaeche (mobil hoeher): Raster und Kurve teilen auch sie.
+  assert.match(stats, /chartY\(v, 0, axis\.max, geo\)/);
+  assert.match(stats, /chartGridMarkup\(0, axis\.max, [^;]*, geo, axis\.steps\)/);
   assert.match(stats, /chartXLabelsMarkup\(/, 'die Zeitachse kommt aus der geteilten Geometrie');
   assert.doesNotMatch(stats, /preserveAspectRatio="none"/, 'eine Kurve mit Achse darf nicht gestreckt werden - der Text im Bild verzerrt mit');
   assert.doesNotMatch(stats, /budget-stats__axis-(max|mid|x)/, 'die Achse steht im SVG, nicht als HTML daneben');
@@ -4717,4 +4719,76 @@ test('R17/E5: "Ausgleichen" steht in der Salden-Zeile; schmal tritt der Gruppenk
     'schmal bleibt der Kopf im Baum und tritt aus dem Bild');
   assert.match(find('.split-group-header--tools-only .split-header-actions', schmal)?.body ?? '', /display:\s*none/, 'sein Ausloeser ist dann kein Tab-Stopp');
   assert.match(find('.split-section-head__lead')?.body ?? '', /flex:\s*1 1 0/, 'der Kopf der Salden bricht nicht um');
+});
+
+// ---------------------------------------------------------------------------
+// Statistik (Critique R17): Kategoriezeilen auf dem Lesemass, Zukunft
+// gestrichelt mit Heute-Marke, mobil ein hoeheres Diagramm, Leerzustand mit
+// Handlung.
+// ---------------------------------------------------------------------------
+
+test('R17: die Kurve teilt sich am heutigen Tag - nur wenn der Zeitraum eine Zukunft hat', async () => {
+  const { __test: st } = await import('../public/pages/budget-stats.js');
+  const days = ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04'];
+  assert.equal(st.futureStartIndex(days, '2026-10-02'), 1, 'der letzte Tag bis heute ist der Teilungspunkt');
+  assert.equal(st.futureStartIndex(days, '2026-10-01'), 0);
+  assert.equal(st.futureStartIndex(days, '2026-10-04'), -1, 'heute ist der letzte Tag: keine Zukunft');
+  assert.equal(st.futureStartIndex(days, '2026-11-15'), -1, 'ein vergangener Monat bleibt eine durchgezogene Kurve');
+  assert.equal(st.futureStartIndex(days, '2026-09-30'), -1, 'ein kuenftiger Monat hat keine Vergangenheit zu trennen');
+  assert.equal(st.futureStartIndex([], '2026-10-02'), -1);
+  // Luecken in der Reihe (Wochenraster): der letzte Punkt bis heute.
+  assert.equal(st.futureStartIndex(['2026-10-01', '2026-10-08', '2026-10-15'], '2026-10-10'), 1);
+
+  const fn = stats.slice(stats.indexOf('function renderTrendChart()'), stats.indexOf('/** Die Flaeche des Verlaufs'));
+  assert.match(fn, /futureStartIndex\(s\.map\(\(p\) => p\.period\), todayKey\(\)\)/, 'heute ist der Tag der Haushaltszone (todayKey)');
+  assert.match(fn, /cumulative \? futureStartIndex/, 'nur die aufsummierte Tageskurve - das Jahr vergleicht Monate');
+  assert.equal(fn.match(/class="budget-stats__future"/g)?.length, 2, 'beide Serien laufen ab heute punktiert weiter');
+  assert.match(fn, /points\(incomes, 0, lastPast\)[\s\S]*points\(expenses, 0, lastPast\)/, 'die gebuchte Kurve endet heute');
+  assert.match(fn, /points\(incomes, todayIndex\)/, 'die Zukunft beginnt am selben Punkt - keine Luecke in der Linie');
+  assert.match(fn, /todayMarkerMarkup\(/);
+  assert.match(stats, /class="chart__axis budget-stats__today-label"[^>]*>\$\{view\.ctx\.esc\(t\('common\.today'\)\)\}/, 'die Marke nennt den Tag');
+  // Schritt 2 hat das Einzeichnen eingebaut: die Zukunft steht IN der Gruppe, die sich einzeichnet.
+  const group = fn.slice(fn.indexOf('<g class="budget-stats__lines">'), fn.indexOf('</g>'));
+  assert.match(group, /budget-stats__future/);
+  assert.match(fn, /drawChartOnce\('budget-stats-trend', \{ lines: host\.querySelector\('\.budget-stats__lines'\) \}\)/);
+  const rules = [...eachRule(budgetCss)];
+  const future = rules.find(({ selector }) => selector.trim() === '.budget-stats__future');
+  assert.match(future?.body ?? '', /stroke-dasharray:/, 'die Zukunft ist gestrichelt');
+});
+
+test('R17: mobil rechnet der Verlauf auf einer hoeheren Flaeche (mindestens 160px bei 390px Fenster)', async () => {
+  const { __test: st } = await import('../public/pages/budget-stats.js');
+  // 390px Fenster: 358px Karte, davon 34px Achsenpolster - das SVG ist 324px breit.
+  const height = 324 * st.TREND_CHART_NARROW.H / st.TREND_CHART_NARROW.W;
+  assert.ok(height >= 160, `das Diagramm stuende bei ${Math.round(height)}px (vorher 108)`);
+  assert.match(stats, /matchMedia\?\.\('\(max-width: 639px\)'\)\?\.matches === true \? TREND_CHART_NARROW : CHART/);
+  const fn = stats.slice(stats.indexOf('function renderTrendChart()'), stats.indexOf('/** Die Flaeche des Verlaufs'));
+  assert.match(fn, /const ratio = H === CHART\.H \? '' : ` style="aspect-ratio: \$\{W\} \/ \$\{H\}"`;/,
+    '`.chart` traegt 600/200 als Seitenverhaeltnis - die hoehere Flaeche sagt ihres selbst an');
+  assert.match(fn, /viewBox="0 0 \$\{W\} \$\{H\}"\$\{ratio\}/);
+  assert.doesNotMatch(fn.replace(/H === CHART\.H/g, ''), /CHART\.(W|H)|chartX\(i, s\.length\)|chartXLabelsMarkup\([^;]*\)\)\)\}/,
+    'Kurve, Raster, Achse und Punkte rechnen mit derselben Geometrie');
+  assert.match(fn, /chartXLabelsMarkup\(s\.map\(\(p\) => periodLabel\(p\.period\)\), geo\)/);
+  assert.match(fn, /chartX\(i, s\.length, geo\) \/ geo\.W/, 'auch die Ablesepunkte');
+});
+
+test('R17: der Leerzustand der Statistik traegt eine Handlung - nur fuer den, der schreiben darf', () => {
+  assert.match(stats, /action: typeof view\.ctx\.onAddEntry === 'function'\s*\? \{ label: t\('budget\.emptyAction'\), icon: 'plus', attrs: \{ id: 'budget-stats-empty-add' \} \}\s*: undefined/);
+  assert.match(stats, /querySelector\('#budget-stats-empty-add'\)\?\.addEventListener\('click', \(\) => view\.ctx\.onAddEntry\?\.\(\)\)/);
+  assert.match(budget, /onAddEntry: readOnly\(\) \? null : \(\) => openBudgetModal\(\{ mode: 'create' \}\)/,
+    'bei `read` reicht das Budget keine Handlung herein');
+});
+
+test('R17: in der Statistik stehen Ausgaben und Einnahmen nebeneinander, der Name in der Zeilentypo', () => {
+  const rules = [...eachRule(budgetCss)];
+  const at = (re) => (r) => r.at.some((a) => re.test(a));
+  const wide = rules.find((r) => r.selector.trim() === '.budget-stats__main--wide .budget-chart' && at(/budget-page\s*\(\s*min-width:\s*960px\s*\)/)(r));
+  assert.match(wide?.body ?? '', /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
+    'zwei Bloecke je ~480-550px statt einer 830px langen Balkenbahn zwischen Name und Betrag');
+  const label = rules.find((r) => r.selector.trim() === '.budget-stats__main--wide .budget-bar-row__label' && at(/budget-page\s*\(\s*min-width:\s*480px\s*\)/)(r));
+  assert.match(label?.body ?? '', /font-size:\s*var\(--text-sm\)/, '14px statt der 12px-Caption');
+  assert.match(label?.body ?? '', /color:\s*var\(--color-text-primary\)/);
+  // Die Seitenleiste der Uebersicht behaelt die kompakte Form.
+  const base = rules.find((r) => r.selector.trim() === '.budget-bar-row__label' && r.at.length === 0 && /font-size/.test(r.body));
+  assert.match(base?.body ?? '', /font-size:\s*var\(--text-xs\)/);
 });
