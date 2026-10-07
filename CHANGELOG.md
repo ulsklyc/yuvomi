@@ -317,6 +317,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the entry list, so the entry went elsewhere and the report stayed empty. The dialog now starts
   on the first day of the period on screen, or on today when the period contains it (#1775).
 
+- **Budget and calendar: a second swipe while the next period is still loading is ignored.** Two
+  quick swipes forward in the budget asked for the same month twice instead of moving on by two,
+  and two opposite ones left whichever answer came last on screen. A swipe now starts only when
+  the one before it has finished loading; the arrows are unchanged (#1775).
+
 ## [2.74.0] - 2026-10-07
 
 ### Added

@@ -3708,6 +3708,93 @@ test('Zeitraum-Wisch: ein zweiter Finger mitten im Wisch setzt den Inhalt zuruec
   }
 });
 
+/* Ein zweiter Wisch, WAEHREND der erste noch laedt (#1775). Das Budget leitet
+ * das Ziel aus `state.month` ab, und der wandert erst nach den Anfragen: zwei
+ * schnelle Wische verlangten denselben Monat zweimal. Gemessen wird die Geste
+ * als Programm - ein onStep, das haengt, bis der Test es loslaesst. */
+// `test()` dieser Datei ist synchron: ein async-Rumpf waere gruen, bevor er
+// etwas gemessen hat. Deshalb hier ausgeschrieben und am Dateikopf abgewartet.
+await (async () => {
+  const name = 'Zeitraum-Wisch: waehrend ein Schritt laedt, beginnt keine zweite Geste';
+  const same = (a, b, msg) => assert(JSON.stringify(a) === JSON.stringify(b), `${msg} - ist ${JSON.stringify(a)}`);
+  try {
+  await (async () => {
+  const zuvor = { window: globalThis.window, document: globalThis.document };
+  try {
+    globalThis.window = { matchMedia: () => ({ matches: false }), innerWidth: 375 };
+    globalThis.document = { getElementById: () => null, documentElement: { dir: '' } };
+    const handlers = {};
+    const child = { style: {}, isConnected: true, classList: { add() {}, remove() {} } };
+    const surface = {
+      firstElementChild: child,
+      addEventListener: (type, fn) => { handlers[type] = fn; },
+      removeEventListener() {},
+      closest: () => null,
+    };
+    const steps = [];
+    let release = null;
+    periodSwipe.wirePeriodSwipe(surface, {
+      enabled: () => true,
+      onStep: (step) => { steps.push(step); return new Promise((resolve) => { release = resolve; }); },
+    });
+    const target = { closest: () => null };
+    const at = (x, y) => ({ clientX: x, clientY: y });
+    const swipe = (fromX, toX) => {
+      handlers.touchstart({ touches: [at(fromX, 300)], target });
+      handlers.touchmove({ touches: [at(toX, 302)], cancelable: true, preventDefault() {} });
+      return handlers.touchend({ touches: [] });
+    };
+
+    const first = swipe(250, 100);
+    same(steps, [1], 'Vorbedingung: der erste Wisch blaettert vor');
+
+    // Zweiter Wisch vor, dritter zurueck - beide, waehrend der erste haengt.
+    // Der alte Inhalt steht noch, wo der erste Finger ihn losliess - ein
+    // zweiter, kuerzerer Weg darf ihn nicht dorthin nachziehen.
+    const parked = child.style.transform;
+    swipe(250, 160);
+    same(steps, [1], 'der zweite Wisch darf keinen zweiten Schritt ausloesen');
+    assert(child.style.transform === parked, `der Inhalt folgt dem zweiten Finger nicht: ${parked} -> ${child.style.transform}`);
+    swipe(100, 250);
+    same(steps, [1], 'auch kein gegenlaeufiger');
+
+    release();
+    await first;
+    // Danach gilt die Geste wieder - die Sperre darf nicht kleben bleiben.
+    const next = swipe(250, 100);
+    same(steps, [1, 1], 'nach dem Laden blaettert der naechste Wisch wieder');
+    release();
+    await next;
+
+    // Auch ein Schritt, der SCHEITERT, gibt die Geste wieder frei.
+    let fail = true;
+    const handlers2 = {};
+    const surface2 = { ...surface, addEventListener: (type, fn) => { handlers2[type] = fn; } };
+    let calls = 0;
+    periodSwipe.wirePeriodSwipe(surface2, {
+      enabled: () => true,
+      onStep: async () => { calls++; if (fail) throw new Error('offline'); },
+    });
+    const swipe2 = () => {
+      handlers2.touchstart({ touches: [at(250, 300)], target });
+      handlers2.touchmove({ touches: [at(100, 302)], cancelable: true, preventDefault() {} });
+      return handlers2.touchend({ touches: [] });
+    };
+    let thrown = null;
+    try { await swipe2(); } catch (err) { thrown = err; }
+    assert(thrown?.message === 'offline', 'Vorbedingung: der Schritt scheitert');
+    fail = false;
+    await swipe2();
+    assert(calls === 2, `nach einem Fehler ist die Geste nicht tot (Aufrufe: ${calls})`);
+  } finally {
+    globalThis.window = zuvor.window;
+    globalThis.document = zuvor.document;
+  }
+})();
+    console.log(`  ✓ ${name}`); passed++;
+  } catch (err) { console.error(`  ✗ ${name}: ${err.message}`); failed++; }
+})();
+
 // --------------------------------------------------------
 // Tastatur und Screenreader (Critique 2026-09-24, P1, Schritt 3)
 //

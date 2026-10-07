@@ -113,6 +113,7 @@ export function wirePeriodSwipe(surface, { enabled, onStep, ignore } = {}) {
   let lock = null;       // null = unentschieden, 'swipe' | 'scroll' | 'off'
   let thresholdHit = false;
   let moving = null;     // das Element, das dem Finger folgt
+  let stepping = false;  // ein Schritt laedt noch (onStep ist nicht zurueck)
 
   const reset = (animate) => {
     const el = moving;
@@ -135,6 +136,13 @@ export function wirePeriodSwipe(surface, { enabled, onStep, ignore } = {}) {
     // und der Inhalt bliebe verschoben stehen (PR #1460, Review).
     if (moving) reset(true);
     lock = 'off';
+    // EIN SCHRITT ZUR ZEIT (#1775). Der Aufrufer leitet sein Ziel aus dem
+    // Zeitraum ab, den er ZEIGT, und der wandert erst, wenn seine Anfragen da
+    // sind: ein zweiter Wisch davor verlangte denselben Zeitraum noch einmal
+    // statt des uebernaechsten, und zwei gegenlaeufige liessen stehen, was
+    // zuletzt antwortete. Solange ein Schritt laedt, gehoert der Finger dem
+    // Scrollen - die Geste beginnt gar nicht erst.
+    if (stepping) return;
     if (e.touches.length !== 1) return;
     if (enabled && !enabled()) return;
     if (overlayOpen()) return;
@@ -188,9 +196,11 @@ export function wirePeriodSwipe(surface, { enabled, onStep, ignore } = {}) {
     // sein Transform trotzdem weg.
     const outgoing = moving;
     moving = null;
+    stepping = true;
     try {
       await onStep(step);
     } finally {
+      stepping = false;
       if (outgoing?.isConnected) {
         outgoing.style.transition = '';
         outgoing.style.transform = '';
