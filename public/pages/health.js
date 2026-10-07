@@ -14,7 +14,7 @@
 import { api } from '/api.js';
 import { t, formatDate, formatMonthYear, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
+import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, calmDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
 import { scheduleUndoableDelete, expandIn, drawChartOnce } from '/utils/ux.js';
 import { swapContent } from '/utils/content-swap.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays, todayKey} from '/utils/date.js';
@@ -1578,6 +1578,9 @@ function watchPhoneQuery() {
     if (vitals.root?.isConnected && vitals.loaded && !vitals.error) renderCards();
     // Die Uebersicht ordnet ihre Karten je Breite anders (overviewGridMarkup).
     if (overview.root?.isConnected && overview.loaded && !overview.error) renderOverviewShell();
+    // Das Aktivitaets-Diagramm rechnet je Breite auf einer anderen Flaeche
+    // (activityChartGeometry) - sonst bliebe nach dem Drehen die alte stehen.
+    if (activity.root?.isConnected && activity.loaded && !activity.error) renderActivityShell();
     syncHoists();
   });
 }
@@ -4554,28 +4557,48 @@ function activityChartMarkup(summary) {
     return emptyHintHTML(t('health.activity.noData'), { className: 'health-chart-empty' });
   }
 
-  const { W, H } = CHART;
-  const { left, right, top, bottom } = chartScales();
+  // MOBIL EINE HOEHERE FLAECHE MIT MEHR FUSS (Critique R18, 2026-10-07).
+  // Gemessen bei 390px: das Diagramm stand 324x96, und weil die Geometrie
+  // skaliert, die Achsenschrift aber nicht, war der Fuss (PAD_B = 26
+  // Einheiten) nur 14px hoch - die Wochentage standen 3px IN den Balkenfuessen
+  // und neben der "0" der Werteachse. Unter 640px rechnet das Diagramm auf
+  // 600x320 mit 44 Einheiten Fuss (24px bei 324px Breite): die Flaeche steht
+  // bei rund 170px, die Wochentage frei unter der Grundlinie.
+  const geo = activityChartGeometry();
+  const { W, H } = geo;
+  const { left, right, top, bottom } = chartScales(geo);
   const n = buckets.length;
   const chartH = bottom - top;
   const slot = (right - left) / n;
-  const barW = slot * 0.6;
-  // Runde Achse (C4): die Balken messen gegen die gerundete Obergrenze.
-  const { max, steps } = niceDomain(0, peak);
+  // SCHLANKE BALKEN (hoechstens ~24px am Bildschirm, der Rest der Spalte ist
+  // Luft): die Breite steht in viewBox-Einheiten und folgt deshalb der
+  // Geometrie - 40 Einheiten sind auf dem Telefon 22px, 18 am Desktop 22-26px.
+  const barW = Math.min(slot * 0.6, geo === ACTIVITY_CHART_NARROW ? 40 : 18);
+  // Ruhige Achse (R18): Grundlinie, Mitte, Obergrenze - die Werte stehen am
+  // heutigen Balken, in den Kacheln darueber und in der Tabelle.
+  const { max, steps } = calmDomain(peak, { integer: true });
+  const today = todayKey();
 
   const bars = buckets.map((b, i) => {
     const h = (b.durationMin / max) * chartH;
     const x = left + i * slot + (slot - barW) / 2;
     const y = bottom - h;
+    const isToday = b.date === today;
     const label = t(ACTIVITY_WEEKDAY_LABEL_KEYS[b.weekday ?? i]);
-    const rect = b.durationMin > 0
-      ? `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="var(--module-health)"><title>${esc(`${label}: ${t('health.activity.unit.min', { value: fmtNum(b.durationMin) })}`)}</title></rect>`
+    const minutes = t('health.activity.unit.min', { value: fmtNum(b.durationMin) });
+    const bar = b.durationMin > 0
+      ? `<path class="health-activity-chart__bar${isToday ? ' health-activity-chart__bar--today' : ''}" d="${activityBarPath(x, y, barW, bottom)}"><title>${esc(`${label}: ${minutes}`)}</title></path>`
       : '';
-    return `${rect}
-      <text x="${(x + barW / 2).toFixed(1)}" y="${H - 8}" class="chart__axis" text-anchor="middle">${esc(label)}</text>`;
+    // Der Wert steht nur am heutigen Balken (R18): eine Zahl an jedem Balken
+    // waere eine zweite Achse; alle sieben stehen in der Tabelle darunter.
+    const value = isToday && b.durationMin > 0
+      ? `<text x="${(x + barW / 2).toFixed(1)}" y="${y.toFixed(1)}" dy="-0.5em" class="chart__axis health-activity-chart__value" text-anchor="middle">${esc(minutes)}</text>`
+      : '';
+    return `${bar}${value}
+      <text x="${(x + barW / 2).toFixed(1)}" y="${H - 8}" class="chart__axis${isToday ? ' health-activity-chart__day--today' : ''}" text-anchor="middle">${esc(label)}</text>`;
   }).join('');
 
-  const grid = chartGridFor(0, max, undefined, undefined, steps);
+  const grid = chartGridFor(0, max, undefined, geo, steps);
 
   const tableRows = buckets.map((b, i) => [
     t(ACTIVITY_WEEKDAY_LABEL_KEYS[b.weekday ?? i]),
@@ -4587,13 +4610,35 @@ function activityChartMarkup(summary) {
     tableRows,
   );
 
+  // `.chart` traegt 600 / 200 als Seitenverhaeltnis (panel.css); die hoehere
+  // Flaeche sagt ihres selbst an (wie der Budget-Verlauf).
+  const ratio = H === CHART.H ? '' : ` style="aspect-ratio: ${W} / ${H}"`;
   return `
-    <svg class="chart health-chart health-activity-chart" viewBox="0 0 ${W} ${H}" role="img"
+    <svg class="chart health-chart health-activity-chart" viewBox="0 0 ${W} ${H}"${ratio} role="img"
          aria-label="${esc(t('health.activity.chartTitle'))}">
       ${grid}
       ${bars}
     </svg>
     ${table}`;
+}
+
+/** Die Flaeche des Aktivitaets-Diagramms unter 640px (siehe activityChartMarkup). */
+const ACTIVITY_CHART_NARROW = Object.freeze({ ...CHART, H: 320, PAD_B: 44 });
+
+function activityChartGeometry() {
+  return isPhone() ? ACTIVITY_CHART_NARROW : CHART;
+}
+
+/**
+ * Ein Balken, OBEN VOLL GERUNDET und unten gerade auf der Grundlinie: der
+ * Radius ist die halbe Breite, bei sehr kleinen Werten die Balkenhoehe (ein
+ * flacher Bogen statt einer Kappe, die ueber den Wert hinausragte). Ein
+ * `<rect rx>` rundete auch die Fuesse - der Balken schwebte ueber der Achse.
+ */
+function activityBarPath(x, y, width, bottom) {
+  const r = Math.min(width / 2, bottom - y);
+  const f = (v) => v.toFixed(1);
+  return `M${f(x)},${f(bottom)} V${f(y + r)} A${f(width / 2)},${f(r)} 0 0 1 ${f(x + width)},${f(y + r)} V${f(bottom)} Z`;
 }
 
 function activityLogMarkup(rows) {
@@ -9121,6 +9166,8 @@ export const __test = {
   // C7: Kalender und Trends als Paar.
   cyclePairMarkup,
   VITAL_SHEET_CHART,
+  // R18: die Balken der Aktivitaet (Flaeche, Balkenform, heute im Vollton).
+  activityChartMarkup, activityBarPath, ACTIVITY_CHART_NARROW,
   CYCLE_TREND_CHART,
   backToVitalSheetForTest: (type) => backToVitalSheet(type),
   vitalPatchBody,

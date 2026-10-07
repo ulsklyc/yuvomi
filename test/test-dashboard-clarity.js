@@ -812,3 +812,49 @@ test('R18: Geld, Zeit und Zaehler der Uebersicht stehen in tabular-nums', async 
   const gone = carriers.filter((cls) => !source.includes(cls));
   assert.deepEqual(gone, [], `nicht mehr im Markup der Uebersicht: ${gone.join(', ')}`);
 });
+
+/* VIER LESESTUFEN (Critique R18, 2026-10-07): 17 / 15 / 13 / 12 auf den
+ * Inhaltsflaechen der Uebersicht; 14 und 16 bleiben den Bedienelementen.
+ * Gemessen im Browser (1440, hell): 22 -> 16 Groesse/Gewicht-Paare, kein
+ * Inhalt der genannten Klassen mehr auf 14, 16 oder 18px; bei 390px in `fi`
+ * und `de` kein Umbruch und keine Ellipse an ihnen.
+ *
+ * Dieser Guard ist NICHT die Messung - die braucht ein Layout. Er haelt, was
+ * sich am Stylesheet halten laesst: die Klassen, die umgestellt wurden, stehen
+ * in JEDER ihrer Regeln auf einem Token der Leiter. */
+test('R18: die umgestellten Inhaltsklassen der Uebersicht stehen auf der Lese-Leiter (17/15/13/12)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const tokens = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const LADDER = { '--type-card-title': '1.0625rem', '--type-secondary': '0.9375rem', '--type-caption': '0.8125rem', '--text-xs': '0.75rem' };
+  for (const [token, value] of Object.entries(LADDER)) {
+    assert.match(tokens, new RegExp(`${token}:\\s*${value.replace('.', '\\.')};`), `${token} ist ${value}`);
+  }
+  const expected = {
+    '.weather-widget__range': '--type-caption',
+    '.weather-widget__desc': '--type-caption',
+    '.weather-widget__city': '--type-caption',
+    '.budget-widget__savings span': '--type-caption',
+    '.budget-widget__savings strong': '--type-card-title',
+    '.budget-widget__flow-item > strong': '--type-caption',
+    '.birthday-widget-item__name': '--type-secondary',
+    '.birthday-widget-item__age': '--type-caption',
+    '.rewards-member__name': '--type-secondary',
+  };
+  const rules = [...eachRule(css)];
+  for (const [selector, token] of Object.entries(expected)) {
+    const sized = rules.filter((r) => r.selector.split(',').some((s) => s.trim() === selector) && /font-size:/.test(r.body));
+    assert.ok(sized.length >= 1, `${selector} nennt seine Groesse selbst (16px waeren sonst geerbt)`);
+    for (const rule of sized) {
+      const size = /font-size:\s*([^;]+);/.exec(rule.body)[1].trim();
+      assert.ok(Object.keys(LADDER).some((step) => size === `var(${step})`), `${selector} (${rule.at.join(' ') || 'Basis'}): ${size} liegt nicht auf der Leiter`);
+    }
+    assert.ok(sized.some((r) => r.at.length === 0 && new RegExp(`font-size:\\s*var\\(${token}\\)`).test(r.body)), `${selector}: Basis ${token}`);
+  }
+  // Kein Fett auf den Nebenwerten: semibold traegt die Zahl, bold bleibt Kennzahl und Avatar.
+  for (const selector of ['.budget-widget__savings strong', '.budget-widget__flow-item > strong', '.birthday-widget-item__age']) {
+    const body = rules.filter((r) => r.at.length === 0 && r.selector.split(',').some((s) => s.trim() === selector)).map((r) => r.body).join(';');
+    assert.match(body, /font-weight:\s*var\(--font-weight-semibold\)/, selector);
+  }
+});

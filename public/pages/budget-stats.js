@@ -9,7 +9,7 @@ import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { renderSkeletonChart } from '/utils/skeleton.js';
 import { growBars, drawChartOnce } from '/utils/ux.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
-import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup } from '/utils/chart.js';
+import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup, calmDomain } from '/utils/chart.js';
 import { formatMoneyAxis, formatSignedAmount } from '/utils/money.js';
 import { addLocalDays, todayKey } from '/utils/date.js';
 import { trendMarkup } from '/utils/metric-card.js';
@@ -653,28 +653,15 @@ function futureStartIndex(periods, today) {
 }
 
 /**
- * RUHIGE ACHSE: DREI LINIEN (Critique R18, 2026-10-07). Die runde Skala der
- * geteilten Geometrie (`niceDomain`) legt drei bis sechs Schritte - beim
- * Verlauf standen damit bis zu sieben Gitterlinien hinter zwei Kurven. Hier
- * genuegen Grundlinie, Mitte und Obergrenze: die Werte stehen am Punkt und in
- * der Ableselinie, die Achse fluestert nur noch die Groessenordnung.
- *
- * Die Obergrenze laesst mindestens 15 % Luft ueber dem Spitzenwert: darin
- * steht der Wert des hoechsten Punkts, ohne die oberste Linie zu beruehren.
- * Die Schrittfolge ist dichter als die der geteilten Skala (auch 3,5 und 4,5):
- * bei nur zwei Schritten verschenkte der Sprung von 3 auf 4 sonst ein Viertel
- * der Flaeche (5.550 -> 0 / 4.000 / 8.000 statt 0 / 3.500 / 7.000). Schritte
- * sind ganzzahlig (die Geldachse beschriftet ohne Nachkommastellen).
+ * Die ruhige Achse des Verlaufs: drei Linien, ganzzahlige Schritte (die
+ * Geldachse beschriftet ohne Nachkommastellen). Regel und Begruendung stehen
+ * an `calmDomain` (utils/chart.js) - die Aktivitaet der Gesundheit nutzt sie auch.
  * @param {number} max  groesster Datenwert
  * @returns {{ max: number, step: number, steps: 2 }}
  */
-const CALM_FACTORS = [1, 1.2, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8, 9, 10];
 function calmAxis(max) {
-  const need = (Math.max(1, Number(max) || 0) * 1.15) / 2;
-  const mag = 10 ** Math.floor(Math.log10(need));
-  const step = CALM_FACTORS.map((f) => f * mag)
-    .find((v) => v >= need - 1e-9 && Math.abs(v - Math.round(v)) < 1e-9) ?? Math.ceil(need);
-  return { max: step * 2, step, steps: 2 };
+  const { max: top, step, steps } = calmDomain(max, { integer: true });
+  return { max: top, step, steps };
 }
 
 /**

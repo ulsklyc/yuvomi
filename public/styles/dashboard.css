@@ -1506,7 +1506,8 @@
 .weather-widget__range {
   display: flex;
   gap: var(--space-1);
-  font-size: var(--text-sm);
+  /* Footnote (13px), nicht 14: siehe "VIER LESESTUFEN" am Dateiende. */
+  font-size: var(--type-caption);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
   margin-bottom: var(--space-0h);
@@ -1522,8 +1523,8 @@
 }
 
 .weather-widget__desc {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-regular);
   text-transform: capitalize;
   margin-bottom: 1px;
   overflow: hidden;
@@ -1532,8 +1533,8 @@
 }
 
 .weather-widget__city {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-regular);
   color: var(--color-text-secondary);
   margin-bottom: var(--space-1);
   overflow: hidden;
@@ -3823,6 +3824,9 @@ button.today-cockpit__more--link {
 
 .birthday-widget-item__name {
   color: var(--color-text-primary);
+  /* Zeilentitel der Uebersicht: 15px semibold wie der Notiztitel daneben
+   * (vorher geerbte 16px - siehe "VIER LESESTUFEN" am Dateiende). */
+  font-size: var(--type-secondary);
   font-weight: var(--font-weight-semibold);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3856,8 +3860,9 @@ button.today-cockpit__more--link {
   white-space: nowrap;
   background: var(--color-fill-well);
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-bold);
+  /* Footnote semibold statt 14px fett ("VIER LESESTUFEN" am Dateiende). */
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Countdown-Kachel (#647). Bewusst dieselbe Zeilenform wie die Geburtstage
@@ -4255,14 +4260,16 @@ button.today-cockpit__more--link {
 
 .budget-widget__savings span {
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-regular);
 }
 
+/* Headline (17px semibold) statt 18px fett: die Stuetzmetrik steht auf der
+ * Stufe der Kacheltitel, eine unter dem Saldo darueber. */
 .budget-widget__savings strong {
   color: var(--module-budget);
-  font-size: var(--text-lg);
-  font-weight: var(--font-weight-bold);
+  font-size: var(--type-card-title);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Sparziel-Fortschritt im Budget-Widget (#468) */
@@ -4330,7 +4337,8 @@ button.today-cockpit__more--link {
 }
 
 .budget-widget__flow-item > strong {
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-semibold);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4623,7 +4631,9 @@ button.today-cockpit__more--link {
 
 .rewards-member__name {
   color: var(--color-text-primary);
-  font-weight: var(--font-weight-medium);
+  /* Zeilentitel: 15px semibold (vorher geerbte 16px medium). */
+  font-size: var(--type-secondary);
+  font-weight: var(--font-weight-semibold);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6572,3 +6582,23 @@ button.today-cockpit__more--link {
 .rewards-widget__footer {
   font-variant-numeric: tabular-nums;
 }
+
+/* VIER LESESTUFEN AUF DEN INHALTSFLAECHEN (Critique R18, 2026-10-07).
+ *
+ * Gemessen standen auf der Uebersicht 11 bis 14 Schriftgroessen, in
+ * 1-px-Schritten von 12 bis 18. Inhalt liest auf vier Stufen: 17 (Headline,
+ * Kacheltitel und Leitwert einer Zeile), 15 (Subheadline, Zeilentitel und
+ * Fliesstext), 13 (Footnote, Nebenzeile) und 12 (Caption, Meta und Badge).
+ * 14 und 16 bleiben den Bedienelementen (Knopf, Link, Feld), die Display-
+ * Werte (28, 34) den Kennzahlen.
+ *
+ * Umgestellt ist, was dabei KLEINER oder gleich breit wird - so entsteht kein
+ * neuer Umbruch: Wetter (Spanne, Lage, Ort 14 -> 13), Budget (Sparquote
+ * 18 fett -> 17 semibold, ihr Label und die beiden Fluesse 14 -> 13),
+ * Geburtstage (Name geerbte 16 -> 15, "wird 41" 14 fett -> 13 semibold),
+ * Belohnungen (Name 16 medium -> 15 semibold). Die Regeln stehen bei ihren
+ * Kacheln weiter oben; dieser Absatz ist ihr gemeinsamer Grund. Gemessen
+ * (1440, hell): 22 -> 16 Groesse/Gewicht-Paare; bei 390px in `fi` und `de`
+ * weder Umbruch noch Ellipse an den umgestellten Klassen.
+ * Guard: test-dashboard-clarity.js (die genannten Klassen stehen auf
+ * Leiter-Tokens). */

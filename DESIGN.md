@@ -3853,6 +3853,17 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   Wochentag und Datum; die anderen Tage nennen nur diese ("Samstag, 24. Oktober", mit Jahr nur
   ausserhalb des laufenden). Quelle ist `dayHeading()` in utils/day-label.js (Arithmetik auf
   dem Key, kein Date aus dem Key).
+- **Do** eine Balkenreihe ueber die Zeit so zeichnen wie die Aktivitaet der Gesundheit
+  (`activityChartMarkup`): Balken oben voll gerundet und unten gerade auf der Grundlinie (ein
+  Pfad, kein `rect rx`), hoechstens ~24px breit, HEUTE im Vollton mit seinem Wert, die
+  uebrigen Tage getoent (`--tint-ink` + 5 Punkte: die erste Stufe, die 3:1 gegen die Karte in
+  beiden Themes haelt), drei Gitterlinien (`calmDomain`, utils/chart.js). Unter 640px rechnet
+  das Diagramm auf einer hoeheren Flaeche mit mehr Fuss, damit die feste Achsenschrift nicht in
+  die Balkenfuesse laeuft.
+- **Do** Inhalt auf der Uebersicht auf vier Stufen lesen lassen: 17 (Headline), 15
+  (Subheadline), 13 (Footnote), 12 (Caption). 14 und 16 bleiben Bedienelementen, 28 und 34 den
+  Kennzahlen. Wer umstellt, stellt nach UNTEN oder gleich breit um - so entsteht kein neuer
+  Umbruch in langen Sprachen.
 - **Do** einen STAND in Textfarbe setzen (Kontostand, Nettovermoegen), nur das Minus rot.
   Gruen bleibt Veraenderungen und Einnahmen vorbehalten: es sagt "es ist mehr geworden", und
   ein Stand ist weder gut noch schlecht.

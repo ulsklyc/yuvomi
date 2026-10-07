@@ -1639,6 +1639,40 @@ button.health-med-card:hover {
   background: var(--color-surface);
 }
 
+/* DIE BALKEN DER WOCHE (Critique R18, 2026-10-07; health.js
+ * `activityChartMarkup`). HEUTE im Vollton, die uebrigen Tage getoent: sieben
+ * gleich laute Balken liessen offen, wo man steht. Die Toenung ist die
+ * Tinten-Stufe plus 5 Punkte (75 % Modulton in der Kartenflaeche) - die
+ * naechste Stufe, die den Grafikkontrast 3:1 (WCAG 1.4.11) in BEIDEN Themes
+ * haelt: hell #B656A6 auf #FFFFFF 4,31:1, dunkel #AF52A2 auf #2B2825 3,18:1
+ * (bei 70 % waeren es dunkel 2,93:1). Der Vollton: hell 7,01:1, dunkel
+ * 4,57:1. Heute traegt dazu seinen Wert und den Wochentag in Primaertinte -
+ * die Farbe ist nicht der einzige Traeger. */
+.health-activity-chart__bar {
+  fill: color-mix(in srgb, var(--module-health) calc(var(--tint-ink) + 5%), var(--color-surface));
+}
+
+.health-activity-chart__bar--today {
+  fill: var(--module-health);
+}
+
+/* Der Wert am heutigen Balken: Textfarbe, tabellarisch, mit Hof in
+ * Flaechenfarbe, damit die Gitterlinie nicht durch eine Ziffer laeuft. */
+.health-activity-chart__value {
+  fill: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  paint-order: stroke;
+  stroke: var(--color-surface);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.health-activity-chart__day--today {
+  fill: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
 /* Trainings-Log */
 .health-activity__log-title {
   margin-block-end: var(--space-2);

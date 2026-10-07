@@ -48,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   column in front of the names.
 - **The agenda names its days in words.** "Today - Thursday, 8 October" and "Saturday, 10
   October" instead of "08.10.2026 Thursday".
+- **The week of activity is easier to read.** Bars have a round top and a flat foot, today's
+  bar stands in full colour with its value while the other days step back, and three grid
+  lines replace five. On a phone the chart is taller, and the weekdays no longer run into the
+  feet of the bars.
+- **The overview uses fewer type sizes.** Weather, birthdays, rewards and the budget tile mixed
+  sizes one pixel apart; their content now reads on four steps.
 - **Numbers no longer jump sideways.** On the overview, times, amounts and counters now use
   digits of equal width everywhere, not only in some tiles.
 - **The app starts faster on a slow connection.** Before the overview asked for its data, the

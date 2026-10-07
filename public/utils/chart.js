@@ -331,6 +331,37 @@ export function niceDomain(min, max, { integer = false } = {}) {
   return best;
 }
 
+/* RUHIGE ACHSE: DREI LINIEN (Critique R18, 2026-10-07).
+ *
+ * `niceDomain` legt drei bis sechs Schritte - hinter zwei Kurven oder sieben
+ * Balken standen damit bis zu sieben Gitterlinien. Wo die Werte am Punkt, am
+ * Balken und in der Tabelle stehen, fluestert die Achse nur noch die
+ * Groessenordnung: Grundlinie, Mitte, Obergrenze. Fuer Diagramme ab null
+ * (Summen, Dauern, Betraege); eine Kurve mit freier Unterkante (Blutdruck)
+ * bleibt bei `niceDomain`.
+ *
+ * Die Obergrenze laesst mindestens 15 % Luft ueber dem Spitzenwert: darin
+ * steht der Wert des hoechsten Punkts oder Balkens, ohne die oberste Linie zu
+ * beruehren. Die Schrittfolge ist dichter als die der runden Skala (auch 3,5
+ * und 4,5): bei nur zwei Schritten verschenkte der Sprung von 3 auf 4 sonst
+ * ein Viertel der Flaeche (5.550 -> 0 / 4.000 / 8.000 statt 0 / 3.500 / 7.000). */
+const CALM_FACTORS = [1, 1.2, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8, 9, 10];
+
+/**
+ * @param {number} max  groesster Datenwert (die Skala beginnt bei 0)
+ * @param {{ integer?: boolean }} [opts]  `integer`: nur ganzzahlige Schritte
+ * @returns {{ min: 0, max: number, step: number, steps: 2 }}
+ */
+export function calmDomain(max, { integer = false } = {}) {
+  const need = (Math.max(integer ? 1 : 1e-9, Number(max) || 0) * 1.15) / 2;
+  const mag = 10 ** Math.floor(Math.log10(need));
+  const whole = (v) => Math.abs(v - Math.round(v)) < 1e-9;
+  const fix = (v) => Number(v.toFixed(Math.max(0, 2 - Math.floor(Math.log10(mag)))));
+  const step = CALM_FACTORS.map((f) => fix(f * mag)).find((v) => v >= need - 1e-9 && (!integer || whole(v)))
+    ?? Math.ceil(need);
+  return { min: 0, max: fix(step * 2), step, steps: 2 };
+}
+
 /* EINE ZEITACHSE RECHNET NACH DEM DATUM, NICHT NACH DER NUMMER (C4).
  *
  * `chartX(index, count)` setzt Punkte in gleichen Abstaenden - richtig fuer
