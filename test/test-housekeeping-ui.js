@@ -983,3 +983,50 @@ test('R17: der Zeitraum der Berichte steht unter den Reitern, nicht im Kopf', as
   const verborgen = regeln.findIndex((r) => r.selector.trim() === '.housekeeping-period[hidden]' && /display:\s*none/.test(r.body));
   assert.ok(verborgen > regeln.indexOf(basis), '`[hidden]` gewinnt gegen `display: flex` (steht dahinter)');
 });
+
+/* Entscheidung R17 (E16): am Desktop steht der Zeitraum wieder in der
+ * Titelzeile - dort sprang nie etwas, und unter den Reitern scrollte der Monat
+ * mit dem Inhalt weg. EIN Knoten, zwei Plaetze: placeReportPeriod() haengt ihn
+ * um. Mobil bleibt der Platz aus dem Markup (Test darueber). */
+test('R17/E16: ab 1024px haengt der Zeitraum in der Titelzeile, darunter unter den Reitern', async () => {
+  const klassen = new Set(['housekeeping-period']);
+  const zuege = [];
+  const actions = { name: 'actions' };
+  const slot = {
+    parentNode: null,
+    classList: { add: (c) => klassen.add(c), remove: (c) => klassen.delete(c) },
+  };
+  const head = {
+    querySelector: (sel) => (sel === '.page-toolbar__actions' ? actions : null),
+    insertBefore(node, vor) { zuege.push(['insertBefore', vor.name]); node.parentNode = head; },
+    after(node) { zuege.push(['after']); node.parentNode = page; },
+  };
+  const page = {
+    querySelector: (sel) => (sel === '#housekeeping-period' ? slot : sel === '.housekeeping-toolbar' ? head : null),
+  };
+  slot.parentNode = page;
+
+  hk.placeReportPeriod(page, true);
+  assert.deepEqual(zuege, [['insertBefore', 'actions']], 'breit: der Slot steht im Kopf VOR den Aktionen (Titel, Zeitraum, Pille)');
+  assert.ok(klassen.has('page-toolbar__center'), 'im Kopf ist er der Center-Slot der Shell');
+
+  hk.placeReportPeriod(page, true);
+  assert.equal(zuege.length, 1, 'steht er schon im Kopf, wird er nicht neu eingehaengt (der Pfeil behielte seinen Fokus nicht)');
+
+  hk.placeReportPeriod(page, false);
+  assert.deepEqual(zuege[1], ['after'], 'schmal: zurueck hinter den Kopf, also unter die Reiter');
+  assert.ok(!klassen.has('page-toolbar__center'), 'unter den Reitern ist er kein Center-Slot mehr');
+
+  hk.placeReportPeriod(page, false);
+  assert.equal(zuege.length, 2, 'steht er schon unter den Reitern, bleibt er stehen');
+
+  assert.equal(hk.REPORT_PERIOD_HEAD_QUERY, '(min-width: 1024px)', 'die Schwelle der angedockten Kopf-Pille');
+  const { readFileSync } = await import('node:fs');
+  const quelle = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
+  const shell = quelle.slice(quelle.indexOf('function renderShell('), quelle.indexOf('\n}\n', quelle.indexOf('function renderShell(')));
+  assert.match(shell, /watchReportPeriodPlace\(page\)/, 'renderShell() stellt den Platz ein und folgt der Breite');
+  const { eachRule } = await import('./css-rules.js');
+  const regeln = [...eachRule(readFileSync(new URL('../public/styles/housekeeping.css', import.meta.url), 'utf8'))];
+  const imKopf = regeln.find((r) => r.selector.trim() === '.page-toolbar > .housekeeping-period');
+  assert.match(imKopf?.body ?? '', /padding:\s*0/, 'im Kopf faellt das eigene Zeilenpolster');
+});

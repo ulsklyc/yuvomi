@@ -353,6 +353,14 @@ function renderShell(container) {
   // weil der Inhalt bei jedem Monatsschritt neu gebaut wird und der Pfeil,
   // auf dem jemand blaettert, seinen Fokus behalten muss; auf den anderen
   // Reitern ist er leer und verborgen (syncReportPeriod()).
+  //
+  // AM DESKTOP STEHT ER WIEDER IN DER TITELZEILE (Entscheidung R17, E16). Dort
+  // sprang nie etwas - Titel, Zeitraum und Kopf-Pille teilen sich Zeile 1 -,
+  // und unter den Reitern scrollte der Monat mit dem Inhalt weg. Ein Knoten,
+  // zwei Plaetze: placeReportPeriod() haengt den Slot ab 1024px (ab dort dockt
+  // auch die Kopf-Pille an) als Center-Slot in den Kopf und darunter zurueck
+  // zwischen Kopf und Inhalt. Das Markup traegt den schmalen Platz, damit eine
+  // Seite ohne `matchMedia` die Reiter nie verschiebt.
   // Breitenregel (DESIGN.md, R16 2026-10-05): Flaeche mit Spalten. Die Seite
   // fuehrt das breite Mass, der Kopf endet in allen vier Reitern an derselben
   // Kante (vorher 996 in der Uebersicht, 720 in den anderen - der Knopf
@@ -383,6 +391,7 @@ function renderShell(container) {
   // Monats-Stepper des Berichte-Tabs.
   page.addEventListener('click', readOnlyLatch, true);
   page.addEventListener('submit', readOnlyLatch, true);
+  watchReportPeriodPlace(page);
 
   wireTablist(container.querySelector('.housekeeping-tabs'), {
     activeId: state.tab,
@@ -1284,7 +1293,49 @@ function reportMonthNavHtml(shownMonth, isCurrentMonth) {
   });
 }
 
-/** Der Zeitraum-Slot (unter den Reitern) der Seite, zu der `content` gehoert. */
+/* Ab dieser Breite steht der Zeitraum in der Titelzeile: dieselbe Schwelle,
+ * ab der die Kopf-Pille andockt (dockFabIntoToolbar in router.js) und der
+ * Aktions-Slot die Titelzeile auf einer Hoehe haelt (housekeeping.css). */
+const REPORT_PERIOD_HEAD_QUERY = '(min-width: 1024px)';
+
+/**
+ * Haengt den Zeitraum-Slot an seinen Platz: `inHead` = Center-Slot der
+ * Titelzeile (vor den Aktionen), sonst die Zeile zwischen Kopf und Inhalt.
+ * Der Knoten wandert samt Stepper und Zuhoerern; steht er schon richtig,
+ * passiert nichts (ein erneutes Einhaengen naehme dem Pfeil den Fokus).
+ */
+function placeReportPeriod(page, inHead) {
+  const slot = page?.querySelector?.('#housekeeping-period');
+  const head = page?.querySelector?.('.housekeeping-toolbar');
+  if (!slot || !head) return;
+  const actions = head.querySelector('.page-toolbar__actions');
+  if (inHead && actions) {
+    if (slot.parentNode !== head) head.insertBefore(slot, actions);
+    slot.classList.add('page-toolbar__center');
+  } else {
+    if (slot.parentNode === head) head.after(slot);
+    slot.classList.remove('page-toolbar__center');
+  }
+}
+
+let reportPeriodMedia = null;
+let reportPeriodMediaHandler = null;
+
+/* Die Seite entsteht bei jedem Aufruf neu: der alte Zuhoerer faellt, bevor der
+ * neue haengt, sonst verschoebe jede fruehere Seite ihren abgehaengten Slot. */
+function watchReportPeriodPlace(page) {
+  if (reportPeriodMedia && reportPeriodMediaHandler) {
+    reportPeriodMedia.removeEventListener('change', reportPeriodMediaHandler);
+  }
+  reportPeriodMedia = typeof window.matchMedia === 'function' ? window.matchMedia(REPORT_PERIOD_HEAD_QUERY) : null;
+  reportPeriodMediaHandler = null;
+  if (!reportPeriodMedia) return;
+  reportPeriodMediaHandler = (event) => placeReportPeriod(page, event.matches);
+  reportPeriodMedia.addEventListener('change', reportPeriodMediaHandler);
+  placeReportPeriod(page, reportPeriodMedia.matches);
+}
+
+/** Der Zeitraum-Slot (Titelzeile oder Zeile unter den Reitern) der Seite, zu der `content` gehoert. */
 function reportPeriodSlot(content) {
   return content?.closest?.('.housekeeping-page')?.querySelector('#housekeeping-period') ?? null;
 }
@@ -2486,6 +2537,8 @@ export const __test = {
   completeTask,
   reportMonthNavHtml,
   syncReportPeriod,
+  placeReportPeriod,
+  REPORT_PERIOD_HEAD_QUERY,
   renderStaff,
   staffLogPayHtml,
   receiptFieldHtml,

@@ -267,6 +267,15 @@
   display: none;
 }
 
+/* AM DESKTOP IN DER TITELZEILE (Entscheidung R17, E16): ab 1024px haengt
+ * placeReportPeriod() die Zeile als Center-Slot in den Kopf. Dort bringt die
+ * Shell Abstand und Seitenpolster mit, das eigene Polster der Zeile faellt -
+ * sonst stuende der Monat eine Seitenkante weiter rechts als der Titel
+ * verlangt und 4px tiefer als die Kopf-Pille daneben. */
+.page-toolbar > .housekeeping-period {
+  padding: 0;
+}
+
 /* Die Pfeile bringen ihre Luft in der Trefferflaeche mit; mit dem vollen
  * Inhaltspolster darunter stuende der Monat naeher an den Reitern als an den
  * Kennzahlen, die er beschreibt. */

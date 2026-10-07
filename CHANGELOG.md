@@ -82,7 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Housekeeping: the tab bar no longer jumps when you open "Reports".** On a phone the month
   stepper pushed itself between the title and the tabs, so the bar moved 52 px down under your
   finger on that one tab. The tabs now sit in the same place on all four, and the month stepper
-  stands below them, above the figures it selects - on every screen size.
+  stands below them, above the figures it selects. On a desktop it stays in the title row, where
+  nothing ever jumped.
 
 - **Shifts in the calendar are readable: tinted chip, colour dot, dark text.** A shift from the
   shift plan stood in the calendar as a block of its full colour with white 12 px text - 3.26:1
