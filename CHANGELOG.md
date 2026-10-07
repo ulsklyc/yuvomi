@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead - the row was gone and the rest jumped. They now use the same motion, also when
   "Undo" brings an entry back. Searching and filtering still redraw without motion, and with
   reduced motion switched on nothing moves.
+- **Picking another row fades the detail column in.** In tasks, recipes, contacts, birthdays,
+  the agenda and inventory the column on the right swapped its content with a hard cut when
+  another row was selected. The new content now fades in briefly, like a tab or a month
+  change does. Saving the entry that is already shown redraws it without the fade.
 
 ### Fixed
 

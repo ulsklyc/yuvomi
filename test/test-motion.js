@@ -1177,6 +1177,22 @@ test('Listenbewegung R17: Notizen, Dokumente, Kontakte, Budget, Inventar, Abos, 
   assert.deepEqual(bare, [], `Zeile ohne Wiedererkennungs-Attribut:\n  ${bare.join('\n  ')}`);
 });
 
+const publicSource = (path) => readFileSync(new URL(`../public/${path}`, import.meta.url), 'utf8');
+
+test('Liste + Detail: ein Wechsel der Auswahl blendet die Detailspalte, ein Neuzeichnen derselben nicht', () => {
+  const md = publicSource('utils/master-detail.js');
+  // Nur select() mit einer ANDEREN Auswahl blendet ...
+  assert.match(md, /if \(!same \|\| bodyEl\.hidden\) paint\(selected, \{ swap: !same \}\);/);
+  // ... und zwar NACH dem Zeichnen, ohne Richtung (nur opacity: ein transform
+  // machte die Spalte zum Bezugsrahmen ihres klebenden Kopfes).
+  const paint = md.slice(md.indexOf('async function paint('), md.indexOf('function showLoadError('));
+  assert.match(paint, /createIcons\(\{ el: bodyEl \}\);[\s\S]{0,260}if \(swap\) swapContent\(bodyEl, null\);\n  \}/);
+  assert.ok(paint.indexOf('await renderDetail') < paint.indexOf('swapContent(bodyEl'), 'erst zeichnen, dann blenden');
+  // refresh({ repaint }) zeichnet dieselbe Auswahl neu - ohne Blende.
+  assert.match(md, /if \(repaint && selected != null && isSplit\(\)\) paint\(selected\);/);
+  assert.equal((md.match(/swap: /g) ?? []).length, 1, 'genau eine Stelle setzt swap');
+});
+
 test('Schichtplan: Laden zeigt das geteilte Skelett, Blaettern haelt den Inhalt bis zur Antwort', () => {
   const schedule = pageSource('schedule');
   assert.doesNotMatch(schedule, /card card--padded schedule-stat-loading/, 'keine Textkarte "Laedt..." mehr');
