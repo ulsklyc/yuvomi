@@ -2362,13 +2362,24 @@ function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '' } = {}) {
  */
 const VIEW_ICONS = { month: 'calendar-days', week: 'calendar-range', day: 'calendar-1', agenda: 'list' };
 
+/**
+ * DER KNOPF ZEIGT DIE AKTIVE ANSICHT (R17, E11; Critique 2026-10-07 A2 P2).
+ * Hinter "..." stand mobil nirgends im Kopf, in welcher Ansicht man ist - das
+ * Segment, das es am Desktop sagt, ist unter 640px ausgeblendet. Der Knopf
+ * traegt jetzt die Glyphe der aktiven Ansicht (dieselbe wie ihr Menue-Eintrag)
+ * und nennt sie im Namen: "Ansicht: Woche". Das Menue bleibt.
+ */
+function viewMenuLabel(current = state.view) {
+  return `${t('calendar.viewSwitcher')}: ${VIEW_LABELS()[current] ?? ''}`;
+}
+
 function viewMenuHtml(current = state.view) {
-  const label = t('calendar.viewSwitcher');
+  const label = viewMenuLabel(current);
   return `
         <button type="button" class="btn btn--secondary btn--icon cal-toolbar__tools-btn popover-menu__trigger" id="cal-views-menu"
                 popovertarget="cal-views-menu-panel" aria-haspopup="menu" aria-expanded="false" data-collapse-fold-menu
-                aria-label="${esc(label)}" title="${esc(label)}">
-          <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
+                data-view="${esc(current)}" aria-label="${esc(label)}" title="${esc(label)}">
+          <i data-lucide="${VIEW_ICONS[current] ?? VIEW_ICONS.month}" class="icon-md" aria-hidden="true"></i>
         </button>
         <div class="popover-menu" id="cal-views-menu-panel" popover role="menu">
           ${VIEWS.map((v) => `
@@ -2384,11 +2395,24 @@ function viewMenuHtml(current = state.view) {
 
 /** Den Haken im Ansichtsmenue der aktuellen Ansicht nachziehen. */
 function syncViewMenu(root = _container) {
+  let active = null;
   for (const item of root?.querySelectorAll?.('[data-cal-view]') ?? []) {
     const on = item.dataset.calView === state.view;
+    if (on) active = item;
     item.setAttribute('aria-checked', String(on));
     item.querySelector('.popover-menu__item-check')?.classList.toggle('popover-menu__item-check--hidden', !on);
   }
+  // Der Ausloeser zieht mit (E11): Glyphe und Name der aktiven Ansicht. Die
+  // Glyphe ist die des Menue-Eintrags, als Kopie - sie ist dort schon
+  // gezeichnet, ein zweiter Lucide-Lauf ueber den Kopf entfaellt.
+  const trigger = root?.querySelector?.('#cal-views-menu');
+  if (!trigger || trigger.dataset.view === state.view) return;
+  trigger.dataset.view = state.view;
+  const label = viewMenuLabel(state.view);
+  trigger.setAttribute('aria-label', label);
+  trigger.setAttribute('title', label);
+  const glyph = active?.firstElementChild?.cloneNode(true);
+  if (glyph) trigger.replaceChildren(glyph);
 }
 
 function renderToolbar() {
@@ -6090,6 +6114,7 @@ export const __test = {
   buildLayerRowsHtml,
   periodNavHtml,
   toolbarHtml,
+  viewMenuHtml,
   hourGutterLabel,
   compactHourLabel,
   syncTodayButton,

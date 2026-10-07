@@ -5061,6 +5061,33 @@ test('Zeitraum-Kopf (R17 Z1): Filter, Lupe und „..." tragen EINE Icon-Knopffor
   assert(own.length === 0, `keine eigene Ruhe-Tinte fuer einen Kopfknopf: ${own.map((r) => r.selector.trim()).join(' | ')}`);
 });
 
+// R17 E11 (Critique 2026-10-07, A2 P2): mobil stand die Ansichtswahl hinter
+// "...", und der Kopf sagte nirgends, welche Ansicht offen ist.
+test('E11: der Ansichtswahl-Knopf traegt Glyphe und Namen der aktiven Ansicht, das Menue bleibt', () => {
+  const ICONS = { month: 'calendar-days', week: 'calendar-range', day: 'calendar-1', agenda: 'list' };
+  const names = new Set();
+  for (const [view, icon] of Object.entries(ICONS)) {
+    const html = calendarHelpers.viewMenuHtml(view);
+    const btn = buttonTag(html, 'cal-views-menu');
+    assert(btn.whole.includes(`data-lucide="${icon}"`), `${view}: der Knopf zeigt die Glyphe der Ansicht (${icon})`);
+    assert(!btn.whole.includes('data-lucide="ellipsis"'), `${view}: kein "..." mehr`);
+    const item = html.match(new RegExp(`data-cal-view="${view}"[\\s\\S]*?</button>`))[0];
+    assert(item.includes(`data-lucide="${icon}"`), `${view}: dieselbe Glyphe wie der Menue-Eintrag`);
+    const name = btn.tag.match(/aria-label="([^"]*)"/)[1];
+    assert(name.startsWith('calendar.viewSwitcher: ') && name.length > 'calendar.viewSwitcher: '.length, `${view}: der Name nennt die Ansicht (${name})`);
+    assert(btn.tag.includes(`title="${name}"`), 'Tooltip = Name');
+    assert(btn.tag.includes(`data-view="${view}"`));
+    names.add(name);
+    assert((html.match(/role="menuitemradio"/g) ?? []).length === 4, 'das Menue mit allen vier Ansichten bleibt');
+    assert(new RegExp(`aria-checked="true"[^>]*data-cal-view="${view}"`).test(html.replace(/\s+/g, ' ')), `${view}: der Eintrag ist gewaehlt`);
+  }
+  assert(names.size === 4, 'vier Ansichten, vier Namen');
+  // Der Wechsel zieht den Knopf nach, nicht nur den Haken.
+  const sync = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8').match(/function syncViewMenu\([\s\S]*?\n\}/)[0];
+  assert(/trigger\.setAttribute\('aria-label', label\)/.test(sync) && /trigger\.replaceChildren\(glyph\)/.test(sync),
+    'syncViewMenu() setzt Name und Glyphe des Ausloesers');
+});
+
 test('Zeitraum-Kopf (R17 Z1): der Filterknopf traegt den geteilten Zaehler und nennt ihn', () => {
   const two = buttonTag(calendarHelpers.toolbarHtml({ filterCount: 2 }), 'cal-filters');
   assert(/\bpage-filter-btn\b/.test(two.tag), 'derselbe Baustein wie jeder Filterknopf (utils/filter-sheet.js)');

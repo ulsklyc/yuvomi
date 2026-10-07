@@ -2515,6 +2515,11 @@ und nur unter dieser Klasse loest calendar.css die Bar-Zeile auf (`display: cont
 aufloest, und laesst sie nur mit der Klasse durch; die Klasse selbst nur in den Modulen,
 die dieser Absatz nennt. Ein zweites Modul mit Zeitraum-Titel kommt hier dazu, nicht in
 eine Ausnahmekarte.
+**Das Menue zeigt die aktive Ansicht (R17, E11).** Der Ausloeser traegt statt „..." die Glyphe
+der offenen Ansicht (dieselbe wie ihr Menue-Eintrag: Monat `calendar-days`, Woche
+`calendar-range`, Tag `calendar-1`, Agenda `list`) und nennt sie im Namen („Ansicht: Woche");
+`syncViewMenu()` zieht beides beim Wechsel nach. Vorher sagte der mobile Kopf nirgends, welche
+Ansicht offen ist - das Segment, das es am Desktop sagt, ist unter 640px ausgeblendet.
 **Eingeklappt ist der Zeitraum-Kopf EINE Zeile (R17 Schritt 5, Critique 2026-10-07 A1 P1).**
 Gemessen 390x844 mass er ausgeklappt wie eingeklappt 117px: Titel und Siegel gingen, aber die
 Werkzeuge hielten Zeile 1 offen (drei Icons neben 206px Leerraum) und der Stepper blieb in

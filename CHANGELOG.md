@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The calendar's view button on a phone shows which view is open.** It carried "..." and the
+  header said nowhere whether you were in month, week, day or agenda. It now shows the icon of
+  the open view and names it ("View: Week"); the menu behind it is unchanged.
 - **"Log day" in the cycle tracker shows the daily entries first.** Bleeding, symptoms and
   feelings stay at the top; basal temperature, cervical mucus, tests and intimacy sit behind "More
   details", which opens by itself when one of them already has a value. On a phone the dialog is
