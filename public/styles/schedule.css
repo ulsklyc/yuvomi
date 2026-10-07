@@ -237,6 +237,12 @@
 
 /* A cycle day can carry several classes (a timetable), not just one - a small
  * add/remove list instead of a single <select>, same grid cell as before. */
+/* Tage jenseits der getippten Zykluslaenge bleiben im Dialog, verborgen
+ * (schedule.js, syncPatternDayGroups) - die Klasse unten setzt `display`. */
+.schedule-day-group[hidden] {
+  display: none;
+}
+
 .schedule-day-group {
   min-width: 0;
 }

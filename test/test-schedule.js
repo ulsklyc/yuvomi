@@ -1894,6 +1894,15 @@ test('R17/E1: shift types and plans are rows, edited in the create dialog with O
   // One save writes both halves.
   const saveType = schedulePage.slice(schedulePage.indexOf('async function saveShiftTypeEdit('), schedulePage.indexOf('function openPatternEditModal('));
   assert.match(saveType, /api\.put\(`\/schedule\/shift-types\/\$\{id\}`, formData\(form\)\);[\s\S]*api\.put\(`\/schedule\/shift-types\/\$\{id\}\/fields`, \{ fields \}\)/);
+  // Typing the cycle length runs on every keystroke (7 -> "1" -> "14"). Days
+  // beyond the typed length are hidden, never removed: removed groups came
+  // back empty and Save wrote them over the assigned ones (review of #1767).
+  const sync = schedulePage.slice(schedulePage.indexOf('function syncPatternDayGroups(form) {'), schedulePage.indexOf('function openPatternEditModal('));
+  assert.ok(sync.length > 0, 'syncPatternDayGroups() must exist');
+  assert.doesNotMatch(sync.replace(/\/\*[\s\S]*?\*\//g, ''), /\.remove\(\)/, 'no day group is removed while typing');
+  assert.match(sync, /group\.hidden = Number\(group\.dataset\.dayGroup\) >= cycleLength/);
+  assert.match(schedulePage, /form\.querySelectorAll\('\[data-day-group\]:not\(\[hidden\]\) \[data-day-row\]'\)/, 'hidden days are not collected');
+  assert.match(readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8'), /\.schedule-day-group\[hidden\]\s*\{\s*display:\s*none/);
   // Half written (review of #1767): when the fields request fails after the
   // type was saved, the page reloads the server state instead of staying stale.
   assert.match(saveType, /typeSaved = true;/);

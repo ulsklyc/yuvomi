@@ -2636,7 +2636,9 @@ function collectShiftTypeFields(form) {
 
 /** Die Zyklustage, wie sie im Dialog gerade stehen - eine Zeile je Schicht. */
 function collectPatternDays(form) {
-  return [...form.querySelectorAll('[data-day-row]')].map((row) => {
+  // Ohne die verborgenen Gruppen: das sind Tage jenseits der getippten
+  // Zykluslaenge, die syncPatternDayGroups() nur zurueckhaelt.
+  return [...form.querySelectorAll('[data-day-group]:not([hidden]) [data-day-row]')].map((row) => {
     const select = row.querySelector('[data-day]');
     return { position: Number(select.dataset.day), shift_type_id: select.value ? Number(select.value) : null, field_values: collectFieldValues(row) };
   });
@@ -2644,7 +2646,13 @@ function collectPatternDays(form) {
 
 /**
  * Stellt den Zyklustage-Editor auf die getippte Zykluslaenge ein: fehlende
- * Tage kommen leer dazu, ueberzaehlige fallen. So speichert EIN Knopf Angaben
+ * Tage kommen leer dazu, ueberzaehlige werden VERBORGEN, nicht entfernt. Das
+ * laeuft bei jedem Tastendruck im Laengenfeld: wer 7 durch 14 ersetzt, tippt
+ * zuerst "1" - entfernte Gruppen kamen danach leer zurueck, und "Speichern"
+ * schrieb die leeren Tage ueber die belegten (ebenso 7 -> 5 -> 7). Verborgene
+ * Gruppen zaehlt collectPatternDays() nicht mit; waechst die Laenge wieder,
+ * stehen sie mit ihren Schichten und Feldwerten wieder da.
+ * So speichert EIN Knopf Angaben
  * und Tage zusammen - bis R17 musste man erst die Laenge speichern, um die
  * neuen Tage zu sehen, und die alte Laenge mit belegten Tagen wies der Server
  * ab. Die Zahl bleibt in den Grenzen des Felds (1-366); alles andere laesst
@@ -2655,7 +2663,7 @@ function syncPatternDayGroups(form) {
   const cycleLength = Number(formValue(form, 'cycle_length'));
   if (!host || !Number.isInteger(cycleLength) || cycleLength < 1 || cycleLength > 366) return;
   const groups = [...host.querySelectorAll('[data-day-group]')];
-  groups.filter((group) => Number(group.dataset.dayGroup) >= cycleLength).forEach((group) => group.remove());
+  for (const group of groups) group.hidden = Number(group.dataset.dayGroup) >= cycleLength;
   const window_ = { anchor: formValue(form, 'anchor_date'), cycleLength, validFrom: formValue(form, 'valid_from') || null, validUntil: formValue(form, 'valid_until') || null };
   for (let position = groups.length; position < cycleLength; position += 1) {
     host.insertAdjacentHTML('beforeend', dayGroupHtml(position, null, true, window_));
