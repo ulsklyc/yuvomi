@@ -3249,6 +3249,9 @@
    * `.popover-menu`): es waechst aus der Ecke am Filterknopf (96 % -> 100 %)
    * und blendet, der Ausgang ist kuerzer (--duration-xs gegen --duration-md)
    * und nimmt das Wachstum zurueck. Bisher erschien und verschwand es hart.
+   * Den Ursprung (`transform-origin`) setzt positionFiltersPopover() mit der
+   * Position - dort faellt die Entscheidung fuer die Kante, hier stuende sie
+   * als physische Seite, die in RTL nicht stimmen muss.
    * Hier MIT @starting-style: die Position rechnet openFiltersPopover() im
    * selben Takt wie showPopover(), es gibt keinen Frame oben links zu
    * verstecken. ZWEI DEKLARATIONEN, die Reihenfolge ist der Rueckfall: ohne
@@ -3257,7 +3260,6 @@
    * die Dauer auf 0s. */
   opacity: 0;
   transform: scale(0.96);
-  transform-origin: top right;
   transition:
     opacity var(--duration-xs) var(--ease-out),
     transform var(--duration-xs) var(--ease-out);

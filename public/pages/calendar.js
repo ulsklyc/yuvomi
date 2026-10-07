@@ -5666,6 +5666,10 @@ function positionFiltersPopover(pop, anchor) {
   pop.style.left = `${Math.round(left)}px`;
   pop.style.top = `${Math.round(top)}px`;
   pop.style.maxHeight = `${Math.round(window.innerHeight - top - margin)}px`;
+  // Es waechst aus der Ecke am Knopf (calendar.css): der Ursprung ist die
+  // Stelle des Popovers, unter der die Knopfkante steht - auch wenn das
+  // Fenster es von dort weggeschoben hat.
+  pop.style.transformOrigin = `${Math.round(Math.min(Math.max(0, rect.right - left), width))}px 0`;
 }
 
 /**

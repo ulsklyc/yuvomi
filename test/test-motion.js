@@ -1268,6 +1268,9 @@ test('Kalender: das Filter-Popover hat Ein- und Ausgang wie das Popover-Menue', 
   assert.match(open, /transform:\s*none/);
   assert.match(open, /opacity var\(--duration-md\) var\(--ease-out\)/, 'die Einfahrt ist laenger als der Ausgang');
   assert.match(css('calendar.css'), /@starting-style \{\s*\.cal-filters-popover:popover-open \{\s*opacity: 0;\s*transform: scale\(0\.96\);/);
+  // Der Ursprung kommt mit der Position aus JS (keine physische Seite im Blatt, RTL-Guard in test:calendar).
+  assert.doesNotMatch(base, /transform-origin/);
+  assert.match(pageSource('calendar'), /pop\.style\.transformOrigin = `\$\{Math\.round\(Math\.min\(Math\.max\(0, rect\.right - left\), width\)\)\}px 0`;/);
   // Ein sofortiges remove() im toggle schnitt den Ausgang ab.
   const cal = pageSource('calendar');
   const toggle = cal.slice(cal.indexOf("pop.addEventListener('toggle'"), cal.indexOf('pop.showPopover();'));
