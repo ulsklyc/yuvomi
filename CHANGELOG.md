@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Inventory opens on your things, not on a list of categories.** The start page used to show
+  one row per category and no item at all; reaching an item took two clicks. It now lists every
+  item, grouped by category, with the categories as filter chips above the list. On a wide
+  screen the details of the selected item stand beside it from the start, and short facts
+  (brand, model, serial number, price) share a row instead of running down one column. A link
+  to a category still works and selects its chip.
+
 - **Settings list their options as rows, one group per section.** Until now almost every option
   had a card of its own: Appearance showed ten settings in eight cards and three of them on the
   first screen. Options are now rows in one group - name on the left, switch or selection on the
@@ -182,6 +189,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Paging to another period afterwards shows the new figures at once, without replaying it.
 
 ### Fixed
+
+- **Inventory: a deleted item no longer stays in the address.** Deleting the selected item could
+  leave `?open=<id>` in the address bar, so a reload showed "not found". The detail row for the
+  warranty is now labelled "Warranty" and names the duration and the end date; it used to carry
+  the form label "Warranty (months)" above a date.
 
 - **Editing a shopping item: quantity and category, price and store stand side by side again.**
   The dialog used a layout class whose stylesheet is only loaded in the pantry, so each pair fell

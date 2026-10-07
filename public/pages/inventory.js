@@ -34,7 +34,7 @@ import { openDetailView, closeDetailView } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { wireScrollFade } from '/utils/ux.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
-import { attachOverlay } from '/utils/overlay-history.js';
+import { attachOverlay, whenHistorySettled } from '/utils/overlay-history.js';
 import { setNavBadge } from '/utils/nav-badges.js';
 import { CHART, chartScales, chartY, chartGridMarkup, niceDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
 
@@ -50,8 +50,7 @@ const state = {
   categories: [],
   query: '',
   filterAttention: false,
-  view: 'browse',        // 'browse' | 'category'
-  activeCategory: null,  // category key, when view === 'category'
+  activeCategory: null,  // Kategorie-Chip; null = alle
 };
 
 /**
@@ -240,25 +239,26 @@ function matchesAttentionFilter(item) {
 }
 
 // --------------------------------------------------------
-// DIE EBENE HAT EINE ADRESSE (Re-Critique 2026-09-28, A6 P1-1 / A8 P2-1)
+// EINE LISTE, DIE KATEGORIE IST EIN FILTER (Critique R17, E3)
 //
-// `/inventory` ist die Kategorienliste, `/inventory?category=<key>` eine
-// Kategorie. Vorher setzte `openCategory()` nur `state.view`, die URL blieb
-// `/inventory` - wer zurueckwischte, landete im vorigen Modul statt in der
-// Kategorienliste. Jetzt legt das Oeffnen einen History-Eintrag an, und
-// Zurueck/Vor stellt die Ebene aus der Adresse wieder her
-// (`syncLevelFromAddress`, am popstate der Seite).
+// Bis R17 war `/inventory` eine Kategorienliste ohne einen einzigen Gegenstand
+// (1280x800: vier Zeilen, 460px leer, zwei Klicks bis zum Detail) und
+// `/inventory?category=<key>` eine zweite Ebene mit eigenem Kopf. Jetzt steht
+// links IMMER die Liste aller Gegenstaende, nach Kategorie gruppiert, darueber
+// die Kategorien als Filter-Chips; rechts das Detail. Mobil dieselbe Liste,
+// das Detail als Blatt.
 //
-// Die Auswahl eines Gegenstands (`?open=`) bleibt Sache des Bausteins
-// (utils/master-detail.js). Er bekommt ueber `mdAddress` gesagt, dass jede
-// Ebene dieselbe Seite ist - sonst hielte er eine andere Kategorie fuer eine
-// fremde Adresse, und der Router zeichnete bei jedem Zurueck die ganze Seite
-// neu (Skelett, Seitenuebergang).
+// Die Adresse bleibt, wie sie war: `?category=<key>` waehlt den Chip vor,
+// `?open=<id>` die Auswahl (utils/master-detail.js). Ein Chip ist ein Filter
+// und kein Schritt fuer die Zurueck-Taste - er ERSETZT die Adresse. Der
+// Baustein bekommt ueber `mdAddress` gesagt, dass jeder Filterstand dieselbe
+// Seite ist - sonst hielte er eine andere Kategorie fuer eine fremde Adresse,
+// und der Router zeichnete bei jedem Zurueck die ganze Seite neu.
 // --------------------------------------------------------
 
 const INVENTORY_PATH = '/inventory';
 
-/** Die Kategorie, die die Adresse nennt (`null` = Kategorienliste). */
+/** Die Kategorie, die die Adresse nennt (`null` = alle). */
 function categoryFromAddress(loc = globalThis.location) {
   return new URLSearchParams(loc?.search ?? '').get('category');
 }
@@ -271,156 +271,105 @@ function inventoryHref({ category = null, open = null } = {}) {
   return query ? `${INVENTORY_PATH}?${query}` : INVENTORY_PATH;
 }
 
-/** Die Kategorie, die gerade steht - `null` auf der Kategorienliste und in Treffern. */
-function shownCategory() {
-  return state.view === 'category' ? state.activeCategory : null;
-}
-
 /**
- * Die Ebene in die Adresse schreiben. `path` im State, weil der Router ihn bei
- * popstate liest; `inventoryFromBrowse` merkt, dass dieser Eintrag direkt aus
- * der Kategorienliste kam - dann ist „‹ Inventar" ein Schritt zurueck.
+ * Den Filterstand in die Adresse schreiben - ersetzt, nie gestapelt. `path` im
+ * State, weil der Router ihn bei popstate liest.
  */
-function writeLevelAddress(mode, { category = shownCategory(), open = null, fromBrowse = false } = {}) {
+function writeFilterAddress({ category = state.activeCategory, open = null } = {}) {
   const hist = globalThis.history;
-  if (typeof hist?.pushState !== 'function') return;
+  if (typeof hist?.replaceState !== 'function') return;
   const path = inventoryHref({ category, open });
-  if (mode === 'push') hist.pushState(fromBrowse ? { path, inventoryFromBrowse: true } : { path }, '', path);
-  else hist.replaceState({ ...(hist.state ?? {}), path }, '', path);
+  hist.replaceState({ ...(hist.state ?? {}), path }, '', path);
 }
 
-/** Adresse der Auswahl fuer den Baustein: `?open=` neben der Ebene. */
+/** Adresse der Auswahl fuer den Baustein: `?open=` neben dem Filter. */
 const mdAddress = {
   read: (loc) => (loc?.pathname === INVENTORY_PATH ? new URLSearchParams(loc.search ?? '').get('open') : undefined),
-  href: (id) => inventoryHref({ category: shownCategory(), open: id }),
+  href: (id) => inventoryHref({ category: state.activeCategory, open: id }),
 };
 
-function setCategoryState(key) {
-  state.view = 'category';
-  state.activeCategory = key;
-  state.query = '';
-  state.filterAttention = false;
-  _search?.clear();
+/** Eine Kategorie ist waehlbar, solange ein Gegenstand in ihr steht. */
+function isShownCategory(key) {
+  return Boolean(key) && state.items.some((item) => item.category === key);
 }
 
-function setBrowseState() {
-  state.view = 'browse';
-  state.activeCategory = null;
-  state.query = '';
-  state.filterAttention = false;
-  _search?.clear();
-}
-
-function isKnownCategory(key) {
-  return Boolean(key) && state.categories.some((c) => c.key === key);
-}
-
-function openCategory(key) {
-  setCategoryState(key);
-  // ERST der Eintrag, dann die Liste: der Neuaufbau waehlt in der Spalte die
-  // erste Zeile vor (`replaceState`) - das gehoert auf den NEUEN Eintrag.
-  writeLevelAddress('push', { category: key, fromBrowse: true });
+/**
+ * Der Klick auf einen Chip (`null` = „Alle"). Suche und Fristen-Filter
+ * bleiben stehen: die drei Fragen kombinieren sich, statt einander zu
+ * loeschen. Die Auswahl rechts folgt der Liste (renderList -> refresh): steht
+ * ihre Zeile noch da, bleibt sie, sonst waehlt der Baustein die erste.
+ */
+function selectCategory(key) {
+  const next = isShownCategory(key) ? key : null;
+  if (next === state.activeCategory) return;
+  state.activeCategory = next;
+  // ERST die Adresse, dann die Liste: der Neuaufbau schreibt die Auswahl
+  // (`?open=`) ueber `mdAddress.href` NEBEN die Kategorie, die dann gilt.
+  writeFilterAddress({ category: next, open: _md?.selectedId?.() ?? null });
   renderList();
   scrollListToTop();
 }
 
 /**
- * Zur Kategorienliste. Als Geste des Nutzers („‹ Inventar"): kam die Kategorie
- * direkt aus der Liste, ist das ein Schritt zurueck wie Apples Zurueck-Knopf
- * (popstate stellt die Ebene her), sonst ein neuer Eintrag. Als Folge
- * (Kategorie verschwunden, Inventar leer) ersetzt sie die Adresse.
+ * Zurueck/Vor: der Chip folgt der Adresse. Laeuft am popstate der Seite; die
+ * Auswahl zieht die Seite danach selbst aus `?open=` nach (siehe dort).
+ * @returns {boolean} ob sich der Filter geaendert hat
  */
-function backToBrowse({ history: mode = 'push' } = {}) {
-  const hist = globalThis.history;
-  if (mode === 'push' && hist?.state?.inventoryFromBrowse
-    && categoryFromAddress() === state.activeCategory && typeof hist.back === 'function') {
-    hist.back();
-    return;
-  }
-  setBrowseState();
-  writeLevelAddress(mode, { category: null });
-  renderList();
-  scrollListToTop();
-}
-
-/**
- * Zurueck/Vor: die Ebene folgt der Adresse. Laeuft am popstate der Seite,
- * VOR dem Baustein (der Router fragt ihn erst nach den Dialogen) - die Liste
- * muss stehen, bevor er die Auswahl aus `?open=` markiert. Deshalb ohne
- * `_md.refresh()`: der raeumte eine Auswahl ab, die die Adresse gleich nennt.
- * @returns {boolean} ob sich die Ebene geaendert hat
- */
-function syncLevelFromAddress() {
+function syncCategoryFromAddress() {
   const key = categoryFromAddress();
-  if (isKnownCategory(key)) {
-    if (state.view === 'category' && state.activeCategory === key) return false;
-    setCategoryState(key);
-    return true;
-  }
-  if (state.view !== 'category') return false;
-  setBrowseState();
+  const next = isShownCategory(key) ? key : null;
+  if (next === state.activeCategory) return false;
+  state.activeCategory = next;
   return true;
 }
 
-/** Welche Ebene steht: Kategorienliste, Treffer (Suche/Fristen) oder eine Kategorie. */
-function inventoryLevel() {
-  if (state.view === 'category') return 'category';
-  return state.query || state.filterAttention ? 'search' : 'categories';
-}
-
-/**
- * Kopf der Ebene: in einer Kategorie „‹ Inventar" oben und ihr Name als Titel
- * (Muster Gesundheit), sonst der Modulname. Die Ebene steht als
- * `data-inventory-level` an der Seite - auf der Kategorienliste gibt es am
- * Desktop keine Detailspalte (inventory.css): sie forderte „Waehle einen
- * Gegenstand" neben einer Liste ohne Gegenstaende.
- */
-function syncInventoryHeader(container = _container) {
-  if (!container) return;
-  const level = inventoryLevel();
-  const category = level === 'category' ? state.categories.find((c) => c.key === state.activeCategory) : null;
-  const title = category ? categoryLabel(category) : t('nav.inventory');
-  // Nur schreiben, wenn sich etwas aendert: der Kopf-Beobachter der Shell
-  // (ux.js) misst bei jeder Mutation in diesem Teilbaum neu.
-  const heading = container.querySelector('.inventory-toolbar .page-toolbar__title');
-  if (heading && heading.textContent !== title) heading.textContent = title;
-  const back = container.querySelector('.inventory-toolbar__back');
-  if (back && back.hidden !== !category) back.hidden = !category;
-  container.querySelector('.inventory-page')?.setAttribute('data-inventory-level', level);
-}
-
 /** Gleicher Scroll-Container wie router.js bei echten Routenwechseln
- *  (#main-content) - ein Ebenenwechsel hier fuehlt sich sonst wie eine neue
- *  Seite an, springt aber nicht wie eine. */
+ *  (#main-content) - ein anderer Filter beginnt oben. */
 function scrollListToTop() {
   const main = globalThis.document?.getElementById('main-content');
   if (main) main.scrollTop = 0;
 }
 
 /**
- * Fuellt die Filter-Zeile neu - eigene Funktion statt Teil von renderList(),
- * weil die Zeile ausserhalb von #inventory-list liegt (gleiches Muster wie
- * public/pages/documents.js#renderCategoryChips fuer #documents-category).
- * `items` ist der Massstab fuer den Zaehler - die UNGEFILTERTE Menge des
- * aktuellen Geltungsbereichs (ganzes Inventar auf der Kategorie-Detailseite
- * gibt es nicht mehr direkt - dort ist der Geltungsbereich immer eine
- * Kategorie).
+ * Kategorien als Chips, in der Reihenfolge von state.categories; eine
+ * Kategorie ohne Gegenstand bekommt keinen (wie sie keine Gruppe bekommt), ein
+ * Gegenstand mit einer Kategorie, die es nicht mehr gibt, behaelt seinen ueber
+ * `category_name` am Gegenstand selbst (wie groupItemsByCategory).
+ * @returns {{key: string, name: string, count: number}[]}
  */
-function updateFilterChips(items) {
+function categoryChips() {
+  return groupItemsByCategory(state.items).map((g) => ({ key: g.key, name: g.name, count: g.items.length }));
+}
+
+function categoryChipHtml({ key, name, count }, active) {
+  return `
+    <button type="button" class="filter-chip filter-chip--sm${active ? ' filter-chip--active' : ''}"
+            data-category="${esc(key)}" aria-pressed="${active}">
+      ${esc(name)}<span class="filter-chip__count">${count}</span>
+    </button>`;
+}
+
+/**
+ * Fuellt die Chip-Zeile neu - eigene Funktion statt Teil von renderListBody(),
+ * weil die Zeile ausserhalb von #inventory-list liegt (gleiches Muster wie
+ * public/pages/documents.js#renderCategoryChips): sie behaelt so ihren
+ * Scrollstand, wenn die Liste darunter neu steht. Die Zaehler nennen den
+ * BESTAND der Kategorie, nicht die Treffer der Suche - ein Chip ist ein Ort,
+ * keine Trefferzahl.
+ */
+function updateFilterChips() {
   const host = _container?.querySelector('#inventory-filters');
   if (!host) return;
-  host.hidden = false;
-  const needsAttention = countUpcomingDeadlines(items);
+  const chips = categoryChips();
+  host.hidden = chips.length === 0;
   host.replaceChildren();
+  if (!chips.length) return;
   host.insertAdjacentHTML('beforeend', `
-    <button type="button" class="filter-chip filter-chip--sm${!state.filterAttention ? ' filter-chip--active' : ''}"
-            data-filter="all" aria-pressed="${!state.filterAttention}">
-      ${esc(t('common.all'))}
+    <button type="button" class="filter-chip filter-chip--sm${state.activeCategory == null ? ' filter-chip--active' : ''}"
+            data-category="" aria-pressed="${state.activeCategory == null}">
+      ${esc(t('common.all'))}<span class="filter-chip__count">${state.items.length}</span>
     </button>
-    <button type="button" class="filter-chip filter-chip--sm${state.filterAttention ? ' filter-chip--active' : ''}"
-            data-filter="attention" aria-pressed="${state.filterAttention}">
-      ${esc(t('inventory.metricAttentionLabel'))}<span class="filter-chip__count">${needsAttention}</span>
-    </button>`);
+    ${chips.map((chip) => categoryChipHtml(chip, chip.key === state.activeCategory)).join('')}`);
 }
 
 /**
@@ -645,67 +594,9 @@ function renderItemRow(item) {
 }
 
 /**
- * Landing-Zeile je Kategorie: Icon, Name, Item-Anzahl - dieselbe .list-row-
- * Grammatik wie jede andere Zeile in diesem Modul. Kein Modul-"Siegel"
- * (anders als das Dashboard-Cockpit): dies ist EIN Modul, keine
- * modulübergreifende Mischstelle, also traegt die Zeile die Kategorie-Ikone
- * direkt, wie .list-group__title es heute schon tut.
- */
-function renderCategoryRow(category, itemCount) {
-  return `
-    <div class="list-row" data-category="${esc(category.key)}">
-      <button type="button" class="list-row__main list-row__main--interactive" data-action="open-category">
-        <span class="inventory-row__headline">
-          <i data-lucide="${esc(category.icon)}" class="icon-sm" aria-hidden="true"></i>
-          <span class="list-row__name">${esc(categoryLabel(category))}</span>
-        </span>
-      </button>
-      <span class="list-group__count">${itemCount}</span>
-    </div>`;
-}
-
-/**
- * Nur Kategorien mit mindestens einem Gegenstand werden zur Zeile - gleiches
- * Verhalten wie groupItemsByCategory, das eine leere Kategorie heute schon
- * nie als eigene Gruppe zeigt. Ein Item, dessen category-Key in keiner
- * geladenen Kategorie mehr steckt (z.B. waehrend eine andere Session sie
- * gerade geloescht hat), bekam bislang GAR KEINE Zeile - unerreichbar beim
- * Browsen, obwohl dieselben Items in einer Suchtrefferliste (die
- * groupItemsByCategory's eigenen "unbekannt"-Eimer nutzt) durchaus
- * auftauchen. Gleicher Fallback wie dort: category_name/category_icon vom
- * Item selbst, sonst der rohe Key/"package".
- */
-function renderCategoryList() {
-  const counts = new Map();
-  const unknownSample = new Map();
-  for (const item of state.items) {
-    counts.set(item.category, (counts.get(item.category) || 0) + 1);
-    if (!unknownSample.has(item.category)) unknownSample.set(item.category, item);
-  }
-  const categoriesByKey = new Map(state.categories.map((c) => [c.key, c]));
-  const knownKeys = state.categories.map((c) => c.key).filter((k) => counts.has(k));
-  const unknownKeys = [...counts.keys()].filter((k) => !categoriesByKey.has(k));
-  const rows = [
-    ...knownKeys.map((k) => renderCategoryRow(categoriesByKey.get(k), counts.get(k))),
-    ...unknownKeys.map((k) => {
-      const sample = unknownSample.get(k);
-      const fallback = { key: k, name: itemCategoryLabel(sample), icon: sample.category_icon || 'package' };
-      return renderCategoryRow(fallback, counts.get(k));
-    }),
-  ];
-  return `
-    <div class="row-carrier">
-      ${rows.join('')}
-    </div>`;
-}
-
-/** Verdrahtet Klicks auf Gegenstands-Zeilen - geteilt zwischen der
- *  Such-Trefferliste (Browse-Ansicht) und der Kategorie-Detailansicht. */
-/**
  * Suchfeld-Text passend zum Geltungsbereich - sonst signalisiert nichts,
- * dass die Suche in der Kategorie-Detailansicht nur INNERHALB dieser
- * Kategorie greift, obwohl sie sich global anfuehlt (gleiches Feld, gleiche
- * Position wie auf der Startseite). Placeholder UND sr-only-Label, nicht nur
+ * dass die Suche unter einem gewaehlten Kategorie-Chip nur INNERHALB dieser
+ * Kategorie greift, obwohl sie sich global anfuehlt. Placeholder UND sr-only-Label, nicht nur
  * der sichtbare Platzhaltertext - sonst haert eine Screenreader-Nutzerin den
  * globalen Anspruch weiter.
  */
@@ -730,21 +621,21 @@ function wireItemRows(list) {
   });
 }
 
-/**
- * @param {{repaint?: boolean}} [opts] `repaint` nach einer Datenaenderung
- *   (Speichern, Loeschen, Frist erledigt): die Detailspalte zeichnet den
- *   ausgewaehlten Gegenstand neu. Ohne (Suche, Filter, Ebenenwechsel) bleibt
- *   sie stehen - jeder Tastendruck in der Suche holte sonst den Verlauf neu.
- */
+/** Verdrahtet Klicks auf Gegenstands-Zeilen. */
 const INVENTORY_ITEM_ROW = '.list-row[data-id]';
 
 /* `motion: true` setzt, wer einen GEGENSTAND angelegt, gespeichert oder
  * geloescht hat: seine Zeile zieht auf, und was dadurch die Stelle wechselt,
- * gleitet (utils/list-motion.js). Die Bewegung haengt an zwei Dingen, die
- * einen Umbau der Ebenen ueberleben muessen: dem Traeger `#inventory-list`
- * (er bleibt ueber jedes Zeichnen stehen) und `data-id` an der Zeile des
- * Gegenstands (renderItemRow). Ebenenwechsel, Suche und Filter zeichnen ohne
- * Bewegung neu - dort wechselt die Frage, nicht die Liste. */
+ * gleitet (utils/list-motion.js). Die Bewegung haengt an zwei Dingen: dem
+ * Traeger `#inventory-list` (er bleibt ueber jedes Zeichnen stehen) und
+ * `data-id` an der Zeile des Gegenstands (renderItemRow). Chip, Suche und
+ * Fristen-Filter zeichnen ohne Bewegung neu - dort wechselt die Frage, nicht
+ * die Liste.
+ *
+ * `repaint` nach einer Datenaenderung (Speichern, Loeschen, Frist erledigt):
+ * die Detailspalte zeichnet den ausgewaehlten Gegenstand neu. Ohne (Suche,
+ * Filter) bleibt sie stehen - jeder Tastendruck in der Suche holte sonst den
+ * Verlauf neu. */
 function renderList({ repaint = false, motion = false } = {}) {
   const host = motion ? _container?.querySelector('#inventory-list') : null;
   if (host) redrawList(host, renderListBody, { selector: INVENTORY_ITEM_ROW, keyAttr: 'data-id' });
@@ -752,7 +643,7 @@ function renderList({ repaint = false, motion = false } = {}) {
   // Wie in Mail: verschwindet die ausgewaehlte Zeile aus der Liste (anderer
   // Ordner, Suche, geloescht), faellt die Spalte auf den Leerzustand zurueck.
   _md?.refresh({ repaint });
-  // Die Filterzeile kommt und geht mit der Ebene - die Spalte darunter misst neu.
+  // Die Chip-Zeile kommt und geht mit dem Bestand - die Spalte darunter misst neu.
   const page = _container?.querySelector('.inventory-page');
   syncDetailTop(page, page?.querySelector('.split-view__detail'));
 }
@@ -792,42 +683,59 @@ function emptyInventoryState() {
   };
 }
 
+/**
+ * Was die Liste zeigt: unter „Alle" jeder Gegenstand in der Gruppe seiner
+ * Kategorie, unter einem Chip nur dessen Kategorie, nach Ort gruppiert. Suche
+ * und Fristen-Filter greifen darin. Leer = nichts trifft.
+ */
+function visibleGroups() {
+  const inCategory = state.activeCategory != null;
+  const scoped = inCategory ? state.items.filter((item) => item.category === state.activeCategory) : state.items;
+  const filtered = scoped.filter((item) => matchesQuery(item) && matchesAttentionFilter(item));
+  if (!filtered.length) return [];
+  return inCategory ? groupItemsByLocation(filtered) : groupItemsByCategory(filtered);
+}
+
+function resetFilters() {
+  state.query = '';
+  state.filterAttention = false;
+  _search?.clear();
+  renderList();
+}
+
+/**
+ * Die EINE Liste: Kennzahlen, dann alle Gegenstaende nach Kategorie gruppiert.
+ * Unter einem gewaehlten Chip steht nur dessen Kategorie - dann nach ORT
+ * gruppiert, weil der Kategoriename als Gruppentitel nur den Chip
+ * wiederholte. Suche und Fristen-Filter greifen in dem, was der Chip zeigt.
+ */
 function renderListBody() {
   const list = _container?.querySelector('#inventory-list');
   if (!list) return;
 
-  if (!state.items.length) {
-    // Sonst wuerde ein spaeter neu angelegtes Item (in JEDER Kategorie) diese
-    // Detailansicht wiederbeleben, statt auf der Startseite zu landen.
-    const hadCategory = state.view === 'category' || categoryFromAddress();
-    state.view = 'browse';
+  // Die gewaehlte Kategorie kann verschwunden sein (ihr letzter Gegenstand
+  // geloescht oder umgehaengt, die Kategorie selbst geloescht - der Server
+  // haengt ihre Gegenstaende auf 'other' um): dann gilt wieder „Alle".
+  if (state.activeCategory != null && !isShownCategory(state.activeCategory)) {
     state.activeCategory = null;
-    if (hadCategory) writeLevelAddress('replace', { category: null });
-    syncInventoryHeader();
-    const filtersHost = _container?.querySelector('#inventory-filters');
-    if (filtersHost) filtersHost.hidden = true;
+    writeFilterAddress({ category: null, open: _md?.selectedId?.() ?? null });
+  }
+  updateFilterChips();
+
+  if (!state.items.length) {
+    if (categoryFromAddress()) writeFilterAddress({ category: null });
+    updateSearchScope(t('inventory.searchPlaceholder'));
     list.replaceChildren(emptyStateEl(emptyInventoryState()));
     return;
   }
 
-  if (state.view === 'category') {
-    renderCategoryDetail(list);
-  } else {
-    renderBrowse(list);
-  }
-  syncInventoryHeader();
-}
-
-/**
- * Landing-Ansicht: Kennzahlen + Kategorie-Liste. Bei aktiver Suche stattdessen
- * eine flache, nach Kategorie gruppierte Trefferliste ueber ALLE
- * Gegenstaende - gleiches Verhalten wie die fruehere Einzelseite, nur jetzt
- * hinter der Suche statt permanent sichtbar.
- */
-function renderBrowse(list) {
-  const filtersHost = _container?.querySelector('#inventory-filters');
-  if (filtersHost) filtersHost.hidden = true;
-  updateSearchScope(t('inventory.searchPlaceholder'));
+  const category = state.activeCategory == null
+    ? null
+    : state.categories.find((c) => c.key === state.activeCategory)
+      ?? { key: state.activeCategory, name: itemCategoryLabel(state.items.find((i) => i.category === state.activeCategory)) };
+  updateSearchScope(category
+    ? t('inventory.searchInCategoryPlaceholder', { category: categoryLabel(category) })
+    : t('inventory.searchPlaceholder'));
 
   list.replaceChildren();
   list.insertAdjacentHTML('beforeend', renderMetrics());
@@ -837,94 +745,29 @@ function renderBrowse(list) {
     renderList();
   });
 
-  if (!state.query && !state.filterAttention) {
-    list.insertAdjacentHTML('beforeend', renderCategoryList());
-    list.querySelectorAll('[data-action="open-category"]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const key = button.closest('[data-category]')?.dataset.category;
-        if (key) openCategory(key);
-      });
-    });
-    if (window.lucide) window.lucide.createIcons({ el: list });
-    return;
-  }
-
-  const filtered = state.items.filter((item) => matchesQuery(item) && matchesAttentionFilter(item));
-  if (!filtered.length) {
-    const reset = () => { state.query = ''; state.filterAttention = false; _search?.clear(); renderList(); };
+  const groups = visibleGroups();
+  if (!groups.length) {
     list.appendChild(emptyStateEl(
       state.query
         ? {
             variant: 'no-results',
             title: t('inventory.noResultsTitle'),
             description: t('inventory.noResultsDescription'),
-            hint: `"${state.query}"`,
-            action: { label: t('inventory.resetSearch'), onClick: reset },
+            hint: [`"${state.query}"`, state.filterAttention ? t('inventory.metricAttentionLabel') : null].filter(Boolean).join(' · '),
+            action: { label: t('inventory.resetSearch'), onClick: resetFilters },
           }
         : {
             variant: 'no-results',
             title: t('inventory.attentionEmptyTitle'),
             description: t('inventory.attentionEmptyDescription'),
-            action: { label: t('inventory.clearAttentionFilter'), onClick: reset },
+            action: { label: t('inventory.clearAttentionFilter'), onClick: resetFilters },
           },
     ));
     if (window.lucide) window.lucide.createIcons({ el: list });
     return;
   }
 
-  list.insertAdjacentHTML('beforeend', renderGroupedItems(groupItemsByCategory(filtered)));
-  wireItemRows(list);
-  if (window.lucide) window.lucide.createIcons({ el: list });
-}
-
-/**
- * Kategorie-Detail: Zurueck-Link, Kategorie-Name, Filter-Chips (skaliert auf
- * diese Kategorie), nach Ort gruppierte Gegenstaende dieser einen Kategorie.
- * Eigene Such-Zeile lebt im Toolbar (unveraendert) - hier wird nur gefiltert,
- * was schon in state.items steht, nicht neu geladen.
- */
-function renderCategoryDetail(list) {
-  const category = state.categories.find((c) => c.key === state.activeCategory);
-  // Die aktive Kategorie kann verschwunden sein, waehrend diese Ansicht offen
-  // war (ueber manage-categories geloescht - der Server haengt ihre Items auf
-  // 'other' um). Kein Geister-Detail fuer eine Kategorie, die es nicht mehr
-  // gibt: zurueck zur Startseite statt den rohen Key als Titel zu zeigen.
-  if (!category) { backToBrowse({ history: 'replace' }); return; }
-  const categoryItems = state.items.filter((item) => item.category === state.activeCategory);
-
-  updateFilterChips(categoryItems);
-  updateSearchScope(t('inventory.searchInCategoryPlaceholder', { category: categoryLabel(category) }));
-
-  // Rueckweg und Kategoriename stehen im Kopf (syncInventoryHeader) - hier
-  // stand bis zur Re-Critique 2026-09-28 ein Textlink „Zurueck zum Inventar"
-  // unter den Chips und ein zweiter Titel.
-  list.replaceChildren();
-
-  const filtered = categoryItems.filter((item) => matchesQuery(item) && matchesAttentionFilter(item));
-  if (!filtered.length) {
-    const active = [];
-    if (state.query) active.push(`"${state.query}"`);
-    if (state.filterAttention) active.push(t('inventory.metricAttentionLabel'));
-    list.appendChild(emptyStateEl({
-      variant: 'no-results',
-      title: t('inventory.noResultsTitle'),
-      description: t('inventory.noResultsDescription'),
-      hint: active.length ? active.join(' · ') : undefined,
-      action: {
-        label: t('inventory.resetSearch'),
-        onClick: () => {
-          state.query = '';
-          state.filterAttention = false;
-          _search?.clear();
-          renderList();
-        },
-      },
-    }));
-    if (window.lucide) window.lucide.createIcons({ el: list });
-    return;
-  }
-
-  list.insertAdjacentHTML('beforeend', renderGroupedItems(groupItemsByLocation(filtered)));
+  list.insertAdjacentHTML('beforeend', renderGroupedItems(groups));
   wireItemRows(list);
   if (window.lucide) window.lucide.createIcons({ el: list });
 }
@@ -980,19 +823,27 @@ function inventoryDetailListNode(entries) {
   return wrap;
 }
 
-/** Garantie-Zeile: kombiniert die reine Monatsangabe mit dem berechneten
- *  Status, wenn ein Kaufdatum vorliegt - sonst nur "X Monate". */
+/**
+ * Garantie-Zeile: die Dauer, und mit Kaufdatum dahinter der berechnete Stand
+ * („24 Monate · Garantie gueltig bis ..."). Bis R17 stand der Stand ALLEIN
+ * unter dem Formular-Label „Garantie (Monate)" - das Label versprach eine
+ * Zahl, der Wert nannte ein Datum. Die Zeile heisst jetzt „Garantie" und nennt
+ * beides.
+ */
 function warrantyDetailValue(item) {
   if (item.warranty_months == null) return '';
+  const months = t('inventory.warrantyMonthsValue', { count: item.warranty_months });
   const status = warrantyStatus(item);
-  if (!status) return t('inventory.warrantyMonthsValue', { count: item.warranty_months });
+  if (!status) return months;
   // Der Key direkt, ohne Date-Umweg: `new Date(key + 'T00:00:00')` ist
   // Mitternacht der BROWSER-Zone, und in einer Haushaltszone westlich davon
   // faellt der angezeigte Tag dann auf den Vortag (#829 Teil 3).
   const formattedDate = formatDate(status.endDateKey);
-  if (status.state === 'expired') return t('inventory.warrantyStatusExpired', { date: formattedDate });
-  if (status.state === 'expiring') return t('inventory.warrantyStatusExpiringSoon', { count: status.days });
-  return t('inventory.warrantyStatusValid', { date: formattedDate });
+  let stand;
+  if (status.state === 'expired') stand = t('inventory.warrantyStatusExpired', { date: formattedDate });
+  else if (status.state === 'expiring') stand = t('inventory.warrantyStatusExpiringSoon', { count: status.days });
+  else stand = t('inventory.warrantyStatusValid', { date: formattedDate });
+  return `${months} · ${stand}`;
 }
 
 /**
@@ -1298,7 +1149,9 @@ function renderItemDetail(item, history, onDoneTrackedDate, historyLoadFailed) {
     {
       group: t('inventory.detailGroupWarranty'),
       rows: [
-        { icon: 'shield', label: t('inventory.warrantyMonthsLabel'), value: warrantyDetailValue(item) },
+        // „Garantie" ist dasselbe Wort wie die Dokument-Kategorie (ein Key, eine
+        // Uebersetzung); „Garantie (Monate)" bleibt das Label des Formularfelds.
+        { icon: 'shield', label: t('documents.category.warranty'), value: warrantyDetailValue(item) },
         { icon: 'calendar-clock', label: t('inventory.trackedDatesLabel'), node: trackedDatesDetailNode(item, onDoneTrackedDate) },
       ],
     },
@@ -2326,6 +2179,14 @@ async function removeItem(item) {
     // Die Zeile klappt aus, die Nachbarn ruecken nach - erst dann steht die
     // Liste ohne sie neu (ohne Bewegung loest collapseRow sofort auf).
     await collapseRow(_container?.querySelector(`#inventory-list .list-row[data-id="${item.id}"]`) ?? null);
+    // ERST WENN DIE HISTORY WIEDER DER SEITE GEHOERT (R17). Die Rueckfrage
+    // gibt ihren Marker per `history.back()` zurueck, und das kommt erst nach
+    // ihrem Ausblenden an (~220ms). Antwortet der Server schneller, raeumte der
+    // Listenaufbau `?open=<id>` vom MARKER-Eintrag ab - das `back()` trug den
+    // Browser danach auf den Eintrag darunter, und in der Adresse stand wieder
+    // der geloeschte Gegenstand (gemessen bei aktiver Suche: Spalte leer,
+    // Adresse `?open=9`; ein Neuladen zeigte „nicht gefunden").
+    await whenHistorySettled();
     renderList({ repaint: true, motion: true });
     refocusAfterRender();
     updateAttentionBadge();
@@ -2396,12 +2257,6 @@ export async function render(container, { signal } = {}) {
     })}
     ${inventoryToolsHtml()}`);
   toolbar.insertAdjacentHTML('afterbegin', `<h1 class="page-toolbar__title">${esc(t('nav.inventory'))}</h1>`);
-  // Rueckweg aus einer Kategorie, oben wie Apples Navigationsleiste und wie
-  // „‹ Gesundheit" (syncInventoryHeader blendet ihn ein).
-  toolbar.insertAdjacentHTML('afterbegin', `
-    <a class="inventory-toolbar__back" href="/inventory" hidden>
-      <i data-lucide="chevron-left" class="inventory-toolbar__back-icon" aria-hidden="true"></i><span>${esc(t('nav.inventory'))}</span>
-    </a>`);
 
   const filters = document.createElement('div');
   filters.className = 'inventory-filters';
@@ -2445,24 +2300,20 @@ export async function render(container, { signal } = {}) {
   if (window.lucide) window.lucide.createIcons({ el: container });
 
   installPopoverMenus(container);
-  toolbar.querySelector('.inventory-toolbar__back')?.addEventListener('click', (event) => {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
-    event.preventDefault();
-    backToBrowse();
-  }, { signal });
-  // Zurueck/Vor zwischen den Ebenen. Der Router fragt danach den Baustein
-  // (`handleMasterDetailPopstate`), der dank `mdAddress` jede Ebene als
+  // Zurueck/Vor ueber Eintraege mit verschiedenem Chip (eine Auswahl legt
+  // ihren Eintrag samt `?category=` an). Der Router fragt danach den Baustein
+  // (`handleMasterDetailPopstate`), der dank `mdAddress` jeden Filterstand als
   // dieselbe Seite erkennt und nur die Auswahl aus `?open=` nachzieht.
   //
   // DIE REIHENFOLGE ZWISCHEN DIESEM HOERER UND DEM BAUSTEIN IST NICHT FEST:
   // der Router fragt den Baustein in einem `.then`, und der Browser leert die
   // Microtasks nach JEDEM Hoerer - gemessen lief der Baustein ZUERST, noch auf
-  // der alten Ebene (Detailspalte verborgen), merkte sich `?open=` und malte
-  // nichts. Deshalb zieht die Seite die Auswahl nach dem Neuaufbau selbst aus
-  // der Adresse nach - dasselbe Ziel, in welcher Reihenfolge auch immer.
+  // der alten Liste. Deshalb zieht die Seite die Auswahl nach dem Neuaufbau
+  // selbst aus der Adresse nach - dasselbe Ziel, in welcher Reihenfolge auch
+  // immer.
   window.addEventListener('popstate', () => {
-    if (location.pathname !== INVENTORY_PATH || !state.categories.length) return;
-    if (!syncLevelFromAddress()) return;
+    if (location.pathname !== INVENTORY_PATH || !state.items.length) return;
+    if (!syncCategoryFromAddress()) return;
     renderListBody();
     syncDetailTop(page, split.querySelector('.split-view__detail'));
     scrollListToTop();
@@ -2484,12 +2335,9 @@ export async function render(container, { signal } = {}) {
   });
 
   filters.addEventListener('click', (e) => {
-    const chip = e.target.closest('[data-filter]');
+    const chip = e.target.closest('[data-category]');
     if (!chip) return;
-    const next = chip.dataset.filter === 'attention';
-    if (next === state.filterAttention) return;
-    state.filterAttention = next;
-    renderList();
+    selectCategory(chip.dataset.category || null);
   });
   wireScrollFade(filters);
 
@@ -2528,16 +2376,14 @@ export async function render(container, { signal } = {}) {
       api.get('/preferences').then((res) => { _householdCurrency = res.data?.currency ?? 'EUR'; }).catch(() => {}),
     ]);
     if (signal?.aborted) return;
-    // Die Ebene steht in der Adresse, nicht im Modulzustand vom letzten Besuch.
-    if (isKnownCategory(categoryFromAddress())) {
-      state.view = 'category';
+    // Der Chip steht in der Adresse, nicht im Modulzustand vom letzten Besuch.
+    if (isShownCategory(categoryFromAddress())) {
       state.activeCategory = categoryFromAddress();
     } else {
-      if (categoryFromAddress()) writeLevelAddress('replace', { category: null, open: new URLSearchParams(location.search).get('open') });
-      state.view = 'browse';
+      if (categoryFromAddress()) writeFilterAddress({ category: null, open: new URLSearchParams(location.search).get('open') });
       state.activeCategory = null;
     }
-    openDeepLinkedCategory(split);
+    revealDeepLinkedItem(split);
     renderList();
     _md = mountMasterDetail({
       root: split,
@@ -2566,34 +2412,40 @@ export async function render(container, { signal } = {}) {
 /**
  * Deep-Link `?open=` in der Spaltenform: die Zeile des Gegenstands muss in der
  * Liste stehen, sonst waere die Auswahl ohne Markierung und fiele beim
- * naechsten Neuaufbau weg (master-detail.js#refresh). Die Startseite zeigt nur
- * Kategorien - also die Kategorie des Gegenstands oeffnen, wie ein Klick es
- * getan haette. Unter der Schwelle loest niemand den Link ein (kein Sheet, das
- * beim Laden aufspringt), und die Seite bleibt auf der Startseite.
+ * naechsten Neuaufbau weg (master-detail.js#refresh). Unter der Schwelle loest
+ * niemand den Link ein (kein Blatt, das beim Laden aufspringt), und der Filter
+ * bleibt, wie die Adresse ihn nennt.
  */
-function openDeepLinkedCategory(split) {
+function revealDeepLinkedItem(split) {
   const id = new URLSearchParams(location.search).get('open');
   if (!id) return;
   const detail = split.querySelector('.split-view__detail');
   if (!detail || getComputedStyle(detail).display === 'none') return;
-  showItemCategory(id);
+  revealItem(id);
 }
 
 /**
- * Die Kategorie eines Gegenstands zeigen, damit seine Zeile in der Liste steht.
- * Wie ein Klick (openCategory): auch Suche und Fristen-Filter fallen weg.
- * Beide ueberleben den Seitenwechsel; stuende ein alter davon noch, fehlte
- * die Zeile in der geoeffneten Kategorie, und rechts stuende ein Detail, das
- * der naechste Listenaufbau samt Adresse abraeumt.
+ * Dafuer sorgen, dass die Zeile eines Gegenstands in der Liste steht. Suche
+ * und Fristen-Filter fallen weg - beide ueberleben den Seitenwechsel im
+ * Modulzustand, und stuende ein alter davon noch, fehlte die Zeile, und rechts
+ * stuende ein Detail, das der naechste Listenaufbau samt Adresse abraeumt. Der
+ * Chip bleibt, wenn der Gegenstand in seiner Kategorie liegt (eine
+ * Kategorie-Adresse waehlt ihn vor); nennt die Adresse eine ANDERE Kategorie,
+ * gewinnt der Gegenstand und es gilt „Alle".
  * @returns {boolean} ob es den Gegenstand gibt
  */
-function showItemCategory(id) {
+function revealItem(id) {
   const item = state.items.find((i) => String(i.id) === String(id));
   if (!item) return false;
-  setCategoryState(item.category);
-  // Die Adresse nennt die Ebene mit (ersetzt: ein Deep-Link oder ein breiter
-  // gezogenes Fenster ist kein Schritt fuer die Zurueck-Taste).
-  writeLevelAddress('replace', { category: item.category, open: id });
+  state.query = '';
+  state.filterAttention = false;
+  _search?.clear();
+  if (state.activeCategory != null && state.activeCategory !== item.category) {
+    state.activeCategory = null;
+    // Ersetzt: ein Deep-Link oder ein breiter gezogenes Fenster ist kein
+    // Schritt fuer die Zurueck-Taste.
+    writeFilterAddress({ category: null, open: id });
+  }
   return true;
 }
 
@@ -2612,29 +2464,30 @@ function openItemNarrow(id, _trigger, { signal } = {}) {
 /**
  * Die Darstellung hat gewechselt (utils/master-detail.js, `onModeChange`).
  *
- * Ein `?open=` vom Telefon laesst die Startseite stehen (kein Blatt beim
- * Laden), der Baustein merkt sich die ID. Wird das Fenster breiter, zeichnet
- * er das Detail - vorher muss links die Zeile stehen, also die Kategorie des
- * Gegenstands, wie beim Deep-Link in der Spaltenform.
+ * Ein `?open=` vom Telefon oeffnet nichts (kein Blatt beim Laden), der
+ * Baustein merkt sich die ID. Wird das Fenster breiter, zeichnet er das
+ * Detail - vorher muss links die Zeile stehen, wie beim Deep-Link in der
+ * Spaltenform (eine Suche vom Telefon kann sie verbergen).
  */
 function onInventoryModeChange({ split, selectedId }) {
   if (!split || selectedId == null) return;
   const list = _container?.querySelector('#inventory-list');
   if (list?.querySelector(`[data-md-id="${CSS.escape(String(selectedId))}"]`)) return;
-  if (showItemCategory(selectedId)) renderList();
+  if (revealItem(selectedId)) renderList();
 }
 
 export const __test = {
   state,
-  // Re-Critique 2026-09-28 (W1): die Ebene hat eine Adresse.
-  openCategory,
-  backToBrowse,
-  syncLevelFromAddress,
-  syncInventoryHeader,
+  // R17 (E3): eine Liste, die Kategorie ist ein Filter mit Adresse.
+  selectCategory,
+  syncCategoryFromAddress,
+  categoryChips,
+  visibleGroups,
+  warrantyDetailValue,
   mdAddress,
   renderItemRow,
   renderItemDetail,
-  openDeepLinkedCategory,
+  revealDeepLinkedItem,
   syncDetailTop,
   onInventoryModeChange,
   openItemNarrow,

@@ -137,9 +137,8 @@ const MODULES = [
   // Handlungsbedarf) und ist damit die, die auf Daumennagelgroesse noch etwas
   // sagt. Eine zweite Aufnahme der aufgeklappten Kategorie gab es kurzzeitig,
   // sie wurde von keiner Seite referenziert - und unreferenzierte Aufnahmen sind
-  // genau der Bestand, den diese Runde abgebaut hat. Wieder aufnehmen mit:
-  // { path: '/inventory', name: 'inventory-items',
-  //   tab: '[data-category="electronics"] [data-action="open-category"]' },
+  // genau der Bestand, den diese Runde abgebaut hat. Seit R17 zeigt die
+  // Einstiegsansicht die Gegenstaende selbst (Kategorien sind Filter-Chips).
   { path: '/inventory',    name: 'inventory'      },
   { path: '/housekeeping', name: 'housekeeping'          },
   { path: '/housekeeping', name: 'housekeeping-tasks',   tab: '.housekeeping-tabs [data-tab-id="tasks"]' },

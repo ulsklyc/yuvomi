@@ -231,9 +231,7 @@ for (const device of ['mobile', 'desktop']) {
 
     // Kilometerstand: das Diagramm wird ausserhalb des Dokuments gebaut und dann eingehaengt.
     await gotoRoute(page, '/inventory');
-    const category = await page.waitForSelector('.list-row[data-category="vehicles"] [data-action="open-category"]', { timeout: 15000 });
-    await settle(page);
-    await category.click();
+    // Seit R17 (E3) steht jeder Gegenstand auf der Wurzel - kein Kategorie-Schritt davor.
     const row = await page.waitForSelector(`.list-row[data-id="${car}"] [data-action="open-detail"]`, { timeout: 15000 });
     await row.evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await row.click();

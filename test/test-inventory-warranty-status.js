@@ -204,7 +204,7 @@ test('hasUpcomingDeadline und der Chip sprechen aus derselben Regel', () => {
 test('die Inventarzeile zeigt die Frist als sichtbaren Chip statt eines stummen 12px-Icons', async () => {
   const { readFileSync } = await import('node:fs');
   const page = readFileSync(new URL('../public/pages/inventory.js', import.meta.url), 'utf8');
-  const row = page.slice(page.indexOf('function renderItemRow'), page.indexOf('function renderCategoryRow'));
+  const row = page.slice(page.indexOf('function renderItemRow'), page.indexOf('function updateSearchScope'));
   assert.doesNotMatch(row, /shield-alert/, 'das stumme Icon mit sr-only-Satz ohne Frist und Datum ist weg');
   assert.match(row, /deadlineChipHtml\(item\)/);
   const chip = page.slice(page.indexOf('function deadlineChipHtml'), page.indexOf('function renderItemRow'));

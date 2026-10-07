@@ -54,9 +54,11 @@
 }
 
 /* --------------------------------------------------------
- * Filter-Chips (All / Braucht Aufmerksamkeit) - gleiche einzeilige
- * Scroll-Zeile wie .pantry-filters (pantry.css), .filter-chip selbst kommt
- * aus dem geteilten filter-chip.css.
+ * Kategorie-Chips (Alle / je Kategorie mit Bestand, R17 E3) - gleiche
+ * einzeilige Scroll-Zeile wie .pantry-filters (pantry.css), .filter-chip
+ * selbst kommt aus dem geteilten filter-chip.css. Die Zeile steht UEBER der
+ * Liste und ausserhalb von #inventory-list, damit sie ihren Scrollstand
+ * behaelt, wenn die Liste neu steht.
  * -------------------------------------------------------- */
 
 .inventory-filters {
@@ -78,49 +80,6 @@
  * übersteuern (gleiches Muster wie .pantry-filters[hidden] in list-row.css). */
 .inventory-filters[hidden] {
   display: none;
-}
-
-/* --------------------------------------------------------
- * Rueckweg aus einer Kategorie (Re-Critique 2026-09-28, A6 P1-1)
- *
- * Apples Navigationsleiste: „‹ Inventar" als eigene Zeile ueber dem
- * Kategorienamen, der als Titel im Kopf steht (inventory.js,
- * syncInventoryHeader). Dieselbe Form wie „‹ Gesundheit" (health.css). Bis
- * dahin stand hier ein grauer Textlink „Zurueck zum Inventar" UNTER den
- * Filterchips samt zweitem Titel, und die Ebene hatte keine Adresse - die
- * Zurueck-Geste verliess das Modul. In jeder Breite: auch am Desktop ersetzt
- * die Kategorie die Liste, es gibt keine Seitenspalte, die den Rueckweg traegt.
- * -------------------------------------------------------- */
-
-.inventory-toolbar:has(> .inventory-toolbar__back:not([hidden])) {
-  flex-wrap: wrap;
-  row-gap: 0;
-}
-
-.inventory-toolbar__back {
-  display: inline-flex;
-  flex-basis: 100%;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: var(--target-base);
-  /* Die Treffflaeche reicht bis an die Kante, das Zeichen steht auf der
-   * Fluchtlinie des Inhalts (wie health-toolbar__back). */
-  margin-inline-start: calc(-1 * var(--space-2));
-  padding-inline: var(--space-2);
-  color: var(--color-accent);
-  font-size: var(--text-base);
-  font-weight: var(--font-weight-medium);
-  text-decoration: none;
-}
-
-.inventory-toolbar__back[hidden] {
-  display: none;
-}
-
-.inventory-toolbar__back-icon {
-  width: var(--icon-lg);
-  height: var(--icon-lg);
-  flex: 0 0 auto;
 }
 
 /* --------------------------------------------------------
@@ -652,34 +611,6 @@
     overflow: visible;
   }
 
-  /* DIE KATEGORIENLISTE HAT KEINE DETAILSPALTE (Re-Critique 2026-09-28,
-   * A8 P2-1). Gemessen bei 1440: 4 Kategorien links in 424px, rechts 676px
-   * „Waehle einen Gegenstand" - neben einer Liste, die keinen Gegenstand
-   * zeigt. Auf dieser Ebene nimmt die Liste die volle Flaeche: Kennzahlen als
-   * schmale Spalte vorn, die Kategorien daneben breit (DOM-Reihenfolge =
-   * Lesereihenfolge, kein Sprung der Tabulatortaste). Treffer der Suche und
-   * eine geoeffnete Kategorie zeigen Gegenstaende - dort steht die Spalte
-   * wieder. `data-inventory-level` setzt inventory.js (syncInventoryHeader). */
-  .inventory-page[data-inventory-level="categories"] .split-view {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .inventory-page[data-inventory-level="categories"] .split-view__detail {
-    display: none;
-  }
-
-  .inventory-page[data-inventory-level="categories"] .inventory-list:has(> .metric-grid + .row-carrier) {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-    column-gap: var(--space-6);
-    align-items: start;
-  }
-
-  /* Beide Spalten beginnen auf derselben Hoehe: die Kennzahlen tragen hier
-   * ihren Blockabstand (unten), die Kategorien bekommen denselben. */
-  .inventory-page[data-inventory-level="categories"] .inventory-list > .metric-grid + .row-carrier {
-    margin-block-start: var(--space-3);
-  }
-
   .inventory-page .split-view__detail {
     position: sticky;
     /* Dieselbe Luft unter dem Kopf, ob die Spalte ruht oder klebt. */
@@ -762,4 +693,26 @@
 .inventory-photo-action,
 .inventory-booking-picker__item {
   transition: background-color var(--transition-fast);
+}
+
+/* --------------------------------------------------------
+ * Schluessel-Wert-Zeilen zweispaltig, wenn die Detailspalte es traegt
+ * (Critique R17, A6). Bei 1440 lief das Detail einspaltig in 676px: dreizehn
+ * Zeilen untereinander, rechts von jeder 400px leer. Gefragt wird die SPALTE
+ * (`detail-pane`, layout.css), nicht das Fenster - im Blatt unter der Schwelle
+ * und in einer schmalen Spalte bleibt es bei einer Zeile je Angabe. Was kein
+ * kurzer Wert ist (Notizen, Fristen, Belege, Verlauf - ein Knoten statt eines
+ * `span`), nimmt beide Spalten.
+ * -------------------------------------------------------- */
+@container detail-pane (min-width: 35rem) {
+  .inventory-page .detail-group__rows {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-6);
+  }
+
+  .inventory-page .detail-group__rows > .detail-row--multiline,
+  .inventory-page .detail-group__rows > .detail-row:has(> .detail-row__text > .detail-row__value:not(span)) {
+    grid-column: 1 / -1;
+  }
 }
