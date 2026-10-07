@@ -13,6 +13,8 @@ import { eachRule } from './css-rules.js';
 // /i18n.js wird durch test-browser-loader.mjs gemockt (--loader Flag)
 const {
   wireBlurValidation,
+  validateAll,
+  collapseEmptyBody,
   btnSuccess,
   btnError,
   focusRestoreTarget,
@@ -245,9 +247,10 @@ test('wireBlurValidation: registriert blur-Listener auf required inputs', () => 
   assert.equal(typeof input._listeners['blur'], 'function');
 });
 
-test('wireBlurValidation: blur mit leerem Wert setzt form-field--error', () => {
+test('wireBlurValidation: ein beschriebenes und wieder geleertes Feld ruegt beim Verlassen', () => {
   const input = makeInput({ value: '' });
   wireBlurValidation(makeContainer([input]));
+  input._listeners['input']();
   input._listeners['blur']();
   assert.ok(input._field._classes.has('form-field--error'));
   assert.ok(!input._field._classes.has('form-field--valid'));
@@ -266,6 +269,7 @@ test('wireBlurValidation: blur mit gültigem Wert setzt form-field--valid', () =
 test('wireBlurValidation: Whitespace-only gilt als leer → form-field--error', () => {
   const input = makeInput({ value: '   ' });
   wireBlurValidation(makeContainer([input]));
+  input._listeners['input']();
   input._listeners['blur']();
   assert.ok(input._field._classes.has('form-field--error'));
   assert.equal(input._attrs['aria-invalid'], 'true');
@@ -286,6 +290,7 @@ test('wireBlurValidation: legt Fehlermeldung an und verknüpft sie per aria-desc
   const input = makeInput({ value: '' });
   input.id = 'cardav-name';
   wireBlurValidation(makeContainer([input]));
+  input._listeners['input']();
   input._listeners['blur']();
 
   const errorEl = input._field._children.find((c) => c.className === 'form-field__error');
@@ -299,6 +304,7 @@ test('wireBlurValidation: legt die Meldung nur einmal an', () => {
   const input = makeInput({ value: '' });
   input.id = 'cardav-url';
   wireBlurValidation(makeContainer([input]));
+  input._listeners['input']();
   input._listeners['blur']();
   input._listeners['blur']();
   const errors = input._field._children.filter((c) => c.className === 'form-field__error');
@@ -312,8 +318,117 @@ test('wireBlurValidation: schlanker Container ohne DOM-API bleibt fehlerfrei', (
   input.closest = () => input._field;
   input.parentElement = input._field;
   wireBlurValidation(makeContainer([input]));
+  input._listeners['input']();
   assert.doesNotThrow(() => input._listeners['blur']());
   assert.ok(input._field._classes.has('form-field--error'));
+});
+
+// R18: EIN UNBERUEHRTES PFLICHTFELD RUEGT NICHT. Im Dialog "Neuer Termin" stand
+// "Dieses Feld ist erforderlich." am Titel, sobald der Fokus das leere Feld
+// zum ersten Mal verliess - beim ersten Tab, beim Griff zum Datumswaehler.
+test('wireBlurValidation: ein unberuehrtes leeres Feld bleibt beim Verlassen still', () => {
+  const input = makeInput({ value: '' });
+  wireBlurValidation(makeContainer([input]));
+  input._listeners['blur']();
+  assert.ok(!input._field._classes.has('form-field--error'), 'kein Fehlerrahmen');
+  assert.equal(input._attrs['aria-invalid'], undefined, 'kein aria-invalid');
+  assert.equal(input._field._children.length, 0, 'keine Meldung angelegt');
+});
+
+test('validateAll: beim Absenden ruegt auch das unberuehrte Feld - und danach jedes Verlassen', () => {
+  const input = makeInput({ value: '' });
+  input.matches = () => true;
+  const container = makeContainer([input]);
+  wireBlurValidation(container);
+  assert.equal(validateAll(container), false);
+  assert.ok(input._field._classes.has('form-field--error'), 'das Absenden meldet das leere Pflichtfeld');
+  assert.equal(input._attrs['aria-invalid'], 'true');
+  // Ein geruegtes Feld bleibt geruegt, wenn man es nur verlaesst.
+  input._listeners['blur']();
+  assert.ok(input._field._classes.has('form-field--error'));
+  // Und die Eingabe entwarnt sofort.
+  input.value = 'Zahnarzt';
+  input._listeners['input']();
+  assert.ok(!input._field._classes.has('form-field--error'));
+  assert.ok(input._field._classes.has('form-field--valid'));
+});
+
+test('ein unberuehrtes Feld MIT Wert wird beim Verlassen weiter als gueltig markiert', () => {
+  const input = makeInput({ value: 'Vorbelegt' });
+  wireBlurValidation(makeContainer([input]));
+  input._listeners['blur']();
+  assert.ok(input._field._classes.has('form-field--valid'));
+});
+
+test('die Meldung zieht auf (expandIn), einmal je Erscheinen - nicht bei jedem Verlassen', () => {
+  const seen = [];
+  globalThis.__expandIn = (el) => seen.push(el);
+  try {
+    const input = makeInput({ value: '' });
+    wireBlurValidation(makeContainer([input]));
+    input._listeners['input']();
+    input._listeners['blur']();
+    assert.equal(seen.length, 1, 'beim Erscheinen zieht die Meldung auf');
+    assert.equal(seen[0].className, 'form-field__error');
+    input._listeners['blur']();
+    assert.equal(seen.length, 1, 'eine stehende Meldung zieht nicht erneut auf');
+    input.value = 'x';
+    input._listeners['input']();
+    input.value = '';
+    input._listeners['input']();
+    input._listeners['blur']();
+    assert.equal(seen.length, 2, 'nach der Entwarnung erscheint sie wieder mit Bewegung');
+  } finally {
+    delete globalThis.__expandIn;
+  }
+});
+
+// R18: EINE RUECKFRAGE OHNE ERKLAERTEXT HAT KEINEN RUMPF. Nach dem Anheben der
+// Fusszeile blieben im Rumpf nur die Leerzeichen des Template-Literals - und
+// 32px Polster zwischen zwei Haarlinien (Abmelden).
+function makeBody({ children = [], text = '' } = {}) {
+  const body = {
+    children,
+    textContent: text,
+    emptied: 0,
+    replaceChildren() { body.emptied += 1; body.textContent = ''; body.children = []; },
+  };
+  return body;
+}
+
+test('collapseEmptyBody: ein Rumpf aus Leerzeichen wird wirklich leer', () => {
+  const body = makeBody({ text: '\n        \n      ' });
+  const panel = { querySelector: (sel) => (sel === '.modal-panel__body' ? body : null) };
+  assert.equal(collapseEmptyBody(panel), true);
+  assert.equal(body.emptied, 1);
+  assert.equal(body.textContent, '', ':empty greift nur ohne jeden Textknoten');
+});
+
+test('collapseEmptyBody: Text oder ein Kind bleiben stehen', () => {
+  for (const body of [makeBody({ text: 'Erklaerung' }), makeBody({ children: [{}], text: '' })]) {
+    const panel = { querySelector: () => body };
+    assert.equal(collapseEmptyBody(panel), false);
+    assert.equal(body.emptied, 0);
+  }
+  assert.equal(collapseEmptyBody({ querySelector: () => null }), false);
+});
+
+test('mountFooter leert den Rumpf nach dem Anheben, und das Stylesheet nimmt ihn aus dem Fluss', () => {
+  const src = readFileSync(fileURLToPath(new URL('../public/components/modal.js', import.meta.url)), 'utf8');
+  const fn = src.slice(src.indexOf('export function mountFooter'), src.indexOf('export function collapseEmptyBody'));
+  assert.match(fn, /panel\.appendChild\(bodyFooter\);[\s\S]*collapseEmptyBody\(panel\);/,
+    'erst anheben, dann pruefen - vorher ist die Fusszeile noch ein Kind des Rumpfs');
+
+  const rules = [...eachRule(readFileSync(fileURLToPath(new URL('../public/styles/layout.css', import.meta.url)), 'utf8'))];
+  const gone = rules.find((r) => r.selector === '.modal-panel__body:empty');
+  assert.ok(gone, 'die Regel fuer den leeren Rumpf fehlt');
+  assert.match(gone.body, /display:\s*none/);
+  const line = rules.find((r) => /\.modal-panel__body:empty\s*~\s*\.modal-panel__footer/.test(r.selector));
+  assert.ok(line, 'der Fuss unter einem leeren Rumpf gibt seine Linie ab');
+  assert.match(line.body, /border-top:\s*none/);
+  // Die Linie darf nicht von einer staerkeren Regel zurueckkommen: die Basis am
+  // angehobenen Fuss ist (0,2,0), die Ausnahme muss darueber liegen.
+  assert.ok((line.selector.match(/\.[\w-]+|:empty/g) ?? []).length >= 3, line.selector);
 });
 
 // --------------------------------------------------------

@@ -585,7 +585,8 @@ test('R14 P3/P6: der Umzug haengt verdrahtete Knoten um und bringt sie zurueck o
 
 test('R14 P3/P6: Kopf, Streifen und Detailkopf stehen im Markup, die Karten sind benannt', async () => {
   assert.match(HEALTH_JS, /class="health-toolbar__person" data-health-person-slot/, 'Slot in der Zeile „‹ Gesundheit"');
-  assert.match(HEALTH_JS, /class="health-priority" data-health-priority><\/div>\s*<\/section>\s*\$\{areasNavMarkup\(\)\}/, 'Streifen VOR der Bereichsliste');
+  // Seit R18 folgt dem Umzugsziel sein Skelett (Geschwister, nicht Kind - siehe den R18-Test unten).
+  assert.match(HEALTH_JS, /class="health-priority" data-health-priority><\/div>\s*\$\{prioritySkeletonMarkup\(\)\}\s*<\/section>\s*\$\{areasNavMarkup\(\)\}/, 'Streifen VOR der Bereichsliste');
   assert.match(HEALTH_JS, /overviewCard\('calendar-check', 'health\.overview\.dueToday\.title', overviewDueMarkup\(\), 'due'\)/);
   assert.match(HEALTH_JS, /overviewCard\('plus-circle', 'health\.overview\.quick\.title', quickCaptureMarkup\(\), 'quick'\)/);
   assert.match(HEALTH_JS, /class="split-view__detail-head health-detail-head"/, 'Detailkopf wie die anderen Split-Views (A8 P2-2)');
@@ -594,7 +595,7 @@ test('R14 P3/P6: Kopf, Streifen und Detailkopf stehen im Markup, die Karten sind
   const rules = [...eachRule(css)];
   assert.ok(rules.some((r) => /\.health-page\[data-health-pushed\] \.health-priority-region/.test(r.selector) && /display:\s*none/.test(r.body)),
     'in einem Bereich gibt es den Streifen nicht');
-  assert.ok(rules.some((r) => /\.health-priority-region:not\(:has\(> \.health-priority > \*\)\)/.test(r.selector) && /display:\s*none/.test(r.body)), 'leer kostet er nichts');
+  assert.ok(rules.some((r) => /\.health-priority-region:not\(\[data-health-priority-pending\]\):not\(:has\(> \.health-priority > \*\)\)/.test(r.selector) && /display:\s*none/.test(r.body)), 'leer kostet er nichts');
 });
 
 // Sonde 10 (document-guards) nach R14 P3: mobil stand „Heute faellig" (h3) als
@@ -623,7 +624,7 @@ test('R14 P3: vor den hochgezogenen Karten steht eine Ueberschrift eine Ebene da
   const { eachRule } = await import('./css-rules.js');
   const rules = [...eachRule(read('public/styles/health.css'))];
   const hides = (re) => rules.some((r) => re.test(r.selector) && /display:\s*none/.test(r.body));
-  assert.ok(hides(/\.health-priority-region:not\(:has\(> \.health-priority > \*\)\)/), 'leere Region mit Ueberschrift bliebe stehen');
+  assert.ok(hides(/\.health-priority-region:not\(\[data-health-priority-pending\]\):not\(:has\(> \.health-priority > \*\)\)/), 'leere Region mit Ueberschrift bliebe stehen');
   assert.ok(hides(/\.health-page\[data-health-pushed\] \.health-priority-region/), 'in einem Bereich bliebe die Region stehen');
 });
 
@@ -697,4 +698,85 @@ test('R14 P6: die Kopf-Pille nennt je Bereich ihr Objekt', () => {
   }
   const de = JSON.parse(read('public/locales/de.json')).newLabel;
   for (const k of keys) assert.ok(!['Eintrag', 'Einheit'].includes(de[k]), `de ${k}: „${de[k]}" ist kein Objekt`);
+});
+
+/* R18 (Ursache zu #1770): DIE "HEUTE"-REGION SPRINGT NICHT INS BILD.
+ *
+ * Gemessen bei 390x844, drei Laeufe: die Region stand per `:has()` auf
+ * `display: none`, bis die Uebersicht geladen war, und erschien dann mit 480px
+ * auf einmal - `.health-areas` von y=81 auf y=577, Layout-Shift 0,58. Dazu
+ * wuchs jede Bereichszeile von 49 auf 63px, wenn ihr Status eintraf.
+ * Nachher: 0,003 (PerformanceObserver 'layout-shift', derselbe Weg).
+ *
+ * Der Browser misst das Ergebnis; hier steht, was es traegt - und die drei
+ * Stellen, an denen es wieder kippen kann. */
+test('R18: die Heute-Region steht auf dem Telefon vom ersten Bild an - mit Skelett, sonst nie leer', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(read('public/styles/health.css'))];
+  const body = (sel) => rules.filter((r) => r.selector.trim() === sel).map((r) => r.body).join(';');
+
+  // 1. Solange Inhalt erwartet wird, faellt die Region NICHT weg - und nur dann.
+  const hide = rules.filter((r) => /\.health-priority-region\b[^,]*:has\(/.test(r.selector) && /display:\s*none/.test(r.body));
+  assert.equal(hide.length, 1, 'genau eine Leer-Regel');
+  assert.match(hide[0].selector, /:not\(\[data-health-priority-pending\]\)/,
+    'ohne die Ausnahme ist die Region bis zum Eintreffen der Daten weg und springt dann ins Bild');
+
+  // 2. Das Skelett ist GESCHWISTER des Umzugsziels: applyHoistPlan raeumt im
+  //    Ziel alles weg, was es nicht selbst umgehaengt hat - als Kind waere es
+  //    beim ersten Abgleich fort, vor den Daten.
+  const fn = HEALTH_JS.slice(HEALTH_JS.indexOf('function prioritySkeletonMarkup()'), HEALTH_JS.indexOf('function syncPriorityRegion()'));
+  assert.match(fn, /class="health-priority-skeleton" data-health-priority-skeleton aria-hidden="true"/);
+  assert.match(fn, /health-priority-skeleton__pill[\s\S]*health-priority-skeleton__card--due[\s\S]*health-priority-skeleton__card--quick/,
+    'die Form dessen, was kommt: Pille, Heute faellig, Schnell erfassen');
+  assert.match(body('.health-priority-skeleton'), /display:\s*none/, 'ohne die Marke steht kein Skelett');
+  const show = rules.find((r) => /\[data-health-priority-pending\]\s*>\s*\.health-priority:empty\s*~\s*\.health-priority-skeleton/.test(r.selector));
+  assert.ok(show && /display:\s*flex/.test(show.body), 'es steht nur, solange die Region wartet UND ihr Ziel leer ist');
+  // Zielgeometrie: dieselben Abstaende wie der Streifen, den es vertritt.
+  for (const prop of ['gap', 'padding-inline']) {
+    const want = body('.health-priority').match(new RegExp(`${prop}:\\s*([^;]+)`))?.[1].trim();
+    assert.ok(want, `Reichweite: .health-priority setzt ${prop}`);
+    assert.equal(body('.health-priority-skeleton').match(new RegExp(`${prop}:\\s*([^;]+)`))?.[1].trim(), want, `das Skelett traegt ${prop} des Streifens`);
+  }
+
+  // 3. Die Marke gilt nur auf dem Telefon in der Uebersicht und faellt, sobald
+  //    Inhalt da ist - oder keiner mehr kommt (Ladefehler).
+  assert.match(HEALTH_JS, /_priorityPending = activeRoute === '\/health' && isPhone\(\);/, 'gesetzt beim Seitenaufbau, nur Telefon + Uebersicht');
+  assert.match(HEALTH_JS, /\$\{priorityPending \? ' data-health-priority-pending' : ''\}/, 'und schon im ERSTEN Markup, nicht erst nach einem Abgleich');
+  const sync = HEALTH_JS.slice(HEALTH_JS.indexOf('function syncPriorityRegion()'), HEALTH_JS.indexOf('function syncHoists()'));
+  assert.match(sync, /if \(filled \|\| !overviewActive \|\| !isPhone\(\)\) _priorityPending = false;/);
+  assert.match(sync, /toggleAttribute\('data-health-priority-pending', _priorityPending\)/);
+  const hoists = HEALTH_JS.slice(HEALTH_JS.indexOf('function syncHoists()'), HEALTH_JS.indexOf('let _hoistObserver'));
+  assert.match(hoists, /applyHoistPlan\([\s\S]*syncPriorityRegion\(\);/, 'nach jedem Umzug nachgefuehrt');
+  const shell = HEALTH_JS.slice(HEALTH_JS.indexOf('function renderOverviewShell()'), HEALTH_JS.indexOf('function overviewGridMarkup('));
+  assert.match(shell, /if \(overview\.error\) \{[\s\S]*?_priorityPending = false;\s*syncPriorityRegion\(\);[\s\S]*?return;/,
+    'nach einem Ladefehler bleibt kein Skelett stehen');
+});
+
+test('R18: eine Bereichszeile ist immer zwei Zeilen hoch - ihr Status schiebt nichts mehr', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(read('public/styles/health.css'))];
+  const main = rules.filter((r) => r.selector.trim() === '.health-area-row__main').map((r) => r.body).join(';');
+  assert.match(main, /min-block-size:\s*calc\(1lh \+ var\(--space-0h\) \+ var\(--text-sm\) \* var\(--line-height-base\)\)/,
+    'Name plus Statuszeile, ob der Status schon da ist oder nie kommt');
+  assert.match(main, /justify-content:\s*center/, 'ein Name ohne Status steht mittig');
+  // Der Name darf die reservierte Hoehe nicht selbst fuellen (.list-row__name waechst im Flex-Traeger).
+  const name = rules.find((r) => r.selector.trim() === '.health-area-row__main > .health-area-row__name');
+  assert.ok(name && /flex:\s*0 0 auto/.test(name.body), 'sonst steht der Name oben statt mittig');
+  // Reichweite der Rechnung: der Status laeuft wirklich in --text-sm.
+  const status = rules.filter((r) => r.selector.trim() === '.health-area-row__status').map((r) => r.body).join(';');
+  assert.match(status, /font-size:\s*var\(--text-sm\)/);
+  assert.match(status, /white-space:\s*nowrap/, 'und bleibt eine Zeile');
+});
+
+test('R18: kein Bereich laedt mehr mit dem Wort "Lade..." - jeder traegt ein Skelett', () => {
+  const texts = [...HEALTH_JS.matchAll(/__loading">\$\{esc\(t\('common\.loading'\)\)\}<\/div>/g)];
+  assert.equal(texts.length, 0, 'ein Ladezustand, der nur aus dem Wort besteht');
+  const calls = [...HEALTH_JS.matchAll(/areaLoadingMarkup\('([a-z]+)', '(list|chart)'\)/g)].map((m) => m[1]).sort();
+  assert.deepEqual(calls, ['activity', 'labs', 'meds', 'nutrition', 'overview', 'prevention', 'vitals']);
+  const fn = HEALTH_JS.slice(HEALTH_JS.indexOf('function areaLoadingMarkup('), HEALTH_JS.indexOf('function cycleSkeletonMarkup()'));
+  assert.match(fn, /role="status"/, 'der Ladezustand bleibt eine Statusmeldung');
+  assert.match(fn, /<span class="sr-only">\$\{esc\(t\('common\.loading'\)\)\}<\/span>/, 'und das Wort bleibt fuer Screenreader');
+  assert.match(fn, /renderSkeletonChart\(\{ charts: 2 \}\)/);
+  assert.match(fn, /renderSkeletonList\(\{ rows: 3, lines: 2 \}\)/);
+  assert.match(HEALTH_JS, /import \{ renderSkeletonList, renderSkeletonChart \} from '\/utils\/skeleton\.js';/);
 });

@@ -154,9 +154,44 @@
   display: none;
 }
 
-.health-priority-region:not(:has(> .health-priority > *)) {
+/* AUSSER, WENN INHALT ERWARTET WIRD (R18, #1770): auf dem Telefon traegt die
+ * Region vom ersten Bild an ihr Skelett (`data-health-priority-pending`,
+ * health.js). Sonst erschien sie mit rund 480px auf einmal und schob die
+ * Bereichsliste von y=81 auf y=577 - Layout-Shift 0,58 bei 390x844. */
+.health-priority-region:not([data-health-priority-pending]):not(:has(> .health-priority > *)) {
   display: none;
 }
+
+/* Das Skelett in der Form dessen, was kommt: Pille, "Heute faellig", "Schnell
+ * erfassen" - Abstaende und Polster wie `.health-priority`. Die beiden
+ * Kartenhoehen sind die des haeufigen Falls (zwei faellige Einnahmen, drei
+ * Schnellwege: 232 und 176px bei 390px Breite); die zuletzt gemessene
+ * Gesamthoehe setzt health.js als `min-block-size`. Es steht nur, solange die
+ * Region wartet UND leer ist - der umgezogene Inhalt loest es im selben Frame
+ * ab. */
+.health-priority-skeleton {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-inline: var(--page-inline-pad);
+}
+
+.health-priority-region[data-health-priority-pending] > .health-priority:empty ~ .health-priority-skeleton {
+  display: flex;
+}
+
+.health-priority-skeleton__pill {
+  inline-size: 12rem;
+  block-size: var(--target-base);
+  border-radius: var(--radius-full);
+}
+
+.health-priority-skeleton__card {
+  border-radius: var(--radius-lg);
+}
+
+.health-priority-skeleton__card--due   { min-block-size: 14.5rem; }
+.health-priority-skeleton__card--quick { min-block-size: 11rem; }
 
 .health-priority > .health-overview__card {
   margin-bottom: 0;
@@ -242,12 +277,28 @@
   height: var(--icon-md);
 }
 
+/* IMMER ZWEI ZEILEN HOCH (R18, #1770). Der Status kommt nach dem Namen an
+ * (ein Abruf je Bereich), und jede Zeile wuchs dabei von 49 auf 63px - acht
+ * kleine Spruenge unter dem Finger. Die Hoehe ist jetzt die von Name plus
+ * Status, ob der Status schon da ist oder nie kommt (Fasten ohne laufende
+ * Phase); ein Name allein steht mittig. `1lh` ist die Namenszeile, der Status
+ * laeuft in --text-sm mit der geerbten Zeilenhoehe. Ohne `lh` (aeltere
+ * Browser) faellt die Zeile auf das alte Verhalten zurueck. */
 .health-area-row__main {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: var(--space-0h);
+  min-block-size: calc(1lh + var(--space-0h) + var(--text-sm) * var(--line-height-base));
+}
+
+/* `.list-row__name` waechst in einem Flex-Traeger (`flex: 1 1 auto`,
+ * list-row.css) - hier ist der Traeger eine SPALTE, und ein wachsender Name
+ * fuellte die reservierte Hoehe: der Text stand oben statt mittig. */
+.health-area-row__main > .health-area-row__name {
+  flex: 0 0 auto;
 }
 
 /* Ein Wert ist EINE Zeile: lieber abgekürzt als ein Umbruch, der die Zeile
@@ -361,13 +412,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
-
-.health-vitals__loading {
-  padding: var(--space-8) var(--space-4);
-  text-align: center;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
 }
 
 /* Personen-Umschalter: EIN Knopf mit der aktiven Person statt einer
@@ -701,13 +745,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
-
-.health-meds__loading {
-  padding: var(--space-8) var(--space-4);
-  text-align: center;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
 }
 
 .health-meds__toolbar {
@@ -1236,13 +1273,6 @@ button.health-med-card:hover {
   gap: var(--space-4);
 }
 
-.health-labs__loading {
-  padding: var(--space-8) var(--space-4);
-  text-align: center;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-}
-
 .health-labs__toolbar {
   display: flex;
   align-items: center;
@@ -1559,12 +1589,6 @@ button.health-med-card:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
-
-.health-activity__loading {
-  padding: var(--space-6);
-  text-align: center;
-  color: var(--color-text-secondary);
 }
 
 .health-activity__toolbar {
@@ -1890,12 +1914,6 @@ button.health-med-card:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
-
-.health-overview__loading {
-  padding: var(--space-6);
-  text-align: center;
-  color: var(--color-text-secondary);
 }
 
 /* Karten-Masonry: unterschiedlich hohe Karten (kurze „Einnahmetreue" neben hoher
@@ -2228,6 +2246,9 @@ button.health-med-card:hover {
    ZYKLUS-TAB (/health/cycle)
    ======================================================== */
 
+/* Der Ladezustand der uebrigen Bereiche ist ein Skelett (areaLoadingMarkup,
+ * health.js), kein Wort mehr - die Textpolster `.health-*__loading` sind damit
+ * entfallen. Das Skelett steht buendig, wo gleich die Karten stehen. */
 .health-cycle__loading {
   padding: var(--space-4) 0;
 }

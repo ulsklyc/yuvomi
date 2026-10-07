@@ -966,7 +966,10 @@ function widgetHeader(widgetId, title, count, linkHref, linkLabel, sealSlug = nu
   // Guard „wer ein Markensiegel baut, benennt eine Herkunft" liest ein Fenster
   // von acht Zeilen um das `module-seal` herum, und der Link-Block dazwischen
   // hat sie beim ersten Anlauf genau daraus herausgeschoben.
-  const slug = sealSlug ?? ((linkHref || '').split('/')[1] || '');
+  // Query und Hash gehoeren nicht zum Slug: `/budget?tab=budget` ergab
+  // `var(--module-budget?tab=budget, ...)`, eine ungueltige Deklaration - das
+  // Budget-Siegel stand im geerbten Violett der Uebersicht (R18).
+  const slug = sealSlug ?? ((linkHref || '').split(/[?#]/)[0].split('/')[1] || '');
   const seal = slug ? ` style="--seal-accent: var(--module-${slug}, var(--color-accent))"` : '';
   // Vollton statt Toenung (Widget-Kopf-Kur 2026-08-17): das Siegel ist seit
   // dem Rueckbau des Absenderbands der EINZIGE Farbtraeger des Kopfes. Die
@@ -2964,7 +2967,7 @@ function renderFastingWidget(fasting) {
   if (!fasting) throw new Error('fasting widget slice failed to load');
   const active = fasting.active;
   const writable = moduleAccess('health') === 'write';
-  return `<div class="widget widget--fasting">${widgetHeader('fasting', t('health.fasting.title'), null)}
+  return `<div class="widget widget--fasting">${widgetHeader('fasting', t('health.fasting.title'), null, null, null, 'health')}
     <div class="fasting-widget">
       <div class="fasting-dial fasting-dial--segmented" data-fasting-progress><div data-fasting-segments></div><div class="fasting-dial__content">
         <span class="fasting-widget__meta" data-fasting-clock-label></span>

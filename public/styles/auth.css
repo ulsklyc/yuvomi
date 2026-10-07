@@ -47,33 +47,21 @@
   margin-bottom: var(--space-8);
 }
 
-/* Marken-Anker: App-Tile mit dem Yuvomi-Zeichen (drei transluzente Kreise).
- * Selbstbewusst (gefülltes Tile, weicher Schatten) und warm – „Würde ohne Kälte". */
+/* Marken-Anker: die Bildmarke selbst (utils/brand-mark.js) - dieselbe Kachel
+ * wie in der Seitenleiste und auf dem Homescreen, in beiden Themes dieselbe.
+ *
+ * Hier stand eine akzentfarbene Kachel mit den Kreisen in `currentColor` bei
+ * 55 %: im Dark dunkle Punkte auf Flieder, und die Kreise fuellten rund 30 %
+ * der Kachel statt der Haelfte (19px in 64px, R18). Der Traeger gibt jetzt nur
+ * noch Groesse und Schatten; die Rundung ist das Verhaeltnis der Marke
+ * (36 auf 160), damit der Schatten ihrer Kante folgt - in jeder Groesse. */
 .auth-hero__mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-block;
   width: var(--space-16);
   height: var(--space-16);
   margin-bottom: var(--space-4);
-  border-radius: var(--radius-lg);
-  background-color: var(--color-accent);
-  /* Nicht --color-text-on-accent: das ist statisches Weiss und wird im Dark-Block
-   * nirgends redefiniert, während --color-accent dort aufhellt - gemessene
-   * 2,72:1 auf dem Zeichen. --color-ink-on-vivid kippt mit dem Modus und liegt
-   * so in beiden Themes bei 6,06:1 bzw. 6,40:1. */
-  color: var(--color-ink-on-vivid);
-  box-shadow:
-    var(--shadow-md),
-    /* Lichtkante, kein Text: bleibt weiss und nimmt im Dark-Modus zurück, weil
-     * die Fläche dort selbst hell ist. Eigenes Token, damit die Zeile nicht
-     * versehentlich der Textfarbe oben folgt. */
-    inset 0 1px 0 var(--glass-highlight-subtle);
-}
-
-.auth-hero__mark svg {
-  width: 55%;
-  height: 55%;
+  border-radius: 22.5%;
+  box-shadow: var(--shadow-md);
 }
 
 /* DER KOPF UEBER EINER KARTE MIT EIGENEM TITEL (R16, utils/auth-ui.js):

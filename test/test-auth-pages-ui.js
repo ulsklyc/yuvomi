@@ -48,7 +48,7 @@ const ui = read('../public/utils/auth-ui.js');
 
 test('R16: jede Seite vor der Anmeldung traegt denselben Kopf mit der Marke', () => {
   assert.match(ui, /export function authHeroHtml\(/);
-  assert.match(ui, /<span class="auth-hero__mark" aria-hidden="true">/, 'der Baustein fuehrt die Marke');
+  assert.match(ui, /<span class="auth-hero__mark" aria-hidden="true">\$\{brandMarkSvg\(\)\}<\/span>/, 'der Baustein fuehrt die Marke');
   for (const page of AUTH_FORMS) {
     const src = read(`../public/pages/${page}.js`);
     const mains = (src.match(/<main class="auth-page" id="main-content">/g) ?? []).length;
@@ -81,5 +81,62 @@ test('R16: das Fehlerfeld der Auth-Seiten steht in EINER Fassung', () => {
     const src = read(`../public/pages/${page}.js`);
     assert.doesNotMatch(src, /class="form-error"/, `${page}.js nimmt authErrorHtml()`);
     assert.doesNotMatch(src, /role="alert"[^>]*aria-live|aria-live[^>]*role="alert"/, `${page}.js: alert ist schon assertiv`);
+  }
+});
+
+/* R18: DIE BILDMARKE KOMMT AUS EINER QUELLE UND KIPPT NICHT MIT DEM THEME.
+ * Sie stand zweimal im Code: in der Seitenleiste (router.js, Verlauf an
+ * --color-accent - im Dark Weiss auf Flieder) und auf den Zugangsseiten
+ * (auth-ui.js, Kreise in currentColor auf einer Akzentkachel - im Dark dunkle
+ * Punkte auf Flieder, die Kreise rund 30 % der Kachel). Gemessen wird das
+ * ERZEUGTE Markup gegen docs/logo.svg, nicht ein Wortlaut im Quelltext. */
+test('R18: die Bildmarke ist docs/logo.svg - eine Quelle, feste Farben, beide Stellen', async () => {
+  const { brandMarkSvg, BRAND_MARK_CIRCLES } = await import('../public/utils/brand-mark.js');
+  const logo = read('../docs/logo.svg');
+  const svg = brandMarkSvg();
+
+  // Form: dieselbe Kachel, dieselben drei Kreise.
+  const circlesOf = (markup) => [...markup.matchAll(/<circle cx="(\d+)" cy="(\d+)" r="(\d+)"\s*\/>/g)].map((m) => m.slice(1).map(Number));
+  assert.equal(circlesOf(logo).length, 3, 'Reichweite: docs/logo.svg traegt drei Kreise');
+  assert.deepEqual(circlesOf(svg), circlesOf(logo), 'die Kreise der Marke sind die von docs/logo.svg');
+  assert.deepEqual(BRAND_MARK_CIRCLES.map((c) => [...c]), circlesOf(logo));
+  assert.match(svg, /viewBox="0 0 160 160"/);
+  assert.match(svg, /<rect width="160" height="160" rx="36" fill="url\(#(yuvomi-brand-mark-\d+)\)"\/>/, 'die Kachel traegt den Verlauf');
+  assert.match(svg, /<linearGradient id="yuvomi-brand-mark-\d+" x1="0" y1="0" x2="160" y2="160"/, 'von oben links nach unten rechts');
+  // Zwei Marken im selben Dokument teilen sich keine Verlaufs-ID.
+  assert.notEqual(svg.match(/id="([^"]+)"/)[1], brandMarkSvg().match(/id="([^"]+)"/)[1]);
+
+  // Farben: nicht im Markup, nicht am Theme. Die Tokens tragen die Werte des
+  // Logos und stehen genau einmal - ein Dark-Zwilling waere die alte Lage.
+  assert.doesNotMatch(svg, /currentColor|#[0-9a-f]{3,8}\b|stop-color|fill="white"|style=/i, 'das Markup traegt keine Farbe');
+  const tokens = read('../public/styles/tokens.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  const stops = [...logo.matchAll(/<linearGradient id="bg"[\s\S]*?<\/linearGradient>/g)][0][0];
+  const [from, to] = [...stops.matchAll(/stop-color="(#[0-9a-f]{6})"/gi)].map((m) => m[1].toUpperCase());
+  for (const [name, value] of [['--brand-mark-from', from], ['--brand-mark-to', to], ['--brand-mark-ink', '#FFFFFF']]) {
+    const found = [...tokens.matchAll(new RegExp(`${name}:\\s*([^;]+);`, 'g'))].map((m) => m[1].trim().toUpperCase());
+    assert.deepEqual(found, [value], `${name} steht genau einmal und traegt den Wert der Marke`);
+  }
+  const layout = [...eachRule(read('../public/styles/layout.css'))];
+  const body = (sel) => layout.filter((r) => r.selector.trim() === sel).map((r) => r.body).join(';');
+  assert.match(body('.brand-mark__from'), /stop-color:\s*var\(--brand-mark-from\)/);
+  assert.match(body('.brand-mark__to'), /stop-color:\s*var\(--brand-mark-to\)/);
+  assert.match(body('.brand-mark__circles'), /fill:\s*var\(--brand-mark-ink\)/);
+  assert.match(body('.brand-mark__circles'), /fill-opacity:\s*0\.82/);
+
+  // Beide Stellen nehmen die eine Quelle, und keine baut die Marke daneben.
+  const router = read('../public/router.js');
+  assert.match(router, /logomark\.insertAdjacentHTML\('beforeend', brandMarkSvg\(\)\);/, 'die Seitenleiste nimmt die eine Marke');
+  assert.match(ui, /import \{ brandMarkSvg \} from '\/utils\/brand-mark\.js';/);
+  for (const [name, src] of [['router.js', router], ['auth-ui.js', ui]]) {
+    assert.doesNotMatch(src, /<circle|createElementNS\([^)]*\), 'circle'\)|linearGradient/, `${name} baut keine eigene Marke`);
+  }
+
+  // Der Traeger auf den Zugangsseiten faerbt nichts mehr: keine Akzentkachel
+  // unter dem Zeichen, keine Tinte, kein verkleinertes SVG.
+  const mark = [...eachRule(css)].filter((r) => /\.auth-hero__mark\b/.test(r.selector));
+  assert.ok(mark.length >= 2, 'Reichweite: Grund- und Kompaktregel der Marke');
+  for (const r of mark) {
+    assert.doesNotMatch(r.body, /background|(?:^|;)\s*color\s*:/, `${r.selector} faerbt die Marke`);
+    assert.doesNotMatch(r.selector, /\bsvg\b/, `${r.selector} skaliert das Zeichen in seiner Kachel`);
   }
 });

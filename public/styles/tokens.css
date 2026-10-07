@@ -133,6 +133,15 @@
    * Schalterbahn haelt 3:1". Der Installer traegt dieselben Werte inline. */
   --_color-switch-off:    #88847C;
   --color-switch-off:     var(--_color-switch-off);
+  /* DER KNOPF IST HELL, IN BEIDEN THEMES (R18). Er trug --color-surface und
+   * war damit im Dark ein dunkler Punkt (#2B2825) auf heller Bahn - der
+   * Schalter las sich invertiert, und sein Glanz (--glass-inset-thumb) lag auf
+   * Kohle. Ein Knopf ist kein Stueck Flaeche, das mit dem Theme kippt: Weiss,
+   * immer. Gegen die Aus-Bahn 3,72:1 hell und 3,25:1 dunkel. Die An-Bahn
+   * traegt die FLAECHEN-Rolle der Stimme (--color-btn-primary, dieselbe wie
+   * der Primaerknopf, weil beide Weiss tragen): 6,06:1 hell, 5,70:1 dunkel.
+   * Der Text-Akzent (dunkel #A78BFA) truege den weissen Knopf nur mit 2,72. */
+  --color-switch-knob:    #FFFFFF;
   /* ZURUECKGENOMMEN IST EIN MUSTER, KEINE DECKUNG (#1230, Entscheidung Ulas
    * 2026-09-15). Erledigte und abgelegte Aufgaben, archivierte Konten,
    * pausierte und abgeschlossene Abos, inaktive Medikamente und Praemien,
@@ -358,6 +367,17 @@
    * Tageszeit spricht seither allein über den Grusstext. Nach dem Umbau stand
    * die Reihe in drei Blöcken (Light, Dark, forced-dark) ohne einen einzigen
    * Nutzer im CSS oder JS. */
+  /* DIE BILDMARKE (utils/brand-mark.js): der Verlauf ihrer Kachel, von oben
+   * links nach unten rechts - die Werte von docs/logo.svg und den App-Icons.
+   * BEWUSST OHNE DARK-ZWILLING: eine Marke kippt nicht mit dem Theme. Solange
+   * der Verlauf an --color-accent hing, stand sie im Dark als Weiss auf
+   * Flieder (#A78BFA nach #C4B5FD) in der Seitenleiste und als dunkle Punkte
+   * auf Flieder auf den Zugangsseiten (R18). Die Kreise sind Weiss mit 0,82
+   * Deckung; auf dem dunkleren Ende 4,6:1, auf dem helleren 3,4:1 - ein
+   * Zeichen, kein Text. */
+  --brand-mark-from:   #8B5CF6;
+  --brand-mark-to:     #6C3AED;
+  --brand-mark-ink:    #FFFFFF;
   --_color-accent-secondary:  #8B5CF6;
   --color-accent-secondary:   var(--_color-accent-secondary);  /* Violett-hell — Sekundärer Akzent für Logo-Gradient */
   --_color-accent-light:      #F3EFFE;
@@ -982,7 +1002,21 @@
    * ist überall dieselbe Pille" in test/test-frontend-audit.js - eine geteilte
    * Regel ohne Guard ist eine wandernde Annahme.
    * -------------------------------------------------------- */
-  --seg-active-bg:     var(--color-surface);
+  /* DER DAUMEN IST DIE HELLERE FLAECHE, IN BEIDEN THEMES (R18). Hier stand
+   * `var(--color-surface)`. Hell stimmt das: Weiss auf der Bahn #EDEAE3,
+   * 1,20:1. Dunkel ist --color-surface (#2B2825) aber die Stufe UNTER der
+   * Bahn (--color-fill-well / --color-surface-3, #37332E) - der gewaehlte
+   * Daumen lag als Mulde in seiner Bahn (gemessen Bahn rgb(55,51,46), Daumen
+   * rgb(43,40,37)), und der Schatten darunter ist auf Kohle wirkungslos.
+   * Dunkel traegt er deshalb die Stufe UEBER der Bahn (--_neutral-250,
+   * #443E37): 1,19:1, derselbe Abstand wie hell, nur nach oben. Tinte darauf:
+   * Text 9,51:1; die Modulton-Tinte (70 % Ton in --color-text-primary) haelt
+   * AA ueber alle neun Familien, knappster Wert Gesundheit 4,51:1, Kontakte
+   * 5,05, Dokumente 5,08, Uebersicht 5,16. Heller geht nicht: --_neutral-300
+   * druckte Gesundheit auf 3,68. Guard: test-frontend-audit.js, "der
+   * Segmentdaumen ist heller als seine Bahn". */
+  --_seg-active-bg:    var(--_color-surface);
+  --seg-active-bg:     var(--_seg-active-bg);
   --seg-active-shadow: var(--shadow-xs);
 
   /* --------------------------------------------------------
@@ -1474,6 +1508,11 @@
    * begruendet hat, stellt sich dort nicht - unter ihm liegt Chrome, kein
    * Inhalt. Auf dem Desktop (keine Bottom-Nav) schwebt er weiter frei und
    * behaelt seine Zone. */
+  /* Der Weg, nach dem eine Wischzeile ausloest - derselbe Wert wie
+   * SWIPE_THRESHOLD in utils/swipe-row.js (ein Guard haelt beide zusammen).
+   * Das Reveal-Panel stellt Icon und Etikett in genau diesen Streifen: was
+   * beim Ausloesen aufgedeckt ist, ist dann auch vollstaendig zu lesen. */
+  --swipe-threshold: 80px;
   --fab-size: 52px;
   --fab-gap: var(--space-6);
   /* Mitte der Nav-Kapsel: safe-area + Bar-Polster + halbe Resthoehe. */
@@ -2001,6 +2040,8 @@
     /* Bahn des ausgeschalteten Schalters (#1572, Werte im :root-Block). Als Hex,
      * nicht als var(): die Naht zum Installer-Fallback vergleicht Wert fuer Wert. */
     --_color-switch-off:   #948E85;  /* = --_neutral-500 */
+    /* Der Segmentdaumen: eine Stufe UEBER der Bahn (#37332E), Begruendung im :root-Block. */
+    --_seg-active-bg:      #443E37;  /* = --_neutral-250 */
 
     --_sidebar-bg:           #221F1D;
     --_sidebar-shadow-light: rgba(255, 255, 255, 0.04);
@@ -2271,6 +2312,8 @@
     --color-border:        #47423B;
     --color-border-strong: #6F6A61;
     --_color-switch-off:   #948E85;  /* = --_neutral-500 */
+    /* Der Segmentdaumen: eine Stufe UEBER der Bahn (#37332E), Begruendung im :root-Block. */
+    --_seg-active-bg:      #443E37;  /* = --_neutral-250 */
 
     /* Sidebar */
     --_sidebar-bg:           #221F1D;

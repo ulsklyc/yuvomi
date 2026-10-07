@@ -1152,6 +1152,44 @@ test('der Hinweis am Formularlabel ist eine Klasse, kein Inline-Design-Wert', ()
     'notes.js muss die Klasse nutzen statt drei Werte inline zu schreiben');
 });
 
+// R18: AN DER AUSLOESESCHWELLE IST DAS ETIKETT GANZ ZU LESEN. Das Reveal-Panel
+// ist die halbe Zeile breit und zentrierte Icon und Wort in dieser Haelfte -
+// bei 390px also 97px von der Kante, waehrend die Geste nach 80px ausloest. Bei
+// 86px aufgedeckter Breite standen "Abh" und ein halber Haken. Der Inhalt
+// gehoert in den Streifen, den die Schwelle aufdeckt; die Flaeche darf breiter
+// bleiben. Gehalten wird die RECHNUNG, nicht ein Wortlaut: Schwelle in JS und
+// CSS sind derselbe Wert, und der Inhaltskasten jeder Seite ist genau sie breit.
+test('R18: das Wisch-Etikett steht im Streifen, den die Ausloeseschwelle aufdeckt', () => {
+  const swipe = read('../public/utils/swipe-row.js');
+  const threshold = Number(swipe.match(/export const SWIPE_THRESHOLD = (\d+);/)?.[1]);
+  assert.ok(threshold > 0, 'SWIPE_THRESHOLD in swipe-row.js nicht gefunden');
+  const token = read('../public/styles/tokens.css').match(/--swipe-threshold:\s*(\d+)px;/)?.[1];
+  assert.equal(Number(token), threshold, '--swipe-threshold (tokens.css) und SWIPE_THRESHOLD (swipe-row.js) sind derselbe Weg');
+
+  const rules = [...eachRule(read('../public/styles/layout.css'))];
+  const bodies = (selector) => rules.filter((r) => r.at.length === 0 && r.selector.trim() === selector).map((r) => r.body).join(';');
+  const base = bodies('.swipe-reveal');
+  const width = base.match(/(?:^|;)\s*width:\s*(\d+)%/)?.[1];
+  assert.ok(width, 'Reichweite: die Panelbreite steht in Prozent der Zeile');
+
+  // Was vom Panel hinter der Karte bleibt, wird Polster: Panelbreite minus
+  // Schwelle, auf der Seite, die NICHT aufgedeckt wird.
+  const hidden = new RegExp(`calc\\(\\s*${width}%\\s*-\\s*var\\(--swipe-threshold\\)\\s*\\)`);
+  for (const [side, prop, wrong] of [
+    ['leading', 'padding-inline-end', 'padding-inline-start'],
+    ['trailing', 'padding-inline-start', 'padding-inline-end'],
+  ]) {
+    const body = bodies(`.swipe-reveal--${side}`);
+    assert.match(body, new RegExp(`${prop}:\\s*${hidden.source}`),
+      `.swipe-reveal--${side}: der Inhalt steht nicht im aufgedeckten Streifen (${prop} fehlt)`);
+    assert.doesNotMatch(body, new RegExp(`${wrong}\\s*:`), `.swipe-reveal--${side}: Polster auf der aufgedeckten Seite`);
+    assert.doesNotMatch(body, /padding-(?:left|right)\s*:/, 'logische Seiten - in RTL liegt der Streifen am anderen Ende');
+  }
+  // Und das Wort darf im Streifen umbrechen, statt ueber seine Kante zu laufen.
+  assert.match(base, /overflow-wrap:\s*anywhere/);
+  assert.match(base, /text-align:\s*center/);
+});
+
 test('die Wischgeste setzt und loest das Compositor-Versprechen selbst', () => {
   const swipe = read('../public/utils/swipe-row.js');
   const layout = read('../public/styles/layout.css');
@@ -8133,6 +8171,92 @@ test('die ausgeschaltete Schalterbahn haelt 3:1 auf jeder Flaeche, auf der ein S
 });
 
 /* ────────────────────────────────────────────────────────────────────────────
+ * R18: Dark invertiert nicht - Knopf und Daumen sind die HELLERE Flaeche
+ *
+ * Zwei Bauteile trugen `--color-surface` als "das Helle obenauf". Hell stimmt
+ * das (Weiss), dunkel ist --color-surface die Stufe UNTER Bahn und Schiene:
+ * der Schalterknopf stand als dunkler Punkt auf heller Bahn, der gewaehlte
+ * Segmentdaumen als Mulde in seiner Bahn (Bahn rgb(55,51,46), Daumen
+ * rgb(43,40,37)). Der 3:1-Guard darueber sah nichts davon - ein dunkler Knopf
+ * auf heller Bahn haelt 3:1 genauso wie ein heller.
+ *
+ * Gemessen wird deshalb die RICHTUNG: in jedem Theme ist der Knopf heller als
+ * seine Bahn (aus UND an), der Daumen heller als die Bahn, in der er liegt,
+ * und was darauf steht, haelt seinen Kontrast.
+ * ──────────────────────────────────────────────────────────────────────────── */
+function r18ThemeMaps() {
+  const { light, dark } = themeTokenMaps();
+  const scheme = darkSchemeBlock(read('../public/styles/tokens.css'));
+  assert.ok(scheme, 'prefers-color-scheme-Dark-Block in tokens.css nicht gefunden');
+  const darkScheme = new Map(light);
+  for (const [k, v] of parseTokenMap(scheme[1])) darkScheme.set(k, v);
+  return [['light', light], ['dark [data-theme]', dark], ['dark prefers-color-scheme', darkScheme]];
+}
+
+const r18Lum = (hex) => relLum(hexToRgb(hex));
+
+test('R18: der Schalterknopf ist in jedem Theme heller als seine Bahn - aus und an', () => {
+  const rules = [...eachRule(read('../public/styles/layout.css'))];
+  const bg = (selector) => {
+    const rule = rules.filter((r) => r.selector.trim() === selector && /background(?:-color)?\s*:/.test(r.body)).pop();
+    assert.ok(rule, `Regel ${selector} mit Hintergrund nicht gefunden - der Guard misst nichts`);
+    const token = rule.body.match(/background(?:-color)?\s*:\s*var\(\s*(--[\w-]+)\s*\)/)?.[1];
+    assert.ok(token, `${selector} setzt keinen Token-Hintergrund`);
+    return token;
+  };
+  const knob = bg('.toggle__track::after');
+  const tracks = { aus: bg('.toggle__track'), an: bg('.toggle input:checked + .toggle__track') };
+
+  const findings = [];
+  for (const [theme, map] of r18ThemeMaps()) {
+    const knobHex = resolveColor(knob, map);
+    assert.match(knobHex ?? '', /^#[0-9a-f]{6}$/i, `${theme}: ${knob} loest nicht auf eine Hex-Farbe auf`);
+    for (const [state, token] of Object.entries(tracks)) {
+      const trackHex = resolveColor(token, map);
+      assert.match(trackHex ?? '', /^#[0-9a-f]{6}$/i, `${theme}: ${token} loest nicht auf eine Hex-Farbe auf`);
+      if (r18Lum(knobHex) <= r18Lum(trackHex)) {
+        findings.push(`${theme}, ${state}: Knopf ${knob} (${knobHex}) ist dunkler als die Bahn ${token} (${trackHex})`);
+      }
+      const ratio = contrastRatio(knobHex, trackHex);
+      if (ratio + 0.005 < 3) findings.push(`${theme}, ${state}: Knopf ${knobHex} auf ${trackHex} ${ratio.toFixed(2)}:1`);
+    }
+  }
+  assert.deepEqual(findings, []);
+});
+
+test('R18: der Segmentdaumen ist in jedem Theme heller als seine Bahn, und die Modulton-Tinte haelt AA', () => {
+  // Die Bahnen, in denen ein Daumen liegt: jede Regel, die einem Traeger eines
+  // `--seg-active-bg`-Kinds eine Flaeche gibt, fuehrt eines dieser beiden Tokens
+  // (.group-toggle, .segmented, die Sub-Tab-Leiste).
+  const TRACKS = ['--color-fill-well', '--color-surface-3'];
+  const findings = [];
+  let inks = 0;
+  for (const [theme, map] of r18ThemeMaps()) {
+    const thumb = resolveColor('--seg-active-bg', map);
+    assert.match(thumb ?? '', /^#[0-9a-f]{6}$/i, `${theme}: --seg-active-bg loest nicht auf eine Hex-Farbe auf (${thumb})`);
+    for (const token of TRACKS) {
+      const track = resolveColor(token, map);
+      assert.match(track ?? '', /^#[0-9a-f]{6}$/i, `${theme}: ${token} loest nicht auf`);
+      if (r18Lum(thumb) <= r18Lum(track)) findings.push(`${theme}: Daumen ${thumb} ist nicht heller als die Bahn ${token} (${track})`);
+    }
+    // Die Tinte des aktiven Segments, wie sie an jeder Fundstelle steht:
+    // color-mix(in srgb, <Modulton> var(--tint-ink), var(--color-text-primary)).
+    const share = parseFloat(resolveColor('--tint-ink', map)) / 100;
+    assert.ok(share > 0 && share <= 1, `${theme}: --tint-ink ist kein Prozentwert`);
+    const text = hexToRgb(resolveColor('--color-text-primary', map));
+    for (const name of [...map.keys()].filter((k) => /^--_family-[\w-]+$/.test(k))) {
+      const tone = hexToRgb(resolveColor(name, map));
+      const ink = `#${tone.map((v, i) => Math.round(v * share + text[i] * (1 - share)).toString(16).padStart(2, '0')).join('')}`;
+      const ratio = contrastRatio(ink, thumb);
+      inks += 1;
+      if (ratio + 0.005 < 4.5) findings.push(`${theme}: Tinte ${name} (${ink}) auf dem Daumen ${thumb} ${ratio.toFixed(2)}:1`);
+    }
+  }
+  assert.ok(inks >= 27, `Reichweite: ${inks} Tinten gemessen (neun Familien, drei Theme-Bloecke)`);
+  assert.deepEqual(findings, []);
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
  * Der Schalterknopf spiegelt in RTL (#1572)
  *
  * In `ar` und `fa` setzt die App `dir=rtl`. Apple (und jede RTL-Plattform)
@@ -15036,6 +15160,13 @@ test('ein Flaechen-Leerzustand ist die geteilte .empty-state', () => {
 // in den Listen des eigenen Moduls. Das war der Bestand vor Block 2
 // (Gesundheit 14 Vorkommen, Dokumente null), und es ist das Anti-Ziel
 // „keine Siegel-Inflation".
+//
+// WAS DIESER GUARD NICHT SIEHT (R18): ob die benannte Herkunft ein Modulton IST.
+// Er liest Text, und `--seal-accent: var(--module-budget?tab=budget, ...)`
+// enthaelt die gesuchte Zeichenkette - das Budget-Siegel der Uebersicht stand
+// damit violett, bei gruenem Guard. Den Slug prueft deshalb der AUFRUF:
+// test-dashboard-a11y.js, „jedes Widget-Siegel nennt einen Modulton, den
+// tokens.css kennt".
 //
 // UEBER DIE BAUART, NICHT UEBER EINE DATEILISTE: gesucht wird jede Stelle, die
 // die Klasse zusammensetzt - gleich ob per `className`, per Template-Literal

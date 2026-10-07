@@ -62,6 +62,7 @@ import {
 } from '/utils/health-tabs.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { hoistPlan, applyHoistPlan } from '/utils/health-hoist.js';
+import { renderSkeletonList, renderSkeletonChart } from '/utils/skeleton.js';
 import { formatFastingDuration } from '/utils/health-fasting.js';
 import { canUseFasting, isNavModuleReadOnly } from '/permissions.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
@@ -700,6 +701,63 @@ function markAreaEntering(route) {
   if (panel) swapContent(panel, null);
 }
 
+/* DIE "HEUTE"-REGION SPRINGT NICHT INS BILD (R18, Ursache zu #1770).
+ *
+ * Die Region vor der Bereichsliste war leer und per `:has()` auf
+ * `display: none`, bis die Uebersicht geladen und ihre Karten umgezogen waren
+ * (health-hoist.js). Dann erschien sie mit rund 480px auf einmal: die
+ * Bereichsliste rutschte bei 390x844 von y=81 auf y=577, Layout-Shift 0,58
+ * (drei Laeufe). Wer in dem Moment eine Bereichszeile antippen wollte, traf
+ * eine andere.
+ *
+ * Auf dem Telefon steht die Region deshalb vom ersten Bild an, mit einem
+ * Skelett in der Form dessen, was kommt: Personen-Pille, "Heute faellig",
+ * "Schnell erfassen". Die Hoehe der Karten haengt an den Daten (wie viele
+ * Einnahmen heute faellig sind), also merkt sich das Modul die zuletzt
+ * gemessene Hoehe - beim zweiten Aufruf der Sitzung passt das Skelett genau,
+ * beim ersten steht die Liste ohnehin schon unter dem Falz.
+ *
+ * `_priorityPending` gilt nur, solange Inhalt ERWARTET wird: am Tablet und am
+ * Desktop zieht nichts in die Region, dort bleibt sie weg (keine leere
+ * Landmarke), und nach einem Ladefehler faellt die Marke ebenfalls. */
+let _priorityPending = false;
+let _priorityHeight = 0;
+
+function prioritySkeletonMarkup() {
+  return `<div class="health-priority-skeleton" data-health-priority-skeleton aria-hidden="true">
+              <div class="skeleton health-priority-skeleton__pill"></div>
+              <div class="skeleton-card health-priority-skeleton__card health-priority-skeleton__card--due">
+                <div class="skeleton skeleton-line skeleton-line--title"></div>
+                <div class="skeleton skeleton-line skeleton-line--medium"></div>
+                <div class="skeleton skeleton-line skeleton-line--full"></div>
+              </div>
+              <div class="skeleton-card health-priority-skeleton__card health-priority-skeleton__card--quick">
+                <div class="skeleton skeleton-line skeleton-line--title"></div>
+                <div class="skeleton skeleton-line skeleton-line--full"></div>
+              </div>
+            </div>`;
+}
+
+/** Die Marke an der Region nachfuehren und die Hoehe des Inhalts merken. */
+function syncPriorityRegion() {
+  const region = _container?.querySelector('.health-priority-region');
+  const slot = region?.querySelector('[data-health-priority]');
+  if (!region || !slot) return;
+  const filled = slot.children.length > 0;
+  const overviewActive = (_activeArea ?? HEALTH_OVERVIEW_ID) === HEALTH_OVERVIEW_ID;
+  if (filled || !overviewActive || !isPhone()) _priorityPending = false;
+  region.toggleAttribute('data-health-priority-pending', _priorityPending);
+  const skeleton = region.querySelector('[data-health-priority-skeleton]');
+  if (skeleton && _priorityPending && _priorityHeight > 0) skeleton.style.minBlockSize = `${_priorityHeight}px`;
+  if (filled && typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => {
+      if (!slot.isConnected || slot.children.length === 0) return;
+      const height = slot.getBoundingClientRect().height;
+      if (height > 0) _priorityHeight = Math.round(height);
+    });
+  }
+}
+
 /* Personenwahl und „Heute" an ihren Ort je Darstellung (health-hoist.js). */
 function syncHoists() {
   if (!_container?.isConnected || !_panelsHost) return;
@@ -715,6 +773,7 @@ function syncHoists() {
       priority: _container.querySelector('[data-health-priority]'),
     },
   });
+  syncPriorityRegion();
   // Die eigenen Umzuege sind keine Neubauten der Panels.
   _hoistObserver?.takeRecords();
 }
@@ -1006,6 +1065,11 @@ export async function render(container, ctx = {}) {
   }
   const panels = PANELS().filter((panel) => (cycleEnabled || panel.route !== '/health/cycle') && (fastingEnabled || panel.route !== '/health/fasting'));
 
+  // Auf dem Telefon kommt vor der Bereichsliste gleich Inhalt (health-hoist.js):
+  // die Region steht deshalb vom ersten Bild an, mit Skelett (R18, #1770).
+  _priorityPending = activeRoute === '/health' && isPhone();
+  const priorityPending = _priorityPending;
+
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="health-page app-page app-page--dashboard app-page--list-detail" data-composition="dashboard">
@@ -1032,9 +1096,10 @@ export async function render(container, ctx = {}) {
                VOR der Bereichsliste (health-hoist.js, R14 P3). Die h2 steht
                vor dem Umzugsziel, nicht darin: die Karten bringen ihre h3 mit,
                ohne sie folgten sie direkt auf das h1. -->
-          <section class="health-priority-region" aria-labelledby="health-priority-title">
+          <section class="health-priority-region" aria-labelledby="health-priority-title"${priorityPending ? ' data-health-priority-pending' : ''}>
             <h2 class="sr-only" id="health-priority-title">${esc(t('common.today'))}</h2>
             <div class="health-priority" data-health-priority></div>
+            ${prioritySkeletonMarkup()}
           </section>
           ${areasNavMarkup()}
           <div class="health-stage" data-health-stage></div>
@@ -1184,7 +1249,7 @@ async function loadHealthMembers(view, user) {
 async function mountVitals() {
   vitals.root.replaceChildren();
   vitals.root.insertAdjacentHTML('beforeend',
-    `<div class="health-vitals__loading">${esc(t('common.loading'))}</div>`);
+    areaLoadingMarkup('vitals', 'chart'));
 
   try {
     await loadHealthMembers(vitals, healthUser);
@@ -2415,7 +2480,7 @@ function maybeMountMeds(activeRoute) {
 async function mountMeds() {
   meds.root.replaceChildren();
   meds.root.insertAdjacentHTML('beforeend',
-    `<div class="health-meds__loading">${esc(t('common.loading'))}</div>`);
+    areaLoadingMarkup('meds', 'list'));
 
   try {
     await loadHealthMembers(meds, healthUser);
@@ -3614,7 +3679,7 @@ function maybeMountLabs(activeRoute) {
 async function mountLabs() {
   labs.root.replaceChildren();
   labs.root.insertAdjacentHTML('beforeend',
-    `<div class="health-labs__loading">${esc(t('common.loading'))}</div>`);
+    areaLoadingMarkup('labs', 'list'));
 
   try {
     await loadHealthMembers(labs, healthUser);
@@ -4339,7 +4404,7 @@ function maybeMountActivity(activeRoute) {
 async function mountActivity() {
   activity.root.replaceChildren();
   activity.root.insertAdjacentHTML('beforeend',
-    `<div class="health-activity__loading">${esc(t('common.loading'))}</div>`);
+    areaLoadingMarkup('activity', 'chart'));
 
   try {
     await loadHealthMembers(activity, healthUser);
@@ -4789,7 +4854,7 @@ function maybeMountPrevention(activeRoute) {
 async function mountPrevention() {
   prevention.root.replaceChildren();
   prevention.root.insertAdjacentHTML('beforeend',
-    `<div class="health-prevention__loading">${esc(t('common.loading'))}</div>`);
+    areaLoadingMarkup('prevention', 'list'));
 
   try {
     await loadHealthMembers(prevention, healthUser);
@@ -5218,7 +5283,7 @@ function maybeMountNutrition(activeRoute) {
 async function mountNutrition() {
   nutrition.root.replaceChildren();
   nutrition.root.insertAdjacentHTML('beforeend',
-    `<div class="health-nutrition__loading">${esc(t('common.loading'))}</div>`);
+    areaLoadingMarkup('nutrition', 'chart'));
 
   try {
     await loadHealthMembers(nutrition, healthUser);
@@ -5709,7 +5774,7 @@ function maybeMountOverview(activeRoute) {
 async function mountOverview() {
   overview.root.replaceChildren();
   overview.root.insertAdjacentHTML('beforeend',
-    `<div class="health-overview__loading">${esc(t('common.loading'))}</div>`);
+    areaLoadingMarkup('overview', 'list'));
 
   try {
     await loadHealthMembers(overview, healthUser);
@@ -5825,6 +5890,9 @@ function renderOverviewShell() {
 
   if (overview.error) {
     mountAreaLoadError(overview, 'overview', mountOverview);
+    // Es kommt nichts mehr, das vor die Liste zieht - das Skelett geht.
+    _priorityPending = false;
+    syncPriorityRegion();
     return;
   }
 
@@ -6420,6 +6488,25 @@ function maybeMountFasting(activeRoute) {
     root.replaceChildren();
     root.insertAdjacentHTML('beforeend', `<div class="fasting-panel__error" role="alert"><h3>${esc(t('health.fasting.loadError'))}</h3><p>${esc(error?.message || '')}</p></div>`);
   });
+}
+
+/**
+ * DER LADEZUSTAND EINES BEREICHS IST EIN SKELETT, KEIN WORT (R18). Sieben der
+ * acht Bereiche luden mit "Lade..." in Sekundaerschrift, der Zyklus mit seiner
+ * Silhouette (cycleSkeletonMarkup). Die Form folgt dem, was kommt: `chart`
+ * fuer Bereiche, die mit Kennzahlen und Kurven oeffnen, `list` fuer
+ * Zeilenlisten. Der Text bleibt fuer Screenreader (`role="status"`), das
+ * Skelett selbst ist `aria-hidden` (utils/skeleton.js).
+ *
+ * @param {string} area - Bereichsname der Klasse (`health-<area>__loading`)
+ * @param {'list'|'chart'} shape
+ */
+function areaLoadingMarkup(area, shape) {
+  const skeleton = shape === 'chart' ? renderSkeletonChart({ charts: 2 }) : renderSkeletonList({ rows: 3, lines: 2 });
+  return `<div class="health-${area}__loading" role="status">
+    <span class="sr-only">${esc(t('common.loading'))}</span>
+    ${skeleton}
+  </div>`;
 }
 
 function cycleSkeletonMarkup() {

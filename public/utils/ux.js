@@ -211,13 +211,24 @@ export function collapseOut(el, { duration = durationToken('--duration-lg', 250)
  * Das Gegenstueck: ein gerade eingesetztes Element von null auf seine Hoehe
  * aufziehen (aufgeklappte Gruppe, eine per „Rueckgaengig" zurueckgekehrte
  * Zeile). Ohne `fill` - am Ende gilt wieder das Stylesheet.
+ *
+ * `absorbGap`: das Element ist Kind eines Flex- oder Grid-Traegers mit `gap`.
+ * Der Abstand gehoert dem Traeger und steht im selben Frame da, in dem das
+ * Kind erscheint - die Nachbarn spraengen um genau diesen Betrag, bevor die
+ * Hoehe ueberhaupt waechst. Ein negativer Aussenabstand im ersten Frame nimmt
+ * ihn mit auf null (Feldmeldung im `.form-field`, gap 4px, R18).
  */
-export function expandIn(el, { duration = durationToken('--duration-lg', 250) } = {}) {
+export function expandIn(el, { duration = durationToken('--duration-lg', 250), absorbGap = false } = {}) {
   if (!el || typeof el.animate !== 'function') return Promise.resolve();
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
   const prevOverflow = el.style.overflow;
   el.style.overflow = 'hidden';
-  const anim = el.animate([closedFrame(), blockFrame(el)], {
+  const closed = closedFrame();
+  if (absorbGap && el.parentElement) {
+    const gap = parseFloat(getComputedStyle(el.parentElement).rowGap);
+    if (gap > 0) closed.marginTop = `${-gap}px`;
+  }
+  const anim = el.animate([closed, blockFrame(el)], {
     duration, easing: easingToken('--ease-in-out', 'ease-in-out'),
   });
   return settleAnimation(anim, duration).then(() => { el.style.overflow = prevOverflow; });

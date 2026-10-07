@@ -2050,13 +2050,35 @@ svg.weather-forecast__icon {
 /* Plus wird zum X. Der Zustand steht schon im `aria-expanded`, das der
  * Speed-Dial ohnehin pflegen muss - eine Klasse daneben wäre eine zweite
  * Wahrheit über denselben Zustand, und die beiden liefen bisher schon
- * auseinander, wenn eine von ihnen vergessen wurde. */
-.page-fab[aria-expanded="true"] {
+ * auseinander, wenn eine von ihnen vergessen wurde.
+ *
+ * ES DREHT DAS ICON, NIE DER KNOPF (R18). Die Drehung stand am `.page-fab`
+ * selbst, und derselbe Selektor trifft am Desktop die beschriftete Kapsel
+ * `.page-fab--docked` ("+ Neu", Popover-Auslöser): sie kippte samt Wort um
+ * 45 Grad (gemessen `matrix(0.707, 0.707, ...)`, Bounding-Box 92x92 statt
+ * 92x40). Am runden FAB sieht die Icon-Drehung aus wie die alte - ein Kreis
+ * in einer Farbe hat keine Lage -, nur der Schatten wandert nicht mehr mit.
+ * Guard in test-motion.js: keine Drehung auf einem Knoten, der Text trägt. */
+.page-fab[aria-expanded="true"] > svg,
+.page-fab[aria-expanded="true"] > i {
   transform: rotate(45deg);
-  /* Hier ist das Nachfedern die Aussage, nicht Zierrat - es quittiert den
-     Zustandswechsel. Über das Token statt als Literal, damit die Kurve eine
-     benannte Entscheidung bleibt (tokens.css §g). */
+}
+
+/* Hier ist das Nachfedern die Aussage, nicht Zierrat - es quittiert den
+ * Zustandswechsel. Über das Token statt als Literal, damit die Kurve eine
+ * benannte Entscheidung bleibt (tokens.css §g). Am Icon in BEIDEN Zuständen,
+ * damit auch der Rückweg federt. */
+.page-fab[aria-expanded] > svg,
+.page-fab[aria-expanded] > i {
   transition: transform var(--transition-glass);
+}
+
+/* Das Grau gehört dem schwebenden Speed-Dial: sein offener Zustand heisst
+ * "Schliessen", und das Backdrop dahinter nimmt der Seite die Farbe. Die
+ * angedockte Kapsel bleibt die violette Primäraktion - ihr Menü ist ein
+ * Popover ohne Backdrop, und ein ergrauter Primärknopf läse sich dort als
+ * deaktiviert. */
+.page-fab[aria-expanded="true"]:not(.page-fab--docked) {
   background-color: var(--neutral-600);
 }
 

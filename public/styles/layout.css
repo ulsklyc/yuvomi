@@ -5079,17 +5079,11 @@ p.field-hint--warn[hidden] {
     flex-shrink: 0;
   }
 
-  /* SVG-Logomark (via DOM API in router.js injiziert, Gradient im SVG selbst) */
+  /* Die Bildmarke (utils/brand-mark.js) - `.brand-mark` fuellt ihren Traeger. */
   .nav-sidebar__logomark {
     width: 28px;
     height: 28px;
     flex-shrink: 0;
-  }
-
-  .nav-sidebar__logomark svg {
-    width: 100%;
-    height: 100%;
-    display: block;
   }
 
   .nav-sidebar__brand-text {
@@ -6350,6 +6344,20 @@ p.field-hint--warn[hidden] {
   flex-shrink: 0;
 }
 
+/* EINE RÜCKFRAGE OHNE ERKLÄRTEXT HAT KEINEN RUMPF (R18). Frage und Fuß sind
+ * der ganze Dialog; der leere Rumpf dazwischen stand als 32px Polster zwischen
+ * zwei Haarlinien (Abmelden). `collapseEmptyBody()` in modal.js leert ihn bis
+ * auf nichts, damit `:empty` greift - dann fällt er aus dem Fluss, und der Fuß
+ * gibt seine Linie ab: die des Kopfs trennt bereits. Füllt ein Aufrufer den
+ * Rumpf später, gilt beides von selbst nicht mehr. */
+.modal-panel__body:empty {
+  display: none;
+}
+
+.modal-panel > .modal-panel__body:empty ~ .modal-panel__footer {
+  border-top: none;
+}
+
 /* DER FUSS MIT LÖSCHEN AUF DEM TELEFON (Re-Critique 2026-09-27, R9 M8).
  *
  * Gemessen bei 390px: Löschen · Abbrechen · Speichern brauchten 345px, der Fuß
@@ -7139,6 +7147,26 @@ textarea::placeholder {
 .meal-type-badge--none      { background: var(--color-surface-2);     color: var(--color-text-secondary); }
 
 /* --------------------------------------------------------
+ * Die Bildmarke (utils/brand-mark.js)
+ * Ihre Farben stehen hier und nicht im Markup: EIN Zeichen fuer Seitenleiste
+ * und Zugangsseiten, in beiden Themes dasselbe (Tokens ohne Dark-Zwilling,
+ * Begruendung in tokens.css). Die Groesse gibt der Traeger.
+ * -------------------------------------------------------- */
+.brand-mark {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.brand-mark__from { stop-color: var(--brand-mark-from); }
+.brand-mark__to   { stop-color: var(--brand-mark-to); }
+
+.brand-mark__circles {
+  fill: var(--brand-mark-ink);
+  fill-opacity: 0.82;
+}
+
+/* --------------------------------------------------------
  * Toggle-Switch
  * Custom iOS-style toggle, ersetzt native Checkboxen.
  * Usage: <label class="toggle"><input type="checkbox"><span class="toggle__track"></span></label>
@@ -7184,7 +7212,9 @@ textarea::placeholder {
   inset-inline-start: 3px;
   width: 20px;
   height: 20px;
-  background: var(--color-surface);
+  /* Hell in BEIDEN Themes (tokens.css, --color-switch-knob): mit
+   * --color-surface war der Knopf im Dark ein dunkler Punkt auf heller Bahn. */
+  background: var(--color-switch-knob);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-sm);
   /* Dauer UND Kurve einzeln, nicht `var(--transition-fast) var(--ease-out)`:
@@ -7194,8 +7224,11 @@ textarea::placeholder {
   transition: transform var(--duration-sm) var(--ease-out);
 }
 
+/* Die FLAECHEN-Rolle der Stimme, nicht der Text-Akzent: die Bahn traegt einen
+ * weissen Knopf wie der Primaerknopf sein weisses Label. Hell derselbe Wert
+ * wie --color-accent (6,06:1); dunkel #7C3AED statt #A78BFA (5,70 statt 2,72). */
 .toggle input:checked + .toggle__track {
-  background-color: var(--color-accent);
+  background-color: var(--color-btn-primary);
 }
 
 .toggle input:checked + .toggle__track::after {
@@ -8384,10 +8417,43 @@ textarea::placeholder {
   gap: var(--space-1);
   font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);
+  /* Das Etikett steht mittig in seinem Streifen und darf dort umbrechen: ein
+   * laengeres Wort einer anderen Sprache waechst in die Hoehe, nicht ueber die
+   * aufgedeckte Kante hinaus. */
+  text-align: center;
+  line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
   opacity: 0;
   pointer-events: none;
   z-index: 0;
   transition: opacity var(--duration-2xs) linear;
+}
+
+/* ICON UND ETIKETT STEHEN IM AUFGEDECKTEN STREIFEN, NICHT IN DER PANELMITTE
+ * (R18). Das Panel ist die halbe Zeile breit und zentrierte seinen Inhalt:
+ * bei 390px lag die Mitte 97px von der Kante, ausgeloest wird aber nach 80px
+ * (--swipe-threshold). An der Schwelle - dem Moment, in dem die Geste ihre
+ * Folge zeigen muss - stand "Abh" und ein halber Haken (gemessen bei 86px).
+ *
+ * Die Flaeche bleibt, wie sie ist (die Karte federt gedaempft ueber die
+ * Schwelle hinaus und braucht Farbe darunter); nur der INHALTSKASTEN wird auf
+ * den Streifen an der aufgedeckten Kante gestaucht, per Polster auf der
+ * anderen Seite. Prozent im Polster rechnet gegen die Zeile, das Panel ist
+ * ihre Haelfte: 50 % minus Schwelle ist, was vom Panel verdeckt bleibt.
+ * Logische Seiten, wie die Kanten weiter unten - in RTL liegt der Streifen
+ * von selbst am anderen Ende. */
+.swipe-reveal > * {
+  max-inline-size: calc(100% - 2 * var(--space-1));
+}
+
+.swipe-reveal--leading {
+  padding-inline-end: calc(50% - var(--swipe-threshold));
+}
+
+.swipe-reveal--trailing {
+  padding-inline-start: calc(50% - var(--swipe-threshold));
 }
 
 /* --------------------------------------------------------

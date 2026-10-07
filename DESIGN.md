@@ -1845,8 +1845,12 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
   Sekundaertext, Hover hebt nur die Textfarbe. Gilt identisch fuer Aufgaben-Gruppentoggle,
   Kalender-Ansichtswahl, Budget-Tabs, Sub-Tabs, Kuechen-Tabs, Dokumenten-View-Toggle,
   Listen-Tabs, Gesundheits-Zeitraum und die Settings-Schalter. Der Traeger ist ein Well
-  (`--color-surface-3`), sonst ist die Pille kein Zustand (gemessen 1.20:1 hell / 1.16:1
-  dunkel gegen Surface, plus Schatten). Innenradius konzentrisch
+  (`--color-surface-3`), sonst ist die Pille kein Zustand. Der Daumen ist in BEIDEN Themes die
+  HELLERE Flaeche: hell Weiss auf dem Well (1.20:1), dunkel die Stufe UEBER dem Well
+  (`--_seg-active-bg` #443E37 auf #37332E, 1.19:1) - mit `--color-surface` lag er im Dark
+  als Mulde in seiner Bahn (R18). Die Modulton-Tinte haelt darauf AA (knappster Wert
+  Gesundheit 4.51:1). Dasselbe gilt fuer den Schalterknopf: `--color-switch-knob` ist in
+  beiden Themes Weiss, die An-Bahn traegt `--color-btn-primary`. Innenradius konzentrisch
   (`calc(var(--radius-sm) - 2px)`). Kein 3px-Akzentstreifen unter aktiven Tabs.
 - **EINE BEHANDLUNG PRO KONTROLLTYP.** Der Modulton erscheint genau einmal als FLAECHE
   (aktiver Filter-Chip, getoent) und einmal als TINTE (aktives Segment). Bis 2026-08-12

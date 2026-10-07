@@ -2,7 +2,7 @@
  * Modul: Bausteine der Auth-Seiten (auth-ui)
  * Zweck: EIN Kopf, EIN Passwortfeld, EIN Fehlerfeld fuer Anmeldung,
  *        Ersteinrichtung, Einladung und Passwort-Reset.
- * Abhaengigkeiten: /utils/html.js
+ * Abhaengigkeiten: /utils/html.js, /utils/brand-mark.js
  *
  * WARUM (Critique 2026-10-05, R16 "Bausteine werden nicht vererbt"): die fuenf
  * Seiten vor der Anmeldung bauten dieselben drei Dinge je selbst.
@@ -17,6 +17,7 @@
  *   alert ist assertiv) und beides gemischt.
  */
 import { esc } from '/utils/html.js';
+import { brandMarkSvg } from '/utils/brand-mark.js';
 
 const DEFAULT_APP_NAME = 'Yuvomi';
 const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
@@ -46,15 +47,7 @@ export function authHeroHtml({ appName = getStoredAppName(), tagline = '', headi
   const tag = heading ? 'h1' : 'p';
   return `
       <div class="auth-hero${heading ? '' : ' auth-hero--compact'}">
-        <span class="auth-hero__mark" aria-hidden="true">
-          <svg viewBox="0 0 160 160" fill="currentColor">
-            <g fill-opacity="0.82">
-              <circle cx="64" cy="72" r="27" />
-              <circle cx="100" cy="78" r="25" />
-              <circle cx="80" cy="106" r="24" />
-            </g>
-          </svg>
-        </span>
+        <span class="auth-hero__mark" aria-hidden="true">${brandMarkSvg()}</span>
         <${tag} class="auth-hero__title">${esc(appName)}</${tag}>
         ${tagline ? `<p class="auth-hero__tagline">${esc(tagline)}</p>` : ''}
       </div>`;

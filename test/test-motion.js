@@ -1317,3 +1317,57 @@ test('Schichtplan: Laden zeigt das geteilte Skelett, Blaettern haelt den Inhalt 
   assert.match(fn, /const hold = step !== null && !overview\.loading && !overview\.error;/);
   assert.match(fn, /if \(hold\) swapPeriod\(bodyEl\(\), step, renderPage\);/);
 });
+
+// --------------------------------------------------------------------------
+// R18: KEINE DREHUNG AUF EINEM KNOTEN, DER TEXT TRAEGT.
+//
+// `.page-fab[aria-expanded="true"] { transform: rotate(45deg) }` (dashboard.css)
+// sollte aus dem Plus ein X machen und drehte den ganzen Knopf. Am runden FAB
+// faellt das nicht auf; dieselbe Klasse traegt am Desktop aber die Kapsel
+// "+ Neu" (`.page-fab--docked`), und die kippte samt Wort um 45 Grad.
+//
+// Knoepfe sind die Knoten, die ein Etikett tragen KOENNEN: `.page-fab`
+// (angedockt beschriftet), `.btn`, der Popover-Ausloeser. Eine Drehung gehoert
+// an das Icon darin, nie an den Knopf - gleich in welcher Datei.
+// --------------------------------------------------------------------------
+const LABEL_BEARERS = ['page-fab', 'btn', 'popover-menu__trigger', 'toolbar-new-btn'];
+
+/** Der letzte zusammengesetzte Selektor - der Knoten, den die Regel trifft. */
+function subjectOf(selector) {
+  return selector.trim().split(/\s*[>+~]\s*|\s+/).pop();
+}
+
+function rotatedLabelBearers() {
+  const hits = [];
+  for (const file of allSheets) {
+    for (const { selector, body } of eachRule(css(file))) {
+      if (!/(?:^|[;\s])(?:transform|rotate)\s*:[^;]*(?:rotate[XYZ]?\(|\d(?:deg|turn|rad))/.test(body)) continue;
+      for (const part of selector.split(',')) {
+        const subject = subjectOf(part);
+        // Ein Pseudo-Element ist ein eigener Kasten ohne Text - das darf drehen.
+        if (/::|:(?:before|after)\b/.test(subject)) continue;
+        const classes = (subject.match(/\.[\w-]+/g) ?? []).map((c) => c.slice(1));
+        if (classes.some((c) => LABEL_BEARERS.includes(c))) hits.push(`${file}: ${part.trim()}`);
+      }
+    }
+  }
+  return hits;
+}
+
+test('R18: keine Drehung auf einem Knopf, der Text tragen kann - es dreht das Icon', () => {
+  assert.deepEqual(rotatedLabelBearers(), [],
+    'eine Drehung am Knopf kippt seine Beschriftung mit (Kapsel "+ Neu" am Desktop)');
+
+  // Reichweite: das Plus-zu-X gibt es weiterhin, am Icon.
+  const dash = [...eachRule(css('dashboard.css'))];
+  const turn = dash.find((r) => r.selector.split(',').some((s) => s.trim() === '.page-fab[aria-expanded="true"] > svg'));
+  assert.ok(turn, 'die Regel fuer das gedrehte Icon fehlt');
+  assert.match(turn.body, /transform:\s*rotate\(45deg\)/);
+
+  // Das Grau des offenen Speed-Dials erreicht die angedockte Kapsel nicht.
+  const grey = dash.filter((r) => /\.page-fab\[aria-expanded="true"\]/.test(r.selector) && /background(?:-color)?\s*:/.test(r.body));
+  assert.ok(grey.length > 0, 'Reichweite: der offene Speed-Dial faerbt sich weiterhin um');
+  for (const r of grey) {
+    assert.match(r.selector, /:not\(\.page-fab--docked\)/, `${r.selector} wuerde die violette Kapsel ergrauen lassen`);
+  }
+});

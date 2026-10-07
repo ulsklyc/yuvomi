@@ -27,6 +27,7 @@ import { esc } from '/utils/html.js';
 import { pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import { iconElement } from '/utils/lucide-icons.js';
+import { expandIn, durationToken } from '/utils/ux.js';
 
 let activeOverlay = null;
 let previouslyFocused = null;
@@ -1200,7 +1201,34 @@ export function mountFooter(panel) {
 
   panel.appendChild(bodyFooter);
   decorateFooterDelete(bodyFooter);
+  collapseEmptyBody(panel);
   return bodyFooter;
+}
+
+/**
+ * EIN RUMPF OHNE INHALT IST KEIN RUMPF (R18).
+ *
+ * Eine Rückfrage ohne `detail` besteht nur aus Frage (Titel) und Fuß. Nach dem
+ * Anheben der Fußzeile blieb ihr Rumpf als leerer Kasten stehen: zweimal 16px
+ * Polster zwischen der Linie des Kopfs und der des Fußes (Abmelden, gemessen
+ * 32px Leere zwischen zwei Haarlinien). Das trifft jede Rückfrage ohne
+ * Erklärtext, nicht eine bestimmte.
+ *
+ * Der Rumpf wird dafür nur WIRKLICH leer gemacht - übrig waren die
+ * Leerzeichen des Template-Literals, und an denen scheitert `:empty`. Den
+ * Rest trägt das Stylesheet (`.modal-panel__body:empty`, layout.css): keine
+ * Klasse, die jemand wieder abnehmen müsste, wenn ein Aufrufer den Rumpf
+ * später füllt - dann ist er nicht mehr `:empty` und steht von selbst wieder.
+ *
+ * @param {HTMLElement} panel
+ * @returns {boolean} true, wenn der Rumpf geleert wurde
+ */
+export function collapseEmptyBody(panel) {
+  const body = panel?.querySelector?.('.modal-panel__body');
+  if (!body) return false;
+  if (body.children.length > 0 || body.textContent.trim() !== '') return false;
+  body.replaceChildren();
+  return true;
 }
 
 /**
@@ -2063,10 +2091,18 @@ function _focusField(input) {
 function _validateField(input) {
   const group = input.closest('.form-field') ?? input.parentElement;
   const hasValue = input.value.trim().length > 0;
+  const wasShown = Boolean(group?.classList.contains?.('form-field--error'));
   if (group) _ensureFieldError(group, input);
   group?.classList.toggle('form-field--error', !hasValue);
   group?.classList.toggle('form-field--valid', hasValue);
   input.setAttribute('aria-invalid', String(!hasValue));
+  // Die Meldung zieht auf, statt zu erscheinen: sie ist eine Zeile hoch, und
+  // alles darunter rueckte in einem Frame um rund 24px - auch der Knopf, auf
+  // den der Zeiger gerade zielt (R18). `expandIn` ist der Baustein dafuer.
+  if (!hasValue && !wasShown) {
+    const el = typeof group?.querySelector === 'function' ? group.querySelector('.form-field__error') : null;
+    if (el) expandIn(el, { duration: durationToken('--duration-md', 200), absorbGap: true });
+  }
 
   if (!hasValue && group) {
     const count = parseInt(group.dataset.errorCount ?? '0', 10) + 1;
@@ -2084,12 +2120,32 @@ function _validateField(input) {
   return hasValue;
 }
 
+/**
+ * Felder, in die schon jemand geschrieben hat - je Knoten, ohne Spur im DOM.
+ *
+ * EIN UNBERUEHRTES PFLICHTFELD RUEGT NICHT (R18). Der Dialog oeffnet mit dem
+ * Fokus im ersten Feld; der erste Tab, der Griff zum Datumswaehler, ein Klick
+ * daneben - alles ein `blur` auf einem leeren Titel, und jedes davon meldete
+ * "Dieses Feld ist erforderlich.", bevor irgendwer etwas versaeumt hatte
+ * ("Neuer Termin", zwei Laeufe). Geruegt wird, wo eine Eingabe FEHLT: nach
+ * dem Absenden (`validateAll`) oder wenn jemand das Feld beschrieben und
+ * wieder geleert hat. Wer es nur durchquert, hat nichts falsch gemacht.
+ */
+const _touchedFields = new WeakSet();
+
 export function wireBlurValidation(formContainer) {
   formContainer.querySelectorAll('input[required], select[required], textarea[required]').forEach((input) => {
-    input.addEventListener('blur', () => _validateField(input));
+    input.addEventListener('blur', () => {
+      const pristineEmpty = input.value.trim().length === 0
+        && !_touchedFields.has(input)
+        && input.getAttribute('aria-invalid') !== 'true';
+      if (pristineEmpty) return;
+      _validateField(input);
+    });
     // Sofortige Entwarnung: ist das Feld bereits als fehlerhaft markiert,
     // räumt die nächste Eingabe den Fehler ohne erneuten Blur auf.
     input.addEventListener('input', () => {
+      _touchedFields.add(input);
       if (input.getAttribute('aria-invalid') === 'true') _validateField(input);
     });
   });
@@ -2122,9 +2178,15 @@ export function reportFieldError(input, message) {
   const group = (typeof input.closest === 'function' ? input.closest('.form-field') : null) ?? input.parentElement;
   if (!group) return false;
 
+  const wasShown = Boolean(group.classList?.contains?.('form-field--error'));
   _ensureFieldError(group, input, message);
   group.classList?.add('form-field--error');
   group.classList?.remove('form-field--valid');
+  // Dieselbe Bewegung wie in _validateField: die Meldung zieht auf.
+  if (!wasShown && typeof group.querySelector === 'function') {
+    const el = group.querySelector('.form-field__error');
+    if (el) expandIn(el, { duration: durationToken('--duration-md', 200), absorbGap: true });
+  }
   input.setAttribute?.('aria-invalid', 'true');
   _focusField(input);
 

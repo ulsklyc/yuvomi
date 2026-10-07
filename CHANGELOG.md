@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Overview on a desktop: opening "New" no longer tips the button over.** The plus turns into
+  a cross by rotating - and it was the whole button that rotated, label included, so the capsule
+  stood diagonally at 45 degrees and turned grey while its menu was open. Only the icon turns
+  now, and the capsule keeps its colour. The round button on a phone looks as before.
+- **The budget tile on the overview wears the budget colour.** Its mark was violet, the colour of
+  the overview itself, because the colour was derived from the tile's link and that link carries
+  a `?tab=` part. The fasting tile, which had no colour of its own either, now wears the health
+  colour like the other health tiles.
+- **Swiping a row shows its whole label at the point where the swipe takes effect.** Icon and
+  word sat in the middle of a panel half the row wide, while the action triggers after 80 px -
+  at that moment a phone showed "Che" and half a tick. They now stand inside the strip the swipe
+  uncovers, on both sides and in right-to-left languages, in every list that swipes.
+- **A required field no longer complains before anything was entered.** In "New event" the title
+  showed "This field is required." on the first Tab or when reaching for the date picker, and
+  everything below it jumped down by a line. An untouched empty field now stays quiet until the
+  form is submitted or until something was typed into it and removed again, and the message
+  slides in instead of pushing the form. This applies to every dialog that marks required fields
+  (events, tasks, meals, recipes, pantry, inventory, contact sync).
+- **Dark theme: the selected segment and the switch knob are the lighter surface again.** The
+  selected tab of a segmented control was darker than its track and read as a dent, and the knob
+  of a switch was a dark dot on a light rail. The thumb now sits one step above its track
+  (module-coloured labels on it keep at least 4.5:1), and the knob is white in both themes; a
+  switch that is on uses the same violet as a primary button, so the knob stands at 5.7:1 instead
+  of 2.7:1.
+- **The login pages show the Yuvomi mark as it is.** In the dark theme the mark on login,
+  invitation and password reset was three dark dots on a lilac tile, and the circles filled less
+  than a third of it. Sidebar and login pages now draw the same mark - the gradient tile with
+  the three light circles of the app icon - and it no longer changes with the theme.
+- **Health on a phone no longer jumps while it loads** (cause of #1770). The block above the list
+  of areas - person, "Due today", "Quick add" - appeared only once its data had arrived and
+  pushed the list down by almost 500 px, under the finger; each row then grew again when its
+  status came in. The block now holds its place from the first frame with a placeholder in its
+  final shape, and the rows have their two-line height from the start. Measured layout shift at
+  390x844: 0.58 before, below 0.01 after. The areas themselves load with a placeholder in the
+  shape of their content instead of the word "Loading".
+- **A confirmation without an explanation has no empty gap.** Dialogs such as "Log out of this
+  device?" showed an empty band between two hairlines, between the question and its buttons.
+
 ## [2.75.0] - 2026-10-07
 
 ### Added

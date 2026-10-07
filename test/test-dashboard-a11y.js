@@ -82,6 +82,65 @@ test('die Signatur bleibt: fuenf Positionsargumente plus optionaler Siegel-Slug'
   assert.ok(!/widget__link/.test(html), 'ohne Ziel weiterhin kein Link');
 });
 
+// R18: DER SLUG DES SIEGELS IST EIN MODUL, KEIN STUECK ADRESSE. Das Budget-Widget
+// verlinkt auf `/budget?tab=budget`; der Slug wurde am ersten `/` geschnitten und
+// ergab `var(--module-budget?tab=budget, ...)` - ungueltig, das Siegel stand im
+// geerbten Violett. Der Text-Guard „wer ein Markensiegel baut, benennt eine
+// Herkunft" (test-frontend-audit.js) sah die Zeichenkette `--seal-accent` und
+// war gruen. Deshalb hier der AUFRUF: jedes Ziel, das dashboard.js einem
+// Widget-Kopf gibt, laeuft durch widgetHeader, und der Ton muss ein Token sein,
+// das tokens.css kennt.
+test('jedes Widget-Siegel nennt einen Modulton, den tokens.css kennt (R18)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
+  const known = new Set([...read('../public/styles/tokens.css').matchAll(/--module-([a-z-]+)\s*:/g)].map((m) => m[1]));
+  assert.ok(known.has('budget') && known.has('health'), 'Reichweite: die Modulliste wurde gelesen');
+
+  const src = read('../public/pages/dashboard.js');
+  const constants = Object.fromEntries(
+    [...src.matchAll(/^const ([A-Z_]+_ROUTE) = '([^']+)';/gm)].map((m) => [m[1], m[2]]));
+  const slugOf = (html) => html.match(/--seal-accent: var\(--module-([^,)]*)/)?.[1];
+
+  // Jeder Aufruf mit seinen Argumenten - ueber die Klammern, nicht ueber ein
+  // Muster: `t('nav.budget')` schliesst vor dem Ziel schon einmal.
+  const calls = [];
+  for (const m of src.matchAll(/(?<!function )widgetHeader\('([a-z-]+)'/g)) {
+    let depth = 0;
+    let end = m.index + 'widgetHeader'.length;
+    do {
+      if (src[end] === '(') depth += 1;
+      else if (src[end] === ')') depth -= 1;
+      end += 1;
+    } while (depth > 0);
+    calls.push([src.slice(m.index, end), m[1]]);
+  }
+  assert.ok(calls.length >= 30, `Reichweite: ${calls.length} Aufrufe gefunden`);
+
+  const offenders = [];
+  let viaConstant = 0;
+  for (const [text, id] of calls) {
+    const route = text.match(/'(\/[^']*)'/)?.[1];
+    const constant = text.match(/\b([A-Z_]+_ROUTE)\b/)?.[1];
+    const seal = text.match(/,\s*'([a-z-]+)'\)$/)?.[1] ?? null;
+    if (constant) viaConstant += 1;
+    const href = route ?? (constant ? constants[constant] : null);
+    if (constant) assert.ok(href, `${constant} ist aufloesbar`);
+    // Ohne Ziel und ohne benannte Herkunft bleibt nur, was der Aufruf selbst
+    // mitgibt (das Familie-Widget rechnet sein Ziel zur Laufzeit, nennt aber
+    // die Herkunft).
+    const slug = slugOf(widgetHeader(id, 'Titel', null, href, null, seal));
+    if (!slug) offenders.push(`${id}: kein Modulton (weder Ziel noch sealSlug) in ${text}`);
+    else if (!known.has(slug)) offenders.push(`${id}: --module-${slug} gibt es nicht (${text})`);
+  }
+  assert.ok(viaConstant >= 2, 'Reichweite: der Budget-Kopf (Route mit Query) ist dabei');
+  assert.deepEqual(offenders, []);
+
+  // Und die Regel selbst, an den Formen, die eine Adresse haben kann.
+  for (const href of ['/budget?tab=budget', '/budget#monat', '/budget/', '/budget/x?y=1']) {
+    assert.equal(slugOf(widgetHeader('budget', 'Budget', null, href)), 'budget', href);
+  }
+});
+
 test('das Raster hat eine eigene h2 - die Widgets haengen nicht unter „Heute wichtig"', () => {
   const html = renderDashboardLayout([{ id: 'clock', visible: true, size: '1x1' }], {}, null, 'EUR');
   const gridAt = html.indexOf('dashboard__grid');
