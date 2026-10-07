@@ -475,3 +475,27 @@
     display: inline-flex;
   }
 }
+
+/* DER FUSS DES LESEBLATTS AUF DEM TELEFON (R17, E7). Mit Bearbeiten als
+ * Primaerknopf am Ende (`edit.primary`) stehen im Kontakt drei Aktionen im
+ * Fuss; "Als vCard exportieren" brach in 332px auf zwei Zeilen (Knopf 57px,
+ * Fuss 82 statt 73). Dieselbe Antwort wie in der schmalen Detailspalte
+ * (layout.css, `@container detail-pane`): ein leiser Knopf mit Icon zeigt nur
+ * das Icon, sein Name bleibt fuer Screenreader und als Tooltip. Loeschen und
+ * die Hauptaktion behalten ihr Wort bzw. ihre eigene Regel. */
+@media (max-width: 639px) {
+  .modal-panel > .detail-view__footer:has(> .btn--primary) > .btn--ghost:has(> svg, > i) > .btn__label {
+    position: absolute;
+    width: var(--space-px);
+    height: var(--space-px);
+    margin: calc(-1 * var(--space-px));
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .modal-panel > .detail-view__footer:has(> .btn--primary) > .btn--ghost:has(> svg, > i):has(> .btn__label) {
+    min-width: var(--target-base);
+    padding-inline: var(--space-2);
+  }
+}

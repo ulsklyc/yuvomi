@@ -193,6 +193,22 @@ test('Zeile mit Schreibrecht (Gegenfall): Knopf, Griff, Bearbeiten, Loeschen, Wi
   assert.doesNotMatch(html, /item-check--static|swipe-row--static|shopping-item--static/);
 });
 
+test('R17 E7: der Zeilenkoerper oeffnet die Details, der Stift entfaellt, Haken/Griff/Papierkorb bleiben', async () => {
+  zustand();
+  const html = await withAccess(SCHREIBEN, () => shopping.renderItem(artikel({ quantity: '2 l' })));
+  const body = html.match(/<button type="button" class="list-row__main list-row__main--interactive"[^>]*>([\s\S]*?)<\/button>/);
+  assert.ok(body, 'der Zeilenkoerper ist ein echter Knopf - per Tastatur erreichbar, Enter oeffnet');
+  assert.match(body[0], /data-action="item-details" data-id="1"/);
+  assert.match(body[1], /Milch/, 'er traegt den Namen');
+  assert.match(body[1], /2 l/, 'und die Menge');
+  assert.doesNotMatch(body[1], /<(div|button|a|p)\b/, 'in einem Knopf steht nur Phrasing-Inhalt');
+  assert.equal((html.match(/data-action="item-details"/g) ?? []).length, 1, 'EIN Weg in die Details, kein zweiter Knopf daneben');
+  assert.doesNotMatch(html, /data-lucide="pencil"/, 'der Stift doppelte den Zeilenkoerper');
+  for (const bleibt of ['data-action="toggle-item"', 'data-action="reorder-handle"', 'data-action="delete-item"']) {
+    assert.ok(html.includes(bleibt), `${bleibt} bleibt in der Zeile`);
+  }
+});
+
 test('Zeile bei `read`: ein abgehakter Artikel zeigt den Haken gesetzt und sagt es', async () => {
   zustand();
   const html = await withAccess(LESEN, () => shopping.renderItem(artikel({ is_checked: 1 })));
@@ -464,8 +480,10 @@ test('Delegierter Handler bei `read`: nur die Positivliste kommt durch', async (
       zustand();
       await handler(klick({ aktion: 'delete-item' }));
     }));
-    assert.deepEqual(schreibend, ['PATCH /shopping/items/1', 'PATCH /shopping/items/1'],
-      'Gegenprobe: Knopf und Zeilenklick haken mit Schreibrecht ab');
+    // Seit R17 (E7) hakt nur noch der Knopf ab: ein Klick in die Zeile ohne
+    // benanntes Ziel tut nichts, der Zeilenkoerper oeffnet die Details.
+    assert.deepEqual(schreibend, ['PATCH /shopping/items/1'],
+      'Gegenprobe: der Knopf hakt mit Schreibrecht ab, der blosse Zeilenklick nicht mehr');
     assert.equal(undo.length, 1, 'Gegenprobe: das Loeschen landet im Undo-Fenster');
   } finally {
     delete globalThis.__undoStub;

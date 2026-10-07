@@ -34,23 +34,21 @@ const uid = u1.lastInsertRowid;
 
 console.log('\n[Shopping-Test] Listen, Artikel, Sortierung\n');
 
-test('Einkaufslisten-Zeilen toggeln nur außerhalb interaktiver Controls', () => {
+test('Einkaufszeile: der Zeilenkoerper oeffnet die Details, das Kaestchen hakt ab (R17, E7)', () => {
   const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
-  assert(/function shouldIgnoreShoppingRowToggle/.test(source), 'Row-Toggle-Guard muss als Helper existieren');
-  assert(/button, a, input, select, textarea, \[data-no-row-toggle\]/.test(source), 'Interaktive Controls müssen ignoriert werden');
-  assert(/closest\('\.shopping-item'\)/.test(source), 'Klicks müssen auf Einkaufszeilen begrenzt sein');
-  assert(/data-item-id/.test(source), 'Zeilen-Toggle muss die Artikel-ID aus data-item-id lesen');
-  // R16 Schritt 2b: ein Zwischenstand hatte den Zeilen-Tipp auf "oeffnen"
-  // umgestellt und den Stift entfernt - das nahm die einhaendige Abhak-Geste
-  // im Laden (Ziel 358px statt 48px). Zurueckgenommen; DESIGN.md "Was eine
-  // Zeile tut" fuehrt die Abhak-Liste des Einkaufs als die eine Ausnahme.
+  // Entscheidung vom 07.10.2026 (E7): "Zeilentipp oeffnet Details" gilt auch im
+  // Einkauf, der Stift entfaellt. Vorher hakte der Tipp auf die Zeile ab (R16
+  // Schritt 2b) und der Stift war der Bearbeiten-Weg - die eine Ausnahme von
+  // der Zeilenregel. Das gerenderte Markup prueft test:shopping-readonly-ui
+  // (echtes `renderItem`); hier steht, dass der delegierte Handler die Zeile
+  // nicht mehr selbst abhakt.
   const rowSrc = source.match(/function renderItem\(item\)[\s\S]*?\n\}/)?.[0] ?? '';
-  assert(/class="row-action" data-action="item-details"[\s\S]{0,200}data-lucide="pencil"/.test(rowSrc),
-    'der Stift bleibt der Bearbeiten-Weg der Einkaufszeile');
-  assert(!/list-row__main--interactive/.test(rowSrc),
-    'der Zeilenkoerper ist kein Oeffnen-Knopf: der Tipp auf die Zeile hakt ab');
-  assert(/await toggleShoppingItem\(Number\(row\.dataset\.itemId\)/.test(source),
-    'der Zeilenklick ohne benanntes Ziel hakt ab');
+  assert(/class="list-row__main list-row__main--interactive"\s+data-action="item-details"/.test(rowSrc),
+    'der Zeilenkoerper ist der Oeffnen-Knopf');
+  assert(!/data-lucide="pencil"/.test(rowSrc), 'der Stift doppelte den Zeilenkoerper und entfaellt');
+  assert(!/toggleShoppingItem\(Number\(row\.dataset\.itemId\)/.test(source),
+    'ein Klick ohne benanntes Ziel hakt nicht mehr ab');
+  assert(/data-item-id/.test(source), 'die Zeile traegt weiter ihre Artikel-ID (Wisch, Nachzeichnen)');
 });
 
 test('Shopping-Löschaktionen importieren den gemeinsamen Undo-Helper', () => {

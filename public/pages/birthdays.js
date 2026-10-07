@@ -711,10 +711,11 @@ async function onListClick(e) {
   const open = e.target.closest('[data-open]');
   if (open) {
     // Ab der Schwelle waehlt der Tipp aus (Detailspalte), darunter oeffnet er
-    // wie bisher Editor bzw. Leseansicht - das entscheidet der Baustein.
+    // das Leseblatt (R17, E7; bei Nur-lesen die Leseansicht) - das entscheidet
+    // der Baustein.
     if (_md) { _md.open(open.dataset.open, open); return; }
     const birthday = state.birthdays.find((item) => item.id === Number(open.dataset.open));
-    if (birthday) openBirthdayModal({ mode: 'edit', birthday });
+    if (birthday) openBirthdaySheet(birthday);
     return;
   }
   const action = e.target.closest('[data-action]');
@@ -1275,6 +1276,60 @@ function renderBirthdayPane(id, body) {
 }
 
 /**
+ * Der Geburtstag als Leseblatt unter der Schwelle (R17, E7).
+ *
+ * ZEILENTIPP OEFFNET DETAILS, NICHT DAS FORMULAR. Am Telefon ging der Tipp
+ * bisher direkt in den Editor - als einzige Liste neben Kalender (Leseblatt,
+ * Bearbeiten primaer im Fuss) und Kontakten (Leseblatt). Wer nur nachsehen
+ * will, wie alt jemand wird, stand in einem Formular mit offener Tastatur.
+ * Dieselben Zeilen wie die Detailspalte (`birthdayPaneSections`), dieselbe
+ * Fussordnung wie der Termin: Loeschen zurueckgenommen am Anfang, Bearbeiten
+ * als Primaerknopf am Ende (Daumenzone, DESIGN.md "Das Leseblatt").
+ *
+ * Bearbeiten ist eine `action` und kein `edit.mount`: der Editor ist ein
+ * eigener Dialog mit Bild-Upload und eigener Fusszeile (`openBirthdayModal`),
+ * kein Formular, das sich in ein fremdes Blatt setzen liesse. Das Blatt geht
+ * zu, der Fokus kehrt auf die Zeile zurueck, und von dort oeffnet der Editor -
+ * sein Schliessen landet deshalb wieder auf der Zeile.
+ *
+ * Nur mit Schreibrecht: bei `calendar: read` bleibt die Leseansicht
+ * `openBirthdayReadModal` der Weg (openBirthdayModal entscheidet).
+ */
+function openBirthdaySheet(birthday) {
+  if (readOnly()) { openBirthdayModal({ mode: 'edit', birthday }); return; }
+  openDetailView({
+    title: birthday.name,
+    key: `birthday:${birthday.id}`,
+    accentColor: 'var(--module-birthdays)',
+    size: 'md',
+    sections: birthdayPaneSections(birthday),
+    actions: [{
+      id: 'birthday-detail-delete',
+      label: t('common.delete'),
+      variant: 'danger-ghost',
+      icon: 'trash-2',
+      align: 'start',
+      onClick: async ({ close }) => {
+        await close({ force: true });
+        deleteBirthday(birthday.id);
+      },
+    }, {
+      id: 'detail-view-edit',
+      label: t('common.edit'),
+      variant: 'primary',
+      icon: 'pencil',
+      onClick: async ({ close }) => {
+        await close({ force: true });
+        // Der Editor merkt sich beim Oeffnen, wo der Fokus steht - das muss
+        // die Zeile sein, nicht <body> zwischen zwei Dialogen.
+        _container?.querySelector(`[data-open="${birthday.id}"]`)?.focus();
+        openBirthdayModal({ mode: 'edit', birthday });
+      },
+    }],
+  });
+}
+
+/**
  * Der Kopf klebt in #main-content; die Detailspalte klebt darunter und misst
  * ihn dafuer (wie Inventar - Geburtstage haben keinen eigenen Scrollport, und
  * der Kopf bricht in langen Locales um).
@@ -1305,10 +1360,10 @@ function mountBirthdaysDetail(signal) {
     root,
     signal,
     renderDetail: (id, body) => renderBirthdayPane(id, body),
-    // Unter der Schwelle der bisherige Weg: Editor, bei Nur-lesen die Leseansicht.
+    // Unter der Schwelle das Leseblatt (E7), bei Nur-lesen die Leseansicht.
     openNarrow: (id) => {
       const birthday = find(id);
-      if (birthday) openBirthdayModal({ mode: 'edit', birthday });
+      if (birthday) openBirthdaySheet(birthday);
     },
     onEnter: (id) => {
       const birthday = find(id);

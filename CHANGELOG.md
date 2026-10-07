@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Tapping a row opens its details - also for birthdays on a phone and in the shopping list.**
+  A birthday opened straight into the edit form with the keyboard up; it now opens a read sheet
+  (next date and age, birth date, name day, note, reminder) with Delete at the start of the footer
+  and Edit as the main button at the end, as an appointment does. A contact's sheet has Edit in
+  the same place instead of in the header. In the shopping list, tapping an item opens its
+  details and the pencil in the row is gone; ticking off is the checkbox and, on touch, the swipe
+  from the start of the row - tapping the row itself no longer ticks.
 - **One word per thing in the German interface, and two settings pages named for what they
   hold.** The navigation says "Übersicht"; nine texts still said "Dashboard" (load error, pinned
   notes, weather, permissions, shortcuts) - they now say "Übersicht" too, likewise "Overview" in

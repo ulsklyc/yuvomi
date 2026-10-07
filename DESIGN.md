@@ -1498,7 +1498,7 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 | Mehrfachauswahl in einer Liste | Auswahlkreis ERSETZT Statuskreis und Zeilen-Picker (Apple Erinnerungen); Leiste = Bulk-Pille mit "Fertig"; Name je Zeile mit Objekt ("<Titel> auswaehlen"); Loeschen im Pillen-Stil, Rueckfrage in der Pille, eine Folge, die die Frage nicht traegt, als Detailzeile darunter (Dokumente: kein Papierkorb) | `.select-circle` (layout.css) + `setBulkPill({ label, actions })` / `clearBulkPill()` (utils/bulk-pill.js), `confirm: { question, detail? }` | native blaue Checkbox neben dem Statuskreis, eigene Aktionsleiste, gefuellte rote Loeschen-Kapsel |
 | Aktionen an Karte oder Zeile | dauerhaft sichtbar, ruhig per Tertiaerfarbe (ignore.md) | `.row-action` | Einblenden erst per `:hover`/`:focus-within` |
 | Erledigen an einer Zeile | EIN Abhakkreis: 20px, 2px, in Ruhe `--color-text-tertiary`; unter dem Zeiger laedt der Modulton ein, erledigt ist `--color-success` (Gruen bestaetigt, es steht nie in Ruhe da); `--static` = Zeichen ohne Einladung. Das Kaestchen des Einkaufs (`.item-check`) ist ein Kaestchen und bleibt eigen | `.check-ring` (list-row.css) an `.task-status-btn` und `.housekeeping-task__check`; Trefferflaeche und Zustand beim Modul | zweiter Ring je Modul (24px, in Ruhe gruen) |
-| Was eine Zeile tut (R16) | **In Abhak-Listen des Einkaufs hakt der Zeilen-Tipp ab; sonst oeffnet er** (Bearbeiten, mit Leserecht die Leseansicht) - als echter Knopf (`.list-row__main--interactive`). Im Einkauf bleibt der Stift der Bearbeiten-Weg: die ganze Zeile ist dort das Abhak-Ziel (einhaendig im Laden, 358 statt 48px). **Loeschen = Wisch mobil + ein fester Ort am Desktop:** den Dialogfuss (Desktop, Tastatur) und auf Touch den Wisch zum Zeilenende. Eine Zeilenaktion, die nur den Zeilenkoerper doppelt (Stift), entfaellt; sichtbare Zeilenaktionen bleiben sichtbar (ignore.md), reduziert wird ihre ZAHL | `wireSwipeRows()` (utils/swipe-row.js), `scheduleUndoableDelete()` (utils/ux.js), `decorateFooterDelete()` (modal.js) | Stift + Papierkorb als 2 x 48px am Zeilenende, vier Grammatiken je Modulgruppe |
+| Was eine Zeile tut (R16, R17 E7) | **Der Zeilen-Tipp oeffnet - ueberall, seit R17 auch im Einkauf** (Details; wo es ein Leseblatt gibt, das Leseblatt: Kalender, Kontakte, Inventar, seit R17 Geburtstage unter der Spaltenschwelle; mit Leserecht die Leseansicht) - als echter Knopf (`.list-row__main--interactive`). Im Einkauf hakt das Kaestchen ab (48px) und auf Touch der Wisch vom Zeilenanfang; der Stift ist fort, weil er den Zeilenkoerper doppelte (Entscheidung E7 vom 07.10.2026 - sie nimmt die R16-Ausnahme "die ganze Zeile hakt ab" zurueck). **Im Leseblatt sitzt Bearbeiten an EINER Stelle:** als Primaerknopf am Ende des Fusses (`edit.primary`; Termin, Inventar, Kontakt, Geburtstag), in der Detailspalte als Kopfaktion; die Aufgabe ist die benannte Ausnahme (Hauptabsicht Erledigen). **Loeschen = Wisch mobil + ein fester Ort am Desktop:** den Dialogfuss (Desktop, Tastatur) und auf Touch den Wisch zum Zeilenende. Eine Zeilenaktion, die nur den Zeilenkoerper doppelt (Stift), entfaellt; sichtbare Zeilenaktionen bleiben sichtbar (ignore.md), reduziert wird ihre ZAHL | `wireSwipeRows()` (utils/swipe-row.js), `scheduleUndoableDelete()` (utils/ux.js), `decorateFooterDelete()` (modal.js) | Stift + Papierkorb als 2 x 48px am Zeilenende, vier Grammatiken je Modulgruppe |
 | Name einer Zeile | Rolle **Zeilentitel**: 16px medium (Abschnitt Typography) | `.list-row__name` / `.u-row-title` (typography.css) | 15/600, 16/400, 17/600 je Modul |
 | Abschnitt als Auszug eines Reiters | der Abschnittstitel IST der Weg: Knopf im `h2.u-section-title` mit Pfeil | `.section-title-link` (layout.css) | "Alle anzeigen"-Knopf daneben, Nachbau je Modul |
 | Ueberschrift ueber Inhalt | **Gruppentitel IN einer Liste** = `.list-group__title` (12px Versalien). **Abschnittstitel einer Flaeche** = `h2.u-section-title` (20px semibold) AUF DER BUEHNE, ueber der Karte oder dem Traeger, Werkzeuge rechts daneben; ohne Icon. Wiederholt er den Namen des offenen Reiters, steht er nur in der Gliederung (`.sr-only`) | list-row.css, typography.css | Titel in der Karte, `div` ohne Ueberschriftenrolle, Icon vor dem Titel |
@@ -1559,12 +1559,13 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 
 **Die Zeilenregel in der Kueche (R16, Critique 2026-10-05).** In Abhak-Listen des Einkaufs
 hakt der Zeilen-Tipp ab; sonst oeffnet er. Loeschen = Wisch mobil + ein fester Ort am Desktop.
-- **Einkauf:** der Tipp auf die Zeile hakt ab (die ganze Zeile ist das Ziel, nicht nur das
-  Kaestchen - die Geste im Laden ist einhaendig), auf Touch zusaetzlich der Wisch vom
-  Zeilenanfang. Bearbeiten ist der Stift in der Zeile. Ein Zwischenstand von R16 hatte den
-  Zeilenkoerper zum Oeffnen-Knopf gemacht und den Stift entfernt; das ist zurueckgenommen
-  (`test:shopping` haelt Stift und Zeilen-Toggle). Loeschen: Wisch zum Zeilenende (Touch),
-  Papierkorb in der Zeile (Zeiger), Dialogfuss (immer).
+- **Einkauf:** der Tipp auf die Zeile oeffnet die Artikel-Details (R17, E7: der Zeilenkoerper
+  ist der Knopf, mobil 228 statt 180px breit). Abhaken: das Kaestchen (48px) und auf Touch der
+  Wisch vom Zeilenanfang. Der Stift entfaellt. R16 hatte es umgekehrt entschieden (die ganze
+  Zeile hakt ab, der Stift oeffnet); die Entscheidung vom 07.10.2026 stellt den Einkauf unter
+  dieselbe Regel wie jede andere Liste (`test:shopping`, `test:shopping-readonly-ui` am
+  gerenderten Markup). Loeschen: Wisch zum Zeilenende (Touch), Papierkorb in der Zeile
+  (Zeiger), Dialogfuss (immer).
 - **Vorrat:** Koerper oeffnet. Loeschen: Wisch zum Zeilenende (Touch; Stepper und Warenkorb
   sind Ausnahmezone, `wirePantrySwipe()`), Dialogfuss (immer), jeweils mit Rueckgaengig. Der
   Chevron am Zeilenende entfaellt hier - dort steht der "+"-Knopf.
@@ -3423,8 +3424,13 @@ Fusszeile - die riskanteste Aktion war die erreichbarste. Mit `edit.primary` ste
 als Primaerknopf am ENDE der Fusszeile, Löschen bleibt `danger-ghost` am Anfang
 (`margin-inline-end: auto`, in RTL gespiegelt), und der Kopfknopf erscheint erst im Formular,
 als „Zurück". Opt-in, weil die Hauptabsicht dem Objekt gehoert: im Termin ist es Bearbeiten, in
-der Aufgabe das Erledigen. Die Rueckfrage beim Löschen bleibt. Der Kalender nimmt es; Kontakte
-und Inventar haben dieselbe Fusszeile und sind die naechsten Kandidaten.
+der Aufgabe das Erledigen. Die Rueckfrage beim Löschen bleibt. Kalender, Inventar und seit R17
+(E7) Kontakte und Geburtstage nehmen es. Der Geburtstag hat unter der Spaltenschwelle seither
+ueberhaupt erst ein Leseblatt (`openBirthdaySheet`; vorher ging der Tipp direkt in den Editor) -
+sein Bearbeiten ist eine Fussaktion, die das Blatt schliesst und den Editor-Dialog oeffnet, weil
+der Editor ein eigener Dialog mit Bild-Upload ist. Stehen im Fuss neben Loeschen und Bearbeiten
+weitere leise Aktionen mit Icon (Kontakt: vCard-Export), zeigen sie unter 640px nur das Icon
+(detail-view.css), wie in der schmalen Detailspalte.
 **Das Popover am Desktop folgt derselben Ordnung** (Re-Kritik 2026-09-25, P2): es setzte
 Bearbeiten als Sekundaerknopf VOR alle Aktionen, Löschen stand 8px daneben, sein `--start` schob
 nichts mehr auseinander, und „In Maps öffnen" rutschte allein in eine zweite Zeile. Mit

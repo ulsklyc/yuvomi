@@ -234,10 +234,6 @@ function readOnlyBlocks(action) {
   return readOnly() && !READ_SAFE_ACTIONS.has(action);
 }
 
-function shouldIgnoreShoppingRowToggle(target) {
-  return Boolean(target?.closest?.('button, a, input, select, textarea, [data-no-row-toggle]'));
-}
-
 // --------------------------------------------------------
 // Sammelaktions-Pille: Zustandsautomat (#1039)
 //
@@ -1375,13 +1371,14 @@ function renderItem(item) {
       <div class="list-row shopping-item ${isDone ? 'shopping-item--checked' : ''}${ro ? ' shopping-item--static' : ''}"
            data-item-id="${item.id}">
         ${renderItemCheck(item, isDone)}
-        <div class="list-row__main">
-          <div class="list-row__name">${esc(item.name)}${renderItemMeta(item)}</div>
-          ${item.quantity || item.tags?.length ? `<div class="list-row__meta">
+        ${ro ? '<span class="list-row__main">' : `<button type="button" class="list-row__main list-row__main--interactive"
+                data-action="item-details" data-id="${item.id}">`}
+          <span class="list-row__name">${esc(item.name)}${renderItemMeta(item)}</span>
+          ${item.quantity || item.tags?.length ? `<span class="list-row__meta">
             ${item.quantity ? `<span class="shopping-item__quantity">${esc(item.quantity)}</span>` : ''}
             ${renderItemTags(item.tags)}
-          </div>` : ''}
-        </div>
+          </span>` : ''}
+        ${ro ? '</span>' : '</button>'}
         <!-- Geteilte .row-action-Grammatik aus layout.css (app-weit von sieben
              Modulen genutzt), gruppiert in der geteilten .list-row__actions -
              vorher hingen die zwei Buttons als direkte Flex-Kinder in der Zeile,
@@ -1390,17 +1387,14 @@ function renderItem(item) {
           ${ro ? renderReadActions(item) : `<!-- Griff für die Handsortierung (#678). Ein BUTTON, kein role="img"
                wie im Kategorie-Manager: dort steht daneben ein Auf/Ab-Paar als
                Tastaturpfad, hier trägt der Griff ihn selbst (Pfeiltasten bei
-               Fokus). Die Einkaufszeile hat schon Abhaken, Details, Löschen und
-               zwei Wischgesten - zwei weitere Knöpfe hätten die Bedienzone auf
-               dem Handy zugestellt. -->
+               Fokus). Die Einkaufszeile hat schon Abhaken, Löschen und zwei
+               Wischgesten - zwei weitere Knöpfe hätten die Bedienzone auf dem
+               Handy zugestellt. Der Stift ist seit R17 (E7) fort: der
+               Zeilenkörper öffnet die Details. -->
           <button class="row-action list-row__drag" data-action="reorder-handle" data-id="${item.id}"
                   aria-label="${t('shopping.reorderHandle', { name: esc(item.name) })}"
                   title="${t('shopping.reorderHandleHint')}">
             <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
-          </button>
-          <button class="row-action" data-action="item-details" data-id="${item.id}"
-                  aria-label="${t('shopping.detailsLabel', { name: esc(item.name) })}">
-            <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
           </button>
           <button class="row-action row-action--danger" data-action="delete-item" data-id="${item.id}"
                   aria-label="${t('shopping.deleteItemLabel', { name: esc(item.name) })}">
@@ -2040,10 +2034,10 @@ function refreshItemName(container, item) {
   const hasTags = !!item.tags?.length;
   if (item.quantity || hasTags) {
     if (!metaEl) {
-      main?.insertAdjacentHTML('beforeend', `<div class="list-row__meta">
+      main?.insertAdjacentHTML('beforeend', `<span class="list-row__meta">
         ${item.quantity ? `<span class="shopping-item__quantity">${esc(item.quantity)}</span>` : ''}
         ${renderItemTags(item.tags)}
-      </div>`);
+      </span>`);
     } else {
       const qtyEl = metaEl.querySelector('.shopping-item__quantity');
       if (item.quantity && qtyEl) {
@@ -3284,17 +3278,12 @@ function wireListContentEvents(container) {
     }
 
     const target = e.target.closest('[data-action]');
-    if (!target) {
-      // Der Zeilenklick hakt ab - bei `read` gibt es nichts abzuhaken.
-      if (readOnly()) return;
-      if (shouldIgnoreShoppingRowToggle(e.target)) return;
-      const row = e.target.closest('.shopping-item');
-      if (!row) return;
-      const toggle = row.querySelector('[data-action="toggle-item"]');
-      if (!toggle) return;
-      await toggleShoppingItem(Number(row.dataset.itemId), Number(toggle.dataset.checked), container);
-      return;
-    }
+    // ZEILENTIPP OEFFNET DIE DETAILS (R17, E7): der Zeilenkoerper ist ein
+    // Knopf mit `data-action="item-details"` und laeuft unten durch denselben
+    // Zweig wie jede andere Aktion. Abhaken tragen das Kaestchen und - auf
+    // Touch - der Wisch vom Zeilenanfang; ein Klick in eine Luecke der Zeile
+    // tut nichts mehr, statt neben dem Kaestchen abzuhaken.
+    if (!target) return;
     const action = target.dataset.action;
 
     // Der eine Riegel fuer alle Aktionen darunter (siehe READ_SAFE_ACTIONS):
@@ -3784,7 +3773,6 @@ export async function render(container, { user, signal: routeSignal = null } = {
 }
 
 export const __test = {
-  shouldIgnoreShoppingRowToggle,
   // Mengen-Zerlegung fuer den Vorrats-Uebertrag: haengt an der Format-Locale,
   // ist also nur verhaltensgetrieben pruefbar (siehe test-shopping-ux.js).
   parseShoppingQuantity,

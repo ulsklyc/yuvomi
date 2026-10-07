@@ -1723,7 +1723,11 @@ test('Kontakt-Detailansicht mit `contacts: read`: kein Bearbeiten, kein Loeschen
   const schreibend = withAccess({ contacts: 'write' }, () => (
     detailOptionen(() => contacts.openContactDetail(kontakt()))
   ));
-  assert.ok(schreibend.edit, 'mit Schreibrecht traegt der Kopf „Bearbeiten"');
+  assert.ok(schreibend.edit, 'mit Schreibrecht traegt die Ansicht „Bearbeiten"');
+  // R17 (E7): Bearbeiten sitzt im Blatt an EINER Stelle - als Primaerknopf am
+  // Ende des Fusses, wie im Termin und im Inventar; bis dahin stand es im
+  // Kontakt als Kopfaktion.
+  assert.equal(schreibend.edit.primary, true, 'Bearbeiten ist im Blatt die Hauptaktion unten');
   assert.ok(ids(schreibend).includes('contact-detail-delete'));
 
   const lesend = withAccess({ contacts: 'read' }, () => (
@@ -2074,16 +2078,40 @@ test('Geburtstagszeile: die Textspalte ist fuer Lesende UND Schreibende der Weg 
   });
 });
 
-test('Ein Tipp auf die Geburtstagszeile mit Schreibrecht oeffnet den Editor mit dem Bestand (H8)', () => {
+test('R17 E7: ein Tipp auf die Geburtstagszeile oeffnet das Leseblatt, Bearbeiten steht primaer am Ende', async () => {
+  // Bis R17 ging der Tipp unter der Schwelle direkt in den Editor (H8) - als
+  // einzige Liste neben Kalender und Kontakten, die ein Leseblatt oeffnen.
   const eintrag = geburtstag();
-  const offen = mitGeburtstagen([eintrag], () => withAccess({ calendar: 'write' }, () => (
-    modalOptionen(() => birthdays.onListClick(klickAuf({ '[data-open]': { dataset: { open: '9' } } })))
-  )));
-  assert.ok(offen, 'der Tipp oeffnet einen Dialog');
-  assert.match(offen.content, /id="bd-save"/, 'der Editor, nicht die Leseansicht');
+  let blatt = null;
+  const editor = mitGeburtstagen([eintrag], () => withAccess({ calendar: 'write' }, () => modalOptionen(() => {
+    blatt = detailOptionen(() => birthdays.onListClick(klickAuf({ '[data-open]': { dataset: { open: '9' } } })));
+  })));
+  assert.ok(blatt, 'der Tipp oeffnet die geteilte Leseansicht (openDetailView)');
+  assert.equal(editor, null, 'und NICHT den Editor - kein Formular, keine Tastatur');
+  assert.equal(blatt.title, 'Oma Erna');
+  assert.equal(blatt.pane, undefined, 'als Blatt, nicht in der Spalte');
+  assert.ok(blatt.sections.some((row) => row.value === 'Mag Kuchen'), 'die Notiz, die die Zeile am Telefon ausblendet');
+  assert.deepEqual(blatt.actions.map((a) => [a.id, a.variant, a.align ?? 'end']), [
+    ['birthday-detail-delete', 'danger-ghost', 'start'],
+    ['detail-view-edit', 'primary', 'end'],
+  ], 'Loeschen zurueckgenommen am Anfang, Bearbeiten als Primaerknopf am Ende - wie im Termin');
+
+  // Bearbeiten schliesst das Blatt und oeffnet den Editor mit dem Bestand.
+  const geschlossen = [];
+  let offen = null;
+  const vorher = globalThis.__openModal;
+  globalThis.__openModal = (opts) => { offen = opts; };
+  try {
+    await blatt.actions[1].onClick({ close: async (o) => { geschlossen.push(o); } });
+  } finally {
+    if (vorher === undefined) delete globalThis.__openModal;
+    else globalThis.__openModal = vorher;
+  }
+  assert.deepEqual(geschlossen, [{ force: true }], 'erst geht das Blatt zu');
+  assert.ok(offen, 'dann oeffnet der Editor');
+  assert.match(offen.content, /id="bd-save"/);
   assert.match(offen.content, /id="bd-name"[^>]*value="Oma Erna"/, 'mit dem Bestand vorbelegt');
 });
-
 test('Ein Tipp bei `calendar: read` oeffnet die Leseansicht, und sie zeigt, was der Editor zeigt', () => {
   const eintrag = geburtstag({ name_day: '05-12', reminder_offset: '2880' });
   const offen = mitGeburtstagen([eintrag], () => withAccess({ calendar: 'read' }, () => (

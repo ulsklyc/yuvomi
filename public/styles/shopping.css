@@ -706,7 +706,9 @@
 /* Geometrie, Trennlinie, Hover und Zielhöhe kommen aus .list-row. Hier bleibt
  * nur, was den Einkauf unterscheidet. */
 .shopping-item {
-  cursor: pointer;
+  /* Kein `cursor: pointer` an der Zeile mehr (R17, E7): sie ist kein Ziel.
+   * Der Zeilenkoerper ist ein eigener Knopf (`.list-row__main--interactive`)
+   * und oeffnet die Details, das Kaestchen hakt ab. */
   transition: opacity var(--transition-fast);
   /* KOMPAKTE ZEILE, NUR HIER (#1039). .list-row traegt 8px Block-Polster
    * (--space-2) UND min-height: --target-lg (48px) - beides zusammen ergab
@@ -729,7 +731,9 @@
 /* KEIN WISCH-CHEVRON IN DER EINKAUFSLISTE (Re-Critique 2026-09-28, A4 P2-5).
  * Die geteilte Zeile (.swipe-row::after, layout.css) malt ein ">" an den
  * Rand - in iOS heisst das "tippe fuer Detail", hier hiess es "wische", und
- * Tippen hakt ab. Oma Ingrid tippte auf ein Versprechen, das es nicht gibt.
+ * Tippen hakte damals ab (seit R17 oeffnet es die Details, der Pfeil bleibt
+ * trotzdem fort: am Zeilenende stehen Griff und Papierkorb). Oma Ingrid
+ * tippte auf ein Versprechen, das es nicht gab.
  * Die Geste lehrt der vorhandene Nudge (`swipe-row--hint`, einmal je Liste).
  * Mit dem Pfeil geht auch die Polster-Reserve, die hier fuer ihn stand. */
 .swipe-row:has(> .shopping-item)::after {
