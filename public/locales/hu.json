@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "Az új terv élvez elsőbbséget, ahol a kettő átfedi egymást. A(z) \"{{name}}\" mentve marad, de nem jelenik meg, amíg átfedésben vannak.",
         "patternOverlapConfirmAction": "Csere",
         "editOverride": "Kivétel szerkesztése",
+        "editShiftType": "Műszaktípus szerkesztése",
+        "editPattern": "Műszakciklus szerkesztése",
         "deleteOverrideRangeTitle": "Törli ezt az időszakot?",
         "deleteOverrideRangeDetail": "Ez {{user}} minden bejegyzését eltávolítja {{from}} és {{to}} között. Nem vonható vissza.",
         "fillRange": "Időszak kitöltése",

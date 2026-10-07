@@ -36,18 +36,97 @@
 }
 
 .schedule-content,
-.schedule-content > section,
-.schedule-today {
+.schedule-content > section {
   display: grid;
   gap: var(--space-3);
   min-width: 0;
+}
+
+/* "HEUTE" IST EINE ZEILE (Entscheidung R17, E1). Bis R17 eine Karte mit
+ * Abschnittstitel und Listenzeilen: 132px (mobil) bis 148px ueber JEDEM Reiter,
+ * bevor dessen Inhalt begann - mobil lag die erste Datenzeile der Planung bei
+ * y=304. Jetzt das Wort und dahinter eine Marke je Eintrag, eine
+ * Trefferflaeche hoch; mehr Eintraege, als die Zeile fasst, rollen seitwaerts
+ * (der Anschnitt kommt aus wireScrollFade()). */
+.schedule-today {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.schedule-today__label {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
+
+.schedule-today__entries {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.schedule-today__entry {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--target-base);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  white-space: nowrap;
+}
+
+.schedule-today__name {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.schedule-today__meta,
+.schedule-today__empty {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Der leere Tag haelt dieselbe Zeilenhoehe wie einer mit Marke, damit der
+ * Inhalt darunter nicht um eine halbe Zeile ruckt, sobald der erste Eintrag
+ * dazukommt. */
+.schedule-today__empty {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-base);
+}
+
+.schedule-today-slot > .schedule-warnings {
+  margin: var(--space-2) var(--page-inline-pad) 0;
 }
 
 .schedule-toolbar {
   margin-bottom: calc(var(--space-4) * -1);
 }
 
-.schedule-today > h2,
+/* EINE TITELZEILE, EINE HOEHE (wie die Haushaltshilfe). "Vergleich" und
+ * "Auswertung" tragen keinen Kopf-Knopf; ohne diese Regel war der Kopf dort
+ * 13px niedriger (104 statt 117px bei 1280) und die Reiterleiste sprang beim
+ * Wechsel - seit R17 beim ersten Wechsel WEG vom Startreiter. Nur mit
+ * angedocktem Knopf (ab 1024px, dockFabIntoToolbar in router.js): darunter
+ * steht der Slot leer und darf keine Zeile oeffnen. */
+@media (min-width: 1024px) {
+  .schedule-toolbar > .page-toolbar__actions {
+    min-height: var(--target-base);
+  }
+}
+
 .schedule-content > section > h2 {
   margin-bottom: var(--space-2);
 }
@@ -134,41 +213,6 @@
 :root[data-theme="dark"] .schedule-page input[type="time"],
 :root[data-theme="dark"] .schedule-modal-form input[type="time"] {
   color-scheme: dark;
-}
-
-.schedule-details {
-  /* Shift colour belongs to its small swatch, not to a module-specific rail.
-   * This keeps the cell in the same neutral card family as Notes and Tasks. */
-  margin-bottom: var(--space-3);
-  min-inline-size: 0;
-  overflow: hidden;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.schedule-details:not([open]):hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
-.schedule-details > summary {
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--target-lg);
-  padding: var(--space-3) var(--space-4);
-}
-
-.schedule-details[open] > summary {
-  background-color: var(--color-surface-hover);
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.schedule-details form,
-.schedule-details h3,
-.schedule-details .schedule-days,
-.schedule-details .schedule-actions {
-  margin: var(--space-3) var(--space-4) 0;
 }
 
 /* 12rem fits "24 · 24-hour shift" (the longest shipped preset) without the
@@ -279,13 +323,6 @@
   min-width: 0;
 }
 
-/* Shift types keep their actions inside the edit form; give that nested row
- * the same breathing room as the pattern action row below its card content. */
-.schedule-details > .schedule-form > .schedule-actions {
-  margin: var(--space-1) 0 0;
-  padding-bottom: var(--space-3);
-}
-
 .schedule-swatch {
   display: inline-block;
   width: .7rem;
@@ -305,6 +342,8 @@
 :root[data-theme="dark"] .schedule-swatch { box-shadow: inset 0 0 0 1px var(--color-border-strong); }
 
 .schedule-entry-row,
+.schedule-type-row,
+.schedule-pattern-row,
 .schedule-override {
   align-items: center;
   gap: var(--space-2);
@@ -353,7 +392,6 @@
   width: fit-content;
 }
 
-
 @media (max-width: 639px) {
   .schedule-page {
     gap: var(--space-3);
@@ -364,10 +402,6 @@
 
   .schedule-toolbar {
     margin-bottom: calc(var(--space-3) * -1);
-  }
-
-  .schedule-today {
-    padding: var(--space-3);
   }
 
   .schedule-create > .schedule-form {
@@ -393,31 +427,6 @@
     min-height: 2.75rem;
   }
 
-  .schedule-details {
-    margin-bottom: var(--space-2);
-  }
-
-  .schedule-details > summary {
-    padding: var(--space-3);
-  }
-
-  .schedule-details > .schedule-form,
-  .schedule-details > .schedule-actions {
-    inline-size: calc(100% - var(--space-3) - var(--space-3));
-    max-inline-size: calc(100% - var(--space-3) - var(--space-3));
-    margin-inline: var(--space-3);
-  }
-
-  .schedule-details > .schedule-actions {
-    margin-top: var(--space-1);
-    margin-bottom: var(--space-3);
-  }
-
-  .schedule-details > h3,
-  .schedule-details > .schedule-days {
-    margin-inline: var(--space-3);
-  }
-
   .schedule-days {
     padding: var(--space-2);
   }
@@ -431,12 +440,13 @@
     justify-content: center;
   }
 
+  .schedule-type-row,
+  .schedule-pattern-row,
   .schedule-override {
     flex-wrap: wrap;
     min-height: 3.25rem;
   }
 }
-
 
 .schedule-warnings {
   padding: var(--space-2) var(--space-3);
@@ -461,7 +471,6 @@
     margin-top: var(--space-2);
   }
 }
-
 
 .schedule-statistics,
 .schedule-stat-sections,
@@ -716,23 +725,11 @@
    * ein Selektor auf `> h2` griff ins Leere, und die erste Karte rutschte
    * neben die Ueberschrift. */
   .schedule-library--shifts > .schedule-library__head,
+  .schedule-library--shifts > .row-carrier,
   .schedule-library--shifts > .empty-state {
     grid-column: 1 / -1;
   }
 
-  .schedule-library--shifts .schedule-details {
-    margin-block-end: 0;
-  }
-
-  /* S-26 (UX-Audit): an open card in a 2-column CSS grid pushes only its own
-   * row taller - the sibling sharing that row (and everything below) jumps
-   * sideways/down as columns re-balance, reading as a layout glitch rather
-   * than an intentional expand. Spanning both columns while open keeps every
-   * OTHER card's column position stable; only rows shift, which is the
-   * expected, unsurprising effect of something above growing taller. */
-  .schedule-library--shifts .schedule-details[open] {
-    grid-column: 1 / -1;
-  }
 }
 
 @container schedule-page (min-width: 900px) {
@@ -785,12 +782,18 @@
   grid-template-columns: minmax(0, 1fr);
   /* Mindestbreite EINER Personenspur je Tag (Re-Critique 2026-09-28, A2
    * P2-5). Vorher 220px fest: mit einer Person 1676px Inhalt in 1156px, Sa/So
-   * hinter einem Seitwaerts-Scroll. 8rem reichen fuer Titel + Uhrzeit (die
-   * Kalenderwoche fasst ihre Tage bei 1440 in 151px); die Tage teilen sich
-   * den Rest (.schedule-overview__day unten). Gescrollt wird erst, wenn
-   * mehrere Personen zusammen das Minimum ueberschreiten. Die Spurspalten im
-   * Markup (renderOverview()) lesen denselben Wert. */
-  --schedule-lane-min: 8rem;
+   * hinter einem Seitwaerts-Scroll. Die Tage teilen sich den Rest
+   * (.schedule-overview__day unten). Gescrollt wird erst, wenn mehrere
+   * Personen zusammen das Minimum ueberschreiten. Die Spurspalten im Markup
+   * (renderOverview()) lesen denselben Wert.
+   *
+   * 7rem, NICHT 8rem (Critique R17): bei 1280 ist die Flaeche 996px breit,
+   * davon gehen die Zeitspalte (52px) und sieben Tagesabstaende (84px) ab -
+   * bleiben 122,9px je Tag, und die Spur traegt 3px eigene Kante. Mit 128px
+   * Minimum ragte der Sonntag 36px hinter den Rand, fuer EINE Person, und der
+   * Vergleich ist seit R17 der Startreiter. Die Tage dehnen sich weiter auf
+   * den Platz; 112px sind nur die Grenze, ab der gescrollt wird. */
+  --schedule-lane-min: 7rem;
 }
 
 .schedule-overview__toolbar {

@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "Mananaig ang bagong plano saan man sila magkapatong. Mananatiling naka-save ang \"{{name}}\" pero hindi na ito ipapakita habang magkapatong sila.",
         "patternOverlapConfirmAction": "Palitan",
         "editOverride": "I-edit ang eksepsiyon",
+        "editShiftType": "I-edit ang uri ng shift",
+        "editPattern": "I-edit ang pattern ng shift",
         "deleteOverrideRangeTitle": "Burahin ang saklaw na ito?",
         "deleteOverrideRangeDetail": "Buburahin nito ang bawat entry para kay {{user}} mula {{from}} hanggang {{to}}. Hindi ito maibabalik.",
         "fillRange": "Punan ang saklaw",

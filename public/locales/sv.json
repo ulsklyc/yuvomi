@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "Den nya planen gäller före där båda gäller samtidigt. \"{{name}}\" sparas kvar men slutar visas så länge de överlappar.",
         "patternOverlapConfirmAction": "Ersätt",
         "editOverride": "Redigera undantag",
+        "editShiftType": "Redigera skifttyp",
+        "editPattern": "Redigera skiftcykel",
         "deleteOverrideRangeTitle": "Ta bort den här perioden?",
         "deleteOverrideRangeDetail": "Det tar bort varje post för {{user}} från {{from}} till {{to}}. Det går inte att ångra.",
         "fillRange": "Fyll perioden",

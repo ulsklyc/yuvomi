@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "जहाँ भी दोनों लागू होते हैं, नई योजना को प्राथमिकता मिलेगी। \"{{name}}\" सहेजा रहेगा, पर जब तक ओवरलैप रहेगा तब तक दिखना बंद रहेगा।",
         "patternOverlapConfirmAction": "बदलें",
         "editOverride": "अपवाद संपादित करें",
+        "editShiftType": "शिफ़्ट का प्रकार संपादित करें",
+        "editPattern": "शिफ़्ट चक्र संपादित करें",
         "deleteOverrideRangeTitle": "यह अवधि हटाएँ?",
         "deleteOverrideRangeDetail": "इससे {{user}} की {{from}} से {{to}} तक की हर प्रविष्टि हट जाएगी। इसे वापस नहीं किया जा सकता।",
         "fillRange": "अवधि भरें",

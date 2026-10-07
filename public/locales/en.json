@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "The new plan takes precedence wherever both apply. \"{{name}}\" stays saved but stops showing while they overlap.",
         "patternOverlapConfirmAction": "Replace",
         "editOverride": "Edit override",
+        "editShiftType": "Edit shift type",
+        "editPattern": "Edit schedule plan",
         "deleteOverrideRangeTitle": "Delete this range?",
         "deleteOverrideRangeDetail": "This removes every entry for {{user}} from {{from}} to {{to}}. This cannot be undone.",
         "fillRange": "Fill range",

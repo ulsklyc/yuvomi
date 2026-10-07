@@ -5788,6 +5788,8 @@
         "patternOverlapConfirmDetail": "A nova escala terá prioridade onde houver sobreposição. \"{{name}}\" continuará salva, mas ficará oculta durante o período coincidente.",
         "patternOverlapConfirmAction": "Substituir",
         "editOverride": "Editar exceção",
+        "editShiftType": "Editar tipo de turno",
+        "editPattern": "Editar escala",
         "deleteOverrideRangeTitle": "Excluir este período?",
         "deleteOverrideRangeDetail": "Isso removerá todos os lançamentos de {{user}} de {{from}} a {{to}}. Esta ação não pode ser desfeita.",
         "fillRange": "Preencher período",

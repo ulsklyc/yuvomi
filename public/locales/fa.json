@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "برنامه جدید هر جا با هم هم‌پوشانی داشته باشند اولویت دارد. \"{{name}}\" ذخیره می‌ماند اما تا زمانی که هم‌پوشانی دارند نمایش داده نمی‌شود.",
         "patternOverlapConfirmAction": "جایگزینی",
         "editOverride": "ویرایش استثنا",
+        "editShiftType": "ویرایش نوع شیفت",
+        "editPattern": "ویرایش چرخه شیفت",
         "deleteOverrideRangeTitle": "این بازه حذف شود؟",
         "deleteOverrideRangeDetail": "این کار همه ورودی‌های {{user}} را از {{from}} تا {{to}} حذف می‌کند. قابل بازگشت نیست.",
         "fillRange": "پر کردن بازه",

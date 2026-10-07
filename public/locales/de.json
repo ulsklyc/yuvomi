@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "Der neue Plan hat überall Vorrang, wo sich beide überschneiden. \"{{name}}\" bleibt gespeichert, wird aber nicht mehr angezeigt, solange sich beide überschneiden.",
         "patternOverlapConfirmAction": "Ersetzen",
         "editOverride": "Ausnahme bearbeiten",
+        "editShiftType": "Schichtart bearbeiten",
+        "editPattern": "Schichtplan bearbeiten",
         "deleteOverrideRangeTitle": "Diesen Zeitraum löschen?",
         "deleteOverrideRangeDetail": "Das entfernt jeden Eintrag für {{user}} von {{from}} bis {{to}}. Das lässt sich nicht rückgängig machen.",
         "fillRange": "Zeitraum ausfüllen",

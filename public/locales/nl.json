@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "Het nieuwe rooster krijgt voorrang waar beide gelden. \"{{name}}\" blijft bewaard maar wordt niet meer getoond zolang ze overlappen.",
         "patternOverlapConfirmAction": "Vervangen",
         "editOverride": "Uitzondering bewerken",
+        "editShiftType": "Diensttype bewerken",
+        "editPattern": "Roosterpatroon bewerken",
         "deleteOverrideRangeTitle": "Deze periode verwijderen?",
         "deleteOverrideRangeDetail": "Dit verwijdert elk item van {{user}} van {{from}} tot {{to}}. Dit kan niet ongedaan worden gemaakt.",
         "fillRange": "Periode invullen",

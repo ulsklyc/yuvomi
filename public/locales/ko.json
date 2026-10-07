@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "두 일정이 겹치는 곳에서는 새 일정이 우선 적용됩니다. \"{{name}}\"은(는) 저장된 채로 남지만 겹치는 동안에는 표시되지 않습니다.",
         "patternOverlapConfirmAction": "교체",
         "editOverride": "예외 편집",
+        "editShiftType": "근무 유형 편집",
+        "editPattern": "근무 패턴 편집",
         "deleteOverrideRangeTitle": "이 기간을 삭제할까요?",
         "deleteOverrideRangeDetail": "{{from}}부터 {{to}}까지 {{user}}의 모든 항목이 삭제됩니다. 되돌릴 수 없습니다.",
         "fillRange": "기간 채우기",

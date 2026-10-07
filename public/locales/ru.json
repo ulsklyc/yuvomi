@@ -6271,6 +6271,8 @@
         "patternOverlapConfirmDetail": "Новый план получает приоритет там, где оба действуют. \"{{name}}\" остаётся сохранённым, но перестаёт отображаться, пока они пересекаются.",
         "patternOverlapConfirmAction": "Заменить",
         "editOverride": "Изменить исключение",
+        "editShiftType": "Изменить тип смены",
+        "editPattern": "Изменить цикл смен",
         "deleteOverrideRangeTitle": "Удалить этот период?",
         "deleteOverrideRangeDetail": "Будут удалены все записи для {{user}} с {{from}} по {{to}}. Это нельзя отменить.",
         "fillRange": "Заполнить период",

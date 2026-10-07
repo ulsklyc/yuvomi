@@ -6123,6 +6123,8 @@
         "patternOverlapConfirmDetail": "Nový plán má přednost všude, kde se oba překrývají. \"{{name}}\" zůstane uložen, ale přestane se zobrazovat, dokud se překrývají.",
         "patternOverlapConfirmAction": "Nahradit",
         "editOverride": "Upravit výjimku",
+        "editShiftType": "Upravit typ směny",
+        "editPattern": "Upravit cyklus směn",
         "deleteOverrideRangeTitle": "Smazat toto období?",
         "deleteOverrideRangeDetail": "Odstraní každý záznam pro {{user}} od {{from}} do {{to}}. Nelze vrátit zpět.",
         "fillRange": "Vyplnit období",

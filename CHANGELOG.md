@@ -36,6 +36,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Shift plan: the plan comes first.** The module opened on its master data: three tabs of shift
+  types, patterns and statistics stood before "Compare", the week as a grid, and that tab first
+  asked you to pick a person. "Compare" is now the first tab and the one the module opens on, with
+  your own lane already selected; a selection you made yourself is kept. Without a shift type or a
+  plan it shows the button that adds one. The "Today" card, 132 px tall above every tab, is one
+  line of chips. A shift type or a plan is a row, and editing it opens the same dialog as adding
+  it, with one "Save" - until now each was a fold-out card with the whole form inside and two
+  "Save" buttons, and a plan with seven cycle days was 964 px tall on a phone. Changing a plan's
+  cycle length adds or removes its days right in the dialog. On a 1280 px screen all seven days
+  of the comparison fit; Sunday used to be cut off by 36 px. The tab addresses are unchanged.
+
 - **Lists move the same way everywhere when an entry comes or goes.** Tasks, shopping, pantry
   and a few others already did it: a deleted row folds away and the rows below close the gap,
   a new one opens up, a re-sorted one glides to its place. Notes, documents, contacts, the

@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "Le nouveau planning prévaut partout où les deux se chevauchent. \"{{name}}\" reste enregistré mais ne s'affiche plus tant qu'ils se chevauchent.",
         "patternOverlapConfirmAction": "Remplacer",
         "editOverride": "Modifier l'exception",
+        "editShiftType": "Modifier le type de poste",
+        "editPattern": "Modifier le roulement",
         "deleteOverrideRangeTitle": "Supprimer cette période ?",
         "deleteOverrideRangeDetail": "Cela retire chaque entrée de {{user}} du {{from}} au {{to}}. Cette action est irréversible.",
         "fillRange": "Remplir la période",

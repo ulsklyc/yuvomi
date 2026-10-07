@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "Den nye planen har forrang der begge gjelder. \"{{name}}\" forblir lagret, men slutter å vises mens de overlapper.",
         "patternOverlapConfirmAction": "Erstatt",
         "editOverride": "Rediger overstyring",
+        "editShiftType": "Rediger skiftetype",
+        "editPattern": "Rediger planleggingsplan",
         "deleteOverrideRangeTitle": "Slett dette området?",
         "deleteOverrideRangeDetail": "Dette fjerner alle oppføringer for {{user}} fra {{from}} til {{to}}. Dette kan ikke gjøres om.",
         "fillRange": "Fyll område",

@@ -6271,6 +6271,8 @@
         "patternOverlapConfirmDetail": "Новий план матиме пріоритет там, де вони перетинаються. \"{{name}}\" залишається збереженим, але перестає відображатися, поки триває перетин.",
         "patternOverlapConfirmAction": "Замінити",
         "editOverride": "Змінити виняток",
+        "editShiftType": "Змінити тип зміни",
+        "editPattern": "Змінити цикл змін",
         "deleteOverrideRangeTitle": "Видалити цей період?",
         "deleteOverrideRangeDetail": "Буде видалено всі записи для {{user}} з {{from}} по {{to}}. Це не можна скасувати.",
         "fillRange": "Заповнити період",

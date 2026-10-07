@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "新排班在两者重叠的范围内优先生效。“{{name}}”仍会保留,但在重叠期间不再显示。",
         "patternOverlapConfirmAction": "替换",
         "editOverride": "编辑例外",
+        "editShiftType": "编辑班次类型",
+        "editPattern": "编辑排班周期",
         "deleteOverrideRangeTitle": "删除此时间段？",
         "deleteOverrideRangeDetail": "这会删除 {{user}} 从 {{from}} 到 {{to}} 的所有记录。此操作无法撤销。",
         "fillRange": "填充时间段",

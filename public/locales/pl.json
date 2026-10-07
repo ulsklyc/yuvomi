@@ -6271,6 +6271,8 @@
         "patternOverlapConfirmDetail": "Nowy plan ma pierwszeństwo wszędzie tam, gdzie oba się pokrywają. \"{{name}}\" pozostaje zapisany, ale przestaje się wyświetlać, dopóki się pokrywają.",
         "patternOverlapConfirmAction": "Zastąp",
         "editOverride": "Edytuj wyjątek",
+        "editShiftType": "Edytuj rodzaj zmiany",
+        "editPattern": "Edytuj cykl zmian",
         "deleteOverrideRangeTitle": "Usunąć ten okres?",
         "deleteOverrideRangeDetail": "To usuwa każdy wpis dla {{user}} od {{from}} do {{to}}. Nie można tego cofnąć.",
         "fillRange": "Wypełnij okres",

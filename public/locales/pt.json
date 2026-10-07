@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "O novo plano tem prioridade onde os dois se aplicarem. \"{{name}}\" permanece salva, mas deixa de aparecer enquanto houver sobreposição.",
         "patternOverlapConfirmAction": "Substituir",
         "editOverride": "Editar exceção",
+        "editShiftType": "Editar tipo de turno",
+        "editPattern": "Editar escala",
         "deleteOverrideRangeTitle": "Eliminar este período?",
         "deleteOverrideRangeDetail": "Isto remove todas as entradas de {{user}} de {{from}} a {{to}}. Não é possível anular.",
         "fillRange": "Preencher o período",

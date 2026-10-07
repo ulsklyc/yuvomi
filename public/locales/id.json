@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "Rencana baru diutamakan di mana pun keduanya berlaku. \"{{name}}\" tetap tersimpan tapi berhenti ditampilkan selama tumpang tindih.",
         "patternOverlapConfirmAction": "Ganti",
         "editOverride": "Edit pengecualian",
+        "editShiftType": "Edit jenis shift",
+        "editPattern": "Edit pola shift",
         "deleteOverrideRangeTitle": "Hapus rentang ini?",
         "deleteOverrideRangeDetail": "Ini menghapus setiap entri untuk {{user}} dari {{from}} sampai {{to}}. Tidak dapat dibatalkan.",
         "fillRange": "Isi rentang",

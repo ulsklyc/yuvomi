@@ -1012,7 +1012,7 @@ test('the Overrides section groups consecutive same-type days and edits/deletes 
   assert.match(schedulePage, /data-form="override-edit"/);
   assert.match(schedulePage, /data-action="delete-override-range"/);
   assert.match(schedulePage, /overrideGroups\(\)\.find\(/);
-  const editBranch = schedulePage.slice(schedulePage.indexOf("form.dataset.form === 'override-edit'"), schedulePage.indexOf("await load();\n    // S-03 (Review zu #1099): dieser Speichervorgang baut JEDE Musterkarte neu"));
+  const editBranch = schedulePage.slice(schedulePage.indexOf("form.dataset.form === 'override-edit'"), schedulePage.indexOf('await reloadAfterWrite();', schedulePage.indexOf("form.dataset.form === 'override-edit'")));
   // confirmOverModal(), not confirmModal(): the create/edit form is still open
   // behind this confirm, and confirmModal() force-closes whatever modal is
   // already open (no stacking) before opening its own - it would have silently
@@ -1029,7 +1029,7 @@ test('the Overrides section groups consecutive same-type days and edits/deletes 
   // shared success path at the end of saveCreatedSchedule().
   assert.match(editBranch, /confirmOverModal\([\s\S]*closeOnConfirm:\s*false/, 'a failed save must find the form still parked, not already closed by the confirmation itself');
   assert.match(editBranch, /rangeDifference\(/, 'shrinking a range removes what fell outside it, not just fills the new span');
-  const deleteBranch = schedulePage.slice(schedulePage.indexOf("'delete-override-range'"), schedulePage.indexOf("'save-days'"));
+  const deleteBranch = schedulePage.slice(schedulePage.indexOf("button.dataset.action === 'delete-override-range'"), schedulePage.indexOf("button.dataset.action === 'open-create-extra'"));
   assert.match(deleteBranch, /confirmModal\(/, 'deleting a range confirms first, unlike the old single-day delete');
 });
 
@@ -1344,7 +1344,7 @@ test('the Extra shifts section groups consecutive same-type days and edits/delet
   const deleteIndex = editBranch.indexOf('api.delete');
   assert.ok(postIndex < deleteIndex, 'the new rows must be created before the old ones are deleted, so a failed create never loses data');
 
-  const deleteBranch = schedulePage.slice(schedulePage.indexOf("'delete-extra-range'"), schedulePage.indexOf("'save-days'"));
+  const deleteBranch = schedulePage.slice(schedulePage.indexOf("button.dataset.action === 'delete-extra-range'"), schedulePage.indexOf('await reloadAfterWrite();\n    renderPage();\n    if (gefragt)'));
   assert.match(deleteBranch, /confirmModal\(/, 'deleting a range confirms first, matching the override range delete');
 });
 
@@ -1741,16 +1741,16 @@ test('patternDaysExceedingCycleLength() flags exactly the positions a shorter cy
   assert.equal(__test.patternDaysExceedingCycleLength(undefined, 3), null);
 });
 
-test('the pattern-update submit path prechecks cycle_length against pattern.days before PUTting, field-level not toast', () => {
+test('saving a pattern from its edit dialog prechecks cycle_length against the days IN THE DIALOG before PUTting, field-level not toast', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  const branch = schedulePage.slice(
-    schedulePage.indexOf("if (form.dataset.form === 'pattern-update')"),
-    schedulePage.indexOf("await load();", schedulePage.indexOf("if (form.dataset.form === 'pattern-update')")),
-  );
-  assert.match(branch, /patternDaysExceedingCycleLength\(pattern\?\.days, data\.cycle_length\)/);
+  const start = schedulePage.indexOf('async function savePatternEdit(event) {');
+  assert.ok(start !== -1, 'savePatternEdit() must exist');
+  const branch = schedulePage.slice(start, schedulePage.indexOf('\n}\n', start));
+  assert.match(branch, /const days = collectPatternDays\(form\);/);
+  assert.match(branch, /patternDaysExceedingCycleLength\(days\.filter\(\(day\) => day\.shift_type_id != null\), data\.cycle_length\)/);
   assert.match(branch, /reportFieldError\(form\.querySelector\('\[name="cycle_length"\]'\), t\('schedule\.cycleLengthTooShort', conflict\)\)/);
   assert.match(branch, /if \(conflict\) \{[\s\S]*return;\s*\}/, 'a detected conflict must bail out before the PUT');
-  assert.doesNotMatch(branch.slice(0, branch.indexOf('return;')), /api\.put\(`\/schedule\/patterns\/\$\{form\.dataset\.id\}`/, 'the PUT must not fire before the precheck has passed');
+  assert.doesNotMatch(branch.slice(0, branch.indexOf('return;', branch.indexOf('if (conflict)'))), /api\.put\(/, 'no PUT may fire before the precheck has passed');
 });
 
 test('scheduleErrorMessage() maps the three known raw server strings to humanized keys, and passes through anything unknown', async () => {
@@ -1849,19 +1849,64 @@ test('switching the statistics range outdates any request in flight, matching th
   assert.match(overviewBranch, /await activateView\('overview'(?:, \{[^}]*\})?\)/, 'overview-week must route back through activateView(), which itself owns ++overviewRequestId - unlike statistics-range it does not need its own bump here');
 });
 
-test('switching Planning sub-tabs while a pattern editor is dirty asks before discarding, and clears on save (S-03)', () => {
+test('R17/E1: shift types and plans are rows, edited in the create dialog with ONE save - no accordion, no inline form', async () => {
+  const { installMiniDom } = await import('./mini-dom.js');
+  installMiniDom();
+  const { __test } = await import('../public/pages/schedule.js');
+  // setOwnerContext() ersetzt den Zustand: erst danach greifen.
+  __test.setOwnerContext({ users: [{ id: 7, display_name: 'Ada' }], me: 7, mayManageOthers: true });
+  const st = __test.scheduleState();
+  const before = { types: st.types, patterns: st.patterns };
+  try {
+    st.types = [{ id: 3, name: 'Frueh', short_code: 'F', color: '#0891b2', start_time: '06:00', end_time: '14:00', created_by: 7, fields: [] }];
+    st.patterns = [{ id: 9, user_id: 7, name: 'Wechselschicht', anchor_date: '2026-10-05', cycle_length: 7, is_active: 1, days: [{ position: 0, shift_type_id: 3, field_values: {} }] }];
+    const typeRow = __test.shiftTypeRow(st.types[0]);
+    const patternRow = __test.patternRow(st.patterns[0]);
+    for (const [name, row] of [['shift type', typeRow], ['plan', patternRow]]) {
+      assert.match(row, /^<div class="list-row /, `${name}: a list row like overrides and extra shifts`);
+      assert.doesNotMatch(row, /<details|<summary|<form|<input|<select/, `${name}: the row carries no accordion and no inline form`);
+    }
+    assert.match(typeRow, /data-action="edit-shift-type" data-id="3"/);
+    assert.match(typeRow, /data-action="delete-shift" data-id="3"/);
+    assert.match(patternRow, /data-action="edit-pattern" data-id="9"/);
+    assert.match(patternRow, /data-action="delete-pattern" data-id="9"/);
+    assert.match(__test.planningPanel(), /<div class="row-carrier"><div class="list-row schedule-pattern-row"/, 'the plans stand in a row carrier');
+
+    // The day editor that used to live in the card, now a block of the dialog.
+    const editor = __test.patternDaysEditorHtml(st.patterns[0], true);
+    assert.equal((editor.match(/data-day-group="/g) || []).length, 7, 'one group per cycle day');
+    assert.doesNotMatch(editor, /data-action="save-days"|<button[^>]*type="submit"/, 'the day editor has no save button of its own');
+  } finally {
+    Object.assign(st, before);
+    __test.setOwnerContext({});
+  }
+
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  assert.match(schedulePage, /async function guardedActivateView\(id\)/);
-  const guardFn = schedulePage.slice(schedulePage.indexOf('async function guardedActivateView'), schedulePage.indexOf('function renderShell'));
-  assert.match(guardFn, /dirtyPatternIds\.size/);
-  assert.match(guardFn, /confirmModal\(/);
-  assert.match(guardFn, /scheduleTablist\?\.sync\(activeView\)/, 'cancelling must revert the tab bar without ever calling activateView()');
+  assert.doesNotMatch(schedulePage, /<details class="card schedule-details"|data-action="save-days"|data-action="save-shift-fields"/, 'no accordion card and no second save button anywhere');
+  for (const fn of ['openShiftTypeEditModal', 'openPatternEditModal']) {
+    const start = schedulePage.indexOf(`function ${fn}(`);
+    const body = schedulePage.slice(start, schedulePage.indexOf('\n}\n', start));
+    assert.match(body, /class="form-stack schedule-modal-form"/, `${fn}: the form class of the create dialog`);
+    assert.match(body, /modal-panel__footer modal-panel__footer--plain/, `${fn}: the footer of the create dialog`);
+    assert.equal((body.match(/type="submit"/g) || []).length, 1, `${fn}: exactly one save`);
+    assert.match(body, /openModal\(\{/);
+  }
+  // One save writes both halves.
+  const saveType = schedulePage.slice(schedulePage.indexOf('async function saveShiftTypeEdit('), schedulePage.indexOf('function openPatternEditModal('));
+  assert.match(saveType, /api\.put\(`\/schedule\/shift-types\/\$\{id\}`, formData\(form\)\);[\s\S]*api\.put\(`\/schedule\/shift-types\/\$\{id\}\/fields`, \{ fields \}\)/);
+  const savePattern = schedulePage.slice(schedulePage.indexOf('async function savePatternEdit('), schedulePage.indexOf('\nfunction formData('));
+  assert.match(savePattern, /for \(const step of patternSaveOrder\(pattern\.cycle_length, data\.cycle_length\)\)/);
+  assert.match(savePattern, /api\.put\(`\/schedule\/patterns\/\$\{id\}`, data\)/);
+  assert.match(savePattern, /api\.put\(`\/schedule\/patterns\/\$\{id\}\/days`, \{ days \}\)/);
 
-  // Beide Speicherpfade, die eine Musterkarte betreffen, muessen ihre id wieder freigeben.
-  assert.match(schedulePage, /await api\.put\(`\/schedule\/patterns\/\$\{button\.dataset\.id\}\/days`, \{ days \}\);\s*\n\s*dirtyPatternIds\.delete\(String\(button\.dataset\.id\)\)/);
-  assert.match(schedulePage, /await api\.put\(`\/schedule\/patterns\/\$\{form\.dataset\.id\}`, data\);\s*\n\s*dirtyPatternIds\.delete\(String\(form\.dataset\.id\)\)/);
+  // The server refuses a cycle length that excludes stored days, and days
+  // beyond the stored length: shrinking writes the days first, growing the plan first.
+  assert.deepEqual(__test.patternSaveOrder(7, 5), ['days', 'pattern']);
+  assert.deepEqual(__test.patternSaveOrder(7, 8), ['pattern', 'days']);
+  assert.deepEqual(__test.patternSaveOrder(7, 7), ['pattern', 'days']);
 
-  assert.match(schedulePage, /onChange: \(id[^\n]*guardedActivateView\(id\); \}/, 'the tablist must route through the guard, not call activateView() directly');
+  const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css, /\.schedule-details/, 'the accordion card has no rules left');
 });
 
 // UX audit batch 3 (comprehension): S-04 cycle positions get real dates,
@@ -1977,60 +2022,134 @@ test('a new ACTIVE pattern creation and re-activating one via the Active toggle 
   assert.match(createBranch, /confirmOverModal\([\s\S]*closeOnConfirm:\s*false/, 'a failed POST /schedule/patterns must find the Add-entry modal still parked, not already closed by the confirmation itself');
   assert.ok(createBranch.indexOf('if (!confirmed) return;') < createBranch.indexOf("await api.post('/schedule/patterns', data);"));
 
-  const updateBranch = schedulePage.slice(
-    schedulePage.indexOf("if (form.dataset.form === 'pattern-update')"),
-    schedulePage.indexOf('await load();', schedulePage.indexOf("if (form.dataset.form === 'pattern-update')")),
-  );
-  assert.match(updateBranch, /data\.is_active && !pattern\?\.is_active/, 'the guard must only fire on an off -> on transition, not on every save');
-  assert.match(updateBranch, /findOverlappingActivePattern\(state\.patterns, pattern\?\.user_id, data\.valid_from \|\| null, data\.valid_until \|\| null, pattern\?\.id\)/);
-  assert.match(updateBranch, /confirmModal\(/, 'this form is inline (no modal open), so the plain confirmModal is correct here');
+  const start = schedulePage.indexOf('async function savePatternEdit(event) {');
+  const updateBranch = schedulePage.slice(start, schedulePage.indexOf('\n}\n', start));
+  assert.match(updateBranch, /data\.is_active && !pattern\.is_active/, 'the guard must only fire on an off -> on transition, not on every save');
+  assert.match(updateBranch, /findOverlappingActivePattern\(state\.patterns, pattern\.user_id, data\.valid_from \|\| null, data\.valid_until \|\| null, pattern\.id\)/);
+  // Since R17 the plan is edited in a dialog: the question must park it, and a
+  // failed PUT must find the typed fields still there.
+  assert.match(updateBranch, /confirmOverModal\([\s\S]*closeOnConfirm:\s*false/);
+  assert.doesNotMatch(updateBranch, /\bconfirmModal\(/, 'confirmModal would close the edit dialog and drop what was typed');
+  assert.ok(updateBranch.indexOf('if (!confirmed) return;') < updateBranch.indexOf('api.put('));
 });
 
-// Review of #1099, finding 4: dirtyPatternIds only used to clear on the
-// tab-switch discard, a save/delete of THAT SAME card, and the page-level
-// reset - saving a DIFFERENT pattern, deleting an override range, or a
-// successful create-modal save all run load()+renderPage() and silently
-// rebuild every pattern card, discarding another card's unsaved cycle-day
-// edits without ever asking, while its id stayed behind in the set (the next
-// tab switch then wrongly asked to discard edits that no longer exist).
-// Minimum accepted fix per the review: clear the set whenever the cards are
-// rebuilt this way. Every `await load();` outside the page-level render()
-// (which already gets a fresh `dirtyPatternIds = new Set()`) must clear it
-// before the matching renderPage() call.
-test('every load()+renderPage() rebuild outside the page reset clears dirtyPatternIds (S-03, #1099 finding 4)', () => {
+// R17/E1: a write reloads through ONE helper. The comparison view is the start
+// tab now, and a shift type or plan created from there has to appear in its
+// grid without a tab change - reloadAfterWrite() refetches the week as well.
+test('every write reloads through reloadAfterWrite(), which also refreshes the comparison week', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  const renderStart = schedulePage.indexOf('export async function render(container');
-  assert.ok(renderStart !== -1, 'render() must exist');
-  const beforeRender = schedulePage.slice(0, renderStart);
-  const afterRenderLoads = [...schedulePage.slice(renderStart).matchAll(/^\s*await load\(\);$/gm)];
-  // render() itself calls load() exactly once, followed by its own full
-  // `dirtyPatternIds = new Set()` reset rather than a `.clear()` call -
-  // excluded on purpose, it is not one of the rebuild sites this finding is
-  // about.
-  assert.equal(afterRenderLoads.length, 1, 'render() itself must call load() exactly once');
-
-  const loadSites = [...beforeRender.matchAll(/^\s*await load\(\);$/gm)];
-  assert.ok(loadSites.length >= 6, 'expected at least six load()+renderPage() rebuild sites before render()');
-  for (const match of loadSites) {
-    const after = beforeRender.slice(match.index, match.index + 700);
-    assert.match(
-      after,
-      /dirtyPatternIds\.clear\(\);[\s\S]*?renderPage\(\);/,
-      `load() at offset ${match.index} must clear dirtyPatternIds before its renderPage() rebuild`,
-    );
-  }
+  const loads = [...schedulePage.matchAll(/^\s*await load\(\);$/gm)];
+  assert.equal(loads.length, 2, 'load() is awaited in reloadAfterWrite() and in render(), nowhere else');
+  const start = schedulePage.indexOf('async function reloadAfterWrite() {');
+  const helper = schedulePage.slice(start, schedulePage.indexOf('\n}\n', start));
+  assert.match(helper, /await load\(\);\s*\n\s*if \(activeView !== 'overview'\) return;\s*\n\s*const requestId = \+\+overviewRequestId;\s*\n\s*try \{ await refreshOverview\(\); \}/);
+  assert.ok((schedulePage.match(/await reloadAfterWrite\(\);/g) || []).length >= 6, 'the save, delete and quick-start paths all go through it');
 });
 
-test('the initial tab lands on Shift types when the household has no shift types yet, otherwise stays on Planning (S-07)', () => {
+test('R17/E1: the first visit lands on the comparison view, whatever the data (replaces S-07)', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   const renderFn = schedulePage.slice(schedulePage.indexOf('export async function render'), schedulePage.indexOf('export async function update'));
   const branchStart = renderFn.indexOf('} else if (!initialViewDecided) {');
   assert.ok(branchStart !== -1, 'the fallback branch must exist for a bare-root visit with no explicit deep link');
-  const fallbackBranch = renderFn.slice(branchStart, branchStart + 700);
-  assert.match(fallbackBranch, /activeView = state\.types\.length \? 'patterns' : 'shifts';/);
+  const fallbackBranch = renderFn.slice(branchStart, renderFn.indexOf('initialViewDecided = true;', branchStart) + 30);
+  assert.match(fallbackBranch, /\n\s*activeView = 'overview';\n/);
+  assert.doesNotMatch(fallbackBranch, /state\.types\.length \?/, 'no data-dependent start tab any more: the comparison view carries its own empty state');
   assert.match(fallbackBranch, /initialViewDecided = true;/);
-  // The decision must happen strictly after load() populated state.types, not before.
-  assert.ok(renderFn.indexOf('await load();') < branchStart);
+
+  // The comparison view is the first tab; the tab addresses stay.
+  const shellFn = schedulePage.slice(schedulePage.indexOf('function renderShell()'), schedulePage.indexOf('scheduleTablist = wireTablist('));
+  const order = [...shellFn.matchAll(/^\s*\['(\w+)', t\('schedule\.\w+'\)\],$/gm)].map((m) => m[1]);
+  assert.deepEqual(order, ['overview', 'shifts', 'patterns', 'statistics']);
+  const tabsJs = readFileSync(new URL('../public/utils/schedule-tabs.js', import.meta.url), 'utf8');
+  for (const route of ['/schedule', '/schedule/shifts', '/schedule/patterns', '/schedule/statistics', '/schedule/overview']) {
+    assert.ok(tabsJs.includes(`'${route}',`), `${route} stays a route`);
+  }
+});
+
+test('R17/E1: the comparison view opens with your own lane, unless you chose yourself', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const pick = __test.initialOverviewSelection;
+  assert.deepEqual(pick({ saved: [], hasSaved: false, eligibleIds: [1, 2, 3], ownId: 2 }), [2], 'never chosen: your own lane');
+  assert.deepEqual(pick({ saved: [], hasSaved: false, eligibleIds: [1, 3], ownId: 2 }), [], 'you are not a selectable member: empty as before');
+  assert.deepEqual(pick({ saved: [], hasSaved: false, eligibleIds: [1, 2], ownId: null }), []);
+  assert.deepEqual(pick({ saved: [], hasSaved: true, eligibleIds: [1, 2, 3], ownId: 2 }), [], 'a cleared selection is a choice and stays empty');
+  assert.deepEqual(pick({ saved: [3, 1], hasSaved: true, eligibleIds: [1, 2, 3], ownId: 2 }), [1, 3], 'a saved selection wins, in household order');
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const loadFn = schedulePage.slice(schedulePage.indexOf('async function load() {'), schedulePage.indexOf('function monthKey('));
+  assert.match(loadFn, /selectedIds: initialOverviewSelection\(\{[\s\S]*?hasSaved: hasSavedOverviewSelection\(\),[\s\S]*?ownId: currentUserId,/);
+});
+
+test('R17/E1: without anything to compare the start tab leads to the first action', async () => {
+  const { installMiniDom } = await import('./mini-dom.js');
+  installMiniDom();
+  const { __test } = await import('../public/pages/schedule.js');
+  const st = __test.scheduleState();
+  const before = { types: st.types, patterns: st.patterns, overrides: st.overrides, extras: st.extras };
+  try {
+    Object.assign(st, { types: [], patterns: [], overrides: [], extras: [] });
+    const empty = __test.renderOverview();
+    assert.match(empty, /data-action="open-create"[^>]*data-view="shifts"|data-view="shifts"[^>]*data-action="open-create"/, 'empty household: the button adds a shift type');
+    assert.doesNotMatch(empty, /schedule-overview__toolbar|data-action="overview-week"/, 'no person picker and no week stepper above nothing');
+
+    st.types = [{ id: 1, name: 'Frueh', color: '#0891b2', start_time: '06:00', end_time: '14:00', fields: [] }];
+    const noPlan = __test.renderOverview();
+    assert.match(noPlan, /data-action="open-create"[^>]*data-view="patterns"|data-view="patterns"[^>]*data-action="open-create"/, 'shift types but no plan: the button adds a plan');
+    assert.doesNotMatch(noPlan, /schedule-overview__toolbar/);
+
+    st.patterns = [{ id: 2, user_id: 1, name: 'Plan', anchor_date: '2026-10-05', cycle_length: 7, is_active: 1, days: [] }];
+    assert.match(__test.renderOverview(), /schedule-overview__toolbar/, 'with a plan the comparison itself stands');
+  } finally {
+    Object.assign(st, before);
+  }
+});
+
+test('R17/E1: "Today" is one line of chips, not a card of list rows', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  __test.setOwnerContext({ users: [{ id: 7, display_name: 'Ada' }], me: 7 });
+  const st = __test.scheduleState();
+  const before = { entries: st.entries };
+  try {
+    st.entries = [
+      { user_id: 7, date_key: '2026-10-07', source: 'pattern', shift_type: { id: 3, name: 'Frueh', short_code: 'F', color: '#0891b2', start_time: '06:00', end_time: '14:00', fields: [] } },
+      { user_id: 7, date_key: '2026-10-07', source: 'pattern', shift_type: null },
+    ];
+    const html = __test.renderToday();
+    assert.equal((html.match(/class="schedule-today__entry /g) || []).length, 2, 'one chip per entry');
+    assert.doesNotMatch(html, /list-row|row-carrier|<p>/, 'no list rows, no carrier');
+    assert.equal((html.match(/role="button" tabindex="0" data-action="view-schedule-entry"/g) || []).length, 2, 'each chip still opens the detail (S-17)');
+    assert.match(html, /F · Frueh<\/span><span class="schedule-today__meta">Ada · 06:00-14:00</);
+    st.entries = [];
+    assert.match(__test.renderToday(), /^<span class="schedule-today__empty">/);
+  } finally {
+    Object.assign(st, before);
+    __test.setOwnerContext({});
+  }
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const cardFn = schedulePage.slice(schedulePage.indexOf('function renderTodayCard()'), schedulePage.indexOf('function wireShiftTypeFieldSortables('));
+  assert.doesNotMatch(cardFn, /card card--padded|u-section-title/, 'no card frame and no section title above the line');
+  assert.match(cardFn, /<section class="schedule-today" aria-labelledby="schedule-today-label"><h2 class="schedule-today__label" id="schedule-today-label">/);
+
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8'))];
+  const strip = rules.find((r) => r.selector.trim() === '.schedule-today' && r.at.length === 0);
+  assert.match(strip?.body ?? '', /display:\s*flex/);
+  const entries = rules.find((r) => r.selector.trim() === '.schedule-today__entries');
+  assert.match(entries?.body ?? '', /overflow-x:\s*auto/, 'more chips than fit scroll sideways instead of stacking');
+  const chip = rules.find((r) => r.selector.trim() === '.schedule-today__entry');
+  assert.match(chip?.body ?? '', /min-height:\s*var\(--target-base\)/);
+  assert.match(chip?.body ?? '', /white-space:\s*nowrap/);
+});
+
+test('R17/E1: seven day columns fit the 996px stage for one person', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8'))];
+  const host = rules.find((r) => r.selector.trim() === '.schedule-overview' && /--schedule-lane-min/.test(r.body));
+  const rem = Number(/--schedule-lane-min:\s*([\d.]+)rem/.exec(host?.body ?? '')?.[1]);
+  assert.ok(rem > 0, 'the lane minimum is a rem value on .schedule-overview');
+  // 996px stage - 52px time column (44 + 8) - seven 12px day gaps = 860px for
+  // seven days; a lane adds 3px of its own. With 8rem the Sunday stood 36px out.
+  const perDay = (996 - 52 - 7 * 12) / 7;
+  assert.ok(rem * 16 + 3 <= perDay, `a day needs ${rem * 16 + 3}px, the stage gives ${perDay.toFixed(1)}px`);
 });
 
 test('an explicit tab deep link (URL path) always wins over the remembered tab, but the bare root still falls back to it (S-10)', () => {
@@ -2044,7 +2163,7 @@ test('an explicit tab deep link (URL path) always wins over the remembered tab, 
 
 test('switching tabs navigates through the router (URL + history entry), and the router registers one exact route per tab (S-10)', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  const guardedFn = schedulePage.slice(schedulePage.indexOf('async function guardedActivateView'), schedulePage.indexOf('/**\n * Builds the toolbar'));
+  const guardedFn = schedulePage.slice(schedulePage.indexOf('function navigateToView(id) {'), schedulePage.indexOf('/**\n * Builds the toolbar'));
   assert.match(guardedFn, /window\.yuvomi\?\.navigate\(scheduleRouteForView\(id\)\)/, 'a tab click must go through navigate(), not a bare activateView() call, or the URL never updates');
 
   const routerJs = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');

@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "Il nuovo piano ha la precedenza ovunque i due si sovrappongano. \"{{name}}\" resta salvato ma smette di essere mostrato finché si sovrappongono.",
         "patternOverlapConfirmAction": "Sostituisci",
         "editOverride": "Modifica eccezione",
+        "editShiftType": "Modifica tipo di turno",
+        "editPattern": "Modifica rotazione",
         "deleteOverrideRangeTitle": "Eliminare questo periodo?",
         "deleteOverrideRangeDetail": "Rimuove ogni voce di {{user}} dal {{from}} al {{to}}. L'operazione non può essere annullata.",
         "fillRange": "Riempi il periodo",

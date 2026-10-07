@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "新しいプランは重なる範囲で優先されます。「{{name}}」は保存されたままですが、重なっている間は表示されなくなります。",
         "patternOverlapConfirmAction": "置き換える",
         "editOverride": "例外を編集",
+        "editShiftType": "シフトの種類を編集",
+        "editPattern": "シフトパターンを編集",
         "deleteOverrideRangeTitle": "この期間を削除しますか？",
         "deleteOverrideRangeDetail": "{{user}} の {{from}} から {{to}} までのすべての登録を削除します。元に戻せません。",
         "fillRange": "期間を埋める",

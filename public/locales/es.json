@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "El nuevo plan tiene prioridad donde ambos coincidan. \"{{name}}\" queda guardada pero deja de mostrarse mientras se solapen.",
         "patternOverlapConfirmAction": "Reemplazar",
         "editOverride": "Editar excepción",
+        "editShiftType": "Editar tipo de turno",
+        "editPattern": "Editar rotación",
         "deleteOverrideRangeTitle": "¿Eliminar este periodo?",
         "deleteOverrideRangeDetail": "Esto elimina todas las entradas de {{user}} del {{from}} al {{to}}. No se puede deshacer.",
         "fillRange": "Rellenar el periodo",

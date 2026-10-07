@@ -5169,18 +5169,24 @@ One page module with nine deep-link routes (pattern like Settings, not like the 
 
 ### Schedule (`/schedule`)
 
-Off by default. Four tabs — Shift types, Planning (patterns, overrides and extra shifts together),
-Statistics, and Compare (the side-by-side weekly view, formerly labelled "Overview") — plus a
-"today" card. Each tab is its own route (`/schedule/shifts`, `/schedule/patterns`,
-`/schedule/statistics`, `/schedule/overview`; the routes themselves keep the `overview` path segment
-even though the tab label reads "Compare") registered like Health's sub-tabs (one exact route per
-tab, `public/utils/schedule-tabs.js`, soft-navigated via the page module's `update()` export) — a
-reload or a shared/deep link lands on the right tab, and the browser Back button walks between tabs
-instead of leaving the page. A household with no shift types yet opens on the Shift types tab
-instead of Planning, which would otherwise dead-end every form behind it. Clicking a schedule entry
-anywhere it renders (the "today" card, the Compare grid, a week/day calendar block) opens a small
-read-only detail view (shift type, times, owner, note, custom field values, and its origin
-pattern/override/extra) — month-view calendar chips keep navigating to that day instead.
+Off by default. Four tabs - Compare (the side-by-side weekly view, formerly labelled "Overview"),
+Shift types, Planning (patterns, overrides and extra shifts together) and Statistics - plus a
+one-line "today" strip above them. Each tab is its own route (`/schedule/overview`,
+`/schedule/shifts`, `/schedule/patterns`, `/schedule/statistics`; the routes themselves keep the
+`overview` path segment even though the tab label reads "Compare") registered like Health's sub-tabs
+(one exact route per tab, `public/utils/schedule-tabs.js`, soft-navigated via the page module's
+`update()` export) - a reload or a shared/deep link lands on the right tab, and the browser Back
+button walks between tabs instead of leaving the page. **Compare is the first tab and the one the
+bare `/schedule` opens on**, with the member's own lane preselected until they choose themselves
+(a deliberately cleared selection stays empty). A household without shift types sees there the
+empty state that adds one (templates and "Add shift type"), one with shift types but no plan the
+empty state that adds a plan; the person picker and week stepper appear once there is something
+to compare. Shift types and plans are list rows; **editing one opens the same dialog as creating
+it**, with one "Save" - for a plan that dialog also carries the cycle days, and changing the cycle
+length adds or drops day groups in place. Clicking a schedule entry anywhere it renders (the
+"today" strip, the Compare grid, a week/day calendar block) opens a small read-only detail view
+(shift type, times, owner, note, custom field values, and its origin pattern/override/extra) -
+month-view calendar chips keep navigating to that day instead.
 
 - **Scoping:** every household member may *read* the whole overlay — the family mostly needs to know
   that one person is unavailable on Tuesday evening. A member writes only their own schedule; an

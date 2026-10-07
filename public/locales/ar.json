@@ -6424,6 +6424,8 @@
         "patternOverlapConfirmDetail": "تحصل الخطة الجديدة على الأولوية أينما تداخلتا. يبقى \"{{name}}\" محفوظًا لكنه يتوقف عن الظهور طالما استمر التداخل.",
         "patternOverlapConfirmAction": "استبدال",
         "editOverride": "تعديل الاستثناء",
+        "editShiftType": "تعديل نوع المناوبة",
+        "editPattern": "تعديل دورة المناوبات",
         "deleteOverrideRangeTitle": "حذف هذه الفترة؟",
         "deleteOverrideRangeDetail": "سيؤدي هذا إلى إزالة كل إدخال لـ {{user}} من {{from}} إلى {{to}}. لا يمكن التراجع عن ذلك.",
         "fillRange": "تعبئة الفترة",

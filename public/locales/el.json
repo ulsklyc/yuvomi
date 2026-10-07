@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "Το νέο πλάνο υπερισχύει όπου επικαλύπτονται. Το \"{{name}}\" παραμένει αποθηκευμένο αλλά σταματά να εμφανίζεται όσο επικαλύπτονται.",
         "patternOverlapConfirmAction": "Αντικατάσταση",
         "editOverride": "Επεξεργασία εξαίρεσης",
+        "editShiftType": "Επεξεργασία τύπου βάρδιας",
+        "editPattern": "Επεξεργασία κύκλου βαρδιών",
         "deleteOverrideRangeTitle": "Διαγραφή αυτής της περιόδου;",
         "deleteOverrideRangeDetail": "Αφαιρεί κάθε καταχώριση για {{user}} από {{from}} έως {{to}}. Δεν μπορεί να αναιρεθεί.",
         "fillRange": "Συμπλήρωση περιόδου",

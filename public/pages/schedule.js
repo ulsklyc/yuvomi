@@ -31,24 +31,14 @@ let scheduleFab = null;
 let scheduleTablist = null;
 let currentUserId = null;
 let canManageOthers = false;
-let activeView = 'patterns';
-// S-07: der Vorgabewert oben gilt nur, bevor jemals entschieden wurde - render()
-// ersetzt ihn beim ALLERERSTEN Laden dieses Moduls (in dieser Sitzung) je nach
-// Datenlage (siehe dort), aber niemals danach: `activeView` ist ausdruecklich
+let activeView = 'overview';
+// Der Vorgabewert oben gilt nur, bevor jemals entschieden wurde - render()
+// setzt ihn beim ALLERERSTEN Laden dieses Moduls (in dieser Sitzung) auf den
+// Startreiter "Vergleich" (R17, siehe dort), aber niemals danach: `activeView` ist ausdruecklich
 // Zustand, der einen Tab-Wechsel und einen Seitenbesuch ueberlebt (Kommentar an
 // render() weiter unten), ein spaeterer Besuch soll die eigene Tab-Wahl der
 // Person nicht wieder ueberschreiben.
 let initialViewDecided = false;
-// S-03: welche Musterkarten (per `pattern.id`, als String) gerade eine
-// ungespeicherte Aenderung im Zyklustage-Editor oder im inline Pattern-
-// Formular tragen. renderPage() ersetzt `.schedule-body` komplett bei jedem
-// Tab-Wechsel/Neuladen - ohne diese Nachverfolgung verschwand eine getippte,
-// aber nicht gespeicherte Aenderung lautlos, sobald irgendetwas einen
-// Re-Render ausloeste (Audit-Fund S-03). Ein Set statt eines einzelnen
-// Flags: mehrere Musterkarten koennen gleichzeitig geoeffnet und bearbeitet
-// sein, eine Rueckfrage beim Schliessen EINER Karte soll nicht von der
-// Restlichkeit falsch beeinflusst werden.
-let dirtyPatternIds = new Set();
 let state = { users: [], types: [], customFields: [], patterns: [], overrides: [], extras: [], entries: [], warnings: [], reminderOffsetMinutes: null, weeklyHours: null, overtimeEnabled: true, hiddenTemplates: [] };
 // Die drei Berichtszeitraeume der Auswertung - EINE Liste fuer Segment und
 // Auswahlfeld (R9 M11), damit beide nie verschiedene Wahlen anbieten.
@@ -106,6 +96,25 @@ function loadSavedOverviewSelection() {
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed.map(Number) : [];
   } catch { return []; }
+}
+
+/* Hat die Person je selbst gewaehlt? Eine gespeicherte LEERE Auswahl ist eine
+ * Wahl ("Auswahl leeren") und bleibt leer; nur wer nie gewaehlt hat, bekommt
+ * die Vorgabe aus initialOverviewSelection(). */
+function hasSavedOverviewSelection() {
+  try { return localStorage.getItem(OVERVIEW_SELECTION_KEY) !== null; } catch { return false; }
+}
+
+/**
+ * Die Auswahl, mit der der Vergleich aufgeht (Entscheidung R17, E1): die
+ * gespeicherte, und ohne eine solche DIE EIGENE PERSON - der Startreiter zeigt
+ * sofort einen Plan statt der Aufforderung, erst jemanden zu waehlen. Wer
+ * selbst nicht waehlbar ist (kein Haushaltsmitglied in der Liste), startet
+ * leer wie bisher. Rein: Eingaben als Parameter, damit ein Test sie belegt.
+ */
+function initialOverviewSelection({ saved, hasSaved, eligibleIds, ownId }) {
+  if (hasSaved) return normalizeOverviewSelection(saved, eligibleIds);
+  return normalizeOverviewSelection(ownId == null ? [] : [Number(ownId)], eligibleIds.map(Number));
 }
 
 function saveOverviewSelection(ids) {
@@ -294,7 +303,12 @@ async function load() {
   overview = {
     ...overview,
     people: householdMembers.data ?? [],
-    selectedIds: normalizeOverviewSelection(loadSavedOverviewSelection(), (householdMembers.data ?? []).map((person) => person.id)),
+    selectedIds: initialOverviewSelection({
+      saved: loadSavedOverviewSelection(),
+      hasSaved: hasSavedOverviewSelection(),
+      eligibleIds: (householdMembers.data ?? []).map((person) => person.id),
+      ownId: currentUserId,
+    }),
   };
 }
 
@@ -592,7 +606,7 @@ async function refreshStatistics() {
 }
 
 /* Richtung des naechsten Reiterwechsels (R16, Bewegung). Der Klick in der
- * Leiste navigiert ueber den Router (guardedActivateView -> navigate ->
+ * Leiste navigiert ueber den Router (navigateToView -> navigate ->
  * update -> activateView); die Richtung reist deshalb nicht als Argument,
  * sondern wartet hier auf GENAU den naechsten activateView() und faellt dann.
  * null = kein Reiterwechsel (Deep-Link, Retry, FAB): tauschen ohne Blende. */
@@ -887,22 +901,25 @@ function patternFields(pattern = {}) {
   ].join('');
 }
 
-function shiftTypeCard(type) {
+/* EINE ZEILE JE SCHICHTART, BEARBEITEN IM DIALOG (Entscheidung R17, E1). Bis
+ * R17 war jede Schichtart ein Akkordeon mit dem ganzen Formular und zwei
+ * "Speichern" (Angaben, eigene Felder). Jetzt dieselbe Zeile wie Ausnahmen und
+ * Zusatzschichten darunter: Punkt, Symbol, Name, Uhrzeit, rechts "Bearbeiten"
+ * und "Loeschen". Wer die Schichtart nicht aendern darf, liest in der
+ * Metazeile, wem sie gehoert. */
+function shiftTypeRow(type) {
   const editable = canEditType(type);
-  const body = editable
-    ? `<form class="schedule-form" data-form="shift-update" data-id="${type.id}">${shiftFields(type)}<div class="schedule-actions"><button class="btn btn--secondary">${esc(t('schedule.save'))}</button><button type="button" class="btn btn--danger-outline" data-action="delete-shift" data-id="${type.id}">${esc(t('schedule.delete'))}</button></div></form>`
-    : `<p class="schedule-readonly">${esc(type?.created_by == null
-        ? t('schedule.typeOrphaned')
-        : t('schedule.typeOwnedBy', { user: userName(type.created_by) }))}</p>`;
   const icon = type.icon ? `<i data-lucide="${esc(type.icon)}" class="schedule-type-icon" aria-hidden="true"></i>` : '';
-  // Nur zeigen, wenn der Haushalt ueberhaupt Felder definiert hat - eine leere
-  // "Eigene Felder"-Sektion auf JEDER Schichttyp-Karte waere fuer den (haeufigen)
-  // reinen Arbeitsschicht-Haushalt, der die Registrierung nie anfasst, nur Ballast.
-  const fieldsEditor = editable && state.customFields.length ? shiftTypeFieldsEditor(type) : '';
-  return `<details class="card schedule-details"><summary><span class="schedule-swatch" style="--schedule-color:${esc(type.color)}"></span>${icon}<span class="u-card-title u-compact">${esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name)}</span> <small>${esc(clockLabel(type))}</small></summary>
-    ${body}
-    ${fieldsEditor}
-  </details>`;
+  const name = type.short_code ? `${type.short_code} · ${type.name}` : type.name;
+  const owner = editable || readOnly() ? '' : (type?.created_by == null
+    ? t('schedule.typeOrphaned')
+    : t('schedule.typeOwnedBy', { user: userName(type.created_by) }));
+  const meta = [clockLabel(type), owner].filter(Boolean).join(' · ');
+  const actions = editable
+    ? '<span class="schedule-override-actions"><button type="button" class="btn btn--secondary" data-action="edit-shift-type" data-id="' + type.id + '" aria-label="' + esc(t('common.editNamed', { name })) + '">' + esc(t('common.edit')) + '</button>'
+      + '<button type="button" class="btn btn--danger-outline" data-action="delete-shift" data-id="' + type.id + '" aria-label="' + esc(t('common.deleteNamed', { name })) + '">' + esc(t('schedule.delete')) + '</button></span>'
+    : '';
+  return `<div class="list-row schedule-type-row" data-shift-type="${type.id}"><span class="schedule-swatch" style="--schedule-color:${esc(type.color)}"></span>${icon}<div class="list-row__main"><span class="list-row__name">${esc(name)}</span><span class="list-row__meta">${esc(meta)}</span></div>${actions}</div>`;
 }
 
 function shiftTypeFieldRow(field) {
@@ -916,10 +933,10 @@ function shiftTypeFieldRow(field) {
     + '</div>';
 }
 
-// Eine ZWEITE, unabhaengig gespeicherte Sektion neben dem shift-update-Formular
-// oben - derselbe Aufbau wie patternCard()'s Zyklustage-Editor + eigener
-// save-days-Knopf: rein lokale Aenderungen (hinzufuegen/entfernen/umsortieren/
-// Overlay-Haken), erst der Speichern-Klick hier schreibt etwas.
+// Der Abschnitt "Eigene Felder" im Bearbeiten-Dialog einer Schichtart: rein
+// lokale Aenderungen (hinzufuegen/entfernen/umsortieren/Overlay-Haken), die
+// das EINE "Speichern" des Dialogs mitschreibt (saveShiftTypeEdit()). Bis R17
+// trug der Abschnitt einen zweiten Speichern-Knopf neben dem der Angaben.
 function shiftTypeFieldsEditor(type) {
   const attachedIds = new Set(type.fields.map((field) => field.id));
   const available = state.customFields.filter((field) => !attachedIds.has(field.id));
@@ -931,9 +948,8 @@ function shiftTypeFieldsEditor(type) {
       + '</div>' : '';
   const body = '<div class="schedule-type-fields-rows" data-type-fields-rows="' + type.id + '">'
     + (rows || '<p class="u-meta">' + esc(t('schedule.noFieldsAttached')) + '</p>') + '</div>'
-    + picker
-    + '<div class="schedule-actions"><button type="button" class="btn btn--secondary" data-action="save-shift-fields" data-id="' + type.id + '">' + esc(t('schedule.save')) + '</button></div>';
-  return advancedSection(body, { label: t('schedule.attachedFields') });
+    + picker;
+  return advancedSection(body, { label: t('schedule.attachedFields'), open: type.fields.length > 0 });
 }
 
 // Ein Feld gehoert dem Haushalt, nicht einer Person - definiert einmal, an
@@ -1005,38 +1021,56 @@ function dayRowHtml(position, shiftTypeId, writable, fieldValues = {}) {
     + '</div>';
 }
 
-function patternCard(pattern) {
-  const writable = canWrite(pattern.user_id);
+/** Die Zeilen eines Zyklustags aus den gespeicherten Tagen, je Position. */
+function patternDaysByPosition(pattern) {
   const assigned = new Map();
-  for (const day of pattern.days) {
+  for (const day of pattern.days ?? []) {
     const position = Number(day.position);
     if (!assigned.has(position)) assigned.set(position, []);
     assigned.get(position).push({ shiftTypeId: day.shift_type_id, fieldValues: day.field_values ?? {} });
   }
-  const days = Array.from({ length: pattern.cycle_length }, (_, position) => {
-    const classes = assigned.get(position) ?? [{ shiftTypeId: null, fieldValues: {} }];
-    const rows = classes.map((day) => dayRowHtml(position, day.shiftTypeId, writable, day.fieldValues)).join('');
-    const add = writable ? '<button type="button" class="btn btn--secondary" data-action="add-pattern-day-row" data-position="' + position + '">' + esc(t('common.add')) + '</button>' : '';
-    // S-04: die Kopfzeile nennt das naechste tatsaechliche Datum dieser
-    // Position ("1 · Do 10.09."), nicht nur eine nackte Nummer - `data-day-
-    // group-label` ist der Anker, an dem das Live-Neuberechnen (renderShell()'
-    // 'input'/'change'-Delegierte) den Text austauscht, sobald Start-/
-    // Zykluslaenge-Feld sich aendert, ohne die Zeilen selbst neu zu bauen.
-    const label = cycleDayHeaderLabel(pattern.anchor_date, pattern.cycle_length, pattern.valid_from, pattern.valid_until, position + 1);
-    return '<div class="form-field schedule-day-group" data-day-group="' + position + '"><label class="label" data-day-group-label>' + esc(label) + '</label><div class="schedule-day-rows">' + rows + '</div>' + add + '</div>';
-  }).join('');
-  // S-05: nur sichtbar, wenn diese Karte HEUTE tatsaechlich gegen eine andere
-  // aktive Karte derselben Person konkurriert (resolveWinningPatternId()
-  // liefert sonst null) - eine einzelne aktive Karte traegt kein Abzeichen.
+  return assigned;
+}
+
+/* EIN Zyklustag im Editor: Kopfzeile, seine Zeilen, "Hinzufuegen".
+ * S-04: die Kopfzeile nennt das naechste tatsaechliche Datum dieser Position
+ * ("1 · Do 10.09."), nicht nur eine nackte Nummer - `data-day-group-label` ist
+ * der Anker, an dem updateCycleDayHeadersFor() den Text austauscht, sobald
+ * Start oder Zykluslaenge sich aendern, ohne die Zeilen neu zu bauen. */
+function dayGroupHtml(position, classes, writable, { anchor, cycleLength, validFrom, validUntil }) {
+  const rows = (classes ?? [{ shiftTypeId: null, fieldValues: {} }]).map((day) => dayRowHtml(position, day.shiftTypeId, writable, day.fieldValues)).join('');
+  const add = writable ? '<button type="button" class="btn btn--secondary" data-action="add-pattern-day-row" data-position="' + position + '">' + esc(t('common.add')) + '</button>' : '';
+  const label = cycleDayHeaderLabel(anchor, cycleLength, validFrom, validUntil, position + 1);
+  return '<div class="form-field schedule-day-group" data-day-group="' + position + '"><span class="label" data-day-group-label>' + esc(label) + '</span><div class="schedule-day-rows">' + rows + '</div>' + add + '</div>';
+}
+
+function patternDaysEditorHtml(pattern, writable) {
+  const assigned = patternDaysByPosition(pattern);
+  const window_ = { anchor: pattern.anchor_date, cycleLength: pattern.cycle_length, validFrom: pattern.valid_from, validUntil: pattern.valid_until };
+  const days = Array.from({ length: pattern.cycle_length }, (_, position) => dayGroupHtml(position, assigned.get(position), writable, window_)).join('');
+  return `<h3 class="u-card-title">${esc(t('schedule.cycleDays'))}</h3><p class="u-meta schedule-cycle-hint" data-cycle-hint>${esc(t('schedule.cycleDaysHint', { count: pattern.cycle_length }))}</p><div class="schedule-days" data-pattern-days>${days}</div>`;
+}
+
+/* EINE ZEILE JE SCHICHTPLAN, BEARBEITEN IM DIALOG (Entscheidung R17, E1). Bis
+ * R17 ein Akkordeon mit Angaben-Formular UND Zyklustage-Editor, je mit eigenem
+ * "Speichern"; sieben Zyklustage waren mobil 964px Karte. Jetzt dieselbe Zeile
+ * wie Ausnahmen und Zusatzschichten. Ein fremder Plan bleibt lesbar: "Details
+ * anzeigen" oeffnet denselben Dialog ohne Schreibweg. */
+function patternRow(pattern) {
+  const writable = canWrite(pattern.user_id);
+  // S-05: nur sichtbar, wenn dieser Plan HEUTE tatsaechlich gegen einen anderen
+  // aktiven Plan derselben Person konkurriert (resolveWinningPatternId()
+  // liefert sonst null) - ein einzelner aktiver Plan traegt kein Abzeichen.
   const winningId = resolveWinningPatternId(state.patterns, pattern.user_id, todayKey());
   const winsBadge = winningId != null && Number(winningId) === Number(pattern.id)
     ? '<span class="schedule-wins-badge">' + esc(t('schedule.patternWinsBadge')) + '</span>'
     : '';
-  return `<details class="card schedule-details" data-pattern="${pattern.id}"><summary><span class="u-card-title u-compact">${esc(pattern.name)}</span> <small>· ${esc(userName(pattern.user_id))}</small>${winsBadge}</summary>
-    ${writable ? `<form class="schedule-form" data-form="pattern-update" data-id="${pattern.id}">${patternFields(pattern)}<button class="btn btn--secondary">${esc(t('schedule.save'))}</button></form>` : ''}
-    <h3 class="u-card-title">${esc(t('schedule.cycleDays'))}</h3><p class="u-meta schedule-cycle-hint">${esc(t('schedule.cycleDaysHint', { count: pattern.cycle_length }))}</p><div class="schedule-days">${days}</div>
-    ${writable ? `<div class="schedule-actions"><button type="button" class="btn btn--secondary" data-action="save-days" data-id="${pattern.id}">${esc(t('schedule.save'))}</button><button type="button" class="btn btn--danger-outline" data-action="delete-pattern" data-id="${pattern.id}">${esc(t('schedule.delete'))}</button></div>` : ''}
-  </details>`;
+  const meta = userName(pattern.user_id);
+  const actions = writable
+    ? '<span class="schedule-override-actions"><button type="button" class="btn btn--secondary" data-action="edit-pattern" data-id="' + pattern.id + '" aria-label="' + esc(t('common.editNamed', { name: pattern.name })) + '">' + esc(t('common.edit')) + '</button>'
+      + '<button type="button" class="btn btn--danger-outline" data-action="delete-pattern" data-id="' + pattern.id + '" aria-label="' + esc(t('common.deleteNamed', { name: pattern.name })) + '">' + esc(t('schedule.delete')) + '</button></span>'
+    : '<span class="schedule-override-actions"><button type="button" class="btn btn--secondary" data-action="edit-pattern" data-id="' + pattern.id + '" aria-label="' + esc(t('common.showDetails')) + ': ' + esc(pattern.name) + '">' + esc(t('common.showDetails')) + '</button></span>';
+  return `<div class="list-row schedule-pattern-row" data-pattern-row="${pattern.id}"><div class="list-row__main"><span class="list-row__name">${esc(pattern.name)}${winsBadge}</span><span class="list-row__meta">${esc(meta)}</span></div>${actions}</div>`;
 }
 
 /**
@@ -1352,7 +1386,7 @@ function planningPanel() {
   if (planningNeedsShiftTypes()) {
     return '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + emptyPlanningNeedsTypesState() + '</section>';
   }
-  return '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + (state.patterns.length ? patternsInMemberOrder().map(patternCard).join('') : emptyPatternState()) + '</section>'
+  return '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + (state.patterns.length ? '<div class="row-carrier">' + patternsInMemberOrder().map(patternRow).join('') + '</div>' : emptyPatternState()) + '</section>'
         // App-weite UX-Durchsicht 2026-09-12 (Batch 4, "bis zu vier
         // konkurrierende Anlege-Wege"): Override/Extra trugen bisher JE EINEN
         // Anlege-Knopf im Abschnittskopf, IMMER sichtbar - zusaetzlich zur
@@ -1487,9 +1521,15 @@ function openScheduleEntryDetailModal(entry) {
   openModal({ title: t('schedule.entryDetailTitle'), size: 'sm', content: renderScheduleEntryDetailContent(entry), dirtyGuard: false });
 }
 
+/* "HEUTE" IST EINE ZEILE (Entscheidung R17, E1). Bis R17 eine Karte mit
+ * Abschnittstitel und einer Listenzeile je Eintrag: 132px (mobil) bis 148px
+ * ueber JEDEM Reiter, bevor dessen Inhalt begann. Jetzt das Wort "Heute" und
+ * dahinter je Eintrag eine Marke - Punkt, Schicht, Person und Uhrzeit -, die
+ * bei vielen Eintraegen seitwaerts rollt statt zu stapeln. Jede Marke bleibt
+ * der Detail-Ausloeser von S-17 (role=button, READ_SAFE_ACTIONS). */
 function renderToday() {
-  if (!state.entries.length) return `<p>${esc(t('schedule.empty'))}</p>`;
-  return `<div class="row-carrier">${state.entries.map((entry) => {
+  if (!state.entries.length) return `<span class="schedule-today__empty">${esc(t('schedule.empty'))}</span>`;
+  return state.entries.map((entry) => {
     const type = entry.shift_type;
     const swatchColor = type ? type.color : 'var(--color-border)';
     const name = type ? esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name) : esc(t('schedule.freeDay'));
@@ -1498,13 +1538,9 @@ function renderToday() {
     const meta = overlay ? `${base} · ${esc(overlay)}` : base;
     const icon = type?.icon ? `<i data-lucide="${esc(type.icon)}" class="schedule-type-icon" aria-hidden="true"></i>` : '';
     const badge = entry.source === 'extra' ? extraBadge() : '';
-    // S-17: Zeile ist read-only, aber klickbar/tastaturbedienbar (role=button,
-    // dieselbe Enter/Space-Aktivierung wie calendar.js' Agenda-Zeilen) - jede
-    // Rolle im Haushalt darf sich einen Eintrag ansehen, deshalb steht die
-    // Aktion in READ_SAFE_ACTIONS.
     const key = esc(scheduleEntryMatchKey(entry));
-    return `<div class="list-row schedule-entry-row" role="button" tabindex="0" data-action="view-schedule-entry" data-schedule-key="${key}" aria-label="${name}, ${meta}"><span class="schedule-swatch" style="--schedule-color:${esc(swatchColor)}"></span>${icon}${badge}<div class="list-row__main"><span class="list-row__name">${name}</span><span class="list-row__meta">${meta}</span></div></div>`;
-  }).join('')}</div>`;
+    return `<div class="schedule-today__entry schedule-entry-row" role="button" tabindex="0" data-action="view-schedule-entry" data-schedule-key="${key}" aria-label="${name}, ${meta}"><span class="schedule-swatch" style="--schedule-color:${esc(swatchColor)}"></span>${icon}${badge}<span class="schedule-today__name">${name}</span><span class="schedule-today__meta">${meta}</span></div>`;
+  }).join('');
 }
 
 // Uebersicht-Tab: mehrere Personen nebeneinander vergleichen.
@@ -1719,6 +1755,17 @@ function scheduleOverviewEntryTitle(entry) {
 }
 
 function renderOverview() {
+  // DER STARTREITER FUEHRT ZUR ERSTEN HANDLUNG (Entscheidung R17, E1). Ohne
+  // Schichtart und ohne Plan gibt es nichts zu vergleichen - Personenwahl,
+  // Wochenstepper und ein leeres Raster waeren Verwaltung vor dem Inhalt. Der
+  // Reiter zeigt stattdessen den Leerzustand, der das Fehlende anlegt:
+  // derselbe wie auf "Schichtarten" (Vorlagen + "Schichtart hinzufuegen") bzw.
+  // wie auf "Planung" ("Schichtplan hinzufuegen"). Nach dem Speichern steht
+  // man weiter hier (reloadAfterWrite()) und sieht den naechsten Schritt.
+  if (planningNeedsShiftTypes()) return `<section class="schedule-overview schedule-overview--start">${emptyShiftTypesState()}</section>`;
+  if (!state.patterns.length && !state.overrides.length && !state.extras.length && !overview.loading && !overview.error && !overview.entries.length) {
+    return `<section class="schedule-overview schedule-overview--start">${emptyPatternState()}</section>`;
+  }
   const picker = renderUserMultiSelect(overview.people, overview.selectedIds, 'overview-people', 'schedule.overviewPeopleLabel', 'schedule.overviewClearSelection');
   const weekDays = overviewVisibleDays();
   const showsToday = weekDays.includes(todayKey());
@@ -1823,38 +1870,12 @@ function renderScheduleWarnings() {
   return '<div class="schedule-warnings" role="status">' + state.warnings.map((warning) => '<p>' + esc(t('schedule.overlapWarning', { date: formatDate(warning.date_key), user: userName(warning.user_id) })) + '</p>').join('') + '</div>';
 }
 
-// S-03: markiert die umschliessende Musterkarte (`[data-pattern]`, siehe
-// patternCard()) als dirty - deckt sowohl den Zyklustage-Editor (die
-// `[data-day]`-Selects/Feld-Unterbloecke) als auch das inline
-// `pattern-update`-Formular ab, beide leben im selben `<details
-// data-pattern>`. Kein Effekt ausserhalb einer Musterkarte (z.B. Override-/
-// Extra-Zeilen) - deren Aenderungen haben ihr eigenes Modal mit eigenem
-// Dirty-Guard.
-function markPatternDirty(target) {
-  const details = target?.closest?.('[data-pattern]');
-  if (details?.dataset?.pattern) dirtyPatternIds.add(details.dataset.pattern);
-}
+// Ein Reiterwechsel ist eine Navigation: Adresse UND Verlaufseintrag. Bis R17
+// fragte er vorher nach ungespeicherten Zyklustagen einer offenen Karte
+// (S-03); seit das Bearbeiten im Dialog laeuft, haelt dessen eigener
+// Verwerfen-Schutz die Eingabe, und hinter einem Dialog wechselt niemand den Reiter.
+function navigateToView(id) {
 
-// S-03: vor einem Tab-Wechsel gefragt, waehrend mindestens eine Musterkarte
-// dirty ist. `wireTablist()` malt den Klick bereits VOR diesem Aufruf visuell
-// um (setActive() ruft paint() vor onChange()) - bei "Abbrechen" muss der
-// Tab-Balken deshalb aktiv auf den alten activeView zurueckgeholt werden
-// (sync() loest dabei bewusst kein weiteres onChange aus), das eigentliche
-// `.schedule-body` bleibt unveraendert (kein renderPage() gelaufen), die
-// Eingabe steht also unveraendert im DOM.
-async function guardedActivateView(id) {
-  if (activeView === 'patterns' && dirtyPatternIds.size) {
-    const confirmed = await confirmModal(
-      t('modal.unsavedChanges'),
-      { danger: true, confirmLabel: t('modal.discardChanges'), detail: t('schedule.discardCycleDayEditsDetail') },
-    );
-    if (!confirmed) {
-      pendingTabDirection = null;
-      scheduleTablist?.sync(activeView);
-      return;
-    }
-    dirtyPatternIds.clear();
-  }
   // S-10: navigate() statt eines blossen activateView() - haengt Adresse UND
   // Verlaufseintrag an. Da /schedule/<tab> bereits als eigene Route
   // registriert ist (router.js) und dieses Modul schon gerendert ist, nimmt
@@ -1870,11 +1891,15 @@ async function guardedActivateView(id) {
  * being destroyed along with a full-page reset.
  */
 function renderShell() {
+  // DER PLAN ZUERST (Entscheidung R17, E1). "Vergleich" - die Woche als Raster -
+  // ist das, wofuer jemand den Schichtplan oeffnet; bis R17 stand er als
+  // letzter Reiter hinter drei Reitern Stammdaten und verlangte dort erst eine
+  // Personenwahl. Die Adressen der Reiter bleiben (utils/schedule-tabs.js).
   const tabs = [
+    ['overview', t('schedule.overview')],
     ['shifts', t('schedule.shiftTypes')],
     ['patterns', t('schedule.planning')],
     ['statistics', t('schedule.statistics')],
-    ['overview', t('schedule.overview')],
   ];
   root.replaceChildren();
   root.insertAdjacentHTML('beforeend', `<div class="schedule-page app-page app-page--full" data-composition="full">
@@ -1896,8 +1921,7 @@ function renderShell() {
   // Scroll-Fade-Affordanz gleich mit - eine zusaetzliche wireScrollFade()-Zeile
   // hier waere seither doppelt verdrahtet.
   // manualActivation (Review zu #1099): onChange() hier navigiert echt
-  // (window.yuvomi?.navigate), fetcht Statistik/Uebersicht neu und kann bei
-  // ungespeicherten Zyklustage-Aenderungen die S-03-Nachfrage ausloesen -
+  // (window.yuvomi?.navigate) und fetcht Statistik/Uebersicht neu -
   // ohne manualActivation loeste JEDER Pfeiltastendruck beim blossen
   // Durchblaettern der Tableiste jeweils einen davon aus. Mit
   // manualActivation bewegen Pfeiltasten/Home/End nur den Fokus; erst
@@ -1905,7 +1929,7 @@ function renderShell() {
   scheduleTablist = wireTablist(root.querySelector('.schedule-tabs'), {
     activeId: activeView,
     manualActivation: true,
-    onChange: (id, { direction = 0 } = {}) => { pendingTabDirection = direction; guardedActivateView(id); },
+    onChange: (id, { direction = 0 } = {}) => { pendingTabDirection = direction; navigateToView(id); },
   });
   // Gleitende Auswahl-Kapsel (utils/segment-indicator.js), dieselbe Bewegung
   // wie die Gesundheit auf derselben `.sub-tabs-bar` (Kanon, Runde 7 D8). Die
@@ -1913,42 +1937,10 @@ function renderShell() {
   attachSegmentIndicator(root.querySelector('.schedule-tabs'));
   root.addEventListener('submit', submitForm);
   root.addEventListener('click', (event) => {
-    // S-03: eine Musterkarte einklappen ist ebenfalls ein "Re-Render" ihrer
-    // Sicht (der Zyklustage-Editor darunter verschwindet) - derselbe Verlust
-    // wie ein Tab-Wechsel, nur ueber das native <summary>-Toggle statt
-    // renderPage(). Der 'toggle'-Event von <details> selbst ist nicht
-    // abbrechbar; der Klick auf <summary>, der ihn ausloest, ist es - hier
-    // wird nur das SCHLIESSEN einer dirty Karte abgefangen, das Oeffnen
-    // (nichts geht dabei verloren) bleibt unangetastet.
-    const summary = event.target.closest('summary');
-    const details = summary?.closest('[data-pattern]');
-    if (details?.open && dirtyPatternIds.has(details.dataset.pattern)) {
-      event.preventDefault();
-      confirmModal(
-        t('modal.unsavedChanges'),
-        { danger: true, confirmLabel: t('modal.discardChanges'), detail: t('schedule.discardCycleDayEditsDetail') },
-      ).then((confirmed) => {
-        if (!confirmed) return;
-        dirtyPatternIds.delete(details.dataset.pattern);
-        details.open = false;
-      });
-      return;
-    }
     const actionButton = event.target.closest('[data-action]');
     if (actionButton) action({ currentTarget: actionButton });
   });
-  // S-03: jede Eingabe im Zyklustage-Editor/inline Pattern-Formular markiert
-  // ihre Musterkarte als dirty - 'input' fuer Texteingaben (Name,
-  // Zykluslaenge, Feldwerte, tippt man ohne je zu blur'en), 'change'
-  // zusaetzlich fuer <select>/<input type=date> (Zyklustag-Auswahl,
-  // Anker-/Gueltigkeitsdatum, Aktiv-Schalter), die manchmal ohne 'input' feuern.
-  root.addEventListener('input', (event) => {
-    if (activeView === 'patterns') markPatternDirty(event.target);
-    if (activeView === 'patterns') updateCycleDayHeadersFor(event.target);
-  });
   root.addEventListener('change', async (event) => {
-    if (activeView === 'patterns') markPatternDirty(event.target);
-    if (activeView === 'patterns') updateCycleDayHeadersFor(event.target);
     if (event.target.matches('.schedule-stat-range__select')) {
       // Das schmale Gegenstueck zum Segment (R9 M11) - derselbe Wechsel.
       setStatisticsRange(event.target.value);
@@ -1958,20 +1950,6 @@ function renderShell() {
       overview = { ...overview, selectedIds: getSelectedUserIds(root, 'overview-people') };
       saveOverviewSelection(overview.selectedIds);
       renderPage();
-    } else if (event.target.matches('[data-day]')) {
-      // Der gewaehlte Schichttyp entscheidet, welche Felder die Zeile zeigt -
-      // ein Wechsel baut den Unterblock neu aus dem NEUEN Typ, ohne die bereits
-      // getippten Werte anderer Zeilen anzufassen. Werte fuer Felder, die am
-      // neuen Typ nicht mehr haengen, werden dabei mit verworfen (best-effort,
-      // spiegelt dieselbe Validierung, die der Server beim Speichern ohnehin durchsetzt).
-      const row = event.target.closest('[data-day-row]');
-      const existing = row?.querySelector('[data-day-row-fields]');
-      const html = dayRowFieldsHtml(event.target.value);
-      if (existing) {
-        existing.insertAdjacentHTML('afterend', html);
-        existing.remove();
-      } else if (html) row.insertAdjacentHTML('beforeend', html);
-      window.lucide?.createIcons({ el: row });
     }
   });
   // S-17: Tastaturaktivierung der als role="button" ausgezeichneten
@@ -1994,16 +1972,15 @@ function renderShell() {
  */
 function updateCycleDayHeadersFor(target) {
   const name = target?.name || target?.getAttribute?.('name');
-  if (name !== 'anchor_date' && name !== 'cycle_length') return;
-  const details = target.closest('[data-pattern]');
-  const form = details?.querySelector('[data-form="pattern-update"]');
+  if (name !== 'anchor_date' && name !== 'cycle_length' && name !== 'valid_from' && name !== 'valid_until') return;
+  const form = target.closest('[data-form="pattern-update"]');
   if (!form) return;
   const anchor = formValue(form, 'anchor_date');
   const cycleLength = Number(formValue(form, 'cycle_length'));
   const validFrom = formValue(form, 'valid_from') || null;
   const validUntil = formValue(form, 'valid_until') || null;
   if (!anchor || !cycleLength) return;
-  details.querySelectorAll('[data-day-group]').forEach((group) => {
+  form.querySelectorAll('[data-day-group]').forEach((group) => {
     const position = Number(group.dataset.dayGroup) + 1;
     const label = group.querySelector('[data-day-group-label]');
     if (label) label.textContent = cycleDayHeaderLabel(anchor, cycleLength, validFrom, validUntil, position);
@@ -2046,7 +2023,7 @@ function renderPage() {
       + (locked ? '' : (state.types.length && visibleQuickstartTemplates().length ? '<div class="schedule-quickstart-actions" role="group" aria-label="' + esc(t('schedule.quickStartShiftTypes')) + '">'
         + visibleQuickstartTemplates().map(([template, key]) => '<button type="button" class="btn btn--secondary btn--sm" data-action="quick-start-shifts" data-template="' + template + '"><i data-lucide="sparkles" aria-hidden="true"></i>' + esc(t(key)) + '</button>').join('')
         + '</div>' : '')) + '</div>'
-      + (state.types.length ? state.types.map(shiftTypeCard).join('') : emptyShiftTypesState()) + '</section>'
+      + (state.types.length ? '<div class="row-carrier">' + state.types.map(shiftTypeRow).join('') + '</div>' : emptyShiftTypesState()) + '</section>'
       + customFieldsSection()
     : activeView === 'patterns'
       ? planningPanel()
@@ -2059,7 +2036,6 @@ function renderPage() {
   renderTodayCard();
   updateScheduleFab();
   window.lucide?.createIcons({ el: body });
-  wireShiftTypeFieldSortables(body);
   if (activeView === 'overview') {
     bindUserMultiSelect(body, 'overview-people');
     wireScrollFade(body.querySelector('.schedule-overview__scroll'));
@@ -2096,7 +2072,10 @@ function renderTodayCard() {
     || state.overrides.length || state.entries.length;
   slot.replaceChildren();
   if (inUse) {
-    slot.insertAdjacentHTML('beforeend', '<section class="card card--padded schedule-today"><h2 class="u-section-title">' + esc(t('schedule.today')) + '</h2>' + renderToday() + renderScheduleWarnings() + '</section>');
+    // Kein Kartenrahmen, kein Abschnittstitel: eine Zeile (renderToday()). Die
+    // Ueberschneidungs-Warnung ist selten und steht als eigene Zeile darunter.
+    slot.insertAdjacentHTML('beforeend', '<section class="schedule-today" aria-labelledby="schedule-today-label"><h2 class="schedule-today__label" id="schedule-today-label">' + esc(t('schedule.today')) + '</h2><div class="schedule-today__entries">' + renderToday() + '</div></section>' + renderScheduleWarnings());
+    wireScrollFade(slot.querySelector('.schedule-today__entries'));
   }
   window.lucide?.createIcons({ el: slot });
 }
@@ -2543,14 +2522,7 @@ async function saveCreatedSchedule(event) {
         await api.delete(`/schedule/extras/${id}`);
       }
     }
-    await load();
-    // S-03 (Review zu #1099): dieser Speichervorgang baut JEDE Musterkarte neu
-    // auf, auch die einer ganz anderen Person/eines ganz anderen Musters -
-    // eine dort noch offene, ungespeicherte Zyklustage-Bearbeitung ist damit
-    // schon verworfen, ohne dass je gefragt wurde. Ohne dieses clear() bliebe
-    // ihre Id in dirtyPatternIds stehen und der naechste Tab-Wechsel fragte
-    // faelschlich nach dem Verwerfen von Aenderungen, die es nicht mehr gibt.
-    dirtyPatternIds.clear();
+    await reloadAfterWrite();
     renderPage();
     await closeModal({ force: true });
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
@@ -2583,19 +2555,278 @@ async function saveCustomField(event, fieldId) {
   try {
     if (fieldId) await api.put(`/schedule/custom-fields/${fieldId}`, data);
     else await api.post('/schedule/custom-fields', data);
-    await load();
-    // S-03 (Review zu #1099): dieser Speichervorgang baut JEDE Musterkarte neu
-    // auf, auch die einer ganz anderen Person/eines ganz anderen Musters -
-    // eine dort noch offene, ungespeicherte Zyklustage-Bearbeitung ist damit
-    // schon verworfen, ohne dass je gefragt wurde. Ohne dieses clear() bliebe
-    // ihre Id in dirtyPatternIds stehen und der naechste Tab-Wechsel fragte
-    // faelschlich nach dem Verwerfen von Aenderungen, die es nicht mehr gibt.
-    dirtyPatternIds.clear();
+    await reloadAfterWrite();
     renderPage();
     await closeModal({ force: true });
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
   } catch (error) {
     window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
+  }
+}
+
+/**
+ * Die rein lokalen Handgriffe der beiden Bearbeiten-Dialoge: Zeilen eines
+ * Zyklustags und eigene Felder einer Schichtart hinzufuegen, entfernen,
+ * umsortieren, das Symbol waehlen. Kein API-Aufruf - erst das EINE "Speichern"
+ * des Dialogs schreibt. Die Dialoge haengen an document.body, ausserhalb von
+ * `root`; der Klick-Delegierte der Seite erreicht sie nicht, deshalb verdrahtet
+ * jeder Dialog diese Funktion selbst (wireEditorActions()).
+ */
+function editorAction(button) {
+  const kind = button.dataset.action;
+  if (kind === 'pick-shift-icon') { pickShiftIcon(button); return; }
+  if (kind === 'add-pattern-day-row') {
+    const rows = button.closest('[data-day-group]')?.querySelector('.schedule-day-rows');
+    rows?.insertAdjacentHTML('beforeend', dayRowHtml(Number(button.dataset.position), null, true));
+    if (rows) window.lucide?.createIcons({ el: rows });
+    return;
+  }
+  if (kind === 'remove-pattern-day-row') {
+    button.closest('[data-day-row]')?.remove();
+    return;
+  }
+  if (kind === 'add-type-field') {
+    const scope = button.closest('form');
+    const container = scope?.querySelector('[data-type-fields-rows]');
+    const picker = scope?.querySelector('[data-field-picker]');
+    if (!container || !picker?.value) return;
+    const field = state.customFields.find((item) => Number(item.id) === Number(picker.value));
+    if (!field) return;
+    container.querySelector('.u-meta')?.remove();
+    container.insertAdjacentHTML('beforeend', shiftTypeFieldRow({ ...field, show_in_overlay: false }));
+    picker.querySelector(`option[value="${field.id}"]`)?.remove();
+    window.lucide?.createIcons({ el: container.parentElement });
+    return;
+  }
+  if (kind === 'remove-type-field') {
+    const row = button.closest('[data-type-field-row]');
+    const container = row?.closest('[data-type-fields-rows]');
+    row?.remove();
+    if (container && !container.children.length) container.insertAdjacentHTML('beforeend', '<p class="u-meta">' + esc(t('schedule.noFieldsAttached')) + '</p>');
+    return;
+  }
+  // Tastaturbedienbarer Reorder-Pfad neben dem Ziehen ueber makeSortable()
+  // (utils/sortable.js verlangt genau das).
+  if (kind === 'move-type-field') {
+    const row = button.closest('[data-type-field-row]');
+    const sibling = button.dataset.direction === 'up' ? row?.previousElementSibling : row?.nextElementSibling;
+    if (!row || !sibling) return;
+    if (button.dataset.direction === 'up') row.parentElement.insertBefore(row, sibling);
+    else row.parentElement.insertBefore(sibling, row);
+  }
+}
+
+function wireEditorActions(form) {
+  form?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-action]');
+    if (button && button.dataset.action !== 'close-modal') editorAction(button);
+  });
+}
+
+/** Die eigenen Felder einer Schichtart, wie sie im Dialog gerade stehen. */
+function collectShiftTypeFields(form) {
+  const container = form.querySelector('[data-type-fields-rows]');
+  if (!container) return null;
+  return [...container.querySelectorAll('[data-type-field-row]')].map((row, index) => ({
+    custom_field_id: Number(row.dataset.customFieldId),
+    position: index,
+    show_in_overlay: row.querySelector('[data-show-in-overlay]')?.checked ?? false,
+  }));
+}
+
+/** Die Zyklustage, wie sie im Dialog gerade stehen - eine Zeile je Schicht. */
+function collectPatternDays(form) {
+  return [...form.querySelectorAll('[data-day-row]')].map((row) => {
+    const select = row.querySelector('[data-day]');
+    return { position: Number(select.dataset.day), shift_type_id: select.value ? Number(select.value) : null, field_values: collectFieldValues(row) };
+  });
+}
+
+/**
+ * Stellt den Zyklustage-Editor auf die getippte Zykluslaenge ein: fehlende
+ * Tage kommen leer dazu, ueberzaehlige fallen. So speichert EIN Knopf Angaben
+ * und Tage zusammen - bis R17 musste man erst die Laenge speichern, um die
+ * neuen Tage zu sehen, und die alte Laenge mit belegten Tagen wies der Server
+ * ab. Die Zahl bleibt in den Grenzen des Felds (1-366); alles andere laesst
+ * den Editor stehen und ueberlaesst die Meldung dem Feld.
+ */
+function syncPatternDayGroups(form) {
+  const host = form.querySelector('[data-pattern-days]');
+  const cycleLength = Number(formValue(form, 'cycle_length'));
+  if (!host || !Number.isInteger(cycleLength) || cycleLength < 1 || cycleLength > 366) return;
+  const groups = [...host.querySelectorAll('[data-day-group]')];
+  groups.filter((group) => Number(group.dataset.dayGroup) >= cycleLength).forEach((group) => group.remove());
+  const window_ = { anchor: formValue(form, 'anchor_date'), cycleLength, validFrom: formValue(form, 'valid_from') || null, validUntil: formValue(form, 'valid_until') || null };
+  for (let position = groups.length; position < cycleLength; position += 1) {
+    host.insertAdjacentHTML('beforeend', dayGroupHtml(position, null, true, window_));
+  }
+  const hint = form.querySelector('[data-cycle-hint]');
+  if (hint) hint.textContent = t('schedule.cycleDaysHint', { count: cycleLength });
+  window.lucide?.createIcons({ el: host });
+}
+
+/**
+ * Bearbeiten einer Schichtart: DERSELBE Dialog wie das Anlegen (Entscheidung
+ * R17, E1) - dieselben Felder, derselbe Fuss "Abbrechen + Speichern". Die
+ * eigenen Felder stehen als aufklappbarer Abschnitt darunter und gehen mit
+ * demselben Knopf mit.
+ */
+function openShiftTypeEditModal(type) {
+  const fieldsEditor = state.customFields.length ? shiftTypeFieldsEditor(type) : '';
+  const content = '<form id="schedule-edit-form" class="form-stack schedule-modal-form" data-form="shift-update" data-id="' + type.id + '">'
+    + shiftFields(type)
+    + fieldsEditor
+    + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
+  openModal({
+    title: t('schedule.editShiftType'),
+    size: 'md',
+    content,
+    onSave: (modal) => {
+      const form = modal.querySelector('#schedule-edit-form');
+      wireEditorActions(form);
+      wireShiftTypeFieldSortables(form);
+      form?.addEventListener('submit', saveShiftTypeEdit);
+    },
+  });
+}
+
+async function saveShiftTypeEdit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  if (readOnly()) return;
+  const id = form.dataset.id;
+  try {
+    await api.put(`/schedule/shift-types/${id}`, formData(form));
+    const fields = collectShiftTypeFields(form);
+    if (fields) await api.put(`/schedule/shift-types/${id}/fields`, { fields });
+    // Geschrieben ist: erst schliessen, dann neu bauen. Die Zeile mit dem
+    // ausloesenden "Bearbeiten" entsteht dabei neu - refocusAfterRender()
+    // zieht den Fokus dorthin nach statt ihn auf <body> fallen zu lassen.
+    await closeModal({ force: true });
+    await reloadAfterWrite();
+    renderPage();
+    refocusAfterRender();
+    window.yuvomi?.showToast(t('schedule.saved'), 'success');
+  } catch (error) {
+    window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
+  }
+}
+
+/**
+ * Bearbeiten eines Schichtplans: DERSELBE Dialog wie das Anlegen (Entscheidung
+ * R17, E1), dazu die Zyklustage - und EIN "Speichern" fuer beides. Ohne
+ * Schreibrecht ist er eine Leseansicht: alle Felder gesperrt, im Fuss nur
+ * "Schliessen".
+ */
+function openPatternEditModal(pattern) {
+  const writable = canWrite(pattern.user_id);
+  const footer = writable
+    ? '<button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button>'
+    : '<button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.close')) + '</button>';
+  const content = '<form id="schedule-edit-form" class="form-stack schedule-modal-form" data-form="pattern-update" data-id="' + pattern.id + '">'
+    + formField(t('schedule.owner'), '<input class="input" readonly value="' + esc(userName(pattern.user_id)) + '">')
+    + '<fieldset class="schedule-pattern-fields" data-field="pattern-fields"' + (writable ? '' : ' disabled') + '>' + patternFields(pattern) + '</fieldset>'
+    + patternDaysEditorHtml(pattern, writable)
+    + '<div class="modal-panel__footer modal-panel__footer--plain">' + footer + '</div></form>';
+  openModal({
+    title: writable ? t('schedule.editPattern') : pattern.name,
+    size: 'md',
+    content,
+    dirtyGuard: writable,
+    onSave: (modal) => {
+      const form = modal.querySelector('#schedule-edit-form');
+      if (!writable) return;
+      wireEditorActions(form);
+      const onFieldEdit = (event) => {
+        const name = event.target?.getAttribute?.('name');
+        if (name === 'cycle_length') syncPatternDayGroups(form);
+        updateCycleDayHeadersFor(event.target);
+      };
+      form?.addEventListener('input', onFieldEdit);
+      form?.addEventListener('change', (event) => {
+        onFieldEdit(event);
+        // Der gewaehlte Schichttyp entscheidet, welche Felder die Zeile zeigt -
+        // ein Wechsel baut den Unterblock neu aus dem NEUEN Typ, ohne die
+        // bereits getippten Werte anderer Zeilen anzufassen.
+        if (!event.target.matches?.('[data-day]')) return;
+        const row = event.target.closest('[data-day-row]');
+        const existing = row?.querySelector('[data-day-row-fields]');
+        const html = dayRowFieldsHtml(event.target.value);
+        if (existing) {
+          existing.insertAdjacentHTML('afterend', html);
+          existing.remove();
+        } else if (html) row.insertAdjacentHTML('beforeend', html);
+        window.lucide?.createIcons({ el: row });
+      });
+      form?.addEventListener('submit', savePatternEdit);
+    },
+  });
+}
+
+/**
+ * In welcher Reihenfolge Angaben und Tage geschrieben werden. Der Server
+ * weist eine Zykluslaenge ab, die belegte Tage ausschliesst, und Tage jenseits
+ * der gespeicherten Laenge: wird der Zyklus KUERZER, gehen deshalb zuerst die
+ * Tage (alle innerhalb der neuen UND der alten Laenge), sonst zuerst die Angaben.
+ */
+function patternSaveOrder(oldCycleLength, newCycleLength) {
+  return Number(newCycleLength) < Number(oldCycleLength) ? ['days', 'pattern'] : ['pattern', 'days'];
+}
+
+async function savePatternEdit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const id = form.dataset.id;
+  const pattern = state.patterns.find((item) => Number(item.id) === Number(id));
+  if (!pattern || !canWrite(pattern.user_id)) return;
+  const data = formData(form);
+  data.cycle_length = Number(data.cycle_length);
+  data.is_active = form.elements.is_active.checked;
+  const days = collectPatternDays(form);
+  // S-02/S-37: vorab pruefen statt den Rohtext des Servers abzuwarten -
+  // dieselbe Bedingung, die der Server durchsetzt (siehe
+  // patternDaysExceedingCycleLength()), jetzt gegen die Tage IM DIALOG:
+  // syncPatternDayGroups() haelt sie zur Laenge passend, die Pruefung faengt
+  // den Rest (eine Laenge ausserhalb der Feldgrenzen laesst den Editor stehen).
+  const conflict = patternDaysExceedingCycleLength(days.filter((day) => day.shift_type_id != null), data.cycle_length);
+  if (conflict) {
+    reportFieldError(form.querySelector('[name="cycle_length"]'), t('schedule.cycleLengthTooShort', conflict));
+    return;
+  }
+  try {
+    // S-05: ein Umschalten von aus -> an kann denselben stillen
+    // Ueberlappungs-Sieg ausloesen wie ein neu angelegter aktiver Plan.
+    // confirmOverModal: dieser Dialog ist noch offen, "Abbrechen" soll die
+    // getippten Felder nicht loeschen; closeOnConfirm: false, weil erst der
+    // Erfolgspfad unten schliesst (siehe saveCreatedSchedule()).
+    if (data.is_active && !pattern.is_active) {
+      const overlap = findOverlappingActivePattern(state.patterns, pattern.user_id, data.valid_from || null, data.valid_until || null, pattern.id);
+      if (overlap) {
+        const confirmed = await confirmOverModal(
+          t('schedule.patternOverlapConfirmTitle', { user: userName(pattern.user_id) }),
+          { confirmLabel: t('schedule.patternOverlapConfirmAction'), detail: t('schedule.patternOverlapConfirmDetail', { name: overlap.name }), closeOnConfirm: false },
+        );
+        if (!confirmed) return;
+      }
+    }
+    for (const step of patternSaveOrder(pattern.cycle_length, data.cycle_length)) {
+      if (step === 'pattern') await api.put(`/schedule/patterns/${id}`, data);
+      else await api.put(`/schedule/patterns/${id}/days`, { days });
+    }
+    // Geschrieben ist: erst schliessen, dann neu bauen. Die Zeile mit dem
+    // ausloesenden "Bearbeiten" entsteht dabei neu - refocusAfterRender()
+    // zieht den Fokus dorthin nach statt ihn auf <body> fallen zu lassen.
+    await closeModal({ force: true });
+    await reloadAfterWrite();
+    renderPage();
+    refocusAfterRender();
+    window.yuvomi?.showToast(t('schedule.saved'), 'success');
+  } catch (error) {
+    // Zwei Schreibvorgaenge, kein gemeinsamer Abschluss: scheitert der zweite,
+    // steht der erste schon. Der Dialog bleibt offen (die Eingabe ist nicht
+    // verloren), die Seite dahinter zeigt den Stand des Servers.
+    window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
+    try { await reloadAfterWrite(); renderPage(); } catch { /* der Toast oben nennt den Fehler */ }
   }
 }
 
@@ -2639,63 +2870,10 @@ async function submitForm(event) {
       if (statisticsRequest === statisticsRequestId) renderPage();
       return;
     }
-    // Keine Zweige fuer 'shift-create'/'pattern-create'/'override-create' hier:
-    // alle drei werden ausschliesslich im Erstellen-Modal gebaut (an
-    // document.body, nicht in `root`), das direkt an saveCreatedSchedule()
-    // verdrahtet - dieser Delegierte an `root` sieht so ein Formular nie.
-    // Nur die INLINE-Bearbeitungsformulare (Update) leben in `root`.
-    // Ob unten die Ueberlappungs-Rueckfrage geschlossen wurde - nur dann darf der
-    // Fokus nach dem Neuaufbau nachgezogen werden (siehe `gefragt` in action()).
-    let gefragt = false;
-    if (form.dataset.form === 'shift-update') await api.put(`/schedule/shift-types/${form.dataset.id}`, data);
-    if (form.dataset.form === 'pattern-update') {
-      data.cycle_length = Number(data.cycle_length);
-      data.is_active = form.elements.is_active.checked;
-      // S-02/S-37: vorab pruefen statt den Rohtext des Servers abzuwarten -
-      // pattern.days liegt bereits geladen im state, dieselbe Bedingung, die
-      // der Server ohnehin durchsetzt (siehe patternDaysExceedingCycleLength()).
-      // Feldbezogen statt Toast: das Feld liegt direkt in diesem (nicht-modalen)
-      // Inline-Formular, reportFieldError() setzt/loescht die Meldung genau wie
-      // in den Modal-Formularen anderer Seiten.
-      const pattern = state.patterns.find((item) => Number(item.id) === Number(form.dataset.id));
-      const conflict = patternDaysExceedingCycleLength(pattern?.days, data.cycle_length);
-      if (conflict) {
-        reportFieldError(form.querySelector('[name="cycle_length"]'), t('schedule.cycleLengthTooShort', conflict));
-        return;
-      }
-      // S-05: ein Umschalten von aus -> an kann genau denselben stillen
-      // Ueberlappungs-Sieg ausloesen wie eine neu angelegte aktive Karte -
-      // derselbe Check, dasselbe confirmModal (kein Anlege-Formular offen,
-      // dieses Formular lebt inline in der Karte selbst, kein confirmOverModal
-      // noetig).
-      if (data.is_active && !pattern?.is_active) {
-        const overlap = findOverlappingActivePattern(state.patterns, pattern?.user_id, data.valid_from || null, data.valid_until || null, pattern?.id);
-        if (overlap) {
-          const confirmed = await confirmModal(
-            t('schedule.patternOverlapConfirmTitle', { user: userName(pattern?.user_id) }),
-            { confirmLabel: t('schedule.patternOverlapConfirmAction'), detail: t('schedule.patternOverlapConfirmDetail', { name: overlap.name }) },
-          );
-          if (!confirmed) return;
-          gefragt = true;
-        }
-      }
-      await api.put(`/schedule/patterns/${form.dataset.id}`, data);
-      dirtyPatternIds.delete(String(form.dataset.id)); // S-03: gespeichert, nichts mehr zu verwerfen
-    }
-    await load();
-    // S-03 (Review zu #1099): dieser gemeinsame Speicherpfad (shift-update,
-    // pattern-update, ...) baut JEDE Musterkarte neu auf, nicht nur die des
-    // eben abgeschickten Formulars - eine woanders noch offene, ungespeicherte
-    // Zyklustage-Bearbeitung ist damit schon verworfen, ohne dass je gefragt
-    // wurde. Ohne dieses clear() bliebe ihre Id in dirtyPatternIds stehen und
-    // der naechste Tab-Wechsel fragte faelschlich nach dem Verwerfen von
-    // Aenderungen, die es nicht mehr gibt.
-    dirtyPatternIds.clear();
-    renderPage();
-    // Nur nach der Ueberlappungs-Rueckfrage: ohne Dialog griffe refocusAfterRender()
-    // auf den Merker eines frueheren Dialogs zurueck und setzte den Fokus dorthin (#1083).
-    if (gefragt) refocusAfterRender();
-    window.yuvomi?.showToast(t('schedule.saved'), 'success');
+    // Kein weiterer Zweig: Anlegen und Bearbeiten laufen in Dialogen (an
+    // document.body, nicht in `root`), die ihr Formular selbst verdrahten
+    // (saveCreatedSchedule(), saveShiftTypeEdit(), savePatternEdit()). Dieser
+    // Delegierte an `root` sieht nur noch den Filter der Auswertung.
   } catch (error) {
     if (form.dataset.form === 'statistics' && statisticsRequest === statisticsRequestId) {
       statistics = { ...statistics, loading: false, error: true };
@@ -2720,6 +2898,9 @@ const READ_SAFE_ACTIONS = new Set([
   'view-schedule-entry',
   // Reine Navigation zum Schichtarten-Tab (Leerzustand der Planung).
   'go-to-shift-types',
+  // Oeffnet den Plan-Dialog; ohne Schreibrecht ist er eine Leseansicht ohne
+  // Speichern (openPatternEditModal()), und savePatternEdit() prueft selbst.
+  'edit-pattern',
 ]);
 
 async function action(event) {
@@ -2731,7 +2912,7 @@ async function action(event) {
       return;
     }
     if (button.dataset.action === 'go-to-shift-types') {
-      await guardedActivateView('shifts');
+      navigateToView('shifts');
       return;
     }
     if (button.dataset.action === 'view-schedule-entry') {
@@ -2768,8 +2949,7 @@ async function action(event) {
           createdCount += 1;
         }
       } finally {
-        await load();
-        dirtyPatternIds.clear(); // S-03 (Review zu #1099): siehe Kommentar am naechsten load()+renderPage()-Paar unten
+        await reloadAfterWrite();
         renderPage();
       }
       // Zaehlend statt "Gespeichert." fuer beide Faelle (S-11): ein erneuter
@@ -2822,6 +3002,16 @@ async function action(event) {
       overview = { ...overview, viewMode: button.dataset.mode };
       saveOverviewViewMode(overview.viewMode);
       renderPage();
+      return;
+    }
+    if (button.dataset.action === 'edit-shift-type') {
+      const type = state.types.find((item) => Number(item.id) === Number(button.dataset.id));
+      if (type && canEditType(type)) openShiftTypeEditModal(type);
+      return;
+    }
+    if (button.dataset.action === 'edit-pattern') {
+      const pattern = state.patterns.find((item) => Number(item.id) === Number(button.dataset.id));
+      if (pattern) openPatternEditModal(pattern);
       return;
     }
     if (button.dataset.action === 'edit-override') {
@@ -2889,7 +3079,6 @@ async function action(event) {
       if (!confirmed) return;
       gefragt = true;
       await api.delete(`/schedule/patterns/${button.dataset.id}`);
-      dirtyPatternIds.delete(String(button.dataset.id)); // S-03: die Karte selbst ist weg, nichts mehr zu verwerfen
     }
     // Ein Bereich kann viele Tage tragen, darum fragt das Loeschen hier nach,
     // anders als ein Einzeltag frueher (der jetzt selbst eine Gruppe der
@@ -2938,98 +3127,35 @@ async function action(event) {
         // fuer Zeile, und ein Fehlschlag in der Mitte hat bereits einige davon
         // entfernt, bevor der Fehler auftrat. Ohne Neuladen bliebe die alte
         // (jetzt falsche) Liste stehen und taeuschte vor, nichts sei passiert.
-        await load();
-        dirtyPatternIds.clear(); // S-03 (Review zu #1099): siehe Kommentar am naechsten load()+renderPage()-Paar unten
+        await reloadAfterWrite();
         renderPage();
         refocusAfterRender();
         window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
         return;
       }
     }
-    // Rein lokale Aenderungen am Tageseditor, kein API-Aufruf - erst der
-    // 'save-days'-Klick unten schreibt etwas. Deshalb ein fruehes `return`:
-    // das gemeinsame `await load(); renderPage();` am Ende dieser Funktion
-    // wuerde sonst die gerade hinzugefuegte/entfernte Zeile mit dem
-    // Server-Stand ueberschreiben, bevor sie je gespeichert wurde.
-    if (button.dataset.action === 'add-pattern-day-row') {
-      button.closest('[data-day-group]')?.querySelector('.schedule-day-rows')?.insertAdjacentHTML('beforeend', dayRowHtml(Number(button.dataset.position), null, true));
-      window.lucide?.createIcons({ el: root });
-      markPatternDirty(button); // S-03: eine hinzugefuegte, aber ungespeicherte Zeile
-      return;
-    }
-    if (button.dataset.action === 'remove-pattern-day-row') {
-      markPatternDirty(button); // S-03: siehe add-pattern-day-row
-      button.closest('[data-day-row]')?.remove();
-      return;
-    }
-    // Dieselbe lokal-erst-Regel wie die Zyklustage-Zeilen oben: hinzufuegen,
-    // entfernen und umsortieren aendern nur das DOM, bis 'save-shift-fields'
-    // unten den ganzen Satz an /schedule/shift-types/:id/fields schreibt.
-    if (button.dataset.action === 'add-type-field') {
-      const container = document.querySelector(`[data-type-fields-rows="${button.dataset.id}"]`);
-      const picker = document.querySelector(`[data-field-picker="${button.dataset.id}"]`);
-      if (!container || !picker?.value) return;
-      const field = state.customFields.find((item) => Number(item.id) === Number(picker.value));
-      if (!field) return;
-      container.querySelector('.u-meta')?.remove();
-      container.insertAdjacentHTML('beforeend', shiftTypeFieldRow({ ...field, show_in_overlay: false }));
-      picker.querySelector(`option[value="${field.id}"]`)?.remove();
-      window.lucide?.createIcons({ el: container.parentElement });
-      return;
-    }
-    if (button.dataset.action === 'remove-type-field') {
-      const row = button.closest('[data-type-field-row]');
-      const container = row?.closest('[data-type-fields-rows]');
-      row?.remove();
-      if (container && !container.children.length) container.insertAdjacentHTML('beforeend', '<p class="u-meta">' + esc(t('schedule.noFieldsAttached')) + '</p>');
-      return;
-    }
-    // Tastaturbedienbarer Reorder-Pfad neben dem Ziehen ueber makeSortable()
-    // oben (utils/sortable.js verlangt genau das) - dieselbe Richtung ('up'/
-    // 'down') treibt beide Knopf-Varianten, nur je Zeile lokal statt ueber
-    // einen Server-Aufruf.
-    if (button.dataset.action === 'move-type-field') {
-      const row = button.closest('[data-type-field-row]');
-      const sibling = button.dataset.direction === 'up' ? row?.previousElementSibling : row?.nextElementSibling;
-      if (!row || !sibling) return;
-      if (button.dataset.direction === 'up') row.parentElement.insertBefore(row, sibling);
-      else row.parentElement.insertBefore(sibling, row);
-      return;
-    }
-    if (button.dataset.action === 'save-shift-fields') {
-      const container = document.querySelector(`[data-type-fields-rows="${button.dataset.id}"]`);
-      const fields = [...(container?.querySelectorAll('[data-type-field-row]') ?? [])].map((row, index) => ({
-        custom_field_id: Number(row.dataset.customFieldId),
-        position: index,
-        show_in_overlay: row.querySelector('[data-show-in-overlay]')?.checked ?? false,
-      }));
-      await api.put(`/schedule/shift-types/${button.dataset.id}/fields`, { fields });
-    }
-    if (button.dataset.action === 'save-days') {
-      const details = button.closest('[data-pattern]');
-      const days = [...details.querySelectorAll('[data-day-row]')].map((row) => {
-        const select = row.querySelector('[data-day]');
-        const field_values = {};
-        row.querySelectorAll('[data-field-value]').forEach((input) => { if (input.value.trim()) field_values[input.dataset.fieldValue] = input.value.trim(); });
-        return { position: Number(select.dataset.day), shift_type_id: select.value ? Number(select.value) : null, field_values };
-      });
-      await api.put(`/schedule/patterns/${button.dataset.id}/days`, { days });
-      dirtyPatternIds.delete(String(button.dataset.id)); // S-03: gespeichert, nichts mehr zu verwerfen
-    }
-    await load();
-    // S-03 (Review zu #1099): dieser gemeinsame Pfad deckt u.a.
-    // delete-override-range/delete-pattern/save-days und baut JEDE
-    // Musterkarte neu auf - eine woanders noch offene, ungespeicherte
-    // Zyklustage-Bearbeitung ist damit schon verworfen, ohne dass je gefragt
-    // wurde. Ohne dieses clear() bliebe ihre Id in dirtyPatternIds stehen und
-    // der naechste Tab-Wechsel fragte faelschlich nach dem Verwerfen von
-    // Aenderungen, die es nicht mehr gibt.
-    dirtyPatternIds.clear();
+    await reloadAfterWrite();
     renderPage();
     if (gefragt) refocusAfterRender();
     window.yuvomi?.showToast(button.dataset.action.startsWith('delete') ? t('schedule.deleted') : t('schedule.saved'), 'success');
   } catch (error) {
     window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
+  }
+}
+
+/**
+ * Neu laden nach einem Schreibvorgang. Steht der Vergleich offen, kommt seine
+ * Woche mit: er ist seit R17 der Startreiter, und eine dort angelegte
+ * Schichtart oder ein dort angelegter Plan muss im Raster stehen, ohne dass
+ * jemand erst den Reiter wechselt. Der Aufrufer zeichnet danach (renderPage()).
+ */
+async function reloadAfterWrite() {
+  await load();
+  if (activeView !== 'overview') return;
+  const requestId = ++overviewRequestId;
+  try { await refreshOverview(); }
+  catch {
+    if (requestId === overviewRequestId) overview = { ...overview, loading: false, error: true };
   }
 }
 
@@ -3049,13 +3175,15 @@ export async function render(container, { user } = {}) {
     activeView = requestedView;
     initialViewDecided = true;
   } else if (!initialViewDecided) {
-    // S-07: die Vorgabe fuer den allerersten Tab dieser Sitzung haengt von der
-    // Datenlage ab - "Planung" (Muster/Ausnahmen/Extras) ist ohne einen einzigen
-    // Schichttyp eine Sackgasse (jedes Formular dahinter dead-endet in einer
-    // leeren Auswahl). Nur beim allerersten Laden entschieden (initialViewDecided),
-    // niemals danach - ein spaeterer Besuch soll die eigene Tab-Wahl der Person
-    // nicht ueberschreiben (siehe Kommentar an `activeView` oben).
-    activeView = state.types.length ? 'patterns' : 'shifts';
+    // DER STARTREITER IST DER PLAN (Entscheidung R17, E1): "Vergleich" mit der
+    // eigenen Person vorgewaehlt (load()). Bis R17 entschied hier die Datenlage
+    // zwischen "Planung" und "Schichtarten" (S-07), weil die Planung ohne
+    // Schichtart eine Sackgasse war - der Vergleich ist keine: ohne Schichtart
+    // zeigt er den Leerzustand, der sie anlegt (renderOverview()). Nur beim
+    // allerersten Laden entschieden (initialViewDecided), niemals danach - ein
+    // spaeterer Besuch soll die eigene Tab-Wahl der Person nicht
+    // ueberschreiben (siehe Kommentar an `activeView` oben).
+    activeView = 'overview';
     initialViewDecided = true;
   }
   // `statistics`/`overview`/`activeView` sind Modul-globaler Zustand, der eine
@@ -3069,10 +3197,6 @@ export async function render(container, { user } = {}) {
   // bis irgendjemand aktiv auf "Heute" klickte.
   statistics = { ...statistics, userId: currentUserId, monthFrom: monthKey(), monthTo: monthKey(), from: todayKey(), to: todayKey(), entries: [], bounds: null, error: false };
   overview = { ...overview, weekCursor: todayKey(), entries: [], holidays: [], error: false };
-  // S-03: `load()` gerade eben hat frische Musterkarten aus dem Server
-  // geholt - eine Dirty-Markierung vom letzten Seitenbesuch waere jetzt ein
-  // Geisterzustand ohne zugehoerige ungespeicherte DOM-Aenderung.
-  dirtyPatternIds = new Set();
   renderShell();
   scheduleFab = createPageFab({ id: 'schedule-fab', dockLabel: t('newLabel.scheduleShiftType') });
   root.querySelector('.schedule-page')?.appendChild(scheduleFab);
@@ -3108,13 +3232,6 @@ export async function update({ path } = {}) {
     history.replaceState({ path: resolvedRoute }, '', resolvedRoute);
   }
   if (nextView !== activeView) {
-    // S-03 Restluecke (bewusst offen, siehe PLAN.md): ein Browser-Zurueck ruft
-    // diese Funktion ueber popstate direkt auf und umgeht damit
-    // guardedActivateView()s Rueckfrage - dieselbe Einschraenkung wie die
-    // anderen "load()+renderPage()"-Pfade, die eine offene Zyklustage-
-    // Bearbeitung stillschweigend verwerfen wuerden. Volle Abdeckung braeuchte
-    // eine Kopplung an handleBackNavigation() (#871) und ist hier bewusst
-    // nicht gebaut.
     await activateView(nextView);
   }
   return true;
@@ -3124,4 +3241,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };

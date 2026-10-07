@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "Kế hoạch mới được ưu tiên ở bất kỳ đâu cả hai cùng áp dụng. \"{{name}}\" vẫn được lưu nhưng ngừng hiển thị khi còn chồng chéo.",
         "patternOverlapConfirmAction": "Thay thế",
         "editOverride": "Sửa ngoại lệ",
+        "editShiftType": "Sửa loại ca",
+        "editPattern": "Sửa chu kỳ ca",
         "deleteOverrideRangeTitle": "Xóa khoảng thời gian này?",
         "deleteOverrideRangeDetail": "Thao tác này xóa mọi mục của {{user}} từ {{from}} đến {{to}}. Không thể hoàn tác.",
         "fillRange": "Điền khoảng thời gian",

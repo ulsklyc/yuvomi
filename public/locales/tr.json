@@ -5965,6 +5965,8 @@
         "patternOverlapConfirmDetail": "Yeni plan, ikisinin çakıştığı her yerde önceliklidir. \"{{name}}\" kayıtlı kalır ama çakıştıkları sürece görünmez.",
         "patternOverlapConfirmAction": "Değiştir",
         "editOverride": "İstisnayı düzenle",
+        "editShiftType": "Vardiya türünü düzenle",
+        "editPattern": "Vardiya düzenini düzenle",
         "deleteOverrideRangeTitle": "Bu aralık silinsin mi?",
         "deleteOverrideRangeDetail": "{{user}} için {{from}} ile {{to}} arasındaki her kayıt silinir. Bu işlem geri alınamaz.",
         "fillRange": "Aralığı doldur",

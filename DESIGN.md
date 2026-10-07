@@ -2466,6 +2466,13 @@ unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
   der Stepper in Zeile 2 (263 -> 110px). Auswertung: Person und Zeitraum nebeneinander ohne
   Kartenflaeche, die Aktionen darunter (257 -> 104px). Feld-Labels, die dabei weichen,
   bleiben im Baum (geclippt), nie `display: none`.
+- **Schichtplan: der Plan zuerst (R17, E1).** "Vergleich" ist erster Reiter und Startreiter,
+  die eigene Person vorgewaehlt; ohne Schichtart oder Plan traegt er den Leerzustand, der das
+  Fehlende anlegt, statt Personenwahl und Stepper ueber einem leeren Raster. "Heute" ist EINE
+  Zeile aus Marken (`.schedule-today`, 132 -> 48px mobil), keine Karte mit Listenzeilen.
+  Schichtart und Plan sind `.list-row` mit "Bearbeiten"/"Loeschen" wie Ausnahmen und
+  Zusatzschichten; Bearbeiten oeffnet den Dialog des Anlegens mit EINEM "Speichern" (Plan samt
+  Zyklustagen) - kein `<details>` mit Formular in der Flaeche.
 - **Kacheln werden mobil kompakte Karten.** Praemien: 358x218 -> rund 130px (Zeichen und Text
   nebeneinander, Preis und Aktion darunter). Ein Abschnittstitel, der den Reiter wiederholt,
   steht mobil nur im Baum.
