@@ -2695,8 +2695,13 @@ async function saveShiftTypeEdit(event) {
   const form = event.currentTarget;
   if (readOnly()) return;
   const id = form.dataset.id;
+  // ZWEI Schreibvorgaenge hinter EINEM "Speichern": die Stammdaten und die
+  // Felder. Scheitert der zweite (ein gewaehltes Feld wurde inzwischen
+  // geloescht), ist der erste schon geschrieben.
+  let typeSaved = false;
   try {
     await api.put(`/schedule/shift-types/${id}`, formData(form));
+    typeSaved = true;
     const fields = collectShiftTypeFields(form);
     if (fields) await api.put(`/schedule/shift-types/${id}/fields`, { fields });
     // Geschrieben ist: erst schliessen, dann neu bauen. Die Zeile mit dem
@@ -2709,6 +2714,12 @@ async function saveShiftTypeEdit(event) {
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
   } catch (error) {
     window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
+    // Halb geschrieben: die Seite unter dem Dialog zeigt den Stand des
+    // Servers, nicht den von vor dem Speichern - sonst blieben Name, Zeit und
+    // Farbe bis zum Neuladen verborgen geaendert. Der Dialog bleibt offen.
+    if (typeSaved) {
+      try { await reloadAfterWrite(); renderPage(); } catch { /* die Meldung oben steht schon */ }
+    }
   }
 }
 

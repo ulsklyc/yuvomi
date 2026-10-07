@@ -1894,6 +1894,10 @@ test('R17/E1: shift types and plans are rows, edited in the create dialog with O
   // One save writes both halves.
   const saveType = schedulePage.slice(schedulePage.indexOf('async function saveShiftTypeEdit('), schedulePage.indexOf('function openPatternEditModal('));
   assert.match(saveType, /api\.put\(`\/schedule\/shift-types\/\$\{id\}`, formData\(form\)\);[\s\S]*api\.put\(`\/schedule\/shift-types\/\$\{id\}\/fields`, \{ fields \}\)/);
+  // Half written (review of #1767): when the fields request fails after the
+  // type was saved, the page reloads the server state instead of staying stale.
+  assert.match(saveType, /typeSaved = true;/);
+  assert.match(saveType, /catch \(error\) \{[\s\S]*if \(typeSaved\) \{[\s\S]*await reloadAfterWrite\(\); renderPage\(\);/);
   const savePattern = schedulePage.slice(schedulePage.indexOf('async function savePatternEdit('), schedulePage.indexOf('\nfunction formData('));
   assert.match(savePattern, /for \(const step of patternSaveOrder\(pattern\.cycle_length, data\.cycle_length\)\)/);
   assert.match(savePattern, /api\.put\(`\/schedule\/patterns\/\$\{id\}`, data\)/);
