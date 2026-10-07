@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **On a phone the document viewer uses the whole screen.** It was a sheet with a margin all
+  round, and 172 px of details stood above the document - which got 54 % of the height. The
+  viewer now fills the screen, the document runs from edge to edge, and the details are one row:
+  tapping the category unfolds folder, size, expiry and the note on why sharing is unavailable.
+  Download, edit and share stay where they were.
 - **Editing a repeating meal asks first what the change applies to.** "Apply change to" decides
   what Save does and was the last field of the dialog, behind "More settings" - on a phone about
   three screens down. It now stands at the top. The ingredients of an existing meal are folded

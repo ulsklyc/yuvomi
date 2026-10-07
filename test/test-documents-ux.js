@@ -1880,3 +1880,47 @@ test('das Ablaufdatum nutzt den Kanon-Datepicker statt eines nativen Datumsfelds
   assert.match(page, /expiresInput\.addEventListener\('input', \(\) => \{ reminderGroup\.hidden = !expiresInput\.value; \}\)/);
   assert.match(page, /form\.querySelector\('#document-expires-at'\)\.value \|\| null/);
 });
+
+// ── R17 Schritt 5 (Critique 2026-10-07, A6 P2): der Betrachter am Telefon ────
+// Gemessen 390x844: Blatt 366x743 mit Rand, Dokument 332x460 (54 % der Hoehe),
+// davor 172px Meta samt Dauerhinweis. Jetzt vollflaechig (Dokument 390x694),
+// der Meta-Block ist eine Zeile, die aufklappt.
+test('der Betrachter ist schmal vollflaechig, und der Meta-Block klappt hinter der Kategorie auf', () => {
+  const rules = [...eachRule(css)].map((r) => ({ ...r, selector: r.selector.trim() }));
+  const at = (r, re) => r.at.some((a) => re.test(a));
+  const sheet = rules.find((r) => r.selector === '.modal-panel:has(.document-viewer)');
+  assert.ok(sheet && at(sheet, /max-width:\s*767px/), 'vollflaechig nur dort, wo Dialoge Blaetter sind (unter 768px)');
+  assert.match(sheet.body, /height:\s*100%/);
+  assert.match(sheet.body, /max-height:\s*none/, 'die 88-%-Kappung des Blatts gilt hier nicht');
+  assert.match(sheet.body, /border-radius:\s*0/);
+  const overlay = rules.find((r) => r.selector === '.modal-overlay:has(.document-viewer)');
+  assert.ok(overlay && at(overlay, /max-width:\s*767px/) && /padding:\s*0/.test(overlay.body), 'kein Rand um das Blatt');
+  const head = rules.find((r) => r.selector === '.modal-panel:has(.document-viewer) > .modal-panel__header');
+  assert.match(head?.body ?? '', /env\(safe-area-inset-top\)/, 'der Kopf weicht der Statusleiste');
+  const pdf = rules.find((r) => r.selector === '.document-viewer__pdf' && at(r, /max-width:\s*767px/));
+  assert.match(pdf?.body ?? '', /align-self:\s*stretch/, 'der PDF-Rahmen fuellt den Rest statt fester 65vh');
+
+  // Der Knopf: ausserhalb der schmalen Breite unsichtbar.
+  const base = rules.find((r) => r.at.length === 0 && r.selector.split(',').map((s) => s.trim()).includes('.document-viewer__info-toggle'));
+  assert.match(base?.body ?? '', /display:\s*none/, 'ab 640px gibt es den Knopf nicht');
+  const shown = rules.find((r) => r.selector === '.document-viewer__info-toggle' && at(r, /max-width:\s*639px/));
+  assert.match(shown?.body ?? '', /display:\s*inline-flex/);
+  assert.match(shown.body, /min-height:\s*var\(--target-base\)/, 'ein volles Ziel');
+  const hidden = rules.find((r) => at(r, /max-width:\s*639px/) && /:not\(\.document-viewer--info-open\)/.test(r.selector));
+  assert.ok(hidden && /display:\s*none/.test(hidden.body), 'eingeklappt blendet der Meta-Block aus');
+  assert.match(hidden.selector, /\.document-viewer__note/, 'samt Teilen-Hinweis');
+  assert.match(hidden.selector, /\.document-viewer__details/, 'und Lesezeilen');
+  assert.match(hidden.selector, /> span:not\(\.document-viewer__actions\):not\(\.doc-badge\)/,
+    'die Aktionen und ein Ablauf in Warnfarbe bleiben stehen');
+  // Die Regeln stehen NACH den Grundregeln des Betrachters (gleiche Spezifitaet).
+  assert.ok(css.lastIndexOf('.document-viewer__pdf {') > css.indexOf('height: 65vh'), 'die schmale Regel folgt der Grundregel');
+
+  const viewer = fnBody('openDocumentViewer', 'renderViewerContent');
+  assert.match(viewer, /<button type="button" class="btn btn--ghost btn--sm document-viewer__info-toggle"\s+aria-expanded="false" aria-controls="document-viewer-root"\s+aria-label="\$\{t\('common\.showDetails'\)\}"/,
+    'der Knopf ist ein Aufklapper mit Namen');
+  assert.match(viewer, /<div class="document-viewer" id="document-viewer-root">/);
+  assert.match(viewer, /infoToggle\.setAttribute\('aria-expanded', String\(open\)\)/);
+  assert.match(viewer, /classList\.toggle\('document-viewer--info-open', open\)/);
+  // Der Hinweis bleibt im Markup: SPEC.md (D#1014) sagt ihn zu.
+  assert.match(viewer, /class="document-viewer__note"/);
+});

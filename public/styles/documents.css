@@ -2302,3 +2302,131 @@
   gap: var(--space-1);
   font-size: var(--text-sm);
 }
+
+/* SCHMAL: DER BETRACHTER IST VOLLFLAECHIG, DER META-BLOCK EINE ZEILE (R17
+ * Schritt 5, Critique 2026-10-07 A6 P2).
+ *
+ * Gemessen 390x844: das Blatt mass 366x743 mit Rand ringsum, das Dokument
+ * darin 332x460 - 54 % der Hoehe, weil 172px Meta davorstanden (davon 53px
+ * der Dauerhinweis, warum Teilen nicht geht). Ein Dokument liest man; hier
+ * ist die Karte-ueber-dem-Modul-Form des Blatts (88 % der Hoehe, layout.css)
+ * die falsche: der Betrachter nimmt unter 768px - dort, wo Dialoge Blaetter
+ * sind - die ganze Flaeche, das Dokument laeuft von Kante zu Kante.
+ *
+ * Der Knopf `.document-viewer__info-toggle` nennt die Kategorie und klappt
+ * den Rest auf (documents.js). Eingeklappt bleiben die Aktionen und ein
+ * Ablauf in Warnfarbe (`.doc-badge`) stehen. Unter 640px, wo die Meta-Zeile
+ * umbricht; darueber steht alles da wie bisher.
+ *
+ * AM DATEIENDE, weil die Regeln hier die Grundregeln des Betrachters weiter
+ * oben bei gleicher Spezifitaet ueberschreiben. */
+.document-viewer__info-toggle,
+.document-viewer__info-chevron {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .modal-overlay:has(.document-viewer) {
+    padding: 0;
+  }
+
+  .modal-panel:has(.document-viewer) {
+    height: 100%;
+    max-height: none;
+    border: none;
+    border-radius: 0;
+  }
+
+  .modal-panel:has(.document-viewer) > .modal-panel__header {
+    padding-top: max(var(--space-3), env(safe-area-inset-top));
+  }
+
+  .modal-panel:has(.document-viewer) > .modal-panel__body {
+    padding-inline: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .document-viewer__meta,
+  .document-viewer__details {
+    padding-inline: var(--space-4);
+  }
+
+  /* Vollflaechig fuellt die Vorschau den Rest des Blatts statt fester 65vh:
+   * der Betrachter nimmt die Hoehe des Rumpfs, der eingebettete PDF-Rahmen
+   * die seines Bereichs; ein Bild darf so hoch werden, wie Platz ist. Die
+   * Rundung faellt - sie stiesse an die Bildschirmkante. */
+  .modal-panel__body > .document-viewer {
+    flex: 1 0 auto;
+  }
+
+  .document-viewer__pdf {
+    align-self: stretch;
+    height: auto;
+    min-height: 50vh;
+    border-radius: 0;
+  }
+
+  .document-viewer__image {
+    max-height: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* Was kein Bild und kein PDF ist (Text, "keine Vorschau"), behaelt seinen Rand. */
+  .document-viewer__body:not(:has(.document-viewer__pdf, .document-viewer__pdf-pages, .document-viewer__image)) {
+    padding-inline: var(--space-4);
+  }
+}
+
+@media (max-width: 639px) {
+  .document-viewer__info-toggle {
+    display: inline-flex;
+    min-height: var(--target-base);
+    gap: var(--space-2);
+    margin-inline-start: calc(-1 * var(--space-3));
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm);
+  }
+
+  .document-viewer__meta .document-viewer__info-chevron {
+    display: block;
+    width: var(--space-4);
+    height: var(--space-4);
+    transition: rotate var(--duration-sm) var(--ease-out);
+  }
+
+  .document-viewer__info-toggle[aria-expanded="true"] .document-viewer__info-chevron {
+    rotate: 180deg;
+  }
+
+  /* Die Kategorie traegt schmal der Knopf. */
+  .document-viewer__meta > .document-viewer__category {
+    display: none;
+  }
+
+  .document-viewer__meta {
+    padding-block: var(--space-1);
+    gap: var(--space-2);
+  }
+
+  .document-viewer:not(.document-viewer--info-open) .document-viewer__meta > span:not(.document-viewer__actions):not(.doc-badge),
+  .document-viewer:not(.document-viewer--info-open) .document-viewer__note,
+  .document-viewer:not(.document-viewer--info-open) .document-viewer__details {
+    display: none;
+  }
+
+  .document-viewer--info-open .document-viewer__meta {
+    padding-bottom: var(--space-3);
+  }
+
+  .document-viewer__body,
+  .document-viewer__body:has(.document-viewer__pdf-pages) {
+    padding-top: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .document-viewer__meta .document-viewer__info-chevron {
+    transition: none;
+  }
+}

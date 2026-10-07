@@ -3632,9 +3632,25 @@ function openDocumentViewer(doc) {
     title: doc.name,
     size: 'xl',
     content: `
-      <div class="document-viewer">
+      <div class="document-viewer" id="document-viewer-root">
         <div class="document-viewer__meta">
-          <span><i data-lucide="${CATEGORY_ICONS[doc.category] || 'folder'}" aria-hidden="true"></i>${categoryLabel}</span>
+          ${/* SCHMAL IST DER META-BLOCK EINE ZEILE, DIE AUFKLAPPT (R17 Schritt 5,
+                Critique 2026-10-07 A6 P2). Gemessen 390x844: 172px Meta ueber
+                einem 460px hohen Dokument, davon 53px der Hinweis, warum Teilen
+                nicht geht. Der Knopf nennt die Kategorie und klappt Ordner,
+                Groesse, Ablauf, Hinweis und Lesezeilen auf; die Aktionen
+                daneben und ein Ablauf in Warnfarbe bleiben stehen. Ab 640px
+                ist er unsichtbar und alles steht da wie bisher
+                (documents.css). Der Hinweis selbst bleibt: SPEC.md (D#1014)
+                sagt ihn zu - er steht nur nicht mehr dauerhaft im Bild. */ ''}
+          <button type="button" class="btn btn--ghost btn--sm document-viewer__info-toggle"
+                  aria-expanded="false" aria-controls="document-viewer-root"
+                  aria-label="${t('common.showDetails')}" title="${t('common.showDetails')}">
+            <i data-lucide="${CATEGORY_ICONS[doc.category] || 'folder'}" aria-hidden="true"></i>
+            <span>${categoryLabel}</span>
+            <i data-lucide="chevron-down" class="document-viewer__info-chevron" aria-hidden="true"></i>
+          </button>
+          <span class="document-viewer__category"><i data-lucide="${CATEGORY_ICONS[doc.category] || 'folder'}" aria-hidden="true"></i>${categoryLabel}</span>
           ${doc.folder_name && !folderRepeatsCategory(doc.folder_name, categoryLabel) ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
           <span>${formatFileSize(doc.file_size)}</span>
           ${expiryViewerHtml(doc)}
@@ -3673,6 +3689,14 @@ function openDocumentViewer(doc) {
       if (window.lucide) window.lucide.createIcons({ el: panel });
       if (shareSupport === 'ok') prepareShare(panel);
       releasePdfFocus = keepFocusOutOfUnclickedPdf(panel, { keyboard: openedByKeyboard });
+      // Der Meta-Block klappt schmal auf und zu (documents.css blendet aus,
+      // was die Klasse nicht freigibt; ab 640px ist der Knopf unsichtbar).
+      const infoToggle = panel.querySelector('.document-viewer__info-toggle');
+      infoToggle?.addEventListener('click', () => {
+        const open = infoToggle.getAttribute('aria-expanded') !== 'true';
+        infoToggle.setAttribute('aria-expanded', String(open));
+        panel.querySelector('.document-viewer')?.classList.toggle('document-viewer--info-open', open);
+      });
       // BEARBEITEN AUS DEM BETRACHTER (Re-Critique 2026-09-25, Alex). Kein
       // eigenes closeModal(): openModal() ersetzt den offenen Dialog selbst -
       // derselbe Weg wie jeder Modal-zu-Modal-Wechsel, und er haelt EINEN

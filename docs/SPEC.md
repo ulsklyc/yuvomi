@@ -2406,7 +2406,10 @@ endpoint in the background, shows the Share button busy until it is there, and t
 straight into `navigator.share()`; closing the viewer aborts the fetch and drops the file. When the
 answer is no, no dead control is shown: a line under the metadata names the one cause that applies -
 the type, an insecure context (plain HTTP, the only case that mentions HTTPS) or a browser that cannot
-hand files to the share sheet - and Download stays the path that works everywhere.
+hand files to the share sheet - and Download stays the path that works everywhere. Below 640px the
+metadata is one row that unfolds (the category is its button; folder, size, expiry, this line and the
+read-only rows sit behind it), and below 768px the viewer takes the whole screen instead of the sheet
+form, so the document gets the area: measured at 390x844, 332x460 before and 390x694 after.
 
 **Expiry date and reminder (v218):** a document may carry an optional
 `expires_at` and an optional `expiry_reminder_days` lead time (0–365, mirroring
