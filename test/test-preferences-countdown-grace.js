@@ -157,7 +157,12 @@ test('das Einstellungsformular fällt auf denselben Standard zurück wie der Ser
 
     let markup = '';
     let onSubmit = null;
-    const input = { value: '', disabled: false, isConnected: true };
+    // Das Feld speichert seit R17 auch beim Verlassen (blur/Enter/Escape) - die
+    // Attrappe nimmt die Zuhoerer an; geprueft wird weiter der Absende-Weg.
+    const input = {
+      value: '', disabled: false, readOnly: false, isConnected: true,
+      addEventListener() {}, setAttribute() {}, removeAttribute() {},
+    };
     const elements = {
       '#countdown-grace-days-form': {
         addEventListener: (type, handler) => { if (type === 'submit') onSubmit = handler; },
