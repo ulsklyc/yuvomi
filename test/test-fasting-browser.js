@@ -304,7 +304,13 @@ test('health areas: every area has its address, old ?tab= links redirect, fastin
       assert.ok(ids.includes(id), `Bereich ${id} fehlt in "Alle Bereiche": ${ids.join(', ')}`);
     }
 
-    // Fasten ueber die Liste erreichen, starten und beenden.
+    // Fasten ueber die Liste erreichen, starten und beenden. ERST WENN DIE
+    // UEBERSICHT STEHT: sie zeichnet ein Bild nach dem Adresswechsel und schiebt
+    // die Liste um ihre Hoehe nach unten (gemessen: Zeile bei 221px, ein Bild
+    // spaeter bei 713px auf main und 745px hier). Wer davor in die Mitte
+    // scrollt, scrollt nicht - die Zeile ist ja sichtbar - und trifft danach
+    // die Tab-Leiste; auf main ging das um 30px gut.
+    await page.waitForFunction(() => document.querySelector('.health-priority-region')?.getBoundingClientRect().height > 0);
     await clickFasting(page, '.health-areas__list [data-md-id="fasting"]');
     await page.waitForFunction(() => location.pathname === '/health/fasting');
     await page.waitForSelector('[data-fasting-action]');
