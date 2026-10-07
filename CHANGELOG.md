@@ -327,6 +327,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pick then. It is hidden until a type is active again, as it already was before the first type
   existed (#1775).
 
+- **The filter popover on the desktop follows the window.** It was placed once when it opened;
+  narrowing or rotating the window while it was open could leave it partly outside until it was
+  closed and opened again. It is now placed again on every change of the window, and closes when
+  the window gets narrower than the width from which the filters open as a popover (#1775).
+
 ## [2.74.0] - 2026-10-07
 
 ### Added

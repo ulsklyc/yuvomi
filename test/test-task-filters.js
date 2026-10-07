@@ -716,7 +716,7 @@ test('„Bis heute faellig": Blatt und Adresse ergeben denselben Status und dies
 // Baustein (utils/filter-sheet.js), mit einem Popover-Knoten, der mitschreibt.
 
 class PopEl {
-  constructor() { this.attrs = {}; this.style = {}; this.listeners = {}; this.html = ''; this.calls = []; this.offsetWidth = 360; this.inside = true; this.resetBtn = new PopEl.Btn(); }
+  constructor() { this.attrs = {}; this.style = {}; this.listeners = {}; this.html = ''; this.calls = []; this.offsetWidth = 360; this.inside = true; this.isConnected = true; this.resetBtn = new PopEl.Btn(); }
   static Btn = class { constructor() { this.listeners = {}; } addEventListener(type, fn) { this.listeners[type] = fn; } focus() { this.focused = true; } };
   set id(v) { this.attrs.id = v; }
   get id() { return this.attrs.id; }
@@ -728,7 +728,7 @@ class PopEl {
   contains() { return this.inside; }
   showPopover() { this.calls.push('show'); }
   hidePopover() { this.calls.push('hide'); this.fire('beforetoggle', { newState: 'closed' }); this.fire('toggle', { newState: 'closed' }); }
-  remove() { this.calls.push('remove'); }
+  remove() { this.calls.push('remove'); this.isConnected = false; }
 }
 
 async function withFilterEnv({ wide, popoverApi = true }, fn) {
@@ -740,7 +740,17 @@ async function withFilterEnv({ wide, popoverApi = true }, fn) {
   const env = { pop, appended: [], modals: [], closes: 0, queries: [], modalPanel: new PopEl() };
   globalThis.HTMLElement = class {};
   if (popoverApi) globalThis.HTMLElement.prototype.popover = null;
-  globalThis.window = { innerWidth: 1280, innerHeight: 800, matchMedia: (q) => { env.queries.push(q); return { matches: wide }; } };
+  // `env.wide` laesst sich im Test umstellen (Fenster schmaler ziehen), und
+  // die Fenster-Lauscher schreiben mit, damit ein Test `resize` feuern kann.
+  env.wide = wide;
+  env.windowListeners = {};
+  globalThis.window = {
+    innerWidth: 1280, innerHeight: 800,
+    matchMedia: (q) => { env.queries.push(q); return { matches: env.wide }; },
+    addEventListener: (type, fn) => { (env.windowListeners[type] ??= new Set()).add(fn); },
+    removeEventListener: (type, fn) => { env.windowListeners[type]?.delete(fn); },
+  };
+  env.resize = () => { for (const fn of [...(env.windowListeners.resize ?? [])]) fn(); };
   globalThis.document = {
     activeElement: {},
     getElementById: () => null,
@@ -819,6 +829,66 @@ test('E13: ab 1024px oeffnen die Filter als Popover am Knopf - keine Modal-Schic
     // geschlossen hat, oeffnet nicht im selben Zug wieder.
     assert.equal(openFilterSheet({ anchor: () => anchor, groups: [{ heading: 'x', html: 'y' }] }), null);
   });
+});
+
+/* #1775: das Popover wurde EINMAL platziert. Beim Schmalerziehen aenderte sich
+ * seine Breite per CSS, `left` blieb stehen - rechts verankert ragte es aus
+ * dem Fenster. Gefahren am echten Baustein: Fenster und Knopf wandern, dann
+ * `resize`. */
+test('#1775: das Filter-Popover zieht bei einer Fensteraenderung mit, unter der Schwelle schliesst es', async () => {
+  const { openFilterSheet } = await import('/utils/filter-sheet.js');
+  const groups = [{ heading: 'Status', html: '<button data-filter="status">Offen</button>' }];
+  const realNow = Date.now;
+  let clock = realNow() + 60_000;
+  Date.now = () => clock;          // der Umschalter-Riegel der Nachbartests ist abgelaufen
+  try {
+    await withFilterEnv({ wide: true }, async (env) => {
+      const rect = { right: 1257, bottom: 54, left: 1166, top: 14 };
+      const anchor = { ...filterAnchor(), getBoundingClientRect: () => rect };
+      openFilterSheet({ anchor: () => anchor, groups });
+      assert.equal(env.pop.style.left, `${1257 - 360}px`, 'Vorbedingung: rechtsbuendig unter dem Knopf');
+      assert.equal(env.windowListeners.resize?.size, 1, 'solange es offen ist, hoert es auf das Fenster');
+
+      // Das Fenster wird schmaler (bleibt ueber der Schwelle), der Knopf wandert mit.
+      globalThis.window.innerWidth = 1040;
+      globalThis.window.innerHeight = 600;
+      Object.assign(rect, { right: 1017, left: 926 });
+      env.resize();
+      assert.equal(env.pop.style.left, `${1017 - 360}px`, 'neu platziert: wieder unter dem Knopf');
+      assert.ok(Number.parseInt(env.pop.style.left, 10) + 360 <= 1040 - 8, 'und ganz im Fenster');
+      assert.equal(env.pop.style.maxHeight, `${600 - 58 - 8}px`, 'die Hoehe folgt dem Fenster');
+      assert.ok(!env.pop.calls.includes('hide'), 'ueber der Schwelle bleibt es offen');
+
+      // Unter 1024px gibt es das Popover nicht - es schliesst, der Lauscher geht.
+      globalThis.window.innerWidth = 900;
+      env.wide = false;
+      env.resize();
+      assert.ok(env.pop.calls.includes('hide'), 'unter der Schwelle schliesst es');
+      assert.equal(env.windowListeners.resize.size, 0, 'geschlossen hoert nichts mehr auf das Fenster');
+    });
+
+    // Der Seitenwechsel entfernt den Knoten OHNE `toggle` (dismissFilterPopovers):
+    // der Lauscher raeumt sich beim naechsten `resize` selbst und fasst nichts an.
+    clock += 60_000;
+    await withFilterEnv({ wide: true }, async (env) => {
+      const anchor = filterAnchor();
+      openFilterSheet({ anchor: () => anchor, groups });
+      const before = env.pop.style.left;
+      env.pop.isConnected = false;
+      globalThis.window.innerWidth = 1100;
+      env.resize();
+      assert.equal(env.pop.style.left, before, 'ein abgehaengtes Popover wird nicht mehr platziert');
+      assert.ok(!env.pop.calls.includes('hide'));
+      assert.equal(env.windowListeners.resize.size, 0);
+      // Der Umschalter-Riegel merkt sich die Schliesszeit im Modul. Dieser Test
+      // hat sie mit seiner vorgestellten Uhr gesetzt - zurueck auf "lange her",
+      // sonst oeffnete das Popover des naechsten Tests nicht.
+      Date.now = () => 0;
+      env.pop.fire('toggle', { newState: 'closed' });
+    });
+  } finally {
+    Date.now = realNow;
+  }
 });
 
 test('E13: unter der Schwelle, ohne Anker oder ohne Popover-API bleibt es das Blatt', async () => {

@@ -267,10 +267,25 @@ function openFilterPopover({ title, content, anchor }) {
   pop.addEventListener('beforetoggle', (event) => {
     if (event.newState === 'closed' && pop.contains(document.activeElement)) anchor()?.focus();
   });
+  // DAS FENSTER AENDERT SICH, DAS POPOVER ZIEHT MIT (#1775). Platziert wurde
+  // es einmal, mit festem `left`/`top`: beim Schmalerziehen oder Drehen aendert
+  // das Blatt seine Breite per CSS, sein Ort blieb stehen - am rechten Rand
+  // verankert ragte es aus dem Fenster, bis man es schloss und neu oeffnete.
+  // Faellt die Breite unter die Schwelle, gibt es diese Form dort gar nicht
+  // (darunter ist es das Blatt): dann schliesst es, statt als Popover in einem
+  // Fenster zu stehen, das keines mehr zeigt. Der Lauscher geht mit dem
+  // Schliessen; `dismissFilterPopovers()` entfernt den Knoten ohne `toggle`,
+  // deshalb raeumt er sich auch selbst, sobald der Knoten abgehaengt ist.
+  const onResize = () => {
+    if (!pop.isConnected) { window.removeEventListener('resize', onResize); return; }
+    if (!filtersAsPopover()) { pop.hidePopover(); return; }
+    positionFilterPopover(pop, anchor());
+  };
   pop.addEventListener('toggle', (event) => {
     const open = event.newState === 'open';
     anchor()?.setAttribute('aria-expanded', String(open));
     if (open) return;
+    window.removeEventListener('resize', onResize);
     popoverClosedAt = Date.now();
     // Erst NACH dem Ausgang aus dem Baum (layout.css: --duration-xs, das
     // Popover bleibt per `allow-discrete` so lange im Top-Layer). Ein
@@ -279,6 +294,7 @@ function openFilterPopover({ title, content, anchor }) {
   });
   pop.showPopover();
   positionFilterPopover(pop, anchor());
+  window.addEventListener('resize', onResize);
   anchor()?.setAttribute('aria-expanded', 'true');
   // Der Fokus geht INS Popover (Tastatur: Tab laeuft durch die Filter, Esc
   // schliesst); ohne Ziel bleibt er am Knopf.
