@@ -42,6 +42,37 @@ function scopeQuery() {
   return view.ctx?.budgetMode === 'personal' ? `&scope=${view.ctx.scope}` : '';
 }
 
+/* DIE LETZTE ANFRAGE GEWINNT, NICHT DIE LETZTE ANTWORT (#1775, Review). `view`
+ * ist EIN geteilter Zustand, und jeder Schritt am Stepper (Pfeil oder Wisch)
+ * startet eine neue Ladung, ohne auf die vorige zu warten: kam die aeltere
+ * Antwort spaeter an, schrieb sie ihren Zeitraum ueber den neueren - der Kopf
+ * zeigte April, die Auswertung Maerz. Jede Ladung zieht deshalb eine Nummer
+ * und schreibt nur, wenn sie noch die juengste ist. Liefert `false` fuer eine
+ * ueberholte Ladung; die zeichnet dann auch nichts. */
+let loadSeq = 0;
+async function fetchStats() {
+  const seq = ++loadSeq;
+  let data = null;
+  let prev = null;
+  let error = false;
+  try {
+    const res = await api.get(`/budget/stats?range=${view.range}&anchor=${view.anchor}${scopeQuery()}`);
+    data = res.data;
+    prev = await loadPrevious(res.data);
+  } catch (err) {
+    console.error('[Budget] stats load error:', err);
+    data = null;
+    // Das Fehlerobjekt selbst, nicht nur `true`: `mountLoadError` liest daraus
+    // den Statuscode - die einzige Angabe, die dem Selbsthoster hier weiterhilft.
+    error = err;
+  }
+  if (seq !== loadSeq) return false;
+  view.data = data;
+  view.prev = prev;
+  view.error = error;
+  return true;
+}
+
 async function loadStats() {
   const body = view.root.querySelector('#budget-stats-body');
   // Ladezustand statt leerer Fläche — der Budget-Tab zeigt beim Monatswechsel
@@ -51,18 +82,7 @@ async function loadStats() {
     // Diagrammfoermig, nicht als Liste: danach stehen hier Verlauf und Anteile.
     body.insertAdjacentHTML('beforeend', renderSkeletonChart({ charts: 2 }));
   }
-  try {
-    const res = await api.get(`/budget/stats?range=${view.range}&anchor=${view.anchor}${scopeQuery()}`);
-    view.data = res.data;
-    view.error = false;
-    view.prev = await loadPrevious(res.data);
-  } catch (err) {
-    console.error('[Budget] stats load error:', err);
-    view.data = null;
-    // Das Fehlerobjekt selbst, nicht nur `true`: `mountLoadError` liest daraus
-    // den Statuscode - die einzige Angabe, die dem Selbsthoster hier weiterhilft.
-    view.error = err;
-  }
+  if (!(await fetchStats())) return;
   renderBodyContent(body);
 }
 
@@ -708,4 +728,4 @@ function updatePeriodLabel() {
 }
 
 // Nur fuer Tests: die Farbzuordnung von Balken und Donut (R14 P8).
-export const __test = { categoryColorIndex, DONUT_SEGMENTS, futureStartIndex, TREND_CHART_NARROW };
+export const __test = { fetchStats, statsView: () => view, categoryColorIndex, DONUT_SEGMENTS, futureStartIndex, TREND_CHART_NARROW };

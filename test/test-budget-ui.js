@@ -4882,3 +4882,43 @@ test('R17: der Verlauf zeichnet neu, wenn das Fenster die Schwelle kreuzt; ein M
   assert.match(toggle, /querySelectorAll\(`\[popovertarget="\$\{panel\.id\}"\]`\)\) el\.setAttribute\('aria-expanded', 'false'\);[\s\S]*?trigger\?\.setAttribute\('aria-expanded', String\(event\.newState === 'open'\)\)/,
     'erst alle auf false, dann der sichtbare auf den Zustand');
 });
+
+/* #1775 (Review): die Statistik laedt bei jedem Schritt neu, ohne auf die
+ * vorige Ladung zu warten, und schrieb jede Antwort in denselben `view`. Kam
+ * die AELTERE Antwort spaeter, stand ihr Zeitraum unter dem Kopf des neueren.
+ * Gefahren wird die echte fetchStats() mit Antworten in vertauschter Folge. */
+test('#1775: eine ueberholte Statistik-Antwort ueberschreibt den neueren Zeitraum nicht', async () => {
+  const { __test } = await import('../public/pages/budget-stats.js');
+  const view = __test.statsView();
+  const saved = { ...view };
+  const savedStub = globalThis.__apiStub;
+  const pending = new Map();
+  globalThis.__apiStub = {
+    get: (url) => new Promise((resolve) => {
+      const anchor = /anchor=([\d-]+)/.exec(url)[1];
+      pending.set(anchor, () => resolve({ data: { from: anchor, to: anchor, categories: [] } }));
+    }),
+  };
+  const settle = async (anchor) => { pending.get(anchor)(); await new Promise((r) => setTimeout(r, 0)); };
+  try {
+    Object.assign(view, { range: 'month', ctx: { budgetMode: 'shared' }, data: null, prev: null, error: false });
+    view.anchor = '2026-03-01';
+    const older = __test.fetchStats();
+    view.anchor = '2026-04-01';
+    const newer = __test.fetchStats();
+    // Die juengere Ladung antwortet zuerst (samt ihrem Vorzeitraum) ...
+    await settle('2026-04-01');
+    await settle('2026-03-31');
+    assert.equal(await newer, true);
+    assert.equal(view.data.from, '2026-04-01');
+    // ... die aeltere danach: sie darf nichts mehr schreiben.
+    await settle('2026-03-01');
+    await settle('2026-02-28');
+    assert.equal(await older, false, 'die ueberholte Ladung meldet sich als ueberholt');
+    assert.equal(view.data.from, '2026-04-01', 'unter dem April-Kopf steht weiter der April');
+    assert.equal(view.prev.from, '2026-03-31');
+  } finally {
+    Object.assign(view, saved);
+    globalThis.__apiStub = savedStub;
+  }
+});
