@@ -844,11 +844,12 @@
   max-inline-size: 50cqi;
 }
 
-.settings-group .settings-setting-row__control > select.form-input {
-  inline-size: auto;
-  max-inline-size: 100%;
-  text-overflow: ellipsis;
-}
+/* DIE AUSWAHL IN DER ZEILE IST RANDLOS (R18, 2026-10-07). Hier stand ihre
+ * Breitenregel; sie traegt jetzt die geteilte Form der Formularzeile
+ * (`.form-row__control > select.form-input`, layout.css): Wert in
+ * Sekundaerfarbe, rechtsbuendig, dahinter das Zeichen. Die Zeile ist eine
+ * `.settings-setting-row.form-row` (settings/components.js). Bis dahin sass am
+ * Zeilenende ein Kasten mit Kontur, 143 bis 360px breit je nach Wert. */
 
 /* Ein Kurzfeld (Zahl) traegt die Breite seines Werts, nicht die der Zeile. Es
  * steht in seinem eigenen <form>, damit Enter es absendet. */

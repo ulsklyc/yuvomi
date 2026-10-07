@@ -7276,6 +7276,379 @@ textarea::placeholder {
 }
 
 /* --------------------------------------------------------
+ * Formularzeile (utils/form-row.js; Entscheidung Ulas 2026-10-07,
+ * DESIGN.md "Formularzeile")
+ *
+ * EIN Baustein fuer gruppierte Formularzeilen: Traeger mit Haarlinien, Etikett
+ * links, Wert rechts. Er steht HIER und nicht in einem Seitenblatt, weil
+ * Dialoge im geteilten Overlay rendern und der Router je Route EIN Seitenblatt
+ * laedt - eine Zeile, deren Regeln in settings.css wohnen, ist nur in den
+ * Einstellungen eine Zeile.
+ *
+ * ZWEI EBENEN:
+ *   1. Die Geometrie der Zeile gilt im Traeger `.form-rows` (Dialoge). Die
+ *      Einstellungen fuehren ihre Zeile als `.settings-setting-row.form-row`
+ *      im Traeger `.row-carrier.settings-group`; deren Masse stehen in
+ *      settings.css (Kartenpolster, 50cqi) und bleiben dort.
+ *   2. Was IN der Zeile steht (randlose Auswahl, Datum als Wert, Paar), gilt
+ *      ueber `.form-row__control` fuer BEIDE - eine Regel, zwei Orte.
+ *
+ * IM DIALOG OHNE EIGENE FLAECHE: nach dem Kasten-in-Kasten-Vokabular
+ * (tokens.css) ist eine Zeile IN einer Karte eine Haarlinie, kein Kasten - der
+ * Traeger hat weder Flaeche noch Kante noch Radius.
+ * -------------------------------------------------------- */
+.form-rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* Die Zeile stapelt nach der Breite ihres TRAEGERS, nicht des Fensters:
+   * derselbe Dialog ist am Telefon ein Blatt und am Desktop 400 bis 680px. */
+  container: form-rows / inline-size;
+}
+
+.form-rows > * + * {
+  border-top: var(--space-px) solid var(--color-border-subtle);
+}
+
+.form-rows > .form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1) var(--space-4);
+  align-items: center;
+  min-width: 0;
+  /* Ein Fingerziel hoch; das Polster haelt ein Feld in der Zeile (40px am
+   * Desktop) von den Haarlinien frei. */
+  min-height: var(--target-lg);
+  padding-block: var(--space-1);
+}
+
+/* Die Fehlergruppe eines Feldes ist die Zeile selbst (`.form-field`,
+ * components/modal.js): ihr Raster bleibt, die Meldung laeuft darunter. */
+.form-rows > .form-row.form-field {
+  display: grid;
+}
+
+/* DIE SEKUNDAERZEILE LAEUFT UNTER BEIDEN SPALTEN (wie in den Einstellungen,
+ * settings.css): der Textblock gibt seine Kinder ans Raster der Zeile ab -
+ * Etikett und Bedienelement in Zeile 1, Hinweis und Fehlerzeile darunter ueber
+ * die volle Breite. In der Etikett-Spalte allein stuende ein Hinweis mobil auf
+ * 160px. */
+.form-rows > .form-row:not(.form-row--stacked) > .form-row__copy {
+  display: contents;
+}
+
+.form-rows > .form-row > .form-row__copy > *,
+.form-rows > .form-row > .form-field__error {
+  grid-column: 1 / -1;
+}
+
+.form-rows > .form-row:not(.form-row--stacked) > .form-row__copy > .form-row__label {
+  grid-area: 1 / 1;
+  align-self: center;
+}
+
+.form-rows > .form-row:not(.form-row--stacked) > .form-row__control {
+  grid-area: 1 / 2;
+}
+
+/* LANGE ETIKETTEN BRECHEN, DER WERT BLEIBT EINZEILIG (24 Sprachen). Das
+ * Etikett trennt an der Silbe, statt das Bedienelement zu quetschen; das
+ * Bedienelement ist bei 62 % des Traegers gedeckelt, damit dem Etikett immer
+ * mehr als ein Drittel bleibt. */
+.form-rows .form-row__label {
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+}
+
+.form-rows .form-row__description {
+  max-width: 50ch;
+  margin: 0;
+  padding-bottom: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--line-height-snug);
+}
+
+.form-rows > .form-row > .form-row__control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 0;
+  max-inline-size: 62cqi;
+  white-space: nowrap;
+}
+
+/* GESTAPELT: ein Segment, eine Chip-Gruppe oder eine Skala steht neben keinem
+ * Etikett. Das Bedienelement nimmt die Zeile unter dem Text. */
+.form-rows > .form-row--stacked {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: var(--space-2);
+  padding-block: var(--space-3);
+}
+
+.form-rows > .form-row--stacked > .form-row__control {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  max-inline-size: none;
+  white-space: normal;
+}
+
+/* AB EINER MINDESTBREITE STAPELN. Unter 20rem Traegerbreite (ein sm-Dialog am
+ * schmalsten Telefon, eine lange Sprache bei 200 % Schrift) passt neben dem
+ * Wert kein Etikett mehr: jede Zeile stapelt. Eine Zeile mit BREITEM
+ * Bedienelement (Datum mit Uhrzeit, `--wide`) tut das schon unter 26rem.
+ * Ohne Container Queries (untere Browser-Stufe) bleibt die Zeile zweispaltig. */
+@container form-rows (max-width: 26rem) {
+  .form-rows > .form-row--wide:not(.form-row--stacked) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .form-rows > .form-row--wide:not(.form-row--stacked) > .form-row__copy > .form-row__label,
+  .form-rows > .form-row--wide:not(.form-row--stacked) > .form-row__control {
+    grid-area: auto;
+  }
+
+  .form-rows > .form-row--wide:not(.form-row--stacked) > .form-row__control {
+    justify-content: flex-start;
+    max-inline-size: none;
+  }
+
+  /* Gestapelt steht der Wert UNTER dem Etikett und beginnt in dessen Flucht -
+   * rechtsbuendig in seinem Teilfeld stuende er eingerueckt im Raum. */
+  .form-rows > .form-row--wide:not(.form-row--stacked) > .form-row__control > yuvomi-datepicker .ydp__fields {
+    justify-content: flex-start;
+  }
+
+  .form-rows > .form-row--wide:not(.form-row--stacked) > .form-row__control > yuvomi-datepicker .ydp__input {
+    padding-inline-start: 0;
+    text-align: start;
+  }
+}
+
+@container form-rows (max-width: 20rem) {
+  .form-rows > .form-row:not(.form-row--stacked) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .form-rows > .form-row:not(.form-row--stacked) > .form-row__copy > .form-row__label,
+  .form-rows > .form-row:not(.form-row--stacked) > .form-row__control {
+    grid-area: auto;
+  }
+
+  .form-rows > .form-row:not(.form-row--stacked) > .form-row__control {
+    justify-content: flex-start;
+    max-inline-size: none;
+  }
+}
+
+/* Die Schalterzeile (`label.toggle-row--switch`) IST eine Zeile des Traegers:
+ * ihr eigenes Polster und ihre Rundung gehoeren der freistehenden Form. */
+.form-rows > .toggle-row {
+  padding-inline: 0;
+  border-radius: 0;
+}
+
+.form-rows > .toggle-row:hover {
+  background-color: transparent;
+}
+
+.form-rows > .toggle-row--switch .toggle-row__label {
+  font-size: var(--text-base);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+}
+
+/* ── In der Zeile: die randlose Auswahl ──
+ *
+ * WCAG 1.4.11 VORAB GEKLAERT (R18): die Grenze eines Bedienelements braucht
+ * 3:1 - ODER ein anderes Zeichen, das es als bedienbar ausweist. Die Auswahl
+ * in der Zeile traegt keine Kante; ihr Erkennungsmerkmal ist das Zeichen
+ * dahinter (--field-chevron: hell #63615B 6,19:1 auf Weiss, 5,89:1 im Dialog;
+ * dunkel #B4AEA5 6,66:1 auf -surface), dazu der Wert in Sekundaerfarbe am
+ * Zeilenende. Der Fokus zeichnet die Akzentkante und den Glow des Feldkanons.
+ *
+ * Das Zeichen sitzt an der Zeilenkante (Position 0), der Wert davor und
+ * rechtsbuendig. Am Finger fuellt die Auswahl die Zeilenhoehe (48px, das
+ * negative Aussenmass hebt das Zeilenpolster auf), an der Maus 40px. */
+.form-row__control > select.form-input,
+.form-row__control > select.input {
+  inline-size: auto;
+  max-inline-size: 100%;
+  min-height: var(--target-md);
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  text-align-last: end;
+  cursor: pointer;
+}
+
+/* Polster und Lage des Zeichens stehen am Feldkanon unter
+ * `:not([multiple]):not([size])` - dieselbe Kette hier, sonst gewinnt dessen
+ * Spezifitaet und das Zeichen sitzt 12px vor der Zeilenkante. */
+.form-row__control > select.form-input:not([multiple]):not([size]),
+.form-row__control > select.input:not([multiple]):not([size]),
+.form-composite > select.form-input:not([multiple]):not([size]) {
+  padding-inline: var(--space-2) var(--space-6);
+  background-position: right 0 center;
+}
+
+[dir="rtl"] .form-row__control > select.form-input:not([multiple]):not([size]),
+[dir="rtl"] .form-row__control > select.input:not([multiple]):not([size]),
+[dir="rtl"] .form-composite > select.form-input:not([multiple]):not([size]) {
+  background-position: left 0 center;
+}
+
+@media (hover: none) {
+  .form-row__control > select.form-input,
+  .form-row__control > select.input {
+    min-height: var(--target-lg);
+  }
+
+  .form-rows > .form-row > .form-row__control > select.form-input,
+  .form-rows > .form-row > .form-row__control > select.input {
+    margin-block: calc(-1 * var(--space-1));
+  }
+}
+
+@media (hover: hover) {
+  .form-row__control > select.form-input:not(:disabled):hover,
+  .form-row__control > select.input:not(:disabled):hover {
+    color: var(--color-text-primary);
+    background-color: var(--color-surface-hover);
+  }
+}
+
+.form-row__control > select.form-input:focus,
+.form-row__control > select.input:focus {
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+}
+
+.form-row__control > select.form-input:disabled,
+.form-row__control > select.input:disabled {
+  color: var(--color-text-tertiary);
+  cursor: default;
+}
+
+.form-field--error .form-row__control > select.form-input,
+.form-field--error .form-row__control > select.input {
+  border-color: var(--color-danger);
+}
+
+/* ── In der Zeile: Datum und Uhrzeit als Wert ──
+ * Der Datepicker bleibt, was er ist (getipptes Feld + Kalender-Knopf), nur
+ * ohne Kasten: der Wert steht rechtsbuendig vor seinem Zeichen. Die Breite ist
+ * die des Werts, nicht die der Zeile. */
+.form-row__control > yuvomi-datepicker {
+  flex: 0 1 auto;
+  inline-size: 10rem;
+  min-width: 0;
+}
+
+.form-row__control > yuvomi-datepicker[type="time"] {
+  inline-size: 7.5rem;
+}
+
+/* Datum MIT Uhrzeit: die zwei Teilfelder teilen sich sonst die Breite 58:42
+ * (datepicker.css) und stuenden als Werte mit einem Loch dazwischen. In der
+ * Zeile sind sie so breit wie ihr Wert und ruecken zusammen ans Zeilenende. */
+.form-row__control > yuvomi-datepicker[type="datetime"] {
+  inline-size: auto;
+  max-inline-size: 100%;
+}
+
+.form-row__control > yuvomi-datepicker[type="datetime"] .ydp__fields {
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.form-row__control > yuvomi-datepicker[type="datetime"] .ydp__sub--date {
+  flex: 0 1 10rem;
+}
+
+.form-row__control > yuvomi-datepicker[type="datetime"] .ydp__sub--time {
+  flex: 0 1 7rem;
+}
+
+.form-row__control > yuvomi-datepicker .ydp__input {
+  min-height: var(--target-md);
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  text-align: end;
+}
+
+.form-row__control > yuvomi-datepicker .ydp__input:focus {
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+}
+
+.form-row__control > yuvomi-datepicker .ydp__sub.is-invalid .ydp__input,
+.form-field--error .form-row__control > yuvomi-datepicker .ydp__input {
+  border-color: var(--color-danger);
+}
+
+/* ── In der Zeile: das zusammengesetzte Feld ("120 / 80 mmHg") ──
+ * Teilfelder bleiben FELDER (Kante 3:1, Fuellung): eine leere Zahl ohne Kasten
+ * waere nur ein Platzhalter im Raum. Sie sind so breit wie ihr Wert, die
+ * Ziffern tabellarisch und rechtsbuendig; Trenner und Einheit stehen in
+ * Sekundaerfarbe auf der Grundlinie des Werts. */
+.form-composite {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.form-composite__part {
+  inline-size: 4.5rem;
+  min-height: var(--target-md);
+  padding-inline: var(--space-2);
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (hover: none) {
+  .form-composite__part {
+    min-height: var(--target-base);
+  }
+}
+
+/* Ein einzelner Messwert (Gewicht "72,5") braucht zwei Stellen mehr als eine
+ * Haelfte des Paars. */
+.form-composite__part--wide {
+  inline-size: 6rem;
+}
+
+.form-composite__sep,
+.form-composite__unit {
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  white-space: nowrap;
+}
+
+/* Die Einheit einer AUSWAHL (kg / lb) ist selbst eine randlose Auswahl hinter
+ * dem Wert. */
+.form-composite > select.form-input {
+  inline-size: auto;
+  min-height: var(--target-md);
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.form-composite > select.form-input:focus {
+  border-color: var(--color-accent);
+}
+
+/* --------------------------------------------------------
  * Zutaten-Zeile (geteilt: Mahlzeiten- + Rezept-Modal)
  * Global statt modul-scoped, weil Modals im geteilten Overlay rendern und der
  * Router immer nur EIN Modul-Stylesheet aktiv hält. Markup: ingredient-row.js.

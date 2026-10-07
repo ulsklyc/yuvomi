@@ -25,6 +25,7 @@ import { trendMarkup } from '/utils/metric-card.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, reportFieldError, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
+import { formRowsHtml, formRowHtml, formCompositeHtml } from '/utils/form-row.js';
 import { installPopoverMenus, pageToolsMenuHtml } from '/utils/popover-menu.js';
 import { personSwitcherMarkup } from '/utils/health-person-switcher.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
@@ -2039,6 +2040,11 @@ function localDateTimeValue(date) {
   return `${key}T${hh}:${mm}`;
 }
 
+// Beispielwerte als Platzhalter des Blutdruck-Paars und die Einheit des
+// Pulses. Zahlen und ein Einheitenzeichen, keine Texte - wie `metric.units`.
+const PAIR_EXAMPLE = Object.freeze({ systolic: 120, diastolic: 80, pulse: 72 });
+const PULSE_UNIT = '/min';
+
 function valueFieldsMarkup(type, row = null) {
   const metric = vitalMetric(type) || VITAL_METRICS[0];
   // Bearbeiten (R8 H9): der Bestand steht im Markup, nicht erst nach einem
@@ -2050,17 +2056,24 @@ function valueFieldsMarkup(type, row = null) {
   // ist eine Rechnung, die der Erfassende sonst im Kopf machen müsste.
   if (metric.format === 'duration') {
     const parts = row && has(row.value_num) ? splitDuration(row.value_num) : null;
-    return `
-      <div class="modal-grid modal-grid--2">
-        <div class="form-field">
-          <label class="label" for="vital-hours">${esc(t('health.vitals.field.hours'))}</label>
-          <input class="input" id="vital-hours" type="number" inputmode="numeric" step="1" min="0" max="24" required${parts ? ` value="${esc(String(parts.hours))}"` : ''}>
-        </div>
-        <div class="form-field">
-          <label class="label" for="vital-minutes">${esc(t('health.vitals.field.minutes'))}</label>
-          <input class="input" id="vital-minutes" type="number" inputmode="numeric" step="1" min="0" max="59" value="${esc(String(parts ? parts.minutes : 0))}">
-        </div>
-      </div>
+    // EIN zusammengesetztes Feld: "7 Stunden 30 Minuten". Die Worte hinter den
+    // Zahlen SIND die Etiketten der Teilfelder (`<label for>`).
+    return `${formRowHtml({
+      label: t(metric.labelKey),
+      labelId: 'vital-duration-label',
+      field: true,
+      control: formCompositeHtml({
+        labelledBy: 'vital-duration-label',
+        parts: [
+          { id: 'vital-hours', label: t('health.vitals.field.hours'), suffix: t('health.vitals.field.hours'), suffixIsLabel: true,
+            value: parts ? parts.hours : null,
+            attrs: { type: 'number', inputmode: 'numeric', step: '1', min: '0', max: '24', required: true } },
+          { id: 'vital-minutes', label: t('health.vitals.field.minutes'), suffix: t('health.vitals.field.minutes'), suffixIsLabel: true,
+            value: parts ? parts.minutes : 0,
+            attrs: { type: 'number', inputmode: 'numeric', step: '1', min: '0', max: '59' } },
+        ],
+      }),
+    })}
       <input type="hidden" id="vital-unit" value="${esc(metric.units[0] || '')}">`;
   }
 
@@ -2068,37 +2081,60 @@ function valueFieldsMarkup(type, row = null) {
   // Auswahl-Chip wie Flow und Symptome im Zyklus-Tagebuch (.health-choice).
   if (metric.format === 'scale') {
     const chosen = row && has(row.value_num) ? moodStep(row.value_num)?.value : null;
-    return `
-      <div class="form-field">
-        <span class="label">${esc(t('health.vitals.field.mood'))}</span>
-        <div class="health-choices health-choices--scale" data-group="mood" role="group"
-             aria-label="${esc(t('health.vitals.field.mood'))}">
+    // Eine Skala steht neben keinem Etikett: gestapelte Zeile.
+    return `${formRowHtml({
+      label: t('health.vitals.field.mood'),
+      labelId: 'vital-mood-label',
+      stacked: true,
+      field: true,
+      control: `<div class="health-choices health-choices--scale" data-group="mood" role="group"
+             aria-labelledby="vital-mood-label">
           ${MOOD_SCALE.map((step) => `
             <button type="button" class="health-choice" data-mood="${esc(step.value)}" aria-pressed="${step.value === chosen ? 'true' : 'false'}">
               <i data-lucide="${esc(step.icon)}" aria-hidden="true"></i>
               <span class="health-choice-label">${esc(t(step.labelKey))}</span>
             </button>`).join('')}
-        </div>
-      </div>
+        </div>`,
+    })}
       <input type="hidden" id="vital-unit" value="">`;
   }
 
   if (metric.format === 'pair') {
-    return `
-      <div class="modal-grid modal-grid--3">
-        <div class="form-field">
-          <label class="label" for="vital-sys">${esc(t('health.vitals.field.systolic'))}</label>
-          <input class="input" id="vital-sys" type="number" inputmode="numeric" step="1" min="0" required${valueAttr(row?.value_num)}>
-        </div>
-        <div class="form-field">
-          <label class="label" for="vital-dia">${esc(t('health.vitals.field.diastolic'))}</label>
-          <input class="input" id="vital-dia" type="number" inputmode="numeric" step="1" min="0" required${valueAttr(row?.value_num2)}>
-        </div>
-        <div class="form-field">
-          <label class="label" for="vital-pulse">${esc(t('health.vitals.field.pulse'))}</label>
-          <input class="input" id="vital-pulse" type="number" inputmode="numeric" step="1" min="0"${valueAttr(row?.value_num3)}>
-        </div>
-      </div>`;
+    // DER BLUTDRUCK IST EIN WERT, KEINE DREI KAESTEN (R18, 2026-10-07): bis
+    // dahin drei gleich breite Felder "Systolisch", "Diastolisch", "Puls" ohne
+    // Einheit. Jetzt steht er, wie man ihn sagt - "120 / 80 mmHg" -, der Puls
+    // als eigene Zeile darunter. Die Teilfelder behalten ihre ids und Namen
+    // (Screenreader: Gruppe "Blutdruck", "Systolisch", "Diastolisch, mmHg").
+    // Die Platzhalter sind Beispielwerte, keine Vorgaben.
+    return formRowHtml({
+      label: t(metric.labelKey),
+      labelId: 'vital-pair-label',
+      field: true,
+      control: formCompositeHtml({
+        labelledBy: 'vital-pair-label',
+        unit: metric.units[0],
+        parts: [
+          { id: 'vital-sys', label: t('health.vitals.field.systolic'), value: has(row?.value_num) ? row.value_num : null,
+            placeholder: PAIR_EXAMPLE.systolic,
+            attrs: { type: 'number', inputmode: 'numeric', step: '1', min: '0', required: true } },
+          { separator: '/' },
+          { id: 'vital-dia', label: t('health.vitals.field.diastolic'), value: has(row?.value_num2) ? row.value_num2 : null,
+            placeholder: PAIR_EXAMPLE.diastolic,
+            attrs: { type: 'number', inputmode: 'numeric', step: '1', min: '0', required: true } },
+        ],
+      }),
+    }) + formRowHtml({
+      label: t('health.vitals.field.pulse'),
+      labelFor: 'vital-pulse',
+      field: true,
+      control: formCompositeHtml({
+        parts: [
+          { id: 'vital-pulse', suffix: PULSE_UNIT,
+            value: has(row?.value_num3) ? row.value_num3 : null, placeholder: PAIR_EXAMPLE.pulse,
+            attrs: { type: 'number', inputmode: 'numeric', step: '1', min: '0' } },
+        ],
+      }),
+    });
   }
   /* EINE UNBEKANNTE EINHEIT WURDE STILL ZUR ERSTEN (Codex an #1485): stand
    * die gespeicherte Einheit nicht in der Liste (per API oder Import erfasst,
@@ -2107,23 +2143,24 @@ function valueFieldsMarkup(type, row = null) {
    * Einheit steht deshalb als eigene Option da und ist gewaehlt. */
   const orphanUnit = row?.unit && !metric.units.includes(row.unit) ? row.unit : null;
   const unitOptions = orphanUnit ? [orphanUnit, ...metric.units] : metric.units;
-  const unitField = vitalUnitEditable(metric)
-    ? `
-      <div class="form-field">
-        <label class="label" for="vital-unit">${esc(t('health.vitals.field.unit'))}</label>
-        <select class="input" id="vital-unit">
+  // WERT UND EINHEIT SIND EIN FELD: die Einheit steht als Suffix hinter der
+  // Zahl - als randlose Auswahl, wo es mehrere gibt (kg / lb), sonst als Text.
+  // Das versteckte Einheitenfeld bleibt, wo die Metrik nur eine fuehrt:
+  // collectVitalBody() liest `#vital-unit` in beiden Faellen.
+  const unitChoice = vitalUnitEditable(metric);
+  const unitControl = unitChoice
+    ? `<select class="form-input" id="vital-unit" aria-label="${esc(t('health.vitals.field.unit'))}">
           ${unitOptions.map((u) => `<option value="${esc(u)}"${row?.unit === u ? ' selected' : ''}>${esc(u)}</option>`).join('')}
-        </select>
-      </div>`
-    : `<input type="hidden" id="vital-unit" value="${esc(metric.units[0])}">`;
-  return `
-    <div class="modal-grid modal-grid--2">
-      <div class="form-field">
-        <label class="label" for="vital-value">${esc(t('health.vitals.field.value'))}</label>
-        <input class="input" id="vital-value" type="number" inputmode="decimal" step="any" required${valueAttr(row?.value_num)}>
-      </div>
-      ${unitField}
-    </div>`;
+        </select>`
+    : '';
+  const staticUnit = !unitChoice && metric.units[0] ? metric.units[0] : '';
+  const valueInput = `<input class="form-input form-composite__part form-composite__part--wide" id="vital-value" type="number" inputmode="decimal" step="any" required${staticUnit ? ' aria-describedby="vital-value-unit"' : ''}${valueAttr(row?.value_num)}>`;
+  return `${formRowHtml({
+    label: t(metric.labelKey),
+    labelFor: 'vital-value',
+    field: true,
+    control: `<span class="form-composite">${valueInput}${unitControl}${staticUnit ? `<span class="form-composite__unit" id="vital-value-unit">${esc(staticUnit)}</span>` : ''}</span>`,
+  })}${unitChoice ? '' : `<input type="hidden" id="vital-unit" value="${esc(metric.units[0])}">`}`;
 }
 
 /**
@@ -2158,27 +2195,36 @@ function openVitalModal(opts = {}) {
     onClose: opts.onClose,
     content: `
       <form id="vital-form" class="form-stack">
-        <div class="form-field">
-          <label class="label" for="vital-type">${esc(t('health.vitals.field.type'))}</label>
-          <select class="input" id="vital-type"${isEdit ? ' disabled' : ''}>${typeOptions}</select>
-        </div>
-        <div id="vital-value-fields">${valueFieldsMarkup(currentType, row)}</div>
-        <div class="modal-grid modal-grid--2">
-          <div class="form-field">
-            <label class="label" for="vital-measured-at">${esc(t('health.vitals.field.measuredAt'))}</label>
-            <yuvomi-datepicker id="vital-measured-at" type="datetime" value="${esc(measuredValue)}"></yuvomi-datepicker>
-          </div>
-          <div class="form-field">
-            <label class="label" for="vital-visibility">${esc(t('health.vitals.field.visibility'))}</label>
-            <select class="input" id="vital-visibility">
+        ${/* GRUPPIERTE ZEILEN (R18, 2026-10-07, utils/form-row.js): Etikett
+             links, Wert rechts. Reihenfolge, ids und Verhalten der Felder
+             sind die alten - Art, Wert, Zeitpunkt, Sichtbarkeit, Notiz. Die
+             Notiz bleibt ein freies Feld ohne Zeilenraster. */ ''}
+        ${formRowsHtml(formRowHtml({
+          label: t('health.vitals.field.type'),
+          labelFor: 'vital-type',
+          control: `<select class="form-input" id="vital-type"${isEdit ? ' disabled' : ''}>${typeOptions}</select>`,
+        }))}
+        <div class="form-rows" id="vital-value-fields">${valueFieldsMarkup(currentType, row)}</div>
+        ${formRowsHtml([
+          formRowHtml({
+            label: t('health.vitals.field.measuredAt'),
+            labelFor: 'vital-measured-at',
+            wide: true,
+            field: true,
+            control: `<yuvomi-datepicker id="vital-measured-at" type="datetime" value="${esc(measuredValue)}"></yuvomi-datepicker>`,
+          }),
+          formRowHtml({
+            label: t('health.vitals.field.visibility'),
+            labelFor: 'vital-visibility',
+            control: `<select class="form-input" id="vital-visibility">
               <option value="private"${visibilityValue === 'family' ? '' : ' selected'}>${esc(t('health.vitals.visibility.private'))}</option>
               <option value="family"${visibilityValue === 'family' ? ' selected' : ''}>${esc(t('health.vitals.visibility.family'))}</option>
-            </select>
-          </div>
-        </div>
+            </select>`,
+          }),
+        ])}
         <div class="form-field">
-          <label class="label" for="vital-note">${esc(t('health.vitals.field.note'))}</label>
-          <textarea class="input" id="vital-note" rows="2" maxlength="2000">${esc(isEdit && row.note ? row.note : '')}</textarea>
+          <label class="form-label" for="vital-note">${esc(t('health.vitals.field.note'))}</label>
+          <textarea class="form-input" id="vital-note" rows="2" maxlength="2000">${esc(isEdit && row.note ? row.note : '')}</textarea>
         </div>
         ${disclaimerMarkup(true)}
         <div class="modal-panel__footer modal-panel__footer--plain">
@@ -9154,6 +9200,8 @@ export const __test = {
   recentMeasurementsMarkup,
   // R8 H9: Bearbeiten von Messung und Analyt.
   openVitalModal,
+  // R18: die Wertefelder des Dialogs als Formularzeilen (Paar, Dauer, Skala).
+  valueFieldsMarkup,
   // Re-Critique 2026-09-27 (M3): das mobile Detailblatt und die Zeile der
   // leeren Metriken.
   openVitalSheet,

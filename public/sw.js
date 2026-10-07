@@ -147,6 +147,7 @@ const APP_SHELL = [
   '/utils/filter-sheet.js',
   '/utils/folder-upload.js',
   '/utils/folder-tree.js',
+  '/utils/form-row.js',
   '/utils/friendly-error.js',
   '/utils/health-activity.js',
   '/utils/health-cycle.js',

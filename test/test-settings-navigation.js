@@ -3432,9 +3432,12 @@ test('R17: die gruppierte Zeile - Label links, Bedienelement rechts, der Hinweis
     label: 'Zeit <zone>', labelFor: 'tz', description: 'Gilt & wirkt', descriptionId: 'tz-hint',
     control: '<select id="tz"></select>', extra: '<div id="tz-error" hidden></div>',
   });
-  assert.match(row, /^<div class="settings-setting-row"><div class="settings-setting-row__copy"><label class="settings-setting-row__label" for="tz">Zeit &lt;zone&gt;<\/label>/);
-  assert.match(row, /<p class="settings-setting-row__description" id="tz-hint">Gilt &amp; wirkt<\/p><div id="tz-error" hidden><\/div><\/div><div class="settings-setting-row__control"><select id="tz"><\/select><\/div><\/div>$/);
-  assert.match(settingRowHtml({ label: 'x', labelId: 'l', stacked: true }), /^<div class="settings-setting-row settings-setting-row--stacked"><div class="settings-setting-row__copy"><span class="settings-setting-row__label" id="l">x<\/span>/,
+  // Seit R18 (2026-10-07) IST die Einstellungszeile eine Formularzeile
+  // (utils/form-row.js): jede Klasse `settings-setting-row*` traegt ihr
+  // `form-row*` daneben. Reihenfolge, Verknuepfung und Escaping sind die alten.
+  assert.match(row, /^<div class="settings-setting-row form-row"><div class="settings-setting-row__copy form-row__copy"><label class="settings-setting-row__label form-row__label" for="tz">Zeit &lt;zone&gt;<\/label>/);
+  assert.match(row, /<p class="settings-setting-row__description form-row__description" id="tz-hint">Gilt &amp; wirkt<\/p><div id="tz-error" hidden><\/div><\/div><div class="settings-setting-row__control form-row__control"><select id="tz"><\/select><\/div><\/div>$/);
+  assert.match(settingRowHtml({ label: 'x', labelId: 'l', stacked: true }), /^<div class="settings-setting-row settings-setting-row--stacked form-row form-row--stacked"><div class="settings-setting-row__copy form-row__copy"><span class="settings-setting-row__label form-row__label" id="l">x<\/span>/,
     'ohne `labelFor` kein <label>: eine Gruppe (Segment, Chips) wird ueber aria-labelledby benannt');
 
   const sw = settingSwitchRowHtml({ label: 'Push', checked: true, description: 'Nur hier', descriptionId: 'p-hint', attrs: { id: 'p' } });
@@ -3455,6 +3458,107 @@ test('R17: die gruppierte Zeile - Label links, Bedienelement rechts, der Hinweis
     'keine Breitenabfrage stapelt die Zeile wieder: gestapelt war ein Auswahlfeld mit "5 Minuten" mobil vollbreit');
   const control = rules.find((r) => r.selector.trim() === '.settings-group .settings-setting-row__control' && !r.at.length);
   assert.match(control?.body ?? '', /max-inline-size:\s*50cqi/, 'das Bedienelement nimmt hoechstens die halbe Zeile, das Label bricht um');
+});
+
+// --------------------------------------------------------
+// R18 (2026-10-07): die Formularzeile - EIN Baustein fuer Einstellungen und
+// Erfassungsdialoge (utils/form-row.js, layout.css "Formularzeile")
+// --------------------------------------------------------
+test('R18: formRowHtml baut Etikett links / Wert rechts mit verknuepftem Etikett, die Einstellungszeile baut darauf', async () => {
+  const { formRowHtml, formRowsHtml } = await import('../public/utils/form-row.js');
+  const row = formRowHtml({
+    label: 'Art <b>', labelFor: 'kind', description: 'Nur & hier', descriptionId: 'kind-hint',
+    control: '<select class="form-input" id="kind"></select>', field: true,
+  });
+  assert.match(row, /^<div class="form-row form-field"><div class="form-row__copy"><label class="form-row__label" for="kind">Art &lt;b&gt;<\/label>/,
+    'das Etikett ist ein <label for> - und die Zeile die Fehlergruppe ihres Feldes');
+  assert.match(row, /<p class="form-row__description" id="kind-hint">Nur &amp; hier<\/p><\/div><div class="form-row__control"><select class="form-input" id="kind"><\/select><\/div><\/div>$/);
+  assert.match(formRowHtml({ label: 'x', labelId: 'l', stacked: true, wide: true }),
+    /^<div class="form-row form-row--stacked form-row--wide"><div class="form-row__copy"><span class="form-row__label" id="l">x<\/span>/,
+    'ohne labelFor ein benennbares <span> fuer aria-labelledby');
+  assert.equal(formRowsHtml(['<i>a</i>', '', null, '<i>b</i>'], { attrs: { id: 'g' } }), '<div class="form-rows" id="g"><i>a</i><i>b</i></div>');
+  // Die Einstellungszeile ist dieselbe Funktion mit einer Variante - nicht ein zweiter Bau.
+  const components = await readFile(new URL('../public/settings/components.js', import.meta.url), 'utf8');
+  const fn = components.slice(components.indexOf('export function settingRowHtml('), components.indexOf('export function settingSwitchRowHtml('));
+  assert.match(fn, /return formRowHtml\(\{[\s\S]*variant: 'settings-setting-row'/, 'settingRowHtml delegiert an formRowHtml');
+  assert.doesNotMatch(fn, /<div class=/, 'settingRowHtml baut kein eigenes Markup mehr');
+  const dom = components.slice(components.indexOf('export function createSettingRow('), components.indexOf('export function createStatusSummary('));
+  for (const cls of ['settings-setting-row form-row', 'settings-setting-row__copy form-row__copy', 'settings-setting-row__label form-row__label',
+    'settings-setting-row__description form-row__description', 'settings-setting-row__control form-row__control']) {
+    assert.ok(dom.includes(`'${cls}'`), `createSettingRow traegt "${cls}"`);
+  }
+});
+
+test('R18: ein zusammengesetztes Feld ist eine benannte Gruppe, jedes Teilfeld hat einen eigenen Namen', async () => {
+  const { formCompositeHtml } = await import('../public/utils/form-row.js');
+  const pair = formCompositeHtml({
+    labelledBy: 'bp-label',
+    unit: 'mmHg',
+    parts: [
+      { id: 'sys', label: 'Systolisch', value: 120, placeholder: 120, attrs: { type: 'number', required: true } },
+      { separator: '/' },
+      { id: 'dia', label: 'Dia "stolisch"', attrs: { type: 'number' } },
+    ],
+  });
+  assert.match(pair, /^<span class="form-composite" role="group" aria-labelledby="bp-label">/);
+  assert.match(pair, /<input class="form-input form-composite__part" type="number" required id="sys" aria-label="Systolisch" placeholder="120" value="120">/);
+  assert.match(pair, /<span class="form-composite__sep" aria-hidden="true">\/<\/span>/, 'der Trenner ist Dekor');
+  assert.match(pair, /<input class="form-input form-composite__part" type="number" id="dia" aria-label="Dia &quot;stolisch&quot;" aria-describedby="dia-unit">/,
+    'die Einheit beschreibt das letzte Teilfeld');
+  assert.match(pair, /<span class="form-composite__unit" id="dia-unit">mmHg<\/span><\/span>$/);
+  // Ein Wort als Suffix IST das Etikett seines Teilfelds; ein einzelnes Feld ohne Gruppe bleibt ohne Rolle.
+  const dur = formCompositeHtml({ labelledBy: 'd', parts: [{ id: 'h', label: 'Stunden', suffix: 'Stunden', suffixIsLabel: true }] });
+  assert.match(dur, /<input class="form-input form-composite__part" type="text" id="h"><label class="form-composite__unit" for="h">Stunden<\/label>/);
+  const single = formCompositeHtml({ parts: [{ id: 'p', suffix: '/min' }] });
+  assert.match(single, /^<span class="form-composite"><input class="form-input form-composite__part" type="text" id="p" aria-describedby="p-suffix"><span class="form-composite__unit" id="p-suffix">\/min<\/span><\/span>$/);
+});
+
+test('R18: die Formularzeile steht im globalen Blatt - randlose Auswahl mit Zeichen, Etikett bricht, Wert bleibt, schmal stapelt sie', async () => {
+  const layout = await readFile(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(layout)];
+  const parts = (r) => r.selector.split(',').map((s) => s.trim().replace(/\s+/g, ' '));
+  const one = (sel, at = null) => rules.find((r) => parts(r).includes(sel) && (at ? r.at.some((a) => at.test(a)) : !r.at.length));
+  const rows = one('.form-rows');
+  assert.match(rows?.body ?? '', /container:\s*form-rows \/ inline-size/, 'die Zeile misst ihren Traeger');
+  assert.match(one('.form-rows > * + *')?.body ?? '', /border-top:\s*var\(--space-px\) solid var\(--color-border-subtle\)/, 'Haarlinie zwischen den Zeilen');
+  assert.doesNotMatch(rows.body, /background|border-radius|box-shadow/, 'im Dialog kein Kasten im Kasten: der Traeger hat keine eigene Flaeche');
+  const row = one('.form-rows > .form-row');
+  assert.match(row?.body ?? '', /grid-template-columns:\s*minmax\(0, 1fr\) auto/);
+  assert.match(row.body, /min-height:\s*var\(--target-lg\)/);
+  const label = one('.form-rows .form-row__label');
+  assert.match(label?.body ?? '', /overflow-wrap:\s*anywhere/);
+  assert.match(label.body, /hyphens:\s*auto/, 'das Etikett bricht an der Silbe');
+  const control = one('.form-rows > .form-row > .form-row__control');
+  assert.match(control?.body ?? '', /white-space:\s*nowrap/, 'der Wert bleibt einzeilig');
+  assert.match(control.body, /max-inline-size:\s*62cqi/);
+  // Stapeln per Container Query: alle unter 20rem, breite Bedienelemente unter 26rem.
+  assert.match(one('.form-rows > .form-row:not(.form-row--stacked)', /@container form-rows \(max-width: 20rem\)/)?.body ?? '', /grid-template-columns:\s*minmax\(0, 1fr\)/);
+  assert.match(one('.form-rows > .form-row--wide:not(.form-row--stacked)', /@container form-rows \(max-width: 26rem\)/)?.body ?? '', /grid-template-columns:\s*minmax\(0, 1fr\)/);
+  // Die randlose Auswahl: EINE Regel fuer Dialog und Einstellungen.
+  const select = one('.form-row__control > select.form-input');
+  assert.ok(select, 'die Regel haengt an .form-row__control, nicht an einem Traeger');
+  assert.match(select.body, /border-color:\s*transparent/);
+  assert.match(select.body, /background-color:\s*transparent/);
+  assert.match(select.body, /color:\s*var\(--color-text-secondary\)/, 'der Wert in Sekundaerfarbe');
+  assert.doesNotMatch(select.body, /background-image:\s*none|appearance/, 'das Zeichen des Feldkanons bleibt - es traegt die 3:1 als Erkennungsmerkmal');
+  assert.match(one('.form-row__control > select.form-input:focus')?.body ?? '', /border-color:\s*var\(--color-accent\)/, 'der Fokus zeichnet die Akzentkante');
+  assert.match(one('.form-row__control > select.form-input:not([multiple]):not([size])')?.body ?? '', /background-position:\s*right 0 center/);
+  assert.match(one('[dir="rtl"] .form-row__control > select.form-input:not([multiple]):not([size])')?.body ?? '', /background-position:\s*left 0 center/);
+  assert.match(one('.form-row__control > select.form-input', /hover: none/)?.body ?? '', /min-height:\s*var\(--target-lg\)/,
+    'am Finger 48px - in Dialog UND Einstellungen');
+  // Das Zeichen haelt 3:1 auf den Flaechen, auf denen eine Zeile steht.
+  const tokens = await readFile(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const strokes = [...tokens.matchAll(/--_field-chevron:[^;]*stroke='%23([0-9A-Fa-f]{6})'/g)].map((m) => `#${m[1]}`);
+  assert.deepEqual([...new Set(strokes)], ['#63615B', '#B4AEA5']);
+  const lum = (hex) => { const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const ratio = (a, b) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+  for (const [chevron, grounds] of [['#63615B', ['#FFFFFF', '#FBFAF7', '#F5F3ED']], ['#B4AEA5', ['#2B2825', '#37332E', '#191816']]]) {
+    for (const ground of grounds) assert.ok(ratio(chevron, ground) >= 3, `${chevron} auf ${ground}: ${ratio(chevron, ground).toFixed(2)}:1`);
+  }
+  // Und in den Einstellungen gibt es keine zweite Auswahl-Regel mehr daneben.
+  const settings = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  assert.equal([...eachRule(settings)].filter((r) => /settings-setting-row__control > select/.test(r.selector)).length, 0,
+    'die Auswahl der Einstellungszeile kommt aus der Formularzeile (layout.css)');
 });
 
 test('R17: keine Abschnittsueberschrift steht in einem Blatt zweimal ("Termine", "Zyklus")', async () => {

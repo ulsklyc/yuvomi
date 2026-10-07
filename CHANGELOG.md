@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as tall as the text fields beside them and show the same small arrow on every browser, number
   fields no longer show the tiny up/down arrows, and the quick-add row of the shopping list
   focuses in violet like every other field.
+- **Settings read like a list, not like a form.** A choice in a settings row was a bordered
+  box at the end of the line, anywhere between a third and the full width of the row. It is now
+  the plain value with a small arrow, the way phone settings show it - "Language ... German".
+- **Recording a measurement is quicker to read and fill in.** Blood pressure was three wide
+  boxes named "Systolic", "Diastolic" and "Pulse", none with a unit. It is now written the way
+  it is said: "120 / 80 mmHg", with the pulse on the line below, each with an example value and
+  its unit. Type, time and visibility stand as rows with the label on the left and the value on
+  the right; the note keeps its own field. Screen readers still announce every part by name.
 - **Rows show fewer buttons.** Lists no longer carry a pencil and a bin on every line. Editing,
   deleting and anything further sit behind one "more" button per row that is always visible and
   names what it does in words. This applies to shopping items, birthdays, tasks, loan payments

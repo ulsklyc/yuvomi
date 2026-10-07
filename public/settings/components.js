@@ -2,6 +2,7 @@ import { t } from '/i18n.js';
 import { moduleIconHTML } from '/nav-icons.js';
 import { esc } from '/utils/html.js';
 import { getReadableTextColor } from '/utils/color.js';
+import { formRowHtml } from '/utils/form-row.js';
 
 let settingRowIdCounter = 0;
 
@@ -215,18 +216,15 @@ export function settingRowHtml({
   className = '',
   attrs = {},
 }) {
-  const rowClass = ['settings-setting-row', stacked ? 'settings-setting-row--stacked' : '', className]
-    .filter(Boolean).join(' ');
-  const labelHtml = labelFor
-    ? `<label class="settings-setting-row__label"${attrsHtml({ id: labelId, for: labelFor })}>${esc(String(label ?? ''))}</label>`
-    : `<span class="settings-setting-row__label"${attrsHtml({ id: labelId })}>${esc(String(label ?? ''))}</span>`;
-  const descriptionHtml = description
-    ? `<p class="settings-setting-row__description"${attrsHtml({ id: descriptionId })}>${esc(String(description))}</p>`
-    : '';
-  return `<div class="${rowClass}"${attrsHtml(attrs)}>`
-    + `<div class="settings-setting-row__copy">${labelHtml}${descriptionHtml}${extra}</div>`
-    + `<div class="settings-setting-row__control">${control}</div>`
-    + '</div>';
+  // DIE EINSTELLUNGSZEILE IST EINE FORMULARZEILE (R18, 2026-10-07): derselbe
+  // Baustein wie in den Erfassungsdialogen (utils/form-row.js). Die Klassen
+  // `settings-setting-row*` bleiben vorn - unter ihnen fuehrt settings.css die
+  // Masse des Blatts -, `form-row*` kommt dazu und bringt, was in der Zeile
+  // steht: die randlose Auswahl, das Datum als Wert, das zusammengesetzte Feld.
+  return formRowHtml({
+    label, labelFor, labelId, description, descriptionId, control, extra, stacked, className, attrs,
+    variant: 'settings-setting-row',
+  });
 }
 
 /**
@@ -261,14 +259,15 @@ export function createSettingRow({ label, description, control }) {
     formControl.id = `${rowId}-control`;
   }
 
+  // Dieselben Klassenpaare wie `settingRowHtml()` (utils/form-row.js).
   const row = document.createElement('div');
-  row.className = 'settings-setting-row';
+  row.className = 'settings-setting-row form-row';
 
   const copy = document.createElement('div');
-  copy.className = 'settings-setting-row__copy';
+  copy.className = 'settings-setting-row__copy form-row__copy';
 
   const title = document.createElement(formControl ? 'label' : 'div');
-  title.className = 'settings-setting-row__label';
+  title.className = 'settings-setting-row__label form-row__label';
   title.textContent = String(label ?? '');
   if (formControl) title.htmlFor = formControl.id;
   copy.appendChild(title);
@@ -276,7 +275,7 @@ export function createSettingRow({ label, description, control }) {
   if (description) {
     const detail = document.createElement('p');
     detail.id = `${rowId}-description`;
-    detail.className = 'settings-setting-row__description';
+    detail.className = 'settings-setting-row__description form-row__description';
     detail.textContent = String(description);
     copy.appendChild(detail);
 
@@ -290,7 +289,7 @@ export function createSettingRow({ label, description, control }) {
   }
 
   const controlContainer = document.createElement('div');
-  controlContainer.className = 'settings-setting-row__control';
+  controlContainer.className = 'settings-setting-row__control form-row__control';
   appendContent(controlContainer, control);
 
   row.append(copy, controlContainer);

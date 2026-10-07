@@ -2103,6 +2103,34 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
 - **Focus:** Akzentkante plus 3px Glow in `--color-accent-light`; interaktive Nicht-Felder
   tragen den app-weiten 2px-Ring. **Der Fokus eines Feldes ist immer die eine Stimme
   (Violett), nie ein Modulton** - die Schnellzeile des Einkaufs war bis 2026-10-07 orange.
+- **Formularzeile (Entscheidung Ulas, 2026-10-07):** Ziel fuer Erfassungsdialoge und
+  Einstellungen sind GRUPPIERTE ZEILEN nach HIG - als EIN Baustein, gestuft eingefuehrt
+  (`utils/form-row.js`: `formRowsHtml`, `formRowHtml`, `formCompositeHtml`; Regeln in
+  layout.css "Formularzeile"). Traeger `.form-rows` mit Haarlinien (im Dialog ohne eigene
+  Flaeche: Zeile-in-Karte), Zeile `.form-row` mit **Etikett links, Wert rechts**; ein Hinweis nur
+  zu dieser Zeile laeuft darunter ueber die volle Breite. In der Zeile gilt:
+  - **Auswahl** = randloser `select.form-input`: Wert in Sekundaerfarbe, rechtsbuendig, dahinter
+    das Zeichen (`--field-chevron`). WCAG 1.4.11 ist ueber das ZEICHEN erfuellt, nicht ueber eine
+    Kante (hell 6,19:1 auf Weiss, dunkel 6,66:1 auf `-surface`); der Fokus zeichnet Akzentkante
+    und Glow des Feldkanons. Am Finger 48px, an der Maus 40px.
+  - **Datum/Uhrzeit** = `yuvomi-datepicker` als Wert (ohne Kasten, rechtsbuendig).
+  - **Zusammengesetztes Feld** = Teilfelder mit Trenner und Einheit als Suffix
+    ("120 / 80 mmHg"): `role="group"` mit dem Zeilenetikett als Namen, JEDES Teilfeld mit eigenem
+    zugaenglichen Namen, die Einheit als Beschreibung. Teilfelder bleiben Felder mit Kante.
+  - **Schalter** = `toggleRowHtml({ control: 'switch' })` als Zeile des Traegers.
+  - **Lange Etiketten** (24 Sprachen): das Etikett bricht an der Silbe, der Wert bleibt
+    einzeilig (hoechstens 62 % des Traegers); unter 20rem Traegerbreite stapelt jede Zeile, eine
+    Zeile mit breitem Wert (`wide`, Datum mit Uhrzeit) schon unter 26rem (Container Query; ohne
+    sie bleibt die Zeile zweispaltig).
+  - **Freitext bleibt ein Feld OHNE Zeilenraster:** Titel, Notiz, Beschreibung (`.form-input`,
+    Etikett darueber; ein Titel darf die grosse erste Zeile sein).
+  - **Jedes Bedienelement behaelt ein programmatisch verknuepftes Etikett** (`labelFor` bzw.
+    `labelId` + `aria-labelledby`).
+  Die Einstellungszeile IST dieser Baustein (`settingRowHtml()` delegiert an `formRowHtml()`,
+  Klassen `settings-setting-row form-row`); ihre Masse im Kartentraeger bleiben in settings.css.
+  **Umgestellt:** alle Einstellungszeilen mit Auswahl, der Dialog "Messwert erfassen"
+  (Gesundheit). **Noch Felder mit Etikett darueber** (naechste Stufe): "Aufgabe" und "Termin".
+  Alle uebrigen Dialoge behalten Felder mit Kontur nach der einen Feldhaut.
 - **Klassenname:** `.input` und `.form-input` sind ein Alias auf dieselbe Regel (layout.css).
   Kanonisch fuer neuen Code ist `.form-input` - der Name, den `.form-group`/`.form-field`/
   `.form-label` schon fuehren. Bestand bleibt unangetastet, Umbenennen aller Fundstellen ist
