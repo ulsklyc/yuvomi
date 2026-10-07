@@ -1563,6 +1563,7 @@ function openMoneyRequestModal(kind, memberId) {
         <p class="rw-hint">${esc(t('rewards.money.requestHint'))}</p>
         <div id="rw-money-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary" id="rw-money-submit">${esc(t('rewards.requestAction'))}</button>
         </div>
       </form>`,
@@ -1628,6 +1629,7 @@ function openMoneyBookModal(memberId) {
         </div>
         <div id="rw-money-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary" id="rw-money-submit">${esc(t('common.save'))}</button>
         </div>
       </form>`,
@@ -1718,7 +1720,8 @@ function openMoneyPlanModal(memberId) {
         </label>
         <div id="rw-money-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${plan ? `<button type="button" class="btn btn--ghost" id="rw-plan-remove">${esc(t('rewards.money.removePlan'))}</button>` : ''}
+          ${plan ? `<button type="button" class="btn btn--danger-outline" id="rw-plan-remove">${esc(t('rewards.money.removePlan'))}</button>` : ''}
+          <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary" id="rw-money-submit">${esc(t('common.save'))}</button>
         </div>
       </form>`,
@@ -1790,6 +1793,7 @@ function openMoneyAccountModal() {
         </div>
         <div id="rw-money-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary" id="rw-money-submit">${esc(t('rewards.money.openAccount'))}</button>
         </div>
       </form>`,
