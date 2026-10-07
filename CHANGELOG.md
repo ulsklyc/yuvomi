@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.74.0] - 2026-10-07
-
 ### Added
 
 - **Rewards can hold pocket money: a money balance per child, credited on a schedule, paid out on
@@ -51,6 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pendingCount` and the tile's `pending` still count reward requests, with money requests next to
   them in `moneyPendingCount` and `moneyPending`, and `GET /api/v1/rewards/ledger` stays the points
   history (migration 236).
+
+## [2.74.0] - 2026-10-07
+
+### Added
 
 - **The Singapore dollar is a currency a household can pick, and Singapore is a region** (#1697,
   from D#982). SGD was missing from the list the household setting, subscriptions and shared
