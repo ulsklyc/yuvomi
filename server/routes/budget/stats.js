@@ -27,7 +27,7 @@ export function computeStats(database, { range, anchor }, filter = { clause: '',
       COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS income,
       COALESCE(SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END), 0) AS expenses,
       COALESCE(SUM(amount), 0) AS balance
-    FROM budget_entries WHERE date BETWEEN ? AND ?${f.clause}${bookedOnly()}
+    FROM budget_entries WHERE date BETWEEN ? AND ?${f.clause}${bookedOnly()} AND transfer_entry_id IS NULL
   `).get(r.from, r.to, ...f.params);
 
   const prevRow = database.prepare(`
@@ -35,7 +35,7 @@ export function computeStats(database, { range, anchor }, filter = { clause: '',
       COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS income,
       COALESCE(SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END), 0) AS expenses,
       COALESCE(SUM(amount), 0) AS balance
-    FROM budget_entries WHERE date BETWEEN ? AND ?${f.clause}${bookedOnly()}
+    FROM budget_entries WHERE date BETWEEN ? AND ?${f.clause}${bookedOnly()} AND transfer_entry_id IS NULL
   `).get(r.prevFrom, r.prevTo, ...f.params);
 
   // Fremde 'shared_amount'-Eintraege zaehlen in totals und series voll mit,
@@ -46,7 +46,7 @@ export function computeStats(database, { range, anchor }, filter = { clause: '',
            COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS income,
            COALESCE(SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END), 0) AS expenses,
            COALESCE(SUM(amount), 0) AS total
-    FROM budget_entries WHERE date BETWEEN ? AND ?${f.clause}${bookedOnly()}
+    FROM budget_entries WHERE date BETWEEN ? AND ?${f.clause}${bookedOnly()} AND transfer_entry_id IS NULL
     -- GROUP BY 1, nicht GROUP BY category: bei gleichnamigem Output-Alias
     -- gewinnt in SQLite die ECHTE Spalte, und der Sammel-Bucket bliebe leer.
     GROUP BY 1 ORDER BY ABS(SUM(amount)) DESC
@@ -59,7 +59,7 @@ export function computeStats(database, { range, anchor }, filter = { clause: '',
            COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS income,
            COALESCE(SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END), 0) AS expenses,
            COALESCE(SUM(amount), 0) AS balance
-    FROM budget_entries WHERE date BETWEEN ? AND ?${f.clause}${bookedOnly()}
+    FROM budget_entries WHERE date BETWEEN ? AND ?${f.clause}${bookedOnly()} AND transfer_entry_id IS NULL
     GROUP BY period
   `).all(r.from, r.to, ...f.params);
 

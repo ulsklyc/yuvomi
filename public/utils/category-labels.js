@@ -1,4 +1,5 @@
 const BUDGET_CATEGORY_LABEL_KEYS = {
+  saving: 'budget.catSaving',
   income: 'budget.categoryIncome',
   housing: 'budget.categoryHousing',
   food: 'budget.categoryFood',

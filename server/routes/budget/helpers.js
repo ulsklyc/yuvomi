@@ -6,6 +6,7 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { linkTransfer } from '../../services/budget-transfers.js';
 import path from 'path';
 import * as db from '../../db.js';
 import {
@@ -66,12 +67,12 @@ export function budgetFilter(req, alias, { scoped = true } = {}) {
  *
  * @returns {{ expr: string, params: number[] }}
  */
-export function budgetCategoryExpr(req, alias) {
+export function budgetCategoryExpr(req, alias, category = `${alias}.category`) {
   const mode = getBudgetMode();
-  if (mode !== 'personal') return { expr: `${alias}.category`, params: [] };
+  if (mode !== 'personal') return { expr: category, params: [] };
   return {
     expr: `CASE WHEN ${budgetDetailsHiddenWhere(alias, '?', { mode })}`
-        + ` THEN '${BUDGET_MASKED_CATEGORY}' ELSE ${alias}.category END`,
+        + ` THEN '${BUDGET_MASKED_CATEGORY}' ELSE ${category} END`,
     params: [viewerId(req)],
   };
 }
@@ -96,6 +97,7 @@ export function mayEdit(req, row) {
 
 const LOCALE_CACHE = new Map();
 const CATEGORY_LABEL_KEYS = {
+  saving: 'catSaving',
   housing: 'catHousing',
   food: 'catFood',
   transport: 'catTransport',
@@ -310,7 +312,7 @@ export function occurrenceDatesInMonth(startDate, interval, count, month) {
  * #1035 nur "von Hand erfasst" heisst.
  */
 const SERIES_SELECT = `
-    SELECT a.id, COALESCE(s.start_date, a.date) AS start_date, a.created_by, a.owner_id,
+    SELECT a.id, a.transfer_entry_id, COALESCE(s.start_date, a.date) AS start_date, a.created_by, a.owner_id,
            a.recurrence_interval, a.recurrence_interval_count,
            a.recurrence_virtual, a.recurrence_confirm,
            s.title, s.amount, s.category, s.subcategory, s.account_id, s.visibility,
@@ -347,7 +349,25 @@ function occurrenceWriter(database) {
     SELECT ?, user_id FROM budget_series_responsibles WHERE anchor_id = ?
   `);
 
-  return (orig, date) => {
+  const write = (orig, date) => {
+    if (orig.transfer_entry_id) {
+      const partner = database.prepare(`${SERIES_SELECT} AND a.id = ?`).get(orig.transfer_entry_id);
+      if (!partner) throw new Error('Transfer series partner missing');
+      return database.transaction(() => {
+        if ((orig.grid_from && date < orig.grid_from) || (partner.grid_from && date < partner.grid_from)) return false;
+        if (skipStmt.get(orig.id, date) || skipStmt.get(partner.id, date)) return false;
+        const first = existsStmt.get(orig.id, date);
+        const second = existsStmt.get(partner.id, date);
+        if (first && second) return false;
+        if (first || second) throw new Error('Unpaired transfer occurrence');
+        write({ ...orig, transfer_entry_id: null }, date);
+        write({ ...partner, transfer_entry_id: null }, date);
+        const firstId = existsStmt.get(orig.id, date).id;
+        const secondId = existsStmt.get(partner.id, date).id;
+        linkTransfer(database, firstId, secondId);
+        return true;
+      })();
+    }
     // VOR DER LETZTEN RASTERAENDERUNG ENTSTEHT NICHTS (#1545, Review-Befund in
     // #1585). Hat eine Serien-Aenderung den Starttag oder den Rhythmus
     // verschoben, stehen die Buchungen davor auf dem ALTEN Raster - ein
@@ -398,6 +418,7 @@ function occurrenceWriter(database) {
     copyResponsiblesStmt.run(created.lastInsertRowid, orig.id);
     return true;
   };
+  return write;
 }
 
 /**

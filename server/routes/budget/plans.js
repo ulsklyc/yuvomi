@@ -89,7 +89,7 @@ export function computePlanProgress(database, month, context) {
   // also VOR den WHERE-Binds.
   const spentRows = database.prepare(`
     SELECT ${c.expr} AS category, SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END) AS spent
-    FROM budget_entries WHERE date BETWEEN ? AND ?${f.clause}${bookedOnly()} GROUP BY 1
+    FROM budget_entries WHERE date BETWEEN ? AND ?${f.clause}${bookedOnly()} AND transfer_entry_id IS NULL GROUP BY 1
   `).all(...c.params, from, to, ...f.params);
   const spentMap = new Map(spentRows.map((r) => [r.category, cents(r.spent || 0)]));
 
@@ -115,7 +115,7 @@ export function computePlanProgress(database, month, context) {
   const totals = database.prepare(`
     SELECT SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income,
            SUM(amount) AS balance
-    FROM budget_entries WHERE date BETWEEN ? AND ?${f.clause}${bookedOnly()}
+    FROM budget_entries WHERE date BETWEEN ? AND ?${f.clause}${bookedOnly()} AND transfer_entry_id IS NULL
   `).get(from, to, ...f.params);
   const income  = cents(totals.income || 0);
   const balance = cents(totals.balance || 0); // Netto-Ersparnis des Monats

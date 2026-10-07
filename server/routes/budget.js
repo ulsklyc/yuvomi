@@ -17,6 +17,7 @@
 import express from 'express';
 
 import entriesRouter from './budget/entries.js';
+import transfersRouter from './budget/transfers.js';
 import categoriesRouter from './budget/categories.js';
 import loansRouter from './budget/loans.js';
 import accountsRouter from './budget/accounts.js';
@@ -34,6 +35,7 @@ router.use(loansRouter);
 router.use(accountsRouter);
 router.use(plansRouter);
 router.use(statsRouter);
+router.use(transfersRouter);
 router.use(entriesRouter);
 
 export default router;

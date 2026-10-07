@@ -1498,6 +1498,25 @@ const MIGRATIONS_SQL = {
     );
     CREATE INDEX idx_reward_allowances_next_run ON reward_allowances(next_run_date, paused_at);
   `,
+  237: `
+    ALTER TABLE budget_entries ADD COLUMN transfer_entry_id INTEGER NULL REFERENCES budget_entries(id) ON DELETE CASCADE;
+    CREATE INDEX idx_budget_transfer ON budget_entries(transfer_entry_id);
+    INSERT OR IGNORE INTO budget_categories (key, name, type, sort_order) VALUES ('saving', 'Saving', 'expense', 100);
+  `,
+  238: `
+      INSERT OR IGNORE INTO budget_categories (key, name, type, sort_order)
+        VALUES ('financial_other', 'Financial Services and Other', 'expense', 7);
+      INSERT OR IGNORE INTO budget_subcategories (key, category_key, name, sort_order)
+        VALUES ('saving', 'financial_other', 'Savings', 5);
+      UPDATE budget_subcategories SET category_key = 'financial_other' WHERE category_key = 'saving';
+      UPDATE budget_entries SET category = 'financial_other', subcategory = CASE WHEN subcategory = '' THEN 'saving' ELSE subcategory END WHERE category = 'saving';
+      UPDATE budget_series SET category = 'financial_other', subcategory = CASE WHEN subcategory = '' THEN 'saving' ELSE subcategory END WHERE category = 'saving';
+      INSERT INTO budget_plans (category, amount, created_by, updated_at)
+        SELECT 'financial_other', amount, created_by, updated_at FROM budget_plans WHERE category = 'saving'
+        ON CONFLICT(category) DO UPDATE SET amount = budget_plans.amount + excluded.amount;
+      DELETE FROM budget_plans WHERE category = 'saving';
+      DELETE FROM budget_categories WHERE key = 'saving';
+  `,
 };
 
 export { MIGRATIONS_SQL };

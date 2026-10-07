@@ -126,6 +126,60 @@ test('GET /summary: aggregiert income/expenses/balance + byCategory', async () =
   assert.equal(food.total, 70);
 });
 
+test('GET /summary: Savings has its own chart bar under the stored Financials category', async () => {
+  const id = insertEntry({ amount: -125, category: 'financial_other', subcategory: 'saving', date: '2042-01-10' });
+  insertEntry({ amount: -10, category: 'financial_other', subcategory: '', date: '2042-01-10' });
+  insertEntry({ amount: -50, category: 'financial_other', subcategory: 'saving', date: '2042-01-10', is_pending: 1 });
+  const r = await call('GET', '/summary?month=2042-01');
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.data.byCategory, [
+    { category: 'saving', income: 0, expenses: -125, total: -125 },
+    { category: 'financial_other', income: 0, expenses: -10, total: -10 },
+  ]);
+  assert.equal(r.body.data.expenses, -135);
+  assert.equal(db.prepare('SELECT category FROM budget_entries WHERE id = ?').get(id).category, 'financial_other');
+});
+
+test('GET /summary: Savings chart grouping preserves hidden category details', async () => {
+  setMode('personal');
+  insertEntry({ amount: -125, category: 'financial_other', subcategory: 'saving', date: '2042-02-10', created_by: B, owner_id: B, visibility: 'shared_amount' });
+  const r = await call('GET', '/summary?month=2042-02&scope=household');
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.data.byCategory, [
+    { category: '__private__', income: 0, expenses: -125, total: -125 },
+  ]);
+});
+
+test('salary and an account transfer keep income, spending, and account balances distinct', async () => {
+  const from = (await call('POST', '/accounts', { body: { name: 'Transfer source', type: 'checking', starting_balance: 0 } })).body.data;
+  const to = (await call('POST', '/accounts', { body: { name: 'Transfer target', type: 'savings', starting_balance: 0 } })).body.data;
+  insertEntry({ title: 'Salary', amount: 1000, category: 'Erwerbseinkommen', date: '2042-03-01', account_id: from.id });
+  const transfer = await call('POST', '/transfers', { body: {
+    title: 'Save', amount: 10, date: '2042-03-01', from_account_id: from.id, to_account_id: to.id,
+  } });
+  assert.equal(transfer.status, 201);
+  const r = await call('GET', '/summary?month=2042-03');
+  assert.equal(r.status, 200);
+  const summary = r.body.data;
+  assert.equal(summary.income, 1000);
+  assert.equal(summary.expenses, 0);
+  assert.equal(summary.balance, 1000);
+  assert.equal(summary.moved_to_savings, 10);
+  assert.deepEqual(summary.byCategory.find(c => c.category === 'saving'),
+    { category: 'saving', income: 0, expenses: 0, total: 0, transfers: 10 });
+  assert.equal(summary.byCategory.some(c => c.category === 'Geschenke & Transfers'), false);
+  const stats = (await call('GET', '/stats?range=month&anchor=2042-03-01')).body.data;
+  assert.deepEqual(stats.totals, { income: 1000, expenses: 0, balance: 1000 });
+  assert.equal(stats.series.reduce((sum, row) => sum + row.income, 0), 1000);
+  assert.equal(stats.series.reduce((sum, row) => sum + row.expenses, 0), 0);
+  assert.equal(stats.byCategory.some(c => c.category === 'financial_other'), false);
+  const plans = (await call('GET', '/plans?month=2042-03')).body.data;
+  assert.equal(plans.totalActual, 0);
+  const accounts = (await call('GET', '/accounts')).body.data.accounts;
+  assert.equal(accounts.find(a => a.id === from.id).projected_balance, 990);
+  assert.equal(accounts.find(a => a.id === to.id).projected_balance, 10);
+});
+
 // ── GET /export ─────────────────────────────────────────────────────────────────
 test('GET /export: CSV mit BOM, Header und Zeilen (month-Range)', async () => {
   insertEntry({ title: 'Kaffee', amount: -4.5, category: 'food', date: '2031-02-10' });

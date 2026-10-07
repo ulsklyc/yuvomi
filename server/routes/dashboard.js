@@ -755,7 +755,7 @@ router.get('/', (req, res) => {
       FROM budget_entries
       -- Erwartete, noch unbestaetigte Buchungen zaehlen nicht mit (#637), wie in
       -- Uebersicht, Statistik, Plan und Kontostand.
-      WHERE date BETWEEN ? AND ?${ownerClause} AND is_pending = 0
+      WHERE date BETWEEN ? AND ?${ownerClause} AND is_pending = 0 AND transfer_entry_id IS NULL
     `).get(from, to, ...ownerParams);
 
     // Die drei groessten Ausgabenkategorien, nicht nur die groesste: die hohe
@@ -766,7 +766,7 @@ router.get('/', (req, res) => {
     const topExpenses = d.prepare(`
       SELECT category, SUM(amount) AS amount
       FROM budget_entries
-      WHERE amount < 0 AND date BETWEEN ? AND ?${ownerClause} AND is_pending = 0
+      WHERE amount < 0 AND date BETWEEN ? AND ?${ownerClause} AND is_pending = 0 AND transfer_entry_id IS NULL
       GROUP BY category
       ORDER BY ABS(SUM(amount)) DESC
       LIMIT 3

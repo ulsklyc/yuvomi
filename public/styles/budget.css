@@ -1299,6 +1299,7 @@
  * Einkaufen liessen den echten Alarm (Plan ueberschritten) untergehen. Die
  * Richtung benennt der Blocktitel, nicht der Farbton. */
 .budget-bar-row__fill--income   { background-color: var(--color-success); }
+.budget-bar-row__fill--transfers { background-color: var(--module-accent); }
 .budget-bar-row__fill--expenses { background-color: var(--bar-fill, var(--module-accent)); }
 
 /* Der Anteil einer Ausgabe steht in der Statistik hinter ihrem Betrag
