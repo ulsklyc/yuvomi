@@ -3145,18 +3145,65 @@
 }
 
 
+/* DER SCHICHT-CHIP IST GETOENT, NICHT VOLLFARBIG (Critique R17).
+ *
+ * Er erbte die Balkenform des Feiertags samt dessen Vollton-Flaeche, aber
+ * nicht dessen Tinte: der Feiertag bekommt `--holi-ink` aus
+ * getReadableTextColor(), der Schicht-Chip nicht, und fiel damit auf Weiss
+ * zurueck - gemessen 3,26:1 fuer 12px-Schrift auf der Fruehschicht (#0891B2),
+ * 2,9:1 auf "Ganztags" (#D97706).
+ *
+ * Die Antwort ist die des Schichtplans selbst (schedule.css,
+ * `.schedule-overview__block`, Reiter "Vergleich"), damit dieselbe Schicht in
+ * beiden Modulen dieselbe Sprache spricht: die Flaeche ist die 16-%-Toenung
+ * (`--tint-surface`, Objekt-Sprosse), den Vollton traegt ein Punkt vor dem
+ * Namen, und die Schrift ist NEUTRAL (DESIGN.md, "Rangmarke -> Vollton-Punkt,
+ * Schrift neutral"). `--tint-ink` waere hier falsch: die Farbe einer
+ * Schichtart ist frei gewaehlt, und die 70-%-Tinte ist nur fuer die neun
+ * Familientoene geeicht (Begruendung an `.day-event` weiter oben).
+ *
+ * Gilt in Monat, Ganztagszeile (Woche/Tag) und Agenda. Der Guard rechnet den
+ * Kontrast fuer jede Farbe der Startpalette in beiden Themes nach
+ * (test-frontend-audit.js, "Schicht-Chips im Kalender").
+ *
+ * Die Punktfassung des mobilen Monats (`.month-view:not(.month-view--titles)
+ * .month-day__holiday`) schlaegt diese Regel ueber ihre Spezifitaet und bleibt
+ * ein Vollton-Punkt mit Ring: dort IST der Chip der Punkt. */
+.month-day__holiday.schedule-entry,
+.allday-holiday.schedule-entry,
+.agenda-holiday.schedule-entry {
+  background: color-mix(in srgb, var(--holi-color) var(--tint-surface), var(--color-surface-work));
+  color: var(--color-text-primary);
+}
+
+.month-day__holiday.schedule-entry > span:first-child::before,
+.allday-holiday.schedule-entry > span:first-child::before,
+.agenda-holiday.schedule-entry > span:first-child::before {
+  content: '';
+  display: inline-block;
+  inline-size: var(--space-1h);
+  block-size: var(--space-1h);
+  margin-inline-end: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--holi-color);
+  vertical-align: middle;
+}
+
+/* Zeit und Zusatz-Marke treten ueber die Sekundaertinte zurueck, nicht ueber
+ * `opacity`: auf der getoenten Flaeche liesse eine 82-%-Deckung den Kontrast
+ * mit der Schichtfarbe schwanken, die Sekundaertinte ist gemessen. */
 .allday-holiday .schedule-entry__start {
   flex: 0 0 auto;
   font: inherit;
   font-variant-numeric: tabular-nums;
-  opacity: .82;
+  color: var(--color-text-secondary);
 }
 
 .schedule-entry__extra-badge {
   width: 12px;
   height: 12px;
   flex: 0 0 auto;
-  opacity: .82;
+  color: var(--color-text-secondary);
 }
 
 /* S-17: Woche/Tag machen den Chip zu einem Detail-Ausloeser (role="button",

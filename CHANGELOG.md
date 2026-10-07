@@ -46,6 +46,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   finger on that one tab. The tabs now sit in the same place on all four, and the month stepper
   stands below them, above the figures it selects - on every screen size.
 
+- **Shifts in the calendar are readable: tinted chip, colour dot, dark text.** A shift from the
+  shift plan stood in the calendar as a block of its full colour with white 12 px text - 3.26:1
+  on the early shift's teal, less on amber. It now looks the way the same shift does in the shift
+  plan's comparison view: a light tint of its colour, the full colour as a dot before the name,
+  the text in the normal ink. Month, the all-day row of week and day, and agenda, in light and
+  dark; every colour of the starter palette is above 10:1 for the name and 5:1 for the time.
+
 ## [2.74.0] - 2026-10-07
 
 ### Added

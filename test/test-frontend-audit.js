@@ -11223,6 +11223,103 @@ test('.btn--sm haelt die Zielgroesse der Geraetewelt, auch am Zeiger', () => {
   assert.ok(touch && /min-height:\s*var\(--target-base\)/.test(touch.body), 'am Finger fehlt --target-base');
 });
 
+// Schicht-Chips im Kalender (Critique R17). Der Chip erbte die Vollton-Flaeche
+// des Feiertags, aber nicht dessen berechnete Tinte (`--holi-ink`), und stand
+// damit in Weiss auf der Schichtfarbe: gemessen 3,26:1 fuer 12px-Schrift auf
+// der Fruehschicht (#0891B2). Jetzt traegt er das Rezept des Schichtplans
+// (schedule.css, `.schedule-overview__block`): 16-%-Toenung, Vollton-Punkt,
+// neutrale Schrift - in Monat, Ganztagszeile und Agenda.
+//
+// GERECHNET WIRD AUS DEN QUELLEN, nicht aus Literalen hier: die Farben aus der
+// Startpalette in schedule.js, Flaeche und Tinte aus tokens.css je Theme, das
+// Rezept aus der Regel in calendar.css. Aendert sich eine der drei Seiten,
+// rechnet der Guard mit dem neuen Wert.
+test('Schicht-Chips im Kalender: getoent wie im Schichtplan, Schrift >= 4,5:1 fuer die Startpalette', async () => {
+  const { contrastRatio } = await import('../public/utils/contrast.js');
+  const calendarCss = read('../public/styles/calendar.css');
+  const scheduleCss = read('../public/styles/schedule.css');
+  const tokensCss = read('../public/styles/tokens.css');
+  const scheduleJs = read('../public/pages/schedule.js');
+  const calendarJs = read('../public/pages/calendar.js');
+
+  // --- Die Startpalette: jede Farbe der Schicht-Vorlagen ---------------------
+  const presets = scheduleJs.slice(scheduleJs.indexOf('const SHARED_PRESETS'), scheduleJs.indexOf('});', scheduleJs.indexOf('const PRESET_TEMPLATES')));
+  const palette = [...new Set([...presets.matchAll(/color:\s*'(#[0-9A-Fa-f]{6})'/g)].map((m) => m[1].toUpperCase()))];
+  assert.ok(palette.length >= 8, `Startpalette aus schedule.js gelesen (${palette.length} Farben)`);
+  assert.ok(palette.includes('#0891B2'), 'die Befund-Farbe (Fruehschicht) ist dabei');
+
+  // --- Das Rezept: eine Regel fuer alle drei Ansichten -----------------------
+  const SELEKTOREN = ['.month-day__holiday.schedule-entry', '.allday-holiday.schedule-entry', '.agenda-holiday.schedule-entry'];
+  const regeln = [...eachRule(calendarCss)];
+  const letzte = (selektor, eigenschaft) => {
+    let wert = null;
+    for (const { selector, body, at } of regeln) {
+      if (at.length) continue;
+      if (!selector.split(',').map((t) => t.trim()).includes(selektor)) continue;
+      const m = new RegExp(`(?:^|;)\\s*${eigenschaft}\\s*:\\s*([^;]+)`).exec(body);
+      if (m) wert = m[1].trim();
+    }
+    return wert;
+  };
+  const REZEPT = 'color-mix(in srgb, var(--holi-color) var(--tint-surface), var(--color-surface-work))';
+  for (const selektor of SELEKTOREN) {
+    assert.equal(letzte(selektor, 'background'), REZEPT, `${selektor}: Flaeche ist die 16-%-Toenung`);
+    assert.equal(letzte(selektor, 'color'), 'var(--color-text-primary)', `${selektor}: Schrift neutral, keine Mischtinte aus einer Nutzerfarbe`);
+    assert.match(letzte(`${selektor} > span:first-child::before`, 'background') ?? '', /^var\(--holi-color\)$/,
+      `${selektor}: den Vollton traegt der Punkt vor dem Namen`);
+  }
+  // Dasselbe Rezept wie der Block im Schichtplan-Reiter "Vergleich".
+  const block = [...eachRule(scheduleCss)].find((r) => r.selector.trim() === '.schedule-overview__block');
+  assert.match(block.body, /background:\s*color-mix\(in srgb, var\(--schedule-color\) var\(--tint-surface\), var\(--color-surface-work\)\)/);
+  assert.match(block.body, /(?:^|;)\s*color:\s*var\(--color-text-primary\)/);
+  // Der Chip bekommt keine eigene Tinte aus dem Markup, die die Regel ueberstimmte.
+  for (const m of calendarJs.matchAll(/class="[^"]*schedule-entry"[^>]*style="([^"]*)"/g)) {
+    assert.doesNotMatch(m[1], /--holi-ink|(?:^|;)\s*color\s*:/, 'der Schicht-Chip setzt keine Inline-Tinte');
+  }
+  // Zeit und Zusatz-Marke: Sekundaertinte statt Deckkraft.
+  for (const selektor of ['.allday-holiday .schedule-entry__start', '.schedule-entry__extra-badge']) {
+    assert.equal(letzte(selektor, 'color'), 'var(--color-text-secondary)', `${selektor}: Sekundaertinte`);
+    assert.equal(letzte(selektor, 'opacity'), null, `${selektor}: keine Deckkraft - sie liesse den Kontrast mit der Schichtfarbe schwanken`);
+  }
+
+  // --- Die Werte je Theme, aus tokens.css ------------------------------------
+  const roh = (rumpf, name) => new RegExp(`(?:^|[;{\\s])${name}:\\s*(#[0-9A-Fa-f]{6})\\b`).exec(rumpf)?.[1] ?? null;
+  const tint = Number(/--tint-surface:\s*(\d+)%/.exec(tokensCss)?.[1]) / 100;
+  assert.equal(tint, 0.16, '--tint-surface gelesen');
+  const themes = {
+    light: tokensCss,
+    'dark (System)': darkSchemeBlock(tokensCss)?.[1],
+    'dark (Schalter)': darkAttrBlock(tokensCss)?.[1],
+  };
+  const kanaele = (hex) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));
+  const hex = (rgb) => `#${rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+  const mische = (farbe, flaeche, anteil) => hex(kanaele(farbe).map((v, i) => v * anteil + kanaele(flaeche)[i] * (1 - anteil)));
+
+  let gemessen = 0;
+  for (const [theme, rumpf] of Object.entries(themes)) {
+    assert.ok(rumpf, `${theme}: Token-Block gefunden`);
+    const flaeche = roh(rumpf, '--_color-surface-work');
+    const primaer = roh(rumpf, '--_neutral-900');
+    const sekundaer = roh(rumpf, '--_neutral-600');
+    assert.ok(flaeche && primaer && sekundaer, `${theme}: Flaeche und Tinten gelesen (${flaeche}, ${primaer}, ${sekundaer})`);
+    for (const farbe of palette) {
+      const chip = mische(farbe, flaeche, tint);
+      const schrift = contrastRatio(primaer, chip);
+      const zeit = contrastRatio(sekundaer, chip);
+      assert.ok(schrift >= 4.5, `${theme} ${farbe}: Name ${schrift.toFixed(2)}:1 auf ${chip}`);
+      assert.ok(zeit >= 4.5, `${theme} ${farbe}: Zeit ${zeit.toFixed(2)}:1 auf ${chip}`);
+      gemessen += 2;
+    }
+  }
+  assert.equal(gemessen, palette.length * 3 * 2, 'jede Farbe in jedem Theme fuer Name und Zeit gemessen');
+
+  // --- Gegenprobe der Rechnung: der alte Zustand faellt ----------------------
+  // Weiss auf dem 90-%-Vollton ueber der hellen Arbeitsflaeche: genau der
+  // Befund. Lieferte die Rechnung hier nichts Rotes, maesse sie nichts.
+  const alt = mische('#0891B2', roh(tokensCss, '--_color-surface-work'), 0.9);
+  assert.ok(contrastRatio('#FFFFFF', alt) < 4.5, `Vollton mit weisser Schrift riss die Schwelle (${contrastRatio('#FFFFFF', alt).toFixed(2)}:1)`);
+});
+
 // Avatare tragen die Farbe, die sich das Mitglied selbst aussucht; die
 // Initialen standen darauf immer in Weiss. Gemessen 3,5:1 auf #ec4899 und
 // 2,8:1 auf #f97316 - noetig sind 4,5:1 (Critique 2026-07-27).
