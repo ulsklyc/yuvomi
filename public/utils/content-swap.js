@@ -18,7 +18,7 @@
  *   keinen Inline-Stil und kein rAF - laeuft die Blende nicht (verdeckter Tab,
  *   kein `animate`), steht der neue Inhalt trotzdem fertig da.
  * - Nur `opacity` und `transform`. Die Blende beginnt bei 0,4 statt 0: kein
- *   leerer Frame (dieselbe Zahl wie `period-swipe-in` in calendar.css).
+ *   leerer Frame (dieselbe Zahl wie `period-swipe-in` in layout.css).
  * - Richtung: `direction > 0` heisst "weiter" - der Inhalt kommt von der
  *   Seite, zu der man blaettert (in RTL gespiegelt), derselbe Richtungssinn
  *   wie das Wischen (utils/period-swipe.js).

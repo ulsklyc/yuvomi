@@ -55,35 +55,9 @@
   touch-action: pan-y pinch-zoom;
 }
 
-/* Der neue Zeitraum gleitet von der Seite herein, aus der ihn der Finger
- * geholt hat - kurz und ohne Ueberschwingen: er antwortet auf eine Geste,
- * er fuehrt keine vor. Die Seite ist LOGISCH (Leserichtung), in `ar`/`fa`
- * gespiegelt. Unter reduzierter Bewegung setzt period-swipe.js die Klasse gar
- * nicht erst; die Regel unten ist das Netz dafuer. */
-.period-swipe-in--next,
-.period-swipe-in--prev {
-  animation: period-swipe-in var(--duration-md) var(--ease-out);
-}
-
-.period-swipe-in--next { --period-swipe-from: var(--space-8); }
-.period-swipe-in--prev { --period-swipe-from: calc(-1 * var(--space-8)); }
-
-[dir="rtl"] .period-swipe-in--next { --period-swipe-from: calc(-1 * var(--space-8)); }
-[dir="rtl"] .period-swipe-in--prev { --period-swipe-from: var(--space-8); }
-
-@keyframes period-swipe-in {
-  from {
-    transform: translateX(var(--period-swipe-from));
-    opacity: 0.4;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .period-swipe-in--next,
-  .period-swipe-in--prev {
-    animation: none;
-  }
-}
+/* Das Hereingleiten des neuen Zeitraums (`.period-swipe-in--next/--prev`) steht
+ * in layout.css: der Wisch (utils/period-swipe.js) blaettert seit R17 auch den
+ * Monat im Budget, und dieses Stylesheet laedt nur mit dem Kalender. */
 
 /* Ansichtswechsel Monat/Woche/Tag/Agenda (Re-Critique 2026-09-28, A2 P3):
  * die neue Ansicht blendet ein statt hart zu schneiden - kurz, ohne Versatz,

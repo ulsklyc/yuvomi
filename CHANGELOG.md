@@ -54,6 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fades in at its new size, and back when you return to the top. In the budget it fades back
   in when the header opens again. The title that docks into the bar on scrolling pages fades
   in and out the same way. Nothing changes size over time - only the opacity moves.
+- **Budget: swipe sideways to change the month.** On the tabs that have a period - Budget, Plan
+  and Reports - a horizontal swipe pages one period forward or back, with the same distance
+  and feel as in the calendar. The arrows stay for mouse and keyboard. Scrolling up and down
+  is unaffected, and the chart in Reports keeps its own horizontal drag for picking a day.
 
 ### Fixed
 

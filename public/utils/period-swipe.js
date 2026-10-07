@@ -37,7 +37,7 @@ import { SWIPE_THRESHOLD, SWIPE_MAX_VERT } from '/utils/swipe-row.js';
 /** Abstand zur Bildschirmkante, in dem ein Kontakt der Systemgeste gehoert. */
 export const PERIOD_SWIPE_EDGE = 20;
 
-/** Dauer des Hereingleitens = --duration-md der Keyframe-Regel in calendar.css. */
+/** Dauer des Hereingleitens = --duration-md der Keyframe-Regel in layout.css. */
 const SLIDE_IN_MS = durationToken('--duration-md', 200);
 
 /**

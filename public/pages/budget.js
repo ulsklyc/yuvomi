@@ -16,6 +16,7 @@ import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFor
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
 import { swapContent } from '/utils/content-swap.js';
+import { wirePeriodSwipe } from '/utils/period-swipe.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -851,15 +852,32 @@ function wireNav() {
   // Der neue Zeitraum kommt von der Seite, zu der man blaettert (swapPeriod,
   // utils/period-stepper.js) - vorher ein harter Schnitt.
   const bodyEl = () => _container.querySelector('#budget-body');
-  const stepPeriod = async (dir) => {
+  // `swap: false` setzt der Wisch, der sein eigenes Hereingleiten mitbringt
+  // (utils/period-swipe.js) - kein zweiter Uebergang darueber.
+  const stepPeriod = async (dir, { swap = true } = {}) => {
     if (state.activeTab === 'reports') {
       state.reportAnchor = stepAnchor(state.reportAnchor, state.range, dir);
-      swapPeriod(bodyEl(), dir, renderBody);
+      if (swap) swapPeriod(bodyEl(), dir, renderBody);
+      else renderBody();
       return;
     }
     await loadMonth(addMonths(state.month, dir));
-    swapPeriod(bodyEl(), dir, () => { renderBody(); updateLabel(); });
+    if (swap) swapPeriod(bodyEl(), dir, () => { renderBody(); updateLabel(); });
+    else { renderBody(); updateLabel(); }
   };
+  // WISCHEN BLAETTERT DEN ZEITRAUM WIE IM KALENDER (R17, Bewegung): auf den
+  // Reitern mit Zeitachse (`TAB_CAPS.month`: Budget, Plan, Berichte) holt ein
+  // waagerechter Wisch den naechsten bzw. vorigen Zeitraum - derselbe Stepper
+  // wie die Pfeile, die der Weg fuer Tastatur und Maus bleiben. Senkrecht
+  // gewinnt das Scrollen (Richtungssperre in period-swipe.js); eine Leiste,
+  // die selbst waagerecht scrollt, und ein Eingabefeld behalten ihren Finger.
+  // `#budget-body` ueberlebt jeden renderBody(); dem Finger folgt sein erstes
+  // Kind, das Panel des Reiters.
+  wirePeriodSwipe(bodyEl(), {
+    enabled: () => Boolean(tabCaps().month) && !state.loadError,
+    ignore: PERIOD_SWIPE_IGNORE,
+    onStep: (step) => stepPeriod(step, { swap: false }),
+  });
   _container.querySelector('#budget-prev').addEventListener('click', () => stepPeriod(-1));
   _container.querySelector('#budget-next').addEventListener('click', () => stepPeriod(1));
   _container.querySelector('#budget-today').addEventListener('click', async () => {
@@ -1001,6 +1019,12 @@ function watchAsideFit(panel) {
 // --------------------------------------------------------
 // Body
 // --------------------------------------------------------
+
+/* Wo ein waagerechter Kontakt NICHT den Zeitraum blaettert: Leisten, die selbst
+ * waagerecht scrollen (`.u-scroll-fade`: Chip- und Filterreihen), die
+ * Diagrammflaeche der Berichte (`.budget-stats__points` - dort waehlt der
+ * waagerechte Zug den Tag, wie ein Regler) und Eingabefelder. */
+const PERIOD_SWIPE_IGNORE = '.u-scroll-fade, .budget-stats__points, input, textarea, select, [contenteditable]';
 
 const BUDGET_ENTRY = '#budget-list .budget-entry[data-id]';
 

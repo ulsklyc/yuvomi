@@ -39,6 +39,10 @@
 #budget-body {
   padding-inline: var(--page-inline-pad);
   container: budget-page / inline-size;
+  /* Waagerecht gehoert der Kontakt dem Zeitraum-Wisch (utils/period-swipe.js,
+   * auf den Reitern mit Monat), senkrecht dem Scrollen - dieselbe Abgrenzung
+   * wie `#cal-body`. `pinch-zoom` MUSS mit (#1276, test:mobile-scroll-layout). */
+  touch-action: pan-y pinch-zoom;
 }
 
 /* Split-Expenses und Abonnements bringen als eigenständige Gast-Routen ihr

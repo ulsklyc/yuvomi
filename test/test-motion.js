@@ -1232,6 +1232,28 @@ test('Large Title: der Titel blendet in seinen neuen Schnitt, Layout wird nicht 
   assert.match(ruleBodies('layout.css', '.page-toolbar--stacked.is-docked > .page-toolbar__dock-title').join(';'), /opacity:\s*1/);
 });
 
+test('Zeitraum-Wisch: das Budget blaettert seine Monats-Reiter wie der Kalender, ohne zweiten Uebergang', () => {
+  const budget = pageSource('budget');
+  assert.match(budget, /import \{ wirePeriodSwipe \} from '\/utils\/period-swipe\.js';/);
+  const wire = budget.slice(budget.indexOf('wirePeriodSwipe(bodyEl(), {'), budget.indexOf('wirePeriodSwipe(bodyEl(), {') + 260);
+  assert.match(wire, /enabled: \(\) => Boolean\(tabCaps\(\)\.month\) && !state\.loadError,/, 'nur Reiter mit Zeitachse (TAB_CAPS.month)');
+  assert.match(wire, /ignore: PERIOD_SWIPE_IGNORE,/);
+  assert.match(wire, /onStep: \(step\) => stepPeriod\(step, \{ swap: false \}\),/, 'derselbe Stepper wie die Pfeile; der Wisch gleitet selbst herein');
+  // Was selbst waagerecht arbeitet, behaelt seinen Finger.
+  const ignore = budget.match(/const PERIOD_SWIPE_IGNORE = '([^']+)';/)?.[1] ?? '';
+  for (const sel of ['.u-scroll-fade', '.budget-stats__points', 'input']) {
+    assert.ok(ignore.split(',').map((s) => s.trim()).includes(sel), `${sel} fehlt in PERIOD_SWIPE_IGNORE`);
+  }
+  assert.match(publicSource('pages/budget-stats.js'), /class="budget-stats__points"/, 'die Diagrammflaeche heisst noch so');
+  // Senkrecht scrollt, waagerecht gehoert dem Wisch - wie #cal-body.
+  assert.match(ruleBodies('budget.css', '#budget-body').join(';'), /touch-action:\s*pan-y pinch-zoom/);
+  // Das Hereingleiten steht im geteilten Blatt: calendar.css laedt nur mit dem Kalender.
+  assert.ok(globalSheets.includes('layout.css'));
+  assert.ok([...eachRule(css('layout.css'))].some((r) => /\.period-swipe-in--next/.test(r.selector) && /animation:\s*period-swipe-in var\(--duration-md\) var\(--ease-out\)/.test(r.body)));
+  assert.match(css('layout.css'), /@keyframes period-swipe-in\b/);
+  assert.doesNotMatch(css('calendar.css').replace(/\/\*[\s\S]*?\*\//g, ''), /period-swipe-in/, 'keine zweite Fassung im Modul-Blatt');
+});
+
 test('Schichtplan: Laden zeigt das geteilte Skelett, Blaettern haelt den Inhalt bis zur Antwort', () => {
   const schedule = pageSource('schedule');
   assert.doesNotMatch(schedule, /card card--padded schedule-stat-loading/, 'keine Textkarte "Laedt..." mehr');
