@@ -3875,10 +3875,14 @@ function renderFilters(container) {
  * Liste um seine Hoehe nach unten und lief am Desktop 1156px ueber einer
  * 720px-Liste (A3 P2-8); Schliessen per Esc, Tipp daneben und Zurueck-Geste
  * bringt das Blatt jetzt von der Modal-Schicht mit, den Fokus gibt sie an den
- * Knopf zurueck.
+ * Knopf zurueck. Ab 1024px ist es ein Popover am Knopf ohne Overlay
+ * (utils/filter-sheet.js, `anchor`).
  */
 function openTaskFilters(container) {
   const panel = openFilterSheet({
+    // Am Desktop haengen die Filter als Popover am Knopf (E13): die Liste
+    // dahinter bleibt sichtbar und filtert live.
+    anchor: () => container?.querySelector?.('#tasks-filter-btn') ?? null,
     groups: filterSheetGroups(),
     // Nicht „Alle Filter aufheben": der Knopf stellt den Standard her (Status
     // „Offen"), und so heisst er auch.
@@ -5772,6 +5776,8 @@ export async function render(container, { user, signal } = {}) {
 // Testfläche: nur reine Funktionen, deren Vertrag außerhalb dieser Datei zählt.
 export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
+  // E13: am Desktop haengen die Filter als Popover am Knopf (utils/filter-sheet.js).
+  openTaskFilters,
   // Die Quittung nach dem Abhaken (#1603), je Weg am laufenden Aufruf: Haken
   // und Wisch teilen sich eine, die Personenwahl und das Brett haben je ihre.
   acknowledgeStatusToggle, completeTaskFor, runColumnMove,

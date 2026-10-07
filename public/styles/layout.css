@@ -4726,6 +4726,96 @@ a.popover-menu__item {
   margin-top: var(--space-3);
 }
 
+/* --------------------------------------------------------
+ * Filter am Desktop als Popover am Knopf (Critique R17, E13;
+ * utils/filter-sheet.js `openFilterPopover`, ab 1024px).
+ *
+ * Dasselbe Blatt ohne Overlay und ohne Unschaerfe: die Liste dahinter bleibt
+ * sichtbar und filtert live. Flaeche, Kante, Schatten und Radius wie
+ * `.popover-menu` - dasselbe Material fuer alles, was an einem Knopf aufgeht;
+ * die Form hatte zuerst der Kalender-Filter (`.cal-filters-popover`,
+ * calendar.css). Breite = `--layout-rail-min`, die Inhaltsbreite eines
+ * Telefons: die Gruppen sind fuer genau diese Breite gebaut.
+ *
+ * EIN- UND AUSGANG WIE DAS POPOVER-MENUE: es waechst aus der Ecke am Knopf
+ * (96 % -> 100 %) und blendet, der Ausgang ist kuerzer. Den Ursprung setzt
+ * positionFilterPopover() mit der Position. ZWEI DEKLARATIONEN, die
+ * Reihenfolge ist der Rueckfall: ohne `allow-discrete` verwirft der Browser
+ * die zweite, und das Popover schliesst hart. Unter reduzierter Bewegung
+ * nimmt reset.css die Dauer auf 0s.
+ * -------------------------------------------------------- */
+.filter-popover {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  z-index: var(--z-dropdown);
+  inline-size: min(var(--layout-rail-min), calc(100vw - 2 * var(--space-2)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3) var(--space-3) 0;
+  border: var(--space-px) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity var(--duration-xs) var(--ease-out),
+    transform var(--duration-xs) var(--ease-out);
+  transition:
+    opacity var(--duration-xs) var(--ease-out),
+    transform var(--duration-xs) var(--ease-out),
+    overlay var(--duration-xs) allow-discrete,
+    display var(--duration-xs) allow-discrete;
+}
+
+.filter-popover:popover-open {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--duration-md) var(--ease-out),
+    transform var(--duration-md) var(--ease-out);
+  transition:
+    opacity var(--duration-md) var(--ease-out),
+    transform var(--duration-md) var(--ease-out),
+    overlay var(--duration-md) allow-discrete,
+    display var(--duration-md) allow-discrete;
+}
+
+@starting-style {
+  .filter-popover:popover-open {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* Kein Abdunkeln, keine Unschaerfe: das ist der Sinn der Form. */
+.filter-popover::backdrop {
+  background: transparent;
+}
+
+.filter-popover__title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Das Zuruecksetzen bleibt ohne Scrollen im Blick - wie mountFooter() es im
+ * Blatt an den Rand hebt, klebt es hier am unteren Rand des Popovers. */
+.filter-popover .modal-panel__footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-block-start: var(--space-3);
+  margin-inline: calc(-1 * var(--space-3));
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-block-start: var(--space-px) solid var(--color-border-subtle);
+  background-color: var(--color-surface);
+}
+
 /* DIE CHIPREIHE IM SCROLLPORT.
  *
  * Sie ist das ERSTE Kind des `.page-scrollport` (oder, wo die Seite selbst

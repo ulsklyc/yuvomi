@@ -2386,6 +2386,10 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    Element IM Scrollport (scrollt weg) oder hinter „Filter (n)" mit Blatt
    (utils/filter-sheet.js, Vorbild Kalender). Aktive Filter bleiben sichtbar: die Zahl am
    Knopf oder die Chips im Port. Nie beides fuer dieselbe Achse.
+   Am Desktop (ab 1024px) ist das Blatt ein POPOVER am Filterknopf (R17, E13:
+   `openFilterSheet({ anchor })`, `.filter-popover` in layout.css) - ohne Overlay und
+   Unschaerfe, die Liste dahinter bleibt sichtbar und filtert live; Esc und Tipp daneben
+   schliessen, der Fokus geht an den Knopf zurueck. Mobil bleibt es das Blatt.
 4. **Die Suche ist mobil ein Icon**, das zum Feld aufgeht (`.page-search`, Label-Verlust-Regel
    oben). Die Icon-Form fragt nach dem Kopf, nicht nach dem Elternteil: sie greift auch in
    einem Wrapper-Slot, und ein Slot, der nur die Suche traegt, schrumpft mit ihr. Der

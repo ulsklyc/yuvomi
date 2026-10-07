@@ -705,3 +705,153 @@ test('„Bis heute faellig": Blatt und Adresse ergeben denselben Status und dies
     tasks.state.filterSheet = null;
   }
 });
+
+// ---------------------------------------------------------------------------
+// E13 (Critique R17): am Desktop ein Popover am Filterknopf statt des Blatts
+// ---------------------------------------------------------------------------
+// Das Blatt ist eine Modal-Schicht (Overlay, Unschaerfe, zentriert) und
+// verdeckte am Desktop die Liste, die ein Chip darin live filtert. Ab 1024px
+// haengen die Filter am Knopf, schmaler bleibt das Blatt. GEFAHREN am echten
+// Baustein (utils/filter-sheet.js), mit einem Popover-Knoten, der mitschreibt.
+
+class PopEl {
+  constructor() { this.attrs = {}; this.style = {}; this.listeners = {}; this.html = ''; this.calls = []; this.offsetWidth = 360; this.inside = true; this.resetBtn = new PopEl.Btn(); }
+  static Btn = class { constructor() { this.listeners = {}; } addEventListener(type, fn) { this.listeners[type] = fn; } focus() { this.focused = true; } };
+  set id(v) { this.attrs.id = v; }
+  get id() { return this.attrs.id; }
+  setAttribute(k, v) { this.attrs[k] = String(v); }
+  insertAdjacentHTML(_pos, html) { this.html += html; }
+  addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }
+  fire(type, event) { for (const fn of this.listeners[type] ?? []) fn(event); }
+  querySelector(sel) { return sel === '[data-filter-sheet-reset]' ? this.resetBtn : (sel === 'button, input, summary' ? this.resetBtn : null); }
+  contains() { return this.inside; }
+  showPopover() { this.calls.push('show'); }
+  hidePopover() { this.calls.push('hide'); this.fire('beforetoggle', { newState: 'closed' }); this.fire('toggle', { newState: 'closed' }); }
+  remove() { this.calls.push('remove'); }
+}
+
+async function withFilterEnv({ wide, popoverApi = true }, fn) {
+  const saved = {
+    HTMLElement: globalThis.HTMLElement, window: globalThis.window, document: globalThis.document,
+    openModal: globalThis.__openModal, closeModal: globalThis.__closeModal, setTimeout: globalThis.setTimeout,
+  };
+  const pop = new PopEl();
+  const env = { pop, appended: [], modals: [], closes: 0, queries: [], modalPanel: new PopEl() };
+  globalThis.HTMLElement = class {};
+  if (popoverApi) globalThis.HTMLElement.prototype.popover = null;
+  globalThis.window = { innerWidth: 1280, innerHeight: 800, matchMedia: (q) => { env.queries.push(q); return { matches: wide }; } };
+  globalThis.document = {
+    activeElement: {},
+    getElementById: () => null,
+    createElement: () => pop,
+    body: { appendChild: (el) => env.appended.push(el) },
+    querySelector: (sel) => (sel === '#shared-modal-overlay .modal-panel' ? env.modalPanel : null),
+  };
+  globalThis.__openModal = (opts) => { env.modals.push(opts); };
+  globalThis.__closeModal = () => { env.closes += 1; };
+  // Das Aufraeumen des Knotens haengt an einem Timer; der Test wartet nicht darauf.
+  globalThis.setTimeout = (cb) => { env.timer = cb; return 0; };
+  try { return await fn(env); } finally {
+    globalThis.HTMLElement = saved.HTMLElement;
+    globalThis.window = saved.window;
+    globalThis.document = saved.document;
+    globalThis.__openModal = saved.openModal;
+    globalThis.__closeModal = saved.closeModal;
+    globalThis.setTimeout = saved.setTimeout;
+  }
+}
+
+const filterAnchor = () => {
+  const el = { attrs: {}, focused: 0, setAttribute(k, v) { this.attrs[k] = v; }, focus() { this.focused += 1; },
+    getBoundingClientRect: () => ({ right: 1057, bottom: 54, left: 966, top: 14 }) };
+  return el;
+};
+
+test('E13: ab 1024px oeffnen die Filter als Popover am Knopf - keine Modal-Schicht, die Liste bleibt frei', async () => {
+  const { openFilterSheet } = await import('/utils/filter-sheet.js');
+  await withFilterEnv({ wide: true }, async (env) => {
+    const anchor = filterAnchor();
+    const changes = [];
+    let resets = 0;
+    const panel = openFilterSheet({
+      anchor: () => anchor,
+      groups: [{ heading: 'Status', html: '<button data-filter="status">Offen</button>' }],
+      onChange: (target) => changes.push(target),
+      onReset: () => { resets += 1; },
+    });
+    assert.equal(panel, env.pop, 'der Aufrufer bekommt das Popover als Panel (derselbe Vertrag wie das Blatt)');
+    assert.deepEqual(env.modals, [], 'kein openModal: kein Overlay, keine Unschaerfe');
+    assert.deepEqual(env.queries, ['(min-width: 1024px)'], 'die Desktop-Schwelle des Kopfs');
+    assert.equal(env.pop.attrs.popover, 'auto', 'natives Popover: Esc und Tipp daneben schliessen');
+    assert.equal(env.pop.attrs.role, 'dialog');
+    assert.equal(env.pop.attrs.class ?? env.pop.className, 'filter-popover');
+    assert.match(env.pop.html, /class="filter-sheet"/, 'dieselben Gruppen wie im Blatt');
+    assert.match(env.pop.html, /data-filter-sheet-reset/);
+    assert.deepEqual(env.appended, [env.pop]);
+    assert.equal(env.pop.calls[0], 'show');
+    // Verankert: rechtsbuendig unter dem Knopf, 4px Abstand.
+    assert.equal(env.pop.style.left, `${1057 - 360}px`);
+    assert.equal(env.pop.style.top, '58px');
+    assert.equal(env.pop.style.transformOrigin, '360px 0', 'es waechst aus der Ecke am Knopf');
+    assert.equal(anchor.attrs['aria-expanded'], 'true');
+    assert.equal(env.pop.resetBtn.focused, true, 'der Fokus geht ins Popover');
+
+    // Live: ein Schalter meldet sich, das Popover bleibt offen.
+    const input = new globalThis.HTMLElement();
+    env.pop.fire('change', { target: input });
+    assert.deepEqual(changes, [input]);
+    assert.ok(!env.pop.calls.includes('hide'));
+
+    // Zuruecksetzen schliesst das POPOVER (nicht ein Modal), der Fokus geht
+    // VOR dem Schliessen an den Knopf zurueck.
+    env.pop.resetBtn.listeners.click();
+    assert.equal(resets, 1);
+    assert.ok(env.pop.calls.includes('hide'));
+    assert.equal(env.closes, 0, 'closeModal schloesse ein fremdes Blatt');
+    assert.equal(anchor.focused, 1, 'Fokus zurueck zum Filterknopf');
+    assert.equal(anchor.attrs['aria-expanded'], 'false');
+    assert.ok(!env.pop.calls.includes('remove'), 'der Knoten bleibt fuer den Ausgang im Baum');
+    env.timer();
+    assert.ok(env.pop.calls.includes('remove'));
+
+    // Der Knopf ist ein Umschalter: der Klick, der per Light-Dismiss gerade
+    // geschlossen hat, oeffnet nicht im selben Zug wieder.
+    assert.equal(openFilterSheet({ anchor: () => anchor, groups: [{ heading: 'x', html: 'y' }] }), null);
+  });
+});
+
+test('E13: unter der Schwelle, ohne Anker oder ohne Popover-API bleibt es das Blatt', async () => {
+  const { openFilterSheet } = await import('/utils/filter-sheet.js');
+  const groups = [{ heading: 'Status', html: '<button>Offen</button>' }];
+  await withFilterEnv({ wide: false }, async (env) => {
+    const panel = openFilterSheet({ anchor: () => filterAnchor(), groups });
+    assert.equal(env.modals.length, 1, 'mobil das Blatt');
+    assert.equal(panel, env.modalPanel);
+    assert.deepEqual(env.appended, []);
+    env.modalPanel.resetBtn.listeners.click();
+    assert.equal(env.closes, 1, 'Zuruecksetzen schliesst das Blatt');
+  });
+  await withFilterEnv({ wide: true }, async (env) => {
+    openFilterSheet({ groups });
+    assert.equal(env.modals.length, 1, 'ohne Anker gibt es nichts, woran es haengen koennte');
+  });
+  await withFilterEnv({ wide: true, popoverApi: false }, async (env) => {
+    openFilterSheet({ anchor: () => filterAnchor(), groups });
+    assert.equal(env.modals.length, 1, 'ein Browser ohne `popover` behaelt das Blatt');
+  });
+});
+
+test('E13: die Aufgaben reichen ihren Filterknopf als Anker herein', async () => {
+  await withFilterEnv({ wide: true }, async (env) => {
+    const btn = filterAnchor();
+    const container = { querySelector: (sel) => (sel === '#tasks-filter-btn' ? btn : null) };
+    // Der Umschalter-Riegel des vorigen Tests ist abgelaufen, sobald die Uhr weiter ist.
+    const realNow = Date.now;
+    Date.now = () => realNow() + 1000;
+    let panel;
+    try { panel = tasks.openTaskFilters(container); } finally { Date.now = realNow; tasks.state.filterSheet = null; }
+    assert.equal(panel, env.pop, 'openTaskFilters oeffnet am Desktop das Popover');
+    assert.equal(btn.attrs['aria-expanded'], 'true', 'am Knopf #tasks-filter-btn');
+    assert.deepEqual(env.modals, []);
+  });
+});

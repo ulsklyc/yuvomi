@@ -221,6 +221,28 @@ test('(5) die geteilten Bausteine existieren an einer Stelle', async () => {
   }
 });
 
+// E13 (Critique R17): am Desktop haengen die Filter als Popover am Knopf. Die
+// Form steht global (layout.css) wie das Blatt - und sie hat weder Overlay
+// noch Unschaerfe: das ist ihr Sinn, die Liste dahinter filtert live.
+test('E13: das Filter-Popover hat kein Overlay und keine Unschaerfe, aber Ein- und Ausgang', () => {
+  const pop = rules(layoutCss).filter((r) => /^\.filter-popover\b/.test(r.selector));
+  assert.ok(topLevel(layoutCss, '.filter-popover').length >= 1, '.filter-popover gehoert in layout.css (global geladen)');
+  const backdrop = pop.find((r) => r.selector === '.filter-popover::backdrop');
+  assert.ok(backdrop && /background:\s*transparent/.test(backdrop.body), 'kein Abdunkeln hinter dem Popover');
+  for (const r of pop) assert.doesNotMatch(r.body, /backdrop-filter/, `${r.selector}: keine Unschaerfe`);
+  const base = topLevel(layoutCss, '.filter-popover')[0];
+  assert.match(base.body, /position:\s*fixed/);
+  assert.match(base.body, /inline-size:\s*min\(var\(--layout-rail-min\)/, 'Breite aus tokens.css');
+  assert.match(base.body, /overlay var\(--duration-xs\) allow-discrete/, 'der Ausgang laeuft, bevor es den Top-Layer verlaesst');
+  const open = topLevel(layoutCss, '.filter-popover:popover-open').find((r) => /transition/.test(r.body));
+  assert.ok(open && /var\(--duration-md\)/.test(open.body), 'Eingang in --duration-md wie das Popover-Menue');
+  assert.match(layoutCss, /@starting-style\s*\{\s*\.filter-popover:popover-open\s*\{[^}]*transform:\s*scale\(0\.96\)/,
+    'Eingang aus dem verkleinerten Zustand');
+  const sheet = read('../public/utils/filter-sheet.js');
+  assert.match(sheet, /export function filtersAsPopover\(/);
+  assert.match(sheet, /setAttribute\('popover', 'auto'\)/, 'Esc und Tipp daneben schliessen (Browser)');
+});
+
 // R14 P12 (Re-Critique 2026-09-28, A1 P3-2): im Desktop-Kopf standen zwei
 // Hoehen - Suche und "..." 44px, Segment, Filter und angedockte Pille 40px,
 // gemessen in 12 Modulen bei 1440. Am Zeiger ist 40px die Regel (ignore.md,

@@ -30,6 +30,7 @@
 import { esc } from '/utils/html.js';
 import { t } from '/i18n.js';
 import { openModal, closeModal } from '/components/modal.js';
+import { durationToken } from '/utils/ux.js';
 
 /**
  * @typedef {object} FilterLabels
@@ -133,10 +134,16 @@ export function syncFilterButton(button, count, labels = defaultFilterLabels()) 
  *        `change`-Ereignis aus dem Blatt (Checkbox, Radio, Select).
  * @param {(panel: HTMLElement) => void} [opts.onReset]  Nach dem Aufheben
  *        schliesst das Blatt selbst.
- * @returns {HTMLElement|null} das Panel, fuer weitere Verdrahtung
+ * @param {() => (HTMLElement|null)} [opts.anchor]  Der Filterknopf. Mit ihm
+ *        haengen die Filter am Zeigergeraet-Desktop als POPOVER am Knopf statt
+ *        als Blatt (siehe `filtersAsPopover`). Eine Funktion, weil ein Kopf
+ *        seinen Knopf neu bauen darf, waehrend das Popover offen ist.
+ * @returns {HTMLElement|null} das Panel, fuer weitere Verdrahtung - in beiden
+ *        Formen derselbe Vertrag: `querySelector`, `change`- und
+ *        `click`-Ereignisse, `isConnected` solange es offen ist.
  */
 export function openFilterSheet({
-  title = t('common.filters'), groups = [], resetLabel = t('common.filtersReset'), onChange, onReset,
+  title = t('common.filters'), groups = [], resetLabel = t('common.filtersReset'), onChange, onReset, anchor = null,
 }) {
   // ZWEI ANGABEN JE GRUPPE (Critique 2026-10-05, R16):
   // - `fold: 'closed' | 'open'` macht die Gruppe zum Aufklapper (<details>),
@@ -169,14 +176,21 @@ export function openFilterSheet({
     <div class="modal-panel__footer">
       <button type="button" class="btn btn--secondary" data-filter-sheet-reset>${esc(resetLabel)}</button>
     </div>` : '';
-  openModal({
-    title,
-    content: `<div class="filter-sheet">${body}</div>${footer}`,
-    size: 'sm',
-    initialFocus: 'none',
-    dirtyGuard: false,
-  });
-  const panel = document.querySelector('#shared-modal-overlay .modal-panel');
+  const content = `<div class="filter-sheet">${body}</div>${footer}`;
+  let panel;
+  let close;
+  if (typeof anchor === 'function' && filtersAsPopover()) {
+    // Ein Klick auf den Knopf bei offenem Popover schliesst es zuerst per
+    // Light-Dismiss (pointerdown) - derselbe Klick oeffnete es sonst sofort
+    // wieder. So wirkt der Knopf wie ein Umschalter.
+    if (Date.now() - popoverClosedAt < 300) return null;
+    panel = openFilterPopover({ title, content, anchor });
+    close = () => panel.hidePopover?.();
+  } else {
+    openModal({ title, content, size: 'sm', initialFocus: 'none', dirtyGuard: false });
+    panel = document.querySelector('#shared-modal-overlay .modal-panel');
+    close = () => closeModal({ force: true });
+  }
   if (!panel) return null;
   if (onChange) {
     panel.addEventListener('change', (e) => {
@@ -185,8 +199,91 @@ export function openFilterSheet({
   }
   panel.querySelector('[data-filter-sheet-reset]')?.addEventListener('click', () => {
     onReset?.(panel);
-    closeModal({ force: true });
+    close();
   });
   window.lucide?.createIcons?.({ el: panel });
   return panel;
+}
+
+// --------------------------------------------------------
+// AM DESKTOP EIN POPOVER AM KNOPF (Critique R17, E13)
+//
+// Das Blatt ist eine Modal-Schicht: Overlay, Unschaerfe, zentriert. Am Desktop
+// verdeckte es genau die Liste, die ein Chip darin live filtert - man stellte
+// ein, schloss, sah nach, oeffnete wieder. Ab 1024px haengen die Filter ohne
+// Abdunkeln am Filterknopf, die Liste dahinter bleibt sichtbar und bedienbar
+// (Light-Dismiss). Schmaler bleibt das Blatt: dort ist der Daumen unten und
+// die Liste ohnehin verdeckt.
+//
+// Das Vokabular ist das des Kalender-Filters (calendar.js,
+// `openFiltersPopover`), der diese Form zuerst hatte: natives `popover`
+// (Top-Layer, Esc und Light-Dismiss vom Browser), Position per JS wie
+// utils/popover-menu.js (rechtsbuendig unter dem Ausloeser, im Fenster
+// gehalten), Ein- und Ausgang in layout.css (`.filter-popover`).
+// --------------------------------------------------------
+
+const FILTER_POPOVER_QUERY = '(min-width: 1024px)';
+const FILTER_POPOVER_ID = 'filter-popover';
+let popoverClosedAt = 0;
+
+/** Popover statt Blatt? Nur wo der Browser `popover` kennt und das Fenster breit ist. */
+export function filtersAsPopover() {
+  if (typeof HTMLElement === 'undefined' || !('popover' in HTMLElement.prototype)) return false;
+  return globalThis.window?.matchMedia?.(FILTER_POPOVER_QUERY)?.matches === true;
+}
+
+function openFilterPopover({ title, content, anchor }) {
+  document.getElementById(FILTER_POPOVER_ID)?.remove();
+  const pop = document.createElement('div');
+  pop.id = FILTER_POPOVER_ID;
+  pop.className = 'filter-popover';
+  pop.setAttribute('popover', 'auto');
+  pop.setAttribute('role', 'dialog');
+  pop.setAttribute('aria-labelledby', `${FILTER_POPOVER_ID}-title`);
+  pop.insertAdjacentHTML('beforeend',
+    `<h2 class="filter-popover__title" id="${FILTER_POPOVER_ID}-title">${esc(title)}</h2>${content}`);
+  document.body.appendChild(pop);
+  // DER FOKUS GEHT AN DEN KNOPF ZURUECK, und zwar VOR dem Schliessen: nach
+  // Esc fiel er sonst aus dem verschwindenden Popover auf den Scrollport,
+  // bevor `toggle` ueberhaupt lief. Ein Klick daneben auf ein anderes
+  // Bedienelement setzt seinen Fokus danach trotzdem selbst - der
+  // Light-Dismiss laeuft auf pointerdown, der Fokus erst mit mousedown.
+  pop.addEventListener('beforetoggle', (event) => {
+    if (event.newState === 'closed' && pop.contains(document.activeElement)) anchor()?.focus();
+  });
+  pop.addEventListener('toggle', (event) => {
+    const open = event.newState === 'open';
+    anchor()?.setAttribute('aria-expanded', String(open));
+    if (open) return;
+    popoverClosedAt = Date.now();
+    // Erst NACH dem Ausgang aus dem Baum (layout.css: --duration-xs, das
+    // Popover bleibt per `allow-discrete` so lange im Top-Layer). Ein
+    // erneutes Oeffnen davor raeumt den alten Knoten selbst (oben).
+    setTimeout(() => pop.remove(), durationToken('--duration-xs', 120) + 40);
+  });
+  pop.showPopover();
+  positionFilterPopover(pop, anchor());
+  anchor()?.setAttribute('aria-expanded', 'true');
+  // Der Fokus geht INS Popover (Tastatur: Tab laeuft durch die Filter, Esc
+  // schliesst); ohne Ziel bleibt er am Knopf.
+  pop.querySelector('button, input, summary')?.focus();
+  return pop;
+}
+
+function positionFilterPopover(pop, anchorEl) {
+  if (!anchorEl) return;
+  const rect = anchorEl.getBoundingClientRect();
+  const gap = 4;
+  const margin = 8;
+  const width = pop.offsetWidth || 360;
+  const left = Math.min(Math.max(margin, rect.right - width), window.innerWidth - width - margin);
+  const top = rect.bottom + gap;
+  pop.style.left = `${Math.round(left)}px`;
+  pop.style.top = `${Math.round(top)}px`;
+  pop.style.maxHeight = `${Math.round(window.innerHeight - top - margin)}px`;
+  // Es waechst aus der Ecke am Knopf: der Ursprung ist die Stelle des
+  // Popovers, unter der die Knopfkante steht - auch wenn das Fenster es von
+  // dort weggeschoben hat. Per JS statt als physische Seite im Blatt, die in
+  // RTL nicht stimmen muss.
+  pop.style.transformOrigin = `${Math.round(Math.min(Math.max(0, rect.right - left), width))}px 0`;
 }

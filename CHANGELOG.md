@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Tasks: on a desktop the filters open beside the list instead of over it.** The filter sheet
+  was a centred dialog with a dimmed, blurred backdrop - it covered the very list each chip
+  filters. From 1024px it is now a popover anchored to the filter button: no backdrop, the list
+  stays visible and updates as you choose. Escape or a click outside closes it and focus
+  returns to the button. On a phone it stays the sheet.
+
 - **Inventory opens on your things, not on a list of categories.** The start page used to show
   one row per category and no item at all; reaching an item took two clicks. It now lists every
   item, grouped by category, with the categories as filter chips above the list. On a wide
