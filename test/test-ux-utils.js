@@ -1341,15 +1341,24 @@ test('K1: die Kuechen-Kontextzeile aus reinen Werkzeugen klappt beim Andocken ei
   } finally { s.restore(); }
 });
 
-test('K1: eine Kontextzeile, die etwas benennt, und ein kurzer Port falten nicht', () => {
-  const named = kitchenFoldStub({ centerCls: ['page-toolbar__center', 'week-nav'] });
-  try {
-    wireCollapsingHeader(named.toolbar);
-    assert.equal(named.toolbar.classList.contains('page-toolbar--fold-row'), false, 'Wochenstepper und Listen-Kapseln bleiben stehen');
-    named.fire('touchstart', named.row);
-    named.scrollTo(120);
-    assert.equal(named.toolbar.classList.contains('is-collapsed'), false);
-  } finally { named.restore(); }
+// R17 Schritt 5 (Critique 2026-10-07): bis dahin blieben Wochenstepper
+// (Mahlzeiten) und Listen-Kapseln (Einkauf) stehen - 121px Kopf in jedem
+// Scrollstand, der Vorrat daneben 56. Jede Zeile unter der Leiste faltet.
+test('K1: auch eine Kontextzeile, die etwas benennt, faltet - ein kurzer Port nicht', () => {
+  for (const centerCls of [['page-toolbar__center', 'week-nav'], ['page-toolbar__center']]) {
+    const named = kitchenFoldStub({ centerCls });
+    try {
+      wireCollapsingHeader(named.toolbar);
+      assert.equal(named.toolbar.classList.contains('page-toolbar--fold-row'), true,
+        `Wochenstepper und Listen-Kapseln falten wie die Suche (${centerCls.join(' ')})`);
+      assert.equal(named.toolbar.props.get('--fold-row-h'), '64px');
+      named.fire('touchstart', named.row);
+      named.scrollTo(120);
+      assert.equal(named.toolbar.classList.contains('is-collapsed'), true, 'angedockt steht nur die Kuechen-Leiste');
+      named.scrollTo(0);
+      assert.equal(named.toolbar.classList.contains('is-collapsed'), false, 'zurueck oben kommen Woche und Liste wieder');
+    } finally { named.restore(); }
+  }
   const short = kitchenFoldStub();
   try {
     short.port.scrollHeight = short.port.clientHeight + 90;

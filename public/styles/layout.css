@@ -3870,11 +3870,12 @@ html.fab-anim-done .page-fab {
  * Unter der Kuechen-Leiste traegt der Kopf von Rezepte und Vorrat mobil nur
  * Werkzeuge - Lupe, "..." -, und kostete dafuer 65px ueber der Liste.
  * `wireCollapsingHeader` (utils/ux.js) erkennt eine solche Zeile
- * (`--fold-row`: Gruppen-Variante, einzeilig, ohne Titel, im Center-Slot
- * nur die Suche) und haengt sie an dieselbe Schwelle und Klasse wie den Kopf
- * der gedeckelten Module: angedockt (`is-collapsed`) gibt sie ihre Hoehe
- * frei, zurueck oben kommt sie wieder. Mahlzeiten und Einkauf benennen in
- * ihrer Zeile etwas (Woche, Liste) und falten nicht.
+ * (`--fold-row`: Gruppen-Variante, einzeilig, ohne Titel) und haengt sie an
+ * dieselbe Schwelle und Klasse wie den Kopf der gedeckelten Module: angedockt
+ * (`is-collapsed`) gibt sie ihre Hoehe frei, zurueck oben kommt sie wieder.
+ * Seit R17 Schritt 5 falten auch Mahlzeiten (Wochenstepper) und Einkauf
+ * (Listen-Kapseln): ihr Kopf stand in jedem Scrollstand bei 121px, der des
+ * Vorrats daneben bei 56 (gemessen 390x844: Port 723 -> 787px).
  *
  * WIE SIE FALTET: nicht ueber ihre Hoehe. Eine Hoehe, die nach `auto`
  * zurueckgleiten soll, braucht `interpolate-size`, und das kann Safari nicht -

@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Meal plan and shopping list give the second header row back when you scroll (phone).** Under
+  the kitchen tabs the row with the week or the lists stayed put - 121 px of header at any scroll
+  position, where the pantry beside it folds to 56. It now folds away like the pantry's and
+  returns at the top; the quick-add field of the shopping list still opens from the "+" button.
 - **On a phone the calendar header shrinks to one row when you scroll.** Collapsed it measured
   the same 117 px as open - the title left, but its row stayed for three icons. The period
   stepper now moves up into that row (65 px, 52 px more for the week, day and agenda). Search,

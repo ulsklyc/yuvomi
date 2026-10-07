@@ -887,27 +887,29 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // DIE FALTZEILE (R17 K1, Re-Critique 2026-09-28 A4 P2-4 / A8 P3-2). Unter
     // einer Gruppen-Leiste (Kueche) steht der Kopf der Seite als EINE Zeile
     // ohne Titel - in Rezepte und Vorrat traegt sie mobil nur Werkzeuge (Lupe,
-    // "...") und kostet 65px fuer ein bis zwei Icons. Angedockt gibt sie diese
+    // "..."), im Essensplan die Woche, im Einkauf die Listen - und kostet 65px
+    // ueber der Liste. Angedockt gibt sie diese
     // Hoehe frei, an derselben Schwelle und mit derselben Klasse wie der Kopf
     // der gedeckelten Module (`is-collapsed`, onInnerScroll); zurueck oben
     // kommt sie wieder. Das ist Apples `hidesSearchBarWhenScrolling` fuer eine
     // Zeile, deren Inhalt die Suche IST.
     //
-    // NUR EINE ZEILE, DIE NICHTS BENENNT: steht im Center-Slot etwas anderes
-    // als die Suche (Wochenstepper im Essensplan, Listen-Kapseln im Einkauf),
-    // beantwortet die Zeile beim Scrollen weiter „wo bin ich" und bleibt -
-    // dieselbe Abgrenzung wie der Zeitraum im Kalender. Gezaehlt wird ueber
-    // `classList`, nicht per Selektor: die Regel ist eine Aussage ueber den
-    // Inhalt des Slots.
+    // JEDE ZEILE UNTER DER LEISTE FALTET, AUCH EINE, DIE ETWAS BENENNT (R17
+    // Schritt 5, Critique 2026-10-07 A1 P2 / A4). Bis dahin blieben
+    // Essensplan (Wochenstepper) und Einkauf (Listen-Kapseln) stehen, mit der
+    // Begruendung, ihre Zeile beantworte beim Scrollen weiter „wo bin ich" -
+    // gemessen kostete das in beiden 121px Kopf in JEDEM Scrollstand, waehrend
+    // der Vorrat daneben auf 56px faltet. Die Leiste darueber nennt den Ort
+    // (Mahlzeiten, Einkauf); Woche und Liste kommen oben wieder, wie die
+    // Suche. Fokus in der Zeile, ein Suchbegriff und ein offenes Menue halten
+    // sie offen (layout.css) - wer gerade die Woche blaettert, behaelt sie.
     //
     // KEINE LEAD-ZONE: die Zeile ist einzeilig, und eine Lead-Zone auf einem
     // einzeiligen Kopf verbirgt seine Linie (Sonde 8). Die Hoehe steht deshalb
     // in einer eigenen Variablen, gemessen OHNE die Linie - die bleibt
     // gefaltet als Kante unter der Leiste stehen.
-    const center = [...toolbar.children].find((c) => c.classList.contains('page-toolbar__center'));
     const foldRow = Boolean(capped) && lines.length === 1 && !heading
-      && toolbar.classList.contains('page-toolbar--in-group')
-      && (!center || center.classList.contains('page-search'));
+      && toolbar.classList.contains('page-toolbar--in-group');
     toolbar.classList.toggle('page-toolbar--fold-row', foldRow);
     foldH = foldRow ? Math.round(tb.height - (parseFloat(getComputedStyle(toolbar).borderBottomWidth) || 0)) : 0;
     if (foldH > 0) toolbar.style.setProperty('--fold-row-h', `${foldH}px`);

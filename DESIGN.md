@@ -2418,19 +2418,22 @@ am Ende der Leiste, Zaehler als Punkt an der Ecke) ist zurueckgenommen - sie gab
 vier Kopfbauarten, und „Einkauf 23" war je nach Tab eine Zahl oder ein Punkt. Ausgeklappt
 misst der Kuechenkopf in allen vier Tabs 121px (Leiste 56 + Zeile 2 65, 390px).
 
-**Zeile 2 faltet angedockt, wenn sie nur Werkzeuge traegt** (R17 K1, A4 P2-4 / A8 P3-2).
+**Zeile 2 faltet angedockt** (R17 K1, A4 P2-4 / A8 P3-2; seit R17 Schritt 5 in allen vier Tabs).
 Rezepte (Lupe, mit Anbieter dazu der Quellenfilter) und Vorrat (Lupe, „...") zahlten 65px
 fuer ein bis zwei Icons. `wireCollapsingHeader` (utils/ux.js) erkennt die Zeile selbst
-(`page-toolbar--fold-row`: Gruppen-Variante, einzeilig, ohne Titel, im Center-Slot nur die
-Suche) und haengt sie an dieselbe Schwelle und Klasse wie den Kopf der gedeckelten Module:
+(`page-toolbar--fold-row`: Gruppen-Variante, einzeilig, ohne Titel) und haengt sie an dieselbe Schwelle und Klasse wie den Kopf der gedeckelten Module:
 ein Nutzer-Scroll im Port setzt `is-collapsed` (ab 24px, zurueck unter 8px), und nur, wenn
 der Port die Zeile ausgeklappt traegt (Reserve >= Zeile + 48px, ausgeklappt gemessen, sonst
 pendelt eine knappe Liste). Angedockt steht nur die Leiste mit der Linie der Zeile darunter;
 ungescrollt ist der Kopf unveraendert. Gemessen 390x844: Vorrat-Port 723 → 787px, erste
-Zeile y 121 → 57; Rezepte ebenso, sobald die Liste die Reserve hat. Mahlzeiten und Einkauf
-falten nicht - ihre Zeile benennt etwas (Woche, Liste) und beantwortet beim Scrollen weiter
-„wo bin ich", wie der Zeitraum im Kalender. Am Desktop (ab 1024px) faltet nichts: dort traegt
-die Zeile Suchfeld und angedockte Primaer-Pille.
+Zeile y 121 → 57; Rezepte ebenso, sobald die Liste die Reserve hat. **Seit R17 Schritt 5
+falten auch Mahlzeiten und Einkauf** (Critique 2026-10-07, A1 P2: 121px Kopf in jedem
+Scrollstand, der Vorrat daneben 56): die Erkennung fragt nicht mehr, was im Center-Slot
+steht. Die Leiste nennt den Ort; Woche und Liste kommen oben wieder wie die Suche, und wer
+gerade die Woche blaettert, behaelt die Zeile (Fokus). Gemessen 390x844: Port 723 → 787px in
+beiden. Die Schnelleingabe des Einkaufs liegt unter der Zeile im Listenbereich - der FAB
+oeffnet sie auch gefaltet (y 57, Fokus im Feld). Am Desktop (ab 1024px) faltet nichts: dort
+traegt die Zeile Suchfeld und angedockte Primaer-Pille.
 Gefaltet wird ueber Rand und Verschiebung, nicht ueber die Hoehe: der negative Rand
 (`--fold-row-h`, ohne Linie) zieht die Liste hoch, dieselbe Strecke schiebt die Zeile hinter
 die Leiste, wo die Seite sie abschneidet. Beides gleitet in Safari (eine Hoehe nach `auto`
