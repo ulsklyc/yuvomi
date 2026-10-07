@@ -176,35 +176,18 @@ test('die Hover-Reaktion nimmt das Zeichen aus, statt gegen es anzuschreiben', (
     'die Hover-Regel muss das Zeichen ausdruecklich ausnehmen');
 });
 
-test('die erledigte Teilaufgabe im Zustandszeichen animiert nicht', () => {
-  // DIE ZWEITE SORTE: eine Regel, die NICHT an ihrer Position haengt.
-  // `.subtask-item__checkbox--done` traegt `check-pop` und steht weiter oben;
-  // eine zweite einfache Klasse daneben haette nach Quellreihenfolge verloren,
-  // so wie es an `.task-status-btn--static` tatsaechlich passiert ist (Review
-  // zu PR #1252). Zwei Klassen im Selektor (0,2,0) schlagen sie unabhaengig
-  // davon, wer wo steht.
-  //
-  // WAS am Ende gilt, rechnet test-module-readonly-ui.js aus; hier steht die
-  // Zusicherung, DASS es die Regel an dieser Stelle gibt - der Guard, der beim
-  // naechsten Umbau der Datei anschlaegt.
-  const kombi = regelnFuer(/^\.subtask-item__checkbox--done\.subtask-item__checkbox--static$/);
-  assert.equal(kombi.length, 1, 'genau eine Regel fuer die Kombination aus erledigt und Zustandszeichen');
-  assert.match(kombi[0].body, /animation:\s*none/);
-  assert.deepEqual(kombi[0].at, [], 'sie gilt fuer alle, nicht nur unter einer At-Bedingung');
-});
-
-test('der Bewegungs-Verzicht deckt weiter beide Abhak-Zeichen', () => {
-  // DIE REGRESSION, DIE DER ERSTE ANLAUF NEBENBEI EINBAUTE. Der Block wurde
-  // mitten in die Selektorliste dieser Regel geschoben und trennte
-  // `.task-status-btn--done` von seinem `animation: none` - unter reduzierter
-  // Bewegung lief der check-pop wieder, wogegen die Abfrage gebaut ist
-  // (Audit F-07). Nichts daran war sichtbar, ausser man stellt die
-  // Systemeinstellung um und hakt etwas ab.
-  const treffer = [...eachRule(TASKS_CSS)].filter((r) => /animation:\s*none/.test(r.body)
-    && r.at.some((a) => a.includes('prefers-reduced-motion')));
-  const selektoren = treffer.flatMap((r) => r.selector.split(',').map((x) => x.trim()));
-  assert.ok(selektoren.includes('.task-status-btn--done'),
-    `der grosse Haken muss dabei sein, gefunden: ${JSON.stringify(selektoren)}`);
-  assert.ok(selektoren.includes('.subtask-item__checkbox--done'),
-    `die Teilaufgabe auch, gefunden: ${JSON.stringify(selektoren)}`);
+test('kein Abhak-Zeichen animiert aus dem Stylesheet heraus', () => {
+  // R18: die Quittung startet der Klick-Handler (`acknowledgeCheck`,
+  // utils/ux.js). Vorher hing `check-pop` an `--done`, und zwei Gegenregeln
+  // (`--done.--static { animation: none }`, dazu ein Block unter reduzierter
+  // Bewegung) mussten sie dort wieder ausschalten, wo niemand etwas beruehrt
+  // hatte - eine davon war schon einmal wirkungslos (Review zu PR #1252), die
+  // andere schon einmal versehentlich abgetrennt (Audit F-07). Ohne die
+  // Animation an der Zustandsklasse gibt es nichts mehr auszuschalten: das
+  // Zeichen ist ein `span` ohne Handler, und unter reduzierter Bewegung startet
+  // der Helfer nichts. Hier steht die Zusicherung fuer dieses Blatt; fuer alle
+  // Blaetter haelt sie test:motion.
+  const animiert = [...eachRule(TASKS_CSS)].filter((r) => /(?:^|[.\s,])\.?(?:task-status-btn|subtask-item__checkbox)/.test(r.selector)
+    && /(?:^|;)\s*animation(?:-name)?\s*:\s*(?!none)/.test(r.body));
+  assert.deepEqual(animiert.map((r) => r.selector), []);
 });

@@ -34,7 +34,7 @@ import { t, formatDate, formatTime } from '/i18n.js';
 import { openDetailView, closeDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { closeModal, btnLoading, refocusAfterRender } from '/components/modal.js';
 import { recurrenceRow } from '/rrule-ui.js';
-import { scheduleUndoableDelete } from '/utils/ux.js';
+import { scheduleUndoableDelete, acknowledgeCheck } from '/utils/ux.js';
 import { rowActionEl } from '/utils/row-action.js';
 import { renderMarkdownLight } from '/utils/html.js';
 import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
@@ -996,6 +996,7 @@ async function toggleDescriptionCheck(task, box) {
   };
 
   paint(checked);
+  acknowledgeCheck(box, { checked });
   try {
     const res = await api.patch(`/tasks/${task.id}/check`, { line, checked, expect });
     task.description = res.data.description;

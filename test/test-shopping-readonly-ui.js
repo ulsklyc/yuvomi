@@ -864,7 +864,12 @@ test('CSS: der Hover-Rahmen nimmt das Zeichen aus, Zeiger und Pop sind neutral',
   const statisch = regeln.find(({ selector, at }) => !at.length && selector === '.item-check.item-check--static');
   assert.ok(statisch, 'die Regel fuer das Zeichen fehlt - (0,2,0), damit sie `.item-check--checked` schlaegt');
   assert.match(statisch.body, /cursor:\s*default/);
-  assert.match(statisch.body, /animation:\s*none/);
+  // R18: der Pop haengt gar nicht mehr an `.item-check--checked` - die Quittung
+  // startet der Handler (acknowledgeCheck), und das Zeichen hat keinen. Eine
+  // Gegenregel waere tot; dass die Zustandsklasse keine Animation traegt,
+  // haelt test:motion fuer alle Blaetter.
+  assert.ok(!regeln.some(({ selector, body }) => /\.item-check/.test(selector) && /animation(?:-name)?\s*:\s*(?!none)/.test(body)),
+    'kein Haken animiert aus dem Stylesheet heraus');
   const zeile = regeln.find(({ selector, at }) => !at.length && selector === '.shopping-item.shopping-item--static');
   assert.match(zeile?.body ?? '', /cursor:\s*default/, 'die Zeile verspraeche sonst ein Antippen');
 });

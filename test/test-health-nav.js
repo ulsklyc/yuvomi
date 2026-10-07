@@ -678,9 +678,11 @@ test('R14 P8: Verlaufslisten der Gesundheit stehen auf einem Traeger', async () 
 test('R16: der Bereichswechsel blendet in jeder Breite ueber swapContent', async () => {
   const start = HEALTH_JS.indexOf('function activateArea(');
   const body = HEALTH_JS.slice(start, HEALTH_JS.indexOf('\n}\n', start));
-  assert.match(body, /if \(previous && previous !== id\) markAreaEntering\(route\);/, 'nicht mehr nur schmal');
+  // R18: schmal traegt der Wechsel Uebersicht <-> Bereich zusaetzlich eine Richtung (test:motion, Drill-down).
+  assert.match(body, /if \(previous && previous !== id\) markAreaEntering\(route, drill\);/, 'nicht mehr nur schmal');
   const fn = HEALTH_JS.slice(HEALTH_JS.indexOf('function markAreaEntering('), HEALTH_JS.indexOf('function markAreaEntering(') + 400);
-  assert.match(fn, /swapContent\(panel, null\)/, 'Blende ohne Versatz am Panel');
+  assert.match(fn, /function markAreaEntering\(route, direction = 0\)/, 'ohne Angabe: Blende ohne Versatz');
+  assert.match(fn, /swapContent\(panel, null, \{ direction \}\)/, 'ueber den geteilten Helfer am Panel');
   const { eachRule } = await import('./css-rules.js');
   assert.ok(![...eachRule(read('public/styles/health.css'))].some((r) => /health-panel--entering/.test(r.selector)), 'die eigene Klasse ist weg');
 });

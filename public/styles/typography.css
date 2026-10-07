@@ -469,19 +469,9 @@ button.note-md-box:focus-visible {
 .note-md-check.is-checked .note-md-box {
   background: color-mix(in srgb, currentColor 70%, transparent);
   border-color: color-mix(in srgb, currentColor 70%, transparent);
-  /* Der Abhak-Pop der antippbaren Checkliste (#704): dieselbe kanonische
-   * check-pop-Quittung wie im Einkauf und in den Aufgaben (layout.css) - die
-   * Checkliste war der eine Alltags-Abhakmoment, der seinen Zustand noch
-   * kommentarlos wechselte (Motion-Etappe, Critique 2026-08-27). Der globale
-   * reduced-motion-Block in reset.css nullt die Dauer; die Abschaltung hier
-   * folgt trotzdem dem expliziten Muster der beiden Geschwister. */
-  animation: check-pop var(--duration-md) var(--ease-out);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .note-md-check.is-checked .note-md-box {
-    animation: none;
-  }
+  /* Die Quittung des Tipps (#704) startet der Handler (acknowledgeCheck in
+   * utils/ux.js), nicht diese Zustandsregel: hier lief sie bei jedem Zeichnen
+   * einer Notiz an jedem schon gesetzten Haken (R18, Guard test:motion). */
 }
 .note-md-check.is-checked .note-md-box::after {
   content: '';

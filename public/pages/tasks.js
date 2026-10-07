@@ -6,9 +6,9 @@
 
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
-import { openModal as openSharedModal, closeModal, whenModalClosed, wireBlurValidation, validateAll, btnSuccess, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, whenModalClosed, wireBlurValidation, validateAll, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { whenHistorySettled } from '/utils/overlay-history.js';
-import { stagger, vibrate, scheduleUndoableDelete, animationSettled, collapseOut, expandIn, wireScrollFade } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, acknowledgeCheck, collapseOut, expandIn, wireScrollFade } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
@@ -2652,23 +2652,34 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
       }
     }
 
-    btnSuccess(submitBtn, originalLabel);
-    setTimeout(() => closeModal({ force: true }), 700);
+    // DER DIALOG SCHLIESST SOFORT (Critique R18, Bewegung). Hier stand ein
+    // gruener Haken im Knopf und 700ms spaeter das Schliessen: gemessen begann
+    // der Ausgang 739-750ms nach dem Klick, die neue Zeile war nach 887-901ms
+    // zu sehen (Notizen: 25ms). Die Quittung ist die Zeile, die aufzieht, dazu
+    // der Toast oben - ein Knopf, hinter dem beides wartet, haelt nur auf.
+    // `btnSuccess` bleibt der Baustein fuer Formulare, die offen bleiben.
+    closeModal({ force: true });
     // Erst die Tag-Liste, dann neu zeichnen: ein gerade vergebener Tag soll
     // sofort in Filterleiste und Vorschlägen stehen (#586).
     await refreshTags();
     await onChanged();
+    // Der Dialog ist jetzt VOR dem Neuzeichnen zu: sein Fokus-Rueckweg (der
+    // Stift der bearbeiteten Zeile) wird mit der Liste ersetzt.
+    refocusAfterRender();
     // Angelegt, nicht bearbeitet: die neue Zeile zeigen (siehe revealCreatedTask).
     // ERST WENN DER DIALOG WEG IST und die History wieder der Seite gehoert:
-    // er schliesst 700ms nach dem Haken und gibt dabei seinen Marker per
-    // `history.back()` zurueck. Eine Auswahl davor schriebe `?open=` auf den
+    // er gibt beim Schliessen seinen Marker per `history.back()` zurueck. Eine Auswahl davor schriebe `?open=` auf den
     // Marker-Eintrag, und das `back()` truege die alte Adresse wieder herein
     // (gemessen: rechts die neue Aufgabe, in der Adresse die alte). Und die
     // Zeile zieht so ein, wenn man sie sieht, nicht hinter dem Dialog.
     if (!taskId && savedTaskId) {
       whenModalClosed()
         .then(() => whenHistorySettled())
-        .then(() => revealCreatedTask(container, savedTaskId));
+        .then(() => {
+          // Kann die Gruppe aufklappen und dabei die Liste noch einmal zeichnen.
+          revealCreatedTask(container, savedTaskId);
+          refocusAfterRender();
+        });
     }
   } catch (err) {
     resetSubmit(err.message);
@@ -4818,7 +4829,7 @@ function handleBulkDelete(taskIds, container) {
  * Abhaken mit benannter Person (#1205) - der zweite Weg zu demselben Uebergang.
  *
  * ER NIMMT DIE OPTIMISTISCHE ANIMATION BEWUSST NICHT MIT. Die gehoert zum
- * gedrueckten Haken („check-pop" quittiert genau diese Beruehrung); hier wurde
+ * gedrueckten Haken (die Quittung gehoert genau dieser Beruehrung); hier wurde
  * ein Menueeintrag gewaehlt, und der Haken hat niemand angefasst. Was bleibt,
  * ist der Teil, der die Bedienung traegt: Neuladen und dieselbe Quittung mit
  * Rueckweg wie Tipp und Wisch - mit dem Namen darin, weil sonst nichts auf dem
@@ -5019,9 +5030,11 @@ function wireTaskList(container) {
       target.classList.toggle('task-status-btn--open', nextStatus !== 'done');
       target.closest('.task-card')?.classList.toggle('task-card--done', nextStatus === 'done');
       // Die Quittung startet JETZT und läuft neben dem Roundtrip, nicht danach:
-      // `loadTasks()` ersetzt den Knopf, und ohne dieses Warten war `check-pop`
-      // (tasks.css:703) in 0 von 6 Messungen zu sehen. Siehe animationSettled().
-      const settled = animationSettled(target);
+      // `loadTasks()` ersetzt den Knopf, und ohne dieses Warten war sie in 0
+      // von 6 Messungen zu sehen. Seit R18 loest sie dieser Handler aus, nicht
+      // mehr die Zustandsklasse (siehe acknowledgeCheck()) - auch beim
+      // Zuruecknehmen.
+      const settled = acknowledgeCheck(target, { checked: nextStatus === 'done' });
       // Die Haltezeit laeuft ab dem Tipp, neben dem Roundtrip - ein langsames
       // Netz verlaengert sie nicht noch einmal (EXIT_HOLD_MS).
       const holdUntil = performance.now() + EXIT_HOLD_MS;
@@ -5063,10 +5076,19 @@ function wireTaskList(container) {
       // des Servers. Zwei Zeilen fuer eine Zusicherung, die sonst an einem
       // Attribut haengt.
       if (actingAsDisplay()) return;
+      // Wie der grosse Haken: Zustand und Quittung im Moment des Tipps, das
+      // Neuzeichnen wartet auf beides (R18 - vorher kam der Haken erst mit der
+      // Antwort, und die Quittung spielte auf JEDER erledigten Teilaufgabe).
+      const subtaskDone = target.dataset.status !== 'done';
+      target.classList.toggle('subtask-item__checkbox--done', subtaskDone);
+      const settled = acknowledgeCheck(target, { checked: subtaskDone });
       try {
         await toggleSubtaskStatus(id, target.dataset.status);
+        await settled;
         await loadTasks(container);
       } catch (err) {
+        // Der vorgezogene Haken geht zurueck - der Server kennt ihn nicht.
+        target.classList.toggle('subtask-item__checkbox--done', !subtaskDone);
         window.yuvomi.showToast(err.message, 'danger');
       }
     }

@@ -789,17 +789,10 @@
   border-color: var(--module-accent, var(--color-accent));
 }
 
-.item-check--checked {
-  animation: check-pop var(--duration-md) var(--ease-out);
-}
-
-/* Skalierungs-Pop unter reduzierter Bewegung abschalten (Audit F-07);
- * der Farbwechsel trägt das Feedback allein. */
-@media (prefers-reduced-motion: reduce) {
-  .item-check--checked {
-    animation: none;
-  }
-}
+/* KEINE ANIMATION AN `--checked` (R18). Die Quittung des Hakens startet der
+ * Handler (`acknowledgeCheck`, utils/ux.js): an der Zustandsklasse lief sie bei
+ * jedem Neuzeichnen auf jeder laengst abgehakten Zeile - beim Anlegen, Loeschen
+ * und Aufklappen einer Gruppe. Guard: test:motion. */
 
 .item-check--checked::before {
   background-color: var(--color-success);
@@ -821,15 +814,10 @@
  * Bei `shopping: read` bleibt der Kasten stehen, weil er die Auskunft traegt -
  * abgehakt oder offen -, aber nichts an ihm lockt zum Tippen: neutraler Zeiger,
  * kein Hover-Rahmen (den nimmt die Hover-Regel oben per `:not()` aus, keine
- * Gegenregel hier) und kein Pop beim Zeichnen - der Pop quittiert eine
- * Beruehrung, und bei jedem Neuaufbau einer gelesenen Liste liefe er ohne eine.
- *
- * ZWEI KLASSEN IM SELEKTOR: `.item-check--checked` traegt die Animation mit
- * derselben Spezifitaet (0,1,0); eine einzelne Klasse hier hinge an der
- * Quellreihenfolge (dieselbe Falle wie in tasks.css, Review zu PR #1252). */
+ * Gegenregel hier). Den Pop beim Zeichnen gibt es seit R18 an keinem Haken
+ * mehr: die Quittung startet der Handler, und das Zeichen hat keinen. */
 .item-check.item-check--static {
   cursor: default;
-  animation: none;
 }
 
 /* Die Zeile hakt bei `read` nicht ab - also auch kein Zeiger, der es verspricht. */

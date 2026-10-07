@@ -98,46 +98,59 @@ export function vibrate(pattern) {
   navigator.vibrate(pattern);
 }
 
+/** Haken -> laufende Quittung: ein zweiter Tipp bricht die erste ab. */
+const checkPops = new WeakMap();
+
 /**
- * Wartet, bis eine Quittungs-Animation auf `el` ausgespielt ist.
+ * Die Quittung eines Hakens - ausgeloest vom HANDLER, am beruehrten Element,
+ * genau einmal (Critique R18, Bewegung).
  *
- * DER ANLASS (Critique 2026-08-28, P0): das Abhaken einer Aufgabe zeigte nie
- * eine Quittung, obwohl `check-pop` an `.task-status-btn--done` verdrahtet ist
- * (tasks.css:703). Gemessen feuerte sie in 0 von 6 Versuchen. Der Grund war
- * kein fehlendes Bauteil, sondern ein WETTLAUF: die Klasse wurde gesetzt, und
- * der Re-Render der Liste ersetzte das Element, bevor die 200ms einen Frame
- * bekamen. Eine gebaute Animation, die nie zu sehen ist, ist teurer als keine -
- * sie sieht im Stylesheet nach erledigter Arbeit aus.
+ * WARUM NICHT MEHR PER CSS: die Quittung hing als `animation: check-pop` an
+ * den Zustandsklassen (`.item-check--checked`, `.task-status-btn--done` ...).
+ * Eine Animation an einer Zustandsklasse startet, sobald ein Knoten MIT der
+ * Klasse entsteht - also bei jedem Neuzeichnen. Gemessen im Einkauf: beim
+ * Anlegen, beim Loeschen und beim Aufklappen einer Gruppe zuckten alle laengst
+ * abgehakten Haken. Dieselbe Fehlerklasse wie #467 (Zustandszeichen), dort je
+ * Stelle mit einer Gegenregel geflickt. Jetzt traegt die Klasse nur noch das
+ * Aussehen; `test:motion` verbietet eine Animation an einer Zustandsklasse.
  *
- * DER FALLBACK IST PFLICHT, NICHT VORSICHT: unter `prefers-reduced-motion`
- * feuert `animationend` NIE, weil es gar keine Animation gibt (dieselbe Lehre
- * wie bei `transitionend` in detail-view.js:250 und router.js:1554). Ohne den
- * Timer bliebe der Aufrufer dort für immer hängen.
+ * EIN UEBERSCHWINGER. Die alte Kurve hatte fuenf Stuetzpunkte und vier
+ * Richtungswechsel in 200ms (1 - 0,8 - 1,3 - 0,95 - 1): ein Zittern. Jetzt
+ * Ruhe - Ausschlag - Ruhe. Abhaken schwingt ueber, Zuruecknehmen gibt nach und
+ * ist kuerzer - auch der Rueckweg bekommt seine Antwort.
  *
- * Der Rückgabewert ist bewusst ein Promise und kein Callback: der Aufrufer
- * startet ihn VOR seinem Server-Roundtrip und wartet danach auf beides. So
- * kostet die Quittung keine zusätzliche Zeit, solange das Netz langsamer ist
- * als sie - und sie bleibt sichtbar, wenn es schneller ist.
+ * DER WETTLAUF MIT DEM NEUZEICHNEN (Critique 2026-08-28, P0): wer nach dem
+ * Tipp die Liste neu baut, ersetzt den Haken, bevor die Quittung einen Frame
+ * bekommt (gemessen: 0 von 6 sichtbar). Deshalb das Promise: der Aufrufer
+ * startet sie VOR seinem Roundtrip und wartet danach auf beides - sie kostet
+ * keine Zeit, solange das Netz langsamer ist als sie. Es loest per Timer auf,
+ * nicht per Ereignis: im verdeckten Tab und an einem abgehaengten Knoten kommt
+ * `finish` nicht verlaesslich, und der Aufrufer bliebe haengen.
  *
- * @param {Element} el                 - Element, das die Animation trägt
+ * Reduzierte Bewegung: nichts - der Farbwechsel des Zustands traegt die
+ * Rueckmeldung allein (Audit F-07).
+ *
+ * @param {Element|null} el              der beruehrte Haken
  * @param {Object} [opts]
- * @param {number} [opts.fallback=260] - ms, nach denen ohne Event aufgelöst wird
- * @returns {Promise<void>}
+ * @param {boolean} [opts.checked=true]  true: abgehakt, false: zurueckgenommen
+ * @returns {Promise<void>} aufgeloest, wenn die Quittung ausgespielt ist
  */
-export function animationSettled(el, { fallback = 260 } = {}) {
-  if (!el) return Promise.resolve();
+export function acknowledgeCheck(el, { checked = true } = {}) {
+  if (!el || typeof el.animate !== 'function') return Promise.resolve();
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      el.removeEventListener('animationend', finish);
-      resolve();
-    };
-    el.addEventListener('animationend', finish, { once: true });
-    setTimeout(finish, fallback);
-  });
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return Promise.resolve();
+  const previous = checkPops.get(el);
+  if (previous) {
+    try { previous.cancel(); } catch { /* schon beendet */ }
+  }
+  const duration = checked ? durationToken('--duration-md', 200) : durationToken('--duration-sm', 150);
+  const anim = el.animate([
+    { transform: 'scale(1)' },
+    { transform: `scale(${checked ? 1.16 : 0.9})`, offset: 0.4 },
+    { transform: 'scale(1)' },
+  ], { duration, easing: easingToken('--ease-out', 'ease-out') });
+  checkPops.set(el, anim);
+  return settleAnimation(anim, duration);
 }
 
 /**

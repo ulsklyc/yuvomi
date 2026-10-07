@@ -1098,7 +1098,7 @@ test('Inhaltswechsel: Reiter, Zeitraeume und Bereiche tauschen ueber swapContent
     ['meals', /swapPeriod\(_container\?\.querySelector\('#week-grid'\) \?\? null, step, renderWeekGrid\)/, 'Woche'],
     ['schedule', /swapContent\(bodyEl\(\), renderPage, \{ direction \}\)/, 'Reiterwechsel'],
     ['schedule', /swapPeriod\(bodyEl\(\), step, renderPage\)/, 'Woche/Tag der Uebersicht'],
-    ['health', /swapContent\(panel, null\)/, 'Bereichswechsel in jeder Breite'],
+    ['health', /swapContent\(panel, null, \{ direction \}\)/, 'Bereichswechsel in jeder Breite (schmal mit Richtung, R18)'],
   ];
   const missing = carriers.filter(([name, pattern]) => !pattern.test(pageSource(name))).map(([name, , what]) => `${name}.js: ${what}`);
   assert.deepEqual(missing, [], `Traeger ohne den geteilten Uebergang:\n  ${missing.join('\n  ')}`);
@@ -1370,4 +1370,193 @@ test('R18: keine Drehung auf einem Knopf, der Text tragen kann - es dreht das Ic
   for (const r of grey) {
     assert.match(r.selector, /:not\(\.page-fab--docked\)/, `${r.selector} wuerde die violette Kapsel ergrauen lassen`);
   }
+});
+
+// --------------------------------------------------------------------------
+// R18, Bewegung: DIE QUITTUNG HAENGT AN DER BERUEHRUNG, NICHT AM ZUSTAND.
+//
+// `check-pop` stand als `animation` an `.item-check--checked`,
+// `.task-status-btn--done`, `.subtask-item__checkbox--done` und
+// `.note-md-check.is-checked`. Eine Animation an einer Zustandsklasse startet
+// jedes Mal, wenn ein Knoten MIT der Klasse entsteht - also bei jedem
+// Neuzeichnen. Gemessen im Einkauf: beim Anlegen, Loeschen und beim Aufklappen
+// einer Gruppe zuckten alle laengst abgehakten Haken. Das Projekt kannte die
+// Fehlerklasse (#467, das Zustandszeichen) und hatte sie je Stelle mit einer
+// Gegenregel geflickt.
+//
+// Die Regel: eine Zustandsklasse traegt Aussehen, keine Animation. Die
+// Quittung startet der Handler (`acknowledgeCheck` in utils/ux.js), am
+// beruehrten Element, einmal.
+// --------------------------------------------------------------------------
+
+/** Klassen, die einen ZUSTAND nennen - er steht, solange die Daten ihn tragen. */
+const STATE_CLASS = /\.(?:[\w-]+--(?:checked|done|selected|active|current|open|expanded|completed|pinned|archived|collapsed|on)|(?:is|was|has)-[\w-]+)(?![\w-])/;
+
+/** `datei: selektor` -> Grund. Ein Eintrag, der nichts mehr trifft, macht den Guard rot. */
+const STATE_ANIMATION_EXCEPTIONS = new Map([
+  ['layout.css: .page-toolbar--capped.is-collapsed > .page-toolbar__title', 'Large Title: der Zustand folgt dem Scrollstand am selben, nie neu gezeichneten Knoten; die Blende ist sein Uebergang (Guard "Large Title")'],
+  ['layout.css: .page-toolbar--capped.was-collapsed:not(.is-collapsed) > .page-toolbar__title', 'Rueckweg derselben Blende; `was-collapsed` faellt erst nach dem ersten Einklappen, ein Seitenaufbau spielt sie nicht'],
+]);
+
+function stateAnimations() {
+  const hits = [];
+  for (const file of allSheets) {
+    for (const rule of eachRule(css(file))) {
+      const decl = rule.body.match(/(?:^|;)\s*animation(?:-name)?\s*:\s*([^;]+)/);
+      if (!decl || /^none\b/.test(decl[1].trim())) continue;
+      // Endlos-Schleifen (Spinner an `.is-loading`) SIND der Zustand.
+      if (/(?<![\w-])infinite(?![\w-])/.test(decl[1])) continue;
+      for (const part of selectorList(rule.selector)) {
+        if (STATE_CLASS.test(part)) hits.push(`${file}: ${part.replace(/\s+/g, ' ')}`);
+      }
+    }
+  }
+  return hits;
+}
+
+test('R18: keine Animation an einer Zustandsklasse - ein Neuzeichnen spielte sie an unberuehrten Zeilen', () => {
+  // Reichweite des Musters, an Text geprueft.
+  for (const sel of ['.item-check--checked', '.task-status-btn--done', '.note-md-check.is-checked .note-md-box', '.a.was-collapsed:not(.is-collapsed) > .b']) {
+    assert.match(sel, STATE_CLASS, `${sel} muss als Zustand gelten`);
+  }
+  for (const sel of ['.modal-panel--closing', '.toast--out', '.btn--shaking', '.detail-pane--enter', '.history-list']) {
+    assert.doesNotMatch(sel, STATE_CLASS, `${sel} ist ein kurzlebiger Moment, kein Zustand`);
+  }
+  const hits = stateAnimations();
+  const offenders = hits.filter((hit) => !STATE_ANIMATION_EXCEPTIONS.has(hit));
+  assert.deepEqual(offenders, [], `Animation an einer Zustandsklasse - im Handler ausloesen (acknowledgeCheck) oder benannt ausnehmen:\n  ${offenders.join('\n  ')}`);
+  const dead = [...STATE_ANIMATION_EXCEPTIONS.keys()].filter((key) => !hits.includes(key));
+  assert.deepEqual(dead, [], `Ausnahme trifft nichts mehr - streichen:\n  ${dead.join('\n  ')}`);
+  // Die alte Kurve (fuenf Stuetzpunkte, vier Richtungswechsel in 200ms) ist weg.
+  assert.ok(!keyframeNames().has('check-pop'), '@keyframes check-pop ist in acknowledgeCheck aufgegangen');
+});
+
+/** Skalierungen der Stuetzpunkte: `scale(1.16)` -> 1.16. */
+const scalesOf = (keyframes) => keyframes.map((k) => Number(String(k.transform).match(/^scale\(([\d.]+)\)$/)?.[1]));
+
+test('acknowledgeCheck: eine Quittung am beruehrten Element, ein Ueberschwinger, auch beim Zuruecknehmen', async () => {
+  const restore = motionEnv();
+  try {
+    const { acknowledgeCheck } = await import('../public/utils/ux.js');
+    const el = motionEl('haken');
+    const started = Date.now();
+    await acknowledgeCheck(el, { checked: true }); // `finished` loest in motionEl NIE auf
+    assert.ok(Date.now() - started < 1000, 'der Timer loest auf, nicht das Ereignis - der Aufrufer wartet darauf vor dem Neuzeichnen');
+    assert.equal(el.calls.length, 1, 'genau eine Animation');
+    const up = scalesOf(el.calls[0].keyframes);
+    assert.equal(up.length, 3, 'Ruhe - Ausschlag - Ruhe: ein Richtungswechsel, nicht vier');
+    assert.equal(up[0], 1);
+    assert.equal(up[2], 1);
+    assert.ok(up[1] > 1 && up[1] <= 1.2, `Abhaken schwingt einmal ueber (${up[1]})`);
+    assert.equal(el.calls[0].timing.duration, 200, '--duration-md');
+    assert.equal(el.calls[0].timing.fill, undefined, 'kein fill: am Ende gilt das Stylesheet');
+    assert.deepEqual(el.style, {}, 'kein Inline-Stil, keine Klasse');
+
+    const back = motionEl('zurueck');
+    await acknowledgeCheck(back, { checked: false });
+    const down = scalesOf(back.calls[0].keyframes);
+    assert.ok(down[1] < 1 && down[1] >= 0.85, `Zuruecknehmen gibt einmal nach (${down[1]})`);
+    assert.equal(back.calls[0].timing.duration, 150, '--duration-sm: der Rueckweg ist kuerzer');
+
+    // Ein zweiter Tipp auf denselben Haken bricht die laufende Quittung ab.
+    const twice = motionEl('doppelt');
+    acknowledgeCheck(twice, { checked: true });
+    await acknowledgeCheck(twice, { checked: false });
+    assert.equal(twice.cancelled, 1);
+    assert.equal(twice.calls.length, 2);
+
+    await acknowledgeCheck(null); // nichts zu tun
+  } finally { restore(); }
+});
+
+test('acknowledgeCheck: reduzierte Bewegung und verdeckter Tab bewegen nichts und halten niemanden auf', async () => {
+  for (const env of [{ reduced: true }, { visibility: 'hidden' }]) {
+    const restore = motionEnv(env);
+    try {
+      const { acknowledgeCheck } = await import('../public/utils/ux.js');
+      const el = motionEl('haken');
+      await acknowledgeCheck(el, { checked: true });
+      assert.equal(el.calls.length, 0, JSON.stringify(env));
+    } finally { restore(); }
+  }
+});
+
+test('R18: jeder Abhak-Handler quittiert selbst - die Zeilen-Auffrischung nicht', () => {
+  const shopping = pageSource('shopping');
+  const toggle = shopping.slice(shopping.indexOf('async function toggleShoppingItem('), shopping.indexOf('async function toggleShoppingItem(') + 2600);
+  assert.match(toggle, /updateItemRow\(container, item\);[\s\S]{0,400}acknowledgeCheck\(checkOf\(container, id\), \{ checked: newVal === 1 \}\);/, 'Einkauf: Quittung im Tipp');
+  // updateItemRow laeuft auch fuer fremde Aenderungen (Live-Auffrischung) und
+  // beim Zuruecksetzen nach einem Fehler: dort hat niemand etwas beruehrt.
+  const refresh = shopping.slice(shopping.indexOf('function updateItemRow('), shopping.indexOf('function refreshItemName('));
+  assert.doesNotMatch(stripComments(refresh), /acknowledgeCheck/);
+
+  const tasks = pageSource('tasks');
+  assert.match(tasks, /const settled = acknowledgeCheck\(target, \{ checked: nextStatus === 'done' \}\);/, 'Aufgabe: Quittung laeuft neben dem Roundtrip');
+  assert.match(tasks, /await toggleTaskStatus\(id, status\);\s*await settled;/, 'und das Neuzeichnen wartet auf sie');
+  assert.match(tasks, /const settled = acknowledgeCheck\(target, \{ checked: subtaskDone \}\);[\s\S]{0,200}await toggleSubtaskStatus\(id, target\.dataset\.status\);\s*await settled;/, 'Teilaufgabe ebenso');
+  assert.match(pageSource('housekeeping'), /const settled = acknowledgeCheck\(button, \{ checked: true \}\);/);
+  assert.match(pageSource('notes'), /paintCheck\(noteId, line, checked\);\s*acknowledgeCheck\(box, \{ checked \}\);/, 'Notiz-Checkliste: am angetippten Kasten, nicht an jeder Ansicht');
+  assert.match(publicSource('components/task-detail.js'), /paint\(checked\);\s*acknowledgeCheck\(box, \{ checked \}\);/, 'Checkliste in der Aufgabenbeschreibung');
+  // Der alte Warter hing an `animationend` - das feuert die Web Animations API nicht.
+  assert.doesNotMatch(publicSource('utils/ux.js'), /export function animationSettled/);
+});
+
+// --------------------------------------------------------------------------
+// R18, Bewegung: "NEUE AUFGABE" SCHLIESST SOFORT. Der Dialog zeigte nach dem
+// Speichern 700ms einen Haken im Knopf und schloss dann (gemessen: Ausgang
+// beginnt 739-750ms nach dem Klick, Zeile sichtbar nach 887-901ms; Notizen
+// schliessen in 25ms). Die Quittung einer angelegten Aufgabe ist die Zeile,
+// die aufzieht - nicht ein Knopf, hinter dem sie wartet.
+// --------------------------------------------------------------------------
+test('R18: der Aufgaben-Dialog schliesst mit dem Speichern - die aufziehende Zeile ist die Quittung', () => {
+  const tasks = stripComments(pageSource('tasks'));
+  const save = tasks.slice(tasks.indexOf("const res = await api.post('/tasks', body);"), tasks.indexOf('async function handleRenameSubtask('));
+  assert.ok(save.length > 500, 'Vorbedingung: der Speicherpfad ist gefunden');
+  assert.doesNotMatch(save, /btnSuccess\(/, 'kein Haken im Knopf eines Dialogs, der schliesst');
+  assert.doesNotMatch(save, /setTimeout\(\(\) => closeModal/, 'kein verzoegertes Schliessen');
+  assert.match(save, /closeModal\(\{ force: true \}\);\s*await refreshTags\(\);\s*await onChanged\(\);/, 'schliessen, dann neu zeichnen');
+  // Die Reihenfolge der Enthuellung bleibt: erst der Dialog weg, dann die
+  // History wieder bei der Seite, dann die Zeile (sonst traegt `back()` die
+  // alte Adresse wieder herein).
+  assert.match(save, /whenModalClosed\(\)\s*\.then\(\(\) => whenHistorySettled\(\)\)\s*\.then\(\(\) => \{\s*revealCreatedTask\(container, savedTaskId\);\s*refocusAfterRender\(\);\s*\}\);/);
+  // Der Dialog ist jetzt vor dem Neuzeichnen zu - der Fokus-Rueckweg muss nachgezogen werden.
+  assert.match(save, /await onChanged\(\);\s*refocusAfterRender\(\);/);
+  // Der Fehlerpfad der Dokument-Verknuepfung haelt das Formular weiter offen.
+  assert.match(save, /resetSubmit\(t\('tasks\.documentsLinkFailed'\)\);\s*btnError\(submitBtn\);/);
+  // btnSuccess bleibt als Baustein fuer Formulare, die OFFEN bleiben.
+  assert.match(publicSource('components/modal.js'), /export function btnSuccess\(/);
+});
+
+// --------------------------------------------------------------------------
+// R18, Bewegung: DRILL-DOWN HAT EINE RICHTUNG. Einstellungen mobil, Uebersicht
+// <-> Blatt: 0 Animationen in drei Messungen (der Soft-Update-Zweig des
+// Routers ruft `startViewTransition` nie). Gesundheit, Bereich hin und
+// zurueck: nur die richtungslose Blende.
+//
+// BENANNTE AUSNAHME zur Regel "der Seiteninhalt blendet nur - kein Versatz"
+// (Guard weiter oben): die gilt dem TAB-WECHSEL - Geschwister ohne Raumbezug,
+// das Chrome steht. Ein Drill-down ist eine Ebene tiefer im SELBEN Modul; dort
+// sagt die Richtung, wohin Zurueck fuehrt. Er laeuft nicht ueber
+// `.page-transition--*`, sondern ueber `swapContent(host, ..., { direction })`:
+// 8px, RTL-fest, unter reduzierter Bewegung nur die Blende (alles oben am
+// Helfer getestet). Hinein +1, zurueck -1 - und nur dort, wo die Ebenen
+// einander ERSETZEN: neben der Seitenleiste bzw. in der Split-Ansicht bleibt
+// es bei der Blende.
+// --------------------------------------------------------------------------
+const DRILL_DOWN_HOSTS = [
+  ['settings/shell.js', /const drill = existingShell && !isSplit\(shell\) && wasLeaf !== Boolean\(activeLeaf\)\s*\? \(activeLeaf \? 1 : -1\)\s*: 0;/, 'Einstellungen: Uebersicht <-> Blatt, nur ohne Seitenleiste'],
+  ['settings/shell.js', /if \(drill\) swapContent\(content, null, \{ direction: drill \}\);\s*if \(toolbar\) renderToolbar\(toolbar, content, \{ activeLeaf, domain: leafDomain \}\);\s*await renderLeafContent\(/, 'Einstellungen: das Blatt gleitet mit seinem Geruest herein - vor dem Laden gestartet, nicht danach'],
+  ['settings/shell.js', /renderOverview\(content, domains, user\);[\s\S]{0,200}if \(drill\) swapContent\(content, null, \{ direction: drill \}\);/, 'Einstellungen: zurueck zur Uebersicht'],
+  ['pages/health.js', /const drill = !narrow \? 0 : id === HEALTH_OVERVIEW_ID \? -1 : previous === HEALTH_OVERVIEW_ID \? 1 : 0;\s*if \(previous && previous !== id\) markAreaEntering\(route, drill\);/, 'Gesundheit: Uebersicht <-> Bereich, nur schmal'],
+  ['pages/health.js', /if \(panel\) swapContent\(panel, null, \{ direction \}\);/, 'Gesundheit: ueber den geteilten Helfer'],
+];
+
+test('R18: Drill-down gleitet mit Richtung - hinein +1, zurueck -1, ueber swapContent', () => {
+  const missing = DRILL_DOWN_HOSTS.filter(([file, pattern]) => !pattern.test(publicSource(file))).map(([file, , what]) => `${file}: ${what}`);
+  assert.deepEqual(missing, [], `Drill-down ohne Richtung:\n  ${missing.join('\n  ')}`);
+  // Die Ausnahme oeffnet die Tab-Regel nicht: keine `.page-transition--*`-Regel
+  // versetzt, und kein Drill-down haengt eine solche Klasse an.
+  for (const [file] of DRILL_DOWN_HOSTS) assert.doesNotMatch(publicSource(file), /page-transition--/, `${file} greift in die Seitenblende`);
+  // Kein Doppel: das Blatt, das hereingleitet, traegt nicht zusaetzlich die Blattwechsel-Blende.
+  assert.match(publicSource('settings/shell.js'), /const swapping = Boolean\(content\.querySelector\(':scope > \.settings-leaf'\)\);/);
 });

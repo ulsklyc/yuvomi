@@ -414,28 +414,34 @@ test('der Kaskadenloeser selbst: Zustands-Suffix und :not() zaehlen mit', () => 
     'der bedienbare Knopf reagiert weiter');
 });
 
+// R18: die Quittung haengt gar nicht mehr am Stylesheet. `acknowledgeCheck`
+// (utils/ux.js) startet sie im Klick-Handler des Knopfs; das Zeichen ist ein
+// `span` ohne `data-action` und erreicht den Handler nie. Damit gilt die
+// Zusicherung staerker als vorher: KEINE Kombination der Zustandsklassen traegt
+// eine Animation - weder das Zeichen noch der bedienbare Knopf, der sie frueher
+// bei jedem Neuzeichnen mitspielte. (Blattuebergreifend: test:motion.)
+const ANIMIERT_NICHT = [null, 'none'];
+const TASKS_JS = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+
 test('eine erledigte Aufgabe im Zustandszeichen animiert nicht', () => {
-  assert.equal(
+  assert.ok(ANIMIERT_NICHT.includes(
     effektiverWert(TASKS_CSS, ['task-status-btn', 'task-status-btn--done', 'task-status-btn--static'], 'animation'),
-    'none',
-    'check-pop quittiert eine Beruehrung - hier hat niemand etwas beruehrt',
-  );
-  // Der bedienbare Knopf behaelt sie: die Quittung gehoert zum gedrueckten Haken.
-  assert.match(
-    effektiverWert(TASKS_CSS, ['task-status-btn', 'task-status-btn--done'], 'animation') ?? '',
-    /check-pop/,
-  );
+  ), 'die Quittung gehoert einer Beruehrung - hier hat niemand etwas beruehrt');
+  assert.ok(ANIMIERT_NICHT.includes(
+    effektiverWert(TASKS_CSS, ['task-status-btn', 'task-status-btn--done'], 'animation'),
+  ), 'auch der Knopf traegt sie nicht als Zustand: sie liefe bei jedem Neuzeichnen');
+  // Der bedienbare Knopf behaelt seine Quittung - im Handler.
+  assert.match(TASKS_JS, /const settled = acknowledgeCheck\(target, \{ checked: nextStatus === 'done' \}\);/);
 });
 
 test('dieselbe Zusicherung fuer die Teilaufgabe (#1209 und #467 teilen sich das Zeichen)', () => {
-  assert.equal(
+  assert.ok(ANIMIERT_NICHT.includes(
     effektiverWert(TASKS_CSS, ['subtask-item__checkbox', 'subtask-item__checkbox--done', 'subtask-item__checkbox--static'], 'animation'),
-    'none',
-  );
-  assert.match(
-    effektiverWert(TASKS_CSS, ['subtask-item__checkbox', 'subtask-item__checkbox--done'], 'animation') ?? '',
-    /check-pop/,
-  );
+  ));
+  assert.ok(ANIMIERT_NICHT.includes(
+    effektiverWert(TASKS_CSS, ['subtask-item__checkbox', 'subtask-item__checkbox--done'], 'animation'),
+  ));
+  assert.match(TASKS_JS, /const settled = acknowledgeCheck\(target, \{ checked: subtaskDone \}\);/);
 });
 
 // -------------------------------------------------------------------------

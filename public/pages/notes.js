@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, btnError, advancedSection, reportFieldError } from '/components/modal.js';
 import { wireCategoryScopeHelp } from '/components/category-manager.js';
-import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade, acknowledgeCheck } from '/utils/ux.js';
 import { redrawList } from '/utils/list-motion.js';
 import { t } from '/i18n.js';
 import { esc, renderMarkdownLight } from '/utils/html.js';
@@ -200,6 +200,7 @@ async function toggleCheck(noteId, box) {
   }
 
   paintCheck(noteId, line, checked);
+  acknowledgeCheck(box, { checked });
   vibrate(10);
 
   try {

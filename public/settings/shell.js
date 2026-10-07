@@ -2,6 +2,7 @@ import { t } from '/i18n.js';
 import { moduleAccentVar } from '/utils/module-accent.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
+import { swapContent } from '/utils/content-swap.js';
 import { createRetryState } from './components.js';
 import { watchLeafForms } from './dirty-guard.js';
 import { KITCHEN_CHILD_IDS } from './module-order.js';
@@ -1178,7 +1179,20 @@ export async function renderSettingsShell(container, {
   }
 
   const page = shell.closest('.settings-page');
+  const wasLeaf = Boolean(page?.classList.contains('settings-page--leaf'));
   page?.classList.toggle('settings-page--leaf', Boolean(activeLeaf));
+  // DRILL-DOWN MIT RICHTUNG (Critique R18, Bewegung). Ohne Seitenleiste ist die
+  // Uebersicht die Seite und ein Blatt eine Ebene tiefer - der Wechsel war ein
+  // harter Schnitt (gemessen mobil: 0 Animationen, der Soft-Update-Zweig des
+  // Routers startet keine View Transition). Hinein kommt das Blatt von der
+  // Seite, zu der man geht (+1), zurueck die Uebersicht von der anderen (-1);
+  // der Helfer spiegelt in RTL und laesst unter reduzierter Bewegung nur die
+  // Blende. Neben der Seitenleiste (Split) gibt es keine Ebene: dort bleibt die
+  // Blattwechsel-Blende aus renderLeafContent. Der erste Aufbau kommt mit der
+  // Seitenblende des Routers.
+  const drill = existingShell && !isSplit(shell) && wasLeaf !== Boolean(activeLeaf)
+    ? (activeLeaf ? 1 : -1)
+    : 0;
   const toolbar = page?.querySelector(':scope > .page-toolbar');
 
   const focusDomain = view === 'domain'
@@ -1198,12 +1212,18 @@ export async function renderSettingsShell(container, {
 
   if (activeLeaf && leafDomain) {
     // Kopf zuerst: der Rueckweg steht, bevor das Blatt geladen ist.
+    // Die Bewegung haengt am TRAEGER und startet vor dem Laden: der synchrone
+    // Teil von renderLeafContent setzt Kopf und Blatt noch in diesem Takt ein,
+    // das Blatt gleitet also mit seinem Geruest herein, nicht erst nach den
+    // Abschnitten.
+    if (drill) swapContent(content, null, { direction: drill });
     if (toolbar) renderToolbar(toolbar, content, { activeLeaf, domain: leafDomain });
     await renderLeafContent(content, activeLeaf, leafDomain, user, query);
     return;
   }
   renderOverview(content, domains, user);
   hydrateIcons(content);
+  if (drill) swapContent(content, null, { direction: drill });
   if (toolbar) renderToolbar(toolbar, content, {});
   revealOverviewSection(content, focusDomain?.id);
   if (page) watchSplit(container, page, { user, domainId: focusDomain?.id ?? null });

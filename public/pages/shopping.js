@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknowledgeCheck } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { flipSnapshot, flipPlay } from '/utils/flip.js';
 import { t } from '/i18n.js';
@@ -550,6 +550,11 @@ function settleIntents(items, listId, { fromCache = false, startedAt = 0 } = {})
   }
 }
 
+/** Der Haken einer Artikelzeile - das Element, das die Quittung traegt. */
+function checkOf(container, id) {
+  return container.querySelector(`.swipe-row[data-swipe-id="${id}"] .item-check`);
+}
+
 async function toggleShoppingItem(id, checked, container) {
   // Dritte Linie hinter Markup und Handler-Riegel: auch ein Aufruf, den ein
   // Rechtewechsel ueberholt hat, schickt nichts.
@@ -586,6 +591,11 @@ async function toggleShoppingItem(id, checked, container) {
     // Nur die betroffene Zeile aktualisieren — kein Komplett-Re-Render,
     // damit die Scroll-Position der Liste erhalten bleibt (Issue #276).
     updateItemRow(container, item);
+    // DIE QUITTUNG GEHOERT DIESEM TIPP (R18). Sie hing als CSS-Animation an
+    // `.item-check--checked` und lief deshalb bei jedem Neuzeichnen auf allen
+    // abgehakten Zeilen. `updateItemRow` selbst quittiert nichts: es laeuft
+    // auch fuer fremde Aenderungen und beim Zuruecksetzen nach einem Fehler.
+    acknowledgeCheck(checkOf(container, id), { checked: newVal === 1 });
     // userChecked NUR beim Abhaken selbst (#1039): das Zurueckholen eines
     // Artikels eroeffnet keinen neuen Feedback-Batch.
     updateCheckedActions(container, { userChecked: newVal === 1 });

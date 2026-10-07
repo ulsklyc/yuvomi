@@ -692,13 +692,20 @@ function syncDetailHead() {
 /* DER NEUE BEREICH BLENDET EIN - IN JEDER BREITE (R14 P11, R16 Bewegung).
  * Schmal schaltete der Wechsel nur `hidden` um; seit R14 blendete er dort,
  * am Desktop schnitt die Detailspalte weiter hart. Jetzt ueber den geteilten
- * Helfer (utils/content-swap.js): nur Deckkraft, kein Versatz - die Bereiche
+ * Helfer (utils/content-swap.js). Zwischen zwei Bereichen nur Deckkraft: sie
  * stehen untereinander in einer Liste, eine Seitwaertsrichtung gibt es nicht.
+ *
+ * SCHMAL IST DER BEREICH EINE EBENE TIEFER (R18): dort ersetzt er die
+ * Uebersicht, und Zurueck fuehrt zu ihr. Hinein gleitet er deshalb von der
+ * Seite, zu der man geht (`direction` +1), zurueck die Uebersicht von der
+ * anderen (-1) - 8px, in RTL gespiegelt, unter reduzierter Bewegung nur die
+ * Blende. In der Split-Ansicht steht die Liste daneben, es bleibt bei 0.
+ *
  * Der Tausch selbst ist das Umschalten von `hidden` davor; hier laeuft nur
- * die Blende, und ein zweiter Wechsel bricht sie ab. */
-function markAreaEntering(route) {
+ * die Bewegung, und ein zweiter Wechsel bricht sie ab. */
+function markAreaEntering(route, direction = 0) {
   const panel = [..._container.querySelectorAll('[data-health-panel]')].find((p) => p.dataset.healthPanel === route);
-  if (panel) swapContent(panel, null);
+  if (panel) swapContent(panel, null, { direction });
 }
 
 /* DIE "HEUTE"-REGION SPRINGT NICHT INS BILD (R18, Ursache zu #1770).
@@ -816,7 +823,8 @@ function activateArea(id) {
   for (const panel of _container.querySelectorAll('[data-health-panel]')) {
     panel.hidden = panel.dataset.healthPanel !== route;
   }
-  if (previous && previous !== id) markAreaEntering(route);
+  const drill = !narrow ? 0 : id === HEALTH_OVERVIEW_ID ? -1 : previous === HEALTH_OVERVIEW_ID ? 1 : 0;
+  if (previous && previous !== id) markAreaEntering(route, drill);
   rememberHealthRoute(route);
   syncHealthHeader();
   updateHealthFab(route);
