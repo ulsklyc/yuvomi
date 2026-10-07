@@ -311,6 +311,12 @@ const DIALOG_REGISTRY = {
   'public/pages/documents.js': [{ bars: ['dms-preview__header', 'dms-preview__actions'] }],
   'public/pages/inventory.js': [{ bars: ['inventory-booking-picker__header', 'inventory-booking-picker__nav', 'inventory-booking-picker__role-footer'] }],
   'public/pages/subscriptions.js': [{ bars: ['subscriptions-logo-picker-head', 'subscriptions-logo-search'] }],
+  // R17 (E13): das Filter-Popover am Desktop baut das Filterblatt selbst, fuer
+  // jedes Modul, das es am Knopf oeffnet (Aufgaben; der Kalender traegt seins
+  // noch im eigenen Modul). Inhalt und Fuss sind die des Blatts.
+  'public/utils/filter-sheet.js': [
+    { none: true, why: 'Filter-Popover: Haken und Fuss kommen fertig aus dem Filterblatt, ausgezeichnet wird nichts eigenes' },
+  ],
   'public/router.js': [
     { none: true, why: 'Mehr-Blatt: Navigation ohne Kopf- und Fusszeile, seine Links sind selbst die Leisten' },
     { none: true, why: 'Suche: Feld und Treffer sind selbst die Leisten' },
