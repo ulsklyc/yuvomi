@@ -159,13 +159,66 @@ test('Schreibrecht: die eigene Serie laesst sich oeffnen und umschalten, die fre
   await buehne({}, () => {
     const html = hauptteil();
     assert.match(html, /<button type="button" class="split-expense" data-recurring-id="11" aria-label="Miete - splitExpenses\.recurring\.edit">/);
-    assert.match(html, /data-recurring-toggle="11" aria-label="Miete - splitExpenses\.recurring\.pause"[^>]*>\s*<i data-lucide="pause"/);
-    assert.match(html, /data-recurring-toggle="12" aria-label="Strom - splitExpenses\.recurring\.resume"[^>]*>\s*<i data-lucide="play"/);
+    assert.match(html, /aria-label="Miete - splitExpenses\.recurring\.pause" data-recurring-toggle="11"[^>]*>\s*<i data-lucide="pause"/);
+    assert.match(html, /aria-label="Strom - splitExpenses\.recurring\.resume" data-recurring-toggle="12"[^>]*>\s*<i data-lucide="play"/);
     // Ohne `can_edit`: Leseansicht, kein Umschalter - die Regel kommt vom Server.
     assert.match(html, /<button type="button" class="split-expense" data-recurring-view="13">/);
     assert.doesNotMatch(html, /data-recurring-(id|toggle)="13"/);
     assert.match(html, /data-recurring-add/);
   });
+});
+
+// Critique R17: in der 300px-Spalte des Gruppenrasters blieben der Textspalte
+// 68px - Titel gekappt, "Naechster Termin" dreizeilig, die Zeile 134px hoch und
+// pausiert 98px, der Anlegen-Knopf 306px breit. Die Zeile stapelt jetzt (Titel
+// / Betrag + Rhythmus / Termin oder Zustand), und der Umschalter ist die
+// geteilte Zeilenaktion statt eines umrandeten 44px-Knopfes.
+test('Der Umschalter ist die geteilte Zeilenaktion, in beiden Zustaenden derselbe Knopf', async () => {
+  await buehne({}, () => {
+    const html = hauptteil();
+    for (const id of [11, 12]) {
+      const knopf = html.match(new RegExp(`<button [^>]*data-recurring-toggle="${id}"[^>]*>`));
+      assert.ok(knopf, `Umschalter ${id}`);
+      assert.match(knopf[0], /^<button type="button" class="row-action split-recurring-toggle"/, `Umschalter ${id} ist eine .row-action`);
+      assert.doesNotMatch(knopf[0], /\bbtn\b|btn--/, `Umschalter ${id} traegt keine Knopf-Kapsel`);
+      assert.match(knopf[0], / title="splitExpenses\.recurring\.(pause|resume)"/, `Umschalter ${id} nennt seine Handlung auch dem Zeiger`);
+    }
+  });
+});
+
+test('Die Serienzeile traegt in der schmalen Spalte: Titel ungekappt, beide Zustaende gleich hoch, Anlegen in der Spalte', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const regeln = [...eachRule(readFileSync(new URL('../public/styles/split-expenses.css', import.meta.url), 'utf8'))];
+  const wert = (selektor, eigenschaft) => {
+    let gefunden = null;
+    for (const { selector, body } of regeln) {
+      if (!String(selector).split(',').map((s) => s.trim()).includes(selektor)) continue;
+      const m = new RegExp(`(?:^|;)\\s*${eigenschaft}\\s*:\\s*([^;]+)`).exec(body);
+      if (m) gefunden = m[1].trim();
+    }
+    return gefunden;
+  };
+  // Der Titel: an der Ausgabenzeile einzeilig mit Ellipse, hier bricht er um.
+  assert.equal(wert('.split-expense__body strong', 'white-space'), 'nowrap', 'Vorbedingung: die Ausgabenzeile kappt ihren Titel');
+  assert.equal(wert('.split-recurring-row .split-expense__body strong', 'white-space'), 'normal', 'der Serientitel bricht um');
+  assert.equal(wert('.split-recurring-row .split-expense__body strong', 'overflow'), 'visible', 'und wird nicht beschnitten');
+  // Der Textblock loest sich auf; das Raster des Knopfes setzt seine Kinder.
+  assert.equal(wert('.split-recurring-row > button.split-expense', 'display'), 'grid');
+  assert.equal(wert('.split-recurring-row .split-expense__body', 'display'), 'contents');
+  // Termin (blanker span) und "Pausiert" (Marke) stehen in derselben Zeile mit
+  // demselben Blockpolster - sonst springt die Zeile beim Umschalten.
+  const zustand = '.split-recurring-row .split-expense__body strong + span + span';
+  assert.equal(wert(zustand, 'grid-row'), '3');
+  assert.equal(wert(zustand, 'padding-block'), 'var(--space-0h)');
+  let marke = null;
+  for (const { selector, body } of regeln) {
+    if (/\.split-recurring__state/.test(selector)) marke = /padding\s*:\s*([^;]+)/.exec(body)?.[1].trim() ?? marke;
+  }
+  assert.equal(marke, 'var(--space-0h) var(--space-2)', 'die Marke traegt dasselbe Blockpolster wie der Termin');
+  // Der Anlegen-Knopf endet an der Spaltenkante.
+  assert.equal(wert('.split-recurring-add', 'max-width'), '100%');
+  assert.equal(wert('.split-recurring-add', 'white-space'), 'normal');
 });
 
 test('Zustand steht bei jedem Recht und im Archiv: Rhythmus, Termin, "Pausiert", der Grund, der Betrag', async () => {
@@ -217,7 +270,7 @@ test('Der Titel einer Serie ist Nutzereingabe und geht durch esc()', async () =>
     // Auch in den Namen der beiden Knoepfe: ein Anfuehrungszeichen im Titel
     // schloesse sonst das Attribut.
     assert.match(html, /data-recurring-id="20" aria-label="&lt;img src=x onerror=1&gt;&quot; - splitExpenses\.recurring\.edit"/);
-    assert.match(html, /data-recurring-toggle="20" aria-label="&lt;img src=x onerror=1&gt;&quot; - splitExpenses\.recurring\.pause"/);
+    assert.match(html, /aria-label="&lt;img src=x onerror=1&gt;&quot; - splitExpenses\.recurring\.pause" data-recurring-toggle="20"/);
   });
   const boese = serie(21, { title: 'a"b<i>', paused_at: '2026-08-01T00:00:00Z' });
   await buehne({ recurring: [boese], activity: [{ id: 71, type: 'recurring_auto_paused', entity_type: 'recurring_expense', entity_id: 21, created_at: '2026-09-10T03:00:00Z', metadata: { title: 'a"b<i>' } }] }, () => {
@@ -311,7 +364,7 @@ test('Nach dem Umschalten wird die Liste neu geladen: die Zeile zeigt, was der S
     assert.ok(spur.gets.includes('/split-expenses/groups/2/recurring'), 'die Serien werden neu geholt');
     assert.equal(split.state.recurring.length, 1);
     assert.ok(split.state.recurring[0].paused_at, 'der Stand der Seite ist der des Servers');
-    assert.match(split.renderRecurring(), /data-recurring-toggle="11" aria-label="Miete - splitExpenses\.recurring\.resume"/, 'ein zweiter Klick wuerde fortsetzen, nicht noch einmal pausieren');
+    assert.match(split.renderRecurring(), /aria-label="Miete - splitExpenses\.recurring\.resume" data-recurring-toggle="11"/, 'ein zweiter Klick wuerde fortsetzen, nicht noch einmal pausieren');
   });
   // Auch wenn der Aufruf scheitert (jemand war schneller): der Schirm zeigt danach den wirklichen Stand.
   await buehne({}, async (spur) => {

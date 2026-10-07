@@ -9,6 +9,7 @@ import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode
 import { openDetailView } from '/components/detail-view.js';
 import { t, formatDate, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { rowActionHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { stagger } from '/utils/ux.js';
@@ -869,6 +870,14 @@ function mayActOnRecurring(recurring) {
  * Serie, fuer die der Server `can_edit` meldet (Verwalter oder wer sie angelegt
  * hat). Sonst oeffnet die Zeile die Leseansicht.
  *
+ * DIE ZEILE TRAEGT IN 300PX (Critique R17). Der Abschnitt steht in der rechten
+ * Spalte des Gruppenrasters, und dort blieben der Textspalte neben Marke,
+ * Betrag und Umschalter 68px: der Titel gekappt, "Naechster Termin" dreizeilig,
+ * die Zeile 134px hoch und beim Pausieren 98px. Das Markup der Zeile ist
+ * geblieben, die Anordnung macht split-expenses.css (Titel / Betrag + Rhythmus
+ * / Termin oder Zustand); der Umschalter ist die geteilte Zeilenaktion
+ * (`rowActionHtml`) statt eines umrandeten Knopfes.
+ *
  * Der Grund (`blocked_reason`) ist am heutigen Stand gemessen: er steht auch an
  * einer laufenden Serie, die der naechste Lauf pausieren wuerde, und faellt,
  * sobald eine Bearbeitung sie repariert hat.
@@ -903,9 +912,12 @@ function renderRecurring(asList = false) {
       <div class="split-recurring-row${paused ? ' split-recurring-row--paused' : ''}">
         ${acts
     ? `<button type="button" class="split-expense" data-recurring-id="${recurring.id}" aria-label="${esc(recurring.title)} - ${t('splitExpenses.recurring.edit')}">${body}</button>
-        <button type="button" class="btn btn--secondary btn--icon split-recurring-toggle" data-recurring-toggle="${recurring.id}" aria-label="${esc(`${recurring.title} - ${toggleLabel}`)}" title="${esc(toggleLabel)}">
-          <i data-lucide="${paused ? 'play' : 'pause'}" class="icon-md" aria-hidden="true"></i>
-        </button>`
+        ${rowActionHtml({
+    icon: paused ? 'play' : 'pause',
+    label: `${recurring.title} - ${toggleLabel}`,
+    className: 'split-recurring-toggle',
+    attrs: { 'data-recurring-toggle': recurring.id, title: toggleLabel },
+  })}`
     : `<button type="button" class="split-expense" data-recurring-view="${recurring.id}">${body}</button>`}
       </div>`;
   }).join('');

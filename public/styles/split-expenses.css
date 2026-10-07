@@ -512,12 +512,39 @@ button.split-expense:hover {
   margin: var(--space-2) auto 0;
 }
 
+/* Der Knopf endet an der Spaltenkante. Ein `.btn` bricht nicht um und kuerzt
+ * nicht; "Wiederkehrende Ausgabe hinzufuegen" war damit 306px in der
+ * 300px-Spalte (Critique R17). Mit dem engeren Seitenpolster passt der
+ * deutsche Text in eine Zeile (298px); eine laengere Sprache bricht um, wie
+ * die Antworten der Fortsetzen-Frage weiter unten, statt ueberzustehen. */
+.split-recurring-add {
+  max-width: 100%;
+  padding-inline: var(--space-3);
+  white-space: normal;
+  text-align: center;
+}
+
 /* Wiederkehrende Ausgaben (#1647). Die Zeile ist die Ausgabenzeile, daneben
  * steht - nur wo gehandelt werden darf - der Umschalter Pausieren/Fortsetzen.
  * Zwei Knoepfe nebeneinander statt eines im anderen: die Trennlinie und der
  * rechte Rand wandern deshalb von der Zeile an ihren Rahmen. "Pausiert" ist ein
  * Zeichen in der Form von "Storniert" und steht bei jedem Recht; der Grund,
- * warum eine Serie nicht bucht, ist eine Warnung und kein Fehler der Eingabe. */
+ * warum eine Serie nicht bucht, ist eine Warnung und kein Fehler der Eingabe.
+ *
+ * DREI ZEILEN STATT DREI SPALTEN (Critique R17). Der Abschnitt steht in der
+ * rechten Spalte des Gruppenrasters (`minmax(300px, 1fr)`), und nebeneinander
+ * blieben der Textspalte dort 68px: Titel "Mietan...", "Naechster Termin:
+ * 01.11.2026" dreizeilig, die Zeile 134px hoch und pausiert 98px. Jetzt:
+ *
+ *   Titel                        volle Breite, bricht um statt zu kappen
+ *   Betrag  Rhythmus             der Betrag fuehrt, der Rhythmus liest sich an
+ *   Termin ODER "Pausiert"       eine Zeile, in beiden Zustaenden gleich hoch
+ *   (Grund)                      nur wenn die Serie nicht bucht
+ *
+ * Das Markup bleibt die Ausgabenzeile (Marke, Textblock, Betrag): der
+ * Textblock loest sich per `display: contents` auf, und das Raster des Knopfes
+ * setzt seine Kinder. Der Umschalter ist die geteilte Zeilenaktion
+ * (`.row-action`, layout.css) und steht mittig daneben. */
 .split-recurring-row {
   display: flex;
   align-items: center;
@@ -533,11 +560,78 @@ button.split-expense:hover {
   width: auto;
   min-width: 0;
   border-top: 0;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: baseline;
+  /* Kein `column-gap`: die Marken-Spalte ist schmal leer, und eine Luecke
+   * hinter einer leeren Spalte ruekte den Text um 8px von der Zeilenkante
+   * der Nachbarlisten weg. Die Abstaende tragen Marke und Betrag selbst. */
+  gap: var(--space-0h) 0;
+}
+
+/* Neben dem Umschalter endet das Polster am Knopf, nicht an der Traegerkante. */
+.split-recurring-row > button.split-expense:not(:last-child) {
+  padding-inline-end: var(--space-1);
+}
+
+.split-recurring-row .split-expense__icon {
+  grid-column: 1;
+  grid-row: 1 / span 4;
+  align-self: center;
+  margin-inline-end: var(--space-3);
+}
+
+.split-recurring-row .split-expense__body {
+  display: contents;
+}
+
+/* Der Titel bricht um, statt zu kappen: er ist der Name, an dem man die Serie
+ * wiedererkennt, und er hat hier die ganze Zeile. */
+.split-recurring-row .split-expense__body strong {
+  grid-column: 2 / -1;
+  grid-row: 1;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+
+.split-recurring-row .split-expense__amount {
+  grid-column: 2;
+  grid-row: 2;
+  margin-inline-end: var(--space-2);
+}
+
+/* Rhythmus: der erste `span` des Textblocks. */
+.split-recurring-row .split-expense__body strong + span {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+/* Termin oder Zustand: der `span` dahinter. Beide tragen dasselbe
+ * Blockpolster wie die "Pausiert"-Marke, damit die Zeile beim Pausieren und
+ * Fortsetzen ihre Hoehe haelt (vorher 134px gegen 98px). */
+.split-recurring-row .split-expense__body strong + span + span {
+  grid-column: 2 / -1;
+  grid-row: 3;
+  justify-self: start;
+  padding-block: var(--space-0h);
+}
+
+.split-recurring-row .split-expense__body span.split-recurring__reason {
+  grid-column: 2 / -1;
+  grid-row: 4;
 }
 
 .split-recurring-toggle {
-  flex: 0 0 auto;
-  margin-inline-end: var(--space-3);
+  margin-inline-end: var(--space-1);
+}
+
+/* Die Kategorie-Marke braucht 54px. In der schmalen Spalte gehoeren die dem
+ * Termin, der sonst wieder umbricht; ab 400px Traegerbreite steht sie. */
+@container list-rows (max-width: 399px) {
+  .split-recurring-row .split-expense__icon {
+    display: none;
+  }
 }
 
 /* Die Frage beim Fortsetzen (#1647): zwei Antworten, jede mit ihrem Datum im
@@ -791,12 +885,6 @@ button.split-expense:hover {
 @container split-main (max-width: 639px) {
   .split-content-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* Schmal teilt sich die Serienzeile die Breite mit Betrag und Umschalter;
-   * die Kategorie-Marke weicht, damit "Naechster Termin" auf einer Zeile steht. */
-  .split-recurring-row .split-expense__icon {
-    display: none;
   }
 
   .split-content-grid > .split-section,
