@@ -243,12 +243,24 @@ export function filtersAsPopover() {
  * Abbau im `toggle` laeuft erst nach der Ausgangsdauer.
  */
 export function dismissFilterPopovers() {
+  releaseResize();
   for (const id of [FILTER_POPOVER_ID, 'cal-filters-popover']) {
     document.getElementById(id)?.remove();
   }
 }
 
+// Der `resize`-Lauscher des offenen Popovers. Wer den Knoten entfernt, ohne
+// dass `toggle` feuert (Seitenwechsel, ein zweites Oeffnen), haengt ihn hier
+// ab - sonst hielte das Fenster das abgehaengte Popover samt der alten Seite
+// fest, bis jemand zufaellig die Fenstergroesse aendert (#1775, Review).
+let resizeHandler = null;
+function releaseResize() {
+  if (resizeHandler) window.removeEventListener('resize', resizeHandler);
+  resizeHandler = null;
+}
+
 function openFilterPopover({ title, content, anchor }) {
+  releaseResize();
   document.getElementById(FILTER_POPOVER_ID)?.remove();
   const pop = document.createElement('div');
   pop.id = FILTER_POPOVER_ID;
@@ -274,10 +286,10 @@ function openFilterPopover({ title, content, anchor }) {
   // Faellt die Breite unter die Schwelle, gibt es diese Form dort gar nicht
   // (darunter ist es das Blatt): dann schliesst es, statt als Popover in einem
   // Fenster zu stehen, das keines mehr zeigt. Der Lauscher geht mit dem
-  // Schliessen; `dismissFilterPopovers()` entfernt den Knoten ohne `toggle`,
-  // deshalb raeumt er sich auch selbst, sobald der Knoten abgehaengt ist.
+  // Schliessen; `dismissFilterPopovers()` entfernt den Knoten ohne `toggle`
+  // und haengt ihn deshalb selbst ab (releaseResize).
   const onResize = () => {
-    if (!pop.isConnected) { window.removeEventListener('resize', onResize); return; }
+    if (!pop.isConnected) { releaseResize(); return; }
     if (!filtersAsPopover()) { pop.hidePopover(); return; }
     positionFilterPopover(pop, anchor());
   };
@@ -285,7 +297,7 @@ function openFilterPopover({ title, content, anchor }) {
     const open = event.newState === 'open';
     anchor()?.setAttribute('aria-expanded', String(open));
     if (open) return;
-    window.removeEventListener('resize', onResize);
+    if (resizeHandler === onResize) releaseResize();
     popoverClosedAt = Date.now();
     // Erst NACH dem Ausgang aus dem Baum (layout.css: --duration-xs, das
     // Popover bleibt per `allow-discrete` so lange im Top-Layer). Ein
@@ -295,6 +307,7 @@ function openFilterPopover({ title, content, anchor }) {
   pop.showPopover();
   positionFilterPopover(pop, anchor());
   window.addEventListener('resize', onResize);
+  resizeHandler = onResize;
   anchor()?.setAttribute('aria-expanded', 'true');
   // Der Fokus geht INS Popover (Tastatur: Tab laeuft durch die Filter, Esc
   // schliesst); ohne Ziel bleibt er am Knopf.

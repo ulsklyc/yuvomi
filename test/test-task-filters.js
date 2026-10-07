@@ -868,12 +868,18 @@ test('#1775: das Filter-Popover zieht bei einer Fensteraenderung mit, unter der 
     });
 
     // Der Seitenwechsel entfernt den Knoten OHNE `toggle` (dismissFilterPopovers):
-    // der Lauscher raeumt sich beim naechsten `resize` selbst und fasst nichts an.
+    // der Lauscher geht SOFORT mit, nicht erst beim naechsten `resize` - sonst
+    // hielte das Fenster das abgehaengte Popover samt der alten Seite fest
+    // (Review auf #1779).
     clock += 60_000;
     await withFilterEnv({ wide: true }, async (env) => {
+      const { dismissFilterPopovers } = await import('/utils/filter-sheet.js');
       const anchor = filterAnchor();
       openFilterSheet({ anchor: () => anchor, groups });
       const before = env.pop.style.left;
+      assert.equal(env.windowListeners.resize.size, 1);
+      dismissFilterPopovers();
+      assert.equal(env.windowListeners.resize.size, 0, 'der Seitenwechsel haengt den Lauscher ab, ohne auf ein resize zu warten');
       env.pop.isConnected = false;
       globalThis.window.innerWidth = 1100;
       env.resize();
