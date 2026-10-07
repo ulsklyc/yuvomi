@@ -887,6 +887,30 @@
   .health-dose__name { min-width: 3rem; }
 }
 
+/* DER NAME BEKOMMT DIE ZEILE (Critique R17). Die zwei Stufen darueber haben die
+ * Aktionen im Bild gehalten, aber den Namen bezahlt: bei 390px blieben ihm
+ * 81px, und „Eisen (Eisenbisglycinat) · 1x" brach mitten im Wort auf zwei
+ * Zeilen („Eisen (Ei-/senbisgl…"). In einem Modul, das Medikamente fuehrt, ist
+ * das Praeparat die Zeile. Schmal steht der Name deshalb allein in der ersten
+ * Zeile, Uhrzeit (bzw. Abstand) und Aktionen in der zweiten.
+ *
+ * NUR DIESE ZEILE, NUR SCHMAL: `.list-row` bleibt `nowrap` (die geteilte Regel
+ * fuer alle Module, siehe oben). Hier bricht eine Zeile um, die das mit
+ * Absicht tut - der Name traegt die volle Basis und die Reihenfolge, nichts
+ * faellt dem Zufall der Breite zu. */
+@container list-rows (max-width: 26rem) {
+  .health-dose {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .health-dose > .health-dose__name {
+    order: -1;
+    flex: 1 0 100%;
+    min-width: 0;
+  }
+}
+
 .health-dose__actions {
   display: inline-flex;
   gap: var(--space-2);
@@ -2013,6 +2037,22 @@ button.health-med-card:hover {
  * nichts: dort gibt es nichts zu ueberspannen. */
 .health-overview__card--vitals {
   column-span: all;
+}
+
+/* UND DER ABSTAND DAVOR IST DER REGULAERE (Critique R17). Den Abstand zwischen
+ * den Karten traegt ihr `margin-bottom`. Vor einem Spaltenumbruch wird er
+ * abgeschnitten, nur die LETZTE Spalte behaelt ihn - die Hoehe der Spalten ist
+ * also max(Spalte 1 ohne Abstand, ..., letzte Spalte mit Abstand). War eine
+ * vordere Spalte die hoechste, begann das Band direkt an ihrer Unterkante
+ * (gemessen: „Einnahmetreue" endet y=433, „Letzte Vitalwerte" beginnt y=433),
+ * sonst 16px darunter. Jetzt gibt die Karte vor dem Band ihren Abstand ab, und
+ * das Band bringt ihn selbst mit: 16px, welche Spalte auch die hoechste ist. */
+.health-overview__card:has(+ .health-overview__card--vitals) {
+  margin-bottom: 0;
+}
+
+.health-overview__card--vitals:not(:first-child) {
+  margin-top: var(--space-4);
 }
 
 /* Letzte Vitalwerte */

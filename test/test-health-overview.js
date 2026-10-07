@@ -144,3 +144,39 @@ test('medLogsToCsv: Header + medication_name', () => {
   assert.equal(head, '"scheduled_at","medication","status","taken_at","dose_qty","note"');
   assert.ok(row.includes('"Aspirin"') && row.includes('"taken"'));
 });
+
+// ---------------------------------------------------------------------------
+// Critique R17: Abstand vor dem Vitalwerte-Band, und der Name in der Dosiszeile
+// ---------------------------------------------------------------------------
+test('R17: das Vitalwerte-Band bringt seinen Abstand selbst mit - welche Spalte auch die hoechste ist', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)].filter((r) => r.at.length === 0);
+  const body = (sel) => rules.filter((r) => r.selector.trim() === sel).map((r) => r.body).join(';');
+  // Der Abstand zwischen den Karten ist ihr margin-bottom; vor einem
+  // Spaltenumbruch wird er abgeschnitten. War eine vordere Spalte die
+  // hoechste, begann das Band 0px unter ihr („Einnahmetreue" endet y=433,
+  // „Letzte Vitalwerte" beginnt y=433).
+  assert.match(body('.health-overview__card'), /margin-bottom:\s*var\(--space-4\)/, 'Vorbedingung: der Kartenabstand ist ein margin-bottom');
+  assert.match(body('.health-overview__card--vitals'), /column-span:\s*all/, 'Vorbedingung: das Band ueberspannt die Spalten');
+  assert.match(body('.health-overview__card:has(+ .health-overview__card--vitals)'), /margin-bottom:\s*0/,
+    'die Karte vor dem Band gibt ihren (mal abgeschnittenen, mal gezaehlten) Abstand ab');
+  assert.match(body('.health-overview__card--vitals:not(:first-child)'), /margin-top:\s*var\(--space-4\)/,
+    'das Band traegt den regulaeren Abschnittsabstand selbst');
+});
+
+test('R17: schmal bekommt der Medikamentenname die Zeile, die Aktionen stehen darunter', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
+  const narrow = [...eachRule(css)].filter((r) => r.at.some((a) => /@container list-rows \(max-width: 26rem\)/.test(a)));
+  const row = narrow.find((r) => r.selector.trim() === '.health-dose');
+  assert.match(row?.body ?? '', /flex-wrap:\s*wrap/, 'nur diese Zeile, nur schmal, bricht um');
+  const name = narrow.find((r) => r.selector.trim() === '.health-dose > .health-dose__name');
+  assert.match(name?.body ?? '', /flex:\s*1 0 100%/, 'der Name nimmt die ganze erste Zeile (vorher 81px, Bruch mitten im Wort)');
+  assert.match(name?.body ?? '', /order:\s*-1/, 'vor der Uhrzeit - Uhrzeit und Aktionen teilen die zweite Zeile');
+  // Die geteilte Zeile bleibt nowrap: die Regel steht NUR in der Container-Abfrage.
+  const flat = [...eachRule(css)].filter((r) => r.at.length === 0 && r.selector.trim() === '.health-dose');
+  for (const r of flat) assert.doesNotMatch(r.body, /flex-wrap/, 'ausserhalb der schmalen Stufe bricht die Dosiszeile nicht um');
+});

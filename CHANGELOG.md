@@ -212,6 +212,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Health overview: the medication name gets its own line on a phone, and the gap above "Latest
+  vitals" is always there.** The dose row left the name 81px, so "Eisen (Eisenbisglycinat)" broke
+  in the middle of the word; the name now stands on the first line, time and actions below it.
+  On a desktop the vitals band could sit flush against the card above it, depending on which
+  column was the tallest.
+
 - **Notes: no empty row between pinned and other notes.** When the pinned notes did not fill
   their last row - five notes in four columns - the rest of that row stayed empty and "Other
   notes" started a screen further down. The other notes now continue in that row; their heading
