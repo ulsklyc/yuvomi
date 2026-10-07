@@ -2,6 +2,11 @@
 /* Avatar-Stack (Mehrfach-Zuweisung Anzeige)                           */
 /* ------------------------------------------------------------------ */
 
+/* row-reverse legt den ersten Avatar ans Zeilenende und jeden weiteren
+ * davor; der Rand am Zeilenanfang (margin-inline-start) zieht den naechsten
+ * darueber. Logisch statt links, damit der Stapel in RTL genauso ueberlappt:
+ * mit margin-left ragte dort der erste Avatar ueber die Kante, und das
+ * letzte Paar lag nebeneinander statt uebereinander. */
 .avatar-stack {
   display: inline-flex;
   align-items: center;
@@ -17,7 +22,7 @@
   color: var(--color-text-on-accent);
   border: 2px solid var(--color-surface);
   flex-shrink: 0;
-  margin-left: -6px;
+  margin-inline-start: -6px;
   overflow: hidden;
 }
 
@@ -28,7 +33,7 @@
 }
 
 .avatar-stack__item:last-child {
-  margin-left: 0;
+  margin-inline-start: 0;
 }
 
 /* Der Grund ist ein Textton und kippt daher mit dem Theme (Light #6C6B67,
