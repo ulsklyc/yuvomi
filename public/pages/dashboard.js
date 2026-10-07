@@ -34,6 +34,7 @@ import { openModal, closeModal, confirmModal, refocusAfterRender } from '/compon
 import { renderAvatarStack } from '/components/user-multi-select.js';
 import { isSoloHousehold } from '/utils/household.js';
 import { toggleRegion, durationToken, easingToken } from '/utils/ux.js';
+import { swapContent } from '/utils/content-swap.js';
 import { findSettingsLeaf } from '/settings/registry.js';
 import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
@@ -116,7 +117,7 @@ const noteCategoryScope = (category) => t(
 
 const ONBOARDING_KEY = 'yuvomi-onboarded';
 // Der Dialog benennt sich ueber seinen Schritt-Titel; die id steht hier, weil
-// beide Seiten der Verknuepfung sie brauchen (Overlay und `renderStep()`).
+// beide Seiten der Verknuepfung sie brauchen (Overlay und `fillStep()`).
 const ONBOARDING_TITLE_ID = 'onboarding-step-title';
 const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
 const CUSTOMIZE_HINT_KEY = 'yuvomi-dash-customize-hint';
@@ -284,7 +285,7 @@ function showOnboarding(appContainer, onDone) {
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   // EIN DIALOG OHNE NAMEN ist fuer den Screenreader nur „Dialog". Der Name
-  // kommt aus dem Schritt-Titel, den `renderStep()` ohnehin baut; die id ist
+  // kommt aus dem Schritt-Titel, den `fillStep()` ohnehin baut; die id ist
   // deshalb konstant und wandert mit dem Austausch des Karteninhalts mit
   // (WCAG 4.1.2). `aria-modal` versteckt alles dahinter - was bleibt, muss
   // sich also selbst benennen.
@@ -295,7 +296,7 @@ function showOnboarding(appContainer, onDone) {
     if (event.key !== 'Tab') return;
     // Fokus-Trap (WCAG 2.4.3/2.1.2): der Erststart-Dialog darf den Fokus nicht
     // auf die verdeckte Seite dahinter entlassen. Fokussierbare Elemente je
-    // Tab-Druck neu ermitteln, da renderStep() den Karteninhalt austauscht.
+    // Tab-Druck neu ermitteln, da fillStep() den Karteninhalt austauscht.
     const focusables = overlay.querySelectorAll(
       'button, [href], input, [tabindex]:not([tabindex="-1"])',
     );
@@ -312,13 +313,38 @@ function showOnboarding(appContainer, onDone) {
   };
   document.addEventListener('keydown', onKeydown);
 
-  function renderStep() {
+  /* DIE KARTE STEHT, IHR INHALT WECHSELT (R17, Bewegung). Bisher baute jeder
+   * Schritt die Karte neu: sie sprang mit der Textlaenge (gemessen 327 ->
+   * 353px) und die Knoepfe wanderten unter dem Zeiger weg. Jetzt bleibt die
+   * Karte derselbe Knoten, `.onboarding-step` darin traegt den Schritt und
+   * tauscht ueber swapContent() in Leserichtung (utils/content-swap.js) - und
+   * er ist so hoch wie der hoechste der Schritte (`fitSteps()`, gemessen
+   * statt geraten: die Texte sind je Sprache verschieden lang). */
+  const card = document.createElement('div');
+  card.className = 'onboarding-card';
+  const stepEl = document.createElement('div');
+  stepEl.className = 'onboarding-step';
+  card.appendChild(stepEl);
+  overlay.appendChild(card);
+
+  function fitSteps() {
+    stepEl.style.minBlockSize = '';
+    const shown = current;
+    let tallest = 0;
+    for (current = 0; current < steps.length; current += 1) {
+      fillStep();
+      tallest = Math.max(tallest, stepEl.offsetHeight);
+    }
+    current = shown;
+    fillStep();
+    if (tallest > 0) stepEl.style.minBlockSize = `${tallest}px`;
+  }
+
+  /** Baut den Schritt `current` in die stehende Karte; gibt seinen Hauptknopf zurueck. */
+  function fillStep() {
     const step = steps[current];
     const isLast = current === steps.length - 1;
-    overlay.replaceChildren();
-
-    const card = document.createElement('div');
-    card.className = 'onboarding-card';
+    stepEl.replaceChildren();
 
     const icon = document.createElement('i');
     icon.dataset.lucide = step.icon;
@@ -365,23 +391,24 @@ function showOnboarding(appContainer, onDone) {
     nextBtn.addEventListener('click', () => {
       if (isLast) { finish(); return; }
       current++;
-      renderStep();
-      if (window.lucide) window.lucide.createIcons({ el: overlay });
-      nextBtn.focus();
+      // Der Fokus geht an den NEUEN Hauptknopf (der alte ist mit dem Schritt
+      // gegangen) - synchron nach dem Tausch, die Blende sperrt nichts.
+      let next = null;
+      swapContent(stepEl, () => { next = fillStep(); }, { direction: 1 });
+      next?.focus();
     });
 
     if (!isLast) actions.appendChild(skipBtn);
     actions.appendChild(nextBtn);
-    card.appendChild(icon);
-    card.appendChild(title);
-    card.appendChild(body);
-    card.appendChild(dots);
-    card.appendChild(progress);
-    card.appendChild(actions);
-    overlay.appendChild(card);
+    stepEl.appendChild(icon);
+    stepEl.appendChild(title);
+    stepEl.appendChild(body);
+    stepEl.appendChild(dots);
+    stepEl.appendChild(progress);
+    stepEl.appendChild(actions);
 
-    if (window.lucide) window.lucide.createIcons({ el: overlay });
-    setTimeout(() => nextBtn.focus(), 50);
+    if (window.lucide) window.lucide.createIcons({ el: stepEl });
+    return nextBtn;
   }
 
   let finished = false;
@@ -409,8 +436,10 @@ function showOnboarding(appContainer, onDone) {
     onDone?.();
   }
 
-  renderStep();
   appContainer.appendChild(overlay);
+  // Messen kann erst ein Knoten im Baum; danach steht Schritt 1.
+  fitSteps();
+  setTimeout(() => stepEl.querySelector('.btn--primary')?.focus(), 50);
   // Die Zurueck-Geste beendet die Einfuehrung, statt hinter ihr zu navigieren
   // (#871). `finish()` ist der EINE Weg hinaus und merkt sich das auch.
   attachOverlay(overlay, finish);

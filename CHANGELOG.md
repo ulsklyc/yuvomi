@@ -61,6 +61,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The calendar's filter popover opens and closes like every other menu.** On a desktop it
   appeared and vanished with a hard cut; it now grows out of the filter button and fades, and
   leaves a little faster than it came.
+- **The welcome tour keeps its card still.** Each of the three steps rebuilt the card, which
+  changed height with the length of the text and moved "Next" away from under the pointer.
+  The card now has one height for all steps, the buttons stay where they are, and the text
+  of the next step fades in from the side.
 
 ### Fixed
 

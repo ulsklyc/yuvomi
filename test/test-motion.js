@@ -1275,6 +1275,18 @@ test('Kalender: das Filter-Popover hat Ein- und Ausgang wie das Popover-Menue', 
   assert.match(toggle, /setTimeout\(\(\) => pop\.remove\(\), durationToken\('--duration-xs', 120\) \+ 40\);/);
 });
 
+test('Erststart: die Karte steht, der Schritt wechselt ueber swapContent mit fester Hoehe', () => {
+  const dash = pageSource('dashboard');
+  const fn = dash.slice(dash.indexOf('function showOnboarding('), dash.indexOf('function maybeHintCustomize('));
+  assert.doesNotMatch(fn, /overlay\.replaceChildren\(\)/, 'die Karte wird nicht mehr je Schritt neu gebaut');
+  assert.match(fn, /swapContent\(stepEl, \(\) => \{ next = fillStep\(\); \}, \{ direction: 1 \}\);\s*next\?\.focus\(\);/, 'Tausch, dann Fokus auf den neuen Hauptknopf');
+  assert.match(fn, /function fitSteps\(\) \{[\s\S]{0,420}tallest = Math\.max\(tallest, stepEl\.offsetHeight\);[\s\S]{0,200}stepEl\.style\.minBlockSize = `\$\{tallest\}px`;/, 'die Hoehe ist die des hoechsten Schritts');
+  assert.match(fn, /appContainer\.appendChild\(overlay\);[\s\S]{0,120}fitSteps\(\);/, 'gemessen wird im Baum');
+  const step = ruleBodies('dashboard.css', '.onboarding-step').join(';');
+  assert.match(step, /display:\s*flex/);
+  assert.match(ruleBodies('dashboard.css', '.onboarding-step > .onboarding-body').join(';'), /flex:\s*1 0 auto/, 'der Text nimmt den Rest, Punkte und Knoepfe stehen');
+});
+
 test('Schichtplan: Laden zeigt das geteilte Skelett, Blaettern haelt den Inhalt bis zur Antwort', () => {
   const schedule = pageSource('schedule');
   assert.doesNotMatch(schedule, /card card--padded schedule-stat-loading/, 'keine Textkarte "Laedt..." mehr');

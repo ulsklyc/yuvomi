@@ -2340,6 +2340,23 @@ svg.weather-forecast__icon {
   box-shadow: var(--shadow-lg);
 }
 
+/* Der Schritt in der stehenden Karte (dashboard.js, showOnboarding): er traegt
+ * die Spalte, die frueher die Karte selbst trug, und wechselt ueber
+ * swapContent(). Seine Mindesthoehe ist die des hoechsten Schritts (gemessen);
+ * der Text nimmt den Rest, damit Punkte und Knoepfe ueber alle Schritte an
+ * derselben Stelle stehen. */
+.onboarding-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  inline-size: 100%;
+}
+
+.onboarding-step > .onboarding-body {
+  flex: 1 0 auto;
+}
+
 .onboarding-icon {
   width: 48px;
   height: 48px;
