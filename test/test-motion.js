@@ -1153,6 +1153,7 @@ test('Listenbewegung R17: Notizen, Dokumente, Kontakte, Budget, Inventar, Abos, 
     ['split-expenses', /redrawList\(main, \(\) => drawMain\(main\), \{ selector: SPLIT_ROW, keyAttr: 'data-row-key' \}\)/, 'Ausgaben und Serien'],
     ['split-expenses', /await collapseSplitRow\(`expense-\$\{expense\.id\}`\);\s*renderAll\(\{ motion: true \}\)/, 'geloeschte Ausgabe klappt aus'],
     ['split-expenses', /await collapseSplitRow\(`recurring-\$\{recurring\.id\}`\);\s*renderAll\(\{ motion: true \}\)/, 'geloeschte Serie klappt aus'],
+    ['split-expenses', /renderAll\(\);[\s\S]{0,260}swapContent\(_container\?\.querySelector\(`#split-main \[data-row-key="recurring-\$\{id\}"\]`\) \?\? null, null\);/, 'Pausieren/Fortsetzen blendet die Serienzeile'],
     ['birthdays', /redrawList\(host, \(\) => drawList\(host, \{ repaint \}\), \{ selector: BIRTHDAY_ROW, keyAttr: 'data-swipe-id' \}\)/, 'Liste'],
     ['birthdays', /collapseRow\(row\)\.then\(\(\) => \{ if \(_container === owner\) renderList\(\{ motion: true \}\); \}\)/, 'geloeschter Geburtstag klappt aus'],
   ];

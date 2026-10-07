@@ -1169,7 +1169,12 @@ das Verhaeltnis haelt.
   Leeren blendet einmal gestaffelt ein, eine neue Zeile zieht auf (`expandIn`), eine reine
   Umsortierung gleitet (FLIP) - nie zwei Bewegungen uebereinander. Eine Zeile, die geht, klappt
   VOR dem Neuzeichnen aus (`collapseRow`). Nutzer: Aufgaben und Einkauf (Bestand),
-  Haushaltshilfe, Entsorgung (drei Listen), Vorrat, Belohnungen. Filter und Suche zeichnen ohne
+  Haushaltshilfe, Entsorgung (drei Listen), Vorrat, Belohnungen; seit R17 auch Notizen,
+  Dokumente, Kontakte, die Buchungsliste des Budgets, Inventar, Abos, Aufteilung (Ausgaben und
+  Serien) und Geburtstage - jede Seite ueber einen Schalter `motion: true`, den nur setzt, wer
+  die DATEN geaendert hat. In einem Kartenraster (Notizen, Dokumente im Raster) klappt die
+  gehende Karte NICHT vorher aus: die Nachbarkarte haelt die Zeilenhoehe, die Nachbarn gleiten
+  in die Luecke (FLIP). Filter und Suche zeichnen ohne
   Bewegung neu - dort wechselt die Frage, nicht die Liste. Ein Skelett gehoert zum ERSTEN
   Laden; danach bleibt der Inhalt stehen, bis der neue da ist.
 - **Inhaltswechsel - der Standard (`utils/content-swap.js`):** derselbe Traeger, neuer Inhalt
@@ -1183,7 +1188,22 @@ das Verhaeltnis haelt.
   `utils/period-stepper.js`). Die Seite selbst wechselt weiter ueber `swapPage` (naechster
   Punkt). Zwei kleine Geschwister in `utils/ux.js`: `toggleRegion(region, open)` fuer per
   `hidden` geschaltete Aufklapper, `growBars(root, { selector, memo })` fuer Balken ueber
-  `--bar-scale` (der Endwert steht im Markup, der Helfer setzt nur den Startwert).
+  `--bar-scale` (der Endwert steht im Markup, der Helfer setzt nur den Startwert). Seit R17
+  tauschen darueber auch die Detailspalte von "Liste + Detail" (nur beim Wechsel der Auswahl,
+  ohne Richtung - ein Versatz machte die Spalte zum Bezugsrahmen ihres klebenden Kopfes), das
+  Tagesraster des Datepickers (gerichtet), die Schritte des Erststart-Dialogs (die Karte steht,
+  so hoch wie der hoechste Schritt) und die Serienzeile der Aufteilung beim
+  Pausieren/Fortsetzen. Drittes Geschwister: `drawChartOnce(memo, { lines, arcs })` - Kurven
+  zeichnen sich entlang der Zeitachse ein (`clip-path`), Ringsegmente fuellen sich im
+  Uhrzeigersinn, EINMAL je Sitzung und Diagramm; Blaettern spielt es nicht neu ab.
+- **Zeitraum-Wisch (`utils/period-swipe.js`):** Kalender (Monat, Woche, Tag) und seit R17 die
+  Budget-Reiter mit Zeitachse (`TAB_CAPS.month`: Budget, Plan, Berichte) blaettern per
+  waagerechtem Wisch ueber denselben Stepper wie die Pfeile. Senkrecht gewinnt das Scrollen;
+  was selbst waagerecht arbeitet (`.u-scroll-fade`, die Diagrammflaeche der Berichte,
+  Eingabefelder), behaelt seinen Finger. Das Hereingleiten steht in layout.css.
+- **Titel im Kopf:** der Groessenwechsel des Large Title faellt weiter in einen Frame (keine
+  `font-size`-Transition); der Titel blendet an der neuen Stelle ein (`opacity`,
+  `--duration-xs`), ebenso der angedockte Titel der scrollenden Seiten (ein und aus).
 - **Seitenwechsel:** Kontinuitaet vor Effekt - Navigation, Kopf und Tab-Leisten STEHEN, nur
   der Inhalt wechselt. Der Router tauscht per View Transition (`utils/view-transition.js`):
   Wurzel-Blende 200ms `--ease-out`, Seitenleiste und Kapsel zeigen nur ihr lebendes Bild,
