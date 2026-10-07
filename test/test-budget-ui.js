@@ -4821,3 +4821,20 @@ test('R17: in der Statistik stehen Ausgaben und Einnahmen nebeneinander, der Nam
   const base = rules.find((r) => r.selector.trim() === '.budget-bar-row__label' && r.at.length === 0 && /font-size/.test(r.body));
   assert.match(base?.body ?? '', /font-size:\s*var\(--text-xs\)/);
 });
+
+// Review an #1767: zwei Stellen, die an der Fensterbreite haengen.
+test('R17: der Verlauf zeichnet neu, wenn das Fenster die Schwelle kreuzt; ein Menue setzt ALLE Ausloeser zurueck', () => {
+  const watch = stats.slice(stats.indexOf('function watchTrendBreakpoint(panel)'), stats.indexOf('function trendGeometry()'));
+  assert.ok(watch.length > 0, 'watchTrendBreakpoint fehlt');
+  assert.match(watch, /matchMedia\?\.\('\(max-width: 639px\)'\)/, 'dieselbe Schwelle wie trendGeometry()');
+  assert.match(stats, /trendGeometry\(\) \{\s*return globalThis\.window\?\.matchMedia\?\.\('\(max-width: 639px\)'\)/);
+  assert.match(watch, /addEventListener\('change', onChange\)/);
+  assert.match(watch, /if \(!panel\.isConnected\) \{\s*mql\.removeEventListener\('change', onChange\)/, 'meldet sich ab, wenn das Panel weg ist');
+  assert.match(watch, /trendWatch\?\.mql\.removeEventListener/, 'ein Lauscher, nicht einer je Aufbau');
+  assert.match(stats, /renderTrendChart\(\);\s*watchTrendBreakpoint\(panel\);/);
+
+  const menu = read('../public/utils/popover-menu.js');
+  const toggle = menu.slice(menu.indexOf('function onToggle(event)'));
+  assert.match(toggle, /querySelectorAll\(`\[popovertarget="\$\{panel\.id\}"\]`\)\) el\.setAttribute\('aria-expanded', 'false'\);[\s\S]*?trigger\?\.setAttribute\('aria-expanded', String\(event\.newState === 'open'\)\)/,
+    'erst alle auf false, dann der sichtbare auf den Zustand');
+});

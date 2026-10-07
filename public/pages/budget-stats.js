@@ -200,6 +200,7 @@ function renderBodyContent(body) {
     <div class="budget-stats__export"></div>
   `);
   renderTrendChart();
+  watchTrendBreakpoint(panel);
   renderCatBars();
   renderDonut();
   renderExport();
@@ -548,6 +549,30 @@ function renderTrendChart() {
 
 /** Die Flaeche des Verlaufs: mobil hoeher (siehe renderTrendChart). */
 const TREND_CHART_NARROW = Object.freeze({ ...CHART, H: 300 });
+
+/**
+ * Die Geometrie haengt an der Breite, also zeichnet der Verlauf neu, wenn das
+ * Fenster die Schwelle kreuzt (Telefon gedreht, Fenster geteilt): sonst blieb
+ * die Flaeche der alten Breite stehen - 600x200 auf dem Telefon ist genau das
+ * gedrungene Diagramm, das die hoehere Flaeche abloest. EIN Lauscher je
+ * Modul; er meldet sich ab, sobald sein Panel aus dem Dokument ist.
+ */
+let trendWatch = null;
+function watchTrendBreakpoint(panel) {
+  const mql = globalThis.window?.matchMedia?.('(max-width: 639px)');
+  if (!mql?.addEventListener) return;
+  trendWatch?.mql.removeEventListener('change', trendWatch.onChange);
+  const onChange = () => {
+    if (!panel.isConnected) {
+      mql.removeEventListener('change', onChange);
+      if (trendWatch?.onChange === onChange) trendWatch = null;
+      return;
+    }
+    renderTrendChart();
+  };
+  mql.addEventListener('change', onChange);
+  trendWatch = { mql, onChange };
+}
 
 function trendGeometry() {
   return globalThis.window?.matchMedia?.('(max-width: 639px)')?.matches === true ? TREND_CHART_NARROW : CHART;
