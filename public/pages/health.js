@@ -6575,17 +6575,28 @@ function renderCycleShell() {
     return;
   }
 
+  // DIE HEUTE-KARTE STEHT SCHMAL VOR DEN KENNZAHLEN (R17 Schritt 5, Critique
+  // 2026-10-07 A6 P1). Gemessen 390x844: sie begann bei y 667 und war 161px
+  // hoch - "Tag protokollieren" lag bei y 768 unter der Navigation (ab 768).
+  // Unter 640px steht der Kopfbereich als Spalte; dort kommt die Karte direkt
+  // nach dem Ring, vor die Kacheln. Im MARKUP an der Stelle, an der sie zu
+  // sehen ist (Tab-Folge = Bild, kein `order`); darueber bleibt sie unter der
+  // Legende, wo sie stand. watchCycleTodayPlace() zeichnet beim Wechsel der
+  // Breite neu.
+  const todayLeads = cycleTodayLeads();
+  watchCycleTodayPlace();
   cycle.root.insertAdjacentHTML('beforeend', `
     ${persons}
     ${own ? cycleBubbleMarkup(prediction, pms, darf, { withRing: true }) : ''}
     <div class="cycle-hero">
       ${cycleRingMarkup(prediction)}
+      ${darf && todayLeads ? cycleTodayActionsMarkup() : ''}
       <div class="cycle-hero__side">
         ${cycleStatsMarkup(prediction)}
       </div>
     </div>
     ${cycleRingLegendMarkup(prediction)}
-    ${darf ? cycleTodayActionsMarkup() : ''}
+    ${darf && !todayLeads ? cycleTodayActionsMarkup() : ''}
     ${cyclePairMarkup(cycleCalendarMarkup(own, pms, darf), cycleTrendsMarkup())}
     ${cycleHistoryMarkup(darf)}
     ${cycleFooterMarkup(darf, prediction)}
@@ -7077,6 +7088,24 @@ function cycleOpenPeriod() {
   return [...cycle.periods]
     .filter((p) => !p.end_date && String(p.start_date).slice(0, 10) <= today)
     .sort((a, b) => (a.start_date < b.start_date ? 1 : -1))[0] || null;
+}
+
+/** Dieselbe Schwelle, an der `.cycle-hero` zur Spalte wird (health.css). */
+const CYCLE_TODAY_LEADS_QUERY = '(max-width: 639px)';
+
+function cycleTodayLeads() {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia(CYCLE_TODAY_LEADS_QUERY).matches;
+}
+
+let cycleTodayMedia = null;
+
+/* EIN Zuhoerer fuer die Lebenszeit des Moduls: er zeichnet nur, solange die
+ * Zyklus-Flaeche im Dokument haengt (renderCycleShell prueft das selbst). */
+function watchCycleTodayPlace() {
+  if (cycleTodayMedia || typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+  cycleTodayMedia = window.matchMedia(CYCLE_TODAY_LEADS_QUERY);
+  cycleTodayMedia.addEventListener?.('change', () => renderCycleShell());
 }
 
 function cycleTodayActionsMarkup(pregnant = false) {
@@ -8501,34 +8530,19 @@ function openDayLogModal(dateKey) {
   // Chip-Reihe braucht also keinen eigenen Sichtbarkeits-Check.
   const intimacyButtons = singleChoiceButtons(INTIMACY_TYPES, 'health.cycle.intimacy.none', existing?.intimacy, 'intimacy');
 
-  openModal({
-    title: `${t('health.cycle.dayLog.title')} · ${formatDate(key)}`,
-    size: 'md',
-    // A-2: kein Autofokus auf das erste Formularfeld (das waere ohne dieses
-    // Flag die Basaltemperatur weiter unten, siehe FIRST_FIELD in modal.js) -
-    // der Browser scrollt sonst beim Fokussieren dorthin, und die
-    // Blutungsstaerke-Gruppe (das meistgenutzte Feld, ganz oben im Formular)
-    // rutscht aus dem sichtbaren Bereich. onSave() setzt den Fokus stattdessen
-    // gezielt auf den ersten Flow-Chip.
-    initialFocus: 'none',
-    content: `
-      <form id="cycle-log-form" class="form-stack">
-        <div class="form-field">
-          <span class="label">${esc(t('health.cycle.flow.label'))}</span>
-          <div class="health-choices" data-group="flow" role="group" aria-label="${esc(t('health.cycle.flow.label'))}">${flowButtons}</div>
-        </div>
-        <div class="form-field">
-          <span class="label">${esc(t('health.cycle.symptom.label'))}</span>
-          <div class="health-choices health-choices--wrap" data-group="symptoms">${symptomButtons}</div>
-          <div class="cycle-quick-links">
-            <button type="button" class="btn btn--ghost btn--sm" data-action="cycle-log-painkiller">${esc(t('health.cycle.quickLink.painkiller'))}</button>
-            <button type="button" class="btn btn--ghost btn--sm" data-action="cycle-log-weight">${esc(t('health.cycle.quickLink.weight'))}</button>
-          </div>
-        </div>
-        <div class="form-field">
-          <span class="label">${esc(t('health.cycle.feelings.label'))}</span>
-          <div class="health-choices health-choices--wrap" data-group="feelings">${feelingsButtons}</div>
-        </div>
+  // WEITERE ANGABEN (R17, E10; Critique 2026-10-07 A6 P1). Der Dialog trug 51
+  // Schalter ohne Stufung - mobil 2215px Koerper in 591px, 3,7 Bildschirme.
+  // Blutung, Symptome und Gefuehle sind der taegliche Eintrag und bleiben
+  // oben; Basaltemperatur, Zervixschleim, Tests und Intimitaet traegt nur ein,
+  // wer sie fuehrt. Sie stehen hinter dem geteilten Aufklapper (wie im
+  // Vorsorge- und im Upload-Dialog), der selbst sagt, was er birgt, und der
+  // offen startet, sobald dort schon ein Wert steht - ein gesetzter Wert
+  // hinter einem geschlossenen Riegel waere unsichtbar. Die Felder bleiben im
+  // DOM; Verdrahtung, Dirty-Check und Absenden lesen sie wie bisher.
+  const moreOpen = Boolean(existing && (existing.basal_temp != null || existing.cervix_mucus
+    || existing.lh_test || existing.pregnancy_test || existing.intimacy));
+  const moreHint = [t('health.cycle.bbt.label'), t('health.cycle.mucus.label'), t('health.cycle.test.label'), t('health.cycle.intimacy.label')].join(', ');
+  const moreFieldsHtml = `
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
             <label class="label" for="cycle-bbt">${esc(t('health.cycle.bbt.label'))}</label>
@@ -8566,6 +8580,36 @@ function openDayLogModal(dateKey) {
           <div class="health-choices" data-group="intimacy" role="group" aria-label="${esc(t('health.cycle.intimacy.label'))}">${intimacyButtons}</div>
           <p class="cycle-hint">${esc(t('health.cycle.intimacy.hint'))}</p>
         </div>
+`;
+
+  openModal({
+    title: `${t('health.cycle.dayLog.title')} · ${formatDate(key)}`,
+    size: 'md',
+    // A-2: kein Autofokus auf das erste Formularfeld (das waere ohne dieses
+    // Flag die Basaltemperatur weiter unten, siehe FIRST_FIELD in modal.js) -
+    // der Browser scrollt sonst beim Fokussieren dorthin, und die
+    // Blutungsstaerke-Gruppe (das meistgenutzte Feld, ganz oben im Formular)
+    // rutscht aus dem sichtbaren Bereich. onSave() setzt den Fokus stattdessen
+    // gezielt auf den ersten Flow-Chip.
+    initialFocus: 'none',
+    content: `
+      <form id="cycle-log-form" class="form-stack">
+        <div class="form-field">
+          <span class="label">${esc(t('health.cycle.flow.label'))}</span>
+          <div class="health-choices" data-group="flow" role="group" aria-label="${esc(t('health.cycle.flow.label'))}">${flowButtons}</div>
+        </div>
+        <div class="form-field">
+          <span class="label">${esc(t('health.cycle.symptom.label'))}</span>
+          <div class="health-choices health-choices--wrap" data-group="symptoms">${symptomButtons}</div>
+          <div class="cycle-quick-links">
+            <button type="button" class="btn btn--ghost btn--sm" data-action="cycle-log-painkiller">${esc(t('health.cycle.quickLink.painkiller'))}</button>
+            <button type="button" class="btn btn--ghost btn--sm" data-action="cycle-log-weight">${esc(t('health.cycle.quickLink.weight'))}</button>
+          </div>
+        </div>
+        <div class="form-field">
+          <span class="label">${esc(t('health.cycle.feelings.label'))}</span>
+          <div class="health-choices health-choices--wrap" data-group="feelings">${feelingsButtons}</div>
+        </div>
         <div class="form-field">
           <label class="label" for="cycle-log-visibility">${esc(t('health.cycle.field.visibility'))}</label>
           <select class="input" id="cycle-log-visibility">
@@ -8577,6 +8621,7 @@ function openDayLogModal(dateKey) {
           <label class="label" for="cycle-log-note">${esc(t('health.cycle.field.note'))}</label>
           <textarea class="input" id="cycle-log-note" rows="2" maxlength="2000">${esc(existing?.note || '')}</textarea>
         </div>
+        ${advancedSection(moreFieldsHtml, { label: t('health.cycle.dayLog.more'), hint: moreHint, open: moreOpen })}
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${existing ? `<button type="button" class="btn btn--danger-outline" data-action="cycle-delete-log" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
@@ -8981,6 +9026,8 @@ export const __test = {
   cycleBubbleMarkup,
   cyclePregnancyMarkup,
   cycleTodayActionsMarkup,
+  // R17 E10: der Tages-Dialog (Stufung "Weitere Angaben").
+  openDayLogModal,
   cycleCalendarMarkup,
   cycleDayLabel,
   cycleHistoryMarkup,

@@ -3251,7 +3251,11 @@ test('renderCycleShell() reicht beide Antworten getrennt weiter', () => {
   // Der Kalender bekommt beide: `own` fuer das Lesbare, `darf` fuer den Knopf.
   assert.match(fn, /cycleCalendarMarkup\(own, pms, darf\)/);
   // Alles, was nur handelt, haengt an `darf`.
-  assert.match(fn, /\$\{darf \? cycleTodayActionsMarkup\(\) : ''\}/);
+  // Seit R17 steht die Heute-Karte an zwei moeglichen Stellen (schmal vor den
+  // Kennzahlen, breit unter der Legende) - an `darf` haengt jede von ihnen.
+  const todayCalls = fn.match(/\$\{[^}]*cycleTodayActionsMarkup\([^)]*\)[^}]*\}/g) ?? [];
+  assert.equal(todayCalls.length, 3, 'Reichweite: Schwangerschaft, schmal, breit');
+  for (const call of todayCalls) assert.match(call, /^\$\{darf (\? |&& )/, `${call} haengt an darf`);
   assert.match(fn, /cycleHistoryMarkup\(darf\)/);
   assert.match(fn, /cycleFooterMarkup\(darf\)/);
   assert.match(fn, /cyclePregnancyMarkup\(prediction, darf\)/);

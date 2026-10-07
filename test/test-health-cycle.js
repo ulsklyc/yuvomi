@@ -2093,3 +2093,82 @@ test('R17: cycleDayLabel() nennt heute, Vorhersage, Eisprung, Symptom-Overlay un
     healthPage.setViewStateForTest('cycle', { likelihoodSymptom: null });
   }
 });
+
+// --------------------------------------------------------
+// R17 E10 (Critique 2026-10-07, A6 P1): "Tag protokollieren" gestuft
+// --------------------------------------------------------
+// 51 Schalter ohne Stufung, mobil 2215px Koerper in 591px. Blutung, Symptome
+// und Gefuehle bleiben oben; Basaltemperatur, Zervixschleim, Tests und
+// Intimitaet stehen hinter "Weitere Angaben".
+function tagesDialog(log) {
+  const abraeumen = installMiniDom();
+  setPermissions({ admin: false, modules: { health: 'write' }, widgets: {}, capabilities: {} });
+  healthPage.setViewStateForTest('cycle', { meId: 1, personId: 1, periods: [], settings: {}, logs: log ? [log] : [] });
+  let dialog = null;
+  let mehr = null;
+  const vorModal = globalThis.__openModal;
+  const vorMehr = globalThis.__advancedSection;
+  globalThis.__openModal = (opts) => { dialog = opts; };
+  globalThis.__advancedSection = (inner, options) => { mehr = { inner, options }; return '<!--mehr-->'; };
+  try {
+    healthPage.openDayLogModal('2026-06-03');
+  } finally {
+    if (vorModal === undefined) delete globalThis.__openModal; else globalThis.__openModal = vorModal;
+    if (vorMehr === undefined) delete globalThis.__advancedSection; else globalThis.__advancedSection = vorMehr;
+    healthPage.setViewStateForTest('cycle', { periods: [], logs: [], settings: {} });
+    clearPermissions();
+    abraeumen();
+  }
+  return { dialog, mehr };
+}
+
+test('R17 E10: Blutung, Symptome und Gefuehle stehen oben, vier Angaben hinter "Weitere Angaben"', () => {
+  const { dialog, mehr } = tagesDialog(null);
+  assert.ok(dialog, 'Reichweite: der Dialog oeffnet');
+  assert.ok(mehr, 'der Dialog nutzt den geteilten Aufklapper (advancedSection)');
+  const oben = dialog.content;
+  for (const gruppe of ['flow', 'symptoms', 'feelings']) {
+    assert.match(oben, new RegExp(`data-group="${gruppe}"`), `${gruppe} bleibt im sichtbaren Teil`);
+    assert.doesNotMatch(mehr.inner, new RegExp(`data-group="${gruppe}"`), `${gruppe} steht nicht hinter dem Aufklapper`);
+  }
+  for (const feld of ['id="cycle-bbt"', 'id="cycle-bbt-unit"', 'data-group="mucus"', 'data-group="lh-test"', 'data-group="pregnancy-test"', 'data-group="intimacy"']) {
+    assert.ok(mehr.inner.includes(feld), `${feld} steht hinter "Weitere Angaben"`);
+    assert.ok(!oben.includes(feld), `${feld} steht nicht mehr im sichtbaren Teil`);
+  }
+  for (const feld of ['id="cycle-log-visibility"', 'id="cycle-log-note"']) {
+    assert.ok(oben.includes(feld), `${feld} bleibt sichtbar`);
+  }
+  assert.ok(oben.indexOf('<!--mehr-->') > oben.indexOf('id="cycle-log-note"'), 'der Aufklapper steht als Letztes vor dem Fuss');
+  assert.ok(oben.indexOf('<!--mehr-->') < oben.indexOf('modal-panel__footer'));
+  assert.equal(mehr.options.label, 'health.cycle.dayLog.more');
+  assert.equal(mehr.options.open, false, 'ohne Werte startet er geschlossen');
+  for (const key of ['health.cycle.bbt.label', 'health.cycle.mucus.label', 'health.cycle.test.label', 'health.cycle.intimacy.label']) {
+    assert.ok(mehr.options.hint.includes(key), `der Aufklapper nennt, was er birgt (${key})`);
+  }
+});
+
+test('R17 E10: "Weitere Angaben" startet offen, sobald dort ein Wert steht - und nur dann', () => {
+  const basis = { id: 2, log_date: '2026-06-03', flow: 'medium', symptoms: null, feelings: ['calm'], note: 'x' };
+  assert.equal(tagesDialog(basis).mehr.options.open, false, 'Blutung, Gefuehl und Notiz oeffnen ihn nicht');
+  for (const wert of [{ basal_temp: 36.6, basal_temp_unit: 'c' }, { basal_temp: 0 }, { cervix_mucus: 'creamy' }, { lh_test: 'positive' }, { pregnancy_test: 'negative' }, { intimacy: 'protected' }]) {
+    assert.equal(tagesDialog({ ...basis, ...wert }).mehr.options.open, true,
+      `${JSON.stringify(wert)}: ein gesetzter Wert hinter einem geschlossenen Riegel waere unsichtbar`);
+  }
+});
+
+// Die Heute-Karte lag mobil bei y 667 (161px hoch) unter der Navigation (ab
+// y 768). Unter 640px steht sie im Markup zwischen Ring und Kennzahlen.
+test('R17: die Heute-Karte steht schmal vor den Kennzahlen, breit bleibt sie unter der Legende', () => {
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const shell = src.match(/function renderCycleShell\(\)[\s\S]*?\n\}\n/)?.[0] ?? '';
+  const hero = shell.match(/<div class="cycle-hero">[\s\S]*?\$\{cycleRingLegendMarkup\(prediction\)\}\n[^\n]*\n/)?.[0] ?? '';
+  assert.match(hero, /\$\{cycleRingMarkup\(prediction\)\}\s*\$\{darf && todayLeads \? cycleTodayActionsMarkup\(\) : ''\}\s*<div class="cycle-hero__side">/,
+    'schmal: Ring, Heute-Karte, Kennzahlen - in dieser Reihenfolge im Markup (Tab-Folge = Bild)');
+  assert.match(hero, /\$\{cycleRingLegendMarkup\(prediction\)\}\s*\$\{darf && !todayLeads \? cycleTodayActionsMarkup\(\) : ''\}/,
+    'breit: unter der Legende, wo sie stand');
+  assert.match(src, /const CYCLE_TODAY_LEADS_QUERY = '\(max-width: 639px\)'/, 'dieselbe Schwelle wie die Spaltenform des Kopfbereichs');
+  const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
+  assert.match(css, /@media \(max-width: 639px\) \{\s*\.cycle-hero \{ flex-direction: column; \}/, 'health.css: die Spalte beginnt an derselben Schwelle');
+  assert.match(css, /\.cycle-hero > \.cycle-today \{\s*align-self: stretch;/, 'in der Spalte nimmt die Karte die volle Breite');
+});
+

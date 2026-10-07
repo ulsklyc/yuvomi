@@ -5079,7 +5079,8 @@
             },
             "dayLog": {
                 "title": "Log day",
-                "date": "Date"
+                "date": "Date",
+                "more": "More details"
             },
             "export": {
                 "csv": "Export as CSV"

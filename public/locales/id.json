@@ -5079,7 +5079,8 @@
             },
             "dayLog": {
                 "title": "Catat hari",
-                "date": "Tanggal"
+                "date": "Tanggal",
+                "more": "Detail lainnya"
             },
             "export": {
                 "csv": "Ekspor sebagai CSV"

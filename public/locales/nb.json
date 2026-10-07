@@ -5079,7 +5079,8 @@
             },
             "dayLog": {
                 "title": "Logg dag",
-                "date": "Dato"
+                "date": "Dato",
+                "more": "Flere detaljer"
             },
             "export": {
                 "csv": "Eksporter som CSV"

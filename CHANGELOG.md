@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **"Log day" in the cycle tracker shows the daily entries first.** Bleeding, symptoms and
+  feelings stay at the top; basal temperature, cervical mucus, tests and intimacy sit behind "More
+  details", which opens by itself when one of them already has a value. On a phone the dialog is
+  about a third shorter, and the "Today" card with "Log day" now stands above the figures instead
+  of below the navigation bar.
 - **Meal plan and shopping list give the second header row back when you scroll (phone).** Under
   the kitchen tabs the row with the week or the lists stayed put - 121 px of header at any scroll
   position, where the pantry beside it folds to 56. It now folds away like the pantry's and

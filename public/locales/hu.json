@@ -5079,7 +5079,8 @@
             },
             "dayLog": {
                 "title": "Nap rögzítése",
-                "date": "Dátum"
+                "date": "Dátum",
+                "more": "További adatok"
             },
             "export": {
                 "csv": "Exportálás CSV-ként"

@@ -5329,7 +5329,8 @@
             },
             "dayLog": {
                 "title": "Zapisz dzień",
-                "date": "Data"
+                "date": "Data",
+                "more": "Więcej informacji"
             },
             "export": {
                 "csv": "Eksportuj jako CSV"

@@ -5205,7 +5205,8 @@
             },
             "dayLog": {
                 "title": "Zaznamenat den",
-                "date": "Datum"
+                "date": "Datum",
+                "more": "Další údaje"
             },
             "export": {
                 "csv": "Exportovat jako CSV"

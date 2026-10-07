@@ -5079,7 +5079,8 @@
             },
             "dayLog": {
                 "title": "Tag protokollieren",
-                "date": "Datum"
+                "date": "Datum",
+                "more": "Weitere Angaben"
             },
             "export": {
                 "csv": "Als CSV exportieren"

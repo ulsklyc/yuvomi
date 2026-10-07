@@ -5079,7 +5079,8 @@
             },
             "dayLog": {
                 "title": "记录当天",
-                "date": "日期"
+                "date": "日期",
+                "more": "更多信息"
             },
             "export": {
                 "csv": "导出为 CSV"

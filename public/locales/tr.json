@@ -5079,7 +5079,8 @@
             },
             "dayLog": {
                 "title": "Günü kaydet",
-                "date": "Tarih"
+                "date": "Tarih",
+                "more": "Diğer bilgiler"
             },
             "export": {
                 "csv": "CSV olarak dışa aktar"

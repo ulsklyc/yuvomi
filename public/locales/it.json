@@ -5079,7 +5079,8 @@
             },
             "dayLog": {
                 "title": "Registra giorno",
-                "date": "Data"
+                "date": "Data",
+                "more": "Altri dettagli"
             },
             "export": {
                 "csv": "Esporta come CSV"

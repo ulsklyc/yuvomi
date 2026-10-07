@@ -5079,7 +5079,8 @@
             },
             "dayLog": {
                 "title": "Ghi lại ngày",
-                "date": "Ngày"
+                "date": "Ngày",
+                "more": "Thông tin thêm"
             },
             "export": {
                 "csv": "Xuất ra CSV"

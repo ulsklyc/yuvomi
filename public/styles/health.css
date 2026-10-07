@@ -3476,6 +3476,14 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 @media (max-width: 639px) {
   .cycle-hero { flex-direction: column; }
   .cycle-ring { width: 200px; height: 200px; }
+
+  /* Schmal steht die Heute-Karte IN der Spalte, zwischen Ring und Kennzahlen
+   * (health.js, renderCycleShell): volle Breite statt mittig auf
+   * Inhaltsbreite, und der Abstand kommt aus dem `gap` der Spalte. */
+  .cycle-hero > .cycle-today {
+    align-self: stretch;
+    margin-top: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

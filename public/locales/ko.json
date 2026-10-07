@@ -5079,7 +5079,8 @@
             },
             "dayLog": {
                 "title": "하루 기록",
-                "date": "날짜"
+                "date": "날짜",
+                "more": "추가 정보"
             },
             "export": {
                 "csv": "CSV로 내보내기"

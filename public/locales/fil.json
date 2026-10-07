@@ -5079,7 +5079,8 @@
             },
             "dayLog": {
                 "title": "Itala ang araw",
-                "date": "Petsa"
+                "date": "Petsa",
+                "more": "Iba pang detalye"
             },
             "export": {
                 "csv": "I-export bilang CSV"
