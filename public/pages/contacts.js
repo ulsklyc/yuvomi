@@ -21,6 +21,7 @@ import { composeDisplayName, contactSortKey, splitDisplayName } from '/utils/con
 import { getPhoneFormatter, createAsYouType, countryFromRegion } from '/utils/phone.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
 import { splitViewDetailHtml, mountMasterDetail } from '/utils/master-detail.js';
+import { redrawList, collapseRow } from '/utils/list-motion.js';
 import '/components/category-manager.js';
 import { findPageFab } from '/utils/fab.js';
 import { isNavModuleReadOnly } from '/permissions.js';
@@ -663,11 +664,23 @@ function contactsEmptyStateHtml(filtered) {
   });
 }
 
-function renderList({ animate = false } = {}) {
+const CONTACT_ROW = '.contact-item[data-id]';
+
+/* `motion: true` setzt, wer die DATEN geaendert hat (Kontakt angelegt,
+ * gespeichert, geloescht, per "Rueckgaengig" zurueckgeholt): die neue Zeile
+ * zieht auf, und was dadurch die Stelle wechselt, gleitet
+ * (utils/list-motion.js). Suche, Filter und Auswahlmodus zeichnen ohne
+ * Bewegung neu - dort wechselt die Frage, nicht die Liste. */
+function renderList({ animate = false, motion = false } = {}) {
   // Die Zeilen stehen in `#contacts-rows`, damit die Chipreihe davor im Port
   // (`#contacts-list`) bei jedem Render stehen bleibt und mit wegscrollt.
   const container = _container.querySelector('#contacts-rows');
   if (!container) return;
+  if (motion) redrawList(container, () => drawList(container, { animate }), { selector: CONTACT_ROW, keyAttr: 'data-id' });
+  else drawList(container, { animate });
+}
+
+function drawList(container, { animate = false } = {}) {
   // Die Chipreihe folgt den BELEGTEN Kategorien: ein neuer Kontakt in einer
   // bisher leeren Kategorie bringt ihren Chip mit, der letzte nimmt ihn mit.
   renderCategoryFilters();
@@ -1616,7 +1629,7 @@ function buildContactForm({ mode, contact = null }) {
             if (idx !== -1) state.contacts[idx] = res.data;
           }
           closeModal({ force: true });
-          renderList();
+          renderList({ motion: true });
           // In der Spalte: das Gespeicherte steht rechts - das Bearbeitete neu
           // gezeichnet, das Neue ausgewaehlt (wie in Apples Kontakten), sofern
           // Suche und Filter seine Zeile zeigen. Den Fokus gibt das Schliessen
@@ -1770,7 +1783,14 @@ async function deleteContact(id) {
   if (readOnly()) return;
   const contact = state.contacts.find((c) => c.id === id);
   state.contacts = state.contacts.filter((c) => c.id !== id);
-  renderList();
+  // Die Zeile klappt aus (mit der letzten ihrer Gruppe die Gruppe), die
+  // Nachbarn ruecken nach - erst dann steht die Liste ohne sie neu. Der Zustand
+  // ist schon geaendert: ein Neuzeichnen, das dazwischenkommt, zeigt dasselbe
+  // Ergebnis nur ohne die Bewegung.
+  const owner = _container;
+  const row = owner?.querySelector(`#contacts-rows .contact-item[data-id="${id}"]`) ?? null;
+  collapseRow(row, { group: row?.closest('.contact-group'), selector: CONTACT_ROW })
+    .then(() => { if (_container === owner) renderList({ motion: true }); });
   vibrate([30, 50, 30]);
 
   scheduleUndoableDelete({
@@ -1779,7 +1799,7 @@ async function deleteContact(id) {
     restore: (err) => {
       if (contact) {
         state.contacts = [...state.contacts, contact].sort(byName);
-        renderList();
+        if (_container === owner) renderList({ motion: true });
       }
       if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     },

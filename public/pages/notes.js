@@ -8,6 +8,7 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, btnError, advancedSection, reportFieldError } from '/components/modal.js';
 import { wireCategoryScopeHelp } from '/components/category-manager.js';
 import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
+import { redrawList } from '/utils/list-motion.js';
 import { t } from '/i18n.js';
 import { esc, renderMarkdownLight } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
@@ -362,9 +363,9 @@ export async function render(container, { user, signal }) {
 // --------------------------------------------------------
 
 /** Kategorienchips haengen von den Zuordnungen in state.notes ab. */
-function renderNotesAndFilters() {
+function renderNotesAndFilters({ motion = false } = {}) {
   renderFilters();
-  renderGrid();
+  renderGrid({ motion });
 }
 
 /**
@@ -480,9 +481,28 @@ function visibleNotes() {
   });
 }
 
-function renderGrid() {
+const NOTE_CARD = '.note-card[data-id]';
+
+/* `motion: true` setzt, wer die DATEN geaendert hat (Notiz angelegt,
+ * gespeichert, angepinnt, geloescht, per "Rueckgaengig" zurueckgeholt): die
+ * neue Karte zieht auf, und was dadurch die Stelle wechselt, gleitet
+ * (utils/list-motion.js). Die Karte, die geht, klappt hier NICHT vorher aus:
+ * im Raster haelt die Nachbarkarte die Zeilenhoehe, das Ausklappen liesse nur
+ * ein Loch stehen - die Nachbarn gleiten stattdessen in die Luecke (FLIP).
+ * Filter und Suche zeichnen ohne Bewegung neu - dort wechselt die Frage,
+ * nicht die Liste. */
+function renderGrid({ motion = false } = {}) {
   const grid = _container.querySelector('#notes-grid');
   if (!grid) return;
+  if (motion) {
+    redrawList(grid, () => drawGrid(grid), { selector: NOTE_CARD, keyAttr: 'data-id' });
+    return;
+  }
+  drawGrid(grid);
+  stagger(grid.querySelectorAll('.note-card'), { host: grid });
+}
+
+function drawGrid(grid) {
   grid.removeAttribute('aria-busy');
 
   const q = state.filterQuery.trim().toLowerCase();
@@ -520,7 +540,6 @@ function renderGrid() {
   grid.replaceChildren();
   grid.insertAdjacentHTML('beforeend', html);
   if (window.lucide) lucide.createIcons({ el: grid });
-  stagger(grid.querySelectorAll('.note-card'), { host: grid });
 }
 
 /**
@@ -1312,7 +1331,7 @@ function openNoteModal({ mode, note = null }) {
             state.notes.sort((a, b) => b.pinned - a.pinned);
           }
           closeSavedEditorWhenActive();
-          renderNotesAndFilters();
+          renderNotesAndFilters({ motion: true });
           window.yuvomi?.showToast(mode === 'create' ? t('notes.createdToast') : t('notes.savedToast'), 'success');
         } catch (err) {
           window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
@@ -1405,7 +1424,7 @@ async function togglePin(id) {
     const note = state.notes.find((n) => n.id === id);
     if (note) note.pinned = res.data.pinned;
     state.notes.sort((a, b) => b.pinned - a.pinned);
-    renderGrid();
+    renderGrid({ motion: true });
   } catch (err) {
     window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
   }
@@ -1433,7 +1452,7 @@ async function deleteNote(id) {
   closeModal({ force: true });
   const note = state.notes.find((n) => n.id === id);
   state.notes = state.notes.filter((n) => n.id !== id);
-  renderNotesAndFilters();
+  renderNotesAndFilters({ motion: true });
   vibrate([30, 50, 30]);
 
   scheduleUndoableDelete({
@@ -1442,7 +1461,7 @@ async function deleteNote(id) {
     restore: (err) => {
       if (note) {
         state.notes = [...state.notes, note].sort((a, b) => b.pinned - a.pinned);
-        renderNotesAndFilters();
+        renderNotesAndFilters({ motion: true });
       }
       if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     },

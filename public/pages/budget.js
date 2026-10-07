@@ -16,6 +16,7 @@ import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFor
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
 import { swapContent } from '/utils/content-swap.js';
+import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { render as renderSplitExpenses, prefillSplitExpense, canAddSplitExpense, openNewSplitExpense } from '/pages/split-expenses.js';
@@ -1000,6 +1001,28 @@ function watchAsideFit(panel) {
 // --------------------------------------------------------
 // Body
 // --------------------------------------------------------
+
+const BUDGET_ENTRY = '#budget-list .budget-entry[data-id]';
+
+/* DIE BUCHUNGSLISTE BEWEGT SICH WIE JEDE LISTE (R17, Bewegung): wer eine
+ * Buchung angelegt, geloescht oder per "Rueckgaengig" zurueckgeholt hat,
+ * zeichnet hierueber neu - die neue Zeile zieht auf, was die Stelle wechselt,
+ * gleitet (utils/list-motion.js). Traeger ist `#budget-body`: `#budget-list`
+ * baut jeder renderBody() neu, wiedererkannt wird die Zeile an `data-id`.
+ * Filter, Suche, Reiter und Monat zeichnen weiter ueber renderBody() bzw.
+ * swapContent/swapPeriod - dort wechselt die Frage, nicht die Liste. */
+function redrawEntries() {
+  const body = _container?.querySelector('#budget-body');
+  if (!body) return;
+  redrawList(body, renderBody, { selector: BUDGET_ENTRY, keyAttr: 'data-id' });
+}
+
+/** Die Zeile einer Buchung klappt aus, bevor die Liste ohne sie neu steht. */
+function collapseEntryThenRedraw(id) {
+  const owner = _container;
+  const row = owner?.querySelector(`#budget-list .budget-entry[data-id="${id}"]`) ?? null;
+  collapseRow(row).then(() => { if (_container === owner) redrawEntries(); });
+}
 
 function renderBody() {
   const body = _container.querySelector('#budget-body');
@@ -3595,7 +3618,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
             state.entries.unshift(res.data);
             await loadMonth(state.month);
             closeModal({ force: true });
-            renderBody();
+            redrawEntries();
             window.yuvomi?.showToast(t('budget.addedToast'), 'success');
           } else if (entry.recurrence_parent_id || (entry.is_recurring && recurring)) {
             // Buchung einer Serie - eine Instanz ODER die erste Buchung selbst:
@@ -4851,7 +4874,9 @@ async function deleteEntry(id) {
   // Auch im Konto-Drilldown genau: der Server loescht genau diese eine
   // Buchung, und sie steht in der Liste - anders als die Serie (listNarrowsSummary).
   if (entry && inMonth) state.summary = summaryWith(state.summary, [entry], -1);
-  renderBody();
+  // Der Zustand ist schon geaendert: ein Neuzeichnen, das dem Ausklappen
+  // zuvorkommt, zeigt dasselbe Ergebnis nur ohne die Bewegung.
+  collapseEntryThenRedraw(id);
   vibrate([30, 50, 30]);
 
   scheduleUndoableDelete({
@@ -4877,7 +4902,7 @@ async function deleteEntry(id) {
         state.ledgerResults = [...state.ledgerResults.filter((e) => e.id !== id), entry].sort(byDate);
         back = true;
       }
-      if (back) renderBody();
+      if (back) redrawEntries();
       if (err) showBudgetError(err);
     },
   });

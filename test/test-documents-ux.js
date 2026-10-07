@@ -359,7 +359,7 @@ test('die Speicher-Einstellungen sind von der Seite aus verlinkt — nur für Ad
 test('das Rückgängig-Löschen stellt die Server-Sortierung wieder her', () => {
   // Vorher wurde beim Undo fest nach Namen sortiert, was die Datums-Ordnung zerschoss.
   assert.match(page, /function deleteDocuments\(docs\)/);
-  const del = page.slice(page.indexOf('function deleteDocuments'), page.indexOf('function deleteDocuments') + 1400);
+  const del = page.slice(page.indexOf('function deleteDocuments'), page.indexOf('function deleteDocuments') + 2400);
   assert.doesNotMatch(del, /localeCompare/);
   assert.match(del, /applyFilters\(\)/);
   // Kein Nachladen auf einen abgehängten Container nach Seitenwechsel.

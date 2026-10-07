@@ -34,6 +34,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `payer_name`, `participants`, `splits`, `blocked_reason`, `can_edit`, `missed_count` and
   `resume_date`; activity types `recurring_edited` and `recurring_deleted`. No migration.
 
+### Changed
+
+- **Lists move the same way everywhere when an entry comes or goes.** Tasks, shopping, pantry
+  and a few others already did it: a deleted row folds away and the rows below close the gap,
+  a new one opens up, a re-sorted one glides to its place. Notes, documents, contacts, the
+  budget's transactions, inventory, subscriptions, shared expenses and birthdays cut hard
+  instead - the row was gone and the rest jumped. They now use the same motion, also when
+  "Undo" brings an entry back. Searching and filtering still redraw without motion, and with
+  reduced motion switched on nothing moves.
+
 ### Fixed
 
 - **The meal plan's week board no longer cuts its cards off on a short window.** At a window

@@ -126,7 +126,11 @@ test('die Seite haengt Liste + Detail ein: Klick ueber den Baustein, Signal des 
     'der Zeilen-Klick geht ueber den Baustein: in der Spalte auswaehlen, darunter oeffnen');
   // Jeder Neuaufbau der Liste meldet sich beim Baustein - sonst stuende rechts
   // ein geloeschter oder weggefilterter Kontakt.
-  const renderList = src.slice(src.indexOf('function renderList('));
+  // Gezeichnet wird in drawList(); renderList() entscheidet nur, ob mit
+  // Listenbewegung (utils/list-motion.js) oder ohne.
+  assert.match(src, /function renderList\([^)]*\) \{[\s\S]{0,500}?redrawList\(container, \(\) => drawList\(container, \{ animate \}\),[\s\S]{0,120}?else drawList\(container, \{ animate \}\);\n\}/,
+    'renderList zeichnet auf beiden Wegen ueber drawList');
+  const renderList = src.slice(src.indexOf('function drawList('));
   const body = renderList.slice(0, renderList.indexOf('\n}\n'));
   assert.equal((body.match(/md\?\.refresh\(\)/g) ?? []).length, 2,
     'beide Ausgaenge von renderList (leer und gefuellt) melden sich beim Baustein');

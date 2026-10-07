@@ -9,6 +9,7 @@ import { openModal as openSharedModal, closeModal, selectModal, advancedSection,
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
+import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { previewKind } from '/utils/document-preview.js';
@@ -373,12 +374,12 @@ export async function render(container, context = {}) {
 
 // Alle abhängigen Flächen nach einer Datenänderung neu zeichnen. Die Facetten-
 // Zähler (Kategorie + Ordner) hängen voneinander ab, deshalb nie einzeln aufrufen.
-function renderAll() {
+function renderAll({ motion = false } = {}) {
   renderCategoryChips();
   renderExpiringChip();
   renderFolderBrowser();
   renderBreadcrumb();
-  renderDocuments();
+  renderDocuments({ motion });
 }
 
 /**
@@ -1082,7 +1083,24 @@ function renderEmptyState(list) {
   if (state.query) probeOtherStatusSearch();
 }
 
-function renderDocuments() {
+const DOCUMENT_ITEM = ':is(.document-card, .document-row)[data-id]';
+
+/* `motion: true` setzt, wer die DATEN geaendert hat (hochgeladen, archiviert,
+ * geloescht, per "Rueckgaengig" zurueckgeholt): das neue Dokument zieht auf,
+ * und was dadurch die Stelle wechselt, gleitet (utils/list-motion.js). Filter,
+ * Suche, Ordner- und Ansichtswechsel zeichnen ohne Bewegung neu - dort
+ * wechselt die Frage, nicht die Liste. */
+function renderDocuments({ motion = false } = {}) {
+  const list = _container.querySelector('#documents-list');
+  if (motion && list) {
+    redrawList(list, drawDocuments, { selector: DOCUMENT_ITEM, keyAttr: 'data-id' });
+    return;
+  }
+  drawDocuments();
+  if (list) stagger(list.querySelectorAll('.document-card, .document-row'), { host: list });
+}
+
+function drawDocuments() {
   // Jeder Rerender (Moduswechsel, Filter, Löschen) ersetzt die Karten samt
   // Menü-Anker. Ein offenes Kontextmenü hinge sonst als Geister-Popover im
   // Top-Layer, weil weder Scroll- noch Resize-Listener feuern.
@@ -1105,7 +1123,6 @@ function renderDocuments() {
   repairRovingStops(list);
   wireThumbnails(list);
   wireLocalThumbs(list);
-  stagger(list.querySelectorAll('.document-card, .document-row'), { host: list });
 }
 
 // Facetten-Zähler: jede Achse zählt unter Berücksichtigung der jeweils ANDEREN
@@ -2086,7 +2103,7 @@ async function runDocumentAction(action, doc) {
       await api.patch(`/documents/${doc.id}/archive`, { archived: doc.status !== 'archived' });
       window.yuvomi?.showToast(doc.status === 'archived' ? t('documents.restoredToast') : t('documents.archivedToast'), 'success');
       await loadDocuments();
-      renderAll();
+      renderAll({ motion: true });
     } catch (err) {
       window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     }
@@ -2128,12 +2145,23 @@ function deleteDocuments(docs) {
   const owner = _container;
   state.allDocuments = state.allDocuments.filter((doc) => !ids.has(doc.id));
   applyFilters();
-  renderAll();
+  // In der Liste klappt die Zeile aus, die Nachbarn ruecken nach, erst dann
+  // steht die Liste ohne sie neu (der Zustand ist schon geaendert: ein
+  // Neuzeichnen, das dazwischenkommt, zeigt dasselbe Ergebnis ohne Bewegung).
+  // Im Raster haelt die Nachbarkarte die Zeilenhoehe - dort gleiten die
+  // Nachbarn in die Luecke (FLIP in redrawList).
+  const leaving = state.view === 'list'
+    ? [...(owner?.querySelectorAll('#documents-list .document-row[data-id]') ?? [])]
+      .filter((row) => ids.has(Number(row.dataset.id)))
+    : [];
+  Promise.all(leaving.map((row) => collapseRow(row))).then(() => {
+    if (_container === owner) renderAll({ motion: true });
+  });
 
   const restore = () => {
     state.allDocuments = [...state.allDocuments, ...docs];
     applyFilters();
-    renderAll();
+    renderAll({ motion: true });
   };
 
   const message = docs.length === 1
@@ -3062,7 +3090,7 @@ async function saveDocument(event, doc, panel) {
     }
     closeModal({ force: true });
     await loadDocuments();
-    renderAll();
+    renderAll({ motion: true });
     refocusAfterRender();
   } catch (err) {
     error.textContent = friendlyError(err);
@@ -3404,7 +3432,7 @@ async function linkDmsDocument(item, accountId) {
     });
     closeModal({ force: true });
     await loadDocuments();
-    renderAll();
+    renderAll({ motion: true });
     refocusAfterRender();
     return true;
   } catch (err) {

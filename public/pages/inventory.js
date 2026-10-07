@@ -33,6 +33,7 @@ import { warrantyStatus, hasUpcomingDeadline, dateStatus, countUpcomingDeadlines
 import { openDetailView, closeDetailView } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { wireScrollFade } from '/utils/ux.js';
+import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { setNavBadge } from '/utils/nav-badges.js';
 import { CHART, chartScales, chartY, chartGridMarkup, niceDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
@@ -735,8 +736,19 @@ function wireItemRows(list) {
  *   ausgewaehlten Gegenstand neu. Ohne (Suche, Filter, Ebenenwechsel) bleibt
  *   sie stehen - jeder Tastendruck in der Suche holte sonst den Verlauf neu.
  */
-function renderList({ repaint = false } = {}) {
-  renderListBody();
+const INVENTORY_ITEM_ROW = '.list-row[data-id]';
+
+/* `motion: true` setzt, wer einen GEGENSTAND angelegt, gespeichert oder
+ * geloescht hat: seine Zeile zieht auf, und was dadurch die Stelle wechselt,
+ * gleitet (utils/list-motion.js). Die Bewegung haengt an zwei Dingen, die
+ * einen Umbau der Ebenen ueberleben muessen: dem Traeger `#inventory-list`
+ * (er bleibt ueber jedes Zeichnen stehen) und `data-id` an der Zeile des
+ * Gegenstands (renderItemRow). Ebenenwechsel, Suche und Filter zeichnen ohne
+ * Bewegung neu - dort wechselt die Frage, nicht die Liste. */
+function renderList({ repaint = false, motion = false } = {}) {
+  const host = motion ? _container?.querySelector('#inventory-list') : null;
+  if (host) redrawList(host, renderListBody, { selector: INVENTORY_ITEM_ROW, keyAttr: 'data-id' });
+  else renderListBody();
   // Wie in Mail: verschwindet die ausgewaehlte Zeile aus der Liste (anderer
   // Ordner, Suche, geloescht), faellt die Spalte auf den Leerzustand zurueck.
   _md?.refresh({ repaint });
@@ -2292,7 +2304,7 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
     else await api.put(`/inventory/items/${item.id}`, payload);
     await loadItems();
     closeSharedModal({ force: true });
-    renderList({ repaint: true });
+    renderList({ repaint: true, motion: true });
     updateAttentionBadge();
     window.yuvomi?.showToast(mode === 'create' ? t('inventory.created') : t('inventory.updated'), 'success');
   } catch (err) {
@@ -2311,7 +2323,10 @@ async function removeItem(item) {
   try {
     await api.delete(`/inventory/items/${item.id}`);
     await loadItems();
-    renderList({ repaint: true });
+    // Die Zeile klappt aus, die Nachbarn ruecken nach - erst dann steht die
+    // Liste ohne sie neu (ohne Bewegung loest collapseRow sofort auf).
+    await collapseRow(_container?.querySelector(`#inventory-list .list-row[data-id="${item.id}"]`) ?? null);
+    renderList({ repaint: true, motion: true });
     refocusAfterRender();
     updateAttentionBadge();
     window.yuvomi?.showToast(t('inventory.deleted'), 'success');

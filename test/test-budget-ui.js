@@ -2926,9 +2926,12 @@ test('die Bilanz rechnet eine geloeschte Buchung sofort heraus und beim Undo wie
   const del = budgetCode.slice(budgetCode.indexOf('async function deleteEntry('));
   const delBody = del.slice(0, del.indexOf('\n}\n'));
   const before = delBody.slice(0, delBody.indexOf('scheduleUndoableDelete'));
-  assert.match(before, /state\.summary = summaryWith\(state\.summary, \[entry\], -1\)[\s\S]*renderBody\(\)/, 'Loeschen zeichnet die alte Bilanz');
+  assert.match(before, /state\.summary = summaryWith\(state\.summary, \[entry\], -1\)[\s\S]*collapseEntryThenRedraw\(id\)/, 'Loeschen zeichnet die alte Bilanz');
   const restore = delBody.slice(delBody.indexOf('restore:'));
-  assert.match(restore, /state\.summary = summaryWith\(state\.summary, \[entry\], 1\)[\s\S]*renderBody\(\)/, 'Undo rechnet die Buchung nicht zurueck');
+  assert.match(restore, /state\.summary = summaryWith\(state\.summary, \[entry\], 1\)[\s\S]*redrawEntries\(\)/, 'Undo rechnet die Buchung nicht zurueck');
+  // Beide zeichnen ueber renderBody() - mit Listenbewegung (utils/list-motion.js).
+  assert.match(budgetCode, /function redrawEntries\(\) \{[\s\S]{0,200}redrawList\(body, renderBody,/);
+  assert.match(budgetCode, /function collapseEntryThenRedraw\(id\) \{[\s\S]{0,300}redrawEntries\(\); \}\);\n\}/);
   const series = budgetCode.slice(budgetCode.indexOf('async function deleteEntrySeries('));
   const seriesBefore = series.slice(0, series.indexOf('scheduleUndoableDelete'));
   assert.match(seriesBefore, /state\.summary = summaryWith\(state\.summary, removed, -1\)/, 'Serie loeschen zeichnet die alte Bilanz');

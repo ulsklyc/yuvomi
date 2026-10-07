@@ -13,6 +13,8 @@ import { rowActionHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { stagger } from '/utils/ux.js';
+import { redrawList, collapseRow } from '/utils/list-motion.js';
+import { swapContent } from '/utils/content-swap.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { formatMoney, amountPlaceholder, toDecimalString, smallestUnitLabel, amountInputProblem, amountExample, amountToInput, toStoredNumber } from '/utils/money.js';
 import { todayKey } from '/utils/date.js';
@@ -462,11 +464,11 @@ function isArchivedView() {
   return state.groupStatus === 'archived';
 }
 
-function renderAll() {
+function renderAll({ motion = false } = {}) {
   renderStatusFilter();
   renderSummary();
   renderGroups();
-  renderMain();
+  renderMain({ motion });
   if (window.lucide) lucide.createIcons({ el: _container });
 }
 
@@ -641,8 +643,32 @@ function groupToolsMenuHtml() {
     </div>`;
 }
 
-function renderMain() {
+/* Ausgaben und Serien der Gruppe tragen `data-row-key`: die Zeile hat je nach
+ * Recht zwei Formen (`data-expense-id` bearbeitet, `data-expense-view` liest),
+ * die Bewegung erkennt sie an EINEM Attribut wieder. */
+const SPLIT_ROW = '[data-row-key]';
+
+/* `motion: true` setzt, wer die DATEN der Gruppe geaendert hat (Ausgabe oder
+ * Serie angelegt, gespeichert, geloescht): die neue Zeile zieht auf, und was
+ * dadurch die Stelle wechselt, gleitet (utils/list-motion.js). Traeger ist
+ * `#split-main` - die Abschnitte darin baut jedes Zeichnen neu. Gruppen- und
+ * Archivwechsel zeichnen ohne Bewegung neu: dort wechselt die Frage. */
+function renderMain({ motion = false } = {}) {
   const main = _container.querySelector('#split-main');
+  if (motion) {
+    redrawList(main, () => drawMain(main), { selector: SPLIT_ROW, keyAttr: 'data-row-key' });
+    return;
+  }
+  drawMain(main);
+  stagger(main.querySelectorAll('.split-expense, .split-debt, .split-activity-item'), { host: main });
+}
+
+/** Klappt die Zeile `key` aus, bevor die Gruppe ohne sie neu gezeichnet wird. */
+function collapseSplitRow(key) {
+  return collapseRow(_container?.querySelector(`#split-main [data-row-key="${key}"]`) ?? null);
+}
+
+function drawMain(main) {
   main.removeAttribute('aria-busy');
   const group = state.groups.find((g) => g.id === state.activeGroupId);
   if (!group) {
@@ -749,7 +775,6 @@ function renderMain() {
     else openExpenseModal(expense);
   });
   main.querySelector('#split-recurring-list')?.addEventListener('click', onRecurringClick);
-  stagger(main.querySelectorAll('.split-expense, .split-debt, .split-activity-item'), { host: main });
 }
 
 // So viele Namen stehen in der Kopfzeile einer Gruppe, der Rest als „+N".
@@ -834,13 +859,13 @@ function renderExpenses(asList = false) {
     // Handlung, der Inhalt (Titel, Zahler, Datum, Betrag) sagt, was er ist.
     if (asList) {
       return `
-      <button type="button" class="split-expense" data-expense-view="${expense.id}">
+      <button type="button" class="split-expense" data-expense-view="${expense.id}" data-row-key="expense-${expense.id}">
         ${body}
       </button>
     `;
     }
     return `
-      <button type="button" class="split-expense" data-expense-id="${expense.id}" aria-label="${esc(expense.title)} - ${t('splitExpenses.editExpense')}">
+      <button type="button" class="split-expense" data-expense-id="${expense.id}" data-row-key="expense-${expense.id}" aria-label="${esc(expense.title)} - ${t('splitExpenses.editExpense')}">
         ${body}
       </button>
     `;
@@ -909,7 +934,7 @@ function renderRecurring(asList = false) {
     const acts = !asList && recurring.can_edit;
     const toggleLabel = t(paused ? 'splitExpenses.recurring.resume' : 'splitExpenses.recurring.pause');
     return `
-      <div class="split-recurring-row${paused ? ' split-recurring-row--paused' : ''}">
+      <div class="split-recurring-row${paused ? ' split-recurring-row--paused' : ''}" data-row-key="recurring-${recurring.id}">
         ${acts
     ? `<button type="button" class="split-expense" data-recurring-id="${recurring.id}" aria-label="${esc(recurring.title)} - ${t('splitExpenses.recurring.edit')}">${body}</button>
         ${rowActionHtml({
@@ -1032,6 +1057,9 @@ async function toggleRecurring(id) {
     _recurringToggleBusy = false;
     await loadGroupData();
     renderAll();
+    // Pausiert <-> laeuft tauscht Zeichen und Termin an derselben Zeile (gleich
+    // hoch seit R17): sie blendet ihren neuen Zustand ein statt umzuspringen.
+    swapContent(_container?.querySelector(`#split-main [data-row-key="recurring-${id}"]`) ?? null, null);
     // Der Umschalter ist ein neuer Knopf (Pausieren wurde zu Fortsetzen oder
     // umgekehrt). Wer ihn bedient hat, behaelt ihn unter dem Finger bzw. dem
     // Tastaturfokus, statt auf den Seitenanfang zu fallen. Hier schliesst kein
@@ -1908,7 +1936,8 @@ function openExpenseModal(expense = null, prefill = null) {
         await api.delete(`/split-expenses/expenses/${expense.id}`);
         await refreshDashboard();
         await loadGroupData();
-        renderAll();
+        await collapseSplitRow(`expense-${expense.id}`);
+        renderAll({ motion: true });
         refocusAfterRender();
       });
       panel.querySelector('#split-expense-form')?.addEventListener('submit', async (e) => {
@@ -1931,7 +1960,7 @@ function openExpenseModal(expense = null, prefill = null) {
         closeModal({ force: true });
         await refreshDashboard();
         await loadGroupData();
-        renderAll();
+        renderAll({ motion: true });
         refocusAfterRender();
       });
     },
@@ -2155,7 +2184,8 @@ function openRecurringModal(recurring = null) {
           busy = false;
         }
         await loadGroupData();
-        renderAll();
+        await collapseSplitRow(`recurring-${recurring.id}`);
+        renderAll({ motion: true });
         refocusAfterRender();
       });
       form?.addEventListener('submit', async (e) => {
@@ -2196,7 +2226,7 @@ function openRecurringModal(recurring = null) {
         }
         closeModal({ force: true });
         await loadGroupData();
-        renderAll();
+        renderAll({ motion: true });
         refocusAfterRender();
       });
     },

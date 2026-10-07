@@ -1131,6 +1131,52 @@ test('Listenbewegung: Module, die ihre Zeilen neu bauen, nutzen list-motion bzw.
   assert.match(fn, /if \(first\) \{\s*el\.replaceChildren\(\);\s*el\.insertAdjacentHTML\('beforeend', renderSkeletonList/, 'Skelett nur unter `first`');
 });
 
+/* R17, Bewegung: "das System steht, die Abdeckung fehlt". Acht Seiten bauten
+ * ihre Liste nach Anlegen und Loeschen hart neu. Jede Zeile hier ist eine
+ * Stelle, an der die DATEN sich aendern - nicht die Frage (Filter, Suche). */
+test('Listenbewegung R17: Notizen, Dokumente, Kontakte, Budget, Inventar, Abos, Aufteilung und Geburtstage zeichnen ueber list-motion', () => {
+  const modules = [
+    ['notes', /redrawList\(grid, \(\) => drawGrid\(grid\), \{ selector: NOTE_CARD, keyAttr: 'data-id' \}\)/, 'Raster'],
+    ['notes', /state\.notes = state\.notes\.filter\(\(n\) => n\.id !== id\);\s*renderNotesAndFilters\(\{ motion: true \}\)/, 'geloeschte Notiz'],
+    ['notes', /closeSavedEditorWhenActive\(\);\s*renderNotesAndFilters\(\{ motion: true \}\)/, 'gespeicherte Notiz'],
+    ['documents', /redrawList\(list, drawDocuments, \{ selector: DOCUMENT_ITEM, keyAttr: 'data-id' \}\)/, 'Liste und Raster'],
+    ['documents', /Promise\.all\(leaving\.map\(\(row\) => collapseRow\(row\)\)\)\.then\(/, 'geloeschte Zeile klappt aus'],
+    ['contacts', /redrawList\(container, \(\) => drawList\(container, \{ animate \}\), \{ selector: CONTACT_ROW, keyAttr: 'data-id' \}\)/, 'Liste'],
+    ['contacts', /collapseRow\(row, \{ group: row\?\.closest\('\.contact-group'\), selector: CONTACT_ROW \}\)/, 'geloeschter Kontakt klappt aus, mit dem letzten die Gruppe'],
+    ['budget', /redrawList\(body, renderBody, \{ selector: BUDGET_ENTRY, keyAttr: 'data-id' \}\)/, 'Buchungsliste'],
+    ['budget', /summaryWith\(state\.summary, \[entry\], -1\);[\s\S]{0,260}collapseEntryThenRedraw\(id\);/, 'geloeschte Buchung klappt aus'],
+    ['budget', /closeModal\(\{ force: true \}\);\s*redrawEntries\(\);\s*window\.yuvomi\?\.showToast\(t\('budget\.addedToast'\)/, 'neue Buchung zieht auf'],
+    ['inventory', /redrawList\(host, renderListBody, \{ selector: INVENTORY_ITEM_ROW, keyAttr: 'data-id' \}\)/, 'Gegenstaende'],
+    ['inventory', /await collapseRow\(_container\?\.querySelector\(`#inventory-list \.list-row\[data-id="\$\{item\.id\}"\]`\)/, 'geloeschter Gegenstand klappt aus'],
+    ['subscriptions', /redrawList\(content, drawContent, \{ selector: SUBSCRIPTION_ROW, keyAttr: 'data-swipe-id' \}\)/, 'Abos'],
+    ['subscriptions', /await collapseRow\(container\.querySelector\(`#subscriptions-list \.swipe-row\[data-swipe-id=/, 'geloeschtes Abo klappt aus'],
+    ['split-expenses', /redrawList\(main, \(\) => drawMain\(main\), \{ selector: SPLIT_ROW, keyAttr: 'data-row-key' \}\)/, 'Ausgaben und Serien'],
+    ['split-expenses', /await collapseSplitRow\(`expense-\$\{expense\.id\}`\);\s*renderAll\(\{ motion: true \}\)/, 'geloeschte Ausgabe klappt aus'],
+    ['split-expenses', /await collapseSplitRow\(`recurring-\$\{recurring\.id\}`\);\s*renderAll\(\{ motion: true \}\)/, 'geloeschte Serie klappt aus'],
+    ['birthdays', /redrawList\(host, \(\) => drawList\(host, \{ repaint \}\), \{ selector: BIRTHDAY_ROW, keyAttr: 'data-swipe-id' \}\)/, 'Liste'],
+    ['birthdays', /collapseRow\(row\)\.then\(\(\) => \{ if \(_container === owner\) renderList\(\{ motion: true \}\); \}\)/, 'geloeschter Geburtstag klappt aus'],
+  ];
+  const missing = modules.filter(([name, pattern]) => !pattern.test(pageSource(name))).map(([name, , what]) => `${name}.js: ${what}`);
+  assert.deepEqual(missing, [], `Liste ohne Bewegung:\n  ${missing.join('\n  ')}`);
+  // Die Zeile muss das Attribut auch TRAGEN, an dem die Bewegung sie
+  // wiedererkennt - ein Selektor ohne Treffer zeichnet still ohne Bewegung.
+  const carried = [
+    ['notes', /class="note-card \$\{[^}]+\}"\s+data-id="\$\{note\.id\}"/],
+    ['documents', /<article class="document-card\$\{[^}]+\}" data-id="\$\{doc\.id\}">/],
+    ['documents', /<article class="list-row document-row\$\{[^}]+\}" data-id="\$\{doc\.id\}">/],
+    ['contacts', /contact-item" data-id="\$\{c\.id\}"/],
+    ['budget', /const rowInteraction = masked \? '' : `data-id="\$\{e\.id\}"`;/],
+    ['inventory', /<div class="list-row" data-id="\$\{item\.id\}" data-md-id=/],
+    ['subscriptions', /data-swipe-id="\$\{subscription\.id\}"/],
+    ['split-expenses', /data-expense-id="\$\{expense\.id\}" data-row-key="expense-\$\{expense\.id\}"/],
+    ['split-expenses', /data-expense-view="\$\{expense\.id\}" data-row-key="expense-\$\{expense\.id\}"/],
+    ['split-expenses', /split-recurring-row\$\{[^}]+\}" data-row-key="recurring-\$\{recurring\.id\}"/],
+    ['birthdays', /data-swipe-id="\$\{birthday\.id\}"/],
+  ];
+  const bare = carried.filter(([name, pattern]) => !pattern.test(pageSource(name))).map(([name, pattern]) => `${name}.js: ${pattern}`);
+  assert.deepEqual(bare, [], `Zeile ohne Wiedererkennungs-Attribut:\n  ${bare.join('\n  ')}`);
+});
+
 test('Schichtplan: Laden zeigt das geteilte Skelett, Blaettern haelt den Inhalt bis zur Antwort', () => {
   const schedule = pageSource('schedule');
   assert.doesNotMatch(schedule, /card card--padded schedule-stat-loading/, 'keine Textkarte "Laedt..." mehr');
