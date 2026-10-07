@@ -49,6 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   change does. Saving the entry that is already shown redraws it without the fade.
 - **The date picker's month glides in from the side you page to**, like the calendar and the
   budget month. It used to swap the grid of days with a hard cut.
+- **On a phone, the page title fades into its small form instead of snapping.** In notes and
+  contacts the large title jumps to the small one in the bar when the list scrolls; it now
+  fades in at its new size, and back when you return to the top. In the budget it fades back
+  in when the header opens again. The title that docks into the bar on scrolling pages fades
+  in and out the same way. Nothing changes size over time - only the opacity moves.
 
 ### Fixed
 

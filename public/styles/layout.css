@@ -3637,6 +3637,27 @@ html.fab-anim-done .page-fab {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    opacity: 1;
+  }
+
+  /* ER BLENDET EIN UND AUS statt zu springen (R17, Bewegung) - das Muster des
+   * Popover-Menues: `display` schaltet diskret, die Deckkraft laeuft in
+   * `--duration-xs`. Zwei Deklarationen, die Reihenfolge ist der Rueckfall:
+   * ohne `allow-discrete` verwirft der Browser die zweite und der Titel
+   * erscheint hart wie bisher. Kein Layout: er nimmt seinen Platz im selben
+   * Frame ein wie zuvor (`flex: 1 1 0`, die Zeile bricht nie um). */
+  .page-toolbar--stacked > .page-toolbar__dock-title {
+    opacity: 0;
+    transition: opacity var(--duration-xs) var(--ease-out);
+    transition:
+      opacity var(--duration-xs) var(--ease-out),
+      display var(--duration-xs) allow-discrete;
+  }
+
+  @starting-style {
+    .page-toolbar--stacked.is-docked > .page-toolbar__dock-title {
+      opacity: 0;
+    }
   }
 
   /* NIE EIN KOPF OHNE ORTSANGABE (R9 M9): laesst die Bar-Zeile dem Titel
@@ -3680,6 +3701,18 @@ html.fab-anim-done .page-fab {
 
   .page-toolbar--stacked.page-toolbar--dock-band.is-docked > .page-toolbar__dock-title {
     visibility: visible;
+  }
+
+  /* Im Band tauschen Large Title und angedockter Titel per Deckkraft
+   * (`visibility` schaltet am Ende bzw. Anfang derselben Dauer mit). */
+  .page-toolbar--stacked.page-toolbar--dock-band > .page-toolbar__dock-title {
+    transition:
+      opacity var(--duration-xs) var(--ease-out),
+      visibility var(--duration-xs) var(--ease-out);
+  }
+
+  .page-toolbar--stacked.page-toolbar--dock-band > [data-dock-lead] {
+    transition: opacity var(--duration-xs) var(--ease-out);
   }
 
   /* Opazitaet statt `visibility`: der Large Title bleibt die Ueberschrift der
@@ -3729,6 +3762,33 @@ html.fab-anim-done .page-fab {
    * `transform: scale()` an ihrer Stelle traegt nicht: der Platz der Zeile
    * wechselt mit (`flex-basis` oben), der Titel liefe waehrend der Skalierung
    * ueber seine Nachbarn. Der Groessenwechsel faellt deshalb in EINEN Frame. */
+
+  /* ... UND DER TITEL BLENDET IN SEINEN NEUEN SCHNITT (R17, Bewegung). Der
+   * Wechsel selbst bleibt ein Frame (Layout wird nicht animiert, siehe oben);
+   * weich wird er, weil der Titel an der neuen Stelle aus der Deckkraft 0
+   * kommt statt dort hart zu stehen - nur `opacity`, `--duration-xs`.
+   * Zwei gleiche Keyframes mit zwei Namen: der Namenswechsel startet die
+   * Blende in beide Richtungen neu. Den Rueckweg traegt `was-collapsed`
+   * (gesetzt von wireCollapsingHeader beim ersten Einklappen) - ohne den
+   * Merker blendete jeder Seitenaufbau seinen Titel ein, sobald die Messung
+   * `--capped` setzt. Im Budget ist der Titel eingeklappt aus dem Bild
+   * (`--period`, unten); dort blendet nur die Rueckkehr. Unter reduzierter
+   * Bewegung nimmt reset.css die Dauer auf 0s. */
+  .page-toolbar--capped.is-collapsed > .page-toolbar__title {
+    animation: page-title-settle var(--duration-xs) var(--ease-out);
+  }
+
+  .page-toolbar--capped.was-collapsed:not(.is-collapsed) > .page-toolbar__title {
+    animation: page-title-settle-back var(--duration-xs) var(--ease-out);
+  }
+}
+
+@keyframes page-title-settle {
+  from { opacity: 0; }
+}
+
+@keyframes page-title-settle-back {
+  from { opacity: 0; }
 }
 
 /* EIN KOPF MIT ZEITRAUM KLAPPT DIE TITELZEILE GANZ EIN (Kalender-Critique

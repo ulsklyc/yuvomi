@@ -709,7 +709,9 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // Ab hier nur noch der Nutzer (siehe `gestureTarget` oben).
     if (!gestureTarget || !port.contains(gestureTarget)) return;
     const top = port.scrollTop;
-    if (top > 24) toolbar.classList.add(...states);
+    // `was-collapsed`: ab jetzt darf der Titel beim Ausklappen einblenden
+    // (layout.css, `page-title-settle-back`) - nicht schon beim Seitenaufbau.
+    if (top > 24) toolbar.classList.add(...states, 'was-collapsed');
     else if (top < 8) toolbar.classList.remove(...states);
   };
   const update = () => {
@@ -1046,7 +1048,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       toolbar.style.removeProperty('--page-toolbar-lead');
       toolbar.style.removeProperty('--fold-row-h');
       foldH = 0;
-      toolbar.classList.remove('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked', 'page-toolbar--dock-fold', 'page-toolbar--dock-band', 'page-toolbar--fold-row');
+      toolbar.classList.remove('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked', 'was-collapsed', 'page-toolbar--dock-fold', 'page-toolbar--dock-band', 'page-toolbar--fold-row');
     },
   };
 }

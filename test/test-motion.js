@@ -1193,6 +1193,45 @@ test('Liste + Detail: ein Wechsel der Auswahl blendet die Detailspalte, ein Neuz
   assert.equal((md.match(/swap: /g) ?? []).length, 1, 'genau eine Stelle setzt swap');
 });
 
+const ruleBodies = (file, selector) => [...eachRule(css(file))]
+  .filter((r) => r.selector.replace(/\s+/g, ' ').trim() === selector)
+  .map((r) => r.body);
+
+test('Large Title: der Titel blendet in seinen neuen Schnitt, Layout wird nicht animiert', () => {
+  const settle = ruleBodies('layout.css', '.page-toolbar--capped.is-collapsed > .page-toolbar__title').join(';');
+  assert.match(settle, /animation:\s*page-title-settle var\(--duration-xs\) var\(--ease-out\)/, 'Einklappen blendet');
+  const back = ruleBodies('layout.css', '.page-toolbar--capped.was-collapsed:not(.is-collapsed) > .page-toolbar__title').join(';');
+  assert.match(back, /animation:\s*page-title-settle-back var\(--duration-xs\) var\(--ease-out\)/, 'Ausklappen blendet');
+  // Nur Deckkraft: ein Keyframe mit Groesse, Abstand oder Versatz animierte Layout im klebenden Kopf.
+  for (const name of ['page-title-settle', 'page-title-settle-back']) {
+    const body = keyframesBody(name);
+    assert.ok(body, `@keyframes ${name} fehlt`);
+    const props = [...body.matchAll(/([\w-]+)\s*:/g)].map((m) => m[1]);
+    assert.deepEqual([...new Set(props)], ['opacity'], `${name} animiert mehr als opacity`);
+  }
+  // Der Rueckweg haengt am Merker, nicht an `--capped` allein: sonst blendete
+  // jeder Seitenaufbau seinen Titel ein, sobald die Messung die Klasse setzt.
+  const titleRules = [...eachRule(css('layout.css'))].filter((r) => /page-title-settle/.test(r.body));
+  assert.equal(titleRules.length, 2);
+  for (const r of titleRules) assert.match(r.selector, /\.is-collapsed|\.was-collapsed/, `${r.selector}: Blende ohne Zustand`);
+  const ux = publicSource('utils/ux.js');
+  assert.match(ux, /if \(top > 24\) toolbar\.classList\.add\(\.\.\.states, 'was-collapsed'\);/, 'der Merker faellt beim ersten Einklappen');
+  assert.match(ux, /classList\.remove\('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked', 'was-collapsed',/, 'und geht mit dem Abbau');
+  // Weiterhin keine font-size-Transition am Titel (R16).
+  for (const file of ['layout.css', 'typography.css']) {
+    for (const r of eachRule(css(file))) {
+      if (!/page-toolbar__title/.test(r.selector)) continue;
+      assert.doesNotMatch(r.body, /transition[^;]*font-size/, `${file}: ${r.selector} animiert font-size`);
+    }
+  }
+  // Der angedockte Titel blendet ein und aus (Muster des Popover-Menues).
+  const dock = ruleBodies('layout.css', '.page-toolbar--stacked > .page-toolbar__dock-title').join(';');
+  assert.match(dock, /opacity:\s*0/);
+  assert.match(dock, /transition:\s*opacity var\(--duration-xs\) var\(--ease-out\),\s*display var\(--duration-xs\) allow-discrete/);
+  assert.match(css('layout.css'), /@starting-style \{\s*\.page-toolbar--stacked\.is-docked > \.page-toolbar__dock-title \{\s*opacity: 0;/);
+  assert.match(ruleBodies('layout.css', '.page-toolbar--stacked.is-docked > .page-toolbar__dock-title').join(';'), /opacity:\s*1/);
+});
+
 test('Schichtplan: Laden zeigt das geteilte Skelett, Blaettern haelt den Inhalt bis zur Antwort', () => {
   const schedule = pageSource('schedule');
   assert.doesNotMatch(schedule, /card card--padded schedule-stat-loading/, 'keine Textkarte "Laedt..." mehr');
