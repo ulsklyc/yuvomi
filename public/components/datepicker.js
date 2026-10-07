@@ -29,6 +29,7 @@ import {
 } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { todayKey } from '/utils/date.js';
+import { swapContent } from '/utils/content-swap.js';
 
 // ── lokale Datums-Helfer (kanonisches ISO, lokale Zeitzone) ──────────────
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -494,8 +495,17 @@ class YuvomiDatepicker extends HTMLElement {
     if (m > 11) { m = 0; y += 1; }
     this._viewMonth = m;
     this._viewYear = y;
-    this._paintDays(el, sub);
+    this._swapDays(el, sub, delta);
     this._position(sub.trigger, el);
+  }
+
+  /* DER MONAT WECHSELT WIE IM KALENDER UND IM BUDGET (R17, Bewegung): das
+   * Tagesraster kommt von der Seite, zu der man blaettert (utils/content-swap.js,
+   * in RTL gespiegelt). Getauscht wird synchron und zuerst - der Fokus, den der
+   * Aufrufer danach setzt, trifft schon die neuen Tage. Kopfzeile und
+   * Wochentage stehen; nur `.ydp-cal__days` bewegt sich. */
+  _swapDays(el, sub, direction) {
+    swapContent(el.querySelector('.ydp-cal__days'), () => this._paintDays(el, sub), { direction });
   }
 
   _paintDays(el, sub) {
@@ -561,7 +571,7 @@ class YuvomiDatepicker extends HTMLElement {
         if (d.getFullYear() !== this._viewYear || d.getMonth() !== this._viewMonth) {
           this._viewYear = d.getFullYear();
           this._viewMonth = d.getMonth();
-          this._paintDays(el, sub);
+          this._swapDays(el, sub, Math.sign(step));
           this._position(sub.trigger, el);
         }
         const target = grid.querySelector(`[data-iso="${iso}"]`);

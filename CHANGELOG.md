@@ -47,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the agenda and inventory the column on the right swapped its content with a hard cut when
   another row was selected. The new content now fades in briefly, like a tab or a month
   change does. Saving the entry that is already shown redraws it without the fade.
+- **The date picker's month glides in from the side you page to**, like the calendar and the
+  budget month. It used to swap the grid of days with a hard cut.
 
 ### Fixed
 

@@ -88,6 +88,12 @@ test('Escaped dynamische Werte via esc()', () => {
   assert(/import \{[^}]*esc[^}]*\} from '\/utils\/html\.js'/.test(comp), 'esc muss importiert werden');
   assert(/esc\(/.test(comp), 'esc muss verwendet werden');
 });
+test('Der Monatswechsel tauscht das Tagesraster gerichtet ueber swapContent', () => {
+  assert(/import \{ swapContent \} from '\/utils\/content-swap\.js'/.test(comp), 'swapContent muss importiert werden');
+  assert(/_swapDays\(el, sub, direction\) \{\s*swapContent\(el\.querySelector\('\.ydp-cal__days'\), \(\) => this\._paintDays\(el, sub\), \{ direction \}\);/.test(comp), 'das Raster tauscht ueber swapContent');
+  assert(/this\._swapDays\(el, sub, delta\);/.test(comp), 'Pfeilknoepfe und Bild-auf/-ab blaettern gerichtet');
+  assert(/this\._swapDays\(el, sub, Math\.sign\(step\)\);/.test(comp), 'ein Pfeil ueber die Monatsgrenze blaettert gerichtet');
+});
 test('Räumt Popover in disconnectedCallback auf', () => {
   assert(/disconnectedCallback\s*\(\)\s*\{[\s\S]*?_popover/.test(comp), 'Popover-Cleanup nötig');
 });
