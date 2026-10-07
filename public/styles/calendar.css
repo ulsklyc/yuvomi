@@ -3245,6 +3245,47 @@
   background-color: var(--color-surface);
   color: var(--color-text-primary);
   box-shadow: var(--shadow-md);
+  /* EIN- UND AUSGANG WIE DAS POPOVER-MENUE (R17, Bewegung; layout.css,
+   * `.popover-menu`): es waechst aus der Ecke am Filterknopf (96 % -> 100 %)
+   * und blendet, der Ausgang ist kuerzer (--duration-xs gegen --duration-md)
+   * und nimmt das Wachstum zurueck. Bisher erschien und verschwand es hart.
+   * Hier MIT @starting-style: die Position rechnet openFiltersPopover() im
+   * selben Takt wie showPopover(), es gibt keinen Frame oben links zu
+   * verstecken. ZWEI DEKLARATIONEN, die Reihenfolge ist der Rueckfall: ohne
+   * `allow-discrete` verwirft der Browser die zweite, und das Popover
+   * schliesst hart wie bisher. Unter reduzierter Bewegung nimmt reset.css
+   * die Dauer auf 0s. */
+  opacity: 0;
+  transform: scale(0.96);
+  transform-origin: top right;
+  transition:
+    opacity var(--duration-xs) var(--ease-out),
+    transform var(--duration-xs) var(--ease-out);
+  transition:
+    opacity var(--duration-xs) var(--ease-out),
+    transform var(--duration-xs) var(--ease-out),
+    overlay var(--duration-xs) allow-discrete,
+    display var(--duration-xs) allow-discrete;
+}
+
+.cal-filters-popover:popover-open {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--duration-md) var(--ease-out),
+    transform var(--duration-md) var(--ease-out);
+  transition:
+    opacity var(--duration-md) var(--ease-out),
+    transform var(--duration-md) var(--ease-out),
+    overlay var(--duration-md) allow-discrete,
+    display var(--duration-md) allow-discrete;
+}
+
+@starting-style {
+  .cal-filters-popover:popover-open {
+    opacity: 0;
+    transform: scale(0.96);
+  }
 }
 
 .cal-filters-popover::backdrop {

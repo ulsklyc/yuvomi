@@ -10,7 +10,7 @@ import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModa
 import { attachOverlay } from '/utils/overlay-history.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
-import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate } from '/utils/ux.js';
+import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate, durationToken } from '/utils/ux.js';
 import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
@@ -5642,7 +5642,11 @@ function openFiltersPopover(content) {
     trigger()?.setAttribute('aria-expanded', String(open));
     if (open) return;
     filtersPopoverClosedAt = Date.now();
-    pop.remove();
+    // Erst NACH dem Ausgang aus dem Baum (calendar.css: --duration-xs, das
+    // Popover bleibt per `allow-discrete` so lange im Top-Layer). Ein
+    // sofortiges remove() schnitt ihn ab. Ein erneutes Oeffnen davor raeumt
+    // den alten Knoten selbst (erste Zeile von openFiltersPopover).
+    setTimeout(() => pop.remove(), durationToken('--duration-xs', 120) + 40);
   });
   pop.showPopover();
   positionFiltersPopover(pop, trigger());

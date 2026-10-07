@@ -1254,6 +1254,27 @@ test('Zeitraum-Wisch: das Budget blaettert seine Monats-Reiter wie der Kalender,
   assert.doesNotMatch(css('calendar.css').replace(/\/\*[\s\S]*?\*\//g, ''), /period-swipe-in/, 'keine zweite Fassung im Modul-Blatt');
 });
 
+test('Kalender: das Filter-Popover hat Ein- und Ausgang wie das Popover-Menue', () => {
+  const base = ruleBodies('calendar.css', '.cal-filters-popover').join(';');
+  assert.match(base, /opacity:\s*0/);
+  assert.match(base, /transform:\s*scale\(0\.96\)/);
+  assert.match(base, /overlay var\(--duration-xs\) allow-discrete,\s*display var\(--duration-xs\) allow-discrete/, 'der Ausgang haelt es im Top-Layer');
+  // Rueckfall: die erste transition-Deklaration kommt ohne allow-discrete aus.
+  const transitions = [...base.matchAll(/transition:\s*([^;]+)/g)].map((m) => m[1]);
+  assert.equal(transitions.length, 2);
+  assert.doesNotMatch(transitions[0], /allow-discrete/);
+  const open = ruleBodies('calendar.css', '.cal-filters-popover:popover-open').join(';');
+  assert.match(open, /opacity:\s*1/);
+  assert.match(open, /transform:\s*none/);
+  assert.match(open, /opacity var\(--duration-md\) var\(--ease-out\)/, 'die Einfahrt ist laenger als der Ausgang');
+  assert.match(css('calendar.css'), /@starting-style \{\s*\.cal-filters-popover:popover-open \{\s*opacity: 0;\s*transform: scale\(0\.96\);/);
+  // Ein sofortiges remove() im toggle schnitt den Ausgang ab.
+  const cal = pageSource('calendar');
+  const toggle = cal.slice(cal.indexOf("pop.addEventListener('toggle'"), cal.indexOf('pop.showPopover();'));
+  assert.doesNotMatch(toggle.replace(/\/\/.*$/gm, ''), /^\s*pop\.remove\(\);/m, 'das Popover geht erst nach dem Ausgang aus dem Baum');
+  assert.match(toggle, /setTimeout\(\(\) => pop\.remove\(\), durationToken\('--duration-xs', 120\) \+ 40\);/);
+});
+
 test('Schichtplan: Laden zeigt das geteilte Skelett, Blaettern haelt den Inhalt bis zur Antwort', () => {
   const schedule = pageSource('schedule');
   assert.doesNotMatch(schedule, /card card--padded schedule-stat-loading/, 'keine Textkarte "Laedt..." mehr');

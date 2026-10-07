@@ -58,6 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and Reports - a horizontal swipe pages one period forward or back, with the same distance
   and feel as in the calendar. The arrows stay for mouse and keyboard. Scrolling up and down
   is unaffected, and the chart in Reports keeps its own horizontal drag for picking a day.
+- **The calendar's filter popover opens and closes like every other menu.** On a desktop it
+  appeared and vanished with a hard cut; it now grows out of the filter button and fades, and
+  leaves a little faster than it came.
 
 ### Fixed
 
