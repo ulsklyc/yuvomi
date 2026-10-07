@@ -76,6 +76,11 @@ master data with the character of a form, and a readable column (about 612px) is
 width for it; it gets a side column only when the module has a second piece of content that
 belongs there.
 
+Since 2026-10-07 the housekeeping **tasks** tab fills its side column: the two figures "Due" and
+"Done this month" (`taskSummaryHtml()`, the same as on the overview) stand beside the list from
+the split threshold. Below 640px neither the figures nor the track are rendered - the phone
+keeps the plain list.
+
 Arbitrary values such as `max-width: 843px` are prohibited.
 
 ### Primary alignment edge
@@ -342,7 +347,7 @@ overflow checks. Not wired into CI yet.
 | Reference | `reading` | **birthdays** | **Done (helpers + CSS)** |
 | A | `reading` | contacts, pantry, recipes | Mode declared |
 | A' | `reading` -> `dashboard` + columns | rewards, waste, housekeeping | Moved on 2026-10-05: one outer edge per module, lists on the reading measure inside `.page-columns`, a side column from the split threshold (DESIGN.md, "Die Breitenregel") |
-| B | `data` -> `reading` | inventory | Moved to `reading` on 2026-09-26 when the width rule retired the 960px measure for core pages (DESIGN.md, "Die Breitenregel"); wired to `list-detail` since (PAGE-017) |
+| B | `data` -> `reading` | inventory | Moved to `reading` on 2026-09-26 when the width rule retired the 960px measure for core pages (DESIGN.md, "Die Breitenregel"); wired to `list-detail` since (PAGE-017). Since 2026-10-07 the list column holds every item grouped by category, with the categories as filter chips above it (`#inventory-filters`, outside the redrawn `#inventory-list`); the category overview as a level of its own is gone, the detail column is there from the start |
 | B' | `full` | schedule, documents | Mode declared. Both were `data` until the seventh review round: their headers run full width (no `--narrow`), so the 960px measure was visible only on the primitives that happen to consume it - the KPI band of the schedule statistics ended at 960 while the filter card and the result cards beside it did not. `full` sets the measure to 100% and caps nothing, which is what these pages looked like before this PR. PAGE-016 keeps it that way: a measured mode needs a narrow header, or nothing on the page may consume the measure |
 | C | budget family | budget + stats/plans | Mode declared (`reading`); stats and plans are tab panels inside the Budget page and inherit its measure. A per-tab mode (reports as `dashboard`) also means switching the shared header per tab - an open design decision, not done here |
 | C' | `full` / `split` | subscriptions (`full`), split-expenses (`split`) | Mode declared; content not on a measure yet (analytics grid / two-column layout own their width) |

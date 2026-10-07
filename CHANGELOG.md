@@ -159,8 +159,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   straight into the edit form with the keyboard up; it now opens a read sheet (next date and age,
   birth date, name day, note, reminder) with Delete at the start of the footer and Edit as the
   main button at the end, as an appointment does. A contact's sheet has Edit in the same place
-  instead of in the header. The shopping list keeps its own rule: tapping a row ticks it off, the
-  pencil opens the item.
+  instead of in the header.
 - **One word per thing in the German interface, and two settings pages named for what they
   hold.** The navigation says "Übersicht"; nine texts still said "Dashboard" (load error, pinned
   notes, weather, permissions, shortcuts) - they now say "Übersicht" too, likewise "Overview" in
@@ -257,11 +256,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   back on the menu button.** With the header docked, view switch and filter move into the "..."
   menu; choosing one of them there left the focus on the page instead of on the button the menu
   was opened from.
-
-- **Budget: two small headings set right.** On the overview "Planned" and "Booked" were as large
-  as the heading "Transactions" right above them; they are now one step smaller. In split
-  expenses on a desktop the note "simplified debts" broke over two lines beside "Settle up"; it
-  now has its own line below the heading.
 
 - **Health overview: the medication name gets its own line on a phone, and the gap above "Latest
   vitals" is always there.** The dose row left the name 81px, so "Eisen (Eisenbisglycinat)" broke

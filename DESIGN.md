@@ -2540,7 +2540,8 @@ Zeile 2. Eingeklappt rueckt der Stepper jetzt in Zeile 1 vor das Menue: 117 -> 6
 Filter und "Heute" falten dafuer ins Ansichtsmenue - als Eintraege mit demselben Namen, die das
 Original klicken (`data-collapse-fold` am Werkzeug, `data-collapse-fold-menu` am Menue; die
 Stellvertreter baut `wireCollapsingHeader` beim Oeffnen, wie bei der Faltung der scrollenden
-Koepfe). Das Label bekommt so 194px ("07.10. - 06.11.2026" braucht 172; mit allen dreien
+Koepfe; schliesst das Menue, geht der Fokus vom Stellvertreter an den Ausloeser, BEVOR der
+Eintrag aus dem DOM faellt - die Popover-API gibt ihn sonst an niemanden zurueck). Das Label bekommt so 194px ("07.10. - 06.11.2026" braucht 172; mit allen dreien
 blieben 68). Ein AKTIVER Filter faltet nicht, seine Zahl bleibt (Regel 3), dann kuerzt das
 Label; "Heute" ist nur ein Eintrag, wenn ein anderer Zeitraum offen ist. Nur unter 640px -
 darueber gibt es kein Menue, in das gefaltet wird. Die Reserve-Regel des Kopfs rechnet seither
