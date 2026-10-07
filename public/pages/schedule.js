@@ -961,6 +961,13 @@ function shiftTypeFieldsEditor(type) {
   return advancedSection(body, { label: t('schedule.attachedFields'), open: type.fields.length > 0 });
 }
 
+/* WAS "ENTFERNEN" MITNAHM, BRINGT "HINZUFUEGEN" ZURUECK (#1775, Review). Die
+ * Zeile traegt den Haken "Im Overlay zeigen"; wer ein Feld versehentlich
+ * entfernte und wieder anhaengte, bekam es ohne den Haken zurueck, und
+ * Speichern schrieb das fest - das Feld verschwand still aus Plan, Kalender
+ * und ICS. Gemerkt wird je Formular, also je geoeffnetem Dialog. */
+const removedOverlayState = new WeakMap();
+
 /**
  * Zieht die Feld-Auswahl im Schichtart-Dialog auf den Stand der Zeilen nach:
  * waehlbar ist jedes Feld des Haushalts, das gerade KEINE Zeile hat, in der
@@ -2621,7 +2628,10 @@ function editorAction(button) {
     const field = state.customFields.find((item) => Number(item.id) === Number(picker.value));
     if (!field) return;
     container.querySelector('.u-meta')?.remove();
-    container.insertAdjacentHTML('beforeend', shiftTypeFieldRow({ ...field, show_in_overlay: false }));
+    // Ein Feld, das in DIESEM Dialog entfernt wurde, kommt mit seinem Haken
+    // zurueck (removedOverlayState); ein neues beginnt ohne.
+    const overlay = removedOverlayState.get(scope)?.get(String(field.id)) ?? false;
+    container.insertAdjacentHTML('beforeend', shiftTypeFieldRow({ ...field, show_in_overlay: overlay }));
     syncTypeFieldPicker(scope);
     window.lucide?.createIcons({ el: container.parentElement });
     // War das das letzte waehlbare Feld, ist die Auswahl samt diesem Knopf
@@ -2633,6 +2643,10 @@ function editorAction(button) {
     const row = button.closest('[data-type-field-row]');
     const container = row?.closest('[data-type-fields-rows]');
     const scope = button.closest('form');
+    if (row && scope) {
+      if (!removedOverlayState.has(scope)) removedOverlayState.set(scope, new Map());
+      removedOverlayState.get(scope).set(String(row.dataset.customFieldId), Boolean(row.querySelector('[data-show-in-overlay]')?.checked));
+    }
     row?.remove();
     if (container && !container.children.length) container.insertAdjacentHTML('beforeend', '<p class="u-meta">' + esc(t('schedule.noFieldsAttached')) + '</p>');
     // Das entfernte Feld kehrt in die Auswahl zurueck (#1775).

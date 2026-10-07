@@ -320,7 +320,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Budget and calendar: a second swipe while the next period is still loading is ignored.** Two
   quick swipes forward in the budget asked for the same month twice instead of moving on by two,
   and two opposite ones left whichever answer came last on screen. A swipe now starts only when
-  the one before it has finished loading; the arrows are unchanged (#1775).
+  the one before it has finished loading; the arrows are unchanged. In the statistics, a late
+  answer for an earlier period no longer replaces the period on screen (#1775).
 
 - **Waste: "Add pickup" is no longer offered while every waste type is archived.** The entry in
   the header menu opened the dialog for a new waste type in that state - a pickup has no type to
@@ -335,7 +336,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shift types: a field removed in the dialog can be attached again without leaving it.** Removing
   an attached field only deleted its row; it did not come back to the list of fields to add, and
   with every field attached there was no such list at all - undoing a slip meant cancelling the
-  dialog and losing the other edits. A removed field now returns to the list at once (#1775).
+  dialog and losing the other edits. A removed field now returns to the list at once, and comes
+  back with its "show in overlay" switch as it was (#1775).
 
 - **Dialogs ask before discarding a change that is only a tick.** Closing a dialog asks "Discard
   changes?" when a field differs from what it was on opening, but a checkbox or a radio button

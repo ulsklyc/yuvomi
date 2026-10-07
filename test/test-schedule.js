@@ -1091,7 +1091,7 @@ test('#1775: ein entferntes eigenes Feld kehrt in die Auswahl des Schichtart-Dia
       insertAdjacentHTML(_pos, html) {
         this.inserted.push(html);
         const id = /data-custom-field-id="(\d+)"/.exec(html)?.[1];
-        if (id) rows.push(makeRow(id));
+        if (id) rows.push(makeRow(id, /data-show-in-overlay checked/.test(html)));
       },
       parentElement: {},
     };
@@ -1099,13 +1099,15 @@ test('#1775: ein entferntes eigenes Feld kehrt in die Auswahl des Schichtart-Dia
       querySelector: (sel) => (sel === '[data-field-picker]' ? picker : sel === '[data-type-fields-rows]' ? container : null),
       querySelectorAll: (sel) => (sel === '[data-type-field-row]' ? [...rows] : []),
     };
-    function makeRow(id) {
+    function makeRow(id, overlay = false) {
       const row = {
         dataset: { customFieldId: String(id) },
+        overlay,
         focused: 0,
         remove() { rows.splice(rows.indexOf(row), 1); },
         closest: (sel) => (sel === '[data-type-fields-rows]' ? container : null),
-        querySelector: (sel) => (sel === '[data-action="remove-type-field"]' ? { focus: () => { row.focused += 1; } } : null),
+        querySelector: (sel) => (sel === '[data-action="remove-type-field"]' ? { focus: () => { row.focused += 1; } }
+          : sel === '[data-show-in-overlay]' ? { checked: row.overlay } : null),
       };
       return row;
     }
@@ -1114,6 +1116,9 @@ test('#1775: ein entferntes eigenes Feld kehrt in die Auswahl des Schichtart-Dia
     const addButton = { dataset: { action: 'add-type-field' },
       closest: (sel) => (sel === 'form' ? form : sel === '[hidden]' ? (wrapper.hidden ? wrapper : null) : null) };
     for (const id of [11, 12, 13]) rows.push(makeRow(id));
+
+    // "Fahrzeug" steht im Overlay - der Haken muss das Entfernen ueberleben.
+    rows[1].overlay = true;
 
     // Entfernen: das Feld steht wieder zur Wahl, die Auswahl wird sichtbar.
     __test.editorAction(removeButton(rows[1]));
@@ -1129,12 +1134,15 @@ test('#1775: ein entferntes eigenes Feld kehrt in die Auswahl des Schichtart-Dia
     // Wieder anhaengen: Zeile da, Feld aus der Auswahl.
     __test.editorAction(addButton);
     assert.deepEqual(rows.map((r) => r.dataset.customFieldId), ['13', '12']);
+    assert.equal(rows.at(-1).overlay, true,
+      'das wieder angehaengte Feld bringt seinen Overlay-Haken mit (Review): sonst schriebe Speichern ihn weg');
     assert.equal(picker.html, '<option value="11">Station</option>');
     assert.equal(wrapper.hidden, false);
 
     // Das letzte: die Auswahl ist leer und verborgen, der Fokus geht auf die neue Zeile.
     __test.editorAction(addButton);
     assert.deepEqual(rows.map((r) => r.dataset.customFieldId), ['13', '12', '11']);
+    assert.equal(rows.at(-1).overlay, false, 'ein Feld ohne Haken kommt ohne Haken zurueck');
     assert.equal(picker.html, '');
     assert.equal(wrapper.hidden, true);
     assert.equal(rows.at(-1).focused, 1, 'der Knopf, der eben noch den Fokus hatte, ist verborgen');
