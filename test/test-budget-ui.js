@@ -2100,7 +2100,9 @@ test('Gruppe löschen trägt eine andere Gewichtung als bearbeiten/archivieren',
     'Löschen steht zuletzt, hinter einem Trenner, im Gefahrenton');
   // Sichtbar bleibt die haeufige Handlung, nicht fuenf Knoepfe.
   const main = splitExpenses.slice(splitExpenses.indexOf('function renderMain('), splitExpenses.indexOf('// So viele Namen stehen'));
-  assert.match(main, /id="split-settle"[\s\S]*\$\{groupToolsMenuHtml\(\)\}/);
+  // Seit R17/E5 steht "Ausgleichen" in der Salden-Zeile, das Menue im Gruppenkopf.
+  assert.match(main, /id="split-settle"/);
+  assert.match(main, /<div class="split-header-actions">[\s\S]*?: groupToolsMenuHtml\(\)\}/);
   assert.doesNotMatch(main, /id="split-(edit|archive|delete)-group"/, 'die Gruppenverwaltung steht im Menue, nicht als Icon-Knopfreihe');
 });
 
@@ -4593,4 +4595,89 @@ test('R17/E4: der Aufklapper schaltet ohne Neuaufbau, auch bei Nur-lesen; geplan
   // Listenbewegung und Monats-Wisch (R17, Schritt 2) haengen an diesen beiden.
   assert.match(budget, /const BUDGET_ENTRY = '#budget-list \.budget-entry\[data-id\]';/);
   assert.match(budget, /class="budget-list" id="budget-list"/);
+});
+
+// ---------------------------------------------------------------------------
+// Entscheidung R17 (E5): die Kurzzeile gehoert der gewaehlten Gruppe
+// ---------------------------------------------------------------------------
+
+/* Oben stand die Summe ueber alle Gruppen ("Du schuldest 196,14 €") direkt
+ * ueber dem Saldo der Gruppe ("Linda schuldet Alex 24,14 €"): zwei Zahlen fuer
+ * scheinbar dieselbe Frage. */
+test('R17/E5: Kurzzeile und Karten zeigen den Saldo der GEWAEHLTEN Gruppe, die Summe aller steht in der Gruppenwahl', () => {
+  const saldo = splitGlance.ownGroupBalance;
+  const balances = [
+    { currency: 'EUR', user_id: 1, net_minor: 2414, net: '24.14' },
+    { currency: 'EUR', user_id: 2, net_minor: -2414, net: '-24.14' },
+    { currency: 'USD', user_id: 2, net_minor: 500, net: '5.00' },
+    { currency: 'CHF', user_id: 2, net_minor: 0, net: '0.00' },
+  ];
+  assert.deepEqual(saldo(balances, 2), { owed: [{ amount: '5.00', currency: 'USD' }], owing: [{ amount: '24.14', currency: 'EUR' }] },
+    'positiv bekommt man, negativ schuldet man - je Waehrung, ohne Vorzeichen, null zaehlt nicht');
+  assert.deepEqual(saldo(balances, 1), { owed: [{ amount: '24.14', currency: 'EUR' }], owing: [] });
+  assert.deepEqual(saldo(balances, 9), { owed: [], owing: [] }, 'ohne Saldo in der Gruppe: ausgeglichen');
+  assert.deepEqual(saldo(balances, null), { owed: [], owing: [] });
+
+  const boxen = { summary: { html: '' }, glance: { html: '' }, total: { html: '', hidden: true } };
+  const el = (box) => ({
+    replaceChildren() { box.html = ''; }, insertAdjacentHTML(_p, v) { box.html += v; }, querySelector: () => null,
+    set hidden(v) { box.hidden = v; }, get hidden() { return box.hidden; },
+  });
+  const container = { querySelector: (sel) => ({ '#split-summary': el(boxen.summary), '#split-glance': el(boxen.glance), '#split-groups-total': el(boxen.total) }[sel] ?? null) };
+  const vorher = { ...splitGlance.state };
+  try {
+    Object.assign(splitGlance.state, {
+      groupStatus: 'active', groups: [{ id: 1 }, { id: 2 }], user: { id: 2 },
+      // Alle Gruppen zusammen: 196,14 € Schulden. In der gewaehlten Gruppe: 24,14 €.
+      dashboard: { total_owed: [], total_owing: [{ amount: '196.14', currency: 'EUR' }] },
+      balances: { balances: balances.slice(0, 2), simplified_debts: [] },
+      meta: { currencies: ['EUR'], default_currency: 'EUR' },
+    });
+    splitGlance.renderSummaryForTest(container);
+    assert.match(boxen.glance.html, /24,14/, 'die Kurzzeile nennt den Saldo der Gruppe');
+    assert.doesNotMatch(boxen.glance.html, /196,14/, 'nicht die Summe aller Gruppen');
+    assert.match(boxen.summary.html, /metric-card metric-card--negative">\s*<div class="metric-card__label">splitExpenses\.youOwe<\/div>\s*<div class="metric-card__value">24,14/);
+    assert.doesNotMatch(boxen.summary.html, /196,14/);
+    assert.equal(boxen.total.hidden, false);
+    assert.match(boxen.total.html, /splitExpenses\.allGroups<\/span>[\s\S]*splitExpenses\.youOwe <strong>196,14/, 'die Summe ueber alle Gruppen steht in der Gruppenwahl');
+
+    // Im Archiv zaehlen die Summen des Servers nicht mit: die Zeile faellt.
+    splitGlance.state.groupStatus = 'archived';
+    splitGlance.renderSummaryForTest(container);
+    assert.equal(boxen.total.hidden, true);
+  } finally {
+    Object.assign(splitGlance.state, vorher);
+  }
+  assert.match(splitExpenses, /<p class="split-groups-total" id="split-groups-total" hidden><\/p>\s*<div class="split-groups" id="split-groups"><\/div>/,
+    'die Zeile steht in der Gruppenwahl, ueber der Liste');
+});
+
+test('R17/E5: "Ausgleichen" steht in der Salden-Zeile; schmal tritt der Gruppenkopf zurueck', () => {
+  const main = splitExpenses.slice(splitExpenses.indexOf('function drawMain('), splitExpenses.indexOf('// So viele Namen stehen'));
+  const kopf = main.slice(main.indexOf('<div class="split-header-actions">'), main.indexOf('<div class="split-content-grid">'));
+  assert.doesNotMatch(kopf, /split-settle/, 'im Gruppenkopf steht "Ausgleichen" nicht mehr');
+  assert.match(main, /const balanceActions = canAct \? `\s*<div class="split-section-actions">\s*<button class="btn btn--secondary" id="split-settle">[\s\S]*?\$\{groupToolsTriggerHtml\(\)\}/,
+    'die Salden-Zeile traegt "Ausgleichen" und den schmalen Ausloeser des Werkzeugmenues');
+  assert.match(main, /<span>\$\{t\('splitExpenses\.simplified'\)\}<\/span>\s*<\/div>\$\{balanceActions\}/);
+  assert.match(main, /const canAct = !ro && !archived;/, 'nur wer handeln darf, in einer aktiven Gruppe');
+  assert.match(main, /class="split-group-header\$\{toolsOnly \? ' split-group-header--tools-only' : ''\}"/);
+
+  // EIN Menue, zwei Ausloeser: die ids im Menue bleiben einmalig.
+  const trigger = splitGlance.groupToolsTriggerHtml();
+  assert.match(trigger, /popovertarget="split-group-tools-menu"/);
+  assert.doesNotMatch(trigger, /id="/, 'der Ausloeser traegt keine id - es gibt ihn zweimal');
+  assert.equal((splitGlance.groupToolsMenuHtml().match(/id="split-group-tools-menu"/g) ?? []).length, 1);
+  const popover = read('../public/utils/popover-menu.js');
+  assert.match(popover, /const trigger = triggerOf\(panel\.id\);/, 'das Menue richtet sich am SICHTBAREN Ausloeser aus');
+  assert.match(popover, /all\.find\(\(el\) => \(typeof el\.getClientRects === 'function' \? el\.getClientRects\(\)\.length > 0 : false\)\) \?\? all\[0\]/);
+
+  const rules = [...eachRule(splitCss)];
+  const schmal = (r) => r.at.some((a) => /split-page \(max-width:\s*639px\)/.test(a));
+  const find = (sel, pred = () => true) => rules.find((r) => r.selector.trim() === sel && pred(r));
+  assert.match(find('.split-section-actions .split-group-tools', (r) => r.at.length === 0)?.body ?? '', /display:\s*none/, 'breit steht der Ausloeser im Gruppenkopf');
+  assert.match(find('.split-section-actions .split-group-tools', schmal)?.body ?? '', /display:\s*inline-flex/, 'schmal der in der Salden-Zeile');
+  assert.match(find('.split-group-header--tools-only', schmal)?.body ?? '', /position:\s*absolute[\s\S]*clip-path/,
+    'schmal bleibt der Kopf im Baum und tritt aus dem Bild');
+  assert.match(find('.split-group-header--tools-only .split-header-actions', schmal)?.body ?? '', /display:\s*none/, 'sein Ausloeser ist dann kein Tab-Stopp');
+  assert.match(find('.split-section-head__lead')?.body ?? '', /flex:\s*1 1 0/, 'der Kopf der Salden bricht nicht um');
 });

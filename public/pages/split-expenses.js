@@ -222,6 +222,9 @@ export async function render(container, { user, embedded = false, onAddableChang
                   tabindex="${on ? '0' : '-1'}">${t(key)}</button>`;
             }).join('')}
           </div>
+          <!-- Die Summe ueber alle Gruppen (R17, E5) steht bei der Liste, die sie
+               zusammenzaehlt - die Kurzzeile oben gehoert der gewaehlten Gruppe. -->
+          <p class="split-groups-total" id="split-groups-total" hidden></p>
           <div class="split-groups" id="split-groups"></div>
           </div>
         </aside>
@@ -503,10 +506,52 @@ export function openNewSplitExpense() {
   openExpenseModal();
 }
 
-function renderSummary() {
-  const summary = _container.querySelector('#split-summary');
+/**
+ * Pure: der eigene Saldo in der GEWAEHLTEN Gruppe, in der Form der
+ * Dashboard-Summen (`[{ amount, currency }]`, je Waehrung eine Zeile; leer =
+ * ausgeglichen). Quelle sind die Salden der Gruppe (`balances.balances`, eine
+ * Zeile je Mitglied und Waehrung, `net` mit Vorzeichen): positiv bekommt man,
+ * negativ schuldet man. Wer in der Gruppe keinen Saldo hat, bekommt zwei leere
+ * Listen.
+ */
+function ownGroupBalance(balances = state.balances?.balances ?? [], userId = state.user?.id) {
+  const own = userId == null ? [] : balances.filter((row) => Number(row.user_id) === Number(userId));
+  const part = (sign) => own
+    .filter((row) => Math.sign(Number(row.net_minor ?? Number(row.net) * 100)) === sign)
+    .map((row) => ({ amount: String(row.net).replace(/^-/, ''), currency: row.currency }));
+  return { owed: part(1), owing: part(-1) };
+}
+
+/** "24,14 € · 12,00 $" aus Summenzeilen; ohne Zeile die Null in der Standardwaehrung. */
+function totalsText(rows) {
+  return rows.length ? rows.map((r) => money(r.amount, r.currency)).join(' · ') : money(0, state.meta.default_currency);
+}
+
+/**
+ * Die Summe ueber ALLE Gruppen steht in der Gruppenwahl (Entscheidung R17,
+ * E5), ueber der Liste, deren Gruppen sie zusammenzaehlt. Im Archiv entfaellt
+ * sie: die Summen des Servers zaehlen die aktiven Gruppen.
+ */
+function renderGroupsTotal() {
+  const el = _container.querySelector('#split-groups-total');
+  if (!el) return;
   const owed = state.dashboard?.total_owed || [];
   const owing = state.dashboard?.total_owing || [];
+  el.hidden = isArchivedView() || !state.groups.length;
+  setHtml(el, `<span class="split-groups-total__label">${t('splitExpenses.allGroups')}</span>
+    <span class="split-groups-total__part">${t('splitExpenses.youAreOwed')} <strong>${totalsText(owed)}</strong></span>
+    <span class="split-groups-total__part">${t('splitExpenses.youOwe')} <strong>${totalsText(owing)}</strong></span>`);
+}
+
+function renderSummary() {
+  const summary = _container.querySelector('#split-summary');
+  // DIE KURZZEILE GEHOERT DER GEWAEHLTEN GRUPPE (Entscheidung R17, E5). Bis R17
+  // stand hier die Summe ueber alle Gruppen - "Du schuldest 196,14 €" direkt
+  // ueber dem Saldo der Gruppe "Linda schuldet Alex 24,14 €": zwei Zahlen fuer
+  // scheinbar dieselbe Frage. Die Summe aller Gruppen steht jetzt in der
+  // Gruppenwahl (renderGroupsTotal()).
+  const { owed, owing } = ownGroupBalance();
+  renderGroupsTotal();
   // Geteilte Kennzahlkarte des Budget-Moduls (budget.css). Die frühere eigene
   // .split-summary-card war die dritte von fünf Bauarten im selben Modul
   // (Critique 2026-07-30, P0).
@@ -516,8 +561,8 @@ function renderSummary() {
   // ist sie dort die einzige (split-expenses.css, R10 L11).
   const count = _container.querySelector('#split-group-count');
   if (count) count.textContent = String(state.groups.length);
-  const owedText = owed.length ? owed.map((r) => money(r.amount, r.currency)).join(' · ') : money(0, state.meta.default_currency);
-  const owingText = owing.length ? owing.map((r) => money(r.amount, r.currency)).join(' · ') : money(0, state.meta.default_currency);
+  const owedText = totalsText(owed);
+  const owingText = totalsText(owing);
   const glance = _container.querySelector('#split-glance');
   if (glance) {
     const expanded = summary?.classList?.contains('is-expanded') ?? false;
@@ -621,6 +666,18 @@ function renderGroups() {
  * Ein Gast bekommt nur „Ausgleichen": die vier Eintraege hier verwalten die
  * Gruppe, und das darf er nicht - dann faellt das Menue ganz.
  */
+/** Ein Ausloeser des Gruppen-Werkzeugmenues; das Menue selbst baut groupToolsMenuHtml(). */
+function groupToolsTriggerHtml() {
+  if (isSplitGuest()) return '';
+  const label = t('common.moreActions');
+  return `
+    <button type="button" class="btn btn--secondary btn--icon split-group-tools popover-menu__trigger"
+            popovertarget="split-group-tools-menu" aria-haspopup="menu" aria-expanded="false"
+            aria-label="${esc(label)}" title="${esc(label)}">
+      <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
+    </button>`;
+}
+
 function groupToolsMenuHtml() {
   if (isSplitGuest()) return '';
   const label = t('common.moreActions');
@@ -628,12 +685,7 @@ function groupToolsMenuHtml() {
       <button type="button" role="menuitem" class="popover-menu__item${danger ? ' popover-menu__item--danger' : ''}" id="${id}">
         <i data-lucide="${icon}" class="icon-md" aria-hidden="true"></i><span>${esc(text)}</span>
       </button>`;
-  return `
-    <button type="button" class="btn btn--secondary btn--icon split-group-tools popover-menu__trigger"
-            popovertarget="split-group-tools-menu" aria-haspopup="menu" aria-expanded="false"
-            aria-label="${esc(label)}" title="${esc(label)}">
-      <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
-    </button>
+  return `${groupToolsTriggerHtml()}
     <div class="popover-menu split-group-tools-menu" id="split-group-tools-menu" popover role="menu" aria-label="${esc(label)}">
       ${item('split-invite', 'user-plus', t('splitExpenses.addMember'))}
       ${item('split-edit-group', 'pencil', t('splitExpenses.editGroup'))}
@@ -692,8 +744,26 @@ function drawMain(main) {
   const ro = readOnly();
   const GroupTag = _embedded ? 'h3' : 'h2';
   const SectionTag = _embedded ? 'h4' : 'h3';
+  // "AUSGLEICHEN" STEHT IN DER SALDEN-ZEILE (Entscheidung R17, E5): es ist die
+  // Handlung an den Salden, und im Gruppenkopf kostete es mobil eine eigene
+  // 60px-Zeile vor der ersten Ausgabe (y=502 bei 390x844). Schmal traegt der
+  // Gruppenkopf dann nichts Sichtbares mehr - Name und Typ stehen in der
+  // Gruppenwahl darueber - und tritt ganz zurueck (`--tools-only`,
+  // split-expenses.css); das Werkzeugmenue bekommt dort einen zweiten
+  // Ausloeser in der Salden-Zeile (EIN Menue, zwei Ausloeser, je Breite steht
+  // einer - popover-menu.js richtet sich am sichtbaren aus).
+  const canAct = !ro && !archived;
+  const toolsOnly = canAct;
+  const balanceActions = canAct ? `
+          <div class="split-section-actions">
+            <button class="btn btn--secondary" id="split-settle">
+              <i data-lucide="hand-coins" class="icon-md" aria-hidden="true"></i>
+              ${t('splitExpenses.settle')}
+            </button>
+            ${groupToolsTriggerHtml()}
+          </div>` : '';
   setHtml(main, `
-    <section class="split-group-header">
+    <section class="split-group-header${toolsOnly ? ' split-group-header--tools-only' : ''}">
       <div class="split-group-header__text">
         <${GroupTag} class="split-group-name">${esc(group.name)}</${GroupTag}>
         <p class="split-group-type">${t(`splitExpenses.groupType.${group.type}`)}</p>
@@ -709,12 +779,7 @@ function drawMain(main) {
         <button class="btn btn--secondary" id="split-restore-group" ${isSplitGuest() ? 'hidden' : ''}>
           <i data-lucide="archive-restore" class="icon-md" aria-hidden="true"></i>
           ${t('splitExpenses.restoreGroup')}
-        </button>` : `
-        <button class="btn btn--secondary" id="split-settle">
-          <i data-lucide="hand-coins" class="icon-md" aria-hidden="true"></i>
-          ${t('splitExpenses.settle')}
-        </button>
-        ${groupToolsMenuHtml()}`}
+        </button>` : groupToolsMenuHtml()}
       </div>`}
     </section>
     ${/* ABSCHNITTSTITEL AUF DER BUEHNE, ZEILEN IM TRAEGER (R16 Schritt 2b,
@@ -728,8 +793,10 @@ function drawMain(main) {
     <div class="split-content-grid">
       <section class="split-section split-section--balances">
         <div class="split-section-head">
-          <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.balances')}</${SectionTag}>
-          <span>${t('splitExpenses.simplified')}</span>
+          <div class="split-section-head__lead">
+            <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.balances')}</${SectionTag}>
+            <span>${t('splitExpenses.simplified')}</span>
+          </div>${balanceActions}
         </div>
         <div id="split-balances">${renderBalances()}</div>
       </section>
@@ -2494,4 +2561,6 @@ export const __test = {
   renderGroupsForTest(container) { _container = container; renderGroups(); },
   // R10 L11: die Gruppenzahl steht am Kopf der Liste (test-split-activity-ui.js).
   renderSummaryForTest(container) { _container = container; renderSummary(); },
+  // R17/E5: der eigene Saldo der gewaehlten Gruppe und die Summe aller Gruppen.
+  ownGroupBalance, groupToolsTriggerHtml,
 };

@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Shared expenses: the figures at the top are those of the group you are looking at.** They
+  used to add up all groups, so "You owe 196.14" stood right above the group's own "Linda owes
+  Alex 24.14" - two numbers for what looked like one question. "You are owed" and "You owe" now
+  show your balance in the selected group; the sum across all groups stands in the group picker.
+  "Settle up" moved into the balances row, which is what it acts on. On a phone that frees a row:
+  the first expense starts 52 px higher and a fourth one fits on the first screen.
+
 - **Budget: what is planned and what is booked stand apart.** In the running month the overview
   listed everything by date, latest first - so the entries that had not happened yet stood on top,
   and on a full month the first real booking sat below the fold. The list now has two sections:

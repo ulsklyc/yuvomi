@@ -421,6 +421,61 @@
   margin-block-start: 0;
 }
 
+/* SALDEN: TITEL MIT ZUSATZ LINKS, DIE HANDLUNG RECHTS (Entscheidung R17, E5).
+ * "Ausgleichen" ist die Handlung an den Salden und steht in ihrer Zeile; der
+ * Zusatz ("vereinfachte Schulden") rueckt als zweite Zeile unter den Titel,
+ * damit Titel, Zusatz und Knopf auch in der 300px-Spalte des Desktops und in
+ * langen Sprachen nebeneinander Platz haben. */
+.split-section-head__lead {
+  display: flex;
+  flex-direction: column;
+  /* Basis 0: der Kopf bricht nie um, weil der Zusatz zu lang waere - der
+   * Zusatz bricht in seiner eigenen Spalte, der Knopf bleibt in der Zeile. */
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.split-section-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+/* EIN Werkzeugmenue, zwei Ausloeser: breit steht der im Gruppenkopf, schmal
+ * der in der Salden-Zeile (unten, Container-Regel). */
+.split-section-actions .split-group-tools {
+  display: none;
+}
+
+/* DIE SUMME UEBER ALLE GRUPPEN STEHT IN DER GRUPPENWAHL (Entscheidung R17,
+ * E5), ueber der Liste, die sie zusammenzaehlt - die Kurzzeile oben gehoert
+ * der gewaehlten Gruppe. Eine Zeile Sekundaertext, die Betraege im Gewicht der
+ * Zeilenbetraege. */
+.split-groups-total {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-0h) var(--space-3);
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.split-groups-total[hidden] {
+  display: none;
+}
+
+.split-groups-total__label {
+  flex-basis: 100%;
+  font-weight: var(--font-weight-medium);
+}
+
+.split-groups-total strong {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
 .split-debt,
 .split-expense,
 .split-activity-item {
@@ -853,6 +908,43 @@ button.split-expense:hover {
 
   .split-header-actions .btn.split-group-tools {
     flex: 0 0 auto;
+  }
+
+  /* DER GRUPPENKOPF TRITT GANZ ZURUECK, WENN ER NUR NOCH DAS WERKZEUG TRUEGE
+     (Entscheidung R17, E5). "Ausgleichen" steht in der Salden-Zeile, Name und
+     Typ in der Gruppenwahl darueber: die Zeile kostete 60px vor der ersten
+     Ausgabe fuer einen Drei-Punkte-Knopf. Der Kopf bleibt im Baum (Name, Typ
+     und Beschreibung fuer die Gliederung), sein Ausloeser weicht dem zweiten
+     in der Salden-Zeile. Mit Archiv-Marke, Wiederherstellen oder den Angaben
+     bei `budget: read` traegt er die Klasse nicht und bleibt stehen. */
+  .split-group-header--tools-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .split-group-header--tools-only .split-header-actions {
+    display: none;
+  }
+
+  .split-section-actions .split-group-tools {
+    display: inline-flex;
+  }
+
+  /* Neben "Ausgleichen" und dem Werkzeug bleiben der Titelspalte bei 390px
+     155px: der Zusatz ("vereinfachte Schulden") braeche dort auf zwei Zeilen
+     und naehme der ersten Ausgabe die 29px wieder, die der Umzug bringt. Er
+     weicht schmal aus dem Bild und bleibt im Baum (geclippt, nie
+     `display: none`) - ohne Knoepfe daneben (Archiv, Nur-lesen) steht er. */
+  .split-section-head:has(> .split-section-actions) > .split-section-head__lead > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .split-content-grid {

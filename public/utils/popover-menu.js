@@ -193,6 +193,21 @@ function onBeforeToggle(event) {
   panel.style.transform = '';
 }
 
+/**
+ * Der Ausloeser eines Menues. EIN Menue darf ZWEI Ausloeser haben, von denen
+ * je Breite einer steht (Aufteilung, R17: das Gruppen-Werkzeug im Gruppenkopf
+ * am Desktop, in der Salden-Zeile am Telefon) - `popovertarget` erlaubt das,
+ * und ids im Menue blieben so einmalig. Gemeint ist dann der SICHTBARE: am
+ * ersten Treffer im Dokument richtete sich das Menue sonst an einem
+ * verborgenen Knopf aus (Rechteck 0/0) und meldete dort seinen Zustand.
+ */
+function triggerOf(id) {
+  const selector = `[popovertarget="${id}"]`;
+  const all = typeof document.querySelectorAll === 'function' ? [...document.querySelectorAll(selector)] : [];
+  if (all.length < 2) return all[0] ?? document.querySelector(selector);
+  return all.find((el) => (typeof el.getClientRects === 'function' ? el.getClientRects().length > 0 : false)) ?? all[0];
+}
+
 function onToggle(event) {
   const panel = event.target;
   if (!(panel instanceof HTMLElement) || !panel.matches('.popover-menu')) return;
@@ -200,7 +215,7 @@ function onToggle(event) {
   // `aria-expanded` gehoert dem Trigger, und die Popover-API pflegt es nicht:
   // sie kennt nur `popovertarget`, kein ARIA. Ohne diese Zeile meldet der
   // Screenreader ein Menue, das nie aufgeht.
-  const trigger = document.querySelector(`[popovertarget="${panel.id}"]`);
+  const trigger = triggerOf(panel.id);
   trigger?.setAttribute('aria-expanded', String(event.newState === 'open'));
 
   if (event.newState !== 'open') { panel.style.opacity = ''; panel.style.transform = ''; return; }
