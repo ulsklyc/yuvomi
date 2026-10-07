@@ -1770,3 +1770,63 @@ test('A2 P1-2: in jedem Dialogfuss steht Loeschen am Anfang, Abbrechen und Prima
   assert.deepEqual(notStart, [], 'hier steht Loeschen neben Abbrechen am Ende statt am Anfang');
   assert.ok(globalRule, 'die eine Regel in layout.css fehlt - jeder neue Fuss muesste wieder selbst schieben');
 });
+
+// --------------------------------------------------------
+// #1775: der Verwerfen-Schutz liest Haken mit
+// --------------------------------------------------------
+// serializeForm() verglich je Feld `value`. Eine Checkbox behaelt ihren Wert
+// ("on"), ob gesetzt oder nicht - wer NUR einen Haken umlegte ("Aktiv" im
+// Schichtplan, die Feld-Schalter einer Schichtart) und schloss, verlor die
+// Aenderung ohne Rueckfrage. Gefahren wird die echte Funktion an Feldern, die
+// tragen, was sie liest.
+test('#1775: der Schnappschuss des Verwerfen-Schutzes unterscheidet gesetzte von ungesetzten Haken', () => {
+  const { serializeForm } = modalTest;
+  const field = (props) => ({ name: '', id: '', value: '', type: 'text', checked: false, ...props });
+  const form = (fields) => ({ querySelectorAll: () => fields });
+
+  // Checkbox: derselbe Wert, anderer Zustand.
+  const active = field({ type: 'checkbox', id: 'pattern-active', value: 'on', checked: true });
+  const before = serializeForm(form([field({ name: 'name', value: 'Frueh' }), active]));
+  active.checked = false;
+  const after = serializeForm(form([field({ name: 'name', value: 'Frueh' }), active]));
+  assert.notEqual(after, before, 'ein umgelegter Haken ist eine Aenderung');
+  active.checked = true;
+  assert.equal(serializeForm(form([field({ name: 'name', value: 'Frueh' }), active])), before,
+    'zurueckgelegt ist es wieder der Stand vom Oeffnen - keine Rueckfrage');
+
+  // Radios: die Gruppe teilt den Namen, die Wahl steht nur in `checked`.
+  const all = field({ type: 'radio', name: 'cal-scope', value: 'all', checked: true });
+  const mine = field({ type: 'radio', name: 'cal-scope', value: 'mine', checked: false });
+  const radiosBefore = serializeForm(form([all, mine]));
+  all.checked = false; mine.checked = true;
+  assert.notEqual(serializeForm(form([all, mine])), radiosBefore, 'eine andere Wahl in der Radiogruppe ist eine Aenderung');
+
+  // Haken ohne Namen und ohne id (die Feld-Schalter einer Schichtart tragen
+  // nur ein data-Attribut): der Zustand zaehlt trotzdem.
+  const overlay = field({ type: 'checkbox', value: 'on', checked: false });
+  const unnamedBefore = serializeForm(form([overlay]));
+  overlay.checked = true;
+  assert.notEqual(serializeForm(form([overlay])), unnamedBefore);
+
+  // Was kein Haken ist, bleibt, wie es war: `checked` eines Textfelds, eines
+  // Selects oder eines verborgenen Felds geht nicht in den Vergleich ein.
+  for (const type of ['text', 'hidden', 'number', 'select-one', 'textarea']) {
+    const plain = field({ type, name: 'f', value: 'x', checked: false });
+    const plainBefore = serializeForm(form([plain]));
+    assert.equal(plainBefore, 'f=x', `${type}: Name und Wert, sonst nichts`);
+    plain.checked = true;
+    assert.equal(serializeForm(form([plain])), plainBefore);
+  }
+});
+
+// Ein Blatt, dessen Haken SOFORT speichern, hat nichts zu verwerfen - mit dem
+// Schnappschuss oben fragte sein Schliessen sonst nach einem Verlust, den es
+// nicht gibt. Die Teilnehmer der Belohnungen sind so ein Blatt (PUT je Haken).
+test('#1775: das Teilnehmer-Blatt der Belohnungen ist ein Ansichtsblatt (dirtyGuard: false)', () => {
+  const rewards = readFileSync(fileURLToPath(new URL('../public/pages/rewards.js', import.meta.url)), 'utf8');
+  const start = rewards.indexOf("title: t('rewards.manageParticipants'),");
+  assert.ok(start > 0, 'das Blatt heisst noch so');
+  const sheet = rewards.slice(start, rewards.indexOf('async function openMemberDetail', start));
+  assert.match(sheet, /cb\.addEventListener\('change', async \(\) => \{[\s\S]*?await api\.put\(`\/rewards\/participants\//, 'Vorbedingung: der Haken speichert sofort');
+  assert.match(sheet.replace(/^\s*\/\/.*$/gm, ''), /^\s*dirtyGuard: false,$/m);
+});

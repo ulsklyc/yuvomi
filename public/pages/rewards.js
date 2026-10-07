@@ -1212,6 +1212,10 @@ async function openParticipantsModal() {
   }
   openModal({
     title: t('rewards.manageParticipants'),
+    // Ein ANSICHTSBLATT: jeder Haken speichert sofort (PUT je Person), es gibt
+    // nichts zu verwerfen. Seit der Verwerfen-Schutz Haken mitliest (#1775),
+    // fragte das Schliessen sonst nach einem Verlust, den es nicht gibt.
+    dirtyGuard: false,
     content: `
       <p class="rw-modal-intro">${esc(t('rewards.participantsIntro'))}</p>
       <ul class="rw-participant-list">

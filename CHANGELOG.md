@@ -337,6 +337,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with every field attached there was no such list at all - undoing a slip meant cancelling the
   dialog and losing the other edits. A removed field now returns to the list at once (#1775).
 
+- **Dialogs ask before discarding a change that is only a tick.** Closing a dialog asks "Discard
+  changes?" when a field differs from what it was on opening, but a checkbox or a radio button
+  was compared by a text that never changes - switching only "Active" in a shift pattern, or the
+  switches of the fields of a shift type, and closing the dialog lost the change without a
+  question. Their state now counts, in every dialog. The participants sheet of Rewards saves
+  each tick at once and therefore still closes without asking (#1775).
+
 ## [2.74.0] - 2026-10-07
 
 ### Added

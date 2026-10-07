@@ -420,7 +420,19 @@ function serializeForm(container) {
   const inputs = container.querySelectorAll(
     'input:not([type="file"]):not([data-dirty-ignore]), select:not([data-dirty-ignore]), textarea:not([data-dirty-ignore])'
   );
-  return Array.from(inputs).map((el) => `${el.name || el.id}=${el.value}`).join('&');
+  return Array.from(inputs).map(serializeField).join('&');
+}
+
+// EIN HAKEN IST SEIN ZUSTAND, NICHT SEIN WERT (#1775). Eine Checkbox traegt
+// als `value` "on" (oder was das Markup ihr gab), ob sie gesetzt ist oder
+// nicht - verglichen wurde also ein Text, der sich nie aendert: wer nur
+// "Aktiv" umlegte und den Dialog schloss, verlor die Aenderung ohne die
+// Verwerfen-Frage. Fuer Checkbox und Radio steht deshalb `checked` mit im
+// Schnappschuss. Ein Blatt, dessen Haken SOFORT wirken und gespeichert sind,
+// ist ein Ansichtsblatt und oeffnet mit `dirtyGuard: false`.
+function serializeField(el) {
+  const state = el.type === 'checkbox' || el.type === 'radio' ? `:${el.checked ? 1 : 0}` : '';
+  return `${el.name || el.id}=${el.value}${state}`;
 }
 
 function isFormDirty(container) {
@@ -1967,6 +1979,7 @@ export const askOverModal = createAskOverModal();
 
 /** Nur fuer Tests: Gesten und Bestaetigungen ohne echtes Panel treiben. */
 export const __test = {
+  serializeForm,
   wireSheetSwipe: _wireSheetSwipe,
   createConfirmOverModal,
   createAskOverModal,
