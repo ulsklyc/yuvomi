@@ -1,5 +1,5 @@
 import { t } from '/i18n.js';
-import { toggleRowHtml } from '/settings/components.js';
+import { settingSwitchRowHtml } from '/settings/components.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 
 /**
@@ -67,72 +67,83 @@ function checkedState(preferences) {
  */
 const PARTS = ['budget', 'health', 'housekeeping', 'tasks', 'schedule'];
 
+/**
+ * EIN TRAEGER JE TEIL, ZEILEN DARIN (R17, E9). Bis dahin stand jeder Schalter
+ * in einer eigenen Karte mit Kartentitel und Hinweis darueber - 154 bis 225px
+ * fuer eine Ja/Nein-Frage. Der Hinweis ist jetzt der Fuss der Gruppe.
+ *
+ * EINE ZEILE BRAUCHT KEINE UEBERSCHRIFT: der Kartentitel ueber einem einzelnen
+ * Schalter ("Zyklus" ueber "Zyklus-Tab anzeigen", "Unteraufgaben" ueber
+ * "Unteraufgaben in Aufgaben aufgeklappt lassen") sagte in einem Wort, was die
+ * Zeile ausschreibt - und als Abschnittsueberschrift stuende "Zyklus" im Blatt
+ * Gesundheit zweimal, wie vorher "Termine" im Kalender. Einen Titel traegt nur
+ * die Gruppe mit mehreren Zeilen (Schichtplan-Vorlagen); er ist dort der
+ * Suchtreffer.
+ */
+function groupHtml({ titleKey = null, rows, footer }) {
+  return `
+      ${titleKey ? `<h2 class="settings-section__title">${t(titleKey)}</h2>` : ''}
+      <div class="row-carrier settings-group">${rows}</div>
+      ${footer}`;
+}
+
 function partHtml(part, preferences, checked) {
   switch (part) {
     case 'budget':
-      return `
-      <div class="settings-card">
-        <h3 class="settings-card__title">${t('settings.budgetModeTitle')}</h3>
-        <p class="form-hint">${t('settings.budgetModeHint')}</p>
-        ${toggleRowHtml({
-          control: 'switch',
+      return groupHtml({
+        rows: settingSwitchRowHtml({
           label: t('settings.budgetModePersonalLabel'),
           checked: checked.get('budget-mode-personal'),
-          attrs: { id: 'budget-mode-personal' },
-        })}
-        <p class="form-hint">
-          ${t('settings.currencyMovedHint')}
-          <a href="${APPEARANCE_PATH}" id="budget-region-link">${t('settings.regionTitle')}</a>
-        </p>
-      </div>`;
+          attrs: { id: 'budget-mode-personal', 'aria-describedby': 'budget-mode-hint' },
+        }),
+        footer: `
+      <p class="form-hint settings-group__footer" id="budget-mode-hint">${t('settings.budgetModeHint')}</p>
+      <p class="form-hint settings-group__footer">
+        ${t('settings.currencyMovedHint')}
+        <a href="${APPEARANCE_PATH}" id="budget-region-link">${t('settings.regionTitle')}</a>
+      </p>`,
+      });
     case 'health':
-      return `
-      <div class="settings-card">
-        <h3 class="settings-card__title">${t('health.tabs.cycle')}</h3>
-        <p class="form-hint">${t('settings.healthCycleHint')}</p>
-        ${toggleRowHtml({
-          control: 'switch',
+      return groupHtml({
+        rows: settingSwitchRowHtml({
           label: t('settings.healthCycleEnableLabel'),
           checked: checked.get('health-cycle-enabled'),
-          attrs: { id: 'health-cycle-enabled' },
-        })}
-      </div>`;
+          attrs: { id: 'health-cycle-enabled', 'aria-describedby': 'health-cycle-hint' },
+        }),
+        footer: `
+      <p class="form-hint settings-group__footer" id="health-cycle-hint">${t('settings.healthCycleHint')}</p>`,
+      });
     case 'housekeeping':
-      return `
-      <div class="settings-card">
-        <h3 class="settings-card__title">${t('settings.housekeepingPaymentsTitle')}</h3>
-        <p class="form-hint">${t('settings.housekeepingPaymentTasksHint')}</p>
-        ${toggleRowHtml({
-          control: 'switch',
+      return groupHtml({
+        rows: settingSwitchRowHtml({
           label: t('settings.housekeepingPaymentTasksLabel'),
           checked: checked.get('housekeeping-payment-tasks'),
-          attrs: { id: 'housekeeping-payment-tasks' },
-        })}
-      </div>`;
+          attrs: { id: 'housekeeping-payment-tasks', 'aria-describedby': 'housekeeping-payment-tasks-hint' },
+        }),
+        footer: `
+      <p class="form-hint settings-group__footer" id="housekeeping-payment-tasks-hint">${t('settings.housekeepingPaymentTasksHint')}</p>`,
+      });
     case 'tasks':
-      return `
-      <div class="settings-card">
-        <h3 class="settings-card__title">${t('settings.tasksSubtasksExpandedTitle')}</h3>
-        <p class="form-hint">${t('settings.tasksSubtasksExpandedHint')}</p>
-        ${toggleRowHtml({
-          control: 'switch',
+      return groupHtml({
+        rows: settingSwitchRowHtml({
           label: t('settings.tasksSubtasksExpandedLabel'),
           checked: checked.get('tasks-subtasks-expanded'),
-          attrs: { id: 'tasks-subtasks-expanded' },
-        })}
-      </div>`;
+          attrs: { id: 'tasks-subtasks-expanded', 'aria-describedby': 'tasks-subtasks-expanded-hint' },
+        }),
+        footer: `
+      <p class="form-hint settings-group__footer" id="tasks-subtasks-expanded-hint">${t('settings.tasksSubtasksExpandedHint')}</p>`,
+      });
     case 'schedule':
-      return `
-      <div class="settings-card">
-        <h3 class="settings-card__title">${t('settings.scheduleTemplatesTitle')}</h3>
-        <p class="form-hint">${t('settings.scheduleTemplatesHint')}</p>
-        ${SCHEDULE_TEMPLATES.map(([key, labelKey]) => toggleRowHtml({
-          control: 'switch',
+      return groupHtml({
+        titleKey: 'settings.scheduleTemplatesTitle',
+        rows: SCHEDULE_TEMPLATES.map(([key, labelKey]) => settingSwitchRowHtml({
           label: t(labelKey),
           checked: !(preferences.schedule_hidden_templates ?? []).includes(key),
           attrs: { id: `schedule-template-${key}`, 'data-template': key },
-        })).join('')}
-      </div>`;
+        })).join(''),
+        footer: `
+      <p class="form-hint settings-group__footer">${t('settings.scheduleTemplatesHint')}</p>`,
+      });
     default:
       return '';
   }

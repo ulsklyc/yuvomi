@@ -1739,7 +1739,9 @@ test('module-specific settings leaves preserve their required controls and behav
   // deshalb zählt das Blatt keine `<input>`-Literale mehr. Fuenf statt vier
   // Fundstellen im QUELLTEXT, nicht Aufrufe zur Laufzeit: die drei
   // Schichtplan-Vorlagen teilen sich die eine `.map(...)`-Aufrufstelle oben.
-  assert.equal([...options.matchAll(/toggleRowHtml\(\{/g)].length, 5);
+  // Seit R17 (E9) ueber die Schalterzeile der Gruppe (`settingSwitchRowHtml`).
+  assert.equal([...options.matchAll(/settingSwitchRowHtml\(\{/g)].length, 5);
+  assert.equal([...options.matchAll(/\btoggleRowHtml\(/g)].length, 0, 'kein Schalter ausserhalb einer gruppierten Zeile');
   assert.equal([...options.matchAll(/<(?:input|select|textarea)\b/g)].length, 0);
   assert.equal([...options.matchAll(/getPreferences\(\)/g)].length, 1);
   assert.match(options, /budget_mode: checked \? 'personal' : 'shared'/);

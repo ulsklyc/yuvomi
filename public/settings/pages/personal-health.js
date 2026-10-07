@@ -1,7 +1,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { toggleRowHtml } from '/settings/components.js';
+import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 import { VITAL_METRICS } from '/utils/health-vitals.js';
 import { canUseFasting } from '/permissions.js';
@@ -44,14 +44,14 @@ function visibilityScopes() {
 
 function scopeRowHtml(row, current) {
   const isFamily = current === 'family';
-  return `
-    <div class="form-group">
-      <label class="form-label" for="hv-${esc(row.key)}">${esc(row.label)}</label>
-      <select class="form-input" id="hv-${esc(row.key)}" data-scope="${esc(row.key)}">
+  return settingRowHtml({
+    label: row.label,
+    labelFor: `hv-${row.key}`,
+    control: `<select class="form-input" id="hv-${esc(row.key)}" data-scope="${esc(row.key)}">
         <option value="private"${isFamily ? '' : ' selected'}>${esc(t('health.vitals.visibility.private'))}</option>
         <option value="family"${isFamily ? ' selected' : ''}>${esc(t('health.vitals.visibility.family'))}</option>
-      </select>
-    </div>`;
+      </select>`,
+  });
 }
 
 /**
@@ -82,42 +82,45 @@ function renderPage(container, preferences, defaults) {
            darüber, und ein h2, das ihn wiederholt, ist eine Überschrift ohne
            Aussage (Guard in test-typography.js). -->
       <h2 class="settings-section__title">${t('health.tabs.cycle')}</h2>
-      <div class="settings-card">
-        <p class="settings-card-description">${t('settings.healthCyclePersonalHint')}</p>
-        ${toggleRowHtml({
-          control: 'switch',
+      <!-- Zeilen im Traeger statt je einer Karte (R17, E9): der Hinweis zur
+           Zeile ist der Fuss der Gruppe. -->
+      <div class="row-carrier settings-group">
+        ${settingSwitchRowHtml({
           label: t('settings.healthCyclePersonalLabel'),
           checked: personalEnabled,
           disabled: !householdEnabled,
-          attrs: { id: 'health-cycle-personal' },
+          attrs: { id: 'health-cycle-personal', 'aria-describedby': 'health-cycle-personal-hint' },
         })}
-        ${householdEnabled ? '' : `<p class="form-hint">${t('settings.healthCyclePersonalHouseholdOff')}</p>`}
       </div>
+      <p class="form-hint settings-group__footer" id="health-cycle-personal-hint">${t('settings.healthCyclePersonalHint')}</p>
+      ${householdEnabled ? '' : `<p class="form-hint settings-group__footer">${t('settings.healthCyclePersonalHouseholdOff')}</p>`}
     </section>
     <section class="settings-section">
       <h2 class="settings-section__title">${t('health.tabs.prevention')}</h2>
-      <div class="settings-card">
-        <p class="settings-card-description">${t('settings.healthPreventionNotifyCaregiversHint')}</p>
-        ${toggleRowHtml({
-          control: 'switch',
+      <div class="row-carrier settings-group">
+        ${settingSwitchRowHtml({
           label: t('settings.healthPreventionNotifyCaregiversLabel'),
           checked: preferences.health_prevention_notify_caregivers === true,
-          attrs: { id: 'health-prevention-notify-caregivers' },
+          attrs: { id: 'health-prevention-notify-caregivers', 'aria-describedby': 'health-prevention-notify-caregivers-hint' },
         })}
       </div>
+      <p class="form-hint settings-group__footer" id="health-prevention-notify-caregivers-hint">${t('settings.healthPreventionNotifyCaregiversHint')}</p>
     </section>
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.healthVisibilityTitle')}</h2>
-      <div class="settings-card">
-        <p class="settings-card-description">${t('settings.healthVisibilityHint')}</p>
-        ${visibilityScopes().map((group) => `
-          <h3 class="settings-card__title">${esc(t(group.titleKey))}</h3>
+      <!-- Je Bereich EIN Traeger mit einer Zeile je Wert: Label links,
+           "Privat / Familie" rechts. Vorher stapelten sich die Auswahlfelder
+           vollbreit in einer Karte, jedes mit einem Zwei-Wort-Wert. -->
+      <p class="form-hint settings-group__lead">${t('settings.healthVisibilityHint')}</p>
+      ${visibilityScopes().map((group) => `
+        <h3 class="settings-card__title settings-group__title">${esc(t(group.titleKey))}</h3>
+        <div class="row-carrier settings-group">
           ${group.rows.map((row) => scopeRowHtml(row, defaults[row.key])).join('')}
-        `).join('')}
-        <div class="form-group" id="hv-apply" hidden>
-          <p class="form-hint" id="hv-apply-text"></p>
-          <button type="button" class="btn btn--secondary btn--sm" id="hv-apply-btn"></button>
         </div>
+      `).join('')}
+      <div class="settings-group__footer" id="hv-apply" hidden>
+        <p class="form-hint" id="hv-apply-text"></p>
+        <button type="button" class="btn btn--secondary btn--sm" id="hv-apply-btn"></button>
       </div>
     </section>
   `);
