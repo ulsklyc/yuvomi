@@ -1770,3 +1770,190 @@ test('R18: stagger startet nicht unter der Seitenblende - und holt es danach nic
   } finally { restore(); }
   await new Promise((r) => setTimeout(r, 500));
 });
+
+// --------------------------------------------------------------------------
+// R18, Bewegung: DIE BLATT-GESTE WIRD ZU ENDE GEFUEHRT.
+//
+// Nach einem Flick loeste sich das Blatt AM ORT auf: der Tipp-Ausgang
+// (`sheet-out`: 24px + Deckkraft) lief dort los, wo der Finger es liess - rund
+// 150px unter der Ruhelage. Das Tempo des Fingers entschied nur Ja/Nein und
+// ging dann verloren, die Abdunklung blieb waehrend des Zugs voll.
+//
+// Die Guards (1) und (4) oben gelten den KEYFRAMES des Tipp- und Esc-Ausgangs
+// (kurzer Hub, entschieden am 05.10.) - die bleiben. Der GESTEN-Ausgang ist ein
+// eigener Fall: per Web Animations API auf `translate` (setzt sich mit dem
+// `transform` der Keyframes zusammen), von der Lage des Fingers aus dem Bild.
+// --------------------------------------------------------------------------
+function gestureSheet({ height = 500, top = 300, animate = true } = {}) {
+  const handlers = {};
+  const attrs = {};
+  const calls = [];
+  let translate = '';
+  let clock = 1000;
+  const panel = {
+    addEventListener: (type, fn) => { handlers[type] = fn; },
+    removeEventListener: () => {},
+    getBoundingClientRect: () => ({ top, height }),
+    setAttribute: (k, v) => { attrs[k] = v; },
+    removeAttribute: (k) => { delete attrs[k]; },
+    getAttribute: (k) => attrs[k] ?? null,
+    style: { get translate() { return translate; }, set translate(v) { translate = v; } },
+  };
+  if (animate) {
+    panel.animate = (keyframes, timing) => {
+      const anim = { keyframes, timing, cancelled: false, finished: new Promise(() => {}), cancel() { anim.cancelled = true; } };
+      calls.push(anim);
+      return anim;
+    };
+  }
+  const at = (y, dt = 16) => { clock += dt; return { timeStamp: clock, touches: [{ clientY: y }], changedTouches: [{ clientY: y }] }; };
+  return {
+    panel, attrs, calls,
+    get translate() { return translate; },
+    start: (y) => handlers.touchstart(at(y, 0)),
+    move: (y, dt) => handlers.touchmove(at(y, dt)),
+    end: (y, dt) => handlers.touchend(at(y, dt)),
+  };
+}
+
+function dimEl() {
+  const props = new Map();
+  const calls = [];
+  return {
+    props, calls,
+    style: { setProperty: (k, v) => props.set(k, String(v)), removeProperty: (k) => props.delete(k) },
+    animate: (keyframes, timing) => { calls.push({ keyframes, timing }); return { finished: new Promise(() => {}), cancel() {} }; },
+  };
+}
+
+test('Blatt-Geste: nach dem Flick faehrt das Blatt von der Lage des Fingers aus dem Bild - Dauer aus Reststrecke und Tempo', async () => {
+  const restore = motionEnv();
+  globalThis.requestAnimationFrame = (fn) => fn();
+  try {
+    const { wireSheetDrag, travelDuration } = await import('../public/utils/sheet-drag.js');
+    let dismissed = 0;
+    const sheet = gestureSheet({ height: 500 });
+    wireSheetDrag(sheet.panel, { onDismiss: () => { dismissed += 1; } });
+    // 60px in 32ms, dann los: 1,875px/ms. Versatz 50px (60 minus Schwelle).
+    sheet.start(600);
+    sheet.move(630, 16);
+    sheet.move(660, 16);
+    sheet.end(660, 1);
+    assert.equal(dismissed, 1);
+    assert.equal(sheet.calls.length, 1, 'genau ein Flug');
+    const fly = sheet.calls[0];
+    assert.deepEqual(fly.keyframes, [{ translate: '0px 50px', opacity: 1 }, { translate: '0px 500px', opacity: 1 }], 'von der Lage des Fingers ueber die eigene Hoehe hinaus - ohne Aufloesen');
+    assert.equal(fly.timing.fill, 'forwards', 'bleibt draussen, bis das Blatt abgebaut bzw. zurueckgesetzt ist');
+    // (500 - 50) / ~1,82 px/ms waeren rund 247ms -> geklemmt auf die Dauer des Ausgangs.
+    assert.equal(fly.timing.duration, 200, 'hoechstens --duration-md: der Ausgang bleibt kuerzer als die Einfahrt (300ms)');
+    // Die Klemme selbst.
+    assert.equal(travelDuration(450, 3, { min: 120, max: 200 }), 150, 'Weg / Tempo');
+    assert.equal(travelDuration(450, 30, { min: 120, max: 200 }), 120, 'nie kuerzer als --duration-xs');
+    assert.equal(travelDuration(450, 0, { min: 120, max: 200 }), 200, 'ohne Tempo (langsam ueber die Schwelle gezogen) die volle Dauer');
+    assert.equal(travelDuration(450, -2, { min: 120, max: 200 }), 200, 'ein Tempo gegen die Richtung beschleunigt nichts');
+  } finally { delete globalThis.requestAnimationFrame; restore(); }
+});
+
+test('Blatt-Geste: ein schneller Flick an einem kurzen Blatt ist schneller draussen', async () => {
+  const restore = motionEnv();
+  globalThis.requestAnimationFrame = (fn) => fn();
+  try {
+    const { wireSheetDrag } = await import('../public/utils/sheet-drag.js');
+    const sheet = gestureSheet({ height: 300 });
+    wireSheetDrag(sheet.panel, { onDismiss: () => {} });
+    sheet.start(600);
+    sheet.move(660, 16);
+    sheet.move(720, 16);
+    sheet.end(720, 1); // ~3,6px/ms, Rest 190px -> ~52ms -> geklemmt auf 120
+    assert.equal(sheet.calls[0].timing.duration, 120);
+  } finally { delete globalThis.requestAnimationFrame; restore(); }
+});
+
+test('Blatt-Geste: unter der Schwelle federt es mit dem Tempo des Loslassens zurueck - der Endzustand haengt an keiner Animation', async () => {
+  const restore = motionEnv();
+  globalThis.requestAnimationFrame = (fn) => fn();
+  try {
+    const { wireSheetDrag } = await import('../public/utils/sheet-drag.js');
+    let dismissed = 0;
+    const sheet = gestureSheet({ height: 500 });
+    wireSheetDrag(sheet.panel, { onDismiss: () => { dismissed += 1; } });
+    sheet.start(600);
+    sheet.move(630, 200);
+    sheet.move(650, 200);
+    sheet.end(650, 400); // 50px, Finger steht: kein Schliessen
+    assert.equal(dismissed, 0);
+    assert.equal(sheet.translate, '', 'der Versatz ist sofort weg - die Feder liegt nur darueber');
+    assert.equal(sheet.calls.length, 1);
+    const back = sheet.calls[0];
+    assert.deepEqual(back.keyframes, [{ translate: '0px 40px' }, { translate: '0px 0px' }]);
+    assert.equal(back.timing.fill, undefined, 'kein fill: am Ende gilt das Stylesheet');
+    assert.equal(back.timing.duration, 250, 'ohne Tempo --duration-lg, wie die Transition davor');
+    assert.equal(sheet.attrs['data-sheet-drag'], 'drag', 'solange die Feder laeuft, schweigt die CSS-Transition darunter - sonst spraenge das Blatt an ihrem Ende');
+    await new Promise((r) => setTimeout(r, 400));
+    assert.equal(sheet.attrs['data-sheet-drag'], undefined, 'die Marke faellt per Timer, nicht per finish');
+  } finally { delete globalThis.requestAnimationFrame; restore(); }
+});
+
+test('Blatt-Geste: die Abdunklung folgt dem Zug, kehrt beim Zurueckfedern zurueck und haelt beim Schliessen', async () => {
+  const restore = motionEnv();
+  globalThis.requestAnimationFrame = (fn) => fn();
+  try {
+    const { wireSheetDrag } = await import('../public/utils/sheet-drag.js');
+    const dim = dimEl();
+    const sheet = gestureSheet({ height: 400 });
+    const drag = wireSheetDrag(sheet.panel, { onDismiss: () => {}, dim: () => dim, resetAfterDismiss: true });
+    sheet.start(600);
+    sheet.move(710, 300); // Versatz 100px von 400px
+    assert.equal(dim.props.get('--sheet-pull'), '0.25', 'Anteil des Zugs an der Blatthoehe - das Stylesheet macht daraus opacity');
+    sheet.move(650, 300); // zurueck auf 40px
+    assert.equal(dim.props.get('--sheet-pull'), '0.1');
+    sheet.end(650, 400);
+    assert.equal(dim.props.has('--sheet-pull'), false, 'zurueckgefedert: volle Abdunklung');
+    assert.deepEqual(dim.calls[0]?.keyframes, [{ opacity: 0.9 }, { opacity: 1 }], 'und sie kehrt mit dem Blatt zurueck, nicht in einem Sprung');
+
+    // Schliessen: der Wert bleibt, bis das Blatt zurueckgesetzt ist - sonst
+    // spraenge die Abdunklung auf voll, waehrend das Blatt hinausfaehrt.
+    sheet.start(600);
+    sheet.move(760, 300);
+    sheet.end(760, 100);
+    assert.equal(dim.props.get('--sheet-pull'), '0.375');
+    const fly = sheet.calls.at(-1);
+    assert.equal(fly.timing.fill, 'forwards');
+    drag.reset();
+    assert.equal(dim.props.has('--sheet-pull'), false);
+    assert.equal(fly.cancelled, true, 'das Mehr-Blatt bleibt im DOM: der Flug darf es beim naechsten Oeffnen nicht draussen halten');
+  } finally { delete globalThis.requestAnimationFrame; restore(); }
+});
+
+test('Blatt-Geste: ohne animate oder unter reduzierter Bewegung bleibt es beim Ausgang des Stylesheets', async () => {
+  for (const [name, env, opts] of [['reduzierte Bewegung', { reduced: true }, {}], ['kein animate', {}, { animate: false }]]) {
+    const restore = motionEnv(env);
+    globalThis.requestAnimationFrame = (fn) => fn();
+    try {
+      const { wireSheetDrag } = await import('../public/utils/sheet-drag.js');
+      let dismissed = 0;
+      const sheet = gestureSheet(opts);
+      wireSheetDrag(sheet.panel, { onDismiss: () => { dismissed += 1; } });
+      sheet.start(600); sheet.move(700, 16); sheet.end(700, 1);
+      assert.equal(dismissed, 1, name);
+      assert.equal(sheet.calls.length, 0, `${name}: kein Flug`);
+      sheet.start(600); sheet.move(640, 300); sheet.end(640, 400);
+      assert.equal(sheet.calls.length, 0, `${name}: keine Feder`);
+      assert.equal(sheet.attrs['data-sheet-drag'], undefined, `${name}: die Transition des Stylesheets federt`);
+    } finally { delete globalThis.requestAnimationFrame; restore(); }
+  }
+});
+
+test('Blatt-Geste: Verdrahtung - das Mehr-Blatt reicht seinen Backdrop durch, dessen Deckkraft folgt der Custom Property', () => {
+  assert.match(publicSource('router.js'), /wireSheetDrag\(sheet, \{[\s\S]{0,200}resetAfterDismiss: true,[\s\S]{0,160}dim: \(\) => backdrop,/);
+  const backdrop = ruleBodies('layout.css', '.more-backdrop').join(';');
+  assert.match(backdrop, /opacity:\s*calc\(1 - var\(--sheet-pull, 0\)\)/, 'nur opacity - kein Layout, kein Neuzeichnen der Flaeche');
+  // Der Tipp-/Esc-Ausgang bleibt der kurze Hub (Entscheidung 05.10.).
+  assert.match(keyframesBody('sheet-out'), /translateY\(var\(--sheet-lift\)\)/);
+  // Der Helfer schreibt weiter `translate`, nie `transform` (eine gefuellte Einfahrt schluege es).
+  const src = stripComments(publicSource('utils/sheet-drag.js'));
+  assert.doesNotMatch(src, /transform/);
+  // Und er mutiert das DOM nicht im touchend: Marke und Versatz fallen im rAF.
+  const end = src.slice(src.indexOf('const end = (e) => {'), src.indexOf("sheet.addEventListener('touchend', end);"));
+  assert.match(end, /raf\(\(\) => settle\(/);
+});

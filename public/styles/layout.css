@@ -816,6 +816,11 @@ html.fab-holding .nav-bottom__items {
   z-index: calc(var(--z-nav) + 1);
   backdrop-filter: var(--blur-2xs);
   -webkit-backdrop-filter: var(--blur-2xs);
+  /* DIE ABDUNKLUNG FOLGT DEM ZUG (R18): utils/sheet-drag.js schreibt den Anteil
+   * des Zugs an der Blatthoehe als `--sheet-pull` (0..1). Vorher blieb sie voll,
+   * waehrend das Blatt schon halb aus dem Bild war. Nur `opacity`; ohne Zug
+   * steht die Eigenschaft nicht und der Wert ist 1. */
+  opacity: calc(1 - var(--sheet-pull, 0));
 }
 
 .more-backdrop--visible {

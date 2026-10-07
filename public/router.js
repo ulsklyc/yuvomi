@@ -3158,6 +3158,8 @@ function initMoreSheet(container, openSearch) {
     scroller: () => sheet.querySelector('.more-sheet__body'),
     onDismiss: () => closeSheet(),
     resetAfterDismiss: true,
+    // Die Abdunklung folgt dem Zug (R18): der Backdrop ist ein eigenes Element.
+    dim: () => backdrop,
   });
 
   sheet.addEventListener('click', (e) => {
