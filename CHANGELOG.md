@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Budget accounts: net worth stands beside the accounts.** On a desktop the single figure used
+  to fill a whole row above the account grid - one card across the page, mostly empty. It is now
+  a card in the side column, like the figures on the overview and on loans, and the accounts
+  start at the top next to it, one per row on the reading width.
+
 - **Tasks: on a desktop the filters open beside the list instead of over it.** The filter sheet
   was a centred dialog with a dimmed, blurred backdrop - it covered the very list each chip
   filters. From 1024px it is now a popover anchored to the filter button: no backdrop, the list

@@ -2148,7 +2148,16 @@ function renderAccountsPage() {
       value: netWorth.text,
       tone: Number(state.netWorth) > 0 ? 'positive' : Number(state.netWorth) < 0 ? 'negative' : 'neutral',
     })}
-    <div class="metric-grid budget-glance-details">
+    `;
+  // DAS NETTOVERMOEGEN IST EINE LEISTENKARTE NEBEN DEN KONTEN (Critique R17,
+  // E14). Bis dahin trug die eine Kennzahl eine ganze Zeile ueber dem Raster:
+  // EINE Karte ueber 981px (1280) bzw. 1124px (1440), davon rund 800px leer.
+  // Ab 960px Modulflaeche steht sie in der Seitenleiste der Budget-Bahn wie
+  // die Kennzahlen der Uebersicht und der Darlehen (`.metric-grid--rail`),
+  // die Konten daneben auf dem Lesemass. Im Markup bleibt sie VORN: schmaler
+  // steht sie ueber den Konten, mobil vertritt sie die Kurzzeile.
+  const rail = `
+    <div class="metric-grid metric-grid--rail budget-glance-details">
       <div class="metric-card ${netWorth.className}">
         <div class="metric-card__label">${t('budget.netWorth')}</div>
         <div class="metric-card__value">${netWorth.text}</div>
@@ -2159,12 +2168,15 @@ function renderAccountsPage() {
     return `
       <div class="budget-tab-panel page-scrollport budget-tab-panel--accounts">
         ${header}
+        <div class="budget-accounts">
+        ${rail}
         ${emptyStateHTML({
     icon: 'wallet',
     title: t('budget.accountsEmptyTitle'),
     description: ro ? '' : t('budget.accountsEmptyDescription'),
     action: ro ? null : { label: t('budget.addAccount'), icon: 'plus', attrs: { id: 'budget-add-account-empty' } },
   })}
+        </div>
       </div>`;
   }
 
@@ -2206,7 +2218,10 @@ function renderAccountsPage() {
   return `
     <div class="budget-tab-panel page-scrollport budget-tab-panel--accounts">
       ${header}
-      <div class="budget-accounts__list">${cards}</div>
+      <div class="budget-accounts">
+        ${rail}
+        <div class="budget-accounts__list">${cards}</div>
+      </div>
     </div>`;
 }
 

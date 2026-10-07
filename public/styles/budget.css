@@ -358,6 +358,8 @@
   --budget-rail-min: 18.75rem;
   --budget-rail-max: 23.75rem;
   --budget-column-gap: var(--space-6);
+  /* Mindestbreite einer Kontokarte im Raster (Icon, Name, Saldo, Stift). */
+  --budget-account-min: 22.5rem;
   --budget-lane: calc(var(--page-measure, var(--layout-reading)) + var(--budget-column-gap) + var(--budget-rail-max));
 }
 
@@ -530,25 +532,60 @@
 /* .budget-networth ist entfallen: das Nettovermögen ist jetzt eine
  * .metric-card wie jede andere Kennzahl im Modul. */
 
-/* DIE EINE KENNZAHL TRAEGT DIE ZEILE (Critique R16, 2026-10-05). Am Desktop
- * stand das Nettovermoegen als 232px-Kachel in der ersten von drei Spalten,
- * daneben 764px leer, und endete am Lesemass ueber einem Kontenraster, das bis
- * zur Bahn laeuft. Wie die Einzelkarte „Nur Ausgaben" (#504) nimmt sie die
- * volle Zeile - mobil tat sie das ueber `auto-fit` schon - und endet an
- * derselben Kante wie die Konten darunter. */
-#budget-body .budget-tab-panel--accounts > .metric-grid {
-  --summary-cards: 1;
-  max-width: var(--budget-lane);
+/* DAS NETTOVERMOEGEN STEHT IN DER SEITENLEISTE (Critique R17, E14).
+ *
+ * R16 liess die eine Kennzahl die ganze Zeile tragen (vorher eine 232px-Kachel
+ * neben 764px Leere). Das fuellte die Zeile, aber nicht mit Inhalt: EINE Karte
+ * ueber 981px (1280) bzw. 1124px (1440), der Wert links, rechts davon nichts.
+ * Ab 960px Modulflaeche stehen die Konten deshalb auf dem Lesemass und das
+ * Nettovermoegen daneben in der Leiste - dieselbe Zweispalte und dieselben
+ * Spaltenmasse wie Uebersicht, Plan und Darlehen, damit die rechte Kante beim
+ * Reiterwechsel nicht springt. Die Karte selbst ist `.metric-grid--rail`
+ * (panel.css: eine Karte je Zeile, Title 1). Im Markup steht sie vorn; unter
+ * der Schwelle steht sie ueber den Konten, mobil vertritt sie die Kurzzeile. */
+@container budget-page (min-width: 960px) {
+  .budget-accounts {
+    display: grid;
+    grid-template-columns:
+      minmax(0, var(--page-measure, var(--layout-reading)))
+      clamp(
+        var(--budget-rail-min),
+        calc(100% - var(--page-measure, var(--layout-reading)) - var(--budget-column-gap)),
+        var(--budget-rail-max)
+      );
+    column-gap: var(--budget-column-gap);
+    align-items: start;
+  }
+
+  .budget-accounts > .metric-grid {
+    grid-column: 2;
+    grid-row: 1;
+    padding-block-start: 0;
+  }
+
+  /* Konten oder ihr Leerzustand: die Hauptspalte. */
+  .budget-accounts > :not(.metric-grid) {
+    grid-column: 1;
+    grid-row: 1;
+  }
 }
 
+/* Unter der Schwelle traegt die Kennzahl die Zeile bis zur Kante der Konten
+ * darunter (die Kennzahl-Zeile endete sonst am Lesemass, 67px davor). */
+.budget-accounts > .metric-grid {
+  max-width: none;
+}
+
+/* Zwei Konten je Zeile, sobald jede Karte ihre Mindestbreite hat - gefragt
+ * wird der Platz der Liste, nicht das Fenster: neben der Leiste hat sie
+ * 657px (1280) bzw. 720px (1440), und zwei Karten von 325 bis 356px brachen
+ * „Gemeinsames Konto" und „Wertpapierdepot" mitten im Wort (Karte 93 statt
+ * 72px). Dort steht je Zeile EIN Konto auf dem Lesemass, wie die Buchungen der
+ * Uebersicht; ohne Leiste (Tablet) bleiben es zwei. */
 .budget-accounts__list {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--budget-account-min), 100%), 1fr));
   gap: var(--space-2);
-}
-
-@media (min-width: 640px) {
-  .budget-accounts__list { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* Container: Zeile mit primärem Drilldown-Button + separatem Bearbeiten-Icon.

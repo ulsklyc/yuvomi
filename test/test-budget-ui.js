@@ -1446,10 +1446,43 @@ test('Kopf und alle Reiter enden an der Bahn: Kopfmass, Plan, Darlehen und Konte
   assert.match(loanMetrics?.body ?? '', /grid-column:\s*2/);
   assert.match(loanMetrics?.body ?? '', /--summary-cards:\s*1/, 'in der Seitenleiste stehen die Kennzahlen untereinander');
 
-  // Konten: die eine Kennzahl traegt die Zeile bis zur Bahn.
-  const net = rule('#budget-body .budget-tab-panel--accounts > .metric-grid', flat);
-  assert.match(net?.body ?? '', /--summary-cards:\s*1/);
-  assert.match(net?.body ?? '', /max-width:\s*var\(--budget-lane\)/);
+  // Konten (R17, E14): das Nettovermoegen steht als Leistenkarte NEBEN den
+  // Konten - dieselbe Zweispalte wie Uebersicht, Plan und Darlehen. Bis dahin
+  // trug EINE Karte die ganze Zeile (981px bei 1280, 1124px bei 1440).
+  const accounts = rule('.budget-accounts', wide);
+  assert.match(accounts?.body ?? '', columns, 'die Konten stehen auf derselben Zweispalte');
+  const net = rule('.budget-accounts > .metric-grid', wide);
+  assert.match(net?.body ?? '', /grid-column:\s*2/, 'das Nettovermoegen steht in der Seitenleiste');
+  assert.match(net?.body ?? '', /grid-row:\s*1/, 'neben den Konten, nicht darueber');
+  assert.match(rule('.budget-accounts > :not(.metric-grid)', wide)?.body ?? '', /grid-column:\s*1;[\s\S]*grid-row:\s*1/,
+    'Konten (oder ihr Leerzustand) nehmen die Hauptspalte');
+  assert.equal(rule('#budget-body .budget-tab-panel--accounts > .metric-grid', flat), undefined,
+    'die Regel „eine Karte traegt die Zeile" ist abgeloest');
+  // Die Liste fragt IHREN Platz: neben der Leiste (657/720px) ein Konto je Zeile.
+  const list = rule('.budget-accounts__list', flat);
+  assert.match(list?.body ?? '', /grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(min\(var\(--budget-account-min\),\s*100%\),\s*1fr\)\)/);
+  assert.ok(!rules.some(({ selector, at }) => selector.trim() === '.budget-accounts__list' && at.some((a) => /@media/.test(a))),
+    'keine Fensterabfrage mehr an der Kontenliste - zwei 325px-Karten brachen die Namen mitten im Wort');
+});
+
+test('E14: das Nettovermoegen ist eine Leistenkarte im Konten-Raster, im Markup vor den Konten', () => {
+  const zuvor = { accounts: budgetUi.state.accounts, netWorth: budgetUi.state.netWorth, show: budgetUi.state.accountsShowArchived };
+  try {
+    budgetUi.state.accounts = [{ id: 1, name: 'Giro', type: 'checking', current_balance: 100, starting_balance: 0, archived: 0 }];
+    budgetUi.state.netWorth = 100;
+    const html = budgetUi.renderAccountsPage();
+    const wrap = html.indexOf('<div class="budget-accounts">');
+    const rail = html.indexOf('class="metric-grid metric-grid--rail budget-glance-details"');
+    const list = html.indexOf('<div class="budget-accounts__list">');
+    assert.ok(wrap > 0 && rail > wrap && list > rail, 'Huelle > Leistenkarte > Kontenliste (schmal steht die Kennzahl ueber den Konten)');
+    assert.equal(html.match(/class="metric-card /g)?.length, 1, 'EINE Karte, EIN Wert');
+    // Auch der Leerzustand steht in der Zweispalte (Quelltext: emptyStateHTML braucht ein DOM).
+    const fn = budget.slice(budget.indexOf('function renderAccountsPage()'), budget.indexOf('function wireAccountsPage()'));
+    assert.equal(fn.match(/<div class="budget-accounts">/g)?.length, 2, 'beide Zweige (leer und gefuellt) fuehren die Huelle');
+    assert.equal(fn.match(/\$\{rail\}/g)?.length, 2, 'und beide die Leistenkarte');
+  } finally {
+    Object.assign(budgetUi.state, { accounts: zuvor.accounts, netWorth: zuvor.netWorth, accountsShowArchived: zuvor.show });
+  }
 });
 
 test('alle Tabs teilen EINE Bahn: gleiche linke Kante, gleiches Mass, der Plan nicht zentriert', () => {

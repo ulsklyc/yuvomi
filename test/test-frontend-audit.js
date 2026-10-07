@@ -19703,7 +19703,9 @@ test('R16: Konten zeigt mobil die Kurzzeile wie jeder Budget-Reiter mit Kennzahl
   const accounts = read('../public/pages/budget.js').match(/const header = `[\s\S]*?<\/div>`;/)?.[0] ?? '';
   assert.match(accounts, /metricGlanceHtml\(\{\s*label: t\('budget\.netWorth'\)/, 'Konten fuehrt die Kurzzeile');
   assert.doesNotMatch(accounts, /controls:/, 'eine Zahl hat nichts aufzuklappen');
-  assert.match(accounts, /<div class="metric-grid budget-glance-details">/, 'die Karte bleibt unter 640px aus');
+  // Seit R17 (E14) ist die Karte die Leistenkarte neben den Konten - `budget-glance-details`
+  // haelt sie unter 640px weiter aus.
+  assert.match(accounts, /<div class="metric-grid metric-grid--rail budget-glance-details">/, 'die Karte bleibt unter 640px aus');
 });
 
 test('R16: im Budget steht jeder Abschnittstitel auf der Buehne, die Zeilen liegen im Traeger', () => {

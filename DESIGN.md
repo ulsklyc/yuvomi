@@ -1296,7 +1296,9 @@ Abstand + Seitenleiste; die Variable steht an `.budget-page`, damit der Kopf sie
 Kopf endet an der Bahn statt am Lesemass (Knopf 972 -> 1248 / 1376), und jeder Reiter fuellt
 sie: Plan mit Kategorien links und Sparziel in der Seitenleiste, Darlehen mit Filter, Karten
 und Transaktionen links und den drei Kennzahlen rechts (vorher vier Kanten), Konten mit dem
-Nettovermoegen als Zeile ueber dem Raster, Aufteilung mit den Ausgaben in der breiten Spalte,
+Nettovermoegen als Leistenkarte NEBEN den Konten (R17, E14: `.budget-accounts`, die Karte
+`.metric-grid--rail`; die Konten je Zeile eines auf dem Lesemass - vorher EINE Karte ueber
+981 / 1124px), Aufteilung mit den Ausgaben in der breiten Spalte,
 Statistik mit dem Anteilsring in Zeile 1 neben dem Verlauf, die Kategoriezeilen darunter ueber
 die ganze Bahn (`test:budget-ui`).
 
