@@ -209,6 +209,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Notes: no empty row between pinned and other notes.** When the pinned notes did not fill
+  their last row - five notes in four columns - the rest of that row stayed empty and "Other
+  notes" started a screen further down. The other notes now continue in that row; their heading
+  starts in the first free column. On a phone nothing changes.
+
 - **A new task shows up where you can see it.** After adding a task the list simply redrew: the
   new row sat somewhere between the others - below the fold in a long list, hidden in a
   collapsed group - and the detail column kept showing the previous task. The new row now

@@ -6282,6 +6282,90 @@ test('showToast is never called with an unsupported variant', () => {
   }
 });
 
+// Critique R17: fuenf angepinnte Notizen in vier Spalten liessen die fuenfte
+// allein in ihrer Zeile (240 von 996px, 432px hoch), und „Weitere Notizen"
+// begann erst bei y=988 - der Gruppenkopf spannte ueber alle Spalten und machte
+// immer eine neue Zeile auf. Jetzt fliesst die naechste Gruppe in die
+// angebrochene Zeile. Das Raster BLEIBT das Raster (Guard darunter).
+test('R17: die weiteren Notizen fliessen in die angebrochene Zeile der angepinnten', () => {
+  const page = read('../public/pages/notes.js');
+  const fnSrc = (name) => {
+    const start = page.indexOf(`function ${name}(`);
+    assert.ok(start > 0, `${name} fehlt`);
+    return page.slice(start, page.indexOf('\n}\n', start) + 2);
+  };
+  // GEFAHREN, nicht gelesen: beide Funktionen aus dem Quelltext, mit einem Raster, das mitschreibt.
+  const run = new Function('getComputedStyle', `${fnSrc('groupFlow')}\n${fnSrc('syncGroupFlow')}\nreturn { groupFlow, syncGroupFlow };`);
+  const makeEl = (classes) => {
+    const set = new Set(classes);
+    const props = new Map();
+    return {
+      classList: { add: (c) => set.add(c), remove: (c) => set.delete(c), contains: (c) => set.has(c) },
+      style: { setProperty: (k, v) => props.set(k, v), removeProperty: (k) => props.delete(k) },
+      props, has: (c) => set.has(c),
+    };
+  };
+  const makeGrid = (pinnedCount, restCount, columns) => {
+    const titles = restCount && pinnedCount ? [makeEl(['notes-group__title']), makeEl(['notes-group__title'])] : [];
+    const pinned = Array.from({ length: pinnedCount }, () => makeEl(['note-card', 'note-card--pinned']));
+    const all = () => [...titles, ...pinned];
+    const grid = {
+      titles, pinned, columns,
+      querySelectorAll: (sel) => {
+        if (sel === '.notes-group__title') return titles;
+        if (sel === '.note-card--pinned') return pinned;
+        if (sel === '.note-card--trailing') return all().filter((el) => el.has('note-card--trailing'));
+        return [];
+      },
+    };
+    return grid;
+  };
+  const { groupFlow, syncGroupFlow } = run((grid) => ({ gridTemplateColumns: Array.from({ length: grid.columns }, () => '232.5px').join(' ') }));
+
+  assert.deepEqual(groupFlow(5, 4), { trailing: 1, labelStart: 2 }, 'fuenf in vier Spalten: eine Nachzueglerin, der Kopf beginnt in Spalte 2');
+  assert.deepEqual(groupFlow(5, 3), { trailing: 2, labelStart: 3 });
+  assert.equal(groupFlow(8, 4).trailing, 0, 'eine volle Zeile bricht wie bisher');
+  assert.equal(groupFlow(5, 1).trailing, 0, 'eine Spalte (Telefon): nichts aendert sich');
+  assert.equal(groupFlow(0, 4).trailing, 0);
+
+  const grid = makeGrid(5, 3, 4);
+  syncGroupFlow(grid);
+  assert.deepEqual(grid.pinned.map((el) => el.has('note-card--trailing')), [false, false, false, false, true]);
+  assert.equal(grid.titles[1].has('notes-group__title--inline'), true, 'der Kopf „Weitere Notizen" reiht sich ein');
+  assert.equal(grid.titles[1].props.get('--notes-label-start'), '2');
+  assert.equal(grid.titles[0].has('notes-group__title--inline'), false, 'der erste Kopf spannt weiter ueber alle Spalten');
+  // Die Breite wechselt (drei Spalten): der alte Stand wird abgeraeumt, nicht ueberlagert.
+  grid.columns = 3;
+  syncGroupFlow(grid);
+  assert.deepEqual(grid.pinned.map((el) => el.has('note-card--trailing')), [false, false, false, true, true]);
+  assert.equal(grid.titles[1].props.get('--notes-label-start'), '3');
+  // Telefon: alles zurueck.
+  grid.columns = 1;
+  syncGroupFlow(grid);
+  assert.equal(grid.pinned.some((el) => el.has('note-card--trailing')), false);
+  assert.equal(grid.titles[1].has('notes-group__title--inline'), false);
+  assert.equal(grid.titles[1].props.has('--notes-label-start'), false);
+  // Ohne zweite Gruppe (nur Angepinnte) gibt es keinen Kopf, der sich einreihen koennte.
+  const only = makeGrid(5, 0, 4);
+  syncGroupFlow(only);
+  assert.equal(only.pinned.some((el) => el.has('note-card--trailing')), false);
+
+  // Verdrahtung: in der Zeichenfunktion (die Listenbewegung misst direkt danach) und beim Breitenwechsel.
+  const draw = fnSrc('drawGrid');
+  assert.match(draw, /insertAdjacentHTML\('beforeend', html\);[\s\S]*syncGroupFlow\(grid\);/);
+  assert.match(page, /new ResizeObserver\(\(\) => \{[\s\S]{0,300}syncGroupFlow\(grid\);/);
+
+  // CSS: nur im Zeilenraster, und die Gruppenkoepfe bleiben Koepfe.
+  const css = read('../public/styles/notes.css');
+  const rows = [...eachRule(css)].filter((r) => r.at.some((a) => /@supports not \(grid-template-rows: masonry\)/.test(a)));
+  const inline = rows.find((r) => r.selector.trim() === '.notes-group__title.notes-group__title--inline');
+  assert.match(inline?.body ?? '', /grid-column:\s*var\(--notes-label-start, 1\) \/ -1/, 'von der ersten freien Spalte bis zum Rand');
+  assert.match(inline?.body ?? '', /align-self:\s*end/, 'der Kopf bleibt bei seinen Karten');
+  assert.match(rows.find((r) => r.selector.trim() === '.note-card--trailing')?.body ?? '', /grid-row:\s*span 2/,
+    'die Nachzueglerin steht neben Kopf UND erster Kartenzeile');
+  assert.match(page, /heading\(t\('notes\.groupPinned'\)\)[\s\S]{0,120}heading\(t\('notes\.groupOthers'\)\)/, 'beide Gruppenlabel bleiben');
+});
+
 test('responsive adaptation keeps Notes vertical and prevents intrinsic-width overflow', () => {
   const notes = read('../public/styles/notes.css');
   const dashboard = read('../public/styles/dashboard.css');
