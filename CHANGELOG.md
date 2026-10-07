@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.74.0] - 2026-10-07
+
 ### Added
 
 - **Rewards can hold pocket money: a money balance per child, credited on a schedule, paid out on
