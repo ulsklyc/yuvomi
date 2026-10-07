@@ -52,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Arrow keys in the date picker move one day again after changing the month.** Every month
+  change added another key listener to the grid of days: after two changes an arrow key jumped
+  three days and Page Down three months. The keys are now bound once per opened picker.
 - **The meal plan's week board no longer cuts its cards off on a short window.** At a window
   height of 650 px every planned meal lost its lower edge, including the "+" for a second meal
   in the same slot, and the board offered no way to scroll there. A row is now as tall as its

@@ -88,6 +88,17 @@ test('Escaped dynamische Werte via esc()', () => {
   assert(/import \{[^}]*esc[^}]*\} from '\/utils\/html\.js'/.test(comp), 'esc muss importiert werden');
   assert(/esc\(/.test(comp), 'esc muss verwendet werden');
 });
+test('Die Pfeiltasten des Rasters werden einmal je Popover gebunden, nicht je Monat', () => {
+  // Das Raster (`.ydp-cal__days`) ueberlebt jeden Monatswechsel. Stand die
+  // Bindung in _paintDays(), kam mit jedem Wechsel ein Zuhoerer dazu: nach zwei
+  // Wechseln sprang ein Pfeil drei Tage (im Browser gemessen: 01.10. -> 04.10.).
+  const paint = comp.slice(comp.indexOf('  _paintDays(el, sub) {'), comp.indexOf('  _bindGridKeys(grid, el, sub) {'));
+  assert(paint.length > 0, '_paintDays nicht gefunden - der Guard waere blind');
+  assert(!/_bindGridKeys\(/.test(paint), '_paintDays darf die Tasten nicht (erneut) binden');
+  assert((comp.match(/this\._bindGridKeys\(/g) ?? []).length === 1, 'genau ein Aufruf von _bindGridKeys');
+  const render = comp.slice(comp.indexOf('  _renderCalendar(el, sub) {'), comp.indexOf('  _shiftMonth(el, sub, delta) {'));
+  assert(/this\._paintDays\(el, sub\);[\s\S]*this\._bindGridKeys\(el\.querySelector\('\.ydp-cal__days'\), el, sub\);/.test(render), 'gebunden wird beim Aufbau des Kalenders');
+});
 test('Der Monatswechsel tauscht das Tagesraster gerichtet ueber swapContent', () => {
   assert(/import \{ swapContent \} from '\/utils\/content-swap\.js'/.test(comp), 'swapContent muss importiert werden');
   assert(/_swapDays\(el, sub, direction\) \{\s*swapContent\(el\.querySelector\('\.ydp-cal__days'\), \(\) => this\._paintDays\(el, sub\), \{ direction \}\);/.test(comp), 'das Raster tauscht ueber swapContent');

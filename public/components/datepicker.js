@@ -486,6 +486,11 @@ class YuvomiDatepicker extends HTMLElement {
     });
 
     this._paintDays(el, sub);
+    // EINMAL je Popover, nicht je Monat: das Raster ueberlebt jedes
+    // _paintDays() (nur seine Tage werden ersetzt). Hier gebunden statt dort
+    // sammelte jeder Monatswechsel einen weiteren Zuhoerer - nach zwei
+    // Wechseln sprang ein Pfeil drei Tage, Bild-ab drei Monate.
+    this._bindGridKeys(el.querySelector('.ydp-cal__days'), el, sub);
   }
 
   _shiftMonth(el, sub, delta) {
@@ -555,7 +560,6 @@ class YuvomiDatepicker extends HTMLElement {
       const firstIn = [...grid.children].find((b) => !b.classList.contains('is-outside') && !b.disabled);
       if (firstIn) firstIn.tabIndex = 0;
     }
-    this._bindGridKeys(grid, el, sub);
   }
 
   _bindGridKeys(grid, el, sub) {
