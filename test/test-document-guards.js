@@ -2474,12 +2474,12 @@ test('Sonde 8 - ein Kopf mit Lead-Zone traegt seine Linie erst angedockt, und do
  *
  * DIE SIGNATUR IST DER MASSSTAB, NICHT EINE OBERGRENZE. Die Frage ist nicht
  * „wie viele Ebenen sind zu viele", sondern „waechst die Zahl mit dem Inhalt".
- * Ein einmaliges Chrome-Element (die Sidebar-Pille, der Tab-Indikator, ein
- * Backdrop-Blob) darf sein Versprechen dauerhaft halten - es gibt genau eins
+ * Ein einmaliges Chrome-Element (die Sidebar-Pille, der Tab-Indikator)
+ * darf sein Versprechen dauerhaft halten - es gibt genau eins
  * davon, egal wie lang die Liste wird. Eine Zeile darf es nicht: dieselbe
  * Signatur zweimal heisst, sie kommt auch 200-mal.
  *
- * Genau diese Unterscheidung sieht ein Stylesheet-Scanner nicht: `.lg-blob--1`
+ * Genau diese Unterscheidung sieht ein Stylesheet-Scanner nicht: `.nav-sidebar__indicator`
  * und `.task-card` tragen dieselbe Deklaration.
  */
 // Nur Versprechen, die tatsaechlich eine eigene Ebene erzwingen. `will-change:
@@ -2535,7 +2535,9 @@ test('Sonde 9 - ein Compositor-Versprechen im Ruhezustand ist einmalig, nie eine
   // Eine Sonde, die nichts gesehen hat, darf nicht urteilen (dieselbe
   // Zusicherung wie bei Sonde 3 bis 8). Hier zaehlt BEIDES: die Routen, und
   // dass ueberhaupt Ebenen gefunden werden - die Shell traegt drei einmalige
-  // (Sidebar-Pille, Sidebar-Hover, Tab-Indikator) plus die Backdrop-Blobs.
+  // (Sidebar-Pille, Sidebar-Hover, Tab-Indikator).  Die vier Backdrop-Blobs,
+  // die bis R18 dazukamen, sind gestrichen - die Schwelle unten (eine Ebene je
+  // Route) haelt auch ohne sie.
   // Findet die Sonde gar keine, misst sie den Selektor falsch statt die App.
   assert.ok(routesSeen >= routes.length - 1,
     `Nur ${routesSeen} von ${routes.length} Zustaenden gesehen.`);
@@ -2590,8 +2592,8 @@ test('Sonde 9 - ein Compositor-Versprechen im Ruhezustand ist einmalig, nie eine
  * im synchronen Markup, war aber im Sinne der Sichtbarkeitspruefung nicht da.
  * Ein Guard, der von einer Animation abhaengt, meldet Zufall statt Regel.
  *
- * NUR ENDLICHE Animationen: die Backdrop-Blobs laufen mit
- * `animation: lg-drift 26s infinite alternate` und werden NIE fertig - ein
+ * NUR ENDLICHE Animationen: eine Endlos-Schleife (Spinner, Skelett-Schimmer,
+ * Wetter; bis R18 auch die Backdrop-Blobs) wird NIE fertig - ein
  * naives `Promise.all(getAnimations().map(a => a.finished))` haengt bis zum
  * Timeout der Suite.
  */
@@ -3713,7 +3715,9 @@ describe('Sonde 15 - in der kompakten Hoehe traegt der Kopf hoechstens eine Bedi
  * Leerlauf fielen dadurch 60 auf ~20 fps, bei einem Style-Recalc je Frame; ein
  * Melder sah 100 % GPU auf integrierter Grafik. Die Reparatur trennt beides auf
  * zwei Knoten - die Huelle bewegt sich, das Kind `.lg-blob__ink` traegt den
- * Blur und steht still -, danach standen 60 fps.
+ * Blur und steht still -, danach standen 60 fps. Der Backdrop ist seit R18
+ * (2026-10-07) gestrichen, weil er vollstaendig unter dem opaken Scrollport
+ * lag; die Regel gilt weiter fuer alles, was im Leerlauf laeuft.
  *
  * WARUM NICHT IM STYLESHEET. Die Zuordnung ist dort nicht sichtbar: Filter und
  * Animation koennen in zwei getrennten Regeln stehen (`.lg-blob` und
@@ -3735,12 +3739,28 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
     const offenders = [];
     // Zustaende, in denen die Vorbedingung fehlte - JE ZUSTAND, nicht als Summe.
     const unmeasured = [];
+    const backdropBack = [];
 
     for (const name of sweep('Sonde 16')) {
       await gotoRoute(page, ALL_ROUTES[name]);
       const found = await page.evaluate(() => {
-        const out = { animated: 0, blobs: 0, blobsRunning: 0, offenders: [] };
-        out.blobs = document.querySelectorAll('.lg-blob').length;
+        const out = { animated: 0, shell: false, backdrop: 0, selfTest: false, offenders: [] };
+        // SELBSTPROBE: ein Koeder, der die Regel verletzt (endlos + filter).
+        // Bis R18 bewiesen die vier Backdrop-Blobs in jedem Zustand, dass die
+        // Sonde Endlos-Animationen ueberhaupt liest; seit es sie nicht mehr
+        // gibt, steht in einer ruhenden Seite oft keine einzige. Findet die
+        // Sonde den Koeder nicht, ist sie blind, nicht die Seite sauber.
+        const bait = document.createElement('div');
+        bait.setAttribute('data-probe16-bait', '');
+        bait.style.cssText = 'position:fixed;inline-size:1px;block-size:1px;opacity:0;pointer-events:none;'
+          + 'animation:probe16-bait 1s linear infinite;filter:blur(1px)';
+        document.body.appendChild(bait);
+        // Die Vorbedingung je Zustand: die Shell steht und die Seite ist
+        // aufgebaut. Bis R18 war es der laufende Backdrop - den gibt es nicht
+        // mehr, und kaeme er zurueck, ist das hier der Befund.
+        out.shell = !!document.querySelector('.app-shell')
+          && (document.getElementById('main-content')?.childElementCount ?? 0) > 0;
+        out.backdrop = document.querySelectorAll('.lg-blob, .lg-backdrop').length;
         for (const el of document.querySelectorAll('*')) {
           const cs = getComputedStyle(el);
           // `infinite` liest sich berechnet als 'infinite'; mehrere Animationen
@@ -3753,18 +3773,21 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
             && cs.animationDuration.split(',').some((v) => parseFloat(v) > 0);
           if (!endless || !running) continue;
           out.animated += 1;
-          if (el.classList.contains('lg-blob')) out.blobsRunning += 1;
           const filter = cs.filter;
+          if (el === bait) { out.selfTest = !!filter && filter !== 'none'; continue; }
           if (filter && filter !== 'none') {
             out.offenders.push(`${el.tagName.toLowerCase()}.${el.className || '(ohne Klasse)'} -> ${filter}`);
           }
         }
+        bait.remove();
+        out.animated -= 1;
         return out;
       });
-      if (found.blobs === 0 || found.blobsRunning < found.blobs) {
-        unmeasured.push(`${name}: ${found.blobs} .lg-blob, davon ${found.blobsRunning} endlos animiert `
-          + `(${found.animated} dauerlaufende Animationen insgesamt)`);
+      if (!found.selfTest) unmeasured.push(`${name}: der Koeder (endlos + filter) wurde nicht erkannt`);
+      if (!found.shell) {
+        unmeasured.push(`${name}: keine aufgebaute Shell (${found.animated} dauerlaufende Animationen)`);
       }
+      if (found.backdrop > 0) backdropBack.push(`${name}: ${found.backdrop} Backdrop-Knoten`);
       for (const o of found.offenders) offenders.push(`${name}: ${o}`);
     }
     await page.close();
@@ -3778,19 +3801,23 @@ describe('Sonde 16 - kein dauerlaufendes Element rastert pro Frame einen Filter'
     // konnte nicht sagen, welche Zustaende zu kurz kamen; und ein Lauf, in dem
     // einigen die Shell fehlte, waehrend andere Spinner oder Skelette trugen,
     // blieb gruen, obwohl jene Zustaende nie geprueft waren. Die Vorbedingung
-    // ist der lebende Backdrop, und der steht in JEDEM Zustand: mindestens ein
-    // `.lg-blob`, und jeder davon laeuft endlos. Fehlt er, nennt die Meldung
-    // den Zustand - die Zahl der Blobs kommt aus dem Dokument, nicht von hier.
+    // war bis R18 der lebende Backdrop (in JEDEM Zustand vier endlos laufende
+    // `.lg-blob`). Er ist gestrichen; seither ist die Vorbedingung je Zustand
+    // die aufgebaute Shell und der erkannte Koeder (siehe oben): eine ruhende
+    // Seite traegt oft keine einzige Endlos-Animation, also beweist die Sonde
+    // an einem eingebauten Verstoss, dass sie ihn saehe.
     assert.deepEqual(unmeasured, [],
-      'Zustaende ohne laufenden Backdrop - dort hat die Sonde nichts gemessen, statt nichts '
-      + 'zu finden. Fehlt die Shell (Route nicht aufgebaut, auf /login gelandet), oder laufen '
-      + `die .lg-blob nicht mehr?\n  ${unmeasured.join('\n  ')}`);
+      'Zustaende ohne aufgebaute Shell oder ohne erkannten Koeder - dort hat die Sonde nichts gemessen, statt nichts '
+      + `zu finden (Route nicht aufgebaut, auf /login gelandet?).\n  ${unmeasured.join('\n  ')}`);
+    assert.deepEqual(backdropBack, [],
+      'Der Backdrop ist zurueck. Er lag vollstaendig unter dem opaken Scrollport und ist '
+      + `mit R18 gestrichen (DESIGN.md, "Colors").\n  ${backdropBack.join('\n  ')}`);
 
     assert.deepEqual(offenders.sort(), [],
       'Ein endlos animiertes Element traegt einen `filter` und rastert ihn damit pro '
       + 'Frame neu - im Leerlauf, solange die Seite offen ist (Issue #716). Bewegung '
       + 'und Filter gehoeren auf zwei Knoten: die aeussere Huelle bewegt sich, das '
-      + `Kind traegt den Filter und steht still (siehe .lg-blob in glass.css).\n  ${offenders.join('\n  ')}`);
+      + `Kind traegt den Filter und steht still.\n  ${offenders.join('\n  ')}`);
   });
 });
 

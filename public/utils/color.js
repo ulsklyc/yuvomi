@@ -29,7 +29,7 @@ export const AVATAR_COLORS = ['#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52
  * #7C3AED - im Dark exakt die Flaeche des Primaerknopfs.
  *
  * Jede Farbe hier haelt >= 3:1 (Nicht-Text-Kontrast, WCAG 1.4.11) auf
- * `--color-surface` UND `--color-surface-raised`, Light (#FFFFFF/#FBFBFD) wie
+ * `--color-surface` UND `--color-surface-raised`, Light (#FFFFFF/#FBFAF7) wie
  * Dark (#2B2825/#37332E); keine liegt im Markenband (Hue 245-275). Der Test
  * in test-waste-ui.js rechnet das gegen tokens.css nach.
  *

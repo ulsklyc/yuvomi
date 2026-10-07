@@ -2060,26 +2060,6 @@ function renderAppShell(container) {
   routeAnnouncer.setAttribute('aria-live', 'polite');
   routeAnnouncer.setAttribute('aria-atomic', 'true');
 
-  // Lebender Backdrop — driftende, getönte Blobs (Liquid Glass).
-  // Erstes Shell-Kind: liegt via z-index: -1 (glass.css Section 40) hinter
-  // dem transluzenten Content, aber über dem app-shell-Basis-Gradient.
-  // Blob 1 folgt --active-module-accent → rekoloriert pro Sektion.
-  const lgBackdrop = document.createElement('div');
-  lgBackdrop.className = 'lg-backdrop';
-  lgBackdrop.setAttribute('aria-hidden', 'true');
-  // Zwei Knoten je Blob: die Hülle driftet, die Farbwolke darin steht still und
-  // trägt den Blur. Solange beides auf EINEM Element sass, rasterte der Browser
-  // den blur(90px) pro Frame neu - im Leerlauf 60 → 20 fps (Issue #716). Die
-  // Begründung samt Messung steht bei .lg-blob in glass.css.
-  for (let i = 1; i <= 4; i++) {
-    const blob = document.createElement('div');
-    blob.className = `lg-blob lg-blob--${i}`;
-    const ink = document.createElement('div');
-    ink.className = 'lg-blob__ink';
-    blob.appendChild(ink);
-    lgBackdrop.appendChild(blob);
-  }
-
   // `bottomStack` steht VOR der Nav und nicht am Ende der Shell (Critique
   // 2026-08-13). Die Pille darin ist eine Bedienung für die Liste, die gerade
   // darüber steht - in der Tabfolge lag sie aber hinter der Liste, hinter dem
@@ -2094,7 +2074,7 @@ function renderAppShell(container) {
   //
   // Sichtbar ändert das nichts: der Stapel ist `position: fixed` und trägt
   // `--z-toast`, seine Lage kommt aus der Regel, nicht aus der Reihenfolge.
-  const shellNodes = [skipLink, lgBackdrop, sidebar, main, fabLayer, bottomStack, bottomNav];
+  const shellNodes = [skipLink, sidebar, main, fabLayer, bottomStack, bottomNav];
   if (backdrop)   shellNodes.push(backdrop);
   if (moreSheet)  shellNodes.push(moreSheet);
   shellNodes.push(searchOverlay, routeAnnouncer);

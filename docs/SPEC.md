@@ -6004,11 +6004,22 @@ this rule enforces "glass is chrome" in the document *as a side effect*, so a pr
 the rendered document can pass tautologically; the written rule is checked in the stylesheet as
 well.
 
-**The drifting backdrop** (`.lg-backdrop`) remains the app's only chromatic drama: four slowly
-moving blurred blobs on a non-scrolling layer inside `.app-shell`, the first following
-`--active-module-accent`. `--lg-blob-opacity` is deliberately low (0.16 light / 0.20 dark) so
-content dominates, and collapses to 0 under `prefers-reduced-transparency` / `prefers-contrast`.
-The drift freezes under `prefers-reduced-motion`.
+**No backdrop behind the content.** Until v2.75 four drifting blurred blobs (`.lg-backdrop`) and
+an accent gradient on `.app-shell` sat behind the app. The opaque `.app-content` covered both
+completely, so they were removed: inside the app, glass refracts content only (what scrolls under
+the tab capsule, a sheet, or the expanded sidebar rail). The **brand light field**
+(`--brand-field`: three still radial gradients in the two brand-mark colours, no filter, no
+animation) lives where nothing opaque covers it - behind the glass panel of the access pages
+(login, setup, invitation, password reset, display pairing) and on the loading screen. Its
+strength `--brand-field-opacity` (0.20 light / 0.26 dark) collapses to 0 under
+`prefers-reduced-transparency` / `prefers-contrast`. No text sits directly on the field; on the
+access pages everything stands on the panel.
+
+**Floating surfaces share one radius step:** dialog, More sheet, search palette, event popover,
+toast, the desktop sidebar and the access panel use 26px (`--radius-xl` / `--radius-glass-card`);
+menus and filter popovers use 18px (`--radius-glass-inner`). Inner radii are concentric (outer
+minus padding). The desktop sidebar is a floating glass panel 8px off the window edge
+(`--sidebar-float-gap`); the content area keeps its width.
 
 **Navigation** keeps its sliding pill indicator on the sidebar and the mobile bar, and its custom
 monoline SVG icon set (`public/nav-icons.js`), with Lucide as the fallback for entries without a

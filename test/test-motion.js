@@ -235,7 +235,7 @@ test('kein Shorthand-Token mit einer zweiten Kurve in einer Transition oder Anim
  *
  *    Die Regel: Interaktions-Motion nimmt Dauer und Kurve aus tokens.css.
  *    AUSGENOMMEN sind nur
- *      - Endlos-Schleifen (`infinite`): Wetter, Spinner, Shimmer, Blob - dort
+ *      - Endlos-Schleifen (`infinite`): Wetter, Spinner, Shimmer - dort
  *        ist `linear`/`ease-in-out` die Aussage und die Periode kein UI-Tempo;
  *      - die benannten Stellen unten, jede mit ihrem Grund;
  *      - Nullwerte (`0s`, `none`) - kein Tempo, sondern "aus".

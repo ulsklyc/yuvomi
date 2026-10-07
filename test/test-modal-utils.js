@@ -1411,7 +1411,13 @@ test('Sheet-Grammatik: das Mehr-Blatt zieht ueber denselben Helfer wie der Dialo
   assert.doesNotMatch(router, /clientY - _touchStartY > 60/, 'die alte Geste (erst bei touchend, ab 60px) ist weg');
   const more = [...eachRule(layout)].find((r) => r.selector === '.more-sheet' && !r.at.length)?.body ?? '';
   assert.match(more, /translate var\(--duration-lg\) var\(--ease-out\)/, 'Rueckfedern mit Token-Dauer und -Kurve');
-  assert.match(more, /border-radius:\s*var\(--radius-lg\)/, 'Radius des Dialog-Sheets');
+  // Derselbe Radius wie das Dialog-Sheet - aus dessen Regel gelesen, nicht als
+  // Literal: bis R18 stand hier `--radius-lg`, und der Guard waere beim Wechsel
+  // BEIDER Flaechen auf `--radius-xl` nur am Mehr-Blatt rot geworden.
+  const dialog = [...eachRule(layout)].find((r) => r.selector === '.modal-panel' && !r.at.length)?.body ?? '';
+  const radius = (body) => body.match(/border-radius:\s*([^;]+)/)?.[1].trim();
+  assert.ok(radius(dialog), 'das Dialog-Sheet traegt einen Radius');
+  assert.equal(radius(more), radius(dialog), 'Radius des Dialog-Sheets');
 });
 
 /* DER ERSTFOKUS NIMMT KEINEN SPAETER GESETZTEN FOKUS WEG (#1156).

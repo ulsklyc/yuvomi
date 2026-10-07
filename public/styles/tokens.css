@@ -102,7 +102,7 @@
    *
    * --color-border-control ist die vorhandene Rampenstufe --neutral-500 und
    * haelt 3:1 auf jedem Grund, auf dem ein Feld gemessen stand: light 3,53 auf
-   * Weiss, 3,42 auf -raised, 3,18 auf der Buehne; dark 4,51 auf -surface, 3,86
+   * Weiss, 3,38 auf -raised, 3,18 auf der Buehne; dark 4,51 auf -surface, 3,86
    * auf -raised, 5,46 auf der Buehne (die Dark-Bloecke setzen --_neutral-500,
    * das Token zieht mit). Die knappere Alternative (#938E85 / #7A746B) fiel auf
    * der hellen Buehne auf 2,93 und auf dem dunklen -raised auf 2,71.
@@ -214,9 +214,14 @@
    * glass = rein dekorative/leichte Glass-Bereiche. */
   --_color-surface-work:      #FFFFFF;
   --color-surface-work:       var(--_color-surface-work);
-  --_color-surface-raised:    #FBFBFD;
+  /* raised und glass tragen den Ton von --neutral-50 (#FBFAF7), nicht mehr
+   * Apples kuehles #FBFBFD / rgb(250,250,252) - Begruendung und Rechnung am
+   * Glas, Abschnitt 16 a). Auf -raised gemessen: Sekundaertext 5,93:1 (vorher
+   * 5,99), Tertiaertext 5,39 (5,45), Akzent 5,81 (5,86), Feldkante 3,38
+   * (3,42). */
+  --_color-surface-raised:    #FBFAF7;
   --color-surface-raised:     var(--_color-surface-raised);
-  --_color-surface-glass:     rgba(250, 250, 252, 0.62);
+  --_color-surface-glass:     rgba(251, 250, 247, 0.62);
 
   /* KASTEN-IN-KASTEN-VOKABULAR (HIG-Rollout Runde 2, 2026-08-06).
    * Karten sind randlos auf dem Grouped-Grund. Was IN einer Karte liegt, bekommt
@@ -378,6 +383,77 @@
   --brand-mark-from:   #8B5CF6;
   --brand-mark-to:     #6C3AED;
   --brand-mark-ink:    #FFFFFF;
+
+  /* DAS MARKEN-LICHTFELD (R18, 2026-10-07): drei weiche Kreise in den beiden
+   * Farben der Bildmarke, in der Anordnung ihrer drei Kreise (zwei oben, einer
+   * unten). Es steht als Raumlicht HINTER der Glastafel der Zugangsseiten und
+   * im Ladebild - den beiden Orten, an denen nichts Opakes darueber liegt. In
+   * der App gibt es kein Lichtfeld hinter dem Inhalt mehr (glass.css,
+   * Abschnitt 40).
+   *
+   * STEHEND UND OHNE FILTER: drei radiale Verlaeufe, kein blur(), keine
+   * Animation - der Browser malt sie einmal. Die Weichheit kommt aus der
+   * Stoppfolge, nicht aus einer Unschaerfe: elf Stuetzen auf cos² (100, 98,
+   * 90, 79, 65, 50, 35, 21, 10, 2, 0 % der Staerke), also ohne Steigung im
+   * Kern und am Rand. Weniger reicht nicht: zwei Stopps haben in der Mitte
+   * eine Spitze (im Dark ein heller Punkt), sechs zeichnen im Ladebild, wo
+   * keine Tafel davor blurrt, sichtbare Ringe an jedem Knick.
+   *
+   * KEIN TEXT STEHT DIREKT DARAUF. Schon bei 10 % Staerke faellt
+   * Sekundaertext auf der getoenten Buehne unter AA (3,99:1 im Kern); deshalb
+   * steht auf den Zugangsseiten ALLES auf der Tafel (auth.css), auch Marke,
+   * Name und Versionszeile. Gerechnet ist der schlechteste denkbare Grund
+   * unter der Tafel - alle drei Kreise mit vollem Kern uebereinander, ohne den
+   * Blur der Tafel - und darauf jede Tinte, die sie traegt:
+   *   hell  (0,20): Label/Sekundaertext 5,43:1, Tertiaer 4,93, Akzent-Link
+   *                 5,31, Feldkante 3,09 (Grenze 3:1); direkt auf dem Feld
+   *                 stuende Sekundaertext bei 2,96
+   *   dunkel (0,26): Sekundaertext 6,20:1, Tertiaer 5,46, Akzent 5,02,
+   *                 Feldkante 4,21
+   * Die Rechnung laeuft in test:material aus diesen Tokens mit.
+   *
+   * Der Schalter ist die Staerke: prefers-reduced-transparency und
+   * prefers-contrast setzen sie auf 0, dann sind alle Stopps transparent -
+   * dieselbe Kopplung wie beim Wetter-Lichthauch (--weather-glow-opacity). */
+  --_brand-field-opacity: 0.20;
+  --brand-field-opacity:  var(--_brand-field-opacity);
+  --brand-field:
+    radial-gradient(circle 24rem at calc(50% - 13rem) calc(50% - 12rem),
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 100%), transparent) 0%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 98%), transparent) 10%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 90%), transparent) 20%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 79%), transparent) 30%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 65%), transparent) 40%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 50%), transparent) 50%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 35%), transparent) 60%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 21%), transparent) 70%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 10%), transparent) 80%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 2%), transparent) 90%,
+      transparent 100%),
+    radial-gradient(circle 22rem at calc(50% + 15rem) calc(50% - 1rem),
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 100%), transparent) 0%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 98%), transparent) 10%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 90%), transparent) 20%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 79%), transparent) 30%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 65%), transparent) 40%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 50%), transparent) 50%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 35%), transparent) 60%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 21%), transparent) 70%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 10%), transparent) 80%,
+      color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 2%), transparent) 90%,
+      transparent 100%),
+    radial-gradient(circle 23rem at calc(50% - 1rem) calc(50% + 17rem),
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 80%), transparent) 0%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 78%), transparent) 10%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 72%), transparent) 20%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 64%), transparent) 30%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 52%), transparent) 40%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 40%), transparent) 50%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 28%), transparent) 60%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 16%), transparent) 70%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 8%), transparent) 80%,
+      color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 2%), transparent) 90%,
+      transparent 100%);
   --_color-accent-secondary:  #8B5CF6;
   --color-accent-secondary:   var(--_color-accent-secondary);  /* Violett-hell — Sekundärer Akzent für Logo-Gradient */
   --_color-accent-light:      #F3EFFE;
@@ -818,13 +894,13 @@
   --weather-band-hot:   var(--_weather-band-hot);
 
   /* Der Lichthauch hinter der Glyphe - und der Grund, warum er ein TOKEN ist
-   * und keine Zahl in dashboard.css: er ist dieselbe Gattung wie die
-   * Backdrop-Blobs hinter dem Glas (Abschnitt 14b, `--lg-blob-opacity`), also
+   * und keine Zahl in dashboard.css: er ist ein Lichtfeld, also
    * eine weiche Atmosphäre HINTER dem Inhalt, kein chromatischer Verlauf AUF
-   * ihm. Weil er dieselbe Gattung ist, hat er dieselben Ausschalter: in
-   * prefers-reduced-transparency und prefers-contrast steht er wie sein
-   * Vorbild auf 0. Ein Wert in der Komponente hätte diese Kopplung nicht
-   * mitgebracht. */
+   * ihm - dieselbe Gattung wie das Marken-Lichtfeld der Zugangsseiten
+   * (`--brand-field-opacity`, bei der Bildmarke). Weil es dieselbe Gattung ist,
+   * hat es dieselben Ausschalter: in prefers-reduced-transparency und
+   * prefers-contrast stehen beide auf 0. Ein Wert in der Komponente hätte
+   * diese Kopplung nicht mitgebracht. */
   --weather-glow-opacity: 1;
 
   /* --------------------------------------------------------
@@ -1397,6 +1473,16 @@
   --viewport-height: 100vh;
   --sidebar-width: 56px;             /* Fallback (mobile: sidebar hidden) */
   --sidebar-width-expanded: 220px;   /* full sidebar (≥1024px), max 240px laut Spec */
+  /* DIE SEITENLEISTE SCHWEBT (R18, 2026-10-07): Abstand der Tafel zur
+   * Fensterkante, oben, unten und an der Startkante - derselbe Wert wie die
+   * Luft um die mobile Tab-Kapsel (`--nav-bottom-height`, darueber).
+   * --sidebar-width bleibt die Breite der TAFEL und zugleich der Rand, den
+   * `.app-content` freihaelt: die Tafel ragt um diesen Abstand in den
+   * Seitenrand des Inhalts (32px Gutter, es bleiben 24px Luft). Die
+   * Inhaltsbreite aendert sich dadurch nicht - jede Schwelle, die gegen
+   * "Fenster minus 220px" gerechnet ist (`--layout-split-threshold`,
+   * `--layout-rail-min`), gilt unveraendert. */
+  --sidebar-float-gap: var(--space-2);
   /* Zeilenhoehe der Seitenleiste (Critique 2026-09-26, P1-2): 15 Module,
    * vier Sektionslabels, Einstellungen und das Konto muessen auf 1280x800
    * ohne Scrollen stehen - mit 40px-Zeilen fehlten dort ~270px. Die Zeilen
@@ -1633,8 +1719,38 @@
    *       g) Glass-Übergänge
    * -------------------------------------------------------- */
 
-  /* a) Glass-Hintergründe */
-  --_glass-bg-elevated: rgba(250, 250, 252, 0.86);
+  /* a) Glass-Hintergründe
+   *
+   * DAS HELLE GLAS TRAEGT DEN TON SEINER BUEHNE (R18, 2026-10-07). Hier stand
+   * `rgba(250, 250, 252, ...)` - Apples kuehles Systemweiss, ein Rest der
+   * Rampe, die 2026-08-10 warm zurueckgeholt wurde (Abschnitt 1). Auf der
+   * warmen Buehne rgb(245,243,237) las sich jede Glasflaeche als blaeulicher
+   * Fremdkoerper. Der neue Ton ist --neutral-50 (#FBFAF7 = 251,250,247), die
+   * hellste Stufe derselben Rampe; Dark war schon warm (45,42,39) und bleibt.
+   *
+   * DIE LUMINANZ IST GEHALTEN: L 0,9572 -> 0,9560. Damit verschiebt sich jeder
+   * Text-auf-Glas-Kontrast um hoechstens 0,02. Nachgerechnet (sRGB, deckend
+   * gemischt, OHNE den Blur, der fremde Tinte unter dem Glas zusaetzlich
+   * mittelt - die Zahlen sind also die untere Grenze):
+   *
+   *   Seitenleiste (0.86 ueber der Buehne -> 250,249,246)
+   *     Zeilenlabel   --color-text-secondary    5,88:1   (vorher 5,89)
+   *     Gruppenlabel  --color-text-tertiary     5,35:1   (5,35)
+   *     Kontoname     --color-text-primary     16,33:1   (16,35)
+   *     aktives Label (70 % Akzent in Tinte) auf der Pille   6,93:1   (6,94)
+   *   Seitenleiste ueber Inhalt (Overlay-Zustand, weisse Karte darunter)
+   *     Zeilenlabel 5,97:1, Gruppenlabel 5,43:1
+   *   Tab-Kapsel (0.66): Label --color-text-primary ueber Buehne 16,14:1,
+   *     ueber einer Tintenzeile 7,77:1, ueber mittelgrauem Foto 11,21:1 (je
+   *     -0,01 gegen vorher); die Messung am gerenderten Pixel in a1) gilt
+   *     weiter, sie liegt wegen des Blurs darueber.
+   *   Dialogkopf: traegt kein Glas mehr (layout.css, `.modal-panel__header`),
+   *     der Titel steht auf --color-surface, 17,3:1.
+   *
+   * Die Rechnung laeuft in test:material mit (aus diesen Tokens, nicht aus
+   * einer Kopie der Zahlen): wer einen Glaswert oder eine Tinte anfasst,
+   * sieht dort, was unter 4,5:1 faellt. */
+  --_glass-bg-elevated: rgba(251, 250, 247, 0.86);
   --glass-bg-elevated:  var(--_glass-bg-elevated);
   /* a1) Die schwebende Tab-Bar-Kapsel: duenneres Glas als die uebrigen
    * Chrome-Flaechen (Entscheid von Ulas 2026-10-01: "mehr Glas im Hintergrund,
@@ -1659,7 +1775,7 @@
    * misst alle neu. Ohne backdrop-filter bleibt --glass-bg-elevated (glass.css,
    * Abschnitt 1); prefers-reduced-transparency und prefers-contrast: more
    * kippen die Toenung auf --color-surface (Bloecke unten). */
-  --_glass-bg-capsule:   rgba(250, 250, 252, 0.66);
+  --_glass-bg-capsule:   rgba(251, 250, 247, 0.66);
   --glass-bg-capsule:    var(--_glass-bg-capsule);
   --_glass-capsule-tone: brightness(1);
   --glass-capsule-tone:  var(--_glass-capsule-tone);
@@ -1679,7 +1795,7 @@
   /* a2) Glass-Hintergründe: Vibrancy-Stufe (transparenter, mehr Durchschein) */
   --_glass-bg-card:       var(--_color-surface-glass);
   --glass-bg-card:        var(--_glass-bg-card);
-  --_glass-bg-card-hover: rgba(250, 250, 252, 0.74);
+  --_glass-bg-card-hover: rgba(251, 250, 247, 0.74);
   --glass-bg-card-hover:  var(--_glass-bg-card-hover);
 
   /* a3) Tint: Modul-Akzentfarbe als subtile Glass-Tonung */
@@ -1722,7 +1838,7 @@
    * DER FAKTOR IST DER SCHALTER. glass.css sagt in Abschnitt 40 zu, dass
    * "Opazität/Specular in prefers-reduced-transparency / prefers-contrast über
    * die Tokens auf 0 gesetzt" werden - bis 2026-08-09 galt das nur für
-   * --lg-specular, während diese siebzehn Leser hier mit statischem rgba an
+   * das damalige --lg-specular, während diese siebzehn Leser hier mit statischem rgba an
    * beiden a11y-Blöcken vorbeiliefen. Gleiches Konzept, gegensätzliche
    * Behandlung: --glass-highlight, -subtle und --glass-sheen fallen dort auf
    * `transparent`, der Inset-Specular blieb stehen.
@@ -1807,18 +1923,16 @@
   --sheet-out:  var(--duration-md) var(--ease-out);
   --sheet-lift: 24px;
 
-  /* h) Liquid-Glass-Backdrop (Section 17) — driftende Blobs + Specular.
-   *    --lg-blob-opacity bleibt bewusst niedrig, damit Inhalte dominieren.
-   *    In prefers-reduced-transparency / prefers-contrast wird sie auf 0
-   *    gesetzt (siehe unten). */
-  --_app-backdrop-accent-strength: 2%;
-  --app-backdrop-accent-strength:  var(--_app-backdrop-accent-strength);
-  --_app-backdrop-secondary-strength: 1%;
-  --app-backdrop-secondary-strength: var(--_app-backdrop-secondary-strength);
-  --lg-blob-opacity:   0.16;
+  /* h) Liquid Glass - Saettigung.
+   *    Hier standen bis R18 (2026-10-07) drei Werte fuer einen Backdrop, den
+   *    die opake Inhaltsflaeche vollstaendig verdeckte (Blob-Deckung und zwei
+   *    Verlaufsstaerken der Shell). Sie sind mit ihm gestrichen. */
   --lg-glass-saturate: 200%;    /* Backdrop-Sättigung erhöhter Glass-Flächen */
   --lg-capsule-saturate: 220%;  /* Tab-Bar-Kapsel: duenneres Glas, sattere Durchsicht (a1) */
-  --lg-specular:       0.22;    /* Stärke des Inset-Top-Highlights */
+  /* --lg-specular (0.22, die Staerke EINES freien Highlights) ist mit R18
+   * entfallen: sein letzter Leser, die Seitenleiste, nimmt als schwebende
+   * Tafel `--glass-inset-elevated` wie Dialog und Blatt. Es gibt damit nur
+   * noch eine Schreibweise fuer einen Specular: die Inset-Tokens (d2). */
 
   /* i) Maskenstopp — voll deckend. KEIN FARBWERT.
    *
@@ -2258,9 +2372,7 @@
     --_glass-bg-card:          var(--_color-surface-glass);
     --_glass-bg-card-hover:    rgba(43, 40, 37, 0.80);
     --_glass-tint-strength:    6%;
-    --_app-backdrop-accent-strength: 1.5%;
-    --_app-backdrop-secondary-strength: 0.75%;
-    --lg-blob-opacity:         0.20;
+    --_brand-field-opacity:    0.26;
   }
 }
 
@@ -2484,9 +2596,7 @@
     --_glass-bg-card:         var(--_color-surface-glass);
     --_glass-bg-card-hover:   rgba(43, 40, 37, 0.80);
     --_glass-tint-strength:   6%;
-    --_app-backdrop-accent-strength: 1.5%;
-    --_app-backdrop-secondary-strength: 0.75%;
-    --lg-blob-opacity:        0.20;
+    --_brand-field-opacity:   0.26;
   }
 }
 
@@ -2513,12 +2623,10 @@
     --blur-md:  blur(0px);
     --blur-lg:  blur(0px);
     --opacity-glass-elevated: 1;
-    --lg-blob-opacity: 0;     /* Backdrop-Blobs aus */
-    --weather-glow-opacity: 0; /* Wetter-Lichthauch aus - gleiche Gattung (5b) */
-    /* Specular aus - beide Schreibweisen. --lg-specular ist die Stärke des
-     * einen freien Highlights, --glass-inset-strength der Faktor der
-     * abgestuften Inset-Tokens; sie sind dasselbe Konzept und fallen zusammen. */
-    --lg-specular: 0;
+    --weather-glow-opacity: 0; /* Wetter-Lichthauch aus (5b) */
+    --brand-field-opacity: 0;  /* Marken-Lichtfeld aus - gleiche Gattung */
+    /* Specular aus: --glass-inset-strength ist der Faktor aller abgestuften
+     * Inset-Tokens (d2). */
     --glass-inset-strength: 0;
   }
 }
@@ -2558,10 +2666,9 @@
      * Ein Hochkontrast-Block, der den Kontrast senkt, ist schlimmer als keiner.
      * Ohne Eintrag gilt der regulaere Modul-Tint, und der haelt seine Zusage. */
 
-    --lg-blob-opacity: 0;     /* Backdrop-Blobs aus */
-    --weather-glow-opacity: 0; /* Wetter-Lichthauch aus - gleiche Gattung (5b) */
-    /* Specular aus - beide Schreibweisen, siehe der Schwesterblock oben. */
-    --lg-specular: 0;
+    --weather-glow-opacity: 0; /* Wetter-Lichthauch aus (5b) */
+    --brand-field-opacity: 0;  /* Marken-Lichtfeld aus - gleiche Gattung */
+    /* Specular aus, siehe der Schwesterblock oben. */
     --glass-inset-strength: 0;
   }
 }

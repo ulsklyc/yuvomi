@@ -40,6 +40,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   memory, and some 25 seconds of background work on one core spread over the first requests
   after a start. The files themselves are unchanged. `STATIC_BROTLI=off` restores the previous
   behaviour.
+- **Everything that floats has one shape, and the sidebar floats too.** Dialogs, the "More"
+  sheet and the search palette had tighter corners (16 px) than the event popover and the
+  toasts (26 px); they now share the larger radius, with fields, tiles and menu rows rounded to
+  match, and catch a fine line of light at the top. The dialog header is no longer a grey strip
+  above a white body. On a desktop the sidebar is a glass panel 8 px off the window edge instead
+  of a full-height bar; the content keeps its width. Light glass takes the warm tone of the
+  page instead of a cool white, and the icon wells in the sidebar are visible in the light
+  theme (they were 1.007:1 against the bar).
+- **Login, setup, invitation and password reset have a place.** The form stood as a small card
+  on a plain page. It is now a glass panel in front of a still field of soft light in the
+  colours of the Yuvomi mark, which also stands behind the loading screen. Everything on these
+  pages sits on the panel, where text keeps its contrast (label 5.4:1 light, 6.2:1 dark, in the
+  worst spot); with "reduce transparency" or "increase contrast" the light is off and the panel
+  is solid. A form taller than the window can now be scrolled by hand - on a small phone or in
+  landscape its lower end could only be reached with the Tab key.
+- **The app no longer animates a backdrop nobody could see.** Four blurred colour fields drifted
+  behind the content the whole time the app was open, and the content covered them completely.
+  They are gone, together with a gradient that was covered the same way. Nothing looks
+  different; the browser has four large layers less to carry.
 
 ### Fixed
 

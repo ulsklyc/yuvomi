@@ -554,7 +554,8 @@
   gap: var(--space-0h);
   padding: var(--space-1);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  /* Form wie `.popover-menu` (layout.css): 18px, Zeilen konzentrisch. */
+  border-radius: var(--radius-glass-inner);
   background: var(--color-surface);
   box-shadow: var(--shadow-lg);
   /* Ein- und Ausgang wie `.popover-menu` (layout.css), hier rein in CSS: das
@@ -607,7 +608,7 @@
   width: 100%;
   min-height: var(--target-md);
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
+  border-radius: calc(var(--radius-glass-inner) - var(--space-1));
   color: var(--color-text-primary);
   font-size: var(--text-sm);
   text-align: left;
@@ -2335,6 +2336,11 @@
     max-height: none;
     border: none;
     border-radius: 0;
+  }
+
+  /* Randlos und eckig hat die Tafel keine Kante, die Licht faengt. */
+  .modal-panel:has(.document-viewer)::after {
+    content: none;
   }
 
   .modal-panel:has(.document-viewer) > .modal-panel__header {

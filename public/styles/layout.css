@@ -34,11 +34,10 @@
   height: 100vh;
   height: -webkit-fill-available;
   height: 100dvh;
-  /* Containing-Block für den lebenden Backdrop (.lg-backdrop, position: absolute;
-   * inset: 0). Bewusst KEIN isolation/z-index → app-shell bleibt kein eigener
-   * Stacking-Context, damit die globale z-Reihenfolge (Toast 300 > Modal 200 etc.)
-   * unverändert bleibt. Der Backdrop malt mit z-index: 0 über die opaken
-   * html/body-Hintergründe; .app-content liegt via position: relative darüber. */
+  /* Positioniert, seit hier der Backdrop hing (gestrichen mit R18); absolut
+   * gesetzte Shell-Kinder messen sich seither an dieser Box. Bewusst KEIN
+   * isolation/z-index: .app-shell bleibt kein eigener Stacking-Context, damit
+   * die globale z-Reihenfolge (Toast 300 > Modal 200 etc.) unveraendert bleibt. */
   position: relative;
 }
 
@@ -54,12 +53,22 @@
   min-height: 100dvh;
   width: 100%;
   background-color: var(--color-bg);
+  /* Das Marken-Lichtfeld (tokens.css, `--brand-field`): dasselbe stehende
+   * Raumlicht wie hinter der Glastafel der Zugangsseiten - wer abgemeldet
+   * startet, sieht vom Ladebild zur Anmeldung EINEN Raum. Kein Filter, keine
+   * Animation auf der Flaeche; nur der Schriftzug darin pulsiert. */
+  background-image: var(--brand-field);
+  background-repeat: no-repeat;
 }
 
+/* Label-Farbe statt Akzent (R18): der Schriftzug steht direkt auf dem
+ * Lichtfeld, und Violett auf violettem Licht faellt im Kern unter 3:1. Die
+ * Tinte haelt ueberall auf dem Feld mindestens 8:1 (hell) - und DESIGN.md
+ * fuehrt Akzent-Titel ohnehin als Verbot. */
 .app-loading__logo {
   font-size: var(--text-2xl);
   font-weight: var(--font-weight-bold);
-  color: var(--color-accent);
+  color: var(--color-text-primary);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -853,7 +862,8 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   right: max(var(--space-3), env(safe-area-inset-right));
   background-color: var(--color-surface);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
+  /* Dieselbe Stufe wie der Dialog (R18, Begruendung an `.modal-panel`). */
+  border-radius: var(--radius-xl);
   box-shadow: var(--glass-shadow-lg);
   /* DER SEITENRAND IST HIER SPALTENBREITE, KEIN LUXUS. Seit das Raster vier
    * statt drei Spalten fuehrt, entscheidet jeder Pixel Innenabstand darueber,
@@ -1222,7 +1232,8 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * Kachelkante das Siegel beruehrt (das misst 40px in einer ~83px-Zelle). */
   padding: var(--space-2h) var(--space-1) var(--space-2);
   background-color: var(--color-surface);
-  border-radius: var(--radius-lg);
+  /* Konzentrisch zum Blatt: 26px aussen minus 12px Seitenpolster. */
+  border-radius: calc(var(--radius-xl) - var(--space-3));
   box-shadow: var(--shadow-xs);
   color: var(--color-text-secondary);
   text-decoration: none;
@@ -1416,7 +1427,9 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   justify-content: center;
   gap: var(--space-1);
   padding: var(--space-1h) var(--space-1);
-  border-radius: var(--radius-md);
+  /* Konzentrisch zum Blatt: die Systemzeile schliesst es unten ab, dort
+   * stehen 16px Polster - 26px minus 16px. */
+  border-radius: calc(var(--radius-xl) - var(--space-4));
   background-color: transparent;
   color: var(--color-text-secondary);
   text-decoration: none;
@@ -1773,9 +1786,11 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
     width: min(640px, 92vw);
     max-height: calc(var(--viewport-height) - 12vh - var(--space-6));
     background-color: var(--color-surface);
-    border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--glass-border);
+    /* Dieselbe Stufe, Kante und Schattenfamilie wie der Dialog (R18,
+     * Begruendung an `.modal-panel`) - die Palette ist dieselbe Gattung. */
+    border-radius: var(--radius-xl);
+    box-shadow: var(--glass-shadow-lg);
     overflow: hidden;
     /* Auftakt wie der Desktop-Dialog (glass-modal-scale-in): Fade + scale(0.95→1)
      * mit ease-out-expo, statt eines vom Bildschirmrand hochfahrenden Sheets.
@@ -1804,6 +1819,13 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 
   .search-overlay__results {
     padding-bottom: var(--space-4);
+  }
+
+  /* Konzentrisch zur Palette: der Traeger steht 16px von ihrer Kante, also
+   * 26px minus 16px. Mobil fuellt die Suche den Schirm und hat keine Ecke,
+   * an der er sich messen muesste - dort bleibt die Traegerstufe (16px). */
+  .search-section__rows {
+    border-radius: calc(var(--radius-xl) - var(--space-4));
   }
 }
 
@@ -1970,9 +1992,22 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
     opacity var(--duration-xs) var(--ease-out);
 }
 
+/* DIE MULDE DER SEITENLEISTE IST EINE MULDE, IN BEIDEN THEMES (R18). Sie trug
+ * `--color-surface-elevated`: dunkel eine Stufe ueber dem Glas (1,17:1), hell
+ * aber rgb(251,250,247) auf Glas rgb(250,249,246) - gemessen 1,007:1, also
+ * nichts. Jetzt ist sie in beiden Themes dieselbe Geste: 8 % Tinte im Glas
+ * (`--tint-wash`, die leiseste Stufe der Leiter). Hell vertieft das die
+ * Flaeche (232,231,228 - 1,17:1 gegen das Glas), dunkel hebt es sie
+ * (59,56,53 - 1,26:1), und die Tinte kippt mit dem Theme von selbst.
+ * Das Modulzeichen ist Grafik (3:1): schwaechster Ton auf der Mulde hell
+ * 4,08:1 (Einstellungen), dunkel 3,63:1 (Gesundheit).
+ * Statt der oberen Lichtkante der Basisregel die Vertiefung eines Felds -
+ * eine Mulde faengt oben kein Licht. */
 .nav-sidebar .nav-item__icon-well {
   width: 26px;
   height: 26px;
+  background: color-mix(in srgb, var(--color-text-primary) var(--tint-wash), transparent);
+  box-shadow: var(--glass-inset-input);
 }
 
 /* Der äußere Indikator ist die einzige aktive Fläche; das Icon trägt die Stimme.
@@ -4436,7 +4471,10 @@ html.fab-anim-done .page-fab {
   gap: var(--space-0h);
   padding: var(--space-1);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  /* Die kleine Stufe der schwebenden Flaechen (R18): ein Menue ist dieselbe
+   * Gattung wie Dialog und Blatt, nur kleiner - 18px statt der 12px einer
+   * Karte. Die Zeilen darin sind konzentrisch (18px minus 4px Polster). */
+  border-radius: var(--radius-glass-inner);
   background-color: var(--color-surface);
   box-shadow: var(--shadow-md);
   /* Die Position rechnet JS erst im `toggle`-Ereignis; ohne die Startopazität
@@ -4494,7 +4532,7 @@ html.fab-anim-done .page-fab {
   width: 100%;
   padding: var(--space-2) var(--space-3);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: calc(var(--radius-glass-inner) - var(--space-1));
   background: none;
   font: inherit;
   font-size: var(--text-sm);
@@ -4754,7 +4792,7 @@ a.popover-menu__item {
   overscroll-behavior: contain;
   padding: var(--space-3) var(--space-3) 0;
   border: var(--space-px) solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-glass-inner);
   background-color: var(--color-surface);
   color: var(--color-text-primary);
   box-shadow: var(--shadow-md);
@@ -4968,9 +5006,12 @@ p.field-hint--warn[hidden] {
 /* ================================================================
  * Sidebar Navigation - Desktop (≥ 1024px)
  *
- * Design: Flach, kein Neumorphismus. Dezenter Seitenrand.
- * Aktiver State: Hintergrund-Highlight + Akzentstreifen links.
- * Hover: Subtile Hintergrundfarbe, kein Shadow.
+ * Design: eine SCHWEBENDE GLASTAFEL (R18, 2026-10-07) - die Form der mobilen
+ * Tab-Kapsel am Desktop: Abstand zur Fensterkante, Glasradius, Schatten,
+ * Lichtkante. Bis dahin: volle Hoehe, Radius 0, ein Blur ueber der
+ * einfarbigen Buehne - Glas, das nichts brach und nach nichts aussah.
+ * Geometrie hier, Material in glass.css (Abschnitt 2 und 41).
+ * Aktiver State: gleitende Indikator-Pille. Hover: ruhige Flaeche.
  * ================================================================ */
 @media (min-width: 1024px) {
   :root {
@@ -4999,12 +5040,16 @@ p.field-hint--warn[hidden] {
   .nav-sidebar {
     display: flex;
     position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
+    /* Der Abstand zur Fensterkante macht die Leiste zur Tafel. Die Breite
+     * bleibt die der Spalte - Rechnung und Folgen an `--sidebar-float-gap`
+     * (tokens.css): der Inhalt wird dadurch nicht schmaler. */
+    top: var(--sidebar-float-gap);
+    left: var(--sidebar-float-gap);
+    bottom: var(--sidebar-float-gap);
     width: var(--sidebar-width);
     background: var(--sidebar-bg);
-    border-right: 1px solid var(--color-border-subtle);
+    border: var(--space-px) solid var(--color-border-subtle);
+    border-radius: var(--radius-glass-card);
     flex-direction: column;
     z-index: var(--z-nav);
     /* 12px statt 16px oben und unten: die Leiste muss auf 1280x800 alle Module
@@ -5199,7 +5244,6 @@ p.field-hint--warn[hidden] {
    * Fuss und haelt deshalb die Zielgroesse des Zeigers. */
   .nav-sidebar .nav-item.nav-sidebar__account-trigger {
     min-height: var(--target-md);
-    width: 100%;
     border: none;
     background: none;
     font-family: inherit;
@@ -5374,6 +5418,22 @@ p.field-hint--warn[hidden] {
     flex-shrink: 0;
   }
 
+  /* DIE ZWEI ZEILEN AUSSERHALB DER LISTE HABEN DIE GEOMETRIE DER PILLE (R18).
+   * In der Liste traegt die gleitende Pille Hover und Auswahl, 4px von der
+   * Tafelkante eingerueckt. Einstellungen und die Kontozeile haengen
+   * ausserhalb der Liste und faerbten sich selbst - ueber die volle Breite,
+   * bis an die Kante. In der flachen Leiste war das ein Balken; in der
+   * runden Tafel schnitte ihre untere Ecke (26px) die Flaeche der Kontozeile
+   * an. Mit demselben Einzug wie die Pille liegt die Ecke der Zeile innerhalb
+   * der Kurve (Abstand zum Kreismittelpunkt 24,7px < 26px), und alle Zeilen
+   * der Tafel sprechen eine Form. Das Polster faellt um den Einzug, damit das
+   * Zeichen auf der Flucht X=28 bleibt. */
+  .nav-sidebar > .nav-item--pinned-end,
+  .nav-sidebar .nav-item.nav-sidebar__account-trigger {
+    margin-inline: var(--space-1);
+    padding-inline: calc(15px - var(--space-1)) calc(var(--space-3) - var(--space-1));
+  }
+
   /* UND EINE KANTE, SOBALD DIE LISTE UEBERLAEUFT. Ohne sie liest sich der
    * gepinnte Eintrag als naechster Listeneintrag - im Screenshot stand
    * „Einstellungen" direkt unter „Belohnungen", waehrend „Menschen" und
@@ -5459,7 +5519,13 @@ p.field-hint--warn[hidden] {
   html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover,
   html.sidebar-collapsed .nav-sidebar:focus-within {
     width: var(--sidebar-width-expanded);
-    box-shadow: var(--shadow-lg);
+    /* Ueber dem Inhalt eine Schattenstufe hoeher, mit derselben Lichtkante wie
+     * in Ruhe (glass.css, Abschnitt 41). DAS GLAS BLEIBT HIER DAS DICKE
+     * (`--glass-bg-elevated`, 0.86), obwohl die Tafel in diesem Zustand
+     * wirklich Inhalt bricht: mit dem Kapselwert (0.66) faellt das Zeilenlabel
+     * ueber einer Tintenzeile rechnerisch auf 2,80:1, mit 0.86 haelt es 4,46:1
+     * ohne und deutlich mehr mit dem Blur - der Stand von vorher. */
+    box-shadow: var(--glass-inset-elevated), var(--glass-inset-bottom-lift), var(--glass-shadow-lg);
   }
 
   /* HOVER-ABSICHT (Re-Critique 2026-09-27, A1 P3-1): der Zeiger, der nur auf
@@ -5633,7 +5699,7 @@ p.field-hint--warn[hidden] {
  * - Desktop: Zentriert (max-width variabel)
  * - Overlay: var(--color-overlay)
  * - Padding: 16px
- * - Radius: 16px
+ * - Radius: 26px (`--radius-xl`, die Stufe aller schwebenden Flaechen)
  * -------------------------------------------------------- */
 .modal-overlay {
   position: fixed;
@@ -5700,7 +5766,14 @@ p.field-hint--warn[hidden] {
   position: relative;
   display: flex;
   flex-direction: column;
-  border-radius: var(--radius-lg);
+  /* EINE RADIUSSTUFE FUER ALLES, WAS SCHWEBT (R18). Dialog, Mehr-Blatt und
+   * Suche trugen 16px, waehrend Termin-Popover, Heute-Blatt und Toast 26px
+   * hatten und DESIGN.md "Sheets und Glas-Chrome 26px+" sagt - drei Flaechen
+   * derselben Gattung in zwei Formen. Innen gilt die Konzentrik: 26px aussen
+   * minus 16px Polster sind die 10px (`--radius-sm`) der Felder, und Kopf und
+   * Fuss fuellen die Tafel bis an die Kante - `overflow: clip` oben schneidet
+   * sie auf dieselbe Kurve. Die Lichtkante steht in glass.css (Abschnitt 3). */
+  border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-subtle);
   box-shadow: var(--shadow-lg);
   /* DIE EINFAHRT STEHT IN glass.css (Abschnitt 18), NICHT HIER. Hier stand
@@ -5715,7 +5788,6 @@ p.field-hint--warn[hidden] {
   .modal-panel {
     max-width: 520px;
     max-height: calc(var(--viewport-height) - (2 * var(--space-6)));
-    border-radius: var(--radius-lg);
   }
   .modal-panel--sm { max-width: 400px; }
   .modal-panel--lg { max-width: 680px; }
@@ -5728,7 +5800,12 @@ p.field-hint--warn[hidden] {
   justify-content: space-between;
   padding: var(--space-4);
   border-bottom: 1px solid var(--color-border-subtle);
-  background-color: var(--color-surface);
+  /* KEINE EIGENE FLAECHE (R18). Der Kopf trug `--color-surface` und darueber
+   * in glass.css das Chrome-Glas (hell `rgba(250,250,252,0.86)`): ueber der
+   * weissen Tafel ein kuehler Graustreifen, eine Fremdflaeche im eigenen
+   * Dialog. Unter dem Kopf scrollt nichts - der Rumpf ist ein eigener
+   * Scrollport darunter -, also braucht er kein Material. Er zeigt die Tafel,
+   * die Haarlinie trennt. */
   flex-shrink: 0;
 }
 

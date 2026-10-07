@@ -659,8 +659,8 @@ test('die geteilte Sub-Tab-Leiste verlangt eine erklärte Semantik und versprich
  *
  * HIER STEHT NUR DIE BAUFORM. Die eigentliche Groesse - waechst die Zahl der
  * Ebenen mit der Zeilenzahl? - kann ein Stylesheet-Scanner nicht sehen:
- * `.nav-sidebar__indicator` und `.lg-blob--1` tragen dasselbe `will-change`
- * und sind einmalig, `.task-card` ist es nicht, und dem Selektor sieht man das
+ * `.nav-sidebar__indicator` und `.nav-bottom__indicator` tragen dasselbe
+ * `will-change` und sind einmalig, `.task-card` ist es nicht, und dem Selektor sieht man das
  * nicht an. Diese Frage misst Sonde 9 der Dokument-Guards am gerenderten
  * Dokument, ueber die Wiederholung der Klassensignatur.
  */
@@ -673,11 +673,14 @@ test('die geteilte Sub-Tab-Leiste verlangt eine erklärte Semantik und versprich
  * die Seite offen ist, auch wenn niemand sie bedient. Gemessener Anlass:
  * `.lg-blob` trug `filter: blur(90px)` neben `animation: lg-drift ... infinite`
  * ueber vier Flaechen von 30-46vw; im Leerlauf fielen 60 auf ~20 fps, ein Melder
- * sah 100 % GPU (Issue #716). Die Reparatur trennt beides auf zwei Knoten.
+ * sah 100 % GPU (Issue #716). Die Reparatur trennte beides auf zwei Knoten. Den
+ * Backdrop selbst gibt es seit R18 (2026-10-07) nicht mehr - die Regel bleibt,
+ * weil sie fuer jedes kuenftige Lichtfeld gilt (das der Zugangsseiten steht
+ * still und traegt keinen Filter).
  *
  * DIESER GUARD SIEHT NUR DEN FALL, IN DEM BEIDES IN EINER REGEL STEHT - und das
  * ist genau der Bestandsfall, aber nicht die ganze Regel: Filter und Animation
- * koennen ueber zwei Regeln zusammenkommen (`.lg-blob` und `.lg-blob--2`), und
+ * koennen ueber zwei Regeln zusammenkommen (Basis- und Variantenklasse), und
  * welche Werte am Ende auf einem Kasten liegen, weiss nur das gerenderte
  * Dokument. Die vollstaendige Fassung ist Sonde 16 der Dokument-Guards; sie ist
  * genauer und laeuft nicht in dieser Kette mit. Was hier steht, ist die
@@ -714,7 +717,7 @@ test('kein endlos animiertes Element traegt in derselben Regel einen filter', ()
     'Bewegung und Filter liegen auf demselben Element: der Browser rastert den Filter '
     + 'damit pro Frame neu, im Leerlauf und solange die Seite offen ist (Issue #716). '
     + 'Beides gehoert auf zwei Knoten - die aeussere Huelle bewegt sich, das Kind traegt '
-    + `den Filter und steht still (Vorbild: .lg-blob / .lg-blob__ink in glass.css).\n${offenders.join('\n')}`);
+    + `den Filter und steht still.\n${offenders.join('\n')}`);
 });
 
 /**
@@ -7449,11 +7452,12 @@ test('phase 1 defines synchronized surface roles for readable work areas', () =>
   const root = parseTokenMap(rootBlock[1]);
   const media = parseTokenMap(mediaBlock[1]);
   const attr = parseTokenMap(attrBlock[1]);
+  // Die beiden `--app-backdrop-*-strength` standen hier bis R18 (2026-10-07):
+  // Staerken eines Shell-Verlaufs, den der opake Scrollport verdeckte. Mit dem
+  // Verlauf gestrichen; dass sie nicht zurueckkommen, haelt test:material.
   const publicSurfaceTokens = [
     '--color-surface-work',
     '--color-surface-raised',
-    '--app-backdrop-accent-strength',
-    '--app-backdrop-secondary-strength',
   ];
   // --_color-surface-glass hat KEINE oeffentliche Fassade mehr: die trug niemand
   // im Stylesheet, waehrend der private Wert weiter --_glass-bg-card speist. Ein
@@ -7462,8 +7466,6 @@ test('phase 1 defines synchronized surface roles for readable work areas', () =>
     '--_color-surface-work',
     '--_color-surface-raised',
     '--_color-surface-glass',
-    '--_app-backdrop-accent-strength',
-    '--_app-backdrop-secondary-strength',
   ];
 
   for (const token of publicSurfaceTokens) {
@@ -7496,15 +7498,20 @@ test('phase 1 keeps productive list surfaces opaque instead of high-transparency
   }
 });
 
-test('phase 1 app backdrop uses subtle tokenized tint and opaque scroll content', () => {
+// Bis R18 pruefte dieser Fall zusaetzlich, dass der Shell-Verlauf seine Staerke
+// aus Tokens nimmt. Der Verlauf ist gestrichen (er lag vollstaendig unter dem
+// opaken Scrollport); was bleibt, ist die Haelfte, die immer die tragende war.
+test('phase 1 keeps the scroll content on an opaque base without a shell gradient', () => {
   const glass = read('../public/styles/glass.css');
   const layout = read('../public/styles/layout.css');
-  const shellRule = cssRuleBody(glass, '.app-shell');
+  // Aus layout.css: glass.css fuehrt keine .app-shell-Regel mehr, und ein
+  // leerer Rumpf bestuende jede Verneinung.
+  const shellRule = cssRuleBody(layout, '.app-shell');
+  assert.ok(shellRule.length > 0, 'expected the .app-shell rule in layout.css');
   const glassContentRule = cssRuleBody(glass, '.app-content');
   const layoutContentRule = cssRuleBody(layout, '.app-content');
 
-  assert.match(shellRule, /var\(--app-backdrop-accent-strength\)/, 'app-shell tint strength should be tokenized');
-  assert.match(shellRule, /var\(--app-backdrop-secondary-strength\)/, 'secondary backdrop tint should be tokenized');
+  assert.doesNotMatch(shellRule, /gradient\(/, 'app-shell should not paint a gradient the opaque scroll content hides');
   assert.match(glassContentRule, /background-color:\s*var\(--color-bg\)/, 'glass.css should keep scroll content on an opaque readable base');
   assert.doesNotMatch(layoutContentRule, /radial-gradient/, 'layout.css should not put decorative radial gradients on the scroll container');
 });
@@ -8051,7 +8058,9 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
     // ohne Kante und im Hover mit --color-border-control - keine Kartenkante mehr.
     ['.cal-search', 'Leiste der Kalendersuche; die Kante ist die Trennlinie unter der Leiste, nicht die des Feldes'],
     ['.search-overlay__header', 'Kopf des Such-Overlays; Trennlinie zur Trefferliste'],
-    ['.search-overlay__panel', 'Flaeche des Such-Overlays ab Tablet-Breite; Kartenkante'],
+    // `.search-overlay__panel` stand hier bis R18 (2026-10-07): die Palette traegt
+    // seither die Glaskante der schwebenden Flaechen (--glass-border), keine
+    // Kartenkante mehr.
     ['.search-result + .search-result', 'Trennlinie zwischen zwei Treffern'],
     ['.search-scope', 'Bereichs-Chip in der Suche; ein Knopf, kein Feld'],
     ['.search-scope:hover', 'Hover desselben Chips'],
@@ -13861,17 +13870,17 @@ test('ein Maskenstopp kommt aus --mask-opaque, nie als roher Farbwert', () => {
  *
  * glass.css sagt seit Runde 1 zu, dass Opazitaet und Specular unter
  * prefers-reduced-transparency und prefers-contrast ueber die Tokens auf 0
- * fallen. Dafuer gibt es ZWEI Schreibweisen, und tokens.css:1667 fuehrt sie
- * ausdruecklich als dasselbe Konzept: `--lg-specular` ist die Staerke des einen
- * freien Highlights, `--glass-inset-strength` der Faktor der abgestuften
- * Inset-Tokens. Erlaubt sind beide. Verboten ist die dritte Schreibweise, die an
- * beiden vorbeilaeuft: ein rohes rgba in einem `inset`-Segment.
+ * fallen. Dafuer gab es bis R18 ZWEI Schreibweisen: `--lg-specular`, die
+ * Staerke eines freien Highlights (entfallen mit der schwebenden Seitenleiste,
+ * 2026-10-07), und `--glass-inset-strength`, der Faktor der abgestuften
+ * Inset-Tokens. Verboten ist die Schreibweise, die am Schalter vorbeilaeuft:
+ * ein rohes rgba in einem `inset`-Segment.
  *
  * Session 27 hat 17 Leser von `--glass-inset-*` in die Reihe gebracht; drei
  * Stellen standen NICHT darunter, weil sie den Token nie lasen und deshalb in
  * keiner Suche auftauchten - `.page-fab` (layout.css, der opake Fallback der
  * Signature Component) sowie `.nav-bottom__items` und `.nav-sidebar`, die
- * ihren OBEREN Specular korrekt ueber `--lg-specular` fuehren und den unteren
+ * ihren OBEREN Specular korrekt ueber das damalige `--lg-specular` fuehrten und den unteren
  * eine Zeile darunter roh schrieben. Der letzte Fall brauchte einen Token, den
  * es noch nicht gab (`--glass-inset-bottom-lift`): die bestehenden
  * Bottom-Tokens sind schwarze Unterrand-SCHATTEN, gebraucht wurde ein helles
@@ -13925,8 +13934,8 @@ test('ein Inset-Specular kommt aus dem Token, nie als rohes rgba', () => {
     + 'der Guard hat nichts gemessen, statt nichts zu finden.');
 
   assert.deepEqual(offenders, [],
-    'Ein Inset-Specular nimmt ein `--glass-inset-*`-Token oder die color-mix-Formel '
-    + 'ueber `--lg-specular`. Ein rohes rgba traegt den a11y-Schalter nicht: unter '
+    'Ein Inset-Specular nimmt ein `--glass-inset-*`-Token. '
+    + 'Ein rohes rgba traegt den a11y-Schalter nicht: unter '
     + 'prefers-reduced-transparency und prefers-contrast muss die Lichtkante '
     + `verschwinden, und ein fester Wert tut das nie.\n${offenders.join('\n')}`);
 });
@@ -15599,7 +15608,7 @@ test('das Überlappungszeichen kommt aus einer Hand', () => {
 const SHELL_ROOTS = [
   '.nav-bottom', '.nav-sidebar', '.nav-item', '.page-fab', '.fab-layer',
   '.more-sheet', '.more-item', '.more-action', '.more-backdrop',
-  '.search-overlay', '.modal-overlay', '.app-shell', '.lg-blob', '.lg-backdrop',
+  '.search-overlay', '.modal-overlay', '.app-shell', '.app-loading', '.auth-page',
   '.changelog-release',
 ];
 const SHARED_CONTROLS = ['.btn--', '.toggle', '.form-check', '.page-search', '.input:focus', '.form-input:focus'];
@@ -15628,9 +15637,9 @@ test('die Shell traegt die Stimme, nicht den Modulton', () => {
       if (!isShell && !isSharedControl) continue;
 
       // AN DER SHELL IST DER VERSTOSS DAS MITWANDERN, nicht die Farbe. Ein
-      // FESTER Modulton dort ist eine Palettenwahl - die Backdrop-Blobs 2-4
-      // tragen vier feste Toene und sehen in jedem Modul gleich aus, was die
-      // Regel gerade verlangt. Verboten sind die routen- bzw.
+      // FESTER Modulton dort ist eine Palettenwahl - er sieht in jedem Modul
+      // gleich aus, was die Regel gerade verlangt (so trugen es bis R18 die
+      // Backdrop-Blobs 2-4). Verboten sind die routen- bzw.
       // seitenabhaengigen Namen: --active-module-accent (Router, je Route) und
       // --module-accent (Modul-Root, je Seite). An einem GETEILTEN
       // BEDIENELEMENT ist dagegen jeder Modulton falsch, auch ein fester:
@@ -18265,7 +18274,13 @@ test('SHELL: die Seitenleiste fasst 15 Module ohne Scrollen auf 800px Fensterhoe
   // Gruppenluecken: je Zeile eine hinter dem Label; zwischen den fuenf
   // Kindern des Containers vier.
   const list = 15 * row + 4 * label + 14 * groupGap + 4 * gap + itemsPad.bottom;
-  const frame = sidebarPad.top + sidebarPad.bottom
+  // Seit R18 schwebt die Leiste: oben und unten steht ihr Abstand zur
+  // Fensterkante, dazu ihre Kante rundum (2 x 1px) - das geht von den 800px ab.
+  const sidebar = rule('.nav-sidebar');
+  const floatGap = val(prop(sidebar, 'top')) + val(prop(sidebar, 'bottom'));
+  assert.match(prop(sidebar, 'border'), /^var\(--space-px\) solid /, 'die Kante der Tafel ist 1px rundum');
+  const frame = floatGap + 2 * tok('--space-px')
+    + sidebarPad.top + sidebarPad.bottom
     + val(prop(logo, 'height')) + val(prop(logo, 'margin-bottom'))
     + row + val(prop(pinned, 'margin-top'))
     + val(prop(account, 'padding-top')) + val(prop(account, 'margin-top')) + 1 + accountRow;

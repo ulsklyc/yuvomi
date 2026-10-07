@@ -152,10 +152,12 @@
  * 2. Sidebar (Desktop ≥ 1024px) — Glass Panel
  * ================================================================ */
 @media (min-width: 1024px) {
+  /* Die schwebende Tafel (R18): Glas rundum gefasst statt einer rechten
+   * Kante. Der Schatten samt Lichtkante steht in Abschnitt 41 - dort gewann
+   * er ohnehin, und hier stand er ein zweites Mal. */
   .nav-sidebar {
     background: var(--glass-bg-elevated);
-    border-right: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow-md);
+    border-color: var(--glass-border);
   }
 
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
@@ -183,9 +185,47 @@
   box-shadow: var(--glass-shadow-lg);
 }
 
-.modal-panel__header {
-  border-bottom-color: var(--glass-border);
+/* DIE LICHTKANTE DER SCHWEBENDEN TAFELN (R18): Dialog, Mehr-Blatt und die
+ * Such-Palette fangen oben Licht wie Kapsel und Seitenleiste - aus demselben
+ * Inset-Token, also mit demselben Schalter (--glass-inset-strength faellt
+ * unter prefers-reduced-transparency und prefers-contrast auf 0).
+ *
+ * ALS PSEUDO-ELEMENT UEBER DEM INHALT, nicht als box-shadow der Tafel: ein
+ * Inset-Schatten liegt UNTER den Kindern, und Kopf, Fuss oder ein Bild fuellen
+ * die Tafel bis an die Kante - die Kante waere genau dort verdeckt, wo sie
+ * steht. Das Pseudo nimmt keinen Zeiger und kein Layout (absolut, also weder
+ * Flex-Kind noch Luecke). Sein Radius ist der der Tafel minus ihrer 1px-Kante,
+ * weil `inset: 0` an der Polsterbox misst.
+ *
+ * KEIN backdrop-filter - weder hier noch an der Tafel (siehe unten): die
+ * Kante ist Material ohne Blur. */
+.modal-panel::after,
+.more-sheet::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: calc(var(--radius-xl) - var(--space-px));
+  box-shadow: var(--glass-inset-elevated);
+  pointer-events: none;
 }
+
+@media (min-width: 768px) {
+  .search-overlay__panel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: calc(var(--radius-xl) - var(--space-px));
+    box-shadow: var(--glass-inset-elevated);
+    pointer-events: none;
+  }
+}
+
+/* Die Kopflinie kommt aus layout.css (`--color-border-subtle`, dieselbe wie
+ * am Fuss). Hier stand sie auf `--glass-border`: Glas-Weiss, hell also weiss
+ * auf weisser Tafel - getrennt hat nur der Graustreifen des Kopfs, und der ist
+ * mit R18 entfallen. */
 
 /* Blur nur wenn unterstützt */
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
@@ -197,9 +237,10 @@
 
   /* No backdrop-filter on .modal-panel: it breaks async scrolling on the inner scroll container. Blur lives on .modal-overlay. */
 
-  .modal-panel__header {
-    background: var(--glass-bg-elevated);
-  }
+  /* Hier bekam `.modal-panel__header` das Chrome-Glas als Flaeche. Ohne
+   * Blur darunter war es kein Material, nur eine zweite Farbe im Dialog
+   * (hell ein kuehler Streifen ueber der weissen Tafel) - gestrichen mit R18,
+   * Begruendung an der Regel in layout.css. */
 }
 
 /* Bottom-Sheet-Griff: hier stand `--modal-handle-color: var(--glass-border)`
@@ -817,35 +858,20 @@ textarea.form-input {
 }
 
 /* ================================================================
- * 35. App-Content-Hintergrund — Vibrancy-Basis
+ * 35. Buehne - eine Flaeche, kein Verlauf
  *
- * Subtiler Gradient im Seitenhintergrund damit Glass-
- * Elemente darauf lebendiger wirken.
+ * Hier stand ein radialer Akzentverlauf auf .app-shell ("Vibrancy-Basis"),
+ * und der Kommentar sagte, er scheine durch .app-content. Er schien nie durch:
+ * der Scrollport ist opak (--color-bg, hier und in layout.css) und deckt die
+ * Shell vollstaendig. Der Verlauf ist mit dem Backdrop gestrichen (R18,
+ * Entscheidung 07.10.2026): Glas bricht in der App nur INHALT - was unter der
+ * Tab-Kapsel, der Seitenleiste oder einem Blatt durchlaeuft.
  *
- * WICHTIG: Der Gradient liegt auf .app-shell (Viewport-Container,
- * scrollt nicht), NICHT auf .app-content (Scroll-Container).
- * Grund: ein radialer color-mix()-Gradient auf einem overflow:auto-
- * Element wird in WebKit (iOS Safari/PWA) und Blink (Android Chrome)
- * beim Scrollen unzuverlässig rasterisiert — Symptom: leerer
- * Bildschirminhalt nach kurzem Scrollen (Issue #166).
- * .app-content trägt darum nur die opake Basisfarbe; der Gradient
- * scheint vom darunterliegenden .app-shell-Hintergrund durch.
+ * Opak bleibt der Scrollport aus dem alten Grund: ein Verlauf oder Filter auf
+ * einem overflow:auto-Element rastert in WebKit und Blink beim Scrollen
+ * unzuverlaessig (leerer Bildschirm, Issue #166).
+ * Guard: test:material.
  * ================================================================ */
-.app-shell {
-  background:
-    radial-gradient(
-      ellipse at 20% 0%,
-      color-mix(in srgb, var(--color-accent) var(--app-backdrop-accent-strength), transparent),
-      transparent 60%
-    ),
-    radial-gradient(
-      ellipse at 85% 90%,
-      color-mix(in srgb, var(--color-accent) var(--app-backdrop-secondary-strength), transparent),
-      transparent 50%
-    ),
-    var(--color-bg);
-}
-
 .app-content {
   background-color: var(--color-bg);
 }
@@ -870,14 +896,9 @@ textarea.form-input {
    * frühere Liste aus Widgets, Task-Cards, Note-Items, Meal-Slots und
    * Skeletons schaltete hier ein Glas ab, das es nicht mehr gibt.
    * Zurück bleibt, was echtes Chrome-Material ist. */
-  .app-shell {
-    background: var(--color-bg);
-  }
-
-  .app-content {
-    background-color: transparent;
-  }
-
+  /* Hier wurde .app-content durchsichtig, damit der Grund der Shell den
+   * Verlauf ersetzt. Die Shell traegt keinen Verlauf mehr (Abschnitt 35), der
+   * Scrollport bleibt in jedem Zustand selbst opak. */
   .fab-action__label,
   .fab-action__btn {
     backdrop-filter: none;
@@ -944,146 +965,41 @@ textarea.form-input {
 }
 
 /* ================================================================
- * PHASE 5 — Liquid Glass: lebender Backdrop + Specular
+ * PHASE 5 - Liquid Glass: Specular
  * ================================================================ */
 
 /* ================================================================
- * 40. Lebender Backdrop — driftende, getönte Blobs
+ * 40. Lebender Backdrop - gestrichen (R18, 2026-10-07)
  *
- * Das "Flüssige", das die Glass-Flächen brechen. Liegt als
- * .lg-backdrop direkt in .app-shell (Viewport-Container, scrollt
- * NICHT). z-index: 0 → malt über die opaken html/body- und
- * app-shell-Hintergründe; .app-content (position: relative, später
- * im DOM) und alle positionierten Nav-/Overlay-Flächen liegen
- * darüber. Bewusst KEINE negative z-Ebene / kein isolation auf der
- * Shell, damit die globale z-Reihenfolge unverändert bleibt.
+ * Hier standen vier driftende, weichgezeichnete Farbfelder (.lg-backdrop /
+ * .lg-blob) als "das Fluessige, das die Glasflaechen brechen". Gemessen in
+ * drei Laeufen: sie liefen endlos und lagen vollstaendig unter der opaken
+ * .app-content - sichtbar wurden sie erst, wenn man die Flaeche in der
+ * Sichtprobe durchsichtig schaltete. Vier Compositor-Ebenen von 30-46vw fuer
+ * ein Bild, das niemand sah (und zwei Issues, #443 und #716, um sie bezahlbar
+ * zu halten).
  *
- * WICHTIG (Issue #166): Die Blobs liegen AUSSERHALB von .app-content.
- * Die Blanket-Regel `.app-content * { filter: none }` greift hier
- * nicht — der blur() der Blobs bleibt erhalten, ohne den Scroll-
- * Container zu rastern. Da sie nicht scrollen, lösen sie den
- * Blank-Screen-Bug nicht aus.
+ * Das Marken-Lichtfeld lebt dort, wo nichts Opakes darueber liegt: auf den
+ * Zugangsseiten und im Ladebild (`--brand-field`, tokens.css) - stehend, ohne
+ * Filter, ohne Dauer-Animation.
  *
- * Blob 1 traegt die STIMME (--color-accent) und wechselt damit nicht
- * mehr pro Route. Er folgte bis 2026-08-10 --active-module-accent und
- * rekolorierte die ganze App pro Sektion - der Backdrop war damit die
- * grossflaechigste Stelle, an der der Modulton ins Chrome griff.
- * Blobs 2–4 sind feste Modul-Tints für Farbvielfalt.
- * Opazität/Specular werden in prefers-reduced-transparency /
- * prefers-contrast über die Tokens auf 0 gesetzt (tokens.css).
+ * .app-content bleibt positioniert: die Regel kam mit dem Backdrop, aber seit
+ * sie steht, messen sich absolut gesetzte Nachfahren des Scrollports an ihm.
+ * z-index bewusst weggelassen - .app-content wird KEIN Stacking-Context,
+ * damit Nachfahren (FAB etc.) ihre z-Ebene behalten.
  * ================================================================ */
-.lg-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-/* .app-content über den Backdrop heben (position: relative → wird im
- * Root-Stacking-Context nach dem Backdrop in DOM-Reihenfolge gemalt).
- * z-index bewusst weggelassen → app-content wird KEIN Stacking-Context,
- * damit Descendants (FAB etc.) ihre bisherige z-Ebene behalten. */
 .app-content {
   position: relative;
-}
-
-/* ZWEI ELEMENTE, WEIL BEWEGUNG UND UNSCHÄRFE NICHT AUF DASSELBE DÜRFEN.
- *
- * Die Hülle bewegt sich und trägt sonst nichts; die Farbwolke steht still und
- * trägt den blur(90px). Ein Filter wird für seinen Inhalt gerastert - solange
- * er auf dem animierten Element selbst sass, fiel diese Rasterung PRO FRAME an,
- * über 4 Flächen von 30-46vw Kantenlänge. Genau das hat Issue #716 gemessen:
- * im Leerlauf 60 → 20 fps und ein Style-Recalc je Frame, die Fassung ohne
- * `filter` auf der Hülle hält 60 fps. Getrennt rastert der Blur EINMAL, und die
- * Animation verschiebt danach nur noch die fertige Textur.
- *
- * Das war schon der Anspruch von Issue #443 („die geblurrte Textur wird EINMAL
- * gerastert") - `will-change: transform` und translate-only Keyframes allein
- * haben ihn aber nicht eingelöst, solange der Filter mitanimiert wurde. Der
- * Kommentar behauptete zwei Jahre lang etwas, das die Messung nicht hergab.
- *
- * Deshalb: kein `filter` auf .lg-blob, und kein `animation`/`transform` auf
- * .lg-blob__ink. Guard: test-frontend-audit, „keine Dauer-Animation auf einem
- * Element mit filter". */
-.lg-blob {
-  position: absolute;
-  opacity: var(--lg-blob-opacity);
-  animation: lg-drift 26s ease-in-out infinite alternate;
-  /* Auf eigenen Compositor-Layer heben: pro Frame wird die Ebene nur noch
-   * verschoben. Zusammen mit der translate-only-Keyframe (kein scale) und dem
-   * ausgelagerten Blur oben bleibt davon reines Compositing übrig. */
-  will-change: transform;
-}
-
-.lg-blob__ink {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  filter: blur(90px);
-  /* Blob 1 wechselt seine Farbe mit der Stimme - der Übergang gehört an die
-   * Farbe, also hierher zum Gradienten und nicht an die bewegte Hülle. */
-  transition: background var(--duration-2xl) var(--ease-out);
-}
-
-/* Blob-Positionen meiden die Chrome-Zonen (Sidebar links, schwebende Tab-Bar
- * unten): ein Modul-getönter Blob, der durch das Glas einer Nav-Fläche
- * scheint, liest sich als verrutschte Aktiv-Pille (Befund Redesign 2026-08 -
- * auf /tasks stand ein grüner Blob exakt hinter der Tab-Bar-Kapsel). */
-.lg-blob--1 {
-  width: 46vw; height: 46vw; top: -8%; left: 30%;
-}
-.lg-blob--1 .lg-blob__ink {
-  background: radial-gradient(circle, var(--color-accent) 0%, transparent 70%);
-}
-.lg-blob--2 {
-  width: 38vw; height: 38vw; top: 26%; right: 2%;
-  animation-delay: -8s;
-  opacity: calc(var(--lg-blob-opacity) * 0.7);
-}
-.lg-blob--2 .lg-blob__ink {
-  background: radial-gradient(circle, var(--module-shopping) 0%, transparent 70%);
-}
-.lg-blob--3 {
-  width: 40vw; height: 40vw; bottom: 14%; left: 34%;
-  animation-delay: -14s;
-  opacity: calc(var(--lg-blob-opacity) * 0.6);
-}
-.lg-blob--3 .lg-blob__ink {
-  background: radial-gradient(circle, var(--module-tasks) 0%, transparent 70%);
-}
-.lg-blob--4 {
-  width: 30vw; height: 30vw; top: 40%; left: 28%;
-  animation-delay: -19s;
-  opacity: calc(var(--lg-blob-opacity) * 0.5);
-}
-.lg-blob--4 .lg-blob__ink {
-  background: radial-gradient(circle, var(--module-meals) 0%, transparent 70%);
-}
-
-/* translate-only: bewusst KEIN scale(). Ein Skalierungswechsel würde den
- * blur(90px) pro Frame neu rastern (GPU-Dauerlast, Issue #443); reines
- * Verschieben einer bereits geblurrten Layer-Textur ist ein Compositor-Nop.
- * Translate-Bereich leicht erweitert, um das entfallene „Atmen" auszugleichen. */
-@keyframes lg-drift {
-  0%   { transform: translate(0, 0); }
-  50%  { transform: translate(5vw, -4vw); }
-  100% { transform: translate(-4vw, 3vw); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lg-blob {
-    animation: none;
-  }
 }
 
 /* ================================================================
  * 41. Stärkerer Specular — Inset-Top-Highlight auf erhöhten Flächen
  *
  * Kanonische Glass-Rezeptur (siehe README): jede erhöhte Glass-
- * Fläche erhält einen Inset-Top-Highlight, dessen Stärke über
- * --lg-specular gesteuert wird (0 in prefers-reduced-transparency /
- * prefers-contrast → Highlight verschwindet).
+ * Fläche erhält einen Inset-Top-Highlight aus den `--glass-inset-*`-Tokens;
+ * ihr Faktor `--glass-inset-strength` faellt unter
+ * prefers-reduced-transparency / prefers-contrast auf 0 (Highlight
+ * verschwindet).
  *
  * --glass-shadow-capsule darunter ist der einzige Schatten der Kapsel; die
  * Begruendung, warum es nicht --glass-shadow-md ist, steht am Token.
@@ -1099,9 +1015,13 @@ textarea.form-input {
 }
 
 @media (min-width: 1024px) {
+  /* Lichtkante der schwebenden Tafel: dieselbe Stufe wie Dialog und Blatt
+   * (`--glass-inset-elevated`), am selben Schalter. Hier stand eine freie
+   * color-mix-Formel mit eigener Staerke (0.22) fuer eine Leiste, die bis an die
+   * Fensterkante reichte und oben gar keine sichtbare Kante hatte. */
   .nav-sidebar {
     box-shadow:
-      inset 0 1px 0 color-mix(in srgb, white calc(var(--lg-specular) * 100%), transparent),
+      var(--glass-inset-elevated),
       var(--glass-inset-bottom-lift),
       var(--glass-shadow-md);
   }

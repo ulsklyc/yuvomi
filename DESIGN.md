@@ -490,10 +490,22 @@ kreisrunde Lichtfelder HINTER dem Inhalt, die nie eine Flaeche fuellen und nie u
 liegen, wo sie ihn traegt. Zwei Stellen gehoeren ihr an, und beide teilen dieselben
 Ausschalter (in reduced-transparency und prefers-contrast auf 0):
 
-- die driftenden **Backdrop-Blobs** hinter dem Glas (`--lg-blob-opacity` 0.16 light /
-  0.20 dark);
 - der **Lichthauch der Wetterglyphe** (`--weather-glow-opacity`, 2026-08-17), der aus dem
-  Zeichen zu kommen scheint und lange vor dem Text auslaeuft.
+  Zeichen zu kommen scheint und lange vor dem Text auslaeuft - das einzige Lichtfeld IN der
+  App;
+- das **Marken-Lichtfeld** (`--brand-field`, Staerke `--brand-field-opacity` 0.20 light /
+  0.26 dark; R18, 2026-10-07): drei stehende Kreise in den beiden Farben der Bildmarke,
+  hinter der Glastafel der Zugangsseiten und im Ladebild - den zwei Orten, an denen nichts
+  Opakes darueber liegt. Ohne Filter, ohne Animation. Kein Text steht direkt darauf
+  (Sekundaertext fiele im Kern auf 2,96:1): auf den Zugangsseiten steht alles auf der
+  Tafel, der Schriftzug des Ladebilds in Label-Farbe.
+
+**Die App selbst hat keinen Backdrop mehr.** Bis R18 liefen hinter dem Inhalt vier
+driftende, weichgezeichnete Farbfelder (`.lg-blob`) und ein Akzentverlauf auf der Shell -
+beide vollstaendig verdeckt von der opaken Inhaltsflaeche, also Dauerlast fuer ein Bild,
+das niemand sah (gemessen in drei Laeufen). Sie sind gestrichen. **Glas bricht in der App
+nur Inhalt:** was unter der Tab-Kapsel, unter einem Blatt oder unter der ausgeklappten
+Seitenleiste liegt. Guard: `test:material`.
 
 **Die Unterscheidung ist keine Wortklauberei, sie ist die Lehre aus dem Verlauf, den
 Runde 3 entfernt hat.** Der war die Karte: eine deckende Flaeche von Kante zu Kante, im
@@ -773,7 +785,7 @@ bin ich". Die Shell beantwortet nie die zweite: sie ist in jedem Modul dieselbe.
 
 Der Anlass war das Urteil des Betreibers, die App fuehle sich "nicht mehr wie aus einem
 Guss" an, und die Ursache war genau hier. Der Modulton war ins Chrome gewandert: Tab-Leiste,
-FAB, Primaerknopf, Fokusring, sogar die Backdrop-Blobs lasen `--active-module-accent`. Beim
+FAB, Primaerknopf, Fokusring, sogar die damaligen Backdrop-Blobs lasen `--active-module-accent`. Beim
 Wechsel Budget → Einkaufen → Aufgaben faerbte sich damit der ganze RAHMEN der App von Tuerkis
 auf Rostrot auf Gruen um - nicht das Zimmer, das Haus. Apple faerbt pro APP, nicht pro TAB;
 in einer App bleibt der Tint konstant, und der Tab-Name sagt, wo man ist.
@@ -784,7 +796,7 @@ in einer App bleibt der Tint konstant, und der Tab-Name sagt, wo man ist.
 Pruefebene: **Struktur** (`test/test-frontend-audit.js`, Guard
 `die Shell traegt die Stimme, nicht den Modulton`). Er leitet das Chrome aus SELEKTOR-Formen
 ab - Shell-Wurzeln (`.nav-bottom`, `.nav-sidebar`, `.page-fab`, `.more-*`, `.search-overlay`,
-`.modal-overlay`, `.app-shell`, `.lg-blob`) plus geteilte Bedienelemente (`.btn--*`,
+`.modal-overlay`, `.app-shell`) plus geteilte Bedienelemente (`.btn--*`,
 `.toggle`, `.form-check`, `--focus-ring-color`) -, nicht aus einer Dateiliste; die Liste
 waere beim achtzehnten Modul wieder unvollstaendig.
 
@@ -1149,7 +1161,7 @@ das Verhaeltnis haelt.
   `transition: all`, keine Literal-Dauer, kein nacktes Keyword - weder im Stylesheet noch in
   Skripten (Inline-Transitions zeigen auf `var(--duration-*) var(--ease-*)`, die Web Animations
   API liest `durationToken()`/`easingToken()` aus `utils/ux.js`). Ausgenommen sind nur
-  Endlos-Schleifen (`infinite`: Wetter, Spinner, Shimmer, Blob) und die acht benannten Stellen
+  Endlos-Schleifen (`infinite`: Wetter, Spinner, Shimmer) und die acht benannten Stellen
   in `test:motion` (`MOTION_EXCEPTIONS`, jede mit Grund). Eintritt darf federn, Austritt ist
   kuerzer und ohne Ueberschwinger; im Arbeitsfluss laeuft nichts laenger als 300ms. Unter
   reduzierter Bewegung gilt EINE "aus"-Konvention: `0s` aus `reset.css`, kein `0.01ms` daneben.
@@ -1437,8 +1449,8 @@ war es die kleinste Fassung seiner selbst.
 (background, border, shadow) stehen AUSSERHALB von `@supports` und wirken ueberall; nur der
 backdrop-filter steht drin (mit webkit-Zwilling fuer Safari < 18). prefers-reduced-
 transparency kippt alle Glas-Tokens auf `--color-surface`-Werte und alle Blur-Stufen auf 0;
-prefers-contrast: more haertet Kanten auf Textfarben, schaltet Blur und Backdrop-Blobs ab
-und hebt den Notes-Tint auf 6.3:1.
+prefers-contrast: more haertet Kanten auf Textfarben, schaltet Blur und beide Lichtfelder
+ab und hebt den Notes-Tint auf 6.3:1.
 
 **Die Ausweich-Regel des Toast-Stapels (#1421, 2026-09-22).** Der untere Shell-Stapel
 (Toasts, Sammelpille) liegt UEBER Dialogen (`--z-toast` 300 ueber `--z-modal` 200), damit
@@ -1468,14 +1480,29 @@ Apple-Kurvatur, durchgehend gerundet, nie scharfkantig: Formfelder und Zellen 10
 (`--radius-sm`), Karten 12px (`--radius-md`), Zeilen-Traeger und grosse Flaechen 16px
 (`--radius-lg`), Sheets und Glas-Chrome 26px+ (`--radius-xl`, `--radius-glass-card` 26 /
 `--radius-glass-inner` 18), Kapseln und Pillen `--radius-full` (Tab-Bar-Kapsel, FAB, Chips,
-ALLE Buttons). Sheets runden oben (`var(--radius-xl) var(--radius-xl) 0 0`). Ein
+ALLE Buttons). **Alles, was schwebt, traegt EINE Stufe (R18, 2026-10-07):** Dialog,
+Mehr-Blatt, Such-Palette, Termin-Popover, Heute-Blatt, Toast, die Seitenleiste am Desktop
+und die Tafel der Zugangsseiten 26px; die kleinen schwebenden Flaechen (Ueberlaufmenue,
+Konto-Menue, Kontextmenue, Filter-Popover) 18px. Dialog, Mehr-Blatt und Palette trugen bis
+dahin 16px - dieselbe Gattung in zwei Formen. Ein Blatt, das mit Abstand zur Fensterkante
+schwebt (Dialog-Sheet, Mehr-Blatt), rundet rundum. Ein
 border-radius wird ausschliesslich ueber ein Radius-Token oder eine Prozentangabe gesetzt
 (Guard in test-frontend-audit.js).
 
 **Die Konzentrik-Regel.** Verschachtelte Rundungen sind konzentrisch: der innere Radius ist
 der aeussere minus Abstand, ausgeschrieben als `calc(var(--radius-*) - Npx)` bzw. `+ Npx`
 fuer Umhuellungen (belegt in tasks.css, documents.css, health.css). Nie denselben Radius
-blind nach innen kopieren.
+blind nach innen kopieren. An den schwebenden Flaechen gerechnet und in `test:material`
+gehalten: Dialog und Zugangstafel 26 - 16 Polster = 10px Felder (`--radius-sm`), Kacheln im
+Mehr-Blatt 26 - 12 = 14px, seine Systemzeile und der Treffertraeger der Palette 26 - 16 =
+10px, Menuezeilen 18 - 4 = 14px.
+
+**Die Lichtkante der Tafeln (R18).** Dialog, Mehr-Blatt und Such-Palette fangen oben Licht
+wie Kapsel und Seitenleiste: `--glass-inset-elevated` an einem Pseudo-Element UEBER dem
+Inhalt (ein Inset-Schatten der Tafel laege unter Kopf und Fuss), ohne Blur - am Dialog ist
+`backdrop-filter` gesperrt, weil sein Rumpf scrollt. Der Dialogkopf ist keine eigene
+Flaeche: er zeigt die Tafel, die Haarlinie trennt (bis R18 trug er das Chrome-Glas, hell
+ein kuehler Graustreifen ueber der weissen Tafel).
 
 ## Components
 
@@ -2102,6 +2129,20 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
   tokens.css (a1).
 - **Desktop:** Glas-Sidebar mit gleitender Aktiv-Pille; Toolbar ohne Akzentstreifen, Titel in
   Title 2.
+- **Die Seitenleiste ist eine schwebende Tafel (R18, 2026-10-07)** - die Form der mobilen
+  Kapsel am Desktop: 8px Abstand zur Fensterkante oben, unten und an der Startkante
+  (`--sidebar-float-gap`), `--radius-glass-card`, `--glass-shadow-md`, Lichtkante
+  `--glass-inset-elevated`, Glas rundum gefasst. Vorher: volle Hoehe, Radius 0, ein Blur
+  ueber der einfarbigen Buehne. **Die Inhaltsbreite aendert sich nicht:** `.app-content`
+  haelt weiter `--sidebar-width` frei, die Tafel ragt um ihren Abstand in den 32px-Gutter
+  des Inhalts (24px Luft bleiben) - jede Schwelle, die gegen "Fenster minus 220px" gerechnet
+  ist, gilt unveraendert. Eingeklappt ist sie eine 56px-Kapsel; ausgeklappt per Hover oder
+  Fokus liegt sie UEBER dem Inhalt und bricht ihn (Schattenstufe `--glass-shadow-lg`, das
+  Glas bleibt bei 0.86 - mit dem duenneren Kapselwert fiele das Zeilenlabel ueber einer
+  Tintenzeile rechnerisch auf 2,80:1). Einstellungen und Kontozeile tragen den Einzug der
+  gleitenden Pille (4px), damit ihre Flaeche in der Kurve der Tafel liegt. Die Icon-Mulde
+  ist in beiden Themes eine Mulde: 8 % Tinte im Glas (hell 1,17:1, dunkel 1,26:1 gegen die
+  Tafel; hell stand sie vorher bei 1,007:1).
 - **Die Seitenleiste zeigt jedes Modul ohne Scrollen - auf 1440x900 UND 1280x800**
   (Critique 2026-09-26, P1-2). Vorher lagen auf 1440x900 Geburtstage, Gesundheit und Budget
   unter der Falz, auf 1280x800 rund 270px. Die Rechnung: Zeilen `--sidebar-row-height` (32px,
@@ -2109,7 +2150,8 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
   Suche (⌘K / Ctrl+K, dazu `/`) und Einklappen als Werkzeuge IN der Logo-Zeile, Hilfe /
   Aenderungen / Abmelden in einem Konto-Menue hinter dem Avatar (geteiltes `popover-menu`,
   Rollen und Pfeiltasten wie das Werkzeugmenue, oeffnet nach oben). Gemessen mit 15 Modulen:
-  Modulliste 614px, fester Rahmen 157px - 771px von 800. Die Kontozeile nennt, wer angemeldet
+  Modulliste 614px, fester Rahmen 157px - 771px von 800; seit die Leiste schwebt (R18),
+  kommen 2 x 8px Abstand und 2 x 1px Kante dazu: 789px von 800. Die Kontozeile nennt, wer angemeldet
   ist, und traegt den Update-Punkt, solange „Aenderungen" etwas Neues hat. Eingeklappt stapelt
   die Logo-Zeile (Logo, Einklappen, Suche) auf der Icon-Flucht X=28.
 - Labels in 12px; lange Locales duerfen die Kapsel wachsen lassen, nie clippen.
@@ -3200,13 +3242,31 @@ abgeschaltetes Modul; ist es eingerichtet und der Anbieter scheitert, bleibt die
 Ein unbekannter Grund zaehlt als eingerichtet: im Zweifel bleibt die Kachel.
 
 ### Anmeldeseite
-Die erste Seite der App ist Teil derselben Welt, keine Ausnahme. Die Buehne ist der reine
-Seitengrund ohne Verlauf (bis Runde 3 stand hier der letzte chromatische Verlauf der App).
-Die Marke traegt allein das Tile: 64px, `--radius-lg`, gefuellt in Akzent, Zeichen in
-`--color-ink-on-vivid` (6.06:1 light / 6.40:1 dark - nicht `--color-text-on-accent`, das
-statisches Weiss ist und im Dark auf 2.72:1 faellt), shadow-md plus feine Lichtkante. Der
-Titel ist ein Large Title in Label-Farbe wie jeder Seitentitel. Die Bildmarke selbst - drei
-transluzente violette Kreise mit Sheen - ist als Marke gesetzt und unantastbar.
+Die erste Seite der App ist Teil derselben Welt, keine Ausnahme - und sie hat einen Ort
+(R18, 2026-10-07; gilt fuer Anmeldung, Einrichtung, Einladung, Passwort-Reset und das
+Koppeln eines Wandtabletts). Zwei Ebenen, wie ueberall sonst: **Raumlicht und Glas.** Die
+Shell traegt das Marken-Lichtfeld (`--brand-field`, siehe „Colors"): drei stehende, weiche
+Kreise in den Farben der Bildmarke. Die Seite selbst (`main.auth-page`) ist die Glastafel
+davor: `--radius-xl`, Lichtkante, `--glass-bg-elevated` mit `--blur-lg` in `@supports`,
+opak (`--color-surface`) ohne `backdrop-filter` und unter reduzierter Transparenz. Hier
+scrollt nichts unter dem Glas weg, also darf die Tafel den Blur selbst tragen.
+
+**Alles steht auf der Tafel** - Marke, Name, Formular, Versionszeile. Direkt auf dem Feld
+hielte Sekundaertext AA nicht (2,96:1 im Kern); auf der Tafel halten gegen den
+schlechtesten Grund (drei Kerne uebereinander, ohne Blur) Label und Satz 5,43:1 hell /
+6,20:1 dunkel, die Versionszeile 4,93 / 5,46, der Link 5,31 / 5,02 und die Feldkante
+3,09 / 4,21 (`test:material`). Die Karte im Markup (`.auth-card`) ist nur noch die Huelle
+des Formulars: Flaeche, Schatten und Polster traegt die Tafel. Ist sie hoeher als das
+Fenster, scrollt ihre Huelle; das Feld bleibt stehen. Ohne `:has()` entfaellt das Feld, die
+Tafel steht waagerecht mittig auf der planen Buehne.
+
+Das ist kein Rueckfall in den Verlauf, den Runde 3 entfernt hat: der lag als Akzent-Hauch
+AUF der Buehne unter freiem Text. Das Lichtfeld liegt HINTER einer Tafel, die den Text
+traegt, und faellt unter `prefers-reduced-transparency` und `prefers-contrast` weg.
+
+Die Marke ist die Bildmarke selbst (`utils/brand-mark.js`, 64px, kompakt 48px), in beiden
+Themes dieselbe; der Traeger gibt nur Groesse und Schatten. Der Titel ist ein Large Title
+in Label-Farbe wie jeder Seitentitel. Die Bildmarke ist als Marke gesetzt und unantastbar.
 
 ### FAB (Signature Component)
 Getoente Glas-Kapsel: der App-Akzent mit 78 % Deckung
@@ -3727,10 +3787,12 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   es den zweiten Guard ueber die Klassen-Kopplung im Markup.
 - **Don't** Gradient-Text oder Akzent-Titel: Large Titles und Ueberschriften tragen immer
   Label-Farbe.
-- **Don't** chromatische Verlaeufe auf Inhalt legen; auch nicht auf der Anmeldebuehne und
-  nicht auf einem Widget. Ein weiches Lichtfeld HINTER einer Glyphe ist keins - es fuellt
-  keine Flaeche, laeuft vor dem Text aus und traegt die Ausschalter der Backdrop-Blobs
-  (siehe „Colors"). Wer es kopiert, kopiert auch die Messung.
+- **Don't** chromatische Verlaeufe auf Inhalt legen; auch nicht unter freiem Text auf der
+  Anmeldebuehne und nicht auf einem Widget. Ein weiches Lichtfeld HINTER einer Glyphe oder
+  hinter einer Glastafel ist keins - es fuellt keine Flaeche, traegt keinen Text und hat
+  die Ausschalter seiner Gattung (siehe „Colors"). Wer es kopiert, kopiert auch die Messung.
+- **Don't** der App wieder einen Backdrop hinter den Inhalt legen (Blobs, Shell-Verlauf):
+  die Inhaltsflaeche ist opak und verdeckt ihn. Glas bricht in der App nur Inhalt.
 - **Don't** Akzentstreifen an Toolbars, Tabs oder Koepfen; die gehoerten zur abgeloesten Welt.
 - **Don't** dekorative Kicker/Eyebrows; eine Versal-Zeile ist nur als echte Information
   erlaubt (Apple-News-Muster, z. B. das Masthead-Datum).

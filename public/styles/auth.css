@@ -14,37 +14,104 @@
  * layout.css.
  */
 
-/* Diese Seiten werden direkt in #app.app-shell gerendert (keine Sidebar/App-Shell
- * vor dem Login). Ab >=1024px schaltet .app-shell auf flex-direction: row für die
- * Sidebar um – ohne Sidebar schrumpft der Seiten-Wrapper dann auf Inhaltsbreite und
- * wird linksbündig (sieht aus wie das Mobil-Layout). Solange eine Auth-Seite präsent
- * ist, bleibt die Shell daher im Spaltenfluss, damit das Formular voll zentriert. */
+/* DIE ZUGANGSSEITEN HABEN EINEN ORT (R18, 2026-10-07).
+ *
+ * Bis hierher: eine 380px-Karte mit dem Kartenradius auf planer Buehne, Marke
+ * und Name frei darueber. Jetzt zwei Ebenen, wie die App sie ueberall sonst
+ * kennt - Raumlicht und Glas:
+ *
+ *   1. Die Shell traegt das Marken-Lichtfeld (`--brand-field`, tokens.css):
+ *      drei stehende, weiche Kreise in den Farben der Bildmarke. Es ist die
+ *      eine Stelle neben dem Ladebild, an der nichts Opakes darueber liegt.
+ *   2. Die Seite selbst (`main.auth-page`) ist die Glastafel: 26px wie jede
+ *      schwebende Flaeche, Lichtkante, Blur - sie bricht das Feld.
+ *
+ * ALLES STEHT AUF DER TAFEL, auch Marke, Name und Versionszeile. Das ist keine
+ * Geschmacksfrage: direkt auf dem Feld faellt Sekundaertext unter AA (Rechnung
+ * am Token), auf der Tafel haelt jede Tinte. Deshalb ist die TAFEL das <main>
+ * und nicht mehr die Karte darin - am Markup der Seiten aendert sich nichts,
+ * `.auth-card` gibt nur Flaeche, Schatten und Polster an die Tafel ab.
+ *
+ * Diese Seiten werden direkt in #app.app-shell gerendert (keine Sidebar vor
+ * der Anmeldung). Ab 1024px schaltet .app-shell auf flex-direction: row fuer
+ * die Sidebar um; solange eine Auth-Seite praesent ist, bleibt sie im
+ * Spaltenfluss.
+ *
+ * `:has()` IST DIE WEICHE: ein Browser ohne `:has()` (Chrome < 105, Firefox
+ * < 121) verwirft die Regeln unten. Er bekommt die plane Buehne ohne Feld und
+ * die Tafel waagerecht mittig mit festem Abstand nach oben - bedienbar, nur
+ * ohne Ort. */
 .app-shell:has(.auth-page) {
   flex-direction: column;
+  background-color: var(--color-bg);
+  background-image: var(--brand-field);
+  background-repeat: no-repeat;
+}
+
+/* Der Router haengt jede Seite in eine `.page-transition`-Huelle. Fuer die
+ * Zugangsseiten ist sie der Rahmen der Tafel: sie fuellt die Shell, stellt die
+ * Tafel in ihre Mitte (`margin: auto` an einem Flex-Kind zentriert in beiden
+ * Richtungen und klemmt nicht, wenn der Inhalt hoeher ist) und SCROLLT, wenn
+ * die Tafel hoeher ist als das Fenster (Einrichtung auf einem kleinen Telefon,
+ * Querformat). `body` ist `overflow: hidden` - vorher lief die Seite dort
+ * unten aus dem Bild und liess sich von Hand nicht scrollen (gemessen bei
+ * 390x420: 543px Inhalt, der Knopf nur per Tab erreichbar). Das Feld haengt an
+ * der Shell und bleibt beim Scrollen stehen. */
+.page-transition:has(> .auth-page) {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding-block: var(--space-4);
+}
+
+.page-transition:has(> .auth-page) > .auth-page {
+  margin: auto;
 }
 
 .auth-page {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  /* vh-Zwilling fuer Browser ohne dvh (#1276), siehe .app-shell in layout.css. */
-  min-height: 100vh;
-  min-height: 100dvh;
-  width: 100%;
-  padding: var(--space-4);
-  /* Der Seitengrund, ohne Verlauf. Hier stand bis Runde 3 ein radialer
-   * Akzent-Hauch mit der Begründung der abgelösten Welt („Akzent-Scarcity-Regel
-   * ≤10 %") - der letzte chromatische Verlauf der App, und ausgerechnet auf der
-   * einzigen Seite, die ein abgemeldeter Nutzer je sieht. Die Marke trägt hier
-   * das Tile, nicht die Bühne. */
-  background: var(--color-bg);
+  align-items: stretch;
+  flex: 0 0 auto;
+  /* 380px Formularbreite plus das Polster der Tafel; auf dem Telefon bleibt
+   * beidseits der Seitenrand der App. */
+  inline-size: min(100% - 2 * var(--space-4), 380px + 2 * var(--space-4));
+  /* Der Rueckfall ohne `:has()`: die Huelle ist dort ein Block, `auto`
+   * zentriert nur waagerecht, und der senkrechte Wert haelt die Tafel von der
+   * Fensterkante ab. Mit der Flex-Huelle gilt die Regel direkt darueber. */
+  margin: var(--space-4) auto;
+  /* 16px Polster: aussen 26px minus 16px sind die 10px der Felder
+   * (`--radius-sm`) - konzentrisch. Oben eine Stufe mehr, damit die Marke
+   * nicht an der Lichtkante klebt. */
+  padding: var(--space-6) var(--space-4) var(--space-4);
+  /* Der opake Rueckfall steht AUSSERHALB von @supports (Fallback-Regel in
+   * DESIGN.md): ohne backdrop-filter liefe das Feld ungefiltert durch. */
+  background-color: var(--color-surface);
+  border: var(--space-px) solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--glass-inset-elevated), var(--glass-shadow-lg);
 }
 
-/* Hero-Bereich über dem Login-Formular */
+/* Hier scrollt nichts unter dem Glas weg (die Tafel ist der Inhalt), also
+ * darf sie den Blur selbst tragen - anders als `.modal-panel`, dessen Rumpf
+ * scrollt. Unter prefers-reduced-transparency und prefers-contrast kippen
+ * `--glass-bg-elevated` auf `--color-surface` und `--blur-lg` auf 0: dieselbe
+ * opake Tafel wie im Rueckfall darueber. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .auth-page {
+    background-color: var(--glass-bg-elevated);
+    backdrop-filter: var(--blur-lg) saturate(var(--lg-glass-saturate));
+    -webkit-backdrop-filter: var(--blur-lg) saturate(var(--lg-glass-saturate));
+  }
+}
+
+/* Kopf der Tafel: Marke, Name, ein Satz. */
 .auth-hero {
   text-align: center;
-  margin-bottom: var(--space-8);
+  margin-bottom: var(--space-6);
 }
 
 /* Marken-Anker: die Bildmarke selbst (utils/brand-mark.js) - dieselbe Kachel
@@ -101,13 +168,25 @@
   font-size: var(--text-base);
   color: var(--color-text-secondary);
   max-width: 360px;
+  margin-inline: auto;
   line-height: var(--line-height-relaxed, 1.6);
+  text-wrap: balance;
 }
 
-/* Die Karte, die das Formular trägt */
-.auth-card {
+/* Die Karte ist nur noch die Huelle des Formulars: Flaeche, Schatten, Radius
+ * und Polster traegt die Tafel (`.auth-page`). Eine Karte IN der Tafel waere
+ * Flaeche auf Flaeche. `overflow: visible`, weil `.card` clippt - der
+ * Fokusring eines Felds an der Kante gehoert nicht abgeschnitten.
+ * Zwei Klassen im Selektor: `.card` und `.card--padded` stehen in layout.css
+ * und laden frueher, aber mit gleicher Spezifitaet waere das eine Wette auf
+ * die Ladereihenfolge. */
+.auth-page .auth-card {
   width: 100%;
-  max-width: 380px;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
 }
 
 .auth-form__submit {
@@ -185,7 +264,7 @@
 }
 
 .auth-version {
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
   /* Platz reservieren, damit die spät nachgeladene Version das zentrierte
    * Formular nicht nach oben schiebt (CLS). */
   min-height: var(--text-sm);

@@ -1338,10 +1338,10 @@
 
 /* DER LICHTHAUCH - und warum er kein Rückfall in den Verlauf ist, den Runde 3
  * entfernt hat. Der alte Verlauf WAR die Karte: eine deckende Fläche von Kante
- * zu Kante, im globalen Akzent, unter dem jeder Text stand. Das hier ist die
- * Gattung der Backdrop-Blobs hinter dem Glas - ein weiches, kreisrundes Feld
+ * zu Kante, im globalen Akzent, unter dem jeder Text stand. Das hier ist ein
+ * Lichtfeld (DESIGN.md, "Colors") - ein weiches, kreisrundes Feld
  * HINTER der Glyphe, das aus der Glyphe zu kommen scheint und lange vor dem
- * Text ausläuft. Es teilt deshalb die Ausschalter der Blobs
+ * Text ausläuft. Es teilt deshalb die Ausschalter seiner Gattung
  * (--weather-glow-opacity, in prefers-reduced-transparency und
  * prefers-contrast auf 0) und trägt den Ton der LAGE, nicht den der App.
  *
