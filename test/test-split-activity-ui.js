@@ -508,3 +508,17 @@ test('die Gruppenzahl steht am Kopf der Liste, mobil entfaellt ihre Kennzahlkart
   const src = readFileSync(new URL('../public/pages/split-expenses.js', import.meta.url), 'utf8');
   assert.match(src, /class="split-panel-title u-section-title">\$\{t\('splitExpenses\.groups'\)\}<span class="list-group__count split-panel-count" id="split-group-count">/);
 });
+
+// Review an #1767: die Kurzzeile liest seit R17 (E5) aus `state.balances`. Der
+// Zustand lebt auf Modulebene; lud der Einstieg die Gruppendaten nur MIT
+// aktiver Gruppe, stand nach dem Verlust der letzten Gruppe der alte Saldo
+// ueber dem Leerzustand. loadGroupData() leert ohne Gruppe - es muss nur
+// immer laufen.
+test('Einstieg ohne Gruppe leert die Salden der zuletzt gesehenen Gruppe', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/split-expenses.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
+  const fn = src.slice(src.indexOf('async function loadInitial()'), src.indexOf('async function loadGroupData()'));
+  assert.ok(fn.length > 0, 'loadInitial nicht gefunden - der Scanner greift nicht');
+  assert.doesNotMatch(fn, /if\s*\(state\.activeGroupId\)\s*await loadGroupData\(\)/, 'nicht nur mit aktiver Gruppe');
+  assert.match(fn, /^\s*await loadGroupData\(\);/m);
+});

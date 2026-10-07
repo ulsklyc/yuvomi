@@ -263,7 +263,12 @@ async function loadInitial() {
   // Sprungziel von aussen (Dashboard-Kachel „Ausgleich offen"): ?group= oeffnet
   // die Gruppe, in der die genannte Position steht - sonst die erste wie bisher.
   state.activeGroupId = groupFromQuery(window.location.search, state.groups) ?? state.groups[0]?.id ?? null;
-  if (state.activeGroupId) await loadGroupData();
+  // IMMER, auch ohne Gruppe: der Zustand lebt auf Modulebene und ueberlebt den
+  // Seitenwechsel. Ohne aktive Gruppe leert loadGroupData() Ausgaben und
+  // Salden - sonst stuende der Saldo der zuletzt gesehenen Gruppe ueber dem
+  // Leerzustand, wenn sie inzwischen geloescht, archiviert oder man aus ihr
+  // entfernt wurde (die Kurzzeile liest seit R17 aus `state.balances`).
+  await loadGroupData();
 }
 
 /** Gruppe aus `?group=` - nur eine, die in der geladenen Liste steht. */
