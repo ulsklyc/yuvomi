@@ -1460,9 +1460,15 @@ test('Kopf und alle Reiter enden an der Bahn: Kopfmass, Plan, Darlehen und Konte
     'Konten (oder ihr Leerzustand) nehmen die Hauptspalte');
   assert.equal(rule('#budget-body .budget-tab-panel--accounts > .metric-grid', flat), undefined,
     'die Regel „eine Karte traegt die Zeile" ist abgeloest');
-  // Die Liste fragt IHREN Platz: neben der Leiste (657/720px) ein Konto je Zeile.
+  // EIN Traeger, flache Zeilen (Sonde 7): die Liste traegt Flaeche und Radius,
+  // das Konto keine; getrennt wird ueber `> * + *`, nie ueber `gap`.
   const list = rule('.budget-accounts__list', flat);
-  assert.match(list?.body ?? '', /grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(min\(var\(--budget-account-min\),\s*100%\),\s*1fr\)\)/);
+  assert.match(list?.body ?? '', /flex-direction:\s*column/);
+  assert.match(list?.body ?? '', /background:\s*var\(--color-surface\)/);
+  assert.match(list?.body ?? '', /overflow:\s*hidden/);
+  assert.doesNotMatch(list?.body ?? '', /\bgap\s*:|grid-template-columns/, 'keine gap-getrennte Kartenspalte, kein Raster');
+  assert.match(rule('.budget-accounts__list > * + *', flat)?.body ?? '', /border-top:\s*1px solid var\(--color-border-subtle\)/);
+  assert.doesNotMatch(rule('.budget-account', flat)?.body ?? '', /background|box-shadow|border-radius/, 'die Zeile ist flaechenlos');
   assert.ok(!rules.some(({ selector, at }) => selector.trim() === '.budget-accounts__list' && at.some((a) => /@media/.test(a))),
     'keine Fensterabfrage mehr an der Kontenliste - zwei 325px-Karten brachen die Namen mitten im Wort');
 });

@@ -358,8 +358,6 @@
   --budget-rail-min: 18.75rem;
   --budget-rail-max: 23.75rem;
   --budget-column-gap: var(--space-6);
-  /* Mindestbreite einer Kontokarte im Raster (Icon, Name, Saldo, Stift). */
-  --budget-account-min: 22.5rem;
   --budget-lane: calc(var(--page-measure, var(--layout-reading)) + var(--budget-column-gap) + var(--budget-rail-max));
 }
 
@@ -576,48 +574,42 @@
   max-width: none;
 }
 
-/* Zwei Konten je Zeile, sobald jede Karte ihre Mindestbreite hat - gefragt
- * wird der Platz der Liste, nicht das Fenster: neben der Leiste hat sie
- * 657px (1280) bzw. 720px (1440), und zwei Karten von 325 bis 356px brachen
- * „Gemeinsames Konto" und „Wertpapierdepot" mitten im Wort (Karte 93 statt
- * 72px). Dort steht je Zeile EIN Konto auf dem Lesemass, wie die Buchungen der
- * Uebersicht; ohne Leiste (Tablet) bleiben es zwei. */
+/* EIN TRAEGER, FLACHE ZEILEN (Zeilenlisten-Regel, Sonde 7). Die Konten sind
+ * eine Folge gleichartiger Zeilen: sie liegen in genau einer Karte und trennen
+ * sich ueber `> * + *`. Vorher trug jedes Konto Flaeche, Radius und Schatten
+ * und die Liste trennte ueber `gap` - neben der Leiste (657px bei 1280) stand
+ * damit eine Spalte aus sechs Karten. Zwei Karten je Zeile sind dort keine
+ * Antwort: bei 325px brachen „Gemeinsames Konto" und „Wertpapierdepot" mitten
+ * im Wort. Eine Spalte in jeder Breite, auf dem Lesemass der Hauptspalte. */
 .budget-accounts__list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(var(--budget-account-min), 100%), 1fr));
-  gap: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  max-width: var(--page-measure, var(--layout-reading));
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
-/* Container: Zeile mit primärem Drilldown-Button + separatem Bearbeiten-Icon.
- * --account-accent kommt inline je Konto (Fallback: Modul-Akzent). */
+.budget-accounts__list > * + * {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* Zeile mit primärem Drilldown-Button + separatem Bearbeiten-Icon.
+ * --account-accent kommt inline je Konto (Fallback: Modul-Akzent) und faerbt
+ * Kachel und Fokusring; die Zeile selbst ist flaechenlos. */
 .budget-account {
   --account-accent: var(--module-accent);
   display: flex;
   align-items: stretch;
-  /* HIG-Karte: opake Fläche, randlos, 16px - wie .metric-card und das
-   * Dashboard-Widget. Die Kante bleibt als transparenter Träger stehen, weil
-   * der Hover sie einfärbt. */
-  background: var(--color-surface);
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-  transition: border-color var(--transition-fast);
 }
-
-.budget-account:hover { border-color: var(--account-accent); }
 
 /* Zurücknehmen-Muster (tokens.css, #1230) statt `opacity: 0.62`, die Badge,
  * Saldo und Metazeile auf 2,5 bis 3,8:1 zog. Das „Archiviert"-Badge und der
- * Saldo bleiben voll, die Kante wird die ruhigste und ersetzt den Schatten -
- * auch unter dem Zeiger, wo `.budget-account:hover` sonst die Akzentkante einer
- * aktiven Karte setzte (#1230). Die Zeile darin (`__main:hover`) antwortet
- * weiter auf den Zeiger. */
-.budget-account--archived,
-.budget-account--archived:hover {
+ * Saldo bleiben voll; die Zeile nimmt die zurueckgenommene Flaeche. Die Zeile
+ * darin (`__main:hover`) antwortet weiter auf den Zeiger. */
+.budget-account--archived {
   background: var(--color-surface-receded);
-  border-color: var(--color-border-receded);
-  box-shadow: none;
 }
 
 .budget-account--archived .budget-account__type,
