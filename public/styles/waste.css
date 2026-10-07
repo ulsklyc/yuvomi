@@ -569,9 +569,10 @@
   display: none;
 }
 
-/* Ohne Abfallart gibt es nichts, wofuer man eine Einzelabholung eintraegt
-   (waste.js, fabIntent): im Onboarding fehlt auch dieser Eintrag. */
-.waste-page--onboarding #waste-page-menu [data-action="add-pickup"] {
+/* Ohne AKTIVE Abfallart gibt es nichts, wofuer man eine Einzelabholung
+   eintraegt (waste.js, pageModeClasses): der Eintrag fehlt im Onboarding und
+   ebenso, wenn alle Abfallarten archiviert sind (#1775). */
+.waste-page--no-active-type #waste-page-menu [data-action="add-pickup"] {
   display: none;
 }
 

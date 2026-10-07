@@ -322,6 +322,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and two opposite ones left whichever answer came last on screen. A swipe now starts only when
   the one before it has finished loading; the arrows are unchanged (#1775).
 
+- **Waste: "Add pickup" is no longer offered while every waste type is archived.** The entry in
+  the header menu opened the dialog for a new waste type in that state - a pickup has no type to
+  pick then. It is hidden until a type is active again, as it already was before the first type
+  existed (#1775).
+
 ## [2.74.0] - 2026-10-07
 
 ### Added

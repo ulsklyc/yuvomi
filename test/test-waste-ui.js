@@ -873,6 +873,33 @@ test('fabIntent: ohne Abfallart nennt der FAB "Abfallart" und legt sie an', () =
     { creates: 'schedule', labelKey: 'waste.addSchedule', dockLabelKey: 'newLabel.wasteSchedule' });
 });
 
+/* #1775: mit NUR archivierten Abfallarten ist die Seite kein Onboarding (die
+ * Karten bleiben wiederherstellbar), der Eintrag "Abholung hinzufuegen" stand
+ * also im Menue - und oeffnete den Abfallart-Dialog. Gemessen wird die Klasse,
+ * an der waste.css den Eintrag herausnimmt, an genau diesem Zustand. */
+test('#1775: sind alle Abfallarten archiviert, traegt die Seite die Klasse, die "Abholung hinzufuegen" ausblendet', () => {
+  const { pageModeClasses } = __test;
+  const state = (types) => ({ loading: false, error: null, types });
+  const archived = pageModeClasses(state([{ id: 1, archived: true }, { id: 2, archived: 1 }]));
+  assert.equal(archived['waste-page--onboarding'], false, 'kein Onboarding: die Karten muessen bleiben');
+  assert.equal(archived['waste-page--no-active-type'], true, 'aber auch keine aktive Abfallart');
+  assert.equal(pageModeClasses(state([]))['waste-page--no-active-type'], true, 'im Onboarding ebenso');
+  assert.deepEqual(pageModeClasses(state([{ id: 1, archived: true }, { id: 2, archived: false }])),
+    { 'waste-page--onboarding': false, 'waste-page--no-active-type': false },
+    'eine aktive genuegt: der Eintrag steht');
+  // Dieselbe Regel wie der Primaerknopf - der Eintrag fehlt genau dann, wenn
+  // sein Klick eine Abfallart anlegen wuerde.
+  for (const types of [[], [{ archived: true }], [{ archived: false }]]) {
+    assert.equal(pageModeClasses(state(types))['waste-page--no-active-type'], fabIntent({ types }).creates === 'type');
+  }
+  // Verdrahtung: applyPageMode() setzt JEDE dieser Klassen, und das Blatt
+  // haengt die Regel an die neue, nicht mehr nur an das Onboarding.
+  assert.match(WASTE_CODE, /for \(const \[name, on\] of Object\.entries\(pageModeClasses\(state\)\)\) page\?\.classList\.toggle\(name, on\);/);
+  const css = readFileSync(new URL('../public/styles/waste.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(css)].find((r) => r.selector.split(',').some((x) => x.trim() === '.waste-page--no-active-type #waste-page-menu [data-action="add-pickup"]'));
+  assert.ok(rule && /display:\s*none/.test(rule.body));
+});
+
 // ---------------------------------------------------------------------------
 // Critique R17 (E2): der Termin ist der Hauptweg, die Abholung sagt, wann sie ist
 // ---------------------------------------------------------------------------
@@ -884,8 +911,8 @@ test('R17/E2: die Einzelabholung steht im Werkzeugmenue, der Termin-Dialog waehl
   const css = readFileSync(new URL('../public/styles/waste.css', import.meta.url), 'utf8');
   const hidden = [...eachRule(css)].filter((r) => /display:\s*none/.test(r.body))
     .flatMap((r) => r.selector.split(',').map((x) => x.trim()));
-  assert.ok(hidden.includes('.waste-page--onboarding #waste-page-menu [data-action="add-pickup"]'),
-    'ohne Abfallart gibt es nichts, wofuer man eine Einzelabholung eintraegt');
+  assert.ok(hidden.includes('.waste-page--no-active-type #waste-page-menu [data-action="add-pickup"]'),
+    'ohne aktive Abfallart gibt es nichts, wofuer man eine Einzelabholung eintraegt');
 
   // Vom Primaerknopf kommt der Dialog ohne Abfallart: vorgeschlagen wird die
   // erste aktive OHNE Termin, sonst die erste aktive.
@@ -947,7 +974,11 @@ test('Onboarding-CSS: Abholungen, Quellen, Abschnittstitel und Kopfknopf treten 
     '.waste-page--onboarding .waste-types-section .waste-section-title',
     '.waste-page--onboarding #waste-add-type-btn',
   ]) assert.ok(hidden.includes(sel), `${sel} fehlt`);
-  assert.match(WASTE_CODE, /classList\.toggle\('waste-page--onboarding', isOnboarding\(state\)\)/);
+  // Seit #1775 kommen die Zustandsklassen aus pageModeClasses() - gemessen
+  // wird, was die Funktion fuer das Onboarding sagt, nicht ihre Schreibweise.
+  assert.equal(__test.pageModeClasses({ loading: false, error: null, types: [] })['waste-page--onboarding'], true);
+  assert.equal(__test.pageModeClasses({ loading: true, error: null, types: [] })['waste-page--onboarding'], false);
+  assert.match(WASTE_CODE, /Object\.entries\(pageModeClasses\(state\)\)\) page\?\.classList\.toggle\(name, on\)/);
 });
 
 // R17 (E6), Critique 2026-10-07 (A3 P1): der Termin-Dialog trug sieben rohe
