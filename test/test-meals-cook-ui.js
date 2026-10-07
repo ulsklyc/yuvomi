@@ -475,6 +475,71 @@ test('Dialog: ein gespeicherter Koch, der kein Mitglied (mehr) ist, steht in der
   assert.deepEqual(optionen(andere).map((o) => o.name), ['userMultiSelect.nobody', 'Anna', 'Ben']);
 });
 
+// R17 Schritt 5 (Critique 2026-10-07, A4 P2): "Mahlzeit bearbeiten" war mobil
+// 1899px lang, "Aenderung anwenden auf" stand bei y 1813 hinter "Weitere
+// Einstellungen". Der Umfang entscheidet, was Speichern tut - er steht oben.
+// Die Zutaten sind beim Bearbeiten eingeklappt und nennen ihre Zahl.
+async function dialogMitAbschnitten(opts) {
+  const abschnitte = [];
+  const vorher = globalThis.__advancedSection;
+  globalThis.__advancedSection = (inner, options) => {
+    abschnitte.push({ inner, options });
+    return `<!--abschnitt-${abschnitte.length - 1}-->`;
+  };
+  try {
+    const html = await withAccess(SCHREIBEN, () => mitPlan({}, () => meals.buildModalContent(opts)));
+    return { html, abschnitte };
+  } finally {
+    if (vorher === undefined) delete globalThis.__advancedSection; else globalThis.__advancedSection = vorher;
+  }
+}
+
+test('Dialog einer Serie: der Umfang steht als Erstes im Dialog, nicht hinter "Weitere Einstellungen"', async () => {
+  const serie = mahlzeit({ recurrence_template_id: 5, recurrence_end_date: '2026-12-31' });
+  const { html, abschnitte } = await dialogMitAbschnitten({ mode: 'edit', date: serie.date, mealType: 'lunch', meal: serie });
+  const umfang = html.indexOf('id="modal-edit-scope"');
+  assert.ok(umfang >= 0, 'der Umfang steht im sichtbaren Teil');
+  for (const marke of ['id="modal-date"', 'id="modal-title"', 'data-ms-name="meal_cook"', '<!--abschnitt-0-->']) {
+    assert.ok(html.indexOf(marke) > umfang, `der Umfang steht vor ${marke}`);
+  }
+  assert.ok(html.indexOf('meal-recurrence-note') >= 0 && html.indexOf('meal-recurrence-note') < umfang, 'der Serienhinweis geht voran');
+  const ende = html.indexOf('id="modal-repeat-until-group" hidden');
+  assert.ok(ende > umfang && ende < html.indexOf('id="modal-date"'), 'das Wiederholungs-Ende bleibt beim Umfang, verborgen bis "Serie"');
+  assert.equal((html.match(/id="modal-edit-scope"/g) ?? []).length, 1, 'genau EIN Umfang-Feld');
+  for (const a of abschnitte) {
+    assert.doesNotMatch(a.inner, /modal-edit-scope|modal-repeat-until/, 'in keinem Aufklapper steht noch ein Stueck davon');
+  }
+  const erweitert = abschnitte.find((a) => /id="modal-recipe-id"/.test(a.inner));
+  assert.equal(erweitert.options.open, false, 'die Serie allein oeffnet "Weitere Einstellungen" nicht mehr');
+
+  // Gegenfall: ohne Serie gibt es keinen Umfang, und Anlegen behaelt den Schalter.
+  const einzel = await dialogMitAbschnitten({ mode: 'edit', date: serie.date, mealType: 'lunch', meal: mahlzeit() });
+  assert.doesNotMatch(einzel.html + einzel.abschnitte.map((a) => a.inner).join(''), /modal-edit-scope/);
+  const neu = await dialogMitAbschnitten({ mode: 'create', date: serie.date, mealType: 'lunch' });
+  assert.match(neu.abschnitte.map((a) => a.inner).join(''), /id="modal-repeat-weekly"/, 'Anlegen: "Woechentlich wiederholen" bleibt, wo es war');
+});
+
+test('Dialog: die Zutaten sind beim Bearbeiten eingeklappt und nennen ihre Zahl - beim Anlegen und ohne Zutaten stehen sie offen', async () => {
+  const drei = mahlzeit({ ingredients: [1, 2, 3].map((id) => ({ id, name: `Zutat ${id}`, quantity: '', category: 'Vorrat', on_shopping_list: 1 })) });
+  const { html, abschnitte } = await dialogMitAbschnitten({ mode: 'edit', date: drei.date, mealType: 'lunch', meal: drei });
+  const zutaten = abschnitte.find((a) => /id="ingredient-list"/.test(a.inner));
+  assert.ok(zutaten, 'die Zutaten stehen im geteilten Aufklapper');
+  assert.equal(zutaten.options.label, 'meals.ingredientsLabel · 3', 'er nennt die Zahl');
+  assert.ok(!zutaten.options.open, 'und startet geschlossen');
+  assert.match(zutaten.inner, /id="add-ingredient-btn"/, '"Zutat hinzufuegen" steht bei der Liste');
+  assert.equal((zutaten.inner.match(/class="ingredient-row/g) ?? []).length, 3);
+  assert.match(html, /<div class="meal-ingredients-fold" id="modal-ingredients-fold">\s*<!--abschnitt-0-->/, 'vor "Weitere Einstellungen"');
+
+  for (const [name, opts] of [
+    ['Anlegen', { mode: 'create', date: drei.date, mealType: 'lunch' }],
+    ['Bearbeiten ohne Zutaten', { mode: 'edit', date: drei.date, mealType: 'lunch', meal: mahlzeit({ ingredients: [] }) }],
+  ]) {
+    const offen = await dialogMitAbschnitten(opts);
+    assert.match(offen.html, /<label class="form-label">meals\.ingredientsLabel<\/label>\s*<div class="ingredient-list" id="ingredient-list">/, `${name}: Liste offen im Dialog`);
+    assert.ok(!offen.abschnitte.some((a) => /id="ingredient-list"/.test(a.inner)), `${name}: nicht im Aufklapper`);
+  }
+});
+
 test('Dialog im Solo-Haushalt: die Auswahl ist verborgen, nicht entfernt', async () => {
   const feld = (html) => html.match(/<div class="form-group meal-modal__cook"([^>]*)>/)?.[1];
   const bauen = (members, meal = null) => withAccess(SCHREIBEN, () => mitPlan({ members }, () => meals.buildModalContent(

@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Editing a repeating meal asks first what the change applies to.** "Apply change to" decides
+  what Save does and was the last field of the dialog, behind "More settings" - on a phone about
+  three screens down. It now stands at the top. The ingredients of an existing meal are folded
+  behind "Ingredients · n"; when adding a meal they stay open.
 - **The calendar's view button on a phone shows which view is open.** It carried "..." and the
   header said nowhere whether you were in month, week, day or agenda. It now shows the icon of
   the open view and names it ("View: Week"); the menu behind it is unchanged.

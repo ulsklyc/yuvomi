@@ -2202,6 +2202,7 @@ function openMealModal(opts) {
         showCookForScope(panel, meal);
       });
 
+      wireIngredientCount(panel);
       wireCookPicker(panel);
       if (membersMissing) {
         refreshCookPicker(panel, isEdit ? meal : null)
@@ -2330,6 +2331,25 @@ async function refreshCookPicker(panel, meal) {
   showCookForScope(panel, meal);
 }
 
+/** Beschriftung des Zutaten-Aufklappers: "Zutaten · 6" (wie "Geplant · n" im Budget). */
+function ingredientsFoldLabel(count) {
+  return `${t('meals.ingredientsLabel')} · ${count}`;
+}
+
+/**
+ * Haelt den Zaehler am Zutaten-Aufklapper nach, wenn Zeilen dazukommen oder
+ * gehen (Hinzufuegen, Entfernen, ein Rezept ersetzt die Liste). Ohne
+ * Aufklapper (Anlegen, keine Zutaten) passiert nichts.
+ */
+function wireIngredientCount(panel) {
+  const label = panel.querySelector?.('#modal-ingredients-fold .form-advanced__summary > span');
+  const list = panel.querySelector?.('#ingredient-list');
+  if (!label || !list || typeof MutationObserver !== 'function') return;
+  new MutationObserver(() => {
+    label.textContent = ingredientsFoldLabel(list.querySelectorAll('.ingredient-row').length);
+  }).observe(list, { childList: true });
+}
+
 function buildModalContent({ mode, date, mealType, meal, fromSlot = false, recipeId = null }) {
   const isEdit   = mode === 'edit';
   const isRecurring = isEdit && meal.recurrence_template_id;
@@ -2374,7 +2394,34 @@ function buildModalContent({ mode, date, mealType, meal, fromSlot = false, recip
   // Wie beim Bearbeiten einer Mahlzeit mit Rezept: aus der Rezept-Spalte
   // geoeffnet, steht die Rezeptauswahl offen da, damit sichtbar ist, WOHER Titel
   // und Zutaten kommen.
-  const advancedOpen = (isEdit && (!!meal.recipe_id || !!meal.notes || !!meal.recipe_url || isRecurring)) || Boolean(recipeId);
+  // (Bis R17 Schritt 5 oeffnete auch `isRecurring` den Abschnitt - der
+  // Serien-Umfang stand darin. Er steht jetzt oben, siehe `scopeHtml`.)
+  const advancedOpen = (isEdit && (!!meal.recipe_id || !!meal.notes || !!meal.recipe_url)) || Boolean(recipeId);
+
+  // DER SERIEN-UMFANG STEHT OBEN (R17 Schritt 5, Critique 2026-10-07 A4 P2).
+  // "Aenderung anwenden auf" entscheidet, was Speichern tut - und stand als
+  // letztes Feld hinter "Weitere Einstellungen", mobil bei y 1813 von 1899px.
+  // Nur die POSITION wechselt: dieselben Knoten mit denselben ids, die
+  // Verdrahtung (Wiederholungs-Ende zeigen, Koch der Vorlage zeigen) greift
+  // unveraendert.
+  const scopeHtml = isRecurring ? `
+    <div class="meal-recurrence-note">
+      <i data-lucide="repeat-2" class="icon-sm" aria-hidden="true"></i>
+      <span>${t('meals.recurrenceEditHint')}</span>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="modal-edit-scope">${t('meals.editScopeLabel')}</label>
+      <select class="form-input" id="modal-edit-scope">
+        <option value="single">${t('meals.editScopeSingle')}</option>
+        <option value="series">${t('meals.editScopeSeries')}</option>
+      </select>
+    </div>
+    <div class="form-group" id="modal-repeat-until-group" hidden>
+      <label class="form-label" for="modal-repeat-until">${t('meals.recurrenceUntilLabel')}</label>
+      <yuvomi-datepicker type="date" id="modal-repeat-until"
+                         value="${meal.recurrence_end_date ? formatDateInput(meal.recurrence_end_date) : ''}"></yuvomi-datepicker>
+      <p class="form-hint">${t('meals.recurrenceUntilHint')}</p>
+    </div>` : '';
 
   const advancedFieldsHtml = `
     <div class="form-group">
@@ -2405,24 +2452,7 @@ function buildModalContent({ mode, date, mealType, meal, fromSlot = false, recip
              value="${esc(isEdit && meal.recipe_url ? meal.recipe_url : '')}">
     </div>
 
-    ${isEdit ? (isRecurring ? `
-    <div class="meal-recurrence-note">
-      <i data-lucide="repeat-2" class="icon-sm" aria-hidden="true"></i>
-      <span>${t('meals.recurrenceEditHint')}</span>
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="modal-edit-scope">${t('meals.editScopeLabel')}</label>
-      <select class="form-input" id="modal-edit-scope">
-        <option value="single">${t('meals.editScopeSingle')}</option>
-        <option value="series">${t('meals.editScopeSeries')}</option>
-      </select>
-    </div>
-    <div class="form-group" id="modal-repeat-until-group" hidden>
-      <label class="form-label" for="modal-repeat-until">${t('meals.recurrenceUntilLabel')}</label>
-      <yuvomi-datepicker type="date" id="modal-repeat-until"
-                         value="${meal.recurrence_end_date ? formatDateInput(meal.recurrence_end_date) : ''}"></yuvomi-datepicker>
-      <p class="form-hint">${t('meals.recurrenceUntilHint')}</p>
-    </div>` : '') : `
+    ${isEdit ? '' : `
     <div class="meal-recurrence-option">
       <label class="toggle">
         <input type="checkbox" id="modal-repeat-weekly">
@@ -2467,18 +2497,34 @@ function buildModalContent({ mode, date, mealType, meal, fromSlot = false, recip
   // fuehrt jetzt der Name (mit den Rezeptvorschlaegen des Autocompletes), Tag
   // und Mahlzeit stehen als ruhige, weiter editierbare Zeile darunter. Ohne
   // Slot (FAB, Kurzbefehl) bleibt "erst wann, dann was".
-  return `
-    ${fromSlot && !isEdit ? nameHtml + whenHtml : whenHtml + nameHtml}
-    ${cookPickerHtml(isEdit ? meal : null)}
-
-    <div class="form-group">
-      <label class="form-label">${t('meals.ingredientsLabel')}</label>
+  // ZUTATEN BEIM BEARBEITEN EINGEKLAPPT, MIT ZAEHLER (R17 Schritt 5). Eine
+  // Zutatenzeile misst mobil 104px; mit sechs Zutaten lag alles Weitere zwei
+  // Bildschirme tiefer. Wer eine bestehende Mahlzeit oeffnet, aendert meist
+  // Tag, Koch oder Umfang - die Zutaten stehen hinter dem geteilten Aufklapper,
+  // der ihre Zahl nennt (wireIngredientCount haelt sie nach). Beim Anlegen und
+  // ohne Zutaten bleibt der Abschnitt offen wie bisher: dort IST er die Arbeit.
+  const ingCount = isEdit ? (meal.ingredients?.length ?? 0) : 0;
+  const ingFieldsHtml = `
       <div class="ingredient-list" id="ingredient-list">${ingRows}</div>
       <button class="btn btn--secondary add-ingredient-btn" id="add-ingredient-btn" type="button">
         <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
         ${t('meals.addIngredient')}
-      </button>
-    </div>
+      </button>`;
+  const ingredientsHtml = ingCount > 0
+    ? `<div class="meal-ingredients-fold" id="modal-ingredients-fold">
+      ${advancedSection(ingFieldsHtml, { label: ingredientsFoldLabel(ingCount) })}
+    </div>`
+    : `
+    <div class="form-group">
+      <label class="form-label">${t('meals.ingredientsLabel')}</label>${ingFieldsHtml}
+    </div>`;
+
+  return `
+    ${scopeHtml}
+    ${fromSlot && !isEdit ? nameHtml + whenHtml : whenHtml + nameHtml}
+    ${cookPickerHtml(isEdit ? meal : null)}
+
+    ${ingredientsHtml}
 
     ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
 
