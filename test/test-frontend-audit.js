@@ -20007,3 +20007,43 @@ test('R17 E6: im Dialogfuss misst ein Icon-Knopf am Zeiger so hoch wie seine Nac
   assert.ok(rule.at.some((a) => /min-width:\s*1024px/.test(a)), 'nur am Zeiger - auf Touch bleiben 44px');
   assert.match(rule.body, /min-height:\s*var\(--target-md\)/);
 });
+
+// ── R17, E12: ein Wort je Sache ─────────────────────────────────────────────
+// Critique 2026-10-07 (A7 P2): die Navigation sagt "Übersicht", acht Texte
+// sagten "Dashboard"; das Blatt "Integrationen" trug nur Immich und Wetter
+// (CalDAV, Mealie, ntfy liegen woanders); "Familie und Rollen" stand neben
+// "Rollen und Rechte"; "Recipe-Provider" war nie uebersetzt; und der Rundgang
+// beschrieb eine Leiste, die es nicht gibt ("Dashboard und Kalender", "···").
+test('R17 E12: die deutsche Oberflaeche nennt die Startseite ueberall "Uebersicht"', () => {
+  const de = JSON.parse(read('../public/locales/de.json'));
+  const hits = [];
+  const walk = (node, path) => {
+    for (const [key, value] of Object.entries(node)) {
+      const here = path ? `${path}.${key}` : key;
+      if (typeof value === 'string') {
+        if (/Dashboard|Recipe-Provider/.test(value)) hits.push(`${here}: ${value}`);
+      } else if (value && typeof value === 'object') walk(value, here);
+    }
+  };
+  walk(de, '');
+  assert.deepEqual(hits, [], 'die Navigation heisst "Übersicht" - kein zweites Wort fuer dieselbe Seite, kein unuebersetzter Fachbegriff');
+  assert.equal(de.nav.dashboard, 'Übersicht');
+  assert.equal(de.settings.pageIntegrations, 'Fotos und Wetter', 'das Blatt nennt, was es traegt');
+  assert.equal(de.settings.pageFamilyRoles, 'Mitglieder', 'nicht "Familie und Rollen" neben "Rollen und Rechte"');
+});
+
+test('R17 E12: der Rundgang beschreibt die untere Leiste, die es gibt - in jeder Sprache', () => {
+  const dir = new URL('../public/locales/', import.meta.url);
+  const offenders = [];
+  for (const file of readdirSync(dir).filter((name) => name.endsWith('.json'))) {
+    const locale = JSON.parse(read(`../public/locales/${file}`));
+    const body = locale.onboarding.step2Body;
+    // Die Leiste traegt den Knopf "Mehr" (nav.more), keinen "···"-Knopf, und
+    // ihre Plaetze sind einstellbar - der Text zaehlt deshalb keine Module auf.
+    if (body.includes('···') || !body.includes(locale.nav.more)) offenders.push(`${file}: ${body}`);
+    // Der Verweis im Kalender-Leerzustand fuehrt zum Blatt, das die
+    // Synchronisation traegt, nicht zu "Fotos und Wetter".
+    if (!locale.emptyHint.calendar.includes(locale.settings.pageCalendarModule)) offenders.push(`${file}: ${locale.emptyHint.calendar}`);
+  }
+  assert.deepEqual(offenders, []);
+});

@@ -36,6 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One word per thing in the German interface, and two settings pages named for what they
+  hold.** The navigation says "Übersicht"; nine texts still said "Dashboard" (load error, pinned
+  notes, weather, permissions, shortcuts) - they now say "Übersicht" too, likewise "Overview" in
+  English. The settings page "Integrations" held only Immich and the weather location, while
+  CalDAV, Mealie, ntfy and the API live elsewhere: it is now "Photos and weather". "Family and
+  roles" stood next to "Roles and permissions" and is now "Members". Both in all 26 languages.
+  "Recipe-Provider" is "Rezeptdienst" in German. The tour's second step described a bottom bar
+  that does not exist ("Dashboard and Calendar", a "···" button); it now says what the bar does
+  and names "More", and the calendar's empty-state hint points to Settings → Calendar, where the
+  sync accounts are.
 - **Dialogs speak one grammar: Cancel and the main button sit at the bottom right, adding is
   "Add" and editing is "Save".** Rewards dialogs (reward, redeem, bonus) had a main button and no
   Cancel; adding or editing a housekeeper and editing a visit carried "Save" left-aligned at the
