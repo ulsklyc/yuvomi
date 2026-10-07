@@ -3267,7 +3267,22 @@ test('settings sidebar: the active link is revealed below the sticky search, not
   }
 });
 
-// R17 (E9): jeder Abschnitt der Registry als Programm gerendert - beurteilt wird das Markup.
+// R17 (Critique 2026-10-07, E9): EINE KARTE JE OPTION GIBT ES NICHT MEHR.
+//
+// Das Blatt Darstellung trug zehn Einstellungen in acht Karten (1650px bei
+// 1280, 2014px mobil, drei im ersten Bild), waehrend "Aktive Module" daneben
+// schon gruppierte Zeilen fuehrte. Jetzt steht eine Option als Zeile in einem
+// Traeger (`.row-carrier.settings-group`, settings/components.js
+// `settingRowHtml` / `settingSwitchRowHtml`); eine Karte bleibt, wo ein echtes
+// Formular steht (mehrere Felder, ein Knopf).
+//
+// AM GERENDERTEN MARKUP, nicht am Dateitext: jeder Abschnitt der Registry wird
+// als Programm gerendert (Admin, leere Antworten), und beurteilt wird, was er
+// in seinen Traeger schreibt. Ein Regex ueber die Quelldatei saehe weder, was
+// ein Helfer zusammensetzt (`partHtml`, `scopeRowHtml`), noch welcher Zweig
+// einer Vorlage laeuft. Nicht gesehen wird, was ein Abschnitt erst per DOM-API
+// baut (documents-storage, die Konten der Synchronisation) - dort stehen
+// Formulare, keine Ein-Element-Karten.
 function sheetProbeContainer(part) {
   let html = '';
   let longest = '';
@@ -3285,6 +3300,44 @@ function sheetProbeContainer(part) {
     closest: () => null,
   };
 }
+
+/** Jede `.settings-card` des Markups samt Inhalt (Kommentare vorher entfernt). */
+function settingsCardsIn(markup) {
+  const html = markup.replace(/<!--[\s\S]*?-->/g, '');
+  const cards = [];
+  const open = /<div class="(?:[^"]*\s)?settings-card(?:\s[^"]*)?"[^>]*>/g;
+  let m;
+  while ((m = open.exec(html))) {
+    const tag = /<(\/?)div\b[^>]*>/g;
+    tag.lastIndex = open.lastIndex;
+    let depth = 1;
+    let end = html.length;
+    let t;
+    while (depth > 0 && (t = tag.exec(html))) {
+      depth += t[1] ? -1 : 1;
+      if (depth === 0) end = tag.lastIndex;
+    }
+    cards.push(html.slice(m.index, end));
+  }
+  return cards;
+}
+
+const cardControls = (card) => [...card.matchAll(
+  /<select\b|<textarea\b|role="radiogroup"|<input\b(?![^>]*\btype="(?:hidden|file|radio)")[^>]*>/g,
+)].length;
+const cardHasAction = (card) => /<button\b|class="(?:[^"]*\s)?btn(?:\s[^"]*)?"/.test(card);
+
+test('R17: der Karten-Scanner sieht eine Karte mit genau einem Bedienelement - und laesst ein Formular stehen', () => {
+  const lone = '<div class="settings-card"><h3>Titel</h3><label class="toggle-row"><input type="checkbox" role="switch"></label><p>Hinweis</p></div>';
+  const form = '<div class="settings-card"><div><input type="text"></div><input type="password"><button class="btn btn--primary">x</button></div>';
+  const withButton = '<div class="settings-card settings-card--x"><input type="text"><div><button type="submit">x</button></div></div>';
+  const commented = '<!-- <div class="settings-card"><select></select></div> --><div class="row-carrier settings-group"><select></select></div>';
+  const cards = settingsCardsIn(lone + form + withButton + commented);
+  assert.equal(cards.length, 3, 'drei Karten, die auskommentierte zaehlt nicht');
+  assert.deepEqual(cards.map(cardControls), [1, 2, 1]);
+  assert.deepEqual(cards.map(cardHasAction), [false, true, true]);
+  assert.match(cards[1], /btn--primary/, 'die Karte reicht bis zu IHREM schliessenden div, nicht bis zum ersten');
+});
 
 /** Jeder Abschnitt der Registry, als Programm gerendert: id -> Markup. Einmal je Lauf. */
 let sheetProbe = null;
@@ -3338,6 +3391,40 @@ function probeSheets() {
   return sheetProbe;
 }
 
+test('R17: kein Einstellungsblatt rendert eine Karte mit genau einem Bedienelement', async () => {
+  const rendered = await probeSheets();
+
+  const offenders = [];
+  let cardsSeen = 0;
+  for (const [id, html] of rendered) {
+    for (const card of settingsCardsIn(html)) {
+      cardsSeen += 1;
+      if (cardControls(card) === 1 && !cardHasAction(card)) {
+        offenders.push(`${id}: ${card.replace(/\s+/g, ' ').slice(0, 140)}`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [],
+    'eine Option ist eine Zeile in einem Traeger (.settings-group), keine eigene Karte');
+
+  // EINE ZUSICHERUNG UEBER NICHTS IST KEINE. Die umgestellten Abschnitte
+  // muessen wirklich gezeichnet haben, und zwar gruppierte Zeilen; faellt
+  // einer unter der Attrappe um, bevor er zeichnet, sieht der Guard ihn nicht.
+  const GROUPED = [
+    'personal-appearance', 'personal-notifications', 'admin-family', 'modules-countdowns',
+    'personal-calendar', 'personal-feeds', 'modules-calendar', 'options-schedule', 'options-tasks',
+    'options-budget', 'options-housekeeping', 'options-health', 'modules-rewards', 'personal-health',
+    'feed-schedule', 'feed-cycle', 'feed-inventory', 'feed-waste',
+  ];
+  for (const id of GROUPED) {
+    const html = rendered.get(id) ?? '';
+    assert.match(html, /class="row-carrier settings-group"/, `${id}: keine gruppierten Zeilen im gerenderten Markup`);
+    assert.match(html, /class="settings-setting-row[ "]/, `${id}: der Traeger ist leer`);
+  }
+  const drawn = [...rendered.values()].filter((html) => html.length > 0).length;
+  assert.ok(drawn >= 30, `nur ${drawn} von ${rendered.size} Abschnitten haben gezeichnet - liest der Guard die Blaetter noch?`);
+  assert.ok(cardsSeen >= 15, `nur ${cardsSeen} Karten gesehen - der Scanner findet die Formular-Karten nicht mehr`);
+});
 
 test('R17: die gruppierte Zeile - Label links, Bedienelement rechts, der Hinweis ausserhalb des Labels', async () => {
   const { settingRowHtml, settingSwitchRowHtml } = await import('../public/settings/components.js');

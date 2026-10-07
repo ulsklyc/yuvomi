@@ -7,7 +7,7 @@ import { api, notifications } from '/api.js';
 import { confirmModal } from '/components/modal.js';
 import { esc } from '/utils/html.js';
 import { getPwaInstallState } from '/utils/pwa-install.js';
-import { toggleRowHtml } from '/settings/components.js';
+import { toggleRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 
 const DEFAULT_PROVIDERS = [
   { id: 'gotify', name: 'Gotify' },
@@ -78,18 +78,21 @@ function renderPage(container, user) {
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.pushToggleTitle')}</h2>
-      <div class="settings-card">
-        <div class="settings-card__body">
-          <p class="form-hint">${t('settings.pushDeviceDescription')}</p>
-          <p class="form-hint" id="push-ios-hint" hidden>${t('settings.pushIosHomescreenHint')}</p>
-          <p class="form-hint" id="push-status" aria-live="polite">${t('settings.pushChecking')}</p>
-          ${toggleRowHtml({
-            control: 'switch',
-            label: t('settings.pushToggleLabel'),
-            disabled: true,
-            attrs: { id: 'push-toggle' },
-          })}
-          <div class="settings-form-actions">
+      <!-- Zeilen im Traeger (R17, E9): der Schalter mit seinem Hinweis und
+           dem Zustand darunter, die Probe als eigene Zeile. Vorher eine Karte,
+           in der drei Hinweise UEBER dem Schalter standen, den sie erklaeren. -->
+      <div class="row-carrier settings-group">
+        ${settingSwitchRowHtml({
+          label: t('settings.pushToggleLabel'),
+          disabled: true,
+          description: t('settings.pushDeviceDescription'),
+          descriptionId: 'push-device-description',
+          extra: `<p class="form-hint" id="push-ios-hint" hidden>${t('settings.pushIosHomescreenHint')}</p>
+            <p class="form-hint" id="push-status" aria-live="polite">${t('settings.pushChecking')}</p>`,
+          attrs: { id: 'push-toggle', 'aria-describedby': 'push-device-description push-status' },
+        })}
+        <div class="settings-setting-row settings-setting-row--stacked">
+          <div class="settings-setting-row__control settings-form-actions">
             <button type="button" class="btn btn--secondary" id="push-test-btn" disabled>
               <i data-lucide="bell-ring" aria-hidden="true"></i>
               <span>${t('settings.pushTestButton')}</span>

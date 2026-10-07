@@ -1,7 +1,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { confirmModal } from '/components/modal.js';
-import { toggleRowHtml } from '/settings/components.js';
+import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 
 // Spiegelt MAX_POINTS in server/routes/tasks.js.
@@ -16,34 +16,36 @@ function renderPage(container, preferences) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">
-      <div class="settings-card">
-        <h2 class="settings-card__title">${t('settings.rewardsApprovalTitle')}</h2>
-        <p class="form-hint">${t('settings.rewardsApprovalHint')}</p>
-        ${toggleRowHtml({
-          control: 'switch',
+      <!-- ZWEI ZEILEN IN EINEM TRAEGER (R17, E9), vorher zwei Karten mit je
+           einem Kartentitel ("Einloesungen", "Standard-Punkte") ueber genau
+           einem Bedienelement. Die Zeilen tragen die Namen der Bedienelemente;
+           die Kartentitel sagten dasselbe in einem Wort. -->
+      <div class="row-carrier settings-group">
+        ${settingSwitchRowHtml({
           label: t('settings.rewardsApprovalLabel'),
           checked: preferences.rewards_require_approval !== false,
-          attrs: { id: 'rewards-require-approval' },
+          description: t('settings.rewardsApprovalHint'),
+          descriptionId: 'rewards-require-approval-hint',
+          attrs: { id: 'rewards-require-approval', 'aria-describedby': 'rewards-require-approval-hint' },
         })}
-      </div>
-      <div class="settings-card">
-        <h2 class="settings-card__title">${t('settings.rewardsDefaultPointsTitle')}</h2>
-        <p class="form-hint">${t('settings.rewardsDefaultPointsHint')}</p>
         <!-- EIN SPEICHERMODELL AUF DER SEITE (Re-Critique 2026-09-27, A7 P2-8):
-             die Schalter daneben speichern sofort, also tut es das Zahlenfeld
+             der Schalter daneben speichert sofort, also tut es das Zahlenfeld
              auch - beim Verlassen und mit Enter. Ein eigener Speichern-Knopf nur
              fuer dieses Feld liess offen, ob die Schalter ihn auch brauchen. -->
-        <form class="settings-form settings-form--compact" id="rewards-default-points-form" novalidate autocomplete="off">
-          <div class="form-group">
-            <label class="form-label" for="rewards-default-points">${t('settings.rewardsDefaultPointsLabel')}</label>
+        ${settingRowHtml({
+          label: t('settings.rewardsDefaultPointsLabel'),
+          labelFor: 'rewards-default-points',
+          description: t('settings.rewardsDefaultPointsHint'),
+          descriptionId: 'rewards-default-points-hint',
+          extra: `<p class="form-hint" id="rewards-default-points-off-hint">${t('settings.rewardsDefaultPointsOffHint')}</p>
+            <div id="rewards-default-points-error" class="form-error" role="alert" hidden></div>`,
+          control: `<form class="settings-row-form" id="rewards-default-points-form" novalidate autocomplete="off">
             <input class="form-input" type="number" id="rewards-default-points" inputmode="numeric"
                    min="0" max="${MAX_TASK_POINTS}" step="1" enterkeyhint="done"
-                   aria-describedby="rewards-default-points-off-hint rewards-default-points-error"
+                   aria-describedby="rewards-default-points-hint rewards-default-points-off-hint rewards-default-points-error"
                    value="${Number(preferences.tasks_default_points) || 0}">
-            <p class="settings-card-description" id="rewards-default-points-off-hint">${t('settings.rewardsDefaultPointsOffHint')}</p>
-          </div>
-          <div id="rewards-default-points-error" class="form-error" role="alert" hidden></div>
-        </form>
+          </form>`,
+        })}
       </div>
     </section>
   `);

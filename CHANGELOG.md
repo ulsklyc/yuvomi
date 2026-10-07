@@ -36,6 +36,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Settings list their options as rows, one group per section.** Until now almost every option
+  had a card of its own: Appearance showed ten settings in eight cards and three of them on the
+  first screen. Options are now rows in one group - name on the left, switch or selection on the
+  right, the explanation below - the form "Active modules" already had. Appearance is about a
+  third shorter and shows five settings on the first screen of a laptop; on a phone a selection
+  with a short value no longer spans the full width. Cards remain for real forms (account,
+  password, CalDAV, e-mail, tokens). Saving is unchanged: switches and selections apply at once.
+- **The calendar settings name each section once.** "Appointments" stood twice in the sheet; the
+  personal section is now "Event defaults". The jump links at the top carry the names of the
+  headings they lead to instead of older names, and the default reminders are chips like the
+  other multi-selections in the app instead of small checkboxes.
 - **On a phone the document viewer uses the whole screen.** It was a sheet with a margin all
   round, and 172 px of details stood above the document - which got 54 % of the height. The
   viewer now fills the screen, the document runs from edge to edge, and the details are one row:

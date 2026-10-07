@@ -1,5 +1,6 @@
 import { t } from '/i18n.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
+import { settingRowHtml } from '/settings/components.js';
 
 // Spiegelt MAX_COUNTDOWN_GRACE_DAYS in server/routes/preferences (#969).
 const MAX_COUNTDOWN_GRACE_DAYS = 90;
@@ -24,26 +25,30 @@ function renderPage(container, preferences) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">
-      <div class="settings-card">
-        <h2 class="settings-card__title">${t('settings.countdownGraceDaysTitle')}</h2>
-        <p class="form-hint">${t('settings.countdownGraceDaysHint')}</p>
+      <!-- Eine Zeile im Traeger statt einer Karte fuer ein Feld (R17, E9). Der
+           fruehere Kartentitel ist die Ueberschrift des Abschnitts (der
+           Suchtreffer), der Hinweis der Fuss der Gruppe. -->
+      <h2 class="settings-section__title">${t('settings.countdownGraceDaysTitle')}</h2>
+      <div class="row-carrier settings-group">
         <!-- EIN EINZELNES KURZFELD SPEICHERT BEIM VERLASSEN (H12 vom 27.09.,
              R17 Schritt 5): dieselbe Antwort wie das Punktefeld der Belohnungen
              - beim Verlassen und mit Enter, quittiert per Toast. Ein eigener
              Speichern-Knopf fuer EIN Zahlfeld gab derselben Frage in zwei
              Blaettern zwei Antworten. Blaetter mit echten Formularen (Konto,
              Passwort, CalDAV, SMTP) behalten den Knopf rechts im Kartenfuss. -->
-        <form class="settings-form settings-form--compact" id="countdown-grace-days-form" novalidate autocomplete="off">
-          <div class="form-group">
-            <label class="form-label" for="countdown-grace-days">${t('settings.countdownGraceDaysLabel')}</label>
+        ${settingRowHtml({
+          label: t('settings.countdownGraceDaysLabel'),
+          labelFor: 'countdown-grace-days',
+          extra: '<div id="countdown-grace-days-error" class="form-error" role="alert" hidden></div>',
+          control: `<form class="settings-row-form" id="countdown-grace-days-form" novalidate autocomplete="off">
             <input class="form-input" type="number" id="countdown-grace-days" inputmode="numeric"
                    min="0" max="${MAX_COUNTDOWN_GRACE_DAYS}" step="1"
-                   enterkeyhint="done" aria-describedby="countdown-grace-days-error"
+                   enterkeyhint="done" aria-describedby="countdown-grace-days-hint countdown-grace-days-error"
                    value="${Number.isFinite(preferences.countdown_grace_days) ? preferences.countdown_grace_days : DEFAULT_GRACE_DAYS}">
-          </div>
-          <div id="countdown-grace-days-error" class="form-error" role="alert" hidden></div>
-        </form>
+          </form>`,
+        })}
       </div>
+      <p class="form-hint settings-group__footer" id="countdown-grace-days-hint">${t('settings.countdownGraceDaysHint')}</p>
     </section>
   `);
 }
