@@ -422,17 +422,33 @@
 }
 
 /* SALDEN: TITEL MIT ZUSATZ LINKS, DIE HANDLUNG RECHTS (Entscheidung R17, E5).
- * "Ausgleichen" ist die Handlung an den Salden und steht in ihrer Zeile; der
- * Zusatz ("vereinfachte Schulden") rueckt als zweite Zeile unter den Titel,
- * damit Titel, Zusatz und Knopf auch in der 300px-Spalte des Desktops und in
- * langen Sprachen nebeneinander Platz haben. */
+ * "Ausgleichen" ist die Handlung an den Salden und steht in der Zeile des
+ * Titels; der Zusatz ("vereinfachte Schulden") steht darunter. */
 .split-section-head__lead {
-  display: flex;
-  flex-direction: column;
-  /* Basis 0: der Kopf bricht nie um, weil der Zusatz zu lang waere - der
-   * Zusatz bricht in seiner eigenen Spalte, der Knopf bleibt in der Zeile. */
+  /* DER ZUSATZ BEKOMMT SEINE EIGENE ZEILE UNTER TITEL UND KNOPF (R17). Als
+   * Spalte neben dem Knopf blieben ihm in der 300px-Spalte des Desktops rund
+   * 140px: „vereinfachte Schulden" brach auf zwei Zeilen und der Kopf stand
+   * 77 statt 44px hoch. Die Huelle loest sich auf (`contents`): Titel und
+   * Knopf teilen die erste Zeile, der Zusatz nimmt darunter die ganze Breite
+   * und bleibt einzeilig. Das DOM bleibt (die schmale Regel unten blendet den
+   * Zusatz weiter ueber diese Huelle aus). */
+  display: contents;
+}
+
+/* Zeile 2 (der Zusatz) haengt am Titel, nicht 12px darunter. */
+.split-section-head:has(> .split-section-head__lead) {
+  row-gap: 0;
+}
+
+.split-section-head__lead > .split-section-title {
   flex: 1 1 0;
   min-width: 0;
+}
+
+.split-section-head__lead > span {
+  order: 1;
+  flex: 1 0 100%;
+  margin-block-start: 0;
 }
 
 .split-section-actions {

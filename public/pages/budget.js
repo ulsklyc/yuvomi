@@ -1904,6 +1904,10 @@ function plannedToggleLabel(expanded, count) {
  * (`plannedExpandedMonth`), und wird nicht gespeichert.
  */
 function ledgerSectionsHtml(rows) {
+  // „Geplant" und „Gebucht" sind UNTERTITEL von „Transaktionen" (R17): beide
+  // standen als 20px-Abschnittstitel 17px unter einem 20px-Abschnittstitel -
+  // zwei gleich grosse Ueberschriften uebereinander. `u-compact` ist die Stufe
+  // darunter (typography.css, Kartentitel).
   if (isForecastMonth(state.month)) return entryRows(rows);
   const { planned, booked } = splitLedger(rows);
   if (!planned.length) return entryRows(rows);
@@ -1917,7 +1921,7 @@ function ledgerSectionsHtml(rows) {
         </button>` : '';
   return `
       <section class="budget-ledger-section budget-ledger-section--planned${expanded ? ' is-expanded' : ''}" aria-labelledby="budget-planned-title">
-        <h3 class="u-section-title budget-ledger-section__title" id="budget-planned-title">${esc(t('budget.plannedTitle'))} <span class="budget-ledger-section__count">· ${planned.length}</span></h3>
+        <h3 class="u-section-title u-compact budget-ledger-section__title" id="budget-planned-title">${esc(t('budget.plannedTitle'))} <span class="budget-ledger-section__count">· ${planned.length}</span></h3>
         <div class="budget-ledger-section__rows" id="budget-planned-rows">
           ${entryRows(planned.slice(0, PLANNED_PREVIEW_ROWS))}
           ${entryRows(planned.slice(PLANNED_PREVIEW_ROWS), { rowClass: 'budget-entry--more' })}${toggle}
@@ -1925,7 +1929,7 @@ function ledgerSectionsHtml(rows) {
       </section>
       ${booked.length ? `
       <section class="budget-ledger-section budget-ledger-section--booked" aria-labelledby="budget-booked-title">
-        <h3 class="u-section-title budget-ledger-section__title" id="budget-booked-title">${esc(t('budget.bookedTitle'))}</h3>
+        <h3 class="u-section-title u-compact budget-ledger-section__title" id="budget-booked-title">${esc(t('budget.bookedTitle'))}</h3>
         <div class="budget-ledger-section__rows">
           ${entryRows(booked)}
         </div>

@@ -4554,8 +4554,12 @@ test('R17/E4: zwei Abschnitte mit Titel, "Geplant" eingeklappt auf drei Zeilen',
     const html = budgetUi.renderEntries();
     const abschnitte = [...html.matchAll(/<section class="budget-ledger-section ([^"]*)"/g)].map((m) => m[1].trim());
     assert.deepEqual(abschnitte, ['budget-ledger-section--planned', 'budget-ledger-section--booked'], 'erst Geplant, dann Gebucht');
-    assert.match(html, /<h3 class="u-section-title budget-ledger-section__title" id="budget-planned-title">budget\.plannedTitle <span class="budget-ledger-section__count">· 5<\/span><\/h3>/);
-    assert.match(html, /<h3 class="u-section-title budget-ledger-section__title" id="budget-booked-title">budget\.bookedTitle<\/h3>/);
+    // R17: eine Stufe unter dem Abschnittstitel „Transaktionen" (`u-compact`, 17 statt 20px) -
+    // zwei gleich grosse Ueberschriften standen 17px uebereinander.
+    assert.match(html, /<h3 class="u-section-title u-compact budget-ledger-section__title" id="budget-planned-title">budget\.plannedTitle <span class="budget-ledger-section__count">· 5<\/span><\/h3>/);
+    assert.match(html, /<h3 class="u-section-title u-compact budget-ledger-section__title" id="budget-booked-title">budget\.bookedTitle<\/h3>/);
+    assert.match(readFileSync(new URL('../public/styles/typography.css', import.meta.url), 'utf8'),
+      /\.u-section-title\.u-compact\s*\{\s*font-size:\s*var\(--type-card-title\);/);
 
     const [planned, booked] = html.split('budget-ledger-section--booked');
     const reihen = [...planned.matchAll(/class="list-row budget-entry([^"]*)" data-id="(\d+)"/g)];
@@ -4718,7 +4722,14 @@ test('R17/E5: "Ausgleichen" steht in der Salden-Zeile; schmal tritt der Gruppenk
   assert.match(find('.split-group-header--tools-only', schmal)?.body ?? '', /position:\s*absolute[\s\S]*clip-path/,
     'schmal bleibt der Kopf im Baum und tritt aus dem Bild');
   assert.match(find('.split-group-header--tools-only .split-header-actions', schmal)?.body ?? '', /display:\s*none/, 'sein Ausloeser ist dann kein Tab-Stopp');
-  assert.match(find('.split-section-head__lead')?.body ?? '', /flex:\s*1 1 0/, 'der Kopf der Salden bricht nicht um');
+  // R17: der Zusatz („vereinfachte Schulden") brach NEBEN dem Knopf in der 300px-Spalte auf zwei
+  // Zeilen (Kopf 77 statt 44px). Die Huelle loest sich auf; Titel und Knopf teilen Zeile 1, der
+  // Zusatz nimmt Zeile 2 ueber die ganze Breite.
+  assert.match(find('.split-section-head__lead')?.body ?? '', /display:\s*contents/);
+  assert.match(find('.split-section-head__lead > .split-section-title')?.body ?? '', /flex:\s*1 1 0/, 'der Titel teilt die Zeile mit dem Knopf');
+  const zusatz = find('.split-section-head__lead > span')?.body ?? '';
+  assert.match(zusatz, /flex:\s*1 0 100%/, 'der Zusatz bekommt die ganze Zeile - kein Umbruch mitten im Ausdruck');
+  assert.match(zusatz, /order:\s*1/, 'unter Titel UND Knopf');
 });
 
 // ---------------------------------------------------------------------------
