@@ -330,6 +330,54 @@ export function growBars(root, { selector, memo }) {
   return moving.length;
 }
 
+/** Diagramme, die sich in dieser Sitzung schon eingezeichnet haben (`memo`). */
+const drawnCharts = new Set();
+
+/**
+ * Laesst ein Diagramm sich EINMAL einzeichnen - beim ersten Erscheinen in
+ * dieser Sitzung, danach nie wieder (Critique R17, Bewegung). Das Geschwister
+ * von `growBars`: dort wachsen Balken an ihren Wert, hier zeichnet sich eine
+ * Linie von der Zeitachse her ein und ein Ring fuellt sich im Uhrzeigersinn.
+ *
+ * EINMAL, NICHT BEI JEDEM ZEITRAUM: wer blaettert, vergleicht - eine Kurve,
+ * die sich bei jedem Schritt neu einzeichnet, hielte die Antwort 300ms zurueck
+ * und waere beim dritten Mal Dekoration. Den Zeitraumwechsel traegt der
+ * gerichtete Inhaltswechsel (utils/content-swap.js). `memo` benennt das
+ * Diagramm; ein Aufruf ohne Marken (leeres Diagramm) verbraucht ihn nicht.
+ *
+ * DER ENDZUSTAND STEHT IM MARKUP. Beide Bewegungen laufen ueber die Web
+ * Animations API ohne `fill`: faellt sie aus (kein `animate`, verdeckter Tab,
+ * reduzierte Bewegung), steht das Diagramm fertig da. Nur Zeichnen, kein
+ * Layout: `clip-path` an der Liniengruppe, `stroke-dasharray`/`-dashoffset` an
+ * den Ringsegmenten.
+ *
+ * @param {string} memo  Name des Diagramms
+ * @param {Object} marks
+ * @param {Element|null} [marks.lines]  Gruppe der Linien (zeichnet sich in Leserichtung der Zeitachse ein)
+ * @param {Iterable<Element>} [marks.arcs]  Ringsegmente (`<circle>` mit stroke-dasharray "Laenge Umfang")
+ * @returns {number} wie viele Marken sich einzeichnen
+ */
+export function drawChartOnce(memo, { lines = null, arcs = [] } = {}) {
+  const segments = [...(arcs ?? [])].filter((el) => typeof el?.animate === 'function');
+  const group = typeof lines?.animate === 'function' ? lines : null;
+  if (!group && !segments.length) return 0;
+  if (drawnCharts.has(memo)) return 0;
+  if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return 0;
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return 0;
+  drawnCharts.add(memo);
+  const timing = { duration: durationToken('--duration-xl', 300), easing: easingToken('--ease-out', 'ease-out') };
+  if (group) group.animate([{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }], timing);
+  for (const el of segments) {
+    const dash = el.getAttribute('stroke-dasharray') ?? '';
+    const total = dash.trim().split(/[\s,]+/)[1] ?? '0';
+    el.animate([
+      { strokeDasharray: `0 ${total}`, strokeDashoffset: '0' },
+      { strokeDasharray: dash, strokeDashoffset: el.getAttribute('stroke-dashoffset') ?? '0' },
+    ], timing);
+  }
+  return (group ? 1 : 0) + segments.length;
+}
+
 function settleAnimation(anim, duration) {
   return new Promise((resolve) => {
     let done = false;

@@ -7,7 +7,7 @@ import { t, formatDate, getLocale } from '/i18n.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { renderSkeletonChart } from '/utils/skeleton.js';
-import { growBars } from '/utils/ux.js';
+import { growBars, drawChartOnce } from '/utils/ux.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup, niceDomain } from '/utils/chart.js';
 import { formatMoneyAxis, formatSignedAmount } from '/utils/money.js';
@@ -393,6 +393,8 @@ function renderDonut() {
         <p class="budget-stats__donut-note">${view.ctx.esc(summary)}</p>
       </div>
     </div>`);
+  // Der Ring fuellt sich einmal, beim ersten Erscheinen (ux.js, drawChartOnce).
+  drawChartOnce('budget-stats-donut', { arcs: host.querySelectorAll('.budget-stats__donut circle') });
 }
 
 function renderExport() {
@@ -483,10 +485,12 @@ function renderTrendChart() {
           <svg class="chart budget-stats__trend" viewBox="0 0 ${CHART.W} ${CHART.H}" aria-hidden="true">
             ${chartGridMarkup(0, axis.max, (val) => formatMoneyAxis(val, view.ctx.currency), CHART, axis.steps)}
             ${chartXLabelsMarkup(s.map((p) => periodLabel(p.period)))}
-            <polyline fill="none" stroke="var(--color-success)" stroke-width="2"
-                      vector-effect="non-scaling-stroke" points="${points(incomes)}" />
-            <polyline fill="none" stroke="var(--color-text-secondary)" stroke-width="2" stroke-dasharray="6 4"
-                      vector-effect="non-scaling-stroke" points="${points(expenses)}" />
+            <g class="budget-stats__lines">
+              <polyline fill="none" stroke="var(--color-success)" stroke-width="2"
+                        vector-effect="non-scaling-stroke" points="${points(incomes)}" />
+              <polyline fill="none" stroke="var(--color-text-secondary)" stroke-width="2" stroke-dasharray="6 4"
+                        vector-effect="non-scaling-stroke" points="${points(expenses)}" />
+            </g>
           </svg>
           <div class="budget-stats__points" role="group" aria-label="${t('budget.statsPointsLabel')}">${hotspots}</div>
         </div>
@@ -503,6 +507,9 @@ function renderTrendChart() {
   // es im Dokument steht (#1722).
   if (window.lucide) lucide.createIcons({ el: host });
   wireTrendPoints(host, shown, pointKey, s);
+  // Die Kurven zeichnen sich einmal ein, beim ersten Erscheinen - nicht bei
+  // jedem Zeitraum (ux.js, drawChartOnce). Raster und Achse stehen.
+  drawChartOnce('budget-stats-trend', { lines: host.querySelector('.budget-stats__lines') });
 }
 
 // Bucket-Schlüssel der Serie: 'YYYY-MM' (Monatsraster) oder 'YYYY-MM-DD' (Tage).

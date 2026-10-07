@@ -1446,6 +1446,70 @@ async function withBarEnv({ reduced = false, visibility = 'visible', raf = 'neve
   }
 }
 
+/*
+ * drawChartOnce (Critique R17, Bewegung): Linie und Ring zeichnen sich EINMAL
+ * ein. Geprueft wird das Programm: was animiert wird, womit, und dass es beim
+ * zweiten Mal, unter reduzierter Bewegung und im verdeckten Tab still bleibt -
+ * ohne den Merker zu verbrauchen.
+ */
+function chartMark(attrs = {}) {
+  const el = {
+    calls: [],
+    getAttribute: (name) => attrs[name] ?? null,
+    animate(keyframes, timing) { el.calls.push({ keyframes, timing }); return {}; },
+  };
+  return el;
+}
+
+async function withChartEnv({ reduced = false, visibility = 'visible' }, fn) {
+  const saved = { window: globalThis.window, document: globalThis.document, getComputedStyle: globalThis.getComputedStyle };
+  globalThis.window = { matchMedia: (q) => ({ matches: reduced && /prefers-reduced-motion/.test(q) }) };
+  globalThis.document = { visibilityState: visibility, documentElement: {} };
+  globalThis.getComputedStyle = () => ({ getPropertyValue: (name) => ({ '--duration-xl': '300ms', '--ease-out': 'cubic-bezier(0.16, 1, 0.3, 1)' }[name] ?? '') });
+  const { drawChartOnce } = await import('../public/utils/ux.js');
+  try { return await fn(drawChartOnce); } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete globalThis[key]; else globalThis[key] = value;
+    }
+  }
+}
+
+test('drawChartOnce: Linie per clip-path, Ring per stroke-dasharray - aus Tokens, ohne fill, und nur einmal', async () => {
+  await withChartEnv({}, async (drawChartOnce) => {
+    const lines = chartMark();
+    const arc = chartMark({ 'stroke-dasharray': '94.25 376.99', 'stroke-dashoffset': '-120.00' });
+    assert.equal(drawChartOnce('test-once', { lines, arcs: [arc] }), 2);
+    assert.deepEqual(lines.calls[0].keyframes, [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }]);
+    assert.deepEqual(arc.calls[0].keyframes, [
+      { strokeDasharray: '0 376.99', strokeDashoffset: '0' },
+      { strokeDasharray: '94.25 376.99', strokeDashoffset: '-120.00' },
+    ], 'das Segment waechst von 12 Uhr an seine Stelle; Ziel ist der Wert aus dem Markup');
+    for (const mark of [lines, arc]) {
+      assert.deepEqual(mark.calls[0].timing, { duration: 300, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }, 'Dauer und Kurve aus Tokens, kein fill');
+    }
+    // Zweiter Aufruf (Zeitraum geblaettert, Reiter neu betreten): nichts.
+    const again = chartMark();
+    assert.equal(drawChartOnce('test-once', { lines: again }), 0);
+    assert.equal(again.calls.length, 0);
+  });
+});
+
+test('drawChartOnce: reduzierte Bewegung, verdeckter Tab und ein leeres Diagramm verbrauchen den Merker nicht', async () => {
+  for (const env of [{ reduced: true }, { visibility: 'hidden' }]) {
+    await withChartEnv(env, async (drawChartOnce) => {
+      const lines = chartMark();
+      assert.equal(drawChartOnce('test-held', { lines }), 0, JSON.stringify(env));
+      assert.equal(lines.calls.length, 0);
+    });
+  }
+  await withChartEnv({}, async (drawChartOnce) => {
+    assert.equal(drawChartOnce('test-held', { lines: null, arcs: [] }), 0, 'ohne Marken kein Lauf');
+    assert.equal(drawChartOnce('test-held', { lines: {} }), 0, 'ohne animate kein Lauf');
+    const lines = chartMark();
+    assert.equal(drawChartOnce('test-held', { lines }), 1, 'der erste echte Aufruf zeichnet');
+  });
+});
+
 test('growBars: startet bei 0, und der Endwert kommt auch OHNE rAF (Timer-Rueckfall)', async () => {
   await withBarEnv({ raf: 'never' }, async (growBars, frames) => {
     const a = barEl('a', '0.4000');

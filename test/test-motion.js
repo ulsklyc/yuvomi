@@ -1290,6 +1290,23 @@ test('Erststart: die Karte steht, der Schritt wechselt ueber swapContent mit fes
   assert.match(ruleBodies('dashboard.css', '.onboarding-step > .onboarding-body').join(';'), /flex:\s*1 0 auto/, 'der Text nimmt den Rest, Punkte und Knoepfe stehen');
 });
 
+test('Diagramme: Kurven und Ring der Berichte zeichnen sich einmal ein (drawChartOnce)', () => {
+  const stats = publicSource('pages/budget-stats.js');
+  assert.match(stats, /import \{ growBars, drawChartOnce \} from '\/utils\/ux\.js';/);
+  // Die Kurven stehen in EINER Gruppe - an ihr haengt der Beschnitt, Raster und Achse bleiben stehen.
+  assert.match(stats, /<g class="budget-stats__lines">\s*<polyline[\s\S]{0,400}<polyline[\s\S]{0,300}<\/g>/);
+  assert.match(stats, /drawChartOnce\('budget-stats-trend', \{ lines: host\.querySelector\('\.budget-stats__lines'\) \}\);/);
+  assert.match(stats, /drawChartOnce\('budget-stats-donut', \{ arcs: host\.querySelectorAll\('\.budget-stats__donut circle'\) \}\);/);
+  // Das Ringsegment traegt "Laenge Umfang" - daraus liest der Helfer den Startwert.
+  assert.match(stats, /stroke-dasharray="\$\{\(frac \* C\)\.toFixed\(2\)\} \$\{C\.toFixed\(2\)\}"/);
+  // Der Helfer selbst: ohne fill (Endzustand = Markup), einmal je Sitzung.
+  const ux = publicSource('utils/ux.js');
+  const fn = ux.slice(ux.indexOf('export function drawChartOnce('), ux.indexOf('function settleAnimation('));
+  assert.doesNotMatch(fn, /fill:/, 'kein fill - faellt die Animation aus, steht das Diagramm');
+  assert.match(fn, /prefers-reduced-motion: reduce/);
+  assert.match(fn, /durationToken\('--duration-xl', 300\), easing: easingToken\('--ease-out'/);
+});
+
 test('Schichtplan: Laden zeigt das geteilte Skelett, Blaettern haelt den Inhalt bis zur Antwort', () => {
   const schedule = pageSource('schedule');
   assert.doesNotMatch(schedule, /card card--padded schedule-stat-loading/, 'keine Textkarte "Laedt..." mehr');

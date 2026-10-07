@@ -271,6 +271,7 @@ const STUBS = {
     export const toggleRegion = (region, open) => { if (region) region.hidden = !open; return Promise.resolve(); };
     // Balken wachsen lassen: ohne Layout nichts zu tun, der Endwert steht im Markup.
     export const growBars = () => 0;
+    export const drawChartOnce = () => 0;
     export const durationToken = (name, fallback) => fallback;
     export const easingToken = (name, fallback = 'ease-out') => fallback;
   `,

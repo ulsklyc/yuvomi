@@ -65,6 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   changed height with the length of the text and moved "Next" away from under the pointer.
   The card now has one height for all steps, the buttons stay where they are, and the text
   of the next step fades in from the side.
+- **Budget reports: the curves draw themselves in once.** The first time the reports open, the
+  income and expense curves draw in along the time axis and the category ring fills clockwise.
+  Paging to another period afterwards shows the new figures at once, without replaying it.
 
 ### Fixed
 
