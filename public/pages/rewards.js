@@ -893,6 +893,7 @@ async function openRedeemModal(memberId, presetItemId = null) {
         </div>
         <div id="rw-redeem-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary" id="rw-redeem-submit">${esc(isAdmin() ? t('rewards.confirmRedeem') : t('rewards.requestAction'))}</button>
         </div>
       </form>`,
@@ -1023,6 +1024,7 @@ function openBonusModal() {
         </div>
         <div id="rw-bonus-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary" id="rw-bonus-submit">${esc(t('common.save'))}</button>
         </div>
       </form>`,
@@ -1091,8 +1093,9 @@ function openRewardModal(item) {
           </label>` : ''}
         <div id="rw-reward-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isEdit ? `<button type="button" class="btn btn--danger" id="rw-reward-delete">${esc(t('common.delete'))}</button>` : ''}
-          <button type="submit" class="btn btn--primary" id="rw-reward-submit">${isEdit ? esc(t('common.save')) : esc(t('common.create'))}</button>
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="rw-reward-delete">${esc(t('common.delete'))}</button>` : ''}
+          <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
+          <button type="submit" class="btn btn--primary" id="rw-reward-submit">${isEdit ? esc(t('common.save')) : esc(t('common.add'))}</button>
         </div>
       </form>`,
     onSave: (panel) => {
@@ -1232,6 +1235,7 @@ async function openMemberDetail(memberId) {
       </div>
       <ul class="rw-ledger rw-ledger--compact row-divided">${rows}</ul>
       ${canRedeem ? `<div class="modal-panel__footer modal-panel__footer--plain">
+        <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.close'))}</button>
         <button type="button" class="btn btn--primary" id="rw-detail-redeem"><i data-lucide="gift" aria-hidden="true"></i>${esc(redeemVerb())}</button>
       </div>` : ''}`,
     onSave: (panel) => {

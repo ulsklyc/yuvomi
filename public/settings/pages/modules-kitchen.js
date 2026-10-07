@@ -338,7 +338,7 @@ function bindProviderAddButton(container) {
           <div id="recipe-provider-add-error" class="form-error" role="alert" hidden></div>
           <div class="modal-panel__footer modal-panel__footer--plain">
             <button type="button" class="btn btn--secondary" id="recipe-provider-add-cancel">${t('common.cancel')}</button>
-            <button type="submit" class="btn btn--primary">${t('common.save')}</button>
+            <button type="submit" class="btn btn--primary">${t('common.add')}</button>
           </div>
         </form>
       `,

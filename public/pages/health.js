@@ -2089,7 +2089,7 @@ function openVitalModal(opts = {}) {
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="vital-delete" data-delete-name="${esc(t(VITAL_METRICS.find((m) => m.type === currentType)?.labelKey ?? 'common.delete'))}" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
-          <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
+          <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
       </form>`,
     onSave(panel) {
@@ -3373,7 +3373,7 @@ function openMedModal(med) {
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="med-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
-          <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
+          <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
       </form>`,
     onSave(panel) {
@@ -4035,7 +4035,7 @@ function openLabModal(report) {
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="lab-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
-          <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
+          <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
       </form>`,
     onSave(panel) {
@@ -4654,7 +4654,7 @@ function openActivityModal(row, opts = {}) {
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="activity-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
-          <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
+          <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
       </form>`,
     onSave(panel) {
@@ -5078,7 +5078,7 @@ function openPreventionModal(row) {
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="prevention-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
-          <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
+          <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
       </form>`,
     onSave(panel) {
@@ -5574,7 +5574,7 @@ function openNutritionModal(row) {
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="nutrition-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
-          <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
+          <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
       </form>`,
     onSave(panel) {
@@ -8232,7 +8232,7 @@ function openPeriodModal(period) {
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="cycle-delete-period" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
-          <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
+          <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
       </form>`,
     onSave(panel) {

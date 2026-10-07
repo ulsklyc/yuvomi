@@ -1335,7 +1335,7 @@ ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`
           </button>` : ''}
         <button type="button" class="btn btn--secondary" data-action="close-modal">${t('common.cancel')}</button>
         <button type="submit" class="btn btn--primary" id="task-submit-btn">
-          ${isEdit ? t('common.save') : t('common.create')}
+          ${isEdit ? t('common.save') : t('common.add')}
         </button>
       </div>
     </form>`;
@@ -2420,7 +2420,7 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
   submitBtn.disabled = true;
   submitBtn.textContent = t('common.saving');
 
-  const originalLabel = taskId ? t('common.save') : t('common.create');
+  const originalLabel = taskId ? t('common.save') : t('common.add');
 
   const startDateRaw = form.start_date?.value || '';
   const startDate = parseDateInput(startDateRaw);

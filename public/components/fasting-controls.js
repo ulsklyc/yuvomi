@@ -238,7 +238,7 @@ export function openFastingEditor(row, refresh, finished = false) {
       </fieldset>
       <div class="form-group"><label class="form-label" for="fast-note">${esc(t('health.fasting.note'))}</label><textarea class="form-input" id="fast-note" name="note" maxlength="2000" rows="3">${esc(row.note || '')}</textarea></div>
       <p class="form-hint" data-fasting-edit-error role="alert"></p>
-      <div class="modal-panel__footer"><button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button><button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button></div>
+      <div class="modal-panel__footer"><button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button><button type="submit" class="btn btn--primary">${esc(creating && !finished ? t('common.add') : t('common.save'))}</button></div>
     </form>`,
     onSave(panel) {
       const context = captureModalContext();

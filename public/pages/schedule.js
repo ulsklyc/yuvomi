@@ -2236,7 +2236,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
     content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="shift-create">'
       + formField(t('schedule.preset'), '<select class="input" name="shift_preset">' + shiftPresetOptions() + '</select>')
       + shiftFields()
-      + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('common.create')) + '</button></div></form>';
+      + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('common.add')) + '</button></div></form>';
   } else if (view === 'patterns') {
     // EIN Formular fuer drei Faelle statt drei getrennter Modale: eine
     // wiederkehrende Rotation (Muster), eine einmalige ERSETZUNG eines Tages
@@ -2307,7 +2307,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
         ? formField(t('schedule.shiftType'), '<select class="input" required name="shift_type_id">' + typeOptions(null, false) + '</select>')
         : '<p class="form-hint schedule-no-types-hint">' + esc(t('schedule.noShiftTypesHint')) + '</p>')
       + reminderOffsetField(null) + dayRowFieldsHtml(state.types[0]?.id ?? null) + '</fieldset>'
-      + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary" data-role="save-entry">' + esc(t('schedule.save')) + '</button></div></form>';
+      + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary" data-role="save-entry">' + esc(t('common.add')) + '</button></div></form>';
   }
   openModal({
     title,
@@ -2542,7 +2542,7 @@ function openCustomFieldModal(field = null) {
     size: 'sm',
     content: '<form id="schedule-custom-field-form" class="form-stack schedule-modal-form">'
       + formField(t('schedule.fieldName'), '<input class="input" required name="name" maxlength="100" value="' + esc(field?.name ?? '') + '">')
-      + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>',
+      + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t(isEdit ? 'schedule.save' : 'common.add')) + '</button></div></form>',
     onSave: (modal) => {
       modal.querySelector('#schedule-custom-field-form')?.addEventListener('submit', (event) => saveCustomField(event, field?.id ?? null));
     },
@@ -2720,14 +2720,13 @@ async function saveShiftTypeEdit(event) {
  */
 function openPatternEditModal(pattern) {
   const writable = canWrite(pattern.user_id);
-  const footer = writable
-    ? '<button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button>'
-    : '<button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.close')) + '</button>';
   const content = '<form id="schedule-edit-form" class="form-stack schedule-modal-form" data-form="pattern-update" data-id="' + pattern.id + '">'
     + formField(t('schedule.owner'), '<input class="input" readonly value="' + esc(userName(pattern.user_id)) + '">')
     + '<fieldset class="schedule-pattern-fields" data-field="pattern-fields"' + (writable ? '' : ' disabled') + '>' + patternFields(pattern) + '</fieldset>'
     + patternDaysEditorHtml(pattern, writable)
-    + '<div class="modal-panel__footer modal-panel__footer--plain">' + footer + '</div></form>';
+    + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t(writable ? 'common.cancel' : 'common.close')) + '</button>'
+    + (writable ? '<button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button>' : '')
+    + '</div></form>';
   openModal({
     title: writable ? t('schedule.editPattern') : pattern.name,
     size: 'md',

@@ -875,7 +875,7 @@ function openNoteModal({ mode, note = null }) {
           <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
         </button>` : ''}
         <button type="button" class="btn btn--secondary" id="note-modal-cancel" data-editor-only>${t('common.cancel')}</button>
-        <button type="button" class="btn btn--primary" id="note-modal-save" data-editor-only>${isEdit ? t('common.save') : t('common.create')}</button>
+        <button type="button" class="btn btn--primary" id="note-modal-save" data-editor-only>${isEdit ? t('common.save') : t('common.add')}</button>
         ${isEdit ? `<button type="button" class="btn btn--primary" id="note-modal-edit" data-reader-only>${t('common.edit')}</button>` : ''}
       </div>
     </div>`;
@@ -1340,7 +1340,7 @@ function openNoteModal({ mode, note = null }) {
           noteSavePending = false;
           categoryCreateButton.disabled = false;
           saveBtn.disabled    = false;
-          saveBtn.textContent = isEdit ? t('common.save') : t('common.create');
+          saveBtn.textContent = isEdit ? t('common.save') : t('common.add');
         }
       });
     },

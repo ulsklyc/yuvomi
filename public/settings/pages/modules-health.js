@@ -156,7 +156,7 @@ function openTypeModal(type) {
             <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}
           </button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
-          <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
+          <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
       </form>`,
     onSave(panel) {

@@ -54,7 +54,7 @@
  * Knopf und Link des Dialogs. Die Auszeichnung ist eine Verstaerkung, keine
  * Voraussetzung: openModal-Dialoge tragen immer einen `.modal-panel__header`,
  * ihre Speichern-Zeile steht aber oft in einer eigenen Klasse im Koerper
- * (`.settings-form-actions`, `.housekeeping-form-submit`). Solange der
+ * (`.settings-form-actions`; bis R17 auch `.housekeeping-form-submit`). Solange der
  * Rueckfall nur griff, wenn GAR NICHTS ausgezeichnet war, lag dort "Speichern"
  * wieder unter dem Toast (Ersatz-Review an #1421, gemessen an "Mitglied
  * bearbeiten"). Weggescrollte Knoepfe zaehlen nicht: jede Flaeche wird auf den

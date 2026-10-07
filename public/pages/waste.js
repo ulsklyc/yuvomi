@@ -982,7 +982,7 @@ function openTypeModal(type = null) {
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
       ${isEdit ? `
-      <div style="display:flex;gap:var(--space-2);margin-inline-end:auto">
+      <div style="display:flex;gap:var(--space-1);margin-inline-end:auto">
           <button type="button" class="btn btn--danger-outline" id="wtm-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>
           <button type="button" class="btn btn--secondary btn--icon" id="wtm-archive" aria-label="${esc(type.archived ? t('waste.restoreAction') : t('waste.archiveAction'))}"><i data-lucide="${type.archived ? 'archive-restore' : 'archive'}" class="icon-md" aria-hidden="true"></i></button>
       </div>` : ''}
@@ -995,7 +995,9 @@ function openTypeModal(type = null) {
   openModal({
     title: isEdit ? t('waste.editType') : t('waste.newType'),
     content,
-    size: 'sm',
+    // 520 statt 400: Loeschen, Archivieren, Abbrechen und Speichern brauchen
+    // 395px, das 400er-Blatt hat innen 366 - der Fuss brach in zwei Zeilen.
+    size: 'md',
     onSave(panel) {
       panel.querySelector('#wtm-cancel').addEventListener('click', () => closeModal());
       panel.querySelector('[data-action="pick-type-icon"]').addEventListener('click', (e) => pickTypeIcon(e.currentTarget));
@@ -1838,7 +1840,7 @@ function openUrlSourceWizard() {
       <div></div>
       <div style="display:flex;gap:var(--space-3)">
         <button class="btn btn--secondary" id="wurl-cancel">${t('common.cancel')}</button>
-        <button class="btn btn--primary" id="wurl-save">${t('common.save')}</button>
+        <button class="btn btn--primary" id="wurl-save">${t('common.add')}</button>
       </div>
     </div>`;
 

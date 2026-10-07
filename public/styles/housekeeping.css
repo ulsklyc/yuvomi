@@ -449,14 +449,6 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
-.housekeeping-form-submit {
-  min-height: var(--target-lg);
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 /* DER ANLEGEDIALOG (Critique 2026-09-26, A3 P1-1): oben die Vorlagen als
  * Schnellauswahl, darunter das eigene Formular. Vorher standen beide als
  * Karten dauerhaft vor der Liste; das Karussell lief seitlich aus dem Bild,

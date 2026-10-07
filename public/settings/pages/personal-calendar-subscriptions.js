@@ -274,7 +274,7 @@ function openIcsEditModal(container, sub, subs, user) {
           <p class="form-hint">${t('settings.sync.defaultAssigneeHint')}</p>
         </div>
         <div id="ics-edit-error" class="form-error" role="alert" hidden></div>
-        <div class="settings-form-actions">
+        <div class="modal-panel__footer modal-panel__footer--plain">
           <button type="button" class="btn btn--secondary" id="ics-edit-cancel">${t('common.cancel')}</button>
           <button type="submit" class="btn btn--primary">${t('settings.ics.actions.save')}</button>
         </div>

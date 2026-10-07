@@ -11,6 +11,10 @@ import { SETTINGS_DOMAINS, SETTINGS_LEAVES } from '../public/settings/registry.j
 import { eachRule } from './css-rules.js';
 import { keySetDiff } from './i18n-plural-keys.js';
 import { withoutHtmlComments, withoutBlockComments, withoutCommentsKeepingLines } from './source-text.js';
+import {
+  dialogSegments, submitOutsideFooter, footerWithoutCancel, saveBranchPartners,
+  fixedSaveOnTwoCaseDialog, foreignCreateVerbs, aliasFieldClasses,
+} from './dialog-grammar.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r/g, '');
 
@@ -19897,4 +19901,109 @@ test('R16: in der schmalen Abo-Liste steht der Turnus unter dem Betrag, nicht in
   assert.match(show?.body ?? '', /display:\s*block/, 'schmal steht er unter dem Betrag');
   const hide = rules.find((r) => narrow(r) && /\.subscription-card__meta-cycle\b/.test(r.selector));
   assert.match(hide?.body ?? '', /display:\s*none/, 'und weicht dort aus der Metazeile - nie beides zugleich');
+});
+
+// ── R17, E6: EINE Dialog-Grammatik ──────────────────────────────────────────
+// Critique 2026-10-07 (A3 P1, A5 P2): drei Fuss-Grammatiken (Belohnungen ohne
+// Abbrechen, Haushaltshilfe mit dem Speichern-Knopf linksbuendig im scrollenden
+// Koerper - mobil bei y=1362 in einem 664px-Fenster) und vier Verben fuer
+// dieselbe Handlung ("Erstellen", "Hinzufuegen", "Aufgabe erstellen",
+// "Speichern"). Die Regel: Fuss = Abbrechen + Primaer am Ende; Anlegen heisst
+// "Hinzufuegen", Bearbeiten "Speichern". Gelesen wird das Markup der Funktion,
+// die den Dialog oeffnet (test/dialog-grammar.js), die Beschriftung ueber ihren
+// deutschen Locale-Wert.
+const DIALOG_SOURCES = ['../public/pages/', '../public/components/', '../public/settings/']
+  .flatMap((dir) => walkJsFiles(dir));
+const dialogSource = (path) => withoutCommentsKeepingLines(read(path));
+const deValueOf = (() => {
+  const de = JSON.parse(read('../public/locales/de.json'));
+  return (key) => {
+    const value = key.split('.').reduce((node, part) => node?.[part], de);
+    return typeof value === 'string' ? value : undefined;
+  };
+})();
+// Kein Anlegen/Bearbeiten, sondern eine benannte Handlung mit eigenem Verb.
+const NAMED_DIALOG_ACTIONS = ['documents.uploadAction'];
+// "Erstellen und hinzufuegen": legt einen Gast an UND nimmt ihn in die Gruppe -
+// zwei Schritte, die das Verb beide nennen muss.
+const COMPOUND_CREATE = ['splitExpenses.createAndAddGuest'];
+
+test('R17 E6: die Scanner der Dialog-Grammatik sehen ihre Gegenfaelle', () => {
+  const body = `
+function openThing(item) {
+  const isEdit = Boolean(item);
+  openModal({
+    title: isEdit ? t('waste.editType') : t('waste.newType'),
+    content: \`<form id="f">
+      <input class="form-input" name="n">
+      <button class="btn btn--primary" type="submit">\${t('common.save')}</button>
+    </form>\`,
+  });
+}`;
+  assert.deepEqual(submitOutsideFooter(body), [4], 'Absenden im Koerper wird gefunden');
+  assert.deepEqual(fixedSaveOnTwoCaseDialog(body, deValueOf), [4], 'starres Speichern bei zwei Faellen wird gefunden');
+  const footer = `
+function openThing(item) {
+  openSharedModal({
+    title: t('rewards.addReward'),
+    content: \`<form id="f">
+      <div class="modal-panel__footer">
+        <button type="submit" class="btn btn--primary">\${isEdit ? esc(t('common.save')) : esc(t('common.create'))}</button>
+      </div>
+    </form>\`,
+  });
+}`;
+  assert.deepEqual(submitOutsideFooter(footer), [], 'der Knopf im Fuss ist kein Fund');
+  assert.deepEqual(footerWithoutCancel(footer), [3], 'ein Fuss ohne Abbrechen wird gefunden');
+  assert.deepEqual(saveBranchPartners(footer), ['common.create']);
+  assert.deepEqual(foreignCreateVerbs(footer, deValueOf), ['common.create=Erstellen']);
+  // Ein Kommentar macht nichts gruen: der Aufrufer schneidet ihn vorher.
+  const commented = withoutCommentsKeepingLines(footer.replace('<form id="f">', '<form id="f">\n      <!-- <button data-action="close-modal"> -->'));
+  assert.deepEqual(footerWithoutCancel(commented), [3]);
+  const good = footer
+    .replace('<button type="submit"', '<button type="button" class="btn btn--secondary" data-action="close-modal">${t(\'common.cancel\')}</button>\n        <button type="submit"')
+    .replace("t('common.create')", "t('common.add')");
+  assert.deepEqual(footerWithoutCancel(good), []);
+  assert.deepEqual(saveBranchPartners(good), []);
+  assert.deepEqual(foreignCreateVerbs(good, deValueOf), []);
+});
+
+test('R17 E6: kein Dialog sendet aus dem scrollenden Koerper, und neben dem Primaerknopf steht Abbrechen', () => {
+  const outside = [];
+  const lonely = [];
+  let dialogs = 0;
+  for (const path of DIALOG_SOURCES) {
+    const src = dialogSource(path);
+    dialogs += dialogSegments(src).length;
+    for (const line of submitOutsideFooter(src)) outside.push(`${path}:${line}`);
+    for (const line of footerWithoutCancel(src)) lonely.push(`${path}:${line}`);
+  }
+  assert.ok(dialogs > 100, `der Scanner findet die Dialoge der App (${dialogs})`);
+  assert.deepEqual(outside, [], 'der absendende Knopf gehoert in `.modal-panel__footer` (mountFooter hebt ihn an den Blattrand)');
+  assert.deepEqual(lonely, [], 'ein Fuss mit absendendem Primaerknopf traegt auch Abbrechen');
+});
+
+test('R17 E6: Anlegen heisst "Hinzufuegen", Bearbeiten "Speichern" - in jedem Dialog', () => {
+  assert.equal(deValueOf('common.add'), 'Hinzufügen');
+  assert.equal(deValueOf('common.save'), 'Speichern');
+  const partners = [];
+  const fixed = [];
+  const verbs = [];
+  for (const path of DIALOG_SOURCES) {
+    const src = dialogSource(path);
+    for (const key of saveBranchPartners(src, NAMED_DIALOG_ACTIONS)) partners.push(`${path}: ${key}`);
+    for (const line of fixedSaveOnTwoCaseDialog(src, deValueOf)) fixed.push(`${path}:${line}`);
+    for (const hit of foreignCreateVerbs(src, deValueOf, COMPOUND_CREATE)) verbs.push(`${path}: ${hit}`);
+  }
+  assert.deepEqual(partners, [], 'neben "Speichern" steht als Anlegen-Fall nur `common.add`');
+  assert.deepEqual(fixed, [], 'ein Dialog fuer Anlegen UND Bearbeiten nennt beide Faelle am Knopf');
+  assert.deepEqual(verbs, [], 'kein Primaerknopf im Dialogfuss nennt das Anlegen "Erstellen" oder "Anlegen"');
+});
+
+test('R17 E6: im Dialogfuss misst ein Icon-Knopf am Zeiger so hoch wie seine Nachbarn', () => {
+  const rule = [...eachRule(read('../public/styles/layout.css'))]
+    .find((r) => r.selector.trim() === '.modal-panel__footer .btn--icon');
+  assert.ok(rule, '.modal-panel__footer .btn--icon fehlt');
+  assert.ok(rule.at.some((a) => /min-width:\s*1024px/.test(a)), 'nur am Zeiger - auf Touch bleiben 44px');
+  assert.match(rule.body, /min-height:\s*var\(--target-md\)/);
 });

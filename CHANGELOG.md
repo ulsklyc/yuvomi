@@ -36,6 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Dialogs speak one grammar: Cancel and the main button sit at the bottom right, adding is
+  "Add" and editing is "Save".** Rewards dialogs (reward, redeem, bonus) had a main button and no
+  Cancel; adding or editing a housekeeper and editing a visit carried "Save" left-aligned at the
+  end of the scrolling form - on a phone below the fold of a 1200 px form. All of them now use the
+  shared footer, which stays in view. The main button of every create dialog reads "Add" where it
+  said "Create", "Create task", "Create loan", "Create folder" or "Save" (tasks, notes, calendar,
+  contacts, birthdays, rewards, health, shared expenses, shifts, quick links, sync accounts); a
+  dialog that edits says "Save". "Edit waste type" is 520 px wide so Delete, Archive, Cancel and
+  Save hold one row (the footer was two rows, 121 px), and on a phone "Save" no longer breaks
+  into two lines there and in "Edit account".
 - **Inventory on a phone: search and tools sit in the title row.** The head took three rows there
   (114 px, 154 px inside a category) for a title and two icon buttons, while Documents and Health
   next to it need one. It is one row now, and the first entry starts 49 px higher.

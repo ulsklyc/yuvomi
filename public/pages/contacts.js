@@ -1509,7 +1509,7 @@ function buildContactForm({ mode, contact = null }) {
       </button>` : '<div></div>'}
       <div class="contact-modal__footer-actions">
         <button class="btn btn--secondary" id="cm-cancel">${t('common.cancel')}</button>
-        <button class="btn btn--primary" id="cm-save">${isEdit ? t('common.save') : t('common.create')}</button>
+        <button class="btn btn--primary" id="cm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
     </div>`;
 
@@ -1644,7 +1644,7 @@ function buildContactForm({ mode, contact = null }) {
             ? t('common.emailInUse')
             : (err.data?.error ?? t('common.unknownError')), 'danger');
           saveBtn.disabled    = false;
-          saveBtn.textContent = isEdit ? t('common.save') : t('common.create');
+          saveBtn.textContent = isEdit ? t('common.save') : t('common.add');
         }
       });
     },

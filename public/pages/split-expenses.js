@@ -1826,7 +1826,7 @@ async function openGroupModal(group = null) {
         ${isEdit ? renderGroupDefaults(group) : ''}
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button class="btn btn--secondary" type="button" id="split-cancel-group">${t('common.cancel')}</button>
-          <button class="btn btn--primary" type="submit" id="split-save-group">${t('common.save')}</button>
+          <button class="btn btn--primary" type="submit" id="split-save-group">${isEdit ? t('common.save') : t('common.add')}</button>
         </div>
       </form>
     `,
@@ -1970,7 +1970,7 @@ function openExpenseModal(expense = null, prefill = null) {
           </button>` : ''}
           <div class="split-form__footer-actions">
             <button class="btn btn--secondary" type="button" id="split-cancel-expense">${t('common.cancel')}</button>
-            <button class="btn btn--primary" type="submit" id="split-save-expense">${t('common.save')}</button>
+            <button class="btn btn--primary" type="submit" id="split-save-expense">${isEdit ? t('common.save') : t('common.add')}</button>
           </div>
         </div>
       </form>
@@ -2214,7 +2214,7 @@ function openRecurringModal(recurring = null) {
           </button>` : ''}
           <div class="split-form__footer-actions">
             <button class="btn btn--secondary" type="button" id="split-cancel-recurring">${t('common.cancel')}</button>
-            <button class="btn btn--primary" type="submit" id="split-save-recurring">${t('common.save')}</button>
+            <button class="btn btn--primary" type="submit" id="split-save-recurring">${isEdit ? t('common.save') : t('common.add')}</button>
           </div>
         </div>
       </form>
@@ -2466,7 +2466,7 @@ async function openMemberModal() {
           <button class="btn btn--secondary" type="button" id="split-new-guest" style="margin-inline-end:auto">${t('splitExpenses.createGuest')}</button>
           <div class="split-form__footer-actions">
             <button class="btn btn--secondary" type="button" id="split-cancel-member">${t('common.cancel')}</button>
-            <button class="btn btn--primary" type="submit" id="split-save-member">${t('common.save')}</button>
+            <button class="btn btn--primary" type="submit" id="split-save-member">${t('common.add')}</button>
           </div>
         </div>
       </form>

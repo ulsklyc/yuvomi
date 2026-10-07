@@ -6756,6 +6756,14 @@ p.field-hint--warn[hidden] {
     min-height: var(--target-md);
     height: var(--target-md);
   }
+
+  /* Dieselbe Regel im Dialogfuss (R17, E6): ein Icon-Knopf (Archivieren neben
+   * Loeschen, Entsorgung und Konto) stand mit 44px neben Abbrechen und
+   * Speichern mit 40 und streckte seinen Nachbarn mit. */
+  .modal-panel__footer .btn--icon {
+    min-height: var(--target-md);
+    min-width: var(--target-md);
+  }
 }
 
 

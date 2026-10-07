@@ -3136,7 +3136,8 @@ function openFolderModal({ parentId = null } = {}) {
         </div>
         <div id="document-folder-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
-          <button type="submit" class="btn btn--primary">${t('documents.createFolderAction')}</button>
+          <button type="button" class="btn btn--secondary" data-action="close-modal">${t('common.cancel')}</button>
+          <button type="submit" class="btn btn--primary">${t('common.add')}</button>
         </div>
       </form>
     `,

@@ -897,7 +897,7 @@ function openBirthdayModal({ mode, birthday = null }) {
           </button>` : '<div></div>'}
           <div class="birthday-modal__footer-actions">
             <button class="btn btn--secondary" type="button" id="bd-cancel">${t('common.cancel')}</button>
-            <button class="btn btn--primary" type="button" id="bd-save">${isEdit ? t('common.save') : t('common.create')}</button>
+            <button class="btn btn--primary" type="button" id="bd-save">${isEdit ? t('common.save') : t('common.add')}</button>
           </div>
         </div>
       </div>

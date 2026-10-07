@@ -2308,7 +2308,7 @@ function openAccountModal(account = null) {
     </div>
 
     <div class="modal-panel__footer modal-panel__footer--plain">
-      <div style="display:flex;gap:var(--space-2);margin-inline-end:auto">
+      <div style="display:flex;gap:var(--space-1);margin-inline-end:auto">
       ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="am-delete">
         <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>
@@ -3493,7 +3493,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
           panel.querySelector('#bm-recurrence-options').hidden = !panel.querySelector('#bm-recurring').checked;
         }
         panel.querySelector('#bm-save').textContent = type === 'loan'
-          ? t('budget.createLoan')
+          ? t('common.add')
           : (isEdit ? t('common.save') : t('common.add'));
         if (type !== 'loan') updateCategoryOptions();
       };
@@ -4692,7 +4692,7 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
   const accountSel = panel.querySelector('#lm-account');
   if (accountSel) body.account_id = accountSel.value === '' ? null : parseInt(accountSel.value, 10);
 
-  const saveLabel = isEdit ? t('common.save') : t('budget.createLoan');
+  const saveLabel = isEdit ? t('common.save') : t('common.add');
   saveBtn.disabled = true;
   saveBtn.textContent = '…';
   // Gezahlte Raten gegen die abgeleitete Laufzeit (#1656) - nur wo es etwas zu
@@ -4732,7 +4732,7 @@ function openLoanModal(loan = null) {
       <div></div>
       <div style="display:flex;gap:var(--space-3)">
         <button class="btn btn--secondary" id="lm-cancel">${t('common.cancel')}</button>
-        <button class="btn btn--primary" id="lm-save">${isEdit ? t('common.save') : t('budget.createLoan')}</button>
+        <button class="btn btn--primary" id="lm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
     </div>`;
 

@@ -547,7 +547,7 @@ function openAccountModal(account, onDone) {
         <div id="cardav-account-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button type="button" class="btn btn--secondary" id="cardav-account-cancel">${t('common.cancel')}</button>
-          <button type="submit" class="btn btn--primary">${t('common.save')}</button>
+          <button type="submit" class="btn btn--primary">${isEdit ? t('common.save') : t('common.add')}</button>
         </div>
       </form>
     `,

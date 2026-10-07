@@ -854,7 +854,7 @@ function openTaskCreateModal(content) {
           </div>
           <div class="modal-panel__footer">
             <button class="btn btn--secondary" type="button" data-create-cancel>${esc(t('common.cancel'))}</button>
-            <button class="btn btn--primary" type="submit">${esc(t('housekeeping.createTask'))}</button>
+            <button class="btn btn--primary" type="submit">${esc(t('common.add'))}</button>
           </div>
         </form>
       </div>
@@ -2025,10 +2025,10 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
           </label>
         </div>
         ${receiptFieldHtml(visit)}
-        <button class="btn btn--primary housekeeping-form-submit" type="submit">
-          <i data-lucide="save" aria-hidden="true"></i>
-          <span>${esc(t('common.save'))}</span>
-        </button>
+        <div class="modal-panel__footer">
+          <button class="btn btn--secondary" type="button" data-action="close-modal">${esc(t('common.cancel'))}</button>
+          <button class="btn btn--primary" type="submit">${esc(t('common.save'))}</button>
+        </div>
       </form>
     `,
     onSave: (panel) => {
@@ -2282,10 +2282,10 @@ function openStaffModal(worker, content, options = {}) {
           <span>${esc(t('housekeeping.workerNotes'))}</span>
           <textarea name="notes" rows="3" maxlength="5000">${esc(item.notes || '')}</textarea>
         </label>
-        <button class="btn btn--primary housekeeping-form-submit" type="submit">
-          <i data-lucide="save" aria-hidden="true"></i>
-          <span>${esc(t('common.save'))}</span>
-        </button>
+        <div class="modal-panel__footer">
+          <button class="btn btn--secondary" type="button" data-action="close-modal">${esc(t('common.cancel'))}</button>
+          <button class="btn btn--primary" type="submit">${esc(item.id ? t('common.save') : t('common.add'))}</button>
+        </div>
       </form>
     `,
     onSave: (panel) => {

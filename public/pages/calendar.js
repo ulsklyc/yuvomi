@@ -7972,7 +7972,7 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       </button>` : '<div></div>'}
       <div style="display:flex;gap:var(--space-3)">
         <button type="button" class="btn btn--secondary" id="modal-cancel">${t('common.cancel')}</button>
-        <button class="btn btn--primary" id="modal-save">${isEdit ? t('common.save') : t('common.create')}</button>
+        <button class="btn btn--primary" id="modal-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
     </div>`;
 }
@@ -8150,7 +8150,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     if (!rrule.valid_until) {
       reportFieldError(overlay.querySelector('#event-rrule-until'), t('calendar.invalidDate'));
       saveBtn.disabled    = false;
-      saveBtn.textContent = mode === 'edit' ? t('common.save') : t('common.create');
+      saveBtn.textContent = mode === 'edit' ? t('common.save') : t('common.add');
       return;
     }
     const attachmentFile = overlay.querySelector('#modal-attachment')?.files?.[0];
@@ -8356,7 +8356,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     // und der Button reaktiviert - die Eingaben des Nutzers bleiben erhalten.
     window.yuvomi?.showToast(calendarSaveErrorMessage(err), 'danger');
     saveBtn.disabled    = false;
-    saveBtn.textContent = mode === 'edit' ? t('common.save') : t('common.create');
+    saveBtn.textContent = mode === 'edit' ? t('common.save') : t('common.add');
   }
 }
 
