@@ -2165,6 +2165,18 @@ test('Budgetkopf traegt page-toolbar--period: eingeklappt verlaesst der Titel da
   const copies = [...eachRule(calendarCss)].filter((r) => /\.is-collapsed/.test(r.selector)
     && (/\.page-toolbar__title|\.module-seal--head/.test(r.selector) || /clip-path\s*:/.test(r.body)));
   assert.deepEqual(copies.map((r) => r.selector.trim()), [], 'keine zweite, kalendereigene Kopie der Regel');
+  // Allowlist statt Denylist (R17 Schritt 8): bis R17 verbot dieser Test JEDE
+  // eingeklappte Kalender-Regel. Die Praezisierung oben faengt die alte Kopie,
+  // aber nicht denselben Fehler in anderer Schreibweise (`> h1 { display: none }`).
+  // Erlaubt ist deshalb nur, was der eingeklappte Kalenderkopf wirklich ordnet:
+  // der Center-Slot (Stepper rueckt in Zeile 1) und die Werkzeuge, die ins
+  // Ansichtsmenue falten. Jede weitere Regel ist rot, bis sie hier steht.
+  const ALLOWED_COLLAPSED = [/> \.page-toolbar__center$/, /\[data-collapse-fold\]/];
+  const strangers = [...eachRule(calendarCss)]
+    .filter((r) => /\.is-collapsed/.test(r.selector))
+    .flatMap((r) => r.selector.split(',').map((part) => part.trim()))
+    .filter((part) => /\.is-collapsed/.test(part) && !ALLOWED_COLLAPSED.some((re) => re.test(part)));
+  assert.deepEqual(strangers, [], 'der eingeklappte Kalenderkopf ordnet nur Center-Slot und gefaltete Werkzeuge');
 });
 
 /* ZWEI SKALEN (Critique 2026-09-25, P2): eine gemeinsame Skala liess das
