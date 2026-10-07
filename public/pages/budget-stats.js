@@ -165,7 +165,10 @@ function renderBodyContent(body) {
         ? { label: t('budget.emptyAction'), icon: 'plus', attrs: { id: 'budget-stats-empty-add' } }
         : undefined,
     });
-    box?.querySelector('#budget-stats-empty-add')?.addEventListener('click', () => view.ctx.onAddEntry?.());
+    box?.querySelector('#budget-stats-empty-add')?.addEventListener('click', () => view.ctx.onAddEntry?.(
+      // Der Zeitraum, den der Server fuer DIESE Ansicht gemeldet hat (#1775).
+      view.data ? { from: view.data.from, to: view.data.to } : null,
+    ));
     return;
   }
   /* KEINE ZWEITE UEBERSICHT (Critique 2026-09-25). Hier standen dieselben

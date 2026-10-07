@@ -312,6 +312,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as a button and in the read-only view of your own cycle. Somebody else's cycle stays hidden
   from the screen reader as before.
 
+- **Budget statistics: an entry added from an empty period lands in that period.** The "add an
+  entry" action of an empty week, month or year opened the dialog with a date from the month of
+  the entry list, so the entry went elsewhere and the report stayed empty. The dialog now starts
+  on the first day of the period on screen, or on today when the period contains it (#1775).
+
 ## [2.74.0] - 2026-10-07
 
 ### Added
