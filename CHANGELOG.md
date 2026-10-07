@@ -53,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the text in the normal ink. Month, the all-day row of week and day, and agenda, in light and
   dark; every colour of the starter palette is above 10:1 for the name and 5:1 for the time.
 
+- **The cycle calendar tells a screen reader what each day shows, not only its date.** Period,
+  predicted period, fertile window, ovulation, an entry and "today" were colours on the day and
+  nothing else - somebody listening to the calendar got 42 dates and no state. Each day now names
+  what it shows in the words of the legend next to it ("3 October, Period, Flow: Medium, Entry"),
+  as a button and in the read-only view of your own cycle. Somebody else's cycle stays hidden
+  from the screen reader as before.
+
 ## [2.74.0] - 2026-10-07
 
 ### Added

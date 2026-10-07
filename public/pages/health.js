@@ -7140,6 +7140,51 @@ function cycleMonthLabel(anchorKey) {
 }
 
 /**
+ * Der Name einer Tageszelle fuer den Screenreader: das Datum UND was die Zelle
+ * zeigt (Critique R17). Bis hierher nannte das Label nur das Datum; Periode,
+ * Vorhersage, fruchtbares Fenster, Eisprung, Eintrag und "heute" standen allein
+ * als Klassen an der Zelle, also als Farbe - wer den Kalender hoert statt
+ * sieht, bekam 35 Daten und keinen einzigen Zustand.
+ *
+ * DIE WORTE SIND DIE DER LEGENDE. Jeder Zustand, den die Zelle als Klasse oder
+ * Marker traegt, wird mit genau dem Text genannt, mit dem die Legende daneben
+ * ihn erklaert - eine zweite Wortwahl waere eine zweite Legende. Die
+ * Reihenfolge folgt dem Gewicht: heute, Phase (samt "vorhergesagt"),
+ * Blutungsstaerke, Eintrag, dann die Zusatzmarker.
+ *
+ * Nur fuer die EIGENE Ansicht gebaut (die fremde ist `aria-hidden`, siehe
+ * unten) - der Intimitaets-Marker steht deshalb hier nicht hinter einer
+ * zweiten Sperre, sondern kommt schon own-gated herein.
+ *
+ * @param {object} c       Zelle aus buildCycleCalendar()
+ * @param {object} marks   Zusatzmarker dieser Zelle: `symptom` ('tracked' |
+ *                         'predicted' | null), `pms`, `intimacy`
+ */
+function cycleDayLabel(c, { symptom = null, pms = false, intimacy = false } = {}) {
+  const parts = [formatDate(c.dateKey)];
+  if (c.isToday) parts.push(t('health.cycle.legend.today'));
+  if (c.phase === PHASE.MENSTRUATION) parts.push(t('health.cycle.legend.period'));
+  else if (c.phase === PHASE.FERTILE) parts.push(t('health.cycle.legend.fertile'));
+  else if (c.phase === PHASE.OVULATION) {
+    parts.push(t(c.confirmed ? 'health.cycle.status.ovulationConfirmed' : 'health.cycle.legend.ovulation'));
+  }
+  if (c.phase && c.predicted) parts.push(t('health.cycle.legend.predicted'));
+  const flow = c.flow ? flowLevel(c.flow) : null;
+  if (flow) parts.push(`${t('health.cycle.flow.label')}: ${t(flow.labelKey)}`);
+  if (c.hasLog) parts.push(t('health.cycle.legend.logged'));
+  if (symptom) {
+    // Die Legende nennt das Overlay ohne das Symptom, weil der gewaehlte Chip
+    // daneben steht; ein Label steht allein und nennt es deshalb mit.
+    const name = symptomType(cycle.likelihoodSymptom);
+    const state = t(symptom === 'tracked' ? 'health.cycle.trends.symptomTracked' : 'health.cycle.trends.symptomPredicted');
+    parts.push(name ? `${t(name.labelKey)}: ${state}` : state);
+  }
+  if (pms) parts.push(t('health.cycle.legend.pms'));
+  if (intimacy) parts.push(t('health.cycle.intimacy.label'));
+  return parts.join(', ');
+}
+
+/**
  * @param {boolean} own     Sieht diese Person ihre EIGENEN Daten? Steuert das
  *                          Lesbare (Intimitaets-Marker, PMS-Schattierung).
  * @param {boolean} canEdit Darf sie hier schreiben? Steuert allein, ob eine
@@ -7216,26 +7261,33 @@ function cycleCalendarMarkup(own, pms, canEdit = own) {
     // buildCycleCalendar() gegenseitig aus.
     if (c.confirmed) { cls.push('is-confirmed'); hasConfirmedOvulation = true; }
     if (c.hasLog) cls.push('has-log');
-    if (trackedDates?.has(c.dateKey)) cls.push('is-symptom-tracked');
-    else if (predictedDates?.has(c.dateKey)) cls.push('is-symptom-predicted');
-    if (!c.phase && inPmsWindow(c.dateKey)) {
+    const symptomMark = trackedDates?.has(c.dateKey) ? 'tracked' : predictedDates?.has(c.dateKey) ? 'predicted' : null;
+    if (symptomMark) cls.push(`is-symptom-${symptomMark}`);
+    const pmsMark = !c.phase && inPmsWindow(c.dateKey);
+    if (pmsMark) {
       cls.push('is-pms');
       if (c.inMonth) pmsVisibleInMonth = true;
     }
+    const intimacyMark = Boolean(intimacyDates?.has(c.dateKey));
     const flowAttr = c.flow ? ` data-flow="${esc(c.flow)}"` : '';
     const tag = canEdit ? 'button' : 'div';
     // Drei Faelle, nicht zwei. `aria-hidden` gehoert der FREMDEN Ansicht, wo
     // der Kalender ohnehin nur Umriss ist. Die eigene Ansicht eines
     // Nur-lesen-Mitglieds (seit #1265 P2: own, aber kein Schreibrecht) behaelt
-    // ihr Datums-Label - die Sperre nimmt die Handlung, nicht die Auskunft.
+    // ihr Label - die Sperre nimmt die Handlung, nicht die Auskunft.
     // Ohne diese Stufe waere der eigene Kalender fuer einen Screenreader stumm,
     // obwohl die Person ihre eigenen Daten sehen darf.
+    // Das Label nennt Datum UND Zustand (cycleDayLabel()), in beiden Zweigen
+    // dasselbe: was die Zelle zeigt, haengt nicht am Schreibrecht.
+    const label = canEdit || own
+      ? esc(cycleDayLabel(c, { symptom: symptomMark, pms: pmsMark, intimacy: intimacyMark }))
+      : '';
     const attrs = canEdit
-      ? `type="button" data-cycle-day="${esc(c.dateKey)}" aria-label="${esc(formatDate(c.dateKey))}"`
+      ? `type="button" data-cycle-day="${esc(c.dateKey)}" aria-label="${label}"`
       : own
-        ? `role="img" aria-label="${esc(formatDate(c.dateKey))}"`
+        ? `role="img" aria-label="${label}"`
         : 'aria-hidden="true"';
-    const heart = intimacyDates?.has(c.dateKey)
+    const heart = intimacyMark
       ? '<i data-lucide="heart" class="cycle-cal__intimacy-icon icon-sm" aria-hidden="true"></i>'
       : '';
     return `<${tag} class="${cls.join(' ')}"${flowAttr} ${attrs}>
@@ -8930,6 +8982,7 @@ export const __test = {
   cyclePregnancyMarkup,
   cycleTodayActionsMarkup,
   cycleCalendarMarkup,
+  cycleDayLabel,
   cycleHistoryMarkup,
   cycleFooterMarkup,
   /**

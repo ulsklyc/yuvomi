@@ -1975,3 +1975,121 @@ test('Zyklus: Kalender und Trends stehen als Paar, das seine eigene Breite fragt
   }
   assert.match(cols.body, /grid-template-columns:\s*var\(--cycle-pair-cal\)\s+minmax\(0,\s*1fr\)/);
 });
+
+// ---------------------------------------------------------------------------
+// Critique R17: der Zyklus-Kalender sagt dem Screenreader, was die Zelle zeigt
+// ---------------------------------------------------------------------------
+//
+// Das Label jeder Tageszelle war das Datum und sonst nichts. Periode,
+// Vorhersage, fruchtbares Fenster, Eisprung, Eintrag und "heute" standen nur
+// als Klassen an der Zelle - als Farbe. Gemessen wird am ECHTEN Markup: jede
+// Zelle, deren Klasse einen Zustand traegt, nennt ihn im Label mit dem Text der
+// Legende, und keine Zelle nennt einen Zustand, den sie nicht zeigt.
+
+/** Jede Tageszelle des gerenderten Kalenders: Klassen, Label, Marker. */
+function zyklusZellen(html) {
+  return [...html.matchAll(/<(button|div) class="(cycle-cal__day[^"]*)"([^>]*)>([\s\S]*?)<\/\1>/g)].map(([, tag, klassen, attrs, innen]) => ({
+    tag,
+    klassen: klassen.split(/\s+/),
+    label: /aria-label="([^"]*)"/.exec(attrs)?.[1] ?? null,
+    flow: /data-flow="([^"]*)"/.exec(attrs)?.[1] ?? null,
+    herz: /cycle-cal__intimacy-icon/.test(innen),
+    versteckt: /aria-hidden="true"/.test(attrs),
+  }));
+}
+
+// Klasse an der Zelle -> der Legendentext, den das Label dafuer nennt.
+const ZUSTAND_ZU_TEXT = [
+  ['is-today', /health\.cycle\.legend\.today/],
+  ['is-menstruation', /health\.cycle\.legend\.period/],
+  ['is-fertile', /health\.cycle\.legend\.fertile/],
+  ['is-ovulation', /health\.cycle\.(legend\.ovulation|status\.ovulationConfirmed)/],
+  ['is-predicted', /health\.cycle\.legend\.predicted/],
+  ['has-log', /health\.cycle\.legend\.logged/],
+  ['is-pms', /health\.cycle\.legend\.pms/],
+  ['is-symptom-tracked', /health\.cycle\.trends\.symptomTracked/],
+  ['is-symptom-predicted', /health\.cycle\.trends\.symptomPredicted/],
+];
+
+test('R17: jede Zelle des Zyklus-Kalenders nennt im Label, was sie zeigt - als Knopf und als Bild', () => {
+  const abraeumen = installMiniDom();
+  setPermissions({ admin: false, modules: { health: 'write' }, widgets: {}, capabilities: {} });
+  healthPage.setViewStateForTest('cycle', {
+    meId: 1, personId: 1, anchor: '2026-06-15', likelihoodSymptom: null, settings: {},
+    periods: [{ id: 55, start_date: '2026-06-01', end_date: '2026-06-05' }],
+    logs: [
+      { id: 2, log_date: '2026-06-03', flow: 'medium', intimacy: 'protected', symptoms: null },
+      { id: 3, log_date: '2026-06-20', flow: null, intimacy: null, symptoms: null, note: 'x' },
+    ],
+  });
+  try {
+    for (const [name, canEdit] of [['Knopf (Schreibrecht)', true], ['Bild (eigene Ansicht, nur lesen)', false]]) {
+      const zellen = zyklusZellen(healthPage.cycleCalendarMarkup(true, null, canEdit));
+      assert.ok(zellen.length >= 28, `${name}: Zellen gefunden (${zellen.length})`);
+      for (const z of zellen) {
+        assert.equal(z.tag, canEdit ? 'button' : 'div', name);
+        assert.ok(z.label, `${name}: jede Zelle hat ein Label`);
+        assert.match(z.label, /^2026-\d\d-\d\d(, |$)/, `${name}: das Label beginnt mit dem Datum (${z.label})`);
+        for (const [klasse, text] of ZUSTAND_ZU_TEXT) {
+          assert.equal(text.test(z.label), z.klassen.includes(klasse),
+            `${name}: ${z.label} - Klasse ${klasse} ${z.klassen.includes(klasse) ? 'steht an der Zelle, fehlt im Label' : 'steht nicht an der Zelle, aber im Label'}`);
+        }
+        assert.equal(/health\.cycle\.flow\.label: /.test(z.label), Boolean(z.flow), `${name}: Blutungsstaerke (${z.label})`);
+        assert.equal(/health\.cycle\.intimacy\.label/.test(z.label), z.herz, `${name}: Intimitaets-Marker (${z.label})`);
+      }
+      // Die Gegenprobe gegen einen Test, der nichts misst: die Zustaende der
+      // Saat kommen wirklich vor.
+      const mit = (klasse) => zellen.filter((z) => z.klassen.includes(klasse));
+      assert.equal(mit('is-menstruation').filter((z) => !z.klassen.includes('is-predicted')).length, 5, `${name}: fuenf erfasste Periodentage`);
+      assert.equal(mit('has-log').length, 2, `${name}: zwei Tage mit Eintrag`);
+      const dritter = zellen.find((z) => z.label.startsWith('2026-06-03'));
+      assert.equal(dritter.label,
+        '2026-06-03, health.cycle.legend.period, health.cycle.flow.label: health.cycle.flow.medium, health.cycle.legend.logged, health.cycle.intimacy.label',
+        `${name}: der 3. Juni nennt Periode, Staerke, Eintrag und Intimitaet - in dieser Reihenfolge`);
+      const blank = zellen.find((z) => z.klassen.length === 1 && z.klassen[0] === 'cycle-cal__day');
+      assert.ok(blank, `${name}: es gibt einen Tag ohne Zustand`);
+      assert.match(blank.label, /^2026-\d\d-\d\d$/, `${name}: ein Tag ohne Zustand nennt nur sein Datum`);
+    }
+    // Die fremde Ansicht bleibt stumm: dort ist der Kalender Umriss, und ein
+    // Label truege Zustaende hinaus, die der beobachtenden Person nicht zustehen.
+    const fremd = zyklusZellen(healthPage.cycleCalendarMarkup(false, null, false));
+    assert.ok(fremd.length >= 28);
+    for (const z of fremd) {
+      assert.equal(z.label, null, 'fremde Ansicht: kein Label');
+      assert.ok(z.versteckt, 'fremde Ansicht: aria-hidden');
+    }
+  } finally {
+    healthPage.setViewStateForTest('cycle', { periods: [], logs: [], settings: {}, likelihoodSymptom: null });
+    clearPermissions();
+    abraeumen();
+  }
+});
+
+// Die Zustaende, die an der Uhr haengen (heute, Vorhersage, bestaetigter
+// Eisprung) und die Zusatzmarker: am Label-Baustein selbst, mit festen Zellen.
+test('R17: cycleDayLabel() nennt heute, Vorhersage, Eisprung, Symptom-Overlay und PMS mit den Texten der Legende', () => {
+  const zelle = (over = {}) => ({ dateKey: '2026-07-10', isToday: false, phase: null, predicted: false, confirmed: false, flow: null, hasLog: false, ...over });
+  const label = (over, marks) => healthPage.cycleDayLabel(zelle(over), marks);
+  assert.equal(label({}), '2026-07-10');
+  assert.equal(label({ isToday: true }), '2026-07-10, health.cycle.legend.today');
+  assert.equal(label({ phase: 'menstruation', predicted: true }), '2026-07-10, health.cycle.legend.period, health.cycle.legend.predicted');
+  assert.equal(label({ phase: 'fertile', predicted: true }), '2026-07-10, health.cycle.legend.fertile, health.cycle.legend.predicted');
+  assert.equal(label({ phase: 'ovulation', predicted: true }), '2026-07-10, health.cycle.legend.ovulation, health.cycle.legend.predicted');
+  // Bestaetigt ist ein Messwert und keine Vorhersage mehr - dieselbe
+  // Unterscheidung, die die Legende mit einem eigenen Eintrag trifft.
+  assert.equal(label({ phase: 'ovulation', confirmed: true }), '2026-07-10, health.cycle.status.ovulationConfirmed');
+  assert.equal(label({ phase: 'fertile', confirmed: true }), '2026-07-10, health.cycle.legend.fertile');
+  assert.equal(label({ isToday: true, phase: 'menstruation', flow: 'heavy', hasLog: true }),
+    '2026-07-10, health.cycle.legend.today, health.cycle.legend.period, health.cycle.flow.label: health.cycle.flow.heavy, health.cycle.legend.logged');
+  assert.equal(label({}, { pms: true }), '2026-07-10, health.cycle.legend.pms');
+  assert.equal(label({ flow: 'kein-wert' }), '2026-07-10', 'eine unbekannte Staerke nennt nichts statt eines rohen Werts');
+  // Das Overlay nennt sein Symptom mit: die Legende steht neben dem gewaehlten
+  // Chip, das Label steht allein.
+  healthPage.setViewStateForTest('cycle', { likelihoodSymptom: 'cramps' });
+  try {
+    assert.match(label({}, { symptom: 'tracked' }), /^2026-07-10, health\.cycle\.[\w.]+: health\.cycle\.trends\.symptomTracked$/);
+    assert.match(label({}, { symptom: 'predicted' }), /^2026-07-10, health\.cycle\.[\w.]+: health\.cycle\.trends\.symptomPredicted$/);
+  } finally {
+    healthPage.setViewStateForTest('cycle', { likelihoodSymptom: null });
+  }
+});
