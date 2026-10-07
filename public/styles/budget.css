@@ -631,8 +631,14 @@
   transition: background var(--transition-fast);
 }
 
-.budget-account__main:hover { background: var(--color-surface-hover); }
-.budget-account__main:active { background: var(--color-surface-hover); }
+/* DIE GANZE ZEILE ANTWORTET, nicht nur der Drilldown-Knopf: seit die Zeile
+ * flaechenlos im Traeger liegt, endete die Hover-Flaeche des Knopfs 44px vor
+ * der Zeilenkante, und die Stift-Zelle blieb als weisser Block stehen. Der
+ * Stift behaelt seinen eigenen Zustand darueber. */
+.budget-account:has(> .budget-account__main:hover),
+.budget-account:has(> .budget-account__main:active) {
+  background: var(--color-surface-hover);
+}
 /* AUSNAHME vom Fokusring-Token: die Zeile trägt die Farbe IHRES Kontos, nicht
  * die des Moduls - das ist die Information, die sie transportiert. Nur die
  * Farbe weicht ab, Breite und Offset kommen aus den Tokens. */
